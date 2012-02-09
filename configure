@@ -31120,7 +31120,7 @@ fi
 { echo "$as_me:$LINENO: checking boost version compatibility" >&5
 echo $ECHO_N "checking boost version compatibility... $ECHO_C" >&6; }
 if test -n "$boost_major_version" -a $boost_major_version -ge 146; then
-   if test $boost_major_version -ge 148; then
+   if test $boost_major_version -ge 149; then
    	  { { echo "$as_me:$LINENO: error: boost version is too new" >&5
 echo "$as_me: error: boost version is too new" >&2;}
    { (exit 1); exit 1; }; }

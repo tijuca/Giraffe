@@ -656,7 +656,7 @@ BOOST_FILESYSTEM([mt])
 BOOST_DATE_TIME([mt])
 AC_MSG_CHECKING([boost version compatibility])
 if test -n "$boost_major_version" -a $boost_major_version -ge 146; then
-   if test $boost_major_version -ge 148; then
+   if test $boost_major_version -ge 149; then
    	  AC_MSG_ERROR([boost version is too new])
    fi
    AC_MSG_RESULT([adding backward compatible flags])
