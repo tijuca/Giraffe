@@ -1,5 +1,5 @@
-pythonexeclib_LTLIBRARIES = _MAPICore.la _inetmapi.la _icalmapi.la _licenseclient.la 
-noinst_LTLIBRARIES = _libcommon.la _archiver.la _libfreebusy.la
+pythonexeclib_LTLIBRARIES = _MAPICore.la _inetmapi.la _icalmapi.la _licenseclient.la
+noinst_LTLIBRARIES = _libcommon.la _archiver.la _libfreebusy.la _RecurrenceState.la
 
 if ! OSS_ONLY
 pythonexeclib_LTLIBRARIES += _licensereq.la
@@ -65,6 +65,12 @@ _libcommon_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
 					   ${top_builddir}/common/libcommon_util.la \
 				  	   $(PROG_LIBS) $(PYTHON_LIBS)
 
+_RecurrenceState_la_LDFLAGS = -module -avoid-version -rpath '$(libdir)'
+_RecurrenceState_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
+	${top_builddir}/common/libcommon_mapi.la \
+	${top_builddir}/common/libcommon_util.la \
+	$(PROG_LIBS) $(PYTHON_LIBS)
+
 _libfreebusy_la_CXXFLAGS = -I${top_srcdir}/libfreebusy
 _libfreebusy_la_LDFLAGS = -module -avoid-version 
 _libfreebusy_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
@@ -81,7 +87,8 @@ BUILT_SOURCES = mapi_wrap.cxx \
 				archiver_wrap.cxx \
 				libcommon_wrap.cxx \
 				licenseclient_wrap.cxx \
-				libfreebusy_wrap.cxx
+				libfreebusy_wrap.cxx \
+				RecurrenceState_wrap.cxx
 
 if ! OSS_ONLY
 BUILT_SOURCES += licensereq_wrap.cxx
@@ -108,6 +115,7 @@ archiver.py: $(BUILT_SOURCES)
 libcommon.py: $(BUILT_SOURCES)
 licenseclient.py: $(BUILT_SOURCES)
 libfreebusy.py: $(BUILT_SOURCES)
+RecurrenceState.py: $(BUILT_SOURCES)
 
 if ! OSS_ONLY
 licensereq.py: $(BUILT_SOURCES)
@@ -117,7 +125,8 @@ _MAPICore_la_SOURCES = conversion.h conversion.cpp mapi_wrap.cxx mapi_wrap.h scl
 _inetmapi_la_SOURCES = conversion.h conversion.cpp inetmapi_wrap.cxx 
 _icalmapi_la_SOURCES = conversion.h conversion.cpp icalmapi_wrap.cxx
 _archiver_la_SOURCES = archiver_wrap.cxx archiver_conv.h archiver_conv.cpp
-_libcommon_la_SOURCES = libcommon_wrap.cxx
+_libcommon_la_SOURCES = conversion.h conversion.cpp libcommon_wrap.cxx
+_RecurrenceState_la_SOURCES = conversion.h conversion.cpp RecurrenceState_wrap.cxx
 _licenseclient_la_SOURCES = licenseclient_wrap.cxx licenseclient_conv.cpp licenseclient_conv.h
 _libfreebusy_la_SOURCES = conversion.h conversion.cpp libfreebusy_wrap.cxx libfreebusy_conv.h libfreebusy_conv.cpp
 
@@ -128,7 +137,7 @@ endif
 EXTRA_DIST = typemap_python.i helpers_python.i setup.py $(BUILT_SOURCES) MAPICore.py inetmapi.py icalmapi.py licenseclient.py MAPI/Defs.py  MAPI/__init__.py  MAPI/Struct.py  MAPI/Tags.py  MAPI/Time.py MAPI/Util/__init__.py MAPI/Util/Generators.py MAPI/Util/Iterators.py MAPI/Util/AddressBook.py archiver_python.i
 datadir = $(pythonexeclibdir)
 data_DATA = MAPICore.py inetmapi.py icalmapi.py licenseclient.py
-noinst_datadir = libcommon.py 
+noinst_datadir = libcommon.py RecurrenceState.py
 
 if ! OSS_ONLY
 EXTRA_DIST += licensereq.py
@@ -151,6 +160,9 @@ archiver_wrap.cxx: ../archiver.i archiver_python.i
 
 libcommon_wrap.cxx: ../libcommon.i
 	$(SWIG_EXEC) -I${top_srcdir}/common -I${top_srcdir/swig} -Wall -python -c++ -threads -o ${top_builddir}/swig/python/libcommon_wrap.cxx ${top_srcdir}/swig/libcommon.i
+
+RecurrenceState_wrap.cxx: ../RecurrenceState.i
+	$(SWIG_EXEC) -I${top_srcdir}/common -I${top_srcdir/swig} -Wall -python -c++ -threads -o ${top_builddir}/swig/python/RecurrenceState_wrap.cxx ${top_srcdir}/swig/RecurrenceState.i
 
 licenseclient_wrap.cxx: ../licenseclient.i
 	$(SWIG_EXEC) -I${top_srcdir}/provider/common -I${top_srcdir}/common -I${top_srcdir/swig} -Wall -python -c++ -threads -o ${top_builddir}/swig/python/licenseclient_wrap.cxx ${top_srcdir}/swig/licenseclient.i

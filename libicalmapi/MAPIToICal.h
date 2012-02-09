@@ -73,6 +73,6 @@ public:
 	virtual HRESULT ResetObject() = 0;
 };
 
-void ICALMAPI_API CreateMapiToICal(LPADRBOOK lpAdrBook, const std::string &strCharset, MapiToICal **lppMapiToICal);
+HRESULT ICALMAPI_API CreateMapiToICal(LPADRBOOK lpAdrBook, const std::string &strCharset, MapiToICal **lppMapiToICal);
 
 #endif

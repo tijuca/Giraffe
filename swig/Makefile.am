@@ -11,7 +11,13 @@ endif
 
 AM_CPPFLAGS = $(DEBUGFLAGS) -DLINUX -I$(top_srcdir)/mapi4linux/include -I$(top_srcdir)/provider/common -I${top_srcdir}/common
 
-EXTRA_DIST = edkmdb.i mapi.i mapiutil.i mapidefs.i mapicode.i mapix.i mapinotifsink.i typemap.i helpers.i IECExportChanges.i IECMultiStoreTable.i IECServiceAdmin.i IECSpooler.i IECTestProtocol.i IECLicense.i inetmapi.i icalmapi.i swig_iunknown.h ecdefs.i libcommon.i archiver.i licenseclient.i libfreebusy.i zarafasync.i ECLogger.i
+EXTRA_DIST = edkmdb.i mapi.i mapiutil.i mapidefs.i mapicode.i mapix.i	\
+	mapinotifsink.i typemap.i helpers.i IECExportChanges.i				\
+	IECMultiStoreTable.i IECServiceAdmin.i IECSpooler.i					\
+	IECTestProtocol.i IECLicense.i inetmapi.i icalmapi.i				\
+	swig_iunknown.h ecdefs.i libcommon.i archiver.i licenseclient.i		\
+	libfreebusy.i zarafasync.i ECLogger.i RecurrenceState.i				\
+	RecurrenceState.swig.h
 
 if ! OSS_ONLY
 EXTRA_DIST += licensereq.i

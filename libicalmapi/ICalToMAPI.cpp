@@ -111,9 +111,16 @@ private:
  * @param[in]  bNoRecipients Skip recipients from ical. Used for DAgent, which uses the mail recipients
  * @param[out] lppICalToMapi The ICalToMapi class
  */
-void CreateICalToMapi(IMAPIProp *lpPropObj, LPADRBOOK lpAdrBook, bool bNoRecipients, ICalToMapi **lppICalToMapi)
+HRESULT CreateICalToMapi(IMAPIProp *lpPropObj, LPADRBOOK lpAdrBook, bool bNoRecipients, ICalToMapi **lppICalToMapi)
 {
-	*lppICalToMapi = new ICalToMapiImpl(lpPropObj, lpAdrBook, bNoRecipients);
+	if (!lpPropObj || !lpAdrBook || !lppICalToMapi)
+		return MAPI_E_INVALID_PARAMETER;
+	try {
+		*lppICalToMapi = new ICalToMapiImpl(lpPropObj, lpAdrBook, bNoRecipients);
+	} catch (...) {
+		return MAPI_E_NOT_ENOUGH_MEMORY;
+	}
+	return hrSuccess;
 }
 
 /** 

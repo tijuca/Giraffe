@@ -82,6 +82,6 @@ protected:
 	bool m_bNoRecipients;
 };
 
-void ICALMAPI_API CreateICalToMapi(IMAPIProp *lpPropObj, LPADRBOOK lpAdrBook, bool bNoRecipients, ICalToMapi **lppICalToMapi);
+HRESULT ICALMAPI_API CreateICalToMapi(IMAPIProp *lpPropObj, LPADRBOOK lpAdrBook, bool bNoRecipients, ICalToMapi **lppICalToMapi);
 
 #endif

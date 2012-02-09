@@ -71,6 +71,16 @@ _MAPICore_la_OBJECTS = $(am__MAPICore_la_OBJECTS)
 _MAPICore_la_LINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(_MAPICore_la_CXXFLAGS) \
 	$(CXXFLAGS) $(_MAPICore_la_LDFLAGS) $(LDFLAGS) -o $@
+_RecurrenceState_la_DEPENDENCIES =  \
+	${top_builddir}/mapi4linux/src/libmapi.la \
+	${top_builddir}/common/libcommon_mapi.la \
+	${top_builddir}/common/libcommon_util.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+am__RecurrenceState_la_OBJECTS = conversion.lo RecurrenceState_wrap.lo
+_RecurrenceState_la_OBJECTS = $(am__RecurrenceState_la_OBJECTS)
+_RecurrenceState_la_LINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
+	$(CXXFLAGS) $(_RecurrenceState_la_LDFLAGS) $(LDFLAGS) -o $@
 _archiver_la_DEPENDENCIES =  \
 	${top_builddir}/ECtools/zarafa-archiver/libarchiver.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
@@ -108,7 +118,7 @@ _libcommon_la_DEPENDENCIES =  \
 	${top_builddir}/common/libcommon_mapi.la \
 	${top_builddir}/common/libcommon_util.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
-am__libcommon_la_OBJECTS = libcommon_wrap.lo
+am__libcommon_la_OBJECTS = conversion.lo libcommon_wrap.lo
 _libcommon_la_OBJECTS = $(am__libcommon_la_OBJECTS)
 _libcommon_la_LINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
@@ -181,14 +191,15 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = $(_MAPICore_la_SOURCES) $(_archiver_la_SOURCES) \
-	$(_icalmapi_la_SOURCES) $(_inetmapi_la_SOURCES) \
-	$(_libcommon_la_SOURCES) $(_libfreebusy_la_SOURCES) \
-	$(_licenseclient_la_SOURCES) $(_licensereq_la_SOURCES)
-DIST_SOURCES = $(_MAPICore_la_SOURCES) $(_archiver_la_SOURCES) \
-	$(_icalmapi_la_SOURCES) $(_inetmapi_la_SOURCES) \
-	$(_libcommon_la_SOURCES) $(_libfreebusy_la_SOURCES) \
-	$(_licenseclient_la_SOURCES) \
+SOURCES = $(_MAPICore_la_SOURCES) $(_RecurrenceState_la_SOURCES) \
+	$(_archiver_la_SOURCES) $(_icalmapi_la_SOURCES) \
+	$(_inetmapi_la_SOURCES) $(_libcommon_la_SOURCES) \
+	$(_libfreebusy_la_SOURCES) $(_licenseclient_la_SOURCES) \
+	$(_licensereq_la_SOURCES)
+DIST_SOURCES = $(_MAPICore_la_SOURCES) $(_RecurrenceState_la_SOURCES) \
+	$(_archiver_la_SOURCES) $(_icalmapi_la_SOURCES) \
+	$(_inetmapi_la_SOURCES) $(_libcommon_la_SOURCES) \
+	$(_libfreebusy_la_SOURCES) $(_licenseclient_la_SOURCES) \
 	$(am___licensereq_la_SOURCES_DIST)
 dataDATA_INSTALL = $(INSTALL_DATA)
 DATA = $(data_DATA)
@@ -383,7 +394,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 pythonexeclib_LTLIBRARIES = _MAPICore.la _inetmapi.la _icalmapi.la \
 	_licenseclient.la $(am__append_1)
-noinst_LTLIBRARIES = _libcommon.la _archiver.la _libfreebusy.la
+noinst_LTLIBRARIES = _libcommon.la _archiver.la _libfreebusy.la _RecurrenceState.la
 
 # disable warnings since code is mostly generated
 AM_CPPFLAGS = $(DEBUGFLAGS) -DLINUX -I$(top_srcdir)/mapi4linux/include -I$(top_srcdir)/provider/common -I${top_srcdir}/common $(PYTHON_INCLUDES) -I${top_srcdir}/swig -w -DSWIG_PYTHON_OUTPUT_TUPLE
@@ -443,6 +454,12 @@ _libcommon_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
 					   ${top_builddir}/common/libcommon_util.la \
 				  	   $(PROG_LIBS) $(PYTHON_LIBS)
 
+_RecurrenceState_la_LDFLAGS = -module -avoid-version -rpath '$(libdir)'
+_RecurrenceState_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
+	${top_builddir}/common/libcommon_mapi.la \
+	${top_builddir}/common/libcommon_util.la \
+	$(PROG_LIBS) $(PYTHON_LIBS)
+
 _libfreebusy_la_CXXFLAGS = -I${top_srcdir}/libfreebusy
 _libfreebusy_la_LDFLAGS = -module -avoid-version 
 _libfreebusy_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
@@ -453,7 +470,8 @@ _libfreebusy_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
 
 BUILT_SOURCES = mapi_wrap.cxx mapi_wrap.h inetmapi_wrap.cxx \
 	icalmapi_wrap.cxx archiver_wrap.cxx libcommon_wrap.cxx \
-	licenseclient_wrap.cxx libfreebusy_wrap.cxx $(am__append_2)
+	licenseclient_wrap.cxx libfreebusy_wrap.cxx \
+	RecurrenceState_wrap.cxx $(am__append_2)
 CLEANFILES = $(BUILT_SOURCES) MAPICore.py inetmapi.py icalmapi.py \
 	archiver.py libcommon.py licenseclient.py libfreebusy.py \
 	$(am__append_3)
@@ -461,7 +479,8 @@ _MAPICore_la_SOURCES = conversion.h conversion.cpp mapi_wrap.cxx mapi_wrap.h scl
 _inetmapi_la_SOURCES = conversion.h conversion.cpp inetmapi_wrap.cxx 
 _icalmapi_la_SOURCES = conversion.h conversion.cpp icalmapi_wrap.cxx
 _archiver_la_SOURCES = archiver_wrap.cxx archiver_conv.h archiver_conv.cpp
-_libcommon_la_SOURCES = libcommon_wrap.cxx
+_libcommon_la_SOURCES = conversion.h conversion.cpp libcommon_wrap.cxx
+_RecurrenceState_la_SOURCES = conversion.h conversion.cpp RecurrenceState_wrap.cxx
 _licenseclient_la_SOURCES = licenseclient_wrap.cxx licenseclient_conv.cpp licenseclient_conv.h
 _libfreebusy_la_SOURCES = conversion.h conversion.cpp libfreebusy_wrap.cxx libfreebusy_conv.h libfreebusy_conv.cpp
 @OSS_ONLY_FALSE@_licensereq_la_SOURCES = licensereq_wrap.cxx
@@ -473,7 +492,7 @@ EXTRA_DIST = typemap_python.i helpers_python.i setup.py \
 	MAPI/Util/AddressBook.py archiver_python.i $(am__append_4)
 data_DATA = MAPICore.py inetmapi.py icalmapi.py licenseclient.py \
 	$(am__append_5)
-noinst_datadir = libcommon.py 
+noinst_datadir = libcommon.py RecurrenceState.py
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -546,6 +565,8 @@ clean-pythonexeclibLTLIBRARIES:
 	done
 _MAPICore.la: $(_MAPICore_la_OBJECTS) $(_MAPICore_la_DEPENDENCIES) 
 	$(_MAPICore_la_LINK) -rpath $(pythonexeclibdir) $(_MAPICore_la_OBJECTS) $(_MAPICore_la_LIBADD) $(LIBS)
+_RecurrenceState.la: $(_RecurrenceState_la_OBJECTS) $(_RecurrenceState_la_DEPENDENCIES) 
+	$(_RecurrenceState_la_LINK)  $(_RecurrenceState_la_OBJECTS) $(_RecurrenceState_la_LIBADD) $(LIBS)
 _archiver.la: $(_archiver_la_OBJECTS) $(_archiver_la_DEPENDENCIES) 
 	$(_archiver_la_LINK)  $(_archiver_la_OBJECTS) $(_archiver_la_LIBADD) $(LIBS)
 _icalmapi.la: $(_icalmapi_la_OBJECTS) $(_icalmapi_la_DEPENDENCIES) 
@@ -567,6 +588,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/RecurrenceState_wrap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_MAPICore_la-conversion.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_MAPICore_la-director_util.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_MAPICore_la-mapi_wrap.Plo@am__quote@
@@ -582,6 +604,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_licenseclient_la-licenseclient_conv.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_licenseclient_la-licenseclient_wrap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_licensereq_la-licensereq_wrap.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/conversion.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcommon_wrap.Plo@am__quote@
 
 .cpp.o:
@@ -949,6 +972,7 @@ archiver.py: $(BUILT_SOURCES)
 libcommon.py: $(BUILT_SOURCES)
 licenseclient.py: $(BUILT_SOURCES)
 libfreebusy.py: $(BUILT_SOURCES)
+RecurrenceState.py: $(BUILT_SOURCES)
 
 @OSS_ONLY_FALSE@licensereq.py: $(BUILT_SOURCES)
 
@@ -968,6 +992,9 @@ archiver_wrap.cxx: ../archiver.i archiver_python.i
 
 libcommon_wrap.cxx: ../libcommon.i
 	$(SWIG_EXEC) -I${top_srcdir}/common -I${top_srcdir/swig} -Wall -python -c++ -threads -o ${top_builddir}/swig/python/libcommon_wrap.cxx ${top_srcdir}/swig/libcommon.i
+
+RecurrenceState_wrap.cxx: ../RecurrenceState.i
+	$(SWIG_EXEC) -I${top_srcdir}/common -I${top_srcdir/swig} -Wall -python -c++ -threads -o ${top_builddir}/swig/python/RecurrenceState_wrap.cxx ${top_srcdir}/swig/RecurrenceState.i
 
 licenseclient_wrap.cxx: ../licenseclient.i
 	$(SWIG_EXEC) -I${top_srcdir}/provider/common -I${top_srcdir}/common -I${top_srcdir/swig} -Wall -python -c++ -threads -o ${top_builddir}/swig/python/licenseclient_wrap.cxx ${top_srcdir}/swig/licenseclient.i

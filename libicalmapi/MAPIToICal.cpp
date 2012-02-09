@@ -94,9 +94,16 @@ private:
  * @param[in]  strCharset charset of the ical returned by this class
  * @param[out] lppMapiToICal The conversion class
  */
-void CreateMapiToICal(LPADRBOOK lpAdrBook, const std::string &strCharset, MapiToICal **lppMapiToICal)
+HRESULT CreateMapiToICal(LPADRBOOK lpAdrBook, const std::string &strCharset, MapiToICal **lppMapiToICal)
 {
-	*lppMapiToICal = new MapiToICalImpl(lpAdrBook, strCharset);
+	if (!lpAdrBook || !lppMapiToICal)
+		return MAPI_E_INVALID_PARAMETER;
+	try {
+		*lppMapiToICal = new MapiToICalImpl(lpAdrBook, strCharset);
+	} catch (...) {
+		return MAPI_E_NOT_ENOUGH_MEMORY;
+	}
+	return hrSuccess;
 }
 
 /** 

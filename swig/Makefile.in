@@ -256,7 +256,7 @@ EXTRA_DIST = edkmdb.i mapi.i mapiutil.i mapidefs.i mapicode.i mapix.i \
 	IECTestProtocol.i IECLicense.i inetmapi.i icalmapi.i \
 	swig_iunknown.h ecdefs.i libcommon.i archiver.i \
 	licenseclient.i libfreebusy.i zarafasync.i ECLogger.i \
-	$(am__append_3)
+	RecurrenceState.i RecurrenceState.swig.h $(am__append_3)
 all: all-recursive
 
 .SUFFIXES:
