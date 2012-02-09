@@ -64,11 +64,11 @@ enum BODYLEVEL { BODY_NONE, BODY_PLAIN, BODY_HTML };
 enum ATTACHLEVEL { ATTACH_NONE, ATTACH_INLINE, ATTACH_NORMAL };
 
 typedef struct sMailState {
-	BODYLEVEL bodyLevel;
-	ATTACHLEVEL attachLevel;
-	bool bAttachSignature;
-	ULONG ulMsgInMsg;
-	std::string strHTMLBody;
+	BODYLEVEL bodyLevel;		//!< the current body state. plain upgrades none, html upgrades plain and none.
+	ATTACHLEVEL attachLevel;	//!< the current attachment state
+	bool bAttachSignature;		//!< add a signed signature at the end
+	ULONG ulMsgInMsg;			//!< counter for msg-in-msg level
+	std::string strHTMLBody;	//!< cache for the current complete untouched HTML body, used for finding CIDs or locations (inline images)
 
 	sMailState() {
 		this->reset();

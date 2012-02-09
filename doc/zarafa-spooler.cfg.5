@@ -213,6 +213,14 @@ Default:
 \fIno\fR
 .RE
 .PP
+\fBcharset_upgrade\fR
+.RS 4
+Upgrades the us\-ascii charset to this charset\&. This makes sure high\-characters in recipients and attachment filenames are correctly sent when the body is in plain text\&. Not used when always_send_utf8 is enabled\&.
+.sp
+Default:
+\fIwindows\-1252\fR
+.RE
+.PP
 \fBallow_redirect_spoofing\fR
 .RS 4
 Normally, users are not allowed to send e\-mail from a different e\-mail address than their own\&. However, the \'redirect\' rule sends e\-mails with their original \'from\' address\&. Enabling this option allows redirected e\-mails to be sent with their original \'from\' e\-mail address\&.

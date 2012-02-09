@@ -75,6 +75,12 @@ class sending_options(_object):
     __swig_setmethods__["force_utf8"] = _inetmapi.sending_options_force_utf8_set
     __swig_getmethods__["force_utf8"] = _inetmapi.sending_options_force_utf8_get
     if _newclass:force_utf8 = _swig_property(_inetmapi.sending_options_force_utf8_get, _inetmapi.sending_options_force_utf8_set)
+    __swig_setmethods__["charset_upgrade"] = _inetmapi.sending_options_charset_upgrade_set
+    __swig_getmethods__["charset_upgrade"] = _inetmapi.sending_options_charset_upgrade_get
+    if _newclass:charset_upgrade = _swig_property(_inetmapi.sending_options_charset_upgrade_get, _inetmapi.sending_options_charset_upgrade_set)
+    __swig_setmethods__["allow_send_to_everyone"] = _inetmapi.sending_options_allow_send_to_everyone_set
+    __swig_getmethods__["allow_send_to_everyone"] = _inetmapi.sending_options_allow_send_to_everyone_get
+    if _newclass:allow_send_to_everyone = _swig_property(_inetmapi.sending_options_allow_send_to_everyone_get, _inetmapi.sending_options_allow_send_to_everyone_set)
     def __init__(self, *args): 
         this = _inetmapi.new_sending_options(*args)
         try: self.this.append(this)

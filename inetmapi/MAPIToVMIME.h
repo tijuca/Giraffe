@@ -78,9 +78,9 @@ private:
 	LPMAPISESSION m_lpSession;
 	std::wstring m_strError;
 	convert_context m_converter;
-	vmime::charset m_vmCharset;
-	std::string m_strCharset;
-	std::string m_strHTMLCharset;
+	vmime::charset m_vmCharset;		//!< charset to use in email
+	std::string m_strCharset;		//!< charset to use in email + //TRANSLIT tag
+	std::string m_strHTMLCharset;	//!< HTML body charset in MAPI message (input)
 
 	HRESULT fillVMIMEMail(IMessage *lpMessage, bool bSkipContent, vmime::messageBuilder* lpVMMessageBuilder);
 

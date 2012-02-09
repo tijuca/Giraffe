@@ -68,6 +68,7 @@ typedef struct _so {
 	bool add_received_date;
 	bool force_tnef;
 	bool force_utf8;
+	char *charset_upgrade;
 	bool allow_send_to_everyone;
 } sending_options;
 

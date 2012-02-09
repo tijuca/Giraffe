@@ -1217,6 +1217,12 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage, vmime::ref<vmime::m
 		// Outlook sets some other incorrect charset for meeting requests and such,
 		// so for non-email we upgrade this to utf-8
 		m_vmCharset = MAPI_CHARSET_STRING;
+	} else if (m_vmCharset == "us-ascii") {
+		// silently upgrade, since recipients and attachment filenames may contain high-chars, while the body does not.
+		if (sopt.charset_upgrade && strlen(sopt.charset_upgrade))
+			m_vmCharset = sopt.charset_upgrade;
+		else
+			m_vmCharset = "windows-1252";
 	}
 
 	// Add iconv tag to convert non-exising chars without a fuss

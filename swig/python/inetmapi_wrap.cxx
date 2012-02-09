@@ -2853,7 +2853,16 @@ SWIGINTERNINLINE PyObject*
   return PyBool_FromLong(value ? 1 : 0);
 }
 
-SWIGINTERN sending_options *new_sending_options(){ sending_options *sopt = new sending_options; imopt_default_sending_options(sopt); return sopt; }
+SWIGINTERN sending_options *new_sending_options(){
+				sending_options *sopt = new sending_options;
+				imopt_default_sending_options(sopt);
+				sopt->charset_upgrade = strdup(sopt->charset_upgrade); /* avoid free problems */
+				return sopt;
+			}
+SWIGINTERN void delete_sending_options(sending_options *self){
+				free(self->alternate_boundary);
+				free(self->charset_upgrade);
+			}
 SWIGINTERN delivery_options *new_delivery_options(){ delivery_options *dopt = new delivery_options; imopt_default_delivery_options(dopt); return dopt; }
 
 SWIGINTERN int
@@ -3360,6 +3369,147 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_sending_options_charset_upgrade_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  sending_options *arg1 = (sending_options *) 0 ;
+  char *arg2 = (char *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  int res2 ;
+  char *buf2 = 0 ;
+  int alloc2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  
+  SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  if (!PyArg_ParseTuple(args,(char *)"OO:sending_options_charset_upgrade_set",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p__so, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sending_options_charset_upgrade_set" "', argument " "1"" of type '" "sending_options *""'"); 
+  }
+  arg1 = reinterpret_cast< sending_options * >(argp1);
+  res2 = SWIG_AsCharPtrAndSize(obj1, &buf2, NULL, &alloc2);
+  if (!SWIG_IsOK(res2)) {
+    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "sending_options_charset_upgrade_set" "', argument " "2"" of type '" "char *""'");
+  }
+  arg2 = reinterpret_cast< char * >(buf2);
+  {
+    SWIG_PYTHON_THREAD_BEGIN_ALLOW;
+    if (arg1->charset_upgrade) delete[] arg1->charset_upgrade;
+    if (arg2) {
+      size_t size = strlen(reinterpret_cast< const char * >(arg2)) + 1;
+      arg1->charset_upgrade = (char *)reinterpret_cast< char* >(memcpy((new char[size]), reinterpret_cast< const char * >(arg2), sizeof(char)*(size)));
+    } else {
+      arg1->charset_upgrade = 0;
+    }
+    SWIG_PYTHON_THREAD_END_ALLOW;
+  }
+  resultobj = SWIG_Py_Void();
+  if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return resultobj;
+fail:
+  if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_sending_options_charset_upgrade_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  sending_options *arg1 = (sending_options *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  char *result = 0 ;
+  
+  SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  if (!PyArg_ParseTuple(args,(char *)"O:sending_options_charset_upgrade_get",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p__so, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sending_options_charset_upgrade_get" "', argument " "1"" of type '" "sending_options *""'"); 
+  }
+  arg1 = reinterpret_cast< sending_options * >(argp1);
+  {
+    SWIG_PYTHON_THREAD_BEGIN_ALLOW;
+    result = (char *) ((arg1)->charset_upgrade);
+    SWIG_PYTHON_THREAD_END_ALLOW;
+  }
+  resultobj = SWIG_FromCharPtr((const char *)result);
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return resultobj;
+fail:
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_sending_options_allow_send_to_everyone_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  sending_options *arg1 = (sending_options *) 0 ;
+  bool arg2 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  bool val2 ;
+  int ecode2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  
+  SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  if (!PyArg_ParseTuple(args,(char *)"OO:sending_options_allow_send_to_everyone_set",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p__so, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sending_options_allow_send_to_everyone_set" "', argument " "1"" of type '" "sending_options *""'"); 
+  }
+  arg1 = reinterpret_cast< sending_options * >(argp1);
+  ecode2 = SWIG_AsVal_bool(obj1, &val2);
+  if (!SWIG_IsOK(ecode2)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "sending_options_allow_send_to_everyone_set" "', argument " "2"" of type '" "bool""'");
+  } 
+  arg2 = static_cast< bool >(val2);
+  {
+    SWIG_PYTHON_THREAD_BEGIN_ALLOW;
+    if (arg1) (arg1)->allow_send_to_everyone = arg2;
+    SWIG_PYTHON_THREAD_END_ALLOW;
+  }
+  resultobj = SWIG_Py_Void();
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return resultobj;
+fail:
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_sending_options_allow_send_to_everyone_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  sending_options *arg1 = (sending_options *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  bool result;
+  
+  SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  if (!PyArg_ParseTuple(args,(char *)"O:sending_options_allow_send_to_everyone_get",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p__so, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sending_options_allow_send_to_everyone_get" "', argument " "1"" of type '" "sending_options *""'"); 
+  }
+  arg1 = reinterpret_cast< sending_options * >(argp1);
+  {
+    SWIG_PYTHON_THREAD_BEGIN_ALLOW;
+    result = (bool) ((arg1)->allow_send_to_everyone);
+    SWIG_PYTHON_THREAD_END_ALLOW;
+  }
+  resultobj = SWIG_From_bool(static_cast< bool >(result));
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return resultobj;
+fail:
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return NULL;
+}
+
+
 SWIGINTERN PyObject *_wrap_new_sending_options(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   sending_options *result = 0 ;
@@ -3396,7 +3546,7 @@ SWIGINTERN PyObject *_wrap_delete_sending_options(PyObject *SWIGUNUSEDPARM(self)
   arg1 = reinterpret_cast< sending_options * >(argp1);
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
-    delete arg1;
+    delete_sending_options(arg1);
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
   resultobj = SWIG_Py_Void();
@@ -3927,6 +4077,10 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"sending_options_force_tnef_get", _wrap_sending_options_force_tnef_get, METH_VARARGS, NULL},
 	 { (char *)"sending_options_force_utf8_set", _wrap_sending_options_force_utf8_set, METH_VARARGS, NULL},
 	 { (char *)"sending_options_force_utf8_get", _wrap_sending_options_force_utf8_get, METH_VARARGS, NULL},
+	 { (char *)"sending_options_charset_upgrade_set", _wrap_sending_options_charset_upgrade_set, METH_VARARGS, NULL},
+	 { (char *)"sending_options_charset_upgrade_get", _wrap_sending_options_charset_upgrade_get, METH_VARARGS, NULL},
+	 { (char *)"sending_options_allow_send_to_everyone_set", _wrap_sending_options_allow_send_to_everyone_set, METH_VARARGS, NULL},
+	 { (char *)"sending_options_allow_send_to_everyone_get", _wrap_sending_options_allow_send_to_everyone_get, METH_VARARGS, NULL},
 	 { (char *)"new_sending_options", _wrap_new_sending_options, METH_VARARGS, NULL},
 	 { (char *)"delete_sending_options", _wrap_delete_sending_options, METH_VARARGS, NULL},
 	 { (char *)"sending_options_swigregister", sending_options_swigregister, METH_VARARGS, NULL},

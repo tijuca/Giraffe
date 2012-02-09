@@ -6451,6 +6451,18 @@
 		  </varlistentry>
 
 		  <varlistentry>
+			<term><option>charset_upgrade</option></term>
+			<listitem>
+			  <para>Upgrades the us-ascii charset to this
+			  charset. This makes sure high-characters in recipients
+			  and attachment filenames are correctly sent when the
+			  body is in plain text. Not used when always_send_utf8 is
+			  enabled.</para>
+			  <para>Default: <replaceable>windows-1252</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
 			<term><option>allow_redirect_spoofing</option></term>
 			<listitem>
 			  <para>Normally, users are not allowed to send e-mail from a
