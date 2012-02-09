@@ -396,15 +396,21 @@ bool FNeedsAutoAccept(IMsgStore *lpStore, LPMESSAGE lpMessage)
 	bool bAutoAccept = false, bDeclineConflict = false, bDeclineRecurring = false;
 	
 	hr = lpMessage->GetProps((LPSPropTagArray)&sptaProps, 0, &cValues, &lpProps);
-	if (hr != hrSuccess) // If either property is missing, then no autorespond is needed
+	if (FAILED(hr))
 		goto exit;
-		
-	if (!lpProps[0].Value.b) {
+
+	if (PROP_TYPE(lpProps[1].ulPropTag) == PT_ERROR) {
 		hr = MAPI_E_NOT_FOUND;
 		goto exit;
 	}
 	
 	if (wcscasecmp(lpProps[1].Value.lpszW, L"IPM.Schedule.Meeting.Request") != 0 && wcscasecmp(lpProps[1].Value.lpszW, L"IPM.Schedule.Meeting.Canceled") != 0) {
+		hr = MAPI_E_NOT_FOUND;
+		goto exit;
+	}
+
+	if (((PROP_TYPE(lpProps[0].ulPropTag) == PT_ERROR) || !lpProps[0].Value.b) && wcscasecmp(lpProps[1].Value.lpszW, L"IPM.Schedule.Meeting.Request") == 0) {
+		// PR_RESPONSE_REQUESTED must be true for requests to start the auto accepter
 		hr = MAPI_E_NOT_FOUND;
 		goto exit;
 	}
