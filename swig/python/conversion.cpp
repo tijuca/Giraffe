@@ -2025,7 +2025,7 @@ exit:
 PyObject * Object_from_LPECUSER(LPECUSER lpUser)
 {
 	// @todo charset conversion ?
-	return PyObject_CallFunction(PyTypeECUser, "(ssssslIIls#)", lpUser->lpszUsername, lpUser->lpszPassword, lpUser->lpszMailAddress, lpUser->lpszFullName, lpUser->lpszServername, lpUser->ulObjClass, lpUser->ulIsAdmin, lpUser->ulIsABHidden, lpUser->ulCapacity, lpUser->sUserId.lpb, lpUser->sUserId.cb);
+	return PyObject_CallFunction(PyTypeECUser, "(ssssslllls#)", lpUser->lpszUsername, lpUser->lpszPassword, lpUser->lpszMailAddress, lpUser->lpszFullName, lpUser->lpszServername, lpUser->ulObjClass, lpUser->ulIsAdmin, lpUser->ulIsABHidden, lpUser->ulCapacity, lpUser->sUserId.lpb, lpUser->sUserId.cb);
 }
 
 
@@ -2094,7 +2094,7 @@ exit:
 PyObject * Object_from_LPECGROUP(LPECGROUP lpGroup)
 {
 	// @todo charset conversion ?
-	return PyObject_CallFunction(PyTypeECGroup, "(sssIs#)", lpGroup->lpszGroupname, lpGroup->lpszFullname, lpGroup->lpszFullEmail, lpGroup->ulIsABHidden, lpGroup->sGroupId.lpb, lpGroup->sGroupId.cb);
+	return PyObject_CallFunction(PyTypeECGroup, "(sssls#)", lpGroup->lpszGroupname, lpGroup->lpszFullname, lpGroup->lpszFullEmail, lpGroup->ulIsABHidden, lpGroup->sGroupId.lpb, lpGroup->sGroupId.cb);
 }
 
 PyObject * List_from_LPECGROUP(LPECGROUP lpGroup, ULONG cElements)
@@ -2161,7 +2161,7 @@ exit:
 PyObject * Object_from_LPECCOMPANY(LPECCOMPANY lpCompany)
 {
 	// @todo charset conversion ?
-	return PyObject_CallFunction(PyTypeECCompany, "(ssIs#)", lpCompany->lpszCompanyname, lpCompany->lpszServername, lpCompany->ulIsABHidden, lpCompany->sCompanyId.lpb, lpCompany->sCompanyId.cb);
+	return PyObject_CallFunction(PyTypeECCompany, "(ssls#)", lpCompany->lpszCompanyname, lpCompany->lpszServername, lpCompany->ulIsABHidden, lpCompany->sCompanyId.lpb, lpCompany->sCompanyId.cb);
 }
 
 PyObject * List_from_LPECCOMPANY(LPECCOMPANY lpCompany, ULONG cElements)
@@ -2344,7 +2344,5 @@ exit:
 
 PyObject *Object_from_LPECQUOTA(LPECQUOTA lpQuota)
 {
-	return PyObject_CallFunction(PyTypeECQuota, "(IILLL)", lpQuota->bUseDefaultQuota, lpQuota->bIsUserDefaultQuota, lpQuota->llWarnSize, lpQuota->llSoftSize, lpQuota->llHardSize);
+	return PyObject_CallFunction(PyTypeECQuota, "(llLLL)", lpQuota->bUseDefaultQuota, lpQuota->bIsUserDefaultQuota, lpQuota->llWarnSize, lpQuota->llSoftSize, lpQuota->llHardSize);
 }
-
-
