@@ -4797,7 +4797,7 @@ SWIGINTERN PyObject *_wrap_Archiver_Create__SWIG_0(PyObject *SWIGUNUSEDPARM(self
     }
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_Archiver, 0 |  0 );
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_Archiver, SWIG_POINTER_OWN |  0 );
   if (alloc1 == SWIG_NEWOBJ) delete[] buf1;
   if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
   SWIG_PYTHON_THREAD_END_BLOCK;
@@ -4847,7 +4847,7 @@ SWIGINTERN PyObject *_wrap_Archiver_Create__SWIG_1(PyObject *SWIGUNUSEDPARM(self
     }
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_Archiver, 0 |  0 );
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_Archiver, SWIG_POINTER_OWN |  0 );
   if (alloc1 == SWIG_NEWOBJ) delete[] buf1;
   if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
   SWIG_PYTHON_THREAD_END_BLOCK;
@@ -4940,7 +4940,7 @@ SWIGINTERN PyObject *_wrap_Archiver_GetControl(PyObject *SWIGUNUSEDPARM(self), P
     }
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_ArchiveControl, 0 |  0 );
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_ArchiveControl, SWIG_POINTER_OWN |  0 );
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
@@ -4985,7 +4985,7 @@ SWIGINTERN PyObject *_wrap_Archiver_GetManage(PyObject *SWIGUNUSEDPARM(self), Py
     }
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_ArchiveManage, 0 |  0 );
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_ArchiveManage, SWIG_POINTER_OWN |  0 );
   if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;

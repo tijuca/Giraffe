@@ -172,7 +172,11 @@ public:
 		AttachStdErr		= 0x00000002,
 		InhibitErrorLogging	= 0x40000000
 	};
-
+	
+	%newobject Create;
+	%newobject GetControl;
+	%newobject GetManage;
+	
 	%extend {
 		static Archiver *Create(const char *lpszAppName, const char *lpszConfig, unsigned int ulFlags = 0) {
 			eResult r = Success;
