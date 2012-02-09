@@ -1296,12 +1296,15 @@ HRESULT CalDAV::HrPut()
 		goto exit;
 	}
 
-	if(lpICalToMapi->GetItemCount() != 1 )
+	if (lpICalToMapi->GetItemCount() == 0)
 	{
 		hr = MAPI_E_INVALID_OBJECT;
 		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "No message in ical data in PUT request, error code : 0x%08X", hr);
 		goto exit;
 	}
+
+	if (lpICalToMapi->GetItemCount() > 1)
+		m_lpLogger->Log(EC_LOGLEVEL_WARNING, "More than one message found in PUT, trying to combine messages");
 	
 	hr = HrGetOneProp (m_lpUsrFld, PR_CONTAINER_CLASS_A, &lpsPropVal);
 	if (hr != hrSuccess)
@@ -1338,6 +1341,33 @@ HRESULT CalDAV::HrPut()
 	{
 		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error converting ical data to Mapi message in PUT request, error code : 0x%08X", hr);
 		goto exit;
+	}
+
+	// get other messages if present
+	for (ULONG n = 1; n < lpICalToMapi->GetItemCount(); n++) {
+		SBinary sbSubUid;
+		eIcalType eSubType = VEVENT;
+
+		hr = lpICalToMapi->GetItemInfo(n, &eSubType, NULL, &sbSubUid);
+		if(hr != hrSuccess)
+		{
+			hr = MAPI_E_NO_ACCESS;
+			goto exit;
+		}
+
+		if (etype != eSubType || Util::CompareSBinary(sbUid, sbSubUid) != hrSuccess) {
+			hr = MAPI_E_INVALID_OBJECT;
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Invalid sub item in ical, unable to save message");
+			goto exit;
+		}
+
+		// merge in the same message, and hope for the best
+		hr = lpICalToMapi->GetItem(n, 0, lpMessage);
+		if(hr != hrSuccess)
+		{
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error converting ical data to Mapi message in PUT request, error code : 0x%08X", hr);
+			goto exit;
+		}
 	}
 
 	hr = lpMessage->SaveChanges(0);
