@@ -548,15 +548,7 @@ LIBS=$LIBS_system
 
 # OpenSSL check for new EVP_PKEY_cmp() function
 LIBS="$LIBS $SSL_LIBS"
-AC_MSG_CHECKING([for OpenSSL's EVP_PKEY_cmp])
-AC_LINK_IFELSE(AC_LANG_SOURCE([int main() {
-  char EVP_PKEY_cmp();  EVP_PKEY_cmp();
-}]),
-	[ AC_MSG_RESULT([yes])
-	  SSL_HAS_EVP_PKEY_CMP="-DSSL_HAS_EVP_PKEY_CMP=1" ],
-	[ AC_MSG_RESULT([no])
-	  SSL_HAS_EVP_PKEY_CMP="-DSSL_HAS_EVP_PKEY_CMP=0" ])
-AC_SUBST(SSL_HAS_EVP_PKEY_CMP)
+AC_CHECK_FUNCS([EVP_PKEY_cmp])
 LIBS=$LIBS_system
 
 # Check for pam library (optional)

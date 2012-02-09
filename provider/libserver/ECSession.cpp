@@ -105,7 +105,7 @@ static char THIS_FILE[] = __FILE__;
 int relocate_fd(int fd, ECLogger *lpLogger);
 
 // possible missing ssl function
-#if !SSL_HAS_EVP_PKEY_CMP
+#if !HAVE_EVP_PKEY_CMP
 int EVP_PKEY_cmp(EVP_PKEY *a, EVP_PKEY *b)
     {
     if (a->type != b->type)
