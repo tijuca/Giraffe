@@ -275,6 +275,21 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 
 		lpicProp = icalcomponent_get_next_property(lpicEvent, ICAL_EXDATE_PROPERTY);
 	}
+
+	// now that we have a full recurrence object, recalculate the end time, see ZCP-9143
+	if (lpRec->getEndType() == recurrence::DATE)
+	{
+		OccrInfo *lpOccrInfo = NULL;
+		ULONG cValues = 0;
+
+		hr = lpRec->HrGetItems(dtUTCStart, dtUTCUntil, NULL, sTimeZone, 0, &lpOccrInfo, &cValues);
+		if (hr == hrSuccess && cValues > 0) {
+			dtUTCUntil = lpOccrInfo[cValues-1].tBaseDate;
+			lpRec->setEndDate(UTCToLocal(dtUTCUntil, sTimeZone));
+		}
+
+		MAPIFreeBuffer(lpOccrInfo);
+	}
 	
 	lpIcalItem->lpRecurrence = lpRec;
 	lpRec = NULL;
