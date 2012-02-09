@@ -596,7 +596,7 @@ function getMenuButtons(){
 				'id'=>"attach_item",
 				'name'=>"",
 				'title'=>_("Attach item"),
-				'callback'=>"function(){webclient.openModalDialog(module, 'attachitem', DIALOG_URL+'task=attachitem_modal&storeid=' + module.storeid + '&entryid=' + module.parententryid +'&dialog_attachments=' + dhtml.getElementById('dialog_attachments').value, 550, 480, false, false, {module : module});}"
+				'callback'=>"function(){webclient.openModalDialog(module, 'attachitem', DIALOG_URL+'task=attachitem_modal&storeid=' + module.storeid + '&entryid=' + module.parententryid +'&dialog_attachments=' + dhtml.getElementById('dialog_attachments').value, FIXEDSETTINGS.ATTACHITEM_DIALOG_WIDTH, FIXEDSETTINGS.ATTACHITEM_DIALOG_HEIGHT, false, false, {module : module});}"
 			),
 			array(
 				'id'=>"seperator",

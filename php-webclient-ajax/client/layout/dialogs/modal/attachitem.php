@@ -91,6 +91,8 @@ function getJavaScript_onload(){ ?>
 					
 					// create paging element
 					attachItemCreatePagingElement(moduleID, dhtml.getElementById("attach_item"));
+
+					resizeBody();
 					
 <?php } // getJavaScript_onload
 

@@ -304,6 +304,30 @@ attachitemlistmodule.prototype.eventAttachItemRowDblClick = function(tblWidget, 
 }
 
 /**
+ * Function which resizes the view.
+ */ 
+attachitemlistmodule.prototype.resize = function()
+{
+	var dialogDimensions = dhtml.getBrowserInnerSize();
+	var dialogHeight = dialogDimensions['y'];
+	var dialogWidth = dialogDimensions['x'];
+
+	var tableWidgetElement = dhtml.getElementById("attach_item_tablewidget", "div", this.element);
+
+	// Calcuate how much space there is from the top of the tableWidgetElement till the bottom of 
+	// dialog. That space, minus 10 pixels to have an edge at the bottom, will be the new height of
+	// the tableWidget.
+	var tableWidgetTopOffset = dhtml.getElementTop(module.contentElement);
+	tableWidgetElement.style.height = (dialogHeight - tableWidgetTopOffset - 10) + "px";
+
+	// Size the width of the widget element 12 pixels smaller than the inner size of the dialog to 
+	// not let the scrollbar disappear under the edge of the dialog.
+	tableWidgetElement.style.width = (dialogWidth-12)+'px';
+	// resize table widget
+	this.tableWidget.resize();
+}
+
+/**
  * Event which is called when any folder in hierarchy tree is been selected
  * @param Object moduleObject
  * @param Html Element the element on which event occured

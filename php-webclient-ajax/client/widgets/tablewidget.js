@@ -363,7 +363,7 @@ TableWidget.prototype.generateRowColumnsHTML = function(rowData, addWidthData){
 					columnWidth = ' style="width:'+this.widths[ this.columns[i]['id'] ]+'px;" ';
 				}
 
-				content += '<td class="rowcolumn '+cellClassnames+'" '+columnWidth+'></td>';
+				content += '<td class="rowcolumn '+cellClassnames+'" '+columnWidth+' columnID="'+this.columns[i]["id"]+'"></td>';
 			}
 		}else{
 			content += '<td></td>';
