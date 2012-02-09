@@ -171,6 +171,12 @@ typedef auto_free<struct berval*, auto_free_dealloc<struct berval**, void, ldap_
 #define END_FOREACH_LDAP_PAGING	\
 	} \
 	while (morePages == true); \
+	\
+	if (sCookie.bv_val != NULL) { \
+		ber_memfree(sCookie.bv_val); \
+		sCookie.bv_val = NULL; \
+		sCookie.bv_len = 0; \
+	} \
 }
 #else
 // non paged support, revert to normal search
@@ -2894,3 +2900,4 @@ void LDAPUserPlugin::removeAllObjects(objectid_t except) throw(std::exception)
 {
     throw notimplemented("removeAllObjects is not implemented in the LDAP user plugin.");
 }
+
