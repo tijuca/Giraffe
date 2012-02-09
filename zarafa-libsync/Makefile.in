@@ -56,6 +56,7 @@ am__installdirs = "$(DESTDIR)$(libdir)" \
 libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libzarafasync_la_DEPENDENCIES =  \
+	${top_builddir}/mapi4linux/src/libmapi.la \
 	${top_builddir}/common/libcommon_mapi.la
 am_libzarafasync_la_OBJECTS = ECSync.lo ECSyncLog.lo ECSyncUtil.lo \
 	ECSyncContext.lo ECOfflineABImporter.lo ECSyncSettings.lo \
@@ -272,7 +273,10 @@ AM_CPPFLAGS = $(DEBUGFLAGS) -DLINUX	$(BOOST_CPPFLAGS)	\
 	-I${top_srcdir}/provider/common 	\
 	-I${top_srcdir}/common
 
-libzarafasync_la_LIBADD = ${top_builddir}/common/libcommon_mapi.la
+libzarafasync_la_LIBADD = \
+	${top_builddir}/mapi4linux/src/libmapi.la \
+	${top_builddir}/common/libcommon_mapi.la
+
 libzarafasync_la_includedir = $(includedir)/libzarafasync
 libzarafasync_la_include_HEADERS = ECLibSync.h ECSync.h ECSyncLog.h	\
 	ECSyncUtil.h ECSyncContext.h ECOfflineABImporter.h ECSyncSettings.h ECResyncSet.h

@@ -4,8 +4,10 @@ AM_CPPFLAGS = $(DEBUGFLAGS) -DLINUX	$(BOOST_CPPFLAGS)	\
 	-I${top_srcdir}/mapi4linux/include	\
 	-I${top_srcdir}/provider/common 	\
 	-I${top_srcdir}/common
-	
-libzarafasync_la_LIBADD = ${top_builddir}/common/libcommon_mapi.la
+
+libzarafasync_la_LIBADD = \
+	${top_builddir}/mapi4linux/src/libmapi.la \
+	${top_builddir}/common/libcommon_mapi.la
 
 libzarafasync_la_includedir = $(includedir)/libzarafasync
 

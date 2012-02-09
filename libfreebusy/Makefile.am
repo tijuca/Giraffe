@@ -8,8 +8,6 @@ libfreebusy_la_includedir = $(includedir)/libfreebusy
 
 libfreebusy_la_LDFLAGS = -static
 
-libfreebusy_la_LIBADD = ${top_builddir}/common/libcommon_util.la
-
 libfreebusy_la_include_HEADERS = ECEnumFBBlock.h ECFBBlockList.h		\
 	ECFreeBusyData.h ECFreeBusySupport.h ECFreeBusyUpdate.h freebusy.h	\
 	freebusyguid.h freebusytags.h freebusyutil.h PublishFreeBusy.h recurrence.h

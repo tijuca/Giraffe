@@ -56,11 +56,10 @@ libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 libicalmapi_la_DEPENDENCIES =  \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la \
 	${top_builddir}/libfreebusy/libfreebusy.la \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	$(am__DEPENDENCIES_1)
+	${top_builddir}/common/libcommon_mapi.la \
+	${top_builddir}/common/libcommon_util.la $(am__DEPENDENCIES_1)
 am_libicalmapi_la_OBJECTS = icalinit.lo nameids.lo icaluid.lo \
 	MAPIToICal.lo ICalToMAPI.lo vtimezone.lo valarm.lo \
 	vconverter.lo vevent.lo vtodo.lo icalrecurrence.lo \
@@ -281,10 +280,10 @@ AM_CPPFLAGS = $(DEBUGFLAGS) $(BOOST_CPPFLAGS) -DLINUX $(ICAL_CFLAGS) \
 
 libicalmapi_la_LDFLAGS = -version-info $(ECCLIENT_LIBRARY_VERSION)
 libicalmapi_la_LIBADD = \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la \
 	${top_builddir}/libfreebusy/libfreebusy.la \
 	${top_builddir}/mapi4linux/src/libmapi.la \
+	${top_builddir}/common/libcommon_mapi.la \
+	${top_builddir}/common/libcommon_util.la \
 	$(ICAL_LIBS)
 
 libicalmapidir = $(includedir)/icalmapi

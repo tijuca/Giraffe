@@ -4,7 +4,7 @@ if ! OSS_ONLY
 PROSUBS = liblicense licensed
 endif
 
-SUBDIRS = common libfreebusy zarafa-libsync mapi4linux $(PROSUBS) provider libicalmapi inetmapi php-ext ECtools spooler gateway caldav installer po doc
+SUBDIRS = common libfreebusy mapi4linux zarafa-libsync $(PROSUBS) provider libicalmapi inetmapi php-ext ECtools spooler gateway caldav installer po doc
 
 if WITH_SWIG
 SUBDIRS += swig

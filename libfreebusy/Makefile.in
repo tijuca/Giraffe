@@ -55,8 +55,7 @@ am__installdirs = "$(DESTDIR)$(libdir)" \
 	"$(DESTDIR)$(libfreebusy_la_includedir)"
 libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
-libfreebusy_la_DEPENDENCIES =  \
-	${top_builddir}/common/libcommon_util.la
+libfreebusy_la_LIBADD =
 am_libfreebusy_la_OBJECTS = ECEnumFBBlock.lo ECFBBlockList.lo \
 	ECFreeBusyData.lo ECFreeBusySupport.lo ECFreeBusyUpdate.lo \
 	freebusyutil.lo PublishFreeBusy.lo recurrence.lo
@@ -276,7 +275,6 @@ AM_CPPFLAGS = $(DEBUGFLAGS) -DLINUX $(BOOST_CPPFLAGS) \
 
 libfreebusy_la_includedir = $(includedir)/libfreebusy
 libfreebusy_la_LDFLAGS = -static
-libfreebusy_la_LIBADD = ${top_builddir}/common/libcommon_util.la
 libfreebusy_la_include_HEADERS = ECEnumFBBlock.h ECFBBlockList.h		\
 	ECFreeBusyData.h ECFreeBusySupport.h ECFreeBusyUpdate.h freebusy.h	\
 	freebusyguid.h freebusytags.h freebusyutil.h PublishFreeBusy.h recurrence.h
