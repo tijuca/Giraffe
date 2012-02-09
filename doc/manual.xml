@@ -985,7 +985,7 @@
 			  <para>When logging to a file, specify the filename in
 			  this parameter. Use <replaceable>-</replaceable> (minus
 			  sign) for stderr output.</para>
-			  <para>Default: <replaceable>-</replaceable></para>
+			  <para>Default: <replaceable>/var/log/zarafa/dagent.log</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -3234,7 +3234,7 @@
 			  <para>When logging to a file, specify the filename in
 			  this parameter. Use <replaceable>-</replaceable> (minus
 			  sign) for stderr output.</para>
-			  <para>Default: <replaceable>-</replaceable></para>
+			  <para>Default: <replaceable>/var/log/zarafa/server.log</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -6357,7 +6357,7 @@
 			  <para>When logging to a file, specify the filename in
 			  this parameter. Use <replaceable>-</replaceable> (minus
 			  sign) for stderr output.</para>
-			  <para>Default: <replaceable>-</replaceable></para>
+			  <para>Default: <replaceable>/var/log/zarafa/spooler.log</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -7182,7 +7182,7 @@
 			  <para>When logging to a file, specify the filename in
 			  this parameter. Use <replaceable>-</replaceable> (minus
 			  sign) for stderr output.</para>
-			  <para>Default: <replaceable>-</replaceable></para>
+			  <para>Default: <replaceable>/var/log/zarafa/gateway.log</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -7622,7 +7622,7 @@
 			  <para>When logging to a file, specify the filename in
 			  this parameter. Use <replaceable>-</replaceable> (minus
 			  sign) for stderr output.</para>
-			  <para>Default: <replaceable>-</replaceable></para>
+			  <para>Default: <replaceable>/var/log/zarafa/monitor.log</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -9131,7 +9131,7 @@
 			  <para>When logging to a file, specify the filename in
 			  this parameter. Use <replaceable>-</replaceable> (minus
 			  sign) for stderr output.</para>
-			  <para>Default: <replaceable>-</replaceable></para>
+			  <para>Default: <replaceable>/var/log/zarafa/ical.log</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -9570,7 +9570,7 @@
 			  <para>When logging to a file, specify the filename in
 			  this parameter. Use <replaceable>-</replaceable> (minus
 			  sign) for stderr output.</para>
-			  <para>Default: <replaceable>-</replaceable></para>
+			  <para>Default: <replaceable>/var/log/zarafa/licensed.log</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -10614,7 +10614,7 @@
 			  <para>When logging to a file, specify the filename in
 			  this parameter. Use <replaceable>-</replaceable> (minus
 			  sign) for stderr output.</para>
-			  <para>Default: <replaceable>-</replaceable></para>
+			  <para>Default: <replaceable>/var/log/zarafa/indexer.log</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
