@@ -178,6 +178,7 @@ ZEND_FUNCTION(mapi_table_queryrows);
 ZEND_FUNCTION(mapi_table_getrowcount);
 ZEND_FUNCTION(mapi_table_sort);
 ZEND_FUNCTION(mapi_table_restrict);
+ZEND_FUNCTION(mapi_table_findrow);
 
 ZEND_FUNCTION(mapi_folder_gethierarchytable);
 ZEND_FUNCTION(mapi_folder_getcontentstable);

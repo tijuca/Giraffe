@@ -258,9 +258,12 @@
 			// TODO: let javascript generate the MAPI restriction just as with the rules
 
 			if(isset($action["restriction"])) {
-				if(isset($action["restriction"]["start"])) {
+				if(isset($action["restriction"]["selectedmessageid"])) {
+					$this->selectedMessageId = hex2bin($action["restriction"]["selectedmessageid"]);
+				} elseif(isset($action["restriction"]["start"])) {
 					// Set start variable
 					$this->start = (int) $action["restriction"]["start"];
+					unset($this->selectedMessageId);
 				}
 				if(isset($action["restriction"]["search"])) {
 					// if the restriction is a associative array, it means that only one property is requested
@@ -420,7 +423,11 @@
 			$data["storeid"]["_content"] = bin2hex($folderprops[PR_STORE_ENTRYID]);
 			$data["isinbox"] = array();
 			$data["isinbox"]["_content"] = $folderprops[PR_ENTRYID] == $inboxentryid;
-				
+
+			if(isset($this->selectedMessageId)) {
+				$this->start = $GLOBALS["operations"]->getStartRow($store, $entryid, $this->selectedMessageId, $this->sort, false, $this->searchRestriction);
+			}
+
 			// Get the table and merge the arrays
 			$items = array_merge($data, $GLOBALS["operations"]->getTable($store, $entryid, $this->properties, $this->sort, $this->start, false, $this->searchRestriction));
 

@@ -104,8 +104,11 @@
 				$data["sort"]["attributes"]["direction"] = (isset($this->sort[$firstSortColumn]) && $this->sort[$firstSortColumn] == TABLE_SORT_ASCEND) ? "asc" : "desc";
 				$data["sort"]["_content"] = array_search($firstSortColumn, $this->properties);
 
+				if(isset($this->selectedMessageId)) {
+					$this->start = $GLOBALS["operations"]->getStartRow($store, $entryid, $this->selectedMessageId, $this->sort, false, $this->searchRestriction);
+				}
+
 				// Get the table and merge the arrays
-			
 				$data = array_merge($data, $GLOBALS["operations"]->getTable($store, $entryid, $this->properties, $this->sort, $this->start, false, $taskRestriction));
 
 				array_push($this->responseData["action"], $data);

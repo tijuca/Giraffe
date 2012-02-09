@@ -312,6 +312,9 @@
 					$data["sort"]["attributes"]["direction"] = (isset($this->sort[$firstSortColumn]) && $this->sort[$firstSortColumn] == TABLE_SORT_ASCEND) ? "asc" : "desc";
 					$data["sort"]["_content"] = array_search($firstSortColumn, $this->properties);
 
+					if(isset($this->selectedMessageId)) {
+						$this->start = $GLOBALS["operations"]->getStartRow($store, $entryid, $this->selectedMessageId, $this->sort, false, $this->searchRestriction);
+					}
 					$items = array_merge($data, $GLOBALS["operations"]->getTable($store, $entryid, $this->properties, $sort, $this->start, false, $restriction));
 					
 					for($i=0; $i<count($items["item"]); $i++){
@@ -337,9 +340,12 @@
 		function parseSearchRestriction($action)
 		{
 			if(isset($action["restriction"])) {
-				if(isset($action["restriction"]["start"])) {
+				if(isset($action["restriction"]["selectedmessageid"])) {
+					$this->selectedMessageId = hex2bin($action["restriction"]["selectedmessageid"]);
+				} elseif(isset($action["restriction"]["start"])) {
 					// Set start variable
 					$this->start = (int) $action["restriction"]["start"];
+					unset($this->selectedMessageId);
 				}
 
 				if(isset($action["restriction"]["search"])) {

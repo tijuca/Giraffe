@@ -974,8 +974,9 @@ ListModule.prototype.getRowId = function(entryid)
  * @param boolean useTimeOut use a time out for the request (@TODO check this parameter is not used anymore)
  * @param boolean noLoader use loader
  * @param boolean storeUniqueIds store selected items' unique ids before reloading listmodule
+ * @param boolean reposition the cursor based on the selection. This does nothing if storeUniqueIds is undefined or false
  */ 
-ListModule.prototype.list = function(useTimeOut, noLoader, storeUniqueIds)
+ListModule.prototype.list = function(useTimeOut, noLoader, storeUniqueIds, reposition)
 {
 	var data = new Object();
     data["store"] = this.storeid;
@@ -1036,10 +1037,10 @@ ListModule.prototype.list = function(useTimeOut, noLoader, storeUniqueIds)
 	if(typeof storeUniqueIds != "undefined" && storeUniqueIds) {
 		// store unique ids of items that are currently selected
 		this.storeSelectedMessageIds();
-		if(this.sort && typeof this.oldSelectedMessageIds == 'object') {
+		if(typeof reposition != "undefined" && reposition && typeof this.oldSelectedMessageIds == 'object') {
 			// special case when we select a message while sorting the list,So we need to send the entryid of message.
-			data["sort"]["selectedmessageid"] = this.oldSelectedMessageIds[0];
-			data["restriction"]["start"] = 0;
+			data["restriction"]["selectedmessageid"] = this.oldSelectedMessageIds[0];
+			delete data["restriction"]["start"];
 		}
 	}
 
@@ -2564,9 +2565,9 @@ function eventListColumnSort(moduleObject, element, event)
 			dhtml.removeClassName(character, "characterselect");
 		}
 	} else if (typeof(this.enableGABPagination) != "undefined" && this.enableGABPagination) {
-		moduleObject.list(false, false, getPaginationRestriction());
+		moduleObject.list(false, false, getPaginationRestriction(), true);
 	} else {
-		moduleObject.list(false, false, moduleObject.selectedMessages);
+		moduleObject.list(false, false, moduleObject.selectedMessages, true);
 	}
 }
 

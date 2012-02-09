@@ -747,8 +747,6 @@
 		 * @param integer $start Starting row at which to start reading rows
 		 * @param integer $rowcount Number of rows which should be read
 		 * @param array $restriction Table restriction to apply to the table (formatted as MAPI restriction)
-		 * @param array $folderProps reference to an array which will be filled with PR_ENTRYID and PR_STORE_ENTRYID of the folder
-		 * @param boolean $addRecipients Is to set recipient properties in appointments   
 		 * @return array XML array structure with row data
 		 */
 		function getTable($store, $entryid, $properties, $sort, $start, $rowcount = false, $restriction = false)
@@ -790,12 +788,6 @@
 						}
 						$sort = $sortReplace;
 					}
-					// If sort array contains slectedmessageid then we need to delete this entry 
-					// as sort array can only contain propeties. 
-					if(isset($sort["selectedmessageid"])){
-						$selectedMessageID = $sort["selectedmessageid"];
-						unset($sort["selectedmessageid"]);
-					}
 					mapi_table_sort($table, $sort, TBL_BATCH);
 				}
 
@@ -808,12 +800,8 @@
 				 * items in one list clogging up the memory limit. This is especially important when
 				 * dealing with contactlists in the addressbook. Those lists can contain 10K items. 
 				 */
-				$batchcount = $rowcount < 50 ? $rowcount : 50;
-				if($rowcount && !isset($selectedMessageID)){
-					$end = min($totalrowcount, ($start+$rowcount));
-				}else{
-					$end = $totalrowcount;
-				}
+				$batchcount = 50;
+				$end = min($totalrowcount, ($start+$rowcount));
 				$diff = $end - $start;
 				$numBatches = ceil($diff/$batchcount);
 
@@ -825,36 +813,98 @@
 
 					$rows = mapi_table_queryrows($table, $properties, $batchStart, $batchcount);
 					
-					/**
-					 * In case where user has selected any message while sorting the data, we need to query all 
-					 * folder items in batchs and return the batch in which that item exists, so that we can 
-					 * display the selected message after sorting as well.
-					 */
-					if(isset($selectedMessageID)){
-						$selectedMessageFound = false;
-						
-						foreach($rows as $row){
-							if(bin2hex($row[PR_ENTRYID]) == $selectedMessageID){
-								$selectedMessageFound = true;
-							}
-						}
-
-						if($selectedMessageFound){
-							foreach($rows as $row){
-								array_push($data["item"], Conversion::mapMAPI2XML($properties, $row));	
-							}
-							$data["page"]["start"] = $batchStart;
-							break;
-						}
-					}else{// normal operation i.e iterate each row and move it to data[item] 
-						foreach($rows as $row){
-							array_push($data["item"], Conversion::mapMAPI2XML($properties, $row));
-						}
+					foreach($rows as $row){
+						array_push($data["item"], Conversion::mapMAPI2XML($properties, $row));
 					}
 				}
 			}
 			
 			return $data;
+		}
+
+		/**
+		 * Find the start row that will cause getTable to output a batch that contains a certain message.
+		 *
+		 * This function performs various operations to open, setup, and read all rows from a MAPI table.
+		 *
+		 * The output from this function is an integer, specifying the row to start getTable with.
+		 *
+		 * @param object $store MAPI Message Store Object
+		 * @param string $entryid The entryid of the folder to read the table from
+		 * @param string $messageid The entryid of the message to include
+		 * @param array $sort The set properties which the table will be sort on (formatted as a MAPI sort order)
+		 * @param integer $rowcount Number of rows which should be read
+		 * @param array $restriction Table restriction to apply to the table (formatted as MAPI restriction)
+		 * @return integer row to start reading
+		 */
+		function getStartRow($store, $entryid, $messageid, $sort, $rowcount = false, $restriction = false)
+		{
+			$start = 0;
+			$folder = mapi_msgstore_openentry($store, $entryid);
+			
+			if($folder) {
+				$table = mapi_folder_getcontentstable($folder, MAPI_DEFERRED_ERRORS);
+
+				if(!$rowcount) {
+					$rowcount = $GLOBALS["settings"]->get("global/rowcount", 50);
+				}
+
+				if(is_array($restriction)) {
+					mapi_table_restrict($table, $restriction, TBL_BATCH);
+				}
+
+				if (is_array($sort) && count($sort)>0){
+					/**
+					 * If the sort array contains the PR_SUBJECT column we should change this to 
+					 * PR_NORMALIZED_SUBJECT to make sure that when sorting on subjects: "sweet" and
+					 * "RE: sweet", the first one is displayed before the latter one. If the subject
+					 * is used for sorting the PR_MESSAGE_DELIVERY_TIME must be added as well as 
+					 * Outlook behaves the same way in this case.
+					 */
+					if(isset($sort[PR_SUBJECT])){
+						$sortReplace = Array();
+						foreach($sort as $key => $value){
+							if($key == PR_SUBJECT){
+								$sortReplace[PR_NORMALIZED_SUBJECT] = $value;
+								$sortReplace[PR_MESSAGE_DELIVERY_TIME] = TABLE_SORT_DESCEND;
+							}else{
+								$sortReplace[$key] = $value;
+							}
+						}
+						$sort = $sortReplace;
+					}
+					mapi_table_sort($table, $sort, TBL_BATCH);
+				}
+
+				// Not all php-ext implementations have mapi_table_findrow, so check
+				// before usage.
+				if (function_exists('mapi_table_findrow')) {
+					$rowNum = mapi_table_findrow($table, array(RES_PROPERTY, array(RELOP => RELOP_EQ, ULPROPTAG => PR_ENTRYID, VALUE => $messageid)));
+					if ($rowNum !== false) {
+						$start = floor($rowNum / $rowcount) * $rowcount;
+					}
+				} else {
+					dump('Performing slow search', 'class.operations.php - getStartRow()');
+					// If we can't find, we'll just do a brute force search.
+					$rowNum = 0;
+					$done = false;
+					while (!$done) {
+						$rows = mapi_table_queryrows($table, array(PR_ENTRYID), $rowNum, 64);
+						foreach ($rows as $row) {
+							if ($row[PR_ENTRYID] == $messageid) {
+								$done = true;
+								$start = floor($rowNum / $rowcount) * $rowcount;
+								break;
+							}
+							$rowNum++;
+						}
+						if(count($rows) < 64)
+							break;
+					}
+				}
+			}
+
+			return $start;
 		}
 		
 		/**

@@ -318,6 +318,7 @@ zend_function_entry mapi_functions[] =
 	ZEND_FE(mapi_table_getrowcount, NULL)
 	ZEND_FE(mapi_table_sort, NULL)
 	ZEND_FE(mapi_table_restrict, NULL)
+	ZEND_FE(mapi_table_findrow, NULL)
 
 	ZEND_FE(mapi_folder_gethierarchytable, NULL)
 	ZEND_FE(mapi_folder_getcontentstable, NULL)
@@ -2537,6 +2538,57 @@ ZEND_FUNCTION(mapi_table_restrict)
 		goto exit;
 
 	RETVAL_TRUE;
+
+exit:
+	if (lpRestrict)
+		MAPIFreeBuffer(lpRestrict);
+
+	THROW_ON_ERROR();
+	return;
+}
+
+ZEND_FUNCTION(mapi_table_findrow)
+{
+	// params
+	zval			*res;
+	zval			*restrictionArray;
+	ulong			bkOrigin = BOOKMARK_BEGINNING;
+	ulong			ulFlags = 0;
+	// local
+	LPMAPITABLE		lpTable = NULL;
+	LPSRestriction	lpRestrict = NULL;
+	ULONG ulRow = 0;
+	ULONG ulNumerator = 0;
+	ULONG ulDenominator = 0;
+
+	RETVAL_FALSE;
+	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ra|ll", &res, &restrictionArray, &bkOrigin, &ulFlags) == FAILURE) return;
+
+	ZEND_FETCH_RESOURCE(lpTable, LPMAPITABLE, &res, -1, name_mapi_table, le_mapi_table);
+
+	if (!restrictionArray || zend_hash_num_elements(Z_ARRVAL_P(restrictionArray)) == 0) {
+		// reset restriction
+		lpRestrict = NULL;
+	} else {
+		// create restrict array
+		MAPI_G(hr) = PHPArraytoSRestriction(restrictionArray, NULL, &lpRestrict TSRMLS_CC);
+		if (MAPI_G(hr) != hrSuccess) {
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Failed to convert the PHP srestriction Array");
+			goto exit;
+		}
+	}
+
+	MAPI_G(hr) = lpTable->FindRow(lpRestrict, bkOrigin, ulFlags);
+	if(MAPI_G(hr) != hrSuccess)
+		goto exit;
+
+	MAPI_G(hr) = lpTable->QueryPosition(&ulRow, &ulNumerator, &ulDenominator);
+	if (FAILED(MAPI_G(hr)))
+		goto exit;
+
+	RETVAL_LONG(ulRow);
 
 exit:
 	if (lpRestrict)
