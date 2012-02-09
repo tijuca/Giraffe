@@ -150,9 +150,9 @@ HRESULT ECImportContentsChangesProxy::GetLastError(HRESULT hResult, ULONG ulFlag
 HRESULT ECImportContentsChangesProxy::Config(LPSTREAM lpStream, ULONG ulFlags) {
     HRESULT hr = hrSuccess;
     
-    pval *pvalFuncName;
-    pval *pvalReturn;
-    pval *pvalArgs[2];
+    zval *pvalFuncName;
+    zval *pvalReturn;
+    zval *pvalArgs[2];
     
     MAKE_STD_ZVAL(pvalFuncName);
     MAKE_STD_ZVAL(pvalReturn);
@@ -192,9 +192,9 @@ exit:
 HRESULT ECImportContentsChangesProxy::UpdateState(LPSTREAM lpStream) {
     HRESULT hr = hrSuccess;
     
-    pval *pvalFuncName;
-    pval *pvalReturn;
-    pval *pvalArgs[1];
+    zval *pvalFuncName;
+    zval *pvalReturn;
+    zval *pvalArgs[1];
     
     MAKE_STD_ZVAL(pvalFuncName);
     MAKE_STD_ZVAL(pvalReturn);
@@ -228,9 +228,9 @@ exit:
 }
 
 HRESULT ECImportContentsChangesProxy::ImportMessageChange(ULONG cValues, LPSPropValue lpPropArray, ULONG ulFlags, LPMESSAGE * lppMessage)  {
-    pval *pvalFuncName;
-    pval *pvalReturn;
-    pval *pvalArgs[3];
+    zval *pvalFuncName;
+    zval *pvalReturn;
+    zval *pvalArgs[3];
     IMessage *lpMessage = NULL;
     HRESULT hr = hrSuccess;
     
@@ -287,9 +287,9 @@ exit:
 HRESULT ECImportContentsChangesProxy::ImportMessageDeletion(ULONG ulFlags, LPENTRYLIST lpSourceEntryList) {
     HRESULT hr = hrSuccess;
     
-    pval *pvalFuncName;
-    pval *pvalReturn;
-    pval *pvalArgs[2];
+    zval *pvalFuncName;
+    zval *pvalReturn;
+    zval *pvalArgs[2];
     
     MAKE_STD_ZVAL(pvalFuncName);
     MAKE_STD_ZVAL(pvalReturn);
@@ -323,9 +323,9 @@ exit:
 HRESULT ECImportContentsChangesProxy::ImportPerUserReadStateChange(ULONG cElements, LPREADSTATE lpReadState) {
     HRESULT hr = hrSuccess;
     
-    pval *pvalFuncName;
-    pval *pvalReturn;
-    pval *pvalArgs[1];
+    zval *pvalFuncName;
+    zval *pvalReturn;
+    zval *pvalArgs[1];
     
     MAKE_STD_ZVAL(pvalFuncName);
     MAKE_STD_ZVAL(pvalReturn);

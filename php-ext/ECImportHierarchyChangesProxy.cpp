@@ -147,9 +147,9 @@ HRESULT ECImportHierarchyChangesProxy::GetLastError(HRESULT hResult, ULONG ulFla
 HRESULT ECImportHierarchyChangesProxy::Config(LPSTREAM lpStream, ULONG ulFlags) {
     HRESULT hr = hrSuccess;
     
-    pval *pvalFuncName;
-    pval *pvalReturn;
-    pval *pvalArgs[2];
+    zval *pvalFuncName;
+    zval *pvalReturn;
+    zval *pvalArgs[2];
     
     MAKE_STD_ZVAL(pvalFuncName);
     MAKE_STD_ZVAL(pvalReturn);
@@ -189,9 +189,9 @@ exit:
 HRESULT ECImportHierarchyChangesProxy::UpdateState(LPSTREAM lpStream) {
     HRESULT hr = hrSuccess;
     
-    pval *pvalFuncName;
-    pval *pvalReturn;
-    pval *pvalArgs[1];
+    zval *pvalFuncName;
+    zval *pvalReturn;
+    zval *pvalArgs[1];
     
     MAKE_STD_ZVAL(pvalFuncName);
     MAKE_STD_ZVAL(pvalReturn);
@@ -225,9 +225,9 @@ exit:
 }
 
 HRESULT ECImportHierarchyChangesProxy::ImportFolderChange(ULONG cValues, LPSPropValue lpPropArray)  {
-    pval *pvalFuncName;
-    pval *pvalReturn;
-    pval *pvalArgs[1];
+    zval *pvalFuncName;
+    zval *pvalReturn;
+    zval *pvalArgs[1];
     HRESULT hr = hrSuccess;
     
     MAKE_STD_ZVAL(pvalFuncName);
@@ -265,9 +265,9 @@ exit:
 HRESULT ECImportHierarchyChangesProxy::ImportFolderDeletion(ULONG ulFlags, LPENTRYLIST lpSourceEntryList) {
     HRESULT hr = hrSuccess;
     
-    pval *pvalFuncName;
-    pval *pvalReturn;
-    pval *pvalArgs[2];
+    zval *pvalFuncName;
+    zval *pvalReturn;
+    zval *pvalArgs[2];
     
     MAKE_STD_ZVAL(pvalFuncName);
     MAKE_STD_ZVAL(pvalReturn);
