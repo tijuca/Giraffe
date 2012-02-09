@@ -282,6 +282,10 @@ HRESULT ECLuceneIndexer::IndexStreamEntries(sourceid_list_t &listSourceId)
 	for (sourceid_list_t::iterator iter = listSourceId.begin(); iter != listSourceId.end(); iter++) {
 		lucene::document::Document sDocument;
 
+		// quit without error, caller will check this flag too not to save sync point
+		if (m_lpThreadData->bShutdown)
+			goto exit;
+
 		/* No stream, will be handled by IndexCreateEntries */
 		if (!(*iter)->lpStream)
 			continue;

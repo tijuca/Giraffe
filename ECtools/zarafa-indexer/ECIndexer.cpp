@@ -990,6 +990,10 @@ HRESULT ECIndexer::LoadUserFolderContentChanges(ECSynchronization *lpSyncer, ECE
 	if (hr != hrSuccess)
 		goto exit;
 
+	// quit before updating sync base. next run, user will be reindexed
+	if (m_lpThreadData->bShutdown)
+		goto exit;
+
 	for (iter = lpEntry->m_lFolders.begin(); iter != lpEntry->m_lFolders.end(); iter++) {
 		if (UpdateFolderSyncBase(lpEntry, (*iter)) != hrSuccess)
 			continue;
