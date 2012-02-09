@@ -2045,19 +2045,22 @@ HRESULT DisplayUserCount(LPMDB lpAdminStore)
 	SPropValue sPropDisplayName;
 	SRestrictionPtr ptrRestriction;
 	mapi_rowset_ptr ptrRows;
-	ULONG ulLicensedUsers = (ULONG)-1;
-	ULONG ulActiveUsers = (ULONG)-1;
-	ULONG ulNonActiveTotal = (ULONG)-1;
-	ULONG ulNonActiveUsers = (ULONG)-1;
-	ULONG ulRooms = (ULONG)-1;
-	ULONG ulEquipment = (ULONG)-1;
-	ULONG ulMaxTotal = 0;
+	ULONG ulLicensedUsers = (ULONG)-1;	//!< active users allowed by license
+	ULONG ulActiveUsers = (ULONG)-1;	//!< used active users
+	ULONG ulNonActiveTotal = (ULONG)-1;	//!< used non-active users
+	ULONG ulNonActiveUsers = (ULONG)-1;	//!< used sharedstores, subset of used non-active users
+	ULONG ulRooms = (ULONG)-1;			//!< used rooms, subset of used non-active users
+	ULONG ulEquipment = (ULONG)-1;		//!< used equipment, subset of used non-active users
+	ULONG ulMaxTotal = 0;				//!< complete total of user objects allowed by license, aka ulNonActiveHigh limit
+	ULONG ulNonActiveLow = 0;			//!< atleast non-active users allowed
+	ULONG ulActiveAsNonActive = 0;		//!< non-active users taken from active count
 	ConsoleTable ct(3, 4);
 	ULONG ulExtraRow = 0;
 	ULONG ulExtraRows = 0;
 
 	SizedSPropTagArray(2, sptaStatsProps) = {2, {PR_DISPLAY_NAME_A, PR_EC_STATS_SYSTEM_VALUE}};
 	enum {IDX_DISPLAY_NAME_A, IDX_EC_STATS_SYSTEM_VALUE};
+	enum {COL_ALLOWED=1, COL_USED, COL_AVAILABLE};
 
 	hr = lpAdminStore->OpenProperty(PR_EC_STATSTABLE_SYSTEM, &ptrSystemTable.iid, 0, 0, &ptrSystemTable);
 	if (hr != hrSuccess)
@@ -2121,56 +2124,63 @@ HRESULT DisplayUserCount(LPMDB lpAdminStore)
 		ct.Resize(3 + ulExtraRows, 4);
 
 	ulMaxTotal = std::max(ulLicensedUsers + 25, (ulLicensedUsers *5)/ 2);
+	ulNonActiveLow = ulMaxTotal - ulLicensedUsers;
+	ulActiveAsNonActive = (ulNonActiveTotal > ulNonActiveLow) ? ulNonActiveTotal - ulNonActiveLow : 0;
 
 	cout << "User counts:" << endl;
-	ct.SetHeader(1, "Allowed");
-	ct.SetHeader(2, "Used");
-	ct.SetHeader(3, "Available");
+	ct.SetHeader(COL_ALLOWED, "Allowed");
+	ct.SetHeader(COL_USED, "Used");
+	ct.SetHeader(COL_AVAILABLE, "Available");
 	
 	ct.SetColumn(0, 0, "Active");	
-	ct.SetColumn(0, 2, stringify(ulActiveUsers));
+	ct.SetColumn(0, COL_USED, stringify(ulActiveUsers));
 	if (ulLicensedUsers == 0) {
-		ct.SetColumn(0, 1, "no limit");
-		ct.SetColumn(0, 3, "-");
+		ct.SetColumn(0, COL_ALLOWED, "no limit");
+		ct.SetColumn(0, COL_AVAILABLE, "-");
 	} else {
-		ct.SetColumn(0, 1, stringify(ulLicensedUsers));
-		ct.SetColumn(0, 3, stringify(ulLicensedUsers - ulActiveUsers));
+		ct.SetColumn(0, COL_ALLOWED, stringify(ulLicensedUsers));
+		ct.SetColumn(0, COL_AVAILABLE, stringify(ulLicensedUsers - ulActiveUsers - ulActiveAsNonActive, false, true));
 	}
 	
 	ct.SetColumn(1, 0, "Non-active");
-	ct.SetColumn(1, 2, stringify(ulNonActiveTotal));
+	if (ulNonActiveTotal > ulNonActiveLow)
+		ct.SetColumn(1, COL_USED, stringify(ulNonActiveLow) + " + " + stringify(ulActiveAsNonActive));
+	else
+		ct.SetColumn(1, COL_USED, stringify(ulNonActiveTotal));
 	if (ulLicensedUsers == 0) {
-		ct.SetColumn(1, 1, "no limit");
-		ct.SetColumn(1, 3, "-");
+		ct.SetColumn(1, COL_ALLOWED, "no limit");
+		ct.SetColumn(1, COL_AVAILABLE, "-");
+	} else {
+		ct.SetColumn(1, COL_ALLOWED, stringify(ulMaxTotal - ulLicensedUsers, false, true));
+		if (ulNonActiveTotal > ulNonActiveLow) 
+			ct.SetColumn(1, COL_AVAILABLE, "0 (+" + stringify(ulLicensedUsers - ulActiveUsers - ulActiveAsNonActive, false, true) + ")");
+		else
+			ct.SetColumn(1, COL_AVAILABLE, stringify(ulNonActiveLow - ulNonActiveTotal, false, true) + 
+						 " (+" + stringify(ulLicensedUsers - ulActiveUsers - ulActiveAsNonActive, false, true) + ")");
 	}
 
 	if (ulNonActiveUsers != (ULONG)-1) {
 		ct.SetColumn(2 + ulExtraRow, 0, "  Users");
-		ct.SetColumn(2 + ulExtraRow, 2, stringify(ulNonActiveUsers));
+		ct.SetColumn(2 + ulExtraRow, COL_USED, stringify(ulNonActiveUsers));
 		ulExtraRow++;
 	}
 	
 	if (ulRooms != (ULONG)-1) {
 		ct.SetColumn(2 + ulExtraRow, 0, "  Rooms");
-		ct.SetColumn(2 + ulExtraRow, 2, stringify(ulRooms));
+		ct.SetColumn(2 + ulExtraRow, COL_USED, stringify(ulRooms));
 		ulExtraRow++;
 	}
 	
 	if (ulEquipment != (ULONG)-1) {
 		ct.SetColumn(2 + ulExtraRow, 0, "  Equipment");
-		ct.SetColumn(2 + ulExtraRow, 2, stringify(ulEquipment));
+		ct.SetColumn(2 + ulExtraRow, COL_USED, stringify(ulEquipment));
 		ulExtraRow++;
 	}
 	
 	ct.SetColumn(2 + ulExtraRows, 0, "Total");
-	ct.SetColumn(2 + ulExtraRows, 2, stringify(ulActiveUsers + ulNonActiveTotal));
-	if (ulLicensedUsers == 0) {
-		ct.SetColumn(2 + ulExtraRows, 1, "no limit");
-		ct.SetColumn(2 + ulExtraRows, 3, "-");
-	} else {
-		ct.SetColumn(2 + ulExtraRows, 1, stringify(ulMaxTotal));
-		ct.SetColumn(2 + ulExtraRows, 3, stringify(ulMaxTotal - (ulActiveUsers + ulNonActiveTotal)));
-	}
+	ct.SetColumn(2 + ulExtraRows, COL_USED, stringify(ulActiveUsers + ulNonActiveTotal));
+	// available & allowed columns are too confusing in totals field.
+	ct.SetColumn(2 + ulExtraRows, COL_AVAILABLE, string()); // add empty last column to make sure we print this row
 
 	ct.PrintTable();
 
