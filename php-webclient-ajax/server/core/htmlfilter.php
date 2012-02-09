@@ -112,70 +112,77 @@ function sq_unspace(&$attvalue){
  * @return attvalue  Nothing, modifies a reference value.
  * @author Marc Groot Koerkamp.
  */
+// IE has the evil habit of accepting every possible value for the attribute expression.
+// The table below contains characters which are parsed by IE if they are used in the "expression"
+// attribute value.
+$aDangerousCharsReplacementTable = array(
+     array('&#x029F;', '&#0671;' ,/* L UNICODE IPA Extension */
+           '&#x0280;', '&#0640;' ,/* R UNICODE IPA Extension */
+           '&#x0274;', '&#0628;' ,/* N UNICODE IPA Extension */
+           '&#xFF25;', '&#65317;' ,/* Unicode FULLWIDTH LATIN CAPITAL LETTER E */
+           '&#xFF45;', '&#65349;' ,/* Unicode FULLWIDTH LATIN SMALL LETTER E */
+           '&#xFF38;', '&#65336;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER X */
+           '&#xFF58;', '&#65368;',/* Unicode FULLWIDTH LATIN SMALL LETTER X */
+           '&#xFF30;', '&#65328;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER P */
+           '&#xFF50;', '&#65360;',/* Unicode FULLWIDTH LATIN SMALL LETTER P */
+           '&#xFF32;', '&#65330;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER R */
+           '&#xFF52;', '&#65362;',/* Unicode FULLWIDTH LATIN SMALL LETTER R */
+           '&#xFF33;', '&#65331;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER S */
+           '&#xFF53;', '&#65363;',/* Unicode FULLWIDTH LATIN SMALL LETTER S */
+           '&#xFF29;', '&#65321;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER I */
+           '&#xFF49;', '&#65353;',/* Unicode FULLWIDTH LATIN SMALL LETTER I */
+           '&#xFF2F;', '&#65327;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER O */
+           '&#xFF4F;', '&#65359;',/* Unicode FULLWIDTH LATIN SMALL LETTER O */
+           '&#xFF2E;', '&#65326;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER N */
+           '&#xFF4E;', '&#65358;',/* Unicode FULLWIDTH LATIN SMALL LETTER N */
+           '&#xFF2C;', '&#65324;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER L */
+           '&#xFF4C;', '&#65356;',/* Unicode FULLWIDTH LATIN SMALL LETTER L */
+           '&#xFF35;', '&#65333;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER U */
+           '&#xFF55;', '&#65365;',/* Unicode FULLWIDTH LATIN SMALL LETTER U */
+           '&#x207F;', '&#8319;' ,/* Unicode SUPERSCRIPT LATIN SMALL LETTER N */
+           "\xEF\xBC\xA5", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER E */   // in unicode this is some Chinese char range
+           "\xEF\xBD\x85", /* Shift JIS FULLWIDTH LATIN SMALL LETTER E */
+           "\xEF\xBC\xB8", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER X */
+           "\xEF\xBD\x98", /* Shift JIS FULLWIDTH LATIN SMALL LETTER X */
+           "\xEF\xBC\xB0", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER P */
+           "\xEF\xBD\x90", /* Shift JIS FULLWIDTH LATIN SMALL LETTER P */
+           "\xEF\xBC\xB2", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER R */
+           "\xEF\xBD\x92", /* Shift JIS FULLWIDTH LATIN SMALL LETTER R */
+           "\xEF\xBC\xB3", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER S */
+           "\xEF\xBD\x93", /* Shift JIS FULLWIDTH LATIN SMALL LETTER S */
+           "\xEF\xBC\xA9", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER I */
+           "\xEF\xBD\x89", /* Shift JIS FULLWIDTH LATIN SMALL LETTER I */
+           "\xEF\xBC\xAF", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER O */
+           "\xEF\xBD\x8F", /* Shift JIS FULLWIDTH LATIN SMALL LETTER O */
+           "\xEF\xBC\xAE", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER N */
+           "\xEF\xBD\x8E", /* Shift JIS FULLWIDTH LATIN SMALL LETTER N */
+           "\xEF\xBC\xAC", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER L */
+           "\xEF\xBD\x8C", /* Shift JIS FULLWIDTH LATIN SMALL LETTER L */
+           "\xEF\xBC\xB5", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER U */
+           "\xEF\xBD\x95", /* Shift JIS FULLWIDTH LATIN SMALL LETTER U */
+           "\xE2\x81\xBF", /* Shift JIS FULLWIDTH SUPERSCRIPT N */
+           "\xCA\x9F", /* L UNICODE IPA Extension */
+           "\xCA\x80", /* R UNICODE IPA Extension */
+           "\xC9\xB4"),  /* N UNICODE IPA Extension */
+    array('l', 'l', 'r','r','n','n',
+          'E','E','e','e','X','X','x','x','P','P','p','p','R','R','r','r','S','S','s','s','I','I',
+          'i','i','O','O','o','o','N','N','n','n','L','L','l','l','U','U','u','u','n','n',
+          'E','e','X','x','P','p','R','r','S','s','I','i','O','o','N','n','L','l','U','u','n','l','r','n'));
+
 function sq_fixIE_idiocy(&$attvalue) {
+    global $aDangerousCharsReplacementTable;
+
+    // Shortcut if the value contains only 'normal' characters    
+    if(preg_match("/^[a-zA-Z0-9\";:.,\\s-]*\$/s", $attvalue)) {
+        return;
+    }
+    
     // remove NUL
     $attvalue = str_replace("\0", "", $attvalue);
     // remove comments
     $attvalue = preg_replace("/(\/\*.*?\*\/)/","",$attvalue);
 
-    // IE has the evil habit of accepting every possible value for the attribute expression.
-    // The table below contains characters which are parsed by IE if they are used in the "expression"
-    // attribute value.
-    $aDangerousCharsReplacementTable = array(
-                        array('&#x029F;', '&#0671;' ,/* L UNICODE IPA Extension */
-                              '&#x0280;', '&#0640;' ,/* R UNICODE IPA Extension */
-                              '&#x0274;', '&#0628;' ,/* N UNICODE IPA Extension */
-                              '&#xFF25;', '&#65317;' ,/* Unicode FULLWIDTH LATIN CAPITAL LETTER E */
-                              '&#xFF45;', '&#65349;' ,/* Unicode FULLWIDTH LATIN SMALL LETTER E */
-                              '&#xFF38;', '&#65336;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER X */
-                              '&#xFF58;', '&#65368;',/* Unicode FULLWIDTH LATIN SMALL LETTER X */
-                              '&#xFF30;', '&#65328;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER P */
-                              '&#xFF50;', '&#65360;',/* Unicode FULLWIDTH LATIN SMALL LETTER P */
-                              '&#xFF32;', '&#65330;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER R */
-                              '&#xFF52;', '&#65362;',/* Unicode FULLWIDTH LATIN SMALL LETTER R */
-                              '&#xFF33;', '&#65331;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER S */
-                              '&#xFF53;', '&#65363;',/* Unicode FULLWIDTH LATIN SMALL LETTER S */
-                              '&#xFF29;', '&#65321;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER I */
-                              '&#xFF49;', '&#65353;',/* Unicode FULLWIDTH LATIN SMALL LETTER I */
-                              '&#xFF2F;', '&#65327;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER O */
-                              '&#xFF4F;', '&#65359;',/* Unicode FULLWIDTH LATIN SMALL LETTER O */
-                              '&#xFF2E;', '&#65326;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER N */
-                              '&#xFF4E;', '&#65358;',/* Unicode FULLWIDTH LATIN SMALL LETTER N */
-                              '&#xFF2C;', '&#65324;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER L */
-                              '&#xFF4C;', '&#65356;',/* Unicode FULLWIDTH LATIN SMALL LETTER L */
-                              '&#xFF35;', '&#65333;',/* Unicode FULLWIDTH LATIN CAPITAL LETTER U */
-                              '&#xFF55;', '&#65365;',/* Unicode FULLWIDTH LATIN SMALL LETTER U */
-                              '&#x207F;', '&#8319;' ,/* Unicode SUPERSCRIPT LATIN SMALL LETTER N */
-                              "\xEF\xBC\xA5", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER E */   // in unicode this is some Chinese char range
-                              "\xEF\xBD\x85", /* Shift JIS FULLWIDTH LATIN SMALL LETTER E */
-                              "\xEF\xBC\xB8", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER X */
-                              "\xEF\xBD\x98", /* Shift JIS FULLWIDTH LATIN SMALL LETTER X */
-                              "\xEF\xBC\xB0", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER P */
-                              "\xEF\xBD\x90", /* Shift JIS FULLWIDTH LATIN SMALL LETTER P */
-                              "\xEF\xBC\xB2", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER R */
-                              "\xEF\xBD\x92", /* Shift JIS FULLWIDTH LATIN SMALL LETTER R */
-                              "\xEF\xBC\xB3", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER S */
-                              "\xEF\xBD\x93", /* Shift JIS FULLWIDTH LATIN SMALL LETTER S */
-                              "\xEF\xBC\xA9", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER I */
-                              "\xEF\xBD\x89", /* Shift JIS FULLWIDTH LATIN SMALL LETTER I */
-                              "\xEF\xBC\xAF", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER O */
-                              "\xEF\xBD\x8F", /* Shift JIS FULLWIDTH LATIN SMALL LETTER O */
-                              "\xEF\xBC\xAE", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER N */
-                              "\xEF\xBD\x8E", /* Shift JIS FULLWIDTH LATIN SMALL LETTER N */
-                              "\xEF\xBC\xAC", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER L */
-                              "\xEF\xBD\x8C", /* Shift JIS FULLWIDTH LATIN SMALL LETTER L */
-                              "\xEF\xBC\xB5", /* Shift JIS FULLWIDTH LATIN CAPITAL LETTER U */
-                              "\xEF\xBD\x95", /* Shift JIS FULLWIDTH LATIN SMALL LETTER U */
-                              "\xE2\x81\xBF", /* Shift JIS FULLWIDTH SUPERSCRIPT N */
-                              "\xCA\x9F", /* L UNICODE IPA Extension */
-                              "\xCA\x80", /* R UNICODE IPA Extension */
-                              "\xC9\xB4"),  /* N UNICODE IPA Extension */
-                       array('l', 'l', 'r','r','n','n',
-                             'E','E','e','e','X','X','x','x','P','P','p','p','R','R','r','r','S','S','s','s','I','I',
-                             'i','i','O','O','o','o','N','N','n','n','L','L','l','l','U','U','u','u','n','n',
-                             'E','e','X','x','P','p','R','r','S','s','I','i','O','o','N','n','L','l','U','u','n','l','r','n'));
     $attvalue = str_replace($aDangerousCharsReplacementTable[0],$aDangerousCharsReplacementTable[1],$attvalue);
-
     // Escapes are useful for special characters like "{}[]()'&. In other cases they are
     // used for XSS.
     $attvalue = preg_replace("/(\\\\)([a-zA-Z]{1})/",'$2',$attvalue);
@@ -236,10 +243,15 @@ function sq_casenormalize(&$val){
  */
 function sq_skipspace($body, $offset){
     $me = 'sq_skipspace';
-    preg_match('/^(\s*)/s', substr($body, $offset), $matches);
-    if (sizeof($matches{1})){
-        $count = strlen($matches{1});
-        $offset += $count;
+    while(1) {
+        $matches = Array();
+        preg_match('/^(\s*)/s', substr($body, $offset, 256), $matches);
+        if (sizeof($matches{1})){
+            $count = strlen($matches{1});
+            if ($count == 0)
+                break;
+            $offset += $count;
+        } else break;
     }
     return $offset;
 }
@@ -281,7 +293,7 @@ function sq_findnxreg($body, $offset, $reg){
     $me = 'sq_findnxreg';
     $matches = Array();
     $retarr = Array();
-    preg_match("%^(.*?)($reg)%si", substr($body, $offset), $matches);
+    preg_match("%(.*?)($reg)%si", $body, $matches, 0, $offset);
     if (!isset($matches{0}) || !$matches{0}){
         $retarr = false;
     } else {
@@ -334,7 +346,7 @@ function sq_getnxtag($body, $offset){
      *    <img src="blah" />
      */
     $tagtype = false;
-    switch (substr($body, $pos, 1)){
+    switch ($body[$pos]){
         case '/':
             $tagtype = 2;
             $pos++;
@@ -441,12 +453,11 @@ function sq_getnxtag($body, $offset){
          * the end of the tag.
          */
         $matches = Array();
-        if (preg_match("%^(\s*)(>|/>)%s", substr($body, $pos), $matches)) {
+        if (preg_match("%^(>|/>)%s", substr($body, $pos, 2), $matches)) {
             /**
              * Yep. So we did.
              */
-            $pos += strlen($matches{1});
-            if ($matches{2} == "/>"){
+            if ($matches{1} == "/>"){
                 $tagtype = 3;
                 $pos++;
             }
@@ -666,8 +677,6 @@ function sq_fixatts($tagname,
             }
         }
 
-
-
         /**
          * Workaround for IE quirks
          */
@@ -712,6 +721,7 @@ function sq_fixatts($tagname,
                 }
             }
         }
+
         if ($attname == 'style') {
             if (preg_match('/[\0-\37\200-\377]+/',$attvalue)) {
                 // 8bit and control characters in style attribute values can be used for XSS, remove them
@@ -1016,6 +1026,7 @@ function sq_sanitize($body,
     while (($curtag = sq_getnxtag($body, $curpos)) != FALSE){
         list($tagname, $attary, $tagtype, $lt, $gt) = $curtag;
         $free_content = substr($body, $curpos, $lt-$curpos);
+
         /**
          * Take care of <style>
          */
