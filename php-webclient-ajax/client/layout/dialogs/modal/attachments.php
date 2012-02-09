@@ -90,18 +90,7 @@ function getJavaScript_onload(){ ?>
 
 					if(parentwindow.module) {
 						var filelist = dhtml.getElementById("filelist");
-						
-						/**
-						 * NOTE: We do not want to send attachments of original mail
-						 * when we are replying to that mail. But new attachments 
-						 * can be sent with that mail.
-						 */						
-						if (parentwindow.module && parentwindow.module.messageAction){ 
-							if (parentwindow.module.messageAction == "reply" || parentwindow.module.messageAction == "replyall"){
-								parentwindow.module.attachments = "";
-							}
-						}
-						
+
 						var deletedattachments = new Object();
 						
 						<?

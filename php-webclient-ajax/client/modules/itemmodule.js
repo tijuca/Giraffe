@@ -1784,26 +1784,25 @@ function eventItemAttachmentNameAddInlineClick(moduleObject, element, event)
 function eventAttachmentClick(moduleObject, element, event)
 {
 	var attach_num = element.getAttribute("attach_num", false);
-	var attachments = (moduleObject.itemProps && moduleObject.itemProps.attachments) ? moduleObject.itemProps.attachments.attachment : false;
-	/**
-	 * When an attachment is clicked in an edit dialog, there is also the possibility that the 
-	 * attachment has not been saved at the server yet. So therefor we need add the list of unsaved 
-	 * new attachments as well.
-	 */
-	if(!attachments && moduleObject.attachments){
+	var attachments = (moduleObject.itemProps && moduleObject.itemProps.attachments) ? moduleObject.itemProps.attachments.attachment : new Array();
+	if(attachments.length === 0 && moduleObject.attachments){
 		// clone array
-		attachments = new Array();
 		for(var i in moduleObject.attachments){
 			attachments[i] = new Object();
 			for(var j in moduleObject.attachments[i]){
 				attachments[i][j] = moduleObject.attachments[i][j];
 			}
 		}
+	}
 
-		if(moduleObject.newattachments){
-			for(var i in moduleObject.newattachments){
-				attachments[attachments.length] = moduleObject.newattachments[i];
-			}
+	/**
+	 * When an attachment is clicked in an edit dialog, there is also the possibility that the 
+	 * attachment has not been saved at the server yet. So therefor we need add the list of unsaved 
+	 * new attachments as well.
+	 */
+	if(moduleObject.newattachments){
+		for(var i in moduleObject.newattachments){
+			attachments[attachments.length] = moduleObject.newattachments[i];
 		}
 	}
 
@@ -1869,8 +1868,8 @@ function eventAttachmentClick(moduleObject, element, event)
 			} else {
 				attachNum += "&attachNum[]=" + attach_num;
 				var action = webclient.base_url + "index.php?load=download_attachment&store=" + moduleObject.storeid + attachNum + "&openType=attachment";
-				if(moduleObject.rootentryid) {
-					action += "&entryid=" + moduleObject.rootentryid;
+				if(moduleObject.messageentryid) {
+					action += "&entryid=" + moduleObject.messageentryid;
 				}
 
 				/**

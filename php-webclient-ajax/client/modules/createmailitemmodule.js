@@ -260,12 +260,19 @@ createmailitemmodule.prototype.item = function(action)
 				this.setSender(message);
 				this.setSubjectBody(message, _("RE"));
 				this.setInlineAttachmentData(this.attachments); //message contains inline attachments
+				/**
+				 * NOTE: We do not want to send attachments of original mail
+				 * when we are replying to that mail. But new attachments 
+				 * can be sent with that mail.
+				 */
+				this.attachments = new Array();
 				break;
 			case "replyall":
 				this.setSender(message);
 				this.setRecipients(message, "replyall");
 				this.setSubjectBody(message, _("RE"));
 				this.setInlineAttachmentData(this.attachments); //message contains inline attachments
+				this.attachments = new Array();
 				break;
 			case "forward":
 				this.setSubjectBody(message, _("FW"));
