@@ -7,6 +7,9 @@ LOGPATH=$(grep -w client_update_log_path ${CONFIG} | grep -v \# | cut -d= -f2 | 
 if test -z "${LOGPATH}"; then
 	LOGPATH=/var/lib/zarafa/client
 fi
+if ! test -r "${LOGPATH}"; then
+	exit 0
+fi
 LOGPATH=$(readlink -e ${LOGPATH})
 if test -z "${LOGPATH}"; then
 	exit 0
