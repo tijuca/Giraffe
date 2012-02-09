@@ -2837,42 +2837,46 @@ void *HandlerLMTP(void *lpArg) {
 
 		case LMTP_Command_DATA:
 			{
-				FILE *tmp = tmpfile();
-
 				if (mapRCPT.empty()) {
 					lmtp.HrResponse("503 5.1.1 No recipients");
-				} else {
+					break;
+				}
 
-					hr = lmtp.HrCommandDATA(tmp);
-					
-					if (hr == hrSuccess) {
-						// During delivery lpArgs->ulDeliveryMode can be set to DM_JUNK. However it won't reset it
-						// if required. So make sure to reset it here so we can safely reuse the LMTP connection
-						delivery_mode ulDeliveryMode = lpArgs->ulDeliveryMode;
+				FILE *tmp = tmpfile();
+				if (!tmp) {
+					lmtp.HrResponse("503 5.1.1 Internal error during delivery");
+					g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to create temp file for email delivery. Please check write-access in /tmp directory.");
+					break;
+				}
 
-						hr = ProcessDeliveryToList(lpSession, tmp, &mapRCPT, lpArgs);
+				hr = lmtp.HrCommandDATA(tmp);
+				if (hr == hrSuccess) {
+					// During delivery lpArgs->ulDeliveryMode can be set to DM_JUNK. However it won't reset it
+					// if required. So make sure to reset it here so we can safely reuse the LMTP connection
+					delivery_mode ulDeliveryMode = lpArgs->ulDeliveryMode;
 
-						SaveRawMessage(tmp, "LMTP");
-						lpArgs->ulDeliveryMode = ulDeliveryMode;
-					}
+					hr = ProcessDeliveryToList(lpSession, tmp, &mapRCPT, lpArgs);
+
+					SaveRawMessage(tmp, "LMTP");
+					lpArgs->ulDeliveryMode = ulDeliveryMode;
+				}
 					
-					// We're not that interested in the error value here; if an error occurs then this will be reflected in the
-					// wstrDeliveryStatus of each recipient.
-					hr = hrSuccess;
+				// We're not that interested in the error value here; if an error occurs then this will be reflected in the
+				// wstrDeliveryStatus of each recipient.
+				hr = hrSuccess;
 					
-					fclose(tmp);
+				fclose(tmp);
 					
-					for(companyrecipients_t::iterator iCompany = mapRCPT.begin(); iCompany != mapRCPT.end(); iCompany++) {
-						for(serverrecipients_t::iterator iServer = iCompany->second.begin(); iServer != iCompany->second.end(); iServer++) {
-							for(recipients_t::iterator iRecipient = iServer->second.begin(); iRecipient != iServer->second.end(); iRecipient++) {
-								lmtp.HrResponse(convert_to<string>((*iRecipient)->wstrDeliveryStatus).c_str());
-							}
+				for(companyrecipients_t::iterator iCompany = mapRCPT.begin(); iCompany != mapRCPT.end(); iCompany++) {
+					for(serverrecipients_t::iterator iServer = iCompany->second.begin(); iServer != iCompany->second.end(); iServer++) {
+						for(recipients_t::iterator iRecipient = iServer->second.begin(); iRecipient != iServer->second.end(); iRecipient++) {
+							lmtp.HrResponse(convert_to<string>((*iRecipient)->wstrDeliveryStatus).c_str());
 						}
 					}
-
-					// Reset RCPT TO list now
-					FreeServerRecipients(&mapRCPT);
 				}
+
+				// Reset RCPT TO list now
+				FreeServerRecipients(&mapRCPT);
 			}
 			break;
 
