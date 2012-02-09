@@ -75,6 +75,7 @@ void ECCacheBase::RequestStats(void(callback)(const std::string &, const std::st
 {
 	callback((std::string)"cache_" + m_strCachename + "_items", (std::string)"Cache " + m_strCachename + " items", stringify_int64(ItemCount()), obj);
 	callback((std::string)"cache_" + m_strCachename + "_size", (std::string)"Cache " + m_strCachename + " size", stringify_int64(Size()), obj);
+	callback((std::string)"cache_" + m_strCachename + "_maxsz", (std::string)"Cache " + m_strCachename + " maximum size", stringify_int64(m_ulMaxSize), obj);
 	callback((std::string)"cache_" + m_strCachename + "_req", (std::string)"Cache " + m_strCachename + " requests", stringify_int64(HitCount()), obj);
 	callback((std::string)"cache_" + m_strCachename + "_hit", (std::string)"Cache " + m_strCachename + " hits", stringify_int64(ValidCount()), obj);
 }
