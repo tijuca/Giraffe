@@ -106,6 +106,26 @@ exit:
     return er;
 }
 
+ECRESULT ECLicenseClient::QueryCapability(unsigned int ulServiceType, const std::string &strCapability, bool *lpbResult)
+{
+    ECRESULT er = erSuccess;
+	std::string strServiceType;
+	std::vector<std::string> vResult;
+
+	er = ServiceTypeToServiceTypeString(ulServiceType, strServiceType);
+	if (er != erSuccess)
+		goto exit;
+
+    er = DoCmd("QUERY " + strServiceType + " " + strCapability, vResult);
+    if (er != erSuccess)
+		goto exit;
+
+	*lpbResult = (vResult.front().compare("ENABLED") == 0);
+
+exit:
+    return er;
+}
+
 ECRESULT ECLicenseClient::GetSerial(unsigned int ulServiceType, std::string &strSerial, std::vector<std::string> &lstCALs)
 {
     ECRESULT er = erSuccess;

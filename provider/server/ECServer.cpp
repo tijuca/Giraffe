@@ -1140,6 +1140,32 @@ int running_server(char *szName, const char *szConfig)
 		signal(SIGPIPE, process_signal);
 	}
 
+	// Check if we're licensed to run distributed mode. The license daemon might
+	// not be running (yet), so try for a minute before giving up.
+	if (distributed) {
+		for (int i = 0; i < 30; ++i) {
+			bool bLicensed = false;
+			er = lpLicense->QueryCapability(0 /*SERVICE_TYPE_ZCP*/, "MULTISERVER", &bLicensed);
+			if (er != erSuccess) {
+				if (i < 29) {
+					g_lpLogger->Log(EC_LOGLEVEL_FATAL, "WARNING: Unable to determine if distributed features are allowed, waiting 2s for retry. (attempt %u/30)", i + 1);
+					sleep_ms(2000);
+				} else {
+					g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to determine if distributed features are allowed, assuming unavailable.");
+					retval = -1;
+					goto exit;
+				}
+			} else {
+				if (!bLicensed) {
+					g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Your license key does not allow the usage of the distributed features.");
+					retval = -1;
+					goto exit;
+				}
+				break;
+			}
+		}
+	}
+
 	// ignore ignorable signals that might stop the server during database upgrade
 	// all these signals will be reset after the database upgrade part.
 	m_bDatabaseUpdateIgnoreSignals = true;
