@@ -42,14 +42,14 @@ if [ -z "$ZARAFA_LOCALE" ]; then
 fi
 
 start() {
-	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" --expect-user root -- $ical
+	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $ical
 	RETVAL=$?
 
 	return $RETVAL
 }
 
 stop() {
-	stop_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" --expect-user root -- $ical
+	stop_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $ical
 	RETVAL=$?
 
 	return $RETVAL
@@ -62,7 +62,7 @@ restart() {
 
 reload() {
 	msg_reloading $ical
-	stop_daemon --pidfile "$PIDFILE" --expect-user root -HUP -- $ical
+	stop_daemon --pidfile "$PIDFILE" -HUP -- $ical
 	RETVAL=$?
 
 	return $RETVAL
@@ -98,7 +98,7 @@ case "$1" in
 		fi
 		;;
     status)
-		status --pidfile "$PIDFILE" --expect-user root -- $ical
+		status --pidfile "$PIDFILE" $ical
 		RETVAL=$?
 		;;
     *)

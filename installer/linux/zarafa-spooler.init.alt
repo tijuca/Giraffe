@@ -44,14 +44,14 @@ if [ -z "$ZARAFA_LOCALE" ]; then
 fi
 
 start() {
-	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" --expect-user root -- $spooler
+	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $spooler
 	RETVAL=$?
 
 	return $RETVAL
 }
 
 stop() {
-	stop_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" --expect-user root -- $spooler
+	stop_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $spooler
 	RETVAL=$?
 
 	return $RETVAL
@@ -64,7 +64,7 @@ restart() {
 
 reload() {
 	msg_reloading $spooler
-	stop_daemon --pidfile "$PIDFILE" --expect-user root -HUP -- $spooler
+	stop_daemon --pidfile "$PIDFILE" -HUP -- $spooler
 	RETVAL=$?
 
 	return $RETVAL
@@ -100,7 +100,7 @@ case "$1" in
 		fi
 		;;
     status)
-		status --pidfile "$PIDFILE" --expect-user root -- $spooler
+		status --pidfile "$PIDFILE" $spooler
 		RETVAL=$?
 		;;
     *)

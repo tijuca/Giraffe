@@ -42,14 +42,14 @@ if [ -z "$ZARAFA_LOCALE" ]; then
 fi
 
 start() {
-	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" --expect-user root -- $indexer
+	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $indexer
 	RETVAL=$?
 
 	return $RETVAL
 }
 
 stop() {
-	stop_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" --expect-user root -- $indexer
+	stop_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $indexer
 	RETVAL=$?
 
 	return $RETVAL
@@ -62,7 +62,7 @@ restart() {
 
 reload() {
 	msg_reloading $indexer
-	stop_daemon --pidfile "$PIDFILE" --expect-user root -HUP -- $indexer
+	stop_daemon --pidfile "$PIDFILE" -HUP -- $indexer
 	RETVAL=$?
 
 	return $RETVAL
@@ -98,7 +98,7 @@ case "$1" in
 		fi
 		;;
     status)
-		status --pidfile "$PIDFILE" --expect-user root -- $indexer
+		status --pidfile "$PIDFILE" $indexer
 		RETVAL=$?
 		;;
     *)

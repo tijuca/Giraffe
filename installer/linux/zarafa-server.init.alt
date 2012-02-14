@@ -50,7 +50,7 @@ if [ -z "$ZARAFA_LOCALE" ]; then
 fi
 
 start() {
-	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" --expect-user root -- $server
+	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $server
 	RETVAL=$?
 
 	return $RETVAL
@@ -111,7 +111,7 @@ restart() {
 
 reload() {
 	msg_reloading $server
-	stop_daemon --pidfile "$PIDFILE" --expect-user root -HUP -- $server
+	stop_daemon --pidfile "$PIDFILE" -HUP -- $server
 	RETVAL=$?
 
 	return $RETVAL
@@ -147,7 +147,7 @@ case "$1" in
 		fi
 		;;
     status)
-		status --pidfile "$PIDFILE" --expect-user root -- $server
+		status --pidfile "$PIDFILE" $server
 		RETVAL=$?
 		;;
     *)
