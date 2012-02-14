@@ -378,12 +378,19 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 		if(hr != hrSuccess)
 			goto exit;
 	}else{
+		bool bRestored = false;
+
 		// Changed folder is an existing subfolder
 		hr = m_lpFolder->OpenEntry(cbEntryId, lpEntryId, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, (LPUNKNOWN*)&lpFolder);
 		if(hr != hrSuccess){
 			hr = m_lpFolder->OpenEntry(cbEntryId, lpEntryId, &IID_IMAPIFolder, MAPI_MODIFY | SHOW_SOFT_DELETES, &ulObjType, (LPUNKNOWN*)&lpFolder);
 			if(hr != hrSuccess)
 				goto exit;
+
+			/**
+			 * If the folder was deleted locally, it must have been resotored remote in order to get a change for it.
+			 */
+			bRestored = true;
 		}
 
 		hr = HrGetOneProp(lpFolder, PR_PARENT_SOURCE_KEY, &lpPropVal);
@@ -391,7 +398,7 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 			goto exit;
 		
 		//check if we have to move the folder
-		if(lpPropVal->Value.bin.cb != lpPropParentSourceKey->Value.bin.cb || memcmp(lpPropVal->Value.bin.lpb, lpPropParentSourceKey->Value.bin.lpb, lpPropVal->Value.bin.cb) != 0){
+		if(bRestored || lpPropVal->Value.bin.cb != lpPropParentSourceKey->Value.bin.cb || memcmp(lpPropVal->Value.bin.lpb, lpPropParentSourceKey->Value.bin.lpb, lpPropVal->Value.bin.cb) != 0){
 			if(lpPropParentSourceKey->Value.bin.cb > 0){
 				hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId , lpPropParentSourceKey->Value.bin.cb, lpPropParentSourceKey->Value.bin.lpb, 0, NULL, &cbDestEntryId, &lpDestEntryId);
 				if(hr == MAPI_E_NOT_FOUND){
