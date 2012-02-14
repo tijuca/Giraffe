@@ -282,6 +282,35 @@ exit:
 	kill(0, signr);
 }
 
+ECRESULT check_database_innodb(ECDatabase *lpDatabase)
+{
+	ECRESULT er = erSuccess;
+	string strQuery;
+	DB_RESULT lpResult = NULL;
+	DB_ROW lpRow = NULL;
+
+	er = lpDatabase->DoSelect("SHOW TABLE STATUS WHERE engine != 'InnoDB'", &lpResult);
+	if (er != erSuccess)
+		goto exit;
+
+	while( (lpRow = lpDatabase->FetchRow(lpResult)) ) {
+		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Database table '%s' not in InnoDB format: %s", lpRow[0] ? lpRow[0] : "unknown table", lpRow[1] ? lpRow[1] : "unknown engine");
+		er = ZARAFA_E_DATABASE_ERROR;
+	}
+
+	if (er != erSuccess) {
+		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Your database was incorrectly created. Please upgrade all tables to the InnoDB format using this query:");
+		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "  ALTER TABLE <table name> ENGINE='InnoDB';");
+		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "This process may take a very long time, depending on the size of your database.");
+	}
+	
+exit:
+	if (lpResult)
+		lpDatabase->FreeResult(lpResult);
+
+	return er;
+}
+
 ECRESULT check_database_attachments(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
@@ -1213,6 +1242,11 @@ int running_server(char *szName, const char *szConfig)
 		retval = -1;
 		goto exit;
 	}
+
+	// check database for MyISAM tables
+	er = check_database_innodb(lpDatabase);
+	if (er != erSuccess)
+		goto exit;
 
 	// check attachment database started with, and maybe reject startup
 	er = check_database_attachments(lpDatabase);
