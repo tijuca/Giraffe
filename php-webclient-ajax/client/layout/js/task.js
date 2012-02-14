@@ -670,6 +670,11 @@ function showHideRecurrenceMenu(hide) {
 
 function delete_task_item()
 {
+	if (dhtml.getElementById("messagechanged").value == 1) {
+		if( confirm("This item has changed. Are you sure you want to delete it?") == false)
+			return;
+	}
+
 	if (module.messageentryid) {
 		var taskstate = dhtml.getElementById("taskstate").value;
 		var complete = dhtml.getElementById("complete").value;
@@ -684,7 +689,10 @@ function delete_task_item()
 		} else {
 			module.deleteMessage(false);
 		}
+	} else {
+		window.close();
 	}
+
 }
 
 function showTaskRecurrence()

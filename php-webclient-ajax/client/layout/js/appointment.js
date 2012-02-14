@@ -678,10 +678,14 @@ function callbackdeleteoccurence()
 // If 'send' is TRUE, then send a cancellation
 function deleteAppointment()
 {
-	var basedate = dhtml.getElementById("basedate").getAttribute("unixtime");
-	basedate = basedate ? parseInt(basedate, 10) : 0;
+	if(module.messageentryid) {
+		var basedate = dhtml.getElementById("basedate").getAttribute("unixtime");
+		basedate = basedate ? parseInt(basedate, 10) : 0;
 
-	module.deleteMessage(basedate);
+		module.deleteMessage(basedate);
+	} else {
+		window.close();
+	}
 }
 
 function onChangeReminder()
