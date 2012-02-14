@@ -109,7 +109,14 @@
 							<table id="form_fields">
 								<tr>
 									<th><label for="username"><?=_("Name")?>:</label></th>
-									<td><input type="text" name="username" id="username" class="inputelement" <?=($user)?'value="'.$user.'"':''?>></td>
+									<td><input type="text" name="username" id="username" class="inputelement"
+									<?php
+									 if (defined("CERT_VAR_TO_COMPARE_WITH") && $_SERVER ) {
+										echo " value='".$_SERVER[CERT_VAR_TO_COMPARE_WITH]."' readonly='readonly'";
+									 } elseif ($user) {
+									 	echo " value='".$user."'";
+									 }
+									?>></td>
 								</tr>
 								<tr>
 									<th><label for="password"><?=_("Password")?>:</label></th>

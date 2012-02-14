@@ -97,6 +97,12 @@
 	// Booking method (true = direct booking, false = send meeting request)
 	define('ENABLE_DIRECT_BOOKING', true);
 
+	// If you want to make sure that the user name in the authentication is the same as
+	// a certain variable in the certificate, then set this constant to the
+	// the name of this certificate variable
+	//define("CERT_VAR_TO_COMPARE_WITH", "SSL_CLIENT_S_DN_CN");
+
+
 	/**************************************\
 	* Memory usage and timeouts            *
 	\**************************************/
