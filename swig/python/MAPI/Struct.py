@@ -152,6 +152,63 @@ class SCommentRestriction(MAPIStruct):
     def __repr__(self):
         return 'SCommentRestriction(%s,%s)' %(str(self.lpRes), str(self.lpProp))
 
+class actMoveCopy(MAPIStruct):
+    def __init__(self, store, folder):
+        self.StoreEntryId = store
+        self.FldEntryId = folder
+    def __repr__(self):
+        return 'actMoveCopy(0x%s,0x%s)' % (self.StoreEntryId.encode('hex'), self.FldEntryId.encode('hex'))
+
+class actReply(MAPIStruct):
+    def __init__(self, entryid, guid):
+        self.EntryId = entryid
+        self.guidReplyTemplate = guid
+    def __repr__(self):
+        return 'actReply(0x%s,0x%s)' % (self.EntryId.encode('hex'), self.guidReplyTemplate.encode('hex'))
+
+class actDeferAction(MAPIStruct):
+    def __init__(self, deferMsg):
+        self.data = deferMsg
+    def __repr__(self):
+        return 'actDeferMsg(0x%s)' % (self.data.encode('hex'))
+
+class actBounce(MAPIStruct):
+    def __init__(self, code):
+        self.scBounceCode = code
+    def __repr__(self):
+        return 'actBounce(%d)' % (len(self.scBounceCode))
+
+class actFwdDelegate(MAPIStruct):
+    def __init__(self, adrlist):
+        self.lpadrlist = adrlist
+    def __repr__(self):
+        return 'actFwdDelegate(%s)' % (str(self.lpadrlist))
+
+class actTag(MAPIStruct):
+    def __init__(self, tag):
+        self.propTag = tag
+    def __repr__(self):
+        return 'actTag(%s)' % (str(self.propTag))
+
+class ACTION(MAPIStruct):
+    def __init__(self, acttype, flavor, res, proptagarray, flags, actobj):
+        self.acttype = acttype
+        self.ulActionFlavor = flavor
+        self.lpRes = res
+        self.lpPropTagArray = proptagarray
+        self.ulFlags = flags
+        # any of the above action
+        self.actobj = actobj
+    def __repr__(self):
+        return 'ACTION(%d,%d,%s,%s,0x%x,%s)' % (self.acttype,self.ulActionFlavor,str(self.lpRes),str(self.lpPropTagArray),self.ulFlags,str(self.actobj))
+
+class ACTIONS(MAPIStruct):
+    def __init__(self, version, actions):
+        self.ulVersion = version
+        self.lpAction = actions
+    def __repr__(self):
+        return 'ACTIONS(%d,%s)' % (self.ulVersion, str(self.lpAction))
+    
 class MAPIError(Exception):
     def __init__(self, hr):
         self.hr = hr
@@ -204,6 +261,24 @@ class ECCOMPANY(MAPIStruct):
         self.IsHidden = IsHidden
         self.CompanyID = CompanyID
 
+class ECUSERCLIENTUPDATESTATUS(MAPIStruct):
+    def __init__(self, TrackId, Updatetime, Currentversion, Latestversion, Computername, Status):
+        self.TrackId = TrackId
+        self.Updatetime = Updatetime
+        self.Currentversion = Currentversion
+        self.Latestversion = Latestversion
+        self.Computername = Computername
+        self.Status = Status
+
+class ECSERVER(MAPIStruct):
+    def __init__(self, Name, FilePath, HttpPath, SslPath, PreferedPath, Flags):
+        self.Name = Name
+        self.FilePath = FilePath
+        self.HttpPath = HttpPath
+        self.SslPath = SslPath
+        self.PreferedPath = PreferedPath
+        self.Flags = Flags
+
 class ERROR_NOTIFICATION(MAPIStruct):
     def __init__(self, lpEntryID, scode, ulFlags, lpMAPIError):
         self.lpEntryID = lpEntryID
@@ -249,4 +324,10 @@ class ECQUOTA(MAPIStruct):
         self.llWarnSize = llWarnSize
         self.llSoftSize = llSoftSize
         self.llHardSize = llHardSize
-        
+
+class ECQUOTASTATUS(MAPIStruct):
+    def __init_(self, StoreSize, QuotaStatus):
+        self.StoreSize = StoreSize
+        self.QuotaStatus = QuotaStatus
+
+

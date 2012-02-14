@@ -3430,6 +3430,7 @@ SWIGINTERN PyObject *_wrap_CreateICalToMapi(PyObject *SWIGUNUSEDPARM(self), PyOb
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
+  HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
   {
@@ -3454,10 +3455,17 @@ SWIGINTERN PyObject *_wrap_CreateICalToMapi(PyObject *SWIGUNUSEDPARM(self), PyOb
   arg3 = static_cast< bool >(val3);
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
-    CreateICalToMapi(arg1,arg2,arg3,arg4);
+    result = CreateICalToMapi(arg1,arg2,arg3,arg4);
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
-  resultobj = SWIG_Py_Void();
+  {
+    resultobj = Py_None;
+    Py_INCREF(Py_None);
+    if(FAILED(result)) {
+      DoException(result);
+      SWIG_fail;
+    }
+  }
   {
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)*(arg4), SWIGTYPE_p_ICalToMapi, SWIG_SHADOW | SWIG_OWNER));
   }
@@ -3828,6 +3836,7 @@ SWIGINTERN PyObject *_wrap_CreateMapiToICal(PyObject *SWIGUNUSEDPARM(self), PyOb
   MapiToICal *temp3 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
+  HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
   {
@@ -3853,10 +3862,17 @@ SWIGINTERN PyObject *_wrap_CreateMapiToICal(PyObject *SWIGUNUSEDPARM(self), PyOb
   }
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
-    CreateMapiToICal(arg1,(std::string const &)*arg2,arg3);
+    result = CreateMapiToICal(arg1,(std::string const &)*arg2,arg3);
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
-  resultobj = SWIG_Py_Void();
+  {
+    resultobj = Py_None;
+    Py_INCREF(Py_None);
+    if(FAILED(result)) {
+      DoException(result);
+      SWIG_fail;
+    }
+  }
   {
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)*(arg3), SWIGTYPE_p_MapiToICal, SWIG_SHADOW | SWIG_OWNER));
   }

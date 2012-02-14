@@ -405,6 +405,23 @@ class IMsgStore(IMAPIProp):
 IMsgStore_swigregister = _MAPICore.IMsgStore_swigregister
 IMsgStore_swigregister(IMsgStore)
 
+class IProxyStoreObject(IUnknown):
+    __swig_setmethods__ = {}
+    for _s in [IUnknown]: __swig_setmethods__.update(getattr(_s,'__swig_setmethods__',{}))
+    __setattr__ = lambda self, name, value: _swig_setattr(self, IProxyStoreObject, name, value)
+    __swig_getmethods__ = {}
+    for _s in [IUnknown]: __swig_getmethods__.update(getattr(_s,'__swig_getmethods__',{}))
+    __getattr__ = lambda self, name: _swig_getattr(self, IProxyStoreObject, name)
+    def __init__(self, *args, **kwargs): raise AttributeError, "No constructor defined"
+    __repr__ = _swig_repr
+    def PlaceHolder1(*args): return _MAPICore.IProxyStoreObject_PlaceHolder1(*args)
+    def PlaceHolder2(*args): return _MAPICore.IProxyStoreObject_PlaceHolder2(*args)
+    __swig_destroy__ = _MAPICore.delete_IProxyStoreObject
+    __del__ = lambda self : None;
+    def UnwrapNoRef(*args): return _MAPICore.IProxyStoreObject_UnwrapNoRef(*args)
+IProxyStoreObject_swigregister = _MAPICore.IProxyStoreObject_swigregister
+IProxyStoreObject_swigregister(IProxyStoreObject)
+
 FOLDER_ROOT = _MAPICore.FOLDER_ROOT
 FOLDER_GENERIC = _MAPICore.FOLDER_GENERIC
 FOLDER_SEARCH = _MAPICore.FOLDER_SEARCH
@@ -849,6 +866,7 @@ MAPI_ALLOW_OTHERS = _MAPICore.MAPI_ALLOW_OTHERS
 MAPI_EXPLICIT_PROFILE = _MAPICore.MAPI_EXPLICIT_PROFILE
 MAPI_SERVICE_UI_ALWAYS = _MAPICore.MAPI_SERVICE_UI_ALWAYS
 MAPI_NO_MAIL = _MAPICore.MAPI_NO_MAIL
+MAPI_NT_SERVICE = _MAPICore.MAPI_NT_SERVICE
 MAPI_TIMEOUT_SHORT = _MAPICore.MAPI_TIMEOUT_SHORT
 class MAPIINIT_0(_object):
     __swig_setmethods__ = {}
@@ -1333,6 +1351,8 @@ class IECServiceAdmin(IUnknown):
     def GetSendAsList(*args): return _MAPICore.IECServiceAdmin_GetSendAsList(*args)
     def AddSendAsUser(*args): return _MAPICore.IECServiceAdmin_AddSendAsUser(*args)
     def DelSendAsUser(*args): return _MAPICore.IECServiceAdmin_DelSendAsUser(*args)
+    def GetUserClientUpdateStatus(*args): return _MAPICore.IECServiceAdmin_GetUserClientUpdateStatus(*args)
+    def RemoveAllObjects(*args): return _MAPICore.IECServiceAdmin_RemoveAllObjects(*args)
     def CreateGroup(*args): return _MAPICore.IECServiceAdmin_CreateGroup(*args)
     def DeleteGroup(*args): return _MAPICore.IECServiceAdmin_DeleteGroup(*args)
     def SetGroup(*args): return _MAPICore.IECServiceAdmin_SetGroup(*args)

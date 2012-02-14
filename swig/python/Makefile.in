@@ -83,6 +83,7 @@ _RecurrenceState_la_LINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) \
 	$(CXXFLAGS) $(_RecurrenceState_la_LDFLAGS) $(LDFLAGS) -o $@
 _archiver_la_DEPENDENCIES =  \
 	${top_builddir}/ECtools/zarafa-archiver/libarchiver.la \
+	${top_builddir}/ECtools/zarafa-archiver/libarchiver-core.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am__archiver_la_OBJECTS = _archiver_la-archiver_wrap.lo \
 	_archiver_la-archiver_conv.lo
@@ -425,6 +426,7 @@ _icalmapi_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
 _archiver_la_CXXFLAGS = -I${top_srcdir}/ECtools/zarafa-archiver
 _archiver_la_LDFLAGS = -module -avoid-version -rpath '$(libdir)'
 _archiver_la_LIBADD = ${top_builddir}/ECtools/zarafa-archiver/libarchiver.la \
+						${top_builddir}/ECtools/zarafa-archiver/libarchiver-core.la \
 						$(PROG_LIBS) $(PYTHON_LIBS)
 
 _licenseclient_la_CXXFLAGS = -I${top_srcdir}/provider/common -I${top_builddir}/provider/soap -I${top_srcdir}/provider/soap

@@ -54,6 +54,7 @@
 #include "ECDefs.h"		// LPECUSER
 
 
+LPSPropValue	Object_to_LPSPropValue(PyObject *object, void *lpBase = NULL);
 PyObject *		List_from_LPSPropValue(LPSPropValue lpProps, ULONG cValues);
 LPSPropValue	List_to_LPSPropValue(PyObject *sv, ULONG *cValues, void *lpBase = NULL);
 
@@ -65,6 +66,11 @@ PyObject *		List_from_LPSPropTagArray(LPSPropTagArray lpPropTagArray);
 LPSRestriction	Object_to_LPSRestriction(PyObject *sv, void *lpBase = NULL);
 void			Object_to_LPSRestriction(PyObject *sv, LPSRestriction lpsRestriction, void *lpBase = NULL);
 PyObject *		Object_from_LPSRestriction(LPSRestriction lpRestriction);
+
+PyObject *		Object_from_LPACTION(LPACTION lpAction);
+PyObject *		Object_from_LPACTIONS(ACTIONS *lpsActions);
+void			Object_to_LPACTION(PyObject *object, ACTION *lpAction, void *lpBase);
+void			Object_to_LPACTIONS(PyObject *object, ACTIONS *lpActions, void *lpBase = NULL);
 
 LPSSortOrderSet	Object_to_LPSSortOrderSet(PyObject *sv);
 PyObject *		Object_from_LPSSortOrderSet(LPSSortOrderSet lpSortOrderSet);
@@ -88,8 +94,8 @@ PyObject *		List_from_LPENTRYLIST(LPENTRYLIST lpEntryList);
 
 LPNOTIFICATION	List_to_LPNOTIFICATION(PyObject *, ULONG *lpcNames);
 PyObject *		List_from_LPNOTIFICATION(LPNOTIFICATION lpNotif, ULONG cNotifs);
-PyObject *		Object_from_p_NOTIFICATION(NOTIFICATION *lpNotif);
-NOTIFICATION *	Object_to_p_NOTIFICATION(PyObject *);
+PyObject *		Object_from_LPNOTIFICATION(NOTIFICATION *lpNotif);
+NOTIFICATION *	Object_to_LPNOTIFICATION(PyObject *);
 
 LPFlagList		List_to_LPFlagList(PyObject *);
 PyObject *		List_from_LPFlagList(LPFlagList lpFlags);
@@ -117,7 +123,17 @@ PyObject *		List_from_LPECCOMPANY(LPECCOMPANY lpCompany, ULONG cElements);
 LPECQUOTA		Object_to_LPECQUOTA(PyObject *);
 PyObject *		Object_from_LPECQUOTA(LPECQUOTA lpQuota);
 
+PyObject *		Object_from_LPECQUOTASTATUS(LPECQUOTASTATUS lpQuotaStatus);
+
+PyObject *		Object_from_LPECUSERCLIENTUPDATESTATUS(LPECUSERCLIENTUPDATESTATUS lpECUCUS);
+
 LPROWLIST		List_to_LPROWLIST(PyObject *);
+
+LPECSVRNAMELIST List_to_LPECSVRNAMELIST(PyObject *object);
+
+PyObject *		Object_from_LPECSERVER(LPECSERVER lpServer);
+
+PyObject *		List_from_LPECSERVERLIST(LPECSERVERLIST lpServerList);
 
 void			Init();
 

@@ -2988,171 +2988,170 @@ namespace Swig {
 
 /* -------- TYPES TABLE (BEGIN) -------- */
 
-#define SWIGTYPE_p_ECChangeAdviseSink swig_types[0]
-#define SWIGTYPE_p_ECImportContentsChanges swig_types[1]
-#define SWIGTYPE_p_ECLogger swig_types[2]
-#define SWIGTYPE_p_ECSimpleLogger swig_types[3]
-#define SWIGTYPE_p_ECSyncLog swig_types[4]
-#define SWIGTYPE_p_ECSyncSettings swig_types[5]
-#define SWIGTYPE_p_ExchangeExportChanges swig_types[6]
-#define SWIGTYPE_p_ExchangeImportContentsChanges swig_types[7]
-#define SWIGTYPE_p_ExchangeImportHierarchyChanges swig_types[8]
-#define SWIGTYPE_p_GUID swig_types[9]
-#define SWIGTYPE_p_IABContainer swig_types[10]
-#define SWIGTYPE_p_IAddrBook swig_types[11]
-#define SWIGTYPE_p_IAttach swig_types[12]
-#define SWIGTYPE_p_IDistList swig_types[13]
-#define SWIGTYPE_p_IECChangeAdviseSink swig_types[14]
-#define SWIGTYPE_p_IECChangeAdvisor swig_types[15]
-#define SWIGTYPE_p_IECExportChanges swig_types[16]
-#define SWIGTYPE_p_IECImportContentsChanges swig_types[17]
-#define SWIGTYPE_p_IECLicense swig_types[18]
-#define SWIGTYPE_p_IECMultiStoreTable swig_types[19]
-#define SWIGTYPE_p_IECServiceAdmin swig_types[20]
-#define SWIGTYPE_p_IECSingleInstance swig_types[21]
-#define SWIGTYPE_p_IECSpooler swig_types[22]
-#define SWIGTYPE_p_IECTestProtocol swig_types[23]
-#define SWIGTYPE_p_IExchangeExportChanges swig_types[24]
-#define SWIGTYPE_p_IExchangeImportContentsChanges swig_types[25]
-#define SWIGTYPE_p_IExchangeImportHierarchyChanges swig_types[26]
-#define SWIGTYPE_p_IExchangeManageStore swig_types[27]
-#define SWIGTYPE_p_IExchangeModifyTable swig_types[28]
-#define SWIGTYPE_p_IID swig_types[29]
-#define SWIGTYPE_p_IMAPIAdviseSink swig_types[30]
-#define SWIGTYPE_p_IMAPIContainer swig_types[31]
-#define SWIGTYPE_p_IMAPIFolder swig_types[32]
-#define SWIGTYPE_p_IMAPIProgress swig_types[33]
-#define SWIGTYPE_p_IMAPIProp swig_types[34]
-#define SWIGTYPE_p_IMAPISession swig_types[35]
-#define SWIGTYPE_p_IMAPIStatus swig_types[36]
-#define SWIGTYPE_p_IMAPITable swig_types[37]
-#define SWIGTYPE_p_IMailUser swig_types[38]
-#define SWIGTYPE_p_IMessage swig_types[39]
-#define SWIGTYPE_p_IMsgServiceAdmin swig_types[40]
-#define SWIGTYPE_p_IMsgStore swig_types[41]
-#define SWIGTYPE_p_IProfAdmin swig_types[42]
-#define SWIGTYPE_p_IProfSect swig_types[43]
-#define SWIGTYPE_p_IProviderAdmin swig_types[44]
-#define SWIGTYPE_p_ISequentialStream swig_types[45]
-#define SWIGTYPE_p_IStream swig_types[46]
-#define SWIGTYPE_p_IUnknown swig_types[47]
-#define SWIGTYPE_p_LARGE_INTEGER swig_types[48]
-#define SWIGTYPE_p_LPADRENTRY swig_types[49]
-#define SWIGTYPE_p_LPADRLIST swig_types[50]
-#define SWIGTYPE_p_LPADRPARM swig_types[51]
-#define SWIGTYPE_p_LPCIID swig_types[52]
-#define SWIGTYPE_p_LPECCOMPANY swig_types[53]
-#define SWIGTYPE_p_LPECGROUP swig_types[54]
-#define SWIGTYPE_p_LPECQUOTA swig_types[55]
-#define SWIGTYPE_p_LPECQUOTASTATUS swig_types[56]
-#define SWIGTYPE_p_LPECSERVERLIST swig_types[57]
-#define SWIGTYPE_p_LPECSVRNAMELIST swig_types[58]
-#define SWIGTYPE_p_LPECUSER swig_types[59]
-#define SWIGTYPE_p_LPENTRYID swig_types[60]
-#define SWIGTYPE_p_LPENTRYLIST swig_types[61]
-#define SWIGTYPE_p_LPFNBUTTON swig_types[62]
-#define SWIGTYPE_p_LPFNDISMISS swig_types[63]
-#define SWIGTYPE_p_LPFlagList swig_types[64]
-#define SWIGTYPE_p_LPGUID swig_types[65]
-#define SWIGTYPE_p_LPMAPIADVISESINK swig_types[66]
-#define SWIGTYPE_p_LPMAPIERROR swig_types[67]
-#define SWIGTYPE_p_LPMAPIFOLDER swig_types[68]
-#define SWIGTYPE_p_LPMAPINAMEID swig_types[69]
-#define SWIGTYPE_p_LPMAPIPROP swig_types[70]
-#define SWIGTYPE_p_LPMAPITABLE swig_types[71]
-#define SWIGTYPE_p_LPMAPIUID swig_types[72]
-#define SWIGTYPE_p_LPMDB swig_types[73]
-#define SWIGTYPE_p_LPMESSAGE swig_types[74]
-#define SWIGTYPE_p_LPNOTIFICATION swig_types[75]
-#define SWIGTYPE_p_LPREADSTATE swig_types[76]
-#define SWIGTYPE_p_LPROWLIST swig_types[77]
-#define SWIGTYPE_p_LPSPropProblemArray swig_types[78]
-#define SWIGTYPE_p_LPSPropTagArray swig_types[79]
-#define SWIGTYPE_p_LPSPropValue swig_types[80]
-#define SWIGTYPE_p_LPSRestriction swig_types[81]
-#define SWIGTYPE_p_LPSRowSet swig_types[82]
-#define SWIGTYPE_p_LPSSortOrderSet swig_types[83]
-#define SWIGTYPE_p_LPUNKNOWN swig_types[84]
-#define SWIGTYPE_p_MAPIAdviseSink swig_types[85]
-#define SWIGTYPE_p_MAPIINIT_0 swig_types[86]
-#define SWIGTYPE_p_MAPINotifSink swig_types[87]
-#define SWIGTYPE_p_STATSTG swig_types[88]
-#define SWIGTYPE_p_Stream swig_types[89]
-#define SWIGTYPE_p_ULARGE_INTEGER swig_types[90]
-#define SWIGTYPE_p___int64 swig_types[91]
-#define SWIGTYPE_p_bool swig_types[92]
-#define SWIGTYPE_p_char swig_types[93]
-#define SWIGTYPE_p_float swig_types[94]
-#define SWIGTYPE_p_int swig_types[95]
-#define SWIGTYPE_p_long swig_types[96]
-#define SWIGTYPE_p_p_ECChangeAdviseSink swig_types[97]
-#define SWIGTYPE_p_p_ECImportContentsChanges swig_types[98]
-#define SWIGTYPE_p_p_ECLogger swig_types[99]
-#define SWIGTYPE_p_p_ExchangeExportChanges swig_types[100]
-#define SWIGTYPE_p_p_ExchangeImportContentsChanges swig_types[101]
-#define SWIGTYPE_p_p_ExchangeImportHierarchyChanges swig_types[102]
-#define SWIGTYPE_p_p_IABContainer swig_types[103]
-#define SWIGTYPE_p_p_IAddrBook swig_types[104]
-#define SWIGTYPE_p_p_IAttach swig_types[105]
-#define SWIGTYPE_p_p_IDistList swig_types[106]
-#define SWIGTYPE_p_p_IECChangeAdviseSink swig_types[107]
-#define SWIGTYPE_p_p_IECChangeAdvisor swig_types[108]
-#define SWIGTYPE_p_p_IECExportChanges swig_types[109]
-#define SWIGTYPE_p_p_IECImportContentsChanges swig_types[110]
-#define SWIGTYPE_p_p_IECLicense swig_types[111]
-#define SWIGTYPE_p_p_IECMultiStoreTable swig_types[112]
-#define SWIGTYPE_p_p_IECServiceAdmin swig_types[113]
-#define SWIGTYPE_p_p_IECSingleInstance swig_types[114]
-#define SWIGTYPE_p_p_IECTestProtocol swig_types[115]
-#define SWIGTYPE_p_p_IExchangeExportChanges swig_types[116]
-#define SWIGTYPE_p_p_IExchangeImportContentsChanges swig_types[117]
-#define SWIGTYPE_p_p_IExchangeImportHierarchyChanges swig_types[118]
-#define SWIGTYPE_p_p_IExchangeManageStore swig_types[119]
-#define SWIGTYPE_p_p_IExchangeModifyTable swig_types[120]
-#define SWIGTYPE_p_p_IMAPIAdviseSink swig_types[121]
-#define SWIGTYPE_p_p_IMAPIContainer swig_types[122]
-#define SWIGTYPE_p_p_IMAPIFolder swig_types[123]
-#define SWIGTYPE_p_p_IMAPIProgress swig_types[124]
-#define SWIGTYPE_p_p_IMAPIProp swig_types[125]
-#define SWIGTYPE_p_p_IMAPISession swig_types[126]
-#define SWIGTYPE_p_p_IMAPIStatus swig_types[127]
-#define SWIGTYPE_p_p_IMAPITable swig_types[128]
-#define SWIGTYPE_p_p_IMailUser swig_types[129]
-#define SWIGTYPE_p_p_IMessage swig_types[130]
-#define SWIGTYPE_p_p_IMsgServiceAdmin swig_types[131]
-#define SWIGTYPE_p_p_IMsgStore swig_types[132]
-#define SWIGTYPE_p_p_IProfAdmin swig_types[133]
-#define SWIGTYPE_p_p_IProfSect swig_types[134]
-#define SWIGTYPE_p_p_IProviderAdmin swig_types[135]
-#define SWIGTYPE_p_p_ISequentialStream swig_types[136]
-#define SWIGTYPE_p_p_IStream swig_types[137]
-#define SWIGTYPE_p_p_IUnknown swig_types[138]
-#define SWIGTYPE_p_p_LPMAPINAMEID swig_types[139]
-#define SWIGTYPE_p_p_MAPIAdviseSink swig_types[140]
-#define SWIGTYPE_p_p_MAPIERROR swig_types[141]
-#define SWIGTYPE_p_p_MAPINotifSink swig_types[142]
-#define SWIGTYPE_p_p_Stream swig_types[143]
-#define SWIGTYPE_p_p_char swig_types[144]
-#define SWIGTYPE_p_p_p_char swig_types[145]
-#define SWIGTYPE_p_p_unsigned_char swig_types[146]
-#define SWIGTYPE_p_p_unsigned_long swig_types[147]
-#define SWIGTYPE_p_p_void swig_types[148]
-#define SWIGTYPE_p_short swig_types[149]
-#define SWIGTYPE_p_signed___int64 swig_types[150]
-#define SWIGTYPE_p_signed_char swig_types[151]
-#define SWIGTYPE_p_tagLOCKTYPE swig_types[152]
-#define SWIGTYPE_p_tagSTATFLAG swig_types[153]
-#define SWIGTYPE_p_tagSTGTY swig_types[154]
-#define SWIGTYPE_p_tagSTREAM_SEEK swig_types[155]
-#define SWIGTYPE_p_unsigned___int64 swig_types[156]
-#define SWIGTYPE_p_unsigned_char swig_types[157]
-#define SWIGTYPE_p_unsigned_int swig_types[158]
-#define SWIGTYPE_p_unsigned_long swig_types[159]
-#define SWIGTYPE_p_unsigned_short swig_types[160]
-#define SWIGTYPE_p_void swig_types[161]
-#define SWIGTYPE_p_wchar_t swig_types[162]
-static swig_type_info *swig_types[164];
-static swig_module_info swig_module = {swig_types, 163, 0, 0, 0, 0};
+#define SWIGTYPE_p_BYTE swig_types[0]
+#define SWIGTYPE_p_ECChangeAdviseSink swig_types[1]
+#define SWIGTYPE_p_ECImportContentsChanges swig_types[2]
+#define SWIGTYPE_p_ECLogger swig_types[3]
+#define SWIGTYPE_p_ECSimpleLogger swig_types[4]
+#define SWIGTYPE_p_ECSyncLog swig_types[5]
+#define SWIGTYPE_p_ECSyncSettings swig_types[6]
+#define SWIGTYPE_p_ExchangeExportChanges swig_types[7]
+#define SWIGTYPE_p_ExchangeImportContentsChanges swig_types[8]
+#define SWIGTYPE_p_ExchangeImportHierarchyChanges swig_types[9]
+#define SWIGTYPE_p_GUID swig_types[10]
+#define SWIGTYPE_p_IABContainer swig_types[11]
+#define SWIGTYPE_p_IAddrBook swig_types[12]
+#define SWIGTYPE_p_IAttach swig_types[13]
+#define SWIGTYPE_p_IDistList swig_types[14]
+#define SWIGTYPE_p_IECChangeAdviseSink swig_types[15]
+#define SWIGTYPE_p_IECChangeAdvisor swig_types[16]
+#define SWIGTYPE_p_IECExportChanges swig_types[17]
+#define SWIGTYPE_p_IECImportContentsChanges swig_types[18]
+#define SWIGTYPE_p_IECLicense swig_types[19]
+#define SWIGTYPE_p_IECMultiStoreTable swig_types[20]
+#define SWIGTYPE_p_IECServiceAdmin swig_types[21]
+#define SWIGTYPE_p_IECSingleInstance swig_types[22]
+#define SWIGTYPE_p_IECSpooler swig_types[23]
+#define SWIGTYPE_p_IECTestProtocol swig_types[24]
+#define SWIGTYPE_p_IExchangeExportChanges swig_types[25]
+#define SWIGTYPE_p_IExchangeImportContentsChanges swig_types[26]
+#define SWIGTYPE_p_IExchangeImportHierarchyChanges swig_types[27]
+#define SWIGTYPE_p_IExchangeManageStore swig_types[28]
+#define SWIGTYPE_p_IExchangeModifyTable swig_types[29]
+#define SWIGTYPE_p_IID swig_types[30]
+#define SWIGTYPE_p_IMAPIAdviseSink swig_types[31]
+#define SWIGTYPE_p_IMAPIContainer swig_types[32]
+#define SWIGTYPE_p_IMAPIFolder swig_types[33]
+#define SWIGTYPE_p_IMAPIProgress swig_types[34]
+#define SWIGTYPE_p_IMAPIProp swig_types[35]
+#define SWIGTYPE_p_IMAPISession swig_types[36]
+#define SWIGTYPE_p_IMAPIStatus swig_types[37]
+#define SWIGTYPE_p_IMAPITable swig_types[38]
+#define SWIGTYPE_p_IMailUser swig_types[39]
+#define SWIGTYPE_p_IMessage swig_types[40]
+#define SWIGTYPE_p_IMsgServiceAdmin swig_types[41]
+#define SWIGTYPE_p_IMsgStore swig_types[42]
+#define SWIGTYPE_p_IProfAdmin swig_types[43]
+#define SWIGTYPE_p_IProfSect swig_types[44]
+#define SWIGTYPE_p_IProviderAdmin swig_types[45]
+#define SWIGTYPE_p_IProxyStoreObject swig_types[46]
+#define SWIGTYPE_p_ISequentialStream swig_types[47]
+#define SWIGTYPE_p_IStream swig_types[48]
+#define SWIGTYPE_p_IUnknown swig_types[49]
+#define SWIGTYPE_p_LARGE_INTEGER swig_types[50]
+#define SWIGTYPE_p_LONG swig_types[51]
+#define SWIGTYPE_p_LPADRENTRY swig_types[52]
+#define SWIGTYPE_p_LPADRLIST swig_types[53]
+#define SWIGTYPE_p_LPADRPARM swig_types[54]
+#define SWIGTYPE_p_LPBYTE swig_types[55]
+#define SWIGTYPE_p_LPCIID swig_types[56]
+#define SWIGTYPE_p_LPECCOMPANY swig_types[57]
+#define SWIGTYPE_p_LPECGROUP swig_types[58]
+#define SWIGTYPE_p_LPECQUOTA swig_types[59]
+#define SWIGTYPE_p_LPECQUOTASTATUS swig_types[60]
+#define SWIGTYPE_p_LPECSERVERLIST swig_types[61]
+#define SWIGTYPE_p_LPECSVRNAMELIST swig_types[62]
+#define SWIGTYPE_p_LPECUSER swig_types[63]
+#define SWIGTYPE_p_LPECUSERCLIENTUPDATESTATUS swig_types[64]
+#define SWIGTYPE_p_LPENTRYID swig_types[65]
+#define SWIGTYPE_p_LPENTRYLIST swig_types[66]
+#define SWIGTYPE_p_LPFNBUTTON swig_types[67]
+#define SWIGTYPE_p_LPFNDISMISS swig_types[68]
+#define SWIGTYPE_p_LPFlagList swig_types[69]
+#define SWIGTYPE_p_LPGUID swig_types[70]
+#define SWIGTYPE_p_LPMAPIADVISESINK swig_types[71]
+#define SWIGTYPE_p_LPMAPIERROR swig_types[72]
+#define SWIGTYPE_p_LPMAPIFOLDER swig_types[73]
+#define SWIGTYPE_p_LPMAPINAMEID swig_types[74]
+#define SWIGTYPE_p_LPMAPIPROP swig_types[75]
+#define SWIGTYPE_p_LPMAPITABLE swig_types[76]
+#define SWIGTYPE_p_LPMAPIUID swig_types[77]
+#define SWIGTYPE_p_LPMDB swig_types[78]
+#define SWIGTYPE_p_LPMESSAGE swig_types[79]
+#define SWIGTYPE_p_LPNOTIFICATION swig_types[80]
+#define SWIGTYPE_p_LPREADSTATE swig_types[81]
+#define SWIGTYPE_p_LPROWLIST swig_types[82]
+#define SWIGTYPE_p_LPSPropProblemArray swig_types[83]
+#define SWIGTYPE_p_LPSPropTagArray swig_types[84]
+#define SWIGTYPE_p_LPSPropValue swig_types[85]
+#define SWIGTYPE_p_LPSRestriction swig_types[86]
+#define SWIGTYPE_p_LPSRowSet swig_types[87]
+#define SWIGTYPE_p_LPSSortOrderSet swig_types[88]
+#define SWIGTYPE_p_LPSTR swig_types[89]
+#define SWIGTYPE_p_LPTSTR swig_types[90]
+#define SWIGTYPE_p_LPUNKNOWN swig_types[91]
+#define SWIGTYPE_p_LPVOID swig_types[92]
+#define SWIGTYPE_p_MAPIAdviseSink swig_types[93]
+#define SWIGTYPE_p_MAPIINIT_0 swig_types[94]
+#define SWIGTYPE_p_MAPINotifSink swig_types[95]
+#define SWIGTYPE_p_STATSTG swig_types[96]
+#define SWIGTYPE_p_Stream swig_types[97]
+#define SWIGTYPE_p_ULARGE_INTEGER swig_types[98]
+#define SWIGTYPE_p_ULONG swig_types[99]
+#define SWIGTYPE_p_bool swig_types[100]
+#define SWIGTYPE_p_char swig_types[101]
+#define SWIGTYPE_p_p_ECChangeAdviseSink swig_types[102]
+#define SWIGTYPE_p_p_ECImportContentsChanges swig_types[103]
+#define SWIGTYPE_p_p_ECLogger swig_types[104]
+#define SWIGTYPE_p_p_ExchangeExportChanges swig_types[105]
+#define SWIGTYPE_p_p_ExchangeImportContentsChanges swig_types[106]
+#define SWIGTYPE_p_p_ExchangeImportHierarchyChanges swig_types[107]
+#define SWIGTYPE_p_p_IABContainer swig_types[108]
+#define SWIGTYPE_p_p_IAddrBook swig_types[109]
+#define SWIGTYPE_p_p_IAttach swig_types[110]
+#define SWIGTYPE_p_p_IDistList swig_types[111]
+#define SWIGTYPE_p_p_IECChangeAdviseSink swig_types[112]
+#define SWIGTYPE_p_p_IECChangeAdvisor swig_types[113]
+#define SWIGTYPE_p_p_IECExportChanges swig_types[114]
+#define SWIGTYPE_p_p_IECImportContentsChanges swig_types[115]
+#define SWIGTYPE_p_p_IECLicense swig_types[116]
+#define SWIGTYPE_p_p_IECMultiStoreTable swig_types[117]
+#define SWIGTYPE_p_p_IECServiceAdmin swig_types[118]
+#define SWIGTYPE_p_p_IECSingleInstance swig_types[119]
+#define SWIGTYPE_p_p_IECTestProtocol swig_types[120]
+#define SWIGTYPE_p_p_IExchangeExportChanges swig_types[121]
+#define SWIGTYPE_p_p_IExchangeImportContentsChanges swig_types[122]
+#define SWIGTYPE_p_p_IExchangeImportHierarchyChanges swig_types[123]
+#define SWIGTYPE_p_p_IExchangeManageStore swig_types[124]
+#define SWIGTYPE_p_p_IExchangeModifyTable swig_types[125]
+#define SWIGTYPE_p_p_IMAPIAdviseSink swig_types[126]
+#define SWIGTYPE_p_p_IMAPIContainer swig_types[127]
+#define SWIGTYPE_p_p_IMAPIFolder swig_types[128]
+#define SWIGTYPE_p_p_IMAPIProgress swig_types[129]
+#define SWIGTYPE_p_p_IMAPIProp swig_types[130]
+#define SWIGTYPE_p_p_IMAPISession swig_types[131]
+#define SWIGTYPE_p_p_IMAPIStatus swig_types[132]
+#define SWIGTYPE_p_p_IMAPITable swig_types[133]
+#define SWIGTYPE_p_p_IMailUser swig_types[134]
+#define SWIGTYPE_p_p_IMessage swig_types[135]
+#define SWIGTYPE_p_p_IMsgServiceAdmin swig_types[136]
+#define SWIGTYPE_p_p_IMsgStore swig_types[137]
+#define SWIGTYPE_p_p_IProfAdmin swig_types[138]
+#define SWIGTYPE_p_p_IProfSect swig_types[139]
+#define SWIGTYPE_p_p_IProviderAdmin swig_types[140]
+#define SWIGTYPE_p_p_IProxyStoreObject swig_types[141]
+#define SWIGTYPE_p_p_ISequentialStream swig_types[142]
+#define SWIGTYPE_p_p_IStream swig_types[143]
+#define SWIGTYPE_p_p_IUnknown swig_types[144]
+#define SWIGTYPE_p_p_LPMAPINAMEID swig_types[145]
+#define SWIGTYPE_p_p_LPTSTR swig_types[146]
+#define SWIGTYPE_p_p_MAPIAdviseSink swig_types[147]
+#define SWIGTYPE_p_p_MAPIERROR swig_types[148]
+#define SWIGTYPE_p_p_MAPINotifSink swig_types[149]
+#define SWIGTYPE_p_p_Stream swig_types[150]
+#define SWIGTYPE_p_p_char swig_types[151]
+#define SWIGTYPE_p_p_unsigned_char swig_types[152]
+#define SWIGTYPE_p_p_void swig_types[153]
+#define SWIGTYPE_p_tagLOCKTYPE swig_types[154]
+#define SWIGTYPE_p_tagSTATFLAG swig_types[155]
+#define SWIGTYPE_p_tagSTGTY swig_types[156]
+#define SWIGTYPE_p_tagSTREAM_SEEK swig_types[157]
+#define SWIGTYPE_p_unsigned_char swig_types[158]
+#define SWIGTYPE_p_unsigned_int swig_types[159]
+#define SWIGTYPE_p_void swig_types[160]
+#define SWIGTYPE_p_wchar_t swig_types[161]
+static swig_type_info *swig_types[163];
+static swig_module_info swig_module = {swig_types, 162, 0, 0, 0, 0};
 #define SWIG_TypeQuery(name) SWIG_TypeQueryModule(&swig_module, &swig_module, name)
 #define SWIG_MangledTypeQuery(name) SWIG_MangledTypeQueryModule(&swig_module, &swig_module, name)
 
@@ -3757,6 +3756,15 @@ SWIG_FromWCharPtr(const wchar_t *cptr)
 }
 
 SWIGINTERN void delete_IMsgStore(IMsgStore *self){ self->Release(); }
+SWIGINTERN void delete_IProxyStoreObject(IProxyStoreObject *self){ self->Release(); }
+SWIGINTERN HRESULT IProxyStoreObject_UnwrapNoRef(IProxyStoreObject *self,IUnknown **OUTPUT){
+            HRESULT hr = 0;
+            hr = self->UnwrapNoRef((LPVOID*)OUTPUT);
+            if(hr == 0)
+                (*OUTPUT)->AddRef();
+
+            return hr;          
+        }
 SWIGINTERN void delete_IMAPIFolder(IMAPIFolder *self){ self->Release(); }
 SWIGINTERN void delete_IMessage(IMessage *self){ self->Release(); }
 SWIGINTERN void delete_IAttach(IAttach *self){ self->Release(); }
@@ -3934,6 +3942,7 @@ swig_type_info *TypeFromIID(REFIID iid)
   TYPECASE(IECChangeAdviseSink)
   TYPECASE(IECSingleInstance)
   TYPECASE(IECLicense)
+  TYPECASE(IProxyStoreObject)
   return NULL;
 }
 
@@ -3964,6 +3973,7 @@ LPCIID IIDFromType(const char *type)
   IIDCASE(IECChangeAdviseSink)
   IIDCASE(IECSingleInstance)
   IIDCASE(IECLicense)
+  IIDCASE(IProxyStoreObject)
   return &IID_IUnknown;
 }
 
@@ -4958,7 +4968,7 @@ HRESULT SwigDirector_ExchangeExportChanges::Synchronize(ULONG *lpulSteps, ULONG 
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
   {
     swig::PyObject_var obj0;
-    obj0 = SWIG_NewPointerObj(SWIG_as_voidptr(INOUT), SWIGTYPE_p_unsigned_long,  0 );
+    obj0 = SWIG_NewPointerObj(SWIG_as_voidptr(INOUT), SWIGTYPE_p_ULONG,  0 );
     if (!swig_get_self()) {
       Swig::DirectorException::raise("'self' uninitialized, maybe you forgot to call ExchangeExportChanges.__init__.");
     }
@@ -5552,9 +5562,11 @@ HRESULT SwigDirector_ECImportContentsChanges::ConfigForConversionStream(IStream 
     swig::PyObject_var obj1;
     obj1 = SWIG_From_unsigned_SS_int(static_cast< unsigned int >(ulFlags));
     swig::PyObject_var obj2;
-    obj2 = SWIG_From_unsigned_SS_int(static_cast< unsigned int >(cValuesConversion));
-    swig::PyObject_var obj3;
-    obj3 = SWIG_NewPointerObj(SWIG_as_voidptr(&lpPropArrayConversion), SWIGTYPE_p_LPSPropValue,  0 );
+    {
+      obj2 = List_from_LPSPropValue(lpPropArrayConversion, cValuesConversion);
+      if(PyErr_Occurred())
+      Swig::DirectorTypeMismatchException::raise(SWIG_ErrorType(SWIG_ArgError(0)), "in output value of type '""ULONG""'");
+    }
     if (!swig_get_self()) {
       Swig::DirectorException::raise("'self' uninitialized, maybe you forgot to call ECImportContentsChanges.__init__.");
     }
@@ -5562,9 +5574,9 @@ HRESULT SwigDirector_ECImportContentsChanges::ConfigForConversionStream(IStream 
     const size_t swig_method_index = 7;
     const char * const swig_method_name = "ConfigForConversionStream";
     PyObject* method = swig_get_method(swig_method_index, swig_method_name);
-    swig::PyObject_var result = PyObject_CallFunction(method, (char *)"(OOOO)" ,(PyObject *)obj0,(PyObject *)obj1,(PyObject *)obj2,(PyObject *)obj3);
+    swig::PyObject_var result = PyObject_CallFunction(method, (char *)"(OOO)" ,(PyObject *)obj0,(PyObject *)obj1,(PyObject *)obj2);
 #else
-    swig::PyObject_var result = PyObject_CallMethod(swig_get_self(), (char *)"ConfigForConversionStream", (char *)"(OOOO)" ,(PyObject *)obj0,(PyObject *)obj1,(PyObject *)obj2,(PyObject *)obj3);
+    swig::PyObject_var result = PyObject_CallMethod(swig_get_self(), (char *)"ConfigForConversionStream", (char *)"(OOO)" ,(PyObject *)obj0,(PyObject *)obj1,(PyObject *)obj2);
 #endif
     if (result == NULL) {
       PyObject *error = PyErr_Occurred();
@@ -6467,7 +6479,7 @@ SWIGINTERN PyObject *_wrap_IUnknown_QueryInterface(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->QueryInterface((IID const &)*arg2,arg3);
+        result = (arg1)->QueryInterface((IID const &)*arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -6578,7 +6590,7 @@ SWIGINTERN PyObject *_wrap_ISequentialStream_Write(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Write((char const *)arg2,arg3,arg4);
+        result = (arg1)->Write((char const *)arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -6599,7 +6611,7 @@ SWIGINTERN PyObject *_wrap_ISequentialStream_Write(PyObject *SWIGUNUSEDPARM(self
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg4)));
   } else {
     int new_flags = SWIG_IsNewObj(res4) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_ULONG, new_flags));
   }
   if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
   SWIG_PYTHON_THREAD_END_BLOCK;
@@ -6645,7 +6657,7 @@ SWIGINTERN PyObject *_wrap_ISequentialStream_Read(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)ISequentialStream_Read(arg1,arg2,arg3,arg4);
+        result = ISequentialStream_Read(arg1,arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -6760,7 +6772,7 @@ SWIGINTERN PyObject *_wrap_IStream_Seek(PyObject *SWIGUNUSEDPARM(self), PyObject
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Seek(arg2,arg3,arg4);
+        result = (arg1)->Seek(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -6816,7 +6828,7 @@ SWIGINTERN PyObject *_wrap_IStream_SetSize(PyObject *SWIGUNUSEDPARM(self), PyObj
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetSize(arg2);
+        result = (arg1)->SetSize(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -6888,7 +6900,7 @@ SWIGINTERN PyObject *_wrap_IStream_CopyTo(PyObject *SWIGUNUSEDPARM(self), PyObje
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CopyTo(arg2,arg3,arg4,arg5);
+        result = (arg1)->CopyTo(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -6948,7 +6960,7 @@ SWIGINTERN PyObject *_wrap_IStream_Commit(PyObject *SWIGUNUSEDPARM(self), PyObje
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Commit(arg2);
+        result = (arg1)->Commit(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -6993,7 +7005,7 @@ SWIGINTERN PyObject *_wrap_IStream_Revert(PyObject *SWIGUNUSEDPARM(self), PyObje
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Revert();
+        result = (arg1)->Revert();
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -7063,7 +7075,7 @@ SWIGINTERN PyObject *_wrap_IStream_LockRegion(PyObject *SWIGUNUSEDPARM(self), Py
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->LockRegion(arg2,arg3,arg4);
+        result = (arg1)->LockRegion(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -7133,7 +7145,7 @@ SWIGINTERN PyObject *_wrap_IStream_UnlockRegion(PyObject *SWIGUNUSEDPARM(self), 
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->UnlockRegion(arg2,arg3,arg4);
+        result = (arg1)->UnlockRegion(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -7196,7 +7208,7 @@ SWIGINTERN PyObject *_wrap_IStream_Stat(PyObject *SWIGUNUSEDPARM(self), PyObject
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Stat(arg2,arg3);
+        result = (arg1)->Stat(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -7244,7 +7256,7 @@ SWIGINTERN PyObject *_wrap_IStream_Clone(PyObject *SWIGUNUSEDPARM(self), PyObjec
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Clone(arg2);
+        result = (arg1)->Clone(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -7390,7 +7402,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProp_GetLastError(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetLastError(arg2,arg3,arg4);
+        result = (arg1)->GetLastError(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -7460,7 +7472,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProp_SaveChanges(PyObject *SWIGUNUSEDPARM(self),
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SaveChanges(arg2);
+        result = (arg1)->SaveChanges(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -7530,7 +7542,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProp_GetProps(PyObject *SWIGUNUSEDPARM(self), Py
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetProps(arg2,arg3,arg4,arg5);
+        result = (arg1)->GetProps(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -7611,7 +7623,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProp_GetPropList(PyObject *SWIGUNUSEDPARM(self),
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetPropList(arg2,arg3);
+        result = (arg1)->GetPropList(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -7720,7 +7732,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProp_OpenProperty(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->OpenProperty(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->OpenProperty(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -7788,7 +7800,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProp_SetProps(PyObject *SWIGUNUSEDPARM(self), Py
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetProps(arg2,arg3,arg4);
+        result = (arg1)->SetProps(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -7863,7 +7875,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProp_DeleteProps(PyObject *SWIGUNUSEDPARM(self),
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DeleteProps(arg2,arg3);
+        result = (arg1)->DeleteProps(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -8008,7 +8020,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProp_CopyTo(PyObject *SWIGUNUSEDPARM(self), PyOb
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CopyTo(arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10);
+        result = (arg1)->CopyTo(arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -8148,7 +8160,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProp_CopyProps(PyObject *SWIGUNUSEDPARM(self), P
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CopyProps(arg2,arg3,arg4,arg5,arg6,arg7,arg8);
+        result = (arg1)->CopyProps(arg2,arg3,arg4,arg5,arg6,arg7,arg8);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -8256,7 +8268,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProp_GetNamesFromIDs(PyObject *SWIGUNUSEDPARM(se
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetNamesFromIDs(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->GetNamesFromIDs(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -8352,7 +8364,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProp_GetIDsFromNames(PyObject *SWIGUNUSEDPARM(se
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetIDsFromNames(arg2,arg3,arg4,arg5);
+        result = (arg1)->GetIDsFromNames(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -8477,7 +8489,7 @@ SWIGINTERN PyObject *_wrap_IMAPIContainer_GetContentsTable(PyObject *SWIGUNUSEDP
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetContentsTable(arg2,arg3);
+        result = (arg1)->GetContentsTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -8541,7 +8553,7 @@ SWIGINTERN PyObject *_wrap_IMAPIContainer_GetHierarchyTable(PyObject *SWIGUNUSED
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetHierarchyTable(arg2,arg3);
+        result = (arg1)->GetHierarchyTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -8648,7 +8660,7 @@ SWIGINTERN PyObject *_wrap_IMAPIContainer_OpenEntry(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->OpenEntry(arg2,arg3,arg4,arg5,arg6,arg7);
+        result = (arg1)->OpenEntry(arg2,arg3,arg4,arg5,arg6,arg7);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -8740,7 +8752,7 @@ SWIGINTERN PyObject *_wrap_IMAPIContainer_SetSearchCriteria(PyObject *SWIGUNUSED
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetSearchCriteria(arg2,arg3,arg4);
+        result = (arg1)->SetSearchCriteria(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -8824,7 +8836,7 @@ SWIGINTERN PyObject *_wrap_IMAPIContainer_GetSearchCriteria(PyObject *SWIGUNUSED
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetSearchCriteria(arg2,arg3,arg4,arg5);
+        result = (arg1)->GetSearchCriteria(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -8853,7 +8865,7 @@ SWIGINTERN PyObject *_wrap_IMAPIContainer_GetSearchCriteria(PyObject *SWIGUNUSED
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg5)));
   } else {
     int new_flags = SWIG_IsNewObj(res5) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg5), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg5), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     if(*arg3)
@@ -8958,7 +8970,7 @@ SWIGINTERN PyObject *_wrap_IMAPIAdviseSink_OnNotify(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (ULONG)(arg1)->OnNotify(arg2,arg3);
+        result = (arg1)->OnNotify(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -9228,7 +9240,7 @@ SWIGINTERN PyObject *_wrap_IMsgStore_Advise(PyObject *SWIGUNUSEDPARM(self), PyOb
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Advise(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->Advise(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -9249,7 +9261,7 @@ SWIGINTERN PyObject *_wrap_IMsgStore_Advise(PyObject *SWIGUNUSEDPARM(self), PyOb
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg6)));
   } else {
     int new_flags = SWIG_IsNewObj(res6) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg6), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg6), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
@@ -9294,7 +9306,7 @@ SWIGINTERN PyObject *_wrap_IMsgStore_Unadvise(PyObject *SWIGUNUSEDPARM(self), Py
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Unadvise(arg2);
+        result = (arg1)->Unadvise(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -9396,7 +9408,7 @@ SWIGINTERN PyObject *_wrap_IMsgStore_CompareEntryIDs(PyObject *SWIGUNUSEDPARM(se
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CompareEntryIDs(arg2,arg3,arg4,arg5,arg6,arg7);
+        result = (arg1)->CompareEntryIDs(arg2,arg3,arg4,arg5,arg6,arg7);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -9417,7 +9429,7 @@ SWIGINTERN PyObject *_wrap_IMsgStore_CompareEntryIDs(PyObject *SWIGUNUSEDPARM(se
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg7)));
   } else {
     int new_flags = SWIG_IsNewObj(res7) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg7), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg7), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
@@ -9518,7 +9530,7 @@ SWIGINTERN PyObject *_wrap_IMsgStore_OpenEntry(PyObject *SWIGUNUSEDPARM(self), P
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->OpenEntry(arg2,arg3,arg4,arg5,arg6,arg7);
+        result = (arg1)->OpenEntry(arg2,arg3,arg4,arg5,arg6,arg7);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -9570,7 +9582,7 @@ fail:
 SWIGINTERN PyObject *_wrap_IMsgStore_SetReceiveFolder(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IMsgStore *arg1 = (IMsgStore *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
   ULONG arg3 ;
   ULONG arg4 ;
   LPENTRYID arg5 ;
@@ -9658,7 +9670,7 @@ SWIGINTERN PyObject *_wrap_IMsgStore_SetReceiveFolder(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetReceiveFolder(arg2,arg3,arg4,arg5);
+        result = (arg1)->SetReceiveFolder(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -9698,7 +9710,7 @@ fail:
 SWIGINTERN PyObject *_wrap_IMsgStore_GetReceiveFolder(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IMsgStore *arg1 = (IMsgStore *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
   ULONG arg3 ;
   ULONG *arg4 = (ULONG *) 0 ;
   LPENTRYID *arg5 = (LPENTRYID *) 0 ;
@@ -9778,7 +9790,7 @@ SWIGINTERN PyObject *_wrap_IMsgStore_GetReceiveFolder(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetReceiveFolder(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->GetReceiveFolder(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -9873,7 +9885,7 @@ SWIGINTERN PyObject *_wrap_IMsgStore_GetReceiveFolderTable(PyObject *SWIGUNUSEDP
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetReceiveFolderTable(arg2,arg3);
+        result = (arg1)->GetReceiveFolderTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -9908,24 +9920,34 @@ SWIGINTERN PyObject *_wrap_IMsgStore_StoreLogoff(PyObject *SWIGUNUSEDPARM(self),
   void *argp1 = 0 ;
   int res1 = 0 ;
   ULONG temp2 ;
-  int res2 = SWIG_TMPOBJ ;
+  int res2 = 0 ;
   PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-  arg2 = &temp2;
-  if (!PyArg_ParseTuple(args,(char *)"O:IMsgStore_StoreLogoff",&obj0)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OO:IMsgStore_StoreLogoff",&obj0,&obj1)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IMsgStore, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IMsgStore_StoreLogoff" "', argument " "1"" of type '" "IMsgStore *""'"); 
   }
   arg1 = reinterpret_cast< IMsgStore * >(argp1);
+  if (!(SWIG_IsOK((res2 = SWIG_ConvertPtr(obj1,SWIG_as_voidptrptr(&arg2),SWIGTYPE_p_ULONG,0))))) {
+    unsigned int val; 
+    int ecode = SWIG_AsVal_unsigned_SS_int(obj1, &val);
+    if (!SWIG_IsOK(ecode)) {
+      SWIG_exception_fail(SWIG_ArgError(ecode), "in method '" "IMsgStore_StoreLogoff" "', argument " "2"" of type '" "ULONG""'");
+    }
+    temp2 = static_cast< ULONG >(val);
+    arg2 = &temp2;
+    res2 = SWIG_AddTmpMask(ecode);
+  }
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->StoreLogoff(arg2);
+        result = (arg1)->StoreLogoff(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -9946,7 +9968,7 @@ SWIGINTERN PyObject *_wrap_IMsgStore_StoreLogoff(PyObject *SWIGUNUSEDPARM(self),
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg2)));
   } else {
     int new_flags = SWIG_IsNewObj(res2) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -10009,7 +10031,7 @@ SWIGINTERN PyObject *_wrap_IMsgStore_AbortSubmit(PyObject *SWIGUNUSEDPARM(self),
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->AbortSubmit(arg2,arg3,arg4);
+        result = (arg1)->AbortSubmit(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -10076,7 +10098,7 @@ SWIGINTERN PyObject *_wrap_IMsgStore_GetOutgoingQueue(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetOutgoingQueue(arg2,arg3);
+        result = (arg1)->GetOutgoingQueue(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -10142,7 +10164,7 @@ SWIGINTERN PyObject *_wrap_IMsgStore_SetLockState(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetLockState(arg2,arg3);
+        result = (arg1)->SetLockState(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -10220,7 +10242,7 @@ SWIGINTERN PyObject *_wrap_IMsgStore_FinishedMsg(PyObject *SWIGUNUSEDPARM(self),
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->FinishedMsg(arg2,arg3,arg4);
+        result = (arg1)->FinishedMsg(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -10257,13 +10279,12 @@ SWIGINTERN PyObject *_wrap_IMsgStore_NotifyNewMail(PyObject *SWIGUNUSEDPARM(self
   LPNOTIFICATION arg2 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  void *argp2 ;
-  int res2 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  arg2 = NULL;
   if (!PyArg_ParseTuple(args,(char *)"OO:IMsgStore_NotifyNewMail",&obj0,&obj1)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IMsgStore, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
@@ -10271,24 +10292,15 @@ SWIGINTERN PyObject *_wrap_IMsgStore_NotifyNewMail(PyObject *SWIGUNUSEDPARM(self
   }
   arg1 = reinterpret_cast< IMsgStore * >(argp1);
   {
-    res2 = SWIG_ConvertPtr(obj1, &argp2, SWIGTYPE_p_LPNOTIFICATION,  0  | 0);
-    if (!SWIG_IsOK(res2)) {
-      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IMsgStore_NotifyNewMail" "', argument " "2"" of type '" "LPNOTIFICATION""'"); 
-    }  
-    if (!argp2) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IMsgStore_NotifyNewMail" "', argument " "2"" of type '" "LPNOTIFICATION""'");
-    } else {
-      LPNOTIFICATION * temp = reinterpret_cast< LPNOTIFICATION * >(argp2);
-      arg2 = *temp;
-      if (SWIG_IsNewObj(res2)) delete temp;
-    }
+    arg2 = Object_to_LPNOTIFICATION(obj1);
+    if(PyErr_Occurred()) goto fail;
   }
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->NotifyNewMail(arg2);
+        result = (arg1)->NotifyNewMail(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -10305,9 +10317,17 @@ SWIGINTERN PyObject *_wrap_IMsgStore_NotifyNewMail(PyObject *SWIGUNUSEDPARM(self
       SWIG_fail;
     }
   }
+  {
+    if(arg2)
+    MAPIFreeBuffer(arg2);
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
+  {
+    if(arg2)
+    MAPIFreeBuffer(arg2);
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
 }
@@ -10354,6 +10374,191 @@ SWIGINTERN PyObject *IMsgStore_swigregister(PyObject *SWIGUNUSEDPARM(self), PyOb
   PyObject *obj;
   if (!PyArg_ParseTuple(args,(char*)"O:swigregister", &obj)) return NULL;
   SWIG_TypeNewClientData(SWIGTYPE_p_IMsgStore, SWIG_NewClientData(obj));
+  return SWIG_Py_Void();
+}
+
+SWIGINTERN PyObject *_wrap_IProxyStoreObject_PlaceHolder1(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  IProxyStoreObject *arg1 = (IProxyStoreObject *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  HRESULT result;
+  
+  SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  if (!PyArg_ParseTuple(args,(char *)"O:IProxyStoreObject_PlaceHolder1",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IProxyStoreObject, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IProxyStoreObject_PlaceHolder1" "', argument " "1"" of type '" "IProxyStoreObject *""'"); 
+  }
+  arg1 = reinterpret_cast< IProxyStoreObject * >(argp1);
+  {
+    SWIG_PYTHON_THREAD_BEGIN_ALLOW;
+    {
+      try {
+        mark_call_from_python();
+        result = (arg1)->PlaceHolder1();
+        unmark_call_from_python();
+      } catch (const Swig::DirectorException &) {
+        unmark_call_from_python();
+        SWIG_fail;
+      }
+    }
+    SWIG_PYTHON_THREAD_END_ALLOW;
+  }
+  {
+    resultobj = Py_None;
+    Py_INCREF(Py_None);
+    if(FAILED(result)) {
+      DoException(result);
+      SWIG_fail;
+    }
+  }
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return resultobj;
+fail:
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_IProxyStoreObject_PlaceHolder2(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  IProxyStoreObject *arg1 = (IProxyStoreObject *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  HRESULT result;
+  
+  SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  if (!PyArg_ParseTuple(args,(char *)"O:IProxyStoreObject_PlaceHolder2",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IProxyStoreObject, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IProxyStoreObject_PlaceHolder2" "', argument " "1"" of type '" "IProxyStoreObject *""'"); 
+  }
+  arg1 = reinterpret_cast< IProxyStoreObject * >(argp1);
+  {
+    SWIG_PYTHON_THREAD_BEGIN_ALLOW;
+    {
+      try {
+        mark_call_from_python();
+        result = (arg1)->PlaceHolder2();
+        unmark_call_from_python();
+      } catch (const Swig::DirectorException &) {
+        unmark_call_from_python();
+        SWIG_fail;
+      }
+    }
+    SWIG_PYTHON_THREAD_END_ALLOW;
+  }
+  {
+    resultobj = Py_None;
+    Py_INCREF(Py_None);
+    if(FAILED(result)) {
+      DoException(result);
+      SWIG_fail;
+    }
+  }
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return resultobj;
+fail:
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_delete_IProxyStoreObject(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  IProxyStoreObject *arg1 = (IProxyStoreObject *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  
+  SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  if (!PyArg_ParseTuple(args,(char *)"O:delete_IProxyStoreObject",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IProxyStoreObject, SWIG_POINTER_DISOWN |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_IProxyStoreObject" "', argument " "1"" of type '" "IProxyStoreObject *""'"); 
+  }
+  arg1 = reinterpret_cast< IProxyStoreObject * >(argp1);
+  {
+    SWIG_PYTHON_THREAD_BEGIN_ALLOW;
+    {
+      try {
+        mark_call_from_python();
+        delete_IProxyStoreObject(arg1);
+        unmark_call_from_python();
+      } catch (const Swig::DirectorException &) {
+        unmark_call_from_python();
+        SWIG_fail;
+      }
+    }
+    SWIG_PYTHON_THREAD_END_ALLOW;
+  }
+  resultobj = SWIG_Py_Void();
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return resultobj;
+fail:
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_IProxyStoreObject_UnwrapNoRef(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  IProxyStoreObject *arg1 = (IProxyStoreObject *) 0 ;
+  IUnknown **arg2 = (IUnknown **) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  IUnknown *temp2 ;
+  PyObject * obj0 = 0 ;
+  HRESULT result;
+  
+  SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  temp2 = NULL; arg2 = &temp2;
+  if (!PyArg_ParseTuple(args,(char *)"O:IProxyStoreObject_UnwrapNoRef",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IProxyStoreObject, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IProxyStoreObject_UnwrapNoRef" "', argument " "1"" of type '" "IProxyStoreObject *""'"); 
+  }
+  arg1 = reinterpret_cast< IProxyStoreObject * >(argp1);
+  {
+    SWIG_PYTHON_THREAD_BEGIN_ALLOW;
+    {
+      try {
+        mark_call_from_python();
+        result = IProxyStoreObject_UnwrapNoRef(arg1,arg2);
+        unmark_call_from_python();
+      } catch (const Swig::DirectorException &) {
+        unmark_call_from_python();
+        SWIG_fail;
+      }
+    }
+    SWIG_PYTHON_THREAD_END_ALLOW;
+  }
+  {
+    resultobj = Py_None;
+    Py_INCREF(Py_None);
+    if(FAILED(result)) {
+      DoException(result);
+      SWIG_fail;
+    }
+  }
+  {
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)*(arg2), SWIGTYPE_p_IUnknown, SWIG_SHADOW | SWIG_OWNER));
+  }
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return resultobj;
+fail:
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *IProxyStoreObject_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *obj;
+  if (!PyArg_ParseTuple(args,(char*)"O:swigregister", &obj)) return NULL;
+  SWIG_TypeNewClientData(SWIGTYPE_p_IProxyStoreObject, SWIG_NewClientData(obj));
   return SWIG_Py_Void();
 }
 
@@ -10408,7 +10613,7 @@ SWIGINTERN PyObject *_wrap_IMAPIFolder_CreateMessage(PyObject *SWIGUNUSEDPARM(se
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateMessage(arg2,arg3,arg4);
+        result = (arg1)->CreateMessage(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -10520,7 +10725,7 @@ SWIGINTERN PyObject *_wrap_IMAPIFolder_CopyMessages(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CopyMessages(arg2,arg3,arg4,arg5,arg6,arg7);
+        result = (arg1)->CopyMessages(arg2,arg3,arg4,arg5,arg6,arg7);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -10613,7 +10818,7 @@ SWIGINTERN PyObject *_wrap_IMAPIFolder_DeleteMessages(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DeleteMessages(arg2,arg3,arg4,arg5);
+        result = (arg1)->DeleteMessages(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -10650,8 +10855,8 @@ SWIGINTERN PyObject *_wrap_IMAPIFolder_CreateFolder(PyObject *SWIGUNUSEDPARM(sel
   PyObject *resultobj = 0;
   IMAPIFolder *arg1 = (IMAPIFolder *) 0 ;
   ULONG arg2 ;
-  LPTSTR arg3 = (LPTSTR) 0 ;
-  LPTSTR arg4 = (LPTSTR) 0 ;
+  LPTSTR arg3 ;
+  LPTSTR arg4 ;
   LPCIID arg5 ;
   ULONG arg6 ;
   IMAPIFolder **arg7 = (IMAPIFolder **) 0 ;
@@ -10782,7 +10987,7 @@ SWIGINTERN PyObject *_wrap_IMAPIFolder_CreateFolder(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateFolder(arg2,arg3,arg4,arg5,arg6,arg7);
+        result = (arg1)->CreateFolder(arg2,arg3,arg4,arg5,arg6,arg7);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -10831,7 +11036,7 @@ SWIGINTERN PyObject *_wrap_IMAPIFolder_CopyFolder(PyObject *SWIGUNUSEDPARM(self)
   LPENTRYID arg3 ;
   LPCIID arg4 ;
   IUnknown *arg5 = (IUnknown *) 0 ;
-  LPTSTR arg6 = (LPTSTR) 0 ;
+  LPTSTR arg6 ;
   ULONG arg7 ;
   IMAPIProgress *arg8 = (IMAPIProgress *) 0 ;
   ULONG arg9 ;
@@ -10957,7 +11162,7 @@ SWIGINTERN PyObject *_wrap_IMAPIFolder_CopyFolder(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CopyFolder(arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9);
+        result = (arg1)->CopyFolder(arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -11067,7 +11272,7 @@ SWIGINTERN PyObject *_wrap_IMAPIFolder_DeleteFolder(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DeleteFolder(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->DeleteFolder(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -11156,7 +11361,7 @@ SWIGINTERN PyObject *_wrap_IMAPIFolder_SetReadFlags(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetReadFlags(arg2,arg3,arg4,arg5);
+        result = (arg1)->SetReadFlags(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -11246,7 +11451,7 @@ SWIGINTERN PyObject *_wrap_IMAPIFolder_GetMessageStatus(PyObject *SWIGUNUSEDPARM
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetMessageStatus(arg2,arg3,arg4,arg5);
+        result = (arg1)->GetMessageStatus(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -11267,7 +11472,7 @@ SWIGINTERN PyObject *_wrap_IMAPIFolder_GetMessageStatus(PyObject *SWIGUNUSEDPARM
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg5)));
   } else {
     int new_flags = SWIG_IsNewObj(res5) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg5), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg5), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
@@ -11345,7 +11550,7 @@ SWIGINTERN PyObject *_wrap_IMAPIFolder_SetMessageStatus(PyObject *SWIGUNUSEDPARM
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetMessageStatus(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->SetMessageStatus(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -11366,7 +11571,7 @@ SWIGINTERN PyObject *_wrap_IMAPIFolder_SetMessageStatus(PyObject *SWIGUNUSEDPARM
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg6)));
   } else {
     int new_flags = SWIG_IsNewObj(res6) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg6), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg6), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
@@ -11422,7 +11627,7 @@ SWIGINTERN PyObject *_wrap_IMAPIFolder_SaveContentsSort(PyObject *SWIGUNUSEDPARM
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SaveContentsSort(arg2,arg3);
+        result = (arg1)->SaveContentsSort(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -11506,7 +11711,7 @@ SWIGINTERN PyObject *_wrap_IMAPIFolder_EmptyFolder(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->EmptyFolder(arg2,arg3,arg4);
+        result = (arg1)->EmptyFolder(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -11611,7 +11816,7 @@ SWIGINTERN PyObject *_wrap_IMessage_GetAttachmentTable(PyObject *SWIGUNUSEDPARM(
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetAttachmentTable(arg2,arg3);
+        result = (arg1)->GetAttachmentTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -11699,7 +11904,7 @@ SWIGINTERN PyObject *_wrap_IMessage_OpenAttach(PyObject *SWIGUNUSEDPARM(self), P
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->OpenAttach(arg2,arg3,arg4,arg5);
+        result = (arg1)->OpenAttach(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -11784,7 +11989,7 @@ SWIGINTERN PyObject *_wrap_IMessage_CreateAttach(PyObject *SWIGUNUSEDPARM(self),
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateAttach(arg2,arg3,arg4,arg5);
+        result = (arg1)->CreateAttach(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -11805,7 +12010,7 @@ SWIGINTERN PyObject *_wrap_IMessage_CreateAttach(PyObject *SWIGUNUSEDPARM(self),
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg4)));
   } else {
     int new_flags = SWIG_IsNewObj(res4) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)*(arg5), SWIGTYPE_p_IAttach, SWIG_SHADOW | SWIG_OWNER));
@@ -11880,7 +12085,7 @@ SWIGINTERN PyObject *_wrap_IMessage_DeleteAttach(PyObject *SWIGUNUSEDPARM(self),
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DeleteAttach(arg2,arg3,arg4,arg5);
+        result = (arg1)->DeleteAttach(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -11941,7 +12146,7 @@ SWIGINTERN PyObject *_wrap_IMessage_GetRecipientTable(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetRecipientTable(arg2,arg3);
+        result = (arg1)->GetRecipientTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -12009,7 +12214,7 @@ SWIGINTERN PyObject *_wrap_IMessage_ModifyRecipients(PyObject *SWIGUNUSEDPARM(se
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ModifyRecipients(arg2,arg3);
+        result = (arg1)->ModifyRecipients(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -12027,15 +12232,13 @@ SWIGINTERN PyObject *_wrap_IMessage_ModifyRecipients(PyObject *SWIGUNUSEDPARM(se
     }
   }
   {
-    if(arg3)
-    MAPIFreeBuffer(arg3);
+    FreeProws((LPSRowSet)arg3);
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
   {
-    if(arg3)
-    MAPIFreeBuffer(arg3);
+    FreeProws((LPSRowSet)arg3);
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
@@ -12075,7 +12278,7 @@ SWIGINTERN PyObject *_wrap_IMessage_SubmitMessage(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SubmitMessage(arg2);
+        result = (arg1)->SubmitMessage(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -12133,7 +12336,7 @@ SWIGINTERN PyObject *_wrap_IMessage_SetReadFlag(PyObject *SWIGUNUSEDPARM(self), 
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetReadFlag(arg2);
+        result = (arg1)->SetReadFlag(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -12304,7 +12507,7 @@ SWIGINTERN PyObject *_wrap_IABContainer_CreateEntry(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateEntry(arg2,arg3,arg4,arg5);
+        result = (arg1)->CreateEntry(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -12393,7 +12596,7 @@ SWIGINTERN PyObject *_wrap_IABContainer_CopyEntries(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CopyEntries(arg2,arg3,arg4,arg5);
+        result = (arg1)->CopyEntries(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -12466,7 +12669,7 @@ SWIGINTERN PyObject *_wrap_IABContainer_DeleteEntries(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DeleteEntries(arg2,arg3);
+        result = (arg1)->DeleteEntries(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -12553,7 +12756,7 @@ SWIGINTERN PyObject *_wrap_IABContainer_ResolveNames(PyObject *SWIGUNUSEDPARM(se
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ResolveNames(arg2,arg3,arg4,arg5);
+        result = (arg1)->ResolveNames(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -12583,8 +12786,7 @@ SWIGINTERN PyObject *_wrap_IABContainer_ResolveNames(PyObject *SWIGUNUSEDPARM(se
     MAPIFreeBuffer(arg2);
   }
   {
-    if(arg4)
-    MAPIFreeBuffer(arg4);
+    FreeProws((LPSRowSet)arg4);
   }
   {
     if(arg5)
@@ -12598,8 +12800,7 @@ fail:
     MAPIFreeBuffer(arg2);
   }
   {
-    if(arg4)
-    MAPIFreeBuffer(arg4);
+    FreeProws((LPSRowSet)arg4);
   }
   {
     if(arg5)
@@ -12756,7 +12957,7 @@ SWIGINTERN PyObject *_wrap_IDistList_CreateEntry(PyObject *SWIGUNUSEDPARM(self),
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateEntry(arg2,arg3,arg4,arg5);
+        result = (arg1)->CreateEntry(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -12845,7 +13046,7 @@ SWIGINTERN PyObject *_wrap_IDistList_CopyEntries(PyObject *SWIGUNUSEDPARM(self),
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CopyEntries(arg2,arg3,arg4,arg5);
+        result = (arg1)->CopyEntries(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -12918,7 +13119,7 @@ SWIGINTERN PyObject *_wrap_IDistList_DeleteEntries(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DeleteEntries(arg2,arg3);
+        result = (arg1)->DeleteEntries(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -13005,7 +13206,7 @@ SWIGINTERN PyObject *_wrap_IDistList_ResolveNames(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ResolveNames(arg2,arg3,arg4,arg5);
+        result = (arg1)->ResolveNames(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -13035,8 +13236,7 @@ SWIGINTERN PyObject *_wrap_IDistList_ResolveNames(PyObject *SWIGUNUSEDPARM(self)
     MAPIFreeBuffer(arg2);
   }
   {
-    if(arg4)
-    MAPIFreeBuffer(arg4);
+    FreeProws((LPSRowSet)arg4);
   }
   {
     if(arg5)
@@ -13050,8 +13250,7 @@ fail:
     MAPIFreeBuffer(arg2);
   }
   {
-    if(arg4)
-    MAPIFreeBuffer(arg4);
+    FreeProws((LPSRowSet)arg4);
   }
   {
     if(arg5)
@@ -13148,7 +13347,7 @@ SWIGINTERN PyObject *_wrap_IMAPIStatus_ValidateState(PyObject *SWIGUNUSEDPARM(se
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ValidateState(arg2,arg3);
+        result = (arg1)->ValidateState(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -13215,7 +13414,7 @@ SWIGINTERN PyObject *_wrap_IMAPIStatus_SettingsDialog(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SettingsDialog(arg2,arg3);
+        result = (arg1)->SettingsDialog(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -13243,8 +13442,8 @@ fail:
 SWIGINTERN PyObject *_wrap_IMAPIStatus_ChangePassword(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IMAPIStatus *arg1 = (IMAPIStatus *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
-  LPTSTR arg3 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
+  LPTSTR arg3 ;
   ULONG arg4 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
@@ -13349,7 +13548,7 @@ SWIGINTERN PyObject *_wrap_IMAPIStatus_ChangePassword(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ChangePassword(arg2,arg3,arg4);
+        result = (arg1)->ChangePassword(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -13454,7 +13653,7 @@ SWIGINTERN PyObject *_wrap_IMAPIStatus_FlushQueues(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->FlushQueues(arg2,arg3,arg4,arg5);
+        result = (arg1)->FlushQueues(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -13568,7 +13767,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_GetLastError(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetLastError(arg2,arg3,arg4);
+        result = (arg1)->GetLastError(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -13647,7 +13846,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_Advise(PyObject *SWIGUNUSEDPARM(self), PyO
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Advise(arg2,arg3,arg4);
+        result = (arg1)->Advise(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -13668,7 +13867,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_Advise(PyObject *SWIGUNUSEDPARM(self), PyO
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg4)));
   } else {
     int new_flags = SWIG_IsNewObj(res4) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -13707,7 +13906,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_Unadvise(PyObject *SWIGUNUSEDPARM(self), P
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Unadvise(arg2);
+        result = (arg1)->Unadvise(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -13760,7 +13959,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_GetStatus(PyObject *SWIGUNUSEDPARM(self), 
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetStatus(arg2,arg3);
+        result = (arg1)->GetStatus(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -13781,13 +13980,13 @@ SWIGINTERN PyObject *_wrap_IMAPITable_GetStatus(PyObject *SWIGUNUSEDPARM(self), 
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg2)));
   } else {
     int new_flags = SWIG_IsNewObj(res2) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_ULONG, new_flags));
   }
   if (SWIG_IsTmpObj(res3)) {
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg3)));
   } else {
     int new_flags = SWIG_IsNewObj(res3) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg3), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg3), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -13837,7 +14036,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_SetColumns(PyObject *SWIGUNUSEDPARM(self),
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetColumns(arg2,arg3);
+        result = (arg1)->SetColumns(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -13906,7 +14105,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_QueryColumns(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->QueryColumns(arg2,arg3);
+        result = (arg1)->QueryColumns(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -13980,7 +14179,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_GetRowCount(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetRowCount(arg2,arg3);
+        result = (arg1)->GetRowCount(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -14001,7 +14200,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_GetRowCount(PyObject *SWIGUNUSEDPARM(self)
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg3)));
   } else {
     int new_flags = SWIG_IsNewObj(res3) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg3), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg3), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -14053,7 +14252,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_SeekRow(PyObject *SWIGUNUSEDPARM(self), Py
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SeekRow(arg2,arg3,arg4);
+        result = (arg1)->SeekRow(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -14074,7 +14273,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_SeekRow(PyObject *SWIGUNUSEDPARM(self), Py
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg4)));
   } else {
     int new_flags = SWIG_IsNewObj(res4) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_LONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -14122,7 +14321,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_SeekRowApprox(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SeekRowApprox(arg2,arg3);
+        result = (arg1)->SeekRowApprox(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -14179,7 +14378,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_QueryPosition(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->QueryPosition(arg2,arg3,arg4);
+        result = (arg1)->QueryPosition(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -14200,19 +14399,19 @@ SWIGINTERN PyObject *_wrap_IMAPITable_QueryPosition(PyObject *SWIGUNUSEDPARM(sel
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg2)));
   } else {
     int new_flags = SWIG_IsNewObj(res2) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_ULONG, new_flags));
   }
   if (SWIG_IsTmpObj(res3)) {
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg3)));
   } else {
     int new_flags = SWIG_IsNewObj(res3) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg3), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg3), SWIGTYPE_p_ULONG, new_flags));
   }
   if (SWIG_IsTmpObj(res4)) {
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg4)));
   } else {
     int new_flags = SWIG_IsNewObj(res4) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -14271,7 +14470,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_FindRow(PyObject *SWIGUNUSEDPARM(self), Py
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->FindRow(arg2,arg3,arg4);
+        result = (arg1)->FindRow(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -14344,7 +14543,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_Restrict(PyObject *SWIGUNUSEDPARM(self), P
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Restrict(arg2,arg3);
+        result = (arg1)->Restrict(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -14401,7 +14600,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_CreateBookmark(PyObject *SWIGUNUSEDPARM(se
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateBookmark(arg2);
+        result = (arg1)->CreateBookmark(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -14422,7 +14621,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_CreateBookmark(PyObject *SWIGUNUSEDPARM(se
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg2)));
   } else {
     int new_flags = SWIG_IsNewObj(res2) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -14461,7 +14660,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_FreeBookmark(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->FreeBookmark(arg2);
+        result = (arg1)->FreeBookmark(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -14526,7 +14725,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_SortTable(PyObject *SWIGUNUSEDPARM(self), 
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SortTable(arg2,arg3);
+        result = (arg1)->SortTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -14582,7 +14781,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_QuerySortOrder(PyObject *SWIGUNUSEDPARM(se
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->QuerySortOrder(arg2);
+        result = (arg1)->QuerySortOrder(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -14664,7 +14863,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_QueryRows(PyObject *SWIGUNUSEDPARM(self), 
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->QueryRows(arg2,arg3,arg4);
+        result = (arg1)->QueryRows(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -14719,7 +14918,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_Abort(PyObject *SWIGUNUSEDPARM(self), PyOb
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Abort();
+        result = (arg1)->Abort();
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -14813,7 +15012,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_ExpandRow(PyObject *SWIGUNUSEDPARM(self), 
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ExpandRow(arg2,arg3,arg4,arg5,arg6,arg7);
+        result = (arg1)->ExpandRow(arg2,arg3,arg4,arg5,arg6,arg7);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -14838,7 +15037,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_ExpandRow(PyObject *SWIGUNUSEDPARM(self), 
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg7)));
   } else {
     int new_flags = SWIG_IsNewObj(res7) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg7), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg7), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
@@ -14917,7 +15116,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_CollapseRow(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CollapseRow(arg2,arg3,arg4,arg5);
+        result = (arg1)->CollapseRow(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -14938,7 +15137,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_CollapseRow(PyObject *SWIGUNUSEDPARM(self)
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg5)));
   } else {
     int new_flags = SWIG_IsNewObj(res5) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg5), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg5), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
@@ -15000,7 +15199,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_WaitForCompletion(PyObject *SWIGUNUSEDPARM
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->WaitForCompletion(arg2,arg3,arg4);
+        result = (arg1)->WaitForCompletion(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -15021,7 +15220,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_WaitForCompletion(PyObject *SWIGUNUSEDPARM
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg4)));
   } else {
     int new_flags = SWIG_IsNewObj(res4) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -15036,7 +15235,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_GetCollapseState(PyObject *SWIGUNUSEDPARM(
   IMAPITable *arg1 = (IMAPITable *) 0 ;
   ULONG arg2 ;
   ULONG arg3 ;
-  LPBYTE arg4 = (LPBYTE) 0 ;
+  LPBYTE arg4 ;
   ULONG *arg5 = (ULONG *) 0 ;
   LPBYTE *arg6 = (LPBYTE *) 0 ;
   void *argp1 = 0 ;
@@ -15045,7 +15244,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_GetCollapseState(PyObject *SWIGUNUSEDPARM(
   int ecode2 ;
   unsigned int val3 ;
   int ecode3 = 0 ;
-  void *argp4 = 0 ;
+  void *argp4 ;
   int res4 = 0 ;
   ULONG temp5 ;
   int res5 = SWIG_TMPOBJ ;
@@ -15080,12 +15279,20 @@ SWIGINTERN PyObject *_wrap_IMAPITable_GetCollapseState(PyObject *SWIGUNUSEDPARM(
     SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "IMAPITable_GetCollapseState" "', argument " "3"" of type '" "ULONG""'");
   } 
   arg3 = static_cast< ULONG >(val3);
-  res4 = SWIG_ConvertPtr(obj3, &argp4,SWIGTYPE_p_unsigned_char, 0 |  0 );
-  if (!SWIG_IsOK(res4)) {
-    SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IMAPITable_GetCollapseState" "', argument " "4"" of type '" "LPBYTE""'"); 
+  {
+    res4 = SWIG_ConvertPtr(obj3, &argp4, SWIGTYPE_p_LPBYTE,  0  | 0);
+    if (!SWIG_IsOK(res4)) {
+      SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IMAPITable_GetCollapseState" "', argument " "4"" of type '" "LPBYTE""'"); 
+    }  
+    if (!argp4) {
+      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IMAPITable_GetCollapseState" "', argument " "4"" of type '" "LPBYTE""'");
+    } else {
+      LPBYTE * temp = reinterpret_cast< LPBYTE * >(argp4);
+      arg4 = *temp;
+      if (SWIG_IsNewObj(res4)) delete temp;
+    }
   }
-  arg4 = reinterpret_cast< LPBYTE >(argp4);
-  res6 = SWIG_ConvertPtr(obj4, &argp6,SWIGTYPE_p_p_unsigned_char, 0 |  0 );
+  res6 = SWIG_ConvertPtr(obj4, &argp6,SWIGTYPE_p_LPBYTE, 0 |  0 );
   if (!SWIG_IsOK(res6)) {
     SWIG_exception_fail(SWIG_ArgError(res6), "in method '" "IMAPITable_GetCollapseState" "', argument " "6"" of type '" "LPBYTE *""'"); 
   }
@@ -15095,7 +15302,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_GetCollapseState(PyObject *SWIGUNUSEDPARM(
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetCollapseState(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->GetCollapseState(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -15116,7 +15323,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_GetCollapseState(PyObject *SWIGUNUSEDPARM(
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg5)));
   } else {
     int new_flags = SWIG_IsNewObj(res5) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg5), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg5), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -15131,7 +15338,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_SetCollapseState(PyObject *SWIGUNUSEDPARM(
   IMAPITable *arg1 = (IMAPITable *) 0 ;
   ULONG arg2 ;
   ULONG arg3 ;
-  LPBYTE arg4 = (LPBYTE) 0 ;
+  LPBYTE arg4 ;
   BOOKMARK *arg5 = (BOOKMARK *) 0 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
@@ -15139,7 +15346,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_SetCollapseState(PyObject *SWIGUNUSEDPARM(
   int ecode2 ;
   unsigned int val3 ;
   int ecode3 = 0 ;
-  void *argp4 = 0 ;
+  void *argp4 ;
   int res4 = 0 ;
   BOOKMARK temp5 ;
   int res5 = SWIG_TMPOBJ ;
@@ -15171,17 +15378,25 @@ SWIGINTERN PyObject *_wrap_IMAPITable_SetCollapseState(PyObject *SWIGUNUSEDPARM(
     SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "IMAPITable_SetCollapseState" "', argument " "3"" of type '" "ULONG""'");
   } 
   arg3 = static_cast< ULONG >(val3);
-  res4 = SWIG_ConvertPtr(obj3, &argp4,SWIGTYPE_p_unsigned_char, 0 |  0 );
-  if (!SWIG_IsOK(res4)) {
-    SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IMAPITable_SetCollapseState" "', argument " "4"" of type '" "LPBYTE""'"); 
+  {
+    res4 = SWIG_ConvertPtr(obj3, &argp4, SWIGTYPE_p_LPBYTE,  0  | 0);
+    if (!SWIG_IsOK(res4)) {
+      SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IMAPITable_SetCollapseState" "', argument " "4"" of type '" "LPBYTE""'"); 
+    }  
+    if (!argp4) {
+      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IMAPITable_SetCollapseState" "', argument " "4"" of type '" "LPBYTE""'");
+    } else {
+      LPBYTE * temp = reinterpret_cast< LPBYTE * >(argp4);
+      arg4 = *temp;
+      if (SWIG_IsNewObj(res4)) delete temp;
+    }
   }
-  arg4 = reinterpret_cast< LPBYTE >(argp4);
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetCollapseState(arg2,arg3,arg4,arg5);
+        result = (arg1)->SetCollapseState(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -15202,7 +15417,7 @@ SWIGINTERN PyObject *_wrap_IMAPITable_SetCollapseState(PyObject *SWIGUNUSEDPARM(
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg5)));
   } else {
     int new_flags = SWIG_IsNewObj(res5) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg5), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg5), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -15347,7 +15562,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProgress_Progress(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Progress(arg2,arg3,arg4);
+        result = (arg1)->Progress(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -15396,7 +15611,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProgress_GetFlags(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetFlags(arg2);
+        result = (arg1)->GetFlags(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -15417,7 +15632,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProgress_GetFlags(PyObject *SWIGUNUSEDPARM(self)
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg2)));
   } else {
     int new_flags = SWIG_IsNewObj(res2) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -15451,7 +15666,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProgress_GetMax(PyObject *SWIGUNUSEDPARM(self), 
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetMax(arg2);
+        result = (arg1)->GetMax(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -15472,7 +15687,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProgress_GetMax(PyObject *SWIGUNUSEDPARM(self), 
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg2)));
   } else {
     int new_flags = SWIG_IsNewObj(res2) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -15506,7 +15721,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProgress_GetMin(PyObject *SWIGUNUSEDPARM(self), 
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetMin(arg2);
+        result = (arg1)->GetMin(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -15527,7 +15742,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProgress_GetMin(PyObject *SWIGUNUSEDPARM(self), 
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg2)));
   } else {
     int new_flags = SWIG_IsNewObj(res2) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -15569,7 +15784,7 @@ SWIGINTERN PyObject *_wrap_IMAPIProgress_SetLimits(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetLimits(arg2,arg3,arg4);
+        result = (arg1)->SetLimits(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -15590,19 +15805,19 @@ SWIGINTERN PyObject *_wrap_IMAPIProgress_SetLimits(PyObject *SWIGUNUSEDPARM(self
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg2)));
   } else {
     int new_flags = SWIG_IsNewObj(res2) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_ULONG, new_flags));
   }
   if (SWIG_IsTmpObj(res3)) {
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg3)));
   } else {
     int new_flags = SWIG_IsNewObj(res3) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg3), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg3), SWIGTYPE_p_ULONG, new_flags));
   }
   if (SWIG_IsTmpObj(res4)) {
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg4)));
   } else {
     int new_flags = SWIG_IsNewObj(res4) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -15701,7 +15916,7 @@ SWIGINTERN PyObject *_wrap_IProviderAdmin_GetLastError(PyObject *SWIGUNUSEDPARM(
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetLastError(arg2,arg3,arg4);
+        result = (arg1)->GetLastError(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -15780,7 +15995,7 @@ SWIGINTERN PyObject *_wrap_IProviderAdmin_GetProviderTable(PyObject *SWIGUNUSEDP
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetProviderTable(arg2,arg3);
+        result = (arg1)->GetProviderTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -15808,7 +16023,7 @@ fail:
 SWIGINTERN PyObject *_wrap_IProviderAdmin_CreateProvider(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IProviderAdmin *arg1 = (IProviderAdmin *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
   ULONG arg3 ;
   LPSPropValue arg4 ;
   ULONG arg5 ;
@@ -15905,7 +16120,7 @@ SWIGINTERN PyObject *_wrap_IProviderAdmin_CreateProvider(PyObject *SWIGUNUSEDPAR
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateProvider(arg2,arg3,arg4,arg5,arg6,arg7);
+        result = (arg1)->CreateProvider(arg2,arg3,arg4,arg5,arg6,arg7);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -15982,7 +16197,7 @@ SWIGINTERN PyObject *_wrap_IProviderAdmin_DeleteProvider(PyObject *SWIGUNUSEDPAR
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DeleteProvider(arg2);
+        result = (arg1)->DeleteProvider(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -16075,7 +16290,7 @@ SWIGINTERN PyObject *_wrap_IProviderAdmin_OpenProfileSection(PyObject *SWIGUNUSE
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->OpenProfileSection(arg2,arg3,arg4,arg5);
+        result = (arg1)->OpenProfileSection(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -16205,7 +16420,7 @@ SWIGINTERN PyObject *_wrap_MAPIINIT_0_ulVersion_get(PyObject *SWIGUNUSEDPARM(sel
   arg1 = reinterpret_cast< MAPIINIT_0 * >(argp1);
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
-    result = (ULONG) ((arg1)->ulVersion);
+    result =  ((arg1)->ulVersion);
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
   resultobj = SWIG_From_unsigned_SS_int(static_cast< unsigned int >(result));
@@ -16275,7 +16490,7 @@ SWIGINTERN PyObject *_wrap_MAPIINIT_0_ulFlags_get(PyObject *SWIGUNUSEDPARM(self)
   arg1 = reinterpret_cast< MAPIINIT_0 * >(argp1);
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
-    result = (ULONG) ((arg1)->ulFlags);
+    result =  ((arg1)->ulFlags);
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
   resultobj = SWIG_From_unsigned_SS_int(static_cast< unsigned int >(result));
@@ -16380,7 +16595,7 @@ SWIGINTERN PyObject *_wrap_MAPIInitialize(PyObject *SWIGUNUSEDPARM(self), PyObje
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)MAPIInitialize(arg1);
+        result = MAPIInitialize(arg1);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -16436,8 +16651,8 @@ fail:
 SWIGINTERN PyObject *_wrap_MAPILogonEx(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   ULONG arg1 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
-  LPTSTR arg3 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
+  LPTSTR arg3 ;
   ULONG arg4 ;
   IMAPISession **arg5 = (IMAPISession **) 0 ;
   unsigned int val1 ;
@@ -16545,7 +16760,7 @@ SWIGINTERN PyObject *_wrap_MAPILogonEx(PyObject *SWIGUNUSEDPARM(self), PyObject 
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)MAPILogonEx(arg1,arg2,arg3,arg4,arg5);
+        result = MAPILogonEx(arg1,arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -16612,7 +16827,7 @@ SWIGINTERN PyObject *_wrap_MAPIAdminProfiles(PyObject *SWIGUNUSEDPARM(self), PyO
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)MAPIAdminProfiles(arg1,arg2);
+        result = MAPIAdminProfiles(arg1,arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -16691,7 +16906,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_GetLastError(PyObject *SWIGUNUSEDPARM(se
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetLastError(arg2,arg3,arg4);
+        result = (arg1)->GetLastError(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -16752,7 +16967,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_GetMsgStoresTable(PyObject *SWIGUNUSEDPA
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetMsgStoresTable(arg2,arg3);
+        result = (arg1)->GetMsgStoresTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -16860,7 +17075,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_OpenMsgStore(PyObject *SWIGUNUSEDPARM(se
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->OpenMsgStore(arg2,arg3,arg4,arg5,arg6,arg7);
+        result = (arg1)->OpenMsgStore(arg2,arg3,arg4,arg5,arg6,arg7);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -16956,7 +17171,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_OpenAddressBook(PyObject *SWIGUNUSEDPARM
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->OpenAddressBook(arg2,arg3,arg4,arg5);
+        result = (arg1)->OpenAddressBook(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -17052,7 +17267,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_OpenProfileSection(PyObject *SWIGUNUSEDP
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->OpenProfileSection(arg2,arg3,arg4,arg5);
+        result = (arg1)->OpenProfileSection(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -17120,7 +17335,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_GetStatusTable(PyObject *SWIGUNUSEDPARM(
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetStatusTable(arg2,arg3);
+        result = (arg1)->GetStatusTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -17227,7 +17442,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_OpenEntry(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->OpenEntry(arg2,arg3,arg4,arg5,arg6,arg7);
+        result = (arg1)->OpenEntry(arg2,arg3,arg4,arg5,arg6,arg7);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -17353,7 +17568,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_CompareEntryIDs(PyObject *SWIGUNUSEDPARM
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CompareEntryIDs(arg2,arg3,arg4,arg5,arg6,arg7);
+        result = (arg1)->CompareEntryIDs(arg2,arg3,arg4,arg5,arg6,arg7);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -17374,7 +17589,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_CompareEntryIDs(PyObject *SWIGUNUSEDPARM
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg7)));
   } else {
     int new_flags = SWIG_IsNewObj(res7) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg7), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg7), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
@@ -17466,7 +17681,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_Advise(PyObject *SWIGUNUSEDPARM(self), P
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Advise(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->Advise(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -17487,7 +17702,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_Advise(PyObject *SWIGUNUSEDPARM(self), P
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg6)));
   } else {
     int new_flags = SWIG_IsNewObj(res6) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg6), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg6), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
@@ -17532,7 +17747,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_Unadvise(PyObject *SWIGUNUSEDPARM(self),
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Unadvise(arg2);
+        result = (arg1)->Unadvise(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -17562,7 +17777,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_MessageOptions(PyObject *SWIGUNUSEDPARM(
   IMAPISession *arg1 = (IMAPISession *) 0 ;
   ULONG arg2 ;
   ULONG arg3 ;
-  LPTSTR arg4 = (LPTSTR) 0 ;
+  LPTSTR arg4 ;
   LPMESSAGE arg5 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
@@ -17654,7 +17869,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_MessageOptions(PyObject *SWIGUNUSEDPARM(
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->MessageOptions(arg2,arg3,arg4,arg5);
+        result = (arg1)->MessageOptions(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -17688,7 +17903,7 @@ fail:
 SWIGINTERN PyObject *_wrap_IMAPISession_QueryDefaultMessageOpt(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IMAPISession *arg1 = (IMAPISession *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
   ULONG arg3 ;
   ULONG *arg4 = (ULONG *) 0 ;
   LPSPropValue *arg5 = (LPSPropValue *) 0 ;
@@ -17769,7 +17984,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_QueryDefaultMessageOpt(PyObject *SWIGUNU
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->QueryDefaultMessageOpt(arg2,arg3,arg4,arg5);
+        result = (arg1)->QueryDefaultMessageOpt(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -17790,7 +18005,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_QueryDefaultMessageOpt(PyObject *SWIGUNU
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg4)));
   } else {
     int new_flags = SWIG_IsNewObj(res4) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     
@@ -17842,7 +18057,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_EnumAdrTypes(PyObject *SWIGUNUSEDPARM(se
     arg2 = fl2;
     ulFlags = fl2;
   }
-  res4 = SWIG_ConvertPtr(obj2, &argp4,SWIGTYPE_p_p_p_char, 0 |  0 );
+  res4 = SWIG_ConvertPtr(obj2, &argp4,SWIGTYPE_p_p_LPTSTR, 0 |  0 );
   if (!SWIG_IsOK(res4)) {
     SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IMAPISession_EnumAdrTypes" "', argument " "4"" of type '" "LPTSTR **""'"); 
   }
@@ -17852,7 +18067,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_EnumAdrTypes(PyObject *SWIGUNUSEDPARM(se
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->EnumAdrTypes(arg2,arg3,arg4);
+        result = (arg1)->EnumAdrTypes(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -17873,7 +18088,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_EnumAdrTypes(PyObject *SWIGUNUSEDPARM(se
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg3)));
   } else {
     int new_flags = SWIG_IsNewObj(res3) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg3), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg3), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -17910,7 +18125,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_QueryIdentity(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->QueryIdentity(arg2,arg3);
+        result = (arg1)->QueryIdentity(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -17999,7 +18214,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_Logoff(PyObject *SWIGUNUSEDPARM(self), P
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Logoff(arg2,arg3,arg4);
+        result = (arg1)->Logoff(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -18077,7 +18292,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_SetDefaultStore(PyObject *SWIGUNUSEDPARM
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetDefaultStore(arg2,arg3,arg4);
+        result = (arg1)->SetDefaultStore(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -18144,7 +18359,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_AdminServices(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->AdminServices(arg2,arg3);
+        result = (arg1)->AdminServices(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -18185,7 +18400,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_ShowForm(PyObject *SWIGUNUSEDPARM(self),
   ULONG arg9 ;
   ULONG arg10 ;
   ULONG arg11 ;
-  LPSTR arg12 = (LPSTR) 0 ;
+  LPSTR arg12 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
   unsigned int val2 ;
@@ -18210,9 +18425,8 @@ SWIGINTERN PyObject *_wrap_IMAPISession_ShowForm(PyObject *SWIGUNUSEDPARM(self),
   int ecode10 = 0 ;
   unsigned int val11 ;
   int ecode11 = 0 ;
-  int res12 ;
-  char *buf12 = 0 ;
-  int alloc12 = 0 ;
+  void *argp12 ;
+  int res12 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
@@ -18316,17 +18530,25 @@ SWIGINTERN PyObject *_wrap_IMAPISession_ShowForm(PyObject *SWIGUNUSEDPARM(self),
     SWIG_exception_fail(SWIG_ArgError(ecode11), "in method '" "IMAPISession_ShowForm" "', argument " "11"" of type '" "ULONG""'");
   } 
   arg11 = static_cast< ULONG >(val11);
-  res12 = SWIG_AsCharPtrAndSize(obj11, &buf12, NULL, &alloc12);
-  if (!SWIG_IsOK(res12)) {
-    SWIG_exception_fail(SWIG_ArgError(res12), "in method '" "IMAPISession_ShowForm" "', argument " "12"" of type '" "LPSTR""'");
+  {
+    res12 = SWIG_ConvertPtr(obj11, &argp12, SWIGTYPE_p_LPSTR,  0  | 0);
+    if (!SWIG_IsOK(res12)) {
+      SWIG_exception_fail(SWIG_ArgError(res12), "in method '" "IMAPISession_ShowForm" "', argument " "12"" of type '" "LPSTR""'"); 
+    }  
+    if (!argp12) {
+      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IMAPISession_ShowForm" "', argument " "12"" of type '" "LPSTR""'");
+    } else {
+      LPSTR * temp = reinterpret_cast< LPSTR * >(argp12);
+      arg12 = *temp;
+      if (SWIG_IsNewObj(res12)) delete temp;
+    }
   }
-  arg12 = reinterpret_cast< LPSTR >(buf12);
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ShowForm(arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10,arg11,arg12);
+        result = (arg1)->ShowForm(arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10,arg11,arg12);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -18344,12 +18566,10 @@ SWIGINTERN PyObject *_wrap_IMAPISession_ShowForm(PyObject *SWIGUNUSEDPARM(self),
     }
   }
   if (alloc5 == SWIG_NEWOBJ) delete[] buf5;
-  if (alloc12 == SWIG_NEWOBJ) delete[] buf12;
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
   if (alloc5 == SWIG_NEWOBJ) delete[] buf5;
-  if (alloc12 == SWIG_NEWOBJ) delete[] buf12;
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
 }
@@ -18411,7 +18631,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_PrepareForm(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->PrepareForm(arg2,arg3,arg4);
+        result = (arg1)->PrepareForm(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -18432,7 +18652,7 @@ SWIGINTERN PyObject *_wrap_IMAPISession_PrepareForm(PyObject *SWIGUNUSEDPARM(sel
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg4)));
   } else {
     int new_flags = SWIG_IsNewObj(res4) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_ULONG, new_flags));
   }
   if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
   SWIG_PYTHON_THREAD_END_BLOCK;
@@ -18567,7 +18787,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_OpenEntry(PyObject *SWIGUNUSEDPARM(self), P
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->OpenEntry(arg2,arg3,arg4,arg5,arg6,arg7);
+        result = (arg1)->OpenEntry(arg2,arg3,arg4,arg5,arg6,arg7);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -18693,7 +18913,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_CompareEntryIDs(PyObject *SWIGUNUSEDPARM(se
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CompareEntryIDs(arg2,arg3,arg4,arg5,arg6,arg7);
+        result = (arg1)->CompareEntryIDs(arg2,arg3,arg4,arg5,arg6,arg7);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -18714,7 +18934,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_CompareEntryIDs(PyObject *SWIGUNUSEDPARM(se
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg7)));
   } else {
     int new_flags = SWIG_IsNewObj(res7) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg7), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg7), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
@@ -18806,7 +19026,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_Advise(PyObject *SWIGUNUSEDPARM(self), PyOb
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Advise(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->Advise(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -18827,7 +19047,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_Advise(PyObject *SWIGUNUSEDPARM(self), PyOb
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg6)));
   } else {
     int new_flags = SWIG_IsNewObj(res6) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg6), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg6), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
@@ -18872,7 +19092,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_Unadvise(PyObject *SWIGUNUSEDPARM(self), Py
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Unadvise(arg2);
+        result = (arg1)->Unadvise(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -18900,9 +19120,9 @@ fail:
 SWIGINTERN PyObject *_wrap_IAddrBook_CreateOneOff(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IAddrBook *arg1 = (IAddrBook *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
-  LPTSTR arg3 = (LPTSTR) 0 ;
-  LPTSTR arg4 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
+  LPTSTR arg3 ;
+  LPTSTR arg4 ;
   ULONG arg5 ;
   ULONG *arg6 = (ULONG *) 0 ;
   LPENTRYID *arg7 = (LPENTRYID *) 0 ;
@@ -19051,7 +19271,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_CreateOneOff(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateOneOff(arg2,arg3,arg4,arg5,arg6,arg7);
+        result = (arg1)->CreateOneOff(arg2,arg3,arg4,arg5,arg6,arg7);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -19196,7 +19416,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_NewEntry(PyObject *SWIGUNUSEDPARM(self), Py
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->NewEntry(arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9);
+        result = (arg1)->NewEntry(arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -19251,7 +19471,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_ResolveName(PyObject *SWIGUNUSEDPARM(self),
   IAddrBook *arg1 = (IAddrBook *) 0 ;
   ULONG arg2 ;
   ULONG arg3 ;
-  LPTSTR arg4 = (LPTSTR) 0 ;
+  LPTSTR arg4 ;
   LPADRLIST arg5 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
@@ -19333,7 +19553,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_ResolveName(PyObject *SWIGUNUSEDPARM(self),
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ResolveName(arg2,arg3,arg4,arg5);
+        result = (arg1)->ResolveName(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -19358,8 +19578,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_ResolveName(PyObject *SWIGUNUSEDPARM(self),
     
   }
   {
-    if(arg5)
-    MAPIFreeBuffer(arg5);
+    FreeProws((LPSRowSet)arg5);
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -19368,8 +19587,7 @@ fail:
     
   }
   {
-    if(arg5)
-    MAPIFreeBuffer(arg5);
+    FreeProws((LPSRowSet)arg5);
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
@@ -19420,7 +19638,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_Address(PyObject *SWIGUNUSEDPARM(self), PyO
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Address(arg2,arg3,arg4);
+        result = (arg1)->Address(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -19441,7 +19659,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_Address(PyObject *SWIGUNUSEDPARM(self), PyO
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg2)));
   } else {
     int new_flags = SWIG_IsNewObj(res2) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     resultobj = SWIG_Python_AppendOutput(resultobj, List_from_LPADRLIST(*(arg4)));
@@ -19466,12 +19684,12 @@ SWIGINTERN PyObject *_wrap_IAddrBook_Details(PyObject *SWIGUNUSEDPARM(self), PyO
   IAddrBook *arg1 = (IAddrBook *) 0 ;
   ULONG *arg2 = (ULONG *) 0 ;
   LPFNDISMISS arg3 ;
-  LPVOID arg4 = (LPVOID) 0 ;
+  LPVOID arg4 ;
   ULONG arg5 ;
   LPENTRYID arg6 ;
   LPFNBUTTON arg7 ;
-  LPVOID arg8 = (LPVOID) 0 ;
-  LPTSTR arg9 = (LPTSTR) 0 ;
+  LPVOID arg8 ;
+  LPTSTR arg9 ;
   ULONG arg10 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
@@ -19479,14 +19697,16 @@ SWIGINTERN PyObject *_wrap_IAddrBook_Details(PyObject *SWIGUNUSEDPARM(self), PyO
   int res2 = SWIG_TMPOBJ ;
   void *argp3 ;
   int res3 = 0 ;
-  int res4 ;
+  void *argp4 ;
+  int res4 = 0 ;
   int res5 ;
   char *buf5 = 0 ;
   size_t size5 ;
   int alloc5 = 0 ;
   void *argp7 ;
   int res7 = 0 ;
-  int res8 ;
+  void *argp8 ;
+  int res8 = 0 ;
   unsigned int fl10 ;
   int ecode10 ;
   std::string strInput9 ;
@@ -19523,9 +19743,18 @@ SWIGINTERN PyObject *_wrap_IAddrBook_Details(PyObject *SWIGUNUSEDPARM(self), PyO
       if (SWIG_IsNewObj(res3)) delete temp;
     }
   }
-  res4 = SWIG_ConvertPtr(obj2,SWIG_as_voidptrptr(&arg4), 0, 0);
-  if (!SWIG_IsOK(res4)) {
-    SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IAddrBook_Details" "', argument " "4"" of type '" "LPVOID""'"); 
+  {
+    res4 = SWIG_ConvertPtr(obj2, &argp4, SWIGTYPE_p_LPVOID,  0  | 0);
+    if (!SWIG_IsOK(res4)) {
+      SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IAddrBook_Details" "', argument " "4"" of type '" "LPVOID""'"); 
+    }  
+    if (!argp4) {
+      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IAddrBook_Details" "', argument " "4"" of type '" "LPVOID""'");
+    } else {
+      LPVOID * temp = reinterpret_cast< LPVOID * >(argp4);
+      arg4 = *temp;
+      if (SWIG_IsNewObj(res4)) delete temp;
+    }
   }
   {
     res5 = SWIG_AsCharPtrAndSize(obj3, &buf5, &size5, &alloc5);
@@ -19553,9 +19782,18 @@ SWIGINTERN PyObject *_wrap_IAddrBook_Details(PyObject *SWIGUNUSEDPARM(self), PyO
       if (SWIG_IsNewObj(res7)) delete temp;
     }
   }
-  res8 = SWIG_ConvertPtr(obj5,SWIG_as_voidptrptr(&arg8), 0, 0);
-  if (!SWIG_IsOK(res8)) {
-    SWIG_exception_fail(SWIG_ArgError(res8), "in method '" "IAddrBook_Details" "', argument " "8"" of type '" "LPVOID""'"); 
+  {
+    res8 = SWIG_ConvertPtr(obj5, &argp8, SWIGTYPE_p_LPVOID,  0  | 0);
+    if (!SWIG_IsOK(res8)) {
+      SWIG_exception_fail(SWIG_ArgError(res8), "in method '" "IAddrBook_Details" "', argument " "8"" of type '" "LPVOID""'"); 
+    }  
+    if (!argp8) {
+      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IAddrBook_Details" "', argument " "8"" of type '" "LPVOID""'");
+    } else {
+      LPVOID * temp = reinterpret_cast< LPVOID * >(argp8);
+      arg8 = *temp;
+      if (SWIG_IsNewObj(res8)) delete temp;
+    }
   }
   {
     arg9 = (LPTSTR)obj6;
@@ -19604,7 +19842,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_Details(PyObject *SWIGUNUSEDPARM(self), PyO
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Details(arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10);
+        result = (arg1)->Details(arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -19625,7 +19863,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_Details(PyObject *SWIGUNUSEDPARM(self), PyO
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg2)));
   } else {
     int new_flags = SWIG_IsNewObj(res2) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     if (alloc5 == SWIG_NEWOBJ) delete[] buf5;
@@ -19706,7 +19944,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_RecipOptions(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->RecipOptions(arg2,arg3,arg4);
+        result = (arg1)->RecipOptions(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -19734,7 +19972,7 @@ fail:
 SWIGINTERN PyObject *_wrap_IAddrBook_QueryDefaultRecipOpt(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IAddrBook *arg1 = (IAddrBook *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
   ULONG arg3 ;
   ULONG *arg4 = (ULONG *) 0 ;
   LPSPropValue *arg5 = (LPSPropValue *) 0 ;
@@ -19807,7 +20045,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_QueryDefaultRecipOpt(PyObject *SWIGUNUSEDPA
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->QueryDefaultRecipOpt(arg2,arg3,arg4,arg5);
+        result = (arg1)->QueryDefaultRecipOpt(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -19877,7 +20115,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_GetPAB(PyObject *SWIGUNUSEDPARM(self), PyOb
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetPAB(arg2,arg3);
+        result = (arg1)->GetPAB(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -19955,7 +20193,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_SetPAB(PyObject *SWIGUNUSEDPARM(self), PyOb
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetPAB(arg2,arg3);
+        result = (arg1)->SetPAB(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -20013,7 +20251,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_GetDefaultDir(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetDefaultDir(arg2,arg3);
+        result = (arg1)->GetDefaultDir(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -20091,7 +20329,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_SetDefaultDir(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetDefaultDir(arg2,arg3);
+        result = (arg1)->SetDefaultDir(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -20158,7 +20396,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_GetSearchPath(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetSearchPath(arg2,arg3);
+        result = (arg1)->GetSearchPath(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -20243,7 +20481,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_SetSearchPath(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetSearchPath(arg2,arg3);
+        result = (arg1)->SetSearchPath(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -20260,9 +20498,15 @@ SWIGINTERN PyObject *_wrap_IAddrBook_SetSearchPath(PyObject *SWIGUNUSEDPARM(self
       SWIG_fail;
     }
   }
+  {
+    FreeProws((LPSRowSet)arg3);
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
+  {
+    FreeProws((LPSRowSet)arg3);
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
 }
@@ -20315,7 +20559,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_PrepareRecips(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->PrepareRecips(arg2,arg3,arg4);
+        result = (arg1)->PrepareRecips(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -20341,8 +20585,7 @@ SWIGINTERN PyObject *_wrap_IAddrBook_PrepareRecips(PyObject *SWIGUNUSEDPARM(self
     MAPIFreeBuffer(arg3);
   }
   {
-    if(arg4)
-    MAPIFreeBuffer(arg4);
+    FreeProws((LPSRowSet)arg4);
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -20352,8 +20595,7 @@ fail:
     MAPIFreeBuffer(arg3);
   }
   {
-    if(arg4)
-    MAPIFreeBuffer(arg4);
+    FreeProws((LPSRowSet)arg4);
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
@@ -20449,7 +20691,7 @@ SWIGINTERN PyObject *_wrap_IProfAdmin_GetLastError(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetLastError(arg2,arg3,arg4);
+        result = (arg1)->GetLastError(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -20522,7 +20764,7 @@ SWIGINTERN PyObject *_wrap_IProfAdmin_GetProfileTable(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetProfileTable(arg2,arg3);
+        result = (arg1)->GetProfileTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -20553,8 +20795,8 @@ fail:
 SWIGINTERN PyObject *_wrap_IProfAdmin_CreateProfile(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IProfAdmin *arg1 = (IProfAdmin *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
-  LPTSTR arg3 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
+  LPTSTR arg3 ;
   ULONG arg4 ;
   ULONG arg5 ;
   void *argp1 = 0 ;
@@ -20668,7 +20910,7 @@ SWIGINTERN PyObject *_wrap_IProfAdmin_CreateProfile(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateProfile(arg2,arg3,arg4,arg5);
+        result = (arg1)->CreateProfile(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -20708,7 +20950,7 @@ fail:
 SWIGINTERN PyObject *_wrap_IProfAdmin_DeleteProfile(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IProfAdmin *arg1 = (IProfAdmin *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
   ULONG arg3 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
@@ -20776,7 +21018,7 @@ SWIGINTERN PyObject *_wrap_IProfAdmin_DeleteProfile(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DeleteProfile(arg2,arg3);
+        result = (arg1)->DeleteProfile(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -20810,9 +21052,9 @@ fail:
 SWIGINTERN PyObject *_wrap_IProfAdmin_ChangeProfilePassword(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IProfAdmin *arg1 = (IProfAdmin *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
-  LPTSTR arg3 = (LPTSTR) 0 ;
-  LPTSTR arg4 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
+  LPTSTR arg3 ;
+  LPTSTR arg4 ;
   ULONG arg5 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
@@ -20954,7 +21196,7 @@ SWIGINTERN PyObject *_wrap_IProfAdmin_ChangeProfilePassword(PyObject *SWIGUNUSED
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ChangeProfilePassword(arg2,arg3,arg4,arg5);
+        result = (arg1)->ChangeProfilePassword(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -21000,9 +21242,9 @@ fail:
 SWIGINTERN PyObject *_wrap_IProfAdmin_CopyProfile(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IProfAdmin *arg1 = (IProfAdmin *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
-  LPTSTR arg3 = (LPTSTR) 0 ;
-  LPTSTR arg4 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
+  LPTSTR arg3 ;
+  LPTSTR arg4 ;
   ULONG arg5 ;
   ULONG arg6 ;
   void *argp1 = 0 ;
@@ -21153,7 +21395,7 @@ SWIGINTERN PyObject *_wrap_IProfAdmin_CopyProfile(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CopyProfile(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->CopyProfile(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -21199,9 +21441,9 @@ fail:
 SWIGINTERN PyObject *_wrap_IProfAdmin_RenameProfile(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IProfAdmin *arg1 = (IProfAdmin *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
-  LPTSTR arg3 = (LPTSTR) 0 ;
-  LPTSTR arg4 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
+  LPTSTR arg3 ;
+  LPTSTR arg4 ;
   ULONG arg5 ;
   ULONG arg6 ;
   void *argp1 = 0 ;
@@ -21352,7 +21594,7 @@ SWIGINTERN PyObject *_wrap_IProfAdmin_RenameProfile(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->RenameProfile(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->RenameProfile(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -21398,7 +21640,7 @@ fail:
 SWIGINTERN PyObject *_wrap_IProfAdmin_SetDefaultProfile(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IProfAdmin *arg1 = (IProfAdmin *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
   ULONG arg3 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
@@ -21466,7 +21708,7 @@ SWIGINTERN PyObject *_wrap_IProfAdmin_SetDefaultProfile(PyObject *SWIGUNUSEDPARM
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetDefaultProfile(arg2,arg3);
+        result = (arg1)->SetDefaultProfile(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -21500,8 +21742,8 @@ fail:
 SWIGINTERN PyObject *_wrap_IProfAdmin_AdminServices(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IProfAdmin *arg1 = (IProfAdmin *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
-  LPTSTR arg3 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
+  LPTSTR arg3 ;
   ULONG arg4 ;
   ULONG arg5 ;
   IMsgServiceAdmin **arg6 = (IMsgServiceAdmin **) 0 ;
@@ -21618,7 +21860,7 @@ SWIGINTERN PyObject *_wrap_IProfAdmin_AdminServices(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->AdminServices(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->AdminServices(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -21747,7 +21989,7 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_GetLastError(PyObject *SWIGUNUSEDPAR
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetLastError(arg2,arg3,arg4);
+        result = (arg1)->GetLastError(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -21820,7 +22062,7 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_GetMsgServiceTable(PyObject *SWIGUNU
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetMsgServiceTable(arg2,arg3);
+        result = (arg1)->GetMsgServiceTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -21851,8 +22093,8 @@ fail:
 SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_CreateMsgService(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IMsgServiceAdmin *arg1 = (IMsgServiceAdmin *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
-  LPTSTR arg3 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
+  LPTSTR arg3 ;
   ULONG arg4 ;
   ULONG arg5 ;
   void *argp1 = 0 ;
@@ -21966,7 +22208,7 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_CreateMsgService(PyObject *SWIGUNUSE
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateMsgService(arg2,arg3,arg4,arg5);
+        result = (arg1)->CreateMsgService(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -22038,7 +22280,7 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_DeleteMsgService(PyObject *SWIGUNUSE
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DeleteMsgService(arg2);
+        result = (arg1)->DeleteMsgService(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -22069,10 +22311,10 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_CopyMsgService(PyObject *SWIGUNUSEDP
   PyObject *resultobj = 0;
   IMsgServiceAdmin *arg1 = (IMsgServiceAdmin *) 0 ;
   LPMAPIUID arg2 ;
-  LPTSTR arg3 = (LPTSTR) 0 ;
+  LPTSTR arg3 ;
   LPCIID arg4 ;
   LPCIID arg5 ;
-  LPVOID arg6 = (LPVOID) 0 ;
+  LPVOID arg6 ;
   ULONG arg7 ;
   ULONG arg8 ;
   void *argp1 = 0 ;
@@ -22089,7 +22331,8 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_CopyMsgService(PyObject *SWIGUNUSEDP
   char *buf5 ;
   size_t size5 ;
   int alloc5 ;
-  int res6 ;
+  void *argp6 ;
+  int res6 = 0 ;
   unsigned int val7 ;
   int ecode7 = 0 ;
   unsigned int fl8 ;
@@ -22144,9 +22387,18 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_CopyMsgService(PyObject *SWIGUNUSEDP
     }
     arg5 = reinterpret_cast< LPCIID >(buf5);
   }
-  res6 = SWIG_ConvertPtr(obj5,SWIG_as_voidptrptr(&arg6), 0, 0);
-  if (!SWIG_IsOK(res6)) {
-    SWIG_exception_fail(SWIG_ArgError(res6), "in method '" "IMsgServiceAdmin_CopyMsgService" "', argument " "6"" of type '" "LPVOID""'"); 
+  {
+    res6 = SWIG_ConvertPtr(obj5, &argp6, SWIGTYPE_p_LPVOID,  0  | 0);
+    if (!SWIG_IsOK(res6)) {
+      SWIG_exception_fail(SWIG_ArgError(res6), "in method '" "IMsgServiceAdmin_CopyMsgService" "', argument " "6"" of type '" "LPVOID""'"); 
+    }  
+    if (!argp6) {
+      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IMsgServiceAdmin_CopyMsgService" "', argument " "6"" of type '" "LPVOID""'");
+    } else {
+      LPVOID * temp = reinterpret_cast< LPVOID * >(argp6);
+      arg6 = *temp;
+      if (SWIG_IsNewObj(res6)) delete temp;
+    }
   }
   ecode7 = SWIG_AsVal_unsigned_SS_int(obj6, &val7);
   if (!SWIG_IsOK(ecode7)) {
@@ -22197,7 +22449,7 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_CopyMsgService(PyObject *SWIGUNUSEDP
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CopyMsgService(arg2,arg3,arg4,arg5,arg6,arg7,arg8);
+        result = (arg1)->CopyMsgService(arg2,arg3,arg4,arg5,arg6,arg7,arg8);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -22239,7 +22491,7 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_RenameMsgService(PyObject *SWIGUNUSE
   IMsgServiceAdmin *arg1 = (IMsgServiceAdmin *) 0 ;
   LPMAPIUID arg2 ;
   ULONG arg3 ;
-  LPTSTR arg4 = (LPTSTR) 0 ;
+  LPTSTR arg4 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
   int res2 ;
@@ -22320,7 +22572,7 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_RenameMsgService(PyObject *SWIGUNUSE
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->RenameMsgService(arg2,arg3,arg4);
+        result = (arg1)->RenameMsgService(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -22425,7 +22677,7 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_ConfigureMsgService(PyObject *SWIGUN
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ConfigureMsgService(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->ConfigureMsgService(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -22526,7 +22778,7 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_OpenProfileSection(PyObject *SWIGUNU
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->OpenProfileSection(arg2,arg3,arg4,arg5);
+        result = (arg1)->OpenProfileSection(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -22615,7 +22867,7 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_MsgServiceTransportOrder(PyObject *S
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->MsgServiceTransportOrder(arg2,arg3,arg4);
+        result = (arg1)->MsgServiceTransportOrder(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -22693,7 +22945,7 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_AdminProviders(PyObject *SWIGUNUSEDP
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->AdminProviders(arg2,arg3,arg4);
+        result = (arg1)->AdminProviders(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -22771,7 +23023,7 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_SetPrimaryIdentity(PyObject *SWIGUNU
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetPrimaryIdentity(arg2,arg3);
+        result = (arg1)->SetPrimaryIdentity(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -22834,7 +23086,7 @@ SWIGINTERN PyObject *_wrap_IMsgServiceAdmin_GetProviderTable(PyObject *SWIGUNUSE
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetProviderTable(arg2,arg3);
+        result = (arg1)->GetProviderTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -22949,7 +23201,7 @@ SWIGINTERN PyObject *_wrap_MAPINotifSink_GetNotifications(PyObject *SWIGUNUSEDPA
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetNotifications(arg2,arg3,arg4,arg5);
+        result = (arg1)->GetNotifications(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -23062,7 +23314,7 @@ SWIGINTERN PyObject *MAPINotifSink_swigregister(PyObject *SWIGUNUSEDPARM(self), 
 SWIGINTERN PyObject *_wrap_WrapStoreEntryID(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   ULONG arg1 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
   ULONG arg3 ;
   LPENTRYID arg4 ;
   ULONG *arg5 = (ULONG *) 0 ;
@@ -23148,7 +23400,7 @@ SWIGINTERN PyObject *_wrap_WrapStoreEntryID(PyObject *SWIGUNUSEDPARM(self), PyOb
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)WrapStoreEntryID(arg1,arg2,arg3,arg4,arg5,arg6);
+        result = WrapStoreEntryID(arg1,arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -23234,7 +23486,7 @@ SWIGINTERN PyObject *_wrap_WrapCompressedRTFStream(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)WrapCompressedRTFStream(arg1,arg2,arg3);
+        result = WrapCompressedRTFStream(arg1,arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -23307,7 +23559,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportContentsChanges_GetLastError(PyObject 
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetLastError(arg2,arg3,arg4);
+        result = (arg1)->GetLastError(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -23386,7 +23638,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportContentsChanges_Config(PyObject *SWIGU
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Config(arg2,arg3);
+        result = (arg1)->Config(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -23440,7 +23692,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportContentsChanges_UpdateState(PyObject *
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->UpdateState(arg2);
+        result = (arg1)->UpdateState(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -23516,7 +23768,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportContentsChanges_ImportMessageChange(Py
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ImportMessageChange(arg2,arg3,arg4,arg5);
+        result = (arg1)->ImportMessageChange(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -23592,7 +23844,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportContentsChanges_ImportMessageDeletion(
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ImportMessageDeletion(arg2,arg3);
+        result = (arg1)->ImportMessageDeletion(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -23660,7 +23912,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportContentsChanges_ImportPerUserReadState
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ImportPerUserReadStateChange(arg2,arg3);
+        result = (arg1)->ImportPerUserReadStateChange(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -23753,7 +24005,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportContentsChanges_ImportMessageMove(PyOb
     SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IExchangeImportContentsChanges_ImportMessageMove" "', argument " "2"" of type '" "ULONG""'");
   } 
   arg2 = static_cast< ULONG >(val2);
-  res3 = SWIG_ConvertPtr(obj2, &argp3,SWIGTYPE_p_unsigned_char, 0 |  0 );
+  res3 = SWIG_ConvertPtr(obj2, &argp3,SWIGTYPE_p_BYTE, 0 |  0 );
   if (!SWIG_IsOK(res3)) {
     SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IExchangeImportContentsChanges_ImportMessageMove" "', argument " "3"" of type '" "BYTE *""'"); 
   }
@@ -23763,7 +24015,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportContentsChanges_ImportMessageMove(PyOb
     SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IExchangeImportContentsChanges_ImportMessageMove" "', argument " "4"" of type '" "ULONG""'");
   } 
   arg4 = static_cast< ULONG >(val4);
-  res5 = SWIG_ConvertPtr(obj4, &argp5,SWIGTYPE_p_unsigned_char, 0 |  0 );
+  res5 = SWIG_ConvertPtr(obj4, &argp5,SWIGTYPE_p_BYTE, 0 |  0 );
   if (!SWIG_IsOK(res5)) {
     SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "IExchangeImportContentsChanges_ImportMessageMove" "', argument " "5"" of type '" "BYTE *""'"); 
   }
@@ -23773,7 +24025,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportContentsChanges_ImportMessageMove(PyOb
     SWIG_exception_fail(SWIG_ArgError(ecode6), "in method '" "IExchangeImportContentsChanges_ImportMessageMove" "', argument " "6"" of type '" "ULONG""'");
   } 
   arg6 = static_cast< ULONG >(val6);
-  res7 = SWIG_ConvertPtr(obj6, &argp7,SWIGTYPE_p_unsigned_char, 0 |  0 );
+  res7 = SWIG_ConvertPtr(obj6, &argp7,SWIGTYPE_p_BYTE, 0 |  0 );
   if (!SWIG_IsOK(res7)) {
     SWIG_exception_fail(SWIG_ArgError(res7), "in method '" "IExchangeImportContentsChanges_ImportMessageMove" "', argument " "7"" of type '" "BYTE *""'"); 
   }
@@ -23783,7 +24035,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportContentsChanges_ImportMessageMove(PyOb
     SWIG_exception_fail(SWIG_ArgError(ecode8), "in method '" "IExchangeImportContentsChanges_ImportMessageMove" "', argument " "8"" of type '" "ULONG""'");
   } 
   arg8 = static_cast< ULONG >(val8);
-  res9 = SWIG_ConvertPtr(obj8, &argp9,SWIGTYPE_p_unsigned_char, 0 |  0 );
+  res9 = SWIG_ConvertPtr(obj8, &argp9,SWIGTYPE_p_BYTE, 0 |  0 );
   if (!SWIG_IsOK(res9)) {
     SWIG_exception_fail(SWIG_ArgError(res9), "in method '" "IExchangeImportContentsChanges_ImportMessageMove" "', argument " "9"" of type '" "BYTE *""'"); 
   }
@@ -23793,7 +24045,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportContentsChanges_ImportMessageMove(PyOb
     SWIG_exception_fail(SWIG_ArgError(ecode10), "in method '" "IExchangeImportContentsChanges_ImportMessageMove" "', argument " "10"" of type '" "ULONG""'");
   } 
   arg10 = static_cast< ULONG >(val10);
-  res11 = SWIG_ConvertPtr(obj10, &argp11,SWIGTYPE_p_unsigned_char, 0 |  0 );
+  res11 = SWIG_ConvertPtr(obj10, &argp11,SWIGTYPE_p_BYTE, 0 |  0 );
   if (!SWIG_IsOK(res11)) {
     SWIG_exception_fail(SWIG_ArgError(res11), "in method '" "IExchangeImportContentsChanges_ImportMessageMove" "', argument " "11"" of type '" "BYTE *""'"); 
   }
@@ -23803,7 +24055,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportContentsChanges_ImportMessageMove(PyOb
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ImportMessageMove(arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10,arg11);
+        result = (arg1)->ImportMessageMove(arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10,arg11);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -23917,7 +24169,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportHierarchyChanges_GetLastError(PyObject
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetLastError(arg2,arg3,arg4);
+        result = (arg1)->GetLastError(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -23996,7 +24248,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportHierarchyChanges_Config(PyObject *SWIG
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Config(arg2,arg3);
+        result = (arg1)->Config(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -24050,7 +24302,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportHierarchyChanges_UpdateState(PyObject 
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->UpdateState(arg2);
+        result = (arg1)->UpdateState(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -24110,7 +24362,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportHierarchyChanges_ImportFolderChange(Py
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ImportFolderChange(arg2,arg3);
+        result = (arg1)->ImportFolderChange(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -24183,7 +24435,7 @@ SWIGINTERN PyObject *_wrap_IExchangeImportHierarchyChanges_ImportFolderDeletion(
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ImportFolderDeletion(arg2,arg3);
+        result = (arg1)->ImportFolderDeletion(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -24305,7 +24557,7 @@ SWIGINTERN PyObject *_wrap_IExchangeExportChanges_GetLastError(PyObject *SWIGUNU
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetLastError(arg2,arg3,arg4);
+        result = (arg1)->GetLastError(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -24423,7 +24675,7 @@ SWIGINTERN PyObject *_wrap_IExchangeExportChanges_Config(PyObject *SWIGUNUSEDPAR
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Config(arg2,arg3,arg4,arg5,arg6,arg7,arg8);
+        result = (arg1)->Config(arg2,arg3,arg4,arg5,arg6,arg7,arg8);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -24495,7 +24747,7 @@ SWIGINTERN PyObject *_wrap_IExchangeExportChanges_Synchronize(PyObject *SWIGUNUS
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IExchangeExportChanges_Synchronize" "', argument " "1"" of type '" "IExchangeExportChanges *""'"); 
   }
   arg1 = reinterpret_cast< IExchangeExportChanges * >(argp1);
-  if (!(SWIG_IsOK((res3 = SWIG_ConvertPtr(obj1,SWIG_as_voidptrptr(&arg3),SWIGTYPE_p_unsigned_long,0))))) {
+  if (!(SWIG_IsOK((res3 = SWIG_ConvertPtr(obj1,SWIG_as_voidptrptr(&arg3),SWIGTYPE_p_ULONG,0))))) {
     unsigned int val; 
     int ecode = SWIG_AsVal_unsigned_SS_int(obj1, &val);
     if (!SWIG_IsOK(ecode)) {
@@ -24510,7 +24762,7 @@ SWIGINTERN PyObject *_wrap_IExchangeExportChanges_Synchronize(PyObject *SWIGUNUS
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Synchronize(arg2,arg3);
+        result = (arg1)->Synchronize(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -24531,13 +24783,13 @@ SWIGINTERN PyObject *_wrap_IExchangeExportChanges_Synchronize(PyObject *SWIGUNUS
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg2)));
   } else {
     int new_flags = SWIG_IsNewObj(res2) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_ULONG, new_flags));
   }
   if (SWIG_IsTmpObj(res3)) {
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg3)));
   } else {
     int new_flags = SWIG_IsNewObj(res3) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg3), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg3), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -24576,7 +24828,7 @@ SWIGINTERN PyObject *_wrap_IExchangeExportChanges_UpdateState(PyObject *SWIGUNUS
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->UpdateState(arg2);
+        result = (arg1)->UpdateState(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -24648,8 +24900,8 @@ SWIGINTERN PyObject *IExchangeExportChanges_swigregister(PyObject *SWIGUNUSEDPAR
 SWIGINTERN PyObject *_wrap_IExchangeManageStore_CreateStoreEntryID(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IExchangeManageStore *arg1 = (IExchangeManageStore *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
-  LPTSTR arg3 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
+  LPTSTR arg3 ;
   ULONG arg4 ;
   ULONG *arg5 = (ULONG *) 0 ;
   LPENTRYID *arg6 = (LPENTRYID *) 0 ;
@@ -24761,7 +25013,7 @@ SWIGINTERN PyObject *_wrap_IExchangeManageStore_CreateStoreEntryID(PyObject *SWI
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateStoreEntryID(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->CreateStoreEntryID(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -24878,7 +25130,7 @@ SWIGINTERN PyObject *_wrap_IExchangeManageStore_EntryIDFromSourceKey(PyObject *S
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->EntryIDFromSourceKey(arg2,arg3,arg4,arg5,arg6,arg7);
+        result = (arg1)->EntryIDFromSourceKey(arg2,arg3,arg4,arg5,arg6,arg7);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -24938,10 +25190,10 @@ SWIGINTERN PyObject *_wrap_IExchangeManageStore_GetRights(PyObject *SWIGUNUSEDPA
   ULONG *arg6 = (ULONG *) 0 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  unsigned int val2 ;
-  int ecode2 = 0 ;
-  void *argp3 ;
-  int res3 = 0 ;
+  int res2 ;
+  char *buf2 = 0 ;
+  size_t size2 ;
+  int alloc2 = 0 ;
   int res4 ;
   char *buf4 = 0 ;
   size_t size4 ;
@@ -24951,37 +25203,31 @@ SWIGINTERN PyObject *_wrap_IExchangeManageStore_GetRights(PyObject *SWIGUNUSEDPA
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
-  PyObject * obj3 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
   arg6 = &temp6;
-  if (!PyArg_ParseTuple(args,(char *)"OOOO:IExchangeManageStore_GetRights",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OOO:IExchangeManageStore_GetRights",&obj0,&obj1,&obj2)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IExchangeManageStore, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IExchangeManageStore_GetRights" "', argument " "1"" of type '" "IExchangeManageStore *""'"); 
   }
   arg1 = reinterpret_cast< IExchangeManageStore * >(argp1);
-  ecode2 = SWIG_AsVal_unsigned_SS_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IExchangeManageStore_GetRights" "', argument " "2"" of type '" "ULONG""'");
-  } 
-  arg2 = static_cast< ULONG >(val2);
   {
-    res3 = SWIG_ConvertPtr(obj2, &argp3, SWIGTYPE_p_LPENTRYID,  0  | 0);
-    if (!SWIG_IsOK(res3)) {
-      SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IExchangeManageStore_GetRights" "', argument " "3"" of type '" "LPENTRYID""'"); 
-    }  
-    if (!argp3) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IExchangeManageStore_GetRights" "', argument " "3"" of type '" "LPENTRYID""'");
+    res2 = SWIG_AsCharPtrAndSize(obj1, &buf2, &size2, &alloc2);
+    if (!SWIG_IsOK(res2)) {
+      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IExchangeManageStore_GetRights" "', argument " "2"" of type '" "ULONG""'");
+    }
+    if(buf2 == NULL) {
+      arg2 = 0;
+      arg3 = NULL;
     } else {
-      LPENTRYID * temp = reinterpret_cast< LPENTRYID * >(argp3);
-      arg3 = *temp;
-      if (SWIG_IsNewObj(res3)) delete temp;
+      arg2 = static_cast< ULONG >(size2 - 1);
+      arg3 = reinterpret_cast< LPENTRYID >(buf2);
     }
   }
   {
-    res4 = SWIG_AsCharPtrAndSize(obj3, &buf4, &size4, &alloc4);
+    res4 = SWIG_AsCharPtrAndSize(obj2, &buf4, &size4, &alloc4);
     if (!SWIG_IsOK(res4)) {
       SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IExchangeManageStore_GetRights" "', argument " "4"" of type '" "ULONG""'");
     }
@@ -24998,7 +25244,7 @@ SWIGINTERN PyObject *_wrap_IExchangeManageStore_GetRights(PyObject *SWIGUNUSEDPA
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetRights(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->GetRights(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -25019,7 +25265,10 @@ SWIGINTERN PyObject *_wrap_IExchangeManageStore_GetRights(PyObject *SWIGUNUSEDPA
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg6)));
   } else {
     int new_flags = SWIG_IsNewObj(res6) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg6), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg6), SWIGTYPE_p_ULONG, new_flags));
+  }
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
   }
   {
     if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
@@ -25027,6 +25276,9 @@ SWIGINTERN PyObject *_wrap_IExchangeManageStore_GetRights(PyObject *SWIGUNUSEDPA
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
   {
     if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
   }
@@ -25038,7 +25290,7 @@ fail:
 SWIGINTERN PyObject *_wrap_IExchangeManageStore_GetMailboxTable(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IExchangeManageStore *arg1 = (IExchangeManageStore *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
   IMAPITable **arg3 = (IMAPITable **) 0 ;
   ULONG arg4 ;
   void *argp1 = 0 ;
@@ -25109,7 +25361,7 @@ SWIGINTERN PyObject *_wrap_IExchangeManageStore_GetMailboxTable(PyObject *SWIGUN
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetMailboxTable(arg2,arg3,arg4);
+        result = (arg1)->GetMailboxTable(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -25146,7 +25398,7 @@ fail:
 SWIGINTERN PyObject *_wrap_IExchangeManageStore_GetPublicFolderTable(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IExchangeManageStore *arg1 = (IExchangeManageStore *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
   IMAPITable **arg3 = (IMAPITable **) 0 ;
   ULONG arg4 ;
   void *argp1 = 0 ;
@@ -25217,7 +25469,7 @@ SWIGINTERN PyObject *_wrap_IExchangeManageStore_GetPublicFolderTable(PyObject *S
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetPublicFolderTable(arg2,arg3,arg4);
+        result = (arg1)->GetPublicFolderTable(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -25340,7 +25592,7 @@ SWIGINTERN PyObject *_wrap_IExchangeModifyTable_GetLastError(PyObject *SWIGUNUSE
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetLastError(arg2,arg3,arg4);
+        result = (arg1)->GetLastError(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -25413,7 +25665,7 @@ SWIGINTERN PyObject *_wrap_IExchangeModifyTable_GetTable(PyObject *SWIGUNUSEDPAR
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetTable(arg2,arg3);
+        result = (arg1)->GetTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -25481,7 +25733,7 @@ SWIGINTERN PyObject *_wrap_IExchangeModifyTable_ModifyTable(PyObject *SWIGUNUSED
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ModifyTable(arg2,arg3);
+        result = (arg1)->ModifyTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -26035,7 +26287,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_CreateStore(PyObject *SWIGUNUSEDPARM(
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateStore(arg2,arg3,arg4,arg5,arg6,arg7,arg8);
+        result = (arg1)->CreateStore(arg2,arg3,arg4,arg5,arg6,arg7,arg8);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -26206,7 +26458,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_CreateEmptyStore(PyObject *SWIGUNUSED
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateEmptyStore(arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9);
+        result = (arg1)->CreateEmptyStore(arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -26309,7 +26561,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_ResolveStore(PyObject *SWIGUNUSEDPARM
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ResolveStore(arg2,arg3,arg4,arg5);
+        result = (arg1)->ResolveStore(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -26330,7 +26582,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_ResolveStore(PyObject *SWIGUNUSEDPARM
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg3)));
   } else {
     int new_flags = SWIG_IsNewObj(res3) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg3), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg3), SWIGTYPE_p_ULONG, new_flags));
   }
   {
     if (*arg5) {
@@ -26417,7 +26669,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_HookStore(PyObject *SWIGUNUSEDPARM(se
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->HookStore(arg2,arg3,arg4,arg5);
+        result = (arg1)->HookStore(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -26497,7 +26749,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_UnhookStore(PyObject *SWIGUNUSEDPARM(
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->UnhookStore(arg2,arg3,arg4);
+        result = (arg1)->UnhookStore(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -26563,7 +26815,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_RemoveStore(PyObject *SWIGUNUSEDPARM(
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->RemoveStore(arg2);
+        result = (arg1)->RemoveStore(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -26640,7 +26892,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_CreateUser(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateUser(arg2,arg3,arg4,arg5);
+        result = (arg1)->CreateUser(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -26726,7 +26978,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DeleteUser(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DeleteUser(arg2,arg3);
+        result = (arg1)->DeleteUser(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -26802,7 +27054,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_SetUser(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetUser(arg2,arg3);
+        result = (arg1)->SetUser(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -26891,7 +27143,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetUser(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetUser(arg2,arg3,arg4,arg5);
+        result = (arg1)->GetUser(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -26937,7 +27189,7 @@ fail:
 SWIGINTERN PyObject *_wrap_IECServiceAdmin_ResolveUserName(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IECServiceAdmin *arg1 = (IECServiceAdmin *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
   ULONG arg3 ;
   ULONG *arg4 = (ULONG *) 0 ;
   LPENTRYID *arg5 = (LPENTRYID *) 0 ;
@@ -27012,7 +27264,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_ResolveUserName(PyObject *SWIGUNUSEDP
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ResolveUserName(arg2,arg3,arg4,arg5);
+        result = (arg1)->ResolveUserName(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -27114,7 +27366,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetUserList(PyObject *SWIGUNUSEDPARM(
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetUserList(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->GetUserList(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -27215,7 +27467,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetSendAsList(PyObject *SWIGUNUSEDPAR
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetSendAsList(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->GetSendAsList(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -27271,18 +27523,17 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddSendAsUser(PyObject *SWIGUNUSEDPAR
   char *buf2 = 0 ;
   size_t size2 ;
   int alloc2 = 0 ;
-  unsigned int val4 ;
-  int ecode4 = 0 ;
-  void *argp5 ;
-  int res5 = 0 ;
+  int res4 ;
+  char *buf4 = 0 ;
+  size_t size4 ;
+  int alloc4 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
-  PyObject * obj3 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-  if (!PyArg_ParseTuple(args,(char *)"OOOO:IECServiceAdmin_AddSendAsUser",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OOO:IECServiceAdmin_AddSendAsUser",&obj0,&obj1,&obj2)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_AddSendAsUser" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
@@ -27301,22 +27552,17 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddSendAsUser(PyObject *SWIGUNUSEDPAR
       arg3 = reinterpret_cast< LPENTRYID >(buf2);
     }
   }
-  ecode4 = SWIG_AsVal_unsigned_SS_int(obj2, &val4);
-  if (!SWIG_IsOK(ecode4)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECServiceAdmin_AddSendAsUser" "', argument " "4"" of type '" "ULONG""'");
-  } 
-  arg4 = static_cast< ULONG >(val4);
   {
-    res5 = SWIG_ConvertPtr(obj3, &argp5, SWIGTYPE_p_LPENTRYID,  0  | 0);
-    if (!SWIG_IsOK(res5)) {
-      SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "IECServiceAdmin_AddSendAsUser" "', argument " "5"" of type '" "LPENTRYID""'"); 
-    }  
-    if (!argp5) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_AddSendAsUser" "', argument " "5"" of type '" "LPENTRYID""'");
+    res4 = SWIG_AsCharPtrAndSize(obj2, &buf4, &size4, &alloc4);
+    if (!SWIG_IsOK(res4)) {
+      SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_AddSendAsUser" "', argument " "4"" of type '" "ULONG""'");
+    }
+    if(buf4 == NULL) {
+      arg4 = 0;
+      arg5 = NULL;
     } else {
-      LPENTRYID * temp = reinterpret_cast< LPENTRYID * >(argp5);
-      arg5 = *temp;
-      if (SWIG_IsNewObj(res5)) delete temp;
+      arg4 = static_cast< ULONG >(size4 - 1);
+      arg5 = reinterpret_cast< LPENTRYID >(buf4);
     }
   }
   {
@@ -27324,7 +27570,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddSendAsUser(PyObject *SWIGUNUSEDPAR
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->AddSendAsUser(arg2,arg3,arg4,arg5);
+        result = (arg1)->AddSendAsUser(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -27344,11 +27590,17 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddSendAsUser(PyObject *SWIGUNUSEDPAR
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
   }
+  {
+    if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
+    if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
@@ -27368,18 +27620,17 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DelSendAsUser(PyObject *SWIGUNUSEDPAR
   char *buf2 = 0 ;
   size_t size2 ;
   int alloc2 = 0 ;
-  unsigned int val4 ;
-  int ecode4 = 0 ;
-  void *argp5 ;
-  int res5 = 0 ;
+  int res4 ;
+  char *buf4 = 0 ;
+  size_t size4 ;
+  int alloc4 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
-  PyObject * obj3 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-  if (!PyArg_ParseTuple(args,(char *)"OOOO:IECServiceAdmin_DelSendAsUser",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OOO:IECServiceAdmin_DelSendAsUser",&obj0,&obj1,&obj2)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_DelSendAsUser" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
@@ -27398,22 +27649,17 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DelSendAsUser(PyObject *SWIGUNUSEDPAR
       arg3 = reinterpret_cast< LPENTRYID >(buf2);
     }
   }
-  ecode4 = SWIG_AsVal_unsigned_SS_int(obj2, &val4);
-  if (!SWIG_IsOK(ecode4)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECServiceAdmin_DelSendAsUser" "', argument " "4"" of type '" "ULONG""'");
-  } 
-  arg4 = static_cast< ULONG >(val4);
   {
-    res5 = SWIG_ConvertPtr(obj3, &argp5, SWIGTYPE_p_LPENTRYID,  0  | 0);
-    if (!SWIG_IsOK(res5)) {
-      SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "IECServiceAdmin_DelSendAsUser" "', argument " "5"" of type '" "LPENTRYID""'"); 
-    }  
-    if (!argp5) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_DelSendAsUser" "', argument " "5"" of type '" "LPENTRYID""'");
+    res4 = SWIG_AsCharPtrAndSize(obj2, &buf4, &size4, &alloc4);
+    if (!SWIG_IsOK(res4)) {
+      SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_DelSendAsUser" "', argument " "4"" of type '" "ULONG""'");
+    }
+    if(buf4 == NULL) {
+      arg4 = 0;
+      arg5 = NULL;
     } else {
-      LPENTRYID * temp = reinterpret_cast< LPENTRYID * >(argp5);
-      arg5 = *temp;
-      if (SWIG_IsNewObj(res5)) delete temp;
+      arg4 = static_cast< ULONG >(size4 - 1);
+      arg5 = reinterpret_cast< LPENTRYID >(buf4);
     }
   }
   {
@@ -27421,7 +27667,183 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DelSendAsUser(PyObject *SWIGUNUSEDPAR
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DelSendAsUser(arg2,arg3,arg4,arg5);
+        result = (arg1)->DelSendAsUser(arg2,arg3,arg4,arg5);
+        unmark_call_from_python();
+      } catch (const Swig::DirectorException &) {
+        unmark_call_from_python();
+        SWIG_fail;
+      }
+    }
+    SWIG_PYTHON_THREAD_END_ALLOW;
+  }
+  {
+    resultobj = Py_None;
+    Py_INCREF(Py_None);
+    if(FAILED(result)) {
+      DoException(result);
+      SWIG_fail;
+    }
+  }
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
+    if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
+  }
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return resultobj;
+fail:
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
+    if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
+  }
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetUserClientUpdateStatus(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  IECServiceAdmin *arg1 = (IECServiceAdmin *) 0 ;
+  ULONG arg2 ;
+  LPENTRYID arg3 ;
+  ULONG arg4 ;
+  LPECUSERCLIENTUPDATESTATUS *arg5 = (LPECUSERCLIENTUPDATESTATUS *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  int res2 ;
+  char *buf2 = 0 ;
+  size_t size2 ;
+  int alloc2 = 0 ;
+  unsigned int fl4 ;
+  int ecode4 ;
+  LPECUSERCLIENTUPDATESTATUS temp5 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  PyObject * obj2 = 0 ;
+  HRESULT result;
+  
+  SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  ULONG ulFlags = 0;
+  temp5 = NULL; arg5 = &temp5;
+  if (!PyArg_ParseTuple(args,(char *)"OOO:IECServiceAdmin_GetUserClientUpdateStatus",&obj0,&obj1,&obj2)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_GetUserClientUpdateStatus" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
+  }
+  arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
+  {
+    res2 = SWIG_AsCharPtrAndSize(obj1, &buf2, &size2, &alloc2);
+    if (!SWIG_IsOK(res2)) {
+      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_GetUserClientUpdateStatus" "', argument " "2"" of type '" "ULONG""'");
+    }
+    if(buf2 == NULL) {
+      arg2 = 0;
+      arg3 = NULL;
+    } else {
+      arg2 = static_cast< ULONG >(size2 - 1);
+      arg3 = reinterpret_cast< LPENTRYID >(buf2);
+    }
+  }
+  {
+    ecode4 = SWIG_AsVal_unsigned_SS_int (obj2, &fl4);
+    if (!SWIG_IsOK(ecode4)) {
+      SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECServiceAdmin_GetUserClientUpdateStatus" "', argument " "4"" of type '" "ULONG""'");
+    } 
+    arg4 = fl4;
+    ulFlags = fl4;
+  }
+  {
+    SWIG_PYTHON_THREAD_BEGIN_ALLOW;
+    {
+      try {
+        mark_call_from_python();
+        result = (arg1)->GetUserClientUpdateStatus(arg2,arg3,arg4,arg5);
+        unmark_call_from_python();
+      } catch (const Swig::DirectorException &) {
+        unmark_call_from_python();
+        SWIG_fail;
+      }
+    }
+    SWIG_PYTHON_THREAD_END_ALLOW;
+  }
+  {
+    resultobj = Py_None;
+    Py_INCREF(Py_None);
+    if(FAILED(result)) {
+      DoException(result);
+      SWIG_fail;
+    }
+  }
+  {
+    resultobj = SWIG_Python_AppendOutput(resultobj, Object_from_LPECUSERCLIENTUPDATESTATUS(*(arg5)));
+    if(PyErr_Occurred()) goto fail;
+  }
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
+    if(*arg5)
+    MAPIFreeBuffer(*arg5);
+  }
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return resultobj;
+fail:
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
+    if(*arg5)
+    MAPIFreeBuffer(*arg5);
+  }
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_IECServiceAdmin_RemoveAllObjects(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  IECServiceAdmin *arg1 = (IECServiceAdmin *) 0 ;
+  ULONG arg2 ;
+  LPENTRYID arg3 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  int res2 ;
+  char *buf2 = 0 ;
+  size_t size2 ;
+  int alloc2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  HRESULT result;
+  
+  SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  if (!PyArg_ParseTuple(args,(char *)"OO:IECServiceAdmin_RemoveAllObjects",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_RemoveAllObjects" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
+  }
+  arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
+  {
+    res2 = SWIG_AsCharPtrAndSize(obj1, &buf2, &size2, &alloc2);
+    if (!SWIG_IsOK(res2)) {
+      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_RemoveAllObjects" "', argument " "2"" of type '" "ULONG""'");
+    }
+    if(buf2 == NULL) {
+      arg2 = 0;
+      arg3 = NULL;
+    } else {
+      arg2 = static_cast< ULONG >(size2 - 1);
+      arg3 = reinterpret_cast< LPENTRYID >(buf2);
+    }
+  }
+  {
+    SWIG_PYTHON_THREAD_BEGIN_ALLOW;
+    {
+      try {
+        mark_call_from_python();
+        result = (arg1)->RemoveAllObjects(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -27461,8 +27883,6 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_CreateGroup(PyObject *SWIGUNUSEDPARM(
   LPENTRYID *arg5 = (LPENTRYID *) 0 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  void *argp2 ;
-  int res2 = 0 ;
   unsigned int fl3 ;
   int ecode3 ;
   ULONG cbEntryID4 = 0 ;
@@ -27473,6 +27893,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_CreateGroup(PyObject *SWIGUNUSEDPARM(
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  arg2 = NULL;
   ULONG ulFlags = 0;
   {
     arg4 = &cbEntryID4; arg5 = &lpEntryID4;
@@ -27484,17 +27905,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_CreateGroup(PyObject *SWIGUNUSEDPARM(
   }
   arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
   {
-    res2 = SWIG_ConvertPtr(obj1, &argp2, SWIGTYPE_p_LPECGROUP,  0  | 0);
-    if (!SWIG_IsOK(res2)) {
-      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_CreateGroup" "', argument " "2"" of type '" "LPECGROUP""'"); 
-    }  
-    if (!argp2) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_CreateGroup" "', argument " "2"" of type '" "LPECGROUP""'");
-    } else {
-      LPECGROUP * temp = reinterpret_cast< LPECGROUP * >(argp2);
-      arg2 = *temp;
-      if (SWIG_IsNewObj(res2)) delete temp;
-    }
+    arg2 = (LPECGROUP)obj1;
   }
   {
     ecode3 = SWIG_AsVal_unsigned_SS_int (obj2, &fl3);
@@ -27505,11 +27916,17 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_CreateGroup(PyObject *SWIGUNUSEDPARM(
     ulFlags = fl3;
   }
   {
+    arg2 = Object_to_LPECGROUP((PyObject*)arg2, ulFlags);
+    if(PyErr_Occurred()) {
+      SWIG_exception_fail(SWIG_ArgError(SWIG_ERROR), "in method '" "IECServiceAdmin_CreateGroup" "', argument " "2"" of type '" "LPECGROUP""'");
+    }
+  }
+  {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateGroup(arg2,arg3,arg4,arg5);
+        result = (arg1)->CreateGroup(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -27532,12 +27949,20 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_CreateGroup(PyObject *SWIGUNUSEDPARM(
     }
   }
   {
+    if(arg2)
+    MAPIFreeBuffer(arg2);
+  }
+  {
     if(*arg5)
     MAPIFreeBuffer(*arg5);
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
+  {
+    if(arg2)
+    MAPIFreeBuffer(arg2);
+  }
   {
     if(*arg5)
     MAPIFreeBuffer(*arg5);
@@ -27554,38 +27979,32 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DeleteGroup(PyObject *SWIGUNUSEDPARM(
   LPENTRYID arg3 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  unsigned int val2 ;
-  int ecode2 = 0 ;
-  void *argp3 ;
-  int res3 = 0 ;
+  int res2 ;
+  char *buf2 = 0 ;
+  size_t size2 ;
+  int alloc2 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
-  PyObject * obj2 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-  if (!PyArg_ParseTuple(args,(char *)"OOO:IECServiceAdmin_DeleteGroup",&obj0,&obj1,&obj2)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OO:IECServiceAdmin_DeleteGroup",&obj0,&obj1)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_DeleteGroup" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
   }
   arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-  ecode2 = SWIG_AsVal_unsigned_SS_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_DeleteGroup" "', argument " "2"" of type '" "ULONG""'");
-  } 
-  arg2 = static_cast< ULONG >(val2);
   {
-    res3 = SWIG_ConvertPtr(obj2, &argp3, SWIGTYPE_p_LPENTRYID,  0  | 0);
-    if (!SWIG_IsOK(res3)) {
-      SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_DeleteGroup" "', argument " "3"" of type '" "LPENTRYID""'"); 
-    }  
-    if (!argp3) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_DeleteGroup" "', argument " "3"" of type '" "LPENTRYID""'");
+    res2 = SWIG_AsCharPtrAndSize(obj1, &buf2, &size2, &alloc2);
+    if (!SWIG_IsOK(res2)) {
+      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_DeleteGroup" "', argument " "2"" of type '" "ULONG""'");
+    }
+    if(buf2 == NULL) {
+      arg2 = 0;
+      arg3 = NULL;
     } else {
-      LPENTRYID * temp = reinterpret_cast< LPENTRYID * >(argp3);
-      arg3 = *temp;
-      if (SWIG_IsNewObj(res3)) delete temp;
+      arg2 = static_cast< ULONG >(size2 - 1);
+      arg3 = reinterpret_cast< LPENTRYID >(buf2);
     }
   }
   {
@@ -27593,7 +28012,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DeleteGroup(PyObject *SWIGUNUSEDPARM(
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DeleteGroup(arg2,arg3);
+        result = (arg1)->DeleteGroup(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -27610,9 +28029,15 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DeleteGroup(PyObject *SWIGUNUSEDPARM(
       SWIG_fail;
     }
   }
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
 }
@@ -27625,8 +28050,6 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_SetGroup(PyObject *SWIGUNUSEDPARM(sel
   ULONG arg3 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  void *argp2 ;
-  int res2 = 0 ;
   unsigned int fl3 ;
   int ecode3 ;
   PyObject * obj0 = 0 ;
@@ -27635,6 +28058,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_SetGroup(PyObject *SWIGUNUSEDPARM(sel
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  arg2 = NULL;
   ULONG ulFlags = 0;
   if (!PyArg_ParseTuple(args,(char *)"OOO:IECServiceAdmin_SetGroup",&obj0,&obj1,&obj2)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
@@ -27643,17 +28067,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_SetGroup(PyObject *SWIGUNUSEDPARM(sel
   }
   arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
   {
-    res2 = SWIG_ConvertPtr(obj1, &argp2, SWIGTYPE_p_LPECGROUP,  0  | 0);
-    if (!SWIG_IsOK(res2)) {
-      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_SetGroup" "', argument " "2"" of type '" "LPECGROUP""'"); 
-    }  
-    if (!argp2) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_SetGroup" "', argument " "2"" of type '" "LPECGROUP""'");
-    } else {
-      LPECGROUP * temp = reinterpret_cast< LPECGROUP * >(argp2);
-      arg2 = *temp;
-      if (SWIG_IsNewObj(res2)) delete temp;
-    }
+    arg2 = (LPECGROUP)obj1;
   }
   {
     ecode3 = SWIG_AsVal_unsigned_SS_int (obj2, &fl3);
@@ -27664,11 +28078,17 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_SetGroup(PyObject *SWIGUNUSEDPARM(sel
     ulFlags = fl3;
   }
   {
+    arg2 = Object_to_LPECGROUP((PyObject*)arg2, ulFlags);
+    if(PyErr_Occurred()) {
+      SWIG_exception_fail(SWIG_ArgError(SWIG_ERROR), "in method '" "IECServiceAdmin_SetGroup" "', argument " "2"" of type '" "LPECGROUP""'");
+    }
+  }
+  {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetGroup(arg2,arg3);
+        result = (arg1)->SetGroup(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -27685,9 +28105,17 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_SetGroup(PyObject *SWIGUNUSEDPARM(sel
       SWIG_fail;
     }
   }
+  {
+    if(arg2)
+    MAPIFreeBuffer(arg2);
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
+  {
+    if(arg2)
+    MAPIFreeBuffer(arg2);
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
 }
@@ -27702,66 +28130,54 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetGroup(PyObject *SWIGUNUSEDPARM(sel
   LPECGROUP *arg5 = (LPECGROUP *) 0 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  unsigned int val2 ;
-  int ecode2 = 0 ;
-  void *argp3 ;
-  int res3 = 0 ;
+  int res2 ;
+  char *buf2 = 0 ;
+  size_t size2 ;
+  int alloc2 = 0 ;
   unsigned int fl4 ;
   int ecode4 ;
-  void *argp5 = 0 ;
-  int res5 = 0 ;
+  LPECGROUP temp5 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
-  PyObject * obj3 = 0 ;
-  PyObject * obj4 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
   ULONG ulFlags = 0;
-  if (!PyArg_ParseTuple(args,(char *)"OOOOO:IECServiceAdmin_GetGroup",&obj0,&obj1,&obj2,&obj3,&obj4)) SWIG_fail;
+  temp5 = NULL; arg5 = &temp5;
+  if (!PyArg_ParseTuple(args,(char *)"OOO:IECServiceAdmin_GetGroup",&obj0,&obj1,&obj2)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_GetGroup" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
   }
   arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-  ecode2 = SWIG_AsVal_unsigned_SS_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_GetGroup" "', argument " "2"" of type '" "ULONG""'");
-  } 
-  arg2 = static_cast< ULONG >(val2);
   {
-    res3 = SWIG_ConvertPtr(obj2, &argp3, SWIGTYPE_p_LPENTRYID,  0  | 0);
-    if (!SWIG_IsOK(res3)) {
-      SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_GetGroup" "', argument " "3"" of type '" "LPENTRYID""'"); 
-    }  
-    if (!argp3) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_GetGroup" "', argument " "3"" of type '" "LPENTRYID""'");
+    res2 = SWIG_AsCharPtrAndSize(obj1, &buf2, &size2, &alloc2);
+    if (!SWIG_IsOK(res2)) {
+      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_GetGroup" "', argument " "2"" of type '" "ULONG""'");
+    }
+    if(buf2 == NULL) {
+      arg2 = 0;
+      arg3 = NULL;
     } else {
-      LPENTRYID * temp = reinterpret_cast< LPENTRYID * >(argp3);
-      arg3 = *temp;
-      if (SWIG_IsNewObj(res3)) delete temp;
+      arg2 = static_cast< ULONG >(size2 - 1);
+      arg3 = reinterpret_cast< LPENTRYID >(buf2);
     }
   }
   {
-    ecode4 = SWIG_AsVal_unsigned_SS_int (obj3, &fl4);
+    ecode4 = SWIG_AsVal_unsigned_SS_int (obj2, &fl4);
     if (!SWIG_IsOK(ecode4)) {
       SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECServiceAdmin_GetGroup" "', argument " "4"" of type '" "ULONG""'");
     } 
     arg4 = fl4;
     ulFlags = fl4;
   }
-  res5 = SWIG_ConvertPtr(obj4, &argp5,SWIGTYPE_p_LPECGROUP, 0 |  0 );
-  if (!SWIG_IsOK(res5)) {
-    SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "IECServiceAdmin_GetGroup" "', argument " "5"" of type '" "LPECGROUP *""'"); 
-  }
-  arg5 = reinterpret_cast< LPECGROUP * >(argp5);
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetGroup(arg2,arg3,arg4,arg5);
+        result = (arg1)->GetGroup(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -27778,9 +28194,27 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetGroup(PyObject *SWIGUNUSEDPARM(sel
       SWIG_fail;
     }
   }
+  {
+    resultobj = SWIG_Python_AppendOutput(resultobj, Object_from_LPECGROUP(*(arg5)));
+    if(PyErr_Occurred()) goto fail;
+  }
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
+    if(*arg5)
+    MAPIFreeBuffer(*arg5);
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
+    if(*arg5)
+    MAPIFreeBuffer(*arg5);
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
 }
@@ -27789,7 +28223,7 @@ fail:
 SWIGINTERN PyObject *_wrap_IECServiceAdmin_ResolveGroupName(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IECServiceAdmin *arg1 = (IECServiceAdmin *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
   ULONG arg3 ;
   ULONG *arg4 = (ULONG *) 0 ;
   LPENTRYID *arg5 = (LPENTRYID *) 0 ;
@@ -27864,7 +28298,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_ResolveGroupName(PyObject *SWIGUNUSED
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ResolveGroupName(arg2,arg3,arg4,arg5);
+        result = (arg1)->ResolveGroupName(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -27966,7 +28400,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetGroupList(PyObject *SWIGUNUSEDPARM
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetGroupList(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->GetGroupList(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -28018,10 +28452,10 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DeleteGroupUser(PyObject *SWIGUNUSEDP
   LPENTRYID arg5 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  unsigned int val2 ;
-  int ecode2 = 0 ;
-  void *argp3 ;
-  int res3 = 0 ;
+  int res2 ;
+  char *buf2 = 0 ;
+  size_t size2 ;
+  int alloc2 = 0 ;
   int res4 ;
   char *buf4 = 0 ;
   size_t size4 ;
@@ -28029,36 +28463,30 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DeleteGroupUser(PyObject *SWIGUNUSEDP
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
-  PyObject * obj3 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-  if (!PyArg_ParseTuple(args,(char *)"OOOO:IECServiceAdmin_DeleteGroupUser",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OOO:IECServiceAdmin_DeleteGroupUser",&obj0,&obj1,&obj2)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_DeleteGroupUser" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
   }
   arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-  ecode2 = SWIG_AsVal_unsigned_SS_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_DeleteGroupUser" "', argument " "2"" of type '" "ULONG""'");
-  } 
-  arg2 = static_cast< ULONG >(val2);
   {
-    res3 = SWIG_ConvertPtr(obj2, &argp3, SWIGTYPE_p_LPENTRYID,  0  | 0);
-    if (!SWIG_IsOK(res3)) {
-      SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_DeleteGroupUser" "', argument " "3"" of type '" "LPENTRYID""'"); 
-    }  
-    if (!argp3) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_DeleteGroupUser" "', argument " "3"" of type '" "LPENTRYID""'");
+    res2 = SWIG_AsCharPtrAndSize(obj1, &buf2, &size2, &alloc2);
+    if (!SWIG_IsOK(res2)) {
+      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_DeleteGroupUser" "', argument " "2"" of type '" "ULONG""'");
+    }
+    if(buf2 == NULL) {
+      arg2 = 0;
+      arg3 = NULL;
     } else {
-      LPENTRYID * temp = reinterpret_cast< LPENTRYID * >(argp3);
-      arg3 = *temp;
-      if (SWIG_IsNewObj(res3)) delete temp;
+      arg2 = static_cast< ULONG >(size2 - 1);
+      arg3 = reinterpret_cast< LPENTRYID >(buf2);
     }
   }
   {
-    res4 = SWIG_AsCharPtrAndSize(obj3, &buf4, &size4, &alloc4);
+    res4 = SWIG_AsCharPtrAndSize(obj2, &buf4, &size4, &alloc4);
     if (!SWIG_IsOK(res4)) {
       SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_DeleteGroupUser" "', argument " "4"" of type '" "ULONG""'");
     }
@@ -28075,7 +28503,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DeleteGroupUser(PyObject *SWIGUNUSEDP
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DeleteGroupUser(arg2,arg3,arg4,arg5);
+        result = (arg1)->DeleteGroupUser(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -28093,11 +28521,17 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DeleteGroupUser(PyObject *SWIGUNUSEDP
     }
   }
   {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
     if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
   {
     if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
   }
@@ -28115,10 +28549,10 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddGroupUser(PyObject *SWIGUNUSEDPARM
   LPENTRYID arg5 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  unsigned int val2 ;
-  int ecode2 = 0 ;
-  void *argp3 ;
-  int res3 = 0 ;
+  int res2 ;
+  char *buf2 = 0 ;
+  size_t size2 ;
+  int alloc2 = 0 ;
   int res4 ;
   char *buf4 = 0 ;
   size_t size4 ;
@@ -28126,36 +28560,30 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddGroupUser(PyObject *SWIGUNUSEDPARM
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
-  PyObject * obj3 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-  if (!PyArg_ParseTuple(args,(char *)"OOOO:IECServiceAdmin_AddGroupUser",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OOO:IECServiceAdmin_AddGroupUser",&obj0,&obj1,&obj2)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_AddGroupUser" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
   }
   arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-  ecode2 = SWIG_AsVal_unsigned_SS_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_AddGroupUser" "', argument " "2"" of type '" "ULONG""'");
-  } 
-  arg2 = static_cast< ULONG >(val2);
   {
-    res3 = SWIG_ConvertPtr(obj2, &argp3, SWIGTYPE_p_LPENTRYID,  0  | 0);
-    if (!SWIG_IsOK(res3)) {
-      SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_AddGroupUser" "', argument " "3"" of type '" "LPENTRYID""'"); 
-    }  
-    if (!argp3) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_AddGroupUser" "', argument " "3"" of type '" "LPENTRYID""'");
+    res2 = SWIG_AsCharPtrAndSize(obj1, &buf2, &size2, &alloc2);
+    if (!SWIG_IsOK(res2)) {
+      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_AddGroupUser" "', argument " "2"" of type '" "ULONG""'");
+    }
+    if(buf2 == NULL) {
+      arg2 = 0;
+      arg3 = NULL;
     } else {
-      LPENTRYID * temp = reinterpret_cast< LPENTRYID * >(argp3);
-      arg3 = *temp;
-      if (SWIG_IsNewObj(res3)) delete temp;
+      arg2 = static_cast< ULONG >(size2 - 1);
+      arg3 = reinterpret_cast< LPENTRYID >(buf2);
     }
   }
   {
-    res4 = SWIG_AsCharPtrAndSize(obj3, &buf4, &size4, &alloc4);
+    res4 = SWIG_AsCharPtrAndSize(obj2, &buf4, &size4, &alloc4);
     if (!SWIG_IsOK(res4)) {
       SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_AddGroupUser" "', argument " "4"" of type '" "ULONG""'");
     }
@@ -28172,7 +28600,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddGroupUser(PyObject *SWIGUNUSEDPARM
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->AddGroupUser(arg2,arg3,arg4,arg5);
+        result = (arg1)->AddGroupUser(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -28190,11 +28618,17 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddGroupUser(PyObject *SWIGUNUSEDPARM
     }
   }
   {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
     if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
   {
     if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
   }
@@ -28213,10 +28647,10 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetUserListOfGroup(PyObject *SWIGUNUS
   LPECUSER *arg6 = (LPECUSER *) 0 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  unsigned int val2 ;
-  int ecode2 = 0 ;
-  void *argp3 ;
-  int res3 = 0 ;
+  int res2 ;
+  char *buf2 = 0 ;
+  size_t size2 ;
+  int alloc2 = 0 ;
   unsigned int fl4 ;
   int ecode4 ;
   ULONG c5 ;
@@ -28224,38 +28658,32 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetUserListOfGroup(PyObject *SWIGUNUS
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
-  PyObject * obj3 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
   ULONG ulFlags = 0;
   lp5 = NULL; arg6 = &lp5; c5 = 0; arg5 = &c5;
-  if (!PyArg_ParseTuple(args,(char *)"OOOO:IECServiceAdmin_GetUserListOfGroup",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OOO:IECServiceAdmin_GetUserListOfGroup",&obj0,&obj1,&obj2)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_GetUserListOfGroup" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
   }
   arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-  ecode2 = SWIG_AsVal_unsigned_SS_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_GetUserListOfGroup" "', argument " "2"" of type '" "ULONG""'");
-  } 
-  arg2 = static_cast< ULONG >(val2);
   {
-    res3 = SWIG_ConvertPtr(obj2, &argp3, SWIGTYPE_p_LPENTRYID,  0  | 0);
-    if (!SWIG_IsOK(res3)) {
-      SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_GetUserListOfGroup" "', argument " "3"" of type '" "LPENTRYID""'"); 
-    }  
-    if (!argp3) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_GetUserListOfGroup" "', argument " "3"" of type '" "LPENTRYID""'");
+    res2 = SWIG_AsCharPtrAndSize(obj1, &buf2, &size2, &alloc2);
+    if (!SWIG_IsOK(res2)) {
+      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_GetUserListOfGroup" "', argument " "2"" of type '" "ULONG""'");
+    }
+    if(buf2 == NULL) {
+      arg2 = 0;
+      arg3 = NULL;
     } else {
-      LPENTRYID * temp = reinterpret_cast< LPENTRYID * >(argp3);
-      arg3 = *temp;
-      if (SWIG_IsNewObj(res3)) delete temp;
+      arg2 = static_cast< ULONG >(size2 - 1);
+      arg3 = reinterpret_cast< LPENTRYID >(buf2);
     }
   }
   {
-    ecode4 = SWIG_AsVal_unsigned_SS_int (obj3, &fl4);
+    ecode4 = SWIG_AsVal_unsigned_SS_int (obj2, &fl4);
     if (!SWIG_IsOK(ecode4)) {
       SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECServiceAdmin_GetUserListOfGroup" "', argument " "4"" of type '" "ULONG""'");
     } 
@@ -28267,7 +28695,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetUserListOfGroup(PyObject *SWIGUNUS
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetUserListOfGroup(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->GetUserListOfGroup(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -28289,12 +28717,18 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetUserListOfGroup(PyObject *SWIGUNUS
     if(PyErr_Occurred()) goto fail;
   }
   {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
     if(*arg6)
     MAPIFreeBuffer(*arg6);
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
   {
     if(*arg6)
     MAPIFreeBuffer(*arg6);
@@ -28362,7 +28796,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetGroupListOfUser(PyObject *SWIGUNUS
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetGroupListOfUser(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->GetGroupListOfUser(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -28457,7 +28891,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_CreateCompany(PyObject *SWIGUNUSEDPAR
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->CreateCompany(arg2,arg3,arg4,arg5);
+        result = (arg1)->CreateCompany(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -28543,7 +28977,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DeleteCompany(PyObject *SWIGUNUSEDPAR
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DeleteCompany(arg2,arg3);
+        result = (arg1)->DeleteCompany(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -28619,7 +29053,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_SetCompany(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetCompany(arg2,arg3);
+        result = (arg1)->SetCompany(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -28667,17 +29101,16 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetCompany(PyObject *SWIGUNUSEDPARM(s
   int alloc2 = 0 ;
   unsigned int fl4 ;
   int ecode4 ;
-  void *argp5 = 0 ;
-  int res5 = 0 ;
+  LPECCOMPANY temp5 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
-  PyObject * obj3 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
   ULONG ulFlags = 0;
-  if (!PyArg_ParseTuple(args,(char *)"OOOO:IECServiceAdmin_GetCompany",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  temp5 = NULL; arg5 = &temp5;
+  if (!PyArg_ParseTuple(args,(char *)"OOO:IECServiceAdmin_GetCompany",&obj0,&obj1,&obj2)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_GetCompany" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
@@ -28704,17 +29137,12 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetCompany(PyObject *SWIGUNUSEDPARM(s
     arg4 = fl4;
     ulFlags = fl4;
   }
-  res5 = SWIG_ConvertPtr(obj3, &argp5,SWIGTYPE_p_LPECCOMPANY, 0 |  0 );
-  if (!SWIG_IsOK(res5)) {
-    SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "IECServiceAdmin_GetCompany" "', argument " "5"" of type '" "LPECCOMPANY *""'"); 
-  }
-  arg5 = reinterpret_cast< LPECCOMPANY * >(argp5);
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetCompany(arg2,arg3,arg4,arg5);
+        result = (arg1)->GetCompany(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -28732,13 +29160,25 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetCompany(PyObject *SWIGUNUSEDPARM(s
     }
   }
   {
+    resultobj = SWIG_Python_AppendOutput(resultobj, Object_from_LPECCOMPANY(*(arg5)));
+    if(PyErr_Occurred()) goto fail;
+  }
+  {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
+    if(*arg5)
+    MAPIFreeBuffer(*arg5);
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
+    if(*arg5)
+    MAPIFreeBuffer(*arg5);
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
@@ -28748,7 +29188,7 @@ fail:
 SWIGINTERN PyObject *_wrap_IECServiceAdmin_ResolveCompanyName(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IECServiceAdmin *arg1 = (IECServiceAdmin *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
   ULONG arg3 ;
   ULONG *arg4 = (ULONG *) 0 ;
   LPENTRYID *arg5 = (LPENTRYID *) 0 ;
@@ -28823,7 +29263,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_ResolveCompanyName(PyObject *SWIGUNUS
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ResolveCompanyName(arg2,arg3,arg4,arg5);
+        result = (arg1)->ResolveCompanyName(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -28905,7 +29345,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetCompanyList(PyObject *SWIGUNUSEDPA
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetCompanyList(arg2,arg3,arg4);
+        result = (arg1)->GetCompanyList(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -28951,10 +29391,10 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddCompanyToRemoteViewList(PyObject *
   LPENTRYID arg5 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  unsigned int val2 ;
-  int ecode2 = 0 ;
-  void *argp3 ;
-  int res3 = 0 ;
+  int res2 ;
+  char *buf2 = 0 ;
+  size_t size2 ;
+  int alloc2 = 0 ;
   int res4 ;
   char *buf4 = 0 ;
   size_t size4 ;
@@ -28962,36 +29402,30 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddCompanyToRemoteViewList(PyObject *
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
-  PyObject * obj3 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-  if (!PyArg_ParseTuple(args,(char *)"OOOO:IECServiceAdmin_AddCompanyToRemoteViewList",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OOO:IECServiceAdmin_AddCompanyToRemoteViewList",&obj0,&obj1,&obj2)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_AddCompanyToRemoteViewList" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
   }
   arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-  ecode2 = SWIG_AsVal_unsigned_SS_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_AddCompanyToRemoteViewList" "', argument " "2"" of type '" "ULONG""'");
-  } 
-  arg2 = static_cast< ULONG >(val2);
   {
-    res3 = SWIG_ConvertPtr(obj2, &argp3, SWIGTYPE_p_LPENTRYID,  0  | 0);
-    if (!SWIG_IsOK(res3)) {
-      SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_AddCompanyToRemoteViewList" "', argument " "3"" of type '" "LPENTRYID""'"); 
-    }  
-    if (!argp3) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_AddCompanyToRemoteViewList" "', argument " "3"" of type '" "LPENTRYID""'");
+    res2 = SWIG_AsCharPtrAndSize(obj1, &buf2, &size2, &alloc2);
+    if (!SWIG_IsOK(res2)) {
+      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_AddCompanyToRemoteViewList" "', argument " "2"" of type '" "ULONG""'");
+    }
+    if(buf2 == NULL) {
+      arg2 = 0;
+      arg3 = NULL;
     } else {
-      LPENTRYID * temp = reinterpret_cast< LPENTRYID * >(argp3);
-      arg3 = *temp;
-      if (SWIG_IsNewObj(res3)) delete temp;
+      arg2 = static_cast< ULONG >(size2 - 1);
+      arg3 = reinterpret_cast< LPENTRYID >(buf2);
     }
   }
   {
-    res4 = SWIG_AsCharPtrAndSize(obj3, &buf4, &size4, &alloc4);
+    res4 = SWIG_AsCharPtrAndSize(obj2, &buf4, &size4, &alloc4);
     if (!SWIG_IsOK(res4)) {
       SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_AddCompanyToRemoteViewList" "', argument " "4"" of type '" "ULONG""'");
     }
@@ -29008,7 +29442,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddCompanyToRemoteViewList(PyObject *
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->AddCompanyToRemoteViewList(arg2,arg3,arg4,arg5);
+        result = (arg1)->AddCompanyToRemoteViewList(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -29026,11 +29460,17 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddCompanyToRemoteViewList(PyObject *
     }
   }
   {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
     if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
   {
     if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
   }
@@ -29048,10 +29488,10 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DelCompanyFromRemoteViewList(PyObject
   LPENTRYID arg5 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  unsigned int val2 ;
-  int ecode2 = 0 ;
-  void *argp3 ;
-  int res3 = 0 ;
+  int res2 ;
+  char *buf2 = 0 ;
+  size_t size2 ;
+  int alloc2 = 0 ;
   int res4 ;
   char *buf4 = 0 ;
   size_t size4 ;
@@ -29059,36 +29499,30 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DelCompanyFromRemoteViewList(PyObject
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
-  PyObject * obj3 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-  if (!PyArg_ParseTuple(args,(char *)"OOOO:IECServiceAdmin_DelCompanyFromRemoteViewList",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OOO:IECServiceAdmin_DelCompanyFromRemoteViewList",&obj0,&obj1,&obj2)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_DelCompanyFromRemoteViewList" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
   }
   arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-  ecode2 = SWIG_AsVal_unsigned_SS_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_DelCompanyFromRemoteViewList" "', argument " "2"" of type '" "ULONG""'");
-  } 
-  arg2 = static_cast< ULONG >(val2);
   {
-    res3 = SWIG_ConvertPtr(obj2, &argp3, SWIGTYPE_p_LPENTRYID,  0  | 0);
-    if (!SWIG_IsOK(res3)) {
-      SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_DelCompanyFromRemoteViewList" "', argument " "3"" of type '" "LPENTRYID""'"); 
-    }  
-    if (!argp3) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_DelCompanyFromRemoteViewList" "', argument " "3"" of type '" "LPENTRYID""'");
+    res2 = SWIG_AsCharPtrAndSize(obj1, &buf2, &size2, &alloc2);
+    if (!SWIG_IsOK(res2)) {
+      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_DelCompanyFromRemoteViewList" "', argument " "2"" of type '" "ULONG""'");
+    }
+    if(buf2 == NULL) {
+      arg2 = 0;
+      arg3 = NULL;
     } else {
-      LPENTRYID * temp = reinterpret_cast< LPENTRYID * >(argp3);
-      arg3 = *temp;
-      if (SWIG_IsNewObj(res3)) delete temp;
+      arg2 = static_cast< ULONG >(size2 - 1);
+      arg3 = reinterpret_cast< LPENTRYID >(buf2);
     }
   }
   {
-    res4 = SWIG_AsCharPtrAndSize(obj3, &buf4, &size4, &alloc4);
+    res4 = SWIG_AsCharPtrAndSize(obj2, &buf4, &size4, &alloc4);
     if (!SWIG_IsOK(res4)) {
       SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_DelCompanyFromRemoteViewList" "', argument " "4"" of type '" "ULONG""'");
     }
@@ -29105,7 +29539,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DelCompanyFromRemoteViewList(PyObject
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DelCompanyFromRemoteViewList(arg2,arg3,arg4,arg5);
+        result = (arg1)->DelCompanyFromRemoteViewList(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -29123,11 +29557,17 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DelCompanyFromRemoteViewList(PyObject
     }
   }
   {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
     if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
   {
     if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
   }
@@ -29194,7 +29634,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetRemoteViewList(PyObject *SWIGUNUSE
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetRemoteViewList(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->GetRemoteViewList(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -29297,7 +29737,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddUserToRemoteAdminList(PyObject *SW
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->AddUserToRemoteAdminList(arg2,arg3,arg4,arg5);
+        result = (arg1)->AddUserToRemoteAdminList(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -29394,7 +29834,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DelUserFromRemoteAdminList(PyObject *
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DelUserFromRemoteAdminList(arg2,arg3,arg4,arg5);
+        result = (arg1)->DelUserFromRemoteAdminList(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -29489,7 +29929,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetRemoteAdminList(PyObject *SWIGUNUS
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetRemoteAdminList(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->GetRemoteAdminList(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -29572,7 +30012,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_SyncUsers(PyObject *SWIGUNUSEDPARM(se
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SyncUsers(arg2,arg3);
+        result = (arg1)->SyncUsers(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -29655,7 +30095,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetQuota(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetQuota(arg2,arg3,arg4,arg5);
+        result = (arg1)->GetQuota(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -29745,7 +30185,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_SetQuota(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetQuota(arg2,arg3,arg4);
+        result = (arg1)->SetQuota(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -29798,21 +30238,20 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddQuotaRecipient(PyObject *SWIGUNUSE
   char *buf2 = 0 ;
   size_t size2 ;
   int alloc2 = 0 ;
-  unsigned int val4 ;
-  int ecode4 = 0 ;
-  void *argp5 ;
-  int res5 = 0 ;
+  int res4 ;
+  char *buf4 = 0 ;
+  size_t size4 ;
+  int alloc4 = 0 ;
   unsigned int val6 ;
   int ecode6 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
   PyObject * obj3 = 0 ;
-  PyObject * obj4 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-  if (!PyArg_ParseTuple(args,(char *)"OOOOO:IECServiceAdmin_AddQuotaRecipient",&obj0,&obj1,&obj2,&obj3,&obj4)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OOOO:IECServiceAdmin_AddQuotaRecipient",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_AddQuotaRecipient" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
@@ -29831,25 +30270,20 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddQuotaRecipient(PyObject *SWIGUNUSE
       arg3 = reinterpret_cast< LPENTRYID >(buf2);
     }
   }
-  ecode4 = SWIG_AsVal_unsigned_SS_int(obj2, &val4);
-  if (!SWIG_IsOK(ecode4)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECServiceAdmin_AddQuotaRecipient" "', argument " "4"" of type '" "ULONG""'");
-  } 
-  arg4 = static_cast< ULONG >(val4);
   {
-    res5 = SWIG_ConvertPtr(obj3, &argp5, SWIGTYPE_p_LPENTRYID,  0  | 0);
-    if (!SWIG_IsOK(res5)) {
-      SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "IECServiceAdmin_AddQuotaRecipient" "', argument " "5"" of type '" "LPENTRYID""'"); 
-    }  
-    if (!argp5) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_AddQuotaRecipient" "', argument " "5"" of type '" "LPENTRYID""'");
+    res4 = SWIG_AsCharPtrAndSize(obj2, &buf4, &size4, &alloc4);
+    if (!SWIG_IsOK(res4)) {
+      SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_AddQuotaRecipient" "', argument " "4"" of type '" "ULONG""'");
+    }
+    if(buf4 == NULL) {
+      arg4 = 0;
+      arg5 = NULL;
     } else {
-      LPENTRYID * temp = reinterpret_cast< LPENTRYID * >(argp5);
-      arg5 = *temp;
-      if (SWIG_IsNewObj(res5)) delete temp;
+      arg4 = static_cast< ULONG >(size4 - 1);
+      arg5 = reinterpret_cast< LPENTRYID >(buf4);
     }
   }
-  ecode6 = SWIG_AsVal_unsigned_SS_int(obj4, &val6);
+  ecode6 = SWIG_AsVal_unsigned_SS_int(obj3, &val6);
   if (!SWIG_IsOK(ecode6)) {
     SWIG_exception_fail(SWIG_ArgError(ecode6), "in method '" "IECServiceAdmin_AddQuotaRecipient" "', argument " "6"" of type '" "ULONG""'");
   } 
@@ -29859,7 +30293,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddQuotaRecipient(PyObject *SWIGUNUSE
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->AddQuotaRecipient(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->AddQuotaRecipient(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -29879,11 +30313,17 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_AddQuotaRecipient(PyObject *SWIGUNUSE
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
   }
+  {
+    if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
+    if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
@@ -29900,68 +30340,56 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DeleteQuotaRecipient(PyObject *SWIGUN
   ULONG arg6 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  unsigned int val2 ;
-  int ecode2 = 0 ;
-  void *argp3 ;
-  int res3 = 0 ;
-  unsigned int val4 ;
-  int ecode4 = 0 ;
-  void *argp5 ;
-  int res5 = 0 ;
+  int res2 ;
+  char *buf2 = 0 ;
+  size_t size2 ;
+  int alloc2 = 0 ;
+  int res4 ;
+  char *buf4 = 0 ;
+  size_t size4 ;
+  int alloc4 = 0 ;
   unsigned int val6 ;
   int ecode6 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
   PyObject * obj3 = 0 ;
-  PyObject * obj4 = 0 ;
-  PyObject * obj5 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-  if (!PyArg_ParseTuple(args,(char *)"OOOOOO:IECServiceAdmin_DeleteQuotaRecipient",&obj0,&obj1,&obj2,&obj3,&obj4,&obj5)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OOOO:IECServiceAdmin_DeleteQuotaRecipient",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
   }
   arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-  ecode2 = SWIG_AsVal_unsigned_SS_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "2"" of type '" "ULONG""'");
-  } 
-  arg2 = static_cast< ULONG >(val2);
   {
-    res3 = SWIG_ConvertPtr(obj2, &argp3, SWIGTYPE_p_LPENTRYID,  0  | 0);
-    if (!SWIG_IsOK(res3)) {
-      SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "3"" of type '" "LPENTRYID""'"); 
-    }  
-    if (!argp3) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "3"" of type '" "LPENTRYID""'");
+    res2 = SWIG_AsCharPtrAndSize(obj1, &buf2, &size2, &alloc2);
+    if (!SWIG_IsOK(res2)) {
+      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "2"" of type '" "ULONG""'");
+    }
+    if(buf2 == NULL) {
+      arg2 = 0;
+      arg3 = NULL;
     } else {
-      LPENTRYID * temp = reinterpret_cast< LPENTRYID * >(argp3);
-      arg3 = *temp;
-      if (SWIG_IsNewObj(res3)) delete temp;
+      arg2 = static_cast< ULONG >(size2 - 1);
+      arg3 = reinterpret_cast< LPENTRYID >(buf2);
     }
   }
-  ecode4 = SWIG_AsVal_unsigned_SS_int(obj3, &val4);
-  if (!SWIG_IsOK(ecode4)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "4"" of type '" "ULONG""'");
-  } 
-  arg4 = static_cast< ULONG >(val4);
   {
-    res5 = SWIG_ConvertPtr(obj4, &argp5, SWIGTYPE_p_LPENTRYID,  0  | 0);
-    if (!SWIG_IsOK(res5)) {
-      SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "5"" of type '" "LPENTRYID""'"); 
-    }  
-    if (!argp5) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "5"" of type '" "LPENTRYID""'");
+    res4 = SWIG_AsCharPtrAndSize(obj2, &buf4, &size4, &alloc4);
+    if (!SWIG_IsOK(res4)) {
+      SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "4"" of type '" "ULONG""'");
+    }
+    if(buf4 == NULL) {
+      arg4 = 0;
+      arg5 = NULL;
     } else {
-      LPENTRYID * temp = reinterpret_cast< LPENTRYID * >(argp5);
-      arg5 = *temp;
-      if (SWIG_IsNewObj(res5)) delete temp;
+      arg4 = static_cast< ULONG >(size4 - 1);
+      arg5 = reinterpret_cast< LPENTRYID >(buf4);
     }
   }
-  ecode6 = SWIG_AsVal_unsigned_SS_int(obj5, &val6);
+  ecode6 = SWIG_AsVal_unsigned_SS_int(obj3, &val6);
   if (!SWIG_IsOK(ecode6)) {
     SWIG_exception_fail(SWIG_ArgError(ecode6), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "6"" of type '" "ULONG""'");
   } 
@@ -29971,7 +30399,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DeleteQuotaRecipient(PyObject *SWIGUN
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DeleteQuotaRecipient(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->DeleteQuotaRecipient(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -29988,9 +30416,21 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_DeleteQuotaRecipient(PyObject *SWIGUN
       SWIG_fail;
     }
   }
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
+    if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
+  {
+    if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
+    if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
 }
@@ -30054,7 +30494,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetQuotaRecipients(PyObject *SWIGUNUS
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetQuotaRecipients(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->GetQuotaRecipients(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -30109,15 +30549,14 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetQuotaStatus(PyObject *SWIGUNUSEDPA
   char *buf2 = 0 ;
   size_t size2 ;
   int alloc2 = 0 ;
-  void *argp4 = 0 ;
-  int res4 = 0 ;
+  LPECQUOTASTATUS temp4 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
-  PyObject * obj2 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-  if (!PyArg_ParseTuple(args,(char *)"OOO:IECServiceAdmin_GetQuotaStatus",&obj0,&obj1,&obj2)) SWIG_fail;
+  temp4 = NULL; arg4 = &temp4;
+  if (!PyArg_ParseTuple(args,(char *)"OO:IECServiceAdmin_GetQuotaStatus",&obj0,&obj1)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_GetQuotaStatus" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
@@ -30136,17 +30575,12 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetQuotaStatus(PyObject *SWIGUNUSEDPA
       arg3 = reinterpret_cast< LPENTRYID >(buf2);
     }
   }
-  res4 = SWIG_ConvertPtr(obj2, &argp4,SWIGTYPE_p_LPECQUOTASTATUS, 0 |  0 );
-  if (!SWIG_IsOK(res4)) {
-    SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_GetQuotaStatus" "', argument " "4"" of type '" "LPECQUOTASTATUS *""'"); 
-  }
-  arg4 = reinterpret_cast< LPECQUOTASTATUS * >(argp4);
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetQuotaStatus(arg2,arg3,arg4);
+        result = (arg1)->GetQuotaStatus(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -30164,13 +30598,25 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetQuotaStatus(PyObject *SWIGUNUSEDPA
     }
   }
   {
+    resultobj = SWIG_Python_AppendOutput(resultobj, Object_from_LPECQUOTASTATUS(*(arg4)));
+    if(PyErr_Occurred()) goto fail;
+  }
+  {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
+    if(*arg4)
+    MAPIFreeBuffer(*arg4);
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
   {
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  }
+  {
+    if(*arg4)
+    MAPIFreeBuffer(*arg4);
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
@@ -30206,7 +30652,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_PurgeSoftDelete(PyObject *SWIGUNUSEDP
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->PurgeSoftDelete(arg2);
+        result = (arg1)->PurgeSoftDelete(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -30264,7 +30710,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_PurgeCache(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->PurgeCache(arg2);
+        result = (arg1)->PurgeCache(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -30325,7 +30771,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_OpenUserStoresTable(PyObject *SWIGUNU
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->OpenUserStoresTable(arg2,arg3);
+        result = (arg1)->OpenUserStoresTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -30361,38 +30807,27 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetServerDetails(PyObject *SWIGUNUSED
   LPECSERVERLIST *arg4 = (LPECSERVERLIST *) 0 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  void *argp2 ;
-  int res2 = 0 ;
   unsigned int fl3 ;
   int ecode3 ;
-  void *argp4 = 0 ;
-  int res4 = 0 ;
+  LPECSERVERLIST temp4 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
-  PyObject * obj3 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  arg2 = NULL;
   ULONG ulFlags = 0;
-  if (!PyArg_ParseTuple(args,(char *)"OOOO:IECServiceAdmin_GetServerDetails",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  temp4 = NULL; arg4 = &temp4;
+  if (!PyArg_ParseTuple(args,(char *)"OOO:IECServiceAdmin_GetServerDetails",&obj0,&obj1,&obj2)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_GetServerDetails" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
   }
   arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
   {
-    res2 = SWIG_ConvertPtr(obj1, &argp2, SWIGTYPE_p_LPECSVRNAMELIST,  0  | 0);
-    if (!SWIG_IsOK(res2)) {
-      SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_GetServerDetails" "', argument " "2"" of type '" "LPECSVRNAMELIST""'"); 
-    }  
-    if (!argp2) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_GetServerDetails" "', argument " "2"" of type '" "LPECSVRNAMELIST""'");
-    } else {
-      LPECSVRNAMELIST * temp = reinterpret_cast< LPECSVRNAMELIST * >(argp2);
-      arg2 = *temp;
-      if (SWIG_IsNewObj(res2)) delete temp;
-    }
+    arg2 = List_to_LPECSVRNAMELIST(obj1);
+    if(PyErr_Occurred()) goto fail;
   }
   {
     ecode3 = SWIG_AsVal_unsigned_SS_int (obj2, &fl3);
@@ -30402,17 +30837,12 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetServerDetails(PyObject *SWIGUNUSED
     arg3 = fl3;
     ulFlags = fl3;
   }
-  res4 = SWIG_ConvertPtr(obj3, &argp4,SWIGTYPE_p_LPECSERVERLIST, 0 |  0 );
-  if (!SWIG_IsOK(res4)) {
-    SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_GetServerDetails" "', argument " "4"" of type '" "LPECSERVERLIST *""'"); 
-  }
-  arg4 = reinterpret_cast< LPECSERVERLIST * >(argp4);
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetServerDetails(arg2,arg3,arg4);
+        result = (arg1)->GetServerDetails(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -30429,9 +30859,29 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetServerDetails(PyObject *SWIGUNUSED
       SWIG_fail;
     }
   }
+  {
+    resultobj = SWIG_Python_AppendOutput(resultobj, List_from_LPECSERVERLIST(*(arg4)));
+    if(PyErr_Occurred()) goto fail;
+  }
+  {
+    if(arg2)
+    MAPIFreeBuffer(arg2);
+  }
+  {
+    if(*arg4)
+    MAPIFreeBuffer(*arg4);
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
+  {
+    if(arg2)
+    MAPIFreeBuffer(arg2);
+  }
+  {
+    if(*arg4)
+    MAPIFreeBuffer(*arg4);
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
 }
@@ -30448,18 +30898,20 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_ResolvePseudoUrl(PyObject *SWIGUNUSED
   int res2 ;
   char *buf2 = 0 ;
   int alloc2 = 0 ;
-  void *argp3 = 0 ;
-  int res3 = 0 ;
-  void *argp4 = 0 ;
-  int res4 = 0 ;
+  char *lpStr3 = NULL ;
+  bool bBool4 = NULL ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
-  PyObject * obj2 = 0 ;
-  PyObject * obj3 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-  if (!PyArg_ParseTuple(args,(char *)"OOOO:IECServiceAdmin_ResolvePseudoUrl",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  {
+    arg3 = &lpStr3;
+  }
+  {
+    arg4 = &bBool4;
+  }
+  if (!PyArg_ParseTuple(args,(char *)"OO:IECServiceAdmin_ResolvePseudoUrl",&obj0,&obj1)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_ResolvePseudoUrl" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
@@ -30470,22 +30922,12 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_ResolvePseudoUrl(PyObject *SWIGUNUSED
     SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_ResolvePseudoUrl" "', argument " "2"" of type '" "char *""'");
   }
   arg2 = reinterpret_cast< char * >(buf2);
-  res3 = SWIG_ConvertPtr(obj2, &argp3,SWIGTYPE_p_p_char, 0 |  0 );
-  if (!SWIG_IsOK(res3)) {
-    SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_ResolvePseudoUrl" "', argument " "3"" of type '" "char **""'"); 
-  }
-  arg3 = reinterpret_cast< char ** >(argp3);
-  res4 = SWIG_ConvertPtr(obj3, &argp4,SWIGTYPE_p_bool, 0 |  0 );
-  if (!SWIG_IsOK(res4)) {
-    SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_ResolvePseudoUrl" "', argument " "4"" of type '" "bool *""'"); 
-  }
-  arg4 = reinterpret_cast< bool * >(argp4);
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ResolvePseudoUrl(arg2,arg3,arg4);
+        result = (arg1)->ResolvePseudoUrl(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -30502,11 +30944,25 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_ResolvePseudoUrl(PyObject *SWIGUNUSED
       SWIG_fail;
     }
   }
+  {
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_FromCharPtr((char*)*arg3));
+  }
+  {
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_int((int)*arg4));
+  }
   if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  {
+    if(*arg3)
+    MAPIFreeBuffer(*arg3);
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
   if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  {
+    if(*arg3)
+    MAPIFreeBuffer(*arg3);
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
 }
@@ -30552,7 +31008,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetPublicStoreEntryID(PyObject *SWIGU
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetPublicStoreEntryID(arg2,arg3,arg4);
+        result = (arg1)->GetPublicStoreEntryID(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -30593,8 +31049,8 @@ fail:
 SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetArchiveStoreEntryID(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IECServiceAdmin *arg1 = (IECServiceAdmin *) 0 ;
-  LPTSTR arg2 = (LPTSTR) 0 ;
-  LPTSTR arg3 = (LPTSTR) 0 ;
+  LPTSTR arg2 ;
+  LPTSTR arg3 ;
   ULONG arg4 ;
   ULONG *arg5 = (ULONG *) 0 ;
   LPENTRYID *arg6 = (LPENTRYID *) 0 ;
@@ -30706,7 +31162,7 @@ SWIGINTERN PyObject *_wrap_IECServiceAdmin_GetArchiveStoreEntryID(PyObject *SWIG
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetArchiveStoreEntryID(arg2,arg3,arg4,arg5,arg6);
+        result = (arg1)->GetArchiveStoreEntryID(arg2,arg3,arg4,arg5,arg6);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -30836,7 +31292,7 @@ SWIGINTERN PyObject *_wrap_IECSpooler_GetMasterOutgoingTable(PyObject *SWIGUNUSE
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetMasterOutgoingTable(arg2,arg3);
+        result = (arg1)->GetMasterOutgoingTable(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -30917,7 +31373,7 @@ SWIGINTERN PyObject *_wrap_IECSpooler_DeleteFromMasterOutgoingTable(PyObject *SW
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->DeleteFromMasterOutgoingTable(arg2,arg3,arg4);
+        result = (arg1)->DeleteFromMasterOutgoingTable(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -31047,7 +31503,7 @@ SWIGINTERN PyObject *_wrap_IECTestProtocol_TestPerform(PyObject *SWIGUNUSEDPARM(
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->TestPerform(arg2,arg3,arg4);
+        result = (arg1)->TestPerform(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -31120,7 +31576,7 @@ SWIGINTERN PyObject *_wrap_IECTestProtocol_TestSet(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->TestSet(arg2,arg3);
+        result = (arg1)->TestSet(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -31182,7 +31638,7 @@ SWIGINTERN PyObject *_wrap_IECTestProtocol_TestGet(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->TestGet(arg2,arg3);
+        result = (arg1)->TestGet(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -31201,7 +31657,7 @@ SWIGINTERN PyObject *_wrap_IECTestProtocol_TestGet(PyObject *SWIGUNUSEDPARM(self
   }
   if (*arg3) {
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_FromCharPtr(*arg3));
-    MAPIFreeBuffer(arg3);					  	     
+    MAPIFreeBuffer(*arg3);					  	     
   }
   if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
   SWIG_PYTHON_THREAD_END_BLOCK;
@@ -31300,7 +31756,7 @@ SWIGINTERN PyObject *_wrap_IECMultiStoreTable_OpenMultiStoreTable(PyObject *SWIG
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->OpenMultiStoreTable(arg2,arg3,arg4);
+        result = (arg1)->OpenMultiStoreTable(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -31425,7 +31881,7 @@ SWIGINTERN PyObject *_wrap_IECLicense_LicenseAuth(PyObject *SWIGUNUSEDPARM(self)
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->LicenseAuth(arg2,arg3,arg4,arg5);
+        result = (arg1)->LicenseAuth(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -31522,7 +31978,7 @@ SWIGINTERN PyObject *_wrap_IECExportChanges_GetChangeCount(PyObject *SWIGUNUSEDP
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetChangeCount(arg2);
+        result = (arg1)->GetChangeCount(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -31543,7 +31999,7 @@ SWIGINTERN PyObject *_wrap_IECExportChanges_GetChangeCount(PyObject *SWIGUNUSEDP
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg2)));
   } else {
     int new_flags = SWIG_IsNewObj(res2) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg2), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -31590,7 +32046,7 @@ SWIGINTERN PyObject *_wrap_IECExportChanges_SetMessageInterface(PyObject *SWIGUN
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetMessageInterface(arg2);
+        result = (arg1)->SetMessageInterface(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -31648,7 +32104,7 @@ SWIGINTERN PyObject *_wrap_IECExportChanges_SetLogger(PyObject *SWIGUNUSEDPARM(s
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetLogger(arg2);
+        result = (arg1)->SetLogger(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -31752,7 +32208,7 @@ SWIGINTERN PyObject *_wrap_UnwrapObject(PyObject *SWIGUNUSEDPARM(self), PyObject
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)UnwrapObject(arg1,arg2,arg3);
+        result = UnwrapObject(arg1,arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -31831,7 +32287,7 @@ SWIGINTERN PyObject *_wrap_IECChangeAdvisor_GetLastError(PyObject *SWIGUNUSEDPAR
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetLastError(arg2,arg3,arg4);
+        result = (arg1)->GetLastError(arg2,arg3,arg4);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -31916,7 +32372,7 @@ SWIGINTERN PyObject *_wrap_IECChangeAdvisor_Config(PyObject *SWIGUNUSEDPARM(self
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->Config(arg2,arg3,arg4,arg5);
+        result = (arg1)->Config(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -31970,7 +32426,7 @@ SWIGINTERN PyObject *_wrap_IECChangeAdvisor_UpdateState(PyObject *SWIGUNUSEDPARM
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->UpdateState(arg2);
+        result = (arg1)->UpdateState(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -32022,7 +32478,7 @@ SWIGINTERN PyObject *_wrap_IECChangeAdvisor_AddKeys(PyObject *SWIGUNUSEDPARM(sel
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->AddKeys(arg2);
+        result = (arg1)->AddKeys(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -32082,7 +32538,7 @@ SWIGINTERN PyObject *_wrap_IECChangeAdvisor_RemoveKeys(PyObject *SWIGUNUSEDPARM(
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->RemoveKeys(arg2);
+        result = (arg1)->RemoveKeys(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -32144,7 +32600,7 @@ SWIGINTERN PyObject *_wrap_IECChangeAdvisor_IsMonitoringSyncId(PyObject *SWIGUNU
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->IsMonitoringSyncId(arg2);
+        result = (arg1)->IsMonitoringSyncId(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -32207,7 +32663,7 @@ SWIGINTERN PyObject *_wrap_IECChangeAdvisor_UpdateSyncState(PyObject *SWIGUNUSED
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->UpdateSyncState(arg2,arg3);
+        result = (arg1)->UpdateSyncState(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -32316,7 +32772,7 @@ SWIGINTERN PyObject *_wrap_IECChangeAdviseSink_OnNotify(PyObject *SWIGUNUSEDPARM
     {
       try {
         mark_call_from_python();
-        result = (ULONG)(arg1)->OnNotify(arg2,arg3);
+        result = (arg1)->OnNotify(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -32399,20 +32855,21 @@ SWIGINTERN PyObject *_wrap_IECImportContentsChanges_ConfigForConversionStream(Py
   int res2 = 0 ;
   unsigned int fl3 ;
   int ecode3 ;
-  unsigned int val4 ;
-  int ecode4 = 0 ;
-  void *argp5 ;
-  int res5 = 0 ;
+  ULONG cArray4 = 0 ;
+  LPSPropValue lpArray4 = NULL ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
   PyObject * obj3 = 0 ;
-  PyObject * obj4 = 0 ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
   ULONG ulFlags = 0;
-  if (!PyArg_ParseTuple(args,(char *)"OOOOO:IECImportContentsChanges_ConfigForConversionStream",&obj0,&obj1,&obj2,&obj3,&obj4)) SWIG_fail;
+  {
+    arg4 = 0;
+    arg5 = NULL;
+  }
+  if (!PyArg_ParseTuple(args,(char *)"OOOO:IECImportContentsChanges_ConfigForConversionStream",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IECImportContentsChanges, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECImportContentsChanges_ConfigForConversionStream" "', argument " "1"" of type '" "IECImportContentsChanges *""'"); 
@@ -32431,30 +32888,18 @@ SWIGINTERN PyObject *_wrap_IECImportContentsChanges_ConfigForConversionStream(Py
     arg3 = fl3;
     ulFlags = fl3;
   }
-  ecode4 = SWIG_AsVal_unsigned_SS_int(obj3, &val4);
-  if (!SWIG_IsOK(ecode4)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECImportContentsChanges_ConfigForConversionStream" "', argument " "4"" of type '" "ULONG""'");
-  } 
-  arg4 = static_cast< ULONG >(val4);
   {
-    res5 = SWIG_ConvertPtr(obj4, &argp5, SWIGTYPE_p_LPSPropValue,  0  | 0);
-    if (!SWIG_IsOK(res5)) {
-      SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "IECImportContentsChanges_ConfigForConversionStream" "', argument " "5"" of type '" "LPSPropValue""'"); 
-    }  
-    if (!argp5) {
-      SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECImportContentsChanges_ConfigForConversionStream" "', argument " "5"" of type '" "LPSPropValue""'");
-    } else {
-      LPSPropValue * temp = reinterpret_cast< LPSPropValue * >(argp5);
-      arg5 = *temp;
-      if (SWIG_IsNewObj(res5)) delete temp;
-    }
+    ULONG len;
+    arg5 = List_to_LPSPropValue(obj3, &len);
+    arg4 = len;
+    if(PyErr_Occurred()) goto fail;
   }
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ConfigForConversionStream(arg2,arg3,arg4,arg5);
+        result = (arg1)->ConfigForConversionStream(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -32471,9 +32916,17 @@ SWIGINTERN PyObject *_wrap_IECImportContentsChanges_ConfigForConversionStream(Py
       SWIG_fail;
     }
   }
+  {
+    if(arg5)
+    MAPIFreeBuffer((void *)arg5);
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
+  {
+    if(arg5)
+    MAPIFreeBuffer((void *)arg5);
+  }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return NULL;
 }
@@ -32530,7 +32983,7 @@ SWIGINTERN PyObject *_wrap_IECImportContentsChanges_ImportMessageChangeAsAStream
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->ImportMessageChangeAsAStream(arg2,arg3,arg4,arg5);
+        result = (arg1)->ImportMessageChangeAsAStream(arg2,arg3,arg4,arg5);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -32601,7 +33054,7 @@ SWIGINTERN PyObject *_wrap_IECImportContentsChanges_SetMessageInterface(PyObject
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetMessageInterface((IID const &)*arg2);
+        result = (arg1)->SetMessageInterface((IID const &)*arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -32699,7 +33152,7 @@ SWIGINTERN PyObject *_wrap_IECSingleInstance_GetSingleInstanceId(PyObject *SWIGU
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->GetSingleInstanceId(arg2,arg3);
+        result = (arg1)->GetSingleInstanceId(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -32783,7 +33236,7 @@ SWIGINTERN PyObject *_wrap_IECSingleInstance_SetSingleInstanceId(PyObject *SWIGU
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)(arg1)->SetSingleInstanceId(arg2,arg3);
+        result = (arg1)->SetSingleInstanceId(arg2,arg3);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -33173,7 +33626,7 @@ SWIGINTERN PyObject *_wrap_ECSimpleLogger_Log(PyObject *SWIGUNUSEDPARM(self), Py
         if (upcall) {
           Swig::DirectorPureVirtualException::raise("ECSimpleLogger::Log");
         } else {
-          result = (HRESULT)(arg1)->Log(arg2,(char const *)arg3);
+          result = (arg1)->Log(arg2,(char const *)arg3);
         }
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
@@ -33425,7 +33878,7 @@ SWIGINTERN PyObject *_wrap_Stream_Read(PyObject *SWIGUNUSEDPARM(self), PyObject 
         if (upcall) {
           Swig::DirectorPureVirtualException::raise("Stream::Read");
         } else {
-          result = (HRESULT)(arg1)->Read(arg2,arg3,arg4);
+          result = (arg1)->Read(arg2,arg3,arg4);
         }
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
@@ -33448,7 +33901,7 @@ SWIGINTERN PyObject *_wrap_Stream_Read(PyObject *SWIGUNUSEDPARM(self), PyObject 
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg4)));
   } else {
     int new_flags = SWIG_IsNewObj(res4) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -33504,7 +33957,7 @@ SWIGINTERN PyObject *_wrap_Stream_Write(PyObject *SWIGUNUSEDPARM(self), PyObject
         if (upcall) {
           Swig::DirectorPureVirtualException::raise("Stream::Write");
         } else {
-          result = (HRESULT)(arg1)->Write((void const *)arg2,arg3,arg4);
+          result = (arg1)->Write((void const *)arg2,arg3,arg4);
         }
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
@@ -33527,7 +33980,7 @@ SWIGINTERN PyObject *_wrap_Stream_Write(PyObject *SWIGUNUSEDPARM(self), PyObject
     resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_unsigned_SS_int((*arg4)));
   } else {
     int new_flags = SWIG_IsNewObj(res4) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
-    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_unsigned_long, new_flags));
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_ULONG, new_flags));
   }
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
@@ -33700,7 +34153,7 @@ SWIGINTERN PyObject *_wrap_ECSyncSettings_SyncLogLevel(PyObject *SWIGUNUSEDPARM(
     {
       try {
         mark_call_from_python();
-        result = (ULONG)((ECSyncSettings const *)arg1)->SyncLogLevel();
+        result = ((ECSyncSettings const *)arg1)->SyncLogLevel();
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -33890,7 +34343,7 @@ SWIGINTERN PyObject *_wrap_ECSyncSettings_StreamTimeout(PyObject *SWIGUNUSEDPARM
     {
       try {
         mark_call_from_python();
-        result = (ULONG)((ECSyncSettings const *)arg1)->StreamTimeout();
+        result = ((ECSyncSettings const *)arg1)->StreamTimeout();
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -33928,7 +34381,7 @@ SWIGINTERN PyObject *_wrap_ECSyncSettings_StreamBufferSize(PyObject *SWIGUNUSEDP
     {
       try {
         mark_call_from_python();
-        result = (ULONG)((ECSyncSettings const *)arg1)->StreamBufferSize();
+        result = ((ECSyncSettings const *)arg1)->StreamBufferSize();
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -33966,7 +34419,7 @@ SWIGINTERN PyObject *_wrap_ECSyncSettings_StreamBatchSize(PyObject *SWIGUNUSEDPA
     {
       try {
         mark_call_from_python();
-        result = (ULONG)((ECSyncSettings const *)arg1)->StreamBatchSize();
+        result = ((ECSyncSettings const *)arg1)->StreamBatchSize();
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -34060,7 +34513,7 @@ SWIGINTERN PyObject *_wrap_ECSyncSettings_SetSyncLogLevel(PyObject *SWIGUNUSEDPA
     {
       try {
         mark_call_from_python();
-        result = (ULONG)(arg1)->SetSyncLogLevel(arg2);
+        result = (arg1)->SetSyncLogLevel(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -34107,7 +34560,7 @@ SWIGINTERN PyObject *_wrap_ECSyncSettings_SetSyncOptions(PyObject *SWIGUNUSEDPAR
     {
       try {
         mark_call_from_python();
-        result = (ULONG)(arg1)->SetSyncOptions(arg2);
+        result = (arg1)->SetSyncOptions(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -34154,7 +34607,7 @@ SWIGINTERN PyObject *_wrap_ECSyncSettings_SetStreamTimeout(PyObject *SWIGUNUSEDP
     {
       try {
         mark_call_from_python();
-        result = (ULONG)(arg1)->SetStreamTimeout(arg2);
+        result = (arg1)->SetStreamTimeout(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -34201,7 +34654,7 @@ SWIGINTERN PyObject *_wrap_ECSyncSettings_SetStreamBufferSize(PyObject *SWIGUNUS
     {
       try {
         mark_call_from_python();
-        result = (ULONG)(arg1)->SetStreamBufferSize(arg2);
+        result = (arg1)->SetStreamBufferSize(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -34248,7 +34701,7 @@ SWIGINTERN PyObject *_wrap_ECSyncSettings_SetStreamBatchSize(PyObject *SWIGUNUSE
     {
       try {
         mark_call_from_python();
-        result = (ULONG)(arg1)->SetStreamBatchSize(arg2);
+        result = (arg1)->SetStreamBatchSize(arg2);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -34330,7 +34783,7 @@ SWIGINTERN PyObject *_wrap_ECSyncLog_GetLogger(PyObject *SWIGUNUSEDPARM(self), P
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)ECSyncLog::GetLogger(arg1);
+        result = ECSyncLog::GetLogger(arg1);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -34379,7 +34832,7 @@ SWIGINTERN PyObject *_wrap_ECSyncLog_SetLogger(PyObject *SWIGUNUSEDPARM(self), P
     {
       try {
         mark_call_from_python();
-        result = (HRESULT)ECSyncLog::SetLogger(arg1);
+        result = ECSyncLog::SetLogger(arg1);
         unmark_call_from_python();
       } catch (const Swig::DirectorException &) {
         unmark_call_from_python();
@@ -34545,6 +34998,11 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"IMsgStore_NotifyNewMail", _wrap_IMsgStore_NotifyNewMail, METH_VARARGS, NULL},
 	 { (char *)"delete_IMsgStore", _wrap_delete_IMsgStore, METH_VARARGS, NULL},
 	 { (char *)"IMsgStore_swigregister", IMsgStore_swigregister, METH_VARARGS, NULL},
+	 { (char *)"IProxyStoreObject_PlaceHolder1", _wrap_IProxyStoreObject_PlaceHolder1, METH_VARARGS, NULL},
+	 { (char *)"IProxyStoreObject_PlaceHolder2", _wrap_IProxyStoreObject_PlaceHolder2, METH_VARARGS, NULL},
+	 { (char *)"delete_IProxyStoreObject", _wrap_delete_IProxyStoreObject, METH_VARARGS, NULL},
+	 { (char *)"IProxyStoreObject_UnwrapNoRef", _wrap_IProxyStoreObject_UnwrapNoRef, METH_VARARGS, NULL},
+	 { (char *)"IProxyStoreObject_swigregister", IProxyStoreObject_swigregister, METH_VARARGS, NULL},
 	 { (char *)"IMAPIFolder_CreateMessage", _wrap_IMAPIFolder_CreateMessage, METH_VARARGS, NULL},
 	 { (char *)"IMAPIFolder_CopyMessages", _wrap_IMAPIFolder_CopyMessages, METH_VARARGS, NULL},
 	 { (char *)"IMAPIFolder_DeleteMessages", _wrap_IMAPIFolder_DeleteMessages, METH_VARARGS, NULL},
@@ -34775,6 +35233,8 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"IECServiceAdmin_GetSendAsList", _wrap_IECServiceAdmin_GetSendAsList, METH_VARARGS, NULL},
 	 { (char *)"IECServiceAdmin_AddSendAsUser", _wrap_IECServiceAdmin_AddSendAsUser, METH_VARARGS, NULL},
 	 { (char *)"IECServiceAdmin_DelSendAsUser", _wrap_IECServiceAdmin_DelSendAsUser, METH_VARARGS, NULL},
+	 { (char *)"IECServiceAdmin_GetUserClientUpdateStatus", _wrap_IECServiceAdmin_GetUserClientUpdateStatus, METH_VARARGS, NULL},
+	 { (char *)"IECServiceAdmin_RemoveAllObjects", _wrap_IECServiceAdmin_RemoveAllObjects, METH_VARARGS, NULL},
 	 { (char *)"IECServiceAdmin_CreateGroup", _wrap_IECServiceAdmin_CreateGroup, METH_VARARGS, NULL},
 	 { (char *)"IECServiceAdmin_DeleteGroup", _wrap_IECServiceAdmin_DeleteGroup, METH_VARARGS, NULL},
 	 { (char *)"IECServiceAdmin_SetGroup", _wrap_IECServiceAdmin_SetGroup, METH_VARARGS, NULL},
@@ -35083,6 +35543,9 @@ static void *_p_p_StreamTo_p_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory))
 static void *_p_p_MAPINotifSinkTo_p_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((IUnknown **) (IMAPIAdviseSink *) ((MAPINotifSink **) x));
 }
+static void *_p_p_IProxyStoreObjectTo_p_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((IUnknown **)  ((IProxyStoreObject **) x));
+}
 static void *_p_p_IECLicenseTo_p_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((IUnknown **)  ((IECLicense **) x));
 }
@@ -35212,6 +35675,9 @@ static void *_p_StreamTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
 static void *_p_MAPINotifSinkTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((IUnknown *) (IMAPIAdviseSink *) ((MAPINotifSink *) x));
 }
+static void *_p_IProxyStoreObjectTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((IUnknown *)  ((IProxyStoreObject *) x));
+}
 static void *_p_IECLicenseTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((IUnknown *)  ((IECLicense *) x));
 }
@@ -35242,6 +35708,7 @@ static void *_p_IProfSectTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) 
 static void *_p_IStreamTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((IUnknown *) (ISequentialStream *) ((IStream *) x));
 }
+static swig_type_info _swigt__p_BYTE = {"_p_BYTE", "BYTE *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_ECChangeAdviseSink = {"_p_ECChangeAdviseSink", "ECChangeAdviseSink *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_ECImportContentsChanges = {"_p_ECImportContentsChanges", "ECImportContentsChanges *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_ECLogger = {"_p_ECLogger", "ECLogger *", 0, 0, (void*)0, 0};
@@ -35287,13 +35754,16 @@ static swig_type_info _swigt__p_IMsgStore = {"_p_IMsgStore", "IMsgStore *", 0, 0
 static swig_type_info _swigt__p_IProfAdmin = {"_p_IProfAdmin", "IProfAdmin *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_IProfSect = {"_p_IProfSect", "IProfSect *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_IProviderAdmin = {"_p_IProviderAdmin", "IProviderAdmin *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_IProxyStoreObject = {"_p_IProxyStoreObject", "IProxyStoreObject *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_ISequentialStream = {"_p_ISequentialStream", "ISequentialStream *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_IStream = {"_p_IStream", "IStream *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_IUnknown = {"_p_IUnknown", "IUnknown *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LARGE_INTEGER = {"_p_LARGE_INTEGER", "LARGE_INTEGER *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_LONG = {"_p_LONG", "LONG *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPADRENTRY = {"_p_LPADRENTRY", "LPADRENTRY *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPADRLIST = {"_p_LPADRLIST", "LPADRLIST *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPADRPARM = {"_p_LPADRPARM", "LPADRPARM *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_LPBYTE = {"_p_LPBYTE", "LPBYTE *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPCIID = {"_p_LPCIID", "LPCIID *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPECCOMPANY = {"_p_LPECCOMPANY", "LPECCOMPANY *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPECGROUP = {"_p_LPECGROUP", "LPECGROUP *", 0, 0, (void*)0, 0};
@@ -35302,6 +35772,7 @@ static swig_type_info _swigt__p_LPECQUOTASTATUS = {"_p_LPECQUOTASTATUS", "LPECQU
 static swig_type_info _swigt__p_LPECSERVERLIST = {"_p_LPECSERVERLIST", "LPECSERVERLIST *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPECSVRNAMELIST = {"_p_LPECSVRNAMELIST", "LPECSVRNAMELIST *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPECUSER = {"_p_LPECUSER", "LPECUSER *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_LPECUSERCLIENTUPDATESTATUS = {"_p_LPECUSERCLIENTUPDATESTATUS", "LPECUSERCLIENTUPDATESTATUS *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPENTRYID = {"_p_LPENTRYID", "LPENTRYID *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPENTRYLIST = {"_p_LPENTRYLIST", "LPENTRYLIST *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPFNBUTTON = {"_p_LPFNBUTTON", "LPFNBUTTON *", 0, 0, (void*)0, 0};
@@ -35326,19 +35797,19 @@ static swig_type_info _swigt__p_LPSPropValue = {"_p_LPSPropValue", "LPSPropValue
 static swig_type_info _swigt__p_LPSRestriction = {"_p_LPSRestriction", "LPSRestriction *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPSRowSet = {"_p_LPSRowSet", "LPSRowSet *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPSSortOrderSet = {"_p_LPSSortOrderSet", "LPSSortOrderSet *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_LPSTR = {"_p_LPSTR", "LPSTR *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_LPTSTR = {"_p_LPTSTR", "LPTSTR *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPUNKNOWN = {"_p_LPUNKNOWN", "LPUNKNOWN *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_LPVOID = {"_p_LPVOID", "LPVOID *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_MAPIAdviseSink = {"_p_MAPIAdviseSink", "MAPIAdviseSink *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_MAPIINIT_0 = {"_p_MAPIINIT_0", "MAPIINIT *|MAPIINIT_0 *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_MAPINotifSink = {"_p_MAPINotifSink", "MAPINotifSink *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_STATSTG = {"_p_STATSTG", "STATSTG *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_Stream = {"_p_Stream", "Stream *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_ULARGE_INTEGER = {"_p_ULARGE_INTEGER", "ULARGE_INTEGER *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p___int64 = {"_p___int64", "__int64 *|LONGLONG *|LONG64 *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_ULONG = {"_p_ULONG", "ULONG *|BOOKMARK *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_bool = {"_p_bool", "bool *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_char = {"_p_char", "CHAR *|TCHAR *|char *|CCHAR *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_float = {"_p_float", "FLOAT *|float *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_int = {"_p_int", "BOOL *|INT32 *|int *|INT *|INT_PTR *|LONG32 *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_long = {"_p_long", "SHANDLE_PTR *|LONG_PTR *|LONG *|HRESULT *|long *|SSIZE_T *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_char = {"_p_char", "char *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_p_ECLogger = {"_p_p_ECLogger", "ECLogger **", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_p_IAddrBook = {"_p_p_IAddrBook", "IAddrBook **", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_p_IAttach = {"_p_p_IAttach", "IAttach **", 0, 0, (void*)0, 0};
@@ -35376,6 +35847,7 @@ static swig_type_info _swigt__p_p_IMAPIContainer = {"_p_p_IMAPIContainer", 0, 0,
 static swig_type_info _swigt__p_p_IABContainer = {"_p_p_IABContainer", 0, 0, 0, 0, 0};
 static swig_type_info _swigt__p_p_ISequentialStream = {"_p_p_ISequentialStream", 0, 0, 0, 0, 0};
 static swig_type_info _swigt__p_p_IECTestProtocol = {"_p_p_IECTestProtocol", 0, 0, 0, 0, 0};
+static swig_type_info _swigt__p_p_IProxyStoreObject = {"_p_p_IProxyStoreObject", 0, 0, 0, 0, 0};
 static swig_type_info _swigt__p_p_MAPINotifSink = {"_p_p_MAPINotifSink", 0, 0, 0, 0, 0};
 static swig_type_info _swigt__p_p_IECLicense = {"_p_p_IECLicense", 0, 0, 0, 0, 0};
 static swig_type_info _swigt__p_p_IMAPIProp = {"_p_p_IMAPIProp", 0, 0, 0, 0, 0};
@@ -35385,28 +35857,22 @@ static swig_type_info _swigt__p_p_IECChangeAdviseSink = {"_p_p_IECChangeAdviseSi
 static swig_type_info _swigt__p_p_ECChangeAdviseSink = {"_p_p_ECChangeAdviseSink", 0, 0, 0, 0, 0};
 static swig_type_info _swigt__p_p_IMAPIProgress = {"_p_p_IMAPIProgress", 0, 0, 0, 0, 0};
 static swig_type_info _swigt__p_p_LPMAPINAMEID = {"_p_p_LPMAPINAMEID", "LPMAPINAMEID **", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_p_LPTSTR = {"_p_p_LPTSTR", "LPTSTR **", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_p_MAPIERROR = {"_p_p_MAPIERROR", "MAPIERROR **", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_p_char = {"_p_p_char", "PTCH *|PCTSTR *|LPCTSTR *|LPTCH *|PUTSTR *|LPUTSTR *|PCUTSTR *|LPCUTSTR *|char **|PTSTR *|LPTSTR *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_p_p_char = {"_p_p_p_char", "char ***|LPTSTR **", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_p_unsigned_char = {"_p_p_unsigned_char", "unsigned char **|LPBYTE *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_p_unsigned_long = {"_p_p_unsigned_long", "unsigned long **|PLCID *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_p_char = {"_p_p_char", "char **", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_p_unsigned_char = {"_p_p_unsigned_char", "unsigned char **", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_p_void = {"_p_p_void", "void **", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_short = {"_p_short", "HALF_PTR *|short *|SHORT *|INT16 *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_signed___int64 = {"_p_signed___int64", "INT64 *|signed __int64 *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_signed_char = {"_p_signed_char", "signed char *|INT8 *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_tagLOCKTYPE = {"_p_tagLOCKTYPE", "enum tagLOCKTYPE *|LOCKTYPE *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_tagSTATFLAG = {"_p_tagSTATFLAG", "enum tagSTATFLAG *|STATFLAG *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_tagSTGTY = {"_p_tagSTGTY", "enum tagSTGTY *|STGTY *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_tagSTREAM_SEEK = {"_p_tagSTREAM_SEEK", "enum tagSTREAM_SEEK *|STREAM_SEEK *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_unsigned___int64 = {"_p_unsigned___int64", "UINT64 *|DWORD64 *|unsigned __int64 *|DWORDLONG *|ULONGLONG *|ULONG64 *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_unsigned_char = {"_p_unsigned_char", "FCHAR *|unsigned char *|UCHAR *|BYTE *|TBYTE *|UINT8 *|BOOLEAN *|LPBYTE", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_unsigned_int = {"_p_unsigned_int", "UINT32 *|DWORD32 *|UINT *|unsigned int *|UINT_PTR *|ULONG32 *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_unsigned_long = {"_p_unsigned_long", "HANDLE_PTR *|DWORD *|ULONG_PTR *|DWORD_PTR *|FLONG *|unsigned long *|BOOKMARK *|ULONG *|SIZE_T *|LCID *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_unsigned_short = {"_p_unsigned_short", "WORD *|UHALF_PTR *|unsigned short *|USHORT *|FSHORT *|LANGID *|UINT16 *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_unsigned_char = {"_p_unsigned_char", "unsigned char *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_unsigned_int = {"_p_unsigned_int", "unsigned int *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_void = {"_p_void", "void *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_wchar_t = {"_p_wchar_t", "wchar_t *", 0, 0, (void*)0, 0};
 
 static swig_type_info *swig_type_initial[] = {
+  &_swigt__p_BYTE,
   &_swigt__p_ECChangeAdviseSink,
   &_swigt__p_ECImportContentsChanges,
   &_swigt__p_ECLogger,
@@ -35452,13 +35918,16 @@ static swig_type_info *swig_type_initial[] = {
   &_swigt__p_IProfAdmin,
   &_swigt__p_IProfSect,
   &_swigt__p_IProviderAdmin,
+  &_swigt__p_IProxyStoreObject,
   &_swigt__p_ISequentialStream,
   &_swigt__p_IStream,
   &_swigt__p_IUnknown,
   &_swigt__p_LARGE_INTEGER,
+  &_swigt__p_LONG,
   &_swigt__p_LPADRENTRY,
   &_swigt__p_LPADRLIST,
   &_swigt__p_LPADRPARM,
+  &_swigt__p_LPBYTE,
   &_swigt__p_LPCIID,
   &_swigt__p_LPECCOMPANY,
   &_swigt__p_LPECGROUP,
@@ -35467,6 +35936,7 @@ static swig_type_info *swig_type_initial[] = {
   &_swigt__p_LPECSERVERLIST,
   &_swigt__p_LPECSVRNAMELIST,
   &_swigt__p_LPECUSER,
+  &_swigt__p_LPECUSERCLIENTUPDATESTATUS,
   &_swigt__p_LPENTRYID,
   &_swigt__p_LPENTRYLIST,
   &_swigt__p_LPFNBUTTON,
@@ -35491,19 +35961,19 @@ static swig_type_info *swig_type_initial[] = {
   &_swigt__p_LPSRestriction,
   &_swigt__p_LPSRowSet,
   &_swigt__p_LPSSortOrderSet,
+  &_swigt__p_LPSTR,
+  &_swigt__p_LPTSTR,
   &_swigt__p_LPUNKNOWN,
+  &_swigt__p_LPVOID,
   &_swigt__p_MAPIAdviseSink,
   &_swigt__p_MAPIINIT_0,
   &_swigt__p_MAPINotifSink,
   &_swigt__p_STATSTG,
   &_swigt__p_Stream,
   &_swigt__p_ULARGE_INTEGER,
-  &_swigt__p___int64,
+  &_swigt__p_ULONG,
   &_swigt__p_bool,
   &_swigt__p_char,
-  &_swigt__p_float,
-  &_swigt__p_int,
-  &_swigt__p_long,
   &_swigt__p_p_ECChangeAdviseSink,
   &_swigt__p_p_ECImportContentsChanges,
   &_swigt__p_p_ECLogger,
@@ -35543,35 +36013,30 @@ static swig_type_info *swig_type_initial[] = {
   &_swigt__p_p_IProfAdmin,
   &_swigt__p_p_IProfSect,
   &_swigt__p_p_IProviderAdmin,
+  &_swigt__p_p_IProxyStoreObject,
   &_swigt__p_p_ISequentialStream,
   &_swigt__p_p_IStream,
   &_swigt__p_p_IUnknown,
   &_swigt__p_p_LPMAPINAMEID,
+  &_swigt__p_p_LPTSTR,
   &_swigt__p_p_MAPIAdviseSink,
   &_swigt__p_p_MAPIERROR,
   &_swigt__p_p_MAPINotifSink,
   &_swigt__p_p_Stream,
   &_swigt__p_p_char,
-  &_swigt__p_p_p_char,
   &_swigt__p_p_unsigned_char,
-  &_swigt__p_p_unsigned_long,
   &_swigt__p_p_void,
-  &_swigt__p_short,
-  &_swigt__p_signed___int64,
-  &_swigt__p_signed_char,
   &_swigt__p_tagLOCKTYPE,
   &_swigt__p_tagSTATFLAG,
   &_swigt__p_tagSTGTY,
   &_swigt__p_tagSTREAM_SEEK,
-  &_swigt__p_unsigned___int64,
   &_swigt__p_unsigned_char,
   &_swigt__p_unsigned_int,
-  &_swigt__p_unsigned_long,
-  &_swigt__p_unsigned_short,
   &_swigt__p_void,
   &_swigt__p_wchar_t,
 };
 
+static swig_cast_info _swigc__p_BYTE[] = {  {&_swigt__p_BYTE, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_ECChangeAdviseSink[] = {  {&_swigt__p_ECChangeAdviseSink, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_ECImportContentsChanges[] = {  {&_swigt__p_ECImportContentsChanges, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_ECLogger[] = {  {&_swigt__p_ECLogger, 0, 0, 0},{0, 0, 0, 0}};
@@ -35617,13 +36082,16 @@ static swig_cast_info _swigc__p_IMsgStore[] = {  {&_swigt__p_IMsgStore, 0, 0, 0}
 static swig_cast_info _swigc__p_IProfAdmin[] = {  {&_swigt__p_IProfAdmin, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_IProfSect[] = {  {&_swigt__p_IProfSect, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_IProviderAdmin[] = {  {&_swigt__p_IProviderAdmin, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_IProxyStoreObject[] = {  {&_swigt__p_IProxyStoreObject, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_ISequentialStream[] = {  {&_swigt__p_IStream, _p_IStreamTo_p_ISequentialStream, 0, 0},  {&_swigt__p_Stream, _p_StreamTo_p_ISequentialStream, 0, 0},  {&_swigt__p_ISequentialStream, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_IStream[] = {  {&_swigt__p_IStream, 0, 0, 0},  {&_swigt__p_Stream, _p_StreamTo_p_IStream, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_IUnknown[] = {  {&_swigt__p_IMAPIStatus, _p_IMAPIStatusTo_p_IUnknown, 0, 0},  {&_swigt__p_IECSingleInstance, _p_IECSingleInstanceTo_p_IUnknown, 0, 0},  {&_swigt__p_IAddrBook, _p_IAddrBookTo_p_IUnknown, 0, 0},  {&_swigt__p_IMessage, _p_IMessageTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeManageStore, _p_IExchangeManageStoreTo_p_IUnknown, 0, 0},  {&_swigt__p_IMailUser, _p_IMailUserTo_p_IUnknown, 0, 0},  {&_swigt__p_IMsgStore, _p_IMsgStoreTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeImportContentsChanges, _p_IExchangeImportContentsChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeImportHierarchyChanges, _p_IExchangeImportHierarchyChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeExportChanges, _p_IExchangeExportChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_ECImportContentsChanges, _p_ECImportContentsChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IECImportContentsChanges, _p_IECImportContentsChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IECExportChanges, _p_IECExportChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_ExchangeExportChanges, _p_ExchangeExportChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_ExchangeImportHierarchyChanges, _p_ExchangeImportHierarchyChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_ExchangeImportContentsChanges, _p_ExchangeImportContentsChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IECServiceAdmin, _p_IECServiceAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IMsgServiceAdmin, _p_IMsgServiceAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IUnknown, 0, 0, 0},  {&_swigt__p_IProviderAdmin, _p_IProviderAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IAttach, _p_IAttachTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeModifyTable, _p_IExchangeModifyTableTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPITable, _p_IMAPITableTo_p_IUnknown, 0, 0},  {&_swigt__p_IECChangeAdvisor, _p_IECChangeAdvisorTo_p_IUnknown, 0, 0},  {&_swigt__p_IDistList, _p_IDistListTo_p_IUnknown, 0, 0},  {&_swigt__p_IECMultiStoreTable, _p_IECMultiStoreTableTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIContainer, _p_IMAPIContainerTo_p_IUnknown, 0, 0},  {&_swigt__p_IABContainer, _p_IABContainerTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPISession, _p_IMAPISessionTo_p_IUnknown, 0, 0},  {&_swigt__p_ISequentialStream, _p_ISequentialStreamTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIFolder, _p_IMAPIFolderTo_p_IUnknown, 0, 0},  {&_swigt__p_IECTestProtocol, _p_IECTestProtocolTo_p_IUnknown, 0, 0},  {&_swigt__p_MAPINotifSink, _p_MAPINotifSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_IECLicense, _p_IECLicenseTo_p_IUnknown, 0, 0},  {&_swigt__p_IProfAdmin, _p_IProfAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIProp, _p_IMAPIPropTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIAdviseSink, _p_IMAPIAdviseSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_MAPIAdviseSink, _p_MAPIAdviseSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_IECChangeAdviseSink, _p_IECChangeAdviseSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_ECChangeAdviseSink, _p_ECChangeAdviseSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIProgress, _p_IMAPIProgressTo_p_IUnknown, 0, 0},  {&_swigt__p_Stream, _p_StreamTo_p_IUnknown, 0, 0},  {&_swigt__p_IStream, _p_IStreamTo_p_IUnknown, 0, 0},  {&_swigt__p_IProfSect, _p_IProfSectTo_p_IUnknown, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_IUnknown[] = {  {&_swigt__p_IMAPIStatus, _p_IMAPIStatusTo_p_IUnknown, 0, 0},  {&_swigt__p_IECSingleInstance, _p_IECSingleInstanceTo_p_IUnknown, 0, 0},  {&_swigt__p_IAddrBook, _p_IAddrBookTo_p_IUnknown, 0, 0},  {&_swigt__p_IMessage, _p_IMessageTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeManageStore, _p_IExchangeManageStoreTo_p_IUnknown, 0, 0},  {&_swigt__p_IMailUser, _p_IMailUserTo_p_IUnknown, 0, 0},  {&_swigt__p_IMsgStore, _p_IMsgStoreTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeImportContentsChanges, _p_IExchangeImportContentsChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeImportHierarchyChanges, _p_IExchangeImportHierarchyChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeExportChanges, _p_IExchangeExportChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_ECImportContentsChanges, _p_ECImportContentsChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IECImportContentsChanges, _p_IECImportContentsChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IECExportChanges, _p_IECExportChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_ExchangeExportChanges, _p_ExchangeExportChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_ExchangeImportHierarchyChanges, _p_ExchangeImportHierarchyChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_ExchangeImportContentsChanges, _p_ExchangeImportContentsChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IECServiceAdmin, _p_IECServiceAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IMsgServiceAdmin, _p_IMsgServiceAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IUnknown, 0, 0, 0},  {&_swigt__p_IProviderAdmin, _p_IProviderAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IAttach, _p_IAttachTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeModifyTable, _p_IExchangeModifyTableTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPITable, _p_IMAPITableTo_p_IUnknown, 0, 0},  {&_swigt__p_IECChangeAdvisor, _p_IECChangeAdvisorTo_p_IUnknown, 0, 0},  {&_swigt__p_IDistList, _p_IDistListTo_p_IUnknown, 0, 0},  {&_swigt__p_IECMultiStoreTable, _p_IECMultiStoreTableTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIContainer, _p_IMAPIContainerTo_p_IUnknown, 0, 0},  {&_swigt__p_IABContainer, _p_IABContainerTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPISession, _p_IMAPISessionTo_p_IUnknown, 0, 0},  {&_swigt__p_ISequentialStream, _p_ISequentialStreamTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIFolder, _p_IMAPIFolderTo_p_IUnknown, 0, 0},  {&_swigt__p_IECTestProtocol, _p_IECTestProtocolTo_p_IUnknown, 0, 0},  {&_swigt__p_MAPINotifSink, _p_MAPINotifSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_IProxyStoreObject, _p_IProxyStoreObjectTo_p_IUnknown, 0, 0},  {&_swigt__p_IECLicense, _p_IECLicenseTo_p_IUnknown, 0, 0},  {&_swigt__p_IProfAdmin, _p_IProfAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIProp, _p_IMAPIPropTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIAdviseSink, _p_IMAPIAdviseSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_MAPIAdviseSink, _p_MAPIAdviseSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_IECChangeAdviseSink, _p_IECChangeAdviseSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_ECChangeAdviseSink, _p_ECChangeAdviseSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIProgress, _p_IMAPIProgressTo_p_IUnknown, 0, 0},  {&_swigt__p_Stream, _p_StreamTo_p_IUnknown, 0, 0},  {&_swigt__p_IStream, _p_IStreamTo_p_IUnknown, 0, 0},  {&_swigt__p_IProfSect, _p_IProfSectTo_p_IUnknown, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LARGE_INTEGER[] = {  {&_swigt__p_LARGE_INTEGER, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_LONG[] = {  {&_swigt__p_LONG, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPADRENTRY[] = {  {&_swigt__p_LPADRENTRY, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPADRLIST[] = {  {&_swigt__p_LPADRLIST, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPADRPARM[] = {  {&_swigt__p_LPADRPARM, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_LPBYTE[] = {  {&_swigt__p_LPBYTE, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPCIID[] = {  {&_swigt__p_LPCIID, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPECCOMPANY[] = {  {&_swigt__p_LPECCOMPANY, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPECGROUP[] = {  {&_swigt__p_LPECGROUP, 0, 0, 0},{0, 0, 0, 0}};
@@ -35632,6 +36100,7 @@ static swig_cast_info _swigc__p_LPECQUOTASTATUS[] = {  {&_swigt__p_LPECQUOTASTAT
 static swig_cast_info _swigc__p_LPECSERVERLIST[] = {  {&_swigt__p_LPECSERVERLIST, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPECSVRNAMELIST[] = {  {&_swigt__p_LPECSVRNAMELIST, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPECUSER[] = {  {&_swigt__p_LPECUSER, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_LPECUSERCLIENTUPDATESTATUS[] = {  {&_swigt__p_LPECUSERCLIENTUPDATESTATUS, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPENTRYID[] = {  {&_swigt__p_LPENTRYID, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPENTRYLIST[] = {  {&_swigt__p_LPENTRYLIST, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPFNBUTTON[] = {  {&_swigt__p_LPFNBUTTON, 0, 0, 0},{0, 0, 0, 0}};
@@ -35656,19 +36125,19 @@ static swig_cast_info _swigc__p_LPSPropValue[] = {  {&_swigt__p_LPSPropValue, 0,
 static swig_cast_info _swigc__p_LPSRestriction[] = {  {&_swigt__p_LPSRestriction, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPSRowSet[] = {  {&_swigt__p_LPSRowSet, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPSSortOrderSet[] = {  {&_swigt__p_LPSSortOrderSet, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_LPSTR[] = {  {&_swigt__p_LPSTR, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_LPTSTR[] = {  {&_swigt__p_LPTSTR, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPUNKNOWN[] = {  {&_swigt__p_LPUNKNOWN, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_LPVOID[] = {  {&_swigt__p_LPVOID, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_MAPIAdviseSink[] = {  {&_swigt__p_MAPIAdviseSink, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_MAPIINIT_0[] = {  {&_swigt__p_MAPIINIT_0, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_MAPINotifSink[] = {  {&_swigt__p_MAPINotifSink, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_STATSTG[] = {  {&_swigt__p_STATSTG, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_Stream[] = {  {&_swigt__p_Stream, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_ULARGE_INTEGER[] = {  {&_swigt__p_ULARGE_INTEGER, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p___int64[] = {  {&_swigt__p___int64, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_ULONG[] = {  {&_swigt__p_ULONG, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_bool[] = {  {&_swigt__p_bool, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_char[] = {  {&_swigt__p_char, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_float[] = {  {&_swigt__p_float, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_int[] = {  {&_swigt__p_int, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_long[] = {  {&_swigt__p_long, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_ECLogger[] = {  {&_swigt__p_p_ECLogger, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_IAddrBook[] = {  {&_swigt__p_p_IAddrBook, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_IAttach[] = {  {&_swigt__p_p_IAttach, 0, 0, 0},{0, 0, 0, 0}};
@@ -35705,6 +36174,7 @@ static swig_cast_info _swigc__p_p_IMAPIContainer[] = {{&_swigt__p_p_IMAPIContain
 static swig_cast_info _swigc__p_p_IABContainer[] = {{&_swigt__p_p_IABContainer, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_ISequentialStream[] = {{&_swigt__p_p_ISequentialStream, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_IECTestProtocol[] = {{&_swigt__p_p_IECTestProtocol, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_p_IProxyStoreObject[] = {{&_swigt__p_p_IProxyStoreObject, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_MAPINotifSink[] = {{&_swigt__p_p_MAPINotifSink, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_IECLicense[] = {{&_swigt__p_p_IECLicense, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_IMAPIProp[] = {{&_swigt__p_p_IMAPIProp, 0, 0, 0},{0, 0, 0, 0}};
@@ -35713,30 +36183,24 @@ static swig_cast_info _swigc__p_p_MAPIAdviseSink[] = {{&_swigt__p_p_MAPIAdviseSi
 static swig_cast_info _swigc__p_p_IECChangeAdviseSink[] = {{&_swigt__p_p_IECChangeAdviseSink, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_ECChangeAdviseSink[] = {{&_swigt__p_p_ECChangeAdviseSink, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_IMAPIProgress[] = {{&_swigt__p_p_IMAPIProgress, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_p_IUnknown[] = {  {&_swigt__p_p_IMAPIStatus, _p_p_IMAPIStatusTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECSingleInstance, _p_p_IECSingleInstanceTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IAddrBook, _p_p_IAddrBookTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMessage, _p_p_IMessageTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeManageStore, _p_p_IExchangeManageStoreTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMailUser, _p_p_IMailUserTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMsgStore, _p_p_IMsgStoreTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeImportContentsChanges, _p_p_IExchangeImportContentsChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeImportHierarchyChanges, _p_p_IExchangeImportHierarchyChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeExportChanges, _p_p_IExchangeExportChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_ECImportContentsChanges, _p_p_ECImportContentsChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECImportContentsChanges, _p_p_IECImportContentsChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECExportChanges, _p_p_IECExportChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_ExchangeExportChanges, _p_p_ExchangeExportChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_ExchangeImportHierarchyChanges, _p_p_ExchangeImportHierarchyChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_ExchangeImportContentsChanges, _p_p_ExchangeImportContentsChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECServiceAdmin, _p_p_IECServiceAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMsgServiceAdmin, _p_p_IMsgServiceAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IUnknown, 0, 0, 0},  {&_swigt__p_p_IProviderAdmin, _p_p_IProviderAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IAttach, _p_p_IAttachTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeModifyTable, _p_p_IExchangeModifyTableTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPITable, _p_p_IMAPITableTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECChangeAdvisor, _p_p_IECChangeAdvisorTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IDistList, _p_p_IDistListTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECMultiStoreTable, _p_p_IECMultiStoreTableTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIContainer, _p_p_IMAPIContainerTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IABContainer, _p_p_IABContainerTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPISession, _p_p_IMAPISessionTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_ISequentialStream, _p_p_ISequentialStreamTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIFolder, _p_p_IMAPIFolderTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECTestProtocol, _p_p_IECTestProtocolTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_MAPINotifSink, _p_p_MAPINotifSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECLicense, _p_p_IECLicenseTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IProfAdmin, _p_p_IProfAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIProp, _p_p_IMAPIPropTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIAdviseSink, _p_p_IMAPIAdviseSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_MAPIAdviseSink, _p_p_MAPIAdviseSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECChangeAdviseSink, _p_p_IECChangeAdviseSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_ECChangeAdviseSink, _p_p_ECChangeAdviseSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIProgress, _p_p_IMAPIProgressTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_Stream, _p_p_StreamTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IProfSect, _p_p_IProfSectTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IStream, _p_p_IStreamTo_p_p_IUnknown, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_p_IUnknown[] = {  {&_swigt__p_p_IMAPIStatus, _p_p_IMAPIStatusTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECSingleInstance, _p_p_IECSingleInstanceTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IAddrBook, _p_p_IAddrBookTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMessage, _p_p_IMessageTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeManageStore, _p_p_IExchangeManageStoreTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMailUser, _p_p_IMailUserTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMsgStore, _p_p_IMsgStoreTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeImportContentsChanges, _p_p_IExchangeImportContentsChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeImportHierarchyChanges, _p_p_IExchangeImportHierarchyChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeExportChanges, _p_p_IExchangeExportChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_ECImportContentsChanges, _p_p_ECImportContentsChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECImportContentsChanges, _p_p_IECImportContentsChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECExportChanges, _p_p_IECExportChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_ExchangeExportChanges, _p_p_ExchangeExportChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_ExchangeImportHierarchyChanges, _p_p_ExchangeImportHierarchyChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_ExchangeImportContentsChanges, _p_p_ExchangeImportContentsChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECServiceAdmin, _p_p_IECServiceAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMsgServiceAdmin, _p_p_IMsgServiceAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IUnknown, 0, 0, 0},  {&_swigt__p_p_IProviderAdmin, _p_p_IProviderAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IAttach, _p_p_IAttachTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeModifyTable, _p_p_IExchangeModifyTableTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPITable, _p_p_IMAPITableTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECChangeAdvisor, _p_p_IECChangeAdvisorTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IDistList, _p_p_IDistListTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECMultiStoreTable, _p_p_IECMultiStoreTableTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIContainer, _p_p_IMAPIContainerTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IABContainer, _p_p_IABContainerTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPISession, _p_p_IMAPISessionTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_ISequentialStream, _p_p_ISequentialStreamTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIFolder, _p_p_IMAPIFolderTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECTestProtocol, _p_p_IECTestProtocolTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IProxyStoreObject, _p_p_IProxyStoreObjectTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_MAPINotifSink, _p_p_MAPINotifSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECLicense, _p_p_IECLicenseTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IProfAdmin, _p_p_IProfAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIProp, _p_p_IMAPIPropTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIAdviseSink, _p_p_IMAPIAdviseSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_MAPIAdviseSink, _p_p_MAPIAdviseSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECChangeAdviseSink, _p_p_IECChangeAdviseSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_ECChangeAdviseSink, _p_p_ECChangeAdviseSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIProgress, _p_p_IMAPIProgressTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_Stream, _p_p_StreamTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IProfSect, _p_p_IProfSectTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IStream, _p_p_IStreamTo_p_p_IUnknown, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_LPMAPINAMEID[] = {  {&_swigt__p_p_LPMAPINAMEID, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_p_LPTSTR[] = {  {&_swigt__p_p_LPTSTR, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_MAPIERROR[] = {  {&_swigt__p_p_MAPIERROR, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_char[] = {  {&_swigt__p_p_char, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_p_p_char[] = {  {&_swigt__p_p_p_char, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_unsigned_char[] = {  {&_swigt__p_p_unsigned_char, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_p_unsigned_long[] = {  {&_swigt__p_p_unsigned_long, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_void[] = {  {&_swigt__p_p_void, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_short[] = {  {&_swigt__p_short, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_signed___int64[] = {  {&_swigt__p_signed___int64, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_signed_char[] = {  {&_swigt__p_signed_char, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_tagLOCKTYPE[] = {  {&_swigt__p_tagLOCKTYPE, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_tagSTATFLAG[] = {  {&_swigt__p_tagSTATFLAG, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_tagSTGTY[] = {  {&_swigt__p_tagSTGTY, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_tagSTREAM_SEEK[] = {  {&_swigt__p_tagSTREAM_SEEK, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_unsigned___int64[] = {  {&_swigt__p_unsigned___int64, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_unsigned_char[] = {  {&_swigt__p_unsigned_char, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_unsigned_int[] = {  {&_swigt__p_unsigned_int, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_unsigned_long[] = {  {&_swigt__p_unsigned_long, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_unsigned_short[] = {  {&_swigt__p_unsigned_short, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_void[] = {  {&_swigt__p_void, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_wchar_t[] = {  {&_swigt__p_wchar_t, 0, 0, 0},{0, 0, 0, 0}};
 
 static swig_cast_info *swig_cast_initial[] = {
+  _swigc__p_BYTE,
   _swigc__p_ECChangeAdviseSink,
   _swigc__p_ECImportContentsChanges,
   _swigc__p_ECLogger,
@@ -35782,13 +36246,16 @@ static swig_cast_info *swig_cast_initial[] = {
   _swigc__p_IProfAdmin,
   _swigc__p_IProfSect,
   _swigc__p_IProviderAdmin,
+  _swigc__p_IProxyStoreObject,
   _swigc__p_ISequentialStream,
   _swigc__p_IStream,
   _swigc__p_IUnknown,
   _swigc__p_LARGE_INTEGER,
+  _swigc__p_LONG,
   _swigc__p_LPADRENTRY,
   _swigc__p_LPADRLIST,
   _swigc__p_LPADRPARM,
+  _swigc__p_LPBYTE,
   _swigc__p_LPCIID,
   _swigc__p_LPECCOMPANY,
   _swigc__p_LPECGROUP,
@@ -35797,6 +36264,7 @@ static swig_cast_info *swig_cast_initial[] = {
   _swigc__p_LPECSERVERLIST,
   _swigc__p_LPECSVRNAMELIST,
   _swigc__p_LPECUSER,
+  _swigc__p_LPECUSERCLIENTUPDATESTATUS,
   _swigc__p_LPENTRYID,
   _swigc__p_LPENTRYLIST,
   _swigc__p_LPFNBUTTON,
@@ -35821,19 +36289,19 @@ static swig_cast_info *swig_cast_initial[] = {
   _swigc__p_LPSRestriction,
   _swigc__p_LPSRowSet,
   _swigc__p_LPSSortOrderSet,
+  _swigc__p_LPSTR,
+  _swigc__p_LPTSTR,
   _swigc__p_LPUNKNOWN,
+  _swigc__p_LPVOID,
   _swigc__p_MAPIAdviseSink,
   _swigc__p_MAPIINIT_0,
   _swigc__p_MAPINotifSink,
   _swigc__p_STATSTG,
   _swigc__p_Stream,
   _swigc__p_ULARGE_INTEGER,
-  _swigc__p___int64,
+  _swigc__p_ULONG,
   _swigc__p_bool,
   _swigc__p_char,
-  _swigc__p_float,
-  _swigc__p_int,
-  _swigc__p_long,
   _swigc__p_p_ECChangeAdviseSink,
   _swigc__p_p_ECImportContentsChanges,
   _swigc__p_p_ECLogger,
@@ -35873,31 +36341,25 @@ static swig_cast_info *swig_cast_initial[] = {
   _swigc__p_p_IProfAdmin,
   _swigc__p_p_IProfSect,
   _swigc__p_p_IProviderAdmin,
+  _swigc__p_p_IProxyStoreObject,
   _swigc__p_p_ISequentialStream,
   _swigc__p_p_IStream,
   _swigc__p_p_IUnknown,
   _swigc__p_p_LPMAPINAMEID,
+  _swigc__p_p_LPTSTR,
   _swigc__p_p_MAPIAdviseSink,
   _swigc__p_p_MAPIERROR,
   _swigc__p_p_MAPINotifSink,
   _swigc__p_p_Stream,
   _swigc__p_p_char,
-  _swigc__p_p_p_char,
   _swigc__p_p_unsigned_char,
-  _swigc__p_p_unsigned_long,
   _swigc__p_p_void,
-  _swigc__p_short,
-  _swigc__p_signed___int64,
-  _swigc__p_signed_char,
   _swigc__p_tagLOCKTYPE,
   _swigc__p_tagSTATFLAG,
   _swigc__p_tagSTGTY,
   _swigc__p_tagSTREAM_SEEK,
-  _swigc__p_unsigned___int64,
   _swigc__p_unsigned_char,
   _swigc__p_unsigned_int,
-  _swigc__p_unsigned_long,
-  _swigc__p_unsigned_short,
   _swigc__p_void,
   _swigc__p_wchar_t,
 };
@@ -36842,6 +37304,7 @@ SWIGEXPORT void SWIG_init(void) {
   SWIG_Python_SetConstant(d, "MAPI_EXPLICIT_PROFILE",SWIG_From_int(static_cast< int >(0x00000010)));
   SWIG_Python_SetConstant(d, "MAPI_SERVICE_UI_ALWAYS",SWIG_From_int(static_cast< int >(0x00002000)));
   SWIG_Python_SetConstant(d, "MAPI_NO_MAIL",SWIG_From_int(static_cast< int >(0x00008000)));
+  SWIG_Python_SetConstant(d, "MAPI_NT_SERVICE",SWIG_From_int(static_cast< int >(0x00010000)));
   SWIG_Python_SetConstant(d, "MAPI_TIMEOUT_SHORT",SWIG_From_int(static_cast< int >(0x00100000)));
   SWIG_Python_SetConstant(d, "MAPI_INIT_VERSION",SWIG_From_int(static_cast< int >(0)));
   SWIG_Python_SetConstant(d, "MAPI_MULTITHREAD_NOTIFICATIONS",SWIG_From_int(static_cast< int >(0x00000001)));

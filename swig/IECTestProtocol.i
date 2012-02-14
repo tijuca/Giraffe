@@ -1,7 +1,7 @@
 %include "cstring.i"
 %apply (unsigned int, char **) {(unsigned int ulArgs, char **szArgs)}
 
-%cstring_output_allocate(char **OUTPUT, MAPIFreeBuffer($1))
+%cstring_output_allocate(char **OUTPUT, MAPIFreeBuffer(*$1))
 
 class IECTestProtocol : public IUnknown {
 public:

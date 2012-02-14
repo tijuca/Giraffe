@@ -271,7 +271,7 @@ public:
     virtual HRESULT GetReceiveFolder(LPTSTR lpszMessageClass, ULONG ulFlags, ULONG *OUTPUT, LPENTRYID* OUTPUT /*lppEntryID*/,
 				     LPTSTR* OUTPUT /*lppszExplicitClass*/) = 0;
     virtual HRESULT GetReceiveFolderTable(ULONG ulFlags, IMAPITable ** OUTPUT /*lppTable*/) = 0;
-    virtual HRESULT StoreLogoff(ULONG *lpulFlags) = 0;
+    virtual HRESULT StoreLogoff(ULONG * INOUT /*lpulFlags*/) = 0;
     virtual HRESULT AbortSubmit(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags) = 0;
     virtual HRESULT GetOutgoingQueue(ULONG ulFlags, IMAPITable ** OUTPUT/*lppTable*/) = 0;
     virtual HRESULT SetLockState(IMessage *lpMessage, ULONG ulLockState) = 0;
@@ -281,6 +281,26 @@ public:
 	%extend {
 		~IMsgStore() { self->Release(); }
 	}
+};
+
+class IProxyStoreObject : public IUnknown {
+public:
+    virtual HRESULT PlaceHolder1() = 0;
+    virtual HRESULT PlaceHolder2() = 0;
+
+    %extend {
+        ~IProxyStoreObject() { self->Release(); }
+
+        virtual HRESULT UnwrapNoRef(IUnknown **OUTPUT /*ppvObject*/) {
+            HRESULT hr = hrSuccess;
+            hr = self->UnwrapNoRef((LPVOID*)OUTPUT);
+            if(hr == hrSuccess)
+                (*OUTPUT)->AddRef();
+
+            return hr;          
+        };
+ 
+    }
 };
 
 #define FOLDER_ROOT             (0x00000000)
@@ -375,7 +395,7 @@ public:
     virtual HRESULT CreateAttach(LPCIID lpInterface, ULONG ulFlags, ULONG *lpulAttachmentNum, IAttach** OUTPUT /*lppAttach*/) = 0;
     virtual HRESULT DeleteAttach(ULONG ulAttachmentNum, ULONG ulUIParam, IMAPIProgress * lpProgress, ULONG ulFlags) = 0;
     virtual HRESULT GetRecipientTable(ULONG ulFlags, IMAPITable ** OUTPUT /*lppTable*/) = 0;
-    virtual HRESULT ModifyRecipients(ULONG ulFlags, LPADRLIST lpMods) = 0;
+    virtual HRESULT ModifyRecipients(ULONG ulFlags, LPADRLIST INPUT /*lpMods*/) = 0;
     virtual HRESULT SubmitMessage(ULONG ulFlags) = 0;
     virtual HRESULT SetReadFlag(ULONG ulFlags) = 0;
 	%extend {

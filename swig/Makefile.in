@@ -31,9 +31,8 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-@WITH_PERL_TRUE@am__append_1 = perl
-@WITH_PYTHON_TRUE@am__append_2 = python
-@OSS_ONLY_FALSE@am__append_3 = licensereq.i
+@WITH_PYTHON_TRUE@am__append_1 = python
+@OSS_ONLY_FALSE@am__append_2 = licensereq.i
 subdir = swig
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -58,7 +57,7 @@ RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 ETAGS = etags
 CTAGS = ctags
-DIST_SUBDIRS = . perl python
+DIST_SUBDIRS = . python
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
@@ -247,7 +246,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 
 # make sure common swig lib builds first
-SUBDIRS = . $(am__append_1) $(am__append_2)
+SUBDIRS = . $(am__append_1)
 AM_CPPFLAGS = $(DEBUGFLAGS) -DLINUX -I$(top_srcdir)/mapi4linux/include -I$(top_srcdir)/provider/common -I${top_srcdir}/common
 EXTRA_DIST = edkmdb.i mapi.i mapiutil.i mapidefs.i mapicode.i mapix.i \
 	mapinotifsink.i typemap.i helpers.i IECExportChanges.i \
@@ -255,7 +254,7 @@ EXTRA_DIST = edkmdb.i mapi.i mapiutil.i mapidefs.i mapicode.i mapix.i \
 	IECTestProtocol.i IECLicense.i inetmapi.i icalmapi.i \
 	swig_iunknown.h ecdefs.i libcommon.i archiver.i \
 	licenseclient.i libfreebusy.i zarafasync.i ECLogger.i \
-	RecurrenceState.i RecurrenceState.swig.h $(am__append_3)
+	RecurrenceState.i RecurrenceState.swig.h $(am__append_2)
 all: all-recursive
 
 .SUFFIXES:

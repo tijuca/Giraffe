@@ -1,10 +1,6 @@
 # make sure common swig lib builds first
 SUBDIRS = .
 
-if WITH_PERL
-SUBDIRS += perl
-endif
-
 if WITH_PYTHON
 SUBDIRS += python
 endif

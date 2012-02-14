@@ -1,8 +1,22 @@
 %include "typemaps.i"
 
-%apply (ULONG cbEntryID, LPENTRYID lpEntryID) {(ULONG cbUserId, LPENTRYID lpUserId), (ULONG cbStoreId, LPENTRYID lpStoreId), (ULONG cbRootId, LPENTRYID lpRootId), (ULONG cbCompanyId, LPENTRYID lpCompanyId)};
+%apply (ULONG cbEntryID, LPENTRYID lpEntryID) {(ULONG cbUserId, LPENTRYID lpUserId), (ULONG cbStoreId, LPENTRYID lpStoreId), (ULONG cbRootId, LPENTRYID lpRootId), (ULONG cbCompanyId, LPENTRYID lpCompanyId), (ULONG cbGroupId, LPENTRYID lpGroupId), (ULONG cbSenderId, LPENTRYID lpSenderId), (ULONG cbRecipientId, LPENTRYID lpRecipientId), (ULONG cbSetCompanyId, LPENTRYID lpSetCompanyId)};
 
 %apply (ULONG *, MAPIARRAY *) {(ULONG *OUTPUT, LPECUSER *OUTPUT), (ULONG *OUTPUT, LPECGROUP *OUTPUT), (ULONG *OUTPUT, LPECCOMPANY *OUTPUT)};
+%apply MAPISTRUCT_W_FLAGS {LPECUSER, LPECCOMPANY, LPECGROUP};
+%apply MAPISTRUCT * {LPECUSER *OUTPUT, LPECQUOTA *OUTPUT, LPECUSERCLIENTUPDATESTATUS *OUTPUT, LPECCOMPANY *OUTPUT, LPECGROUP *OUTPUT, LPECQUOTASTATUS *OUTPUT};
+%apply MAPISTRUCT {LPECQUOTA};
+
+%apply MAPILIST {LPECSVRNAMELIST};
+%apply MAPILIST * {LPECSERVERLIST* OUTPUT};
+
+%typemap(in,numinputs=0) (bool *OUTPUT) (bool bBool = NULL) {
+  $1 = &bBool;
+}
+%typemap(argout, fragment="SWIG_From_int") bool *OUTPUT{
+    %append_output(SWIG_From_int((int)*$1));
+}
+
 
 #define ECSTORE_TYPE_PRIVATE      			0
 #define ECSTORE_TYPE_PUBLIC               	1
@@ -28,12 +42,14 @@ public:
 	virtual HRESULT GetSendAsList(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *OUTPUT /*lpcSenders*/, LPECUSER *OUTPUT /*lppSenders*/) = 0;
 	virtual HRESULT AddSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbSenderId, LPENTRYID lpSenderId) = 0;
 	virtual HRESULT DelSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbSenderId, LPENTRYID lpSenderId) = 0;
+    virtual HRESULT GetUserClientUpdateStatus(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, LPECUSERCLIENTUPDATESTATUS  *OUTPUT /*lppECUCUS*/) = 0;
+    virtual HRESULT RemoveAllObjects(ULONG cbUserId, LPENTRYID lpUserId) = 0;
 
 	// Group functions
 	virtual HRESULT CreateGroup(LPECGROUP lpECGroup, ULONG ulFlags, ULONG *OUTPUT, LPENTRYID *OUTPUT) = 0;
 	virtual HRESULT DeleteGroup(ULONG cbGroupId, LPENTRYID lpGroupId) = 0;
 	virtual HRESULT SetGroup(LPECGROUP lpECGroup, ULONG ulFlags) = 0;
-	virtual HRESULT GetGroup(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG ulFlags, LPECGROUP *lppECGroup) = 0;
+	virtual HRESULT GetGroup(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG ulFlags, LPECGROUP *OUTPUT/*lppECGroup*/) = 0;
 	virtual HRESULT ResolveGroupName(LPTSTR lpszGroupName, ULONG ulFlags, ULONG *OUTPUT, LPENTRYID *OUTPUT) = 0;
 	virtual HRESULT GetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *OUTPUT /*lpcGroups*/, LPECGROUP *OUTPUT /*lppsGroups*/) = 0;
 
@@ -46,7 +62,7 @@ public:
 	virtual HRESULT CreateCompany(LPECCOMPANY lpECCompany, ULONG ulFlags, ULONG *OUTPUT, LPENTRYID *OUTPUT) = 0;
 	virtual HRESULT DeleteCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId) = 0;
 	virtual HRESULT SetCompany(LPECCOMPANY lpECCompany, ULONG ulFlags) = 0;
-	virtual HRESULT GetCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, LPECCOMPANY *lppECCompany) = 0;
+	virtual HRESULT GetCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, LPECCOMPANY *OUTPUT/*lppECCompany*/) = 0;
 	virtual HRESULT ResolveCompanyName(LPTSTR lpszCompanyName, ULONG ulFlags, ULONG *OUTPUT, LPENTRYID *OUTPUT) = 0;
 	virtual HRESULT GetCompanyList(ULONG ulFlags, ULONG *OUTPUT /*lpcCompanies*/, LPECCOMPANY *OUTPUT /*lppsCompanies*/) = 0;
 
@@ -64,18 +80,18 @@ public:
 	virtual HRESULT SetQuota(ULONG cbUserId, LPENTRYID lpUserId, LPECQUOTA lpsQuota) = 0;
 
 	virtual HRESULT AddQuotaRecipient(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG cbRecipientId, LPENTRYID lpRecipientId, ULONG ulType) = 0;
-	virtual HRESULT DeleteQuotaRecipient(ULONG cbCompanyId, LPENTRYID lpCmopanyId, ULONG cbRecipientId, LPENTRYID lpRecipientId, ULONG ulType) = 0;
+	virtual HRESULT DeleteQuotaRecipient(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG cbRecipientId, LPENTRYID lpRecipientId, ULONG ulType) = 0;
 	virtual HRESULT GetQuotaRecipients(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *OUTPUT /*lpcUsers*/, LPECUSER *OUTPUT /*lppsUsers*/) = 0;
 
-	virtual HRESULT GetQuotaStatus(ULONG cbUserId, LPENTRYID lpUserId, LPECQUOTASTATUS* lppsQuotaStatus) = 0;
+	virtual HRESULT GetQuotaStatus(ULONG cbUserId, LPENTRYID lpUserId, LPECQUOTASTATUS* OUTPUT/*lppsQuotaStatus*/) = 0;
 	
 	virtual HRESULT PurgeSoftDelete(ULONG ulDays) = 0;
 	virtual HRESULT PurgeCache(ULONG ulFlags) = 0;
 	virtual HRESULT OpenUserStoresTable(ULONG ulFlags, IMAPITable **OUTPUT /*lppTable*/) = 0;
 
 	// Multiserver functions
-	virtual HRESULT GetServerDetails(LPECSVRNAMELIST lpServerNameList, ULONG ulFlags, LPECSERVERLIST* lppsServerList) = 0;
-	virtual HRESULT ResolvePseudoUrl(char *lpszPseudoUrl, char **lppszServerPath, bool *lpbIsPeer) = 0;
+	virtual HRESULT GetServerDetails(LPECSVRNAMELIST lpServerNameList, ULONG ulFlags, LPECSERVERLIST* OUTPUT/*lppsServerList*/) = 0;
+	virtual HRESULT ResolvePseudoUrl(char *lpszPseudoUrl, char** OUTMAPICHAR/*lppszServerPath*/, bool *OUTPUT /*lpbIsPeer*/) = 0;
 	
 	// Public store function(s)
 	virtual HRESULT GetPublicStoreEntryID(ULONG ulFlags, ULONG *OUTPUT /*lpcbStoreID*/, LPENTRYID *OUTPUT /*lppStoreID*/) = 0;

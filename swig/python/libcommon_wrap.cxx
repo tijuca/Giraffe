@@ -2506,28 +2506,32 @@ SWIG_Python_MustGetPtr(PyObject *obj, swig_type_info *ty, int argnum, int flags)
 /* -------- TYPES TABLE (BEGIN) -------- */
 
 #define SWIGTYPE_p_CHtmlToTextParser swig_types[0]
-#define SWIGTYPE_p_IMAPIProp swig_types[1]
-#define SWIGTYPE_p_Util swig_types[2]
-#define SWIGTYPE_p___int64 swig_types[3]
-#define SWIGTYPE_p_char swig_types[4]
-#define SWIGTYPE_p_float swig_types[5]
-#define SWIGTYPE_p_int swig_types[6]
-#define SWIGTYPE_p_long swig_types[7]
-#define SWIGTYPE_p_p_char swig_types[8]
-#define SWIGTYPE_p_p_unsigned_long swig_types[9]
-#define SWIGTYPE_p_short swig_types[10]
-#define SWIGTYPE_p_signed___int64 swig_types[11]
-#define SWIGTYPE_p_signed_char swig_types[12]
-#define SWIGTYPE_p_std__string swig_types[13]
-#define SWIGTYPE_p_std__wstring swig_types[14]
-#define SWIGTYPE_p_unsigned___int64 swig_types[15]
-#define SWIGTYPE_p_unsigned_char swig_types[16]
-#define SWIGTYPE_p_unsigned_int swig_types[17]
-#define SWIGTYPE_p_unsigned_long swig_types[18]
-#define SWIGTYPE_p_unsigned_short swig_types[19]
-#define SWIGTYPE_p_wchar_t swig_types[20]
-static swig_type_info *swig_types[22];
-static swig_module_info swig_module = {swig_types, 21, 0, 0, 0, 0};
+#define SWIGTYPE_p_IMAPIFolder swig_types[1]
+#define SWIGTYPE_p_IMAPIProp swig_types[2]
+#define SWIGTYPE_p_IMAPISession swig_types[3]
+#define SWIGTYPE_p_LPSPropValue swig_types[4]
+#define SWIGTYPE_p_Util swig_types[5]
+#define SWIGTYPE_p___int64 swig_types[6]
+#define SWIGTYPE_p_char swig_types[7]
+#define SWIGTYPE_p_float swig_types[8]
+#define SWIGTYPE_p_int swig_types[9]
+#define SWIGTYPE_p_long swig_types[10]
+#define SWIGTYPE_p_p_IMAPIFolder swig_types[11]
+#define SWIGTYPE_p_p_char swig_types[12]
+#define SWIGTYPE_p_p_unsigned_long swig_types[13]
+#define SWIGTYPE_p_short swig_types[14]
+#define SWIGTYPE_p_signed___int64 swig_types[15]
+#define SWIGTYPE_p_signed_char swig_types[16]
+#define SWIGTYPE_p_std__string swig_types[17]
+#define SWIGTYPE_p_std__wstring swig_types[18]
+#define SWIGTYPE_p_unsigned___int64 swig_types[19]
+#define SWIGTYPE_p_unsigned_char swig_types[20]
+#define SWIGTYPE_p_unsigned_int swig_types[21]
+#define SWIGTYPE_p_unsigned_long swig_types[22]
+#define SWIGTYPE_p_unsigned_short swig_types[23]
+#define SWIGTYPE_p_wchar_t swig_types[24]
+static swig_type_info *swig_types[26];
+static swig_module_info swig_module = {swig_types, 25, 0, 0, 0, 0};
 #define SWIG_TypeQuery(name) SWIG_TypeQueryModule(&swig_module, &swig_module, name)
 #define SWIG_MangledTypeQuery(name) SWIG_MangledTypeQueryModule(&swig_module, &swig_module, name)
 
@@ -2636,6 +2640,15 @@ namespace swig {
 
 
 #include <string>
+
+
+#include "conversion.h"
+#include "director_util.h"
+
+#define SWIG_SHADOW 0
+#define SWIG_OWNER SWIG_POINTER_OWN
+
+#define DIRECTORARGOUT(_arg) (__tupleIndex == -1 ? (PyObject*)(_arg) : PyTuple_GetItem((_arg), __tupleIndex++))
 
 
 #include <wchar.h>
@@ -2834,6 +2847,16 @@ SWIG_AsPtr_std_string (PyObject * obj, std::string **val)
 }
 
 
+#include <limits.h>
+#if !defined(SWIG_NO_LLONG_MAX)
+# if !defined(LLONG_MAX) && defined(__GNUC__) && defined (__LONG_LONG_MAX__)
+#   define LLONG_MAX __LONG_LONG_MAX__
+#   define LLONG_MIN (-LLONG_MAX - 1LL)
+#   define ULLONG_MAX (LLONG_MAX * 2ULL + 1ULL)
+# endif
+#endif
+
+
 SWIGINTERN int
 SWIG_AsVal_double (PyObject *obj, double *val)
 {
@@ -2958,6 +2981,22 @@ SWIG_AsVal_unsigned_SS_long (PyObject *obj, unsigned long *val)
 }
 
 
+SWIGINTERN int
+SWIG_AsVal_unsigned_SS_int (PyObject * obj, unsigned int *val)
+{
+  unsigned long v;
+  int res = SWIG_AsVal_unsigned_SS_long (obj, &v);
+  if (SWIG_IsOK(res)) {
+    if ((v > UINT_MAX)) {
+      return SWIG_OverflowError;
+    } else {
+      if (val) *val = static_cast< unsigned int >(v);
+    }
+  }  
+  return res;
+}
+
+
 SWIGINTERNINLINE PyObject *
 SWIG_FromCharPtrAndSize(const char* carray, size_t size)
 {
@@ -2982,6 +3021,9 @@ SWIG_FromCharPtr(const char *cptr)
 }
 
 
+
+
+
   #define SWIG_From_long   PyInt_FromLong 
 
 
@@ -2990,6 +3032,13 @@ SWIG_From_unsigned_SS_long  (unsigned long value)
 {
   return (value > LONG_MAX) ?
     PyLong_FromUnsignedLong(value) : PyInt_FromLong(static_cast< long >(value)); 
+}
+
+
+SWIGINTERNINLINE PyObject *
+SWIG_From_unsigned_SS_int  (unsigned int value)
+{    
+  return SWIG_From_unsigned_SS_long  (value);
 }
 
 #ifdef __cplusplus
@@ -3187,11 +3236,10 @@ SWIGINTERN PyObject *_wrap_HrExtractHTMLFromRTF(PyObject *SWIGUNUSEDPARM(self), 
   std::string *arg2 = 0 ;
   ULONG arg3 ;
   std::string s2 ;
-  unsigned long val3 ;
+  unsigned int val3 ;
   int ecode3 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
-  char ex[64] ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
@@ -3208,7 +3256,7 @@ SWIGINTERN PyObject *_wrap_HrExtractHTMLFromRTF(PyObject *SWIGUNUSEDPARM(self), 
     arg1 = *ptr;
     if (SWIG_IsNewObj(res)) delete ptr;
   }
-  ecode3 = SWIG_AsVal_unsigned_SS_long(obj1, &val3);
+  ecode3 = SWIG_AsVal_unsigned_SS_int(obj1, &val3);
   if (!SWIG_IsOK(ecode3)) {
     SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "HrExtractHTMLFromRTF" "', argument " "3"" of type '" "ULONG""'");
   } 
@@ -3219,9 +3267,11 @@ SWIGINTERN PyObject *_wrap_HrExtractHTMLFromRTF(PyObject *SWIGUNUSEDPARM(self), 
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
   {
+    resultobj = Py_None;
+    Py_INCREF(Py_None);
     if(FAILED(result)) {
-      snprintf(ex,sizeof(ex),"failed with HRESULT 0x%08X", result);
-      SWIG_exception(SWIG_RuntimeError, ex);
+      DoException(result);
+      SWIG_fail;
     }
   }
   {
@@ -3243,11 +3293,10 @@ SWIGINTERN PyObject *_wrap_HrExtractHTMLFromTextRTF(PyObject *SWIGUNUSEDPARM(sel
   std::string *arg2 = 0 ;
   ULONG arg3 ;
   std::string s2 ;
-  unsigned long val3 ;
+  unsigned int val3 ;
   int ecode3 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
-  char ex[64] ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
@@ -3264,7 +3313,7 @@ SWIGINTERN PyObject *_wrap_HrExtractHTMLFromTextRTF(PyObject *SWIGUNUSEDPARM(sel
     arg1 = *ptr;
     if (SWIG_IsNewObj(res)) delete ptr;
   }
-  ecode3 = SWIG_AsVal_unsigned_SS_long(obj1, &val3);
+  ecode3 = SWIG_AsVal_unsigned_SS_int(obj1, &val3);
   if (!SWIG_IsOK(ecode3)) {
     SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "HrExtractHTMLFromTextRTF" "', argument " "3"" of type '" "ULONG""'");
   } 
@@ -3275,9 +3324,11 @@ SWIGINTERN PyObject *_wrap_HrExtractHTMLFromTextRTF(PyObject *SWIGUNUSEDPARM(sel
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
   {
+    resultobj = Py_None;
+    Py_INCREF(Py_None);
     if(FAILED(result)) {
-      snprintf(ex,sizeof(ex),"failed with HRESULT 0x%08X", result);
-      SWIG_exception(SWIG_RuntimeError, ex);
+      DoException(result);
+      SWIG_fail;
     }
   }
   {
@@ -3299,11 +3350,10 @@ SWIGINTERN PyObject *_wrap_HrExtractHTMLFromRealRTF(PyObject *SWIGUNUSEDPARM(sel
   std::string *arg2 = 0 ;
   ULONG arg3 ;
   std::string s2 ;
-  unsigned long val3 ;
+  unsigned int val3 ;
   int ecode3 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
-  char ex[64] ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
@@ -3320,7 +3370,7 @@ SWIGINTERN PyObject *_wrap_HrExtractHTMLFromRealRTF(PyObject *SWIGUNUSEDPARM(sel
     arg1 = *ptr;
     if (SWIG_IsNewObj(res)) delete ptr;
   }
-  ecode3 = SWIG_AsVal_unsigned_SS_long(obj1, &val3);
+  ecode3 = SWIG_AsVal_unsigned_SS_int(obj1, &val3);
   if (!SWIG_IsOK(ecode3)) {
     SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "HrExtractHTMLFromRealRTF" "', argument " "3"" of type '" "ULONG""'");
   } 
@@ -3331,9 +3381,11 @@ SWIGINTERN PyObject *_wrap_HrExtractHTMLFromRealRTF(PyObject *SWIGUNUSEDPARM(sel
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
   {
+    resultobj = Py_None;
+    Py_INCREF(Py_None);
     if(FAILED(result)) {
-      snprintf(ex,sizeof(ex),"failed with HRESULT 0x%08X", result);
-      SWIG_exception(SWIG_RuntimeError, ex);
+      DoException(result);
+      SWIG_fail;
     }
   }
   {
@@ -3355,7 +3407,6 @@ SWIGINTERN PyObject *_wrap_HrExtractBODYFromTextRTF(PyObject *SWIGUNUSEDPARM(sel
   std::wstring *arg2 = 0 ;
   std::wstring s2 ;
   PyObject * obj0 = 0 ;
-  char ex[64] ;
   HRESULT result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
@@ -3378,9 +3429,11 @@ SWIGINTERN PyObject *_wrap_HrExtractBODYFromTextRTF(PyObject *SWIGUNUSEDPARM(sel
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
   {
+    resultobj = Py_None;
+    Py_INCREF(Py_None);
     if(FAILED(result)) {
-      snprintf(ex,sizeof(ex),"failed with HRESULT 0x%08X", result);
-      SWIG_exception(SWIG_RuntimeError, ex);
+      DoException(result);
+      SWIG_fail;
     }
   }
   {
@@ -3396,36 +3449,336 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_GetShortcutFolder(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  IMAPISession *arg1 = (IMAPISession *) 0 ;
+  LPTSTR arg2 = (LPTSTR) 0 ;
+  LPTSTR arg3 = (LPTSTR) 0 ;
+  ULONG arg4 ;
+  IMAPIFolder **arg5 = (IMAPIFolder **) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  unsigned int fl4 ;
+  int ecode4 ;
+  IMAPIFolder *temp5 ;
+  std::string strInput2 ;
+  std::wstring wstrInput2 ;
+  std::string strInput3 ;
+  std::wstring wstrInput3 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  PyObject * obj2 = 0 ;
+  PyObject * obj3 = 0 ;
+  HRESULT result;
+  
+  SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  ULONG ulFlags = 0;
+  temp5 = NULL; arg5 = &temp5;
+  if (!PyArg_ParseTuple(args,(char *)"OOOO:GetShortcutFolder",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IMAPISession, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "GetShortcutFolder" "', argument " "1"" of type '" "IMAPISession *""'"); 
+  }
+  arg1 = reinterpret_cast< IMAPISession * >(argp1);
+  {
+    arg2 = (LPTSTR)obj1;
+  }
+  {
+    arg3 = (LPTSTR)obj2;
+  }
+  {
+    ecode4 = SWIG_AsVal_unsigned_SS_int (obj3, &fl4);
+    if (!SWIG_IsOK(ecode4)) {
+      SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "GetShortcutFolder" "', argument " "4"" of type '" "ULONG""'");
+    } 
+    arg4 = fl4;
+    ulFlags = fl4;
+  }
+  {
+    PyObject *o = (PyObject *)arg2;
+    if(o == Py_None)
+    arg2 = NULL;
+    else {
+      if(ulFlags & MAPI_UNICODE) {
+        if(PyUnicode_Check(o)) {
+          wstrInput2.assign((wchar_t*)PyUnicode_AsUnicode(o), PyUnicode_GetSize(o));
+          arg2 = (LPTSTR)wstrInput2.c_str();
+        } else {
+          PyErr_SetString(PyExc_RuntimeError, "MAPI_UNICODE flag passed but passed parameter is not a unicode string");
+        }
+      } else {
+        if(PyUnicode_Check(o)) {
+          PyErr_SetString(PyExc_RuntimeError, "MAPI_UNICODE flag not passed but passed parameter is a unicode string");
+        }
+        char *input;
+        Py_ssize_t size;
+        
+        PyString_AsStringAndSize(o, &input, &size);
+        strInput2.assign(input, size);
+        
+        arg2 = (LPTSTR)strInput2.c_str();
+      }
+    }
+    
+    if(PyErr_Occurred()) {
+      SWIG_exception_fail(SWIG_ArgError(SWIG_ERROR), "in method '" "GetShortcutFolder" "', argument " "2"" of type '" "LPTSTR""'");
+    }
+    
+  }
+  {
+    PyObject *o = (PyObject *)arg3;
+    if(o == Py_None)
+    arg3 = NULL;
+    else {
+      if(ulFlags & MAPI_UNICODE) {
+        if(PyUnicode_Check(o)) {
+          wstrInput3.assign((wchar_t*)PyUnicode_AsUnicode(o), PyUnicode_GetSize(o));
+          arg3 = (LPTSTR)wstrInput3.c_str();
+        } else {
+          PyErr_SetString(PyExc_RuntimeError, "MAPI_UNICODE flag passed but passed parameter is not a unicode string");
+        }
+      } else {
+        if(PyUnicode_Check(o)) {
+          PyErr_SetString(PyExc_RuntimeError, "MAPI_UNICODE flag not passed but passed parameter is a unicode string");
+        }
+        char *input;
+        Py_ssize_t size;
+        
+        PyString_AsStringAndSize(o, &input, &size);
+        strInput3.assign(input, size);
+        
+        arg3 = (LPTSTR)strInput3.c_str();
+      }
+    }
+    
+    if(PyErr_Occurred()) {
+      SWIG_exception_fail(SWIG_ArgError(SWIG_ERROR), "in method '" "GetShortcutFolder" "', argument " "3"" of type '" "LPTSTR""'");
+    }
+    
+  }
+  {
+    SWIG_PYTHON_THREAD_BEGIN_ALLOW;
+    result = (HRESULT)GetShortcutFolder(arg1,arg2,arg3,arg4,arg5);
+    SWIG_PYTHON_THREAD_END_ALLOW;
+  }
+  {
+    resultobj = Py_None;
+    Py_INCREF(Py_None);
+    if(FAILED(result)) {
+      DoException(result);
+      SWIG_fail;
+    }
+  }
+  {
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)*(arg5), SWIGTYPE_p_IMAPIFolder, SWIG_SHADOW | SWIG_OWNER));
+  }
+  {
+    
+  }
+  {
+    
+  }
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return resultobj;
+fail:
+  {
+    
+  }
+  {
+    
+  }
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_DelFavoriteFolder(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  IMAPIFolder *arg1 = (IMAPIFolder *) 0 ;
+  LPSPropValue arg2 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  HRESULT result;
+  
+  SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  arg2 = NULL;
+  if (!PyArg_ParseTuple(args,(char *)"OO:DelFavoriteFolder",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IMAPIFolder, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "DelFavoriteFolder" "', argument " "1"" of type '" "IMAPIFolder *""'"); 
+  }
+  arg1 = reinterpret_cast< IMAPIFolder * >(argp1);
+  {
+    arg2 = Object_to_LPSPropValue(obj1);
+    if(PyErr_Occurred()) goto fail;
+  }
+  {
+    SWIG_PYTHON_THREAD_BEGIN_ALLOW;
+    result = (HRESULT)DelFavoriteFolder(arg1,arg2);
+    SWIG_PYTHON_THREAD_END_ALLOW;
+  }
+  {
+    resultobj = Py_None;
+    Py_INCREF(Py_None);
+    if(FAILED(result)) {
+      DoException(result);
+      SWIG_fail;
+    }
+  }
+  {
+    if(arg2)
+    MAPIFreeBuffer(arg2);
+  }
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return resultobj;
+fail:
+  {
+    if(arg2)
+    MAPIFreeBuffer(arg2);
+  }
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_AddFavoriteFolder(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  IMAPIFolder *arg1 = (IMAPIFolder *) 0 ;
+  IMAPIFolder *arg2 = (IMAPIFolder *) 0 ;
+  LPTSTR arg3 = (LPTSTR) 0 ;
+  ULONG arg4 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  void *argp2 = 0 ;
+  int res2 = 0 ;
+  unsigned int fl4 ;
+  int ecode4 ;
+  std::string strInput3 ;
+  std::wstring wstrInput3 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  PyObject * obj2 = 0 ;
+  PyObject * obj3 = 0 ;
+  HRESULT result;
+  
+  SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  ULONG ulFlags = 0;
+  if (!PyArg_ParseTuple(args,(char *)"OOOO:AddFavoriteFolder",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IMAPIFolder, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "AddFavoriteFolder" "', argument " "1"" of type '" "IMAPIFolder *""'"); 
+  }
+  arg1 = reinterpret_cast< IMAPIFolder * >(argp1);
+  res2 = SWIG_ConvertPtr(obj1, &argp2,SWIGTYPE_p_IMAPIFolder, 0 |  0 );
+  if (!SWIG_IsOK(res2)) {
+    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "AddFavoriteFolder" "', argument " "2"" of type '" "IMAPIFolder *""'"); 
+  }
+  arg2 = reinterpret_cast< IMAPIFolder * >(argp2);
+  {
+    arg3 = (LPTSTR)obj2;
+  }
+  {
+    ecode4 = SWIG_AsVal_unsigned_SS_int (obj3, &fl4);
+    if (!SWIG_IsOK(ecode4)) {
+      SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "AddFavoriteFolder" "', argument " "4"" of type '" "ULONG""'");
+    } 
+    arg4 = fl4;
+    ulFlags = fl4;
+  }
+  {
+    PyObject *o = (PyObject *)arg3;
+    if(o == Py_None)
+    arg3 = NULL;
+    else {
+      if(ulFlags & MAPI_UNICODE) {
+        if(PyUnicode_Check(o)) {
+          wstrInput3.assign((wchar_t*)PyUnicode_AsUnicode(o), PyUnicode_GetSize(o));
+          arg3 = (LPTSTR)wstrInput3.c_str();
+        } else {
+          PyErr_SetString(PyExc_RuntimeError, "MAPI_UNICODE flag passed but passed parameter is not a unicode string");
+        }
+      } else {
+        if(PyUnicode_Check(o)) {
+          PyErr_SetString(PyExc_RuntimeError, "MAPI_UNICODE flag not passed but passed parameter is a unicode string");
+        }
+        char *input;
+        Py_ssize_t size;
+        
+        PyString_AsStringAndSize(o, &input, &size);
+        strInput3.assign(input, size);
+        
+        arg3 = (LPTSTR)strInput3.c_str();
+      }
+    }
+    
+    if(PyErr_Occurred()) {
+      SWIG_exception_fail(SWIG_ArgError(SWIG_ERROR), "in method '" "AddFavoriteFolder" "', argument " "3"" of type '" "LPTSTR""'");
+    }
+    
+  }
+  {
+    SWIG_PYTHON_THREAD_BEGIN_ALLOW;
+    result = (HRESULT)AddFavoriteFolder(arg1,arg2,arg3,arg4);
+    SWIG_PYTHON_THREAD_END_ALLOW;
+  }
+  {
+    resultobj = Py_None;
+    Py_INCREF(Py_None);
+    if(FAILED(result)) {
+      DoException(result);
+      SWIG_fail;
+    }
+  }
+  {
+    
+  }
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return resultobj;
+fail:
+  {
+    
+  }
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return NULL;
+}
+
+
 SWIGINTERN PyObject *_wrap_Util_GetBestBody(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   IMAPIProp *arg1 = (IMAPIProp *) 0 ;
   ULONG arg2 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  unsigned long val2 ;
-  int ecode2 = 0 ;
+  unsigned int fl2 ;
+  int ecode2 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   ULONG result;
   
   SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  ULONG ulFlags = 0;
   if (!PyArg_ParseTuple(args,(char *)"OO:Util_GetBestBody",&obj0,&obj1)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_IMAPIProp, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "Util_GetBestBody" "', argument " "1"" of type '" "IMAPIProp *""'"); 
   }
   arg1 = reinterpret_cast< IMAPIProp * >(argp1);
-  ecode2 = SWIG_AsVal_unsigned_SS_long(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "Util_GetBestBody" "', argument " "2"" of type '" "ULONG""'");
-  } 
-  arg2 = static_cast< ULONG >(val2);
+  {
+    ecode2 = SWIG_AsVal_unsigned_SS_int (obj1, &fl2);
+    if (!SWIG_IsOK(ecode2)) {
+      SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "Util_GetBestBody" "', argument " "2"" of type '" "ULONG""'");
+    } 
+    arg2 = fl2;
+    ulFlags = fl2;
+  }
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
     result = (ULONG)Util::GetBestBody(arg1,arg2);
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
-  resultobj = SWIG_From_unsigned_SS_long(static_cast< unsigned long >(result));
+  resultobj = SWIG_From_unsigned_SS_int(static_cast< unsigned int >(result));
   SWIG_PYTHON_THREAD_END_BLOCK;
   return resultobj;
 fail:
@@ -3501,6 +3854,9 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"HrExtractHTMLFromTextRTF", _wrap_HrExtractHTMLFromTextRTF, METH_VARARGS, NULL},
 	 { (char *)"HrExtractHTMLFromRealRTF", _wrap_HrExtractHTMLFromRealRTF, METH_VARARGS, NULL},
 	 { (char *)"HrExtractBODYFromTextRTF", _wrap_HrExtractBODYFromTextRTF, METH_VARARGS, NULL},
+	 { (char *)"GetShortcutFolder", _wrap_GetShortcutFolder, METH_VARARGS, NULL},
+	 { (char *)"DelFavoriteFolder", _wrap_DelFavoriteFolder, METH_VARARGS, NULL},
+	 { (char *)"AddFavoriteFolder", _wrap_AddFavoriteFolder, METH_VARARGS, NULL},
 	 { (char *)"Util_GetBestBody", _wrap_Util_GetBestBody, METH_VARARGS, NULL},
 	 { (char *)"new_Util", _wrap_new_Util, METH_VARARGS, NULL},
 	 { (char *)"delete_Util", _wrap_delete_Util, METH_VARARGS, NULL},
@@ -3512,13 +3868,17 @@ static PyMethodDef SwigMethods[] = {
 /* -------- TYPE CONVERSION AND EQUIVALENCE RULES (BEGIN) -------- */
 
 static swig_type_info _swigt__p_CHtmlToTextParser = {"_p_CHtmlToTextParser", "CHtmlToTextParser *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_IMAPIFolder = {"_p_IMAPIFolder", "IMAPIFolder *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_IMAPIProp = {"_p_IMAPIProp", "IMAPIProp *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_IMAPISession = {"_p_IMAPISession", "IMAPISession *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_LPSPropValue = {"_p_LPSPropValue", "LPSPropValue *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_Util = {"_p_Util", "Util *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p___int64 = {"_p___int64", "__int64 *|LONGLONG *|LONG64 *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_char = {"_p_char", "CHAR *|TCHAR *|char *|CCHAR *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_float = {"_p_float", "FLOAT *|float *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_int = {"_p_int", "BOOL *|INT32 *|int *|INT *|INT_PTR *|LONG32 *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_long = {"_p_long", "SHANDLE_PTR *|LONG_PTR *|LONG *|HRESULT *|long *|SSIZE_T *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_p_IMAPIFolder = {"_p_p_IMAPIFolder", "IMAPIFolder **", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_p_char = {"_p_p_char", "PTCH *|PCTSTR *|LPCTSTR *|LPTCH *|PUTSTR *|LPUTSTR *|PCUTSTR *|LPCUTSTR *|char **|PTSTR *|LPTSTR *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_p_unsigned_long = {"_p_p_unsigned_long", "unsigned long **|PLCID *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_short = {"_p_short", "HALF_PTR *|short *|SHORT *|INT16 *", 0, 0, (void*)0, 0};
@@ -3535,13 +3895,17 @@ static swig_type_info _swigt__p_wchar_t = {"_p_wchar_t", "wchar_t *", 0, 0, (voi
 
 static swig_type_info *swig_type_initial[] = {
   &_swigt__p_CHtmlToTextParser,
+  &_swigt__p_IMAPIFolder,
   &_swigt__p_IMAPIProp,
+  &_swigt__p_IMAPISession,
+  &_swigt__p_LPSPropValue,
   &_swigt__p_Util,
   &_swigt__p___int64,
   &_swigt__p_char,
   &_swigt__p_float,
   &_swigt__p_int,
   &_swigt__p_long,
+  &_swigt__p_p_IMAPIFolder,
   &_swigt__p_p_char,
   &_swigt__p_p_unsigned_long,
   &_swigt__p_short,
@@ -3558,13 +3922,17 @@ static swig_type_info *swig_type_initial[] = {
 };
 
 static swig_cast_info _swigc__p_CHtmlToTextParser[] = {  {&_swigt__p_CHtmlToTextParser, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_IMAPIFolder[] = {  {&_swigt__p_IMAPIFolder, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_IMAPIProp[] = {  {&_swigt__p_IMAPIProp, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_IMAPISession[] = {  {&_swigt__p_IMAPISession, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_LPSPropValue[] = {  {&_swigt__p_LPSPropValue, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_Util[] = {  {&_swigt__p_Util, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p___int64[] = {  {&_swigt__p___int64, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_char[] = {  {&_swigt__p_char, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_float[] = {  {&_swigt__p_float, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_int[] = {  {&_swigt__p_int, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_long[] = {  {&_swigt__p_long, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_p_IMAPIFolder[] = {  {&_swigt__p_p_IMAPIFolder, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_char[] = {  {&_swigt__p_p_char, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_unsigned_long[] = {  {&_swigt__p_p_unsigned_long, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_short[] = {  {&_swigt__p_short, 0, 0, 0},{0, 0, 0, 0}};
@@ -3581,13 +3949,17 @@ static swig_cast_info _swigc__p_wchar_t[] = {  {&_swigt__p_wchar_t, 0, 0, 0},{0,
 
 static swig_cast_info *swig_cast_initial[] = {
   _swigc__p_CHtmlToTextParser,
+  _swigc__p_IMAPIFolder,
   _swigc__p_IMAPIProp,
+  _swigc__p_IMAPISession,
+  _swigc__p_LPSPropValue,
   _swigc__p_Util,
   _swigc__p___int64,
   _swigc__p_char,
   _swigc__p_float,
   _swigc__p_int,
   _swigc__p_long,
+  _swigc__p_p_IMAPIFolder,
   _swigc__p_p_char,
   _swigc__p_p_unsigned_long,
   _swigc__p_short,
@@ -4129,6 +4501,9 @@ SWIGEXPORT void SWIG_init(void) {
   SWIG_InitializeModule(0);
   SWIG_InstallConstants(d,swig_const_table);
   
+  
+  
+  Init();
   
   
   /* Initialize threading */

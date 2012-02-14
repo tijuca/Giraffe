@@ -94,7 +94,7 @@
 }
 %apply (ULONG cbEntryID, LPENTRYID lpEntryID) {(ULONG cFolderKeySize, BYTE *lpFolderSourceKey), (ULONG cMessageKeySize, BYTE *lpMessageSourceKey), (ULONG cbInstanceKey, BYTE *pbInstanceKey)};
 %apply (ULONG cbEntryID, LPENTRYID lpEntryID) {(ULONG cbEntryID1, LPENTRYID lpEntryID1), (ULONG cbEntryID2, LPENTRYID lpEntryID2), 
-(ULONG cbEIDContainer, LPENTRYID lpEIDContainer), (ULONG cbEIDNewEntryTpl, LPENTRYID lpEIDNewEntryTpl)};
+(ULONG cbEIDContainer, LPENTRYID lpEIDContainer), (ULONG cbEIDNewEntryTpl, LPENTRYID lpEIDNewEntryTpl), (ULONG cbUserEntryID, LPENTRYID lpUserEntryID) };
 
 // Output
 %typemap(in,numinputs=0) (ULONG *OUTPUT, LPENTRYID *OUTPUT) (ULONG cbEntryID = 0, LPENTRYID lpEntryID = NULL) {
@@ -240,6 +240,20 @@
 %typemap(freearg) LPTSTR *OUTPUT {
   if(*$1)
 	MAPIFreeBuffer(*$1);
+}
+
+//////////////////////
+// char** allocated with mapi
+/////////////////////
+%typemap(in,numinputs=0) (char** OUTMAPICHAR) (char* lpStr = NULL) {
+  $1 = &lpStr;
+}
+%typemap(argout,fragment="SWIG_FromCharPtr") char** OUTMAPICHAR {
+    %append_output(SWIG_FromCharPtr((char*)*$1));
+}
+%typemap(freearg) char** OUTMAPICHAR {
+  if(*$1)
+    MAPIFreeBuffer(*$1);
 }
 
 //////////////////////
@@ -422,25 +436,30 @@
 /////////////////////////////////////////////////
 
 // Input
-%apply (ULONG, MAPIARRAY) {(ULONG cValues, LPSPropValue lpProps), (ULONG cPropNames, LPMAPINAMEID* lppPropNames), (ULONG cInterfaces, LPCIID lpInterfaces)};
+%apply (ULONG, MAPIARRAY) {(ULONG cValues, LPSPropValue lpProps), (ULONG cPropNames, LPMAPINAMEID* lppPropNames), (ULONG cInterfaces, LPCIID lpInterfaces), ( ULONG cValuesConversion, LPSPropValue lpPropArrayConversion) };
 %apply MAPILIST {LPSPropTagArray, LPENTRYLIST, LPADRLIST, LPFlagList, LPROWLIST};
 %apply MAPILIST *INPUT {LPSPropTagArray *};
-%apply MAPISTRUCT {LPSRestriction, LPSSortOrderSet, LPECQUOTA};
-%apply MAPISTRUCT_W_FLAGS {LPECUSER, LPECCOMPANY};
+%apply MAPISTRUCT {LPSRestriction, LPSSortOrderSet, LPSPropValue, LPNOTIFICATION};
 
 // Output
 %apply (ULONG *, MAPIARRAY *) {(ULONG *OUTPUT, LPSPropValue *OUTPUT), (ULONG *OUTPUT, LPNOTIFICATION *OUTPUT), (ULONG *OUTPUT, LPMAPINAMEID **OUTPUT)};
 %apply MAPILIST * {LPADRLIST *OUTPUT, LPSRowSet *OUTPUT, LPSPropProblemArray *OUTPUT, LPSPropTagArray *OUTPUT, LPENTRYLIST *OUTPUT};
-%apply MAPISTRUCT * {LPMAPIERROR *OUTPUT, LPSSortOrderSet *OUTPUT, LPSRestriction *OUTPUT, LPECUSER *OUTPUT, LPECQUOTA *OUTPUT};
+%apply MAPISTRUCT * {LPMAPIERROR *OUTPUT, LPSSortOrderSet *OUTPUT, LPSRestriction *OUTPUT};
 
 // Input/Output
 %apply MAPILIST INOUT {LPADRLIST INOUT, LPFlagList INOUT };
 
 // Classes
-%apply MAPICLASS *{IMAPISession **, IProfAdmin **, IMsgServiceAdmin **, IMAPITable **, IMsgStore **, IMAPIFolder **, IMAPITable **, IStream **, IMessage **, IAttach **, IAddrBook **, IProviderAdmin **, IProfSect **}
+%apply MAPICLASS *{IMAPISession **, IProfAdmin **, IMsgServiceAdmin **, IMAPITable **, IMsgStore **, IMAPIFolder **, IMAPITable **, IStream **, IMessage **, IAttach **, IAddrBook **, IProviderAdmin **, IProfSect **, IUnknown **}
 
 // Specialization for LPSRowSet and LPADRLIST
 %typemap(freearg) LPSRowSet *OUTPUT, LPADRLIST *OUTPUT
 {
 	FreeProws((LPSRowSet)*$1);
 }
+
+%typemap(freearg) LPADRLIST INOUT, LPSRowSet INOUT, LPSRowSet INPUT, LPADRLIST INPUT
+{
+    FreeProws((LPSRowSet)$1);
+}
+

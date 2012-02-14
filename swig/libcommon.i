@@ -19,6 +19,7 @@
 %include "cstring.i"
 %include "cwstring.i"
 %include "std_string.i"
+%include "typemap.i"
 
 class CHtmlToTextParser {
     public:
@@ -36,18 +37,6 @@ class CHtmlToTextParser {
         }
 
 };
-
-/////////////////////////////////
-// HRESULT
-/////////////////////////////////
-%include "exception.i"
-%typemap(out) HRESULT (char ex[64])
-{
-  if(FAILED($1)) {
-    snprintf(ex,sizeof(ex),"failed with HRESULT 0x%08X", $1);
-	SWIG_exception(SWIG_RuntimeError, ex);
-  }
-}
 
 /////////////////////////////////
 // std::string&
@@ -80,6 +69,12 @@ HRESULT HrExtractHTMLFromRTF(std::string lpStrRTFIn, std::string &OUTPUT, ULONG 
 HRESULT HrExtractHTMLFromTextRTF(std::string lpStrRTFIn, std::string &OUTPUT, ULONG ulCodepage);
 HRESULT HrExtractHTMLFromRealRTF(std::string lpStrRTFIn, std::string &OUTPUT, ULONG ulCodepage);
 HRESULT HrExtractBODYFromTextRTF(std::string lpStrRTFIn, std::wstring &OUTPUT);
+
+// functions from favoritesutil.h
+HRESULT GetShortcutFolder(IMAPISession *lpSession, LPTSTR lpszFolderName, LPTSTR lpszFolderComment, ULONG ulFlags, IMAPIFolder **lppShortcutFolder);
+
+HRESULT DelFavoriteFolder(IMAPIFolder *lpShortcutFolder, LPSPropValue lpPropSourceKey);
+HRESULT AddFavoriteFolder(IMAPIFolder *lpShortcutFolder, IMAPIFolder *lpFolder, LPTSTR lpszAliasName, ULONG ulFlags);
 
 // functions from common/Util.h
 class Util {

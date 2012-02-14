@@ -100,9 +100,9 @@ private:
 	ECSync();
 };
 
-#endif // HAVE_OFFLINE_SUPPORT
-
 %include "windows.i"
+
+#endif // HAVE_OFFLINE_SUPPORT
 
 #if SWIGPYTHON
 #ifndef WIN32
