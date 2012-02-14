@@ -532,7 +532,8 @@ appointmentitemmodule.prototype.save = function(props, send, recipients, dialog_
 			data["recipients"]["recipient"].unshift({
 				"address": this.owner["email_address"],
 				"name": this.owner["fullname"],
-				"type": "mapi_to"
+				"type": "mapi_to",
+				"recipient_flags": 3 /* recipSenable | recipOrganizer */
 			});
 		}
 	}
