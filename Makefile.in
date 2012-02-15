@@ -37,8 +37,7 @@ host_triplet = @host@
 subdir = .
 DIST_COMMON = $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/specialbuild.in \
-	$(srcdir)/version.in $(top_srcdir)/configure \
-	$(top_srcdir)/swig/perl/Makefile.in autoconf/compile \
+	$(srcdir)/version.in $(top_srcdir)/configure autoconf/compile \
 	autoconf/config.guess autoconf/config.sub autoconf/depcomp \
 	autoconf/install-sh autoconf/ltmain.sh autoconf/missing \
 	autoconf/ylwrap
@@ -52,7 +51,7 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/common/config.h
-CONFIG_CLEAN_FILES = swig/perl/Makefile version specialbuild
+CONFIG_CLEAN_FILES = version specialbuild
 SOURCES =
 DIST_SOURCES =
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
@@ -311,8 +310,6 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 	cd $(srcdir) && $(AUTOCONF)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	cd $(srcdir) && $(ACLOCAL) $(ACLOCAL_AMFLAGS)
-swig/perl/Makefile: $(top_builddir)/config.status $(top_srcdir)/swig/perl/Makefile.in
-	cd $(top_builddir) && $(SHELL) ./config.status $@
 version: $(top_builddir)/config.status $(srcdir)/version.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 specialbuild: $(top_builddir)/config.status $(srcdir)/specialbuild.in

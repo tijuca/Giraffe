@@ -321,6 +321,40 @@ sub ACQUIRE {
 }
 
 
+############# Class : MAPICore::IProxyStoreObject ##############
+
+package MAPICore::IProxyStoreObject;
+use vars qw(@ISA %OWNER %ITERATORS %BLESSEDMEMBERS);
+@ISA = qw( MAPICore::IUnknown MAPICore );
+%OWNER = ();
+%ITERATORS = ();
+*PlaceHolder1 = *MAPICorec::IProxyStoreObject_PlaceHolder1;
+*PlaceHolder2 = *MAPICorec::IProxyStoreObject_PlaceHolder2;
+sub DESTROY {
+    return unless $_[0]->isa('HASH');
+    my $self = tied(%{$_[0]});
+    return unless defined $self;
+    delete $ITERATORS{$self};
+    if (exists $OWNER{$self}) {
+        MAPICorec::delete_IProxyStoreObject($self);
+        delete $OWNER{$self};
+    }
+}
+
+*UnwrapNoRef = *MAPICorec::IProxyStoreObject_UnwrapNoRef;
+sub DISOWN {
+    my $self = shift;
+    my $ptr = tied(%$self);
+    delete $OWNER{$ptr};
+}
+
+sub ACQUIRE {
+    my $self = shift;
+    my $ptr = tied(%$self);
+    $OWNER{$ptr} = 1;
+}
+
+
 ############# Class : MAPICore::IMAPIFolder ##############
 
 package MAPICore::IMAPIFolder;
@@ -1188,6 +1222,8 @@ use vars qw(@ISA %OWNER %ITERATORS %BLESSEDMEMBERS);
 *GetSendAsList = *MAPICorec::IECServiceAdmin_GetSendAsList;
 *AddSendAsUser = *MAPICorec::IECServiceAdmin_AddSendAsUser;
 *DelSendAsUser = *MAPICorec::IECServiceAdmin_DelSendAsUser;
+*GetUserClientUpdateStatus = *MAPICorec::IECServiceAdmin_GetUserClientUpdateStatus;
+*RemoveAllObjects = *MAPICorec::IECServiceAdmin_RemoveAllObjects;
 *CreateGroup = *MAPICorec::IECServiceAdmin_CreateGroup;
 *DeleteGroup = *MAPICorec::IECServiceAdmin_DeleteGroup;
 *SetGroup = *MAPICorec::IECServiceAdmin_SetGroup;
@@ -1964,6 +2000,7 @@ sub MAPI_ALLOW_OTHERS () { $MAPICorec::MAPI_ALLOW_OTHERS }
 sub MAPI_EXPLICIT_PROFILE () { $MAPICorec::MAPI_EXPLICIT_PROFILE }
 sub MAPI_SERVICE_UI_ALWAYS () { $MAPICorec::MAPI_SERVICE_UI_ALWAYS }
 sub MAPI_NO_MAIL () { $MAPICorec::MAPI_NO_MAIL }
+sub MAPI_NT_SERVICE () { $MAPICorec::MAPI_NT_SERVICE }
 sub MAPI_TIMEOUT_SHORT () { $MAPICorec::MAPI_TIMEOUT_SHORT }
 sub MAPI_INIT_VERSION () { $MAPICorec::MAPI_INIT_VERSION }
 sub MAPI_MULTITHREAD_NOTIFICATIONS () { $MAPICorec::MAPI_MULTITHREAD_NOTIFICATIONS }

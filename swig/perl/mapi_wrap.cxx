@@ -1493,110 +1493,113 @@ SWIG_Perl_SetModule(swig_module_info *module) {
 #define SWIGTYPE_p_IProfAdmin swig_types[35]
 #define SWIGTYPE_p_IProfSect swig_types[36]
 #define SWIGTYPE_p_IProviderAdmin swig_types[37]
-#define SWIGTYPE_p_ISequentialStream swig_types[38]
-#define SWIGTYPE_p_IStream swig_types[39]
-#define SWIGTYPE_p_IUnknown swig_types[40]
-#define SWIGTYPE_p_LARGE_INTEGER swig_types[41]
-#define SWIGTYPE_p_LONG swig_types[42]
-#define SWIGTYPE_p_LPADRENTRY swig_types[43]
-#define SWIGTYPE_p_LPADRLIST swig_types[44]
-#define SWIGTYPE_p_LPADRPARM swig_types[45]
-#define SWIGTYPE_p_LPBYTE swig_types[46]
-#define SWIGTYPE_p_LPCIID swig_types[47]
-#define SWIGTYPE_p_LPECCOMPANY swig_types[48]
-#define SWIGTYPE_p_LPECGROUP swig_types[49]
-#define SWIGTYPE_p_LPECQUOTA swig_types[50]
-#define SWIGTYPE_p_LPECQUOTASTATUS swig_types[51]
-#define SWIGTYPE_p_LPECSERVERLIST swig_types[52]
-#define SWIGTYPE_p_LPECSVRNAMELIST swig_types[53]
-#define SWIGTYPE_p_LPECUSER swig_types[54]
-#define SWIGTYPE_p_LPENTRYID swig_types[55]
-#define SWIGTYPE_p_LPENTRYLIST swig_types[56]
-#define SWIGTYPE_p_LPFNBUTTON swig_types[57]
-#define SWIGTYPE_p_LPFNDISMISS swig_types[58]
-#define SWIGTYPE_p_LPFlagList swig_types[59]
-#define SWIGTYPE_p_LPGUID swig_types[60]
-#define SWIGTYPE_p_LPMAPIADVISESINK swig_types[61]
-#define SWIGTYPE_p_LPMAPIERROR swig_types[62]
-#define SWIGTYPE_p_LPMAPIFOLDER swig_types[63]
-#define SWIGTYPE_p_LPMAPINAMEID swig_types[64]
-#define SWIGTYPE_p_LPMAPIPROP swig_types[65]
-#define SWIGTYPE_p_LPMAPITABLE swig_types[66]
-#define SWIGTYPE_p_LPMAPIUID swig_types[67]
-#define SWIGTYPE_p_LPMDB swig_types[68]
-#define SWIGTYPE_p_LPMESSAGE swig_types[69]
-#define SWIGTYPE_p_LPNOTIFICATION swig_types[70]
-#define SWIGTYPE_p_LPREADSTATE swig_types[71]
-#define SWIGTYPE_p_LPROWLIST swig_types[72]
-#define SWIGTYPE_p_LPSPropProblemArray swig_types[73]
-#define SWIGTYPE_p_LPSPropTagArray swig_types[74]
-#define SWIGTYPE_p_LPSPropValue swig_types[75]
-#define SWIGTYPE_p_LPSRestriction swig_types[76]
-#define SWIGTYPE_p_LPSRowSet swig_types[77]
-#define SWIGTYPE_p_LPSSortOrderSet swig_types[78]
-#define SWIGTYPE_p_LPSTR swig_types[79]
-#define SWIGTYPE_p_LPTSTR swig_types[80]
-#define SWIGTYPE_p_LPUNKNOWN swig_types[81]
-#define SWIGTYPE_p_LPVOID swig_types[82]
-#define SWIGTYPE_p_MAPIINIT_0 swig_types[83]
-#define SWIGTYPE_p_MAPINotifSink swig_types[84]
-#define SWIGTYPE_p_STATSTG swig_types[85]
-#define SWIGTYPE_p_ULARGE_INTEGER swig_types[86]
-#define SWIGTYPE_p_ULONG swig_types[87]
-#define SWIGTYPE_p_bool swig_types[88]
-#define SWIGTYPE_p_char swig_types[89]
-#define SWIGTYPE_p_p_IABContainer swig_types[90]
-#define SWIGTYPE_p_p_IAddrBook swig_types[91]
-#define SWIGTYPE_p_p_IAttach swig_types[92]
-#define SWIGTYPE_p_p_IDistList swig_types[93]
-#define SWIGTYPE_p_p_IECChangeAdviseSink swig_types[94]
-#define SWIGTYPE_p_p_IECChangeAdvisor swig_types[95]
-#define SWIGTYPE_p_p_IECExportChanges swig_types[96]
-#define SWIGTYPE_p_p_IECImportContentsChanges swig_types[97]
-#define SWIGTYPE_p_p_IECLicense swig_types[98]
-#define SWIGTYPE_p_p_IECMultiStoreTable swig_types[99]
-#define SWIGTYPE_p_p_IECServiceAdmin swig_types[100]
-#define SWIGTYPE_p_p_IECSingleInstance swig_types[101]
-#define SWIGTYPE_p_p_IECTestProtocol swig_types[102]
-#define SWIGTYPE_p_p_IExchangeExportChanges swig_types[103]
-#define SWIGTYPE_p_p_IExchangeImportContentsChanges swig_types[104]
-#define SWIGTYPE_p_p_IExchangeImportHierarchyChanges swig_types[105]
-#define SWIGTYPE_p_p_IExchangeManageStore swig_types[106]
-#define SWIGTYPE_p_p_IExchangeModifyTable swig_types[107]
-#define SWIGTYPE_p_p_IMAPIAdviseSink swig_types[108]
-#define SWIGTYPE_p_p_IMAPIContainer swig_types[109]
-#define SWIGTYPE_p_p_IMAPIFolder swig_types[110]
-#define SWIGTYPE_p_p_IMAPIProgress swig_types[111]
-#define SWIGTYPE_p_p_IMAPIProp swig_types[112]
-#define SWIGTYPE_p_p_IMAPISession swig_types[113]
-#define SWIGTYPE_p_p_IMAPIStatus swig_types[114]
-#define SWIGTYPE_p_p_IMAPITable swig_types[115]
-#define SWIGTYPE_p_p_IMailUser swig_types[116]
-#define SWIGTYPE_p_p_IMessage swig_types[117]
-#define SWIGTYPE_p_p_IMsgServiceAdmin swig_types[118]
-#define SWIGTYPE_p_p_IMsgStore swig_types[119]
-#define SWIGTYPE_p_p_IProfAdmin swig_types[120]
-#define SWIGTYPE_p_p_IProfSect swig_types[121]
-#define SWIGTYPE_p_p_IProviderAdmin swig_types[122]
-#define SWIGTYPE_p_p_ISequentialStream swig_types[123]
-#define SWIGTYPE_p_p_IStream swig_types[124]
-#define SWIGTYPE_p_p_IUnknown swig_types[125]
-#define SWIGTYPE_p_p_LPMAPINAMEID swig_types[126]
-#define SWIGTYPE_p_p_LPTSTR swig_types[127]
-#define SWIGTYPE_p_p_MAPIERROR swig_types[128]
-#define SWIGTYPE_p_p_MAPINotifSink swig_types[129]
-#define SWIGTYPE_p_p_char swig_types[130]
-#define SWIGTYPE_p_p_unsigned_char swig_types[131]
-#define SWIGTYPE_p_p_void swig_types[132]
-#define SWIGTYPE_p_tagLOCKTYPE swig_types[133]
-#define SWIGTYPE_p_tagSTATFLAG swig_types[134]
-#define SWIGTYPE_p_tagSTGTY swig_types[135]
-#define SWIGTYPE_p_tagSTREAM_SEEK swig_types[136]
-#define SWIGTYPE_p_unsigned_char swig_types[137]
-#define SWIGTYPE_p_unsigned_int swig_types[138]
-#define SWIGTYPE_p_wchar_t swig_types[139]
-static swig_type_info *swig_types[141];
-static swig_module_info swig_module = {swig_types, 140, 0, 0, 0, 0};
+#define SWIGTYPE_p_IProxyStoreObject swig_types[38]
+#define SWIGTYPE_p_ISequentialStream swig_types[39]
+#define SWIGTYPE_p_IStream swig_types[40]
+#define SWIGTYPE_p_IUnknown swig_types[41]
+#define SWIGTYPE_p_LARGE_INTEGER swig_types[42]
+#define SWIGTYPE_p_LONG swig_types[43]
+#define SWIGTYPE_p_LPADRENTRY swig_types[44]
+#define SWIGTYPE_p_LPADRLIST swig_types[45]
+#define SWIGTYPE_p_LPADRPARM swig_types[46]
+#define SWIGTYPE_p_LPBYTE swig_types[47]
+#define SWIGTYPE_p_LPCIID swig_types[48]
+#define SWIGTYPE_p_LPECCOMPANY swig_types[49]
+#define SWIGTYPE_p_LPECGROUP swig_types[50]
+#define SWIGTYPE_p_LPECQUOTA swig_types[51]
+#define SWIGTYPE_p_LPECQUOTASTATUS swig_types[52]
+#define SWIGTYPE_p_LPECSERVERLIST swig_types[53]
+#define SWIGTYPE_p_LPECSVRNAMELIST swig_types[54]
+#define SWIGTYPE_p_LPECUSER swig_types[55]
+#define SWIGTYPE_p_LPECUSERCLIENTUPDATESTATUS swig_types[56]
+#define SWIGTYPE_p_LPENTRYID swig_types[57]
+#define SWIGTYPE_p_LPENTRYLIST swig_types[58]
+#define SWIGTYPE_p_LPFNBUTTON swig_types[59]
+#define SWIGTYPE_p_LPFNDISMISS swig_types[60]
+#define SWIGTYPE_p_LPFlagList swig_types[61]
+#define SWIGTYPE_p_LPGUID swig_types[62]
+#define SWIGTYPE_p_LPMAPIADVISESINK swig_types[63]
+#define SWIGTYPE_p_LPMAPIERROR swig_types[64]
+#define SWIGTYPE_p_LPMAPIFOLDER swig_types[65]
+#define SWIGTYPE_p_LPMAPINAMEID swig_types[66]
+#define SWIGTYPE_p_LPMAPIPROP swig_types[67]
+#define SWIGTYPE_p_LPMAPITABLE swig_types[68]
+#define SWIGTYPE_p_LPMAPIUID swig_types[69]
+#define SWIGTYPE_p_LPMDB swig_types[70]
+#define SWIGTYPE_p_LPMESSAGE swig_types[71]
+#define SWIGTYPE_p_LPNOTIFICATION swig_types[72]
+#define SWIGTYPE_p_LPREADSTATE swig_types[73]
+#define SWIGTYPE_p_LPROWLIST swig_types[74]
+#define SWIGTYPE_p_LPSPropProblemArray swig_types[75]
+#define SWIGTYPE_p_LPSPropTagArray swig_types[76]
+#define SWIGTYPE_p_LPSPropValue swig_types[77]
+#define SWIGTYPE_p_LPSRestriction swig_types[78]
+#define SWIGTYPE_p_LPSRowSet swig_types[79]
+#define SWIGTYPE_p_LPSSortOrderSet swig_types[80]
+#define SWIGTYPE_p_LPSTR swig_types[81]
+#define SWIGTYPE_p_LPTSTR swig_types[82]
+#define SWIGTYPE_p_LPUNKNOWN swig_types[83]
+#define SWIGTYPE_p_LPVOID swig_types[84]
+#define SWIGTYPE_p_MAPIINIT_0 swig_types[85]
+#define SWIGTYPE_p_MAPINotifSink swig_types[86]
+#define SWIGTYPE_p_STATSTG swig_types[87]
+#define SWIGTYPE_p_ULARGE_INTEGER swig_types[88]
+#define SWIGTYPE_p_ULONG swig_types[89]
+#define SWIGTYPE_p_bool swig_types[90]
+#define SWIGTYPE_p_char swig_types[91]
+#define SWIGTYPE_p_p_IABContainer swig_types[92]
+#define SWIGTYPE_p_p_IAddrBook swig_types[93]
+#define SWIGTYPE_p_p_IAttach swig_types[94]
+#define SWIGTYPE_p_p_IDistList swig_types[95]
+#define SWIGTYPE_p_p_IECChangeAdviseSink swig_types[96]
+#define SWIGTYPE_p_p_IECChangeAdvisor swig_types[97]
+#define SWIGTYPE_p_p_IECExportChanges swig_types[98]
+#define SWIGTYPE_p_p_IECImportContentsChanges swig_types[99]
+#define SWIGTYPE_p_p_IECLicense swig_types[100]
+#define SWIGTYPE_p_p_IECMultiStoreTable swig_types[101]
+#define SWIGTYPE_p_p_IECServiceAdmin swig_types[102]
+#define SWIGTYPE_p_p_IECSingleInstance swig_types[103]
+#define SWIGTYPE_p_p_IECTestProtocol swig_types[104]
+#define SWIGTYPE_p_p_IExchangeExportChanges swig_types[105]
+#define SWIGTYPE_p_p_IExchangeImportContentsChanges swig_types[106]
+#define SWIGTYPE_p_p_IExchangeImportHierarchyChanges swig_types[107]
+#define SWIGTYPE_p_p_IExchangeManageStore swig_types[108]
+#define SWIGTYPE_p_p_IExchangeModifyTable swig_types[109]
+#define SWIGTYPE_p_p_IMAPIAdviseSink swig_types[110]
+#define SWIGTYPE_p_p_IMAPIContainer swig_types[111]
+#define SWIGTYPE_p_p_IMAPIFolder swig_types[112]
+#define SWIGTYPE_p_p_IMAPIProgress swig_types[113]
+#define SWIGTYPE_p_p_IMAPIProp swig_types[114]
+#define SWIGTYPE_p_p_IMAPISession swig_types[115]
+#define SWIGTYPE_p_p_IMAPIStatus swig_types[116]
+#define SWIGTYPE_p_p_IMAPITable swig_types[117]
+#define SWIGTYPE_p_p_IMailUser swig_types[118]
+#define SWIGTYPE_p_p_IMessage swig_types[119]
+#define SWIGTYPE_p_p_IMsgServiceAdmin swig_types[120]
+#define SWIGTYPE_p_p_IMsgStore swig_types[121]
+#define SWIGTYPE_p_p_IProfAdmin swig_types[122]
+#define SWIGTYPE_p_p_IProfSect swig_types[123]
+#define SWIGTYPE_p_p_IProviderAdmin swig_types[124]
+#define SWIGTYPE_p_p_IProxyStoreObject swig_types[125]
+#define SWIGTYPE_p_p_ISequentialStream swig_types[126]
+#define SWIGTYPE_p_p_IStream swig_types[127]
+#define SWIGTYPE_p_p_IUnknown swig_types[128]
+#define SWIGTYPE_p_p_LPMAPINAMEID swig_types[129]
+#define SWIGTYPE_p_p_LPTSTR swig_types[130]
+#define SWIGTYPE_p_p_MAPIERROR swig_types[131]
+#define SWIGTYPE_p_p_MAPINotifSink swig_types[132]
+#define SWIGTYPE_p_p_char swig_types[133]
+#define SWIGTYPE_p_p_unsigned_char swig_types[134]
+#define SWIGTYPE_p_p_void swig_types[135]
+#define SWIGTYPE_p_tagLOCKTYPE swig_types[136]
+#define SWIGTYPE_p_tagSTATFLAG swig_types[137]
+#define SWIGTYPE_p_tagSTGTY swig_types[138]
+#define SWIGTYPE_p_tagSTREAM_SEEK swig_types[139]
+#define SWIGTYPE_p_unsigned_char swig_types[140]
+#define SWIGTYPE_p_unsigned_int swig_types[141]
+#define SWIGTYPE_p_wchar_t swig_types[142]
+static swig_type_info *swig_types[144];
+static swig_module_info swig_module = {swig_types, 143, 0, 0, 0, 0};
 #define SWIG_TypeQuery(name) SWIG_TypeQueryModule(&swig_module, &swig_module, name)
 #define SWIG_MangledTypeQuery(name) SWIG_MangledTypeQueryModule(&swig_module, &swig_module, name)
 
@@ -2123,6 +2126,15 @@ SWIG_FromWCharPtr(const wchar_t *cptr)
 }
 
 SWIGINTERN void delete_IMsgStore(IMsgStore *self){ self->Release(); }
+SWIGINTERN void delete_IProxyStoreObject(IProxyStoreObject *self){ self->Release(); }
+SWIGINTERN HRESULT IProxyStoreObject_UnwrapNoRef(IProxyStoreObject *self,IUnknown **OUTPUT){
+            HRESULT hr = 0;
+            hr = self->UnwrapNoRef((LPVOID*)OUTPUT);
+            if(hr == 0)
+                (*OUTPUT)->AddRef();
+
+            return hr;          
+        }
 SWIGINTERN void delete_IMAPIFolder(IMAPIFolder *self){ self->Release(); }
 SWIGINTERN void delete_IMessage(IMessage *self){ self->Release(); }
 SWIGINTERN void delete_IAttach(IAttach *self){ self->Release(); }
@@ -2327,6 +2339,7 @@ swig_type_info *TypeFromIID(REFIID iid)
   TYPECASE(IECChangeAdviseSink)
   TYPECASE(IECSingleInstance)
   TYPECASE(IECLicense)
+  TYPECASE(IProxyStoreObject)
   return NULL;
 }
 
@@ -2357,6 +2370,7 @@ LPCIID IIDFromType(const char *type)
   IIDCASE(IECChangeAdviseSink)
   IIDCASE(IECSingleInstance)
   IIDCASE(IECLicense)
+  IIDCASE(IProxyStoreObject)
   return &IID_IUnknown;
 }
 
@@ -4477,12 +4491,11 @@ XS(_wrap_IMAPIAdviseSink_OnNotify) {
     int res1 = 0 ;
     unsigned int val2 ;
     int ecode2 = 0 ;
-    void *argp3 ;
-    int res3 = 0 ;
     int argvi = 0;
     ULONG result;
     dXSARGS;
     
+    arg3 = NULL;
     if ((items < 3) || (items > 3)) {
       SWIG_croak("Usage: IMAPIAdviseSink_OnNotify(self,cNotif,lpNotifications);");
     }
@@ -4497,24 +4510,28 @@ XS(_wrap_IMAPIAdviseSink_OnNotify) {
     } 
     arg2 = static_cast< ULONG >(val2);
     {
-      res3 = SWIG_ConvertPtr(ST(2), &argp3, SWIGTYPE_p_LPNOTIFICATION,  0 );
-      if (!SWIG_IsOK(res3)) {
-        SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IMAPIAdviseSink_OnNotify" "', argument " "3"" of type '" "LPNOTIFICATION""'"); 
-      }  
-      if (!argp3) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IMAPIAdviseSink_OnNotify" "', argument " "3"" of type '" "LPNOTIFICATION""'");
+      if(!SvOK(ST(2))) {
+        arg3 = NULL;
       } else {
-        arg3 = *(reinterpret_cast< LPNOTIFICATION * >(argp3));
+        arg3 = HV_to_LPNOTIFICATION((HV *)SvRV(ST(2)));
       }
     }
     result = (arg1)->OnNotify(arg2,arg3);
     ST(argvi) = SWIG_From_unsigned_SS_int  SWIG_PERL_CALL_ARGS_1(static_cast< unsigned int >(result)); argvi++ ;
     
     
+    {
+      if(arg3)
+      MAPIFreeBuffer(arg3);
+    }
     XSRETURN(argvi);
   fail:
     
     
+    {
+      if(arg3)
+      MAPIFreeBuffer(arg3);
+    }
     SWIG_croak_null();
   }
 }
@@ -5184,20 +5201,31 @@ XS(_wrap_IMsgStore_StoreLogoff) {
     void *argp1 = 0 ;
     int res1 = 0 ;
     ULONG temp2 ;
-    int res2 = SWIG_TMPOBJ ;
+    int res2 = 0 ;
     int argvi = 0;
+    SV * _saved[1] ;
     HRESULT result;
     dXSARGS;
     
-    arg2 = &temp2;
-    if ((items < 1) || (items > 1)) {
-      SWIG_croak("Usage: IMsgStore_StoreLogoff(self);");
+    if ((items < 2) || (items > 2)) {
+      SWIG_croak("Usage: IMsgStore_StoreLogoff(self,INOUT);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IMsgStore, 0 |  0 );
     if (!SWIG_IsOK(res1)) {
       SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IMsgStore_StoreLogoff" "', argument " "1"" of type '" "IMsgStore *""'"); 
     }
     arg1 = reinterpret_cast< IMsgStore * >(argp1);
+    if (!(SWIG_IsOK((res2 = SWIG_ConvertPtr(ST(1),SWIG_as_voidptrptr(&arg2),SWIGTYPE_p_ULONG,0))))) {
+      unsigned int val; 
+      int ecode = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(1), &val);
+      if (!SWIG_IsOK(ecode)) {
+        SWIG_exception_fail(SWIG_ArgError(ecode), "in method '" "IMsgStore_StoreLogoff" "', argument " "2"" of type '" "ULONG""'");
+      }
+      temp2 = static_cast< ULONG >(val);
+      arg2 = &temp2;
+      res2 = SWIG_AddTmpMask(ecode);
+    }
+    _saved[0] = ST(1);
     result = (arg1)->StoreLogoff(arg2);
     {
       if(FAILED(result)) {
@@ -5475,12 +5503,11 @@ XS(_wrap_IMsgStore_NotifyNewMail) {
     LPNOTIFICATION arg2 ;
     void *argp1 = 0 ;
     int res1 = 0 ;
-    void *argp2 ;
-    int res2 = 0 ;
     int argvi = 0;
     HRESULT result;
     dXSARGS;
     
+    arg2 = NULL;
     if ((items < 2) || (items > 2)) {
       SWIG_croak("Usage: IMsgStore_NotifyNewMail(self,lpNotification);");
     }
@@ -5490,14 +5517,10 @@ XS(_wrap_IMsgStore_NotifyNewMail) {
     }
     arg1 = reinterpret_cast< IMsgStore * >(argp1);
     {
-      res2 = SWIG_ConvertPtr(ST(1), &argp2, SWIGTYPE_p_LPNOTIFICATION,  0 );
-      if (!SWIG_IsOK(res2)) {
-        SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IMsgStore_NotifyNewMail" "', argument " "2"" of type '" "LPNOTIFICATION""'"); 
-      }  
-      if (!argp2) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IMsgStore_NotifyNewMail" "', argument " "2"" of type '" "LPNOTIFICATION""'");
+      if(!SvOK(ST(1))) {
+        arg2 = NULL;
       } else {
-        arg2 = *(reinterpret_cast< LPNOTIFICATION * >(argp2));
+        arg2 = HV_to_LPNOTIFICATION((HV *)SvRV(ST(1)));
       }
     }
     result = (arg1)->NotifyNewMail(arg2);
@@ -5507,9 +5530,17 @@ XS(_wrap_IMsgStore_NotifyNewMail) {
       }
     }
     
+    {
+      if(arg2)
+      MAPIFreeBuffer(arg2);
+    }
     XSRETURN(argvi);
   fail:
     
+    {
+      if(arg2)
+      MAPIFreeBuffer(arg2);
+    }
     SWIG_croak_null();
   }
 }
@@ -5536,6 +5567,137 @@ XS(_wrap_delete_IMsgStore) {
     
     XSRETURN(argvi);
   fail:
+    
+    SWIG_croak_null();
+  }
+}
+
+
+XS(_wrap_IProxyStoreObject_PlaceHolder1) {
+  {
+    IProxyStoreObject *arg1 = (IProxyStoreObject *) 0 ;
+    void *argp1 = 0 ;
+    int res1 = 0 ;
+    int argvi = 0;
+    HRESULT result;
+    dXSARGS;
+    
+    if ((items < 1) || (items > 1)) {
+      SWIG_croak("Usage: IProxyStoreObject_PlaceHolder1(self);");
+    }
+    res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IProxyStoreObject, 0 |  0 );
+    if (!SWIG_IsOK(res1)) {
+      SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IProxyStoreObject_PlaceHolder1" "', argument " "1"" of type '" "IProxyStoreObject *""'"); 
+    }
+    arg1 = reinterpret_cast< IProxyStoreObject * >(argp1);
+    result = (arg1)->PlaceHolder1();
+    {
+      if(FAILED(result)) {
+        Do_Exception(result);
+      }
+    }
+    
+    XSRETURN(argvi);
+  fail:
+    
+    SWIG_croak_null();
+  }
+}
+
+
+XS(_wrap_IProxyStoreObject_PlaceHolder2) {
+  {
+    IProxyStoreObject *arg1 = (IProxyStoreObject *) 0 ;
+    void *argp1 = 0 ;
+    int res1 = 0 ;
+    int argvi = 0;
+    HRESULT result;
+    dXSARGS;
+    
+    if ((items < 1) || (items > 1)) {
+      SWIG_croak("Usage: IProxyStoreObject_PlaceHolder2(self);");
+    }
+    res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IProxyStoreObject, 0 |  0 );
+    if (!SWIG_IsOK(res1)) {
+      SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IProxyStoreObject_PlaceHolder2" "', argument " "1"" of type '" "IProxyStoreObject *""'"); 
+    }
+    arg1 = reinterpret_cast< IProxyStoreObject * >(argp1);
+    result = (arg1)->PlaceHolder2();
+    {
+      if(FAILED(result)) {
+        Do_Exception(result);
+      }
+    }
+    
+    XSRETURN(argvi);
+  fail:
+    
+    SWIG_croak_null();
+  }
+}
+
+
+XS(_wrap_delete_IProxyStoreObject) {
+  {
+    IProxyStoreObject *arg1 = (IProxyStoreObject *) 0 ;
+    void *argp1 = 0 ;
+    int res1 = 0 ;
+    int argvi = 0;
+    dXSARGS;
+    
+    if ((items < 1) || (items > 1)) {
+      SWIG_croak("Usage: delete_IProxyStoreObject(self);");
+    }
+    res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IProxyStoreObject, SWIG_POINTER_DISOWN |  0 );
+    if (!SWIG_IsOK(res1)) {
+      SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_IProxyStoreObject" "', argument " "1"" of type '" "IProxyStoreObject *""'"); 
+    }
+    arg1 = reinterpret_cast< IProxyStoreObject * >(argp1);
+    delete_IProxyStoreObject(arg1);
+    
+    
+    XSRETURN(argvi);
+  fail:
+    
+    SWIG_croak_null();
+  }
+}
+
+
+XS(_wrap_IProxyStoreObject_UnwrapNoRef) {
+  {
+    IProxyStoreObject *arg1 = (IProxyStoreObject *) 0 ;
+    IUnknown **arg2 = (IUnknown **) 0 ;
+    void *argp1 = 0 ;
+    int res1 = 0 ;
+    IUnknown *temp2 ;
+    int argvi = 0;
+    HRESULT result;
+    dXSARGS;
+    
+    temp2 = NULL; arg2 = &temp2;
+    if ((items < 1) || (items > 1)) {
+      SWIG_croak("Usage: IProxyStoreObject_UnwrapNoRef(self);");
+    }
+    res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IProxyStoreObject, 0 |  0 );
+    if (!SWIG_IsOK(res1)) {
+      SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IProxyStoreObject_UnwrapNoRef" "', argument " "1"" of type '" "IProxyStoreObject *""'"); 
+    }
+    arg1 = reinterpret_cast< IProxyStoreObject * >(argp1);
+    result = IProxyStoreObject_UnwrapNoRef(arg1,arg2);
+    {
+      if(FAILED(result)) {
+        Do_Exception(result);
+      }
+    }
+    {
+      if (argvi >= items) EXTEND(sp,1);  ST(argvi) = SWIG_NewPointerObj((void*)*(arg2), SWIGTYPE_p_IUnknown, SWIG_SHADOW | SWIG_OWNER); argvi++  ;
+    }
+    
+    
+    XSRETURN(argvi);
+  fail:
+    
     
     SWIG_croak_null();
   }
@@ -6964,7 +7126,7 @@ XS(_wrap_IMessage_ModifyRecipients) {
     ULONG ulFlags = 0;
     arg3 = NULL;
     if ((items < 3) || (items > 3)) {
-      SWIG_croak("Usage: IMessage_ModifyRecipients(self,ulFlags,lpMods);");
+      SWIG_croak("Usage: IMessage_ModifyRecipients(self,ulFlags,INPUT);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IMessage, 0 |  0 );
     if (!SWIG_IsOK(res1)) {
@@ -6995,16 +7157,14 @@ XS(_wrap_IMessage_ModifyRecipients) {
     
     
     {
-      if(arg3)
-      MAPIFreeBuffer(arg3);
+      FreeProws((LPSRowSet)arg3);
     }
     XSRETURN(argvi);
   fail:
     
     
     {
-      if(arg3)
-      MAPIFreeBuffer(arg3);
+      FreeProws((LPSRowSet)arg3);
     }
     SWIG_croak_null();
   }
@@ -7449,8 +7609,7 @@ XS(_wrap_IABContainer_ResolveNames) {
     }
     
     {
-      if(arg4)
-      MAPIFreeBuffer(arg4);
+      FreeProws((LPSRowSet)arg4);
     }
     {
       if(arg5)
@@ -7465,8 +7624,7 @@ XS(_wrap_IABContainer_ResolveNames) {
     }
     
     {
-      if(arg4)
-      MAPIFreeBuffer(arg4);
+      FreeProws((LPSRowSet)arg4);
     }
     {
       if(arg5)
@@ -7823,8 +7981,7 @@ XS(_wrap_IDistList_ResolveNames) {
     }
     
     {
-      if(arg4)
-      MAPIFreeBuffer(arg4);
+      FreeProws((LPSRowSet)arg4);
     }
     {
       if(arg5)
@@ -7839,8 +7996,7 @@ XS(_wrap_IDistList_ResolveNames) {
     }
     
     {
-      if(arg4)
-      MAPIFreeBuffer(arg4);
+      FreeProws((LPSRowSet)arg4);
     }
     {
       if(arg5)
@@ -13130,8 +13286,7 @@ XS(_wrap_IAddrBook_ResolveName) {
       
     }
     {
-      if(arg5)
-      MAPIFreeBuffer(arg5);
+      FreeProws((LPSRowSet)arg5);
     }
     XSRETURN(argvi);
   fail:
@@ -13142,8 +13297,7 @@ XS(_wrap_IAddrBook_ResolveName) {
       
     }
     {
-      if(arg5)
-      MAPIFreeBuffer(arg5);
+      FreeProws((LPSRowSet)arg5);
     }
     SWIG_croak_null();
   }
@@ -13850,7 +14004,7 @@ XS(_wrap_IAddrBook_SetSearchPath) {
     
     ULONG ulFlags = 0;
     if ((items < 3) || (items > 3)) {
-      SWIG_croak("Usage: IAddrBook_SetSearchPath(self,ulFlags,lpSearchPath);");
+      SWIG_croak("Usage: IAddrBook_SetSearchPath(self,ulFlags,INPUT);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IAddrBook, 0 |  0 );
     if (!SWIG_IsOK(res1)) {
@@ -13884,10 +14038,16 @@ XS(_wrap_IAddrBook_SetSearchPath) {
     }
     
     
+    {
+      FreeProws((LPSRowSet)arg3);
+    }
     XSRETURN(argvi);
   fail:
     
     
+    {
+      FreeProws((LPSRowSet)arg3);
+    }
     SWIG_croak_null();
   }
 }
@@ -13953,8 +14113,7 @@ XS(_wrap_IAddrBook_PrepareRecips) {
       MAPIFreeBuffer(arg3);
     }
     {
-      if(arg4)
-      MAPIFreeBuffer(arg4);
+      FreeProws((LPSRowSet)arg4);
     }
     XSRETURN(argvi);
   fail:
@@ -13965,8 +14124,7 @@ XS(_wrap_IAddrBook_PrepareRecips) {
       MAPIFreeBuffer(arg3);
     }
     {
-      if(arg4)
-      MAPIFreeBuffer(arg4);
+      FreeProws((LPSRowSet)arg4);
     }
     SWIG_croak_null();
   }
@@ -17719,10 +17877,10 @@ XS(_wrap_IExchangeManageStore_GetRights) {
     ULONG *arg6 = (ULONG *) 0 ;
     void *argp1 = 0 ;
     int res1 = 0 ;
-    unsigned int val2 ;
-    int ecode2 = 0 ;
-    void *argp3 ;
-    int res3 = 0 ;
+    int res2 ;
+    char *buf2 = 0 ;
+    size_t size2 ;
+    int alloc2 = 0 ;
     int res4 ;
     char *buf4 = 0 ;
     size_t size4 ;
@@ -17734,7 +17892,7 @@ XS(_wrap_IExchangeManageStore_GetRights) {
     dXSARGS;
     
     arg6 = &temp6;
-    if ((items < 4) || (items > 4)) {
+    if ((items < 3) || (items > 3)) {
       SWIG_croak("Usage: IExchangeManageStore_GetRights(self,cbUserEntryID,lpUserEntryID,cbEntryID,lpEntryID);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IExchangeManageStore, 0 |  0 );
@@ -17742,24 +17900,21 @@ XS(_wrap_IExchangeManageStore_GetRights) {
       SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IExchangeManageStore_GetRights" "', argument " "1"" of type '" "IExchangeManageStore *""'"); 
     }
     arg1 = reinterpret_cast< IExchangeManageStore * >(argp1);
-    ecode2 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(1), &val2);
-    if (!SWIG_IsOK(ecode2)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IExchangeManageStore_GetRights" "', argument " "2"" of type '" "ULONG""'");
-    } 
-    arg2 = static_cast< ULONG >(val2);
     {
-      res3 = SWIG_ConvertPtr(ST(2), &argp3, SWIGTYPE_p_LPENTRYID,  0 );
-      if (!SWIG_IsOK(res3)) {
-        SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IExchangeManageStore_GetRights" "', argument " "3"" of type '" "LPENTRYID""'"); 
-      }  
-      if (!argp3) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IExchangeManageStore_GetRights" "', argument " "3"" of type '" "LPENTRYID""'");
+      res2 = SWIG_AsCharPtrAndSize(ST(1), &buf2, &size2, &alloc2);
+      if (!SWIG_IsOK(res2)) {
+        SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IExchangeManageStore_GetRights" "', argument " "2"" of type '" "ULONG""'");
+      }
+      if(buf2 == NULL) {
+        arg2 = 0;
+        arg3 = NULL;
       } else {
-        arg3 = *(reinterpret_cast< LPENTRYID * >(argp3));
+        arg2 = static_cast< ULONG >(size2 - 1);
+        arg3 = reinterpret_cast< LPENTRYID >(buf2);
       }
     }
     {
-      res4 = SWIG_AsCharPtrAndSize(ST(3), &buf4, &size4, &alloc4);
+      res4 = SWIG_AsCharPtrAndSize(ST(2), &buf4, &size4, &alloc4);
       if (!SWIG_IsOK(res4)) {
         SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IExchangeManageStore_GetRights" "', argument " "4"" of type '" "ULONG""'");
       }
@@ -17784,7 +17939,9 @@ XS(_wrap_IExchangeManageStore_GetRights) {
       if (argvi >= items) EXTEND(sp,1);  ST(argvi) = SWIG_NewPointerObj((void*)(arg6), SWIGTYPE_p_ULONG, new_flags); argvi++  ;
     }
     
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     {
       if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
     }
@@ -17792,7 +17949,9 @@ XS(_wrap_IExchangeManageStore_GetRights) {
     XSRETURN(argvi);
   fail:
     
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     {
       if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
     }
@@ -19342,15 +19501,15 @@ XS(_wrap_IECServiceAdmin_AddSendAsUser) {
     char *buf2 = 0 ;
     size_t size2 ;
     int alloc2 = 0 ;
-    unsigned int val4 ;
-    int ecode4 = 0 ;
-    void *argp5 ;
-    int res5 = 0 ;
+    int res4 ;
+    char *buf4 = 0 ;
+    size_t size4 ;
+    int alloc4 = 0 ;
     int argvi = 0;
     HRESULT result;
     dXSARGS;
     
-    if ((items < 4) || (items > 4)) {
+    if ((items < 3) || (items > 3)) {
       SWIG_croak("Usage: IECServiceAdmin_AddSendAsUser(self,cbUserId,lpUserId,cbSenderId,lpSenderId);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
@@ -19371,20 +19530,17 @@ XS(_wrap_IECServiceAdmin_AddSendAsUser) {
         arg3 = reinterpret_cast< LPENTRYID >(buf2);
       }
     }
-    ecode4 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(2), &val4);
-    if (!SWIG_IsOK(ecode4)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECServiceAdmin_AddSendAsUser" "', argument " "4"" of type '" "ULONG""'");
-    } 
-    arg4 = static_cast< ULONG >(val4);
     {
-      res5 = SWIG_ConvertPtr(ST(3), &argp5, SWIGTYPE_p_LPENTRYID,  0 );
-      if (!SWIG_IsOK(res5)) {
-        SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "IECServiceAdmin_AddSendAsUser" "', argument " "5"" of type '" "LPENTRYID""'"); 
-      }  
-      if (!argp5) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_AddSendAsUser" "', argument " "5"" of type '" "LPENTRYID""'");
+      res4 = SWIG_AsCharPtrAndSize(ST(2), &buf4, &size4, &alloc4);
+      if (!SWIG_IsOK(res4)) {
+        SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_AddSendAsUser" "', argument " "4"" of type '" "ULONG""'");
+      }
+      if(buf4 == NULL) {
+        arg4 = 0;
+        arg5 = NULL;
       } else {
-        arg5 = *(reinterpret_cast< LPENTRYID * >(argp5));
+        arg4 = static_cast< ULONG >(size4 - 1);
+        arg5 = reinterpret_cast< LPENTRYID >(buf4);
       }
     }
     result = (arg1)->AddSendAsUser(arg2,arg3,arg4,arg5);
@@ -19397,14 +19553,18 @@ XS(_wrap_IECServiceAdmin_AddSendAsUser) {
     {
       if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
     }
-    
+    {
+      if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
+    }
     XSRETURN(argvi);
   fail:
     
     {
       if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
     }
-    
+    {
+      if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
+    }
     SWIG_croak_null();
   }
 }
@@ -19423,15 +19583,15 @@ XS(_wrap_IECServiceAdmin_DelSendAsUser) {
     char *buf2 = 0 ;
     size_t size2 ;
     int alloc2 = 0 ;
-    unsigned int val4 ;
-    int ecode4 = 0 ;
-    void *argp5 ;
-    int res5 = 0 ;
+    int res4 ;
+    char *buf4 = 0 ;
+    size_t size4 ;
+    int alloc4 = 0 ;
     int argvi = 0;
     HRESULT result;
     dXSARGS;
     
-    if ((items < 4) || (items > 4)) {
+    if ((items < 3) || (items > 3)) {
       SWIG_croak("Usage: IECServiceAdmin_DelSendAsUser(self,cbUserId,lpUserId,cbSenderId,lpSenderId);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
@@ -19452,20 +19612,17 @@ XS(_wrap_IECServiceAdmin_DelSendAsUser) {
         arg3 = reinterpret_cast< LPENTRYID >(buf2);
       }
     }
-    ecode4 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(2), &val4);
-    if (!SWIG_IsOK(ecode4)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECServiceAdmin_DelSendAsUser" "', argument " "4"" of type '" "ULONG""'");
-    } 
-    arg4 = static_cast< ULONG >(val4);
     {
-      res5 = SWIG_ConvertPtr(ST(3), &argp5, SWIGTYPE_p_LPENTRYID,  0 );
-      if (!SWIG_IsOK(res5)) {
-        SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "IECServiceAdmin_DelSendAsUser" "', argument " "5"" of type '" "LPENTRYID""'"); 
-      }  
-      if (!argp5) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_DelSendAsUser" "', argument " "5"" of type '" "LPENTRYID""'");
+      res4 = SWIG_AsCharPtrAndSize(ST(2), &buf4, &size4, &alloc4);
+      if (!SWIG_IsOK(res4)) {
+        SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_DelSendAsUser" "', argument " "4"" of type '" "ULONG""'");
+      }
+      if(buf4 == NULL) {
+        arg4 = 0;
+        arg5 = NULL;
       } else {
-        arg5 = *(reinterpret_cast< LPENTRYID * >(argp5));
+        arg4 = static_cast< ULONG >(size4 - 1);
+        arg5 = reinterpret_cast< LPENTRYID >(buf4);
       }
     }
     result = (arg1)->DelSendAsUser(arg2,arg3,arg4,arg5);
@@ -19478,7 +19635,92 @@ XS(_wrap_IECServiceAdmin_DelSendAsUser) {
     {
       if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
     }
+    {
+      if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
+    }
+    XSRETURN(argvi);
+  fail:
     
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
+    {
+      if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
+    }
+    SWIG_croak_null();
+  }
+}
+
+
+XS(_wrap_IECServiceAdmin_GetUserClientUpdateStatus) {
+  {
+    IECServiceAdmin *arg1 = (IECServiceAdmin *) 0 ;
+    ULONG arg2 ;
+    LPENTRYID arg3 ;
+    ULONG arg4 ;
+    LPECUSERCLIENTUPDATESTATUS *arg5 = (LPECUSERCLIENTUPDATESTATUS *) 0 ;
+    void *argp1 = 0 ;
+    int res1 = 0 ;
+    int res2 ;
+    char *buf2 = 0 ;
+    size_t size2 ;
+    int alloc2 = 0 ;
+    unsigned int fl4 ;
+    int ecode4 ;
+    LPECUSERCLIENTUPDATESTATUS temp5 ;
+    int argvi = 0;
+    HRESULT result;
+    dXSARGS;
+    
+    ULONG ulFlags = 0;
+    temp5 = NULL; arg5 = &temp5;
+    if ((items < 3) || (items > 3)) {
+      SWIG_croak("Usage: IECServiceAdmin_GetUserClientUpdateStatus(self,cbUserId,lpUserId,ulFlags);");
+    }
+    res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
+    if (!SWIG_IsOK(res1)) {
+      SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_GetUserClientUpdateStatus" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
+    }
+    arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
+    {
+      res2 = SWIG_AsCharPtrAndSize(ST(1), &buf2, &size2, &alloc2);
+      if (!SWIG_IsOK(res2)) {
+        SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_GetUserClientUpdateStatus" "', argument " "2"" of type '" "ULONG""'");
+      }
+      if(buf2 == NULL) {
+        arg2 = 0;
+        arg3 = NULL;
+      } else {
+        arg2 = static_cast< ULONG >(size2 - 1);
+        arg3 = reinterpret_cast< LPENTRYID >(buf2);
+      }
+    }
+    {
+      ecode4 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(2), &fl4);
+      if (!SWIG_IsOK(ecode4)) {
+        SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECServiceAdmin_GetUserClientUpdateStatus" "', argument " "4"" of type '" "ULONG""'");
+      } 
+      arg4 = fl4;
+      ulFlags = fl4;
+    }
+    result = (arg1)->GetUserClientUpdateStatus(arg2,arg3,arg4,arg5);
+    {
+      if(FAILED(result)) {
+        Do_Exception(result);
+      }
+    }
+    {
+      if (argvi >= items) EXTEND(sp,1);  ST(argvi) = sv_2mortal(newRV_noinc((SV *)HV_from_LPECUSERCLIENTUPDATESTATUS(*(arg5)))); argvi++  ;
+    }
+    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
+    
+    {
+      if(*arg5)
+      MAPIFreeBuffer(*arg5);
+    }
     XSRETURN(argvi);
   fail:
     
@@ -19486,6 +19728,67 @@ XS(_wrap_IECServiceAdmin_DelSendAsUser) {
       if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
     }
     
+    {
+      if(*arg5)
+      MAPIFreeBuffer(*arg5);
+    }
+    SWIG_croak_null();
+  }
+}
+
+
+XS(_wrap_IECServiceAdmin_RemoveAllObjects) {
+  {
+    IECServiceAdmin *arg1 = (IECServiceAdmin *) 0 ;
+    ULONG arg2 ;
+    LPENTRYID arg3 ;
+    void *argp1 = 0 ;
+    int res1 = 0 ;
+    int res2 ;
+    char *buf2 = 0 ;
+    size_t size2 ;
+    int alloc2 = 0 ;
+    int argvi = 0;
+    HRESULT result;
+    dXSARGS;
+    
+    if ((items < 2) || (items > 2)) {
+      SWIG_croak("Usage: IECServiceAdmin_RemoveAllObjects(self,cbUserId,lpUserId);");
+    }
+    res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
+    if (!SWIG_IsOK(res1)) {
+      SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_RemoveAllObjects" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
+    }
+    arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
+    {
+      res2 = SWIG_AsCharPtrAndSize(ST(1), &buf2, &size2, &alloc2);
+      if (!SWIG_IsOK(res2)) {
+        SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_RemoveAllObjects" "', argument " "2"" of type '" "ULONG""'");
+      }
+      if(buf2 == NULL) {
+        arg2 = 0;
+        arg3 = NULL;
+      } else {
+        arg2 = static_cast< ULONG >(size2 - 1);
+        arg3 = reinterpret_cast< LPENTRYID >(buf2);
+      }
+    }
+    result = (arg1)->RemoveAllObjects(arg2,arg3);
+    {
+      if(FAILED(result)) {
+        Do_Exception(result);
+      }
+    }
+    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
+    XSRETURN(argvi);
+  fail:
+    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     SWIG_croak_null();
   }
 }
@@ -19510,6 +19813,7 @@ XS(_wrap_IECServiceAdmin_CreateGroup) {
     HRESULT result;
     dXSARGS;
     
+    arg2 = NULL;
     ULONG ulFlags = 0;
     {
       arg4 = &cbEntryID4; arg5 = &lpEntryID4;
@@ -19553,6 +19857,10 @@ XS(_wrap_IECServiceAdmin_CreateGroup) {
       }
     }
     
+    {
+      if(arg2)
+      MAPIFreeBuffer(arg2);
+    }
     
     {
       if(*arg5)
@@ -19561,6 +19869,10 @@ XS(_wrap_IECServiceAdmin_CreateGroup) {
     XSRETURN(argvi);
   fail:
     
+    {
+      if(arg2)
+      MAPIFreeBuffer(arg2);
+    }
     
     {
       if(*arg5)
@@ -19578,15 +19890,15 @@ XS(_wrap_IECServiceAdmin_DeleteGroup) {
     LPENTRYID arg3 ;
     void *argp1 = 0 ;
     int res1 = 0 ;
-    unsigned int val2 ;
-    int ecode2 = 0 ;
-    void *argp3 ;
-    int res3 = 0 ;
+    int res2 ;
+    char *buf2 = 0 ;
+    size_t size2 ;
+    int alloc2 = 0 ;
     int argvi = 0;
     HRESULT result;
     dXSARGS;
     
-    if ((items < 3) || (items > 3)) {
+    if ((items < 2) || (items > 2)) {
       SWIG_croak("Usage: IECServiceAdmin_DeleteGroup(self,cbGroupId,lpGroupId);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
@@ -19594,20 +19906,17 @@ XS(_wrap_IECServiceAdmin_DeleteGroup) {
       SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_DeleteGroup" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
     }
     arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-    ecode2 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(1), &val2);
-    if (!SWIG_IsOK(ecode2)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_DeleteGroup" "', argument " "2"" of type '" "ULONG""'");
-    } 
-    arg2 = static_cast< ULONG >(val2);
     {
-      res3 = SWIG_ConvertPtr(ST(2), &argp3, SWIGTYPE_p_LPENTRYID,  0 );
-      if (!SWIG_IsOK(res3)) {
-        SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_DeleteGroup" "', argument " "3"" of type '" "LPENTRYID""'"); 
-      }  
-      if (!argp3) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_DeleteGroup" "', argument " "3"" of type '" "LPENTRYID""'");
+      res2 = SWIG_AsCharPtrAndSize(ST(1), &buf2, &size2, &alloc2);
+      if (!SWIG_IsOK(res2)) {
+        SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_DeleteGroup" "', argument " "2"" of type '" "ULONG""'");
+      }
+      if(buf2 == NULL) {
+        arg2 = 0;
+        arg3 = NULL;
       } else {
-        arg3 = *(reinterpret_cast< LPENTRYID * >(argp3));
+        arg2 = static_cast< ULONG >(size2 - 1);
+        arg3 = reinterpret_cast< LPENTRYID >(buf2);
       }
     }
     result = (arg1)->DeleteGroup(arg2,arg3);
@@ -19617,11 +19926,15 @@ XS(_wrap_IECServiceAdmin_DeleteGroup) {
       }
     }
     
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     XSRETURN(argvi);
   fail:
     
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     SWIG_croak_null();
   }
 }
@@ -19642,6 +19955,7 @@ XS(_wrap_IECServiceAdmin_SetGroup) {
     HRESULT result;
     dXSARGS;
     
+    arg2 = NULL;
     ULONG ulFlags = 0;
     if ((items < 3) || (items > 3)) {
       SWIG_croak("Usage: IECServiceAdmin_SetGroup(self,lpECGroup,ulFlags);");
@@ -19677,10 +19991,18 @@ XS(_wrap_IECServiceAdmin_SetGroup) {
       }
     }
     
+    {
+      if(arg2)
+      MAPIFreeBuffer(arg2);
+    }
     
     XSRETURN(argvi);
   fail:
     
+    {
+      if(arg2)
+      MAPIFreeBuffer(arg2);
+    }
     
     SWIG_croak_null();
   }
@@ -19696,72 +20018,77 @@ XS(_wrap_IECServiceAdmin_GetGroup) {
     LPECGROUP *arg5 = (LPECGROUP *) 0 ;
     void *argp1 = 0 ;
     int res1 = 0 ;
-    unsigned int val2 ;
-    int ecode2 = 0 ;
-    void *argp3 ;
-    int res3 = 0 ;
+    int res2 ;
+    char *buf2 = 0 ;
+    size_t size2 ;
+    int alloc2 = 0 ;
     unsigned int fl4 ;
     int ecode4 ;
-    void *argp5 = 0 ;
-    int res5 = 0 ;
+    LPECGROUP temp5 ;
     int argvi = 0;
     HRESULT result;
     dXSARGS;
     
     ULONG ulFlags = 0;
-    if ((items < 5) || (items > 5)) {
-      SWIG_croak("Usage: IECServiceAdmin_GetGroup(self,cbGroupId,lpGroupId,ulFlags,lppECGroup);");
+    temp5 = NULL; arg5 = &temp5;
+    if ((items < 3) || (items > 3)) {
+      SWIG_croak("Usage: IECServiceAdmin_GetGroup(self,cbGroupId,lpGroupId,ulFlags);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
     if (!SWIG_IsOK(res1)) {
       SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_GetGroup" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
     }
     arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-    ecode2 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(1), &val2);
-    if (!SWIG_IsOK(ecode2)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_GetGroup" "', argument " "2"" of type '" "ULONG""'");
-    } 
-    arg2 = static_cast< ULONG >(val2);
     {
-      res3 = SWIG_ConvertPtr(ST(2), &argp3, SWIGTYPE_p_LPENTRYID,  0 );
-      if (!SWIG_IsOK(res3)) {
-        SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_GetGroup" "', argument " "3"" of type '" "LPENTRYID""'"); 
-      }  
-      if (!argp3) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_GetGroup" "', argument " "3"" of type '" "LPENTRYID""'");
+      res2 = SWIG_AsCharPtrAndSize(ST(1), &buf2, &size2, &alloc2);
+      if (!SWIG_IsOK(res2)) {
+        SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_GetGroup" "', argument " "2"" of type '" "ULONG""'");
+      }
+      if(buf2 == NULL) {
+        arg2 = 0;
+        arg3 = NULL;
       } else {
-        arg3 = *(reinterpret_cast< LPENTRYID * >(argp3));
+        arg2 = static_cast< ULONG >(size2 - 1);
+        arg3 = reinterpret_cast< LPENTRYID >(buf2);
       }
     }
     {
-      ecode4 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(3), &fl4);
+      ecode4 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(2), &fl4);
       if (!SWIG_IsOK(ecode4)) {
         SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECServiceAdmin_GetGroup" "', argument " "4"" of type '" "ULONG""'");
       } 
       arg4 = fl4;
       ulFlags = fl4;
     }
-    res5 = SWIG_ConvertPtr(ST(4), &argp5,SWIGTYPE_p_LPECGROUP, 0 |  0 );
-    if (!SWIG_IsOK(res5)) {
-      SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "IECServiceAdmin_GetGroup" "', argument " "5"" of type '" "LPECGROUP *""'"); 
-    }
-    arg5 = reinterpret_cast< LPECGROUP * >(argp5);
     result = (arg1)->GetGroup(arg2,arg3,arg4,arg5);
     {
       if(FAILED(result)) {
         Do_Exception(result);
       }
     }
+    {
+      if (argvi >= items) EXTEND(sp,1);  ST(argvi) = sv_2mortal(newRV_noinc((SV *)HV_from_LPECGROUP(*(arg5)))); argvi++  ;
+    }
     
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     
-    
-    
+    {
+      if(*arg5)
+      MAPIFreeBuffer(*arg5);
+    }
     XSRETURN(argvi);
   fail:
     
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     
-    
-    
+    {
+      if(*arg5)
+      MAPIFreeBuffer(*arg5);
+    }
     SWIG_croak_null();
   }
 }
@@ -19962,10 +20289,10 @@ XS(_wrap_IECServiceAdmin_DeleteGroupUser) {
     LPENTRYID arg5 ;
     void *argp1 = 0 ;
     int res1 = 0 ;
-    unsigned int val2 ;
-    int ecode2 = 0 ;
-    void *argp3 ;
-    int res3 = 0 ;
+    int res2 ;
+    char *buf2 = 0 ;
+    size_t size2 ;
+    int alloc2 = 0 ;
     int res4 ;
     char *buf4 = 0 ;
     size_t size4 ;
@@ -19974,7 +20301,7 @@ XS(_wrap_IECServiceAdmin_DeleteGroupUser) {
     HRESULT result;
     dXSARGS;
     
-    if ((items < 4) || (items > 4)) {
+    if ((items < 3) || (items > 3)) {
       SWIG_croak("Usage: IECServiceAdmin_DeleteGroupUser(self,cbGroupId,lpGroupId,cbUserId,lpUserId);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
@@ -19982,24 +20309,21 @@ XS(_wrap_IECServiceAdmin_DeleteGroupUser) {
       SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_DeleteGroupUser" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
     }
     arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-    ecode2 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(1), &val2);
-    if (!SWIG_IsOK(ecode2)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_DeleteGroupUser" "', argument " "2"" of type '" "ULONG""'");
-    } 
-    arg2 = static_cast< ULONG >(val2);
     {
-      res3 = SWIG_ConvertPtr(ST(2), &argp3, SWIGTYPE_p_LPENTRYID,  0 );
-      if (!SWIG_IsOK(res3)) {
-        SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_DeleteGroupUser" "', argument " "3"" of type '" "LPENTRYID""'"); 
-      }  
-      if (!argp3) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_DeleteGroupUser" "', argument " "3"" of type '" "LPENTRYID""'");
+      res2 = SWIG_AsCharPtrAndSize(ST(1), &buf2, &size2, &alloc2);
+      if (!SWIG_IsOK(res2)) {
+        SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_DeleteGroupUser" "', argument " "2"" of type '" "ULONG""'");
+      }
+      if(buf2 == NULL) {
+        arg2 = 0;
+        arg3 = NULL;
       } else {
-        arg3 = *(reinterpret_cast< LPENTRYID * >(argp3));
+        arg2 = static_cast< ULONG >(size2 - 1);
+        arg3 = reinterpret_cast< LPENTRYID >(buf2);
       }
     }
     {
-      res4 = SWIG_AsCharPtrAndSize(ST(3), &buf4, &size4, &alloc4);
+      res4 = SWIG_AsCharPtrAndSize(ST(2), &buf4, &size4, &alloc4);
       if (!SWIG_IsOK(res4)) {
         SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_DeleteGroupUser" "', argument " "4"" of type '" "ULONG""'");
       }
@@ -20018,14 +20342,18 @@ XS(_wrap_IECServiceAdmin_DeleteGroupUser) {
       }
     }
     
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     {
       if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
     }
     XSRETURN(argvi);
   fail:
     
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     {
       if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
     }
@@ -20043,10 +20371,10 @@ XS(_wrap_IECServiceAdmin_AddGroupUser) {
     LPENTRYID arg5 ;
     void *argp1 = 0 ;
     int res1 = 0 ;
-    unsigned int val2 ;
-    int ecode2 = 0 ;
-    void *argp3 ;
-    int res3 = 0 ;
+    int res2 ;
+    char *buf2 = 0 ;
+    size_t size2 ;
+    int alloc2 = 0 ;
     int res4 ;
     char *buf4 = 0 ;
     size_t size4 ;
@@ -20055,7 +20383,7 @@ XS(_wrap_IECServiceAdmin_AddGroupUser) {
     HRESULT result;
     dXSARGS;
     
-    if ((items < 4) || (items > 4)) {
+    if ((items < 3) || (items > 3)) {
       SWIG_croak("Usage: IECServiceAdmin_AddGroupUser(self,cbGroupId,lpGroupId,cbUserId,lpUserId);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
@@ -20063,24 +20391,21 @@ XS(_wrap_IECServiceAdmin_AddGroupUser) {
       SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_AddGroupUser" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
     }
     arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-    ecode2 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(1), &val2);
-    if (!SWIG_IsOK(ecode2)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_AddGroupUser" "', argument " "2"" of type '" "ULONG""'");
-    } 
-    arg2 = static_cast< ULONG >(val2);
     {
-      res3 = SWIG_ConvertPtr(ST(2), &argp3, SWIGTYPE_p_LPENTRYID,  0 );
-      if (!SWIG_IsOK(res3)) {
-        SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_AddGroupUser" "', argument " "3"" of type '" "LPENTRYID""'"); 
-      }  
-      if (!argp3) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_AddGroupUser" "', argument " "3"" of type '" "LPENTRYID""'");
+      res2 = SWIG_AsCharPtrAndSize(ST(1), &buf2, &size2, &alloc2);
+      if (!SWIG_IsOK(res2)) {
+        SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_AddGroupUser" "', argument " "2"" of type '" "ULONG""'");
+      }
+      if(buf2 == NULL) {
+        arg2 = 0;
+        arg3 = NULL;
       } else {
-        arg3 = *(reinterpret_cast< LPENTRYID * >(argp3));
+        arg2 = static_cast< ULONG >(size2 - 1);
+        arg3 = reinterpret_cast< LPENTRYID >(buf2);
       }
     }
     {
-      res4 = SWIG_AsCharPtrAndSize(ST(3), &buf4, &size4, &alloc4);
+      res4 = SWIG_AsCharPtrAndSize(ST(2), &buf4, &size4, &alloc4);
       if (!SWIG_IsOK(res4)) {
         SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_AddGroupUser" "', argument " "4"" of type '" "ULONG""'");
       }
@@ -20099,14 +20424,18 @@ XS(_wrap_IECServiceAdmin_AddGroupUser) {
       }
     }
     
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     {
       if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
     }
     XSRETURN(argvi);
   fail:
     
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     {
       if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
     }
@@ -20125,10 +20454,10 @@ XS(_wrap_IECServiceAdmin_GetUserListOfGroup) {
     LPECUSER *arg6 = (LPECUSER *) 0 ;
     void *argp1 = 0 ;
     int res1 = 0 ;
-    unsigned int val2 ;
-    int ecode2 = 0 ;
-    void *argp3 ;
-    int res3 = 0 ;
+    int res2 ;
+    char *buf2 = 0 ;
+    size_t size2 ;
+    int alloc2 = 0 ;
     unsigned int fl4 ;
     int ecode4 ;
     ULONG c5 ;
@@ -20139,7 +20468,7 @@ XS(_wrap_IECServiceAdmin_GetUserListOfGroup) {
     
     ULONG ulFlags = 0;
     lp5 = NULL; arg6 = &lp5; c5 = 0; arg5 = &c5;
-    if ((items < 4) || (items > 4)) {
+    if ((items < 3) || (items > 3)) {
       SWIG_croak("Usage: IECServiceAdmin_GetUserListOfGroup(self,cbGroupId,lpGroupId,ulFlags,OUTPUT);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
@@ -20147,24 +20476,21 @@ XS(_wrap_IECServiceAdmin_GetUserListOfGroup) {
       SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_GetUserListOfGroup" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
     }
     arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-    ecode2 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(1), &val2);
-    if (!SWIG_IsOK(ecode2)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_GetUserListOfGroup" "', argument " "2"" of type '" "ULONG""'");
-    } 
-    arg2 = static_cast< ULONG >(val2);
     {
-      res3 = SWIG_ConvertPtr(ST(2), &argp3, SWIGTYPE_p_LPENTRYID,  0 );
-      if (!SWIG_IsOK(res3)) {
-        SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_GetUserListOfGroup" "', argument " "3"" of type '" "LPENTRYID""'"); 
-      }  
-      if (!argp3) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_GetUserListOfGroup" "', argument " "3"" of type '" "LPENTRYID""'");
+      res2 = SWIG_AsCharPtrAndSize(ST(1), &buf2, &size2, &alloc2);
+      if (!SWIG_IsOK(res2)) {
+        SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_GetUserListOfGroup" "', argument " "2"" of type '" "ULONG""'");
+      }
+      if(buf2 == NULL) {
+        arg2 = 0;
+        arg3 = NULL;
       } else {
-        arg3 = *(reinterpret_cast< LPENTRYID * >(argp3));
+        arg2 = static_cast< ULONG >(size2 - 1);
+        arg3 = reinterpret_cast< LPENTRYID >(buf2);
       }
     }
     {
-      ecode4 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(3), &fl4);
+      ecode4 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(2), &fl4);
       if (!SWIG_IsOK(ecode4)) {
         SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECServiceAdmin_GetUserListOfGroup" "', argument " "4"" of type '" "ULONG""'");
       } 
@@ -20181,7 +20507,9 @@ XS(_wrap_IECServiceAdmin_GetUserListOfGroup) {
       if (argvi >= items) EXTEND(sp,1);  ST(argvi) = sv_2mortal(newRV_noinc((SV *)AV_from_LPECUSER(*(arg6),*(arg5)))); argvi++  ;
     }
     
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     
     {
       if(*arg6)
@@ -20190,7 +20518,9 @@ XS(_wrap_IECServiceAdmin_GetUserListOfGroup) {
     XSRETURN(argvi);
   fail:
     
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     
     {
       if(*arg6)
@@ -20518,15 +20848,15 @@ XS(_wrap_IECServiceAdmin_GetCompany) {
     int alloc2 = 0 ;
     unsigned int fl4 ;
     int ecode4 ;
-    void *argp5 = 0 ;
-    int res5 = 0 ;
+    LPECCOMPANY temp5 ;
     int argvi = 0;
     HRESULT result;
     dXSARGS;
     
     ULONG ulFlags = 0;
-    if ((items < 4) || (items > 4)) {
-      SWIG_croak("Usage: IECServiceAdmin_GetCompany(self,cbCompanyId,lpCompanyId,ulFlags,lppECCompany);");
+    temp5 = NULL; arg5 = &temp5;
+    if ((items < 3) || (items > 3)) {
+      SWIG_croak("Usage: IECServiceAdmin_GetCompany(self,cbCompanyId,lpCompanyId,ulFlags);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
     if (!SWIG_IsOK(res1)) {
@@ -20554,23 +20884,24 @@ XS(_wrap_IECServiceAdmin_GetCompany) {
       arg4 = fl4;
       ulFlags = fl4;
     }
-    res5 = SWIG_ConvertPtr(ST(3), &argp5,SWIGTYPE_p_LPECCOMPANY, 0 |  0 );
-    if (!SWIG_IsOK(res5)) {
-      SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "IECServiceAdmin_GetCompany" "', argument " "5"" of type '" "LPECCOMPANY *""'"); 
-    }
-    arg5 = reinterpret_cast< LPECCOMPANY * >(argp5);
     result = (arg1)->GetCompany(arg2,arg3,arg4,arg5);
     {
       if(FAILED(result)) {
         Do_Exception(result);
       }
     }
+    {
+      if (argvi >= items) EXTEND(sp,1);  ST(argvi) = sv_2mortal(newRV_noinc((SV *)HV_from_LPECCOMPANY(*(arg5)))); argvi++  ;
+    }
     
     {
       if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
     }
     
-    
+    {
+      if(*arg5)
+      MAPIFreeBuffer(*arg5);
+    }
     XSRETURN(argvi);
   fail:
     
@@ -20578,7 +20909,10 @@ XS(_wrap_IECServiceAdmin_GetCompany) {
       if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
     }
     
-    
+    {
+      if(*arg5)
+      MAPIFreeBuffer(*arg5);
+    }
     SWIG_croak_null();
   }
 }
@@ -20754,10 +21088,10 @@ XS(_wrap_IECServiceAdmin_AddCompanyToRemoteViewList) {
     LPENTRYID arg5 ;
     void *argp1 = 0 ;
     int res1 = 0 ;
-    unsigned int val2 ;
-    int ecode2 = 0 ;
-    void *argp3 ;
-    int res3 = 0 ;
+    int res2 ;
+    char *buf2 = 0 ;
+    size_t size2 ;
+    int alloc2 = 0 ;
     int res4 ;
     char *buf4 = 0 ;
     size_t size4 ;
@@ -20766,7 +21100,7 @@ XS(_wrap_IECServiceAdmin_AddCompanyToRemoteViewList) {
     HRESULT result;
     dXSARGS;
     
-    if ((items < 4) || (items > 4)) {
+    if ((items < 3) || (items > 3)) {
       SWIG_croak("Usage: IECServiceAdmin_AddCompanyToRemoteViewList(self,cbSetCompanyId,lpSetCompanyId,cbCompanyId,lpCompanyId);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
@@ -20774,24 +21108,21 @@ XS(_wrap_IECServiceAdmin_AddCompanyToRemoteViewList) {
       SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_AddCompanyToRemoteViewList" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
     }
     arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-    ecode2 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(1), &val2);
-    if (!SWIG_IsOK(ecode2)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_AddCompanyToRemoteViewList" "', argument " "2"" of type '" "ULONG""'");
-    } 
-    arg2 = static_cast< ULONG >(val2);
     {
-      res3 = SWIG_ConvertPtr(ST(2), &argp3, SWIGTYPE_p_LPENTRYID,  0 );
-      if (!SWIG_IsOK(res3)) {
-        SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_AddCompanyToRemoteViewList" "', argument " "3"" of type '" "LPENTRYID""'"); 
-      }  
-      if (!argp3) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_AddCompanyToRemoteViewList" "', argument " "3"" of type '" "LPENTRYID""'");
+      res2 = SWIG_AsCharPtrAndSize(ST(1), &buf2, &size2, &alloc2);
+      if (!SWIG_IsOK(res2)) {
+        SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_AddCompanyToRemoteViewList" "', argument " "2"" of type '" "ULONG""'");
+      }
+      if(buf2 == NULL) {
+        arg2 = 0;
+        arg3 = NULL;
       } else {
-        arg3 = *(reinterpret_cast< LPENTRYID * >(argp3));
+        arg2 = static_cast< ULONG >(size2 - 1);
+        arg3 = reinterpret_cast< LPENTRYID >(buf2);
       }
     }
     {
-      res4 = SWIG_AsCharPtrAndSize(ST(3), &buf4, &size4, &alloc4);
+      res4 = SWIG_AsCharPtrAndSize(ST(2), &buf4, &size4, &alloc4);
       if (!SWIG_IsOK(res4)) {
         SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_AddCompanyToRemoteViewList" "', argument " "4"" of type '" "ULONG""'");
       }
@@ -20810,14 +21141,18 @@ XS(_wrap_IECServiceAdmin_AddCompanyToRemoteViewList) {
       }
     }
     
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     {
       if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
     }
     XSRETURN(argvi);
   fail:
     
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     {
       if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
     }
@@ -20835,10 +21170,10 @@ XS(_wrap_IECServiceAdmin_DelCompanyFromRemoteViewList) {
     LPENTRYID arg5 ;
     void *argp1 = 0 ;
     int res1 = 0 ;
-    unsigned int val2 ;
-    int ecode2 = 0 ;
-    void *argp3 ;
-    int res3 = 0 ;
+    int res2 ;
+    char *buf2 = 0 ;
+    size_t size2 ;
+    int alloc2 = 0 ;
     int res4 ;
     char *buf4 = 0 ;
     size_t size4 ;
@@ -20847,7 +21182,7 @@ XS(_wrap_IECServiceAdmin_DelCompanyFromRemoteViewList) {
     HRESULT result;
     dXSARGS;
     
-    if ((items < 4) || (items > 4)) {
+    if ((items < 3) || (items > 3)) {
       SWIG_croak("Usage: IECServiceAdmin_DelCompanyFromRemoteViewList(self,cbSetCompanyId,lpSetCompanyId,cbCompanyId,lpCompanyId);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
@@ -20855,24 +21190,21 @@ XS(_wrap_IECServiceAdmin_DelCompanyFromRemoteViewList) {
       SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_DelCompanyFromRemoteViewList" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
     }
     arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-    ecode2 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(1), &val2);
-    if (!SWIG_IsOK(ecode2)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_DelCompanyFromRemoteViewList" "', argument " "2"" of type '" "ULONG""'");
-    } 
-    arg2 = static_cast< ULONG >(val2);
     {
-      res3 = SWIG_ConvertPtr(ST(2), &argp3, SWIGTYPE_p_LPENTRYID,  0 );
-      if (!SWIG_IsOK(res3)) {
-        SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_DelCompanyFromRemoteViewList" "', argument " "3"" of type '" "LPENTRYID""'"); 
-      }  
-      if (!argp3) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_DelCompanyFromRemoteViewList" "', argument " "3"" of type '" "LPENTRYID""'");
+      res2 = SWIG_AsCharPtrAndSize(ST(1), &buf2, &size2, &alloc2);
+      if (!SWIG_IsOK(res2)) {
+        SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_DelCompanyFromRemoteViewList" "', argument " "2"" of type '" "ULONG""'");
+      }
+      if(buf2 == NULL) {
+        arg2 = 0;
+        arg3 = NULL;
       } else {
-        arg3 = *(reinterpret_cast< LPENTRYID * >(argp3));
+        arg2 = static_cast< ULONG >(size2 - 1);
+        arg3 = reinterpret_cast< LPENTRYID >(buf2);
       }
     }
     {
-      res4 = SWIG_AsCharPtrAndSize(ST(3), &buf4, &size4, &alloc4);
+      res4 = SWIG_AsCharPtrAndSize(ST(2), &buf4, &size4, &alloc4);
       if (!SWIG_IsOK(res4)) {
         SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_DelCompanyFromRemoteViewList" "', argument " "4"" of type '" "ULONG""'");
       }
@@ -20891,14 +21223,18 @@ XS(_wrap_IECServiceAdmin_DelCompanyFromRemoteViewList) {
       }
     }
     
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     {
       if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
     }
     XSRETURN(argvi);
   fail:
     
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
     {
       if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
     }
@@ -21471,17 +21807,17 @@ XS(_wrap_IECServiceAdmin_AddQuotaRecipient) {
     char *buf2 = 0 ;
     size_t size2 ;
     int alloc2 = 0 ;
-    unsigned int val4 ;
-    int ecode4 = 0 ;
-    void *argp5 ;
-    int res5 = 0 ;
+    int res4 ;
+    char *buf4 = 0 ;
+    size_t size4 ;
+    int alloc4 = 0 ;
     unsigned int val6 ;
     int ecode6 = 0 ;
     int argvi = 0;
     HRESULT result;
     dXSARGS;
     
-    if ((items < 5) || (items > 5)) {
+    if ((items < 4) || (items > 4)) {
       SWIG_croak("Usage: IECServiceAdmin_AddQuotaRecipient(self,cbCompanyId,lpCompanyId,cbRecipientId,lpRecipientId,ulType);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
@@ -21502,23 +21838,20 @@ XS(_wrap_IECServiceAdmin_AddQuotaRecipient) {
         arg3 = reinterpret_cast< LPENTRYID >(buf2);
       }
     }
-    ecode4 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(2), &val4);
-    if (!SWIG_IsOK(ecode4)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECServiceAdmin_AddQuotaRecipient" "', argument " "4"" of type '" "ULONG""'");
-    } 
-    arg4 = static_cast< ULONG >(val4);
     {
-      res5 = SWIG_ConvertPtr(ST(3), &argp5, SWIGTYPE_p_LPENTRYID,  0 );
-      if (!SWIG_IsOK(res5)) {
-        SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "IECServiceAdmin_AddQuotaRecipient" "', argument " "5"" of type '" "LPENTRYID""'"); 
-      }  
-      if (!argp5) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_AddQuotaRecipient" "', argument " "5"" of type '" "LPENTRYID""'");
+      res4 = SWIG_AsCharPtrAndSize(ST(2), &buf4, &size4, &alloc4);
+      if (!SWIG_IsOK(res4)) {
+        SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_AddQuotaRecipient" "', argument " "4"" of type '" "ULONG""'");
+      }
+      if(buf4 == NULL) {
+        arg4 = 0;
+        arg5 = NULL;
       } else {
-        arg5 = *(reinterpret_cast< LPENTRYID * >(argp5));
+        arg4 = static_cast< ULONG >(size4 - 1);
+        arg5 = reinterpret_cast< LPENTRYID >(buf4);
       }
     }
-    ecode6 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(4), &val6);
+    ecode6 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(3), &val6);
     if (!SWIG_IsOK(ecode6)) {
       SWIG_exception_fail(SWIG_ArgError(ecode6), "in method '" "IECServiceAdmin_AddQuotaRecipient" "', argument " "6"" of type '" "ULONG""'");
     } 
@@ -21533,7 +21866,9 @@ XS(_wrap_IECServiceAdmin_AddQuotaRecipient) {
     {
       if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
     }
-    
+    {
+      if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
+    }
     
     XSRETURN(argvi);
   fail:
@@ -21541,7 +21876,9 @@ XS(_wrap_IECServiceAdmin_AddQuotaRecipient) {
     {
       if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
     }
-    
+    {
+      if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
+    }
     
     SWIG_croak_null();
   }
@@ -21558,61 +21895,55 @@ XS(_wrap_IECServiceAdmin_DeleteQuotaRecipient) {
     ULONG arg6 ;
     void *argp1 = 0 ;
     int res1 = 0 ;
-    unsigned int val2 ;
-    int ecode2 = 0 ;
-    void *argp3 ;
-    int res3 = 0 ;
-    unsigned int val4 ;
-    int ecode4 = 0 ;
-    void *argp5 ;
-    int res5 = 0 ;
+    int res2 ;
+    char *buf2 = 0 ;
+    size_t size2 ;
+    int alloc2 = 0 ;
+    int res4 ;
+    char *buf4 = 0 ;
+    size_t size4 ;
+    int alloc4 = 0 ;
     unsigned int val6 ;
     int ecode6 = 0 ;
     int argvi = 0;
     HRESULT result;
     dXSARGS;
     
-    if ((items < 6) || (items > 6)) {
-      SWIG_croak("Usage: IECServiceAdmin_DeleteQuotaRecipient(self,cbCompanyId,lpCmopanyId,cbRecipientId,lpRecipientId,ulType);");
+    if ((items < 4) || (items > 4)) {
+      SWIG_croak("Usage: IECServiceAdmin_DeleteQuotaRecipient(self,cbCompanyId,lpCompanyId,cbRecipientId,lpRecipientId,ulType);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
     if (!SWIG_IsOK(res1)) {
       SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
     }
     arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
-    ecode2 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(1), &val2);
-    if (!SWIG_IsOK(ecode2)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "2"" of type '" "ULONG""'");
-    } 
-    arg2 = static_cast< ULONG >(val2);
     {
-      res3 = SWIG_ConvertPtr(ST(2), &argp3, SWIGTYPE_p_LPENTRYID,  0 );
-      if (!SWIG_IsOK(res3)) {
-        SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "3"" of type '" "LPENTRYID""'"); 
-      }  
-      if (!argp3) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "3"" of type '" "LPENTRYID""'");
+      res2 = SWIG_AsCharPtrAndSize(ST(1), &buf2, &size2, &alloc2);
+      if (!SWIG_IsOK(res2)) {
+        SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "2"" of type '" "ULONG""'");
+      }
+      if(buf2 == NULL) {
+        arg2 = 0;
+        arg3 = NULL;
       } else {
-        arg3 = *(reinterpret_cast< LPENTRYID * >(argp3));
+        arg2 = static_cast< ULONG >(size2 - 1);
+        arg3 = reinterpret_cast< LPENTRYID >(buf2);
       }
     }
-    ecode4 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(3), &val4);
-    if (!SWIG_IsOK(ecode4)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "4"" of type '" "ULONG""'");
-    } 
-    arg4 = static_cast< ULONG >(val4);
     {
-      res5 = SWIG_ConvertPtr(ST(4), &argp5, SWIGTYPE_p_LPENTRYID,  0 );
-      if (!SWIG_IsOK(res5)) {
-        SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "5"" of type '" "LPENTRYID""'"); 
-      }  
-      if (!argp5) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "5"" of type '" "LPENTRYID""'");
+      res4 = SWIG_AsCharPtrAndSize(ST(2), &buf4, &size4, &alloc4);
+      if (!SWIG_IsOK(res4)) {
+        SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "4"" of type '" "ULONG""'");
+      }
+      if(buf4 == NULL) {
+        arg4 = 0;
+        arg5 = NULL;
       } else {
-        arg5 = *(reinterpret_cast< LPENTRYID * >(argp5));
+        arg4 = static_cast< ULONG >(size4 - 1);
+        arg5 = reinterpret_cast< LPENTRYID >(buf4);
       }
     }
-    ecode6 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(5), &val6);
+    ecode6 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(3), &val6);
     if (!SWIG_IsOK(ecode6)) {
       SWIG_exception_fail(SWIG_ArgError(ecode6), "in method '" "IECServiceAdmin_DeleteQuotaRecipient" "', argument " "6"" of type '" "ULONG""'");
     } 
@@ -21624,14 +21955,22 @@ XS(_wrap_IECServiceAdmin_DeleteQuotaRecipient) {
       }
     }
     
-    
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
+    {
+      if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
+    }
     
     XSRETURN(argvi);
   fail:
     
-    
-    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
+    {
+      if (alloc4 == SWIG_NEWOBJ) delete[] buf4;
+    }
     
     SWIG_croak_null();
   }
@@ -21737,14 +22076,14 @@ XS(_wrap_IECServiceAdmin_GetQuotaStatus) {
     char *buf2 = 0 ;
     size_t size2 ;
     int alloc2 = 0 ;
-    void *argp4 = 0 ;
-    int res4 = 0 ;
+    LPECQUOTASTATUS temp4 ;
     int argvi = 0;
     HRESULT result;
     dXSARGS;
     
-    if ((items < 3) || (items > 3)) {
-      SWIG_croak("Usage: IECServiceAdmin_GetQuotaStatus(self,cbUserId,lpUserId,lppsQuotaStatus);");
+    temp4 = NULL; arg4 = &temp4;
+    if ((items < 2) || (items > 2)) {
+      SWIG_croak("Usage: IECServiceAdmin_GetQuotaStatus(self,cbUserId,lpUserId);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
     if (!SWIG_IsOK(res1)) {
@@ -21764,29 +22103,33 @@ XS(_wrap_IECServiceAdmin_GetQuotaStatus) {
         arg3 = reinterpret_cast< LPENTRYID >(buf2);
       }
     }
-    res4 = SWIG_ConvertPtr(ST(2), &argp4,SWIGTYPE_p_LPECQUOTASTATUS, 0 |  0 );
-    if (!SWIG_IsOK(res4)) {
-      SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_GetQuotaStatus" "', argument " "4"" of type '" "LPECQUOTASTATUS *""'"); 
-    }
-    arg4 = reinterpret_cast< LPECQUOTASTATUS * >(argp4);
     result = (arg1)->GetQuotaStatus(arg2,arg3,arg4);
     {
       if(FAILED(result)) {
         Do_Exception(result);
       }
     }
+    {
+      if (argvi >= items) EXTEND(sp,1);  ST(argvi) = sv_2mortal(newRV_noinc((SV *)HV_from_LPECQUOTASTATUS(*(arg4)))); argvi++  ;
+    }
     
     {
       if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
     }
-    
+    {
+      if(*arg4)
+      MAPIFreeBuffer(*arg4);
+    }
     XSRETURN(argvi);
   fail:
     
     {
       if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
     }
-    
+    {
+      if(*arg4)
+      MAPIFreeBuffer(*arg4);
+    }
     SWIG_croak_null();
   }
 }
@@ -21942,19 +22285,18 @@ XS(_wrap_IECServiceAdmin_GetServerDetails) {
     LPECSERVERLIST *arg4 = (LPECSERVERLIST *) 0 ;
     void *argp1 = 0 ;
     int res1 = 0 ;
-    void *argp2 ;
-    int res2 = 0 ;
     unsigned int fl3 ;
     int ecode3 ;
-    void *argp4 = 0 ;
-    int res4 = 0 ;
+    LPECSERVERLIST temp4 ;
     int argvi = 0;
     HRESULT result;
     dXSARGS;
     
+    arg2 = NULL;
     ULONG ulFlags = 0;
-    if ((items < 4) || (items > 4)) {
-      SWIG_croak("Usage: IECServiceAdmin_GetServerDetails(self,lpServerNameList,ulFlags,lppsServerList);");
+    temp4 = NULL; arg4 = &temp4;
+    if ((items < 3) || (items > 3)) {
+      SWIG_croak("Usage: IECServiceAdmin_GetServerDetails(self,lpServerNameList,ulFlags);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
     if (!SWIG_IsOK(res1)) {
@@ -21962,14 +22304,10 @@ XS(_wrap_IECServiceAdmin_GetServerDetails) {
     }
     arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
     {
-      res2 = SWIG_ConvertPtr(ST(1), &argp2, SWIGTYPE_p_LPECSVRNAMELIST,  0 );
-      if (!SWIG_IsOK(res2)) {
-        SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_GetServerDetails" "', argument " "2"" of type '" "LPECSVRNAMELIST""'"); 
-      }  
-      if (!argp2) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECServiceAdmin_GetServerDetails" "', argument " "2"" of type '" "LPECSVRNAMELIST""'");
+      if(!SvOK(ST(1))) {
+        arg2 = NULL;
       } else {
-        arg2 = *(reinterpret_cast< LPECSVRNAMELIST * >(argp2));
+        arg2 = AV_to_LPECSVRNAMELIST((AV *)SvRV(ST(1)));
       }
     }
     {
@@ -21980,25 +22318,37 @@ XS(_wrap_IECServiceAdmin_GetServerDetails) {
       arg3 = fl3;
       ulFlags = fl3;
     }
-    res4 = SWIG_ConvertPtr(ST(3), &argp4,SWIGTYPE_p_LPECSERVERLIST, 0 |  0 );
-    if (!SWIG_IsOK(res4)) {
-      SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_GetServerDetails" "', argument " "4"" of type '" "LPECSERVERLIST *""'"); 
-    }
-    arg4 = reinterpret_cast< LPECSERVERLIST * >(argp4);
     result = (arg1)->GetServerDetails(arg2,arg3,arg4);
     {
       if(FAILED(result)) {
         Do_Exception(result);
       }
     }
+    {
+      if (argvi >= items) EXTEND(sp,1);  ST(argvi) = sv_2mortal(newRV_noinc((SV *)AV_from_LPECSERVERLIST(*(arg4)))); argvi++  ;
+    }
     
+    {
+      if(arg2)
+      MAPIFreeBuffer(arg2);
+    }
     
-    
+    {
+      if(*arg4)
+      MAPIFreeBuffer(*arg4);
+    }
     XSRETURN(argvi);
   fail:
     
+    {
+      if(arg2)
+      MAPIFreeBuffer(arg2);
+    }
     
-    
+    {
+      if(*arg4)
+      MAPIFreeBuffer(*arg4);
+    }
     SWIG_croak_null();
   }
 }
@@ -22015,16 +22365,20 @@ XS(_wrap_IECServiceAdmin_ResolvePseudoUrl) {
     int res2 ;
     char *buf2 = 0 ;
     int alloc2 = 0 ;
-    void *argp3 = 0 ;
-    int res3 = 0 ;
-    void *argp4 = 0 ;
-    int res4 = 0 ;
+    char *lpStr3 = NULL ;
+    bool bBool4 = NULL ;
     int argvi = 0;
     HRESULT result;
     dXSARGS;
     
-    if ((items < 4) || (items > 4)) {
-      SWIG_croak("Usage: IECServiceAdmin_ResolvePseudoUrl(self,lpszPseudoUrl,lppszServerPath,lpbIsPeer);");
+    {
+      arg3 = &lpStr3;
+    }
+    {
+      arg4 = &bBool4;
+    }
+    if ((items < 2) || (items > 2)) {
+      SWIG_croak("Usage: IECServiceAdmin_ResolvePseudoUrl(self,lpszPseudoUrl);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
     if (!SWIG_IsOK(res1)) {
@@ -22036,31 +22390,33 @@ XS(_wrap_IECServiceAdmin_ResolvePseudoUrl) {
       SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_ResolvePseudoUrl" "', argument " "2"" of type '" "char *""'");
     }
     arg2 = reinterpret_cast< char * >(buf2);
-    res3 = SWIG_ConvertPtr(ST(2), &argp3,SWIGTYPE_p_p_char, 0 |  0 );
-    if (!SWIG_IsOK(res3)) {
-      SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IECServiceAdmin_ResolvePseudoUrl" "', argument " "3"" of type '" "char **""'"); 
-    }
-    arg3 = reinterpret_cast< char ** >(argp3);
-    res4 = SWIG_ConvertPtr(ST(3), &argp4,SWIGTYPE_p_bool, 0 |  0 );
-    if (!SWIG_IsOK(res4)) {
-      SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IECServiceAdmin_ResolvePseudoUrl" "', argument " "4"" of type '" "bool *""'"); 
-    }
-    arg4 = reinterpret_cast< bool * >(argp4);
     result = (arg1)->ResolvePseudoUrl(arg2,arg3,arg4);
     {
       if(FAILED(result)) {
         Do_Exception(result);
       }
     }
+    {
+      if (argvi >= items) EXTEND(sp,1);  ST(argvi) = SWIG_FromCharPtr((char*)*arg3); argvi++  ;
+    }
+    {
+      if (argvi >= items) EXTEND(sp,1);  ST(argvi) = SWIG_From_int((int)*arg4); argvi++  ;
+    }
     
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
-    
+    {
+      if(*arg3)
+      MAPIFreeBuffer(*arg3);
+    }
     
     XSRETURN(argvi);
   fail:
     
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
-    
+    {
+      if(*arg3)
+      MAPIFreeBuffer(*arg3);
+    }
     
     SWIG_croak_null();
   }
@@ -22598,7 +22954,7 @@ XS(_wrap_IECTestProtocol_TestGet) {
     }
     if (*arg3) {
       if (argvi >= items) EXTEND(sp,1);  ST(argvi) = SWIG_FromCharPtr(*arg3); argvi++  ;
-      MAPIFreeBuffer(arg3);					  	     
+      MAPIFreeBuffer(*arg3);					  	     
     }
     
     if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
@@ -23530,16 +23886,16 @@ XS(_wrap_IECImportContentsChanges_ConfigForConversionStream) {
     int res2 = 0 ;
     unsigned int fl3 ;
     int ecode3 ;
-    unsigned int val4 ;
-    int ecode4 = 0 ;
-    void *argp5 ;
-    int res5 = 0 ;
     int argvi = 0;
     HRESULT result;
     dXSARGS;
     
     ULONG ulFlags = 0;
-    if ((items < 5) || (items > 5)) {
+    {
+      arg4 = 0;
+      arg5 = NULL;
+    }
+    if ((items < 4) || (items > 4)) {
       SWIG_croak("Usage: IECImportContentsChanges_ConfigForConversionStream(self,lpStream,ulFlags,cValuesConversion,lpPropArrayConversion);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECImportContentsChanges, 0 |  0 );
@@ -23560,20 +23916,14 @@ XS(_wrap_IECImportContentsChanges_ConfigForConversionStream) {
       arg3 = fl3;
       ulFlags = fl3;
     }
-    ecode4 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(3), &val4);
-    if (!SWIG_IsOK(ecode4)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "IECImportContentsChanges_ConfigForConversionStream" "', argument " "4"" of type '" "ULONG""'");
-    } 
-    arg4 = static_cast< ULONG >(val4);
     {
-      res5 = SWIG_ConvertPtr(ST(4), &argp5, SWIGTYPE_p_LPSPropValue,  0 );
-      if (!SWIG_IsOK(res5)) {
-        SWIG_exception_fail(SWIG_ArgError(res5), "in method '" "IECImportContentsChanges_ConfigForConversionStream" "', argument " "5"" of type '" "LPSPropValue""'"); 
-      }  
-      if (!argp5) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IECImportContentsChanges_ConfigForConversionStream" "', argument " "5"" of type '" "LPSPropValue""'");
+      STRLEN len;
+      if(!SvOK(ST(3))) {
+        arg5 = NULL;
+        arg4 = 0;
       } else {
-        arg5 = *(reinterpret_cast< LPSPropValue * >(argp5));
+        arg5 = AV_to_LPSPropValue((AV *)SvRV(ST(3)), &len);
+        arg4 = len;
       }
     }
     result = (arg1)->ConfigForConversionStream(arg2,arg3,arg4,arg5);
@@ -23585,13 +23935,19 @@ XS(_wrap_IECImportContentsChanges_ConfigForConversionStream) {
     
     
     
-    
+    {
+      if(arg5)
+      MAPIFreeBuffer((void *)arg5);
+    }
     XSRETURN(argvi);
   fail:
     
     
     
-    
+    {
+      if(arg5)
+      MAPIFreeBuffer((void *)arg5);
+    }
     SWIG_croak_null();
   }
 }
@@ -24023,6 +24379,9 @@ static void *_p_p_IECTestProtocolTo_p_p_IUnknown(void *x, int *SWIGUNUSEDPARM(ne
 static void *_p_p_MAPINotifSinkTo_p_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((IUnknown **) (IMAPIAdviseSink *) ((MAPINotifSink **) x));
 }
+static void *_p_p_IProxyStoreObjectTo_p_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((IUnknown **)  ((IProxyStoreObject **) x));
+}
 static void *_p_p_IECLicenseTo_p_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((IUnknown **)  ((IECLicense **) x));
 }
@@ -24032,11 +24391,11 @@ static void *_p_p_IProfAdminTo_p_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemo
 static void *_p_p_IMAPIPropTo_p_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((IUnknown **)  ((IMAPIProp **) x));
 }
-static void *_p_p_IECChangeAdviseSinkTo_p_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
-    return (void *)((IUnknown **)  ((IECChangeAdviseSink **) x));
-}
 static void *_p_p_IMAPIAdviseSinkTo_p_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((IUnknown **)  ((IMAPIAdviseSink **) x));
+}
+static void *_p_p_IECChangeAdviseSinkTo_p_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((IUnknown **)  ((IECChangeAdviseSink **) x));
 }
 static void *_p_p_IMAPIProgressTo_p_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((IUnknown **)  ((IMAPIProgress **) x));
@@ -24131,6 +24490,9 @@ static void *_p_IECTestProtocolTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmem
 static void *_p_MAPINotifSinkTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((IUnknown *) (IMAPIAdviseSink *) ((MAPINotifSink *) x));
 }
+static void *_p_IProxyStoreObjectTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((IUnknown *)  ((IProxyStoreObject *) x));
+}
 static void *_p_IECLicenseTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((IUnknown *)  ((IECLicense *) x));
 }
@@ -24140,11 +24502,11 @@ static void *_p_IProfAdminTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory))
 static void *_p_IMAPIPropTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((IUnknown *)  ((IMAPIProp *) x));
 }
-static void *_p_IECChangeAdviseSinkTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
-    return (void *)((IUnknown *)  ((IECChangeAdviseSink *) x));
-}
 static void *_p_IMAPIAdviseSinkTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((IUnknown *)  ((IMAPIAdviseSink *) x));
+}
+static void *_p_IECChangeAdviseSinkTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
+    return (void *)((IUnknown *)  ((IECChangeAdviseSink *) x));
 }
 static void *_p_IMAPIProgressTo_p_IUnknown(void *x, int *SWIGUNUSEDPARM(newmemory)) {
     return (void *)((IUnknown *)  ((IMAPIProgress *) x));
@@ -24193,6 +24555,7 @@ static swig_type_info _swigt__p_IMsgStore = {"_p_IMsgStore", "IMsgStore *", 0, 0
 static swig_type_info _swigt__p_IProfAdmin = {"_p_IProfAdmin", "IProfAdmin *", 0, 0, (void*)"MAPICore::IProfAdmin", 0};
 static swig_type_info _swigt__p_IProfSect = {"_p_IProfSect", "IProfSect *", 0, 0, (void*)"MAPICore::IProfSect", 0};
 static swig_type_info _swigt__p_IProviderAdmin = {"_p_IProviderAdmin", "IProviderAdmin *", 0, 0, (void*)"MAPICore::IProviderAdmin", 0};
+static swig_type_info _swigt__p_IProxyStoreObject = {"_p_IProxyStoreObject", "IProxyStoreObject *", 0, 0, (void*)"MAPICore::IProxyStoreObject", 0};
 static swig_type_info _swigt__p_ISequentialStream = {"_p_ISequentialStream", "ISequentialStream *", 0, 0, (void*)"MAPICore::ISequentialStream", 0};
 static swig_type_info _swigt__p_IStream = {"_p_IStream", "IStream *", 0, 0, (void*)"MAPICore::IStream", 0};
 static swig_type_info _swigt__p_IUnknown = {"_p_IUnknown", "IUnknown *", 0, 0, (void*)"MAPICore::IUnknown", 0};
@@ -24210,6 +24573,7 @@ static swig_type_info _swigt__p_LPECQUOTASTATUS = {"_p_LPECQUOTASTATUS", "LPECQU
 static swig_type_info _swigt__p_LPECSERVERLIST = {"_p_LPECSERVERLIST", "LPECSERVERLIST *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPECSVRNAMELIST = {"_p_LPECSVRNAMELIST", "LPECSVRNAMELIST *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPECUSER = {"_p_LPECUSER", "LPECUSER *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_LPECUSERCLIENTUPDATESTATUS = {"_p_LPECUSERCLIENTUPDATESTATUS", "LPECUSERCLIENTUPDATESTATUS *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPENTRYID = {"_p_LPENTRYID", "LPENTRYID *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPENTRYLIST = {"_p_LPENTRYLIST", "LPENTRYLIST *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_LPFNBUTTON = {"_p_LPFNBUTTON", "LPFNBUTTON *", 0, 0, (void*)0, 0};
@@ -24277,10 +24641,11 @@ static swig_type_info _swigt__p_p_IABContainer = {"_p_p_IABContainer", 0, 0, 0, 
 static swig_type_info _swigt__p_p_ISequentialStream = {"_p_p_ISequentialStream", 0, 0, 0, 0, 0};
 static swig_type_info _swigt__p_p_IECTestProtocol = {"_p_p_IECTestProtocol", 0, 0, 0, 0, 0};
 static swig_type_info _swigt__p_p_MAPINotifSink = {"_p_p_MAPINotifSink", 0, 0, 0, 0, 0};
+static swig_type_info _swigt__p_p_IProxyStoreObject = {"_p_p_IProxyStoreObject", 0, 0, 0, 0, 0};
 static swig_type_info _swigt__p_p_IECLicense = {"_p_p_IECLicense", 0, 0, 0, 0, 0};
 static swig_type_info _swigt__p_p_IMAPIProp = {"_p_p_IMAPIProp", 0, 0, 0, 0, 0};
-static swig_type_info _swigt__p_p_IECChangeAdviseSink = {"_p_p_IECChangeAdviseSink", 0, 0, 0, 0, 0};
 static swig_type_info _swigt__p_p_IMAPIAdviseSink = {"_p_p_IMAPIAdviseSink", 0, 0, 0, 0, 0};
+static swig_type_info _swigt__p_p_IECChangeAdviseSink = {"_p_p_IECChangeAdviseSink", 0, 0, 0, 0, 0};
 static swig_type_info _swigt__p_p_IMAPIProgress = {"_p_p_IMAPIProgress", 0, 0, 0, 0, 0};
 static swig_type_info _swigt__p_p_LPMAPINAMEID = {"_p_p_LPMAPINAMEID", "LPMAPINAMEID **", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_p_LPTSTR = {"_p_p_LPTSTR", "LPTSTR **", 0, 0, (void*)0, 0};
@@ -24335,6 +24700,7 @@ static swig_type_info *swig_type_initial[] = {
   &_swigt__p_IProfAdmin,
   &_swigt__p_IProfSect,
   &_swigt__p_IProviderAdmin,
+  &_swigt__p_IProxyStoreObject,
   &_swigt__p_ISequentialStream,
   &_swigt__p_IStream,
   &_swigt__p_IUnknown,
@@ -24352,6 +24718,7 @@ static swig_type_info *swig_type_initial[] = {
   &_swigt__p_LPECSERVERLIST,
   &_swigt__p_LPECSVRNAMELIST,
   &_swigt__p_LPECUSER,
+  &_swigt__p_LPECUSERCLIENTUPDATESTATUS,
   &_swigt__p_LPENTRYID,
   &_swigt__p_LPENTRYLIST,
   &_swigt__p_LPFNBUTTON,
@@ -24420,6 +24787,7 @@ static swig_type_info *swig_type_initial[] = {
   &_swigt__p_p_IProfAdmin,
   &_swigt__p_p_IProfSect,
   &_swigt__p_p_IProviderAdmin,
+  &_swigt__p_p_IProxyStoreObject,
   &_swigt__p_p_ISequentialStream,
   &_swigt__p_p_IStream,
   &_swigt__p_p_IUnknown,
@@ -24477,9 +24845,10 @@ static swig_cast_info _swigc__p_IMsgStore[] = {  {&_swigt__p_IMsgStore, 0, 0, 0}
 static swig_cast_info _swigc__p_IProfAdmin[] = {  {&_swigt__p_IProfAdmin, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_IProfSect[] = {  {&_swigt__p_IProfSect, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_IProviderAdmin[] = {  {&_swigt__p_IProviderAdmin, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_IProxyStoreObject[] = {  {&_swigt__p_IProxyStoreObject, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_ISequentialStream[] = {  {&_swigt__p_IStream, _p_IStreamTo_p_ISequentialStream, 0, 0},  {&_swigt__p_ISequentialStream, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_IStream[] = {  {&_swigt__p_IStream, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_IUnknown[] = {  {&_swigt__p_IMAPIStatus, _p_IMAPIStatusTo_p_IUnknown, 0, 0},  {&_swigt__p_IECSingleInstance, _p_IECSingleInstanceTo_p_IUnknown, 0, 0},  {&_swigt__p_IAddrBook, _p_IAddrBookTo_p_IUnknown, 0, 0},  {&_swigt__p_IMessage, _p_IMessageTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeManageStore, _p_IExchangeManageStoreTo_p_IUnknown, 0, 0},  {&_swigt__p_IMailUser, _p_IMailUserTo_p_IUnknown, 0, 0},  {&_swigt__p_IMsgStore, _p_IMsgStoreTo_p_IUnknown, 0, 0},  {&_swigt__p_IECImportContentsChanges, _p_IECImportContentsChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IECExportChanges, _p_IECExportChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeExportChanges, _p_IExchangeExportChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeImportHierarchyChanges, _p_IExchangeImportHierarchyChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeImportContentsChanges, _p_IExchangeImportContentsChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IMsgServiceAdmin, _p_IMsgServiceAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IECServiceAdmin, _p_IECServiceAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IUnknown, 0, 0, 0},  {&_swigt__p_IProviderAdmin, _p_IProviderAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IAttach, _p_IAttachTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeModifyTable, _p_IExchangeModifyTableTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPITable, _p_IMAPITableTo_p_IUnknown, 0, 0},  {&_swigt__p_IECChangeAdvisor, _p_IECChangeAdvisorTo_p_IUnknown, 0, 0},  {&_swigt__p_IDistList, _p_IDistListTo_p_IUnknown, 0, 0},  {&_swigt__p_IECMultiStoreTable, _p_IECMultiStoreTableTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIContainer, _p_IMAPIContainerTo_p_IUnknown, 0, 0},  {&_swigt__p_IABContainer, _p_IABContainerTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPISession, _p_IMAPISessionTo_p_IUnknown, 0, 0},  {&_swigt__p_ISequentialStream, _p_ISequentialStreamTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIFolder, _p_IMAPIFolderTo_p_IUnknown, 0, 0},  {&_swigt__p_IECTestProtocol, _p_IECTestProtocolTo_p_IUnknown, 0, 0},  {&_swigt__p_MAPINotifSink, _p_MAPINotifSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_IECLicense, _p_IECLicenseTo_p_IUnknown, 0, 0},  {&_swigt__p_IProfAdmin, _p_IProfAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIProp, _p_IMAPIPropTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIAdviseSink, _p_IMAPIAdviseSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_IECChangeAdviseSink, _p_IECChangeAdviseSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIProgress, _p_IMAPIProgressTo_p_IUnknown, 0, 0},  {&_swigt__p_IProfSect, _p_IProfSectTo_p_IUnknown, 0, 0},  {&_swigt__p_IStream, _p_IStreamTo_p_IUnknown, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_IUnknown[] = {  {&_swigt__p_IMAPIStatus, _p_IMAPIStatusTo_p_IUnknown, 0, 0},  {&_swigt__p_IECSingleInstance, _p_IECSingleInstanceTo_p_IUnknown, 0, 0},  {&_swigt__p_IAddrBook, _p_IAddrBookTo_p_IUnknown, 0, 0},  {&_swigt__p_IMessage, _p_IMessageTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeManageStore, _p_IExchangeManageStoreTo_p_IUnknown, 0, 0},  {&_swigt__p_IMailUser, _p_IMailUserTo_p_IUnknown, 0, 0},  {&_swigt__p_IMsgStore, _p_IMsgStoreTo_p_IUnknown, 0, 0},  {&_swigt__p_IECImportContentsChanges, _p_IECImportContentsChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IECExportChanges, _p_IECExportChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeExportChanges, _p_IExchangeExportChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeImportHierarchyChanges, _p_IExchangeImportHierarchyChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeImportContentsChanges, _p_IExchangeImportContentsChangesTo_p_IUnknown, 0, 0},  {&_swigt__p_IMsgServiceAdmin, _p_IMsgServiceAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IECServiceAdmin, _p_IECServiceAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IUnknown, 0, 0, 0},  {&_swigt__p_IProviderAdmin, _p_IProviderAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IAttach, _p_IAttachTo_p_IUnknown, 0, 0},  {&_swigt__p_IExchangeModifyTable, _p_IExchangeModifyTableTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPITable, _p_IMAPITableTo_p_IUnknown, 0, 0},  {&_swigt__p_IECChangeAdvisor, _p_IECChangeAdvisorTo_p_IUnknown, 0, 0},  {&_swigt__p_IDistList, _p_IDistListTo_p_IUnknown, 0, 0},  {&_swigt__p_IECMultiStoreTable, _p_IECMultiStoreTableTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIContainer, _p_IMAPIContainerTo_p_IUnknown, 0, 0},  {&_swigt__p_IABContainer, _p_IABContainerTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPISession, _p_IMAPISessionTo_p_IUnknown, 0, 0},  {&_swigt__p_ISequentialStream, _p_ISequentialStreamTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIFolder, _p_IMAPIFolderTo_p_IUnknown, 0, 0},  {&_swigt__p_IECTestProtocol, _p_IECTestProtocolTo_p_IUnknown, 0, 0},  {&_swigt__p_MAPINotifSink, _p_MAPINotifSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_IProxyStoreObject, _p_IProxyStoreObjectTo_p_IUnknown, 0, 0},  {&_swigt__p_IECLicense, _p_IECLicenseTo_p_IUnknown, 0, 0},  {&_swigt__p_IProfAdmin, _p_IProfAdminTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIProp, _p_IMAPIPropTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIAdviseSink, _p_IMAPIAdviseSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_IECChangeAdviseSink, _p_IECChangeAdviseSinkTo_p_IUnknown, 0, 0},  {&_swigt__p_IMAPIProgress, _p_IMAPIProgressTo_p_IUnknown, 0, 0},  {&_swigt__p_IStream, _p_IStreamTo_p_IUnknown, 0, 0},  {&_swigt__p_IProfSect, _p_IProfSectTo_p_IUnknown, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LARGE_INTEGER[] = {  {&_swigt__p_LARGE_INTEGER, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LONG[] = {  {&_swigt__p_LONG, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPADRENTRY[] = {  {&_swigt__p_LPADRENTRY, 0, 0, 0},{0, 0, 0, 0}};
@@ -24494,6 +24863,7 @@ static swig_cast_info _swigc__p_LPECQUOTASTATUS[] = {  {&_swigt__p_LPECQUOTASTAT
 static swig_cast_info _swigc__p_LPECSERVERLIST[] = {  {&_swigt__p_LPECSERVERLIST, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPECSVRNAMELIST[] = {  {&_swigt__p_LPECSVRNAMELIST, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPECUSER[] = {  {&_swigt__p_LPECUSER, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_LPECUSERCLIENTUPDATESTATUS[] = {  {&_swigt__p_LPECUSERCLIENTUPDATESTATUS, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPENTRYID[] = {  {&_swigt__p_LPENTRYID, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPENTRYLIST[] = {  {&_swigt__p_LPENTRYLIST, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_LPFNBUTTON[] = {  {&_swigt__p_LPFNBUTTON, 0, 0, 0},{0, 0, 0, 0}};
@@ -24560,12 +24930,13 @@ static swig_cast_info _swigc__p_p_IABContainer[] = {{&_swigt__p_p_IABContainer, 
 static swig_cast_info _swigc__p_p_ISequentialStream[] = {{&_swigt__p_p_ISequentialStream, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_IECTestProtocol[] = {{&_swigt__p_p_IECTestProtocol, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_MAPINotifSink[] = {{&_swigt__p_p_MAPINotifSink, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_p_IProxyStoreObject[] = {{&_swigt__p_p_IProxyStoreObject, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_IECLicense[] = {{&_swigt__p_p_IECLicense, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_IMAPIProp[] = {{&_swigt__p_p_IMAPIProp, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_p_IECChangeAdviseSink[] = {{&_swigt__p_p_IECChangeAdviseSink, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_IMAPIAdviseSink[] = {{&_swigt__p_p_IMAPIAdviseSink, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_p_IECChangeAdviseSink[] = {{&_swigt__p_p_IECChangeAdviseSink, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_IMAPIProgress[] = {{&_swigt__p_p_IMAPIProgress, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_p_IUnknown[] = {  {&_swigt__p_p_IMAPIStatus, _p_p_IMAPIStatusTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECSingleInstance, _p_p_IECSingleInstanceTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IAddrBook, _p_p_IAddrBookTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMessage, _p_p_IMessageTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeManageStore, _p_p_IExchangeManageStoreTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMailUser, _p_p_IMailUserTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMsgStore, _p_p_IMsgStoreTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECImportContentsChanges, _p_p_IECImportContentsChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECExportChanges, _p_p_IECExportChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeExportChanges, _p_p_IExchangeExportChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeImportHierarchyChanges, _p_p_IExchangeImportHierarchyChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeImportContentsChanges, _p_p_IExchangeImportContentsChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMsgServiceAdmin, _p_p_IMsgServiceAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECServiceAdmin, _p_p_IECServiceAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IUnknown, 0, 0, 0},  {&_swigt__p_p_IProviderAdmin, _p_p_IProviderAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IAttach, _p_p_IAttachTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeModifyTable, _p_p_IExchangeModifyTableTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPITable, _p_p_IMAPITableTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECChangeAdvisor, _p_p_IECChangeAdvisorTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IDistList, _p_p_IDistListTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECMultiStoreTable, _p_p_IECMultiStoreTableTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIContainer, _p_p_IMAPIContainerTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IABContainer, _p_p_IABContainerTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPISession, _p_p_IMAPISessionTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_ISequentialStream, _p_p_ISequentialStreamTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIFolder, _p_p_IMAPIFolderTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECTestProtocol, _p_p_IECTestProtocolTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_MAPINotifSink, _p_p_MAPINotifSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECLicense, _p_p_IECLicenseTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IProfAdmin, _p_p_IProfAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIProp, _p_p_IMAPIPropTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECChangeAdviseSink, _p_p_IECChangeAdviseSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIAdviseSink, _p_p_IMAPIAdviseSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIProgress, _p_p_IMAPIProgressTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IProfSect, _p_p_IProfSectTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IStream, _p_p_IStreamTo_p_p_IUnknown, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_p_IUnknown[] = {  {&_swigt__p_p_IMAPIStatus, _p_p_IMAPIStatusTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECSingleInstance, _p_p_IECSingleInstanceTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IAddrBook, _p_p_IAddrBookTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMessage, _p_p_IMessageTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeManageStore, _p_p_IExchangeManageStoreTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMailUser, _p_p_IMailUserTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMsgStore, _p_p_IMsgStoreTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECImportContentsChanges, _p_p_IECImportContentsChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECExportChanges, _p_p_IECExportChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeExportChanges, _p_p_IExchangeExportChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeImportHierarchyChanges, _p_p_IExchangeImportHierarchyChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeImportContentsChanges, _p_p_IExchangeImportContentsChangesTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMsgServiceAdmin, _p_p_IMsgServiceAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECServiceAdmin, _p_p_IECServiceAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IUnknown, 0, 0, 0},  {&_swigt__p_p_IProviderAdmin, _p_p_IProviderAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IAttach, _p_p_IAttachTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IExchangeModifyTable, _p_p_IExchangeModifyTableTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPITable, _p_p_IMAPITableTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECChangeAdvisor, _p_p_IECChangeAdvisorTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IDistList, _p_p_IDistListTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECMultiStoreTable, _p_p_IECMultiStoreTableTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIContainer, _p_p_IMAPIContainerTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IABContainer, _p_p_IABContainerTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPISession, _p_p_IMAPISessionTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_ISequentialStream, _p_p_ISequentialStreamTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIFolder, _p_p_IMAPIFolderTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECTestProtocol, _p_p_IECTestProtocolTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_MAPINotifSink, _p_p_MAPINotifSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IProxyStoreObject, _p_p_IProxyStoreObjectTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECLicense, _p_p_IECLicenseTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IProfAdmin, _p_p_IProfAdminTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIProp, _p_p_IMAPIPropTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIAdviseSink, _p_p_IMAPIAdviseSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IECChangeAdviseSink, _p_p_IECChangeAdviseSinkTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IMAPIProgress, _p_p_IMAPIProgressTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IProfSect, _p_p_IProfSectTo_p_p_IUnknown, 0, 0},  {&_swigt__p_p_IStream, _p_p_IStreamTo_p_p_IUnknown, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_LPMAPINAMEID[] = {  {&_swigt__p_p_LPMAPINAMEID, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_LPTSTR[] = {  {&_swigt__p_p_LPTSTR, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_p_MAPIERROR[] = {  {&_swigt__p_p_MAPIERROR, 0, 0, 0},{0, 0, 0, 0}};
@@ -24619,6 +24990,7 @@ static swig_cast_info *swig_cast_initial[] = {
   _swigc__p_IProfAdmin,
   _swigc__p_IProfSect,
   _swigc__p_IProviderAdmin,
+  _swigc__p_IProxyStoreObject,
   _swigc__p_ISequentialStream,
   _swigc__p_IStream,
   _swigc__p_IUnknown,
@@ -24636,6 +25008,7 @@ static swig_cast_info *swig_cast_initial[] = {
   _swigc__p_LPECSERVERLIST,
   _swigc__p_LPECSVRNAMELIST,
   _swigc__p_LPECUSER,
+  _swigc__p_LPECUSERCLIENTUPDATESTATUS,
   _swigc__p_LPENTRYID,
   _swigc__p_LPENTRYLIST,
   _swigc__p_LPFNBUTTON,
@@ -24704,6 +25077,7 @@ static swig_cast_info *swig_cast_initial[] = {
   _swigc__p_p_IProfAdmin,
   _swigc__p_p_IProfSect,
   _swigc__p_p_IProviderAdmin,
+  _swigc__p_p_IProxyStoreObject,
   _swigc__p_p_ISequentialStream,
   _swigc__p_p_IStream,
   _swigc__p_p_IUnknown,
@@ -24786,6 +25160,10 @@ static swig_command_info swig_commands[] = {
 {"MAPICorec::IMsgStore_FinishedMsg", _wrap_IMsgStore_FinishedMsg},
 {"MAPICorec::IMsgStore_NotifyNewMail", _wrap_IMsgStore_NotifyNewMail},
 {"MAPICorec::delete_IMsgStore", _wrap_delete_IMsgStore},
+{"MAPICorec::IProxyStoreObject_PlaceHolder1", _wrap_IProxyStoreObject_PlaceHolder1},
+{"MAPICorec::IProxyStoreObject_PlaceHolder2", _wrap_IProxyStoreObject_PlaceHolder2},
+{"MAPICorec::delete_IProxyStoreObject", _wrap_delete_IProxyStoreObject},
+{"MAPICorec::IProxyStoreObject_UnwrapNoRef", _wrap_IProxyStoreObject_UnwrapNoRef},
 {"MAPICorec::IMAPIFolder_CreateMessage", _wrap_IMAPIFolder_CreateMessage},
 {"MAPICorec::IMAPIFolder_CopyMessages", _wrap_IMAPIFolder_CopyMessages},
 {"MAPICorec::IMAPIFolder_DeleteMessages", _wrap_IMAPIFolder_DeleteMessages},
@@ -24982,6 +25360,8 @@ static swig_command_info swig_commands[] = {
 {"MAPICorec::IECServiceAdmin_GetSendAsList", _wrap_IECServiceAdmin_GetSendAsList},
 {"MAPICorec::IECServiceAdmin_AddSendAsUser", _wrap_IECServiceAdmin_AddSendAsUser},
 {"MAPICorec::IECServiceAdmin_DelSendAsUser", _wrap_IECServiceAdmin_DelSendAsUser},
+{"MAPICorec::IECServiceAdmin_GetUserClientUpdateStatus", _wrap_IECServiceAdmin_GetUserClientUpdateStatus},
+{"MAPICorec::IECServiceAdmin_RemoveAllObjects", _wrap_IECServiceAdmin_RemoveAllObjects},
 {"MAPICorec::IECServiceAdmin_CreateGroup", _wrap_IECServiceAdmin_CreateGroup},
 {"MAPICorec::IECServiceAdmin_DeleteGroup", _wrap_IECServiceAdmin_DeleteGroup},
 {"MAPICorec::IECServiceAdmin_SetGroup", _wrap_IECServiceAdmin_SetGroup},
@@ -26273,6 +26653,7 @@ XS(SWIG_init) {
     SvREADONLY_on(sv);
   } while(0) /*@SWIG@*/;
   SWIG_TypeClientData(SWIGTYPE_p_IMsgStore, (void*) "MAPICore::IMsgStore");
+  SWIG_TypeClientData(SWIGTYPE_p_IProxyStoreObject, (void*) "MAPICore::IProxyStoreObject");
   /*@SWIG:/usr/share/swig1.3/perl5/perltypemaps.swg,64,%set_constant@*/ do {
     SV *sv = get_sv((char*) SWIG_prefix "FOLDER_ROOT", TRUE | 0x2 | GV_ADDMULTI);
     sv_setsv(sv, SWIG_From_int  SWIG_PERL_CALL_ARGS_1(static_cast< int >((0x00000000))));
@@ -27412,6 +27793,11 @@ XS(SWIG_init) {
   /*@SWIG:/usr/share/swig1.3/perl5/perltypemaps.swg,64,%set_constant@*/ do {
     SV *sv = get_sv((char*) SWIG_prefix "MAPI_NO_MAIL", TRUE | 0x2 | GV_ADDMULTI);
     sv_setsv(sv, SWIG_From_int  SWIG_PERL_CALL_ARGS_1(static_cast< int >(0x00008000)));
+    SvREADONLY_on(sv);
+  } while(0) /*@SWIG@*/;
+  /*@SWIG:/usr/share/swig1.3/perl5/perltypemaps.swg,64,%set_constant@*/ do {
+    SV *sv = get_sv((char*) SWIG_prefix "MAPI_NT_SERVICE", TRUE | 0x2 | GV_ADDMULTI);
+    sv_setsv(sv, SWIG_From_int  SWIG_PERL_CALL_ARGS_1(static_cast< int >(0x00010000)));
     SvREADONLY_on(sv);
   } while(0) /*@SWIG@*/;
   /*@SWIG:/usr/share/swig1.3/perl5/perltypemaps.swg,64,%set_constant@*/ do {
