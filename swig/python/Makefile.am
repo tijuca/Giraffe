@@ -35,8 +35,7 @@ _icalmapi_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
 
 _archiver_la_CXXFLAGS = -I${top_srcdir}/ECtools/zarafa-archiver
 _archiver_la_LDFLAGS = -module -avoid-version -rpath '$(libdir)'
-_archiver_la_LIBADD = 	${top_builddir}/ECtools/zarafa-archiver/libarchiver.la \
-						${top_builddir}/ECtools/zarafa-archiver/libarchiver-core.la \
+_archiver_la_LIBADD = ${top_builddir}/ECtools/zarafa-archiver/libarchiver.la \
 						$(PROG_LIBS) $(PYTHON_LIBS)
 
 _licenseclient_la_CXXFLAGS = -I${top_srcdir}/provider/common -I${top_builddir}/provider/soap -I${top_srcdir}/provider/soap
