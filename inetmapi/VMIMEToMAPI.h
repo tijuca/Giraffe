@@ -65,6 +65,7 @@ enum ATTACHLEVEL { ATTACH_NONE, ATTACH_INLINE, ATTACH_NORMAL };
 
 typedef struct sMailState {
 	BODYLEVEL bodyLevel;		//!< the current body state. plain upgrades none, html upgrades plain and none.
+	ULONG ulLastCP;
 	ATTACHLEVEL attachLevel;	//!< the current attachment state
 	bool bAttachSignature;		//!< add a signed signature at the end
 	ULONG ulMsgInMsg;			//!< counter for msg-in-msg level
@@ -76,6 +77,7 @@ typedef struct sMailState {
 	};
 	void reset() {
 		bodyLevel = BODY_NONE;
+		ulLastCP = 0;
 		attachLevel = ATTACH_NONE;
 		bAttachSignature = false;
 		strHTMLBody.clear();

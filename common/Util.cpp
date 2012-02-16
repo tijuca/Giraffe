@@ -4646,3 +4646,71 @@ HRESULT Util::HrDeleteMessage(IMAPISession *lpSession, IMessage *lpMessage)
 exit:
 	return hr;
 }
+
+/**
+ * Read a property via OpenProperty and put the output in std::string
+ *
+ * @param[in] lpProp Object to read from
+ * @param[in] ulPropTag Proptag to open
+ * @param[out] strData String to write to
+ * @return result
+ */
+HRESULT Util::ReadProperty(IMAPIProp *lpProp, ULONG ulPropTag, std::string &strData)
+{
+	HRESULT hr = hrSuccess;
+	IStream *lpStream = NULL;
+	char buf[4096];
+	ULONG len = 0;
+
+	hr = lpProp->OpenProperty(ulPropTag, &IID_IStream, 0, 0, (IUnknown **)&lpStream);
+	if(hr != hrSuccess)
+		goto exit;
+		
+	hr = HrStreamToString(lpStream, strData);
+	if(hr != hrSuccess)
+		goto exit;
+	
+exit:
+	if(lpStream)
+		lpStream->Release();
+		
+	return hr;
+}
+
+/**
+ * Write a property using OpenProperty()
+ *
+ * This function will open a stream to the given property and write all data from strData into
+ * it usin STGM_DIRECT and MAPI_MODIFY | MAPI_CREATE. This means the existing data will be over-
+ * written
+ *
+ * @param[in] lpProp Object to write to
+ * @param[in] ulPropTag Property to write
+ * @param[in] strData Data to write
+ * @return result
+ */
+HRESULT Util::WriteProperty(IMAPIProp *lpProp, ULONG ulPropTag, const std::string &strData)
+{
+	HRESULT hr = hrSuccess;
+	IStream *lpStream = NULL;
+	ULONG len = 0;
+
+	hr = lpProp->OpenProperty(ulPropTag, &IID_IStream, STGM_DIRECT, MAPI_CREATE | MAPI_MODIFY, (IUnknown **)&lpStream);
+	if(hr != hrSuccess)
+		goto exit;
+		
+	hr = lpStream->Write(strData.data(), strData.size(), &len);
+	if(hr != hrSuccess)
+		goto exit;
+		
+	hr = lpStream->Commit(0);
+	if(hr != hrSuccess)
+		goto exit;
+
+exit:
+	if(lpStream)
+		lpStream->Release();
+		
+	return hr;
+}
+
