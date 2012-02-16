@@ -100,6 +100,8 @@
 static char THIS_FILE[] = __FILE__;
 #endif
 
+#define MAX_PARENT_LIMIT 64
+
 /** 
  * ECSecurity constructor
  * 
@@ -318,7 +320,7 @@ ECRESULT ECSecurity::GetObjectPermission(unsigned int ulObjId, unsigned int* lpu
 		// that you never have any rights for folders that are more than 64 levels of folders away from their ACL ..
 		ulDepth++;
 		
-		if(ulDepth > 64) {
+		if(ulDepth > MAX_PARENT_LIMIT) {
 			m_lpSession->GetSessionManager()->GetLogger()->Log(EC_LOGLEVEL_FATAL, "Maximum depth reached for object %d, deepest object: %d", ulObjId, ulCurObj);
 			er = erSuccess;
 			goto exit;
@@ -405,6 +407,45 @@ ECRESULT ECSecurity::GetOwner(unsigned int ulObjId, unsigned int *lpulOwnerId)
 		er = ZARAFA_E_NOT_FOUND;
 		goto exit;
 	}
+
+exit:
+	return er;
+}
+
+/** 
+ * Check for a deleted folder as parent of ulId, max folder depth as
+ * defined (64).
+ * 
+ * @param[in] ulId object id to start checking from
+ * 
+ * @return ZARAFA_E_NOT_FOUND Error if a parent has the delete flag
+ */
+ECRESULT ECSecurity::CheckDeletedParent(unsigned int ulId)
+{
+	ECRESULT er = erSuccess;
+	unsigned int ulParentObjId = 0;
+	unsigned int ulObjFlags = 0;
+	unsigned int ulObjType = 0;
+	unsigned int ulDepth = 0;
+	ECCacheManager *lpCache = m_lpSession->GetSessionManager()->GetCacheManager();
+
+	do {
+		er = lpCache->GetObject(ulId, &ulParentObjId, NULL, &ulObjFlags, &ulObjType);
+		if (er != erSuccess)
+			goto exit;
+
+		if (ulObjFlags & MSGFLAG_DELETED) {
+			er = ZARAFA_E_NOT_FOUND;
+			goto exit;
+		}
+
+		ulId = ulParentObjId;
+		ulDepth++;
+	} while (ulObjType != MAPI_STORE && ulParentObjId != CACHE_NO_PARENT && ulDepth <= MAX_PARENT_LIMIT);
+
+	// return error when max depth is reached, so we don't create folders and messages deeper than the limit
+	if (ulDepth == MAX_PARENT_LIMIT)
+		er = ZARAFA_E_NOT_FOUND;
 
 exit:
 	return er;
@@ -528,6 +569,11 @@ ECRESULT ECSecurity::CheckPermission(unsigned int ulObjId, unsigned int ulecRigh
 	}
 
 exit:
+	if (er == erSuccess && (ulecRights == ecSecurityCreate || ulecRights == ecSecurityEdit || ulecRights == ecSecurityCreateFolder)) {
+		// writing in a deleted parent is not allowed
+		er = CheckDeletedParent(ulObjId);
+	}
+
 	if(er != erSuccess)
 		TRACE_INTERNAL(TRACE_ENTRY,"Security","ECSecurity::CheckPermission","object=%d, rights=%d", ulObjId, ulecRights);
 
