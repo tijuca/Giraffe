@@ -403,14 +403,19 @@
 			// Get the store of the user, need this for the call to mapi_msgstore_getarchiveentryid()
 			$userStoreEntryid = mapi_msgstore_createentryid($this->getDefaultMessageStore(), $userData[PR_ACCOUNT]);
 			$userStore = mapi_openmsgstore($GLOBALS['mapisession']->getSession(), $userStoreEntryid);
+			$storeResult = mapi_last_hresult();
 
 			$archiveStores = Array();
-			if(isset($userData[PR_EC_ARCHIVE_SERVERS]) && count($userData[PR_EC_ARCHIVE_SERVERS]) > 0){
+			if($storeResult === NOERROR && isset($userData[PR_EC_ARCHIVE_SERVERS]) && count($userData[PR_EC_ARCHIVE_SERVERS]) > 0){
 				for($i=0;$i<count($userData[PR_EC_ARCHIVE_SERVERS]);$i++){
 					$archiveStoreEntryid = mapi_msgstore_getarchiveentryid($userStore, $userData[PR_ACCOUNT], $userData[PR_EC_ARCHIVE_SERVERS][$i]);
-					$archiveStores[$archiveStoreEntryid] = mapi_openmsgstore($GLOBALS['mapisession']->getSession(), $archiveStoreEntryid);
-					// Add the archive store to the list
-					$this->stores[$archiveStoreEntryid] = $archiveStores[$archiveStoreEntryid];
+					// Check if the store exists. It can be that the store archiving has been enabled, but no 
+					// archived store has been created an none can be found in the PR_EC_ARCHIVE_SERVERS property.
+					if(mapi_last_hresult() === NOERROR){
+						$archiveStores[$archiveStoreEntryid] = mapi_openmsgstore($GLOBALS['mapisession']->getSession(), $archiveStoreEntryid);
+						// Add the archive store to the list
+						$this->stores[$archiveStoreEntryid] = $archiveStores[$archiveStoreEntryid];
+					}
 				}
 			}
 			return $archiveStores;
