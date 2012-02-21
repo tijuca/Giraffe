@@ -1651,7 +1651,7 @@ HRESULT print_details(LPMAPISESSION lpSession, IECUnknown *lpECMsgStore, objectc
 			if (hr != hrSuccess)
 				goto exit;
 
-			for (unsigned i = 0; i < lpArchiveServers->cValues; ++i) {
+			for (int i = 0; i < lpArchiveServers->cValues; ++i) {
 				MsgStorePtr ptrRemoteAdminStore;
 				SPropValuePtr ptrPropValue;
 				IECUnknown *lpECRemoteAdminStore = NULL;
@@ -3526,14 +3526,14 @@ int main(int argc, char* argv[])
 			goto exit;
 		}
 
-		if (quota != -1 || quotahard != -1 || quotasoft != -1 || quotawarn != -1) {
-			hr = setQuota(lpServiceAdmin, cbUserId, lpUserId, quota, false, quotawarn, quotasoft, quotahard);
+		if (quota != -1) {
+			hr = setQuota(lpServiceAdmin, cbCompanyId, lpCompanyId, quota, false, quotawarn, quotasoft, quotahard);
 			if(hr != hrSuccess)
 				goto exit;
 		}
 
-		if (ud_quota != -1 || ud_quotahard != -1 || ud_quotasoft != -1 || ud_quotawarn != -1) {
-			hr = setQuota(lpServiceAdmin, cbUserId, lpUserId, ud_quota, true, ud_quotawarn, ud_quotasoft, ud_quotahard);
+		if (ud_quota != -1) {
+			hr = setQuota(lpServiceAdmin, cbCompanyId, lpCompanyId, ud_quota, true, ud_quotawarn, ud_quotasoft, ud_quotahard);
 			if (hr != hrSuccess)
 				goto exit;
 		}
