@@ -1743,7 +1743,7 @@
 			  The argument with this option indicates for what type of object
 			  the details are being requested.
 			  Allowed values are <replaceable>'user'</replaceable>,
-			  <replaceable>'group'</replaceable> or <replaceable>'tenant'</replaceable>
+			  <replaceable>'group'</replaceable> or <replaceable>'company'</replaceable>
 			  When this option is not used, it defaults to
 			  <replaceable>'user'</replaceable>
 			  </para>
