@@ -1055,6 +1055,16 @@ Default:
 \fI10\fR
 .RE
 .PP
+\fBindex_services_prefix_chars\fR
+.RS 4
+Number of characters a search term must contain before a prefix search is performed by
+\fBzarafa-indexer\fR(1)
+\&. A value of 0 will allow any term to be used for a prefix search\&. This may perform badly since a prefix search of one character will match almost all documents\&. Using a high value (like 99) will effectively disable prefix searching, matching only the exact search term\&.
+.sp
+Default:
+\fI3\fR
+.RE
+.PP
 \fBenable_enhanced_ics\fR
 .RS 4
 Allow enhanced ICS operations to speedup synchronization with cached profiles\&. This options should also be enabled when the

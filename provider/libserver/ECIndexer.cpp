@@ -57,6 +57,7 @@
 #include "ZarafaCmdUtil.h"
 #include "Util.h"
 #include "ECStatsCollector.h"
+#include "ustringutil.h"
 
 #include <map>
 #include <string>
@@ -130,7 +131,7 @@ exit:
  * @retval ZARAFA_E_NO_SUPPORT	The restriction is not support to work with lucene indexer
  * @retval ZARAFA_E_IGNORE_ME	The data must be ignored
  */
-ECRESULT BuildLuceneQuery(ECDatabase *lpDatabase, std::map<unsigned int, std::string> &mapIndexedPropTags, struct restrictTable *lpsRestrict, ULONG ulLevel, bool &bHaveContent, bool &bNotOnly, std::string &strIndexQuery)
+ECRESULT BuildLuceneQuery(ECDatabase *lpDatabase, std::map<unsigned int, std::string> &mapIndexedPropTags, struct restrictTable *lpsRestrict, ULONG ulLevel, ULONG ulPrefixLen, bool &bHaveContent, bool &bNotOnly, std::string &strIndexQuery)
 {
 	ECRESULT		er = erSuccess;
 	unsigned int	i = 0;
@@ -166,7 +167,7 @@ ECRESULT BuildLuceneQuery(ECDatabase *lpDatabase, std::map<unsigned int, std::st
 			
 			strLocalQuery.clear();
 
-			er = BuildLuceneQuery(lpDatabase, mapIndexedPropTags, lpsRestrict->lpOr->__ptr[i], ulLevel+1, bHaveContent, bState, strLocalQuery);
+			er = BuildLuceneQuery(lpDatabase, mapIndexedPropTags, lpsRestrict->lpOr->__ptr[i], ulLevel+1, ulPrefixLen, bHaveContent, bState, strLocalQuery);
 			if (er == ZARAFA_E_IGNORE_ME) {
 				continue;
 			} else if (er != erSuccess) {
@@ -199,7 +200,7 @@ ECRESULT BuildLuceneQuery(ECDatabase *lpDatabase, std::map<unsigned int, std::st
 			
 			strLocalQuery.clear();
 
-			er = BuildLuceneQuery(lpDatabase, mapIndexedPropTags, lpsRestrict->lpAnd->__ptr[i], ulLevel+1, bHaveContent, bState, strLocalQuery);
+			er = BuildLuceneQuery(lpDatabase, mapIndexedPropTags, lpsRestrict->lpAnd->__ptr[i], ulLevel+1, ulPrefixLen, bHaveContent, bState, strLocalQuery);
 			if (er == ZARAFA_E_IGNORE_ME) {
 				continue;
 			} else if (er != erSuccess) {
@@ -225,7 +226,7 @@ ECRESULT BuildLuceneQuery(ECDatabase *lpDatabase, std::map<unsigned int, std::st
 		break;	
 
 	case RES_NOT:
-		er = BuildLuceneQuery(lpDatabase, mapIndexedPropTags, lpsRestrict->lpNot->lpNot, ulLevel+1, bHaveContent, bNotOnly, strLocalQuery);
+		er = BuildLuceneQuery(lpDatabase, mapIndexedPropTags, lpsRestrict->lpNot->lpNot, ulLevel+1, ulPrefixLen, bHaveContent, bNotOnly, strLocalQuery);
 		if (er == ZARAFA_E_IGNORE_ME) {
 			break;
 		} else if (er != erSuccess) {
@@ -276,21 +277,20 @@ ECRESULT BuildLuceneQuery(ECDatabase *lpDatabase, std::map<unsigned int, std::st
 		if (lpsRestrict->lpContent->ulFuzzyLevel & (FL_PREFIX | FL_SUBSTRING)) {
 			vector<string> words;
 			do {
+			    std::string strWord;
+			    
 				ulEnd = strLocalQuery.find(' ', ulStart);
 				if (ulEnd == std::string::npos) {
 					ulEnd = strLocalQuery.size();
 					bLast = true;
 				}
-				if (ulEnd - ulStart == 1) {
-					// we're not going to search only string which are 1 letter.
-					// lucene does a dictionary expand first, which will result
-					// in an or query with every word that starts with a certain
-					// letter, an dcan result in a 'Too many clauses' error anyway.
-					ulStart = ulEnd +1;
-					continue;
-				}
 
-				words.push_back(strField + ": " + string(strLocalQuery, ulStart, ulEnd - ulStart) + "*");
+				strWord = string(strLocalQuery, ulStart, ulEnd - ulStart);
+				
+				if(u8_len(strWord.c_str()) >= ulPrefixLen)
+    				words.push_back(strField + ": " + strWord + "*");
+                else
+    				words.push_back(strField + ": " + strWord);
 
 				ulStart = ulEnd + 1;
 			} while (!bLast);
@@ -385,12 +385,12 @@ exit:
  * @return Zarafa error code
  * @retval ZARAFA_E_NO_SUPPORT	The restriction is not support to work with lucene indexer
  */
-ECRESULT BuildLuceneQuery(ECDatabase *lpDatabase, std::map<unsigned int, std::string> &mapIndexedPropTags, struct restrictTable *lpsRestrict, std::string &strIndexQuery)
+ECRESULT BuildLuceneQuery(ECDatabase *lpDatabase, std::map<unsigned int, std::string> &mapIndexedPropTags, struct restrictTable *lpsRestrict, unsigned int ulPrefixLen, std::string &strIndexQuery)
 {
 	bool bHaveContent = false;
 	bool bNotOnly = false;
 	strIndexQuery.reserve(8192); // prealloc some memory, but unknown how large this will become
-	return BuildLuceneQuery(lpDatabase, mapIndexedPropTags, lpsRestrict, 0, bHaveContent, bNotOnly, strIndexQuery);
+	return BuildLuceneQuery(lpDatabase, mapIndexedPropTags, lpsRestrict, 0, ulPrefixLen, bHaveContent, bNotOnly, strIndexQuery);
 }
 
 /** 
@@ -451,7 +451,7 @@ ECRESULT GetIndexerResults(ECDatabase *lpDatabase, ECConfig *lpConfig, ECLogger 
                 goto exit;
         }  
 
-		er = BuildLuceneQuery(lpDatabase, mapIndexedPropTags, lpRestrict, strIndexQuery);
+		er = BuildLuceneQuery(lpDatabase, mapIndexedPropTags, lpRestrict, atoui(lpConfig->GetSetting("index_services_prefix_chars")), strIndexQuery);
 		if (er != erSuccess) {
 			lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unable to run restriction in indexer: 0x%08X, reverting to normal database search.", er);
 			goto exit;

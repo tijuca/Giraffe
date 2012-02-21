@@ -4296,6 +4296,24 @@
 		  </varlistentry>
 		  
 		  <varlistentry>
+			<term><option>index_services_prefix_chars</option></term>
+			<listitem>
+			  <para>Number of characters a search term must contain before
+			  a prefix search is performed by
+				<citerefentry>
+				  <refentrytitle>zarafa-indexer</refentrytitle>
+				  <manvolnum>1</manvolnum>
+				</citerefentry>
+				. A value of 0 will allow any term to be used for a prefix
+				search. This may perform badly since a prefix search of one
+				character will match almost all documents. Using a high
+				value (like 99) will effectively disable prefix searching,
+				matching only the exact search term.</para>
+			  <para>Default: <replaceable>3</replaceable></para>
+			</listitem>
+		  </varlistentry>
+		  
+		  <varlistentry>
 			<term><option>enable_enhanced_ics</option></term>
 			<listitem>
 			  <para>Allow enhanced ICS operations to speedup synchronization

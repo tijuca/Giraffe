@@ -903,6 +903,7 @@ int running_server(char *szName, const char *szConfig)
         { "index_services_enabled", "no", CONFIGSETTING_RELOADABLE }, 
         { "index_services_path",    "file:///var/run/zarafa-indexer", CONFIGSETTING_RELOADABLE },        
 		{ "index_services_search_timeout", "10", CONFIGSETTING_RELOADABLE },
+		{ "index_services_prefix_chars", "3", CONFIGSETTING_RELOADABLE },
 
 		{ "threads",				"8", CONFIGSETTING_RELOADABLE },
         { "watchdog_max_age",		"500", CONFIGSETTING_RELOADABLE },
