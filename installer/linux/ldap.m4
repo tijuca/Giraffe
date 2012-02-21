@@ -245,8 +245,8 @@ ldap_groupmembers_attribute_type = ifelse(TYPE,`OPENLDAP',`text',`dn')
 
 # The attribute of the user which is listed in ldap_groupmember_attribute
 # Active directory: empty, matching dn's
-# LDAP: uidNumber, matching users in ldap_user_unique_attribute
-ldap_groupmembers_relation_attribute = ifelse(TYPE,`OPENLDAP',`uidNumber',`')
+# LDAP: uid, matching users in ldap_loginname_attribute
+ldap_groupmembers_relation_attribute = ifelse(TYPE,`OPENLDAP',`uid',`')
 
 # A group can also be used for security, eg. setting permissions on folders.
 # This makes a group a security group. The zarafaSecurityGroup value is boolean.
