@@ -2108,6 +2108,8 @@
 					foreach($_SESSION["deleteattachment"][$dialog_attachments] as $attach_num) {
 						mapi_message_deleteattach($message, (int) $attach_num);
 					}	
+					// Clear the list of deleteattachment items from the session when the changes have been applied to the MAPI IMessage
+					$_SESSION["deleteattachment"][$dialog_attachments] = Array();
 				}
 			}
 			
