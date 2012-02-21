@@ -567,6 +567,7 @@ HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook, LPMDB lpOrigS
 
 	LPSPropValue lpOrigSubject = NULL;
 	SPropValue sForwardProps[4];
+	ULONG cfp = 0;
 	wstring strSubject;
 
 	if (lpRuleRecipients == NULL || lpRuleRecipients->cEntries == 0) {
@@ -649,17 +650,23 @@ HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook, LPMDB lpOrigS
 	if(!bDoNotMunge || bForwardAsAttachment)
 		strSubject.insert(0, L"FW: ");
 
-	sForwardProps[0].ulPropTag = PR_AUTO_FORWARDED;
-	sForwardProps[0].Value.b = TRUE;
+	cfp = 0;
+	sForwardProps[cfp].ulPropTag = PR_AUTO_FORWARDED;
+	sForwardProps[cfp++].Value.b = TRUE;
 
-	sForwardProps[1].ulPropTag = PR_SUBJECT;
-	sForwardProps[1].Value.lpszW = (WCHAR*)strSubject.c_str();
+	sForwardProps[cfp].ulPropTag = PR_SUBJECT;
+	sForwardProps[cfp++].Value.lpszW = (WCHAR*)strSubject.c_str();
 
-	sForwardProps[2].ulPropTag = PR_SENTMAIL_ENTRYID;
-	sForwardProps[2].Value.bin.cb = lpSentMailEntryID->Value.bin.cb;
-	sForwardProps[2].Value.bin.lpb = lpSentMailEntryID->Value.bin.lpb;
+	sForwardProps[cfp].ulPropTag = PR_SENTMAIL_ENTRYID;
+	sForwardProps[cfp].Value.bin.cb = lpSentMailEntryID->Value.bin.cb;
+	sForwardProps[cfp++].Value.bin.lpb = lpSentMailEntryID->Value.bin.lpb;
 
-	hr = lpFwdMsg->SetProps(3, (LPSPropValue)&sForwardProps, NULL);
+	if (bForwardAsAttachment) {
+		sForwardProps[cfp].ulPropTag = PR_MESSAGE_CLASS;
+		sForwardProps[cfp++].Value.lpszW = L"IPM.Note";
+	}
+
+	hr = lpFwdMsg->SetProps(cfp, (LPSPropValue)&sForwardProps, NULL);
 	if (hr != hrSuccess)
 		goto exit;
 
