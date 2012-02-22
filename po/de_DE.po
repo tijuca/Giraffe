@@ -3,9 +3,9 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PHP-Langadmin 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2012-01-03 15:33+0100\n"
-"PO-Revision-Date: 2011-11-24 12:09+0200\n"
-"Last-Translator: Hans-Peter <hps@zarafaserver.de>\n"
+"POT-Creation-Date: 2012-02-17 16:37+0100\n"
+"PO-Revision-Date: 2012-02-08 21:56+0200\n"
+"Last-Translator: André <welter@bitbone.de>\n"
 "Language-Team: de_DE <de@li.org>\n"
 "Language: de\n"
 "MIME-Version: 1.0\n"
@@ -14,102 +14,102 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Pootle 2.1.5\n"
 
-#: provider/ECProps/Addin.cpp:506 provider/ECProps/SyncBar.cpp:322
+#: provider/ECProps/Addin.cpp:500 provider/ECProps/SyncBar.cpp:326
 msgid "Configure"
 msgstr "Eigenschaften"
 
-#: provider/ECProps/Addin.cpp:508 provider/ECProps/SyncBar.cpp:314
+#: provider/ECProps/Addin.cpp:502 provider/ECProps/SyncBar.cpp:318
 msgid "Synchronize"
 msgstr "Synchronisieren"
 
-#: provider/ECProps/Addin.cpp:510
+#: provider/ECProps/Addin.cpp:504
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:28
 msgid "Open Shared Folders..."
 msgstr "Gemeinsame Ordner öffnen ..."
 
-#: provider/ECProps/Addin.cpp:512 provider/ECProps/Addin.cpp:553
+#: provider/ECProps/Addin.cpp:506 provider/ECProps/Addin.cpp:547
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:19
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:20
 msgid "Recover Deleted Items..."
 msgstr "Gelöschte Objekte wiederherstellen ..."
 
-#: provider/ECProps/Addin.cpp:514 provider/ECProps/Addin.cpp:555
+#: provider/ECProps/Addin.cpp:508 provider/ECProps/Addin.cpp:549
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:20
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:21
 msgid "Out of Office Assistant..."
 msgstr "Abwesenheitsassistent"
 
-#: provider/ECProps/Addin.cpp:518
+#: provider/ECProps/Addin.cpp:512
 msgid "Offline"
 msgstr "Offline"
 
-#: provider/ECProps/Addin.cpp:547 provider/ECProps/SyncBar.cpp:324
+#: provider/ECProps/Addin.cpp:541 provider/ECProps/SyncBar.cpp:328
 msgid "Configure offline synchronization"
 msgstr "Offline Synchronisation konfigurieren"
 
-#: provider/ECProps/Addin.cpp:549 provider/ECProps/SyncBar.cpp:316
+#: provider/ECProps/Addin.cpp:543 provider/ECProps/SyncBar.cpp:320
 msgid "Start offline synchronization"
 msgstr "Starte Zarafa Offline Synchronisation"
 
-#: provider/ECProps/Addin.cpp:551
+#: provider/ECProps/Addin.cpp:545
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:29
 msgid "Open another user's Outlook Sharing Folders (Calendar, E-mail, etc)"
 msgstr ""
 "Die öffentlichen Outlook-Ordner eines anderen Benutzers öffnen (Kalender, "
 "E-Mail, etc.)"
 
-#: provider/ECProps/Addin.cpp:663
+#: provider/ECProps/Addin.cpp:657
 msgid "Out of Office currently on. Would you like to turn it off?"
 msgstr ""
 "Abwesenheitsbenachrichtigung ist momentan aktiv. Möchten Sie diese jetzt "
 "abschalten?"
 
-#: provider/ECProps/Addin.cpp:663
+#: provider/ECProps/Addin.cpp:657
 msgid "Out Of Office Turned On"
 msgstr "Abwesenheitsbenachrichtigungen wurden abgeschaltet"
 
-#: provider/ECProps/Addin.cpp:669
+#: provider/ECProps/Addin.cpp:663
 msgid "Unable to save Out of Office status"
 msgstr "Die Abwesenheitsbenachrichtigung konnte nicht gespeicht werden"
 
-#: provider/ECProps/Addin.cpp:764
+#: provider/ECProps/Addin.cpp:763
 msgid "Delegates"
 msgstr "Stellvertreter"
 
-#: provider/ECProps/Addin.cpp:888 provider/client/ECMAPIFolderPublic.cpp:164
+#: provider/ECProps/Addin.cpp:887 provider/client/ECMAPIFolderPublic.cpp:164
 #: provider/client/ECMsgStorePublic.cpp:547
 msgid "Favorites"
 msgstr "Favoriten"
 
-#: provider/ECProps/Addin.cpp:900 provider/ECProps/PropPage.cpp:433
+#: provider/ECProps/Addin.cpp:899 provider/ECProps/PropPage.cpp:433
 msgid "Permissions"
 msgstr "Berechtigungen"
 
-#: provider/ECProps/Addin.cpp:1104 provider/ECProps/Addin.cpp:1105
+#: provider/ECProps/Addin.cpp:1103 provider/ECProps/Addin.cpp:1104
 msgid "Add to Public Favorites Folder"
 msgstr "Dem öffentlichen Favoritenordner hinzufügen"
 
-#: provider/ECProps/Addin.cpp:1189
-#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:106
+#: provider/ECProps/Addin.cpp:1188
+#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:108
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:89
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:97
 msgid "Unable to open MAPI session."
 msgstr "Eine MAPI-Verbindung kann nicht hergestellt werden"
 
-#: provider/ECProps/Addin.cpp:1193 provider/ECProps/ECFavoritePropPage.cpp:110
-#: provider/client/ECMsgStore.cpp:2374
+#: provider/ECProps/Addin.cpp:1192 provider/ECProps/ECFavoritePropPage.cpp:110
+#: provider/client/ECMsgStore.cpp:2373
 msgid "Shortcut"
 msgstr "Verknüpfung"
 
-#: provider/ECProps/Addin.cpp:1193 provider/ECProps/ECFavoritePropPage.cpp:110
+#: provider/ECProps/Addin.cpp:1192 provider/ECProps/ECFavoritePropPage.cpp:110
 msgid "Shortcut folder"
 msgstr "Favoriten Ordner"
 
-#: provider/ECProps/Addin.cpp:1195
+#: provider/ECProps/Addin.cpp:1194
 msgid "Unable to get shortcut folder."
 msgstr "Favoriten konnte nicht geöffnet werden"
 
-#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:130
+#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:136
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:102
 msgid ""
 "You are currently offline. To use this command, connect to the online server."
@@ -117,20 +117,25 @@ msgstr ""
 "Sie sind derzeit offline. Um dieses Kommando nutzen zu können müssen Sie "
 "sich mit dem Zarafa-Server verbinden."
 
-#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:132
+#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:138
 msgid "Unable to open default store in MAPI session."
 msgstr "Der Standardordner kann nicht geöffnet werden"
 
-#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:157
+#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:165
+#: provider/client/SettingsPropPageAdvance.cpp:189
+msgid "Refusing to add primary store as shared store."
+msgstr ""
+
+#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:174
 msgid "Unable to open this store."
 msgstr "Dieser Speicher kann nicht geöffnet werden."
 
-#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:262
+#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:279
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:130
 msgid "You have insufficient permissions to open this store."
 msgstr "Sie haben nicht die Berechtigung, diesen Store zu öffnen."
 
-#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:262
+#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:279
 msgid "Access Denied"
 msgstr "Zugriff verweigert"
 
@@ -173,7 +178,7 @@ msgstr "&Speichern"
 #: provider/ECProps/SyncConfigDlg.cpp:120
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:132
 #: provider/ECProps/ECDeletedMessageRecoveryDlg.cpp:630
-#: provider/client/ProviderUtil.cpp:178
+#: provider/client/ProviderUtil.cpp:151
 msgid "Cancel"
 msgstr "Abbrechen"
 
@@ -296,14 +301,14 @@ msgstr ""
 
 #: provider/ECProps/ECDelegatePropPage.cpp:237
 #: provider/ECProps/PropPage.cpp:714 provider/ECProps/ECFavoritesDlg.cpp:48
-#: provider/client/SettingsPropPageAdvance.cpp:99
+#: provider/client/SettingsPropPageAdvance.cpp:105
 msgid "Add"
 msgstr "Hinzufügen"
 
 #: provider/ECProps/ECDelegatePropPage.cpp:252
 #: provider/ECProps/PropPage.cpp:721 provider/ECProps/MapOtherUserDlg.cpp:175
 #: provider/client/ECABContainer.cpp:244 provider/client/ECABContainer.cpp:299
-#: provider/client/SettingsPropPageAdvance.cpp:229
+#: provider/client/SettingsPropPageAdvance.cpp:245
 msgid "Global Address Book"
 msgstr "Globales Adressbuch"
 
@@ -324,27 +329,35 @@ msgstr "Schließen"
 msgid "Connection error"
 msgstr "Verbindungsfehler"
 
-#: provider/ECProps/SyncStatusDlg.cpp:141
+#: provider/ECProps/SyncStatusDlg.cpp:142
+msgid "Username or password incorrect. Please update your MAPI profile."
+msgstr ""
+
+#: provider/ECProps/SyncStatusDlg.cpp:142
+msgid "Logon error"
+msgstr ""
+
+#: provider/ECProps/SyncStatusDlg.cpp:145
 msgid "synchronization done"
 msgstr "Abgleich beendet"
 
-#: provider/ECProps/SyncStatusDlg.cpp:146
+#: provider/ECProps/SyncStatusDlg.cpp:150
 msgid "Synchronizing folders ..."
 msgstr "Synchronisiere Ordner ..."
 
-#: provider/ECProps/SyncStatusDlg.cpp:148
+#: provider/ECProps/SyncStatusDlg.cpp:152
 msgid "Looking for changes ..."
 msgstr "Suche nach Änderungen ..."
 
-#: provider/ECProps/SyncStatusDlg.cpp:150
+#: provider/ECProps/SyncStatusDlg.cpp:154
 msgid "Synchronizing messages ..."
 msgstr "Synchronisiere Nachrichten ..."
 
-#: provider/ECProps/SyncStatusDlg.cpp:152
+#: provider/ECProps/SyncStatusDlg.cpp:156
 msgid "Logging in ..."
 msgstr "Anmelden ..."
 
-#: provider/ECProps/SyncStatusDlg.cpp:154
+#: provider/ECProps/SyncStatusDlg.cpp:158
 msgid "Synchronizing ..."
 msgstr "Abgleichen ..."
 
@@ -510,7 +523,7 @@ msgid "Inbox (Temporary)"
 msgstr "Posteingang (vorübergehend)"
 
 #: provider/ECProps/MapOtherUserDlg.cpp:120
-#: provider/client/SettingsPropPageAdvance.cpp:164
+#: provider/client/SettingsPropPageAdvance.cpp:171
 msgid "User could not be resolved."
 msgstr "Der Name kann nicht aufgelöst werden"
 
@@ -537,7 +550,7 @@ msgid "Ok"
 msgstr "Ok"
 
 #: provider/ECProps/MapOtherUserDlg.cpp:250
-#: provider/client/SettingsPropPageAdvance.cpp:100
+#: provider/client/SettingsPropPageAdvance.cpp:106
 msgid "Name..."
 msgstr "Name..."
 
@@ -607,32 +620,32 @@ msgid "This delegate has the following permissions"
 msgstr "Der Stellvertreter hat folgende Berechtigungen"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:134
-#: provider/client/ECMsgStore.cpp:2451
+#: provider/client/ECMsgStore.cpp:2450
 msgid "Calendar"
 msgstr "Kalender"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:135
-#: provider/client/ECMsgStore.cpp:2497
+#: provider/client/ECMsgStore.cpp:2496
 msgid "Tasks"
 msgstr "Aufgaben"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:136
-#: provider/libserver/ECGenProps.cpp:876 provider/client/ECMsgStore.cpp:2391
+#: provider/libserver/ECGenProps.cpp:924 provider/client/ECMsgStore.cpp:2390
 msgid "Inbox"
 msgstr "Posteingang"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:137
-#: provider/client/ECMsgStore.cpp:2439
+#: provider/client/ECMsgStore.cpp:2438
 msgid "Contacts"
 msgstr "Kontakte"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:138
-#: provider/client/ECMsgStore.cpp:2485
+#: provider/client/ECMsgStore.cpp:2484
 msgid "Notes"
 msgstr "Notizen"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:139
-#: provider/client/ECMsgStore.cpp:2473
+#: provider/client/ECMsgStore.cpp:2472
 msgid "Journal"
 msgstr "Journal"
 
@@ -774,26 +787,26 @@ msgstr ""
 "Dieser Ordner und / oder diese Nachrichten kann / können nicht gelöscht "
 "werden."
 
-#: provider/libserver/ECDBUpdateProgress.cpp:46
+#: provider/libserver/ECDBUpdateProgress.cpp:58
 msgid "Your cache is being upgraded..."
 msgstr "Ihr Cache wird aktualisiert..."
 
-#: provider/libserver/ECDBUpdateProgress.cpp:81
+#: provider/libserver/ECDBUpdateProgress.cpp:93
 msgid "Upgrade: "
 msgstr "Aktualisierung:"
 
-#: provider/libserver/ECGenProps.cpp:834
+#: provider/libserver/ECGenProps.cpp:882
 #: provider/client/ECMAPIFolderPublic.cpp:162
 #: provider/client/ECMsgStorePublic.cpp:653
 msgid "Public Folders"
 msgstr "Alle Öffentlichen Ordner"
 
-#: provider/libserver/ECGenProps.cpp:878
+#: provider/libserver/ECGenProps.cpp:926
 msgid "Archive"
 msgstr "Archiv"
 
 #: provider/client/ECMSProvider.cpp:247
-#: provider/client/ECABProviderSwitch.cpp:279
+#: provider/client/ECABProviderSwitch.cpp:277
 #: provider/client/EntryPoint.cpp:1102
 msgid ""
 "Cannot use the profile because you are over the license limit. To continue, "
@@ -803,7 +816,7 @@ msgstr ""
 "haben. Um fortzufahren müssen Sie weitere Client Lizenzen kaufen"
 
 #: provider/client/ECMSProvider.cpp:251
-#: provider/client/ECABProviderSwitch.cpp:284
+#: provider/client/ECABProviderSwitch.cpp:282
 #: provider/client/EntryPoint.cpp:1108
 msgid ""
 "Cannot use the profile because the server was unable to contact the license "
@@ -829,8 +842,8 @@ msgid "Connection"
 msgstr "Verbindung"
 
 #: provider/client/SettingsTabConnection.cpp:80
-#: provider/client/SettingsPropPageAdvance.cpp:51
-#: provider/client/SettingsPropPageAdvance.cpp:97
+#: provider/client/SettingsPropPageAdvance.cpp:54
+#: provider/client/SettingsPropPageAdvance.cpp:103
 msgid "Advanced"
 msgstr "Erweitert"
 
@@ -901,7 +914,7 @@ msgstr ""
 msgid "Unable to store SSL certificate in registry key."
 msgstr "Das SSL Zertifikat konnte nicht in der Registry hinterlegt werden."
 
-#: provider/client/ProviderUtil.cpp:159
+#: provider/client/ProviderUtil.cpp:132
 msgid ""
 "Unable to work online! The first time you need a network connection. Retry "
 "if you have the network connection."
@@ -910,63 +923,63 @@ msgstr ""
 "eine Netzwerkverbindung. Versuchen Sie es erneut, wenn eine "
 "Netzwerkverbindung besteht."
 
-#: provider/client/ProviderUtil.cpp:177
+#: provider/client/ProviderUtil.cpp:150
 msgid "First Folder Sync..."
 msgstr "Erster Abgleich der Ordner..."
 
-#: provider/client/ProviderUtil.cpp:182
+#: provider/client/ProviderUtil.cpp:155
 msgid "Sync folder items"
 msgstr "Ordnereinträge abgleichen"
 
-#: provider/client/ECMsgStore.cpp:2421
+#: provider/client/ECMsgStore.cpp:2420
 msgid "Outbox"
 msgstr "Postausgang"
 
-#: provider/client/ECMsgStore.cpp:2427
+#: provider/client/ECMsgStore.cpp:2426
 msgid "Deleted Items"
 msgstr "Gelöschte Objekte"
 
-#: provider/client/ECMsgStore.cpp:2433
+#: provider/client/ECMsgStore.cpp:2432
 msgid "Sent Items"
 msgstr "Gesendete Objekte"
 
-#: provider/client/ECMsgStore.cpp:2461
+#: provider/client/ECMsgStore.cpp:2460
 msgid "Drafts"
 msgstr "Entwürfe"
 
-#: provider/client/ECMsgStore.cpp:2509
+#: provider/client/ECMsgStore.cpp:2508
 msgid "Junk E-mail"
 msgstr "Junk E-Mail"
 
-#: provider/client/ECMsgStore.cpp:2531
+#: provider/client/ECMsgStore.cpp:2530
 msgid "RSS Feeds"
 msgstr "RSS Feeds"
 
-#: provider/client/ECMsgStore.cpp:2531
+#: provider/client/ECMsgStore.cpp:2530
 msgid "RSS Feed comment"
 msgstr "RSS Feed Kommentar"
 
-#: provider/client/ECMsgStore.cpp:2535
+#: provider/client/ECMsgStore.cpp:2534
 msgid "Conversation Action Settings"
 msgstr "Konversationseinstellungen"
 
-#: provider/client/ECMsgStore.cpp:2539
+#: provider/client/ECMsgStore.cpp:2538
 msgid "Quick Step Settings"
 msgstr "Quickstep Einstellungen"
 
-#: provider/client/ECMsgStore.cpp:2543
+#: provider/client/ECMsgStore.cpp:2542
 msgid "Suggested Contacts"
 msgstr "Vorgeschlagene Kontakte"
 
-#: provider/client/SettingsPropPageAdvance.cpp:98
+#: provider/client/SettingsPropPageAdvance.cpp:104
 msgid "MailBox"
 msgstr "Mailbox"
 
-#: provider/client/SettingsPropPageAdvance.cpp:101
+#: provider/client/SettingsPropPageAdvance.cpp:107
 msgid "Remove"
 msgstr "Entfernen"
 
-#: provider/client/SettingsPropPageAdvance.cpp:183
+#: provider/client/SettingsPropPageAdvance.cpp:199
 msgid "User already exists."
 msgstr "Der Benutzer existiert bereits."
 
@@ -1003,13 +1016,13 @@ msgstr "Sie haben nicht die nötige Berechtigung um auf das Archiv zuzugreifen."
 msgid "Error description:"
 msgstr "Fehlerbeschreibung:"
 
-#: provider/client/ECABProviderSwitch.cpp:138
-#: provider/client/ECMSProviderSwitch.cpp:281
+#: provider/client/ECABProviderSwitch.cpp:136
+#: provider/client/ECMSProviderSwitch.cpp:272
 msgid "Your cache is being upgraded. Do you want to work online this session?"
 msgstr "Ihr Cache wurde aktualisiert. Wollen Sie jetzt online arbeiten?"
 
-#: provider/client/ECABProviderSwitch.cpp:209
-#: provider/client/ECMSProviderSwitch.cpp:386
+#: provider/client/ECABProviderSwitch.cpp:207
+#: provider/client/ECMSProviderSwitch.cpp:377
 msgid "Unable to work online! Do you want to switch to offline mode?"
 msgstr ""
 "Es ist nicht möglich, online zu arbeiten. Möchten Sie in den Offline-Mode "
@@ -1250,7 +1263,7 @@ msgstr "Cc:"
 msgid "Sent on:"
 msgstr "gesendet am:"
 
-#: provider/client/ECMSProviderSwitch.cpp:245
+#: provider/client/ECMSProviderSwitch.cpp:236
 msgid ""
 "Unable to connect to the online server. If you continue, no new connections "
 "will be attempted until you disable the 'Work offline' option in the 'File' "
@@ -1320,7 +1333,7 @@ msgstr ""
 
 #: provider/contacts/ZCABContainer.cpp:645
 msgid "Zarafa Contacts Folders"
-msgstr ""
+msgstr "Zarafa Kontakte Ordner"
 
 #: provider/common/SOAPSock.cpp:481
 msgid "Unable to get SSL object from store"
@@ -1356,6 +1369,14 @@ msgstr ""
 #: provider/common/SOAPSock.cpp:657
 msgid "Do you wish to continue?"
 msgstr "Wollen Sie fortfahren?"
+
+#: zarafa-libsync/ECSync.cpp:1903
+msgid ""
+"The syncronization of a folder failed. Press retry for continue or ignore to "
+"supress all errors\r\n"
+"\r\n"
+"Please contact the system administrator if this problem persists."
+msgstr ""
 
 #: ECtools/zarafa-archiver/helpers/archivehelper.cpp:895
 msgid "Zarafa Archive"
@@ -1436,7 +1457,7 @@ msgstr ""
 "Der Benutzer/die Gruppe in deren Namen der Versand erfolgen soll kann nicht "
 "gefunden werden."
 
-#: spooler/mailer.cpp:2486
+#: spooler/mailer.cpp:2489
 msgid "Error found while trying to send your message. Error code: "
 msgstr "Fehler beim Versuch Ihre Nachricht zu senden. Fehler Code:"
 
