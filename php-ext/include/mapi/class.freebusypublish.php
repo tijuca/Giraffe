@@ -249,7 +249,7 @@ class FreeBusyPublish {
 			if(!is_array($rows))
 				break;
 				
-			if(count($rows) == 0)
+			if(empty($rows))
 				break;
 				
             foreach ($rows as $row) {
@@ -275,10 +275,19 @@ class FreeBusyPublish {
 		// $freebusy now contains the start, end and status of all items, merged.
 
 		// Get the FB interface
-		$fbsupport = mapi_freebusysupport_open($this->session, $this->store);
+		try {
+			$fbsupport = mapi_freebusysupport_open($this->session, $this->store);
+		} catch (MAPIException $e) {
+			if($e->getCode() == MAPI_E_NOT_FOUND) {
+				$e->setHandled();
+				if(function_exists("dump")) {
+					dump("Error in opening freebusysupport object.");
+				}
+			}
+		}
 
-		if(mapi_last_hresult() == NOERROR) {
-			// Open updater for this user
+		// Open updater for this user
+		if(isset($fbsupport)) {
 			$updaters = mapi_freebusysupport_loadupdate($fbsupport, Array($this->entryid));
 
 			$updater = $updaters[0];
@@ -290,10 +299,6 @@ class FreeBusyPublish {
 			
 			// We're finished
 			mapi_freebusysupport_close($fbsupport);
-		} else {
-			if(function_exists("dump")) {
-				dump("Error in opening freebusysupport object.");
-			}
 		}
 	}
 
@@ -344,16 +349,15 @@ class FreeBusyPublish {
 
     	foreach($timestamps as $ts)
 		{
-
     		switch ($ts["type"])
-    		{
-    			case 0: // Start
+			{
+				case 0: // Start
     				if ($level != 0 && $laststart != $ts["time"])
     				{
     					$newitem["start"] = $laststart;
     					$newitem["end"] = $ts["time"];
     					$newitem["subject"] = join(",", $csubj);
-    					$newitem["status"] = count($cbusy)>0?max($cbusy):0;
+    					$newitem["status"] = !empty($cbusy) ? max($cbusy) : 0;
 						if($newitem["status"] > 0)
 	    					$merged[] = $newitem;
     				} 
@@ -371,7 +375,7 @@ class FreeBusyPublish {
     					$newitem["start"] = $laststart;
     					$newitem["end"] = $ts["time"];
     					$newitem["subject"] = join(",", $csubj);
-    					$newitem["status"] = count($cbusy)>0?max($cbusy):0;
+    					$newitem["status"] = !empty($cbusy) ? max($cbusy) : 0;
 						if($newitem["status"] > 0)
 	    					$merged[] = $newitem;
     				} 

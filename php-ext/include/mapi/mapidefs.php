@@ -418,7 +418,18 @@ define('olResponseTentative'                     ,2);
 define('olResponseAccepted'                      ,3);
 define('olResponseDeclined'                      ,4);
 define('olResponseNotResponded'                  ,5);
-    
+
+/* OlRecipientTrackStatus to set PR_RECIPIENT_TRACKSTATUS in recipient table
+ * Value of the recipient trackstatus are same as OlResponseStatus but
+ * recipient trackstatus doesn't have olResponseOrganized and olResponseNotResponded
+ * and olResponseNone has different interpretation with PR_RECIPIENT_TRACKSTATUS
+ * so to avoid confusions we have defined new constants.
+*/
+define('olRecipientTrackStatusNone'              ,0);
+define('olRecipientTrackStatusTentative'         ,2);
+define('olRecipientTrackStatusAccepted'          ,3);
+define('olRecipientTrackStatusDeclined'          ,4);
+
 /* OlMeetingStatus */
 define('olNonMeeting'                            ,0);
 define('olMeeting'                               ,1);

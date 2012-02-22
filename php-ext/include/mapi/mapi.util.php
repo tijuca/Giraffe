@@ -97,13 +97,16 @@ function makeGuid($guid)
  */
 function get_mapi_error_name($errcode=null)
 {
-	if ($errcode===null){
+	if ($errcode === null){
 		$errcode = mapi_last_hresult();
 	}
 	
-	if ($errcode!=0){
-		foreach(get_defined_constants() as $key=>$value){
-			if (substr($key,0,7)=="MAPI_E_" || substr($key,0,7)=="MAPI_W_") {
+	if ($errcode !== 0){
+		$allConstants = get_defined_constants(true);
+
+		foreach($allConstants['user'] as $key => $value){
+			$prefix = substr($key, 0, 7);
+			if ($prefix == "MAPI_E_" || $prefix == "MAPI_W_") {
 				/**
 				 * If PHP encounters a number beyond the bounds of the integer type,
 				 * it will be interpreted as a float instead, so when comparing these error codes
@@ -120,8 +123,8 @@ function get_mapi_error_name($errcode=null)
 	}
 
 	// error code not found, return hex value (this is a fix for 64-bit systems, we can't use the dechex() function for this)
-	$result = unpack("H*",pack("N", $errcode));
-	return "0x".$result[1];
+	$result = unpack("H*", pack("N", $errcode));
+	return "0x" . $result[1];
 }
 
 /**
@@ -178,7 +181,7 @@ function getPropIdsFromStrings($store, $mapping)
 		}
 	}
 	
-	if (count($ids["id"])==0){
+	if (empty($ids["id"])){
 		return $props;
 	}
 

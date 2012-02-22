@@ -217,7 +217,7 @@
 			
 			$rows = mapi_table_queryallrows($contents, array(PR_ENTRYID), $restriction);
 			
-			if(count($rows) == 0) {
+			if(empty($rows)) {
 				// None found, create one if possible
 				if(!$create)
 					return false;
@@ -715,7 +715,8 @@
 			$rows = mapi_table_queryallrows($table, array(PR_ATTACH_NUM));
 			
 			// Assume only one attachment
-			if(count($rows) < 1) return false;
+			if(empty($rows))
+				return false;
 			
 			$attach = mapi_message_openattach($message, $rows[0][PR_ATTACH_NUM]);
 			$message = mapi_openproperty($attach, PR_ATTACH_DATA_OBJ, IID_IMessage, 0, 0);
@@ -746,7 +747,7 @@
 			$recipTable = mapi_message_getrecipienttable($this->message);
 			$recips = mapi_table_queryallrows($recipTable, array(PR_DISPLAY_NAME));
 
-			if (count($recips) > 0) {
+			if (!empty($recips)) {
 				$owner = array();
 				foreach ($recips as $value) {
 					$owner[] = $value[PR_DISPLAY_NAME];
@@ -804,7 +805,7 @@
 				$recips[] = $assignor;
 			}
 
-			if (count($recips) > 0)
+			if (!empty($recips))
 				mapi_message_modifyrecipients($task, MODRECIP_ADD, $recips);
 		}
 
@@ -849,7 +850,7 @@
 			$rows = mapi_table_queryallrows($contents, array(PR_ENTRYID, PR_PARENT_ENTRYID, PR_STORE_ENTRYID), $restriction);
 
 			$taskrequest = false;
-			if(count($rows) > 0) {
+			if(!empty($rows)) {
 				// If there are multiple, just use the first
 				$entryid = $rows[0][PR_ENTRYID];
 				$wastebasket = mapi_msgstore_openentry($store, $storeProps[PR_IPM_WASTEBASKET_ENTRYID]);
@@ -898,7 +899,8 @@
 												));
 
 				// No recipients found, return error
-				if (count($recips) == 0) return false;
+				if (empty($recips))
+					return false;
 
 				foreach($recips as $recip) {
 					$recip[PR_RECIPIENT_TYPE] = MAPI_TO;	// Change recipient type to MAPI_TO
@@ -927,8 +929,8 @@
 			$body = "";
 
 			if (isset($msgProps[PR_SUBJECT])) $body .= "\n" . _("Subject") . ":\t". $msgProps[PR_SUBJECT];
-			if (isset($msgProps[$this->props['startdate']])) $body .= "\n" . _("Start Date") . ":\t". strftime("%A, %B %d, %Y",$msgProps[$this->props['startdate']]);
-			if (isset($msgProps[$this->props['duedate']])) $body .= "\n" . _("Due Date") . ":\t". strftime("%A, %B %d, %Y",$msgProps[$this->props['duedate']]);
+			if (isset($msgProps[$this->props['startdate']])) $body .= "\n" . _("Start Date") . ":\t". strftime(_("%A, %B %d, %Y"),$msgProps[$this->props['startdate']]);
+			if (isset($msgProps[$this->props['duedate']])) $body .= "\n" . _("Due Date") . ":\t". strftime(_("%A, %B %d, %Y"),$msgProps[$this->props['duedate']]);
 			$body .= "\n";
 
 			if (isset($msgProps[$this->props['status']])) {
@@ -955,8 +957,8 @@
 			if (isset($msgProps[$this->props['owner']])) $body .= "\n" . _("Owner") . ":\t". $msgProps[$this->props['owner']];
 			$body .="\n";
 
-			if (isset($msgProps[$this->props['categories']]) && count($msgProps[$this->props['categories']]) > 0) $body .= "\nCategories:\t". implode(', ', $msgProps[$this->props['categories']]);
-			if (isset($msgProps[$this->props['companies']]) && count($msgProps[$this->props['companies']]) > 0) $body .= "\nCompany:\t". implode(', ', $msgProps[$this->props['companies']]);
+			if (isset($msgProps[$this->props['categories']]) && !empty($msgProps[$this->props['categories']])) $body .= "\nCategories:\t". implode(', ', $msgProps[$this->props['categories']]);
+			if (isset($msgProps[$this->props['companies']]) && !empty($msgProps[$this->props['companies']])) $body .= "\nCompany:\t". implode(', ', $msgProps[$this->props['companies']]);
 			if (isset($msgProps[$this->props['billinginformation']])) $body .= "\n" . _("Billing Information") . ":\t". $msgProps[$this->props['billinginformation']];
 			if (isset($msgProps[$this->props['mileage']])) $body .= "\n" . _("Mileage") . ":\t". $msgProps[$this->props['mileage']];
 			$body .="\n";

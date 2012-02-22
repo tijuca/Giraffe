@@ -255,7 +255,7 @@
 				// Retrieve next occurrence
 				$items = $this->getItems($start, $dayend, 1);
 
-				return (count($items) > 0) ? $items[0] : false;
+				return !empty($items) ? $items[0] : false;
 			}
 		}
 
@@ -425,7 +425,8 @@
 				$props[$this->proptags['reset_reminder']] = false;
 			}
 
-			if (count($props) > 0) mapi_setprops($this->message, $props);
+			if (!empty($props))
+				mapi_setprops($this->message, $props);
 		}
 
 		/**
