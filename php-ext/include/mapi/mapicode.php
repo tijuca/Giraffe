@@ -66,30 +66,12 @@ define('SEVERITY_ERROR',     1);
 
 /* from winerror.h */ 
 
-define('FACILITY_NULL'                                   ,0x0000);
-define('FACILITY_RPC'                                    ,0x0001);
-define('FACILITY_DISPATCH'                               ,0x0002);
-define('FACILITY_STORAGE'                                ,0x0003);
-define('FACILITY_ITF'                                    ,0x0004);
-define('FACILITY_WIN32'                                  ,0x0007);
-define('FACILITY_WINDOWS'                                ,0x0008);
-define('FACILITY_SSPI'                                   ,0x0009);
-define('FACILITY_CONTROL'                                ,0x000A);
-
-/**
- * Function to make an return code for errors or warnings
- */
-function make_mapi_scode($sev, $fac, $code)
-{
-	return (int) (($sev << 31) | ($fac << 16) | ($code));
-}
-
 /**
 * Function to make a error
 */
 function make_mapi_e($code)
 {
-    return (int) make_mapi_scode(1, FACILITY_ITF, $code);
+    return (int) mapi_make_scode(1, $code);
 }
 
 
@@ -98,7 +80,7 @@ function make_mapi_e($code)
 */
 function make_mapi_s($code)
 {
-    return (int) make_mapi_scode(0, FACILITY_ITF, $code);
+    return (int) mapi_make_scode(0, $code);
 }
 
 /* From mapicode.h */ 

@@ -119,6 +119,7 @@
 			$properties["meeting"] = "PT_LONG:PSETID_Appointment:0x8217";
 			$properties["startdate_recurring"] = "PT_SYSTIME:PSETID_Appointment:0x8235";
 			$properties["enddate_recurring"] = "PT_SYSTIME:PSETID_Appointment:0x8236";
+			$properties["recurring_pattern"] = "PT_STRING8:PSETID_Appointment:0x8232";
 			$properties["location"] = "PT_STRING8:PSETID_Appointment:0x8208";
 			$properties["duration"] = "PT_LONG:PSETID_Appointment:0x8213";
 			$properties["responsestatus"] = "PT_LONG:PSETID_Appointment:0x8218";
@@ -455,6 +456,12 @@
 			
 			$this->deleteAttachments();
 			$this->saveRecurrence();
+
+			// if client has not set the recurring_pattern then we should generate it and save it
+			$messageProps = mapi_getprops($this->message, Array($this->proptags["recurring_pattern"]));
+			if(empty($messageProps[$this->proptags["recurring_pattern"]])) {
+				$this->saveRecurrencePattern();
+			}
 		}
 		
 		// Returns the start or end time of the occurrence on the given base date.
@@ -545,7 +552,147 @@
 		 * CODE BELOW THIS LINE IS FOR INTERNAL USE ONLY
 		 *****************************************************************************************************************
 		 */
-		 
+
+		/**
+		 * Generates and stores recurrence pattern string to recurring_pattern property.
+		 */
+		function saveRecurrencePattern()
+		{
+			// Start formatting the properties in such a way we can apply
+			// them directly into the recurrence pattern.
+			$type = $this->recur['type'];
+			$everyn = $this->recur['everyn'];
+			$start = $this->recur['start'];
+			$end = $this->recur['end'];
+			$term = $this->recur['term'];
+			$numocc = isset($this->recur['numoccur']) ? $this->recur['numoccur'] : false;
+			$startocc = $this->recur['startocc'];
+			$endocc = $this->recur['endocc'];
+			$pattern = '';
+			$occSingleDayRank = false;
+			$occTimeRange = ($startocc != 0 && $endocc != 0);
+
+			switch ($type) {
+				// Daily
+				case 0x0A:
+					if ($everyn == 1) {
+						$type = _('workday');
+						$occSingleDayRank = true;
+					} else if ($everyn == (24 * 60)) {
+						$type = _('day');
+						$occSingleDayRank = true;
+					} else {
+						$everyn /= (24 * 60);
+						$type = _('days');
+						$occSingleDayRank = false;
+					}
+					break;
+				// Weekly
+				case 0x0B:
+					if ($everyn == 1) {
+						$type = _('week');
+						$occSingleDayRank = true;
+					} else {
+						$type = _('weeks');
+						$occSingleDayRank = false;
+					}
+					break;
+				// Monthly
+				case 0x0C:
+					if ($everyn == 1) {
+						$type = _('month');
+						$occSingleDayRank = true;
+					} else {
+						$type = _('months');
+						$occSingleDayRank = false;
+					}
+					break;
+				// Yearly
+				case 0x0D:
+					if ($everyn <= 12) {
+						$everyn = 1;
+						$type = _('year');
+						$occSingleDayRank = true;
+					} else {
+						$everyn = $everyn / 12;
+						$type = _('years');
+						$occSingleDayRank = false;
+					}
+					break;
+			}
+
+			// get timings of the first occurence
+			$firstoccstartdate = isset($startocc) ? $start + (((int) $startocc) * 60) : $start;
+			$firstoccenddate = isset($endocc) ? $end + (((int) $endocc) * 60) : $end;
+
+			$start = gmdate(_('d-m-Y'), $firstoccstartdate);
+			$end = gmdate(_('d-m-Y'), $firstoccenddate);
+			$startocc = gmdate(_('G:i'), $firstoccstartdate);
+			$endocc = gmdate(_('G:i'), $firstoccenddate);
+
+			// Based on the properties, we need to generate the recurrence pattern string.
+			// This is obviously very easy since we can simply concatenate a bunch of strings,
+			// however this messes up translations for languages which order their words
+			// differently.
+			// To improve translation quality we create a series of default strings, in which
+			// we only have to fill in the correct variables. The base string is thus selected
+			// based on the available properties.
+			if ($term == 0x23) {
+				// Never ends
+				if ($occTimeRange) {
+					if ($occSingleDayRank) {
+						$pattern = sprintf(_('Occurs every %s effective %s from %s to %s.'), $type, $start, $startocc, $endocc);
+					} else {
+						$pattern = sprintf(_('Occurs every %s %s effective %s from %s to %s.'), $everyn, $type, $start, $startocc, $endocc);
+					}
+				} else {
+					if ($occSingleDayRank) {
+						$pattern = sprintf(_('Occurs every %s effective %s.'), $type, $start);
+					} else {
+						$pattern = sprintf(_('Occurs every %s %s effective %s.'), $everyn, $type, $start);
+					}
+				}
+			} else if ($term == 0x22) {
+				// After a number of times
+				if ($occTimeRange) {
+					if ($occSingleDayRank) {
+						$pattern = sprintf(ngettext('Occurs every %s effective %s for %s occurence from %s to %s.',
+												'Occurs every %s effective %s for %s occurences from %s to %s.', $numocc), $type, $start, $numocc, $startocc, $endocc);
+					} else {
+						$pattern = sprintf(ngettext('Occurs every %s %s effective %s for %s occurence from %s to %s.',
+												'Occurs every %s %s effective %s for %s occurences %s to %s.', $numocc), $everyn, $type, $start, $numocc, $startocc, $endocc);
+					}
+				} else {
+					if ($occSingleDayRank) {
+						$pattern = sprintf(ngettext('Occurs every %s effective %s for %s occurence.',
+													 'Occurs every %s effective %s for %s occurences.', $numocc), $type, $start, $numocc);
+					} else {
+						$pattern = sprintf(ngettext('Occurs every %s %s effective %s for %s occurence.',
+														 'Occurs every %s %s effective %s for %s occurences.', $numocc), $everyn, $type, $start, $numocc);
+					}
+				}
+			} else if ($term == 0x21) {
+				// After the given enddate
+				if ($occTimeRange) {
+					if ($occSingleDayRank) {
+						$pattern = sprintf(_('Occurs every %s effective %s until %s from %s to %s.'), $type, $start, $end, $startocc, $endocc);
+					} else {
+						$pattern = sprintf(_('Occurs every %s %s effective %s until %s from %s to %s.'), $everyn, $type, $start, $end, $startocc, $endocc);
+					}
+				} else {
+					if ($occSingleDayRank) {
+						$pattern = sprintf(_('Occurs every %s effective %s until %s.'), $type, $start, $end);
+					} else {
+						$pattern = sprintf(_('Occurs every %s %s effective %s until %s.'), $everyn, $type, $start, $end);
+					}
+				}
+			}
+
+			if(!empty($pattern)) {
+				mapi_setprops($this->message, Array($this->proptags["recurring_pattern"] => $pattern ));
+			}
+		}
+
 		/*
 		 * Remove an exception by base_date. This is the base date in local daystart time
 		 */

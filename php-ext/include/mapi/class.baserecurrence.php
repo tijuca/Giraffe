@@ -1393,25 +1393,7 @@
 			}
 		}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-				/**
+		/**
 		* Function which converts a recurrence date timestamp to an unix date timestamp.
 		* @author Steve Hardy
 		* @param Int $rdate the date which will be converted

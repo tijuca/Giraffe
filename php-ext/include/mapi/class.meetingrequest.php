@@ -1694,7 +1694,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 			$subjectprefix = _("New Time Proposed");
 		}
 
-		$props[PR_SUBJECT] = u2w($subjectprefix) . ": " . $messageprops[PR_SUBJECT];
+		$props[PR_SUBJECT] = $subjectprefix . ": " . $messageprops[PR_SUBJECT];
 
 		$props[PR_MESSAGE_CLASS] = "IPM.Schedule.Meeting.Resp." . $classpostfix;
 		if(isset($messageprops[PR_OWNER_APPT_ID]))
@@ -3178,7 +3178,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 	 */
 	function setMeetingTimeInfo($meetingTimeInfo)
 	{
-		$this->meetingTimeInfo = u2w($meetingTimeInfo);
+		$this->meetingTimeInfo = $meetingTimeInfo;
 	}
 }
 ?>
