@@ -567,7 +567,7 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 
 	res = CompareVersions(sCurrentVersion, sLatestVersion);
 	if (res == 0) {
-		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Client update: trackid: 0x%08X, Client already has latest version.", sClientUpdateInfo.ulTrackId);
+		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Client update: trackid: 0x%08X, Client already has the latest version.", sClientUpdateInfo.ulTrackId);
 		goto ok;
 	} else if (res > 0) {
 		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Client update: trackid: 0x%08X, Client has newer version than server.", sClientUpdateInfo.ulTrackId);

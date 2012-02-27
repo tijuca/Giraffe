@@ -70,7 +70,7 @@ public:
 		eUnknownCharset,
 		eIllegalSequence
 	};
-	convert_exception(enum exception_type type, const std::string &message) throw();
+	convert_exception(enum exception_type type, const std::string &message);
 	
 	enum exception_type type() const {
 		return m_type;
@@ -86,7 +86,7 @@ private:
 class unknown_charset_exception : public convert_exception
 {
 public:
-	unknown_charset_exception(const std::string &message) throw();
+	unknown_charset_exception(const std::string &message);
 };
 
 /**
@@ -95,7 +95,7 @@ public:
 class illegal_sequence_exception : public convert_exception
 {
 public:
-	illegal_sequence_exception(const std::string &message) throw();
+	illegal_sequence_exception(const std::string &message);
 };
 
 

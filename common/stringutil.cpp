@@ -652,3 +652,84 @@ std::string urlDecode(const std::string &input)
 
 	return output;
 }
+
+
+/** 
+ * Convert a memory buffer with strings with Unix \n enters to DOS
+ * \r\n enters.
+ * 
+ * @param[in] size length of the input
+ * @param[in] input buffer containing strings with enters to convert
+ * @param[out] output buffer with enough space to hold input + extra \r characters
+ * @param[out] outsize number of characters written to output
+ */
+void BufferLFtoCRLF(size_t size, const char *input, char *output, size_t *outsize) {
+	size_t j = 0;
+	for (size_t i = 0; i < size; i++) {
+		if (input[i] == '\r') {
+			if ((i+1) < size && input[i+1] == '\n') {
+				output[j++] = '\r';
+				output[j++] = '\n';
+				i++;
+			} else {
+				output[j++] = '\r';
+				output[j++] = '\n';
+			}
+		} else if (input[i] == '\n') {
+			output[j++] = '\r';
+			output[j++] = '\n';
+		} else {
+			output[j++] = input[i];
+		}
+	}
+	output[j] = '\0';
+	*outsize = j;
+}
+
+/**
+ * converts Tabs in a string to spaces
+ *
+ * @param[in] 	strInput		input string to be converted
+ * @param[out] 	strOutput		return converted string
+ */
+void StringTabtoSpaces(const std::wstring &strInput, std::wstring *lpstrOutput) {
+
+	std::wstring::const_iterator iInput(strInput.begin());
+	std::wstring strOutput;
+
+	strOutput.reserve(strInput.length());
+
+	for (; iInput != strInput.end(); ++iInput) {
+		if (*iInput == '\t') {
+			strOutput.append(4, ' ');
+		} else {
+			strOutput.append(1, *iInput);
+		}
+	}
+
+	lpstrOutput->swap(strOutput);
+}
+
+/**
+ * converts CRLF in a string to LF
+ *
+ * @param[in] strInput		input string to be converted
+ * @param[out] strOutput	return converted string
+ */
+void StringCRLFtoLF(const std::wstring &strInput, std::wstring *lpstrOutput) {
+	std::wstring::const_iterator iInput(strInput.begin());
+	std::wstring strOutput;
+
+	strOutput.reserve(strInput.length());
+
+	for (; iInput != strInput.end(); ++iInput) {
+		
+		// skips /r if /r/n found together in the text
+		if (*iInput == '\r' && (iInput + 1 != strInput.end() && *(iInput + 1) == '\n')) 
+			continue;
+		else
+			strOutput.append(1, *iInput);
+		
+	}
+	lpstrOutput->swap(strOutput);
+}

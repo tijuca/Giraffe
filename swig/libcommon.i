@@ -12,6 +12,7 @@
     #include "favoritesutil.h"
     #include "Util.h"
 	#include "ECLogger.h"
+    #include "fileutil.h"
 %}
 
 %include "wchar.i"
@@ -82,3 +83,9 @@ public:
     static ULONG GetBestBody(IMAPIProp *lpPropObj, ULONG ulFlags);
 };
 
+// functions from common/fileutil.h
+%inline %{
+    bool ConvertFileFromUCS2ToUTF8(std::string strSrcFileName, std::string strDstFileName) {
+        return ConvertFileFromUCS2ToUTF8(NULL, strSrcFileName, strDstFileName);
+    }
+%}

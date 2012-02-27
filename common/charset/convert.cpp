@@ -65,16 +65,16 @@
 static char THIS_FILE[] = __FILE__;
 #endif
 
-convert_exception::convert_exception(enum exception_type type, const std::string &message) throw()
+convert_exception::convert_exception(enum exception_type type, const std::string &message)
 	: std::runtime_error(message)
 	, m_type(type)
 {}
 
-unknown_charset_exception::unknown_charset_exception(const std::string &message) throw()
+unknown_charset_exception::unknown_charset_exception(const std::string &message) 
 	: convert_exception(eUnknownCharset, message) 
 {}
 
-illegal_sequence_exception::illegal_sequence_exception(const std::string &message) throw()
+illegal_sequence_exception::illegal_sequence_exception(const std::string &message)
 	: convert_exception(eIllegalSequence, message)
 {}
 

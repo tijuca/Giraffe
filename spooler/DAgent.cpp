@@ -82,6 +82,7 @@
 #include <map>
 
 #include "mapi_ptr.h"
+#include "fileutil.h"
 
 #include <errno.h>
 #include <sys/types.h>
@@ -545,7 +546,7 @@ void SaveRawMessage(FILE *fp, char *lpRecipient)
 		sprintf(szBuff, "_%04d%02d%02d%02d%02d%02d_%08x.eml", tmResult.tm_year+1900, tmResult.tm_mon+1, tmResult.tm_mday, tmResult.tm_hour, tmResult.tm_min, tmResult.tm_sec, rand_mt());
 		strFileName += szBuff;
 
-		if(Util::DupFile(g_lpLogger, fp, strFileName))
+		if(DuplicateFile(g_lpLogger, fp, strFileName))
 			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Raw message saved to '%s'", strFileName.c_str());
 	}
 }
@@ -2487,7 +2488,7 @@ HRESULT ProcessDeliveryToSingleRecipient(IMAPISession *lpSession, LPADRBOOK lpAd
 	rewind(fp);
 
 	/* Read file into string */
-	hr = Util::HrMapFileToString(fp, &strMail);
+	hr = HrMapFileToString(fp, &strMail);
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to map input to memory");
 		goto exit;
@@ -2532,7 +2533,7 @@ HRESULT ProcessDeliveryToCompany(IMAPISession *lpSession, LPADRBOOK lpAdrBook, F
 	rewind(fp);
 
 	/* Read file into string */
-	hr = Util::HrMapFileToString(fp, &strMail);
+	hr = HrMapFileToString(fp, &strMail);
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to map input to memory");
 		goto exit;
@@ -3155,7 +3156,7 @@ HRESULT deliver_recipient(char *recipient, bool bStringEmail, FILE *file, Delive
 	FILE *fpMail = NULL;
 
 	/* Make sure file uses CRLF */
-	if(Util::FileLFtoCRLF(file, &fpMail) != hrSuccess) {
+	if(HrFileLFtoCRLF(file, &fpMail) != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to convert input to CRLF format");
 		fpMail = file;
 	}

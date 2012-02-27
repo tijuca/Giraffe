@@ -1664,7 +1664,7 @@ HRESULT MAPIToVMIME::handleTextparts(IMessage* lpMessage, vmime::messageBuilder 
 				char *crlfconv = NULL;
 				size_t outsize = 0;
 				crlfconv = new char[strBodyConverted.length()*2+1];
-				Util::BufferLFtoCRLF(strBodyConverted.length(), strBodyConverted.c_str(), crlfconv, &outsize);
+				BufferLFtoCRLF(strBodyConverted.length(), strBodyConverted.c_str(), crlfconv, &outsize);
 				strBodyConverted.assign(crlfconv, outsize);
 				delete [] crlfconv;
 

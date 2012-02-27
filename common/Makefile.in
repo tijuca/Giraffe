@@ -91,7 +91,7 @@ am__libcommon_util_la_SOURCES_DIST = platform.cpp platform.linux.cpp \
 	charset/convert.cpp charset/convstring.cpp charset/traits.cpp \
 	charset/localeutil.cpp TimeUtil.cpp RecurrenceState.cpp \
 	ECGetText.cpp threadutil.cpp ECRestriction.cpp userutil.cpp \
-	ECFeatures.cpp ECACL.cpp ECThreadPool.cpp \
+	ECFeatures.cpp ECACL.cpp fileutil.cpp ECThreadPool.cpp \
 	ustringutil/itercomp.cpp ustringutil/utf32iter.cpp \
 	ustringutil/utf8iter.cpp ustringutil/utfutil.cpp
 @HAVE_ICU_TRUE@am__objects_1 = itercomp.lo utf32iter.lo utf8iter.lo \
@@ -103,7 +103,8 @@ am_libcommon_util_la_OBJECTS = platform.lo platform.linux.lo md5.lo \
 	ustringutil.lo SymmetricCrypt.lo convert.lo convstring.lo \
 	traits.lo localeutil.lo TimeUtil.lo RecurrenceState.lo \
 	ECGetText.lo threadutil.lo ECRestriction.lo userutil.lo \
-	ECFeatures.lo ECACL.lo ECThreadPool.lo $(am__objects_1)
+	ECFeatures.lo ECACL.lo fileutil.lo ECThreadPool.lo \
+	$(am__objects_1)
 libcommon_util_la_OBJECTS = $(am_libcommon_util_la_OBJECTS)
 libcommon_util_la_LINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
@@ -344,6 +345,7 @@ libcommon_mapi_la_include_HEADERS = rtfutil.h mapiext.h ECGuid.h ECTags.h ECDefs
 				  TimeUtil.h ECGetText.h ECInvariantChecker.h tstring.h mapi_ptr.h utf8.h ECRestriction.h threadutil.h				\
 				  HtmlToTextParser.h HtmlEntity.h userutil.h ECFeatures.h ECFeatureList.h ECDebugPrint.h ECInterfaceDefs.h			\
 				  HrException.h ECIterators.h ECACL.h pthreadutil.h ECThreadPool.h MAPINotifSink.h \
+				  fileutil.h \
 				  $(charset_HEADERS) $(utf8_HEADERS) $(ustringutil_HEADERS) $(mapiptr_HEADERS)
 
 libcommon_mapi_la_includedir = $(includedir)/zarafa
@@ -381,7 +383,8 @@ libcommon_util_la_SOURCES = platform.cpp platform.linux.cpp md5.cpp \
 	charset/convert.cpp charset/convstring.cpp charset/traits.cpp \
 	charset/localeutil.cpp TimeUtil.cpp RecurrenceState.cpp \
 	ECGetText.cpp threadutil.cpp ECRestriction.cpp userutil.cpp \
-	ECFeatures.cpp ECACL.cpp ECThreadPool.cpp $(am__append_1)
+	ECFeatures.cpp ECACL.cpp fileutil.cpp ECThreadPool.cpp \
+	$(am__append_1)
 libcommon_ssl_la_LDFLAGS = -static
 libcommon_ssl_la_SOURCES = \
 			SSLUtil.cpp								\
@@ -520,6 +523,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/convert.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/convstring.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/favoritesutil.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fileutil.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/itercomp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/localeutil.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/md5.Plo@am__quote@

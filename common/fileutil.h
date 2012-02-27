@@ -47,33 +47,18 @@
  * 
  */
 
-#ifndef MAPINOTIFSINK_H
-#define MAPINOTIFSINK_H
+#ifndef _FILEUTIL_H
+#define _FILEUTIL_H
 
-#include <list>
-#include <mapi.h>
-#include <mapix.h>
-#include <mapidefs.h>
-#include <pthread.h>
+#include <string>
 
-class MAPINotifSink : public IMAPIAdviseSink {
-public:
-    MAPINotifSink();
-    virtual ~MAPINotifSink();
+HRESULT HrFileLFtoCRLF(FILE *fin, FILE** fout);
+HRESULT HrMapFileToString(FILE *f, std::string *lpstrBuffer, int *lpSize = NULL);
+HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize, bool *lpImmap);
+HRESULT HrUnmapFileBuffer(char *lpBuffer, int ulSize, bool bImmap);
 
-    virtual ULONG __stdcall		AddRef();
-    virtual ULONG __stdcall		Release();
-    virtual HRESULT __stdcall	QueryInterface(REFIID iid, void **lpvoid);
-    
-    virtual ULONG __stdcall 	OnNotify(ULONG cNotif, LPNOTIFICATION lpNotifications);
-    virtual HRESULT __stdcall 	GetNotifications(ULONG *lpcNotif, LPNOTIFICATION *lppNotifications, BOOL fNonBlock, ULONG timeout);
+bool DuplicateFile(ECLogger *lpLogger, FILE *lpFile, std::string &strFileName);
 
-private:
-    pthread_mutex_t m_hMutex;
-    pthread_cond_t 	m_hCond;
-    bool			m_bExit;
-    std::list<NOTIFICATION *> m_lstNotifs;
-};
+bool ConvertFileFromUCS2ToUTF8(ECLogger *lpLogger, const std::string &strSrcFileName, const std::string &strDstFileName);
 
 #endif
-

@@ -2634,6 +2634,7 @@ namespace swig {
     #include "favoritesutil.h"
     #include "Util.h"
 	#include "ECLogger.h"
+    #include "fileutil.h"
 
 
 #include <cwchar>
@@ -3040,6 +3041,11 @@ SWIG_From_unsigned_SS_int  (unsigned int value)
 {    
   return SWIG_From_unsigned_SS_long  (value);
 }
+
+
+    bool ConvertFileFromUCS2ToUTF8(std::string strSrcFileName, std::string strDstFileName) {
+        return ConvertFileFromUCS2ToUTF8(NULL, strSrcFileName, strDstFileName);
+    }
 
 #ifdef __cplusplus
 extern "C" {
@@ -3842,6 +3848,48 @@ SWIGINTERN PyObject *Util_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject 
   return SWIG_Py_Void();
 }
 
+SWIGINTERN PyObject *_wrap_ConvertFileFromUCS2ToUTF8(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  std::string arg1 ;
+  std::string arg2 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  bool result;
+  
+  SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+  if (!PyArg_ParseTuple(args,(char *)"OO:ConvertFileFromUCS2ToUTF8",&obj0,&obj1)) SWIG_fail;
+  {
+    std::string *ptr = (std::string *)0;
+    int res = SWIG_AsPtr_std_string(obj0, &ptr);
+    if (!SWIG_IsOK(res) || !ptr) {
+      SWIG_exception_fail(SWIG_ArgError((ptr ? res : SWIG_TypeError)), "in method '" "ConvertFileFromUCS2ToUTF8" "', argument " "1"" of type '" "std::string""'"); 
+    }
+    arg1 = *ptr;
+    if (SWIG_IsNewObj(res)) delete ptr;
+  }
+  {
+    std::string *ptr = (std::string *)0;
+    int res = SWIG_AsPtr_std_string(obj1, &ptr);
+    if (!SWIG_IsOK(res) || !ptr) {
+      SWIG_exception_fail(SWIG_ArgError((ptr ? res : SWIG_TypeError)), "in method '" "ConvertFileFromUCS2ToUTF8" "', argument " "2"" of type '" "std::string""'"); 
+    }
+    arg2 = *ptr;
+    if (SWIG_IsNewObj(res)) delete ptr;
+  }
+  {
+    SWIG_PYTHON_THREAD_BEGIN_ALLOW;
+    result = (bool)ConvertFileFromUCS2ToUTF8(arg1,arg2);
+    SWIG_PYTHON_THREAD_END_ALLOW;
+  }
+  resultobj = SWIG_From_bool(static_cast< bool >(result));
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return resultobj;
+fail:
+  SWIG_PYTHON_THREAD_END_BLOCK;
+  return NULL;
+}
+
+
 static PyMethodDef SwigMethods[] = {
 	 { (char *)"CHtmlToTextParser_Parse", _wrap_CHtmlToTextParser_Parse, METH_VARARGS, NULL},
 	 { (char *)"CHtmlToTextParser_GetText", _wrap_CHtmlToTextParser_GetText, METH_VARARGS, NULL},
@@ -3861,6 +3909,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"new_Util", _wrap_new_Util, METH_VARARGS, NULL},
 	 { (char *)"delete_Util", _wrap_delete_Util, METH_VARARGS, NULL},
 	 { (char *)"Util_swigregister", Util_swigregister, METH_VARARGS, NULL},
+	 { (char *)"ConvertFileFromUCS2ToUTF8", _wrap_ConvertFileFromUCS2ToUTF8, METH_VARARGS, NULL},
 	 { NULL, NULL, 0, NULL }
 };
 
