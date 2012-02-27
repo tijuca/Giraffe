@@ -254,8 +254,11 @@ target_alias = @target_alias@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 SUBDIRS = linux userscripts quotamail indexerscripts
-dist_data_DATA = ldap/zarafa.schema licenseagreement/eula.txt licenseagreement/AGPL-3
-all: all-recursive
+dist_data_DATA = ldap/zarafa.schema zarafa.ldif licenseagreement/eula.txt licenseagreement/AGPL-3
+BUILT_SOURCES = zarafa.ldif
+EXTRA_DIST = ldap/ol-schema-migrate.pl
+all: $(BUILT_SOURCES)
+	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
 .SUFFIXES:
 $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
@@ -485,14 +488,16 @@ distdir: $(DISTFILES)
 	  fi; \
 	done
 check-am: all-am
-check: check-recursive
+check: $(BUILT_SOURCES)
+	$(MAKE) $(AM_MAKEFLAGS) check-recursive
 all-am: Makefile $(DATA)
 installdirs: installdirs-recursive
 installdirs-am:
 	for dir in "$(DESTDIR)$(datadir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
-install: install-recursive
+install: $(BUILT_SOURCES)
+	$(MAKE) $(AM_MAKEFLAGS) install-recursive
 install-exec: install-exec-recursive
 install-data: install-data-recursive
 uninstall: uninstall-recursive
@@ -516,6 +521,7 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
+	-test -z "$(BUILT_SOURCES)" || rm -f $(BUILT_SOURCES)
 clean: clean-recursive
 
 clean-am: clean-generic clean-libtool mostlyclean-am
@@ -588,6 +594,9 @@ uninstall-am: uninstall-dist_dataDATA
 	ps ps-am tags tags-recursive uninstall uninstall-am \
 	uninstall-dist_dataDATA
 
+
+$(BUILT_SOURCES): ldap/zarafa.schema ldap/ol-schema-migrate.pl
+	${top_srcdir}/installer/ldap/ol-schema-migrate.pl -b ${top_srcdir}/installer/ldap/zarafa.schema > ${top_builddir}/installer/zarafa.ldif
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:
