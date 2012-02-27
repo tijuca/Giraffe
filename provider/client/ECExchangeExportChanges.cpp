@@ -535,32 +535,23 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 
 				case ICS_SOFT_DELETE:
 				case ICS_HARD_DELETE:
-					if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_NEW) {
-						LOG_DEBUG(m_lpLogger, "Ignoring previous ICS_NEW due to current ICS_xxxx_DELETE. sourcekey=%s", bin2hex(m_lpChanges[ulStep].sSourceKey.cb, m_lpChanges[ulStep].sSourceKey.lpb).c_str());
-						// An add and a delete results in nothing.
+					// We'll ignore the previous change and replace it with this delete. We won't write it now as
+					// we could get an add for the same object. But because of the reordering (deletes after all adds/changes) we would delete
+					// the new object. Therefore we'll make a change out of a delete - add/change.
+					LOG_DEBUG(m_lpLogger, "Replacing previous change with current ICS_xxxx_DELETE. prev_change=%04x, sourcekey=%s", iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey.cb, m_lpChanges[ulStep].sSourceKey.lpb).c_str());
+					if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_NEW || ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_CHANGE)
 						lstChange.erase(iterLastChange->second);
-						mapChanges.erase(iterLastChange);
-					}
+					else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_FLAG)
+						m_lstFlag.erase(iterLastChange->second);
+					else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE)
+						m_lstSoftDelete.erase(iterLastChange->second);
+					else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_HARD_DELETE)
+						m_lstHardDelete.erase(iterLastChange->second);
 
-					else {
-						// We'll ignore the previous change and replace it with this delete. We won't write it now as
-						// we could get an add for the same object. But because of the reordering (deletes after all adds/changes) we would delete
-						// the new object. Therefore we'll make a change out of a delete - add/change.
-						LOG_DEBUG(m_lpLogger, "Replacing previous change with current ICS_xxxx_DELETE. prev_change=%04x, sourcekey=%s", iterLastChange->second->ulChangeType, bin2hex(m_lpChanges[ulStep].sSourceKey.cb, m_lpChanges[ulStep].sSourceKey.lpb).c_str());
-						if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_CHANGE)
-							lstChange.erase(iterLastChange->second);
-						else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_FLAG)
-							m_lstFlag.erase(iterLastChange->second);
-						else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_SOFT_DELETE)
-							m_lstSoftDelete.erase(iterLastChange->second);
-						else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_HARD_DELETE)
-							m_lstHardDelete.erase(iterLastChange->second);
-
-						if (m_lpChanges[ulStep].ulChangeType == ICS_SOFT_DELETE)
-							iterLastChange->second = m_lstSoftDelete.insert(m_lstSoftDelete.end(), m_lpChanges[ulStep]);
-						else
-							iterLastChange->second = m_lstHardDelete.insert(m_lstHardDelete.end(), m_lpChanges[ulStep]);
-					}
+					if (m_lpChanges[ulStep].ulChangeType == ICS_SOFT_DELETE)
+						iterLastChange->second = m_lstSoftDelete.insert(m_lstSoftDelete.end(), m_lpChanges[ulStep]);
+					else
+						iterLastChange->second = m_lstHardDelete.insert(m_lstHardDelete.end(), m_lpChanges[ulStep]);
 					break;
 
 				default:
