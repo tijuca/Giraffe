@@ -1746,10 +1746,10 @@ HRESULT HrOverrideFallbackProps(IMessage *lpMessage, ECRecipient *lpRecip)
 	// Set From: and To: to the receiving party, reply will be to yourself...
 	// Too much information?
 	sPropOverride[ulPropPos].ulPropTag = PR_SENDER_NAME_W;
-	sPropOverride[ulPropPos++].Value.lpszW = L"Zarafa System";
+	sPropOverride[ulPropPos++].Value.lpszW = L"System Administrator";
 
 	sPropOverride[ulPropPos].ulPropTag = PR_SENT_REPRESENTING_NAME_W;
-	sPropOverride[ulPropPos++].Value.lpszW = L"Zarafa System";
+	sPropOverride[ulPropPos++].Value.lpszW = L"System Administrator";
 
 	sPropOverride[ulPropPos].ulPropTag = PR_RECEIVED_BY_NAME_W;
 	sPropOverride[ulPropPos++].Value.lpszW = (WCHAR *)lpRecip->wstrEmail.c_str();
