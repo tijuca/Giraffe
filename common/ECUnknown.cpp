@@ -168,6 +168,42 @@ HRESULT ECUnknown::SetParent(ECUnknown *lpParent) {
 	return hrSuccess;
 }
 
+/** 
+ * Returns whether this object is the parent of passed object
+ * 
+ * @param lpObject Possible child object
+ * 
+ * @return this is a parent of lpObject, or not
+ */
+BOOL ECUnknown::IsParentOf(ECUnknown *lpObject) {
+	while (lpObject && lpObject->lpParent) {
+		if (lpObject->lpParent == this)
+			return TRUE;
+		lpObject = lpObject->lpParent;
+	}
+	return FALSE;
+}
+
+/** 
+ * Returns whether this object is a child of passed object
+ * 
+ * @param lpObject IUnknown object which may be a child of this
+ * 
+ * @return lpObject is a parent of this, or not
+ */
+BOOL ECUnknown::IsChildOf(ECUnknown *lpObject) {
+	std::list<ECUnknown *>::iterator i;
+	if (lpObject) {
+		for (i = lpObject->lstChildren.begin(); i != lpObject->lstChildren.end(); i++) {
+			if (this == *i)
+				return TRUE;
+			if (this->IsChildOf(*i))
+				return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 // We kill the local object if there are no external (AddRef()) and no internal
 // (AddChild) objects depending on us. 
 

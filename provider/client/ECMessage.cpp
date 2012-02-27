@@ -2194,30 +2194,27 @@ HRESULT ECMessage::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArra
 		lpDestTop = lpECMAPIProp->m_lpRoot;
 		lpSourceTop = this->m_lpRoot;
 
-		if(lpDestTop == lpSourceTop) {
-			// Source and destination are the same in-memory object
-			hr = MAPI_E_NO_ACCESS;
-			goto exit;
-		}
+		// destination may not be a child of the source, but source can be a child of destination
+		if (!this->IsChildOf(lpDestTop)) {
+			// ICS expects the entryids to be equal. So check if the objects reside on
+			// the same server as well.
+			hr = lpDestTop->GetMsgStore()->lpTransport->GetServerGUID(&sDestServerGuid);
+			if (hr != hrSuccess)
+				goto exit;
 
-		// ICS expects the entryids to be equal. So check if the objects reside on
-		// the same server as well.
-		hr = lpDestTop->GetMsgStore()->lpTransport->GetServerGUID(&sDestServerGuid);
-		if (hr != hrSuccess)
-			goto exit;
+			hr = lpSourceTop->GetMsgStore()->lpTransport->GetServerGUID(&sSourceServerGuid);
+			if (hr != hrSuccess)
+				goto exit;
 
-		hr = lpSourceTop->GetMsgStore()->lpTransport->GetServerGUID(&sSourceServerGuid);
-		if (hr != hrSuccess)
-			goto exit;
+			if(lpDestTop->m_lpEntryId && lpSourceTop->m_lpEntryId && 
+			   lpDestTop->m_cbEntryId == lpSourceTop->m_cbEntryId && 
+			   memcmp(lpDestTop->m_lpEntryId, lpSourceTop->m_lpEntryId, lpDestTop->m_cbEntryId) == 0 &&
+			   sDestServerGuid == sSourceServerGuid) {
+				// Source and destination are the same on-disk objects (entryids are equal)
 
-		if(lpDestTop->m_lpEntryId && lpSourceTop->m_lpEntryId && 
-			lpDestTop->m_cbEntryId == lpSourceTop->m_cbEntryId && 
-			memcmp(lpDestTop->m_lpEntryId, lpSourceTop->m_lpEntryId, lpDestTop->m_cbEntryId) == 0 &&
-			sDestServerGuid == sSourceServerGuid) {
-			// Source and destination are the same on-disk objects (entryids are equal)
-
-			hr = MAPI_E_NO_ACCESS;
-			goto exit;
+				hr = MAPI_E_NO_ACCESS;
+				goto exit;
+			}
 		}
 
 		lpECMAPIProp->Release();

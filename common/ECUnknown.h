@@ -105,9 +105,10 @@ public:
 
 	// lpParent is public because it is always thread-safe and valid
 	ECUnknown				*lpParent;
+	virtual BOOL IsParentOf(ECUnknown *lpObject);
+	virtual BOOL IsChildOf(ECUnknown *lpObject);
 
 protected:
-
 	// Called by AddChild
 	virtual HRESULT SetParent(ECUnknown *lpParent);
 
