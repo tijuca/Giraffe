@@ -327,6 +327,7 @@ ZEND_FUNCTION(mapi_wrap_importcontentschanges);
 ZEND_FUNCTION(mapi_wrap_importhierarchychanges);
 
 ZEND_FUNCTION(mapi_inetmapi_imtoinet);
+ZEND_FUNCTION(mapi_inetmapi_imtomapi);
 
 #if SUPPORT_EXCEPTIONS
 ZEND_FUNCTION(mapi_enable_exceptions);

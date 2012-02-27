@@ -447,6 +447,7 @@ zend_function_entry mapi_functions[] =
 	ZEND_FE(mapi_wrap_importhierarchychanges, first_arg_force_ref)
 
 	ZEND_FE(mapi_inetmapi_imtoinet, NULL)
+	ZEND_FE(mapi_inetmapi_imtomapi, NULL)
 	
 #if SUPPORT_EXCEPTIONS
 	ZEND_FE(mapi_enable_exceptions, NULL)
@@ -7632,7 +7633,6 @@ ZEND_FUNCTION(mapi_inetmapi_imtoinet)
     
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rrra", &resSession, &resAddrBook, &resMessage, &resOptions) == FAILURE) return;
     
-    // ZEND_FETCH_RESOURCE(lpImportHierarchyChanges, IExchangeImportHierarchyChanges *, &resImportHierarchyChanges, -1, name_mapi_exportchanges, le_mapi_exportchanges);
     ZEND_FETCH_RESOURCE(lpMAPISession, IMAPISession *, &resSession, -1, name_mapi_session, le_mapi_session);
     ZEND_FETCH_RESOURCE(lpAddrBook, IAddrBook *, &resAddrBook, -1, name_mapi_addrbook, le_mapi_addrbook);
     ZEND_FETCH_RESOURCE(lpMessage, IMessage *, &resMessage, -1, name_mapi_message, le_mapi_message);
@@ -7662,6 +7662,50 @@ exit:
     return;    
 }
 
+ZEND_FUNCTION(mapi_inetmapi_imtomapi)
+{
+    zval *resSession;
+    zval *resStore;
+    zval *resAddrBook;
+    zval *resMessage;
+    zval *resOptions;
+    ECLogger_Null logger;
+    delivery_options dopt;
+    ULONG cbString = 0;
+    char *szString = NULL;
+    
+    imopt_default_delivery_options(&dopt);
+    
+    IMAPISession *lpMAPISession = NULL;
+    IAddrBook *lpAddrBook = NULL;
+    IMessage *lpMessage = NULL;
+    IMsgStore *lpMsgStore = NULL;
+    
+    RETVAL_FALSE;
+    MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
+    
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rrrrsa", &resSession, &resStore, &resAddrBook, &resMessage, &szString, &cbString, &resOptions) == FAILURE) return;
+    
+    ZEND_FETCH_RESOURCE(lpMAPISession, IMAPISession *, &resSession, -1, name_mapi_session, le_mapi_session);
+    ZEND_FETCH_RESOURCE(lpMsgStore, IMsgStore *, &resStore, -1, name_mapi_msgstore, le_mapi_msgstore);
+    ZEND_FETCH_RESOURCE(lpAddrBook, IAddrBook *, &resAddrBook, -1, name_mapi_addrbook, le_mapi_addrbook);
+    ZEND_FETCH_RESOURCE(lpMessage, IMessage *, &resMessage, -1, name_mapi_message, le_mapi_message);
+
+    std::string strInput(szString, cbString);
+    
+    MAPI_G(hr) = IMToMAPI(lpMAPISession, lpMsgStore, lpAddrBook, lpMessage, strInput, dopt, &logger);
+
+    if(MAPI_G(hr) != hrSuccess)
+        goto exit;
+        
+    RETVAL_TRUE;
+    
+exit:
+
+    THROW_ON_ERROR();
+    return;
+}    
+
 #if SUPPORT_EXCEPTIONS
 ZEND_FUNCTION(mapi_enable_exceptions)
 {
@@ -7686,7 +7730,7 @@ ZEND_FUNCTION(mapi_enable_exceptions)
 // Can be queried by client applications to check whether certain API features are supported or not.
 ZEND_FUNCTION(mapi_feature)
 {
-    char *features[] = { "LOGONFLAGS", "NOTIFICATIONS" };
+    char *features[] = { "LOGONFLAGS", "NOTIFICATIONS", "INETMAPI_IMTOMAPI" };
     char *szFeature = NULL;
     long cbFeature;
     
