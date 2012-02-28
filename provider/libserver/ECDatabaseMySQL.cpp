@@ -944,6 +944,7 @@ ECRESULT ECDatabaseMySQL::Commit() {
 
 ECRESULT ECDatabaseMySQL::Rollback() {
 	ECRESULT er = erSuccess;
+
 	er = Query("ROLLBACK");
 	
 #ifdef DEBUG

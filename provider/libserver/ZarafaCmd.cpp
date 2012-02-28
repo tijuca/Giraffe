@@ -10926,6 +10926,17 @@ SOAP_ENTRY_START(importMessageFromStream, *result, unsigned int ulFlags, unsigne
 	if (er != erSuccess)
 		goto exit;
 
+	// Get the parent object id.
+	er = lpecSession->GetObjectFromEntryId(&sFolderEntryId, &ulParentId);
+	if (er != erSuccess)
+		goto exit;
+		
+	// Lock the parent folder
+	strQuery = "SELECT val_ulong FROM properties WHERE hierarchyid = " + stringify(ulParentId) + " FOR UPDATE";
+	er = lpDatabase->DoSelect(strQuery, NULL);
+	if (er != erSuccess)
+		goto exit;
+
 	if (!bIsNew) {
 		// Delete the existing message and recreate it
 		er = lpecSession->GetObjectFromEntryId(&sEntryId, &ulObjectId);
@@ -10990,11 +11001,6 @@ SOAP_ENTRY_START(importMessageFromStream, *result, unsigned int ulFlags, unsigne
 		}
 
 	}
-
-	// Get the parent object id.
-	er = lpecSession->GetObjectFromEntryId(&sFolderEntryId, &ulParentId);
-	if (er != erSuccess)
-		goto exit;
 
 	// Create the message
 	if (bIsNew) {
