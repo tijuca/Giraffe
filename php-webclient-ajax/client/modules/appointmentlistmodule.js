@@ -394,6 +394,11 @@ appointmentlistmodule.prototype.deleteAppointment = function(entryid, basedate, 
 		 */
 		if(endtime.getTime() > (new Date().getTime()) && selectedElement.requestsent && selectedElement.requestsent == "1") {
 			if(selectedElement.meetingrequest && parseInt(selectedElement.meetingrequest, 10) == 1) {
+				/**
+				 * with FF6 and above we have a problem of focus if a confirm box is called from parentwidow 
+				 * when another dialog is opened, so to get the focus back to correct window/dialog we do this call
+				 */
+				window.focus();
 				send = confirm(_("Would you like to send an update to the attendees regarding cancellation of this meeting?"));
 				//if user does not want to cancel/delete the meeting,we want like to ignore this action
 				if(send == false) return true;
