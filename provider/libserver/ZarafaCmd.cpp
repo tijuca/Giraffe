@@ -1408,7 +1408,7 @@ ECRESULT PrepareReadProps(struct soap *soap, ECSession *lpecSession, unsigned in
 	if(ulObjId)
         strQuery = "SELECT " + (std::string)PROPCOLORDER + ",hierarchyid FROM properties FORCE INDEX (PRIMARY) WHERE hierarchyid="+stringify(ulObjId);
     else
-        strQuery = "SELECT " + (std::string)PROPCOLORDER + ",hierarchy.id FROM properties JOIN hierarchy ON hierarchy.id=properties.hierarchyid WHERE parent="+stringify(ulParentId);
+        strQuery = "SELECT " + (std::string)PROPCOLORDER + ",hierarchy.id FROM properties FORCE INDEX (PRIMARY) JOIN hierarchy FORCE INDEX (parenttypeflags) ON hierarchy.id=properties.hierarchyid WHERE parent="+stringify(ulParentId);
 
     er = lpDatabase->DoSelect(strQuery, &lpDBResult);
     if(er != erSuccess)
