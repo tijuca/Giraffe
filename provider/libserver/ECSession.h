@@ -102,7 +102,7 @@ public:
 	virtual unsigned int GetCapabilities();
 	virtual ECSessionManager* GetSessionManager();
 	virtual ECUserManagement* GetUserManagement();
-	virtual ECDatabase* GetDatabase();
+	virtual ECRESULT GetDatabase(ECDatabase **lppDatabase);
 	ECRESULT GetServerGUID(GUID* lpServerGuid);
 	ECRESULT GetNewSourceKey(SOURCEKEY* lpSourceKey);
 

@@ -122,7 +122,7 @@ ECRESULT ECConvenientDepthObjectTable::Create(ECSession *lpSession, unsigned int
 
 ECRESULT ECConvenientDepthObjectTable::Load() {
 	ECRESULT er = erSuccess;
-	ECDatabase *lpDatabase = lpSession->GetDatabase();;
+	ECDatabase *lpDatabase = NULL;
 	DB_RESULT 	lpDBResult = NULL;
 	DB_ROW		lpDBRow = NULL;
 	std::string	strQuery;
@@ -141,10 +141,9 @@ ECRESULT ECConvenientDepthObjectTable::Load() {
 
 	FOLDERINFO sRoot;
 
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	sRoot.ulFolderId = ulFolderId;
 	sRoot.strFolderName.clear();

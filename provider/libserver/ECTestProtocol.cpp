@@ -66,14 +66,19 @@ ECRESULT TestPerform(struct soap *soap, ECSession *lpSession, char *szCommand, u
     if(stricmp(szCommand, "purge_deferred") == 0) {
         while (1) {
             unsigned int ulFolderId = 0;
-            
-            er = ECTPropsPurge::GetLargestFolderId(lpSession->GetDatabase(), &ulFolderId);
+			ECDatabase *lpDatabase = NULL;
+
+			er = lpSession->GetDatabase(&lpDatabase);
+            if(er != erSuccess)
+				goto exit;
+			
+            er = ECTPropsPurge::GetLargestFolderId(lpDatabase, &ulFolderId);
             if(er != erSuccess) {
                 er = erSuccess;
                 break;
             }
             
-            er = ECTPropsPurge::PurgeDeferredTableUpdates(lpSession->GetDatabase(), ulFolderId);
+            er = ECTPropsPurge::PurgeDeferredTableUpdates(lpDatabase, ulFolderId);
             if(er != erSuccess)
                 goto exit;
         }

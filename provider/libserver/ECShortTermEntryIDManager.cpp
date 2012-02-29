@@ -220,7 +220,7 @@ ECRESULT ECShortTermEntryIDManager::IsShortTermEntryId(const entryId *lpEntryId,
 		goto exit;
 	}
 	
-	if (lpEntryId->__size < CbNewEID(""))
+	if (lpEntryId->__size < (int)CbNewEID(""))
 		*lpbResult = false;
 	else {
 		const EID *lpEid = (const EID*)lpEntryId->__ptr;

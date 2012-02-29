@@ -192,7 +192,7 @@ ECRESULT ECStoreObjectTable::GetColumnsAll(ECListInt* lplstProps)
 	DB_RESULT		lpDBResult = NULL;
 	DB_ROW			lpDBRow = NULL;
 	std::string		strQuery;
-	ECDatabase*		lpDatabase = lpSession->GetDatabase();
+	ECDatabase*		lpDatabase = NULL;
 	ECODStore*		lpODStore = (ECODStore*)m_lpObjectData;
 	ULONG			ulPropID = 0;
 	ECObjectTableMap::iterator		iterObjects;
@@ -201,10 +201,9 @@ ECRESULT ECStoreObjectTable::GetColumnsAll(ECListInt* lplstProps)
 
 	ASSERT(lplstProps != NULL);
 
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 	
 	//List always emtpy
 	lplstProps->clear();
@@ -267,7 +266,7 @@ ECRESULT ECStoreObjectTable::ReloadTableMVData(ECObjectTableList* lplistRows, EC
 	DB_ROW				lpDBRow = NULL;
 	std::string			strQuery;
 	std::string			strColName;
-	ECDatabase*			lpDatabase = lpSession->GetDatabase();	
+	ECDatabase*			lpDatabase = NULL;
 	int					j;
 	ECListIntIterator	iterListMVPropTag;
 	sObjectTableKey		sRowItem;
@@ -275,10 +274,9 @@ ECRESULT ECStoreObjectTable::ReloadTableMVData(ECObjectTableList* lplistRows, EC
 
 	ECObjectTableList::iterator	iterListRows;
 
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	ASSERT(lplistMVPropTag->size() <2); //FIXME: Limit of one 1 MV column
 
@@ -351,7 +349,7 @@ ECRESULT ECStoreObjectTable::QueryRowData(ECGenericObjectTable *lpThis, struct s
 
 	ECODStore*		lpODStore = (ECODStore*)lpObjectData;
 
-	ECDatabase		*lpDatabase = lpSession->GetDatabase();	
+	ECDatabase		*lpDatabase = NULL;
 
 	std::map<unsigned int, std::map<sObjectTableKey, unsigned int> > mapStoreIdObjIds;
 	std::map<unsigned int, std::map<sObjectTableKey, unsigned int> >::iterator iterStoreIdObjIds;
@@ -381,10 +379,9 @@ ECRESULT ECStoreObjectTable::QueryRowData(ECGenericObjectTable *lpThis, struct s
 
 	ASSERT(lpRowList != NULL);
 
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	lpsRowSet = s_alloc<rowSet>(soap);
 	lpsRowSet->__size = 0;
@@ -646,7 +643,7 @@ ECRESULT ECStoreObjectTable::QueryRowDataByRow(ECGenericObjectTable *lpThis, str
 	std::string		strQuery;
 	std::string		strSubquery;
 
-	ECDatabase		*lpDatabase = lpSession->GetDatabase();	
+	ECDatabase		*lpDatabase = NULL;
 
 	bool			bNeedProps = false;
 	bool			bNeedMVProps = false;
@@ -666,10 +663,9 @@ ECRESULT ECStoreObjectTable::QueryRowDataByRow(ECGenericObjectTable *lpThis, str
 	
 	ASSERT(lpsRowSet != NULL);
 
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 	
 	g_lpStatsCollector->Increment(SCN_DATABASE_ROW_READS, 1);
 
@@ -866,14 +862,19 @@ ECRESULT ECStoreObjectTable::QueryRowDataByColumn(ECGenericObjectTable *lpThis, 
     unsigned int ulTag = 0;
     unsigned int ulType = 0;
     ULONG ulMin, ulMax;
-    ECDatabase      *lpDatabase = lpSession->GetDatabase();
+    ECDatabase      *lpDatabase = NULL;
     std::set<unsigned int> setSubQueries;
     std::set<unsigned int>::iterator iterSubQueries;
     std::string		strSubquery;
     std::string		strPropColOrder;
 
+
     if(mapColumns.empty() || mapObjIds.empty())
     	goto exit;
+
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
+		goto exit;
 
 	ulMin = ulMax = PROP_ID(mapColumns.begin()->first);
 
@@ -1056,15 +1057,14 @@ ECRESULT ECStoreObjectTable::GetMVRowCount(unsigned int ulObjId, unsigned int *l
     ECObjectTableList			listRows;
 	ECObjectTableList::iterator iterListRows;
 	ECObjectTableMap::iterator		iterIDs;
-	ECDatabase *lpDatabase = lpSession->GetDatabase();
+	ECDatabase *lpDatabase = NULL;
 	ECListInt::iterator	iterListMVPropTag;
 
 	pthread_mutex_lock(&m_hLock);
 
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	// scan for MV-props and add rows
 	strQuery = "SELECT count(h.id) FROM hierarchy as h";
@@ -1101,7 +1101,7 @@ exit:
 ECRESULT ECStoreObjectTable::Load()
 {
     ECRESULT er = erSuccess;
-    ECDatabase *lpDatabase = lpSession->GetDatabase();
+    ECDatabase *lpDatabase = NULL;
     DB_RESULT 	lpDBResult = NULL;
     DB_ROW		lpDBRow = NULL;
     std::string	strQuery;
@@ -1118,10 +1118,9 @@ ECRESULT ECStoreObjectTable::Load()
     
     std::list<unsigned int> lstObjIds;
 
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
     
     if(ulFolderId) {
         // Clear old entries
@@ -1257,6 +1256,7 @@ ECRESULT ECStoreObjectTable::AddRowKey(ECObjectTableList* lpRows, unsigned int *
     int n = 0;
     ECCategory *lpCategory = NULL;
     unsigned int ulFirstCol = 0;
+    ECDatabase *lpDatabase = NULL;
     
 	pthread_mutex_lock(&m_hLock);
 	
@@ -1267,6 +1267,10 @@ ECRESULT ECStoreObjectTable::AddRowKey(ECObjectTableList* lpRows, unsigned int *
     if(!bLoad || !lpsRestrict || !lpODStore->ulFolderId || !lpODStore->ulStoreId || (lpODStore->ulFlags & MAPI_ASSOCIATED)) {
         er = ECGenericObjectTable::AddRowKey(lpRows, lpulLoaded, ulFlags, bLoad);
    } else {
+		er = lpSession->GetDatabase(&lpDatabase);
+        if(er != erSuccess)
+            goto exit;
+
         // Attempt to use the indexer
         er = lpSession->GetSessionManager()->GetServerGUID(&guidServer);
         if(er != erSuccess)
@@ -1274,7 +1278,7 @@ ECRESULT ECStoreObjectTable::AddRowKey(ECObjectTableList* lpRows, unsigned int *
         
         lstFolders.push_back(lpODStore->ulFolderId);
         
-    	if(GetIndexerResults(lpSession->GetDatabase(), lpSession->GetSessionManager()->GetConfig(), lpSession->GetSessionManager()->GetLogger(), lpSession->GetSessionManager()->GetCacheManager(), &guidServer, lpODStore->ulStoreId, lstFolders, lpsRestrict, &lpIndexerResults) != erSuccess) {
+    	if(GetIndexerResults(lpDatabase, lpSession->GetSessionManager()->GetConfig(), lpSession->GetSessionManager()->GetLogger(), lpSession->GetSessionManager()->GetCacheManager(), &guidServer, lpODStore->ulStoreId, lstFolders, lpsRestrict, &lpIndexerResults) != erSuccess) {
     	    // Cannot handle this restriction with the indexer, use 'normal' restriction code
     	    // Reasons can be:
     	    //  - restriction too complex

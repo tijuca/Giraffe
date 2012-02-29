@@ -236,7 +236,7 @@ ECRESULT ExpandDeletedItems(ECSession *lpSession, ECDatabase *lpDatabase, ECList
 	DELETEITEM sItem;
 	ECSessionManager *lpSessionManager = NULL;
 	ECCacheManager *lpCacheManager = NULL;
-	unsigned int ulParent = NULL;
+	unsigned int ulParent = 0;
 	
 	if (lpSession == NULL || lpDatabase == NULL || lpsObjectList == NULL || lplstDeleteItems == NULL) {
 		er = ZARAFA_E_INVALID_PARAMETER;
@@ -1787,7 +1787,11 @@ ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId)
 	unsigned int ulAffected = 0;
 	unsigned int ulParent = 0;
 	
-	ECDatabase *lpDatabase = lpSession->GetDatabase();
+	ECDatabase *lpDatabase = NULL;
+
+	er = lpSession->GetDatabase(&lpDatabase);
+	if(er != erSuccess)
+		goto exit;
 
 	er = lpDatabase->Begin();
 	if(er != erSuccess)
@@ -1930,11 +1934,9 @@ ECRESULT GetStoreType(ECSession *lpSession, unsigned int ulObjId, unsigned int *
 	DB_ROW lpDBRow = NULL;
 	std::string strQuery;
 
-	lpDatabase = lpSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	strQuery = "SELECT s.type FROM stores AS s JOIN hierarchy AS h ON s.hierarchy_id=h.id AND s.user_id=h.owner AND h.type=" + stringify(MAPI_STORE) + " AND h.id=" + stringify(ulObjId);
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);

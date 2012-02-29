@@ -475,11 +475,9 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 	// Lock the session
 	lpecSession->Lock();
 
-	lpDatabase = lpecSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpecSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 //@TODO change loglevel?
 	g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: trackid: 0x%08X, computername: %s, username: %s, clientversion: %s, windowsversion: %s, iplist: %s, soapip: %s", 
@@ -681,11 +679,9 @@ int ns__setClientUpdateStatus(struct soap *soap, struct clientUpdateStatusReques
 	// Lock the session
 	lpecSession->Lock();
 
-	lpDatabase = lpecSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpecSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	soap->fmimewriteopen = mime_file_write_open;
 	soap->fmimewriteclose = mime_file_write_close;
@@ -722,7 +718,7 @@ int ns__setClientUpdateStatus(struct soap *soap, struct clientUpdateStatusReques
 
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: trackid: 0x%08X, Log files saved in '%s'", sClientUpdateStatus.ulTrackId, strFilePath.c_str());
 
-		unsigned int ulFile = 0;
+		int ulFile = 0;
 		while (true) {
 
 			if (ulFile >= sClientUpdateStatus.sFiles.__size)

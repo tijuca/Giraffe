@@ -267,7 +267,6 @@ ECRESULT UpdateObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned
 	ECRESULT		er = erSuccess;
 	unsigned int	ulPropTag = 0;
 	unsigned int	ulAffRows = 0;
-	unsigned int	ulFolderId = 0;
 	std::string		strQuery;
 	std::string		strField;
 

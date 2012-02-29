@@ -627,16 +627,15 @@ ECRESULT ECSecurity::GetRights(unsigned int objid, int ulType, struct rightsArra
 	ECRESULT			er = ZARAFA_E_NO_ACCESS;
 	DB_RESULT			lpDBResult = NULL;
 	DB_ROW				lpDBRow = NULL;
-	ECDatabase			*lpDatabase = m_lpSession->GetDatabase();
+	ECDatabase			*lpDatabase = NULL;
 	std::string			strQuery;
 	unsigned int		ulCount = 0;
 	unsigned int		i=0;
 	objectid_t			sExternId;
 
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = m_lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	if (lpsRightsArray == NULL) {
 		er = ZARAFA_E_INVALID_PARAMETER;
@@ -721,16 +720,15 @@ ECRESULT ECSecurity::SetRights(unsigned int objid, struct rightsArray *lpsRights
 	std::string			strQueryModify, strQueryDeniedModify;
 	std::string			strQueryDelete, strQueryDeniedDelete;
 	unsigned int		ulDeniedRights=0;
-	ECDatabase			*lpDatabase = m_lpSession->GetDatabase();
+	ECDatabase			*lpDatabase = NULL;
 	unsigned int		ulUserId = 0;
 	objectid_t			sExternId;
 	objectdetails_t		sDetails;
 	unsigned int		ulErrors = 0;
 
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = m_lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	if (lpsRightsArray == NULL) {
 		er = ZARAFA_E_INVALID_PARAMETER;
@@ -1300,11 +1298,9 @@ ECRESULT ECSecurity::GetStoreSize(unsigned int ulObjId, long long* lpllStoreSize
 	std::string		strQuery;
 	unsigned int	ulStore;
 
-	lpDatabase = m_lpSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = m_lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	er = m_lpSession->GetSessionManager()->GetCacheManager()->GetStore(ulObjId, &ulStore, NULL);
 	if(er != erSuccess)
@@ -1355,11 +1351,9 @@ ECRESULT ECSecurity::GetUserSize(unsigned int ulUserId, long long* lpllUserSize)
 	std::string		strQuery;
 	long long		llUserSize = 0;
 
-	lpDatabase = m_lpSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = m_lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	strQuery =
 		"SELECT p.val_longint "

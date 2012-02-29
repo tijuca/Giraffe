@@ -170,7 +170,7 @@ ECRESULT ECTPropsPurge::PurgeOverflowDeferred(ECDatabase *lpDatabase)
     ECRESULT er = erSuccess;
     unsigned int ulCount = 0;
     unsigned int ulFolderId = 0;
-    int ulMaxDeferred = atoi(m_lpConfig->GetSetting("max_deferred_records"));
+    unsigned int ulMaxDeferred = atoi(m_lpConfig->GetSetting("max_deferred_records"));
     
     if(ulMaxDeferred > 0) {
 		while(!m_bExit) {

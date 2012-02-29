@@ -563,7 +563,7 @@ ECRESULT ECUserStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 	struct rowSet *lpsRowSet = NULL;
 	ECObjectTableList::iterator iterRowList;
 	ECUserManagement *lpUserManagement = lpSession->GetUserManagement();
-	ECDatabase *lpDatabase = lpSession->GetDatabase();
+	ECDatabase *lpDatabase = NULL;
 	long long llStoreSize = 0;
 	objectdetails_t objectDetails;
 	objectdetails_t companyDetails;
@@ -575,10 +575,9 @@ ECRESULT ECUserStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 	DB_RESULT lpDBResult = NULL;
 	std::string strQuery;
 
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	lpsRowSet = s_alloc<rowSet>(soap);
 	lpsRowSet->__size = 0;
@@ -816,7 +815,7 @@ ECRESULT ECCompanyStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct 
 	struct rowSet *lpsRowSet = NULL;
 	ECObjectTableList::iterator iterRowList;
 	ECUserManagement *lpUserManagement = lpSession->GetUserManagement();
-	ECDatabase *lpDatabase = lpSession->GetDatabase();
+	ECDatabase *lpDatabase = NULL;
 	long long llStoreSize = 0;
 	objectdetails_t companyDetails;
 	quotadetails_t quotaDetails;
@@ -827,10 +826,9 @@ ECRESULT ECCompanyStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct 
 	DB_RESULT lpDBResult = NULL;
 	std::string strQuery;
 
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	lpsRowSet = s_alloc<rowSet>(soap);
 	lpsRowSet->__size = 0;

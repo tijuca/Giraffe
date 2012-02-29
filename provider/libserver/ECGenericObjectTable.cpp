@@ -3036,7 +3036,7 @@ ECRESULT ECGenericObjectTable::UpdateKeyTableRow(ECCategory *lpCategory, sObject
 	}
 	
     // Build binary sort keys from updated data
-    for(unsigned int i=0; i < n; i++) {
+    for(int i=0; i < n; i++) {
         if(GetBinarySortKey(&lpOrderedProps[i], &lpSortLen[i], &lppSortKeys[i]) != erSuccess)
         	lppSortKeys[i] = NULL;
         if(GetSortFlags(lpOrderedProps[i].ulPropTag, &lpSortFlags[i]) != erSuccess)

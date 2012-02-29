@@ -207,13 +207,9 @@ ECUserManagement* BTSession::GetUserManagement()
 	return m_lpUserManagement;
 }
 
-ECDatabase* BTSession::GetDatabase()
+ECRESULT BTSession::GetDatabase(ECDatabase **lppDatabase)
 {
-	ECDatabase *lpDatabase = NULL;
-
-	GetThreadLocalDatabase(this->m_lpDatabaseFactory, &lpDatabase);
-
-	return lpDatabase;
+	return GetThreadLocalDatabase(this->m_lpDatabaseFactory, lppDatabase);
 }
 
 ECRESULT BTSession::GetServerGUID(GUID* lpServerGuid){
@@ -424,11 +420,9 @@ ECRESULT ECSession::AddChangeAdvise(unsigned int ulConnection, notifySyncState *
 	if (er != hrSuccess)
 		goto exit;
 
-    lpDatabase = GetDatabase();
-    if (!lpDatabase) {
-        er = ZARAFA_E_DATABASE_ERROR;
+    er = GetDatabase(&lpDatabase);
+    if (er != erSuccess)
         goto exit;
-    }
 
 	strQuery =	"SELECT c.id FROM changes AS c JOIN syncs AS s "
 					"ON s.sourcekey=c.parentsourcekey "

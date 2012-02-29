@@ -230,7 +230,7 @@ exit:
 ECRESULT ECUserStoreTable::Load() {
 	ECRESULT er = erSuccess;
 	ECListIntIterator i;
-    ECDatabase *lpDatabase = lpSession->GetDatabase();
+    ECDatabase *lpDatabase = NULL;
     DB_RESULT 	lpDBResult = NULL;
     DB_ROW		lpDBRow = NULL;
     DB_LENGTHS	lpDBLength = NULL;
@@ -247,10 +247,9 @@ ECRESULT ECUserStoreTable::Load() {
 
 	enum cols { USERID = 0, EXTERNID, OBJCLASS, UCOMPANY, STOREGUID, STORETYPE, USERNAME, SCOMPANY, HIERARCHYID, STORESIZE, MODTIME_HI, MODTIME_LO };
 
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
     Clear();
 

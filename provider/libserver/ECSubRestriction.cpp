@@ -197,12 +197,11 @@ ECRESULT RunSubRestriction(ECSession *lpSession, void *lpECODStore, struct restr
     unsigned int ulParent = 0;
     sObjectTableKey sKey;
     int i = 0;
-    ECDatabase *lpDatabase = lpSession->GetDatabase();
-    
-    if(lpDatabase == NULL) {
-        er = ZARAFA_E_DATABASE_ERROR;
+    ECDatabase *lpDatabase = NULL;
+
+	er = lpSession->GetDatabase(&lpDatabase);
+    if(er != erSuccess)
         goto exit;
-    }
 
 	if (lpObjects->empty())
 		goto exit;				// nothing to search in, return success.

@@ -824,11 +824,9 @@ ECRESULT ECGenProps::IsOrphanStore(ECSession* lpSession, unsigned int ulObjId, b
 		goto exit;
 	}
 
-	lpDatabase = lpSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	strQuery = "SELECT 0 FROM stores where user_id != 0 and hierarchy_id="+stringify(ulObjId);
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);

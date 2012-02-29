@@ -1050,13 +1050,12 @@ ECRESULT ECUserManagement::ModifyExternId(unsigned int ulObjectId, const objecti
 	objectid_t sOldExternId;
 	std::string strQuery;
 	unsigned int ulRows = 0;
-	ECDatabase *lpDatabase = m_lpSession->GetDatabase();
+	ECDatabase *lpDatabase = NULL;
 	UserPlugin *lpPlugin = NULL;
 
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = m_lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	if (IsInternalObject(ulObjectId) || sExternId.id.empty()) {
 		er = ZARAFA_E_INVALID_PARAMETER;
@@ -1601,11 +1600,9 @@ ECRESULT ECUserManagement::GetLocalObjectIdList(objectclass_t objclass, unsigned
 	std::list<unsigned int> *lpObjects = new std::list<unsigned int>();
 	string strQuery;
 
-	lpDatabase = m_lpSession->GetDatabase();
-	if (lpDatabase == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = m_lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	strQuery =
 		"SELECT id FROM users "
@@ -2761,7 +2758,7 @@ exit:
 // Create a local user corresponding to the given userid on the external database
 ECRESULT ECUserManagement::CreateLocalObject(const objectsignature_t &signature, unsigned int *lpulObjectId) {
 	ECRESULT er = erSuccess;
-	ECDatabase *lpDatabase = m_lpSession->GetDatabase();
+	ECDatabase *lpDatabase = NULL;
 	std::string strQuery;
 	objectdetails_t details;
 	unsigned int ulId;
@@ -2774,10 +2771,9 @@ ECRESULT ECUserManagement::CreateLocalObject(const objectsignature_t &signature,
 	string strThisServer = m_lpConfig->GetSetting("server_name");
 	bool bDistributed = m_lpSession->GetSessionManager()->IsDistributedSupported();
 
-	if(lpDatabase == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = m_lpSession->GetDatabase(&lpDatabase);
+	if(er != erSuccess)
 		goto exit;
-	}
 
 	er = GetThreadLocalPlugin(m_lpPluginFactory, &lpPlugin, m_lpLogger);
 	if(er != erSuccess)
@@ -2933,7 +2929,7 @@ exit:
 // Creates a local object under a specific object ID
 ECRESULT ECUserManagement::CreateLocalObjectSimple(const objectsignature_t &signature, unsigned int ulPreferredId) {
 	ECRESULT er = erSuccess;
-	ECDatabase *lpDatabase = m_lpSession->GetDatabase();
+	ECDatabase *lpDatabase = NULL;
 	objectdetails_t details;
 	std::string strQuery;
 	unsigned int ulCompanyId;
@@ -2942,10 +2938,9 @@ ECRESULT ECUserManagement::CreateLocalObjectSimple(const objectsignature_t &sign
 	std::string strUserId;
 	bool bLocked = false;
 
-	if(lpDatabase == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = m_lpSession->GetDatabase(&lpDatabase);
+	if(er != erSuccess)
 		goto exit;
-	}
 
 	// No user count checking or script starting in this function; it is only used in for addressbook synchronization in the offline server
 
@@ -3031,7 +3026,7 @@ exit:
 ECRESULT ECUserManagement::UpdateObjectclassOrDelete(const objectid_t &sExternId, unsigned int *lpulObjectId)
 {
 	ECRESULT er = erSuccess;
-	ECDatabase *lpDatabase = m_lpSession->GetDatabase();
+	ECDatabase *lpDatabase = NULL;
 	DB_RESULT lpResult = NULL;
 	DB_ROW lpRow = NULL;
 	string strQuery;
@@ -3040,10 +3035,9 @@ ECRESULT ECUserManagement::UpdateObjectclassOrDelete(const objectid_t &sExternId
 	SOURCEKEY sSourceKey;
 	ABEID eid(MAPI_ABCONT, *(GUID*)&MUIDECSAB_SERVER, 1);
 
-	if(lpDatabase == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = m_lpSession->GetDatabase(&lpDatabase);
+	if(er != erSuccess)
 		goto exit;
-	}
 
 	strQuery = "SELECT id, objectclass FROM users WHERE externid='" + lpDatabase->Escape(sExternId.id) + "' AND " +
 		OBJECTCLASS_COMPARE_SQL("objectclass", OBJECTCLASS_CLASSTYPE(sExternId.objclass));
@@ -3289,11 +3283,9 @@ ECRESULT ECUserManagement::MoveLocalObject(unsigned int ulObjectId, objectclass_
 
 	m_lpLogger->Log(EC_LOGLEVEL_INFO, "Auto-moving %s to different company from external source", ObjectClassToName(objclass));
 
-	lpDatabase = m_lpSession->GetDatabase();
-	if(lpDatabase == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = m_lpSession->GetDatabase(&lpDatabase);
+	if(er != erSuccess)
 		goto exit;
-	}
 
 	bTransaction = true;
 
@@ -3374,11 +3366,9 @@ ECRESULT ECUserManagement::DeleteLocalObject(unsigned int ulObjectId, objectclas
 		goto exit;
 	}
 
-	lpDatabase = m_lpSession->GetDatabase();
-	if(lpDatabase == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = m_lpSession->GetDatabase(&lpDatabase);
+	if(er != erSuccess)
 		goto exit;
-	}
 
 	m_lpLogger->Log(EC_LOGLEVEL_INFO, "Auto-deleting %s %d from external source", ObjectClassToName(objclass), ulObjectId);
 
@@ -4676,11 +4666,9 @@ ECRESULT ECUserManagement::GetUserCount(usercount_t *lpUserCount)
     unsigned int ulEquipment = 0;
     unsigned int ulContact = 0;
 
-    lpDatabase = m_lpSession->GetDatabase();
-    if(lpDatabase == NULL) {
-        er = ZARAFA_E_DATABASE_ERROR;
+    er = m_lpSession->GetDatabase(&lpDatabase);
+    if(er != erSuccess)
         goto exit;
-    }
 
 	strQuery =
 		"SELECT COUNT(*), objectclass "
@@ -4860,11 +4848,9 @@ ECRESULT ECUserManagement::ProcessModification(unsigned int ulId, const std::str
 	// Ignore ICS error
 
 	// Save the new signature
-	lpDatabase = m_lpSession->GetDatabase();
-	if(lpDatabase == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = m_lpSession->GetDatabase(&lpDatabase);
+	if(er != erSuccess)
 		goto exit;
-	}
 
 	er = lpDatabase->DoUpdate("UPDATE users SET signature=" + lpDatabase->EscapeBinary((unsigned char *)newsignature.c_str(), newsignature.size()) + " WHERE id=" + stringify(ulId));
 	if(er != erSuccess)

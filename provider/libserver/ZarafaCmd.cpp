@@ -847,8 +847,8 @@ int ns__##fname(struct soap *soap, ULONG64 ulSessionId, ##__VA_ARGS__) \
        ECDatabase*             lpDatabase = NULL; \
        ALLOC_DBRESULT(); \
     \
-       lpDatabase = lpecSession->GetDatabase(); \
-       if (!lpDatabase) { \
+       er = lpecSession->GetDatabase(&lpDatabase); \
+       if (er != erSuccess) { \
                er = ZARAFA_E_DATABASE_ERROR; \
                goto __soapentry_exit; \
        }
@@ -876,11 +876,9 @@ ECRESULT SaveLogonTime(ECSession *lpecSession, bool bLogon)
 	ECDatabase *lpDatabase = NULL; 
 	ALLOC_DBRESULT(); 
     
-	lpDatabase = lpecSession->GetDatabase(); 
-	if (!lpDatabase) { 
-		er = ZARAFA_E_DATABASE_ERROR; 
+	er = lpecSession->GetDatabase(&lpDatabase); 
+	if (er != erSuccess)
 		goto exit; 
-	}
     
     UnixTimeToFileTime(now, &ft);
     
@@ -941,11 +939,9 @@ ECRESULT PurgeSoftDelete(ECSession *lpecSession, unsigned int ulLifetime, unsign
 	if (!lpbExit)
 		lpbExit = &bExitDummy;
 
-	lpDatabase = lpecSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpecSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	// Although it doesn't make sence for the message deleter to include EC_DELETE_FOLDERS, it doesn't hurt either, since they shouldn't be there
 	// and we really want to delete all the softdeleted items anyway.
@@ -8087,11 +8083,9 @@ ECRESULT CopyObject(ECSession *lpecSession, ECAttachmentStorage *lpAttachmentSto
 	unsigned long long ullIMAP = 0;
 	ECAttachmentStorage *lpInternalAttachmentStorage = NULL;
 
-	lpDatabase = lpecSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpecSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	if (!lpAttachmentStorage) {
 		if (!bIsRoot) {
@@ -8410,11 +8404,9 @@ ECRESULT CopyFolderObjects(struct soap *soap, ECSession *lpecSession, unsigned i
 		goto exit;
 	}
 
-	lpDatabase = lpecSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpecSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	er = CreateAttachmentStorage(lpDatabase, &lpAttachmentStorage);
 	if(er != erSuccess)
@@ -9472,11 +9464,9 @@ SOAP_ENTRY_START(readABProps, readPropsResponse->er, entryId sEntryId, struct re
 	unsigned int		ulProps = 0;
 	int		i = 0;
 
-	lpDatabase = lpecSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpecSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	er = ABEntryIDToID(&sEntryId, &ulId, &sExternId, &ulTypeId);
 	if(er != erSuccess)

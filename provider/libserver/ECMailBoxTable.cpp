@@ -89,17 +89,15 @@ ECRESULT ECMailBoxTable::Create(ECSession *lpSession, unsigned int ulFlags, cons
 ECRESULT ECMailBoxTable::Load()
 {
 	ECRESULT er = erSuccess;
-	ECDatabase *lpDatabase = lpSession->GetDatabase();
+	ECDatabase *lpDatabase = NULL;
 	DB_RESULT 	lpDBResult = NULL;
 	DB_ROW		lpDBRow = NULL;
-	DB_LENGTHS	lpDBLength = NULL;
 	std::string strQuery;
 	std::list<unsigned int> lstObjIds;
 
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	Clear();
 

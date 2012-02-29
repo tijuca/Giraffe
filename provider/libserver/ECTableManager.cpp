@@ -197,12 +197,11 @@ ECRESULT ECTableManager::OpenOutgoingQueueTable(unsigned int ulStoreId, unsigned
 	GUID sGuid;
 	sObjectTableKey sRowItem;
 	const ECLocale locale = lpSession->GetSessionManager()->GetSortLocale(ulStoreId);
-	
-	ECDatabase *lpDatabase = lpSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	ECDatabase *lpDatabase = NULL;
+
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	if(ulStoreId) {
 		er = lpSession->GetSessionManager()->GetCacheManager()->GetStore(ulStoreId, &ulStoreId, &sGuid);
@@ -350,12 +349,11 @@ ECRESULT ECTableManager::OpenGenericTable(unsigned int ulParent, unsigned int ul
 	unsigned int	ulStoreId = 0;
 	GUID			sGuid;
 	ECLocale			locale;
+	ECDatabase *lpDatabase = NULL;
 
-	ECDatabase *lpDatabase = lpSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	er = lpSession->GetSessionManager()->GetCacheManager()->GetStore(ulParent, &ulStoreId, &sGuid);
 	if(er != erSuccess)

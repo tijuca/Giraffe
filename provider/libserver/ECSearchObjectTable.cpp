@@ -84,7 +84,6 @@ ECRESULT ECSearchObjectTable::Create(ECSession *lpSession, unsigned int ulStoreI
 
 ECRESULT ECSearchObjectTable::Load() {
     ECRESULT er = erSuccess;
-    ECODStore	*lpData = (ECODStore *)m_lpObjectData;
     sObjectTableKey		sRowItem;
 
     struct sortOrderArray*      lpsPrevSortOrderArray = NULL;

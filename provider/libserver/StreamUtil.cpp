@@ -768,11 +768,9 @@ ECRESULT SerializeProps(ECSession *lpecSession, ECAttachmentStorage *lpAttachmen
 
 	ASSERT(lpStreamCaps != NULL);
 
-	lpDatabase = lpecSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpecSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	if (!lpAttachmentStorage) {
 		er = ZARAFA_E_INVALID_PARAMETER;
@@ -1015,11 +1013,9 @@ ECRESULT SerializeObject(ECSession *lpecSession, ECAttachmentStorage *lpAttachme
 	DB_RESULT		lpDBResult = NULL;
 	std::string		strQuery;
 
-	lpDatabase = lpecSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpecSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	er = g_lpSessionManager->GetCacheManager()->GetObject(ulObjId, &ulParentId, NULL, NULL, &ulObjType);
 	if (er != erSuccess)

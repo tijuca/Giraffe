@@ -112,13 +112,18 @@ ECRESULT ConvertABEntryIDToSoapSourceKey(struct soap *soap, ECSession *lpSession
 		string strQuery = "SELECT 0 from users where id = " + stringify(lpAbeid->ulId) + " AND company = " + stringify(ulCompanyFilter);
 		DB_RESULT		lpDBResult = NULL;
 		DB_ROW			lpDBRow = NULL;
-		
-		er = lpSession->GetDatabase()->DoSelect(strQuery, &lpDBResult);
+		ECDatabase *lpDatabase = NULL;
+
+		er = lpSession->GetDatabase(&lpDatabase);
+		if (er != erSuccess)
+			goto exit;
+
+		er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 		if (er != erSuccess)
 			goto exit;
 		
-		lpDBRow = lpSession->GetDatabase()->FetchRow(lpDBResult);
-		lpSession->GetDatabase()->FreeResult(lpDBResult);
+		lpDBRow = lpDatabase->FetchRow(lpDBResult);
+		lpDatabase->FreeResult(lpDBResult);
 		if (lpDBRow == NULL) {
 			// no rows, so filtered object
 			er = ZARAFA_E_NO_ACCESS;
@@ -215,11 +220,9 @@ ECRESULT AddChange(BTSession *lpSession, unsigned int ulSyncId, SOURCEKEY sSourc
 		goto exit;
 	}
 
-	lpDatabase = lpSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	bLogAllChanges = parseBool(g_lpSessionManager->GetConfig()->GetSetting("sync_log_all_changes"));
 
@@ -422,11 +425,9 @@ void* CleanupSyncsTable(void* lpTmpMain){
 
 	lpSession->Lock();
 
-	lpDatabase = lpSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 	
 	strQuery = "DELETE FROM syncs WHERE sync_time < DATE_SUB(FROM_UNIXTIME("+stringify(time(NULL))+"), INTERVAL " + stringify(ulSyncLifeTime) + " DAY)";
 	er = lpDatabase->DoDelete(strQuery, &ulDeletedSyncs);
@@ -468,11 +469,9 @@ void* CleanupChangesTable(void* lpTmpMain){
 
 	lpSession->Lock();
 
-	lpDatabase = lpSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	//delete all changes < oldest/lowest sync
 	strQuery = "SELECT MIN(change_id) FROM syncs WHERE change_id > 0";
@@ -541,11 +540,9 @@ void *CleanupSyncedMessagesTable(void *lpTmpMain)
 
 	lpSession->Lock();
 
-	lpDatabase = lpSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
     strQuery =  "DELETE syncedmessages.* FROM syncedmessages "
                  "LEFT JOIN syncs ON syncs.id = syncedmessages.sync_id " 	/* join with syncs */
@@ -599,11 +596,9 @@ ECRESULT GetChanges(struct soap *soap, ECSession *lpSession, SOURCEKEY sFolderSo
 	ECGetContentChangesHelper *lpHelper = NULL;
 	
     // Get database object
-    lpDatabase = lpSession->GetDatabase();
-    if (!lpDatabase) {
-        er = ZARAFA_E_DATABASE_ERROR;
+    er = lpSession->GetDatabase(&lpDatabase);
+    if (er != erSuccess)
         goto exit;
-    }
 
     er = lpDatabase->Begin();
     if (er != erSuccess)
@@ -1096,11 +1091,9 @@ ECRESULT AddABChange(BTSession *lpSession, unsigned int ulChange, SOURCEKEY sSou
 	std::string		strQuery;
 	ECDatabase*		lpDatabase = NULL;
 
-	lpDatabase = lpSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	// Add/Replace new change
 	strQuery = "REPLACE INTO abchanges (sourcekey, parentsourcekey, change_type) VALUES(" + lpDatabase->EscapeBinary(sSourceKey, sSourceKey.size()) + "," + lpDatabase->EscapeBinary(sParentSourceKey, sParentSourceKey.size()) + "," + stringify(ulChange) + ")";
@@ -1126,11 +1119,9 @@ ECRESULT GetSyncStates(struct soap *soap, ECSession *lpSession, mv_long ulaSyncI
 		goto exit;
 	}
 
-	lpDatabase = lpSession->GetDatabase();
-	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+	er = lpSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
 		goto exit;
-	}
 
 	strQuery = "SELECT id,change_id FROM syncs WHERE id IN (" + stringify(ulaSyncId.__ptr[0]);
 	for (int i = 1; i < ulaSyncId.__size; ++i)

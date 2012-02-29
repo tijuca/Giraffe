@@ -916,11 +916,6 @@ ECRESULT ECSearchFolders::Search(unsigned int ulStoreId, unsigned int ulFolderId
 	if(er != erSuccess)
 		goto exit;
 	ecODStore.lpGuid = &guidStore;
-
-    // Get database
-    er = GetThreadLocalDatabase(m_lpDatabaseFactory, &lpDatabase);
-    if(er != erSuccess)
-        goto exit;
     
     // Get the owner of the store
     er = m_lpSessionManager->GetCacheManager()->GetObject(ulStoreId, NULL, &ulUserId, NULL, NULL);
@@ -933,6 +928,10 @@ ECRESULT ECSearchFolders::Search(unsigned int ulStoreId, unsigned int ulFolderId
         goto exit;
         
     lpSession->Lock();
+
+	er = lpSession->GetDatabase(&lpDatabase);
+	if(er != erSuccess)
+		goto exit;
 
     // Get target folders
 	er = m_lpSessionManager->GetCacheManager()->GetEntryListToObjectList(lpSearchCrit->lpFolders, &lstFolders);
@@ -972,7 +971,7 @@ ECRESULT ECSearchFolders::Search(unsigned int ulStoreId, unsigned int ulFolderId
 	if(er != erSuccess)
 		goto exit;
 	
-	if(GetIndexerResults(lpSession->GetDatabase(), m_lpSessionManager->GetConfig(), m_lpLogger, m_lpSessionManager->GetCacheManager(), &guidServer, ulStoreId, lstFolders, lpSearchCrit->lpRestrict, &lpIndexerResults) == erSuccess) {
+	if(GetIndexerResults(lpDatabase, m_lpSessionManager->GetConfig(), m_lpLogger, m_lpSessionManager->GetCacheManager(), &guidServer, ulStoreId, lstFolders, lpSearchCrit->lpRestrict, &lpIndexerResults) == erSuccess) {
 		er = lpDatabase->Begin();
 		if (er != erSuccess)
 			goto exit;
