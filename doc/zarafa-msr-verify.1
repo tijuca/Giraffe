@@ -1,0 +1,42 @@
+.\"     Title: zarafa-msr-verify
+.\"    Author: 
+.\" Generator: DocBook XSL Stylesheets v1.73.2 <http://docbook.sf.net/>
+.\"      Date: August 2011
+.\"    Manual: Zarafa user reference
+.\"    Source: Zarafa 7.0
+.\"
+.TH "ZARAFA\-MSR\-VERIFY" "1" "August 2011" "Zarafa 7.0" "Zarafa user reference"
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.SH "NAME"
+zarafa-msr-verify \- Compares the content of the source and destination store after a relocation.
+.SH "SYNOPSIS"
+.HP 11
+\fBzarafa\-msr\fR [\fIOPTIONS\fR] [\fICONFIG\fR]
+.SH "DESCRIPTION"
+.PP
+Once a user has been relocated from one multi\-server node to another, this tool can be used to compare the content of the two stores in order to verify if all messages have realy been relocated\&.
+.PP
+The config file is expected to be in the same format as the one used for
+\fIzarafa\-msr\fR\&. Usually the same configuration file should be used\&.
+.SH "OPTIONS"
+.PP
+\fB\-\-correct\fR
+.RS 4
+Attempt to correct mismatches\&. Currently this only removes messages that exist in the destination store but not in the source store\&.
+.RE
+.PP
+\fB\-\-help\fR
+.RS 4
+Show a help message\&.
+.RE
+.SH "AUTHOR"
+.PP
+Written by Zarafa\&.
+.SH "SEE ALSO"
+.PP
+
+\fBzarafa-msr.cfg\fR(5)
+\fBzarafa-msr\fR(1)
