@@ -87,7 +87,7 @@ namespace details {
 			return ::stringify(x, true) + "(" + ::stringify(x, false) + ")";
 		}
 
-		static std::string	stringify(LPVOID lpVoid);
+		static std::string	stringify(LPCVOID lpVoid);
 
 		static std::string  bin2hex(ULONG cbData, LPBYTE lpData) {
 			return ::bin2hex(cbData, lpData);
@@ -107,7 +107,7 @@ namespace details {
 			return ::wstringify(x, true) + L"(" + ::wstringify(x, false) + L")";
 		}
 
-		static std::wstring	stringify(LPVOID lpVoid);
+		static std::wstring	stringify(LPCVOID lpVoid);
 
 		static std::wstring  bin2hex(ULONG cbData, LPBYTE lpData) {
 			return ::bin2hexw(cbData, lpData);
@@ -198,7 +198,12 @@ public:
 		return details::makeDefaultPrinter2<deref_mode, string_type>(a1, a2).toString();
 	}
 
-	static string_type toString(ULONG ulValue) {
+
+	static string_type toString(unsigned int ulValue) {
+		return helpers::stringify(ulValue);
+	}
+
+	static string_type toString(WORD ulValue) {
 		return helpers::stringify(ulValue);
 	}
 
@@ -219,6 +224,10 @@ public:
 	}
 
 	static string_type toString(LPVOID lpVoid) {
+		return helpers::stringify(lpVoid);
+	}
+
+	static string_type toString(LPCVOID lpVoid) {
 		return helpers::stringify(lpVoid);
 	}
 
@@ -290,6 +299,19 @@ public:
 	static string_type toString(LPTSTR data) {
 		return (char *)data;
 	}
+
+	static string_type toString(LARGE_INTEGER li) {
+		return helpers::convert_from(stringify_int64(li.QuadPart));
+	}
+
+	static string_type toString(ULARGE_INTEGER li) {
+		return helpers::convert_from(stringify_int64(li.QuadPart));
+	}
+
+	static string_type toString(STATSTG) {
+		return helpers::convert_from(std::string("STATSTG (not implemented)"));
+	}
+
 };
 
 #endif // ndef ECDebugPrint_INCLUDED

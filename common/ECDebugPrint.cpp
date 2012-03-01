@@ -67,7 +67,7 @@ namespace details {
 		return convert_to<string>(s);
 	}
 
-	string conversion_helpers<string>::stringify(LPVOID lpVoid) {
+	string conversion_helpers<string>::stringify(LPCVOID lpVoid) {
 		if(!lpVoid) return "NULL";
 
 		char szBuff[33];
@@ -83,7 +83,7 @@ namespace details {
 		return convert_to<wstring>(s);
 	}
 
-	wstring conversion_helpers<wstring>::stringify(LPVOID lpVoid) {
+	wstring conversion_helpers<wstring>::stringify(LPCVOID lpVoid) {
 		if(!lpVoid) return L"NULL";
 
 		wchar_t szBuff[33];
