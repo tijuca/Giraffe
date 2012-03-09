@@ -618,7 +618,6 @@ ECGetContentChangesHelper::ECGetContentChangesHelper(struct soap *soap, ECSessio
 	, m_ulChangeId(ulChangeId)
 	, m_ulChangeCnt(0)
 	, m_ulMaxFolderChange(0)
-	, m_ulMaxSystemChange(0)
 	, m_ulFlags(ulFlags)
 { }
 
@@ -646,19 +645,6 @@ ECRESULT ECGetContentChangesHelper::Init()
 	
 	m_lpDatabase->FreeResult(lpDBResult);
 	lpDBResult = NULL;
-
-	strQuery = "SELECT MAX(id) FROM changes";
-	er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
-	if (er != erSuccess)
-		goto exit;
-		
-	if ((lpDBRow = m_lpDatabase->FetchRow(lpDBResult)) == NULL || lpDBRow == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
-		goto exit;
-	}
-
-	if (lpDBRow[0])
-		m_ulMaxSystemChange = atoui(lpDBRow[0]);
 
 	// Here we setup the classes to delegate specific work to	
 	if (m_ulChangeId == 0) {
@@ -907,18 +893,22 @@ ECRESULT ECGetContentChangesHelper::Finalize(unsigned int *lpulMaxChange, icsCha
 	}
 	
 	if (ulMaxChange == m_ulChangeId) {
-		if (ulMaxChange == m_ulMaxSystemChange) {
-			// Bump the changeid
-			strQuery = "REPLACE INTO changes (sourcekey,parentsourcekey,sourcesync) VALUES (0, " + m_lpDatabase->EscapeBinary(m_sFolderSourceKey, m_sFolderSourceKey.size()) + "," + stringify(m_ulSyncId) + ")";
-			er = m_lpDatabase->DoInsert(strQuery, &ulNewChange);
-			if (er != erSuccess)
-				goto exit;
-				
-			ASSERT(ulNewChange > ulMaxChange);
-			ulMaxChange = ulNewChange;
-		} else
-			ulMaxChange++;
+		/**
+		 * If we get here, we had at least one change but the max changeid for the server is the
+		 * same as the changeid in the request. This means the change was caused by either a modified
+		 * restriction.
+		 * When this happens a new changeid must be generated in order to return a unique state to the
+		 * client that can be used in subsequent requests. We do this by creating a dummy change in the
+		 * changes table.
+		 */
+		// Bump the changeid
+		strQuery = "REPLACE INTO changes (sourcekey,parentsourcekey,sourcesync) VALUES (0, " + m_lpDatabase->EscapeBinary(m_sFolderSourceKey, m_sFolderSourceKey.size()) + "," + stringify(m_ulSyncId) + ")";
+		er = m_lpDatabase->DoInsert(strQuery, &ulNewChange);
+		if (er != erSuccess)
+			goto exit;
 			
+		ASSERT(ulNewChange > ulMaxChange);
+		ulMaxChange = ulNewChange;
 		ASSERT(ulMaxChange > m_ulChangeId);
 	}
 	

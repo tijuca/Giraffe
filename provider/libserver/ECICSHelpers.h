@@ -116,7 +116,6 @@ private:
 	unsigned int	m_ulChangeId;
 	unsigned int	m_ulChangeCnt;
 	unsigned int	m_ulMaxFolderChange;
-	unsigned int	m_ulMaxSystemChange;
 	unsigned int	m_ulFlags;
 	MESSAGESET		m_setLegacyMessages;
 	MESSAGESET		m_setNewMessages;
