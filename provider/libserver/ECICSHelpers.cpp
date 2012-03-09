@@ -894,8 +894,9 @@ ECRESULT ECGetContentChangesHelper::Finalize(unsigned int *lpulMaxChange, icsCha
 	
 	// If there were no changes and this was not the initial sync, we only need to purge all too-new-syncedmessages.
 	// If this is the initial sync, we might need to write the empty restricted set marker, so we can't
-	// stop doing work here.
-	if (m_ulChangeCnt == 0 && m_ulChangeId > 0) {
+	// stop doing work here. Also, if we have converted from a non-restricted to a restricted set, we have to write
+	// the new set of messages, even if there are no changes.
+	if (m_ulChangeCnt == 0 && m_ulChangeId > 0 && !(m_setLegacyMessages.empty() && m_lpsRestrict) ) {
 		ASSERT(ulMaxChange >= m_ulChangeId);
 		*lpulMaxChange = ulMaxChange;
 		
