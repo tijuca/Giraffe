@@ -201,7 +201,7 @@
 	function inline_attachments($match)
 	{
 		if(array_key_exists("2", $match)) {
-			return "='" . BASE_URL . "index.php?load=download_attachment&store=" . $GLOBALS["preg_replace"]["storeid"] . "&amp;entryid=" . $GLOBALS["preg_replace"]["entryid"] . "&amp;attachNum[]=" . join(",", $GLOBALS["preg_replace"]["attachNum"]) ."&amp;attachCid=" . $match[2] . "&amp;openType=inline'";
+			return "='" . BASE_URL . "index.php?load=download_attachment&store=" . $GLOBALS["preg_replace"]["storeid"] . "&amp;entryid=" . $GLOBALS["preg_replace"]["entryid"] . "&amp;attachNum[]=" . join(",", $GLOBALS["preg_replace"]["attachNum"]) ."&amp;attachCid=" . urlencode($match[2]) . "&amp;openType=inline'";
 		} else {
 			return "=''";
 		}
@@ -226,7 +226,7 @@
 
 			$cid = str_replace("cid:", "", $match[1]);
 
-			return str_replace($match[1], BASE_URL . "index.php?load=download_attachment&store=" . $GLOBALS["preg_replace"]["storeid"] . "&amp;entryid=" . $GLOBALS["preg_replace"]["entryid"] . "&amp;attachNum[]=" . join(",", $GLOBALS["preg_replace"]["attachNum"]) ."&amp;attachCid=" . $cid . "&amp;openType=inline\"", $match[0]);
+			return str_replace($match[1], BASE_URL . "index.php?load=download_attachment&store=" . $GLOBALS["preg_replace"]["storeid"] . "&amp;entryid=" . $GLOBALS["preg_replace"]["entryid"] . "&amp;attachNum[]=" . join(",", $GLOBALS["preg_replace"]["attachNum"]) ."&amp;attachCid=" . urlencode($cid) . "&amp;openType=inline\"", $match[0]);
 		} else {
 			return $match[0];
 		}
