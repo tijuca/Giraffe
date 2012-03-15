@@ -50,7 +50,7 @@
 
 ?>
 <?php
-	include_once('mapi/class.baserecurrence.php');
+	include_once('class.baserecurrence.php');
 
 	/**
 	 * Recurrence 
