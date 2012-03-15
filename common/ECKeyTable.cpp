@@ -1500,6 +1500,8 @@ ECRESULT ECKeyTable::Find(unsigned int ulSortCols, int *lpSortLen, unsigned char
     ECRESULT er = erSuccess;
 	ECTableRow *lpCurPos = lpCurrent;
     
+	pthread_mutex_lock(&mLock);
+
     er = LowerBound(ulSortCols, lpSortLen, lppSortData, lpFlags);
     if(er != erSuccess)
         goto exit;
@@ -1521,6 +1523,8 @@ ECRESULT ECKeyTable::Find(unsigned int ulSortCols, int *lpSortLen, unsigned char
     
 exit:
 	lpCurrent = lpCurPos;
+
+	pthread_mutex_unlock(&mLock);
 
     return er;
 }
@@ -1573,6 +1577,8 @@ ECRESULT ECKeyTable::UpdatePartialSortKey(sObjectTableKey *lpsRowItem, unsigned 
     unsigned int *lpSortLen = NULL;
     unsigned char *lpFlags = NULL;
     
+	pthread_mutex_lock(&mLock);
+
     er = SeekId(lpsRowItem);
     if(er != erSuccess)
         goto exit;
@@ -1608,6 +1614,10 @@ ECRESULT ECKeyTable::UpdatePartialSortKey(sObjectTableKey *lpsRowItem, unsigned 
         
     
 exit:
+    lpCurrent = lpCursor;
+
+	pthread_mutex_unlock(&mLock);
+
     if (lppSortKeys)
         delete [] lppSortKeys;
         
@@ -1617,7 +1627,6 @@ exit:
     if (lpFlags)
         delete [] lpFlags;
         
-    lpCurrent = lpCursor;
     
     return er;
 }
