@@ -395,9 +395,23 @@ HRESULT ECVMIMESender::sendMail(LPADRBOOK lpAdrBook, LPMESSAGE lpMessage, vmime:
 			throw vmime::exceptions::no_expeditor();
 		}
 
+		if (expeditor.isEmpty()) {
+			// cancel this message as unsendable, would otherwise be thrown out of transport::send()
+			hr = MAPI_W_CANCEL_MESSAGE;
+			error = L"No expeditor in e-mail";
+			goto exit;
+		}
+
 		hr = HrMakeRecipientsList(lpAdrBook, lpMessage, vmMessage, recipients, bAllowEveryone);
 		if (hr != hrSuccess)
 			goto exit;
+
+		if (recipients.isEmpty()) {
+			// cancel this message as unsendable, would otherwise be thrown out of transport::send()
+			hr = MAPI_W_CANCEL_MESSAGE;
+			error = L"No recipients in e-mail";
+			goto exit;
+		}
 
         // Remove BCC headers from the message we're about to send
         try {
