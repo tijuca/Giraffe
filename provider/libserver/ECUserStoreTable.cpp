@@ -253,10 +253,17 @@ ECRESULT ECUserStoreTable::Load() {
 
     Clear();
 
-	// we can't use WHERE to exclude wrong user types, because of NULL when there is a store, but not a user object
+	/*
+	 * The next query will first get the list of all users with their primary store details or NULL if
+	 * no primary store was found. Secondly it will get the list of all stores with their owner or NULL
+	 * if they're detached.
+	 * The most important difference id that the first query will return no store for users without a
+	 * primary store, even if they do have an archive store attached, while the second query will
+	 * return all stores types.
+	 */
 	strQuery =
 		" SELECT u.id, u.externid, u.objectclass, u.company, s.guid, s.type, s.user_name, s.company, s.hierarchy_id, p.val_longint, m.val_hi, m.val_lo FROM users AS u"
-		"  LEFT JOIN stores AS s ON s.user_id=u.id LEFT JOIN hierarchy AS h ON h.id=s.hierarchy_id"
+		"  LEFT JOIN stores AS s ON s.user_id=u.id AND s.type=" + stringify(ECSTORE_TYPE_PRIVATE) + " LEFT JOIN hierarchy AS h ON h.id=s.hierarchy_id"
 		"  LEFT JOIN properties AS p ON p.hierarchyid=s.hierarchy_id and p.tag=0x0E08 and p.type=0x14"
 		"  LEFT JOIN properties AS m ON m.hierarchyid=s.hierarchy_id and m.tag=0x3008 and m.type=0x40"
 		" UNION"
