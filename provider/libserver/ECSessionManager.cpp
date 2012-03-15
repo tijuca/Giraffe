@@ -604,8 +604,12 @@ ECRESULT ECSessionManager::CreateSession(struct soap *soap, char *szName, char *
 	ECSession		*lpSession	= NULL;
 	const char		*method = "error";
 	std::string		from;
+	CONNECTION_TYPE ulType;
 
-	if (soap->ip == 0) {
+	zarafa_get_soap_connection_type(soap, &ulType);
+	if (ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY) {
+		from = string("file://") + m_lpConfig->GetSetting("server_pipe_priority");
+	} else if (ulType == CONNECTION_TYPE_NAMED_PIPE) {
 		// connected through unix socket
 		from = string("file://") + m_lpConfig->GetSetting("server_pipe_name");
 	} else {

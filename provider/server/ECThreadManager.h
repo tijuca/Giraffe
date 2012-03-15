@@ -227,6 +227,8 @@ protected:
     ECThreadManager *		m_lpThreadManager;
     pthread_mutex_t 		m_mutexItems;
     std::queue<WORKITEM *> 	m_queueItems;
+    std::queue<WORKITEM *> 	m_queuePrioItems;
+	int m_nPrioDone;
     pthread_cond_t			m_condItems;
     std::map<int, ACTIVESOCKET>	m_setSockets;
     std::map<int, struct soap *>	m_setListenSockets;

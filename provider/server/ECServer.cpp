@@ -742,6 +742,7 @@ int main(int argc, char* argv[])
 }
 
 #define ZARAFA_SERVER_PIPE "/var/run/zarafa"
+#define ZARAFA_SERVER_PRIO "/var/run/zarafa-prio"
 
 int running_server(char *szName, const char *szConfig)
 {
@@ -790,6 +791,7 @@ int running_server(char *szName, const char *szConfig)
 		{ "server_tcp_enabled",			"yes" },
 		{ "server_pipe_enabled",		"yes" },
 		{ "server_pipe_name",			ZARAFA_SERVER_PIPE },
+		{ "server_pipe_priority",		ZARAFA_SERVER_PRIO },
 		{ "server_recv_timeout",		"5", CONFIGSETTING_RELOADABLE },	// timeout before reading next XML request
 		{ "server_read_timeout",		"60", CONFIGSETTING_RELOADABLE }, // timeout during reading of XML request
 		{ "server_send_timeout",		"60", CONFIGSETTING_RELOADABLE },
@@ -1027,6 +1029,21 @@ int running_server(char *szName, const char *szConfig)
 	// setup connection handler
 	g_lpSoapServerConn = new ECSoapServerConnection(g_lpConfig, g_lpLogger);
 
+	// Priority queue is always enabled, create as first socket, so this socket is returned first too on activity
+	er = g_lpSoapServerConn->ListenPipe(g_lpConfig->GetSetting("server_pipe_priority"), true);
+	if (er != erSuccess) {
+		retval = -1;
+		goto exit;
+	}
+	// Setup a pipe connection
+	if (bPipeEnabled) {
+		er = g_lpSoapServerConn->ListenPipe(g_lpConfig->GetSetting("server_pipe_name"));
+		if (er != erSuccess) {
+			retval = -1;
+			goto exit;
+		}
+	}
+
 	// Setup a tcp connection
 	if (bTCPEnabled)
 	{
@@ -1049,15 +1066,6 @@ int running_server(char *szName, const char *szConfig)
 							g_lpConfig->GetSetting("server_ssl_ca_path","",NULL)	// CA certificate path of thrusted sources
 							);
 		if(er != erSuccess) {
-			retval = -1;
-			goto exit;
-		}
-	}
-
-	// Setup a pipe connection
-	if (bPipeEnabled) {
-		er = g_lpSoapServerConn->ListenPipe(g_lpConfig->GetSetting("server_pipe_name"));
-		if (er != erSuccess) {
 			retval = -1;
 			goto exit;
 		}
@@ -1304,15 +1312,6 @@ int running_server(char *szName, const char *szConfig)
 
 	g_lpScheduler->AddSchedule(SCHEDULE_HOUR, 15, &CleanupSyncsTable);
 	g_lpScheduler->AddSchedule(SCHEDULE_HOUR, 16, &CleanupSyncedMessagesTable);
-
-	if (bPipeEnabled)
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Listening for pipe connections on %s", g_lpConfig->GetSetting("server_pipe_name") );
-
-	if (bTCPEnabled)
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Listening for TCP connections on port %d", atoui(g_lpConfig->GetSetting("server_tcp_port")) );
-
-	if (bSSLEnabled)
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Listening for SSL connections on port %d", atoui(g_lpConfig->GetSetting("server_ssl_port")) );
 
 	// high loglevel to always see when server is started.
 	g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Startup succeeded on pid %d", getpid() );

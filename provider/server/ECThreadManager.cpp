@@ -441,6 +441,7 @@ ECDispatcher::ECDispatcher(ECLogger *lpLogger, ECConfig *lpConfig, CREATEPIPESOC
 	m_nSendTimeout = atoi(m_lpConfig->GetSetting("server_send_timeout"));
     
     m_ulIdle = 0;
+	m_nPrioDone = 0;
         
     pthread_mutex_init(&m_mutexItems, NULL);
     pthread_mutex_init(&m_mutexSockets, NULL);
@@ -482,9 +483,11 @@ ECRESULT ECDispatcher::GetFrontItemAge(double *lpdblAge)
     double dblAge = 0;
     
     pthread_mutex_lock(&m_mutexItems);
-    if(m_queueItems.empty())
+    if(m_queueItems.empty() && m_queuePrioItems.empty())
         dblAge = 0;
-    else
+    else if (m_queueItems.empty()) // normal items queue is more important when checking queue age
+        dblAge = dblNow - m_queuePrioItems.front()->dblReceiveStamp;
+	else
         dblAge = dblNow - m_queueItems.front()->dblReceiveStamp;
         
     pthread_mutex_unlock(&m_mutexItems);
@@ -498,7 +501,7 @@ ECRESULT ECDispatcher::GetQueueLength(unsigned int *lpulLength)
 {
     unsigned int ulLength = 0;
     pthread_mutex_lock(&m_mutexItems);
-    ulLength = m_queueItems.size();
+    ulLength = m_queueItems.size() + m_queuePrioItems.size();
     pthread_mutex_unlock(&m_mutexItems);
     
     *lpulLength = ulLength;
@@ -519,12 +522,17 @@ ECRESULT ECDispatcher::AddListenSocket(struct soap *soap)
 ECRESULT ECDispatcher::QueueItem(struct soap *soap)
 {
 	WORKITEM *item = new WORKITEM;
+	CONNECTION_TYPE ulType;
 
 	item->soap = soap;
 	item->dblReceiveStamp = GetTimeOfDay();
+	zarafa_get_soap_connection_type(soap, &ulType);
 
 	pthread_mutex_lock(&m_mutexItems);
-	m_queueItems.push(item);
+	if (ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY)
+		m_queuePrioItems.push(item);
+	else
+		m_queueItems.push(item);
 	pthread_cond_signal(&m_condItems);
 	pthread_mutex_unlock(&m_mutexItems);
 
@@ -538,9 +546,18 @@ ECRESULT ECDispatcher::GetNextWorkItem(WORKITEM **lppItem, bool bWait)
     ECRESULT er = erSuccess;
     
     pthread_mutex_lock(&m_mutexItems);
+	// 1 out of 5 items is forced from normal to avoid starvation
+	if (!m_queuePrioItems.empty() && (m_queueItems.empty() || (m_nPrioDone % 5 != 0))) {
+		*lppItem = m_queuePrioItems.front();
+		m_queuePrioItems.pop();
+		m_nPrioDone++;
+		goto exit;
+	}
+
     // Check the queue
     if(!m_queueItems.empty()) {
         // Item is waiting, return that
+		m_nPrioDone = 0;
         lpItem = m_queueItems.front();
         m_queueItems.pop();
     } else {
@@ -552,6 +569,16 @@ ECRESULT ECDispatcher::GetNextWorkItem(WORKITEM **lppItem, bool bWait)
             pthread_cond_wait(&m_condItems, &m_mutexItems);
             
             pthread_mutex_lock(&m_mutexIdle); m_ulIdle--; pthread_mutex_unlock(&m_mutexIdle);
+
+			// 1 out of 5 items is forced from normal to avoid starvation
+			if (!m_queuePrioItems.empty() && (m_queueItems.empty() || (m_nPrioDone % 5 != 0))) {
+				*lppItem = m_queuePrioItems.front();
+				m_queuePrioItems.pop();
+				m_nPrioDone++;
+				goto exit;
+			}
+			m_nPrioDone = 0;
+
             if(!m_queueItems.empty()) {
                 lpItem = m_queueItems.front();
                 m_queueItems.pop();
@@ -695,7 +722,7 @@ ECRESULT ECDispatcherSelect::MainLoop()
         iterSockets = m_setSockets.begin();
         while(iterSockets != m_setSockets.end()) {
             zarafa_get_soap_connection_type(iterSockets->second.soap, &ulType);
-            if(ulType != CONNECTION_TYPE_NAMED_PIPE && (now - (time_t)iterSockets->second.ulLastActivity > m_nRecvTimeout)) {
+            if(ulType != CONNECTION_TYPE_NAMED_PIPE && ulType != CONNECTION_TYPE_NAMED_PIPE_PRIORITY && (now - (time_t)iterSockets->second.ulLastActivity > m_nRecvTimeout)) {
                 // Socket has been inactive for more than server_recv_timeout seconds, close the socket
 				shutdown(iterSockets->second.soap->socket, SHUT_RDWR);
             }
@@ -775,7 +802,7 @@ ECRESULT ECDispatcherSelect::MainLoop()
                 time(&sActive.ulLastActivity);
 
         		zarafa_get_soap_connection_type(iterListenSockets->second, &ulType);
-                if(ulType == CONNECTION_TYPE_NAMED_PIPE) {
+                if(ulType == CONNECTION_TYPE_NAMED_PIPE || ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY) {
                     int socket = accept(newsoap->master, NULL, 0);
                     newsoap->socket = socket;
                 } else {
@@ -786,6 +813,8 @@ ECRESULT ECDispatcherSelect::MainLoop()
 					if (m_lpLogger->Log(EC_LOGLEVEL_DEBUG)) {
 						if (ulType == CONNECTION_TYPE_NAMED_PIPE)
 							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Error accepting incoming connection from file://%s", m_lpConfig->GetSetting("server_pipe_name"));
+						else if (ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY)
+							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Error accepting incoming connection from file://%s", m_lpConfig->GetSetting("server_pipe_priority"));
 						else
 							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Error accepting incoming connection from network.");
 					}
@@ -794,6 +823,8 @@ ECRESULT ECDispatcherSelect::MainLoop()
 					if (m_lpLogger->Log(EC_LOGLEVEL_DEBUG)) {
 						if (ulType == CONNECTION_TYPE_NAMED_PIPE)
 							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Accepted incoming connection from file://%s", m_lpConfig->GetSetting("server_pipe_name"));
+						else if (ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY)
+							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Accepted incoming connection from file://%s", m_lpConfig->GetSetting("server_pipe_priority"));
 						else
 							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Accepted incoming%sconnection from %d.%d.%d.%d",
 											ulType == CONNECTION_TYPE_SSL ? " SSL ":" ",
@@ -831,6 +862,7 @@ ECRESULT ECDispatcherSelect::MainLoop()
     // Empty the queue
     pthread_mutex_lock(&m_mutexItems);
     while(!m_queueItems.empty()) {soap_free(m_queueItems.front()->soap); m_queueItems.pop(); }
+    while(!m_queuePrioItems.empty()) {soap_free(m_queuePrioItems.front()->soap); m_queuePrioItems.pop(); }
     pthread_mutex_unlock(&m_mutexItems);
 
     // Close all listener sockets. 
@@ -918,7 +950,7 @@ ECRESULT ECDispatcherEPoll::MainLoop()
             iterSockets = m_setSockets.begin();
             while (iterSockets != m_setSockets.end()) {
                 zarafa_get_soap_connection_type(iterSockets->second.soap, &ulType);
-                if(ulType != CONNECTION_TYPE_NAMED_PIPE && (now - (time_t)iterSockets->second.ulLastActivity > m_nRecvTimeout)) {
+                if(ulType != CONNECTION_TYPE_NAMED_PIPE && ulType != CONNECTION_TYPE_NAMED_PIPE_PRIORITY && (now - (time_t)iterSockets->second.ulLastActivity > m_nRecvTimeout)) {
                     // Socket has been inactive for more than server_recv_timeout seconds, close the socket
                     shutdown(iterSockets->second.soap->socket, SHUT_RDWR);
                 }
@@ -944,15 +976,33 @@ ECRESULT ECDispatcherEPoll::MainLoop()
 				time(&sActive.ulLastActivity);
 
 				zarafa_get_soap_connection_type(iterListenSockets->second, &ulType);
-				if(ulType == CONNECTION_TYPE_NAMED_PIPE) {
+				if(ulType == CONNECTION_TYPE_NAMED_PIPE || ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY) {
 					newsoap->socket = accept(newsoap->master, NULL, 0);
 				} else {
 					soap_accept(newsoap);
 				}
 
 				if(newsoap->socket == SOAP_INVALID_SOCKET) {
+					if (m_lpLogger->Log(EC_LOGLEVEL_DEBUG)) {
+						if (ulType == CONNECTION_TYPE_NAMED_PIPE)
+							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Error accepting incoming connection from file://%s", m_lpConfig->GetSetting("server_pipe_name"));
+						else if (ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY)
+							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Error accepting incoming connection from file://%s", m_lpConfig->GetSetting("server_pipe_priority"));
+						else
+							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Error accepting incoming connection from network.");
+					}
 					soap_free(newsoap);
 				} else {
+					if (m_lpLogger->Log(EC_LOGLEVEL_DEBUG)) {
+						if (ulType == CONNECTION_TYPE_NAMED_PIPE)
+							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Accepted incoming connection from file://%s", m_lpConfig->GetSetting("server_pipe_name"));
+						else if (ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY)
+							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Accepted incoming connection from file://%s", m_lpConfig->GetSetting("server_pipe_priority"));
+						else
+							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Accepted incoming%sconnection from %d.%d.%d.%d",
+											ulType == CONNECTION_TYPE_SSL ? " SSL ":" ",
+											(int)((newsoap->ip >> 24)&0xFF), (int)((newsoap->ip >> 16)&0xFF), (int)((newsoap->ip >> 8)&0xFF), (int)(newsoap->ip&0xFF));
+					}
 					newsoap->socket = relocate_fd(newsoap->socket, m_lpLogger);
 					g_lpStatsCollector->Max(SCN_MAX_SOCKET_NUMBER, (LONGLONG)newsoap->socket);
 
@@ -1005,6 +1055,7 @@ ECRESULT ECDispatcherEPoll::MainLoop()
     // Empty the queue
     pthread_mutex_lock(&m_mutexItems);
     while(!m_queueItems.empty()) {soap_free(m_queueItems.front()->soap); m_queueItems.pop(); }
+    while(!m_queuePrioItems.empty()) {soap_free(m_queuePrioItems.front()->soap); m_queuePrioItems.pop(); }
     pthread_mutex_unlock(&m_mutexItems);
 
     // Close all listener sockets. 

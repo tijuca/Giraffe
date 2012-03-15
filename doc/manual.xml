@@ -2960,6 +2960,15 @@
 		  </varlistentry>
 		  
 		  <varlistentry>
+			<term><option>server_pipe_priority</option></term>
+			<listitem>
+			  <para>Priority unix socket to listen on. This socket is only used by the zarafa-licensed daemon.</para>
+			  <para>Default:
+			  <replaceable>/var/run/zarafa-prio</replaceable></para>
+			</listitem>
+		  </varlistentry>
+		  
+		  <varlistentry>
 			<term><option>server_name</option></term>
 			<listitem>
 			  <para>Unique name for identifying the server in a multi-server environment.</para>

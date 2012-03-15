@@ -66,7 +66,7 @@ public:
 	ECRESULT ListenTCP(const char* lpServerName, int nServerPort, bool bEnableGET);
 	ECRESULT ListenSSL(const char* lpServerName, int nServerPort, bool bEnableGET, const char* lpszKeyFile, const char* lpszKeyPass,
 						const char* lpszCAFile, const char* lpszCAPath);
-	ECRESULT ListenPipe(const char* lpPipeName);
+	ECRESULT ListenPipe(const char* lpPipeName, bool bPriority = false);
 
 	ECRESULT MainLoop();
 	

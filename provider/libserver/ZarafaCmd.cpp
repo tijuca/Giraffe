@@ -462,6 +462,7 @@ ECRESULT GetBestServerPath(struct soap *soap, ECSession *lpecSession, const std:
 			break;
 
 		case CONNECTION_TYPE_NAMED_PIPE:
+		case CONNECTION_TYPE_NAMED_PIPE_PRIORITY:
 			if (!strSslPath.empty())
 				strServerPath = strSslPath;
 			else if (!strHttpPath.empty())
@@ -564,6 +565,9 @@ int ns__logon(struct soap *soap, char *user, char *pass, char *clientVersion, un
         // If the license server is not running, report this as no access.
         if(er == ZARAFA_E_NETWORK_ERROR)
             er = ZARAFA_E_NO_ACCESS;
+
+		// kill license client, so we close the socket early
+		delete lpLicenseClient;
         
         if(er != erSuccess) {
             g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "Client requested license but zarafa-licensed could not be contacted");
@@ -591,9 +595,6 @@ exit:
         
     if(lpLicenseResponse)
         delete [] lpLicenseResponse;
-        
-    if(lpLicenseClient)
-        delete lpLicenseClient;
 
 	lpsResponse->er = er;
 
@@ -655,6 +656,9 @@ int ns__ssoLogon(struct soap *soap, ULONG64 ulSessionId, char *szUsername, struc
             // If the license server is not running, report this as no access.
             if(er == ZARAFA_E_NETWORK_ERROR)
                 er = ZARAFA_E_NO_ACCESS;
+
+			// kill license client, so we close the socket early
+			delete lpLicenseClient;
             
             if(er != erSuccess) {
                 g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "Client requested license but zarafa-licensed could not be contacted");
@@ -746,9 +750,6 @@ exit:
 
 	if (lpecSession)
 		lpecSession->Unlock();
-        
-    if (lpLicenseClient)
-        delete lpLicenseClient;
         
 	if (er == erSuccess)
 		g_lpStatsCollector->Increment(SCN_LOGIN_SSO);

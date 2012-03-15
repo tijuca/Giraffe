@@ -68,7 +68,7 @@ struct SOAPINFO {
 };
 
 #define SOAP_CONNECTION_TYPE_NAMED_PIPE(soap)	\
-	((soap) && ((soap)->user) && (((SOAPINFO*)(soap)->user)->ulConnectionType == CONNECTION_TYPE_NAMED_PIPE))
+	((soap) && ((soap)->user) && ((((SOAPINFO*)(soap)->user)->ulConnectionType == CONNECTION_TYPE_NAMED_PIPE) || (((SOAPINFO*)(soap)->user)->ulConnectionType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY)))
 
 #define SOAP_CONNECTION_TYPE(soap)	\
 	(((SOAPINFO*)(soap)->user)->ulConnectionType)
