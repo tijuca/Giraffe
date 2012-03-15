@@ -1296,7 +1296,8 @@ SOAP_ENTRY_START(getStore, lpsResponse->er, entryId* lpsEntryId, struct getStore
 
 		strQuery += "WHERE stores.hierarchy_id=" + stringify(ulStoreId) + " LIMIT 1";// FIXME: mysql query
 	}else {
-		strQuery += "WHERE stores.user_id=" + stringify(ulUserId);
+		strQuery += "WHERE stores.user_id=" + stringify(ulUserId) 
+				 + " AND stores.type=" + stringify(ECSTORE_TYPE_PRIVATE);
 	}
 
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
