@@ -173,7 +173,8 @@ bool isRTFIgnoreCommand(char* lpCommand)
 		strcmp(lpCommand,"atnauthor") == 0 ||
 		strcmp(lpCommand,"annotation") == 0 ||
 		strcmp(lpCommand,"sp") == 0 ||
-		strcmp(lpCommand,"atnid") == 0
+		strcmp(lpCommand,"atnid") == 0 ||
+		strcmp(lpCommand,"xmlopen") == 0
 		//strcmp(lpCommand,"fldrslt") == 0
 		)
 	{

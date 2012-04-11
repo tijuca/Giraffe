@@ -78,6 +78,9 @@
 /* Defined if the requested minimum ICU version is satisfied */
 #undef HAVE_ICU
 
+/* Define to 1 if you have the `initscr' function. */
+#undef HAVE_INITSCR
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
@@ -124,8 +127,8 @@
 /* Define to 1 if you have the `mysql_set_character_set' function. */
 #undef HAVE_MYSQL_SET_CHARACTER_SET
 
-/* Define to 1 if you have the <ncurses.h> header file. */
-#undef HAVE_NCURSES_H
+/* ncurses library available */
+#undef HAVE_NCURSES
 
 /* Define to 1 if you have the <openssl/ssl.h> header file. */
 #undef HAVE_OPENSSL_SSL_H

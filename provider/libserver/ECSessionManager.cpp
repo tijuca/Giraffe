@@ -438,7 +438,52 @@ ECRESULT ECSessionManager::RemoveAllSessions()
 
 		iIterSession = iSessionNext;
 
-        lstSessions.push_back(lpSession);
+		lstSessions.push_back(lpSession);
+	}
+
+	// Release ownership of the mutex object.
+	pthread_rwlock_unlock(&m_hCacheRWLock);
+	
+	// Do the actual session deletes, while the session map is not locked (!)
+	for(iterSessionList = lstSessions.begin(); iterSessionList != lstSessions.end(); iterSessionList++) {
+	    delete *iterSessionList;
+	}
+	
+	return er;
+}
+
+ECRESULT ECSessionManager::CancelAllSessions(ECSESSIONID sessionIDException)
+{
+	ECRESULT		er = erSuccess;
+	BTSession		*lpSession = NULL;
+	SESSIONMAP::iterator iIterSession, iSessionNext;
+	std::list<BTSession *> lstSessions;
+	std::list<BTSession *>::iterator iterSessionList;
+	
+	// Lock the session map since we're going to remove all the sessions.
+	pthread_rwlock_wrlock(&m_hCacheRWLock);
+
+	m_lpLogger->Log(EC_LOGLEVEL_INFO, "Shutdown all current sessions");
+
+	iIterSession = m_mapSessions.begin();
+	while(iIterSession != m_mapSessions.end())
+	{
+		if(iIterSession->first != sessionIDException) {
+			lpSession = iIterSession->second;
+			iSessionNext = iIterSession;
+			iSessionNext++;
+
+			// Tell the notification manager to wake up anyone waiting for this session
+			m_lpNotificationManager->NotifyChange(iIterSession->first);
+			
+			m_mapSessions.erase(iIterSession);
+
+			iIterSession = iSessionNext;
+
+			lstSessions.push_back(lpSession);
+		} else {
+			iIterSession++;
+		}
 	}
 
 	// Release ownership of the mutex object.

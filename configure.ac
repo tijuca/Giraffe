@@ -222,8 +222,46 @@ AC_TYPE_SIZE_T
 AC_HEADER_TIME
 AC_STRUCT_TM
 
-# zarafa-stats requires ncurses for --top
-AC_CHECK_HEADERS([ncurses.h], [], [AC_MSG_ERROR([ncurses header not found])])
+# zarafa-stats requires ncurses(w) for --top
+# check wide version before non-wide version
+AC_DEFUN([LIBNCURSES_WITH_CONFIG],[
+  AC_ARG_WITH(ncurses-config, AC_HELP_STRING([--with-ncurses-config=PATH],[path to the ncurses(w)5-config script, wide version is preferred]),
+    [NCURSES_CONFIG=${withval}],[NCURSES_CONFIG=ncursesw5-config])
+
+  AC_MSG_CHECKING([for ncurses-config presence])
+  NCURSES_CONFIG=`which $NCURSES_CONFIG 2>/dev/null`
+  if ! test -x "$NCURSES_CONFIG"; then
+    # test non-wide version after wide (or forced version)
+    NCURSES_CONFIG=`which ncurses5-config 2>/dev/null`
+  fi
+  if ! test -x "$NCURSES_CONFIG"; then
+    AC_MSG_RESULT([not found])
+	# does not indicate if ncurses is available
+    NCURSES_FLAGS=
+    NCURSES_LIBS=-lncursesw
+  else
+    AC_MSG_RESULT([$NCURSES_CONFIG])
+
+    NCURSES_FLAGS=`$NCURSES_CONFIG --cflags`
+    NCURSES_LIBS=`$NCURSES_CONFIG --libs`
+  fi
+
+  CXXFLAGS="$CXXFLAGS $NCURSES_FLAGS"
+  LIBS=$NCURSES_LIBS
+
+  AC_CHECK_FUNCS([initscr], [AC_DEFINE([HAVE_NCURSES], [1], [ncurses library available])], [
+  # possibly wide version failed, force check normal version
+    NCURSES_LIBS=-lncurses
+	AC_CHECK_FUNCS([initscr], [AC_DEFINE([HAVE_NCURSES], [1], [ncurses library available])])
+  ])
+
+  LIBS=$libs_keep
+  CFLAGS=$cflags_keep
+  AC_SUBST(NCURSES_FLAGS)
+  AC_SUBST(NCURSES_LIBS)
+])
+LIBNCURSES_WITH_CONFIG
+
 AC_CHECK_HEADERS([memory.h stddef.h stdlib.h string.h sys/timeb.h wchar.h syslog.h sys/un.h sys/ucred.h sys/stat.h openssl/ssl.h zlib.h])
 
 # Checks for library functions.
@@ -796,6 +834,7 @@ ICal flags	:	$ICAL_CFLAGS
 ICal libs	:	$ICAL_LIBS
 clucene flags	:	$CLUCENE_CFLAGS
 clucene libs	:	$CLUCENE_LIBS
+ncurses libs	:	$NCURSES_LIBS
 Clients libs	:	$PROG_LIBS
 xmlto	 	:	$PROG_XMLTO
 LDAP support	:	$want_ldap

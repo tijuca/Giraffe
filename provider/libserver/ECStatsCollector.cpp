@@ -65,6 +65,8 @@ ECStatsCollector::ECStatsCollector() {
  	AddStat(SCN_REDIRECT_COUNT, SCDT_LONGLONG, "redirections", "Number of redirected requests");
  	AddStat(SCN_SEARCHFOLDER_COUNT, SCDT_LONGLONG, "searchfld_loaded", "Total number of searchfolders");
  	AddStat(SCN_SEARCHFOLDER_THREADS, SCDT_LONGLONG, "searchfld_threads", "Current number of running searchfolder threads");
+ 	AddStat(SCN_SEARCHFOLDER_UPDATE_RETRY, SCDT_LONGLONG, "searchupd_retry", "The number of times a search folder update was restarted");
+ 	AddStat(SCN_SEARCHFOLDER_UPDATE_FAIL, SCDT_LONGLONG, "searchupd_fail", "The number of failed search folder updates after retrying");
  	AddStat(SCN_SOAP_REQUESTS, SCDT_LONGLONG, "soap_request", "Number of soap requests handled by server");
  	AddStat(SCN_RESPONSE_TIME, SCDT_LONGLONG, "response_time", "Response time of soap requests handled in milliseconds (includes time in queue)");
  	AddStat(SCN_PROCESSING_TIME, SCDT_LONGLONG, "processing_time", "Time taken to process soap requests in milliseconds (wallclock time)");

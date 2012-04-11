@@ -171,6 +171,18 @@ HRESULT VMIMEToMAPI::createIMAPProperties(const std::string &input, std::string 
 	return hrSuccess;
 }
 
+/** 
+ * Force a string to us-ascii characters, anything above-equal 0x80
+ * will become a ?-char.
+ * 
+ * @param[in] c input
+ * 
+ * @return valid us-ascii character
+ */
+static char forceAscii(char c) {
+	return (c >= 0x80) ? '?' : c;
+}
+
 /**
  * Entry point for the conversion from RFC822 mail to IMessage MAPI object.
  *
@@ -206,19 +218,12 @@ HRESULT VMIMEToMAPI::convertVMIMEToMAPI(const string &input, IMessage *lpMessage
 		if(pos != std::string::npos) {
 			SPropValue sPropHeaders;
 			std::string strHeaders = input.substr(0, pos);
-			std::wstring strWHeaders;
 
-			try {
-				// e-mail headers must be in us-ascii, ignore what we can't convert. only this way we have the "full" data from iconv in wchar_t.
-				strWHeaders = m_converter.convert_to<wstring>(CHARSET_WCHAR"//IGNORE", strHeaders.c_str(), rawsize(strHeaders), "us-ascii");
-			}
-			catch (convert_exception &ce) {
-				lpLogger->Log(EC_LOGLEVEL_ERROR, "E-mail headers contain non us-ascii characters");
-				// continue with what we have
-			}
+			// make sure we have us-ascii headers
+			transform(strHeaders.begin(), strHeaders.end(), strHeaders.begin(), forceAscii);
 
-			sPropHeaders.ulPropTag = PR_TRANSPORT_MESSAGE_HEADERS_W;
-			sPropHeaders.Value.lpszW = (WCHAR *) strWHeaders.c_str();
+			sPropHeaders.ulPropTag = PR_TRANSPORT_MESSAGE_HEADERS_A;
+			sPropHeaders.Value.lpszA = (char *) strHeaders.c_str();
 
 			HrSetOneProp(lpMessage, &sPropHeaders);
 		}
@@ -450,10 +455,6 @@ HRESULT VMIMEToMAPI::fillMAPIMail(vmime::ref<vmime::message> vmMessage, IMessage
 		vmime::ref<vmime::header> vmHeader = vmMessage->getHeader();
 		vmime::ref<vmime::body> vmBody = vmMessage->getBody();
 		vmime::ref<vmime::mediaType> mt = vmHeader->ContentType()->getValue().dynamicCast<vmime::mediaType>();
-		bool bMixed = false;
-
-		if (mt->getType() == "multipart" && mt->getSubType() == "mixed")
-			bMixed = true;
 
 		// pass recipients somewhere else 
 		hr = handleRecipients(vmHeader, lpMessage);
@@ -512,20 +513,9 @@ HRESULT VMIMEToMAPI::fillMAPIMail(vmime::ref<vmime::message> vmMessage, IMessage
 				lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to set MDN mail properties");
 				goto exit;
 			}
-
-		} else if (vmBody->getPartCount() > 0) {
-			// multipart message, handle by part
-			for (int i=0; i < vmBody->getPartCount(); i++) {
-				vmime::ref<vmime::bodyPart> VMBodyPart = vmBody->getPartAt(i);
-				hr = disectBody(VMBodyPart->getHeader(), VMBodyPart->getBody(), lpMessage, false, false, bMixed);
-				if (hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to parse multipart %d of mail body", i);
-					goto exit;
-				}
-			}
 		} else {
-			// one body part, always place in the body, no matter if the header says it's an _text_ attachment
-			hr = disectBody(vmHeader, vmBody, lpMessage, true);
+			// multiparts are handled in disectBody, if any
+			hr = disectBody(vmHeader, vmBody, lpMessage, mt->getType().compare("multipart") != 0);
 			if (hr != hrSuccess) {
 				lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to parse mail body");
 				goto exit;
@@ -1630,12 +1620,13 @@ exit:
  * @return		MAPI error code.
  * @retval		MAPI_E_CALL_FAILED	Caught an exception, which breaks the conversion.
  */
-HRESULT VMIMEToMAPI::disectBody(vmime::ref<vmime::header> vmHeader, vmime::ref<vmime::body> vmBody, IMessage* lpMessage, bool onlyBody, bool filterDouble, bool bAppendBody) {
+HRESULT VMIMEToMAPI::disectBody(vmime::ref<vmime::header> vmHeader, vmime::ref<vmime::body> vmBody, IMessage* lpMessage, bool onlyBody, bool filterDouble, bool appendBody) {
 	HRESULT	hr = hrSuccess;
 	IStream *lpStream = NULL;
 	SPropValue sPropSMIMEClass;
 	bool bFilterDouble = filterDouble;
-	bool bMixed = bAppendBody;
+	bool bAppendBody = appendBody;
+	bool bAlternative = false;
 	ICalToMapi *lpIcalMapi = NULL;
 
 	try {
@@ -1644,29 +1635,44 @@ HRESULT VMIMEToMAPI::disectBody(vmime::ref<vmime::header> vmHeader, vmime::ref<v
 		// find body type
 		if (mt->getType() == "multipart") {
 			if (vmBody->getPartCount() > 0) {
-				/*
-				 * reset selected states:
-				 * - new multipart, so disable append mode (bmixed)
-				 * - new bodyLevel: if we previously had written any body (mixed or alternative),
-				 *   this multipart _may_ override this current body
-				 */
-				bMixed = false;
-				m_mailState.bodyLevel = BODY_NONE;
+				vmime::ref<vmime::bodyPart> vmBodyPart;
+
+				// check new multipart type
 				if (mt->getSubType() == "appledouble")
 					bFilterDouble = true;
 				else if (mt->getSubType() == "mixed")
-					bMixed = true;
-				// recursively process multipart message
-				for (int i=0; i < vmBody->getPartCount(); i++) {
-					vmime::ref<vmime::bodyPart> VMBodyPart = vmBody->getPartAt(i);
+					bAppendBody = true;
+				else if (mt->getSubType() == "alternative")
+					bAlternative = true;
 
-					hr = disectBody(VMBodyPart->getHeader(), VMBodyPart->getBody(), lpMessage, onlyBody, bFilterDouble, bMixed);
+				if (bAlternative) {
+					// recursively process multipart alternatives in reverse to select best body first
+					for (int i = vmBody->getPartCount(); i > 0; i--) {
+						vmBodyPart = vmBody->getPartAt(i - 1);
+
+						hr = disectBody(vmBodyPart->getHeader(), vmBodyPart->getBody(), lpMessage, onlyBody, bFilterDouble, bAppendBody);
+						if (hr != hrSuccess)
+							lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to parse alternative multipart %d of mail body, trying other alternatives", i);
+						else
+							break;
+					}
 					if (hr != hrSuccess) {
-						lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to parse sub multipart %d of mail body", i);
+						lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to parse all alternative multiparts of mail body");
 						goto exit;
 					}
+				} else {
+					// recursively process multipart message
+					for (int i=0; i < vmBody->getPartCount(); i++) {
+						vmBodyPart = vmBody->getPartAt(i);
+
+						hr = disectBody(vmBodyPart->getHeader(), vmBodyPart->getBody(), lpMessage, onlyBody, bFilterDouble, bAppendBody);
+						if (hr != hrSuccess) {
+							lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to parse sub multipart %d of mail body", i);
+							goto exit;
+						}
+					}
 				}
-				bFilterDouble = filterDouble;
+
 			} else {
 				// a lonely attachment in a multipart, may not be empty when it's a signed part.
 				hr = handleAttachment(vmHeader, vmBody, lpMessage, mt->getSubType().compare("signed") != 0);
@@ -1692,7 +1698,6 @@ HRESULT VMIMEToMAPI::disectBody(vmime::ref<vmime::header> vmHeader, vmime::ref<v
 				}
 			}
 
-
 		// Only handle as inline text if no filename is specified and not specified as 'attachment'
 		// or if the text part is the only body part in the mail
 		} else if (	mt->getType() == vmime::mediaTypes::TEXT &&
@@ -1703,14 +1708,16 @@ HRESULT VMIMEToMAPI::disectBody(vmime::ref<vmime::header> vmHeader, vmime::ref<v
 					 !vmHeader->ContentType().dynamicCast<vmime::contentTypeField>()->hasParameter("name")) || 
 					 onlyBody)
 					) {
-			if (mt->getSubType() == vmime::mediaTypes::TEXT_HTML) {
-				hr = handleHTMLTextpart(vmHeader, vmBody, lpMessage, bMixed);
+			if (mt->getSubType() == vmime::mediaTypes::TEXT_HTML || (m_mailState.bodyLevel == BODY_HTML && bAppendBody)) {
+				// handle real html part, or append a plain text bodypart to the html main body
+				// subtype guaranteed html or plain.
+				hr = handleHTMLTextpart(vmHeader, vmBody, lpMessage, bAppendBody);
 				if (hr != hrSuccess) {
 					lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to parse mail HTML text");
 					goto exit;
 				}
 			} else {
-				hr = handleTextpart(vmHeader, vmBody, lpMessage, bMixed);
+				hr = handleTextpart(vmHeader, vmBody, lpMessage, bAppendBody);
 				if (hr != hrSuccess)
 					goto exit;
 			}
@@ -2141,12 +2148,24 @@ HRESULT VMIMEToMAPI::handleHTMLTextpart(vmime::ref<vmime::header> vmHeader, vmim
 				
 				// Everything is utf-8 now
 				sCodepage.Value.ul = 65001;
+				bodyCharset = "utf-8";
 			}
 			
 			m_mailState.ulLastCP = sCodepage.Value.ul;
 			
 			sCodepage.ulPropTag = PR_INTERNET_CPID;
 			HrSetOneProp(lpMessage, &sCodepage);
+
+			// we may have received a text part to append to the HTML body
+			if (vmHeader->ContentType()->getValue().dynamicCast<vmime::mediaType>()->getSubType() == vmime::mediaTypes::TEXT_PLAIN) {
+				// escape and wrap with <pre> tags
+				std::wstring strwBody = m_converter.convert_to<std::wstring>(CHARSET_WCHAR "//IGNORE", strHTML, rawsize(strHTML), bodyCharset.getName().c_str());
+				strHTML = "<pre>";
+				hr = Util::HrTextToHtml(strwBody.c_str(), strHTML, sCodepage.Value.ul);
+				if (hr != hrSuccess)
+					goto exit;
+				strHTML += "</pre>";
+			}
 		}
 		catch (vmime::exception& e) {
 			lpLogger->Log(EC_LOGLEVEL_FATAL, "VMIME exception on html body: %s", e.what());
@@ -2737,6 +2756,8 @@ std::string VMIMEToMAPI::mailboxToEnvelope(vmime::ref<vmime::mailbox> mbox)
 	// (( "personal name" NIL "mailbox name" "domain name" ))
 
 	mbox->getName().generate(os);
+	// encoded names never contain "
+	buffer = StringEscape(buffer.c_str(), "\"", '\\');
 	lMBox.push_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
 
 	lMBox.push_back("NIL");	// at-domain-list (source route) ... whatever that means
@@ -2855,6 +2876,8 @@ std::string VMIMEToMAPI::createIMAPEnvelope(vmime::ref<vmime::message> vmMessage
 	// subject
 	try {
 		vmHeader->Subject()->getValue()->generate(os);
+		// encoded subjects never contain ", so escape won't break those.
+		buffer = StringEscape(buffer.c_str(), "\"", '\\');
 		lItems.push_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
 	} catch (vmime::exception &e) {
 		lItems.push_back("NIL");

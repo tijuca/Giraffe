@@ -924,7 +924,7 @@ HRESULT CopySOAPEntryIdToMAPIEntryId(entryId* lpSrc, ULONG ulObjId, ULONG ulType
 		goto exit;
 	}
 
-	if(lpSrc->__size < CbNewABEID("") || lpSrc->__ptr == NULL)
+	if((unsigned int)lpSrc->__size < CbNewABEID("") || lpSrc->__ptr == NULL)
 	{
 		hr = MAPI_E_INVALID_ENTRYID;
 		goto exit;
@@ -1656,7 +1656,7 @@ HRESULT CopyABPropsToSoap(SPROPMAP *lpPropmap, MVPROPMAP *lpMVPropmap, ULONG ulF
 	convert_context	converter;
 
 
-	if (lppsoapPropmap && lpPropmap->cEntries) {
+	if (lpPropmap && lpPropmap->cEntries) {
 		hr = ECAllocateBuffer(sizeof *soapPropmap, (void**)&soapPropmap);
 		if (hr != hrSuccess)
 			goto exit;
@@ -1674,7 +1674,7 @@ HRESULT CopyABPropsToSoap(SPROPMAP *lpPropmap, MVPROPMAP *lpMVPropmap, ULONG ulF
 		}
 	}
 
-	if (lppsoapMVPropmap && lpMVPropmap->cEntries) {
+	if (lpMVPropmap && lpMVPropmap->cEntries) {
 		hr = ECAllocateBuffer(sizeof *soapMVPropmap, (void**)&soapMVPropmap);
 		if (hr != hrSuccess)
 			goto exit;

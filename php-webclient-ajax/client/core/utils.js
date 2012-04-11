@@ -1894,3 +1894,26 @@ function isMeetingCanceled(meetingItem) {
 
 	return false;
 }
+
+/**
+ * Will check whether a string used in recipient input fields has a semicolon after the last 
+ * recipient. It will return true if that is the case, false otherwise. If the string, apart from 
+ * spaces, is empty it will also return true as the next recipient can be added directly. 
+ * If the string is not empty it will check whether the last character is the semicolon. It will 
+ * allow the semicolon to be followed by spaces, but no other characters are allowed. So it will 
+ * accept "RECIPIENT ;  " and return true, but it will not accept "RECIPIENT ; a".
+ * @param String str The recipient input string
+ * @return Boolean Will return true if the string is closed otherwise false
+ */
+function isLastRecipientClosedWithSemicolon(str){
+	/* We check the length of the trimmed string to see if the string is empty and we use the 
+	* regular expression that checks for a semicolon followed by 0 to n spaces until the end of the 
+	* string. If that semicolon can not be found it will return -1. So by checking whether it 
+	* matches -1 we can see that the string is not closed with a semicolon.
+	*/
+	if(str.trim().length > 0 && str.search(/;[\s]*$/) == -1){
+		return false;
+	}else{
+		return true;
+	}
+}

@@ -324,6 +324,9 @@ public:
 	/* notifications */
 	virtual HRESULT HrGetNotify(struct notificationArray **lppsArrayNotifications);
 	virtual HRESULT HrCancelIO();
+	
+	/* Check session and relogon if needed */
+	virtual HRESULT HrEnsureSession();
 
 private:
 	static SOAP_SOCKET RefuseConnect(struct soap*, const char*, const char*, int);

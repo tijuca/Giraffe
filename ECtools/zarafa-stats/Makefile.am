@@ -5,6 +5,7 @@ dist_noinst_DATA = zarafa-ssm zarafa-ssm.default zarafa-ssm.cron
 endif
 
 AM_CPPFLAGS = $(DEBUGFLAGS) $(BOOST_CPPFLAGS) -DLINUX \
+	$(NCURSES_FLAGS) \
 	-I${top_srcdir}/mapi4linux/include \
 	-I${top_srcdir}/libfreebusy	\
 	-I${top_srcdir}/common
@@ -13,7 +14,7 @@ zarafa_stats_LDADD = \
 	${top_builddir}/mapi4linux/src/libmapi.la \
 	${top_builddir}/common/libcommon_mapi.la \
 	${top_builddir}/common/libcommon_util.la \
-	$(PROG_LIBS) -lncurses
+	$(PROG_LIBS) $(NCURSES_LIBS)
 
 zarafa_stats_SOURCES = zarafa-stats.cpp
 

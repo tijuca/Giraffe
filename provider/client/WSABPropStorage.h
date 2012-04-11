@@ -65,11 +65,11 @@ class WSABPropStorage : public ECUnknown
 {
 
 protected:
-	WSABPropStorage(ULONG cbEntryId, LPENTRYID lpEntryId, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport);
+	WSABPropStorage(ULONG cbEntryId, LPENTRYID lpEntryId, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport);
 	virtual ~WSABPropStorage();
 
 public:
-	static HRESULT Create(ULONG cbEntryId, LPENTRYID lpEntryId, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport, WSABPropStorage **lppPropStorage);
+	static HRESULT Create(ULONG cbEntryId, LPENTRYID lpEntryId, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport, WSABPropStorage **lppPropStorage);
 
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
 	
@@ -122,7 +122,7 @@ public:
 private:
 	entryId			m_sEntryId;
 	ZarafaCmd*		lpCmd;
-	pthread_mutex_t	mDataLock;
+	pthread_mutex_t *lpDataLock;
 	ECSESSIONID		ecSessionId;
 	WSTransport*	m_lpTransport;
 	ULONG			m_ulSessionReloadCallback;

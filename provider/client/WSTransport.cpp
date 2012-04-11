@@ -774,7 +774,7 @@ HRESULT WSTransport::HrOpenPropStorage(ULONG cbParentEntryID, LPENTRYID lpParent
 	if(hr != hrSuccess)
 		goto exit;
 
-	hr = WSMAPIPropStorage::Create(cbUnWrapParentID, lpUnWrapParentID, cbUnWrapEntryID, lpUnWrapEntryID, ulFlags, m_lpCmd, m_hDataLock, m_ecSessionId, this->m_ulServerCapabilities, this, &lpPropStorage);
+	hr = WSMAPIPropStorage::Create(cbUnWrapParentID, lpUnWrapParentID, cbUnWrapEntryID, lpUnWrapEntryID, ulFlags, m_lpCmd, &m_hDataLock, m_ecSessionId, this->m_ulServerCapabilities, this, &lpPropStorage);
 	if(hr != hrSuccess)
 		goto exit;
 
@@ -824,7 +824,7 @@ HRESULT WSTransport::HrOpenABPropStorage(ULONG cbEntryID, LPENTRYID lpEntryID, I
 	if(hr != hrSuccess)
 		goto exit;
 
-	hr = WSABPropStorage::Create(cbUnWrapStoreID, lpUnWrapStoreID, m_lpCmd, m_hDataLock, m_ecSessionId, this, &lpPropStorage);
+	hr = WSABPropStorage::Create(cbUnWrapStoreID, lpUnWrapStoreID, m_lpCmd, &m_hDataLock, m_ecSessionId, this, &lpPropStorage);
 
 	if(hr != hrSuccess)
 		goto exit;
@@ -858,7 +858,7 @@ HRESULT WSTransport::HrOpenFolderOps(ULONG cbEntryID, LPENTRYID lpEntryID, WSMAP
 	if(hr != hrSuccess)
 		goto exit;
 
-	hr = WSMAPIFolderOps::Create(m_lpCmd, m_hDataLock, m_ecSessionId, cbUnWrapStoreID, lpUnWrapStoreID, this, lppFolderOps);
+	hr = WSMAPIFolderOps::Create(m_lpCmd, &m_hDataLock, m_ecSessionId, cbUnWrapStoreID, lpUnWrapStoreID, this, lppFolderOps);
 
 exit:
 	if(lpUnWrapStoreID)
@@ -879,7 +879,7 @@ HRESULT WSTransport::HrOpenTableOps(ULONG ulType, ULONG ulFlags, ULONG cbEntryID
 		goto exit;
 	}*/
 
-	hr = WSStoreTableView::Create(ulType, ulFlags, m_lpCmd, m_hDataLock, m_ecSessionId, cbEntryID, lpEntryID, lpMsgStore, this, lppTableOps);
+	hr = WSStoreTableView::Create(ulType, ulFlags, m_lpCmd, &m_hDataLock, m_ecSessionId, cbEntryID, lpEntryID, lpMsgStore, this, lppTableOps);
 	if(hr != hrSuccess)
 		goto exit;
 
@@ -896,7 +896,7 @@ HRESULT WSTransport::HrOpenABTableOps(ULONG ulType, ULONG ulFlags, ULONG cbEntry
 		goto exit;
 	}*/
 
-	hr = WSABTableView::Create(ulType, ulFlags, m_lpCmd, m_hDataLock, m_ecSessionId, cbEntryID, lpEntryID, lpABLogon, this, lppTableOps);
+	hr = WSABTableView::Create(ulType, ulFlags, m_lpCmd, &m_hDataLock, m_ecSessionId, cbEntryID, lpEntryID, lpABLogon, this, lppTableOps);
 
 	return hr;
 }
@@ -907,7 +907,7 @@ HRESULT WSTransport::HrOpenMailBoxTableOps(ULONG ulFlags, ECMsgStore *lpMsgStore
 	WSTableMailBox *lpWSTable = NULL;
 	
 
-	hr = WSTableMailBox::Create(ulFlags, m_lpCmd, m_hDataLock, m_ecSessionId, lpMsgStore, this, &lpWSTable);
+	hr = WSTableMailBox::Create(ulFlags, m_lpCmd, &m_hDataLock, m_ecSessionId, lpMsgStore, this, &lpWSTable);
 	if(hr != hrSuccess)
 		goto exit;
 
@@ -933,7 +933,7 @@ HRESULT WSTransport::HrOpenTableOutGoingQueueOps(ULONG cbStoreEntryID, LPENTRYID
 			goto exit;
 	}
 
-	hr = WSTableOutGoingQueue::Create(m_lpCmd, m_hDataLock, m_ecSessionId, cbUnWrapStoreID, lpUnWrapStoreID, lpMsgStore, this, lppTableOutGoingQueueOps);
+	hr = WSTableOutGoingQueue::Create(m_lpCmd, &m_hDataLock, m_ecSessionId, cbUnWrapStoreID, lpUnWrapStoreID, lpMsgStore, this, lppTableOutGoingQueueOps);
 
 exit:
 	if(lpUnWrapStoreID)
@@ -4436,7 +4436,7 @@ HRESULT WSTransport::HrOpenMultiStoreTable(LPENTRYLIST lpMsgList, ULONG ulFlags,
 	}
 
 
-	hr = WSTableMultiStore::Create(ulFlags, m_lpCmd, m_hDataLock, m_ecSessionId, cbEntryID, lpEntryID, lpMsgStore, this, &lpMultiStoreTable);
+	hr = WSTableMultiStore::Create(ulFlags, m_lpCmd, &m_hDataLock, m_ecSessionId, cbEntryID, lpEntryID, lpMsgStore, this, &lpMultiStoreTable);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -4467,7 +4467,7 @@ HRESULT WSTransport::HrOpenMiscTable(ULONG ulTableType, ULONG ulFlags, ULONG cbE
 		goto exit;
 	}
 
-	hr = WSTableMisc::Create(ulTableType, ulFlags, m_lpCmd, m_hDataLock, m_ecSessionId, cbEntryID, lpEntryID, lpMsgStore, this, &lpMiscTable);
+	hr = WSTableMisc::Create(ulTableType, ulFlags, m_lpCmd, &m_hDataLock, m_ecSessionId, cbEntryID, lpEntryID, lpMsgStore, this, &lpMiscTable);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -4863,3 +4863,26 @@ std::string WSTransport::GetAppName()
 		m_strAppName = basename((char *)s.c_str());
     return m_strAppName;
 }
+
+/**
+ * Ensure that the session is still active
+ *
+ * This function simply calls a random transport request, which will check the session
+ * validity. Since it doesn't matter which call we run, we'll use the normally-disabled
+ * testGet function. Any failed session will automatically be reloaded by the autodetection
+ * code. 
+ */
+HRESULT WSTransport::HrEnsureSession()
+{
+    HRESULT hr = hrSuccess;
+    char *szValue = NULL;
+    hr = HrTestGet("ensure_transaction", &szValue);
+    if(hr != MAPI_E_NETWORK_ERROR && hr != MAPI_E_END_OF_SESSION)
+        hr = hrSuccess;
+
+    if(szValue)
+        MAPIFreeBuffer(szValue);
+        
+    return hr;
+}
+

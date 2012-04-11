@@ -70,7 +70,7 @@ typedef HRESULT (*RELOADCALLBACK)(void *lpParam);
 class WSTableView : public ECUnknown
 {
 protected:
-	WSTableView(ULONG ulType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport, char *szClassName = NULL);
+	WSTableView(ULONG ulType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport, char *szClassName = NULL);
 	virtual ~WSTableView();
 
 public:
@@ -110,7 +110,7 @@ protected:
 
 protected:
 	ZarafaCmd*		lpCmd;
-	pthread_mutex_t	mDataLock;
+	pthread_mutex_t *lpDataLock;
 	ECSESSIONID		ecSessionId;
 	entryId			m_sEntryId;
 	void *			m_lpProvider;

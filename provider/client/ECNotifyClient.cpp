@@ -593,8 +593,9 @@ HRESULT ECNotifyClient::NotifyReload()
 	notifications.push_back(&notif);
 
 
-	// Notify all tables that the data they are looking at must be refreshed. 
-	// The re-logon will be done in the notification thread
+	// The transport used for this notifyclient *may* have a broken session. Inform the
+	// transport that the session may be broken and it should verify that all is well.
+	m_lpTransport->HrEnsureSession();
 
 	// Don't send the notification while we are locked
 	pthread_mutex_lock(&m_hMutex);

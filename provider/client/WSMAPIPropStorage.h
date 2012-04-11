@@ -67,11 +67,11 @@ class WSMAPIPropStorage : public ECUnknown
 {
 
 protected:
-	WSMAPIPropStorage(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, unsigned int ulServerCapabilities, WSTransport *lpTransport);
+	WSMAPIPropStorage(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, unsigned int ulServerCapabilities, WSTransport *lpTransport);
 	virtual ~WSMAPIPropStorage();
 
 public:
-	static HRESULT Create(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, unsigned int ulServerCapabilities, WSTransport *lpTransport, WSMAPIPropStorage **lppPropStorage);
+	static HRESULT Create(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, unsigned int ulServerCapabilities, WSTransport *lpTransport, WSMAPIPropStorage **lppPropStorage);
 
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
 
@@ -146,7 +146,7 @@ private:
 	entryId			m_sEntryId;
 	entryId			m_sParentEntryId;
 	ZarafaCmd*		lpCmd;
-	pthread_mutex_t	mDataLock;
+	pthread_mutex_t *lpDataLock;
 	ECSESSIONID		ecSessionId;
 	unsigned int	ulServerCapabilities;
 	ULONG			m_ulSyncId;
