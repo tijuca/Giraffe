@@ -2102,18 +2102,19 @@
 		  <varlistentry>
 		    <term>
 		      <option>--unhook-store</option>
-		      <replaceable>username</replaceable>
 		    </term>
 		    <listitem>
 		      <para>You can unhook a store from a user, so you can
-		      remove the store and create a new one.</para><para>To
-		      unhook a public store, use the <option>--type</option>
-		      group/company option to influence the name type in the
-		      <replaceable>username</replaceable> argument. Use a companyname with type
-		      company or 'Everyone' with type group to unhook the
-		      public.</para><para>To unhook an archive store, use
-		      <option>--type</option>
-		      <replaceable>archive</replaceable>.</para>
+		      remove the store and create a new one. Use the
+		      <option>-u</option> <replaceable>username</replaceable>
+		      to specify the user to unhook the store
+		      from.</para><para>To unhook a public store, use the
+		      <option>--type</option> group/company option to
+		      influence the name type in the <option>-u</option>
+		      switch. Use a companyname with type company or Everyone
+		      with type group to unhook the public.</para><para>To
+			  unhook an archive store, use <option>--type</option>
+			  <replaceable>archive</replaceable>.</para>
 		    </listitem>
 		  </varlistentry>
 

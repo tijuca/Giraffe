@@ -96,7 +96,6 @@ public:
 	void			ResetResult(DB_RESULT sResult);
 
 	std::string		GetError();
-	DB_ERROR		GetLastError();
 	
 	ECRESULT		Begin();
 	ECRESULT		Commit();

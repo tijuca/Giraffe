@@ -514,18 +514,92 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 
 objectsignature_t DBPlugin::createObject(const objectdetails_t &details) throw(std::exception)
 {
+	ECRESULT er;
 	objectid_t objectid;
+	string strQuery;
+	string strPropName;
+	string strPropValue;
+	unsigned int ulObjectId = 0;
+	DB_RESULT_AUTOFREE lpResult(m_lpDatabase);
+	DB_ROW lpDBRow = NULL;
+	GUID guidExternId = {0};
+	string strExternId;
 
 	m_logger->Log(EC_LOGLEVEL_DEBUG, "%s", __FUNCTION__);
+
+	switch (details.GetClass()) {
+	case ACTIVE_USER:
+	case NONACTIVE_USER:
+	case NONACTIVE_ROOM:
+	case NONACTIVE_EQUIPMENT:
+	case NONACTIVE_CONTACT:
+		strPropName = OP_LOGINNAME;
+		strPropValue = details.GetPropString(OB_PROP_S_LOGIN);
+		break;
+	case DISTLIST_GROUP:
+	case DISTLIST_SECURITY:
+	case DISTLIST_DYNAMIC:
+		strPropName = OP_GROUPNAME;
+		strPropValue = details.GetPropString(OB_PROP_S_FULLNAME);
+		break;
+	case CONTAINER_COMPANY:
+		strPropName = OP_COMPANYNAME;
+		strPropValue = details.GetPropString(OB_PROP_S_FULLNAME);
+		break;
+	case CONTAINER_ADDRESSLIST:
+	default:
+		throw runtime_error("Object is wrong type");
+	}
+
+	// check if object already exists
+	strQuery =
+		"SELECT o.id, op.value "
+		"FROM " + (string)DB_OBJECT_TABLE + " AS o "
+		"JOIN " + (string)DB_OBJECTPROPERTY_TABLE + " AS op "
+			"ON op.objectid = o.id AND op.propname = '" + strPropName + "' "
+		"LEFT JOIN " + (string)DB_OBJECTPROPERTY_TABLE + " AS oc "
+			"ON oc.objectid = o.id AND oc.propname = '" + (string)OP_COMPANYID + "' "
+		"WHERE op.value = '" + m_lpDatabase->Escape(strPropValue) + "' "
+			"AND " + OBJECTCLASS_COMPARE_SQL("o.objectclass", OBJECTCLASS_CLASSTYPE(details.GetClass()));
+
+		if (m_bHosted && details.GetClass() != CONTAINER_COMPANY)
+			strQuery += " AND (oc.value IS NULL OR oc.value = hex('" + m_lpDatabase->Escape(details.GetPropObject(OB_PROP_O_COMPANYID).id) + "'))";
+
+	er = m_lpDatabase->DoSelect(strQuery, &lpResult);
+	if (er != erSuccess)
+		throw runtime_error(string("db_query: ") + strerror(er));
+
+	while ((lpDBRow = m_lpDatabase->FetchRow(lpResult)) != NULL)
+		if (lpDBRow[1] != NULL && stricmp(lpDBRow[1], strPropValue.c_str()) == 0)
+			throw collision_error(string("Object exist: ") + strPropValue);
 
 	objectid = details.GetPropObject(OB_PROP_O_EXTERNID);
 	if (!objectid.id.empty()) {
 		// Offline "force" create object
-		CreateObjectWithExternId(objectid, details);
+		strQuery =
+			"INSERT INTO " + (string)DB_OBJECT_TABLE + "(externid, objectclass) "
+			"VALUES('" + m_lpDatabase->Escape(objectid.id) + "'," + stringify(objectid.objclass) + ")";
 
+		er = m_lpDatabase->DoInsert(strQuery, &ulObjectId);
+		if (er != erSuccess)
+			throw runtime_error(string("db_query: ") + strerror(er));
 	} else {
 		// zarafa-admin online create object
-		objectid = CreateObject(details);
+		if (CoCreateGuid(&guidExternId) != S_OK)
+			throw runtime_error("failed to generate extern id");
+
+		strExternId.assign((const char*)&guidExternId, sizeof(guidExternId));
+
+		strQuery =
+			"INSERT INTO " + (string)DB_OBJECT_TABLE + "(objectclass, externid) "
+			"VALUES (" + stringify(details.GetClass()) + "," +
+			m_lpDatabase->EscapeBinary((unsigned char*)strExternId.c_str(), strExternId.length()) + ")";
+
+		er = m_lpDatabase->DoInsert(strQuery, &ulObjectId);
+		if (er != erSuccess)
+			throw runtime_error(string("db_query: ") + strerror(er));
+
+		objectid = objectid_t(strExternId, details.GetClass());
 	}
 
 	// Insert all properties into the database
@@ -1004,106 +1078,3 @@ void DBPlugin::removeAllObjects(objectid_t except) throw(std::exception)
 		throw runtime_error(string("db_query: ") + strerror(er));
 }
 
-void DBPlugin::CreateObjectWithExternId(const objectid_t &objectid, const objectdetails_t &details)
-{
-	ECRESULT er;
-	string strQuery;
-	DB_RESULT_AUTOFREE lpResult(m_lpDatabase);
-	DB_ROW lpDBRow = NULL;
-
-	// check if object already exists
-	strQuery = 
-		"SELECT id "
-		"FROM " + (string)DB_OBJECT_TABLE + " "
-		"WHERE externid = " + m_lpDatabase->EscapeBinary((unsigned char*)objectid.id.c_str(), objectid.id.length()) + " "
-			"AND " + OBJECTCLASS_COMPARE_SQL("objectclass", OBJECTCLASS_CLASSTYPE(details.GetClass()));
-
-	er = m_lpDatabase->DoSelect(strQuery, &lpResult);
-	if (er != erSuccess)
-		throw runtime_error(string("db_query: ") + strerror(er));
-
-	if (m_lpDatabase->FetchRow(lpResult) != NULL)
-		throw collision_error(string("Object exists: ") + bin2hex(objectid.id));
-
-	strQuery =
-		"INSERT INTO " + (string)DB_OBJECT_TABLE + "(externid, objectclass) "
-		"VALUES('" + m_lpDatabase->Escape(objectid.id) + "'," + stringify(objectid.objclass) + ")";
-
-	er = m_lpDatabase->DoInsert(strQuery);
-	if (er != erSuccess)
-		throw runtime_error(string("db_query: ") + strerror(er));
-}
-
-objectid_t DBPlugin::CreateObject(const objectdetails_t &details)
-{
-	ECRESULT er;
-	string strQuery;
-	DB_RESULT_AUTOFREE lpResult(m_lpDatabase);
-	DB_ROW lpDBRow = NULL;
-	string strPropName;
-	string strPropValue;
-	GUID guidExternId = {0};
-	string strExternId;
-
-	switch (details.GetClass()) {
-	case ACTIVE_USER:
-	case NONACTIVE_USER:
-	case NONACTIVE_ROOM:
-	case NONACTIVE_EQUIPMENT:
-	case NONACTIVE_CONTACT:
-		strPropName = OP_LOGINNAME;
-		strPropValue = details.GetPropString(OB_PROP_S_LOGIN);
-		break;
-	case DISTLIST_GROUP:
-	case DISTLIST_SECURITY:
-	case DISTLIST_DYNAMIC:
-		strPropName = OP_GROUPNAME;
-		strPropValue = details.GetPropString(OB_PROP_S_FULLNAME);
-		break;
-	case CONTAINER_COMPANY:
-		strPropName = OP_COMPANYNAME;
-		strPropValue = details.GetPropString(OB_PROP_S_FULLNAME);
-		break;
-	case CONTAINER_ADDRESSLIST:
-	default:
-		throw runtime_error("Object is wrong type");
-	}
-
-	// check if object already exists
-	strQuery =
-		"SELECT o.id, op.value "
-		"FROM " + (string)DB_OBJECT_TABLE + " AS o "
-		"JOIN " + (string)DB_OBJECTPROPERTY_TABLE + " AS op "
-			"ON op.objectid = o.id AND op.propname = '" + strPropName + "' "
-		"LEFT JOIN " + (string)DB_OBJECTPROPERTY_TABLE + " AS oc "
-			"ON oc.objectid = o.id AND oc.propname = '" + (string)OP_COMPANYID + "' "
-		"WHERE op.value = '" + m_lpDatabase->Escape(strPropValue) + "' "
-			"AND " + OBJECTCLASS_COMPARE_SQL("o.objectclass", OBJECTCLASS_CLASSTYPE(details.GetClass()));
-
-		if (m_bHosted && details.GetClass() != CONTAINER_COMPANY)
-			strQuery += " AND (oc.value IS NULL OR oc.value = hex('" + m_lpDatabase->Escape(details.GetPropObject(OB_PROP_O_COMPANYID).id) + "'))";
-
-	er = m_lpDatabase->DoSelect(strQuery, &lpResult);
-	if (er != erSuccess)
-		throw runtime_error(string("db_query: ") + strerror(er));
-
-	while ((lpDBRow = m_lpDatabase->FetchRow(lpResult)) != NULL)
-		if (lpDBRow[1] != NULL && stricmp(lpDBRow[1], strPropValue.c_str()) == 0)
-			throw collision_error(string("Object exist: ") + strPropValue);
-
-	if (CoCreateGuid(&guidExternId) != S_OK)
-		throw runtime_error("failed to generate extern id");
-
-	strExternId.assign((const char*)&guidExternId, sizeof(guidExternId));
-
-	strQuery =
-		"INSERT INTO " + (string)DB_OBJECT_TABLE + "(objectclass, externid) "
-		"VALUES (" + stringify(details.GetClass()) + "," +
-		m_lpDatabase->EscapeBinary((unsigned char*)strExternId.c_str(), strExternId.length()) + ")";
-
-	er = m_lpDatabase->DoInsert(strQuery);
-	if (er != erSuccess)
-		throw runtime_error(string("db_query: ") + strerror(er));
-
-	return objectid_t(strExternId, details.GetClass());
-}

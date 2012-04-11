@@ -55,12 +55,10 @@
 #include "ECLogger.h"
 #include "ECConfig.h"
 
-#define LOGIN_RETRIES 5
-
 class ClientProto {
 public:
 	ClientProto(const char *szServerPath, ECChannel *lpChannel, ECLogger *lpLogger, ECConfig *lpConfig) :
-	m_strPath(szServerPath), lpChannel(lpChannel), lpLogger(lpLogger), lpConfig(lpConfig), m_ulFailedLogins(0)
+	m_strPath(szServerPath), lpChannel(lpChannel), lpLogger(lpLogger), lpConfig(lpConfig)
 	{};
 	virtual ~ClientProto() {};
 
@@ -78,7 +76,6 @@ protected:
 	ECChannel	*lpChannel;
 	ECLogger	*lpLogger;
 	ECConfig	*lpConfig;
-	ULONG		m_ulFailedLogins;
 };
 
 #endif

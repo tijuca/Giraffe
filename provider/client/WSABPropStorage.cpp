@@ -78,12 +78,12 @@ static char THIS_FILE[] = __FILE__;
  * This is a PropStorage object for use with the WebServices storage platform
  */
 
-WSABPropStorage::WSABPropStorage(ULONG cbEntryId, LPENTRYID lpEntryId, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport) : ECUnknown("WSABPropStorage")
+WSABPropStorage::WSABPropStorage(ULONG cbEntryId, LPENTRYID lpEntryId, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport) : ECUnknown("WSABPropStorage")
 {
 	CopyMAPIEntryIdToSOAPEntryId(cbEntryId, lpEntryId, &m_sEntryId);
 
 	this->lpCmd = lpCmd;
-	this->lpDataLock = lpDataLock;
+	this->mDataLock = mDataLock;
 	this->ecSessionId = ecSessionId;
 	this->m_lpTransport = lpTransport;
 	
@@ -107,12 +107,12 @@ HRESULT WSABPropStorage::QueryInterface(REFIID refiid, void **lppInterface)
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
-HRESULT WSABPropStorage::Create(ULONG cbEntryId, LPENTRYID lpEntryId, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport, WSABPropStorage **lppPropStorage)
+HRESULT WSABPropStorage::Create(ULONG cbEntryId, LPENTRYID lpEntryId, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport, WSABPropStorage **lppPropStorage)
 {
 	HRESULT hr = hrSuccess;
 	WSABPropStorage *lpStorage = NULL;
 	
-	lpStorage = new WSABPropStorage(cbEntryId, lpEntryId, lpCmd, lpDataLock, ecSessionId, lpTransport);
+	lpStorage = new WSABPropStorage(cbEntryId, lpEntryId, lpCmd, mDataLock, ecSessionId, lpTransport);
 
 	hr = lpStorage->QueryInterface(IID_WSABPropStorage, (void **)lppPropStorage);
 
@@ -358,7 +358,7 @@ IECPropStorage* WSABPropStorage::GetServerStorage()
 
 HRESULT WSABPropStorage::LockSoap()
 {
-	pthread_mutex_lock(lpDataLock);
+	pthread_mutex_lock(&mDataLock);
 	return erSuccess;
 }
 
@@ -368,7 +368,7 @@ HRESULT WSABPropStorage::UnLockSoap()
 	if(lpCmd->soap)
 		soap_end(lpCmd->soap);
 
-	pthread_mutex_unlock(lpDataLock);
+	pthread_mutex_unlock(&mDataLock);
 	return erSuccess;
 }
 

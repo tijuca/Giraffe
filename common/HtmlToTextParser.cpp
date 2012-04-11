@@ -241,28 +241,23 @@ void CHtmlToTextParser::parseTag(const WCHAR* &lpwHTML)
 
 	while (*lpwHTML != 0 && !bTagEnd) 
 	{
-		if (bTagName && *lpwHTML == '!') {
+		if (bTagName && (*lpwHTML == '!' || *lpwHTML == '-')) {
 			
 			// HTML comment or doctype detect, ignore all the text
 			bool fCommentMode = false;
 			lpwHTML++;
 
-			if (*lpwHTML == '-' && *(lpwHTML+1) == '-') {
+			if (*lpwHTML == '-')
 				fCommentMode = true;
-				lpwHTML += 2; // Skip over the initial "<!--"
-			}
 
 			while (*lpwHTML != 0) {
-				if (*lpwHTML == '>') {
-					if(fCommentMode) {
-						if (*(lpwHTML-1) == '-' && *(lpwHTML-2) == '-' ) {
-							lpwHTML++; // comment ends with -->
-							return;
-						}
-					} else {
-						lpwHTML++; // all others end on the first >
-						return;
-					}
+
+				if(fCommentMode && *lpwHTML == '>' && *lpwHTML-1 == '-' && *lpwHTML-2 == '-' ) {
+					lpwHTML++;
+					return;
+				} else if (*lpwHTML == '>') {
+					lpwHTML++;
+					return;
 				}
 
 				lpwHTML++;

@@ -113,7 +113,7 @@ foreach($translations as $domain => $translation_list){
 	}
 }
 ?>
-		if(typeof domain != "string") domain = "zarafa_webaccess";
+		if(typeof domain != "string") domain = "zarafa";
 		if(typeof translations[domain] == "undefined") return key;
 
 		if(translations[domain][key]) {

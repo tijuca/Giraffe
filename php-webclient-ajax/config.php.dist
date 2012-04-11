@@ -171,7 +171,7 @@
 	// semicolon.  A list of available languages can be found in
 	// the manual or by looking at the list of directories in
 	// /usr/share/zarafa-webaccess/server/language .
-	define("ENABLED_LANGUAGES", "de_DE;en_EN;en_US;es_ES;fi_FI;fr_FR;he_IL;hu_HU;it_IT;nb_NO;nl_NL;pl_PL;pt_BR;ru_RU;zh_CN");
+	define("ENABLED_LANGUAGES", "de_DE;en_EN;es_ES;fi_FI;fr_FR;he_IL;hu_HU;it_IT;nb_NO;nl_NL;pl_PL;pt_BR;ru_RU;zh_CN");
 
 	// Defines the default time zone, change e.g. to "Europe/London" when needed
 	define('TIMEZONE', '');

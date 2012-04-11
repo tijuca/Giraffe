@@ -597,23 +597,14 @@ ECRESULT DeleteObjectSoft(ECSession *lpSession, ECDatabase *lpDatabase, unsigned
 	
 	// Update folder counts
 	for(iterFolderCounts = mapFolderCounts.begin(); iterFolderCounts != mapFolderCounts.end(); iterFolderCounts++) {
-	    er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_CONTENT_COUNT,    		-(int)iterFolderCounts->second.ulItems);
-	    if (er == erSuccess)
-	    	er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_CONTENT_UNREAD,   		-(int)iterFolderCounts->second.ulUnread);
-	    if (er == erSuccess)
-	    	er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_ASSOC_CONTENT_COUNT,   	-(int)iterFolderCounts->second.ulAssoc);
-	    if (er == erSuccess)
-	    	er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_MSG_COUNT, 		iterFolderCounts->second.ulItems);
-	    if (er == erSuccess)
-	    	er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_ASSOC_MSG_COUNT,  iterFolderCounts->second.ulAssoc);
-	    if (er == erSuccess)
-	    	er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_SUBFOLDERS,  				-(int)iterFolderCounts->second.ulFolders);
-	    if (er == erSuccess)
-	    	er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_FOLDER_CHILD_COUNT,		-(int)iterFolderCounts->second.ulFolders);
-	    if (er == erSuccess)
-	    	er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_FOLDER_COUNT,		iterFolderCounts->second.ulFolders);
-	    if (er != erSuccess)
-			goto exit;
+	    UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_CONTENT_COUNT,    		-(int)iterFolderCounts->second.ulItems);
+	    UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_CONTENT_UNREAD,   		-(int)iterFolderCounts->second.ulUnread);
+	    UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_ASSOC_CONTENT_COUNT,   	-(int)iterFolderCounts->second.ulAssoc);
+	    UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_MSG_COUNT, 		iterFolderCounts->second.ulItems);
+	    UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_ASSOC_MSG_COUNT,  iterFolderCounts->second.ulAssoc);
+	    UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_SUBFOLDERS,  				-(int)iterFolderCounts->second.ulFolders);
+	    UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_FOLDER_CHILD_COUNT,		-(int)iterFolderCounts->second.ulFolders);
+	    UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_FOLDER_COUNT,		iterFolderCounts->second.ulFolders);
 	}
 
 	// Add properties: PR_DELETED_ON
@@ -832,23 +823,14 @@ ECRESULT DeleteObjectHard(ECSession *lpSession, ECDatabase *lpDatabase, ECAttach
 
 		// Update folder counts
 		for(iterFolderCounts = mapFolderCounts.begin(); iterFolderCounts != mapFolderCounts.end(); iterFolderCounts++) {
-			er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_CONTENT_COUNT,    	-(int)iterFolderCounts->second.ulItems);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_ASSOC_CONTENT_COUNT,	-(int)iterFolderCounts->second.ulAssoc);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_ASSOC_MSG_COUNT,	-(int)iterFolderCounts->second.ulDeletedAssoc);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_CONTENT_UNREAD,   	-(int)iterFolderCounts->second.ulUnread);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_MSG_COUNT,	-(int)iterFolderCounts->second.ulDeleted);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_SUBFOLDERS,   		-(int)iterFolderCounts->second.ulFolders);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_FOLDER_CHILD_COUNT,	-(int)iterFolderCounts->second.ulFolders);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_FOLDER_COUNT,	-(int)iterFolderCounts->second.ulDeletedFolders);
-			if (er != erSuccess)
-				goto exit;
+			UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_CONTENT_COUNT,    	-(int)iterFolderCounts->second.ulItems);
+			UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_ASSOC_CONTENT_COUNT,	-(int)iterFolderCounts->second.ulAssoc);
+			UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_ASSOC_MSG_COUNT,	-(int)iterFolderCounts->second.ulDeletedAssoc);
+			UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_CONTENT_UNREAD,   	-(int)iterFolderCounts->second.ulUnread);
+			UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_MSG_COUNT,	-(int)iterFolderCounts->second.ulDeleted);
+			UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_SUBFOLDERS,   		-(int)iterFolderCounts->second.ulFolders);
+			UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_FOLDER_CHILD_COUNT,	-(int)iterFolderCounts->second.ulFolders);
+			UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_FOLDER_COUNT,	-(int)iterFolderCounts->second.ulDeletedFolders);
 		}
 		// Clear map for next round
 		mapFolderCounts.clear();
@@ -1447,20 +1429,19 @@ exit:
 
 ECRESULT UpdateFolderCounts(ECDatabase *lpDatabase, ULONG ulParentId, ULONG ulFlags, propValArray *lpModProps)
 {
-	ECRESULT er = erSuccess;
 	struct propVal *lpPropMessageFlags = NULL;	// non-free
 	
 	if (ulFlags & MAPI_ASSOCIATED)
-		er = UpdateFolderCount(lpDatabase, ulParentId, PR_ASSOC_CONTENT_COUNT, 1);
+		UpdateFolderCount(lpDatabase, ulParentId, PR_ASSOC_CONTENT_COUNT, 1);
 	else {
-		er = UpdateFolderCount(lpDatabase, ulParentId, PR_CONTENT_COUNT, 1);
+		UpdateFolderCount(lpDatabase, ulParentId, PR_CONTENT_COUNT, 1);
 	
 		lpPropMessageFlags = FindProp(lpModProps, PR_MESSAGE_FLAGS);
-		if (er == erSuccess && (!lpPropMessageFlags || (lpPropMessageFlags->Value.ul & MSGFLAG_READ) == 0))
-			er = UpdateFolderCount(lpDatabase, ulParentId, PR_CONTENT_UNREAD, 1);
+		if (!lpPropMessageFlags || (lpPropMessageFlags->Value.ul & MSGFLAG_READ) == 0)
+			UpdateFolderCount(lpDatabase, ulParentId, PR_CONTENT_UNREAD, 1);
 	}
 
-	return er;
+	return erSuccess;
 }
 
 /** 

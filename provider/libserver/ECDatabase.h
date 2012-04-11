@@ -59,13 +59,6 @@
 typedef void *			DB_RESULT;	
 typedef char **			DB_ROW;	
 typedef unsigned long *	DB_LENGTHS;
-typedef unsigned int	DB_ERROR;
-
-
-#define DB_E_UNKNOWN			DB_ERROR(-1)
-#define DB_E_LOCK_WAIT_TIMEOUT	DB_ERROR(1)
-#define DB_E_LOCK_DEADLOCK		DB_ERROR(2)
-
 
 // Abstract base class for databases
 class ECDatabase
@@ -110,9 +103,6 @@ public:
 
 	// Get error string
 	virtual std::string		GetError() = 0;
-	
-	// Get last error code
-	virtual DB_ERROR		GetLastError() = 0;
 
 	// Database functions
 	virtual ECRESULT		CreateDatabase() = 0;

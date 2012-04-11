@@ -1107,13 +1107,9 @@ ItemModule.prototype.setRecipients = function(message, actionType)
 	    var element = dhtml.getElementById(type);
 	    
 	    if(element){
-			if(elemdata[type].length > 0){
-				element.value += elemdata[type].join("; ");
-				// make unique them again, this will eliminate the duplicate contacts in to/cc feilds (if any)
-				element.value = uniqueArray(element.value.split("; ")).join("; ");
-				// Adding semicolon at the end, ready to go for the next recipient
-				element.value += ';';
-			}
+			element.value += elemdata[type].join("; ");
+			// make unique them again, this will eliminate the duplicate contacts in to/cc feilds (if any)
+			element.value = uniqueArray(element.value.split("; ")).join("; ");
 
 			/**
 			 * When new mail dialog is loaded we should fire change event 

@@ -3059,11 +3059,8 @@ SOAP_ENTRY_START(saveObject, lpsLoadObjectResponse->er, entryId sParentEntryId, 
 	}
 	
 	// Update folder counts
-	if(fNewItem) {
-		er = UpdateFolderCounts(lpDatabase, ulParentObjId, ulFlags, &lpsSaveObj->modProps);
-		if (er != erSuccess)
-			goto exit;
-	}
+	if(fNewItem)
+		UpdateFolderCounts(lpDatabase, ulParentObjId, ulFlags, &lpsSaveObj->modProps);
     else if(ulSyncId != 0) {
         // On modified appointments, unread flags may have changed (only possible during ICS import)
         for(unsigned int i=0; i < lpsSaveObj->modProps.__size; i++) {
@@ -3074,9 +3071,7 @@ SOAP_ENTRY_START(saveObject, lpsLoadObjectResponse->er, entryId sParentEntryId, 
         }
 
         if (ulPrevReadState != ulNewReadState) {
-            er = UpdateFolderCount(lpDatabase, ulParentObjId, PR_CONTENT_UNREAD, ulNewReadState == MSGFLAG_READ ? -1 : 1);
-            if (er != erSuccess)
-				goto exit;
+            UpdateFolderCount(lpDatabase, ulParentObjId, PR_CONTENT_UNREAD, ulNewReadState == MSGFLAG_READ ? -1 : 1);
         }
     }
 
@@ -5414,9 +5409,7 @@ SOAP_ENTRY_START(setReadFlags, *result, unsigned int ulFlags, entryId* lpsEntryI
 			er = g_lpSessionManager->GetCacheManager()->GetParent(iterParents->first, &ulGrandParent);
 			if(er != erSuccess)
 				goto exit;
-			er = UpdateFolderCount(lpDatabase, iterParents->first, PR_CONTENT_UNREAD, iterParents->second);
-			if (er != erSuccess)
-				goto exit;
+			UpdateFolderCount(lpDatabase, iterParents->first, PR_CONTENT_UNREAD, iterParents->second);
 		}
 	}
 	
@@ -7940,32 +7933,26 @@ ECRESULT MoveObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt* lp
 				// Undelete
 				if(iterCopyItems->ulFlags & MAPI_ASSOCIATED) {
 					// Associated message undeleted
-					er = UpdateFolderCount(lpDatabase, iterCopyItems->ulParent, PR_DELETED_ASSOC_MSG_COUNT, -1);
-					if (er == erSuccess)
-						er = UpdateFolderCount(lpDatabase, ulDestFolderId, PR_ASSOC_CONTENT_COUNT, 1);
+					UpdateFolderCount(lpDatabase, iterCopyItems->ulParent, PR_DELETED_ASSOC_MSG_COUNT, -1);
+					UpdateFolderCount(lpDatabase, ulDestFolderId, PR_ASSOC_CONTENT_COUNT, 1);
 				} else {
 					// Message undeleted
-					er = UpdateFolderCount(lpDatabase, iterCopyItems->ulParent, PR_DELETED_MSG_COUNT, -1);
-					if (er == erSuccess)
-						er = UpdateFolderCount(lpDatabase, ulDestFolderId, PR_CONTENT_COUNT, 1);
-					if(er == erSuccess && (iterCopyItems->ulMessageFlags & MSGFLAG_READ) == 0) {
+					UpdateFolderCount(lpDatabase, iterCopyItems->ulParent, PR_DELETED_MSG_COUNT, -1);
+					UpdateFolderCount(lpDatabase, ulDestFolderId, PR_CONTENT_COUNT, 1);
+					if((iterCopyItems->ulMessageFlags & MSGFLAG_READ) == 0) {
 						// Undeleted message was unread
-						er = UpdateFolderCount(lpDatabase, ulDestFolderId, PR_CONTENT_UNREAD, 1);
+						UpdateFolderCount(lpDatabase, ulDestFolderId, PR_CONTENT_UNREAD, 1);
 					}
 				}
 			} else {
 				// Move
-				er = UpdateFolderCount(lpDatabase, iterCopyItems->ulParent, PR_CONTENT_COUNT, -1);
-				if (er == erSuccess)
-					er = UpdateFolderCount(lpDatabase, ulDestFolderId, PR_CONTENT_COUNT, 1);
-				if(er == erSuccess && (iterCopyItems->ulMessageFlags & MSGFLAG_READ) == 0) {
-					er = UpdateFolderCount(lpDatabase, iterCopyItems->ulParent, PR_CONTENT_UNREAD, -1);
-					if (er == erSuccess)
-						er = UpdateFolderCount(lpDatabase, ulDestFolderId, PR_CONTENT_UNREAD, 1);
+				UpdateFolderCount(lpDatabase, iterCopyItems->ulParent, PR_CONTENT_COUNT, -1);
+				UpdateFolderCount(lpDatabase, ulDestFolderId, PR_CONTENT_COUNT, 1);
+				if((iterCopyItems->ulMessageFlags & MSGFLAG_READ) == 0) {
+					UpdateFolderCount(lpDatabase, iterCopyItems->ulParent, PR_CONTENT_UNREAD, -1);
+					UpdateFolderCount(lpDatabase, ulDestFolderId, PR_CONTENT_UNREAD, 1);
 				}
 			}
-			if (er != erSuccess)
-				goto exit;
 		} 
 
 		er = lpDatabase->Commit();
@@ -8306,17 +8293,15 @@ ECRESULT CopyObject(ECSession *lpecSession, ECAttachmentStorage *lpAttachmentSto
 		// Can we copy deleted items?
 		if(ulFlags & MAPI_ASSOCIATED) {
 			// Associated message undeleted
-			er = UpdateFolderCount(lpDatabase, ulDestFolderId, PR_ASSOC_CONTENT_COUNT, 1);
+			UpdateFolderCount(lpDatabase, ulDestFolderId, PR_ASSOC_CONTENT_COUNT, 1);
 		} else {
 			// Message undeleted
-			er = UpdateFolderCount(lpDatabase, ulDestFolderId, PR_CONTENT_COUNT, 1);
-			if(er == erSuccess && (ulFlags & MSGFLAG_READ) == 0) {
+			UpdateFolderCount(lpDatabase, ulDestFolderId, PR_CONTENT_COUNT, 1);
+			if((ulFlags & MSGFLAG_READ) == 0) {
 				// Undeleted message was unread
-				er = UpdateFolderCount(lpDatabase, ulDestFolderId, PR_CONTENT_UNREAD, 1);
+				UpdateFolderCount(lpDatabase, ulDestFolderId, PR_CONTENT_UNREAD, 1);
 			}
 		}
-		if (er != erSuccess)
-			goto exit;
 
 		// Update ICS system
 		GetSourceKey(ulDestFolderId, &sParentSourceKey);
@@ -8896,23 +8881,16 @@ SOAP_ENTRY_START(copyFolder, *result, entryId sEntryId, entryId sDestFolderId, c
 		// Update folder counters
 		if((ulObjFlags & MSGFLAG_DELETED) == MSGFLAG_DELETED) {
 			// Undelete
-			er = UpdateFolderCount(lpDatabase, ulOldParent, PR_DELETED_FOLDER_COUNT, -1);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, ulDestFolderId, PR_SUBFOLDERS, 1);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, ulDestFolderId, PR_FOLDER_CHILD_COUNT, 1);
+			UpdateFolderCount(lpDatabase, ulOldParent, PR_DELETED_FOLDER_COUNT, -1);
+			UpdateFolderCount(lpDatabase, ulDestFolderId, PR_SUBFOLDERS, 1);
+			UpdateFolderCount(lpDatabase, ulDestFolderId, PR_FOLDER_CHILD_COUNT, 1);
 		} else {
 			// Move
-			er = UpdateFolderCount(lpDatabase, ulOldParent, PR_SUBFOLDERS, -1);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, ulOldParent, PR_FOLDER_CHILD_COUNT, -1);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, ulDestFolderId, PR_SUBFOLDERS, 1);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, ulDestFolderId, PR_FOLDER_CHILD_COUNT, 1);
+			UpdateFolderCount(lpDatabase, ulOldParent, PR_SUBFOLDERS, -1);
+			UpdateFolderCount(lpDatabase, ulOldParent, PR_FOLDER_CHILD_COUNT, -1);
+			UpdateFolderCount(lpDatabase, ulDestFolderId, PR_SUBFOLDERS, 1);
+			UpdateFolderCount(lpDatabase, ulDestFolderId, PR_FOLDER_CHILD_COUNT, 1);
 		}
-		if (er != erSuccess)
-			goto exit;
 
         er = ECTPropsPurge::AddDeferredUpdate(lpecSession, lpDatabase, ulDestFolderId, ulOldParent, ulFolderId);
         if(er != erSuccess)
@@ -9719,7 +9697,65 @@ SOAP_ENTRY_END()
  */
 SOAP_ENTRY_START(syncUsers, *result, unsigned int ulCompanyId, entryId sCompanyId, unsigned int *result)
 {
-	er = lpecSession->GetUserManagement()->SyncAllObjects();
+	std::list<localobjectdetails_t> *lstCompanyObjects = NULL;
+	std::list<localobjectdetails_t>::iterator iCompany;
+	std::list<localobjectdetails_t> *lstUserObjects = NULL;
+	unsigned int ulFlags = USERMANAGEMENT_IDS_ONLY | USERMANAGEMENT_FORCE_SYNC;
+	
+	/*
+	 * When syncing the users we first start emptying the cache, this makes sure the
+	 * second step won't be accidently "optimized" by caching.
+	 * The second step is requesting all user objects from the plugin, ECUserManagement
+	 * will then sync all results into the user database. And because the cache was
+	 * cleared all signatures in the database will be checked against the signatures
+	 * from the plugin.
+	 * When this function has completed we can be sure that the cache has been repopulated
+	 * with the userobject types, external ids and signatures of all user objects. This
+	 * means that we have only "lost" the user details which will be repopulated later.
+	 */
+
+	er = g_lpSessionManager->GetCacheManager()->PurgeCache(PURGE_CACHE_USEROBJECT | PURGE_CACHE_EXTERNID | PURGE_CACHE_USERDETAILS | PURGE_CACHE_SERVER);
+	if (er != erSuccess)
+		goto exit;
+
+	// request all companies
+	er = lpecSession->GetUserManagement()->GetCompanyObjectListAndSync(CONTAINER_COMPANY, 0, &lstCompanyObjects, ulFlags);
+	if (er == ZARAFA_E_NO_SUPPORT) {
+		er = erSuccess;
+	} else if (er != erSuccess) {
+		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Error synchronizing company list: %08X", er);
+		goto exit;
+	} else { 
+		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Synchronized company list");
+	}
+		
+
+	if (!lstCompanyObjects) {
+		// get all users of server
+		er = lpecSession->GetUserManagement()->GetCompanyObjectListAndSync(OBJECTCLASS_UNKNOWN, 0, &lstUserObjects, ulFlags);
+		if (er != erSuccess) {
+			g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Error synchronizing user list: %08X", er);
+			goto exit;
+		}
+		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Synchronized user list");
+	} else {
+		// per company, get all users
+		for (iCompany = lstCompanyObjects->begin(); iCompany != lstCompanyObjects->end(); iCompany++) {
+			er = lpecSession->GetUserManagement()->GetCompanyObjectListAndSync(OBJECTCLASS_UNKNOWN, iCompany->ulId, &lstUserObjects, ulFlags);
+			if (er != erSuccess) {
+				g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Error synchronizing user list for company %d: %08X", iCompany->ulId, er);
+				goto exit;
+			}
+			g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Synchronized list for company %d", iCompany->ulId);
+		}
+	}
+
+exit:
+	if (lstUserObjects)
+		delete lstUserObjects;
+
+	if (lstCompanyObjects)
+		delete lstCompanyObjects;
 }
 SOAP_ENTRY_END()
 
@@ -11053,9 +11089,7 @@ SOAP_ENTRY_START(importMessageFromStream, *result, unsigned int ulFlags, unsigne
 	}
 
 	// Update the folder counts
-	er = UpdateFolderCounts(lpDatabase, ulParentId, ulFlags, lpsStreamInfo->lpPropValArray);
-	if (er != erSuccess)
-		goto exit;
+	UpdateFolderCounts(lpDatabase, ulParentId, ulFlags, lpsStreamInfo->lpPropValArray);
 
 	// Set PR_CONFLICT_ITEMS if available
 	if (lpsConflictItems != NULL && lpsConflictItems->ulPropTag == PR_CONFLICT_ITEMS) {

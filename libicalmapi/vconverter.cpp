@@ -1812,27 +1812,9 @@ HRESULT VConverter::HrSetTimeProperty(time_t tStamp, bool bDateOnly, icaltimezon
 	icaltimetype ittStamp;
 	icalproperty *lpicProp = NULL;
 
-	if(bDateOnly && !lpicTZinfo) {
-		struct tm date;
-		// We have a problem now. This is a 'date' property type, so time information should not be sent. However,
-		// the timestamp in tStamp *does* have a time part, which is indicating the start of the day in GMT (so, this
-		// would be say 23:00 in central europe, and 03:00 in brasil). This means that if we 'just' take the date part
-		// of the timestamp, you will get the wrong day if you're east of GMT. Unfortunately, we don't know the
-		// timezone either, so we have to do some guesswork. What we do now is a 'round to closest date'. This will
-		// basically work for any timezone that has an offset between GMT+12 and GMT-11. So the 4th at 23:00 will become
-		// the 5h, and the 5th at 03:00 will become the 5th.
-		
-		// So this is a known problem for users in kiribati (GMT+13, GMT+14) and Samoa (GMT+13) which will be
-		// interpreted as GMT-11 and GMT-10, causing a day offset in allday meetings. Sorry.
-		
-		gmtime_r(&tStamp, &date);
-		
-		if(date.tm_hour >= 12) {
-			// Move timestamp up one day so that later conversion to date-only will be correct
-			tStamp += 86400;
-		}
-	}
-	
+	if(bDateOnly && strTZid.compare("(GMT+0000)") == 0) // add a day for GMT+XXXX timezones
+		tStamp += 86400;
+
 	if (lpicTZinfo)
 		ittStamp = icaltime_from_timet_with_zone(tStamp, bDateOnly, lpicTZinfo);
 	else

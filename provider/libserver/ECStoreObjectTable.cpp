@@ -1343,11 +1343,11 @@ ECRESULT ECStoreObjectTable::AddRowKey(ECObjectTableList* lpRows, unsigned int *
                         bUnread = true;
 
                     // Update category for this row if required, and send notification if required
-                    AddCategoryBeforeAddRow(*iterQueryRows, lpRowSet->__ptr[i].__ptr+ulFirstCol, lpsSortOrderArray->__size, ulFlags, bUnread, &fHidden, &lpCategory);
+                    AddCategoryBeforeAddRow(*iterQueryRows, lpRowSet->__ptr[i].__ptr+ulFirstCol, sPropTagArray.__size, ulFlags, bUnread, &fHidden, &lpCategory);
                 }
 
                 // Put the row into the key table and send notification if required
-                AddRow(*iterQueryRows, lpRowSet->__ptr[i].__ptr+ulFirstCol, lpsSortOrderArray->__size, ulFlags, fHidden, lpCategory);
+                AddRow(*iterQueryRows, lpRowSet->__ptr[i].__ptr+ulFirstCol, sPropTagArray.__size, ulFlags, fHidden, lpCategory);
             }
             
             FreeRowSet(lpRowSet, true);

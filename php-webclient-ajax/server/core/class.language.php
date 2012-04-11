@@ -162,12 +162,12 @@
 					setlocale(LC_TIME,$lang);
 				}
 
-				bindtextdomain('zarafa_webaccess' , LANGUAGE_DIR);
+				bindtextdomain('zarafa' , LANGUAGE_DIR);
 
 				// All text from gettext() and _() is in UTF-8 so if you're saving to
 				// MAPI directly, don't forget to convert to windows-1252 if you're writing
 				// to PT_STRING8
-				bind_textdomain_codeset('zarafa_webaccess', "UTF-8");
+				bind_textdomain_codeset('zarafa', "UTF-8");
 
 				if(isset($GLOBALS['PluginManager'])){
 					// What we did above, we are also now going to do for each plugin that has translations.
@@ -178,7 +178,7 @@
 					}
 				}
 
-				textdomain('zarafa_webaccess');
+				textdomain('zarafa');
 			}else{
 				trigger_error("Unknown language: '".$lang."'", E_USER_WARNING);
 			}
@@ -221,8 +221,8 @@
 		function getTranslations(){
 			$translations = Array();
 
-			$translations['zarafa_webaccess'] = $this->getTranslationsFromFile(LANGUAGE_DIR.$this->getSelected().'/LC_MESSAGES/zarafa_webaccess.mo');
-			if(!$translations['zarafa_webaccess']) $translations['zarafa_webaccess'] = Array();
+			$translations['zarafa'] = $this->getTranslationsFromFile(LANGUAGE_DIR.$this->getSelected().'/LC_MESSAGES/zarafa.mo');
+			if(!$translations['zarafa']) $translations['zarafa'] = Array();
 
 			if(isset($GLOBALS['PluginManager'])){
 				// What we did above, we are also now going to do for each plugin that has translations.

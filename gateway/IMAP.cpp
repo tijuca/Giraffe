@@ -944,10 +944,6 @@ HRESULT IMAP::HrCmdLogin(const string &strTag, const string &strUser, const stri
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to login from %s with invalid username \"%s\" or wrong password. Error: 0x%08X",
 					  lpChannel->GetIPAddress().c_str(), strUsername.c_str(), hr);
 		HrResponse(RESP_TAGGED_NO, strTag, "LOGIN wrong username or password");
-		m_ulFailedLogins++;
-		if (m_ulFailedLogins >= LOGIN_RETRIES)
-			// disconnect client
-			hr = MAPI_E_END_OF_SESSION;
 		goto exit;
 	}
 
