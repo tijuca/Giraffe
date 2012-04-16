@@ -95,7 +95,7 @@ if(!defined('ABITEMDETAILS_MAX_NUM_DISTLIST_MEMBERS')) define('ABITEMDETAILS_MAX
  */
 if(!defined('ENABLE_DIRECT_BOOKING')) define('ENABLE_DIRECT_BOOKING', true);
 
-if(!defined('ENABLED_LANGUAGES')) define("ENABLED_LANGUAGES", "de_DE;en_EN;es_ES;fi_FI;fr_FR;he_IL;hu_HU;it_IT;nb_NO;nl_NL;pl_PL;pt_BR;ru_RU;zh_CN");
+if(!defined('ENABLED_LANGUAGES')) define("ENABLED_LANGUAGES", "de_DE;en_EN;en_US;es_ES;fi_FI;fr_FR;he_IL;hu_HU;it_IT;nb_NO;nl_NL;pl_PL;pt_BR;ru_RU;zh_CN");
 
 
 ?>
