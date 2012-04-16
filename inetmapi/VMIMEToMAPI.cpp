@@ -2742,6 +2742,8 @@ std::string VMIMEToMAPI::mailboxToEnvelope(vmime::ref<vmime::mailbox> mbox)
 	// (( "personal name" NIL "mailbox name" "domain name" ))
 
 	mbox->getName().generate(os);
+	// encoded names never contain "
+	buffer = StringEscape(buffer.c_str(), "\"", '\\');
 	lMBox.push_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
 
 	lMBox.push_back("NIL");	// at-domain-list (source route) ... whatever that means
@@ -2860,6 +2862,8 @@ std::string VMIMEToMAPI::createIMAPEnvelope(vmime::ref<vmime::message> vmMessage
 	// subject
 	try {
 		vmHeader->Subject()->getValue()->generate(os);
+		// encoded subjects never contain ", so escape won't break those.
+		buffer = StringEscape(buffer.c_str(), "\"", '\\');
 		lItems.push_back(buffer.empty() ? "NIL" : "\"" + buffer + "\"");
 	} catch (vmime::exception &e) {
 		lItems.push_back("NIL");
