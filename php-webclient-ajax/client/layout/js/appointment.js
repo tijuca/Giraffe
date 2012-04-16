@@ -1186,8 +1186,16 @@ function abCallBackRecipients(recips) {
 			if(key != 'multiple' && key != 'value'){
 				var recipientType = parseInt(attendees[key]['display_type'], 10);
 				if(recipientType === DT_EQUIPMENT || recipientType === DT_ROOM) {
+					// Check whether we need to add an extra semicolon at the end
+					if(!isLastRecipientClosedWithSemicolon(dhtml.getElementById('bcc').value)){
+						dhtml.getElementById('bcc').value += '; ';
+					}
 					dhtml.getElementById('bcc').value += attendees[key].value + '; ';
 				} else {
+					// Check whether we need to add an extra semicolon at the end
+					if(!isLastRecipientClosedWithSemicolon(dhtml.getElementById('to').value)){
+						dhtml.getElementById('to').value += '; ';
+					}
 					dhtml.getElementById('to').value += attendees[key].value + '; ';
 				}
 			}
@@ -1196,8 +1204,16 @@ function abCallBackRecipients(recips) {
 		// this is not going to happen as we always use multiple recipients in meeting request dialog
 		var recipientType = parseInt(attendees['display_type'], 10);
 		if(recipientType === DT_EQUIPMENT || recipientType === DT_ROOM) {
+			// Check whether we need to add an extra semicolon at the end
+			if(!isLastRecipientClosedWithSemicolon(dhtml.getElementById('bcc').value)){
+				dhtml.getElementById('bcc').value += '; ';
+			}
 			dhtml.getElementById('bcc').value += attendees.value + '; ';
 		} else {
+			// Check whether we need to add an extra semicolon at the end
+			if(!isLastRecipientClosedWithSemicolon(dhtml.getElementById('to').value)){
+				dhtml.getElementById('to').value += '; ';
+			}
 			dhtml.getElementById('to').value += attendees.value + '; ';
 		}
 	}
