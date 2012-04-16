@@ -54,7 +54,8 @@ zarafa_stats_OBJECTS = $(am_zarafa_stats_OBJECTS)
 am__DEPENDENCIES_1 =
 zarafa_stats_DEPENDENCIES = ${top_builddir}/mapi4linux/src/libmapi.la \
 	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la $(am__DEPENDENCIES_1)
+	${top_builddir}/common/libcommon_util.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)/common
 depcomp = $(SHELL) $(top_srcdir)/autoconf/depcomp
 am__depfiles_maybe = depfiles
@@ -161,6 +162,8 @@ MKDIR_P = @MKDIR_P@
 MYSQL_INCLUDES = @MYSQL_INCLUDES@
 MYSQL_LIBS = @MYSQL_LIBS@
 MYSQL_VERSION = @MYSQL_VERSION@
+NCURSES_FLAGS = @NCURSES_FLAGS@
+NCURSES_LIBS = @NCURSES_LIBS@
 NMEDIT = @NMEDIT@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
@@ -262,6 +265,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 @OSS_ONLY_FALSE@dist_noinst_DATA = zarafa-ssm zarafa-ssm.default zarafa-ssm.cron
 AM_CPPFLAGS = $(DEBUGFLAGS) $(BOOST_CPPFLAGS) -DLINUX \
+	$(NCURSES_FLAGS) \
 	-I${top_srcdir}/mapi4linux/include \
 	-I${top_srcdir}/libfreebusy	\
 	-I${top_srcdir}/common
@@ -270,7 +274,7 @@ zarafa_stats_LDADD = \
 	${top_builddir}/mapi4linux/src/libmapi.la \
 	${top_builddir}/common/libcommon_mapi.la \
 	${top_builddir}/common/libcommon_util.la \
-	$(PROG_LIBS) -lncurses
+	$(PROG_LIBS) $(NCURSES_LIBS)
 
 zarafa_stats_SOURCES = zarafa-stats.cpp
 all: all-am

@@ -53,8 +53,11 @@
 #include <fstream>
 #include <mapi.h>
 #include <mapiutil.h>
-#include <curses.h>
 #include <edkmdb.h>
+
+#if HAVE_NCURSES
+#include <curses.h>
+#endif
 
 #include <map>
 #include <set>
@@ -238,6 +241,7 @@ double GetDouble(LPSPropValue lpProps, ULONG cValues, ULONG ulPropTag)
 
 void showtop(LPMDB lpStore, bool bLocal)
 {
+#if HAVE_NCURSES
     HRESULT hr = hrSuccess;
     IMAPITable *lpTable = NULL;
     LPSRowSet lpsRowSet = NULL;
@@ -260,7 +264,7 @@ void showtop(LPMDB lpStore, bool bLocal)
     int key;
 
 	// columns in sizes, not literal offsets
-	int cols[] = {0,4,21,13,12,16,15,8,8,7,7};
+	int cols[] = {0,4,21,13,25,16,15,8,8,7,7};
 	int ofs = 0;
 	bool bColumns[] = {false,false,true,true,true,true,true,true,true,true,true}; // key 1 through err?
 	SortFuncPtr fSort[] = {NULL,sort_sessionid,sort_version,sort_user,sort_ippeer,sort_app,NULL}; // key a through g
@@ -451,7 +455,8 @@ void showtop(LPMDB lpStore, bool bLocal)
 			}
 			if (bColumns[3]) {
 				wmove(win, 5 + line, ofs);
-				wprintw(win, "%.11s", iterSessions->strUser.c_str());
+				// the .24 caps off 24 bytes, not characters, so multi-byte utf-8 is capped earlier than you might expect
+				wprintw(win, "%.24s", iterSessions->strUser.c_str());
 				ofs += cols[4];
 			}
 			if (bColumns[4]) {
@@ -531,6 +536,9 @@ exit:
         lpTable->Release();
     if(lpsRowSet)
         FreeProws(lpsRowSet);
+#else
+	cerr << "Not compiled with ncurses support." << endl;
+#endif
 }
  
 void dumptable(eTableType eTable, LPMDB lpStore) {
