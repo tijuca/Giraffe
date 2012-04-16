@@ -67,7 +67,7 @@
 static char THIS_FILE[] = __FILE__;
 #endif
 
-WSStoreTableView::WSStoreTableView(ULONG ulType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport) : WSTableView(ulType, ulFlags, lpCmd, mDataLock, ecSessionId, cbEntryId, lpEntryId, lpTransport, "WSStoreTableView")
+WSStoreTableView::WSStoreTableView(ULONG ulType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport) : WSTableView(ulType, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpTransport, "WSStoreTableView")
 {
 
 	// OK, this is ugly, but the static row-wrapper routines need this object
@@ -87,12 +87,12 @@ WSStoreTableView::~WSStoreTableView()
 }
 
 
-HRESULT WSStoreTableView::Create(ULONG ulType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport, WSTableView **lppTableView)
+HRESULT WSStoreTableView::Create(ULONG ulType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport, WSTableView **lppTableView)
 {
 	HRESULT hr = hrSuccess;
 	WSStoreTableView *lpTableView = NULL; 
 
-	lpTableView = new WSStoreTableView(ulType, ulFlags, lpCmd, mDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport);
+	lpTableView = new WSStoreTableView(ulType, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport);
 
 	hr = lpTableView->QueryInterface(IID_ECTableView, (void **) lppTableView);
 	
@@ -111,7 +111,7 @@ HRESULT WSStoreTableView::QueryInterface(REFIID refiid, void **lppInterface)
 //////////////////////////////////////////////
 // WSTableMultiStore view
 //
-WSTableMultiStore::WSTableMultiStore(ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport) : WSStoreTableView(MAPI_MESSAGE, ulFlags, lpCmd, mDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport)
+WSTableMultiStore::WSTableMultiStore(ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport) : WSStoreTableView(MAPI_MESSAGE, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport)
 {
     memset(&m_sEntryList, 0, sizeof(m_sEntryList));
 
@@ -124,12 +124,12 @@ WSTableMultiStore::~WSTableMultiStore()
 	FreeEntryList(&m_sEntryList, false);
 }
 
-HRESULT WSTableMultiStore::Create(ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport, WSTableMultiStore **lppTableMultiStore)
+HRESULT WSTableMultiStore::Create(ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport, WSTableMultiStore **lppTableMultiStore)
 {
 	HRESULT hr = hrSuccess;
 	WSTableMultiStore *lpTableMultiStore = NULL; 
 
-	lpTableMultiStore = new WSTableMultiStore(ulFlags, lpCmd, mDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport);
+	lpTableMultiStore = new WSTableMultiStore(ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport);
 
 	// interface ?!
 	hr = lpTableMultiStore->QueryInterface(IID_ECTableView, (void **) lppTableMultiStore);
@@ -198,9 +198,9 @@ exit:
   Miscellaneous tables are not really store tables, but the is the same, so it inherits from the store table
   Supported tables are the stats tables, and userstores table.
 */
-WSTableMisc::WSTableMisc(ULONG ulTableType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport)
+WSTableMisc::WSTableMisc(ULONG ulTableType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport)
 	// is MAPI_STATUS even valid here?
-	: WSStoreTableView(MAPI_STATUS, ulFlags, lpCmd, mDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport)
+	: WSStoreTableView(MAPI_STATUS, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport)
 {
 	m_ulTableType = ulTableType;
 	ulTableId = 0;
@@ -210,12 +210,12 @@ WSTableMisc::~WSTableMisc()
 {
 }
 
-HRESULT WSTableMisc::Create(ULONG ulTableType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport, WSTableMisc **lppTableMisc)
+HRESULT WSTableMisc::Create(ULONG ulTableType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport, WSTableMisc **lppTableMisc)
 {
 	HRESULT hr = hrSuccess;
 	WSTableMisc *lpTableMisc = NULL;
 
-	lpTableMisc = new WSTableMisc(ulTableType, ulFlags, lpCmd, mDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport);
+	lpTableMisc = new WSTableMisc(ulTableType, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport);
 
 	hr = lpTableMisc->QueryInterface(IID_ECTableView, (void **) lppTableMisc);
 	if (hr != hrSuccess)
@@ -257,7 +257,7 @@ exit:
 //////////////////////////////////////////////
 // WSTableMailBox view
 //
-WSTableMailBox::WSTableMailBox(ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ECMsgStore *lpMsgStore, WSTransport *lpTransport) : WSStoreTableView(MAPI_STORE, ulFlags, lpCmd, mDataLock, ecSessionId, 0, NULL, lpMsgStore, lpTransport)
+WSTableMailBox::WSTableMailBox(ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ECMsgStore *lpMsgStore, WSTransport *lpTransport) : WSStoreTableView(MAPI_STORE, ulFlags, lpCmd, lpDataLock, ecSessionId, 0, NULL, lpMsgStore, lpTransport)
 {
 	m_ulTableType = TABLETYPE_MAILBOX;
 }
@@ -267,12 +267,12 @@ WSTableMailBox::~WSTableMailBox()
 
 }
 
-HRESULT WSTableMailBox::Create(ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ECMsgStore *lpMsgStore, WSTransport *lpTransport, WSTableMailBox **lppTable)
+HRESULT WSTableMailBox::Create(ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ECMsgStore *lpMsgStore, WSTransport *lpTransport, WSTableMailBox **lppTable)
 {
 	HRESULT hr = hrSuccess;
 	WSTableMailBox *lpTable = NULL; 
 
-	lpTable = new WSTableMailBox(ulFlags, lpCmd, mDataLock, ecSessionId, lpMsgStore, lpTransport);
+	lpTable = new WSTableMailBox(ulFlags, lpCmd, lpDataLock, ecSessionId, lpMsgStore, lpTransport);
 
 	//@todo add a new interface
 	hr = lpTable->QueryInterface(IID_ECTableView, (void **) lppTable);

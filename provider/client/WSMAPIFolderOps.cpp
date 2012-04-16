@@ -76,10 +76,10 @@ static char THIS_FILE[] = __FILE__;
  * The WSMAPIFolderOps for use with the WebServices transport
  */
 
-WSMAPIFolderOps::WSMAPIFolderOps(ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport) : ECUnknown("WSMAPIFolderOps")
+WSMAPIFolderOps::WSMAPIFolderOps(ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport) : ECUnknown("WSMAPIFolderOps")
 {
 	this->lpCmd = lpCmd;
-	this->mDataLock = mDataLock;
+	this->lpDataLock = lpDataLock;
 	this->ecSessionId = ecSessionId;
 	this->m_lpTransport = lpTransport;
 
@@ -95,12 +95,12 @@ WSMAPIFolderOps::~WSMAPIFolderOps()
 	FreeEntryId(&m_sEntryId, false);
 }
 
-HRESULT WSMAPIFolderOps::Create(ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport, WSMAPIFolderOps **lppFolderOps)
+HRESULT WSMAPIFolderOps::Create(ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport, WSMAPIFolderOps **lppFolderOps)
 {
 	HRESULT hr = hrSuccess;
 	WSMAPIFolderOps *lpFolderOps = NULL;
 
-	lpFolderOps = new WSMAPIFolderOps(lpCmd, mDataLock, ecSessionId, cbEntryId, lpEntryId, lpTransport);
+	lpFolderOps = new WSMAPIFolderOps(lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpTransport);
 
 	hr = lpFolderOps->QueryInterface(IID_ECMAPIFolderOps, (void **)lppFolderOps);
 
@@ -569,7 +569,7 @@ exit:
 //FIXME: one lock/unlock function
 HRESULT WSMAPIFolderOps::LockSoap()
 {
-	pthread_mutex_lock(&mDataLock);
+	pthread_mutex_lock(lpDataLock);
 	return erSuccess;
 }
 
@@ -579,7 +579,7 @@ HRESULT WSMAPIFolderOps::UnLockSoap()
 	if(lpCmd->soap)
 		soap_end(lpCmd->soap);
 
-	pthread_mutex_unlock(&mDataLock);
+	pthread_mutex_unlock(lpDataLock);
 	return erSuccess;
 }
 

@@ -68,7 +68,7 @@
 static char THIS_FILE[] = __FILE__;
 #endif
 
-WSABTableView::WSABTableView(ULONG ulType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport) : WSTableView(ulType, ulFlags, lpCmd, mDataLock, ecSessionId, cbEntryId, lpEntryId, lpTransport, "WSABTableView")
+WSABTableView::WSABTableView(ULONG ulType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport) : WSTableView(ulType, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpTransport, "WSABTableView")
 {
 	m_lpProvider = lpABLogon;
 	m_ulTableType = TABLETYPE_AB;
@@ -80,12 +80,12 @@ WSABTableView::~WSABTableView()
 }
 
 
-HRESULT WSABTableView::Create(ULONG ulType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport, WSTableView **lppTableView)
+HRESULT WSABTableView::Create(ULONG ulType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport, WSTableView **lppTableView)
 {
 	HRESULT hr = hrSuccess;
 	WSABTableView *lpTableView = NULL; 
 
-	lpTableView = new WSABTableView(ulType, ulFlags, lpCmd, mDataLock, ecSessionId, cbEntryId, lpEntryId, lpABLogon, lpTransport);
+	lpTableView = new WSABTableView(ulType, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpABLogon, lpTransport);
 
 	hr = lpTableView->QueryInterface(IID_ECTableView, (void **) lppTableView);
 	
