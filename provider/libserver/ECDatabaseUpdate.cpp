@@ -1554,7 +1554,7 @@ ECRESULT UpdateDatabaseCompanyNameToCompanyId(ECDatabase *lpDatabase)
 
 	// update objects to link via externid in companyid, not companyname anymore
 	for (iter = mapIdToName.begin(); iter != mapIdToName.end(); iter++) {
-		strQuery = "UPDATE objectproperty SET value = '" + lpDatabase->Escape(iter->first) + "'"
+		strQuery = "UPDATE objectproperty SET value = 0x" + bin2hex(iter->first) +
 			" WHERE propname='companyid' AND value = '" + iter->second + "'";
 
 		er = lpDatabase->DoUpdate(strQuery);
