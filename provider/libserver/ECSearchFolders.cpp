@@ -1421,7 +1421,7 @@ ECRESULT ECSearchFolders::AddResults(unsigned int ulStoreId, unsigned int ulFold
     if(er != erSuccess)
         goto exit;
 
-    strQuery = "SELECT flags FROM searchresults WHERE folderid = " + stringify(ulFolderId) + " AND hierarchyid = " + stringify(ulObjId) + "FOR UPDATE";
+    strQuery = "SELECT flags FROM searchresults WHERE folderid = " + stringify(ulFolderId) + " AND hierarchyid = " + stringify(ulObjId);
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
 		goto exit;
