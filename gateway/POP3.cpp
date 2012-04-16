@@ -761,6 +761,10 @@ HRESULT POP3::HrLogin(const std::string &strUsername, const std::string &strPass
 	if (hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to login from %s with invalid username \"%s\" or wrong password. Error: 0x%X",
 					  lpChannel->GetIPAddress().c_str(), strUsername.c_str(), hr);
+		m_ulFailedLogins++;
+		if (m_ulFailedLogins >= LOGIN_RETRIES)
+			// disconnect client
+			hr = MAPI_E_END_OF_SESSION;
 		goto exit;
 	}
 
