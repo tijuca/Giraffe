@@ -171,6 +171,18 @@ HRESULT VMIMEToMAPI::createIMAPProperties(const std::string &input, std::string 
 	return hrSuccess;
 }
 
+/** 
+ * Force a string to us-ascii characters, anything above-equal 0x80
+ * will become a ?-char.
+ * 
+ * @param[in] c input
+ * 
+ * @return valid us-ascii character
+ */
+static char forceAscii(char c) {
+	return (c >= 0x80) ? '?' : c;
+}
+
 /**
  * Entry point for the conversion from RFC822 mail to IMessage MAPI object.
  *
@@ -206,19 +218,12 @@ HRESULT VMIMEToMAPI::convertVMIMEToMAPI(const string &input, IMessage *lpMessage
 		if(pos != std::string::npos) {
 			SPropValue sPropHeaders;
 			std::string strHeaders = input.substr(0, pos);
-			std::wstring strWHeaders;
 
-			try {
-				// e-mail headers must be in us-ascii, ignore what we can't convert. only this way we have the "full" data from iconv in wchar_t.
-				strWHeaders = m_converter.convert_to<wstring>(CHARSET_WCHAR"//IGNORE", strHeaders.c_str(), rawsize(strHeaders), "us-ascii");
-			}
-			catch (convert_exception &ce) {
-				lpLogger->Log(EC_LOGLEVEL_ERROR, "E-mail headers contain non us-ascii characters");
-				// continue with what we have
-			}
+			// make sure we have us-ascii headers
+			transform(strHeaders.begin(), strHeaders.end(), strHeaders.begin(), forceAscii);
 
-			sPropHeaders.ulPropTag = PR_TRANSPORT_MESSAGE_HEADERS_W;
-			sPropHeaders.Value.lpszW = (WCHAR *) strWHeaders.c_str();
+			sPropHeaders.ulPropTag = PR_TRANSPORT_MESSAGE_HEADERS_A;
+			sPropHeaders.Value.lpszA = (char *) strHeaders.c_str();
 
 			HrSetOneProp(lpMessage, &sPropHeaders);
 		}
