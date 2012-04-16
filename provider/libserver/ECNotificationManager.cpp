@@ -86,7 +86,7 @@ int soapresponse(struct notifyResponse notifications, struct soap *soap) {
     return soap_closesock(soap);
 }
 
-ECNotificationManager::ECNotificationManager(ECLogger *lpLogger, ECConfig *lpConfig)
+ECNotificationManager::ECNotificationManager(ECLogger *lpLogger, ECConfig *lpConfig) : m_lpLogger(lpLogger), m_lpConfig(lpConfig)
 {
     m_bExit = false;
     pthread_mutex_init(&m_mutexSessions, NULL);
@@ -130,6 +130,8 @@ HRESULT ECNotificationManager::AddRequest(ECSESSIONID ecSessionId, struct soap *
         // Hm. There is already a SOAP request waiting for this session id. Apparently a second SOAP connection has now
         // requested notifications. Since this should only happen if the client thinks it has lost its connection and has
         // restarted the request, we will replace the existing request with this one.
+
+		m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Replacing notification request for ID: %llu", ecSessionId);
         
         // Return the previous request as an error
         struct notifyResponse notifications;

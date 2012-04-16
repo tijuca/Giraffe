@@ -277,6 +277,7 @@ HRESULT StartSpoolerFork(const wchar_t *szUsername, char *szSMTP, int ulSMTPPort
 	// execute the new spooler process to send the email
 	pid = vfork();
 	if (pid < 0) {
+		g_lpLogger->Log(EC_LOGLEVEL_FATAL, string("Unable to start new spooler process: ") + strerror(errno));
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
 	}
@@ -559,6 +560,7 @@ HRESULT ProcessAllEntries(IMAPISession *lpAdminSession, IECSpooler *lpSpooler, I
 	ULONG		ulRowCount		= 0;
 	LPSRowSet	lpsRowSet		= NULL;
 	std::wstring strUsername;
+	bool bForceReconnect = false;
 
 	hr = lpTable->GetRowCount(0, &ulRowCount);
 	if (hr != hrSuccess) {
@@ -631,8 +633,7 @@ HRESULT ProcessAllEntries(IMAPISession *lpAdminSession, IECSpooler *lpSpooler, I
 				}
 			} else {
 				// this error makes the spooler disconnect from the server, and reconnect again (bQuit still false)
-				hr = MAPI_E_NOT_FOUND;
-				goto exit;
+				bForceReconnect = true;
 			}
 			continue;
 		}
@@ -665,7 +666,7 @@ exit:
 	if (lpsRowSet)
 		FreeProws(lpsRowSet);
 
-	return hr;
+	return bForceReconnect ? MAPI_E_NETWORK_ERROR : hr;
 }
 
 /**
@@ -788,8 +789,10 @@ HRESULT ProcessQueue(char* szSMTP, int ulPort, char *szPath)
 	}
 
 	hr = HrAllocAdviseSink(AdviseCallback, NULL, &lpAdviseSink);	
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to allocate memory for advise sink");
 		goto exit;
+	}
 
 	// notify on new mail in the outgoing table
 	hr = lpTable->Advise(fnevTableModified, lpAdviseSink, &ulConnection);
@@ -858,6 +861,8 @@ exit:
 		}
 		if (ulCount == 60)
 			g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "%d threads did not yet exit, closing anyway.", (int)mapSendData.size());
+	} else if (nReload) {
+		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Table reload requested, breaking server connection");
 	}
 
 	if (lpTable && ulConnection)
