@@ -402,18 +402,15 @@ This action will create a store for a newly created user, and is normally called
 action listed users without a store, you can create a new store for those users with this command\&.
 .RE
 .PP
-\fB\-\-unhook\-store\fR
+\fB\-\-unhook\-store\fR \fIusername\fR
 .RS 4
-You can unhook a store from a user, so you can remove the store and create a new one\&. Use the
-\fB\-u\fR
-\fIusername\fR
-to specify the user to unhook the store from\&.
+You can unhook a store from a user, so you can remove the store and create a new one\&.
 .sp
 To unhook a public store, use the
 \fB\-\-type\fR
 group/company option to influence the name type in the
-\fB\-u\fR
-switch\&. Use a companyname with type company or Everyone with type group to unhook the public\&.
+\fIusername\fR
+argument\&. Use a companyname with type company or \'Everyone\' with type group to unhook the public\&.
 .sp
 To unhook an archive store, use
 \fB\-\-type\fR
