@@ -246,6 +246,9 @@ public:
 	/* Completely remove all users, groups, etc except for the passed object */
 	ECRESULT	RemoveAllObjectsAndSync(unsigned int ulObjId);
 
+	/* Resync all objects from the plugin. */
+	ECRESULT	SyncAllObjects();
+
 private:
 	/* Convert a user loginname to username and companyname */
 	virtual ECRESULT	ConvertLoginToUserAndCompany(objectdetails_t *lpDetails);

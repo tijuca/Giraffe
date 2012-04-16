@@ -9719,65 +9719,7 @@ SOAP_ENTRY_END()
  */
 SOAP_ENTRY_START(syncUsers, *result, unsigned int ulCompanyId, entryId sCompanyId, unsigned int *result)
 {
-	std::list<localobjectdetails_t> *lstCompanyObjects = NULL;
-	std::list<localobjectdetails_t>::iterator iCompany;
-	std::list<localobjectdetails_t> *lstUserObjects = NULL;
-	unsigned int ulFlags = USERMANAGEMENT_IDS_ONLY | USERMANAGEMENT_FORCE_SYNC;
-	
-	/*
-	 * When syncing the users we first start emptying the cache, this makes sure the
-	 * second step won't be accidently "optimized" by caching.
-	 * The second step is requesting all user objects from the plugin, ECUserManagement
-	 * will then sync all results into the user database. And because the cache was
-	 * cleared all signatures in the database will be checked against the signatures
-	 * from the plugin.
-	 * When this function has completed we can be sure that the cache has been repopulated
-	 * with the userobject types, external ids and signatures of all user objects. This
-	 * means that we have only "lost" the user details which will be repopulated later.
-	 */
-
-	er = g_lpSessionManager->GetCacheManager()->PurgeCache(PURGE_CACHE_USEROBJECT | PURGE_CACHE_EXTERNID | PURGE_CACHE_USERDETAILS | PURGE_CACHE_SERVER);
-	if (er != erSuccess)
-		goto exit;
-
-	// request all companies
-	er = lpecSession->GetUserManagement()->GetCompanyObjectListAndSync(CONTAINER_COMPANY, 0, &lstCompanyObjects, ulFlags);
-	if (er == ZARAFA_E_NO_SUPPORT) {
-		er = erSuccess;
-	} else if (er != erSuccess) {
-		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Error synchronizing company list: %08X", er);
-		goto exit;
-	} else { 
-		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Synchronized company list");
-	}
-		
-
-	if (!lstCompanyObjects) {
-		// get all users of server
-		er = lpecSession->GetUserManagement()->GetCompanyObjectListAndSync(OBJECTCLASS_UNKNOWN, 0, &lstUserObjects, ulFlags);
-		if (er != erSuccess) {
-			g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Error synchronizing user list: %08X", er);
-			goto exit;
-		}
-		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Synchronized user list");
-	} else {
-		// per company, get all users
-		for (iCompany = lstCompanyObjects->begin(); iCompany != lstCompanyObjects->end(); iCompany++) {
-			er = lpecSession->GetUserManagement()->GetCompanyObjectListAndSync(OBJECTCLASS_UNKNOWN, iCompany->ulId, &lstUserObjects, ulFlags);
-			if (er != erSuccess) {
-				g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Error synchronizing user list for company %d: %08X", iCompany->ulId, er);
-				goto exit;
-			}
-			g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Synchronized list for company %d", iCompany->ulId);
-		}
-	}
-
-exit:
-	if (lstUserObjects)
-		delete lstUserObjects;
-
-	if (lstCompanyObjects)
-		delete lstCompanyObjects;
+	er = lpecSession->GetUserManagement()->SyncAllObjects();
 }
 SOAP_ENTRY_END()
 

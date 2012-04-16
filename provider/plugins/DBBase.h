@@ -391,6 +391,28 @@ private:
 	 */
 	virtual ECRESULT CreateMD5Hash(const std::string &strData, std::string* lpstrResult);
 
+	/**
+	 * Create a new object based on an objectdetails_t instance with an
+	 * externid. This happens when the object is created via ICS.
+	 *
+	 * @param[in]	objectid
+	 *					The objectid of the object to create
+	 * @param[in]	details
+	 *					The details of the object.
+	 */
+	void CreateObjectWithExternId(const objectid_t &objectid, const objectdetails_t &details);
+
+	/**
+	 * Create a new object based on an objectdetails_t instance without
+	 * an externid. This happens when the object is created with 
+	 * zarafa-admin.
+	 *
+	 * @param[in]	details
+	 *					The details of the object.
+	 * @return	The new objectid
+	 */
+	objectid_t CreateObject(const objectdetails_t &details);
+
 protected:
 	/**
 	 * Search in the Database for all users which contain the search term.
