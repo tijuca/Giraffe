@@ -120,13 +120,10 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 	
 	// use localtime for calculating weekday as in UTC time 
 	// the weekday can change to previous day for time 00:00 am
-	dtLocalStart = icaltime_as_timet(icalproperty_get_dtstart(lpicProp));	
+	dtLocalStart = icaltime_as_timet(icalproperty_get_dtstart(lpicProp));
 	gmtime_safe(&dtLocalStart, &tm);
 	
-	if (bIsAllday)
-		dtUTCStart = ICalTimeTypeToLocal(lpicProp);
-	else
-		dtUTCStart = ICalTimeTypeToUTC(lpicRootEvent, lpicProp);
+	dtUTCStart = ICalTimeTypeToUTC(lpicRootEvent, lpicProp);
 
 	lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_DTEND_PROPERTY);
 	if (!lpicProp) {
@@ -139,13 +136,10 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 		}
 	}
 
-	if (bIsAllday)
-		dtUTCEnd = ICalTimeTypeToLocal(lpicProp);
-	else
-		dtUTCEnd = ICalTimeTypeToUTC(lpicRootEvent, lpicProp);
+	dtUTCEnd = ICalTimeTypeToUTC(lpicRootEvent, lpicProp);
 
 	// Set 0x8235, also known as ClipStart in OutlookSpy
-	UnixTimeToFileTime(recurrence::StartOfDay(dtUTCStart), &sPropVal.Value.ft);
+	UnixTimeToFileTime(LocalToUTC(recurrence::StartOfDay(dtLocalStart), sTimeZone), &sPropVal.Value.ft);
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_RECURRENCE_START], PT_SYSTIME);
 	lpIcalItem->lstMsgProps.push_back(sPropVal);
 
@@ -157,7 +151,7 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 	lpRec = new recurrence;
 
 	// recurrence class contains LOCAL times only, so convert UTC -> LOCAL
-	lpRec->setStartDateTime(UTCToLocal(dtUTCStart, sTimeZone));
+	lpRec->setStartDateTime(dtLocalStart);
 
 	// default 1st day of week is sunday, except in weekly recurrences
 	lpRec->setFirstDOW(0);
@@ -325,6 +319,7 @@ HRESULT ICalRecurrence::HrMakeMAPIException(icalcomponent *lpEventRoot, icalcomp
 	time_t ttStartUtcTime = 0;
 	time_t ttEndUtcTime = 0;
 	time_t ttOriginalTime = 0;
+	time_t ttOriginalLocalTime = 0;
 	ULONG ulId = 0;
 	ULONG i = 0;
 	SPropValue sPropVal;
@@ -359,10 +354,8 @@ HRESULT ICalRecurrence::HrMakeMAPIException(icalcomponent *lpEventRoot, icalcomp
 		goto exit;
 	}
 	icRecId = icalvalue_get_datetime(icalproperty_get_value(lpicProp));
-	if(icRecId.is_date)
-		ttOriginalTime = icaltime_as_timet(icRecId);
-	else
-		ttOriginalTime = ICalTimeTypeToUTC(lpEventRoot, lpicProp);
+	ttOriginalTime = ICalTimeTypeToUTC(lpEventRoot, lpicProp);
+	ttOriginalLocalTime = icaltime_as_timet(icRecId);
 	
 	lpEx->tBaseDate = ttOriginalTime;
 
@@ -386,7 +379,7 @@ HRESULT ICalRecurrence::HrMakeMAPIException(icalcomponent *lpEventRoot, icalcomp
 	ttEndLocalTime = icaltime_as_timet(icalvalue_get_datetime(icalproperty_get_value(lpicProp)));
 	ttEndUtcTime = ICalTimeTypeToUTC(lpEventRoot,lpicProp);
 
-	hr = lpIcalItem->lpRecurrence->addModifiedException(ttStartLocalTime, ttEndLocalTime, ttOriginalTime, &ulId);
+	hr = lpIcalItem->lpRecurrence->addModifiedException(ttStartLocalTime, ttEndLocalTime, ttOriginalLocalTime, &ulId);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -761,36 +754,23 @@ bool ICalRecurrence::HrValidateOccurrence(icalitem *lpItem, icalitem::exception 
 {
 	HRESULT hr = hrSuccess;
 	OccrInfo *lpFBBlocksAll = NULL;
-	ULONG lpcValues = 0;
-	bool bIsValid = true;
+	ULONG cValues = 0;
+	bool bIsValid = false;
+	time_t tBaseDateStart = LocalToUTC(lpItem->lpRecurrence->StartOfDay(UTCToLocal(lpEx.tBaseDate, lpItem->tTZinfo)), lpItem->tTZinfo);
+	time_t tStartDateStart = LocalToUTC(lpItem->lpRecurrence->StartOfDay(UTCToLocal(lpEx.tStartDate, lpItem->tTZinfo)), lpItem->tTZinfo);
 
-	if (lpEx.tStartDate > lpEx.tBaseDate) {
+	if (tBaseDateStart < tStartDateStart) {
 
-		hr = lpItem->lpRecurrence->HrGetItems(lpItem->lpRecurrence->StartOfDay(lpEx.tBaseDate) , lpItem->lpRecurrence->StartOfDay(lpEx.tStartDate) + 1439 * 60 , NULL, lpItem->tTZinfo, lpItem->ulFbStatus, &lpFBBlocksAll, &lpcValues);
-		if (hr != hrSuccess)
-			goto exit;
-
-		for (ULONG i = 0 ; i < lpcValues ; i++)	{
-			if(lpEx.tBaseDate < lpFBBlocksAll[i].tBaseDate) {
-				bIsValid = false;
-				break;
-			}
-		}
-
+		hr = lpItem->lpRecurrence->HrGetItems(tBaseDateStart, tStartDateStart + 1439 * 60 , NULL, lpItem->tTZinfo, lpItem->ulFbStatus, &lpFBBlocksAll, &cValues);
 	} else {
-
-		hr = lpItem->lpRecurrence->HrGetItems(lpItem->lpRecurrence->StartOfDay(lpEx.tStartDate) , lpItem->lpRecurrence->StartOfDay(lpEx.tBaseDate) + 1439 * 60 , NULL, lpItem->tTZinfo, lpItem->ulFbStatus, &lpFBBlocksAll, &lpcValues);
-		if (hr != hrSuccess)
-			goto exit;
-
-		for (ULONG i = 0 ; i < lpcValues ; i++)	{
-
-			if(lpEx.tBaseDate > lpFBBlocksAll[i].tBaseDate) {
-				bIsValid = false;
-				break;
-			}
-		}
+		hr = lpItem->lpRecurrence->HrGetItems(tStartDateStart, tBaseDateStart + 1439 * 60 , NULL, lpItem->tTZinfo, lpItem->ulFbStatus, &lpFBBlocksAll, &cValues);
 	}
+
+	if (hr != hrSuccess)
+		goto exit;
+
+	if(cValues == 1)
+		bIsValid = true;
 
 exit:	
 	if (lpFBBlocksAll)
