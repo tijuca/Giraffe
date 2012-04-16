@@ -304,8 +304,9 @@ HRESULT HrCreateVTimeZone(const std::string &strTZID, TIMEZONE_STRUCT &tsTimeZon
 	icaltimetype icTime;
 	icalrecurrencetype icRec;
 
-	if (tsTimeZone.stStdDate.wYear > 0 || tsTimeZone.stStdDate.wDay > 7 || tsTimeZone.stStdDate.wDayOfWeek > 5 ||
-		tsTimeZone.stDstDate.wYear > 0 || tsTimeZone.stDstDate.wDay > 7 || tsTimeZone.stDstDate.wDayOfWeek > 5)
+	// wDay in a timezone context means "week in month", 5 for last week in month
+	if (tsTimeZone.stStdDate.wYear > 0 || tsTimeZone.stStdDate.wDay > 5 || tsTimeZone.stStdDate.wDayOfWeek > 7 ||
+		tsTimeZone.stDstDate.wYear > 0 || tsTimeZone.stDstDate.wDay > 5 || tsTimeZone.stDstDate.wDayOfWeek > 7)
 	{
 		hr = MAPI_E_INVALID_PARAMETER;
 		goto exit;
