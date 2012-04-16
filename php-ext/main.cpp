@@ -3564,7 +3564,7 @@ ZEND_FUNCTION(mapi_savechanges)
 			ZEND_FETCH_RESOURCE(lpMapiProp, LPMAPIPROP, &res, -1, name_mapi_property, le_mapi_property);
 		} else {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Resource does not exist...");
-			RETURN_FALSE;
+			goto exit;
 		}
 	}
 
@@ -3572,11 +3572,11 @@ ZEND_FUNCTION(mapi_savechanges)
 
 	if (FAILED(MAPI_G(hr))) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Failed to save the object %08X", MAPI_G(hr));
-		RETURN_FALSE;
 	} else {
-		RETURN_TRUE;
+		RETVAL_TRUE;
 	}
 
+exit:
 	THROW_ON_ERROR();
 	return;
 }
@@ -3607,7 +3607,7 @@ ZEND_FUNCTION(mapi_deleteprops)
 		ZEND_FETCH_RESOURCE(lpMapiProp, LPMDB, &res, -1, name_mapi_msgstore, le_mapi_msgstore);
 	} else {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Resource does not exist...");
-		RETURN_FALSE;
+		goto exit;
 	}
 
 	MAPI_G(hr) = PHPArraytoPropTagArray(propTagArray, NULL, &lpTagArray TSRMLS_CC);
