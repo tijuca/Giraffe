@@ -3358,9 +3358,7 @@ int main(int argc, char* argv[])
 			goto exit;
 		}
 
-		if (feature) {
-			// get old features
-			// if (bFeature) { remove from disabled, add to enabled } else { remove from enabled, add to disabled }
+			// get old features. we need these, because not setting them would mean: remove
 			hr = lpServiceAdmin->GetUser(cbUserId, lpUserId, 0, &lpECUser);
 			if (hr != hrSuccess) {
 				cerr << "Unable to get user details, " << getMapiCodeString(hr, username) << endl;
@@ -3376,6 +3374,7 @@ int main(int argc, char* argv[])
 				}
 			}
 
+		if (feature) {
 			if (bFeature) {
 				sEnabled.insert((LPTSTR)feature);
 				sDisabled.erase((LPTSTR)feature);
@@ -3409,9 +3408,9 @@ int main(int argc, char* argv[])
 			if (isnonactive == 1)
 				sECUser.ulObjClass = NONACTIVE_USER;
 
-			if (feature) {
+			{
 				// sEnabled to sECUser.sMVPropmap ergens
-				sECUser.sMVPropmap.cEntries = 2; // will all other mvprops be left alone??
+				sECUser.sMVPropmap.cEntries = 2; // @note: if we have more mv props than the feature lists, adjust this value!
 				// mapi allocate more on lpECUser, so this will be freed automatically at exit.
 				hr = MAPIAllocateMore(sizeof(MVPROPMAPENTRY) * sECUser.sMVPropmap.cEntries, lpECUser, (void**)&sECUser.sMVPropmap.lpEntries);
 				if (hr != hrSuccess) {
