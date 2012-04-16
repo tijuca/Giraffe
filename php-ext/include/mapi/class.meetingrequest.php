@@ -643,7 +643,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
      * your calendar.
 	 *@param boolean $tentative true if user as tentative accepted the meeting
 	 *@param boolean $sendresponse true if a response has to be send to organizer
-	 *@param boolean $move true if meeting request has to be move to calendar after changing msgclass
+	 *@param boolean $move true if the meeting request should be moved to the deleted items after processing
 	 *@param string $newProposedStartTime contains starttime if user has proposed other time
 	 *@param string $newProposedEndTime contains endtime if user has proposed other time
 	 *@param string $basedate start of day of occurrence for which user has accepted the recurrent meeting
@@ -817,7 +817,10 @@ If it is the first time this attendee has proposed a new date/time, increment th
 					}
 				}
 				mapi_savechanges($calendarItem);
-				if ($move) mapi_folder_deletemessages($calFolder, array($props[PR_ENTRYID]));
+				if ($move) {
+					$wastebasket = $this->openDefaultWastebasket();
+					mapi_folder_copymessages($calFolder, Array($props[PR_ENTRYID]), $wastebasket, MESSAGE_MOVE);
+				}
 				$entryid = $props[PR_ENTRYID];
 			} else {
 				/**
@@ -857,6 +860,14 @@ If it is the first time this attendee has proposed a new date/time, increment th
 						// and move it to the calendar folder
 						$sourcefolder = $this->openParentFolder();
 
+						/* create a new calendar message, and copy the message to there,
+						   since we want to delete (move to wastebasket) the original message */
+						$old_entryid = mapi_getprops($this->message, Array(PR_ENTRYID));
+						$calmsg = mapi_folder_createmessage($calFolder);
+						mapi_copyto($this->message, array(), array(), $calmsg); /* includes attachments and recipients */
+						/* release old message */
+						$message = null;
+
 						$calItemProps = Array();
 						$calItemProps[PR_MESSAGE_CLASS] = "IPM.Appointment";
 
@@ -878,10 +889,10 @@ If it is the first time this attendee has proposed a new date/time, increment th
 							$calItemProps[$this->proptags['replytime']] = time();
 						}
 
-						mapi_setprops($this->message, $proposeNewTimeProps + $calItemProps);
+						mapi_setprops($calmsg, $proposeNewTimeProps + $calItemProps);
 
 						// get properties which stores owner information in meeting request mails
-						$props = mapi_getprops($this->message, array(PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_NAME, PR_SENT_REPRESENTING_EMAIL_ADDRESS, PR_SENT_REPRESENTING_ADDRTYPE));
+						$props = mapi_getprops($calmsg, array(PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_NAME, PR_SENT_REPRESENTING_EMAIL_ADDRESS, PR_SENT_REPRESENTING_ADDRTYPE));
 
 						// add owner to recipient table
 						$recips = array();
@@ -896,20 +907,18 @@ If it is the first time this attendee has proposed a new date/time, increment th
 							 */
 							$this->setRecipsFromString($recips, $messageprops[$this->proptags['toattendeesstring']], MAPI_TO);
 							$this->setRecipsFromString($recips, $messageprops[$this->proptags['ccattendeesstring']], MAPI_CC);
-							mapi_message_modifyrecipients($this->message, 0, $recips);
+							mapi_message_modifyrecipients($calmsg, 0, $recips);
 						} else {
-							mapi_message_modifyrecipients($this->message, MODRECIP_ADD, $recips);
+							mapi_message_modifyrecipients($calmsg, MODRECIP_ADD, $recips);
 						}
 
-						mapi_message_savechanges($this->message);
-						$messageprops = mapi_getprops($this->message, Array(PR_ENTRYID));
+						mapi_message_savechanges($calmsg);
 
-						// Release the message
-						$this->message = null;
+						// Move the message to the wastebasket
+						$wastebasket = $this->openDefaultWastebasket();
+						mapi_folder_copymessages($sourcefolder, array($old_entryid[PR_ENTRYID]), $wastebasket, MESSAGE_MOVE);
 
-						// Move the message to the calendar
-						mapi_folder_copymessages($sourcefolder, array($messageprops[PR_ENTRYID]), $calFolder, MESSAGE_MOVE);
-
+						$messageprops = mapi_getprops($calmsg, array(PR_ENTRYID));
 						$entryid = $messageprops[PR_ENTRYID];
 					} else {
 						// Create a new appointment with duplicate properties and recipient, but as an IPM.Appointment
