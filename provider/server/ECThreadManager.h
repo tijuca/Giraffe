@@ -104,16 +104,18 @@ class ECDispatcher;
  */
 class ECWorkerThread {
 public:
-    ECWorkerThread(ECLogger *lpLogger, ECThreadManager *lpManager, ECDispatcher *lpDispatcher);
+    ECWorkerThread(ECLogger *lpLogger, ECThreadManager *lpManager, ECDispatcher *lpDispatcher, bool bPriority = false);
+	pthread_t GetThread();
 private:
     // The destructor is private since we self-cleanup; you cannot delete this object externally.
     ~ECWorkerThread();
     static void *Work(void *param);
-    
+
     pthread_t m_thread;
     ECLogger *m_lpLogger;
     ECThreadManager *m_lpManager;
     ECDispatcher *m_lpDispatcher;
+	bool m_bPriority;
 };
 
 /*
@@ -142,6 +144,7 @@ public:
 private:
     pthread_mutex_t 			m_mutexThreads;
     std::list<ECWorkerThread *> m_lstThreads;
+	ECWorkerThread *			m_lpPrioWorker;
     ECLogger *					m_lpLogger;
     ECDispatcher *				m_lpDispatcher;
     unsigned int				m_ulThreads;
@@ -204,7 +207,7 @@ public:
 
     // Get the next work item on the queue, if bWait is TRUE, will block until a work item is available. The returned
     // workitem should not be freed, but returned to the class via NotifyDone(), at which point it will be cleaned up
-    ECRESULT GetNextWorkItem(WORKITEM **item, bool bWait);
+    ECRESULT GetNextWorkItem(WORKITEM **item, bool bWait, bool bPrio);
 
     // Reload variables from config
     ECRESULT DoHUP();
@@ -225,11 +228,13 @@ protected:
     ECLogger *				m_lpLogger;
     ECConfig *				m_lpConfig;
     ECThreadManager *		m_lpThreadManager;
+
     pthread_mutex_t 		m_mutexItems;
     std::queue<WORKITEM *> 	m_queueItems;
-    std::queue<WORKITEM *> 	m_queuePrioItems;
-	int m_nPrioDone;
     pthread_cond_t			m_condItems;
+    std::queue<WORKITEM *> 	m_queuePrioItems;
+    pthread_cond_t			m_condPrioItems;
+
     std::map<int, ACTIVESOCKET>	m_setSockets;
     std::map<int, struct soap *>	m_setListenSockets;
     pthread_mutex_t			m_mutexSockets;

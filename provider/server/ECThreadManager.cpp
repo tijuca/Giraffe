@@ -123,22 +123,28 @@ string GetSoapError(int err)
 
 int relocate_fd(int fd, ECLogger *lpLogger);
 
-ECWorkerThread::ECWorkerThread(ECLogger *lpLogger, ECThreadManager *lpManager, ECDispatcher *lpDispatcher)
+ECWorkerThread::ECWorkerThread(ECLogger *lpLogger, ECThreadManager *lpManager, ECDispatcher *lpDispatcher, bool bPriority)
 {
     m_lpLogger = lpLogger;
     m_lpManager = lpManager;
     m_lpDispatcher = lpDispatcher;
-    
+    m_bPriority = bPriority;
     
     if(pthread_create(&m_thread, NULL, ECWorkerThread::Work, this) != 0) {
         m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to start thread: %s", strerror(errno));
     } else {
-        pthread_detach(m_thread);
+		if (!bPriority)
+			pthread_detach(m_thread);
     }
 }
 
 ECWorkerThread::~ECWorkerThread()
 {
+}
+
+pthread_t ECWorkerThread::GetThread()
+{
+	return m_thread;
 }
 
 void *ECWorkerThread::Work(void *lpParam)
@@ -149,11 +155,11 @@ void *ECWorkerThread::Work(void *lpParam)
     bool fStop = false;
 	int err = 0;
 
-    lpThis->m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Started thread %08x", (ULONG)pthread_self());
+    lpThis->m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Started%sthread %08x", lpThis->m_bPriority ? " priority " : " ", (ULONG)pthread_self());
     
     while(1) {
         // Get the next work item, don't wait for new items
-        if(lpThis->m_lpDispatcher->GetNextWorkItem(&lpWorkItem, false) != erSuccess) {
+        if(lpThis->m_lpDispatcher->GetNextWorkItem(&lpWorkItem, false, lpThis->m_bPriority) != erSuccess) {
             // Nothing in the queue, notify that we're idle now
             lpThis->m_lpManager->NotifyIdle(lpThis, &fStop);
             
@@ -164,7 +170,7 @@ void *ECWorkerThread::Work(void *lpParam)
             }
                 
             // Wait for next work item in the queue
-            er = lpThis->m_lpDispatcher->GetNextWorkItem(&lpWorkItem, true);
+            er = lpThis->m_lpDispatcher->GetNextWorkItem(&lpWorkItem, true, lpThis->m_bPriority);
             if(er != erSuccess) {
                 // This could happen because we were waken up because we are exiting
                 continue;
@@ -261,6 +267,7 @@ ECThreadManager::ECThreadManager(ECLogger *lpLogger, ECDispatcher *lpDispatcher,
     pthread_mutex_init(&m_mutexThreads, NULL);
     
     // Start our worker threads
+	m_lpPrioWorker = new ECWorkerThread(m_lpLogger, this, lpDispatcher, true);
     for(unsigned int i=0;i<ulThreads;i++) {
         ECWorkerThread *lpWorker = new ECWorkerThread(m_lpLogger, this, lpDispatcher);
         m_lstThreads.push_back(lpWorker);
@@ -285,6 +292,7 @@ ECThreadManager::~ECThreadManager()
         else
             break;
     }    
+	pthread_join(m_lpPrioWorker->GetThread(), NULL);
     
     pthread_mutex_destroy(&m_mutexThreads);
 }
@@ -339,6 +347,12 @@ ECRESULT ECThreadManager::NotifyIdle(ECWorkerThread *lpThread, bool *lpfStop)
     *lpfStop = false;
         
     pthread_mutex_lock(&m_mutexThreads);
+	// special case for priority worker
+	if (lpThread == m_lpPrioWorker) {
+		// exit requested?
+		*lpfStop = (m_ulThreads == 0);
+		goto exit;
+	}
     if(m_ulThreads < m_lstThreads.size()) {
         // We are currently running more threads than we want, so tell the thread to stop
         iterThreads = std::find(m_lstThreads.begin(), m_lstThreads.end(), lpThread);
@@ -441,12 +455,12 @@ ECDispatcher::ECDispatcher(ECLogger *lpLogger, ECConfig *lpConfig, CREATEPIPESOC
 	m_nSendTimeout = atoi(m_lpConfig->GetSetting("server_send_timeout"));
     
     m_ulIdle = 0;
-	m_nPrioDone = 0;
         
     pthread_mutex_init(&m_mutexItems, NULL);
     pthread_mutex_init(&m_mutexSockets, NULL);
     pthread_mutex_init(&m_mutexIdle, NULL);
     pthread_cond_init(&m_condItems, NULL);
+    pthread_cond_init(&m_condPrioItems, NULL);
     
     m_bExit = false;
 	m_lpCreatePipeSocketCallback = lpCallback;
@@ -460,6 +474,7 @@ ECDispatcher::~ECDispatcher()
     pthread_mutex_destroy(&m_mutexSockets);
     pthread_mutex_destroy(&m_mutexIdle);
     pthread_cond_destroy(&m_condItems);
+    pthread_cond_destroy(&m_condPrioItems);
 }
 
 ECRESULT ECDispatcher::GetThreadCount(unsigned int *lpulThreads, unsigned int *lpulIdleThreads)
@@ -529,61 +544,57 @@ ECRESULT ECDispatcher::QueueItem(struct soap *soap)
 	zarafa_get_soap_connection_type(soap, &ulType);
 
 	pthread_mutex_lock(&m_mutexItems);
-	if (ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY)
+	if (ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY) {
 		m_queuePrioItems.push(item);
-	else
+		pthread_cond_signal(&m_condPrioItems);
+	} else {
 		m_queueItems.push(item);
-	pthread_cond_signal(&m_condItems);
+		pthread_cond_signal(&m_condItems);
+	}
 	pthread_mutex_unlock(&m_mutexItems);
 
 	return erSuccess;
 }
 
-// Called by worker threads to get an item to work on
-ECRESULT ECDispatcher::GetNextWorkItem(WORKITEM **lppItem, bool bWait)
+/** 
+ * Called by worker threads to get an item to work on
+ * 
+ * @param[out] lppItem soap call to process
+ * @param[in] bWait wait for an item until present or return immediately
+ * @param[in] bPrio handle priority or normal queue
+ * 
+ * @return error code
+ * @retval ZARAFA_E_NOT_FOUND no soap call in the queue present
+ */
+ECRESULT ECDispatcher::GetNextWorkItem(WORKITEM **lppItem, bool bWait, bool bPrio)
 {
     WORKITEM *lpItem = NULL;
     ECRESULT er = erSuccess;
-    
+	std::queue<WORKITEM *>* queue = bPrio ? &m_queuePrioItems : &m_queueItems;
+    pthread_cond_t *condItems = bPrio ? &m_condPrioItems : &m_condItems;
+
     pthread_mutex_lock(&m_mutexItems);
-	// 1 out of 5 items is forced from normal to avoid starvation
-	if (!m_queuePrioItems.empty() && (m_queueItems.empty() || (m_nPrioDone % 5 != 0))) {
-		*lppItem = m_queuePrioItems.front();
-		m_queuePrioItems.pop();
-		m_nPrioDone++;
-		goto exit;
-	}
 
     // Check the queue
-    if(!m_queueItems.empty()) {
+    if(!queue->empty()) {
         // Item is waiting, return that
-		m_nPrioDone = 0;
-        lpItem = m_queueItems.front();
-        m_queueItems.pop();
+        lpItem = queue->front();
+        queue->pop();
     } else {
         // No item waiting
         if(bWait && !m_bExit) {
             pthread_mutex_lock(&m_mutexIdle); m_ulIdle++; pthread_mutex_unlock(&m_mutexIdle);
             
             // If requested, wait until item is available
-            pthread_cond_wait(&m_condItems, &m_mutexItems);
+            pthread_cond_wait(condItems, &m_mutexItems);
             
             pthread_mutex_lock(&m_mutexIdle); m_ulIdle--; pthread_mutex_unlock(&m_mutexIdle);
 
-			// 1 out of 5 items is forced from normal to avoid starvation
-			if (!m_queuePrioItems.empty() && (m_queueItems.empty() || (m_nPrioDone % 5 != 0))) {
-				*lppItem = m_queuePrioItems.front();
-				m_queuePrioItems.pop();
-				m_nPrioDone++;
-				goto exit;
-			}
-			m_nPrioDone = 0;
-
-            if(!m_queueItems.empty()) {
-                lpItem = m_queueItems.front();
-                m_queueItems.pop();
+            if(!queue->empty() && !m_bExit) {
+                lpItem = queue->front();
+                queue->pop();
             } else {
-                // Condition fired, but still nothing there. Probably exit requested
+                // Condition fired, but still nothing there. Probably exit requested or wrong queue signal
                 er = ZARAFA_E_NOT_FOUND;
                 goto exit;
             }
@@ -853,6 +864,7 @@ ECRESULT ECDispatcherSelect::MainLoop()
     // Notify threads that they should re-query their idle state (and exit)
     pthread_mutex_lock(&m_mutexItems);
     pthread_cond_broadcast(&m_condItems);
+    pthread_cond_broadcast(&m_condPrioItems);
     pthread_mutex_unlock(&m_mutexItems);
     
     // Delete thread manager (waits for threads to become idle). During this time
@@ -1048,6 +1060,7 @@ ECRESULT ECDispatcherEPoll::MainLoop()
     // Notify threads that they should re-query their idle state (and exit)
     pthread_mutex_lock(&m_mutexItems);
     pthread_cond_broadcast(&m_condItems);
+    pthread_cond_broadcast(&m_condPrioItems);
     pthread_mutex_unlock(&m_mutexItems);
 
 	delete m_lpThreadManager;
