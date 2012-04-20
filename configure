@@ -23128,8 +23128,9 @@ else
 
   # possibly wide version failed, force check normal version
     NCURSES_LIBS=-lncurses
+    LIBS=$NCURSES_LIBS
 
-for ac_func in initscr
+for ac_func in cbreak
 do
 as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
 { echo "$as_me:$LINENO: checking for $ac_func" >&5
