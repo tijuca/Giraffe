@@ -104,18 +104,25 @@ class ECDispatcher;
  */
 class ECWorkerThread {
 public:
-    ECWorkerThread(ECLogger *lpLogger, ECThreadManager *lpManager, ECDispatcher *lpDispatcher, bool bPriority = false);
-	pthread_t GetThread();
-private:
-    // The destructor is private since we self-cleanup; you cannot delete this object externally.
-    ~ECWorkerThread();
+    ECWorkerThread(ECLogger *lpLogger, ECThreadManager *lpManager, ECDispatcher *lpDispatcher, bool bDoNotStart = false);
+
+protected:
+    // The destructor is protected since we self-cleanup; you cannot delete this object externally.
+    virtual ~ECWorkerThread();
+
     static void *Work(void *param);
 
     pthread_t m_thread;
     ECLogger *m_lpLogger;
     ECThreadManager *m_lpManager;
     ECDispatcher *m_lpDispatcher;
-	bool m_bPriority;
+};
+
+class ECPriorityWorkerThread : public ECWorkerThread {
+public:
+	ECPriorityWorkerThread(ECLogger *lpLogger, ECThreadManager *lpManager, ECDispatcher *lpDispatcher);
+	// The destructor is public since this thread isn't detached, we wait for the thread and clean it
+	~ECPriorityWorkerThread();
 };
 
 /*
@@ -144,7 +151,7 @@ public:
 private:
     pthread_mutex_t 			m_mutexThreads;
     std::list<ECWorkerThread *> m_lstThreads;
-	ECWorkerThread *			m_lpPrioWorker;
+	ECPriorityWorkerThread *	m_lpPrioWorker;
     ECLogger *					m_lpLogger;
     ECDispatcher *				m_lpDispatcher;
     unsigned int				m_ulThreads;

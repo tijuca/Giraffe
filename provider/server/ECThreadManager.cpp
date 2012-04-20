@@ -123,43 +123,52 @@ string GetSoapError(int err)
 
 int relocate_fd(int fd, ECLogger *lpLogger);
 
-ECWorkerThread::ECWorkerThread(ECLogger *lpLogger, ECThreadManager *lpManager, ECDispatcher *lpDispatcher, bool bPriority)
+ECWorkerThread::ECWorkerThread(ECLogger *lpLogger, ECThreadManager *lpManager, ECDispatcher *lpDispatcher, bool bDoNotStart)
 {
     m_lpLogger = lpLogger;
     m_lpManager = lpManager;
     m_lpDispatcher = lpDispatcher;
-    m_bPriority = bPriority;
-    
+
+	if (!bDoNotStart) {
+		if(pthread_create(&m_thread, NULL, ECWorkerThread::Work, this) != 0) {
+			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to start thread: %s", strerror(errno));
+		} else {
+			pthread_detach(m_thread);
+		}
+	}
+}
+
+ECPriorityWorkerThread::ECPriorityWorkerThread(ECLogger *lpLogger, ECThreadManager *lpManager, ECDispatcher *lpDispatcher) : ECWorkerThread(lpLogger, lpManager, lpDispatcher, true)
+{
     if(pthread_create(&m_thread, NULL, ECWorkerThread::Work, this) != 0) {
         m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to start thread: %s", strerror(errno));
-    } else {
-		if (!bPriority)
-			pthread_detach(m_thread);
     }
+	// do not detach
+}
+
+ECPriorityWorkerThread::~ECPriorityWorkerThread()
+{
+	pthread_join(m_thread, NULL);
 }
 
 ECWorkerThread::~ECWorkerThread()
 {
 }
 
-pthread_t ECWorkerThread::GetThread()
-{
-	return m_thread;
-}
-
 void *ECWorkerThread::Work(void *lpParam)
 {
     ECWorkerThread *lpThis = (ECWorkerThread *)lpParam;
+	ECPriorityWorkerThread *lpPrio = dynamic_cast<ECPriorityWorkerThread*>(lpThis);
     WORKITEM *lpWorkItem = NULL;
     ECRESULT er = erSuccess;
     bool fStop = false;
 	int err = 0;
 
-    lpThis->m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Started%sthread %08x", lpThis->m_bPriority ? " priority " : " ", (ULONG)pthread_self());
+    lpThis->m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Started%sthread %08x", lpPrio ? " priority " : " ", (ULONG)pthread_self());
     
     while(1) {
         // Get the next work item, don't wait for new items
-        if(lpThis->m_lpDispatcher->GetNextWorkItem(&lpWorkItem, false, lpThis->m_bPriority) != erSuccess) {
+        if(lpThis->m_lpDispatcher->GetNextWorkItem(&lpWorkItem, false, lpPrio != NULL) != erSuccess) {
             // Nothing in the queue, notify that we're idle now
             lpThis->m_lpManager->NotifyIdle(lpThis, &fStop);
             
@@ -170,7 +179,7 @@ void *ECWorkerThread::Work(void *lpParam)
             }
                 
             // Wait for next work item in the queue
-            er = lpThis->m_lpDispatcher->GetNextWorkItem(&lpWorkItem, true, lpThis->m_bPriority);
+            er = lpThis->m_lpDispatcher->GetNextWorkItem(&lpWorkItem, true, lpPrio != NULL);
             if(er != erSuccess) {
                 // This could happen because we were waken up because we are exiting
                 continue;
@@ -253,7 +262,8 @@ done:
 	ERR_remove_state(0);
 
     // We're detached, so we should clean up ourselves
-    delete lpThis;
+	if (lpPrio == NULL)
+		delete lpThis;
     
     return NULL;
 }
@@ -267,7 +277,7 @@ ECThreadManager::ECThreadManager(ECLogger *lpLogger, ECDispatcher *lpDispatcher,
     pthread_mutex_init(&m_mutexThreads, NULL);
     
     // Start our worker threads
-	m_lpPrioWorker = new ECWorkerThread(m_lpLogger, this, lpDispatcher, true);
+	m_lpPrioWorker = new ECPriorityWorkerThread(m_lpLogger, this, lpDispatcher);
     for(unsigned int i=0;i<ulThreads;i++) {
         ECWorkerThread *lpWorker = new ECWorkerThread(m_lpLogger, this, lpDispatcher);
         m_lstThreads.push_back(lpWorker);
@@ -292,7 +302,7 @@ ECThreadManager::~ECThreadManager()
         else
             break;
     }    
-	pthread_join(m_lpPrioWorker->GetThread(), NULL);
+	delete m_lpPrioWorker;
     
     pthread_mutex_destroy(&m_mutexThreads);
 }
