@@ -90,7 +90,7 @@ public:
 
 	std::string		Escape(const std::string &strToEscape);
 	std::string		EscapeBinary(unsigned char *lpData, unsigned int ulLen);
-	std::string		EscapeBinary(std::string& strData);
+	std::string		EscapeBinary(const std::string& strData);
     std::string 	FilterBMP(const std::string &strToFilter);
 
 	void			ResetResult(DB_RESULT sResult);

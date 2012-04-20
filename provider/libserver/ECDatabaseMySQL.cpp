@@ -887,7 +887,7 @@ std::string ECDatabaseMySQL::EscapeBinary(unsigned char *lpData, unsigned int ul
 	return "'" + escaped + "'";
 }
 
-std::string ECDatabaseMySQL::EscapeBinary(std::string& strData)
+std::string ECDatabaseMySQL::EscapeBinary(const std::string& strData)
 {
 	return EscapeBinary((unsigned char *)strData.c_str(), strData.size());
 }

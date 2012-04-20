@@ -55,6 +55,69 @@
 // Above EC_TABLE_CHANGE_THRESHOLD, a TABLE_CHANGE notification is sent instead of individual notifications
 #define EC_TABLE_CHANGE_THRESHOLD 10
 
+class EntryId {
+public:
+    EntryId() { 
+        updateStruct();
+    }
+    EntryId(const EntryId &s) { 
+        m_data = s.m_data;
+    }
+    EntryId(const entryId *entryid) {
+        if(entryid) 
+            m_data = std::string((char *)entryid->__ptr, entryid->__size);
+        else 
+            m_data.clear();
+        updateStruct();
+    }
+    EntryId(const entryId& entryid) {
+        m_data = std::string((char *)entryid.__ptr, entryid.__size);
+        updateStruct();
+    }
+    EntryId(const std::string& data) {
+        m_data = data;
+        updateStruct();
+    }
+    ~EntryId() { 
+    }
+    
+    EntryId&  operator= (const EntryId &s) { 
+        m_data = s.m_data;
+        updateStruct();
+        return *this;
+    }
+
+    unsigned int type() const {
+        EID_V0 *d = (EID_V0 *)m_data.data();
+        
+        return d->ulType;
+    }
+    
+    bool operator == (const EntryId &s) const {
+        return m_data == s.m_data;
+    }
+	
+	bool operator < (const EntryId &s) const {
+	    return m_data < s.m_data;
+	}
+
+    operator const std::string& () const { return m_data; }    
+    operator unsigned char *() const { return (unsigned char *)m_data.data(); }
+    operator entryId *() { return &m_sEntryId; }
+    
+    unsigned int 	size() const { return m_data.size(); }
+	bool			empty() const { return m_data.empty(); } 
+	
+private:
+    void updateStruct() {
+        m_sEntryId.__size = m_data.size(); 
+        m_sEntryId.__ptr = (unsigned char *)m_data.data();
+    }
+    
+    entryId m_sEntryId;
+    std::string m_data;
+};
+
 // this belongs to the DeleteObjects function
 typedef struct {
 	unsigned int ulId;
@@ -81,16 +144,21 @@ typedef struct _TCN {
 	unsigned int ulType;
 } TABLECHANGENOTIFICATION;
 
-typedef struct {
-	unsigned int ulItems;
-	unsigned int ulFolders;
-	unsigned int ulUnread;
-	unsigned int ulDeleted;
-	unsigned int ulDeletedFolders;
-	unsigned int ulAssoc;
-	unsigned int ulDeletedAssoc;
+class PARENTINFO {
+public:
+    PARENTINFO() : lItems(0), lFolders(0), lAssoc(0), lDeleted(0), lDeletedFolders(0), lDeletedAssoc(0), lUnread(0), ulStoreId(0) { }
+    ~PARENTINFO() { }
+	int lItems;
+	int lFolders;
+	int lAssoc;
+
+	int lDeleted;
+	int lDeletedFolders;
+	int lDeletedAssoc;
+
+	int lUnread;
 	unsigned int ulStoreId;
-} PARENTINFO;
+};
 
 #define EC_DELETE_FOLDERS		0x00000001
 #define EC_DELETE_MESSAGES		0x00000002
@@ -146,6 +214,17 @@ ECRESULT GetStoreType(ECSession *lpSession, unsigned int ulObjId, unsigned int *
 
 ECRESULT RemoveStaleIndexedProp(ECDatabase *lpDatabase, unsigned int ulPropTag, unsigned char *lpData, unsigned int cbSize);
 
+ECRESULT ApplyFolderCounts(ECDatabase *lpDatabase, unsigned int ulFolderId, const PARENTINFO &pi);
+ECRESULT ApplyFolderCounts(ECDatabase *lpDatabase, const std::map<unsigned int, PARENTINFO> &mapFolderCounts);
+
+#define LOCK_SHARED 	0x00000001
+#define LOCK_EXCLUSIVE	0x00000002
+
+// Lock folders and start transaction: 
+ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const std::set<SOURCEKEY>& setObjects, unsigned int ulFlags); // may be mixed list of folders and messages
+ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const std::set<EntryId>& setObjects, unsigned int ulFlags);	// may be mixed list of folders and messages
+ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const EntryId &entryid, unsigned int ulFlags);				// single entryid, folder or message
+ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const SOURCEKEY &sourcekey, unsigned int ulFlags);			// single sourcekey, folder or message
 
 #endif//ZARAFACMD_UTIL_H
 

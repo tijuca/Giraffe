@@ -388,6 +388,15 @@ exit:
 	return er;
 }
 
+ECRESULT ECCacheManager::QueryParent(unsigned int ulObjId, unsigned int *lpulParent)
+{
+    ECRESULT er = erSuccess;
+
+    er = _GetObject(ulObjId, lpulParent, NULL, NULL, NULL);
+    
+    return er;
+}
+
 // Get the parent of the specified object
 ECRESULT ECCacheManager::GetObject(unsigned int ulObjId, unsigned int *lpulParent, unsigned int *lpulOwner, unsigned int *lpulFlags, unsigned int *lpulType)
 {
@@ -1445,7 +1454,6 @@ ECRESULT ECCacheManager::RemoveIndexData(unsigned int ulPropTag, unsigned int cb
         scoped_lock lock(m_hCacheIndPropMutex);
 
         if(m_PropToObjectCache.GetCacheItem(sObject, &sObjectId) == erSuccess) {
-            m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "REMOVE cache for %s", bin2hex(cbData, lpData).c_str());
             m_ObjectToPropCache.RemoveCacheItem(*sObjectId);
             m_PropToObjectCache.RemoveCacheItem(sObject);
         }
@@ -1458,13 +1466,36 @@ exit:
 	return er;
 }
 
+ECRESULT ECCacheManager::RemoveIndexData(unsigned int ulPropTag, unsigned int ulObjId)
+{
+	ECRESULT				er = erSuccess;
+	ECsIndexObject	sObject;
+	ECsIndexProp	*sObjectId;
 
+	sObject.ulTag = PROP_ID(ulPropTag);
+	sObject.ulObjId = ulObjId;
+
+	{
+        scoped_lock lock(m_hCacheIndPropMutex);
+
+        if(m_ObjectToPropCache.GetCacheItem(sObject, &sObjectId) == erSuccess) {
+            m_PropToObjectCache.RemoveCacheItem(*sObjectId);
+            m_ObjectToPropCache.RemoveCacheItem(sObject);
+        }
+	}
+
+	return er;
+}
 
 ECRESULT ECCacheManager::_AddIndexData(ECsIndexObject* lpObject, ECsIndexProp* lpProp)
 {
 	ECRESULT	er = erSuccess;
 	scoped_lock lock(m_hCacheIndPropMutex);
 
+    // Remove any pre-existing references to this data
+    RemoveIndexData(PROP_TAG(PT_UNSPECIFIED, lpObject->ulTag), lpObject->ulObjId);
+    RemoveIndexData(PROP_TAG(PT_UNSPECIFIED, lpProp->ulTag), lpProp->cbData, lpProp->lpData);
+    
 	er = m_PropToObjectCache.AddCacheItem(*lpProp, *lpObject);
 	if(er != erSuccess)
 		goto exit;
@@ -1552,9 +1583,62 @@ ECRESULT ECCacheManager::GetObjectFromProp(unsigned int ulTag, unsigned int cbDa
 	DB_ROW			lpDBRow = NULL;
 	std::string		strQuery;
 	ECDatabase*		lpDatabase = NULL;
+    ECsIndexObject sNewIndexObject;
+	ECsIndexProp	sObject;
+
+	if(lpData == NULL || lpulObjId == NULL || cbData == 0) {
+		er = ZARAFA_E_INVALID_PARAMETER;
+		goto exit;
+	}
+
+	if(QueryObjectFromProp(ulTag, cbData, lpData, lpulObjId) == erSuccess)
+	    goto exit;
+
+	// Item not found, search in database
+    er = GetThreadLocalDatabase(this->m_lpDatabaseFactory, &lpDatabase);
+    if(er != erSuccess)
+        goto exit;
+
+    // Get them from the database
+    strQuery = "SELECT hierarchyid FROM indexedproperties FORCE INDEX(bin) WHERE tag="+stringify(ulTag)+" AND val_binary="+ lpDatabase->EscapeBinary(lpData, cbData);
+    er = lpDatabase->DoSelect(strQuery, &lpDBResult);
+    if(er != erSuccess)
+        goto exit;
+
+    lpDBRow = lpDatabase->FetchRow(lpDBResult);
+    if(lpDBRow == NULL || lpDBRow[0] == NULL) {
+        er = ZARAFA_E_NOT_FOUND;
+        goto exit;
+    }
+
+    sNewIndexObject.ulTag = ulTag;
+    sNewIndexObject.ulObjId = atoui(lpDBRow[0]);
+
+	sObject.ulTag = ulTag;
+	sObject.cbData = cbData;
+	sObject.lpData = lpData; // Cheap copy, Set this item on NULL before you exit
+
+    er = _AddIndexData(&sNewIndexObject, &sObject);
+    if(er != erSuccess)
+        goto exit;
+        
+	*lpulObjId = sNewIndexObject.ulObjId;
+
+exit:
+
+	if (lpDBResult)
+		lpDatabase->FreeResult(lpDBResult);
+
+	sObject.lpData = NULL; // Remove reference
+
+	return er;
+}
+
+ECRESULT ECCacheManager::QueryObjectFromProp(unsigned int ulTag, unsigned int cbData, unsigned char* lpData, unsigned int* lpulObjId)
+{
+	ECRESULT		er = erSuccess;
 	ECsIndexProp	sObject;
 	ECsIndexObject	*sIndexObject;
-    ECsIndexObject sNewIndexObject;
 
 	if(lpData == NULL || lpulObjId == NULL || cbData == 0) {
 		er = ZARAFA_E_INVALID_PARAMETER;
@@ -1568,46 +1652,15 @@ ECRESULT ECCacheManager::GetObjectFromProp(unsigned int ulTag, unsigned int cbDa
 	{
 		scoped_lock lock(m_hCacheIndPropMutex);
 		er = m_PropToObjectCache.GetCacheItem(sObject, &sIndexObject);
+		if(er != erSuccess)
+		    goto exit;
+		    
+		*lpulObjId = sIndexObject->ulObjId;
 	}
-
-	// Item not found, search in database
-	if(er != erSuccess) {
-		er = GetThreadLocalDatabase(this->m_lpDatabaseFactory, &lpDatabase);
-		if(er != erSuccess)
-			goto exit;
-
-		// Get them from the database
-		strQuery = "SELECT hierarchyid FROM indexedproperties FORCE INDEX(bin) WHERE tag="+stringify(ulTag)+" AND val_binary="+ lpDatabase->EscapeBinary(lpData, cbData);
-		er = lpDatabase->DoSelect(strQuery, &lpDBResult);
-		if(er != erSuccess)
-			goto exit;
-
-		lpDBRow = lpDatabase->FetchRow(lpDBResult);
-		if(lpDBRow == NULL || lpDBRow[0] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
-			goto exit;
-		}
-
-		sNewIndexObject.ulTag = ulTag;
-		sNewIndexObject.ulObjId = atoui(lpDBRow[0]);
-
-		er = _AddIndexData(&sNewIndexObject, &sObject);
-		if(er != erSuccess)
-			goto exit;
-			
-        sIndexObject = &sNewIndexObject;
-	}
-
-	*lpulObjId = sIndexObject->ulObjId;
-
+	
 exit:
-
-	if (lpDBResult)
-		lpDatabase->FreeResult(lpDBResult);
-
-	sObject.lpData = NULL; // Remove reference
-
-	return er;
+	sObject.lpData = NULL;
+    return er;
 }
 
 ECRESULT ECCacheManager::SetObjectProp(unsigned int ulTag, unsigned int cbData, unsigned char *lpData, unsigned int ulObjId)
@@ -1619,7 +1672,7 @@ ECRESULT ECCacheManager::SetObjectProp(unsigned int ulTag, unsigned int cbData, 
 
     sObject.ulTag = ulTag;
     sObject.ulObjId = ulObjId;
-
+    
     sProp.SetValue(ulTag, lpData, cbData);
 
     er = _AddIndexData(&sObject, &sProp);

@@ -547,21 +547,20 @@ ECRESULT DeleteObjectSoft(ECSession *lpSession, ECDatabase *lpDatabase, unsigned
                 if(iterDeleteItems->ulParentType == MAPI_FOLDER) {
                 	// Ignore already-softdeleted items
                 	if((iterDeleteItems->ulFlags & MSGFLAG_DELETED) == 0) {
-						memset(&pi, 0, sizeof(pi));
-						pi.ulStoreId = iterDeleteItems->ulStoreId;
-						mapFolderCounts.insert(std::make_pair(iterDeleteItems->ulParent, pi));
-					
 						if(iterDeleteItems->ulObjType == MAPI_MESSAGE) {
 							if(iterDeleteItems->ulFlags & MAPI_ASSOCIATED) {
-								mapFolderCounts[iterDeleteItems->ulParent].ulAssoc++;
+								mapFolderCounts[iterDeleteItems->ulParent].lAssoc--;
+								mapFolderCounts[iterDeleteItems->ulParent].lDeletedAssoc++;
 							} else {
-								mapFolderCounts[iterDeleteItems->ulParent].ulItems++;
+									mapFolderCounts[iterDeleteItems->ulParent].lItems--;
+								mapFolderCounts[iterDeleteItems->ulParent].lDeleted++;
 								if((iterDeleteItems->ulMessageFlags & MSGFLAG_READ) == 0)
-									mapFolderCounts[iterDeleteItems->ulParent].ulUnread++;
+									mapFolderCounts[iterDeleteItems->ulParent].lUnread--;
 							}
 						}
 						if(iterDeleteItems->ulObjType == MAPI_FOLDER) {
-							mapFolderCounts[iterDeleteItems->ulParent].ulFolders++;
+							mapFolderCounts[iterDeleteItems->ulParent].lFolders--;
+							mapFolderCounts[iterDeleteItems->ulParent].lDeletedFolders++;
 						}
 					}
 				}
@@ -594,27 +593,11 @@ ECRESULT DeleteObjectSoft(ECSession *lpSession, ECDatabase *lpDatabase, unsigned
 			goto exit;
 
 	}
+
+	er = ApplyFolderCounts(lpDatabase, mapFolderCounts);
+	if(er != erSuccess)
+	    goto exit;
 	
-	// Update folder counts
-	for(iterFolderCounts = mapFolderCounts.begin(); iterFolderCounts != mapFolderCounts.end(); iterFolderCounts++) {
-	    er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_CONTENT_COUNT,    		-(int)iterFolderCounts->second.ulItems);
-	    if (er == erSuccess)
-	    	er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_CONTENT_UNREAD,   		-(int)iterFolderCounts->second.ulUnread);
-	    if (er == erSuccess)
-	    	er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_ASSOC_CONTENT_COUNT,   	-(int)iterFolderCounts->second.ulAssoc);
-	    if (er == erSuccess)
-	    	er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_MSG_COUNT, 		iterFolderCounts->second.ulItems);
-	    if (er == erSuccess)
-	    	er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_ASSOC_MSG_COUNT,  iterFolderCounts->second.ulAssoc);
-	    if (er == erSuccess)
-	    	er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_SUBFOLDERS,  				-(int)iterFolderCounts->second.ulFolders);
-	    if (er == erSuccess)
-	    	er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_FOLDER_CHILD_COUNT,		-(int)iterFolderCounts->second.ulFolders);
-	    if (er == erSuccess)
-	    	er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_FOLDER_COUNT,		iterFolderCounts->second.ulFolders);
-	    if (er != erSuccess)
-			goto exit;
-	}
 
 	// Add properties: PR_DELETED_ON
 	GetSystemTimeAsFileTime(&ft);
@@ -670,7 +653,7 @@ ECRESULT DeleteObjectHard(ECSession *lpSession, ECDatabase *lpDatabase, ECAttach
 	ECListDeleteItems lstToBeDeleted;
 	ECListDeleteItems::reverse_iterator iterDeleteItems;
 
-	PARENTINFO pi = {0,0,0};
+	PARENTINFO pi;
 	
 	std::map<unsigned int, PARENTINFO> mapFolderCounts;
 	std::map<unsigned int, PARENTINFO>::iterator iterFolderCounts;
@@ -734,25 +717,25 @@ ECRESULT DeleteObjectHard(ECSession *lpSession, ECDatabase *lpDatabase, ECAttach
 				if(iterDeleteItems->ulObjType == MAPI_MESSAGE) {
 					if(iterDeleteItems->ulFlags == MAPI_ASSOCIATED) {
 						// Delete associated
-						mapFolderCounts[iterDeleteItems->ulParent].ulAssoc++;
+						mapFolderCounts[iterDeleteItems->ulParent].lAssoc--;
 					} else if(iterDeleteItems->ulFlags == 0) {
 						// Deleting directly from normal item, count normal and unread items
-						mapFolderCounts[iterDeleteItems->ulParent].ulItems++;
+						mapFolderCounts[iterDeleteItems->ulParent].lItems--;
 						if((iterDeleteItems->ulMessageFlags & MSGFLAG_READ) == 0)
-							mapFolderCounts[iterDeleteItems->ulParent].ulUnread++;
+							mapFolderCounts[iterDeleteItems->ulParent].lUnread--;
 					} else if(iterDeleteItems->ulFlags == (MAPI_ASSOCIATED | MSGFLAG_DELETED)) {
 						// Deleting softdeleted associated item
-						mapFolderCounts[iterDeleteItems->ulParent].ulDeletedAssoc++;
+						mapFolderCounts[iterDeleteItems->ulParent].lDeletedAssoc--;
 					} else {
 						// Deleting normal softdeleted item
-						mapFolderCounts[iterDeleteItems->ulParent].ulDeleted++;
+						mapFolderCounts[iterDeleteItems->ulParent].lDeleted--;
 					}
 				}
 				if(iterDeleteItems->ulObjType == MAPI_FOLDER) {
 					if((iterDeleteItems->ulFlags & MSGFLAG_DELETED) == 0) {
-						mapFolderCounts[iterDeleteItems->ulParent].ulFolders++;
+						mapFolderCounts[iterDeleteItems->ulParent].lFolders--;
 					} else {
-						mapFolderCounts[iterDeleteItems->ulParent].ulDeletedFolders++;
+						mapFolderCounts[iterDeleteItems->ulParent].lDeletedFolders--;
 					}
 				}
 			}
@@ -830,26 +813,10 @@ ECRESULT DeleteObjectHard(ECSession *lpSession, ECDatabase *lpDatabase, ECAttach
 				goto exit;
 		}
 
-		// Update folder counts
-		for(iterFolderCounts = mapFolderCounts.begin(); iterFolderCounts != mapFolderCounts.end(); iterFolderCounts++) {
-			er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_CONTENT_COUNT,    	-(int)iterFolderCounts->second.ulItems);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_ASSOC_CONTENT_COUNT,	-(int)iterFolderCounts->second.ulAssoc);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_ASSOC_MSG_COUNT,	-(int)iterFolderCounts->second.ulDeletedAssoc);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_CONTENT_UNREAD,   	-(int)iterFolderCounts->second.ulUnread);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_MSG_COUNT,	-(int)iterFolderCounts->second.ulDeleted);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_SUBFOLDERS,   		-(int)iterFolderCounts->second.ulFolders);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_FOLDER_CHILD_COUNT,	-(int)iterFolderCounts->second.ulFolders);
-			if (er == erSuccess)
-				er = UpdateFolderCount(lpDatabase, iterFolderCounts->first, PR_DELETED_FOLDER_COUNT,	-(int)iterFolderCounts->second.ulDeletedFolders);
-			if (er != erSuccess)
-				goto exit;
-		}
+		er = ApplyFolderCounts(lpDatabase, mapFolderCounts);
+		if(er != erSuccess)
+		    goto exit;
+
 		// Clear map for next round
 		mapFolderCounts.clear();
 
@@ -1899,7 +1866,7 @@ ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId)
     }
     
     // Trigger an assertion since in practice this should never happen
-    ASSERT(false);
+//    ASSERT(false);
 	g_lpStatsCollector->Increment(SCN_DATABASE_COUNTER_RESYNCS);
 
 	er = lpSession->GetSessionManager()->GetCacheManager()->GetParent(ulObjId, &ulParent);
@@ -2054,4 +2021,245 @@ exit:
 		lpDatabase->FreeResult(lpDBResult);
 
 	return er;
+}
+
+ECRESULT ApplyFolderCounts(ECDatabase *lpDatabase, unsigned int ulFolderId, const PARENTINFO &pi) {
+    ECRESULT er = erSuccess;
+    
+    er = UpdateFolderCount(lpDatabase, ulFolderId, PR_CONTENT_COUNT,    			pi.lItems);
+    if (er == erSuccess)
+        er = UpdateFolderCount(lpDatabase, ulFolderId, PR_CONTENT_UNREAD,   		pi.lUnread);
+    if (er == erSuccess)
+        er = UpdateFolderCount(lpDatabase, ulFolderId, PR_ASSOC_CONTENT_COUNT,   	pi.lAssoc);
+    if (er == erSuccess)
+        er = UpdateFolderCount(lpDatabase, ulFolderId, PR_DELETED_MSG_COUNT, 		pi.lDeleted);
+    if (er == erSuccess)
+        er = UpdateFolderCount(lpDatabase, ulFolderId, PR_DELETED_ASSOC_MSG_COUNT, 	pi.lDeletedAssoc);
+    if (er == erSuccess)
+        er = UpdateFolderCount(lpDatabase, ulFolderId, PR_SUBFOLDERS,  				pi.lFolders);
+    if (er == erSuccess)
+        er = UpdateFolderCount(lpDatabase, ulFolderId, PR_FOLDER_CHILD_COUNT,		pi.lFolders);
+    if (er == erSuccess)
+        er = UpdateFolderCount(lpDatabase, ulFolderId, PR_DELETED_FOLDER_COUNT,		pi.lDeletedFolders);
+    if (er != erSuccess)
+        goto exit;
+        
+exit:
+    return er;
+}
+
+ECRESULT ApplyFolderCounts(ECDatabase *lpDatabase, const std::map<unsigned int, PARENTINFO> &mapFolderCounts) {
+    ECRESULT er = erSuccess;
+    
+	// Update folder counts
+	for(std::map<unsigned int, PARENTINFO>::const_iterator iterFolderCounts = mapFolderCounts.begin(); iterFolderCounts != mapFolderCounts.end(); iterFolderCounts++) {
+	    er = ApplyFolderCounts(lpDatabase, iterFolderCounts->first, iterFolderCounts->second);
+	    if(er != erSuccess)
+	        goto exit;
+	}
+	
+exit:
+	return er;
+}
+
+ECRESULT LockFolders(ECDatabase *lpDatabase, bool bShared, const std::set<unsigned int> &setParents)
+{
+    ECRESULT er = erSuccess;
+    std::string strQuery;
+    std::set<unsigned int>::const_iterator i;
+
+    if(setParents.empty())
+        goto exit;
+    
+    strQuery = "SELECT * FROM properties WHERE hierarchyid IN(";
+    
+    for(i = setParents.begin(); i != setParents.end(); i++) {
+        strQuery += stringify(*i);
+        strQuery += ",";
+    }
+    strQuery.resize(strQuery.size()-1);
+    strQuery += ") ";
+    
+    if(bShared)
+        strQuery += "LOCK IN SHARE MODE";
+    else
+        strQuery += "FOR UPDATE";
+    
+    er = lpDatabase->DoSelect(strQuery, NULL);
+    
+exit:
+    return er;
+}
+
+ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag, const std::set<std::string>& setIds, unsigned int ulFlags)
+{
+    ECRESULT er = erSuccess;
+    DB_RESULT lpDBResult = NULL;
+    DB_ROW lpDBRow = NULL;
+    std::set<unsigned int> setMessages;
+    std::set<unsigned int> setFolders;
+    std::set<std::string> setUncached;
+    std::set<unsigned int> setUncachedMessages;
+    unsigned int ulId;
+    std::string strQuery;
+    
+    // See if we can get the object IDs for the passed objects from the cache
+    for(std::set<std::string>::const_iterator i = setIds.begin(); i != setIds.end(); i++) {
+        if(g_lpSessionManager->GetCacheManager()->QueryObjectFromProp(ulTag, i->size(), (unsigned char *)i->data(), &ulId) == erSuccess) {
+            if(ulTag == PROP_ID(PR_SOURCE_KEY))
+                setFolders.insert(ulId);
+            else if(ulTag == PROP_ID(PR_ENTRYID)) {
+                EntryId eid(*i);
+                
+                if(eid.type() == MAPI_FOLDER) {
+                    setFolders.insert(ulId);
+                } else if(eid.type() == MAPI_MESSAGE) {
+                    setMessages.insert(ulId);
+                } else {
+                    ASSERT(false); // You should not attempt to lock things other than messages and folders
+                }
+            }
+            else {
+                ASSERT(false);
+            }
+        } else {
+            setUncached.insert(*i);
+        }
+    }
+
+    if(!setUncached.empty()) {    
+        // For the items that were uncached, go directly to their parent (or the item itself for folders) in the DB
+        strQuery = "SELECT hierarchyid, hierarchy.type, hierarchy.parent FROM indexedproperties JOIN hierarchy ON hierarchy.id=indexedproperties.hierarchyid WHERE tag = " + stringify(ulTag) + " AND val_binary IN(";
+        for(std::set<std::string>::iterator i= setUncached.begin(); i != setUncached.end(); i++) {
+            if(i != setUncached.begin())
+                strQuery += ",";
+            strQuery += lpDatabase->EscapeBinary(*i);
+        }
+        strQuery += ")";
+        
+        er = lpDatabase->DoSelect(strQuery, &lpDBResult);
+        if(er != erSuccess)
+            goto exit;
+        
+        while((lpDBRow = lpDatabase->FetchRow(lpDBResult))) {
+            if(lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL)
+                continue;
+                
+            if(atoui(lpDBRow[1]) == MAPI_MESSAGE)
+                setFolders.insert(atoui(lpDBRow[2]));
+            else if(atoui(lpDBRow[1]) == MAPI_FOLDER)
+                setFolders.insert(atoui(lpDBRow[0]));
+        }
+
+        lpDatabase->FreeResult(lpDBResult);
+        lpDBResult = NULL;
+    }
+        
+    // For the items that were cached, but messages, find their parents in the cache first
+    for(std::set<unsigned int>::iterator i = setMessages.begin(); i != setMessages.end(); i++) {
+        unsigned int ulParent = 0;
+        
+        if(g_lpSessionManager->GetCacheManager()->QueryParent(*i, &ulParent) == erSuccess) {
+            setFolders.insert(ulParent);
+        } else {
+            setUncachedMessages.insert(*i);
+        }
+    }
+    
+    // Query uncached parents from the database
+    if(!setUncachedMessages.empty()) {
+        strQuery = "SELECT parent FROM hierarchy WHERE id IN(";
+        for(std::set<unsigned int>::iterator i = setUncachedMessages.begin(); i != setUncachedMessages.end(); i++) {
+            if(i != setUncachedMessages.begin())
+                strQuery += ",";
+            strQuery += stringify(*i);
+        }
+        strQuery += ")";
+        
+        er = lpDatabase->DoSelect(strQuery, &lpDBResult);
+        if(er != erSuccess)
+            goto exit;
+
+        while((lpDBRow = lpDatabase->FetchRow(lpDBResult))) {
+            if(lpDBRow[0] == NULL)
+                continue;
+                
+            setFolders.insert(atoui(lpDBRow[0]));
+        }    
+        
+        lpDatabase->FreeResult(lpDBResult);
+        lpDBResult = NULL;
+    }
+        
+    // Query objectid -> parentid for messages
+    if(setFolders.empty()) {
+        // No objects found that we can lock, fail.
+        er = ZARAFA_E_NOT_FOUND;
+        goto exit;
+    }
+    
+    er = lpDatabase->Begin();
+    if(er != erSuccess)
+        goto exit;
+        
+    er = LockFolders(lpDatabase, ulFlags & LOCK_SHARED, setFolders);
+    if(er != erSuccess)
+        goto exit;
+    
+exit:
+    if(lpDBResult)
+        lpDatabase->FreeResult(lpDBResult);
+        
+    return er;
+}
+
+/**
+ * Begin a new transaction and lock folders
+ *
+ * Sourcekey of folders should be passed in setFolders.
+ *
+ */
+ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const std::set<SOURCEKEY>& setFolders, unsigned int ulFlags)
+{
+    std::set<std::string> setIds;
+    
+    std::copy(setFolders.begin(), setFolders.end(), std::inserter(setIds, setIds.begin()));
+    return BeginLockFolders(lpDatabase, PROP_ID(PR_SOURCE_KEY), setIds, ulFlags);
+}
+
+/**
+ * Begin a new transaction and lock folders
+ *
+ * EntryID of messages and folders to lock can be passed in setEntryIds. In practice, only the folders
+ * in which the messages reside are locked.
+ */
+ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const std::set<EntryId>& setEntryIds, unsigned int ulFlags)
+{
+    std::set<std::string> setIds;
+    
+    std::copy(setEntryIds.begin(), setEntryIds.end(), std::inserter(setIds, setIds.begin()));
+    return BeginLockFolders(lpDatabase, PROP_ID(PR_ENTRYID), setIds, ulFlags);
+}
+
+ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const EntryId &entryid, unsigned int ulFlags)
+{
+    std::set<EntryId> set;
+    
+    // No locking needed for stores
+    if(entryid.type() == MAPI_STORE) {
+        return lpDatabase->Begin();
+    }
+    
+    set.insert(entryid);
+    
+    return BeginLockFolders(lpDatabase, set, ulFlags);
+}
+
+ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const SOURCEKEY &sourcekey, unsigned int ulFlags)
+{
+    std::set<SOURCEKEY> set;
+    
+    set.insert(sourcekey);
+    
+    return BeginLockFolders(lpDatabase, set, ulFlags);
 }

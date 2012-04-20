@@ -100,7 +100,7 @@ public:
 	virtual std::string		FilterBMP(const std::string &strToEscape) = 0;
 	virtual std::string		Escape(const std::string &strToEscape) = 0;
 	virtual std::string		EscapeBinary(unsigned char *lpData, unsigned int ulLen) = 0;
-	virtual std::string		EscapeBinary(std::string& strData) = 0;
+	virtual std::string		EscapeBinary(const std::string& strData) = 0;
 
 	// Reset the result set so it can be iterated again
 	virtual void			ResetResult(DB_RESULT sResult) = 0;
