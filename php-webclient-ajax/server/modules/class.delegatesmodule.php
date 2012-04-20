@@ -281,11 +281,9 @@
 								);
 						mapi_zarafa_setpermissionrules($folder, $acls);
 
-						if ($folderName == 'calendar' && $folderName == 'inbox'){
-							if (isset($freebusy)){
-								mapi_zarafa_setpermissionrules($freebusy, $acls);
-								mapi_savechanges($freebusy);
-							}
+						if ($folderName == 'calendar' && isset($freebusy)) {
+							mapi_zarafa_setpermissionrules($freebusy, $acls);
+							mapi_savechanges($freebusy);
 						}
 						mapi_savechanges($folder);
 					}
@@ -423,10 +421,7 @@
 				if ($folderName == 'calendar'){
 					if(isset($freebusy)){
 						// set permissions on free/busy message
-						foreach($acls as $acl) {
-							if( $acl["type"] == ACCESS_TYPE_GRANT && ($acl["rights"] & ecRightsEditOwned))
-								$acl["rights"] |= ecRightsEditAny;
-						}
+						$acls[0]["rights"] |= ecRightsReadAny | ecRightsFolderVisible;
 						mapi_zarafa_setpermissionrules($freebusy, $acls);
 						if(mapi_last_hresult() != NOERROR) {
 							// unable to set permissions
