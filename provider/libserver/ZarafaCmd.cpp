@@ -803,8 +803,10 @@ double GetTimeOfDay();
     double			dblStart = GetTimeOfDay(); \
     ECSession		*lpecSession = NULL; \
     unsigned int 	*lpResultVar = &resultvar; \
+    char 			*szFname = #fname; \
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &startTimes); \
 	SOAP_CALLBACK(soap, pthread_self(), (std::string) "[" + PrettyIP(soap->ip) + "] " + #fname); \
+	g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_DEBUG, "%llu: S %s", ulSessionId, szFname); \
 	er = g_lpSessionManager->ValidateSession(soap, ulSessionId, &lpecSession, true);\
 	const bool UNUSED_VAR bSupportUnicode = (er == erSuccess ? (lpecSession->GetCapabilities() & ZARAFA_CAP_UNICODE) != 0 : false); \
 	const ECStringCompat stringCompat(er == erSuccess ? lpecSession->GetCapabilities() : 0); \
@@ -819,6 +821,7 @@ __soapentry_exit: \
     	lpecSession->AddClocks( timespec2dbl(endTimes) - timespec2dbl(startTimes), \
     	                        0, \
 							    GetTimeOfDay() - dblStart); \
+	g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_DEBUG, "%llu: E %s %f %f", ulSessionId, szFname, timespec2dbl(endTimes) - timespec2dbl(startTimes), GetTimeOfDay() - dblStart); \
 	lpecSession->RemoveBusyState(pthread_self()); \
         lpecSession->Unlock(); \
     } \

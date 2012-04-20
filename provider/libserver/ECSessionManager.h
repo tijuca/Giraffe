@@ -143,7 +143,6 @@ public:
 	virtual ECRESULT DeleteIfOrphaned(ECSessionGroup *lpGroup);
 
 	ECRESULT RemoveAllSessions();
-	ECRESULT CancelAllSessions(ECSESSIONID except = 0);
 	ECRESULT ForEachSession(void(*callback)(ECSession*, void*), void *obj);
 
 	ECRESULT LoadSettings();

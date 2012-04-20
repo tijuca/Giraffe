@@ -90,12 +90,7 @@ ECRESULT TestPerform(struct soap *soap, ECSession *lpSession, char *szCommand, u
 				atoui(g_lpSessionManager->GetConfig()->GetSetting("index_services_search_timeout")) * 10	// Be a bit more patient
 			).SyncRun();
 		}
-	} else if (stricmp(szCommand, "kill_sessions") == 0) {
-	    ECSESSIONID id = lpSession->GetSessionId();
-	    
-	    // Remove all sessions except our own
-	    er = lpSession->GetSessionManager()->CancelAllSessions(id);
-    }
+	}
     
 exit:
     return er;
