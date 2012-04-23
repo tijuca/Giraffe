@@ -103,8 +103,6 @@ ECSearchFolders::~ECSearchFolders() {
 
     for(iterStore = m_mapSearchFolders.begin(); iterStore != m_mapSearchFolders.end(); iterStore++) {
         for(iterFolder = iterStore->second.begin(); iterFolder != iterStore->second.end(); iterFolder++) {
-            FreeSearchCriteria(iterFolder->second->lpSearchCriteria);
-            pthread_mutex_destroy(&iterFolder->second->mMutexThreadFree);
             delete iterFolder->second;
         }
         iterStore->second.clear();
@@ -315,17 +313,13 @@ ECRESULT ECSearchFolders::AddSearchFolder(unsigned int ulStoreId, unsigned int u
             goto exit;
     }
 
-    lpSearchFolder = new SEARCHFOLDER;
+    lpSearchFolder = new SEARCHFOLDER(ulStoreId, ulFolderId);
 
     er = CopySearchCriteria(NULL, lpSearchCriteria, &lpSearchFolder->lpSearchCriteria);
     if(er != erSuccess) {
         delete lpSearchFolder;
         goto exit;
     }
-
-    lpSearchFolder->bThreadExit = false;
-    lpSearchFolder->bThreadFree = true;
-    pthread_mutex_init(&lpSearchFolder->mMutexThreadFree, NULL);
 
     pthread_mutex_lock(&m_mutexMapSearchFolders);
 
@@ -341,8 +335,6 @@ ECRESULT ECSearchFolders::AddSearchFolder(unsigned int ulStoreId, unsigned int u
         THREADINFO *ti = new THREADINFO;
         ti->lpSearchFolders = this;
         ti->lpFolder = lpSearchFolder;
-        ti->lpFolder->ulStoreId = ulStoreId;
-        ti->lpFolder->ulFolderId = ulFolderId;
 
         // Insert the actual folder with the criteria
         // Start the thread (will store the thread id in the original list)
@@ -443,8 +435,6 @@ void ECSearchFolders::DestroySearchFolder(SEARCHFOLDER *lpFolder)
     pthread_mutex_unlock(&lpFolder->mMutexThreadFree);
 
     // Nobody is using lpFolder now
-    FreeSearchCriteria(lpFolder->lpSearchCriteria);
-    pthread_mutex_destroy(&lpFolder->mMutexThreadFree);
     delete lpFolder;
 
     // Set the search as stopped in the database

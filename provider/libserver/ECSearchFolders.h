@@ -55,13 +55,29 @@
 #include "ECKeyTable.h"
 
 #include "soapH.h"
+#include "SOAPUtils.h"
 
 #include <map>
 #include <set>
 
 class ECSessionManager;
 
-typedef struct {
+typedef struct SEARCHFOLDER {
+	SEARCHFOLDER(unsigned int ulStoreId, unsigned int ulFolderId) {
+		this->lpSearchCriteria = NULL;
+		/* sThreadId */
+		pthread_mutex_init(&this->mMutexThreadFree, NULL);
+		this->bThreadExit = false;
+		this->bThreadFree = true;
+		this->ulStoreId = ulStoreId;
+		this->ulFolderId = ulFolderId;
+	}
+	~SEARCHFOLDER() {
+		if (this->lpSearchCriteria)
+			FreeSearchCriteria(this->lpSearchCriteria);
+		pthread_mutex_destroy(&this->mMutexThreadFree);
+	}
+
     struct searchCriteria 	*lpSearchCriteria;
     pthread_t 				sThreadId;
     pthread_mutex_t			mMutexThreadFree;
