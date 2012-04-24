@@ -275,8 +275,14 @@
 			);
 
 			$reminderfolder = mapi_msgstore_openentry($store, $this->reminderEntryId);
-			if(!$reminderfolder)
-				return false;
+			if(!$reminderfolder) {
+				if(mapi_last_hresult() == MAPI_E_NOT_FOUND) {
+					$this->reminderEntryId = $this->createReminderFolder($store);
+					$reminderfolder = mapi_msgstore_openentry($store, $this->reminderEntryId);
+				}				
+				if(!$reminderfolder)
+					return false;
+			}
 				
 			$remindertable = mapi_folder_getcontentstable($reminderfolder);
 			if(!$remindertable)
