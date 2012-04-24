@@ -312,13 +312,11 @@ HRESULT ICalRecurrence::HrMakeMAPIException(icalcomponent *lpEventRoot, icalcomp
 {
 	HRESULT hr = hrSuccess;
 	icalproperty *lpicProp = NULL;
-	icaltimetype icStart;
-	icaltimetype icRecId;
 	time_t ttStartLocalTime = 0;
 	time_t ttEndLocalTime = 0;
 	time_t ttStartUtcTime = 0;
 	time_t ttEndUtcTime = 0;
-	time_t ttOriginalTime = 0;
+	time_t ttOriginalUtcTime = 0;
 	time_t ttOriginalLocalTime = 0;
 	ULONG ulId = 0;
 	ULONG i = 0;
@@ -353,38 +351,35 @@ HRESULT ICalRecurrence::HrMakeMAPIException(icalcomponent *lpEventRoot, icalcomp
 		hr = MAPI_E_NOT_FOUND;
 		goto exit;
 	}
-	icRecId = icalvalue_get_datetime(icalproperty_get_value(lpicProp));
-	ttOriginalTime = ICalTimeTypeToUTC(lpEventRoot, lpicProp);
-	ttOriginalLocalTime = icaltime_as_timet(icRecId);
+	ttOriginalUtcTime = ICalTimeTypeToUTC(lpEventRoot, lpicProp);
+	ttOriginalLocalTime = icaltime_as_timet(icalvalue_get_datetime(icalproperty_get_value(lpicProp)));
 	
-	lpEx->tBaseDate = ttOriginalTime;
+	lpEx->tBaseDate = ttOriginalUtcTime;
 
 	lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_DTSTART_PROPERTY);
 	if (lpicProp == NULL) {
 		hr = MAPI_E_NOT_FOUND;
 		goto exit;
 	}
-	icStart = icalvalue_get_datetime(icalproperty_get_value(lpicProp));
-	ttStartLocalTime = icaltime_as_timet(icStart);
 	ttStartUtcTime = ICalTimeTypeToUTC(lpEventRoot, lpicProp);
+	ttStartLocalTime = icaltime_as_timet(icalvalue_get_datetime(icalproperty_get_value(lpicProp)));
 
-	lpEx->tStartDate = ttStartLocalTime;
+	lpEx->tStartDate = ttStartUtcTime;
 
 	lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_DTEND_PROPERTY);
 	if (lpicProp == NULL) {
 		hr = MAPI_E_NOT_FOUND;
 		goto exit;
 	}
-	
+	ttEndUtcTime = ICalTimeTypeToUTC(lpEventRoot, lpicProp);
 	ttEndLocalTime = icaltime_as_timet(icalvalue_get_datetime(icalproperty_get_value(lpicProp)));
-	ttEndUtcTime = ICalTimeTypeToUTC(lpEventRoot,lpicProp);
 
 	hr = lpIcalItem->lpRecurrence->addModifiedException(ttStartLocalTime, ttEndLocalTime, ttOriginalLocalTime, &ulId);
 	if (hr != hrSuccess)
 		goto exit;
 
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_RECURRINGBASE], PT_SYSTIME);
-	UnixTimeToFileTime(ttOriginalTime , &sPropVal.Value.ft);
+	UnixTimeToFileTime(ttOriginalUtcTime, &sPropVal.Value.ft);
 	lpEx->lstMsgProps.push_back(sPropVal);
 
 	sPropVal.ulPropTag = PR_EXCEPTION_STARTTIME;
@@ -396,7 +391,7 @@ HRESULT ICalRecurrence::HrMakeMAPIException(icalcomponent *lpEventRoot, icalcomp
 	lpEx->lstAttachProps.push_back(sPropVal);
 
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_APPTSTARTWHOLE], PT_SYSTIME);
-	UnixTimeToFileTime(ttStartUtcTime , &sPropVal.Value.ft);	
+	UnixTimeToFileTime(ttStartUtcTime, &sPropVal.Value.ft);	
 	lpEx->lstMsgProps.push_back(sPropVal);
 	
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_COMMONSTART], PT_SYSTIME);

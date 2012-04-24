@@ -1005,7 +1005,6 @@ bool recurrence::isChangedOccurrence(time_t t){
 	}
 	return false;
 }
-*/
 
 bool recurrence::isAfter(time_t tStamp)
 {
@@ -1083,7 +1082,6 @@ bool recurrence::isAfter(time_t tStamp)
 
 	return false;
 }
-/*
 
 list<time_t> recurrence::getOccurrencesBetween(time_t begin, time_t end){
 	list<time_t> occurrences;
@@ -1227,6 +1225,13 @@ ULONG recurrence::calcBits(ULONG x)
 	return n;
 }
 
+/** 
+ * Returns the number of occurrences in this DATE ending recurring
+ * item. It doesn't really matter what is returned, since this value
+ * is only used for display in a Recurrence Dialog window.
+ * 
+ * @return number of occurrences
+ */
 ULONG recurrence::calcCount()
 {
 	ULONG ulCount = 0;
@@ -1240,7 +1245,8 @@ ULONG recurrence::calcCount()
 	switch (m_sRecState.ulRecurFrequency) {
 	case RF_DAILY:
 		if (m_sRecState.ulPatternType == 1) {
-			// ulPeriod is stored in days
+			// every weekday item
+			// ulPeriod is stored in days (so this is always 1, right?)
 			ulCount = (getEndDate() - getStartDate()) / (24*60*60) / m_sRecState.ulPeriod;
 			// this one isn't one short?
 			ulCount--;
@@ -1301,7 +1307,7 @@ time_t recurrence::StartOfDay(time_t t)
 {
 	struct tm sTM;
 	gmtime_safe(&t, &sTM);
-	
+
 	return t - (sTM.tm_hour * 60 * 60 + sTM.tm_min * 60 + sTM.tm_sec);
 }
 
@@ -1423,17 +1429,15 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd, ECLogger *lpLogger,
 	
 	tsDayEnd = StartOfDay(UTCToLocal(tsRangeEnd, ttZinfo));
 
-	lpLogger->Log(EC_LOGLEVEL_DEBUG,"DURATION START TIME : %s", ctime(&tsStart));
-	lpLogger->Log(EC_LOGLEVEL_DEBUG,"DURATIION END TIME : %s", ctime(&tsEnd));
+	lpLogger->Log(EC_LOGLEVEL_DEBUG,"DURATION START TIME : %lu ==> %s", tsStart, ctime(&tsStart));
+	lpLogger->Log(EC_LOGLEVEL_DEBUG,"DURATIION END TIME : %lu ==> %s", tsEnd, ctime(&tsEnd));
 	
-	lpLogger->Log(EC_LOGLEVEL_DEBUG,"Rec Start TIME : %s", ctime(&tsDayStart));		
-	lpLogger->Log(EC_LOGLEVEL_DEBUG,"Rec End TIME : %s", ctime(&tsDayEnd));
+	lpLogger->Log(EC_LOGLEVEL_DEBUG,"Rec Start TIME : %lu ==> %s", tsDayStart, ctime(&tsDayStart));
+	lpLogger->Log(EC_LOGLEVEL_DEBUG,"Rec End TIME : %lu ==> %s", tsDayEnd, ctime(&tsDayEnd));
 	
 	switch (getFrequency())
 	{
 	case DAILY:
-		
-
 		if(m_sRecState.ulPeriod <= 0)
 			m_sRecState.ulPeriod = 1440;
 
@@ -1441,14 +1445,19 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd, ECLogger *lpLogger,
 		{
 			for(tsNow = tsDayStart ; tsNow <= tsDayEnd ; tsNow += (m_sRecState.ulPeriod *60))
 			{			
+				lpLogger->Log(EC_LOGLEVEL_DEBUG, "Testing match: %lu ==> %s", tsNow, ctime(&tsNow));
 				if(isOccurrenceValid(tsStart, tsEnd , tsNow + getStartTimeOffset())) {
 					tsOccStart =  LocalToUTC(tsNow + getStartTimeOffset(), ttZinfo);
 					tsOccEnd = LocalToUTC(tsNow + getEndTimeOffset(), ttZinfo);
+					lpLogger->Log(EC_LOGLEVEL_DEBUG, "Adding match: %lu ==> %s", tsOccStart, ctime(&tsOccStart));
 					AddValidOccr(tsOccStart, tsOccEnd, ulBusyStatus, &lpOccrInfoAll, lpcValues);
+				} else {
+					lpLogger->Log(EC_LOGLEVEL_DEBUG, "Skipping match: %lu ==> %s", tsNow, ctime(&tsNow));
 				}
 			}
 
 		} else {
+			// daily, but every weekday (outlook)
 			for(tsNow = tsDayStart ;tsNow <= tsDayEnd; tsNow += 60 * 1440) { //604800 = 60*60*24*7 
 				tm *sTm = NULL;
 				sTm =  gmtime(&tsNow);
@@ -1463,10 +1472,9 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd, ECLogger *lpLogger,
 				}
 			}
 		}
-	
 		break;// CASE : DAILY
+
 	case WEEKLY:
-		
 		if(m_sRecState.ulPeriod <= 0)
 			m_sRecState.ulPeriod = 1;
 			
@@ -1497,8 +1505,8 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd, ECLogger *lpLogger,
 
 		}
 		break;// CASE : WEEKLY
+
 	case MONTHLY:
-		
 		if(m_sRecState.ulPeriod <= 0)
 			m_sRecState.ulPeriod = 1;
 		
@@ -1627,17 +1635,21 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd, ECLogger *lpLogger,
 
 		lpException = lstExceptions.back();
 		// APPT_STARTWHOLE
-		RTimeToUnixTime(lpException.ulStartDateTime, &tsOccStart);
-		if(tsOccStart < tsStart || tsOccStart > tsEnd)
-			goto next;
+		RTimeToUnixTime(lpException.ulStartDateTime, &tsOccStart);	// tsOccStart == localtime
 		tsOccStart = LocalToUTC(tsOccStart, ttZinfo);
-		UnixTimeToRTime(tsOccStart, &sOccrInfo.fbBlock.m_tmStart);
+		if(tsOccStart > tsEnd) {									// tsStart, tsEnd == gmtime
+			lpLogger->Log(EC_LOGLEVEL_DEBUG, "Skipping exception start match: %lu ==> %s", tsOccStart, ctime(&tsOccStart));
+			goto next;
+		}
+		UnixTimeToRTime(tsOccStart, &sOccrInfo.fbBlock.m_tmStart);	// gmtime in rtime, is this correct?
 
 		// APPT_ENDWHOLE
 		RTimeToUnixTime(lpException.ulEndDateTime, &tsOccEnd);
-		if(tsOccEnd > tsEnd || tsOccEnd < tsStart)
-			goto next;
 		tsOccEnd = LocalToUTC(tsOccEnd, ttZinfo);
+		if(tsOccEnd < tsStart) {
+			lpLogger->Log(EC_LOGLEVEL_DEBUG, "Skipping exception end match: %lu ==> %s", tsOccEnd, ctime(&tsOccEnd));
+			goto next;
+		}
 		UnixTimeToRTime(tsOccEnd, &sOccrInfo.fbBlock.m_tmEnd);
 
 		// APPT_FBSTATUS
@@ -1645,6 +1657,8 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd, ECLogger *lpLogger,
 
 		// Freebusy status
 		RTimeToUnixTime(lpException.ulOriginalStartDate, &sOccrInfo.tBaseDate);
+
+		lpLogger->Log(EC_LOGLEVEL_DEBUG, "Adding exception match: %lu ==> %s", sOccrInfo.tBaseDate, ctime(&sOccrInfo.tBaseDate));
 
 		hr = HrAddFBBlock(sOccrInfo, &lpOccrInfoAll, lpcValues);
 next:

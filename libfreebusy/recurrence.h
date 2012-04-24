@@ -178,11 +178,11 @@ public:
 
 	bool isOccurrence(time_t);
 	bool isRuleOccurrence(time_t);
+
+	bool isAfter(time_t);
 */
 	time_t calcEndDate();
 	ULONG calcCount();
-
-	bool isAfter(time_t);
 
 	static time_t MonthInSeconds(ULONG year, ULONG month);
 	static time_t MonthsInSeconds(ULONG months);
