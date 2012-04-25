@@ -1,15 +1,32 @@
+'\" t
 .\"     Title: zarafa-gateway.cfg
-.\"    Author: 
-.\" Generator: DocBook XSL Stylesheets v1.73.2 <http://docbook.sf.net/>
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
 .\"      Date: August 2011
 .\"    Manual: Zarafa user reference
 .\"    Source: Zarafa 7.0
+.\"  Language: English
 .\"
 .TH "ZARAFA\-GATEWAY\&.CF" "5" "August 2011" "Zarafa 7.0" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
 .ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
 .SH "NAME"
 zarafa-gateway.cfg \- The Zarafa gateway configuration file
 .SH "SYNOPSIS"
@@ -18,9 +35,9 @@ zarafa-gateway.cfg \- The Zarafa gateway configuration file
 .SH "DESCRIPTION"
 .PP
 The
-\fIgateway\&.cfg\fR
+gateway\&.cfg
 is a configuration file for the Zarafa Gateway\&.
-\fIgateway\&.cfg\fR
+gateway\&.cfg
 contains instructions for the software to set up the logging system and to enable or disable the POP3, POP3S, IMAP or IMAPS part of the service\&.
 .SH "FILE FORMAT"
 .PP
@@ -32,7 +49,7 @@ The parameters are written in the form:
 =
 \fIvalue\fR
 .PP
-The file is line\-based\&. Each newline\-terminated line represents either a comment, nothing, a parameter or a directive\&. A line beginning with `#\' is considered a comment, and will be ignored by Zarafa\&. Parameter names are case sensitive\&. Lines beginning with `!\' are directives\&.
+The file is line\-based\&. Each newline\-terminated line represents either a comment, nothing, a parameter or a directive\&. A line beginning with `#\*(Aq is considered a comment, and will be ignored by Zarafa\&. Parameter names are case sensitive\&. Lines beginning with `!\*(Aq are directives\&.
 .PP
 Directives are written in the form:
 .PP
@@ -191,7 +208,7 @@ Default:
 .PP
 \fBimap_only_mailfolders\fR
 .RS 4
-Enable the IMAP and IMAPS service to only show the mailfolders\&. This is the default behaviour\&. When this option is set to \'no\', you will also be able to select you calendar and contacts and such\&. These views will not contain all information, since these items cannot be converted to a rfc\-822 mail item\&.
+Enable the IMAP and IMAPS service to only show the mailfolders\&. This is the default behaviour\&. When this option is set to \*(Aqno\*(Aq, you will also be able to select you calendar and contacts and such\&. These views will not contain all information, since these items cannot be converted to a rfc\-822 mail item\&.
 .sp
 Default:
 \fIyes\fR
@@ -199,7 +216,7 @@ Default:
 .PP
 \fBimap_public_folders\fR
 .RS 4
-Enable the IMAP and IMAPS service to also show the public store with subfolders\&. This is the default behaviour\&. When this option is set to \'no\', IMAP clients will only see the users\' folder\&.
+Enable the IMAP and IMAPS service to also show the public store with subfolders\&. This is the default behaviour\&. When this option is set to \*(Aqno\*(Aq, IMAP clients will only see the users\*(Aq folder\&.
 .sp
 Default:
 \fIyes\fR
@@ -215,7 +232,7 @@ Default:
 .PP
 \fBimap_generate_utf8\fR
 .RS 4
-Normally e\-mails specify the correct charset for their contents\&. This may be altered to make it always UTF\-8\&. This will only happen on e\-mails that do not have the extra imap data properties, which is true for users without the \'imap\' feature enabled\&.
+Normally e\-mails specify the correct charset for their contents\&. This may be altered to make it always UTF\-8\&. This will only happen on e\-mails that do not have the extra imap data properties, which is true for users without the \*(Aqimap\*(Aq feature enabled\&.
 .sp
 Default:
 \fIno\fR
@@ -232,7 +249,7 @@ Default:
 \fBimap_expunge_on_delete\fR
 .RS 4
 Normally when you delete an e\-mail in an IMAP client, it will only be marked as deleted, and not removed from the folder\&. The client should send the EXPUNGE command to actually remove the item from the folder (where Zarafa will place it in the soft\-delete system)\&. When this option is set to
-\fIyes\fR, the zarafa\-gateway will issue the expunge command itself directly after a \'mark as delete\' command was received\&.
+\fIyes\fR, the zarafa\-gateway will issue the expunge command itself directly after a \*(Aqmark as delete\*(Aq command was received\&.
 .sp
 Default:
 \fIno\fR
@@ -327,7 +344,7 @@ Default:
 .PP
 \fBlog_timestamp\fR
 .RS 4
-Specify whether to prefix each log line with a timestamp in \'file\' logging mode\&.
+Specify whether to prefix each log line with a timestamp in \*(Aqfile\*(Aq logging mode\&.
 .sp
 Default:
 \fI1\fR
@@ -341,7 +358,7 @@ log_level
 .RE
 .SH "FILES"
 .PP
-\fI/etc/zarafa/gateway\&.cfg\fR
+/etc/zarafa/gateway\&.cfg
 .RS 4
 The Zarafa gateway configuration file\&.
 .RE

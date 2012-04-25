@@ -1,15 +1,32 @@
+'\" t
 .\"     Title: zarafa-ldap.cfg
-.\"    Author: 
-.\" Generator: DocBook XSL Stylesheets v1.73.2 <http://docbook.sf.net/>
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
 .\"      Date: August 2011
 .\"    Manual: Zarafa user reference
 .\"    Source: Zarafa 7.0
+.\"  Language: English
 .\"
 .TH "ZARAFA\-LDAP\&.CFG" "5" "August 2011" "Zarafa 7.0" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
 .ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
 .SH "NAME"
 zarafa-ldap.cfg \- The Zarafa LDAP configuration file
 .SH "SYNOPSIS"
@@ -18,7 +35,7 @@ zarafa-ldap.cfg \- The Zarafa LDAP configuration file
 .SH "DESCRIPTION"
 .PP
 The
-\fIldap\&.cfg\fR
+ldap\&.cfg
 is a configuration file for LDAP user plugin\&. All options to correctly retrieve user and group information can be set here\&.
 .SH "FILE FORMAT"
 .PP
@@ -30,7 +47,7 @@ The parameters are written in the form:
 =
 \fIvalue\fR
 .PP
-The file is line\-based\&. Each newline\-terminated line represents either a comment, nothing, a parameter or a directive\&. A line beginning with `#\' is considered a comment, and will be ignored by Zarafa\&. Parameter names are case sensitive\&. Lines beginning with `!\' are directives\&.
+The file is line\-based\&. Each newline\-terminated line represents either a comment, nothing, a parameter or a directive\&. A line beginning with `#\*(Aq is considered a comment, and will be ignored by Zarafa\&. Parameter names are case sensitive\&. Lines beginning with `!\*(Aq are directives\&.
 .PP
 Directives are written in the form:
 .PP
@@ -75,7 +92,7 @@ Default:
 .PP
 \fBldap_protocol\fR
 .RS 4
-The protocol to be used to connect to the LDAP server\&. Can be either \'ldap\' or \'ldaps\' for SSL connections\&. You will probably have to specify port 636 for ldap_port also\&. Zarafa will not use STARTTLS for such an SSL connection but instead will connect directly to an SSL encrypted port\&.
+The protocol to be used to connect to the LDAP server\&. Can be either \*(Aqldap\*(Aq or \*(Aqldaps\*(Aq for SSL connections\&. You will probably have to specify port 636 for ldap_port also\&. Zarafa will not use STARTTLS for such an SSL connection but instead will connect directly to an SSL encrypted port\&.
 .sp
 Default:
 \fIldap\fR
@@ -139,7 +156,7 @@ Default:
 .RS 4
 An object is defined by this attribute what type it is, eg\&. user, group, etc\&. Every object type should have a unique value in this attribute in order to define what which enrty is\&.
 .sp
-The value of this attribute must be specified in the ldap_*_type_attribute_value settings\&. Each of those settings may specify multiple values for the type attribute, separated by comma\'s\&. All of these values must be present in the objects type attribute for a match to be made and the object to be recognised as that type\&.
+The value of this attribute must be specified in the ldap_*_type_attribute_value settings\&. Each of those settings may specify multiple values for the type attribute, separated by comma\*(Aqs\&. All of these values must be present in the objects type attribute for a match to be made and the object to be recognised as that type\&.
 .sp
 It is possible for ambiguities to arise by setting the same string for multiple ldap_*_type_attribute_value settings\&. This ambiguity will be resolved by preferring objects with more matching values\&. If the ambiguity cannot be resolved in this way, then the first possibility is chosen from the list (addresslist, tenant, dynamic group, group, contact, user)\&.
 .sp
@@ -404,7 +421,7 @@ Default for ADS:
 .PP
 \fBldap_user_certificate_attribute\fR
 .RS 4
-The attribute which contains the user\'s public certificate to be used for encrypted S/MIME messages\&. Both Active Directory and OpenLDAP use the same ldap attribute by default\&. The format of the certificate should be the binary DER format\&.
+The attribute which contains the user\*(Aqs public certificate to be used for encrypted S/MIME messages\&. Both Active Directory and OpenLDAP use the same ldap attribute by default\&. The format of the certificate should be the binary DER format\&.
 .sp
 Default:
 \fIuserCertificate\fR
@@ -923,13 +940,13 @@ Default:
 .PP
 \fBldap_object_search_filter\fR
 .RS 4
-When searching in the addressbook, this filter will be used\&. Normally, the zarafa server will only search in the unique attribute, loginname, fullname and emailaddress\&. You might want to search in more fields, like \'lastname\'\&. Zarafa also uses a postfix wildcard only\&. Using the \'*\' wildcard with prefixes makes a search slower, but can return more results\&.
+When searching in the addressbook, this filter will be used\&. Normally, the zarafa server will only search in the unique attribute, loginname, fullname and emailaddress\&. You might want to search in more fields, like \*(Aqlastname\*(Aq\&. Zarafa also uses a postfix wildcard only\&. Using the \*(Aq*\*(Aq wildcard with prefixes makes a search slower, but can return more results\&.
 .sp
 Hint: Use the zarafaAccount attribute in the filter to differentiate between non\-zarafa and zarafa objects\&.
 .sp
-You can set a custom search filter here\&. \'%s\' will be replaced with the string being searched\&.
+You can set a custom search filter here\&. \*(Aq%s\*(Aq will be replaced with the string being searched\&.
 .sp
-Active Directory has a shortcut for searching in the addressbook using the \'anr\' attribute\&. This is recommended on ADS installations\&.
+Active Directory has a shortcut for searching in the addressbook using the \*(Aqanr\*(Aq attribute\&. This is recommended on ADS installations\&.
 .sp
 Default:
 .sp
@@ -951,12 +968,12 @@ Default:
 .RE
 .SH "FILES"
 .PP
-\fI/etc/zarafa/server\&.cfg\fR
+/etc/zarafa/server\&.cfg
 .RS 4
 The server configuration file\&.
 .RE
 .PP
-\fI/etc/zarafa/ldap\&.cfg\fR
+/etc/zarafa/ldap\&.cfg
 .RS 4
 The Zarafa LDAP configuration file\&.
 .RE

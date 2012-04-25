@@ -1,15 +1,32 @@
+'\" t
 .\"     Title: zarafa-spooler.cfg
-.\"    Author: 
-.\" Generator: DocBook XSL Stylesheets v1.73.2 <http://docbook.sf.net/>
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
 .\"      Date: August 2011
 .\"    Manual: Zarafa user reference
 .\"    Source: Zarafa 7.0
+.\"  Language: English
 .\"
 .TH "ZARAFA\-SPOOLER\&.CF" "5" "August 2011" "Zarafa 7.0" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
 .ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
 .SH "NAME"
 zarafa-spooler.cfg \- The Zarafa spooler configuration file
 .SH "SYNOPSIS"
@@ -18,9 +35,9 @@ zarafa-spooler.cfg \- The Zarafa spooler configuration file
 .SH "DESCRIPTION"
 .PP
 The
-\fIspooler\&.cfg\fR
+spooler\&.cfg
 is a configuration file for the Zarafa Spooler\&.
-\fIspooler\&.cfg\fR
+spooler\&.cfg
 contains instructions for the software to set up the logging system and outgoing smtp relay server\&.
 .SH "FILE FORMAT"
 .PP
@@ -32,7 +49,7 @@ The parameters are written in the form:
 =
 \fIvalue\fR
 .PP
-The file is line\-based\&. Each newline\-terminated line represents either a comment, nothing, a parameter or a directive\&. A line beginning with `#\' is considered a comment, and will be ignored by Zarafa\&. Parameter names are case sensitive\&. Lines beginning with `!\' are directives\&.
+The file is line\-based\&. Each newline\-terminated line represents either a comment, nothing, a parameter or a directive\&. A line beginning with `#\*(Aq is considered a comment, and will be ignored by Zarafa\&. Parameter names are case sensitive\&. Lines beginning with `!\*(Aq are directives\&.
 .PP
 Directives are written in the form:
 .PP
@@ -152,7 +169,7 @@ Default:
 .PP
 \fBlog_timestamp\fR
 .RS 4
-Specify whether to prefix each log line with a timestamp in \'file\' logging mode\&.
+Specify whether to prefix each log line with a timestamp in \*(Aqfile\*(Aq logging mode\&.
 .sp
 Default:
 \fI1\fR
@@ -183,7 +200,7 @@ Default:
 .PP
 \fBfax_international\fR
 .RS 4
-When sending an international fax, the number will start with a \'+\' sign\&. You can rewrite this to the digits you need to dial when dialing to another country\&.
+When sending an international fax, the number will start with a \*(Aq+\*(Aq sign\&. You can rewrite this to the digits you need to dial when dialing to another country\&.
 .sp
 Default:
 \fI+\fR
@@ -191,7 +208,7 @@ Default:
 .PP
 \fBalways_send_delegates\fR
 .RS 4
-Normally, a user needs to give explicit rights to other users to be able to send under their name\&. When setting this value to \'yes\', the spooler will not check these permissions, and will always send the email with \'On behalf of\' headers\&. This was the default behaviour in installations before Zarafa 6\&.20\&. Please note that this feature overrides \'send\-as\' functionality\&.
+Normally, a user needs to give explicit rights to other users to be able to send under their name\&. When setting this value to \*(Aqyes\*(Aq, the spooler will not check these permissions, and will always send the email with \*(AqOn behalf of\*(Aq headers\&. This was the default behaviour in installations before Zarafa 6\&.20\&. Please note that this feature overrides \*(Aqsend\-as\*(Aq functionality\&.
 .sp
 Default:
 \fIno\fR
@@ -199,7 +216,7 @@ Default:
 .PP
 \fBalways_send_tnef\fR
 .RS 4
-Since Zarafa 6\&.30, meeting requests will be sent using iCalendar files\&. This adds compatibility to more calendar programs\&. To use the previous TNEF (winmail\&.dat) method, set this option to \'yes\'\&.
+Since Zarafa 6\&.30, meeting requests will be sent using iCalendar files\&. This adds compatibility to more calendar programs\&. To use the previous TNEF (winmail\&.dat) method, set this option to \*(Aqyes\*(Aq\&.
 .sp
 Default:
 \fIno\fR
@@ -207,7 +224,7 @@ Default:
 .PP
 \fBalways_send_utf8\fR
 .RS 4
-E\-mails can be sent in any charset that the e\-mail was written in\&. It may be desirable to always send in the UTF\-8 charset, which may be more widely supported\&. To enable e\-mail to always be sent in the utf\-8 charset, set this option to \'yes\'\&.
+E\-mails can be sent in any charset that the e\-mail was written in\&. It may be desirable to always send in the UTF\-8 charset, which may be more widely supported\&. To enable e\-mail to always be sent in the utf\-8 charset, set this option to \*(Aqyes\*(Aq\&.
 .sp
 Default:
 \fIno\fR
@@ -223,7 +240,7 @@ Default:
 .PP
 \fBallow_redirect_spoofing\fR
 .RS 4
-Normally, users are not allowed to send e\-mail from a different e\-mail address than their own\&. However, the \'redirect\' rule sends e\-mails with their original \'from\' address\&. Enabling this option allows redirected e\-mails to be sent with their original \'from\' e\-mail address\&.
+Normally, users are not allowed to send e\-mail from a different e\-mail address than their own\&. However, the \*(Aqredirect\*(Aq rule sends e\-mails with their original \*(Aqfrom\*(Aq address\&. Enabling this option allows redirected e\-mails to be sent with their original \*(Aqfrom\*(Aq e\-mail address\&.
 .sp
 Default:
 \fIyes\fR
@@ -247,7 +264,7 @@ Default:
 .PP
 \fBallow_send_to_everyone\fR
 .RS 4
-When set to \'no\', sending to the \'everyone\' group is disallowed\&. The entire message will be bounced if this is attempted\&. When set to \'yes\', this allows sending to all users in the \'everyone\' group\&.
+When set to \*(Aqno\*(Aq, sending to the \*(Aqeveryone\*(Aq group is disallowed\&. The entire message will be bounced if this is attempted\&. When set to \*(Aqyes\*(Aq, this allows sending to all users in the \*(Aqeveryone\*(Aq group\&.
 .sp
 Default:
 \fIyes\fR
@@ -265,7 +282,7 @@ Default:
 .RS 4
 Archive outgoing messages\&. If an archive is attached to the mailbox from which a message is send, the message will immediately be archived to the special Outgoing folder\&.
 .sp
-Messages that are archived this way are not attached to the original message in the primary store\&. So there\'s no easy way to find the original sent item based on an archive or find an archive based on the sent item in the primary store\&. This option is only intended to make sure all outgoing messages are stored without the possibility for the owner to delete them\&.
+Messages that are archived this way are not attached to the original message in the primary store\&. So there\*(Aqs no easy way to find the original sent item based on an archive or find an archive based on the sent item in the primary store\&. This option is only intended to make sure all outgoing messages are stored without the possibility for the owner to delete them\&.
 .sp
 Default:
 \fIno\fR
@@ -279,7 +296,7 @@ log_level, max_threads, archive_on_send
 .RE
 .SH "FILES"
 .PP
-\fI/etc/zarafa/spooler\&.cfg\fR
+/etc/zarafa/spooler\&.cfg
 .RS 4
 The Zarafa spooler configuration file\&.
 .RE

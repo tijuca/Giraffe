@@ -1,19 +1,36 @@
+'\" t
 .\"     Title: zarafa-admin
-.\"    Author: 
-.\" Generator: DocBook XSL Stylesheets v1.73.2 <http://docbook.sf.net/>
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
 .\"      Date: August 2011
 .\"    Manual: Zarafa user reference
 .\"    Source: Zarafa 7.0
+.\"  Language: English
 .\"
 .TH "ZARAFA\-ADMIN" "1" "August 2011" "Zarafa 7.0" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
 .ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
 .SH "NAME"
-zarafa-admin \- Manages Zarafa users and stores.
+zarafa-admin \- Manages Zarafa users and stores\&.
 .SH "SYNOPSIS"
-.HP 13
+.HP \w'\fBzarafa\-admin\fR\ 'u
 \fBzarafa\-admin\fR \fIACTION\fR [\fIOPTION\fR...]
 .SH "DESCRIPTION"
 .PP
@@ -74,7 +91,7 @@ to update user information\&. Use:
 \fI\-\-qs\fR
 or
 \fI\-\-qh\fR
-to set quota levels\&. Use 0 with quota options to set as \'unlimited\'\&.
+to set quota levels\&. Use 0 with quota options to set as \*(Aqunlimited\*(Aq\&.
 .sp
 \fI\-\-enable\-feature\fR
 and
@@ -143,12 +160,12 @@ Note: This function does not synchronize with the external user plugin\&. Thus c
 .RS 4
 Additional argument for
 \fI\-\-details\fR\&. The argument with this option indicates for what type of object the details are being requested\&. Allowed values are
-\fI\'user\'\fR,
-\fI\'group\'\fR
+\fI\*(Aquser\*(Aq\fR,
+\fI\*(Aqgroup\*(Aq\fR
 or
-\fI\'company\'\fR
+\fI\*(Aqcompany\*(Aq\fR
 When this option is not used, it defaults to
-\fI\'user\'\fR
+\fI\*(Aquser\*(Aq\fR
 .RE
 .PP
 \fB\-\-create\-company\fR \fIcompanyname\fR
@@ -213,10 +230,10 @@ This option is only available in multi\-tenancy Zarafa\&.
 \fB\-\-add\-to\-viewlist\fR \fIcompanyname\fR
 .RS 4
 Add tenant
-\fI\'companyname\'\fR
+\fI\*(Aqcompanyname\*(Aq\fR
 to remote\-view list of company specified by
 \fI\-I\fR\&. After this command the
-\fI\'companyname\'\fR
+\fI\*(Aqcompanyname\*(Aq\fR
 is capable of viewing all members of the company specified by
 \fI\-I\fR\&.
 .sp
@@ -226,10 +243,10 @@ This option is only available in multi\-tenancy Zarafa\&.
 \fB\-\-del\-from\-viewlist\fR \fIcompanyname\fR
 .RS 4
 Delete company
-\fI\'companyname\'\fR
+\fI\*(Aqcompanyname\*(Aq\fR
 from remote\-view list of tenant specified by
 \fI\-I\fR\&. After this command the
-\fI\'companyname\'\fR
+\fI\*(Aqcompanyname\*(Aq\fR
 is no longer capable of viewing all members of the tenant specified by
 \fI\-I\fR\&.
 .sp
@@ -247,7 +264,7 @@ This option is only available in multi\-tenancy Zarafa\&.
 \fB\-\-add\-to\-adminlist\fR \fIusername\fR
 .RS 4
 Add user
-\fI\'username\'\fR
+\fI\*(Aqusername\*(Aq\fR
 to remote\-admin list of tenant specified by
 \fI\-I\fR\&. This is the administrator list for remote administrators, as such it only manages administrators from a different tenant\&. Users who should be administrator over their own tenant are managed by updating (\fB\-u\fR) the user and specifying the
 \fB\-a\fR
@@ -262,7 +279,7 @@ This option is only available in multi\-tenancy Zarafa\&.
 \fB\-\-del\-from\-adminlist\fR \fIusername\fR
 .RS 4
 Delete user
-\fI\'username\'\fR
+\fI\*(Aqusername\*(Aq\fR
 from remote\-admin list of company specified by
 \fI\-I\fR\&. This is the administrator list for remote administrators, as such it only manages administrators from a different tenant\&. Users who should be administrator over their own tenant are managed by updating (\fB\-u\fR) the user and specifying the
 \fB\-a\fR
@@ -287,7 +304,7 @@ This option is only available in multi\-tenancy Zarafa\&.
 \fB\-\-add\-userquota\-recipient\fR \fIuser\fR
 .RS 4
 Add
-\fI\'user\'\fR
+\fI\*(Aquser\*(Aq\fR
 as recipient to userquota warning emails\&. You can optionally use
 \fI\-I\fR
 to set the tenant space to apply the recipient action on\&.
@@ -296,7 +313,7 @@ to set the tenant space to apply the recipient action on\&.
 \fB\-\-del\-userquota\-recipient\fR \fIuser\fR
 .RS 4
 Delete
-\fI\'user\'\fR
+\fI\*(Aquser\*(Aq\fR
 as recipient to userquota warning emails\&. You can optionally use
 \fI\-I\fR
 to set the tenant space to apply the recipient action on\&.
@@ -312,7 +329,7 @@ to request the recipient list for a particular tenant space\&.
 \fB\-\-add\-companyquota\-recipient\fR \fIuser\fR
 .RS 4
 Add
-\fI\'user\'\fR
+\fI\*(Aquser\*(Aq\fR
 as recipient to tenant quota warning emails\&. You can optionally use
 \fI\-I\fR
 to set the tenant space to apply the recipient action on\&.
@@ -321,7 +338,7 @@ to set the tenant space to apply the recipient action on\&.
 \fB\-\-del\-companyquota\-recipient\fR \fIuser\fR
 .RS 4
 Delete
-\fI\'user\'\fR
+\fI\*(Aquser\*(Aq\fR
 as recipient to tenant quota warning emails\&. You can optionally use
 \fI\-I\fR
 to set the tenant space to apply the recipient action on\&.
@@ -346,7 +363,7 @@ to indicate for what kind of object the sendas details are being requested\&.
 .PP
 \fB\-\-clear\-cache\fR
 .RS 4
-Clears the server\'s caches\&. All data cached inside the zarafa\-server is cleared\&. Although this can never cause any data loss, it can affect the performance of your server, since any data requested after the cache is cleared needs to be re\-requested from the database or LDAP server\&. Normally this option is never needed; it is mostly used as a diagnostics tool\&.
+Clears the server\*(Aqs caches\&. All data cached inside the zarafa\-server is cleared\&. Although this can never cause any data loss, it can affect the performance of your server, since any data requested after the cache is cleared needs to be re\-requested from the database or LDAP server\&. Normally this option is never needed; it is mostly used as a diagnostics tool\&.
 .RE
 .PP
 \fB\-\-purge\-softdelete\fR \fIdays\fR
@@ -379,7 +396,7 @@ to specify the user to hook the store to\&.
 .sp
 You can copy an orphaned store to the public store, so you can read the store in the public folders\&. Use the
 \fB\-\-copyto\-public\fR
-to copy the store to the public folder \'Admin/deleted stores\'\&.
+to copy the store to the public folder \*(AqAdmin/deleted stores\*(Aq\&.
 .sp
 To hook a public store, use the
 \fB\-\-type\fR
@@ -410,7 +427,7 @@ To unhook a public store, use the
 \fB\-\-type\fR
 group/company option to influence the name type in the
 \fIusername\fR
-argument\&. Use a companyname with type company or \'Everyone\' with type group to unhook the public\&.
+argument\&. Use a companyname with type company or \*(AqEveryone\*(Aq with type group to unhook the public\&.
 .sp
 To unhook an archive store, use
 \fB\-\-type\fR
@@ -440,7 +457,7 @@ Default:
 .PP
 The options used by actions are as follows:
 .PP
-\fB\-U\fR \fI\'new username\'\fR
+\fB\-U\fR \fI\*(Aqnew username\*(Aq\fR
 .RS 4
 Use this parameter to rename a user\&. This option is only valid with the
 \fI\-u\fR
@@ -465,7 +482,7 @@ create or
 update action\&.
 .RE
 .PP
-\fB\-f\fR \fI\'full name\'\fR
+\fB\-f\fR \fI\*(Aqfull name\*(Aq\fR
 .RS 4
 Specify full user name\&. Use single quotes around the name to pass it as a single parameter\&. This option is only valid with the
 \fI\-c\fR
@@ -474,9 +491,9 @@ create or
 update action\&.
 .RE
 .PP
-\fB\-e\fR \fI\'email address\'\fR
+\fB\-e\fR \fI\*(Aqemail address\*(Aq\fR
 .RS 4
-Specify the email address\&. This address will be used to set the \'From\' email address in outgoing email messages\&. Use single quotes around the name to pass it as a single parameter\&. This option is only valid with the
+Specify the email address\&. This address will be used to set the \*(AqFrom\*(Aq email address in outgoing email messages\&. Use single quotes around the name to pass it as a single parameter\&. This option is only valid with the
 \fI\-c\fR
 create or
 \fI\-u\fR
@@ -485,7 +502,7 @@ update action\&.
 .PP
 \fB\-a\fR \fI[yes|y|1|2 / no|n|0]\fR
 .RS 4
-Set the user as administrator by passing \'yes\'\&. When passing \'no\', administrator rights will be revoked from the user\&. This option is only valid with the
+Set the user as administrator by passing \*(Aqyes\*(Aq\&. When passing \*(Aqno\*(Aq, administrator rights will be revoked from the user\&. This option is only valid with the
 \fI\-c\fR
 create or
 \fI\-u\fR
@@ -501,7 +518,7 @@ Specify a non\-active user\&. This user cannot login, but email can be delivered
 .PP
 \fB\-\-qo\fR \fI[yes|y|1 / no|n|0]\fR
 .RS 4
-Override the default server quota settings for this user\&. User specific quota levels will used\&. The default value of this option is \'no\', always using server quota levels\&. This option is only valid with the
+Override the default server quota settings for this user\&. User specific quota levels will used\&. The default value of this option is \*(Aqno\*(Aq, always using server quota levels\&. This option is only valid with the
 \fI\-c\fR
 create or
 \fI\-u\fR
@@ -539,7 +556,7 @@ update action\&.
 .PP
 \fB\-\-udqo\fR \fI[yes|y|1 / no|n|0]\fR
 .RS 4
-Override the default server quota settings for all user within the specified tenant\&. default value of this option is \'no\', always using server quota levels\&.
+Override the default server quota settings for all user within the specified tenant\&. default value of this option is \*(Aqno\*(Aq, always using server quota levels\&.
 .RE
 .PP
 \fB\-\-udqw\fR \fIvalue in Mb\fR
@@ -567,8 +584,8 @@ for warning emails\&.
 .RS 4
 Connect to the Zarafa server through
 \fIpath\fR, e\&.g\&.
-\fIfile:///path/to/socket\fR\&. Default:
-\fIfile:///var/run/zarafa\fR\&. This option can always be specified\&.
+file:///path/to/socket\&. Default:
+file:///var/run/zarafa\&. This option can always be specified\&.
 .RE
 .PP
 \fB\-i\fR \fIgroupname\fR
@@ -587,7 +604,7 @@ This sets the companyname for all user, group and tenant commands\&. This option
 .PP
 \fB\-\-mr\-accept\fR \fI[yes|y|1 / no|n|0]\fR
 .RS 4
-Specified that meeting requests should automatically be accepted for this user\&. This means that when a meeting request is sent to this user when specified as being a \'resource\', the request will directly be honoured and written to the calendar\&. This is a client\-side action and this setting therefore does not affect actual meeting requests being delivered via zarafa\-dagent\&.
+Specified that meeting requests should automatically be accepted for this user\&. This means that when a meeting request is sent to this user when specified as being a \*(Aqresource\*(Aq, the request will directly be honoured and written to the calendar\&. This is a client\-side action and this setting therefore does not affect actual meeting requests being delivered via zarafa\-dagent\&.
 .RE
 .PP
 \fB\-\-mr\-decline\-conflict\fR \fI[yes|y|1 / no|n|0]\fR
@@ -604,13 +621,13 @@ This option only has effect when \-\-mr\-accept=yes is in effect\&. When specify
 .RS 4
 Add user
 \fIsender\fR
-to the list of the senders you\'re updating as a \'send as\' user\&. The
+to the list of the senders you\*(Aqre updating as a \*(Aqsend as\*(Aq user\&. The
 \fIsender\fR
-can now send mails under the updated user\'s name, unless the updated user sets the
+can now send mails under the updated user\*(Aqs name, unless the updated user sets the
 \fIsender\fR
 as a delegate\&. When the
 \fIsender\fR
-is a delegate, the mail will be sent with \'On behalf of\' markings in the email\&. This option is only valid with the
+is a delegate, the mail will be sent with \*(AqOn behalf of\*(Aq markings in the email\&. This option is only valid with the
 \fI\-u\fR
 and
 \fI\-\-update\-group \fR
@@ -621,7 +638,7 @@ update action\&.
 .RS 4
 Remove user
 \fIsender\fR
-from the list of the senders you\'re updating as a \'send as\' user\&. This option is only valid with the
+from the list of the senders you\*(Aqre updating as a \*(Aqsend as\*(Aq user\&. This option is only valid with the
 \fI\-u\fR
 and
 \fI\-\-update\-group \fRupdate action\&.
@@ -674,7 +691,7 @@ For creating a user:
 \fB\-p\fR
 \fIpassword\fR
 \fB\-f\fR
-\fI\'Firstname Lastname\'\fR
+\fI\*(AqFirstname Lastname\*(Aq\fR
 \fB\-e\fR
 \fIf\&.lastname@tenant\&.com\fR
 .PP
@@ -686,7 +703,7 @@ For creating a non\-login store:
 \fB\-p\fR
 \fIpassword\fR
 \fB\-f\fR
-\fI\'Firstname Lastname\'\fR
+\fI\*(AqFirstname Lastname\*(Aq\fR
 \fB\-e\fR
 \fIf\&.lastname@tenant\&.com\fR
 \fI\-n\fR

@@ -1,17 +1,34 @@
+'\" t
 .\"     Title: zarafa
-.\"    Author: 
-.\" Generator: DocBook XSL Stylesheets v1.73.2 <http://docbook.sf.net/>
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
 .\"      Date: August 2011
 .\"    Manual: Zarafa user reference
 .\"    Source: Zarafa 7.0
+.\"  Language: English
 .\"
 .TH "ZARAFA" "1" "August 2011" "Zarafa 7.0" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
 .ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
 .SH "NAME"
-zarafa \- Zarafa server overview.
+zarafa \- Zarafa server overview\&.
 .SH "DESCRIPTION"
 .PP
 Zarafa is a full\-featured e\-mail and groupware solution, focused towards clients using the MAPI standard\&. The Zarafa suite consists of the following parts:
@@ -28,7 +45,7 @@ The outgoing e\-mail spooler\&. This service makes sure that e\-mails sent by cl
 .PP
 zarafa\-dagent
 .RS 4
-The Zarafa delivery agent is called by your MTA to deliver an incoming e\-mail message into a user\'s inbox\&.
+The Zarafa delivery agent is called by your MTA to deliver an incoming e\-mail message into a user\*(Aqs inbox\&.
 .RE
 .PP
 zarafa\-admin
@@ -67,7 +84,7 @@ zarafa\-restore
 .RS 4
 The restore tool reads data from a backup create by
 \fBzarafa\-backup\fR\&. You can restore single items or folders\&. To restore a complete store, you can use the example script found in
-\fI/usr/share/zarafa/zarafa\-backup\-helpers\fR\&.
+/usr/share/zarafa/zarafa\-backup\-helpers\&.
 .RE
 .PP
 zarafa\-ical

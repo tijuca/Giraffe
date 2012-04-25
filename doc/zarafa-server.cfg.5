@@ -1,15 +1,32 @@
+'\" t
 .\"     Title: zarafa-server.cfg
-.\"    Author: 
-.\" Generator: DocBook XSL Stylesheets v1.73.2 <http://docbook.sf.net/>
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
 .\"      Date: August 2011
 .\"    Manual: Zarafa user reference
 .\"    Source: Zarafa 7.0
+.\"  Language: English
 .\"
 .TH "ZARAFA\-SERVER\&.CFG" "5" "August 2011" "Zarafa 7.0" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
 .ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
 .SH "NAME"
 zarafa-server.cfg \- The Zarafa configuration file
 .SH "SYNOPSIS"
@@ -18,9 +35,9 @@ zarafa-server.cfg \- The Zarafa configuration file
 .SH "DESCRIPTION"
 .PP
 The
-\fIserver\&.cfg\fR
+server\&.cfg
 is a configuration file for the zarafa\-server process\&.
-\fIserver\&.cfg\fR
+server\&.cfg
 contains instructions for the software to set up the database environment, logging system and license\&.
 .SH "FILE FORMAT"
 .PP
@@ -32,7 +49,7 @@ The parameters are written in the form:
 =
 \fIvalue\fR
 .PP
-The file is line\-based\&. Each newline\-terminated line represents either a comment, nothing, a parameter or a directive\&. A line beginning with `#\' is considered a comment, and will be ignored by Zarafa\&. Parameter names are case sensitive\&. Lines beginning with `!\' are directives\&.
+The file is line\-based\&. Each newline\-terminated line represents either a comment, nothing, a parameter or a directive\&. A line beginning with `#\*(Aq is considered a comment, and will be ignored by Zarafa\&. Parameter names are case sensitive\&. Lines beginning with `!\*(Aq are directives\&.
 .PP
 Directives are written in the form:
 .PP
@@ -84,7 +101,7 @@ Default:
 .PP
 \fBserver_recv_timeout\fR
 .RS 4
-TCP and SSL receive timeout in seconds\&. This is the time that a TCP connection may be idle (between requests) before the TCP connection is closed from the server\&. Settings this high makes it less necessary for clients to re\-connect, but increases the total number of concurrent open sockets in the server\&. You normally needn\'t change the default value\&.
+TCP and SSL receive timeout in seconds\&. This is the time that a TCP connection may be idle (between requests) before the TCP connection is closed from the server\&. Settings this high makes it less necessary for clients to re\-connect, but increases the total number of concurrent open sockets in the server\&. You normally needn\*(Aqt change the default value\&.
 .sp
 Default:
 \fI5\fR
@@ -92,7 +109,7 @@ Default:
 .PP
 \fBserver_read_timeout\fR
 .RS 4
-TCP and SSL read timeout in seconds\&. The read timeout is the amount of time that the server will wait to read more data from a socket, after processing of the request has started\&. This needn\'t be changed in most cases\&.
+TCP and SSL read timeout in seconds\&. The read timeout is the amount of time that the server will wait to read more data from a socket, after processing of the request has started\&. This needn\*(Aqt be changed in most cases\&.
 .sp
 Default:
 \fI60\fR
@@ -160,7 +177,7 @@ Default:
 .PP
 \fBallow_local_users\fR
 .RS 4
-Named Unix users which connect through the unix socket (server_pipe_name) which are added here, those users will become the internal SYSTEM user in Zarafa, and have administrative rights\&. Normally, this is only \'root\', so the unix root user can use the zarafa\-admin tool\&. You can add a generic user to be used by the zarafa\-dagent here\&. This user is most likely called \'vmail\'\&. Note that the field is SPACE separated\&.
+Named Unix users which connect through the unix socket (server_pipe_name) which are added here, those users will become the internal SYSTEM user in Zarafa, and have administrative rights\&. Normally, this is only \*(Aqroot\*(Aq, so the unix root user can use the zarafa\-admin tool\&. You can add a generic user to be used by the zarafa\-dagent here\&. This user is most likely called \*(Aqvmail\*(Aq\&. Note that the field is SPACE separated\&.
 .sp
 Default:
 \fIroot\fR
@@ -216,7 +233,7 @@ Default:
 .PP
 \fBsession_ip_check\fR
 .RS 4
-Normally, a session is linked to an IP\-address, so this check is enabled\&. You may want to disable this check when you have laptop\'s which can get multiple ip\-adresses through wired and wireless networks\&. It is highly recommended to leave this check enabled, since the session id can be used by other machines, and thus introduces a large security risc\&. Since version 6\&.20, the session id is 64 bits\&. Older versions use a 32 bit session id, so then the session is easier guessable\&.
+Normally, a session is linked to an IP\-address, so this check is enabled\&. You may want to disable this check when you have laptop\*(Aqs which can get multiple ip\-adresses through wired and wireless networks\&. It is highly recommended to leave this check enabled, since the session id can be used by other machines, and thus introduces a large security risc\&. Since version 6\&.20, the session id is 64 bits\&. Older versions use a 32 bit session id, so then the session is easier guessable\&.
 .sp
 Default:
 \fIyes\fR
@@ -224,7 +241,7 @@ Default:
 .PP
 \fBhide_everyone\fR
 .RS 4
-If this option is set to \'yes\', the internal group Everyone (which always contains all users) will be hidden from the Global Addressbook\&. Thus, users will not be able to send e\-mail to this group anymore, and also will not be able to set access rights on folders for this group\&. Administrators will still be able to see and use the group\&.
+If this option is set to \*(Aqyes\*(Aq, the internal group Everyone (which always contains all users) will be hidden from the Global Addressbook\&. Thus, users will not be able to send e\-mail to this group anymore, and also will not be able to set access rights on folders for this group\&. Administrators will still be able to see and use the group\&.
 .sp
 Default:
 \fIno\fR
@@ -232,7 +249,7 @@ Default:
 .PP
 \fBhide_system\fR
 .RS 4
-If this option is set to \'yes\', the internal user SYSTEM will be hidden from the Global Addressbook\&. Thus, users will not be able to send e\-mail to this user anymore\&. Administrators will still be able to see and use the user\&.
+If this option is set to \*(Aqyes\*(Aq, the internal user SYSTEM will be hidden from the Global Addressbook\&. Thus, users will not be able to send e\-mail to this user anymore\&. Administrators will still be able to see and use the user\&.
 .sp
 Default:
 \fIyes\fR
@@ -307,7 +324,7 @@ Default:
 .PP
 \fBlog_timestamp\fR
 .RS 4
-Specify whether to prefix each log line with a timestamp in \'file\' logging mode\&.
+Specify whether to prefix each log line with a timestamp in \*(Aqfile\*(Aq logging mode\&.
 .sp
 Default:
 \fI1\fR
@@ -362,7 +379,7 @@ Default:
 .PP
 \fBaudit_log_timestamp\fR
 .RS 4
-Specify whether to prefix each log line with a timestamp in \'file\' logging mode\&.
+Specify whether to prefix each log line with a timestamp in \*(Aqfile\*(Aq logging mode\&.
 .sp
 Default:
 \fI1\fR
@@ -402,7 +419,7 @@ Default:
 .PP
 \fBmysql_socket\fR
 .RS 4
-The socket of the MySQL server to use\&. This option can be used to override the default mysql socket\&. To use the socket, the mysql_host value must be empty or \'localhost\'
+The socket of the MySQL server to use\&. This option can be used to override the default mysql socket\&. To use the socket, the mysql_host value must be empty or \*(Aqlocalhost\*(Aq
 .sp
 Default:
 .RE
@@ -425,7 +442,7 @@ Default:
 .PP
 \fBattachment_storage\fR
 .RS 4
-The location where attachments are stored\&. This can be in the MySQL database, or as separate files\&. The drawback of \'database\' is that the large data of attachment will push usefull data from the MySQL cache\&. The drawback of separate files is that a mysqldump is not enough for a full disaster recovery\&.
+The location where attachments are stored\&. This can be in the MySQL database, or as separate files\&. The drawback of \*(Aqdatabase\*(Aq is that the large data of attachment will push usefull data from the MySQL cache\&. The drawback of separate files is that a mysqldump is not enough for a full disaster recovery\&.
 .sp
 Default:
 \fIfiles\fR
@@ -433,7 +450,7 @@ Default:
 .PP
 \fBattachment_path\fR
 .RS 4
-When the attachment_storage option is \'files\', this option sets the location of the attachments on disk\&. Note that the server runs as the \'run_as_user\' user and \'run_as_group\' group, which will require write access to this directory\&.
+When the attachment_storage option is \*(Aqfiles\*(Aq, this option sets the location of the attachments on disk\&. Note that the server runs as the \*(Aqrun_as_user\*(Aq user and \*(Aqrun_as_group\*(Aq group, which will require write access to this directory\&.
 .sp
 Default:
 \fI/var/lib/zarafa\fR
@@ -441,7 +458,7 @@ Default:
 .PP
 \fBattachment_compression\fR
 .RS 4
-When the attachment_storage option is \'files\', this option controls the compression level for the attachments\&. Higher compression levels will compress data better, but at the cost of CPU usage\&. Lower compression levels will require less CPU but will compress data less\&. Setting the compression level to 0 will effectively disable compression completely\&.
+When the attachment_storage option is \*(Aqfiles\*(Aq, this option controls the compression level for the attachments\&. Higher compression levels will compress data better, but at the cost of CPU usage\&. Lower compression levels will require less CPU but will compress data less\&. Setting the compression level to 0 will effectively disable compression completely\&.
 .sp
 Changing the compression level, or switching it on or off, will not affect any existing attachments, and will remain accessible as normal\&.
 .sp
@@ -497,7 +514,7 @@ No default set\&.
 .PP
 \fBserver_ssl_ca_path\fR
 .RS 4
-When you have multiple CA\'s to trust, you may use this option\&. Set this to a directory which contains all your trusted CA certificates\&. The name of the certificate needs to be the hash of the certificate\&. You can get the hash value of the certificate with the following command:
+When you have multiple CA\*(Aqs to trust, you may use this option\&. Set this to a directory which contains all your trusted CA certificates\&. The name of the certificate needs to be the hash of the certificate\&. You can get the hash value of the certificate with the following command:
 .sp
 
 \fB openssl x509 \-hash \-noout \-in cacert\&.pem \fR
@@ -666,7 +683,7 @@ Default:
 .PP
 \fBcache_cell_size\fR
 .RS 4
-Size in bytes of the cell cache\&. This is the main cache used in Zarafa\&. It caches all data that comes into view in tables (ie the view of your inbox, or any other folder)\&. In an ideal situation, all cells would be cached, so that the database does not need to be queried for data when browsing through folders, but this would require around 1\&.5K per message item (e\-mail, appointment task, etc) in the entire server\&. If you can afford it, set this value as high as possible, up to 50% of your total RAM capacity\&. Make sure this doesn\'t lead to swapping though\&.
+Size in bytes of the cell cache\&. This is the main cache used in Zarafa\&. It caches all data that comes into view in tables (ie the view of your inbox, or any other folder)\&. In an ideal situation, all cells would be cached, so that the database does not need to be queried for data when browsing through folders, but this would require around 1\&.5K per message item (e\-mail, appointment task, etc) in the entire server\&. If you can afford it, set this value as high as possible, up to 50% of your total RAM capacity\&. Make sure this doesn\*(Aqt lead to swapping though\&.
 .sp
 Default:
 \fI268435456\fR
@@ -686,7 +703,7 @@ Default:
 .PP
 \fBcache_indexedobject_size\fR
 .RS 4
-This cache contains unique id\'s of objects\&. This cache is used twice, also by the index2 cache, which is the inverse of the index1 cache\&.
+This cache contains unique id\*(Aqs of objects\&. This cache is used twice, also by the index2 cache, which is the inverse of the index1 cache\&.
 .sp
 Default:
 \fI16777216\fR
@@ -704,7 +721,7 @@ Default:
 .PP
 \fBcache_quota_lifetime\fR
 .RS 4
-This sets the lifetime for quota details inside the cache\&. If quota details weren\'t queried during this period it is removed from the cache making room for more often requested quota details\&. Set to 0 to never expire, or \-1 to disable this cache\&.
+This sets the lifetime for quota details inside the cache\&. If quota details weren\*(Aqt queried during this period it is removed from the cache making room for more often requested quota details\&. Set to 0 to never expire, or \-1 to disable this cache\&.
 .sp
 Default:
 \fI1\fR
@@ -749,7 +766,7 @@ Default:
 .PP
 \fBcache_userdetails_lifetime\fR
 .RS 4
-This sets the lifetime for user details inside the cache\&. If user details weren\'t queried during this period it is removed from the cache making room for more often requested user details\&. Set to 0 to never expire, or \-1 to disable this cache\&.
+This sets the lifetime for user details inside the cache\&. If user details weren\*(Aqt queried during this period it is removed from the cache making room for more often requested user details\&. Set to 0 to never expire, or \-1 to disable this cache\&.
 .sp
 Default:
 \fI0\fR
@@ -767,7 +784,7 @@ Default:
 .PP
 \fBcache_server_lifetime\fR
 .RS 4
-This sets the lifetime for server location details inside the cache\&. If server details weren\'t queried during this period it is removed from the cache making room for more often requested server details\&. Set to 0 to never expire, or \-1 to disable this cache\&.
+This sets the lifetime for server location details inside the cache\&. If server details weren\*(Aqt queried during this period it is removed from the cache making room for more often requested server details\&. Set to 0 to never expire, or \-1 to disable this cache\&.
 .sp
 Default:
 \fI30\fR
@@ -1094,9 +1111,9 @@ Default:
 .PP
 \fBsync_gab_realtime\fR
 .RS 4
-When set to \'yes\', zarafa will synchronize the local user list whenever a list of users is requested (eg during zarafa\-admin \-l or when opening the addressbook)\&. This was the default for zarafa 6\&.40\&.4 and earlier\&. When setting this value to \'no\', synchronization will only occur during zarafa\-admin \-\-sync\&. This is useful for setups which have large addressbooks (more than 1000 entries in the addressbook)\&.
+When set to \*(Aqyes\*(Aq, zarafa will synchronize the local user list whenever a list of users is requested (eg during zarafa\-admin \-l or when opening the addressbook)\&. This was the default for zarafa 6\&.40\&.4 and earlier\&. When setting this value to \*(Aqno\*(Aq, synchronization will only occur during zarafa\-admin \-\-sync\&. This is useful for setups which have large addressbooks (more than 1000 entries in the addressbook)\&.
 .sp
-This option is forced to \'yes\' when using the \'db\' plugin since synchronization is implicit in that case\&.
+This option is forced to \*(Aqyes\*(Aq when using the \*(Aqdb\*(Aq plugin since synchronization is implicit in that case\&.
 .sp
 Default:
 \fIyes\fR
@@ -1126,17 +1143,17 @@ createuser_script, deleteuser_script, creategroup_script, deletegroup_script
 .RE
 .SH "FILES"
 .PP
-\fI/etc/zarafa/server\&.cfg\fR
+/etc/zarafa/server\&.cfg
 .RS 4
 The server configuration file\&.
 .RE
 .PP
-\fI/etc/zarafa/ldap\&.cfg\fR
+/etc/zarafa/ldap\&.cfg
 .RS 4
 The Zarafa LDAP user plugin configuration file\&.
 .RE
 .PP
-\fI/etc/zarafa/unix\&.cfg\fR
+/etc/zarafa/unix\&.cfg
 .RS 4
 The Zarafa Unix user plugin configuration file\&.
 .RE

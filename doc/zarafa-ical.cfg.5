@@ -1,15 +1,32 @@
+'\" t
 .\"     Title: zarafa-ical.cfg
-.\"    Author: 
-.\" Generator: DocBook XSL Stylesheets v1.73.2 <http://docbook.sf.net/>
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
 .\"      Date: August 2011
 .\"    Manual: Zarafa user reference
 .\"    Source: Zarafa 7.0
+.\"  Language: English
 .\"
 .TH "ZARAFA\-ICAL\&.CFG" "5" "August 2011" "Zarafa 7.0" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
 .ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
 .SH "NAME"
 zarafa-ical.cfg \- The Zarafa iCal/CalDAV gateway configuration file
 .SH "SYNOPSIS"
@@ -18,9 +35,9 @@ zarafa-ical.cfg \- The Zarafa iCal/CalDAV gateway configuration file
 .SH "DESCRIPTION"
 .PP
 The
-\fIical\&.cfg\fR
+ical\&.cfg
 is a configuration file for the Zarafa iCal/CalDAV Gateway\&.
-\fIical\&.cfg\fR
+ical\&.cfg
 contains instructions for the software to set up the logging system and to enable or disable the normal or SSL part of the service\&.
 .SH "FILE FORMAT"
 .PP
@@ -32,7 +49,7 @@ The parameters are written in the form:
 =
 \fIvalue\fR
 .PP
-The file is line\-based\&. Each newline\-terminated line represents either a comment, nothing, a parameter or a directive\&. A line beginning with `#\' is considered a comment, and will be ignored by Zarafa\&. Parameter names are case sensitive\&. Lines beginning with `!\' are directives\&.
+The file is line\-based\&. Each newline\-terminated line represents either a comment, nothing, a parameter or a directive\&. A line beginning with `#\*(Aq is considered a comment, and will be ignored by Zarafa\&. Parameter names are case sensitive\&. Lines beginning with `!\*(Aq are directives\&.
 .PP
 Directives are written in the form:
 .PP
@@ -222,7 +239,7 @@ Default:
 .PP
 \fBlog_timestamp\fR
 .RS 4
-Specify whether to prefix each log line with a timestamp in \'file\' logging mode\&.
+Specify whether to prefix each log line with a timestamp in \*(Aqfile\*(Aq logging mode\&.
 .sp
 Default:
 \fI1\fR
@@ -230,7 +247,7 @@ Default:
 .PP
 \fBenable_ical_get\fR
 .RS 4
-Enable the ical GET method to download an entire calendar\&. When set to \'yes\', the GET method is enabled and allowed\&. If not, then calendars can only be retrieved with the CalDAV PROPFIND method, which is much more efficient\&. This option allows you to force the use of CalDAV which lowers load on your server\&.
+Enable the ical GET method to download an entire calendar\&. When set to \*(Aqyes\*(Aq, the GET method is enabled and allowed\&. If not, then calendars can only be retrieved with the CalDAV PROPFIND method, which is much more efficient\&. This option allows you to force the use of CalDAV which lowers load on your server\&.
 .RE
 .SH "RELOADING"
 .PP
@@ -241,7 +258,7 @@ log_level
 .RE
 .SH "FILES"
 .PP
-\fI/etc/zarafa/ical\&.cfg\fR
+/etc/zarafa/ical\&.cfg
 .RS 4
 The Zarafa iCal/CalDAV gateway configuration file\&.
 .RE

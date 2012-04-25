@@ -61,11 +61,6 @@
 #include <charset/convert.h>
 #include <charset/utf8string.h>
 
-#if defined(WIN32) && !defined(DISABLE_SSL_UI)
-#include "EntryPoint.h"
-#include "ECGetText.h"
-#include "CertificateDlg.h"
-#endif
 
 using namespace std;
 
@@ -160,14 +155,7 @@ HRESULT CreateSoapTransport(ULONG ulUIFlags,
 		// callback data will be set right before tcp_connect()
 
 		// set our own certificate check function
-#if defined(WIN32) && !defined(DISABLE_SSL_UI)
-		if (ulUIFlags & 0x01 /*MDB_NO_DIALOG*/)
-			lpCmd->soap->fsslverify = ssl_verify_callback_zarafa_silent;
-		else
-			lpCmd->soap->fsslverify = ssl_verify_callback_zarafa;
-#else
 		lpCmd->soap->fsslverify = ssl_verify_callback_zarafa_silent;
-#endif
 
 		SSL_CTX_set_verify(lpCmd->soap->ctx, SSL_VERIFY_PEER, lpCmd->soap->fsslverify);
 	}
@@ -247,10 +235,6 @@ int ssl_verify_callback_zarafa_silent(int ok, X509_STORE_CTX *store)
 		}
 	}
 
-#if defined(WIN32) && !defined(DISABLE_SSL_UI)
-	if(!ok)
-		TRACE_RELEASE("Server certificate rejected. Connect once with Outlook to verify the authenticity and select the option to remember the choice. Please make sure you do this for each server in your cluster.");
-#endif
 	return ok;
 }
 

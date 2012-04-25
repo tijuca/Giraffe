@@ -1,15 +1,32 @@
+'\" t
 .\"     Title: zarafa-licensed.cfg
-.\"    Author: 
-.\" Generator: DocBook XSL Stylesheets v1.73.2 <http://docbook.sf.net/>
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
 .\"      Date: August 2011
 .\"    Manual: Zarafa user reference
 .\"    Source: Zarafa 7.0
+.\"  Language: English
 .\"
 .TH "ZARAFA\-LICENSED\&.C" "5" "August 2011" "Zarafa 7.0" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
 .ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
 .SH "NAME"
 zarafa-licensed.cfg \- The Zarafa licensed configuration file
 .SH "SYNOPSIS"
@@ -18,9 +35,9 @@ zarafa-licensed.cfg \- The Zarafa licensed configuration file
 .SH "DESCRIPTION"
 .PP
 The
-\fIlicensed\&.cfg\fR
+licensed\&.cfg
 is a configuration file for the Zarafa license server\&.
-\fIlicensed\&.cfg\fR
+licensed\&.cfg
 contains instructions for the software to set up the logging system and the licensing part of Zarafa\&.
 .SH "FILE FORMAT"
 .PP
@@ -75,7 +92,7 @@ Default: value not set\&.
 \fBlicense_path\fR
 .RS 4
 The path to the license directory\&. This directory should contain a file named
-\fIbase\fR
+base
 with the serial number\&. All other files in this directory can contain a CALs (Client Access License), one per file\&.
 .sp
 Default:
@@ -144,7 +161,7 @@ Default:
 .PP
 \fBlog_timestamp\fR
 .RS 4
-Specify whether to prefix each log line with a timestamp in \'file\' logging mode\&.
+Specify whether to prefix each log line with a timestamp in \*(Aqfile\*(Aq logging mode\&.
 .sp
 Default:
 \fI1\fR
@@ -182,7 +199,7 @@ log_level
 .RE
 .SH "FILES"
 .PP
-\fI/etc/zarafa/licensed\&.cfg\fR
+/etc/zarafa/licensed\&.cfg
 .RS 4
 The Zarafa license server configuration file\&.
 .RE

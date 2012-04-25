@@ -95,11 +95,7 @@ namespace bfs = boost::filesystem;
 static char THIS_FILE[] = __FILE__;
 #endif
 
-#if defined LINUX || !defined UNICODE
 #define WHITESPACE " \t\n\r"
-#else
-#define WHITESPACE L" \t\n\r"
-#endif
 
 // hackish import of relocate_fd
 int relocate_fd(int fd, ECLogger *lpLogger);

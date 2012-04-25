@@ -332,17 +332,6 @@ HRESULT WSTransport::HrLogon(const sGlobalProfileProps &sProfileProps)
 	}
 
 
-#if defined WIN32 && !defined _DEBUG
-	// Check license info
-
-	// For backward-compatibility: don't check license if server doesn't support licensing (pre 6.20), and don't check on the offline server
-	if(sProfileProps.strServerPath.substr(0,7) != "file://" && sResponse.ulCapabilities & ZARAFA_CAP_LICENSE_SERVER) {
-		hr = ProcessLicenseResponseEnc(ulTrackingId, sResponse.sLicenseResponse.__ptr, sResponse.sLicenseResponse.__size, &m_llFlags);
-
-		if(hr != erSuccess)
-			goto exit;
-	}
-#endif
 
 
 	ecSessionId = sResponse.ulSessionId;

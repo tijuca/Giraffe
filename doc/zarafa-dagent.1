@@ -1,19 +1,36 @@
+'\" t
 .\"     Title: zarafa-dagent
-.\"    Author: 
-.\" Generator: DocBook XSL Stylesheets v1.73.2 <http://docbook.sf.net/>
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
 .\"      Date: August 2011
 .\"    Manual: Zarafa user reference
 .\"    Source: Zarafa 7.0
+.\"  Language: English
 .\"
 .TH "ZARAFA\-DAGENT" "1" "August 2011" "Zarafa 7.0" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
 .ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
 .SH "NAME"
-zarafa-dagent \- Deliver mails to Zarafa.
+zarafa-dagent \- Deliver mails to Zarafa\&.
 .SH "SYNOPSIS"
-.HP 14
+.HP \w'\fBzarafa\-dagent\fR\ 'u
 \fBzarafa\-dagent\fR [\fIOPTION\fR...] \fIRECIPIENT\fR
 .SH "DESCRIPTION"
 .PP
@@ -65,8 +82,8 @@ Read e\-mail input from file\&. When not given, input is read from standard in\&
 .RS 4
 Connect to the Zarafa server through
 \fIpath\fR, e\&.g\&.
-\fIfile:///path/to/socket\fR\&. Default:
-\fIfile:///var/run/zarafa\fR\&.
+file:///path/to/socket\&. Default:
+file:///var/run/zarafa\&.
 .RE
 .PP
 \fB\-\-listen\fR, \fB\-l\fR
@@ -95,7 +112,7 @@ When given a second time, more debugging output will be printed\&.
 .PP
 \fB\-e\fR
 .RS 4
-Strip the domain from the given username\&. For example, when the DAgent is called with \'\-e\' and the username is \'name@domain\&.com\', the delivery will be started for user \'name\' instead of \'name@domain\&.com\'\&.
+Strip the domain from the given username\&. For example, when the DAgent is called with \*(Aq\-e\*(Aq and the username is \*(Aqname@domain\&.com\*(Aq, the delivery will be started for user \*(Aqname\*(Aq instead of \*(Aqname@domain\&.com\*(Aq\&.
 .RE
 .PP
 \fB\-R\fR
@@ -107,7 +124,7 @@ In practice, the resolve will only fail if zarafa\-dagent is not running in a tr
 .PP
 \fB\-n\fR
 .RS 4
-Use \'now\' as the delivery time\&. Normally, the dagent will use the date from the first Received header, which is most likely to be the header from your own mailserver\&.
+Use \*(Aqnow\*(Aq as the delivery time\&. Normally, the dagent will use the date from the first Received header, which is most likely to be the header from your own mailserver\&.
 .RE
 .PP
 \fB\-\-do\-not\-notify\fR, \fB\-N\fR
@@ -117,19 +134,19 @@ Do not send a new mail notification to othere connected clients\&. This option c
 .PP
 \fB\-\-folder\fR, \fB\-F\fR \fIpath\eto\efolder\fR
 .RS 4
-Deliver the incoming email to a specified subfolder of the store\&. Eg\&. \-\-folder \'Inbox\eimportant\'\&. Note that the \'Inbox\' folder is language specific\&. If the folder does not exist, delivery is reverted to the normal Inbox of the user, or use the \-\-create flag\&.
+Deliver the incoming email to a specified subfolder of the store\&. Eg\&. \-\-folder \*(AqInbox\eimportant\*(Aq\&. Note that the \*(AqInbox\*(Aq folder is language specific\&. If the folder does not exist, delivery is reverted to the normal Inbox of the user, or use the \-\-create flag\&.
 .RE
 .PP
 \fB\-\-public\fR, \fB\-P\fR \fIpath\eto\efolder\fR
 .RS 4
-Deliver the incoming email to a specified subfolder of the public store\&. Eg\&. \-\-public \'sales\eincoming\'\&. If the folder does not exist, delivery is reverted to the normal Inbox of the user, or use the \-\-create flag\&.
+Deliver the incoming email to a specified subfolder of the public store\&. Eg\&. \-\-public \*(Aqsales\eincoming\*(Aq\&. If the folder does not exist, delivery is reverted to the normal Inbox of the user, or use the \-\-create flag\&.
 .sp
-Note that before 6\&.20 you\'d need to add \'Public Folders\' to the folder name\&. This is not needed anymore\&.
+Note that before 6\&.20 you\*(Aqd need to add \*(AqPublic Folders\*(Aq to the folder name\&. This is not needed anymore\&.
 .RE
 .PP
 \fB\-p\fR \fI<path separator>\fR
 .RS 4
-Use a different path separator\&. The default is \'\e\'\&. If your delivery path contains a \e character, you can use this to alter the separator\&. Eg\&. \-p _ \-\-folder \'Inbox_resellers\edealers\'\&. The mail will now be delivered in a folder called \'resellers\edealers\' as a subfolder of the Inbox\&.
+Use a different path separator\&. The default is \*(Aq\e\*(Aq\&. If your delivery path contains a \e character, you can use this to alter the separator\&. Eg\&. \-p _ \-\-folder \*(AqInbox_resellers\edealers\*(Aq\&. The mail will now be delivered in a folder called \*(Aqresellers\edealers\*(Aq as a subfolder of the Inbox\&.
 .RE
 .PP
 \fB\-\-create\fR, \fB\-C\fR
@@ -150,7 +167,7 @@ Add IMAP optimizations during delivery\&. The original received email will also 
 \fB\-a\fR \fIautoresponder\fR
 .RS 4
 Path to autoresponder, e\&.g\&.
-\fI/usr/local/bin/zarafa\-autorespond\fR\&. This script will be called when the user enabled a vacation message in the Webaccess settings\&. When a header
+/usr/local/bin/zarafa\-autorespond\&. This script will be called when the user enabled a vacation message in the Webaccess settings\&. When a header
 \fIX\-Zarafa\-Vacation\fR
 or
 \fIPrecedence\fR
@@ -186,7 +203,7 @@ Default:
 .RE
 .SH "USAGE"
 .PP
-To deliver an e\-mail to a Zarafa user\'s mailbox:
+To deliver an e\-mail to a Zarafa user\*(Aqs mailbox:
 .PP
 \fBcat\fR
 \fImail\fR

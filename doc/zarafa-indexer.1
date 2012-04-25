@@ -1,19 +1,36 @@
+'\" t
 .\"     Title: zarafa-indexer
-.\"    Author: 
-.\" Generator: DocBook XSL Stylesheets v1.73.2 <http://docbook.sf.net/>
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
 .\"      Date: August 2011
 .\"    Manual: Zarafa user reference
 .\"    Source: Zarafa 7.0
+.\"  Language: English
 .\"
 .TH "ZARAFA\-INDEXER" "1" "August 2011" "Zarafa 7.0" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
 .ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
 .SH "NAME"
-zarafa-indexer \- Zarafa Indexer Service.
+zarafa-indexer \- Zarafa Indexer Service\&.
 .SH "SYNOPSIS"
-.HP 15
+.HP \w'\fBzarafa\-indexer\fR\ 'u
 \fBzarafa\-indexer\fR
 .SH "DESCRIPTION"
 .PP
@@ -41,8 +58,8 @@ Run in the foreground\&. Normally the indexer will daemonize and run in the back
 .RS 4
 Connect to the Zarafa server through
 \fIpath\fR, e\&.g\&.
-\fIfile:///path/to/socket\fR\&. Default:
-\fIfile:///var/run/zarafa\fR\&.
+file:///path/to/socket\&. Default:
+file:///var/run/zarafa\&.
 .RE
 .PP
 \fB\-V\fR
@@ -51,7 +68,7 @@ Print the version and exit\&.
 .RE
 .PP
 When invoked with no options, the indexer will search for a configuration file in
-\fI/etc/zarafa/indexer\&.cfg\fR\&. If no configuration file is found, default values are used\&. See
+/etc/zarafa/indexer\&.cfg\&. If no configuration file is found, default values are used\&. See
 \fBzarafa-indexer.cfg\fR(5)
 for all configuration options and their default values\&.
 .PP

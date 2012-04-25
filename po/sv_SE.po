@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PHP-Langadmin 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2012-02-17 16:37+0100\n"
+"POT-Creation-Date: 2012-04-11 12:24+0200\n"
 "PO-Revision-Date: 2010-08-19 15:51+0200\n"
 "Last-Translator: Cies <cies@zarafa.com>\n"
 "Language-Team: sv_SE <sv@li.org>\n"
@@ -14,97 +14,97 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Pootle 2.1.5\n"
 
-#: provider/ECProps/Addin.cpp:500 provider/ECProps/SyncBar.cpp:326
+#: provider/ECProps/Addin.cpp:501 provider/ECProps/SyncBar.cpp:326
 msgid "Configure"
 msgstr "Konfigurera"
 
-#: provider/ECProps/Addin.cpp:502 provider/ECProps/SyncBar.cpp:318
+#: provider/ECProps/Addin.cpp:503 provider/ECProps/SyncBar.cpp:318
 msgid "Synchronize"
 msgstr "Synkronisera"
 
-#: provider/ECProps/Addin.cpp:504
+#: provider/ECProps/Addin.cpp:505
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:28
 msgid "Open Shared Folders..."
 msgstr "Öppna delade mappar..."
 
-#: provider/ECProps/Addin.cpp:506 provider/ECProps/Addin.cpp:547
+#: provider/ECProps/Addin.cpp:507 provider/ECProps/Addin.cpp:548
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:19
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:20
 msgid "Recover Deleted Items..."
 msgstr "Återställ borttagna poster..."
 
-#: provider/ECProps/Addin.cpp:508 provider/ECProps/Addin.cpp:549
+#: provider/ECProps/Addin.cpp:509 provider/ECProps/Addin.cpp:550
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:20
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:21
 msgid "Out of Office Assistant..."
 msgstr "Frånvarohjälpredan..."
 
-#: provider/ECProps/Addin.cpp:512
+#: provider/ECProps/Addin.cpp:513
 msgid "Offline"
 msgstr ""
 
-#: provider/ECProps/Addin.cpp:541 provider/ECProps/SyncBar.cpp:328
+#: provider/ECProps/Addin.cpp:542 provider/ECProps/SyncBar.cpp:328
 #, fuzzy
 msgid "Configure offline synchronization"
 msgstr "Konfigurera Zarafa offline synkronisation"
 
-#: provider/ECProps/Addin.cpp:543 provider/ECProps/SyncBar.cpp:320
+#: provider/ECProps/Addin.cpp:544 provider/ECProps/SyncBar.cpp:320
 #, fuzzy
 msgid "Start offline synchronization"
 msgstr "Starta Zarafa offline synkronisering"
 
-#: provider/ECProps/Addin.cpp:545
+#: provider/ECProps/Addin.cpp:546
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:29
 msgid "Open another user's Outlook Sharing Folders (Calendar, E-mail, etc)"
 msgstr "Öppna en annan användares delade Outlook-mappar (Kalender, email etc.)"
 
-#: provider/ECProps/Addin.cpp:657
+#: provider/ECProps/Addin.cpp:658
 msgid "Out of Office currently on. Would you like to turn it off?"
 msgstr "Frånvaromarkering aktiverad. Vill Du stänga av den?"
 
-#: provider/ECProps/Addin.cpp:657
+#: provider/ECProps/Addin.cpp:658
 msgid "Out Of Office Turned On"
 msgstr "Frånvaromarkering aktiverad."
 
-#: provider/ECProps/Addin.cpp:663
+#: provider/ECProps/Addin.cpp:664
 msgid "Unable to save Out of Office status"
 msgstr ""
 
-#: provider/ECProps/Addin.cpp:763
+#: provider/ECProps/Addin.cpp:766
 msgid "Delegates"
 msgstr ""
 
-#: provider/ECProps/Addin.cpp:887 provider/client/ECMAPIFolderPublic.cpp:164
+#: provider/ECProps/Addin.cpp:890 provider/client/ECMAPIFolderPublic.cpp:164
 #: provider/client/ECMsgStorePublic.cpp:547
 msgid "Favorites"
 msgstr "Favoriter"
 
-#: provider/ECProps/Addin.cpp:899 provider/ECProps/PropPage.cpp:433
+#: provider/ECProps/Addin.cpp:902 provider/ECProps/PropPage.cpp:433
 msgid "Permissions"
 msgstr "Rättigheter"
 
-#: provider/ECProps/Addin.cpp:1103 provider/ECProps/Addin.cpp:1104
+#: provider/ECProps/Addin.cpp:1106 provider/ECProps/Addin.cpp:1107
 #, fuzzy
 msgid "Add to Public Favorites Folder"
 msgstr "Tillägga till Zarafa Favorit Mapp"
 
-#: provider/ECProps/Addin.cpp:1188
+#: provider/ECProps/Addin.cpp:1191
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:108
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:89
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:97
 msgid "Unable to open MAPI session."
 msgstr "Kan inte öppna MAPI sessionen."
 
-#: provider/ECProps/Addin.cpp:1192 provider/ECProps/ECFavoritePropPage.cpp:110
-#: provider/client/ECMsgStore.cpp:2373
+#: provider/ECProps/Addin.cpp:1195 provider/ECProps/ECFavoritePropPage.cpp:110
+#: provider/client/ECMsgStore.cpp:2380
 msgid "Shortcut"
 msgstr "Genväg"
 
-#: provider/ECProps/Addin.cpp:1192 provider/ECProps/ECFavoritePropPage.cpp:110
+#: provider/ECProps/Addin.cpp:1195 provider/ECProps/ECFavoritePropPage.cpp:110
 msgid "Shortcut folder"
 msgstr "Genvägs mapp"
 
-#: provider/ECProps/Addin.cpp:1194
+#: provider/ECProps/Addin.cpp:1197
 msgid "Unable to get shortcut folder."
 msgstr "Det gick inte att få genvägs mappen."
 
@@ -187,7 +187,7 @@ msgid "Unable to add folder to favorites"
 msgstr "Det gick inte att tillägga mappen till favoriterna"
 
 #: provider/ECProps/ECFavoritePropPage.cpp:254
-#: provider/ECProps/ECDelegatePropPage.cpp:158
+#: provider/ECProps/ECDelegatePropPage.cpp:167
 #: provider/ECProps/PropPage.cpp:385
 msgid "Unable to get property page site"
 msgstr ""
@@ -235,37 +235,37 @@ msgstr "Tillägga bara direkta submappar"
 msgid "Unable to get folder data"
 msgstr "Det gick inte att få mapp data"
 
-#: provider/ECProps/ECDelegatePropPage.cpp:124
+#: provider/ECProps/ECDelegatePropPage.cpp:133
 msgid "Saving changes failed."
 msgstr ""
 
-#: provider/ECProps/ECDelegatePropPage.cpp:127
+#: provider/ECProps/ECDelegatePropPage.cpp:136
 msgid "Saving rules failed: "
 msgstr ""
 
-#: provider/ECProps/ECDelegatePropPage.cpp:168
+#: provider/ECProps/ECDelegatePropPage.cpp:177
 #: provider/ECProps/PropPage.cpp:231
 msgid "Unable to get session"
 msgstr ""
 
-#: provider/ECProps/ECDelegatePropPage.cpp:174
+#: provider/ECProps/ECDelegatePropPage.cpp:183
 #: provider/ECProps/PropPage.cpp:237 provider/ECProps/MapOtherUserDlg.cpp:262
 msgid "Unable to get addressbook"
 msgstr ""
 
-#: provider/ECProps/ECDelegatePropPage.cpp:179
+#: provider/ECProps/ECDelegatePropPage.cpp:188
 msgid "Add..."
 msgstr "Lägg till..."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:180
+#: provider/ECProps/ECDelegatePropPage.cpp:189
 msgid "Remove..."
 msgstr "Radera..."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:181
+#: provider/ECProps/ECDelegatePropPage.cpp:190
 msgid "Permissions..."
 msgstr "Tillstånd..."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:182
+#: provider/ECProps/ECDelegatePropPage.cpp:191
 msgid ""
 "Delegates can send items on your behalf. To grant permission to others to "
 "access your folders without also giving them send-on-behalf-of privileges, "
@@ -276,29 +276,29 @@ msgstr ""
 "åtkomliga åt andra utan att ge tillstånd att skicka via ombud, ändra under "
 "Tillstånds-fliken i mappens Egenskaper."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:183
+#: provider/ECProps/ECDelegatePropPage.cpp:192
 msgid "Send meeting requests and response only to my delegates, not to me"
 msgstr ""
 
-#: provider/ECProps/ECDelegatePropPage.cpp:190
+#: provider/ECProps/ECDelegatePropPage.cpp:199
 msgid ""
 "The server is not available. Either there are network problems or server is "
 "down for maintenance."
 msgstr ""
 
-#: provider/ECProps/ECDelegatePropPage.cpp:192
+#: provider/ECProps/ECDelegatePropPage.cpp:201
 msgid ""
 "Could not initialize delegation window\n"
 "Please contact your administrator."
 msgstr ""
 
-#: provider/ECProps/ECDelegatePropPage.cpp:237
+#: provider/ECProps/ECDelegatePropPage.cpp:248
 #: provider/ECProps/PropPage.cpp:714 provider/ECProps/ECFavoritesDlg.cpp:48
 #: provider/client/SettingsPropPageAdvance.cpp:105
 msgid "Add"
 msgstr "Lägg till"
 
-#: provider/ECProps/ECDelegatePropPage.cpp:252
+#: provider/ECProps/ECDelegatePropPage.cpp:263
 #: provider/ECProps/PropPage.cpp:721 provider/ECProps/MapOtherUserDlg.cpp:175
 #: provider/client/ECABContainer.cpp:244 provider/client/ECABContainer.cpp:299
 #: provider/client/SettingsPropPageAdvance.cpp:245
@@ -608,32 +608,32 @@ msgid "This delegate has the following permissions"
 msgstr "Detta ombud har följande tillstånd"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:134
-#: provider/client/ECMsgStore.cpp:2450
+#: provider/client/ECMsgStore.cpp:2457
 msgid "Calendar"
 msgstr "Kalender"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:135
-#: provider/client/ECMsgStore.cpp:2496
+#: provider/client/ECMsgStore.cpp:2503
 msgid "Tasks"
 msgstr "Uppgifter"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:136
-#: provider/libserver/ECGenProps.cpp:924 provider/client/ECMsgStore.cpp:2390
+#: provider/libserver/ECGenProps.cpp:924 provider/client/ECMsgStore.cpp:2397
 msgid "Inbox"
 msgstr "Inkorg"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:137
-#: provider/client/ECMsgStore.cpp:2438
+#: provider/client/ECMsgStore.cpp:2445
 msgid "Contacts"
 msgstr "Kontakter"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:138
-#: provider/client/ECMsgStore.cpp:2484
+#: provider/client/ECMsgStore.cpp:2491
 msgid "Notes"
 msgstr "Anteckningar"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:139
-#: provider/client/ECMsgStore.cpp:2472
+#: provider/client/ECMsgStore.cpp:2479
 msgid "Journal"
 msgstr "Dagbok"
 
@@ -645,8 +645,7 @@ msgstr ""
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:141
 msgid "Automatically send a message to delegate summarizing these permissions"
 msgstr ""
-"Skicka ett automatisk meddelande till ombudet som sammanfattar alla "
-"tillstånd"
+"Skicka ett automatisk meddelande till ombudet som sammanfattar alla tillstånd"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:142
 msgid "Delegate can see my private items"
@@ -921,43 +920,43 @@ msgstr "Första mapp synkningen..."
 msgid "Sync folder items"
 msgstr "Synkronisera mapp innehåll"
 
-#: provider/client/ECMsgStore.cpp:2420
+#: provider/client/ECMsgStore.cpp:2427
 msgid "Outbox"
 msgstr "Utkorg"
 
-#: provider/client/ECMsgStore.cpp:2426
+#: provider/client/ECMsgStore.cpp:2433
 msgid "Deleted Items"
 msgstr "Borttagna poster"
 
-#: provider/client/ECMsgStore.cpp:2432
+#: provider/client/ECMsgStore.cpp:2439
 msgid "Sent Items"
 msgstr "Skickade poster"
 
-#: provider/client/ECMsgStore.cpp:2460
+#: provider/client/ECMsgStore.cpp:2467
 msgid "Drafts"
 msgstr "Utkast"
 
-#: provider/client/ECMsgStore.cpp:2508
+#: provider/client/ECMsgStore.cpp:2515
 msgid "Junk E-mail"
 msgstr "Skräppost"
 
-#: provider/client/ECMsgStore.cpp:2530
+#: provider/client/ECMsgStore.cpp:2537
 msgid "RSS Feeds"
 msgstr "RSS Feeds"
 
-#: provider/client/ECMsgStore.cpp:2530
+#: provider/client/ECMsgStore.cpp:2537
 msgid "RSS Feed comment"
 msgstr "RSS Feed kommentar"
 
-#: provider/client/ECMsgStore.cpp:2534
+#: provider/client/ECMsgStore.cpp:2541
 msgid "Conversation Action Settings"
 msgstr ""
 
-#: provider/client/ECMsgStore.cpp:2538
+#: provider/client/ECMsgStore.cpp:2545
 msgid "Quick Step Settings"
 msgstr ""
 
-#: provider/client/ECMsgStore.cpp:2542
+#: provider/client/ECMsgStore.cpp:2549
 msgid "Suggested Contacts"
 msgstr ""
 
@@ -1358,10 +1357,10 @@ msgstr ""
 msgid "Do you wish to continue?"
 msgstr ""
 
-#: zarafa-libsync/ECSync.cpp:1903
+#: zarafa-libsync/ECSync.cpp:1938
 msgid ""
-"The syncronization of a folder failed. Press retry for continue or ignore to "
-"supress all errors\r\n"
+"The synchronization of a folder failed. Press retry to continue or ignore to "
+"supress all errors.\r\n"
 "\r\n"
 "Please contact the system administrator if this problem persists."
 msgstr ""
@@ -1401,7 +1400,7 @@ msgstr "Ta bort"
 msgid "This folder contains archives of messages that have been deleted."
 msgstr ""
 
-#: spooler/Spooler.cpp:481
+#: spooler/Spooler.cpp:482
 msgid ""
 "A fatal error occurred while processing your message, and Zarafa is unable "
 "to send your email."
@@ -1431,31 +1430,31 @@ msgstr ""
 msgid "Unable to save archived message."
 msgstr ""
 
-#: spooler/mailer.cpp:1688
+#: spooler/mailer.cpp:1710
 msgid "You are not allowed to send as user or group "
 msgstr ""
 
-#: spooler/mailer.cpp:1690
+#: spooler/mailer.cpp:1712
 msgid "The user or group you try to send as could not be found."
 msgstr ""
 
-#: spooler/mailer.cpp:2489
+#: spooler/mailer.cpp:2537
 msgid "Error found while trying to send your message. Error code: "
 msgstr ""
 
-#: common/Util.cpp:1735
+#: common/Util.cpp:1728
 msgid "End of Session"
 msgstr "Sessionen har upphört"
 
-#: common/Util.cpp:1738
+#: common/Util.cpp:1731
 msgid "Connection lost"
 msgstr "Förlorat förbindelsen"
 
-#: common/Util.cpp:1741
+#: common/Util.cpp:1734
 msgid "Access denied"
 msgstr "Åtkomst nekas"
 
-#: common/Util.cpp:1744
+#: common/Util.cpp:1737
 msgid ""
 "Unable to move or copy folders. Can't copy folder. A top-level can't be "
 "copied to one of its subfolders. Or, you may not have appropriate "
@@ -1467,7 +1466,7 @@ msgstr ""
 "tillräckliga rättigheter på mappen. För att kontrollera dina rättigheter på "
 "mappen, högerklicka på mappen och välj Egenskaper i menyn."
 
-#: common/Util.cpp:1747
+#: common/Util.cpp:1740
 msgid ""
 "The message store has reached its maximum size. To reduce the amount of data "
 "in this message store, select some items that you no longer need, and "
@@ -1477,7 +1476,7 @@ msgstr ""
 "meddelande mappen, välj saker du inte längre behöver och ta permanent bort "
 "dessa genom att trycka SHIFT + DELETE."
 
-#: common/Util.cpp:1750
+#: common/Util.cpp:1743
 msgid ""
 "The user canceled the operation, typically by clicking the Cancel button in "
 "a dialog box."
@@ -1485,11 +1484,11 @@ msgstr ""
 "Användaren har avbrytit operationen, vanligtvis genom att klicka på Avbryt "
 "knappen i en dialogruta."
 
-#: common/Util.cpp:1753
+#: common/Util.cpp:1746
 msgid "A logon session could not be established."
 msgstr "En inloggningssession kunde inte etableras."
 
-#: common/Util.cpp:1756
+#: common/Util.cpp:1749
 msgid ""
 "The name of the folder being moved or copied is the same as that of a "
 "subfolder in the destination folder. The message store provider requires "
@@ -1499,7 +1498,7 @@ msgstr ""
 "Lagringshanteraren kräver att mappnamnen är unika. Operationen har avbrytits "
 "utan åtgärd."
 
-#: common/Util.cpp:1759
+#: common/Util.cpp:1752
 msgid ""
 "The operation succeeded, but not all entries were successfully processed, "
 "copied, deleted or moved"
@@ -1507,7 +1506,7 @@ msgstr ""
 "Operationen har lyckats, men alla poster vart inte processerade, kopierade, "
 "borttagna eller flyttade"
 
-#: common/Util.cpp:1762
+#: common/Util.cpp:1755
 msgid ""
 "The provider does not have enough information to complete the logon. Or, the "
 "service provider has not been configured."
@@ -1515,7 +1514,7 @@ msgstr ""
 "En provider har inte tillräckligt med information för att avsluta "
 "inloggningen eller har inte blivit konfigurerad."
 
-#: common/Util.cpp:1765
+#: common/Util.cpp:1758
 msgid ""
 "One of the providers cannot log on, but this error should not disable the "
 "other services."
@@ -1523,107 +1522,39 @@ msgstr ""
 "En provider kan inte logga in, men detta fel borde inte stänga av andra "
 "tjänster."
 
-#: common/Util.cpp:1768
+#: common/Util.cpp:1761
 msgid "A database error or I/O error has occurred."
 msgstr ""
 
-#: common/Util.cpp:1771
+#: common/Util.cpp:1764
 msgid "The subfolder being deleted contains subfolders."
 msgstr ""
 
-#: common/Util.cpp:1774
+#: common/Util.cpp:1767
 msgid "The subfolder being deleted contains messages."
 msgstr ""
 
-#: common/Util.cpp:1777
+#: common/Util.cpp:1770
 msgid "No description available."
 msgstr ""
 
-#: common/Util.cpp:1779
+#: common/Util.cpp:1772
 msgid "MAPI error code:"
 msgstr ""
 
-#~ msgid "Inbox -"
-#~ msgstr "Inkorg -"
+#: installer/linux/zarafa-mr-accept:403
+msgid "Recurring meetings are not allowed"
+msgstr ""
 
-#~ msgid "Adding local folders"
-#~ msgstr "Lägger till lokala mappar"
+#: installer/linux/zarafa-mr-accept:453
+msgid "The requested time slot is unavailable"
+msgstr ""
 
-#~ msgid "Adding remote folders"
-#~ msgstr "Lägger till fjärrmappar"
+#: installer/linux/zarafa-mr-accept:455
+msgid "The requested time slots are unavailble on the following dates:"
+msgstr ""
 
-#~ msgid "Removing local folders"
-#~ msgstr "Tar bort lokala mappar"
-
-#~ msgid "Removing remote folders"
-#~ msgstr "Tar bort fjärrmappar"
-
-#~ msgid "Modifying local messages"
-#~ msgstr "Ändrar lokala meddelanden"
-
-#~ msgid "Modifying remote messages"
-#~ msgstr "Ändrar fjärrmeddelanden"
-
-#~ msgid "Reading stores"
-#~ msgstr "Läser lagrad information"
-
-#~ msgid "Starting Synchronisation"
-#~ msgstr "Börjar synkronisera"
-
-#~ msgid "Zarafa Delegates"
-#~ msgstr "Zarafa Ombud"
-
-#~ msgid ""
-#~ "You are currently offline. To use this command, connect to the Zarafa online "
-#~ "server."
-#~ msgstr ""
-#~ "Du är förnärvarande offline. För att använda detta kommando, anslut till "
-#~ "Zarafa online servern."
-
-#~ msgid "Start Zarafa offline synchronization"
-#~ msgstr "Starta Zarafa offline synkronisering"
-
-#~ msgid "Configure Zarafa offline synchronization"
-#~ msgstr "Konfigurera Zarafa offline synkronisation"
-
-#~ msgid "Zarafa Favorites"
-#~ msgstr "Zarafa Favoriter"
-
-#~ msgid "Error"
-#~ msgstr "Fel"
-
-#~ msgid "Zarafa license"
-#~ msgstr "Zarafa licens"
-
-#~ msgid "Incorrect Zarafa version."
-#~ msgstr "Ej godkänt version av Zarafa."
-
-#~ msgid "Cached Zarafa Mode"
-#~ msgstr "Cachat Zarafa läge"
-
-#~ msgid ""
-#~ "Zarafa does not support offline or cached mode for Outlook XP and Outlook "
-#~ "2002. If you wish to use offline functionality of Zarafa, please use Outlook "
-#~ "2000, 2003, 2007 or later."
-#~ msgstr ""
-#~ "Zarafa stödjer inte offline eller cache läge för Outlook XP eller Outlook "
-#~ "2002. Om du vill använda offline funktionaliteten av Zarafa, vänligen använd "
-#~ "Outlook 2000, 2003, 2007 eller senare version."
-
-#~ msgid "Zarafa Offline"
-#~ msgstr "Zarafa Offline"
-
-#~ msgid "Unable to get MAPI information"
-#~ msgstr "Det gick inte att få MAPI information"
-
-#~ msgid "Unable to get Folder information"
-#~ msgstr "Det gick inte att få Mapp information"
-
-#~ msgid "Address Type:"
-#~ msgstr "Addresstyp:"
-
-#~ msgid "You can only use this function with Zarafa profiles."
-#~ msgstr "Du kan bara använda denna funktion med Zarafa profiler."
-
-#~ msgid "test"
-#~ msgstr "prov"
+#: installer/linux/zarafa-mr-accept:458
+#, php-format
+msgid "%x %X"
+msgstr ""

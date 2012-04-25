@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PHP-Langadmin 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2012-02-17 16:37+0100\n"
+"POT-Creation-Date: 2012-04-11 12:24+0200\n"
 "PO-Revision-Date: 2011-02-02 11:17+0200\n"
 "Last-Translator: Verkkotaito <zarafa@verkkotaito.fi>\n"
 "Language-Team: fi_FI <fi@li.org>\n"
@@ -14,96 +14,96 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Pootle 2.1.5\n"
 
-#: provider/ECProps/Addin.cpp:500 provider/ECProps/SyncBar.cpp:326
+#: provider/ECProps/Addin.cpp:501 provider/ECProps/SyncBar.cpp:326
 msgid "Configure"
 msgstr "Asetukset"
 
-#: provider/ECProps/Addin.cpp:502 provider/ECProps/SyncBar.cpp:318
+#: provider/ECProps/Addin.cpp:503 provider/ECProps/SyncBar.cpp:318
 msgid "Synchronize"
 msgstr "Synkronoi"
 
-#: provider/ECProps/Addin.cpp:504
+#: provider/ECProps/Addin.cpp:505
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:28
 msgid "Open Shared Folders..."
 msgstr "Avaa Jaettuja Kansioita..."
 
-#: provider/ECProps/Addin.cpp:506 provider/ECProps/Addin.cpp:547
+#: provider/ECProps/Addin.cpp:507 provider/ECProps/Addin.cpp:548
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:19
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:20
 msgid "Recover Deleted Items..."
 msgstr "Palauta Poistetut Kohteet..."
 
-#: provider/ECProps/Addin.cpp:508 provider/ECProps/Addin.cpp:549
+#: provider/ECProps/Addin.cpp:509 provider/ECProps/Addin.cpp:550
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:20
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:21
 msgid "Out of Office Assistant..."
 msgstr "Poissaolovastaus"
 
-#: provider/ECProps/Addin.cpp:512
+#: provider/ECProps/Addin.cpp:513
 msgid "Offline"
 msgstr "Offline-tila"
 
-#: provider/ECProps/Addin.cpp:541 provider/ECProps/SyncBar.cpp:328
+#: provider/ECProps/Addin.cpp:542 provider/ECProps/SyncBar.cpp:328
 msgid "Configure offline synchronization"
 msgstr "Aseta offline-tilan synkronointi"
 
-#: provider/ECProps/Addin.cpp:543 provider/ECProps/SyncBar.cpp:320
+#: provider/ECProps/Addin.cpp:544 provider/ECProps/SyncBar.cpp:320
 msgid "Start offline synchronization"
 msgstr "Aloita offline-tilan synkronointi"
 
-#: provider/ECProps/Addin.cpp:545
+#: provider/ECProps/Addin.cpp:546
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:29
 msgid "Open another user's Outlook Sharing Folders (Calendar, E-mail, etc)"
 msgstr ""
 "Avaa toisen käyttäjän Outlookin Jaettuja Kansioita (Kalenteri, Sähköposti, "
 "yms)"
 
-#: provider/ECProps/Addin.cpp:657
+#: provider/ECProps/Addin.cpp:658
 msgid "Out of Office currently on. Would you like to turn it off?"
 msgstr "Poissaolovastaus on käytössä. Haluatko ottaa sen pois käytöstä?"
 
-#: provider/ECProps/Addin.cpp:657
+#: provider/ECProps/Addin.cpp:658
 msgid "Out Of Office Turned On"
 msgstr "Poissaolovastaus on otettu käyttöön"
 
-#: provider/ECProps/Addin.cpp:663
+#: provider/ECProps/Addin.cpp:664
 msgid "Unable to save Out of Office status"
 msgstr "Poissaolovastausta ei voitu ottaa käyttöön"
 
-#: provider/ECProps/Addin.cpp:763
+#: provider/ECProps/Addin.cpp:766
 msgid "Delegates"
 msgstr "Edustajat"
 
-#: provider/ECProps/Addin.cpp:887 provider/client/ECMAPIFolderPublic.cpp:164
+#: provider/ECProps/Addin.cpp:890 provider/client/ECMAPIFolderPublic.cpp:164
 #: provider/client/ECMsgStorePublic.cpp:547
 msgid "Favorites"
 msgstr "Suosikit"
 
-#: provider/ECProps/Addin.cpp:899 provider/ECProps/PropPage.cpp:433
+#: provider/ECProps/Addin.cpp:902 provider/ECProps/PropPage.cpp:433
 msgid "Permissions"
 msgstr "Käyttöoikeudet"
 
-#: provider/ECProps/Addin.cpp:1103 provider/ECProps/Addin.cpp:1104
+#: provider/ECProps/Addin.cpp:1106 provider/ECProps/Addin.cpp:1107
 msgid "Add to Public Favorites Folder"
 msgstr "Lisää Suosikkikansioon"
 
-#: provider/ECProps/Addin.cpp:1188
+#: provider/ECProps/Addin.cpp:1191
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:108
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:89
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:97
 msgid "Unable to open MAPI session."
 msgstr "MAPI-istuntoa ei voitu avata."
 
-#: provider/ECProps/Addin.cpp:1192 provider/ECProps/ECFavoritePropPage.cpp:110
-#: provider/client/ECMsgStore.cpp:2373
+#: provider/ECProps/Addin.cpp:1195 provider/ECProps/ECFavoritePropPage.cpp:110
+#: provider/client/ECMsgStore.cpp:2380
 msgid "Shortcut"
 msgstr "Pikakuvake"
 
-#: provider/ECProps/Addin.cpp:1192 provider/ECProps/ECFavoritePropPage.cpp:110
+#: provider/ECProps/Addin.cpp:1195 provider/ECProps/ECFavoritePropPage.cpp:110
 msgid "Shortcut folder"
 msgstr "Pikakuvakekansio"
 
-#: provider/ECProps/Addin.cpp:1194
+#: provider/ECProps/Addin.cpp:1197
 msgid "Unable to get shortcut folder."
 msgstr "Pikakuvakekansiota ei voitu noutaa."
 
@@ -186,7 +186,7 @@ msgid "Unable to add folder to favorites"
 msgstr "Kansiota ei pystytty lisäämään suosikkeihin"
 
 #: provider/ECProps/ECFavoritePropPage.cpp:254
-#: provider/ECProps/ECDelegatePropPage.cpp:158
+#: provider/ECProps/ECDelegatePropPage.cpp:167
 #: provider/ECProps/PropPage.cpp:385
 msgid "Unable to get property page site"
 msgstr "Omaisuudet-ikkunaa ei pystytä avaamaan"
@@ -234,37 +234,37 @@ msgstr "Lisää vain viereiset alikansiot"
 msgid "Unable to get folder data"
 msgstr "Kansion dataa ei voitu noutaa"
 
-#: provider/ECProps/ECDelegatePropPage.cpp:124
+#: provider/ECProps/ECDelegatePropPage.cpp:133
 msgid "Saving changes failed."
 msgstr "Muutosten tallennus epäonnistui."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:127
+#: provider/ECProps/ECDelegatePropPage.cpp:136
 msgid "Saving rules failed: "
 msgstr "Sääntöjen tallennus epäonnistui:"
 
-#: provider/ECProps/ECDelegatePropPage.cpp:168
+#: provider/ECProps/ECDelegatePropPage.cpp:177
 #: provider/ECProps/PropPage.cpp:231
 msgid "Unable to get session"
 msgstr "Istunto ei saatavilla"
 
-#: provider/ECProps/ECDelegatePropPage.cpp:174
+#: provider/ECProps/ECDelegatePropPage.cpp:183
 #: provider/ECProps/PropPage.cpp:237 provider/ECProps/MapOtherUserDlg.cpp:262
 msgid "Unable to get addressbook"
 msgstr "Osoitekirja ei saatavilla"
 
-#: provider/ECProps/ECDelegatePropPage.cpp:179
+#: provider/ECProps/ECDelegatePropPage.cpp:188
 msgid "Add..."
 msgstr "Lisää..."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:180
+#: provider/ECProps/ECDelegatePropPage.cpp:189
 msgid "Remove..."
 msgstr "Poista..."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:181
+#: provider/ECProps/ECDelegatePropPage.cpp:190
 msgid "Permissions..."
 msgstr "Oikeudet..."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:182
+#: provider/ECProps/ECDelegatePropPage.cpp:191
 msgid ""
 "Delegates can send items on your behalf. To grant permission to others to "
 "access your folders without also giving them send-on-behalf-of privileges, "
@@ -273,14 +273,14 @@ msgid ""
 msgstr ""
 "Valtuutetut henkilöt voivat lähettää kohteita sinun puolestasi. Myöntääksesi "
 "muille oikeudet sinun kansioihin, ilman että annat myös lähetysoikeudet, "
-"valitse jokaisen halutun kansion kohdalla Ominaisuudet, ja sieltä Oikeudet "
-"-välilehti."
+"valitse jokaisen halutun kansion kohdalla Ominaisuudet, ja sieltä Oikeudet -"
+"välilehti."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:183
+#: provider/ECProps/ECDelegatePropPage.cpp:192
 msgid "Send meeting requests and response only to my delegates, not to me"
 msgstr ""
 
-#: provider/ECProps/ECDelegatePropPage.cpp:190
+#: provider/ECProps/ECDelegatePropPage.cpp:199
 msgid ""
 "The server is not available. Either there are network problems or server is "
 "down for maintenance."
@@ -288,20 +288,20 @@ msgstr ""
 "Zarafa ei vastaa. Verkossa on ongelmia tai Zarafa on ajettu alas "
 "ylläpitotoimenpiteitä varten."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:192
+#: provider/ECProps/ECDelegatePropPage.cpp:201
 msgid ""
 "Could not initialize delegation window\n"
 "Please contact your administrator."
 msgstr ""
 "Valtuutusikkunan alustus ei onnistunut. Ota yhteys järjestelmänvalvojaan."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:237
+#: provider/ECProps/ECDelegatePropPage.cpp:248
 #: provider/ECProps/PropPage.cpp:714 provider/ECProps/ECFavoritesDlg.cpp:48
 #: provider/client/SettingsPropPageAdvance.cpp:105
 msgid "Add"
 msgstr "Lisää"
 
-#: provider/ECProps/ECDelegatePropPage.cpp:252
+#: provider/ECProps/ECDelegatePropPage.cpp:263
 #: provider/ECProps/PropPage.cpp:721 provider/ECProps/MapOtherUserDlg.cpp:175
 #: provider/client/ECABContainer.cpp:244 provider/client/ECABContainer.cpp:299
 #: provider/client/SettingsPropPageAdvance.cpp:245
@@ -612,32 +612,32 @@ msgid "This delegate has the following permissions"
 msgstr "Tällä valtuutetulla on seuraavat oikeudet"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:134
-#: provider/client/ECMsgStore.cpp:2450
+#: provider/client/ECMsgStore.cpp:2457
 msgid "Calendar"
 msgstr "Kalenteri"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:135
-#: provider/client/ECMsgStore.cpp:2496
+#: provider/client/ECMsgStore.cpp:2503
 msgid "Tasks"
 msgstr "Tehtävät"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:136
-#: provider/libserver/ECGenProps.cpp:924 provider/client/ECMsgStore.cpp:2390
+#: provider/libserver/ECGenProps.cpp:924 provider/client/ECMsgStore.cpp:2397
 msgid "Inbox"
 msgstr "Saapuneet"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:137
-#: provider/client/ECMsgStore.cpp:2438
+#: provider/client/ECMsgStore.cpp:2445
 msgid "Contacts"
 msgstr "Yhteystiedot"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:138
-#: provider/client/ECMsgStore.cpp:2484
+#: provider/client/ECMsgStore.cpp:2491
 msgid "Notes"
 msgstr "Muistiinpanot"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:139
-#: provider/client/ECMsgStore.cpp:2472
+#: provider/client/ECMsgStore.cpp:2479
 msgid "Journal"
 msgstr "Päiväkirja"
 
@@ -921,43 +921,43 @@ msgstr "Ensimmäinen Synkronoitava Kansio..."
 msgid "Sync folder items"
 msgstr "Synkronoi kansion kohteet"
 
-#: provider/client/ECMsgStore.cpp:2420
+#: provider/client/ECMsgStore.cpp:2427
 msgid "Outbox"
 msgstr "Lähtevät"
 
-#: provider/client/ECMsgStore.cpp:2426
+#: provider/client/ECMsgStore.cpp:2433
 msgid "Deleted Items"
 msgstr "Poistetut"
 
-#: provider/client/ECMsgStore.cpp:2432
+#: provider/client/ECMsgStore.cpp:2439
 msgid "Sent Items"
 msgstr "Lähetetyt"
 
-#: provider/client/ECMsgStore.cpp:2460
+#: provider/client/ECMsgStore.cpp:2467
 msgid "Drafts"
 msgstr "Luonnokset"
 
-#: provider/client/ECMsgStore.cpp:2508
+#: provider/client/ECMsgStore.cpp:2515
 msgid "Junk E-mail"
 msgstr "Roskaposti"
 
-#: provider/client/ECMsgStore.cpp:2530
+#: provider/client/ECMsgStore.cpp:2537
 msgid "RSS Feeds"
 msgstr "RSS Syötteet"
 
-#: provider/client/ECMsgStore.cpp:2530
+#: provider/client/ECMsgStore.cpp:2537
 msgid "RSS Feed comment"
 msgstr "RSS Syötteen kommentti"
 
-#: provider/client/ECMsgStore.cpp:2534
+#: provider/client/ECMsgStore.cpp:2541
 msgid "Conversation Action Settings"
 msgstr ""
 
-#: provider/client/ECMsgStore.cpp:2538
+#: provider/client/ECMsgStore.cpp:2545
 msgid "Quick Step Settings"
 msgstr ""
 
-#: provider/client/ECMsgStore.cpp:2542
+#: provider/client/ECMsgStore.cpp:2549
 msgid "Suggested Contacts"
 msgstr ""
 
@@ -1356,10 +1356,10 @@ msgstr "Varmenne on luotettu, muttei todennu oikein."
 msgid "Do you wish to continue?"
 msgstr "Haluatko jatkaa?"
 
-#: zarafa-libsync/ECSync.cpp:1903
+#: zarafa-libsync/ECSync.cpp:1938
 msgid ""
-"The syncronization of a folder failed. Press retry for continue or ignore to "
-"supress all errors\r\n"
+"The synchronization of a folder failed. Press retry to continue or ignore to "
+"supress all errors.\r\n"
 "\r\n"
 "Please contact the system administrator if this problem persists."
 msgstr ""
@@ -1399,7 +1399,7 @@ msgstr "Poista"
 msgid "This folder contains archives of messages that have been deleted."
 msgstr ""
 
-#: spooler/Spooler.cpp:481
+#: spooler/Spooler.cpp:482
 msgid ""
 "A fatal error occurred while processing your message, and Zarafa is unable "
 "to send your email."
@@ -1431,31 +1431,31 @@ msgstr ""
 msgid "Unable to save archived message."
 msgstr ""
 
-#: spooler/mailer.cpp:1688
+#: spooler/mailer.cpp:1710
 msgid "You are not allowed to send as user or group "
 msgstr "Sinulla ei ole oikeuksia lähettää käyttäjänä tai ryhmänä"
 
-#: spooler/mailer.cpp:1690
+#: spooler/mailer.cpp:1712
 msgid "The user or group you try to send as could not be found."
 msgstr "Käyttäjää ja tai ryhmää, jonka nimissä yrität lähettää, ei löydy."
 
-#: spooler/mailer.cpp:2489
+#: spooler/mailer.cpp:2537
 msgid "Error found while trying to send your message. Error code: "
 msgstr "Viestiä lähetettäessä tapahtui virhe. Virhekoodi:"
 
-#: common/Util.cpp:1735
+#: common/Util.cpp:1728
 msgid "End of Session"
 msgstr "Istunnon Päätös"
 
-#: common/Util.cpp:1738
+#: common/Util.cpp:1731
 msgid "Connection lost"
 msgstr "Yhteys katkennut"
 
-#: common/Util.cpp:1741
+#: common/Util.cpp:1734
 msgid "Access denied"
 msgstr "Pääsy evätty"
 
-#: common/Util.cpp:1744
+#: common/Util.cpp:1737
 msgid ""
 "Unable to move or copy folders. Can't copy folder. A top-level can't be "
 "copied to one of its subfolders. Or, you may not have appropriate "
@@ -1468,7 +1468,7 @@ msgstr ""
 "klikkaa oikeanpuoleisella napilla kansion kohdalla, ja valitse Ominaisuudet "
 "pikavalikosta."
 
-#: common/Util.cpp:1747
+#: common/Util.cpp:1740
 msgid ""
 "The message store has reached its maximum size. To reduce the amount of data "
 "in this message store, select some items that you no longer need, and "
@@ -1478,7 +1478,7 @@ msgstr ""
 "tässä viestivarastossa, valitse joitakin kohteita mitä et enää tarvitse, ja "
 "poista ne pysyvästi (SHIFT + DEL)."
 
-#: common/Util.cpp:1750
+#: common/Util.cpp:1743
 msgid ""
 "The user canceled the operation, typically by clicking the Cancel button in "
 "a dialog box."
@@ -1486,11 +1486,11 @@ msgstr ""
 "Käyttäjä peruutti toiminnon, klikkaamalla Peruuta-painiketta "
 "keskusteluruudussa."
 
-#: common/Util.cpp:1753
+#: common/Util.cpp:1746
 msgid "A logon session could not be established."
 msgstr "Sisäänkirjautumisistuntoa ei voitu luoda."
 
-#: common/Util.cpp:1756
+#: common/Util.cpp:1749
 msgid ""
 "The name of the folder being moved or copied is the same as that of a "
 "subfolder in the destination folder. The message store provider requires "
@@ -1500,7 +1500,7 @@ msgstr ""
 "alikansion. Tämä viestivarasto vaatii yksilölliset kansionimet. Toimintoa ei "
 "suoritettu loppuun."
 
-#: common/Util.cpp:1759
+#: common/Util.cpp:1752
 msgid ""
 "The operation succeeded, but not all entries were successfully processed, "
 "copied, deleted or moved"
@@ -1508,7 +1508,7 @@ msgstr ""
 "Toiminto onnistui, mutta kaikkia kohteita ei voitu käsitellä onnistuneesti, "
 "kopioida, poistaa tai siirtää."
 
-#: common/Util.cpp:1762
+#: common/Util.cpp:1755
 msgid ""
 "The provider does not have enough information to complete the logon. Or, the "
 "service provider has not been configured."
@@ -1516,7 +1516,7 @@ msgstr ""
 "Tuottajalla ei ole riittäviä tietoja suorittaakseen sisäänkirjautumista. "
 "Tai, palveluntuottajaa ei ole vielä asetettu."
 
-#: common/Util.cpp:1765
+#: common/Util.cpp:1758
 msgid ""
 "One of the providers cannot log on, but this error should not disable the "
 "other services."
@@ -1524,130 +1524,39 @@ msgstr ""
 "Joku tuottajista ei voi kirjautua sisään, mutta tämän virheen ei pitäisi "
 "estää muiden palveluiden käyttämistä."
 
-#: common/Util.cpp:1768
+#: common/Util.cpp:1761
 msgid "A database error or I/O error has occurred."
 msgstr "Tapahtui tietokanta- tai I/O-virhe."
 
-#: common/Util.cpp:1771
+#: common/Util.cpp:1764
 msgid "The subfolder being deleted contains subfolders."
 msgstr ""
 
-#: common/Util.cpp:1774
+#: common/Util.cpp:1767
 msgid "The subfolder being deleted contains messages."
 msgstr ""
 
-#: common/Util.cpp:1777
+#: common/Util.cpp:1770
 msgid "No description available."
 msgstr ""
 
-#: common/Util.cpp:1779
+#: common/Util.cpp:1772
 msgid "MAPI error code:"
 msgstr ""
 
-#~ msgid "Inbox -"
-#~ msgstr "Saapuneet -"
+#: installer/linux/zarafa-mr-accept:403
+msgid "Recurring meetings are not allowed"
+msgstr ""
 
-#~ msgid "Adding local folders"
-#~ msgstr "Lisätään paikallisia kansioita"
+#: installer/linux/zarafa-mr-accept:453
+msgid "The requested time slot is unavailable"
+msgstr ""
 
-#~ msgid "Adding remote folders"
-#~ msgstr "Lisätään etäkansioita"
+#: installer/linux/zarafa-mr-accept:455
+msgid "The requested time slots are unavailble on the following dates:"
+msgstr ""
 
-#~ msgid "Removing local folders"
-#~ msgstr "Poistetaan paikallisia kansioita"
-
-#~ msgid "Removing remote folders"
-#~ msgstr "Poistetaan etäkansioita"
-
-#~ msgid "Modifying local messages"
-#~ msgstr "Muokataan paikallisia viestejä"
-
-#~ msgid "Modifying remote messages"
-#~ msgstr "Muokataan etäviestejä"
-
-#~ msgid "Reading stores"
-#~ msgstr "Luetaan varastoja"
-
-#~ msgid "Starting Synchronisation"
-#~ msgstr "Aloitetaan Synkronointi"
-
-#~ msgid ""
-#~ "Unable to restore the archived message. The reference data is incomplete or "
-#~ "invalid."
-#~ msgstr ""
-#~ "Arkistoitua viestiä ei voitu palauttaa. Viitetiedot ovat puutteelliset tai "
-#~ "virheelliset."
-
-#~ msgid "You are not licensed to restore archived messages."
-#~ msgstr "Sinulla ei ole oikeuksia palauttaa arkistoituja viestejä."
-
-#~ msgid ""
-#~ "Unable to restore the archived message. Failed to connect to the archive "
-#~ "server."
-#~ msgstr ""
-#~ "Arkistoitua viestiä ei voitu palauttaa. Yhteyttä arkistointipalvelimeen ei "
-#~ "saatu."
-
-#~ msgid "Unknown"
-#~ msgstr "<Tuntematon>"
-
-#~ msgid "Zarafa Delegates"
-#~ msgstr "Valtuutetut"
-
-#~ msgid ""
-#~ "You are currently offline. To use this command, connect to the Zarafa online "
-#~ "server."
-#~ msgstr ""
-#~ "Olet yhteydettömässä tilassa. Käyttääksesi tätä komentoa, sinun täytyy olla "
-#~ "yhdistetty palvelimelle."
-
-#~ msgid "Start Zarafa offline synchronization"
-#~ msgstr "Aloita offline-tilan synkronointi"
-
-#~ msgid "Configure Zarafa offline synchronization"
-#~ msgstr "Aseta offline-tilan synkronointi"
-
-#~ msgid "Zarafa Favorites"
-#~ msgstr "Suosikit"
-
-#~ msgid "Error"
-#~ msgstr "Virhe"
-
-#~ msgid "Zarafa license"
-#~ msgstr "Ohjelmistolisenssi"
-
-#~ msgid "Registry error"
-#~ msgstr "Rekisteröitymisvirhe"
-
-#~ msgid "Incorrect Zarafa version."
-#~ msgstr "Väärä ohjelmaversio."
-
-#~ msgid "Cached Zarafa Mode"
-#~ msgstr "Välimuistiin Tallennettu Tila"
-
-#~ msgid ""
-#~ "Zarafa does not support offline or cached mode for Outlook XP and Outlook "
-#~ "2002. If you wish to use offline functionality of Zarafa, please use Outlook "
-#~ "2000, 2003, 2007 or later."
-#~ msgstr ""
-#~ "Ohjelma ei tue yhteydetöntä tilaa tai välimuistiin tallennettua tilaa "
-#~ "Outlook XP:lle tai Outlook 2002:lle. Jos haluat käyttää tätä "
-#~ "toiminnallisuutta, ole hyvä ja käytä Outlook 2000, 2003, 2007 tai uudempaa."
-
-#~ msgid "Zarafa Offline"
-#~ msgstr "Yhteydetön Tila"
-
-#~ msgid "Restoring archived message..."
-#~ msgstr "Palautetaan arkistoitua viestiä..."
-
-#~ msgid "Unable to get MAPI information"
-#~ msgstr "MAPI dataa ei voitu noutaa"
-
-#~ msgid "Unable to get Folder information"
-#~ msgstr "Kansion tietoja ei voitu noutaa"
-
-#~ msgid "You can only use this function with Zarafa profiles."
-#~ msgstr "Tätä toimintoa voi käyttää vain Zarafa profiilien kanssa"
-
-#~ msgid "test"
-#~ msgstr "testi"
+#: installer/linux/zarafa-mr-accept:458
+#, php-format
+msgid "%x %X"
+msgstr ""

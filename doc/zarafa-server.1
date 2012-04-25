@@ -1,19 +1,36 @@
+'\" t
 .\"     Title: zarafa-server
-.\"    Author: 
-.\" Generator: DocBook XSL Stylesheets v1.73.2 <http://docbook.sf.net/>
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
 .\"      Date: August 2011
 .\"    Manual: Zarafa user reference
 .\"    Source: Zarafa 7.0
+.\"  Language: English
 .\"
 .TH "ZARAFA\-SERVER" "1" "August 2011" "Zarafa 7.0" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
 .ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
 .SH "NAME"
-zarafa-server \- Start the Zarafa storage server.
+zarafa-server \- Start the Zarafa storage server\&.
 .SH "SYNOPSIS"
-.HP 14
+.HP \w'\fBzarafa\-server\fR\ 'u
 \fBzarafa\-server\fR [\fIOPTION\fR]
 .SH "DESCRIPTION"
 .PP
@@ -44,17 +61,17 @@ Rebuild all search folders\&. This may take some time and is only needed when yo
 .PP
 \fB\-\-ignore\-database\-version\-conflict\fR
 .RS 4
-Ignore version information from the database\&. Zarafa will normally not start the server if the database has a newer version than the zarafa\-server binary\&. This makes sure you cannot downgrade your server binary while keeping the same database\&. If you know what you\'re doing, you can use this option to bypass the start\-up version check of the database\&.
+Ignore version information from the database\&. Zarafa will normally not start the server if the database has a newer version than the zarafa\-server binary\&. This makes sure you cannot downgrade your server binary while keeping the same database\&. If you know what you\*(Aqre doing, you can use this option to bypass the start\-up version check of the database\&.
 .RE
 .PP
 \fB\-\-ignore\-attachment\-storage\-conflict\fR
 .RS 4
-Override the attachment storage option from the configuration file\&. When you change the option of the location where to store attachments after you\'ve already started the zarafa\-server once, this location will conflict\&. Attachments will not be found when they are stored in a different location\&.
+Override the attachment storage option from the configuration file\&. When you change the option of the location where to store attachments after you\*(Aqve already started the zarafa\-server once, this location will conflict\&. Attachments will not be found when they are stored in a different location\&.
 .RE
 .PP
 \fB\-\-override\-multiserver\-lock\fR
 .RS 4
-When you upgrade/downgrade from/to multiserver setups, the server will not start, because of database differences\&. If you know what you\'re doing, and want to circumvent this and start the server anyway, you can use this option\&.
+When you upgrade/downgrade from/to multiserver setups, the server will not start, because of database differences\&. If you know what you\*(Aqre doing, and want to circumvent this and start the server anyway, you can use this option\&.
 .RE
 .PP
 \fB\-\-force\-database\-upgrade\fR
@@ -68,7 +85,7 @@ Print the version and exit\&.
 .RE
 .PP
 When invoked with no options, the server will search for a configuration file in
-\fI/etc/zarafa/server\&.cfg\fR\&. If no configuration file is found, default values are used\&. See
+/etc/zarafa/server\&.cfg\&. If no configuration file is found, default values are used\&. See
 \fBzarafa-server.cfg\fR(5)
 for all configuration options and their default values\&.
 .SH "USAGE"
@@ -88,12 +105,12 @@ You may also use the init\&.d scripts:
 \fIrestart\fR]
 .SH "FILES"
 .PP
-\fI/etc/zarafa/server\&.cfg\fR
+/etc/zarafa/server\&.cfg
 .RS 4
 The server configuration file\&.
 .RE
 .PP
-\fI/etc/zarafa/license/base\fR, \fI/etc/zarafa/license/*\fR
+/etc/zarafa/license/base, /etc/zarafa/license/*
 .RS 4
 The base file contains your license key\&. When you have extra CAL license keys, these are found in the other files available in the license/ directory, one key per file\&. This directory is configurable\&.
 .RE
@@ -110,7 +127,7 @@ The normal way for user clients to connect to the server is over TCP, either dir
 .PP
 The normal way for admin clients, like the spooler and admin tool, to connect to the server is through the Unix socket on Unix type servers\&. The admin clients are able to login when they are run as root or as the user the Zarafa server process is running as\&. Most of the time this will be root only, since the Zarafa server process runs as root by default\&.
 .PP
-As an exception for the dagent, a unix user can also connect to it\'s own store without a password\&. Any other store cannot be accessed this way\&.
+As an exception for the dagent, a unix user can also connect to it\*(Aqs own store without a password\&. Any other store cannot be accessed this way\&.
 .PP
 Direct SSL connections are also possible\&. The server needs to be configured to accept SSL connections on a new port\&. Login via an SSL key is also possible\&. Please read the next section on how to setup SSL\&.
 .SH "SSL"
@@ -119,7 +136,7 @@ To accept SSL connections directly by the server, the Zarafa server will need to
 \fIserver_ssl_port\fR
 setting in the configuration file\&.
 .PP
-Then, you must setup a signed SSL certificate\&. First, we\'ll create a Certificate Authority to be able to sign certificate requests\&. We provide a script which makes it easy to create certificates on any distribution\&. This script is located in /usr/share/zarafa, called ssl\-certificate\&.sh\&. Enter the following commands to create a certificate for the Zarafa server\&.
+Then, you must setup a signed SSL certificate\&. First, we\*(Aqll create a Certificate Authority to be able to sign certificate requests\&. We provide a script which makes it easy to create certificates on any distribution\&. This script is located in /usr/share/zarafa, called ssl\-certificate\&.sh\&. Enter the following commands to create a certificate for the Zarafa server\&.
 .PP
 
 \fB mkdir \-p /etc/zarafa/ssl \fR
@@ -132,13 +149,13 @@ Now that we have a CA, we can create self\-signed certificates\&. The script wil
 \fIserver_ssl_ca_file\fR
 setting\&. We need a signed certificate for the server to start with SSL support\&.
 .PP
-Enter a password for the request, and enter the certificate details\&. Some details need to be different from what you typed when creating the CA\&. Type at least a different name in the \'Organizational Unit Name\' field\&. The challenge password at the end may be left empty\&.
+Enter a password for the request, and enter the certificate details\&. Some details need to be different from what you typed when creating the CA\&. Type at least a different name in the \*(AqOrganizational Unit Name\*(Aq field\&. The challenge password at the end may be left empty\&.
 .PP
 The script will automatically continue with signing this certificate request\&. You will need to enter your CA certificate password again to sign this request\&. Then you must accept the new certificate into the CA\&.
 .PP
 After accepting, a new signed certificate is created, with the name server\&.pem\&. This file contains the private key, so keep this file safe\&.
 .PP
-The script will ask if a public key should also be created\&. Since we\'re creating the certificate for the server, this is not needed\&. So enter \'n\' and press enter\&.
+The script will ask if a public key should also be created\&. Since we\*(Aqre creating the certificate for the server, this is not needed\&. So enter \*(Aqn\*(Aq and press enter\&.
 .PP
 The server\&.pem file should be set in the server\&.cfg file in the
 \fIserver_ssl_key_file\fR
@@ -153,7 +170,7 @@ To create a new certificate for a client service, run the script again\&. You ca
 
 \fB sh /usr/share/zarafa/ssl\-certificates\&.sh \fR
 .PP
-When typing the certificate information, type at least a different \'Organizational Unit Name\' field\&. When asked for a public key, type \'y\' and enter to create the public key\&.
+When typing the certificate information, type at least a different \*(AqOrganizational Unit Name\*(Aq field\&. When asked for a public key, type \*(Aqy\*(Aq and enter to create the public key\&.
 .PP
 Install the new service\&.pem on the server that will be logging in\&. Install the service\-public\&.pem file in the /etc/zarafa/sslkeys directory:
 .PP

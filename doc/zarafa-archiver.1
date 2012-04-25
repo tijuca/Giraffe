@@ -1,19 +1,36 @@
+'\" t
 .\"     Title: zarafa-archiver
-.\"    Author: 
-.\" Generator: DocBook XSL Stylesheets v1.73.2 <http://docbook.sf.net/>
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
 .\"      Date: August 2011
 .\"    Manual: Zarafa user reference
 .\"    Source: Zarafa 7.0
+.\"  Language: English
 .\"
 .TH "ZARAFA\-ARCHIVER" "1" "August 2011" "Zarafa 7.0" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
 .ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
 .SH "NAME"
-zarafa-archiver \- Manages zarafa archives and performs the archive operation.
+zarafa-archiver \- Manages zarafa archives and performs the archive operation\&.
 .SH "SYNOPSIS"
-.HP 16
+.HP \w'\fBzarafa\-archiver\fR\ 'u
 \fBzarafa\-archiver\fR [\fIOPTION\fR...]
 .SH "DESCRIPTION"
 .PP
@@ -62,7 +79,7 @@ option\&.
 .RS 4
 Detach an archive from the store of the user specified with the
 \fI\-u\fR
-option\&. zarafa\-archiver will automatically determine which folder to detach\&. However if a user has two archives in one archive store, zarafa\-archiver won\'t be able to tell which one needs to be detached\&. In this case the folder needs to be specified with the
+option\&. zarafa\-archiver will automatically determine which folder to detach\&. However if a user has two archives in one archive store, zarafa\-archiver won\*(Aqt be able to tell which one needs to be detached\&. In this case the folder needs to be specified with the
 \fI\-\-archive\-folder\fR
 option\&.
 .RE
@@ -80,7 +97,7 @@ option\&. The archive to detach is indicated by archiveno and can be obtained by
 .PP
 \fB\-\-auto\-attach\fR
 .RS 4
-When no user is specified with \-u, all users will have their archives attached or detached based on the LDAP/ADS settings\&. If a user is specified only that user\'s store will be processed\&. This option can be combined with
+When no user is specified with \-u, all users will have their archives attached or detached based on the LDAP/ADS settings\&. If a user is specified only that user\*(Aqs store will be processed\&. This option can be combined with
 \fI\-A\fR
 to force an auto\-attach run regardless of the
 \fIenable_auto_attach\fR

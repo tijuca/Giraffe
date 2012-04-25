@@ -96,11 +96,7 @@ SOAP_SOURCE_STAMP("@(#) stdsoap2.c ver 2.7.13 2009-03-21 00:00:00 GMT")
 #define soap_blank(c)		((c) >= 0 && (c) <= 32)
 #define soap_notblank(c)	((c) > 32)
 
-#if defined(WIN32) && !defined(UNDER_CE)
-#define soap_hash_ptr(p)	((PtrToUlong(p) >> 3) & (SOAP_PTRHASH - 1))
-#else
 #define soap_hash_ptr(p)	((size_t)(((unsigned long)(p) >> 3) & (SOAP_PTRHASH-1)))
-#endif
 
 #ifndef PALM_1
 static void soap_init_logs(struct soap*);

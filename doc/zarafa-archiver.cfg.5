@@ -1,15 +1,32 @@
+'\" t
 .\"     Title: zarafa-archiver.cfg
-.\"    Author: 
-.\" Generator: DocBook XSL Stylesheets v1.73.2 <http://docbook.sf.net/>
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
 .\"      Date: August 2011
 .\"    Manual: Zarafa user reference
 .\"    Source: Zarafa 7.0
+.\"  Language: English
 .\"
 .TH "ZARAFA\-ARCHIVER\&.C" "5" "August 2011" "Zarafa 7.0" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
 .ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
 .SH "NAME"
 zarafa-archiver.cfg \- The Zarafa archiver configuration file
 .SH "SYNOPSIS"
@@ -18,9 +35,9 @@ zarafa-archiver.cfg \- The Zarafa archiver configuration file
 .SH "DESCRIPTION"
 .PP
 The
-\fIarchiver\&.cfg\fR
+archiver\&.cfg
 is a configuration file for the Zarafa Archiver\&.
-\fIarchiver\&.cfg\fR
+archiver\&.cfg
 contains instructions for the software to set up the logging system and specific actions the archiver can do\&.
 .SH "FILE FORMAT"
 .PP
@@ -32,7 +49,7 @@ The parameters are written in the form:
 =
 \fIvalue\fR
 .PP
-The file is line\-based\&. Each newline\-terminated line represents either a comment, nothing, a parameter or a directive\&. A line beginning with `#\' is considered a comment, and will be ignored by Zarafa\&. Parameter names are case sensitive\&. Lines beginning with `!\' are directives\&.
+The file is line\-based\&. Each newline\-terminated line represents either a comment, nothing, a parameter or a directive\&. A line beginning with `#\*(Aq is considered a comment, and will be ignored by Zarafa\&. Parameter names are case sensitive\&. Lines beginning with `!\*(Aq are directives\&.
 .PP
 Directives are written in the form:
 .PP
@@ -94,7 +111,7 @@ Default:
 .RS 4
 Specifies if the stub step will be performed\&. Stubbing is the process of removing the data from a message and only leaving a reference to one or more archived versions of that message\&. When such a message is opened it will be de\-stubbed on the fly, leaving the user with a normal message to work with\&.
 .sp
-A message will never be stubbed if it\'s not yet archived\&.
+A message will never be stubbed if it\*(Aqs not yet archived\&.
 .sp
 Default:
 \fIno\fR
@@ -118,9 +135,9 @@ Default:
 .PP
 \fBdelete_enable\fR
 .RS 4
-Specifies if the delete step will be performed\&. The delete step deletes messages from the users store if they\'re old enough\&. This way even more space is freed\&.
+Specifies if the delete step will be performed\&. The delete step deletes messages from the users store if they\*(Aqre old enough\&. This way even more space is freed\&.
 .sp
-A message will never be deleted if it\'s not yet archived\&.
+A message will never be deleted if it\*(Aqs not yet archived\&.
 .sp
 A message will never be deleted from the archive\&.
 .sp
@@ -170,7 +187,7 @@ Default:
 .PP
 \fBcleanup_action\fR
 .RS 4
-Specify what action should be taken on archive messages whose primary message has been deleted\&. The options are \'store\' and \'delete\', meaning store the archived message in a special \'Deleted\' folder or delete the archived messages respectively\&.
+Specify what action should be taken on archive messages whose primary message has been deleted\&. The options are \*(Aqstore\*(Aq and \*(Aqdelete\*(Aq, meaning store the archived message in a special \*(AqDeleted\*(Aq folder or delete the archived messages respectively\&.
 .sp
 Default:
 \fIstore\fR
@@ -186,7 +203,7 @@ Default:
 .PP
 \fBauto_attach_writable\fR
 .RS 4
-Specify whether an auto attached archive will be granted write permissions for the user it\'s attached to\&.
+Specify whether an auto attached archive will be granted write permissions for the user it\*(Aqs attached to\&.
 .sp
 Default:
 \fIyes\fR
@@ -224,7 +241,7 @@ Default:
 .PP
 \fBlog_timestamp\fR
 .RS 4
-Specify whether to prefix each log line with a timestamp in \'file\' logging mode\&.
+Specify whether to prefix each log line with a timestamp in \*(Aqfile\*(Aq logging mode\&.
 .sp
 Default:
 \fI1\fR
@@ -247,7 +264,7 @@ Default:
 .RE
 .SH "FILES"
 .PP
-\fI/etc/zarafa/archiver\&.cfg\fR
+/etc/zarafa/archiver\&.cfg
 .RS 4
 The Zarafa archiver configuration file\&.
 .RE
