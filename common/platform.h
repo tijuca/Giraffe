@@ -53,9 +53,12 @@
 
   // We have to include this now in case select.h is included too soon.
   // Increase our maximum amount of file descriptors to 8192
+  // But only if you don't have a glibc that doesn't check for this compiletime limit
+  #ifndef _FORTIFY_SOURCE
   #include <bits/types.h>
   #undef __FD_SETSIZE
   #define __FD_SETSIZE 8192
+  #endif
 
   // Log the pthreads locks
   #define DEBUG_PTHREADS 0
