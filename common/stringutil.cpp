@@ -733,3 +733,28 @@ void StringCRLFtoLF(const std::wstring &strInput, std::wstring *lpstrOutput) {
 	}
 	lpstrOutput->swap(strOutput);
 }
+
+/**
+ * Force a string to contain alphanumerics only
+ *
+ * Replaces all other characters with _ unless they are in szAdditional
+ *
+ * @param[in] str Input string
+ * @param[in] szAdditional Additional characters to accept
+ * @return Modified string
+ */
+std::string forcealnum(const std::string& str, const char *szAdditional)
+{
+    std::string out;
+
+    for(std::string::const_iterator i = str.begin(); i != str.end(); i++) {
+        if(isalnum(*i))
+            out += *i;
+        else if(szAdditional && strchr(szAdditional, *i) != NULL)
+            out += *i;
+        else
+            out += '_';
+    }
+
+    return out;
+}

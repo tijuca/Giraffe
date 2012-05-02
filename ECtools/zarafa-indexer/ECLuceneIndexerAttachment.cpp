@@ -72,6 +72,7 @@
 #include "ECLuceneIndexer.h"
 #include "ECLuceneIndexerAttachment.h"
 
+#include "stringutil.h"
 #include "charset/convert.h"
 
 #define STREAM_BUFFER   ( 64*1024 )
@@ -415,7 +416,7 @@ HRESULT ECLuceneIndexerAttachment::ParseAttachmentCommand(tstring &strFilename, 
 	};
 
 
-	m_lpThreadData->lpLogger->Log(EC_LOGLEVEL_DEBUG, "Starting attachment parser command: '%s' for file '%ls'", strCommand.c_str(), strFilename.c_str());
+	m_lpThreadData->lpLogger->Log(EC_LOGLEVEL_DEBUG, "Starting attachment parser command: \"%s\" for file '%ls'", strCommand.c_str(), strFilename.c_str());
 
 	ulCommandPid = unix_popen_rw(m_lpThreadData->lpLogger, strCommand.c_str(), &ulFpWrite, &ulFpRead, (popen_rlimit_array *)&sSystemLimits, NULL, true, false);
 	if (ulCommandPid < 0) {
@@ -533,8 +534,9 @@ HRESULT ECLuceneIndexerAttachment::ParseValueAttachment(lucene::document::Docume
 				goto exit;
 			}
 		}
-		command.append("mime ");
-		command.append(tmp);
+		command.append("mime '");
+		command.append(forcealnum(tmp, "/.-"));
+		command.append("'");
 	} else if (!strExtension.empty()) {
 		// this string mostly does not exist
 		string tmp = trim(convert_to<string>(strExtension), "\r\n ");
@@ -544,14 +546,16 @@ HRESULT ECLuceneIndexerAttachment::ParseValueAttachment(lucene::document::Docume
 			hr = MAPI_E_INVALID_OBJECT;
 			goto exit;
 		}
-		command.append("ext ");
-		command.append(tmp);
+		command.append("ext '");
+		command.append(forcealnum(tmp, "."));
+		command.append("'");
 	} else if (!strFilename.empty()) {
 		std::string tmp = trim(convert_to<string>(strFilename), "\r\n ");
 		size_t pos = tmp.find_last_of('.');
 		if (pos == std::string::npos)
 			goto exit;
 
+		
 		// skip dot in find
 		set<string, stricmp_comparison>::iterator i = m_lpThreadData->m_setExtFilter.find(string(tmp, pos+1));
 		if (i != m_lpThreadData->m_setExtFilter.end()) {
@@ -560,8 +564,9 @@ HRESULT ECLuceneIndexerAttachment::ParseValueAttachment(lucene::document::Docume
 			goto exit;
 		}
 
-		command.append("ext ");
-		command.append(tmp, pos, std::string::npos);
+		command.append("ext '");
+		command.append(forcealnum(string(tmp, pos), "."));
+		command.append("'");
 	} else {
 		m_lpThreadData->lpLogger->Log(EC_LOGLEVEL_DEBUG, "Invalid attachment, no mimetag, extension or filename");
 		hr = MAPI_E_INVALID_OBJECT;

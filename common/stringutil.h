@@ -129,6 +129,7 @@ static inline bool parseBool(const std::string &s) {
 
 std::string shell_escape(std::string str);
 std::string shell_escape(std::wstring wstr);
+std::string forcealnum(const std::string& str, const char *additional = NULL);
 
 std::vector<std::wstring> tokenize(const std::wstring &strInput, const WCHAR sep);
 std::vector<std::string> tokenize(const std::string &strInput, const char sep);
