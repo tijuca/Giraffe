@@ -7693,6 +7693,7 @@ typedef struct{
 	SOURCEKEY	 sNewSourceKey;
 	EntryId	 	 sOldEntryId;
 	EntryId	 	 sNewEntryId;
+	bool		 bMoved;
 }COPYITEM;
 
 // Move one or more messages and/or moved a softdeleted message to a normal message
@@ -7775,6 +7776,7 @@ ECRESULT MoveObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt* lp
 		if(lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL || lpDBRow[3] == NULL || lpDBRow[4] == NULL) // no id, type or parent folder?
 			continue;
 
+        sItem.bMoved 	= false;
 		sItem.ulId		= atoi(lpDBRow[0]);
 		sItem.ulParent	= atoi(lpDBRow[1]);
 		sItem.ulType	= atoi(lpDBRow[2]);
@@ -7971,9 +7973,9 @@ ECRESULT MoveObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt* lp
 				    mapFolderCounts[ulDestFolderId].lUnread++;
 				}
 			}
-			if (er != erSuccess)
-				goto exit;
 		} 
+		
+		iterCopyItems->bMoved = true;
     }
     
     er = ApplyFolderCounts(lpDatabase, mapFolderCounts);
@@ -7985,15 +7987,17 @@ ECRESULT MoveObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt* lp
 		UpdateObjectSize(lpDatabase, ulDestStoreId, MAPI_STORE, UPDATE_ADD, ulItemSize);
 
 	for(iterCopyItems=lstCopyItems.begin(); iterCopyItems != lstCopyItems.end(); iterCopyItems++) {
-		// Cache update for object
-		g_lpSessionManager->GetCacheManager()->SetObject(iterCopyItems->ulId, ulDestFolderId, iterCopyItems->ulOwner, iterCopyItems->ulFlags & ~MSGFLAG_DELETED /* possible undelete */, iterCopyItems->ulType);
+	    if(iterCopyItems->bMoved) {
+            // Cache update for object
+            g_lpSessionManager->GetCacheManager()->SetObject(iterCopyItems->ulId, ulDestFolderId, iterCopyItems->ulOwner, iterCopyItems->ulFlags & ~MSGFLAG_DELETED /* possible undelete */, iterCopyItems->ulType);
 
-		// Remove old sourcekey and entryid and add them
-		g_lpSessionManager->GetCacheManager()->RemoveIndexData(iterCopyItems->ulId);
+            // Remove old sourcekey and entryid and add them
+            g_lpSessionManager->GetCacheManager()->RemoveIndexData(iterCopyItems->ulId);
 
-		g_lpSessionManager->GetCacheManager()->SetObjectProp(PROP_ID(PR_SOURCE_KEY), iterCopyItems->sNewSourceKey.size(), iterCopyItems->sNewSourceKey, iterCopyItems->ulId);
+            g_lpSessionManager->GetCacheManager()->SetObjectProp(PROP_ID(PR_SOURCE_KEY), iterCopyItems->sNewSourceKey.size(), iterCopyItems->sNewSourceKey, iterCopyItems->ulId);
 
-		g_lpSessionManager->GetCacheManager()->SetObjectProp(PROP_ID(PR_ENTRYID), iterCopyItems->sNewEntryId.size(), iterCopyItems->sNewEntryId, iterCopyItems->ulId);
+            g_lpSessionManager->GetCacheManager()->SetObjectProp(PROP_ID(PR_ENTRYID), iterCopyItems->sNewEntryId.size(), iterCopyItems->sNewEntryId, iterCopyItems->ulId);
+        }
     }
     
     er = lpDatabase->Commit();
@@ -8001,19 +8005,20 @@ ECRESULT MoveObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt* lp
         goto exit;
 
     for(iterCopyItems=lstCopyItems.begin(); iterCopyItems != lstCopyItems.end(); iterCopyItems++) {
-		// update destenation folder after PR_ENTRYID update
-		if(cCopyItems < EC_TABLE_CHANGE_THRESHOLD) {
-			//Update messages
-			g_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_DELETE, 0, iterCopyItems->ulParent, iterCopyItems->ulId, iterCopyItems->ulType);
-			//Update destenation folder
-			g_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_ADD, 0, ulDestFolderId, iterCopyItems->ulId, iterCopyItems->ulType);
-		}
+        if(iterCopyItems->bMoved) {
+            // update destenation folder after PR_ENTRYID update
+            if(cCopyItems < EC_TABLE_CHANGE_THRESHOLD) {
+                //Update messages
+                g_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_DELETE, 0, iterCopyItems->ulParent, iterCopyItems->ulId, iterCopyItems->ulType);
+                //Update destenation folder
+                g_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_ADD, 0, ulDestFolderId, iterCopyItems->ulId, iterCopyItems->ulType);
+            }
 
-		// Update Store object
-		g_lpSessionManager->NotificationMoved(iterCopyItems->ulType, iterCopyItems->ulId, ulDestFolderId, iterCopyItems->ulParent, iterCopyItems->sOldEntryId);
+            // Update Store object
+            g_lpSessionManager->NotificationMoved(iterCopyItems->ulType, iterCopyItems->ulId, ulDestFolderId, iterCopyItems->ulParent, iterCopyItems->sOldEntryId);
 
-		lstParent.push_back(iterCopyItems->ulParent);
-		
+            lstParent.push_back(iterCopyItems->ulParent);
+        }		
 	}
 
 
