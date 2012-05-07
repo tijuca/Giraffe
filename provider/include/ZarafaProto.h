@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -966,6 +966,11 @@ struct userClientUpdateStatusResponse {
 	unsigned int er;
 };
 
+struct resetFolderCountResponse {
+	unsigned int ulUpdates;
+	unsigned int er;
+};
+
 //TableType flags for function ns__tableOpen
 #define TABLETYPE_MS				1	// MessageStore tables
 #define TABLETYPE_AB				2	// Addressbook tables
@@ -1128,6 +1133,8 @@ int ns__abResolveNames(ULONG64 ulSessionId, struct propTagArray* lpaPropTag, str
 int ns__syncUsers(ULONG64 ulSessionId, unsigned int ulCompanyId, entryId sCompanyId, unsigned int *result);
 
 int ns__setLockState(ULONG64 ulSessionId, entryId sEntryId, bool bLocked, unsigned int *result); 
+
+int ns__resetFolderCount(ULONG64 ulSessionId, entryId sEntryId, struct resetFolderCountResponse *lpsResponse);
 
 // Quota
 int ns__GetQuota(ULONG64 ulSessionId, unsigned int ulUserid, entryId sUserId, bool bGetUserDefault, struct quotaResponse* lpsQuota);

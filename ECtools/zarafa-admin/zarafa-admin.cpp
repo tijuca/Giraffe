@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -106,7 +106,7 @@ enum modes {
 	MODE_ADD_COMPANYQUOTA_RECIPIENT, MODE_DEL_COMPANYQUOTA_RECIPIENT, MODE_LIST_COMPANYQUOTA_RECIPIENT,
 	MODE_SYNC_USERS, MODE_DETAILS, MODE_LIST_SENDAS, MODE_HELP,
 	MODE_SYSTEM_ADMIN, MODE_PURGE_SOFTDELETE, MODE_PURGE_DEFERRED, MODE_CLEAR_CACHE, MODE_LIST_ORPHANS,
-	MODE_FORCE_RESYNC, MODE_USER_COUNT
+	MODE_FORCE_RESYNC, MODE_USER_COUNT, MODE_RESET_FOLDER_COUNT
 };
 
 enum {
@@ -164,7 +164,8 @@ enum {
 	OPT_USER_COUNT,
 	OPT_ENABLE_FEATURE,
 	OPT_DISABLE_FEATURE,
-	OPT_SELECT_NODE
+	OPT_SELECT_NODE,
+	OPT_RESET_FOLDER_COUNT
 };
 
 struct option long_options[] = {
@@ -223,6 +224,7 @@ struct option long_options[] = {
 		{ "enable-feature", 1, NULL, OPT_ENABLE_FEATURE },
 		{ "disable-feature", 1, NULL, OPT_DISABLE_FEATURE },
 		{ "node", 1, NULL, OPT_SELECT_NODE },
+		{ "reset-folder-count", 1, NULL, OPT_RESET_FOLDER_COUNT },
 		{ NULL, 0, NULL, 0 }
 };
 
@@ -334,6 +336,7 @@ void print_help(char *name) {
 	ct.AddColumn(0, "  --type"); ct.AddColumn(1, "Type of the user to hook. Defaults to 'user', can be 'group' or 'company' for public store. Use 'archive' for archive stores.");
 	ct.AddColumn(0, ""); ct.AddColumn(1, "Use 'Everyone' as username with type 'group' to unhook the public store, or use the company name and type 'company'.");
 	ct.AddColumn(0, "--force-resync [username [username [...]]]"); ct.AddColumn(1, "Force a resynchronisation of offline profiles for specified users.");
+	ct.AddColumn(0, "--reset-folder-count username"); ct.AddColumn(1, "Reset the counters on all folder in the store.");
 	ct.PrintTable();
 	cout << endl;
 	cout << "The following functions are for use from the create/delete user/group scripts:" << endl;
@@ -2188,6 +2191,101 @@ exit:
 	return hr;
 }
 
+HRESULT ResetFolderCount(LPMAPISESSION lpSession, LPMDB lpAdminStore, const char *lpszAccount)
+{
+	HRESULT hr = hrSuccess;
+	ExchangeManageStorePtr ptrEMS;
+	ULONG cbEntryID;
+	EntryIdPtr ptrEntryID;
+	ULONG ulType = 0;
+	MsgStorePtr ptrUserStore;
+	MAPIFolderPtr ptrRoot;
+	ECServiceAdminPtr ptrServiceAdmin;
+	SPropValuePtr ptrPropEntryID;
+	ULONG ulUpdates = 0;
+	ULONG bFailures = false;
+	ULONG ulTotalUpdates = 0;
+	MAPITablePtr ptrTable;
+	mapi_rowset_ptr ptrRows;
+
+	SizedSPropTagArray(2, sptaTableProps) = {2, {PR_DISPLAY_NAME_A, PR_ENTRYID}};
+	enum {IDX_DISPLAY_NAME, IDX_ENTRYID};
+
+	hr = lpAdminStore->QueryInterface(ptrEMS.iid, &ptrEMS);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = ptrEMS->CreateStoreEntryID(NULL, (LPTSTR)lpszAccount, 0, &cbEntryID, &ptrEntryID);
+	if (hr != hrSuccess) {
+		cerr << "Unable to resolve store for '" << lpszAccount << "'." << endl;
+		goto exit;
+	}
+
+	hr = lpSession->OpenMsgStore(0, cbEntryID, ptrEntryID, NULL, MDB_WRITE, &ptrUserStore);
+	if (hr != hrSuccess) {
+		cerr << "Unable to open store for '" << lpszAccount << "'." << endl;
+		goto exit;
+	}
+
+	hr = ptrUserStore->QueryInterface(ptrServiceAdmin.iid, &ptrServiceAdmin);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = ptrUserStore->OpenEntry(0, NULL, &ptrRoot.iid, 0, &ulType, &ptrRoot);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = HrGetOneProp(ptrRoot, PR_ENTRYID, &ptrPropEntryID);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = ptrServiceAdmin->ResetFolderCount(ptrPropEntryID->Value.bin.cb, (LPENTRYID)ptrPropEntryID->Value.bin.lpb, &ulUpdates);
+	if (hr != hrSuccess) {
+		cerr << "Failed to update counters in the root folder." << endl;
+		bFailures = true;
+		hr = hrSuccess;
+	} else if (ulUpdates) {
+		cerr << "Updated " << ulUpdates << " counters in the root folder." << endl;
+		ulTotalUpdates += ulUpdates;
+	}
+
+	hr = ptrRoot->GetHierarchyTable(CONVENIENT_DEPTH, &ptrTable);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = HrQueryAllRows(ptrTable, (LPSPropTagArray)&sptaTableProps, NULL, NULL, 0, &ptrRows);
+	if (hr != hrSuccess)
+		goto exit;
+
+	for (mapi_rowset_ptr::size_type i = 0; i < ptrRows.size(); ++i) {
+		mapi_rowset_ptr::const_reference row = ptrRows[i];
+		const char* lpszName = "<Unknown>";
+
+		if (PROP_TYPE(row.lpProps[IDX_DISPLAY_NAME].ulPropTag) != PT_ERROR)
+			lpszName = row.lpProps[IDX_DISPLAY_NAME].Value.lpszA;
+
+		hr = ptrServiceAdmin->ResetFolderCount(row.lpProps[IDX_ENTRYID].Value.bin.cb,
+											   (LPENTRYID)row.lpProps[IDX_ENTRYID].Value.bin.lpb,
+											   &ulUpdates);
+		if (hr != hrSuccess) {
+			cerr << "Failed to update counters in folder '" << lpszName << "'." << endl;
+			bFailures = true;
+			hr = hrSuccess;
+		} else if (ulUpdates) {
+			cerr << "Updated " << ulUpdates << " counters in folder '" << lpszName << "'." << endl;
+			ulTotalUpdates += ulUpdates;
+		}
+	}
+
+	if (ulTotalUpdates == 0)
+		cerr << "No counters needed to be updated." << endl;
+
+exit:
+	if (hr == hrSuccess && bFailures)
+		hr = MAPI_W_ERRORS_RETURNED;
+	return hr;
+}
+
 class InputValidator {
 public:
 	InputValidator(): m_bFailure(false) { }
@@ -2670,6 +2768,10 @@ int main(int argc, char* argv[])
 		case OPT_SELECT_NODE:
 			node = validateInput(my_optarg);
 			break;
+		case OPT_RESET_FOLDER_COUNT:
+			mode = MODE_RESET_FOLDER_COUNT;
+			username = validateInput(my_optarg);
+			break;
 		default:
 			break;
 		};
@@ -2871,6 +2973,11 @@ int main(int argc, char* argv[])
 		 mode == MODE_ADD_COMPANYQUOTA_RECIPIENT || mode == MODE_DEL_COMPANYQUOTA_RECIPIENT) &&
 		username == NULL) {
 		cerr << "Missing information to edit quota recipients" << endl;
+		return 1;
+	}
+
+	if (mode == MODE_RESET_FOLDER_COUNT && username == NULL) {
+		cerr << "Missing information to reset folder counts" << endl;
 		return 1;
 	}
 
@@ -4093,6 +4200,16 @@ int main(int argc, char* argv[])
 			goto exit;
 		}
 		break;
+	case MODE_RESET_FOLDER_COUNT:
+		hr = ResetFolderCount(lpSession, lpMsgStore, username);
+		if (FAILED(hr)) {
+			cerr << "Failed to reset folder counters." << endl;
+			goto exit;
+		} else if (hr != hrSuccess) {
+			cerr << "Some folder counters could not be reset." << endl;
+		} else {
+			cerr << "Successfully reset folder counters." << endl;
+		}
 	case MODE_INVALID:
 	case MODE_HELP:
 		// happy compiler

@@ -4,6 +4,7 @@
 import os
 import sys
 import locale
+import getopt
 import MAPI
 from MAPI.Util import *
 from MAPI.Time import *
@@ -18,6 +19,7 @@ dopt = inetmapi.delivery_options()
 verbose = False
 
 class emptyCompany: pass
+class emptyUser: pass
 
 def CheckUser(store, abook):
     abeid = store.GetProps([PR_MAILBOX_OWNER_ENTRYID], 0)
@@ -30,22 +32,22 @@ def OpenUser(session, store, username):
     userEntryID = admin.CreateStoreEntryID('', username, 0)
     return session.OpenMsgStore(0, userEntryID, None, MDB_WRITE | MDB_NO_DIALOG)
 
+def GetEmptyCompany():
+    company = emptyCompany()
+    company.Companyname = 'Default'
+    company.CompanyID = None
+    return [company]
+
 def GetCompanyList(store):
     service = store.QueryInterface(IID_IECServiceAdmin)
     try:
         return service.GetCompanyList(0)
     except:
-        company = emptyCompany()
-        company.Companyname = 'Default'
-        company.CompanyID = None
-        return [company]
+        return GetEmptyCompany()
 
 def GetUserList(store, company):
     service = store.QueryInterface(IID_IECServiceAdmin)
-    try:
-        return service.GetUserList(company, 0)
-    except:
-        return []
+    return service.GetUserList(company, 0)
 
 def ProcessMessage(session, envPropTag, message):
     rfc822 = inetmapi.IMToINet(session, None, message, sopt)
@@ -113,22 +115,52 @@ def ProcessStore(session, store):
             if err.hr == MAPI_E_STORE_FULL:
                 raise err
 
+def MakeUserList(users):
+    l = []
+    for u in users:
+        a = emptyUser()
+        a.Username = u
+        l.append(a)
+    return l
+
 
 # main()
 try:
-    if sys.argv[1] == '-v':
+    opts, users = getopt.gnu_getopt(sys.argv[1:], "v", ["verbose"])
+except getopt.GetoptError, err:
+    # print help information and exit:
+    print str(err)
+    exit(1)
+for o, a in opts:
+    if o in ('-v', '--verbose'):
         verbose = True
-except: pass
 
 locale.setlocale(locale.LC_CTYPE, '')
 session = OpenECSession('SYSTEM', '', os.getenv('ZARAFA_SOCKET', 'file:///var/run/zarafa'))
 admin = GetDefaultStore(session)
 abook = session.OpenAddressBook(0, None, MAPI_UNICODE)
 
-companies = GetCompanyList(admin)
+if users:
+    print "Using given user list"
+    companies = GetEmptyCompany()
+else:
+    print "Retrieving company list"
+    companies = GetCompanyList(admin)
 for company in companies:
     print 'Processing ' + company.Companyname
-    users = GetUserList(admin, company.CompanyID)
+    if users:
+        users = MakeUserList(users)
+    else:
+        try:
+            users = GetUserList(admin, company.CompanyID)
+        except Exception, ex:
+            print "Unable to list users: " + str(ex)
+            exit(1)
+    if not users:
+        print "No users to process"
+        exit(0)
+    else:
+        print "Processing %d users" % len(users)
     for user in users:
         if user.Username == 'SYSTEM':
             continue

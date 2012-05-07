@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -156,12 +156,17 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 	// default 1st day of week is sunday, except in weekly recurrences
 	lpRec->setFirstDOW(0);
 
+	sPropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_RECURRENCETYPE], PT_LONG);
 	switch (icRRule.freq) {
 	case ICAL_DAILY_RECURRENCE:
+		sPropVal.Value.ul = 1;
+
 		lpRec->setFrequency(recurrence::DAILY);
 		break;
 
 	case ICAL_WEEKLY_RECURRENCE:
+		sPropVal.Value.ul = 2;
+
 		lpRec->setFrequency(recurrence::WEEKLY);
 		// assume this weekly item is exactly on the start time day
 		lpRec->setWeekDays(1 << tm.tm_wday);
@@ -170,10 +175,14 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 		break;
 
 	case ICAL_MONTHLY_RECURRENCE:
+		sPropVal.Value.ul = 3;
+
 		lpRec->setFrequency(recurrence::MONTHLY);
 		break;
 
 	case ICAL_YEARLY_RECURRENCE:
+		sPropVal.Value.ul = 4;
+
 		lpRec->setFrequency(recurrence::YEARLY);
 		lpRec->setDayOfMonth(tm.tm_mday);
 		break;
@@ -181,6 +190,7 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 		hr = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	};
+	lpIcalItem->lstMsgProps.push_back(sPropVal);
 
 	// since we know the frequency, this value can be set correctly
 	lpRec->setInterval(icRRule.interval);

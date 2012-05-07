@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -46,6 +46,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * 
  */
+
+
 
 #include "platform.h"
 
@@ -1543,6 +1545,7 @@ ECRESULT ECGenericObjectTable::GetCollapseState(struct soap *soap, struct xsd__b
         }
     }
     
+    soap_init(&xmlsoap);
 	soap_set_mode(&xmlsoap, SOAP_XML_TREE | SOAP_C_UTFSTRING);
     xmlsoap.os = &os;
     
@@ -1587,6 +1590,7 @@ ECRESULT ECGenericObjectTable::SetCollapseState(struct xsd__base64Binary sCollap
 
     // The collapse state is the serialized collapse state as returned by GetCollapseState(), which we need to parse here
     soap_init(&xmlsoap);
+	soap_set_mode(&xmlsoap, SOAP_XML_TREE | SOAP_C_UTFSTRING);
     xmlsoap.is = &is;
     
     soap_default_collapseState(&xmlsoap, lpCollapseState);

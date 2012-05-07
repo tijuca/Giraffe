@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -211,13 +211,15 @@ HRESULT ZarafaFsckContact::ValidateItem(LPMESSAGE lpMessage, string strClass)
 {
 	HRESULT hr = hrSuccess;
 
-	if (strClass != "IPM.Contact") {
+	if (strClass != "IPM.Contact" && strClass != "IPM.DistList") {
 		std::cout << "Illegal class: \"" << strClass << "\"" << std::endl;
 		hr = E_INVALIDARG;
 		goto exit;
 	}
 
-	hr = ValidateContactNames(lpMessage);
+	if (strClass == "IPM.Contact")
+		hr = ValidateContactNames(lpMessage);
+	// else: @todo distlist validation
 	if (hr != hrSuccess)
 		goto exit;
 

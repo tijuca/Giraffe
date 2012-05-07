@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -119,14 +119,9 @@ struct RTFSTATE {
 	int ulSkipChars;
 };
 
-struct RTFFONT {
-	int ulCharset;
-};
-
 #define RTF_MAXSTATE 	256
-#define RTF_MAXFONT 	256
 #define RTF_MAXCMD		64
-
+typedef map<int,int> fontmap_t;
 
 /**
  * Converts RTF \ansicpgN <N> number to normal charset string.
@@ -234,7 +229,7 @@ HRESULT HrExtractHTMLFromRTF(std::string &lpStrRTFIn, std::string &lpStrHTMLOut,
 	std::wstring strOutput;
 	int ulState = 0;
 	RTFSTATE sState[RTF_MAXSTATE];	
-	RTFFONT sFont[RTF_MAXFONT];
+	fontmap_t mapFontToCharset;
 	convert_context convertContext;
 
     // Find \\htmltag, if there is none we can't extract HTML
@@ -250,8 +245,6 @@ HRESULT HrExtractHTMLFromRTF(std::string &lpStrRTFIn, std::string &lpStrHTMLOut,
 		hr = hrSuccess;
 	}
 	strConvertCharset = szHTMLCharset + string("//HTMLENTITIES");
-
-	memset(sFont, 0, sizeof(sFont));
 
 	InitRTFState(&sState[0]);
 
@@ -298,7 +291,7 @@ HRESULT HrExtractHTMLFromRTF(std::string &lpStrRTFIn, std::string &lpStrHTMLOut,
                     sState[ulState].szCharset = szANSICharset;
 				} else if(strcmp(szCommand,"fcharset") == 0) {
 					if(sState[ulState].bInFontTbl) {
-						sFont[sState[ulState].ulFont].ulCharset = lArg;
+						mapFontToCharset.insert(make_pair<int,int>(sState[ulState].ulFont, lArg));
 					}
 				} else if(strcmp(szCommand,"htmltag") == 0) {
 				} else if(strcmp(szCommand,"mhtmltag") == 0) {
@@ -316,17 +309,18 @@ HRESULT HrExtractHTMLFromRTF(std::string &lpStrRTFIn, std::string &lpStrHTMLOut,
 				} else if (strcmp(szCommand,"uc") == 0) {
 					sState[ulState].ulUnicodeSkip = lArg;
 				} else if(strcmp(szCommand,"f") == 0) {
-					if(lArg >= RTF_MAXFONT)
-						continue;
-					
 					sState[ulState].ulFont = lArg;
 					
 					if(!sState[ulState].bInFontTbl) {
+						fontmap_t::iterator i = mapFontToCharset.find(lArg);
+						if (i == mapFontToCharset.end())
+							continue;
+
 						// Output any data before this point
 						strOutput += RTFFlushStateOutput(convertContext, sState, ulState);
 
 						// Set new charset			
-						HrGetCharsetByRTFID(sFont[lArg].ulCharset, &sState[ulState].szCharset);
+						HrGetCharsetByRTFID(i->second, &sState[ulState].szCharset);
 						if(sState[ulState].szCharset == NULL) {
 							sState[ulState].szCharset = "us-ascii";
 						} else if(sState[ulState].szCharset[0] == 0) {
@@ -475,7 +469,7 @@ HRESULT HrExtractHTMLFromTextRTF(std::string &lpStrRTFIn, std::string &lpStrHTML
 	bool bNewLine = false;
 	int nLineChar=0;
 	RTFSTATE sState[RTF_MAXSTATE];	
-	RTFFONT sFont[RTF_MAXFONT];
+	fontmap_t mapFontToCharset;
 	convert_context convertContext;
 	string tmp;
 
@@ -504,8 +498,6 @@ HRESULT HrExtractHTMLFromTextRTF(std::string &lpStrRTFIn, std::string &lpStrHTML
 	TryConvert(convertContext, tmp, rawsize(tmp), "us-ascii", wstrUnicodeTmp);
 	strOutput.append(wstrUnicodeTmp);
 
-	memset(sFont, 0, sizeof(sFont));
-    
 	InitRTFState(&sState[0]);
 
 	while(*szInput) {
@@ -551,7 +543,7 @@ HRESULT HrExtractHTMLFromTextRTF(std::string &lpStrRTFIn, std::string &lpStrHTML
                     sState[ulState].szCharset = szANSICharset;
 				} else if(strcmp(szCommand,"fcharset") == 0) {
 					if(sState[ulState].bInFontTbl) {
-						sFont[sState[ulState].ulFont].ulCharset = lArg;
+						mapFontToCharset.insert(make_pair<int,int>(sState[ulState].ulFont, lArg));
 					}
 				} else if(strcmp(szCommand,"htmltag") == 0) {
 				} else if(strcmp(szCommand,"mhtmltag") == 0) {
@@ -576,17 +568,18 @@ HRESULT HrExtractHTMLFromTextRTF(std::string &lpStrRTFIn, std::string &lpStrHTML
 				} else if (strcmp(szCommand,"uc") == 0) {
 					sState[ulState].ulUnicodeSkip = lArg;
 				} else if(strcmp(szCommand,"f") == 0) {
-					if(lArg >= RTF_MAXFONT)
-						continue;
-					
 					sState[ulState].ulFont = lArg;
 					
 					if(!sState[ulState].bInFontTbl) {
+						fontmap_t::iterator i = mapFontToCharset.find(lArg);
+						if (i == mapFontToCharset.end())
+							continue;
+
 						// Output any data before this point
 						strOutput += RTFFlushStateOutput(convertContext, sState, ulState);
 
 						// Set new charset			
-						HrGetCharsetByRTFID(sFont[lArg].ulCharset, &sState[ulState].szCharset);
+						HrGetCharsetByRTFID(i->second, &sState[ulState].szCharset);
 						if(sState[ulState].szCharset == NULL) {
 							sState[ulState].szCharset = "us-ascii";
 						} else if(sState[ulState].szCharset[0] == 0) {
@@ -784,9 +777,9 @@ HRESULT HrExtractHTMLFromRealRTF(std::string &lpStrRTFIn, std::string &lpStrHTML
 	std::wstring strOutput;
 	int ulState = 0;
 	RTFSTATE sState[RTF_MAXSTATE];	
-	RTFFONT sFont[RTF_MAXFONT];
 	convert_context convertContext;
 	string tmp;
+	fontmap_t mapFontToCharset;
 
 	// select output charset
 	hr = HrGetCharsetByCP(ulCodepage, &szHTMLCharset);
@@ -812,8 +805,6 @@ HRESULT HrExtractHTMLFromRealRTF(std::string &lpStrRTFIn, std::string &lpStrHTML
 	TryConvert(convertContext, tmp, rawsize(tmp), "us-ascii", wstrUnicodeTmp);
 	strOutput.append(wstrUnicodeTmp);
 
-	memset(sFont, 0, sizeof(sFont));
-    
 	InitRTFState(&sState[0]);
 
 	while(*szInput) {
@@ -861,7 +852,7 @@ HRESULT HrExtractHTMLFromRealRTF(std::string &lpStrRTFIn, std::string &lpStrHTML
 					sState[ulState].szCharset = szANSICharset;
 				} else if(strcmp(szCommand,"fcharset") == 0) {
 					if(sState[ulState].bInFontTbl) {
-						sFont[sState[ulState].ulFont].ulCharset = lArg;
+						mapFontToCharset.insert(make_pair<int,int>(sState[ulState].ulFont, lArg));
 					}
 				} else if(strcmp(szCommand,"htmltag") == 0) {
 				} else if(strcmp(szCommand,"latentstyles") == 0) {
@@ -885,19 +876,20 @@ HRESULT HrExtractHTMLFromRealRTF(std::string &lpStrRTFIn, std::string &lpStrHTML
 				} else if (strcmp(szCommand,"uc") == 0) {
 					sState[ulState].ulUnicodeSkip = lArg;
 				} else if(strcmp(szCommand,"f") == 0) {
-					if(lArg >= RTF_MAXFONT)
-						continue;
-					
 					sState[ulState].ulFont = lArg;
 					
 					if(!sState[ulState].bInFontTbl) {
+						fontmap_t::iterator i = mapFontToCharset.find(lArg);
+						if (i == mapFontToCharset.end())
+							continue;
+
 						// Output any data before this point
 						if (!sState[ulState].output.empty()) {
 							strOutput += RTFFlushStateOutput(convertContext, sState, ulState);
 						}
 
-						// Set new charset			
-						HrGetCharsetByRTFID(sFont[lArg].ulCharset, &sState[ulState].szCharset);
+						// Set new charset
+						HrGetCharsetByRTFID(i->second, &sState[ulState].szCharset);
 						if(sState[ulState].szCharset == NULL) {
 							sState[ulState].szCharset = "us-ascii";
 						} else if(sState[ulState].szCharset[0] == 0) {
@@ -1155,14 +1147,12 @@ HRESULT HrExtractBODYFromTextRTF(std::string &lpStrRTFIn, std::wstring &strBodyO
 	char *szANSICharset = "us-ascii";
 	int ulState = 0;
 	RTFSTATE sState[RTF_MAXSTATE];	
-	RTFFONT sFont[RTF_MAXFONT];
+	fontmap_t mapFontToCharset;
 	convert_context convertContext;
 	std::wstring strwAppend;
 	
     strBodyOut.resize(0,0);
    
-	memset(sFont, 0, sizeof(sFont));
-    
 	InitRTFState(&sState[0]);
 
 	while(*szInput) {
@@ -1206,7 +1196,7 @@ HRESULT HrExtractBODYFromTextRTF(std::string &lpStrRTFIn, std::wstring &strBodyO
 					sState[ulState].szCharset = szANSICharset;
 				} else if(strcmp(szCommand,"fcharset") == 0) {
 					if(sState[ulState].bInFontTbl) {
-						sFont[sState[ulState].ulFont].ulCharset = lArg;
+						mapFontToCharset.insert(make_pair<int,int>(sState[ulState].ulFont, lArg));
 					}
 				} else if(strcmp(szCommand,"htmltag") == 0) {
 				} else if(strcmp(szCommand,"mhtmltag") == 0) {
@@ -1221,17 +1211,18 @@ HRESULT HrExtractBODYFromTextRTF(std::string &lpStrRTFIn, std::wstring &strBodyO
 				} else if (strcmp(szCommand,"uc") == 0) {
 					sState[ulState].ulUnicodeSkip = lArg;
 				} else if(strcmp(szCommand,"f") == 0) {
-					if(lArg >= RTF_MAXFONT)
-						continue;
-					
 					sState[ulState].ulFont = lArg;
 					
 					if(!sState[ulState].bInFontTbl) {
+						fontmap_t::iterator i = mapFontToCharset.find(lArg);
+						if (i == mapFontToCharset.end())
+							continue;
+
 						// Output any data before this point
 						strBodyOut += RTFFlushStateOutput(convertContext, sState, ulState);
 
 						// Set new charset			
-						HrGetCharsetByRTFID(sFont[lArg].ulCharset, &sState[ulState].szCharset);
+						HrGetCharsetByRTFID(i->second, &sState[ulState].szCharset);
 						if(sState[ulState].szCharset == NULL) {
 							sState[ulState].szCharset = "us-ascii";
 						} else if(sState[ulState].szCharset[0] == 0) {

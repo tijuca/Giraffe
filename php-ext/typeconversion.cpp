@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -1831,7 +1831,7 @@ HRESULT PropValueArraytoPHPArray(ULONG cValues, LPSPropValue pPropValueArray, zv
 			break;
 
 		case PT_ERROR:
-			add_assoc_long(zval_prop_value, pulproptag, (ULONG)pPropValue->Value.err);
+			add_assoc_long(zval_prop_value, pulproptag, (LONG)pPropValue->Value.err);
 			break;
 
 		case PT_APPTIME:

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -4852,3 +4852,35 @@ std::string WSTransport::GetAppName()
 		m_strAppName = basename((char *)s.c_str());
     return m_strAppName;
 }
+
+HRESULT WSTransport::HrResetFolderCount(ULONG cbEntryId, LPENTRYID lpEntryId, ULONG *lpulUpdates)
+{
+	HRESULT hr = hrSuccess;
+    ECRESULT er = erSuccess;
+	entryId eidFolder;
+	resetFolderCountResponse sResponse = {0};
+
+	LockSoap();
+
+	hr = CopyMAPIEntryIdToSOAPEntryId(cbEntryId, lpEntryId, &eidFolder, true);
+	if (hr != hrSuccess)
+		goto exit;
+
+	START_SOAP_CALL
+	{
+		if (SOAP_OK != m_lpCmd->ns__resetFolderCount(m_ecSessionId, eidFolder, &sResponse))
+			er = ZARAFA_E_NETWORK_ERROR;
+		else
+			er = sResponse.er;
+	}
+	END_SOAP_CALL
+
+	if (lpulUpdates)
+		*lpulUpdates = sResponse.ulUpdates;
+
+exit:
+    UnLockSoap();
+    
+	return hr;
+}
+

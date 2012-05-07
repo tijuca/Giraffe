@@ -1425,6 +1425,7 @@ class IECServiceAdmin(IUnknown):
     def ResolvePseudoUrl(self, *args): return _MAPICore.IECServiceAdmin_ResolvePseudoUrl(self, *args)
     def GetPublicStoreEntryID(self, *args): return _MAPICore.IECServiceAdmin_GetPublicStoreEntryID(self, *args)
     def GetArchiveStoreEntryID(self, *args): return _MAPICore.IECServiceAdmin_GetArchiveStoreEntryID(self, *args)
+    def ResetFolderCount(self, *args): return _MAPICore.IECServiceAdmin_ResetFolderCount(self, *args)
     __swig_destroy__ = _MAPICore.delete_IECServiceAdmin
     __del__ = lambda self : None;
 IECServiceAdmin_swigregister = _MAPICore.IECServiceAdmin_swigregister

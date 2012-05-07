@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -95,8 +95,7 @@ HRESULT ECAttach::Create(ECMsgStore *lpMsgStore, ULONG ulObjType, BOOL fModify, 
 	lpAttach = new ECAttach(lpMsgStore, ulObjType, fModify, ulAttachNum, lpRoot);
 
 	hr = lpAttach->QueryInterface(IID_ECAttach, (void **)lppAttach);
-
-	if(hr != hrSuccess)
+	if (hr != hrSuccess)
 		delete lpAttach;
 
 	return hr;
@@ -116,6 +115,36 @@ HRESULT ECAttach::QueryInterface(REFIID refiid, void **lppInterface)
 	REGISTER_INTERFACE(IID_IECSingleInstance, &this->m_xECSingleInstance);
 
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
+}
+
+HRESULT ECAttach::SaveChanges(ULONG ulFlags)
+{
+	HRESULT hr = hrSuccess;
+
+	if (!fModify) {
+		hr = MAPI_E_NO_ACCESS;
+		goto exit;
+	}
+
+	if (!lstProps || lstProps->find(PROP_ID(PR_RECORD_KEY)) == lstProps->end()) {
+		GUID guid;
+		SPropValue sPropVal;
+
+		CoCreateGuid(&guid);
+
+		sPropVal.ulPropTag = PR_RECORD_KEY;
+		sPropVal.Value.bin.cb = sizeof(guid);
+		sPropVal.Value.bin.lpb = (LPBYTE)&guid;
+
+		hr = HrSetRealProp(&sPropVal);
+		if (hr != hrSuccess)
+			goto exit;
+	}
+
+	hr = ECMAPIProp::SaveChanges(ulFlags);
+
+exit:
+	return hr;
 }
 
 HRESULT ECAttach::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -213,6 +213,12 @@ ECRESULT ECGenProps::IsPropComputed(unsigned int ulPropTag, unsigned int ulObjTy
 			else
 				er = ZARAFA_E_NOT_FOUND;
 			break;
+		case PR_RECORD_KEY:
+			if (ulObjType == MAPI_ATTACH)
+				er = ZARAFA_E_NOT_FOUND;
+			else
+				er = erSuccess;
+			break;
 		default:
 			er = ZARAFA_E_NOT_FOUND;
 			break;
@@ -238,7 +244,6 @@ ECRESULT ECGenProps::IsPropComputedUncached(unsigned int ulPropTag, unsigned int
 		case PROP_ID(PR_EC_MAILBOX_OWNER_ACCOUNT):
 		case PROP_ID(PR_EC_HIERARCHYID):
 		case PROP_ID(PR_INSTANCE_KEY):
-		case PROP_ID(PR_RECORD_KEY):
 		case PROP_ID(PR_OBJECT_TYPE):
 		case PROP_ID(PR_SOURCE_KEY):
 		case PROP_ID(PR_PARENT_SOURCE_KEY):
@@ -249,6 +254,12 @@ ECRESULT ECGenProps::IsPropComputedUncached(unsigned int ulPropTag, unsigned int
 		case PROP_ID(PR_MAPPING_SIGNATURE):
 		    er = erSuccess;
 		    break;
+		case PROP_ID(PR_RECORD_KEY):
+			if (ulObjType == MAPI_ATTACH)
+				er = ZARAFA_E_NOT_FOUND;
+			else
+				er = erSuccess;
+			break;
 		case PROP_ID(PR_DISPLAY_NAME): // only the store property is generated
 		case PROP_ID(PR_EC_DELETED_STORE):
 		    if(ulObjType == MAPI_STORE)
@@ -292,7 +303,6 @@ ECRESULT ECGenProps::IsPropRedundant(unsigned int ulPropTag, unsigned int ulObjT
 		case PROP_ID(PR_PARENT_ENTRYID): 		// generated from hierarchy
 		case PROP_ID(PR_STORE_ENTRYID):			// generated from store id
 		case PROP_ID(PR_INSTANCE_KEY):			// table data only
-		case PROP_ID(PR_RECORD_KEY):				// generated from hierarchy
 		case PROP_ID(PR_OBJECT_TYPE):			// generated from hierarchy
 		case PROP_ID(PR_CONTENT_COUNT):			// generated from hierarchy
 		case PROP_ID(PR_CONTENT_UNREAD):			// generated from hierarchy
@@ -303,6 +313,12 @@ ECRESULT ECGenProps::IsPropRedundant(unsigned int ulPropTag, unsigned int ulObjT
 		case PROP_ID(PR_EC_IMAP_ID):				// generated for each new mail and updated on move by the server
 		    er = erSuccess;
 		    break;
+		case PROP_ID(PR_RECORD_KEY):				// generated from hierarchy except for attachments
+			if (ulObjType == MAPI_ATTACH)
+				er = ZARAFA_E_NOT_FOUND;
+			else
+				er = erSuccess;
+			break;
 		default:
 			er = ZARAFA_E_NOT_FOUND;
 			break;
@@ -375,7 +391,19 @@ ECRESULT ECGenProps::GetPropComputed(struct soap *soap, unsigned int ulObjType, 
 				lpPropVal->Value.ul &= ~SUBMITFLAG_LOCKED;
 		}
 		break;
-	
+	case PROP_ID(PR_RECORD_KEY):
+		if (ulObjType == MAPI_ATTACH && lpPropVal->ulPropTag != ulPropTagRequested) {
+			lpPropVal->ulPropTag = PR_RECORD_KEY;
+			lpPropVal->__union = SOAP_UNION_propValData_bin;
+			
+			lpPropVal->Value.bin = s_alloc<struct xsd__base64Binary>(soap);
+			lpPropVal->Value.bin->__ptr = s_alloc<unsigned char>(soap, sizeof(ULONG));
+			
+			lpPropVal->Value.bin->__size = sizeof(ULONG);
+			memcpy(lpPropVal->Value.bin->__ptr, &ulObjId, sizeof(ULONG));
+		} else
+			er = ZARAFA_E_NOT_FOUND;
+		break;
 	default:
 		er = ZARAFA_E_NOT_FOUND;
 		goto exit;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -3462,6 +3462,12 @@ ECRESULT ECUserManagement::DeleteLocalObject(unsigned int ulObjectId, objectclas
 
 	bTransaction = false;
 
+	// Purge the usercache because we also need to remove sendas relations
+	er = m_lpSession->GetSessionManager()->GetCacheManager()->PurgeCache(PURGE_CACHE_USEROBJECT | PURGE_CACHE_EXTERNID | PURGE_CACHE_USERDETAILS);
+	if(er != erSuccess)
+		goto exit;
+
+
 	switch (objclass) {
 	case ACTIVE_USER:
 	case NONACTIVE_USER:
@@ -3469,13 +3475,15 @@ ECRESULT ECUserManagement::DeleteLocalObject(unsigned int ulObjectId, objectclas
 	case NONACTIVE_EQUIPMENT:
 		strQuery = "SELECT HEX(guid) FROM stores WHERE user_id=" + stringify(ulObjectId);
 		er = lpDatabase->DoSelect(strQuery, &lpResult);
-
 		if(er != erSuccess)
 			goto exit;
 
 		lpRow = lpDatabase->FetchRow(lpResult);
 
-		if(lpRow == NULL || lpRow[0] == NULL) {
+		if(lpRow == NULL) {
+			m_lpLogger->Log(EC_LOGLEVEL_INFO, "User script not executed. No store exists.");
+			goto exit;
+		} else if (lpRow[0] == NULL) {
 			er = ZARAFA_E_DATABASE_ERROR;
 			goto exit;
 		}
@@ -3502,11 +3510,12 @@ ECRESULT ECUserManagement::DeleteLocalObject(unsigned int ulObjectId, objectclas
 		break;
 	}
 
-	er = m_lpSession->GetSessionManager()->GetCacheManager()->UpdateUser(ulObjectId);
-	if(er != erSuccess)
-		goto exit;
-
 exit:
+	if (er)
+		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Auto-deleting %s %d done. Error code 0x%08X", ObjectClassToName(objclass), ulObjectId, er);
+	else
+		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Auto-deleting %s %d done.", ObjectClassToName(objclass), ulObjectId);
+	
 	if (lpDatabase) {
 		if (bTransaction && er != erSuccess)
 			lpDatabase->Rollback();

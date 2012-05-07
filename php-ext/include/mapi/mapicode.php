@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -128,11 +128,16 @@ function make_mapi_s($code)
  */
 define('NOERROR'                                         ,0);
 
-define('MAPI_E_CALL_FAILED'                              ,(int) 0x80004005);
-define('MAPI_E_NOT_ENOUGH_MEMORY'                        ,(int) 0x8007000E);
-define('MAPI_E_INVALID_PARAMETER'                        ,(int) 0x80070057);
-define('MAPI_E_INTERFACE_NOT_SUPPORTED'                  ,(int) 0x80004002);
-define('MAPI_E_NO_ACCESS'                                ,(int) 0x80070005);
+// The following codes don't use make_mapi_e because they are in the 0x000FF000 range,
+// but we cannot use the HEX value as would make most sense as that would break in 64bit PHP
+// (ZCP server will return a negative value, but PHP would convert this define into a positive
+// value). Hence we declare the value exactly as we need it as integer and bypass the
+// 32bit/64bit hell.
+define('MAPI_E_CALL_FAILED'                              ,(int)-2147467259); // 0x80004005
+define('MAPI_E_NOT_ENOUGH_MEMORY'                        ,(int)-2147024882); // 0x8007000E
+define('MAPI_E_INVALID_PARAMETER'                        ,(int)-2147024809); // 0x80070057
+define('MAPI_E_INTERFACE_NOT_SUPPORTED'                  ,(int)-2147467262); // 0x80004002
+define('MAPI_E_NO_ACCESS'                                ,(int)-2147024891); // 0x80070005
 
 define('MAPI_E_NO_SUPPORT'                               ,make_mapi_e(0x102));
 define('MAPI_E_BAD_CHARWIDTH'                            ,make_mapi_e(0x103));

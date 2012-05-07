@@ -9719,29 +9719,29 @@ XS(_wrap_IMAPITable_GetCollapseState) {
     IMAPITable *arg1 = (IMAPITable *) 0 ;
     ULONG arg2 ;
     ULONG arg3 ;
-    LPBYTE arg4 ;
+    BYTE *arg4 = (BYTE *) 0 ;
     ULONG *arg5 = (ULONG *) 0 ;
     LPBYTE *arg6 = (LPBYTE *) 0 ;
     void *argp1 = 0 ;
     int res1 = 0 ;
     unsigned int fl2 ;
     int ecode2 ;
-    unsigned int val3 ;
-    int ecode3 = 0 ;
-    void *argp4 ;
-    int res4 = 0 ;
-    ULONG temp5 ;
-    int res5 = SWIG_TMPOBJ ;
-    void *argp6 = 0 ;
-    int res6 = 0 ;
+    int res3 ;
+    char *buf3 = 0 ;
+    size_t size3 ;
+    int alloc3 = 0 ;
+    ULONG cbEntryID5 = 0 ;
+    LPBYTE lpEntryID5 = NULL ;
     int argvi = 0;
     HRESULT result;
     dXSARGS;
     
     ULONG ulFlags = 0;
-    arg5 = &temp5;
-    if ((items < 5) || (items > 5)) {
-      SWIG_croak("Usage: IMAPITable_GetCollapseState(self,ulFlags,cbInstanceKey,lpbInstanceKey,OUTPUT);");
+    {
+      arg5 = &cbEntryID5; arg6 = &lpEntryID5;
+    }
+    if ((items < 3) || (items > 3)) {
+      SWIG_croak("Usage: IMAPITable_GetCollapseState(self,ulFlags,cbInstanceKey,pbInstanceKey,lpOutput);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IMAPITable, 0 |  0 );
     if (!SWIG_IsOK(res1)) {
@@ -9756,51 +9756,50 @@ XS(_wrap_IMAPITable_GetCollapseState) {
       arg2 = fl2;
       ulFlags = fl2;
     }
-    ecode3 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(2), &val3);
-    if (!SWIG_IsOK(ecode3)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "IMAPITable_GetCollapseState" "', argument " "3"" of type '" "ULONG""'");
-    } 
-    arg3 = static_cast< ULONG >(val3);
     {
-      res4 = SWIG_ConvertPtr(ST(3), &argp4, SWIGTYPE_p_LPBYTE,  0 );
-      if (!SWIG_IsOK(res4)) {
-        SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IMAPITable_GetCollapseState" "', argument " "4"" of type '" "LPBYTE""'"); 
-      }  
-      if (!argp4) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IMAPITable_GetCollapseState" "', argument " "4"" of type '" "LPBYTE""'");
+      res3 = SWIG_AsCharPtrAndSize(ST(2), &buf3, &size3, &alloc3);
+      if (!SWIG_IsOK(res3)) {
+        SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IMAPITable_GetCollapseState" "', argument " "3"" of type '" "ULONG""'");
+      }
+      if(buf3 == NULL) {
+        arg3 = 0;
+        arg4 = NULL;
       } else {
-        arg4 = *(reinterpret_cast< LPBYTE * >(argp4));
+        arg3 = static_cast< ULONG >(size3 - 1);
+        arg4 = reinterpret_cast< BYTE * >(buf3);
       }
     }
-    res6 = SWIG_ConvertPtr(ST(4), &argp6,SWIGTYPE_p_LPBYTE, 0 |  0 );
-    if (!SWIG_IsOK(res6)) {
-      SWIG_exception_fail(SWIG_ArgError(res6), "in method '" "IMAPITable_GetCollapseState" "', argument " "6"" of type '" "LPBYTE *""'"); 
-    }
-    arg6 = reinterpret_cast< LPBYTE * >(argp6);
     result = (arg1)->GetCollapseState(arg2,arg3,arg4,arg5,arg6);
     {
       if(FAILED(result)) {
         Do_Exception(result);
       }
     }
-    if (SWIG_IsTmpObj(res5)) {
-      if (argvi >= items) EXTEND(sp,1);  ST(argvi) = SWIG_From_unsigned_SS_int  SWIG_PERL_CALL_ARGS_1((*arg5)); argvi++  ;
-    } else {
-      int new_flags = SWIG_IsNewObj(res5) ? (SWIG_POINTER_OWN | 0) : 0;
-      if (argvi >= items) EXTEND(sp,1);  ST(argvi) = SWIG_NewPointerObj((void*)(arg5), SWIGTYPE_p_ULONG, new_flags); argvi++  ;
+    {
+      if (*arg6) {
+        if (argvi >= items) EXTEND(sp,1);  ST(argvi) = SWIG_FromCharPtrAndSize((const char *)*arg6,*arg5); argvi++  ;
+      }
     }
     
     
-    
-    
-    
+    {
+      if (alloc3 == SWIG_NEWOBJ) delete[] buf3;
+    }
+    {
+      if(*arg6)
+      MAPIFreeBuffer(*arg6);
+    }
     XSRETURN(argvi);
   fail:
     
     
-    
-    
-    
+    {
+      if (alloc3 == SWIG_NEWOBJ) delete[] buf3;
+    }
+    {
+      if(*arg6)
+      MAPIFreeBuffer(*arg6);
+    }
     SWIG_croak_null();
   }
 }
@@ -9811,16 +9810,16 @@ XS(_wrap_IMAPITable_SetCollapseState) {
     IMAPITable *arg1 = (IMAPITable *) 0 ;
     ULONG arg2 ;
     ULONG arg3 ;
-    LPBYTE arg4 ;
+    BYTE *arg4 = (BYTE *) 0 ;
     BOOKMARK *arg5 = (BOOKMARK *) 0 ;
     void *argp1 = 0 ;
     int res1 = 0 ;
     unsigned int fl2 ;
     int ecode2 ;
-    unsigned int val3 ;
-    int ecode3 = 0 ;
-    void *argp4 ;
-    int res4 = 0 ;
+    int res3 ;
+    char *buf3 = 0 ;
+    size_t size3 ;
+    int alloc3 = 0 ;
     BOOKMARK temp5 ;
     int res5 = SWIG_TMPOBJ ;
     int argvi = 0;
@@ -9829,7 +9828,7 @@ XS(_wrap_IMAPITable_SetCollapseState) {
     
     ULONG ulFlags = 0;
     arg5 = &temp5;
-    if ((items < 4) || (items > 4)) {
+    if ((items < 3) || (items > 3)) {
       SWIG_croak("Usage: IMAPITable_SetCollapseState(self,ulFlags,cbCollapseState,pbCollapseState);");
     }
     res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IMAPITable, 0 |  0 );
@@ -9845,20 +9844,17 @@ XS(_wrap_IMAPITable_SetCollapseState) {
       arg2 = fl2;
       ulFlags = fl2;
     }
-    ecode3 = SWIG_AsVal_unsigned_SS_int SWIG_PERL_CALL_ARGS_2(ST(2), &val3);
-    if (!SWIG_IsOK(ecode3)) {
-      SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "IMAPITable_SetCollapseState" "', argument " "3"" of type '" "ULONG""'");
-    } 
-    arg3 = static_cast< ULONG >(val3);
     {
-      res4 = SWIG_ConvertPtr(ST(3), &argp4, SWIGTYPE_p_LPBYTE,  0 );
-      if (!SWIG_IsOK(res4)) {
-        SWIG_exception_fail(SWIG_ArgError(res4), "in method '" "IMAPITable_SetCollapseState" "', argument " "4"" of type '" "LPBYTE""'"); 
-      }  
-      if (!argp4) {
-        SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "IMAPITable_SetCollapseState" "', argument " "4"" of type '" "LPBYTE""'");
+      res3 = SWIG_AsCharPtrAndSize(ST(2), &buf3, &size3, &alloc3);
+      if (!SWIG_IsOK(res3)) {
+        SWIG_exception_fail(SWIG_ArgError(res3), "in method '" "IMAPITable_SetCollapseState" "', argument " "3"" of type '" "ULONG""'");
+      }
+      if(buf3 == NULL) {
+        arg3 = 0;
+        arg4 = NULL;
       } else {
-        arg4 = *(reinterpret_cast< LPBYTE * >(argp4));
+        arg3 = static_cast< ULONG >(size3 - 1);
+        arg4 = reinterpret_cast< BYTE * >(buf3);
       }
     }
     result = (arg1)->SetCollapseState(arg2,arg3,arg4,arg5);
@@ -9875,13 +9871,17 @@ XS(_wrap_IMAPITable_SetCollapseState) {
     }
     
     
-    
+    {
+      if (alloc3 == SWIG_NEWOBJ) delete[] buf3;
+    }
     
     XSRETURN(argvi);
   fail:
     
     
-    
+    {
+      if (alloc3 == SWIG_NEWOBJ) delete[] buf3;
+    }
     
     SWIG_croak_null();
   }
@@ -22686,6 +22686,75 @@ XS(_wrap_IECServiceAdmin_GetArchiveStoreEntryID) {
 }
 
 
+XS(_wrap_IECServiceAdmin_ResetFolderCount) {
+  {
+    IECServiceAdmin *arg1 = (IECServiceAdmin *) 0 ;
+    ULONG arg2 ;
+    LPENTRYID arg3 ;
+    ULONG *arg4 = (ULONG *) 0 ;
+    void *argp1 = 0 ;
+    int res1 = 0 ;
+    int res2 ;
+    char *buf2 = 0 ;
+    size_t size2 ;
+    int alloc2 = 0 ;
+    ULONG temp4 ;
+    int res4 = SWIG_TMPOBJ ;
+    int argvi = 0;
+    HRESULT result;
+    dXSARGS;
+    
+    arg4 = &temp4;
+    if ((items < 2) || (items > 2)) {
+      SWIG_croak("Usage: IECServiceAdmin_ResetFolderCount(self,cbEntryID,lpEntryID);");
+    }
+    res1 = SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_IECServiceAdmin, 0 |  0 );
+    if (!SWIG_IsOK(res1)) {
+      SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "IECServiceAdmin_ResetFolderCount" "', argument " "1"" of type '" "IECServiceAdmin *""'"); 
+    }
+    arg1 = reinterpret_cast< IECServiceAdmin * >(argp1);
+    {
+      res2 = SWIG_AsCharPtrAndSize(ST(1), &buf2, &size2, &alloc2);
+      if (!SWIG_IsOK(res2)) {
+        SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "IECServiceAdmin_ResetFolderCount" "', argument " "2"" of type '" "ULONG""'");
+      }
+      if(buf2 == NULL) {
+        arg2 = 0;
+        arg3 = NULL;
+      } else {
+        arg2 = static_cast< ULONG >(size2 - 1);
+        arg3 = reinterpret_cast< LPENTRYID >(buf2);
+      }
+    }
+    result = (arg1)->ResetFolderCount(arg2,arg3,arg4);
+    {
+      if(FAILED(result)) {
+        Do_Exception(result);
+      }
+    }
+    if (SWIG_IsTmpObj(res4)) {
+      if (argvi >= items) EXTEND(sp,1);  ST(argvi) = SWIG_From_unsigned_SS_int  SWIG_PERL_CALL_ARGS_1((*arg4)); argvi++  ;
+    } else {
+      int new_flags = SWIG_IsNewObj(res4) ? (SWIG_POINTER_OWN | 0) : 0;
+      if (argvi >= items) EXTEND(sp,1);  ST(argvi) = SWIG_NewPointerObj((void*)(arg4), SWIGTYPE_p_ULONG, new_flags); argvi++  ;
+    }
+    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
+    
+    XSRETURN(argvi);
+  fail:
+    
+    {
+      if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+    }
+    
+    SWIG_croak_null();
+  }
+}
+
+
 XS(_wrap_delete_IECServiceAdmin) {
   {
     IECServiceAdmin *arg1 = (IECServiceAdmin *) 0 ;
@@ -25463,6 +25532,7 @@ static swig_command_info swig_commands[] = {
 {"MAPICorec::IECServiceAdmin_ResolvePseudoUrl", _wrap_IECServiceAdmin_ResolvePseudoUrl},
 {"MAPICorec::IECServiceAdmin_GetPublicStoreEntryID", _wrap_IECServiceAdmin_GetPublicStoreEntryID},
 {"MAPICorec::IECServiceAdmin_GetArchiveStoreEntryID", _wrap_IECServiceAdmin_GetArchiveStoreEntryID},
+{"MAPICorec::IECServiceAdmin_ResetFolderCount", _wrap_IECServiceAdmin_ResetFolderCount},
 {"MAPICorec::delete_IECServiceAdmin", _wrap_delete_IECServiceAdmin},
 {"MAPICorec::IECSpooler_GetMasterOutgoingTable", _wrap_IECSpooler_GetMasterOutgoingTable},
 {"MAPICorec::IECSpooler_DeleteFromMasterOutgoingTable", _wrap_IECSpooler_DeleteFromMasterOutgoingTable},

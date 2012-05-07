@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -1752,11 +1752,12 @@ exit:
  *
  * WARNING this function creates its own transaction!
  *
- * @param lpSession Session to get database handle, etc
- * @param ulObjId ID of the folder to recalc
+ * @param[in] lpSession Session to get database handle, etc
+ * @param[in] ulObjId ID of the folder to recalc
+ * @param[out] lpulUpdates Will be set to number of counters that were updated (may be NULL)
  * @return result
  */
-ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId)
+ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId, unsigned int *lpulUpdates)
 {
 	ECRESULT er = erSuccess;
 	DB_RESULT lpDBResult = NULL;
@@ -1906,8 +1907,11 @@ ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId)
 exit:
 	if(er != erSuccess)
 		lpDatabase->Rollback();
-	else
+	else {
 		lpDatabase->Commit();
+		if (lpulUpdates)
+			*lpulUpdates = ulAffected;
+	}
 		
 	return er;	
 }

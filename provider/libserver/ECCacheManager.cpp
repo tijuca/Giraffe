@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -757,8 +757,8 @@ ECRESULT ECCacheManager::GetUserObjects(const list<objectid_t> &lstExternObjIds,
 		ulLocalId = atoi(lpDBRow[0]);
 		sExternId.id.assign(lpDBRow[1], lpDBLen[1]);
 		sExternId.objclass = (objectclass_t)atoi(lpDBRow[2]);
-		ulCompanyId = atoi(lpDBRow[3]);
-		strSignature.assign(lpDBRow[4], lpDBLen[4]);
+		strSignature.assign(lpDBRow[3], lpDBLen[3]);
+		ulCompanyId = atoi(lpDBRow[4]);
 
 		lpmapLocalObjIds->insert(make_pair(sExternId, ulLocalId));
 

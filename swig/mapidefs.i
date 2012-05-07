@@ -631,9 +631,9 @@ public:
 			      ULONG ulFlags, LPSRowSet* OUTPUT /*lppRows*/, ULONG* OUTPUT /*lpulMoreRows*/) = 0;
     virtual HRESULT CollapseRow(ULONG cbInstanceKey, BYTE *pbInstanceKey, ULONG ulFlags, ULONG* OUTPUT /*lpulRowCount*/) = 0;
     virtual HRESULT WaitForCompletion(ULONG ulFlags, ULONG ulTimeout, ULONG* OUTPUT /*lpulTableStatus*/) = 0;
-    virtual HRESULT GetCollapseState(ULONG ulFlags, ULONG cbInstanceKey, LPBYTE lpbInstanceKey, ULONG* OUTPUT /*lpcbCollapseState*/,
-				     LPBYTE* OUTPUT /*lppbCollapseState*/) = 0;
-    virtual HRESULT SetCollapseState(ULONG ulFlags, ULONG cbCollapseState, LPBYTE pbCollapseState, BOOKMARK* OUTPUT /*lpbkLocation*/) = 0;
+    virtual HRESULT GetCollapseState(ULONG ulFlags, ULONG cbInstanceKey, BYTE *pbInstanceKey, ULONG* lpulOutput /*lpcbCollapseState*/,
+				     LPBYTE* lpOutput /*lppbCollapseState*/) = 0;
+    virtual HRESULT SetCollapseState(ULONG ulFlags, ULONG cbCollapseState, BYTE *pbCollapseState, BOOKMARK* OUTPUT /*lpbkLocation*/) = 0;
 	%extend {
 		~IMAPITable() { self->Release(); }
 	}

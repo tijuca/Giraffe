@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -1347,6 +1347,8 @@ ECRESULT ECDatabaseMySQL::UpdateDatabase(bool bForceUpdate, std::string &strRepo
 		if (er == ZARAFA_E_IGNORE_ME) {
 			bSkipped = true;
 			er = erSuccess;
+		} else if (er == ZARAFA_E_USER_CANCEL) {
+			goto exit; // Reason should be logged in the update itself.
 		} else if (er != hrSuccess) {
 			Rollback();
 			m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Failed: Rollback database");

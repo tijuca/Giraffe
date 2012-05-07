@@ -528,6 +528,27 @@ def GetZarafaVersion():
     except: pass
     return result
 
+def GetTempSize():
+    r = re.compile(r'^/\S+\s+\d+\s+\d+\s+(\d+)')
+    try:
+        p = subprocess.Popen(['df', '-P','-B1',os.getenv('TEMP','/tmp')], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        for line in p.stdout:
+            m = r.match(line)
+            if not m is None:
+                return int(m.groups()[0])
+        p.wait()
+    except: pass
+    return 0
+
+def StorageSize(size):
+    KiB = 1000
+    MiB = 1000 * KiB
+    GiB = 1000 * MiB
+    if (size > GiB):
+        return str(size / MiB) + " MB"
+    if (size > MiB):
+        return str(size / KiB) + " KB"
+    return str(size) + " B"
 
 def UpdateVersion(cursor, zarafa_version, databaserevision):
     cursor.execute("INSERT INTO versions (major, minor, revision, databaserevision, updatetime) VALUES (%s, %s, %s, %u,NOW())" % (zarafa_version[0], zarafa_version[1], zarafa_version[2], databaserevision))
@@ -561,8 +582,30 @@ def ValidateDBVersions(db):
         sys.exit(1)
     return rev
 
+def GetPropertiesTableSize(db):
+    cursor = db.cursor()
+    cursor.execute('SHOW TABLE STATUS WHERE name = \'properties\'')
+    result = cursor.fetchone()
+    if result is None:
+        print "No properties table size entry in the database. This indicates a fresh install."
+        print "No need to run this tool."
+        sys.exit(1)
+    return result[6]
 
 def UpdateDB(db):
+    # get database size, compare to disksize
+    psize = GetPropertiesTableSize(db)
+    tsize = GetTempSize()
+    if (tsize < psize * 2):
+        print "You may not have enough free diskspace on " + os.getenv('TEMP','/tmp')
+        print "Properties table size: " + StorageSize(psize)
+        print "Diskfree size: " + StorageSize(tsize)
+        print "Press <ENTER> to continue anyway, or CTRL-C to stop"
+        try:
+            raw_input()
+        except:
+            sys.exit(1)
+
     # First check the version, should be at least 45
     dbrevision = ValidateDBVersions(db)
 

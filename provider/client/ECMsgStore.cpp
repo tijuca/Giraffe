@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -3391,6 +3391,11 @@ exit:
 	return hr;
 }
 
+HRESULT ECMsgStore::ResetFolderCount(ULONG cbEntryId, LPENTRYID lpEntryId, ULONG *lpulUpdates)
+{
+	return lpTransport->HrResetFolderCount(cbEntryId, lpEntryId, lpulUpdates);
+}
+
 // This is almost the same as getting a 'normal' outgoing table, except we pass NULL as PEID for the store
 HRESULT ECMsgStore::GetMasterOutgoingTable(ULONG ulFlags, IMAPITable ** lppOutgoingTable)
 {
@@ -4446,6 +4451,13 @@ HRESULT ECMsgStore::xECServiceAdmin::GetArchiveStoreEntryID(LPCTSTR lpszUserName
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetArchiveStoreEntryID", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
 	return pThis->GetArchiveStoreEntryID(lpszUserName, lpszServerName, ulFlags, lpcbStoreID, lppStoreID);
+}
+
+HRESULT ECMsgStore::xECServiceAdmin::ResetFolderCount(ULONG cbEntryId, LPENTRYID lpEntryId, ULONG *lpulUpdates)
+{
+	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::ResetFolderCount", "");
+	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
+	return pThis->ResetFolderCount(cbEntryId, lpEntryId, lpulUpdates);
 }
 
 ///////////////////////

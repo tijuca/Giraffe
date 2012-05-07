@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -312,17 +312,17 @@
 					 */
 					$occurrences = $recur->getItems($row[$this->properties["flagdueby"]], time(), 0, true);
 
-					if(count($occurrences) == 0)
-						continue;
+					if(count($occurrences) > 1) {
+					    // More than one occurrence, use the last one instead of the first one after flagdueby
+                        $occ = $occurrences[count($occurrences)-1];
 
-					$occ = $occurrences[count($occurrences)-1];
-
-					// Bydefault, on occurrence reminder is true but if reminder value is set to false then we don't send popup reminder for this occurrence
-					if (!(isset($occ[$this->properties['reminder']]) && $occ[$this->properties['reminder']] == 0)) {
-						$row[$this->properties["remindertime"]] = $occ[$this->properties["appointment_startdate"]];
-						$row[$this->properties["appointment_startdate"]] = $occ[$this->properties["appointment_startdate"]];
-						$row[$this->properties["appointment_enddate"]] = $occ[$this->properties["appointment_startdate"]];
-					}
+                        // Bydefault, on occurrence reminder is true but if reminder value is set to false then we don't send popup reminder for this occurrence
+                        if (!(isset($occ[$this->properties['reminder']]) && $occ[$this->properties['reminder']] == 0)) {
+                            $row[$this->properties["remindertime"]] = $occ[$this->properties["appointment_startdate"]];
+                            $row[$this->properties["appointment_startdate"]] = $occ[$this->properties["appointment_startdate"]];
+                            $row[$this->properties["appointment_enddate"]] = $occ[$this->properties["appointment_startdate"]];
+                        }
+                    }
 				}
 
 				// Add the non-bogus rows

@@ -71,7 +71,7 @@
 
 
 //////////////////
-// ULONG+LPENTRYID
+// ULONG+LP
 //////////////////
 
 // Input
@@ -92,12 +92,12 @@
 %typemap(freearg) (ULONG cbEntryID, LPENTRYID lpEntryID) {
   if (alloc$argnum == SWIG_NEWOBJ) %delete_array(buf$argnum);
 }
-%apply (ULONG cbEntryID, LPENTRYID lpEntryID) {(ULONG cFolderKeySize, BYTE *lpFolderSourceKey), (ULONG cMessageKeySize, BYTE *lpMessageSourceKey), (ULONG cbInstanceKey, BYTE *pbInstanceKey)};
+%apply (ULONG cbEntryID, LPENTRYID lpEntryID) {(ULONG cFolderKeySize, BYTE *lpFolderSourceKey), (ULONG cMessageKeySize, BYTE *lpMessageSourceKey), (ULONG cbInstanceKey, BYTE *pbInstanceKey), (ULONG cbCollapseState, BYTE *pbCollapseState)};
 %apply (ULONG cbEntryID, LPENTRYID lpEntryID) {(ULONG cbEntryID1, LPENTRYID lpEntryID1), (ULONG cbEntryID2, LPENTRYID lpEntryID2), 
 (ULONG cbEIDContainer, LPENTRYID lpEIDContainer), (ULONG cbEIDNewEntryTpl, LPENTRYID lpEIDNewEntryTpl), (ULONG cbUserEntryID, LPENTRYID lpUserEntryID) };
 
 // Output
-%typemap(in,numinputs=0) (ULONG *OUTPUT, LPENTRYID *OUTPUT) (ULONG cbEntryID = 0, LPENTRYID lpEntryID = NULL) {
+%typemap(in,numinputs=0) (ULONG *OUTPUT, LPENTRYID *OUTPUT) (ULONG cbEntryID = 0, $*2_type lpEntryID = NULL) {
   $1 = &cbEntryID; $2 = &lpEntryID;
 }
 %typemap(argout,fragment="SWIG_FromCharPtrAndSize") (ULONG *OUTPUT, LPENTRYID *OUTPUT)
@@ -110,7 +110,7 @@
 	if(*$2)
 		MAPIFreeBuffer(*$2);
 }
-%apply (ULONG *OUTPUT, LPENTRYID *OUTPUT) {(ULONG* lpcbStoreId, LPENTRYID* lppStoreId), (ULONG* lpcbRootId, LPENTRYID *lppRootId)};
+%apply (ULONG *OUTPUT, LPENTRYID *OUTPUT) {(ULONG* lpcbStoreId, LPENTRYID* lppStoreId), (ULONG* lpcbRootId, LPENTRYID *lppRootId), (ULONG *lpulOutput, LPBYTE *lpOutput)};
 
 // Optional In & Output
 %typemap(in) (ULONG *OPTINOUT, LPENTRYID *OPTINOUT) (int res, char *buf = 0, size_t size, int alloc = 0, ULONG cbEntryID = 0, LPENTRYID lpEntryID = NULL, LPENTRYID lpOrig = NULL) {

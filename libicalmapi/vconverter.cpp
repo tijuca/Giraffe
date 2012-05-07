@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -635,13 +635,13 @@ HRESULT VConverter::HrHandleExceptionGuid(icalcomponent *lpiEvent, void *base, S
 		goto exit;
 	}
 
-	strUid = bin2hex(lpsProp->Value.bin.cb, lpsProp->Value.bin.lpb);
-	
 	icProp = icalcomponent_get_first_property(lpiEvent, ICAL_RECURRENCEID_PROPERTY);
 	if (!icProp) {
 		hr = hrSuccess; //ignoring Recurrence-ID.
 		goto exit;
 	}
+
+	strUid = bin2hex(lpsProp->Value.bin.cb, lpsProp->Value.bin.lpb);
 
 	icTime = icaltime_from_timet(ICalTimeTypeToUTC(lpiEvent, icProp), 0);
 	sprintf(strHexDate,"%04x%02x%02x", icTime.year, icTime.month, icTime.day);
@@ -1737,6 +1737,7 @@ HRESULT VConverter::HrFindTimezone(ULONG ulProps, LPSPropValue lpProps, std::str
 		strTZid = m_converter.convert_to<std::string>(lpPropTimeZoneString->Value.lpszW);
 	if (strTZid.empty()) {
 		strTZid = "(GMT+0000)";
+		// UTC not in map, ttTZInfo still 0
 		goto done;
 	}
 
@@ -1846,7 +1847,8 @@ HRESULT VConverter::HrSetTimeProperty(time_t tStamp, bool bDateOnly, icaltimezon
 
 	icalproperty_set_value(lpicProp, icalvalue_new_datetime(ittStamp));
 
-	if (lpicTZinfo)
+	// only allowed to add timezone information on non-allday events
+	if (lpicTZinfo && !bDateOnly)
 		icalproperty_add_parameter(lpicProp, icalparameter_new_from_value_string(ICAL_TZID_PARAMETER, strTZid.c_str()));
 	icalcomponent_add_property(lpicEvent, lpicProp);
 

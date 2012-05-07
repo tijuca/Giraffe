@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -175,7 +175,6 @@ public:
 	bool IsHostedSupported();
 	bool IsDistributedSupported();
 	ECRESULT GetLicensedUsers(unsigned int ulServiceType, unsigned int* lpulLicensedUsers);
-	ECRESULT GetLicensedUsersCached(unsigned int* lpulLicensedUsers);
 	ECRESULT GetServerGUID(GUID* lpServerGuid);
 
 	ECRESULT GetNewSourceKey(SOURCEKEY* lpSourceKey);
@@ -260,9 +259,6 @@ protected:
 	pthread_mutex_t		m_hSeqMutex;
 	unsigned long long 	m_ulSeqIMAP;
 	unsigned int		m_ulSeqIMAPQueue;
-
-private:
-	unsigned int		m_ulLicensedUsers;
 };
 
 #endif // #ifndef ECSESSIONMANAGER

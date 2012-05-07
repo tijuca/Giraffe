@@ -51,7 +51,7 @@ export PATH="${SCRIPTPATH}:${PATH}"
 # Use awk to obtain and execute the command for this attachment
 CMD="`awk -F'\`' '/^([^#]*;)*'${ARG}'[ \t;]+([^#]*;)*/ { print \$2 }' ${SCRIPTPATH}/attachments_parser.db | head -n 1`"
 TOOL="`echo "${CMD}" | awk '{ print \$1 }'`"
-if [ -n "${CMD}" -a -x "`which ${TOOL}`" ]; then
+if [ -n "${CMD}" -a -x "`which ${TOOL} 2>/dev/null`" ]; then
 	cat /dev/stdin 2>/dev/null | eval "${CMD}"
 	RV=${PIPESTATUS[1]}
 fi

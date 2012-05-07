@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -698,7 +698,7 @@ void MAPISMTPTransport::send(const mailbox& expeditor, const mailboxList& recipi
 		// qmail: ok 1295860788 qp 29154
 		// exim: OK id=1PhIZ9-0002Ko-Q8
 		if (!m_lpLogger->Log(EC_LOGLEVEL_DEBUG)) // prevent double logging
-			m_lpLogger->Log(EC_LOGLEVEL_INFO, "SMTP: %s", resp->getText().c_str());
+			m_lpLogger->Log(EC_LOGLEVEL_WARNING, "SMTP: %s", resp->getText().c_str());
 	}
 }
 

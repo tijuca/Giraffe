@@ -99,6 +99,8 @@ public:
 	// Archive store function(s)
 	virtual HRESULT GetArchiveStoreEntryID(LPTSTR lpszUserName, LPTSTR lpszServerName, ULONG ulFlags, ULONG *OUTPUT /*lpcbStoreID*/, LPENTRYID *OUTPUT /*lppStoreID*/) = 0;
 
+	virtual HRESULT ResetFolderCount(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG *OUTPUT /*lpulUpdates*/) = 0;
+
 	%extend {
 		~IECServiceAdmin() { self->Release(); }
 	}

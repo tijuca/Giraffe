@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2009  Zarafa B.V.
+ * Copyright 2005 - 2012  Zarafa B.V.
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3, 
@@ -141,8 +141,6 @@ ECSessionManager::ECSessionManager(ECConfig *lpConfig, ECLogger *lpLogger, ECLog
 	}
 
     m_lpNotificationManager = new ECNotificationManager(m_lpLogger, m_lpConfig);
-
-    m_ulLicensedUsers = (unsigned int)-1;
 }
 
 ECSessionManager::~ECSessionManager()
@@ -1484,22 +1482,7 @@ ECRESULT ECSessionManager::GetLicensedUsers(unsigned int ulServiceType, unsigned
 	
 	delete lpLicenseClient;
 
-
-	m_ulLicensedUsers = ulLicensedUsers;
 	*lpulLicensedUsers = ulLicensedUsers;
-
-	return er;
-}
-
-//@fixme If the license is changed, this data is Invalid!
-ECRESULT ECSessionManager::GetLicensedUsersCached(unsigned int* lpulLicensedUsers)
-{
-	ECRESULT er = erSuccess;
-	
-	if (m_ulLicensedUsers == (unsigned int)-1)
-		er = GetLicensedUsers(0/*SERVICE_TYPE_ZCP*/, lpulLicensedUsers);
-	else
-		*lpulLicensedUsers = m_ulLicensedUsers;
 
 	return er;
 }

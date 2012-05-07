@@ -1261,6 +1261,7 @@ use vars qw(@ISA %OWNER %ITERATORS %BLESSEDMEMBERS);
 *ResolvePseudoUrl = *MAPICorec::IECServiceAdmin_ResolvePseudoUrl;
 *GetPublicStoreEntryID = *MAPICorec::IECServiceAdmin_GetPublicStoreEntryID;
 *GetArchiveStoreEntryID = *MAPICorec::IECServiceAdmin_GetArchiveStoreEntryID;
+*ResetFolderCount = *MAPICorec::IECServiceAdmin_ResetFolderCount;
 sub DESTROY {
     return unless $_[0]->isa('HASH');
     my $self = tied(%{$_[0]});
