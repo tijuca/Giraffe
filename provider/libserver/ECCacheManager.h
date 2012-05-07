@@ -338,6 +338,7 @@ protected:
 		}
 		ulTag = 0; 
 		cbData = 0;
+		lpData = NULL;
 	}
 
 	void Copy(const ECsIndexProp* src, ECsIndexProp* dst) {
@@ -345,6 +346,9 @@ protected:
 			dst->lpData = new unsigned char[src->cbData];
 			memcpy(dst->lpData, src->lpData, (size_t)src->cbData);
 			dst->cbData = src->cbData;
+		} else {
+			dst->lpData = NULL;
+			dst->cbData = 0;
 		}
 
 		dst->ulTag = src->ulTag;
