@@ -9897,7 +9897,13 @@ SOAP_ENTRY_START(GetQuotaRecipients, lpsUserList->er, unsigned int ulUserid, ent
 	bool bHasLocalStore = false;
 	entryId		sUserEid = {0};
 
+	// does not return full class in sExternId.objclass
 	er = GetLocalId(sUserId, ulUserid, &ulUserid, &sExternId);
+	if (er != erSuccess)
+		goto exit;
+
+	// re-evaluate userid to externid to get the full class (mapi clients only know MAPI_ABCONT for companies)
+	er = g_lpSessionManager->GetCacheManager()->GetUserObject(ulUserid, &sExternId, NULL, NULL);
 	if (er != erSuccess)
 		goto exit;
 
@@ -10029,7 +10035,13 @@ SOAP_ENTRY_START(GetQuotaStatus, lpsQuotaStatus->er, unsigned int ulUserid, entr
 	//Set defaults
 	lpsQuotaStatus->llStoreSize = 0;
 
+	// does not return full class in sExternId.objclass
 	er = GetLocalId(sUserId, ulUserid, &ulUserid, &sExternId);
+	if (er != erSuccess)
+		goto exit;
+
+	// re-evaluate userid to externid to get the full class (mapi clients only know MAPI_ABCONT for companies)
+	er = g_lpSessionManager->GetCacheManager()->GetUserObject(ulUserid, &sExternId, NULL, NULL);
 	if (er != erSuccess)
 		goto exit;
 

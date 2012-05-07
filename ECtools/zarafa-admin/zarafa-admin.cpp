@@ -480,7 +480,7 @@ void print_quota(LPECQUOTA lpQuota, LPECQUOTASTATUS lpQuotaStatus, bool isPublic
  * @param[in]	print		Prints old and new quota settings for a user (optional, default false)
  */
 HRESULT setQuota(IECServiceAdmin *lpServiceAdmin, ULONG cbEid, LPENTRYID lpEid, int quota, bool udefault,
-				 long long warn, long long soft, long long hard, bool print = false)
+				 long long warn, long long soft, long long hard, bool print = false, bool company = false)
 {
 	HRESULT hr = hrSuccess;
 	LPECQUOTASTATUS lpsQuotaStatus = NULL;
@@ -501,7 +501,7 @@ HRESULT setQuota(IECServiceAdmin *lpServiceAdmin, ULONG cbEid, LPENTRYID lpEid, 
 
 	if (print) {
 		cout << "Old quota settings:" << endl;
-		print_quota(lpsQuota, NULL);
+		print_quota(lpsQuota, NULL, company);
 		cout << endl;
 	}
 
@@ -523,12 +523,12 @@ HRESULT setQuota(IECServiceAdmin *lpServiceAdmin, ULONG cbEid, LPENTRYID lpEid, 
 	if (print) {
 		hr = lpServiceAdmin->GetQuotaStatus(cbEid, lpEid, &lpsQuotaStatus);
 		if(hr != hrSuccess) {
-			cerr << "Unable to request updated quota information." << endl;
+			cerr << "Unable to request updated quota information: " << stringify(hr, true) << endl;
 			goto exit;
 		}
 
 		cout << "New quota settings:" << endl;
-		print_quota(&sQuota, lpsQuotaStatus);
+		print_quota(&sQuota, lpsQuotaStatus, company);
 		cout << endl;
 	}
 
@@ -3633,7 +3633,8 @@ int main(int argc, char* argv[])
 		}
 
 		if (quota != -1) {
-			hr = setQuota(lpServiceAdmin, cbCompanyId, lpCompanyId, quota, false, quotawarn, quotasoft, quotahard);
+			// this is the company public quota, and only contains a warning, nothing more.
+			hr = setQuota(lpServiceAdmin, cbCompanyId, lpCompanyId, quota, false, quotawarn, 0, 0, false, true);
 			if(hr != hrSuccess)
 				goto exit;
 		}
@@ -3655,7 +3656,7 @@ int main(int argc, char* argv[])
 		}
 	
 		if (quota != -1 || quotahard != -1 || quotasoft != -1 || quotawarn != -1) {
-			hr = setQuota(lpServiceAdmin, cbCompanyId, lpCompanyId, quota, false, quotawarn, quotasoft, quotahard, true);
+			hr = setQuota(lpServiceAdmin, cbCompanyId, lpCompanyId, quota, false, quotawarn, quotasoft, quotahard, true, true);
 			if (hr != hrSuccess)
 				goto exit;
 		}

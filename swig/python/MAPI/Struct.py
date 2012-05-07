@@ -326,7 +326,7 @@ class ECQUOTA(MAPIStruct):
         self.llHardSize = llHardSize
 
 class ECQUOTASTATUS(MAPIStruct):
-    def __init_(self, StoreSize, QuotaStatus):
+    def __init__(self, StoreSize, QuotaStatus):
         self.StoreSize = StoreSize
         self.QuotaStatus = QuotaStatus
 
