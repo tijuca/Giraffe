@@ -10991,14 +10991,15 @@ SOAP_ENTRY_START(importMessageFromStream, *result, unsigned int ulFlags, unsigne
 			goto exit;
 
 		lpDBRow = lpDatabase->FetchRow(lpDBResult);
-		if (lpDBRow == NULL || lpDBRow[0] == NULL) {	// Can we have messages without IMAP ID?
-			er = ZARAFA_E_DATABASE_ERROR;
-			goto exit;
-		}
-
-		// atoui return a unsigned int at best, but since PR_EC_IMAP_ID is a PT_LONG, the same conversion
-		// will be done when getting the property through MAPI.
-		ullIMAP = atoui(lpDBRow[0]);
+		if (lpDBRow == NULL || lpDBRow[0] == NULL) {
+		    // Items created in previous versions of Zarafa will not have a PR_EC_IMAP_ID. The rule
+		    // is that an item has a PR_EC_IMAP_ID that is equal to the hierarchyid in that case.
+		    ullIMAP = ulObjectId;
+		} else {
+    		// atoui return a unsigned int at best, but since PR_EC_IMAP_ID is a PT_LONG, the same conversion
+	    	// will be done when getting the property through MAPI.
+    		ullIMAP = atoui(lpDBRow[0]);
+        }    		
 		FREE_DBRESULT()
 		
 		
