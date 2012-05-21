@@ -2,14 +2,13 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#: php-webclient-ajax/client/modules/multiusercalendarmodule.js:57
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2011-09-30 00:02+0200\n"
-"PO-Revision-Date: 2010-11-25 10:52+0200\n"
-"Last-Translator: Bee Leng <bizibee@gmail.com>\n"
+"POT-Creation-Date: 2012-05-02 00:01+0200\n"
+"PO-Revision-Date: 2011-12-20 18:06+0200\n"
+"Last-Translator: Terry <shenhuitao2000@163.com>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "Language: zh_CN\n"
 "MIME-Version: 1.0\n"
@@ -23,10 +22,10 @@ msgid "Can't save this message as a file"
 msgstr "不能将这信息保存为文件"
 
 #: php-webclient-ajax/client/download_message.php:81
-#: php-webclient-ajax/server/core/class.operations.php:3571
-#: php-webclient-ajax/server/core/class.operations.php:3587
-#: php-webclient-ajax/client/modules/readmailitemmodule.js:543
-#: php-webclient-ajax/client/modules/itemmodule.js:1602
+#: php-webclient-ajax/server/core/class.operations.php:3584
+#: php-webclient-ajax/server/core/class.operations.php:3600
+#: php-webclient-ajax/client/modules/readmailitemmodule.js:552
+#: php-webclient-ajax/client/modules/itemmodule.js:1624
 msgid "Untitled"
 msgstr "未命名"
 
@@ -34,11 +33,122 @@ msgstr "未命名"
 msgid "Unable to Save the Message"
 msgstr "不能保存信息"
 
+#: php-webclient-ajax/client/login.php:36
+msgid "Please logon"
+msgstr "请登录"
+
+#: php-webclient-ajax/client/login.php:43
+msgid "Logon failed, please check your name/password."
+msgstr "登录失败,请检查你的姓名/密码"
+
+#: php-webclient-ajax/client/login.php:46
+msgid "Cannot connect to the Zarafa Server."
+msgstr "无法连接到Zarafa服务器."
+
+#: php-webclient-ajax/client/login.php:53
+msgid "You have been automatically logged out"
+msgstr "你已被自动登出"
+
+#: php-webclient-ajax/client/login.php:60
+#: php-webclient-ajax/client/layout/dialogs/standard/distlist.php:81
+#: php-webclient-ajax/client/layout/dialogs/standard/contact.php:219
+#: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:74
+#: php-webclient-ajax/client/layout/dialogs/modal/sharedfolder.php:23
+#: php-webclient-ajax/client/layout/dialogs/modal/emailaddress.php:26
+#: php-webclient-ajax/server/core/class.tablecolumns.php:292
+#: php-webclient-ajax/server/core/class.tablecolumns.php:305
+#: php-webclient-ajax/client/modules/distlistmodule.js:95
+#: php-webclient-ajax/client/modules/contactlistmodule.js:49
+#: php-webclient-ajax/client/layout/js/signatures.js:18
+#: php-webclient-ajax/client/layout/js/appointment.js:1191
+#: php-webclient-ajax/client/layout/js/restoreitems.js:138
+#: php-webclient-ajax/client/layout/js/delegates.js:8
+msgid "Name"
+msgstr "名字"
+
+#: php-webclient-ajax/client/login.php:71
+msgid "Password"
+msgstr "密码"
+
+#: php-webclient-ajax/client/login.php:75
+#: php-webclient-ajax/client/layout/dialogs/settings/tabs/preferences.php:15
+msgid "Language"
+msgstr "语言"
+
+#: php-webclient-ajax/client/login.php:78
+msgid "Last used language"
+msgstr "最后使用的语言"
+
+#: php-webclient-ajax/client/login.php:91
+msgid "Logon"
+msgstr "登录"
+
+#: php-webclient-ajax/client/layout/dialogs/framework.item.php:41
+#: php-webclient-ajax/client/layout/dialogs/framework.item.php:42
+#: php-webclient-ajax/client/layout/dialogs/standard/stickynote.php:89
+#: php-webclient-ajax/client/layout/dialogs/standard/stickynote.php:90
+#: php-webclient-ajax/client/layout/dialogs/standard/task.php:626
+#: php-webclient-ajax/client/layout/dialogs/standard/task.php:627
+#: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:507
+#: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:508
+#: php-webclient-ajax/client/layout/dialogs/standard/distlist.php:128
+#: php-webclient-ajax/client/layout/dialogs/standard/distlist.php:129
+#: php-webclient-ajax/client/layout/dialogs/standard/createmail.php:529
+#: php-webclient-ajax/client/layout/dialogs/standard/contact.php:575
+#: php-webclient-ajax/client/layout/dialogs/standard/contact.php:576
+#: php-webclient-ajax/client/layout/dialogs/modal/signatures.php:118
+#: php-webclient-ajax/client/layout/dialogs/settings/open.php:129
+#: php-webclient-ajax/client/layout/dialogs/settings/tabs/shortcuts.php:152
+msgid "Save"
+msgstr "保存"
+
+#: php-webclient-ajax/client/layout/dialogs/not_implemented.php:4
+msgid "Not implemented"
+msgstr "未执行"
+
+#: php-webclient-ajax/client/layout/dialogs/not_implemented.php:11
+msgid "This type of message is not yet implemented."
+msgstr "这类型的邮件尚未执行"
+
+#: php-webclient-ajax/client/layout/dialogs/not_implemented.php:19
+#: php-webclient-ajax/client/layout/dialogs/utils.php:52
+#: php-webclient-ajax/client/layout/dialogs/standard/restoreitems.php:108
+#: php-webclient-ajax/client/layout/dialogs/standard/restoreitems.php:109
+#: php-webclient-ajax/client/layout/dialogs/modal/printitem.php:67
+#: php-webclient-ajax/client/layout/dialogs/modal/printlist.php:60
+#: php-webclient-ajax/client/layout/dialogs/settings/open.php:136
+#: php-webclient-ajax/client/layout/js/date-picker-language.js:118
+msgid "Close"
+msgstr "关闭"
+
+#: php-webclient-ajax/client/layout/dialogs/not_implemented.php:20
+msgid "Close window"
+msgstr "关闭视窗"
+
+#: php-webclient-ajax/client/layout/dialogs/utils.php:42
+#: php-webclient-ajax/client/layout/dialogs/modal/deleteoccurrence.php:72
+msgid "Ok"
+msgstr "确认"
+
+#: php-webclient-ajax/client/layout/dialogs/utils.php:43
+#: php-webclient-ajax/client/layout/dialogs/modal/attachitem.php:59
+#: php-webclient-ajax/client/layout/dialogs/modal/copyfolder.php:71
+#: php-webclient-ajax/client/layout/dialogs/modal/addtofavorite.php:92
+#: php-webclient-ajax/client/layout/dialogs/modal/copymessages.php:83
+#: php-webclient-ajax/client/layout/dialogs/modal/deleteoccurrence.php:72
+#: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:309
+msgid "Cancel"
+msgstr "取消"
+
+#: php-webclient-ajax/client/layout/dialogs/utils.php:72
+msgid "Button"
+msgstr "按钮"
+
 #: php-webclient-ajax/client/layout/dialogs/standard/advancedfind.php:15
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/preferences.php:156
-#: php-webclient-ajax/client/modules/listmodule.js:133
+#: php-webclient-ajax/client/modules/listmodule.js:137
 msgid "Advanced Find"
-msgstr "更先进搜索"
+msgstr "高级搜索"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/advancedfind.php:69
 msgid "Look for"
@@ -141,42 +251,23 @@ msgstr "黄色"
 msgid "White"
 msgstr "白色"
 
-#: php-webclient-ajax/client/layout/dialogs/standard/stickynote.php:89
-#: php-webclient-ajax/client/layout/dialogs/standard/stickynote.php:90
-#: php-webclient-ajax/client/layout/dialogs/standard/task.php:626
-#: php-webclient-ajax/client/layout/dialogs/standard/task.php:627
-#: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:507
-#: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:508
-#: php-webclient-ajax/client/layout/dialogs/standard/distlist.php:128
-#: php-webclient-ajax/client/layout/dialogs/standard/distlist.php:129
-#: php-webclient-ajax/client/layout/dialogs/standard/createmail.php:529
-#: php-webclient-ajax/client/layout/dialogs/standard/contact.php:575
-#: php-webclient-ajax/client/layout/dialogs/standard/contact.php:576
-#: php-webclient-ajax/client/layout/dialogs/modal/signatures.php:118
-#: php-webclient-ajax/client/layout/dialogs/framework.item.php:41
-#: php-webclient-ajax/client/layout/dialogs/framework.item.php:42
-#: php-webclient-ajax/client/layout/dialogs/settings/tabs/shortcuts.php:152
-#: php-webclient-ajax/client/layout/dialogs/settings/open.php:129
-msgid "Save"
-msgstr "保存"
-
 #: php-webclient-ajax/client/layout/dialogs/standard/stickynote.php:102
 #: php-webclient-ajax/client/layout/dialogs/standard/task.php:705
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:610
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:315
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:318
 #: php-webclient-ajax/client/layout/dialogs/standard/contact.php:618
 #: php-webclient-ajax/client/layout/dialogs/modal/fieldchooser.php:35
 #: php-webclient-ajax/client/layout/dialogs/modal/deletetaskoccurrence.php:66
 #: php-webclient-ajax/client/layout/dialogs/modal/rules.php:64
-#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:252
+#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:241
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/shortcuts.php:138
-#: php-webclient-ajax/client/modules/maillistmodule.js:52
-#: php-webclient-ajax/client/modules/distlistmodule.js:28
-#: php-webclient-ajax/client/modules/freebusymodule.js:86
+#: php-webclient-ajax/client/modules/maillistmodule.js:55
+#: php-webclient-ajax/client/modules/distlistmodule.js:26
+#: php-webclient-ajax/client/modules/freebusymodule.js:91
 #: php-webclient-ajax/client/modules/multiusercalendarmodule.js:83
 #: php-webclient-ajax/client/modules/tasklistmodule.js:34
 #: php-webclient-ajax/client/modules/contactlistmodule.js:42
-#: php-webclient-ajax/client/modules/listmodule.js:145
+#: php-webclient-ajax/client/modules/listmodule.js:149
 #: php-webclient-ajax/client/modules/stickynotelistmodule.js:32
 #: php-webclient-ajax/client/modules/journallistmodule.js:36
 #: php-webclient-ajax/client/modules/appointmentlistmodule.js:38
@@ -206,8 +297,8 @@ msgstr "详情"
 #: php-webclient-ajax/server/core/class.tablecolumns.php:202
 #: php-webclient-ajax/client/modules/printmessageitem.js:64
 #: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:57
-#: php-webclient-ajax/client/modules/itemmodule.js:1563
-#: php-webclient-ajax/client/modules/itemmodule.js:1580
+#: php-webclient-ajax/client/modules/itemmodule.js:1584
+#: php-webclient-ajax/client/modules/itemmodule.js:1601
 msgid "To"
 msgstr "收件人"
 
@@ -217,20 +308,20 @@ msgstr "收件人"
 #: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:121
 #: php-webclient-ajax/client/layout/dialogs/standard/createmail.php:490
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/vacation.php:24
-#: php-webclient-ajax/server/core/class.operations.php:2738
+#: php-webclient-ajax/server/core/class.operations.php:2748
 #: php-webclient-ajax/server/core/class.tablecolumns.php:19
 #: php-webclient-ajax/server/core/class.tablecolumns.php:154
 #: php-webclient-ajax/server/core/class.tablecolumns.php:170
 #: php-webclient-ajax/server/core/class.tablecolumns.php:192
 #: php-webclient-ajax/server/core/class.tablecolumns.php:219
 #: php-webclient-ajax/server/core/class.tablecolumns.php:275
-#: php-webclient-ajax/client/modules/maillistmodule.js:380
+#: php-webclient-ajax/client/modules/maillistmodule.js:383
 #: php-webclient-ajax/client/modules/printmessageitem.js:67
 #: php-webclient-ajax/client/core/properties.js:13
 #: php-webclient-ajax/client/core/properties.js:23
 #: php-webclient-ajax/client/core/properties.js:95
 #: php-webclient-ajax/client/layout/js/restoreitems.js:130
-#: php-webclient-ajax/client/layout/js/rule.js:241
+#: php-webclient-ajax/client/layout/js/rule.js:257
 msgid "Subject"
 msgstr "主题"
 
@@ -251,17 +342,17 @@ msgstr "截止日期"
 #: php-webclient-ajax/client/layout/dialogs/modal/signatures.php:136
 #: php-webclient-ajax/client/layout/dialogs/modal/flag.php:70
 #: php-webclient-ajax/client/modules/taskitemmodule.js:178
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:347
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:351
 #: php-webclient-ajax/client/modules/itemmodule.js:581
 #: php-webclient-ajax/client/views/table.view.js:1088
 #: php-webclient-ajax/client/views/today.task.view.js:213
 #: php-webclient-ajax/client/layout/js/delegatespermissions.js:20
-#: php-webclient-ajax/client/layout/js/dialog.js:678
-#: php-webclient-ajax/client/layout/js/dialog.js:699
-#: php-webclient-ajax/client/layout/js/dialog.js:716
-#: php-webclient-ajax/client/layout/js/dialog.js:717
-#: php-webclient-ajax/client/layout/js/dialog.js:968
-#: php-webclient-ajax/client/layout/js/dialog.js:972
+#: php-webclient-ajax/client/layout/js/dialog.js:682
+#: php-webclient-ajax/client/layout/js/dialog.js:703
+#: php-webclient-ajax/client/layout/js/dialog.js:720
+#: php-webclient-ajax/client/layout/js/dialog.js:721
+#: php-webclient-ajax/client/layout/js/dialog.js:971
+#: php-webclient-ajax/client/layout/js/dialog.js:975
 #: php-webclient-ajax/client/layout/js/advancedfind.js:319
 #: php-webclient-ajax/client/layout/js/attachitem.js:356
 #: php-webclient-ajax/client/layout/js/task.js:127
@@ -284,15 +375,15 @@ msgid "Status"
 msgstr "状态"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/task.php:314
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:357
-#: php-webclient-ajax/client/modules/itemmodule.js:673
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:361
+#: php-webclient-ajax/client/modules/itemmodule.js:679
 msgid "Not Started"
 msgstr "未开始"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/task.php:315
 #: php-webclient-ajax/client/modules/printmessageitem.js:81
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:358
-#: php-webclient-ajax/client/modules/itemmodule.js:676
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:362
+#: php-webclient-ajax/client/modules/itemmodule.js:682
 msgid "In Progress"
 msgstr "进行中"
 
@@ -303,21 +394,21 @@ msgstr "进行中"
 #: php-webclient-ajax/server/core/class.tablecolumns.php:217
 #: php-webclient-ajax/client/modules/printmessageitem.js:84
 #: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:105
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:359
-#: php-webclient-ajax/client/modules/itemmodule.js:679
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:363
+#: php-webclient-ajax/client/modules/itemmodule.js:685
 msgid "Complete"
 msgstr "完成"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/task.php:317
 #: php-webclient-ajax/client/modules/printmessageitem.js:87
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:360
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:364
 msgid "Wait for other person"
 msgstr "等待其他人"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/task.php:318
 #: php-webclient-ajax/client/modules/printmessageitem.js:90
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:361
-#: php-webclient-ajax/client/modules/itemmodule.js:685
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:365
+#: php-webclient-ajax/client/modules/itemmodule.js:691
 msgid "Deferred"
 msgstr "延期"
 
@@ -332,7 +423,7 @@ msgstr "开始日期"
 #: php-webclient-ajax/client/layout/dialogs/standard/task.php:482
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:592
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:598
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:45
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:73
 #: php-webclient-ajax/server/core/class.tablecolumns.php:167
 #: php-webclient-ajax/server/core/class.tablecolumns.php:189
 #: php-webclient-ajax/server/core/class.tablecolumns.php:218
@@ -344,10 +435,10 @@ msgstr "优先性质"
 #: php-webclient-ajax/client/layout/dialogs/standard/task.php:337
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:598
 #: php-webclient-ajax/client/layout/dialogs/modal/messageoptions.php:78
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:48
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:78
 #: php-webclient-ajax/client/layout/dialogs/modal/mailoptions.php:28
-#: php-webclient-ajax/client/modules/listmodule.js:153
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:366
+#: php-webclient-ajax/client/modules/listmodule.js:157
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:370
 #: php-webclient-ajax/client/modules/itemmodule.js:509
 #: php-webclient-ajax/client/views/table.view.js:939
 msgid "Low"
@@ -356,11 +447,11 @@ msgstr "低"
 #: php-webclient-ajax/client/layout/dialogs/standard/task.php:338
 #: php-webclient-ajax/client/layout/dialogs/modal/messageoptions.php:79
 #: php-webclient-ajax/client/layout/dialogs/modal/messageoptions.php:90
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:49
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:79
 #: php-webclient-ajax/client/layout/dialogs/modal/mailoptions.php:29
 #: php-webclient-ajax/client/layout/dialogs/modal/mailoptions.php:40
-#: php-webclient-ajax/client/modules/listmodule.js:154
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:367
+#: php-webclient-ajax/client/modules/listmodule.js:158
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:371
 #: php-webclient-ajax/client/views/table.view.js:949
 #: php-webclient-ajax/client/views/table.view.js:1142
 #: php-webclient-ajax/client/layout/js/advancedfind.js:300
@@ -371,10 +462,10 @@ msgstr "一般"
 #: php-webclient-ajax/client/layout/dialogs/standard/task.php:339
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:592
 #: php-webclient-ajax/client/layout/dialogs/modal/messageoptions.php:80
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:50
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:80
 #: php-webclient-ajax/client/layout/dialogs/modal/mailoptions.php:30
-#: php-webclient-ajax/client/modules/listmodule.js:155
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:368
+#: php-webclient-ajax/client/modules/listmodule.js:159
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:372
 #: php-webclient-ajax/client/modules/itemmodule.js:512
 #: php-webclient-ajax/client/views/table.view.js:955
 msgid "High"
@@ -433,11 +524,11 @@ msgstr "附件"
 #: php-webclient-ajax/server/core/class.tablecolumns.php:195
 #: php-webclient-ajax/server/core/class.tablecolumns.php:222
 #: php-webclient-ajax/server/core/class.tablecolumns.php:278
-#: php-webclient-ajax/client/modules/maillistmodule.js:44
+#: php-webclient-ajax/client/modules/maillistmodule.js:47
 #: php-webclient-ajax/client/modules/multiusercalendarmodule.js:81
 #: php-webclient-ajax/client/modules/tasklistmodule.js:32
 #: php-webclient-ajax/client/modules/contactlistmodule.js:40
-#: php-webclient-ajax/client/modules/listmodule.js:143
+#: php-webclient-ajax/client/modules/listmodule.js:147
 #: php-webclient-ajax/client/modules/stickynotelistmodule.js:30
 #: php-webclient-ajax/client/modules/journallistmodule.js:34
 #: php-webclient-ajax/client/modules/printmessageitem.js:141
@@ -507,9 +598,9 @@ msgstr "返回到任务列表"
 #: php-webclient-ajax/client/layout/dialogs/standard/task.php:609
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:477
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:478
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:212
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:213
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:130
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:215
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:216
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:134
 msgid "Accept"
 msgstr "接受"
 
@@ -517,9 +608,9 @@ msgstr "接受"
 #: php-webclient-ajax/client/layout/dialogs/standard/task.php:615
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:489
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:490
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:224
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:225
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:132
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:227
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:228
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:136
 msgid "Decline"
 msgstr "拒绝"
 
@@ -595,8 +686,8 @@ msgid "Permissions"
 msgstr "权限"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/properties.php:25
-#: php-webclient-ajax/client/modules/addressbooklistmodule.js:36
-#: php-webclient-ajax/client/modules/hierarchymodule.js:1313
+#: php-webclient-ajax/client/modules/addressbooklistmodule.js:39
+#: php-webclient-ajax/client/modules/hierarchymodule.js:1361
 msgid "Properties"
 msgstr "属性"
 
@@ -710,8 +801,8 @@ msgstr "删除項目"
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:24
 #: php-webclient-ajax/client/layout/dialogs/modal/createfolder.php:77
 #: php-webclient-ajax/client/widgets/menu.js:11
-#: php-webclient-ajax/client/layout/js/appointment.js:745
-#: php-webclient-ajax/client/layout/js/appointment.js:746
+#: php-webclient-ajax/client/layout/js/appointment.js:749
+#: php-webclient-ajax/client/layout/js/appointment.js:750
 msgid "Appointment"
 msgstr "约会"
 
@@ -726,16 +817,16 @@ msgstr "追踪"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:90
 #: php-webclient-ajax/client/modules/freebusymodule.js:19
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:660
-#: php-webclient-ajax/client/layout/js/appointment.js:1527
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:668
+#: php-webclient-ajax/client/layout/js/appointment.js:1570
 #: php-webclient-ajax/client/layout/js/readmail.js:31
 msgid "Start time"
 msgstr "开始时间"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:91
 #: php-webclient-ajax/client/modules/freebusymodule.js:18
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:661
-#: php-webclient-ajax/client/layout/js/appointment.js:1528
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:669
+#: php-webclient-ajax/client/layout/js/appointment.js:1571
 #: php-webclient-ajax/client/layout/js/readmail.js:32
 msgid "End time"
 msgstr "结束时间"
@@ -873,7 +964,7 @@ msgstr "分钟"
 #: php-webclient-ajax/client/layout/js/appointment.js:165
 #: php-webclient-ajax/client/layout/js/task.js:60
 #: php-webclient-ajax/client/layout/js/task.js:72
-#: php-webclient-ajax/client/layout/js/task.js:774
+#: php-webclient-ajax/client/layout/js/task.js:782
 msgid "hour"
 msgstr "小时"
 
@@ -894,7 +985,7 @@ msgstr "小时"
 #: php-webclient-ajax/client/layout/js/appointment.js:165
 #: php-webclient-ajax/client/layout/js/task.js:60
 #: php-webclient-ajax/client/layout/js/task.js:72
-#: php-webclient-ajax/client/layout/js/task.js:774
+#: php-webclient-ajax/client/layout/js/task.js:782
 msgid "hours"
 msgstr "小时"
 
@@ -904,10 +995,10 @@ msgstr "小时"
 #: php-webclient-ajax/client/layout/dialogs/standard/reminder.php:61
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/calendar.php:74
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/calendar.php:76
-#: php-webclient-ajax/client/core/utils.js:1668
-#: php-webclient-ajax/client/layout/js/appointment.js:1030
-#: php-webclient-ajax/client/layout/js/task.js:776
-#: php-webclient-ajax/client/layout/js/task.js:782
+#: php-webclient-ajax/client/core/utils.js:1674
+#: php-webclient-ajax/client/layout/js/appointment.js:1034
+#: php-webclient-ajax/client/layout/js/task.js:784
+#: php-webclient-ajax/client/layout/js/task.js:790
 msgid "day"
 msgstr "天"
 
@@ -925,30 +1016,30 @@ msgstr "天"
 #: php-webclient-ajax/client/layout/dialogs/standard/reminder.php:63
 #: php-webclient-ajax/client/layout/dialogs/standard/reminder.php:64
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/calendar.php:77
-#: php-webclient-ajax/client/layout/js/appointment.js:1034
-#: php-webclient-ajax/client/layout/js/task.js:776
-#: php-webclient-ajax/client/layout/js/task.js:782
+#: php-webclient-ajax/client/layout/js/appointment.js:1038
+#: php-webclient-ajax/client/layout/js/task.js:784
+#: php-webclient-ajax/client/layout/js/task.js:790
 msgid "days"
 msgstr "天"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:391
 #: php-webclient-ajax/client/layout/dialogs/standard/reminder.php:65
-#: php-webclient-ajax/client/layout/js/appointment.js:1039
-#: php-webclient-ajax/client/layout/js/task.js:786
+#: php-webclient-ajax/client/layout/js/appointment.js:1043
+#: php-webclient-ajax/client/layout/js/task.js:794
 msgid "week"
 msgstr "周"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:392
 #: php-webclient-ajax/client/layout/dialogs/standard/reminder.php:66
-#: php-webclient-ajax/client/layout/js/appointment.js:1043
-#: php-webclient-ajax/client/layout/js/task.js:786
+#: php-webclient-ajax/client/layout/js/appointment.js:1047
+#: php-webclient-ajax/client/layout/js/task.js:794
 msgid "weeks"
 msgstr "周"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:393
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:222
-#: php-webclient-ajax/client/core/utils.js:1627
-#: php-webclient-ajax/client/layout/js/appointment.js:1048
+#: php-webclient-ajax/client/core/utils.js:1633
+#: php-webclient-ajax/client/layout/js/appointment.js:1052
 msgid "month"
 msgstr "月"
 
@@ -968,18 +1059,18 @@ msgstr "空闲"
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:402
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:483
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:484
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:218
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:219
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:221
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:222
 #: php-webclient-ajax/client/layout/dialogs/standard/freebusy.php:56
-#: php-webclient-ajax/server/core/class.operations.php:979
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:131
+#: php-webclient-ajax/server/core/class.operations.php:1032
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:135
 #: php-webclient-ajax/client/modules/itemmodule.js:493
 #: php-webclient-ajax/client/modules/itemmodule.js:534
 #: php-webclient-ajax/client/views/table.view.js:1071
 #: php-webclient-ajax/client/layout/js/advancedfind.js:259
 #: php-webclient-ajax/client/layout/js/advancedfind.js:284
-#: php-webclient-ajax/client/layout/js/appointment.js:1283
-#: php-webclient-ajax/client/layout/js/appointment.js:1356
+#: php-webclient-ajax/client/layout/js/appointment.js:1326
+#: php-webclient-ajax/client/layout/js/appointment.js:1399
 #: php-webclient-ajax/client/layout/js/attachitem.js:296
 #: php-webclient-ajax/client/layout/js/attachitem.js:321
 msgid "Tentative"
@@ -1010,38 +1101,38 @@ msgstr "已收到以下本次会议的反应"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:495
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:496
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:230
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:231
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:134
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:656
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:657
-#: php-webclient-ajax/client/layout/js/appointment.js:1524
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:233
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:234
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:138
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:664
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:665
+#: php-webclient-ajax/client/layout/js/appointment.js:1567
 #: php-webclient-ajax/client/layout/js/readmail.js:27
 #: php-webclient-ajax/client/layout/js/readmail.js:28
 msgid "Propose New Time"
 msgstr "建议新的时间"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:520
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:297
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:300
 #: php-webclient-ajax/client/layout/dialogs/standard/createmail.php:535
 #: php-webclient-ajax/client/layout/dialogs/modal/printitem.php:74
 #: php-webclient-ajax/client/layout/dialogs/modal/printitem.php:75
 #: php-webclient-ajax/client/layout/dialogs/modal/printlist.php:66
 #: php-webclient-ajax/client/layout/dialogs/modal/printlist.php:67
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/shortcuts.php:142
-#: php-webclient-ajax/client/modules/maillistmodule.js:35
+#: php-webclient-ajax/client/modules/maillistmodule.js:38
 #: php-webclient-ajax/client/modules/multiusercalendarmodule.js:79
 #: php-webclient-ajax/client/modules/tasklistmodule.js:27
 #: php-webclient-ajax/client/modules/contactlistmodule.js:37
-#: php-webclient-ajax/client/modules/listmodule.js:130
-#: php-webclient-ajax/client/modules/listmodule.js:141
+#: php-webclient-ajax/client/modules/listmodule.js:134
+#: php-webclient-ajax/client/modules/listmodule.js:145
 #: php-webclient-ajax/client/modules/stickynotelistmodule.js:28
 #: php-webclient-ajax/client/modules/journallistmodule.js:26
 #: php-webclient-ajax/client/modules/appointmentlistmodule.js:34
 #: php-webclient-ajax/client/modules/todaymodule.js:40
 #: php-webclient-ajax/client/modules/advancedfindlistmodule.js:41
 msgid "Print"
-msgstr "列印"
+msgstr "打印"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:573
 #: php-webclient-ajax/client/layout/dialogs/standard/appointment.php:574
@@ -1065,23 +1156,6 @@ msgstr "通讯组列表"
 msgid "Members"
 msgstr "成员"
 
-#: php-webclient-ajax/client/layout/dialogs/standard/distlist.php:81
-#: php-webclient-ajax/client/layout/dialogs/standard/contact.php:219
-#: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:74
-#: php-webclient-ajax/client/layout/dialogs/modal/sharedfolder.php:23
-#: php-webclient-ajax/client/layout/dialogs/modal/emailaddress.php:15
-#: php-webclient-ajax/client/login.php:60
-#: php-webclient-ajax/server/core/class.tablecolumns.php:292
-#: php-webclient-ajax/server/core/class.tablecolumns.php:305
-#: php-webclient-ajax/client/modules/distlistmodule.js:97
-#: php-webclient-ajax/client/modules/contactlistmodule.js:49
-#: php-webclient-ajax/client/layout/js/signatures.js:18
-#: php-webclient-ajax/client/layout/js/appointment.js:1148
-#: php-webclient-ajax/client/layout/js/restoreitems.js:138
-#: php-webclient-ajax/client/layout/js/delegates.js:8
-msgid "Name"
-msgstr "名字"
-
 #: php-webclient-ajax/client/layout/dialogs/standard/distlist.php:87
 msgid "Select Members"
 msgstr "选择成员"
@@ -1093,33 +1167,31 @@ msgstr "添加新的"
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_distlist.php:13
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:13
 msgid "GAB Details"
-msgstr ""
+msgstr "GAB 细节"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_distlist.php:34
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:34
 msgid "Member Of"
-msgstr ""
+msgstr "所属组"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_distlist.php:35
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:35
 #: php-webclient-ajax/client/modules/addressbookitemmodule.js:299
-#, fuzzy
 msgid "E-mail Addresses"
 msgstr "电子邮件地址"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_distlist.php:77
-#, fuzzy
 msgid "Display name"
 msgstr "显示名字"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_distlist.php:81
 msgid "Alias name"
-msgstr ""
+msgstr "别名"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_distlist.php:122
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:208
 msgid "Group membership"
-msgstr ""
+msgstr "组成员关系"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:12
 msgid "Read Mail"
@@ -1137,13 +1209,13 @@ msgstr "已阅读邮件"
 #: php-webclient-ajax/client/widgets/searchcriteria.js:2481
 #: php-webclient-ajax/client/widgets/searchcriteria.js:2484
 #: php-webclient-ajax/client/layout/js/restoreitems.js:129
-#: php-webclient-ajax/client/layout/js/rule.js:239
+#: php-webclient-ajax/client/layout/js/rule.js:255
 msgid "From"
 msgstr "发件人"
 
 # to senD or sent mail?
 #: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:86
-#: php-webclient-ajax/server/core/class.operations.php:2739
+#: php-webclient-ajax/server/core/class.operations.php:2749
 #: php-webclient-ajax/server/core/class.tablecolumns.php:177
 #: php-webclient-ajax/server/core/class.tablecolumns.php:203
 #: php-webclient-ajax/client/modules/printmessageitem.js:63
@@ -1155,8 +1227,8 @@ msgstr "收件人"
 #: php-webclient-ajax/client/layout/dialogs/standard/createmail.php:466
 #: php-webclient-ajax/client/modules/printmessageitem.js:65
 #: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:58
-#: php-webclient-ajax/client/modules/itemmodule.js:1566
-#: php-webclient-ajax/client/modules/itemmodule.js:1583
+#: php-webclient-ajax/client/modules/itemmodule.js:1587
+#: php-webclient-ajax/client/modules/itemmodule.js:1604
 msgid "CC"
 msgstr "抄送"
 
@@ -1195,78 +1267,77 @@ msgstr "结束日期"
 # totally out of context
 #: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:160
 #: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:72
-#: php-webclient-ajax/client/modules/itemmodule.js:1208
-#, fuzzy
+#: php-webclient-ajax/client/modules/itemmodule.js:1227
 msgid "When"
-msgstr "When"
+msgstr "当"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:168
 #: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:77
 msgid "Proposed"
 msgstr "建议"
 
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:200
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:201
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:203
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:204
 msgid "Accept Proposal"
 msgstr "接受建议"
 
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:206
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:207
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:209
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:210
 msgid "View All Proposals"
 msgstr "查看所有建议"
 
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:236
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:237
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:133
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:239
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:240
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:137
 msgid "Remove from Calendar"
 msgstr "从日历中删除"
 
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:242
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:243
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:135
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:245
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:246
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:139
 msgid "Not Current"
 msgstr "不是现在的"
 
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:254
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:255
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:257
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:258
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/shortcuts.php:160
 #: php-webclient-ajax/client/modules/maillistmodule.js:17
-#: php-webclient-ajax/client/modules/maillistmodule.js:38
+#: php-webclient-ajax/client/modules/maillistmodule.js:41
 #: php-webclient-ajax/client/modules/journallistmodule.js:18
 #: php-webclient-ajax/client/modules/journallistmodule.js:28
 msgid "Reply"
 msgstr "回复"
 
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:266
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:267
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:269
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:270
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/shortcuts.php:164
 #: php-webclient-ajax/client/modules/maillistmodule.js:18
-#: php-webclient-ajax/client/modules/maillistmodule.js:39
+#: php-webclient-ajax/client/modules/maillistmodule.js:42
 #: php-webclient-ajax/client/modules/journallistmodule.js:19
 #: php-webclient-ajax/client/modules/journallistmodule.js:29
 msgid "Reply All"
 msgstr "全部回复"
 
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:278
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:279
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:281
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:282
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/shortcuts.php:168
 #: php-webclient-ajax/client/modules/maillistmodule.js:19
-#: php-webclient-ajax/client/modules/maillistmodule.js:40
+#: php-webclient-ajax/client/modules/maillistmodule.js:43
 #: php-webclient-ajax/client/modules/multiusercalendarmodule.js:58
 #: php-webclient-ajax/client/modules/journallistmodule.js:20
 #: php-webclient-ajax/client/modules/journallistmodule.js:30
 msgid "Forward"
 msgstr "转发到"
 
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:290
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:291
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:293
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:294
 #: php-webclient-ajax/client/layout/dialogs/standard/createmail.php:612
 #: php-webclient-ajax/client/layout/dialogs/standard/createmail.php:613
-#: php-webclient-ajax/client/modules/maillistmodule.js:57
+#: php-webclient-ajax/client/modules/maillistmodule.js:60
 msgid "Options"
 msgstr "选项"
 
-#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:303
+#: php-webclient-ajax/client/layout/dialogs/standard/readmail.php:306
 #: php-webclient-ajax/client/layout/dialogs/standard/createmail.php:619
 #: php-webclient-ajax/client/layout/dialogs/modal/flag.php:4
 msgid "Flag"
@@ -1506,11 +1577,11 @@ msgstr "给联系人的新信息"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:32
 msgid "Organization"
-msgstr ""
+msgstr "组织/公司"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:33
 msgid "Phone/Notes"
-msgstr ""
+msgstr "电话/注解"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:78
 #: php-webclient-ajax/client/layout/js/contact.js:443
@@ -1519,7 +1590,7 @@ msgstr "名字"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:80
 msgid "Initials"
-msgstr ""
+msgstr "首字符"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:82
 #: php-webclient-ajax/client/layout/js/contact.js:457
@@ -1528,11 +1599,11 @@ msgstr "姓"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:86
 msgid "Display"
-msgstr ""
+msgstr "显示"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:88
 msgid "Alias"
-msgstr ""
+msgstr "别名"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:99
 #: php-webclient-ajax/client/modules/contactlistmodule.js:54
@@ -1542,11 +1613,11 @@ msgstr "地址"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:117
 msgid "State"
-msgstr ""
+msgstr "国家"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:123
 msgid "Zip code"
-msgstr ""
+msgstr "邮政编码"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:125
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:184
@@ -1565,11 +1636,11 @@ msgstr "电话"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:146
 msgid "Manager"
-msgstr ""
+msgstr "管理器"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:149
 msgid "Direct reports"
-msgstr ""
+msgstr "直接报告"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/gab_detail_mailuser.php:172
 #: php-webclient-ajax/client/modules/contactitemmodule.js:45
@@ -1593,7 +1664,7 @@ msgid "Pager"
 msgstr "呼叫机"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/restoreitems.php:11
-#: php-webclient-ajax/client/modules/listmodule.js:136
+#: php-webclient-ajax/client/modules/listmodule.js:140
 msgid "Restore deleted Items"
 msgstr "还原已删除的项目"
 
@@ -1640,31 +1711,20 @@ msgstr "删除所有的"
 msgid "Permanent delete All"
 msgstr "永久性删除所有的"
 
-#: php-webclient-ajax/client/layout/dialogs/standard/restoreitems.php:108
-#: php-webclient-ajax/client/layout/dialogs/standard/restoreitems.php:109
-#: php-webclient-ajax/client/layout/dialogs/modal/printitem.php:67
-#: php-webclient-ajax/client/layout/dialogs/modal/printlist.php:60
-#: php-webclient-ajax/client/layout/dialogs/not_implemented.php:19
-#: php-webclient-ajax/client/layout/dialogs/settings/open.php:136
-#: php-webclient-ajax/client/layout/dialogs/utils.php:52
-#: php-webclient-ajax/client/layout/js/date-picker-language.js:118
-msgid "Close"
-msgstr "关闭"
-
 #: php-webclient-ajax/client/layout/dialogs/standard/freebusy.php:5
 #: php-webclient-ajax/client/views/multiusercalendar.view.js:63
 msgid "Zoom"
 msgstr "缩放"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/freebusy.php:15
-#: php-webclient-ajax/client/modules/freebusymodule.js:396
+#: php-webclient-ajax/client/modules/freebusymodule.js:402
 #: php-webclient-ajax/client/views/multiusercalendar.view.js:96
 msgid "All Attendees"
 msgstr "所有与会者"
 
 #: php-webclient-ajax/client/layout/dialogs/standard/freebusy.php:17
-#: php-webclient-ajax/client/modules/freebusymodule.js:1001
-#: php-webclient-ajax/client/modules/freebusymodule.js:1011
+#: php-webclient-ajax/client/modules/freebusymodule.js:1040
+#: php-webclient-ajax/client/modules/freebusymodule.js:1050
 msgid "Add a name"
 msgstr "添加名字"
 
@@ -1688,7 +1748,6 @@ msgstr "提醒"
 #: php-webclient-ajax/client/layout/dialogs/standard/reminder.php:36
 #: php-webclient-ajax/client/modules/reminderlistmodule.js:246
 #, c-format, php-format
-#, c-format, php-format,
 msgid "%d reminders are selected"
 msgstr "已选择%d 的提醒"
 
@@ -1749,46 +1808,37 @@ msgid ""
 "Permissions tab of the folder Preferences (accessed by right clicking the "
 "folder)."
 msgstr ""
-"委托人可以代表你发送项目, 并可以选择查看或编辑你的储存库. 你可以在设置视窗內的偏好标签的'编辑委托人...' 按钮來设置. "
-"你若要让其他人进入你的文件夹, 而不给予发送代表特权, 你可以以权限标签來设置 (右键单击该文件夹來进入)."
+"委托人可以代表你发送项目, 并可以选择查看或编辑你的储存库. 你可以在设置视窗內"
+"的偏好标签的'编辑委托人...' 按钮來设置. 你若要让其他人进入你的文件夹, 而不给"
+"予发送代表特权, 你可以以权限标签來设置 (右键单击该文件夹來进入)."
 
 #: php-webclient-ajax/client/layout/dialogs/modal/attachitem.php:3
 msgid "Attach Items"
 msgstr "附件项目"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/attachitem.php:49
+#: php-webclient-ajax/client/layout/dialogs/modal/attachitem.php:51
 msgid "Look in"
 msgstr "查看"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/attachitem.php:53
+#: php-webclient-ajax/client/layout/dialogs/modal/attachitem.php:55
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:308
 msgid "OK"
 msgstr "OK"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/attachitem.php:57
-#: php-webclient-ajax/client/layout/dialogs/modal/copyfolder.php:71
-#: php-webclient-ajax/client/layout/dialogs/modal/addtofavorite.php:92
-#: php-webclient-ajax/client/layout/dialogs/modal/copymessages.php:83
-#: php-webclient-ajax/client/layout/dialogs/modal/deleteoccurrence.php:72
-#: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:309
-#: php-webclient-ajax/client/layout/dialogs/utils.php:43
-msgid "Cancel"
-msgstr "取消"
-
-#: php-webclient-ajax/client/layout/dialogs/modal/attachitem.php:60
+#: php-webclient-ajax/client/layout/dialogs/modal/attachitem.php:62
 msgid "Insert As"
 msgstr "插入为"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/attachitem.php:63
+#: php-webclient-ajax/client/layout/dialogs/modal/attachitem.php:65
 msgid "Text Only"
 msgstr "仅有文字"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/attachitem.php:65
+#: php-webclient-ajax/client/layout/dialogs/modal/attachitem.php:67
 #: php-webclient-ajax/client/core/properties.js:14
 msgid "Attachment"
 msgstr "附件"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/attachitem.php:72
+#: php-webclient-ajax/client/layout/dialogs/modal/attachitem.php:74
 msgid "Select from"
 msgstr "从...选择"
 
@@ -1846,7 +1896,7 @@ msgid "Close preview"
 msgstr "关闭预览"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/fieldchooser.php:4
-#: php-webclient-ajax/client/modules/listmodule.js:2529
+#: php-webclient-ajax/client/modules/listmodule.js:2536
 msgid "Field Chooser"
 msgstr "字段选项"
 
@@ -1943,7 +1993,7 @@ msgid "VIP"
 msgstr "贵宾"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/categories.php:71
-#: php-webclient-ajax/client/modules/itemmodule.js:682
+#: php-webclient-ajax/client/modules/itemmodule.js:688
 msgid "Waiting"
 msgstr "等待中"
 
@@ -2005,7 +2055,7 @@ msgstr "委托人可收到所发送给我的会议有关邮件的副本"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/delegatespermission.php:59
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/preferences.php:68
-#: php-webclient-ajax/client/core/webclient.js:546
+#: php-webclient-ajax/client/core/webclient.js:552
 #: php-webclient-ajax/client/layout/js/sharedfolder.js:6
 msgid "Inbox"
 msgstr "收件箱"
@@ -2060,68 +2110,72 @@ msgstr "新增/编辑规则"
 msgid "Rule"
 msgstr "规则"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:37
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:39
 msgid "Rule name"
 msgstr "规则名称"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:41
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:49
 msgid "With the following properties"
 msgstr "以以下的性质"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:43
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:53
 msgid "From field contains"
 msgstr "从字段包含的"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:44
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:64
 msgid "Subject contains"
 msgstr "主题包含的"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:56
-#: php-webclient-ajax/client/layout/js/rule.js:251
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:88
+#: php-webclient-ajax/client/layout/js/rule.js:267
 msgid "Sent to"
 msgstr "发送到"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:58
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:92
 msgid "Contact or Distribution List"
 msgstr "联系人或通讯组列表"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:59
-#: php-webclient-ajax/client/layout/js/rule.js:253
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:103
+#: php-webclient-ajax/client/layout/js/rule.js:269
 msgid "Sent only to me"
 msgstr "只发送给我"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:63
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:113
 msgid "Perform the following action"
 msgstr "执行以下动作"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:65
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:118
 msgid "Move to"
 msgstr "移动到"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:65
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:66
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:120
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:130
 #: php-webclient-ajax/server/modules/class.hierarchymodule.php:139
 msgid "folder"
 msgstr "文件夹"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:66
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:128
 msgid "Copy to"
 msgstr "复制到"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:67
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:138
 msgid "Delete the message"
 msgstr "删除这信息"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:68
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:144
 msgid "Redirect to"
-msgstr ""
+msgstr "重新定位到"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:69
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:156
 msgid "Forward to"
 msgstr "转发到"
 
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:168
+msgid "Forward as Attachment to"
+msgstr "作为附件转发到"
+
 # does the processing here means to facilitate or to cause or to create?
-#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:70
+#: php-webclient-ajax/client/layout/dialogs/modal/rule.php:180
 msgid "Stop processing more rules"
 msgstr "停止制造更多的规则"
 
@@ -2261,7 +2315,7 @@ msgstr "文件夹类型"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/sharedfolder.php:34
 msgid "Show subfolders"
-msgstr ""
+msgstr "显示子文件夹"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/addtofavorite.php:4
 msgid "Add to favorite folder"
@@ -2288,7 +2342,7 @@ msgid "Add all subfolders"
 msgstr "添加所有子文件夹"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/copymessages.php:4
-#: php-webclient-ajax/client/modules/listmodule.js:129
+#: php-webclient-ajax/client/modules/listmodule.js:133
 msgid "Copy/Move messages"
 msgstr "复制/移动信息"
 
@@ -2309,7 +2363,7 @@ msgstr "请选择目的地文件夹以便复制或移动被选择的信息"
 
 # Is this forms = document, application form, etc. or = types, how something looks, etc.?
 #: php-webclient-ajax/client/layout/dialogs/modal/copymessages.php:65
-#: php-webclient-ajax/client/modules/listmodule.js:2713
+#: php-webclient-ajax/client/modules/listmodule.js:2720
 msgid ""
 "Cannot move the items. The destination folder cannot contain messages/forms."
 msgstr "无法移动项目. 目的地文件夹不能含有信息/表格."
@@ -2347,46 +2401,46 @@ msgid "Delete without sending a response"
 msgstr "删除而不发送任何回复"
 
 # OMITTED? Do you mean to advise user to SKIP some attachments? Or is this meant to be a warning message?
-#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:157
+#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:146
 msgid ""
 "Not all attachments have been uploaded. If you continue some attachments may "
 "be omitted."
 msgstr "不是所有的附件已被上载. 如果你想继续, 某些附件可能将被省略."
 
-#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:223
+#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:212
 msgid "Add attachments"
 msgstr "添加附件"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:227
-#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:234
+#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:216
+#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:223
 msgid "max filesize"
 msgstr "最大的文件大小"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:232
+#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:221
 msgid "Filename"
 msgstr "文件名"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:245
+#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:234
 msgid "Files currently attached"
 msgstr "目前附加的文件"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:252
+#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:241
 msgid "Delete selected file"
 msgstr "删除被选择文件"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:253
+#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:242
 msgid "Download"
 msgstr "下载"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:253
+#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:242
 msgid "Download selected file"
 msgstr "下载被选择文件"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:254
+#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:243
 msgid "Download All"
 msgstr "下载所有"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:254
+#: php-webclient-ajax/client/layout/dialogs/modal/attachments.php:243
 msgid "Download all attachments as a zip archive"
 msgstr "下载所有附件为ZIP文件格式档"
 
@@ -2432,16 +2486,11 @@ msgstr "只删除这个约会"
 msgid "Delete the series"
 msgstr "删除整个系列"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/deleteoccurrence.php:72
-#: php-webclient-ajax/client/layout/dialogs/utils.php:42
-msgid "Ok"
-msgstr "Ok"
-
 #: php-webclient-ajax/client/layout/dialogs/modal/emailaddress.php:4
 msgid "New e-mail address"
-msgstr "新电子邮件地址"
+msgstr "新建电子邮件地址"
 
-#: php-webclient-ajax/client/layout/dialogs/modal/emailaddress.php:20
+#: php-webclient-ajax/client/layout/dialogs/modal/emailaddress.php:31
 #: php-webclient-ajax/server/core/class.tablecolumns.php:112
 #: php-webclient-ajax/server/core/class.tablecolumns.php:134
 msgid "Email Address"
@@ -2510,7 +2559,7 @@ msgid "day(s)"
 msgstr "天"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:149
-#: php-webclient-ajax/client/core/utils.js:1669
+#: php-webclient-ajax/client/core/utils.js:1675
 msgid "weekday"
 msgstr "周日"
 
@@ -2532,7 +2581,7 @@ msgstr "周的每个"
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:167
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:207
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:258
-#: php-webclient-ajax/client/core/utils.js:1672
+#: php-webclient-ajax/client/core/utils.js:1678
 #: php-webclient-ajax/client/core/constants.js:57
 #: php-webclient-ajax/client/layout/js/date-picker-language.js:15
 msgid "Monday"
@@ -2541,7 +2590,7 @@ msgstr "周一"
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:168
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:208
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:259
-#: php-webclient-ajax/client/core/utils.js:1673
+#: php-webclient-ajax/client/core/utils.js:1679
 #: php-webclient-ajax/client/core/constants.js:57
 #: php-webclient-ajax/client/layout/js/date-picker-language.js:16
 msgid "Tuesday"
@@ -2550,7 +2599,7 @@ msgstr "周二"
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:169
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:209
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:260
-#: php-webclient-ajax/client/core/utils.js:1674
+#: php-webclient-ajax/client/core/utils.js:1680
 #: php-webclient-ajax/client/core/constants.js:57
 #: php-webclient-ajax/client/layout/js/date-picker-language.js:17
 msgid "Wednesday"
@@ -2559,7 +2608,7 @@ msgstr "周三"
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:170
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:210
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:261
-#: php-webclient-ajax/client/core/utils.js:1675
+#: php-webclient-ajax/client/core/utils.js:1681
 #: php-webclient-ajax/client/core/constants.js:57
 #: php-webclient-ajax/client/layout/js/date-picker-language.js:18
 msgid "Thursday"
@@ -2568,7 +2617,7 @@ msgstr "周四"
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:173
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:211
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:262
-#: php-webclient-ajax/client/core/utils.js:1676
+#: php-webclient-ajax/client/core/utils.js:1682
 #: php-webclient-ajax/client/core/constants.js:57
 #: php-webclient-ajax/client/layout/js/date-picker-language.js:19
 msgid "Friday"
@@ -2577,7 +2626,7 @@ msgstr "周五"
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:174
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:212
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:263
-#: php-webclient-ajax/client/core/utils.js:1677
+#: php-webclient-ajax/client/core/utils.js:1683
 #: php-webclient-ajax/client/core/constants.js:57
 #: php-webclient-ajax/client/layout/js/date-picker-language.js:20
 msgid "Saturday"
@@ -2586,7 +2635,7 @@ msgstr "周六"
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:175
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:213
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:264
-#: php-webclient-ajax/client/core/utils.js:1671
+#: php-webclient-ajax/client/core/utils.js:1677
 #: php-webclient-ajax/client/core/constants.js:57
 #: php-webclient-ajax/client/layout/js/date-picker-language.js:14
 #: php-webclient-ajax/client/layout/js/date-picker-language.js:21
@@ -2612,12 +2661,10 @@ msgstr "的每个"
 msgid "month(s)"
 msgstr "月"
 
-# No chinese equivalent if out of context
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:195
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:246
-#, fuzzy
 msgid "The"
-msgstr "?"
+msgstr " "
 
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:197
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:248
@@ -2641,7 +2688,7 @@ msgstr "第四"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:201
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:252
-#: php-webclient-ajax/client/core/utils.js:1660
+#: php-webclient-ajax/client/core/utils.js:1666
 msgid "last"
 msgstr "最后"
 
@@ -2754,7 +2801,7 @@ msgid "December"
 msgstr "12月"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:266
-#: php-webclient-ajax/server/core/class.operations.php:238
+#: php-webclient-ajax/server/core/class.operations.php:241
 #: php-webclient-ajax/client/widgets/pagination.js:64
 msgid "of"
 msgstr "共"
@@ -2788,7 +2835,7 @@ msgid "Color of Flag"
 msgstr "旗子的颜色"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/flag.php:71
-#: php-webclient-ajax/client/modules/listmodule.js:1262
+#: php-webclient-ajax/client/modules/listmodule.js:1269
 msgid "Red"
 msgstr "红色"
 
@@ -2800,17 +2847,17 @@ msgstr "橙色"
 msgid "Purple"
 msgstr "紫色"
 
-#: php-webclient-ajax/client/layout/dialogs/not_implemented.php:4
-msgid "Not implemented"
-msgstr "未执行"
+#: php-webclient-ajax/client/layout/dialogs/settings/open.php:56
+msgid "Settings"
+msgstr "设置"
 
-#: php-webclient-ajax/client/layout/dialogs/not_implemented.php:11
-msgid "This type of message is not yet implemented."
-msgstr "这类型的邮件尚未执行"
+#: php-webclient-ajax/client/layout/dialogs/settings/open.php:130
+msgid "Save settings"
+msgstr "保存设置"
 
-#: php-webclient-ajax/client/layout/dialogs/not_implemented.php:20
-msgid "Close window"
-msgstr "关闭视窗"
+#: php-webclient-ajax/client/layout/dialogs/settings/open.php:137
+msgid "Don't save settings"
+msgstr "不要保存设置"
 
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/vacation.php:13
 msgid "Out of Office Assistant"
@@ -2838,7 +2885,7 @@ msgstr "显示已完成的任务"
 
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/addressbook.php:4
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/addressbook.php:13
-#: php-webclient-ajax/client/modules/listmodule.js:131
+#: php-webclient-ajax/client/modules/listmodule.js:135
 msgid "Addressbook"
 msgstr "通讯记录"
 
@@ -2952,7 +2999,7 @@ msgid "New Note"
 msgstr "新便笺"
 
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/shortcuts.php:104
-#: php-webclient-ajax/client/modules/hierarchymodule.js:1280
+#: php-webclient-ajax/client/modules/hierarchymodule.js:1328
 msgid "New Folder"
 msgstr "新文件夹"
 
@@ -2961,14 +3008,14 @@ msgid "For All items (List View)"
 msgstr "所有项目(列出视窗)"
 
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/shortcuts.php:114
-#: php-webclient-ajax/client/modules/maillistmodule.js:33
+#: php-webclient-ajax/client/modules/maillistmodule.js:36
 #: php-webclient-ajax/client/modules/multiusercalendarmodule.js:78
 #: php-webclient-ajax/client/modules/tasklistmodule.js:26
 #: php-webclient-ajax/client/modules/contactlistmodule.js:36
-#: php-webclient-ajax/client/modules/listmodule.js:140
+#: php-webclient-ajax/client/modules/listmodule.js:144
 #: php-webclient-ajax/client/modules/stickynotelistmodule.js:27
 #: php-webclient-ajax/client/modules/journallistmodule.js:25
-#: php-webclient-ajax/client/modules/hierarchymodule.js:1272
+#: php-webclient-ajax/client/modules/hierarchymodule.js:1320
 #: php-webclient-ajax/client/modules/appointmentlistmodule.js:33
 #: php-webclient-ajax/client/modules/advancedfindlistmodule.js:40
 msgid "Open"
@@ -3270,11 +3317,6 @@ msgstr "编辑签名"
 msgid "Preferences"
 msgstr "首选"
 
-#: php-webclient-ajax/client/layout/dialogs/settings/tabs/preferences.php:15
-#: php-webclient-ajax/client/login.php:68
-msgid "Language"
-msgstr "语言"
-
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/preferences.php:31
 msgid "Color theme"
 msgstr "颜色主题"
@@ -3386,62 +3428,36 @@ msgstr "在每(X)秒后刷新效果 [0: 禁用]"
 
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/preferences.php:174
 msgid "classic"
-msgstr ""
+msgstr "经典的"
 
-#: php-webclient-ajax/client/layout/dialogs/settings/open.php:56
-msgid "Settings"
-msgstr "设置"
+#: php-webclient-ajax/server/util.php:272
+msgid "GB"
+msgstr "GB"
 
-#: php-webclient-ajax/client/layout/dialogs/settings/open.php:130
-msgid "Save settings"
-msgstr "保存设置"
+#: php-webclient-ajax/server/util.php:276
+#: php-webclient-ajax/client/modules/foldersizemodule.js:61
+#: php-webclient-ajax/client/modules/foldersizemodule.js:62
+#: php-webclient-ajax/client/modules/foldersizemodule.js:73
+#: php-webclient-ajax/client/modules/foldersizemodule.js:76
+msgid "KB"
+msgstr "KB"
 
-#: php-webclient-ajax/client/layout/dialogs/settings/open.php:137
-msgid "Don't save settings"
-msgstr "不要保存设置"
-
-#: php-webclient-ajax/client/layout/dialogs/utils.php:72
-msgid "Button"
-msgstr "按钮"
-
-#: php-webclient-ajax/client/login.php:36
-msgid "Please logon"
-msgstr "请登录"
-
-#: php-webclient-ajax/client/login.php:43
-msgid "Logon failed, please check your name/password."
-msgstr "登录失败,请检查你的姓名/密码"
-
-#: php-webclient-ajax/client/login.php:46
-msgid "Cannot connect to the Zarafa Server."
-msgstr "无法连接到Zarafa服务器."
-
-#: php-webclient-ajax/client/login.php:53
-msgid "You have been automatically logged out"
-msgstr "你已被自动登出"
-
-#: php-webclient-ajax/client/login.php:64
-msgid "Password"
-msgstr "密码"
-
-#: php-webclient-ajax/client/login.php:71
-msgid "Last used language"
-msgstr "最后使用的语言"
-
-#: php-webclient-ajax/client/login.php:84
-msgid "Logon"
-msgstr "登录"
+#: php-webclient-ajax/server/util.php:278
+#: php-webclient-ajax/client/modules/readmailitemmodule.js:165
+#: php-webclient-ajax/client/modules/itemmodule.js:332
+msgid "B"
+msgstr "B"
 
 #: php-webclient-ajax/server/modules/class.hierarchymodule.php:139
 msgid "store"
 msgstr "储藏"
 
-#: php-webclient-ajax/server/modules/class.hierarchymodule.php:153
-#: php-webclient-ajax/server/modules/class.hierarchymodule.php:167
+#: php-webclient-ajax/server/modules/class.hierarchymodule.php:159
+#: php-webclient-ajax/server/modules/class.hierarchymodule.php:173
 msgid "You have insufficient privileges to open this "
 msgstr "你没有足够的权限来打开这个"
 
-#: php-webclient-ajax/server/modules/class.hierarchymodule.php:165
+#: php-webclient-ajax/server/modules/class.hierarchymodule.php:171
 msgid "User could not be resolved"
 msgstr "用户未能得到解决"
 
@@ -3466,49 +3482,48 @@ msgid "You have insufficient privileges to save items in this folder"
 msgstr "你没有足够的权限把项目保存到此文件夹中"
 
 # 92%
-#: php-webclient-ajax/server/modules/class.listmodule.php:157
-#: php-webclient-ajax/server/modules/class.itemmodule.php:154
-#, fuzzy
+#: php-webclient-ajax/server/modules/class.listmodule.php:165
+#: php-webclient-ajax/server/modules/class.itemmodule.php:162
 msgid "You have insufficient privileges to delete items in this folder"
-msgstr "你没有足够的权限把项目保存到此文件夹中"
+msgstr "你没有足够的权限删除此文件夹内的项目"
 
-#: php-webclient-ajax/server/modules/class.listmodule.php:211
-#: php-webclient-ajax/server/modules/class.listmodule.php:341
+#: php-webclient-ajax/server/modules/class.listmodule.php:219
+#: php-webclient-ajax/server/modules/class.listmodule.php:353
 #: php-webclient-ajax/server/modules/class.advancedfindlistmodule.php:160
-#: php-webclient-ajax/server/modules/class.attachitemlistmodule.php:95
+#: php-webclient-ajax/server/modules/class.attachitemlistmodule.php:97
 msgid "In Folder"
 msgstr "收件文件夹"
 
-#: php-webclient-ajax/server/modules/class.listmodule.php:211
-#: php-webclient-ajax/server/modules/class.listmodule.php:341
+#: php-webclient-ajax/server/modules/class.listmodule.php:219
+#: php-webclient-ajax/server/modules/class.listmodule.php:353
 #: php-webclient-ajax/server/modules/class.advancedfindlistmodule.php:160
-#: php-webclient-ajax/server/modules/class.attachitemlistmodule.php:95
+#: php-webclient-ajax/server/modules/class.attachitemlistmodule.php:97
 msgid "Sort Folder"
 msgstr "文件夹排序"
 
-#: php-webclient-ajax/server/modules/class.listmodule.php:283
-#: php-webclient-ajax/server/modules/class.listmodule.php:294
-#: php-webclient-ajax/server/modules/class.listmodule.php:322
-#: php-webclient-ajax/client/modules/maillistmodule.js:320
+#: php-webclient-ajax/server/modules/class.listmodule.php:295
+#: php-webclient-ajax/server/modules/class.listmodule.php:306
+#: php-webclient-ajax/server/modules/class.listmodule.php:334
+#: php-webclient-ajax/client/modules/maillistmodule.js:323
 #: php-webclient-ajax/client/modules/contactlistmodule.js:404
 msgid "Error in search, please try again"
 msgstr "搜索错误, 请再试一次"
 
-#: php-webclient-ajax/server/modules/class.listmodule.php:418
+#: php-webclient-ajax/server/modules/class.listmodule.php:430
 msgid "Error in search"
 msgstr "搜索错误"
 
-#: php-webclient-ajax/server/modules/class.listmodule.php:1087
+#: php-webclient-ajax/server/modules/class.listmodule.php:1097
 msgid "Private Appointment"
 msgstr "私人约会"
 
 #: php-webclient-ajax/server/modules/class.addressbookitemmodule.php:140
 msgid "Could not handle this type of object."
-msgstr ""
+msgstr "不能处理这类对象"
 
 #: php-webclient-ajax/server/modules/class.addressbookitemmodule.php:148
 msgid "Could not open this object."
-msgstr ""
+msgstr "不能打开该对象"
 
 #: php-webclient-ajax/server/modules/class.propertiesmodule.php:58
 msgid "You have insufficient permissions to set permissions."
@@ -3533,7 +3548,7 @@ msgid "kb"
 msgstr "kb"
 
 #: php-webclient-ajax/server/modules/class.propertiesmodule.php:301
-#: php-webclient-ajax/server/modules/class.delegatesmodule.php:416
+#: php-webclient-ajax/server/modules/class.delegatesmodule.php:411
 #: php-webclient-ajax/client/modules/propertiesmodule.js:137
 msgid "Unknown user/group"
 msgstr "不明用户/组"
@@ -3543,12 +3558,12 @@ msgstr "不明用户/组"
 msgid "unknown"
 msgstr "不明"
 
-#: php-webclient-ajax/server/modules/class.contactitemmodule.php:223
+#: php-webclient-ajax/server/modules/class.contactitemmodule.php:225
 #, php-format
 msgid "%s's Birthday"
 msgstr "%s的生日"
 
-#: php-webclient-ajax/server/modules/class.contactitemmodule.php:247
+#: php-webclient-ajax/server/modules/class.contactitemmodule.php:249
 #, php-format
 msgid "%s's Anniversary"
 msgstr "%s的纪念日"
@@ -3566,7 +3581,9 @@ msgstr "无法设置委托人权限"
 msgid ""
 "Unable to reschedule occurrence: either the new occurrence skips over an "
 "existing occurrence, or an occurrence is already present on this day."
-msgstr "无法重新安排事项: 因为现有事项存在因此新事项不能产生, 或同一事项已经出现在这一天."
+msgstr ""
+"无法重新安排事项: 因为现有事项存在因此新事项不能产生, 或同一事项已经出现在这"
+"一天."
 
 #: php-webclient-ajax/server/modules/class.advancedfindlistmodule.php:97
 msgid ""
@@ -3583,130 +3600,132 @@ msgstr "信息储存已超过其硬性额定限制."
 msgid ""
 "To reduce the amount of data in this message store, select some items that "
 "you no longer need, and permanently (SHIFT + DEL) delete them."
-msgstr "要减少此邮件存储的数据量, 选择一些你不再需要的项目,  并以(SHIFT+ Del) 永久删除它们."
+msgstr ""
+"要减少此邮件存储的数据量, 选择一些你不再需要的项目,  并以(SHIFT+ Del) 永久删"
+"除它们."
 
 #: php-webclient-ajax/server/modules/class.itemmodule.php:42
 msgid "The message store has exceeded its soft quota limit."
 msgstr "信息储存已超过其软性额定限制."
 
-#: php-webclient-ajax/server/modules/class.itemmodule.php:192
-#: php-webclient-ajax/server/core/class.operations.php:2541
+#: php-webclient-ajax/server/modules/class.itemmodule.php:200
+#: php-webclient-ajax/server/core/class.operations.php:2550
 msgid "Task Accepted:"
 msgstr "已接受任务:"
 
-#: php-webclient-ajax/server/modules/class.itemmodule.php:194
-#: php-webclient-ajax/server/core/class.operations.php:2544
-#: php-webclient-ajax/server/core/class.operations.php:2600
+#: php-webclient-ajax/server/modules/class.itemmodule.php:202
+#: php-webclient-ajax/server/core/class.operations.php:2553
+#: php-webclient-ajax/server/core/class.operations.php:2610
 msgid "Task Declined:"
 msgstr "已拒绝任务:"
 
-#: php-webclient-ajax/server/modules/class.itemmodule.php:472
+#: php-webclient-ajax/server/modules/class.itemmodule.php:486
 msgid "Conflicts with another appointment on your Calendar."
 msgstr "与日历上的另一个约会有所冲突."
 
-#: php-webclient-ajax/server/modules/class.itemmodule.php:474
+#: php-webclient-ajax/server/modules/class.itemmodule.php:488
 #, php-format
 msgid ""
 "%s occurrences of this recurring appointment conflict with other "
 "appointments on your Calendar."
 msgstr "这%s定期性约会与日历上的另一个约会有所冲突."
 
-#: php-webclient-ajax/server/modules/class.itemmodule.php:475
+#: php-webclient-ajax/server/modules/class.itemmodule.php:489
 #, php-format
 msgid ""
 "%s occurrence of this recurring appointment conflicts with other appointment "
 "on your Calendar."
 msgstr "这%s定期性约会与日历上的另一个约会有所冲突."
 
-#: php-webclient-ajax/server/core/class.operations.php:943
-#: php-webclient-ajax/server/core/class.operations.php:976
+#: php-webclient-ajax/server/core/class.operations.php:996
+#: php-webclient-ajax/server/core/class.operations.php:1029
 msgid "Organizor"
 msgstr "组织者"
 
-#: php-webclient-ajax/server/core/class.operations.php:947
-#: php-webclient-ajax/client/layout/js/appointment.js:1267
-#: php-webclient-ajax/client/layout/js/appointment.js:1349
+#: php-webclient-ajax/server/core/class.operations.php:1000
+#: php-webclient-ajax/client/layout/js/appointment.js:1310
+#: php-webclient-ajax/client/layout/js/appointment.js:1392
 msgid "Required"
 msgstr "要求"
 
-#: php-webclient-ajax/server/core/class.operations.php:951
-#: php-webclient-ajax/client/layout/js/appointment.js:1270
-#: php-webclient-ajax/client/layout/js/appointment.js:1350
+#: php-webclient-ajax/server/core/class.operations.php:1004
+#: php-webclient-ajax/client/layout/js/appointment.js:1313
+#: php-webclient-ajax/client/layout/js/appointment.js:1393
 msgid "Optional"
 msgstr "可选项"
 
-#: php-webclient-ajax/server/core/class.operations.php:955
+#: php-webclient-ajax/server/core/class.operations.php:1008
 #: php-webclient-ajax/server/core/class.tablecolumns.php:46
-#: php-webclient-ajax/client/layout/js/appointment.js:1273
-#: php-webclient-ajax/client/layout/js/appointment.js:1351
+#: php-webclient-ajax/client/layout/js/appointment.js:1316
+#: php-webclient-ajax/client/layout/js/appointment.js:1394
 msgid "Resource"
 msgstr "资源"
 
-#: php-webclient-ajax/server/core/class.operations.php:973
+#: php-webclient-ajax/server/core/class.operations.php:1026
 #: php-webclient-ajax/client/modules/itemmodule.js:528
 #: php-webclient-ajax/client/views/table.view.js:1032
 #: php-webclient-ajax/client/layout/js/advancedfind.js:253
-#: php-webclient-ajax/client/layout/js/appointment.js:1189
-#: php-webclient-ajax/client/layout/js/appointment.js:1296
-#: php-webclient-ajax/client/layout/js/appointment.js:1354
+#: php-webclient-ajax/client/layout/js/appointment.js:1232
+#: php-webclient-ajax/client/layout/js/appointment.js:1339
+#: php-webclient-ajax/client/layout/js/appointment.js:1397
 #: php-webclient-ajax/client/layout/js/attachitem.js:290
 msgid "No Response"
 msgstr "没有回应"
 
-#: php-webclient-ajax/server/core/class.operations.php:982
+#: php-webclient-ajax/server/core/class.operations.php:1035
 #: php-webclient-ajax/client/modules/itemmodule.js:537
 #: php-webclient-ajax/client/views/table.view.js:1044
 #: php-webclient-ajax/client/layout/js/advancedfind.js:262
-#: php-webclient-ajax/client/layout/js/appointment.js:1286
-#: php-webclient-ajax/client/layout/js/appointment.js:1357
+#: php-webclient-ajax/client/layout/js/appointment.js:1329
+#: php-webclient-ajax/client/layout/js/appointment.js:1400
 #: php-webclient-ajax/client/layout/js/attachitem.js:299
 msgid "Accepted"
 msgstr "已接受"
 
-#: php-webclient-ajax/server/core/class.operations.php:985
+#: php-webclient-ajax/server/core/class.operations.php:1038
 #: php-webclient-ajax/client/modules/itemmodule.js:540
 #: php-webclient-ajax/client/views/table.view.js:1048
 #: php-webclient-ajax/client/layout/js/advancedfind.js:265
-#: php-webclient-ajax/client/layout/js/appointment.js:1289
-#: php-webclient-ajax/client/layout/js/appointment.js:1358
+#: php-webclient-ajax/client/layout/js/appointment.js:1332
+#: php-webclient-ajax/client/layout/js/appointment.js:1401
 #: php-webclient-ajax/client/layout/js/attachitem.js:302
 msgid "Declined"
 msgstr "已拒绝"
 
-#: php-webclient-ajax/server/core/class.operations.php:988
-#: php-webclient-ajax/client/layout/js/appointment.js:1292
-#: php-webclient-ajax/client/layout/js/appointment.js:1359
+#: php-webclient-ajax/server/core/class.operations.php:1041
+#: php-webclient-ajax/client/layout/js/appointment.js:1335
+#: php-webclient-ajax/client/layout/js/appointment.js:1402
 msgid "Not Responded"
 msgstr "没有回应"
 
-#: php-webclient-ajax/server/core/class.operations.php:2547
+#: php-webclient-ajax/server/core/class.operations.php:2556
 msgid "Task Request:"
 msgstr "任务要求:"
 
-#: php-webclient-ajax/server/core/class.operations.php:2557
-#: php-webclient-ajax/server/core/class.operations.php:2601
+#: php-webclient-ajax/server/core/class.operations.php:2566
+#: php-webclient-ajax/server/core/class.operations.php:2611
 msgid "Task Updated:"
 msgstr "已更新任务:"
 
-#: php-webclient-ajax/server/core/class.operations.php:2557
-#: php-webclient-ajax/server/core/class.operations.php:2601
+#: php-webclient-ajax/server/core/class.operations.php:2566
+#: php-webclient-ajax/server/core/class.operations.php:2611
 msgid "Task Completed:"
 msgstr "已完成任务:"
 
-#: php-webclient-ajax/server/core/class.operations.php:2737
+#: php-webclient-ajax/server/core/class.operations.php:2747
 msgid "Your message did not reach some or all of the intended recipients"
 msgstr "您的信息没有到达某些或全部的预定收件人"
 
-#: php-webclient-ajax/server/core/class.operations.php:2740
+#: php-webclient-ajax/server/core/class.operations.php:2750
 msgid "The following recipient(s) could not be reached"
 msgstr "以下收件人无法联系到"
 
-#: php-webclient-ajax/server/core/class.operations.php:3088
+#: php-webclient-ajax/server/core/class.operations.php:3098
 msgid "Untitled rule"
 msgstr "未命名规则"
 
-#: php-webclient-ajax/server/core/class.operations.php:3209
-#: php-webclient-ajax/server/core/class.operations.php:3220
+#: php-webclient-ajax/server/core/class.operations.php:3222
+#: php-webclient-ajax/server/core/class.operations.php:3233
 msgid "Canceled: "
 msgstr "已取消:"
 
@@ -3838,27 +3857,27 @@ msgid "Sort on Contact"
 msgstr "以联系人排序"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:44
-#: php-webclient-ajax/client/modules/freebusymodule.js:1093
+#: php-webclient-ajax/client/modules/freebusymodule.js:1132
 #: php-webclient-ajax/client/modules/itemmodule.js:547
 msgid "Required Attendee"
 msgstr "必要的与会者"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:44
 msgid "Sort on Required Attendee"
-msgstr ""
+msgstr "筛选出必须的与会者"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:45
-#: php-webclient-ajax/client/modules/freebusymodule.js:1095
+#: php-webclient-ajax/client/modules/freebusymodule.js:1134
 msgid "Optional Attendee"
 msgstr "可选的与会者"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:45
 msgid "Sort on Optional Attendee"
-msgstr ""
+msgstr "筛选出可选的与会者"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:46
 msgid "Sort on Resource"
-msgstr ""
+msgstr "按资源分类"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:48
 msgid "Sort on Busy Status"
@@ -3873,9 +3892,9 @@ msgstr "以忙碌状态排序"
 #: php-webclient-ajax/server/core/class.tablecolumns.php:216
 #: php-webclient-ajax/server/core/class.tablecolumns.php:274
 #: php-webclient-ajax/server/core/class.tablecolumns.php:304
-#: php-webclient-ajax/client/modules/distlistmodule.js:96
+#: php-webclient-ajax/client/modules/distlistmodule.js:94
 #: php-webclient-ajax/client/modules/stickynotelistmodule.js:22
-#: php-webclient-ajax/client/layout/js/appointment.js:1147
+#: php-webclient-ajax/client/layout/js/appointment.js:1190
 msgid "Icon"
 msgstr "图标"
 
@@ -4281,8 +4300,8 @@ msgid "Sort on Start Date"
 msgstr "以开始日期排序"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:242
-#: php-webclient-ajax/client/modules/listmodule.js:2918
-#: php-webclient-ajax/client/modules/listmodule.js:2948
+#: php-webclient-ajax/client/modules/listmodule.js:2925
+#: php-webclient-ajax/client/modules/listmodule.js:2955
 msgid "Click here to add a new item"
 msgstr "点击这里來添加一个新项目"
 
@@ -4291,8 +4310,8 @@ msgid "0%"
 msgstr "0%"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:276
-#: php-webclient-ajax/client/modules/maillistmodule.js:382
-#: php-webclient-ajax/client/modules/itemmodule.js:639
+#: php-webclient-ajax/client/modules/maillistmodule.js:385
+#: php-webclient-ajax/client/modules/itemmodule.js:645
 #: php-webclient-ajax/client/core/properties.js:15
 #: php-webclient-ajax/client/core/properties.js:32
 #: php-webclient-ajax/client/core/properties.js:87
@@ -4330,7 +4349,7 @@ msgid "Sort on Name"
 msgstr "以名称排序"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:306
-#: php-webclient-ajax/client/modules/distlistmodule.js:98
+#: php-webclient-ajax/client/modules/distlistmodule.js:96
 #: php-webclient-ajax/client/modules/printmessageitem.js:133
 #: php-webclient-ajax/client/modules/printmessageitem.js:135
 #: php-webclient-ajax/client/modules/printmessageitem.js:137
@@ -4343,34 +4362,16 @@ msgid "Could not perform operation. Error in request"
 msgstr "无法执行操作. 请求中的错误"
 
 # ???
-#: php-webclient-ajax/server/core/htmlfilter.php:1139
+#: php-webclient-ajax/server/core/htmlfilter.php:1164
 msgid "sec_remove_eng.png"
 msgstr "sec_remove_eng.png"
 
-#: php-webclient-ajax/server/core/htmlfilter.php:1237
+#: php-webclient-ajax/server/core/htmlfilter.php:1262
 msgid "This external link will open in a new window"
 msgstr "这外部网络链接将会在新的视窗打开"
 
-#: php-webclient-ajax/server/util.php:272
-msgid "GB"
-msgstr "GB"
-
-#: php-webclient-ajax/server/util.php:276
-#: php-webclient-ajax/client/modules/foldersizemodule.js:61
-#: php-webclient-ajax/client/modules/foldersizemodule.js:62
-#: php-webclient-ajax/client/modules/foldersizemodule.js:73
-#: php-webclient-ajax/client/modules/foldersizemodule.js:76
-msgid "KB"
-msgstr "KB"
-
-#: php-webclient-ajax/server/util.php:278
-#: php-webclient-ajax/client/modules/readmailitemmodule.js:165
-#: php-webclient-ajax/client/modules/itemmodule.js:332
-msgid "B"
-msgstr "B"
-
 #: php-webclient-ajax/client/modules/maillistmodule.js:21
-#: php-webclient-ajax/client/modules/maillistmodule.js:375
+#: php-webclient-ajax/client/modules/maillistmodule.js:378
 #: php-webclient-ajax/client/modules/contactlistmodule.js:30
 #: php-webclient-ajax/client/modules/contactlistmodule.js:315
 msgid "Search"
@@ -4393,114 +4394,115 @@ msgstr "发送/接收"
 msgid "Send or Receive mails"
 msgstr "发送或接收邮件"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:34
+#: php-webclient-ajax/client/modules/maillistmodule.js:37
 msgid "Save Email As a File"
 msgstr "把电子邮件保存为文件"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:36
+#: php-webclient-ajax/client/modules/maillistmodule.js:39
 msgid "Edit as New Message"
 msgstr "编辑為新信息"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:42
+#: php-webclient-ajax/client/modules/maillistmodule.js:45
 #: php-webclient-ajax/client/modules/tasklistmodule.js:29
 #: php-webclient-ajax/client/modules/journallistmodule.js:32
 msgid "Mark Read"
 msgstr "标记为已读"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:43
+#: php-webclient-ajax/client/modules/maillistmodule.js:46
 #: php-webclient-ajax/client/modules/tasklistmodule.js:30
 #: php-webclient-ajax/client/modules/journallistmodule.js:33
 msgid "Mark Unread"
 msgstr "标记为未读"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:45
+#: php-webclient-ajax/client/modules/maillistmodule.js:48
 msgid "Forward Items"
 msgstr "转寄项目"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:47
-#: php-webclient-ajax/client/modules/listmodule.js:3399
+#: php-webclient-ajax/client/modules/maillistmodule.js:50
+#: php-webclient-ajax/client/modules/listmodule.js:3407
 msgid "Red Flag"
 msgstr "红旗"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:48
-#: php-webclient-ajax/client/modules/listmodule.js:3408
+#: php-webclient-ajax/client/modules/maillistmodule.js:51
+#: php-webclient-ajax/client/modules/listmodule.js:3416
 msgid "Flag Complete"
 msgstr "完成旗子"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:49
-#: php-webclient-ajax/client/modules/listmodule.js:3409
+#: php-webclient-ajax/client/modules/maillistmodule.js:52
+#: php-webclient-ajax/client/modules/listmodule.js:3417
 msgid "Delete Flag"
 msgstr "删除旗子"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:51
+#: php-webclient-ajax/client/modules/maillistmodule.js:54
 msgid "Move to Junk Folder"
 msgstr "移动到垃圾邮件文件夹"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:55
+#: php-webclient-ajax/client/modules/maillistmodule.js:58
 msgid "Create a task from email"
-msgstr ""
+msgstr "从邮件创建一个任务"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:66
+#: php-webclient-ajax/client/modules/maillistmodule.js:69
 msgid "Previewpane right"
 msgstr "右预览窗格"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:67
+#: php-webclient-ajax/client/modules/maillistmodule.js:70
 msgid "Previewpane bottom"
 msgstr "底部预览窗格"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:68
+#: php-webclient-ajax/client/modules/maillistmodule.js:71
 msgid "Previewpane off"
 msgstr "关闭预览窗格"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:135
+#: php-webclient-ajax/client/modules/maillistmodule.js:138
 msgid "A new task has been created and is moved into task folder"
 msgstr "一个新的任务已被创建并已移动到任务文件夹"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:137
+#: php-webclient-ajax/client/modules/maillistmodule.js:140
 msgid "You have insufficient privileges to create a new task for this item"
 msgstr "你没有足够的权限在此项目创建新任务"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:165
+#: php-webclient-ajax/client/modules/maillistmodule.js:168
 #, c-format
 msgid "Cannot copy this item. Cannot open calendar for user %s: Access Denied."
 msgstr "无法复制这个项目. 无法打开用户%s日历: 接入被拒绝"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:167
+#: php-webclient-ajax/client/modules/maillistmodule.js:170
 msgid ""
 "You received a more recent update to this meeting. This meeting request is "
 "out of date. You cannot respond this request."
-msgstr "你已收到了会议最近最新的信息. 此会议要求已过时. 你可以不必对这一要求作出反应."
+msgstr ""
+"你已收到了会议最近最新的信息. 此会议要求已过时. 你可以不必对这一要求作出反应."
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:170
+#: php-webclient-ajax/client/modules/maillistmodule.js:173
 msgid ""
 "The meeting has been accepted and moved to your calendar. A response has "
 "been sent to the meeting organiser."
 msgstr "此会议已被接受并移动到你的日历. 也已发送回复给会议组织者."
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:379
+#: php-webclient-ajax/client/modules/maillistmodule.js:382
 #: php-webclient-ajax/client/modules/contactlistmodule.js:48
 msgid "All text fields"
 msgstr "所有字段篇幅"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:381
+#: php-webclient-ajax/client/modules/maillistmodule.js:384
 msgid "Sender"
 msgstr "发件人"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:383
+#: php-webclient-ajax/client/modules/maillistmodule.js:386
 msgid "Subject or Sender"
 msgstr "主题或发件人"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:384
+#: php-webclient-ajax/client/modules/maillistmodule.js:387
 msgid "To or Cc"
 msgstr "发送到或抄送"
 
 # need context.
-#: php-webclient-ajax/client/modules/maillistmodule.js:391
+#: php-webclient-ajax/client/modules/maillistmodule.js:394
 #: php-webclient-ajax/client/modules/contactlistmodule.js:327
 msgid "for"
 msgstr "给"
 
-#: php-webclient-ajax/client/modules/maillistmodule.js:435
+#: php-webclient-ajax/client/modules/maillistmodule.js:438
 #: php-webclient-ajax/client/modules/contactlistmodule.js:366
 msgid "Subfolders"
 msgstr "子文件夹"
@@ -4522,12 +4524,12 @@ msgstr "在你的收件箱中有%s个未读邮件"
 #: php-webclient-ajax/client/modules/appointmentitemmodule.js:99
 #, c-format
 msgid "Do you want to update the location '%s' with new location '%s'"
-msgstr ""
+msgstr "你想要更新地点 '%s' with new location '%s'"
 
-#: php-webclient-ajax/client/modules/appointmentitemmodule.js:343
-#: php-webclient-ajax/client/modules/appointmentitemmodule.js:391
-#: php-webclient-ajax/client/modules/appointmentlistmodule.js:484
-#: php-webclient-ajax/client/views/multiusercalendar.view.js:1761
+#: php-webclient-ajax/client/modules/appointmentitemmodule.js:348
+#: php-webclient-ajax/client/modules/appointmentitemmodule.js:396
+#: php-webclient-ajax/client/modules/appointmentlistmodule.js:493
+#: php-webclient-ajax/client/views/multiusercalendar.view.js:1762
 #: php-webclient-ajax/client/views/calendar.day.view.js:2047
 #: php-webclient-ajax/client/views/calendar.month.view.js:533
 #: php-webclient-ajax/client/views/calendar.week.view.js:494
@@ -4537,13 +4539,13 @@ msgid ""
 "meeting?"
 msgstr "你想发送关于本次会议变动的最新信息給会议与会者吗?"
 
-#: php-webclient-ajax/client/modules/appointmentitemmodule.js:537
+#: php-webclient-ajax/client/modules/appointmentitemmodule.js:543
 msgid "Resources have been planned."
 msgstr "资源已规划."
 
 # need to see the actual dialogue box in context to make sure the meaning is right.
-#: php-webclient-ajax/client/modules/appointmentitemmodule.js:559
-#: php-webclient-ajax/client/modules/appointmentlistmodule.js:535
+#: php-webclient-ajax/client/modules/appointmentitemmodule.js:565
+#: php-webclient-ajax/client/modules/appointmentlistmodule.js:544
 #, c-format
 msgid ""
 "You marked \"%s\" as a resource. You cannot schedule a meeting with \"%s\" "
@@ -4551,11 +4553,12 @@ msgid ""
 "enter the name as a required or optional attendee or talk to your "
 "administrator about giving you permission to schedule \"%s\"."
 msgstr ""
-"你已标记\"%s\"为资源. 你不能安排一个以\"%s\"的会议, 因为你没有该帐户的适当权限. 你可以把名称输入为必需的或可选与会者,  "
-"或向管理员要求让你能够安排\"%s\"的权限."
+"你已标记\"%s\"为资源. 你不能安排一个以\"%s\"的会议, 因为你没有该帐户的适当权"
+"限. 你可以把名称输入为必需的或可选与会者,  或向管理员要求让你能够安排\"%s\"的"
+"权限."
 
-#: php-webclient-ajax/client/modules/appointmentitemmodule.js:562
-#: php-webclient-ajax/client/modules/appointmentlistmodule.js:538
+#: php-webclient-ajax/client/modules/appointmentitemmodule.js:568
+#: php-webclient-ajax/client/modules/appointmentlistmodule.js:547
 #, c-format
 msgid ""
 "\"%s\" has declined your meeting because \"%s\" does not automatically "
@@ -4563,24 +4566,25 @@ msgid ""
 msgstr "\"%s\" 已拒绝你的会议, 因为\"%s\" 不能自动接受会议要求."
 
 # need to see the actual dialogue in context to determine whether it makes sense.
-#: php-webclient-ajax/client/modules/appointmentitemmodule.js:565
-#: php-webclient-ajax/client/modules/appointmentlistmodule.js:541
+#: php-webclient-ajax/client/modules/appointmentitemmodule.js:571
+#: php-webclient-ajax/client/modules/appointmentlistmodule.js:550
 #, c-format
 msgid ""
 "\"%s\" has declined your meeting because it is recurring. You must book each "
 "meeting separetly with this recurrence."
-msgstr "\"%s\" 已拒绝你的会议, 因为此会议是重复性的. 你必须分别预订此重复性会议."
+msgstr ""
+"\"%s\" 已拒绝你的会议, 因为此会议是重复性的. 你必须分别预订此重复性会议."
 
-#: php-webclient-ajax/client/modules/appointmentitemmodule.js:568
-#: php-webclient-ajax/client/modules/appointmentlistmodule.js:544
+#: php-webclient-ajax/client/modules/appointmentitemmodule.js:574
+#: php-webclient-ajax/client/modules/appointmentlistmodule.js:553
 #, c-format
 msgid ""
 "\"%s\" is already booked for this specified time. You must use another time "
 "or find another resource."
 msgstr "在这个指定的时间\"%s\" 已被预订了. 你必须使用另一个时间或寻找其他资源."
 
-#: php-webclient-ajax/client/modules/appointmentitemmodule.js:571
-#: php-webclient-ajax/client/modules/appointmentlistmodule.js:547
+#: php-webclient-ajax/client/modules/appointmentitemmodule.js:577
+#: php-webclient-ajax/client/modules/appointmentlistmodule.js:556
 msgid "Meeting was not scheduled."
 msgstr "这会议并没有被安排"
 
@@ -4594,7 +4598,9 @@ msgstr "当搜索这类型的文件夹时, 你不能在同一时间搜索其他�
 msgid ""
 "The folder you selected does not let you search folders at the same time. To "
 "search other folders, clear the checkbox next to this folder"
-msgstr "所选的文件夹不会让你在同一时间搜索其他文件夹. 如要搜索其他文件夹, 你必须先清除此文件夹旁边的复选框."
+msgstr ""
+"所选的文件夹不会让你在同一时间搜索其他文件夹. 如要搜索其他文件夹, 你必须先清"
+"除此文件夹旁边的复选框."
 
 #: php-webclient-ajax/client/modules/reminderlistmodule.js:205
 #, c-format
@@ -4624,12 +4630,12 @@ msgstr "开始日期:%s"
 #: php-webclient-ajax/client/modules/printitemmodule.js:186
 #: php-webclient-ajax/client/modules/printitemmodule.js:190
 #: php-webclient-ajax/client/modules/readmailitemmodule.js:102
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:215
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:216
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:219
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:220
 #: php-webclient-ajax/client/modules/itemmodule.js:233
 #: php-webclient-ajax/client/modules/itemmodule.js:586
-#: php-webclient-ajax/client/modules/itemmodule.js:615
-#: php-webclient-ajax/client/modules/itemmodule.js:718
+#: php-webclient-ajax/client/modules/itemmodule.js:618
+#: php-webclient-ajax/client/modules/itemmodule.js:729
 #: php-webclient-ajax/client/views/table.view.js:1172
 #: php-webclient-ajax/client/views/table.compact.view.js:264
 #: php-webclient-ajax/client/layout/js/advancedfind.js:370
@@ -4643,7 +4649,7 @@ msgstr "%a %x %X"
 #: php-webclient-ajax/client/modules/taskitemmodule.js:43
 #: php-webclient-ajax/client/modules/printitemmodule.js:78
 #: php-webclient-ajax/client/modules/printitemmodule.js:82
-#: php-webclient-ajax/client/modules/itemmodule.js:664
+#: php-webclient-ajax/client/modules/itemmodule.js:670
 #: php-webclient-ajax/client/views/table.view.js:1175
 #, c-format
 msgid "%a %x"
@@ -4661,15 +4667,15 @@ msgstr "%a %x"
 #: php-webclient-ajax/client/modules/tasklistmodule.js:115
 #: php-webclient-ajax/client/modules/tasklistmodule.js:116
 #: php-webclient-ajax/client/core/date.js:399
-#: php-webclient-ajax/client/core/utils.js:1576
-#: php-webclient-ajax/client/core/utils.js:1578
-#: php-webclient-ajax/client/core/utils.js:1581
-#: php-webclient-ajax/client/core/utils.js:1583
-#: php-webclient-ajax/client/core/utils.js:1585
+#: php-webclient-ajax/client/core/utils.js:1582
+#: php-webclient-ajax/client/core/utils.js:1584
+#: php-webclient-ajax/client/core/utils.js:1587
+#: php-webclient-ajax/client/core/utils.js:1589
 #: php-webclient-ajax/client/core/utils.js:1591
-#: php-webclient-ajax/client/core/utils.js:1593
-#: php-webclient-ajax/client/core/utils.js:1633
-#: php-webclient-ajax/client/core/utils.js:1647
+#: php-webclient-ajax/client/core/utils.js:1597
+#: php-webclient-ajax/client/core/utils.js:1599
+#: php-webclient-ajax/client/core/utils.js:1639
+#: php-webclient-ajax/client/core/utils.js:1653
 #: php-webclient-ajax/client/core/dhtml.js:643
 #: php-webclient-ajax/client/core/dhtml.js:646
 #: php-webclient-ajax/client/widgets/searchcriteria.js:814
@@ -4681,15 +4687,15 @@ msgstr "%a %x"
 #: php-webclient-ajax/client/widgets/datepicker.js:183
 #: php-webclient-ajax/client/layout/js/contact.js:129
 #: php-webclient-ajax/client/layout/js/contact.js:136
-#: php-webclient-ajax/client/layout/js/dialog.js:682
-#: php-webclient-ajax/client/layout/js/dialog.js:683
-#: php-webclient-ajax/client/layout/js/dialog.js:688
+#: php-webclient-ajax/client/layout/js/dialog.js:686
+#: php-webclient-ajax/client/layout/js/dialog.js:687
 #: php-webclient-ajax/client/layout/js/dialog.js:692
-#: php-webclient-ajax/client/layout/js/dialog.js:695
-#: php-webclient-ajax/client/layout/js/dialog.js:969
-#: php-webclient-ajax/client/layout/js/dialog.js:976
-#: php-webclient-ajax/client/layout/js/appointment.js:1071
-#: php-webclient-ajax/client/layout/js/appointment.js:1092
+#: php-webclient-ajax/client/layout/js/dialog.js:696
+#: php-webclient-ajax/client/layout/js/dialog.js:699
+#: php-webclient-ajax/client/layout/js/dialog.js:972
+#: php-webclient-ajax/client/layout/js/dialog.js:979
+#: php-webclient-ajax/client/layout/js/appointment.js:1075
+#: php-webclient-ajax/client/layout/js/appointment.js:1096
 #: php-webclient-ajax/client/layout/js/task.js:96
 #: php-webclient-ajax/client/layout/js/task.js:100
 #: php-webclient-ajax/client/layout/js/task.js:102
@@ -4705,51 +4711,54 @@ msgid "%d-%m-%Y"
 msgstr "%d-%m-%Y"
 
 #: php-webclient-ajax/client/modules/taskitemmodule.js:173
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:340
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:344
 #, c-format
 msgid "Starts on %s"
 msgstr "于%s开始"
 
 #: php-webclient-ajax/client/modules/taskitemmodule.js:175
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:342
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:345
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:346
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:349
 #, c-format
 msgid "Due on %s"
 msgstr "于%s到期"
 
 #: php-webclient-ajax/client/modules/taskitemmodule.js:176
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:343
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:347
 #, c-format
 msgid "due on %s"
 msgstr "于%s到期"
 
-#: php-webclient-ajax/client/modules/distlistmodule.js:280
+#: php-webclient-ajax/client/modules/distlistmodule.js:278
+#: php-webclient-ajax/client/modules/distlistmodule.js:384
 #, c-format
 msgid ""
 "Could not find Contact '%s'. It may have been deleted or moved from its "
 "original location. Would you like to remove it from this list?"
-msgstr "找不到联系人'%s'. 他可能已被删除或从其原来位置已被移动. 你想从这份名单中删除他吗?"
+msgstr ""
+"找不到联系人'%s'. 他可能已被删除或从其原来位置已被移动. 你想从这份名单中删除"
+"他吗?"
 
-#: php-webclient-ajax/client/modules/freebusymodule.js:87
+#: php-webclient-ajax/client/modules/freebusymodule.js:92
 msgid "Update"
 msgstr "更新"
 
-#: php-webclient-ajax/client/modules/freebusymodule.js:1097
+#: php-webclient-ajax/client/modules/freebusymodule.js:1136
 msgid "Resource (Room or Equipment)"
 msgstr "资源(空间或设备)"
 
-#: php-webclient-ajax/client/modules/addressbooklistmodule.js:31
+#: php-webclient-ajax/client/modules/addressbooklistmodule.js:34
 #: php-webclient-ajax/client/modules/contactlistmodule.js:39
 #: php-webclient-ajax/client/widgets/menu.js:10
 msgid "Email Message"
 msgstr "电子邮件信息"
 
-#: php-webclient-ajax/client/modules/addressbooklistmodule.js:34
+#: php-webclient-ajax/client/modules/addressbooklistmodule.js:37
 msgid "Select"
 msgstr "选择"
 
 #: php-webclient-ajax/client/modules/datepickerlistmodule.js:21
-#: php-webclient-ajax/client/core/webclient.js:569
+#: php-webclient-ajax/client/core/webclient.js:575
 #: php-webclient-ajax/client/views/today.calendar.view.js:90
 #: php-webclient-ajax/client/layout/js/date-picker-language.js:119
 msgid "Today"
@@ -4778,17 +4787,17 @@ msgid "List"
 msgstr "列表"
 
 #: php-webclient-ajax/client/modules/createmailitemmodule.js:212
-#: php-webclient-ajax/client/modules/createmailitemmodule.js:218
+#: php-webclient-ajax/client/modules/createmailitemmodule.js:224
 msgid "RE"
 msgstr "主题"
 
 # Forward right?
-#: php-webclient-ajax/client/modules/createmailitemmodule.js:222
+#: php-webclient-ajax/client/modules/createmailitemmodule.js:229
 msgid "FW"
 msgstr "转发"
 
-#: php-webclient-ajax/client/modules/createmailitemmodule.js:468
-#: php-webclient-ajax/client/modules/createmailitemmodule.js:479
+#: php-webclient-ajax/client/modules/createmailitemmodule.js:475
+#: php-webclient-ajax/client/modules/createmailitemmodule.js:486
 msgid "Original message"
 msgstr "原有邮件"
 
@@ -4798,7 +4807,7 @@ msgid "Multi User Calendar"
 msgstr "多用户日历"
 
 #: php-webclient-ajax/client/modules/multiusercalendarmodule.js:24
-#: php-webclient-ajax/client/modules/hierarchymodule.js:1109
+#: php-webclient-ajax/client/modules/hierarchymodule.js:1157
 msgid "Zarafa Webaccess"
 msgstr "Zarafa Webaccess"
 
@@ -4847,8 +4856,8 @@ msgid "The due date of a task cannot occur before its start date."
 msgstr "任务的到期日不能设置在开始日期之前."
 
 #: php-webclient-ajax/client/modules/tasklistmodule.js:215
-#: php-webclient-ajax/client/modules/listmodule.js:1076
-#: php-webclient-ajax/client/modules/listmodule.js:1080
+#: php-webclient-ajax/client/modules/listmodule.js:1083
+#: php-webclient-ajax/client/modules/listmodule.js:1087
 msgid "Are you sure that you want to permanently delete the selected item(s)?"
 msgstr "你确定要永久删除所选项目?"
 
@@ -4884,49 +4893,51 @@ msgstr "你必须先输入这个联系人的有效电子邮件地址, 然后才�
 msgid ""
 "Some of these contacts do not have e-mail addresses specified. E-mail "
 "addresses are required for sending them e-mail."
-msgstr "有些联系人沒有指定的电子邮件地址. 如果要向他们发送电子邮件, 你需要其电子邮件地址."
+msgstr ""
+"有些联系人沒有指定的电子邮件地址. 如果要向他们发送电子邮件, 你需要其电子邮件"
+"地址."
 
-#: php-webclient-ajax/client/modules/listmodule.js:128
+#: php-webclient-ajax/client/modules/listmodule.js:132
 msgid "Delete messages"
 msgstr "删除信息"
 
-#: php-webclient-ajax/client/modules/listmodule.js:136
+#: php-webclient-ajax/client/modules/listmodule.js:140
 msgid "Restore Items"
 msgstr "还原项目"
 
-#: php-webclient-ajax/client/modules/listmodule.js:281
+#: php-webclient-ajax/client/modules/listmodule.js:285
 msgid "You have to select a message to drag it to your desktop."
 msgstr "你必须选择一个信息将其拖放到显示器桌面上."
 
-#: php-webclient-ajax/client/modules/listmodule.js:283
+#: php-webclient-ajax/client/modules/listmodule.js:287
 msgid "You cannot drag more than one message to your desktop at the same time."
 msgstr "你不能同时拖动多个信息到你的显示器桌面上."
 
-#: php-webclient-ajax/client/modules/listmodule.js:357
+#: php-webclient-ajax/client/modules/listmodule.js:361
 msgid ""
 "The operation is completed, but not all items could be copied, deleted or "
 "moved."
 msgstr "操作已完成. 但并不是所有项目已被复制, 删除或移动."
 
-#: php-webclient-ajax/client/modules/listmodule.js:455
-#: php-webclient-ajax/client/modules/listmodule.js:1737
+#: php-webclient-ajax/client/modules/listmodule.js:461
+#: php-webclient-ajax/client/modules/listmodule.js:1744
 #, c-format
 msgid "No matches found for '%s'."
 msgstr "没有找到与'%s' 相配的"
 
-#: php-webclient-ajax/client/modules/listmodule.js:1045
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:547
+#: php-webclient-ajax/client/modules/listmodule.js:1052
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:555
 msgid ""
 "The sender of this message has asked to be notified when you read this "
 "message."
 msgstr "此信息的发送者要求收到已阅读通知."
 
-#: php-webclient-ajax/client/modules/listmodule.js:1045
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:547
+#: php-webclient-ajax/client/modules/listmodule.js:1052
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:555
 msgid "Do you wish to notify the sender?"
 msgstr "你是否想通知此信息的发送者?"
 
-#: php-webclient-ajax/client/modules/listmodule.js:1112
+#: php-webclient-ajax/client/modules/listmodule.js:1119
 #, c-format
 msgid ""
 "This will delete meeting '%s'. \n"
@@ -4934,61 +4945,61 @@ msgid ""
 "meeting?"
 msgstr "这将会删除'%s' 的会议.你想发送关于本次会议最新变化信息给与会者吗?"
 
-#: php-webclient-ajax/client/modules/listmodule.js:1243
+#: php-webclient-ajax/client/modules/listmodule.js:1250
 msgid "Please select a message to copy/move."
 msgstr "请选择一个要复制/移动的信息"
 
-#: php-webclient-ajax/client/modules/listmodule.js:2305
+#: php-webclient-ajax/client/modules/listmodule.js:2312
 msgid "Please select a message to delete."
 msgstr "请选择一个要删除的信息."
 
-#: php-webclient-ajax/client/modules/listmodule.js:2358
+#: php-webclient-ajax/client/modules/listmodule.js:2365
 msgid "Please select a message to print"
 msgstr "请选择要打印的信息"
 
-#: php-webclient-ajax/client/modules/listmodule.js:2522
+#: php-webclient-ajax/client/modules/listmodule.js:2529
 msgid "Sort Ascending"
 msgstr "以升序排序"
 
-#: php-webclient-ajax/client/modules/listmodule.js:2523
+#: php-webclient-ajax/client/modules/listmodule.js:2530
 msgid "Sort Descending"
 msgstr "以降序排序"
 
-#: php-webclient-ajax/client/modules/listmodule.js:2527
+#: php-webclient-ajax/client/modules/listmodule.js:2534
 msgid "Delete this column"
 msgstr "删除此列"
 
-#: php-webclient-ajax/client/modules/listmodule.js:2720
+#: php-webclient-ajax/client/modules/listmodule.js:2727
 msgid "Can not move selected items to destination folder."
 msgstr "无法移动所选项目到指定文件夹."
 
-#: php-webclient-ajax/client/modules/listmodule.js:2949
-#: php-webclient-ajax/client/modules/listmodule.js:2953
+#: php-webclient-ajax/client/modules/listmodule.js:2956
+#: php-webclient-ajax/client/modules/listmodule.js:2960
 msgid "Fill in the Subject"
 msgstr "填写主题"
 
-#: php-webclient-ajax/client/modules/listmodule.js:3400
+#: php-webclient-ajax/client/modules/listmodule.js:3408
 msgid "Blue Flag"
 msgstr "蓝旗"
 
-#: php-webclient-ajax/client/modules/listmodule.js:3401
+#: php-webclient-ajax/client/modules/listmodule.js:3409
 msgid "Yellow Flag"
 msgstr "黄旗"
 
-#: php-webclient-ajax/client/modules/listmodule.js:3402
+#: php-webclient-ajax/client/modules/listmodule.js:3410
 msgid "Green Flag"
 msgstr "绿旗"
 
-#: php-webclient-ajax/client/modules/listmodule.js:3403
+#: php-webclient-ajax/client/modules/listmodule.js:3411
 msgid "Orange Flag"
 msgstr "橙旗"
 
-#: php-webclient-ajax/client/modules/listmodule.js:3404
+#: php-webclient-ajax/client/modules/listmodule.js:3412
 msgid "Purple Flag"
 msgstr "紫旗"
 
 #: php-webclient-ajax/client/modules/readmailitemmodule.js:41
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:416
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:420
 msgid "Received for"
 msgstr "接收到"
 
@@ -5050,33 +5061,35 @@ msgstr "未命名附件"
 msgid "Download all attachments"
 msgstr "下载所有附件"
 
-#: php-webclient-ajax/client/modules/readmailitemmodule.js:272
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:274
+#: php-webclient-ajax/client/modules/readmailitemmodule.js:281
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:278
 msgid ""
 "This meeting request was updated after this message was sent. You should "
 "open the latest update or open the item from the calendar."
-msgstr "在信息被发送后, 这次会议的要求已被更新. 你应该打开最新的会议要求或从日历中打开该项目."
+msgstr ""
+"在信息被发送后, 这次会议的要求已被更新. 你应该打开最新的会议要求或从日历中打"
+"开该项目."
 
-#: php-webclient-ajax/client/modules/readmailitemmodule.js:285
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:280
+#: php-webclient-ajax/client/modules/readmailitemmodule.js:294
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:284
 msgid "As the meeting organizer, you do not need to respond to the meeting"
 msgstr "作为会议组织者, 你不必对这会议做答复"
 
-#: php-webclient-ajax/client/modules/readmailitemmodule.js:349
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:289
+#: php-webclient-ajax/client/modules/readmailitemmodule.js:358
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:293
 msgid "This meeting is not in the Calendar; it may have been moved or deleted."
 msgstr "这个会议不是在日历内. 它可能已被移动或删除."
 
-#: php-webclient-ajax/client/modules/readmailitemmodule.js:433
+#: php-webclient-ajax/client/modules/readmailitemmodule.js:442
 msgid "on behalf of"
 msgstr "代表"
 
-#: php-webclient-ajax/client/modules/readmailitemmodule.js:580
+#: php-webclient-ajax/client/modules/readmailitemmodule.js:589
 #, c-format
 msgid "Send mail (%s)"
 msgstr "发送邮件(%s)"
 
-#: php-webclient-ajax/client/modules/readmailitemmodule.js:582
+#: php-webclient-ajax/client/modules/readmailitemmodule.js:591
 msgid "Add to Contacts"
 msgstr "添加到通訊簿"
 
@@ -5178,77 +5191,77 @@ msgstr "更多"
 msgid "Due date"
 msgstr "结止日期"
 
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:297
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:301
 msgid "has accepted"
 msgstr "已被接受"
 
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:300
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:304
 msgid "has tentatively accepted"
 msgstr "已暂时接受"
 
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:303
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:307
 msgid "has declined"
 msgstr "已被拒绝"
 
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:308
-#: php-webclient-ajax/client/core/utils.js:1612
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:312
+#: php-webclient-ajax/client/core/utils.js:1618
 #: php-webclient-ajax/client/widgets/searchcriteria.js:2136
-#: php-webclient-ajax/client/layout/js/rule.js:255
+#: php-webclient-ajax/client/layout/js/rule.js:271
 msgid "and"
 msgstr "与"
 
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:310
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:314
 msgid "proposed a new time for this meeting"
 msgstr "为这个会议建议新的时间"
 
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:377
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:382
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:381
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:386
 #: php-webclient-ajax/client/layout/js/task.js:488
 #: php-webclient-ajax/client/layout/js/task.js:493
 #, c-format
 msgid "Accepted by %u on %d"
 msgstr "%u已经在%d接受了"
 
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:378
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:383
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:382
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:387
 #: php-webclient-ajax/client/layout/js/task.js:489
 #: php-webclient-ajax/client/layout/js/task.js:494
 #, c-format
 msgid "Declined by %u on %d"
 msgstr "%u已经在%d拒绝了"
 
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:379
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:383
 #: php-webclient-ajax/client/layout/js/task.js:490
 #, c-format
 msgid "Last update was sent by %u on %d"
 msgstr "%u已将最后更新在%d发送"
 
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:380
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:384
 #: php-webclient-ajax/client/layout/js/task.js:491
 #, c-format
 msgid "Assigned by %u on %d"
 msgstr "已由%u 在 %d指定"
 
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:384
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:388
 #: php-webclient-ajax/client/layout/js/task.js:495
 #, c-format
 msgid "Last update was received from %u on %d"
 msgstr "最后更新已在%d被%u收到"
 
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:385
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:389
 #: php-webclient-ajax/client/layout/js/task.js:496
 msgid "Waiting for response from recipient"
 msgstr "等待收件人的答复"
 
 # Is there a need to change to Chinese? i.e. %日/%月/%年 %小时:%分钟
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:394
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:398
 #: php-webclient-ajax/client/views/print.view.js:298
 #: php-webclient-ajax/client/layout/js/task.js:505
 msgid "%d/%m/%Y %H:%M"
 msgstr "%d/%m/%Y %H:%M"
 
-#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:671
-#: php-webclient-ajax/client/layout/js/appointment.js:1538
+#: php-webclient-ajax/client/modules/previewreadmailitemmodule.js:679
+#: php-webclient-ajax/client/layout/js/appointment.js:1581
 #: php-webclient-ajax/client/layout/js/readmail.js:42
 msgid "Comment"
 msgstr "评语"
@@ -5275,61 +5288,61 @@ msgstr "所有文件夹"
 msgid "Open shared folders"
 msgstr "打开共享文件夹"
 
-#: php-webclient-ajax/client/modules/hierarchymodule.js:701
+#: php-webclient-ajax/client/modules/hierarchymodule.js:749
 msgid "items"
 msgstr "项目"
 
-#: php-webclient-ajax/client/modules/hierarchymodule.js:705
+#: php-webclient-ajax/client/modules/hierarchymodule.js:753
 msgid "new"
 msgstr "新"
 
-#: php-webclient-ajax/client/modules/hierarchymodule.js:759
+#: php-webclient-ajax/client/modules/hierarchymodule.js:807
 msgid "Are you sure you want to delete"
 msgstr "你确定要删除吗?"
 
-#: php-webclient-ajax/client/modules/hierarchymodule.js:778
+#: php-webclient-ajax/client/modules/hierarchymodule.js:826
 #, c-format
 msgid "Are you sure you want to empty %s?"
 msgstr "您确定要清除%s吗?"
 
-#: php-webclient-ajax/client/modules/hierarchymodule.js:1049
+#: php-webclient-ajax/client/modules/hierarchymodule.js:1097
 msgid "This shared folder is your own folder."
 msgstr "此共享文件夹是你自己的文件夹."
 
-#: php-webclient-ajax/client/modules/hierarchymodule.js:1058
+#: php-webclient-ajax/client/modules/hierarchymodule.js:1106
 msgid "This shared folder is already open."
 msgstr "此共享文件夹已经打开."
 
-#: php-webclient-ajax/client/modules/hierarchymodule.js:1275
+#: php-webclient-ajax/client/modules/hierarchymodule.js:1323
 msgid "Copy/Move Folder"
 msgstr "复制/移动文件夹"
 
-#: php-webclient-ajax/client/modules/hierarchymodule.js:1276
+#: php-webclient-ajax/client/modules/hierarchymodule.js:1324
 msgid "Rename Folder"
 msgstr "重新命名文件夹"
 
 # Mark All Messages 'as' Read
-#: php-webclient-ajax/client/modules/hierarchymodule.js:1283
+#: php-webclient-ajax/client/modules/hierarchymodule.js:1331
 msgid "Mark All Messages Read"
 msgstr "标记全部邮件为已阅读"
 
-#: php-webclient-ajax/client/modules/hierarchymodule.js:1287
+#: php-webclient-ajax/client/modules/hierarchymodule.js:1335
 msgid "Delete Folder"
 msgstr "删除文件夹"
 
-#: php-webclient-ajax/client/modules/hierarchymodule.js:1290
+#: php-webclient-ajax/client/modules/hierarchymodule.js:1338
 msgid "Empty folder"
 msgstr "空文件夹"
 
-#: php-webclient-ajax/client/modules/hierarchymodule.js:1299
+#: php-webclient-ajax/client/modules/hierarchymodule.js:1347
 msgid "Add to favorites folder"
 msgstr "加入到我的最爱"
 
-#: php-webclient-ajax/client/modules/hierarchymodule.js:1306
+#: php-webclient-ajax/client/modules/hierarchymodule.js:1354
 msgid "Close store"
 msgstr "关闭储藏室"
 
-#: php-webclient-ajax/client/modules/hierarchymodule.js:1311
+#: php-webclient-ajax/client/modules/hierarchymodule.js:1359
 msgid "Reload"
 msgstr "重新加载"
 
@@ -5351,58 +5364,60 @@ msgstr "会议组织者"
 msgid "Not Yet Responded"
 msgstr "尚未回应"
 
-#: php-webclient-ajax/client/modules/itemmodule.js:1139
+#: php-webclient-ajax/client/modules/itemmodule.js:1158
 msgid "New Meeting Time Proposed"
 msgstr "新的会议时间的建议"
 
-#: php-webclient-ajax/client/modules/itemmodule.js:1140
-#: php-webclient-ajax/client/modules/itemmodule.js:1141
-#: php-webclient-ajax/client/modules/itemmodule.js:1213
-#: php-webclient-ajax/client/modules/itemmodule.js:1214
+#: php-webclient-ajax/client/modules/itemmodule.js:1159
+#: php-webclient-ajax/client/modules/itemmodule.js:1160
+#: php-webclient-ajax/client/modules/itemmodule.js:1232
+#: php-webclient-ajax/client/modules/itemmodule.js:1233
 msgid "%A, %B %e, %Y %H:%M"
 msgstr "%A, %B %e, %Y %H:%M"
 
 # 格林尼治标准时间
-#: php-webclient-ajax/client/modules/itemmodule.js:1146
+#: php-webclient-ajax/client/modules/itemmodule.js:1165
 msgid "GMT"
 msgstr "GMT"
 
-#: php-webclient-ajax/client/modules/itemmodule.js:1217
+#: php-webclient-ajax/client/modules/itemmodule.js:1236
 msgid "Where"
 msgstr "哪里"
 
-#: php-webclient-ajax/client/modules/itemmodule.js:1263
+#: php-webclient-ajax/client/modules/itemmodule.js:1282
 msgid "You will lose the modified data. Do you want to continue?"
 msgstr "你将失去已修改的信息. 你想继续吗?"
 
-#: php-webclient-ajax/client/modules/itemmodule.js:1494
+#: php-webclient-ajax/client/modules/itemmodule.js:1515
 msgid "Add to message body"
 msgstr "添加到邮件正文"
 
-#: php-webclient-ajax/client/modules/itemmodule.js:1663
+#: php-webclient-ajax/client/modules/itemmodule.js:1683
 msgid "This meeting request is out-of-date and will now be deleted."
 msgstr "该会议要求已过时, 它现在将被删除."
 
-#: php-webclient-ajax/client/modules/appointmentlistmodule.js:358
-#: php-webclient-ajax/client/modules/appointmentlistmodule.js:404
+#: php-webclient-ajax/client/modules/appointmentlistmodule.js:365
+#: php-webclient-ajax/client/modules/appointmentlistmodule.js:411
 msgid ""
 "Would you like to send an update to the attendees regarding cancellation of "
 "this meeting?"
 msgstr "你想发送有关于本次会议取消的最新信息給会议与会者吗?"
 
-#: php-webclient-ajax/client/modules/appointmentlistmodule.js:667
+#: php-webclient-ajax/client/modules/appointmentlistmodule.js:676
 msgid ""
 "You changed the date of this occurrence. If you want to change the date of "
 "all occurrences, you must first open the appointment series. Do you want to "
 "change only this occurrence?"
-msgstr "你已更改了这个事件的日期. 如果你想更改所有事件的日期, 你必须首先打开该约会系列. 你只是想更改这一个事件?"
+msgstr ""
+"你已更改了这个事件的日期. 如果你想更改所有事件的日期, 你必须首先打开该约会系"
+"列. 你只是想更改这一个事件?"
 
-#: php-webclient-ajax/client/modules/appointmentlistmodule.js:688
+#: php-webclient-ajax/client/modules/appointmentlistmodule.js:697
 #: php-webclient-ajax/client/views/calendar.day.view.js:1411
 msgid "Create Appointment"
 msgstr "创建新约会"
 
-#: php-webclient-ajax/client/modules/appointmentlistmodule.js:689
+#: php-webclient-ajax/client/modules/appointmentlistmodule.js:698
 #: php-webclient-ajax/client/views/calendar.day.view.js:1412
 msgid "Create Meetingrequest"
 msgstr "创建会议要求"
@@ -5495,7 +5510,7 @@ msgstr "TTY/TDD"
 
 #: php-webclient-ajax/client/modules/addressbookitemmodule.js:340
 msgid "Account"
-msgstr ""
+msgstr "帐户"
 
 # or %小时: %分钟
 #: php-webclient-ajax/client/core/date.js:334
@@ -5510,8 +5525,8 @@ msgstr ""
 #: php-webclient-ajax/client/widgets/timepicker.js:130
 #: php-webclient-ajax/client/widgets/timepicker.js:169
 #: php-webclient-ajax/client/widgets/timepicker.js:206
-#: php-webclient-ajax/client/layout/js/dialog.js:682
-#: php-webclient-ajax/client/layout/js/dialog.js:683
+#: php-webclient-ajax/client/layout/js/dialog.js:686
+#: php-webclient-ajax/client/layout/js/dialog.js:687
 #: php-webclient-ajax/client/layout/js/task.js:171
 msgid "%H:%M"
 msgstr "%H:%M"
@@ -5577,119 +5592,120 @@ msgid "%.1f weeks"
 msgstr "%.1f 周"
 
 #: php-webclient-ajax/client/core/utils.js:599
-#: php-webclient-ajax/client/layout/js/emailaddress.js:5
+#: php-webclient-ajax/client/layout/js/emailaddress.js:6
 #: php-webclient-ajax/client/layout/js/dialog.js:198
-#: php-webclient-ajax/client/layout/js/rule.js:221
-#: php-webclient-ajax/client/layout/js/rule.js:231
+#: php-webclient-ajax/client/layout/js/rule.js:227
+#: php-webclient-ajax/client/layout/js/rule.js:237
+#: php-webclient-ajax/client/layout/js/rule.js:247
 msgid "Please input a valid email address!"
 msgstr "请输入一个有效的电子邮件地址!"
 
-#: php-webclient-ajax/client/core/utils.js:1576
+#: php-webclient-ajax/client/core/utils.js:1582
 #, c-format
 msgid "Due every weekday effective %s"
 msgstr "在每个工作日结止有效于%s"
 
-#: php-webclient-ajax/client/core/utils.js:1578
+#: php-webclient-ajax/client/core/utils.js:1584
 #, c-format
 msgid "Due every day effective %s"
 msgstr "在每日结止有效于%s"
 
 # check the English
-#: php-webclient-ajax/client/core/utils.js:1581
+#: php-webclient-ajax/client/core/utils.js:1587
 #, c-format
 msgid "Due %d day after this task is completed effective %s"
 msgstr "这个任务完成后, 在%d日结止有效于%s"
 
-#: php-webclient-ajax/client/core/utils.js:1583
+#: php-webclient-ajax/client/core/utils.js:1589
 #, c-format
 msgid "Due %d days after this task is completed effective %s"
 msgstr "这个任务完成后, 在%d日结止有效于%s"
 
-#: php-webclient-ajax/client/core/utils.js:1585
+#: php-webclient-ajax/client/core/utils.js:1591
 #, c-format
 msgid "Due every %d days effective %s"
 msgstr "在每个%d日结止生效于%s"
 
-#: php-webclient-ajax/client/core/utils.js:1591
+#: php-webclient-ajax/client/core/utils.js:1597
 #, c-format
 msgid "Due every week after this task is completed effective %s"
 msgstr "这个任务完成后, 在每周结止生效于%s"
 
-#: php-webclient-ajax/client/core/utils.js:1593
+#: php-webclient-ajax/client/core/utils.js:1599
 #, c-format
 msgid "Due %s weeks after this task is completed effective %s"
 msgstr "这个任务完成后, 在%s周结止有效于%s"
 
-#: php-webclient-ajax/client/core/utils.js:1597
+#: php-webclient-ajax/client/core/utils.js:1603
 #, c-format
 msgid "Due every %d weeks on"
 msgstr "在每个%d周结止有效于"
 
-#: php-webclient-ajax/client/core/utils.js:1599
+#: php-webclient-ajax/client/core/utils.js:1605
 msgid "Due every"
 msgstr "结止于每"
 
-#: php-webclient-ajax/client/core/utils.js:1621
+#: php-webclient-ajax/client/core/utils.js:1627
 #, c-format
 msgid "Due day %d every"
 msgstr "结止于每%d 日"
 
-#: php-webclient-ajax/client/core/utils.js:1623
+#: php-webclient-ajax/client/core/utils.js:1629
 #, c-format
 msgid "Due the %d %d of every"
 msgstr "结止于每%d%d"
 
-#: php-webclient-ajax/client/core/utils.js:1629
+#: php-webclient-ajax/client/core/utils.js:1635
 #, c-format
 msgid "%d months"
 msgstr "%d月"
 
-#: php-webclient-ajax/client/core/utils.js:1631
+#: php-webclient-ajax/client/core/utils.js:1637
 msgid "after this task is completed"
 msgstr "当这个任务完成后"
 
-#: php-webclient-ajax/client/core/utils.js:1633
-#: php-webclient-ajax/client/core/utils.js:1647
+#: php-webclient-ajax/client/core/utils.js:1639
+#: php-webclient-ajax/client/core/utils.js:1653
 #, c-format
 msgid "effective %s"
 msgstr "有效于%s"
 
-#: php-webclient-ajax/client/core/utils.js:1638
+#: php-webclient-ajax/client/core/utils.js:1644
 #, c-format
 msgid "Due every %d %d"
 msgstr "结止于每%d%d"
 
-#: php-webclient-ajax/client/core/utils.js:1640
+#: php-webclient-ajax/client/core/utils.js:1646
 #, c-format
 msgid "Due the %d %d of %d"
 msgstr "结止于%d%d的%d"
 
-#: php-webclient-ajax/client/core/utils.js:1643
+#: php-webclient-ajax/client/core/utils.js:1649
 msgid "Due every year"
 msgstr "结止于每年"
 
-#: php-webclient-ajax/client/core/utils.js:1645
+#: php-webclient-ajax/client/core/utils.js:1651
 #, c-format
 msgid "Due %d years"
 msgstr "结止于%d年"
 
-#: php-webclient-ajax/client/core/utils.js:1656
+#: php-webclient-ajax/client/core/utils.js:1662
 msgid "first"
 msgstr "第一"
 
-#: php-webclient-ajax/client/core/utils.js:1657
+#: php-webclient-ajax/client/core/utils.js:1663
 msgid "second"
 msgstr "第二"
 
-#: php-webclient-ajax/client/core/utils.js:1658
+#: php-webclient-ajax/client/core/utils.js:1664
 msgid "third"
 msgstr "第三"
 
-#: php-webclient-ajax/client/core/utils.js:1659
+#: php-webclient-ajax/client/core/utils.js:1665
 msgid "fourth"
 msgstr "第四"
 
-#: php-webclient-ajax/client/core/utils.js:1670
+#: php-webclient-ajax/client/core/utils.js:1676
 msgid "weekend day"
 msgstr "周末日"
 
@@ -5777,11 +5793,11 @@ msgstr "设置"
 msgid "log out"
 msgstr "登出"
 
-#: php-webclient-ajax/client/core/webclient.js:188
+#: php-webclient-ajax/client/core/webclient.js:194
 msgid "Out of Office currently on. Would you like to turn it off?"
 msgstr "目前不在办公室. 你想关闭它吗?"
 
-#: php-webclient-ajax/client/core/webclient.js:555
+#: php-webclient-ajax/client/core/webclient.js:561
 msgid "Date picker"
 msgstr "日期选择器"
 
@@ -5962,7 +5978,7 @@ msgstr "向下移动用户"
 msgid "You don't have permission to view this user's calendar."
 msgstr "你没有权限查看此用户的日历."
 
-#: php-webclient-ajax/client/views/multiusercalendar.view.js:693
+#: php-webclient-ajax/client/views/multiusercalendar.view.js:694
 #: php-webclient-ajax/client/views/today.calendar.view.js:216
 msgid "All day event"
 msgstr "全天事件"
@@ -6003,7 +6019,9 @@ msgid ""
 "You are changing details for a meeting on your calendar while you are not "
 "the meeting organizer. If the organizer sends a meeting update, your changes "
 "will be lost. Do you want to continue?"
-msgstr "你正在更改日历上的会议细节, 不过你是不是此会议的组织者. 如果此会议组织者发送会议更新, 你所更改的一切将丢失. 你要继续吗?"
+msgstr ""
+"你正在更改日历上的会议细节, 不过你是不是此会议的组织者. 如果此会议组织者发送"
+"会议更新, 你所更改的一切将丢失. 你要继续吗?"
 
 #: php-webclient-ajax/client/views/print.calendar.weekview.js:41
 msgid "%A %d %B"
@@ -6148,7 +6166,7 @@ msgstr "您输入的大小数字无效"
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1554
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1895
 msgid "Search for the words(s)"
-msgstr ""
+msgstr "搜索关键字"
 
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1324
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1445
@@ -6262,7 +6280,7 @@ msgstr "篇幅只限于电话号码"
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1667
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1757
 msgid "Search for the word(s)"
-msgstr ""
+msgstr "搜索关键字"
 
 # only limited to Content
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1679
@@ -6419,11 +6437,13 @@ msgstr "任务要求"
 #: php-webclient-ajax/client/widgets/datepicker.js:161
 #: php-webclient-ajax/client/widgets/timepicker.js:203
 #: php-webclient-ajax/client/widgets/timepicker.js:212
-#: php-webclient-ajax/client/layout/js/dialog.js:971
+#: php-webclient-ajax/client/layout/js/dialog.js:974
 msgid ""
 "You must specify a valid date and/or time. Check your entries in this dialog "
 "box to make sure they represent a valid date and/or time."
-msgstr "你必须指定一个有效的日期和/或时间. 在此对话框中检查, 以确认你所输入的是有效的日期和/或时间."
+msgstr ""
+"你必须指定一个有效的日期和/或时间. 在此对话框中检查, 以确认你所输入的是有效的"
+"日期和/或时间."
 
 #: php-webclient-ajax/client/widgets/pagination.js:45
 msgid "Go to the first page"
@@ -6445,11 +6465,11 @@ msgstr "转到最后一页"
 msgid "Page"
 msgstr "页"
 
-#: php-webclient-ajax/client/widgets/tablewidget.js:962
+#: php-webclient-ajax/client/widgets/tablewidget.js:964
 msgid "Loading..."
 msgstr "载入中..."
 
-#: php-webclient-ajax/client/widgets/tablewidget.js:981
+#: php-webclient-ajax/client/widgets/tablewidget.js:983
 msgid "There are no items to show in this view."
 msgstr "这视窗没有可显示的项目"
 
@@ -6571,7 +6591,9 @@ msgid ""
 "original text formatting of your HTML signature. \n"
 "\n"
 "Do you want to proceed?"
-msgstr "你的签名已以纯文字模式编辑. 如果保存你将失去原来文本格式的HTML签名. 你要继续吗?"
+msgstr ""
+"你的签名已以纯文字模式编辑. 如果保存你将失去原来文本格式的HTML签名. 你要继续"
+"吗?"
 
 #: php-webclient-ajax/client/layout/js/signatures.js:482
 msgid "Enter new signature name"
@@ -6676,11 +6698,15 @@ msgid ""
 "the task will not be updated."
 msgstr "这个任务是给多个收件人, 因此你的任务的副本将不会被更新."
 
-#: php-webclient-ajax/client/layout/js/dialog.js:439
+#: php-webclient-ajax/client/layout/js/dialog.js:324
+msgid "You must enter at least one recipient in To field."
+msgstr "你必须在收件人地址栏填写至少一个收件人"
+
+#: php-webclient-ajax/client/layout/js/dialog.js:443
 msgid "No signatures"
 msgstr "没有签名"
 
-#: php-webclient-ajax/client/layout/js/dialog.js:478
+#: php-webclient-ajax/client/layout/js/dialog.js:482
 msgid "No signature"
 msgstr "没有签名"
 
@@ -6739,89 +6765,90 @@ msgstr "您输入的结束日期发生在开始日期之前."
 msgid ""
 "This meeting request cannot be sent since it has no recipients. Would you "
 "like to save and close this meeting instead?"
-msgstr "这次会议的要求不能被发送, 因为它没有收件人. 你是否想保存并关闭这个会议呢?"
+msgstr ""
+"这次会议的要求不能被发送, 因为它没有收件人. 你是否想保存并关闭这个会议呢?"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:762
-#: php-webclient-ajax/client/layout/js/appointment.js:763
-#: php-webclient-ajax/client/layout/js/appointment.js:783
-#: php-webclient-ajax/client/layout/js/appointment.js:784
+#: php-webclient-ajax/client/layout/js/appointment.js:766
+#: php-webclient-ajax/client/layout/js/appointment.js:767
+#: php-webclient-ajax/client/layout/js/appointment.js:787
+#: php-webclient-ajax/client/layout/js/appointment.js:788
 msgid "Meeting"
 msgstr "会议"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:819
+#: php-webclient-ajax/client/layout/js/appointment.js:823
 msgid "Meeting has been canceled."
 msgstr "会议已被取消."
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1024
+#: php-webclient-ajax/client/layout/js/appointment.js:1028
 msgid "Occurs every"
 msgstr "每个...发生"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1028
+#: php-webclient-ajax/client/layout/js/appointment.js:1032
 msgid "workday"
 msgstr "工作日"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1052
+#: php-webclient-ajax/client/layout/js/appointment.js:1056
 msgid "months"
 msgstr "月"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1057
+#: php-webclient-ajax/client/layout/js/appointment.js:1061
 msgid "year"
 msgstr "年"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1061
+#: php-webclient-ajax/client/layout/js/appointment.js:1065
 msgid "years"
 msgstr "年"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1067
+#: php-webclient-ajax/client/layout/js/appointment.js:1071
 msgid "effective"
 msgstr "有效"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1079
+#: php-webclient-ajax/client/layout/js/appointment.js:1083
 msgid "for 1 occurrence"
 msgstr "给于1 项事件"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1081
+#: php-webclient-ajax/client/layout/js/appointment.js:1085
 #, c-format
 msgid "for %d occurrences"
 msgstr "给于%d 项事件"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1088
+#: php-webclient-ajax/client/layout/js/appointment.js:1092
 msgid "until"
 msgstr "直到"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1097
+#: php-webclient-ajax/client/layout/js/appointment.js:1101
 msgid "from"
 msgstr "发件人"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1101
+#: php-webclient-ajax/client/layout/js/appointment.js:1105
 msgid "to"
 msgstr "发给"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1149
+#: php-webclient-ajax/client/layout/js/appointment.js:1192
 msgid "Attendance"
 msgstr "出席"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1150
+#: php-webclient-ajax/client/layout/js/appointment.js:1193
 msgid "Response"
 msgstr "反应"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1188
-#: php-webclient-ajax/client/layout/js/appointment.js:1264
-#: php-webclient-ajax/client/layout/js/appointment.js:1280
-#: php-webclient-ajax/client/layout/js/appointment.js:1348
-#: php-webclient-ajax/client/layout/js/appointment.js:1355
+#: php-webclient-ajax/client/layout/js/appointment.js:1231
+#: php-webclient-ajax/client/layout/js/appointment.js:1307
+#: php-webclient-ajax/client/layout/js/appointment.js:1323
+#: php-webclient-ajax/client/layout/js/appointment.js:1391
+#: php-webclient-ajax/client/layout/js/appointment.js:1398
 msgid "Organizer"
 msgstr "组织者"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1241
+#: php-webclient-ajax/client/layout/js/appointment.js:1284
 msgid "attendee accepted"
 msgstr "与会者已接受"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1241
+#: php-webclient-ajax/client/layout/js/appointment.js:1284
 msgid "tentatively accepted"
 msgstr "已暂时接受"
 
-#: php-webclient-ajax/client/layout/js/appointment.js:1241
+#: php-webclient-ajax/client/layout/js/appointment.js:1284
 msgid "declined"
 msgstr "已拒绝"
 
@@ -6903,37 +6930,43 @@ msgstr "无法显示一个以上的行动规则"
 msgid "Unable to show the rule action"
 msgstr "无法显示规则行动"
 
-#: php-webclient-ajax/client/layout/js/rule.js:201
+#: php-webclient-ajax/client/layout/js/rule.js:207
 msgid "Please select an appropriate action for this rule"
 msgstr "请为这个规则选择适当行动"
 
-#: php-webclient-ajax/client/layout/js/rule.js:206
+#: php-webclient-ajax/client/layout/js/rule.js:212
 msgid "Please select a folder to move the item to"
 msgstr "请选择一个文件夹以便移动项目"
 
-#: php-webclient-ajax/client/layout/js/rule.js:211
+#: php-webclient-ajax/client/layout/js/rule.js:217
 msgid "Please select a folder to copy the item to"
 msgstr "请选择一个文件夹以便复制项目"
 
-#: php-webclient-ajax/client/layout/js/rule.js:217
-#: php-webclient-ajax/client/layout/js/rule.js:221
+#: php-webclient-ajax/client/layout/js/rule.js:223
+#: php-webclient-ajax/client/layout/js/rule.js:227
 msgid "Please specify a forwarding address"
 msgstr "请指定一个转发地址"
 
-#: php-webclient-ajax/client/layout/js/rule.js:227
-#: php-webclient-ajax/client/layout/js/rule.js:231
-msgid "Please specify a redirecting address"
-msgstr ""
+#: php-webclient-ajax/client/layout/js/rule.js:233
+#: php-webclient-ajax/client/layout/js/rule.js:237
+msgid "Please specify a forwarding as attachment address"
+msgstr "请指定一个作为附件发送的转发地址"
 
-#: php-webclient-ajax/client/layout/js/rule.js:245
+# 77%
+#: php-webclient-ajax/client/layout/js/rule.js:243
+#: php-webclient-ajax/client/layout/js/rule.js:247
+msgid "Please specify a redirecting address"
+msgstr "请指定一个转发地址"
+
+#: php-webclient-ajax/client/layout/js/rule.js:261
 msgid "Low priority"
 msgstr "低优先级"
 
-#: php-webclient-ajax/client/layout/js/rule.js:246
+#: php-webclient-ajax/client/layout/js/rule.js:262
 msgid "Normal priority"
 msgstr "普通优先级"
 
-#: php-webclient-ajax/client/layout/js/rule.js:247
+#: php-webclient-ajax/client/layout/js/rule.js:263
 msgid "High priority"
 msgstr "高优先级"
 
@@ -6947,11 +6980,13 @@ msgstr "此任务的截止日期已经过期. 你确定要继续吗?"
 msgid "Please enter correct date"
 msgstr "请输入正确的日期"
 
-#: php-webclient-ajax/client/layout/js/task.js:721
+#: php-webclient-ajax/client/layout/js/task.js:729
 msgid ""
 "If you create an unassigned copy of this task, you will own the copy, and "
 "you will no longer receive updates for the task you assigned."
-msgstr "如果你创建了这个未分配任务的副本, 你将拥有这副本, 你也将不再收到你分配的任务更新."
+msgstr ""
+"如果你创建了这个未分配任务的副本, 你将拥有这副本, 你也将不再收到你分配的任务"
+"更新."
 
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/calendar.js:165
 msgid "This combination of Vertical Size and Calendar resolution is invalid"
@@ -6984,24 +7019,3 @@ msgstr "向上箭头"
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/shortcuts.js:11
 msgid "DOWN ARROW"
 msgstr "向下箭头"
-
-#~ msgid "Sort on Attendee"
-#~ msgstr "以与会者排序"
-
-#~ msgid "Check Address"
-#~ msgstr "检查地址"
-
-#~ msgid "Address details"
-#~ msgstr "地址详情"
-
-#~ msgid "Show this again when address is incomplete or unclear"
-#~ msgstr "当地址不完整或不清楚时再次显示这项"
-
-#~ msgid "default"
-#~ msgstr "默认"
-
-#~ msgid "Unable to restore archived message"
-#~ msgstr "无法恢复存档的讯息"
-
-#~ msgid "Convert to Task"
-#~ msgstr "转换为任务"
