@@ -69,7 +69,8 @@ static char THIS_FILE[] = __FILE__;
  *                          could be less if those messages didn't exist anymore on the server. This makes sure the client can still
  *                          request those streams and an appropriate error can be returned.
  * @param[in]	streams		The streams (or actually the information about the streams).
- * @param[in]	lpTransport	Pointer to the parent transport. Used to get the streams from the network and unlock soap when done.
+ * @param[in]	lpTransport	Pointer to the parent transport. Used to get the streams from the network. This transport MUST be used 
+ *                          exclusively by this WSMessageStreamExporter only.
  * @param[out]	lppStreamExporter	The new instance.
  */
 HRESULT WSMessageStreamExporter::Create(ULONG ulOffset, ULONG ulCount, const messageStreamArray &streams, WSTransport *lpTransport, WSMessageStreamExporter **lppStreamExporter)
@@ -183,9 +184,6 @@ WSMessageStreamExporter::~WSMessageStreamExporter()
 
 		while (soap_get_mime_attachment(m_ptrTransport->m_lpCmd->soap, NULL));	// This is a loop!
 	}
-
-	if (m_ptrTransport)
-		m_ptrTransport->UnLockSoap();
 
 	for (StreamInfoMap::iterator i = m_mapStreamInfo.begin(); i != m_mapStreamInfo.end(); ++i)
 		delete i->second;

@@ -1170,8 +1170,7 @@ exit:
 
 /**
  * Export a set of messages as stream.
- * If this call succeeds, the returned exporter is responsible for flushing all streams from the network and
- * unlock this WSTransport object when done.
+ * This method MUST be called on a WSTransport that's dedicated for exporting because no locking is performed.
  *
  * @param[in]	ulFlags		Flags used to determine which messages and what data is to be exported.
  * @param[in]	lpChanges	The complete set of changes available.
@@ -1210,8 +1209,6 @@ HRESULT WSTransport::HrExportMessageChangesAsStream(ULONG ulFlags, ICSCHANGE *lp
 	sPropTags.__size = lpsProps->cValues;
 	sPropTags.__ptr = (unsigned int*)lpsProps->aulPropTag;
 
-	LockSoap();
-
 	// Make sure to get the mime attachments ourselves
 	soap_post_check_mime_attachments(m_lpCmd->soap);
 
@@ -1222,18 +1219,15 @@ HRESULT WSTransport::HrExportMessageChangesAsStream(ULONG ulFlags, ICSCHANGE *lp
 	}
 
 	if (sResponse.sMsgStreams.__size > 0 && !soap_check_mime_attachments(m_lpCmd->soap)) {
-		UnLockSoap();
 		hr = MAPI_E_NETWORK_ERROR;
 		goto exit;
 	}
 
 	hr = WSMessageStreamExporter::Create(ulStart, ulChanges, sResponse.sMsgStreams, this, &ptrStreamExporter);
 	if (hr != hrSuccess) {
-		UnLockSoap();
 		goto exit;
 	}
 
-	// From here one, the MessageStreamExporter is responsible for unlocking soap.
 	*lppsStreamExporter = ptrStreamExporter.release();
 
 exit:
