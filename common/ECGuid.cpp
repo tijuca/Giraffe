@@ -152,7 +152,7 @@
 #define USES_IID_IPRProvider
 #define USES_IID_IMAPIProfile
 
-#define USES_PSETID_OriginalMsgID
+#define USES_PSETID_ZMT
 
 #define USES_IID_IMAPIWrappedObject
 #define USES_IID_IMAPISessionUnknown

@@ -134,9 +134,9 @@ DEFINE_GUID(PSETID_Archive, 0x72e98ebc, 0x57d2, 0x4ab5, 0xb0, 0xaa, 0xd5, 0x0a, 
 #endif
 
 /*  The entry id of the orignal migrated message */
-#if !defined(INITGUID) || defined(USES_PSETID_OriginalMsgID)
+#if !defined(INITGUID) || defined(USES_PSETID_ZMT)
 // {8ACDBF85-4738-4dc4-94A9-D489A83E5C41}
-DEFINE_GUID(PSETID_OriginalMsgID,0x8acdbf85, 0x4738, 0x4dc4, 0x94, 0xa9, 0xd4, 0x89, 0xa8, 0x3e, 0x5c, 0x41);
+DEFINE_GUID(PSETID_ZMT,0x8acdbf85, 0x4738, 0x4dc4, 0x94, 0xa9, 0xd4, 0x89, 0xa8, 0x3e, 0x5c, 0x41);
 #endif
 
 #if !defined(INITGUID) || defined(USES_PSETID_CalendarAssistant)

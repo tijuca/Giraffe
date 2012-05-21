@@ -165,6 +165,7 @@
 #define dispidApptReplyTime					0x8220	//PT_SYSTIME
 
 #define dispidOrgMsgId						0x8251  //PT_BINARY
+#define dispidZmtVersion					0x8252	//PT_STRING8
 
 // New in OLK 2007
 #define dispidApptTZDefStartDisplay			0x825E
