@@ -272,7 +272,7 @@ ECRESULT AddChange(BTSession *lpSession, unsigned int ulSyncId, SOURCEKEY sSourc
 		goto exit;
 
 	// The real item is removed from the database, So no actions needed
-	if (ulChange == ICS_MESSAGE_HARD_DELETE)
+	if (ulChange == ICS_MESSAGE_HARD_DELETE || ulChange == ICS_FOLDER_HARD_DELETE)
 		goto exit;
 		
 	if (ulChange == ICS_MESSAGE_NEW && ulSyncId != 0) {
