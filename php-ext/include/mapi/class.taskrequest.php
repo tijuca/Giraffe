@@ -928,39 +928,39 @@
 			$msgProps = mapi_getprops($this->message);
 			$body = "";
 
-			if (isset($msgProps[PR_SUBJECT])) $body .= "\n" . _("Subject") . ":\t". $msgProps[PR_SUBJECT];
-			if (isset($msgProps[$this->props['startdate']])) $body .= "\n" . _("Start Date") . ":\t". strftime(_("%A, %B %d, %Y"),$msgProps[$this->props['startdate']]);
-			if (isset($msgProps[$this->props['duedate']])) $body .= "\n" . _("Due Date") . ":\t". strftime(_("%A, %B %d, %Y"),$msgProps[$this->props['duedate']]);
+			if (isset($msgProps[PR_SUBJECT])) $body .= "\n" . dgettext("zarafa","Subject") . ":\t". $msgProps[PR_SUBJECT];
+			if (isset($msgProps[$this->props['startdate']])) $body .= "\n" . dgettext("zarafa","Start Date") . ":\t". strftime(dgettext("zarafa","%A, %B %d, %Y"),$msgProps[$this->props['startdate']]);
+			if (isset($msgProps[$this->props['duedate']])) $body .= "\n" . dgettext("zarafa","Due Date") . ":\t". strftime(dgettext("zarafa","%A, %B %d, %Y"),$msgProps[$this->props['duedate']]);
 			$body .= "\n";
 
 			if (isset($msgProps[$this->props['status']])) {
-				$body .= "\n" . _("Status") . ":\t";
-				if ($msgProps[$this->props['status']] == 0) $body .= _("Not Started");
-				else if ($msgProps[$this->props['status']] == 1) $body .= _("In Progress");
-				else if ($msgProps[$this->props['status']] == 2) $body .= _("Complete");
-				else if ($msgProps[$this->props['status']] == 3) $body .= _("Wait for other person");
-				else if ($msgProps[$this->props['status']] == 4) $body .= _("Deferred");
+				$body .= "\n" . dgettext("zarafa","Status") . ":\t";
+				if ($msgProps[$this->props['status']] == 0) $body .= dgettext("zarafa","Not Started");
+				else if ($msgProps[$this->props['status']] == 1) $body .= dgettext("zarafa","In Progress");
+				else if ($msgProps[$this->props['status']] == 2) $body .= dgettext("zarafa","Complete");
+				else if ($msgProps[$this->props['status']] == 3) $body .= dgettext("zarafa","Wait for other person");
+				else if ($msgProps[$this->props['status']] == 4) $body .= dgettext("zarafa","Deferred");
 			}
 
 			if (isset($msgProps[$this->props['percent_complete']])) {
-				$body .= "\n" . _("Percent Complete") . ":\t". ($msgProps[$this->props['percent_complete']] * 100).'%';
+				$body .= "\n" . dgettext("zarafa","Percent Complete") . ":\t". ($msgProps[$this->props['percent_complete']] * 100).'%';
 
 				if ($msgProps[$this->props['percent_complete']] == 1 && isset($msgProps[$this->props['datecompleted']]))
-					$body .= "\n" . _("Date Completed") . ":\t". strftime("%A, %B %d, %Y",$msgProps[$this->props['datecompleted']]);
+					$body .= "\n" . dgettext("zarafa","Date Completed") . ":\t". strftime("%A, %B %d, %Y",$msgProps[$this->props['datecompleted']]);
 			}
 			$body .= "\n";
 
-			if (isset($msgProps[$this->props['totalwork']])) $body .= "\n" . _("Total Work") . ":\t". ($msgProps[$this->props['totalwork']]/60) ." " . _("hours");
-			if (isset($msgProps[$this->props['actualwork']])) $body .= "\n" . _("Actual Work") . ":\t". ($msgProps[$this->props['actualwork']]/60) ." " . _("hours");
+			if (isset($msgProps[$this->props['totalwork']])) $body .= "\n" . dgettext("zarafa","Total Work") . ":\t". ($msgProps[$this->props['totalwork']]/60) ." " . dgettext("zarafa","hours");
+			if (isset($msgProps[$this->props['actualwork']])) $body .= "\n" . dgettext("zarafa","Actual Work") . ":\t". ($msgProps[$this->props['actualwork']]/60) ." " . dgettext("zarafa","hours");
 			$body .="\n";
 
-			if (isset($msgProps[$this->props['owner']])) $body .= "\n" . _("Owner") . ":\t". $msgProps[$this->props['owner']];
+			if (isset($msgProps[$this->props['owner']])) $body .= "\n" . dgettext("zarafa","Owner") . ":\t". $msgProps[$this->props['owner']];
 			$body .="\n";
 
 			if (isset($msgProps[$this->props['categories']]) && !empty($msgProps[$this->props['categories']])) $body .= "\nCategories:\t". implode(', ', $msgProps[$this->props['categories']]);
 			if (isset($msgProps[$this->props['companies']]) && !empty($msgProps[$this->props['companies']])) $body .= "\nCompany:\t". implode(', ', $msgProps[$this->props['companies']]);
-			if (isset($msgProps[$this->props['billinginformation']])) $body .= "\n" . _("Billing Information") . ":\t". $msgProps[$this->props['billinginformation']];
-			if (isset($msgProps[$this->props['mileage']])) $body .= "\n" . _("Mileage") . ":\t". $msgProps[$this->props['mileage']];
+			if (isset($msgProps[$this->props['billinginformation']])) $body .= "\n" . dgettext("zarafa","Billing Information") . ":\t". $msgProps[$this->props['billinginformation']];
+			if (isset($msgProps[$this->props['mileage']])) $body .= "\n" . dgettext("zarafa","Mileage") . ":\t". $msgProps[$this->props['mileage']];
 			$body .="\n";
 
 			$content = mapi_message_openproperty($this->message, PR_BODY);

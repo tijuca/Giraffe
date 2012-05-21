@@ -452,7 +452,7 @@ function autoRespond($session, $store, $entryid, $capacity, $policy)
                 if(count($conflicts) == count($reqitems)) {
                     $body = _("The requested time slot is unavailable");
                 } else {
-                    $body = _("The requested time slots are unavailble on the following dates:\n\n");
+                    $body = _("The requested time slots are unavailble on the following dates:") . "\n\n";
                     
                     foreach($conflicts as $conflict) {
                         $body .= strftime(_("%x %X"), $conflict[$proptags["startdate"]]) . " - " . strftime(_("%x %X"), $conflict[$proptags["duedate"]]) . "\n";
@@ -477,24 +477,24 @@ function autoRespond($session, $store, $entryid, $capacity, $policy)
     }
 }
 
-function forceUTF8()
+function forceUTF8($category)
 {
-    $old_locale = setlocale(LC_CTYPE, "");
+    $old_locale = setlocale($category, "");
     if(!isset($old_locale) || !$old_locale) {
         print "Unable to initialize locale\n";
         exit(1);
     }
     $dot = strpos($old_locale, ".");
     if($dot) {
-        $old_locale = strchr($old_locale, ".");
-        if(strrchr($old_locale, ".") == "UTF-8")
+        if(strrchr($old_locale, ".") == ".UTF-8" || strrchr($old_locale, ".") == ".utf8")
             return true;
+        $old_locale = substr($old_locale, 0, $dot);
     }
     $new_locale = $old_locale . ".UTF-8";
-    $old_locale = setlocale(LC_CTYPE, $new_locale);
+    $old_locale = setlocale($category, $new_locale);
     if(!$old_locale) {
         $new_locale = "en_US.UTF-8";
-        $old_locale = setlocale(LC_CTYPE, $new_locale);
+        $old_locale = setlocale($category, $new_locale);
     }
     if(!$old_locale) {
         print "Unable to set locale $new_locale\n";
@@ -508,7 +508,9 @@ function forceUTF8()
 // to force LC_CTYPE to an UTF-8 language. This makes sure that opening the user's store
 // will always open the correct user's store.
 
-forceUTF8();
+forceUTF8(LC_CTYPE);
+forceUTF8(LC_MESSAGES);
+textdomain("zarafa");
 
 if(count($argv) != 3 && count($argv) != 4) {
     print "Usage: " . $argv[0] . " <username> <path/to/dagent.cfg> [<entryid>]\n";

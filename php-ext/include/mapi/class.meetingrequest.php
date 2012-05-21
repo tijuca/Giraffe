@@ -1686,21 +1686,21 @@ If it is the first time this attendee has proposed a new date/time, increment th
 		switch($status) {
 			case olResponseAccepted:
 				$classpostfix = "Pos";
-				$subjectprefix = _("Accepted");
+				$subjectprefix = dgettext("zarafa","Accepted");
 				break;
 			case olResponseDeclined:
 				$classpostfix = "Neg";
-				$subjectprefix = _("Declined");
+				$subjectprefix = dgettext("zarafa","Declined");
 				break;
 			case olResponseTentative:
 				$classpostfix = "Tent";
-				$subjectprefix = _("Tentatively accepted");
+				$subjectprefix = dgettext("zarafa","Tentatively accepted");
 				break;
 		}
 
 		if($proposalStartTime && $proposalEndTime){
 			// if attendee has proposed new time then change subject prefix
-			$subjectprefix = _("New Time Proposed");
+			$subjectprefix = dgettext("zarafa","New Time Proposed");
 		}
 
 		$props[PR_SUBJECT] = $subjectprefix . ": " . $messageprops[PR_SUBJECT];
@@ -2715,7 +2715,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 			$newmessageprops[$this->proptags['busystatus']] = fbFree; // set the busy status as free
 			$newmessageprops[PR_IMPORTANCE] = IMPORTANCE_HIGH;	// HIGH Importance
 			if (isset($newmessageprops[PR_SUBJECT])) {
-				$newmessageprops[PR_SUBJECT] = _('Canceled: ') . $newmessageprops[PR_SUBJECT];
+				$newmessageprops[PR_SUBJECT] = dgettext("zarafa","Canceled").": " . $newmessageprops[PR_SUBJECT];
 			}
 
 			mapi_setprops($new, $newmessageprops);

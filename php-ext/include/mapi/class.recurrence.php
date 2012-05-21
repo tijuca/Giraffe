@@ -576,34 +576,34 @@
 				// Daily
 				case 0x0A:
 					if ($everyn == 1) {
-						$type = _('workday');
+						$type = dgettext("zarafa","workday");
 						$occSingleDayRank = true;
 					} else if ($everyn == (24 * 60)) {
-						$type = _('day');
+						$type = dgettext("zarafa","day");
 						$occSingleDayRank = true;
 					} else {
 						$everyn /= (24 * 60);
-						$type = _('days');
+						$type = dgettext("zarafa","days");
 						$occSingleDayRank = false;
 					}
 					break;
 				// Weekly
 				case 0x0B:
 					if ($everyn == 1) {
-						$type = _('week');
+						$type = dgettext("zarafa","week");
 						$occSingleDayRank = true;
 					} else {
-						$type = _('weeks');
+						$type = dgettext("zarafa","weeks");
 						$occSingleDayRank = false;
 					}
 					break;
 				// Monthly
 				case 0x0C:
 					if ($everyn == 1) {
-						$type = _('month');
+						$type = dgettext("zarafa","month");
 						$occSingleDayRank = true;
 					} else {
-						$type = _('months');
+						$type = dgettext("zarafa","months");
 						$occSingleDayRank = false;
 					}
 					break;
@@ -611,11 +611,11 @@
 				case 0x0D:
 					if ($everyn <= 12) {
 						$everyn = 1;
-						$type = _('year');
+						$type = dgettext("zarafa","year");
 						$occSingleDayRank = true;
 					} else {
 						$everyn = $everyn / 12;
-						$type = _('years');
+						$type = dgettext("zarafa","years");
 						$occSingleDayRank = false;
 					}
 					break;
@@ -625,10 +625,10 @@
 			$firstoccstartdate = isset($startocc) ? $start + (((int) $startocc) * 60) : $start;
 			$firstoccenddate = isset($endocc) ? $end + (((int) $endocc) * 60) : $end;
 
-			$start = gmdate(_('d-m-Y'), $firstoccstartdate);
-			$end = gmdate(_('d-m-Y'), $firstoccenddate);
-			$startocc = gmdate(_('G:i'), $firstoccstartdate);
-			$endocc = gmdate(_('G:i'), $firstoccenddate);
+			$start = gmdate(dgettext("zarafa","d-m-Y"), $firstoccstartdate);
+			$end = gmdate(dgettext("zarafa","d-m-Y"), $firstoccenddate);
+			$startocc = gmdate(dgettext("zarafa","G:i"), $firstoccstartdate);
+			$endocc = gmdate(dgettext("zarafa","G:i"), $firstoccenddate);
 
 			// Based on the properties, we need to generate the recurrence pattern string.
 			// This is obviously very easy since we can simply concatenate a bunch of strings,
@@ -641,49 +641,49 @@
 				// Never ends
 				if ($occTimeRange) {
 					if ($occSingleDayRank) {
-						$pattern = sprintf(_('Occurs every %s effective %s from %s to %s.'), $type, $start, $startocc, $endocc);
+						$pattern = sprintf(dgettext("zarafa","Occurs every %s effective %s from %s to %s."), $type, $start, $startocc, $endocc);
 					} else {
-						$pattern = sprintf(_('Occurs every %s %s effective %s from %s to %s.'), $everyn, $type, $start, $startocc, $endocc);
+						$pattern = sprintf(dgettext("zarafa","Occurs every %s %s effective %s from %s to %s."), $everyn, $type, $start, $startocc, $endocc);
 					}
 				} else {
 					if ($occSingleDayRank) {
-						$pattern = sprintf(_('Occurs every %s effective %s.'), $type, $start);
+						$pattern = sprintf(dgettext("zarafa","Occurs every %s effective %s."), $type, $start);
 					} else {
-						$pattern = sprintf(_('Occurs every %s %s effective %s.'), $everyn, $type, $start);
+						$pattern = sprintf(dgettext("zarafa","Occurs every %s %s effective %s."), $everyn, $type, $start);
 					}
 				}
 			} else if ($term == 0x22) {
 				// After a number of times
 				if ($occTimeRange) {
 					if ($occSingleDayRank) {
-						$pattern = sprintf(ngettext('Occurs every %s effective %s for %s occurence from %s to %s.',
-												'Occurs every %s effective %s for %s occurences from %s to %s.', $numocc), $type, $start, $numocc, $startocc, $endocc);
+						$pattern = sprintf(dngettext("zarafa","Occurs every %s effective %s for %s occurence from %s to %s.",
+													 "Occurs every %s effective %s for %s occurences from %s to %s.", $numocc), $type, $start, $numocc, $startocc, $endocc);
 					} else {
-						$pattern = sprintf(ngettext('Occurs every %s %s effective %s for %s occurence from %s to %s.',
-												'Occurs every %s %s effective %s for %s occurences %s to %s.', $numocc), $everyn, $type, $start, $numocc, $startocc, $endocc);
+						$pattern = sprintf(dngettext("zarafa","Occurs every %s %s effective %s for %s occurence from %s to %s.",
+													 "Occurs every %s %s effective %s for %s occurences %s to %s.", $numocc), $everyn, $type, $start, $numocc, $startocc, $endocc);
 					}
 				} else {
 					if ($occSingleDayRank) {
-						$pattern = sprintf(ngettext('Occurs every %s effective %s for %s occurence.',
-													 'Occurs every %s effective %s for %s occurences.', $numocc), $type, $start, $numocc);
+						$pattern = sprintf(dngettext("zarafa","Occurs every %s effective %s for %s occurence.",
+													 "Occurs every %s effective %s for %s occurences.", $numocc), $type, $start, $numocc);
 					} else {
-						$pattern = sprintf(ngettext('Occurs every %s %s effective %s for %s occurence.',
-														 'Occurs every %s %s effective %s for %s occurences.', $numocc), $everyn, $type, $start, $numocc);
+						$pattern = sprintf(dngettext("zarafa","Occurs every %s %s effective %s for %s occurence.",
+													 "Occurs every %s %s effective %s for %s occurences.", $numocc), $everyn, $type, $start, $numocc);
 					}
 				}
 			} else if ($term == 0x21) {
 				// After the given enddate
 				if ($occTimeRange) {
 					if ($occSingleDayRank) {
-						$pattern = sprintf(_('Occurs every %s effective %s until %s from %s to %s.'), $type, $start, $end, $startocc, $endocc);
+						$pattern = sprintf(dgettext("zarafa","Occurs every %s effective %s until %s from %s to %s."), $type, $start, $end, $startocc, $endocc);
 					} else {
-						$pattern = sprintf(_('Occurs every %s %s effective %s until %s from %s to %s.'), $everyn, $type, $start, $end, $startocc, $endocc);
+						$pattern = sprintf(dgettext("zarafa","Occurs every %s %s effective %s until %s from %s to %s."), $everyn, $type, $start, $end, $startocc, $endocc);
 					}
 				} else {
 					if ($occSingleDayRank) {
-						$pattern = sprintf(_('Occurs every %s effective %s until %s.'), $type, $start, $end);
+						$pattern = sprintf(dgettext("zarafa","Occurs every %s effective %s until %s."), $type, $start, $end);
 					} else {
-						$pattern = sprintf(_('Occurs every %s %s effective %s until %s.'), $everyn, $type, $start, $end);
+						$pattern = sprintf(dgettext("zarafa","Occurs every %s %s effective %s until %s."), $everyn, $type, $start, $end);
 					}
 				}
 			}
