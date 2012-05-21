@@ -47,8 +47,6 @@
  * 
  */
 
-
-
 #include "platform.h"
 
 /* Returns the rows for a contents- or hierarchytable
@@ -1493,6 +1491,7 @@ ECRESULT ECGenericObjectTable::GetCollapseState(struct soap *soap, struct xsd__b
     struct rowSet *lpsRowSet = NULL;
     
     struct soap xmlsoap;
+    soap_init(&xmlsoap);
 
 	pthread_mutex_lock(&m_hLock);
     
@@ -1545,7 +1544,6 @@ ECRESULT ECGenericObjectTable::GetCollapseState(struct soap *soap, struct xsd__b
         }
     }
     
-    soap_init(&xmlsoap);
 	soap_set_mode(&xmlsoap, SOAP_XML_TREE | SOAP_C_UTFSTRING);
     xmlsoap.os = &os;
     
@@ -1553,8 +1551,6 @@ ECRESULT ECGenericObjectTable::GetCollapseState(struct soap *soap, struct xsd__b
     soap_begin_send(&xmlsoap);
     soap_put_collapseState(&xmlsoap, &sCollapseState, "CollapseState", NULL);
     soap_end_send(&xmlsoap);
-    soap_end(&xmlsoap);
-    soap_done(&xmlsoap);
     
     // os.str() now contains serialized objects, copy into return structure
     lpsCollapseState->__size = os.str().size();
@@ -1562,6 +1558,8 @@ ECRESULT ECGenericObjectTable::GetCollapseState(struct soap *soap, struct xsd__b
     memcpy(lpsCollapseState->__ptr, os.str().c_str(), os.str().size());
 
 exit:
+    soap_end(&xmlsoap);
+    soap_done(&xmlsoap);
 	pthread_mutex_unlock(&m_hLock);
 
     return er;
@@ -1583,13 +1581,13 @@ ECRESULT ECGenericObjectTable::SetCollapseState(struct xsd__base64Binary sCollap
 	pthread_mutex_lock(&m_hLock);
     
     lpCollapseState = new collapseState;
+    soap_init(&xmlsoap);
     
     er = Populate();
     if(er != erSuccess)
         goto exit;
 
     // The collapse state is the serialized collapse state as returned by GetCollapseState(), which we need to parse here
-    soap_init(&xmlsoap);
 	soap_set_mode(&xmlsoap, SOAP_XML_TREE | SOAP_C_UTFSTRING);
     xmlsoap.is = &is;
     
@@ -1683,11 +1681,11 @@ next:
     
     // We don't generate notifications for this event, just like ExpandRow and CollapseRow. You just need to reload the table yourself.
     soap_end_recv(&xmlsoap);
-    soap_end(&xmlsoap);
-    soap_done(&xmlsoap);
     
     
 exit:
+    soap_end(&xmlsoap);
+    soap_done(&xmlsoap);
 	pthread_mutex_unlock(&m_hLock);
 
     if(lpCollapseState)
