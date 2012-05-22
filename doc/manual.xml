@@ -11153,6 +11153,20 @@
 		  </varlistentry>
 
 		  <varlistentry>
+			<term><option>-C</option></term>
+			<term><option>--cleanup</option></term>
+			<listitem>
+			  <para>Perform an archive cleanup run. If a <parameter>-u</parameter>
+			  option is provided, only the archives of one user will be
+			  cleaned. Otherwise all stores are cleaned. Optionally the
+			  <parameter>--local-only</parameter> option can be set to only
+			  cleanup archives of users that have their primary store  on the
+			  server to which  zarafa-archiver is connected (usualy the local
+			  server).</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
 			<term>
 			  <option>-a</option>
 			  <replaceable>archive</replaceable>

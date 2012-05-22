@@ -64,6 +64,15 @@ option is provided, only the store of one user will be archived\&. Otherwise all
 option can be set to only archive stores that exist on the server to which zarafa\-archiver is connected (usualy the local server)\&.
 .RE
 .PP
+\fB\-C\fR, \fB\-\-cleanup\fR
+.RS 4
+Perform an archive cleanup run\&. If a
+\fI\-u\fR
+option is provided, only the archives of one user will be cleaned\&. Otherwise all stores are cleaned\&. Optionally the
+\fI\-\-local\-only\fR
+option can be set to only cleanup archives of users that have their primary store on the server to which zarafa\-archiver is connected (usualy the local server)\&.
+.RE
+.PP
 \fB\-a\fR \fIarchive\fR, \fB\-\-attach\-to\fR \fIarchive\fR
 .RS 4
 Attach an archive to the store of the user specified with the
