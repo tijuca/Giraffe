@@ -548,7 +548,7 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 					else if (ICS_ACTION(iterLastChange->second->ulChangeType) == ICS_HARD_DELETE)
 						m_lstHardDelete.erase(iterLastChange->second);
 
-					if (m_lpChanges[ulStep].ulChangeType == ICS_SOFT_DELETE)
+					if (ICS_ACTION(m_lpChanges[ulStep].ulChangeType) == ICS_SOFT_DELETE)
 						iterLastChange->second = m_lstSoftDelete.insert(m_lstSoftDelete.end(), m_lpChanges[ulStep]);
 					else
 						iterLastChange->second = m_lstHardDelete.insert(m_lstHardDelete.end(), m_lpChanges[ulStep]);
