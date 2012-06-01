@@ -3365,6 +3365,7 @@ int main(int argc, char *argv[]) {
 		{ "log_raw_message_path", "/tmp", CONFIGSETTING_RELOADABLE },
 		{ "archive_on_delivery", "no", CONFIGSETTING_RELOADABLE },
 		{ "mr_autoaccepter", "/usr/bin/zarafa-mr-accept", CONFIGSETTING_RELOADABLE },
+		{ "set_rule_headers", "yes", CONFIGSETTING_RELOADABLE },
 		{ NULL, NULL },
 	};
 
