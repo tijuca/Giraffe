@@ -1063,6 +1063,15 @@
               <replaceable>/usr/bin/zarafa-mr-accept</replaceable></para>
           	</listitem>
           </varlistentry>
+
+          <varlistentry>
+            <term><option>set_rule_headers</option></term>
+            <listitem>
+              <para>Enable the addition of X-Zarafa-Rule-Action headers on messages
+			  that have been forwarded or replied by a rule.</para>
+              <para>Default: <replaceable>yes</replaceable></para>
+            </listitem>
+          </varlistentry>
 		</variablelist>
 	  </refsection>
 
