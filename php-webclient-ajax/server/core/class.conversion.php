@@ -1242,12 +1242,15 @@ class Conversion {
 }
 
 /**
-* Shortcut to Conversion::hex2bin
-* @see Conversion::hex2bin()
-*/
-
-function hex2bin($data) {
-	return Conversion::hex2bin($data);
+ * Shortcut to Conversion::hex2bin
+ * Complementary function to bin2hex() which converts a hex entryid to a binary entryid.
+ * Since PHP 5.4 an internal hex2bin() implementation is available.
+ * @see Conversion::hex2bin()
+ */
+if (!function_exists("hex2bin")) {
+	function hex2bin($data) {
+		return Conversion::hex2bin($data);
+	}
 }
 
 /**
