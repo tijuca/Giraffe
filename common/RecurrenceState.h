@@ -165,4 +165,14 @@ public:
 #define WD_SATURDAY		0x40
 #define WD_MASK			0x7F
 
+// ulPatternType values
+#define PT_DAY				0x0
+#define PT_WEEK				0x1
+#define PT_MONTH			0x2
+#define PT_MONTH_END		0x4
+#define PT_MONTH_NTH		0x3
+#define PT_HJ_MONTH			0xA
+#define PT_HJ_MONTH_NTH		0xB
+#define PT_HJ_MONTH_END		0xC
+
 #endif

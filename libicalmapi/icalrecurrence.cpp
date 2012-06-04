@@ -138,16 +138,6 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 
 	dtUTCEnd = ICalTimeTypeToUTC(lpicRootEvent, lpicProp);
 
-	// Set 0x8235, also known as ClipStart in OutlookSpy
-	UnixTimeToFileTime(LocalToUTC(recurrence::StartOfDay(dtLocalStart), sTimeZone), &sPropVal.Value.ft);
-	sPropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_RECURRENCE_START], PT_SYSTIME);
-	lpIcalItem->lstMsgProps.push_back(sPropVal);
-
-	// set named prop 0x8510 to 353, needed for Outlook to ask for single or total recurrence when deleting
-	sPropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_SIDEEFFECT], PT_LONG);
-	sPropVal.Value.ul = 353;
-	lpIcalItem->lstMsgProps.push_back(sPropVal);
-
 	lpRec = new recurrence;
 
 	// recurrence class contains LOCAL times only, so convert UTC -> LOCAL
@@ -185,6 +175,8 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 
 		lpRec->setFrequency(recurrence::YEARLY);
 		lpRec->setDayOfMonth(tm.tm_mday);
+		if (icRRule.by_month[0] != ICAL_RECURRENCE_ARRAY_MAX) 
+			lpRec->setMonth(icRRule.by_month[0]);
 		break;
 	default:
 		hr = MAPI_E_INVALID_PARAMETER;
@@ -228,6 +220,8 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 		// When RRULE:FREQ=MONTHLY;INTERVAL=1 is set then day of the month is set from the start date.		
 		lpRec->setDayOfMonth(tm.tm_mday);
 	}
+
+	lpRec->setStartDateTime(lpRec->calcStartDate());
 
 	if (icRRule.count != 0) {
 		// count limit
@@ -294,7 +288,34 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 
 		MAPIFreeBuffer(lpOccrInfo);
 	}
-	
+
+	// set named prop 0x8510 to 353, needed for Outlook to ask for single or total recurrence when deleting
+	sPropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_SIDEEFFECT], PT_LONG);
+	sPropVal.Value.ul = 353;
+	lpIcalItem->lstMsgProps.push_back(sPropVal);
+
+	// Set 0x8235, also known as ClipStart in OutlookSpy
+	UnixTimeToFileTime(LocalToUTC(recurrence::StartOfDay(lpRec->getStartDateTime()), sTimeZone), &sPropVal.Value.ft);
+	sPropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_RECURRENCE_START], PT_SYSTIME);
+	lpIcalItem->lstMsgProps.push_back(sPropVal);
+
+	UnixTimeToFileTime(LocalToUTC(lpRec->getStartDateTime(), sTimeZone), &sPropVal.Value.ft);
+
+	// Set 0x820D / ApptStartWhole
+	sPropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_APPTSTARTWHOLE], PT_SYSTIME);
+	lpIcalItem->lstMsgProps.push_back(sPropVal);
+
+	// Set 0x8516 / CommonStart
+	sPropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_COMMONSTART], PT_SYSTIME);
+	lpIcalItem->lstMsgProps.push_back(sPropVal);
+
+	UnixTimeToFileTime(LocalToUTC(lpRec->getStartDateTime() + (dtUTCEnd - dtUTCStart), sTimeZone), &sPropVal.Value.ft);
+
+	// Set 0x820E / ApptEndWhole
+	sPropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_APPTENDWHOLE], PT_SYSTIME);
+	lpIcalItem->lstMsgProps.push_back(sPropVal);
+
+
 	lpIcalItem->lpRecurrence = lpRec;
 	lpRec = NULL;
 
@@ -911,7 +932,15 @@ HRESULT ICalRecurrence::HrCreateICalRecurrenceType(TIMEZONE_STRUCT sTimeZone, bo
 
 			icRec.by_month[0] = lpRecurrence->getMonth();
 			icRec.by_month[1] = ICAL_RECURRENCE_ARRAY_MAX;
+		} else {
+			// mapi patterntype == 2
+			icRec.by_month_day[0] = lpRecurrence->getDayOfMonth();
+			icRec.by_month_day[1] = ICAL_RECURRENCE_ARRAY_MAX;
+
+			icRec.by_month[0] = lpRecurrence->getMonth();
+			icRec.by_month[1] = ICAL_RECURRENCE_ARRAY_MAX;
 		}
+
 		break;
 	default:
 		hr = MAPI_E_INVALID_PARAMETER;

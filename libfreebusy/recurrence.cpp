@@ -72,6 +72,7 @@ static char THIS_FILE[] = __FILE__;
 
 recurrence::recurrence()
 {
+	m_ulMonth = 0x0;
 }
 
 recurrence::~recurrence()
@@ -264,7 +265,6 @@ HRESULT recurrence::setFrequency(freq_type ft)
 
 	return hr;
 }
-
 
 time_t recurrence::getStartDate()
 {
@@ -468,7 +468,7 @@ HRESULT recurrence::setWeekDays(UCHAR d)
 
 UCHAR recurrence::getDayOfMonth()
 {
-	if (m_sRecState.ulRecurFrequency != RF_MONTHLY && (m_sRecState.ulPatternType != 2 || m_sRecState.ulPatternType != 4))
+	if ( m_sRecState.ulRecurFrequency != RF_YEARLY && m_sRecState.ulRecurFrequency != RF_MONTHLY && (m_sRecState.ulPatternType != 2 || m_sRecState.ulPatternType != 4))
 		return 0;
 	return m_sRecState.ulDayOfMonth;
 }
@@ -479,31 +479,30 @@ HRESULT recurrence::setDayOfMonth(UCHAR d)
 	return S_OK;
 }
 
+/**
+ * Get the month between 1...12
+ * 1 = jan
+ */
 UCHAR recurrence::getMonth()
 {
+	if (m_ulMonth > 0 && m_ulMonth < 13) {
+		return m_ulMonth;
+	}
+
 	struct tm tmMonth;
 	time_t tStart = getStartDate();
 	gmtime_safe(&tStart, &tmMonth);
 	return tmMonth.tm_mon+1;
 }
 
-// HRESULT recurrence::setMonth(UCHAR m)
-// {
-// 	if(m == 0)
-// 		m = MonthFromTime(this->starttime);
-// 	if(m < 1 || m > 12)
-// 		return MAPI_E_CALL_FAILED;
+HRESULT recurrence::setMonth(UCHAR m)
+{
+	if(m < 1 || m > 12)
+		return MAPI_E_CALL_FAILED;
 
-// 	if(this->freq == DAILY || this->freq == WEEKLY){
-// 		this->freq = MONTHLY;
-// 		m_sRecState.ulPeriod = 1;
-// 		this->nday = 0;
-// 		this->monthday = 1;
-// 	}
-
-// 	this->month = m;
-// 	return hrSuccess;
-// }
+	m_ulMonth = m;
+	return hrSuccess;
+}
 
 
 // only valid in monthly type 0x3 and 0xb
@@ -1105,6 +1104,175 @@ list<time_t> recurrence::getOccurrencesBetween(time_t begin, time_t end){
 }
 */
 
+time_t recurrence::calcStartDate()
+{
+	time_t tStart = getStartDateTime();
+	LONG rStart;
+	struct tm tm;
+
+	switch (m_sRecState.ulRecurFrequency) {
+	case RF_DAILY:
+		// Use the default start date.
+		break;
+	case RF_WEEKLY:
+		int daycount, dayskip;
+		int weekskip;
+
+		gmtime_safe(&tStart, &tm);
+
+		daycount = 0;
+		dayskip = -1;
+		for (int j = 0; j < 7; j++) {
+			if (m_sRecState.ulWeekDays & (1<<((tm.tm_wday + j)%7))) {
+				if (dayskip == -1)
+					dayskip = j;
+				daycount++;
+			}
+		}
+		// dayskip is the number of days to skip from the startdate until the first occurrence
+		// daycount is the number of days per week that an occurrence occurs
+
+		weekskip = 0;
+		if ((tm.tm_wday < (int)m_sRecState.ulFirstDOW && dayskip > 0) || (tm.tm_wday+dayskip) > 6)
+			weekskip = 1;
+		// weekskip is the amount of weeks to skip from the startdate before the first occurence
+
+		// The real start is start + dayskip + weekskip-1 (since dayskip will already bring us into the next week)
+		tStart = tStart + (dayskip * 24*60*60) + (weekskip * (m_sRecState.ulPeriod-1) * 7 * 24*60*60);
+		gmtime_safe(&tStart, &tm);
+
+		break;
+	case RF_MONTHLY:
+	case RF_YEARLY:
+		gmtime_safe(&tStart, &tm);
+
+		if (m_sRecState.ulPatternType == PT_MONTH) {
+			unsigned int count = 0;
+
+			// Go the beginning of the month
+			tStart -= (tm.tm_mday-1) * 24*60*60;
+
+			// Go the the correct month day
+			tStart += (m_sRecState.ulDayOfMonth-1) * 24*60*60;
+
+			// If the previous calculation gave us a start date *before* the original start date, then we need to skip to the next occurrence
+			if ( m_sRecState.ulRecurFrequency == RF_MONTHLY && m_sRecState.ulDayOfMonth < tm.tm_mday) {
+				// Monthly, go to next occurrence in 'everyn' months
+				count = m_sRecState.ulPeriod;
+			} else if (m_sRecState.ulRecurFrequency == RF_YEARLY) {
+
+				if ( ( getMonth()-1 < tm.tm_mon) || ( getMonth()-1 == tm.tm_mon && m_sRecState.ulDayOfMonth < tm.tm_mday) ) {
+					// Yearly, go to next occurrence in 'everyn' months minus difference in first occurence and original date
+					count = (m_sRecState.ulPeriod - (tm.tm_mon - (getMonth()-1)));
+				} else if (getMonth()-1 > tm.tm_mon) {
+					count = (getMonth()-1) - tm.tm_mon;
+				}
+			}
+
+			int curmonth = tm.tm_mon + 1;
+			int curyear = tm.tm_year + 1900;
+			for (int i=0; i < count; i++) {
+				tStart += MonthInSeconds(curyear, curmonth); 
+				if (curmonth == 12) { curmonth = 0; curyear++; }
+				curmonth++;
+			}
+			// "start" is now pointing to the first occurrence, except that it will overshoot if the
+            // month in which it occurs has less days than specified as the day of the month. So 31st
+            // of each month will overshoot in february (29 days). We compensate for that by checking
+            // if the day of the month we got is wrong, and then back up to the last day of the previous
+            // month.
+			if ( m_sRecState.ulDayOfMonth >= 28 &&  m_sRecState.ulDayOfMonth <=31) {
+				gmtime_safe(&tStart, &tm);
+				if(tm.tm_mday < m_sRecState.ulDayOfMonth) {
+					tStart -= tm.tm_mday * 24 * 60 *60;
+				}
+			}
+		} else if (m_sRecState.ulPatternType == PT_MONTH_NTH) {
+			// seek to the begin of the month
+			tStart -= (tm.tm_mday-1) * 24*60*60;
+
+			// See to the end of the month when every last n Day of the month
+			if (m_sRecState.ulWeekNumber == 5) 
+				tStart += MonthInSeconds(tm.tm_year + 1900, tm.tm_mon);
+		
+
+			// Find the first valid day (from the original start date)
+			int day = -1;
+			bool bMoveMonth = false;
+			for (int i = 0; i < 7; i++) {
+
+				if (m_sRecState.ulWeekNumber == 5 && (1<< (tm.tm_wday - i)%7) & m_sRecState.ulWeekDays) {
+					day = DaysInMonth(tm.tm_year+1900, tm.tm_mon) - i;
+					if (day < tm.tm_mday)
+						 bMoveMonth = true;
+					break;
+				} else if (m_sRecState.ulWeekNumber != 5 && (1<< (tm.tm_wday + i)%7) & m_sRecState.ulWeekDays) {
+					int maxweekday = m_sRecState.ulWeekNumber * 7;
+					day = tm.tm_mday+i;
+					if (day > maxweekday)
+						bMoveMonth = true;
+					break;
+				}
+			}
+
+			// Move to the right month
+			if (m_sRecState.ulRecurFrequency == RF_YEARLY) {
+				unsigned int count = 0;
+
+				if (getMonth()-1 < tm.tm_mon || (getMonth()-1 == tm.tm_mon && bMoveMonth) ) {
+					count = 12 - tm.tm_mon + (getMonth()-1);
+				} else {
+					count = (getMonth()-1) - tm.tm_mon;
+				}
+
+				int curmonth = tm.tm_mon + 1;
+				int curyear = tm.tm_year + 1900;
+				for (int i=0; i < count; i++) {
+					tStart += MonthInSeconds(curyear, curmonth); 
+					if (curmonth == 12) { curmonth = 0; curyear++; }
+					curmonth++;
+				}
+
+			} else {
+				// Check you exist in the right month
+				if(bMoveMonth) {
+		            int curmonth = tm.tm_mon + 1;
+		            int curyear = tm.tm_year + 1900;
+					if (m_sRecState.ulWeekNumber == 5) {
+						if (curmonth == 12) { curmonth = 0; curyear++; }
+						curmonth++;
+					}
+
+					for (int i = 0; i < m_sRecState.ulPeriod; i++) {
+						tStart += MonthInSeconds(curyear, curmonth);
+						if (curmonth == 12) { curmonth = 0; curyear++; }
+						curmonth++;
+					}
+				}
+
+			}
+			// Seek to the right day (tStart should be the first day or the last day of the month.
+			gmtime_safe(&tStart, &tm);
+			for (int i = 0; i < 7; i++) {
+				if (m_sRecState.ulWeekNumber == 5 && (1<< (tm.tm_wday - i)%7) & m_sRecState.ulWeekDays) {
+					tStart -= i * 24 * 60 *60;
+					break;
+				} else if (m_sRecState.ulWeekNumber != 5 && (1<< (tm.tm_wday + i)%7) & m_sRecState.ulWeekDays) {
+					tStart += (((m_sRecState.ulWeekNumber-1) * 7 + (i+1))- 1) * 24 * 60 *60;
+					break;
+				}
+			}
+		}
+
+		break;
+	}
+
+
+exit:
+	return tStart;
+
+}
+
 time_t recurrence::calcEndDate()
 {
 	time_t tStart, tEnd;
@@ -1112,6 +1280,7 @@ time_t recurrence::calcEndDate()
 
 	if (m_sRecState.ulEndType != ET_NUMBER)
 		return getEndDateTime();
+
 
 	tStart = getStartDateTime();
 	tEnd = tStart;

@@ -117,8 +117,8 @@ public:
 	UCHAR getDayOfMonth();
 	HRESULT setDayOfMonth(UCHAR);
 
-	UCHAR getMonth();			/* 0..11 */
-/* 	HRESULT setMonth(UCHAR); */
+	UCHAR getMonth();
+ 	HRESULT setMonth(UCHAR);
 
 	UCHAR getWeekNumber();		/* 1..4 and 5 (last) */
 	HRESULT setWeekNumber(UCHAR);
@@ -181,6 +181,7 @@ public:
 
 	bool isAfter(time_t);
 */
+	time_t calcStartDate();
 	time_t calcEndDate();
 	ULONG calcCount();
 
@@ -209,6 +210,7 @@ public:
 
 private:
 	RecurrenceState m_sRecState;
+	unsigned int m_ulMonth;       // yearly, 1...12 (Not stored in the struct)
 
 	std::vector<std::wstring> vExceptionsSubject;
 	std::vector<std::wstring> vExceptionsLocation;
