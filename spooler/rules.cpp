@@ -74,30 +74,30 @@ HRESULT GetRecipStrings(LPMESSAGE lpMessage, std::wstring &wstrTo, std::wstring 
 	mapi_rowset_ptr ptrRows;
 	MAPITablePtr ptrRecips;
 	SizedSPropTagArray(2, sptaDisplay)  = {2, { PR_DISPLAY_NAME_W, PR_RECIPIENT_TYPE } };
-	
+
 	wstrTo.clear();
 	wstrCc.clear();
 	wstrBcc.clear();
-	
+
 	hr = lpMessage->GetRecipientTable(MAPI_UNICODE, &ptrRecips);
 	if(hr != hrSuccess)
 		goto exit;
-		
+
 	hr = ptrRecips->SetColumns((LPSPropTagArray)&sptaDisplay, TBL_BATCH);
 	if(hr != hrSuccess)
 		goto exit;
-		
+
 	while(1) {
 		hr = ptrRecips->QueryRows(1, 0, &ptrRows);
 		if(hr != hrSuccess)
 			goto exit;
-			
+
 		if(ptrRows.size() == 0)
 			break;
-			
+
 		if(ptrRows[0].lpProps[0].ulPropTag != PR_DISPLAY_NAME_W || ptrRows[0].lpProps[1].ulPropTag != PR_RECIPIENT_TYPE)
 			continue;
-			
+
 		switch(ptrRows[0].lpProps[1].Value.ul) {
 			case MAPI_TO:
 				if (!wstrTo.empty()) wstrTo += L"; ";
@@ -114,7 +114,7 @@ HRESULT GetRecipStrings(LPMESSAGE lpMessage, std::wstring &wstrTo, std::wstring 
 		}
 	}
 
-exit:	
+exit:
 	return hr;
 }
 
@@ -149,7 +149,7 @@ HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 	hr = lpOrigMessage->GetProps((LPSPropTagArray)&sBody, 0, &cValues, &ptrBodies);
 	if (FAILED(hr))
 		goto exit;
-		
+
 	if (PROP_TYPE(ptrBodies[3].ulPropTag) != PT_ERROR)
 		ulCharset = ptrBodies[3].Value.ul;
 	else
@@ -169,7 +169,7 @@ HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 	// Cc: <original Cc:>
 	// Subject: <>
 	// Auto forwarded by a rule
-	
+
 	hr = GetRecipStrings(lpOrigMessage, wstrTo, wstrCc, wstrBcc);
 	if (FAILED(hr))
 		goto exit;
@@ -231,7 +231,7 @@ HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 		if (hr == hrSuccess) {
 			hr = Util::HrStreamToString(ptrStream, strHTML);
 		}
-		// icase <body> tag 
+		// icase <body> tag
 		pos = str_ifind(strHTML.c_str(), strFind.c_str());
 		pos = pos ? pos + strFind.length() : strHTML.c_str();
 		// if body tag was not found, this will make it be placed after the first tag, probably <html>
@@ -324,7 +324,7 @@ HRESULT CreateReplyCopy(LPMAPISESSION lpSession, LPMDB lpOrigStore, IMAPIProp *l
 	LPSPropValue lpReplyRecipient = NULL;
 	ADRLIST sRecip = {0};
 	ULONG ulCmp = 0;
-	
+
 	SizedSPropTagArray (5, sFrom) = { 5, {
 		PR_RECEIVED_BY_ENTRYID,
 		PR_RECEIVED_BY_NAME,
@@ -478,15 +478,15 @@ exit:
 	return hr;
 }
 
-/** 
+/**
  * Checks the rule recipient list for a possible loop, and filters
  * that recipient. Returns an error when no recipients are left after
  * the filter.
- * 
+ *
  * @param[in] lpMessage The original delivered message performing the rule action
  * @param[in] lpRuleRecipients The recipient list from the rule
  * @param[out] lppNewRecipients The actual recipient list to perform the action on
- * 
+ *
  * @return MAPI error code
  */
 HRESULT CheckRecipients(ECLogger *lpLogger, LPADRBOOK lpAdrBook, IMAPIProp *lpMessage, LPADRLIST lpRuleRecipients, LPADRLIST *lppNewRecipients)
@@ -513,7 +513,7 @@ HRESULT CheckRecipients(ECLogger *lpLogger, LPADRBOOK lpAdrBook, IMAPIProp *lpMe
 
 	for (ULONG i = 0; i < lpRuleRecipients->cEntries; i++) {
 		hr = HrGetAddress(lpAdrBook, lpRuleRecipients->aEntries[i].rgPropVals, lpRuleRecipients->aEntries[i].cValues, PR_ENTRYID,
-						  CHANGE_PROP_TYPE(PR_DISPLAY_NAME, PT_UNSPECIFIED), CHANGE_PROP_TYPE(PR_ADDRTYPE, PT_UNSPECIFIED), CHANGE_PROP_TYPE(PR_SMTP_ADDRESS, PT_UNSPECIFIED), 
+						  CHANGE_PROP_TYPE(PR_DISPLAY_NAME, PT_UNSPECIFIED), CHANGE_PROP_TYPE(PR_ADDRTYPE, PT_UNSPECIFIED), CHANGE_PROP_TYPE(PR_SMTP_ADDRESS, PT_UNSPECIFIED),
 						  strRuleName, strRuleType, strRuleAddress);
 		if (hr != hrSuccess) {
 			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to get rule address 0x%08X", hr);
@@ -650,7 +650,7 @@ HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook, LPMDB lpOrigS
 
 		lpAttach->Release();
 		lpAttach = NULL;
-	} else {	
+	} else {
 		hr = lpOrigMessage->CopyTo(0, NULL, lpExclude, 0, NULL, &IID_IMessage, lpFwdMsg, 0, NULL);
 		if (hr != hrSuccess)
 			goto exit;
@@ -691,7 +691,7 @@ HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook, LPMDB lpOrigS
 		PROPMAP_INIT(lpFwdMsg);
 
 		sForwardProps[cfp].ulPropTag = PROP_ZarafaRuleAction;
-		sForwardProps[cfp++].Value.lpszW = L"forward";
+		sForwardProps[cfp++].Value.lpszW = LPWSTR(bDoPreserveSender ? L"redirect" : L"forward");
 	}
 
 	hr = lpFwdMsg->SetProps(cfp, (LPSPropValue)&sForwardProps, NULL);
@@ -729,7 +729,7 @@ HRESULT HrDelegateMessage(IMAPIProp *lpMessage)
 	SPropValue sNewProps[6] = {{0}};
 	LPSPropValue lpProps = NULL;
 	ULONG cValues = 0;
-	SizedSPropTagArray(5, sptaRecipProps) = {5, 
+	SizedSPropTagArray(5, sptaRecipProps) = {5,
 		{ PR_RECEIVED_BY_ENTRYID, PR_RECEIVED_BY_ADDRTYPE, PR_RECEIVED_BY_EMAIL_ADDRESS, PR_RECEIVED_BY_NAME, PR_RECEIVED_BY_SEARCH_KEY }
 	};
 
@@ -804,11 +804,11 @@ HRESULT HrProcessRules(LPMAPISESSION lpSession, LPADRBOOK lpAdrBook, LPMDB lpOri
     hr = lpOrigInbox->OpenProperty(PR_RULES_TABLE, &IID_IExchangeModifyTable, 0, 0, (LPUNKNOWN *)&lpTable);
     if(hr != hrSuccess)
         goto exit;
-        
+
     hr = lpTable->GetTable(0, &lpView);
     if(hr != hrSuccess)
         goto exit;
-        
+
     hr = lpView->SetColumns((LPSPropTagArray)&sptaRules, 0);
     if (hr != hrSuccess)
         goto exit;
@@ -860,13 +860,13 @@ HRESULT HrProcessRules(LPMAPISESSION lpSession, LPADRBOOK lpAdrBook, LPMDB lpOri
 			lpLogger->Log(EC_LOGLEVEL_DEBUG, "Rule '%s' has no action, skipping...", strRule.c_str());
 			goto nextrule;
 		}
-		
+
 		// test if action should be done...
 		// @todo: Create the correct locale for the current store.
 		if (TestRestriction(lpCondition, *lppMessage, createLocaleFromName("")) != hrSuccess) {
 			lpLogger->Log(EC_LOGLEVEL_INFO, (std::string)"Rule " + strRule + " doesn't match");
 			goto nextrule;
-		}	
+		}
 		lpLogger->Log(EC_LOGLEVEL_INFO, (std::string)"Rule " + strRule + " matches");
 
 		for(ULONG n=0; n<lpActions->cActions; n++) {
@@ -908,7 +908,7 @@ HRESULT HrProcessRules(LPMAPISESSION lpSession, LPADRBOOK lpAdrBook, LPMDB lpOri
 					lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to create e-mail for rule " + strRule);
 					goto exit;
 				}
-					
+
 				hr = (*lppMessage)->CopyTo(0, NULL, NULL, 0, NULL, &IID_IMessage, lpNewMessage, 0, NULL);
 				if(hr != hrSuccess) {
 					lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to copy e-mail for rule " + strRule);
@@ -986,7 +986,7 @@ HRESULT HrProcessRules(LPMAPISESSION lpSession, LPADRBOOK lpAdrBook, LPMDB lpOri
 
 				hr = CreateForwardCopy(lpLogger, lpAdrBook, lpOrigStore, *lppMessage, lpActions->lpAction[n].lpadrlist,
 									   lpActions->lpAction[n].ulActionFlavor & FWD_PRESERVE_SENDER,
-									   lpActions->lpAction[n].ulActionFlavor & FWD_DO_NOT_MUNGE_MSG, 
+									   lpActions->lpAction[n].ulActionFlavor & FWD_DO_NOT_MUNGE_MSG,
 									   lpActions->lpAction[n].ulActionFlavor & FWD_AS_ATTACHMENT,
 									   &lpFwdMsg);
 				if (hr != hrSuccess) {
@@ -1014,7 +1014,7 @@ HRESULT HrProcessRules(LPMAPISESSION lpSession, LPADRBOOK lpAdrBook, LPMDB lpOri
 				break;
 
 			case OP_DELEGATE:
-				
+
 				if (lpActions->lpAction[n].lpadrlist->cEntries == 0) {
 					lpLogger->Log(EC_LOGLEVEL_DEBUG, "Delegating rule doesn't have recipients");
 					continue; // Nothing todo
@@ -1121,7 +1121,7 @@ exit:
 
 	if (lpNewMessage)
 		lpNewMessage->Release();
-		
+
 	if (lpTable)
 		lpTable->Release();
 
