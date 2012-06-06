@@ -15,7 +15,7 @@
 
   <reference>
 	<title>Zarafa user reference</title>
-	
+
 	<partintro>
 	  <para>This document lists all available Zarafa commands and
 	  configuration files.</para>
@@ -80,7 +80,7 @@
 			<listitem>
 			  <para>The monitor server process monitors user
 			  stores for quota limits. When a user goes over the
-			  warning quota level, zarafa-monitor will issue 
+			  warning quota level, zarafa-monitor will issue
 			  a warning e-mail.
 			  </para>
 			</listitem>
@@ -298,7 +298,7 @@
 		the mailbox of <parameter>RECIPIENT</parameter>. You can alter
 		source and destination of this mail with various
 		options.</para>
-		
+
 		<para>The <parameter>RECIPIENT</parameter> value is resolved by
 		zarafa-dagent prior to delivery, and therefore accepts any unique
 		identifier for the recipient. In practice it is most useful to pass
@@ -772,18 +772,18 @@
 		<para>The parameters are written in the form:</para>
 
 		<para><option>name</option> = <replaceable>value</replaceable></para>
-		
+
 		<para>The file is line-based. Each newline-terminated line
 		represents either a comment, nothing, a parameter or a directive.
 		A line beginning with `#' is considered a comment, and will be
 		ignored	by Zarafa. Parameter names are case sensitive. Lines
 		beginning with `!' are directives.</para>
-		
+
 		<para>Directives are written in the form:</para>
-		
+
 		<para>!<option>directive</option> <replaceable>[argument(s)]
 		</replaceable></para>
-		
+
 		<para>The following directives exist:</para>
 		<variablelist>
 		  <varlistentry>
@@ -1010,7 +1010,7 @@
           <varlistentry>
             <term><option>log_raw_message</option></term>
             <listitem>
-              <para>Log the raw message to a file. The file is saved to the 
+              <para>Log the raw message to a file. The file is saved to the
 				location specifed in <option>log_raw_message_path</option>.
               </para>
               <para>Default: <replaceable>no</replaceable></para>
@@ -1032,16 +1032,16 @@
               <para>Archive incoming message on delivery. If an archive is
               attached to the target mailbox, the message will immediately
               be archived upon delivery.</para>
-              <para>Rules will be processed before the message is archived, so 
-              when a rule moves the message to an alternate location, the 
+              <para>Rules will be processed before the message is archived, so
+              when a rule moves the message to an alternate location, the
               archived message will be placed in the correct location in the
-              archive. When the incoming message is copied by a rule, only the 
+              archive. When the incoming message is copied by a rule, only the
               original message is archived.
               </para>
               <para>Default: <replaceable>no</replaceable></para>
             </listitem>
           </varlistentry>
-          
+
           <varlistentry>
           	<term><option>mr_autoaccepter</option></term>
           	<listitem>
@@ -1084,7 +1084,7 @@
 			<term>log_level</term>
 			<listitem><para></para></listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 			<term>archive_on_delivery</term>
 			<listitem><para></para></listitem>
@@ -1606,7 +1606,7 @@
 			</term>
 			<listitem>
 			  <para>Delete a user. No other options are needed. The
-			  deleted store of the user will be marked as orphan store 
+			  deleted store of the user will be marked as orphan store
 			  and can be restored with <parameter>--hook-store</parameter>
 			</para>
 			</listitem>
@@ -1856,7 +1856,7 @@
 			<listitem>
 			  <para>Delete company <replaceable>'companyname'</replaceable> from remote-view list of tenant specified by <parameter>-I</parameter>.
 			  After this command the <replaceable>'companyname'</replaceable> is no longer capable of viewing all members of the tenant specified
-			  by <parameter>-I</parameter>.</para>	  
+			  by <parameter>-I</parameter>.</para>
 			  <para>This option is only available in multi-tenancy Zarafa.</para>
 			</listitem>
 		  </varlistentry>
@@ -2001,7 +2001,7 @@
 			  what kind of object the sendas details are being requested.</para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 		  	<term>
 		  	  <option>--clear-cache</option>
@@ -2016,7 +2016,7 @@
 		  	  tool.</para>
 		  	</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 		    <term>
 		      <option>--purge-softdelete</option>
@@ -2107,7 +2107,7 @@
 		      users with this command.</para>
 		    </listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 		    <term>
 		      <option>--unhook-store</option>
@@ -2135,6 +2135,17 @@
 			  <para>You can force a resync of cached profiles when
 			  the data is out of sync. One or more usernames can be
 			  specified.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>--reset-folder-count</option>
+			  <replaceable>username</replaceable>
+			</term>
+			<listitem>
+			  <para>Reset the counters on all folder in
+			  <replaceable>username</replaceable>'s store.</para>
 			</listitem>
 		  </varlistentry>
 
@@ -2247,7 +2258,7 @@
 			  <parameter>-c</parameter> create or
 			  <parameter>-u</parameter> update action.</para>
 			  <para>It is also possible to pass 2 as administrator level,
-			  this will make the user a system administrator who can 
+			  this will make the user a system administrator who can
 			  create/modify/delete companies.</para>
 			</listitem>
 		  </varlistentry>
@@ -2508,7 +2519,7 @@
 
 		</variablelist>
 	  </refsection>
-	  
+
 	  <refsection>
 		<title>Config</title>
 
@@ -2711,16 +2722,16 @@
 	  <refsection>
 		<title>Description</title>
 
-		<para>This tool can be used to change a user password. 
+		<para>This tool can be used to change a user password.
 		The Zarafa server must be running for
 		<command>zarafa-passwd</command> to work.
 		</para>
 
 		<para>If no action is given, an error message is printed.
-		When invalid actions or not enough options for an action 
+		When invalid actions or not enough options for an action
 		are given, an error message is printed.</para>
 
-		<para>The Zarafa passwd works only with the dbplugin. 
+		<para>The Zarafa passwd works only with the dbplugin.
 		Please see the
 		<citerefentry>
 		  <refentrytitle>EXTERNAL USERS</refentrytitle>
@@ -2812,7 +2823,7 @@
 		</para>
 	  </refsection>
 	</refentry>
-	
+
 <!--
   -+-+-
 	Zarafa Server Configuration file manual page (5.0 ready)
@@ -2851,18 +2862,18 @@
 		<para>The parameters are written in the form:</para>
 
 		<para><option>name</option> = <replaceable>value</replaceable></para>
-		
+
 		<para>The file is line-based. Each newline-terminated line
 		represents either a comment, nothing, a parameter or a directive.
 		A line beginning with `#' is considered a comment, and will be
 		ignored	by Zarafa. Parameter names are case sensitive. Lines
 		beginning with `!' are directives.</para>
-		
+
 		<para>Directives are written in the form:</para>
-		
+
 		<para>!<option>directive</option> <replaceable>[argument(s)]
 		</replaceable></para>
-		
+
 		<para>The following directives exist:</para>
 		<variablelist>
 		  <varlistentry>
@@ -2899,7 +2910,7 @@
 			  <para>Default: <replaceable>yes</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 			<term><option>server_tcp_port</option></term>
 			<listitem>
@@ -2966,7 +2977,7 @@
 			  <replaceable>/var/run/zarafa</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 			<term><option>server_pipe_priority</option></term>
 			<listitem>
@@ -2975,7 +2986,7 @@
 			  <replaceable>/var/run/zarafa-prio</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 			<term><option>server_name</option></term>
 			<listitem>
@@ -3389,9 +3400,9 @@
 		  <varlistentry>
 			<term><option>mysql_socket</option></term>
 			<listitem>
-				<para>The socket of the MySQL server to use. This option 
+				<para>The socket of the MySQL server to use. This option
 						can be used to override the default mysql socket.
-						To use the socket, the mysql_host value must be 
+						To use the socket, the mysql_host value must be
 						empty or 'localhost'</para>
 			  <para>Default: <replaceable></replaceable></para>
 			</listitem>
@@ -3404,7 +3415,7 @@
 			  <para>Default: <replaceable>zarafa</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 		    <term><option>mysql_group_concat_max_len</option></term>
 		    <listitem>
@@ -3670,7 +3681,7 @@
 				<para>Setting this value to <replaceable>yes</replaceable>
 				will cause slightly more database traffic and the value
 				<replaceable>no</replaceable> will be the correct for
-				most installations.</para>	
+				most installations.</para>
 				<para>Default: <replaceable>no</replaceable></para>
 			</listitem>
 		  </varlistentry>
@@ -3726,7 +3737,7 @@
 				<para>Default: <replaceable>passwd</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 		  	<term><option>max_deferred_records</option></term>
 		  	<listitem>
@@ -3785,7 +3796,7 @@
 			  inbox, or any other folder). In an ideal
 			  situation, all cells would be cached, so that the
 			  database does not need to be queried for data when
-			  browsing through folders, but this would require 
+			  browsing through folders, but this would require
 			  around 1.5K per message item (e-mail, appointment
 			  task, etc) in the entire server. If you can afford
 			  it, set this value as high as possible, up to 50%
@@ -4041,7 +4052,7 @@
 			  <para>These scripts are called by the server when the
 			  external user source, like LDAP, is different from the
 			  users, groups and companies which are known to Zarafa. The script
-			  uses a environment variable to see which user, group or tenant 
+			  uses a environment variable to see which user, group or tenant
 			  is affected. The following parameter is used for the script:
 			  </para>
 			  <variablelist>
@@ -4154,7 +4165,7 @@
 			  <para>Default: <replaceable>false</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 			<term><option>enable_distributed_zarafa</option></term>
 			<listitem>
@@ -4166,7 +4177,7 @@
 			  <para>Default: <replaceable>false</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 			<term><option>storename_format</option></term>
 			<listitem>
@@ -4288,7 +4299,7 @@
 		  <varlistentry>
 			<term><option>index_services_path</option></term>
 			<listitem>
-			  <para>Path to the 
+			  <para>Path to the
 			    <citerefentry>
 				  <refentrytitle>zarafa-indexer</refentrytitle>
 				  <manvolnum>1</manvolnum>
@@ -4311,7 +4322,7 @@
 			  <para>Default: <replaceable>10</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 			<term><option>index_services_prefix_chars</option></term>
 			<listitem>
@@ -4329,7 +4340,7 @@
 			  <para>Default: <replaceable>3</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 			<term><option>enable_enhanced_ics</option></term>
 			<listitem>
@@ -4356,7 +4367,7 @@
 			  <para>Default: <replaceable>1000000</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 		    <term><option>sync_gab_realtime</option></term>
 		    <listitem>
@@ -4506,18 +4517,18 @@
 		<para>The parameters are written in the form:</para>
 
 		<para><option>name</option> = <replaceable>value</replaceable></para>
-		
+
 		<para>The file is line-based. Each newline-terminated line
 		represents either a comment, nothing, a parameter or a directive.
 		A line beginning with `#' is considered a comment, and will be
 		ignored	by Zarafa. Parameter names are case sensitive. Lines
 		beginning with `!' are directives.</para>
-		
+
 		<para>Directives are written in the form:</para>
-		
+
 		<para>!<option>directive</option> <replaceable>[argument(s)]
 		</replaceable></para>
-		
+
 		<para>The following directives exist:</para>
 		<variablelist>
 		  <varlistentry>
@@ -4663,8 +4674,8 @@
 			  <para>The value of this attribute must be specified in the
 			  ldap_*_type_attribute_value settings. Each of those settings
 			  may specify multiple values for the type attribute, separated
-			  by comma's. All of these values must be present in the objects 
-			  type attribute for a match to be made and the object to be 
+			  by comma's. All of these values must be present in the objects
+			  type attribute for a match to be made and the object to be
 			  recognised as that type.
 			  </para>
 			  <para>It is possible for ambiguities to arise by setting the
@@ -4946,7 +4957,7 @@
 			<term><option>ldap_user_certificate_attribute</option></term>
 			<listitem>
 			  <para>The attribute which contains the user's public
-			  certificate to be used for encrypted S/MIME messages. 
+			  certificate to be used for encrypted S/MIME messages.
 			  Both Active Directory and OpenLDAP use the same ldap attribute
 			  by default. The format of the certificate should be the binary
 			  DER format.
@@ -5493,7 +5504,7 @@
 			  <replaceable>(|(mail=%s*)(uid=%s*)(cn=*%s*)(fullname=*%s*)(givenname=*%s*)(lastname=*%s*)(sn=*%s*))</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 		    <term><option>ldap_filter_cutoff_elements</option></term>
 		    <listitem>
@@ -5599,18 +5610,18 @@
 		<para>The parameters are written in the form:</para>
 
 		<para><option>name</option> = <replaceable>value</replaceable></para>
-		
+
 		<para>The file is line-based. Each newline-terminated line
 		represents either a comment, nothing, a parameter or a directive.
 		A line beginning with `#' is considered a comment, and will be
 		ignored	by Zarafa. Parameter names are case sensitive. Lines
 		beginning with `!' are directives.</para>
-		
+
 		<para>Directives are written in the form:</para>
-		
+
 		<para>!<option>directive</option> <replaceable>[argument(s)]
 		</replaceable></para>
-		
+
 		<para>The following directives exist:</para>
 		<variablelist>
 		  <varlistentry>
@@ -5632,7 +5643,7 @@
 			<term><option>ldap_user_server_attribute</option></term>
 			<listitem>
 			  <para>This value is the unique name of the server on
-			  which the users store is available.</para> 
+			  which the users store is available.</para>
 			  <para>Default: <replaceable>zarafaUserServer</replaceable>
 			  </para>
 			</listitem>
@@ -5697,7 +5708,7 @@
 		      </para>
 		    </listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 		    <term><option>ldap_server_search_filter</option></term>
 		    <listitem>
@@ -5706,7 +5717,7 @@
 			  <para>Default for ADS: <replaceable>(objectClass=Computer)</replaceable></para>
 		    </listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 		    <term><option>ldap_server_unique_attribute</option></term>
 		    <listitem>
@@ -5716,7 +5727,7 @@
 			  <para>Default: <replaceable>cn</replaceable></para>
 		    </listitem>
 		  </varlistentry>
-		  
+
 		</variablelist>
 	  </refsection>
 
@@ -5792,18 +5803,18 @@
 		<para>The parameters are written in the form:</para>
 
 		<para><option>name</option> = <replaceable>value</replaceable></para>
-		
+
 		<para>The file is line-based. Each newline-terminated line
 		represents either a comment, nothing, a parameter or a directive.
 		A line beginning with `#' is considered a comment, and will be
 		ignored	by Zarafa. Parameter names are case sensitive. Lines
 		beginning with `!' are directives.</para>
-		
+
 		<para>Directives are written in the form:</para>
-		
+
 		<para>!<option>directive</option> <replaceable>[argument(s)]
 		</replaceable></para>
-		
+
 		<para>The following directives exist:</para>
 		<variablelist>
 		  <varlistentry>
@@ -5871,7 +5882,7 @@
 			  </para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 			<term><option>except_user_uids</option></term>
 			<listitem>
@@ -6217,18 +6228,18 @@
 		<para>The parameters are written in the form:</para>
 
 		<para><option>name</option> = <replaceable>value</replaceable></para>
-		
+
 		<para>The file is line-based. Each newline-terminated line
 		represents either a comment, nothing, a parameter or a directive.
 		A line beginning with `#' is considered a comment, and will be
 		ignored	by Zarafa. Parameter names are case sensitive. Lines
 		beginning with `!' are directives.</para>
-		
+
 		<para>Directives are written in the form:</para>
-		
+
 		<para>!<option>directive</option> <replaceable>[argument(s)]
 		</replaceable></para>
-		
+
 		<para>The following directives exist:</para>
 		<variablelist>
 		  <varlistentry>
@@ -6818,18 +6829,18 @@
 		<para>The parameters are written in the form:</para>
 
 		<para><option>name</option> = <replaceable>value</replaceable></para>
-		
+
 		<para>The file is line-based. Each newline-terminated line
 		represents either a comment, nothing, a parameter or a directive.
 		A line beginning with `#' is considered a comment, and will be
 		ignored	by Zarafa. Parameter names are case sensitive. Lines
 		beginning with `!' are directives.</para>
-		
+
 		<para>Directives are written in the form:</para>
-		
+
 		<para>!<option>directive</option> <replaceable>[argument(s)]
 		</replaceable></para>
-		
+
 		<para>The following directives exist:</para>
 		<variablelist>
 		  <varlistentry>
@@ -7086,8 +7097,8 @@
 		  <varlistentry>
 			<term><option>imap_max_messagesize</option></term>
 			<listitem>
-				<para>Limit the maximum message size (in bytes) which can 
-				be created by an IMAP client. The maximum of this value is 4GB 
+				<para>Limit the maximum message size (in bytes) which can
+				be created by an IMAP client. The maximum of this value is 4GB
 				although this is not recommended. If the value is too high
 				it will cause a segmentation fault.</para>
 				<para>Default: <replaceable>134217728</replaceable></para>
@@ -7145,9 +7156,9 @@
 			<term><option>ssl_certificate_file</option></term>
 			<listitem>
 			  <para>The gateway will use this file as
-			  certificate for SSL TLS. A self-signed certificate 
+			  certificate for SSL TLS. A self-signed certificate
 			  can be created with: <command>openssl req -new -x509
-			  -key /etc/zarafa/gateway/privkey.pem -out /etc/zarafa/gateway/cert.pem 
+			  -key /etc/zarafa/gateway/privkey.pem -out /etc/zarafa/gateway/cert.pem
 			  -days 1095</command>.</para>
 			  <para>Default:
 			  <replaceable>/etc/zarafa/gateway/cert.pem</replaceable></para>
@@ -7481,18 +7492,18 @@
 		<para>The parameters are written in the form:</para>
 
 		<para><option>name</option> = <replaceable>value</replaceable></para>
-		
+
 		<para>The file is line-based. Each newline-terminated line
 		represents either a comment, nothing, a parameter or a directive.
 		A line beginning with `#' is considered a comment, and will be
 		ignored	by Zarafa. Parameter names are case sensitive. Lines
 		beginning with `!' are directives.</para>
-		
+
 		<para>Directives are written in the form:</para>
-		
+
 		<para>!<option>directive</option> <replaceable>[argument(s)]
 		</replaceable></para>
-		
+
 		<para>The following directives exist:</para>
 		<variablelist>
 		  <varlistentry>
@@ -8918,18 +8929,18 @@
 		<para>The parameters are written in the form:</para>
 
 		<para><option>name</option> = <replaceable>value</replaceable></para>
-		
+
 		<para>The file is line-based. Each newline-terminated line
 		represents either a comment, nothing, a parameter or a directive.
 		A line beginning with `#' is considered a comment, and will be
 		ignored	by Zarafa. Parameter names are case sensitive. Lines
 		beginning with `!' are directives.</para>
-		
+
 		<para>Directives are written in the form:</para>
-		
+
 		<para>!<option>directive</option> <replaceable>[argument(s)]
 		</replaceable></para>
-		
+
 		<para>The following directives exist:</para>
 		<variablelist>
 		  <varlistentry>
@@ -9094,9 +9105,9 @@
 			<term><option>ssl_certificate_file</option></term>
 			<listitem>
 			  <para>The iCal/CalDAV gateway will use this file as
-			  certificate for SSL TLS. A self-signed certificate 
+			  certificate for SSL TLS. A self-signed certificate
 			  can be created with: <command>openssl req -new -x509
-			  -key /etc/zarafa/ical/privkey.pem -out /etc/zarafa/ical/cert.pem 
+			  -key /etc/zarafa/ical/privkey.pem -out /etc/zarafa/ical/cert.pem
 			  -days 1095</command>.</para>
 			  <para>Default:
 			  <replaceable>/etc/zarafa/ical/cert.pem</replaceable></para>
@@ -9187,7 +9198,7 @@
 			  <para>Default: <replaceable>1</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 		    <term><option>enable_ical_get</option></term>
 		    <listitem>
@@ -10397,18 +10408,18 @@
 		<para>The parameters are written in the form:</para>
 
 		<para><option>name</option> = <replaceable>value</replaceable></para>
-		
+
 		<para>The file is line-based. Each newline-terminated line
 		represents either a comment, nothing, a parameter or a directive.
 		A line beginning with `#' is considered a comment, and will be
 		ignored	by Zarafa. Parameter names are case sensitive. Lines
 		beginning with `!' are directives.</para>
-		
+
 		<para>Directives are written in the form:</para>
-		
+
 		<para>!<option>directive</option> <replaceable>[argument(s)]
 		</replaceable></para>
-		
+
 		<para>The following directives exist:</para>
 		<variablelist>
 		  <varlistentry>
@@ -10508,7 +10519,7 @@
 			  </para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 		  	<term><option>limit_results</option></term>
 		  	<listitem>
@@ -10570,9 +10581,9 @@
 			<term><option>ssl_certificate_file</option></term>
 			<listitem>
 			  <para>The indexer will use this file as
-			  certificate for SSL TLS. A self-signed certificate 
+			  certificate for SSL TLS. A self-signed certificate
 			  can be created with: <command>openssl req -new -x509
-			  -key /etc/zarafa/indexer/privkey.pem -out /etc/zarafa/indexer/cert.pem 
+			  -key /etc/zarafa/indexer/privkey.pem -out /etc/zarafa/indexer/cert.pem
 			  -days 1095</command>.</para>
 			  <para>Default:
 			  <replaceable>/etc/zarafa/indexer/cert.pem</replaceable></para>
@@ -10947,7 +10958,7 @@
 			  <para>Default: <replaceable></replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 		  	<term><option>index_max_clauses</option></term>
 		  	<listitem>
@@ -11088,7 +11099,7 @@
 	  </refsection>
 
 	</refentry>
-	
+
 <!--
   -+-+-
 	Zarafa Archiver manual page
@@ -11114,11 +11125,11 @@
 
 	  <refsection>
 		<title>Description</title>
-		
+
 		<para>This tool is used to attach or detach archives to a
 		users store. An archive is defined as a special non-active store
 		or a folder inside such a store.</para>
-		
+
 		<para>On top of managing archives, this tool is used to perform
 		the actual archive operation. Using the	<parameter>-u</parameter>
 		option, the archiver can be instructed to archive a single
@@ -11135,7 +11146,7 @@
 			<term><option>-l</option></term>
 			<term><option>--list</option></term>
 			<listitem>
-			  <para>List archives for the specified user. The 
+			  <para>List archives for the specified user. The
 			  <parameter>-u</parameter> option is required.</para>
 			</listitem>
 		  </varlistentry>
@@ -11309,7 +11320,7 @@
 			<listitem>
 			  <para>Use this option to force zarafa-archiver to create
 			  the root of the archive in the root of the archive store
-			  (IPM subtree). This way only one user store can be attached 
+			  (IPM subtree). This way only one user store can be attached
 			  to an archive.</para>
 			</listitem>
 		  </varlistentry>
@@ -11346,7 +11357,7 @@
 			  <replaceable>file</replaceable>
 			</term>
 			<listitem>
-			  <para>Select an alternate config file to be used by 
+			  <para>Select an alternate config file to be used by
 			  zarafa-archiver.</para>
 			  <para>Default: <replaceable>/etc/zarafa/archiver.cfg</replaceable></para>
 			</listitem>
@@ -11381,7 +11392,7 @@
 		<para><command>zarafa-archiver</command> <option>-u</option>
 		<replaceable>username</replaceable> <option>--detach-from</option>
 		<replaceable>archive</replaceable></para>
-		
+
 		<para>For starting an archive run:</para>
 
 		<para><command>zarafa-archiver</command> <option>-A</option></para>
@@ -11450,18 +11461,18 @@
 		<para>The parameters are written in the form:</para>
 
 		<para><option>name</option> = <replaceable>value</replaceable></para>
-		
+
 		<para>The file is line-based. Each newline-terminated line
 		represents either a comment, nothing, a parameter or a directive.
 		A line beginning with `#' is considered a comment, and will be
 		ignored	by Zarafa. Parameter names are case sensitive. Lines
 		beginning with `!' are directives.</para>
-		
+
 		<para>Directives are written in the form:</para>
-		
+
 		<para>!<option>directive</option> <replaceable>[argument(s)]
 		</replaceable></para>
-		
+
 		<para>The following directives exist:</para>
 		<variablelist>
 		  <varlistentry>
@@ -11538,10 +11549,10 @@
 		  <varlistentry>
 			<term><option>stub_enable</option></term>
 			<listitem>
-			  <para>Specifies if the stub step will be performed. 
+			  <para>Specifies if the stub step will be performed.
 			  Stubbing is the process of removing the data from a message
 			  and only leaving a reference to one or more archived versions
-			  of that message. When such a message is opened it will be 
+			  of that message. When such a message is opened it will be
 			  de-stubbed on the fly, leaving the user with a normal message
 			  to work with.
 			  </para>
@@ -11572,7 +11583,7 @@
 		  <varlistentry>
 			<term><option>delete_enable</option></term>
 			<listitem>
-			  <para>Specifies if the delete step will be performed. 
+			  <para>Specifies if the delete step will be performed.
 			  The delete step deletes messages from the users store if
 			  they're old enough. This way even more space is freed.
 			  </para>
@@ -11598,9 +11609,9 @@
 			  be deleted.
 			  </para>
 			  <para>Default: <replaceable>0</replaceable></para>
-			</listitem>		  
+			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 			<term><option>purge_enable</option></term>
 			<listitem>
@@ -11608,9 +11619,9 @@
 			  archive after a certain amount of time.
 			  </para>
 			  <para>Default: <replaceable>no</replaceable></para>
-			</listitem>		  
+			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 			<term><option>purge_after</option></term>
 			<listitem>
@@ -11620,7 +11631,7 @@
 			  store.
 			  </para>
 			  <para>Default: <replaceable>0</replaceable></para>
-			</listitem>		  
+			</listitem>
 		  </varlistentry>
 
 		  <varlistentry>
@@ -11638,7 +11649,7 @@
 			  <para>Default: <replaceable>no</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 			<term><option>cleanup_action</option></term>
 			<listitem>
@@ -11650,7 +11661,7 @@
 			  <para>Default: <replaceable>store</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 			<term><option>enable_auto_attach</option></term>
 			<listitem>
@@ -11661,7 +11672,7 @@
 			  <para>Default: <replaceable>no</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 			<term><option>auto_attach_writable</option></term>
 			<listitem>
@@ -11671,7 +11682,7 @@
 			  <para>Default: <replaceable>yes</replaceable></para>
 			</listitem>
 		  </varlistentry>
-		  
+
 		  <varlistentry>
 			<term><option>log_method</option></term>
 			<listitem>
@@ -11799,7 +11810,7 @@
 
 	  <refsection>
 		<title>Description</title>
-		
+
 		<para>In order to move mailboxes between multi-server nodes, the
 		mailbox storage relocator is available. The <command>zarafa-msr
 		</command> tool should be used to relocate mailboxes to other
@@ -11833,7 +11844,7 @@
 
 	  <refsection>
 		<title>Updating LDAP/ADS</title>
-		
+
 		<para>There are two situations in which it’s safe to update the home
 		servers for the users whose mailboxes have been relocated:</para>
 
@@ -11911,7 +11922,7 @@
 		<para>Servers: This section is an optional section that contains a list
 		of server aliases. These aliases can be used in the Mapping section
 		when a lot of mailboxes are relocated to the same server.</para>
-		  
+
 		<para>Mapping: This section contains the list of usernames and the
 		destination node for their mailboxes. The destination node can be a
 		full server path or an alias specified in the Servers section.</para>
@@ -12085,12 +12096,12 @@
 
 	  <refsection>
 		<title>Description</title>
-		
+
 		<para>Once a user has been relocated from one multi-server
 		node to another, this tool can be used to compare the
 		content of the two stores in order to verify if all messages
 		have realy been relocated.</para>
-		
+
 		<para>The config file is expected to be in the same format as
 		the one used for <replaceable>zarafa-msr</replaceable>.
 		Usually the same configuration file should be used.</para>
@@ -12181,7 +12192,7 @@
 
 	  <refsection>
 		<title>Description</title>
-		
+
 		<para>Due to the probable long duration of a database upgrade from
 		version 6.40 to version 7.0 the server by default refuses to upgrade
 		the database. This tool is used to perform the database upgrade.</para>
@@ -12245,7 +12256,7 @@
 		if the user has write permissions, it's a nuisance to have to set all
 		the permissions twice (or more if multiple archives are attached).
 		</para>
-		
+
 		<para><command>za-aclsync</command> can be used to propagate the
 		ACL settings from the primary store to the archives. However, no user
 		will ever get more right on a store or folder than the owner of the
