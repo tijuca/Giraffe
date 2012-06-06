@@ -565,7 +565,7 @@ HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook, LPMDB lpOrigS
 	LPATTACH lpAttach = NULL;
 	LPMESSAGE lpAttachMsg = NULL;
 
-	SizedSPropTagArray (7, sExcludeFromCopyForward) = { 7, {
+	SizedSPropTagArray (9, sExcludeFromCopyForward) = { 9, {
 		PR_MESSAGE_RECIPIENTS,
 		PR_TRANSPORT_MESSAGE_HEADERS,
 		PR_SENT_REPRESENTING_ENTRYID,
@@ -573,6 +573,8 @@ HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook, LPMDB lpOrigS
 		PR_SENT_REPRESENTING_ADDRTYPE,
 		PR_SENT_REPRESENTING_EMAIL_ADDRESS,
 		PR_SENT_REPRESENTING_SEARCH_KEY,
+		PR_READ_RECEIPT_REQUESTED,
+		PR_ORIGINATOR_DELIVERY_REPORT_REQUESTED,
 	} };
 
 	SizedSPropTagArray (2, sExcludeFromCopyRedirect) = { 2, {

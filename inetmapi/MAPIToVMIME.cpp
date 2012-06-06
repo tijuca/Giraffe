@@ -1046,6 +1046,14 @@ HRESULT MAPIToVMIME::BuildMDNMessage(IMessage *lpMessage, vmime::ref<vmime::mess
 				goto exit;			// Logging done in getMailBox
 		}
 
+		// if vmRecipientbox is a vmime::mailboxGroup the dynamicCast to vmime::mailbox failed,
+		// so never send a MDN to a group.
+		if (vmRecipientbox->isGroup()) {
+			lpLogger->Log(EC_LOGLEVEL_FATAL, "Not possible to send a MDN to a group");
+			hr = MAPI_E_CORRUPT_DATA;
+			goto exit;
+		}
+
 		vmime::mdn::sendableMDNInfos mdnInfos(vmMsgOriginal, *vmRecipientbox.dynamicCast<vmime::mailbox>().get());
 		
 		//FIXME: Get the ActionMode and sending mode from the property 0x0081001E.
