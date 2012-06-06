@@ -1490,8 +1490,7 @@ ECRESULT ECGenericObjectTable::GetCollapseState(struct soap *soap, struct xsd__b
     sObjectTableKey sKey;
     struct rowSet *lpsRowSet = NULL;
     
-    struct soap xmlsoap;
-    soap_init(&xmlsoap);
+    struct soap xmlsoap;	// static, so c++ inits struct, no need for soap init
 
 	pthread_mutex_lock(&m_hLock);
     
@@ -1559,7 +1558,7 @@ ECRESULT ECGenericObjectTable::GetCollapseState(struct soap *soap, struct xsd__b
 
 exit:
     soap_end(&xmlsoap);
-    soap_done(&xmlsoap);
+	// static struct, so c++ destructor frees memory
 	pthread_mutex_unlock(&m_hLock);
 
     return er;
@@ -1581,7 +1580,6 @@ ECRESULT ECGenericObjectTable::SetCollapseState(struct xsd__base64Binary sCollap
 	pthread_mutex_lock(&m_hLock);
     
     lpCollapseState = new collapseState;
-    soap_init(&xmlsoap);
     
     er = Populate();
     if(er != erSuccess)
@@ -1686,7 +1684,6 @@ next:
     
 exit:
     soap_end(&xmlsoap);
-    soap_done(&xmlsoap);
 	pthread_mutex_unlock(&m_hLock);
 
     if(lpCollapseState)
