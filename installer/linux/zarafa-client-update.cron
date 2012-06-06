@@ -17,7 +17,7 @@ fi
 PATHDEPTH=$(echo -en ${LOGPATH} | sed -e 's_[^/]__g' | wc -c)
 if test -n ${LOGPATH} -a ${PATHDEPTH} -gt 2 -a -d ${LOGPATH}; then
 	# remove all files older than 14 days
-	find ${LOGPATH} -maxdepth 2 -type f -ctime +14 -exec rm {} \;
+	find ${LOGPATH} -mindepth 2 -maxdepth 2 -type f -ctime +14 -exec rm {} \;
 	# remove all empty directories
 	find ${LOGPATH} -mindepth 1 -maxdepth 1 -type d -exec rmdir --ignore-fail-on-non-empty {} \;
 fi
