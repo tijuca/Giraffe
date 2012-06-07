@@ -3067,29 +3067,29 @@ SOAP_ENTRY_START(saveObject, lpsLoadObjectResponse->er, entryId sParentEntryId, 
 		er = CheckQuota(lpecSession, ulStoreId);
 		if(er != erSuccess)
 		    goto exit;
-	}
 	
-	// Update folder counts
-	if(fNewItem) {
-		er = UpdateFolderCounts(lpDatabase, ulParentObjId, ulFlags, &lpsSaveObj->modProps);
-		if (er != erSuccess)
-			goto exit;
-	}
-    else if(ulSyncId != 0) {
-        // On modified appointments, unread flags may have changed (only possible during ICS import)
-        for(unsigned int i=0; i < lpsSaveObj->modProps.__size; i++) {
-            if(lpsSaveObj->modProps.__ptr[i].ulPropTag == PR_MESSAGE_FLAGS) {
-                ulNewReadState = lpsSaveObj->modProps.__ptr[i].Value.ul & MSGFLAG_READ;
-                break;
-            }
-        }
-
-        if (ulPrevReadState != ulNewReadState) {
-            er = UpdateFolderCount(lpDatabase, ulParentObjId, PR_CONTENT_UNREAD, ulNewReadState == MSGFLAG_READ ? -1 : 1);
-            if (er != erSuccess)
+		// Update folder counts
+		if(fNewItem) {
+			er = UpdateFolderCounts(lpDatabase, ulParentObjId, ulFlags, &lpsSaveObj->modProps);
+			if (er != erSuccess)
 				goto exit;
-        }
-    }
+		}
+		else if(ulSyncId != 0) {
+			// On modified appointments, unread flags may have changed (only possible during ICS import)
+			for(unsigned int i=0; i < lpsSaveObj->modProps.__size; i++) {
+				if(lpsSaveObj->modProps.__ptr[i].ulPropTag == PR_MESSAGE_FLAGS) {
+					ulNewReadState = lpsSaveObj->modProps.__ptr[i].Value.ul & MSGFLAG_READ;
+					break;
+				}
+			}
+
+			if (ulPrevReadState != ulNewReadState) {
+				er = UpdateFolderCount(lpDatabase, ulParentObjId, PR_CONTENT_UNREAD, ulNewReadState == MSGFLAG_READ ? -1 : 1);
+				if (er != erSuccess)
+					goto exit;
+			}
+		}
+	}
 
 	er = SaveObject(soap, lpecSession, lpDatabase, lpAttachmentStorage, ulStoreId, ulParentObjId, ulParentObjType, ulFlags, ulSyncId, lpsSaveObj, &sReturnObject, &fHaveChangeKey);
 	if (er != erSuccess)

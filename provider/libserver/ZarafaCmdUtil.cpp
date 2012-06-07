@@ -1342,13 +1342,19 @@ ECRESULT UpdateFolderCount(ECDatabase *lpDatabase, unsigned int ulFolderId, unsi
 	ECRESULT er = erSuccess;
 	std::string strQuery;
 	unsigned int ulParentId;
+	unsigned int ulType;
 	
 	if(lDelta == 0)
 		goto exit; // No change
-		
-	er = g_lpSessionManager->GetCacheManager()->GetParent(ulFolderId, &ulParentId);
+
+	er = g_lpSessionManager->GetCacheManager()->GetObject(ulFolderId, &ulParentId, NULL, NULL, &ulType);
 	if(er != erSuccess)
 		goto exit;
+	if (ulType != MAPI_FOLDER) {
+		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Not updating folder count %d for non-folder object %d type %d", lDelta, ulFolderId, ulType);
+		ASSERT(ulType == MAPI_FOLDER);
+		goto exit;
+	}
 	
 	strQuery = "UPDATE properties SET val_ulong = val_ulong + " + stringify(lDelta,false,true) + " WHERE hierarchyid = " + stringify(ulFolderId) + " AND tag = " + stringify(PROP_ID(ulPropTag)) + " AND type = " + stringify(PROP_TYPE(ulPropTag));
 	er = lpDatabase->DoUpdate(strQuery);
@@ -1791,7 +1797,7 @@ ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId, unsigned i
     if (er != erSuccess)
         goto exit;
 	
-	// Gets counters from hierarchy: cc, acc, dmc, cfc, dfc
+	// Gets counters from hierarchy: cc, acc, dmc, dac, cfc, dfc
 	// use for update, since the update query below must see the same values, mysql should already block here.
 	strQuery = "SELECT count(if(flags & 0x440 = 0 && type = 5, 1, null)) AS cc, count(if(flags & 0x440 = 0x40 and type = 5, 1, null)) AS acc, count(if(flags & 0x440 = 0x400 and type = 5, 1, null)) AS dmc, count(if(flags & 0x440 = 0x440 and type = 5, 1, null)) AS dac, count(if(flags & 0x400 = 0 and type = 3, 1, null)) AS cfc, count(if(flags & 0x400 and type = 3, 1, null)) AS dfc from hierarchy where parent=" + stringify(ulObjId) + " FOR UPDATE";
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
