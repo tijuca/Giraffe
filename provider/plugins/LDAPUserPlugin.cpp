@@ -2247,10 +2247,15 @@ auto_ptr<map<objectid_t, objectdetails_t> > LDAPUserPlugin::getObjectDetails(con
 				auto_ptr<signatures_t> lstSignatures;
 				signatures_t::iterator iSignature;
 				lstSignatures = resolveObjectsFromAttributeType(p->objclass, p->ldap_attrs, p->relAttr, p->relAttrType);
+				if (lstSignatures->size() != p->ldap_attrs.size()) {
+					// try to rat out the object causing the failed ldap query
+					m_logger->Log(EC_LOGLEVEL_ERROR, "Not all objects in relation found for object '%s'", o->second.GetPropString(OB_PROP_S_LOGIN).c_str());
+				}
 				for (iSignature = lstSignatures->begin(); iSignature != lstSignatures->end(); iSignature++) {
 					o->second.AddPropObject(p->propname, iSignature->id);
 				}
 			} catch (ldap_error &e) {
+				// we never get here, since resolveObjectsFromAttributeType() already catches errors
 				if(!LDAP_NAME_ERROR(e.GetLDAPError()))
 					throw;
 			} catch (...) {}
@@ -2262,8 +2267,9 @@ auto_ptr<map<objectid_t, objectdetails_t> > LDAPUserPlugin::getObjectDetails(con
 				if (!signature.id.id.empty())
 					o->second.SetPropObject(p->propname, signature.id);
 				else
-					m_logger->Log(EC_LOGLEVEL_WARNING, "Unable to find relation %s in attribute %s", p->ldap_attr.c_str(), p->relAttr);
+					m_logger->Log(EC_LOGLEVEL_ERROR, "Unable to find relation %s in attribute %s", p->ldap_attr.c_str(), p->relAttr);
 			} catch (ldap_error &e) {
+				// we never get here, since resolveObjectsFromAttributeType() already catches errors
 				if(!LDAP_NAME_ERROR(e.GetLDAPError()))
 					throw;
 			} catch (...) {}
