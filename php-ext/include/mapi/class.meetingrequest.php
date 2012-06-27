@@ -112,7 +112,24 @@ class Meetingrequest {
 	 */
 	 
 	// All properties for a recipient that are interesting
-	var $recipprops = Array(PR_ENTRYID, PR_DISPLAY_NAME, PR_EMAIL_ADDRESS, PR_RECIPIENT_ENTRYID, PR_RECIPIENT_TYPE, PR_SEND_INTERNET_ENCODING, PR_SEND_RICH_INFO, PR_RECIPIENT_DISPLAY_NAME, PR_ADDRTYPE, PR_DISPLAY_TYPE, PR_RECIPIENT_TRACKSTATUS, PR_RECIPIENT_TRACKSTATUS_TIME, PR_RECIPIENT_FLAGS, PR_ROWID, PR_OBJECT_TYPE, PR_SEARCH_KEY);
+	var $recipprops = Array(
+		PR_ENTRYID,
+		PR_DISPLAY_NAME,
+		PR_EMAIL_ADDRESS,
+		PR_RECIPIENT_ENTRYID,
+		PR_RECIPIENT_TYPE,
+		PR_SEND_INTERNET_ENCODING,
+		PR_SEND_RICH_INFO,
+		PR_RECIPIENT_DISPLAY_NAME,
+		PR_ADDRTYPE,
+		PR_DISPLAY_TYPE,
+		PR_RECIPIENT_TRACKSTATUS,
+		PR_RECIPIENT_TRACKSTATUS_TIME,
+		PR_RECIPIENT_FLAGS,
+		PR_ROWID,
+		PR_OBJECT_TYPE,
+		PR_SEARCH_KEY
+	);
 	
 	/**
 	 * Indication whether the setting of resources in a Meeting Request is success (false) or if it 
@@ -474,6 +491,7 @@ class Meetingrequest {
 			$recipient[PR_DISPLAY_NAME] = $messageprops[PR_SENT_REPRESENTING_NAME];
 			$recipient[PR_ADDRTYPE] = $messageprops[PR_SENT_REPRESENTING_ADDRTYPE];
 			$recipient[PR_RECIPIENT_TYPE] = MAPI_CC;
+			$recipient[PR_SEARCH_KEY] = $messageprops[PR_SENT_REPRESENTING_SEARCH_KEY];
 			$recipient[PR_RECIPIENT_TRACKSTATUS] = $this->getTrackStatus($messageclass);
 			$recipient[PR_RECIPIENT_TRACKSTATUS_TIME] = $deliverytime;
 
@@ -892,7 +910,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 						mapi_setprops($calmsg, $proposeNewTimeProps + $calItemProps);
 
 						// get properties which stores owner information in meeting request mails
-						$props = mapi_getprops($calmsg, array(PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_NAME, PR_SENT_REPRESENTING_EMAIL_ADDRESS, PR_SENT_REPRESENTING_ADDRTYPE));
+						$props = mapi_getprops($calmsg, array(PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_NAME, PR_SENT_REPRESENTING_EMAIL_ADDRESS, PR_SENT_REPRESENTING_ADDRTYPE, PR_SENT_REPRESENTING_SEARCH_KEY));
 
 						// add owner to recipient table
 						$recips = array();
@@ -1011,6 +1029,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 					$props[PR_SENT_REPRESENTING_NAME] = $messageprops[PR_SENT_REPRESENTING_NAME];
 					$props[PR_SENT_REPRESENTING_ADDRTYPE] = $messageprops[PR_SENT_REPRESENTING_ADDRTYPE];
 					$props[PR_SENT_REPRESENTING_ENTRYID] = $messageprops[PR_SENT_REPRESENTING_ENTRYID];
+					$props[PR_SENT_REPRESENTING_SEARCH_KEY] = $messageprops[PR_SENT_REPRESENTING_SEARCH_KEY];
 
 					$recurr->createException($proposeNewTimeProps + $props, $basedate, false, $recips);
 				}
@@ -1587,6 +1606,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 															PR_SENT_REPRESENTING_EMAIL_ADDRESS,
 															PR_SENT_REPRESENTING_ADDRTYPE,
 															PR_SENT_REPRESENTING_NAME,
+															PR_SENT_REPRESENTING_SEARCH_KEY,
 															$this->proptags['goid'],
 															$this->proptags['goid2'],
 															$this->proptags['location'],
@@ -1682,6 +1702,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 		$recip[PR_ADDRTYPE] = $messageprops[PR_SENT_REPRESENTING_ADDRTYPE];
 		$recip[PR_DISPLAY_NAME] = $messageprops[PR_SENT_REPRESENTING_NAME];
 		$recip[PR_RECIPIENT_TYPE] = MAPI_TO;
+		$recip[PR_SEARCH_KEY] = $messageprops[PR_SENT_REPRESENTING_SEARCH_KEY];
 
 		switch($status) {
 			case olResponseAccepted:
@@ -1749,23 +1770,20 @@ If it is the first time this attendee has proposed a new date/time, increment th
 			$storeProps = mapi_getprops($store, array(PR_ENTRYID));
 			$defaultStoreProps = mapi_getprops($defaultStore, array(PR_ENTRYID));
 
+			// @FIXME use entryid comparison functions here
 			if($storeProps[PR_ENTRYID] !== $defaultStoreProps[PR_ENTRYID]){
 				// get the properties of the other user (for which the logged in user is a delegate).
 				$storeProps = mapi_getprops($store, array(PR_MAILBOX_OWNER_ENTRYID));
 				$addrbook = mapi_openaddressbook($this->session);
 				$addrbookitem = mapi_ab_openentry($addrbook, $storeProps[PR_MAILBOX_OWNER_ENTRYID]); 
-				$addrbookitemprops = mapi_getprops($addrbookitem, array(PR_DISPLAY_NAME, PR_EMAIL_ADDRESS));
+				$addrbookitemprops = mapi_getprops($addrbookitem, array(PR_DISPLAY_NAME, PR_EMAIL_ADDRESS, PR_SEARCH_KEY));
 
 				// setting the following properties will ensure that the delegation part of message.
-				$props[PR_SENT_REPRESENTING_ENTRYID] = $storeProps[PR_MAILBOX_OWNER_ENTRYID];		
+				$props[PR_SENT_REPRESENTING_ENTRYID] = $storeProps[PR_MAILBOX_OWNER_ENTRYID];
 				$props[PR_SENT_REPRESENTING_NAME] = $addrbookitemprops[PR_DISPLAY_NAME];
 				$props[PR_SENT_REPRESENTING_EMAIL_ADDRESS] = $addrbookitemprops[PR_EMAIL_ADDRESS];
 				$props[PR_SENT_REPRESENTING_ADDRTYPE] = "ZARAFA";
-
-				// get the properties of default store and set it accordingly
-				$defaultStoreProps = mapi_getprops($defaultStore, array(PR_MAILBOX_OWNER_ENTRYID));
-				$addrbookitem = mapi_ab_openentry($addrbook, $defaultStoreProps[PR_MAILBOX_OWNER_ENTRYID]); 
-				$addrbookitemprops = mapi_getprops($addrbookitem, array(PR_DISPLAY_NAME, PR_EMAIL_ADDRESS));
+				$props[PR_SENT_REPRESENTING_SEARCH_KEY] = $addrbookitemprops[PR_SEARCH_KEY];
 
 				// set the following properties will ensure the sender's details, which will be the default user in this case.
 				//the function returns array($name, $emailaddr, $addrtype, $entryid, $searchkey);
@@ -1774,6 +1792,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 				$props[PR_SENDER_EMAIL_ADDRESS] = $defaultUserDetails[1];
 				$props[PR_SENDER_NAME] = $defaultUserDetails[0];
 				$props[PR_SENDER_ADDRTYPE] = $defaultUserDetails[2];
+				$props[PR_SENDER_SEARCH_KEY] = $defaultUserDetails[4];
 			}
 		}
 
@@ -1825,43 +1844,48 @@ If it is the first time this attendee has proposed a new date/time, increment th
 
 		return $calendaritems;
 	}
-	
+
 	// Returns TRUE if both entryid's are equal. Equality is defined by both entryid's pointing at the
 	// same SMTP address when converted to SMTP
 	function compareABEntryIDs($entryid1, $entryid2) {
 		// If the session was not passed, just do a 'normal' compare.
-		if(!$this->session)
+		if(!$this->session) {
 			return $entryid1 == $entryid2;
-			
-	    $smtp1 = $this->getSMTPAddress($entryid1);
-	    $smtp2 = $this->getSMTPAddress($entryid2);
-	    
-	    if($smtp1 == $smtp2)
-	        return true;
-        else
-            return false;
+		}
+
+		$smtp1 = $this->getSMTPAddress($entryid1);
+		$smtp2 = $this->getSMTPAddress($entryid2);
+
+		if($smtp1 == $smtp2) {
+			return true;
+		} else {
+			return false;
+		}
 	}
 
 	// Gets the SMTP address of the passed addressbook entryid	
 	function getSMTPAddress($entryid) {
-		if(!$this->session)
+		if(!$this->session) {
 			return false;
-			
+		}
+
 		$ab = mapi_openaddressbook($this->session);
-	    
-	    $abitem = mapi_ab_openentry($ab, $entryid);
-	    
-	    if(!$abitem)
-	        return "";
-	        
-        $props = mapi_getprops($abitem, array(PR_ADDRTYPE, PR_EMAIL_ADDRESS, PR_SMTP_ADDRESS));
-        
-        if($props[PR_ADDRTYPE] == "SMTP") {
-            return $props[PR_EMAIL_ADDRESS];
-        }
-        else return $props[PR_SMTP_ADDRESS];
+
+		$abitem = mapi_ab_openentry($ab, $entryid);
+
+		if(!$abitem) {
+			return "";
+		}
+
+		$props = mapi_getprops($abitem, array(PR_ADDRTYPE, PR_EMAIL_ADDRESS, PR_SMTP_ADDRESS));
+
+		if($props[PR_ADDRTYPE] == "SMTP") {
+			return $props[PR_EMAIL_ADDRESS];
+		} else {
+			return $props[PR_SMTP_ADDRESS];
+		}
 	}
-	
+
 	/**
 	 * Gets the properties associated with the owner of the passed store:
 	 * PR_DISPLAY_NAME, PR_EMAIL_ADDRESS, PR_ADDRTYPE, PR_ENTRYID, PR_SEARCH_KEY
@@ -1895,12 +1919,12 @@ If it is the first time this attendee has proposed a new date/time, increment th
 			if(!$zarafaUser)
 				return false;
 
-			$ownerProps = mapi_getprops($zarafaUser, array(PR_ADDRTYPE, PR_DISPLAY_NAME, PR_EMAIL_ADDRESS));
+			$ownerProps = mapi_getprops($zarafaUser, array(PR_ADDRTYPE, PR_DISPLAY_NAME, PR_EMAIL_ADDRESS, PR_SEARCH_KEY));
 
 			$addrType = $ownerProps[PR_ADDRTYPE];
 			$name = $ownerProps[PR_DISPLAY_NAME];
 			$emailAddr = $ownerProps[PR_EMAIL_ADDRESS];
-			$searchKey = strtoupper($addrType) . ":" . strtoupper($emailAddr);
+			$searchKey = $ownerProps[PR_SEARCH_KEY];
 			$entryId = $ownerEntryId;
 
 			return array($name, $emailAddr, $addrType, $entryId, $searchKey);
@@ -1957,9 +1981,10 @@ If it is the first time this attendee has proposed a new date/time, increment th
 			$organizer[PR_EMAIL_ADDRESS] = $messageProps[PR_SENT_REPRESENTING_EMAIL_ADDRESS];
 			$organizer[PR_RECIPIENT_TYPE] = MAPI_TO;
 			$organizer[PR_RECIPIENT_DISPLAY_NAME] = $messageProps[PR_SENT_REPRESENTING_NAME];
-			$organizer[PR_ADDRTYPE] = empty($messageProps[PR_SENT_REPRESENTING_ADDRTYPE]) ? 'SMTP':$messageProps[PR_SENT_REPRESENTING_ADDRTYPE];
+			$organizer[PR_ADDRTYPE] = empty($messageProps[PR_SENT_REPRESENTING_ADDRTYPE]) ? 'SMTP' : $messageProps[PR_SENT_REPRESENTING_ADDRTYPE];
 			$organizer[PR_RECIPIENT_TRACKSTATUS] = olRecipientTrackStatusNone;
 			$organizer[PR_RECIPIENT_FLAGS] = recipSendable | recipOrganizer;
+			$organizer[PR_SEARCH_KEY] = $messageProps[PR_SENT_REPRESENTING_SEARCH_KEY];
 
 			// Add organizer to recipients list.
 			array_unshift($recipients, $organizer);
@@ -3141,6 +3166,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 			$delegator[PR_ADDRTYPE] = empty($messageProps[PR_RCVD_REPRESENTING_ADDRTYPE]) ? 'SMTP':$messageProps[PR_RCVD_REPRESENTING_ADDRTYPE];
 			$delegator[PR_RECIPIENT_TRACKSTATUS] = olRecipientTrackStatusNone;
 			$delegator[PR_RECIPIENT_FLAGS] = recipSendable;
+			$delegator[PR_SEARCH_KEY] = $messageProps[PR_RCVD_REPRESENTING_SEARCH_KEY];
 
 			// Add organizer to recipients list.
 			array_unshift($recipients, $delegator);

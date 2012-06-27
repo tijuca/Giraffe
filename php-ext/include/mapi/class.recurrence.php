@@ -830,7 +830,7 @@
 								Array(RES_PROPERTY,
 									Array(RELOP => RELOP_EQ,
 										ULPROPTAG => PR_ATTACH_METHOD,
-										VALUE => array(PR_ATTACH_METHOD => 5)
+										VALUE => array(PR_ATTACH_METHOD => ATTACH_EMBEDDED_MSG)
 									)
 								)
 							)
@@ -1096,7 +1096,7 @@
 			}
 
 			// Add organizer to meeting only if it is not organized.
-			$msgprops = mapi_getprops($exception, array(PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_EMAIL_ADDRESS, PR_SENT_REPRESENTING_NAME, PR_SENT_REPRESENTING_ADDRTYPE, $this->proptags['responsestatus']));
+			$msgprops = mapi_getprops($exception, array(PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_EMAIL_ADDRESS, PR_SENT_REPRESENTING_NAME, PR_SENT_REPRESENTING_ADDRTYPE, PR_SENT_REPRESENTING_SEARCH_KEY, $this->proptags['responsestatus']));
 			if (isset($msgprops[$this->proptags['responsestatus']]) && $msgprops[$this->proptags['responsestatus']] != olResponseOrganized){
 				$this->addOrganizer($msgprops, $exception_recips['add']);
 			}
@@ -1143,7 +1143,7 @@
 
 			$recipientTable = mapi_message_getrecipienttable($message);
 			$recipientRows = mapi_table_queryallrows($recipientTable, $this->recipprops);
-				
+
 			if (empty($recipientRows)) {
 				$useMessageRecipients = true;
 				$recipientTable = mapi_message_getrecipienttable($this->message);
@@ -1151,7 +1151,7 @@
 			}
 
 			// Add organizer to meeting only if it is not organized.
-			$msgprops = mapi_getprops($message, array(PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_EMAIL_ADDRESS, PR_SENT_REPRESENTING_NAME, PR_SENT_REPRESENTING_ADDRTYPE, $this->proptags['responsestatus']));
+			$msgprops = mapi_getprops($message, array(PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_EMAIL_ADDRESS, PR_SENT_REPRESENTING_NAME, PR_SENT_REPRESENTING_ADDRTYPE, PR_SENT_REPRESENTING_SEARCH_KEY, $this->proptags['responsestatus']));
 			if (isset($msgprops[$this->proptags['responsestatus']]) && $msgprops[$this->proptags['responsestatus']] != olResponseOrganized){
 				$this->addOrganizer($msgprops, $exception_recips);
 			}
@@ -1236,8 +1236,8 @@
 		 * @param array $recipients	recipients list of message.
 		 * @param boolean $isException true if we are processing recipient of exception
 		 */
-		function addOrganizer($messageProps, &$recipients, $isException = false){
-
+		function addOrganizer($messageProps, &$recipients, $isException = false)
+		{
 			$hasOrganizer = false;
 			// Check if meeting already has an organizer.
 			foreach ($recipients as $key => $recipient){
@@ -1257,9 +1257,10 @@
 				$organizer[PR_EMAIL_ADDRESS] = $messageProps[PR_SENT_REPRESENTING_EMAIL_ADDRESS];
 				$organizer[PR_RECIPIENT_TYPE] = MAPI_TO;
 				$organizer[PR_RECIPIENT_DISPLAY_NAME] = $messageProps[PR_SENT_REPRESENTING_NAME];
-				$organizer[PR_ADDRTYPE] = empty($messageProps[PR_SENT_REPRESENTING_ADDRTYPE])?'SMTP':$messageProps[PR_SENT_REPRESENTING_ADDRTYPE];
+				$organizer[PR_ADDRTYPE] = empty($messageProps[PR_SENT_REPRESENTING_ADDRTYPE]) ? 'SMTP' : $messageProps[PR_SENT_REPRESENTING_ADDRTYPE];
 				$organizer[PR_RECIPIENT_TRACKSTATUS] = olRecipientTrackStatusNone;
 				$organizer[PR_RECIPIENT_FLAGS] = recipSendable | recipOrganizer;
+				$organizer[PR_SEARCH_KEY] = $messageProps[PR_SENT_REPRESENTING_SEARCH_KEY];
 
 				// Add organizer to recipients list.
 				array_unshift($recipients, $organizer);
