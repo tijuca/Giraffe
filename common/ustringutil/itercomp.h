@@ -64,9 +64,6 @@ private:
 	UCharCharacterIterator	m_ucci;
 };
 
-bool ic_equals(const CharacterIterator &i1, const CharacterIterator &i2, const Locale &locale, bool ignoreCase);
-bool ic_startswith(const CharacterIterator &i1, const CharacterIterator &i2, const Locale &locale, bool ignoreCase);
 int ic_compare(const CharacterIterator &i1, const CharacterIterator &i2, const Locale &locale, bool ignoreCase);
-bool ic_contains(const CharacterIterator &iHaystack, const CharacterIterator &iNeedle, const Locale &locale, bool ignoreCase);
 
 #endif // ndef itercomp_INCLUDED

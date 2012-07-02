@@ -72,4 +72,7 @@ static inline UnicodeString UTF32ToUnicode(const UChar32 *utf32) {
 
 #endif
 
+UnicodeString WCHARToUnicode(const wchar_t *str);
+UnicodeString StringToUnicode(const char *str);
+
 #endif // ndef utfutil_INCLUDED

@@ -83,40 +83,6 @@ static RuleBasedCollator *createCollator(const Locale &locale, bool ignoreCase)
 	return lpRBCollator;
 }
 
-bool ic_equals(const CharacterIterator &i1, const CharacterIterator &i2, const Locale &locale, bool ignoreCase)
-{
-	return ic_compare(i1, i2, locale, ignoreCase) == 0;
-}
-
-bool ic_startswith(const CharacterIterator &i1, const CharacterIterator &i2, const Locale &locale, bool ignoreCase)
-{
-	std::auto_ptr<RuleBasedCollator> ptrCollator(createCollator(locale, ignoreCase));
-		
-	std::auto_ptr<CollationElementIterator> cei1(ptrCollator->createCollationElementIterator(i1));
-	std::auto_ptr<CollationElementIterator> cei2(ptrCollator->createCollationElementIterator(i2));
-
-	UErrorCode status = U_ZERO_ERROR;
-	while (true) {
-		int32_t r1 = cei1->next(status);
-		int32_t s1 = cei1->strengthOrder(r1);
-		
-		int32_t r2 = cei2->next(status);
-		int32_t s2 = cei2->strengthOrder(r2);
-
-		// @note
-		// NULLORDER is returned on error or end of string, but since we wrongly set the length (utf8iter.cpp)
-		// we need to check for 0 too, since we correctly step through the characters
-		if (s1 != s2) { 
-			if(r2 == CollationElementIterator::NULLORDER || r2 == 0)
-				return true;
-
-			return false;
-
-		}else if (r2 == CollationElementIterator::NULLORDER || r2 == 0)	// Reached the end of s2 without seeing a difference
-			return true;
-	}
-}
-
 int ic_compare(const CharacterIterator &i1, const CharacterIterator &i2, const Locale &locale, bool ignoreCase)
 {
 	std::auto_ptr<RuleBasedCollator> ptrCollator(createCollator(locale, ignoreCase));
@@ -148,37 +114,3 @@ int ic_compare(const CharacterIterator &i1, const CharacterIterator &i2, const L
 	}
 }
 
-bool ic_contains(const CharacterIterator &iHaystack, const CharacterIterator &iNeedle, const Locale &locale, bool ignoreCase)
-{
-	std::auto_ptr<RuleBasedCollator> ptrCollator(createCollator(locale, ignoreCase));
-		
-	std::auto_ptr<CollationElementIterator> ceiHaystack(ptrCollator->createCollationElementIterator(iHaystack));
-	std::auto_ptr<CollationElementIterator> ceiNeedle(ptrCollator->createCollationElementIterator(iNeedle));
-
-	UErrorCode status = U_ZERO_ERROR;
-	int32_t offset = 0;
-	while (true) {
-		ceiNeedle->reset();
-		int32_t cNeedle = ceiNeedle->next(status);
-		int32_t sNeedle = ceiNeedle->strengthOrder(cNeedle);
-
-		ceiHaystack->setOffset(offset++, status);
-		int32_t cHaystack = ceiHaystack->next(status);
-		int32_t sHaystack = ceiHaystack->strengthOrder(cHaystack);
-
-		while (true) {
-			if (cNeedle == CollationElementIterator::NULLORDER || cNeedle == 0)
-				return true;	// Reached end of needle, so it must have matched
-			if (cHaystack == CollationElementIterator::NULLORDER || cHaystack == 0)
-				return false;	// Reached end of haystack, so no match
-			if (sNeedle != sHaystack)
-				break;			// Found mismatch, restart search at next haystack offset.
-
-			cNeedle = ceiNeedle->next(status);
-			sNeedle = ceiNeedle->strengthOrder(cNeedle);
-			
-			cHaystack = ceiHaystack->next(status);
-			sHaystack = ceiHaystack->strengthOrder(cHaystack);
-		}
-	}
-}

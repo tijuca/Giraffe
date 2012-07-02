@@ -107,6 +107,7 @@ At some point we need to rewqrite these functions to do all the conversion on th
 #include <unicode/tblcoll.h>
 #include <unicode/coleitr.h>
 #include <unicode/normlzr.h>
+#include <unicode/ustring.h>
 
 #include "ustringutil/utf32iter.h"
 #include "ustringutil/utf8iter.h"
@@ -209,7 +210,10 @@ bool str_equals(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s2);
 
 #if HAVE_ICU
-	return ic_equals(MakeIterator(s1), MakeIterator(s2), locale, false);
+    UnicodeString a = StringToUnicode(s1);
+    UnicodeString b = StringToUnicode(s2);
+
+    return a.compare(b) == 0;
 #else
 	return strcmp(s1, s2) == 0;
 #endif
@@ -232,7 +236,10 @@ bool str_iequals(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s2);
 
 #if HAVE_ICU
-	return ic_equals(MakeIterator(s1), MakeIterator(s2), locale, true);
+    UnicodeString a = StringToUnicode(s1);
+    UnicodeString b = StringToUnicode(s2);
+
+    return a.caseCompare(b, 0) == 0;
 #else
 	return strcasecmp_l(s1, s2, locale) == 0;
 #endif
@@ -255,7 +262,10 @@ bool str_startswith(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s2);
 
 #if HAVE_ICU
-	return ic_startswith(MakeIterator(s1), MakeIterator(s2), locale, false);
+    UnicodeString a = StringToUnicode(s1);
+    UnicodeString b = StringToUnicode(s2);
+
+    return a.compare(0, b.length(), b) == 0;
 
 #else
 	size_t cb2 = strlen(s2);
@@ -280,8 +290,10 @@ bool str_istartswith(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s2);
 
 #if HAVE_ICU
-	return ic_startswith(MakeIterator(s1), MakeIterator(s2), locale, true);
+    UnicodeString a = StringToUnicode(s1);
+    UnicodeString b = StringToUnicode(s2);
 
+    return a.caseCompare(0, b.length(), b, 0) == 0;
 #else
 	size_t cb2 = strlen(s2);
 	return strlen(s1) >= cb2 ? (strncasecmp_l(s1, s2, cb2, locale) == 0) : false;
@@ -309,7 +321,6 @@ int str_compare(const char *s1, const char *s2, const ECLocale &locale)
 	
 #if HAVE_ICU
 	return ic_compare(MakeIterator(s1), MakeIterator(s2), locale, false);
-
 #else
 	int r = strcmp(s1, s2);
 	return (r < 0 ? -1 : (r > 0 ? 1 : 0));
@@ -369,7 +380,10 @@ bool str_contains(const char *haystack, const char *needle, const ECLocale &loca
 	assert(needle);
 
 #if HAVE_ICU
-	return ic_contains(MakeIterator(haystack), MakeIterator(needle), locale, false);
+    UnicodeString a = StringToUnicode(haystack);
+    UnicodeString b = StringToUnicode(needle);
+
+    return u_strstr(a.getBuffer(), b.getBuffer());
 #else
 	return strstr(haystack, needle) != NULL;
 #endif
@@ -392,7 +406,13 @@ bool str_icontains(const char *haystack, const char *needle, const ECLocale &loc
 	assert(needle);
 
 #if HAVE_ICU
-	return ic_contains(MakeIterator(haystack), MakeIterator(needle), locale, true);
+    UnicodeString a = StringToUnicode(haystack);
+    UnicodeString b = StringToUnicode(needle);
+
+    a.foldCase();
+    b.foldCase();
+
+    return u_strstr(a.getBuffer(), b.getBuffer());
 #else
 	return strcasestr(haystack, needle) != NULL;
 #endif
@@ -417,7 +437,10 @@ bool wcs_equals(const wchar_t *s1, const wchar_t *s2, const ECLocale &locale)
 	assert(s2);
 
 #if HAVE_ICU
-	return ic_equals(WCharIterator((UChar32*)s1), WCharIterator((UChar32*)s2), locale, false);
+    UnicodeString a = WCHARToUnicode(s1);
+    UnicodeString b = WCHARToUnicode(s2);
+
+    return a.compare(b) == 0;
 #else
 	return wcscmp(s1, s2) == 0;
 #endif
@@ -440,7 +463,10 @@ bool wcs_iequals(const wchar_t *s1, const wchar_t *s2, const ECLocale &locale)
 	assert(s2);
 
 #if HAVE_ICU
-	return ic_equals(WCharIterator((UChar32*)s1), WCharIterator((UChar32*)s2), locale, true);
+    UnicodeString a = WCHARToUnicode(s1);
+    UnicodeString b = WCHARToUnicode(s2);
+
+    return a.caseCompare(b, 0) == 0;
 #else
 	return wcscasecmp_l(s1, s2, locale) == 0;
 #endif
@@ -463,7 +489,10 @@ bool wcs_startswith(const wchar_t *s1, const wchar_t *s2, const ECLocale &locale
 	assert(s2);
 
 #if HAVE_ICU
-	return ic_startswith(WCharIterator((UChar32*)s1), WCharIterator((UChar32*)s2), locale, false);
+    UnicodeString a = WCHARToUnicode(s1);
+    UnicodeString b = WCHARToUnicode(s2);
+
+    return a.compare(0, b.length(), b) == 0;
 #else
 	size_t cb2 = wcslen(s2);
 	return wcslen(s1) >= cb2 ? (wcsncmp(s1, s2, cb2) == 0) : false;
@@ -487,7 +516,10 @@ bool wcs_istartswith(const wchar_t *s1, const wchar_t *s2, const ECLocale &local
 	assert(s2);
 
 #if HAVE_ICU
-	return ic_startswith(WCharIterator((UChar32*)s1), WCharIterator((UChar32*)s2), locale, true);
+    UnicodeString a = WCHARToUnicode(s1);
+    UnicodeString b = WCHARToUnicode(s2);
+
+    return a.caseCompare(0, b.length(), b, 0) == 0;
 #else
 	size_t cb2 = wcslen(s2);
 	return wcslen(s1) >= cb2 ? (wcsncasecmp_l(s1, s2, cb2, locale) == 0) : false;
@@ -574,7 +606,10 @@ bool wcs_contains(const wchar_t *haystack, const wchar_t *needle, const ECLocale
 	assert(needle);
 
 #if HAVE_ICU
-	return ic_contains(WCharIterator((UChar32*)haystack), WCharIterator((UChar32*)needle), locale, false);
+    UnicodeString a = WCHARToUnicode(haystack);
+    UnicodeString b = WCHARToUnicode(needle);
+
+    return u_strstr(a.getBuffer(), b.getBuffer());
 #else
 	return wcsstr(haystack, needle) != NULL;
 #endif
@@ -603,7 +638,13 @@ bool wcs_icontains(const wchar_t *haystack, const wchar_t *needle, const ECLocal
 	assert(needle);
 
 #if HAVE_ICU
-	return ic_contains(WCharIterator((UChar32*)haystack), WCharIterator((UChar32*)needle), locale, true);
+    UnicodeString a = WCHARToUnicode(haystack);
+    UnicodeString b = WCHARToUnicode(needle);
+
+    a.foldCase();
+    b.foldCase();
+
+    return u_strstr(a.getBuffer(), b.getBuffer());
 #else
 	const size_t cbHaystack = wcslen(haystack);
 	const size_t cbNeedle = wcslen(needle);
@@ -637,7 +678,10 @@ bool u8_equals(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s2);
 
 #if HAVE_ICU
-	return ic_equals(UTF8Iterator((uint8_t*)s1), UTF8Iterator((uint8_t*)s2), locale, false);
+    UnicodeString a = UTF8ToUnicode(s1);
+    UnicodeString b = UTF8ToUnicode(s2);
+
+    return a.compare(b) == 0;
 #else
 	convert_context converter;
 	const wchar_t *ws1 = converter.convert_to<WCHAR*>(s1, rawsize(s1), "UTF-8");
@@ -663,7 +707,10 @@ bool u8_iequals(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s2);
 
 #if HAVE_ICU
-	return ic_equals(UTF8Iterator((uint8_t*)s1), UTF8Iterator((uint8_t*)s2), locale, true);
+    UnicodeString a = UTF8ToUnicode(s1);
+    UnicodeString b = UTF8ToUnicode(s2);
+
+    return a.caseCompare(b, 0) == 0;
 #else
 	convert_context converter;
 	const wchar_t *ws1 = converter.convert_to<WCHAR*>(s1, rawsize(s1), "UTF-8");
@@ -689,7 +736,10 @@ bool u8_startswith(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s2);
 
 #if HAVE_ICU
-	return ic_startswith(UTF8Iterator((uint8_t*)s1), UTF8Iterator((uint8_t*)s2), locale, false);
+    UnicodeString a = UTF8ToUnicode(s1);
+    UnicodeString b = UTF8ToUnicode(s2);
+
+    return a.compare(0, b.length(), b) == 0;
 #else
 	convert_context converter;
 	const wchar_t *ws1 = converter.convert_to<WCHAR*>(s1, rawsize(s1), "UTF-8");
@@ -715,7 +765,10 @@ bool u8_istartswith(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s2);
 
 #if HAVE_ICU
-	return ic_startswith(UTF8Iterator((uint8_t*)s1), UTF8Iterator((uint8_t*)s2), locale, true);
+    UnicodeString a = UTF8ToUnicode(s1);
+    UnicodeString b = UTF8ToUnicode(s2);
+
+    return a.caseCompare(0, b.length(), b, 0) == 0;
 #else
 	convert_context converter;
 	const wchar_t *ws1 = converter.convert_to<WCHAR*>(s1, rawsize(s1), "UTF-8");
@@ -808,7 +861,10 @@ bool u8_contains(const char *haystack, const char *needle, const ECLocale &local
 	assert(needle);
 
 #if HAVE_ICU
-	return ic_contains(UTF8Iterator((uint8_t*)haystack), UTF8Iterator((uint8_t*)needle), locale, false);
+    UnicodeString a = UTF8ToUnicode(haystack);
+    UnicodeString b = UTF8ToUnicode(needle);
+
+    return u_strstr(a.getBuffer(), b.getBuffer());
 #else
 	convert_context converter;
 	const wchar_t *ws1 = converter.convert_to<WCHAR*>(haystack, rawsize(haystack), "UTF-8");
@@ -834,7 +890,13 @@ bool u8_icontains(const char *haystack, const char *needle, const ECLocale &loca
 	assert(needle);
 
 #if HAVE_ICU
-	return ic_contains(UTF8Iterator((uint8_t*)haystack), UTF8Iterator((uint8_t*)needle), locale, true);
+    UnicodeString a = UTF8ToUnicode(haystack);
+    UnicodeString b = UTF8ToUnicode(needle);
+
+    a.foldCase();
+    b.foldCase();
+
+    return u_strstr(a.getBuffer(), b.getBuffer());
 #else
 	convert_context converter;
 	const wchar_t *ws1 = converter.convert_to<WCHAR*>(haystack, rawsize(haystack), "UTF-8");
