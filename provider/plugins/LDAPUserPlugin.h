@@ -394,6 +394,8 @@ protected:
 
 	static auto_ptr<LDAPCache> m_lpCache;
 
+	struct timeval m_timeout;
+
 private:
 	/**
 	 * Get the value of the given attribute from the search results.

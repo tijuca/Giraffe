@@ -423,7 +423,6 @@ LDAP *LDAPUserPlugin::ConnectLDAP(const char *bind_dn, const char *bind_pw) thro
 	LDAP *ld = NULL;
 	struct timeval tstart, tend;
 	LONGLONG llelapsedtime;
-	struct timeval timeout;
 
 	gettimeofday(&tstart, NULL);
 
@@ -464,11 +463,11 @@ LDAP *LDAPUserPlugin::ConnectLDAP(const char *bind_dn, const char *bind_pw) thro
 	// Search referrals are never accepted  - FIXME maybe needs config option
 	ldap_set_option(ld, LDAP_OPT_REFERRALS, LDAP_OPT_OFF);
 
-	timeout.tv_sec = atoui(m_config->GetSetting("ldap_network_timeout"));
-	timeout.tv_usec = 0;
+	m_timeout.tv_sec = atoui(m_config->GetSetting("ldap_network_timeout"));
+	m_timeout.tv_usec = 0;
 
 	// Set network timeout (for connect)
-	ldap_set_option(ld, LDAP_OPT_NETWORK_TIMEOUT, &timeout);
+	ldap_set_option(ld, LDAP_OPT_NETWORK_TIMEOUT, &m_timeout);
 
 #if 0		// OpenLDAP stupidly closes the connection when TLS is not configured on the server...
 #ifdef LINUX // Only available in Windows XP, so we can't use this on windows platform ..
@@ -542,7 +541,7 @@ void LDAPUserPlugin::my_ldap_search_s(char *base, int scope, char *filter, char 
 	}
 
 	if (m_ldap != NULL)
-		result = ldap_search_ext_s(m_ldap, base, scope, filter, attrs, attrsonly, serverControls, NULL, NULL, 0, &res);
+		result = ldap_search_ext_s(m_ldap, base, scope, filter, attrs, attrsonly, serverControls, NULL, &m_timeout, 0, &res);
 
 	if (m_ldap == NULL || result == LDAP_SERVER_DOWN) {
 		// server is 'down'. try 1 reconnect and retry, and if that fails, just completely fail
