@@ -383,7 +383,7 @@ bool str_contains(const char *haystack, const char *needle, const ECLocale &loca
     UnicodeString a = StringToUnicode(haystack);
     UnicodeString b = StringToUnicode(needle);
 
-    return u_strstr(a.getBuffer(), b.getBuffer());
+    return u_strstr(a.getTerminatedBuffer(), b.getTerminatedBuffer());
 #else
 	return strstr(haystack, needle) != NULL;
 #endif
@@ -412,7 +412,7 @@ bool str_icontains(const char *haystack, const char *needle, const ECLocale &loc
     a.foldCase();
     b.foldCase();
 
-    return u_strstr(a.getBuffer(), b.getBuffer());
+    return u_strstr(a.getTerminatedBuffer(), b.getTerminatedBuffer());
 #else
 	return strcasestr(haystack, needle) != NULL;
 #endif
@@ -609,7 +609,7 @@ bool wcs_contains(const wchar_t *haystack, const wchar_t *needle, const ECLocale
     UnicodeString a = WCHARToUnicode(haystack);
     UnicodeString b = WCHARToUnicode(needle);
 
-    return u_strstr(a.getBuffer(), b.getBuffer());
+    return u_strstr(a.getTerminatedBuffer(), b.getTerminatedBuffer());
 #else
 	return wcsstr(haystack, needle) != NULL;
 #endif
@@ -644,7 +644,7 @@ bool wcs_icontains(const wchar_t *haystack, const wchar_t *needle, const ECLocal
     a.foldCase();
     b.foldCase();
 
-    return u_strstr(a.getBuffer(), b.getBuffer());
+    return u_strstr(a.getTerminatedBuffer(), b.getTerminatedBuffer());
 #else
 	const size_t cbHaystack = wcslen(haystack);
 	const size_t cbNeedle = wcslen(needle);
@@ -864,7 +864,7 @@ bool u8_contains(const char *haystack, const char *needle, const ECLocale &local
     UnicodeString a = UTF8ToUnicode(haystack);
     UnicodeString b = UTF8ToUnicode(needle);
 
-    return u_strstr(a.getBuffer(), b.getBuffer());
+    return u_strstr(a.getTerminatedBuffer(), b.getTerminatedBuffer());
 #else
 	convert_context converter;
 	const wchar_t *ws1 = converter.convert_to<WCHAR*>(haystack, rawsize(haystack), "UTF-8");
@@ -896,7 +896,7 @@ bool u8_icontains(const char *haystack, const char *needle, const ECLocale &loca
     a.foldCase();
     b.foldCase();
 
-    return u_strstr(a.getBuffer(), b.getBuffer());
+    return u_strstr(a.getTerminatedBuffer(), b.getTerminatedBuffer());
 #else
 	convert_context converter;
 	const wchar_t *ws1 = converter.convert_to<WCHAR*>(haystack, rawsize(haystack), "UTF-8");

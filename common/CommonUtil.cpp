@@ -2189,9 +2189,9 @@ HRESULT TestRestriction(LPSRestriction lpCondition, IMAPIProp *lpMessage, const 
 			case FL_FULLSTRING:
 				if(ulSearchDataSize == ulSearchStringSize) {
 					if ((ulPropType == PT_STRING8 && (ulFuzzyLevel & FL_IGNORECASE) && str_iequals(lpSearchData, lpSearchString, locale)) ||
-						(ulPropType == PT_STRING8 && str_equals(lpSearchData, lpSearchString, locale)) ||
+						(ulPropType == PT_STRING8 && (ulFuzzyLevel & FL_IGNORECASE) == 0 && str_equals(lpSearchData, lpSearchString, locale)) ||
 						(ulPropType == PT_UNICODE && (ulFuzzyLevel & FL_IGNORECASE) && wcs_iequals(lpwSearchData, lpwSearchString, locale)) ||
-						(ulPropType == PT_UNICODE && wcs_equals(lpwSearchData, lpwSearchString, locale)) ||
+						(ulPropType == PT_UNICODE && (ulFuzzyLevel & FL_IGNORECASE) == 0 && wcs_equals(lpwSearchData, lpwSearchString, locale)) ||
 						(ulPropType == PT_BINARY && memcmp(lpSearchData, lpSearchString, ulSearchDataSize) == 0))
 					{
 						fMatch = true;
@@ -2202,9 +2202,9 @@ HRESULT TestRestriction(LPSRestriction lpCondition, IMAPIProp *lpMessage, const 
 			case FL_PREFIX:
 				if(ulSearchDataSize >= ulSearchStringSize) {
 					if ((ulPropType == PT_STRING8 && (ulFuzzyLevel & FL_IGNORECASE) && str_istartswith(lpSearchData, lpSearchString, locale)) ||
-						(ulPropType == PT_STRING8 && str_startswith(lpSearchData, lpSearchString, locale)) ||
+						(ulPropType == PT_STRING8 && (ulFuzzyLevel & FL_IGNORECASE) == 0 && str_startswith(lpSearchData, lpSearchString, locale)) ||
 						(ulPropType == PT_UNICODE && (ulFuzzyLevel & FL_IGNORECASE) && wcs_istartswith(lpwSearchData, lpwSearchString, locale)) ||
-						(ulPropType == PT_UNICODE && wcs_startswith(lpwSearchData, lpwSearchString, locale)) ||
+						(ulPropType == PT_UNICODE && (ulFuzzyLevel & FL_IGNORECASE) == 0 && wcs_startswith(lpwSearchData, lpwSearchString, locale)) ||
 						(ulPropType == PT_BINARY && memcmp(lpSearchData, lpSearchString, ulSearchDataSize) == 0))
 					{
 						fMatch = true;
@@ -2214,9 +2214,9 @@ HRESULT TestRestriction(LPSRestriction lpCondition, IMAPIProp *lpMessage, const 
 				break;
 			case FL_SUBSTRING:
 				if ((ulPropType == PT_STRING8 && (ulFuzzyLevel & FL_IGNORECASE) && str_icontains(lpSearchData, lpSearchString, locale)) ||
-					(ulPropType == PT_STRING8 && str_contains(lpSearchData, lpSearchString, locale)) ||
+					(ulPropType == PT_STRING8 && (ulFuzzyLevel & FL_IGNORECASE) == 0 && str_contains(lpSearchData, lpSearchString, locale)) ||
 					(ulPropType == PT_UNICODE && (ulFuzzyLevel & FL_IGNORECASE) && wcs_icontains(lpwSearchData, lpwSearchString, locale)) ||
-					(ulPropType == PT_UNICODE && wcs_contains(lpwSearchData, lpwSearchString, locale)) ||
+					(ulPropType == PT_UNICODE && (ulFuzzyLevel & FL_IGNORECASE) == 0 && wcs_contains(lpwSearchData, lpwSearchString, locale)) ||
 					(ulPropType == PT_BINARY && memsubstr(lpSearchData, ulSearchDataSize, lpSearchString, ulSearchStringSize) == 0))
 				{
 					fMatch = true;
