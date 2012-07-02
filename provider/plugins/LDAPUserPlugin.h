@@ -59,6 +59,8 @@
 
 // OpenLDAP
 #include <ldap.h>
+// win32 defines this because of clashing types, so we use this define outside win32 too
+#define LDAP_TIMEVAL struct timeval
 
 #include "plugin.h"
 #include "LDAPCache.h"
@@ -394,7 +396,7 @@ protected:
 
 	static auto_ptr<LDAPCache> m_lpCache;
 
-	struct timeval m_timeout;
+	LDAP_TIMEVAL m_timeout;
 
 private:
 	/**
