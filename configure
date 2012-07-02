@@ -20370,12 +20370,40 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking boost version compatibility" >&5
 $as_echo_n "checking boost version compatibility... " >&6; }
 if test -n "$boost_major_version" -a $boost_major_version -ge 146; then
-   if test $boost_major_version -ge 149; then
-   	  as_fn_error $? "boost version is too new" "$LINENO" 5
-   fi
    { $as_echo "$as_me:${as_lineno-$LINENO}: result: adding backward compatible flags" >&5
 $as_echo "adding backward compatible flags" >&6; }
    BOOST_CPPFLAGS="$BOOSTCPPFLAGS -DBOOST_FILESYSTEM_VERSION=2"
+
+    CXXFLAGS="$CXXFLAGS $BOOST_CPPFLAGS"
+    LIBS="$BOOST_FILESYSTEM_LIBS $BOOST_SYSTEM_LIBS"
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for boost filesystem version 2 presence" >&5
+$as_echo_n "checking for boost filesystem version 2 presence... " >&6; }
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+
+#include <boost/filesystem.hpp>
+namespace bfs = boost::filesystem;
+int main() {
+  bfs::path path;
+  bfs::directory_iterator pi(path);
+  pi->path().file_string();
+}
+
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: ok" >&5
+$as_echo "ok" >&6; }
+else
+   as_fn_error $? "no, boost is too new" "$LINENO" 5
+
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+
+    LIBS=$libs_keep
+    CFLAGS=$cflags_keep
 else
    { $as_echo "$as_me:${as_lineno-$LINENO}: result: ok" >&5
 $as_echo "ok" >&6; }
