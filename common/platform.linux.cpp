@@ -141,9 +141,18 @@ void GetSystemTimeAsFileTime(FILETIME *ft) {
 	ft->dwHighDateTime = l >> 32;
 }
 
+/** 
+ * copies the path of the temp directory, including trailing /, into
+ * given buffer.
+ * 
+ * @param[in] inLen size of buffer, inclusive \0 char
+ * @param[in,out] lpBuffer buffer to place path in
+ * 
+ * @return length used in lpBuffer, 0 on failure
+ */
 DWORD GetTempPath(DWORD inLen, char *lpBuffer)
 {
-	char *env = NULL;
+	const char *env = NULL;
 	DWORD len;
 
 	env = getenv("TMP");
@@ -153,17 +162,17 @@ DWORD GetTempPath(DWORD inLen, char *lpBuffer)
 		env = "/tmp/";
 
 	len = strlen(env);
-	if ((len+1) > inLen)
+	if ((len+2) > inLen)		// +1 for / +1 for \0 characters
 		return 0;
 
-	// add trailing / at end
-	if (env[len-1] != '/') {
-		env[len] = '/';
-		len++;
-		env[len] = '\0';
-	}
-
 	strcpy(lpBuffer, env);
+
+	// add trailing / at end
+	if (lpBuffer[len-1] != '/') {
+		lpBuffer[len] = '/';
+		len++;
+		lpBuffer[len] = '\0';
+	}
 
 	return len;
 }
