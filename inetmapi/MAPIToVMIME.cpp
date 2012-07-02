@@ -1083,7 +1083,7 @@ HRESULT MAPIToVMIME::BuildMDNMessage(IMessage *lpMessage, vmime::ref<vmime::mess
 		hr = lpMessage->OpenProperty(PR_BODY_W, &IID_IStream, 0, 0, (IUnknown**)&lpBodyStream);
 		if (hr == hrSuccess) {
 			std::wstring strBuffer;
-			hr = Util::HrStreamToWString(lpBodyStream, strBuffer);
+			hr = Util::HrStreamToString(lpBodyStream, strBuffer);
 			if (hr != hrSuccess) {
 				lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to read MDN message body.");
 				goto exit;
@@ -1641,7 +1641,7 @@ HRESULT MAPIToVMIME::handleTextparts(IMessage* lpMessage, vmime::messageBuilder 
 	try {
 		hr = lpMessage->OpenProperty(PR_BODY_W, &IID_IStream, 0, 0, (IUnknown**)&lpBody);
 		if (hr == hrSuccess) {
-			hr = Util::HrStreamToWString(lpBody, strBody);
+			hr = Util::HrStreamToString(lpBody, strBody);
 			lpBody->Release(); lpBody = NULL;
 		} else {
 			if (hr != MAPI_E_NOT_FOUND)

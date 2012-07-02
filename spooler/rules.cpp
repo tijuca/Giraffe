@@ -213,7 +213,7 @@ HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 		if (ptrBodies[0].ulPropTag == PT_ERROR) {
 			hr = lpOrigMessage->OpenProperty(PR_BODY_W, &IID_IStream, 0, 0, &ptrStream);
 			if (hr == hrSuccess) {
-				hr = Util::HrStreamToWString(ptrStream, wstrBody);
+				hr = Util::HrStreamToString(ptrStream, wstrBody);
 			}
 			// stream
 			strForwardText.append(wstrBody);

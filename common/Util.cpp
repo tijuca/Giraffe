@@ -1958,7 +1958,7 @@ exit:
  * 
  * @return MAPI Error code
  */
-HRESULT Util::HrStreamToWString(IStream *sInput, std::wstring &strOutput) {
+HRESULT Util::HrStreamToString(IStream *sInput, std::wstring &strOutput) {
 	HRESULT hr = hrSuccess;
 	ECMemStream *lpMemStream = NULL;
 	ULONG ulRead = 0;
@@ -4304,8 +4304,6 @@ HRESULT Util::ReadProperty(IMAPIProp *lpProp, ULONG ulPropTag, std::string &strD
 {
 	HRESULT hr = hrSuccess;
 	IStream *lpStream = NULL;
-	char buf[4096];
-	ULONG len = 0;
 
 	hr = lpProp->OpenProperty(ulPropTag, &IID_IStream, 0, 0, (IUnknown **)&lpStream);
 	if(hr != hrSuccess)

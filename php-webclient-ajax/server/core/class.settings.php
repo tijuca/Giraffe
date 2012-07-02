@@ -316,7 +316,13 @@
 		function retrieveExternalSettings()
 		{
 			$props = mapi_getprops($this->store, array(PR_EC_OUTOFOFFICE, PR_EC_OUTOFOFFICE_MSG, PR_EC_OUTOFOFFICE_SUBJECT));
-					
+			if (! isset($props[PR_EC_OUTOFOFFICE_MSG])) {
+				$stream = mapi_openpropertytostream($this->store, PR_EC_OUTOFOFFICE_MSG);
+				if ($stream) {
+					$stat = mapi_stream_stat($stream);
+					$props[PR_EC_OUTOFOFFICE_MSG] = mapi_stream_read($stream, $stat["cb"]);
+				}
+			}
 			$this->settings["outofoffice"]["set"] = isset($props[PR_EC_OUTOFOFFICE]) ? ($props[PR_EC_OUTOFOFFICE] ? "true" : "false") : "false";
 			$this->settings["outofoffice"]["message"] = windows1252_to_utf8(isset($props[PR_EC_OUTOFOFFICE_MSG]) ? $props[PR_EC_OUTOFOFFICE_MSG] : "");
 			$this->settings["outofoffice"]["subject"] = windows1252_to_utf8(isset($props[PR_EC_OUTOFOFFICE_SUBJECT]) ? $props[PR_EC_OUTOFOFFICE_SUBJECT] : "");

@@ -91,7 +91,7 @@ public:
 	static LONG		FindPropInArray(LPSPropTagArray lpPropTags, ULONG ulPropTag);
 
 	static HRESULT HrStreamToString(IStream *sInput, std::string &strOutput);
-	static HRESULT HrStreamToWString(IStream *sInput, std::wstring &strWOutput);
+	static HRESULT HrStreamToString(IStream *sInput, std::wstring &strWOutput);
 
 	static HRESULT HrConvertStreamToWString(IStream *sInput, ULONG ulCodepage, std::wstring *wstrOutput);
 
