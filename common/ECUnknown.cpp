@@ -90,6 +90,7 @@ ULONG ECUnknown::AddRef() {
 
 ULONG ECUnknown::Release() {
 	ULONG nRef;
+	bool bLastRef = false;
 	
 	pthread_mutex_lock(&mutex);
 	this->m_cRef--;
@@ -98,10 +99,13 @@ ULONG ECUnknown::Release() {
 
 	if((int)m_cRef == -1)
 		ASSERT(FALSE);
+		
+	bLastRef = this->lstChildren.empty() && this->m_cRef == 0;
 	
 	pthread_mutex_unlock(&mutex);
 	
-	this->Suicide();
+	if(bLastRef)
+		this->Suicide();
 
 	// The object may be deleted now
 
@@ -132,6 +136,7 @@ HRESULT ECUnknown::AddChild(ECUnknown *lpChild) {
 HRESULT ECUnknown::RemoveChild(ECUnknown *lpChild) {
 	HRESULT hr = hrSuccess;
 	std::list<ECUnknown *>::iterator iterChild;
+	bool bLastRef;
 	
 	pthread_mutex_lock(&mutex);
 
@@ -150,9 +155,12 @@ HRESULT ECUnknown::RemoveChild(ECUnknown *lpChild) {
 
 	lstChildren.erase(iterChild);
 
+	bLastRef = this->lstChildren.empty() && this->m_cRef == 0;
+
 	pthread_mutex_unlock(&mutex);
 
-	this->Suicide();
+	if(bLastRef)
+		this->Suicide();
 
 	// The object may be deleted now
 exit:
@@ -211,27 +219,19 @@ HRESULT ECUnknown::Suicide() {
 	HRESULT hr = hrSuccess;
 	ECUnknown *lpParent = this->lpParent;
 
-	pthread_mutex_lock(&mutex);
-
 	// First, destroy the current object
-	if(this->lstChildren.empty() && this->m_cRef == 0) {
-		this->lpParent = NULL;
-		pthread_mutex_unlock(&mutex);
-		delete this;
+	this->lpParent = NULL;
+	delete this;
 
-		// WARNING: The child list of our parent now contains a pointer to this 
-		// DELETED object. We must make sure that nobody ever follows pointer references
-		// in this list during this interval. The list is, therefore PRIVATE to this object,
-		// and may only be access through functions in ECUnknown.
+	// WARNING: The child list of our parent now contains a pointer to this 
+	// DELETED object. We must make sure that nobody ever follows pointer references
+	// in this list during this interval. The list is, therefore PRIVATE to this object,
+	// and may only be access through functions in ECUnknown.
 
-		// Now, tell our parent to delete this object
-		if(lpParent) {
-			lpParent->RemoveChild(this);
-		}
-	} else {
-		pthread_mutex_unlock(&mutex);
+	// Now, tell our parent to delete this object
+	if(lpParent) {
+		lpParent->RemoveChild(this);
 	}
-
 
 	return hr;
 }
