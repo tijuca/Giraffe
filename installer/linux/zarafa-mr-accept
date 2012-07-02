@@ -466,8 +466,31 @@ function autoRespond($session, $store, $entryid, $capacity, $policy)
         }
         
         // Checks passed, book the meeting
-        $mr->doAccept(false, true, true);
+        $ceid = $mr->doAccept(false, true, true);
+		if ($ceid === false) {
+			debuglog("Failed to accept: " . sprintf("0x%X", mapi_last_hresult()) . "\n");
+			return false;
+		}
         debuglog("Accepted.\n");
+		// reopen entry to add self as BCC recipient for ZCP-9901
+		$calitem = mapi_msgstore_openentry($store, $ceid);
+		if ($calitem) {
+			$storeprops = mapi_getprops($store, array(PR_MAILBOX_OWNER_ENTRYID));
+			$ab = mapi_openaddressbook($session);
+			$mailuser = mapi_ab_openentry($ab, $storeprops[PR_MAILBOX_OWNER_ENTRYID]);
+			$recip = mapi_getprops($mailuser, array(PR_ACCOUNT, PR_ADDRTYPE, PR_DISPLAY_NAME, PR_DISPLAY_TYPE, PR_DISPLAY_TYPE_EX,
+													PR_EMAIL_ADDRESS, PR_ENTRYID, PR_OBJECT_TYPE, PR_SEARCH_KEY, PR_SMTP_ADDRESS));
+			$recip[PR_RECIPIENT_ENTRYID] = $recip[PR_ENTRYID];
+			$recip[PR_RECIPIENT_FLAGS] = 256 | 1;
+			$recip[PR_RECIPIENT_TRACKSTATUS] = 0;
+			$recip[PR_RECIPIENT_TYPE] = MAPI_BCC;
+			// not setting PidLidAllAttendees, not important
+			mapi_message_modifyrecipients($calitem, MODRECIP_ADD, array($recip));
+			mapi_message_savechanges($calitem);
+			debuglog("Accept updated.\n");
+		} else {
+			debuglog("Unable to update accepted item.\n");
+		}
         return true;
     } else if($mr->isMeetingCancellation()) {
         $mr->processMeetingCancellation();

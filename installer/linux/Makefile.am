@@ -39,7 +39,8 @@ alt_sysconfig_path = ${sysconfdir}/sysconfig
 dist_data_DATA = \
 	db-convert-4.1-to-4.2 db-convert-4.20-to-4.21 db-convert-4.20-to-innodb.sql db-calc-storesize db-convert-attachments-to-files \
 	createuser.dotforward db-convert-4.2x-to-5.00 ssl-certificates.sh db-upgrade-objectsid-to-objectguid.pl ldap-switch-sendas.pl \
-	${top_srcdir}/tools/python-scripts/optimize-imap.py audit-parse.pl zarafa7-upgrade db-remove-orphaned-attachments
+	audit-parse.pl zarafa7-upgrade db-remove-orphaned-attachments \
+	${top_srcdir}/tools/python-scripts/optimize-imap.py ${top_srcdir}/tools/python-scripts/update-resource-recipients
 
 BUILT_SOURCES = ldap.openldap.cfg ldap.active-directory.cfg
 
