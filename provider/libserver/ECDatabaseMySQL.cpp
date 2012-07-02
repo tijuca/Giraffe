@@ -1322,7 +1322,10 @@ ECRESULT ECDatabaseMySQL::UpdateDatabase(bool bForceUpdate, std::string &strRepo
 	}
 
 	this->m_bForceUpdate = bForceUpdate;
-	
+
+	if (bForceUpdate)
+		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Manually forced the database upgrade; the option '--force-database-upgrade' was given.");
+
 	// Loop throught the update list
 	for (unsigned int i=ulDatabaseRevisionMin; i < (sizeof(sUpdateList) / sizeof(sUpdateList_t)); i++)
 	{

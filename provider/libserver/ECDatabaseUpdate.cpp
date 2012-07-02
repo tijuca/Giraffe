@@ -1831,8 +1831,7 @@ ECRESULT UpdateDatabaseConvertToUnicode(ECDatabase *lpDatabase)
 		PROGRESS_INIT(Z_UPDATE_CONVERT_TO_UNICODE)
 
 		// Admin requested a forced upgrade, converting known tables
-		lpDatabase->m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Updating you database as requested. Please note not all data can be upgraded, and wrong characters may appear or may even cause crashes of the server or client programs.");
-
+		
 		/*
 		 * Since we inserted the company guid into the objectproperty
 		 * table, this convert may break, since the binary data won't
