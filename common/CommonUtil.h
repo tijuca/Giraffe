@@ -68,7 +68,7 @@ const static SizedSPropTagArray(4, sPropNewMailColumns) =
 	{
 		PR_ENTRYID,
 		PR_PARENT_ENTRYID,
-		PR_MESSAGE_CLASS,
+		PR_MESSAGE_CLASS_A,
 		PR_MESSAGE_FLAGS
 	}
 };

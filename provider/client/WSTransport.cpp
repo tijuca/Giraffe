@@ -996,7 +996,7 @@ HRESULT WSTransport::HrNotify(LPNOTIFICATION lpNotification)
 		goto exit;
 	
 	if(lpNotification->info.newmail.lpszMessageClass){
-		utf8string strMessageClass = convert_to<utf8string>(lpNotification->info.newmail.lpszMessageClass);
+		utf8string strMessageClass = convstring(lpNotification->info.newmail.lpszMessageClass, lpNotification->info.newmail.ulFlags);
 		ulSize = strMessageClass.size() + 1;
 		sNotification.newmail->lpszMessageClass = new char[ulSize];
 		memcpy(sNotification.newmail->lpszMessageClass, strMessageClass.c_str(), ulSize);

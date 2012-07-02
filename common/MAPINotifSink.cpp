@@ -177,7 +177,11 @@ HRESULT CopyNotification(NOTIFICATION *lpSrc, void *lpBase, NOTIFICATION *lpDst)
             MAPICopyMem(lpSrc->info.newmail.cbParentID, 	lpSrc->info.newmail.lpParentID, 	lpBase, &lpDst->info.newmail.cbParentID, 	(void**)&lpDst->info.newmail.lpParentID);
             
             lpDst->info.newmail.ulFlags = lpSrc->info.newmail.ulFlags;
-            MAPICopyString((char*)lpSrc->info.newmail.lpszMessageClass, lpBase, (char**)&lpDst->info.newmail.lpszMessageClass);
+			if (lpSrc->info.newmail.ulFlags&MAPI_UNICODE)
+				MAPICopyUnicode((LPWSTR)lpSrc->info.newmail.lpszMessageClass, lpBase, (LPWSTR*)&lpDst->info.newmail.lpszMessageClass);
+			else
+				MAPICopyString((char*)lpSrc->info.newmail.lpszMessageClass, lpBase, (char**)&lpDst->info.newmail.lpszMessageClass);
+			
             lpDst->info.newmail.ulMessageFlags = lpSrc->info.newmail.ulMessageFlags;
             
             break;
