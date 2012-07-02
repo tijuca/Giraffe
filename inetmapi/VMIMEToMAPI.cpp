@@ -2105,7 +2105,14 @@ HRESULT VMIMEToMAPI::handleHTMLTextpart(vmime::ref<vmime::header> vmHeader, vmim
 			}
 			catch (convert_exception &ce) {
 				lpLogger->Log(EC_LOGLEVEL_FATAL, "Incorrect charset for html body: %s, trying to recover", bodyCharset.getName().c_str());
-				strHTML = m_converter.convert_to<std::string>((bodyCharset.getName() + "//FORCE").c_str(), strHTML, rawsize(strHTML), bodyCharset.getName().c_str());
+				try {
+					strHTML = m_converter.convert_to<std::string>((bodyCharset.getName() + "//FORCE").c_str(), strHTML, rawsize(strHTML), bodyCharset.getName().c_str());
+					lpLogger->Log(EC_LOGLEVEL_INFO, "Recover successful");
+				} catch (std::exception &e) {
+					// bodyCharset is not even an existing charset
+					lpLogger->Log(EC_LOGLEVEL_FATAL, "Recover failed, forcing iso-8859-15");
+					bodyCharset = vmime::charset(vmime::charsets::ISO8859_15);
+				}
 			}
 			
 			// write codepage for PR_HTML property
