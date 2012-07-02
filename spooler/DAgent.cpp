@@ -2961,6 +2961,9 @@ HRESULT running_service(char *servicename, bool bDaemonize, DeliveryArgs *lpArgs
 	int ulListenLMTP = 0;
 	fd_set readfds;
 	int err = 0;
+	pthread_t thread;
+	pthread_attr_t ThreadAttr;
+	pthread_attr_init(&ThreadAttr);
 	unsigned int nMaxThreads;
 	int nCloseFDs = 0, pCloseFDs[1] = {0};
 
