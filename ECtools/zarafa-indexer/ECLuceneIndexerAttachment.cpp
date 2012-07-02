@@ -884,7 +884,7 @@ exit:
 	 * stream position is pointing to the end of the stream or the next object.
 	 */
 	if (i != ulProps)
-		StreamToNextObject(lpSerializer, MAPI_ATTACH, ulProps - i);
+		StreamToNextObject(lpSerializer, MAPI_ATTACH, ulProps - i - 1 /* minus one since we never break out of the loop without reading the next property */);
 
 	if (lpStream)
 		lpStream->Release();
