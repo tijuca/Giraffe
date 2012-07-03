@@ -3649,7 +3649,7 @@ HRESULT Util::DoCopyProps(LPCIID lpSrcInterface, LPVOID lpSrcObj, LPSPropTagArra
 						// The internal MAPI object is unable to make a stream STGM_TRANSACTED, so we retry the action without that flag
 						// to get the stream without the transaction feature.
 						hr = ((LPATTACH)lpDestObj)->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, STGM_WRITE | STGM_TRANSACTED, MAPI_CREATE | MAPI_MODIFY, (LPUNKNOWN *)&lpDestStream);
-						if (hr == E_FAIL)
+						if (hr != hrSuccess)
 							hr = ((LPATTACH)lpDestObj)->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, STGM_WRITE, MAPI_CREATE | MAPI_MODIFY, (LPUNKNOWN *)&lpDestStream);
 						if (hr != hrSuccess) {
 							isProblem = true;
