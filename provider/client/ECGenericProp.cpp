@@ -378,13 +378,17 @@ HRESULT	ECGenericProp::DefaultGetProp(ULONG ulPropTag,  void* lpProvider, ULONG 
 	switch(PROP_ID(ulPropTag))
 	{
 		case PROP_ID(PR_ENTRYID):
-			lpsPropValue->ulPropTag = PR_ENTRYID;
-			lpsPropValue->Value.bin.cb = lpProp->m_cbEntryId;
-			if(lpBase == NULL)
-				ASSERT(FALSE);
+			if(lpProp->m_cbEntryId) {
+				lpsPropValue->ulPropTag = PR_ENTRYID;
+				lpsPropValue->Value.bin.cb = lpProp->m_cbEntryId;
+				if(lpBase == NULL)
+					ASSERT(FALSE);
 
-			ECAllocateMore(lpProp->m_cbEntryId, lpBase, (void **)&lpsPropValue->Value.bin.lpb);
-			memcpy(lpsPropValue->Value.bin.lpb, lpProp->m_lpEntryId, lpProp->m_cbEntryId);
+				ECAllocateMore(lpProp->m_cbEntryId, lpBase, (void **)&lpsPropValue->Value.bin.lpb);
+				memcpy(lpsPropValue->Value.bin.lpb, lpProp->m_lpEntryId, lpProp->m_cbEntryId);
+			} else {
+				hr = MAPI_E_NOT_FOUND;
+			}
 			break;
 
 		// Gives access to the actual ECUnknown underlying object
