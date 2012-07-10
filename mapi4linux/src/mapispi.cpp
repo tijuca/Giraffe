@@ -574,12 +574,21 @@ HRESULT M4LMAPISupport::ExpandRecips(LPMESSAGE lpMessage, ULONG * lpulFlags) {
 	mapi_rowset_ptr ptrRow;
 	AddrBookPtr ptrAddrBook;
 	std::set<std::vector<unsigned char> > setFilter;
+	SPropTagArrayPtr ptrColumns;
 
 	hr = session->OpenAddressBook(0, NULL, AB_NO_DIALOG, &ptrAddrBook);
 	if (hr != hrSuccess)
 		goto exit;
 
-	hr = lpMessage->GetRecipientTable(fMapiUnicode, &ptrRecipientTable);
+	hr = lpMessage->GetRecipientTable(fMapiUnicode | MAPI_DEFERRED_ERRORS, &ptrRecipientTable);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = ptrRecipientTable->QueryColumns(TBL_ALL_COLUMNS, &ptrColumns);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = ptrRecipientTable->SetColumns(ptrColumns, 0);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -588,8 +597,8 @@ HRESULT M4LMAPISupport::ExpandRecips(LPMESSAGE lpMessage, ULONG * lpulFlags) {
 		LPSPropValue lpDLEntryID = NULL;
 		ULONG ulObjType;
 		DistListPtr ptrDistList;
-		MAPITablePtr ptrTable;
-		mapi_rowset_ptr ptrRecips;
+		MAPITablePtr ptrMemberTable;
+		mapi_rowset_ptr ptrMembers;
 
 		hr = ptrRecipientTable->QueryRows(1, 0L, &ptrRow);
 		if (hr != hrSuccess)
@@ -628,17 +637,39 @@ HRESULT M4LMAPISupport::ExpandRecips(LPMESSAGE lpMessage, ULONG * lpulFlags) {
 		if (hr != hrSuccess)
 			goto exit;
 
-		hr = ptrDistList->GetContentsTable(fMapiUnicode, &ptrTable);
+		hr = ptrDistList->GetContentsTable(fMapiUnicode, &ptrMemberTable);
 		if (hr != hrSuccess)
 			continue;
+
+		// Same columns as recipient table
+		hr = ptrMemberTable->SetColumns(ptrColumns, 0);
+		if (hr != hrSuccess)
+			goto exit;
 
 		// Get all recipients in distlist, and add to message.
 		// If another distlist is here, it will expand in the next loop.
-		hr = ptrTable->QueryRows(-1, fMapiUnicode, &ptrRecips);
+		hr = ptrMemberTable->QueryRows(-1, fMapiUnicode, &ptrMembers);
 		if (hr != hrSuccess)
 			continue;
 
-		hr = lpMessage->ModifyRecipients(MODRECIP_ADD, (LPADRLIST)ptrRecips.get());
+		// find all unknown properties in the rows, reference-copy those from the original recipient
+		// ModifyRecipients() will actually copy the data
+		for (ULONG c = 0; c < ptrMembers.size(); c++) {
+			for (ULONG i = 0; i < ptrMembers[c].cValues; i++) {
+				LPSPropValue lpRecipProp = NULL;
+
+				if (PROP_TYPE(ptrMembers[c].lpProps[i].ulPropTag) != PT_ERROR)
+					continue;
+
+				// prop is unknown, find prop in recip, and copy value
+				lpRecipProp = PpropFindProp(ptrRow[0].lpProps, ptrRow[0].cValues, CHANGE_PROP_TYPE(ptrMembers[c].lpProps[i].ulPropTag, PT_UNSPECIFIED));
+				if (lpRecipProp)
+					ptrMembers[c].lpProps[i] = *lpRecipProp;
+				// else: leave property unknown
+			}
+		}
+
+		hr = lpMessage->ModifyRecipients(MODRECIP_ADD, (LPADRLIST)ptrMembers.get());
 		if (hr != hrSuccess)
 			goto exit;
 	}
