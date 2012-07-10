@@ -839,3 +839,13 @@ bool CompareDBPropTag(unsigned int ulPropTag1, unsigned int ulPropTag2)
 	return ulPropTag1 == ulPropTag2;
 }
 
+SuppressLockErrorLogging::SuppressLockErrorLogging(ECDatabase *lpDatabase)
+: m_lpDatabase(lpDatabase)
+, m_bResetValue(lpDatabase ? lpDatabase->SuppressLockErrorLogging(true) : false)
+{ }
+
+SuppressLockErrorLogging::~SuppressLockErrorLogging()
+{
+	if (m_lpDatabase)
+		m_lpDatabase->SuppressLockErrorLogging(m_bResetValue);
+}

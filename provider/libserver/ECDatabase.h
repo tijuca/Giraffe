@@ -114,6 +114,9 @@ public:
 	// Get last error code
 	virtual DB_ERROR		GetLastError() = 0;
 
+	// Enable/disable suppression of lock errors
+	virtual bool			SuppressLockErrorLogging(bool bSuppress) = 0;
+
 	// Database functions
 	virtual ECRESULT		CreateDatabase() = 0;
 	virtual ECRESULT		UpdateDatabase(bool bForceUpdate, std::string &strReport) = 0;
@@ -140,6 +143,7 @@ public:
 	// Function requires m_bForceUpdate variable
 	friend ECRESULT UpdateDatabaseConvertToUnicode(ECDatabase *lpDatabase);
 };
+
 
 
 #endif // ECDATABASE_H

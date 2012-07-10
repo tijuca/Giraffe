@@ -116,4 +116,43 @@ ECRESULT ParseMVPropCount(char* lpRowData, ULONG ulSize, unsigned int *lpulLastP
 unsigned int NormalizeDBPropTag(unsigned int ulPropTag);
 bool CompareDBPropTag(unsigned int ulPropTag1, unsigned int ulPropTag2);
 
+
+/**
+ * This class is used to suppress the lock-error logging for the database passed to its
+ * constructor during the lifetime of the instance.
+ * This means the lock-error logging is restored when the scope in which an instance of
+ * this class exists is exited.
+ */
+class SuppressLockErrorLogging
+{
+public:
+	SuppressLockErrorLogging(ECDatabase *lpDatabase);
+	~SuppressLockErrorLogging();
+
+private:
+	ECDatabase *m_lpDatabase;
+	bool m_bResetValue;
+
+private:
+	SuppressLockErrorLogging(const SuppressLockErrorLogging&);
+	SuppressLockErrorLogging& operator=(const SuppressLockErrorLogging&);
+};
+
+/**
+ * This macro allows anyone to create a temporary scope in which the lock-errors
+ * for a database connection are suppressed.
+ *
+ * Simple usage:
+ * WITH_SUPPRESSED_LOGGING(lpDatabase)
+ *   do_something_with(lpDatabase);
+ *
+ * or when more stuff needs to be done with the suppression enabled:
+ * WITH_SUPPRESSED_LOGGING(lpDatabase) {
+ *   do_something_with(lpDatabase);
+ *   do_something_else_with(lpDatabase);
+ * }
+ */
+#define WITH_SUPPRESSED_LOGGING(_db)	\
+	for (SuppressLockErrorLogging suppressor(_db), *ptr = NULL; ptr == NULL; ptr = &suppressor)
+
 #endif // ECDATABASEUTILS_H

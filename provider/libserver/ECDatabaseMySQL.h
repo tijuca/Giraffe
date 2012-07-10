@@ -97,6 +97,7 @@ public:
 
 	std::string		GetError();
 	DB_ERROR		GetLastError();
+	bool			SuppressLockErrorLogging(bool bSuppress);
 	
 	ECRESULT		Begin();
 	ECRESULT		Commit();
@@ -153,6 +154,7 @@ private:
 	bool				m_bLocked;
 	static std::string	m_strDatabaseDir;
 	ECConfig *			m_lpConfig;
+	bool				m_bSuppressLockErrorLogging;
 #ifdef DEBUG
     unsigned int		m_ulTransactionState;
 #endif

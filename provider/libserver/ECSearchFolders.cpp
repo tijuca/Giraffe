@@ -639,7 +639,8 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 				goto exit;
 
 			// Lock searchfolder
-			er = lpDatabase->DoSelect("SELECT properties.val_ulong FROM properties WHERE hierarchyid = " + stringify(iterFolder->first) + " FOR UPDATE", NULL);
+			WITH_SUPPRESSED_LOGGING(lpDatabase)
+				er = lpDatabase->DoSelect("SELECT properties.val_ulong FROM properties WHERE hierarchyid = " + stringify(iterFolder->first) + " FOR UPDATE", NULL);
 			if (er == ZARAFA_E_DATABASE_ERROR) {
 				DB_ERROR dberr = lpDatabase->GetLastError();
 				if (dberr == DB_E_LOCK_WAIT_TIMEOUT || dberr == DB_E_LOCK_DEADLOCK) {
@@ -841,9 +842,11 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 
 			if(lCount || lUnreadCount) {
 				// If the searchfolder has changed, update counts and send notifications
-				er = UpdateFolderCount(lpDatabase, iterFolder->first, PR_CONTENT_COUNT, lCount);
-				if (er == erSuccess)
-					er = UpdateFolderCount(lpDatabase, iterFolder->first, PR_CONTENT_UNREAD, lUnreadCount);
+				WITH_SUPPRESSED_LOGGING(lpDatabase) {
+					er = UpdateFolderCount(lpDatabase, iterFolder->first, PR_CONTENT_COUNT, lCount);
+					if (er == erSuccess)
+						er = UpdateFolderCount(lpDatabase, iterFolder->first, PR_CONTENT_UNREAD, lUnreadCount);
+				}
 
 				if (er == ZARAFA_E_DATABASE_ERROR) {
 					DB_ERROR dberr = lpDatabase->GetLastError();
