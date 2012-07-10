@@ -11069,6 +11069,7 @@ SOAP_ENTRY_START(importMessageFromStream, *result, unsigned int ulFlags, unsigne
 	// Deserialize the streamed message
 	soap->fmimewriteopen = &MTOMWriteOpen;
 	soap->fmimewrite = &MTOMWrite;
+	soap->fmimewriteclose = NULL;
 
 	// We usualy don't pass database object to other threads. However, since
 	// we wan't to be able to perform a complete rollback we need to pass it
