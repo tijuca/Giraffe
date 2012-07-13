@@ -91,10 +91,22 @@ ECChangeAdvisor::ECChangeAdvisor(ECMsgStore *lpMsgStore)
 	, m_ulFlags(0)
 	, m_ulReloadId(0)
 { 
+	pthread_mutexattr_t attr;
+
 	ECSyncLog::GetLogger(&m_lpLogger);
 
 	m_lpMsgStore->AddRef();
-	pthread_mutex_init(&m_hConnectionLock, NULL);
+
+	// Need MUTEX RECURSIVE because with a reconnection the funtion PurgeStates called indirect the function Reload again:
+	// ECChangeAdvisor::Reload(....)
+ 	// WSTransport::HrReLogon()
+ 	// WSTransport::HrGetSyncStates(....)
+ 	// ECChangeAdvisor::PurgeStates()
+ 	// ECChangeAdvisor::UpdateState(IStream * lpStream)
+
+	pthread_mutexattr_init(&attr);
+	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE_NP);
+	pthread_mutex_init(&m_hConnectionLock, &attr);
 }
 
 ECChangeAdvisor::~ECChangeAdvisor()
