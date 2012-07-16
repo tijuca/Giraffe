@@ -4846,7 +4846,7 @@
 			  itself. When set to password, the
 			  <option>ldap_bind_user</option> should have enough
 			  access rights to read the password field.</para>
-			  <para>Default for OpenLDAP: <replaceable>userPassword</replaceable></para>
+			  <para>Default for OpenLDAP: <replaceable>bind</replaceable></para>
 			  <para>Default for ADS: <replaceable>bind</replaceable></para>
 			</listitem>
 		  </varlistentry>
@@ -4889,13 +4889,11 @@
 			  <para>This value indicates if a user is nonactive.
 			  Nonactive users cannot login, but the store
 			  can be used as a shared store for other users.</para>
-			  <para>By default this option is set to empty. Doing this
-			  will effectively disable the availability of the nonactive
-			  user feature and will assign all users to be active.
+			  <para>Setting this value to 1 will make a mailbox nonactive.
 			  The nonactive attribute provided by the Zarafa schema
 			  for nonactive users is <replaceable>zarafaSharedStoreOnly</replaceable>
 			  </para>
-			  <para>Default: <replaceable>empty</replaceable></para>
+			  <para>Default: <replaceable>zarafaSharedStoreOnly</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
