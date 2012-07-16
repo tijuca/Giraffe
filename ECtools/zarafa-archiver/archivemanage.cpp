@@ -268,6 +268,18 @@ HRESULT ArchiveManageImpl::AttachTo(LPMDB lpArchiveStore, const tstring &strFold
 	bool bEqual = false;
 	ArchiveType aType = UndefArchive;
 	SPropValuePtr ptrArchiveName;
+	
+	// Check if we're not trying to attach a store to itself.
+	hr = m_ptrSession->CompareStoreIds(m_ptrUserStore, lpArchiveStore, &bEqual);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to compare user and archive store (hr=%s).", stringify(hr, true).c_str());
+		goto exit;
+	}
+	if (bEqual) {
+		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "User and archive store are the same.");
+		hr = MAPI_E_INVALID_PARAMETER;
+		goto exit;
+	}
 
 	hr = ArchiveHelper::Create(lpArchiveStore, strFoldername, lpszArchiveServer, &ptrArchiveHelper);
 	if (hr != hrSuccess) {
@@ -321,22 +333,6 @@ HRESULT ArchiveManageImpl::AttachTo(LPMDB lpArchiveStore, const tstring &strFold
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to get attached user for the requested archive (hr=%s).", stringify(hr, true).c_str());
 		goto exit;
 	}
-		
-		
-
-	
-	// Check if we're not trying to attach a store to itself.
-	hr = m_ptrSession->CompareStoreIds(m_ptrUserStore, lpArchiveStore, &bEqual);
-	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to compare user and archive store (hr=%s).", stringify(hr, true).c_str());
-		goto exit;
-	}
-	if (bEqual) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "User and archive store are the same.");
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-	
 		
 	// Add new archive to list of archives.
 	hr = ptrArchiveHelper->GetArchiveEntry(true, &objectEntry);
