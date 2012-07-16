@@ -212,6 +212,8 @@ private:
 
 	// current folder name
 	wstring strCurrentFolder;
+	IMAPITable* m_lpTable;		/* current contents table */
+	vector<string> m_vTableDataColumns; /* current dataitems that caused the setcolumns on the table */
 
 	// true if folder is opened with examine
 	bool bCurrentFolderReadOnly;

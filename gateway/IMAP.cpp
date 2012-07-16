@@ -137,6 +137,8 @@ IMAP::IMAP(char *szServerPath, ECChannel *lpChannel, ECLogger *lpLogger, ECConfi
 	
 	m_ulCacheUID = 0;
 	m_lpsIMAPTags = NULL;
+
+	m_lpTable = NULL;
 	
 	pthread_mutex_init(&m_mIdleLock, NULL);
 }
@@ -145,6 +147,8 @@ IMAP::IMAP(char *szServerPath, ECChannel *lpChannel, ECLogger *lpLogger, ECConfi
  * IMAP class destructor
  */
 IMAP::~IMAP() {
+	if (m_lpTable)
+		m_lpTable->Release();
 	// Free/release all new and allocated memory
 	if (lpPublicStore)
 		lpPublicStore->Release();
@@ -462,7 +466,6 @@ HRESULT IMAP::HrProcessCommand(const std::string &strInput)
 	} else if (strCommand.compare("LOGOUT") == 0) {
 		if (!strvResult.empty()) {
 			hr = HrResponse(RESP_TAGGED_BAD, strTag, "LOGOUT must have 0 arguments");
-			goto exit;
 		} else {
 			hr = HrCmdLogout(strTag);
 			// let the gateway quit from the socket read loop
@@ -967,7 +970,7 @@ HRESULT IMAP::HrCmdLogin(const string &strTag, const string &strUser, const stri
 
 	// check if imap access is disabled
 	if (isFeatureDisabled("imap", lpAddrBook, lpStore)) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "IMAP not enabled for user '%s'", strUsername.c_str());
+		lpLogger->Log(EC_LOGLEVEL_FATAL, "IMAP not enabled for user '%s'", strUsername.c_str());
 		HrResponse(RESP_TAGGED_NO, strTag, "LOGIN imap feature disabled");
 		hr = MAPI_E_LOGON_FAILED;
 		goto exit;
@@ -3917,7 +3920,7 @@ HRESULT IMAP::HrSemicolonToComma(string &strData) {
  * messages. Replies directly to the IMAP client with the result for
  * each mail given.
  * 
- * @param[in] lstMails a full list of emails to process
+ * @param[in] lstMails a full sorted list of emails to process
  * @param[in] lstDataItems vector of IMAP data items to send to the client
  * 
  * @return MAPI Error code
@@ -3925,9 +3928,9 @@ HRESULT IMAP::HrSemicolonToComma(string &strData) {
 HRESULT IMAP::HrPropertyFetch(list<ULONG> &lstMails, vector<string> &lstDataItems) {
 	HRESULT hr = hrSuccess;
 	IMAPIFolder *lpFolder = NULL;
-	LPMAPITABLE lpTable = NULL;
 	LPSRowSet lpRows = NULL;
 	LPSRow lpRow = NULL;
+	LONG nRow = -1;
 	ULONG ulDataItemNr;
 	string strDataItem;
 	SRestriction sRestriction;
@@ -3952,7 +3955,7 @@ HRESULT IMAP::HrPropertyFetch(list<ULONG> &lstMails, vector<string> &lstDataItem
 	}
 
 	// Setup the readahead length
-	ulReadAhead = lstMails.size() > 50 ? 50 : lstMails.size();
+	ulReadAhead = lstMails.size() > ROWS_PER_REQUEST ? ROWS_PER_REQUEST : lstMails.size();
 
 	// Find out which properties we will be needing from the table. This should be kept in-sync
 	// with the properties that are used in HrPropertyFetchRow()
@@ -4017,7 +4020,12 @@ HRESULT IMAP::HrPropertyFetch(list<ULONG> &lstMails, vector<string> &lstDataItem
 		lpEntryList->cValues = 0;
 	}
 
-	if(!setProps.empty()) {
+	if(!setProps.empty() && m_vTableDataColumns != lstDataItems) {
+		if (m_lpTable)
+			m_lpTable->Release();
+		m_lpTable = NULL;
+		m_vTableDataColumns.clear();
+
         // Build an LPSPropTagArray
         hr = MAPIAllocateBuffer(CbNewSPropTagArray(setProps.size()+1), (void **)&lpPropTags);
         if(hr != hrSuccess)
@@ -4038,28 +4046,36 @@ HRESULT IMAP::HrPropertyFetch(list<ULONG> &lstMails, vector<string> &lstDataItem
             goto exit;
 
         // Don't let the server cap the contents to 255 bytes, so our PR_TRANSPORT_MESSAGE_HEADERS is complete in the table
-        hr = lpFolder->GetContentsTable(EC_TABLE_NOCAP | MAPI_DEFERRED_ERRORS, &lpTable);
+        hr = lpFolder->GetContentsTable(EC_TABLE_NOCAP | MAPI_DEFERRED_ERRORS, &m_lpTable);
         if (hr != hrSuccess)
             goto exit;
 
         // Request our columns
-        hr = lpTable->SetColumns(lpPropTags, TBL_BATCH);
+        hr = m_lpTable->SetColumns(lpPropTags, TBL_BATCH);
         if (hr != hrSuccess)
             goto exit;
             
         // Messages are usually requested in UID order, so sort the table in UID order too. This improves
         // the row prefetch hit ratio.
-        hr = lpTable->SortTable((LPSSortOrderSet)&sSortUID, TBL_BATCH);
+        hr = m_lpTable->SortTable((LPSSortOrderSet)&sSortUID, TBL_BATCH);
         if(hr != hrSuccess)
             goto exit;
 
-        // Setup a find restriction that we modify for each row
-        sRestriction.rt = RES_PROPERTY;
-        sRestriction.res.resProperty.relop = RELOP_EQ;
-        sRestriction.res.resProperty.ulPropTag = PR_INSTANCE_KEY;
-        sRestriction.res.resProperty.lpProp = &sPropVal;
-        sPropVal.ulPropTag = PR_INSTANCE_KEY;
+		m_vTableDataColumns = lstDataItems;
     }
+
+	if (m_lpTable) {
+		hr = m_lpTable->SeekRow(BOOKMARK_BEGINNING, 0, NULL);
+		if(hr != hrSuccess)
+			goto exit;
+	}
+
+	// Setup a find restriction that we modify for each row
+	sRestriction.rt = RES_PROPERTY;
+	sRestriction.res.resProperty.relop = RELOP_EQ;
+	sRestriction.res.resProperty.ulPropTag = PR_INSTANCE_KEY;
+	sRestriction.res.resProperty.lpProp = &sPropVal;
+	sPropVal.ulPropTag = PR_INSTANCE_KEY;
     
 	// Loop through all requested rows, and get the data for each (FIXME: slow for large requests)
 	for (lpMail = lstMails.begin(); lpMail != lstMails.end(); lpMail++) {
@@ -4069,28 +4085,31 @@ HRESULT IMAP::HrPropertyFetch(list<ULONG> &lstMails, vector<string> &lstDataItem
 		sPropVal.Value.bin.lpb = lstFolderMailEIDs[*lpMail].sInstanceKey.lpb;
 
         // We use a read-ahead mechanism here, reading 50 rows at a time.		
-		if (lpTable) {
+		if (m_lpTable) {
             // First, see if the next row is somewhere in our already-read data
             lpRow = NULL;
             if(lpRows) {
-                for(unsigned int i=0; i<lpRows->cRows;i++) {
+				// use nRow to start checking where we left off
+                for(unsigned int i = nRow+1; i < lpRows->cRows; i++) {
                     if(lpRows->aRow[i].lpProps[0].ulPropTag == PR_INSTANCE_KEY && BinaryArray(lpRows->aRow[i].lpProps[0].Value.bin) == BinaryArray(sPropVal.Value.bin)) {
                         lpRow = &lpRows->aRow[i];
+						nRow = i;
 						break;
                     }
                 }
             }
-                        
+
             if(lpRow == NULL) {
                 if(lpRows)
                     FreeProws(lpRows);
                 lpRows = NULL;
                 
                 // Row was not found in our current data, request new data
-                if(lpTable->FindRow(&sRestriction, BOOKMARK_BEGINNING, 0) == hrSuccess && lpTable->QueryRows(ulReadAhead, 0, &lpRows) == hrSuccess) {
+                if(m_lpTable->FindRow(&sRestriction, BOOKMARK_CURRENT, 0) == hrSuccess && m_lpTable->QueryRows(ulReadAhead, 0, &lpRows) == hrSuccess) {
 					if (lpRows->cRows != 0) {
 						// The row we want is the first returned row
 						lpRow = &lpRows->aRow[0];
+						nRow = 0;
 					}
                 }
             }
@@ -4144,9 +4163,6 @@ exit:
         
 	if (lpRows)
 		FreeProws(lpRows);
-
-	if (lpTable)
-		lpTable->Release();
 
 	if (lpFolder)
 		lpFolder->Release();
