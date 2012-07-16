@@ -592,6 +592,12 @@ ECRESULT DeleteObjectSoft(ECSession *lpSession, ECDatabase *lpDatabase, unsigned
 		if(er!= erSuccess)
 			goto exit;
 
+		// Remove the MSGSTATUS_DELMARKED flag (IMAP gateway set)
+		strQuery = "UPDATE properties SET val_ulong=val_ulong&~" + stringify(MSGSTATUS_DELMARKED) +
+			" WHERE hierarchyid IN(" + strInclause + ") AND tag = " + stringify(PROP_ID(PR_MSG_STATUS)) + " and type = " + stringify(PROP_TYPE(PR_MSG_STATUS));
+		er = lpDatabase->DoUpdate(strQuery);
+		if(er!= erSuccess)
+			goto exit;
 	}
 
 	er = ApplyFolderCounts(lpDatabase, mapFolderCounts);
