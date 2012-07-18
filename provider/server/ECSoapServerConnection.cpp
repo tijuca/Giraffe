@@ -328,6 +328,9 @@ ECRESULT ECSoapServerConnection::ListenPipe(const char* lpPipeName, bool bPriori
 
 	lpsSoap->master = sPipe;
 
+	lpsSoap->peerlen = 0;
+	memset((void*)&lpsSoap->peer, 0, sizeof(lpsSoap->peer));
+
 	m_lpDispatcher->AddListenSocket(lpsSoap);
 
 	// Manually check for attachments, independant of streaming support
