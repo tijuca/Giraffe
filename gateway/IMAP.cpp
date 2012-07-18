@@ -175,6 +175,14 @@ IMAP::~IMAP() {
 	pthread_mutex_destroy(&m_mIdleLock);
 }
 
+void IMAP::ReleaseContentsCache()
+{
+	if (m_lpTable)
+		m_lpTable->Release();
+	m_lpTable = NULL;
+	m_vTableDataColumns.clear();
+}
+
 /** 
  * Returns number of minutes to keep connection alive
  * 
@@ -1044,6 +1052,9 @@ HRESULT IMAP::HrCmdSelect(const string &strTag, const string &strFolder, bool bR
 		goto exit;
 	}
 
+	// close old contents table if cached version was open
+	ReleaseContentsCache();
+
 	// Apple mail client does this request, so we need to block it.
 	if (strFolder.empty()) {
 		HrResponse(RESP_TAGGED_NO, strTag, command+" invalid folder name");
@@ -1256,6 +1267,8 @@ HRESULT IMAP::HrCmdDelete(const string &strTag, const string &strFolderParam) {
 	// close folder if it was selected
 	if (strCurrentFolder == strFolder) {
 	    strCurrentFolder.clear();
+		// close old contents table if cached version was open
+		ReleaseContentsCache();
     }
 
 	HrResponse(RESP_TAGGED_OK, strTag, "DELETE completed");
@@ -2144,6 +2157,9 @@ HRESULT IMAP::HrCmdClose(const string &strTag) {
 		HrResponse(RESP_TAGGED_NO, strTag, "CLOSE error no folder");
 		goto exit;
 	}
+
+	// close old contents table if cached version was open
+	ReleaseContentsCache();
 
 	if (bCurrentFolderReadOnly) {
 		// cannot expunge messages on a readonly folder
@@ -4021,10 +4037,7 @@ HRESULT IMAP::HrPropertyFetch(list<ULONG> &lstMails, vector<string> &lstDataItem
 	}
 
 	if(!setProps.empty() && m_vTableDataColumns != lstDataItems) {
-		if (m_lpTable)
-			m_lpTable->Release();
-		m_lpTable = NULL;
-		m_vTableDataColumns.clear();
+		ReleaseContentsCache();
 
         // Build an LPSPropTagArray
         hr = MAPIAllocateBuffer(CbNewSPropTagArray(setProps.size()+1), (void **)&lpPropTags);

@@ -127,6 +127,8 @@ public:
 	HRESULT HrDone(bool bSendResponse);
 
 private:
+	void ReleaseContentsCache();
+
 	std::string GetCapabilityString(bool bAllFlags);
 
 	HRESULT HrSplitInput(const string &strInput, vector<string> &lstWords);
