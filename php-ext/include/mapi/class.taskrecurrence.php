@@ -50,7 +50,7 @@
 
 ?>
 <?php
-	require_once("mapi/class.baserecurrence.php");
+	require_once("class.baserecurrence.php");
 
 	class TaskRecurrence extends BaseRecurrence
 	{
