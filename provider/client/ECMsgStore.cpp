@@ -569,6 +569,12 @@ HRESULT ECMsgStore::Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMa
 
 		cbEntryID = cbUnWrapStoreID;
 		lpEntryID = lpUnWrapStoreID;
+	} else {
+		// check that the given lpEntryID belongs to the store in m_lpEntryId
+		if (memcmp(&this->GetStoreGuid(), &((PEID)lpEntryID)->guid, sizeof(GUID)) != 0) {
+			hr = MAPI_E_NO_SUPPORT;
+			goto exit;
+		}
 	}
 
 	if(m_lpNotifyClient->Advise(cbEntryID, (LPBYTE)lpEntryID, ulEventMask, lpAdviseSink, lpulConnection) != S_OK)

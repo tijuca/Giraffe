@@ -4588,6 +4588,11 @@ ECRESULT DoNotifySubscribe(ECSession *lpecSession, unsigned long long ulSessionI
 		er = lpecSession->GetObjectFromEntryId(&notifySubscribe->sKey, &ulKey);
 		if(er != erSuccess)
 			goto exit;
+
+		// Check permissions
+		er = lpecSession->GetSecurity()->CheckPermission(ulKey, ecSecurityRead);
+		if(er != erSuccess)
+			goto exit;
 	}
 	
 	if(notifySubscribe->ulEventMask & fnevTableModified) {
