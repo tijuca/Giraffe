@@ -55,6 +55,7 @@
 #include <mapi.h>
 #include <mapispi.h>
 #include <mapiutil.h>
+#include "mapiguidext.h"
 #include "ECGuid.h"
 #include "mapiext.h"
 #include "edkmdb.h"
@@ -363,6 +364,8 @@ HRESULT ECXPLogon::SubmitMessage(ULONG ulFlags, LPMESSAGE lpMessage, ULONG * lpu
 	SPropValue sDeleteAfterSubmitProp;
 	ULONG ulOnlineAdviseConnection = 0;
 	ENTRYLIST sDelete;
+	IMsgStore *lpMsgStore = NULL;
+	ULONG ulType = 0;
 
 	ULONG ulSize;
 	ULONG ulValue;
@@ -370,32 +373,12 @@ HRESULT ECXPLogon::SubmitMessage(ULONG ulFlags, LPMESSAGE lpMessage, ULONG * lpu
 	struct timespec sTimeOut;
 	struct timeval sNow;
 
-	SizedSPropTagArray(4, sptMessage) = {4,{PR_MDB_PROVIDER, PR_SOURCE_KEY, PR_PARENT_SOURCE_KEY, PR_STORE_ENTRYID}};
 	SizedSPropTagArray(6, sptExcludeProps) = {6,{PR_SENTMAIL_ENTRYID, PR_SOURCE_KEY, PR_CHANGE_KEY, PR_PREDECESSOR_CHANGE_LIST, PR_ENTRYID, PR_SUBMIT_FLAGS}};
 
 	// Un-cancel
 	pthread_mutex_lock( &m_hExitMutex);
 	m_bCancel = false;
 	pthread_mutex_unlock( &m_hExitMutex);
-
-	hr = lpMessage->GetProps((LPSPropTagArray)&sptMessage, 0, &ulValues, &lpMessageProps);
-	if(hr != hrSuccess) {
-		// Promote possible warning to error
-		if (! FAILED(hr))
-			hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if(lpMessageProps[0].Value.bin.cb != sizeof(MAPIUID)) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-	// Only accept e-mail in the primary store of Zarafa
-	if(CompareMDBProvider(lpMessageProps[0].Value.bin.lpb, &ZARAFA_SERVICE_GUID) == FALSE) {
-		hr = MAPI_E_NOT_ME;
-		goto exit;
-	}
 
 	// Save some outgoing properties for the server
 	hr = SetOutgoingProps(lpMessage);
@@ -445,19 +428,29 @@ HRESULT ECXPLogon::SubmitMessage(ULONG ulFlags, LPMESSAGE lpMessage, ULONG * lpu
 		goto exit;
 	}
 
-	hr =  HrGetOneProp(lpMessage, PR_EC_OBJECT, &lpECObject);
-	if (hr != hrSuccess)
-		goto exit;
-	
-	lpECMessage = (ECMessage*)lpECObject->Value.lpszA;
-	lpECMessage->AddRef();
+	if (HrGetOneProp(lpMessage, PR_EC_OBJECT, &lpECObject) == hrSuccess) {
+		// Apparently the message is a Zarafa message, so get the store it's in
+		lpECMessage = (ECMessage*)lpECObject->Value.lpszA;
+		lpECMessage->AddRef();
 
-	lpECMsgStore = lpECMessage->GetMsgStore();
-	if(!lpECMsgStore){
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
+		lpECMsgStore = lpECMessage->GetMsgStore();
+		if(!lpECMsgStore){
+			hr = MAPI_E_NOT_FOUND;
+			goto exit;
+		}
+		lpECMsgStore->AddRef();
+	} else {
+		hr = m_lpMAPISup->OpenEntry(this->m_lpXPProvider->m_lpIdentityProps[XPID_STORE_EID].Value.bin.cb, (LPENTRYID)this->m_lpXPProvider->m_lpIdentityProps[XPID_STORE_EID].Value.bin.lpb, NULL, MAPI_MODIFY, &ulType, (IUnknown **)&lpMsgStore);
+		if (hr != hrSuccess)
+			goto exit;
+
+		hr = HrGetOneProp(lpMsgStore, PR_EC_OBJECT, &lpECObject);
+		if (hr != hrSuccess)
+			goto exit;
+
+		lpECMsgStore = (ECMsgStore*)lpECObject->Value.lpszA;
+		lpECMsgStore->AddRef();
 	}
-	lpECMsgStore->AddRef();
 
 	hr = lpECMsgStore->QueryInterface(IID_ECMsgStoreOnline, (LPVOID*)&lpOnlineStore);
 	if (hr != hrSuccess)
@@ -579,6 +572,8 @@ HRESULT ECXPLogon::SubmitMessage(ULONG ulFlags, LPMESSAGE lpMessage, ULONG * lpu
 	// only important for other transports running on the same lpMessage.
 
 exit:
+	if (lpMsgStore)
+		lpMsgStore->Release();
 
 	if (lpECObject)
 		MAPIFreeBuffer(lpECObject);
@@ -612,9 +607,6 @@ exit:
 
 	if(lpMessage)
 		lpMessage->Release();
-
-	if(lpMessageProps)
-		MAPIFreeBuffer(lpMessageProps);
 
 	return hr;
 }
