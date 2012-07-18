@@ -1186,6 +1186,7 @@ HRESULT WSTransport::HrExportMessageChangesAsStream(ULONG ulFlags, ICSCHANGE *lp
 {
 	typedef mapi_memory_ptr<sourceKeyPairArray> sourceKeyPairArrayPtr;
 
+	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	sourceKeyPairArrayPtr ptrsSourceKeyPairs;
 	WSMessageStreamExporterPtr ptrStreamExporter;
@@ -1212,11 +1213,14 @@ HRESULT WSTransport::HrExportMessageChangesAsStream(ULONG ulFlags, ICSCHANGE *lp
 	// Make sure to get the mime attachments ourselves
 	soap_post_check_mime_attachments(m_lpCmd->soap);
 
-	if (m_lpCmd->ns__exportMessageChangesAsStream(m_ecSessionId, ulFlags, sPropTags, *ptrsSourceKeyPairs, &sResponse) != SOAP_OK) {
-		UnLockSoap();
-		hr = MAPI_E_NETWORK_ERROR;
-		goto exit;
+	START_SOAP_CALL
+	{
+		if (m_lpCmd->ns__exportMessageChangesAsStream(m_ecSessionId, ulFlags, sPropTags, *ptrsSourceKeyPairs, &sResponse) != SOAP_OK)
+			er = MAPI_E_NETWORK_ERROR;
+		else
+			er = sResponse.er;
 	}
+	END_SOAP_CALL
 
 	if (sResponse.sMsgStreams.__size > 0 && !soap_check_mime_attachments(m_lpCmd->soap)) {
 		hr = MAPI_E_NETWORK_ERROR;
