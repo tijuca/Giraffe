@@ -144,12 +144,12 @@ public:
 	static bool rowcompareprefix(unsigned int ulSortColPrefix, unsigned int ulSortColsA, int *lpSortLenA, unsigned char **lppSortKeysA, unsigned char *lpSortFlagsA, unsigned int ulSortColsB, int *lpSortLenB, unsigned char **lppSortKeysB, unsigned char *lpSortFlagsB);
 
 	bool operator < (const ECTableRow &other) const;
-	ECTableRow& operator = (const ECTableRow &other);
+	
 
 private:
 	void initSortCols(unsigned int ulSortCols, int * lpSortLen, unsigned char * lpFlags, unsigned char ** lppSortData);
 	void freeSortCols();
-	
+	ECTableRow& operator = (const ECTableRow &other);
 public:
 	sObjectTableKey	sKey;
 

@@ -752,7 +752,6 @@ ECRESULT ECGenericObjectTable::ReloadKeyTable()
 		goto exit;
 
 exit:
-	//Auto delete
 	pthread_mutex_unlock(&m_hLock);
 
 	return er;
@@ -2567,6 +2566,8 @@ ECRESULT ECGenericObjectTable::Clear()
 {
 	ECCategoryMap::iterator iterCategories;
 
+	pthread_mutex_lock(&m_hLock);
+
 	// Clear old entries
 	mapObjects.clear();
 	lpKeyTable->Clear();
@@ -2577,6 +2578,8 @@ ECRESULT ECGenericObjectTable::Clear()
 	m_mapCategories.clear();
 	m_mapSortedCategories.clear();
     
+	pthread_mutex_unlock(&m_hLock);
+
 	return hrSuccess;
 }
 

@@ -693,10 +693,12 @@ exit:
 
 ECRESULT ECKeyTable::Clear()
 {
-	ECTableRow *lpRow = lpRoot;
+	ECTableRow *lpRow = NULL;
 	ECTableRow *lpParent = NULL;
 
 	pthread_mutex_lock(&mLock);
+
+	lpRow = lpRoot;
 
 	// Depth-first delete of all nodes (excluding root)
 	while(lpRow) {
@@ -1585,27 +1587,25 @@ ECRESULT ECKeyTable::UpdatePartialSortKey(sObjectTableKey *lpsRowItem, unsigned 
     
 	pthread_mutex_lock(&mLock);
 
-	lpCursor = lpCurrent;
-
-    er = SeekId(lpsRowItem);
+    er = GetRow(lpsRowItem, &lpCursor);
     if(er != erSuccess)
         goto exit;
         
-    if(ulColumn >= lpCurrent->ulSortCols) {
+    if(ulColumn >= lpCursor->ulSortCols) {
         er = ZARAFA_E_INVALID_PARAMETER;
         goto exit;
     }
     
     // Copy the sortkeys that we used to have
-    lppSortKeys = new unsigned char *[lpCurrent->ulSortCols];
-    lpSortLen = new unsigned int[lpCurrent->ulSortCols];
-    lpFlags = new unsigned char[lpCurrent->ulSortCols];
+    lppSortKeys = new unsigned char *[lpCursor->ulSortCols];
+    lpSortLen = new unsigned int[lpCursor->ulSortCols];
+    lpFlags = new unsigned char[lpCursor->ulSortCols];
 
     // Note: we can just copy the pointers of the sort data here, since they are still valid, and are also valid
     // to pass into UpdateRow()        
-    memcpy(lppSortKeys, lpCurrent->lppSortKeys, sizeof(unsigned char *) * lpCurrent->ulSortCols);
-    memcpy(lpSortLen, lpCurrent->lpSortLen, sizeof(unsigned int) * lpCurrent->ulSortCols);
-    memcpy(lpFlags, lpCurrent->lpFlags, sizeof(unsigned char) * lpCurrent->ulSortCols);
+    memcpy(lppSortKeys, lpCursor->lppSortKeys, sizeof(unsigned char *) * lpCursor->ulSortCols);
+    memcpy(lpSortLen, lpCursor->lpSortLen, sizeof(unsigned int) * lpCursor->ulSortCols);
+    memcpy(lpFlags, lpCursor->lpFlags, sizeof(unsigned char) * lpCursor->ulSortCols);
     
     // Modify the updated colum
     lppSortKeys[ulColumn] = lpSortData;
@@ -1613,16 +1613,14 @@ ECRESULT ECKeyTable::UpdatePartialSortKey(sObjectTableKey *lpsRowItem, unsigned 
     lpFlags[ulColumn] = ulFlags;
     
     if(lpfHidden)
-        *lpfHidden = lpCurrent->fHidden;
+        *lpfHidden = lpCursor->fHidden;
 
     // Update the row
-    er = UpdateRow(TABLE_ROW_MODIFY, lpsRowItem, lpCurrent->ulSortCols, lpSortLen, lpFlags, lppSortKeys, lpsPrevRow, lpCurrent->fHidden, lpulAction);
+    er = UpdateRow(TABLE_ROW_MODIFY, lpsRowItem, lpCursor->ulSortCols, lpSortLen, lpFlags, lppSortKeys, lpsPrevRow, lpCursor->fHidden, lpulAction);
     if(er != erSuccess)
         goto exit;
     
 exit:
-    lpCurrent = lpCursor;
-
 	pthread_mutex_unlock(&mLock);
 
     if (lppSortKeys)
