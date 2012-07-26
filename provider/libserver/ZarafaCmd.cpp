@@ -4590,7 +4590,7 @@ ECRESULT DoNotifySubscribe(ECSession *lpecSession, unsigned long long ulSessionI
 			goto exit;
 
 		// Check permissions
-		er = lpecSession->GetSecurity()->CheckPermission(ulKey, ecSecurityRead);
+		er = lpecSession->GetSecurity()->CheckPermission(ulKey, ecSecurityFolderVisible);
 		if(er != erSuccess)
 			goto exit;
 	}
