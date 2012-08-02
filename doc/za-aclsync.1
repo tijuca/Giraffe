@@ -46,6 +46,20 @@ For every archived foler in an archived store
 \fB\-h\fR \fIserverpath\fR
 .RS 4
 Host to connect with\&.
+.sp
+Default:
+\fIfile:///var/run/zarafa \fR
+.sp
+Three formats are allowed for this option:
+.sp
+\fBUNIX socket\fR
+: file://\fIpath_to_the_UNIX_socket\fR
+.sp
+\fBHTTP\fR
+: http://\fIhost_or_IP\fR:\fIport\fR/zarafa
+.sp
+\fBSecure HTTP\fR
+: https://\fIhost_or_IP\fR:\fIport\fR/zarafa
 .RE
 .PP
 \fB\-s\fR \fIsslkey_file\fR

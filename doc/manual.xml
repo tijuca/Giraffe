@@ -12279,6 +12279,12 @@
 			</term>
 			<listitem>
 			  <para>Host to connect with.</para>
+			  <para>Default: <replaceable>file:///var/run/zarafa
+			  </replaceable></para>
+			  <para>Three formats are allowed for this option:</para>
+			  <para><option>UNIX socket</option> : file://<replaceable>path_to_the_UNIX_socket</replaceable></para>
+			  <para><option>HTTP</option> : http://<replaceable>host_or_IP</replaceable>:<replaceable>port</replaceable>/zarafa</para>
+			  <para><option>Secure HTTP</option> : https://<replaceable>host_or_IP</replaceable>:<replaceable>port</replaceable>/zarafa</para>
 			</listitem>
 		  </varlistentry>
 
