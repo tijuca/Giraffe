@@ -892,6 +892,11 @@ exit:
 HRESULT ArchiveControlImpl::CleanupArchive(const SObjectEntry &archiveEntry, LPMDB lpUserStore)
 {
 	HRESULT hr = hrSuccess;
+	SPropValuePtr ptrPropVal;
+	EntryIDSet setRefs;
+	EntryIDSet setEntries;
+	EntryIDSet setDead;
+	
 	ArchiveHelperPtr ptrArchiveHelper;
 	MAPIFolderPtr ptrArchiveFolder;
 	ECFolderIterator iEnd;
@@ -903,28 +908,71 @@ HRESULT ArchiveControlImpl::CleanupArchive(const SObjectEntry &archiveEntry, LPM
 	hr = ptrArchiveHelper->GetArchiveFolder(true, &ptrArchiveFolder);
 	if (hr != hrSuccess)
 		goto exit;
+		
 
-	// First process root of archive
-	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Cleaning root of archive");
-	hr = CleanupArchiveFolder(ptrArchiveHelper, ptrArchiveFolder, lpUserStore);
-	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to cleanup archive root. (hr=0x%08x)", hr);
-		hr = hrSuccess;
+	if (m_cleanupAction == caStore) {
+		// If the cleanup action is store, we need to perform the hierarchy cleanup
+		// before cleaning up messages so the hierarchy gets preserved.
+		hr = CleanupHierarchy(ptrArchiveHelper, ptrArchiveFolder, lpUserStore);
+		if (hr != hrSuccess) {
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to cleanup hierarchy.");
+			goto exit;
+		}
 	}
 
-	try {
-		for (ECFolderIterator i = ECFolderIterator(ptrArchiveFolder, MAPI_MODIFY|fMapiDeferredErrors, 0); i != iEnd; ++i) {
-			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Cleaning subfolder of archive");
-			hr = CleanupArchiveFolder(ptrArchiveHelper, *i, lpUserStore);
-			if (hr != hrSuccess) {
-				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to cleanup archive folder. (hr=0x%08x)", hr);
-				hr = hrSuccess;
-			}
-		}
-	} catch (const HrException &he) {
-		hr = he.hr();
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to iterate archive folders. (hr=0x%08x)", hr);
+	// Get the archive store GUID (PR_STORE_RECORD_KEY)
+	hr = HrGetOneProp(ptrArchiveHelper->GetMsgStore(), PR_STORE_RECORD_KEY, &ptrPropVal);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get store GUID of archive store.");
 		goto exit;
+	}
+	
+	if (ptrPropVal->Value.bin.cb != sizeof(GUID)) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Store record key size does not match that of a GUID. size=%u", ptrPropVal->Value.bin.cb);
+		hr = MAPI_E_CORRUPT_DATA;
+		goto exit;
+	}
+	
+	// Get a set of all primary messages that have a reference to this archive.
+	hr = GetAllReferences(lpUserStore, (LPGUID)ptrPropVal->Value.bin.lpb, &setRefs);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to get all references from primary store. (hr=0x%08x)", hr);
+		goto exit;
+	}
+
+
+	hr = GetAllEntries(ptrArchiveHelper, ptrArchiveFolder, &setEntries);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to get all entries from archive store. (hr=0x%08x)", hr);
+		goto exit;
+	}
+
+	// We now have a set containing the entryids of all messages in the archive and a set containing all
+	// references to archives in the primary store, which are those same entryids.
+	// We simply check which entries are in the set of entries from the archive and not in the set of
+	// entries in the primary store. Those can be deleted (or stored).
+	
+	//The difference of two sets is formed by the elements that are present in the first set, but not in
+	//the second one. Notice that this is a directional operation.
+	std::set_difference(setEntries.begin(), setEntries.end(), setRefs.begin(), setRefs.end(), std::inserter(setDead, setDead.begin()));
+	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Found " SIZE_T_PRINTF " dead entries in archive.", setDead.size());
+	
+	if (!setDead.empty()) {
+		if (m_cleanupAction == caStore)
+			hr = MoveAndDetachMessages(ptrArchiveHelper, ptrArchiveFolder, setDead);
+		else
+			hr = DeleteMessages(ptrArchiveFolder, setDead);
+	}
+	
+	if (m_cleanupAction == caDelete) {
+		// If the cleanup action is delete, we need to cleanup the hierarchy after cleaning the
+		// messages because we won't delete non-empty folders. So we want to get rid of the
+		// messages first.
+		hr = CleanupHierarchy(ptrArchiveHelper, ptrArchiveFolder, lpUserStore);
+		if (hr != hrSuccess) {
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to cleanup hierarchy.");
+			goto exit;
+		}
 	}
 
 exit:
@@ -932,149 +980,372 @@ exit:
 }
 
 /**
- * Cleanup an archive folder. Currently this means that all messages will be tested to
- * see if the message in the primary store still exists.
- * The approach to detect this is:
- * 1. Create a list of all messages in the primary folder that is referenced by the
- *    current folder.
- * 2. Open the contentstable of the current folder and see if the referenced entryid
- *    is available in the list. If it is, the reference is valid.
- * 3. If the reference entryid is not found in the list, try to open the the entry on
- *    the primary store, just to be sure the message is realy deleted. If this fails
- *    the message is considered deleted and the archive message will be moved to the
- *    special 'Deleted Items' folder.
- *
- * @param[in]	lpArchiveHelper		An ArchiveHelper object containing the archive store that's being processed.
- * @param[in]	lpArchiveFolder		The archive folder to cleanup.
- * @param[in]	lpUserStore			The primary store, used to check the references.
+ * Get all references to archived items from the primary store. A reference is the entryid of
+ * the archived messages.
+ * 
+ * @param[in]	lpUserStore		The primary store containing the references.
+ * @param[in]	lpArchiveGuid	The GUID of the archive store for which to get the references.
+ * @param[out]	lpReferences	An EntryIDSet containing all references.
  */
-HRESULT ArchiveControlImpl::CleanupArchiveFolder(ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchiveFolder, LPMDB lpUserStore)
+HRESULT ArchiveControlImpl::GetAllReferences(LPMDB lpUserStore, LPGUID lpArchiveGuid, EntryIDSet *lpReferences)
 {
 	HRESULT hr = hrSuccess;
-	MAPIPropHelperPtr ptrFolderHelper;
-	SObjectEntry primaryEntry;
-	MAPIFolderPtr ptrPrimaryFolder;
-	ULONG ulType;
-	ReferenceSet setReferences;
-	ReferenceSet::const_iterator iReference;
-	EntryIDSet setPrimaryEIDs;
-	EntryIDSet::const_iterator iEntryID;
-	MAPIFolderPtr ptrDeletedFolder;
-	EntryIDSet setDeleteEIDs;
+	EntryIDSet setRefs;
+	SPropValuePtr ptrPropVal;
+	ULONG ulType = 0;
+	MAPIFolderPtr ptrIpmSubtree;
+	ECFolderIterator iEnd;
 
-	if (lpArchiveFolder == NULL || lpUserStore == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
+	// Find the primary store IPM subtree
+	hr = HrGetOneProp(lpUserStore, PR_IPM_SUBTREE_ENTRYID, &ptrPropVal);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to locate ipm subtree of primary store. (hr=0x%08x)", hr);
 		goto exit;
 	}
-
-	if (m_lpLogger->Log(EC_LOGLEVEL_INFO)) {
-		SPropValuePtr ptrDisplayName;
-
-		hr = HrGetOneProp(lpArchiveFolder, PR_DISPLAY_NAME_A, &ptrDisplayName);
-		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Cleaning up folder '%s'", hr == hrSuccess ? ptrDisplayName->Value.lpszA : "<Unknown>");
-	}
-
-	hr = MAPIPropHelper::Create(MAPIPropPtr(lpArchiveFolder, true), &ptrFolderHelper);
-	if (hr != hrSuccess)
-		goto exit;
-
-	hr = ptrFolderHelper->GetReference(&primaryEntry);
-	if (hr == MAPI_E_NOT_FOUND) {
-		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Folder does not reference primary folder.");
-		hr = hrSuccess;
-		goto exit;
-	} else if (hr != hrSuccess)
-		goto exit;
-
-	hr = GetReferenceSet(lpArchiveFolder, &setReferences);
-	if (hr != hrSuccess)
-		goto exit;
-
-	if (setReferences.empty()) {
-		m_lpLogger->Log(EC_LOGLEVEL_INFO, "No references found in folder.");
+	
+	hr = lpUserStore->OpenEntry(ptrPropVal->Value.bin.cb, (LPENTRYID)ptrPropVal->Value.bin.lpb, &ptrIpmSubtree.iid, 0, &ulType, &ptrIpmSubtree);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open ipm subtree of primary store. (hr=0x%08x)", hr);
 		goto exit;
 	}
-
-	hr = lpUserStore->OpenEntry(primaryEntry.sItemEntryId.size(), primaryEntry.sItemEntryId, &ptrPrimaryFolder.iid, 0, &ulType, &ptrPrimaryFolder);
-	if (hr == MAPI_E_NOT_FOUND) {
-		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Primary message seems to have been deleted");
-		if (m_cleanupAction == caStore)
-			hr = MoveAndDetachFolder(ptrArchiveHelper, lpArchiveFolder);
-		else
-			hr = DeleteFolder(lpArchiveFolder);
-		goto exit;
-	} else if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to open primary folder. (hr=0x%08x)", hr);
+	
+	hr = AppendAllReferences(ptrIpmSubtree, lpArchiveGuid, &setRefs);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get all references from the ipm subtree. (hr=0x%08x)", hr);
 		goto exit;
 	}
-
-	hr = GetEntryIDSet(ptrPrimaryFolder, &setPrimaryEIDs);
-	if (hr != hrSuccess)
-		goto exit;
-
-	iReference = setReferences.begin();
-	iEntryID = setPrimaryEIDs.begin();
-
-	while (iReference != setReferences.end() && iEntryID != setPrimaryEIDs.end()) {
-		if (iReference->second == *iEntryID) {
-			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Found message in archive and primary list");
-			++iReference;
-			++iEntryID;
-		}
-
-		else if (iReference->second > *iEntryID) {
-			// Skip a message in the primary folder that has no reference from the archive (unarchived)
-			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Skip unreferences message in primary list");
-			++iEntryID;
-		}
-
-		else {
-			// We found a message in the archive folder referencing a message that was not found
-			// in the primary folder. Try to open it to determine if we need to move this message
-			// to the deleted items folder.
-			MessagePtr ptrMessage;
-			
-			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Processing dead reference from archive list");
-			HRESULT hrTmp = lpUserStore->OpenEntry(iReference->second.size(), iReference->second, &ptrMessage.iid, 0, &ulType, &ptrMessage);
-			if (hrTmp == MAPI_E_NOT_FOUND) {
-				// This message should be moved
-				m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Adding message to list of messages to 'delete'.");
-				setDeleteEIDs.insert(iReference->first);
-			} else if (hrTmp != hrSuccess) {
-				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unexpected error while trying to open message. (hr=0x%08x)", hrTmp);
+	
+	try {
+		for (ECFolderIterator i = ECFolderIterator(ptrIpmSubtree, fMapiDeferredErrors, 0); i != iEnd; ++i) {
+			hr = AppendAllReferences(*i, lpArchiveGuid, &setRefs);
+			if (hr != hrSuccess) {
+				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get all references from primary folder. (hr=0x%08x)", hr);
+				goto exit;
 			}
+		}
+	} catch (const HrException &he) {
+		hr = he.hr();
+		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to iterate primary folders. (hr=0x%08x)", hr);
+		goto exit;
+	}
+	
+	lpReferences->swap(setRefs);
+	
+exit:
+	return hr;
+}
 
-			++iReference;
+/**
+ * Get all references to archived items from a primary folder and add them to the
+ * passed set.
+ * 
+ * @param[in]	lpUserStore		The primary store containing the references.
+ * @param[in]	lpArchiveGuid	The GUID of the archive store for which to get the references.
+ * @param[out]	lpReferences	The EntryIDSet to add the references to.
+ */
+HRESULT ArchiveControlImpl::AppendAllReferences(LPMAPIFOLDER lpFolder, LPGUID lpArchiveGuid, EntryIDSet *lpReferences)
+{
+	HRESULT hr = hrSuccess;
+	BYTE prefixData[4 + sizeof(GUID)] = {0};
+	
+	const ULONG ulFlagArray[] = {0, SHOW_SOFT_DELETES};
+	
+	SizedSPropTagArray(1, sptaContentProps) = {1, {PT_NULL}};
+
+	PROPMAP_START
+	PROPMAP_NAMED_ID(ITEM_ENTRYIDS, PT_MV_BINARY, PSETID_Archive, dispidItemEntryIds)
+	PROPMAP_INIT(lpFolder)
+	
+	sptaContentProps.aulPropTag[0] = PROP_ITEM_ENTRYIDS;
+	
+	memcpy(prefixData + 4, lpArchiveGuid, sizeof(GUID));
+	
+	for (size_t i = 0; i < arraySize(ulFlagArray); ++i) {
+		MAPITablePtr ptrTable;
+		
+		hr = lpFolder->GetContentsTable(ulFlagArray[i], &ptrTable);
+		if (hr != hrSuccess)
+			goto exit;
+		
+		hr = ptrTable->SetColumns((LPSPropTagArray)&sptaContentProps, TBL_BATCH);
+		if (hr != hrSuccess)
+			goto exit;
+		
+		while (true) {
+			SRowSetPtr ptrRows;
+			const ULONG batch_size = 128;
+			
+			hr = ptrTable->QueryRows(batch_size, 0, &ptrRows);
+			if (hr != hrSuccess)
+				goto exit;
+			
+			for (SRowSetPtr::size_type j = 0; j < ptrRows.size(); ++j) {
+				if (PROP_TYPE(ptrRows[j].lpProps[0].ulPropTag) == PT_ERROR)
+					continue;
+				
+				for (ULONG k = 0; k < ptrRows[j].lpProps[0].Value.MVbin.cValues; ++k) {
+					if (ptrRows[j].lpProps[0].Value.MVbin.lpbin[k].cb >= sizeof(prefixData) &&
+						memcmp(ptrRows[j].lpProps[0].Value.MVbin.lpbin[k].lpb, prefixData, sizeof(prefixData)) == 0)
+					{
+						lpReferences->insert(ptrRows[j].lpProps[0].Value.MVbin.lpbin[k]);
+					}
+				}
+			}
+			
+			if (ptrRows.size() < batch_size)
+				break;
 		}
 	}
 
-	// if setPrimaryEIDs is not fully processed, it means those messages are just not archived.
-	// if setReferences is not fully processed, it means they didn't reference an item in setEIDs.
-	for (; iReference != setReferences.end(); ++iReference) {
-		// @todo: Get rid of duplicate code.
+exit:
+	return hr;
+}
+
+/**
+ * Get the entryid of almost all messages in an archive store. Everything that's
+ * below the special folder root is excluded because those don't necessarily get
+ * referenced from the primary store anymore.
+ *
+ * @param[in]	ptrArchiveHelper	The ArchiverHelper instance for the archive to process.
+ * @param[in]	lpArchive			The root of the archive.
+ * @param[out]	lpEntryies			An EntryIDSet containing all the entryids.
+ */
+HRESULT ArchiveControlImpl::GetAllEntries(ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchive, EntryIDSet *lpEntries)
+{
+	HRESULT hr = hrSuccess;
+	EntryIDSet setEntries;
+	ECFolderIterator iEnd;
+	EntryIDSet setFolderExcludes;
+	MAPIFolderPtr ptrFolder;
+
+	hr = AppendAllEntries(lpArchive, &setEntries);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get all entries from the root archive folder. (hr=0x%08x)", hr);
+		goto exit;
+	}
+
+	// Exclude everything below the special folder root because that's were we store messages
+	// that have not references to the primary store.
+	hr = ptrArchiveHelper->GetSpecialsRootFolder(&ptrFolder);
+	if (hr == hrSuccess)
+		hr = AppendFolderEntries(ptrFolder, &setFolderExcludes);
+
+	ptrFolder.reset();
+
+	try {
+		for (ECFolderIterator i = ECFolderIterator(lpArchive, fMapiDeferredErrors, 0); i != iEnd; ++i) {
+			SPropValuePtr ptrProp;
+			
+			hr = HrGetOneProp(*i, PR_ENTRYID, &ptrProp);
+			if (hr != hrSuccess)
+				goto exit;
+			
+			if (setFolderExcludes.find(ptrProp->Value.bin) != setFolderExcludes.end()) {
+				m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Skipping special folder");
+				continue;
+			}
+			
+			hr = AppendAllEntries(*i, &setEntries);
+			if (hr != hrSuccess) {
+				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get all references from archive folder. (hr=0x%08x)", hr);
+				goto exit;
+			}
+		}
+	} catch (const HrException &he) {
+		hr = he.hr();
+		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to iterate archive folders. (hr=0x%08x)", hr);
+		goto exit;
+	}
+	
+	lpEntries->swap(setEntries);
+	
+exit:
+	return hr;
+}
+
+/**
+ * Get the entryid of all messages in an archive folder and append them to the passed set.
+ *
+ * @param[in]		ptrArchiveHelper	The ArchiverHelper instance for the archive to process.
+ * @param[in]		lpArchive			The root of the archive.
+ * @param[in,out]	lpEntryies			The EntryIDSet to add the items to.
+ */
+HRESULT ArchiveControlImpl::AppendAllEntries(LPMAPIFOLDER lpArchive, EntryIDSet *lpEntries)
+{
+	HRESULT hr = hrSuccess;
+	MAPITablePtr ptrTable;
+	SRestriction resContent = {0};
+	
+	SizedSPropTagArray(1, sptaContentProps) = {1, {PR_ENTRYID}};
+	
+	PROPMAP_START
+	PROPMAP_NAMED_ID(REF_ITEM_ENTRYID, PT_BINARY, PSETID_Archive, dispidRefItemEntryId)
+	PROPMAP_INIT(lpArchive)
+	
+	resContent.rt = RES_EXIST;
+	resContent.res.resExist.ulPropTag = PROP_REF_ITEM_ENTRYID;
+	
+	hr = lpArchive->GetContentsTable(0, &ptrTable);
+	if (hr != hrSuccess)
+		goto exit;
+	
+	hr = ptrTable->SetColumns((LPSPropTagArray)&sptaContentProps, TBL_BATCH);
+	if (hr != hrSuccess)
+		goto exit;
+	
+	hr = ptrTable->Restrict(&resContent, TBL_BATCH);
+	if (hr != hrSuccess)
+		goto exit;
+	
+	while (true) {
+		SRowSetPtr ptrRows;
+		const ULONG batch_size = 128;
 		
-		// We found a message in the archive folder referencing a message that was not found
-		// in the primary folder. Try to open it to determine if we need to move this message
-		// to the deleted items folder.
-		MessagePtr ptrMessage;
+		hr = ptrTable->QueryRows(batch_size, 0, &ptrRows);
+		if (hr != hrSuccess)
+			goto exit;
 		
-		HRESULT hrTmp = lpUserStore->OpenEntry(iReference->second.size(), iReference->second, &ptrMessage.iid, 0, &ulType, &ptrMessage);
-		if (hrTmp == MAPI_E_NOT_FOUND) {
-			// This message should be moved
-			m_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Adding message to list of messages to 'delete'.");
-			setDeleteEIDs.insert(iReference->first);
-		} else if (hrTmp != hrSuccess) {
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unexpected error while trying to open message. (hr=0x%08x)", hrTmp);
+		for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
+			if (PROP_TYPE(ptrRows[i].lpProps[0].ulPropTag) == PT_ERROR) {
+				hr = ptrRows[i].lpProps[0].Value.err;
+				goto exit;
+			}
+			
+			lpEntries->insert(ptrRows[i].lpProps[0].Value.bin);
+		}
+		
+		if (ptrRows.size() < batch_size)
+			break;
+	}
+
+exit:
+	return hr;
+}
+
+/**
+ * Cleanup the archive hierarchy. This works by going through the heirarchy
+ * and check for each folder if the back reference still works. If it doesn't
+ * the folder should be deleted or moved to the deleted items folder.
+ * When the cleanup_action is 'delete', the folder will only be deleted if
+ * it's empty.
+ * If the cleanup action is 'store', the folder will be moved to the deleted
+ * items folder as is, leaving the hierarchy in tact.
+ * 
+ * @param[in]	ptrArchiveHelper	The ArchiverHelper instance for the archive to process.
+ * @param[in]	lpArchiveRoot		The root of the archive.
+ * @param[out]	lpUserStore			The users primary store.
+ */
+HRESULT ArchiveControlImpl::CleanupHierarchy(ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchiveRoot, LPMDB lpUserStore)
+{
+	HRESULT hr = hrSuccess;
+	MAPITablePtr ptrTable;
+	SRestriction resHierarchy = {0};
+	
+	SizedSSortOrderSet(1, ssosHierarchy) = {0};
+	SizedSPropTagArray(4, sptaHierarchyProps) = {4, {PR_NULL, PR_ENTRYID, PR_CONTENT_COUNT, PR_FOLDER_CHILD_COUNT}};
+	enum {IDX_REF_ITEM_ENTRYID, IDX_ENTRYID, IDX_CONTENT_COUNT, IDX_FOLDER_CHILD_COUNT};
+	
+	PROPMAP_START
+	PROPMAP_NAMED_ID(REF_ITEM_ENTRYID, PT_BINARY, PSETID_Archive, dispidRefItemEntryId)
+	PROPMAP_INIT(lpArchiveRoot)
+	
+	sptaHierarchyProps.aulPropTag[IDX_REF_ITEM_ENTRYID] = PROP_REF_ITEM_ENTRYID;
+	
+	resHierarchy.rt = RES_EXIST;
+	resHierarchy.res.resExist.ulPropTag = PROP_REF_ITEM_ENTRYID;
+	
+	ssosHierarchy.cSorts = 1;
+	ssosHierarchy.cCategories = 0;
+	ssosHierarchy.cExpanded = 0;
+	ssosHierarchy.aSort[0].ulPropTag = PR_DEPTH;
+	ssosHierarchy.aSort[0].ulOrder = TABLE_SORT_ASCEND;
+
+	hr = lpArchiveRoot->GetHierarchyTable(CONVENIENT_DEPTH, &ptrTable);
+	if (hr != hrSuccess)
+		goto exit;
+	
+	hr = ptrTable->SetColumns((LPSPropTagArray)&sptaHierarchyProps, TBL_BATCH);
+	if (hr != hrSuccess)
+		goto exit;
+	
+	hr = ptrTable->Restrict(&resHierarchy, TBL_BATCH);
+	if (hr != hrSuccess)
+		goto exit;
+		
+	hr = ptrTable->SortTable((LPSSortOrderSet)&ssosHierarchy, TBL_BATCH);
+	if (hr != hrSuccess)
+		goto exit;
+	
+	while (true) {
+		SRowSetPtr ptrRows;
+		
+		hr = ptrTable->QueryRows(64, 0, &ptrRows);
+		if (hr != hrSuccess)
+			goto exit;
+			
+		if (ptrRows.empty())
+			break;
+		
+		for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
+			ULONG ulType = 0;
+			MAPIFolderPtr ptrPrimaryFolder;
+			
+			// If the cleanup action is delete, we don't want to delete a folder that's not empty because it might contain messages that
+			// have been moved in the primary store before the original folder was deleted. If we were to delete the folder in the archive
+			// we would lose that data.
+			// But if the cleanup action is store, we do want to move the folder with content so the hierarchy is preserverd.
+			
+			if (m_cleanupAction == caDelete) {
+				// The content count and folder child count should always exist. If not we'll skip the folder
+				// just to be safe.
+				if (PROP_TYPE(ptrRows[i].lpProps[IDX_CONTENT_COUNT].ulPropTag) == PT_ERROR) {
+					m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to obtain folder content count. Skipping folder. (hr=0x%08x)", ptrRows[i].lpProps[IDX_CONTENT_COUNT].Value.err);
+					continue;
+				} else if (ptrRows[i].lpProps[IDX_CONTENT_COUNT].Value.l != 0) {
+					m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Folder contains messages. Skipping folder.");
+					continue;
+				}
+				
+				if (PROP_TYPE(ptrRows[i].lpProps[IDX_FOLDER_CHILD_COUNT].ulPropTag) == PT_ERROR)	{
+					m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to obtain folder child count. Skipping folder. (hr=0x%08x)", ptrRows[i].lpProps[IDX_FOLDER_CHILD_COUNT].Value.err);
+					continue;
+				} else if (ptrRows[i].lpProps[IDX_FOLDER_CHILD_COUNT].Value.l != 0) {
+					m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Folder has subfolders it. Skipping folder.");
+					continue;
+				}
+			}
+			
+			hr = lpUserStore->OpenEntry(ptrRows[i].lpProps[IDX_REF_ITEM_ENTRYID].Value.bin.cb, (LPENTRYID)ptrRows[i].lpProps[IDX_REF_ITEM_ENTRYID].Value.bin.lpb,
+										&ptrPrimaryFolder.iid, 0, &ulType, &ptrPrimaryFolder);
+			if (hr == MAPI_E_NOT_FOUND) {
+				MAPIFolderPtr ptrArchiveFolder;
+				SPropValuePtr ptrProp;
+				
+				hr = lpArchiveRoot->OpenEntry(ptrRows[i].lpProps[IDX_ENTRYID].Value.bin.cb, (LPENTRYID)ptrRows[i].lpProps[IDX_ENTRYID].Value.bin.lpb,
+											  &ptrArchiveFolder.iid, MAPI_MODIFY, &ulType, &ptrArchiveFolder);
+				if (hr != hrSuccess)
+					goto exit;
+				
+				// Check if we still have a back-ref
+				if (HrGetOneProp(ptrArchiveFolder, PROP_REF_ITEM_ENTRYID, &ptrProp) != hrSuccess) {
+					m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Back ref is gone. Folder is possibly moved to the deleted items already.");
+					continue;
+				}
+				
+				// The primary folder does not exist anymore and this folder is empty. Time to get rid of it.
+				m_lpLogger->Log(EC_LOGLEVEL_INFO, "Primary folder seems to have been deleted");
+				if (m_cleanupAction == caStore)
+					hr = MoveAndDetachFolder(ptrArchiveHelper, ptrArchiveFolder);
+				else
+					hr = DeleteFolder(ptrArchiveFolder);
+				if (hr != hrSuccess)
+					m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to process dead folder. (hr=0x%08x)", hr);
+			}
+			if (hr != hrSuccess)
+				goto exit;
 		}
 	}
-
-	if (!setDeleteEIDs.empty()) {
-		if (m_cleanupAction == caStore)
-			hr = MoveAndDetachMessages(ptrArchiveHelper, lpArchiveFolder, setDeleteEIDs);
-		else
-			hr = DeleteMessages(lpArchiveFolder, setDeleteEIDs);
-	}
-
+	
 exit:
 	return hr;
 }
@@ -1168,6 +1439,7 @@ HRESULT ArchiveControlImpl::MoveAndDetachFolder(ArchiveHelperPtr ptrArchiveHelpe
 	SPropValuePtr ptrEntryID;
 	MAPIFolderPtr ptrDelItemsFolder;
 	MAPIPropHelperPtr ptrHelper;
+	ECFolderIterator iEnd;
 
 	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Moving folder to the special 'Deleted Items' folder...");
 
@@ -1192,6 +1464,25 @@ HRESULT ArchiveControlImpl::MoveAndDetachFolder(ArchiveHelperPtr ptrArchiveHelpe
 	hr = ptrHelper->ClearReference(true);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to clear back reference. (hr=0x%08x)", hr);
+		goto exit;
+	}
+	
+	// Get rid of references of all subfolders
+	try {
+		for (ECFolderIterator i = ECFolderIterator(lpArchiveFolder, fMapiDeferredErrors, 0); i != iEnd; ++i) {
+			MAPIPropHelperPtr ptrSubHelper;
+			
+			hr = MAPIPropHelper::Create(MAPIPropPtr(*i, true), &ptrSubHelper);
+			if (hr != hrSuccess)
+				goto exit;
+			
+			hr = ptrSubHelper->ClearReference(true);
+			if (hr != hrSuccess)
+				m_lpLogger->Log(EC_LOGLEVEL_INFO, "Failed to clean reference of subfolder.");
+		}
+	} catch (const HrException &he) {
+		hr = he.hr();
+		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to iterate folders. (hr=0x%08x)", hr);
 		goto exit;
 	}
 
@@ -1271,125 +1562,46 @@ exit:
 }
 
 /**
- * Get a set of entryids, containing the entryids of all the message in a folder.
- *
- * @param[in]		lpFolder	The folder to get the entryids from.
- * @param[in,out]	lpSetEIDs	The set of entryids.
+ * Append the entryid of the passed folder and all its subfolder to a list.
+ * @param[in]	lpBase		The folder to start processing.
+ * @param[out]	lpEntries	The returned set of entryids.
  */
-HRESULT ArchiveControlImpl::GetEntryIDSet(LPMAPIFOLDER lpFolder, EntryIDSet *lpSetEIDs)
+HRESULT ArchiveControlImpl::AppendFolderEntries(LPMAPIFOLDER lpBase, EntryIDSet *lpEntries)
 {
 	HRESULT hr = hrSuccess;
-	MAPITablePtr ptrContentsTable;
-	mapi_rowset_ptr ptrRows;
-	EntryIDSet setEIDs;
-
-	SizedSPropTagArray(1, sptaColumnProps) = {1, {PR_ENTRYID}};
-
-	if (lpFolder == NULL || lpSetEIDs == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
+	SPropValuePtr ptrProp;
+	MAPITablePtr ptrTable;
+	
+	SizedSPropTagArray(1, sptaTableProps) = {1, {PR_ENTRYID}};
+	
+	hr = HrGetOneProp(lpBase, PR_ENTRYID, &ptrProp);
+	if (hr != hrSuccess)
 		goto exit;
-	}
-
-	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Getting list of messages...");
-
-	hr = lpFolder->GetContentsTable(0, &ptrContentsTable);
-	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to get contents table. (hr=0x%08x)", hr);
+	
+	lpEntries->insert(ptrProp->Value.bin);
+	
+	hr = lpBase->GetHierarchyTable(CONVENIENT_DEPTH, &ptrTable);
+	if (hr != hrSuccess)
 		goto exit;
-	}
-
-	hr = ptrContentsTable->SetColumns((LPSPropTagArray)&sptaColumnProps, TBL_BATCH);
-	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to select columns on contents table. (hr=0x%08x)", hr);
+	
+	hr = ptrTable->SetColumns((LPSPropTagArray)&sptaTableProps, TBL_BATCH);
+	if (hr != hrSuccess)
 		goto exit;
-	}
-
+	
 	while (true) {
-		hr = ptrContentsTable->QueryRows(64, 0, &ptrRows);
-		if (hr != hrSuccess) {
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to query contents table. (hr=0x%08x)", hr);
+		SRowSetPtr ptrRows;
+		
+		hr = ptrTable->QueryRows(128, 0, &ptrRows);
+		if (hr != hrSuccess)
 			goto exit;
-		}
-
+		
 		if (ptrRows.empty())
 			break;
-
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Got %u rows from contents table", ptrRows.size());
-		for (mapi_rowset_ptr::size_type i = 0; i < ptrRows.size(); ++i)
-			setEIDs.insert(ptrRows[i].lpProps[0].Value.bin);
+		
+		for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i)
+			lpEntries->insert(ptrRows[i].lpProps[0].Value.bin);
 	}
-
-	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Got "SIZE_T_PRINTF" rows from contents table", setEIDs.size());
-	lpSetEIDs->swap(setEIDs);
-
-exit:
-	return hr;
-}
-
-/**
- * Get a set of entryids and references, containing the entryids of all the message in a folder
- * that have a referenec to a primary message.
- *
- * @param[in]		lpFolder	The folder to get the data from.
- * @param[in,out]	lpSetRefs	The set of entryids and references.
- */
-HRESULT ArchiveControlImpl::GetReferenceSet(LPMAPIFOLDER lpFolder, ReferenceSet *lpSetRefs)
-{
-	HRESULT hr = hrSuccess;
-	MAPITablePtr ptrContentsTable;
-	mapi_rowset_ptr ptrRows;
-	ReferenceSet setRefs;
-
-	SizedSPropTagArray(2, sptaColumnProps) = {2, {PR_ENTRYID, PR_NULL}};
-	enum {IDX_ENTRYID, IDX_REF_ITEM_ENTRYID};
-
-	PROPMAP_START
-		PROPMAP_NAMED_ID(REF_ITEM_ENTRYID, PT_BINARY, PSETID_Archive, dispidRefItemEntryId)
-	PROPMAP_INIT(lpFolder)
-
-	sptaColumnProps.aulPropTag[IDX_REF_ITEM_ENTRYID] = PROP_REF_ITEM_ENTRYID;
-
-	if (lpFolder == NULL || lpSetRefs == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Getting list of messages with back references...");
-
-	hr = lpFolder->GetContentsTable(0, &ptrContentsTable);
-	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to get contents table. (hr=0x%08x)", hr);
-		goto exit;
-	}
-
-	hr = ptrContentsTable->SetColumns((LPSPropTagArray)&sptaColumnProps, TBL_BATCH);
-	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to select columns on contents table. (hr=0x%08x)", hr);
-		goto exit;
-	}
-
-	while (true) {
-		hr = ptrContentsTable->QueryRows(64, 0, &ptrRows);
-		if (hr != hrSuccess) {
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to query contents table. (hr=0x%08x)", hr);
-			goto exit;
-		}
-
-		if (ptrRows.empty())
-			break;
-
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Got %u rows from contents table", ptrRows.size());
-		for (mapi_rowset_ptr::size_type i = 0; i < ptrRows.size(); ++i) {
-			if (PROP_TYPE(ptrRows[i].lpProps[IDX_REF_ITEM_ENTRYID].ulPropTag) != PT_ERROR) {
-				m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Adding row %u", i);
-				setRefs.insert(make_pair(ptrRows[i].lpProps[IDX_ENTRYID].Value.bin, ptrRows[i].lpProps[IDX_REF_ITEM_ENTRYID].Value.bin));
-			}
-		}
-	}
-
-	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Got "SIZE_T_PRINTF" rows from contents table", setRefs.size());
-	lpSetRefs->swap(setRefs);
-
+	
 exit:
 	return hr;
 }

@@ -191,17 +191,21 @@ private:
 	HRESULT PurgeArchiveFolder(MsgStorePtr &ptrArchive, const entryid_t &folderEntryID, const LPSRestriction lpRestriction);
 
 	HRESULT CleanupArchive(const SObjectEntry &archiveEntry, LPMDB lpUserStore);
-	HRESULT CleanupArchiveFolder(za::helpers::ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchiveFolder, LPMDB lpUserStore);
+	HRESULT GetAllReferences(LPMDB lpUserStore, LPGUID lpArchiveGuid, EntryIDSet *lpMsgReferences);
+	HRESULT AppendAllReferences(LPMAPIFOLDER lpRoot, LPGUID lpArchiveGuid, EntryIDSet *lpMsgReferences);
+	HRESULT GetAllEntries(za::helpers::ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchive, EntryIDSet *lpEntries);
+	HRESULT AppendAllEntries(LPMAPIFOLDER lpArchive, EntryIDSet *lpMsgEntries);
+	//HRESULT CleanupArchiveFolder(za::helpers::ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchiveFolder, LPMDB lpUserStore);
+	HRESULT CleanupHierarchy(za::helpers::ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchiveRoot, LPMDB lpUserStore);
 
 	HRESULT MoveAndDetachMessages(za::helpers::ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchiveFolder, const EntryIDSet &setEIDs);
 	HRESULT MoveAndDetachFolder(za::helpers::ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchiveFolder);
 
 	HRESULT DeleteMessages(LPMAPIFOLDER lpArchiveFolder, const EntryIDSet &setEIDs);
 	HRESULT DeleteFolder(LPMAPIFOLDER lpArchiveFolder);
-
-	HRESULT GetEntryIDSet(LPMAPIFOLDER lpFolder, EntryIDSet *lpSetEIDs);
-	HRESULT GetReferenceSet(LPMAPIFOLDER lpFolder, ReferenceSet *lpSetRefs);
-
+	
+	HRESULT AppendFolderEntries(LPMAPIFOLDER lpBase, EntryIDSet *lpEntries);
+	
 private:
 	enum eCleanupAction { caDelete, caStore };
 

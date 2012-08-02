@@ -104,6 +104,7 @@ public:
 	HRESULT GetHistoryFolder(LPMAPIFOLDER *lppHistoryFolder);
 	HRESULT GetOutgoingFolder(LPMAPIFOLDER *lppOutgoingFolder);
 	HRESULT GetDeletedItemsFolder(LPMAPIFOLDER *lppOutgoingFolder);
+	HRESULT GetSpecialsRootFolder(LPMAPIFOLDER *lppSpecialsRootFolder);
 
 	HRESULT GetArchiveFolder(bool bCreate, LPMAPIFOLDER *lppArchiveFolder);
 	HRESULT IsArchiveFolder(LPMAPIFOLDER lpFolder, bool *lpbResult);
@@ -125,7 +126,7 @@ private:
 	};
 	HRESULT GetSpecialFolderEntryID(eSpecFolder sfWhich, ULONG *lpcbEntryID, LPENTRYID *lppEntryID);
 	HRESULT SetSpecialFolderEntryID(eSpecFolder sfWhich, ULONG cbEntryID, LPENTRYID lpEntryID);
-	HRESULT GetSpecialFolder(eSpecFolder sfWhich, LPMAPIFOLDER *lppSpecialFolder);
+	HRESULT GetSpecialFolder(eSpecFolder sfWhich, bool bCreate, LPMAPIFOLDER *lppSpecialFolder);
 	HRESULT CreateSpecialFolder(eSpecFolder sfWhich, LPMAPIFOLDER *lppSpecialFolder);
 	HRESULT IsSpecialFolder(eSpecFolder sfWhich, LPMAPIFOLDER lpFolder, bool *lpbResult);
 

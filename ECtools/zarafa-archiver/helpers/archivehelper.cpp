@@ -715,19 +715,40 @@ exit:
 	return hr;
 }
 
+/**
+ * Get the History folder. If the folder doesn't exist it will be created.
+ */
 HRESULT ArchiveHelper::GetHistoryFolder(LPMAPIFOLDER *lppHistoryFolder)
 {
-	return GetSpecialFolder(sfHistory, lppHistoryFolder);
+	return GetSpecialFolder(sfHistory, true, lppHistoryFolder);
 }
 
+/**
+ * Get the Outgoing foler. If the folder doesn't exist it will be created.
+ */
 HRESULT ArchiveHelper::GetOutgoingFolder(LPMAPIFOLDER *lppOutgoingFolder)
 {
-	return GetSpecialFolder(sfOutgoing, lppOutgoingFolder);
+	return GetSpecialFolder(sfOutgoing, true, lppOutgoingFolder);
 }
 
+/**
+ * Get the DeletedItems folder. If the folder doesn't exist it will be created.
+ * @note: This is not the trash folder, but a special archive folder that contains
+ *        messages that were deleted in the primary store.
+ */
 HRESULT ArchiveHelper::GetDeletedItemsFolder(LPMAPIFOLDER *lppOutgoingFolder)
 {
-	return GetSpecialFolder(sfDeleted, lppOutgoingFolder);
+	return GetSpecialFolder(sfDeleted, true, lppOutgoingFolder);
+}
+
+/**
+ * Get the root folder of the special folders. This folder contains the history,
+ * outgoing and deleted items folders. If the folder doesn't exist it won't be
+ * created.
+ */
+HRESULT ArchiveHelper::GetSpecialsRootFolder(LPMAPIFOLDER *lppSpecialsRootFolder)
+{
+	return GetSpecialFolder(sfBase, false, lppSpecialsRootFolder);
 }
 
 /**
@@ -893,7 +914,14 @@ exit:
 	return hr;
 }
 
-HRESULT ArchiveHelper::GetSpecialFolder(eSpecFolder sfWhich, LPMAPIFOLDER *lppSpecialFolder)
+/**
+ * Open one of the special folders.
+ * 
+ * @param[in]	sfWhich				The folder to open. Valid values are sfBase, sfHistory, sfOutgoing and sfDeleted.
+ * @param[in]	bCreate				Specify if the folder should be created if absent.
+ * @param[out]	lppSpecialFolder	Will point to the special folder on success.
+ */
+HRESULT ArchiveHelper::GetSpecialFolder(eSpecFolder sfWhich, bool bCreate, LPMAPIFOLDER *lppSpecialFolder)
 {
 	HRESULT hr = hrSuccess;
 	ULONG ulSpecialFolderID;
@@ -904,14 +932,13 @@ HRESULT ArchiveHelper::GetSpecialFolder(eSpecFolder sfWhich, LPMAPIFOLDER *lppSp
 	if (hr == hrSuccess) {
 		ULONG ulType;
 		hr = m_ptrArchiveStore->OpenEntry(ulSpecialFolderID, ptrSpecialFolderID, &ptrSpecialFolder.iid, MAPI_MODIFY, &ulType, &ptrSpecialFolder);
-		if (hr != hrSuccess)
-			goto exit;
-	} else {
+	} else if (hr == MAPI_E_NOT_FOUND && bCreate) {
 		hr = CreateSpecialFolder(sfWhich, &ptrSpecialFolder);
-		if (hr != hrSuccess)
-			goto exit;
 	}
 
+	if (hr != hrSuccess)
+		goto exit;
+	
 	hr = ptrSpecialFolder->QueryInterface(IID_IMAPIFolder, (LPVOID*)lppSpecialFolder);
 
 exit:
@@ -934,7 +961,7 @@ HRESULT ArchiveHelper::CreateSpecialFolder(eSpecFolder sfWhich, LPMAPIFOLDER *lp
 		hr = GetArchiveFolder(true, &ptrParent);
 	} else {
 		// We need to get the special root to create the other special folders in
-		hr = GetSpecialFolder(sfBase, &ptrParent);
+		hr = GetSpecialFolder(sfBase, true, &ptrParent);
 	}
 	if (hr != hrSuccess)
 		goto exit;
