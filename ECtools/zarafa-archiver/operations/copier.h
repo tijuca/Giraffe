@@ -73,6 +73,12 @@ public:
 	~Copier();
 
 	/**
+	 * Override ArchiveOperationBaseEx's GetRestriction to add some more
+	 * magic.
+	 */
+	HRESULT GetRestriction(LPMAPIPROP lpMapiProp, LPSRestriction *lppRestriction);
+
+	/**
 	 * Set the operation that will perform the deletion if required.
 	 * @param[in]	ptrDeleteOp		The delete operation.
 	 */

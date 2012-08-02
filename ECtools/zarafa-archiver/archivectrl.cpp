@@ -633,7 +633,7 @@ HRESULT ArchiveControlImpl::ProcessFolder(MAPIFolderPtr &ptrFolder, ArchiveOpera
 		goto exit;
 	}
 
-	hr = ptrArchiveOperation->GetRestriction(PR_NULL, &ptrRestriction);
+	hr = ptrArchiveOperation->GetRestriction(ptrFolder, &ptrRestriction);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to get restriction from operation. (hr=%s)", stringify(hr, true).c_str());
 		goto exit;

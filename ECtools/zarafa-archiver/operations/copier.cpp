@@ -50,6 +50,7 @@
 #include <platform.h>
 #include "ECLogger.h"
 #include "ECConfig.h"
+#include "ECRestriction.h"
 #include "copier.h"
 #include "deleter.h"
 #include "stubber.h"
@@ -457,6 +458,35 @@ Copier::Copier(SessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, co
 Copier::~Copier()
 {
 	m_ptrTransaction->PurgeDeletes(m_ptrSession);
+}
+
+HRESULT Copier::GetRestriction(LPMAPIPROP lpMapiProp, LPSRestriction *lppRestriction)
+{
+	HRESULT hr = hrSuccess;
+	ECOrRestriction resResult;
+	SRestrictionPtr ptrRestriction;
+
+	PROPMAP_START
+	PROPMAP_NAMED_ID(ORIGINAL_SOURCE_KEY, PT_BINARY, PSETID_Archive, dispidOrigSourceKey)
+	PROPMAP_INIT(lpMapiProp)
+
+	// Start out with the base restriction, which checks if a message is
+	// old enough to be processed.
+	hr = ArchiveOperationBaseEx::GetRestriction(lpMapiProp, &ptrRestriction);
+	if (hr != hrSuccess)
+		goto exit;
+	resResult.append(ECRawRestriction(ptrRestriction));
+
+	// A reason to process a message before being old enough is when
+	// it's already archived (by archive-on-delivery or because the required
+	// age has changed). We'll check that by checking if PROP_ORIGINAL_SOURCE_KEY
+	// is present.
+	resResult.append(ECExistRestriction(PROP_ORIGINAL_SOURCE_KEY));
+
+	hr = resResult.CreateMAPIRestriction(lppRestriction);
+
+exit:
+	return hr;
 }
 
 HRESULT Copier::EnterFolder(LPMAPIFOLDER lpFolder)

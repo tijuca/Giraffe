@@ -86,7 +86,7 @@ ArchiveOperationBase::ArchiveOperationBase(ECLogger *lpLogger, int ulAge, bool b
 
 
 
-HRESULT ArchiveOperationBase::GetRestriction(ULONG nptFlags, LPSRestriction *lppRestriction)
+HRESULT ArchiveOperationBase::GetRestriction(LPMAPIPROP lpMapiProp, LPSRestriction *lppRestriction)
 {
 	HRESULT hr = hrSuccess;
 	ULARGE_INTEGER li;
@@ -103,6 +103,10 @@ HRESULT ArchiveOperationBase::GetRestriction(ULONG nptFlags, LPSRestriction *lpp
 			ECPropertyRestriction(RELOP_LT, PR_CLIENT_SUBMIT_TIME, &sPropRefTime, ECRestriction::Cheap)
 		)
 	);
+
+	PROPMAP_START
+	PROPMAP_NAMED_ID(FLAGS, PT_LONG, PSETID_Archive, dispidFlags)
+	PROPMAP_INIT(lpMapiProp)
 
 	if (lppRestriction == NULL) {
 		hr = MAPI_E_INVALID_PARAMETER;
@@ -126,15 +130,14 @@ HRESULT ArchiveOperationBase::GetRestriction(ULONG nptFlags, LPSRestriction *lpp
 	resResult.append(resDefault);
 	if (!m_bProcessUnread)
 		resResult.append(ECBitMaskRestriction(BMR_NEZ, PR_MESSAGE_FLAGS, MSGFLAG_READ));
-	if (nptFlags != PR_NULL)
-		resResult.append(
-			ECNotRestriction(
-				ECAndRestriction(
-					ECExistRestriction(nptFlags) +
-					ECBitMaskRestriction(BMR_NEZ, nptFlags, m_ulInhibitMask)
-				)
+	resResult.append(
+		ECNotRestriction(
+			ECAndRestriction(
+				ECExistRestriction(PROP_FLAGS) +
+				ECBitMaskRestriction(BMR_NEZ, PROP_FLAGS, m_ulInhibitMask)
 			)
-		);
+		)
+	);
 
 
 	hr = resResult.CreateMAPIRestriction(lppRestriction);
@@ -148,11 +151,7 @@ HRESULT ArchiveOperationBase::VerifyRestriction(LPMESSAGE lpMessage)
 	HRESULT hr = hrSuccess;
 	SRestrictionPtr ptrRestriction;
 
-	PROPMAP_START
-	PROPMAP_NAMED_ID(FLAGS, PT_LONG, PSETID_Archive, dispidFlags)
-	PROPMAP_INIT(lpMessage)
-	
-	hr = GetRestriction(PROP_FLAGS, &ptrRestriction);
+	hr = GetRestriction(lpMessage, &ptrRestriction);
 	if (hr != hrSuccess)
 		goto exit;
 

@@ -88,10 +88,10 @@ public:
 	/**
 	 * Obtain the restriction the messages need to match in order to be processed by this operation.
 	 *
-	 * @param[in]	nptFlags			The value of the named PropTag "flags"
+	 * @param[in]	LPMAPIPROP			A MAPIProp object that's used to resolve named properties on.
 	 * @param[out]	lppRestriction		The restriction to be matched.
 	 */
-	virtual HRESULT GetRestriction(ULONG nptFlags, LPSRestriction *lppRestriction) = 0;
+	virtual HRESULT GetRestriction(LPMAPIPROP LPMAPIPROP, LPSRestriction *lppRestriction) = 0;
 
 	/**
 	 * Verify the message to make sure a message isn't processed while it shouldn't caused
@@ -116,7 +116,7 @@ class ArchiveOperationBase : public IArchiveOperation
 {
 public:
 	ArchiveOperationBase(ECLogger *lpLogger, int ulAge, bool bProcessUnread, ULONG ulInhibitMask);
-	HRESULT GetRestriction(ULONG nptFlags, LPSRestriction *lppRestriction);
+	HRESULT GetRestriction(LPMAPIPROP LPMAPIPROP, LPSRestriction *lppRestriction);
 	HRESULT VerifyRestriction(LPMESSAGE lpMessage);
 
 protected:
