@@ -1043,7 +1043,7 @@ function collapseXML(xmlroot) {
 			var attributes = new Object;
 			if(node.attributes) {
 				for(var j=0;j<node.attributes.length;j++) {
-					attributes[node.attributes.item(j).nodeName] = node.attributes.item(j).firstChild.nodeValue;
+					attributes[node.attributes.item(j).name] = node.attributes.item(j).value;
 				}
 			}
 
