@@ -455,6 +455,11 @@ HRESULT ECMAPITable::FindRow(LPSRestriction lpRestriction, BOOKMARK bkOrigin, UL
 
 	pthread_mutex_lock(&m_hLock);
 
+	if (!lpRestriction) {
+		hr = MAPI_E_INVALID_PARAMETER;
+		goto exit;
+	}
+
 	hr = FlushDeferred();
 	if(hr != hrSuccess)
 	    goto exit;
