@@ -3229,10 +3229,10 @@ SWIGINTERN PyObject *_wrap_IUnknown_QueryInterface(PyObject *SWIGUNUSEDPARM(self
   void **arg3 = (void **) 0 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  int res2 ;
-  char *buf2 ;
-  size_t size2 ;
-  int alloc2 ;
+  int res2 = 0 ;
+  char *buf2 = NULL ;
+  size_t size2 = 0 ;
+  int alloc2 = 0 ;
   LPUNKNOWN temp3 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
