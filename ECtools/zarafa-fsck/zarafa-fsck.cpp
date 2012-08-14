@@ -158,9 +158,11 @@ void disclaimer()
 	cout << "it may fail doing so, and possibly make things worse." << endl;
 	cout << "Unfixable items should be deleted from the calender to make it" << endl;
 	cout << "correctly viewable in both Microsoft Outlook and Zarafa Webaccess again." << endl;
+	cout << "This tool can affect the performance of the server." << endl;
 	cout << endl;
 	cout << "Zarafa cannot be held responsible for loss of data," << endl;
 	cout << "or any other damage this program may cause." << endl;
+	cout << "Ensure a good working backup is made." << endl;
 	cout << "To accept these terms, press <ENTER> to continue or <CTRL-C> to quit." << endl;
 
 	getline(cin,dummy);
