@@ -104,13 +104,17 @@ ECNotificationManager::~ECNotificationManager()
     m_bExit = true;
     pthread_cond_broadcast(&m_condSessions);
     pthread_mutex_unlock(&m_mutexSessions);
-    
+
+	m_lpLogger->Log(EC_LOGLEVEL_INFO, "Shutdown notification manager");
     pthread_join(m_thread, NULL);
 
     // Close and free any pending requests (clients will receive EOF)
     std::map<ECSESSIONID, NOTIFREQUEST>::iterator iterRequest;
     for(iterRequest = m_mapRequests.begin(); iterRequest != m_mapRequests.end(); iterRequest++) {
-        soap_free(iterRequest->second.soap);
+		// we can't call zarafa_notify_done here, race condition on shutdown in ECSessionManager vs ECDispatcher
+		zarafa_end_soap_connection(iterRequest->second.soap);
+		soap_end(iterRequest->second.soap);
+		soap_free(iterRequest->second.soap);
     }
     
     pthread_mutex_destroy(&m_mutexSessions);
@@ -263,7 +267,7 @@ void *ECNotificationManager::Work() {
                     // The session is dead
                     notifications.er = ZARAFA_E_END_OF_SESSION;
                 }
-                        
+
                 // Send the SOAP data
 				if(soapresponse(notifications, iterRequest->second.soap)) {
 					// Handle error on the response
