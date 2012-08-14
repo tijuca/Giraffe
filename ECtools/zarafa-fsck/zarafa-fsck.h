@@ -52,6 +52,7 @@
 
 #include "platform.h"
 #include <string>
+#include <list>
 using namespace std;
 
 #include <mapidefs.h>
