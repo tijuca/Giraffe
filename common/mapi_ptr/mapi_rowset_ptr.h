@@ -196,6 +196,14 @@ public:
 		return m_lpsRowSet;
 	}
 
+	// Visual studio doesn't use the operator[] if there's also an operator pointer, because
+	// there's a built in operator[pointer, int] that it also considers. This causes VS to
+	// not be able to make up its mind.
+	//
+	// So code that uses SRowSetPtr or AdrListPtr and need to pass those as a raw pointer in
+	// code that has to compile in windows have to use ptrPointer.get().
+	//
+	// Effectively this means that the following two methods might/should disappear completely.
 	const set_pointer_type operator->() const {
 		return m_lpsRowSet;
 	}
