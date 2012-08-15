@@ -113,6 +113,7 @@
 #include "../server/ECSoapServerConnection.h"
 
 #include "ZarafaCmdUtil.h"
+#include "ECThreadPool.h"
 
 #define STRIN_FIX(s) (bSupportUnicode ? (s) : ECStringCompat::WTF1252_to_UTF8(soap, (s)))
 #define STROUT_FIX(s) (bSupportUnicode ? (s) : ECStringCompat::UTF8_to_WTF1252(soap, (s)))
@@ -10533,6 +10534,7 @@ typedef struct {
 	ECDatabase		*lpDatabase;
 	ECAttachmentStorage *lpAttachmentStorage;
 	ECRESULT er;
+	ECThreadPool	*lpThreadPool;
 } MTOMSessionInfo;
 
 typedef struct {
@@ -10543,7 +10545,7 @@ typedef struct {
 	unsigned long long ullIMAP;
 	GUID			sGuid;
 	ULONG			ulFlags;
-	pthread_t		hThread;
+	ECWaitableTask  *lpTask;
 	struct propValArray *lpPropValArray;
 	MTOMSessionInfo *lpSessionInfo;
 } MTOMStreamInfo;
@@ -10576,6 +10578,8 @@ void *SerializeObject(void *arg)
 
 void *MTOMReadOpen(struct soap* soap, void *handle, const char *id, const char* /*type*/, const char* /*options*/)
 {
+	typedef ECDeferredFunc<void*, void*(*)(void*), void*> task_type;
+
 	LPMTOMStreamInfo	lpStreamInfo = NULL;
 
 	lpStreamInfo = (LPMTOMStreamInfo)handle;
@@ -10589,14 +10593,16 @@ void *MTOMReadOpen(struct soap* soap, void *handle, const char *id, const char* 
 	lpStreamInfo->lpFifoBuffer = new ECFifoBuffer();
 
 	if (strncmp(id, "emcas-", 6) == 0) {
-		if (pthread_create(&lpStreamInfo->hThread, NULL, &SerializeObject, lpStreamInfo)) {
-			g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Failed to start serialization thread for '%s'", id);
+		std::auto_ptr<task_type> ptrTask(new task_type(SerializeObject, lpStreamInfo));
+		if (ptrTask->dispatchOn(lpStreamInfo->lpSessionInfo->lpThreadPool) == false) {
+			g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Failed to dispatch serialization task for '%s'", id);
 			soap->error = SOAP_FATAL_ERROR;
 
 			delete lpStreamInfo->lpFifoBuffer;
 			lpStreamInfo->lpFifoBuffer = NULL;
 			return NULL;
 		}
+		lpStreamInfo->lpTask = ptrTask.release();
 	} else {
 		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Got stream request for unknown id: '%s'", id);
 		soap->error = SOAP_FATAL_ERROR;
@@ -10636,7 +10642,10 @@ void MTOMReadClose(struct soap* soap, void *handle)
 	// Since gSOAP won't be reading from the FIFO in any case once we
 	// read this point it's safe to just close the FIFO.
 	lpStreamInfo->lpFifoBuffer->Close(ECFifoBuffer::cfRead);
-	pthread_join(lpStreamInfo->hThread, NULL);
+	if (lpStreamInfo->lpTask) {
+		lpStreamInfo->lpTask->wait();	 // Todo: use result() to wait and get result
+		delete lpStreamInfo->lpTask;
+	}
 	delete lpStreamInfo->lpFifoBuffer;
 	lpStreamInfo->lpFifoBuffer = NULL;
 }
@@ -10648,6 +10657,7 @@ void MTOMSessionDone(void *param)
 	lpInfo->lpAttachmentStorage->Release();
 	lpInfo->lpecSession->Unlock();
 	delete lpInfo->lpSharedDatabase;
+	delete lpInfo->lpThreadPool;
 	delete lpInfo;
 }
 
@@ -10733,6 +10743,7 @@ SOAP_ENTRY_START(exportMessageChangesAsStream, lpsResponse->er, unsigned int ulF
 	lpMTOMSessionInfo->lpecSession->Lock();
 	lpMTOMSessionInfo->lpSharedDatabase = lpBatchDB;
 	lpMTOMSessionInfo->er = erSuccess;
+	lpMTOMSessionInfo->lpThreadPool = new ECThreadPool(1);
 	
 	((SOAPINFO *)soap->user)->fdone = MTOMSessionDone;
 	((SOAPINFO *)soap->user)->fdoneparam = lpMTOMSessionInfo;
@@ -10800,6 +10811,7 @@ SOAP_ENTRY_START(exportMessageChangesAsStream, lpsResponse->er, unsigned int ulF
 		lpStreamInfo->sGuid = sGuid;
 		lpStreamInfo->ulFlags = ulFlags;
 		lpStreamInfo->lpPropValArray = NULL;
+		lpStreamInfo->lpTask = NULL;
 		lpStreamInfo->lpSessionInfo = lpMTOMSessionInfo;
 
 		if(bUseSQLMulti)
@@ -10880,17 +10892,21 @@ void *DeserializeObject(void *arg)
 
 void *MTOMWriteOpen(struct soap* soap, void *handle, const char * /*id*/, const char* /*type*/, const char* /*description*/, enum soap_mime_encoding /*encoding*/)
 {
+	typedef ECDeferredFunc<void*, void*(*)(void*), void*> task_type;
+
 	LPMTOMStreamInfo	lpStreamInfo = NULL;
 	lpStreamInfo = (LPMTOMStreamInfo)handle;
 
 	// Just return the handle (needed for gsoap to operate properly
 	lpStreamInfo->lpFifoBuffer = new ECFifoBuffer();
 
-	if (pthread_create(&lpStreamInfo->hThread, NULL, &DeserializeObject, lpStreamInfo)) {
-		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Failed to start deserialization thread");
+	std::auto_ptr<task_type> ptrTask(new task_type(DeserializeObject, lpStreamInfo));
+	if (ptrTask->dispatchOn(lpStreamInfo->lpSessionInfo->lpThreadPool) == false) {
+		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Failed to dispatch deserialization task");
 		soap->error = SOAP_FATAL_ERROR;
 		return NULL;
 	}
+	lpStreamInfo->lpTask = ptrTask.release();
 
 	return handle;
 }
@@ -10904,7 +10920,7 @@ int MTOMWrite(struct soap* soap, void *handle, const char *buf, size_t len)
 	ASSERT(lpStreamInfo != NULL);
 
 	// Only write data if a reader thread is available
-	if (!pthread_equal(lpStreamInfo->hThread, pthread_self())) {
+	if (lpStreamInfo->lpTask) {
 		er = lpStreamInfo->lpFifoBuffer->Write(buf, len, STR_DEF_TIMEOUT, NULL);
 		if (er != erSuccess) {
 			soap->errnum = (int)er;
@@ -10924,7 +10940,10 @@ void MTOMWriteClose(struct soap *soap, void *handle)
 	ASSERT(lpStreamInfo != NULL);
 
 	lpStreamInfo->lpFifoBuffer->Close(ECFifoBuffer::cfWrite);
-	pthread_join(lpStreamInfo->hThread, (void**)&er);
+	if (lpStreamInfo->lpTask) {
+		lpStreamInfo->lpTask->wait();	// Todo: use result() to wait and get result
+		delete lpStreamInfo->lpTask;
+	}
 	delete lpStreamInfo->lpFifoBuffer;
 	lpStreamInfo->lpFifoBuffer = NULL;
 
@@ -10971,7 +10990,8 @@ SOAP_ENTRY_START(importMessageFromStream, *result, unsigned int ulFlags, unsigne
 	lpMTOMSessionInfo->lpDatabase = lpDatabase;
 	lpMTOMSessionInfo->lpSharedDatabase = NULL;
 	lpMTOMSessionInfo->er = erSuccess;
-
+	lpMTOMSessionInfo->lpThreadPool = new ECThreadPool(1);
+	
 	((SOAPINFO *)soap->user)->fdone = MTOMSessionDone;
 	((SOAPINFO *)soap->user)->fdoneparam = lpMTOMSessionInfo;
 
@@ -11107,7 +11127,7 @@ SOAP_ENTRY_START(importMessageFromStream, *result, unsigned int ulFlags, unsigne
 	lpsStreamInfo->sGuid = sGuid;
 	lpsStreamInfo->ulFlags = ulFlags;
 	lpsStreamInfo->lpPropValArray = NULL;
-	lpsStreamInfo->hThread = pthread_self();
+	lpsStreamInfo->lpTask = NULL;
 	lpsStreamInfo->lpSessionInfo = lpMTOMSessionInfo;
 
 	if (soap_check_mime_attachments(soap)) {
