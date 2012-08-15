@@ -525,7 +525,7 @@ void ECLogger_Pipe::LogVA(int loglevel, const char *format, va_list& va) {
 	off += len;
 
 	// return value is what WOULD have been written if enough space were available in the buffer
-	len = _vsnprintf(msgbuffer+off, _LOG_BUFSIZE -off -1, format, va);
+	len = _vsnprintf_l(msgbuffer+off, _LOG_BUFSIZE -off -1, format, datalocale, va);
 	// -1 can be returned on formatting error (eg. %ls in C locale)
 	if (len < 0) len = 0;
 	len = min(len, _LOG_BUFSIZE -off -2); // yes, -2, otherwise we could have 2 \0 at the end of the buffer
@@ -604,9 +604,6 @@ namespace PrivatePipe {
 		
 		m_lpConfig = lpConfig;
 		m_lpFileLogger = lpFileLogger;
-
-		// since we forked, set it for the complete process
-		forceUTF8Locale(false, NULL);
 
 		if (bNPTL) {
 			sigemptyset(&signal_mask);
