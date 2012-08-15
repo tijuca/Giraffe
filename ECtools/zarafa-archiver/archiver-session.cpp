@@ -62,6 +62,7 @@
 #include <mapiutil.h>
 #include <edkguid.h>
 #include <edkmdb.h>
+#include "mapiext.h"
 
 #include <iostream>
 using namespace std;
@@ -421,10 +422,14 @@ HRESULT Session::OpenReadOnlyStore(const entryid_t &sEntryId, LPMDB *lppMsgStore
  *					Pointer to a std::string that will be populated with the full name
  *					of the resolved user. This argument can be set to NULL if the full name
  *					is not required.
+ * @param[out]	lpbAclCapable
+ * 					Pointer to a boolean that will be set to true if the user is ACL capable.
+ * 					This argument can be set to NULL if the active/non-active
+ * 					information is not required.
  *
  * @return HRESULT
  */
-HRESULT Session::GetUserInfo(const tstring &strUser, abentryid_t *lpsEntryId, tstring *lpstrFullname)
+HRESULT Session::GetUserInfo(const tstring &strUser, abentryid_t *lpsEntryId, tstring *lpstrFullname, bool *lpbAclCapable)
 {
 	HRESULT hr = hrSuccess;
 	MsgStorePtr ptrStore;
@@ -451,10 +456,14 @@ HRESULT Session::GetUserInfo(const tstring &strUser, abentryid_t *lpsEntryId, ts
 	}
 
 
-	if (lpstrFullname) {
+	if (lpstrFullname || lpbAclCapable) {
 		ULONG ulType = 0;
 		MailUserPtr ptrUser;
-		SPropValuePtr ptrDisplayName;
+		ULONG cValues = 0;
+		SPropArrayPtr ptrUserProps;
+
+		SizedSPropTagArray(2, sptaUserProps) = {2, {PR_DISPLAY_NAME, PR_DISPLAY_TYPE_EX}};
+		enum {IDX_DISPLAY_NAME, IDX_DISPLAY_TYPE_EX};
 
 		hr = m_ptrSession->OpenEntry(cbEntryId, ptrEntryId, &IID_IMailUser, 0, &ulType, &ptrUser);
 		if (hr != hrSuccess) {
@@ -462,13 +471,31 @@ HRESULT Session::GetUserInfo(const tstring &strUser, abentryid_t *lpsEntryId, ts
 			goto exit;
 		}
 
-		hr = HrGetOneProp(ptrUser, PR_DISPLAY_NAME, &ptrDisplayName);
-		if (hr != hrSuccess) {
-			m_lpLogger->Log(EC_LOGLEVEL_INFO, "Failed to obtain the display name for user '" TSTRING_PRINTF "' (hr=%s)", strUser.c_str(), stringify(hr, true).c_str());
+		hr = ptrUser->GetProps((LPSPropTagArray)&sptaUserProps, 0, &cValues, &ptrUserProps);
+		if (FAILED(hr)) {
+			m_lpLogger->Log(EC_LOGLEVEL_INFO, "Failed to obtain properties from user '" TSTRING_PRINTF "' (hr=0x%08x)", strUser.c_str(), hr);
 			goto exit;
 		}
 
-		lpstrFullname->assign(ptrDisplayName->Value.LPSZ);
+		if (lpstrFullname) {
+			if (ptrUserProps[IDX_DISPLAY_NAME].ulPropTag != PR_DISPLAY_NAME) {
+				hr = ptrUserProps[IDX_DISPLAY_NAME].Value.err;
+				m_lpLogger->Log(EC_LOGLEVEL_INFO, "Failed to obtain the display name for user '" TSTRING_PRINTF "' (hr=%s)", strUser.c_str(), stringify(hr, true).c_str());
+				goto exit;
+			}
+
+			lpstrFullname->assign(ptrUserProps[IDX_DISPLAY_NAME].Value.LPSZ);
+		}
+		
+		if (lpbAclCapable) {
+			if (ptrUserProps[IDX_DISPLAY_TYPE_EX].ulPropTag != PR_DISPLAY_TYPE_EX) {
+				hr = ptrUserProps[IDX_DISPLAY_TYPE_EX].Value.err;
+				m_lpLogger->Log(EC_LOGLEVEL_INFO, "Failed to obtain the type for user '" TSTRING_PRINTF "' (hr=%s)", strUser.c_str(), stringify(hr, true).c_str());
+				goto exit;
+			}
+
+			*lpbAclCapable = (ptrUserProps[IDX_DISPLAY_TYPE_EX].Value.ul & DTE_FLAG_ACL_CAPABLE);
+		}
 	}
 
 	if (lpsEntryId)
@@ -814,7 +841,7 @@ HRESULT Session::CreateArchiveStore(const tstring& strUserName, const tstring& s
 	MAPIFolderPtr ptrIpmSubtree;
 	SPropValuePtr ptrIpmSubtreeId;
 
-	hr = GetUserInfo(strUserName, &userId, NULL);
+	hr = GetUserInfo(strUserName, &userId, NULL, NULL);
 	if (hr != hrSuccess)
 		goto exit;
 
