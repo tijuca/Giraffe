@@ -74,7 +74,7 @@ extern ECConfig *g_lpConfig;
 HRESULT GetRecipStrings(LPMESSAGE lpMessage, std::wstring &wstrTo, std::wstring &wstrCc, std::wstring &wstrBcc)
 {
 	HRESULT hr = hrSuccess;
-	mapi_rowset_ptr ptrRows;
+	SRowSetPtr ptrRows;
 	MAPITablePtr ptrRecips;
 	SizedSPropTagArray(2, sptaDisplay)  = {2, { PR_DISPLAY_NAME_W, PR_RECIPIENT_TYPE } };
 	

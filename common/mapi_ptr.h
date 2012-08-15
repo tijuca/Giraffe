@@ -109,7 +109,8 @@ typedef mapi_memory_ptr<FlagList> FlagListPtr;
 typedef mapi_array_ptr<ECPERMISSION> ECPermissionArrayPtr;
 typedef mapi_array_ptr<SPropValue> SPropArrayPtr;
 
-typedef mapi_rowset_ptr SRowSetPtr;
+typedef mapi_rowset_ptr<SRow> SRowSetPtr;
+typedef mapi_rowset_ptr<ADRENTRY> AdrListPtr;
 
 
 #endif // ndef mapi_ptr_INCLUDED

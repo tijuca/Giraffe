@@ -116,7 +116,7 @@ HRESULT Stubber::ProcessEntry(LPMESSAGE lpMessage)
 	SPropValue sProps[3];
 	SPropValue sProp = {0};
 	MAPITablePtr ptrAttTable;
-	mapi_rowset_ptr ptrRowSet;
+	SRowSetPtr ptrRowSet;
 	AttachPtr ptrAttach;
 	ULONG ulAttachNum = 0;
 	MAPIPropHelperPtr ptrMsgHelper;

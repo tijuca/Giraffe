@@ -98,7 +98,7 @@ HRESULT MAPITablePrint(IMAPITable *lpTable)
 {
     HRESULT hr = hrSuccess;
     SPropTagArrayPtr ptrColumns;
-    mapi_rowset_ptr ptrRows;
+    SRowSetPtr ptrRows;
     ConsoleTable ct(0, 0);
     unsigned int i = 0, j = 0;
     

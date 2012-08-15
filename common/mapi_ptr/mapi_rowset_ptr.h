@@ -54,33 +54,95 @@
 #include <mapiutil.h>
 #include "Util.h"
 
+namespace details {
+	template<typename _T>
+	class traits {
+	};
+
+	template<>
+	class traits<SRow> {
+	public:
+		typedef LPSRowSet	set_pointer_type;
+
+		static inline size_t CbNew(unsigned cRows) {
+			return CbNewSRowSet(cRows);
+		}
+
+		static inline HRESULT HrCopySet(set_pointer_type lpDest, set_pointer_type lpSrc, void *lpBase) {
+			return Util::HrCopySRowSet(lpDest, lpSrc, lpBase);
+		}
+
+		static inline void FreeSet(set_pointer_type lpSet) {
+			FreeProws(lpSet);
+		}
+
+		static inline ULONG GetSize(set_pointer_type lpSet) {
+			return lpSet->cRows;
+		}
+
+		static inline SRow& GetElement(set_pointer_type lpSet, unsigned index) {
+			return lpSet->aRow[index];
+		}
+	};
+
+	template<>
+	class traits<ADRENTRY> {
+	public:
+		typedef LPADRLIST	set_pointer_type;
+
+		static inline size_t CbNew(unsigned cRows) {
+			return CbNewADRLIST(cRows);
+		}
+
+		static inline HRESULT HrCopySet(set_pointer_type lpDest, set_pointer_type lpSrc, void *lpBase) {
+			return Util::HrCopySRowSet((LPSRowSet)lpDest, (LPSRowSet)lpSrc, lpBase);	// Dirty, I know
+		}
+
+		static inline void FreeSet(set_pointer_type lpSet) {
+			FreePadrlist(lpSet);
+		}
+
+		static inline ULONG GetSize(set_pointer_type lpSet) {
+			return lpSet->cEntries;
+		}
+
+		static inline ADRENTRY& GetElement(set_pointer_type lpSet, unsigned index) {
+			return lpSet->aEntries[index];
+		}
+	};
+}
+
+template<typename _T>
 class mapi_rowset_ptr
 {
 public:
 	typedef unsigned	size_type;
-	typedef SRow*		pointer;
-	typedef SRow&		reference;
-	typedef const SRow*	const_pointer;
-	typedef const SRow&	const_reference;
+	typedef _T*			pointer;
+	typedef _T&			reference;
+	typedef const _T*	const_pointer;
+	typedef const _T&	const_reference;
+
+	typedef typename details::traits<_T>		_traits;
+	typedef typename _traits::set_pointer_type	set_pointer_type;
 
 	mapi_rowset_ptr(): m_lpsRowSet(NULL) {}
-	mapi_rowset_ptr(LPSRowSet lpsRowSet): m_lpsRowSet(lpsRowSet) {}
+	mapi_rowset_ptr(set_pointer_type lpsRowSet): m_lpsRowSet(lpsRowSet) {}
 
 	mapi_rowset_ptr(const mapi_rowset_ptr &other): m_lpsRowSet(NULL) {
 		if (other.m_lpsRowSet) {
-			MAPIAllocateBuffer(CbNewSRowSet(other.m_lpsRowSet->cRows), (LPVOID*)&m_lpsRowSet);
-			Util::HrCopySRowSet(m_lpsRowSet, other.m_lpsRowSet, m_lpsRowSet);
+			MAPIAllocateBuffer(details::traits<_T>::CbNew(other.m_lpsRowSet->cRows), (LPVOID*)&m_lpsRowSet);
+			details::traits<_T>::HrCopySet(m_lpsRowSet, other.m_lpsRowSet, m_lpsRowSet);
 		}
 	}
 
 	mapi_rowset_ptr& operator=(const mapi_rowset_ptr &other) {
 		if (&other != this) {
 			if (m_lpsRowSet)
-				FreeProws(m_lpsRowSet);
+				details::traits<_T>::FreeSet(m_lpsRowSet);
 			
 			if (other.m_lpsRowSet) {
-				MAPIAllocateBuffer(CbNewSRowSet(other.m_lpsRowSet->cRows), (LPVOID*)&m_lpsRowSet);
-				Util::HrCopySRowSet(m_lpsRowSet, other.m_lpsRowSet, m_lpsRowSet);
+				MAPIAllocateBuffer(details::traits<_T>::CbNew(other.m_lpsRowSet->cRows), (LPVOID*)&m_lpsRowSet);
+				details::traits<_T>::HrCopySet(m_lpsRowSet, other.m_lpsRowSet, m_lpsRowSet);
 			} else
 				m_lpsRowSet = NULL;
 		}
@@ -90,48 +152,60 @@ public:
 
 	~mapi_rowset_ptr() {
 		if (m_lpsRowSet)
-			FreeProws(m_lpsRowSet);
+			details::traits<_T>::FreeSet(m_lpsRowSet);
 	}
 
 	void reset(LPSRowSet lpsRowSet = NULL) {
 		if (m_lpsRowSet)
-			FreeProws(m_lpsRowSet);
+			details::traits<_T>::FreeSet(m_lpsRowSet);
 
 		m_lpsRowSet = lpsRowSet;
 	}
 
-	LPSRowSet* operator&() {
+	set_pointer_type* operator&() {
 		if (m_lpsRowSet) {
-			FreeProws(m_lpsRowSet);
+			details::traits<_T>::FreeSet(m_lpsRowSet);
 			m_lpsRowSet = NULL;
 		}
 		return &m_lpsRowSet;
 	}
 
-	size_type size() const { return m_lpsRowSet ? m_lpsRowSet->cRows : 0; }
-	bool empty() const { return m_lpsRowSet ? (m_lpsRowSet->cRows == 0) : true; }
+	size_type size() const { return m_lpsRowSet ? details::traits<_T>::GetSize(m_lpsRowSet) : 0; }
+	bool empty() const { return m_lpsRowSet ? (details::traits<_T>::GetSize(m_lpsRowSet) == 0) : true; }
 
-	reference operator[](unsigned i) { return m_lpsRowSet->aRow[i]; }
-	const_reference operator[](unsigned i) const { return m_lpsRowSet->aRow[i]; }
+	reference operator[](unsigned i) { return details::traits<_T>::GetElement(m_lpsRowSet, i); }
+	const_reference operator[](unsigned i) const { return details::traits<_T>::GetElement(m_lpsRowSet, i); }
 
 	reference at(unsigned i) { 
-		if (m_lpsRowSet == NULL || i >= m_lpsRowSet->cRows)
+		if (m_lpsRowSet == NULL || i >= details::traits<_T>::GetSize(m_lpsRowSet))
 			throw std::out_of_range("i");
-		return m_lpsRowSet->aRow[i];
+		return details::traits<_T>::GetElement(m_lpsRowSet, i);
 	}
 
 	const_reference at(unsigned i) const { 
-		if (m_lpsRowSet == NULL || i >= m_lpsRowSet->cRows)
+		if (m_lpsRowSet == NULL || i >= details::traits<_T>::GetSize(m_lpsRowSet))
 			throw std::out_of_range("i");
-		return m_lpsRowSet->aRow[i];
+		return details::traits<_T>::GetElement(m_lpsRowSet, i);
 	}
 
-	LPSRowSet get() {
+	set_pointer_type get() {
+		return m_lpsRowSet;
+	}
+
+	set_pointer_type operator->() {
+		return m_lpsRowSet;
+	}
+
+	const set_pointer_type operator->() const {
+		return m_lpsRowSet;
+	}
+
+	operator set_pointer_type() {
 		return m_lpsRowSet;
 	}
 
 private:
-	LPSRowSet	m_lpsRowSet;
+	set_pointer_type	m_lpsRowSet;
 };
 
 #endif // ndef mapi_rowset_ptr_INCLUDED

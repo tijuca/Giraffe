@@ -116,7 +116,7 @@ namespace details {
 	HRESULT MailboxDataCollector::CollectData(LPMAPITABLE lpStoreTable)
 	{
 		HRESULT hr = hrSuccess;
-		mapi_rowset_ptr ptrRows;
+		SRowSetPtr ptrRows;
 
 		enum {IDX_ENTRYID, IDX_MAILBOX_OWNER_ENTRYID, IDX_STORE_ENTRYIDS, IDX_ITEM_ENTRYIDS, IDX_MAX};
 
@@ -128,7 +128,7 @@ namespace details {
 			if (ptrRows.size() == 0)
 				break;
 
-			for (mapi_rowset_ptr::size_type i = 0; i < ptrRows.size(); ++i) {
+			for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
 				std::pair<ArchiveStateCollector::ArchiveInfoMap::iterator, bool> res;
 				bool bComplete = true;
 				abentryid_t userId;
@@ -296,7 +296,7 @@ HRESULT ArchiveStateCollector::PopulateFromContainer(LPABCONT lpContainer)
 	SPropValue sPropDispType;
 	SRestrictionPtr ptrRestriction;
 	MAPITablePtr ptrTable;
-	mapi_rowset_ptr ptrRows;
+	SRowSetPtr ptrRows;
 
 	SizedSPropTagArray(4, sptaUserProps) = {4, {PR_ENTRYID, PR_ACCOUNT, PR_EC_ARCHIVE_SERVERS, PR_EC_ARCHIVE_COUPLINGS}};
 	enum {IDX_ENTRYID, IDX_ACCOUNT, IDX_EC_ARCHIVE_SERVERS, IDX_EC_ARCHIVE_COUPLINGS};
@@ -339,7 +339,7 @@ HRESULT ArchiveStateCollector::PopulateFromContainer(LPABCONT lpContainer)
 		if (ptrRows.size() == 0)
 			break;
 
-		for (mapi_rowset_ptr::size_type i = 0; i < ptrRows.size(); ++i) {
+		for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
 			ArchiveInfoMap::iterator iterator;
 			
 			if (ptrRows[i].lpProps[IDX_ENTRYID].ulPropTag != PR_ENTRYID) {

@@ -68,7 +68,7 @@ HRESULT TaskBase::Execute(ULONG ulPropTag, const InstanceIdMapperPtr &ptrMapper)
 	ULONG cbSourceInstanceID = 0;
 	EntryIdPtr ptrSourceInstanceID;
 	MAPITablePtr ptrTable;
-	mapi_rowset_ptr ptrRows;
+	SRowSetPtr ptrRows;
 	AttachPtr ptrAttach;
 	SPropValuePtr ptrDestServerUID;
 	ULONG cbDestInstanceID = 0;

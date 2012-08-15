@@ -532,7 +532,7 @@ HRESULT Session::GetGAL(LPABCONT *lppAbContainer)
 	ABContainerPtr	ptrABRootContainer;
 	ABContainerPtr	ptrGAL;
 	MAPITablePtr	ptrABRCTable;
-	mapi_rowset_ptr	ptrRows;
+	SRowSetPtr		ptrRows;
 	ULONG			ulType = 0;
 
 	SizedSPropTagArray(1, sGALProps) = {1, {PR_ENTRYID}};

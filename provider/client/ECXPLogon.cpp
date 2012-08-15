@@ -274,7 +274,7 @@ HRESULT ECXPLogon::ClearOldSubmittedMessages(LPMAPIFOLDER lpFolder)
 	LPENTRYLIST		lpDeleteItemEntryList = NULL;
 	SPropValue		sPropDelAfterSubmit = {0};
 	SPropValue		sPropxDaysBefore = {0};
-	mapi_rowset_ptr ptrRows;
+	SRowSetPtr		ptrRows;
 	time_t tNow = 0;
 
 	hr = lpFolder->GetContentsTable(0, &ptrContentsTable);

@@ -309,8 +309,8 @@ HRESULT Copier::Helper::UpdateIIDs(LPMESSAGE lpSource, LPMESSAGE lpDest, PostSav
 	// We'll go through the table one row at a time (from each table) and assume the attachments
 	// are sorted the same. We'll do a sanity check on the size propertie though.
 	while (true) {
-		mapi_rowset_ptr ptrSourceRows;
-		mapi_rowset_ptr ptrDestRows;
+		SRowSetPtr ptrSourceRows;
+		SRowSetPtr ptrDestRows;
 
 		hr = ptrSourceTable->QueryRows(16, 0, &ptrSourceRows);
 		if (hr != hrSuccess) {
@@ -328,7 +328,7 @@ HRESULT Copier::Helper::UpdateIIDs(LPMESSAGE lpSource, LPMESSAGE lpDest, PostSav
 		}
 
 		ASSERT(ptrSourceRows.size() == ptrDestRows.size());
-		for (mapi_rowset_ptr::size_type i = 0; i < ptrSourceRows.size(); ++i) {
+		for (SRowSetPtr::size_type i = 0; i < ptrSourceRows.size(); ++i) {
 			HRESULT hrTmp = hrSuccess;
 			AttachPtr ptrSourceAttach;
 			SPropValuePtr ptrAttachMethod;
