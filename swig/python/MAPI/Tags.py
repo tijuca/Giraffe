@@ -1624,3 +1624,6 @@ ecRightsFolderVisible   = 0x00000400
 ecRightsFullControl     = 0x00004FBL
 
 EMS_AB_ADDRESS_LOOKUP = 0x1
+
+SHOW_SOFT_DELETES	= 0x02
+DELETE_HARD_DELETE	= 0x10
