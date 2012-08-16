@@ -209,6 +209,7 @@ HRESULT VMIMEToMAPI::convertVMIMEToMAPI(const string &input, IMessage *lpMessage
 	IMAPITable *lpAttachTable = NULL;
 	LPSRowSet lpAttachRows = NULL;
 	size_t posHeaderEnd;
+	bool bUnix = false;
 
 	try {
 		if (m_mailState.ulMsgInMsg == 0)
@@ -216,13 +217,19 @@ HRESULT VMIMEToMAPI::convertVMIMEToMAPI(const string &input, IMessage *lpMessage
 
 		// get raw headers
 		posHeaderEnd = input.find("\r\n\r\n");
-		if (posHeaderEnd == std::string::npos) posHeaderEnd = input.find("\n\n"); // input was not rfc compliant, try unix enters
+		if (posHeaderEnd == std::string::npos) {
+			// input was not rfc compliant, try unix enters
+			posHeaderEnd = input.find("\n\n");
+			bUnix = true;
+		}
 		if (posHeaderEnd != std::string::npos) {
 			SPropValue sPropHeaders;
 			std::string strHeaders = input.substr(0, posHeaderEnd);
 
 			// make sure we have us-ascii headers
 			transform(strHeaders.begin(), strHeaders.end(), strHeaders.begin(), forceAscii);
+			if (bUnix)
+				StringLFtoCRLF(strHeaders);
 
 			sPropHeaders.ulPropTag = PR_TRANSPORT_MESSAGE_HEADERS_A;
 			sPropHeaders.Value.lpszA = (char *) strHeaders.c_str();

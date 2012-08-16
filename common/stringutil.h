@@ -162,6 +162,7 @@ std::string StringEscape(const char* input, const char *tokens, const char escap
 
 void BufferLFtoCRLF(size_t size, const char *input, char *output, size_t *outsize);
 void StringCRLFtoLF(const std::wstring &strInput, std::wstring *lpstrOutput);
+void StringLFtoCRLF(std::string &strInOut);
 void StringTabtoSpaces(const std::wstring &strInput, std::wstring *lpstrOutput);
 
 template<typename T>

@@ -738,6 +738,29 @@ void StringCRLFtoLF(const std::wstring &strInput, std::wstring *lpstrOutput) {
 	lpstrOutput->swap(strOutput);
 }
 
+/** 
+ * converts a string inline from \n enters to \r\n
+ * 
+ * @param strInOut string to edit
+ */
+void StringLFtoCRLF(std::string &strInOut)
+{
+	std::string strOutput;
+	std::string::iterator i;
+
+	strOutput.reserve(strInOut.size());
+
+	for (i = strInOut.begin(); i != strInOut.end(); i++) {
+		if (*i == '\n' && i != strInOut.begin() && *(i-1) != '\r')
+			strOutput.append("\r\n");
+		else
+			strOutput.append(1, *i);
+	}
+
+	swap(strInOut, strOutput);
+}
+
+
 /**
  * Force a string to contain alphanumerics only
  *
