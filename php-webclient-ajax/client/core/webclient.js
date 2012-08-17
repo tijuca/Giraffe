@@ -375,16 +375,18 @@ WebClient.prototype.getModule = function(moduleID)
 	}else {
 		// Loop through dialogs
 		for(var dialogname in this.dialogs){
-			var client;
+			var client = null;
+
 			try{ //try/catch in order to prevent IE from throwing an exception because of missing windows
 				if(this.dialogs[dialogname].window){
-					if(typeof this.dialogs[dialogname].window.webclient != "unknown" && typeof this.dialogs[dialogname].window.webclient == "object" && this.dialogs[dialogname].window.webclient != null){
+					if(typeof this.dialogs[dialogname].window.webclient == "object" && this.dialogs[dialogname].window.webclient != null){
 						client = this.dialogs[dialogname].window.webclient;
 					}
 				}
 			} catch(e) {}
-			if(client){
-				module = this.dialogs[dialogname].window.webclient.getModule(moduleID);
+
+			if(client !== null && client.getModule){
+				module = client.getModule(moduleID);
 				if(module){
 					break;
 				}
@@ -677,6 +679,7 @@ function eventWebClientUnload()
 	for(name in webclient.dialogs){
 		try{
 			webclient.dialogs[name].window.close();
+			delete webclient.dialogs[name];
 		}catch(e){
 		}
 	}
