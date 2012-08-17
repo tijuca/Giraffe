@@ -496,6 +496,7 @@ HRESULT CheckRecipients(ECLogger *lpLogger, LPADRBOOK lpAdrBook, IMAPIProp *lpMe
 {
 	HRESULT hr = hrSuccess;
 	LPADRLIST lpRecipients = NULL;
+	LPSPropValue lpMsgClass = NULL;
 	std::wstring strFromName, strFromType, strFromAddress;
 	std::wstring strRuleName, strRuleType, strRuleAddress;
 
@@ -512,6 +513,8 @@ HRESULT CheckRecipients(ECLogger *lpLogger, LPADRBOOK lpAdrBook, IMAPIProp *lpMe
 	if (hr != hrSuccess)
 		goto exit;
 
+	HrGetOneProp(lpMessage, PR_MESSAGE_CLASS_A, &lpMsgClass); //ignore errors
+
 	lpRecipients->cEntries = 0;
 
 	for (ULONG i = 0; i < lpRuleRecipients->cEntries; i++) {
@@ -524,8 +527,12 @@ HRESULT CheckRecipients(ECLogger *lpLogger, LPADRBOOK lpAdrBook, IMAPIProp *lpMe
 		}
 
 		if (strFromAddress == strRuleAddress) {
-			lpLogger->Log(EC_LOGLEVEL_INFO, "Same user found in From and rule, blocking for loop protection");
-			continue;
+			// Hack for Meeting requests
+			if (!lpMsgClass || strstr(lpMsgClass->Value.lpszA, "IPM.Schedule.Meeting.") == NULL) 
+			{
+				lpLogger->Log(EC_LOGLEVEL_INFO, "Same user found in From and rule, blocking for loop protection");
+				continue;
+			}
 		}
 
 		// copy recipient
@@ -553,6 +560,9 @@ HRESULT CheckRecipients(ECLogger *lpLogger, LPADRBOOK lpAdrBook, IMAPIProp *lpMe
 exit:
 	if (lpRecipients)
 		FreeProws((LPSRowSet)lpRecipients);
+
+	if (lpMsgClass)
+		MAPIFreeBuffer(lpMsgClass);
 
 	return hr;
 }
