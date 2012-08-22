@@ -200,13 +200,13 @@ ZEND_END_ARG_INFO()
 
 
 #define LOG_BEGIN() { \
-    if (INI_INT("mapi.debug")) { \
+    if (INI_INT("mapi.debug") & 1) { \
         php_error_docref(NULL TSRMLS_CC, E_NOTICE, "[IN] %s", __FUNCTION__); \
     } \
 }
 
 #define LOG_END()   { \
-    if (INI_INT("mapi.debug")) { \
+    if (INI_INT("mapi.debug") & 2) { \
         HRESULT hrx =  MAPI_G(hr); \
         php_error_docref(NULL TSRMLS_CC, E_NOTICE, "[OUT] %s hr=0x%08x", __FUNCTION__, hrx); \
     } \
