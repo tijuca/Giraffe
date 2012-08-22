@@ -237,7 +237,7 @@ attributetype (1.3.6.1.4.1.26278.1.3.1.6
 	
 attributetype ( 1.3.6.1.4.1.26278.1.3.4.1
 	NAME 'zarafaCompanyServer'
-	DESC 'ZARAFA: Home server for the user'
+	DESC 'ZARAFA: Home server for the public folders for a company'
 	EQUALITY caseIgnoreMatch
 	SUBSTR caseIgnoreSubstringsMatch
 	SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 SINGLE-VALUE )
