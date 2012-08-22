@@ -783,6 +783,9 @@ HRESULT VConverter::HrAddSimpleHeaders(icalcomponent *lpicEvent, icalitem *lpIca
 
 	// Set body / DESCRIPTION
 	lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_DESCRIPTION_PROPERTY);
+	if (!lpicProp)
+		// used by exchange on replies in meeting requests
+		lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_COMMENT_PROPERTY);
 	if (lpicProp){
 		sPropVal.ulPropTag = PR_BODY_W;
 		hr = HrCopyString(m_converter, m_strCharset, lpIcalItem->base, icalproperty_get_description(lpicProp), &sPropVal.Value.lpszW);
