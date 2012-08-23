@@ -324,6 +324,7 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 	if (hr != hrSuccess)
 		goto exit;
 
+	j = 0;
 	while (true) {
 		hr = ptrContents->QueryRows(256, ulFlags, &ptrRows);
 		if (hr != hrSuccess)
@@ -332,7 +333,6 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 		if (ptrRows.empty())
 			break;
 
-		j = 0;
 		for (i = 0; i < ptrRows.size(); i++) {
 			ULONG ulOffset = 0;
 			mapi_memory_ptr<cabEntryID> lpEntryID;
@@ -412,10 +412,11 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 
 			lpColData[O_INSTANCE_KEY].ulPropTag = PR_INSTANCE_KEY;
 			lpColData[O_INSTANCE_KEY].Value.bin.cb = sizeof(ULONG);
-			lpColData[O_INSTANCE_KEY].Value.bin.lpb = (LPBYTE)&i;
+			lpColData[O_INSTANCE_KEY].Value.bin.lpb = (LPBYTE)&j;
 
 			lpColData[O_ROWID].ulPropTag = PR_ROWID;
 			lpColData[O_ROWID].Value.ul = j++;
+
 			hr = lpTable->HrModifyRow(ECKeyTable::TABLE_ROW_ADD, NULL, lpColData, O_NCOLS);
 			if (hr != hrSuccess)
 				goto exit;
