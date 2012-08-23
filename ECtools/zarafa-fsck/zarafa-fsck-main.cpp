@@ -375,9 +375,9 @@ HRESULT ZarafaFsck::DeleteRecipientList(LPMESSAGE lpMessage, std::list<unsigned 
 
 	this->ulProblems++;
 
-	cout << mapiReciptDel.size() << " duplicate recipients found. " << endl;
+	cout << mapiReciptDel.size() << " duplicate or invalid recipients found. " << endl;
 
-	if (ReadYesNoMessage("Remove duplicate recipients?", auto_fix) )
+	if (ReadYesNoMessage("Remove duplicate or invalid recipients?", auto_fix) )
 	{
 		hr = MAPIAllocateBuffer(CbNewADRLIST(mapiReciptDel.size()), (void**)&lpMods);
 		if (hr != hrSuccess)
@@ -539,7 +539,7 @@ HRESULT ZarafaFsck::ValidateDuplicateRecipients(LPMESSAGE lpMessage, bool &bChan
 	std::pair<std::set<std::string>::iterator, bool> res;
 	unsigned int i = 0;
 
-	SizedSPropTagArray(4, sptaProps) = {4, {PR_ROWID, PR_DISPLAY_NAME_A, PR_EMAIL_ADDRESS_A, PR_RECIPIENT_TYPE}};
+	SizedSPropTagArray(5, sptaProps) = {5, {PR_ROWID, PR_DISPLAY_NAME_A, PR_EMAIL_ADDRESS_A, PR_RECIPIENT_TYPE, PR_ENTRYID}};
 
 	hr = lpMessage->GetRecipientTable(0, &lpTable);
 	if (hr != hrSuccess)
@@ -570,6 +570,12 @@ HRESULT ZarafaFsck::ValidateDuplicateRecipients(LPMESSAGE lpMessage, bool &bChan
 		for (i = 0; i < pRows->cRows; i++) {
 
 			if (pRows->aRow[i].lpProps[1].ulPropTag != PR_DISPLAY_NAME_A && pRows->aRow[i].lpProps[2].ulPropTag != PR_EMAIL_ADDRESS_A) {
+				mapiReciptDel.push_back(pRows->aRow[i].lpProps[0].Value.ul);
+				continue;
+			}
+
+			// Wrong entryid
+			if (pRows->aRow[i].lpProps[4].ulPropTag == PR_ENTRYID && pRows->aRow[i].lpProps[4].Value.bin.cb == 0) {
 				mapiReciptDel.push_back(pRows->aRow[i].lpProps[0].Value.ul);
 				continue;
 			}
