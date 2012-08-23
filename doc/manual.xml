@@ -8512,6 +8512,13 @@
 		  </varlistentry>
 
 		  <varlistentry>
+		  	<term><option>--acceptdisclaimer</option></term>
+			<listitem>
+			  <para>Auto accept the disclaimer</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
 			<term><option>--public</option></term>
 			<listitem>
 			  <para>Check the public store for user given with
