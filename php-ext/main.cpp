@@ -7548,15 +7548,15 @@ exit:
 
 ZEND_FUNCTION(mapi_importcontentschanges_importmessagemove)
 {
-	long			cbSourceKeySrcFolder = 0;
+	ULONG			cbSourceKeySrcFolder = 0;
 	BYTE *			pbSourceKeySrcFolder = NULL;
-	long			cbSourceKeySrcMessage = 0;
+	ULONG			cbSourceKeySrcMessage = 0;
 	BYTE *			pbSourceKeySrcMessage = NULL;
-	long			cbPCLMessage = 0;
+	ULONG			cbPCLMessage = 0;
 	BYTE *			pbPCLMessage = NULL;
-	long 			cbSourceKeyDestMessage = 0;
+	ULONG 			cbSourceKeyDestMessage = 0;
 	BYTE *			pbSourceKeyDestMessage = NULL;
-	long			cbChangeNumDestMessage = 0;
+	ULONG			cbChangeNumDestMessage = 0;
 	BYTE *			pbChangeNumDestMessage = NULL;
 
 	zval *			resImportContentsChanges;
@@ -7867,7 +7867,7 @@ exit:
 #if SUPPORT_EXCEPTIONS
 ZEND_FUNCTION(mapi_enable_exceptions)
 {
-	long			cbExClass = 0;
+	ULONG			cbExClass = 0;
 	char *			szExClass = NULL;
 	zend_class_entry **ce = NULL;
 
@@ -7890,7 +7890,7 @@ ZEND_FUNCTION(mapi_feature)
 {
     char *features[] = { "LOGONFLAGS", "NOTIFICATIONS", "INETMAPI_IMTOMAPI" };
     char *szFeature = NULL;
-    long cbFeature;
+    ULONG cbFeature = 0;
     
     RETVAL_FALSE;
     
