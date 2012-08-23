@@ -2326,15 +2326,15 @@ private:
 
 // compare function for set<tstring, ltstr>, fixes default wchar_t compare, and makes it case-insensitive
 // used for PR_EC_*ABLED_FEATURES_A properties from TCHAR* strings in ECUSER struct
-struct ltstr
+struct lstr
 {
-	bool operator()(const tstring &t1, const tstring &t2) const
+	bool operator()(const string &t1, const string &t2) const
 	{
 		return stricmp((char*)t1.c_str(), (char*)t2.c_str()) < 0;
 	}
 };
 
-HRESULT fillMVPropmap(ECUSER &sECUser, ULONG ulPropTag, int index, set<tstring, ltstr> &sFeatures, void *lpBase)
+HRESULT fillMVPropmap(ECUSER &sECUser, ULONG ulPropTag, int index, set<string, lstr> &sFeatures, void *lpBase)
 {
 	HRESULT hr = hrSuccess;
 
@@ -2349,7 +2349,8 @@ HRESULT fillMVPropmap(ECUSER &sECUser, ULONG ulPropTag, int index, set<tstring, 
 			goto exit;
 		}
 		int n;
-		set<tstring, ltstr>::iterator i;
+		set<string, lstr>::iterator i;
+		// @note we store char* data in a LPTSTR (whcar_t by -DUNICODE) pointer.
 		for (i = sFeatures.begin(), n = 0; i != sFeatures.end(); i++, n++)
 			sECUser.sMVPropmap.lpEntries[index].lpszValues[n] = (TCHAR*)i->c_str();
 	}
@@ -2418,8 +2419,8 @@ int main(int argc, char* argv[])
 	char *feature = NULL;
 	char *node = NULL;
 	bool bFeature = true;
-	set<tstring, ltstr> sEnabled;
-	set<tstring, ltstr> sDisabled;
+	set<string, lstr> sEnabled;
+	set<string, lstr> sDisabled;
 	int quota = -1;
 	long long quotahard = -1;
 	long long quotasoft = -1;
@@ -3475,19 +3476,21 @@ int main(int argc, char* argv[])
 			// lpECUser memory will be kept alive to let the SetUser() call work
 			for (ULONG i = 0; i < lpECUser->sMVPropmap.cEntries; i++) {
 				if (lpECUser->sMVPropmap.lpEntries[i].ulPropId == PR_EC_ENABLED_FEATURES_A) {
-					sEnabled.insert(lpECUser->sMVPropmap.lpEntries[i].lpszValues, lpECUser->sMVPropmap.lpEntries[i].lpszValues + lpECUser->sMVPropmap.lpEntries[i].cValues);
+					sEnabled.insert((char**)lpECUser->sMVPropmap.lpEntries[i].lpszValues,
+									(char**)lpECUser->sMVPropmap.lpEntries[i].lpszValues + lpECUser->sMVPropmap.lpEntries[i].cValues);
 				} else if (lpECUser->sMVPropmap.lpEntries[i].ulPropId == PR_EC_DISABLED_FEATURES_A) {
-					sDisabled.insert(lpECUser->sMVPropmap.lpEntries[i].lpszValues, lpECUser->sMVPropmap.lpEntries[i].lpszValues + lpECUser->sMVPropmap.lpEntries[i].cValues);
+					sDisabled.insert((char**)lpECUser->sMVPropmap.lpEntries[i].lpszValues,
+									 (char**)lpECUser->sMVPropmap.lpEntries[i].lpszValues + lpECUser->sMVPropmap.lpEntries[i].cValues);
 				}
 			}
 
 		if (feature) {
 			if (bFeature) {
-				sEnabled.insert((LPTSTR)feature);
-				sDisabled.erase((LPTSTR)feature);
+				sEnabled.insert(feature);
+				sDisabled.erase(feature);
 			} else {
-				sEnabled.erase((LPTSTR)feature);
-				sDisabled.insert((LPTSTR)feature);
+				sEnabled.erase(feature);
+				sDisabled.insert(feature);
 			}
 		}
 
