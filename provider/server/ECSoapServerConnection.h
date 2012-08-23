@@ -82,6 +82,7 @@ private:
     // Main thread handler
     ECDispatcher *m_lpDispatcher;
 
+	ECConfig*	m_lpConfig;
 	ECLogger*	m_lpLogger;
 	int*		m_lpQuit;
 	

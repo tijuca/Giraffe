@@ -61,6 +61,7 @@
 #include "ECSoapServerConnection.h"
 #include "ECServerEntrypoint.h"
 #include "ECClientUpdate.h"
+#include "UnixUtil.h"
 
 extern ECLogger *g_lpLogger;
 
@@ -81,7 +82,7 @@ struct soap_connection_thread {
  * 
  * @return the socket we're listening on, or -1 for failure.
  */
-int create_pipe_socket(const char *unix_socket, ECLogger *lpLogger, bool bInit, int mode) {
+int create_pipe_socket(const char *unix_socket, ECConfig *lpConfig, ECLogger *lpLogger, bool bInit, int mode) {
 	int s;
 	struct sockaddr_un saddr;
 	memset(&saddr, 0, sizeof(struct sockaddr_un));
@@ -105,6 +106,8 @@ int create_pipe_socket(const char *unix_socket, ECLogger *lpLogger, bool bInit, 
 	}
 
 	chmod(unix_socket,mode);
+
+	unix_chown(unix_socket, lpConfig->GetSetting("run_as_user"), lpConfig->GetSetting("run_as_group"));
 	
 	if(listen(s,8) == -1) {
 		lpLogger->Log(EC_LOGLEVEL_FATAL, "Can't listen on unix socket %s", unix_socket);
@@ -169,7 +172,7 @@ exit:
 
 ECSoapServerConnection::ECSoapServerConnection(ECConfig* lpConfig, ECLogger* lpLogger)
 {
-	// Logger
+	m_lpConfig = lpConfig;
 	m_lpLogger = lpLogger;
 
 #ifdef USE_EPOLL
@@ -317,7 +320,7 @@ ECRESULT ECSoapServerConnection::ListenPipe(const char* lpPipeName, bool bPriori
 	// Create a unix or windows pipe
 	m_strPipeName = lpPipeName;
 	// set the mode stricter for the priority socket: let only the same unix user or root connect on the priority socket, users should not be able to abuse the socket
-	lpsSoap->socket = sPipe = create_pipe_socket(m_strPipeName.c_str(), m_lpLogger, true, bPriority ? 0660 : 0666);
+	lpsSoap->socket = sPipe = create_pipe_socket(m_strPipeName.c_str(), m_lpConfig, m_lpLogger, true, bPriority ? 0660 : 0666);
 	// This just marks the socket as being a pipe, which triggers some slightly different behaviour
 	strcpy(lpsSoap->path,"pipe");
 
@@ -350,7 +353,7 @@ SOAP_SOCKET ECSoapServerConnection::CreatePipeSocketCallback(void *lpParam)
 {
 	ECSoapServerConnection *lpThis = (ECSoapServerConnection *)lpParam;
 
-	return (SOAP_SOCKET)create_pipe_socket(lpThis->m_strPipeName.c_str(), lpThis->m_lpLogger, false, 0666);
+	return (SOAP_SOCKET)create_pipe_socket(lpThis->m_strPipeName.c_str(), lpThis->m_lpConfig, lpThis->m_lpLogger, false, 0666);
 }
 
 ECRESULT ECSoapServerConnection::ShutDown()
