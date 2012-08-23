@@ -274,7 +274,7 @@ AC_FUNC_STRFTIME
 AC_FUNC_STRTOD
 AC_FUNC_VPRINTF
 AC_TYPE_SIGNAL
-AC_CHECK_FUNCS([random gettimeofday ftime localtime_r timegm gmtime gmtime_r memchr memset select socket strchr strerror strrchr strstr strtol strtoul strtoll strtoull sscanf strtof_l strtod_l wctomb mbtowc dcgettext getpeereid gethostbyname_r getpwnam_r vsyslog])
+AC_CHECK_FUNCS([random gettimeofday ftime localtime_r timegm gmtime gmtime_r memchr memset select socket strchr strerror strrchr strstr strtol strtoul strtoll strtoull sscanf strtof_l strtod_l wctomb mbtowc dcgettext getpeereid gethostbyname_r getpwnam_r vsyslog vsnprintf_l])
 
 
 #

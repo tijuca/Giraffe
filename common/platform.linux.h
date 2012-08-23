@@ -66,6 +66,7 @@
 #include <byteswap.h>
 #include <endian.h>
 #include <errno.h>
+#include <locale.h>
 
 #include <string>
 
@@ -94,6 +95,16 @@
 
 #define _vsnprintf vsnprintf
 #define _snprintf snprintf
+#ifdef HAVE_VSNPRINTF_L
+#define _vsnprintf_l vsnprintf_l
+#else
+inline int _vsnprintf_l(char *str, size_t size, const char *format, locale_t locale, va_list ap) {
+	locale_t prev = uselocale(locale);
+	int ret = _vsnprintf(str, size, format, ap);
+	uselocale(prev);
+	return ret;
+}
+#endif
 
 #include <sys/types.h>
 #include <sys/wait.h>

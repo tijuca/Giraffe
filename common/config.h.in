@@ -248,6 +248,9 @@
 /* Define to 1 if you have the `vprintf' function. */
 #undef HAVE_VPRINTF
 
+/* Define to 1 if you have the `vsnprintf_l' function. */
+#undef HAVE_VSNPRINTF_L
+
 /* Define to 1 if you have the `vsyslog' function. */
 #undef HAVE_VSYSLOG
 

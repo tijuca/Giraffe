@@ -54,6 +54,7 @@
 #include <zlib.h>
 #include <assert.h>
 #include "stringutil.h"
+#include "charset/localeutil.h"
 
 #include "config.h"
 #if HAVE_SYSLOG_H
@@ -78,7 +79,8 @@ ECLogger::ECLogger(int max_ll) {
 	max_loglevel = max_ll;
 	msgbuffer = new char[_LOG_BUFSIZE];
 	// get system locale for time, NULL is returned if locale was not found.
-	timelocale = createlocale(LC_TIME, "");
+	timelocale = createlocale(LC_TIME, "C");
+	datalocale = createUTF8Locale();
 	prefix = LP_NONE;
 	m_ulRef = 1;
 }
@@ -87,7 +89,8 @@ ECLogger::~ECLogger() {
 	delete [] msgbuffer;
 	if (timelocale)
 		freelocale(timelocale);
-
+	if (datalocale)
+		freelocale(datalocale);
 	pthread_mutex_destroy(&msgbuflock);
 }
 
@@ -166,9 +169,9 @@ ECLogger_File::ECLogger_File(int max_ll, int add_timestamp, const char *filename
 		szMode = NULL;
 	} else {
 		if (compress) {
-			fnOpen = &gzopen;
-			fnClose = &gzclose;
-			fnPrintf = &gzprintf;
+			fnOpen = (open_func)&gzopen;
+			fnClose = (close_func)&gzclose;
+			fnPrintf = (printf_func)&gzprintf;
 			fnFileno = NULL;
 			fnFlush = NULL;	// gzflush does exist, but degrades performance
 			szMode = "wb";
@@ -284,7 +287,7 @@ void ECLogger_File::Log(int loglevel, const char *format, ...) {
 
 void ECLogger_File::LogVA(int loglevel, const char *format, va_list& va) {
 	pthread_mutex_lock(&msgbuflock);
-	_vsnprintf(msgbuffer, _LOG_BUFSIZE, format, va);
+	_vsnprintf_l(msgbuffer, _LOG_BUFSIZE, format, datalocale, va);
 
 	pthread_mutex_lock(&filelock);
 
@@ -335,14 +338,14 @@ void ECLogger_Syslog::Log(int loglevel, const char *format, ...) {
 }
 
 void ECLogger_Syslog::LogVA(int loglevel, const char *format, va_list& va) {
+	pthread_mutex_lock(&msgbuflock);
 #if HAVE_VSYSLOG
 	vsyslog(levelmap[loglevel], format, va);
 #else
-	pthread_mutex_lock(&msgbuflock);
-	_vsnprintf(msgbuffer, _LOG_BUFSIZE, format, va);
+	_vsnprintf_l(msgbuffer, _LOG_BUFSIZE, format, datalocale, va);
 	syslog(levelmap[loglevel], "%s", msgbuffer);
-	pthread_mutex_unlock(&msgbuflock);
 #endif
+	pthread_mutex_unlock(&msgbuflock);
 }
 
 
@@ -426,7 +429,7 @@ void ECLogger_Tee::LogVA(int loglevel, const char *format, va_list& va) {
 	LoggerList::iterator iLogger;
 
 	pthread_mutex_lock(&msgbuflock);
-	_vsnprintf(msgbuffer, _LOG_BUFSIZE, format, va);
+	_vsnprintf_l(msgbuffer, _LOG_BUFSIZE, format, datalocale, va);
 
 	for (iLogger = m_loggers.begin(); iLogger != m_loggers.end(); ++iLogger)
 		(*iLogger)->Log(loglevel, std::string(msgbuffer));
@@ -478,9 +481,11 @@ void ECLogger_Pipe::Log(int loglevel, const std::string &message) {
 		len = snprintf(msgbuffer+off, _LOG_BUFSIZE -off, "[0x%08x] ", (unsigned int)pthread_self());
 	else if (prefix == LP_PID)
 		len = snprintf(msgbuffer+off, _LOG_BUFSIZE -off, "[%5d] ", getpid());
+	if (len < 0) len = 0;
 	off += len;
 
 	len = min((int)message.length(), _LOG_BUFSIZE -off -1);
+	if (len < 0) len = 0;
 	memcpy(msgbuffer+off, message.c_str(), len);
 	off += len;
 
@@ -512,10 +517,13 @@ void ECLogger_Pipe::LogVA(int loglevel, const char *format, va_list& va) {
 		len = snprintf(msgbuffer+off, _LOG_BUFSIZE -off, "[0x%08x] ", (unsigned int)pthread_self());
 	else if (prefix == LP_PID)
 		len = snprintf(msgbuffer+off, _LOG_BUFSIZE -off, "[%5d] ", getpid());
+	if (len < 0) len = 0;
 	off += len;
 
 	// return value is what WOULD have been written if enough space were available in the buffer
-	len = _vsnprintf(msgbuffer+off, _LOG_BUFSIZE -off -1, format, va);
+	len = _vsnprintf_l(msgbuffer+off, _LOG_BUFSIZE -off -1, format, datalocale, va);
+	// -1 can be returned on formatting error (eg. %ls in C locale)
+	if (len < 0) len = 0;
 	len = min(len, _LOG_BUFSIZE -off -2); // yes, -2, otherwise we could have 2 \0 at the end of the buffer
 	off += len;
 

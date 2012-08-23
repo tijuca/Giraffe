@@ -47,9 +47,45 @@
  * 
  */
 
+#include "platform.h"
 #include <string>
 #include <iostream>
 #include <string.h>
+
+locale_t createUTF8Locale()
+{
+	locale_t loc;
+
+	// this trick only works on newer distro's
+	loc = createlocale(LC_CTYPE, "C.UTF-8");
+	if (loc)
+		return loc;
+
+	std::string new_locale;
+	char *cur_locale = setlocale(LC_CTYPE, NULL);
+	char *dot = strchr(cur_locale, '.');
+	if (dot) {
+		if (strcmp(dot+1, "UTF-8") == 0 || strcmp(dot+1, "utf8") == 0) {
+			loc = createlocale(LC_CTYPE, cur_locale);
+			goto exit;
+		}
+		// strip current charset selector, to be replaced
+		*dot = '\0';
+	}
+	new_locale = std::string(cur_locale) + ".UTF-8";
+	loc = createlocale(LC_CTYPE, new_locale.c_str()); 
+	if (loc)
+		return loc;
+
+	loc = createlocale(LC_CTYPE, "en_US.UTF-8");
+
+exit:
+	// too bad, but I don't want to return an unusable object
+	if (!loc)
+		loc = createlocale(LC_CTYPE, "C");
+
+	return loc;
+}
 
 /**
  * Initializes the locale to the current language, forced in UTF-8.
@@ -71,7 +107,7 @@ bool forceUTF8Locale(bool bOutput, std::string *lpstrLastSetLocale)
 	char *dot = strchr(old_locale, '.');
 	if (dot) {
 		*dot = '\0';
-		if (strcmp(dot+1, "UTF-8") == 0) {
+		if (strcmp(dot+1, "UTF-8") == 0 || strcmp(dot+1, "utf8") == 0) {
 			if (lpstrLastSetLocale)
 				*lpstrLastSetLocale = old_locale;
 			return true; // no need to force anything

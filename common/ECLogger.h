@@ -114,6 +114,7 @@ protected:
 	char *msgbuffer;
 	pthread_mutex_t msgbuflock;
 	locale_t timelocale;
+	locale_t datalocale;
 	char timestring[_LOG_TSSIZE];
 	logprefix prefix;
 

@@ -51,5 +51,6 @@
 #define __CHARSET_UTIL_H
 
 bool forceUTF8Locale(bool bOutput, std::string *lpstrLastSetLocale = NULL);
+locale_t createUTF8Locale();
 
 #endif
