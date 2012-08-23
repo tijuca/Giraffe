@@ -72,6 +72,7 @@
 #include "StorageUtil.h"
 #include "ECAttachmentStorage.h"
 #include "ECStatsCollector.h"
+#include "ECTPropsPurge.h"
 
 #include "ZarafaCmdUtil.h"
 
@@ -608,7 +609,6 @@ ECRESULT DeleteObjectSoft(ECSession *lpSession, ECDatabase *lpDatabase, unsigned
 	// Add properties: PR_DELETED_ON
 	GetSystemTimeAsFileTime(&ft);
 
-	// TODO: move PR_DELETED_ON to another new table
 	for(iterDeleteItems=lstDeleteItems.begin(); iterDeleteItems != lstDeleteItems.end(); iterDeleteItems++)
 	{
 		if( iterDeleteItems->fRoot == true && 
@@ -618,6 +618,10 @@ ECRESULT DeleteObjectSoft(ECSession *lpSession, ECDatabase *lpDatabase, unsigned
 			strQuery = "REPLACE INTO properties(hierarchyid, tag, type, val_lo, val_hi) VALUES("+stringify(iterDeleteItems->ulId)+","+stringify(PROP_ID(PR_DELETED_ON))+","+stringify(PROP_TYPE(PR_DELETED_ON))+","+stringify(ft.dwLowDateTime)+","+stringify(ft.dwHighDateTime)+")";
 			er = lpDatabase->DoUpdate(strQuery);
 			if(er!= erSuccess)
+				goto exit;
+
+			er = ECTPropsPurge::AddDeferredUpdateNoPurge(lpDatabase, iterDeleteItems->ulParent, 0, iterDeleteItems->ulId);
+			if (er != erSuccess)
 				goto exit;
 		}
 	}
@@ -1144,7 +1148,7 @@ ECRESULT DeleteObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt *
 	else
 		er = DeleteObjectSoft(lpSession, lpDatabase, ulFlags, lstDeleteItems, lstDeleted);
 	if (er != erSuccess) {
-		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Error while expanding delete item list, error code: %u", er);
+		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Error while deleting expanded item list, error code: %u", er);
 		goto exit;
 	}
 
