@@ -1915,7 +1915,7 @@ HRESULT M4LAddrBook::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpIn
 	HRESULT hr = hrSuccess;
 	std::wstring name, type, email;
 	IMAPIProp *lpMailUser;
-	SPropValue sProps[4];
+	SPropValue sProps[5];
 
 	if ((lpInterface == NULL || *lpInterface == IID_IMailUser || *lpInterface == IID_IMAPIProp || *lpInterface == IID_IUnknown) && lpEntryID != NULL) {
 		hr = ECParseOneOff(lpEntryID, cbEntryID, name, type, email);
@@ -1937,7 +1937,13 @@ HRESULT M4LAddrBook::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpIn
 			sProps[3].Value.bin.cb = cbEntryID;
 			sProps[3].Value.bin.lpb = (BYTE *)lpEntryID;
 
-			lpMailUser->SetProps(4, sProps, NULL);
+			sProps[4].ulPropTag = PR_OBJECT_TYPE;
+			sProps[4].Value.ul = MAPI_MAILUSER;
+
+			// also missing, but still not important:
+			// PR_ENTRYID, PR_RECORD_KEY, PR_SEARCH_KEY, PR_SEND_INTERNET_ENCODING, PR_SEND_RICH_INFO
+
+			lpMailUser->SetProps(5, sProps, NULL);
 
 			*lppUnk = (LPUNKNOWN)lpMailUser;
 			*lpulObjType = MAPI_MAILUSER;
@@ -2387,7 +2393,7 @@ HRESULT M4LAddrBook::SetDefaultDir(ULONG cbEntryID, LPENTRYID lpEntryID) {
 }
 
 /** 
- * Returns the all hierarchy entries of the AB Root Container, see ResolveName()
+ * Returns all the hierarchy entries of the AB Root Container, see ResolveName()
  * Should return what's set with SetSearchPath().
  * Also should not return AB_SUBFOLDERS from the root container, but the subfolders.
  * 
