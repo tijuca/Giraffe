@@ -37,7 +37,7 @@ elif [ -d /usr/lib/ssl/misc ]; then
 		CADIR=`grep -w ^dir /etc/ssl/openssl.cnf | awk {'print $3'}`
 	fi
 elif [ -d /etc/pki/tls/misc ]; then
-	# Fedora Core
+	# Fedora Core, RHEL 5, 6
 	if [ -x /etc/pki/tls/misc/CA.pl ]; then
 		CASCRIPT=/etc/pki/tls/misc/CA.pl
 	elif [ -x /etc/pki/tls/misc/CA.sh ]; then
@@ -46,8 +46,8 @@ elif [ -d /etc/pki/tls/misc ]; then
 		CASCRIPT=/etc/pki/tls/misc/CA
 	fi
 	if [ -f /etc/pki/tls/openssl.cnf ]; then
-		# Fedora
-		CADIR=`grep -w ^dir /etc/pki/tls/openssl.cnf | awk {'print $3'}`
+		# Take first hit, new config has multiple hits because of [blocks] in config
+		CADIR=`grep -w ^dir /etc/pki/tls/openssl.cnf | awk {'print $3'} | head -1`
 	elif [ -f /etc/ssl/openssl.cnf ]; then
 		# --
 		CADIR=`grep -w ^dir /etc/ssl/openssl.cnf | awk {'print $3'}`
@@ -89,11 +89,13 @@ fi
 
 set -e
 
-if [ ! -d "$CADIR" ]; then
+if [ ! -d "$CADIR" -o ! "$CADIR/serial" ]; then
 	echo "No Certificate Authority Root found in current directory."
 	echo "Press enter to create, or ctrl-c to exit."
 	read dummy
-
+	if [ -d "$CADIR" ]; then
+		mv $CADIR ${CADIR}-backup.zarafa
+	fi
 	$CASCRIPT -newca
 fi
 
