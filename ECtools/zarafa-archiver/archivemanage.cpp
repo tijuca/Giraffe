@@ -222,7 +222,7 @@ HRESULT ArchiveManageImpl::AttachTo(const char *lpszArchiveServer, const TCHAR *
 	}
 
 	// Resolve the requested user.
-	hr = m_ptrSession->GetUserInfo(m_strUser, &sUserEntryId, &strFoldername);
+	hr = m_ptrSession->GetUserInfo(m_strUser, &sUserEntryId, &strFoldername, NULL);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to resolve user information for '" TSTRING_PRINTF "' (hr=%s).", m_strUser.c_str(), stringify(hr, true).c_str());
 		goto exit;
@@ -649,6 +649,7 @@ eResult ArchiveManageImpl::ListArchives(ArchiveList *lplstArchives, const char *
 {
 	HRESULT hr = hrSuccess;
 	StoreHelperPtr ptrStoreHelper;
+	bool bAclCapable = true;
 	ObjectEntryList lstArchives;
 	ObjectEntryList::const_iterator iArchive;
 	MsgStorePtr ptrArchiveStore;
@@ -658,7 +659,11 @@ eResult ArchiveManageImpl::ListArchives(ArchiveList *lplstArchives, const char *
 	hr = StoreHelper::Create(m_ptrUserStore, &ptrStoreHelper);
 	if (hr != hrSuccess)
 		goto exit;
-	
+
+	hr = m_ptrSession->GetUserInfo(m_strUser, NULL, NULL, &bAclCapable);
+	if (hr != hrSuccess)
+		goto exit;
+
 	hr = ptrStoreHelper->GetArchiveList(&lstArchives);
 	if (hr != hrSuccess)
 		goto exit;
@@ -744,7 +749,7 @@ eResult ArchiveManageImpl::ListArchives(ArchiveList *lplstArchives, const char *
 				entry.FolderName = ptrPropValue->Value.lpszA ;
 		}
 
-		if (!iArchive->sStoreEntryId.isWrapped()) {
+		if (bAclCapable && !iArchive->sStoreEntryId.isWrapped()) {
 			hrTmp = GetRights(ptrArchiveFolder, &entry.Rights);
 			if (hrTmp != hrSuccess)
 				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to get archive rights (hr=%s)", stringify(hrTmp, true).c_str());

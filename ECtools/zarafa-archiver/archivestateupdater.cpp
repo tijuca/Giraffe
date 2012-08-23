@@ -211,7 +211,7 @@ HRESULT ArchiveStateUpdater::Update(const tstring &userName, unsigned int ulAtta
 		abentryid_t userId;
 
 		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unable to find entry for user '" TSTRING_PRINTF "', trying to resolve.", userName.c_str());
-		hr = m_ptrSession->GetUserInfo(userName, &userId, NULL);
+		hr = m_ptrSession->GetUserInfo(userName, &userId, NULL, NULL);
 		if (hr != hrSuccess)
 			goto exit;
 

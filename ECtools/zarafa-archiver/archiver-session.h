@@ -80,7 +80,7 @@ public:
 	HRESULT OpenStore(const entryid_t &sEntryId, ULONG ulFlags, LPMDB *lppMsgStore);
 	HRESULT OpenStore(const entryid_t &sEntryId, LPMDB *lppMsgStore);
 	HRESULT OpenReadOnlyStore(const entryid_t &sEntryId, LPMDB *lppMsgStore);
-	HRESULT GetUserInfo(const tstring &strUser, abentryid_t *lpsEntryId, tstring *lpstrFullname);
+	HRESULT GetUserInfo(const tstring &strUser, abentryid_t *lpsEntryId, tstring *lpstrFullname, bool *bAclCapable);
 	HRESULT GetUserInfo(const abentryid_t &sEntryId, tstring *lpstrUser, tstring *lpstrFullname);
 	HRESULT GetGAL(LPABCONT *lppAbContainer);
 	HRESULT CompareStoreIds(LPMDB lpUserStore, LPMDB lpArchiveStore, bool *lpbResult);
