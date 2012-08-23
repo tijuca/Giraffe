@@ -574,8 +574,8 @@ HRESULT ZarafaFsck::ValidateDuplicateRecipients(LPMESSAGE lpMessage, bool &bChan
 				continue;
 			}
 
-			// Wrong entryid
-			if (pRows->aRow[i].lpProps[4].ulPropTag == PR_ENTRYID && pRows->aRow[i].lpProps[4].Value.bin.cb == 0) {
+			// Invalid or missing entryid 
+			if (pRows->aRow[i].lpProps[4].ulPropTag != PR_ENTRYID || pRows->aRow[i].lpProps[4].Value.bin.cb == 0) {
 				mapiReciptDel.push_back(pRows->aRow[i].lpProps[0].Value.ul);
 				continue;
 			}
