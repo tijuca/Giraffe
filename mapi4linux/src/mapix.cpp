@@ -2226,7 +2226,8 @@ HRESULT M4LAddrBook::ResolveName(ULONG ulUIParam, ULONG ulFlags, LPTSTR lpszNewE
 		}
 
 	next:
-		lpABContainer->Release();
+		if (lpABContainer)
+			lpABContainer->Release();
 		lpABContainer = NULL;
 	}
 
