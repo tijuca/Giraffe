@@ -316,9 +316,13 @@ zend_function_entry mapi_functions[] =
 	ZEND_FE(mapi_table_queryallrows, NULL)
 	ZEND_FE(mapi_table_queryrows, NULL)
 	ZEND_FE(mapi_table_getrowcount, NULL)
+	ZEND_FE(mapi_table_setcolumns, NULL)
+	ZEND_FE(mapi_table_seekrow, NULL)
 	ZEND_FE(mapi_table_sort, NULL)
 	ZEND_FE(mapi_table_restrict, NULL)
 	ZEND_FE(mapi_table_findrow, NULL)
+	ZEND_FE(mapi_table_createbookmark, NULL)
+	ZEND_FE(mapi_table_freebookmark, NULL)
 
 	ZEND_FE(mapi_folder_gethierarchytable, NULL)
 	ZEND_FE(mapi_folder_getcontentstable, NULL)
@@ -2376,19 +2380,9 @@ ZEND_FUNCTION(mapi_table_queryrows)
 	RETVAL_FALSE;
 	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r|all", &res, &tagArray, &start, &lRowCount) == FAILURE) return;
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r|a!ll", &res, &tagArray, &start, &lRowCount) == FAILURE) return;
 
 	ZEND_FETCH_RESOURCE(lpTable, LPMAPITABLE, &res, -1, name_mapi_table, le_mapi_table);
-
-	// move to the starting row if there is one
-	if (start != 0) {
-		MAPI_G(hr) = lpTable->SeekRow(BOOKMARK_BEGINNING, start, NULL);
-
-		if (FAILED(MAPI_G(hr))) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Seekrow failed. Error code %08X", MAPI_G(hr));
-			goto exit;
-		}
-	}
 
 	if (tagArray != NULL) {
 		MAPI_G(hr) = PHPArraytoPropTagArray(tagArray, NULL, &lpTagArray TSRMLS_CC);
@@ -2405,6 +2399,17 @@ ZEND_FUNCTION(mapi_table_queryrows)
 			goto exit;
 		}
 	}
+
+	// move to the starting row if there is one
+	if (start != 0) {
+		MAPI_G(hr) = lpTable->SeekRow(BOOKMARK_BEGINNING, start, NULL);
+
+		if (FAILED(MAPI_G(hr))) {
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Seekrow failed. Error code %08X", MAPI_G(hr));
+			goto exit;
+		}
+	}
+
 
 	MAPI_G(hr) = lpTable->QueryRows(lRowCount, 0, &pRowSet);
 
@@ -2427,6 +2432,91 @@ exit:
 	if (pRowSet)
 		FreeProws(pRowSet);
 
+	THROW_ON_ERROR();
+	return;
+}
+
+/**
+* mapi_table_setcolumns
+* Execute setcolumns on a table
+* @param Resource MAPITable
+* @param array		column set
+* @return true/false
+*/
+ZEND_FUNCTION(mapi_table_setcolumns)
+{
+	// params
+	zval		*res	= NULL;
+	LPMAPITABLE	lpTable = NULL;
+	zval		*tagArray = NULL;
+	long		lFlags = 0;
+	// local
+	LPSPropTagArray lpTagArray = NULL;
+
+	RETVAL_FALSE;
+	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ra|l", &res, &tagArray, &lFlags) == FAILURE) return;
+
+	ZEND_FETCH_RESOURCE(lpTable, LPMAPITABLE, &res, -1, name_mapi_table, le_mapi_table);
+
+	MAPI_G(hr) = PHPArraytoPropTagArray(tagArray, NULL, &lpTagArray TSRMLS_CC);
+
+	if (MAPI_G(hr) != hrSuccess) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Failed to convert the PHP Array");
+		goto exit;
+	}
+
+	MAPI_G(hr) = lpTable->SetColumns(lpTagArray, lFlags);
+
+	if (FAILED(MAPI_G(hr))) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "SetColumns failed. Error code %08X", MAPI_G(hr));
+		goto exit;
+	}
+
+	RETVAL_TRUE;
+exit:
+	if(lpTagArray)
+		MAPIFreeBuffer(lpTagArray);
+
+	THROW_ON_ERROR();
+	return;
+}
+
+/**
+ * mapi_table_seekrow
+ * Execute seekrow on a table
+ * @param Resource MAPITable
+ * @param long bookmark
+ * @param long Flags
+ * @return long RowsSought
+ */
+ZEND_FUNCTION(mapi_table_seekrow)
+{
+	// params
+	zval		*res	= NULL;
+	LPMAPITABLE	lpTable = NULL;
+	long		lRowCount = 0, lbookmark = BOOKMARK_BEGINNING;
+	// return
+	long lRowsSought = 0;
+
+	RETVAL_FALSE;
+	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rll", &res, &lbookmark, &lRowCount) == FAILURE) return;
+
+	ZEND_FETCH_RESOURCE(lpTable, LPMAPITABLE, &res, -1, name_mapi_table, le_mapi_table);
+
+	MAPI_G(hr) = lpTable->SeekRow((BOOKMARK)lbookmark, lRowCount, (LONG*)&lRowsSought);
+
+	if (FAILED(MAPI_G(hr))) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Seekrow failed. Error code %08X", MAPI_G(hr));
+		goto exit;
+	}
+
+	RETVAL_LONG(lRowsSought);
+	
+exit:
 	THROW_ON_ERROR();
 	return;
 }
@@ -2599,6 +2689,74 @@ exit:
 	return;
 }
 
+/**
+ * mapi_table_createbookmark
+ * Execute create bookmark on a table
+ * @param Resource MAPITable
+ * @return long bookmark
+ */
+ZEND_FUNCTION(mapi_table_createbookmark)
+{
+	// params
+	zval		*res	= NULL;
+	LPMAPITABLE	lpTable = NULL;
+	// return
+	long lbookmark = 0;
+
+	RETVAL_FALSE;
+	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &res) == FAILURE) return;
+
+	ZEND_FETCH_RESOURCE(lpTable, LPMAPITABLE, &res, -1, name_mapi_table, le_mapi_table);
+
+	MAPI_G(hr) = lpTable->CreateBookmark((BOOKMARK*)&lbookmark);
+
+	if (FAILED(MAPI_G(hr))) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Create bookmark failed. Error code %08X", MAPI_G(hr));
+		goto exit;
+	}
+
+	RETVAL_LONG(lbookmark);
+	
+exit:
+	THROW_ON_ERROR();
+	return;
+}
+
+/**
+ * mapi_table_freebookmark
+ * Execute free bookmark on a table
+ * @param Resource MAPITable
+ * @param long bookmark
+ * @return true/false
+ */
+ZEND_FUNCTION(mapi_table_freebookmark)
+{
+	// params
+	zval		*res	= NULL;
+	LPMAPITABLE	lpTable = NULL;
+	long lbookmark = 0;
+
+	RETVAL_FALSE;
+	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rl", &res, &lbookmark) == FAILURE) return;
+
+	ZEND_FETCH_RESOURCE(lpTable, LPMAPITABLE, &res, -1, name_mapi_table, le_mapi_table);
+
+	MAPI_G(hr) = lpTable->FreeBookmark((BOOKMARK)lbookmark);
+
+	if (FAILED(MAPI_G(hr))) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Free bookmark failed. Error code %08X", MAPI_G(hr));
+		goto exit;
+	}
+
+	RETVAL_TRUE;	
+exit:
+	THROW_ON_ERROR();
+	return;
+}
 /**
 * mapi_msgstore_getreceivefolder
 *
