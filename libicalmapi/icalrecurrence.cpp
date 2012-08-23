@@ -206,6 +206,21 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 			// handle the BYSETPOS value
 			if (icRRule.by_set_pos[0] != ICAL_RECURRENCE_ARRAY_MAX)
 				lpRec->setWeekNumber(icRRule.by_set_pos[0]);
+
+			if (lpRec->getFrequency() == recurrence::MONTHLY) {
+				// A montly every day is not supported in outlook. but this is the same as 
+				// weekly x day so convert this item to weekly x day
+
+				lpRec->setFrequency(recurrence::WEEKLY);
+				// assume this weekly item is exactly on the start time day
+				lpRec->setWeekDays(1 << tm.tm_wday);
+				// Strange little thing for the recurrence type "every workday"
+				lpRec->setFirstDOW(1);
+
+				sPropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_RECURRENCETYPE], PT_LONG);
+				sPropVal.Value.ul = 2;
+				lpIcalItem->lstMsgProps.push_back(sPropVal);
+			}
 		} else {
 			// monthly, first sunday: 9, monday: 10
 			ulWeekDays |= (1 << ((icRRule.by_day[0]%8) - 1));
