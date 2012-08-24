@@ -89,7 +89,7 @@ fi
 
 set -e
 
-if [ ! -d "$CADIR" -o ! "$CADIR/serial" ]; then
+if [ ! -d "$CADIR" -o ! -f "$CADIR/serial" ]; then
 	echo "No Certificate Authority Root found in current directory."
 	echo "Press enter to create, or ctrl-c to exit."
 	read dummy
