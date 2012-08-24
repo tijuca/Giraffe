@@ -31,14 +31,14 @@
 zarafa-set-oof \- Control a user\*(Aqs out of office settings\&.
 .SH "SYNOPSIS"
 .HP \w'\fBzarafa\-set\-oof\fR\ 'u
-\fBzarafa\-set\-oof\fR \fIUSERNAME\fR \fISTATE\fR [\fISUBJECT\fR] [\fIMESSAGE\ FILE\fR]
+\fBzarafa\-set\-oof\fR \fIUSERNAME\fR \fIMODE\fR [\fISUBJECT\fR] [\fIMESSAGE\ FILE\fR]
 .SH "DESCRIPTION"
 .PP
 This tool can be used to change a user\*(Aqs out of office settings\&. The Zarafa server must be running for
 \fBzarafa\-set\-oof\fR
 to work\&.
 .PP
-You must choose a state, enabled or disabled, when using this script\&.
+You must choose a state, enabled, disabled or don\*(Aqt change, when using this script\&.
 .SH "ACTIONS"
 .PP
 zarafa\-set\-oof needs atleast a state command\&. Valid states are:
@@ -51,6 +51,13 @@ Disable the user\*(Aqs out of office reply\&.
 \fB1\fR
 .RS 4
 Enable the user\*(Aqs out of office reply\&.
+.RE
+.PP
+\fB\-\fR
+.RS 4
+Don\*(Aqt enable or disable the user\*(Aqs out of office reply\&. Just update the subject and message, unless the user\*(Aqs out of office reply is enabled\&.
+.sp
+This is useful to update all out of office settings without enabling them and without changing the messages of enabled replies because that might overwrite some useful information that a user has set\&.
 .RE
 .SH "OPTIONS"
 .PP

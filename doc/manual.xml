@@ -2898,7 +2898,7 @@
 		<cmdsynopsis>
 		  <command>zarafa-set-oof</command>
 		  <arg choice="plain"><replaceable>USERNAME</replaceable></arg>
-		  <arg choice="plain"><replaceable>STATE</replaceable></arg>
+		  <arg choice="plain"><replaceable>MODE</replaceable></arg>
 		  <arg choice="opt"><replaceable>SUBJECT</replaceable></arg>
 		  <arg choice="opt"><replaceable>MESSAGE FILE</replaceable></arg>
 		</cmdsynopsis>
@@ -2912,8 +2912,8 @@
 		<command>zarafa-set-oof</command> to work.
 		</para>
 
-		<para>You must choose a state, enabled or disabled, when using
-		this script.</para>
+		<para>You must choose a state, enabled, disabled or don't change,
+		when using this script.</para>
 	  </refsection>
 
 	  <refsection>
@@ -2936,6 +2936,22 @@
 			</term>
 			<listitem>
 			  <para>Enable the user's out of office reply.</para>
+			</listitem>
+		  </varlistentry>
+		  
+		  <varlistentry>
+			<term>
+			  <option>-</option>
+			</term>
+			<listitem>
+				<para>Don't enable or disable the user's out of office
+				reply. Just update the subject and message, unless the
+				user's out of office reply is enabled.</para>
+				<para>This is useful to update all out of office
+				settings without enabling them and without changing
+				the messages of enabled replies because that might
+				overwrite some useful information that a user has set.
+				</para>
 			</listitem>
 		  </varlistentry>
 

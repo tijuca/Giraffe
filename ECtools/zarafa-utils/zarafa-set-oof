@@ -8,8 +8,12 @@ PR_EC_OUTOFOFFICE                   = PROP_TAG(PT_BOOLEAN,    PR_EC_BASE+0x60)
 PR_EC_OUTOFOFFICE_MSG               = PROP_TAG(PT_TSTRING,    PR_EC_BASE+0x61)
 PR_EC_OUTOFOFFICE_SUBJECT           = PROP_TAG(PT_TSTRING,    PR_EC_BASE+0x62)
 
+MODE_ENABLE = 1
+MODE_DISABLE = 2
+MODE_UPDATE_ONLY = 3
+
 if len(sys.argv) < 3:
-    print "Usage: %s <username> <0|1> [<oof_subject>] [</path/to/oof/message.txt>]" % sys.argv[0]
+    print "Usage: %s <username> <0|1|-> [<oof_subject>] [</path/to/oof/message.txt>]" % sys.argv[0]
     exit(1)
 
 def PrintSubject(subject):
@@ -19,7 +23,12 @@ def PrintSubject(subject):
         print "No subject set"
 
 
-enabled = bool(int(sys.argv[2]))
+if sys.argv[2] == '-':
+    mode = MODE_UPDATE_ONLY
+else:
+    enabled = bool(int(sys.argv[2]))
+    mode = {True: MODE_ENABLE,
+            False: MODE_DISABLE}.get(enabled)
 
 try:
     session = OpenECSession(sys.argv[1], '', os.getenv('ZARAFA_SOCKET','file:///var/run/zarafa'))
@@ -30,17 +39,18 @@ except MAPIError, e:
 
 props = st.GetProps([PR_EC_OUTOFOFFICE, PR_EC_OUTOFOFFICE_SUBJECT], 0)
 if props[0].ulPropTag == PR_EC_OUTOFOFFICE:
-    if props[0].Value == True and enabled:
+    if props[0].Value == True and mode != MODE_DISABLE:
         print "Not changing subject and message for user %s which already has out of office message enbled." % sys.argv[1]
         PrintSubject(props[1])
         exit(0)
-    elif not props[0].Value and not enabled:
+    elif props[0].Value == False and mode == MODE_DISABLE:
         print "Out of office is already disabled for user %s" % sys.argv[1]
         exit(0)
 
-st.SetProps([SPropValue(PR_EC_OUTOFOFFICE, enabled)])
+if mode != MODE_UPDATE_ONLY:
+    st.SetProps([SPropValue(PR_EC_OUTOFOFFICE, enabled)])
 
-if(enabled):
+if mode != MODE_DISABLE:
     if len(sys.argv) >= 4:
         st.SetProps([SPropValue(PR_EC_OUTOFOFFICE_SUBJECT, sys.argv[3])])
 
@@ -50,7 +60,12 @@ if(enabled):
         st.SetProps([SPropValue(PR_EC_OUTOFOFFICE_MSG, msg)])
         f.close()
 
-    print "Out of office enabled for user %s" % sys.argv[1]
+    if mode == MODE_ENABLE:
+        print "Out of office enabled for user %s" % sys.argv[1]
+    elif len(sys.argv) >=4:
+        print "Out of office updated for user %s" % sys.argv[1]
+    else:
+        print "Out of user not updated for user %s" % sys.argv[1]
     props = st.GetProps([PR_EC_OUTOFOFFICE_SUBJECT], 0)
     PrintSubject(props[0])
 else:
