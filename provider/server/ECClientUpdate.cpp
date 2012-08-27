@@ -69,6 +69,7 @@ namespace ba = boost::algorithm;
 #include "ECSessionManager.h"
 #include "ECDatabase.h"
 #include "ECStatsCollector.h"
+#include "boost_compat.h"
 
 /* class and add constructor params? */
 extern ECRESULT GetBestServerPath(struct soap *soap, ECSession *lpecSession, const std::string &strServerName, std::string *lpstrServerPath);
@@ -357,13 +358,13 @@ bool GetLatestVersionAtServer(char *szUpdatePath, unsigned int ulTrackid, Client
 
 		bfs::directory_iterator update_last;
 		for (bfs::directory_iterator update(updatesdir); update != update_last; update++) {
-			std::string strFilename = update->path().leaf();
+			std::string strFilename = filename_from_path(update->path());
 
-			if (!bfs::is_regular(*update) && !bfs::is_symlink(*update)) {
+			if (!bfs::is_regular_file(*update) && !bfs::is_symlink(*update)) {
 				continue;
 			}
 
-			if (!ba::starts_with(update->path().leaf(), strFileStart)) {
+			if (!ba::starts_with(strFilename, strFileStart)) {
 				g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Client update: trackid: 0x%08X, Ignoring file %s for client update", ulTrackid, strFilename.c_str());
 				continue;
 			}

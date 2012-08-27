@@ -19613,8 +19613,6 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 fi
 
 
-# BOOST_BIND
-# BOOST_THREADS([mt])
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for the toolset name used by Boost for $CXX" >&5
 $as_echo_n "checking for the toolset name used by Boost for $CXX... " >&6; }
 if test "${boost_cv_lib_tag+set}" = set; then :
@@ -20414,47 +20412,6 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 fi
 
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking boost version compatibility" >&5
-$as_echo_n "checking boost version compatibility... " >&6; }
-if test -n "$boost_major_version" -a $boost_major_version -ge 146; then
-   { $as_echo "$as_me:${as_lineno-$LINENO}: result: adding backward compatible flags" >&5
-$as_echo "adding backward compatible flags" >&6; }
-   BOOST_CPPFLAGS="$BOOSTCPPFLAGS -DBOOST_FILESYSTEM_VERSION=2"
-
-    CXXFLAGS="$CXXFLAGS $BOOST_CPPFLAGS"
-    LIBS="$BOOST_FILESYSTEM_LIBS $BOOST_SYSTEM_LIBS"
-
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for boost filesystem version 2 presence" >&5
-$as_echo_n "checking for boost filesystem version 2 presence... " >&6; }
-    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-
-#include <boost/filesystem.hpp>
-namespace bfs = boost::filesystem;
-int main() {
-  bfs::path path;
-  bfs::directory_iterator pi(path);
-  pi->path().file_string();
-}
-
-_ACEOF
-if ac_fn_cxx_try_link "$LINENO"; then :
-   { $as_echo "$as_me:${as_lineno-$LINENO}: result: ok" >&5
-$as_echo "ok" >&6; }
-else
-   as_fn_error $? "no, boost is too new" "$LINENO" 5
-
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-
-    LIBS=$libs_keep
-    CFLAGS=$cflags_keep
-else
-   { $as_echo "$as_me:${as_lineno-$LINENO}: result: ok" >&5
-$as_echo "ok" >&6; }
-fi
 
 # Check whether --enable-icu was given.
 if test "${enable_icu+set}" = set; then :
@@ -23465,12 +23422,10 @@ Curl libs	:	$CURL_LIBS
 Pam libs	:	$PAM_LIBS
 Krb5 libs	:	$KRB5_LIBS
 TCMalloc lib	:	$TCMALLOC_LIBS
-Boost
+Boost		:
  Flags		:	$BOOST_CPPFLAGS
  FS ldflags	:	$BOOST_FILESYSTEM_LDFLAGS
  FS libs	:	$BOOST_FILESYSTEM_LIBS
-# Thread ldflags	:	$BOOST_THREAD_LDFLAGS
-# Thread libs	:	$BOOST_THREAD_LIBS
 ICU libs	:	$ICU_LIBS
 Swig 		:	$want_swig
 Python module	:	$want_python
@@ -23514,12 +23469,10 @@ Curl libs	:	$CURL_LIBS
 Pam libs	:	$PAM_LIBS
 Krb5 libs	:	$KRB5_LIBS
 TCMalloc lib	:	$TCMALLOC_LIBS
-Boost
+Boost		:
  Flags		:	$BOOST_CPPFLAGS
  FS ldflags	:	$BOOST_FILESYSTEM_LDFLAGS
  FS libs	:	$BOOST_FILESYSTEM_LIBS
-# Thread ldflags	:	$BOOST_THREAD_LDFLAGS
-# Thread libs	:	$BOOST_THREAD_LIBS
 ICU libs	:	$ICU_LIBS
 Swig 		:	$want_swig
 Python module	:	$want_python

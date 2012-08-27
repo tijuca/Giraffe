@@ -84,6 +84,7 @@
 
 #include "pthreadutil.h"
 #include "threadutil.h"
+#include "boost_compat.h"
 
 #include <boost/filesystem.hpp>
 namespace bfs = boost::filesystem;
@@ -948,7 +949,7 @@ ECRESULT ECAuthSession::ValidateUserCertificate(struct soap *soap, char *lpszNam
 			if (is_directory(key->status()))
 				continue;
 
-			lpFileName = key->path().file_string().c_str();
+			lpFileName = path_to_string(key->path()).c_str();
 
 			biofile = BIO_new_file(lpFileName, "r");
 			if (!biofile) {

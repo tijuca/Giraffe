@@ -56,6 +56,7 @@
 #include "mapicode.h"
 #include "mapitags.h"
 #include "mapiutil.h"
+#include "boost_compat.h"
 
 #include "Util.h"
 
@@ -64,6 +65,7 @@
 
 #include <boost/algorithm/string.hpp>
 namespace ba = boost::algorithm;
+
 #include <boost/filesystem.hpp>
 namespace bfs = boost::filesystem;
 
@@ -125,14 +127,14 @@ HRESULT INFLoader::LoadINFs()
 			if (is_directory(inffile->status()))
 				continue;
 
-			string strFilename = inffile->path().file_string();
+ 			string strFilename = path_to_string(inffile->path());
 			string::size_type pos = strFilename.rfind(".inf", strFilename.size(), strlen(".inf"));
 
 			if (pos == string::npos || strFilename.size() - pos != strlen(".inf"))
 				// silently skip files not ending in pos
 				continue;
 
-			hr = LoadINF(inffile->path().file_string().c_str());
+			hr = LoadINF(path_to_string(inffile->path()).c_str());
 			if (hr != hrSuccess)
 				goto exit;
 		}
