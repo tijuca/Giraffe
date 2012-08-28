@@ -1903,8 +1903,10 @@ HRESULT CalDAV::HrHandlePost()
 	}
 
 	hr = lpIcalToMapi->ParseICal(strIcal, m_strCharset, m_strSrvTz, m_lpLoginUser, 0);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to parse received ical message: 0x%08X", hr);
 		goto exit;
+	}
 
 	if (lpIcalToMapi->GetFreeBusyInfo(NULL, NULL, NULL, NULL) == hrSuccess)
 		hr = HrHandleFreebusy(lpIcalToMapi);
@@ -1970,8 +1972,11 @@ HRESULT CalDAV::HrHandleFreebusy(ICalToMapi *lpIcalToMapi)
 	sWebFbInfo.strUID = strUID;
 
 	hr = HrGetFreebusy(lpMapiToIcal, lpFBSupport, m_lpAddrBook, lstUsers, &sWebFbInfo);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		// @todo, print which users?
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get freebusy information for %lu users: 0x%08X", lstUsers->size(), hr);
 		goto exit;
+	}
 	
 	hr = WebDav::HrPostFreeBusy(&sWebFbInfo);
 	if (hr != hrSuccess)
@@ -2205,14 +2210,14 @@ HRESULT CalDAV::HrMapValtoStruct(LPMAPIPROP lpObj, LPSPropValue lpProps, ULONG u
 				HrSetDavPropName(&(sWebVal.sPropName), "collection", WEBDAVNS);
 				sWebProperty.lstValues.push_back(sWebVal);
 			}
-			
-			if(lpFoundProp && (!strcmp(lpFoundProp->Value.lpszA ,"IPF.Appointment") || !strcmp(lpFoundProp->Value.lpszA , "IPF.Task"))) {
+
+			if (lpFoundProp && (!strcmp(lpFoundProp->Value.lpszA ,"IPF.Appointment") || !strcmp(lpFoundProp->Value.lpszA , "IPF.Task"))) {
 				HrSetDavPropName(&(sWebVal.sPropName), "calendar", CALDAVNS);
 				sWebProperty.lstValues.push_back(sWebVal);
-			}else if (m_wstrFldName == L"Inbox") {
+			} else if (m_wstrFldName == L"Inbox") {
 				HrSetDavPropName(&(sWebVal.sPropName), "schedule-inbox", CALDAVNS);
 				sWebProperty.lstValues.push_back(sWebVal);
-			}else if(m_wstrFldName == L"Outbox") {
+			} else if (m_wstrFldName == L"Outbox") {
 				HrSetDavPropName(&(sWebVal.sPropName), "schedule-outbox", CALDAVNS);
 				sWebProperty.lstValues.push_back(sWebVal);
 			}
@@ -2334,8 +2339,11 @@ HRESULT CalDAV::HrMapValtoStruct(LPMAPIPROP lpObj, LPSPropValue lpProps, ULONG u
 
 		} else if (strProperty == "current-user-principal") {
 			// webdav rfc5397
+			// we should return the currently authenticated user principal url, but due to sharing, Mac iCal 10.8 gets confused
+			// and will use this url as the actual store being access, disabling sharing through a different url
+			// so we return the current accessed user principal url.
 			HrSetDavPropName(&(sWebVal.sPropName), "href", WEBDAVNS);
-			sWebVal.strValue = strCurrentUserURL;
+			sWebVal.strValue = strPrincipalURL;
 			sWebProperty.lstValues.push_back(sWebVal);
 
 		} else if (strProperty == "owner") {
