@@ -296,9 +296,9 @@ HRESULT ProtocolBase::HrInitializeClass()
 		m_lpRequest->HrGetDepth(&ulDepth);
 		m_lpRequest->HrGetHeaderValue("User-Agent", &strAgent);
 
-		// /caldav/ depth 0 or 1 == redirect
-		// /caldav/username (which we add in XML!) only depth 0 == redirect, since this isn't a calender /caldav/username/Calendar/ is.
-		if ((strAgent.find("Sunbird/1") != string::npos || strAgent.find("Lightning/1") != string::npos) && (ulDepth >= 1 || parts.size() <= 2)) {
+		// /caldav/
+		// /caldav/username/ (which we return in XML data!), since this isn't a calender, but /caldav/username/Calendar/ is.
+		if ((strAgent.find("Sunbird/1") != string::npos || strAgent.find("Lightning/1") != string::npos) && parts.size() <= 2) {
 			// Mozilla Sunbird / Lightning doesn't handle listing of calendars, only contents.
 			// We therefore redirect them to the default calendar url.
 			if (parts.empty())
