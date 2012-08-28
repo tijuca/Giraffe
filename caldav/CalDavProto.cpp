@@ -2339,9 +2339,9 @@ HRESULT CalDAV::HrMapValtoStruct(LPMAPIPROP lpObj, LPSPropValue lpProps, ULONG u
 
 		} else if (strProperty == "current-user-principal") {
 			// webdav rfc5397
-			// we should return the currently authenticated user principal url, but due to sharing, Mac iCal 10.8 gets confused
-			// and will use this url as the actual store being access, disabling sharing through a different url
-			// so we return the current accessed user principal url.
+			// We should return the currently authenticated user principal url, but due to sharing, Mac iCal 10.8 gets confused
+			// and will use this url as the actual store being accessed, therefor disabling sharing through a different url.
+			// So we return the current accessed user principal url to continue in the correct store.
 			HrSetDavPropName(&(sWebVal.sPropName), "href", WEBDAVNS);
 			sWebVal.strValue = strPrincipalURL;
 			sWebProperty.lstValues.push_back(sWebVal);
