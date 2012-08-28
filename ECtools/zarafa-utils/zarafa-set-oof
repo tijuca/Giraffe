@@ -14,7 +14,7 @@ MODE_UPDATE_ONLY = 3
 
 if len(sys.argv) < 3:
     print "Usage: %s <username> <0|1|-> [<oof_subject>] [</path/to/oof/message.txt>]" % sys.argv[0]
-    exit(1)
+    sys.exit(1)
 
 def PrintSubject(subject):
     if subject.ulPropTag == PR_EC_OUTOFOFFICE_SUBJECT:
@@ -35,17 +35,17 @@ try:
     st = GetDefaultStore(session)
 except MAPIError, e:
     print "Unable to open store for user %s" % sys.argv[1]
-    exit(1)
+    sys.exit(1)
 
 props = st.GetProps([PR_EC_OUTOFOFFICE, PR_EC_OUTOFOFFICE_SUBJECT], 0)
 if props[0].ulPropTag == PR_EC_OUTOFOFFICE:
     if props[0].Value == True and mode != MODE_DISABLE:
         print "Not changing subject and message for user %s which already has out of office message enbled." % sys.argv[1]
         PrintSubject(props[1])
-        exit(0)
+        sys.exit(0)
     elif props[0].Value == False and mode == MODE_DISABLE:
         print "Out of office is already disabled for user %s" % sys.argv[1]
-        exit(0)
+        sys.exit(0)
 
 if mode != MODE_UPDATE_ONLY:
     st.SetProps([SPropValue(PR_EC_OUTOFOFFICE, enabled)])
