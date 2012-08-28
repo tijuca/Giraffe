@@ -195,6 +195,8 @@ exit:
 	}
 	else if (hr == MAPI_E_NOT_FOUND)
 		m_lpRequest->HrResponseHeader(404, "Not Found");
+	else if (hr == MAPI_E_NO_ACCESS)
+		m_lpRequest->HrResponseHeader(403, "Access Denied");
 	else 
 		m_lpRequest->HrResponseHeader(500, "Internal Server Error");
 

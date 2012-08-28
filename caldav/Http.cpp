@@ -589,10 +589,10 @@ HRESULT Http::HrValidateReq()
 		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "HTTP request method is empty: %08X", hr);
 		goto exit;
 	}
-	
+
 	if (!parseBool(m_lpConfig->GetSetting("enable_ical_get")) && m_strMethod == "GET") {
 		hr = MAPI_E_NO_ACCESS;
-		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Denying iCalendar GET since it is disabled");
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Denying iCalendar GET since it is disabled");
 		goto exit;
 	}
 
@@ -718,6 +718,25 @@ HRESULT Http::HrFinalize()
 exit:
 	m_ulRetCode = 0;
 	return hr;
+}
+
+/** 
+ * Converts common hr codes to http error codes
+ * 
+ * @param hr HRESULT
+ * 
+ * @return Error from HrResponseHeader(unsigned int, string)
+ */
+HRESULT Http::HrToHTTPCode(HRESULT hr)
+{
+	if (hr == hrSuccess)
+		return HrResponseHeader(200, "Ok");
+	else if (hr == MAPI_E_NO_ACCESS)
+		return HrResponseHeader(403, "Forbidden");
+	else if (hr == MAPI_E_NOT_FOUND)
+		return HrResponseHeader(404, "Not Found");
+	// @todo other codes?
+	return  HrResponseHeader(500, "Unhanded error " + stringify(hr, true));
 }
 
 /**

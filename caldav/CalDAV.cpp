@@ -710,6 +710,8 @@ HRESULT HrHandleRequest(ECChannel *lpChannel)
 	if(!strMethod.compare("OPTIONS"))
 	{
 		lpRequest->HrResponseHeader(200, "OK");
+		// @todo, if ical get is disabled, do not add GET as allowed option
+		// @todo, should check write access on url and only return read actions if not available
 		lpRequest->HrResponseHeader("Allow", "OPTIONS, GET, POST, PUT, DELETE, MOVE");
 		lpRequest->HrResponseHeader("Allow", "PROPFIND, PROPPATCH, REPORT, MKCALENDAR");
 		// most clients do not login with this action, no need to complain.
@@ -754,12 +756,7 @@ HRESULT HrHandleRequest(ECChannel *lpChannel)
 
 	hr = lpBase->HrInitializeClass();
 	if (hr != hrSuccess) {
-		if (hr == MAPI_E_NOT_FOUND)
-			lpRequest->HrResponseHeader(404, "Folder not found");
-		else {
-			string strcode = stringify(hr, true);
-			lpRequest->HrResponseHeader(500, "Error "+strcode);
-		}
+		hr = lpRequest->HrToHTTPCode(hr);
 		goto exit;
 	}
 

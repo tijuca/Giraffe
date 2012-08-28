@@ -100,6 +100,7 @@ public:
 	HRESULT HrGetCharSet(std::string *strCharset);
 	HRESULT HrGetDestination(std::string *strDestination);
 
+	HRESULT HrToHTTPCode(HRESULT hr);
 	HRESULT HrResponseHeader(unsigned int ulCode, std::string strResponse);
 	HRESULT HrResponseHeader(std::string strHeader, std::string strValue);
 	HRESULT HrRequestAuth(std::string strMsg);
