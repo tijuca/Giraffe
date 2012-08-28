@@ -47,23 +47,41 @@
  * 
  */
 
-#define PROJECT_VERSION_SERVER		7,1,1,36820
-#define PROJECT_VERSION_SERVER_STR	"7,1,1,36820"
-#define PROJECT_VERSION_CLIENT		7,1,1,36820
-#define PROJECT_VERSION_CLIENT_STR	"7,1,1,36820"
-#define PROJECT_VERSION_EXT_STR		"7,1,1,36820"
-#define PROJECT_VERSION_SPOOLER_STR	"7,1,1,36820"
-#define PROJECT_VERSION_GATEWAY_STR	"7,1,1,36820"
-#define PROJECT_VERSION_CALDAV_STR	"7,1,1,36820"
-#define PROJECT_VERSION_DAGENT_STR	"7,1,1,36820"
-#define PROJECT_VERSION_PROFADMIN_STR	"7,1,1,36820"
-#define PROJECT_VERSION_MONITOR_STR	"7,1,1,36820"
-#define PROJECT_VERSION_PASSWD_STR	"7,1,1,36820"
-#define PROJECT_VERSION_FBSYNCER_STR	"7,1,1,36820"
-#define PROJECT_VERSION_SEARCH_STR	"7,1,1,36820"
-#define PROJECT_VERSION_DOT_STR		"7.1.1"
-#define PROJECT_SPECIALBUILD			"beta"
-#define PROJECT_SVN_REV_STR			"36820"
-#define PROJECT_VERSION_MAJOR			7
-#define PROJECT_VERSION_MINOR			1
-#define PROJECT_VERSION_REVISION			36820
+#ifndef boost_compat_INCLUDED
+#define boost_compat_INCLUDED
+
+#include <string>
+
+#include <boost/filesystem.hpp>
+
+#if !defined(BOOST_FILESYSTEM_VERSION) || BOOST_FILESYSTEM_VERION == 2
+
+static inline std::string path_to_string(const boost::filesystem::path &p) {
+    return p.file_string();
+}
+
+static inline boost::filesystem::path& remove_filename_from_path(boost::filesystem::path &p) {
+    return p.remove_leaf();
+}
+
+static inline std::string filename_from_path(const boost::filesystem::path &p) {
+    return p.leaf();
+}
+    
+#else
+
+static inline std::string path_to_string(const boost::filesystem::path &p) {
+    return p.string();
+}
+
+static inline boost::filesystem::path& remove_filename_from_path(boost::filesystem::path &p) {
+    return p.remove_filename();
+}
+
+static inline std::string filename_from_path(const boost::filesystem::path &p) {
+    return p.filename().string();
+}
+    
+#endif
+
+#endif // ndef boost_compat_INCLUDED
