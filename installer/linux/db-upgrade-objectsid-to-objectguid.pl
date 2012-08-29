@@ -120,7 +120,7 @@ foreach $tag (@tags) {
 	print "Converting properties table step $i of ".scalar(@tags)."\n";
 
 	# join store so we use the index, only return addressbook entries V1
-	$query = "SELECT parent.id,hierarchyid,val_binary FROM properties JOIN hierarchy ON properties.hierarchyid=hierarchy.id LEFT JOIN hierarchy AS parent ON hierarchy.parent=parent.id AND parent.type=3 WHERE properties.type=0x0102 AND tag=? AND substr(val_binary,1,24) = 0x00000000AC21A95040D3EE48B319FBA75330442501000000"
+	$query = "SELECT parent.id,hierarchyid,val_binary FROM properties JOIN hierarchy ON properties.hierarchyid=hierarchy.id LEFT JOIN hierarchy AS parent ON hierarchy.parent=parent.id AND parent.type=3 WHERE properties.type=0x0102 AND tag=? AND substr(val_binary,1,24) = 0x00000000AC21A95040D3EE48B319FBA75330442501000000";
 	$sth = $dbh->prepare($query)
 		or die $DBI::errstr;
 
@@ -148,7 +148,7 @@ foreach $tag (@tags) {
 		$udh->execute($entryid, $row[1], $tag)
 			or die $DBI::errstr;
 		
-		if defined($row[0]) {
+		if (defined($row[0])) {
 			$udh_t->execute($entryid, $row[0], $row[1], $tag)
 				or die $DBI::errstr;
 		}
