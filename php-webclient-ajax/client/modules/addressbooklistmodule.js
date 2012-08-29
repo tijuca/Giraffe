@@ -124,6 +124,9 @@ addressbooklistmodule.prototype.execute = function(type, action)
 			// Content in addressbook is loaded and table widget is added so call resize function.
 			if (window.onresize)
 				window.onresize();
+			// empty old selected messages if there was any.
+			if(this.selectedMessages)
+				this.selectedMessages = new Array();
 			break;
 		case "hierarchy":
 			this.updateHierarchy(action);
