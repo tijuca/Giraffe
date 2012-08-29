@@ -10,13 +10,15 @@ sub readconfig($) {
 
 	open(CFG, $fn) or die("unable to open ".$fn." config file");
 	while (<CFG>) {
-		if ($_ =~ /^\s*#/) {
+		if ($_ =~ /^\s*[#!]/) {
 			next;
 		}
-		if ($_ =~ /\s*(\S+)\s*=\s*([^]+)/) {
+		if ($_ =~ /^\s*(\S+)\s*=\s*([^\r]+)\r?$/) {
+			my $idx = $1;
 			my $val = $2;
 			chomp($val);
-			$options{$1} = $val;
+			$val =~ s/\s+$//;
+			$options{$idx} = $val;
 		}
 	}
 	close(CFG);
