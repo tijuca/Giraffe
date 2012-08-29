@@ -367,7 +367,12 @@ WebClient.prototype.loadModule = function(moduleName, title, position, data, LAY
 WebClient.prototype.getModule = function(moduleID)
 {
 	var module = false;
-	
+
+	// sometimes modules are registered with objects but here we only need module id in form of string or number
+	if(typeof moduleID != 'string' && typeof moduleID != 'number') {
+		return module;
+	}
+
 	if(this.modules[moduleID]) {
 		module = this.modules[moduleID];
 	} else if(this.modules[this.modulePrefix + "_" + moduleID]) {
