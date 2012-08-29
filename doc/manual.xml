@@ -4943,7 +4943,11 @@
 			<term>log_level</term>
 			<term>session_timeout</term>
 			<term>sync_lifetime</term>
-			<term>enable_sso_ntlmauth</term>
+			<term>enable_sso</term>
+                        <term>audit_log_level</term>
+                        <term>threads</term>
+                        <term>counter_reset</term>
+                        <term>user_safe_mode</term>
 			<listitem><para></para></listitem>
 		  </varlistentry>
 
