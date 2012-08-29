@@ -120,6 +120,8 @@ HRESULT ProtocolBase::HrInitializeClass()
 	string strFldName;
 	LPSPropValue lpDefaultProp = NULL;
 	LPSPropValue lpFldProp = NULL;
+	SPropValuePtr lpEntryID;
+	ULONG ulRes = 0;
 	bool blCreateIFNf = false;
 	bool bIsPublic = false;
 	ULONG ulType = 0;
@@ -264,6 +266,17 @@ HRESULT ProtocolBase::HrInitializeClass()
 			goto exit;
 		}
 		m_ulFolderFlag |= SINGLE_FOLDER;
+
+		// check if this is the default calendar folder to enable freebusy publishing
+		if (HrGetOneProp(m_lpUsrFld, PR_ENTRYID, &lpEntryID) == hrSuccess &&
+			m_lpActiveStore->CompareEntryIDs(lpEntryID->Value.bin.cb, (LPENTRYID)lpEntryID->Value.bin.lpb,
+											 lpDefaultProp->Value.bin.cb, (LPENTRYID)lpDefaultProp->Value.bin.lpb, 0, &ulRes) == hrSuccess &&
+			ulRes == TRUE)
+		{
+			// disable delete default folder, and enable fb publish
+			m_blFolderAccess = false;
+			m_ulFolderFlag |= DEFAULT_FOLDER;
+		}
 	} else {
 		// default calendar
 		if (bIsPublic) {
