@@ -4936,18 +4936,67 @@
 
 	  <refsection>
 		<title>Reloading</title>
-		<para>The following options are reloadable by sending the zarafa-server process a HUP signal:</para>
+		<para>The following options are reloadable by sending the zarafa-server process a HUP signal or reload the process by the initscript</para>
 
 		<variablelist>
 		  <varlistentry>
-			<term>log_level</term>
-			<term>session_timeout</term>
-			<term>sync_lifetime</term>
+                        <term>system_email_address</term>
+                        <term>local_admin_users</term>
+                        <term>allow_local_users</term>
+                        <term>hide_system</term>
+                        <term>hide_everyone</term>
+                        <term>auth_method</term>
+                        <term>pam_service</term>
 			<term>enable_sso</term>
+                        <term>enable_gab</term>
+                        <term>sync_gab_realtime</term>
+                        <listitem><para></para></listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                        <term>session_timeout</term>
+                        <term>server_recv_timeout</term>
+                        <term>server_read_timeout</term>
+                        <term>server_send_timeout</term>
+			<term>sync_lifetime</term>
+                        <listitem><para></para></listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+			<term>log_level</term>
                         <term>audit_log_level</term>
+                        <listitem><para></para></listitem>
+                  </varlistentry>
+
+                  <varlistentry>
                         <term>threads</term>
+                        <term>watchdog_max_age</term>
+                        <term>watchdog_frequency</term>
+                        <term>max_deferred_records</term>
+                        <term>max_deferred_records_folder</term>
+                        <listitem><para></para></listitem>
+                  </varlistentry>
+
+                  <varlistentry>
                         <term>counter_reset</term>
                         <term>user_safe_mode</term>
+                        <term>enable_enhanced_ics</term>
+                        <term>report_path</term>
+                        <term>report_ca_path</term>
+                        <term>client_update_log_level</term>
+                        <term>client_update_path</term>
+                        <term>client_update_log_path</term>
+                        <listitem><para></para></listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                        <term>search_enabled</term>
+                        <term>search_socket</term>
+                        <term>search_timeout</term>
+                        <term>disabled_features</term>
+                        <term>mysql_group_concat_max_len</term>
+                        <term>embedded_attachment_limit</term>
+                        <term>proxy_header</term>
 			<listitem><para></para></listitem>
 		  </varlistentry>
 
@@ -4955,6 +5004,9 @@
 			<term>quota_warn</term>
 			<term>quota_soft</term>
 			<term>quota_hard</term>
+                        <term>companyquota_warn</term>
+                        <term>companyquota_soft</term>
+                        <term>companyquota_hard</term>
 			<listitem><para></para></listitem>
 		  </varlistentry>
 
@@ -4963,6 +5015,8 @@
 			<term>deleteuser_script</term>
 			<term>creategroup_script</term>
 			<term>deletegroup_script</term>
+                        <term>createcompany_script</term>
+                        <term>deletecompany_script</term>
 			<listitem><para></para></listitem>
 		  </varlistentry>
 		</variablelist>

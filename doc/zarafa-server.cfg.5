@@ -1145,17 +1145,37 @@ Default:
 .RE
 .SH "RELOADING"
 .PP
-The following options are reloadable by sending the zarafa\-server process a HUP signal:
+The following options are reloadable by sending the zarafa\-server process a HUP signal or reload the process by the initscript
 .PP
-log_level, session_timeout, sync_lifetime, enable_sso, audit_log_level, threads, counter_reset, user_safe_mode
+system_email_address, local_admin_users, allow_local_users, hide_system, hide_everyone, auth_method, pam_service, enable_sso, enable_gab, sync_gab_realtime
 .RS 4
 .RE
 .PP
-quota_warn, quota_soft, quota_hard
+session_timeout, server_recv_timeout, server_read_timeout, server_send_timeout, sync_lifetime
 .RS 4
 .RE
 .PP
-createuser_script, deleteuser_script, creategroup_script, deletegroup_script
+log_level, audit_log_level
+.RS 4
+.RE
+.PP
+threads, watchdog_max_age, watchdog_frequency, max_deferred_records, max_deferred_records_folder
+.RS 4
+.RE
+.PP
+counter_reset, user_safe_mode, enable_enhanced_ics, report_path, report_ca_path, client_update_log_level, client_update_path, client_update_log_path
+.RS 4
+.RE
+.PP
+search_enabled, search_socket, search_timeout, disabled_features, mysql_group_concat_max_len, embedded_attachment_limit, proxy_header
+.RS 4
+.RE
+.PP
+quota_warn, quota_soft, quota_hard, companyquota_warn, companyquota_soft, companyquota_hard
+.RS 4
+.RE
+.PP
+createuser_script, deleteuser_script, creategroup_script, deletegroup_script, createcompany_script, deletecompany_script
 .RS 4
 .RE
 .SH "FILES"
