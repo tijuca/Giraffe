@@ -358,12 +358,12 @@ bool GetLatestVersionAtServer(char *szUpdatePath, unsigned int ulTrackid, Client
 
 		bfs::directory_iterator update_last;
 		for (bfs::directory_iterator update(updatesdir); update != update_last; update++) {
-			std::string strFilename = filename_from_path(update->path());
-
-			if (!bfs::is_regular_file(*update) && !bfs::is_symlink(*update)) {
+			const bfs::file_type file_type = update->status().type();
+			if (file_type != bfs::regular_file && file_type != bfs::symlink_file) {
 				continue;
 			}
 
+			const std::string strFilename = filename_from_path(update->path());
 			if (!ba::starts_with(strFilename, strFileStart)) {
 				g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Client update: trackid: 0x%08X, Ignoring file %s for client update", ulTrackid, strFilename.c_str());
 				continue;
