@@ -95,6 +95,7 @@ enum {
 	OPT_AUTO_DEL,
 	OPT_CHECK_ONLY,
 	OPT_PROMPT,
+	OPT_ACCEPT_DISCLAIMER,
 	OPT_ALL
 };
 
@@ -115,6 +116,7 @@ struct option long_options[] = {
 	{ "autodel",	1, NULL, OPT_AUTO_DEL },
 	{ "checkonly",	0, NULL, OPT_CHECK_ONLY },
 	{ "prompt",		0, NULL, OPT_PROMPT },
+	{ "acceptdisclaimer", 0, NULL, OPT_ACCEPT_DISCLAIMER },
 	{}
 };
 
@@ -130,6 +132,7 @@ void print_help(char *strName)
 	cout << "[-u|--user] <username>\tUsername used to login" << endl;
 	cout << "[-p|--pass] <password>\tPassword used to login" << endl;
 	cout << "[-P|--prompt]\t\tPrompt for password to login" << endl;
+	cout << "[--acceptdisclaimer]\tAuto accept disclaimer" << endl;
 	cout << "[--public]\t\tCheck the public store for the user" << endl;
         cout << "[--autofix] <yes/no>\tAutoreply to all \"fix property\" messages" << endl;
         cout << "[--autodel] <yes/no>\tAutoreply to all \"delete item\" messages" << endl;
@@ -146,24 +149,21 @@ void print_help(char *strName)
 	cout << "[--all]\tCheck all folders" << endl;
 }
 
-void disclaimer()
+void disclaimer(bool acceptDisclaimer)
 {
 	std::string dummy;
 
 	cout << "*********" << endl;
 	cout << " WARNING" << endl;
 	cout << "*********" << endl;
-	cout << "Although this program tries to fix broken items in your calender" << endl;
-	cout << "so Microsoft Outlook will show your calender correctly again," << endl;
-	cout << "it may fail doing so, and possibly make things worse." << endl;
-	cout << "Unfixable items should be deleted from the calender to make it" << endl;
-	cout << "correctly viewable in both Microsoft Outlook and Zarafa Webaccess again." << endl;
+	cout << "This tool will repair items and remove invalid items from a mailbox." << endl;
+	cout << "It is recommended to use this tool outside of office hours, as it may affect server performance." << endl;
+	cout << "Before running this program, ensure a working backup is available." << endl;
 	cout << endl;
-	cout << "Zarafa cannot be held responsible for loss of data," << endl;
-	cout << "or any other damage this program may cause." << endl;
 	cout << "To accept these terms, press <ENTER> to continue or <CTRL-C> to quit." << endl;
 
-	getline(cin,dummy);
+	if (!acceptDisclaimer)
+		getline(cin,dummy);
 }
 
 HRESULT allocNamedIdList(ULONG ulSize, LPMAPINAMEID **lpppNameArray)
@@ -535,6 +535,7 @@ int main(int argc, char *argv[])
 	bool bAll = false;
 	bool bPrompt = false;
 	bool bPublic = false;
+	bool acceptDisclaimer = false;
 
 	setlocale(LC_MESSAGES, "");
 	if (!forceUTF8Locale(true))
@@ -607,6 +608,9 @@ int main(int argc, char *argv[])
 			auto_fix = "no";
 			auto_del = "no";
 			break;
+		case OPT_ACCEPT_DISCLAIMER:
+			acceptDisclaimer = true;
+			break;
 		default:
 			cout << "Invalid argument" << endl;
 			print_help(argv[0]);
@@ -614,7 +618,7 @@ int main(int argc, char *argv[])
 		};
 	}
 
-	disclaimer();
+	disclaimer(acceptDisclaimer);
 
 	/*
 	 * Validate arguments.

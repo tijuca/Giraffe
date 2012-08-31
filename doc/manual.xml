@@ -7890,6 +7890,15 @@
 		  </varlistentry>
 
 		  <varlistentry>
+		  	<term><option>--acceptdisclaimer</option></term>
+			<listitem>
+			  <para>Auto accept the disclaimer so no user input is needed to 
+			  accept the disclaimer. This can be used for scripts along with 
+			  <parameter>--autofix </parameter>argument.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
 			<term><option>--public</option></term>
 			<listitem>
 			  <para>Check the public store for user given with
