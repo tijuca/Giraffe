@@ -10,13 +10,15 @@ sub readconfig($) {
 
 	open(CFG, $fn) or die("unable to open ".$fn." config file");
 	while (<CFG>) {
-		if ($_ =~ /^\s*#/) {
+		if ($_ =~ /^\s*[#!]/) {
 			next;
 		}
-		if ($_ =~ /\s*(\S+)\s*=\s*([^]+)/) {
+		if ($_ =~ /^\s*(\S+)\s*=\s*([^\r]+)\r?$/) {
+			my $idx = $1;
 			my $val = $2;
 			chomp($val);
-			$options{$1} = $val;
+			$val =~ s/\s+$//;
+			$options{$idx} = $val;
 		}
 	}
 	close(CFG);
@@ -104,7 +106,7 @@ $dbh->commit();
 $ldap->unbind();
 
 # upgrade most recipient entry id's in database
-my ($tag, $upd, $udh, $i);
+my ($tag, $upd, $udh, $upd_t, $udh_t, $i);
 my @row;
 # tags:
 # PR_RECEIVED_BY_ENTRYID, PR_SENT_REPRESENTING_ENTRYID, PR_RCVD_REPRESENTING_ENTRYID, PR_READ_RECEIPT_ENTRYID,
@@ -120,12 +122,16 @@ foreach $tag (@tags) {
 	print "Converting properties table step $i of ".scalar(@tags)."\n";
 
 	# join store so we use the index, only return addressbook entries V1
-	$query = "SELECT storeid,hierarchyid,val_binary FROM properties JOIN stores on properties.storeid=stores.hierarchy_id WHERE type=0x0102 AND tag=? AND substr(val_binary,1,24) = 0x00000000AC21A95040D3EE48B319FBA75330442501000000";
+	$query = "SELECT parent.id,hierarchyid,val_binary FROM properties JOIN hierarchy ON properties.hierarchyid=hierarchy.id LEFT JOIN hierarchy AS parent ON hierarchy.parent=parent.id AND parent.type=3 WHERE properties.type=0x0102 AND tag=? AND substr(val_binary,1,24) = 0x00000000AC21A95040D3EE48B319FBA75330442501000000";
 	$sth = $dbh->prepare($query)
 		or die $DBI::errstr;
 
-	$upd = "UPDATE properties SET val_binary=? WHERE storeid=? AND hierarchyid=? and type=0x0102 and tag=?";
+	$upd = "UPDATE properties SET val_binary=? WHERE hierarchyid=? and type=0x0102 and tag=?";
 	$udh = $dbh->prepare($upd)
+		or die $DBI::errstr;
+
+	$upd_t = "UPDATE tproperties SET val_binary=? WHERE folderid=? and hierarchyid=? and type=0x0102 and tag=?";
+	$udh_t = $dbh->prepare($upd_t)
 		or die $DBI::errstr;
 
 	$sth->execute($tag);
@@ -141,8 +147,13 @@ foreach $tag (@tags) {
 		$entryid = encode_contact_entryid(@values);
 		
 		# check # converted?
-		$udh->execute($entryid, $row[0], $row[1], $tag)
+		$udh->execute($entryid, $row[1], $tag)
 			or die $DBI::errstr;
+		
+		if (defined($row[0])) {
+			$udh_t->execute($entryid, $row[0], $row[1], $tag)
+				or die $DBI::errstr;
+		}
 	}
 
 	$dbh->commit();
