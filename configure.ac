@@ -689,36 +689,8 @@ AC_SUBST(EPOLL_CFLAGS)
 # Boost
 BOOST_REQUIRE([1.35])
 BOOST_SMART_PTR
-# BOOST_BIND
-# BOOST_THREADS([mt])
 BOOST_FILESYSTEM([mt])
 BOOST_DATE_TIME([mt])
-AC_MSG_CHECKING([boost version compatibility])
-if test -n "$boost_major_version" -a $boost_major_version -ge 146; then
-   AC_MSG_RESULT([adding backward compatible flags])
-   BOOST_CPPFLAGS="$BOOSTCPPFLAGS -DBOOST_FILESYSTEM_VERSION=2"
-
-    CXXFLAGS="$CXXFLAGS $BOOST_CPPFLAGS"
-    LIBS="$BOOST_FILESYSTEM_LIBS $BOOST_SYSTEM_LIBS"
-
-    AC_MSG_CHECKING([for boost filesystem version 2 presence])
-    AC_LINK_IFELSE([
-      AC_LANG_SOURCE([
-#include <boost/filesystem.hpp>
-namespace bfs = boost::filesystem;
-int main() {
-  bfs::path path;
-  bfs::directory_iterator pi(path);
-  pi->path().file_string();
-}
-      ]) ], [ AC_MSG_RESULT([ok]) ], [ AC_MSG_ERROR([no, boost is too new])
-    ])
-
-    LIBS=$libs_keep
-    CFLAGS=$cflags_keep
-else
-   AC_MSG_RESULT([ok])
-fi
 
 AC_ARG_ENABLE(icu, AC_HELP_STRING([--enable-icu],[enable icu support]), [want_icu=${enableval}],[want_icu=auto])
 if test "$want_icu" = "no"; then
@@ -861,12 +833,10 @@ Curl libs	:	$CURL_LIBS
 Pam libs	:	$PAM_LIBS
 Krb5 libs	:	$KRB5_LIBS
 TCMalloc lib	:	$TCMALLOC_LIBS
-Boost
+Boost		:
  Flags		:	$BOOST_CPPFLAGS
  FS ldflags	:	$BOOST_FILESYSTEM_LDFLAGS
  FS libs	:	$BOOST_FILESYSTEM_LIBS
-# Thread ldflags	:	$BOOST_THREAD_LDFLAGS
-# Thread libs	:	$BOOST_THREAD_LIBS
 ICU libs	:	$ICU_LIBS
 Swig 		:	$want_swig
 Perl module	:	$want_perl

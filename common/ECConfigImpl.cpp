@@ -59,6 +59,8 @@
 
 #include "charset/convert.h"
 
+#include "boost_compat.h"
+
 using namespace std;
 
 #ifdef _DEBUG
@@ -68,7 +70,6 @@ static char THIS_FILE[] = __FILE__;
 #endif
 
 #include <boost/filesystem.hpp>
-
 namespace fs = boost::filesystem;
 
 const directive_t ECConfigImpl::s_sDirectives[] = {
@@ -322,11 +323,11 @@ bool ECConfigImpl::ReadConfigFile(const path_type &file, unsigned int ulFlags, u
 	m_currentFile = file;
 
 	if (!exists(file)) {
-		errors.push_back("Config file '" + file.file_string() + "' does not exist.");
+		errors.push_back("Config file '" + path_to_string(file) + "' does not exist.");
 		goto exit;
 	}
 	if (is_directory(file)) {
-		errors.push_back("Config file '" + file.file_string() + "' is a directory.");
+		errors.push_back("Config file '" + path_to_string(file) + "' is a directory.");
 		goto exit;
 	}
 
@@ -338,8 +339,8 @@ bool ECConfigImpl::ReadConfigFile(const path_type &file, unsigned int ulFlags, u
 
     m_readFiles.insert(file);
 
-	if(!(fp = fopen(file.file_string().c_str(), "rt"))) {
-		errors.push_back("Unable to open config file '" + file.file_string() + "'");
+	if(!(fp = fopen(path_to_string(file).c_str(), "rt"))) {
+		errors.push_back("Unable to open config file '" + path_to_string(file) + "'");
 		goto exit;
 	}
 
@@ -424,9 +425,6 @@ bool ECConfigImpl::HandleDirective(string &strLine, unsigned int ulFlags)
 }
 
 
-#if (((BOOST_VERSION / 100) % 1000) < 36)
-	#define remove_filename remove_leaf
-#endif
 bool ECConfigImpl::HandleInclude(const char *lpszArgs, unsigned int ulFlags)
 {
 	string strValue;
@@ -435,7 +433,7 @@ bool ECConfigImpl::HandleInclude(const char *lpszArgs, unsigned int ulFlags)
 	file = (strValue = trim(lpszArgs, " \t\r\n"));
 	if (!file.is_complete()) {
 		// Rebuild the path
-		file = m_currentFile.remove_filename();
+		file = remove_filename_from_path(m_currentFile);
 		file /= strValue;
 	}
 	
@@ -639,8 +637,8 @@ bool ECConfigImpl::WriteSettingsToFile(const char* szFileName)
 	fs::path pathBakFile;
 
 	pathOutFile = pathBakFile = szFileName;
-	pathOutFile.remove_filename() /= "config_out.cfg";
-	pathBakFile.remove_filename() /= "config_bak.cfg";
+	remove_filename_from_path(pathOutFile) /= "config_out.cfg";
+	remove_filename_from_path(pathBakFile) /= "config_bak.cfg";
 
 	ifstream in(szFileName);
 
@@ -659,7 +657,7 @@ bool ECConfigImpl::WriteSettingsToFile(const char* szFileName)
 	}
 
 	// open temp output file
-	ofstream out(pathOutFile.file_string().c_str());
+	ofstream out(path_to_string(pathOutFile.string()).c_str());
 
 	settingmap_t::iterator iterSettings;
 	const char* szName = NULL;
@@ -680,7 +678,7 @@ bool ECConfigImpl::WriteSettingsToFile(const char* szFileName)
 
 // the stdio functions does not work in win release mode in some cases
 	remove(szFileName);
-	rename(pathOutFile.file_string().c_str(),szFileName);
+	rename(path_to_string(pathOutFile).c_str(),szFileName);
 
 	return true;
 }
