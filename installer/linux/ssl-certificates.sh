@@ -15,13 +15,13 @@ if [ -d /usr/share/ssl/misc ]; then
 	fi
 	if [ -f /usr/share/ssl/misc/openssl.cnf ]; then
 		# RHEL4
-		CADIR=`grep -w ^dir /usr/share/ssl/misc/openssl.cnf | awk {'print $3'}`
+		CADIR=`grep -w ^dir -m 1 /usr/share/ssl/misc/openssl.cnf | awk {'print $3'}`
 	elif [ -f /etc/ssl/openssl.cnf ]; then
-		#SuSE
-		CADIR=`grep -w ^dir /etc/ssl/openssl.cnf | awk {'print $3'}`
+		# SuSE
+		CADIR=`grep -w ^dir -m 1 /etc/ssl/openssl.cnf | awk {'print $3'}`
 	fi
 elif [ -d /usr/lib/ssl/misc ]; then
-	# Debian
+	# Debian / Ubuntu
 	if [ -x /usr/lib/ssl/misc/CA.pl ]; then
 		CASCRIPT=/usr/lib/ssl/misc/CA.pl
 	elif [ -x /usr/lib/ssl/misc/CA.sh ]; then
@@ -31,13 +31,13 @@ elif [ -d /usr/lib/ssl/misc ]; then
 	fi
 	if [ -f /usr/lib/ssl/misc/openssl.cnf ]; then
 		# --
-		CADIR=`grep -w ^dir /usr/lib/ssl/misc/openssl.cnf | awk {'print $3'}`
+		CADIR=`grep -w ^dir -m 1 /usr/lib/ssl/misc/openssl.cnf | awk {'print $3'}`
 	elif [ -f /etc/ssl/openssl.cnf ]; then
-		# Debian
-		CADIR=`grep -w ^dir /etc/ssl/openssl.cnf | awk {'print $3'}`
+		# Debian / Ubuntu
+		CADIR=`grep -w ^dir -m 1 /etc/ssl/openssl.cnf | awk {'print $3'}`
 	fi
 elif [ -d /etc/pki/tls/misc ]; then
-	# Fedora Core
+	# Fedora Core, RHEL5, RHEL6
 	if [ -x /etc/pki/tls/misc/CA.pl ]; then
 		CASCRIPT=/etc/pki/tls/misc/CA.pl
 	elif [ -x /etc/pki/tls/misc/CA.sh ]; then
@@ -46,11 +46,10 @@ elif [ -d /etc/pki/tls/misc ]; then
 		CASCRIPT=/etc/pki/tls/misc/CA
 	fi
 	if [ -f /etc/pki/tls/openssl.cnf ]; then
-		# Fedora
-		CADIR=`grep -w ^dir /etc/pki/tls/openssl.cnf | awk {'print $3'}`
+		CADIR=`grep -w ^dir -m 1 /etc/pki/tls/openssl.cnf | awk {'print $3'}`
 	elif [ -f /etc/ssl/openssl.cnf ]; then
 		# --
-		CADIR=`grep -w ^dir /etc/ssl/openssl.cnf | awk {'print $3'}`
+		CADIR=`grep -w ^dir -m 1 /etc/ssl/openssl.cnf | awk {'print $3'}`
 	fi
 elif [ -d /var/lib/ssl/misc ]; then
 	# ALTLinux
@@ -59,7 +58,7 @@ elif [ -d /var/lib/ssl/misc ]; then
 	fi
 	if [ -f /etc/openssl/openssl.cnf ]; then
 		# ALTLinux
-		CADIR=`grep -w ^dir /etc/openssl/openssl.cnf | awk {'print $3'}`
+		CADIR=`grep -w ^dir -m 1 /etc/openssl/openssl.cnf | awk {'print $3'}`
 	fi
 fi
 
@@ -89,11 +88,13 @@ fi
 
 set -e
 
-if [ ! -d "$CADIR" ]; then
+if [ ! -d "$CADIR" -o ! -f "$CADIR/serial" ]; then
 	echo "No Certificate Authority Root found in current directory."
 	echo "Press enter to create, or ctrl-c to exit."
 	read dummy
-
+	if [ -d "$CADIR" ]; then
+		mv $CADIR ${CADIR}-backup.zarafa
+	fi
 	$CASCRIPT -newca
 fi
 
