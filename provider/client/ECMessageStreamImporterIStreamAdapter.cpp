@@ -104,7 +104,7 @@ HRESULT ECMessageStreamImporterIStreamAdapter::Write(const void *pv, ULONG cb, U
 	if (hr != hrSuccess)
 		goto exit;
 
-	if (*pcbWritten)
+	if (pcbWritten)
 		*pcbWritten = cb;
 
 exit:
