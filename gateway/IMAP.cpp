@@ -4075,6 +4075,11 @@ HRESULT IMAP::HrPropertyFetch(list<ULONG> &lstMails, vector<string> &lstDataItem
             goto exit;
 
 		m_vTableDataColumns = lstDataItems;
+    } else if (bMarkAsRead) {
+        // we need the folder to mark mails as read
+        hr = HrFindFolder(strCurrentFolder, bCurrentFolderReadOnly, &lpFolder);
+        if (hr != hrSuccess)
+            goto exit;
     }
 
 	if (m_lpTable) {
