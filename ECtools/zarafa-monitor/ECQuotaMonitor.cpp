@@ -689,24 +689,24 @@ HRESULT ECQuotaMonitor::CreateMailFromTemplate(TemplateVariables *lpVars, string
 		ZARAFA_QUOTA_LAST_ITEM /* KEEP LAST! */
 	};
 
-	if (lpVars->ulClass == CONTAINER_COMPANY)
-		strTemplateConfig = "company";
-	else
-		strTemplateConfig = "user";
-
-	switch (lpVars->ulStatus) {
-	case QUOTA_WARN:
-			strTemplateConfig += "quota_warning_template";
-		break;
-	case QUOTA_SOFTLIMIT:
-			strTemplateConfig += "quota_soft_template";
-		break;
-	case QUOTA_HARDLIMIT:
-		strTemplateConfig += "quota_warning_template";
-		break;
-	case QUOTA_OK:
-	default:
-		goto exit;
+	if (lpVars->ulClass == CONTAINER_COMPANY) {
+		// Company public stores only support QUOTA_WARN.
+		strTemplateConfig = "companyquota_warning_template";
+	} else {
+		switch (lpVars->ulStatus) {
+		case QUOTA_WARN:
+				strTemplateConfig = "userquota_warning_template";
+			break;
+		case QUOTA_SOFTLIMIT:
+				strTemplateConfig = "userquota_soft_template";
+			break;
+		case QUOTA_HARDLIMIT:
+			strTemplateConfig = "userquota_warning_template";
+			break;
+		case QUOTA_OK:
+		default:
+			goto exit;
+		}
 	}
 
 	lpszTemplate = m_lpThreadMonitor->lpConfig->GetSetting(strTemplateConfig.c_str());

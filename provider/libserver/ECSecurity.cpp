@@ -1547,8 +1547,6 @@ ECRESULT ECSecurity::GetUserQuota(unsigned int ulUserId, bool bGetUserDefault, q
 		lpszHardQuota = m_lpSession->GetSessionManager()->GetConfig()->GetSetting("quota_hard");
 	} else if (sExternId.objclass == CONTAINER_COMPANY) {
 		lpszWarnQuota = m_lpSession->GetSessionManager()->GetConfig()->GetSetting("companyquota_warn");
-		lpszSoftQuota = m_lpSession->GetSessionManager()->GetConfig()->GetSetting("companyquota_soft");
-		lpszHardQuota = m_lpSession->GetSessionManager()->GetConfig()->GetSetting("companyquota_hard");
 	}
 
 	quotadetails.bUseDefaultQuota = true;
