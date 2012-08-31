@@ -6,6 +6,6 @@ The public store size is ${ZARAFA_QUOTA_STORE_SIZE}.
 
 Mailbox size limit:
 	* Warninglevel (${ZARAFA_QUOTA_WARN_SIZE})
-		- When this limit is exceeded this warning message will be send
+		- When this limit is exceeded this warning message will be sent
 
 See client Help for more information.
