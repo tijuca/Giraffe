@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2012-07-28 02:42+0200\n"
-"PO-Revision-Date: 2012-04-06 10:44+0200\n"
+"POT-Creation-Date: 2012-09-03 00:03+0200\n"
+"PO-Revision-Date: 2012-09-02 15:06+0200\n"
 "Last-Translator: Abdulahadov  <abdulahadov@cg.ru>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "Language: ru\n"
@@ -18,100 +18,100 @@ msgstr ""
 "10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 "X-Generator: Pootle 2.1.5\n"
 
-#: provider/ECProps/Addin.cpp:506 provider/ECProps/SyncBar.cpp:326
+#: provider/ECProps/Addin.cpp:516 provider/ECProps/SyncBar.cpp:326
 msgid "Configure"
 msgstr "Настройка"
 
-#: provider/ECProps/Addin.cpp:508 provider/ECProps/SyncBar.cpp:318
+#: provider/ECProps/Addin.cpp:518 provider/ECProps/SyncBar.cpp:318
 msgid "Synchronize"
 msgstr "Синхронизация"
 
-#: provider/ECProps/Addin.cpp:510
+#: provider/ECProps/Addin.cpp:520
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:28
 msgid "Open Shared Folders..."
 msgstr "Открыть общие каталоги..."
 
-#: provider/ECProps/Addin.cpp:512 provider/ECProps/Addin.cpp:553
+#: provider/ECProps/Addin.cpp:522 provider/ECProps/Addin.cpp:563
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:19
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:20
 msgid "Recover Deleted Items..."
 msgstr "Восстановить удаленные элементы..."
 
-#: provider/ECProps/Addin.cpp:514 provider/ECProps/Addin.cpp:555
+#: provider/ECProps/Addin.cpp:524 provider/ECProps/Addin.cpp:565
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:20
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:21
 msgid "Out of Office Assistant..."
 msgstr "Помощник функции «Я недоступен»..."
 
-#: provider/ECProps/Addin.cpp:518
+#: provider/ECProps/Addin.cpp:528
 msgid "Offline"
 msgstr "Отключен"
 
-#: provider/ECProps/Addin.cpp:547 provider/ECProps/SyncBar.cpp:328
+#: provider/ECProps/Addin.cpp:557 provider/ECProps/SyncBar.cpp:328
 msgid "Configure offline synchronization"
 msgstr "Настройка автономной синхронизации"
 
-#: provider/ECProps/Addin.cpp:549 provider/ECProps/SyncBar.cpp:320
+#: provider/ECProps/Addin.cpp:559 provider/ECProps/SyncBar.cpp:320
 msgid "Start offline synchronization"
 msgstr "Запуск автономной синхронизации"
 
-#: provider/ECProps/Addin.cpp:551
+#: provider/ECProps/Addin.cpp:561
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:29
 msgid "Open another user's Outlook Sharing Folders (Calendar, E-mail, etc)"
 msgstr ""
 "Открыть общие каталоги Outlook (календарь, почту и т.д.) другого пользователя"
 
-#: provider/ECProps/Addin.cpp:663
+#: provider/ECProps/Addin.cpp:673
 msgid "Out of Office currently on. Would you like to turn it off?"
 msgstr "Активен статус «Я недоступен». Хотите отключить этот режим?"
 
-#: provider/ECProps/Addin.cpp:663
+#: provider/ECProps/Addin.cpp:673
 msgid "Out Of Office Turned On"
 msgstr "Активен статус «Я недоступен»"
 
-#: provider/ECProps/Addin.cpp:669
+#: provider/ECProps/Addin.cpp:679
 msgid "Unable to save Out of Office status"
 msgstr "Не удалось сохранить статус «Я недоступен»"
 
-#: provider/ECProps/Addin.cpp:771
+#: provider/ECProps/Addin.cpp:781
 msgid "Delegates"
 msgstr "Делегаты"
 
-#: provider/ECProps/Addin.cpp:908 provider/client/ECMAPIFolderPublic.cpp:164
+#: provider/ECProps/Addin.cpp:918 provider/client/ECMAPIFolderPublic.cpp:164
 #: provider/client/ECMsgStorePublic.cpp:547
 msgid "Favorites"
 msgstr "Избранное"
 
-#: provider/ECProps/Addin.cpp:920 provider/ECProps/PropPage.cpp:435
+#: provider/ECProps/Addin.cpp:930 provider/ECProps/PropPage.cpp:435
 msgid "Permissions"
 msgstr "Права доступа"
 
-#: provider/ECProps/Addin.cpp:1130 provider/ECProps/Addin.cpp:1131
+#: provider/ECProps/Addin.cpp:1140 provider/ECProps/Addin.cpp:1141
 msgid "Add to Public Favorites Folder"
 msgstr "Добавить в общий каталог «Избранное»"
 
-#: provider/ECProps/Addin.cpp:1215
+#: provider/ECProps/Addin.cpp:1225
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:108
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:89
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:97
 msgid "Unable to open MAPI session."
 msgstr "Не удалось открыть сессию MAPI."
 
-#: provider/ECProps/Addin.cpp:1219 provider/ECProps/ECFavoritePropPage.cpp:110
+#: provider/ECProps/Addin.cpp:1229 provider/ECProps/ECFavoritePropPage.cpp:110
 #: provider/client/ECMsgStore.cpp:2387
 msgid "Shortcut"
 msgstr "Ярлык"
 
-#: provider/ECProps/Addin.cpp:1219 provider/ECProps/ECFavoritePropPage.cpp:110
+#: provider/ECProps/Addin.cpp:1229 provider/ECProps/ECFavoritePropPage.cpp:110
 msgid "Shortcut folder"
 msgstr "Каталог для ярлыков"
 
-#: provider/ECProps/Addin.cpp:1221
+#: provider/ECProps/Addin.cpp:1231
 msgid "Unable to get shortcut folder."
 msgstr "Невозможно получить каталог для ярлыков."
 
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:136
-#: provider/ECProps/CommandBarButtonOutOfOffice.cpp:102
+#: provider/ECProps/CommandBarButtonOutOfOffice.cpp:107
 msgid ""
 "You are currently offline. To use this command, connect to the online server."
 msgstr ""
@@ -140,11 +140,11 @@ msgstr "У вас не хватает прав для открытия этог�
 msgid "Access Denied"
 msgstr "Доступ запрещен"
 
-#: provider/ECProps/CommandBarButtonOutOfOffice.cpp:104
+#: provider/ECProps/CommandBarButtonOutOfOffice.cpp:109
 msgid "Unable to open store, access denied."
 msgstr "Не удалось открыть хранилище, запрещен доступ."
 
-#: provider/ECProps/CommandBarButtonOutOfOffice.cpp:106
+#: provider/ECProps/CommandBarButtonOutOfOffice.cpp:111
 msgid "Unable to open store."
 msgstr "Не удалось открыть хранилище."
 
@@ -325,7 +325,7 @@ msgstr "Закрыть"
 #: provider/ECProps/SyncStatusDlg.cpp:132
 #: provider/libserver/ECDBUpdateProgress.cpp:56
 msgid "Your offline cache database is being upgraded..."
-msgstr ""
+msgstr "Обновляется локальная база данных..."
 
 #: provider/ECProps/SyncStatusDlg.cpp:134
 msgid "Connection error"
@@ -1019,6 +1019,8 @@ msgid ""
 "Your offline cache database is being upgraded. Outlook will start in online "
 "mode for this session."
 msgstr ""
+"Локальная база данных была обновлена. Outlook в этом сеансе запустится в "
+"режиме прямого подключения."
 
 #: provider/client/ECABProviderSwitch.cpp:209
 #: provider/client/ECMSProviderSwitch.cpp:379
@@ -1380,36 +1382,36 @@ msgstr ""
 "\r\n"
 "Обратитесь к вашему системному администратору в случае повтора проблемы."
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:895
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:922
 msgid "Zarafa Archive"
 msgstr "Архив Zarafa"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:896
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:923
 msgid "This folder contains the special archive folders."
 msgstr "Эта папка содержит специальные архивные папки."
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:901
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:928
 msgid "History"
 msgstr "История"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:902
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:929
 msgid ""
 "This folder contains archives that have been replaced by a newer version."
 msgstr "Этот каталог содержит архивы, которые были заменены на новую версию."
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:906
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:933
 msgid "Outgoing"
 msgstr "Исходящие"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:907
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:934
 msgid "This folder contains archives of all outgoing messages."
 msgstr "Этот каталог содержит архивы для всех исходящих сообщений."
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:911
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:938
 msgid "Deleted"
 msgstr "Удалено"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:912
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:939
 msgid "This folder contains archives of messages that have been deleted."
 msgstr "Этот каталог содержит архивы сообщений, которые были удалены."
 
@@ -1578,137 +1580,136 @@ msgstr "%x %X"
 
 #: php-ext/include/mapi/class.meetingrequest.php:1659
 msgid "Accepted"
-msgstr ""
+msgstr "Принято"
 
 #: php-ext/include/mapi/class.meetingrequest.php:1663
 msgid "Declined"
-msgstr ""
+msgstr "Отклонено"
 
 #: php-ext/include/mapi/class.meetingrequest.php:1667
 msgid "Tentatively accepted"
-msgstr ""
+msgstr "Предварительно принято"
 
 #: php-ext/include/mapi/class.meetingrequest.php:1673
 msgid "New Time Proposed"
-msgstr ""
+msgstr "Предложено новое время"
 
 # 75%
 #: php-ext/include/mapi/class.meetingrequest.php:2692
-#, fuzzy
 msgid "Canceled"
-msgstr "Отмена"
+msgstr "Отменено"
 
 #: php-ext/include/mapi/class.taskrequest.php:881
 msgid "Start Date"
-msgstr ""
+msgstr "Начало"
 
 #: php-ext/include/mapi/class.taskrequest.php:881
 #: php-ext/include/mapi/class.taskrequest.php:882
 msgid "%A, %B %d, %Y"
-msgstr ""
+msgstr "%A, %B %d, %Y"
 
 #: php-ext/include/mapi/class.taskrequest.php:882
 msgid "Due Date"
-msgstr ""
+msgstr "Срок"
 
 #: php-ext/include/mapi/class.taskrequest.php:886
 msgid "Status"
-msgstr ""
+msgstr "Статус"
 
 #: php-ext/include/mapi/class.taskrequest.php:887
 msgid "Not Started"
-msgstr ""
+msgstr "Не начато"
 
 #: php-ext/include/mapi/class.taskrequest.php:888
 msgid "In Progress"
-msgstr ""
+msgstr "В процессе"
 
 #: php-ext/include/mapi/class.taskrequest.php:889
 msgid "Complete"
-msgstr ""
+msgstr "Завершено"
 
 #: php-ext/include/mapi/class.taskrequest.php:890
 msgid "Wait for other person"
-msgstr ""
+msgstr "В ожидании других участников"
 
 #: php-ext/include/mapi/class.taskrequest.php:891
 msgid "Deferred"
-msgstr ""
+msgstr "Отложено"
 
 #: php-ext/include/mapi/class.taskrequest.php:895
 msgid "Percent Complete"
-msgstr ""
+msgstr "Процентов завершено"
 
 #: php-ext/include/mapi/class.taskrequest.php:898
 msgid "Date Completed"
-msgstr ""
+msgstr "Время завершения"
 
 #: php-ext/include/mapi/class.taskrequest.php:902
 msgid "Total Work"
-msgstr ""
+msgstr "Общее время"
 
 #: php-ext/include/mapi/class.taskrequest.php:902
 #: php-ext/include/mapi/class.taskrequest.php:903
 msgid "hours"
-msgstr ""
+msgstr "часов"
 
 #: php-ext/include/mapi/class.taskrequest.php:903
 msgid "Actual Work"
-msgstr ""
+msgstr "Рабочее время"
 
 #: php-ext/include/mapi/class.taskrequest.php:911
 msgid "Billing Information"
-msgstr ""
+msgstr "Расходы"
 
 #: php-ext/include/mapi/class.taskrequest.php:912
 msgid "Mileage"
-msgstr ""
+msgstr "Расстояние"
 
 #: php-ext/include/mapi/class.recurrence.php:528
 msgid "workday"
-msgstr ""
+msgstr "рабочий день"
 
 #: php-ext/include/mapi/class.recurrence.php:531
 msgid "day"
-msgstr ""
+msgstr "день"
 
 #: php-ext/include/mapi/class.recurrence.php:535
 msgid "days"
-msgstr ""
+msgstr "дней"
 
 #: php-ext/include/mapi/class.recurrence.php:542
 msgid "week"
-msgstr ""
+msgstr "неделя"
 
 #: php-ext/include/mapi/class.recurrence.php:545
 msgid "weeks"
-msgstr ""
+msgstr "недель"
 
 #: php-ext/include/mapi/class.recurrence.php:552
 msgid "month"
-msgstr ""
+msgstr "месяц"
 
 #: php-ext/include/mapi/class.recurrence.php:555
 msgid "months"
-msgstr ""
+msgstr "месяц"
 
 #: php-ext/include/mapi/class.recurrence.php:563
 msgid "year"
-msgstr ""
+msgstr "год"
 
 #: php-ext/include/mapi/class.recurrence.php:567
 msgid "years"
-msgstr ""
+msgstr "лет"
 
 #: php-ext/include/mapi/class.recurrence.php:577
 #: php-ext/include/mapi/class.recurrence.php:578
 msgid "d-m-Y"
-msgstr ""
+msgstr "d-m-Y"
 
 #: php-ext/include/mapi/class.recurrence.php:579
 #: php-ext/include/mapi/class.recurrence.php:580
 msgid "G:i"
-msgstr ""
+msgstr "G:i"
 
 #: php-ext/include/mapi/class.recurrence.php:593
 #, php-format
@@ -1784,29 +1785,29 @@ msgstr ""
 
 #: php-ext/include/mapi/class.mapiexception.php:24
 msgid "You have insufficient privileges to open this object."
-msgstr ""
+msgstr "Недостаточно прав для открытия этого объекта."
 
 #: php-ext/include/mapi/class.mapiexception.php:27
 msgid "Logon Failed. Please check your name/password."
-msgstr ""
+msgstr "Войти не удалось. Проверьте имя и пароль"
 
 #: php-ext/include/mapi/class.mapiexception.php:29
 msgid "Can not connect to Zarafa server."
-msgstr ""
+msgstr "Не удалось соединиться с сервером Zarafa."
 
 #: php-ext/include/mapi/class.mapiexception.php:31
 msgid "Can not open object with provided id."
-msgstr ""
+msgstr "Не удалось открыть объект с таким ID."
 
 #: php-ext/include/mapi/class.mapiexception.php:33
 msgid "There are no recipients in the message."
-msgstr ""
+msgstr "У сообщения нет получателей."
 
 #: php-ext/include/mapi/class.mapiexception.php:35
 msgid "Can not find object."
-msgstr ""
+msgstr "Не удалось найти объект."
 
 #: php-ext/include/mapi/class.mapiexception.php:47
 #, php-format
 msgid "Unknown MAPI Error: %s"
-msgstr ""
+msgstr "Неизвестная ошибка MAPI:%s"
