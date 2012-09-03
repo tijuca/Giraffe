@@ -248,8 +248,12 @@ HRESULT ECMAPIFolderPublic::GetPropHandler(ULONG ulPropTag, void* lpProvider, UL
 	case PROP_ID(PR_RECORD_KEY):
 		// Use entryid as record key because it should be global unique in outlook.
 		hr = ECMAPIFolderPublic::GetPropHandler(PR_ENTRYID, lpProvider, ulFlags, lpsPropValue, lpParam, lpBase);
-		if (hr == hrSuccess)
+		if (hr == hrSuccess) {
+			if(lpFolder->m_ePublicEntryID == ePE_FavoriteSubFolder)
+				((LPENTRYID)lpsPropValue->Value.bin.lpb)->abFlags[3] = ZARAFA_FAVORITE;
+
 			lpsPropValue->ulPropTag = PR_RECORD_KEY;
+		}
 		break;
 	case PROP_ID(PR_PARENT_ENTRYID):
 		if (lpFolder->m_ePublicEntryID == ePE_IPMSubtree || lpFolder->m_ePublicEntryID == ePE_PublicFolders || lpFolder->m_ePublicEntryID == ePE_Favorites) {

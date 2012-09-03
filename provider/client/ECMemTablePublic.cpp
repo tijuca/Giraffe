@@ -380,6 +380,7 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 	ULONG cbFolderID = 0;
 	LPENTRYID lpEntryID = NULL; //Do not free this
 	LPENTRYID lpFolderID = NULL;
+	LPENTRYID lpRecordKeyID = NULL;
 	std::string strInstanceKey;
 	ECMAPFolderRelation::iterator	iterRel;
 	ECKeyTable::UpdateType	ulUpdateType; 
@@ -443,9 +444,17 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 	lpProps[cProps].ulPropTag = PR_ROWID;
 	lpProps[cProps++].Value.ul = ulRowId;
 
+	hr = MAPIAllocateBuffer(cbEntryID, (void**)&lpRecordKeyID);
+	if (hr != hrSuccess)
+		goto exit;
+
+	memcpy(lpRecordKeyID, lpEntryID, cbEntryID);
+	lpRecordKeyID->abFlags[3] = ZARAFA_FAVORITE;
+
 	lpProps[cProps].ulPropTag = PR_RECORD_KEY;
 	lpProps[cProps].Value.bin.cb = cbEntryID;
-	lpProps[cProps].Value.bin.lpb = (LPBYTE)lpEntryID;
+	lpProps[cProps].Value.bin.lpb = (LPBYTE)lpRecordKeyID;
+
 	cProps++;
 
 	// Set this folder as parent
@@ -600,6 +609,9 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 	}
 
 exit:
+
+	if (lpRecordKeyID)
+		MAPIFreeBuffer(lpRecordKeyID);
 
 	if (lpFolderReal)
 		lpFolderReal->Release(); 
