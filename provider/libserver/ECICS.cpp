@@ -271,10 +271,13 @@ ECRESULT AddChange(BTSession *lpSession, unsigned int ulSyncId, SOURCEKEY sSourc
 	if(er != erSuccess)
 		goto exit;
 
-	// The real item is removed from the database, So no actions needed
-	if (ulChange == ICS_MESSAGE_HARD_DELETE || ulChange == ICS_FOLDER_HARD_DELETE)
+	if (ulChange == ICS_MESSAGE_HARD_DELETE || ulChange == ICS_FOLDER_HARD_DELETE) {
+		if (ulSyncId != 0)
+			er = RemoveFromLastSyncedMessagesSet(lpDatabase, ulSyncId, sSourceKey, sParentSourceKey);
+		// The real item is removed from the database, So no further actions needed
 		goto exit;
-		
+	}
+
 	if (ulChange == ICS_MESSAGE_NEW && ulSyncId != 0) {
 		er = AddToLastSyncedMessagesSet(lpDatabase, ulSyncId, sSourceKey, sParentSourceKey);
 		if (er != erSuccess)
@@ -1205,7 +1208,7 @@ ECRESULT AddToLastSyncedMessagesSet(ECDatabase *lpDatabase, unsigned int ulSyncI
 		goto exit;
 	}
 	
-	if (lpDBRow[0] == NULL)	// no set for this sync id.
+	if (lpDBRow[0] == NULL)	// none set for this sync id.
 		goto exit;
 	
 	strQuery = "INSERT INTO syncedmessages (sync_id,change_id,sourcekey,parentsourcekey) VALUES (" +
@@ -1229,3 +1232,42 @@ exit:
 	return er;
 }
 
+ECRESULT RemoveFromLastSyncedMessagesSet(ECDatabase *lpDatabase, unsigned int ulSyncId, const SOURCEKEY &sSourceKey, const SOURCEKEY &sParentSourceKey)
+{
+	ECRESULT	er = erSuccess;
+	std::string	strQuery;
+	DB_RESULT	lpDBResult	= NULL;
+	DB_ROW		lpDBRow;
+	
+	strQuery = "SELECT MAX(change_id) FROM syncedmessages WHERE sync_id=" + stringify(ulSyncId);	
+	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
+	if (er != erSuccess)
+		goto exit;
+		
+	lpDBRow = lpDatabase->FetchRow(lpDBResult);
+	if (lpDBRow == NULL) {
+		er = ZARAFA_E_DATABASE_ERROR;
+		goto exit;
+	}
+	
+	if (lpDBRow[0] == NULL)	// none set for this sync id.
+		goto exit;
+	
+	strQuery = "DELETE FROM syncedmessages WHERE sync_id=" + stringify(ulSyncId) +
+				" AND change_id=" + lpDBRow[0] +
+				" AND sourcekey=" + lpDatabase->EscapeBinary(sSourceKey, sSourceKey.size());
+	
+	// cleanup the previous query result
+	lpDatabase->FreeResult(lpDBResult);
+	lpDBResult = NULL;
+	
+	er = lpDatabase->DoDelete(strQuery);
+	if (er != erSuccess)
+		goto exit;
+		
+exit:
+	if (lpDBResult)
+		lpDatabase->FreeResult(lpDBResult);
+		
+	return er;
+}
