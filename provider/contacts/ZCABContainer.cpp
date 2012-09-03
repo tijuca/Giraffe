@@ -189,6 +189,31 @@ exit:
 // IMAPIContainer
 //
 
+HRESULT ZCABContainer::MakeWrappedEntryID(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulObjType, ULONG ulOffset, ULONG *lpcbEntryID, LPENTRYID *lppEntryID)
+{
+	HRESULT hr = hrSuccess;
+	ULONG cbWrapped = 0;
+	cabEntryID *lpWrapped = NULL;
+
+	cbWrapped = CbNewCABENTRYID(cbEntryID);
+	hr = MAPIAllocateBuffer(cbWrapped, (void**)&lpWrapped);
+	if (hr != hrSuccess)
+		goto exit;
+
+	memset(lpWrapped, 0, cbWrapped);
+	memcpy(&lpWrapped->muid, &MUIDZCSAB, sizeof(MAPIUID));
+	lpWrapped->ulObjType = ulObjType;
+	lpWrapped->ulOffset = ulOffset;
+	memcpy(lpWrapped->origEntryID, lpEntryID, cbEntryID);
+	
+
+	*lpcbEntryID = cbWrapped;
+	*lppEntryID = (LPENTRYID)lpWrapped;
+
+exit:
+	return hr;
+}
+
 HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 {
 	HRESULT hr = hrSuccess;
@@ -367,8 +392,6 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 
 		for (i = 0; i < ptrRows.size(); i++) {
 			ULONG ulOffset = 0;
-			mapi_memory_ptr<cabEntryID> lpEntryID;
-			ULONG cbEntryID = 0;
 
 			if (ptrRows[i].lpProps[I_MV_INDEX].ulPropTag == (ptrNameTags->aulPropTag[0] & ~MVI_FLAG)) {
 				// do not index outside named properties
@@ -411,22 +434,14 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 				continue;
 			}
 
-			// make wrapped entryid...
-			cbEntryID = CbNewCABENTRYID(ptrRows[i].lpProps[I_ENTRYID].Value.bin.cb);
-			hr = MAPIAllocateBuffer(cbEntryID, (void**)&lpEntryID);
+
+			hr = MakeWrappedEntryID(ptrRows[i].lpProps[I_ENTRYID].Value.bin.cb, (LPENTRYID)ptrRows[i].lpProps[I_ENTRYID].Value.bin.lpb,
+									lpColData[O_OBJECT_TYPE].Value.ul, ulOffset/5,
+									&lpColData[O_ENTRYID].Value.bin.cb, (LPENTRYID*)&lpColData[O_ENTRYID].Value.bin.lpb);
 			if (hr != hrSuccess)
 				goto exit;
 
-			memset(lpEntryID, 0, cbEntryID);
-			memcpy(&lpEntryID->muid, &MUIDZCSAB, sizeof(MAPIUID));
-			lpEntryID->ulObjType = lpColData[O_OBJECT_TYPE].Value.ul;
-			// devide by 5 since a block of properties on a contact is a set of 5 (see mnNamedProps above)
-			lpEntryID->ulOffset = ulOffset/5;
-			memcpy(lpEntryID->origEntryID, ptrRows[i].lpProps[I_ENTRYID].Value.bin.lpb, ptrRows[i].lpProps[I_ENTRYID].Value.bin.cb);
-
 			lpColData[O_ENTRYID].ulPropTag = PR_ENTRYID;
-			lpColData[O_ENTRYID].Value.bin.cb = cbEntryID;
-			lpColData[O_ENTRYID].Value.bin.lpb = (LPBYTE)lpEntryID.get();
 
 			ulOffset += I_NAMEDSTART;
 
@@ -509,6 +524,7 @@ HRESULT ZCABContainer::GetDistListContentsTable(ULONG ulFlags, LPMAPITABLE *lppT
 	ULONG cValues;
 	SPropArrayPtr ptrProps;
 	SPropValue sKey;
+	mapi_object_ptr<ZCMAPIProp> ptrZCMAPIProp;
 
 	hr = Util::HrCopyUnicodePropTagArray(ulFlags, (LPSPropTagArray)&sptaCols, &ptrCols);
 	if (hr != hrSuccess)
@@ -528,6 +544,8 @@ HRESULT ZCABContainer::GetDistListContentsTable(ULONG ulFlags, LPMAPITABLE *lppT
 	sKey.Value.ul = 0;
 	for (ULONG i = 0; i < ptrEntries->Value.MVbin.cValues; i++) {
 		ULONG ulOffset = 0;
+		BYTE cType = 0;
+
 		// Wrapped entryid's:
 		// Flags: (ULONG) 0
 		// Provider: (GUID) 0xC091ADD3519DCF11A4A900AA0047FAA4
@@ -549,22 +567,51 @@ HRESULT ZCABContainer::GetDistListContentsTable(ULONG ulFlags, LPMAPITABLE *lppT
 		//  top bit:
 		//   0x80 default on, except for oneoff entryids
 
-		// @todo, add provider guid test in entryid?
-
-		// 0xC3 = 1100 0011 .. contact and email 1
-		// 0xB5 = 1011 0101 .. GAB IMailUser, 1011 = 3, 3 not defined
-		if (ptrEntries->Value.MVbin.lpbin[i].lpb[sizeof(ULONG)+sizeof(GUID)] & 0x80) {
+		// either WAB_GUID or ONE_OFF_MUID
+		if (memcmp(ptrEntries->Value.MVbin.lpbin[i].lpb + sizeof(ULONG), (void*)&WAB_GUID, sizeof(GUID)) == 0) {
 			// handle wrapped entryids
 			ulOffset = sizeof(ULONG) + sizeof(GUID) + sizeof(BYTE);
+			cType = ptrEntries->Value.MVbin.lpbin[i].lpb[sizeof(ULONG) + sizeof(GUID)];
 		}
 
 		hr = m_lpMAPISup->OpenEntry(ptrEntries->Value.MVbin.lpbin[i].cb - ulOffset, (LPENTRYID)(ptrEntries->Value.MVbin.lpbin[i].lpb + ulOffset), NULL, 0, &ulObjType, &ptrUser);
 		if (hr != hrSuccess)
 			continue;
 
-		hr = ptrUser->GetProps(ptrCols, 0, &cValues, &ptrProps);
-		if (FAILED(hr))
-			continue;
+		if ((cType & 0x80) && (cType & 0x0F) < 5 && (cType & 0x0F) > 0) {
+			ULONG cbEntryID;
+			LPENTRYID lpEntryID = NULL;
+			SPropValuePtr ptrEntryID;
+			ULONG ulObjOffset = 0;
+			ULONG ulObjType = 0;
+
+			hr = HrGetOneProp(ptrUser, PR_ENTRYID, &ptrEntryID);
+			if (hr != hrSuccess)
+				goto exit;
+
+			if ((cType & 0x0F) == 3) {
+				ulObjType = MAPI_MAILUSER;
+				ulObjOffset = cType >> 4;
+			} else 
+				ulObjType = MAPI_DISTLIST;
+
+			hr = MakeWrappedEntryID(ptrEntryID->Value.bin.cb, (LPENTRYID)ptrEntryID->Value.bin.lpb, ulObjType, ulObjOffset, &cbEntryID, &lpEntryID);
+			if (hr != hrSuccess)
+				goto exit;
+
+			hr = ZCMAPIProp::Create(ptrUser, cbEntryID, lpEntryID, &ptrZCMAPIProp);
+			if (hr != hrSuccess)
+				goto exit;
+
+			hr = ptrZCMAPIProp->GetProps(ptrCols, 0, &cValues, &ptrProps);
+			if (FAILED(hr))
+				continue;
+
+		} else {
+			hr = ptrUser->GetProps(ptrCols, 0, &cValues, &ptrProps);
+			if (FAILED(hr))
+				continue;
+		}
 
 		ptrProps[0] = sKey;
 

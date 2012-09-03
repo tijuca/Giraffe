@@ -108,9 +108,6 @@ HRESULT ZCMAPIProp::ConvertMailUser(LPSPropTagArray lpNames, ULONG cValues, LPSP
 	std::string strSearchKey;
 	convert_context converter;
 
-	lpProp = PpropFindProp(lpProps, cValues, PR_ADDRTYPE);
-	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ADDRTYPE);
-
 	lpProp = PpropFindProp(lpProps, cValues, PR_BODY);
 	if (lpProp) {
 		ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_BODY);
@@ -141,6 +138,12 @@ HRESULT ZCMAPIProp::ConvertMailUser(LPSPropTagArray lpNames, ULONG cValues, LPSP
 	sValue.ulPropTag = PR_DISPLAY_TYPE;
 	sValue.Value.ul = DT_MAILUSER;
 	m_mapProperties.insert(std::make_pair(PROP_ID(PR_DISPLAY_TYPE), sValue));
+
+	if (lpNames)
+		lpProp = PpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[1], PT_UNICODE));
+	if (!lpProp)
+		lpProp = PpropFindProp(lpProps, cValues, PR_ADDRTYPE);
+	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ADDRTYPE);
 
 	if (lpNames)
 		lpProp = PpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[2], PT_UNICODE));
@@ -252,7 +255,7 @@ exit:
  * 
  * @return 
  */
-HRESULT ZCMAPIProp::ConvertProps(IMessage *lpContact, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulIndex)
+HRESULT ZCMAPIProp::ConvertProps(IMAPIProp *lpContact, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulIndex)
 {
 	HRESULT hr = hrSuccess;
 	ULONG cValues = 0;
@@ -313,7 +316,7 @@ exit:
 	return hr;
 }
 
-HRESULT ZCMAPIProp::Create(IMessage *lpContact, ULONG cbEntryID, LPENTRYID lpEntryID, ZCMAPIProp **lppZCMAPIProp)
+HRESULT ZCMAPIProp::Create(IMAPIProp *lpContact, ULONG cbEntryID, LPENTRYID lpEntryID, ZCMAPIProp **lppZCMAPIProp)
 {
 	HRESULT	hr = hrSuccess;
 	ZCMAPIProp *lpZCMAPIProp = NULL;
