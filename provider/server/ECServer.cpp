@@ -113,7 +113,7 @@ void *CleanupSyncedMessagesTable(void *lpTmpMain);
 // Reports information on the current state of the license
 void* ReportLicense(void *);
 
-int running_server(char *szName, const char *config);
+int running_server(char *szName, const char *config, int argc, char *argv[]);
 
 
 int					g_Quit;
@@ -745,7 +745,7 @@ int main(int argc, char* argv[])
 	//FIXME: By start as service current path is the system32 dir ??? <-- use '-c' option in service to be sure?
 	// check for configfile
 	while (1) {
-		int c = my_getopt_long(argc, argv, "c:VFiuR", long_options, NULL);
+		int c = my_getopt_long_permissive(argc, argv, "c:VFiuR", long_options, NULL);
 
 		if(c == -1)
 			break;
@@ -803,7 +803,7 @@ int main(int argc, char* argv[])
 	}
 
 	//windows and linux
-	nReturn = running_server(argv[0], config);
+	nReturn = running_server(argv[0], config, argc-my_optind, &argv[my_optind]);
 
 	return nReturn;
 }
@@ -811,7 +811,7 @@ int main(int argc, char* argv[])
 #define ZARAFA_SERVER_PIPE "/var/run/zarafa"
 #define ZARAFA_SERVER_PRIO "/var/run/zarafa-prio"
 
-int running_server(char *szName, const char *szConfig)
+int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 {
 	int				retval = 0;
 	ECRESULT		er = erSuccess;
@@ -1015,8 +1015,8 @@ int running_server(char *szName, const char *szConfig)
 
 	// Load settings
 	g_lpConfig = ECConfig::Create(lpDefaults);
-
-	if (!g_lpConfig->LoadSettings(szConfig) || (!m_bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) ) {
+	
+	if (!g_lpConfig->LoadSettings(szConfig) || !g_lpConfig->ParseParams(argc, argv, NULL) || (!m_bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) ) {
 		g_lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-"); // create fatal logger without a timestamp to stderr
 		LogConfigErrors(g_lpConfig, g_lpLogger);
 		retval = -1;

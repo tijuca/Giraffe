@@ -55,6 +55,7 @@
 #include <assert.h>
 #include <limits.h>
 
+#include <algorithm>
 #include "stringutil.h"
 #include "ECConfigImpl.h"
 
@@ -107,6 +108,73 @@ bool ECConfigImpl::LoadSettings(const char *szFilename)
 {
 	m_szConfigFile = szFilename;	
 	return InitConfigFile(LOADSETTING_OVERWRITE);
+}
+
+int tounderscore(int c) {
+	if(c == '-')
+		return '_';
+	return c;
+}
+
+/**
+ * Parse commandline parameters to override the values loaded from the
+ * config files.
+ * 
+ * This function accepts only long options in the form
+ * --option-name=value. All dashes in the option-name will be converted
+ * to underscores. The option-name should then match a valid config option.
+ * This config option will be set to value. No processing is done on value
+ * except for removing leading and trailing whitespaces.
+ * 
+ * The aray in argv will be reordered so all non-long-option values will
+ * be located after the long-options. On return *lpargidx will be the
+ * index of the first non-long-option in the array.
+ * 
+ * @param[in]	argc		The number of arguments to parse.
+ * @param[in]	argv		The parameters to parse. The size of the
+ * 							array must be at least argc.
+ * @param[out]	lpargidx	Pointer to an integer that will be set to
+ * 							the index in argv where parsing stopped.
+ * 							This parameter may be NULL.
+ * @retval	true
+ */
+bool ECConfigImpl::ParseParams(int argc, char *argv[], int *lpargidx)
+{
+	for (int i = 0 ; i < argc ; i++) {
+		char *arg = argv[i];
+		if (arg && arg[0] == '-' && arg[1] == '-') {
+			char *eq = strchr(arg, '=');
+			
+			if (eq) {
+				string strName(arg+2, eq-arg-2);
+				string strValue(eq+1);
+				
+				strName = trim(strName, " \t\r\n");
+				strValue = trim(strValue, " \t\r\n");
+				
+				std::transform(strName.begin(), strName.end(), strName.begin(), tounderscore);
+				
+				configsetting_t setting = { strName.c_str(), strValue.c_str(), 0, 0 };
+				
+				// Overwrite an existing setting, and make sure it is not reloadable during HUP
+				AddSetting(&setting, LOADSETTING_OVERWRITE | LOADSETTING_CMDLINE_PARAM);
+			} else {
+				errors.push_back("Commandline option '" + string(arg+2) + "' cannot be empty!");
+			}
+		} else if (arg) {
+			// Move non-long-option to end of list
+			--argc;
+			for (int j = i; j < argc; ++j)
+				argv[j] = argv[j+1];
+			argv[argc] = arg;
+			--i;
+		}
+	}
+	
+	if (lpargidx)
+		*lpargidx = argc;
+
+	return true;
 }
 
 const char *ECConfigImpl::GetSettingsPath()
@@ -206,15 +274,24 @@ size_t ECConfigImpl::GetSize(const char *szValue)
  */
 void ECConfigImpl::InsertOrReplace(settingmap_t *lpMap, const settingkey_t &s, const char* szValue, bool bIsSize)
 {
-	pair<settingmap_t::iterator, bool> res;
 	char* data = NULL;
 	size_t len = std::min((size_t)1023, strlen(szValue));
 
-	res = lpMap->insert(make_pair(s, (char*)NULL));
-	if (res.second)
-		data = res.first->second = new char[1024];
-	else
-		data = res.first->second;
+	settingmap_t::iterator i = lpMap->find(s);
+
+	if(i == lpMap->end()) {
+		// Insert new value
+		data = (char *)new char[1024];
+		lpMap->insert(make_pair(s, data));
+	} else {
+		// Actually remove and re-insert the map entry since we may be modifying
+		// ulFlags in the key (this is a bit of a hack, since you shouldn't be modifying
+		// stuff in the key, but this is the easiest)
+		data = i->second;
+		lpMap->erase(i);
+		lpMap->insert(make_pair(s, data));
+	}
+	
 	if (bIsSize)
 		len = snprintf(data, 1024, "%lu", GetSize(szValue));
 	else
@@ -559,6 +636,12 @@ bool ECConfigImpl::AddSetting(const configsetting_t *lpsConfig, unsigned int ulF
 				warnings.push_back("Option '" + string(lpsConfig->szName) + "' is not used anymore.");
 
 		s.ulFlags = iterSettings->first.ulFlags;
+
+		// If this is a commandline parameter, mark the setting as non-reloadable since you do not want to
+		// change the value after a HUP
+		if (ulFlags & LOADSETTING_CMDLINE_PARAM)
+			s.ulFlags &= ~ CONFIGSETTING_RELOADABLE;
+
 	}
 
 	if (lpsConfig->szValue[0] == '$' && (s.ulFlags & CONFIGSETTING_EXACT) == 0) {

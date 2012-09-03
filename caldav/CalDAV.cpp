@@ -241,7 +241,7 @@ int main(int argc, char **argv) {
 	setlocale(LC_CTYPE, "");
 
 	while (1) {
-		opt = my_getopt_long(argc, argv, "Fhc:V", long_options, NULL);
+		opt = my_getopt_long_permissive(argc, argv, "Fhc:V", long_options, NULL);
 
 		if (opt == -1)
 			break;
@@ -270,7 +270,7 @@ int main(int argc, char **argv) {
 	xmlInitParser();
 
 	g_lpConfig = ECConfig::Create(lpDefaults);
-	if (!g_lpConfig->LoadSettings(lpszCfg) || (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
+	if (!g_lpConfig->LoadSettings(lpszCfg) || !g_lpConfig->ParseParams(argc, argv, NULL) || (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
 		g_lpLogger = new ECLogger_File(1, 0, "-");
 		LogConfigErrors(g_lpConfig, g_lpLogger);
 		goto exit;

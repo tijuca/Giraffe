@@ -246,7 +246,7 @@ int main(int argc, char *argv[]) {
 		goto exit;
 
 	while(1) {
-		c = my_getopt_long(argc, argv, "c:h:iuFV", long_options, NULL);
+		c = my_getopt_long_permissive(argc, argv, "c:h:iuFV", long_options, NULL);
 		
 		if(c == -1)
 			break;
@@ -284,7 +284,7 @@ int main(int argc, char *argv[]) {
 	m_lpThreadMonitor = new ECTHREADMONITOR;
 
 	m_lpThreadMonitor->lpConfig = ECConfig::Create(lpDefaults);
-	if (!m_lpThreadMonitor->lpConfig->LoadSettings(szConfig) || (!bIgnoreUnknownConfigOptions && m_lpThreadMonitor->lpConfig->HasErrors())) {
+	if (!m_lpThreadMonitor->lpConfig->LoadSettings(szConfig) || !m_lpThreadMonitor->lpConfig->ParseParams(argc, argv, NULL) || (!bIgnoreUnknownConfigOptions && m_lpThreadMonitor->lpConfig->HasErrors())) {
 		m_lpThreadMonitor->lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-"); // create fatal logger without a timestamp to stderr
 		LogConfigErrors(m_lpThreadMonitor->lpConfig, m_lpThreadMonitor->lpLogger);
 		hr = E_FAIL;

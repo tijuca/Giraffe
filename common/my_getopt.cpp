@@ -248,13 +248,15 @@ int _my_getopt_internal(int argc, char * argv[], const char *shortopts,
         opt = '?';
         if(my_opterr) fprintf(stderr,
                            "%s: unrecognized option `%s'\n",
-                           argv[0], argv[my_optind++]);
+                           argv[0], argv[my_optind]);
+        my_optind++;
       }
     } else {
       opt = '?';
       if(my_opterr) fprintf(stderr,
                          "%s: option `%s' is ambiguous\n",
-                         argv[0], argv[my_optind++]);
+                         argv[0], argv[my_optind]);
+        my_optind++;
     }
   }
   if (my_optind > argc) my_optind = argc;
@@ -271,4 +273,38 @@ int my_getopt_long_only(int argc, char * argv[], const char *shortopts,
                 const struct option *longopts, int *longind)
 {
   return _my_getopt_internal(argc, argv, shortopts, longopts, longind, 1);
+}
+
+int my_getopt_long_permissive(int argc, char * argv[], const char *shortopts,
+                const struct option *longopts, int *longind)
+{
+    int my_opterr_save = my_opterr;
+    my_opterr = 0;
+    
+    int c = my_getopt_long(argc, argv, shortopts, longopts, longind);
+    
+    if(c == '?') {
+        // Move this parameter to the end of the list if it a long option
+        if(argv[my_optind-1][0] == '-' && argv[my_optind-1][1] == '-' && argv[my_optind-1][2] != '\0') {
+            int i = my_optind-1;
+            c = my_getopt_long_permissive(argc, argv, shortopts, longopts, longind);
+            
+            char *tmp = argv[i];
+            for(;i<argc-1;i++) {
+                argv[i] = argv[i+1];
+            }
+            argv[i] = tmp;
+            my_optind--;
+        }
+    }
+    
+    my_opterr = my_opterr_save;
+    
+    // Show error
+    if(c == '?') {
+        my_optind--;
+        my_getopt_long(argc, argv, shortopts, longopts, longind);
+    }
+    
+    return c;
 }

@@ -100,6 +100,7 @@ typedef struct {
 #define LOADSETTING_OVERWRITE			0x0004	/* Allow overwriting predefined configuration options */
 #define LOADSETTING_OVERWRITE_GROUP		0x0008	/* Same as CONFIG_LOAD_OVERWRITE but only if options are in the same group */
 #define LOADSETTING_OVERWRITE_RELOAD	0x0010	/* Same as CONFIG_LOAD_OVERWRITE but only if option is marked reloadable */
+#define LOADSETTING_CMDLINE_PARAM		0x0020	/* This setting is being set from commandline parameters. Sets the option non-reloadable */
 
 class ECConfigImpl : public ECConfig {
 public:
@@ -107,6 +108,7 @@ public:
 	~ECConfigImpl();
 
 	bool	LoadSettings(const char *szFilename);
+	virtual bool    ParseParams(int argc, char *argv[], int *lpargidx);
 	const char *	GetSettingsPath();
 	bool	ReloadSettings();
 

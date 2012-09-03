@@ -386,7 +386,7 @@ int main(int argc, char *argv[]) {
 
 	// Get commandline options
 	while (1) {
-		c = my_getopt_long(argc, argv, "c:h:iuFV", long_options, NULL);
+		c = my_getopt_long_permissive(argc, argv, "c:h:iuFV", long_options, NULL);
 
 		if (c == -1)
 			break;
@@ -422,7 +422,7 @@ int main(int argc, char *argv[]) {
 	}
 	// Setup config
 	g_lpConfig = ECConfig::Create(lpDefaults);
-	if (!g_lpConfig->LoadSettings(szConfig) || (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
+	if (!g_lpConfig->LoadSettings(szConfig) || !g_lpConfig->ParseParams(argc, argv, NULL) || (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
 		g_lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-");	// create fatal logger without a timestamp to stderr
 		LogConfigErrors(g_lpConfig, g_lpLogger);
 		hr = E_FAIL;

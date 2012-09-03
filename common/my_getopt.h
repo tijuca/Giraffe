@@ -62,6 +62,12 @@ extern int _my_getopt_internal(int argc, char * argv[], const char *shortopts,
                             const struct option *longopts, int *longind,
                             int long_only);
 
+/* Permit unknown long options, move them to end of argv like arguments */
+extern int my_getopt_long_permissive(int argc, char * argv[], const char *shortopts,
+                       const struct option *longopts, int *longind);
+
+
+
 #ifdef __cplusplus
 }
 #endif

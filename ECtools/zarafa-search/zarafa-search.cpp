@@ -471,7 +471,7 @@ int main(int argc, char *argv[]) {
 	};
 
 	while (true) {
-		char c = my_getopt_long(argc, argv, "c:h:iuFV", long_options, NULL);
+		char c = my_getopt_long_permissive(argc, argv, "c:h:iuFV", long_options, NULL);
 		
 		if (c == -1)
 			break;
@@ -511,7 +511,7 @@ int main(int argc, char *argv[]) {
 	g_lpThreadData = new ECThreadData();
 
 	g_lpThreadData->lpConfig = ECConfig::Create(lpDefaults);
-	if (!g_lpThreadData->lpConfig->LoadSettings(szConfig) || (!bIgnoreUnknownConfigOptions && g_lpThreadData->lpConfig->HasErrors())) {
+	if (!g_lpThreadData->lpConfig->LoadSettings(szConfig) || !g_lpThreadData->lpConfig->ParseParams(argc, argv, NULL) || (!bIgnoreUnknownConfigOptions && g_lpThreadData->lpConfig->HasErrors())) {
 		g_lpThreadData->lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-"); // create fatal logger without a timestamp to stderr
 		LogConfigErrors(g_lpThreadData->lpConfig, g_lpThreadData->lpLogger);
 		hr = E_FAIL;

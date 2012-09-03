@@ -84,6 +84,7 @@ public:
 
 	virtual bool	LoadSettings(const char *szFilename) = 0;
 	virtual bool	LoadSettings(const wchar_t *szFilename);
+	virtual bool    ParseParams(int argc, char *argv[], int *lpargidx) = 0;
 	virtual const char*	GetSettingsPath() = 0;
 	virtual bool	ReloadSettings() = 0;
 

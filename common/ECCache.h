@@ -234,6 +234,9 @@ public:
 		typedef typename _MapType::iterator iterator;
 		std::pair<iterator,bool> result;
 
+		if (MaxSize() == 0)
+			return erSuccess;
+
 		result = m_map.insert(value_type(key, value));
 
 		if (result.second == false) {

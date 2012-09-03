@@ -3455,7 +3455,7 @@ int main(int argc, char *argv[]) {
 
 	int c;
 	while (1) {
-		c = my_getopt_long(argc, argv, "c:jf:dh:a:F:P:p:qsvenCVrRlN", long_options, NULL);
+		c = my_getopt_long_permissive(argc, argv, "c:jf:dh:a:F:P:p:qsvenCVrRlN", long_options, NULL);
 		if (c == -1)
 			break;
 		switch (c) {
@@ -3557,6 +3557,34 @@ int main(int argc, char *argv[]) {
 
 	}
 
+	g_lpConfig = ECConfig::Create(lpDefaults);
+	if (szConfig) {
+		/* When LoadSettings fails, provide warning to user (but wait until we actually have the Logger) */
+		if (!g_lpConfig->LoadSettings(szConfig))
+			bDefaultConfigWarning = true;
+		else {
+			int argidx = 0;			
+
+			// ParseParams always return true.
+			g_lpConfig->ParseParams(argc-my_optind, &argv[my_optind], &argidx);
+			if (argidx > 0) {
+				// If one overrides the config, it is assumed that the
+				// config is explicit. This causes errors from
+				// ECConfig::ParseParams to be logged. Besides that
+				// it doesn't make sense to override your config if
+				// you don't know whats in it.
+				bExplicitConfig = true;
+			}
+
+			// ECConfig::ParseParams returns the index in the passed array,
+			// after some shuffling, where it stopped parsing. my_optind is
+			// the index where my_getopt_long_permissive stopped parsing. So
+			// adding argidx to my_optind will result in the index after all
+			// options are parsed.
+			my_optind += argidx;
+		}
+	}
+
 	if (!bListenLMTP && my_optind == argc) {
 		cerr << "Not enough options given, need at least the username" << endl;
 		return EX_USAGE;
@@ -3565,13 +3593,6 @@ int main(int argc, char *argv[]) {
 	if (strip_email && sDeliveryArgs.bResolveAddress) {
 		cerr << "You must specify either -e or -R, not both" << endl;
 		return EX_USAGE;
-	}
-
-	g_lpConfig = ECConfig::Create(lpDefaults);
-	if (szConfig) {
-		/* When LoadSettings fails, provide warning to user (but wait until we actually have the Logger) */
-		if (!g_lpConfig->LoadSettings(szConfig))
-			bDefaultConfigWarning = true;
 	}
 
 	if (!loglevel)

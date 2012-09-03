@@ -1154,7 +1154,7 @@ int main(int argc, char *argv[]) {
 	setlocale(LC_MESSAGES, "");
 
 	while(1) {
-		c = my_getopt_long(argc, argv, "c:h:iuVF", long_options, NULL);
+		c = my_getopt_long_permissive(argc, argv, "c:h:iuVF", long_options, NULL);
 
 		if(c == -1)
 			break;
@@ -1212,12 +1212,20 @@ int main(int argc, char *argv[]) {
 
 	g_lpConfig = ECConfig::Create(lpDefaults);
 	if (szConfig) {
-		if (!g_lpConfig->LoadSettings(szConfig) || (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
+		int argidx = 0;
+		if (!g_lpConfig->LoadSettings(szConfig) || !g_lpConfig->ParseParams(argc-my_optind, &argv[my_optind], &argidx) || (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
 			g_lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-"); // create fatal logger without a timestamp to stderr
 			LogConfigErrors(g_lpConfig, g_lpLogger);
 			hr = E_FAIL;
 			goto exit;
 		}
+		
+		// ECConfig::ParseParams returns the index in the passed array,
+		// after some shuffling, where it stopped parsing. my_optind is
+		// the index where my_getopt_long_permissive stopped parsing. So
+		// adding argidx to my_optind will result in the index after all
+		// options are parsed.
+		my_optind += argidx;
 	}
 
 	// commandline overwrites spooler.cfg
