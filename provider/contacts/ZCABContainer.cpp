@@ -434,7 +434,7 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 				continue;
 			}
 
-
+			// devide by 5 since a block of properties on a contact is a set of 5 (see mnNamedProps above)
 			hr = MakeWrappedEntryID(ptrRows[i].lpProps[I_ENTRYID].Value.bin.cb, (LPENTRYID)ptrRows[i].lpProps[I_ENTRYID].Value.bin.lpb,
 									lpColData[O_OBJECT_TYPE].Value.ul, ulOffset/5,
 									&lpColData[O_ENTRYID].Value.bin.cb, (LPENTRYID*)&lpColData[O_ENTRYID].Value.bin.lpb);
