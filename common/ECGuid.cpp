@@ -148,6 +148,7 @@
 #define USES_IID_IMAPIClientShutdown
 #define USES_IID_IMAPIProviderShutdown
 #define USES_IID_ISharedFolderEntryId
+#define USES_WAB_GUID
 
 #define USES_IID_IPRProvider
 #define USES_IID_IMAPIProfile

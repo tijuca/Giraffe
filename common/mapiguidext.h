@@ -213,10 +213,14 @@ DEFINE_GUID(IID_IMAPISecureMessage, 0x253cc320, 0xeab6, 0x11d0, 0x82, 0x22, 0, 0
 DEFINE_GUID(IID_IMAPIGetSession, 0x614ab435, 0x491d, 0x4f5b, 0xa8, 0xb4, 0x60, 0xeb, 0x3, 0x10, 0x30, 0xc6);
 #endif
 
-
 #if !defined(INITGUID) || defined(USES_IID_IAddrBookSession)
 // Looks like the MAPI's internal IAddrBook object
 DEFINE_OLEGUID(IID_IAddrBookSession,0x000203A1,0,0);
+#endif
+
+// Contact Address Book Wrapped Entry ID, found in PidLidDistributionListMembers
+#if !defined(INITGUID) || defined(USES_WAB_GUID)
+DEFINE_GUID(WAB_GUID, 0xD3AD91C0, 0x9D51, 0x11CF, 0xA4, 0xA9, 0x00, 0xAA, 0x00, 0x47, 0xFA, 0xA4);
 #endif
 
 #endif
