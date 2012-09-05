@@ -3316,10 +3316,10 @@ ZEND_FUNCTION(mapi_stream_write)
 
 	MAPI_G(hr) = pStream->Write(pv, cb, &pcbWritten);
 
-	if (MAPI_G(hr) == hrSuccess)
+	if (MAPI_G(hr) != hrSuccess)
 		goto exit;
 
-	RETVAL_TRUE;
+	RETVAL_LONG(pcbWritten);
 exit:
 	LOG_END();
 	THROW_ON_ERROR();
@@ -6735,6 +6735,7 @@ ZEND_FUNCTION(mapi_zarafa_setpermissionrules)
 	for (j=0, i=0; i<cPerms; i++) {
 		zend_hash_get_current_data(target_hash, (void **) &entry);
 
+		// null pointer returned if perms was not array(array()).
 		data = HASH_OF(entry[0]);
 		zend_hash_internal_pointer_reset(data);
 
