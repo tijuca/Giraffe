@@ -603,10 +603,8 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 				stringify(tNow) + "), \"" + strCurVersion + "\", \"" + strLatestVersion + "\", \"" +
 				lpDatabase->Escape(sClientUpdateInfo.szComputerName).c_str()+"\", "+ stringify(UPDATE_STATUS_PENDING) + ")";
 
-	er = lpDatabase->DoUpdate(strQuery);
-	if (er != erSuccess)
-		goto exit;
-
+	// ignore error in database tracking, SQL error logged in server, still send new client
+	lpDatabase->DoUpdate(strQuery);
 
 	soap->fmimereadopen = &mime_file_read_open;
 	soap->fmimeread = &mime_file_read;
