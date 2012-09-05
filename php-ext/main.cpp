@@ -257,7 +257,6 @@ ZEND_END_ARG_INFO()
 #include "inetmapi.h"
 #include "options.h"
 
-
 #include "edkmdb.h"
 #include <mapiguid.h>
 #include "ECGuid.h"
@@ -270,8 +269,6 @@ ZEND_END_ARG_INFO()
 
 // at last, the php-plugin extension headers
 #include "main.h"
-#include "Session.h"
-#include "SessionPool.h"
 #include "typeconversion.h"
 #include "MAPINotifSink.h"
 
@@ -282,12 +279,6 @@ ZEND_END_ARG_INFO()
 using namespace std;
 
 #define MAPI_ASSERT_EX
-
-// Our globally allocated session pool
-SessionPool *lpSessionPool = NULL;
-
-// The administrator profile for Exchange
-#define ADMIN_PROFILE "Zarafa"
 
 /* function list so that the Zend engine will know what's here */
 zend_function_entry mapi_functions[] =
@@ -304,8 +295,6 @@ zend_function_entry mapi_functions[] =
 	ZEND_FE(mapi_logon_zarafa, NULL)
 	ZEND_FE(mapi_getmsgstorestable, NULL)
 	ZEND_FE(mapi_openmsgstore, NULL)
-	ZEND_FE(mapi_openmsgstore_zarafa, NULL)
-	ZEND_FE(mapi_openmsgstore_zarafa_other, NULL) // ATTN: see comment by function
 	ZEND_FE(mapi_openprofilesection, NULL)
 
 	ZEND_FE(mapi_openaddressbook, NULL)
@@ -515,8 +504,6 @@ zend_module_entry mapi_module_entry =
 };
 
 PHP_INI_BEGIN()
-PHP_INI_ENTRY("mapi.cache_max_sessions", "128", PHP_INI_ALL, NULL)
-PHP_INI_ENTRY("mapi.cache_max_lifetime", "300", PHP_INI_ALL, NULL)
 PHP_INI_ENTRY("mapi.debug", "0", PHP_INI_ALL, NULL)
 PHP_INI_END()
 
@@ -536,11 +523,6 @@ PHP_MINFO_FUNCTION(mapi)
 	php_info_print_table_row(2, "Version", PROJECT_VERSION_EXT_STR);
 	php_info_print_table_row(2, "Svn version", PROJECT_SVN_REV_STR);
 	php_info_print_table_row(2, "specialbuild", PROJECT_SPECIALBUILD);
-	if (lpSessionPool) {
-		char szSessions[MAX_PATH];
-		snprintf(szSessions, MAX_PATH-1, "%u of %u (%u locked)", lpSessionPool->GetPoolSize(), INI_INT("mapi.cache_max_sessions"), lpSessionPool->GetLocked());
-		php_info_print_table_row(2, "Sessions", szSessions);
-	}
 	php_info_print_table_end();
 }
 
@@ -579,8 +561,6 @@ PHP_MINIT_FUNCTION(mapi)
 	le_mapi_importhierarchychanges = zend_register_list_destructors_ex(_php_free_mapi_object, NULL, name_mapi_importhierarchychanges, module_number);
 	le_mapi_importcontentschanges = zend_register_list_destructors_ex(_php_free_mapi_object, NULL, name_mapi_importcontentschanges, module_number);
 
-	lpSessionPool = new SessionPool(INI_INT("mapi.cache_max_sessions"), INI_INT("mapi.cache_max_lifetime"));
-
 	MAPIINIT_0 MAPIINIT = { 0, MAPI_MULTITHREAD_NOTIFICATIONS };
 
 	// There is also a MAPI_NT_SERVICE flag, see help page for MAPIInitialize
@@ -611,8 +591,6 @@ PHP_MSHUTDOWN_FUNCTION(mapi)
 {
     UNREGISTER_INI_ENTRIES();
     
-	if(lpSessionPool)
-		delete lpSessionPool;
 	MAPIUninitialize();
 	return SUCCESS;
 }
@@ -646,19 +624,11 @@ PHP_RSHUTDOWN_FUNCTION(mapi)
 ***************************************************************/
 
 // This is called when our proxy object goes out of scope
-// To cache the session, we don't actually free the object, but simply
-// unlock it so that it *could* be deleted by a new incoming session
 
 static void _php_free_mapi_session(zend_rsrc_list_entry *rsrc TSRMLS_DC)
 {
-	Session *lpSession = (Session *)rsrc->ptr;
-	if(lpSession) {
-    	if(INI_INT("mapi.cache_max_sessions") > 0)
-    	    lpSession->Unlock();
-        else
-            // Not doing any caching, just delete the session
-            delete lpSession;
-    }
+	IMAPISession *lpSession = (IMAPISession *)rsrc->ptr;
+	if(lpSession) lpSession->Release();
 }
 
 static void _php_free_mapi_rowset(zend_rsrc_list_entry *rsrc TSRMLS_DC)
@@ -898,6 +868,22 @@ exit:
 	return;
 }
 
+/*
+ * How sessions and stores work:
+ * - mapi_logon_zarafa() creates a session and returns this
+ * - mapi_getmsgstorestable() to get the entryid of the default and public store
+ * - mapi_openmsgstore() to open the default user store + public store
+ * - mapi_msgstore_createentryid() retuns an store entryid of requested user
+ * - store entryid can be used with mapi_openmsgstore() to open
+ *
+ * Removed, how it did work in the far past:
+ * - mapi_openmsgstore_zarafa() creates a session, opens the user's store, and the public
+ *   and returns these store pointers in an array.
+ * - mapi_msgstore_createentryid() is used to call Store->CreateStoreEntryID()
+ * - mapi_openmsgstore_zarafa_other() with the prev acquired entryid opens the store of another user,
+ * - mapi_openmsgstore_zarafa_other() is therefor called with the current user id and password (and maybe the server) as well!
+ * Only with this info we can find the session again, to get the IMAPISession, and open another store.
+ */
 
 ZEND_FUNCTION(mapi_logon_zarafa)
 {
@@ -917,8 +903,6 @@ ZEND_FUNCTION(mapi_logon_zarafa)
 	// return value
 	LPMAPISESSION lpMAPISession = NULL;
 	// local
-	SessionTag	sTag;
-	Session		*lpSession = NULL;
 	ULONG		ulProfNum = rand_mt();
 	char		szProfName[MAX_PATH];
 	SPropValue	sPropZarafa[6];
@@ -935,17 +919,7 @@ ZEND_FUNCTION(mapi_logon_zarafa)
 		server_len = strlen(server);
 	}
 
-	// Check the cache
-	sTag.ulType = SESSION_ZARAFA;
-	sTag.szUsername = username;
-	sTag.szPassword = password;
-	sTag.szLocation = server;
-
-	lpSession = lpSessionPool->GetSession(&sTag);
-
-	// Check if there is already a session open
-	if(!lpSession) {
-
+	{
 		snprintf(szProfName, MAX_PATH-1, "www-profile%010u", ulProfNum);
 
 		sPropZarafa[0].ulPropTag = PR_EC_PATH;
@@ -983,252 +957,19 @@ ZEND_FUNCTION(mapi_logon_zarafa)
 		MAPI_G(hr) = mapi_util_deleteprof(szProfName);
 
 		if(MAPI_G(hr) != hrSuccess) {
+			lpMAPISession->Release();
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable to delete profile");
 			goto exit;
 		}
-
-		// We now have a session, register it with the session pooling system
-		lpSession = new Session(lpMAPISession, sTag, NULL);
-
-		// Lock it now, so when it is added, it cannot be removed by other threads!
-		lpSession->Lock();
-
-		if(INI_INT("mapi.cache_max_sessions") > 0)
-    		lpSessionPool->AddSession(lpSession);
-	} else {
-		lpMAPISession = lpSession->GetIMAPISession();
-		lpMAPISession->AddRef();
-		
-		MAPI_G(hr) = hrSuccess;
 	}
 
-	ZEND_REGISTER_RESOURCE(return_value, lpSession, le_mapi_session);
+	ZEND_REGISTER_RESOURCE(return_value, lpMAPISession, le_mapi_session);
 
-exit:
-	// We release the session because it is now being handled by the sessionpooling system
-	// The session pooling system keeps the object open as long as possible, and must not release
-	// the object while a page request is running (including the page request this function was called from!)
-
-	if (lpMAPISession)
-		lpMAPISession->Release();
-
-	LOG_END();
-	THROW_ON_ERROR();
-	return;
-}
-
-/*
- * **WARNING** This is DEPRICATED. Please use the "How it _should_ work" section. (next function)
- */
-ZEND_FUNCTION(mapi_openmsgstore_zarafa)
-{
-	LOG_BEGIN();
-	// params
-	char		*username = NULL;
-	int			username_len = 0;
-	char		*password = NULL;
-	int			password_len = 0;
-	char		*server = NULL;
-	int			server_len = 0;
-	// return value
-	zval * zval_private_store = NULL;
-	zval * zval_public_store = NULL;
-	// local
-	SPropValue	sPropZarafa[4];
-	LPMAPISESSION pMAPISession = NULL;
-	Session		*lpSession = NULL;
-	SessionTag	sTag;
-	ULONG		ulProfNum = rand_mt();
-	char		szProfName[MAX_PATH];
-	IMsgStore	*lpMDB = NULL;
-	IMsgStore	*lpPublicMDB = NULL;
-
-	RETVAL_FALSE;
-	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
-
-	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss|s",
-							 &username, &username_len, &password, &password_len, &server, &server_len) == FAILURE) return;
-
-	if (!server) {
-		server = "http://localhost:236/zarafa";
-		server_len = strlen(server);
-	}
-
-	// Check the cache
-	sTag.ulType = SESSION_ZARAFA;
-	sTag.szUsername = username;
-	sTag.szPassword = password;
-	sTag.szLocation = server;
-
-	lpSession = lpSessionPool->GetSession(&sTag);
-
-	// Check if there is already a session open
-	if(!lpSession) {
-
-		snprintf(szProfName, MAX_PATH-1, "www-profile%010u", ulProfNum);
-
-		sPropZarafa[0].ulPropTag = PR_EC_PATH;
-		sPropZarafa[0].Value.lpszA = server;
-		sPropZarafa[1].ulPropTag = PR_EC_USERNAME_A;
-		sPropZarafa[1].Value.lpszA = username;
-		sPropZarafa[2].ulPropTag = PR_EC_USERPASSWORD_A;
-		sPropZarafa[2].Value.lpszA = password;
-		sPropZarafa[3].ulPropTag = PR_EC_FLAGS;
-		sPropZarafa[3].Value.ul = EC_PROFILE_FLAGS_NO_NOTIFICATIONS;
-
-		MAPI_G(hr) = mapi_util_createprof(szProfName,"ZARAFA6", 4, sPropZarafa);
-
-		if(MAPI_G(hr) != hrSuccess) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "%s", mapi_util_getlasterror().c_str());
-			goto exit; // error already displayed in mapi_util_createprof
-		}
-
-		// Logon to our new profile
-		MAPI_G(hr) = MAPILogonEx(0, (LPTSTR)szProfName, (LPTSTR)"", MAPI_EXTENDED | MAPI_TIMEOUT_SHORT | MAPI_NEW_SESSION, &pMAPISession);
-
-		if(MAPI_G(hr) != hrSuccess) {
-			mapi_util_deleteprof(szProfName);
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable to logon to profile");
-			goto exit;
-		}
-
-		// Delete the profile (it will be deleted when we close our session)
-		MAPI_G(hr) = mapi_util_deleteprof(szProfName);
-
-		if(MAPI_G(hr) != hrSuccess) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable to delete profile");
-			goto exit;
-		}
-
-		// We now have a session, register it with the session pooling system
-		lpSession = new Session(pMAPISession, sTag, NULL);
-
-		// Lock it now, so when it is added, it cannot be removed by other threads!
-		lpSession->Lock();
-
-		lpSessionPool->AddSession(lpSession);
-	} else {
-		pMAPISession = lpSession->GetIMAPISession();
-		pMAPISession->AddRef();
-	}
-
-	// Open the default message store (the one we just added)
-	MAPI_G(hr) = HrOpenDefaultStore(pMAPISession, &lpMDB);
-
-	if(MAPI_G(hr) != hrSuccess) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable to open the default store");
-		goto exit;
-	}
-
-	// .. and the public store
-	MAPI_G(hr) = HrOpenECPublicStore(pMAPISession, &lpPublicMDB);
-
-	if(MAPI_G(hr) != hrSuccess) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable to open the public store");
-		// Ignore the error
-		MAPI_G(hr) = hrSuccess;
-		lpPublicMDB = NULL;
-	}
-
-	MAKE_STD_ZVAL(zval_private_store);
-	if(lpPublicMDB) {
-		MAKE_STD_ZVAL(zval_public_store);
-	}
-
-	ZEND_REGISTER_RESOURCE(zval_private_store, lpMDB, le_mapi_msgstore);
-	if(lpPublicMDB) {
-		ZEND_REGISTER_RESOURCE(zval_public_store, lpPublicMDB, le_mapi_msgstore);
-	}
-	array_init(return_value);
-
-	add_next_index_zval(return_value, zval_private_store);
-	if(lpPublicMDB)
-		add_next_index_zval(return_value, zval_public_store);
-
-exit:
-
-	// We release the session because it is now being handled by the sessionpooling system
-	// The session pooling system keeps the object open as long as possible, and must not release
-	// the object while a page request is running (including the page request this function was called from!)
-
-	if (pMAPISession)
-		pMAPISession->Release();
-
-	LOG_END();
-	THROW_ON_ERROR();
-	return;
-}
-
-
-/*
- * **WARNING** This hack is DEPRICATED. Please use the "How it _should_ work" section.
- *
- * How it previously worked:
- * - mapi_openmsgstore_zarafa() creates a session, opens the user's store, and the public
- *   and returns these store pointers in an array.
- * - mapi_msgstore_createentryid() is used to call Store->CreateStoreEntryID()
- * - mapi_openmsgstore_zarafa_other() with the prev acquired entryid opens the store of another user,
- * - mapi_openmsgstore_zarafa_other() is therefor called with the current user id and password (and maybe the server) as well!
- * Only with this info we can find the session again, to get the IMAPISession, and open another store.
- *
- * How it _should_ work:
- * - mapi_logon_zarafa() creates a session and returns this
- * - mapi_openmsgstore() opens the user store + public and returns this
- * - mapi_msgstore_createentryid() retuns an entryid of requested user store
- * - entryid can be used with mapi_openmsgstore() to open any store the user has access to.
- */
-ZEND_FUNCTION(mapi_openmsgstore_zarafa_other)
-{
-	LOG_BEGIN();
-	// params
-	LPENTRYID lpEntryID = NULL;
-	ULONG cbEntryID;
-	LPSTR sUsername = NULL; ULONG cUsername;
-	LPSTR sPassword = NULL; ULONG cPassword;
-	LPSTR sServer = NULL;   ULONG cServer;
-	// return value
-	LPMDB lpMDB;
-	// local
-	SessionTag	sTag;
-	Session		*lpSession = NULL;
-
-	RETVAL_FALSE;
-	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
-
-	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sss|s",
-							 &lpEntryID, &cbEntryID,
-							 &sUsername, &cUsername, &sPassword, &cPassword, &sServer, &cServer) == FAILURE) return;
-
-	if (!sServer) {
-		sServer = "http://localhost:236/zarafa";
-		cServer = strlen(sServer);
-	}
-
-	sTag.ulType = SESSION_ZARAFA;
-	sTag.szUsername = sUsername;
-	sTag.szPassword = sPassword;
-	sTag.szLocation = sServer;
-
-	lpSession = lpSessionPool->GetSession(&sTag);
-	if (!lpSession) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Attempting to open another user's store without first opening a main store");
-		MAPI_G(hr) = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-	MAPI_G(hr) = lpSession->GetIMAPISession()->OpenMsgStore(0, cbEntryID, lpEntryID, NULL,
-													MAPI_BEST_ACCESS | MDB_TEMPORARY | MDB_NO_DIALOG, &lpMDB);
-	if (MAPI_G(hr) != hrSuccess)
-		goto exit;
-
-	ZEND_REGISTER_RESOURCE(return_value, lpMDB, le_mapi_msgstore);
 exit:
 	LOG_END();
 	THROW_ON_ERROR();
 	return;
 }
-
-
 
 /**
 * mapi_openentry
@@ -1241,7 +982,7 @@ ZEND_FUNCTION(mapi_openentry)
 	LOG_BEGIN();
 	// params
 	zval		*res;
-	Session		*lpSession = NULL;
+	IMAPISession *lpSession = NULL;
 	ULONG		cbEntryID	= 0;
 	LPENTRYID	lpEntryID	= NULL;
 	long		ulFlags = MAPI_BEST_ACCESS;
@@ -1255,10 +996,9 @@ ZEND_FUNCTION(mapi_openentry)
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r|sl", &res, &lpEntryID, &cbEntryID, &ulFlags) == FAILURE) return;
 
-	ZEND_FETCH_RESOURCE(lpSession, Session *, &res, -1, name_mapi_session, le_mapi_session);
+	ZEND_FETCH_RESOURCE(lpSession, IMAPISession *, &res, -1, name_mapi_session, le_mapi_session);
 
-	MAPI_G(hr) = lpSession->GetIMAPISession()->OpenEntry(cbEntryID, lpEntryID, NULL, ulFlags, &ulObjType, &lpUnknown );
-
+	MAPI_G(hr) = lpSession->OpenEntry(cbEntryID, lpEntryID, NULL, ulFlags, &ulObjType, &lpUnknown);
 	if (FAILED(MAPI_G(hr)))
 		goto exit;
 
@@ -1281,7 +1021,7 @@ exit:
 	return;
 }
 
-// FIXME: is this function really used ?
+// This function cannot be used, since you currently can't create profiles directly in php
 ZEND_FUNCTION(mapi_logon)
 {
 	LOG_BEGIN();
@@ -1290,10 +1030,9 @@ ZEND_FUNCTION(mapi_logon)
 	char			*profilepassword = "";
 	int 			profilename_len = 0, profilepassword_len = 0;
 	// return value
-	Session			*lpSession = NULL;
-	// local
 	LPMAPISESSION	lpMAPISession = NULL;
-	SessionTag		sTag;
+	// local
+
 
 	RETVAL_FALSE;
 	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
@@ -1302,18 +1041,6 @@ ZEND_FUNCTION(mapi_logon)
 	{
 		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss",
 			&profilename, &profilename_len, &profilepassword, &profilepassword_len) == FAILURE) return;
-	}
-
-	sTag.ulType = SESSION_PROFILE;
-	sTag.szLocation = profilename;
-
-	lpSession = lpSessionPool->GetSession(&sTag);
-
-	// If we have a session, simply return that !
-	if(lpSession) {
-		ZEND_REGISTER_RESOURCE(return_value, lpSession, le_mapi_session);
-		MAPI_G(hr) = hrSuccess;
-		goto exit;
 	}
 
 	/*
@@ -1327,17 +1054,9 @@ ZEND_FUNCTION(mapi_logon)
 	if(MAPI_G(hr) != hrSuccess)
 		goto exit;
 
-	// register this new session for the pooling system
-	lpSession = new Session(lpMAPISession, sTag);
-	lpSession->Lock();
-	lpSessionPool->AddSession(lpSession);
+	ZEND_REGISTER_RESOURCE(return_value, lpMAPISession, le_mapi_session);
 
-	ZEND_REGISTER_RESOURCE(return_value, lpSession, le_mapi_session);
 exit:
-
-	if(lpMAPISession)
-		lpMAPISession->Release();
-
 	LOG_END();
 	THROW_ON_ERROR();
 	return;
@@ -1350,20 +1069,20 @@ ZEND_FUNCTION(mapi_openaddressbook)
 	LOG_BEGIN();
 	// params
 	zval *res;
-	Session *lpSession = NULL;
+	IMAPISession *lpSession = NULL;
 	// return value
 	LPADRBOOK lpAddrBook;
 	// local
-	SessionTag	sTag;
+
 
 	RETVAL_FALSE;
 	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
 
 	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &res) == FAILURE) return;
 
-	ZEND_FETCH_RESOURCE(lpSession, Session*, &res, -1, name_mapi_session, le_mapi_session);
+	ZEND_FETCH_RESOURCE(lpSession, IMAPISession*, &res, -1, name_mapi_session, le_mapi_session);
 
-	MAPI_G(hr) = lpSession->GetIMAPISession()->OpenAddressBook(0, NULL, AB_NO_DIALOG, &lpAddrBook);
+	MAPI_G(hr) = lpSession->OpenAddressBook(0, NULL, AB_NO_DIALOG, &lpAddrBook);
 	if (MAPI_G(hr) != hrSuccess)
 		goto exit;
 
@@ -1512,7 +1231,7 @@ ZEND_FUNCTION(mapi_getmsgstorestable)
 	LOG_BEGIN();
 	// params
 	zval *res = NULL;
-	Session *lpSession = NULL;
+	IMAPISession *lpSession = NULL;
 	// return value
 	LPMAPITABLE	lpTable = NULL;
 
@@ -1521,9 +1240,9 @@ ZEND_FUNCTION(mapi_getmsgstorestable)
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &res) == FAILURE) return;
 
-	ZEND_FETCH_RESOURCE(lpSession, Session *, &res, -1, name_mapi_session, le_mapi_session);
+	ZEND_FETCH_RESOURCE(lpSession, IMAPISession *, &res, -1, name_mapi_session, le_mapi_session);
 
-	MAPI_G(hr) = lpSession->GetIMAPISession()->GetMsgStoresTable(0, &lpTable);
+	MAPI_G(hr) = lpSession->GetMsgStoresTable(0, &lpTable);
 
 	if (FAILED(MAPI_G(hr))) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable to fetch the message store table: 0x%08X", MAPI_G(hr));
@@ -1550,7 +1269,7 @@ ZEND_FUNCTION(mapi_openmsgstore)
 	ULONG		cbEntryID	= 0;
 	LPENTRYID	lpEntryID	= NULL;
 	zval *res = NULL;
-	Session * lpSession = NULL;
+	IMAPISession * lpSession = NULL;
 	// return value
 	LPMDB	pMDB = NULL;
 
@@ -1560,9 +1279,9 @@ ZEND_FUNCTION(mapi_openmsgstore)
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rs",
 		&res, (char *)&lpEntryID, &cbEntryID) == FAILURE) return;
 
-	ZEND_FETCH_RESOURCE(lpSession, Session *, &res, -1, name_mapi_session, le_mapi_session);
+	ZEND_FETCH_RESOURCE(lpSession, IMAPISession *, &res, -1, name_mapi_session, le_mapi_session);
 
-	MAPI_G(hr) = lpSession->GetIMAPISession()->OpenMsgStore(0, cbEntryID, lpEntryID,
+	MAPI_G(hr) = lpSession->OpenMsgStore(0, cbEntryID, lpEntryID,
 													  0, MAPI_BEST_ACCESS | MDB_NO_DIALOG, &pMDB);
 
 	if (FAILED(MAPI_G(hr))) {
@@ -1590,7 +1309,7 @@ ZEND_FUNCTION(mapi_openprofilesection)
 	LOG_BEGIN();
 	// params
 	zval *res;
-	Session *lpSession = NULL;
+	IMAPISession *lpSession = NULL;
 	int uidlen;
 	LPMAPIUID lpUID = NULL;
 	// return value
@@ -1605,10 +1324,10 @@ ZEND_FUNCTION(mapi_openprofilesection)
 	if (uidlen != sizeof(MAPIUID))
 		goto exit;
 
-	ZEND_FETCH_RESOURCE(lpSession, Session*, &res, -1, name_mapi_session, le_mapi_session);
+	ZEND_FETCH_RESOURCE(lpSession, IMAPISession*, &res, -1, name_mapi_session, le_mapi_session);
 
 	// yes, you can request any compatible interface, but the return pointer is LPPROFSECT .. ohwell.
-	MAPI_G(hr) = lpSession->GetIMAPISession()->OpenProfileSection(lpUID, &IID_IMAPIProp, 0, (LPPROFSECT*)&lpProfSectProp);
+	MAPI_G(hr) = lpSession->OpenProfileSection(lpUID, &IID_IMAPIProp, 0, (LPPROFSECT*)&lpProfSectProp);
 	if (MAPI_G(hr) != hrSuccess)
 		goto exit;
 
@@ -2043,7 +1762,7 @@ exit:
 
 /**
 * mapi_msgstore_createentryid
-* Creates an EntryID to open a store with mapi_openmsgstore_zarafa.
+* Creates an EntryID to open a store with mapi_openmsgstore.
 * @param Resource IMsgStore
 *        String   username
 *
@@ -6799,7 +6518,7 @@ ZEND_FUNCTION(mapi_freebusysupport_open)
 	// extern
 	zval*				resSession = NULL;
 	zval*				resStore = NULL;
-	Session*			lpSession = NULL;
+	IMAPISession*		lpSession = NULL;
 	IMsgStore*			lpUserStore = NULL;
 
 	// return
@@ -6810,7 +6529,7 @@ ZEND_FUNCTION(mapi_freebusysupport_open)
 
 	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r|r", &resSession, &resStore) == FAILURE) return;
 
-	ZEND_FETCH_RESOURCE(lpSession, Session*, &resSession, -1, name_mapi_session, le_mapi_session);
+	ZEND_FETCH_RESOURCE(lpSession, IMAPISession*, &resSession, -1, name_mapi_session, le_mapi_session);
 
 	if(resStore != NULL) {
 		ZEND_FETCH_RESOURCE(lpUserStore, LPMDB, &resStore, -1, name_mapi_msgstore, le_mapi_msgstore);
@@ -6825,7 +6544,7 @@ ZEND_FUNCTION(mapi_freebusysupport_open)
 	if( MAPI_G(hr) != hrSuccess)
 		goto exit;
 
-	MAPI_G(hr) = lpFBSupport->Open(lpSession->GetIMAPISession(), lpUserStore, (lpUserStore)?TRUE:FALSE);
+	MAPI_G(hr) = lpFBSupport->Open(lpSession, lpUserStore, (lpUserStore)?TRUE:FALSE);
 	if( MAPI_G(hr) != hrSuccess)
 		goto exit;
 
@@ -7427,7 +7146,7 @@ ZEND_FUNCTION(mapi_favorite_add)
 	// params
 	zval *				resSession = NULL;
 	zval *				resFolder = NULL;
-	Session				*lpSession = NULL;
+	IMAPISession		*lpSession = NULL;
 	LPMAPIFOLDER		lpFolder = NULL;
 	long				ulFlags = 0;
 	// local
@@ -7440,13 +7159,13 @@ ZEND_FUNCTION(mapi_favorite_add)
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rr|sl", &resSession, &resFolder, &lpszAliasName, &cbAliasName, &ulFlags) == FAILURE) return;
 
-	ZEND_FETCH_RESOURCE(lpSession, Session *, &resSession, -1, name_mapi_session, le_mapi_session);
+	ZEND_FETCH_RESOURCE(lpSession, IMAPISession *, &resSession, -1, name_mapi_session, le_mapi_session);
 	ZEND_FETCH_RESOURCE(lpFolder, LPMAPIFOLDER, &resFolder, -1, name_mapi_folder, le_mapi_folder);
 	
 	if(cbAliasName == 0)
 		lpszAliasName = NULL;
 	
-	MAPI_G(hr) = GetShortcutFolder(lpSession->GetIMAPISession(), NULL, NULL, MAPI_CREATE, &lpShortCutFolder); // use english language
+	MAPI_G(hr) = GetShortcutFolder(lpSession, NULL, NULL, MAPI_CREATE, &lpShortCutFolder); // use english language
 	if(MAPI_G(hr) != hrSuccess)
 		goto exit;
 

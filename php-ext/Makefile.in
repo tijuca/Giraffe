@@ -84,8 +84,7 @@ mapi_la_DEPENDENCIES = ${top_builddir}/mapi4linux/src/libmapi.la \
 	${top_builddir}/common/libcommon_util.la \
 	${top_builddir}/libfreebusy/libfreebusy.la \
 	${top_builddir}/inetmapi/libinetmapi.la $(am__DEPENDENCIES_1)
-am_mapi_la_OBJECTS = main.lo Session.lo SessionPool.lo util.lo \
-	ECImportContentsChangesProxy.lo \
+am_mapi_la_OBJECTS = main.lo util.lo ECImportContentsChangesProxy.lo \
 	ECImportHierarchyChangesProxy.lo typeconversion.lo
 mapi_la_OBJECTS = $(am_mapi_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
@@ -365,8 +364,8 @@ mapi_la_LIBADD = \
 # therefore, we explicitly link mapi.so with -lpthread :(
 dist_data_DATA = include/mapi/mapicode.php include/mapi/mapidefs.php include/mapi/mapitags.php include/mapi/mapi.util.php include/mapi/class.recurrence.php include/mapi/class.meetingrequest.php include/mapi/class.freebusypublish.php include/mapi/class.baseexception.php include/mapi/class.mapiexception.php include/mapi/mapiguid.php include/mapi/class.baserecurrence.php include/mapi/class.taskrequest.php include/mapi/class.taskrecurrence.php
 dist_sysconf_DATA = zarafa.ini
-mapi_la_SOURCES = main.cpp Session.cpp SessionPool.cpp util.cpp \
-	phpconfig.h main.h Session.h SessionPool.h util.h \
+mapi_la_SOURCES = main.cpp util.cpp \
+	phpconfig.h main.h util.h \
 	ECImportContentsChangesProxy.cpp ECImportContentsChangesProxy.h \
 	ECImportHierarchyChangesProxy.cpp ECImportHierarchyChangesProxy.h \
 	typeconversion.cpp typeconversion.h \
@@ -448,8 +447,6 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ECImportContentsChangesProxy.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ECImportHierarchyChangesProxy.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/Session.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/SessionPool.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/typeconversion.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/util.Plo@am__quote@

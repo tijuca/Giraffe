@@ -31,8 +31,8 @@ datadir = ${datarootdir}/php/mapi
 sysconfdir = ${PHP_SYSCONF_DIR}
 dist_sysconf_DATA = zarafa.ini
 
-mapi_la_SOURCES = main.cpp Session.cpp SessionPool.cpp util.cpp \
-	phpconfig.h main.h Session.h SessionPool.h util.h \
+mapi_la_SOURCES = main.cpp util.cpp \
+	phpconfig.h main.h util.h \
 	ECImportContentsChangesProxy.cpp ECImportContentsChangesProxy.h \
 	ECImportHierarchyChangesProxy.cpp ECImportHierarchyChangesProxy.h \
 	typeconversion.cpp typeconversion.h \
