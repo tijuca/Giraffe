@@ -1872,6 +1872,13 @@ HRESULT MAPIToVMIME::handleExtraHeaders(IMessage *lpMessage, vmime::ref<vmime::h
 	}
 	lpMessageId = NULL;
 
+	// only for message-in-message items, add Message-ID header from MAPI
+	if (sopt.msg_in_msg && HrGetOneProp(lpMessage, PR_INTERNET_MESSAGE_ID_A, &lpMessageId) == hrSuccess) {
+		vmHeader->MessageId()->setValue(lpMessageId->Value.lpszA);
+		MAPIFreeBuffer(lpMessageId);
+	}
+	lpMessageId = NULL;
+
 	// priority settings
 	char* priomap[3] = { "5 (Lowest)", "3 (Normal)", "1 (Highest)" }; // 2 and 4 cannot be set from outlook
 	if (HrGetOneProp(lpMessage, PR_IMPORTANCE, &lpImportance) == hrSuccess) {
