@@ -12866,7 +12866,7 @@
 		  <varlistentry>
 			<term>
 			  <option>-s</option>
-			  <replaceable>sslkey_file</replaceable>
+			  <replaceable>sslkey-file</replaceable>
 			</term>
 			<listitem>
 			  <para>SSL key file for authentication.</para>
@@ -12876,7 +12876,7 @@
 		  <varlistentry>
 			<term>
 			  <option>-p</option>
-			  <replaceable>sslkey_pass</replaceable>
+			  <replaceable>sslkey-pass</replaceable>
 			</term>
 			<listitem>
 			  <para>Password for the SSL key file.</para>
@@ -12979,7 +12979,7 @@
 		  <varlistentry>
 			<term>
 			  <option>-s</option>
-			  <replaceable>sslkey_file</replaceable>
+			  <replaceable>sslkey-file</replaceable>
 			</term>
 			<listitem>
 			  <para>SSL key file for authentication.</para>
@@ -12989,7 +12989,7 @@
 		  <varlistentry>
 			<term>
 			  <option>-p</option>
-			  <replaceable>sslkey_pass</replaceable>
+			  <replaceable>sslkey-pass</replaceable>
 			</term>
 			<listitem>
 			  <para>Password for the SSL key file.</para>
