@@ -511,7 +511,7 @@ int main(int argc, char *argv[]) {
 	g_lpThreadData = new ECThreadData();
 
 	g_lpThreadData->lpConfig = ECConfig::Create(lpDefaults);
-	if (!g_lpThreadData->lpConfig->LoadSettings(szConfig) || !g_lpThreadData->lpConfig->ParseParams(argc, argv, NULL) || (!bIgnoreUnknownConfigOptions && g_lpThreadData->lpConfig->HasErrors())) {
+	if (!g_lpThreadData->lpConfig->LoadSettings(szConfig) || !g_lpThreadData->lpConfig->ParseParams(argc-my_optind, &argv[my_optind], NULL) || (!bIgnoreUnknownConfigOptions && g_lpThreadData->lpConfig->HasErrors())) {
 		g_lpThreadData->lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-"); // create fatal logger without a timestamp to stderr
 		LogConfigErrors(g_lpThreadData->lpConfig, g_lpThreadData->lpLogger);
 		hr = E_FAIL;

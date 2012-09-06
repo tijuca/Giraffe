@@ -284,7 +284,7 @@ int main(int argc, char *argv[]) {
 	m_lpThreadMonitor = new ECTHREADMONITOR;
 
 	m_lpThreadMonitor->lpConfig = ECConfig::Create(lpDefaults);
-	if (!m_lpThreadMonitor->lpConfig->LoadSettings(szConfig) || !m_lpThreadMonitor->lpConfig->ParseParams(argc, argv, NULL) || (!bIgnoreUnknownConfigOptions && m_lpThreadMonitor->lpConfig->HasErrors())) {
+	if (!m_lpThreadMonitor->lpConfig->LoadSettings(szConfig) || !m_lpThreadMonitor->lpConfig->ParseParams(argc-my_optind, &argv[my_optind], NULL) || (!bIgnoreUnknownConfigOptions && m_lpThreadMonitor->lpConfig->HasErrors())) {
 		m_lpThreadMonitor->lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-"); // create fatal logger without a timestamp to stderr
 		LogConfigErrors(m_lpThreadMonitor->lpConfig, m_lpThreadMonitor->lpLogger);
 		hr = E_FAIL;
