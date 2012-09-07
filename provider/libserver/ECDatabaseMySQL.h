@@ -122,6 +122,8 @@ public:
 	ECLogger*		GetLogger();
 
 	std::string		GetDatabaseDir();
+	
+	ECRESULT		CheckExistColumn(const std::string &strTable, const std::string &strColumn, bool *lpbExist);
 
 public:
 	// Freememory methods

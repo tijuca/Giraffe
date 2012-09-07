@@ -468,6 +468,30 @@ std::string ECDatabaseMySQL::GetDatabaseDir()
 	return m_strDatabaseDir;
 }
 
+ECRESULT ECDatabaseMySQL::CheckExistColumn(const std::string &strTable, const std::string &strColumn, bool *lpbExist)
+{
+	ECRESULT		er = erSuccess;
+	std::string		strQuery;
+	DB_RESULT		lpDBResult = NULL;
+
+	strQuery = "SELECT 1 FROM information_schema.COLUMNS "
+				"WHERE TABLE_SCHEMA = '" + string(m_lpConfig->GetSetting("mysql_database")) + "' "
+				"AND TABLE_NAME = '" + strTable + "' "
+				"AND COLUMN_NAME = '" + strColumn + "'";
+				
+	er = DoSelect(strQuery, &lpDBResult);
+	if (er != erSuccess)
+		goto exit;
+	
+	*lpbExist = (FetchRow(lpDBResult) != NULL);
+	
+exit:
+	if (lpDBResult)
+		FreeResult(lpDBResult);
+	
+	return er;
+}
+
 ECRESULT ECDatabaseMySQL::Connect()
 {
 	ECRESULT		er = erSuccess;

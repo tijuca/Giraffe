@@ -1291,8 +1291,8 @@ ECRESULT UpdateDatabaseCreateABChangesTable(ECDatabase *lpDatabase)
 	er = lpDatabase->DoInsert(Z_TABLEDEF_ABCHANGES);
 	if (er != erSuccess)
 		goto exit;
-
-	strQuery = "SELECT id, sourcekey, parentsourcekey, change_type, moved_from FROM changes WHERE change_type & " + stringify(ICS_AB) + " AND parentsourcekey=0x00000000AC21A95040D3EE48B319FBA75330442500000000040000000100000000000000";
+		
+	strQuery = "SELECT id, sourcekey, parentsourcekey, change_type FROM changes WHERE change_type & " + stringify(ICS_AB) + " AND parentsourcekey=0x00000000AC21A95040D3EE48B319FBA75330442500000000040000000100000000000000";
 	er = lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess)
 		goto exit;
@@ -1311,14 +1311,10 @@ ECRESULT UpdateDatabaseCreateABChangesTable(ECDatabase *lpDatabase)
 		syncIds.push_back(ulId);
 
 		strQuery = "INSERT INTO abchanges (id, sourcekey, parentsourcekey, change_type";
-		if (lpDBRow[4] != NULL && lpDBLen[4] != 0)
-			strQuery += ", moved_from";
 		strQuery += (string)") VALUES (" + lpDBRow[0] + ", " +
 								   lpDatabase->EscapeBinary((unsigned char*)lpDBRow[1], lpDBLen[1]) + ", " +
 								   lpDatabase->EscapeBinary((unsigned char*)lpDBRow[2], lpDBLen[2]) + ", " +
 								   lpDBRow[3];
-		if (lpDBRow[4] != NULL && lpDBLen[4] != 0)
-			strQuery += ", " + lpDatabase->EscapeBinary((unsigned char*)lpDBRow[4], lpDBLen[4]);
 		strQuery += ")";
         queries.push_back(strQuery);
 	}
@@ -1805,12 +1801,27 @@ exit:
 ECRESULT UpdateDatabaseSyncTimeIndex(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
+	DB_RESULT	lpResult = NULL;
 
-	er = lpDatabase->DoUpdate("ALTER TABLE syncs ADD INDEX sync_time (`sync_time`);");
+	// There are upgrade paths where the sync_time key already exists.
+	er = lpDatabase->DoSelect("SHOW INDEXES FROM syncs WHERE Key_name='sync_time'", &lpResult);
+	if (er != erSuccess)
+		goto exit;
+
+	if (lpDatabase->FetchRow(lpResult))
+		goto exit;
+
+	lpDatabase->FreeResult(lpResult);
+	lpResult = NULL;
+
+	er = lpDatabase->DoUpdate("ALTER TABLE syncs ADD INDEX sync_time (`sync_time`)");
 	if (er != erSuccess)
 		goto exit;
 
 exit:
+	if (lpResult)
+		lpDatabase->FreeResult(lpResult);
+
 	return er;
 }
 
@@ -1818,8 +1829,24 @@ exit:
 ECRESULT UpdateDatabaseAddStateKey(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
+	DB_RESULT	lpResult = NULL;
+
+	// There are upgrade paths where the state key already exists.
+	er = lpDatabase->DoSelect("SHOW INDEXES FROM changes WHERE Key_name='state'", &lpResult);
+	if (er != erSuccess)
+		goto exit;
+
+	if (lpDatabase->FetchRow(lpResult))
+		goto exit;
+
+	lpDatabase->FreeResult(lpResult);
+	lpResult = NULL;
 
 	er = lpDatabase->DoUpdate("ALTER TABLE changes ADD UNIQUE KEY `state` (`parentsourcekey`,`id`)");
+
+exit:
+	if (lpResult)
+		lpDatabase->FreeResult(lpResult);
 
 	return er;
 }
@@ -2316,9 +2343,15 @@ ECRESULT UpdateDatabaseConvertChanges(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
 	std::string strQuery;
-
-	strQuery = "ALTER TABLE changes DROP COLUMN moved_from, DROP key moved";
-	er = lpDatabase->DoDelete(strQuery);
+	bool bDropColumn;
+	
+	// In some upgrade paths the moved_from column doesn't exist. We'll
+	// check so no error (which we could ignore) will be logged.
+	er = lpDatabase->CheckExistColumn("changes", "moved_from", &bDropColumn);
+	if (er == erSuccess && bDropColumn) {
+		strQuery = "ALTER TABLE changes DROP COLUMN moved_from, DROP key moved";
+		er = lpDatabase->DoDelete(strQuery);
+	}
 
 	return er;
 }
