@@ -1801,27 +1801,14 @@ exit:
 ECRESULT UpdateDatabaseSyncTimeIndex(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
-	DB_RESULT	lpResult = NULL;
+	bool bHaveIndex;
 
 	// There are upgrade paths where the sync_time key already exists.
-	er = lpDatabase->DoSelect("SHOW INDEXES FROM syncs WHERE Key_name='sync_time'", &lpResult);
-	if (er != erSuccess)
-		goto exit;
-
-	if (lpDatabase->FetchRow(lpResult))
-		goto exit;
-
-	lpDatabase->FreeResult(lpResult);
-	lpResult = NULL;
-
-	er = lpDatabase->DoUpdate("ALTER TABLE syncs ADD INDEX sync_time (`sync_time`)");
-	if (er != erSuccess)
-		goto exit;
+	er = lpDatabase->CheckExistIndex("syncs", "sync_time", &bHaveIndex);
+	if (er == erSuccess && !bHaveIndex)
+		er = lpDatabase->DoUpdate("ALTER TABLE syncs ADD INDEX sync_time (`sync_time`)");
 
 exit:
-	if (lpResult)
-		lpDatabase->FreeResult(lpResult);
-
 	return er;
 }
 
@@ -1829,24 +1816,12 @@ exit:
 ECRESULT UpdateDatabaseAddStateKey(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
-	DB_RESULT	lpResult = NULL;
+	bool bHaveIndex;
 
 	// There are upgrade paths where the state key already exists.
-	er = lpDatabase->DoSelect("SHOW INDEXES FROM changes WHERE Key_name='state'", &lpResult);
-	if (er != erSuccess)
-		goto exit;
-
-	if (lpDatabase->FetchRow(lpResult))
-		goto exit;
-
-	lpDatabase->FreeResult(lpResult);
-	lpResult = NULL;
-
-	er = lpDatabase->DoUpdate("ALTER TABLE changes ADD UNIQUE KEY `state` (`parentsourcekey`,`id`)");
-
-exit:
-	if (lpResult)
-		lpDatabase->FreeResult(lpResult);
+	er = lpDatabase->CheckExistIndex("changes", "state", &bHaveIndex);
+	if (er == erSuccess && !bHaveIndex)
+		er = lpDatabase->DoUpdate("ALTER TABLE changes ADD UNIQUE KEY `state` (`parentsourcekey`,`id`)");
 
 	return er;
 }

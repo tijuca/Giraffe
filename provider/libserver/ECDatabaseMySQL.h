@@ -124,6 +124,7 @@ public:
 	std::string		GetDatabaseDir();
 	
 	ECRESULT		CheckExistColumn(const std::string &strTable, const std::string &strColumn, bool *lpbExist);
+	ECRESULT		CheckExistIndex(const std::string strTable, const std::string &strKey, bool *lpbExist);
 
 public:
 	// Freememory methods

@@ -492,6 +492,27 @@ exit:
 	return er;
 }
 
+ECRESULT ECDatabaseMySQL::CheckExistIndex(const std::string strTable, const std::string &strKey, bool *lpbExist)
+{
+	ECRESULT		er = erSuccess;
+	std::string		strQuery;
+	DB_RESULT		lpDBResult = NULL;
+	
+	strQuery = "SHOW INDEXES FROM " + strTable + " WHERE Key_name='" + strKey + "'";
+
+	er = DoSelect(strQuery, &lpDBResult);
+	if (er != erSuccess)
+		goto exit;
+
+	*lpbExist = (FetchRow(lpDBResult) != NULL);
+
+exit:
+	if (lpDBResult)
+		FreeResult(lpDBResult);
+	
+	return er;
+}
+
 ECRESULT ECDatabaseMySQL::Connect()
 {
 	ECRESULT		er = erSuccess;
