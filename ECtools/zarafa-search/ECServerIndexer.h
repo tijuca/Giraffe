@@ -88,18 +88,20 @@ private:
     HRESULT Thread();
     static void *ThreadEntry(void *lpParam);
     
-    HRESULT BuildIndexes(IMAPISession *lpSession);
-    HRESULT IndexStore(IMAPISession *lpSession, SBinary *lpsEntryId, unsigned int ulStoreType);
-    HRESULT IndexFolder(IMAPISession *lpSession, IMsgStore *lpStore, SBinary *lpsEntryId, const WCHAR *szName, ECIndexImporter *lpImporter, ECIndexDB *lpIndexDB);
-    HRESULT IndexStubTargets(IMAPISession *lpSession, const std::list<ECIndexImporter::ArchiveItem> *lpStubTargets, ECIndexImporter *lpImporter);
-    HRESULT IndexStubTargetsServer(IMAPISession *lpSession, const std::string& strServerName, const std::list<std::string> &lstStubTargets, ECIndexImporter *lpImporter);
-    HRESULT GetServerState(IMAPISession *lpSession, std::string &strState);
-    HRESULT ProcessChanges(IMAPISession *lpSession);
-    HRESULT GetServerGUID(IMAPISession *lpSession, GUID *lpGuid);
+    HRESULT BuildIndexes();
+    HRESULT IndexStore(SBinary *lpsEntryId, unsigned int ulStoreType);
+    HRESULT IndexFolder(IMsgStore *lpStore, SBinary *lpsEntryId, const WCHAR *szName, ECIndexImporter *lpImporter, ECIndexDB *lpIndexDB);
+    HRESULT IndexStubTargets(const std::list<ECIndexImporter::ArchiveItem> *lpStubTargets, ECIndexImporter *lpImporter);
+    HRESULT IndexStubTargetsServer(const std::string& strServerName, const std::list<std::string> &lstStubTargets, ECIndexImporter *lpImporter);
+    HRESULT GetServerState(std::string &strState);
+    HRESULT ProcessChanges();
+    HRESULT GetServerGUID(GUID *lpGuid);
 
     ECLogger *m_lpLogger;
     ECConfig *m_lpConfig;
     ECThreadData *m_lpThreadData;
+	MAPISessionPtr m_ptrSession;
+	MsgStorePtr m_ptrAdminStore;
     
     // Thread synchronization
     pthread_t m_thread; 

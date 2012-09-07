@@ -224,22 +224,29 @@ void *ECServerIndexer::ThreadEntry(void *lpParam)
 HRESULT ECServerIndexer::Thread()
 {
     HRESULT hr = hrSuccess;
-    MAPISessionPtr lpSession;
 
     m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Entering main indexer loop");
 
     while(!m_bExit) {
         // Open an admin session
-        if(!lpSession) {
-            hr = HrOpenECSession(&lpSession, L"SYSTEM", L"", m_lpConfig->GetSetting("server_socket"), 0, m_lpConfig->GetSetting("sslkey_file"),  m_lpConfig->GetSetting("sslkey_pass"));
+        if(!m_ptrSession) {
+            hr = HrOpenECSession(&m_ptrSession, L"SYSTEM", L"", m_lpConfig->GetSetting("server_socket"), 0, m_lpConfig->GetSetting("sslkey_file"),  m_lpConfig->GetSetting("sslkey_pass"));
             if(hr != hrSuccess) {
                 m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to contact zarafa server %s: %08X. Will retry.", m_lpConfig->GetSetting("server_socket"), hr);
                 goto next;
             }
+
+			hr = HrOpenDefaultStore(m_ptrSession, &m_ptrAdminStore);
+			if(hr != hrSuccess) {
+				m_ptrSession = NULL;
+				m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to open system admin store: %08X", hr);
+				goto next;
+			}
             
-            hr = GetServerGUID(lpSession, &m_guidServer);
+            hr = GetServerGUID(&m_guidServer);
             if(hr != hrSuccess) {
-				lpSession = NULL;
+				m_ptrSession = NULL;
+				m_ptrAdminStore = NULL;
                 goto next;
             }
 
@@ -259,7 +266,7 @@ HRESULT ECServerIndexer::Thread()
             
         if(m_ulIndexerState == stateUnknown) {
             m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Initial state, getting server state");
-            hr = GetServerState(lpSession, m_strICSState);
+            hr = GetServerState(m_strICSState);
             if(hr != hrSuccess)
                 goto exit;
                 
@@ -272,7 +279,7 @@ HRESULT ECServerIndexer::Thread()
         
         if(m_ulIndexerState == stateBuilding) {
             
-            hr = BuildIndexes(lpSession);
+            hr = BuildIndexes();
             if(hr != hrSuccess) {
                 m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Store indexing failed");
                 hr = hrSuccess;
@@ -287,7 +294,7 @@ HRESULT ECServerIndexer::Thread()
         }
         if(m_ulIndexerState == stateRunning) {
 
-            hr = ProcessChanges(lpSession);
+            hr = ProcessChanges();
             
             if(hr != hrSuccess) {
                 m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Change processing failed: %08X", hr);
@@ -316,10 +323,9 @@ exit:
     return hr;
 }
 
-HRESULT ECServerIndexer::ProcessChanges(IMAPISession *lpSession)
+HRESULT ECServerIndexer::ProcessChanges()
 {
     HRESULT hr = hrSuccess;
-    MsgStorePtr lpStore;
     IStreamAdapter state(m_strICSState);
     UnknownPtr lpImportInterface;
     ECIndexImporter *lpImporter = NULL;
@@ -333,19 +339,14 @@ HRESULT ECServerIndexer::ProcessChanges(IMAPISession *lpSession)
     ULONG ulTotalChange = 0, ulTotalBytes = 0;
     ULONG ulCreate = 0, ulChange = 0, ulDelete = 0, ulBytes = 0;
     
-    hr = HrOpenDefaultStore(lpSession, &lpStore);
-    if(hr != hrSuccess) {
-        m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to open system admin store: %08X", hr);
-        goto exit;
-    }
     
-    hr = lpStore->OpenProperty(PR_CONTENTS_SYNCHRONIZER, &IID_IExchangeExportChanges, 0, 0, &lpExporter);
+    hr = m_ptrAdminStore->OpenProperty(PR_CONTENTS_SYNCHRONIZER, &IID_IExchangeExportChanges, 0, 0, &lpExporter);
     if(hr != hrSuccess) {
         m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to get system exporter: %08X", hr);
         goto exit;
     }
     
-    hr = ECIndexImporter::Create(m_lpConfig, m_lpLogger, lpStore, m_lpThreadData, NULL, m_guidServer, &lpImporter);
+    hr = ECIndexImporter::Create(m_lpConfig, m_lpLogger, m_ptrAdminStore, m_lpThreadData, NULL, m_guidServer, &lpImporter);
     if(hr != hrSuccess) {
         m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to create stream importer: %08X", hr);
         goto exit;
@@ -396,7 +397,7 @@ HRESULT ECServerIndexer::ProcessChanges(IMAPISession *lpSession)
         goto exit;
     lpStubTargets.reset(lpArchived);
     
-    hr = IndexStubTargets(lpSession, lpStubTargets.get(), lpImporter);
+    hr = IndexStubTargets(lpStubTargets.get(), lpImporter);
     if(hr != hrSuccess)
         goto exit;
 
@@ -429,20 +430,15 @@ exit:
  * when everything has been indexed, in which case it will not be re-indexed during the next
  * run.
  */
-HRESULT ECServerIndexer::BuildIndexes(IMAPISession *lpSession)
+HRESULT ECServerIndexer::BuildIndexes()
 {
     HRESULT hr = hrSuccess;
-    MsgStorePtr lpStore;
     ExchangeManageStorePtr lpEMS;
     MAPITablePtr lpTable;
     SRowSetPtr lpRows;
     SizedSPropTagArray(3, sptaProps) = { 3, { PR_DISPLAY_NAME_W, PR_ENTRYID, PR_EC_STORETYPE } };
-    
-    hr = HrOpenDefaultStore(lpSession, &lpStore);
-    if(hr != hrSuccess)
-        goto exit;
-        
-    hr = lpStore->QueryInterface(IID_IExchangeManageStore, (void **)&lpEMS);
+            
+    hr = m_ptrAdminStore->QueryInterface(IID_IExchangeManageStore, (void **)&lpEMS);
     if(hr != hrSuccess)
         goto exit;
         
@@ -470,7 +466,7 @@ HRESULT ECServerIndexer::BuildIndexes(IMAPISession *lpSession)
                 
             m_lpLogger->Log(EC_LOGLEVEL_INFO, "Starting indexing of store %ls", WSTR(lpRows[i].lpProps[0]));
             
-            hr = IndexStore(lpSession, &lpRows[i].lpProps[1].Value.bin, lpRows[i].lpProps[2].Value.ul);
+            hr = IndexStore(&lpRows[i].lpProps[1].Value.bin, lpRows[i].lpProps[2].Value.ul);
             if(hr != hrSuccess)
                 goto exit;
         }
@@ -486,7 +482,7 @@ exit:
  * We index all the data in the store from IPM_SUBTREE and lower. This excludes associated messages and
  * folders under 'root'. Each folder is processed separately.
  */
-HRESULT ECServerIndexer::IndexStore(IMAPISession *lpSession, SBinary *lpsEntryId, unsigned int ulStoreType)
+HRESULT ECServerIndexer::IndexStore(SBinary *lpsEntryId, unsigned int ulStoreType)
 {
     HRESULT hr = hrSuccess;
     MsgStorePtr lpStore;
@@ -502,7 +498,7 @@ HRESULT ECServerIndexer::IndexStore(IMAPISession *lpSession, SBinary *lpsEntryId
     ULONG ulObjType = 0;
     ECIndexImporter *lpImporter = NULL;
     
-    hr = lpSession->OpenMsgStore(0, lpsEntryId->cb, (LPENTRYID)lpsEntryId->lpb, NULL, 0, &lpStore);
+    hr = m_ptrSession->OpenMsgStore(0, lpsEntryId->cb, (LPENTRYID)lpsEntryId->lpb, NULL, 0, &lpStore);
     if(hr != hrSuccess) {
         m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to open store: %08X", hr);
         goto exit;
@@ -566,7 +562,7 @@ HRESULT ECServerIndexer::IndexStore(IMAPISession *lpSession, SBinary *lpsEntryId
             
         for(unsigned int i=0; i < lpRows.size(); i++) {
             m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Processing folder %ls", WSTR(lpRows[i].lpProps[0]));
-            hr = IndexFolder(lpSession, lpStore, &lpRows[i].lpProps[1].Value.bin, WSTR(lpRows[i].lpProps[0]), lpImporter, lpIndex);
+            hr = IndexFolder(lpStore, &lpRows[i].lpProps[1].Value.bin, WSTR(lpRows[i].lpProps[0]), lpImporter, lpIndex);
             if(hr != hrSuccess) {
                 m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Indexing failed for folder: %08X", hr);
                 goto exit;
@@ -598,7 +594,7 @@ exit:
  * sync state, if any, and using that if possible.
  */
  
-HRESULT ECServerIndexer::IndexFolder(IMAPISession *lpSession, IMsgStore *lpStore, SBinary *lpsEntryId, const WCHAR *szName, ECIndexImporter *lpImporter, ECIndexDB *lpIndex)
+HRESULT ECServerIndexer::IndexFolder(IMsgStore *lpStore, SBinary *lpsEntryId, const WCHAR *szName, ECIndexImporter *lpImporter, ECIndexDB *lpIndex)
 {
     HRESULT hr = hrSuccess;
     SPropArrayPtr lpProps;
@@ -693,7 +689,7 @@ HRESULT ECServerIndexer::IndexFolder(IMAPISession *lpSession, IMsgStore *lpStore
     
     // Don't attempt to process the stubs if exit was requested.
     if (!m_bExit) {
-        hr = IndexStubTargets(lpSession, lpStubTargets.get(), lpImporter);
+        hr = IndexStubTargets(lpStubTargets.get(), lpImporter);
         if(hr != hrSuccess)
             goto exit;
     } else
@@ -728,7 +724,7 @@ exit:
  *
  * @param[in] lpStubTargets A List of all stub targets to process
  */
-HRESULT ECServerIndexer::IndexStubTargets(IMAPISession *lpSession, const std::list<ECIndexImporter::ArchiveItem> *lpStubTargets, ECIndexImporter *lpImporter)
+HRESULT ECServerIndexer::IndexStubTargets(const std::list<ECIndexImporter::ArchiveItem> *lpStubTargets, ECIndexImporter *lpImporter)
 {
     HRESULT hr = hrSuccess;
     std::map<std::string, std::list<std::string> > mapArchiveServers;
@@ -750,7 +746,7 @@ HRESULT ECServerIndexer::IndexStubTargets(IMAPISession *lpSession, const std::li
     }
     
     for(server = mapArchiveServers.begin() ; server != mapArchiveServers.end(); server++) {
-        hr = IndexStubTargetsServer(lpSession, server->first, server->second, lpImporter);
+        hr = IndexStubTargetsServer(server->first, server->second, lpImporter);
         if(hr != hrSuccess) {
             m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to index stubs on server '%s': %08X", server->first.c_str(), hr);
             goto exit;
@@ -772,10 +768,9 @@ exit:
  * @param[in] mapArchiveItems Map containing document id -> entryid
  */
  
-HRESULT ECServerIndexer::IndexStubTargetsServer(IMAPISession *lpSession, const std::string &strServer, const std::list<std::string> &mapItems, ECIndexImporter *lpImporter)
+HRESULT ECServerIndexer::IndexStubTargetsServer(const std::string &strServer, const std::list<std::string> &mapItems, ECIndexImporter *lpImporter)
 {
     HRESULT hr = hrSuccess;
-    MsgStorePtr lpStore;
     MsgStorePtr lpRemoteStore;
     ECExportChangesPtr lpExporter;
 	time_t ulLastStatsTime = time(NULL);
@@ -799,14 +794,8 @@ HRESULT ECServerIndexer::IndexStubTargetsServer(IMAPISession *lpSession, const s
         m_lpLogger->Log(EC_LOGLEVEL_FATAL, "QueryInterface failed for importer: %08X", hr);
         goto exit;
     }
-    
-    hr = HrOpenDefaultStore(lpSession, &lpStore);
-    if(hr != hrSuccess) {
-        m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to open local admin session: %08X", hr);
-        goto exit;
-    }
-    
-    hr = HrGetRemoteAdminStore(lpSession, lpStore, (TCHAR *)strServer.c_str(), 0, &lpRemoteStore);
+        
+    hr = HrGetRemoteAdminStore(m_ptrSession, m_ptrAdminStore, (TCHAR *)strServer.c_str(), 0, &lpRemoteStore);
     if(hr != hrSuccess) {
         m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to open remote admin store on server '%s': %08X. Make sure your SSL authentication is properly configured for access from this host to the remote host.", strServer.c_str(), hr);
         goto exit;
@@ -900,22 +889,15 @@ exit:
  * This is used to determine from what state we need to replay server-wide
  * ICS events once we're done exporting data from all the stores. 
  */
-HRESULT ECServerIndexer::GetServerState(IMAPISession *lpSession, std::string &strServerState)
+HRESULT ECServerIndexer::GetServerState(std::string &strServerState)
 {
     HRESULT hr = hrSuccess;
-    MsgStorePtr lpStore;
     std::string strState;
     IStreamAdapter state(strState);
     ExchangeExportChangesPtr lpExporter;
     ULONG ulSteps = 0, ulStep = 0;
-    
-    hr = HrOpenDefaultStore(lpSession, &lpStore);
-    if(hr != hrSuccess) {
-        m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to open default system store: %08X", hr);
-        goto exit;
-    }
-    
-    hr = lpStore->OpenProperty(PR_CONTENTS_SYNCHRONIZER, &IID_IExchangeExportChanges, 0, 0, &lpExporter);
+        
+    hr = m_ptrAdminStore->OpenProperty(PR_CONTENTS_SYNCHRONIZER, &IID_IExchangeExportChanges, 0, 0, &lpExporter);
     if(hr != hrSuccess) {
         m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to open systemwide exporter: %08X", hr);
         goto exit;
@@ -1012,19 +994,12 @@ exit:
 /**
  * Get GUID for the server we're connected to in
  */
-HRESULT ECServerIndexer::GetServerGUID(IMAPISession *lpSession, GUID *lpGuid)
+HRESULT ECServerIndexer::GetServerGUID(GUID *lpGuid)
 {
     HRESULT hr = hrSuccess;
-    MsgStorePtr lpStore;
     SPropValuePtr lpProp;
-    
-    hr = HrOpenDefaultStore(lpSession, &lpStore);
-    if(hr != hrSuccess) {
-        m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to open default system store: %08X", hr);
-        goto exit;
-    }
-    
-    hr = HrGetOneProp(lpStore, PR_MAPPING_SIGNATURE, &lpProp);
+        
+    hr = HrGetOneProp(m_ptrAdminStore, PR_MAPPING_SIGNATURE, &lpProp);
     if(hr != hrSuccess) {
         m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to get server guid: %08X", hr);
         goto exit;
