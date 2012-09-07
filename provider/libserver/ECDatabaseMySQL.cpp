@@ -718,7 +718,9 @@ ECRESULT ECDatabaseMySQL::Query(const string &strQuery) {
 		if (!m_bSuppressLockErrorLogging || GetLastError() == DB_E_UNKNOWN)
 			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "SQL [%08lu] Failed: %s, Query Size: %lu, Query: \"%s\"", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL), (long unsigned int)strQuery.size(), strQuery.c_str()); 
 		er = ZARAFA_E_DATABASE_ERROR;
-		ASSERT(false);
+		// Don't assert on ER_NO_SUCH_TABLE because it's an anticipated error in the db upgrade code.
+		if (mysql_errno(&m_lpMySQL) != ER_NO_SUCH_TABLE)
+			ASSERT(false);
 	}
 
 exit:
