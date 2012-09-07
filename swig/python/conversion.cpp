@@ -1051,7 +1051,7 @@ PyObject *		Object_from_LPSRestriction(LPSRestriction lpsRestriction)
         if (!propval)
             goto exit;
 
-        result = PyObject_CallFunction(PyTypeSContentRestriction, "llO", lpsRestriction->res.resContent.ulFuzzyLevel, lpsRestriction->res.resContent.ulPropTag, propval);
+        result = PyObject_CallFunction(PyTypeSContentRestriction, "kkO", lpsRestriction->res.resContent.ulFuzzyLevel, lpsRestriction->res.resContent.ulPropTag, propval);
         break;
         
     case RES_PROPERTY:
@@ -1059,23 +1059,23 @@ PyObject *		Object_from_LPSRestriction(LPSRestriction lpsRestriction)
         if (!propval)
             goto exit;
 
-        result = PyObject_CallFunction(PyTypeSPropertyRestriction, "llO", lpsRestriction->res.resProperty.relop, lpsRestriction->res.resProperty.ulPropTag, propval);
+        result = PyObject_CallFunction(PyTypeSPropertyRestriction, "kkO", lpsRestriction->res.resProperty.relop, lpsRestriction->res.resProperty.ulPropTag, propval);
         break;
         
     case RES_COMPAREPROPS:
-        result = PyObject_CallFunction(PyTypeSComparePropsRestriction, "lll", lpsRestriction->res.resCompareProps.relop, lpsRestriction->res.resCompareProps.ulPropTag1, lpsRestriction->res.resCompareProps.ulPropTag2);
+        result = PyObject_CallFunction(PyTypeSComparePropsRestriction, "kkk", lpsRestriction->res.resCompareProps.relop, lpsRestriction->res.resCompareProps.ulPropTag1, lpsRestriction->res.resCompareProps.ulPropTag2);
         break;
         
     case RES_BITMASK:
-        result = PyObject_CallFunction(PyTypeSBitMaskRestriction, "lll", lpsRestriction->res.resBitMask.relBMR, lpsRestriction->res.resBitMask.ulPropTag, lpsRestriction->res.resBitMask.ulMask);
+        result = PyObject_CallFunction(PyTypeSBitMaskRestriction, "kkk", lpsRestriction->res.resBitMask.relBMR, lpsRestriction->res.resBitMask.ulPropTag, lpsRestriction->res.resBitMask.ulMask);
         break;
         
     case RES_SIZE:
-        result = PyObject_CallFunction(PyTypeSSizeRestriction, "lll", lpsRestriction->res.resSize.relop, lpsRestriction->res.resSize.ulPropTag, lpsRestriction->res.resSize.cb);
+        result = PyObject_CallFunction(PyTypeSSizeRestriction, "kkk", lpsRestriction->res.resSize.relop, lpsRestriction->res.resSize.ulPropTag, lpsRestriction->res.resSize.cb);
         break;
         
     case RES_EXIST:
-        result = PyObject_CallFunction(PyTypeSExistRestriction, "l", lpsRestriction->res.resExist.ulPropTag);
+        result = PyObject_CallFunction(PyTypeSExistRestriction, "k", lpsRestriction->res.resExist.ulPropTag);
         break;
             
     case RES_SUBRESTRICTION:
@@ -1083,7 +1083,7 @@ PyObject *		Object_from_LPSRestriction(LPSRestriction lpsRestriction)
         if (!sub)
             goto exit;
 
-        result = PyObject_CallFunction(PyTypeSSubRestriction, "lO", lpsRestriction->res.resSub.ulSubObject, sub);
+        result = PyObject_CallFunction(PyTypeSSubRestriction, "kO", lpsRestriction->res.resSub.ulSubObject, sub);
         break;
             
     case RES_COMMENT:

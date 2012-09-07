@@ -33,8 +33,8 @@ class SSort(MAPIStruct):
         self.ulOrder = ulOrder
         
     def __repr__(self):
-        sorts = [ 'ASC', 'DESC' ]
-        return "{ %08X %s }" % (self.ulPropTag, sorts[self.ulOrder])
+        sorts = [ 'TABLE_SORT_ASCEND', 'TABLE_SORT_DESCEND' ]
+        return "SSort(%#x, %s)" % (self.ulPropTag, sorts[self.ulOrder])
 
 class SSortOrderSet(MAPIStruct):
     def __init__(self, sorts, cCategories, cExpanded):
@@ -43,7 +43,7 @@ class SSortOrderSet(MAPIStruct):
         self.cExpanded = cExpanded
       
     def __repr__(self):
-        return "{ %s, %d, %d }" % (repr(self.aSort), self.cCategories, self.cExpanded)
+        return "SSortOrderSet(%r, %r, %r)" % (self.aSort, self.cCategories, self.cExpanded)
 
 class MAPINAMEID(MAPIStruct):
     def __init__(self, guid, kind, id):
@@ -53,9 +53,9 @@ class MAPINAMEID(MAPIStruct):
         
     def __repr__(self):
         if (self.kind == MAPICore.MNID_ID):
-            return "{ %s MNID_ID %s }" % (bin2hex(self.guid), self.id)
+            return "MAPINAMEID(%r, MNID_ID, %r)" % (self.guid, self.id)
         else:
-            return "{ %s MNID_STRING %s }" % (bin2hex(self.guid), self.id)
+            return "MAPINAMEID(%r, MNID_STRING, %r)" % (self.guid, self.id)
 
 class SPropProblem(MAPIStruct):
     def __init__(self, index, tag, scode):
@@ -68,21 +68,21 @@ class SAndRestriction(MAPIStruct):
         self.rt = MAPICore.RES_AND
         self.lpRes = sub
     def __repr__(self):
-        return 'SAndRestriction(%s)' % (str(self.lpRes))
+        return 'SAndRestriction(%r)' % (self.lpRes)
             
 class SOrRestriction(MAPIStruct):
     def __init__(self, sub):
         self.rt = MAPICore.RES_OR
         self.lpRes = sub
     def __repr__(self):
-        return 'SOrRestriction(%s)' % (str(self.lpRes))
+        return 'SOrRestriction(%r)' % (self.lpRes)
         
 class SNotRestriction(MAPIStruct):
     def __init__(self, sub):
         self.rt = MAPICore.RES_NOT
         self.lpRes = sub
     def __repr__(self):
-        return 'SNotRestriction(%s)' % (str(self.lpRes))
+        return 'SNotRestriction(%r)' % (self.lpRes)
         
 class SContentRestriction(MAPIStruct):
     def __init__(self, fuzzy, proptag, prop):
@@ -91,7 +91,7 @@ class SContentRestriction(MAPIStruct):
         self.ulPropTag = proptag
         self.lpProp = prop
     def __repr__(self):
-        return 'SContentRestriction(%d,0x%x,%s)' % (self.ulFuzzyLevel, self.ulPropTag, str(self.lpProp))
+        return 'SContentRestriction(%r,%#x,%r)' % (self.ulFuzzyLevel, self.ulPropTag, self.lpProp)
         
 class SBitMaskRestriction(MAPIStruct):
     def __init__(self, relBMR, ulPropTag, ulMask):
@@ -100,7 +100,7 @@ class SBitMaskRestriction(MAPIStruct):
         self.ulPropTag = ulPropTag
         self.ulMask = ulMask
     def __repr__(self):
-        return 'SBitMaskRestriction(%d,0x%x,%d)' % (self.relBMR, self.ulPropTag, self.ulMask)
+        return 'SBitMaskRestriction(%r,%#x,%r)' % (self.relBMR, self.ulPropTag, self.ulMask)
 
 class SPropertyRestriction(MAPIStruct):
     def __init__(self, relop, ulPropTag, prop):
@@ -109,7 +109,7 @@ class SPropertyRestriction(MAPIStruct):
         self.relop = relop
         self.lpProp = prop
     def __repr__(self):
-        return 'SPropertyRestriction(%d,0x%x,%s)' %(self.relop, self.ulPropTag, str(self.lpProp))
+        return 'SPropertyRestriction(%r,%#x,%r)' %(self.relop, self.ulPropTag, self.lpProp)
 
 class SComparePropsRestriction(MAPIStruct):
     def __init__(self, relop, ulPropTag1, ulPropTag2):
@@ -118,7 +118,7 @@ class SComparePropsRestriction(MAPIStruct):
         self.ulPropTag1 = ulPropTag1
         self.ulPropTag2 = ulPropTag2
     def __repr__(self):
-        return 'SComparePropsRestriction(%d,0x%x,0x%x)' % (self.relop, self.ulPropTag1, self.ulPropTag2)
+        return 'SComparePropsRestriction(%r,%#x,%#x)' % (self.relop, self.ulPropTag1, self.ulPropTag2)
         
 class SSizeRestriction(MAPIStruct):
     def __init__(self, relop, ulPropTag, cb):
@@ -127,14 +127,14 @@ class SSizeRestriction(MAPIStruct):
         self.ulPropTag = ulPropTag
         self.cb = cb
     def __repr__(self):
-        return 'SSizeRestriction(%d,0x%x,%d)' % (self.relop, self.ulPropTag, self.cb)
+        return 'SSizeRestriction(%r,%#x,%r)' % (self.relop, self.ulPropTag, self.cb)
         
 class SExistRestriction(MAPIStruct):
     def __init__(self, proptag):
         self.rt = MAPICore.RES_EXIST
         self.ulPropTag = proptag
     def __repr__(self):
-        return 'SExistRestriction(0x%x)' % (self.ulPropTag)
+        return 'SExistRestriction(%#x)' % (self.ulPropTag)
         
 class SSubRestriction(MAPIStruct):
     def __init__(self, ulSubObject, res):
@@ -142,7 +142,7 @@ class SSubRestriction(MAPIStruct):
         self.ulSubObject = ulSubObject
         self.lpRes = res
     def __repr__(self):
-        return 'SSubRestriction(0x%x,%s)' % (self.ulSubObject, str(self.lpRes))
+        return 'SSubRestriction(%#x,%r)' % (self.ulSubObject, self.lpRes)
         
 class SCommentRestriction(MAPIStruct):
     def __init__(self, res, prop):
@@ -150,45 +150,45 @@ class SCommentRestriction(MAPIStruct):
         self.lpRes = res
         self.lpProp = prop
     def __repr__(self):
-        return 'SCommentRestriction(%s,%s)' %(str(self.lpRes), str(self.lpProp))
+        return 'SCommentRestriction(%r,%r)' %(self.lpRes, self.lpProp)
 
 class actMoveCopy(MAPIStruct):
     def __init__(self, store, folder):
         self.StoreEntryId = store
         self.FldEntryId = folder
     def __repr__(self):
-        return 'actMoveCopy(0x%s,0x%s)' % (self.StoreEntryId.encode('hex'), self.FldEntryId.encode('hex'))
+        return 'actMoveCopy(%r,%r)' % (self.StoreEntryId, self.FldEntryId)
 
 class actReply(MAPIStruct):
     def __init__(self, entryid, guid):
         self.EntryId = entryid
         self.guidReplyTemplate = guid
     def __repr__(self):
-        return 'actReply(0x%s,0x%s)' % (self.EntryId.encode('hex'), self.guidReplyTemplate.encode('hex'))
+        return 'actReply(%r,%r)' % (self.EntryId, self.guidReplyTemplate)
 
 class actDeferAction(MAPIStruct):
     def __init__(self, deferMsg):
         self.data = deferMsg
     def __repr__(self):
-        return 'actDeferMsg(0x%s)' % (self.data.encode('hex'))
+        return 'actDeferMsg(%r)' % (self.data)
 
 class actBounce(MAPIStruct):
     def __init__(self, code):
         self.scBounceCode = code
     def __repr__(self):
-        return 'actBounce(%d)' % (len(self.scBounceCode))
+        return 'actBounce(%r)' % (self.scBounceCode)
 
 class actFwdDelegate(MAPIStruct):
     def __init__(self, adrlist):
         self.lpadrlist = adrlist
     def __repr__(self):
-        return 'actFwdDelegate(%s)' % (str(self.lpadrlist))
+        return 'actFwdDelegate(%r)' % (self.lpadrlist)
 
 class actTag(MAPIStruct):
     def __init__(self, tag):
         self.propTag = tag
     def __repr__(self):
-        return 'actTag(%s)' % (str(self.propTag))
+        return 'actTag(%r)' % (self.propTag)
 
 class ACTION(MAPIStruct):
     def __init__(self, acttype, flavor, res, proptagarray, flags, actobj):
@@ -200,14 +200,14 @@ class ACTION(MAPIStruct):
         # any of the above action
         self.actobj = actobj
     def __repr__(self):
-        return 'ACTION(%d,%d,%s,%s,0x%x,%s)' % (self.acttype,self.ulActionFlavor,str(self.lpRes),str(self.lpPropTagArray),self.ulFlags,str(self.actobj))
+        return 'ACTION(%r,%r,%r,%r,%#x,%r)' % (self.acttype,self.ulActionFlavor,self.lpRes,self.lpPropTagArray,self.ulFlags,self.actobj)
 
 class ACTIONS(MAPIStruct):
     def __init__(self, version, actions):
         self.ulVersion = version
         self.lpAction = actions
     def __repr__(self):
-        return 'ACTIONS(%d,%s)' % (self.ulVersion, str(self.lpAction))
+        return 'ACTIONS(%r,%r)' % (self.ulVersion, self.lpAction)
     
 class MAPIError(Exception):
     def __init__(self, hr):
