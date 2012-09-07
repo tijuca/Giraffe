@@ -2786,11 +2786,11 @@ ECRESULT ECUserManagement::CreateLocalObject(const objectsignature_t &signature,
 
 		if (signature.id.objclass == ACTIVE_USER && (ulLicenseStatus & USERMANAGEMENT_BLOCK_CREATE_ACTIVE_USER)) {
 			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to create active user: Your license doesn't permit this amount of users.");
-			er = ZARAFA_E_NOT_FOUND;
+			er = ZARAFA_E_UNABLE_TO_COMPLETE;
 			goto exit;
 		} else if (ulLicenseStatus & USERMANAGEMENT_BLOCK_CREATE_NONACTIVE_USER) {
 			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to create non-active user: Your license doesn't permit this amount of users.");
-			er = ZARAFA_E_NOT_FOUND;
+			er = ZARAFA_E_UNABLE_TO_COMPLETE;
 			goto exit;
 		}
 	}

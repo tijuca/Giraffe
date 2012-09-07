@@ -568,6 +568,8 @@ string getMapiCodeString(HRESULT hr, const char* object = "object")
 		return string(object) + " already exists";
 	case MAPI_E_NO_ACCESS:
 		return "no access to " + string(object);
+	case MAPI_E_UNABLE_TO_COMPLETE:
+		return "please check your license";
 	case MAPI_E_INVALID_TYPE:
 		return "invalid type combination";
 	};
