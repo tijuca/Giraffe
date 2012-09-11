@@ -147,12 +147,8 @@ ZEND_FUNCTION(mapi_parseoneoff);
 
 ZEND_FUNCTION(mapi_logon);
 ZEND_FUNCTION(mapi_logon_zarafa);
-ZEND_FUNCTION(mapi_logon_pst);
 ZEND_FUNCTION(mapi_getmsgstorestable);
 ZEND_FUNCTION(mapi_openmsgstore);
-ZEND_FUNCTION(mapi_openmsgstore_exchange);
-ZEND_FUNCTION(mapi_openmsgstore_zarafa);
-ZEND_FUNCTION(mapi_openmsgstore_zarafa_other);
 ZEND_FUNCTION(mapi_openprofilesection);
 
 ZEND_FUNCTION(mapi_openentry);
