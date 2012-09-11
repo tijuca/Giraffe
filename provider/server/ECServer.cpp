@@ -880,8 +880,8 @@ int running_server(char *szName, const char *szConfig)
 		{ "quota_soft",				"0", CONFIGSETTING_RELOADABLE },
 		{ "quota_hard",				"0", CONFIGSETTING_RELOADABLE },
 		{ "companyquota_warn",		"0", CONFIGSETTING_RELOADABLE },
-		{ "companyquota_soft",		"0", CONFIGSETTING_RELOADABLE },
-		{ "companyquota_hard",		"0", CONFIGSETTING_RELOADABLE },
+		{ "companyquota_soft",		"0", CONFIGSETTING_UNUSED },
+		{ "companyquota_hard",		"0", CONFIGSETTING_UNUSED },
 		{ "session_timeout",		"300", CONFIGSETTING_RELOADABLE },		// 5 minutes
 		{ "sync_lifetime",			"365", CONFIGSETTING_RELOADABLE },		// 1 year
 		{ "sync_log_all_changes",	"yes", CONFIGSETTING_RELOADABLE },	// Log All ICS changes

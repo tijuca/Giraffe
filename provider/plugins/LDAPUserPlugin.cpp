@@ -2871,9 +2871,9 @@ auto_ptr<quotadetails_t> LDAPUserPlugin::getQuota(const objectid_t &id, bool bGe
 				quotaDetails->bUseDefaultQuota = !parseBool(getLDAPAttributeValue(att, entry));
 			} else if (warnquota_attr && !stricmp(att, warnquota_attr)) {
 				quotaDetails->llWarnSize = fromstring<string, long long>(getLDAPAttributeValue(att, entry)) * multiplier;
-			} else if (softquota_attr && !stricmp(att, softquota_attr)) {
+			} else if (id.objclass != CONTAINER_COMPANY && softquota_attr && !stricmp(att, softquota_attr)) {
 				quotaDetails->llSoftSize = fromstring<string, long long>(getLDAPAttributeValue(att, entry)) * multiplier;
-			} else if (hardquota_attr && !stricmp(att, hardquota_attr)) {
+			} else if (id.objclass != CONTAINER_COMPANY && hardquota_attr && !stricmp(att, hardquota_attr)) {
 				quotaDetails->llHardSize = fromstring<string, long long>(getLDAPAttributeValue(att, entry)) * multiplier;
 			}
 		}
@@ -2907,4 +2907,3 @@ void LDAPUserPlugin::removeAllObjects(objectid_t except) throw(std::exception)
 {
     throw notimplemented("removeAllObjects is not implemented in the LDAP user plugin.");
 }
-

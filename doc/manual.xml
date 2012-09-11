@@ -4423,6 +4423,7 @@
 			<term>quota_warn</term>
 			<term>quota_soft</term>
 			<term>quota_hard</term>
+                        <term>companyquota_warn</term>
 			<listitem><para></para></listitem>
 		  </varlistentry>
 
@@ -7693,8 +7694,6 @@
 			<term><option>userquota_soft_template</option></term>
 			<term><option>userquota_hard_template</option></term>
 			<term><option>companyquota_warning_template</option></term>
-			<term><option>companyquota_soft_template</option></term>
-			<term><option>companyquota_hard_template</option></term>
 			<listitem>
 			  <para>These templates are read by the zarafa-monitor when a
 			  user or tenant exceeds a particular quota level.
