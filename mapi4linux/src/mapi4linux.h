@@ -68,6 +68,7 @@
 
 /* mapispi.cpp */
 #define USES_IID_IMAPISupport
+#define USES_IID_IMAPIGetSession
 #define USES_IID_IMAPIFolder
 
 #include <mapiguid.h>

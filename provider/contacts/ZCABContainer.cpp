@@ -862,6 +862,39 @@ HRESULT ZCABContainer::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lp
 
 	if (lpCABEntryID->ulObjType == MAPI_ABCONT) {
 		hr = m_lpMAPISup->OpenEntry(cbFolder, lpFolder, NULL, 0, &ulObjType, &ptrContactFolder);
+		if (hr == MAPI_E_NOT_FOUND) {
+			// the folder is most likely in a store that is not yet available through this MAPI session
+			// try opening the store through the support object, and see if we can get it anyway
+			MsgStorePtr ptrStore;
+			MAPIGetSessionPtr ptrGetSession;
+			MAPISessionPtr ptrSession;
+
+			hr = m_lpMAPISup->QueryInterface(IID_IMAPIGetSession, (void**)&ptrGetSession);
+			if (hr != hrSuccess)
+				goto exit;
+
+			hr = ptrGetSession->GetMAPISession(&ptrSession);
+			if (hr != hrSuccess)
+				goto exit;
+
+			std::vector<zcabFolderEntry>::iterator i;
+			// find the store of this folder
+			for (i = m_lpFolders->begin(); i != m_lpFolders->end(); i++) {
+				ULONG res;
+				if ((m_lpMAPISup->CompareEntryIDs(i->cbFolder, (LPENTRYID)i->lpFolder, cbFolder, lpFolder, 0, &res) == hrSuccess) && res == TRUE)
+					break;
+			}
+			if (i == m_lpFolders->end()) {
+				hr = MAPI_E_NOT_FOUND;
+				goto exit;
+			}
+
+			hr = ptrSession->OpenMsgStore(0, i->cbStore, (LPENTRYID)i->lpStore, NULL, 0, &ptrStore);
+			if (hr != hrSuccess)
+				goto exit;
+
+			hr = ptrStore->OpenEntry(cbFolder, lpFolder, NULL, 0, &ulObjType, &ptrContactFolder);
+		}
 		if (hr != hrSuccess)
 			goto exit;
 

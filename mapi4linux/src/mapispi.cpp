@@ -61,6 +61,47 @@
 #include <algorithm>
 #include "mapi_ptr.h"
 
+M4LMAPIGetSession::M4LMAPIGetSession(LPMAPISESSION new_session) {
+	ASSERT(new_session);
+	session = new_session;
+	session->AddRef();
+}
+
+M4LMAPIGetSession::~M4LMAPIGetSession() {
+	session->Release();
+}
+
+HRESULT M4LMAPIGetSession::GetMAPISession(LPUNKNOWN *lppSession)
+{
+	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::GetMAPISession", "");
+	HRESULT hr;
+	hr = session->QueryInterface(IID_IMAPISession, (void**)lppSession);
+	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::GetMAPISession", "0x%08x", hr);
+	return hr;
+}
+
+// iunknown passthru
+ULONG M4LMAPIGetSession::AddRef() {
+    return M4LUnknown::AddRef();
+}
+ULONG M4LMAPIGetSession::Release() {
+    return M4LUnknown::Release();
+}
+HRESULT M4LMAPIGetSession::QueryInterface(REFIID refiid, void **lpvoid) {
+	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::QueryInterface", "");
+	HRESULT hr = hrSuccess;
+
+    if ((refiid == IID_IMAPIGetSession) || (refiid == IID_IUnknown)) {
+		AddRef();
+		*lpvoid = (IMAPISupport *)this;
+		hr = hrSuccess;
+    } else
+		hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
+
+	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::QueryInterface", "0x%08x", hr);
+	return hr;
+}
+
 M4LMAPISupport::M4LMAPISupport(LPMAPISESSION new_session, LPMAPIUID lpUid, SVCService* lpService) {
 	session = new_session;
 	service = lpService;
@@ -789,6 +830,10 @@ HRESULT M4LMAPISupport::QueryInterface(REFIID refiid, void **lpvoid) {
 		AddRef();
 		*lpvoid = (IMAPISupport *)this;
 		hr = hrSuccess;
+	} else if (refiid == IID_IMAPIGetSession) {
+		IMAPIGetSession *lpGetSession = new M4LMAPIGetSession(session);
+		lpGetSession->AddRef();
+		*lpvoid = lpGetSession;
     } else
 		hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
 

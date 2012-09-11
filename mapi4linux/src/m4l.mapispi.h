@@ -90,6 +90,23 @@ struct findKey {
 	}
 };
 
+class M4LMAPIGetSession : public M4LUnknown, public IMAPIGetSession {
+private:
+	LPMAPISESSION		session;
+
+public:
+	M4LMAPIGetSession(LPMAPISESSION new_session);
+	virtual ~M4LMAPIGetSession();
+
+	// IMAPIGetSession
+	virtual HRESULT __stdcall GetMAPISession(LPUNKNOWN *lppSession);
+
+    // iunknown passthru
+    virtual ULONG __stdcall AddRef();
+    virtual ULONG __stdcall Release();
+    virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid);
+};
+
 class M4LMAPISupport : public M4LUnknown, public IMAPISupport {
 private:
 	LPMAPISESSION		session;

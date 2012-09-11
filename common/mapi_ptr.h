@@ -56,6 +56,7 @@
 #include "mapi_ptr/mapi_rowset_ptr.h"
 
 #include <mapix.h>
+#include <mapispi.h>
 #include <edkmdb.h>
 #include <edkguid.h>
 
@@ -63,6 +64,7 @@
 #include "IECSecurity.h"
 #include "IECSingleInstance.h"
 #include "ECGuid.h"
+#include "mapiguidext.h"
 
 DEFINEMAPIPTR(ABContainer);
 DEFINEMAPIPTR(AddrBook);
@@ -88,6 +90,7 @@ DEFINEMAPIPTR(ProviderAdmin);
 DEFINEMAPIPTR(Unknown);
 DEFINEMAPIPTR(Stream);
 typedef mapi_object_ptr<IAttach, IID_IAttachment> AttachPtr;	// Nice... MS (not Mark S) is a bit inconsistent here.
+DEFINEMAPIPTR(MAPIGetSession);
 
 
 typedef mapi_memory_ptr<ECPERMISSION> ECPermissionPtr;
