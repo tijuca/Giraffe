@@ -1146,6 +1146,52 @@
 
 <!--
   -+-+-
+    Zarafa auto respond manual page
+  -+-+-
+-->
+    <refentry>
+      <refmeta>
+        <refentrytitle>zarafa-autorespond</refentrytitle>
+        <manvolnum>1</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+        <refname>zarafa-autorespond</refname>
+        <refpurpose>Vacation message response script.</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+        <cmdsynopsis>
+          <command>zarafa-autorespond</command>
+        </cmdsynopsis>
+      </refsynopsisdiv>
+
+      <refsection>
+        <title>Description</title>
+
+        <para>Script will be called by <command>zarafa-dagent</command> when the user 
+				enabled a vacation message.	</para>
+		<para>This script should not executed from command line.</para>
+      </refsection>
+
+      <refsection>
+        <title>Author</title>
+        <para>Written by Zarafa.</para>
+      </refsection>
+
+      <refsection>
+        <title>See also</title>
+        <para>
+          <citerefentry>
+            <refentrytitle>zarafa-dagent</refentrytitle>
+            <manvolnum>1</manvolnum>
+          </citerefentry>
+        </para>
+      </refsection>
+    </refentry>
+
+<!--
+  -+-+-
 	Zarafa Server manual page (5.0 ready)
   -+-+-
 -->
