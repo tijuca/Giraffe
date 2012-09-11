@@ -2336,8 +2336,8 @@ HRESULT VMIMEToMAPI::handleAttachment(vmime::ref<vmime::header> vmHeader, vmime:
 			 ctf->getValue().dynamicCast <vmime::mediaType>()->getType() == vmime::mediaTypes::TEXT) &&
 			(!strId.empty() || !strLocation.empty()) &&
 			m_mailState.bodyLevel == BODY_HTML &&
-			((!strId.empty() && str_icontains(m_mailState.strHTMLBody.c_str(), string("cid:"+strId).c_str(), ECLocale())) ||
-			 (!strLocation.empty() && str_icontains(m_mailState.strHTMLBody.c_str(), strLocation.c_str(), ECLocale())) ))
+			((!strId.empty() && strcasestr(m_mailState.strHTMLBody.c_str(), string("cid:"+strId).c_str())) ||
+			 (!strLocation.empty() && strcasestr(m_mailState.strHTMLBody.c_str(), strLocation.c_str())) ))
 		{
 			attProps[nProps].ulPropTag = PR_ATTACHMENT_HIDDEN;
 			attProps[nProps++].Value.b = TRUE;
