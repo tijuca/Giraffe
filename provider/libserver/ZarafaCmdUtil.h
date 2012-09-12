@@ -210,8 +210,6 @@ ECRESULT WriteProp(ECDatabase *lpDatabase, unsigned int ulObjId, unsigned int ul
 ECRESULT GetNamesFromIDs(struct soap *soap, ECDatabase *lpDatabase, struct propTagArray *lpPropTags, struct namedPropArray *lpsNames);
 ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId, unsigned int *lpulUpdates = NULL);
 
-ECRESULT GetStoreType(ECSession *lpSession, unsigned int ulObjId, unsigned int *lpulStoreType);
-
 ECRESULT RemoveStaleIndexedProp(ECDatabase *lpDatabase, unsigned int ulPropTag, unsigned char *lpData, unsigned int cbSize);
 
 ECRESULT ApplyFolderCounts(ECDatabase *lpDatabase, unsigned int ulFolderId, const PARENTINFO &pi);

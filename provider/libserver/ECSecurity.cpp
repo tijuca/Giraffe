@@ -1173,19 +1173,13 @@ ECRESULT ECSecurity::GetStoreOwnerAndType(unsigned int ulObjId, unsigned int* lp
 	unsigned int ulStoreId = 0;
 
 	if (lpulOwnerId || lpulStoreType) {
-		er = m_lpSession->GetSessionManager()->GetCacheManager()->GetStore(ulObjId, &ulStoreId, NULL);
+		er = m_lpSession->GetSessionManager()->GetCacheManager()->GetStoreAndType(ulObjId, &ulStoreId, NULL, lpulStoreType);
 		if (er != erSuccess)
 			goto exit;
 	}
 
 	if (lpulOwnerId) {
 		er = GetOwner(ulStoreId, lpulOwnerId);
-		if (er != erSuccess)
-			goto exit;
-	}
-
-	if (lpulStoreType) {
-		er = GetStoreType(m_lpSession, ulStoreId, lpulStoreType);
 		if (er != erSuccess)
 			goto exit;
 	}

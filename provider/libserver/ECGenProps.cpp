@@ -66,7 +66,6 @@
 #include "ECSecurity.h"
 #include "ECSessionManager.h"
 #include "ECLockManager.h"
-#include "ZarafaCmdUtil.h"	// for GetStoreType (seems to be a bit misplaced)
 
 #include <edkmdb.h>
 
@@ -451,8 +450,11 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECSession* lpSes
                 if(ulObjType == MAPI_FOLDER) {
                     ulObjId = ulParentId;
                 } // else PR_PARENT_ENTRYID == PR_ENTRYID
-					
-			}else if (ulPropTag == PR_STORE_ENTRYID) {
+
+                        // The following line is merged from trunk@35290, where a bit more work
+                        // is performed within the next block. So this change is a bit useless except
+                        // when we decide to merge those changes later for some reason.					
+			}else if (ulPropTag == PR_STORE_ENTRYID || ulObjId == ulStoreId) {
 				ulObjId = ulStoreId;
 			}
 
@@ -516,7 +518,7 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECSession* lpSes
 			    goto exit;
 	        }
 
-			er = GetStoreType(lpSession, ulObjId, &ulStoreType);
+			er = lpSession->GetSessionManager()->GetCacheManager()->GetStoreAndType(ulObjId, NULL, NULL, &ulStoreType);
 			if (er != erSuccess)
 				goto exit;
         

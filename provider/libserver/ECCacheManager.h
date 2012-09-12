@@ -168,6 +168,7 @@ class ECsStores : public ECsCacheEntry {
 public:
 	unsigned int	ulStore;
 	GUID			guidStore;
+	unsigned int	ulType;
 };
 
 class ECsUserObject : public ECsCacheEntry {
@@ -624,8 +625,9 @@ public:
 	ECRESULT QueryParent(unsigned int ulObjId, unsigned int *ulParent);
 
 	ECRESULT GetStore(unsigned int ulObjId, unsigned int *ulStore, GUID *lpGuid, unsigned int maxdepth = 100);
+	ECRESULT GetStoreAndType(unsigned int ulObjId, unsigned int *ulStore, GUID *lpGuid, unsigned int *ulType, unsigned int maxdepth = 100);
 	ECRESULT GetObjectFlags(unsigned int ulObjId, unsigned int *ulFlags);
-	ECRESULT SetStore(unsigned int ulObjId, unsigned int ulStore, GUID *lpGuid);
+	ECRESULT SetStore(unsigned int ulObjId, unsigned int ulStore, GUID *lpGuid, unsigned int ulType);
 
 	ECRESULT GetServerDetails(const std::string &strServerId, serverdetails_t *lpsDetails);
 	ECRESULT SetServerDetails(const std::string &strServerId, const serverdetails_t &sDetails);
@@ -697,7 +699,7 @@ private:
 	ECRESULT _GetObject(unsigned int ulObjId, unsigned int *ulParent, unsigned int *ulOwner, unsigned int *ulFlags, unsigned int *ulType);
 	ECRESULT _DelObject(unsigned int ulObjId);
 
-	ECRESULT _GetStore(unsigned int ulObjId, unsigned int *ulStore, GUID *lpGuid);
+	ECRESULT _GetStore(unsigned int ulObjId, unsigned int *ulStore, GUID *lpGuid, unsigned int *ulType);
 	ECRESULT _DelStore(unsigned int ulObjId);
 
 	ECRESULT _AddUserObject(unsigned int ulUserId, objectclass_t ulClass, unsigned int ulCompanyId,

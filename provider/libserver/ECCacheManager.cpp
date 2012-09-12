@@ -310,7 +310,7 @@ ECRESULT ECCacheManager::_DelObject(unsigned int ulObjId)
 	return er;
 }
 
-ECRESULT ECCacheManager::_GetStore(unsigned int ulObjId, unsigned int *ulStore, GUID *lpGuid)
+ECRESULT ECCacheManager::_GetStore(unsigned int ulObjId, unsigned int *ulStore, GUID *lpGuid, unsigned int *lpulType)
 {
 	ECRESULT	er = erSuccess;
 	ECsStores	*sStores;
@@ -323,6 +323,9 @@ ECRESULT ECCacheManager::_GetStore(unsigned int ulObjId, unsigned int *ulStore, 
 
 	if(ulStore)
 		*ulStore = sStores->ulStore;
+		
+    if(lpulType)
+        *lpulType = sStores->ulType;
 
 	if(lpGuid)
 		memcpy(lpGuid, &sStores->guidStore, sizeof(GUID) );
@@ -331,12 +334,13 @@ exit:
 	return er;
 }
 
-ECRESULT ECCacheManager::SetStore(unsigned int ulObjId, unsigned int ulStore, GUID *lpGuid)
+ECRESULT ECCacheManager::SetStore(unsigned int ulObjId, unsigned int ulStore, GUID *lpGuid, unsigned int ulType)
 {
 	ECRESULT		er = erSuccess;
 	ECsStores		sStores;
 	sStores.ulStore = ulStore;
 	sStores.guidStore = *lpGuid;
+	sStores.ulType = ulType;
 
 	scoped_lock lock(m_hCacheMutex);
 
@@ -470,6 +474,12 @@ exit:
 // Get the store that the specified object belongs to
 ECRESULT ECCacheManager::GetStore(unsigned int ulObjId, unsigned int *lpulStore, GUID *lpGuid, unsigned int maxdepth)
 {
+    return GetStoreAndType(ulObjId, lpulStore, lpGuid, NULL, maxdepth);
+}
+
+// Get the store that the specified object belongs to
+ECRESULT ECCacheManager::GetStoreAndType(unsigned int ulObjId, unsigned int *lpulStore, GUID *lpGuid, unsigned int *lpulType, unsigned int maxdepth)
+{
 	ECRESULT	er = erSuccess;
 	DB_RESULT	lpDBResult = NULL;
 	DB_ROW		lpDBRow = NULL;
@@ -477,6 +487,7 @@ ECRESULT ECCacheManager::GetStore(unsigned int ulObjId, unsigned int *lpulStore,
 	ECDatabase	*lpDatabase = NULL;
 	unsigned int ulSubObjId = 0;
 	unsigned int ulStore = 0;
+	unsigned int ulType = 0;
 	GUID guid;
 	
 	if(maxdepth <= 0)
@@ -488,13 +499,13 @@ ECRESULT ECCacheManager::GetStore(unsigned int ulObjId, unsigned int *lpulStore,
 		goto exit;
 
 	// first check the cache if we already know the store for this object
-	if(_GetStore(ulObjId, &ulStore, &guid) == erSuccess)
+	if(_GetStore(ulObjId, &ulStore, &guid, &ulType) == erSuccess)
 		goto found;
 
     // Get our parent folder
 	if(GetParent(ulObjId, &ulSubObjId) != erSuccess) {
 	    // No parent, this must be the top-level item, get the store data from here
-    	strQuery = "SELECT hierarchy_id, guid FROM stores WHERE hierarchy_id = " + stringify(ulObjId);
+    	strQuery = "SELECT hierarchy_id, guid, type FROM stores WHERE hierarchy_id = " + stringify(ulObjId);
     	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
     	if(er != erSuccess)
 	    	goto exit;
@@ -506,29 +517,32 @@ ECRESULT ECCacheManager::GetStore(unsigned int ulObjId, unsigned int *lpulStore,
 
     	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 
-    	if(lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL) {
+    	if(lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL) {
     		er = ZARAFA_E_DATABASE_ERROR;
     		goto exit;
     	}
     	ulStore = atoi(lpDBRow[0]);
         memcpy(&guid, lpDBRow[1], sizeof(GUID));
+        ulType = atoi(lpDBRow[2]);
 
 
 	} else {
 	    // We have a parent, get the store for our parent by recursively calling ourselves
-	    er = GetStore(ulSubObjId, &ulStore, &guid, maxdepth-1);
+	    er = GetStoreAndType(ulSubObjId, &ulStore, &guid, &ulType, maxdepth-1);
 	    if(er != erSuccess)
 	        goto exit;
     }
 
     // insert the item into the cache
-    SetStore(ulObjId, ulStore, &guid);
+    SetStore(ulObjId, ulStore, &guid, ulType);
 
 found:    
     if(lpulStore)
         *lpulStore = ulStore;
     if(lpGuid)
         *lpGuid = guid;
+    if(lpulType)
+        *lpulType = ulType;
 
 exit:
 	if(lpDBResult)

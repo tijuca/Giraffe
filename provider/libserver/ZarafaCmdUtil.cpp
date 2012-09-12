@@ -1932,38 +1932,6 @@ exit:
 	return er;	
 }
 
-ECRESULT GetStoreType(ECSession *lpSession, unsigned int ulObjId, unsigned int *lpulStoreType)
-{
-	ECRESULT er = erSuccess;
-	ECDatabase *lpDatabase = NULL;
-	DB_RESULT lpDBResult = NULL;
-	DB_ROW lpDBRow = NULL;
-	std::string strQuery;
-
-	er = lpSession->GetDatabase(&lpDatabase);
-	if (er != erSuccess)
-		goto exit;
-
-	strQuery = "SELECT s.type FROM stores AS s JOIN hierarchy AS h ON s.hierarchy_id=h.id AND s.user_id=h.owner AND h.type=" + stringify(MAPI_STORE) + " AND h.id=" + stringify(ulObjId);
-	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
-	if (er != erSuccess)
-		goto exit;
-
-	lpDBRow = lpDatabase->FetchRow(lpDBResult);
-	if (lpDBRow == NULL || lpDBRow[0] == NULL) {
-		er = ZARAFA_E_NOT_FOUND;
-		goto exit;
-	}
-	
-	*lpulStoreType = atoui(lpDBRow[0]);
-
-exit:
-	if (lpDBResult)
-		lpDatabase->FreeResult(lpDBResult);
-
-	return er;
-}
-
 /**
  * Removes stale indexed properties
  *
