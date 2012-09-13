@@ -1171,7 +1171,7 @@
 
         <para>Script will be called by <command>zarafa-dagent</command> when the user 
 				enabled a vacation message.	</para>
-		<para>This script should not executed from command line.</para>
+		<para>This script should not be executed from the command line.</para>
       </refsection>
 
       <refsection>
