@@ -12964,12 +12964,12 @@
 
 	  <refsection>
 		<title>Description</title>
-		<para><command>za-aclset</command> resets the permissions
-		the owner of an archive store has on his or her archive.</para>
+		<para><command>za-aclset</command> sets or updates the permissions on
+		an archive store for the owner of that store.</para>
 		
 		<para>When an archive is attached to a store, the owner of the store
-		get read-only or read/write permissions on the archive based on the
-		configuration or commandline options passed at the time of attaching.
+		gets read-only or read/write permissions on the archive based on the
+		configuration or command line options passed at the time of attaching.
 		Also when an archive is attached to a store of a non-active user, no
 		permissions for that non-active user are set because that's not
 		possible.</para>
@@ -13026,7 +13026,7 @@
 		  <varlistentry>
 			<term><option>-w</option></term>
 			<listitem>
-			  <para>By default za-aclset makes an archive read-only
+			  <para>By default <command>za-aclset</command> makes an archive read-only
 			  for the user. By passing this option, the user will get
 			  read/write permissions in the attached archive.</para>
 			</listitem>
