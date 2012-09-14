@@ -12979,7 +12979,7 @@
 		original setting was just wrong.</para>
 		
 		<para>In the second case, if the user is converted to an active user,
-		it's required to rest the permissions because the owner won't have
+		it's required to reset the permissions because the owner won't have
 		any permissions on his archive.</para>
 	  </refsection>
 
