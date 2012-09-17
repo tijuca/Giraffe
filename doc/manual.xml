@@ -12228,7 +12228,7 @@
 
  <!--
   -+-+-
-	Mailbox Storage Relocator manual page
+	Zarafa Archive ACL Sync manual page
   -+-+-
 -->
 	<refentry>
@@ -12325,6 +12325,228 @@
 
 	</refentry>
 
+<!--
+  -+-+-
+	Zarafa Archive Restore manual page
+  -+-+-
+-->
+	<refentry>
+	  <refmeta>
+		<refentrytitle>za-restore</refentrytitle>
+		<manvolnum>1</manvolnum>
+	  </refmeta>
+
+	  <refnamediv>
+		<refname>za-restore</refname>
+		<refpurpose>Restore all stubbed and removed messages in a primary store
+		with the messages found in the currently or previously attached
+		archives(s).</refpurpose>
+	  </refnamediv>
+
+	  <refsynopsisdiv>
+		<cmdsynopsis>
+		  <command>za-restore</command>
+		  <arg rep="repeat"><replaceable>OPTION</replaceable></arg>
+		  <arg rep="repeat"><replaceable>USER</replaceable></arg>
+		</cmdsynopsis>
+	  </refsynopsisdiv>
+
+	  <refsection>
+		<title>Description</title>
+
+		<para>za-restore can be used to repopulate a primary store to a state
+		where no archive is required to read any message. In a less cryptic way
+		this means that all stubbed messages are destubbed and all messages that
+		were deleted after archiving are restored.</para>
+
+		<para>The advantage of using za-restore over dragging the messages back
+		from the archive in Outlook or Webaccess is that the restores messages
+		are sanitized, allowing them to be properly rearchived later.</para>
+	  </refsection>
+
+	  <refsection>
+		<title>Strategy</title>
+
+		<para>The strategy taken by za-restore is that it iterates through all
+		folder in the primary store, and tries to open the archive folders that
+		are attached to that store. There can be more than one attached archive
+		folder, and these folders are not required to exist in an archive that
+		is currently attached. So folders of previously used archives will be
+		restored as well if they still exist.</para>
+
+		<para>Once the archives have been resolved, za-restore will create a list
+		of restorable messages based on the reference entryid found in the
+		archived copies. When multiple archives are found, multiple archived
+		copies for the same primary message can exist. In that case za-restore
+		will choose the most recent one.</para>
+
+		<para>Once the list of restorable messages is complete, za-restore will
+		start restoring by first determining if the primary message, referenced
+		by the reference entryid from the archived copies exist and if so if it
+		is stubbed. If the primary message exists and is not stubbed, there's
+		no need to restore anything. If the message exists but is stubbed, it
+		will be destubbed. If the primary message does not exist, a new message
+		is created based on the archived copy. In this case the archived copy
+		is updated so it will reference the newly created message. This is
+		needed to make sure a subsequent run of za-restore won't create another
+		copy.</para>
+
+	  </refsection>
+
+	  <refsection>
+		<title>Options</title>
+
+		<variablelist>
+		  <varlistentry>
+			<term>
+			  <option>-h</option>
+			  <replaceable>serverpath</replaceable>
+			</term>
+			<listitem>
+			  <para>Host to connect with.</para>
+			  <para>Default: <replaceable>file:///var/run/zarafa</replaceable>
+			  </para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>-s</option>
+			  <replaceable>sslkey_file</replaceable>
+			</term>
+			<listitem>
+			  <para>SSL key file for authentication.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>-p</option>
+			  <replaceable>sslkey_pass</replaceable>
+			</term>
+			<listitem>
+			  <para>Password for the SSL key file.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>-l</option>
+			  <replaceable>log_file</replaceable>
+			</term>
+			<listitem>
+			  <para>Select the logfile to log to.</para>
+			  <para>Default: <replaceable>za-restore.lg</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>--detach</option>
+			</term>
+			<listitem>
+			  <para>Detach the selected or all archive stores before starting
+			  the restore procedure. This avoids the archiver from re archiving
+			  restored messages.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>--unhook</option>
+			</term>
+			<listitem>
+			  <para>Unhook the selected ot all archive stores once the restore
+			  process has completed. This implies --detach and only works on
+			  archive stores.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>--remove</option>
+			</term>
+			<listitem>
+			  <para>Remove the selected ot all archive stores once the restore
+			  process has completed. This implies--unhook and only works on
+			  archive stores.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>--select-source</option>
+			</term>
+			<listitem>
+			  <para>Select the source archive(s) by providing a comma seperated
+			  list of archive indexes. The indexes specify which archives to
+			  restore from. The --detach, --unhook and --remove options only
+			  apply to the selected archives."</para>
+			  <para>The archive indexes can be obtained by listing the attached
+			  archives for a user: zarafa-archiver -u <replaceable>user
+			  </replaceable> -l.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>-v</option>
+			  <replaceable>verbose</replaceable>
+			</term>
+			<listitem>
+			  <para>Increase console loglevel. Can be specified multiple times.
+			  </para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>-q</option>
+			  <replaceable>quiet</replaceable>
+			</term>
+			<listitem>
+			  <para>Decrease console loglevel. Can be specified multiple times.
+			  </para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>-N</option>
+			  <replaceable>dry-run</replaceable>
+			</term>
+			<listitem>
+			  <para>Don't actually modify anything.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>--help</option>
+			</term>
+			<listitem>
+			  <para>Show the help message on the console.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>--log-log-source</option>
+			</term>
+			<listitem>
+			  <para>Log the source file and line numbers in the log file. This
+			  is only useful for debugging purposes.</para>
+			</listitem>
+		  </varlistentry>
+		</variablelist>
+	  </refsection>
+
+	  <refsection>
+		<title>Author</title>
+		<para>Written by Zarafa.</para>
+	  </refsection>
+
+	</refentry>
   </reference>
 </book>
 
