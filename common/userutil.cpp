@@ -646,7 +646,7 @@ HRESULT UpdateServerList(ECLogger *lpLogger, IABContainer *lpContainer, std::set
 	sResAllUsers.res.resAnd.cRes = 2;
 	sResAllUsers.res.resAnd.lpRes = sResSub;
 
-	lpContainer->GetContentsTable(MAPI_DEFERRED_ERRORS, &ptrTable);
+	hr = lpContainer->GetContentsTable(MAPI_DEFERRED_ERRORS, &ptrTable);
 	if(hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to open contents table: 0x%08X", hr);
 		goto exit;
