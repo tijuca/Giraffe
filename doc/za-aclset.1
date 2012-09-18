@@ -1,0 +1,89 @@
+'\" t
+.\"     Title: za-aclset
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
+.\"      Date: August 2011
+.\"    Manual: Zarafa user reference
+.\"    Source: Zarafa 7.0
+.\"  Language: English
+.\"
+.TH "ZA\-ACLSET" "1" "August 2011" "Zarafa 7.0" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+za-aclset \- Reset the archive ACL settings for the owner\&.
+.SH "SYNOPSIS"
+.HP \w'\fBza\-aclset\fR\ 'u
+\fBza\-aclset\fR [\fIOPTION\fR...] [\fIUSERS\fR...]
+.SH "DESCRIPTION"
+.PP
+\fBza\-aclset\fR
+sets or updates the permissions on an archive store for the owner of that store\&.
+.PP
+When an archive is attached to a store, the owner of the store gets read\-only or read/write permissions on the archive based on the configuration or command line options passed at the time of attaching\&. Also when an archive is attached to a store of a non\-active user, no permissions for that non\-active user are set because that\*(Aqs not possible\&.
+.PP
+In the first case it can be desirable to change the permissions at a later time because of company policy changes or because the original setting was just wrong\&.
+.PP
+In the second case, if the user is converted to an active user, it\*(Aqs required to reset the permissions because the owner won\*(Aqt have any permissions on his archive\&.
+.SH "OPTIONS"
+.PP
+\fB\-h\fR \fIserverpath\fR
+.RS 4
+Host to connect with\&.
+.sp
+Default:
+\fIfile:///var/run/zarafa \fR
+.sp
+Three formats are allowed for this option:
+.sp
+\fBUNIX socket\fR
+: file://\fIpath_to_the_UNIX_socket\fR
+.sp
+\fBHTTP\fR
+: http://\fIhost_or_IP\fR:\fIport\fR/zarafa
+.sp
+\fBSecure HTTP\fR
+: https://\fIhost_or_IP\fR:\fIport\fR/zarafa
+.RE
+.PP
+\fB\-s\fR \fIsslkey\-file\fR
+.RS 4
+SSL key file for authentication\&.
+.RE
+.PP
+\fB\-p\fR \fIsslkey\-pass\fR
+.RS 4
+Password for the SSL key file\&.
+.RE
+.PP
+\fB\-w\fR
+.RS 4
+By default
+\fBza\-aclset\fR
+makes an archive read\-only for the user\&. By passing this option, the user will get read/write permissions in the attached archive\&.
+.RE
+.PP
+\fB\-\-writable\fR \fIyes|no\fR
+.RS 4
+Explicitly enable or disable write permissions when setting permissions\&.
+.RE
+.SH "AUTHOR"
+.PP
+Written by Zarafa\&.

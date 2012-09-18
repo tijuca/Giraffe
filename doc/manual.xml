@@ -12327,6 +12327,120 @@
 
 <!--
   -+-+-
+	Zarafa Archive ACL Set manual page
+  -+-+-
+-->
+	<refentry>
+	  <refmeta>
+		<refentrytitle>za-aclset</refentrytitle>
+		<manvolnum>1</manvolnum>
+	  </refmeta>
+
+	  <refnamediv>
+		<refname>za-aclset</refname>
+		<refpurpose>Reset the archive ACL settings for the owner.</refpurpose>
+	  </refnamediv>
+
+	  <refsynopsisdiv>
+		<cmdsynopsis>
+		  <command>za-aclset</command>
+		  <arg rep="repeat"><replaceable>OPTION</replaceable></arg>
+		  <arg rep="repeat"><replaceable>USERS</replaceable></arg>
+		</cmdsynopsis>
+	  </refsynopsisdiv>
+
+	  <refsection>
+		<title>Description</title>
+		<para><command>za-aclset</command> sets or updates the permissions on
+		an archive store for the owner of that store.</para>
+		
+		<para>When an archive is attached to a store, the owner of the store
+		gets read-only or read/write permissions on the archive based on the
+		configuration or command line options passed at the time of attaching.
+		Also when an archive is attached to a store of a non-active user, no
+		permissions for that non-active user are set because that's not
+		possible.</para>
+		
+		<para>In the first case it can be desirable to change the permissions
+		at a later time because of company policy changes or because the
+		original setting was just wrong.</para>
+		
+		<para>In the second case, if the user is converted to an active user,
+		it's required to reset the permissions because the owner won't have
+		any permissions on his archive.</para>
+	  </refsection>
+
+	  <refsection>
+		<title>Options</title>
+
+		<variablelist>
+		  <varlistentry>
+			<term>
+			  <option>-h</option>
+			  <replaceable>serverpath</replaceable>
+			</term>
+			<listitem>
+			  <para>Host to connect with.</para>
+			  <para>Default: <replaceable>file:///var/run/zarafa
+			  </replaceable></para>
+			  <para>Three formats are allowed for this option:</para>
+			  <para><option>UNIX socket</option> : file://<replaceable>path_to_the_UNIX_socket</replaceable></para>
+			  <para><option>HTTP</option> : http://<replaceable>host_or_IP</replaceable>:<replaceable>port</replaceable>/zarafa</para>
+			  <para><option>Secure HTTP</option> : https://<replaceable>host_or_IP</replaceable>:<replaceable>port</replaceable>/zarafa</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>-s</option>
+			  <replaceable>sslkey-file</replaceable>
+			</term>
+			<listitem>
+			  <para>SSL key file for authentication.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>-p</option>
+			  <replaceable>sslkey-pass</replaceable>
+			</term>
+			<listitem>
+			  <para>Password for the SSL key file.</para>
+			</listitem>
+		  </varlistentry>
+		  
+		  <varlistentry>
+			<term><option>-w</option></term>
+			<listitem>
+			  <para>By default <command>za-aclset</command> makes an archive read-only
+			  for the user. By passing this option, the user will get
+			  read/write permissions in the attached archive.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>--writable</option>
+			  <replaceable>yes|no</replaceable>
+			</term>
+			<listitem>
+			  <para>Explicitly enable or disable write permissions when
+			  setting permissions.</para>
+			</listitem>
+		  </varlistentry>
+		</variablelist>
+	  </refsection>
+
+	  <refsection>
+		<title>Author</title>
+		<para>Written by Zarafa.</para>
+	  </refsection>
+
+	</refentry>
+
+<!--
+  -+-+-
 	Zarafa Archive Restore manual page
   -+-+-
 -->
