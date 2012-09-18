@@ -1128,6 +1128,52 @@
 
 <!--
   -+-+-
+    Zarafa auto respond manual page
+  -+-+-
+-->
+    <refentry>
+      <refmeta>
+        <refentrytitle>zarafa-autorespond</refentrytitle>
+        <manvolnum>1</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+        <refname>zarafa-autorespond</refname>
+        <refpurpose>Vacation message response script.</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+        <cmdsynopsis>
+          <command>zarafa-autorespond</command>
+        </cmdsynopsis>
+      </refsynopsisdiv>
+
+      <refsection>
+        <title>Description</title>
+
+        <para>Script will be called by <command>zarafa-dagent</command> when the user 
+				enabled a vacation message.	</para>
+		<para>This script should not be executed from the command line.</para>
+      </refsection>
+
+      <refsection>
+        <title>Author</title>
+        <para>Written by Zarafa.</para>
+      </refsection>
+
+      <refsection>
+        <title>See also</title>
+        <para>
+          <citerefentry>
+            <refentrytitle>zarafa-dagent</refentrytitle>
+            <manvolnum>1</manvolnum>
+          </citerefentry>
+        </para>
+      </refsection>
+    </refentry>
+
+<!--
+  -+-+-
 	Zarafa Server manual page (5.0 ready)
   -+-+-
 -->
@@ -12299,7 +12345,7 @@
 		  <varlistentry>
 			<term>
 			  <option>-s</option>
-			  <replaceable>sslkey_file</replaceable>
+			  <replaceable>sslkey-file</replaceable>
 			</term>
 			<listitem>
 			  <para>SSL key file for authentication.</para>
@@ -12309,7 +12355,7 @@
 		  <varlistentry>
 			<term>
 			  <option>-p</option>
-			  <replaceable>sslkey_pass</replaceable>
+			  <replaceable>sslkey-pass</replaceable>
 			</term>
 			<listitem>
 			  <para>Password for the SSL key file.</para>
@@ -12526,7 +12572,7 @@
 		  <varlistentry>
 			<term>
 			  <option>-s</option>
-			  <replaceable>sslkey_file</replaceable>
+			  <replaceable>sslkey-file</replaceable>
 			</term>
 			<listitem>
 			  <para>SSL key file for authentication.</para>
@@ -12536,7 +12582,7 @@
 		  <varlistentry>
 			<term>
 			  <option>-p</option>
-			  <replaceable>sslkey_pass</replaceable>
+			  <replaceable>sslkey-pass</replaceable>
 			</term>
 			<listitem>
 			  <para>Password for the SSL key file.</para>
