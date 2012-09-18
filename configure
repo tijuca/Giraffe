@@ -20657,7 +20657,7 @@ LDFLAGS="$LDFLAGS $ZLDFLAGS"
 ac_config_files="$ac_config_files Makefile mapi4linux/Makefile mapi4linux/include/Makefile mapi4linux/src/Makefile php-ext/Makefile provider/Makefile provider/client/Makefile provider/contacts/Makefile provider/common/Makefile provider/include/Makefile provider/libserver/Makefile provider/plugins/Makefile provider/server/Makefile provider/soap/Makefile provider/tools/Makefile provider/tools/soapcpp2/Makefile inetmapi/Makefile spooler/Makefile spooler/python/Makefile spooler/python/plugins/Makefile common/Makefile ECtools/Makefile ECtools/zarafa-admin/Makefile ECtools/zarafa-passwd/Makefile ECtools/zarafa-monitor/Makefile ECtools/zarafa-fsck/Makefile ECtools/zarafa-cfgchecker/Makefile ECtools/zarafa-stats/Makefile ECtools/zarafa-archiver/Makefile ECtools/zarafa-search/Makefile ECtools/zarafa-utils/Makefile installer/Makefile installer/linux/Makefile installer/userscripts/Makefile installer/userscripts/createcompany installer/userscripts/createcompany.d/Makefile installer/userscripts/creategroup installer/userscripts/creategroup.d/Makefile installer/userscripts/createuser installer/userscripts/createuser.d/Makefile installer/userscripts/deletecompany installer/userscripts/deletecompany.d/Makefile installer/userscripts/deletegroup installer/userscripts/deletegroup.d/Makefile installer/userscripts/deleteuser installer/userscripts/deleteuser.d/Makefile installer/quotamail/Makefile installer/searchscripts/Makefile po/Makefile doc/Makefile gateway/Makefile libfreebusy/Makefile libicalmapi/Makefile caldav/Makefile swig/Makefile swig/python/Makefile zarafa-libsync/Makefile common/zarafa.pc version specialbuild"
 
 if test -d `dirname $0`/licensed; then
-ac_config_files="$ac_config_files liblicense/Makefile licensed/Makefile ECtools/zarafa-backup/Makefile ECtools/zarafa-backup/helpers/Makefile ECtools/zarafa-report/Makefile ECtools/zarafa-msr/Makefile ECtools/za-extra/Makefile"
+ac_config_files="$ac_config_files liblicense/Makefile licensed/Makefile ECtools/zarafa-backup/Makefile ECtools/zarafa-backup/helpers/Makefile ECtools/zarafa-report/Makefile ECtools/zarafa-msr/Makefile ECtools/zarafa-ocf/Makefile ECtools/za-extra/Makefile"
 
 fi
 
@@ -21854,6 +21854,7 @@ do
     "ECtools/zarafa-backup/helpers/Makefile") CONFIG_FILES="$CONFIG_FILES ECtools/zarafa-backup/helpers/Makefile" ;;
     "ECtools/zarafa-report/Makefile") CONFIG_FILES="$CONFIG_FILES ECtools/zarafa-report/Makefile" ;;
     "ECtools/zarafa-msr/Makefile") CONFIG_FILES="$CONFIG_FILES ECtools/zarafa-msr/Makefile" ;;
+    "ECtools/zarafa-ocf/Makefile") CONFIG_FILES="$CONFIG_FILES ECtools/zarafa-ocf/Makefile" ;;
     "ECtools/za-extra/Makefile") CONFIG_FILES="$CONFIG_FILES ECtools/za-extra/Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5 ;;

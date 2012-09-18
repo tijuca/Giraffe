@@ -6,7 +6,7 @@ AC_CONFIG_HEADERS([common/config.h])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_CONFIG_MACRO_DIR([autoconf])
 # because webaccess has too deep dirs for default tar-v7, we need something "better"
-AM_INIT_AUTOMAKE([1.9 foreign tar-ustar])
+AM_INIT_AUTOMAKE([1.10 foreign tar-ustar])
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
 # used in the pkgconfig file
@@ -795,6 +795,7 @@ AC_CONFIG_FILES([
 		ECtools/zarafa-backup/helpers/Makefile
 		ECtools/zarafa-report/Makefile
 		ECtools/zarafa-msr/Makefile
+		ECtools/zarafa-ocf/Makefile
 		ECtools/za-extra/Makefile
 ])
 fi
