@@ -74,9 +74,9 @@ AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
 ETAGS = etags
 CTAGS = ctags
 DIST_SUBDIRS = zarafa-backup zarafa-report zarafa-msr za-extra \
-	zarafa-archiver zarafa-admin zarafa-monitor zarafa-passwd \
-	zarafa-fsck zarafa-cfgchecker zarafa-stats zarafa-search \
-	zarafa-utils
+	zarafa-ocf zarafa-archiver zarafa-admin zarafa-monitor \
+	zarafa-passwd zarafa-fsck zarafa-cfgchecker zarafa-stats \
+	zarafa-search zarafa-utils
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 am__relativize = \
   dir0=`pwd`; \
@@ -300,7 +300,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-@OSS_ONLY_FALSE@PROSUBS = zarafa-backup zarafa-report zarafa-msr za-extra
+@OSS_ONLY_FALSE@PROSUBS = zarafa-backup zarafa-report zarafa-msr za-extra zarafa-ocf
 SUBDIRS = $(PROSUBS) zarafa-archiver zarafa-admin zarafa-monitor zarafa-passwd zarafa-fsck zarafa-cfgchecker zarafa-stats zarafa-search zarafa-utils
 all: all-recursive
 
