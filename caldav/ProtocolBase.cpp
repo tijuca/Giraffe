@@ -125,7 +125,6 @@ HRESULT ProtocolBase::HrInitializeClass()
 	bool blCreateIFNf = false;
 	bool bIsPublic = false;
 	ULONG ulType = 0;
-	ULONG ulDepth = 0;
 	MAPIFolderPtr lpRoot;
 
 	/* URLs
@@ -306,35 +305,28 @@ HRESULT ProtocolBase::HrInitializeClass()
 		vector<string> parts;
 		parts = tokenize(strUrl, '/', true);
 
-		m_lpRequest->HrGetDepth(&ulDepth);
 		m_lpRequest->HrGetHeaderValue("User-Agent", &strAgent);
 
 		// /caldav/
-		// /caldav/username/ (which we return in XML data!), since this isn't a calender, but /caldav/username/Calendar/ is.
+		// /caldav/username/ (which we return in XML data! (and shouldn't)), since this isn't a calender, but /caldav/username/Calendar/ is.
 		if ((strAgent.find("Sunbird/1") != string::npos || strAgent.find("Lightning/1") != string::npos) && parts.size() <= 2) {
 			// Mozilla Sunbird / Lightning doesn't handle listing of calendars, only contents.
 			// We therefore redirect them to the default calendar url.
-			if (parts.empty())
-				parts.push_back("caldav");
-			if (parts.size() == 1)
-				parts.push_back(W2U(m_wstrUser));
-			if (parts.size() < 3) {
-				SPropValuePtr ptrDisplayName;
-				string strLocation = "/" + parts[0] + "/" + parts[1];
+			SPropValuePtr ptrDisplayName;
+			string strLocation = "/caldav/" + urlEncode(m_wstrFldOwner, "utf-8");
 
-				if (HrGetOneProp(m_lpUsrFld, PR_DISPLAY_NAME_W, &ptrDisplayName) == hrSuccess) {
-					std::string part = urlEncode(ptrDisplayName->Value.lpszW, "UTF-8"); 
-					strLocation += "/" + part + "/";
-				} else {
-					// return 404 ?
-					strLocation += "/Calendar/";
-				}
-
-				m_lpRequest->HrResponseHeader(301, "Moved Permanently");
-				m_lpRequest->HrResponseHeader("Location", m_converter.convert_to<string>(strLocation));
-				hr = MAPI_E_NOT_ME;
-				goto exit;
+			if (HrGetOneProp(m_lpUsrFld, PR_DISPLAY_NAME_W, &ptrDisplayName) == hrSuccess) {
+				std::string part = urlEncode(ptrDisplayName->Value.lpszW, "UTF-8"); 
+				strLocation += "/" + part + "/";
+			} else {
+				// return 404 ?
+				strLocation += "/Calendar/";
 			}
+
+			m_lpRequest->HrResponseHeader(301, "Moved Permanently");
+			m_lpRequest->HrResponseHeader("Location", m_converter.convert_to<string>(strLocation));
+			hr = MAPI_E_NOT_ME;
+			goto exit;
 		}
 	}
 

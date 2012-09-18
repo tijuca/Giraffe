@@ -756,14 +756,15 @@ HRESULT HrHandleRequest(ECChannel *lpChannel)
 
 	hr = lpBase->HrInitializeClass();
 	if (hr != hrSuccess) {
-		hr = lpRequest->HrToHTTPCode(hr);
+		if (hr != MAPI_E_NOT_ME)
+			hr = lpRequest->HrToHTTPCode(hr);
 		goto exit;
 	}
 
 	hr = lpBase->HrHandleCommand(strMethod);
 
 exit:
-	if(hr != hrSuccess && !strMethod.empty())
+	if(hr != hrSuccess && !strMethod.empty() && hr != MAPI_E_NOT_ME)
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error processing %s request, error code 0x%08x", strMethod.c_str(), hr);
 
 	if ( lpRequest && hr != MAPI_E_USER_CANCEL ) // do not send response to client if connection closed by client.
