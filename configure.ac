@@ -390,7 +390,7 @@ AC_ARG_WITH(vmime-prefix,
   VMIME_LIBS="-L$VMIME_PREFIX -R$VMIME_PREFIX "
   ],
   [
-  VMIME_PREFIX="-I/usr/include"
+  VMIME_PREFIX="/usr/include"
   ])
 
 # Checks for libvmime

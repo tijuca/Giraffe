@@ -17949,7 +17949,7 @@ if test "${with_vmime_prefix+set}" = set; then :
 
 else
 
-  VMIME_PREFIX="-I/usr/include"
+  VMIME_PREFIX="/usr/include"
 
 fi
 
