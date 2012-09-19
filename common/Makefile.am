@@ -5,7 +5,7 @@ charset_HEADERS = charset/convert.h charset/traits.h charset/utf32string.h chars
 charsetdir = $(includedir)/zarafa/charset
 utf8_HEADERS = utf8/checked.h utf8/core.h utf8/unchecked.h
 utf8dir = $(includedir)/zarafa/utf8
-ustringutil_HEADERS = ustringutil/utf32iter.h ustringutil/utf8iter.h ustringutil/itercomp.h ustringutil/utfutil.h
+ustringutil_HEADERS = ustringutil/utfutil.h
 ustringutildir = $(includedir)/zarafa/ustringutil
 mapiptr_HEADERS = mapi_ptr/mapi_array_ptr.h mapi_ptr/mapi_memory_ptr.h mapi_ptr/mapi_object_ptr.h mapi_ptr/mapi_rowset_ptr.h
 mapiptrdir = $(includedir)/zarafa/mapi_ptr
@@ -94,11 +94,7 @@ libcommon_util_la_SOURCES = platform.cpp			\
 			ConsoleTable.cpp
 
 if HAVE_ICU
-libcommon_util_la_SOURCES += ustringutil/itercomp.cpp	\
-			ustringutil/utf32iter.cpp	\
-			ustringutil/utf8iter.cpp	\
-			ustringutil/utfutil.cpp
-
+libcommon_util_la_SOURCES += ustringutil/utfutil.cpp
 endif
 
 libcommon_ssl_la_LDFLAGS = -static

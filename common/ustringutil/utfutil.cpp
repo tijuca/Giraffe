@@ -50,9 +50,6 @@
 #include "platform.h"
 #include "utfutil.h"
 
-#include "utf8iter.h"
-#include "utf32iter.h"
-
 #include <unicode/ustring.h>
 #include <charset/convert.h>
 
