@@ -289,6 +289,7 @@ Date.prototype.floorHalfhour = function()
 /**
  * Function to ceil timings according to the passed ceil minutes.
  * @param date ceilTimeValue date time which needs to be ceil (5/10/15/30/60 or so on)
+ * @param Boolean checkForDSTChange When set to true it will check whether the new time is not sooner than the original time due to any DST changes
  * @return number Time number which is unixtimestamp of time.
  *
  * Example to understand what the code is actually suppose to do.
@@ -299,11 +300,26 @@ Date.prototype.floorHalfhour = function()
  *			1hr/60min	ceil-10.00
  *
  */ 
-Date.prototype.ceilMinutes = function(ceilTimeValue){
+Date.prototype.ceilMinutes = function(ceilTimeValue, checkForDSTChange){
+	var originalTime = this.getTime();
+
 	var minutes = parseInt(this.getMinutes(),10);
+
 	// when time is XX:00 then there is no need to ceil the time.
 	if(minutes % ceilTimeValue > 0)
 		this.setMinutes((minutes - (minutes % ceilTimeValue)) + ceilTimeValue);
+
+	/* DST fix:
+	 * When the item ends at the end of the day the it will be set to 23:59. When the above line
+	 * of code rounds the minutes up it will set the time to 0:00 the next day. If at that time 
+	 * a DST change happens (like the Brazilian DST change) the time gets set to 23:00. In that
+	 * case it will set the time to before the original time. If that is the case the original time 
+	 * is set again.
+	 */
+	if(checkForDSTChange && this.getTime() < originalTime){
+		this.setTime(originalTime);
+	}
+
 	//Date and Time values is build using the current time which includes seconds and milliseconds as well
 	//so to roundoff the timestamp value completely, set sec and ms to zero.
 	this.setSeconds(0);
@@ -347,6 +363,126 @@ Date.prototype.getDayShortTranslation = function()
 {
 	return DAYS_SHORT[this.getDay()];
 }
+
+/**
+ * Attempts to clear all time information from this Date by setting the time to midnight of the same day,
+ * automatically adjusting for Daylight Saving Time (DST) where applicable.
+ * (note: DST timezone information for the browser's host operating system is assumed to be up-to-date)
+ * @param {Boolean} clone true to create a clone of this date, clear the time and return it (defaults to false).
+ * @return {Date} this or the clone.
+ */
+Date.prototype.clearTime = function(clone) {
+	// get current date before clearing time
+	var d = this.getDate();
+
+	// clear time
+	this.setHours(0);
+	this.setMinutes(0);
+	this.setSeconds(0);
+	this.setMilliseconds(0);
+
+	if (this.getDate() != d) { // account for DST (i.e. day of month changed when setting hour = 0)
+		// note: DST adjustments are assumed to occur in multiples of 1 hour (this is almost always the case)
+		// refer to http://www.timeanddate.com/time/aboutdst.html for the (rare) exceptions to this rule
+
+		// increment hour until cloned date == current date
+		for (var hr = 1, c = this.add(Date.HOUR, hr); c.getDate() != d; hr++, c = this.add(Date.HOUR, hr));
+
+		this.setDate(d);
+		this.setHours(c.getHours());
+	}
+
+	return this;
+}
+
+/**
+ * Provides a convenient method for performing basic date arithmetic. This method
+ * does not modify the Date instance being called - it creates and returns
+ * a new Date instance containing the resulting date value.
+ *
+ * Examples:
+ * <pre><code>
+// Basic usage:
+var dt = new Date('10/29/2006').add(Date.DAY, 5);
+document.write(dt); //returns 'Fri Nov 03 2006 00:00:00'
+
+// Negative values will be subtracted:
+var dt2 = new Date('10/1/2006').add(Date.DAY, -5);
+document.write(dt2); //returns 'Tue Sep 26 2006 00:00:00'
+
+// You can even chain several calls together in one line:
+var dt3 = new Date('10/1/2006').add(Date.DAY, 5).add(Date.HOUR, 8).add(Date.MINUTE, -30);
+document.write(dt3); //returns 'Fri Oct 06 2006 07:30:00'
+</code></pre>
+ *
+ * @param {String} interval A valid date interval enum value.
+ * @param {Number} value The amount to add to the current date.
+ * @return {Date} The new Date instance.
+ */
+Date.prototype.add = function(interval, value) {
+	// Clone Date
+	var d = new Date(this.getTime());
+	if (!interval || value === 0) return d;
+
+	switch(interval.toLowerCase()) {
+		case Date.MILLI:
+			d.setMilliseconds(this.getMilliseconds() + value);
+			break;
+		case Date.SECOND:
+			d.setSeconds(this.getSeconds() + value);
+			break;
+		case Date.MINUTE:
+			d.setMinutes(this.getMinutes() + value);
+			break;
+		case Date.HOUR:
+			d.setHours(this.getHours() + value);
+			break;
+		case Date.DAY:
+			d.setDate(this.getDate() + value);
+			break;
+		case Date.MONTH:
+			var day = this.getDate();
+			if (day > 28) {
+				day = Math.min(day, this.getFirstDateOfMonth().add('mo', value).getLastDateOfMonth().getDate());
+			}
+			d.setDate(day);
+			d.setMonth(this.getMonth() + value);
+			break;
+		case Date.YEAR:
+			d.setFullYear(this.getFullYear() + value);
+			break;
+	}
+	return d;
+}
+
+function crd(hrs, min, day, month, yr){
+	return new Date(yr||2012, month||9, day||21, hrs, min);
+}
+
+Date.MILLI = 'milli';
+Date.SECOND = 'second';
+Date.MINUTE = 'minute';
+Date.HOUR = 'hour';
+Date.DAY = 'day';
+Date.MONTH = 'month';
+Date.YEAR = 'year';
+
+/**
+ * Get the date of the first day of the month in which this date resides.
+ * @return {Date}
+ */
+Date.prototype.getFirstDateOfMonth = function() {
+	return new Date(this.getFullYear(), this.getMonth(), 1);
+}
+
+/**
+ * Get the date of the last day of the month in which this date resides.
+ * @return {Date}
+ */
+Date.prototype.getLastDateOfMonth = function() {
+	return new Date(this.getFullYear(), this.getMonth(), this.getDaysInMonth());
+}
+
 
 /**
  * Function will set the time of timestamp on zero "12-jan-06 14:12" -> "12-jan-06 0:0"
