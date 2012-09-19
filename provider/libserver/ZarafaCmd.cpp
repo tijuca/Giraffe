@@ -2150,6 +2150,20 @@ ECRESULT WriteProps(struct soap *soap, ECSession *lpecSession, ECDatabase *lpDat
 		if (lpfHaveChangeKey && lpPropValArray->__ptr[i].ulPropTag == PR_CHANGE_KEY)
 			*lpfHaveChangeKey = true;
 
+		// check for existing named id
+		if (PROP_ID(lpPropValArray->__ptr[i].ulPropTag) > 0x8500) {
+			ASSERT(lpDBResult == NULL);
+			strQuery = "SELECT id FROM names WHERE id = " + stringify(PROP_ID(lpPropValArray->__ptr[i].ulPropTag) - 0x8501);
+			er = lpDatabase->DoSelect(strQuery, &lpDBResult);
+			if (er != erSuccess)
+				goto exit;
+			if (lpDatabase->GetNumRows(lpDBResult) == 0) {
+				er = ZARAFA_E_INVALID_PARAMETER;
+				goto exit;
+			}
+			lpDatabase->FreeResult(lpDBResult);
+			lpDBResult = NULL;
+		}
 
 		if((PROP_TYPE(lpPropValArray->__ptr[i].ulPropTag) & MV_FLAG) == MV_FLAG) {
 			// Make sure string prop_types become PT_MV_STRING8
