@@ -806,7 +806,7 @@ HRESULT ClientUtil::GetGlobalProfileProperties(LPPROFSECT lpGlobalProfSect, stru
 	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_CONNECTION_TIMEOUT)) != NULL)
 		lpsProfileProps->ulConnectionTimeOut = lpProp->Value.ul;
 	else
-		lpsProfileProps->ulConnectionTimeOut = 120;
+		lpsProfileProps->ulConnectionTimeOut = 10;
 
 	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_OFFLINE_PATH_W)) != NULL)
 		lpsProfileProps->strOfflinePath = convstring::from_SPropValue(lpProp);

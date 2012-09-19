@@ -3862,7 +3862,7 @@ again:
           }
           FD_ZERO(&fds);
           FD_SET(fd, &fds);
-          r = select((int)fd + 1, NULL, &fds, NULL, &timeout);
+          r = select((int)fd + 1, NULL, &fds, &fds, &timeout);
           if (r > 0)
             break;
           if (!r)
