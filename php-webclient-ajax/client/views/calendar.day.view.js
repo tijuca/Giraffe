@@ -771,6 +771,19 @@ CalendarDayView.prototype.createAppointmentElement = function(daysElement, appoi
 		if((starttime * 1000) < this.days[daynr]){
 			starttime = this.days[daynr]/1000;
 		}
+		/* If the due time is set to the start of a day the appointment will last till that point. 
+		 * In the calendar it should show you an appointment that will run till 0:00. 
+		 * When dealing with the Brazilian DST it will shift from 0:00 till 1:00. That means that it
+		 * will render an appointment that is an extra hour as the appointment lasts till 01:00. 
+		 * This check sets the duetime to 23:59 on the same day as the starttime, thus preventing 
+		 * that extra hour from being rendered.
+		 */
+		if(duetime*1000 == new Date(duetime*1000).clearTime().getTime()){
+			var newDueDate = new Date(starttime*1000);
+			newDueDate.setHours(23);
+			newDueDate.setMinutes(59);
+			duetime = newDueDate.getTime()/1000;
+		}
 
 		var start_date = new Date(starttime * 1000);
 		var due_date = new Date(duetime * 1000);
@@ -1396,9 +1409,10 @@ CalendarDayView.prototype.isAllDayItem = function(allDayEvent, startdate, duedat
 		
 		var tempStartTime = new Date(itemStart);
 		tempStartTime.addDays(1);
-		if((new Date(itemStart).toTime() != "00:00") &&
-			(new Date(itemDue).toTime() == "00:00") &&
-			(timeToZero(tempStartTime.getTime()/1000) == timeToZero(itemDue/1000))){
+		// Check whether the start date does not start at the start of a day and the due Date does.
+		if(itemStart !== (new Date(itemStart)).clearTime().getTime() &&
+			itemDue === (new Date(itemDue)).clearTime().getTime() && 
+			(timeToZero(tempStartTime.getTime()/1000) == timeToZero(itemDue/1000)) ) {
 			return false;
 		}else{
 			return true;
@@ -1437,10 +1451,20 @@ CalendarDayView.prototype.isMultiDayAppointment = function(item){
 
 	// check whether item has more than 24 hrs time span or not.
 	var deltaTimeInHours = (new Date(itemDue).getTime() - new Date(itemStart).getTime())/(1000 * 60);
-	if(deltaTimeInHours > 0 && deltaTimeInHours < (this.numberOfHours * 60) && (new Date(itemStart).getDate() != new Date(itemDue).getDate()) &&	isAllDayEvent != 1 && (new Date(itemDue).getHours() != 0 || new Date(itemDue).getMinutes() != 0))
-		return true;
-	else
+	if(deltaTimeInHours > 0 && deltaTimeInHours < (this.numberOfHours * 60) && (new Date(itemStart).getDate() != new Date(itemDue).getDate()) &&	isAllDayEvent != 1){
+		
+		/* Check by clearing the time whether the due date ends on the start of a day. We need to 
+		 * check it like this to work around DST changes like the Brazilian DST that switches at 0:00.
+		 */
+		if(itemDue === (new Date(itemDue)).clearTime().getTime()){
+			return false;
+			
+		}else{
+			return true;
+		}
+	} else {
 		return false;
+	}
 }
 
 /**
