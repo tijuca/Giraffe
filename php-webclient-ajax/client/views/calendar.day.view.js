@@ -117,8 +117,12 @@ CalendarDayView.prototype.setData = function(data)
 	this.selecteddate = data["selecteddate"];
 
 	this.days = new Array();
-	for(var i = new Date(this.startdate); i.getTime() < this.duedate; i.addDays(1))
+	for(var i = new Date(this.startdate); i.getTime() < this.duedate; i=i.add(Date.DAY, 1))
 	{
+		// This fixes the DST where it goes from 0:00 to 01:00.
+		i = i.add(Date.HOUR, 12);
+		i.clearTime();
+
 		this.days.push(i.getTime());
 	}
 	
@@ -460,7 +464,7 @@ CalendarDayView.prototype.addItemWithoutReposition = function(item, properties, 
 				if(itemData["unixtime"]) {
 					// All day event (real all-day event or item which spans multiple days)
 					// Calculate on which day the start date of the item is
-					var day = Math.floor((itemData["unixtime"] - (this.days[0]/1000))/86400);
+					var day = this.getDayIndexByTimestamp(itemData["unixtime"]);
 					result = new Object();
 					result = this.createItem(days, day, itemData);
 				}
@@ -469,6 +473,26 @@ CalendarDayView.prototype.addItemWithoutReposition = function(item, properties, 
 	}
 	return result;
 }
+
+/**
+ * Get the day index of the timestamp that is passed as argument. It will search for the day that 
+ * it matches in the days property. 
+ * @param timestamp Number|String Timestamp to be used
+ * @return Number The day index from the days property
+ */
+CalendarDayView.prototype.getDayIndexByTimestamp = function(timestamp)
+{
+	var date = new Date( parseInt(timestamp,10) * 1000);
+	// Clearing the date object is part of the way to compensate for DST changes that happen during mid-night
+	var clearedTimestamp = date.clearTime().getTime();
+	for(var i=0,len=this.days.length;i<len;i++){
+		if(clearedTimestamp == this.days[i]){
+			return i;
+		}
+	}
+	return 0;
+}
+
 // Called when a single item must be added (ie after adding a new calendar item)
 CalendarDayView.prototype.addItem = function(item, properties, action)
 {
@@ -622,7 +646,7 @@ CalendarDayView.prototype.createItem = function(days, day, itemData){
 			itemSecondElement["startdate"].setAttribute("unixtime", startDateTime.getTime()/1000);
 			itemSecondElement["duedate"].setAttribute("unixtime", new Date(itemDue).getTime()/1000);
 			appointmentElement = dhtml.addElement(days[day+1], "div", false, itemData["elemId"]+"_2");
-			this.createAppointmentElement(days[day+1], appointmentElement, itemData, day, 2);
+			this.createAppointmentElement(days[day+1], appointmentElement, itemData, day+1, 2);
 			result["id"] = [itemData["elemId"]+"_1",itemData["elemId"]+"_2"];
 		}else{
 			this.createAllDayItem(dhtml.addElement(this.alldayElement, "div", false, "" + itemData["elemId"]), itemData);
@@ -739,10 +763,47 @@ CalendarDayView.prototype.createAppointmentElement = function(daysElement, appoi
 			duetime = tmp;
 		}
 
+		/* It can happen that when dealing with the Brazilian DST changes that happen at 0:00 the 
+		 * starttime will be at 23:00 the past day. This check will see if the start of the 
+		 * appointment is before the start of the day. If so it will set the appointment to the 
+		 * start of the day. 
+		 */ 
+		if((starttime * 1000) < this.days[daynr]){
+			starttime = this.days[daynr]/1000;
+		}
+		/* If the due time is set to the start of a day the appointment will last till that point. 
+		 * In the calendar it should show you an appointment that will run till 0:00. 
+		 * When dealing with the Brazilian DST it will shift from 0:00 till 1:00. That means that it
+		 * will render an appointment that is an extra hour as the appointment lasts till 01:00. 
+		 * This check sets the duetime to 23:59 on the same day as the starttime, thus preventing 
+		 * that extra hour from being rendered.
+		 */
+		if(duetime*1000 == new Date(duetime*1000).clearTime().getTime()){
+			var newDueDate = new Date(starttime*1000);
+			newDueDate.setHours(23);
+			newDueDate.setMinutes(59);
+			duetime = newDueDate.getTime()/1000;
+		}
+
 		var start_date = new Date(starttime * 1000);
 		var due_date = new Date(duetime * 1000);
-		
-		appointment.offsetStartTime = start_date.getHours() * 60 + start_date.getMinutes();
+
+		/* When the Brazilian DST changes it happens on 0:00. The timestamp of that day will then 
+		 * start at 01:00 instead of 0:00. The appointment will then start at 01:00 in the view. 
+		 * This check will compensate for that by setting the hours to 0 for calculating the 
+		 * positioning.
+		 */
+		var startHours, startMinutes;
+		if(starttime*1000 == this.days[daynr]){
+			startHours = 0;
+			startMinutes = 0;
+		}else{
+			startHours = start_date.getHours();
+			startMinutes = start_date.getMinutes();
+		}
+
+
+		appointment.offsetStartTime = startHours * 60 + startMinutes;
 		appointment.offsetDay = daynr;
 
 		/**
@@ -755,7 +816,7 @@ CalendarDayView.prototype.createAppointmentElement = function(daysElement, appoi
 				b. start -> 18 minutes
 		 *
 		 */
-		var startDateId = daysElement.id + "_time" + (start_date.getHours() * 60 + (parseInt(start_date.getMinutes()/this.cellDefaultTime) * this.cellDefaultTime));
+		var startDateId = daysElement.id + "_time" + (startHours * 60 + (parseInt(startMinutes/this.cellDefaultTime) * this.cellDefaultTime));
 		
 		/**
 		 * there can be such cases for enddateid.
@@ -829,7 +890,7 @@ CalendarDayView.prototype.createAppointmentElement = function(daysElement, appoi
 		 * 30 and 45.
 		 */
 		barStartDate = barStartDate.floorMinutes(this.cellDefaultTime);
-		barDueDate = barDueDate.ceilMinutes(this.cellDefaultTime);
+		barDueDate = barDueDate.ceilMinutes(this.cellDefaultTime, true);
 
 		// The blockTimeDiff is the number of seconds that the block covers (not the appointment)
 		var blockTimeDiff = barDueDate.getTime() - barStartDate.getTime();
@@ -1238,7 +1299,7 @@ CalendarDayView.prototype.positionItemsOnDay = function(dayElement)
 		 * half hour slot.
 		 */
 		items[i].positionStartTime = (new Date(items[i].start*1000)).floorMinutes(this.cellDefaultTime).getTime()/1000;
-		items[i].positionEndTime = (new Date(items[i].end*1000)).ceilMinutes(this.cellDefaultTime).getTime()/1000;
+		items[i].positionEndTime = (new Date(items[i].end*1000)).ceilMinutes(this.cellDefaultTime, true).getTime()/1000;
 
 		var overlapping = this.getOverLapping(slots, items[i].positionStartTime, items[i].positionEndTime);
 		var maxdepth = 0;
@@ -1348,9 +1409,10 @@ CalendarDayView.prototype.isAllDayItem = function(allDayEvent, startdate, duedat
 		
 		var tempStartTime = new Date(itemStart);
 		tempStartTime.addDays(1);
-		if((new Date(itemStart).toTime() != "00:00") &&
-			(new Date(itemDue).toTime() == "00:00") &&
-			(timeToZero(tempStartTime.getTime()/1000) == timeToZero(itemDue/1000))){
+		// Check whether the start date does not start at the start of a day and the due Date does.
+		if(itemStart !== (new Date(itemStart)).clearTime().getTime() &&
+			itemDue === (new Date(itemDue)).clearTime().getTime() && 
+			(timeToZero(tempStartTime.getTime()/1000) == timeToZero(itemDue/1000)) ) {
 			return false;
 		}else{
 			return true;
@@ -1389,10 +1451,20 @@ CalendarDayView.prototype.isMultiDayAppointment = function(item){
 
 	// check whether item has more than 24 hrs time span or not.
 	var deltaTimeInHours = (new Date(itemDue).getTime() - new Date(itemStart).getTime())/(1000 * 60);
-	if(deltaTimeInHours > 0 && deltaTimeInHours < (this.numberOfHours * 60) && (new Date(itemStart).getDate() != new Date(itemDue).getDate()) &&	isAllDayEvent != 1 && (new Date(itemDue).getHours() != 0 || new Date(itemDue).getMinutes() != 0))
-		return true;
-	else
+	if(deltaTimeInHours > 0 && deltaTimeInHours < (this.numberOfHours * 60) && (new Date(itemStart).getDate() != new Date(itemDue).getDate()) &&	isAllDayEvent != 1){
+		
+		/* Check by clearing the time whether the due date ends on the start of a day. We need to 
+		 * check it like this to work around DST changes like the Brazilian DST that switches at 0:00.
+		 */
+		if(itemDue === (new Date(itemDue)).clearTime().getTime()){
+			return false;
+			
+		}else{
+			return true;
+		}
+	} else {
 		return false;
+	}
 }
 
 /**
