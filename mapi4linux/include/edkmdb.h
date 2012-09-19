@@ -1001,4 +1001,15 @@ public:
     virtual HRESULT __stdcall DelFavorites(LPENTRYLIST lpEntryList) = 0;
 };
 
+/* New from Outlook 2010 MAPI Extension */
+class IMAPIGetSession : public IUnknown {
+public:
+    //    virtual ~IMAPIGetSession() = 0;
+
+	virtual HRESULT __stdcall GetMAPISession(LPUNKNOWN *lppSession) = 0;
+};
+
+typedef IMAPIGetSession* LPMAPIGETSESSION;
+
+
 #endif

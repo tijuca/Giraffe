@@ -105,8 +105,6 @@
  */
 class IMAPISupport;
 typedef IMAPISupport* LPMAPISUP;
-class IMAPIGetSession;
-typedef IMAPIGetSession* LPMAPIGETSESSION;
 
 /*
  * IMAPISupport Interface
@@ -265,15 +263,6 @@ public:
     virtual HRESULT IStorageFromStream(LPUNKNOWN lpUnkIn, LPCIID lpInterface, ULONG ulFlags, LPSTORAGE * lppStorageOut) = 0; 
     virtual HRESULT GetSvcConfigSupportObj(ULONG ulFlags, LPMAPISUP * lppSvcSupport) = 0;
 };
-
-/* New from Outlook 2010 MAPI Extension */
-class IMAPIGetSession : public IUnknown {
-public:
-    //    virtual ~IMAPIGetSession() = 0;
-
-	virtual HRESULT GetMAPISession(LPUNKNOWN *lppSession) = 0;
-};
-
 
 /********************************************************************/
 /*                                                                  */

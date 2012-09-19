@@ -57,6 +57,7 @@
 #include "m4l.mapisvc.h"
 #include <mapispi.h>
 #include <mapix.h>
+#include <edkmdb.h>
 
 typedef struct m4lsupportadvise {
 	m4lsupportadvise(LPNOTIFKEY lpKey, ULONG ulEventMask, ULONG ulFlags, LPMAPIADVISESINK lpAdviseSink)
