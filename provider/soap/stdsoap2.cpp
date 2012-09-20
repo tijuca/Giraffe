@@ -3851,6 +3851,7 @@ again:
         for (;;)
         { struct timeval timeout;
           fd_set fds;
+          fd_set exfds;
           register int r;
           if (soap->connect_timeout > 0)
           { timeout.tv_sec = soap->connect_timeout;
@@ -3862,7 +3863,9 @@ again:
           }
           FD_ZERO(&fds);
           FD_SET(fd, &fds);
-          r = select((int)fd + 1, NULL, &fds, &fds, &timeout);
+          FD_ZERO(&exfds);
+          FD_SET(fd, &exfds);
+          r = select((int)fd + 1, NULL, &fds, &exfds, &timeout);
           if (r > 0)
             break;
           if (!r)
