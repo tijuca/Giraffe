@@ -402,48 +402,83 @@ Date.prototype.clearTime = function(clone) {
  *
  * Examples:
  * <pre><code>
-// Basic usage:
-var dt = new Date('10/29/2006').add(Date.DAY, 5);
-document.write(dt); //returns 'Fri Nov 03 2006 00:00:00'
+	// Basic usage:
+	var dt = new Date('10/29/2006').add(Date.DAY, 5);
+	document.write(dt); //returns 'Fri Nov 03 2006 00:00:00'
 
-// Negative values will be subtracted:
-var dt2 = new Date('10/1/2006').add(Date.DAY, -5);
-document.write(dt2); //returns 'Tue Sep 26 2006 00:00:00'
+	// Negative values will be subtracted:
+	var dt2 = new Date('10/1/2006').add(Date.DAY, -5);
+	document.write(dt2); //returns 'Tue Sep 26 2006 00:00:00'
 
-// You can even chain several calls together in one line:
-var dt3 = new Date('10/1/2006').add(Date.DAY, 5).add(Date.HOUR, 8).add(Date.MINUTE, -30);
-document.write(dt3); //returns 'Fri Oct 06 2006 07:30:00'
-</code></pre>
+	// You can even chain several calls together in one line:
+	var dt3 = new Date('10/1/2006').add(Date.DAY, 5).add(Date.HOUR, 8).add(Date.MINUTE, -30);
+	document.write(dt3); //returns 'Fri Oct 06 2006 07:30:00'
+ * </code></pre>
+ *
+ * Furthermore, changes to {@link Date#HOUR hours}, {@link Date#MINUTE minutes},
+ * {@link Date#SECOND seconds} and {@link Date#MILLI milliseconds} are treated more accurately
+ * regarding DST changes then the {@link Date#DAY days}, {@link Date#MONTH months} and {@link Date#YEAR years}
+ * changes. When changing the time the standard is applied, which means that if the DST kicks in at 2AM,
+ * and the time becomes 3AM. Doing new Date('Mar 25 2012 01:00').add(Date.HOUR, 1) will be 'Mar 25 2012 03:00'.
+ * However when changing the date, we will use the JS behavior, which means that
+ * new Date('Mar 24 2012 02:00').add(Date.DAY, 1) could become 'Mar 25 2012 01:00' as JS will not correctly
+ * move the time correctly passed the DST switch.
  *
  * @param {String} interval A valid date interval enum value.
  * @param {Number} value The amount to add to the current date.
  * @return {Date} The new Date instance.
  */
-Date.prototype.add = function(interval, value) {
+Date.prototype.add = function(interval, value)
+{
 	// Clone Date
 	var d = new Date(this.getTime());
-	if (!interval || value === 0) return d;
+	if (!interval || value === 0) {
+		return d;
+	}
 
 	switch(interval.toLowerCase()) {
-		case Date.MILLI:
-			d.setMilliseconds(this.getMilliseconds() + value);
-			break;
-		case Date.SECOND:
-			d.setSeconds(this.getSeconds() + value);
-			break;
-		case Date.MINUTE:
-			d.setMinutes(this.getMinutes() + value);
-			break;
+		// Changing the time is done more accuretely then
+		// changing the date. This is because we have to work
+		// around DST issues (which we don't care for when
+		// changing the day). In JS, we have the following
+		// scenario at the following date: Mar 25 2012.
+		// At 2:00:00 the DST kicks in and the time will be
+		//     Mar 25 2012 03:00:00
+		// However, when using setMilliseconds, setSeconds,
+		// setMinutes or setHours, JS decides to wrap back
+		// to:
+		// 	Mar 25 2012 01:00:00
+		// How can this go wrong, take the following date:
+		//      a = new Date('Mar 25 2012 01:45:00')
+		// add 30 minutes to it
+		//      a.setMinutes(a.getMinutes() + 30)
+		// we expect the time to be 03:15:00 however JS
+		// decides to fall back to 01:15:00.
+		// To fix this correctly, we have to work using timestamps
+		// as JS is able to correctly step over the DST switch.
 		case Date.HOUR:
-			d.setHours(this.getHours() + value);
+			// Convert value to minutes
+			value *= 60;
+		case Date.MINUTE:
+			// Convert value to seconds
+			value *= 60;
+		case Date.SECOND:
+			// Convert value to milliseconds
+			value *= 1000;
+		case Date.MILLI:
+			d = new Date(d.getTime() + value);
 			break;
+		// Changing the date is done with less accuracy,
+		// basically we don't care if we come at exactly
+		// the same time as before. If the JS decides to
+		// perform weird tricks, then so be it.
 		case Date.DAY:
 			d.setDate(this.getDate() + value);
 			break;
 		case Date.MONTH:
 			var day = this.getDate();
 			if (day > 28) {
-				day = Math.min(day, this.getFirstDateOfMonth().add('mo', value).getLastDateOfMonth().getDate());
+				day = Math.min(day, this.getFirstDateOfMonth().add(Date.MONTH, value).getLastDateOfMonth().getDate());
 			}
 			d.setDate(day);
 			d.setMonth(this.getMonth() + value);
@@ -453,10 +488,6 @@ Date.prototype.add = function(interval, value) {
 			break;
 	}
 	return d;
-}
-
-function crd(hrs, min, day, month, yr){
-	return new Date(yr||2012, month||9, day||21, hrs, min);
 }
 
 Date.MILLI = 'milli';
