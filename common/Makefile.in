@@ -36,11 +36,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-@HAVE_ICU_TRUE@am__append_1 = ustringutil/itercomp.cpp	\
-@HAVE_ICU_TRUE@			ustringutil/utf32iter.cpp	\
-@HAVE_ICU_TRUE@			ustringutil/utf8iter.cpp	\
-@HAVE_ICU_TRUE@			ustringutil/utfutil.cpp
-
+@HAVE_ICU_TRUE@am__append_1 = ustringutil/utfutil.cpp
 subdir = common
 DIST_COMMON = $(charset_HEADERS) $(libcommon_mapi_la_include_HEADERS) \
 	$(mapiptr_HEADERS) $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
@@ -120,10 +116,8 @@ am__libcommon_util_la_SOURCES_DIST = platform.cpp platform.linux.cpp \
 	charset/localeutil.cpp TimeUtil.cpp RecurrenceState.cpp \
 	ECGetText.cpp threadutil.cpp ECRestriction.cpp userutil.cpp \
 	ECFeatures.cpp ECACL.cpp fileutil.cpp ECThreadPool.cpp \
-	ustringutil/itercomp.cpp ustringutil/utf32iter.cpp \
-	ustringutil/utf8iter.cpp ustringutil/utfutil.cpp
-@HAVE_ICU_TRUE@am__objects_1 = itercomp.lo utf32iter.lo utf8iter.lo \
-@HAVE_ICU_TRUE@	utfutil.lo
+	ustringutil/utfutil.cpp
+@HAVE_ICU_TRUE@am__objects_1 = utfutil.lo
 am_libcommon_util_la_OBJECTS = platform.lo platform.linux.lo md5.lo \
 	base64.lo ECLogger.lo ECConfig.lo ECConfigImpl.lo \
 	ECFifoBuffer.lo ECSerializer.lo ECCache.lo my_getopt.lo \
@@ -380,7 +374,7 @@ charset_HEADERS = charset/convert.h charset/traits.h charset/utf32string.h chars
 charsetdir = $(includedir)/zarafa/charset
 utf8_HEADERS = utf8/checked.h utf8/core.h utf8/unchecked.h
 utf8dir = $(includedir)/zarafa/utf8
-ustringutil_HEADERS = ustringutil/utf32iter.h ustringutil/utf8iter.h ustringutil/itercomp.h ustringutil/utfutil.h
+ustringutil_HEADERS = ustringutil/utfutil.h
 ustringutildir = $(includedir)/zarafa/ustringutil
 mapiptr_HEADERS = mapi_ptr/mapi_array_ptr.h mapi_ptr/mapi_memory_ptr.h mapi_ptr/mapi_object_ptr.h mapi_ptr/mapi_rowset_ptr.h
 mapiptrdir = $(includedir)/zarafa/mapi_ptr
@@ -579,7 +573,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/convstring.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/favoritesutil.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fileutil.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/itercomp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/localeutil.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/md5.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/my_getopt.Plo@am__quote@
@@ -591,8 +584,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/traits.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/userutil.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ustringutil.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utf32iter.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utf8iter.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utfutil.Plo@am__quote@
 
 .cpp.o:
@@ -650,30 +641,6 @@ localeutil.lo: charset/localeutil.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='charset/localeutil.cpp' object='localeutil.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o localeutil.lo `test -f 'charset/localeutil.cpp' || echo '$(srcdir)/'`charset/localeutil.cpp
-
-itercomp.lo: ustringutil/itercomp.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT itercomp.lo -MD -MP -MF $(DEPDIR)/itercomp.Tpo -c -o itercomp.lo `test -f 'ustringutil/itercomp.cpp' || echo '$(srcdir)/'`ustringutil/itercomp.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/itercomp.Tpo $(DEPDIR)/itercomp.Plo
-@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='ustringutil/itercomp.cpp' object='itercomp.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o itercomp.lo `test -f 'ustringutil/itercomp.cpp' || echo '$(srcdir)/'`ustringutil/itercomp.cpp
-
-utf32iter.lo: ustringutil/utf32iter.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT utf32iter.lo -MD -MP -MF $(DEPDIR)/utf32iter.Tpo -c -o utf32iter.lo `test -f 'ustringutil/utf32iter.cpp' || echo '$(srcdir)/'`ustringutil/utf32iter.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utf32iter.Tpo $(DEPDIR)/utf32iter.Plo
-@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='ustringutil/utf32iter.cpp' object='utf32iter.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o utf32iter.lo `test -f 'ustringutil/utf32iter.cpp' || echo '$(srcdir)/'`ustringutil/utf32iter.cpp
-
-utf8iter.lo: ustringutil/utf8iter.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT utf8iter.lo -MD -MP -MF $(DEPDIR)/utf8iter.Tpo -c -o utf8iter.lo `test -f 'ustringutil/utf8iter.cpp' || echo '$(srcdir)/'`ustringutil/utf8iter.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/utf8iter.Tpo $(DEPDIR)/utf8iter.Plo
-@am__fastdepCXX_FALSE@	$(AM_V_CXX) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='ustringutil/utf8iter.cpp' object='utf8iter.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o utf8iter.lo `test -f 'ustringutil/utf8iter.cpp' || echo '$(srcdir)/'`ustringutil/utf8iter.cpp
 
 utfutil.lo: ustringutil/utfutil.cpp
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT utfutil.lo -MD -MP -MF $(DEPDIR)/utfutil.Tpo -c -o utfutil.lo `test -f 'ustringutil/utfutil.cpp' || echo '$(srcdir)/'`ustringutil/utfutil.cpp

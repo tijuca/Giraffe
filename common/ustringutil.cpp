@@ -109,10 +109,7 @@ At some point we need to rewqrite these functions to do all the conversion on th
 #include <unicode/normlzr.h>
 #include <unicode/ustring.h>
 
-#include "ustringutil/utf32iter.h"
-#include "ustringutil/utf8iter.h"
 #include "ustringutil/utfutil.h"
-#include "ustringutil/itercomp.h"
 
 typedef UTF32Iterator	WCharIterator;
 
@@ -320,7 +317,13 @@ int str_compare(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s2);
 	
 #if HAVE_ICU
-	return ic_compare(MakeIterator(s1), MakeIterator(s2), locale, false);
+	UErrorCode status = U_ZERO_ERROR;
+	std::auto_ptr<Collator> ptrCollator(Collator::createInstance(locale, status));
+
+	UnicodeString a = StringToUnicode(s1);
+	UnicodeString b = StringToUnicode(s2);
+
+	return ptrCollator->compare(a,b,status);
 #else
 	int r = strcmp(s1, s2);
 	return (r < 0 ? -1 : (r > 0 ? 1 : 0));
@@ -350,7 +353,16 @@ int str_icompare(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s2);
 	
 #if HAVE_ICU
-	return ic_compare(MakeIterator(s1), MakeIterator(s2), locale, true);
+	UErrorCode status = U_ZERO_ERROR;
+	std::auto_ptr<Collator> ptrCollator(Collator::createInstance(locale, status));
+
+	UnicodeString a = StringToUnicode(s1);
+	UnicodeString b = StringToUnicode(s2);
+
+	a.foldCase();
+	b.foldCase();
+
+	return ptrCollator->compare(a,b,status);
 #else
 	int r = strcasecmp_l(s1, s2, locale);
 	return (r < 0 ? -1 : (r > 0 ? 1 : 0));
@@ -546,7 +558,13 @@ int wcs_compare(const wchar_t *s1, const wchar_t *s2, const ECLocale &locale)
 	assert(s2);
 	
 #if HAVE_ICU
-	return ic_compare(WCharIterator((UChar32*)s1), WCharIterator((UChar32*)s2), locale, false);
+	UErrorCode status = U_ZERO_ERROR;
+	std::auto_ptr<Collator> ptrCollator(Collator::createInstance(locale, status));
+
+	UnicodeString a = UTF32ToUnicode((UChar32*)s1);
+	UnicodeString b = UTF32ToUnicode((UChar32*)s2);
+
+	return ptrCollator->compare(a,b,status);
 #else
 	int r = wcscmp(s1, s2);
 	return (r < 0 ? -1 : (r > 0 ? 1 : 0));
@@ -576,7 +594,16 @@ int wcs_icompare(const wchar_t *s1, const wchar_t *s2, const ECLocale &locale)
 	assert(s2);
 	
 #if HAVE_ICU
-	return ic_compare(WCharIterator((UChar32*)s1), WCharIterator((UChar32*)s2), locale, true);
+	UErrorCode status = U_ZERO_ERROR;
+	std::auto_ptr<Collator> ptrCollator(Collator::createInstance(locale, status));
+
+	UnicodeString a = WCHARToUnicode(s1);
+	UnicodeString b = WCHARToUnicode(s2);
+
+	a.foldCase();
+	b.foldCase();
+
+	return ptrCollator->compare(a,b,status);
 #else
 	int r = wcscasecmp_l(s1, s2, locale);
 	return (r < 0 ? -1 : (r > 0 ? 1 : 0));
@@ -797,7 +824,13 @@ int u8_compare(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s2);
 
 #if HAVE_ICU
-	return ic_compare(UTF8Iterator((uint8_t*)s1), UTF8Iterator((uint8_t*)s2), locale, false);
+	UErrorCode status = U_ZERO_ERROR;
+	std::auto_ptr<Collator> ptrCollator(Collator::createInstance(locale, status));
+
+	UnicodeString a = UTF8ToUnicode(s1);
+	UnicodeString b = UTF8ToUnicode(s2);
+
+	return ptrCollator->compare(a,b,status);
 #else
 	convert_context converter;
 	const wchar_t *ws1 = converter.convert_to<WCHAR*>(s1, rawsize(s1), "UTF-8");
@@ -829,7 +862,16 @@ int u8_icompare(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s2);
 	
 #if HAVE_ICU
-	return ic_compare(UTF8Iterator((uint8_t*)s1), UTF8Iterator((uint8_t*)s2), locale, true);
+	UErrorCode status = U_ZERO_ERROR;
+	std::auto_ptr<Collator> ptrCollator(Collator::createInstance(locale, status));
+
+	UnicodeString a = UTF8ToUnicode(s1);
+	UnicodeString b = UTF8ToUnicode(s2);
+	
+	a.foldCase();
+	b.foldCase();
+
+	return ptrCollator->compare(a,b,status);
 #else
 	convert_context converter;
 	const wchar_t *ws1 = converter.convert_to<WCHAR*>(s1, rawsize(s1), "UTF-8");
