@@ -89,8 +89,12 @@ function CalendarMonthView(moduleID, element, events, data)
 	
 	this.days = new Array();
 
-	for(var i = new Date(this.startdate); i.getTime() < this.duedate; i.addDays(1))
+	for(var i = new Date(this.startdate); i.getTime() < this.duedate; i=i.add(Date.DAY, 1))
 	{
+		// This fixes the DST where it goes from 0:00 to 01:00.
+		i = i.add(Date.HOUR, 12);
+		i.clearTime();
+
 		this.days.push(i.getTime());
 	}
 }
@@ -140,6 +144,8 @@ CalendarMonthView.prototype.initView = function()
 	firstDayOfTheView = firstDayOfTheView.getStartDateOfWeek();
 	
 	currentDay = firstDayOfTheView;
+	currentDay.clearTime();
+
 	
 	this.tableElement = dhtml.addElement(false, "div","month","");
 	
@@ -202,7 +208,10 @@ CalendarMonthView.prototype.initView = function()
 			dhtml.addEvent(this.moduleID,dayElement,"dblclick",eventCalendarContextMenuClickCreateAppointment);
 			//end day number
 			
-			currentDay.addDays(1);
+			currentDay = currentDay.add(Date.DAY, 1);
+			// This fixes the DST where it goes from 0:00 to 01:00.
+			currentDay = currentDay.add(Date.HOUR, 12);
+			currentDay.clearTime();
 		}
 	}
 }
@@ -365,15 +374,9 @@ CalendarMonthView.prototype.createItem = function(item,element)
 	var AppointmentElement;
 	
 	var today = new Date(startDate);
+	today.clearTime();
 	var endday = new Date(dueDate);
-	today.setHours(0);
-	today.setMinutes(0);
-	today.setSeconds(0);
-	today.setMilliseconds(0);
-	endday.setHours(0);
-	endday.setMinutes(0);
-	endday.setSeconds(0);
-	endday.setMilliseconds(0);
+	endday.clearTime();
 	
 	// Treat the item as an 'allday' event if it starts on a different day than it ends
 	var alldayevent = today.getTime() != endday.getTime();
@@ -475,7 +478,10 @@ CalendarMonthView.prototype.createItem = function(item,element)
 			}
 		}
 		// add one_day for more day event
-		today.addDays(1);
+		today = today.add(Date.DAY, 1);
+		// This fixes the DST where it goes from 0:00 to 01:00.
+		today = today.add(Date.HOUR, 12);
+		today.clearTime();
 	}
 
 	return entry;

@@ -128,6 +128,7 @@ CalendarWeekView.prototype.initView = function()
 	
 	// add header info
 	var tmpStart = new Date(this.selecteddate).getStartDateOfWeek();
+	tmpStart.clearTime();
 	for(var i=0;i < this.dayElements.length;i++){
 		this.dayElements[i].element.id = "day_"+this.moduleID+"_"+(tmpStart.getTime()/1000);
 		this.dayElements[i].element.setAttribute("unixtime",(tmpStart.getTime()/1000));
@@ -149,7 +150,10 @@ CalendarWeekView.prototype.initView = function()
 		dhtml.addEvent(this.moduleID,this.dayElements[i].element,"contextmenu",eventShowCreateAppointmentContextMenu);
 		dhtml.addEvent(this.moduleID,this.dayElements[i].element,"dblclick",eventCalendarContextMenuClickCreateAppointment);
 
-		tmpStart.addDays(1);
+		tmpStart = tmpStart.add(Date.DAY, 1);
+		// This fixes the DST where it goes from 0:00 to 01:00.
+		tmpStart = tmpStart.add(Date.HOUR, 12);
+		tmpStart.clearTime();
 	}
 
 	// week picker
@@ -303,19 +307,12 @@ CalendarWeekView.prototype.createItem = function(item, element)
 	var privateAppointment = dhtml.getXMLValue(item, "private", 0);
 	var privateSensitivity = dhtml.getXMLValue(item, "sensitivity", 0);
 
-	var today = new Date(startDate);
-	var endday = new Date(dueDate);
-	
 	var AppointmentElement;
 	
-	today.setHours(0);
-	today.setMinutes(0);
-	today.setSeconds(0);
-	today.setMilliseconds(0);
-	endday.setHours(0);
-	endday.setMinutes(0);
-	endday.setSeconds(0);
-	endday.setMilliseconds(0);
+	var today = new Date(startDate);
+	today.clearTime();
+	var endday = new Date(dueDate);
+	endday.clearTime();
 	
 	var alldayevent = today.getTime() != endday.getTime();
 
@@ -418,9 +415,13 @@ CalendarWeekView.prototype.createItem = function(item, element)
 				entry["id"] = entryid+"_"+unixTimeId;
 				entry["entryid"] = entryid;
 			}
-		}		// add one_day for more day event
-		today.addDays(1);
-	
+		}
+		
+		// add one_day for more day event
+		today = today.add(Date.DAY, 1);
+		// This fixes the DST where it goes from 0:00 to 01:00.
+		today = today.add(Date.HOUR, 12);
+		today.clearTime();
 	}
 	return entry;
 }
