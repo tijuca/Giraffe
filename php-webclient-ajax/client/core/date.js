@@ -993,7 +993,7 @@ function getTimeZone()
     t.setDate(1);
     t.setMonth(0);
     // Look up the first sunday of this year
-    t.setDate(t.getNextWeekDay(0).getDate());
+    t = t.getNextWeekDay(0);
 
     t.setHours(5);
     // Use 5:00 am because any change should have happened by then
