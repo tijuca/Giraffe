@@ -68,11 +68,11 @@ class utf8string;
 class WSMAPIFolderOps : public ECUnknown
 {
 protected:
-	WSMAPIFolderOps(ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport);
+	WSMAPIFolderOps(ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport);
 	virtual ~WSMAPIFolderOps();
 
 public:
-	static HRESULT Create(ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport, WSMAPIFolderOps **lppFolderOps);
+	static HRESULT Create(ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport, WSMAPIFolderOps **lppFolderOps);
 
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
 	
@@ -115,7 +115,7 @@ private:
 private:
 	entryId			m_sEntryId;		// Entryid of the folder
 	ZarafaCmd*		lpCmd;			// command object
-	pthread_mutex_t	mDataLock;		//
+	pthread_mutex_t *lpDataLock;		//
 	ECSESSIONID		ecSessionId;	// Id of the session
 	ULONG			m_ulSessionReloadCallback;
 	WSTransport *	m_lpTransport;

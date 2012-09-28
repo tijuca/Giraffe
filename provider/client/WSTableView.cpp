@@ -79,13 +79,13 @@ static char THIS_FILE[] = __FILE__;
 	if(hr != hrSuccess) \
 		goto exit;
 
-WSTableView::WSTableView(ULONG ulType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport, char *szClassName) : ECUnknown(szClassName)
+WSTableView::WSTableView(ULONG ulType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport, char *szClassName) : ECUnknown(szClassName)
 {
 	this->ulType = ulType;
 	this->ulFlags = ulFlags;
 
 	this->lpCmd = lpCmd;
-	this->mDataLock = mDataLock;
+	this->lpDataLock = lpDataLock;
 	this->ecSessionId = ecSessionId;
 	this->ulTableId = 0;
 	this->m_lpTransport = lpTransport;
@@ -778,7 +778,7 @@ exit:
 //FIXME: one lock/unlock function
 HRESULT WSTableView::LockSoap()
 {
-	pthread_mutex_lock(&mDataLock);
+	pthread_mutex_lock(lpDataLock);
 	return erSuccess;
 }
 
@@ -788,7 +788,7 @@ HRESULT WSTableView::UnLockSoap()
 	if(lpCmd->soap)
 		soap_end(lpCmd->soap);
 
-	pthread_mutex_unlock(&mDataLock);
+	pthread_mutex_unlock(lpDataLock);
 	return erSuccess;
 }
 
@@ -830,17 +830,17 @@ HRESULT WSTableView::SetReloadCallback(RELOADCALLBACK callback, void *lpParam)
 //////////////////////////////////////////////
 // WSTableOutGoingQueue view
 //
-WSTableOutGoingQueue::WSTableOutGoingQueue(ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport) : WSStoreTableView(MAPI_MESSAGE, 0, lpCmd, mDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport)
+WSTableOutGoingQueue::WSTableOutGoingQueue(ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport) : WSStoreTableView(MAPI_MESSAGE, 0, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport)
 {
 
 }
 
-HRESULT WSTableOutGoingQueue::Create(ZarafaCmd *lpCmd, pthread_mutex_t mDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport, WSTableOutGoingQueue **lppTableOutGoingQueue)
+HRESULT WSTableOutGoingQueue::Create(ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport, WSTableOutGoingQueue **lppTableOutGoingQueue)
 {
 	HRESULT hr = hrSuccess;
 	WSTableOutGoingQueue *lpTableOutGoingQueue = NULL; 
 
-	lpTableOutGoingQueue = new WSTableOutGoingQueue(lpCmd, mDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport);
+	lpTableOutGoingQueue = new WSTableOutGoingQueue(lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport);
 
 	hr = lpTableOutGoingQueue->QueryInterface(IID_ECTableOutGoingQueue, (void **) lppTableOutGoingQueue);
 	
