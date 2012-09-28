@@ -754,6 +754,47 @@ Date.prototype.simpleDiffString = function(otherDate, futureString, pastString)
 }
 
 /**
+ * Get the next given weekday starting from this date. If the current date is this weekday,
+ * then the current day will be returned.
+ * @param {Number} weekday The day in the week to skip to (0: Sunday -  6: Saturday). If
+ * not given, tomorrow will be returned.
+ * @return {Date} this or the clone
+ */
+Date.prototype.getNextWeekDay = function(weekday)
+{
+	var currentday = this.getDay();
+
+	if (typeof weekday === 'undefined') {
+		return this.add(Date.DAY, 1);
+	} else if (weekday < currentday) {
+		return this.add(Date.DAY, 7 - (currentday - weekday));
+	} else {
+		return this.add(Date.DAY, weekday - currentday);
+	}
+}
+
+/**
+ * Get the previous given weekday starting from this date. If the current date is this weekday,
+ * then the current day will be returned.
+ * @param {Number} weekday The day in the week to skip to (0: Sunday -  6: Saturday). If
+ * not given, yesterday will be returned.
+ * @return {Date} this or the clone
+ */
+Date.prototype.getPreviousWeekDay = function(weekday)
+{
+	var currentday = this.getDay();
+
+	if (typeof weekday === 'undefined') {
+		return this.add(Date.DAY, -1);
+	} else if (weekday <= currentday) {
+		return this.add(Date.DAY, weekday - currentday);
+	} else {
+		return this.add(Date.DAY, -7 + (weekday - currentday));
+	}
+}
+
+
+/**
 * Returns a human readable string for duration property
 * @param		duration		number		duration in minutes
 * @return		result			string		human readable duration string
@@ -949,11 +990,11 @@ function getTimeZone()
     
     var tz = new Object();
     
-    // We use the year 2000 to do the testing. No special reason.
-    t.setYear(2000);
-    t.setDate(2);
+    t.setDate(1);
     t.setMonth(0);
-    // Jan 2, 2000 was a sunday
+    // Look up the first sunday of this year
+    t.setDate(t.getNextWeekDay(0).getDate());
+
     t.setHours(5);
     // Use 5:00 am because any change should have happened by then
     t.setMinutes(0);
