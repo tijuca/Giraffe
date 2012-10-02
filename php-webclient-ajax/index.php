@@ -191,10 +191,10 @@
 				// if action attributes are passed in POST variable then append it to URL for
 				// further processing
 				$url = "index.php" . $_POST["action_url"];
-				header("Refresh: 0; url=$url");
+				header("Location: $url", true, 303);
 				exit;
 			} else {
-				header("Refresh: 0; url=index.php");
+				header("Location: index.php", true, 303);
 				exit;
 			}
 		}
