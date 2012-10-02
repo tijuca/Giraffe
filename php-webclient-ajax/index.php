@@ -122,7 +122,7 @@
 		}
 		session_destroy();
 
-		header("Refresh: 0; url=index.php");
+		header("Location: index.php", true, 303);
 		exit;
 	}
 
