@@ -54,7 +54,7 @@
 
 #include <boost/filesystem.hpp>
 
-#if !defined(BOOST_FILESYSTEM_VERSION) || BOOST_FILESYSTEM_VERION == 2
+#if !defined(BOOST_FILESYSTEM_VERSION) || BOOST_FILESYSTEM_VERSION == 2
 
 static inline std::string path_to_string(const boost::filesystem::path &p) {
     return p.file_string();
