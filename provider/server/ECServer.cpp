@@ -407,6 +407,33 @@ exit:
 	return er;
 }
 
+ECRESULT check_attachment_storage_permissions()
+{
+	ECRESULT er = erSuccess;
+
+	FILE *tmpfile = NULL;
+	string strtestpath;
+
+	if (strcmp(g_lpConfig->GetSetting("attachment_storage"), "files") == 0) {
+		strtestpath = g_lpConfig->GetSetting("attachment_path");
+		strtestpath += "/testfile";
+
+		tmpfile = fopen(strtestpath.c_str(), "w");
+		if (!tmpfile) {
+			 g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to write attachments to the directory '%s' - %s. Please check the directory and sub directories.",  g_lpConfig->GetSetting("attachment_path"), strerror(errno));
+			 er = ZARAFA_E_NO_ACCESS;
+			 goto exit;
+		}
+	}
+exit:
+	if (tmpfile) {
+		fclose(tmpfile);
+		unlink(strtestpath.c_str());
+	}
+
+	return er;
+}
+
 ECRESULT check_database_tproperties_key(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
@@ -1264,6 +1291,12 @@ int running_server(char *szName, const char *szConfig)
 	er = check_database_attachments(lpDatabase);
 	if (er != erSuccess)
 		goto exit;
+
+	// check you can write into the file attachment storage
+	er = check_attachment_storage_permissions();
+	if (er != erSuccess)
+		goto exit;
+
 
 	// check upgrade problem with wrong sequence in tproperties table primary key
 	er = check_database_tproperties_key(lpDatabase);

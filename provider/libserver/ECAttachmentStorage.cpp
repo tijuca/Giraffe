@@ -1454,6 +1454,7 @@ ECRESULT ECFileAttachment::SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPr
 	if (m_bFileCompression && iSize) {
 		gzFile gzfp = gzopen(filename.c_str(), std::string("wb" + m_CompressionLevel).c_str());
 		if (!gzfp) {
+			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to write attachment '%s' - %s.", filename.c_str(), strerror(errno));
 			er = ZARAFA_E_DATABASE_ERROR;
 			goto exit;
 		}
@@ -1462,6 +1463,7 @@ ECRESULT ECFileAttachment::SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPr
 	} else {
 		FILE *f = fopen(filename.c_str(), "w");
 		if (!f) {
+			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to write attachment '%s' - %s.", filename.c_str(), strerror(errno));
 			er = ZARAFA_E_DATABASE_ERROR;
 			goto exit;
 		}
@@ -1508,6 +1510,7 @@ ECRESULT ECFileAttachment::SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPr
 	if (m_bFileCompression) {
 		gzFile gzfp = gzopen(filename.c_str(), std::string("wb" + m_CompressionLevel).c_str());
 		if (!gzfp) {
+			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to write attachment '%s' - %s.", filename.c_str(), strerror(errno));
 			er = ZARAFA_E_DATABASE_ERROR;
 			goto exit;
 		}
@@ -1534,6 +1537,7 @@ ECRESULT ECFileAttachment::SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPr
 	} else {
 		FILE *f = fopen(filename.c_str(), "w");
 		if (!f) {
+			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to write attachment '%s' - %s.", filename.c_str(), strerror(errno));
 			er = ZARAFA_E_DATABASE_ERROR;
 			goto exit;
 		}
