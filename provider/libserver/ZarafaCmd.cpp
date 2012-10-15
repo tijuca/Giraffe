@@ -9114,13 +9114,14 @@ SOAP_ENTRY_END()
 SOAP_ENTRY_START(unhookStore, *result, unsigned int ulStoreType, entryId sUserId, unsigned int ulSyncId, unsigned int *result)
 {
 	unsigned int	ulUserId = 0;
-	objectid_t		sExternId;
 	unsigned int	ulAffected = 0;
+	std::string		strGUID = "Unknown";
 
 	USE_DATABASE();
 
-	// sExternId class is only a hint, given from mapi type. but it's all we need here.
-	er = ABEntryIDToID(&sUserId, &ulUserId, &sExternId, NULL);
+	// do not use GetLocalId since the user may exist on a different server,
+	// but will be migrated here and we need to remove the previous store with different guid.
+	er = ABEntryIDToID(&sUserId, &ulUserId, NULL, NULL);
 	if(er != erSuccess)
 		goto exit;
 
@@ -9130,11 +9131,24 @@ SOAP_ENTRY_START(unhookStore, *result, unsigned int ulStoreType, entryId sUserId
 		goto exit;
 	}
 
-	g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "Unhooking store (type %d) from userobject %d", ulStoreType, ulUserId);
-
 	er = lpDatabase->Begin();
 	if (er != erSuccess)
 		goto exit;
+
+	strQuery = "SELECT guid FROM stores WHERE user_id=" + stringify(ulUserId) + " AND type=" + stringify(ulStoreType);
+	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
+	if (er != erSuccess)
+		goto exit;
+
+	lpDBRow = lpDatabase->FetchRow(lpDBResult);
+	lpDBLen = lpDatabase->FetchRowLengths(lpDBResult);
+
+	if (lpDBRow == NULL || lpDBRow[0] == NULL) {
+		// store not on this server
+		er = ZARAFA_E_NOT_FOUND;
+		goto exit;
+	} 
+	strGUID = bin2hex(lpDBLen[0], (unsigned char*)lpDBRow[0]);
 
 	strQuery = "UPDATE stores SET user_id=0 WHERE user_id=" + stringify(ulUserId) + " AND type=" + stringify(ulStoreType);
 	er = lpDatabase->DoUpdate(strQuery, &ulAffected);
@@ -9154,7 +9168,9 @@ SOAP_ENTRY_START(unhookStore, *result, unsigned int ulStoreType, entryId sUserId
 
 exit:
 	if (er != erSuccess)
-		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "Unhook of store failed: 0x%x", er);
+		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "Unhook of store (type %d) with userid %d and guid %s failed with error code 0x%x",  ulStoreType, ulUserId, strGUID.c_str(), er);
+	else
+		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "Unhook of store (type %d) with userid %d and guid %s succeeded",  ulStoreType, ulUserId, strGUID.c_str());
 		
 	ROLLBACK_ON_ERROR();
 	FREE_DBRESULT();
@@ -9164,14 +9180,14 @@ SOAP_ENTRY_END()
 SOAP_ENTRY_START(hookStore, *result, unsigned int ulStoreType, entryId sUserId, struct xsd__base64Binary sStoreGuid, unsigned int ulSyncId, unsigned int *result)
 {
 	unsigned int	ulUserId = 0;
-	objectid_t		sExternId;
 	unsigned int	ulAffected = 0;
 	objectdetails_t sUserDetails;
 
 	USE_DATABASE();
 
-	// sExternId class is only a hint, given from mapi type. but it's all we need here.
-	er = ABEntryIDToID(&sUserId, &ulUserId, &sExternId, NULL);
+	// do not use GetLocalId since the user may exist on a different server,
+	// but will be migrated here and we need to hook an old store with specified guid.
+	er = ABEntryIDToID(&sUserId, &ulUserId, NULL, NULL);
 	if(er != erSuccess)
 		goto exit;
 
@@ -9185,14 +9201,6 @@ SOAP_ENTRY_START(hookStore, *result, unsigned int ulStoreType, entryId sUserId, 
 	er = lpecSession->GetUserManagement()->GetObjectDetails(ulUserId, &sUserDetails);
 	if (er != erSuccess)
 		goto exit;
-
-	if (g_lpSessionManager->IsDistributedSupported()) {
-		if (stricmp(sUserDetails.GetPropString(OB_PROP_S_SERVERNAME).c_str(), lpecSession->GetSessionManager()->GetConfig()->GetSetting("server_name")) != 0) {
-			// TODO: redirect?
-			er = ZARAFA_E_NOT_FOUND;
-			goto exit;
-		}
-	}
 
 	// check if store currently is owned and the correct type
 	strQuery = "SELECT users.id, stores.id, stores.user_id, stores.hierarchy_id, stores.type FROM stores LEFT JOIN users ON stores.user_id = users.id WHERE guid = ";

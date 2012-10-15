@@ -342,8 +342,10 @@ void print_help(char *name) {
 	cout << "The following functions are for use from the create/delete user/group scripts:" << endl;
 	ct.Resize(2,2);
 	ct.AddColumn(0, "--create-store user"); ct.AddColumn(1, "Create store for user that exists in external source.");
-	ct.AddColumn(0, "--lang language"); ct.AddColumn(1, "Create folders in a new store in this language (e.g. en_EN).");
+	ct.AddColumn(0, "--lang language"); ct.AddColumn(1, "Create folders in a new store in this language (e.g. en_EN.UTF-8).");
 	ct.PrintTable();
+	cout << endl;
+	cout << "Note: the list-orphans and create/remove/hook/unhook-store functions only work on the server you're connected to. The commands will not be redirected in a multi-server environment." << endl;
 	cout << endl;
 	cout << "Global options: [-h|--host path]" << endl;
 	ct.Resize(3,2);
@@ -897,7 +899,7 @@ void print_user_settings(IMsgStore *lpStore, LPECUSER lpECUser, bool bAutoAccept
 		 cout << " To version:\t\t" << ( (lpECUCUS->lpszLatestversion) ? (LPSTR)lpECUCUS->lpszLatestversion : "-" ) << endl;
 		 cout << " Computername:\t\t" << ( (lpECUCUS->lpszComputername) ? (LPSTR)lpECUCUS->lpszComputername : "-" ) << endl;
 
-		 if (lpECUCUS->ulStatus == UPDATE_STATUS_SUCCESS) cout << " Update:\t\tSucceed" << endl;
+		 if (lpECUCUS->ulStatus == UPDATE_STATUS_SUCCESS) cout << " Update:\t\tSuccess" << endl;
 		 else if (lpECUCUS->ulStatus == UPDATE_STATUS_PENDING) cout << " Update:\t\tPending" << endl;
 		 else if (lpECUCUS->ulStatus == UPDATE_STATUS_UNKNOWN) cout << " Update: \t\tUnknown" << endl;
 		 else cout << " Update:\t\tFailed" << endl;
@@ -2388,6 +2390,8 @@ int main(int argc, char* argv[])
 	LPENTRYID lpStoreId = NULL;
 	ULONG cbRootId = 0;
 	LPENTRYID lpRootId = NULL;
+	ULONG cbUnWrappedEntry = 0;
+	LPENTRYID lpUnWrappedEntry = NULL;
 
 	ECGROUP		sECGroup;
 	LPECGROUP	lpECGroups = NULL;
@@ -3425,14 +3429,32 @@ int main(int argc, char* argv[])
 			if (hr != hrSuccess) {
 				cerr << "Unable to find " << detailstype << ", " << getMapiCodeString(hr, username) << endl;
 				goto exit;
-			}		
+			}
+
+			hr = lpMsgStore->QueryInterface(IID_IExchangeManageStore, (LPVOID*)&lpIEMS);
+			if (hr != hrSuccess)
+				goto exit;
+
+			// do not redirect to another server, unhook works on the server it's connected to
+			hr = lpIEMS->CreateStoreEntryID(NULL, (LPTSTR)username, OPENSTORE_OVERRIDE_HOME_MDB, &cbStoreId, &lpStoreId);
+			if (hr != hrSuccess) {
+				cout << "Unable to unhook store. Can not create store entryid, " << getMapiCodeString(hr, "store") << endl;
+				goto exit;
+			}
+
+			hr = UnWrapStoreEntryID(cbStoreId, lpStoreId, &cbUnWrappedEntry, &lpUnWrappedEntry);
+			if (hr != hrSuccess) {
+				cout << "Unable to unhook store. Unable to unwrap the store entryid, " << getMapiCodeString(hr, "entryid") << endl;
+				goto exit;
+			}
 
 			hr = lpServiceAdmin->UnhookStore(ulStoreType, cbUserId, lpUserId);
 			if (hr != hrSuccess) {
 				cerr << "Unable to unhook store, " << getMapiCodeString(hr) << endl;
 				goto exit;
 			}
-			cout << "Store unhooked." << endl;
+
+			cout << "Store unhooked. Store guid is " << bin2hex(sizeof(GUID), (unsigned char*)lpUnWrappedEntry->ab) << endl;
 		}
 		break;
 	case MODE_REMOVE_STORE:
@@ -4241,6 +4263,9 @@ exit:
 
 	if (lpEntryID)
 		MAPIFreeBuffer(lpEntryID);
+
+	if (lpUnWrappedEntry)
+		MAPIFreeBuffer(lpUnWrappedEntry);
 
 	if (lpUserStore)
 		lpUserStore->Release();
