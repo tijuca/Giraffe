@@ -221,6 +221,14 @@ Default:
 \fI/\fR
 .RE
 .PP
+\fBcoredump_enabled\fR
+.RS 4
+When a segfault occurs, a coredump file will be written in the running_path directory\&. This file should be sent along with the crash report\&.
+.sp
+Default:
+\fIyes\fR
+.RE
+.PP
 \fBsession_timeout\fR
 .RS 4
 The session timeout specifies how many seconds must elapse without any activity from a client before the server counts the session as dead\&. The client sends keepalive requests every 60 seconds, so the session timeout can never be below 60\&. In fact, if you specify a timeout below 300, 300 will be taken as the session timeout instead\&. This makes sure you can never timeout your session while the Zarafa client is running\&.

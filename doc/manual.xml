@@ -3157,6 +3157,19 @@
 		  </varlistentry>
 
 		  <varlistentry>
+			<term><option>coredump_enabled</option></term>
+			<listitem>
+			  <para>When a segfault occurs, a coredump file will be
+			  written in the running_path directory. This file should
+			  be sent along with the crash report.
+			  </para>
+			  <para>Default:
+			  <replaceable>yes</replaceable>
+			  </para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
 			<term><option>session_timeout</option></term>
 			<listitem>
 			  <para>

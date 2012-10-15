@@ -829,7 +829,8 @@ int running_server(char *szName, const char *szConfig)
 		{ "run_as_user",				"" },				// drop root privileges, and run as this user/group
 		{ "run_as_group",				"" },
 		{ "pid_file",					"/var/run/zarafa-server.pid" },
-		{ "running_path",			"/" },
+		{ "running_path",				"/" },
+		{ "coredump_enabled",			"yes" },
 
 		{ "license_path",			"/etc/zarafa/license", CONFIGSETTING_UNUSED },
 		{ "license_socket",			"/var/run/zarafa-licensed" },
@@ -1137,13 +1138,20 @@ int running_server(char *szName, const char *szConfig)
 
 	// Set max open file descriptors to FD_SETSIZE .. higher than this number
 	// is a bad idea, as it will start breaking select() calls.
-	struct rlimit file_limit;
-	file_limit.rlim_cur = FD_SETSIZE;
-	file_limit.rlim_max = FD_SETSIZE;
+	struct rlimit limit;
 
-	if(setrlimit(RLIMIT_NOFILE, &file_limit) < 0) {
+	limit.rlim_cur = FD_SETSIZE;
+	limit.rlim_max = FD_SETSIZE;
+	if(setrlimit(RLIMIT_NOFILE, &limit) < 0) {
 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "WARNING: setrlimit(RLIMIT_NOFILE, %d) failed, you will only be able to connect up to %d sockets.", FD_SETSIZE, getdtablesize());
 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "WARNING: Either start the process as root, or increase user limits for open file descriptors.");
+	}
+
+	if (parseBool(g_lpConfig->GetSetting("coredump_enabled"))) {
+		limit.rlim_cur = RLIM_INFINITY;
+		limit.rlim_max = RLIM_INFINITY;
+		if(setrlimit(RLIMIT_CORE, &limit) < 0)
+			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to raise coredump filesize limit");
 	}
 
 	// fork if needed and drop privileges as requested.
