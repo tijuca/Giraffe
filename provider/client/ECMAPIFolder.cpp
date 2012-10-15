@@ -575,8 +575,6 @@ HRESULT ECMAPIFolder::CopyMessages(LPENTRYLIST lpMsgList, LPCIID lpInterface, LP
 	HRESULT hrEC = hrSuccess;
 	PEID peidDest = NULL;
 	IMAPIFolder	*lpMapiFolder = NULL;
-	ULONG cValues = 0;
-	LPSPropTagArray lpsPropTagArray = NULL;
 	LPSPropValue lpDestPropArray = NULL;
 
 	LPENTRYLIST lpMsgListEC = NULL;
@@ -610,26 +608,12 @@ HRESULT ECMAPIFolder::CopyMessages(LPENTRYLIST lpMsgList, LPCIID lpInterface, LP
 	if(hr != hrSuccess)
 		goto exit;
 
-	// Get the destination entry ID
-	cValues = 1;
-	hr = ECAllocateBuffer(CbNewSPropTagArray(cValues), (void **)&lpsPropTagArray);
-	if(hr != hrSuccess)
+	// Get the destination entry ID, and check for favories public folders, so get PR_ORIGINAL_ENTRYID first.
+	hr = HrGetOneProp(lpMapiFolder, PR_ORIGINAL_ENTRYID, &lpDestPropArray);
+	if (hr != hrSuccess)
+		hr = HrGetOneProp(lpMapiFolder, PR_ENTRYID, &lpDestPropArray);
+	if (hr != hrSuccess)
 		goto exit;
-
-	lpsPropTagArray->cValues = cValues;
-	lpsPropTagArray->aulPropTag[0] = PR_ENTRYID;
-	
-	hr = lpMapiFolder->GetProps(lpsPropTagArray, 0, &cValues, &lpDestPropArray);
-	if(hr != hrSuccess)
-		goto exit;
-
-	if(cValues != 1 || lpDestPropArray[0].ulPropTag != PR_ENTRYID)	
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if(lpsPropTagArray){ ECFreeBuffer(lpsPropTagArray); lpsPropTagArray = NULL; }
 
 	// Check if the destination entryid is a zarafa entryid and if there is a folder transport
 	if( IsZarafaEntryId(lpDestPropArray[0].Value.bin.cb, lpDestPropArray[0].Value.bin.lpb) &&
@@ -710,9 +694,6 @@ exit:
 
 	if(lpMsgListSupport)
 		ECFreeBuffer(lpMsgListSupport);
-
-	if(lpsPropTagArray)
-		ECFreeBuffer(lpsPropTagArray);
 
 	if(peidDest)
 		ECFreeBuffer(peidDest);
