@@ -3438,7 +3438,10 @@ int main(int argc, char* argv[])
 			// do not redirect to another server, unhook works on the server it's connected to
 			hr = lpIEMS->CreateStoreEntryID(NULL, (LPTSTR)username, OPENSTORE_OVERRIDE_HOME_MDB, &cbStoreId, &lpStoreId);
 			if (hr != hrSuccess) {
-				cout << "Unable to unhook store. Can not create store entryid, " << getMapiCodeString(hr, "store") << endl;
+				if (hr == MAPI_E_NOT_FOUND)
+					cout << "Unable to unhook store. User '" << username << "' has no store attached." << endl;
+				else
+					cout << "Unable to unhook store. Can not create store entryid, " << getMapiCodeString(hr, "store") << endl;
 				goto exit;
 			}
 
