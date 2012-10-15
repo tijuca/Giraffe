@@ -312,16 +312,17 @@
 					 */
 					$occurrences = $recur->getItems($row[$this->properties["flagdueby"]], time(), 0, true);
 
-					if(count($occurrences) > 1) {
-					    // More than one occurrence, use the last one instead of the first one after flagdueby
-                        $occ = $occurrences[count($occurrences)-1];
+					if(empty($occurrences))
+						continue;
 
-                        // Bydefault, on occurrence reminder is true but if reminder value is set to false then we don't send popup reminder for this occurrence
-                        if (!(isset($occ[$this->properties['reminder']]) && $occ[$this->properties['reminder']] == 0)) {
-                            $row[$this->properties["remindertime"]] = $occ[$this->properties["appointment_startdate"]];
-                            $row[$this->properties["appointment_startdate"]] = $occ[$this->properties["appointment_startdate"]];
-                            $row[$this->properties["appointment_enddate"]] = $occ[$this->properties["appointment_startdate"]];
-                        }
+				    // More than one occurrence, use the last one instead of the first one after flagdueby
+                    $occ = $occurrences[count($occurrences)-1];
+
+                    // Bydefault, on occurrence reminder is true but if reminder value is set to false then we don't send popup reminder for this occurrence
+                    if (!(isset($occ[$this->properties['reminder']]) && $occ[$this->properties['reminder']] == 0)) {
+                        $row[$this->properties["remindertime"]] = $occ[$this->properties["appointment_startdate"]];
+                        $row[$this->properties["appointment_startdate"]] = $occ[$this->properties["appointment_startdate"]];
+                        $row[$this->properties["appointment_enddate"]] = $occ[$this->properties["appointment_startdate"]];
                     }
 				}
 
