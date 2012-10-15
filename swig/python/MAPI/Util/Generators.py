@@ -12,9 +12,8 @@ def GetStores(session, users = None, flags = MDB_WRITE):
         try:
             storeid = ems.CreateStoreEntryID(None, user, 0)
             store = session.OpenMsgStore(0, storeid, IID_IMsgStore, flags)      
-        except MAPIError, err:
-            if err.hr != MAPI_E_NOT_FOUND:
-                raise
+        except MAPIErrorNotFound:
+            continue
         yield store
 
 

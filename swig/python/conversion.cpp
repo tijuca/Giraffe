@@ -2697,9 +2697,30 @@ void DoException(HRESULT hr)
 	// PyLong object instead.
 	PyObject *hrObj = PyLong_FromUnsignedLong((unsigned int)hr);
 #endif
-	
-	PyErr_SetObject(PyTypeMAPIError, hrObj);
 
+    PyObject *attr_name = PyString_FromString("_errormap");
+    PyObject *errormap = PyObject_GetAttr(PyTypeMAPIError, attr_name);
+    PyObject *errortype = NULL;
+    PyObject *ex = NULL;
+    if (errormap != NULL) {
+        errortype = PyDict_GetItem(errormap, hrObj);
+        if (errortype)
+            ex = PyObject_CallFunction(errortype, NULL);
+    }
+    if (!errortype) {
+        errortype = PyTypeMAPIError;
+        ex = PyObject_CallFunction(PyTypeMAPIError, "O", hrObj);
+    }
+    
+	PyErr_SetObject(errortype, ex);
+
+exit:
+    if (ex)
+        Py_DECREF(ex);
+    if (errormap)
+        Py_DECREF(errormap);
+    if (attr_name)
+        Py_DECREF(attr_name);
 	if (hrObj)
 		Py_DECREF(hrObj);
 }

@@ -1,5 +1,8 @@
 # -*- indent-tabs-mode: nil -*-
 
+import inspect
+import sys
+
 import MAPICore
 from MAPI.Defs import *
 
@@ -210,6 +213,35 @@ class ACTIONS(MAPIStruct):
         return 'ACTIONS(%d,%s)' % (self.ulVersion, str(self.lpAction))
     
 class MAPIError(Exception):
+    _errormap = {}
+    
+    @staticmethod
+    def _initialize_errors():
+        for name, value in inspect.getmembers(sys.modules['MAPICore'], lambda obj: isinstance(obj, int)):
+            if name.startswith('MAPI_E_'):
+                clsname = 'MAPIError' + ''.join(s.capitalize() for s in name[7:].split('_'))
+                def construct_class(hr):
+                    return type(clsname, (MAPIError,), {'__init__': lambda(self): MAPIError.__init__(self, hr)})
+                t = construct_class(value)
+                setattr(sys.modules[__name__], clsname, t)
+                MAPIError._errormap[value] = t
+    
+    @staticmethod
+    def _get_type(hr):
+        '''Returns the type of the MAPIError subclass that represents the given error code.'''
+        return MAPIError._errormap.get(hr)
+    
+    @staticmethod
+    def from_hresult(hr):
+        '''Use MAPIError.from_hresult(hr) to create a MAPIError subclass based on the error
+        code. If no subclass is defined for the error code, a MAPIError instance is
+        returned.
+        '''
+        t = MAPIError._get_type(hr)
+        if t:
+            return t()
+        return MAPIError(hr)
+    
     def __init__(self, hr):
         self.hr = hr
         
@@ -331,3 +363,4 @@ class ECQUOTASTATUS(MAPIStruct):
         self.QuotaStatus = QuotaStatus
 
 
+MAPIError._initialize_errors()
