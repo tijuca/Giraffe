@@ -300,6 +300,7 @@
 					$recur = new Recurrence($store, $row);
 
 					/**
+					 * FlagDueBy == PidLidReminderSignalTime.
 					 * FlagDueBy handles whether we should be showing the item; if now() is after FlagDueBy, then we should show a reminder
 					 * for this recurrence. However, the item we will show is either the last passed occurrence (overdue), or the next occurrence, depending
 					 * on whether we have reached the next occurrence yet (the remindertime of the next item is ignored).
@@ -309,8 +310,12 @@
 					 * we will show to the user. The idea here is:
 					 *
 					 * The item we want to show is the last item in that list (new occurrences that have started uptil now should override old ones)
+					 *
+					 * Add the reminder_minutes (default 15 minutes for calendar, 0 for tasks) to check over the gap between FlagDueBy and the start time of the
+					 * occurrence, if "now" would be in between these values.
 					 */
-					$occurrences = $recur->getItems($row[$this->properties["flagdueby"]], time(), 0, true);
+					$remindertimeinseconds = $row[$this->properties["reminder_minutes"]] * 60;
+					$occurrences = $recur->getItems($row[$this->properties["flagdueby"]], time() + ($remindertimeinseconds), 0, true);
 
 					if(empty($occurrences))
 						continue;
