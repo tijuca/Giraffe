@@ -88,18 +88,20 @@ using namespace za::operations;
  *					Pointer to an ECConfig object that determines the operational options.
  * @param[in]	lpLogger
  *					Pointer to an ECLogger object that's used for logging.
+ * @param[in]	bForceCleanup	Force a cleanup operation to continue, even
+ * 								if the settings aren't safe.
  * @param[out]	lpptrArchiver
  *					Pointer to a ArchivePtr that will be assigned the address of the returned object.
  *
  * @return HRESULT
  */
-HRESULT ArchiveControlImpl::Create(SessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, ArchiveControlPtr *lpptrArchiveControl)
+HRESULT ArchiveControlImpl::Create(SessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, bool bForceCleanup, ArchiveControlPtr *lpptrArchiveControl)
 {
 	HRESULT hr = hrSuccess;
 	std::auto_ptr<ArchiveControlImpl> ptrArchiveControl;
 
 	try {
-		ptrArchiveControl.reset(new ArchiveControlImpl(ptrSession, lpConfig, lpLogger));
+		ptrArchiveControl.reset(new ArchiveControlImpl(ptrSession, lpConfig, lpLogger, bForceCleanup));
 	} catch (bad_alloc &) {
 		hr = MAPI_E_NOT_ENOUGH_MEMORY;
 		goto exit;
@@ -124,10 +126,12 @@ exit:
  *					Pointer to an ECConfig object that determines the operational options.
  * @param[in]	lpLogger
  *					Pointer to an ECLogger object that's used for logging.
- *
+  * @param[in]	bForceCleanup	Force a cleanup operation to continue, even
+ * 								if the settings aren't safe.
+*
  * @return HRESULT
  */
-ArchiveControlImpl::ArchiveControlImpl(SessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger)
+ArchiveControlImpl::ArchiveControlImpl(SessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, bool bForceCleanup)
 : m_ptrSession(ptrSession)
 , m_lpConfig(lpConfig)
 , m_lpLogger(lpLogger)
@@ -139,6 +143,11 @@ ArchiveControlImpl::ArchiveControlImpl(SessionPtr ptrSession, ECConfig *lpConfig
 , m_bStubEnable(false)
 , m_bStubUnread(false)
 , m_ulStubAfter(0)
+, m_bPurgeEnable(false)
+, m_ulPurgeAfter(2555)
+, m_cleanupAction(caStore)
+, m_bCleanupFollowPurgeAfter(false)
+, m_bForceCleanup(bForceCleanup)
 {
 	if (m_lpLogger)
 		m_lpLogger->AddRef();
@@ -173,7 +182,7 @@ HRESULT ArchiveControlImpl::Init()
 	m_ulStubAfter = atoi(m_lpConfig->GetSetting("stub_after", "", "0"));
 
 	m_bPurgeEnable = parseBool(m_lpConfig->GetSetting("purge_enable", "", "no"));
-	m_ulPurgeAfter = atoi(m_lpConfig->GetSetting("purge_after", "", "0"));
+	m_ulPurgeAfter = atoi(m_lpConfig->GetSetting("purge_after", "", "2555"));
 
 	const char *lpszCleanupAction = m_lpConfig->GetSetting("cleanup_action");
 	if (lpszCleanupAction == NULL || *lpszCleanupAction == '\0') {
@@ -191,6 +200,8 @@ HRESULT ArchiveControlImpl::Init()
 		hr = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	}
+
+	m_bCleanupFollowPurgeAfter = parseBool(m_lpConfig->GetSetting("cleanup_follow_purge_after", "", "no"));
 
 	GetSystemTimeAsFileTime(&m_ftCurrent);
 
@@ -308,7 +319,11 @@ eResult ArchiveControlImpl::CleanupAll(bool bLocalOnly)
 {
 	HRESULT hr = hrSuccess;
 
-	hr = ProcessAll(bLocalOnly, &ArchiveControlImpl::DoCleanup);
+	hr = CheckSafeCleanupSettings();
+
+	if (hr == hrSuccess)
+		hr = ProcessAll(bLocalOnly, &ArchiveControlImpl::DoCleanup);
+
 	return MAPIErrorToArchiveError(hr);
 }
 
@@ -326,8 +341,12 @@ eResult ArchiveControlImpl::CleanupAll(bool bLocalOnly)
 eResult ArchiveControlImpl::Cleanup(const TCHAR *lpszUser)
 {
 	HRESULT hr = hrSuccess;
+	
+	hr = CheckSafeCleanupSettings();
 
-	hr = DoCleanup(lpszUser);
+	if (hr == hrSuccess)
+		hr = DoCleanup(lpszUser);
+
 	return MAPIErrorToArchiveError(hr);
 }
 
@@ -544,6 +563,7 @@ HRESULT ArchiveControlImpl::DoCleanup(const TCHAR *lpszUser)
 	MsgStorePtr ptrUserStore;
 	StoreHelperPtr ptrStoreHelper;
 	ObjectEntryList lstArchives;
+	SRestrictionPtr ptrRestriction;
 
 	if (lpszUser == NULL) {
 		hr = MAPI_E_INVALID_PARAMETER;
@@ -551,6 +571,35 @@ HRESULT ArchiveControlImpl::DoCleanup(const TCHAR *lpszUser)
 	}
 
 	m_lpLogger->Log(EC_LOGLEVEL_INFO, "Cleanup store for user '" TSTRING_PRINTF "'", lpszUser);
+	
+	if (m_bCleanupFollowPurgeAfter) {
+		ULARGE_INTEGER li;
+		SPropValue sPropRefTime;
+
+		const ECOrRestriction resDefault(
+			ECAndRestriction(
+				ECExistRestriction(PR_MESSAGE_DELIVERY_TIME) +
+				ECPropertyRestriction(RELOP_LT, PR_MESSAGE_DELIVERY_TIME, &sPropRefTime, ECRestriction::Cheap)
+			) +
+			ECAndRestriction(
+				ECExistRestriction(PR_CLIENT_SUBMIT_TIME) +
+				ECPropertyRestriction(RELOP_LT, PR_CLIENT_SUBMIT_TIME, &sPropRefTime, ECRestriction::Cheap)
+			)
+		);
+
+		li.LowPart = m_ftCurrent.dwLowDateTime;
+		li.HighPart = m_ftCurrent.dwHighDateTime;
+		
+		li.QuadPart -= (m_ulPurgeAfter * _DAY);
+		
+		sPropRefTime.ulPropTag = PROP_TAG(PT_SYSTIME, 0);
+		sPropRefTime.Value.ft.dwLowDateTime = li.LowPart;
+		sPropRefTime.Value.ft.dwHighDateTime = li.HighPart;
+
+		hr = resDefault.CreateMAPIRestriction(&ptrRestriction, 0);
+		if (hr != hrSuccess)
+			goto exit;
+	}
 
 	hr = m_ptrSession->OpenStoreByName(lpszUser, &ptrUserStore);
 	if (hr != hrSuccess) {
@@ -582,7 +631,7 @@ HRESULT ArchiveControlImpl::DoCleanup(const TCHAR *lpszUser)
 	for (ObjectEntryList::iterator iArchive = lstArchives.begin(); iArchive != lstArchives.end(); ++iArchive) {
 		HRESULT hrTmp = hrSuccess;
 
-		hrTmp = CleanupArchive(*iArchive, ptrUserStore);
+		hrTmp = CleanupArchive(*iArchive, ptrUserStore, ptrRestriction);
 		if (hrTmp != hrSuccess)
 			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to cleanup archive. (hr=0x%08x)", hr);
 	}
@@ -888,8 +937,9 @@ exit:
  *
  * @param[in]	archiveEntry	SObjectEntry specifyinf the archive to cleanup
  * @param[in]	lpUserStore		The primary store, used to check the references
+ * @param[in]	lpRestriction	The restriction that's used to make sure the archived items are old enough.
  */
-HRESULT ArchiveControlImpl::CleanupArchive(const SObjectEntry &archiveEntry, LPMDB lpUserStore)
+HRESULT ArchiveControlImpl::CleanupArchive(const SObjectEntry &archiveEntry, LPMDB lpUserStore, LPSRestriction lpRestriction)
 {
 	HRESULT hr = hrSuccess;
 	SPropValuePtr ptrPropVal;
@@ -941,7 +991,7 @@ HRESULT ArchiveControlImpl::CleanupArchive(const SObjectEntry &archiveEntry, LPM
 	}
 
 
-	hr = GetAllEntries(ptrArchiveHelper, ptrArchiveFolder, &setEntries);
+	hr = GetAllEntries(ptrArchiveHelper, ptrArchiveFolder, lpRestriction, &setEntries);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to get all entries from archive store. (hr=0x%08x)", hr);
 		goto exit;
@@ -1108,9 +1158,10 @@ exit:
  *
  * @param[in]	ptrArchiveHelper	The ArchiverHelper instance for the archive to process.
  * @param[in]	lpArchive			The root of the archive.
+ * @param[in]	lpRestriction	The restriction that's used to make sure the archived items are old enough.
  * @param[out]	lpEntryies			An EntryIDSet containing all the entryids.
  */
-HRESULT ArchiveControlImpl::GetAllEntries(ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchive, EntryIDSet *lpEntries)
+HRESULT ArchiveControlImpl::GetAllEntries(ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchive, LPSRestriction lpRestriction, EntryIDSet *lpEntries)
 {
 	HRESULT hr = hrSuccess;
 	EntryIDSet setEntries;
@@ -1118,7 +1169,7 @@ HRESULT ArchiveControlImpl::GetAllEntries(ArchiveHelperPtr ptrArchiveHelper, LPM
 	EntryIDSet setFolderExcludes;
 	MAPIFolderPtr ptrFolder;
 
-	hr = AppendAllEntries(lpArchive, &setEntries);
+	hr = AppendAllEntries(lpArchive, lpRestriction, &setEntries);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get all entries from the root archive folder. (hr=0x%08x)", hr);
 		goto exit;
@@ -1145,7 +1196,7 @@ HRESULT ArchiveControlImpl::GetAllEntries(ArchiveHelperPtr ptrArchiveHelper, LPM
 				continue;
 			}
 			
-			hr = AppendAllEntries(*i, &setEntries);
+			hr = AppendAllEntries(*i, lpRestriction, &setEntries);
 			if (hr != hrSuccess) {
 				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get all references from archive folder. (hr=0x%08x)", hr);
 				goto exit;
@@ -1168,13 +1219,14 @@ exit:
  *
  * @param[in]		ptrArchiveHelper	The ArchiverHelper instance for the archive to process.
  * @param[in]		lpArchive			The root of the archive.
+ * @param[in]		lpRestriction		The restriction that's used to make sure the archived items are old enough.
  * @param[in,out]	lpEntryies			The EntryIDSet to add the items to.
  */
-HRESULT ArchiveControlImpl::AppendAllEntries(LPMAPIFOLDER lpArchive, EntryIDSet *lpEntries)
+HRESULT ArchiveControlImpl::AppendAllEntries(LPMAPIFOLDER lpArchive, LPSRestriction lpRestriction, EntryIDSet *lpEntries)
 {
 	HRESULT hr = hrSuccess;
 	MAPITablePtr ptrTable;
-	SRestriction resContent = {0};
+	ECAndRestriction resContent;
 	
 	SizedSPropTagArray(1, sptaContentProps) = {1, {PR_ENTRYID}};
 	
@@ -1182,8 +1234,9 @@ HRESULT ArchiveControlImpl::AppendAllEntries(LPMAPIFOLDER lpArchive, EntryIDSet 
 	PROPMAP_NAMED_ID(REF_ITEM_ENTRYID, PT_BINARY, PSETID_Archive, dispidRefItemEntryId)
 	PROPMAP_INIT(lpArchive)
 	
-	resContent.rt = RES_EXIST;
-	resContent.res.resExist.ulPropTag = PROP_REF_ITEM_ENTRYID;
+	resContent.append(ECExistRestriction(PROP_REF_ITEM_ENTRYID));
+	if (lpRestriction)
+		resContent.append(ECRawRestriction(lpRestriction, ECRestriction::Cheap));
 	
 	hr = lpArchive->GetContentsTable(0, &ptrTable);
 	if (hr != hrSuccess)
@@ -1193,7 +1246,7 @@ HRESULT ArchiveControlImpl::AppendAllEntries(LPMAPIFOLDER lpArchive, EntryIDSet 
 	if (hr != hrSuccess)
 		goto exit;
 	
-	hr = ptrTable->Restrict(&resContent, TBL_BATCH);
+	hr = resContent.RestrictTable(ptrTable);
 	if (hr != hrSuccess)
 		goto exit;
 	
@@ -1605,3 +1658,46 @@ HRESULT ArchiveControlImpl::AppendFolderEntries(LPMAPIFOLDER lpBase, EntryIDSet 
 exit:
 	return hr;
 }
+
+/**
+ * This method checks the settings to see if they're safe when performing
+ * a cleanup run. It's unsafe to run a cleanup when the delete operation is
+ * enabled, and the cleanup doesn't check the purge_after option or if the
+ * purge_after option is set to 0.
+ * 
+ * See ZCP-10571.
+ */
+HRESULT ArchiveControlImpl::CheckSafeCleanupSettings()
+{
+	int loglevel = (m_bForceCleanup ? EC_LOGLEVEL_WARNING : EC_LOGLEVEL_FATAL);
+	
+	if (m_bDeleteEnable && !m_bCleanupFollowPurgeAfter) {
+		m_lpLogger->Log(loglevel, "'delete_enable' is set to '%s' and 'cleanup_follow_purge_after' is set to '%s'", 
+						m_lpConfig->GetSetting("delete_enable", "", "no"),
+						m_lpConfig->GetSetting("cleanup_follow_purge_after", "", "no"));
+		m_lpLogger->Log(loglevel, "This can cause messages to be deleted from the archive while they shouldn't be deleted.");
+		if (!m_bForceCleanup) {
+			m_lpLogger->Log(loglevel, "Please correct your configuration or pass '--force-cleanup' at the commandline if you");
+			m_lpLogger->Log(loglevel, "know what you're doing (not recommended).");
+			return MAPI_E_UNABLE_TO_COMPLETE;
+		}
+		m_lpLogger->Log(loglevel, "User forced continuation!");
+	}
+	
+	else if (m_bDeleteEnable && m_bCleanupFollowPurgeAfter && m_ulPurgeAfter == 0) {
+		m_lpLogger->Log(loglevel, "'delete_enable' is set to '%s' and 'cleanup_follow_purge_after' is set to '%s'", 
+						m_lpConfig->GetSetting("delete_enable", "", "no"),
+						m_lpConfig->GetSetting("cleanup_follow_purge_after", "", "no"));
+		m_lpLogger->Log(loglevel, "but 'purge_after' is set to '0'");
+		m_lpLogger->Log(loglevel, "This can cause messages to be deleted from the archive while they shouldn't be deleted.");
+		if (!m_bForceCleanup) {
+			m_lpLogger->Log(loglevel, "Please correct your configuration or pass '--force-cleanup' at the commandline if you");
+			m_lpLogger->Log(loglevel, "know what you're doing (not recommended).");
+			return MAPI_E_UNABLE_TO_COMPLETE;
+		}
+		m_lpLogger->Log(loglevel, "User forced continuation!");
+	}
+	
+	return hrSuccess;
+}
+

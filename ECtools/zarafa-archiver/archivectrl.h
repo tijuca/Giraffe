@@ -153,7 +153,7 @@ class ECLogger;
 class ArchiveControlImpl : public ArchiveControl
 {
 public:
-	static HRESULT Create(SessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, ArchiveControlPtr *lpptrArchiveControl);
+	static HRESULT Create(SessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, bool bForceCleanup, ArchiveControlPtr *lpptrArchiveControl);
 
 	eResult ArchiveAll(bool bLocalOnly, bool bAutoAttach, unsigned int ulFlags);
 	eResult Archive(const TCHAR *lpszUser, bool bAutoAttach, unsigned int ulFlags);
@@ -177,7 +177,7 @@ private:
 	typedef std::set<entryid_t> EntryIDSet;
 	typedef std::set<std::pair<entryid_t, entryid_t>, ReferenceLessCompare> ReferenceSet;
 
-	ArchiveControlImpl(SessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger);
+	ArchiveControlImpl(SessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, bool bForceCleanup);
 	HRESULT Init();
 
 	HRESULT DoArchive(const TCHAR *lpszUser);
@@ -190,12 +190,11 @@ private:
 	HRESULT PurgeArchives(const ObjectEntryList &lstArchives);
 	HRESULT PurgeArchiveFolder(MsgStorePtr &ptrArchive, const entryid_t &folderEntryID, const LPSRestriction lpRestriction);
 
-	HRESULT CleanupArchive(const SObjectEntry &archiveEntry, LPMDB lpUserStore);
+	HRESULT CleanupArchive(const SObjectEntry &archiveEntry, LPMDB lpUserStore, LPSRestriction lpRestriction);
 	HRESULT GetAllReferences(LPMDB lpUserStore, LPGUID lpArchiveGuid, EntryIDSet *lpMsgReferences);
 	HRESULT AppendAllReferences(LPMAPIFOLDER lpRoot, LPGUID lpArchiveGuid, EntryIDSet *lpMsgReferences);
-	HRESULT GetAllEntries(za::helpers::ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchive, EntryIDSet *lpEntries);
-	HRESULT AppendAllEntries(LPMAPIFOLDER lpArchive, EntryIDSet *lpMsgEntries);
-	//HRESULT CleanupArchiveFolder(za::helpers::ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchiveFolder, LPMDB lpUserStore);
+	HRESULT GetAllEntries(za::helpers::ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchive, LPSRestriction lpRestriction, EntryIDSet *lpEntries);
+	HRESULT AppendAllEntries(LPMAPIFOLDER lpArchive, LPSRestriction lpRestriction, EntryIDSet *lpMsgEntries);
 	HRESULT CleanupHierarchy(za::helpers::ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchiveRoot, LPMDB lpUserStore);
 
 	HRESULT MoveAndDetachMessages(za::helpers::ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchiveFolder, const EntryIDSet &setEIDs);
@@ -205,6 +204,8 @@ private:
 	HRESULT DeleteFolder(LPMAPIFOLDER lpArchiveFolder);
 	
 	HRESULT AppendFolderEntries(LPMAPIFOLDER lpBase, EntryIDSet *lpEntries);
+	
+	HRESULT CheckSafeCleanupSettings();
 	
 private:
 	enum eCleanupAction { caDelete, caStore };
@@ -229,6 +230,8 @@ private:
 	int m_ulPurgeAfter;
 
 	eCleanupAction m_cleanupAction;
+	bool m_bCleanupFollowPurgeAfter;
+	bool m_bForceCleanup;
 	
 	PROPMAP_START
 	PROPMAP_DEF_NAMED_ID(ARCHIVE_STORE_ENTRYIDS)

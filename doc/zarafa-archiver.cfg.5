@@ -193,6 +193,14 @@ Default:
 \fIstore\fR
 .RE
 .PP
+\fBcleanup_follow_purge_after\fR
+.RS 4
+Specify if items that are cleaned up from the archive are at least the age that is specified in the purge_after setting\&. This is to avoid messages being deleted from the archive when they where deleted from the primary store by a delete operation\&. Note that setting to yes, will cause a cleanup run to seemingly do nothing\&. A rule of thumb is to set this to the same value as delete_enable\&. So when delete_enable is set to yes, make sure cleanup_follow_purge_after is also set to yes\&.
+.sp
+Default:
+\fIno\fR
+.RE
+.PP
 \fBenable_auto_attach\fR
 .RS 4
 Specify whether on each archive run an auto\-attach run is performed in order to match the attached archives to the requested state as specified in LDAP or ADS\&.

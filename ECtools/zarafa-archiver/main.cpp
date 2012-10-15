@@ -168,6 +168,7 @@ enum cmdOptions {
 	OPT_CONFIG,
 	OPT_LOCAL,
 	OPT_WRITABLE,
+	OPT_FORCE_CLEANUP,
 	OPT_HELP
 };
 
@@ -188,6 +189,7 @@ struct option long_options[] = {
 		{ "help", 			no_argument, 		NULL, OPT_HELP		},
 		{ "config", 		required_argument, 	NULL, OPT_CONFIG 	},
 		{ "writable",		required_argument,	NULL, OPT_WRITABLE	},
+		{ "force-cleanup",	no_argument,		NULL, OPT_FORCE_CLEANUP },
 		{ NULL, 			no_argument, 		NULL, 0				}
 };
 
@@ -213,6 +215,7 @@ int main(int argc, char *argv[])
 	const char *lpszArchiveServer = NULL;
 	bool bLocalOnly = false;
 	bool bAutoAttach = false;
+	bool bForceCleanup = false;
 	unsigned ulAttachFlags = 0;
 	ArchiverPtr ptrArchiver;
 	convert_context converter;
@@ -368,6 +371,10 @@ int main(int argc, char *argv[])
 				ulAttachFlags |= ArchiveManage::ReadOnly;
 			break;
 			
+		case OPT_FORCE_CLEANUP:
+			bForceCleanup = true;
+			break;
+			
 		case OPT_HELP:
 			print_help(cout, argv[0]);
 			return 1;
@@ -416,6 +423,11 @@ int main(int argc, char *argv[])
 			print_help(cerr, argv[0]);
 			return 1;
 		}
+	}
+	
+	else if (bForceCleanup && mode != MODE_CLEANUP) {
+		cerr << "--force-cleanup is only valid in cleanup mode." << endl;
+		return 1;
 	}
 
 
@@ -507,7 +519,7 @@ int main(int argc, char *argv[])
 		
 	case MODE_CLEANUP: {
 		ArchiveControlPtr ptr;
-		r = ptrArchiver->GetControl(&ptr);
+		r = ptrArchiver->GetControl(&ptr, bForceCleanup);
 		if (r != Success)
 			goto exit;
 			

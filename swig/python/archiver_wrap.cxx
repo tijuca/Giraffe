@@ -3224,11 +3224,11 @@ SWIGINTERN Archiver *Archiver_Create__SWIG_0(char const *lpszAppName,char const 
 
 			return ptr.release();
 		}
-SWIGINTERN ArchiveControl *Archiver_GetControl(Archiver *self){
+SWIGINTERN ArchiveControl *Archiver_GetControl__SWIG_0(Archiver *self,bool bForceCleanup=false){
 			eResult r = Success;
 			ArchiveControlPtr ptr;
 
-			r = self->GetControl(&ptr);
+			r = self->GetControl(&ptr, bForceCleanup);
 			if (r != Success)
 				throw ArchiverError(r, "Failed to get object!");
 
@@ -4996,7 +4996,48 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_Archiver_GetControl(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+SWIGINTERN PyObject *_wrap_Archiver_GetControl__SWIG_0(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  Archiver *arg1 = (Archiver *) 0 ;
+  bool arg2 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  bool val2 ;
+  int ecode2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  ArchiveControl *result = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OO:Archiver_GetControl",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_Archiver, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "Archiver_GetControl" "', argument " "1"" of type '" "Archiver *""'"); 
+  }
+  arg1 = reinterpret_cast< Archiver * >(argp1);
+  ecode2 = SWIG_AsVal_bool(obj1, &val2);
+  if (!SWIG_IsOK(ecode2)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "Archiver_GetControl" "', argument " "2"" of type '" "bool""'");
+  } 
+  arg2 = static_cast< bool >(val2);
+  {
+    SWIG_PYTHON_THREAD_BEGIN_ALLOW;
+    {
+      try {
+        result = (ArchiveControl *)Archiver_GetControl__SWIG_0(arg1,arg2);
+      } catch (const ArchiverError &ae) {
+        SWIG_exception(SWIG_RuntimeError, ae.what());
+      }
+    }
+    SWIG_PYTHON_THREAD_END_ALLOW;
+  }
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_ArchiveControl, SWIG_POINTER_OWN |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_Archiver_GetControl__SWIG_1(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   Archiver *arg1 = (Archiver *) 0 ;
   void *argp1 = 0 ;
@@ -5014,7 +5055,7 @@ SWIGINTERN PyObject *_wrap_Archiver_GetControl(PyObject *SWIGUNUSEDPARM(self), P
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
     {
       try {
-        result = (ArchiveControl *)Archiver_GetControl(arg1);
+        result = (ArchiveControl *)Archiver_GetControl__SWIG_0(arg1);
       } catch (const ArchiverError &ae) {
         SWIG_exception(SWIG_RuntimeError, ae.what());
       }
@@ -5024,6 +5065,50 @@ SWIGINTERN PyObject *_wrap_Archiver_GetControl(PyObject *SWIGUNUSEDPARM(self), P
   resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_ArchiveControl, SWIG_POINTER_OWN |  0 );
   return resultobj;
 fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_Archiver_GetControl(PyObject *self, PyObject *args) {
+  int argc;
+  PyObject *argv[3];
+  int ii;
+  
+  if (!PyTuple_Check(args)) SWIG_fail;
+  argc = (int)PyObject_Length(args);
+  for (ii = 0; (ii < argc) && (ii < 2); ii++) {
+    argv[ii] = PyTuple_GET_ITEM(args,ii);
+  }
+  if (argc == 1) {
+    int _v;
+    void *vptr = 0;
+    int res = SWIG_ConvertPtr(argv[0], &vptr, SWIGTYPE_p_Archiver, 0);
+    _v = SWIG_CheckState(res);
+    if (_v) {
+      return _wrap_Archiver_GetControl__SWIG_1(self, args);
+    }
+  }
+  if (argc == 2) {
+    int _v;
+    void *vptr = 0;
+    int res = SWIG_ConvertPtr(argv[0], &vptr, SWIGTYPE_p_Archiver, 0);
+    _v = SWIG_CheckState(res);
+    if (_v) {
+      {
+        int res = SWIG_AsVal_bool(argv[1], NULL);
+        _v = SWIG_CheckState(res);
+      }
+      if (_v) {
+        return _wrap_Archiver_GetControl__SWIG_0(self, args);
+      }
+    }
+  }
+  
+fail:
+  SWIG_SetErrorMsg(PyExc_NotImplementedError,"Wrong number of arguments for overloaded function 'Archiver_GetControl'.\n"
+    "  Possible C/C++ prototypes are:\n"
+    "    GetControl(Archiver *,bool)\n"
+    "    GetControl(Archiver *)\n");
   return NULL;
 }
 

@@ -11715,6 +11715,22 @@
 		  </varlistentry>
 
 		  <varlistentry>
+			<term><option>cleanup_follow_purge_after</option></term>
+			<listitem>
+			  <para>Specify if items that are cleaned up from the archive
+			  are at least the age that is specified in the purge_after
+			  setting. This is to avoid messages being deleted from the
+			  archive when they where deleted from the primary store by a
+			  delete operation. Note that setting to yes, will cause a
+			  cleanup run to seemingly do nothing. A rule of thumb is to
+			  set this to the same value as delete_enable. So when
+			  delete_enable is set to yes, make sure
+			  cleanup_follow_purge_after is also set to yes.</para>
+			  <para>Default: <replaceable>no</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
 			<term><option>enable_auto_attach</option></term>
 			<listitem>
 			  <para> Specify whether on each archive run an auto-attach run

@@ -99,7 +99,7 @@ public:
 
 	eResult Init(const char *lpszAppName, const char *lpszConfig, const configsetting_t *lpExtraSettings, unsigned int ulFlags);
 
-	eResult GetControl(ArchiveControlPtr *lpptrControl);
+	eResult GetControl(ArchiveControlPtr *lpptrControl, bool bForceCleanup);
 	eResult GetManage(const TCHAR *lpszUser, ArchiveManagePtr *lpptrManage);
 	eResult AutoAttach(unsigned int ulFlags);
 
@@ -156,10 +156,11 @@ const configsetting_t* Archiver::GetConfigDefaults()
 		{ "delete_after", 	"0" },
 		
 		{ "purge_enable",	"no" },
-		{ "purge_after", 	"0" },
+		{ "purge_after", 	"2555" },
 
 		{ "track_history",	"no" },
 		{ "cleanup_action",	"store" },
+		{ "cleanup_follow_purge_after",	"no" },
 		{ "enable_auto_attach",	"no" },
 		{ "auto_attach_writable",	"yes" },
 
@@ -324,12 +325,12 @@ exit:
 	return r;
 }
 
-eResult ArchiverImpl::GetControl(ArchiveControlPtr *lpptrControl)
+eResult ArchiverImpl::GetControl(ArchiveControlPtr *lpptrControl, bool bForceCleanup)
 {
 	if (!m_MAPI.IsInitialized())
 		return Uninitialized;
 		
-	return MAPIErrorToArchiveError(ArchiveControlImpl::Create(m_ptrSession, m_lpsConfig, m_lpLogger, lpptrControl));
+	return MAPIErrorToArchiveError(ArchiveControlImpl::Create(m_ptrSession, m_lpsConfig, m_lpLogger, bForceCleanup, lpptrControl));
 }
 
 eResult ArchiverImpl::GetManage(const TCHAR *lpszUser, ArchiveManagePtr *lpptrManage)

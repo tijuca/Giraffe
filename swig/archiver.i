@@ -193,11 +193,11 @@ public:
 			return ptr.release();
 		}
 
-		ArchiveControl *GetControl() {
+		ArchiveControl *GetControl(bool bForceCleanup = false) {
 			eResult r = Success;
 			ArchiveControlPtr ptr;
 
-			r = self->GetControl(&ptr);
+			r = self->GetControl(&ptr, bForceCleanup);
 			if (r != Success)
 				throw ArchiverError(r, "Failed to get object!");
 

@@ -165,7 +165,7 @@ public:
 
 	virtual eResult Init(const char *lpszAppName, const char *lpszConfig, const configsetting_t *lpExtraSettings = NULL, unsigned int ulFlags = 0) = 0;
 
-	virtual eResult GetControl(ArchiveControlPtr *lpptrControl) = 0;
+	virtual eResult GetControl(ArchiveControlPtr *lpptrControl, bool bForceCleanup = false) = 0;
 	virtual eResult GetManage(const TCHAR *lpszUser, ArchiveManagePtr *lpptrManage) = 0;
 	virtual eResult AutoAttach(unsigned int ulFlags) = 0;
 
