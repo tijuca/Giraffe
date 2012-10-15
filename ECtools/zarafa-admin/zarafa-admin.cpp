@@ -3421,6 +3421,7 @@ int main(int argc, char* argv[])
 				hr = lpServiceAdmin->ResolveGroupName((LPTSTR)username, 0, &cbUserId, &lpUserId);
 			} else if (strcmp(detailstype, "company") == 0) {
 				ulStoreType = ECSTORE_TYPE_PUBLIC;
+				strCompanyName = convert_to<wstring>(username);
 				hr = lpServiceAdmin->ResolveCompanyName((LPTSTR)username, 0, &cbUserId, &lpUserId);
 			} else {
 				cerr << "Unknown store type: '" << detailstype << "'." << endl;
@@ -3431,24 +3432,45 @@ int main(int argc, char* argv[])
 				goto exit;
 			}
 
-			hr = lpMsgStore->QueryInterface(IID_IExchangeManageStore, (LPVOID*)&lpIEMS);
-			if (hr != hrSuccess)
-				goto exit;
+			if (ulStoreType != ECSTORE_TYPE_PUBLIC) {
+				hr = lpMsgStore->QueryInterface(IID_IExchangeManageStore, (LPVOID*)&lpIEMS);
+				if (hr != hrSuccess)
+					goto exit;
 
-			// do not redirect to another server, unhook works on the server it's connected to
-			hr = lpIEMS->CreateStoreEntryID(NULL, (LPTSTR)username, OPENSTORE_OVERRIDE_HOME_MDB, &cbStoreId, &lpStoreId);
-			if (hr != hrSuccess) {
-				if (hr == MAPI_E_NOT_FOUND)
-					cout << "Unable to unhook store. User '" << username << "' has no store attached." << endl;
-				else
-					cout << "Unable to unhook store. Can not create store entryid, " << getMapiCodeString(hr, "store") << endl;
-				goto exit;
-			}
+				// do not redirect to another server, unhook works on the server it's connected to
+				hr = lpIEMS->CreateStoreEntryID(NULL, (LPTSTR)username, OPENSTORE_OVERRIDE_HOME_MDB, &cbStoreId, &lpStoreId);
+				if (hr != hrSuccess) {
+					if (hr == MAPI_E_NOT_FOUND)
+						cout << "Unable to unhook store. User '" << username << "' has no store attached." << endl;
+					else
+						cout << "Unable to unhook store. Can not create store entryid, " << getMapiCodeString(hr, "store") << endl;
+					goto exit;
+				}
 
-			hr = UnWrapStoreEntryID(cbStoreId, lpStoreId, &cbUnWrappedEntry, &lpUnWrappedEntry);
-			if (hr != hrSuccess) {
-				cout << "Unable to unhook store. Unable to unwrap the store entryid, " << getMapiCodeString(hr, "entryid") << endl;
-				goto exit;
+				hr = UnWrapStoreEntryID(cbStoreId, lpStoreId, &cbUnWrappedEntry, &lpUnWrappedEntry);
+				if (hr != hrSuccess) {
+					cout << "Unable to unhook store. Unable to unwrap the store entryid, " << getMapiCodeString(hr, "entryid") << endl;
+					goto exit;
+				}
+			} else {
+				// ns__resolveUserStore (CreateStoreEntryID) does not work with normal (non-company) public store
+				hr = GetPublicStore(lpSession, lpMsgStore, strCompanyName, &lpPublicStore);
+				if (hr != hrSuccess) {
+					cerr << "Unable to open public store, " << getMapiCodeString(hr, "public") << endl;
+					goto exit;
+				}
+
+				hr = HrGetOneProp(lpPublicStore, PR_STORE_ENTRYID, &lpPropValue);
+				if (hr != hrSuccess) {
+					cerr << "Unable to get public store entryid, " << getMapiCodeString(hr, "store") << endl;
+					goto exit;
+				}
+
+				hr = UnWrapStoreEntryID(lpPropValue->Value.bin.cb, (LPENTRYID)lpPropValue->Value.bin.lpb, &cbUnWrappedEntry, &lpUnWrappedEntry);
+				if (hr != hrSuccess) {
+					cout << "Unable to unhook store. Unable to unwrap the store entryid, " << getMapiCodeString(hr, "entryid") << endl;
+					goto exit;
+				}
 			}
 
 			hr = lpServiceAdmin->UnhookStore(ulStoreType, cbUserId, lpUserId);
