@@ -956,8 +956,18 @@ HRESULT ECTNEF::HrWriteSingleProp(IStream *lpStream, LPSPropValue lpProp)
 				ulLen++;
 			}
 			break;
-
-		// FIXME: PT_CLSID?
+		
+		case PT_CLSID:
+			if(lpProp->ulPropTag & MV_FLAG) {
+				hr = HrWriteData(lpStream, (char *)&lpProp->Value.MVguid.lpguid[ulMVProp], sizeof(GUID));
+				if (hr != hrSuccess)
+					goto exit;
+			} else {
+				hr = HrWriteData(lpStream, (char *)lpProp->Value.lpguid, sizeof(GUID));
+				if (hr != hrSuccess)
+					goto exit;
+			}
+			break;
 
 		default:
 			hr = MAPI_E_INVALID_PARAMETER;
@@ -1427,8 +1437,24 @@ HRESULT ECTNEF::HrReadSingleProp(char *lpBuffer, ULONG ulSize, ULONG *lpulRead, 
 			lpBuffer += ulLen & 3 ? 4 - (ulLen & 3) : 0;
 			ulSize -= ulLen & 3 ? 4 - (ulLen & 3) : 0;
 			break;
+		case PT_CLSID:
+			if(ulSize < sizeof(GUID)) {
+				hr = MAPI_E_CORRUPT_DATA;
+				goto exit;
+			}
+			if(ulPropTag & MV_FLAG) {
+				memcpy(&lpProp->Value.MVguid.lpguid[ulMVProp], lpBuffer, sizeof(GUID));
+			} else {
+				hr = MAPIAllocateMore(sizeof(GUID), lpProp, (LPVOID*)&lpProp->Value.lpguid);
+				if (hr != hrSuccess)
+				    goto exit;
+				    
+				memcpy(lpProp->Value.lpguid, lpBuffer, sizeof(GUID));
+			} 
 
-		// FIXME: PT_CLSID?
+			lpBuffer += sizeof(GUID);
+			ulSize -= sizeof(GUID);
+			break;
 
 		default:
 			hr = MAPI_E_INVALID_PARAMETER;
