@@ -628,6 +628,7 @@ exit:
 HRESULT ZarafaFsckCalendar::ValidateItem(LPMESSAGE lpMessage, string strClass)
 {
 	HRESULT hr = hrSuccess;
+	bool bChanged = false;
 
 	if (strClass != "IPM.Appointment") {
 		std::cout << "Illegal class: \"" << strClass << "\"" << std::endl;
@@ -647,6 +648,9 @@ HRESULT ZarafaFsckCalendar::ValidateItem(LPMESSAGE lpMessage, string strClass)
 	if (hr != hrSuccess)
 		goto exit;
 
+	hr = ValidateRecursiveDuplicateRecipients(lpMessage, bChanged);
 exit:
 	return hr;
 }
+
+

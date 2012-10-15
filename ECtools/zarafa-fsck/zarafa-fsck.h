@@ -52,6 +52,7 @@
 
 #include "platform.h"
 #include <string>
+#include <list>
 using namespace std;
 
 #include <mapidefs.h>
@@ -84,8 +85,14 @@ public:
 				   ULONG ulTag,__UPV Value);
 	HRESULT ReplaceProperty(LPMESSAGE lpMessage, std::string strName,
 				ULONG ulTag, std::string strError, __UPV Value);
+
+	HRESULT DeleteRecipientList(LPMESSAGE lpMessage, std::list<unsigned int> &mapiReciptDel, bool &bChanged);
+
 	HRESULT DeleteMessage(LPMAPIFOLDER lpFolder,
 			      LPSPropValue lpItemProperty);
+
+	HRESULT ValidateRecursiveDuplicateRecipients(LPMESSAGE lpMessage, bool &bChanged);
+	HRESULT ValidateDuplicateRecipients(LPMESSAGE lpMessage, bool &bChanged);
 
 	void PrintStatistics(string title);
 };

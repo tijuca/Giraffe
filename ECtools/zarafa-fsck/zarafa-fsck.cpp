@@ -159,7 +159,9 @@ void disclaimer(bool acceptDisclaimer)
 	cout << "This tool will repair items and remove invalid items from a mailbox." << endl;
 	cout << "It is recommended to use this tool outside of office hours, as it may affect server performance." << endl;
 	cout << "Before running this program, ensure a working backup is available." << endl;
+	cout << "This tool can affect the performance of the server." << endl;
 	cout << endl;
+	cout << "Ensure a good working backup is made." << endl;
 	cout << "To accept these terms, press <ENTER> to continue or <CTRL-C> to quit." << endl;
 
 	if (!acceptDisclaimer)

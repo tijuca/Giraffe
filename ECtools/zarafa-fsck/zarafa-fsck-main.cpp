@@ -50,6 +50,8 @@
 #include <platform.h>
 
 #include <iostream>
+#include <set>
+#include <list>
 
 #include <CommonUtil.h>
 #include <mapiext.h>
@@ -364,6 +366,53 @@ HRESULT ZarafaFsck::ReplaceProperty(LPMESSAGE lpMessage, string strName, ULONG u
 	return hr;
 }
 
+HRESULT ZarafaFsck::DeleteRecipientList(LPMESSAGE lpMessage, std::list<unsigned int> &mapiReciptDel, bool &bChanged)
+{
+	HRESULT hr = hrSuccess;
+
+	std::list<unsigned int>::iterator iter;
+	SRowSet *lpMods = NULL;
+
+	this->ulProblems++;
+
+	cout << mapiReciptDel.size() << " duplicate recipients found. " << endl;
+
+	if (ReadYesNoMessage("Remove duplicate recipients?", auto_fix) )
+	{
+		hr = MAPIAllocateBuffer(CbNewADRLIST(mapiReciptDel.size()), (void**)&lpMods);
+		if (hr != hrSuccess)
+			goto exit;
+
+		lpMods->cRows = 0;
+		for(iter = mapiReciptDel.begin(); iter != mapiReciptDel.end(); iter++) {
+			lpMods->aRow[lpMods->cRows].cValues = 1;
+			MAPIAllocateMore(sizeof(SPropValue), lpMods, (void**)&lpMods->aRow[lpMods->cRows].lpProps);
+			lpMods->aRow[lpMods->cRows].lpProps->ulPropTag = PR_ROWID;
+			lpMods->aRow[lpMods->cRows].lpProps->Value.ul = *iter;
+
+			lpMods->cRows++;
+		}
+
+		hr = lpMessage->ModifyRecipients(MODRECIP_REMOVE, (LPADRLIST)lpMods);
+		if (hr != hrSuccess)
+			goto exit;
+
+		hr = lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
+		if (hr != hrSuccess)
+			goto exit;
+
+		bChanged = true;
+
+		this->ulFixed++;
+	}
+exit:
+
+	if (lpMods)
+		MAPIFreeBuffer(lpMods);
+
+	return hr;
+}
+
 HRESULT ZarafaFsck::DeleteMessage(LPMAPIFOLDER lpFolder, LPSPropValue lpItemProperty)
 {
 	HRESULT hr = hrSuccess;
@@ -377,6 +426,187 @@ HRESULT ZarafaFsck::DeleteMessage(LPMAPIFOLDER lpFolder, LPSPropValue lpItemProp
 	return hr;
 }
 
+HRESULT ZarafaFsck::ValidateRecursiveDuplicateRecipients(LPMESSAGE lpMessage, bool &bChanged)
+{
+	HRESULT hr = hrSuccess;
+	bool bSubChanged = false;
+	LPATTACH lpAttach = NULL;
+	LPMAPITABLE lpTable = NULL;
+    ULONG cRows = 0;
+    SRowSet *pRows = NULL;
+	LPMESSAGE lpSubMessage = NULL;
+
+	SizedSPropTagArray(2, sptaProps) = {2, {PR_ATTACH_NUM, PR_ATTACH_METHOD}};
+
+	hr = lpMessage->GetAttachmentTable(0, &lpTable);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = lpTable->GetRowCount(0, &cRows);
+	if (hr != hrSuccess)
+		goto exit;
+
+	if (cRows == 0)
+		goto message;
+
+	hr = lpTable->SetColumns((LPSPropTagArray)&sptaProps, 0);
+	if (hr != hrSuccess)
+		goto exit;
+
+	while (true) {
+		hr = lpTable->QueryRows(50, 0, &pRows);
+		if (hr != hrSuccess)
+			goto exit;
+
+		if (pRows->cRows == 0)
+			break;
+
+		for (unsigned int i = 0; i < pRows->cRows; i++) {
+			if (pRows->aRow[i].lpProps[1].ulPropTag == PR_ATTACH_METHOD && pRows->aRow[i].lpProps[1].Value.ul == ATTACH_EMBEDDED_MSG)
+			{
+				bSubChanged = false;
+
+				hr = lpMessage->OpenAttach(pRows->aRow[i].lpProps[0].Value.ul, NULL, MAPI_BEST_ACCESS, &lpAttach);
+				if (hr != hrSuccess)
+					goto exit;
+
+				hr = lpAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, MAPI_MODIFY, (LPUNKNOWN*)&lpSubMessage);
+				if (hr != hrSuccess)
+					goto exit;
+
+				hr = ValidateRecursiveDuplicateRecipients(lpSubMessage, bSubChanged);
+				if (hr != hrSuccess)
+					goto exit;
+
+				if (bSubChanged) {
+					hr = lpAttach->SaveChanges(KEEP_OPEN_READWRITE);
+					if (hr != hrSuccess)
+						goto exit;
+
+					bChanged = bSubChanged;
+				}
+				lpAttach->Release();
+				lpAttach = NULL;
+				lpSubMessage->Release();
+				lpSubMessage = NULL;
+
+			}
+
+		}
+
+		FreeProws(pRows);
+		pRows = NULL;
+	}
+
+
+message:
+	lpTable->Release();
+	lpTable = NULL;
+
+	hr = ValidateDuplicateRecipients(lpMessage, bChanged);
+	if (hr != hrSuccess)
+		goto exit;
+
+	if (bChanged)
+		lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
+
+exit:
+	if (lpTable)
+		lpTable->Release();
+
+	if (lpAttach)
+		lpAttach->Release();
+
+	if (lpSubMessage)
+		lpSubMessage->Release();
+
+	if (pRows)
+		FreeProws(pRows);
+
+	return hr;
+}
+
+HRESULT ZarafaFsck::ValidateDuplicateRecipients(LPMESSAGE lpMessage, bool &bChanged)
+{
+	HRESULT hr = hrSuccess;
+	LPMAPITABLE lpTable = NULL;
+	ULONG cRows = 0;
+	std::set<std::string> mapRecip;
+	std::list<unsigned int> mapiReciptDel;
+	std::list<unsigned int>::iterator iter;
+	SRowSet *pRows = NULL;
+	std::string strData;
+	std::pair<std::set<std::string>::iterator, bool> res;
+	unsigned int i = 0;
+
+	SizedSPropTagArray(4, sptaProps) = {4, {PR_ROWID, PR_DISPLAY_NAME_A, PR_EMAIL_ADDRESS_A, PR_RECIPIENT_TYPE}};
+
+	hr = lpMessage->GetRecipientTable(0, &lpTable);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = lpTable->GetRowCount(0, &cRows);
+	if (hr != hrSuccess)
+		goto exit;
+
+
+	if (cRows < 1) {
+		// 0 or 1 row not needed to check
+		goto exit;
+	}
+
+	hr = lpTable->SetColumns((LPSPropTagArray)&sptaProps, 0);
+	if (hr != hrSuccess)
+		goto exit;
+
+	while (true) {
+		hr = lpTable->QueryRows(50, 0, &pRows);
+		if (hr != hrSuccess)
+			goto exit;
+
+		if (pRows->cRows == 0)
+			break;
+
+		for (i = 0; i < pRows->cRows; i++) {
+
+			if (pRows->aRow[i].lpProps[1].ulPropTag != PR_DISPLAY_NAME_A && pRows->aRow[i].lpProps[2].ulPropTag != PR_EMAIL_ADDRESS_A) {
+				mapiReciptDel.push_back(pRows->aRow[i].lpProps[0].Value.ul);
+				continue;
+			}
+
+			strData.clear();
+
+			if (pRows->aRow[i].lpProps[1].ulPropTag == PR_DISPLAY_NAME_A)   strData += pRows->aRow[i].lpProps[1].Value.lpszA;
+			if (pRows->aRow[i].lpProps[2].ulPropTag == PR_EMAIL_ADDRESS_A)  strData += pRows->aRow[i].lpProps[2].Value.lpszA;
+			if (pRows->aRow[i].lpProps[3].ulPropTag == PR_RECIPIENT_TYPE)   strData += stringify(pRows->aRow[i].lpProps[3].Value.ul);
+
+			res = mapRecip.insert(strData);
+			if (res.second == false)
+				mapiReciptDel.push_back(pRows->aRow[i].lpProps[0].Value.ul);
+		}
+
+		FreeProws(pRows);
+		pRows = NULL;
+	}
+
+	lpTable->Release();
+	lpTable = NULL;
+
+	// modify
+	if (!mapiReciptDel.empty()) {
+		hr = DeleteRecipientList(lpMessage, mapiReciptDel, bChanged);
+	}
+
+
+	
+exit:
+	if (lpTable)
+		lpTable->Release();
+
+	if (pRows)
+		FreeProws(pRows);
+	return hr;
+}
 void ZarafaFsck::PrintStatistics(string title)
 {
 	cout << title << endl;
