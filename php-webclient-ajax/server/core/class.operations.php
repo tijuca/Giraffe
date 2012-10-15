@@ -1851,6 +1851,7 @@
 			
 			switch($msgprops[PR_MDB_PROVIDER]){
 				case ZARAFA_STORE_DELEGATE_GUID:
+				case ZARAFA_STORE_ARCHIVER_GUID:
 					// with a store from an other user we need our own waste basket...
 					if(isset($msgprops[PR_IPM_WASTEBASKET_ENTRYID]) && $msgprops[PR_IPM_WASTEBASKET_ENTRYID] == $parententryid || $softDelete == true) {
 						// except when it is the waste basket itself
