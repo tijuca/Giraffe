@@ -1365,8 +1365,14 @@ ECRESULT UpdateFolderCount(ECDatabase *lpDatabase, unsigned int ulFolderId, unsi
 		ASSERT(ulType == MAPI_FOLDER);
 		goto exit;
 	}
-	
-	strQuery = "UPDATE properties SET val_ulong = val_ulong + " + stringify(lDelta,false,true) + " WHERE hierarchyid = " + stringify(ulFolderId) + " AND tag = " + stringify(PROP_ID(ulPropTag)) + " AND type = " + stringify(PROP_TYPE(ulPropTag));
+
+	strQuery = "UPDATE properties SET val_ulong = ";
+	// make sure val_ulong stays a positive number
+	if (lDelta < 0)
+		strQuery += "IF (val_ulong >= " + stringify(abs(lDelta),false,true) + ", val_ulong + " + stringify(lDelta,false,true) + ", 0)";
+	else
+		strQuery += "val_ulong + " + stringify(lDelta,false,true);
+	strQuery += " WHERE hierarchyid = " + stringify(ulFolderId) + " AND tag = " + stringify(PROP_ID(ulPropTag)) + " AND type = " + stringify(PROP_TYPE(ulPropTag));
 	er = lpDatabase->DoUpdate(strQuery);
 	if(er != erSuccess)
 		goto exit;
