@@ -221,7 +221,7 @@ class MAPIError(Exception):
             if name.startswith('MAPI_E_'):
                 clsname = 'MAPIError' + ''.join(s.capitalize() for s in name[7:].split('_'))
                 def construct_class(hr):
-                    return type(clsname, (MAPIError,), {'__init__': lambda(self): MAPIError.__init__(self, hr)})
+                    return type(clsname, (MAPIError,object), {'__init__': lambda(self): MAPIError.__init__(self, hr)})
                 t = construct_class(value)
                 setattr(sys.modules[__name__], clsname, t)
                 MAPIError._errormap[value] = t
