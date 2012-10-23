@@ -6,15 +6,8 @@
 
 #include <platform.h>
 
-/* 
- * this gSoap still uses select(), and only handles sockets > 1024 if
- * you don't have a glibc which checks for compiletime boundaries on
- * this limit.
- */
-#ifndef _FORTIFY_SOURCE
 # include <bits/types.h>
 # undef __FD_SETSIZE
 # define __FD_SETSIZE 8192
-#endif
 
 #endif // ndef SOAPDEFS_H_
