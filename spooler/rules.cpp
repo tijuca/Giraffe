@@ -796,6 +796,7 @@ HRESULT HrProcessRules(LPMAPISESSION lpSession, LPADRBOOK lpAdrBook, LPMDB lpOri
 	LPMESSAGE lpFwdMsg = NULL;
 	ULONG ulObjType;
 	bool bAddFwdFlag = false;
+	bool bMoved = false;
 	IMessage *lpNewMessage = NULL;
 
     LPSRowSet lpRowSet = NULL;
@@ -936,20 +937,14 @@ HRESULT HrProcessRules(LPMAPISESSION lpSession, LPADRBOOK lpAdrBook, LPMDB lpOri
 					goto exit;
 				}
 
-				if (lpActions->lpAction[n].acttype == OP_MOVE) {
-					// Release the original message, it will disappear unsaved
-					(*lppMessage)->Release();
-					*lppMessage = lpNewMessage;
-					lpNewMessage = NULL;
-				} else {
-					// Save the copy in its new location
-					hr = lpNewMessage->SaveChanges(0);
-				}
+				// Save the copy in its new location
+				hr = lpNewMessage->SaveChanges(0);
 				if (hr != hrSuccess) {
 					lpLogger->Log(EC_LOGLEVEL_FATAL, (std::string)"Rule "+strRule+": Unable to copy/move message");
 					goto nextact;
 				}
-
+				if (lpActions->lpAction[n].acttype == OP_MOVE)
+					bMoved = true;
 				break;
 
 			// may become dam's, may become normal rules (ol2k3)
@@ -1133,6 +1128,10 @@ exit:
 	if (hr != hrSuccess && hr != MAPI_E_CANCEL)
 		lpLogger->Log(EC_LOGLEVEL_INFO, "Error while processing rules: 0x%08X", hr);
 
+	// The message was moved to another folder(s), do not save it in the inbox anymore, so cancel it.
+	if (hr == hrSuccess && bMoved)
+		hr = MAPI_E_CANCEL;
+	
 	if (lpNewMessage)
 		lpNewMessage->Release();
 
