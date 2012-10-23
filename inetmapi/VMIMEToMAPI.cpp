@@ -1595,6 +1595,34 @@ exit:
 	return hr;
 }
 
+/** 
+ * Find the best alternatives in a body. Returns a list sorted on best alternative.
+ *
+ * Currently places text/plain alternatives as last, anything else at the front,
+ * returning the later bodies (considered best by rfc-1521) as better.
+ * 
+ * @param[in] vmBody Alternative body container
+ * 
+ * @return sorted list of body alternatives
+ */
+list<int> VMIMEToMAPI::findBestAlternative(vmime::ref<vmime::body> vmBody) {
+	vmime::ref<vmime::header> vmHeader;
+	vmime::ref<vmime::bodyPart> vmBodyPart;
+	vmime::ref<vmime::mediaType> mt;
+	list<int> lBodies;
+
+	for (int i = vmBody->getPartCount(); i > 0; i--) {
+		vmBodyPart = vmBody->getPartAt(i - 1);
+		vmHeader = vmBodyPart->getHeader();
+		mt = vmHeader->ContentType()->getValue().dynamicCast<vmime::mediaType>();
+		// mostly better alternatives for text/plain, so try that last
+		if (mt->getType() == "text" && mt->getSubType() == "plain")
+			lBodies.push_back(i - 1);
+		else
+			lBodies.push_front(i - 1);
+	}
+	return lBodies;
+}
 
 /**
  * Disect Body
@@ -1653,13 +1681,17 @@ HRESULT VMIMEToMAPI::disectBody(vmime::ref<vmime::header> vmHeader, vmime::ref<v
 					bAlternative = true;
 
 				if (bAlternative) {
+					list<int> lBodies = findBestAlternative(vmBody);
+
 					// recursively process multipart alternatives in reverse to select best body first
-					for (int i = vmBody->getPartCount(); i > 0; i--) {
-						vmBodyPart = vmBody->getPartAt(i - 1);
+					for (list<int>::iterator i = lBodies.begin(); i != lBodies.end(); i++) {
+						vmBodyPart = vmBody->getPartAt(*i);
+
+						lpLogger->Log(EC_LOGLEVEL_DEBUG, "Trying to parse alternative multipart %d of mail body", *i);
 
 						hr = disectBody(vmBodyPart->getHeader(), vmBodyPart->getBody(), lpMessage, onlyBody, bFilterDouble, bAppendBody);
 						if (hr != hrSuccess)
-							lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to parse alternative multipart %d of mail body, trying other alternatives", i);
+							lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to parse alternative multipart %d of mail body, trying other alternatives", *i);
 						else
 							break;
 					}
