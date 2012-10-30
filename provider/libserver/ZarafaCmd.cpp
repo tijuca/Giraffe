@@ -7197,7 +7197,7 @@ SOAP_ENTRY_START(submitMessage, *result, entryId sEntryId, unsigned int ulFlags,
 		goto exit;
 
 	// Insert the message into the outgoing queue
-	strQuery = "INSERT INTO outgoingqueue (store_id, hierarchy_id, flags) VALUES("+stringify(ulStoreId)+", "+stringify(ulObjId)+","+stringify(ulFlags)+")";
+	strQuery = "INSERT IGNORE INTO outgoingqueue (store_id, hierarchy_id, flags) VALUES("+stringify(ulStoreId)+", "+stringify(ulObjId)+","+stringify(ulFlags)+")";
 	er = lpDatabase->DoInsert(strQuery);
 	if(er != erSuccess)
 		goto exit;
