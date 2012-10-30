@@ -57,6 +57,8 @@
 #include "globals.h"
 ZEND_EXTERN_MODULE_GLOBALS(mapi)
 
+#include "charset/convert.h"
+
 /*
  * PHP -> MAPI
  *
@@ -96,5 +98,8 @@ HRESULT			RowSettoPHPArray(LPSRowSet lpRowSet, zval **ret TSRMLS_DC);
 HRESULT 		ReadStateArraytoPHPArray(ULONG cValues, LPREADSTATE lpReadStates, zval **ret TSRMLS_DC);
 HRESULT			NotificationstoPHPArray(ULONG cNotifs, LPNOTIFICATION lpNotifs, zval **ret TSRMLS_DC);
 
+/* conversion from unicode to string8 for rules table data */
+HRESULT ConvertUnicodeToString8(LPSRestriction lpRes, void *base, convert_context &converter);
+HRESULT ConvertUnicodeToString8(ACTIONS* lpActions, void *base, convert_context &converter);
 
 #endif

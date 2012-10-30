@@ -118,6 +118,9 @@ HRESULT CopyICSChangeToSOAPSourceKeys(ULONG cbChanges, ICSCHANGE *lpsChanges, so
 HRESULT Utf8ToTString(LPCSTR lpszUtf8, ULONG ulFlags, LPVOID lpBase, convert_context *lpConverter, LPTSTR *lppszTString);
 HRESULT TStringToUtf8(LPCTSTR lpszTstring, ULONG ulFlags, LPVOID lpBase, convert_context *lpConverter, LPSTR *lppszUtf8);
 
+HRESULT ConvertString8ToUnicode(LPSRowSet lpRowSet);
+HRESULT ConvertString8ToUnicode(LPSRow lpRow, void *base, convert_context &converter);
+
 #endif
 
 
