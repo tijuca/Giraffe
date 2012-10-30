@@ -235,8 +235,11 @@ HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 		pos = str_ifind(strHTML.c_str(), strFind.c_str());
 		pos = pos ? pos + strFind.length() : strHTML.c_str();
 		// if body tag was not found, this will make it be placed after the first tag, probably <html>
-		while (*pos && *pos != '>') pos++;
-		if (*pos == '>') pos++;
+		if ((pos == strHTML.c_str() && *pos == '<') || (pos != strHTML.c_str())) {
+			// not all html bodies start actually using tags, so only seek if we find a <, or if we found a body tag starting point.
+			while (*pos && *pos != '>') pos++;
+			if (*pos == '>') pos++;
+		}
 
 
 		{
@@ -990,7 +993,7 @@ HRESULT HrProcessRules(LPMAPISESSION lpSession, LPADRBOOK lpAdrBook, LPMDB lpOri
 					continue; // Nothing todo
 				}
 
-				lpLogger->Log(EC_LOGLEVEL_DEBUG, "Rule action: forwarding e-mail");
+				lpLogger->Log(EC_LOGLEVEL_DEBUG, "Rule action: %s e-mail", (lpActions->lpAction[n].ulActionFlavor & FWD_PRESERVE_SENDER) ? "redirecting" : "forwarding");
 
 				hr = CreateForwardCopy(lpLogger, lpAdrBook, lpOrigStore, *lppMessage, lpActions->lpAction[n].lpadrlist,
 									   false,
