@@ -2176,8 +2176,14 @@ ECRESULT WriteProps(struct soap *soap, ECSession *lpecSession, ECDatabase *lpDat
 
 		// Same goes for flags in PR_MESSAGE_FLAGS
 		if(lpPropValArray->__ptr[i].ulPropTag == PR_MESSAGE_FLAGS) {
-			// Normalize PR_MESSAGE_FLAGS so that the user cannot set things like MSGFLAG_ASSOCIATED 
-		    lpPropValArray->__ptr[i].Value.ul = (lpPropValArray->__ptr[i].Value.ul & (MSGFLAG_SETTABLE_BY_USER | MSGFLAG_SETTABLE_BY_SPOOLER)) | ulFlags;
+			if (ulSyncId == 0) {
+				// Normalize PR_MESSAGE_FLAGS so that the user cannot set things like MSGFLAG_ASSOCIATED 
+				lpPropValArray->__ptr[i].Value.ul = (lpPropValArray->__ptr[i].Value.ul & (MSGFLAG_SETTABLE_BY_USER | MSGFLAG_SETTABLE_BY_SPOOLER)) | ulFlags;
+			} else {
+				// Normalize PR_MESSAGE_FLAGS so that the user cannot change flags that are also
+				// stored in the hierarchy table.
+				lpPropValArray->__ptr[i].Value.ul = (lpPropValArray->__ptr[i].Value.ul & ~MSGFLAG_UNSETTABLE) | ulFlags;
+			}
 		}
 
 		// Make sure we dont have a colliding PR_SOURCE_KEY. This can happen if a user imports an exported message for example.

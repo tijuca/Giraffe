@@ -1399,11 +1399,13 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 
 		// Same goes for flags in PR_MESSAGE_FLAGS
 		if (lpsPropval->ulPropTag == PR_MESSAGE_FLAGS) {
-			// Normalize PR_MESSAGE_FLAGS so that the user cannot set things like MSGFLAG_ASSOCIATED 
-		    lpsPropval->Value.ul &= (MSGFLAG_SETTABLE_BY_USER | MSGFLAG_SETTABLE_BY_SPOOLER);
+		    // ulFlags is obtained from the hierarchy table, which should only contain
+		    // 'unsettable' flags
+		    ASSERT((ulFlags & ~MSGFLAG_UNSETTABLE) == 0);
 
-		    // Now add the 'unsettable' flags
-		    lpsPropval->Value.ul |= (ulFlags & ~(MSGFLAG_SETTABLE_BY_USER | MSGFLAG_SETTABLE_BY_SPOOLER));
+			// Normalize PR_MESSAGE_FLAGS so that the user cannot change flags that are also
+			// stored in the hierarchy table.
+		    lpsPropval->Value.ul = (lpsPropval->Value.ul & ~MSGFLAG_UNSETTABLE) | ulFlags;
 
 			if (lpPropValArray)
 				CopyPropVal(lpsPropval, lpPropValArray->__ptr + lpPropValArray->__size++);
