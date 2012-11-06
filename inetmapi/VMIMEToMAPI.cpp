@@ -1611,15 +1611,15 @@ list<int> VMIMEToMAPI::findBestAlternative(vmime::ref<vmime::body> vmBody) {
 	vmime::ref<vmime::mediaType> mt;
 	list<int> lBodies;
 
-	for (int i = vmBody->getPartCount(); i > 0; i--) {
-		vmBodyPart = vmBody->getPartAt(i - 1);
+	for (int i = 0; i < vmBody->getPartCount(); i++) {
+		vmBodyPart = vmBody->getPartAt(i);
 		vmHeader = vmBodyPart->getHeader();
 		mt = vmHeader->ContentType()->getValue().dynamicCast<vmime::mediaType>();
 		// mostly better alternatives for text/plain, so try that last
 		if (mt->getType() == "text" && mt->getSubType() == "plain")
-			lBodies.push_back(i - 1);
+			lBodies.push_back(i);
 		else
-			lBodies.push_front(i - 1);
+			lBodies.push_front(i);
 	}
 	return lBodies;
 }
