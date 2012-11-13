@@ -334,14 +334,23 @@ ECRESULT ECDatabaseMySQL::CheckExistIndex(const std::string strTable, const std:
 	ECRESULT		er = erSuccess;
 	std::string		strQuery;
 	DB_RESULT		lpDBResult = NULL;
-	
-	strQuery = "SHOW INDEXES FROM " + strTable + " WHERE Key_name='" + strKey + "'";
+	DB_ROW			lpRow = NULL;
+
+	// WHERE not supported in MySQL < 5.0.3 
+	strQuery = "SHOW INDEXES FROM " + strTable;
 
 	er = DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess)
 		goto exit;
 
-	*lpbExist = (FetchRow(lpDBResult) != NULL);
+	*lpbExist = false;
+	while ((lpRow = FetchRow(lpDBResult)) != NULL) {
+		// 2 is Key_name
+		if (lpRow[2] && strcmp(lpRow[2], strKey.c_str()) == 0) {
+			*lpbExist = true;
+			break;
+		}
+	}
 
 exit:
 	if (lpDBResult)
