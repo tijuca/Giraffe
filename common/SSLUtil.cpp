@@ -95,7 +95,9 @@ void ssl_threading_cleanup() {
 		pthread_mutex_destroy(&ssl_locks[i]);
 	delete [] ssl_locks;
 	ssl_locks = NULL;
+	CRYPTO_set_id_callback(NULL);
 	CRYPTO_set_locking_callback(NULL);
+
 }
 
 /**
