@@ -659,6 +659,10 @@ ECRESULT ECDispatcher::NotifyDone(struct soap *soap)
 ECRESULT ECDispatcher::SetThreadCount(unsigned int ulThreads)
 {
     ECRESULT er = erSuccess;
+
+	// if we receive a signal before the MainLoop() has started, we don't have thread manager yet
+	if (m_lpThreadManager == NULL)
+		goto exit;
     
     er = m_lpThreadManager->SetThreadCount(ulThreads);
     if(er != erSuccess)
