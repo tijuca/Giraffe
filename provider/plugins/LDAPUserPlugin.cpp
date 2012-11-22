@@ -1434,20 +1434,9 @@ auto_ptr<signatures_t> LDAPUserPlugin::resolveObjectsFromAttributesType(objectcl
 		 * will request the unique modification attributes for all
 		 * members in a single shot. With this data we can construct
 		 * the list of object signatures */
-		try {
-			signatures = resolveObjectsFromAttributes(objclass, objects, lppAttr, company);
-		} catch (objectnotfound &e) {
-			// resolve failed, drop entry
-			goto exit;
-		} catch (ldap_error &e) {
-			throw;
-		} catch (std::exception &e) {
-			// query failed, drop entry
-			goto exit;
-		}
+		signatures = resolveObjectsFromAttributes(objclass, objects, lppAttr, company);
 	}
 
-exit:
 	return signatures;
 }
 
@@ -2254,10 +2243,11 @@ auto_ptr<map<objectid_t, objectdetails_t> > LDAPUserPlugin::getObjectDetails(con
 					o->second.AddPropObject(p->propname, iSignature->id);
 				}
 			} catch (ldap_error &e) {
-				// we never get here, since resolveObjectsFromAttributeType() already catches errors
 				if(!LDAP_NAME_ERROR(e.GetLDAPError()))
 					throw;
-			} catch (...) {}
+			} catch (std::exception &e) {
+				m_logger->Log(EC_LOGLEVEL_ERROR, "Unable to resolve object from relational attribute type '%s'", p->relAttr);
+			}
 		} else {
 			// string, so use SetPropObject
 			try {
@@ -2268,10 +2258,11 @@ auto_ptr<map<objectid_t, objectdetails_t> > LDAPUserPlugin::getObjectDetails(con
 				else
 					m_logger->Log(EC_LOGLEVEL_ERROR, "Unable to find relation %s in attribute %s", p->ldap_attr.c_str(), p->relAttr);
 			} catch (ldap_error &e) {
-				// we never get here, since resolveObjectsFromAttributeType() already catches errors
 				if(!LDAP_NAME_ERROR(e.GetLDAPError()))
 					throw;
-			} catch (...) {}
+			} catch (std::exception &e) {
+				m_logger->Log(EC_LOGLEVEL_ERROR, "Unable to resolve object from relational attribute type '%s'", p->relAttr);
+			}
 		}
 	}
 
