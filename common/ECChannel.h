@@ -75,7 +75,7 @@ public:
 	HRESULT HrEnableTLS();
 
 	HRESULT HrGets(char *szBuffer, ULONG ulBufSize, ULONG *lpulRead);
-	HRESULT HrReadLine(std::string * strBuffer);
+	HRESULT HrReadLine(std::string * strBuffer, ULONG ulMaxBuffer = 65536);
 	HRESULT HrWriteString(char * szBuffer);
 	HRESULT HrWriteString(const std::string & strBuffer);
 	HRESULT HrWriteLine(char *szBuffer, int len = 0);

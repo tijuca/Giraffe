@@ -240,7 +240,17 @@ HRESULT ECChannel::HrGets(char *szBuffer, ULONG ulBufSize, ULONG *lpulRead) {
 	return MAPI_E_CALL_FAILED;
 }
 
-HRESULT ECChannel::HrReadLine(std::string * strBuffer) {
+/** 
+ * Read a line from a socket. Reads as much data until it encounters a
+ * \n characters.
+ * 
+ * @param[out] strBuffer network data will be placed in this buffer
+ * @param[in] ulMaxBuffer optional, default 65k, breaks reading after this limit is reached
+ * 
+ * @return MAPI_ERROR_CODE
+ * @retval MAPI_E_TOO_BIG more data in the network buffer than requested to read
+ */
+HRESULT ECChannel::HrReadLine(std::string * strBuffer, ULONG ulMaxBuffer) {
 	HRESULT hr = hrSuccess;
 	ULONG ulRead = 0;
 
@@ -254,7 +264,14 @@ HRESULT ECChannel::HrReadLine(std::string * strBuffer) {
 
 	do {
 		hr = HrGets(buffer, 65536, &ulRead);
+		if (hr != hrSuccess)
+			break;
+
 		strBuffer->append(buffer, ulRead);
+		if (strBuffer->size() > ulMaxBuffer) {
+			hr = MAPI_E_TOO_BIG;
+			break;
+		}
 	} while (ulRead == 65535);	// zero-terminator is not counted
 
 	return hr;
@@ -467,13 +484,24 @@ bool ECChannel::sslctx() {
 	return (lpCTX != NULL);
 }
 
+/** 
+ * read from buffer until \n is found, or buffer length is reached
+ * return buffer always contains \0 in the end, so max read from network is *lpulLen -1
+ *
+ * @param[out] buf buffer to read network data in
+ * @param[in,out] lpulLen input is max size to read, output is read bytes from network
+ * 
+ * @return NULL on error, or buf
+ */
 char * ECChannel::fd_gets(char *buf, int *lpulLen) {
 	char *newline, *bp = buf;
 	int len = *lpulLen;
 	int n;
+
 	if (--len < 1)
 		return NULL;
 	do {
+		// return NULL when we read nothing: other side closed it's writing socket
 		if ((n = recv(fd, bp, len, MSG_PEEK)) <= 0)
 			return NULL;
 
@@ -508,6 +536,7 @@ char * ECChannel::SSL_gets(char *buf, int *lpulLen) {
 	if (--len < 1)
 		return NULL;
 	do {
+		// return NULL when we read nothing: other side closed it's writing socket
 		if ((n = SSL_peek(lpSSL, bp, len)) <= 0)
 			return NULL;
 
