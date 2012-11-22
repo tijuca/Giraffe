@@ -3,8 +3,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PHP-Langadmin 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2012-05-02 00:01+0200\n"
-"PO-Revision-Date: 2011-06-14 10:05+0200\n"
+"POT-Creation-Date: 2012-06-14 00:02+0200\n"
+"PO-Revision-Date: 2012-06-13 17:26+0200\n"
 "Last-Translator: Michele <m.brodoloni@casalicomputers.com>\n"
 "Language-Team: it_IT <it@li.org>\n"
 "Language: it\n"
@@ -2166,7 +2166,7 @@ msgstr "Elimina questo messaggio"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/rule.php:144
 msgid "Redirect to"
-msgstr ""
+msgstr "Reindirizza a"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/rule.php:156
 msgid "Forward to"
@@ -2174,7 +2174,7 @@ msgstr "Inoltra a"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/rule.php:168
 msgid "Forward as Attachment to"
-msgstr ""
+msgstr "Inoltra come allegato a"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/rule.php:180
 msgid "Stop processing more rules"
@@ -2315,7 +2315,7 @@ msgstr "Tipo cartella"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/sharedfolder.php:34
 msgid "Show subfolders"
-msgstr ""
+msgstr "Mostra sottocartelle"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/addtofavorite.php:4
 msgid "Add to favorite folder"
@@ -3494,10 +3494,9 @@ msgstr ""
 # 92%
 #: php-webclient-ajax/server/modules/class.listmodule.php:165
 #: php-webclient-ajax/server/modules/class.itemmodule.php:162
-#, fuzzy
 msgid "You have insufficient privileges to delete items in this folder"
 msgstr ""
-"Non si dispone dei privilegi necessari per salvare elementi in questa "
+"Non si dispone dei privilegi necessari per eliminare elementi in questa "
 "cartella"
 
 #: php-webclient-ajax/server/modules/class.listmodule.php:219
@@ -3886,7 +3885,7 @@ msgstr "Partecipante Richiesto"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:44
 msgid "Sort on Required Attendee"
-msgstr ""
+msgstr "Ordina per Partecipante Richiesto"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:45
 #: php-webclient-ajax/client/modules/freebusymodule.js:1134
@@ -3895,11 +3894,11 @@ msgstr "Partecipante Opzionale"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:45
 msgid "Sort on Optional Attendee"
-msgstr ""
+msgstr "Ordina per Partecipante Opzionale"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:46
 msgid "Sort on Resource"
-msgstr ""
+msgstr "Ordina per Risorsa"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:48
 msgid "Sort on Busy Status"
@@ -5650,7 +5649,7 @@ msgstr "Inserire un indirizzo e-mail valido!"
 #: php-webclient-ajax/client/core/utils.js:1582
 #, fuzzy, c-format
 msgid "Due every weekday effective %s"
-msgstr "Scade ogni giorno feriale da %s"
+msgstr "Scade ogni giorno feriale dal %s"
 
 #: php-webclient-ajax/client/core/utils.js:1584
 #, fuzzy, c-format
@@ -5832,7 +5831,7 @@ msgstr "Informazioni di fatturazione"
 
 #: php-webclient-ajax/client/core/layoutmanager.js:283
 msgid "you are logged on as"
-msgstr "Hai avuto accesso come"
+msgstr "Sei entrato come"
 
 #: php-webclient-ajax/client/core/layoutmanager.js:293
 msgid "settings"
@@ -6064,9 +6063,8 @@ msgid "Next week"
 msgstr "Settimana successiva"
 
 #: php-webclient-ajax/client/views/calendar.day.view.js:233
-#, fuzzy
 msgid "%a %e %h"
-msgstr "%a %d %h"
+msgstr "%a %e %h"
 
 #: php-webclient-ajax/client/views/calendar.day.view.js:1941
 msgid ""
@@ -6220,7 +6218,7 @@ msgstr "I valori inseriti per la Dimensione non sono validi"
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1554
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1895
 msgid "Search for the words(s)"
-msgstr ""
+msgstr "Testo da cercare"
 
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1324
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1445
@@ -6303,9 +6301,8 @@ msgid "ends"
 msgstr "Finisce"
 
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1566
-#, fuzzy
 msgid "file as field only"
-msgstr "Archivia solo campo"
+msgstr "Solo campo Archivia come"
 
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1567
 msgid "name fields only"
@@ -6330,7 +6327,7 @@ msgstr "Solo campo Numero di Telefono"
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1667
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1757
 msgid "Search for the word(s)"
-msgstr ""
+msgstr "Ricerca testo"
 
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1679
 msgid "contents only"
@@ -6363,9 +6360,8 @@ msgstr "differito"
 
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1837
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1974
-#, fuzzy
 msgid "due"
-msgstr "Data Utile"
+msgstr "data utile"
 
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1838
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1975
@@ -6764,7 +6760,7 @@ msgstr ""
 
 #: php-webclient-ajax/client/layout/js/dialog.js:324
 msgid "You must enter at least one recipient in To field."
-msgstr ""
+msgstr "Devi inserire almeno un destinatario nel campo A."
 
 #: php-webclient-ajax/client/layout/js/dialog.js:443
 msgid "No signatures"

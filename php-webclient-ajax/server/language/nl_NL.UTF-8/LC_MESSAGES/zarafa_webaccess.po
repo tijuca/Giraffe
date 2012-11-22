@@ -3,9 +3,9 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Zarafa WebAccess\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2012-05-02 00:01+0200\n"
-"PO-Revision-Date: 2012-03-20 15:58+0200\n"
-"Last-Translator: Erwin <erwin@ecm2.nl>\n"
+"POT-Creation-Date: 2012-06-07 00:01+0200\n"
+"PO-Revision-Date: 2012-06-06 13:09+0200\n"
+"Last-Translator: Remon <remon@zarafa.com>\n"
 "Language-Team: nl_NL <nl@li.org>\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
@@ -2162,7 +2162,7 @@ msgstr "Verwijder het bericht"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/rule.php:144
 msgid "Redirect to"
-msgstr "Doorsturen naar"
+msgstr "Omleiden naar"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/rule.php:156
 msgid "Forward to"

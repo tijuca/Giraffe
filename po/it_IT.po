@@ -3,8 +3,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PHP-Langadmin 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2012-05-02 00:01+0200\n"
-"PO-Revision-Date: 2011-06-10 18:08+0200\n"
+"POT-Creation-Date: 2012-10-05 18:07+0200\n"
+"PO-Revision-Date: 2012-06-13 17:14+0200\n"
 "Last-Translator: Michele <m.brodoloni@casalicomputers.com>\n"
 "Language-Team: it_IT <it@li.org>\n"
 "Language: it\n"
@@ -14,100 +14,100 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Pootle 2.1.5\n"
 
-#: provider/ECProps/Addin.cpp:501 provider/ECProps/SyncBar.cpp:326
+#: provider/ECProps/Addin.cpp:516 provider/ECProps/SyncBar.cpp:326
 msgid "Configure"
 msgstr "Configura"
 
-#: provider/ECProps/Addin.cpp:503 provider/ECProps/SyncBar.cpp:318
+#: provider/ECProps/Addin.cpp:518 provider/ECProps/SyncBar.cpp:318
 msgid "Synchronize"
 msgstr "Sincronizza"
 
-#: provider/ECProps/Addin.cpp:505
+#: provider/ECProps/Addin.cpp:520
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:28
 msgid "Open Shared Folders..."
 msgstr "Apri le cartelle condivise..."
 
-#: provider/ECProps/Addin.cpp:507 provider/ECProps/Addin.cpp:548
+#: provider/ECProps/Addin.cpp:522 provider/ECProps/Addin.cpp:563
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:19
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:20
 msgid "Recover Deleted Items..."
 msgstr "Ripristina Messaggi Cancellati..."
 
-#: provider/ECProps/Addin.cpp:509 provider/ECProps/Addin.cpp:550
+#: provider/ECProps/Addin.cpp:524 provider/ECProps/Addin.cpp:565
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:20
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:21
 msgid "Out of Office Assistant..."
 msgstr "Risponditore automatico Fuori Sede..."
 
-#: provider/ECProps/Addin.cpp:513
+#: provider/ECProps/Addin.cpp:528
 msgid "Offline"
 msgstr "Fuori Rete"
 
-#: provider/ECProps/Addin.cpp:542 provider/ECProps/SyncBar.cpp:328
+#: provider/ECProps/Addin.cpp:557 provider/ECProps/SyncBar.cpp:328
 msgid "Configure offline synchronization"
 msgstr "Configura sincronizzazione offline"
 
-#: provider/ECProps/Addin.cpp:544 provider/ECProps/SyncBar.cpp:320
+#: provider/ECProps/Addin.cpp:559 provider/ECProps/SyncBar.cpp:320
 msgid "Start offline synchronization"
 msgstr "Avvia sincronizzazione offline"
 
-#: provider/ECProps/Addin.cpp:546
+#: provider/ECProps/Addin.cpp:561
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:29
 msgid "Open another user's Outlook Sharing Folders (Calendar, E-mail, etc)"
 msgstr ""
 "Apri cartelle condivise Outlook di un altro utente (Calendario, E-mail, ecc)"
 
-#: provider/ECProps/Addin.cpp:658
+#: provider/ECProps/Addin.cpp:674
 msgid "Out of Office currently on. Would you like to turn it off?"
 msgstr "Il risponditore automatico Fuori Sede è attivo. Vuoi disattivarlo?"
 
-#: provider/ECProps/Addin.cpp:658
+#: provider/ECProps/Addin.cpp:674
 msgid "Out Of Office Turned On"
 msgstr "Risponditore automatico Fuori Sede attivo"
 
-#: provider/ECProps/Addin.cpp:664
+#: provider/ECProps/Addin.cpp:680
 msgid "Unable to save Out of Office status"
 msgstr "Impossibile salvare lo stato Fuori Ufficio"
 
-#: provider/ECProps/Addin.cpp:766
+#: provider/ECProps/Addin.cpp:781
 msgid "Delegates"
 msgstr "Delegati"
 
-#: provider/ECProps/Addin.cpp:890 provider/client/ECMAPIFolderPublic.cpp:164
+#: provider/ECProps/Addin.cpp:918 provider/client/ECMAPIFolderPublic.cpp:164
 #: provider/client/ECMsgStorePublic.cpp:547
 msgid "Favorites"
 msgstr "Preferiti"
 
-#: provider/ECProps/Addin.cpp:902 provider/ECProps/PropPage.cpp:433
+#: provider/ECProps/Addin.cpp:930 provider/ECProps/PropPage.cpp:435
 msgid "Permissions"
 msgstr "Permessi"
 
-#: provider/ECProps/Addin.cpp:1106 provider/ECProps/Addin.cpp:1107
+#: provider/ECProps/Addin.cpp:1140 provider/ECProps/Addin.cpp:1141
 msgid "Add to Public Favorites Folder"
 msgstr "Aggiungi alla cartella pubblica Preferiti"
 
-#: provider/ECProps/Addin.cpp:1191
+#: provider/ECProps/Addin.cpp:1225
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:108
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:89
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:97
 msgid "Unable to open MAPI session."
 msgstr "Impossibile aprire la sessione MAPI."
 
-#: provider/ECProps/Addin.cpp:1195 provider/ECProps/ECFavoritePropPage.cpp:110
-#: provider/client/ECMsgStore.cpp:2384
+#: provider/ECProps/Addin.cpp:1229 provider/ECProps/ECFavoritePropPage.cpp:110
+#: provider/client/ECMsgStore.cpp:2387
 msgid "Shortcut"
 msgstr "Collegamento"
 
-#: provider/ECProps/Addin.cpp:1195 provider/ECProps/ECFavoritePropPage.cpp:110
+#: provider/ECProps/Addin.cpp:1229 provider/ECProps/ECFavoritePropPage.cpp:110
 msgid "Shortcut folder"
 msgstr "Collegamento a cartella"
 
-#: provider/ECProps/Addin.cpp:1197
+#: provider/ECProps/Addin.cpp:1231
 msgid "Unable to get shortcut folder."
 msgstr "Impossibile ottenere la cartella shortcut."
 
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:136
-#: provider/ECProps/CommandBarButtonOutOfOffice.cpp:102
+#: provider/ECProps/CommandBarButtonOutOfOffice.cpp:107
 msgid ""
 "You are currently offline. To use this command, connect to the online server."
 msgstr ""
@@ -121,7 +121,7 @@ msgstr "Impossibile aprire l'archivio di default nella sessione MAPI."
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:165
 #: provider/client/SettingsPropPageAdvance.cpp:189
 msgid "Refusing to add primary store as shared store."
-msgstr ""
+msgstr "Impossibile aggiungere l'archivio primario come archivio condiviso"
 
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:174
 msgid "Unable to open this store."
@@ -136,43 +136,43 @@ msgstr "Non hai i permessi sufficienti per accedere a questa casella di posta."
 msgid "Access Denied"
 msgstr "Accesso Negato"
 
-#: provider/ECProps/CommandBarButtonOutOfOffice.cpp:104
+#: provider/ECProps/CommandBarButtonOutOfOffice.cpp:109
 msgid "Unable to open store, access denied."
 msgstr "Impossile aprire la casella di posta, accesso negato."
 
-#: provider/ECProps/CommandBarButtonOutOfOffice.cpp:106
+#: provider/ECProps/CommandBarButtonOutOfOffice.cpp:111
 msgid "Unable to open store."
 msgstr "Impossibile accedere alla questa cassetta postale."
 
-#: provider/ECProps/OutOfOfficeDlg.cpp:77
+#: provider/ECProps/OutOfOfficeDlg.cpp:78
 msgid "I am currently Out of the Office"
 msgstr "Al momento non sono in ufficio"
 
-#: provider/ECProps/OutOfOfficeDlg.cpp:79
+#: provider/ECProps/OutOfOfficeDlg.cpp:80
 msgid "Out of Office Assistant"
 msgstr "Risponditore automatico Fuori Sede"
 
-#: provider/ECProps/OutOfOfficeDlg.cpp:80
+#: provider/ECProps/OutOfOfficeDlg.cpp:81
 msgid "I am currently In the Office"
 msgstr "Sono in ufficio"
 
-#: provider/ECProps/OutOfOfficeDlg.cpp:82
+#: provider/ECProps/OutOfOfficeDlg.cpp:83
 msgid "AutoReply only once to each sender with the following text:"
 msgstr ""
 "Rispondi automaticamente una sola volta a ciascun mittente col testo "
 "seguente:"
 
-#: provider/ECProps/OutOfOfficeDlg.cpp:83 provider/client/ClientUtil.cpp:341
+#: provider/ECProps/OutOfOfficeDlg.cpp:84 provider/client/ClientUtil.cpp:341
 msgid "Subject:"
 msgstr "Oggetto:"
 
-#: provider/ECProps/OutOfOfficeDlg.cpp:84
+#: provider/ECProps/OutOfOfficeDlg.cpp:85
 msgid "&Save"
 msgstr "&Salva"
 
-#: provider/ECProps/OutOfOfficeDlg.cpp:85
+#: provider/ECProps/OutOfOfficeDlg.cpp:86
 #: provider/ECProps/SyncStatusDlg.cpp:67
-#: provider/ECProps/MapOtherUserDlg.cpp:249
+#: provider/ECProps/MapOtherUserDlg.cpp:260
 #: provider/ECProps/SyncConfigDlg.cpp:120
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:132
 #: provider/ECProps/ECDeletedMessageRecoveryDlg.cpp:630
@@ -186,12 +186,12 @@ msgstr "Impossibile aggiungere la cartella ai preferiti"
 
 #: provider/ECProps/ECFavoritePropPage.cpp:254
 #: provider/ECProps/ECDelegatePropPage.cpp:167
-#: provider/ECProps/PropPage.cpp:385
+#: provider/ECProps/PropPage.cpp:387
 msgid "Unable to get property page site"
 msgstr "Impossibile ottenere il sito della pagina proprietà"
 
 #: provider/ECProps/ECFavoritePropPage.cpp:262
-#: provider/ECProps/PropPage.cpp:400
+#: provider/ECProps/PropPage.cpp:402
 msgid "Unable to receive store and folder information"
 msgstr "Impossibile ottenere le informazioni relative alla cassetta postale"
 
@@ -247,7 +247,7 @@ msgid "Unable to get session"
 msgstr "Impossibile ottenere la sessione"
 
 #: provider/ECProps/ECDelegatePropPage.cpp:183
-#: provider/ECProps/PropPage.cpp:237 provider/ECProps/MapOtherUserDlg.cpp:262
+#: provider/ECProps/PropPage.cpp:237 provider/ECProps/MapOtherUserDlg.cpp:273
 msgid "Unable to get addressbook"
 msgstr "Impossibile scaricare la rubrica"
 
@@ -297,13 +297,13 @@ msgstr ""
 "Contattare il proprio amministratore di sistema."
 
 #: provider/ECProps/ECDelegatePropPage.cpp:248
-#: provider/ECProps/PropPage.cpp:714 provider/ECProps/ECFavoritesDlg.cpp:48
+#: provider/ECProps/PropPage.cpp:716 provider/ECProps/ECFavoritesDlg.cpp:48
 #: provider/client/SettingsPropPageAdvance.cpp:105
 msgid "Add"
 msgstr "Aggiungi"
 
 #: provider/ECProps/ECDelegatePropPage.cpp:263
-#: provider/ECProps/PropPage.cpp:721 provider/ECProps/MapOtherUserDlg.cpp:175
+#: provider/ECProps/PropPage.cpp:723 provider/ECProps/MapOtherUserDlg.cpp:186
 #: provider/client/ECABContainer.cpp:244 provider/client/ECABContainer.cpp:299
 #: provider/client/SettingsPropPageAdvance.cpp:245
 msgid "Global Address Book"
@@ -322,39 +322,44 @@ msgstr "Nascondi"
 msgid "Close"
 msgstr "Chiudi"
 
-#: provider/ECProps/SyncStatusDlg.cpp:131
+#: provider/ECProps/SyncStatusDlg.cpp:132
+#: provider/libserver/ECDBUpdateProgress.cpp:56
+msgid "Your offline cache database is being upgraded..."
+msgstr "Aggiornamento del database della cache offline in corso..."
+
+#: provider/ECProps/SyncStatusDlg.cpp:134
 msgid "Connection error"
 msgstr "Errore di connessione"
 
-#: provider/ECProps/SyncStatusDlg.cpp:142
+#: provider/ECProps/SyncStatusDlg.cpp:146
 msgid "Username or password incorrect. Please update your MAPI profile."
-msgstr ""
+msgstr "Nome utente o password errati. Aggiornare il profilo MAPI."
 
-#: provider/ECProps/SyncStatusDlg.cpp:142
+#: provider/ECProps/SyncStatusDlg.cpp:146
 msgid "Logon error"
-msgstr ""
+msgstr "Errore di accesso"
 
-#: provider/ECProps/SyncStatusDlg.cpp:145
+#: provider/ECProps/SyncStatusDlg.cpp:149
 msgid "synchronization done"
 msgstr "sincronizzazione completata"
 
-#: provider/ECProps/SyncStatusDlg.cpp:150
+#: provider/ECProps/SyncStatusDlg.cpp:154
 msgid "Synchronizing folders ..."
 msgstr "Sincronizzazione cartelle in corso ..."
 
-#: provider/ECProps/SyncStatusDlg.cpp:152
+#: provider/ECProps/SyncStatusDlg.cpp:156
 msgid "Looking for changes ..."
 msgstr "Ricerca cambiamenti ..."
 
-#: provider/ECProps/SyncStatusDlg.cpp:154
+#: provider/ECProps/SyncStatusDlg.cpp:158
 msgid "Synchronizing messages ..."
 msgstr "Sincronizzazione messaggi in corso ..."
 
-#: provider/ECProps/SyncStatusDlg.cpp:156
+#: provider/ECProps/SyncStatusDlg.cpp:160
 msgid "Logging in ..."
 msgstr "Accesso in corso ..."
 
-#: provider/ECProps/SyncStatusDlg.cpp:158
+#: provider/ECProps/SyncStatusDlg.cpp:162
 msgid "Synchronizing ..."
 msgstr "Sincronizzazione in corso ..."
 
@@ -402,151 +407,155 @@ msgstr "Impossibile impostare i permessi."
 msgid "Unable to get user store"
 msgstr "Impossibile accedere alla casella postale dell'utente"
 
-#: provider/ECProps/PropPage.cpp:415 provider/client/ECDisplayTable.cpp:28
+#: provider/ECProps/PropPage.cpp:417 provider/client/ECDisplayTable.cpp:28
 msgid "Name"
 msgstr "Nome"
 
-#: provider/ECProps/PropPage.cpp:419
+#: provider/ECProps/PropPage.cpp:421
 msgid "Permission Level"
 msgstr "Livello di permesso"
 
-#: provider/ECProps/PropPage.cpp:423
+#: provider/ECProps/PropPage.cpp:425
 msgid "A&dd"
 msgstr "Aggiungi"
 
-#: provider/ECProps/PropPage.cpp:427
+#: provider/ECProps/PropPage.cpp:429
 msgid "Remo&ve"
 msgstr "Rimuo&vi"
 
-#: provider/ECProps/PropPage.cpp:429
+#: provider/ECProps/PropPage.cpp:431
 msgid "&Properties"
 msgstr "&Proprietà"
 
-#: provider/ECProps/PropPage.cpp:435
+#: provider/ECProps/PropPage.cpp:437
 msgid "Profile"
 msgstr "Profilo"
 
-#: provider/ECProps/PropPage.cpp:440
+#: provider/ECProps/PropPage.cpp:442
 msgid "&Create items"
 msgstr "&Crea elementi"
 
-#: provider/ECProps/PropPage.cpp:441
+#: provider/ECProps/PropPage.cpp:443
 msgid "Read &items"
 msgstr "Legg&i elementi"
 
-#: provider/ECProps/PropPage.cpp:443
+#: provider/ECProps/PropPage.cpp:445
 msgid "Create &subfolders"
 msgstr "Crea &sottocartelle"
 
-#: provider/ECProps/PropPage.cpp:444
+#: provider/ECProps/PropPage.cpp:446
 msgid "Folder pe&rmissions"
 msgstr "Pe&rmessi della cartella"
 
-#: provider/ECProps/PropPage.cpp:445
+#: provider/ECProps/PropPage.cpp:447
 msgid "Folder visi&ble"
 msgstr "Cartella visi&bile"
 
-#: provider/ECProps/PropPage.cpp:446
+#: provider/ECProps/PropPage.cpp:448
 msgid "F&older contact"
 msgstr "C&ontatti nella cartella"
 
-#: provider/ECProps/PropPage.cpp:447
+#: provider/ECProps/PropPage.cpp:449
 msgid "&Edit items"
 msgstr "Modifica &elementi"
 
-#: provider/ECProps/PropPage.cpp:448
+#: provider/ECProps/PropPage.cpp:450
 msgid "De&lete items"
 msgstr "E&limina elementi"
 
-#: provider/ECProps/PropPage.cpp:449 provider/ECProps/PropPage.cpp:452
+#: provider/ECProps/PropPage.cpp:451 provider/ECProps/PropPage.cpp:454
 #: provider/ECProps/SyncConfigDlg.cpp:105
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:162
 msgid "None"
 msgstr "Nessuno"
 
-#: provider/ECProps/PropPage.cpp:450 provider/ECProps/PropPage.cpp:453
+#: provider/ECProps/PropPage.cpp:452 provider/ECProps/PropPage.cpp:455
 msgid "Own"
 msgstr "Proprio"
 
-#: provider/ECProps/PropPage.cpp:451 provider/ECProps/PropPage.cpp:454
+#: provider/ECProps/PropPage.cpp:453 provider/ECProps/PropPage.cpp:456
 msgid "All"
 msgstr "Tutti"
 
-#: provider/ECProps/PropPage.cpp:532
+#: provider/ECProps/PropPage.cpp:534
 msgid "<Unknown user or group>"
 msgstr "<Utente o gruppo sconosciuto>"
 
-#: provider/ECProps/PropPage.cpp:565 provider/ECProps/PropPage.cpp:1056
+#: provider/ECProps/PropPage.cpp:567 provider/ECProps/PropPage.cpp:1058
 msgid "Other"
 msgstr "Altro"
 
-#: provider/ECProps/PropPage.cpp:746 provider/ECProps/PropPage.cpp:761
+#: provider/ECProps/PropPage.cpp:748 provider/ECProps/PropPage.cpp:763
 msgid "One or more users cannot be added to the folder access list."
 msgstr ""
 "Uno o più utenti non possono essere aggiunti alla lista di accesso alla "
 "cartella."
 
-#: provider/ECProps/PropPage.cpp:746
+#: provider/ECProps/PropPage.cpp:748
 msgid "Non-local users cannot be given rights on this server."
 msgstr ""
 "Utenti non locali non possono avere privilegi e permessi su questo server."
 
-#: provider/ECProps/PropPage.cpp:761
+#: provider/ECProps/PropPage.cpp:763
 msgid "One or more users are already specified."
 msgstr "Uno o più utenti sono già specificati."
 
-#: provider/ECProps/MapOtherUserDlg.cpp:34
-msgid "Entire Inbox (Permanent)"
-msgstr "Posta in arrivo (Permanente)"
-
 #: provider/ECProps/MapOtherUserDlg.cpp:35
+msgid "Entire Inbox (Permanent)"
+msgstr "Cassetta postale (Permanente)"
+
+#: provider/ECProps/MapOtherUserDlg.cpp:36
 msgid "Calendar (Temporary)"
 msgstr "Calendario (Temporaneo)"
 
-#: provider/ECProps/MapOtherUserDlg.cpp:36
+#: provider/ECProps/MapOtherUserDlg.cpp:37
 msgid "Notes (Temporary)"
 msgstr "Note (Temporaneo)"
 
-#: provider/ECProps/MapOtherUserDlg.cpp:37
+#: provider/ECProps/MapOtherUserDlg.cpp:38
 msgid "Tasks (Temporary)"
 msgstr "Attività (Temporaneo)"
 
-#: provider/ECProps/MapOtherUserDlg.cpp:38
+#: provider/ECProps/MapOtherUserDlg.cpp:39
 msgid "Contacts (Temporary)"
 msgstr "Contatti (Temporaneo)"
 
-#: provider/ECProps/MapOtherUserDlg.cpp:39
+#: provider/ECProps/MapOtherUserDlg.cpp:40
 msgid "Inbox (Temporary)"
 msgstr "Posta in arrivo (Temporaneo)"
 
-#: provider/ECProps/MapOtherUserDlg.cpp:120
+#: provider/ECProps/MapOtherUserDlg.cpp:114
+msgid "User could not be resolved (GAB is unavailable)."
+msgstr ""
+
+#: provider/ECProps/MapOtherUserDlg.cpp:131
 #: provider/client/SettingsPropPageAdvance.cpp:171
 msgid "User could not be resolved."
 msgstr "Utente non riconosciuto."
 
-#: provider/ECProps/MapOtherUserDlg.cpp:131
+#: provider/ECProps/MapOtherUserDlg.cpp:142
 msgid "Select a folder type or cancel."
 msgstr "Selezionare un tipo di cartella o annullare."
 
-#: provider/ECProps/MapOtherUserDlg.cpp:238
+#: provider/ECProps/MapOtherUserDlg.cpp:249
 msgid "Folder of other user"
 msgstr "Cartella di un altro utente"
 
-#: provider/ECProps/MapOtherUserDlg.cpp:240
+#: provider/ECProps/MapOtherUserDlg.cpp:251
 #: provider/client/SettingsTabConnection.cpp:85
 #: provider/client/PasswordDlg.cpp:87 provider/client/SettingsDlg.cpp:132
 msgid "Username"
 msgstr "Nome utente"
 
-#: provider/ECProps/MapOtherUserDlg.cpp:244
+#: provider/ECProps/MapOtherUserDlg.cpp:255
 msgid "Foldertype"
 msgstr "Tipo cartella"
 
-#: provider/ECProps/MapOtherUserDlg.cpp:248
+#: provider/ECProps/MapOtherUserDlg.cpp:259
 msgid "Ok"
 msgstr "Ok"
 
-#: provider/ECProps/MapOtherUserDlg.cpp:250
+#: provider/ECProps/MapOtherUserDlg.cpp:261
 #: provider/client/SettingsPropPageAdvance.cpp:106
 msgid "Name..."
 msgstr "Nome..."
@@ -617,32 +626,32 @@ msgid "This delegate has the following permissions"
 msgstr "Questo delegato ha i seguenti permessi"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:134
-#: provider/client/ECMsgStore.cpp:2461
+#: provider/client/ECMsgStore.cpp:2464
 msgid "Calendar"
 msgstr "Calendario"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:135
-#: provider/client/ECMsgStore.cpp:2507
+#: provider/client/ECMsgStore.cpp:2510
 msgid "Tasks"
 msgstr "Attività"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:136
-#: provider/libserver/ECGenProps.cpp:924 provider/client/ECMsgStore.cpp:2401
+#: provider/libserver/ECGenProps.cpp:942 provider/client/ECMsgStore.cpp:2404
 msgid "Inbox"
 msgstr "Posta in arrivo"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:137
-#: provider/client/ECMsgStore.cpp:2449
+#: provider/client/ECMsgStore.cpp:2452
 msgid "Contacts"
 msgstr "Contatti"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:138
-#: provider/client/ECMsgStore.cpp:2495
+#: provider/client/ECMsgStore.cpp:2498
 msgid "Notes"
 msgstr "Note"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:139
-#: provider/client/ECMsgStore.cpp:2483
+#: provider/client/ECMsgStore.cpp:2486
 msgid "Journal"
 msgstr "Diario"
 
@@ -786,26 +795,22 @@ msgstr ""
 msgid "The folder and/or messages can not be deleted."
 msgstr "La cartella e/o i messaggi non possono essere cancellati."
 
-#: provider/libserver/ECDBUpdateProgress.cpp:58
-msgid "Your cache is being upgraded..."
-msgstr "Aggiornamento cache in corso..."
-
 #: provider/libserver/ECDBUpdateProgress.cpp:93
 msgid "Upgrade: "
 msgstr "Aggiorno: "
 
-#: provider/libserver/ECGenProps.cpp:882
+#: provider/libserver/ECGenProps.cpp:900
 #: provider/client/ECMAPIFolderPublic.cpp:162
 #: provider/client/ECMsgStorePublic.cpp:653
 msgid "Public Folders"
 msgstr "Cartelle pubbliche"
 
-#: provider/libserver/ECGenProps.cpp:926
+#: provider/libserver/ECGenProps.cpp:944
 msgid "Archive"
-msgstr ""
+msgstr "Archivio"
 
 #: provider/client/ECMSProvider.cpp:247
-#: provider/client/ECABProviderSwitch.cpp:277
+#: provider/client/ECABProviderSwitch.cpp:279
 #: provider/client/EntryPoint.cpp:1102
 msgid ""
 "Cannot use the profile because you are over the license limit. To continue, "
@@ -816,7 +821,7 @@ msgstr ""
 "addizionale."
 
 #: provider/client/ECMSProvider.cpp:251
-#: provider/client/ECABProviderSwitch.cpp:282
+#: provider/client/ECABProviderSwitch.cpp:284
 #: provider/client/EntryPoint.cpp:1108
 msgid ""
 "Cannot use the profile because the server was unable to contact the license "
@@ -931,45 +936,45 @@ msgstr "Sincronizzazione iniziale delle cartelle..."
 msgid "Sync folder items"
 msgstr "Sincronizza elementi cartella"
 
-#: provider/client/ECMsgStore.cpp:2431
+#: provider/client/ECMsgStore.cpp:2434
 msgid "Outbox"
 msgstr "Posta in uscita"
 
-#: provider/client/ECMsgStore.cpp:2437
+#: provider/client/ECMsgStore.cpp:2440
 msgid "Deleted Items"
 msgstr "Posta eliminata"
 
-#: provider/client/ECMsgStore.cpp:2443
+#: provider/client/ECMsgStore.cpp:2446
 msgid "Sent Items"
 msgstr "Posta inviata"
 
-#: provider/client/ECMsgStore.cpp:2471
+#: provider/client/ECMsgStore.cpp:2474
 msgid "Drafts"
 msgstr "Bozze"
 
-#: provider/client/ECMsgStore.cpp:2519
+#: provider/client/ECMsgStore.cpp:2522
 msgid "Junk E-mail"
 msgstr "Posta indesiderata"
 
-#: provider/client/ECMsgStore.cpp:2541
+#: provider/client/ECMsgStore.cpp:2544
 msgid "RSS Feeds"
 msgstr "Feed RSS"
 
-#: provider/client/ECMsgStore.cpp:2541
+#: provider/client/ECMsgStore.cpp:2544
 msgid "RSS Feed comment"
 msgstr "Commento Feed RSS"
 
-#: provider/client/ECMsgStore.cpp:2545
+#: provider/client/ECMsgStore.cpp:2548
 msgid "Conversation Action Settings"
-msgstr ""
+msgstr "Impostazioni Azioni Conversazione"
 
-#: provider/client/ECMsgStore.cpp:2549
+#: provider/client/ECMsgStore.cpp:2552
 msgid "Quick Step Settings"
-msgstr ""
+msgstr "Impostazioni azioni rapide"
 
-#: provider/client/ECMsgStore.cpp:2553
+#: provider/client/ECMsgStore.cpp:2556
 msgid "Suggested Contacts"
-msgstr ""
+msgstr "Contatti suggeriti"
 
 #: provider/client/SettingsPropPageAdvance.cpp:104
 msgid "MailBox"
@@ -983,52 +988,56 @@ msgstr "Rimuovi"
 msgid "User already exists."
 msgstr "Utente già esistente."
 
-#: provider/client/ECArchiveAwareMessage.cpp:477
-#: provider/client/ECArchiveAwareMessage.cpp:535
+#: provider/client/ECArchiveAwareMessage.cpp:471
+#: provider/client/ECArchiveAwareMessage.cpp:529
 msgid "Zarafa Archiver"
-msgstr ""
+msgstr "Zarafa Archiver"
 
-#: provider/client/ECArchiveAwareMessage.cpp:479
+#: provider/client/ECArchiveAwareMessage.cpp:473
 msgid "An error has occurred while fetching the message from the archive."
 msgstr ""
+"Si è verificato un errore durante il download del messaggio dal server di "
+"archiviazione."
 
-#: provider/client/ECArchiveAwareMessage.cpp:481
+#: provider/client/ECArchiveAwareMessage.cpp:475
 msgid "Please contact your system administrator."
-msgstr ""
+msgstr "Contattare l'amministratore di sistema."
 
-#: provider/client/ECArchiveAwareMessage.cpp:484 spooler/archive.cpp:335
+#: provider/client/ECArchiveAwareMessage.cpp:478 spooler/archive.cpp:335
 msgid "Error code:"
-msgstr ""
+msgstr "Codice errore:"
 
-#: provider/client/ECArchiveAwareMessage.cpp:493
+#: provider/client/ECArchiveAwareMessage.cpp:487
 msgid "It seems no valid archiver license is installed."
-msgstr ""
+msgstr "Nessuna licenza archiver installata."
 
-#: provider/client/ECArchiveAwareMessage.cpp:497
+#: provider/client/ECArchiveAwareMessage.cpp:491
 msgid "The archive could not be found."
-msgstr ""
+msgstr "Impossibile trovare l'archivio."
 
-#: provider/client/ECArchiveAwareMessage.cpp:501
+#: provider/client/ECArchiveAwareMessage.cpp:495
 msgid "You don't have sufficient access to the archive."
-msgstr ""
+msgstr "Non hai i privilegi necessari per accedere all'archivio."
 
-#: provider/client/ECArchiveAwareMessage.cpp:508 spooler/archive.cpp:339
+#: provider/client/ECArchiveAwareMessage.cpp:502 spooler/archive.cpp:339
 msgid "Error description:"
-msgstr ""
+msgstr "Descrizione errore:"
 
-#: provider/client/ECArchiveAwareMessage.cpp:537
+#: provider/client/ECArchiveAwareMessage.cpp:531
 msgid "Archives can not be destubbed when working offline."
-msgstr ""
+msgstr "Non è possibile accedere agli archivi in modalità offline."
 
 #: provider/client/ECABProviderSwitch.cpp:136
 #: provider/client/ECMSProviderSwitch.cpp:272
-msgid "Your cache is being upgraded. Do you want to work online this session?"
+msgid ""
+"Your offline cache database is being upgraded. Outlook will start in online "
+"mode for this session."
 msgstr ""
-"La cache è in aggiornamento. Desideri lavorare in modalità online per questa "
-"sessione?"
+"Aggiornamento della database della cache offline in corso. Outlook si aprirà "
+"in modalità online per questa sessione."
 
-#: provider/client/ECABProviderSwitch.cpp:207
-#: provider/client/ECMSProviderSwitch.cpp:377
+#: provider/client/ECABProviderSwitch.cpp:209
+#: provider/client/ECMSProviderSwitch.cpp:379
 msgid "Unable to work online! Do you want to switch to offline mode?"
 msgstr "Impossibile lavorare online! Passare alla modalità offline?"
 
@@ -1337,9 +1346,9 @@ msgstr ""
 "utilizzare la funzionalità offline, si prega di utilizzare Outlook 2000, "
 "2003, 2007 o successive."
 
-#: provider/contacts/ZCABContainer.cpp:645
+#: provider/contacts/ZCABContainer.cpp:740
 msgid "Zarafa Contacts Folders"
-msgstr ""
+msgstr "Cartella contatti Zarafa"
 
 #: provider/common/SOAPSock.cpp:481
 msgid "Unable to get SSL object from store"
@@ -1374,50 +1383,61 @@ msgstr ""
 msgid "Do you wish to continue?"
 msgstr "Vuoi continuare?"
 
-#: zarafa-libsync/ECSync.cpp:1947
+#: zarafa-libsync/ECSync.cpp:1949
 msgid ""
 "The synchronization of a folder failed. Press retry to continue or ignore to "
 "supress all errors.\r\n"
 "\r\n"
 "Please contact the system administrator if this problem persists."
 msgstr ""
+"Errore durante la sicronizzazione di una cartella. Selezionare \"Riprova\" "
+"per continuare o \"Ignora\" per sopprimere tutti gli errori.\r\n"
+"\r\n"
+"Se il problema persiste, contattare l'amministratore di sistema."
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:895
+# 84%
+#: zarafa-libsync/ECSync.cpp:1951
+#, fuzzy
+msgid "Error codes: "
+msgstr "Codice errore:"
+
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:922
 msgid "Zarafa Archive"
-msgstr ""
+msgstr "Archivio Zarafa"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:896
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:923
 msgid "This folder contains the special archive folders."
-msgstr ""
+msgstr "Questa cartella contiene le cartelle archivio speciali."
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:901
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:928
 msgid "History"
-msgstr ""
+msgstr "Cronologia"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:902
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:929
 msgid ""
 "This folder contains archives that have been replaced by a newer version."
 msgstr ""
+"Questa cartella contiene gli archivi che sono stati sostituiti con una nuova "
+"versione."
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:906
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:933
 msgid "Outgoing"
-msgstr ""
+msgstr "In uscita"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:907
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:934
 msgid "This folder contains archives of all outgoing messages."
-msgstr ""
+msgstr "Questa cartella contiene gli archivi di tutti i messaggi in uscita."
 
 # 85%
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:911
-#, fuzzy
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:938
 msgid "Deleted"
-msgstr "Elimina"
+msgstr "Eliminato"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:912
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:939
 msgid "This folder contains archives of messages that have been deleted."
-msgstr ""
+msgstr "Questa cartella contiene gli archivi dei messaggi eliminati."
 
-#: spooler/Spooler.cpp:482
+#: spooler/Spooler.cpp:484
 msgid ""
 "A fatal error occurred while processing your message, and Zarafa is unable "
 "to send your email."
@@ -1427,39 +1447,41 @@ msgstr ""
 
 #: spooler/archive.cpp:241
 msgid "Unable to obtain list of attached archives."
-msgstr ""
+msgstr "Impossibile ottenere la lista degli archivi collegati."
 
 #: spooler/archive.cpp:272
 msgid "Unable to open archive."
-msgstr ""
+msgstr "Impossibile aprire l'archivio."
 
 #: spooler/archive.cpp:279
 msgid "Unable to get outgoing archive folder."
-msgstr ""
+msgstr "Impossibile ottenere la cartella archivio di posta in uscita."
 
 #: spooler/archive.cpp:286
 msgid "Unable to create archive message in outgoing archive folder."
 msgstr ""
+"Impossibile creare il messaggio nella cartella archivio della posta in "
+"uscita."
 
 #: spooler/archive.cpp:292
 msgid "Unable to copy message data."
-msgstr ""
+msgstr "Impossibile copiare i dati del messaggio."
 
 #: spooler/archive.cpp:305
 msgid "Unable to save archived message."
-msgstr ""
+msgstr "Impossibile salvare il messaggio archiviato."
 
-#: spooler/mailer.cpp:1710
+#: spooler/mailer.cpp:1717
 msgid "You are not allowed to send as user or group "
 msgstr "Non ti è permesso di inviare e-mail per conto di "
 
-#: spooler/mailer.cpp:1712
+#: spooler/mailer.cpp:1719
 msgid "The user or group you try to send as could not be found."
 msgstr ""
 "Impossibile trovare l'utente o il gruppo per conto di cui si sta tentando di "
 "inviare e-mail."
 
-#: spooler/mailer.cpp:2537
+#: spooler/mailer.cpp:2549
 msgid "Error found while trying to send your message. Error code: "
 msgstr "Errore durante l'invio del messaggio. Codice di errore: "
 
@@ -1559,256 +1581,255 @@ msgstr "La sottocartella che si sta eliminando contiene dei messaggi."
 
 #: common/Util.cpp:1770
 msgid "No description available."
-msgstr ""
+msgstr "Nessuna descrizione disponibile."
 
 #: common/Util.cpp:1772
 msgid "MAPI error code:"
-msgstr ""
+msgstr "Codice errore MAPI:"
 
 #: installer/linux/zarafa-mr-accept:403
 msgid "Recurring meetings are not allowed"
-msgstr ""
+msgstr "Gli appuntamenti ricorsivi non sono permessi"
 
 #: installer/linux/zarafa-mr-accept:453
 msgid "The requested time slot is unavailable"
-msgstr ""
+msgstr "La fascia oraria richiesta non è disponibile"
 
 #: installer/linux/zarafa-mr-accept:455
 msgid "The requested time slots are unavailble on the following dates:"
-msgstr ""
+msgstr "Le fasce orarie richieste non sono disponibili nelle seguenti date:"
 
 #: installer/linux/zarafa-mr-accept:458
 #, php-format
 msgid "%x %X"
-msgstr ""
+msgstr "%x %X"
 
-#: php-ext/include/mapi/class.meetingrequest.php:1638
+#: php-ext/include/mapi/class.meetingrequest.php:1659
 msgid "Accepted"
-msgstr ""
+msgstr "Accettato"
 
-#: php-ext/include/mapi/class.meetingrequest.php:1642
+#: php-ext/include/mapi/class.meetingrequest.php:1663
 msgid "Declined"
-msgstr ""
+msgstr "Rifiutato"
 
-#: php-ext/include/mapi/class.meetingrequest.php:1646
+#: php-ext/include/mapi/class.meetingrequest.php:1667
 msgid "Tentatively accepted"
-msgstr ""
+msgstr "Accettato provvisoriamente"
 
-#: php-ext/include/mapi/class.meetingrequest.php:1652
+#: php-ext/include/mapi/class.meetingrequest.php:1673
 msgid "New Time Proposed"
-msgstr ""
+msgstr "Nuovo orario proposto"
 
 # 75%
-#: php-ext/include/mapi/class.meetingrequest.php:2667
-#, fuzzy
+#: php-ext/include/mapi/class.meetingrequest.php:2692
 msgid "Canceled"
-msgstr "Annulla"
+msgstr "Annullato"
 
 #: php-ext/include/mapi/class.taskrequest.php:881
 msgid "Start Date"
-msgstr ""
+msgstr "Data inizio"
 
 #: php-ext/include/mapi/class.taskrequest.php:881
 #: php-ext/include/mapi/class.taskrequest.php:882
 msgid "%A, %B %d, %Y"
-msgstr ""
+msgstr "%A %d %B %Y"
 
 #: php-ext/include/mapi/class.taskrequest.php:882
 msgid "Due Date"
-msgstr ""
+msgstr "Data scadenza"
 
 #: php-ext/include/mapi/class.taskrequest.php:886
 msgid "Status"
-msgstr ""
+msgstr "Stato"
 
 #: php-ext/include/mapi/class.taskrequest.php:887
 msgid "Not Started"
-msgstr ""
+msgstr "Non iniziato"
 
 #: php-ext/include/mapi/class.taskrequest.php:888
 msgid "In Progress"
-msgstr ""
+msgstr "In corso"
 
 #: php-ext/include/mapi/class.taskrequest.php:889
 msgid "Complete"
-msgstr ""
+msgstr "Completato"
 
 #: php-ext/include/mapi/class.taskrequest.php:890
 msgid "Wait for other person"
-msgstr ""
+msgstr "In attesa di altri"
 
 #: php-ext/include/mapi/class.taskrequest.php:891
 msgid "Deferred"
-msgstr ""
+msgstr "Differito"
 
 #: php-ext/include/mapi/class.taskrequest.php:895
 msgid "Percent Complete"
-msgstr ""
+msgstr "Percentuale completato"
 
 #: php-ext/include/mapi/class.taskrequest.php:898
 msgid "Date Completed"
-msgstr ""
+msgstr "Data completamento"
 
 #: php-ext/include/mapi/class.taskrequest.php:902
 msgid "Total Work"
-msgstr ""
+msgstr "Lavoro totale"
 
 #: php-ext/include/mapi/class.taskrequest.php:902
 #: php-ext/include/mapi/class.taskrequest.php:903
 msgid "hours"
-msgstr ""
+msgstr "ore"
 
 #: php-ext/include/mapi/class.taskrequest.php:903
 msgid "Actual Work"
-msgstr ""
+msgstr "Lavoro attuale"
 
 #: php-ext/include/mapi/class.taskrequest.php:911
 msgid "Billing Information"
-msgstr ""
+msgstr "Informazioni di fatturazione"
 
 #: php-ext/include/mapi/class.taskrequest.php:912
 msgid "Mileage"
-msgstr ""
+msgstr "Chilometraggio"
 
 #: php-ext/include/mapi/class.recurrence.php:528
 msgid "workday"
-msgstr ""
+msgstr "giorno lavorativo"
 
 #: php-ext/include/mapi/class.recurrence.php:531
 msgid "day"
-msgstr ""
+msgstr "giorno"
 
 #: php-ext/include/mapi/class.recurrence.php:535
 msgid "days"
-msgstr ""
+msgstr "giorni"
 
 #: php-ext/include/mapi/class.recurrence.php:542
 msgid "week"
-msgstr ""
+msgstr "settimana"
 
 #: php-ext/include/mapi/class.recurrence.php:545
 msgid "weeks"
-msgstr ""
+msgstr "settimane"
 
 #: php-ext/include/mapi/class.recurrence.php:552
 msgid "month"
-msgstr ""
+msgstr "mese"
 
 #: php-ext/include/mapi/class.recurrence.php:555
 msgid "months"
-msgstr ""
+msgstr "mesi"
 
 #: php-ext/include/mapi/class.recurrence.php:563
 msgid "year"
-msgstr ""
+msgstr "anno"
 
 #: php-ext/include/mapi/class.recurrence.php:567
 msgid "years"
-msgstr ""
+msgstr "anni"
 
 #: php-ext/include/mapi/class.recurrence.php:577
 #: php-ext/include/mapi/class.recurrence.php:578
 msgid "d-m-Y"
-msgstr ""
+msgstr "d-m-Y"
 
 #: php-ext/include/mapi/class.recurrence.php:579
 #: php-ext/include/mapi/class.recurrence.php:580
 msgid "G:i"
-msgstr ""
+msgstr "G:i"
 
 #: php-ext/include/mapi/class.recurrence.php:593
 #, php-format
 msgid "Occurs every %s effective %s from %s to %s."
-msgstr ""
+msgstr "Ogni %s dal giorno %s dalle ore %s alle %s."
 
 #: php-ext/include/mapi/class.recurrence.php:595
 #, php-format
 msgid "Occurs every %s %s effective %s from %s to %s."
-msgstr ""
+msgstr "Ogni %s %s dal giorno %s dalle ore %s alle %s."
 
 #: php-ext/include/mapi/class.recurrence.php:599
 #, php-format
 msgid "Occurs every %s effective %s."
-msgstr ""
+msgstr "Ogni %s dal giorno %s."
 
 #: php-ext/include/mapi/class.recurrence.php:601
 #, php-format
 msgid "Occurs every %s %s effective %s."
-msgstr ""
+msgstr "Ogni %s %s dal giorno %s."
 
 #: php-ext/include/mapi/class.recurrence.php:608
 #, php-format
 msgid "Occurs every %s effective %s for %s occurence from %s to %s."
 msgid_plural "Occurs every %s effective %s for %s occurences from %s to %s."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Ogni %s dal giorno %s per %s occorrenza dalle ore %s alle %s."
+msgstr[1] "Ogni %s dal giorno %s per %s occorrenze dalle ore %s alle %s."
 
 #: php-ext/include/mapi/class.recurrence.php:611
 #, php-format
 msgid "Occurs every %s %s effective %s for %s occurence from %s to %s."
 msgid_plural "Occurs every %s %s effective %s for %s occurences %s to %s."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Ogni %s %s dal giorno %s per %s occorrenza dalle ore %s alle %s."
+msgstr[1] "Ogni %s %s dal giorno %s per %s occorrenze dalle ore %s alle %s."
 
 #: php-ext/include/mapi/class.recurrence.php:616
 #, php-format
 msgid "Occurs every %s effective %s for %s occurence."
 msgid_plural "Occurs every %s effective %s for %s occurences."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Ogni %s dal giorno %s per %s occorrenza."
+msgstr[1] "Ogni %s dal giorno %s per %s occorrenze."
 
 #: php-ext/include/mapi/class.recurrence.php:619
 #, php-format
 msgid "Occurs every %s %s effective %s for %s occurence."
 msgid_plural "Occurs every %s %s effective %s for %s occurences."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Ogni %s %s dal giorno %s per %s occorrenza."
+msgstr[1] "Ogni %s %s dal giorno %s per %s occorrenze."
 
 #: php-ext/include/mapi/class.recurrence.php:627
 #, php-format
 msgid "Occurs every %s effective %s until %s from %s to %s."
-msgstr ""
+msgstr "Ogni %s dal giorno %s fino al %s dalle ore %s alle %s."
 
 #: php-ext/include/mapi/class.recurrence.php:629
 #, php-format
 msgid "Occurs every %s %s effective %s until %s from %s to %s."
-msgstr ""
+msgstr "Ogni %s %s dal giorno %s fino al %s dalle ore %s alle %s."
 
 #: php-ext/include/mapi/class.recurrence.php:633
 #, php-format
 msgid "Occurs every %s effective %s until %s."
-msgstr ""
+msgstr "Ogni %s dal giorno %s fino al %s."
 
 #: php-ext/include/mapi/class.recurrence.php:635
 #, php-format
 msgid "Occurs every %s %s effective %s until %s."
-msgstr ""
+msgstr "Ogni %s %s dal giorno %s fino al %s."
 
 #: php-ext/include/mapi/class.mapiexception.php:24
 msgid "You have insufficient privileges to open this object."
-msgstr ""
+msgstr "Privilegi insufficienti per aprire questo oggetto."
 
 #: php-ext/include/mapi/class.mapiexception.php:27
 msgid "Logon Failed. Please check your name/password."
-msgstr ""
+msgstr "Accesso fallito. Nome utente e password non validi."
 
 #: php-ext/include/mapi/class.mapiexception.php:29
 msgid "Can not connect to Zarafa server."
-msgstr ""
+msgstr "Impossibile connettersi al server Zarafa."
 
 #: php-ext/include/mapi/class.mapiexception.php:31
 msgid "Can not open object with provided id."
-msgstr ""
+msgstr "Impossibile aprire l'oggetto con l'id fornito."
 
 #: php-ext/include/mapi/class.mapiexception.php:33
 msgid "There are no recipients in the message."
-msgstr ""
+msgstr "Non ci sono i destinatari nel messaggio."
 
 #: php-ext/include/mapi/class.mapiexception.php:35
 msgid "Can not find object."
-msgstr ""
+msgstr "Impossibile trovare l'oggetto."
 
 #: php-ext/include/mapi/class.mapiexception.php:47
 #, php-format
 msgid "Unknown MAPI Error: %s"
-msgstr ""
+msgstr "Errore MAPI sconosciuto: %s"

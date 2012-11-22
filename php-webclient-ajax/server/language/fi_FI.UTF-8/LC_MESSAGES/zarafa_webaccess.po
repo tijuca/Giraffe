@@ -3,8 +3,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PHP-Langadmin 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2012-05-02 00:01+0200\n"
-"PO-Revision-Date: 2011-01-11 11:20+0200\n"
+"POT-Creation-Date: 2012-07-16 09:04+0200\n"
+"PO-Revision-Date: 2012-07-13 07:45+0200\n"
 "Last-Translator: Verkkotaito <zarafa@verkkotaito.fi>\n"
 "Language-Team: fi_FI <fi@li.org>\n"
 "Language: fi\n"
@@ -2161,7 +2161,7 @@ msgstr "Poista viesti"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/rule.php:144
 msgid "Redirect to"
-msgstr ""
+msgstr "Uudelleenohjaa"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/rule.php:156
 msgid "Forward to"
@@ -2169,7 +2169,7 @@ msgstr "Välitä"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/rule.php:168
 msgid "Forward as Attachment to"
-msgstr ""
+msgstr "Välitä liitteenä"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/rule.php:180
 msgid "Stop processing more rules"
@@ -2310,7 +2310,7 @@ msgstr "Kansiotyyppi"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/sharedfolder.php:34
 msgid "Show subfolders"
-msgstr ""
+msgstr "Näytä alikansiot"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/addtofavorite.php:4
 msgid "Add to favorite folder"
@@ -2661,6 +2661,7 @@ msgstr "kuukautta"
 
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:195
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:246
+#, fuzzy
 msgid "The"
 msgstr "    "
 
@@ -2801,6 +2802,7 @@ msgstr "Joulukuu"
 #: php-webclient-ajax/client/layout/dialogs/modal/recurrence.php:266
 #: php-webclient-ajax/server/core/class.operations.php:241
 #: php-webclient-ajax/client/widgets/pagination.js:64
+#, fuzzy
 msgid "of"
 msgstr "   "
 
@@ -3423,7 +3425,7 @@ msgstr "Tulokset päivittyvät joka (X):s sekunti (0: ei käytössä)"
 
 #: php-webclient-ajax/client/layout/dialogs/settings/tabs/preferences.php:174
 msgid "classic"
-msgstr ""
+msgstr "perinteinen"
 
 #: php-webclient-ajax/server/util.php:272
 msgid "GB"
@@ -3482,10 +3484,9 @@ msgstr ""
 # 92%
 #: php-webclient-ajax/server/modules/class.listmodule.php:165
 #: php-webclient-ajax/server/modules/class.itemmodule.php:162
-#, fuzzy
 msgid "You have insufficient privileges to delete items in this folder"
 msgstr ""
-"Sinulla ei ole riittäviä oikeuksia tallentaaksesi kohteita tähän kansioon."
+"Sinulla ei ole riittäviä oikeuksia tallentaaksesi kohteita tähän kansioon"
 
 #: php-webclient-ajax/server/modules/class.listmodule.php:219
 #: php-webclient-ajax/server/modules/class.listmodule.php:353
@@ -3870,7 +3871,7 @@ msgstr "Tarvittava osallistuja"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:44
 msgid "Sort on Required Attendee"
-msgstr ""
+msgstr "Lajittele pakollisen osanottajan mukaan"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:45
 #: php-webclient-ajax/client/modules/freebusymodule.js:1134
@@ -3879,11 +3880,11 @@ msgstr "Vaihtoehtoinen osallistuja"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:45
 msgid "Sort on Optional Attendee"
-msgstr ""
+msgstr "Lajittele vapaaehtoisen osanottajan mukaan"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:46
 msgid "Sort on Resource"
-msgstr ""
+msgstr "Lajittele resurssin mukaan"
 
 #: php-webclient-ajax/server/core/class.tablecolumns.php:48
 msgid "Sort on Busy Status"
@@ -6185,7 +6186,7 @@ msgstr "Koolle antamasi arvot eivät ole käypiä"
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1554
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1895
 msgid "Search for the words(s)"
-msgstr ""
+msgstr "Etsi sana(t)"
 
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1324
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1445
@@ -6294,7 +6295,7 @@ msgstr "vain puhelinnumerokentät"
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1667
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1757
 msgid "Search for the word(s)"
-msgstr ""
+msgstr "Etsi sana(t)"
 
 #: php-webclient-ajax/client/widgets/searchcriteria.js:1679
 msgid "contents only"
@@ -6716,7 +6717,7 @@ msgstr ""
 
 #: php-webclient-ajax/client/layout/js/dialog.js:324
 msgid "You must enter at least one recipient in To field."
-msgstr ""
+msgstr "Vastaanottaja-kenttään tulee syöttää vähintään yksi käyttäjä."
 
 #: php-webclient-ajax/client/layout/js/dialog.js:443
 msgid "No signatures"
@@ -6972,7 +6973,7 @@ msgstr "Määritä välitysosoite"
 #: php-webclient-ajax/client/layout/js/rule.js:233
 #: php-webclient-ajax/client/layout/js/rule.js:237
 msgid "Please specify a forwarding as attachment address"
-msgstr ""
+msgstr "Määritä osoite, johon välitetään liitteenä"
 
 # 77%
 #: php-webclient-ajax/client/layout/js/rule.js:243
