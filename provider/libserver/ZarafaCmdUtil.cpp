@@ -486,9 +486,9 @@ ECRESULT DeleteObjectStoreSize(ECSession *lpSession, ECDatabase *lpDatabase, uns
 	}
 
 	// Update store size for each store
-	for(iterStoreSizeItems=mapStoreSize.begin(); iterStoreSizeItems != mapStoreSize.end(); iterStoreSizeItems++) {
+	for(iterStoreSizeItems=mapStoreSize.begin(); iterStoreSizeItems != mapStoreSize.end() && er == erSuccess; iterStoreSizeItems++) {
 		if ( iterStoreSizeItems->second > 0)	
-			UpdateObjectSize(lpDatabase, iterStoreSizeItems->first, MAPI_STORE, UPDATE_SUB, iterStoreSizeItems->second);
+			er = UpdateObjectSize(lpDatabase, iterStoreSizeItems->first, MAPI_STORE, UPDATE_SUB, iterStoreSizeItems->second);
 	}
 
 	return er;

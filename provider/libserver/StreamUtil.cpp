@@ -1744,10 +1744,14 @@ ECRESULT DeserializeObject(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtt
 		// Calc size of object, now that all children are saved.
 		// Add new size
 		if (CalculateObjectSize(lpDatabase, ulObjId, ulObjType, &ulSize) == erSuccess) {
-			UpdateObjectSize(lpDatabase, ulObjId, ulObjType, UPDATE_SET, ulSize);
+			er = UpdateObjectSize(lpDatabase, ulObjId, ulObjType, UPDATE_SET, ulSize);
+			if (er != erSuccess)
+				goto exit;
 
 			if (ulObjType == MAPI_MESSAGE && ulParentType == MAPI_FOLDER) {
-				UpdateObjectSize(lpDatabase, ulStoreId, MAPI_STORE, UPDATE_ADD, ulSize);
+				er = UpdateObjectSize(lpDatabase, ulStoreId, MAPI_STORE, UPDATE_ADD, ulSize);
+				if (er != erSuccess)
+					goto exit;
 			}
 
 		} else {

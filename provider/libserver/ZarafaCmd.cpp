@@ -2828,17 +2828,22 @@ unsigned int SaveObject(struct soap *soap, ECSession *lpecSession, ECDatabase *l
 			// Remove old size
 			if (fNewItem != true && lpsReturnObj->ulObjType == MAPI_MESSAGE && ulParentType == MAPI_FOLDER) {
 				if (GetObjectSize(lpDatabase, lpsReturnObj->ulServerId, &ulSize) == erSuccess)
-					UpdateObjectSize(lpDatabase, ulStoreId, MAPI_STORE, UPDATE_SUB, ulSize);
+					er = UpdateObjectSize(lpDatabase, ulStoreId, MAPI_STORE, UPDATE_SUB, ulSize);
+				if (er != erSuccess)
+					goto exit;
 			}
 
 			// Add new size
 			if (CalculateObjectSize(lpDatabase, lpsReturnObj->ulServerId, lpsReturnObj->ulObjType, &ulSize) == erSuccess) {
-				UpdateObjectSize(lpDatabase, lpsReturnObj->ulServerId, lpsReturnObj->ulObjType, UPDATE_SET, ulSize);
+				er = UpdateObjectSize(lpDatabase, lpsReturnObj->ulServerId, lpsReturnObj->ulObjType, UPDATE_SET, ulSize);
+				if (er != erSuccess)
+					goto exit;
 
 				if (lpsReturnObj->ulObjType == MAPI_MESSAGE && ulParentType == MAPI_FOLDER) {
-					UpdateObjectSize(lpDatabase, ulStoreId, MAPI_STORE, UPDATE_ADD, ulSize);
+					er = UpdateObjectSize(lpDatabase, ulStoreId, MAPI_STORE, UPDATE_ADD, ulSize);
+					if (er != erSuccess)
+						goto exit;
 				}
-
 			} else {
 				ASSERT(FALSE);
 			}
@@ -6023,8 +6028,9 @@ SOAP_ENTRY_START(createStore, *result, unsigned int ulStoreType, unsigned int ul
 		goto exit;
 
 	//Init storesize
-	UpdateObjectSize(lpDatabase, ulStoreId, MAPI_STORE, UPDATE_SET, 0);
-
+	er = UpdateObjectSize(lpDatabase, ulStoreId, MAPI_STORE, UPDATE_SET, 0);
+	if (er != erSuccess)
+		goto exit;
 
 	// Add SourceKey
 
@@ -8002,8 +8008,11 @@ ECRESULT MoveObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt* lp
         goto exit;
 
 	// change the size if it is a soft delete item
-	if(bUpdateDeletedSize == true)
-		UpdateObjectSize(lpDatabase, ulDestStoreId, MAPI_STORE, UPDATE_ADD, ulItemSize);
+	if(bUpdateDeletedSize == true) {
+		er = UpdateObjectSize(lpDatabase, ulDestStoreId, MAPI_STORE, UPDATE_ADD, ulItemSize);
+		if (er != erSuccess)
+			goto exit;
+	}
 
 	for(iterCopyItems=lstCopyItems.begin(); iterCopyItems != lstCopyItems.end(); iterCopyItems++) {
 	    if(iterCopyItems->bMoved) {
@@ -8387,8 +8396,11 @@ ECRESULT CopyObject(ECSession *lpecSession, ECAttachmentStorage *lpAttachmentSto
 		// Update Size
 		if(GetObjectSize(lpDatabase, ulNewObjectId, &ulSize) == erSuccess)
 		{
-			if(lpecSession->GetSessionManager()->GetCacheManager()->GetStore(ulNewObjectId, &ulStoreId, NULL) == erSuccess)
-				UpdateObjectSize(lpDatabase, ulStoreId, MAPI_STORE, UPDATE_ADD, ulSize);
+			if(lpecSession->GetSessionManager()->GetCacheManager()->GetStore(ulNewObjectId, &ulStoreId, NULL) == erSuccess) {
+				er = UpdateObjectSize(lpDatabase, ulStoreId, MAPI_STORE, UPDATE_ADD, ulSize);
+				if (er != erSuccess)
+					goto exit;
+			}
 		}
 	}
 
@@ -8932,7 +8944,9 @@ SOAP_ENTRY_START(copyFolder, *result, entryId sEntryId, entryId sDestFolderId, c
 
 		// Update the store size if we did an undelete. Note ulSourceStoreId == ulDestStoreId.
 		if(llFolderSize > 0)
-    		UpdateObjectSize(lpDatabase, ulSourceStoreId, MAPI_STORE, UPDATE_ADD, llFolderSize);
+    		er = UpdateObjectSize(lpDatabase, ulSourceStoreId, MAPI_STORE, UPDATE_ADD, llFolderSize);
+		if (er != erSuccess)
+			goto exit;
 
 		// ICS
 		GetSourceKey(ulFolderId, &sSourceKey);
