@@ -186,6 +186,10 @@ void process_signal(int sig)
 		break;
 	case SIGHUP:
 		{
+			// g_lpSessionManager only present when zarafa_init is called (last init function), signals are initialized much earlier
+			if (g_lpSessionManager == NULL)
+				return;
+
 			if (!g_lpConfig->ReloadSettings())
 				g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to reload configuration file, continuing with current settings.");
 			if (g_lpConfig->HasErrors())
