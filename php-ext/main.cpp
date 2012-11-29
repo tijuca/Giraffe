@@ -56,7 +56,7 @@
 
 #include "ECLogger.h"
 #include "mapi_ptr.h"
-#include "ECMemTable.h"
+
 
 /*
  * Things to notice when reading/editing this source:
@@ -3994,9 +3994,6 @@ ZEND_FUNCTION(mapi_rules_gettable) {
 	// locals
 	SizedSPropTagArray(11, sptaRules) = {11, { PR_RULE_ID, PR_RULE_IDS, PR_RULE_SEQUENCE, PR_RULE_STATE, PR_RULE_USER_FLAGS, PR_RULE_CONDITION, PR_RULE_ACTIONS, PR_RULE_PROVIDER, PR_RULE_NAME, PR_RULE_LEVEL, PR_RULE_PROVIDER_DATA } };
 	SizedSSortOrderSet(1, sosRules) = {1, 0, 0, { {PR_RULE_SEQUENCE, TABLE_SORT_ASCEND} } };
-	ECMemTable *lpMemTable = NULL;
-	ECMemTableView *lpView = NULL;
-	SRowSetPtr ptrRow;
 
 	RETVAL_FALSE;
 	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
@@ -4013,76 +4010,15 @@ ZEND_FUNCTION(mapi_rules_gettable) {
 	if (MAPI_G(hr) != hrSuccess)
 		goto exit;
 
-	// table PR_RULE_ACTIONS and PR_RULE_CONDITION contain PT_UNICODE data, which we must convert to local charset PT_STRING8
-	// we can't edit the rules table or view, so create a new copy of the table contents with data fixed.
-	{
-		MAPI_G(hr) = ECMemTable::Create((LPSPropTagArray)&sptaRules, PR_RULE_ID, &lpMemTable);
-		if (MAPI_G(hr) != hrSuccess)
-			goto exit;
-
-		while (true) {
-			LPSPropValue lpRuleProp = NULL;
-			convert_context converter;
-
-			MAPI_G(hr) = lpRulesView->QueryRows(1, 0, &ptrRow);
-			if (MAPI_G(hr) != hrSuccess)
-				goto exit;
-
-			if (ptrRow.empty())
-				break;
-
-			lpRuleProp = PpropFindProp(ptrRow[0].lpProps, ptrRow[0].cValues, PR_RULE_CONDITION);
-			if (lpRuleProp)
-				MAPI_G(hr) = ConvertUnicodeToString8((LPSRestriction)lpRuleProp->Value.lpszA, ptrRow[0].lpProps, converter);
-			if (MAPI_G(hr) != hrSuccess)
-				goto exit;
-
-			lpRuleProp = PpropFindProp(ptrRow[0].lpProps, ptrRow[0].cValues, PR_RULE_ACTIONS);
-			if (lpRuleProp)
-				MAPI_G(hr) = ConvertUnicodeToString8((ACTIONS*)lpRuleProp->Value.lpszA, ptrRow[0].lpProps, converter);
-			if (MAPI_G(hr) != hrSuccess)
-				goto exit;
-
-			lpRuleProp = PpropFindProp(ptrRow[0].lpProps, ptrRow[0].cValues, PR_RULE_ID);
-			MAPI_G(hr) = lpMemTable->HrModifyRow(ECKeyTable::TABLE_ROW_ADD, lpRuleProp, ptrRow[0].lpProps, ptrRow[0].cValues);
-			if (MAPI_G(hr) != hrSuccess)
-				goto exit;
-		}
-		MAPI_G(hr) = lpMemTable->HrSetClean();
-		if (MAPI_G(hr) != hrSuccess)
-			goto exit;
-
-		lpRulesView->Release();
-		lpRulesView = NULL;
-
-		MAPI_G(hr) = lpMemTable->HrGetView(createLocaleFromName(""), 0, &lpView);
-		if (MAPI_G(hr) != hrSuccess)
-			goto exit;
-
-		MAPI_G(hr) = lpView->QueryInterface(IID_IMAPITable, (void **)&lpRulesView);
-		if (MAPI_G(hr) != hrSuccess)
-			goto exit;
-
-		MAPI_G(hr) = lpRulesView->SetColumns((LPSPropTagArray)&sptaRules, 0);
-		if (MAPI_G(hr) != hrSuccess)
-			goto exit;
-
-		MAPI_G(hr) = lpRulesView->SortTable((LPSSortOrderSet)&sosRules, 0);
-		if (MAPI_G(hr) != hrSuccess)
-			goto exit;
-	}
+	MAPI_G(hr) = lpRulesView->SortTable((LPSSortOrderSet)&sosRules, 0);
+	if (MAPI_G(hr) != hrSuccess)
+		goto exit;
 
 	ZEND_REGISTER_RESOURCE(return_value, lpRulesView, le_mapi_table);
 
 exit:
 	if (MAPI_G(hr) != hrSuccess && lpRulesView)
 		lpRulesView->Release();
-
-	if (lpView)
-		lpView->Release();
-
-	if (lpMemTable)
-		lpMemTable->Release();
 
 	THROW_ON_ERROR();
 	return;
