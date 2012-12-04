@@ -122,6 +122,54 @@
 	}
 	
 	/**
+	 * Will extract a specific list of arguments from the $_GET object and construct a properly 
+	 * (raw)urlencoded REQUEST_URI to be used for appending to an URL. 
+	 * A token can be supplied to change the first character. By default it will set an ? as the 
+	 * first character to directly append it to an URL. When other arguments preceed this string it 
+	 * can be changed to an & or to any other value, including to no character by supplying an empty
+	 * string.
+	 * @param String $token (Optional) First character of the returned string. Defaults to "?".
+	 * @return String The REQUEST URI containing the values from the specific list of $_GET-arguments.
+	 */
+	function getActionRequestURI($token = '?'){
+		$requestURI = '';
+		$allowedArgs = Array(
+			'action', 
+			'url', 
+			'to', 
+			'cc', 
+			'bcc', 
+			'storeid', 
+			'parententryid', 
+			'entryid', 
+			'message_action', 
+			'subject', 
+			'body');
+
+		$urlArgs = Array();
+		if($_GET){
+			// Put all allowed arguments in a key/value list
+			for($i=0,$len=count($allowedArgs);$i<$len;$i++){
+				$argName = $allowedArgs[$i];
+				if(isset($_GET[ $argName ])){
+					$urlArgs[ $argName ] = $_GET[ $argName ];
+				}
+			}
+
+			// Create the correctly encoded string for each argument that was extracted \
+			$formattedArgsList = Array();
+			foreach($urlArgs as $argName => $argValue){
+				$formattedArgsList[] = rawurlencode($argName) . '=' . rawurlencode($argValue);
+			}
+
+			// Put them together and ... DONE!
+			$requestURI = $token . implode('&', $formattedArgsList);
+		}
+ 		return $requestURI;
+	}
+
+
+	/**
 	 * Function which replaces some characters to correct XML values.
 	 * @param string @string string which should be converted
 	 * @return string correct XML	 

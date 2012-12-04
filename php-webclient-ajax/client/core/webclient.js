@@ -214,6 +214,8 @@ WebClient.prototype.startClient = function()
 	 */
 	// if action attributes exist then process according to action type
 	var actionUrl = new String(window.location.search);
+	actionUrl = decodeURIComponent(actionUrl);
+
 	// check URL is fully encoded or just its data part is encoded
 	// we can't really tell the difference so we are using two different parameters for that
 	var urlIsDoubleEncoded = actionUrl.search(/\&url\=/i) != -1 ? true : false;
@@ -289,7 +291,7 @@ WebClient.prototype.handleURLAction = function (actionUrl)
 			for(var key in keyValuePairs) {
 				if(key != "action") {
 					// action attribute is not needed in creating createmail dialog URL
-					createmailUrl = createmailUrl + "&" + key + "=" + keyValuePairs[key];
+					createmailUrl = createmailUrl + "&" + encodeURIComponent(key) + "=" + encodeURIComponent(keyValuePairs[key]);
 				}
 			}
 
@@ -298,7 +300,7 @@ WebClient.prototype.handleURLAction = function (actionUrl)
 		}else if(keyValuePairs["action"] == "openmail") {
 
 			// open readmail dialog
-			var uri = DIALOG_URL+"task=readmail_standard&storeid=" + keyValuePairs["storeid"] + "&parententryid=" + keyValuePairs["parententryid"] + "&entryid=" + keyValuePairs["entryid"];
+			var uri = DIALOG_URL+"task=readmail_standard&storeid=" + encodeURIComponent(keyValuePairs["storeid"]) + "&parententryid=" + encodeURIComponent(keyValuePairs["parententryid"]) + "&entryid=" + encodeURIComponent(keyValuePairs["entryid"]);
 			webclient.openWindow(this, "openmail", uri);
 		}
 	}

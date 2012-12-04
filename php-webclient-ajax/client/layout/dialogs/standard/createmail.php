@@ -388,7 +388,7 @@ function getJavaScript_other(){
 				
 				// set content of body if it is passed in URL
 				<? if(isset($_GET["body"])) { ?>
-					editorInstance.SetHTML(decodeURIComponent("<?=rawurlencode($_GET["body"])?>"));
+					editorInstance.SetHTML(decodeURIComponent("<?=rawurlencode(htmlentities($_GET["body"]))?>"));
 				<? } ?>
 				if (module)	{
 				

@@ -52,6 +52,10 @@
 <?php
 	$user = htmlentities($_GET["user"]);
 	header("Content-type: text/html; charset=utf-8");
+
+	// Get the arguments from the arguments passed in the REQUEST URI/$_GET
+	$actionReqURI = getActionRequestURI('&');
+
 ?><!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
 	<head>
@@ -73,16 +77,7 @@
 		<table id="layout">
 			<tr><td>
 				<div id="login_main">
-					<form action="index.php?logon<?=($user)?'&user='.$user:''?>" method="post">
-					<!-- Store action attributes to hidden variable to pass it to index page -->
-					<?php	if($_POST && $_POST["action_url"] != "") {	?>
-								<!-- if login has failed then action attributes will be in POST variable -->
-								<input type="hidden" name="action_url" value="<?= htmlspecialchars($_POST["action_url"]) ?>"></input>
-					<?php	} else {	?>
-								<!-- or else in the URL -->
-								<input type="hidden" name="action_url" value="<?= stristr($_SERVER["REQUEST_URI"], "?action=") ?>"></input>
-					<?php	}	?>
-					
+					<form action="index.php?logon<?=($user)?'&user='.$user:''?><?=($actionReqURI)?$actionReqURI:''?>" method="post">
 						<div id="login_data">
 							<p><?=_("Please logon")?>.</p>
 							<p class="error"><?php
