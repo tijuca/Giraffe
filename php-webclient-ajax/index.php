@@ -109,6 +109,7 @@
 	require("server/core/class.language.php");
 
 	require("server/core/class.state.php");
+	require("server/core/class.attachmentstate.php");
 
 	require("server/core/class.pluginmanager.php");
 	require("server/core/class.plugin.php");
@@ -211,11 +212,6 @@
 		if ($_GET && array_key_exists("load", $_GET)) {
 
 			// Get Attachment data from state and put it into the $_SESSION
-			$attachment_state = new State('attachments');
-			$attachment_state->open();
-			$_SESSION['files'] = $attachment_state->read("files");
-			$_SESSION['deleteattachment'] = $attachment_state->read("deleteattachment");
-			$attachment_state->close();
 			switch ($_GET["load"]) {
 				case "translations.js":
 					$GLOBALS['PluginManager']->triggerHook("server.index.load.jstranslations.before");
@@ -229,14 +225,6 @@
 						$GLOBALS['PluginManager']->triggerHook("server.index.load.upload_attachment.before");
 						include("server/upload_attachment.php");
 						$GLOBALS['PluginManager']->triggerHook("server.index.load.upload_attachment.after");
-						// Get Attachment data from $_SESSION and put it into the state
-						// Do it now before outputting the dialog.php data, so that zarafa.php cannot be called
-						// before we have written the data
-						$attachment_state = new State('attachments');
-						$attachment_state->open();
-						$attachment_state->write("files", $_SESSION['files']);
-						$attachment_state->write("deleteattachment", $_SESSION['deleteattachment']);
-						$attachment_state->close();
 					}
 					$GLOBALS['PluginManager']->triggerHook("server.index.load.dialog.before");
 					include("client/dialog.php");
@@ -264,23 +252,14 @@
 					$GLOBALS['PluginManager']->triggerHook("server.index.load.main.after");
 					break;
 			}
-
-			// Get Attachment data from $_SESSION and put it into the state
-			$attachment_state = new State('attachments');
-			$attachment_state->open();
-			$attachment_state->write("files", $_SESSION['files']);
-			$attachment_state->write("deleteattachment", $_SESSION['deleteattachment']);
-			$attachment_state->close();
-			// Prevent the SESSION data to be stored elsewhere
-			unset($_SESSION['files'], $_SESSION['deleteattachment']);
-
 		} else {
 			// Clean up old state files in tmp/session/
 			$state = new State("index");
 			$state->clean();
 
-			// Clean up old attachments in tmp
-			cleanTemp(TMP_PATH, UPLOADED_ATTACHMENT_MAX_LIFETIME);
+			// Clean up old attachments in tmp/attachments/
+			$state = new AttachmentState();
+			$state->clean();
 					
 			// clean search folders
 			cleanSearchFolders();

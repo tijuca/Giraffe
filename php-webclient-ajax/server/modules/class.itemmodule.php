@@ -280,12 +280,11 @@
 			
 			if($store){
 				if(isset($action["entryids"]) && $action["entryids"]){
-					
 					if(!is_array($action["entryids"])){
 						$action["entryids"] = array($action["entryids"]);
 					}
 
-					//add attach items to session variables
+					// add attach items to attachment state
 					$attachments = $GLOBALS["operations"]->setAttachmentInSession($store, $action["entryids"], $action["dialog_attachments"]);
 				}
 
@@ -294,8 +293,10 @@
 				$data["item"] = array();
 				$data["item"]["parententryid"] = bin2hex($parententryid);
 				$data["item"]["attachments"] = $attachments;
+
 				array_push($this->responseData["action"], $data);
 				$GLOBALS["bus"]->addData($this->responseData);
+
 				$result = true;
 			}
 			return $result;
@@ -885,24 +886,31 @@
 		 */
 		function getAttachments($store, $entryid, $action)
 		{
+			$attachment_state = new AttachmentState();
+			$attachment_state->open();
+
 			// Create the data array of information, which will be send back to the client.
 			$data = array();
 			$data["attributes"] = array("type" => "getAttachments");
 			$dialog_attachments = $action["dialog_attachments"];
 			$data["files"] = array();
 
+			$files = $attachment_state->getAttachmentFiles($dialog_attachments);
+
 			// Get uploaded attachments' information.
-			if(isset($_SESSION["files"]) && isset($_SESSION["files"][$dialog_attachments])) {
-				foreach($_SESSION["files"][$dialog_attachments] as $tmpname => $file)
-				{
+			if($files) {
+				foreach($files as $tmpname => $file) {
 					$filedata = array();
 					$filedata["attach_num"] = $tmpname;
 					$filedata["filetype"] = $file["type"];
 					$filedata["name"] = $file["name"];
 					$filedata["size"] = $file["size"];
+
 					array_push($data["files"], $filedata);
 				}
 			}
+
+			$attachment_state->close();
 
 			// Add file information into response data.
 			array_push($this->responseData["action"], $data);

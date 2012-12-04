@@ -77,92 +77,137 @@
 
 class State {
 
-    var $fp;
-    var $filename;
-    
-    var $sessiondir = "session";
-    
-    /**
-     * @param string $subsystem Name of the subsystem
-     */
-    function State($subsystem) {
-        $this->filename = TMP_PATH . "/" . $this->sessiondir . "/" . session_id() . "." . $subsystem;
-    }
-    
-    /**
-     * Open the session file
-     *
-     * The session file is opened and locked so that other processes can not access the state information
-     */
-    function open() {
-        if(!is_dir(TMP_PATH . "/" . $this->sessiondir))
-            mkdir(TMP_PATH . "/" . $this->sessiondir);
-        $this->fp = fopen($this->filename, "a+");
-        flock($this->fp, LOCK_EX);
-    }
-    
-    /**
-     * Read a setting from the state file
-     *
-     * @param string $name Name of the setting to retrieve
-     * @return string Value of the state value, or null if not found
-     * @todo The entire state file is read and parsed for each call of read()!
-     */
-    function read($name) {
-        $contents = "";
-        
-        fseek($this->fp, 0);
+	/**
+	 * The file pointer of the state file
+	 */
+	var $fp;
 
-        while($data = fread($this->fp, 32768)) 
-            $contents .= $data;
+	/**
+	 * The basedir in which the statefiles are found
+	 */
+	var $basedir;
 
-        $data = unserialize($contents);
+	/**
+	 * The filename which is opened by this state file
+	 */
+	var $filename;
 
-        if(isset($data[$name]))
-            return $data[$name];
-        else
-            return false;
-    }
-    
-    /**
-     * Write a setting to the state file
-     *
-     * @param string $name Name of the setting to write
-     * @param mixed $object Value of the object to be written to the setting
-     * @todo The entire state file is read, parsed, modified and written for each call of write()!
-     */
-    function write($name, $object) {
-        $contents = "";
-        
-        fseek($this->fp, 0);
+	/**
+	 * The directory in which the session files are created
+	 */
+	var $sessiondir = "session";
 
-        while($data = fread($this->fp, 32768)) 
-            $contents .= $data;
+	/**
+	 * The unserialized data as it has been read from the file
+	 */
+	var $sessioncache;
 
-        $data = unserialize($contents);
-        $data[$name] = $object;
-        
-        $contents = serialize($data);
-        
-        ftruncate($this->fp, 0);
-        fseek($this->fp, 0);
-        fwrite($this->fp, $contents);
-    }
- 
-    /**
-     * Close the state file
-     *
-     * This closes and unlocks the state file so that other processes can access the state
-     */
-    function close() {
-        if(isset($this->fp))
-            fclose($this->fp);
-    }
-    
-    /**
-     * Cleans all old state information in the session directory
-     */
-    function clean() {
-		cleanTemp(TMP_PATH . "/" . $this->sessiondir);
-    }
+	/**
+	 * The raw data as it has been read from the file
+	 */
+	var $contents;
+
+	/**
+	 * @param string $subsystem Name of the subsystem
+	 */
+	function State($subsystem) {
+		$this->basedir = TMP_PATH . DIRECTORY_SEPARATOR . $this->sessiondir;
+		$this->filename = $this->basedir . DIRECTORY_SEPARATOR . session_id() . "." . $subsystem;
+	}
+
+	/**
+	 * Open the session file
+	 *
+	 * The session file is opened and locked so that other processes can not access the state information
+	 */
+	function open() {
+		if (!is_dir($this->basedir)) {
+			mkdir($this->basedir, 0755, true /* recursive */);
+		}
+		$this->fp = fopen($this->filename, "a+");
+		$this->sessioncache = false;
+		flock($this->fp, LOCK_EX);
+	}
+
+	/**
+	 * Read a setting from the state file
+	 *
+	 * @param string $name Name of the setting to retrieve
+	 * @return string Value of the state value, or null if not found
+	 */
+	function read($name) {
+		// If the file has already been read, we only have to access
+		// our cache to obtain the requeste data.
+		if ($this->sessioncache === false) {
+			$this->contents = file_get_contents($this->filename);
+			$this->sessioncache = unserialize($this->contents);
+		}
+
+		if (isset($this->sessioncache[$name])) {
+			return $this->sessioncache[$name];
+		} else {
+			return false;
+		}
+	}
+
+	/**
+	 * Write a setting to the state file
+	 *
+	 * @param string $name Name of the setting to write
+	 * @param mixed $object Value of the object to be written to the setting
+	 * @param bool $flush False to prevent the changes written to disk
+	 * This requires a call to $flush() to write the changes to disk.
+	 */
+	function write($name, $object, $flush = true)
+	{
+		$contents = "";
+
+		// If the file has already been read, then we don't
+		// need to read the entire file again.
+		if ($this->sessioncache === false) {
+			$this->read($name);
+		}
+
+		$this->sessioncache[$name] = $object;
+
+		if ($flush === true) {
+			$this->flush();
+		}
+	}
+
+	/**
+	 * Flushes all changes to disk
+	 *
+	 * This flushes all changed made to the $this->sessioncache to disk
+	 */
+	function flush()
+	{
+		if ($this->sessioncache) {
+			$contents = serialize($this->sessioncache);
+			if ($contents !== $this->contents) {
+				ftruncate($this->fp, 0);
+				fseek($this->fp, 0);
+				fwrite($this->fp, $contents);
+				$this->contents = $contents;
+			}
+		}
+	}
+
+	/**
+	 * Close the state file
+	 *
+	 * This closes and unlocks the state file so that other processes can access the state
+	 */
+	function close() {
+		if (isset($this->fp)) {
+			fclose($this->fp);
+		}
+	}
+
+	/**
+	 * Cleans all old state information in the session directory
+	 */
+	function clean() {
+		cleanTemp($this->basedir, STATE_FILE_MAX_LIFETIME);
+	}
 }

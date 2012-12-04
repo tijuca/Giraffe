@@ -73,6 +73,7 @@
 	include("server/core/constants.php");
 	
 	include("server/core/class.state.php");
+	include("server/core/class.attachmentstate.php");
 	include("server/core/class.request.php");
 	include("server/modules/class.module.php");
 	include("server/modules/class.listmodule.php");
@@ -197,27 +198,8 @@
 		$xml = readXML();
 		if (function_exists("dump_xml")) dump_xml($xml,"in"); // debugging
 		
-		// Get Attachment data from state and put it into the $_SESSION
-		$attachment_state = new State('attachments');
-		$attachment_state->open();
-		$_SESSION['files'] = $attachment_state->read("files");
-		$_SESSION['deleteattachment'] = $attachment_state->read("deleteattachment");
-		$checksum = md5(serialize($_SESSION['files']) . serialize($_SESSION['deleteattachment']));
-		$attachment_state->close();
-
 		// Execute the request
 		$xml = $request->execute($xml);
-
-		// Get Attachment data from $_SESSION and put it into the state, but only if something has changed
-		if(md5(serialize($_SESSION['files']) . serialize($_SESSION['deleteattachment'])) != $checksum) {
-			$attachment_state = new State('attachments');
-			$attachment_state->open();
-			$attachment_state->write("files", $_SESSION['files']);
-			$attachment_state->write("deleteattachment", $_SESSION['deleteattachment']);
-			$attachment_state->close();
-		}
-		// Prevent the SESSION data to be stored elsewhere
-		unset($_SESSION['files'], $_SESSION['deleteattachment']);
 
 		if (function_exists("dump_xml")) dump_xml($xml,"out"); // debugging
 

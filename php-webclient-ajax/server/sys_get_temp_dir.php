@@ -1,3 +1,4 @@
+<?php
 /*
  * Copyright 2005 - 2012  Zarafa B.V.
  * 
@@ -47,23 +48,36 @@
  * 
  */
 
-#define PROJECT_VERSION_SERVER		7,0,11,39075
-#define PROJECT_VERSION_SERVER_STR	"7,0,11,39075"
-#define PROJECT_VERSION_CLIENT		7,0,11,39075
-#define PROJECT_VERSION_CLIENT_STR	"7,0,11,39075"
-#define PROJECT_VERSION_EXT_STR		"7,0,11,39075"
-#define PROJECT_VERSION_SPOOLER_STR	"7,0,11,39075"
-#define PROJECT_VERSION_GATEWAY_STR	"7,0,11,39075"
-#define PROJECT_VERSION_CALDAV_STR	"7,0,11,39075"
-#define PROJECT_VERSION_DAGENT_STR	"7,0,11,39075"
-#define PROJECT_VERSION_PROFADMIN_STR	"7,0,11,39075"
-#define PROJECT_VERSION_MONITOR_STR	"7,0,11,39075"
-#define PROJECT_VERSION_PASSWD_STR	"7,0,11,39075"
-#define PROJECT_VERSION_FBSYNCER_STR	"7,0,11,39075"
-#define PROJECT_VERSION_INDEXER_STR	"7,0,11,39075"
-#define PROJECT_VERSION_DOT_STR		"7.0.11"
-#define PROJECT_SPECIALBUILD			"beta"
-#define PROJECT_SVN_REV_STR			"39075"
-#define PROJECT_VERSION_MAJOR			7
-#define PROJECT_VERSION_MINOR			0
-#define PROJECT_VERSION_REVISION			39075
+?>
+<?php
+// Backwards compatibility for the function sys_get_temp_dir which was
+// introduced in PHP 5.2.1
+if ( !function_exists('sys_get_temp_dir') ) {
+	// Reference http://php.net/manual/en/function.sys-get-temp-dir.php
+	// Based on http://www.phpit.net/
+	// article/creating-zip-tar-archives-dynamically-php/2/
+	function sys_get_temp_dir()
+	{
+		// Try to get from environment variable
+		if ( !empty($_ENV['TMP']) ) {
+			return realpath( $_ENV['TMP'] );
+		} else if ( !empty($_ENV['TMPDIR']) ) {
+			return realpath( $_ENV['TMPDIR'] );
+		} else if ( !empty($_ENV['TEMP']) ) {
+			return realpath( $_ENV['TEMP'] );
+		} else {
+			// Detect by creating a temporary file
+			// Try to use system's temporary directory
+			// as random name shouldn't exist
+			$temp_file = tempnam( md5(uniqid(rand(), TRUE)), '' );
+			if ( $temp_file ) {
+				$temp_dir = realpath( dirname($temp_file) );
+				unlink( $temp_file );
+				return $temp_dir;
+			} else {
+				return FALSE;
+			}
+		}
+	}
+}
+?>

@@ -58,147 +58,115 @@
 	// required to validate input arguments
 	require_once("client/layout/dialogs/utils.php");
 
+	// Include backwards compatibility
+	require_once("server/sys_get_temp_dir.php");
+
+	// Get Attachment data from state
+	$attachment_state = new AttachmentState();
+	$attachment_state->open();
+
 	// Check if dialog_attachments is set
 	if(isset($_POST["dialog_attachments"])) {
 		// Check if the file is uploaded correctly and is not above the MAX_FILE_SIZE
-		dump($_FILES["attachments"]);
 		if(isset($_FILES["attachments"]) && is_array($_FILES["attachments"])) {
 			$FILES = Array();
-			
-			if(isset($_FILES['attachments']['name']) && is_array($_FILES['attachments']['name'])){
-				foreach($_FILES['attachments']['name'] as $key => $name){
-					$FILE = Array(
-						'name'     => $_FILES['attachments']['name'][$key],
-						'type'     => $_FILES['attachments']['type'][$key],
-						'tmp_name' => $_FILES['attachments']['tmp_name'][$key],
-						'error'    => $_FILES['attachments']['error'][$key],
-						'size'     => $_FILES['attachments']['size'][$key]
-					);
-					
-					$FILES[] = $FILE;
-				}
-			} else if(isset($_FILES['attachments']['name'])){
-				// SWFUpload sends attachments array already in required format.
-				$FILE = $_FILES['attachments'];
 
-				/**
-				 * Get MIME type of the file, cause SWFUpload object doesn't return MIME type of the file.
-				 * for more information -> http://swfupload.org/forum/generaldiscussion/166
-				 */
-				$FILE["type"] = getMIMEType($FILE["name"]);
-				$FILES[] = $FILE;
-			}
+			if(isset($_FILES['attachments']['name'])) {
+				if(is_array($_FILES['attachments']['name'])){
+					foreach($_FILES['attachments']['name'] as $key => $name){
+						$FILE = Array(
+							'name'     => $_FILES['attachments']['name'][$key],
+							'type'     => $_FILES['attachments']['type'][$key],
+							'tmp_name' => $_FILES['attachments']['tmp_name'][$key],
+							'error'    => $_FILES['attachments']['error'][$key],
+							'size'     => $_FILES['attachments']['size'][$key]
+						);
 
-			foreach($FILES as $FILE) {
-				if (!empty($FILE["size"]) && !(isset($_POST["MAX_FILE_SIZE"]) && $FILE["size"] > $_POST["MAX_FILE_SIZE"])) {
-					// Create unique tmpname
-					$tmpname = tempnam(TMP_PATH, stripslashes($FILE["name"]));
-
-					// Move the uploaded file the the tmpname
-					$result = move_uploaded_file($FILE["tmp_name"], $tmpname);
-
-					if($FILE["type"] == "message/rfc822") {
 						/**
 						 * check content type that is send by browser because content type for
 						 * eml attachments will be message/rfc822, but this content type is used 
 						 * for message-in-message embedded objects, so we have to send it as 
 						 * application/octet-stream.
 						 */
-						$FILE["type"] = "application/octet-stream";
-					}
+						if ($FILE["type"] == "message/rfc822") {
+							$FILE["type"] = "application/octet-stream";
+						}
 
-					// Check if there are no files uploaded
-					if(!isset($_SESSION["files"])) {
-						$_SESSION["files"] = array();
+						$FILES[] = $FILE;
 					}
-					
-					// Check if no files are uploaded with this dialog_attachments
-					if(!isset($_SESSION["files"][$_POST["dialog_attachments"]])) {
-						$_SESSION["files"][$_POST["dialog_attachments"]] = array();
-					}
+				} else {
+					// SWFUpload sends attachments array already in required format.
+					$FILE = $_FILES['attachments'];
 
-					// stripping path details
-					$tmpname = basename($tmpname);
+					/**
+					 * Get MIME type of the file, cause SWFUpload object doesn't return MIME type of the file.
+					 * for more information -> http://swfupload.org/forum/generaldiscussion/166
+					 */
+					$FILE["type"] = getMIMEType($FILE["name"]);
+					$FILES[] = $FILE;
+				}
+			}
 
-					// Add file information to the session
-					$_SESSION["files"][$_POST["dialog_attachments"]][$tmpname] = Array(
-						"name"       => utf8_to_windows1252(stripslashes($FILE["name"])),
+			foreach($FILES as $FILE) {
+				if (!empty($FILE["size"]) && !(isset($_POST["MAX_FILE_SIZE"]) && $FILE["size"] > $_POST["MAX_FILE_SIZE"])) {
+					// Parse the filename, strip it from
+					// any illegal characters.
+					$filename = basename(stripslashes($FILE["name"]));
+
+					// Move the uploaded file into the attachment state
+					$attachid = $attachment_state->addUploadedAttachmentFile($_REQUEST["dialog_attachments"], $filename, $FILE["tmp_name"], array(
+						"name"       => $filename,
 						"size"       => $FILE["size"],
 						"type"       => $FILE["type"],
 						"sourcetype" => 'default'
-					);
+					));
 				}
 
 			}
 		} else if(isset($_POST["deleteattachment"]) && isset($_POST["type"])) { // Delete uploaded file
-			// Check if the delete file is an uploaded or an attachment of a MAPI iMessage
-			if($_POST["type"] == "new") {
-				// Get the tmpname of the uploaded file
-				$tmpname = urldecode($_POST["deleteattachment"]);
+			// Parse the filename, strip it from
+			// any illegal characters
+			$filename = basename(stripslashes(urldecode($_POST["deleteattachment"])));
 
-				if(isset($_SESSION["files"][$_POST["dialog_attachments"]][$tmpname])) {
-					unset($_SESSION["files"][$_POST["dialog_attachments"]][$tmpname]);
-					// Delete file
-					if (is_file($tmpname)) {
-						unlink($tmpname);
-					} 
-				} 
+			// Check if the delete file is an uploaded or an attachment of a MAPI iMessage
+			if ($_POST["type"] == "new") {
+				// Delete the file instance and unregister the file
+				$attachment_state->deleteUploadedAttachmentFile($_REQUEST["dialog_attachments"], $filename);
 			} else { // The file is an attachment of a MAPI iMessage
 				// Set the correct array structure
-				if(!isset($_SESSION["deleteattachment"])) {
-					$_SESSION["deleteattachment"] = array();
-				}
-				
-				if(!isset($_SESSION["deleteattachment"][$_POST["dialog_attachments"]])) {
-					$_SESSION["deleteattachment"][$_POST["dialog_attachments"]] = array();
-				}
-				
-				// Push the number of the attachment to the array structure
-				array_push($_SESSION["deleteattachment"][$_POST["dialog_attachments"]], $_POST["deleteattachment"]);
+				$attachment_state->addDeletedAttachment($_REQUEST["dialog_attachments"], $filename);
 			}
 		}
-} else if($_GET && isset($_GET["attachment_id"])) { // this is to upload the file to server when the doc is send via OOo
-	// check wheather the doc is already moved
-	if(file_exists("/tmp/".$_GET["attachment_id"])){
-		// Create unique tmpname	
-		$tmpname = tempnam(TMP_PATH, stripslashes($_GET["name"]));
-		// Move the uploaded file to tmpname loaction
-		rename("/tmp/".$_GET["attachment_id"], $tmpname);
-				
-		// Check if there are no files uploaded
-		if(!isset($_SESSION["files"])) {
-			$_SESSION["files"] = array();
-		}
-		
-		// Check if no files are uploaded with this attachmentid
-		if(!isset($_SESSION["files"][$_GET["attachment_id"]])) {
-			$_SESSION["files"][$_GET["attachment_id"]] = array();
-		}
+	} else if($_GET && isset($_GET["attachment_id"])) { // this is to upload the file to server when the doc is send via OOo
+		$providedFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $_GET['attachment_id'];
 
-		// Add file information to the session
-		$_SESSION["files"][$_GET["attachment_id"]][basename($tmpname)] = Array(
-			"name"       => utf8_to_windows1252(stripslashes($_GET["name"])),
-			"size"       => filesize($tmpname),
-			"type"       => mime_content_type($tmpname),
-			"sourcetype" => 'default'
-		);
-	}else{
-		// Check if no files are uploaded with this attachmentid
-		if(isset($_SESSION["files"][$_GET["attachment_id"]])) {
-			$_SESSION["files"][$_GET["attachment_id"]] = array();
+		// check wheather the doc is already moved
+		if (file_exists($providedFile)) {
+			$filename = basename(stripslashes($_GET["name"]));
+
+			// Move the uploaded file to the session
+			$attachment_state->addProvidedAttachmentFile($_REQUEST["attachment_id"], $filename, $providedFile, array(
+				"name"       => $filename,
+				"size"       => filesize($tmpname),
+				"type"       => mime_content_type($tmpname),
+				"sourcetype" => 'default'
+			));
+		}else{
+			// Check if no files are uploaded with this attachmentid
+			$attachment_state->clearAttachmentFiles($_GET["attachment_id"]);
 		}
 	}
-}
 
-
-// Return the file data output when client has request this page through the load==upload_attachment
-if(get('load', false, false, STRING_REGEX) == 'upload_attachment'){
-	if(isset($_SESSION["files"]) && isset($_SESSION["files"][$_REQUEST["dialog_attachments"]])) {
-		foreach($_SESSION["files"][$_REQUEST["dialog_attachments"]] as $tmpname => $file){
-			// Echo tmpname | filename | size
-			echo windows1252_to_utf8($tmpname) . "|" . windows1252_to_utf8($file["name"]) . "|" . $file["size"] . "||";
+	// Return the file data output when client has request this page through the load==upload_attachment
+	if(get('load', false, false, STRING_REGEX) == 'upload_attachment'){
+		if(isset($_REQUEST["dialog_attachments"])) {
+			$files = $attachment_state->getAttachmentFiles($_REQUEST["dialog_attachments"]);
+			foreach($files as $tmpname => $file) {
+				// Echo tmpname | filename | size
+				echo windows1252_to_utf8($tmpname) . "|" . windows1252_to_utf8($file["name"]) . "|" . $file["size"] . "||";
+			}
 		}
 	}
-}
 
+	$attachment_state->close();
 ?>

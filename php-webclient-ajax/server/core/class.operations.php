@@ -2061,23 +2061,26 @@
 		 */
 		function setAttachments($store, $message, $dialog_attachments, $copyfromEntryid=false, $add_inline_attachments = array(), $delete_inline_attachments = array(), $copy_inline_attachments_only = false)
 		{
+			$attachment_state = new AttachmentState();
+			$attachment_state->open();
+
 			// check if we need to copy attachments from a forwared message first
 			if ($copyfromEntryid !== false){
 				$copyfrom = mapi_msgstore_openentry($store, $copyfromEntryid);
 
 				$attachmentTable = mapi_message_getattachmenttable($copyfrom);
-				if($attachmentTable) {
+				if($attachmentTable && isset($dialog_attachments)) {
 					$attachments = mapi_table_queryallrows($attachmentTable, array(PR_ATTACH_NUM, PR_ATTACH_SIZE, PR_ATTACH_LONG_FILENAME, PR_ATTACHMENT_HIDDEN, PR_DISPLAY_NAME, PR_ATTACH_METHOD, PR_ATTACH_MIME_TAG));
+
+					$deletedAttachments = $attachment_state->getDeletedAttachments($dialog_attachments);
 
 					foreach($attachments as $props){
 						// check if this attachment is "deleted"
-						if(isset($_SESSION["deleteattachment"]) && isset($_SESSION["deleteattachment"][$dialog_attachments])) {
-							if (in_array($props[PR_ATTACH_NUM],$_SESSION["deleteattachment"][$dialog_attachments])) {
-								// skip attachment
-								continue;
-							}
+						if ($deletedAttachments && in_array($props[PR_ATTACH_NUM], $deletedAttachments)) {
+							// skip attachment, remove reference from state as it no longer applies.
+							$attachment_state->removeDeletedAttachment($dialog_attachments, $props[PR_ATTACH_NUM]);
+							continue;
 						}
-
 
 						// If reply message, then copy only inline attachments.
 						if ($copy_inline_attachments_only){
@@ -2103,14 +2106,15 @@
 					}
 				}
 			} else {
-	
 				// Check if attachments should be deleted. This is set in the "upload_attachment.php" file
-				if(isset($_SESSION["deleteattachment"]) && isset($_SESSION["deleteattachment"][$dialog_attachments])) {
-					foreach($_SESSION["deleteattachment"][$dialog_attachments] as $attach_num) {
-						mapi_message_deleteattach($message, (int) $attach_num);
-					}	
-					// Clear the list of deleteattachment items from the session when the changes have been applied to the MAPI IMessage
-					$_SESSION["deleteattachment"][$dialog_attachments] = Array();
+				if (isset($dialog_attachments)) {
+					$deleted = $attachment_state->getDeletedAttachments($dialog_attachments);
+					if ($deleted) {
+						foreach ($deleted as $attach_num) {
+							mapi_message_deleteattach($message, (int) $attach_num);
+						}
+						$attachment_state->clearDeletedAttachments($dialog_attachments);
+					}
 				}
 			}
 			
@@ -2137,115 +2141,119 @@
 				}
 			}
 
-			// Check if ["files"] and ["files"][$dialog_attachments] is set
-			if(isset($_SESSION["files"])) {
-				if(isset($_SESSION["files"][$dialog_attachments])) {
-					// Loop through teh uploaded attachments
-					foreach ($_SESSION["files"][$dialog_attachments] as $tmpname => $fileinfo)
-					{
-						if (is_file(TMP_PATH."/".$tmpname)) {
-							// Dont save (inline)attachment if deleted from body.
-							$fileDeleted = false;
-							foreach ($delete_inline_attachments as $attach){
-								if ($tmpname == $attach["attach_Num"]){
-									unlink(TMP_PATH."/".$tmpname);
-									$fileDeleted = true;
-								}
+			$files = $attachment_state->getAttachmentFiles($dialog_attachments);
+			if ($files) {
+				// Loop through the uploaded attachments
+				foreach ($files as $tmpname => $fileinfo) {
+					$filepath = $attachment_state->getAttachmentPath($tmpname);
+
+					if (is_file($filepath)) {
+						// Dont save (inline)attachment if deleted from body.
+						$fileDeleted = false;
+						foreach ($delete_inline_attachments as $attach){
+							if ($tmpname == $attach["attach_Num"]){
+								$attachment_state->deleteUploadedAttachmentFile($dialog_attachments, $tmpname);
+								$fileDeleted = true;
 							}
-							
-							if (!$fileDeleted){
-								// Set contentId if attachment is inline
-								$cid = "";
-								foreach ($add_inline_attachments as $attach){
-									if ($tmpname == $attach["attach_Num"]){
-										$cid = $attach["cid"];
-									}
-								}
-															
-								// Set attachment properties
-								$props = Array(PR_ATTACH_LONG_FILENAME => $fileinfo["name"],
-											   PR_DISPLAY_NAME => $fileinfo["name"],
-											   PR_ATTACH_METHOD => ATTACH_BY_VALUE,
-											   PR_ATTACH_DATA_BIN => "",
-											   PR_ATTACH_MIME_TAG => $fileinfo["type"],
-											   PR_ATTACH_CONTENT_ID => empty($cid)?false:$cid,
-											   PR_ATTACHMENT_HIDDEN => $cid?true:false);
-	
-								// Create attachment and set props
-								$attachment = mapi_message_createattach($message);
-								mapi_setprops($attachment, $props);
-								
-								// Stream the file to the PR_ATTACH_DATA_BIN property 
-								$stream = mapi_openpropertytostream($attachment, PR_ATTACH_DATA_BIN, MAPI_CREATE | MAPI_MODIFY);
-								$handle = fopen(TMP_PATH."/".$tmpname, "r");
-								while (!feof($handle))
-								{
-									$contents = fread($handle, BLOCK_SIZE);
-									mapi_stream_write($stream, $contents);
-								}
-								
-								// Commit the stream and save changes
-								mapi_stream_commit($stream);
-								mapi_savechanges($attachment);
-								fclose($handle);
-								unlink(TMP_PATH."/".$tmpname);
-							}
-						} else {//thats means the attachment is a message item and is uploaded in sesssion file as mapi message Obj
-							$props = array();
-							$props[PR_ATTACH_METHOD] = 5;
-							$props[PR_DISPLAY_NAME] = $fileinfo["name"];
-
-							//Create new attachment.
-							$attachment = mapi_message_createattach($message);
-							mapi_message_setprops($attachment, $props);
-							
-							//open embedded msg
-							$imessage = mapi_attach_openobj($attachment, MAPI_CREATE | MAPI_MODIFY);
-							$copyfromStore = $GLOBALS["mapisession"]->openMessageStore($fileinfo["storeid"]);
-							$copyfrom = mapi_msgstore_openentry($copyfromStore , $fileinfo["entryid"]);
-							
-							$msg_props = mapi_message_getprops($copyfrom );
-							//set the props of embedded message same as the selected message
-							$props = $props + $msg_props;
-							mapi_message_setprops($imessage, $props);
-							//hardcode the message class props as we need all message as normal.
-							mapi_message_setprops($imessage,array(PR_MESSAGE_CLASS => "IPM.NOTE" ));
-
-							// copy attachment property to embedded message
-							$attachmentTable = mapi_message_getattachmenttable($copyfrom);
-							if($attachmentTable) {
-								$attachments = mapi_table_queryallrows($attachmentTable, array(PR_ATTACH_NUM, PR_ATTACH_SIZE, PR_ATTACH_LONG_FILENAME, PR_ATTACHMENT_HIDDEN, PR_DISPLAY_NAME, PR_ATTACH_METHOD));
-
-								foreach($attachments as $attach_props){
-									if ($attach_props[PR_ATTACH_METHOD] == 5)
-										continue;
-
-									$attach_old = mapi_message_openattach($copyfrom, (int) $attach_props[PR_ATTACH_NUM]);
-									$attach_newResourceMsg = mapi_message_createattach($imessage);
-									mapi_copyto($attach_old, array(), array(), $attach_newResourceMsg, 0);
-									mapi_savechanges($attach_newResourceMsg);
-								}
-							}
-							
-							//copy the recipient of embedded message
-							$recipienttable = mapi_message_getrecipienttable($copyfrom);
-							$recipients = mapi_table_queryallrows($recipienttable, $GLOBALS["properties"]->getRecipientProperties());
-							$copy_to_recipientTable = mapi_message_getrecipienttable($imessage);
-							$copy_to_recipientRows = mapi_table_queryallrows($copy_to_recipientTable, array(PR_ROWID));
-							foreach($copy_to_recipientRows as $recipient) {
-								mapi_message_modifyrecipients($imessage, MODRECIP_REMOVE, array($recipient));
-							}
-							mapi_message_modifyrecipients($imessage, MODRECIP_ADD, $recipients);
-
-							//save changes in the embedded message and the final attachment 
-							mapi_savechanges($imessage);
-							mapi_savechanges($attachment);
 						}
+
+						$fileDeleted = false;
+						if (!$fileDeleted){
+							// Set contentId if attachment is inline
+							$cid = "";
+							foreach ($add_inline_attachments as $attach){
+								if ($tmpname == $attach["attach_Num"]){
+									$cid = $attach["cid"];
+								}
+							}
+														
+							// Set attachment properties
+							$props = Array(PR_ATTACH_LONG_FILENAME => $fileinfo["name"],
+										   PR_DISPLAY_NAME => $fileinfo["name"],
+										   PR_ATTACH_METHOD => ATTACH_BY_VALUE,
+										   PR_ATTACH_DATA_BIN => "",
+										   PR_ATTACH_MIME_TAG => $fileinfo["type"],
+										   PR_ATTACH_CONTENT_ID => empty($cid)?false:$cid,
+										   PR_ATTACHMENT_HIDDEN => $cid?true:false);
+
+							// Create attachment and set props
+							$attachment = mapi_message_createattach($message);
+							mapi_setprops($attachment, $props);
+							
+							// Stream the file to the PR_ATTACH_DATA_BIN property 
+							$stream = mapi_openpropertytostream($attachment, PR_ATTACH_DATA_BIN, MAPI_CREATE | MAPI_MODIFY);
+							$handle = fopen($filepath, "r");
+							while (!feof($handle))
+							{
+								$contents = fread($handle, BLOCK_SIZE);
+								mapi_stream_write($stream, $contents);
+							}
+							
+							// Commit the stream and save changes
+							mapi_stream_commit($stream);
+							mapi_savechanges($attachment);
+							fclose($handle);
+							unlink($filepath);
+						}
+					} else {
+						// thats means the attachment is a message item and is uploaded in sesssion file as mapi message Obj
+						$props = array();
+						$props[PR_ATTACH_METHOD] = ATTACH_EMBEDDED_MSG;
+						$props[PR_DISPLAY_NAME] = $fileinfo["name"];
+
+						//Create new attachment.
+						$attachment = mapi_message_createattach($message);
+						mapi_message_setprops($attachment, $props);
+
+						//open embedded msg
+						$imessage = mapi_attach_openobj($attachment, MAPI_CREATE | MAPI_MODIFY);
+						$copyfromStore = $GLOBALS["mapisession"]->openMessageStore($fileinfo["storeid"]);
+						$copyfrom = mapi_msgstore_openentry($copyfromStore , $fileinfo["entryid"]);
+
+						$msg_props = mapi_message_getprops($copyfrom );
+						//set the props of embedded message same as the selected message
+						$props = $props + $msg_props;
+						mapi_message_setprops($imessage, $props);
+						//hardcode the message class props as we need all message as normal.
+						mapi_message_setprops($imessage,array(PR_MESSAGE_CLASS => "IPM.NOTE" ));
+
+						// copy attachment property to embedded message
+						$attachmentTable = mapi_message_getattachmenttable($copyfrom);
+						if($attachmentTable) {
+							$attachments = mapi_table_queryallrows($attachmentTable, array(PR_ATTACH_NUM, PR_ATTACH_SIZE, PR_ATTACH_LONG_FILENAME, PR_ATTACHMENT_HIDDEN, PR_DISPLAY_NAME, PR_ATTACH_METHOD));
+
+							foreach($attachments as $attach_props){
+								if ($attach_props[PR_ATTACH_METHOD] == ATTACH_EMBEDDED_MSG)
+									continue;
+
+								$attach_old = mapi_message_openattach($copyfrom, $attach_props[PR_ATTACH_NUM]);
+								$attach_newResourceMsg = mapi_message_createattach($imessage);
+								mapi_copyto($attach_old, array(), array(), $attach_newResourceMsg, 0);
+								mapi_savechanges($attach_newResourceMsg);
+							}
+						}
+							
+						//copy the recipient of embedded message
+						$recipienttable = mapi_message_getrecipienttable($copyfrom);
+						$recipients = mapi_table_queryallrows($recipienttable, $GLOBALS["properties"]->getRecipientProperties());
+						$copy_to_recipientTable = mapi_message_getrecipienttable($imessage);
+						$copy_to_recipientRows = mapi_table_queryallrows($copy_to_recipientTable, array(PR_ROWID));
+						foreach($copy_to_recipientRows as $recipient) {
+							mapi_message_modifyrecipients($imessage, MODRECIP_REMOVE, array($recipient));
+						}
+						mapi_message_modifyrecipients($imessage, MODRECIP_ADD, $recipients);
+
+						//save changes in the embedded message and the final attachment 
+						mapi_savechanges($imessage);
+						mapi_savechanges($attachment);
 					}
-					// Delete all the files in the $_SESSION["files"][$dialog_attachments].
-					unset($_SESSION["files"][$dialog_attachments]);
-				}	
+				}
+
+				// Delete all the files in the state.
+				$attachment_state->clearAttachmentFiles($dialog_attachments);
 			}
+
+			$attachment_state->close();
 		}
 		
 		/**
@@ -3603,7 +3611,7 @@
 		}
 		
 		/**
-		 * Function stores the uploaded items in gloabal session.
+		 * Function stores the uploaded items in attachments state file.
 		 * @param object MAPI Message Store Object
 		 * @param array $entryids entryids of the selected message items
 		 * @param string $dialog_attachments
@@ -3613,47 +3621,42 @@
 		{
 			$attachments = array();
 			$attachments["attachment"] = array();
-			
-			// Check if there are no files uploaded
-			if(!isset($_SESSION["files"])) {
-				$_SESSION["files"] = array();
-			}
-			
-			// Check if no files are uploaded with this dialog_attachments
-			if(!isset($_SESSION["files"][$dialog_attachments])) {
-				$_SESSION["files"][$dialog_attachments] = array();
-			}
-					
-			foreach($entryids as $key =>$items){
-				
-				$message = mapi_msgstore_openentry($store, hex2bin($items));
+
+			$attachment_state = new AttachmentState();
+			$attachment_state->open();
+
+			foreach($entryids as $key => $entryid) {
+				$message = mapi_msgstore_openentry($store, hex2bin($entryid));
 				$msg_props = mapi_getprops($message, array(PR_STORE_ENTRYID, PR_ENTRYID, PR_MESSAGE_SIZE, PR_SUBJECT,  PR_MESSAGE_CLASS));
+
 				// stripping path details
-				$tmpname = w2u($msg_props[PR_SUBJECT]).rand();
-				
+				$tmpname = w2u($msg_props[PR_SUBJECT]) . rand();
+
 				// Add file information to the session
-				$_SESSION["files"][$dialog_attachments][$tmpname] = Array(
-					"name"			=> empty($msg_props[PR_SUBJECT])?_("Untitled"):w2u($msg_props[PR_SUBJECT]),
+				$attachment_state->addAttachmentFile($dialog_attachments, $tmpname, Array(
+					"name"			=> empty($msg_props[PR_SUBJECT]) ? _("Untitled") : w2u($msg_props[PR_SUBJECT]),
 					"size"			=> $msg_props[PR_MESSAGE_SIZE],
 					"type"			=> 'message/rfc822',
 					"sourcetype"	=> 'items',
 					"storeid"		=> $msg_props[PR_STORE_ENTRYID],
 					"entryid"		=> $msg_props[PR_ENTRYID],
 					"message_class" => $msg_props[PR_MESSAGE_CLASS]
-					);
+				));
 
-				//creating attachment array
-				$attachment = array();
+				// get attachment data, modify and send it to client
+				$attachment = $attachment_state->getAttachmentFile($dialog_attachments, $tmpname);
+
+				// add extra data
 				$attachment["attach_num"] = $tmpname;
-				$attachment["attach_method"] = 5 ;
-				$attachment["size"] = $msg_props[PR_MESSAGE_SIZE];
-				$attachment["entryid"] = bin2hex($msg_props[PR_ENTRYID]);
-				$attachment["filetype"] = 'message/rfc822';
-				$attachment["name"] = empty($msg_props[PR_SUBJECT])?_("Untitled"):w2u($msg_props[PR_SUBJECT]);	
+				$attachment["entryid"] = bin2hex($attachment["entryid"]);
+				$attachment["storeid"] = bin2hex($attachment["storeid"]);
 				$attachment["attach_message_class"] = 'IPM.NOTE';
 
 				array_push($attachments["attachment"], $attachment);
 			}
+
+			$attachment_state->close();
+
 			return $attachments;
 		}
 	}

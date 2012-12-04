@@ -94,12 +94,17 @@ function getJavaScript_onload(){ ?>
 						var deletedattachments = new Object();
 						
 						<?
-							if(isset($_SESSION["deleteattachment"]) && isset($_SESSION["deleteattachment"][$_REQUEST["dialog_attachments"]])) {
-								foreach($_SESSION["deleteattachment"][$_REQUEST["dialog_attachments"]] as $attach_num)
+							// Get Attachment data from state
+							$attachment_state = new AttachmentState();
+							$attachment_state->open();
+
+							$deleted = $attachment_state->getDeletedAttachments($_REQUEST["dialog_attachments"]);
+							if($deleted) {
+								foreach($deleted as $attach_num)
 								{
-						?>
-							deletedattachments["<?=$attach_num?>"] = "deleted";
-						<?
+									?>
+										deletedattachments["<?=$attach_num?>"] = "deleted";
+									<?
 								}
 							}
 						?>
@@ -118,38 +123,38 @@ function getJavaScript_onload(){ ?>
 
 						var newattachments = new Array();
 						<?
-							if(isset($_SESSION["files"]) && isset($_SESSION["files"][$_REQUEST["dialog_attachments"]])) {
-								foreach($_SESSION["files"][$_REQUEST["dialog_attachments"]] as $tmpname => $file)
+							$files = $attachment_state->getAttachmentFiles($_REQUEST["dialog_attachments"]);
+							if($files) {
+								foreach($files as $tmpname => $file)
 								{
-								
-						?>
-							var tmpname = "<?=rawurlencode($tmpname)?>";
-							var messageclass = "<?=windows1252_to_utf8($file['message_class'])?>";
-							// Show attachment if it is not an inline attachment.
-							if (typeof(parentwindow.module.inlineimages[tmpname]) == "undefined"){
-								var option = dhtml.addElement(filelist, "option", 
-								"attachmentsourcetype_<?=($file['sourcetype'])?$file['sourcetype']:'default'?>");
-								option.value = "<?=rawurlencode($tmpname)?>";
-								option.text = "<?=windows1252_to_utf8($file["name"])?>";
-								
-								// check the message type of the attached item to display proper icons
-								if(messageclass){
-									dhtml.addClassName(option,iconIndexToClassName(false, messageclass, false));
-								}
+									?>
+										var tmpname = "<?=rawurlencode($tmpname)?>";
+										var messageclass = "<?=windows1252_to_utf8($file['message_class'])?>";
+										// Show attachment if it is not an inline attachment.
+										if (typeof(parentwindow.module.inlineimages[tmpname]) == "undefined"){
+											var option = dhtml.addElement(filelist, "option", 
+											"attachmentsourcetype_<?=($file['sourcetype'])?$file['sourcetype']:'default'?>");
+											option.value = "<?=rawurlencode($tmpname)?>";
+											option.text = "<?=windows1252_to_utf8($file["name"])?>";
+											
+											// check the message type of the attached item to display proper icons
+											if(messageclass){
+												dhtml.addClassName(option,iconIndexToClassName(false, messageclass, false));
+											}
 
-								var attachment = new Object();
-								attachment["attach_num"] = "<?=rawurlencode($tmpname)?>"
-								attachment["name"] = "<?=windows1252_to_utf8($file["name"])?>";
-								attachment["size"] = <?=$file["size"]?>;
-								attachment["filetype"] = "<?=$file["type"]?>";
-								
-								if(parentwindow.module.messageAction == "forwardmultiple"){
-									attachment["entryid"] = "<?=bin2hex($file["entryid"])?>";
-									attachment["attach_method"] = "5";
-								}
-								newattachments.push(attachment);
-							}
-						<?
+											var attachment = new Object();
+											attachment["attach_num"] = "<?=rawurlencode($tmpname)?>"
+											attachment["name"] = "<?=windows1252_to_utf8($file["name"])?>";
+											attachment["size"] = <?=$file["size"]?>;
+											attachment["filetype"] = "<?=$file["type"]?>";
+											
+											if(parentwindow.module.messageAction == "forwardmultiple"){
+												attachment["entryid"] = "<?=bin2hex($file["entryid"])?>";
+												attachment["attach_method"] = "5";
+											}
+											newattachments.push(attachment);
+										}
+									<?
 								}
 							}
 						?>
@@ -177,6 +182,10 @@ function getJavaScript_onload(){ ?>
 					initUploadObject(enableMultiUpload);
 
 					webclient.menu.showMenu();
+
+					<?
+						$attachment_state->close();
+					?>
 <?php } // getJavaScript_onload						
 
 function getJavaScript_other(){ ?>

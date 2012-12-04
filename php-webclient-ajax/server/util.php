@@ -402,26 +402,61 @@
 	 * Cleans up the temp directory.
 	 * @param String $directory The path to the temp dir or sessions dir.
 	 * @param Integer $maxLifeTime The maximum allowed age of files in seconds.
+	 * @param Boolean $recursive False to prevent the folder to be cleaned up recursively
+	 * @param Boolean $removeSubs False to prevent empty subfolders from being deleted
+	 * @return Boolean True if the folder is empty
 	 */
-	function cleanTemp($directory = TMP_PATH, $maxLifeTime = false)
+	function cleanTemp($directory = TMP_PATH, $maxLifeTime = STATE_FILE_MAX_LIFETIME, $recursive = true, $removeSubs = true)
 	{
-		if($maxLifeTime===false)$maxLifeTime = ini_get("session.gc_maxlifetime");
-
-		if (!is_dir($directory)){
+		if (!is_dir($directory)) {
 			return;
 		}
 
+		// PHP doesn't do this by itself, so before running through
+		// the folder, we should flush the statcache, so the 'atime'
+		// is current.
+		clearstatcache();
+
 		$dir = opendir($directory);
+		$is_empty = true;
 
-		while($file = readdir($dir)) {
-			if (!is_dir($directory . "/" . $file)){
-				$fileinfo = stat($directory . "/" . $file);
+		while ($file = readdir($dir)) {
+			// Skip special folders
+			if ($file === '.' || $file === '..') {
+				continue;
+			}
 
-				if($fileinfo && $fileinfo["atime"] < time() - $maxLifeTime) {
-					unlink($directory . "/" . $file);
+			$path = $directory . DIRECTORY_SEPARATOR . $file;
+
+			if (is_dir($path)) {
+				// If it is a directory, check if we need to
+				// recursively clean this subfolder.
+				if ($recursive) {
+					// If cleanTemp indicates the subfolder is empty,
+					// and $removeSubs is true, we must delete the subfolder
+					// otherwise the currently folder is not empty.
+					if (cleanTemp($path, $maxLifeTime, $recursive) && $removeSubs) {
+						rmdir($path);
+					} else {
+						$is_empty = false;
+					}
+				} else {
+					// We are not cleaning recursively, the current
+					// folder is not empty.
+					$is_empty = false;
+				}
+			} else {
+				$fileinfo = stat($path);
+
+				if ($fileinfo && $fileinfo["atime"] < time() - $maxLifeTime) {
+					unlink($path);
+				} else {
+					$is_empty = false;
 				}
 			}
 		}
+
+		return $is_empty;
 	}
 
 	function cleanSearchFolders()

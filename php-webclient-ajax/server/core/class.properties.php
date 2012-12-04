@@ -128,7 +128,7 @@
 		 * @param MAPIStore $store store to use to get property tags
 		 * @return array properties for Recipient.
 		 */
-		function getRecipientProperties($store)
+		function getRecipientProperties($store = null)
 		{
 			$this->Init();
 			
@@ -143,7 +143,7 @@
 			$properties["recipient_status_num"] = PR_RECIPIENT_TRACKSTATUS_TIME;
 			$properties["objecttype"] = PR_OBJECT_TYPE;
 
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 		
 		/**
@@ -151,7 +151,7 @@
 		 * @param MAPIStore $store store to use to get property tags
 		 * @return array properties for an appointment.
 		 */
-		function getAppointmentProperties($store)
+		function getAppointmentProperties($store = null)
 		{
 			$this->Init();
 			
@@ -220,7 +220,7 @@
 			$properties["updatecounter"] = "PT_LONG:PSETID_Appointment:0x8201";
 			$properties["recur_type"] = "PT_LONG:PSETID_Appointment:0x8231";
 
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 		
 		/**
@@ -228,7 +228,7 @@
 		 * @param MAPIStore $store store to use to get property tags
 		 * @return array properties for a contact.
 		 */
-		function getContactProperties($store)
+		function getContactProperties($store = null)
 		{
 			$this->Init();
 			
@@ -360,7 +360,7 @@
 			$properties["birthday_eventid"] = "PT_BINARY:PSETID_Address:0x804D";
 			$properties["anniversary_eventid"] = "PT_BINARY:PSETID_Address:0x804E";
 
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 
 		/**
@@ -368,7 +368,7 @@
 		 * @param MAPIStore $store store to use to get property tags
 		 * @return array properties for a contact.
 		 */
-		function getContactABProperties($store)
+		function getContactABProperties($store = null)
 		{
 			$this->Init();
 			
@@ -410,7 +410,7 @@
 			
 			$properties["deleted_on"] = PR_DELETED_ON;
 
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 
 		/**
@@ -418,7 +418,7 @@
 		 * @param MAPIStore $store store to use to get property tags
 		 * @return array properties for a distribution list.
 		 */
-		function getDistListProperties($store)
+		function getDistListProperties($store = null)
 		{
 			$this->Init();
 			
@@ -443,7 +443,7 @@
 
 			$properties["deleted_on"] = PR_DELETED_ON;
 
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 
 		/**
@@ -451,7 +451,7 @@
 		 * @param MAPIStore $store store to use to get property tags
 		 * @return array properties for a contact.
 		 */
-		function getAddressBookProperties()
+		function getAddressBookProperties($store = null)
 		{
 			$this->Init();
 			
@@ -471,7 +471,7 @@
 			$properties["fax"] = PR_PRIMARY_FAX_NUMBER;
 			$properties["department"] = PR_DEPARTMENT_NAME;
 
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 
 		/**
@@ -479,7 +479,7 @@
 		 * @param MAPIStore $store store to use to get property tags
 		 * @return array properties for an AB entry.
 		 */
-		function getAddressBookItemMailuserProperties($store)
+		function getAddressBookItemMailuserProperties($store = null)
 		{
 			$this->Init();
 			
@@ -521,10 +521,10 @@
 			// Allowing to hook in and add more properties
 			$GLOBALS['PluginManager']->triggerHook("server.core.properties.addressbookitem.mailuser", array(
 				'properties' =>& $properties,
-				'store' => isset($store) ? $store : $this->store
+				'store' => $store !== null ? $store : $this->store
 			));
 
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 
 		/**
@@ -532,7 +532,7 @@
 		 * @param MAPIStore $store store to use to get property tags
 		 * @return array properties for an AB entry.
 		 */
-		function getAddressBookItemDistlistProperties($store)
+		function getAddressBookItemDistlistProperties($store = null)
 		{
 			$this->Init();
 			
@@ -550,10 +550,10 @@
 			// Allowing to hook in and add more properties
 			$GLOBALS['PluginManager']->triggerHook("server.core.properties.addressbookitem.distlist", array(
 				'properties' =>& $properties,
-				'store' => isset($store) ? $store : $this->store
+				'store' => $store !== null ? $store : $this->store
 			));
 
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 
 		/**
@@ -561,7 +561,7 @@
 		 * @param MAPIStore $store store to use to get property tags
 		 * @return array properties for an AB entry.
 		 */
-		function getAddressBookItemABObjectProperties($store)
+		function getAddressBookItemABObjectProperties($store = null)
 		{
 			$this->Init();
 			
@@ -578,10 +578,10 @@
 			// Allowing to hook in and add more properties
 			$GLOBALS['PluginManager']->triggerHook("server.core.properties.addressbookitem.abobject", array(
 				'properties' =>& $properties,
-				'store' => isset($store) ? $store : $this->store
+				'store' => $store !== null ? $store : $this->store
 			));
 
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 
 		/**
@@ -589,7 +589,7 @@
 		 * @param MAPIStore $store store to use to get property tags
 		 * @return array properties for an email.
 		 */
-		function getMailProperties($store)
+		function getMailProperties($store = null)
 		{
 			$this->Init();
 
@@ -669,7 +669,7 @@
 			// Archiver property
 			$properties["stubbed"] = "PT_BOOLEAN:PSETID_Archive:stubbed";
 
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 		
 		/**
@@ -677,7 +677,7 @@
 		 * @param MAPIStore $store store to use to get property tags
 		 * @return array properties for a sticky note.
 		 */
-		function getStickyNoteProperties($store)
+		function getStickyNoteProperties($store = null)
 		{
 			$this->Init();
 			
@@ -700,7 +700,7 @@
 
 			$properties["deleted_on"] = PR_DELETED_ON;
 			
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 		
 		/**
@@ -708,7 +708,7 @@
 		 * @param MAPIStore $store store to use to get property tags
 		 * @return array properties for a task.
 		 */
-		function getTaskProperties($store)
+		function getTaskProperties($store = null)
 		{
 			$this->Init();
 			
@@ -782,7 +782,7 @@
 
 			$properties["display_cc"] = PR_DISPLAY_CC;
 
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 
 		/**
@@ -790,7 +790,7 @@
 		* @param MAPIStore $store store to use to get property tags
 		* @return array properties
 		*/
-		function getCategoryProperties($store)
+		function getCategoryProperties($store = null)
 		{
 			$this->Init();
 			
@@ -799,7 +799,7 @@
 			$properties["parent_entryid"] = PR_PARENT_ENTRYID;
 			$properties["categories"] = "PT_MV_STRING8:PS_PUBLIC_STRINGS:Keywords";
 
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 	
 		/**
@@ -807,7 +807,7 @@
 		 * @param MAPIStore $store store to use to get property tags
 		 * @return array properties.
 		 */
-		function getFolderProperties($store)
+		function getFolderProperties($store = null)
 		{
 			$this->Init();
 			
@@ -828,7 +828,7 @@
 			
 			$properties["deleted_on"] = PR_DELETED_ON;
 
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 		
 		/**
@@ -836,7 +836,7 @@
 		 * @param MAPIStore $store store to use to get property tags
 		 * @return array properties
 		 */
-		function getReminderProperties($store)
+		function getReminderProperties($store = null)
 		{
 			$this->Init();
 			
@@ -869,7 +869,7 @@
 			
 			$properties["deleted_on"] = PR_DELETED_ON;
 
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 
 
@@ -878,7 +878,7 @@
 		 * @param MAPIStore $store store to use to get property tags
 		 * @return array properties
 		 */
-		function getRulesProperties($store)
+		function getRulesProperties($store = null)
 		{
 			$this->Init();
 			
@@ -893,7 +893,7 @@
 			$properties["rule_provider_data"] = PR_RULE_PROVIDER_DATA;
 			$properties["rule_level"] = PR_RULE_LEVEL;
 			
-			return getPropIdsFromStrings((isset($store) && $store) ? $store : $this->store, $properties);
+			return getPropIdsFromStrings($store !== null ? $store : $this->store, $properties);
 		}
 }
 ?>

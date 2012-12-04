@@ -119,6 +119,12 @@
 	// Time that static files may exist in the client's cache (13 weeks)
 	define('EXPIRES_TIME', 60*60*24*7*13);
 
+	// Time that the state files are allowed to survive (in seconds)
+	// For filesystems on which relatime is used, this value should be larger then the relatime_interval
+	// for kernels 2.6.30 and above relatime is enabled by default, and the relatime_interval is set to
+	// 24 hours.
+	define('STATE_FILE_MAX_LIFETIME', 28*60*60);
+
 	// Time that attachments are allowed to survive (in seconds)
 	define('UPLOADED_ATTACHMENT_MAX_LIFETIME', 6*60*60);
 

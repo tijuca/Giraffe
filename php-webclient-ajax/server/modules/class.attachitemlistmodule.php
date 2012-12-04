@@ -168,8 +168,7 @@
 						$action["entryids"] = array($action["entryids"]);
 					}
 					if($action["type"] == "attachment"){
-
-						//add attach items to session variables
+						// add attach items to attachment state
 						$attachments = $GLOBALS["operations"]->setAttachmentInSession($store, $action["entryids"], $action["dialog_attachments"]);
 
 						$data = array();

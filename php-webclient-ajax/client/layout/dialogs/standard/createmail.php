@@ -293,25 +293,26 @@ function getJavaScript_onload(){ ?>
 					// document is send as attachment via any openOffice application
 					var attachment_id = decodeURIComponent("<?=rawurlencode(get("attachment_id"))?>").trim();
 					if(attachment_id){
-						
-						
 						var newattachments = new Array();
 					<?
 						// check for the uploaded document in session variable to display it in the createmail dialog
-						if(isset($_SESSION["files"]) && isset($_SESSION["files"][$_GET["attachment_id"]])) {
-							if(count($_SESSION["files"][$_GET["attachment_id"]]) == 1){
-								foreach($_SESSION["files"][$_GET["attachment_id"]] as $tmpname => $file)
-					?>			
-								{
-									var attachment = new Object();
-									attachment["attach_num"] = "<?=$tmpname?>";
-									attachment["name"] = "<?=$file["name"]?>";
-									attachment["size"] = <?=$file["size"]?>;
-									attachment["filetype"] = "<?=$file["type"]?>";
-									newattachments.push(attachment);
-											
-								}
-								
+						// Get Attachment data from state
+						$attachment_state = new AttachmentState();
+						$attachment_state->open();
+
+						if(isset($_GET["attachment_id"])) {
+							$files = $attachment_state->getAttachmentFiles($_GET["attachment_id"]);
+							if($files) {
+								foreach($files as $tmpname => $file) {
+									?>
+										var attachment = new Object();
+										attachment["attach_num"] = "<?=$tmpname?>";
+										attachment["name"] = "<?=$file["name"]?>";
+										attachment["size"] = <?=$file["size"]?>;
+										attachment["filetype"] = "<?=$file["type"]?>";
+										newattachments.push(attachment);
+								<? } ?>
+
 								/**
 								 * As every dialog has a unique dialog_attachmentid with the help of which is 
 								 * refers its uploaded attachments, here to handle differnt types of attachments 
@@ -319,15 +320,16 @@ function getJavaScript_onload(){ ?>
 								 * we,assign the unique attachid  value recived in the url to dialog_attachments
 								 */ 
 								dhtml.getElementById("dialog_attachments").value = attachment_id;
-					<?
-							}else{
+							<? } else {
 								// if the createmail dialog is refresh the session files should not contain the uploaded attachments
-								$_SESSION["files"][$_GET["attachment_id"]] = array();
+								$attachment_state->clearAttachmentFiles($_GET["attachment_id"]);
 							}
 						}
-					?>
-						module.setAttachmentData(newattachments);
-						module.setAttachments();
+
+						$attachment_state->close();
+						?>
+							module.setAttachmentData(newattachments);
+							module.setAttachments();
 					}
 				
 <?php } // getJavaScript_onload

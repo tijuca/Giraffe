@@ -267,38 +267,32 @@
 	 */
 	function openTemporaryAttachments($storeid, $entryid, $openType, $attachNum, $getContentsOnly=false) {
 		if(isset($_GET["dialog_attachments"])) {
-			if(isset($_SESSION["files"])) {
-				// we can only open one attachment in a request,
-				// so only use first argument of $attachNum
-				if(isset($_SESSION["files"][get("dialog_attachments")]) && isset($_SESSION["files"][get("dialog_attachments")][$attachNum[0]])) {
-					// return recent uploaded file  
-					$tmpname = TMP_PATH."/".$attachNum[0];
-					$filename = $_SESSION["files"][get("dialog_attachments")][$attachNum[0]]["name"];
-					
-					// if we want only contents then pass the content writing on header
-					if($getContentsOnly){
-						if(is_file($tmpname)){
-							return array("content" => file_get_contents($tmpname), "filename" => $filename);
-						}
-					}
-					// Check if the file still exists
-					if(is_file($tmpname)) {
-						// Set the headers
-						header("Pragma: public");
-						header("Expires: 0"); // set expiration time
-						header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
-						header("Content-Disposition: " . $openType . "; filename=\"" . browserDependingHTTPHeaderEncode($filename) . "\"");
-						header("Content-Transfer-Encoding: binary");
-						header("Content-Type: application/octet-stream");
-						header("Content-Length: " . filesize($tmpname));
-						
-						// Open the uploaded file and print it
-						$file = fopen($tmpname, "r");
-						fpassthru($file);
-						fclose($file);
-					}
-				}
+			$attachment_state = new AttachmentState();
+			$attachment_state->open();
+
+			// we can only open one attachment in a request,
+			// so only use first argument of $attachNum
+			$tmpname = $attachment_state->getAttachmentPath($attachNum[0]);
+			$fileinfo = $attachment_state->getAttachmentFile($_GET["dialog_attachments"], $attachNum[0]);
+
+			// Check if the file still exists
+			if (is_file($tmpname)) {
+				// Set the headers
+				header("Pragma: public");
+				header("Expires: 0"); // set expiration time
+				header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
+				header("Content-Disposition: " . $openType . "; filename=\"" . $fileinfo['name'] . "\"");
+				header("Content-Transfer-Encoding: binary");
+				header("Content-Type: application/octet-stream");
+				header("Content-Length: " . filesize($tmpname));
+
+				// Open the uploaded file and print it
+				$file = fopen($tmpname, "r");
+				fpassthru($file);
+				fclose($file);
 			}
+
+			$attachment_state->close();
 		}
 	}
 

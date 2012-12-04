@@ -202,7 +202,7 @@ createmailitemmodule.prototype.updateMessage = function(action)
 			}
 		}
 		/**
-		 * Since message is saved, attachments are no longer avaliable from $_SESSION.
+		 * Since message is saved, attachments are no longer avaliable from state files.
 		 * So, initialize inlineattachments and inlineimages again.
 		 */
 		this.inlineattachments = new Object();
