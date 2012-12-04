@@ -10,6 +10,12 @@
 	// Comment next line to disable the config check (or set FALSE to log the config errors)
 	define("CONFIG_CHECK", TRUE);
 
+	// Use these options to optionally disable some PHP configuration checks.
+	// WARNING: these checks will disable checks regarding the security of the WebApp site configuration,
+	// only change them if you know the consequences - improper use will lead to an insecure installation!
+	define("CONFIG_CHECK_COOKIES_HTTP", TRUE);
+	define("CONFIG_CHECK_COOKIES_SSL", TRUE);
+
 	// Default Zarafa server to connect to.
 	define("DEFAULT_SERVER","file:///var/run/zarafa");
 	#define("DEFAULT_SERVER","file://\\\\.\\pipe\\zarafa");

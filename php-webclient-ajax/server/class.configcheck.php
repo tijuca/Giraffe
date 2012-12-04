@@ -80,6 +80,14 @@ class ConfigCheck
 		$this->checkPHPsetting("output_handler", "", "With this option set, it is unsure if the webaccess will work correctly");
 		$this->checkPHPsetting("zlib.output_handler", "", "With this option set, it is unsure if the webaccess will work correctly");
 		$this->checkPHPsetting("zlib.output_compression", "off", "With this option set, it could occure that XMLHTTP-requests will fail");
+
+		if (CONFIG_CHECK_COOKIES_HTTP) {
+			$this->checkPHPsecurity("session.cookie_httponly", "on", "Modify this setting in '%s'");
+		}
+		if (CONFIG_CHECK_COOKIES_SSL) {
+			$this->checkPHPsecurity("session.cookie_secure", "on", "Modify this setting in '%s'");
+		}
+
 		$this->checkDirectory(TMP_PATH, "rw", "Please make sure this directory exists and is writable for PHP/Apache");
 		$this->checkFunction("iconv", "Install the 'iconv' module for PHP, or else you don't have euro-sign support.");
 		$this->checkFunction("gzencode", "You don't have zlib support: <a href=\"http://php.net/manual/en/ref.zlib.php#zlib.installation\">http://php.net/manual/en/ref.zlib.php#zlib.installation</a>");
@@ -136,13 +144,47 @@ class ConfigCheck
 		$this->error(sprintf("<strong>PHP Config error:</strong> %s must be '%s'", $name, $needed), $help);
 	}
 
+ 	/**
+ 	 * See error()
+ 	 */
+	function error_security($name, $needed, $help)
+	{
+		$help = sprintf($help, "<tt>" . $this->get_site_config() . "</tt>");
+		$this->error("<strong>PHP Security Config error:</strong> $name must be '$needed'", $help);
+	}
+
 	/**
 	 * See error()
 	 */
 	function error_directory($dir, $msg, $help)
 	{
-		$this->error(sprintf("<strong>Directory Error:</strong> %s %s", $dir, $msg), $help);
+		$this->error("<strong>Directory Error:</strong> $dir $msg", $help);
 	}
+
+	/**
+	 * Retrieves the location of the apache site config
+	 */
+	function get_site_config()
+	{
+		if (isset($this->siteconfig)) {
+			return $this->siteconfig;
+		}
+
+		// This is not 100% accurate, so it needs to be improved a bit.
+		$result = "sites-enabled" . DIRECTORY_SEPARATOR . "zarafa-webapp";
+
+		ob_start();
+		phpinfo(INFO_MODULES);
+		$phpinfo = ob_get_contents();
+		ob_end_clean();
+
+		preg_match("/<td class=\"e\">[\s]*Server Root[\s]*<\/td>[\s]*<td class=\"v\">[\s]*(.*)[\s]*<\/td>/i", $phpinfo, $matches);
+		if (isset($matches[1])){
+			$result = trim($matches[1]) . DIRECTORY_SEPARATOR . $result;
+		}
+		$this->siteconfig = $result;
+		return $result;
+ 	}
 
 	/**
 	 * Retrieves the location of php.ini
@@ -241,12 +283,43 @@ class ConfigCheck
 				$value = $value_needed;
 		}
 
-		if (ini_get($setting) != $value){
-			$this->error_config($setting, $value_needed, $help_msg);
+ 		if (ini_get($setting) != $value){
+ 			$this->error_config($setting, $value_needed, $help_msg);
 			$result = false;
 		}
 		return $result;
 	}
+
+	/**
+	 * This function checks if a specific php setting (php.ini) is set to a 
+	 * value we need, for example register_globals
+	 */
+	function checkPHPsecurity($setting,$value_needed, $help_msg=""){
+		$result = true;
+		// convert $value_needed
+		switch($value_needed){
+			case "on":
+			case "yes":
+			case "true":
+				$value = 1;
+				break;
+
+			case "off":
+			case "no":
+			case "false":
+				$value = 0;
+				break;
+
+			default:
+				$value = $value_needed;
+		}
+
+		if (ini_get($setting) != $value){
+			$this->error_security($setting, $value_needed, $help_msg);
+ 			$result = false;
+ 		}
+ 		return $result;
+ 	}
 
 	/**
 	 * This functions checks if a directory exists and if requested also if
