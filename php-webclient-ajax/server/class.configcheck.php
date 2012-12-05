@@ -81,7 +81,7 @@ class ConfigCheck
 		$this->checkPHPsetting("zlib.output_handler", "", "With this option set, it is unsure if the webaccess will work correctly");
 		$this->checkPHPsetting("zlib.output_compression", "off", "With this option set, it could occure that XMLHTTP-requests will fail");
 
-		if (CONFIG_CHECK_COOKIES_HTTP) {
+		if (CONFIG_CHECK_COOKIES_HTTP && version_compare(phpversion(), "5.2") > -1) {
 			$this->checkPHPsecurity("session.cookie_httponly", "on", "Modify this setting in '%s'");
 		}
 		if (CONFIG_CHECK_COOKIES_SSL) {
