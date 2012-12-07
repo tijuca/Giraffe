@@ -142,7 +142,7 @@ exit:
  *
  * @return Zarafa error code
  */
-ECRESULT ValidateDeleteObject(ECSession *lpSession, bool bCheckPermission, unsigned int ulFlags, DELETEITEM &sItem)
+ECRESULT ValidateDeleteObject(ECSession *lpSession, bool bCheckPermission, unsigned int ulFlags, const DELETEITEM &sItem)
 {
 	ECRESULT er = erSuccess;
 
@@ -161,7 +161,7 @@ ECRESULT ValidateDeleteObject(ECSession *lpSession, bool bCheckPermission, unsig
 	if (sItem.fRoot == true)
 		goto exit; // Not for a root
 
-	switch(sItem.ulObjType) {
+	switch(RealObjType(sItem.ulObjType, sItem.ulParentType)) {
 	case MAPI_MESSAGE:
 		if(! (ulFlags & EC_DELETE_MESSAGES) ) {
 			er = ZARAFA_E_HAS_MESSAGES;
