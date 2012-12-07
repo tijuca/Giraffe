@@ -1598,8 +1598,10 @@ HRESULT IMAP::HrCmdList(const string &strTag, string strReferenceFolder, const s
 	
 	// Get all folders
 	hr = HrGetFolderList(lstFolders);
-	if(hr != hrSuccess)
+	if(hr != hrSuccess) {
+		HrResponse(RESP_TAGGED_NO, strTag, strAction+" unable to list folders");
 	    goto exit;
+	}
 
 	// Loop through all folders to see if they match
 	for (list<SFolder>::iterator iFld = lstFolders.begin(); iFld != lstFolders.end(); iFld++) {
