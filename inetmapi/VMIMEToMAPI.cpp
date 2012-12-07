@@ -88,6 +88,7 @@
 #include "namedprops.h"
 #include "charset/convert.h"
 #include "stringutil.h"
+#include "mapi_ptr.h"
 
 // inetmapi
 #include "ECMapiUtils.h"
@@ -1663,9 +1664,17 @@ HRESULT VMIMEToMAPI::disectBody(vmime::ref<vmime::header> vmHeader, vmime::ref<v
 	bool bAppendBody = appendBody;
 	bool bAlternative = false;
 	ICalToMapi *lpIcalMapi = NULL;
+	bool bIsAttachment = false;
 
 	try {
 		vmime::ref<vmime::mediaType> mt = vmHeader->ContentType()->getValue().dynamicCast<vmime::mediaType>();
+
+		try {
+			bIsAttachment = vmHeader->ContentDisposition()->getValue().dynamicCast<vmime::contentDisposition>()->getName() == vmime::contentDispositionTypes::ATTACHMENT;
+		} catch (vmime::exception) {
+			// ignore exception, a header needed to detect attachment status could not be used
+			// probably can not happen, but better safe than sorry.
+		}
 
 		// find body type
 		if (mt->getType() == "multipart") {
@@ -1741,12 +1750,7 @@ HRESULT VMIMEToMAPI::disectBody(vmime::ref<vmime::header> vmHeader, vmime::ref<v
 		// or if the text part is the only body part in the mail
 		} else if (	mt->getType() == vmime::mediaTypes::TEXT &&
 					(mt->getSubType() == vmime::mediaTypes::TEXT_PLAIN || mt->getSubType() == vmime::mediaTypes::TEXT_HTML) &&
-					(
-					 (vmHeader->ContentDisposition()->getValue().dynamicCast<vmime::contentDisposition>()->getName() != vmime::contentDispositionTypes::ATTACHMENT && 
-					 !vmHeader->ContentDisposition().dynamicCast<vmime::contentDispositionField>()->hasParameter("filename") && 
-					 !vmHeader->ContentType().dynamicCast<vmime::contentTypeField>()->hasParameter("name")) || 
-					 onlyBody)
-					) {
+					(!bIsAttachment || onlyBody) ) {
 			if (mt->getSubType() == vmime::mediaTypes::TEXT_HTML || (m_mailState.bodyLevel == BODY_HTML && bAppendBody)) {
 				// handle real html part, or append a plain text bodypart to the html main body
 				// subtype guaranteed html or plain.
@@ -1870,6 +1874,10 @@ next:
 			string icaldata;
 			vmime::utility::outputStreamStringAdapter os(icaldata);
 			std::string strCharset;
+			MessagePtr ptrNewMessage;
+			LPMESSAGE lpIcalMessage = lpMessage;
+			AttachPtr ptrAttach;
+			ULONG ulAttNr = 0;
 
 			// Some senders send utf-8 iCalendar information without a charset (Exchange does this). Default
 			// to utf-8 if no charset was specified
@@ -1879,7 +1887,45 @@ next:
 
 			vmBody->getContents()->extract(os);
 
-			CreateICalToMapi(lpMessage, m_lpAdrBook, true, &lpIcalMapi);
+			if (bIsAttachment) {
+				// create message in message to create calendar message
+				SPropValue sAttProps[3];
+
+				hr = lpMessage->CreateAttach(NULL, 0, &ulAttNr, &ptrAttach);
+				if (hr != hrSuccess) {
+					lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to create attachment for ical data: 0x%08X", hr);
+					goto exit;
+				}
+
+				hr = ptrAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, MAPI_CREATE | MAPI_MODIFY, &ptrNewMessage);
+				if (hr != hrSuccess) {
+					lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to create message attachment for ical data: 0x%08X", hr);
+					goto exit;
+				}
+
+				sAttProps[0].ulPropTag = PR_ATTACH_METHOD;
+				sAttProps[0].Value.ul = ATTACH_EMBEDDED_MSG;
+
+				sAttProps[1].ulPropTag = PR_ATTACHMENT_HIDDEN;
+				sAttProps[1].Value.b = FALSE;
+
+				sAttProps[2].ulPropTag = PR_ATTACH_FLAGS;
+				sAttProps[2].Value.ul = 0;
+
+				hr = ptrAttach->SetProps(3, (LPSPropValue)sAttProps, NULL);
+				if (hr != hrSuccess) {
+					lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to create message attachment for ical data: 0x%08X", hr);
+					goto exit;
+				}
+
+				lpIcalMessage = ptrNewMessage.get();
+			}
+
+			hr = CreateICalToMapi(lpMessage, m_lpAdrBook, true, &lpIcalMapi);
+			if (hr != hrSuccess) {
+				lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to create ical convertor: 0x%08X", hr);
+				goto exit;
+			}
 
 			hr = lpIcalMapi->ParseICal(icaldata, strCharset, "UTC" , NULL, 0);
 			if (hr != hrSuccess || lpIcalMapi->GetItemCount() != 1) {
@@ -1888,11 +1934,36 @@ next:
 				if (hr != hrSuccess)
 					goto exit;
 			} else {
-				// TODO: create attachment and copy props on success not to crapout my message?
-				hr = lpIcalMapi->GetItem(0, IC2M_NO_RECIPIENTS | IC2M_APPEND_ONLY, lpMessage);
+				hr = lpIcalMapi->GetItem(0, IC2M_NO_RECIPIENTS | IC2M_APPEND_ONLY, lpIcalMessage);
 				if (hr != hrSuccess) {
 					lpLogger->Log(EC_LOGLEVEL_FATAL, "Error while converting ical to mapi: 0x%08X", hr);
 					goto exit;
+				}
+				if (bIsAttachment) {
+					SPropValuePtr ptrSubject;
+
+					// give attachment name of calendar item
+					if (HrGetOneProp(ptrNewMessage, PR_SUBJECT_W, &ptrSubject) == hrSuccess) {
+						ptrSubject->ulPropTag = PR_DISPLAY_NAME_W;
+
+						hr = ptrAttach->SetProps(1, ptrSubject, NULL);
+						if (hr != hrSuccess)
+							goto exit;
+					}
+
+					hr = ptrNewMessage->SaveChanges(0);
+					if (hr != hrSuccess) {
+						lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to save ical message: 0x%08X", hr);
+						goto exit;
+					}
+					hr = ptrAttach->SaveChanges(0);
+					if (hr != hrSuccess) {
+						lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to save ical message attachment: 0x%08X", hr);
+						goto exit;
+					}
+
+					// make sure we show the attachment icon
+					m_mailState.attachLevel = ATTACH_NORMAL;
 				}
 			}
 		} else if (filterDouble && mt->getType() == vmime::mediaTypes::APPLICATION && mt->getSubType() == "applefile") {
@@ -2294,6 +2365,7 @@ HRESULT VMIMEToMAPI::handleAttachment(vmime::ref<vmime::header> vmHeader, vmime:
 	vmime::ref<vmime::contentDispositionField> cdf;	// parameters of Content-Disposition header
 	vmime::ref<vmime::contentDisposition> cdv;		// value of Content-Disposition header
 	vmime::ref<vmime::contentTypeField> ctf;	
+	vmime::ref<vmime::mediaType> mt;
 
 	memset(attProps, 0, sizeof(attProps));
 
@@ -2360,12 +2432,12 @@ HRESULT VMIMEToMAPI::handleAttachment(vmime::ref<vmime::header> vmHeader, vmime:
 		cdf = vmHeader->ContentDisposition().dynamicCast <vmime::contentDispositionField>();
 		cdv = vmHeader->ContentDisposition()->getValue().dynamicCast<vmime::contentDisposition>();
 		ctf = vmHeader->ContentType().dynamicCast<vmime::contentTypeField>();
+		mt = vmHeader->ContentType()->getValue().dynamicCast<vmime::mediaType>();
 
 		// make hidden when inline, is an image or text, has an content id or location, is an HTML mail,
 		// has a CID reference in the HTML or has a location reference in the HTML.
 		if (cdv->getName() == vmime::contentDispositionTypes::INLINE &&
-			(ctf->getValue().dynamicCast <vmime::mediaType>()->getType() == vmime::mediaTypes::IMAGE ||
-			 ctf->getValue().dynamicCast <vmime::mediaType>()->getType() == vmime::mediaTypes::TEXT) &&
+			(mt->getType() == vmime::mediaTypes::IMAGE || mt->getType() == vmime::mediaTypes::TEXT) &&
 			(!strId.empty() || !strLocation.empty()) &&
 			m_mailState.bodyLevel == BODY_HTML &&
 			((!strId.empty() && strcasestr(m_mailState.strHTMLBody.c_str(), string("cid:"+strId).c_str())) ||
@@ -2398,8 +2470,8 @@ HRESULT VMIMEToMAPI::handleAttachment(vmime::ref<vmime::header> vmHeader, vmime:
 			strLongFilename = getWideFromVmimeText(vmime::text(cdf->getFilename()));
 		} else if (ctf->hasParameter("name")) {
 			strLongFilename = getWideFromVmimeText(vmime::text(ctf->getParameter("name")->getValue()));
-		} else if (ctf->getValue().dynamicCast <vmime::mediaType>()->getType() == vmime::mediaTypes::TEXT &&
-				   ctf->getValue().dynamicCast <vmime::mediaType>()->getSubType() == "calendar") {
+		} else if (mt->getType() == vmime::mediaTypes::TEXT && mt->getSubType() == "calendar") {
+			// already catched in message-in-message code.
 			strLongFilename = L"calendar.ics";
 		} else {
 			// TODO: add guessFilenameFromContentType()
