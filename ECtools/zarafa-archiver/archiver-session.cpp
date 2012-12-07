@@ -317,7 +317,7 @@ HRESULT Session::OpenStoreByName(const tstring &strUser, LPMDB *lppMsgStore)
 		goto exit;
 	}
 		
-	hr = m_ptrSession->OpenMsgStore(0, cbEntryId, ptrEntryId, &ptrUserStore.iid, MAPI_BEST_ACCESS|fMapiDeferredErrors|MDB_NO_MAIL|MDB_TEMPORARY, &ptrUserStore);
+	hr = m_ptrSession->OpenMsgStore(0, cbEntryId, ptrEntryId, &ptrUserStore.iid, MDB_WRITE|fMapiDeferredErrors|MDB_NO_MAIL|MDB_TEMPORARY, &ptrUserStore);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Failed to open store for user '" TSTRING_PRINTF "' (hr=%s).", strUser.c_str(), stringify(hr, true).c_str());
 		goto exit;
@@ -390,7 +390,7 @@ exit:
  */ 
 HRESULT Session::OpenStore(const entryid_t &sEntryId, LPMDB *lppMsgStore)
 {
-	return OpenStore(sEntryId, MAPI_BEST_ACCESS|fMapiDeferredErrors|MDB_NO_MAIL|MDB_TEMPORARY, lppMsgStore);
+	return OpenStore(sEntryId, MDB_WRITE|fMapiDeferredErrors|MDB_NO_MAIL|MDB_TEMPORARY, lppMsgStore);
 }
 
 /**

@@ -595,7 +595,7 @@ HRESULT MAPIPropHelper::OpenPrevious(SessionPtr ptrSession, LPMESSAGE *lppMessag
 	if (hr != hrSuccess)
 		goto exit;
 
-	hr = ptrSession->GetMAPISession()->OpenEntry(ptrEntryID->Value.bin.cb, (LPENTRYID)ptrEntryID->Value.bin.lpb, &ptrMessage.iid, 0, &ulType, &ptrMessage);
+	hr = ptrSession->GetMAPISession()->OpenEntry(ptrEntryID->Value.bin.cb, (LPENTRYID)ptrEntryID->Value.bin.lpb, &ptrMessage.iid, MAPI_MODIFY, &ulType, &ptrMessage);
 	if (hr == MAPI_E_NOT_FOUND) {
 		SPropValuePtr ptrStoreEntryID;
 		MsgStorePtr ptrStore;
@@ -608,7 +608,7 @@ HRESULT MAPIPropHelper::OpenPrevious(SessionPtr ptrSession, LPMESSAGE *lppMessag
 		if (hr != hrSuccess)
 			goto exit;
 
-		hr = ptrStore->OpenEntry(ptrEntryID->Value.bin.cb, (LPENTRYID)ptrEntryID->Value.bin.lpb, &ptrMessage.iid, 0, &ulType, &ptrMessage);
+		hr = ptrStore->OpenEntry(ptrEntryID->Value.bin.cb, (LPENTRYID)ptrEntryID->Value.bin.lpb, &ptrMessage.iid, MAPI_MODIFY, &ulType, &ptrMessage);
 	}
 	if (hr != hrSuccess)
 		goto exit;
