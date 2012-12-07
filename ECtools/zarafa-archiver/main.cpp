@@ -470,8 +470,12 @@ int main(int argc, char *argv[])
 
 	lSettings = ptrArchiver->GetConfig()->GetAllSettings();
 	ptrArchiver->GetLogger(Archiver::LogOnly)->Log(EC_LOGLEVEL_FATAL, "Config settings:");
-	for (std::list<configsetting_t>::iterator i = lSettings.begin(); i != lSettings.end(); ++i)
-		ptrArchiver->GetLogger(Archiver::LogOnly)->Log(EC_LOGLEVEL_FATAL, "*  %s = '%s'", i->szName, i->szValue);
+	for (std::list<configsetting_t>::iterator i = lSettings.begin(); i != lSettings.end(); ++i) {
+		if (strcmp(i->szName, "sslkey_pass") == 0 || strcmp(i->szName, "mysql_password") == 0)
+			ptrArchiver->GetLogger(Archiver::LogOnly)->Log(EC_LOGLEVEL_FATAL, "*  %s = '********'", i->szName);
+		else
+			ptrArchiver->GetLogger(Archiver::LogOnly)->Log(EC_LOGLEVEL_FATAL, "*  %s = '%s'", i->szName, i->szValue);
+	}
 
 	if (mode == MODE_ARCHIVE || mode == MODE_CLEANUP)
 		if (unix_create_pidfile(argv[0], ptrArchiver->GetConfig(), ptrArchiver->GetLogger(), false) != 0)
