@@ -2085,6 +2085,8 @@ ECRESULT ECUserManagement::QueryContentsRowData(struct soap *soap, ECObjectTable
 		if(m_lpSession->GetSessionManager()->GetCacheManager()->GetUserDetails(iterRowList->ulObjId, &mapAllObjectDetails[externid]) != erSuccess) {
 			// Item needs to be retrieved from the plugin
 			lstObjects.push_back(externid);
+			// remove from all map, since the address reference added an empty entry in the map
+			mapAllObjectDetails.erase(externid);
 		}
 
 		mapExternIdToRowId.insert(std::make_pair(externid, i));
