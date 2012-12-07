@@ -1212,8 +1212,8 @@ int main(int argc, char *argv[]) {
 
 	szCommand = argv[0];
 
-	// setup logging, use pipe to log if started in forked mode
-	if (bForked)
+	// setup logging, use pipe to log if started in forked mode and using pipe (file) logger, create normal logger for syslog
+	if (bForked && logfd != -1)
 		g_lpLogger = new ECLogger_Pipe(logfd, 0, atoi(g_lpConfig->GetSetting("log_level")));
 	else
 		g_lpLogger = CreateLogger(g_lpConfig, argv[0], "ZarafaSpooler");
