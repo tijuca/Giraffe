@@ -436,7 +436,7 @@ public:
         if(PROP_TYPE(ulPropTag) != PT_LONG)
             return;
         i = mapPropVals.find(ulPropTag);
-        if(i == mapPropVals.end())
+        if(i == mapPropVals.end() || PROP_TYPE(i->second.ulPropTag) != PT_LONG)
             return;
         i->second.Value.ul += lDelta;
     }
@@ -447,7 +447,7 @@ public:
         if(PROP_TYPE(ulPropTag) != PT_LONG)
             return;
         i = mapPropVals.find(ulPropTag);
-        if(i == mapPropVals.end())
+        if(i == mapPropVals.end() || PROP_TYPE(i->second.ulPropTag) != PT_LONG)
             return;
         i->second.Value.ul &= ~ulMask;
         i->second.Value.ul |= ulValue & ulMask;

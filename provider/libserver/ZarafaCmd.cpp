@@ -2585,9 +2585,15 @@ ECRESULT DeleteProps(ECSession *lpecSession, ECDatabase *lpDatabase, ULONG ulObj
 	std::string		strQuery;
 	sObjectTableKey key;
 	struct propVal  sPropVal;
+	// block removal of certain properties (per object type?), properties handled in WriteProps
+	unsigned int ulPropTags[] = {PR_MESSAGE_FLAGS, PR_CREATION_TIME, PR_LAST_MODIFICATION_TIME, PR_LAST_MODIFIER_ENTRYID, PR_LAST_MODIFIER_NAME_W, PR_SOURCE_KEY};
+	set<unsigned int> setNotDeletable(ulPropTags, ulPropTags + arraySize(ulPropTags));
 
 	// Delete one or more properties of an object
 	for(i=0;i<lpsPropTags->__size;i++) {
+		if (setNotDeletable.find(lpsPropTags->__ptr[i]) != setNotDeletable.end())
+			continue;
+
 		if((lpsPropTags->__ptr[i]&MV_FLAG) == 0)
 			strQuery = "DELETE FROM properties WHERE hierarchyid="+stringify(ulObjId)+" AND tag="+stringify(PROP_ID(lpsPropTags->__ptr[i]));
 		else // mvprops

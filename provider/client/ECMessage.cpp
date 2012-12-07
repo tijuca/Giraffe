@@ -110,6 +110,8 @@ ECMessage::ECMessage(ECMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFl
 	this->m_ulBodyType = bodyTypeUnknown;
 	this->m_bRecipsDirty = FALSE;
 
+	// proptag, getprop, setprops, class, bRemovable, bHidden
+
 	this->HrAddPropHandlers(PR_RTF_IN_SYNC,				GetPropHandler       ,DefaultSetPropIgnore,		(void*) this, TRUE,  FALSE);
 	this->HrAddPropHandlers(PR_HASATTACH,				GetPropHandler       ,DefaultSetPropComputed,	(void*) this, FALSE, FALSE);
 	this->HrAddPropHandlers(PR_NORMALIZED_SUBJECT,		GetPropHandler		 ,DefaultSetPropIgnore,		(void*) this, FALSE, FALSE);
@@ -138,7 +140,7 @@ ECMessage::ECMessage(ECMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFl
 	this->HrAddPropHandlers(PR_EC_IMAP_ID,      		DefaultGetPropGetReal,DefaultSetPropComputed, 	(void*) this, TRUE, TRUE);
 
 	// Make sure the MSGFLAG_HASATTACH flag gets added when needed.
-	this->HrAddPropHandlers(PR_MESSAGE_FLAGS,      		GetPropHandler		,SetPropHandler,		 	(void*) this, TRUE, FALSE);
+	this->HrAddPropHandlers(PR_MESSAGE_FLAGS,      		GetPropHandler		,SetPropHandler,		 	(void*) this, FALSE, FALSE);
 	
 	// Make sure PR_SOURCE_KEY is available
 	this->HrAddPropHandlers(PR_SOURCE_KEY,				GetPropHandler		,SetPropHandler,			(void*) this, TRUE, FALSE);
@@ -1943,7 +1945,6 @@ HRESULT	ECMessage::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFla
 	unsigned int ulSize = 0;
 	LPBYTE	lpData = NULL;
 	ECMessage *lpMessage = (ECMessage *)lpParam;
-	ECMsgStore *lpMsgStore = (ECMsgStore *)lpProvider;
 	
 	switch(PROP_ID(ulPropTag)) {
 	case PROP_ID(PR_RTF_IN_SYNC):
@@ -1960,7 +1961,7 @@ HRESULT	ECMessage::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFla
 		if(hr != hrSuccess) {
 			hr = hrSuccess;
 			lpsPropValue->ulPropTag = PR_MESSAGE_FLAGS;
-			lpsPropValue->Value.ul = 0;
+			lpsPropValue->Value.ul = MSGFLAG_READ;
 		}
 		// Force MSGFLAG_HASATTACH to the correct value
 		lpsPropValue->Value.ul = (lpsPropValue->Value.ul & ~MSGFLAG_HASATTACH) | (lpMessage->HasAttachment() ? MSGFLAG_HASATTACH : 0);
@@ -2147,10 +2148,15 @@ HRESULT ECMessage::SetPropHandler(ULONG ulPropTag, void* lpProvider, LPSPropValu
 		hr = lpMessage->HrSetRealProp(lpsPropValue);
 		break;
 	case PR_MESSAGE_FLAGS:
-		if (lpMessage->HasAttachment())
-			lpsPropValue->Value.l |= MSGFLAG_HASATTACH;
+		if (lpMessage->m_sMapiObject == NULL || lpMessage->m_sMapiObject->ulObjId == 0) {
+			// filter any invalid flags
+			lpsPropValue->Value.l &= 0x03FF;
 
-		hr = lpMessage->HrSetRealProp(lpsPropValue);
+			if (lpMessage->HasAttachment())
+				lpsPropValue->Value.l |= MSGFLAG_HASATTACH;
+
+			hr = lpMessage->HrSetRealProp(lpsPropValue);
+		}
 		break;
 	case PR_SOURCE_KEY:
 		hr = ECMAPIProp::SetPropHandler(ulPropTag, lpProvider, lpsPropValue, lpParam);
