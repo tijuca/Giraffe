@@ -90,7 +90,10 @@ function getJavaScript_onload(){ ?>
 					subtitle.appendChild(document.createTextNode("<?=get("subtitle", "", false, STRING_REGEX)?>" ));
 
 					var entryid = "<?=get("entryid", "none", false, ID_REGEX)?>";
-					if(entryid == "none" && typeof window.windowData != "undefined") {
+					if(entryid == '' ||  entryid == 'none' || entryid == 'undefined'){
+						entryid = false;
+					}
+					if(!entryid && typeof window.windowData != "undefined") {
 						entryid = window.windowData.entryid;
 					}
 

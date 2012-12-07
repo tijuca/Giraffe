@@ -75,9 +75,11 @@ function submitFolder() {
 		// for single selection
 		var selectedFolderId = module.selectedFolder;
 		
-		if(!module.selectedFolder)
+		if(!module.selectedFolder) {
+			alert(_("Please select a folder") + ".");
 			return;
-			
+		}
+		
 		var selectedFolderElement = dhtml.getElementById(selectedFolderId);
 		
 		var result = new Object;
