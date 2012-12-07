@@ -509,7 +509,11 @@ ItemModule.prototype.setBody = function(message, isReply, isConcept, addAsText)
 			if(key == "body"){
 				content += data[key].value;
 			}else{
-				content += data[key].label + ":\t" + data[key].value.htmlEntities() + "\n";
+				if(usingHTMLEditor()){
+					content += data[key].label + ":\t" + data[key].value.htmlEntities() + "\n";
+				}else{
+					content += data[key].label + ":\t" + data[key].value + "\n";
+				}
 			}
 		}
 		if(html_body)

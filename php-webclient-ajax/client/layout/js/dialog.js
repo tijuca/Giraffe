@@ -70,6 +70,19 @@ function initEditor(useHTMLEditor, FCKEDITOR_JS_PATH, client_lang, spellchecker,
 	}
 }
 
+/**
+ * Returns whether the HTML Editor is used for the body. It does so by detecting whether the 
+ * FCKeditorAPI is available and it can get the instance for the html_body editor.
+ * @return Boolean Returns whether the HTML Editor is used or not
+ */
+function usingHTMLEditor(){
+	if(typeof(FCKeditorAPI) != "undefined" && (fckEditor = FCKeditorAPI.GetInstance("html_body"))) {
+		return true;
+	}else{
+		return false;
+	}
+}
+
 function resizeBody()
 {
 	var use_html = dhtml.getElementById("use_html");
