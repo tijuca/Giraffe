@@ -204,11 +204,11 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 				i++;
 			}
 			// handle the BYSETPOS value
-			if (icRRule.by_set_pos[0] != ICAL_RECURRENCE_ARRAY_MAX)
+			if (icRRule.by_set_pos[0] != ICAL_RECURRENCE_ARRAY_MAX) {
+				// Monthly every Nth [mo/to/we/th/fr/sa/su] day
 				lpRec->setWeekNumber(icRRule.by_set_pos[0]);
-
-			if (lpRec->getFrequency() == recurrence::MONTHLY) {
-				// A montly every day is not supported in outlook. but this is the same as 
+			} else if (lpRec->getFrequency() == recurrence::MONTHLY) {
+				// A monthly every [mo/tu/we/th/fr/sa/su]day is not supported in outlook. but this is the same as 
 				// weekly x day so convert this item to weekly x day
 
 				lpRec->setFrequency(recurrence::WEEKLY);
