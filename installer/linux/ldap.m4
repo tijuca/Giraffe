@@ -192,8 +192,8 @@ ldap_sendas_relation_attribute = ifelse(TYPE,`OPENLDAP',`',`distinguishedName')
 
 # Optional, default = userCertificate
 # Active directory: userCertificate
-# LDAP: userCertificate
-ldap_user_certificate_attribute = userCertificate
+# LDAP: userCertificate;binary
+ldap_user_certificate_attribute = userCertificate`'ifelse(TYPE,`OPENLDAP',`;binary',`')
 
 # Load extra user properties from the propmap file
 !propmap /etc/zarafa/ldap.propmap.cfg
