@@ -104,7 +104,7 @@ public:
 	eResult AutoAttach(unsigned int ulFlags);
 
 	ECConfig* GetConfig() const;
-	ECLogger* GetLogger() const;
+	ECLogger* GetLogger(eLogType which) const;
 
 private:
 	configsetting_t* ConcatSettings(const configsetting_t *lpSettings1, const configsetting_t *lpSettings2);
@@ -114,6 +114,7 @@ private:
 	AutoMAPI		m_MAPI;
 	ECConfig		*m_lpsConfig;
 	ECLogger		*m_lpLogger;
+    ECLogger        *m_lpLogLogger; // Logs only to the log specified in the config
 	SessionPtr 		m_ptrSession;
 	configsetting_t	*m_lpDefaults;
 };
@@ -234,6 +235,7 @@ exit:
 ArchiverImpl::ArchiverImpl()
 : m_lpsConfig(NULL)
 , m_lpLogger(NULL)
+, m_lpLogLogger(NULL)
 , m_lpDefaults(NULL)
 {
 }
@@ -242,7 +244,10 @@ ArchiverImpl::~ArchiverImpl()
 {
 	if (m_lpLogger)
 		m_lpLogger->Release();
-	
+
+	if (m_lpLogLogger)
+		m_lpLogLogger->Release();
+
 	delete m_lpsConfig;
 	delete[] m_lpDefaults;
 }
@@ -281,31 +286,37 @@ eResult ArchiverImpl::Init(const char *lpszAppName, const char *lpszConfig, cons
 		goto exit;
 	}
 
-	m_lpLogger = CreateLogger(m_lpsConfig, (char*)lpszAppName, "");
+	m_lpLogLogger = CreateLogger(m_lpsConfig, (char*)lpszAppName, "");
 	if (ulFlags & InhibitErrorLogging) {
 		// We need to check if we're logging to stderr. If so we'll replace
 		// the logger with a NULL logger.
-		ECLogger_File *lpFileLogger = dynamic_cast<ECLogger_File*>(m_lpLogger);
+		ECLogger_File *lpFileLogger = dynamic_cast<ECLogger_File*>(m_lpLogLogger);
 		if (lpFileLogger && lpFileLogger->IsStdErr()) {
-			m_lpLogger->Release();
-
-			m_lpLogger = new ECLogger_Null();
+			m_lpLogLogger->Release();
+			m_lpLogLogger = new ECLogger_Null();
 		}
+		m_lpLogger = m_lpLogLogger;
+		m_lpLogger->AddRef();
 	} else if (ulFlags & AttachStdErr) {
 		// We need to check if the current logger isn't logging to the console
 		// as that would give duplicate messages
-		ECLogger_File *lpFileLogger = dynamic_cast<ECLogger_File*>(m_lpLogger);
+		ECLogger_File *lpFileLogger = dynamic_cast<ECLogger_File*>(m_lpLogLogger);
 		if (lpFileLogger == NULL || !lpFileLogger->IsStdErr()) {
 			ECLogger_Tee *lpTeeLogger = new ECLogger_Tee();
-			lpTeeLogger->AddLogger(m_lpLogger);
+			lpTeeLogger->AddLogger(m_lpLogLogger);
 
-			ECLogger_File *lpFileLogger = new ECLogger_File(EC_LOGLEVEL_ERROR, 0, "-", false);
-			lpTeeLogger->AddLogger(lpFileLogger);
-			lpFileLogger->Release();
+			ECLogger_File *lpConsoleLogger = new ECLogger_File(EC_LOGLEVEL_ERROR, 0, "-", false);
+			lpTeeLogger->AddLogger(lpConsoleLogger);
+			lpConsoleLogger->Release();
 
-			m_lpLogger->Release();
 			m_lpLogger = lpTeeLogger;
+		} else {
+			m_lpLogger = m_lpLogLogger;
+			m_lpLogger->AddRef();
 		}
+	} else {
+		m_lpLogger = m_lpLogLogger;
+		m_lpLogger->AddRef();
 	}
 
 	if (m_lpsConfig->HasWarnings())
@@ -378,9 +389,12 @@ ECConfig* ArchiverImpl::GetConfig() const
 	return m_lpsConfig;
 }
 
-ECLogger* ArchiverImpl::GetLogger() const
+ECLogger* ArchiverImpl::GetLogger(eLogType which) const
 {
-	return m_lpLogger;
+	switch (which) {
+		case DefaultLog: return m_lpLogger;
+		case LogOnly: return m_lpLogLogger;
+	}
 }
 
 configsetting_t* ArchiverImpl::ConcatSettings(const configsetting_t *lpSettings1, const configsetting_t *lpSettings2)

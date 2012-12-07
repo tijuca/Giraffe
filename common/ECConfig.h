@@ -94,6 +94,7 @@ public:
 	virtual wchar_t* GetSettingW(const char *szName, wchar_t *equal, wchar_t *other) = 0;
 
 	virtual std::list<configsetting_t> GetSettingGroup(unsigned int ulGroup) = 0;
+	virtual std::list<configsetting_t> GetAllSettings() = 0;
 
 	virtual bool	HasWarnings() = 0;
 	virtual std::list<std::string>* GetWarnings() = 0;

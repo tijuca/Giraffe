@@ -120,6 +120,7 @@ public:
 	wchar_t* GetSettingW(const char *szName, wchar_t *equal, wchar_t *other);
 
 	std::list<configsetting_t> GetSettingGroup(unsigned int ulGroup);
+	std::list<configsetting_t> GetAllSettings();
 
 	bool	HasWarnings();
 	std::list<std::string>* GetWarnings();

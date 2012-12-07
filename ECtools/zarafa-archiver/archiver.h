@@ -154,6 +154,11 @@ public:
 		InhibitErrorLogging	= 0x40000000	// To silence Init errors in the unit test.
 	};
 
+	enum eLogType {
+		DefaultLog		= 0,
+		LogOnly			= 1
+	};
+
 	static const char* ARCHIVER_API GetConfigPath();
 	static const configsetting_t* ARCHIVER_API GetConfigDefaults();
 	static eResult ARCHIVER_API Create(auto_ptr_type *lpptrArchiver);
@@ -170,7 +175,7 @@ public:
 	virtual eResult AutoAttach(unsigned int ulFlags) = 0;
 
 	virtual ECConfig* GetConfig() const = 0;
-	virtual ECLogger* GetLogger() const = 0;
+	virtual ECLogger* GetLogger(eLogType which = DefaultLog) const = 0;
 
 protected:
 	Archiver() {};

@@ -268,6 +268,19 @@ list<configsetting_t> ECConfigImpl::GetSettingGroup(unsigned int ulGroup)
 	return lGroup;
 }
 
+std::list<configsetting_t> ECConfigImpl::GetAllSettings()
+{
+	list<configsetting_t> lSettings;
+	configsetting_t sSetting;
+
+	for (settingmap_t::iterator iter = m_mapSettings.begin(); iter != m_mapSettings.end(); iter++) {
+		if (CopyConfigSetting(&iter->first, iter->second, &sSetting))
+			lSettings.push_back(sSetting);
+	}
+
+	return lSettings;
+}
+
 bool ECConfigImpl::InitDefaults(unsigned int ulFlags)
 {
 	unsigned int i = 0;
