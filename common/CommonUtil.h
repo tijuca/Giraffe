@@ -164,6 +164,8 @@ HRESULT HrOpenDefaultCalendar(LPMDB lpMsgStore, ECLogger *lpLogger, LPMAPIFOLDER
 
 HRESULT HrGetPropTags(char **names, IMAPIProp *lpProp, LPSPropTagArray *lppPropTagArray);
 
+HRESULT HrGetAllProps(IMAPIProp *lpProp, ULONG ulFlags, ULONG *lpcValues, LPSPropValue *lppProps);
+
 HRESULT __stdcall UnWrapStoreEntryID(ULONG cbOrigEntry, LPENTRYID lpOrigEntry, ULONG *lpcbUnWrappedEntry, LPENTRYID *lppUnWrappedEntry);
 
 HRESULT DoAddress(IAddrBook *lpAdrBook, ULONG* hWnd, LPADRPARM lpAdrParam, LPADRLIST *lpResult);
@@ -173,6 +175,10 @@ HRESULT SetAutoAcceptSettings(IMsgStore *lpMsgStore, bool bAutoAccept, bool bDec
 HRESULT GetAutoAcceptSettings(IMsgStore *lpMsgStore, bool *lpbAutoAccept, bool *lpbDeclineConflict, bool *lpbDeclineRecurring);
 
 HRESULT HrGetRemoteAdminStore(IMAPISession *lpMAPISession, IMsgStore *lpMsgStore, LPCTSTR lpszServerName, ULONG ulFlags, IMsgStore **lppMsgStore);
+
+HRESULT HrGetGAB(LPMAPISESSION lpSession, LPABCONT *lppGAB);
+HRESULT HrGetGAB(LPADRBOOK lpAddrBook, LPABCONT *lppGAB);
+
 
 /**
  * NAMED PROPERTY utilities

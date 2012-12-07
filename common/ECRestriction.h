@@ -89,6 +89,14 @@ public:
 	HRESULT RestrictTable(LPMAPITABLE lpTable) const;
 
 	/**
+	 * Use the restriction to perform a FindRow on the passed table.
+	 * @param[in]	lpTable		The table on which to perform the FindRow.
+	 * @param[in]	BkOrigin	The location to start searching from. Directly passed to FindRow.
+	 * @param[in]	ulFlags		Flags controlling search behaviour. Directly passed to FindRow.
+	 */
+	HRESULT FindRowIn(LPMAPITABLE lpTable, BOOKMARK BkOrigin, ULONG ulFlags) const;
+
+	/**
 	 * Populate an SRestriction structure based on the objects state.
 	 * @param[in]		lpBase			Base pointer used for allocating additional memory.
 	 * @param[in,out]	lpRestriction	Pointer to the SRestriction object that is to be populated.

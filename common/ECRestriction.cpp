@@ -110,6 +110,26 @@ exit:
 	return hr;
 }
 
+HRESULT ECRestriction::FindRowIn(LPMAPITABLE lpTable, BOOKMARK BkOrigin, ULONG ulFlags) const
+{
+	HRESULT hr = hrSuccess;
+	SRestrictionPtr ptrRestriction;
+
+	if (lpTable == NULL) {
+		hr = MAPI_E_INVALID_PARAMETER;
+		goto exit;
+	}
+
+	hr = CreateMAPIRestriction(&ptrRestriction, ECRestriction::Cheap);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = lpTable->FindRow(ptrRestriction, BkOrigin, ulFlags);
+
+exit:
+	return hr;
+}
+
 /**
  * Copy a property into a newly allocated SPropValue.
  * @param[in]	lpPropSrc	The source property.

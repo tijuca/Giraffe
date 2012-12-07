@@ -82,6 +82,7 @@
 #include "IECUnknown.h"
 #include "IECServiceAdmin.h"
 #include "EMSAbTag.h"
+#include "ECRestriction.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -2770,6 +2771,80 @@ exit:
 }
 
 /**
+ * Gets all properties for passed object
+ *
+ * This includes properties that are normally returned from GetProps() as MAPI_E_NOT_ENOUGH_MEMORY. The
+ * rest of the semantics of this call are equal to those of calling IMAPIProp::GetProps() with NULL as the
+ * property tag array.
+ *
+ * @param[in] lpProp IMAPIProp object to get properties from
+ * @param[in] ulFlags MAPI_UNICODE or 0
+ * @param[out] lpcValues Number of properties saved in lppProps
+ * @param[out] lppProps Output properties
+ */
+HRESULT HrGetAllProps(IMAPIProp *lpProp, ULONG ulFlags, ULONG *lpcValues, LPSPropValue *lppProps)
+{
+	HRESULT hr = hrSuccess;
+	SPropTagArrayPtr lpTags;
+	SPropArrayPtr lpProps;
+	ULONG cValues = 0;
+	StreamPtr lpStream;	
+	std::string strData;
+	void *lpData = NULL;
+	
+	hr = lpProp->GetPropList(ulFlags, &lpTags);
+	if(hr != hrSuccess)
+		goto exit;
+		
+	hr = lpProp->GetProps(lpTags, ulFlags, &cValues, &lpProps);
+	if(FAILED(hr))
+		goto exit;
+		
+	for(unsigned int i=0; i < cValues; i++) {
+		if(PROP_TYPE(lpProps[i].ulPropTag) == PT_ERROR && lpProps[i].Value.err == MAPI_E_NOT_ENOUGH_MEMORY) {
+			if(PROP_TYPE(lpTags->aulPropTag[i]) != PT_STRING8 && PROP_TYPE(lpTags->aulPropTag[i]) != PT_UNICODE && PROP_TYPE(lpTags->aulPropTag[i]) != PT_BINARY)
+				continue;
+				
+			if(lpProp->OpenProperty(lpTags->aulPropTag[i], &IID_IStream, 0, 0, (IUnknown **)&lpStream) != hrSuccess)
+				continue;
+				
+			strData.clear();
+			if(Util::HrStreamToString(lpStream.get(), strData) != hrSuccess)
+				continue;
+				
+			MAPIAllocateMore(strData.size() + sizeof(WCHAR), lpProps, (void **)&lpData);
+			memcpy(lpData, strData.data(), strData.size());
+			
+			lpProps[i].ulPropTag = lpTags->aulPropTag[i];
+				
+			switch PROP_TYPE(lpTags->aulPropTag[i]) {
+				case PT_STRING8:
+					lpProps[i].Value.lpszA = (char *)lpData;
+					lpProps[i].Value.lpszA[strData.size()] = 0;
+					break;
+				case PT_UNICODE:
+					lpProps[i].Value.lpszW = (wchar_t *)lpData;
+					lpProps[i].Value.lpszW[strData.size() / sizeof(WCHAR)] = 0;
+					break;
+				case PT_BINARY:
+					lpProps[i].Value.bin.lpb = (LPBYTE)lpData;
+					lpProps[i].Value.bin.cb = strData.size();
+					break;
+				default:
+					ASSERT(false);
+			}
+		}
+	}
+	
+	*lppProps = lpProps.release();
+	*lpcValues = cValues;
+	
+exit:
+	return hr;
+}
+
+
+/**
  * Converts a wrapped message store's entry identifier to a message store entry identifier.
  *
  * MAPI supplies a wrapped version of a store entryid which indentified a specific service provider. 
@@ -3327,7 +3402,6 @@ exit:
 	return hr;
 }
 
-
 HRESULT HrGetRemoteAdminStore(IMAPISession *lpMAPISession, IMsgStore *lpMsgStore, LPCTSTR lpszServerName, ULONG ulFlags, IMsgStore **lppMsgStore)
 {
 	HRESULT hr = hrSuccess;
@@ -3360,6 +3434,87 @@ HRESULT HrGetRemoteAdminStore(IMAPISession *lpMAPISession, IMsgStore *lpMsgStore
 		goto exit;
 
 	hr = ptrMsgStore->QueryInterface(IID_IMsgStore, (LPVOID*)lppMsgStore);
+
+exit:
+	return hr;
+}
+
+HRESULT HrGetGAB(LPMAPISESSION lpSession, LPABCONT *lppGAB)
+{
+	HRESULT hr = hrSuccess;
+	AddrBookPtr ptrAddrBook;
+
+	if (lpSession == NULL || lppGAB == NULL) {
+		hr = MAPI_E_INVALID_PARAMETER;
+		goto exit;
+	}
+
+	hr = lpSession->OpenAddressBook(NULL, 0, NULL, &ptrAddrBook);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = HrGetGAB(ptrAddrBook, lppGAB);
+
+exit:
+	return hr;
+}
+
+HRESULT HrGetGAB(LPADRBOOK lpAddrBook, LPABCONT *lppGAB)
+{
+	HRESULT hr = hrSuccess;
+	ULONG ulType = 0;
+	ABContainerPtr ptrRoot;
+	MAPITablePtr ptrTable;
+	SRowSetPtr ptrRows;
+	ABContainerPtr ptrGAB;
+
+	SPropValue propDisplayType;
+	SPropValue propEmsAbContainerid;
+
+	SizedSPropTagArray(1, sptaTableProps) = {1, {PR_ENTRYID}};
+
+	if (lpAddrBook == NULL || lppGAB == NULL) {
+		hr = MAPI_E_INVALID_PARAMETER;
+		goto exit;
+	}
+
+	hr = lpAddrBook->OpenEntry(0, NULL, &ptrRoot.iid, MAPI_DEFERRED_ERRORS, &ulType, &ptrRoot);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = ptrRoot->GetHierarchyTable(MAPI_DEFERRED_ERRORS, &ptrTable);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = ptrTable->SetColumns((LPSPropTagArray)&sptaTableProps, TBL_BATCH);
+	if (hr != hrSuccess)
+		goto exit;
+
+	propDisplayType.ulPropTag = PR_DISPLAY_TYPE;
+	propDisplayType.Value.l = DT_GLOBAL;
+
+	propEmsAbContainerid.ulPropTag = PR_EMS_AB_CONTAINERID;
+	propEmsAbContainerid.Value.l = 0;
+
+	hr = ECOrRestriction(
+			ECPropertyRestriction(RELOP_EQ, PR_DISPLAY_TYPE, &propDisplayType, ECRestriction::Shallow) +
+			ECAndRestriction(
+				ECExistRestriction(PR_EMS_AB_CONTAINERID) +
+				ECPropertyRestriction(RELOP_EQ, PR_EMS_AB_CONTAINERID, &propEmsAbContainerid, ECRestriction::Shallow)
+			)
+		).FindRowIn(ptrTable, BOOKMARK_BEGINNING, 0);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = ptrTable->QueryRows(1, 0, &ptrRows);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = lpAddrBook->OpenEntry(ptrRows[0].lpProps[0].Value.bin.cb, (LPENTRYID)ptrRows[0].lpProps[0].Value.bin.lpb, &ptrGAB.iid, 0, &ulType, &ptrGAB);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = ptrGAB->QueryInterface(IID_IABContainer, (LPVOID*)lppGAB);
 
 exit:
 	return hr;

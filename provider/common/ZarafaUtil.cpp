@@ -229,6 +229,12 @@ ECRESULT ABEntryIDToID(ULONG cb, LPBYTE lpEntryId, unsigned int* lpulID, objecti
 	}
 
 	lpABEID = (PABEID)lpEntryId;
+
+	if (memcmp(&lpABEID->guid, MUIDECSAB_SERVER, sizeof(GUID)) != 0) {
+		er = ZARAFA_E_INVALID_ENTRYID;
+		goto exit;
+	}
+
 	ulID = lpABEID->ulId;
 	MAPITypeToType(lpABEID->ulType, &sClass);
 
