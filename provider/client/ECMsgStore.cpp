@@ -750,7 +750,7 @@ HRESULT ECMsgStore::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInt
 		hr = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	}
-
+	
 	if(ulFlags & MAPI_MODIFY) {
 		if(!fModify) {
 			hr = MAPI_E_NO_ACCESS;
@@ -827,7 +827,7 @@ HRESULT ECMsgStore::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInt
 
 		break;
 	case MAPI_MESSAGE:
-		hr = refMessageFactory.Create(this, FALSE, fModify, 0, FALSE, NULL, &lpMessage);
+		hr = refMessageFactory.Create(this, FALSE, fModifyObject, 0, FALSE, NULL, &lpMessage);
 
 		if(hr != hrSuccess)
 			goto exit;

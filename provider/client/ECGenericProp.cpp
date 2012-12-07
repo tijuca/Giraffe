@@ -1088,11 +1088,6 @@ HRESULT ECGenericProp::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSProp
 	SetPropCallBack		lpfnSetProp = NULL;
 	void*				lpParam = NULL;
 
-	if (!fModify) {
-		hr = MAPI_E_NO_ACCESS;
-		goto exit;
-	}
-
 	if (lpPropArray == NULL) {
 		hr = MAPI_E_INVALID_PARAMETER;
 		goto exit;
@@ -1160,11 +1155,6 @@ HRESULT ECGenericProp::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProble
 	ECPropCallBackIterator	iterCallBack;
 	LPSPropProblemArray		lpProblems = NULL;
 	int						nProblem = 0;
-
-	if (!fModify) {
-		hr = MAPI_E_NO_ACCESS;
-		goto exit;
-	}
 
 	// over-allocate the problem array
 	er = ECAllocateBuffer(CbNewSPropProblemArray(lpPropTagArray->cValues), (LPVOID *)&lpProblems);
