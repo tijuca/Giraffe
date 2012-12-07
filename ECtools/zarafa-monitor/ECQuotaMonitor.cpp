@@ -63,6 +63,7 @@
 #include "IECUnknown.h"
 #include "Util.h"
 #include "charset/convert.h"
+#include "mapi_ptr.h"
 
 //#include "IECSecurity.h"
 #include "ECGuid.h"
@@ -80,6 +81,8 @@
 #include <set>
 #include <string>
 using namespace std;
+
+#define QUOTA_CONFIG_MSG "Zarafa.Quota"
 
 /**
  * ECQuotaMonitor constructor
@@ -205,8 +208,6 @@ HRESULT ECQuotaMonitor::CheckQuota()
     ULONG				cCompanies = 0;
 
 	/* Company store */
-	ULONG				cbStoreEntryID = 0;
-	LPENTRYID			lpStoreEntryID = NULL;
 	LPMDB				lpMsgStore = NULL;
 
 	/* Quota information */
@@ -259,22 +260,8 @@ HRESULT ECQuotaMonitor::CheckQuota()
 				goto check_stores;
 			}
 
-			// no need for the MAPI_UNICODE flag, since the list came unmodified from the server, and should be in UTF-8
-			hr = lpIEMS->CreateStoreEntryID((LPTSTR)"", (LPTSTR)lpsCompanyList[i].lpszCompanyname, 0, &cbStoreEntryID, &lpStoreEntryID);
+			hr = OpenUserStore(lpsCompanyList[i].lpszCompanyname, &lpMsgStore);
 			if (hr != hrSuccess) {
-				m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL,
-												"Unable to get store entry id for company %s, error code: 0x%08X",
-												(LPSTR)lpsCompanyList[i].lpszCompanyname, hr);
-				hr = hrSuccess;
-				m_ulFailed++;
-				goto check_stores;
-			}
-
-			hr = m_lpMAPIAdminSession->OpenMsgStore(0, cbStoreEntryID, lpStoreEntryID, &IID_IMsgStore, MDB_WRITE, &lpMsgStore);
-			if (hr != hrSuccess) {
-				m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL,
-												"Unable to open store for company %s, error code: 0x%08X",
-												(LPSTR)lpsCompanyList[i].lpszCompanyname, hr);
 				hr = hrSuccess;
 				m_ulFailed++;
 				goto check_stores;
@@ -294,7 +281,7 @@ HRESULT ECQuotaMonitor::CheckQuota()
 				m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL,
 												 "Storage size of company %s has exceeded one or more size limits",
 												 (LPSTR)lpsCompanyList[i].lpszCompanyname);
-				Notify(NULL, &lpsCompanyList[i], lpsQuotaStatus);
+				Notify(NULL, &lpsCompanyList[i], lpsQuotaStatus, lpMsgStore);
 			}
 		}
 
@@ -310,11 +297,6 @@ check_stores:
 		if (lpMsgStore) {
 			lpMsgStore->Release();
 			lpMsgStore = NULL;
-		}
-
-		if (lpStoreEntryID) {
-			MAPIFreeBuffer(lpStoreEntryID);
-			lpStoreEntryID = NULL;
 		}
 
 		if (lpsQuota) {
@@ -341,9 +323,6 @@ exit:
 
 	if (lpMsgStore) 
 		lpMsgStore->Release();
-
-	if (lpStoreEntryID) 
-		MAPIFreeBuffer(lpStoreEntryID);
 
 	if (lpsQuota) 
 		MAPIFreeBuffer(lpsQuota);
@@ -510,17 +489,14 @@ HRESULT ECQuotaMonitor::CheckServerQuota(ULONG cUsers, LPECUSER lpsUserList, LPE
 	LPMAPITABLE lpTable = NULL;
 	LPSRowSet lpRowSet = NULL;
 	ECQUOTASTATUS sQuotaStatus;
-	bool bSendmail = false;
 	ULONG i, u;
-	SizedSPropTagArray(7, sCols) = {
-		7, {
+	SizedSPropTagArray(5, sCols) = {
+		5, {
 			PR_EC_USERNAME_A,
-			PR_DISPLAY_NAME_A,
 			PR_MESSAGE_SIZE_EXTENDED,
 			PR_QUOTA_WARNING_THRESHOLD,
 			PR_QUOTA_SEND_THRESHOLD,
 			PR_QUOTA_RECEIVE_THRESHOLD,
-			PR_EC_QUOTA_MAIL_TIME,
 		}
 	};
 
@@ -565,20 +541,17 @@ HRESULT ECQuotaMonitor::CheckServerQuota(ULONG cUsers, LPECUSER lpsUserList, LPE
 
 		for (i = 0; i < lpRowSet->cRows; i++) {
 			LPSPropValue lpUsername = NULL;
-			LPSPropValue lpDisplayname = NULL;
 			LPSPropValue lpStoreSize = NULL;
 			LPSPropValue lpQuotaWarn = NULL;
 			LPSPropValue lpQuotaSoft = NULL;
 			LPSPropValue lpQuotaHard = NULL;
-			LPSPropValue lpQuotaTime = NULL;
+			MsgStorePtr ptrStore;
 
 			lpUsername = PpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_EC_USERNAME_A);
-			lpDisplayname = PpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_DISPLAY_NAME_A);
 			lpStoreSize = PpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_MESSAGE_SIZE_EXTENDED);
 			lpQuotaWarn = PpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_QUOTA_WARNING_THRESHOLD);
 			lpQuotaSoft = PpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_QUOTA_SEND_THRESHOLD);
 			lpQuotaHard = PpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_QUOTA_RECEIVE_THRESHOLD);
-			lpQuotaTime = PpropFindProp(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_EC_QUOTA_MAIL_TIME);
 
 			if (!lpUsername || !lpStoreSize)
 				continue;		// don't log error: could be for several valid reasons (contacts, other server, etc)
@@ -607,14 +580,6 @@ HRESULT ECQuotaMonitor::CheckServerQuota(ULONG cUsers, LPECUSER lpsUserList, LPE
 											 sQuotaStatus.quotaStatus == QUOTA_WARN ? "warning" :
 											 sQuotaStatus.quotaStatus == QUOTA_SOFTLIMIT ? "soft" : "hard");
 
-			if (lpQuotaTime) {
-				CheckQuotaInterval(lpQuotaTime, &bSendmail);
-				if (!bSendmail) {
-					m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_INFO, "Not sending message since the user has already received a warning in the past time interval");
-					continue;
-				}
-			}
-
 			// find the user in the full users list
 			for (u = 0; u < cUsers; u++) {
 				if (strcmp((char*)lpsUserList[u].lpszUsername, lpUsername->Value.lpszA) == 0)
@@ -625,7 +590,12 @@ HRESULT ECQuotaMonitor::CheckServerQuota(ULONG cUsers, LPECUSER lpsUserList, LPE
 				m_ulFailed++;
 				continue;
 			}
-			hr = Notify(&lpsUserList[u], lpecCompany, &sQuotaStatus);
+			hr = OpenUserStore(lpsUserList[u].lpszUsername, &ptrStore);
+			if (hr != hrSuccess) {
+				hr = hrSuccess;
+				continue;
+			}
+			hr = Notify(&lpsUserList[u], lpecCompany, &sQuotaStatus, ptrStore);
 			if (hr != hrSuccess)
 				m_ulFailed++;
 		}
@@ -1261,6 +1231,8 @@ HRESULT ECQuotaMonitor::CreateQuotaWarningMail(TemplateVariables *lpVars,
 	if (hr != hrSuccess)
 		goto exit;
 
+	m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_NOTICE, "Mail delivered to user %s", (LPSTR)lpecToUser->lpszUsername);
+
 exit:
 	if (lpPropArray)
 		MAPIFreeBuffer(lpPropArray);
@@ -1268,31 +1240,91 @@ exit:
 	return hr;
 }
 
-/**
- * Checks whether the quota interval has been exceeded and the mail should be send again.
- *
- * @param[in]	lpsPropTime	The prop value to check the time against with the interval from the config file
- * @param[out]	lpbSendmail	true if the interval has been exceeded
- * @return always hrSuccess 
+/** 
+ * Opens the store of a company or user
+ * 
+ * @param[in] szStoreName company or user name
+ * @param[out] lppStore opened store
+ * 
+ * @return MAPI Error code
  */
-HRESULT ECQuotaMonitor::CheckQuotaInterval(LPSPropValue lpsPropTime, bool *lpbSendmail)
+HRESULT ECQuotaMonitor::OpenUserStore(LPTSTR szStoreName, LPMDB *lppStore)
 {
 	HRESULT hr = hrSuccess;
+	ExchangeManageStorePtr ptrEMS;
+	ULONG cbUserStoreEntryID = 0;
+	EntryIdPtr ptrUserStoreEntryID;
+	MsgStorePtr ptrStore;
+
+	hr = m_lpMDBAdmin->QueryInterface(IID_IExchangeManageStore, &ptrEMS);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = ptrEMS->CreateStoreEntryID((LPTSTR)"", szStoreName, OPENSTORE_HOME_LOGON, &cbUserStoreEntryID, &ptrUserStoreEntryID);
+	if (hr != hrSuccess) {
+		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL,
+										 "Unable to get store entry id for '%s', error code: 0x%08X",
+										 (LPSTR)szStoreName, hr);
+		goto exit;
+	}
+
+	hr = m_lpMAPIAdminSession->OpenMsgStore(0, cbUserStoreEntryID, ptrUserStoreEntryID, NULL, MDB_WRITE, lppStore);
+	if (hr != hrSuccess) {
+		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL,
+										 "Unable to open store for '%s', error code: 0x%08X",
+										 (LPSTR)szStoreName, hr);
+		goto exit;
+	}
+
+exit:
+	return hr;
+}
+
+/** 
+ * Check the last mail time for the quota message.
+ * 
+ * @param lpStore Store that is over quota
+ * 
+ * @retval hrSuccess User should not receive quota message
+ * @retval MAPI_E_TIMEOUT User should receive quota message
+ * @return MAPI Error code
+ */
+HRESULT ECQuotaMonitor::CheckQuotaInterval(LPMDB lpStore, LPMESSAGE *lppMessage, bool *lpbTimeout)
+{
+	HRESULT hr = hrSuccess;
+	MessagePtr ptrMessage;
+	SPropValuePtr ptrProp;
 	char *lpResendInterval = NULL;
 	ULONG ulResendInterval = 0;
 	FILETIME ft;
 	FILETIME ftNextRun;
+
+	hr = GetConfigMessage(lpStore, QUOTA_CONFIG_MSG, &ptrMessage);
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = HrGetOneProp(ptrMessage, PR_EC_QUOTA_MAIL_TIME, &ptrProp);
+	if (hr == MAPI_E_NOT_FOUND) {
+		*lppMessage = ptrMessage.release();
+		*lpbTimeout = true;
+		hr = hrSuccess;
+		goto exit;
+	}
+	if (hr != hrSuccess)
+		goto exit;
 
 	/* Determine when the last warning mail was send, and if a new one should be send. */
 	lpResendInterval = m_lpThreadMonitor->lpConfig->GetSetting("mailquota_resend_interval");
 	ulResendInterval = (lpResendInterval && atoui(lpResendInterval) > 0) ? atoui(lpResendInterval) : 1;
 	GetSystemTimeAsFileTime(&ft);
 
-	UnixTimeToFileTime(FileTimeToUnixTime(lpsPropTime->Value.ft.dwHighDateTime, lpsPropTime->Value.ft.dwLowDateTime) +
+	UnixTimeToFileTime(FileTimeToUnixTime(ptrProp->Value.ft.dwHighDateTime, ptrProp->Value.ft.dwLowDateTime) +
 					   (ulResendInterval * 60 * 60 * 24) -(2 * 60), &ftNextRun);
 
-	*lpbSendmail = (ft > ftNextRun);
+	*lppMessage = ptrMessage.release();
+	*lpbTimeout = (ft > ftNextRun);
 
+exit:
 	return hr;
 }
 
@@ -1305,7 +1337,7 @@ HRESULT ECQuotaMonitor::CheckQuotaInterval(LPSPropValue lpsPropTime, bool *lpbSe
  * @param[in]	lpMDB	Store to update the last quota send timestamp in
  * @return MAPI error code
  */
-HRESULT ECQuotaMonitor::UpdateQuotaTimestamp(IMsgStore* lpMDB)
+HRESULT ECQuotaMonitor::UpdateQuotaTimestamp(LPMESSAGE lpMessage)
 {
 	HRESULT hr = hrSuccess;
 	SPropValue sPropTime;
@@ -1316,15 +1348,15 @@ HRESULT ECQuotaMonitor::UpdateQuotaTimestamp(IMsgStore* lpMDB)
 	sPropTime.ulPropTag = PR_EC_QUOTA_MAIL_TIME;
 	sPropTime.Value.ft = ft;
 
-	hr = HrSetOneProp(lpMDB, &sPropTime);
-	if (hr != hrSuccess) {
-		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to add sent time, error code: 0x%08X", hr);
-		goto exit;
-	}
-
-	hr = lpMDB->SaveChanges(KEEP_OPEN_READWRITE);
+	hr = HrSetOneProp(lpMessage, &sPropTime);
 	if (hr != hrSuccess)
 		goto exit;
+
+	hr = lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
+	if (hr != hrSuccess) {
+		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to save config message, error code: 0x%08X", hr);
+		goto exit;
+	}
 
 exit:
 	return hr;
@@ -1335,19 +1367,20 @@ exit:
  * to receive quota information within the company space.
  *
  * @param[in]	lpecUser	The Zarafa user who is over quota, NULL if the company is over quota
- * @param[in]	lpecCompany	The Zarafa company of the lpecUser, or the over quota company if lpecUSer is NULL
+ * @param[in]	lpecCompany	The Zarafa company of the lpecUser (default company if non-hosted), or the over quota company if lpecUser is NULL
  * @param[in]	lpecQuotaStatus	The quota status values of lpecUser or lpecCompany
+ * @param[in]	lpStore The store that is over quota
  * @return MAPI error code
  */
-HRESULT ECQuotaMonitor::Notify(LPECUSER lpecUser, LPECCOMPANY lpecCompany, LPECQUOTASTATUS lpecQuotaStatus)
+HRESULT ECQuotaMonitor::Notify(LPECUSER lpecUser, LPECCOMPANY lpecCompany, LPECQUOTASTATUS lpecQuotaStatus, LPMDB lpStore)
 {
 	HRESULT hr = hrSuccess;
 	IECServiceAdmin *lpServiceAdmin = NULL;
-	IExchangeManageStore *lpIEMS = NULL;
-	LPMDB lpMDB = NULL;
+	MsgStorePtr ptrRecipStore;
+	MAPIFolderPtr ptrRoot;
+	MessagePtr ptrQuotaTSMessage;
+	bool bTimeout;
 	LPSPropValue lpsObject = NULL;
-	ULONG cbUserStoreEntryID = 0;
-	LPENTRYID lpUserStoreEntryID = NULL;
 	LPADRLIST lpAddrList = NULL;
 	LPECUSER lpecFromUser = NULL;
 	ULONG cToUsers = 0;
@@ -1356,8 +1389,17 @@ HRESULT ECQuotaMonitor::Notify(LPECUSER lpecUser, LPECCOMPANY lpecCompany, LPECQ
 	ULONG cbUserId = 0;
 	LPENTRYID lpUserId = NULL;
 	struct TemplateVariables sVars;
-	LPSPropValue lpsPropTime = NULL;
-	bool bSendmail = true;
+
+	// check if we need to send the actual email
+	hr = CheckQuotaInterval(lpStore, &ptrQuotaTSMessage, &bTimeout);
+	if (hr != hrSuccess) {
+		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to query mail timeout value: 0x%08X", hr);
+		goto exit;
+	}
+	if (!bTimeout) {
+		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_INFO, "Not sending message since the warning mail has already been sent in the past time interval");
+		goto exit;
+	}
 
 	hr = HrGetOneProp(m_lpMDBAdmin, PR_EC_OBJECT, &lpsObject);
 	if (hr != hrSuccess) {
@@ -1370,10 +1412,6 @@ HRESULT ECQuotaMonitor::Notify(LPECUSER lpecUser, LPECCOMPANY lpecCompany, LPECQ
 		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to get service admin, error code: 0x%08X", hr);
 		goto exit;
 	}
-
-	hr = m_lpMDBAdmin->QueryInterface(IID_IExchangeManageStore, (void **)&lpIEMS);
-	if (hr != hrSuccess)
-		goto exit;
 
 	hr = lpServiceAdmin->GetUser(lpecCompany->sAdministrator.cb, (LPENTRYID)lpecCompany->sAdministrator.lpb, 0, &lpecFromUser);
 	if (hr != hrSuccess)
@@ -1414,62 +1452,29 @@ HRESULT ECQuotaMonitor::Notify(LPECUSER lpecUser, LPECCOMPANY lpecCompany, LPECQ
 		goto exit;
 
 	/* Go through all stores to deliver the mail to all recipients.
+	 *
 	 * Note that we will parse the template for each recipient seperately,
 	 * this is done to support better language support later on where each user
-	 * will get a notification mail in his prefered language. */
+	 * will get a notification mail in his prefered language.
+	 */
 	for (ULONG i = 0; i < cToUsers; i++) {
-		hr = lpIEMS->CreateStoreEntryID((LPTSTR)"", (LPTSTR)lpToUsers[i].lpszUsername, OPENSTORE_HOME_LOGON,
-										&cbUserStoreEntryID, &lpUserStoreEntryID);
-		if (hr != hrSuccess)
-			goto exit;
-
-		hr = m_lpMAPIAdminSession->OpenMsgStore(0, cbUserStoreEntryID, lpUserStoreEntryID,
-												NULL, MAPI_BEST_ACCESS, &lpMDB);
-		if (hr != hrSuccess)
-			goto exit;
-
-		/* We should only check the interval property on the first store,
-		 * since that is the company who is over quota.
-		 * We only check for company since that wasn't in a table.
-		 */
-		if (i == 0 && lpecUser == NULL) {
-			hr = HrGetOneProp(lpMDB, PR_EC_QUOTA_MAIL_TIME, &lpsPropTime);
-			if (hr == hrSuccess)
-				hr = CheckQuotaInterval(lpsPropTime, &bSendmail);
-			else
-				bSendmail = true;
-			if (!bSendmail) {
-				m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_INFO, "Not sending message since the user has already received a warning in the past time interval");
-				goto exit;
-            }
+		/* Company quota's shouldn't deliver to the first entry since that is the public store. */
+		if (i == 0 && sVars.ulClass == CONTAINER_COMPANY) {
+			if (cToUsers == 1)
+				m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_ERROR, "No quota recipients for over quota company %s", (LPSTR)lpecCompany->lpszCompanyname);
+			continue;
 		}
 
-		/* When something goes wrong, skip delivery to current user and proceed to the next user
-		 * Company quota's shouldn't deliver to the first entry since that is the public store. */
-		if (i != 0 || sVars.ulClass != CONTAINER_COMPANY)
-			CreateQuotaWarningMail(&sVars, lpMDB, &lpToUsers[i], lpecFromUser, lpAddrList);
+		if (OpenUserStore(lpToUsers[i].lpszUsername, &ptrRecipStore) != hrSuccess)
+			continue;
 
-		if (i == 0) {
-			hr = UpdateQuotaTimestamp(lpMDB);
-			if (hr != hrSuccess)
-				m_ulFailed++;
-		}
-
-		if (lpUserStoreEntryID) {
-			MAPIFreeBuffer(lpUserStoreEntryID);
-			lpUserStoreEntryID = NULL;
-		}
-
-		if (lpMDB) {
-			lpMDB->Release();
-			lpMDB = NULL;
-		}
+		CreateQuotaWarningMail(&sVars, ptrRecipStore, &lpToUsers[i], lpecFromUser, lpAddrList);
 	}
 
-exit:
-	if (lpsPropTime)
-		MAPIFreeBuffer(lpsPropTime);
+	if (UpdateQuotaTimestamp(ptrQuotaTSMessage) != hrSuccess)
+		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to update last mail quota timestamp: 0x%08X", hr);
 
+exit:
 	if (lpecFromUser)
 		MAPIFreeBuffer(lpecFromUser);
 
@@ -1481,15 +1486,6 @@ exit:
 
 	if (lpAddrList)
 		FreePadrlist(lpAddrList);
-
-	if (lpUserStoreEntryID)
-		MAPIFreeBuffer(lpUserStoreEntryID);
-
-	if (lpMDB)
-		lpMDB->Release();
-
-	if (lpIEMS)
-		lpIEMS->Release();
 
 	if (lpServiceAdmin)
 		lpServiceAdmin->Release();

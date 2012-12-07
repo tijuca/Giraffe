@@ -92,10 +92,11 @@ private:
 								   IMsgStore* lpMDB, LPECUSER lpecToUser, LPECUSER lpecFromUser,
 								   LPADRLIST lpAddrList);
 
-	HRESULT CheckQuotaInterval(LPSPropValue lpsPropTime, bool *lpbSendmail);
-	HRESULT UpdateQuotaTimestamp(IMsgStore* lpMDB);
+	HRESULT OpenUserStore(LPTSTR szStoreName, LPMDB *lppStore);
+	HRESULT CheckQuotaInterval(LPMDB lpStore, LPMESSAGE *lppMessage, bool *lpbTimeout);
+	HRESULT UpdateQuotaTimestamp(LPMESSAGE lpMessage);
 
-	HRESULT Notify(LPECUSER lpecUser, LPECCOMPANY lpecCompany, LPECQUOTASTATUS lpecQuotaStatus);
+	HRESULT Notify(LPECUSER lpecUser, LPECCOMPANY lpecCompany, LPECQUOTASTATUS lpecQuotaStatus, LPMDB lpStore);
 
 private:
 	LPECTHREADMONITOR	m_lpThreadMonitor;

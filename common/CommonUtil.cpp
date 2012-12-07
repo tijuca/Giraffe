@@ -2556,20 +2556,24 @@ exit:
 	return hr;
 }
 
+HRESULT HrOpenUserMsgStore(LPMAPISESSION lpSession, WCHAR *lpszUser, LPMDB *lppStore)
+{
+	return HrOpenUserMsgStore(lpSession, NULL, lpszUser, lppStore);
+}
+
 /**
  * Opens the default store of a given user using a MAPISession.
  *
  * Use this to open any user store a user is allowed to open.
  *
- * @todo upgrade lpszUser to unicode
- *
  * @param[in]	lpSession	The IMAPISession object you received from the logon procedure.
+ * @param[in]	lpStore		Optional store 
  * @param[in]	lpszUser	Login name of the user's store you want to open.
  * @param[out]	lppStore	Pointer to the store of the given user.
  *
  * @return		HRESULT		Mapi error code.
  */
-HRESULT HrOpenUserMsgStore(LPMAPISESSION lpSession, WCHAR *lpszUser, LPMDB *lppStore)
+HRESULT HrOpenUserMsgStore(LPMAPISESSION lpSession, LPMDB lpStore, WCHAR *lpszUser, LPMDB *lppStore)
 {
 	HRESULT					hr = hrSuccess;
 	LPMDB					lpDefaultStore = NULL;
@@ -2577,13 +2581,17 @@ HRESULT HrOpenUserMsgStore(LPMAPISESSION lpSession, WCHAR *lpszUser, LPMDB *lppS
 	IExchangeManageStore	*lpExchManageStore = NULL;
 	ULONG					cbStoreEntryID = 0;
 	LPENTRYID				lpStoreEntryID = NULL;
-	
-	hr = HrOpenDefaultStore(lpSession, &lpDefaultStore);
-	if (hr != hrSuccess)
-		goto exit;
+
+	if (lpStore == NULL) {
+		hr = HrOpenDefaultStore(lpSession, &lpDefaultStore);
+		if (hr != hrSuccess)
+			goto exit;
+
+		lpStore = lpDefaultStore;
+	}
 
 	// Find and open the store for lpszUser.
-	hr = lpDefaultStore->QueryInterface(IID_IExchangeManageStore, (LPVOID*)&lpExchManageStore);
+	hr = lpStore->QueryInterface(IID_IExchangeManageStore, (LPVOID*)&lpExchManageStore);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -3515,6 +3523,93 @@ HRESULT HrGetGAB(LPADRBOOK lpAddrBook, LPABCONT *lppGAB)
 		goto exit;
 
 	hr = ptrGAB->QueryInterface(IID_IABContainer, (LPVOID*)lppGAB);
+
+exit:
+	return hr;
+}
+
+/** 
+ * Opens or creates an associated message in the non-ipm subtree of
+ * the given store.
+ * 
+ * @param[in] lpStore User or public store to find message in
+ * @param[in] szMessageName Name of the configuration message
+ * @param[out] lppMessage Message to load/save your custom data from/to
+ * 
+ * @return MAPI Error code
+ */
+HRESULT GetConfigMessage(LPMDB lpStore, const char* szMessageName, IMessage **lppMessage)
+{
+	HRESULT hr = hrSuccess;
+	ULONG cValues;
+	SPropArrayPtr ptrEntryIDs;
+	MAPIFolderPtr ptrFolder;
+	ULONG ulType;
+	MAPITablePtr ptrTable;
+	SPropValue propSubject;
+	SRowSetPtr ptrRows;
+	LPSPropValue lpEntryID = NULL;
+	MessagePtr ptrMessage;
+	SizedSPropTagArray(2, sptaTreeProps) = {2, {PR_NON_IPM_SUBTREE_ENTRYID, PR_IPM_SUBTREE_ENTRYID}};
+
+	hr = lpStore->GetProps((LPSPropTagArray)&sptaTreeProps, 0, &cValues, &ptrEntryIDs);
+	if (FAILED(hr))
+		goto exit;
+
+	// NON_IPM on a public store, IPM on a normal store
+	if (ptrEntryIDs[0].ulPropTag == sptaTreeProps.aulPropTag[0])
+		hr = lpStore->OpenEntry(ptrEntryIDs[0].Value.bin.cb, (LPENTRYID)ptrEntryIDs[0].Value.bin.lpb, NULL, MAPI_MODIFY, &ulType, &ptrFolder);
+	else if (ptrEntryIDs[1].ulPropTag == sptaTreeProps.aulPropTag[1])
+		hr = lpStore->OpenEntry(ptrEntryIDs[1].Value.bin.cb, (LPENTRYID)ptrEntryIDs[1].Value.bin.lpb, NULL, MAPI_MODIFY, &ulType, &ptrFolder);
+	else
+		hr = MAPI_E_INVALID_PARAMETER;
+	if (hr != hrSuccess)
+		goto exit;
+
+	hr = ptrFolder->GetContentsTable(MAPI_DEFERRED_ERRORS | MAPI_ASSOCIATED, &ptrTable);
+	if (hr != hrSuccess)
+		goto exit;
+
+	propSubject.ulPropTag = PR_SUBJECT_A;
+	propSubject.Value.lpszA = (char*)szMessageName;
+
+	hr = ECPropertyRestriction(RELOP_EQ, PR_SUBJECT_A, &propSubject, ECRestriction::Shallow).FindRowIn(ptrTable, BOOKMARK_BEGINNING, 0);
+	if (hr == hrSuccess) {
+		hr = ptrTable->QueryRows(1, 0, &ptrRows);
+		if (hr != hrSuccess)
+			goto exit;
+	}
+
+	if (!ptrRows.empty()) {
+		// message found, open it
+		lpEntryID = PpropFindProp(ptrRows[0].lpProps, ptrRows[0].cValues, PR_ENTRYID);
+		if (!lpEntryID) {
+			hr = MAPI_E_INVALID_ENTRYID;
+			goto exit;
+		}
+		hr = ptrFolder->OpenEntry(lpEntryID->Value.bin.cb, (LPENTRYID)lpEntryID->Value.bin.lpb, NULL, MAPI_MODIFY, &ulType, &ptrMessage);
+		if (hr != hrSuccess)
+			goto exit;
+	} else {
+		// not found in folder, create new message
+		hr = ptrFolder->CreateMessage(&IID_IMessage, MAPI_ASSOCIATED, &ptrMessage);
+		if (hr != hrSuccess)
+			goto exit;
+
+		hr = ptrMessage->SetProps(1, &propSubject, NULL);
+		if (hr != hrSuccess)
+			goto exit;
+
+		// set mandatory message property
+		propSubject.ulPropTag = PR_MESSAGE_CLASS_A;
+		propSubject.Value.lpszA = "IPM.Zarafa.Configuration";
+
+		hr = ptrMessage->SetProps(1, &propSubject, NULL);
+		if (hr != hrSuccess)
+			goto exit;
+	}
+
+	*lppMessage = ptrMessage.release();
 
 exit:
 	return hr;

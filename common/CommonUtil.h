@@ -159,6 +159,7 @@ HRESULT OpenSubFolder(LPMDB lpMDB, const WCHAR *folder, WCHAR psep, ECLogger *lp
 HRESULT FindFolder(LPMAPITABLE lpTable, const WCHAR *folder, LPSPropValue *lppFolderProp);
 
 HRESULT HrOpenUserMsgStore(LPMAPISESSION lpSession, WCHAR *lpszWUser, LPMDB *lppStore);
+HRESULT HrOpenUserMsgStore(LPMAPISESSION lpSession, LPMDB lpStore, WCHAR *lpszUser, LPMDB *lppStore);
 
 HRESULT HrOpenDefaultCalendar(LPMDB lpMsgStore, ECLogger *lpLogger, LPMAPIFOLDER *lpDefFolder);
 
@@ -179,6 +180,7 @@ HRESULT HrGetRemoteAdminStore(IMAPISession *lpMAPISession, IMsgStore *lpMsgStore
 HRESULT HrGetGAB(LPMAPISESSION lpSession, LPABCONT *lppGAB);
 HRESULT HrGetGAB(LPADRBOOK lpAddrBook, LPABCONT *lppGAB);
 
+HRESULT GetConfigMessage(LPMDB lpStore, const char* szMessageName, IMessage **lppMessage);
 
 /**
  * NAMED PROPERTY utilities
