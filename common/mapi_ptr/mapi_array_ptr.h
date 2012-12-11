@@ -129,6 +129,12 @@ public:
 		return proxy(&m_lpObject);
 	}
 
+	pointer release() {
+		pointer lpTmp = m_lpObject;
+		m_lpObject = NULL;
+		return lpTmp;
+	}
+
 	reference operator[](unsigned i) { return m_lpObject[i]; }
 	const_reference operator[](unsigned i) const { return m_lpObject[i]; }
 
