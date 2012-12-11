@@ -1294,7 +1294,6 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesFast()
 		hr = ptrSerializedMessage->CopyData(ptrDestStream);
 		if (hr != hrSuccess) {
 			LOG_DEBUG(m_lpLogger, "ExportFast: Failed to copy data, hr = 0x%08x", hr);
-			LogMessageProps(EC_LOGLEVEL_DEBUG, cbProps, ptrProps);
 			goto exit;
 		}
 		LOG_DEBUG(m_lpLogger, "ExportFast: %s", "Copied data");
@@ -1303,12 +1302,10 @@ HRESULT ECExchangeExportChanges::ExportMessageChangesFast()
 		hr = ptrSerializedMessage->DiscardData();
 		if (hr != hrSuccess) {
 			LOG_DEBUG(m_lpLogger, "ExportFast: Failed to discard data, hr = 0x%08x", hr);
-			LogMessageProps(EC_LOGLEVEL_DEBUG, cbProps, ptrProps);
 			goto exit;
 		}
 	} else {
 		LOG_DEBUG(m_lpLogger, "ExportFast: Import failed, hr = 0x%08x", hr);
-		LogMessageProps(EC_LOGLEVEL_DEBUG, cbProps, ptrProps);
 		goto exit;
 	}
 
@@ -1812,22 +1809,4 @@ HRESULT ECExchangeExportChanges::AddProcessedChanges(ChangeList &lstChanges)
 		m_setProcessedChanges.insert(std::pair<unsigned int, std::string>(iterChange->ulChangeId, std::string((char *)iterChange->sSourceKey.lpb, iterChange->sSourceKey.cb)));
 
 	return hrSuccess;
-}
-
-void ECExchangeExportChanges::LogMessageProps(int loglevel, ULONG cValues, LPSPropValue lpPropArray)
-{
-	if (m_lpLogger->Log(loglevel)) {
-		LPSPropValue lpPropEntryID = PpropFindProp(lpPropArray, cValues, PR_ENTRYID);
-		LPSPropValue lpPropSK = PpropFindProp(lpPropArray, cValues, PR_SOURCE_KEY);
-		LPSPropValue lpPropFlags = PpropFindProp(lpPropArray, cValues, PR_MESSAGE_FLAGS);
-		LPSPropValue lpPropHierarchyId = PpropFindProp(lpPropArray, cValues, PR_EC_HIERARCHYID);
-		LPSPropValue lpPropParentId = PpropFindProp(lpPropArray, cValues, PR_EC_PARENT_HIERARCHYID);
-
-		m_lpLogger->Log(loglevel, "ExportFast:   Message info: id=%u, parentid=%u, msgflags=%x, entryid=%s, sourcekey=%s",
-						(lpPropHierarchyId ? lpPropHierarchyId->Value.ul : 0),
-						(lpPropParentId ? lpPropParentId->Value.ul : 0),
-						(lpPropFlags ? lpPropFlags->Value.ul : 0),
-						(lpPropEntryID ? bin2hex(lpPropEntryID->Value.bin.cb, lpPropEntryID->Value.bin.lpb).c_str() : "<Unknown>"),
-						(lpPropSK ? bin2hex(lpPropSK->Value.bin.cb, lpPropSK->Value.bin.lpb).c_str() : "<Unknown>"));
-	}
 }

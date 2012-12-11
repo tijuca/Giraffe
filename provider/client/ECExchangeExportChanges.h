@@ -85,7 +85,7 @@ public:
 	virtual HRESULT SetLogger(ECLogger *lpLogger);
 
 private:
-	void LogMessageProps(int loglevel, ULONG cValues, LPSPropValue lpPropArray);
+	static HRESULT CloseAndGetAsyncResult(IStream *lpStream, HRESULT *lphrResult);
 
 private:
 	class xExchangeExportChanges : public IExchangeExportChanges {
