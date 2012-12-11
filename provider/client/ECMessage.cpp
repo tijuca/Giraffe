@@ -1945,6 +1945,7 @@ HRESULT	ECMessage::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFla
 	unsigned int ulSize = 0;
 	LPBYTE	lpData = NULL;
 	ECMessage *lpMessage = (ECMessage *)lpParam;
+	ECMsgStore *lpMsgStore = (ECMsgStore *)lpProvider;
 	
 	switch(PROP_ID(ulPropTag)) {
 	case PROP_ID(PR_RTF_IN_SYNC):
