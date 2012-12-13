@@ -51,6 +51,7 @@
 #include "my_getopt.h"
 #include "stringutil.h"
 #include "ECConfig.h"
+#include "ECLogger.h"
 #include "charset/convert.h"
 #include "ecversion.h"
 #include <locale.h>
