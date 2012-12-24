@@ -75,6 +75,7 @@
 #include "charset/utf16string.h"
 
 #include "mapiext.h"
+#include "freebusytags.h"
 
 #include "edkguid.h"
 #include "mapiguidext.h"
