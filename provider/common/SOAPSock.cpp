@@ -135,6 +135,9 @@ HRESULT CreateSoapTransport(ULONG ulUIFlags,
 
 	lpCmd->endpoint = strdup(strServerPath.c_str());
 
+	// override the gsoap default v23 method to the force safer v3 only method.
+	lpCmd->soap->ctx = SSL_CTX_new(SSLv3_method());
+
 #ifdef WITH_OPENSSL
 	if (strncmp("https:", lpCmd->endpoint, 6) == 0) {
 		// no need to add certificates to call, since soap also calls SSL_CTX_set_default_verify_paths()

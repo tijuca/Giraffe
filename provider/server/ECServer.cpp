@@ -848,6 +848,7 @@ int running_server(char *szName, const char *szConfig)
 		{ "server_ssl_key_pass",		"server",	CONFIGSETTING_EXACT },
 		{ "server_ssl_ca_file",			"/etc/zarafa/ssl/cacert.pem" },
 		{ "server_ssl_ca_path",			"" },
+		{ "server_ssl_enable_v2",		"no" },
 		{ "sslkeys_path",				"/etc/zarafa/sslkeys" },	// login keys
 		// Database options
 		{ "database_engine",			"mysql" },

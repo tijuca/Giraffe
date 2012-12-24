@@ -357,6 +357,7 @@ int main(int argc, char *argv[]) {
 		{ "ssl_verify_client", "no" },
 		{ "ssl_verify_file", "" },
 		{ "ssl_verify_path", "" },
+		{ "ssl_enable_v2", "no" },
 		{ "log_method", "file" },
 		{ "log_file", "-" },
 		{ "log_level", "2", CONFIGSETTING_RELOADABLE },

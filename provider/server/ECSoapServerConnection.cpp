@@ -269,6 +269,10 @@ ECRESULT ECSoapServerConnection::ListenSSL(const char* lpServerName, int nServer
 		er = ZARAFA_E_CALL_FAILED;
 		goto exit;
 	}
+
+	// disable SSLv2 support
+	if (!parseBool(m_lpConfig->GetSetting("server_ssl_enable_v2", "", "no")))
+		SSL_CTX_set_options(lpsSoap->ctx, SSL_OP_NO_SSLv2);
 	
 	// request certificate from client, is OK if not present.
 	SSL_CTX_set_verify(lpsSoap->ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, NULL);

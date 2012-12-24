@@ -217,6 +217,7 @@ int main(int argc, char **argv) {
 		{ "log_timestamp", "1" },
         { "ssl_private_key_file", "/etc/zarafa/ical/privkey.pem" },
         { "ssl_certificate_file", "/etc/zarafa/ical/cert.pem" },
+		{ "ssl_enable_v2", "no" },
         { "ssl_verify_client", "no" },
         { "ssl_verify_file", "" },
         { "ssl_verify_path", "" },

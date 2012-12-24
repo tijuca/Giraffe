@@ -80,9 +80,13 @@ unsigned long ssl_id_function() {
 void ssl_threading_setup() {
 	if (ssl_locks)
 		return;
+	pthread_mutexattr_t mattr;
+	// make recursive, because of openssl bug http://rt.openssl.org/Ticket/Display.html?id=2813&user=guest&pass=guest
+	pthread_mutexattr_init(&mattr);
+	pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
 	ssl_locks = new pthread_mutex_t[CRYPTO_num_locks()];
 	for (int i=0; i < CRYPTO_num_locks(); i++)
-		pthread_mutex_init(&ssl_locks[i], NULL);
+		pthread_mutex_init(&ssl_locks[i], &mattr);
 	CRYPTO_set_locking_callback(ssl_lock);
 	// no need to set on win32 (or maybe use GetCurrentThreadId)
 	CRYPTO_set_id_callback(ssl_id_function);

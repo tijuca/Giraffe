@@ -3645,6 +3645,15 @@
 			</listitem>
 		  </varlistentry>
 
+		  <varlistentry>
+			<term><option>server_ssl_enable_v2</option></term>
+			<listitem>
+			  <para>Incoming SSL connections normally are v3.</para>
+			  <para>Default: <replaceable>no</replaceable>
+			  </para>
+			</listitem>
+		  </varlistentry>
+
 		</variablelist>
 	  </refsection>
 
@@ -7251,6 +7260,16 @@
 		  </varlistentry>
 
 		  <varlistentry>
+			<term><option>ssl_enable_v2</option></term>
+			<listitem>
+			  <para>Accept SSLv2 only connections. SSLv2 is considered
+			  unsafe, and these connections should not be
+			  accepted.</para>
+			  <para>Default: <replaceable>no</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
 			<term><option>log_method</option></term>
 			<listitem>
 			  <para>The method which should be used for logging. Valid
@@ -9203,6 +9222,16 @@
 			  <para>The path with the files to verify the clients
 			  certificates with.</para>
 			  <para>Default: value not set.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>ssl_enable_v2</option></term>
+			<listitem>
+			  <para>Accept SSLv2 only connections. SSLv2 is considered
+			  unsafe, and these connections should not be
+			  accepted.</para>
+			  <para>Default: <replaceable>no</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
