@@ -79,7 +79,7 @@ private:
 	ULONG				m_ulFlags;
 	ULONG				m_ulDepth;
 	MAPITablePtr		m_ptrTable;
-	mapi_rowset_ptr		m_ptrRows;
+	SRowSetPtr			m_ptrRows;
 	ULONG				m_ulRowIndex;
 	MAPIContainerPtr	m_ptrCurrent;
 };
@@ -138,7 +138,7 @@ private:
 	ULONG				m_ulFlags;
 	SRestrictionPtr		m_ptrRestriction;
 	MAPITablePtr		m_ptrTable;
-	mapi_rowset_ptr		m_ptrRows;
+	SRowSetPtr			m_ptrRows;
 	ULONG				m_ulRowIndex;
 	UnknownPtr			m_ptrCurrent;
 };

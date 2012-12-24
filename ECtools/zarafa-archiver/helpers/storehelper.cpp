@@ -427,7 +427,7 @@ HRESULT StoreHelper::GetSubFolder(MAPIFolderPtr &ptrFolder, const tstring &strFo
 {
 	HRESULT hr = hrSuccess;
 	MAPITablePtr ptrTable;
-	mapi_rowset_ptr ptrRowSet;
+	SRowSetPtr ptrRowSet;
 	MAPIFolderPtr ptrSubFolder;
 	ULONG ulType = 0;
 	

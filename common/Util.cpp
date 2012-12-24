@@ -4206,7 +4206,7 @@ HRESULT Util::HrDeleteAttachments(LPMESSAGE lpMsg)
 {
 	HRESULT hr = hrSuccess;
 	MAPITablePtr ptrAttachTable;
-	mapi_rowset_ptr ptrRows;
+	SRowSetPtr ptrRows;
 
 	SizedSPropTagArray(1, sptaAttachNum) = {1, {PR_ATTACH_NUM}};
 
@@ -4223,7 +4223,7 @@ HRESULT Util::HrDeleteAttachments(LPMESSAGE lpMsg)
 	if (hr != hrSuccess)
 		goto exit;
 
-	for (mapi_rowset_ptr::size_type i = 0; i < ptrRows.size(); ++i) {
+	for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
 		hr = lpMsg->DeleteAttach(ptrRows[i].lpProps[0].Value.l, 0, NULL, 0);
 		if (hr != hrSuccess)
 			goto exit;
@@ -4237,7 +4237,7 @@ HRESULT Util::HrDeleteRecipients(LPMESSAGE lpMsg)
 {
 	HRESULT hr = hrSuccess;
 	MAPITablePtr ptrRecipTable;
-	mapi_rowset_ptr ptrRows;
+	SRowSetPtr ptrRows;
 
 	SizedSPropTagArray(1, sptaRowId) = {1, {PR_ROWID}};
 

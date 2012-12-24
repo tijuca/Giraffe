@@ -503,7 +503,7 @@ HRESULT UpdateProviders(LPPROVIDERADMIN lpAdminProviders, const sGlobalProfilePr
 
 	ProfSectPtr		ptrProfSect;
 	MAPITablePtr	ptrTable;
-	mapi_rowset_ptr	ptrRows;
+	SRowSetPtr		ptrRows;
 	LPSPropValue	lpsProviderUID;
 
 	// Get the provider table

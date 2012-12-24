@@ -664,7 +664,7 @@ HRESULT ArchiveControlImpl::ProcessFolder(MAPIFolderPtr &ptrFolder, ArchiveOpera
 	MAPITablePtr ptrTable;
 	SRestrictionPtr ptrRestriction;
 	SSortOrderSetPtr ptrSortOrder;
-	mapi_rowset_ptr ptrRowSet;
+	SRowSetPtr ptrRowSet;
 	MessagePtr ptrMessage;
 	bool bHaveErrors = false;
 
@@ -754,7 +754,7 @@ HRESULT ArchiveControlImpl::PurgeArchives(const ObjectEntryList &lstArchives)
 	LPSRestriction lpRestriction = NULL;
 	SPropValue sPropCreationTime;
 	ULARGE_INTEGER li;
-	mapi_rowset_ptr ptrRowSet;
+	SRowSetPtr ptrRowSet;
 
 	SizedSPropTagArray(1, sptaFolderProps) = {1, {PR_ENTRYID}};
 
@@ -776,7 +776,7 @@ HRESULT ArchiveControlImpl::PurgeArchives(const ObjectEntryList &lstArchives)
 		MAPIFolderPtr ptrArchiveRoot;
 		ULONG ulType = 0;
 		MAPITablePtr ptrFolderTable;
-		mapi_rowset_ptr ptrFolderRows;
+		SRowSetPtr ptrFolderRows;
 
 		hr = m_ptrSession->OpenStore(iArchive->sStoreEntryId, &ptrArchiveStore);
 		if (hr != hrSuccess) {
@@ -860,7 +860,7 @@ HRESULT ArchiveControlImpl::PurgeArchiveFolder(MsgStorePtr &ptrArchive, const en
 	MAPITablePtr ptrContentsTable;
 	list<entryid_t>::const_iterator iEntryId;
 	list<entryid_t> lstEntries;
-	mapi_rowset_ptr ptrRows;
+	SRowSetPtr ptrRows;
 	EntryListPtr ptrEntryList;
 	ULONG ulIdx = 0;
 

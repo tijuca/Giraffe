@@ -218,7 +218,7 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 {
 	HRESULT hr = hrSuccess;
 	MAPITablePtr ptrContents;
-	mapi_rowset_ptr	ptrRows;
+	SRowSetPtr	ptrRows;
 	ECMemTable*		lpTable = NULL;
 	ECMemTableView*	lpTableView = NULL;
 	ULONG i, j = 0;
@@ -774,7 +774,7 @@ HRESULT ZCABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 			ABContainerPtr ptrContainer;			
 			ULONG ulObjType;
 			MAPITablePtr ptrTable;
-			mapi_rowset_ptr	ptrRows;
+			SRowSetPtr	ptrRows;
 
 			hr = ((ZCABLogon*)m_lpProvider)->OpenEntry(sizeof(sEntryID), (LPENTRYID)sEntryID, NULL, 0, &ulObjType, &ptrContainer);
 			if (hr != hrSuccess)
@@ -788,7 +788,7 @@ HRESULT ZCABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 			if (hr != hrSuccess)
 				goto exit;
 
-			for (mapi_rowset_ptr::size_type i = 0; i < ptrRows.size(); i++) {
+			for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); i++) {
 				// use PR_STORE_ENTRYID field to set instance key, since that is always MAPI_E_NOT_FOUND (see above)
 				LPSPropValue lpProp = PpropFindProp(ptrRows[i].lpProps, ptrRows[i].cValues, CHANGE_PROP_TYPE(PR_STORE_ENTRYID, PT_ERROR));
 				lpProp->ulPropTag = PR_ROWID;
@@ -1023,7 +1023,7 @@ HRESULT ZCABContainer::ResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlag
 	SizedSPropTagArray(7, sptaDefault) = {7, {PR_ADDRTYPE_A, PR_DISPLAY_NAME_A, PR_DISPLAY_TYPE, PR_EMAIL_ADDRESS_A, PR_ENTRYID, PR_INSTANCE_KEY, PR_OBJECT_TYPE}};
 	SizedSPropTagArray(7, sptaUnicode) = {7, {PR_ADDRTYPE_W, PR_DISPLAY_NAME_W, PR_DISPLAY_TYPE, PR_EMAIL_ADDRESS_W, PR_ENTRYID, PR_INSTANCE_KEY, PR_OBJECT_TYPE}};
 	ULONG i;
-	mapi_rowset_ptr	ptrRows;
+	SRowSetPtr	ptrRows;
 
 	if (lpPropTagArray == NULL) {
 		if(ulFlags & MAPI_UNICODE)

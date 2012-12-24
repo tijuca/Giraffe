@@ -612,7 +612,7 @@ HRESULT M4LMAPISupport::ExpandRecips(LPMESSAGE lpMessage, ULONG * lpulFlags) {
 	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::ExpandRecips", "");
 	HRESULT hr = hrSuccess;
 	MAPITablePtr ptrRecipientTable;
-	mapi_rowset_ptr ptrRow;
+	SRowSetPtr ptrRow;
 	AddrBookPtr ptrAddrBook;
 	std::set<std::vector<unsigned char> > setFilter;
 	SPropTagArrayPtr ptrColumns;
@@ -639,7 +639,7 @@ HRESULT M4LMAPISupport::ExpandRecips(LPMESSAGE lpMessage, ULONG * lpulFlags) {
 		ULONG ulObjType;
 		DistListPtr ptrDistList;
 		MAPITablePtr ptrMemberTable;
-		mapi_rowset_ptr ptrMembers;
+		SRowSetPtr ptrMembers;
 
 		hr = ptrRecipientTable->QueryRows(1, 0L, &ptrRow);
 		if (hr != hrSuccess)

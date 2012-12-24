@@ -865,7 +865,7 @@ HRESULT ArchiveManageImpl::GetRights(LPMAPIFOLDER lpFolder, unsigned *lpulRights
 	SPropValue sPropUser;
 	ECPropertyRestriction res(RELOP_EQ, PR_MEMBER_NAME, &sPropUser, ECRestriction::Cheap);
 	SRestrictionPtr ptrRes;
-	mapi_rowset_ptr ptrRows;
+	SRowSetPtr ptrRows;
 
 	SizedSPropTagArray(1, sptaTableProps) = {1, {PR_MEMBER_RIGHTS}};
 
