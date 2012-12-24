@@ -68,7 +68,7 @@ static char THIS_FILE[]=__FILE__;
  * 								fifobuffer.
  * @param[out]	lppSink			The newly created object
  */
-HRESULT WSMessageStreamSink::Create(ECFifoBuffer *lpFifoBuffer, ULONG ulTimeout, WSMessageStreamSink **lppSink)
+HRESULT WSMessageStreamSink::Create(ECFifoBuffer *lpFifoBuffer, ULONG ulTimeout, WSMessageStreamImporter *lpImporter, WSMessageStreamSink **lppSink)
 {
 	HRESULT hr = hrSuccess;
 	WSMessageStreamSinkPtr ptrSink;
@@ -79,7 +79,7 @@ HRESULT WSMessageStreamSink::Create(ECFifoBuffer *lpFifoBuffer, ULONG ulTimeout,
 	}
 
 	try {
-		ptrSink.reset(new WSMessageStreamSink(lpFifoBuffer, ulTimeout));
+		ptrSink.reset(new WSMessageStreamSink(lpFifoBuffer, ulTimeout, lpImporter));
 	} catch (const std::bad_alloc &) {
 		hr = MAPI_E_NOT_ENOUGH_MEMORY;
 		goto exit;
@@ -98,16 +98,36 @@ exit:
  */
 HRESULT WSMessageStreamSink::Write(LPVOID lpData, ULONG cbData)
 {
-	return ZarafaErrorToMAPIError(m_lpFifoBuffer->Write(lpData, cbData, m_ulTimeout, NULL));
+	HRESULT hr = hrSuccess;
+	HRESULT hrAsync = hrSuccess;
+
+	hr = ZarafaErrorToMAPIError(m_lpFifoBuffer->Write(lpData, cbData, 0, NULL));
+	if(hr != hrSuccess) {
+		// Write failed, close the write-side of the FIFO
+		m_lpFifoBuffer->Close(ECFifoBuffer::cfWrite);
+
+		// Failure writing to the fifo. This means there must have been some error
+		// on the other side of the FIFO. Since that is the root cause of the write failure,
+		// return that instead of the error from the FIFO buffer (most probably a network
+		// error, but others also possible, eg logon failure, session lost, etc)
+		m_lpImporter->GetAsyncResult(&hrAsync);
+
+		// Make sure that we only use the async error if there really was an error
+		if(hrAsync != hrSuccess)
+			hr = hrAsync;
+	}
+
+	return hr;
 }
 
 /**
  * Constructor
  * @param[in]	lpFifoBuffer	The fifobuffer to write the data into.
  */
-WSMessageStreamSink::WSMessageStreamSink(ECFifoBuffer *lpFifoBuffer, ULONG ulTimeout)
+WSMessageStreamSink::WSMessageStreamSink(ECFifoBuffer *lpFifoBuffer, ULONG ulTimeout, WSMessageStreamImporter *lpImporter)
 : m_lpFifoBuffer(lpFifoBuffer)
 , m_ulTimeout(ulTimeout)
+, m_lpImporter(lpImporter)
 { }
 
 /**
@@ -191,7 +211,7 @@ HRESULT WSMessageStreamImporter::StartTransfer(WSMessageStreamSink **lppSink)
 		goto exit;
 	}
 
-	hr = WSMessageStreamSink::Create(&m_fifoBuffer, m_ulTimeout, &ptrSink);
+	hr = WSMessageStreamSink::Create(&m_fifoBuffer, m_ulTimeout, this, &ptrSink);
 	if (hr != hrSuccess) {
 		m_fifoBuffer.Close();
 		goto exit;
@@ -307,7 +327,7 @@ size_t WSMessageStreamImporter::MTOMRead(struct soap* soap, void* /*handle*/, ch
 	ECRESULT er = erSuccess;
 	ECFifoBuffer::size_type cbRead = 0;
 
-	er = m_fifoBuffer.Read(buf, len, m_ulTimeout, &cbRead);
+	er = m_fifoBuffer.Read(buf, len, 0, &cbRead);
 	if (er != erSuccess) {
 		m_hr = ZarafaErrorToMAPIError(er);
 		return 0;

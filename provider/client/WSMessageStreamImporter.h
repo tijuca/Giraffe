@@ -60,6 +60,8 @@
 class ECMAPIFolder;
 typedef mapi_object_ptr<WSTransport> WSTransportPtr;
 
+class WSMessageStreamImporter;
+
 /**
  * This class represents the data sink into which the stream data can be written.
  * It is returned from WSMessageStreamImporter::StartTransfer.
@@ -67,15 +69,16 @@ typedef mapi_object_ptr<WSTransport> WSTransportPtr;
 class WSMessageStreamSink : public ECUnknown
 {
 public:
-	static HRESULT Create(ECFifoBuffer *lpFifoBuffer, ULONG ulTimeout, WSMessageStreamSink **lppSink);
+	static HRESULT Create(ECFifoBuffer *lpFifoBuffer, ULONG ulTimeout, WSMessageStreamImporter *lpImporter, WSMessageStreamSink **lppSink);
 	HRESULT Write(LPVOID lpData, ULONG cbData);
 
 private:
-	WSMessageStreamSink(ECFifoBuffer *lpFifoBuffer, ULONG ulTimeout);
+	WSMessageStreamSink(ECFifoBuffer *lpFifoBuffer, ULONG ulTimeout, WSMessageStreamImporter *lpImporter);
 	~WSMessageStreamSink();
 
 private:
 	ECFifoBuffer	*m_lpFifoBuffer;
+	WSMessageStreamImporter *m_lpImporter;
 	ULONG			m_ulTimeout;
 };
 
