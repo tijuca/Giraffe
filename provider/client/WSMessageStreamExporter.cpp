@@ -176,13 +176,12 @@ WSMessageStreamExporter::WSMessageStreamExporter()
 
 WSMessageStreamExporter::~WSMessageStreamExporter()
 {
-	// Discard data of all remaining streams so all data is read from the network
-	if(m_ptrTransport->m_lpCmd) {
-		m_ptrTransport->m_lpCmd->soap->fmimewriteopen = NULL;
-		m_ptrTransport->m_lpCmd->soap->fmimewrite = NULL;
-		m_ptrTransport->m_lpCmd->soap->fmimewriteclose = NULL;
-
-		while (soap_get_mime_attachment(m_ptrTransport->m_lpCmd->soap, NULL));	// This is a loop!
+	if(m_ulMaxIndex != m_ulExpectedIndex && m_ptrTransport->m_lpCmd) {
+		// We are halfway through a sync batch, so there is data waiting for us. Since we have our
+		// own transport, we just drop the connection now, instead of letting the server output up to 254
+		// messages that we'd just discard. Probably we will need to reconnect very soon after this call, to LogOff()
+		// the transport's session, but that's better than receiving unwanted data.
+		m_ptrTransport->m_lpCmd->soap->fshutdownsocket(m_ptrTransport->m_lpCmd->soap, m_ptrTransport->m_lpCmd->soap->socket, 0);
 	}
 
 	for (StreamInfoMap::iterator i = m_mapStreamInfo.begin(); i != m_mapStreamInfo.end(); ++i)
