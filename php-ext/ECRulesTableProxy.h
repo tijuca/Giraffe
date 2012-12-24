@@ -65,8 +65,8 @@ public:
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
 
 	virtual HRESULT GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
-	virtual HRESULT Advise(ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG_PTR *lpulConnection);
-	virtual HRESULT Unadvise(ULONG_PTR ulConnection);
+	virtual HRESULT Advise(ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection);
+	virtual HRESULT Unadvise(ULONG ulConnection);
 	virtual HRESULT GetStatus(ULONG *lpulTableStatus, ULONG *lpulTableType);
 	virtual HRESULT SetColumns(LPSPropTagArray lpPropTagArray, ULONG ulFlags);
 	virtual HRESULT QueryColumns(ULONG ulFlags, LPSPropTagArray *lpPropTagArray);
@@ -97,8 +97,8 @@ protected:
 
 		// From IMAPITable
 		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
-		virtual HRESULT __stdcall Advise(ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG_PTR * lpulConnection);
-		virtual HRESULT __stdcall Unadvise(ULONG_PTR ulConnection);
+		virtual HRESULT __stdcall Advise(ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG * lpulConnection);
+		virtual HRESULT __stdcall Unadvise(ULONG ulConnection);
 		virtual HRESULT __stdcall GetStatus(ULONG *lpulTableStatus, ULONG *lpulTableType);
 		virtual HRESULT __stdcall SetColumns(LPSPropTagArray lpPropTagArray, ULONG ulFlags);
 		virtual HRESULT __stdcall QueryColumns(ULONG ulFlags, LPSPropTagArray *lpPropTagArray);

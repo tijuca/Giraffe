@@ -113,12 +113,12 @@ HRESULT ECRulesTableProxy::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIER
 	return m_lpTable->GetLastError(hResult, ulFlags, lppMAPIError);
 }
 
-HRESULT ECRulesTableProxy::Advise(ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG_PTR *lpulConnection)
+HRESULT ECRulesTableProxy::Advise(ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection)
 {
 	return m_lpTable->Advise(ulEventMask, lpAdviseSink, lpulConnection);
 }
 
-HRESULT ECRulesTableProxy::Unadvise(ULONG_PTR ulConnection)
+HRESULT ECRulesTableProxy::Unadvise(ULONG ulConnection)
 {
 	return m_lpTable->Unadvise(ulConnection);
 }
@@ -267,8 +267,8 @@ ULONG ECRulesTableProxy::xMAPITable::Release()
 
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, QueryInterface, (REFIID, refiid), (void **, lppInterface))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, GetLastError, (HRESULT, hResult), (ULONG, ulFlags), (LPMAPIERROR *, lppMAPIError))
-DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, Advise, (ULONG, ulEventMask), (LPMAPIADVISESINK, lpAdviseSink), (ULONG_PTR *, lpulConnection))
-DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, Unadvise, (ULONG_PTR, ulConnection))
+DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, Advise, (ULONG, ulEventMask), (LPMAPIADVISESINK, lpAdviseSink), (ULONG *, lpulConnection))
+DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, Unadvise, (ULONG, ulConnection))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, GetStatus, (ULONG *, lpulTableStatus), (ULONG *, lpulTableType))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, SetColumns, (LPSPropTagArray, lpPropTagArray), (ULONG, ulFlags))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, QueryColumns, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
