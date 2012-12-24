@@ -60,7 +60,7 @@ namespace za { namespace operations {
 class Stubber : public ArchiveOperationBase
 {
 public:
-	Stubber(ECLogger *lpLogger, ULONG ulptStubbed, int ulAge, bool bProcessUnread);
+	Stubber(ECArchiverLogger *lpLogger, ULONG ulptStubbed, int ulAge, bool bProcessUnread);
 	HRESULT ProcessEntry(LPMAPIFOLDER lpFolder, ULONG cProps, const LPSPropValue lpProps);
 	HRESULT ProcessEntry(LPMESSAGE lpMessage);
 	

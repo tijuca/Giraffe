@@ -23,6 +23,7 @@ libarchiver_la_SOURCES = \
 	helpers/archivehelper.cpp helpers/archivehelper.h \
 	helpers/storehelper.cpp helpers/storehelper.h \
 	helpers/mapiprophelper.cpp helpers/mapiprophelper.h \
+	logger.cpp logger.h \
 	operations/operations.cpp operations/operations.h operations/operations_fwd.h \
 	operations/copier.cpp operations/copier.h \
 	operations/deleter.cpp operations/deleter.h \

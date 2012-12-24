@@ -53,6 +53,7 @@
 #include "archiver-session_fwd.h"
 #include "archiver-common.h"
 #include "archivestateupdater_fwd.h"
+#include "logger.h"
 #include "tstring.h"
 #include "mapi_ptr.h"
 
@@ -94,8 +95,8 @@ private:
 	HRESULT PopulateFromContainer(LPABCONT lpContainer);
 
 private:
-	SessionPtr	m_ptrSession;
-	ECLogger	*m_lpLogger;
+	SessionPtr m_ptrSession;
+	ECArchiverLogger *m_lpLogger;
 
 	ArchiveInfoMap	m_mapArchiveInfo;
 };

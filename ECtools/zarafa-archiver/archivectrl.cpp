@@ -134,7 +134,7 @@ exit:
 ArchiveControlImpl::ArchiveControlImpl(SessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, bool bForceCleanup)
 : m_ptrSession(ptrSession)
 , m_lpConfig(lpConfig)
-, m_lpLogger(lpLogger)
+, m_lpLogger(new ECArchiverLogger(lpLogger))
 , m_bArchiveEnable(true)
 , m_ulArchiveAfter(30)
 , m_bDeleteEnable(false)
@@ -148,12 +148,7 @@ ArchiveControlImpl::ArchiveControlImpl(SessionPtr ptrSession, ECConfig *lpConfig
 , m_cleanupAction(caStore)
 , m_bCleanupFollowPurgeAfter(false)
 , m_bForceCleanup(bForceCleanup)
-{
-	if (m_lpLogger)
-		m_lpLogger->AddRef();
-	else
-		m_lpLogger = new ECLogger_Null();
-}
+{ }
 
 /**
  * Destructor
@@ -269,6 +264,7 @@ exit:
 eResult ArchiveControlImpl::Archive(const TCHAR *lpszUser, bool bAutoAttach, unsigned int ulFlags)
 {
 	HRESULT hr = hrSuccess;
+    ScopedUserLogging sul(m_lpLogger, lpszUser);
 
 	if (ulFlags != ArchiveManage::Writable && ulFlags != ArchiveManage::ReadOnly && ulFlags != 0) {
 		hr = MAPI_E_INVALID_PARAMETER;
@@ -341,6 +337,7 @@ eResult ArchiveControlImpl::CleanupAll(bool bLocalOnly)
 eResult ArchiveControlImpl::Cleanup(const TCHAR *lpszUser)
 {
 	HRESULT hr = hrSuccess;
+    ScopedUserLogging sul(m_lpLogger, lpszUser);
 	
 	hr = CheckSafeCleanupSettings();
 
@@ -667,6 +664,7 @@ HRESULT ArchiveControlImpl::ProcessFolder(MAPIFolderPtr &ptrFolder, ArchiveOpera
 	SRowSetPtr ptrRowSet;
 	MessagePtr ptrMessage;
 	bool bHaveErrors = false;
+	const tstring strFolderRestore = m_lpLogger->GetFolder();
 
 	SizedSPropTagArray(3, sptaProps) = {3, {PR_ENTRYID, PR_PARENT_ENTRYID, PR_STORE_ENTRYID}};
 
@@ -737,6 +735,8 @@ exit:
 	if (hr == hrSuccess && bHaveErrors)
 		hr = MAPI_W_PARTIAL_COMPLETION;
 
+	m_lpLogger->SetFolder(strFolderRestore);
+
 	return hr;
 }
 
@@ -756,7 +756,8 @@ HRESULT ArchiveControlImpl::PurgeArchives(const ObjectEntryList &lstArchives)
 	ULARGE_INTEGER li;
 	SRowSetPtr ptrRowSet;
 
-	SizedSPropTagArray(1, sptaFolderProps) = {1, {PR_ENTRYID}};
+	SizedSPropTagArray(2, sptaFolderProps) = {2, {PR_ENTRYID, PR_DISPLAY_NAME}};
+    enum {IDX_ENTRYID, IDX_DISPLAY_NAME};
 
 	// Create the common restriction that determines which messages are old enough to purge.
 	CREATE_RESTRICTION(lpRestriction);
@@ -823,9 +824,11 @@ HRESULT ArchiveControlImpl::PurgeArchives(const ObjectEntryList &lstArchives)
 			}
 
 			for (ULONG i = 0; i < ptrFolderRows.size(); ++i) {
-				hr = PurgeArchiveFolder(ptrArchiveStore, ptrFolderRows[i].lpProps[0].Value.bin, lpRestriction);
+				ScopedFolderLogging sfl(m_lpLogger, ptrFolderRows[i].lpProps[IDX_DISPLAY_NAME].ulPropTag == PR_DISPLAY_NAME ? ptrFolderRows[i].lpProps[IDX_DISPLAY_NAME].Value.LPSZ : _T("<Unnamed>"));
+
+				hr = PurgeArchiveFolder(ptrArchiveStore, ptrFolderRows[i].lpProps[IDX_ENTRYID].Value.bin, lpRestriction);
 				if (hr != hrSuccess) {
-					m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to purge archive folder. (entryid=%s, hr=%s)", bin2hex(ptrFolderRows[i].lpProps[0].Value.bin.cb, ptrFolderRows[i].lpProps[0].Value.bin.lpb).c_str(), stringify(hr, true).c_str());
+					m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to purge archive folder. (entryid=%s, hr=%s)", bin2hex(ptrFolderRows[i].lpProps[IDX_ENTRYID].Value.bin.cb, ptrFolderRows[i].lpProps[IDX_ENTRYID].Value.bin.lpb).c_str(), stringify(hr, true).c_str());
 					bErrorOccurred = true;
 				}
 			}
@@ -1295,8 +1298,8 @@ HRESULT ArchiveControlImpl::CleanupHierarchy(ArchiveHelperPtr ptrArchiveHelper, 
 	SRestriction resHierarchy = {0};
 	
 	SizedSSortOrderSet(1, ssosHierarchy) = {0};
-	SizedSPropTagArray(4, sptaHierarchyProps) = {4, {PR_NULL, PR_ENTRYID, PR_CONTENT_COUNT, PR_FOLDER_CHILD_COUNT}};
-	enum {IDX_REF_ITEM_ENTRYID, IDX_ENTRYID, IDX_CONTENT_COUNT, IDX_FOLDER_CHILD_COUNT};
+	SizedSPropTagArray(5, sptaHierarchyProps) = {5, {PR_NULL, PR_ENTRYID, PR_CONTENT_COUNT, PR_FOLDER_CHILD_COUNT, PR_DISPLAY_NAME}};
+	enum {IDX_REF_ITEM_ENTRYID, IDX_ENTRYID, IDX_CONTENT_COUNT, IDX_FOLDER_CHILD_COUNT, IDX_DISPLAY_NAME};
 	
 	PROPMAP_START
 	PROPMAP_NAMED_ID(REF_ITEM_ENTRYID, PT_BINARY, PSETID_Archive, dispidRefItemEntryId)
@@ -1342,6 +1345,8 @@ HRESULT ArchiveControlImpl::CleanupHierarchy(ArchiveHelperPtr ptrArchiveHelper, 
 		for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
 			ULONG ulType = 0;
 			MAPIFolderPtr ptrPrimaryFolder;
+
+			ScopedFolderLogging sfl(m_lpLogger, ptrRows[i].lpProps[IDX_DISPLAY_NAME].ulPropTag == PR_DISPLAY_NAME ? ptrRows[i].lpProps[IDX_DISPLAY_NAME].Value.LPSZ : _T("<Unnamed>"));
 			
 			// If the cleanup action is delete, we don't want to delete a folder that's not empty because it might contain messages that
 			// have been moved in the primary store before the original folder was deleted. If we were to delete the folder in the archive
@@ -1363,7 +1368,7 @@ HRESULT ArchiveControlImpl::CleanupHierarchy(ArchiveHelperPtr ptrArchiveHelper, 
 					m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to obtain folder child count. Skipping folder. (hr=0x%08x)", ptrRows[i].lpProps[IDX_FOLDER_CHILD_COUNT].Value.err);
 					continue;
 				} else if (ptrRows[i].lpProps[IDX_FOLDER_CHILD_COUNT].Value.l != 0) {
-					m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Folder has subfolders it. Skipping folder.");
+					m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Folder has subfolders in it. Skipping folder.");
 					continue;
 				}
 			}

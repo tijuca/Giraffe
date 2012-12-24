@@ -205,13 +205,10 @@ exit:
  * @param[in]	SessionPtr		The archive session
  * @param[in]	lpLogger		The logger.
  */
-ArchiveStateCollector::ArchiveStateCollector(const SessionPtr &ptrSession, ECLogger *lpLogger): m_ptrSession(ptrSession), m_lpLogger(lpLogger)
-{
-	if (m_lpLogger)
-		m_lpLogger->AddRef();
-	else
-		m_lpLogger = new ECLogger_Null();
-}
+ArchiveStateCollector::ArchiveStateCollector(const SessionPtr &ptrSession, ECLogger *lpLogger)
+: m_ptrSession(ptrSession)
+, m_lpLogger(new ECArchiverLogger(lpLogger))
+{ }
 
 ArchiveStateCollector::~ArchiveStateCollector()
 {

@@ -70,6 +70,7 @@
 
 class ECConfig;
 class ECLogger;
+class ECArchiverLogger;
 
 
 /**
@@ -212,7 +213,7 @@ private:
 
 	SessionPtr m_ptrSession;
 	ECConfig *m_lpConfig;
-	ECLogger *m_lpLogger;
+	ECArchiverLogger *m_lpLogger;
 
 	FILETIME m_ftCurrent;
 	bool m_bArchiveEnable;

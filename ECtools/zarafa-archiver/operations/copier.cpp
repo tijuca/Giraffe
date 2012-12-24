@@ -48,9 +48,9 @@
  */
 
 #include <platform.h>
-#include "ECLogger.h"
 #include "ECConfig.h"
 #include "ECRestriction.h"
+#include "logger.h"
 #include "copier.h"
 #include "deleter.h"
 #include "stubber.h"
@@ -441,7 +441,7 @@ exit:
  *
  * @return HRESULT
  */
-Copier::Copier(SessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, const ObjectEntryList &lstArchives, LPSPropTagArray lpExcludeProps, int ulAge, bool bProcessUnread)
+Copier::Copier(SessionPtr ptrSession, ECConfig *lpConfig, ECArchiverLogger *lpLogger, const ObjectEntryList &lstArchives, LPSPropTagArray lpExcludeProps, int ulAge, bool bProcessUnread)
 : ArchiveOperationBaseEx(lpLogger, ulAge, bProcessUnread, ARCH_NEVER_ARCHIVE)
 , m_ptrSession(ptrSession)
 , m_lpConfig(lpConfig)

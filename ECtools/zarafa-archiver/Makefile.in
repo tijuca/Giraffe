@@ -86,7 +86,7 @@ libarchiver_la_DEPENDENCIES =  \
 am_libarchiver_la_OBJECTS = archiver-session.lo archiver-common.lo \
 	archivemanage.lo archiver.lo archivectrl.lo \
 	archivestatecollector.lo archivestateupdater.lo \
-	archivehelper.lo storehelper.lo mapiprophelper.lo \
+	archivehelper.lo storehelper.lo mapiprophelper.lo logger.lo \
 	operations.lo copier.lo deleter.lo stubber.lo transaction.lo \
 	instanceidmapper.lo postsaveiidupdater.lo ECDatabaseMySQL.lo
 libarchiver_la_OBJECTS = $(am_libarchiver_la_OBJECTS)
@@ -366,6 +366,7 @@ libarchiver_la_SOURCES = \
 	helpers/archivehelper.cpp helpers/archivehelper.h \
 	helpers/storehelper.cpp helpers/storehelper.h \
 	helpers/mapiprophelper.cpp helpers/mapiprophelper.h \
+	logger.cpp logger.h \
 	operations/operations.cpp operations/operations.h operations/operations_fwd.h \
 	operations/copier.cpp operations/copier.h \
 	operations/deleter.cpp operations/deleter.h \
@@ -513,6 +514,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/copier.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/deleter.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/instanceidmapper.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/logger.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mapiprophelper.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/operations.Plo@am__quote@

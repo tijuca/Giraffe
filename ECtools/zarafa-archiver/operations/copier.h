@@ -69,7 +69,7 @@ namespace za { namespace operations {
 class Copier : public ArchiveOperationBaseEx
 {
 public:
-	Copier(SessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, const ObjectEntryList &lstArchives, LPSPropTagArray lpExcludeProps, int ulAge, bool bProcessUnread);
+	Copier(SessionPtr ptrSession, ECConfig *lpConfig, ECArchiverLogger *lpLogger, const ObjectEntryList &lstArchives, LPSPropTagArray lpExcludeProps, int ulAge, bool bProcessUnread);
 	~Copier();
 
 	/**

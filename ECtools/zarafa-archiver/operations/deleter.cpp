@@ -48,7 +48,7 @@
  */
 
 #include <platform.h>
-#include "ECLogger.h"
+#include "logger.h"
 #include "deleter.h"
 
 using namespace std;
@@ -63,7 +63,7 @@ namespace za { namespace operations {
  *
  * @return HRESULT
  */
-Deleter::Deleter(ECLogger *lpLogger, int ulAge, bool bProcessUnread)
+Deleter::Deleter(ECArchiverLogger *lpLogger, int ulAge, bool bProcessUnread)
 : ArchiveOperationBaseEx(lpLogger, ulAge, bProcessUnread, ARCH_NEVER_DELETE)
 { }
 

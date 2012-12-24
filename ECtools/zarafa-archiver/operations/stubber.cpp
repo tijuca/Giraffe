@@ -48,8 +48,8 @@
  */
 
 #include <platform.h>
-#include "ECLogger.h"
 #include "ECConfig.h"
+#include "logger.h"
 #include "stubber.h"
 #include "archiver-common.h"
 #include "helpers/mapiprophelper.h"
@@ -68,7 +68,7 @@ namespace za { namespace operations {
  *
  * @return HRESULT
  */
-Stubber::Stubber(ECLogger *lpLogger, ULONG ulptStubbed, int ulAge, bool bProcessUnread)
+Stubber::Stubber(ECArchiverLogger *lpLogger, ULONG ulptStubbed, int ulAge, bool bProcessUnread)
 : ArchiveOperationBase(lpLogger, ulAge, bProcessUnread, ARCH_NEVER_STUB)
 , m_ulptStubbed(ulptStubbed)
 { }

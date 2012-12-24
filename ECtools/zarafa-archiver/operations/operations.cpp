@@ -48,9 +48,9 @@
  */
 
 #include <platform.h>
-#include "ECLogger.h"
 #include "ECConfig.h"
 #include "operations.h"
+#include "logger.h"
 #include "helpers/mapiprophelper.h"
 #include "helpers/archivehelper.h"
 #include "archiver-session.h"
@@ -75,7 +75,7 @@ namespace za { namespace operations {
  * @param[in]	lpLogger
  *					Pointer to an ECLogger object that's used for logging.
  */
-ArchiveOperationBase::ArchiveOperationBase(ECLogger *lpLogger, int ulAge, bool bProcessUnread, ULONG ulInhibitMask)
+ArchiveOperationBase::ArchiveOperationBase(ECArchiverLogger *lpLogger, int ulAge, bool bProcessUnread, ULONG ulInhibitMask)
 : m_lpLogger(lpLogger)
 , m_ulAge(ulAge)
 , m_bProcessUnread(bProcessUnread)
@@ -166,7 +166,7 @@ exit:
  * @param[in]	lpLogger
  *					Pointer to an ECLogger object that's used for logging.
  */
-ArchiveOperationBaseEx::ArchiveOperationBaseEx(ECLogger *lpLogger, int ulAge, bool bProcessUnread, ULONG ulInhibitMask)
+ArchiveOperationBaseEx::ArchiveOperationBaseEx(ECArchiverLogger *lpLogger, int ulAge, bool bProcessUnread, ULONG ulInhibitMask)
 : ArchiveOperationBase(lpLogger, ulAge, bProcessUnread, ulInhibitMask)
 { }
 
@@ -215,6 +215,7 @@ HRESULT ArchiveOperationBaseEx::ProcessEntry(LPMAPIFOLDER lpFolder, ULONG cProps
 		
 		if (nResult != 0) {
 			Logger()->Log(EC_LOGLEVEL_DEBUG, "Leaving folder (%s)", bin2hex(m_ptrCurFolderEntryId->Value.bin.cb, m_ptrCurFolderEntryId->Value.bin.lpb).c_str());
+			Logger()->SetFolder(_T(""));
 			hr = LeaveFolder();
 			if (hr != hrSuccess) {
 				Logger()->Log(EC_LOGLEVEL_FATAL, "Failed to leave folder. (hr=%s)", stringify(hr, true).c_str());
@@ -225,7 +226,9 @@ HRESULT ArchiveOperationBaseEx::ProcessEntry(LPMAPIFOLDER lpFolder, ULONG cProps
 		}
 	}
 	
-	if (m_ptrCurFolderEntryId.is_null() || bReloadFolder) {	
+	if (m_ptrCurFolderEntryId.is_null() || bReloadFolder) {
+		SPropValuePtr ptrPropValue;
+        
 		Logger()->Log(EC_LOGLEVEL_DEBUG, "Opening folder (%s)", bin2hex(lpFolderEntryId->Value.bin.cb, lpFolderEntryId->Value.bin.lpb).c_str());
 	
 		hr = lpFolder->OpenEntry(lpFolderEntryId->Value.bin.cb, (LPENTRYID)lpFolderEntryId->Value.bin.lpb, &m_ptrCurFolder.iid, MAPI_BEST_ACCESS|fMapiDeferredErrors, &ulType, &m_ptrCurFolder);
@@ -241,6 +244,11 @@ HRESULT ArchiveOperationBaseEx::ProcessEntry(LPMAPIFOLDER lpFolder, ULONG cProps
 		hr = Util::HrCopyProperty(m_ptrCurFolderEntryId, lpFolderEntryId, m_ptrCurFolderEntryId);
 		if (hr != hrSuccess)
 			goto exit;
+
+		if (HrGetOneProp(m_ptrCurFolder, PR_DISPLAY_NAME, &ptrPropValue) == hrSuccess)
+			Logger()->SetFolder(ptrPropValue->Value.LPSZ);
+		else
+			Logger()->SetFolder(_T("<Unnamed>"));
 
 		hr = EnterFolder(m_ptrCurFolder);
 		if (hr != hrSuccess) {

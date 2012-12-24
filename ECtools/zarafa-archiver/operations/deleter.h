@@ -62,7 +62,7 @@ namespace za { namespace operations {
 class Deleter : public ArchiveOperationBaseEx
 {
 public:
-	Deleter(ECLogger *lpLogger, int ulAge, bool bProcessUnread);
+	Deleter(ECArchiverLogger *lpLogger, int ulAge, bool bProcessUnread);
 	~Deleter();
 
 private:

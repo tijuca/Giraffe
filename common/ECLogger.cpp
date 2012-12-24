@@ -137,6 +137,18 @@ unsigned ECLogger::Release() {
 	return ulRef;
 }
 
+int ECLogger::snprintf(char *str, size_t size, const char *format, ...)
+{
+	va_list va;
+	int len = 0;
+
+	va_start(va, format);
+	len = _vsnprintf_l(str, size, format, datalocale, va);
+	va_end(va);
+	
+	return len;
+}
+
 ECLogger_Null::ECLogger_Null() : ECLogger(EC_LOGLEVEL_NONE) {}
 ECLogger_Null::~ECLogger_Null() {}
 void ECLogger_Null::Reset() {}

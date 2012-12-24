@@ -55,7 +55,7 @@
 #include <mapix.h>
 #include "mapi_ptr.h"
 
-class ECLogger;
+class ECArchiverLogger;
 
 namespace za { namespace operations {
 
@@ -115,19 +115,19 @@ public:
 class ArchiveOperationBase : public IArchiveOperation
 {
 public:
-	ArchiveOperationBase(ECLogger *lpLogger, int ulAge, bool bProcessUnread, ULONG ulInhibitMask);
+	ArchiveOperationBase(ECArchiverLogger *lpLogger, int ulAge, bool bProcessUnread, ULONG ulInhibitMask);
 	HRESULT GetRestriction(LPMAPIPROP LPMAPIPROP, LPSRestriction *lppRestriction);
 	HRESULT VerifyRestriction(LPMESSAGE lpMessage);
 
 protected:
 	/**
 	 * Returns a pointer to the logger.
-	 * @return An ECLogger pointer.
+	 * @return An ECArchiverLogger pointer.
 	 */
-	ECLogger* Logger() { return m_lpLogger; }
+	ECArchiverLogger* Logger() { return m_lpLogger; }
 	
 private:
-	ECLogger *m_lpLogger;
+	ECArchiverLogger *m_lpLogger;
 	const int m_ulAge;
 	const bool m_bProcessUnread;
 	const ULONG m_ulInhibitMask;
@@ -142,7 +142,7 @@ private:
 class ArchiveOperationBaseEx : public ArchiveOperationBase
 {
 public:
-	ArchiveOperationBaseEx(ECLogger *lpLogger, int ulAge, bool bProcessUnread, ULONG ulInhibitMask);
+	ArchiveOperationBaseEx(ECArchiverLogger *lpLogger, int ulAge, bool bProcessUnread, ULONG ulInhibitMask);
 	HRESULT ProcessEntry(LPMAPIFOLDER lpFolder, ULONG cProps, const LPSPropValue lpProps);
 	
 protected:

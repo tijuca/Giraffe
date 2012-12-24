@@ -47,61 +47,74 @@
  * 
  */
 
-#ifndef archivemanage_INCLUDED
-#define archivemanage_INCLUDED
+#ifndef LOGGER_H
+#define LOGGER_H
 
-#include <mapix.h>
-#include <string>
-#include <iostream>
-#include <memory>
-
-#include "archiver.h"
-#include "mapi_ptr.h"
+#include "ECLogger.h"
 #include "tstring.h"
+#include <string>
 
-#include "archiver-session_fwd.h"
-#include "helpers/archivehelper.h"
-#include "logger.h"
-
-class ECLogger;
-class ECConfig;
-
-/**
- * The ArchiveManager is used to attach, detach and list archives for users.
- */
-class ArchiveManageImpl : public ArchiveManage
+class ECArchiverLogger : public ECLogger
 {
 public:
-	static HRESULT Create(SessionPtr ptrSession, ECConfig *lpConfig, const TCHAR *lpszUser, ECLogger *lpLogger, ArchiveManagePtr *lpptrArchiveManage);
+	ECArchiverLogger(ECLogger *lpLogger);
+	~ECArchiverLogger();
 
-	eResult AttachTo(const char *lpszArchiveServer, const TCHAR *lpszArchive, const TCHAR *lpszFolder, unsigned ulFlags);
-	eResult DetachFrom(const char *lpszArchiveServer, const TCHAR *lpszArchive, const TCHAR *lpszFolder);
-	eResult DetachFrom(unsigned int ulArchive);
-	eResult ListArchives(std::ostream &ostr);
-	eResult ListArchives(ArchiveList *lplstArchives, const char *lpszIpmSubtreeSubstitude);
-	eResult ListAttachedUsers(std::ostream &ostr);
-	eResult ListAttachedUsers(UserList *lplstUsers);
-	eResult AutoAttach(unsigned int ulFlags);
+	tstring SetUser(tstring strUser = tstring());
+	tstring SetFolder(tstring strFolder = tstring());
 
-	HRESULT AttachTo(const char *lpszArchiveServer, const TCHAR *lpszArchive, const TCHAR *lpszFolder, unsigned ulFlags, za::helpers::AttachType attachType);
-	HRESULT AttachTo(LPMDB lpArchiveStore, const tstring &strFoldername, const char *lpszArchiveServer, const abentryid_t &sUserEntryId, unsigned ulFlags, za::helpers::AttachType attachType);
+	const tstring& GetUser() const { return m_strUser; }
+	const tstring& GetFolder() const { return m_strFolder; }
 
-	~ArchiveManageImpl();
-	
-private:
-	ArchiveManageImpl(SessionPtr ptrSession, ECConfig *lpConfig, const tstring &strUser, ECLogger *lpLogger);
-	HRESULT Init();
-
-	static UserEntry MakeUserEntry(const std::string &strUser);
-
-	HRESULT GetRights(LPMAPIFOLDER lpFolder, unsigned *lpulRights);
+	void Reset();
+	void Log(int loglevel, const std::string &message);
+	void Log(int loglevel, const char *format, ...) __LIKE_PRINTF(3, 4);
+	void LogVA(int loglevel, const char *format, va_list& va);
 
 private:
-	SessionPtr	m_ptrSession;
-	ECConfig	*m_lpConfig;
-	tstring	m_strUser;
-	ECArchiverLogger *m_lpLogger;
-	MsgStorePtr	m_ptrUserStore;
+	std::string CreateFormat(const char *format);
+	std::string EscapeFormatString(const std::string &strFormat);
+
+private:
+	ECArchiverLogger(const ECArchiverLogger&);
+	ECArchiverLogger& operator=(const ECArchiverLogger&);
+
+private:
+	ECLogger	*m_lpLogger;
+	tstring		m_strUser;
+	tstring		m_strFolder;
 };
 
-#endif // ndef archivemanage_INCLUDED
+
+class ScopedUserLogging
+{
+public:
+	ScopedUserLogging(ECArchiverLogger *lpLogger, const tstring &strUser);
+	~ScopedUserLogging();
+
+private:
+	ScopedUserLogging(const ScopedUserLogging&);
+	ScopedUserLogging& operator=(const ScopedUserLogging&);
+
+private:
+	ECArchiverLogger *m_lpLogger;
+	const tstring m_strPrevUser;
+};
+
+
+class ScopedFolderLogging
+{
+public:
+	ScopedFolderLogging(ECArchiverLogger *lpLogger, const tstring &strFolder);
+	~ScopedFolderLogging();
+
+private:
+	ScopedFolderLogging(const ScopedFolderLogging&);
+	ScopedFolderLogging& operator=(const ScopedFolderLogging&);
+
+private:
+	ECArchiverLogger *m_lpLogger;
+	const tstring m_strPrevFolder;
+};
+
+#endif // ndef LOGGER_H

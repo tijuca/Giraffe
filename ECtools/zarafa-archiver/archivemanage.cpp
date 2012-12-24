@@ -135,12 +135,9 @@ ArchiveManageImpl::ArchiveManageImpl(SessionPtr ptrSession, ECConfig *lpConfig, 
 : m_ptrSession(ptrSession)
 , m_lpConfig(lpConfig)
 , m_strUser(strUser)
-, m_lpLogger(lpLogger)
+, m_lpLogger(new ECArchiverLogger(lpLogger))
 {
-	if (m_lpLogger)
-		m_lpLogger->AddRef();
-	else
-		m_lpLogger = new ECLogger_Null();
+	m_lpLogger->SetUser(strUser);
 }
 
 /**
