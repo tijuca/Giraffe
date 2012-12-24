@@ -159,9 +159,6 @@ typedef void* HGLOBAL;
 
 typedef __int64_t __int64;
 
-typedef unsigned long ULONG_PTR;
-typedef long LONG_PTR;
-
 #ifndef FALSE
   #define FALSE	0
 #endif
