@@ -85,7 +85,8 @@ mapi_la_DEPENDENCIES = ${top_builddir}/mapi4linux/src/libmapi.la \
 	${top_builddir}/libfreebusy/libfreebusy.la \
 	${top_builddir}/inetmapi/libinetmapi.la $(am__DEPENDENCIES_1)
 am_mapi_la_OBJECTS = main.lo util.lo ECImportContentsChangesProxy.lo \
-	ECImportHierarchyChangesProxy.lo typeconversion.lo
+	ECImportHierarchyChangesProxy.lo ECRulesTableProxy.lo \
+	typeconversion.lo
 mapi_la_OBJECTS = $(am_mapi_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -369,6 +370,7 @@ mapi_la_SOURCES = main.cpp util.cpp \
 	phpconfig.h main.h util.h \
 	ECImportContentsChangesProxy.cpp ECImportContentsChangesProxy.h \
 	ECImportHierarchyChangesProxy.cpp ECImportHierarchyChangesProxy.h \
+	ECRulesTableProxy.cpp ECRulesTableProxy.h \
 	typeconversion.cpp typeconversion.h \
 	globals.h
 
@@ -448,6 +450,7 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ECImportContentsChangesProxy.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ECImportHierarchyChangesProxy.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ECRulesTableProxy.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/typeconversion.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/util.Plo@am__quote@

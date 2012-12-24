@@ -57,6 +57,8 @@
 #include "globals.h"
 ZEND_EXTERN_MODULE_GLOBALS(mapi)
 
+#include "charset/convert.h"
+
 /*
  * PHP -> MAPI
  *
@@ -95,6 +97,5 @@ HRESULT 		SRestrictiontoPHPArray(LPSRestriction lpRes, int level, zval **ret TSR
 HRESULT			RowSettoPHPArray(LPSRowSet lpRowSet, zval **ret TSRMLS_DC);
 HRESULT 		ReadStateArraytoPHPArray(ULONG cValues, LPREADSTATE lpReadStates, zval **ret TSRMLS_DC);
 HRESULT			NotificationstoPHPArray(ULONG cNotifs, LPNOTIFICATION lpNotifs, zval **ret TSRMLS_DC);
-
 
 #endif

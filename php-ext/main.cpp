@@ -56,7 +56,7 @@
 
 #include "ECLogger.h"
 #include "mapi_ptr.h"
-
+#include "ECRulesTableProxy.h"
 
 /*
  * Things to notice when reading/editing this source:
@@ -3994,6 +3994,7 @@ ZEND_FUNCTION(mapi_rules_gettable) {
 	// locals
 	SizedSPropTagArray(11, sptaRules) = {11, { PR_RULE_ID, PR_RULE_IDS, PR_RULE_SEQUENCE, PR_RULE_STATE, PR_RULE_USER_FLAGS, PR_RULE_CONDITION, PR_RULE_ACTIONS, PR_RULE_PROVIDER, PR_RULE_NAME, PR_RULE_LEVEL, PR_RULE_PROVIDER_DATA } };
 	SizedSSortOrderSet(1, sosRules) = {1, 0, 0, { {PR_RULE_SEQUENCE, TABLE_SORT_ASCEND} } };
+	ECRulesTableProxy *lpRulesTableProxy = NULL;
 
 	RETVAL_FALSE;
 	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
@@ -4013,12 +4014,26 @@ ZEND_FUNCTION(mapi_rules_gettable) {
 	MAPI_G(hr) = lpRulesView->SortTable((LPSSortOrderSet)&sosRules, 0);
 	if (MAPI_G(hr) != hrSuccess)
 		goto exit;
+	
+	MAPI_G(hr) = ECRulesTableProxy::Create(lpRulesView, &lpRulesTableProxy);
+	if (MAPI_G(hr) != hrSuccess)
+		goto exit;
+	
+	lpRulesView->Release();
+	lpRulesView = NULL;
+	
+	MAPI_G(hr) = lpRulesTableProxy->QueryInterface(IID_IMAPITable, (LPVOID*)&lpRulesView);
+	if (MAPI_G(hr) != hrSuccess)
+		goto exit;
 
 	ZEND_REGISTER_RESOURCE(return_value, lpRulesView, le_mapi_table);
 
 exit:
 	if (MAPI_G(hr) != hrSuccess && lpRulesView)
 		lpRulesView->Release();
+
+	if (lpRulesTableProxy)
+		lpRulesTableProxy->Release();
 
 	THROW_ON_ERROR();
 	return;

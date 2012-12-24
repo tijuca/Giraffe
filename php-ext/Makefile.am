@@ -35,6 +35,7 @@ mapi_la_SOURCES = main.cpp util.cpp \
 	phpconfig.h main.h util.h \
 	ECImportContentsChangesProxy.cpp ECImportContentsChangesProxy.h \
 	ECImportHierarchyChangesProxy.cpp ECImportHierarchyChangesProxy.h \
+	ECRulesTableProxy.cpp ECRulesTableProxy.h \
 	typeconversion.cpp typeconversion.h \
 	globals.h
 
