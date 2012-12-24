@@ -201,20 +201,26 @@ class ECWaitableTask : public ECTask
 public:
 	static const unsigned WAIT_INFINITE = (unsigned)-1;
 	
+	enum State {
+		Idle = 1,
+		Running = 2,
+		Done = 4
+	};
+	
 public:
 	virtual ~ECWaitableTask();
 	virtual void execute();
 	
 	bool done() const;
-	bool wait(unsigned timeout = WAIT_INFINITE) const;
+	bool wait(unsigned timeout = WAIT_INFINITE, unsigned waitMask = Done) const;
 	
 protected:
 	ECWaitableTask();
-	
+
 private:
 	mutable pthread_mutex_t	m_hMutex;
 	mutable pthread_cond_t	m_hCondition;
-	bool					m_bDone;
+	State					m_state;
 };
 
 /**
@@ -222,7 +228,7 @@ private:
  * @retval true when executed, false otherwise.
  */
 inline bool ECWaitableTask::done() const {
-	return m_bDone;
+	return m_state == Done;
 }
 
 

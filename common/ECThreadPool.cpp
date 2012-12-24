@@ -346,7 +346,7 @@ void ECTask::execute()
  * Construct an ECWaitableTask object.
  */
 ECWaitableTask::ECWaitableTask()
-: m_bDone(false)
+: m_state(Idle)
 {
 	pthread_mutex_init(&m_hMutex, NULL);
 	pthread_cond_init(&m_hCondition, NULL);
@@ -357,7 +357,7 @@ ECWaitableTask::ECWaitableTask()
  */
 ECWaitableTask::~ECWaitableTask()
 {
-	wait();
+	wait(WAIT_INFINITE, Idle|Done);
 
 	pthread_cond_destroy(&m_hCondition);
 	pthread_mutex_destroy(&m_hMutex);
@@ -369,10 +369,15 @@ ECWaitableTask::~ECWaitableTask()
  */
 void ECWaitableTask::execute()
 {
+	pthread_mutex_lock(&m_hMutex);
+	m_state = Running;
+	pthread_cond_broadcast(&m_hCondition);
+	pthread_mutex_unlock(&m_hMutex);
+
 	ECTask::execute();
 	
 	pthread_mutex_lock(&m_hMutex);
-	m_bDone = true;
+	m_state = Done;
 	pthread_cond_broadcast(&m_hCondition);
 	pthread_mutex_unlock(&m_hMutex);
 }
@@ -380,9 +385,12 @@ void ECWaitableTask::execute()
 /**
  * Wait for an ECWaitableTask instance to finish.
  * @param[in]	timeout		Timeout in ms to wait for the task to finish. Pass 0 don't block at all or WAIT_INFINITE to block indefinitely.
- * @retval	true if the task finished, false otherwise.
+ * @param[in]	waitMask	Mask of the combined states for which this function will wait. Default is Done, causing this function to wait
+ *                          until the task is executed. The destructor for instance used Idle|Done, causing this function to only wait when
+ *                          the task is currently running.
+ * @retval	true if the task state matches any state in waitMask, false otherwise.
  */
-bool ECWaitableTask::wait(unsigned timeout) const
+bool ECWaitableTask::wait(unsigned timeout, unsigned waitMask) const
 {
 	bool bResult = false;
 
@@ -390,11 +398,11 @@ bool ECWaitableTask::wait(unsigned timeout) const
 	
 	switch (timeout) {
 	case 0:
-		bResult = m_bDone;
+		bResult = ((m_state & waitMask) != 0);
 		break;
 		
 	case WAIT_INFINITE:
-		while (m_bDone == false)
+		while (!(m_state & waitMask))
 			pthread_cond_wait(&m_hCondition, &m_hMutex);
 		bResult = true;
 		break;
@@ -403,12 +411,12 @@ bool ECWaitableTask::wait(unsigned timeout) const
 		{
 			struct timespec ts = GetDeadline(timeout);
 			
-			while (m_bDone == false) {
+			while (!(m_state & waitMask)) {
 				if (pthread_cond_timedwait(&m_hCondition, &m_hMutex, &ts) == ETIMEDOUT)
 					break;
 			}
 			
-			bResult = m_bDone;
+			bResult = ((m_state & waitMask) != 0);
 		}		
 		break;
 	}
