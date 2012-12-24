@@ -3288,7 +3288,6 @@ ECRESULT LoadObject(struct soap *soap, ECSession *lpecSession, unsigned int ulOb
 		memset(sSavedObject.__ptr, 0, sizeof(saveObject) * sSavedObject.__size);
 
 		for (i = 0; i < sSavedObject.__size; i++) {
-		    unsigned int ulChildId;
 			lpDBRow = lpDatabase->FetchRow(lpDBResult);
 			lpDBLen = lpDatabase->FetchRowLengths(lpDBResult);
 
@@ -3296,8 +3295,6 @@ ECRESULT LoadObject(struct soap *soap, ECSession *lpecSession, unsigned int ulOb
 				er = ZARAFA_E_DATABASE_ERROR; // this should never happen
 				goto exit;
 			}
-			
-			ulChildId = atoi(lpDBRow[0]);
 			
    			LoadObject(soap, lpecSession, atoi(lpDBRow[0]), atoi(lpDBRow[1]), ulObjType, &sSavedObject.__ptr[i], &mapChildProps);
 		}
@@ -7743,7 +7740,6 @@ ECRESULT MoveObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt* lp
 	ECListIntIterator	iObjectId;
 	size_t			cCopyItems = 0;
 
-	unsigned int	ulSourceId = 0;
 	unsigned long long ullIMAP = 0;
 
 	std::list<unsigned int> lstParent;
@@ -7779,9 +7775,6 @@ ECRESULT MoveObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt* lp
 	er = lpSession->GetSessionManager()->GetCacheManager()->GetStore(ulDestFolderId, &ulDestStoreId, &guidStore);
 	if(er != erSuccess)
 		goto exit;
-
-	// Get from the first object the store id
-	ulSourceId = *lplObjectIds->begin();
 
 	GetSourceKey(ulDestFolderId, &sDestFolderSourceKey);
 
@@ -10640,7 +10633,8 @@ void *SerializeObject(void *arg)
 	ASSERT(lpStreamInfo != NULL);
 
 	lpSink = new ECFifoSerializer(&lpStreamInfo->data);
-	SerializeObject(lpStreamInfo->lpecSession, lpStreamInfo->lpAttachmentStorage, NULL, lpStreamInfo->ulObjectId, lpStreamInfo->ulStoreId, &lpStreamInfo->sGuid, lpStreamInfo->ulFlags, lpSink);
+
+	SerializeMessage(lpStreamInfo->lpecSession, lpStreamInfo->lpAttachmentStorage, NULL, lpStreamInfo->ulObjectId, MAPI_MESSAGE, lpStreamInfo->ulStoreId, &lpStreamInfo->sGuid, lpStreamInfo->ulFlags, lpSink, true);
 
 	delete lpSink;
 	return NULL;

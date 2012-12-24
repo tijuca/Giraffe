@@ -708,7 +708,11 @@ HRESULT ECMessage::GetRecipientTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 
 			for (iterObjects = m_sMapiObject->lstChildren->begin(); iterObjects != m_sMapiObject->lstChildren->end(); iterObjects++) {
 
-				if ((*iterObjects)->ulObjType != MAPI_MAILUSER && (*iterObjects)->ulObjType != MAPI_DISTLIST)
+				// The only valid types are MAPI_MAILUSER and MAPI_DISTLIST. However some MAPI clients put in other
+				// values as object type. We know about the existence of MAPI_ATTACH as another valid subtype for
+				// Messages, so we'll skip those, treat MAPI_DISTLIST as MAPI_DISTLIST and anything else as
+				// MAPI_MAILUSER.
+				if ((*iterObjects)->ulObjType == MAPI_ATTACH)
 					continue;
 
 				if ((*iterObjects)->bDelete)

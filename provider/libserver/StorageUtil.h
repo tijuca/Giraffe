@@ -51,6 +51,7 @@
 #define STORAGEUTIL_H
 
 #include <ZarafaCode.h>
+#include <mapidefs.h>
 
 class ECDatabase;
 class ECAttachmentStorage;
@@ -63,5 +64,17 @@ enum eSizeUpdateAction{ UPDATE_SET, UPDATE_ADD, UPDATE_SUB };
 ECRESULT GetObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned int* lpulSize);	
 ECRESULT CalculateObjectSize(ECDatabase* lpDatabase, unsigned int objid, unsigned int ulObjType, unsigned int* lpulSize);
 ECRESULT UpdateObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned int ulObjType, eSizeUpdateAction updateAction, long long llSize);
+
+/**
+ * Get the corrected object type used to determine course of action.
+ * MAPI_MESSAGE objects can contain only MAPI_ATTACH, MAPI_MAILUSER and MAPI_DISTLIST sub objects,
+ * but in practice the object type can be different. This function will return MAPI_MAILUSER for
+ * any MAPI_MESSAGE subtype that does not match the mentioned types.
+ */
+static inline unsigned int RealObjType(unsigned int ulObjType, unsigned int ulParentType) {
+    if (ulParentType == MAPI_MESSAGE && ulObjType != MAPI_MAILUSER && ulObjType != MAPI_DISTLIST && ulObjType != MAPI_ATTACH)
+        return MAPI_MAILUSER;
+    return ulObjType;
+}
 
 #endif // ndef STORAGEUTIL_H
