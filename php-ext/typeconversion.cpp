@@ -2286,3 +2286,118 @@ HRESULT NotificationstoPHPArray(ULONG cNotifs, LPNOTIFICATION lpNotifs, zval **p
 exit:	
 	return MAPI_G(hr);
 }
+
+HRESULT PHPArraytoSendingOptions(zval *phpArray, sending_options *lpSOPT)
+{
+	HRESULT hr = hrSuccess;
+	// local
+	int				count;
+	HashTable		*target_hash = NULL;
+	zval			**entry = NULL;
+	char			*keyIndex;
+	ulong			numIndex = 0;
+
+	if (!phpArray) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "No phpArray in PHPArraytoSendingOptions");
+		// not an error
+		goto exit;
+	}
+
+	target_hash = HASH_OF(phpArray);
+	if (!target_hash) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "No target_hash in PHPArraytoSendingOptions");
+		MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
+		goto exit;
+	}
+
+	count = zend_hash_num_elements(target_hash);
+	zend_hash_internal_pointer_reset(target_hash);
+	for (int i = 0; i < count; i++) {
+		// Gets the element that exist at the current pointer.
+		zend_hash_get_current_data(target_hash, (void **) &entry);
+		zend_hash_get_current_key(target_hash, &keyIndex, &numIndex, 0);
+
+		if (strcmp(keyIndex, "alternate_boundary") == 0) {
+			convert_to_string_ex(entry);
+			lpSOPT->alternate_boundary = Z_STRVAL_PP(entry);
+		} else if (strcmp(keyIndex, "no_recipients_workaround") == 0) {
+			convert_to_boolean_ex(entry);
+			lpSOPT->no_recipients_workaround = Z_BVAL_PP(entry);
+		} else if (strcmp(keyIndex, "headers_only") == 0) {
+			convert_to_boolean_ex(entry);
+			lpSOPT->headers_only = Z_BVAL_PP(entry);
+		} else if (strcmp(keyIndex, "add_received_date") == 0) {
+			convert_to_boolean_ex(entry);
+			lpSOPT->add_received_date = Z_BVAL_PP(entry);
+		} else if (strcmp(keyIndex, "use_tnef") == 0) {
+			convert_to_long_ex(entry);
+			lpSOPT->use_tnef = Z_LVAL_PP(entry);
+		} else if (strcmp(keyIndex, "force_utf8") == 0) {
+			convert_to_boolean_ex(entry);
+			lpSOPT->force_utf8 = Z_BVAL_PP(entry);
+		} else if (strcmp(keyIndex, "charset_upgrade") == 0) {
+			convert_to_string_ex(entry);
+			lpSOPT->charset_upgrade = Z_STRVAL_PP(entry);
+		} else if (strcmp(keyIndex, "allow_send_to_everyone") == 0) {
+			convert_to_boolean_ex(entry);
+			lpSOPT->force_utf8 = Z_BVAL_PP(entry);
+		} else {
+			// msg_in_msg and enable_dsn not allowed, others unknown
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unknown or disallowed sending option %s", keyIndex);
+		}
+
+		zend_hash_move_forward(target_hash);
+	}
+	
+exit:
+	return hr;
+}
+
+HRESULT PHPArraytoDeliveryOptions(zval *phpArray, delivery_options *lpDOPT)
+{
+	HRESULT hr = hrSuccess;
+	// local
+	int				count;
+	HashTable		*target_hash = NULL;
+	zval			**entry = NULL;
+	char			*keyIndex;
+	ulong			numIndex = 0;
+
+	if (!phpArray) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "No phpArray in PHPArraytoDeliveryOptions");
+		// not an error
+		goto exit;
+	}
+
+	target_hash = HASH_OF(phpArray);
+	if (!target_hash) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "No target_hash in PHPArraytoDeliveryOptions");
+		MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
+		goto exit;
+	}
+
+	count = zend_hash_num_elements(target_hash);
+	zend_hash_internal_pointer_reset(target_hash);
+	for (int i = 0; i < count; i++) {
+		// Gets the element that exist at the current pointer.
+		zend_hash_get_current_data(target_hash, (void **) &entry);
+		zend_hash_get_current_key(target_hash, &keyIndex, &numIndex, 0);
+
+		if (strcmp(keyIndex, "use_received_date") == 0) {
+			convert_to_boolean_ex(entry);
+			lpDOPT->use_received_date = Z_BVAL_PP(entry);
+		} else if (strcmp(keyIndex, "mark_as_read") == 0) {
+			convert_to_boolean_ex(entry);
+			lpDOPT->mark_as_read = Z_BVAL_PP(entry);
+		} else if (strcmp(keyIndex, "add_imap_date") == 0) {
+			convert_to_boolean_ex(entry);
+			lpDOPT->add_imap_data = Z_BVAL_PP(entry);
+		} else {
+			// user_entryid not supported, others unknown
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unknown or disallowed delivery option %s", keyIndex);
+		}
+	}
+	
+exit:
+	return hr;
+}

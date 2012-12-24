@@ -58,6 +58,7 @@
 ZEND_EXTERN_MODULE_GLOBALS(mapi)
 
 #include "charset/convert.h"
+#include "options.h"
 
 /*
  * PHP -> MAPI
@@ -83,6 +84,10 @@ HRESULT			PHPArraytoGUIDArray(zval *phpVal, void *lpBase, ULONG *lpcValues, LPGU
 
 HRESULT		 	PHPArraytoSBinaryArray(zval * entryid_array, void *lpBase, LPENTRYLIST lpEntryList TSRMLS_DC);
 HRESULT 		PHPArraytoSRestriction(zval *phpVal, void *lpBase, LPSRestriction lpRestriction TSRMLS_DC);
+
+/* imtoinet, imtomapi options */
+HRESULT			PHPArraytoSendingOptions(zval *phpArray, sending_options *lpSOPT);
+HRESULT			PHPArraytoDeliveryOptions(zval *phpArray, delivery_options *lpDOPT);
 
 /*
  * MAPI -> PHP

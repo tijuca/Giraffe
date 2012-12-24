@@ -1608,7 +1608,7 @@ HRESULT MAPIToVMIME::handleTextparts(IMessage* lpMessage, vmime::messageBuilder 
 			goto exit;
 		}
 
-		if(isrtfhtml(strRtf.c_str(), strRtf.size()) )
+		if (isrtfhtml(strRtf.c_str(), strRtf.size()) || sopt.use_tnef == -1)
 		{
 			// Open html
 			hr = lpMessage->OpenProperty(PR_HTML, &IID_IStream, 0, 0, (LPUNKNOWN *)&lpHTMLStream);
@@ -1626,7 +1626,7 @@ HRESULT MAPIToVMIME::handleTextparts(IMessage* lpMessage, vmime::messageBuilder 
 				lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to open HTML-text stream. Error: 0x%08X", hr);
 				// continue with plaintext
 			}
-		} else if(isrtftext(strRtf.c_str(), strRtf.size()) )	{
+		} else if (isrtftext(strRtf.c_str(), strRtf.size())) {
 			//Do nothing, only plain/text
 		} else {
 			// Real rtf
@@ -2358,7 +2358,7 @@ HRESULT MAPIToVMIME::handleTNEF(IMessage* lpMessage, vmime::messageBuilder* lpVM
 	LPSPropTagArray lpNameTagArray	= NULL;
 	ULONG			cNames		= 0;
 	ULONG			ulNamesIDs	= 0;
-	bool			blForceTnef = sopt.force_tnef; // force sending TNEF when requested
+	int				iUseTnef = sopt.use_tnef;
 	std::string		strTnefReason;
 
 	std::list<ULONG> lstOLEAttach; // list of OLE attachments that must be sent via TNEF
@@ -2437,26 +2437,31 @@ HRESULT MAPIToVMIME::handleTNEF(IMessage* lpMessage, vmime::messageBuilder* lpVM
 		}
 		hr = hrSuccess;
 
-		if (blForceTnef)
+		if (iUseTnef > 0)
 			strTnefReason = "Force TNEF on request";
 
 		// no propose new time support for ical
-		if (!blForceTnef && lpMessageClass && strnicmp("IPM.Schedule.Meeting.Resp", lpMessageClass->Value.lpszA, strlen("IPM.Schedule.Meeting.Resp")) == 0 &&
+		if (iUseTnef <= 0 && lpMessageClass && strnicmp("IPM.Schedule.Meeting.Resp", lpMessageClass->Value.lpszA, strlen("IPM.Schedule.Meeting.Resp")) == 0 &&
 			lpApptCounterPropose && lpApptCounterPropose->ulPropTag == lpNameTagArray->aulPropTag[0] && lpApptCounterPropose->Value.b) {
-			blForceTnef = true;
+			iUseTnef = 1;
 			strTnefReason = "Force TNEF because of Propose new time";
 		}
 
 		// currently no task support for ical
-		if (!blForceTnef && lpMessageClass && strnicmp("IPM.Task", lpMessageClass->Value.lpszA, 8) == 0) {
-			blForceTnef = true;
+		if (iUseTnef <= 0 && lpMessageClass && strnicmp("IPM.Task", lpMessageClass->Value.lpszA, 8) == 0) {
+			iUseTnef = 1;
 			strTnefReason = "Force TNEF because of task request";
 		}
 
 		// delegation of meeting requests need to be in tnef too because of special properties
-		if (lpDelegateRule && lpDelegateRule->Value.b == TRUE) {
-			blForceTnef = true;
+		if (iUseTnef <= 0 && lpDelegateRule && lpDelegateRule->Value.b == TRUE) {
+			iUseTnef = 1;
 			strTnefReason = "Force TNEF because of delegation";
+		}
+
+		if (iUseTnef < 0 && lpUseTNEF) {
+			// disable TNEF for RTF
+			lpUseTNEF->Value.b = FALSE;
 		}
 
         /*
@@ -2479,7 +2484,7 @@ HRESULT MAPIToVMIME::handleTNEF(IMessage* lpMessage, vmime::messageBuilder* lpVM
 			 * Send TNEF information for this message if we really need to, or otherwise iCal
 			 */
 			
-			if (lstOLEAttach.size() == 0 && !blForceTnef && lpMessageClass && (strnicmp("IPM.Note", lpMessageClass->Value.lpszA, 8) != 0)) {
+			if (lstOLEAttach.size() == 0 && iUseTnef <= 0 && lpMessageClass && (strnicmp("IPM.Note", lpMessageClass->Value.lpszA, 8) != 0)) {
 				// iCAL
 				string ical, method;
 				vmime::ref<mapiAttachment> vmAttach = NULL;
@@ -2510,7 +2515,7 @@ HRESULT MAPIToVMIME::handleTNEF(IMessage* lpMessage, vmime::messageBuilder* lpVM
 			} else {
 				if (lstOLEAttach.size())
 					lpLogger->Log(EC_LOGLEVEL_INFO, "TNEF because of OLE attachments");
-				else if (!blForceTnef)
+				else if (iUseTnef == 0)
 					lpLogger->Log(EC_LOGLEVEL_INFO, "TNEF because of RTF body");
 				else
 					lpLogger->Log(EC_LOGLEVEL_INFO, strTnefReason);

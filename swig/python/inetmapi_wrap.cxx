@@ -3067,6 +3067,42 @@ SWIGINTERNINLINE PyObject*
   return PyBool_FromLong(value ? 1 : 0);
 }
 
+
+#include <limits.h>
+#if !defined(SWIG_NO_LLONG_MAX)
+# if !defined(LLONG_MAX) && defined(__GNUC__) && defined (__LONG_LONG_MAX__)
+#   define LLONG_MAX __LONG_LONG_MAX__
+#   define LLONG_MIN (-LLONG_MAX - 1LL)
+#   define ULLONG_MAX (LLONG_MAX * 2ULL + 1ULL)
+# endif
+#endif
+
+
+SWIGINTERN int
+SWIG_AsVal_int (PyObject * obj, int *val)
+{
+  long v;
+  int res = SWIG_AsVal_long (obj, &v);
+  if (SWIG_IsOK(res)) {
+    if ((v < INT_MIN || v > INT_MAX)) {
+      return SWIG_OverflowError;
+    } else {
+      if (val) *val = static_cast< int >(v);
+    }
+  }  
+  return res;
+}
+
+
+  #define SWIG_From_long   PyInt_FromLong 
+
+
+SWIGINTERNINLINE PyObject *
+SWIG_From_int  (int value)
+{    
+  return SWIG_From_long  (value);
+}
+
 SWIGINTERN sending_options *new_sending_options(){
 				sending_options *sopt = new sending_options;
 				imopt_default_sending_options(sopt);
@@ -3421,31 +3457,31 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_sending_options_force_tnef_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+SWIGINTERN PyObject *_wrap_sending_options_use_tnef_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   sending_options *arg1 = (sending_options *) 0 ;
-  bool arg2 ;
+  int arg2 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  bool val2 ;
+  int val2 ;
   int ecode2 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   
-  if (!PyArg_ParseTuple(args,(char *)"OO:sending_options_force_tnef_set",&obj0,&obj1)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OO:sending_options_use_tnef_set",&obj0,&obj1)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p__so, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sending_options_force_tnef_set" "', argument " "1"" of type '" "sending_options *""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sending_options_use_tnef_set" "', argument " "1"" of type '" "sending_options *""'"); 
   }
   arg1 = reinterpret_cast< sending_options * >(argp1);
-  ecode2 = SWIG_AsVal_bool(obj1, &val2);
+  ecode2 = SWIG_AsVal_int(obj1, &val2);
   if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "sending_options_force_tnef_set" "', argument " "2"" of type '" "bool""'");
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "sending_options_use_tnef_set" "', argument " "2"" of type '" "int""'");
   } 
-  arg2 = static_cast< bool >(val2);
+  arg2 = static_cast< int >(val2);
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
-    if (arg1) (arg1)->force_tnef = arg2;
+    if (arg1) (arg1)->use_tnef = arg2;
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
   resultobj = SWIG_Py_Void();
@@ -3455,26 +3491,26 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_sending_options_force_tnef_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+SWIGINTERN PyObject *_wrap_sending_options_use_tnef_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   sending_options *arg1 = (sending_options *) 0 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
   PyObject * obj0 = 0 ;
-  bool result;
+  int result;
   
-  if (!PyArg_ParseTuple(args,(char *)"O:sending_options_force_tnef_get",&obj0)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"O:sending_options_use_tnef_get",&obj0)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p__so, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sending_options_force_tnef_get" "', argument " "1"" of type '" "sending_options *""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sending_options_use_tnef_get" "', argument " "1"" of type '" "sending_options *""'"); 
   }
   arg1 = reinterpret_cast< sending_options * >(argp1);
   {
     SWIG_PYTHON_THREAD_BEGIN_ALLOW;
-    result = (bool) ((arg1)->force_tnef);
+    result = (int) ((arg1)->use_tnef);
     SWIG_PYTHON_THREAD_END_ALLOW;
   }
-  resultobj = SWIG_From_bool(static_cast< bool >(result));
+  resultobj = SWIG_From_int(static_cast< int >(result));
   return resultobj;
 fail:
   return NULL;
@@ -4195,8 +4231,8 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"sending_options_headers_only_get", _wrap_sending_options_headers_only_get, METH_VARARGS, NULL},
 	 { (char *)"sending_options_add_received_date_set", _wrap_sending_options_add_received_date_set, METH_VARARGS, NULL},
 	 { (char *)"sending_options_add_received_date_get", _wrap_sending_options_add_received_date_get, METH_VARARGS, NULL},
-	 { (char *)"sending_options_force_tnef_set", _wrap_sending_options_force_tnef_set, METH_VARARGS, NULL},
-	 { (char *)"sending_options_force_tnef_get", _wrap_sending_options_force_tnef_get, METH_VARARGS, NULL},
+	 { (char *)"sending_options_use_tnef_set", _wrap_sending_options_use_tnef_set, METH_VARARGS, NULL},
+	 { (char *)"sending_options_use_tnef_get", _wrap_sending_options_use_tnef_get, METH_VARARGS, NULL},
 	 { (char *)"sending_options_force_utf8_set", _wrap_sending_options_force_utf8_set, METH_VARARGS, NULL},
 	 { (char *)"sending_options_force_utf8_get", _wrap_sending_options_force_utf8_get, METH_VARARGS, NULL},
 	 { (char *)"sending_options_charset_upgrade_set", _wrap_sending_options_charset_upgrade_set, METH_VARARGS, NULL},

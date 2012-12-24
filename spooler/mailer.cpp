@@ -2068,7 +2068,12 @@ HRESULT ProcessMessage(IMAPISession *lpAdminSession, IMAPISession *lpUserSession
 
 	imopt_default_sending_options(&sopt);
 	// optional force sending with TNEF
-	sopt.force_tnef = parseBool(g_lpConfig->GetSetting("always_send_tnef"));
+	if (strcmp(g_lpConfig->GetSetting("always_send_tnef"), "minimal") == 0)
+		sopt.use_tnef = -1;
+	else if (strcmp(g_lpConfig->GetSetting("always_send_tnef"), "auto") == 0)
+		sopt.use_tnef = 0;
+	else
+		sopt.use_tnef = parseBool(g_lpConfig->GetSetting("always_send_tnef"));
 	sopt.force_utf8 = parseBool(g_lpConfig->GetSetting("always_send_utf8"));
 	sopt.allow_send_to_everyone = parseBool(g_lpConfig->GetSetting("allow_send_to_everyone"));
 

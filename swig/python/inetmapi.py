@@ -87,9 +87,9 @@ class sending_options(_object):
     __swig_setmethods__["add_received_date"] = _inetmapi.sending_options_add_received_date_set
     __swig_getmethods__["add_received_date"] = _inetmapi.sending_options_add_received_date_get
     if _newclass:add_received_date = _swig_property(_inetmapi.sending_options_add_received_date_get, _inetmapi.sending_options_add_received_date_set)
-    __swig_setmethods__["force_tnef"] = _inetmapi.sending_options_force_tnef_set
-    __swig_getmethods__["force_tnef"] = _inetmapi.sending_options_force_tnef_get
-    if _newclass:force_tnef = _swig_property(_inetmapi.sending_options_force_tnef_get, _inetmapi.sending_options_force_tnef_set)
+    __swig_setmethods__["use_tnef"] = _inetmapi.sending_options_use_tnef_set
+    __swig_getmethods__["use_tnef"] = _inetmapi.sending_options_use_tnef_get
+    if _newclass:use_tnef = _swig_property(_inetmapi.sending_options_use_tnef_get, _inetmapi.sending_options_use_tnef_set)
     __swig_setmethods__["force_utf8"] = _inetmapi.sending_options_force_utf8_set
     __swig_getmethods__["force_utf8"] = _inetmapi.sending_options_force_utf8_get
     if _newclass:force_utf8 = _swig_property(_inetmapi.sending_options_force_utf8_get, _inetmapi.sending_options_force_utf8_set)

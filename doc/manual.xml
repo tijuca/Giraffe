@@ -6547,6 +6547,10 @@
 			  using iCalendar files. This adds compatibility to more
 			  calendar programs. To use the previous TNEF
 			  (winmail.dat) method, set this option to 'yes'.</para>
+			  <para>When an email body is written in RTF text,
+			  normally this data is sent using TNEF. If you want to
+			  send an HTML representation of the email instead and not
+			  use TNEF, set this to 'minimal'.</para>
 			  <para>Default: <replaceable>no</replaceable></para>
 			</listitem>
 		  </varlistentry>
