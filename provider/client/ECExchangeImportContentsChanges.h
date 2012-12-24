@@ -120,6 +120,7 @@ private:
 private:
 	ECLogger*		m_lpLogger;
 	ECMAPIFolder*	m_lpFolder;
+	LPSPropValue	m_lpSourceKey;
 	LPSTREAM		m_lpStream;
 	ULONG			m_ulFlags;
 	ULONG			m_ulSyncId;

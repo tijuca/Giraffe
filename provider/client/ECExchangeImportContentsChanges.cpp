@@ -140,11 +140,15 @@ ECExchangeImportContentsChanges::ECExchangeImportContentsChanges(ECMAPIFolder *l
 	m_lpFolder = lpFolder;
 	m_lpStream = NULL;
 	m_lpFolder->AddRef();
+	m_lpSourceKey = NULL;
 }
 
 ECExchangeImportContentsChanges::~ECExchangeImportContentsChanges(){
 	m_lpFolder->Release();
 	m_lpLogger->Release();
+
+	if (m_lpSourceKey)
+		MAPIFreeBuffer(m_lpSourceKey);
 }
 
 HRESULT ECExchangeImportContentsChanges::Create(ECMAPIFolder *lpFolder, LPEXCHANGEIMPORTCONTENTSCHANGES* lppExchangeImportContentsChanges){
@@ -156,8 +160,15 @@ HRESULT ECExchangeImportContentsChanges::Create(ECMAPIFolder *lpFolder, LPEXCHAN
 
 	lpEICC = new ECExchangeImportContentsChanges(lpFolder);
 
-	hr = lpEICC->QueryInterface(IID_IExchangeImportContentsChanges, (void **)lppExchangeImportContentsChanges);
+	hr = HrGetOneProp(&lpFolder->m_xMAPIProp, PR_SOURCE_KEY, &lpEICC->m_lpSourceKey);
+	if(hr != hrSuccess)
+		goto exit;
 
+	hr = lpEICC->QueryInterface(IID_IExchangeImportContentsChanges, (void **)lppExchangeImportContentsChanges);
+	if(hr != hrSuccess)
+		goto exit;
+
+exit:
 	return hr;
 
 }
@@ -263,13 +274,9 @@ HRESULT ECExchangeImportContentsChanges::Config(LPSTREAM lpStream, ULONG ulFlags
 			goto exit;
 		}
 		
-		hr = HrGetOneProp(&m_lpFolder->m_xMAPIFolder, PR_SOURCE_KEY, &lpPropSourceKey);
-		if(hr != hrSuccess)
-			goto exit;
-		
 		// The user specified the special sync key '0000000000000000', get a sync key from the server.
 		if(m_ulSyncId == 0) {
-			hr = m_lpFolder->GetMsgStore()->lpTransport->HrSetSyncStatus(lpPropSourceKey->Value.bin, m_ulSyncId, m_ulChangeId, ICS_SYNC_CONTENTS, 0, &m_ulSyncId);
+			hr = m_lpFolder->GetMsgStore()->lpTransport->HrSetSyncStatus(m_lpSourceKey->Value.bin, m_ulSyncId, m_ulChangeId, ICS_SYNC_CONTENTS, 0, &m_ulSyncId);
 			if(hr != hrSuccess)
 				goto exit;
 		}
@@ -322,9 +329,6 @@ exit:
 HRESULT ECExchangeImportContentsChanges::ImportMessageChange(ULONG cValue, LPSPropValue lpPropArray, ULONG ulFlags, LPMESSAGE * lppMessage){
 	HRESULT hr = hrSuccess; 
 
-	SizedSPropTagArray(1, sptSourceKey) = { 1, {PR_SOURCE_KEY} };
-	
-	LPSPropValue lpFolderSourceKey = NULL;
 	LPSPropValue lpPropPCL = NULL;
 	LPSPropValue lpPropCK = NULL;
 	ULONG cbEntryId = 0;
@@ -345,17 +349,8 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageChange(ULONG cValue, LPSPr
 	ECMessage *lpECMessage = NULL;
 	ULONG ulNewFlags = 0;
 
-	hr = m_lpFolder->GetProps((LPSPropTagArray)&sptSourceKey,0, &ulCount, &lpFolderSourceKey);
-	if(hr != hrSuccess)
-		goto exit;
-
-	if(lpFolderSourceKey->ulPropTag != PR_SOURCE_KEY) {
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
-	}
-
 	if(lpMessageSourceKey != NULL) {
-		hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId, lpFolderSourceKey->Value.bin.cb, lpFolderSourceKey->Value.bin.lpb, lpMessageSourceKey->Value.bin.cb, lpMessageSourceKey->Value.bin.lpb, &cbEntryId, &lpEntryId);
+		hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId, m_lpSourceKey->Value.bin.cb, m_lpSourceKey->Value.bin.lpb, lpMessageSourceKey->Value.bin.cb, lpMessageSourceKey->Value.bin.lpb, &cbEntryId, &lpEntryId);
 		if(hr != MAPI_E_NOT_FOUND && hr != hrSuccess)
 			goto exit;
 	} else {
@@ -443,9 +438,6 @@ exit:
 	if(lpECMessage)
 		lpECMessage->Release();
 		
-	if(lpFolderSourceKey)
-		MAPIFreeBuffer(lpFolderSourceKey);
-
 	if(lpPropPCL)
 		MAPIFreeBuffer(lpPropPCL);
 
@@ -462,20 +454,13 @@ exit:
 HRESULT ECExchangeImportContentsChanges::ImportMessageDeletion(ULONG ulFlags, LPENTRYLIST lpSourceEntryList){
 	HRESULT hr = hrSuccess;
 	ENTRYLIST EntryList;
-	LPSPropValue lpPropVal = NULL;
-	ULONG ulSKNr, ulCount;
-	SizedSPropTagArray(1, spt) = { 1, {PR_SOURCE_KEY} };
+	ULONG ulSKNr;
 	EntryList.lpbin = NULL;
 	EntryList.cValues = 0;
 	
-	hr = m_lpFolder->GetProps((LPSPropTagArray)&spt,0, &ulCount, &lpPropVal);
-	if(hr != hrSuccess)
-		goto exit;
-
-
 	MAPIAllocateBuffer(sizeof(SBinary)* lpSourceEntryList->cValues, (LPVOID*)&EntryList.lpbin);
 	for(ulSKNr = 0; ulSKNr < lpSourceEntryList->cValues; ulSKNr++){
-		hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId, lpPropVal->Value.bin.cb, lpPropVal->Value.bin.lpb, lpSourceEntryList->lpbin[ulSKNr].cb, lpSourceEntryList->lpbin[ulSKNr].lpb, &EntryList.lpbin[EntryList.cValues].cb, (LPENTRYID*)&EntryList.lpbin[EntryList.cValues].lpb);
+		hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId, m_lpSourceKey->Value.bin.cb, m_lpSourceKey->Value.bin.lpb, lpSourceEntryList->lpbin[ulSKNr].cb, lpSourceEntryList->lpbin[ulSKNr].lpb, &EntryList.lpbin[EntryList.cValues].cb, (LPENTRYID*)&EntryList.lpbin[EntryList.cValues].lpb);
 		if(hr == MAPI_E_NOT_FOUND){
 			hr = hrSuccess;
 			continue;
@@ -504,17 +489,11 @@ exit:
 
 HRESULT ECExchangeImportContentsChanges::ImportPerUserReadStateChange(ULONG cElements, LPREADSTATE lpReadState){
 	HRESULT hr = hrSuccess;	
-	LPSPropValue lpPropVal = NULL;
-	ULONG ulSKNr, ulCount, cbEntryId;
+	ULONG ulSKNr, cbEntryId;
 	LPENTRYID lpEntryId = NULL;
-	SizedSPropTagArray(1, spt) = { 1, {PR_SOURCE_KEY} };
-	
-	hr = m_lpFolder->GetProps((LPSPropTagArray)&spt,0, &ulCount, &lpPropVal);
-	if(hr != hrSuccess)
-		goto exit;
 
 	for(ulSKNr = 0; ulSKNr < cElements; ulSKNr++){
-		hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId , lpPropVal->Value.bin.cb, lpPropVal->Value.bin.lpb, lpReadState[ulSKNr].cbSourceKey, lpReadState[ulSKNr].pbSourceKey, &cbEntryId, &lpEntryId);
+		hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId , m_lpSourceKey->Value.bin.cb, m_lpSourceKey->Value.bin.lpb, lpReadState[ulSKNr].cbSourceKey, lpReadState[ulSKNr].pbSourceKey, &cbEntryId, &lpEntryId);
 		if(hr == MAPI_E_NOT_FOUND){
 			hr = hrSuccess;
 			continue; // Message is delete or moved
@@ -1001,7 +980,6 @@ exit:
 HRESULT ECExchangeImportContentsChanges::ImportMessageChangeAsAStream(ULONG cValue, LPSPropValue lpPropArray, ULONG ulFlags, LPSTREAM *lppStream)
 {
 	HRESULT hr = hrSuccess; 
-	SPropValuePtr ptrFolderSourceKey;
 	ULONG cbEntryId = 0;
 	EntryIdPtr ptrEntryId;
 	WSMessageStreamImporterPtr ptrMessageImporter;
@@ -1009,12 +987,8 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageChangeAsAStream(ULONG cVal
 
 	LPSPropValue lpMessageSourceKey = PpropFindProp(lpPropArray, cValue, PR_SOURCE_KEY);
 
-	hr = HrGetOneProp(&m_lpFolder->m_xMAPIProp, PR_SOURCE_KEY, &ptrFolderSourceKey);
-	if (hr != hrSuccess)
-		goto exit;
-
 	if (lpMessageSourceKey != NULL) {
-		hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId, ptrFolderSourceKey->Value.bin.cb, ptrFolderSourceKey->Value.bin.lpb, lpMessageSourceKey->Value.bin.cb, lpMessageSourceKey->Value.bin.lpb, &cbEntryId, &ptrEntryId);
+		hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId, m_lpSourceKey->Value.bin.cb, m_lpSourceKey->Value.bin.lpb, lpMessageSourceKey->Value.bin.cb, lpMessageSourceKey->Value.bin.lpb, &cbEntryId, &ptrEntryId);
 		if (hr != MAPI_E_NOT_FOUND && hr != hrSuccess) {
 			LOG_DEBUG(m_lpLogger, "ImportFast: Failed to get entryid from sourcekey, hr = 0x%08x", hr);
 			goto exit;
