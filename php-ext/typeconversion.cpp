@@ -2396,6 +2396,8 @@ HRESULT PHPArraytoDeliveryOptions(zval *phpArray, delivery_options *lpDOPT)
 			// user_entryid not supported, others unknown
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unknown or disallowed delivery option %s", keyIndex);
 		}
+
+		zend_hash_move_forward(target_hash);
 	}
 	
 exit:
