@@ -364,12 +364,38 @@ exit:
 ECRESULT ECSearchFolders::IsSearchFolder(unsigned int ulStoreID, unsigned int ulFolderId)
 {
     ECRESULT er = erSuccess;
-    struct searchCriteria *lpSearchCriteria = NULL;
+	ECDatabase		*lpDatabase = NULL;
+	DB_RESULT		lpDBResult = NULL;
+	DB_ROW			lpDBRow = NULL;
+	std::string		strQuery;
 
-    er = LoadSearchCriteria(ulStoreID, ulFolderId, &lpSearchCriteria);
+    // Get database
+    er = GetThreadLocalDatabase(m_lpDatabaseFactory, &lpDatabase);
+    if(er != erSuccess)
+        goto exit;
 
-    if(lpSearchCriteria)
-        FreeSearchCriteria(lpSearchCriteria);
+	// Find out what kind of table this is
+	strQuery = "SELECT flags FROM hierarchy WHERE id=" + stringify(ulFolderId);
+
+	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
+	if(er != erSuccess)
+		goto exit;
+
+	lpDBRow = lpDatabase->FetchRow(lpDBResult);
+	if(!lpDBRow || lpDBRow[0] == NULL) {
+	    er = ZARAFA_E_NOT_FOUND;
+	    goto exit;
+    }
+
+    if(atoui(lpDBRow[0]) != FOLDER_SEARCH) {
+        er = ZARAFA_E_NOT_FOUND;
+        goto exit;
+    }
+
+exit:
+
+    if(lpDBResult)
+        lpDatabase->FreeResult(lpDBResult);
 
     return er;
 }
