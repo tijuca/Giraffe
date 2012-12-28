@@ -202,14 +202,6 @@ public:
 		return m_lpsRowSet;
 	}
 
-	const set_pointer_type operator->() const {
-		return m_lpsRowSet;
-	}
-
-	operator set_pointer_type() {
-		return m_lpsRowSet;
-	}
-
 private:
 	set_pointer_type	m_lpsRowSet;
 };
