@@ -2287,7 +2287,7 @@ exit:
 	return MAPI_G(hr);
 }
 
-HRESULT PHPArraytoSendingOptions(zval *phpArray, sending_options *lpSOPT)
+HRESULT PHPArraytoSendingOptions(zval *phpArray, sending_options *lpSOPT TSRMLS_DC)
 {
 	HRESULT hr = hrSuccess;
 	// local
@@ -2353,7 +2353,7 @@ exit:
 	return hr;
 }
 
-HRESULT PHPArraytoDeliveryOptions(zval *phpArray, delivery_options *lpDOPT)
+HRESULT PHPArraytoDeliveryOptions(zval *phpArray, delivery_options *lpDOPT TSRMLS_DC)
 {
 	HRESULT hr = hrSuccess;
 	// local

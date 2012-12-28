@@ -7533,7 +7533,7 @@ ZEND_FUNCTION(mapi_inetmapi_imtoinet)
     ZEND_FETCH_RESOURCE(lpAddrBook, IAddrBook *, &resAddrBook, -1, name_mapi_addrbook, le_mapi_addrbook);
     ZEND_FETCH_RESOURCE(lpMessage, IMessage *, &resMessage, -1, name_mapi_message, le_mapi_message);
 
-	MAPI_G(hr) = PHPArraytoSendingOptions(resOptions, &sopt);
+	MAPI_G(hr) = PHPArraytoSendingOptions(resOptions, &sopt TSRMLS_CC);
     if(MAPI_G(hr) != hrSuccess)
         goto exit;
     
@@ -7593,7 +7593,7 @@ ZEND_FUNCTION(mapi_inetmapi_imtomapi)
 
     std::string strInput(szString, cbString);
 
-	MAPI_G(hr) = PHPArraytoDeliveryOptions(resOptions, &dopt);
+	MAPI_G(hr) = PHPArraytoDeliveryOptions(resOptions, &dopt TSRMLS_CC);
     if(MAPI_G(hr) != hrSuccess)
         goto exit; 
    
