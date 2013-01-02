@@ -1036,11 +1036,6 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECAttachmentStorage *lpAttachm
 	if (er != erSuccess)
 		goto exit;
 
-	if (ulObjType != MAPI_MESSAGE) {
-		er = ZARAFA_E_NO_SUPPORT;
-		goto exit;
-	}
-
 	if (lpStreamCaps == NULL) {
 		lpStreamCaps = STREAM_CAPS_CURRENT;	// Set to current stream capabilities.
 
