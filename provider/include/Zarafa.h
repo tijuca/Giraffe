@@ -276,6 +276,22 @@ typedef EID * PEID;
 							STORE_UNICODE_OK | \
 							STORE_SUBMIT_OK
 
+// This is what we support for archive store
+#define EC_SUPPORTMASK_ARCHIVE \
+							STORE_ENTRYID_UNIQUE | \
+							STORE_MODIFY_OK | \
+							STORE_CREATE_OK | \
+							STORE_ATTACH_OK | \
+							STORE_OLE_OK | \
+							STORE_NOTIFY_OK | \
+							STORE_MV_PROPS_OK | \
+							STORE_CATEGORIZE_OK | \
+							STORE_RTF_OK | \
+							STORE_RESTRICTION_OK | \
+							STORE_SORT_OK | \
+							STORE_HTML_OK | \
+							STORE_UNICODE_OK
+
 // This is what we support for delegate store
 #define EC_SUPPORTMASK_DELEGATE \
 							STORE_ENTRYID_UNIQUE | \

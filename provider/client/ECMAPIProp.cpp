@@ -249,6 +249,8 @@ HRESULT	ECMAPIProp::DefaultMAPIGetProp(ULONG ulPropTag, void* lpProvider, ULONG 
 			lpsPropValue->Value.l = EC_SUPPORTMASK_PUBLIC;
 		else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &ZARAFA_STORE_DELEGATE_GUID)){
 			lpsPropValue->Value.l = EC_SUPPORTMASK_DELEGATE;
+		}else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &ZARAFA_STORE_ARCHIVE_GUID)) {
+			lpsPropValue->Value.l = EC_SUPPORTMASK_ARCHIVE;
 		}else {
 			lpsPropValue->Value.l = EC_SUPPORTMASK_PRIVATE;
 		}
@@ -386,6 +388,8 @@ HRESULT ECMAPIProp::TableRowGetProp(void* lpProvider, struct propVal *lpsPropVal
 				lpsPropValDst->Value.l = EC_SUPPORTMASK_PUBLIC;
 			else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &ZARAFA_STORE_DELEGATE_GUID))
 				lpsPropValDst->Value.l = EC_SUPPORTMASK_DELEGATE;
+			else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &ZARAFA_STORE_ARCHIVE_GUID))
+				lpsPropValDst->Value.l = EC_SUPPORTMASK_ARCHIVE;
 			else 
 				lpsPropValDst->Value.l = EC_SUPPORTMASK_PRIVATE;
 
