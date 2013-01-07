@@ -155,7 +155,8 @@ HRESULT HrParseVAlarm(icalcomponent *lpicAlarm, LONG *lplRemindBefore, time_t *l
 	if (lpAction != NULL) {
 		eipaAction = icalproperty_get_action(lpAction);
 
-		if (eipaAction != ICAL_ACTION_NONE)
+		// iMac Calendar 6.0 sends ACTION:NONE, which libical doesn't parse correcty to the ICAL_ACTION_NONE enum value
+		if (eipaAction > ICAL_ACTION_X && eipaAction < ICAL_ACTION_NONE)
 			bReminderSet = true;
 	}
 
