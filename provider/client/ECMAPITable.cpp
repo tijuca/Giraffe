@@ -71,7 +71,7 @@
 static char THIS_FILE[] = __FILE__;
 #endif
 
-ECMAPITable::ECMAPITable(ECNotifyClient *lpNotifyClient, ULONG ulFlags) : ECUnknown("IMAPITable")
+ECMAPITable::ECMAPITable(std::string strName, ECNotifyClient *lpNotifyClient, ULONG ulFlags) : ECUnknown("IMAPITable")
 {
 	TRACE_MAPI(TRACE_ENTRY, "ECMAPITable::ECMAPITable","");
 
@@ -91,6 +91,7 @@ ECMAPITable::ECMAPITable(ECNotifyClient *lpNotifyClient, ULONG ulFlags) : ECUnkn
 	m_ulRowCount = 0;
 	m_ulFlags = 0;
 	m_ulDeferredFlags = 0;
+	m_strName = strName;
 
 	pthread_mutexattr_t mattr;
 	pthread_mutexattr_init(&mattr);
@@ -178,12 +179,12 @@ ECMAPITable::~ECMAPITable()
 	pthread_mutex_destroy(&m_hLock);
 }
 
-HRESULT ECMAPITable::Create(ECNotifyClient *lpNotifyClient, ULONG ulFlags, ECMAPITable **lppECMAPITable)
+HRESULT ECMAPITable::Create(std::string strName, ECNotifyClient *lpNotifyClient, ULONG ulFlags, ECMAPITable **lppECMAPITable)
 {
 	HRESULT hr = hrSuccess;
 	ECMAPITable *lpMAPITable = NULL;
 	
-	lpMAPITable = new ECMAPITable(lpNotifyClient, ulFlags);
+	lpMAPITable = new ECMAPITable(strName, lpNotifyClient, ulFlags);
 
 	hr = lpMAPITable->QueryInterface(IID_ECMAPITable, (void **)lppECMAPITable);
 
@@ -795,38 +796,38 @@ exit:
 ULONG ECMAPITable::xMAPITable::AddRef()
 {
 	METHOD_PROLOGUE_(ECMAPITable, MAPITable);
-	TRACE_MAPI(TRACE_ENTRY, "IMAPITable::AddRef", "table=%d", pThis->lpTableOps->ulTableId);
+	TRACE_MAPI(TRACE_ENTRY, "IMAPITable::AddRef", "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str());
 	return pThis->AddRef();
 }
 
 ULONG ECMAPITable::xMAPITable::Release()
 {
 	METHOD_PROLOGUE_(ECMAPITable, MAPITable);
-	TRACE_MAPI(TRACE_ENTRY, "IMAPITable::Release", "table=%d", pThis->lpTableOps->ulTableId);	
+	TRACE_MAPI(TRACE_ENTRY, "IMAPITable::Release", "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str());	
 	return pThis->Release();
 }
 
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, GetLastError, (HRESULT, hResult), (ULONG, ulFlags), (LPMAPIERROR *, lppMAPIError))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, Advise, (ULONG, ulEventMask), (LPMAPIADVISESINK, lpAdviseSink), (ULONG *, lpulConnection))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, Unadvise, (ULONG, ulConnection))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, GetStatus, (ULONG *, lpulTableStatus), (ULONG *, lpulTableType))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, SetColumns, (LPSPropTagArray, lpPropTagArray), (ULONG, ulFlags))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, QueryColumns, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, GetRowCount, (ULONG, ulFlags), (ULONG *, lpulCount))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, SeekRow, (BOOKMARK, bkOrigin), (LONG, lRowCount), (LONG *, lplRowsSought))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, SeekRowApprox, (ULONG, ulNumerator), (ULONG, ulDenominator))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, QueryPosition, (ULONG *, lpulRow), (ULONG *, lpulNumerator), (ULONG *, lpulDenominator))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, FindRow, (LPSRestriction, lpRestriction), (BOOKMARK, bkOrigin), (ULONG, ulFlags))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, Restrict, (LPSRestriction, lpRestriction), (ULONG, ulFlags))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, CreateBookmark, (BOOKMARK *, lpbkPosition))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, FreeBookmark, (BOOKMARK, bkPosition))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, SortTable, (LPSSortOrderSet, lpSortCriteria), (ULONG, ulFlags))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, QuerySortOrder, (LPSSortOrderSet *, lppSortCriteria))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, QueryRows, (LONG, lRowCount), (ULONG, ulFlags), (LPSRowSet *, lppRows))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, Abort, (void))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, ExpandRow, (ULONG, cbInstanceKey, LPBYTE, pbInstanceKey), (ULONG, ulRowCount), (ULONG, ulFlags), (LPSRowSet *, lppRows), (ULONG *, lpulMoreRows))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, CollapseRow, (ULONG, cbInstanceKey, LPBYTE, pbInstanceKey), (ULONG, ulFlags), (ULONG *, lpulRowCount))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, WaitForCompletion, (ULONG, ulFlags), (ULONG, ulTimeout), (ULONG *, lpulTableStatus))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, GetCollapseState, (ULONG, ulFlags), (ULONG, cbInstanceKey, LPBYTE, lpbInstanceKey), (ULONG *, lpcbCollapseState, LPBYTE *, lppbCollapseState))
-DEF_HRMETHOD_EX(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d", pThis->lpTableOps->ulTableId, SetCollapseState, (ULONG, ulFlags), (ULONG, cbCollapseState, LPBYTE, pbCollapseState), (BOOKMARK *, lpbkLocation))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), GetLastError, (HRESULT, hResult), (ULONG, ulFlags), (LPMAPIERROR *, lppMAPIError))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), Advise, (ULONG, ulEventMask), (LPMAPIADVISESINK, lpAdviseSink), (ULONG *, lpulConnection))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), Unadvise, (ULONG, ulConnection))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), GetStatus, (ULONG *, lpulTableStatus), (ULONG *, lpulTableType))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), SetColumns, (LPSPropTagArray, lpPropTagArray), (ULONG, ulFlags))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), QueryColumns, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), GetRowCount, (ULONG, ulFlags), (ULONG *, lpulCount))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), SeekRow, (BOOKMARK, bkOrigin), (LONG, lRowCount), (LONG *, lplRowsSought))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), SeekRowApprox, (ULONG, ulNumerator), (ULONG, ulDenominator))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), QueryPosition, (ULONG *, lpulRow), (ULONG *, lpulNumerator), (ULONG *, lpulDenominator))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), FindRow, (LPSRestriction, lpRestriction), (BOOKMARK, bkOrigin), (ULONG, ulFlags))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), Restrict, (LPSRestriction, lpRestriction), (ULONG, ulFlags))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), CreateBookmark, (BOOKMARK *, lpbkPosition))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), FreeBookmark, (BOOKMARK, bkPosition))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), SortTable, (LPSSortOrderSet, lpSortCriteria), (ULONG, ulFlags))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), QuerySortOrder, (LPSSortOrderSet *, lppSortCriteria))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), QueryRows, (LONG, lRowCount), (ULONG, ulFlags), (LPSRowSet *, lppRows))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), Abort, (void))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), ExpandRow, (ULONG, cbInstanceKey, LPBYTE, pbInstanceKey), (ULONG, ulRowCount), (ULONG, ulFlags), (LPSRowSet *, lppRows), (ULONG *, lpulMoreRows))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), CollapseRow, (ULONG, cbInstanceKey, LPBYTE, pbInstanceKey), (ULONG, ulFlags), (ULONG *, lpulRowCount))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), WaitForCompletion, (ULONG, ulFlags), (ULONG, ulTimeout), (ULONG *, lpulTableStatus))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), GetCollapseState, (ULONG, ulFlags), (ULONG, cbInstanceKey, LPBYTE, lpbInstanceKey), (ULONG *, lpcbCollapseState, LPBYTE *, lppbCollapseState))
+DEF_HRMETHOD_EX2(TRACE_MAPI, ECMAPITable, MAPITable, "table=%d name=%s",  pThis->lpTableOps->ulTableId, pThis->m_strName.c_str(), SetCollapseState, (ULONG, ulFlags), (ULONG, cbCollapseState, LPBYTE, pbCollapseState), (BOOKMARK *, lpbkLocation))

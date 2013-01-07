@@ -471,7 +471,7 @@ HRESULT ECMsgStore::OpenStatsTable(unsigned int ulTableType, LPMAPITABLE *lppTab
 	}
 
 	// notifications? set 1st param: m_lpNotifyClient
-	hr = ECMAPITable::Create(NULL, 0, &lpTable);
+	hr = ECMAPITable::Create("Stats table", NULL, 0, &lpTable);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -500,6 +500,22 @@ exit:
 	return hr;
 }
 
+/**
+ * Register an internal advise.
+ *
+ * This means that the subscribe request should be sent to the server by some other means, but the
+ * rest of the client-side handling is done just the same as a normal 'Advise()' call. Also, notifications
+ * registered this way are marked 'synchronous' which means that they will not be offloaded to other threads
+ * or passed to MAPI's notification system in win32; the notification callback will be called as soon as it
+ * is received from the server, and other notifications will not be sent until the handler is done.
+ *
+ * @param[in] cbEntryID Size of data in lpEntryID
+ * @param[in] lpEntryID EntryID of item to subscribe to events to
+ * @param[in] ulEventMask Bitmask of events to susbcribe to
+ * @param[in] lpAdviseSink Sink to send notification events to
+ * @param[out] lpulConnection Connection ID of the registered subscription
+ * @return result
+ */
 HRESULT ECMsgStore::InternalAdvise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection){
 	HRESULT hr = hrSuccess;
 	LPENTRYID	lpUnWrapStoreID = NULL;
@@ -528,7 +544,7 @@ HRESULT ECMsgStore::InternalAdvise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG u
 		lpEntryID = lpUnWrapStoreID;
 	}
 
-	if(m_lpNotifyClient->RegisterAdvise(cbEntryID, (LPBYTE)lpEntryID, ulEventMask, lpAdviseSink, lpulConnection) != S_OK)
+	if(m_lpNotifyClient->RegisterAdvise(cbEntryID, (LPBYTE)lpEntryID, ulEventMask, true, lpAdviseSink, lpulConnection) != S_OK)
 		hr = MAPI_E_NO_SUPPORT;
 
 	if(hr != hrSuccess)
@@ -1096,7 +1112,7 @@ HRESULT ECMsgStore::GetOutgoingQueue(ULONG ulFlags, LPMAPITABLE *lppTable)
 		goto exit;
 	}
 
-	hr = ECMAPITable::Create(this->m_lpNotifyClient, 0, &lpTable);
+	hr = ECMAPITable::Create("Outgoing queue", this->m_lpNotifyClient, 0, &lpTable);
 
 	if(hr != hrSuccess)
 		goto exit;
@@ -1719,7 +1735,7 @@ HRESULT ECMsgStore::GetMailboxTable(LPTSTR lpszServerName, LPMAPITABLE *lppTable
 
 	ASSERT(lpMsgStore != NULL);
 
-	hr = ECMAPITable::Create(lpMsgStore->GetMsgStore()->m_lpNotifyClient, 0, &lpTable);
+	hr = ECMAPITable::Create("Mailbox table", lpMsgStore->GetMsgStore()->m_lpNotifyClient, 0, &lpTable);
 	if(hr != hrSuccess)
 		goto exit;
 
@@ -3300,7 +3316,7 @@ HRESULT ECMsgStore::OpenUserStoresTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 	}
 
 	// notifications? set 1st param: m_lpNotifyClient
-	hr = ECMAPITable::Create(NULL, 0, &lpTable);
+	hr = ECMAPITable::Create("Userstores table", NULL, 0, &lpTable);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -3409,7 +3425,7 @@ HRESULT ECMsgStore::GetMasterOutgoingTable(ULONG ulFlags, IMAPITable ** lppOutgo
 	ECMAPITable *lpTable = NULL;
 	WSTableOutGoingQueue *lpTableOps = NULL;
 
-	hr = ECMAPITable::Create(this->m_lpNotifyClient, 0, &lpTable);
+	hr = ECMAPITable::Create("Master outgoing queue", this->m_lpNotifyClient, 0, &lpTable);
 
 	if(hr != hrSuccess)
 		goto exit;
@@ -3542,7 +3558,7 @@ HRESULT ECMsgStore::OpenMultiStoreTable(LPENTRYLIST lpMsgList, ULONG ulFlags, LP
 	}
 
 	// no notifications on this table
-	hr = ECMAPITable::Create(NULL, ulFlags, &lpTable);
+	hr = ECMAPITable::Create("Multistore table", NULL, ulFlags, &lpTable);
 	if (hr != hrSuccess)
 		goto exit;
 

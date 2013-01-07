@@ -111,7 +111,7 @@ public:
 	virtual HRESULT NotifyReload(); // Called when all tables should be notified of RELOAD
 
 	// Only register an advise client side
-	virtual HRESULT RegisterAdvise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection);
+	virtual HRESULT RegisterAdvise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventMask, bool bSynchronous, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection);
 	virtual HRESULT RegisterChangeAdvise(ULONG ulSyncId, ULONG ulChangeId, LPECCHANGEADVISESINK lpChangeAdviseSink, ULONG *lpulConnection);
 	virtual HRESULT UnRegisterAdvise(ULONG ulConnection);
 

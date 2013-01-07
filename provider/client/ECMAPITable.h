@@ -62,12 +62,12 @@
 
 class ECMAPITable : public ECUnknown {
 protected:
-	ECMAPITable(ECNotifyClient *lpNotifyClient, ULONG ulFlags);
+	ECMAPITable(std::string strName, ECNotifyClient *lpNotifyClient, ULONG ulFlags);
 	virtual ~ECMAPITable();
 
 
 public:
-	static	HRESULT Create(ECNotifyClient *lpNotifyClient, ULONG ulFlags, ECMAPITable **lppECMAPITable);
+	static	HRESULT Create(std::string strName, ECNotifyClient *lpNotifyClient, ULONG ulFlags, ECMAPITable **lppECMAPITable);
 
 	virtual HRESULT HrSetTableOps(WSTableView *lpTableOps, bool fLoad);
 
@@ -151,6 +151,7 @@ private:
 	ULONG				m_ulRowCount;
 	ULONG				m_ulFlags;		// Flags from queryrows
 	
+	std::string			m_strName;
 };
 
 #endif // ECMAPITABLE_H

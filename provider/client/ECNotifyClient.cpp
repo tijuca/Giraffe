@@ -189,7 +189,24 @@ HRESULT ECNotifyClient::QueryInterface(REFIID refiid, void **lppInterface)
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
-HRESULT ECNotifyClient::RegisterAdvise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection)
+/**
+ * Register an advise connection
+ *
+ * In windows, registers using the IMAPISupport subscription model, so that threading is handled correctly
+ * concerning the multithreading model selected by the client when doing MAPIInitialize(). However, when
+ * bSynchronous is TRUE, that notification is always handled internal synchronously while the notifications
+ * are being received.
+ *
+ * @param[in] cbKey Bytes in lpKey
+ * @param[in] lpKey Key to subscribe for
+ * @param[in] ulEventMask Mask for events to receive
+ * @param[in] TRUE if the notification should be handled synchronously, FALSE otherwise. In linux, handled as if
+ *                 it were always TRUE
+ * @param[in] lpAdviseSink Sink to send notifications to
+ * @param[out] lpulConnection Connection ID for the subscription
+ * @return result
+ */
+HRESULT ECNotifyClient::RegisterAdvise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventMask, bool bSynchronous, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection)
 {
 	HRESULT		hr = MAPI_E_NO_SUPPORT;
 	ECADVISE*	pEcAdvise = NULL;
@@ -220,6 +237,7 @@ HRESULT ECNotifyClient::RegisterAdvise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventM
 	
 	pEcAdvise->lpAdviseSink	= lpAdviseSink;
 	pEcAdvise->ulEventMask	= ulEventMask;
+	pEcAdvise->ulSupportConnection = 0;
 
 	/*
 	 * Request unique connection id from Master.
@@ -232,21 +250,23 @@ HRESULT ECNotifyClient::RegisterAdvise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventM
 	lpAdviseSink->AddRef();
 
 #ifdef NOTIFY_THROUGH_SUPPORT_OBJECT
-	hr = MAPIAllocateBuffer(CbNewNOTIFKEY(sizeof(GUID)), (void **)&lpKeySupport);
-	if(hr != hrSuccess)
-		goto exit;
+	if(!bSynchronous) {
+		hr = MAPIAllocateBuffer(CbNewNOTIFKEY(sizeof(GUID)), (void **)&lpKeySupport);
+		if(hr != hrSuccess)
+			goto exit;
 
-	lpKeySupport->cb = sizeof(GUID);
-	hr = CoCreateGuid((GUID *)lpKeySupport->ab);
-	if(hr != hrSuccess)
-		goto exit;
+		lpKeySupport->cb = sizeof(GUID);
+		hr = CoCreateGuid((GUID *)lpKeySupport->ab);
+		if(hr != hrSuccess)
+			goto exit;
 
-	// Get support object connection id
-	hr = m_lpSupport->Subscribe(lpKeySupport, (ulEventMask&~fnevLongTermEntryIDs), 0, lpAdviseSink, &pEcAdvise->ulSupportConnection);
-	if(hr != hrSuccess)
-		goto exit;
+		// Get support object connection id
+		hr = m_lpSupport->Subscribe(lpKeySupport, (ulEventMask&~fnevLongTermEntryIDs), 0, lpAdviseSink, &pEcAdvise->ulSupportConnection);
+		if(hr != hrSuccess)
+			goto exit;
 
-	memcpy(&pEcAdvise->guid, lpKeySupport->ab, sizeof(GUID));
+		memcpy(&pEcAdvise->guid, lpKeySupport->ab, sizeof(GUID));
+	}
 #endif
 
 	/* Setup our maps to receive the notifications */
@@ -348,9 +368,9 @@ HRESULT ECNotifyClient::UnRegisterAdvise(ULONG ulConnection)
 	// Remove notify from list
 	iIterAdvise = m_mapAdvise.find(ulConnection);
 	if (iIterAdvise != m_mapAdvise.end()) {
-#ifdef NOTIFY_THROUGH_SUPPORT_OBJECT
-		m_lpSupport->Unsubscribe(iIterAdvise->second->ulSupportConnection);
-#endif
+		if(iIterAdvise->second->ulSupportConnection)
+			m_lpSupport->Unsubscribe(iIterAdvise->second->ulSupportConnection);
+
 		if (iIterAdvise->second->lpAdviseSink != NULL)
 			iIterAdvise->second->lpAdviseSink->Release();
 
@@ -384,7 +404,7 @@ HRESULT ECNotifyClient::Advise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventMask, LPM
 	ULONG		ulConnection = 0;
 
 	
-	hr = RegisterAdvise(cbKey, lpKey, ulEventMask, lpAdviseSink, &ulConnection);
+	hr = RegisterAdvise(cbKey, lpKey, ulEventMask, false, lpAdviseSink, &ulConnection);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -662,28 +682,28 @@ HRESULT ECNotifyClient::Notify(ULONG ulConnection, const NOTIFYLIST &lNotificati
 			}
 
 			/* Send notification to the listener */
-#ifndef NOTIFY_THROUGH_SUPPORT_OBJECT
-			if (iterAdvise->second->lpAdviseSink->OnNotify(i, lpNotifs) != 0)
-				TRACE_NOTIFY(TRACE_WARNING, "ECNotifyClient::Notify", "Error by notify a client");
-#else
-			LPNOTIFKEY	lpKey = NULL;
-			ULONG		ulResult = 0;
+			if (!iterAdvise->second->ulSupportConnection) {
+				if (iterAdvise->second->lpAdviseSink->OnNotify(i, lpNotifs) != 0)
+					TRACE_NOTIFY(TRACE_WARNING, "ECNotifyClient::Notify", "Error by notify a client");
+			} else {
+				LPNOTIFKEY	lpKey = NULL;
+				ULONG		ulResult = 0;
 
-			hr = MAPIAllocateBuffer(CbNewNOTIFKEY(sizeof(GUID)), (void **)&lpKey);
-			if (hr != hrSuccess) {
-				pthread_mutex_unlock(&m_hMutex);
-				goto exit;
+				hr = MAPIAllocateBuffer(CbNewNOTIFKEY(sizeof(GUID)), (void **)&lpKey);
+				if (hr != hrSuccess) {
+					pthread_mutex_unlock(&m_hMutex);
+					goto exit;
+				}
+
+				lpKey->cb = sizeof(GUID);
+				memcpy(lpKey->ab, &iterAdvise->second->guid, sizeof(GUID));
+
+				// FIXME log errors
+				m_lpSupport->Notify(lpKey, i, lpNotifs, &ulResult);
+
+				MAPIFreeBuffer(lpKey);
+				lpKey = NULL;
 			}
-
-			lpKey->cb = sizeof(GUID);
-			memcpy(lpKey->ab, &iterAdvise->second->guid, sizeof(GUID));
-
-			// FIXME log errors
-			m_lpSupport->Notify(lpKey, i, lpNotifs, &ulResult);
-
-			MAPIFreeBuffer(lpKey);
-			lpKey = NULL;
-#endif
 
 			if(lpNotifs) {
 				MAPIFreeBuffer(lpNotifs);

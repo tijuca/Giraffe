@@ -245,7 +245,7 @@ HRESULT ECABContainer::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 	sSortByDisplayName.aSort[0].ulPropTag = PR_DISPLAY_NAME;
 	sSortByDisplayName.aSort[0].ulOrder = TABLE_SORT_ASCEND;
 
-	hr = ECMAPITable::Create(NULL, 0, &lpTable);
+	hr = ECMAPITable::Create("AB Contents", NULL, 0, &lpTable);
 	if(hr != hrSuccess)
 		goto exit;
 
@@ -281,7 +281,7 @@ HRESULT ECABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 	ECMAPITable*	lpTable = NULL;
 	WSTableView*	lpTableOps = NULL;
 
-	hr = ECMAPITable::Create(GetABStore()->m_lpNotifyClient, ulFlags, &lpTable);
+	hr = ECMAPITable::Create("AB hierarchy", GetABStore()->m_lpNotifyClient, ulFlags, &lpTable);
 
 	if(hr != hrSuccess)
 		goto exit;

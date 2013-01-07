@@ -63,6 +63,7 @@
 
 //#include <edkmdb.h>
 #include <mapiext.h>
+#include <mapiutil.h>
 
 #ifdef _DEBUG
 #undef THIS_FILE
@@ -138,8 +139,20 @@ HRESULT ECMAPIContainer::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 	HRESULT			hr = hrSuccess;
 	ECMAPITable*	lpTable = NULL;
 	WSTableView*	lpTableOps = NULL;
+	std::string		strName = "Contents table";
 
-	hr = ECMAPITable::Create(this->GetMsgStore()->m_lpNotifyClient, 0, &lpTable);
+#ifdef DEBUG
+	{
+		LPSPropValue lpDisplay;
+		HrGetOneProp(&this->m_xMAPIProp, PR_DISPLAY_NAME_A, &lpDisplay);
+
+		if(lpDisplay) {
+			strName = lpDisplay->Value.lpszA;
+		}
+	}
+#endif
+
+	hr = ECMAPITable::Create(strName.c_str(), this->GetMsgStore()->m_lpNotifyClient, 0, &lpTable);
 
 	if(hr != hrSuccess)
 		goto exit;
@@ -178,7 +191,18 @@ HRESULT ECMAPIContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 	SPropTagArray	sPropTagArray;
 	ULONG			cValues = 0;
 	LPSPropValue	lpPropArray = NULL; 
+	std::string		strName = "Hierarchy table";
+	
+#ifdef DEBUG
+	{
+		LPSPropValue lpDisplay;
+		HrGetOneProp(&this->m_xMAPIProp, PR_DISPLAY_NAME_A, &lpDisplay);
 
+		if(lpDisplay) {
+			strName = lpDisplay->Value.lpszA;
+		}
+	}
+#endif
 
 	sPropTagArray.aulPropTag[0] = PR_FOLDER_TYPE;
 	sPropTagArray.cValues = 1;
@@ -194,7 +218,7 @@ HRESULT ECMAPIContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 		goto exit;
 	}
 
-	hr = ECMAPITable::Create(this->GetMsgStore()->m_lpNotifyClient, 0, &lpTable);
+	hr = ECMAPITable::Create(strName.c_str(), this->GetMsgStore()->m_lpNotifyClient, 0, &lpTable);
 
 	if(hr != hrSuccess)
 		goto exit;
