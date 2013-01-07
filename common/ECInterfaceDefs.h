@@ -230,6 +230,23 @@ HRESULT __stdcall CLASSMETHOD(_class, CLASSMETHOD(XCLASS(_iface), _method))(ARGL
 	return hr;																									\
 }
 
+#define DEF_HRMETHOD_EX(_trace, _class, _iface, _extra_fmt, _extra_arg, _method, ...)														\
+HRESULT __stdcall CLASSMETHOD(_class, CLASSMETHOD(XCLASS(_iface), _method))(ARGLIST(__VA_ARGS__))	{			\
+	METHOD_PROLOGUE_(_class, _iface);																		\
+	_trace(TRACE_ENTRY, METHODSTR(_iface, _method), _extra_fmt ", " FORMAT_ARGS(__VA_ARGS__), _extra_arg, PRINT_ARGS_IN( __VA_ARGS__));			\
+	HRESULT	hr = hrSuccess;																						\
+	try {																										\
+		hr = pThis->_method(ARGS(__VA_ARGS__));																	\
+	} catch (const std::bad_alloc &) {																			\
+		hr = MAPI_E_NOT_ENOUGH_MEMORY;																			\
+	}																											\
+	if (FAILED(hr))																								\
+		_trace(TRACE_RETURN, METHODSTR(_iface, _method), "FAILED: %s " _extra_fmt, GetMAPIErrorDescription(hr).c_str(), _extra_arg);	\
+	else																										\
+		_trace(TRACE_RETURN, METHODSTR(_iface, _method), "SUCCESS: " _extra_fmt ", " FORMAT_ARGS(__VA_ARGS__), _extra_arg, PRINT_ARGS_OUT(__VA_ARGS__));	\
+	return hr;																									\
+}
+
 #define DEF_HRMETHOD_FORWARD(_trace, _class, _iface, _method, _member, ...)														\
 HRESULT __stdcall CLASSMETHOD(_class, _method)(ARGLIST(__VA_ARGS__))	{			\
 	_trace(TRACE_ENTRY, METHODSTR(_iface, _method), FORMAT_ARGS(__VA_ARGS__), PRINT_ARGS_IN( __VA_ARGS__));			\
