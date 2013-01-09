@@ -1022,6 +1022,8 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECAttachmentStorage *lpAttachm
 {
 	ECRESULT		er = erSuccess;
 	unsigned int	ulStreamVersion = STREAM_VERSION;
+	unsigned int	ulParentObjType = 0;
+	unsigned int	ulParentId = 0;
 	unsigned int	ulSubObjId = 0;
 	unsigned int	ulSubObjType = 0;
 	unsigned int	ulCount = 0;
@@ -1033,6 +1035,14 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECAttachmentStorage *lpAttachm
 	std::string		strQuery;
 
 	er = lpecSession->GetDatabase(&lpDatabase);
+	if (er != erSuccess)
+		goto exit;
+
+	er = g_lpSessionManager->GetCacheManager()->GetObject(ulObjId, &ulParentId, NULL, NULL, NULL);
+	if (er != erSuccess)
+		goto exit;
+
+	er = g_lpSessionManager->GetCacheManager()->GetObject(ulParentId, NULL, NULL, NULL, &ulParentObjType);
 	if (er != erSuccess)
 		goto exit;
 
@@ -1053,7 +1063,7 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECAttachmentStorage *lpAttachm
 	if (er != erSuccess)
 		goto exit;
 
-	if (ulObjType == MAPI_MESSAGE || ulObjType == MAPI_ATTACH) {
+	if (RealObjType(ulObjType, ulParentObjType) == MAPI_MESSAGE || RealObjType(ulObjType, ulParentObjType) == MAPI_ATTACH) {
 		// Serialize sub objects
 		strQuery = "SELECT id,type FROM hierarchy WHERE parent=" + stringify(ulObjId);
 		er = lpDatabase->DoSelect(strQuery, &lpDBResult);
