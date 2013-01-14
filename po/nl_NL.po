@@ -3,9 +3,9 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PHP-Langadmin 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2012-10-23 00:03+0200\n"
-"PO-Revision-Date: 2012-10-22 17:25+0200\n"
-"Last-Translator: Ivo <i.timmermans@zarafa.com>\n"
+"POT-Creation-Date: 2012-12-18 12:36+0100\n"
+"PO-Revision-Date: 2012-12-13 11:09+0200\n"
+"Last-Translator: Robin <r.vandenkerkhoff@zarafa.com>\n"
 "Language-Team: nl_NL <nl@li.org>\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
@@ -79,7 +79,7 @@ msgstr "Gemachtigden"
 msgid "Favorites"
 msgstr "Favorieten"
 
-#: provider/ECProps/Addin.cpp:936 provider/ECProps/PropPage.cpp:435
+#: provider/ECProps/Addin.cpp:936 provider/ECProps/PropPage.cpp:436
 msgid "Permissions"
 msgstr "Machtigingen"
 
@@ -95,7 +95,7 @@ msgid "Unable to open MAPI session."
 msgstr "Kan geen MAPI sessie openen."
 
 #: provider/ECProps/Addin.cpp:1236 provider/ECProps/ECFavoritePropPage.cpp:110
-#: provider/client/ECMsgStore.cpp:2387
+#: provider/client/ECMsgStore.cpp:2403
 msgid "Shortcut"
 msgstr "Snelkoppeling"
 
@@ -186,13 +186,13 @@ msgid "Unable to add folder to favorites"
 msgstr "Toevoegen aan favorieten niet mogelijk"
 
 #: provider/ECProps/ECFavoritePropPage.cpp:254
-#: provider/ECProps/ECDelegatePropPage.cpp:167
-#: provider/ECProps/PropPage.cpp:387
+#: provider/ECProps/ECDelegatePropPage.cpp:168
+#: provider/ECProps/PropPage.cpp:388
 msgid "Unable to get property page site"
 msgstr "Kon de eigenschappenpagina niet ophalen"
 
 #: provider/ECProps/ECFavoritePropPage.cpp:262
-#: provider/ECProps/PropPage.cpp:402
+#: provider/ECProps/PropPage.cpp:403
 msgid "Unable to receive store and folder information"
 msgstr "Kon de store en map informatie niet ophalen"
 
@@ -234,37 +234,37 @@ msgstr "Alleen directe submappen toevoegen"
 msgid "Unable to get folder data"
 msgstr "Kon map gegevens niet ophalen"
 
-#: provider/ECProps/ECDelegatePropPage.cpp:133
+#: provider/ECProps/ECDelegatePropPage.cpp:134
 msgid "Saving changes failed."
 msgstr "Opslaan van wijzigingen is mislukt."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:136
+#: provider/ECProps/ECDelegatePropPage.cpp:137
 msgid "Saving rules failed: "
 msgstr "Opslaan van regels is mislukt:"
 
-#: provider/ECProps/ECDelegatePropPage.cpp:177
-#: provider/ECProps/PropPage.cpp:231
+#: provider/ECProps/ECDelegatePropPage.cpp:178
+#: provider/ECProps/PropPage.cpp:232
 msgid "Unable to get session"
 msgstr "Kon geen sessie maken"
 
-#: provider/ECProps/ECDelegatePropPage.cpp:183
-#: provider/ECProps/PropPage.cpp:237 provider/ECProps/MapOtherUserDlg.cpp:273
+#: provider/ECProps/ECDelegatePropPage.cpp:184
+#: provider/ECProps/PropPage.cpp:238 provider/ECProps/MapOtherUserDlg.cpp:273
 msgid "Unable to get addressbook"
 msgstr "Kon het adresboek niet ophalen"
 
-#: provider/ECProps/ECDelegatePropPage.cpp:188
+#: provider/ECProps/ECDelegatePropPage.cpp:189
 msgid "Add..."
 msgstr "Toevoegen..."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:189
+#: provider/ECProps/ECDelegatePropPage.cpp:190
 msgid "Remove..."
 msgstr "Verwijderen..."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:190
+#: provider/ECProps/ECDelegatePropPage.cpp:191
 msgid "Permissions..."
 msgstr "Machtigingen..."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:191
+#: provider/ECProps/ECDelegatePropPage.cpp:192
 msgid ""
 "Delegates can send items on your behalf. To grant permission to others to "
 "access your folders without also giving them send-on-behalf-of privileges, "
@@ -275,13 +275,13 @@ msgstr ""
 "anderen zonder verstuur-namens rechten te geven, open de map eigenschappen "
 "en wijzig de opties in de rechten tab."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:192
+#: provider/ECProps/ECDelegatePropPage.cpp:193
 msgid "Send meeting requests and response only to my delegates, not to me"
 msgstr ""
 "Verzend vergader verzoeken en antwoorden enkel aan mijn delegates, niet aan "
 "mij"
 
-#: provider/ECProps/ECDelegatePropPage.cpp:199
+#: provider/ECProps/ECDelegatePropPage.cpp:200
 msgid ""
 "The server is not available. Either there are network problems or server is "
 "down for maintenance."
@@ -289,7 +289,7 @@ msgstr ""
 "De server is niet beschikbaar. Dit kan het gevold zijn van onderhoud aan de "
 "server, of netwerk problemen."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:201
+#: provider/ECProps/ECDelegatePropPage.cpp:202
 msgid ""
 "Could not initialize delegation window\n"
 "Please contact your administrator."
@@ -297,14 +297,14 @@ msgstr ""
 "Kan het delegatievenster niet initialiseren.\n"
 "Neem contact op met uw systeembeheerder."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:248
-#: provider/ECProps/PropPage.cpp:716 provider/ECProps/ECFavoritesDlg.cpp:48
+#: provider/ECProps/ECDelegatePropPage.cpp:249
+#: provider/ECProps/PropPage.cpp:717 provider/ECProps/ECFavoritesDlg.cpp:48
 #: provider/client/SettingsPropPageAdvance.cpp:105
 msgid "Add"
 msgstr "Toevoegen"
 
-#: provider/ECProps/ECDelegatePropPage.cpp:263
-#: provider/ECProps/PropPage.cpp:723 provider/ECProps/MapOtherUserDlg.cpp:186
+#: provider/ECProps/ECDelegatePropPage.cpp:264
+#: provider/ECProps/PropPage.cpp:724 provider/ECProps/MapOtherUserDlg.cpp:186
 #: provider/client/ECABContainer.cpp:244 provider/client/ECABContainer.cpp:299
 #: provider/client/SettingsPropPageAdvance.cpp:245
 msgid "Global Address Book"
@@ -326,7 +326,7 @@ msgstr "Sluiten"
 #: provider/ECProps/SyncStatusDlg.cpp:132
 #: provider/libserver/ECDBUpdateProgress.cpp:56
 msgid "Your offline cache database is being upgraded..."
-msgstr ""
+msgstr "Uw offline cache-database wordt bijgewerkt..."
 
 #: provider/ECProps/SyncStatusDlg.cpp:134
 msgid "Connection error"
@@ -365,35 +365,35 @@ msgstr "Bezig met aanmelden ..."
 msgid "Synchronizing ..."
 msgstr "Synchroniseren ..."
 
-#: provider/ECProps/PropPage.cpp:32
+#: provider/ECProps/PropPage.cpp:33
 msgid "Full control"
 msgstr "Volledig beheer"
 
-#: provider/ECProps/PropPage.cpp:33
+#: provider/ECProps/PropPage.cpp:34
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:165
 #: php-ext/include/mapi/class.taskrequest.php:906
 msgid "Owner"
 msgstr "Eigenaar"
 
-#: provider/ECProps/PropPage.cpp:34
+#: provider/ECProps/PropPage.cpp:35
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:164
 msgid "Secretary"
 msgstr "Secretaresse"
 
-#: provider/ECProps/PropPage.cpp:35
+#: provider/ECProps/PropPage.cpp:36
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:163
 msgid "Only read"
 msgstr "Alleen lezen"
 
-#: provider/ECProps/PropPage.cpp:36
+#: provider/ECProps/PropPage.cpp:37
 msgid "No rights"
 msgstr "Geen rechten"
 
-#: provider/ECProps/PropPage.cpp:192
+#: provider/ECProps/PropPage.cpp:193
 msgid "You have insufficient permissions to set permissions"
 msgstr "U heeft onvoldoende rechten om permissies aan te passen"
 
-#: provider/ECProps/PropPage.cpp:195
+#: provider/ECProps/PropPage.cpp:196
 msgid ""
 "Unable to set some permissions. Permissions are only allowed on users and "
 "security groups."
@@ -401,104 +401,104 @@ msgstr ""
 "Niet mogelijk alle permissies op te slaan. Permissies zijn alleen toepasbaar "
 "op gebruikers en veiligheidsgroepen."
 
-#: provider/ECProps/PropPage.cpp:198
+#: provider/ECProps/PropPage.cpp:199
 msgid "Unable to set all permissions."
 msgstr "Niet mogelijk om alle permissies op te slaan."
 
-#: provider/ECProps/PropPage.cpp:244
+#: provider/ECProps/PropPage.cpp:245
 msgid "Unable to get user store"
 msgstr "Kon de store voor deze gebruiker niet ophalen"
 
-#: provider/ECProps/PropPage.cpp:417 provider/client/ECDisplayTable.cpp:28
+#: provider/ECProps/PropPage.cpp:418 provider/client/ECDisplayTable.cpp:28
 msgid "Name"
 msgstr "Naam"
 
-#: provider/ECProps/PropPage.cpp:421
+#: provider/ECProps/PropPage.cpp:422
 msgid "Permission Level"
 msgstr "Toegangsniveau"
 
-#: provider/ECProps/PropPage.cpp:425
+#: provider/ECProps/PropPage.cpp:426
 msgid "A&dd"
 msgstr "T&oevoegen"
 
-#: provider/ECProps/PropPage.cpp:429
+#: provider/ECProps/PropPage.cpp:430
 msgid "Remo&ve"
 msgstr "&Verwijderen"
 
-#: provider/ECProps/PropPage.cpp:431
+#: provider/ECProps/PropPage.cpp:432
 msgid "&Properties"
 msgstr "&Eigenschappen"
 
-#: provider/ECProps/PropPage.cpp:437
+#: provider/ECProps/PropPage.cpp:438
 msgid "Profile"
 msgstr "Profiel"
 
-#: provider/ECProps/PropPage.cpp:442
+#: provider/ECProps/PropPage.cpp:443
 msgid "&Create items"
 msgstr "Items &maken"
 
-#: provider/ECProps/PropPage.cpp:443
+#: provider/ECProps/PropPage.cpp:444
 msgid "Read &items"
 msgstr "Items &lezen"
 
-#: provider/ECProps/PropPage.cpp:445
+#: provider/ECProps/PropPage.cpp:446
 msgid "Create &subfolders"
 msgstr "&Submappen maken"
 
-#: provider/ECProps/PropPage.cpp:446
+#: provider/ECProps/PropPage.cpp:447
 msgid "Folder pe&rmissions"
 msgstr "Map &toegang"
 
-#: provider/ECProps/PropPage.cpp:447
+#: provider/ECProps/PropPage.cpp:448
 msgid "Folder visi&ble"
 msgstr "M&ap weergeven"
 
-#: provider/ECProps/PropPage.cpp:448
+#: provider/ECProps/PropPage.cpp:449
 msgid "F&older contact"
 msgstr "Map&contactpersoon"
 
-#: provider/ECProps/PropPage.cpp:449
+#: provider/ECProps/PropPage.cpp:450
 msgid "&Edit items"
 msgstr "Items be&werken"
 
-#: provider/ECProps/PropPage.cpp:450
+#: provider/ECProps/PropPage.cpp:451
 msgid "De&lete items"
 msgstr "Items verwij&deren"
 
-#: provider/ECProps/PropPage.cpp:451 provider/ECProps/PropPage.cpp:454
+#: provider/ECProps/PropPage.cpp:452 provider/ECProps/PropPage.cpp:455
 #: provider/ECProps/SyncConfigDlg.cpp:105
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:162
 msgid "None"
 msgstr "Geen"
 
-#: provider/ECProps/PropPage.cpp:452 provider/ECProps/PropPage.cpp:455
+#: provider/ECProps/PropPage.cpp:453 provider/ECProps/PropPage.cpp:456
 msgid "Own"
 msgstr "Eigen"
 
-#: provider/ECProps/PropPage.cpp:453 provider/ECProps/PropPage.cpp:456
+#: provider/ECProps/PropPage.cpp:454 provider/ECProps/PropPage.cpp:457
 msgid "All"
 msgstr "Alle"
 
-#: provider/ECProps/PropPage.cpp:534
+#: provider/ECProps/PropPage.cpp:535
 msgid "<Unknown user or group>"
 msgstr "<Onbekende gebruiker of groep>"
 
-#: provider/ECProps/PropPage.cpp:567 provider/ECProps/PropPage.cpp:1058
+#: provider/ECProps/PropPage.cpp:568 provider/ECProps/PropPage.cpp:1059
 msgid "Other"
 msgstr "Aangepast"
 
-#: provider/ECProps/PropPage.cpp:748 provider/ECProps/PropPage.cpp:763
+#: provider/ECProps/PropPage.cpp:749 provider/ECProps/PropPage.cpp:764
 msgid "One or more users cannot be added to the folder access list."
 msgstr ""
 "Een of meer gebruikers kunnen niet toegevoegd worden aan de toegangslijst "
 "van de folder."
 
-#: provider/ECProps/PropPage.cpp:748
+#: provider/ECProps/PropPage.cpp:749
 msgid "Non-local users cannot be given rights on this server."
 msgstr ""
 "Niet-lokale gebruikers kunnen geen rechten gegeven worden op deze server."
 
-#: provider/ECProps/PropPage.cpp:763
+#: provider/ECProps/PropPage.cpp:764
 msgid "One or more users are already specified."
 msgstr "Een of meer gebruikers zijn reeds opgegeven."
 
@@ -628,32 +628,32 @@ msgid "This delegate has the following permissions"
 msgstr "De gemachtigde heeft de volgende permissies"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:134
-#: provider/client/ECMsgStore.cpp:2464
+#: provider/client/ECMsgStore.cpp:2480
 msgid "Calendar"
 msgstr "Agenda"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:135
-#: provider/client/ECMsgStore.cpp:2510
+#: provider/client/ECMsgStore.cpp:2526
 msgid "Tasks"
 msgstr "Taken"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:136
-#: provider/libserver/ECGenProps.cpp:942 provider/client/ECMsgStore.cpp:2404
+#: provider/libserver/ECGenProps.cpp:947 provider/client/ECMsgStore.cpp:2420
 msgid "Inbox"
 msgstr "Postvak IN"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:137
-#: provider/client/ECMsgStore.cpp:2452
+#: provider/client/ECMsgStore.cpp:2468
 msgid "Contacts"
 msgstr "Contactpersonen"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:138
-#: provider/client/ECMsgStore.cpp:2498
+#: provider/client/ECMsgStore.cpp:2514
 msgid "Notes"
 msgstr "Notities"
 
 #: provider/ECProps/ECDelegatePermissionDlg.cpp:139
-#: provider/client/ECMsgStore.cpp:2486
+#: provider/client/ECMsgStore.cpp:2502
 msgid "Journal"
 msgstr "Logboek"
 
@@ -799,13 +799,13 @@ msgstr "De map en/of berichten kunnen niet worden verwijderd."
 msgid "Upgrade: "
 msgstr "Bijwerken: "
 
-#: provider/libserver/ECGenProps.cpp:900
+#: provider/libserver/ECGenProps.cpp:905
 #: provider/client/ECMAPIFolderPublic.cpp:162
 #: provider/client/ECMsgStorePublic.cpp:653
 msgid "Public Folders"
 msgstr "Publieke Mappen"
 
-#: provider/libserver/ECGenProps.cpp:944
+#: provider/libserver/ECGenProps.cpp:949
 msgid "Archive"
 msgstr "Archief"
 
@@ -933,43 +933,43 @@ msgstr "Eerste Synchronisatie Mappen..."
 msgid "Sync folder items"
 msgstr "Sync map items"
 
-#: provider/client/ECMsgStore.cpp:2434
+#: provider/client/ECMsgStore.cpp:2450
 msgid "Outbox"
 msgstr "Postvak UIT"
 
-#: provider/client/ECMsgStore.cpp:2440
+#: provider/client/ECMsgStore.cpp:2456
 msgid "Deleted Items"
 msgstr "Verwijderde items"
 
-#: provider/client/ECMsgStore.cpp:2446
+#: provider/client/ECMsgStore.cpp:2462
 msgid "Sent Items"
 msgstr "Verzonden items"
 
-#: provider/client/ECMsgStore.cpp:2474
+#: provider/client/ECMsgStore.cpp:2490
 msgid "Drafts"
 msgstr "Concepten"
 
-#: provider/client/ECMsgStore.cpp:2522
+#: provider/client/ECMsgStore.cpp:2538
 msgid "Junk E-mail"
 msgstr "Ongewenste E-mail"
 
-#: provider/client/ECMsgStore.cpp:2544
+#: provider/client/ECMsgStore.cpp:2560
 msgid "RSS Feeds"
 msgstr "RSS-kanalen"
 
-#: provider/client/ECMsgStore.cpp:2544
+#: provider/client/ECMsgStore.cpp:2560
 msgid "RSS Feed comment"
 msgstr "Commentaar bij RSS-kanaal"
 
-#: provider/client/ECMsgStore.cpp:2548
+#: provider/client/ECMsgStore.cpp:2564
 msgid "Conversation Action Settings"
 msgstr "Conversatie actie instellingen"
 
-#: provider/client/ECMsgStore.cpp:2552
+#: provider/client/ECMsgStore.cpp:2568
 msgid "Quick Step Settings"
 msgstr "Snelle Handeling Instellingen"
 
-#: provider/client/ECMsgStore.cpp:2556
+#: provider/client/ECMsgStore.cpp:2572
 msgid "Suggested Contacts"
 msgstr "Voorgestelde Contactpersonen"
 
@@ -1287,19 +1287,19 @@ msgstr ""
 "verbindingen worden gemaakt tot 'Offline werken' in het 'Bestand' menu is "
 "uitgeschakeld."
 
-#: provider/client/ECExchangeImportContentsChanges.cpp:818
+#: provider/client/ECExchangeImportContentsChanges.cpp:797
 msgid "Sync Issues"
 msgstr "Sync problemen"
 
-#: provider/client/ECExchangeImportContentsChanges.cpp:824
+#: provider/client/ECExchangeImportContentsChanges.cpp:803
 msgid "Conflicts"
 msgstr "Problemen"
 
-#: provider/client/ECExchangeImportContentsChanges.cpp:830
+#: provider/client/ECExchangeImportContentsChanges.cpp:809
 msgid "Local Failures"
 msgstr "Local Failures"
 
-#: provider/client/ECExchangeImportContentsChanges.cpp:836
+#: provider/client/ECExchangeImportContentsChanges.cpp:815
 msgid "Server Failures"
 msgstr "Server Failures"
 
@@ -1345,39 +1345,39 @@ msgstr ""
 "2002. Als u gebruik wenst te maken van offline functionaliteit dient u "
 "Outlook 2000, 2003, 2007 of hoger te gebruiken."
 
-#: provider/contacts/ZCABContainer.cpp:740
+#: provider/contacts/ZCABContainer.cpp:761
 msgid "Zarafa Contacts Folders"
 msgstr "Zarafa Contacten Mappen"
 
-#: provider/common/SOAPSock.cpp:481
+#: provider/common/SOAPSock.cpp:484
 msgid "Unable to get SSL object from store"
 msgstr "Kon het SSL object van de store niet verkrijgen"
 
-#: provider/common/SOAPSock.cpp:489
+#: provider/common/SOAPSock.cpp:492
 msgid "Unable to get SSL context from SSL object"
 msgstr "Kon de SSL context van het SSL object niet verkrijgen"
 
-#: provider/common/SOAPSock.cpp:512
+#: provider/common/SOAPSock.cpp:515
 msgid "No certificate found in connection"
 msgstr "Geen certificaat gevonden in de verbinding"
 
-#: provider/common/SOAPSock.cpp:527
+#: provider/common/SOAPSock.cpp:530
 msgid "Unable to convert OpenSSL to WinCrypt"
 msgstr "Kon OpenSSL niet naar converteren WinCrypt"
 
-#: provider/common/SOAPSock.cpp:649
+#: provider/common/SOAPSock.cpp:652
 msgid "The certificate is not trusted and could not be verified."
 msgstr "Het certificaat is niet vertrouwd en kon niet worden geverifieerd."
 
-#: provider/common/SOAPSock.cpp:651
+#: provider/common/SOAPSock.cpp:654
 msgid "The certificate is not trusted."
 msgstr "Het certificaat is niet vertrouwd."
 
-#: provider/common/SOAPSock.cpp:654
+#: provider/common/SOAPSock.cpp:657
 msgid "The certificate is trusted but does not verify correctly."
 msgstr "Het certificaat is vertrouwd maar wordt niet juist geverifieerd."
 
-#: provider/common/SOAPSock.cpp:657
+#: provider/common/SOAPSock.cpp:660
 msgid "Do you wish to continue?"
 msgstr "Wilt u doorgaan?"
 
@@ -1432,7 +1432,7 @@ msgstr "Verwijderd "
 msgid "This folder contains archives of messages that have been deleted."
 msgstr "Deze map bevat archieven van berichten die zijn verwijderd. "
 
-#: spooler/Spooler.cpp:484
+#: spooler/Spooler.cpp:485
 msgid ""
 "A fatal error occurred while processing your message, and Zarafa is unable "
 "to send your email."
@@ -1475,7 +1475,7 @@ msgstr ""
 "De gebruiker of groep namens wie u probeert te verzenden kan niet worden "
 "gevonden"
 
-#: spooler/mailer.cpp:2549
+#: spooler/mailer.cpp:2554
 msgid "Error found while trying to send your message. Error code: "
 msgstr "Fout gedetecteerd bij het verzenden van uw bericht. Fout code: "
 
