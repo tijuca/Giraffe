@@ -11122,7 +11122,8 @@ SOAP_ENTRY_START(importMessageFromStream, *result, unsigned int ulFlags, unsigne
 
 	if (soap_check_mime_attachments(soap)) {
 		struct soap_multipart *content;
-		
+		uintptr_t pthread_res = 0;
+
 		if (pthread_create(&lpsStreamInfo->hThread, NULL, &DeserializeObject, lpsStreamInfo)) {
 			g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Failed to start deserialization thread");
 			er = ZARAFA_E_CALL_FAILED;
@@ -11132,8 +11133,10 @@ SOAP_ENTRY_START(importMessageFromStream, *result, unsigned int ulFlags, unsigne
 		content = soap_get_mime_attachment(soap, (void*)lpsStreamInfo);
 		lpsStreamInfo->data.Close();
 		
-		pthread_join(lpsStreamInfo->hThread, (void**)&er);
+		pthread_join(lpsStreamInfo->hThread, (void**)&pthread_res);
 		lpsStreamInfo->hThread = pthread_self();
+
+		er = (ECRESULT)pthread_res;
 		if (er != erSuccess)
 			goto exit;
 
