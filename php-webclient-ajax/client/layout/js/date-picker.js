@@ -1614,11 +1614,11 @@ Calendar.prototype._dragStart = function (ev) {
 Date._MD = new Array(31,28,31,30,31,30,31,31,30,31,30,31);
 
 /** Constants used for time computations */
-Date.SECOND = 1000 /* milliseconds */;
-Date.MINUTE = 60 * Date.SECOND;
-Date.HOUR   = 60 * Date.MINUTE;
-Date.DAY    = 24 * Date.HOUR;
-Date.WEEK   =  7 * Date.DAY;
+Date.DATEPICKER_SECOND = 1000 /* milliseconds */;
+Date.DATEPICKER_MINUTE = 60 * Date.DATEPICKER_SECOND;
+Date.DATEPICKER_HOUR   = 60 * Date.DATEPICKER_MINUTE;
+Date.DATEPICKER_DAY    = 24 * Date.DATEPICKER_HOUR;
+Date.DATEPICKER_WEEK   =  7 * Date.DATEPICKER_DAY;
 
 Date.minYear   = 1901; // least year to consider (supported at serverside)
 Date.maxYear   = 2038; // most year to consider (supported at serverside)
@@ -1759,7 +1759,7 @@ Date.prototype.getDayOfYear = function() {
 	var now = new Date(this.getFullYear(), this.getMonth(), this.getDate(), 0, 0, 0);
 	var then = new Date(this.getFullYear(), 0, 0, 0, 0, 0);
 	var time = now - then;
-	return Math.floor(time / Date.DAY);
+	return Math.floor(time / Date.DATEPICKER_DAY);
 };
 
 /** Returns the number of the week in year, as defined in ISO 8601. */
