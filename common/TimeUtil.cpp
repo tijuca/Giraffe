@@ -101,7 +101,7 @@ LONG getTZOffset(time_t date, TIMEZONE_STRUCT sTimeZone)
 {
 	struct tm tm;
 	time_t dststart, dstend;
-	WORD endyear;
+	bool dst = false;
 
 	if (sTimeZone.lStdBias == sTimeZone.lDstBias || sTimeZone.stDstDate.wMonth == 0 || sTimeZone.stStdDate.wMonth == 0)
 		return -(sTimeZone.lBias) * 60;
@@ -109,11 +109,18 @@ LONG getTZOffset(time_t date, TIMEZONE_STRUCT sTimeZone)
 	gmtime_safe(&date, &tm);
 
 	dststart = getDateByYearMonthWeekDayHour(tm.tm_year, sTimeZone.stDstDate.wMonth, sTimeZone.stDstDate.wDay, sTimeZone.stDstDate.wDayOfWeek, sTimeZone.stDstDate.wHour);
-	// end year is one further when start > end (e.g. on the southern hemisphere)
-	endyear = sTimeZone.stDstDate.wMonth > sTimeZone.stStdDate.wMonth ? 1 : 0;
-	dstend = getDateByYearMonthWeekDayHour(tm.tm_year + endyear, sTimeZone.stStdDate.wMonth, sTimeZone.stStdDate.wDay, sTimeZone.stStdDate.wDayOfWeek, sTimeZone.stStdDate.wHour);
+	dstend = getDateByYearMonthWeekDayHour(tm.tm_year, sTimeZone.stStdDate.wMonth, sTimeZone.stStdDate.wDay, sTimeZone.stStdDate.wDayOfWeek, sTimeZone.stStdDate.wHour);
 
-	if (date > dststart && date < dstend)
+	if (dststart <= dstend) {
+		// Northern hemisphere, eg DST is during Mar-Oct
+		if (date > dststart && date < dstend)
+			dst = true;
+	} else {
+		// Southern hemisphere, eg DST is during Oct-Mar
+		if (date < dstend || date > dststart)
+			dst = true;
+	}
+	if (dst)
 		return -(sTimeZone.lBias + sTimeZone.lDstBias) * 60;
 	return -(sTimeZone.lBias + sTimeZone.lStdBias) * 60;
 }
