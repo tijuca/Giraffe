@@ -59,6 +59,7 @@
 
 #include <map>
 #include <set>
+#include <list>
 
 class ECSessionManager;
 
@@ -167,11 +168,9 @@ public:
      *
      * @param[in] ulStoreId The store id (hierarchyid) of the searchfolder being modified
      * @param[in] ulFolderId The folder id (hierarchyid) of the searchfolder being modified
-     * @param[out] lpulCount Count of the number of items returned in lppObjIdList
-     * @param[out] lppObjIdList Allocated array of unsigned ints with all hierarchy IDs of matching objects. Caller
-     *                          should free this array with delete [] 
+     * @param[out] lstObjIds List of object IDs in the result set. List is cleared and populated.
      */
-    virtual ECRESULT GetSearchResults(unsigned int ulStoreId, unsigned int ulFolderId, unsigned int *lpulCount, unsigned int **lppObjIdList);
+    virtual ECRESULT GetSearchResults(unsigned int ulStoreId, unsigned int ulFolderId, std::list<unsigned int> *lstObjIds);
 
     /**
      * Queue a messages change that should be processed to update the search folders
@@ -370,16 +369,6 @@ private:
      * @param[out] lpulFlags Flags of the object that was just deleted
      */
     virtual ECRESULT DeleteResults(unsigned int ulStoreId, unsigned int ulFolderId, unsigned int ulObjId, unsigned int *lpulFlags);
-
-    /**
-     * Get a list of all matching results for a search folder
-     *
-     * @param[in] ulStoreId Store id of the search folder
-     * @param[in] ulFolderId Folder id of the search folder
-     * @param[out] lpulCount Number of results
-     * @param[out] lppulObjIdList Hierarchy IDs of matching messages. Should be freed with delete []
-     */
-    virtual ECRESULT GetResults(unsigned int ulStoreId, unsigned int ulFolderId, unsigned int *lpulCount, unsigned int **lppulObjIdList);
 
     /**
      * Set the status of a searchfolder

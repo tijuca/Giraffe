@@ -534,17 +534,6 @@ ECRESULT ECSearchFolders::RemoveSearchFolder(unsigned int ulStoreId, unsigned in
     return er;
 }
 
-// Get a list of all matching messages for a search folder (used to load searchfolder contents)
-ECRESULT ECSearchFolders::GetSearchResults(unsigned int ulStoreId, unsigned int ulFolderId, unsigned int *lpulCount, unsigned int **lppulObjIdList)
-{
-    ECRESULT er = erSuccess;
-
-    // Get all search results for this folder
-    er = GetResults(ulStoreId, ulFolderId, lpulCount, lppulObjIdList);
-
-    return er;
-}
-
 // WARNING: THIS FUNCTION IS *NOT* THREADSAFE. IT SHOULD ONLY BE CALLED AT STARTUP WHILE SINGLE-THREADED
 ECRESULT ECSearchFolders::RestartSearches()
 {
@@ -1558,15 +1547,13 @@ exit:
 }
 
 // Get all results of a certain search folder in a list of hierarchy IDs
-ECRESULT ECSearchFolders::GetResults(unsigned int ulStoreId, unsigned int ulFolderId, unsigned int *lpulCount, unsigned int **lppulObjIdList)
+ECRESULT ECSearchFolders::GetSearchResults(unsigned int ulStoreId, unsigned int ulFolderId, std::list<unsigned int> *lstObjIds)
 {
     ECDatabase *lpDatabase = NULL;
     DB_RESULT lpResult = NULL;
     DB_ROW lpRow = NULL;
     ECRESULT er = erSuccess;
     std::string strQuery;
-    unsigned int *lpObjIdList = NULL;
-    unsigned int ulCount = 0;
 
     er = GetThreadLocalDatabase(this->m_lpDatabaseFactory, &lpDatabase);
     if(er != erSuccess)
@@ -1577,26 +1564,17 @@ ECRESULT ECSearchFolders::GetResults(unsigned int ulStoreId, unsigned int ulFold
     if(er != erSuccess)
         goto exit;
 
-    ulCount = lpDatabase->GetNumRows(lpResult);
-    lpObjIdList = new unsigned int [ulCount];
+    lstObjIds->clear();
 
-    for(unsigned int i=0;i<ulCount;i++) {
+    while(1) {
         lpRow = lpDatabase->FetchRow(lpResult);
-        if(lpRow == NULL || lpRow[0] == NULL) {
-            er = ZARAFA_E_DATABASE_ERROR;
-            goto exit;
-        }
-        lpObjIdList[i] = atoi(lpRow[0]);
+        if(lpRow == NULL || lpRow[0] == NULL)
+            break;
+
+        lstObjIds->push_back(atoui(lpRow[0]));
     }
 
-    *lpulCount = ulCount;
-    *lppulObjIdList = lpObjIdList;
-    lpObjIdList = NULL;
-
 exit:
-	if (lpObjIdList)
-		delete[] lpObjIdList;
-
     if(lpResult)
         lpDatabase->FreeResult(lpResult);
 

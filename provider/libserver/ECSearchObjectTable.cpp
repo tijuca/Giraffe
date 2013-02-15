@@ -85,58 +85,23 @@ ECRESULT ECSearchObjectTable::Create(ECSession *lpSession, unsigned int ulStoreI
 ECRESULT ECSearchObjectTable::Load() {
     ECRESULT er = erSuccess;
     sObjectTableKey		sRowItem;
-
-    struct sortOrderArray*      lpsPrevSortOrderArray = NULL;
-    struct sortOrderArray	sDefaultSortOrder = { 0, 0};
-    unsigned int ulCount = 0;
-    unsigned int *lpulObjIdList = NULL;
-    
-    unsigned int ulFolderId = m_ulFolderId;
-    unsigned int ulStoreId = m_ulStoreId;
+    std::list<unsigned int> lstObjId;
 
 	pthread_mutex_lock(&m_hLock);
 
-    if(ulFolderId) {
-        if(lpsSortOrderArray) {
-            // It is faster to switch to a default sort order, then load, and then re-sort
-            lpsPrevSortOrderArray = new struct sortOrderArray;
-            lpsPrevSortOrderArray->__size = lpsSortOrderArray->__size;
-            if(lpsSortOrderArray->__size == 0 ) {
-                lpsPrevSortOrderArray->__ptr = NULL;
-            } else {
-                lpsPrevSortOrderArray->__ptr = new sortOrder[lpsSortOrderArray->__size];
-                memcpy(lpsPrevSortOrderArray->__ptr, lpsSortOrderArray->__ptr, sizeof(struct sortOrder) * lpsSortOrderArray->__size);
-            }
-        
-            SetSortOrder(&sDefaultSortOrder, 0, 0);
-        } else {
-            lpsPrevSortOrderArray = NULL;
-        }
-        
+    if(m_ulFolderId) {
         // Get the search results
-        er = lpSession->GetSessionManager()->GetSearchFolders()->GetSearchResults(ulStoreId, ulFolderId, &ulCount, &lpulObjIdList);
+        er = lpSession->GetSessionManager()->GetSearchFolders()->GetSearchResults(m_ulStoreId, m_ulFolderId, &lstObjId);
         if(er != erSuccess)
             goto exit;
 
-        // Add all objects to the table
-        for(ULONG i=0; i<ulCount; i++) {
-            UpdateRow(ECKeyTable::TABLE_ROW_ADD, lpulObjIdList[i], 0);
-        }
-
-        // Set sort order
-        if(lpsPrevSortOrderArray)
-            SetSortOrder(lpsPrevSortOrderArray, 0 ,0);
-
+        er = UpdateRows(ECKeyTable::TABLE_ROW_ADD, &lstObjId, 0, true);
+        if(er != hrSuccess)
+            goto exit;
     }
     
 exit:
 	pthread_mutex_unlock(&m_hLock);
 
-	if (lpulObjIdList)
-		delete [] lpulObjIdList;
-
-    if(lpsPrevSortOrderArray)
-        FreeSortOrderArray(lpsPrevSortOrderArray);
-        
     return er;
 }
