@@ -958,7 +958,13 @@ string LDAPUserPlugin::getServerSearchFilter()
 	string filter, subfilter;
 	char *objecttype = m_config->GetSetting("ldap_object_type_attribute", "", NULL);
 	char *servertype = m_config->GetSetting("ldap_server_type_attribute_value", "", NULL);
-	char *serverfilter = m_config->GetSetting("ldap_server_search_filter", NULL, ""); // We need empty string
+	char *serverfilter = m_config->GetSetting("ldap_server_search_filter");
+
+	if (!objecttype)
+		throw runtime_error("No object type attribute defined");
+
+	if (!servertype)
+		throw runtime_error("No server type attribute value defined");
 
 	filter = serverfilter;
 	subfilter = "(" + string(objecttype) + "=" + servertype + ")";
@@ -981,11 +987,14 @@ string LDAPUserPlugin::getSearchFilter(objectclass_t objclass) throw(std::except
 	char *companytype = m_config->GetSetting("ldap_company_type_attribute_value","",NULL);
 	char *addresslisttype = m_config->GetSetting("ldap_addresslist_type_attribute_value","",NULL);
 	char *dynamicgrouptype = m_config->GetSetting("ldap_dynamicgroup_type_attribute_value","",NULL);
-	char *userfilter = m_config->GetSetting("ldap_user_search_filter", NULL, ""); // We need empty string
-	char *groupfilter = m_config->GetSetting("ldap_group_search_filter", NULL, ""); // We need empty string
-	char *companyfilter = m_config->GetSetting("ldap_company_search_filter", NULL, ""); // We need empty string
-	char *addresslistfilter = m_config->GetSetting("ldap_addresslist_search_filter", NULL, ""); // We need empty string
-	char *dynamicgroupfilter = m_config->GetSetting("ldap_dynamicgroup_search_filter", NULL, ""); // We need empty string
+	char *userfilter = m_config->GetSetting("ldap_user_search_filter");
+	char *groupfilter = m_config->GetSetting("ldap_group_search_filter");
+	char *companyfilter = m_config->GetSetting("ldap_company_search_filter");
+	char *addresslistfilter = m_config->GetSetting("ldap_addresslist_search_filter");
+	char *dynamicgroupfilter = m_config->GetSetting("ldap_dynamicgroup_search_filter");
+
+	if (!objecttype)
+		throw runtime_error("No object type attribute defined");
 
 	switch (objclass) {
 	case OBJECTCLASS_UNKNOWN:
@@ -1002,6 +1011,8 @@ string LDAPUserPlugin::getSearchFilter(objectclass_t objclass) throw(std::except
 	case NONACTIVE_USER:
 	case NONACTIVE_ROOM:
 	case NONACTIVE_EQUIPMENT:
+		if (!usertype)
+			throw runtime_error("No user type attribute value defined");
 		filter = userfilter;
 		subfilter += "(|";
 		subfilter += GetObjectClassFilter(objecttype, usertype);
@@ -1042,8 +1053,11 @@ string LDAPUserPlugin::getSearchFilter(objectclass_t objclass) throw(std::except
 		break;
 	case OBJECTCLASS_CONTAINER:
 		subfilter = "(|";
-		if (m_bHosted)
+		if (m_bHosted) {
+			if (!companytype)
+				throw runtime_error("No company type attribute value defined");
 			subfilter += string("(&") + companyfilter + GetObjectClassFilter(objecttype, companytype) + ")";
+		}
 		if (addresslisttype)
 			subfilter += string("(&") + addresslistfilter + GetObjectClassFilter(objecttype, addresslisttype) + ")";
 		else
@@ -1053,6 +1067,8 @@ string LDAPUserPlugin::getSearchFilter(objectclass_t objclass) throw(std::except
 	case CONTAINER_COMPANY:
 		if (!m_bHosted)
 			throw runtime_error("Searching for companies is not supported in singlecompany server");
+		if (!companytype)
+			throw runtime_error("No company type attribute value defined");
 		filter = companyfilter;
 		subfilter = GetObjectClassFilter(objecttype, companytype);
 		break;
