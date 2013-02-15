@@ -62,7 +62,6 @@
 #include "stringutil.h"
 
 #include "stringutil.h"
-#include "userutil.h"
 #include "ECRestriction.h"
 #include "ECACL.h"
 #include "charset/convert.h"
@@ -197,26 +196,10 @@ HRESULT ArchiveManageImpl::AttachTo(const char *lpszArchiveServer, const TCHAR *
 	abentryid_t sUserEntryId;
 	SessionPtr ptrArchiveSession(m_ptrSession);
 	SessionPtr ptrRemoteSession;
-	unsigned int ulArchivedUsers = 0;
-	unsigned int ulMaxUsers = 0;
-	
-	hr = ValidateArchivedUserCount(m_lpLogger, m_ptrSession->GetMAPISession(), m_ptrSession->GetSSLPath(), m_ptrSession->GetSSLPass(), &ulArchivedUsers, &ulMaxUsers);
-	if (FAILED(hr)) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to validate archived user count. Please check the archiver and licensed log for errors.");
-		goto exit;
-	}
 
-	if (ulMaxUsers == 0) {
-		 m_lpLogger->Log(EC_LOGLEVEL_INFO, "Not all commercial features will be available.");
-		 // continue!
-	} else if (ulArchivedUsers >= ulMaxUsers) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "You are over your archived user limit of %d users. Please remove an archived user relation or obtain an additional cal.", ulMaxUsers);
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Licensed extended archive features will be disabled until the archived user limit is decreased.");
-		hr = MAPI_E_NOT_FOUND; //@todo which error ?
+	hr = m_ptrSession->ValidateArchiverLicense();
+	if (hr != hrSuccess)
 		goto exit;
-	} else if ((ulArchivedUsers+5) >= ulMaxUsers) { //@todo which warning limit?
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "You almost reached the archived user limit. Archived users %d of %d", ulArchivedUsers, ulMaxUsers);
-	}
 
 	// Resolve the requested user.
 	hr = m_ptrSession->GetUserInfo(m_strUser, &sUserEntryId, &strFoldername, NULL);

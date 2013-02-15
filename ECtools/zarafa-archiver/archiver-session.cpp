@@ -58,6 +58,7 @@
 #include <ECDefs.h>
 #include <IECServiceAdmin.h>
 #include "charset/convert.h"
+#include "userutil.h"
 
 #include <mapiutil.h>
 #include <edkguid.h>
@@ -735,7 +736,7 @@ exit:
 	return hr;
 }
 
-IMAPISession *Session::GetMAPISession()
+IMAPISession *Session::GetMAPISession() const
 {
 	return m_ptrSession;
 }
@@ -856,6 +857,34 @@ HRESULT Session::CreateArchiveStore(const tstring& strUserName, const tstring& s
 		goto exit;
 
 	hr = ptrArchiveStore->QueryInterface(IID_IMsgStore, (LPVOID*)lppArchiveStore);
+
+exit:
+	return hr;
+}
+
+HRESULT Session::ValidateArchiverLicense() const
+{
+	HRESULT hr;
+	unsigned int ulArchivedUsers = 0;
+	unsigned int ulMaxUsers = 0;
+
+	hr = ValidateArchivedUserCount(m_lpLogger, this->GetMAPISession(), this->GetSSLPath(), this->GetSSLPass(), &ulArchivedUsers, &ulMaxUsers);
+	if (FAILED(hr)) {
+		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to validate archived user count. Please check the archiver and licensed log for errors.");
+		goto exit;
+	}
+
+	if (ulMaxUsers == 0) {
+		 m_lpLogger->Log(EC_LOGLEVEL_INFO, "Not all commercial features will be available.");
+		 // continue!
+	} else if (ulArchivedUsers >= ulMaxUsers) {
+		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "You are over your archived user limit of %d users. Please remove an archived user relation or obtain an additional cal.", ulMaxUsers);
+		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Licensed extended archive features will be disabled until the archived user limit is decreased.");
+		hr = MAPI_E_NOT_FOUND; //@todo which error ?
+		goto exit;
+	} else if ((ulArchivedUsers+5) >= ulMaxUsers) { //@todo which warning limit?
+		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "You almost reached the archived user limit. Archived users %d of %d", ulArchivedUsers, ulMaxUsers);
+	}
 
 exit:
 	return hr;

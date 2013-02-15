@@ -223,6 +223,10 @@ eResult ArchiveControlImpl::ArchiveAll(bool bLocalOnly, bool bAutoAttach, unsign
 		goto exit;
 	}
 
+	hr = m_ptrSession->ValidateArchiverLicense();
+	if (hr != hrSuccess)
+		goto exit;
+
 	if (bAutoAttach || parseBool(m_lpConfig->GetSetting("enable_auto_attach"))) {
 		ArchiveStateCollectorPtr ptrArchiveStateCollector;
 		ArchiveStateUpdaterPtr ptrArchiveStateUpdater;
@@ -270,6 +274,10 @@ eResult ArchiveControlImpl::Archive(const TCHAR *lpszUser, bool bAutoAttach, uns
 		hr = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	}
+
+	hr = m_ptrSession->ValidateArchiverLicense();
+	if (hr != hrSuccess)
+		goto exit;
 
 	if (bAutoAttach || parseBool(m_lpConfig->GetSetting("enable_auto_attach"))) {
 		ArchiveStateCollectorPtr ptrArchiveStateCollector;

@@ -93,9 +93,11 @@ public:
 	HRESULT OpenOrCreateArchiveStore(const tstring& strUserName, const tstring& strServerName, LPMDB *lppArchiveStore);
 	HRESULT GetArchiveStoreEntryId(const tstring& strUserName, const tstring& strServerName, entryid_t *lpArchiveId);
 
-	IMAPISession *GetMAPISession();
+	IMAPISession *GetMAPISession() const;
 	const char *GetSSLPath() const;
 	const char *GetSSLPass() const;
+
+	HRESULT ValidateArchiverLicense() const;
 
 private:
 	Session(ECLogger *lpLogger);
