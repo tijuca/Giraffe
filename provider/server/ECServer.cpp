@@ -1340,7 +1340,7 @@ int running_server(char *szName, const char *szConfig)
 	delete lpPluginFactory;	lpPluginFactory = NULL;
 
 	// Load search folders from disk
-	g_lpLogger->Log(EC_LOGLEVEL_INFO, "Loading searchfolders");
+	g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Loading searchfolders");
 	er = g_lpSessionManager->GetSearchFolders()->LoadSearchFolders();
 	if (er != erSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to load searchfolders");
