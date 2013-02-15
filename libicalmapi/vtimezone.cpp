@@ -173,7 +173,7 @@ HRESULT HrZoneToStruct(icalcomponent_kind kind, icalcomponent* lpVTZ, TIMEZONE_S
 {
 	HRESULT hr = hrSuccess;
 	icalcomponent *icComp = NULL;
-	icalproperty *tzFrom, *tzTo, *rRule, *dtStart;
+	icalproperty *tzFrom, *tzTo, *rRule, *dtStart, *rDate;
 	icaltimetype icTime;
 	SYSTEMTIME *lpSysTime = NULL;
 	SYSTEMTIME stRecurTime;
@@ -189,6 +189,7 @@ HRESULT HrZoneToStruct(icalcomponent_kind kind, icalcomponent* lpVTZ, TIMEZONE_S
 	tzFrom = icalcomponent_get_first_property(icComp, ICAL_TZOFFSETFROM_PROPERTY);
 	tzTo = icalcomponent_get_first_property(icComp, ICAL_TZOFFSETTO_PROPERTY);
 	rRule = icalcomponent_get_first_property(icComp, ICAL_RRULE_PROPERTY);
+	rDate = icalcomponent_get_first_property(icComp, ICAL_RDATE_PROPERTY);
 
 	if (!tzFrom || !tzTo || !dtStart) {
 		hr = MAPI_E_NOT_FOUND;
@@ -233,6 +234,15 @@ HRESULT HrZoneToStruct(icalcomponent_kind kind, icalcomponent* lpVTZ, TIMEZONE_S
 			lpSysTime->wDay = icalrecurrencetype_day_position(recur.by_day[0]); // 1..4
 
 		lpSysTime->wDayOfWeek = icalrecurrencetype_day_day_of_week(recur.by_day[0]) -1;
+	} else if (rDate) {
+		// one hit recurrence
+		stRecurTime = TMToSystemTime(UTC_ICalTime2UnixTime(icTime));
+
+		lpSysTime->wMonth = stRecurTime.wMonth+1; // fix for -1 in UTC_ICalTime2UnixTime, since TMToSystemTime doesn't do +1
+		lpSysTime->wDayOfWeek = stRecurTime.wDayOfWeek;
+		lpSysTime->wDay = int(stRecurTime.wDay / 7.0) + 1;
+		lpSysTime->wHour = stRecurTime.wHour;
+		lpSysTime->wMinute = stRecurTime.wMinute;
 	}
 
 exit:
@@ -277,6 +287,25 @@ HRESULT HrParseVTimeZone(icalcomponent* lpVTZ, std::string* lpstrTZID, TIMEZONE_
 
 	// if the timezone does no switching, daylight is not given, so we ignore the error (which is only MAPI_E_NOT_FOUND)
 	HrZoneToStruct(ICAL_XDAYLIGHT_COMPONENT, lpVTZ, &tzRet);
+
+	// unsupported case: only exceptions in the timezone switches, and no base rule (eg. very old Asia/Kolkata timezone)
+	{
+		icalcomponent *icComp = NULL;
+		icalproperty *tzSTDRule = NULL, *tzDSTRule = NULL;
+
+		icComp = icalcomponent_get_first_component(lpVTZ, ICAL_XSTANDARD_COMPONENT);
+		if (icComp)
+			tzSTDRule = icalcomponent_get_first_property(icComp, ICAL_RRULE_PROPERTY);
+		icComp = icalcomponent_get_first_component(lpVTZ, ICAL_XDAYLIGHT_COMPONENT);
+		if (icComp)
+			tzDSTRule = icalcomponent_get_first_property(icComp, ICAL_RRULE_PROPERTY);
+
+		if (tzSTDRule == NULL && tzDSTRule == NULL) {
+			// clear rule data
+			memset(&tzRet.stStdDate, 0, sizeof(SYSTEMTIME));
+			memset(&tzRet.stDstDate, 0, sizeof(SYSTEMTIME));
+		}
+	}
 
 	if (lpstrTZID)
 		*lpstrTZID = strTZID;
