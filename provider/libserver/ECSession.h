@@ -139,6 +139,7 @@ protected:
 	pthread_cond_t		m_hThreadReleased;
 	pthread_mutex_t		m_hThreadReleasedMutex;	
 	
+	pthread_mutex_t		m_hRequestStats;
 	unsigned int		m_ulRequests;
 };
 

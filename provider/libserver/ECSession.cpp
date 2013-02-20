@@ -155,12 +155,15 @@ BTSession::BTSession(unsigned long ip, ECSESSIONID sessionID, ECDatabaseFactory 
 	// Protects the object from deleting while a thread is running on a method in this object
 	pthread_cond_init(&m_hThreadReleased, NULL);
 	pthread_mutex_init(&m_hThreadReleasedMutex, NULL);
+	
+	pthread_mutex_init(&m_hRequestStats, NULL);
 }
 
 BTSession::~BTSession() {
 	// derived destructor still uses these vars
 	pthread_cond_destroy(&m_hThreadReleased);
 	pthread_mutex_destroy(&m_hThreadReleasedMutex);
+	pthread_mutex_destroy(&m_hRequestStats);
 }
 
 ECRESULT BTSession::Shutdown(unsigned int ulTimeout) {
@@ -251,11 +254,13 @@ unsigned long BTSession::GetIpAddress()
 
 void BTSession::IncRequests()
 {
+	scoped_lock lock(m_hRequestStats);
     m_ulRequests++;
 }
 
 unsigned int BTSession::GetRequests() 
 {
+	scoped_lock lock(m_hRequestStats);
     return m_ulRequests;
 }
 
@@ -542,6 +547,7 @@ void ECSession::GetBusyStates(list<string> *lpLstStates)
 
 void ECSession::AddClocks(double dblUser, double dblSystem, double dblReal)
 {
+	scoped_lock lock(m_hRequestStats);
 	m_dblUser += dblUser;
 	m_dblSystem += dblSystem;
 	m_dblReal += dblReal;
@@ -549,6 +555,7 @@ void ECSession::AddClocks(double dblUser, double dblSystem, double dblReal)
 
 void ECSession::GetClocks(double *lpdblUser, double *lpdblSystem, double *lpdblReal)
 {
+	scoped_lock lock(m_hRequestStats);
 	*lpdblUser = m_dblUser;
 	*lpdblSystem = m_dblSystem;
 	*lpdblReal = m_dblReal;
@@ -556,11 +563,13 @@ void ECSession::GetClocks(double *lpdblUser, double *lpdblSystem, double *lpdblR
 
 void ECSession::GetClientVersion(std::string *lpstrVersion)
 {
+	scoped_lock lock(m_hRequestStats);
     lpstrVersion->assign(m_strClientVersion);
 }
 
 void ECSession::GetClientApp(std::string *lpstrClientApp)
 {
+	scoped_lock lock(m_hRequestStats);
     lpstrClientApp->assign(m_strClientApp);
 }
 
