@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2012-10-05 18:07+0200\n"
+"POT-Creation-Date: 2013-02-12 00:03+0100\n"
 "PO-Revision-Date: 2012-09-02 15:06+0200\n"
 "Last-Translator: Abdulahadov  <abdulahadov@cg.ru>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,127 +18,637 @@ msgstr ""
 "10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 "X-Generator: Pootle 2.1.5\n"
 
-#: provider/ECProps/Addin.cpp:516 provider/ECProps/SyncBar.cpp:326
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:922
+msgid "Zarafa Archive"
+msgstr "Архив Zarafa"
+
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:923
+msgid "This folder contains the special archive folders."
+msgstr "Эта папка содержит специальные архивные папки."
+
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:928
+msgid "History"
+msgstr "История"
+
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:929
+msgid ""
+"This folder contains archives that have been replaced by a newer version."
+msgstr "Этот каталог содержит архивы, которые были заменены на новую версию."
+
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:933
+msgid "Outgoing"
+msgstr "Исходящие"
+
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:934
+msgid "This folder contains archives of all outgoing messages."
+msgstr "Этот каталог содержит архивы для всех исходящих сообщений."
+
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:938
+msgid "Deleted"
+msgstr "Удалено"
+
+#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:939
+msgid "This folder contains archives of messages that have been deleted."
+msgstr "Этот каталог содержит архивы сообщений, которые были удалены."
+
+#: common/Util.cpp:1783
+msgid "End of Session"
+msgstr "Конец сессии"
+
+#: common/Util.cpp:1786
+msgid "Connection lost"
+msgstr "Соединение потеряно"
+
+#: common/Util.cpp:1789
+msgid "Access denied"
+msgstr "Доступ запрещен"
+
+#: common/Util.cpp:1792
+msgid ""
+"Unable to move or copy folders. Can't copy folder. A top-level can't be "
+"copied to one of its subfolders. Or, you may not have appropriate "
+"permissions for the folder. To check your permissions for the folder, right-"
+"click the folder, and then click Properties on the shortcut menu."
+msgstr ""
+"Не удалось скопировать каталог в собственный подкаталог. Однако возможно, "
+"что недостаточно прав для операции с этим каталогом. Для проверки ваших прав "
+"для каталога щелкните правой кнопкой мыши по нему и в появившемся меню "
+"нажмите «Параметры»."
+
+#: common/Util.cpp:1795
+msgid ""
+"The message store has reached its maximum size. To reduce the amount of data "
+"in this message store, select some items that you no longer need, and "
+"permanently (SHIFT + DEL) delete them."
+msgstr ""
+"Размер хранилища письма достиг максимального размера. Чтобы уменьшить размер "
+"данных в этом хранилище сообщений, выберите элементы, в которых вы больше не "
+"нуждаетесь и безвозвратно удалите их комбинацией Shift + Del."
+
+#: common/Util.cpp:1798
+msgid ""
+"The user canceled the operation, typically by clicking the Cancel button in "
+"a dialog box."
+msgstr ""
+"Пользователь отменил операцию. Как правило, эта операция выполняется "
+"нажатием кнопки \"Отмена\" в диалоговом окне."
+
+#: common/Util.cpp:1801
+msgid "A logon session could not be established."
+msgstr "Вход в сессию невозможен."
+
+#: common/Util.cpp:1804
+msgid ""
+"The name of the folder being moved or copied is the same as that of a "
+"subfolder in the destination folder. The message store provider requires "
+"that folder names be unique. The operation stops without completing."
+msgstr ""
+"Имя каталога может быть использовано внутри собственного подкаталога. "
+"Провайдер хранилища сообщений требует наличие лишь уникальных имен в именах "
+"каталогов. Операция остановлена до её завершения."
+
+#: common/Util.cpp:1807
+msgid ""
+"The operation succeeded, but not all entries were successfully processed, "
+"copied, deleted or moved"
+msgstr ""
+"Операция была выполнена, но не все элементы были успешно приняты, "
+"скопированы, перемещены или удалены"
+
+#: common/Util.cpp:1810
+msgid ""
+"The provider does not have enough information to complete the logon. Or, the "
+"service provider has not been configured."
+msgstr ""
+"Провайдер не имеет достаточной информации для входа в систему. Также "
+"возможно, что провайдер сервиса не настроен."
+
+#: common/Util.cpp:1813
+msgid ""
+"One of the providers cannot log on, but this error should not disable the "
+"other services."
+msgstr ""
+"Один из провайдеров не смог войти, но эта ошибка не должна повлиять на "
+"работу других сервисов."
+
+#: common/Util.cpp:1816
+msgid "A database error or I/O error has occurred."
+msgstr "Произошла ошибка ввода/вывода базы данных."
+
+#: common/Util.cpp:1819
+msgid "The subfolder being deleted contains subfolders."
+msgstr "Удаляемый каталог содержит подкаталоги."
+
+#: common/Util.cpp:1822
+msgid "The subfolder being deleted contains messages."
+msgstr "Удаляемый подкаталог содержит сообщения."
+
+#: common/Util.cpp:1825
+msgid "No description available."
+msgstr "Описание недоступно."
+
+#: common/Util.cpp:1827
+msgid "MAPI error code:"
+msgstr "Код ошибки MAPI:"
+
+#: zarafa-libsync/ECSync.cpp:1961
+msgid ""
+"The synchronization of a folder failed. Press retry to continue or ignore to "
+"supress all errors.\r\n"
+"\r\n"
+"Please contact the system administrator if this problem persists."
+msgstr ""
+"Синхронизация каталога не удалась. Нажмите «Повторить» для продолжения или "
+"«Игнорировать» для пропуска всех ошибок.\r\n"
+"\r\n"
+"Обратитесь к вашему системному администратору в случае повтора проблемы."
+
+# 84%
+#: zarafa-libsync/ECSync.cpp:1963
+#, fuzzy
+msgid "Error codes: "
+msgstr "Код ошибки:"
+
+#: provider/common/SOAPSock.cpp:484
+msgid "Unable to get SSL object from store"
+msgstr "Не удалось получить объект SSL с хранилища"
+
+#: provider/common/SOAPSock.cpp:492
+msgid "Unable to get SSL context from SSL object"
+msgstr "Не удалось получить содержание SSL с объекта SSL"
+
+#: provider/common/SOAPSock.cpp:515
+msgid "No certificate found in connection"
+msgstr "Не найдено сертификатов в соединении"
+
+#: provider/common/SOAPSock.cpp:530
+msgid "Unable to convert OpenSSL to WinCrypt"
+msgstr "Невозможно превратить OpenSSL в WinCrypt"
+
+#: provider/common/SOAPSock.cpp:652
+msgid "The certificate is not trusted and could not be verified."
+msgstr ""
+"Этот сертификат не является доверенным, поэтому его невозможно проверить."
+
+#: provider/common/SOAPSock.cpp:654
+msgid "The certificate is not trusted."
+msgstr "Сертификат является недоверенным."
+
+#: provider/common/SOAPSock.cpp:657
+msgid "The certificate is trusted but does not verify correctly."
+msgstr "Сертификат является доверенным, однако его не удалось проверить."
+
+#: provider/common/SOAPSock.cpp:660
+msgid "Do you wish to continue?"
+msgstr "Вы действительно хотите продолжить?"
+
+#: provider/ECProps/Addin.cpp:483 provider/ECProps/PropPage.cpp:232
+#: provider/ECProps/ECDelegatePropPage.cpp:178
+msgid "Unable to get session"
+msgstr "Не удалось открыть сессию"
+
+#: provider/ECProps/Addin.cpp:549 provider/ECProps/SyncBar.cpp:326
 msgid "Configure"
 msgstr "Настройка"
 
-#: provider/ECProps/Addin.cpp:518 provider/ECProps/SyncBar.cpp:318
+#: provider/ECProps/Addin.cpp:551 provider/ECProps/SyncBar.cpp:318
 msgid "Synchronize"
 msgstr "Синхронизация"
 
-#: provider/ECProps/Addin.cpp:520
+#: provider/ECProps/Addin.cpp:553
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:28
 msgid "Open Shared Folders..."
 msgstr "Открыть общие каталоги..."
 
-#: provider/ECProps/Addin.cpp:522 provider/ECProps/Addin.cpp:563
+#: provider/ECProps/Addin.cpp:555 provider/ECProps/Addin.cpp:598
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:19
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:20
 msgid "Recover Deleted Items..."
 msgstr "Восстановить удаленные элементы..."
 
-#: provider/ECProps/Addin.cpp:524 provider/ECProps/Addin.cpp:565
+#: provider/ECProps/Addin.cpp:557 provider/ECProps/Addin.cpp:600
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:20
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:21
 msgid "Out of Office Assistant..."
 msgstr "Помощник функции «Я недоступен»..."
 
-#: provider/ECProps/Addin.cpp:528
+# 75%
+#: provider/ECProps/Addin.cpp:559 provider/ECProps/Addin.cpp:602
+#, fuzzy
+msgid "Delegates..."
+msgstr "Делегаты"
+
+#: provider/ECProps/Addin.cpp:563
 msgid "Offline"
 msgstr "Отключен"
 
-#: provider/ECProps/Addin.cpp:557 provider/ECProps/SyncBar.cpp:328
+#: provider/ECProps/Addin.cpp:592 provider/ECProps/SyncBar.cpp:328
 msgid "Configure offline synchronization"
 msgstr "Настройка автономной синхронизации"
 
-#: provider/ECProps/Addin.cpp:559 provider/ECProps/SyncBar.cpp:320
+#: provider/ECProps/Addin.cpp:594 provider/ECProps/SyncBar.cpp:320
 msgid "Start offline synchronization"
 msgstr "Запуск автономной синхронизации"
 
-#: provider/ECProps/Addin.cpp:561
+#: provider/ECProps/Addin.cpp:596
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:29
 msgid "Open another user's Outlook Sharing Folders (Calendar, E-mail, etc)"
 msgstr ""
 "Открыть общие каталоги Outlook (календарь, почту и т.д.) другого пользователя"
 
-#: provider/ECProps/Addin.cpp:674
+#: provider/ECProps/Addin.cpp:713
 msgid "Out of Office currently on. Would you like to turn it off?"
 msgstr "Активен статус «Я недоступен». Хотите отключить этот режим?"
 
-#: provider/ECProps/Addin.cpp:674
+#: provider/ECProps/Addin.cpp:713
 msgid "Out Of Office Turned On"
 msgstr "Активен статус «Я недоступен»"
 
-#: provider/ECProps/Addin.cpp:680
+#: provider/ECProps/Addin.cpp:719
 msgid "Unable to save Out of Office status"
 msgstr "Не удалось сохранить статус «Я недоступен»"
 
-#: provider/ECProps/Addin.cpp:781
+#: provider/ECProps/Addin.cpp:820 provider/ECProps/ECDelegateDlg.cpp:299
 msgid "Delegates"
 msgstr "Делегаты"
 
-#: provider/ECProps/Addin.cpp:918 provider/client/ECMAPIFolderPublic.cpp:164
-#: provider/client/ECMsgStorePublic.cpp:547
+#: provider/ECProps/Addin.cpp:957 provider/client/ECMsgStorePublic.cpp:547
+#: provider/client/ECMAPIFolderPublic.cpp:164
 msgid "Favorites"
 msgstr "Избранное"
 
-#: provider/ECProps/Addin.cpp:930 provider/ECProps/PropPage.cpp:435
+#: provider/ECProps/Addin.cpp:969 provider/ECProps/PropPage.cpp:436
 msgid "Permissions"
 msgstr "Права доступа"
 
-#: provider/ECProps/Addin.cpp:1140 provider/ECProps/Addin.cpp:1141
+#: provider/ECProps/Addin.cpp:1180 provider/ECProps/Addin.cpp:1181
 msgid "Add to Public Favorites Folder"
 msgstr "Добавить в общий каталог «Избранное»"
 
-#: provider/ECProps/Addin.cpp:1225
-#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:108
+#: provider/ECProps/Addin.cpp:1265
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:89
 #: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:97
+#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:108
 msgid "Unable to open MAPI session."
 msgstr "Не удалось открыть сессию MAPI."
 
-#: provider/ECProps/Addin.cpp:1229 provider/ECProps/ECFavoritePropPage.cpp:110
-#: provider/client/ECMsgStore.cpp:2387
+#: provider/ECProps/Addin.cpp:1269 provider/ECProps/ECFavoritePropPage.cpp:110
+#: provider/client/ECMsgStore.cpp:2403
 msgid "Shortcut"
 msgstr "Ярлык"
 
-#: provider/ECProps/Addin.cpp:1229 provider/ECProps/ECFavoritePropPage.cpp:110
+#: provider/ECProps/Addin.cpp:1269 provider/ECProps/ECFavoritePropPage.cpp:110
 msgid "Shortcut folder"
 msgstr "Каталог для ярлыков"
 
-#: provider/ECProps/Addin.cpp:1231
+#: provider/ECProps/Addin.cpp:1271
 msgid "Unable to get shortcut folder."
 msgstr "Невозможно получить каталог для ярлыков."
 
-#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:136
+#: provider/ECProps/PropPage.cpp:33
+msgid "Full control"
+msgstr "Полный контроль"
+
+#: provider/ECProps/PropPage.cpp:34
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:165
+#: php-ext/include/mapi/class.taskrequest.php:906
+msgid "Owner"
+msgstr "Владелец"
+
+#: provider/ECProps/PropPage.cpp:35
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:164
+msgid "Secretary"
+msgstr "Редактор"
+
+#: provider/ECProps/PropPage.cpp:36
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:163
+msgid "Only read"
+msgstr "Только для чтения"
+
+#: provider/ECProps/PropPage.cpp:37
+msgid "No rights"
+msgstr "Нет доступа"
+
+#: provider/ECProps/PropPage.cpp:193
+msgid "You have insufficient permissions to set permissions"
+msgstr "У вас не хватает прав для установки разрешений"
+
+#: provider/ECProps/PropPage.cpp:196
+msgid ""
+"Unable to set some permissions. Permissions are only allowed on users and "
+"security groups."
+msgstr ""
+"Невозможно установить некоторые права. Они разрешены лишь для пользователей "
+"и групп безопасности."
+
+#: provider/ECProps/PropPage.cpp:199
+msgid "Unable to set all permissions."
+msgstr "Невозможно установить все права."
+
+#: provider/ECProps/PropPage.cpp:238 provider/ECProps/MapOtherUserDlg.cpp:273
+#: provider/ECProps/ECDelegatePropPage.cpp:184
+#: provider/ECProps/ECDelegateDlg.cpp:294
+msgid "Unable to get addressbook"
+msgstr "Не удалось открыть адресную книгу"
+
+#: provider/ECProps/PropPage.cpp:245
+msgid "Unable to get user store"
+msgstr "Не удалось открыть хранилище пользователя"
+
+#: provider/ECProps/PropPage.cpp:388
+#: provider/ECProps/ECFavoritePropPage.cpp:254
+#: provider/ECProps/ECDelegatePropPage.cpp:168
+msgid "Unable to get property page site"
+msgstr "Не удалось получить свойства веб-страницы"
+
+#: provider/ECProps/PropPage.cpp:403
+#: provider/ECProps/ECFavoritePropPage.cpp:262
+msgid "Unable to receive store and folder information"
+msgstr "Не удалось получить информацию о хранилище и папке"
+
+#: provider/ECProps/PropPage.cpp:418 provider/client/ECDisplayTable.cpp:28
+msgid "Name"
+msgstr "Имя"
+
+#: provider/ECProps/PropPage.cpp:422
+msgid "Permission Level"
+msgstr "Уровень безопасности"
+
+#: provider/ECProps/PropPage.cpp:426
+msgid "A&dd"
+msgstr "До&бавить"
+
+#: provider/ECProps/PropPage.cpp:430
+msgid "Remo&ve"
+msgstr "Удал&ить"
+
+#: provider/ECProps/PropPage.cpp:432
+msgid "&Properties"
+msgstr "С&войства"
+
+#: provider/ECProps/PropPage.cpp:438
+msgid "Profile"
+msgstr "Профиль"
+
+#: provider/ECProps/PropPage.cpp:443
+msgid "&Create items"
+msgstr "С&оздание элементов"
+
+#: provider/ECProps/PropPage.cpp:444
+msgid "Read &items"
+msgstr "Чтение &документов"
+
+#: provider/ECProps/PropPage.cpp:446
+msgid "Create &subfolders"
+msgstr "Создание &подпапок"
+
+#: provider/ECProps/PropPage.cpp:447
+msgid "Folder pe&rmissions"
+msgstr "Права до&ступа для каталога"
+
+#: provider/ECProps/PropPage.cpp:448
+msgid "Folder visi&ble"
+msgstr "Отобр&ажаемые каталоги"
+
+#: provider/ECProps/PropPage.cpp:449
+msgid "F&older contact"
+msgstr "Конт&акты каталога"
+
+#: provider/ECProps/PropPage.cpp:450
+msgid "&Edit items"
+msgstr "&Правка элементов"
+
+#: provider/ECProps/PropPage.cpp:451
+msgid "De&lete items"
+msgstr "Уд&аление элементов"
+
+#: provider/ECProps/PropPage.cpp:452 provider/ECProps/PropPage.cpp:455
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:162
+#: provider/ECProps/SyncConfigDlg.cpp:105
+msgid "None"
+msgstr "Нет"
+
+#: provider/ECProps/PropPage.cpp:453 provider/ECProps/PropPage.cpp:456
+msgid "Own"
+msgstr "Владелец"
+
+#: provider/ECProps/PropPage.cpp:454 provider/ECProps/PropPage.cpp:457
+msgid "All"
+msgstr "Все"
+
+#: provider/ECProps/PropPage.cpp:535
+msgid "<Unknown user or group>"
+msgstr "<Неизвестный пользователь или группа>"
+
+#: provider/ECProps/PropPage.cpp:568 provider/ECProps/PropPage.cpp:1059
+msgid "Other"
+msgstr "Другой"
+
+#: provider/ECProps/PropPage.cpp:717 provider/ECProps/ECFavoritesDlg.cpp:48
+#: provider/ECProps/ECDelegatePropPage.cpp:249
+#: provider/ECProps/ECDelegateDlg.cpp:103
+#: provider/client/SettingsPropPageAdvance.cpp:105
+msgid "Add"
+msgstr "Добавить"
+
+#: provider/ECProps/PropPage.cpp:724 provider/ECProps/MapOtherUserDlg.cpp:186
+#: provider/ECProps/ECDelegatePropPage.cpp:264
+#: provider/ECProps/ECDelegateDlg.cpp:118
+#: provider/client/ECABContainer.cpp:244 provider/client/ECABContainer.cpp:299
+#: provider/client/SettingsPropPageAdvance.cpp:245
+msgid "Global Address Book"
+msgstr "Глобальная адресная книга"
+
+#: provider/ECProps/PropPage.cpp:749 provider/ECProps/PropPage.cpp:764
+msgid "One or more users cannot be added to the folder access list."
+msgstr ""
+"Не удалось добавить одного или нескольких пользователей в список доступа к "
+"папке."
+
+#: provider/ECProps/PropPage.cpp:749
+msgid "Non-local users cannot be given rights on this server."
+msgstr "Удаленные пользователи не могут получить права на этом сервере."
+
+#: provider/ECProps/PropPage.cpp:764
+msgid "One or more users are already specified."
+msgstr "Один или несколько пользователей уже существуют."
+
+#: provider/ECProps/MapOtherUserDlg.cpp:35
+msgid "Entire Inbox (Permanent)"
+msgstr "Все каталоги (Постоянно)"
+
+#: provider/ECProps/MapOtherUserDlg.cpp:36
+msgid "Calendar (Temporary)"
+msgstr "Календарь (Временно)"
+
+#: provider/ECProps/MapOtherUserDlg.cpp:37
+msgid "Notes (Temporary)"
+msgstr "Заметки (Временно)"
+
+#: provider/ECProps/MapOtherUserDlg.cpp:38
+msgid "Tasks (Temporary)"
+msgstr "Задачи (Временно)"
+
+#: provider/ECProps/MapOtherUserDlg.cpp:39
+msgid "Contacts (Temporary)"
+msgstr "Контакты (Временно)"
+
+#: provider/ECProps/MapOtherUserDlg.cpp:40
+msgid "Inbox (Temporary)"
+msgstr "Входящие (Временно)"
+
+#: provider/ECProps/MapOtherUserDlg.cpp:114
+msgid "User could not be resolved (GAB is unavailable)."
+msgstr ""
+
+#: provider/ECProps/MapOtherUserDlg.cpp:131
+#: provider/client/SettingsPropPageAdvance.cpp:171
+msgid "User could not be resolved."
+msgstr "Невозможно обнаружить пользователя."
+
+#: provider/ECProps/MapOtherUserDlg.cpp:142
+msgid "Select a folder type or cancel."
+msgstr "Выберите тип папки или отмените операцию."
+
+#: provider/ECProps/MapOtherUserDlg.cpp:249
+msgid "Folder of other user"
+msgstr "Каталоги других пользователей"
+
+#: provider/ECProps/MapOtherUserDlg.cpp:251
+#: provider/client/SettingsDlg.cpp:132
+#: provider/client/SettingsTabConnection.cpp:85
+#: provider/client/PasswordDlg.cpp:87
+msgid "Username"
+msgstr "Имя пользователя"
+
+#: provider/ECProps/MapOtherUserDlg.cpp:255
+msgid "Foldertype"
+msgstr "Тип каталога"
+
+#: provider/ECProps/MapOtherUserDlg.cpp:259
+msgid "Ok"
+msgstr "ОK"
+
+#: provider/ECProps/MapOtherUserDlg.cpp:260
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:132
+#: provider/ECProps/SyncConfigDlg.cpp:120
+#: provider/ECProps/SyncStatusDlg.cpp:67
+#: provider/ECProps/OutOfOfficeDlg.cpp:86
+#: provider/ECProps/ECDeletedMessageRecoveryDlg.cpp:630
+#: provider/client/ProviderUtil.cpp:151
+msgid "Cancel"
+msgstr "Отмена"
+
+#: provider/ECProps/MapOtherUserDlg.cpp:261
+#: provider/client/SettingsPropPageAdvance.cpp:106
+msgid "Name..."
+msgstr "Имя..."
+
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:118
+msgid "<Unknown>"
+msgstr "<Неизвестный>"
+
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:120
+msgid "Multiple Delegates"
+msgstr "Множественное делегирование"
+
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:123
+msgid "Delegate permissions"
+msgstr "Разделить права"
+
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:131
+#: provider/ECProps/SyncConfigDlg.cpp:119
+msgid "OK"
+msgstr "ОК"
+
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:133
+msgid "This delegate has the following permissions"
+msgstr "У этого делегата есть следующие права"
+
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:134
+#: provider/client/ECMsgStore.cpp:2480
+msgid "Calendar"
+msgstr "Календарь"
+
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:135
+#: provider/client/ECMsgStore.cpp:2526
+msgid "Tasks"
+msgstr "Задачи"
+
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:136
+#: provider/client/ECMsgStore.cpp:2420 provider/libserver/ECGenProps.cpp:947
+msgid "Inbox"
+msgstr "Входящие"
+
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:137
+#: provider/client/ECMsgStore.cpp:2468
+msgid "Contacts"
+msgstr "Контакты"
+
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:138
+#: provider/client/ECMsgStore.cpp:2514
+msgid "Notes"
+msgstr "Заметки"
+
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:139
+#: provider/client/ECMsgStore.cpp:2502
+msgid "Journal"
+msgstr "Журнал"
+
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:140
+msgid "Delegate receives copies of meeting-related messages sent to me"
+msgstr ""
+"Делегат принимает копии направленных мне сообщений, связанных с собраниями"
+
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:141
+msgid "Automatically send a message to delegate summarizing these permissions"
+msgstr "Автоматически отправлять сообщение с обобщенным разделением этих прав"
+
+#: provider/ECProps/ECDelegatePermissionDlg.cpp:142
+msgid "Delegate can see my private items"
+msgstr "Делегат имеет право просматривать мои личные элементы"
+
+#: provider/ECProps/ECFavoritesDlg.cpp:41
+msgid "Add to favorites"
+msgstr "Добавить в «Избранное»"
+
+#: provider/ECProps/ECFavoritesDlg.cpp:46
+#: provider/ECProps/ECFavoritePropPage.cpp:268
+msgid "Favorite folder name"
+msgstr "Имя избранного каталога"
+
+#: provider/ECProps/ECFavoritesDlg.cpp:47
+#: provider/ECProps/ECFavoritePropPage.cpp:269
+msgid "Public folder name"
+msgstr "Имя общего каталога"
+
+#: provider/ECProps/ECFavoritesDlg.cpp:53
+#: provider/ECProps/ECFavoritePropPage.cpp:270
+msgid "Subfolders"
+msgstr "Подкаталоги"
+
+#: provider/ECProps/ECFavoritesDlg.cpp:54
+#: provider/ECProps/ECFavoritePropPage.cpp:271
+msgid "Add subfolders of this folder"
+msgstr "Добавить подкаталоги этого каталога"
+
+#: provider/ECProps/ECFavoritesDlg.cpp:55
+#: provider/ECProps/ECFavoritePropPage.cpp:272
+msgid "Add all subfolders"
+msgstr "Добавить все подкаталоги"
+
+#: provider/ECProps/ECFavoritesDlg.cpp:56
+#: provider/ECProps/ECFavoritePropPage.cpp:273
+msgid "Add immediate subfolders only"
+msgstr "Добавить только ближайшие подкаталоги"
+
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:107
+#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:136
 msgid ""
 "You are currently offline. To use this command, connect to the online server."
 msgstr ""
 "В данный момент вы отключены. Для выполнения этой команды необходимо "
 "соединение с сервером."
-
-#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:138
-msgid "Unable to open default store in MAPI session."
-msgstr "Не удалось открыть основное хранилище в сессии MAPI."
-
-#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:165
-#: provider/client/SettingsPropPageAdvance.cpp:189
-msgid "Refusing to add primary store as shared store."
-msgstr "Запрет на добавление основного хранилища в качестве общего хранилища."
-
-#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:174
-msgid "Unable to open this store."
-msgstr "Не удалось открыть это хранилище."
-
-#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:279
-#: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:130
-msgid "You have insufficient permissions to open this store."
-msgstr "У вас не хватает прав для открытия этого хранилища."
-
-#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:279
-msgid "Access Denied"
-msgstr "Доступ запрещен"
 
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:109
 msgid "Unable to open store, access denied."
@@ -148,125 +658,89 @@ msgstr "Не удалось открыть хранилище, запрещен 
 msgid "Unable to open store."
 msgstr "Не удалось открыть хранилище."
 
-#: provider/ECProps/OutOfOfficeDlg.cpp:78
-msgid "I am currently Out of the Office"
-msgstr "В настоящее время «Я недоступен»"
+#: provider/ECProps/SyncConfigDlg.cpp:69
+msgid "Configure synchronization"
+msgstr "Настройка синхронизации"
 
-#: provider/ECProps/OutOfOfficeDlg.cpp:80
-msgid "Out of Office Assistant"
-msgstr "Помощник функции «Я недоступен»"
+#: provider/ECProps/SyncConfigDlg.cpp:71
+msgid "Time between synchronizations:"
+msgstr "Период синхронизации:"
 
-#: provider/ECProps/OutOfOfficeDlg.cpp:81
-msgid "I am currently In the Office"
-msgstr "В настоящее время «Я доступен»"
+#: provider/ECProps/SyncConfigDlg.cpp:79
+msgid "1 minute"
+msgstr "1 минута"
 
-#: provider/ECProps/OutOfOfficeDlg.cpp:83
-msgid "AutoReply only once to each sender with the following text:"
-msgstr ""
-"Единожды отправлять автоответ каждому пользователю с следующим текстом:"
+#: provider/ECProps/SyncConfigDlg.cpp:81
+msgid "5 minutes"
+msgstr "5 минут"
 
-#: provider/ECProps/OutOfOfficeDlg.cpp:84 provider/client/ClientUtil.cpp:341
-msgid "Subject:"
-msgstr "Тема:"
+#: provider/ECProps/SyncConfigDlg.cpp:83
+msgid "15 minutes"
+msgstr "15 минут"
 
-#: provider/ECProps/OutOfOfficeDlg.cpp:85
-msgid "&Save"
-msgstr "&Сохранить"
+#: provider/ECProps/SyncConfigDlg.cpp:85
+msgid "1 half hour"
+msgstr "30 минут"
 
-#: provider/ECProps/OutOfOfficeDlg.cpp:86
-#: provider/ECProps/SyncStatusDlg.cpp:67
-#: provider/ECProps/MapOtherUserDlg.cpp:260
-#: provider/ECProps/SyncConfigDlg.cpp:120
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:132
-#: provider/ECProps/ECDeletedMessageRecoveryDlg.cpp:630
-#: provider/client/ProviderUtil.cpp:151
-msgid "Cancel"
-msgstr "Отмена"
+#: provider/ECProps/SyncConfigDlg.cpp:87
+msgid "1 hour"
+msgstr "1 час"
+
+#: provider/ECProps/SyncConfigDlg.cpp:97
+msgid "Also start synchronization when:"
+msgstr "Также синхронизировать при:"
+
+#: provider/ECProps/SyncConfigDlg.cpp:107
+msgid "Receive mail"
+msgstr "Получении почты"
+
+#: provider/ECProps/SyncConfigDlg.cpp:109
+msgid "Any change"
+msgstr "При любых изменениях"
+
+#: provider/ECProps/SyncConfigDlg.cpp:171
+msgid "Error saving synchronization settings"
+msgstr "Ошибка при сохранении настроек синхронизации"
 
 #: provider/ECProps/ECFavoritePropPage.cpp:162
 msgid "Unable to add folder to favorites"
 msgstr "Не удалось добавить папку в «Избранное»"
 
-#: provider/ECProps/ECFavoritePropPage.cpp:254
-#: provider/ECProps/ECDelegatePropPage.cpp:167
-#: provider/ECProps/PropPage.cpp:387
-msgid "Unable to get property page site"
-msgstr "Не удалось получить свойства веб-страницы"
-
-#: provider/ECProps/ECFavoritePropPage.cpp:262
-#: provider/ECProps/PropPage.cpp:402
-msgid "Unable to receive store and folder information"
-msgstr "Не удалось получить информацию о хранилище и папке"
-
 #: provider/ECProps/ECFavoritePropPage.cpp:267
 msgid "Add to favorite folder"
 msgstr "Добавить папку в «Избранное»"
-
-#: provider/ECProps/ECFavoritePropPage.cpp:268
-#: provider/ECProps/ECFavoritesDlg.cpp:46
-msgid "Favorite folder name"
-msgstr "Имя избранного каталога"
-
-#: provider/ECProps/ECFavoritePropPage.cpp:269
-#: provider/ECProps/ECFavoritesDlg.cpp:47
-msgid "Public folder name"
-msgstr "Имя общего каталога"
-
-#: provider/ECProps/ECFavoritePropPage.cpp:270
-#: provider/ECProps/ECFavoritesDlg.cpp:53
-msgid "Subfolders"
-msgstr "Подкаталоги"
-
-#: provider/ECProps/ECFavoritePropPage.cpp:271
-#: provider/ECProps/ECFavoritesDlg.cpp:54
-msgid "Add subfolders of this folder"
-msgstr "Добавить подкаталоги этого каталога"
-
-#: provider/ECProps/ECFavoritePropPage.cpp:272
-#: provider/ECProps/ECFavoritesDlg.cpp:55
-msgid "Add all subfolders"
-msgstr "Добавить все подкаталоги"
-
-#: provider/ECProps/ECFavoritePropPage.cpp:273
-#: provider/ECProps/ECFavoritesDlg.cpp:56
-msgid "Add immediate subfolders only"
-msgstr "Добавить только ближайшие подкаталоги"
 
 #: provider/ECProps/ECFavoritePropPage.cpp:300
 msgid "Unable to get folder data"
 msgstr "Не удалось получить данные каталога"
 
-#: provider/ECProps/ECDelegatePropPage.cpp:133
+#: provider/ECProps/ECDelegatePropPage.cpp:134
+#: provider/ECProps/ECDelegateDlg.cpp:70
 msgid "Saving changes failed."
 msgstr "Не удалось сохранить изменения."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:136
+#: provider/ECProps/ECDelegatePropPage.cpp:137
+#: provider/ECProps/ECDelegateDlg.cpp:73
 msgid "Saving rules failed: "
 msgstr "Не удалось сохранить правила: "
 
-#: provider/ECProps/ECDelegatePropPage.cpp:177
-#: provider/ECProps/PropPage.cpp:231
-msgid "Unable to get session"
-msgstr "Не удалось открыть сессию"
-
-#: provider/ECProps/ECDelegatePropPage.cpp:183
-#: provider/ECProps/PropPage.cpp:237 provider/ECProps/MapOtherUserDlg.cpp:273
-msgid "Unable to get addressbook"
-msgstr "Не удалось открыть адресную книгу"
-
-#: provider/ECProps/ECDelegatePropPage.cpp:188
+#: provider/ECProps/ECDelegatePropPage.cpp:189
+#: provider/ECProps/ECDelegateDlg.cpp:300
 msgid "Add..."
 msgstr "Добавить..."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:189
+#: provider/ECProps/ECDelegatePropPage.cpp:190
+#: provider/ECProps/ECDelegateDlg.cpp:301
 msgid "Remove..."
 msgstr "Удалить..."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:190
+#: provider/ECProps/ECDelegatePropPage.cpp:191
+#: provider/ECProps/ECDelegateDlg.cpp:302
 msgid "Permissions..."
 msgstr "Права доступа..."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:191
+#: provider/ECProps/ECDelegatePropPage.cpp:192
+#: provider/ECProps/ECDelegateDlg.cpp:303
 msgid ""
 "Delegates can send items on your behalf. To grant permission to others to "
 "access your folders without also giving them send-on-behalf-of privileges, "
@@ -278,17 +752,20 @@ msgstr ""
 "права в вкладке \"Права доступа\" настроек папки (вызывается кликом правой "
 "кнопки мыши по каталогу)."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:192
+#: provider/ECProps/ECDelegatePropPage.cpp:193
+#: provider/ECProps/ECDelegateDlg.cpp:304
 msgid "Send meeting requests and response only to my delegates, not to me"
 msgstr "Отправлять приглашения на собрания и ответы к ним только делегатам"
 
-#: provider/ECProps/ECDelegatePropPage.cpp:199
+#: provider/ECProps/ECDelegatePropPage.cpp:200
+#: provider/ECProps/ECDelegateDlg.cpp:311
 msgid ""
 "The server is not available. Either there are network problems or server is "
 "down for maintenance."
 msgstr "Сервер недоступен. Имеются проблемы с сетью или сервер не работает."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:201
+#: provider/ECProps/ECDelegatePropPage.cpp:202
+#: provider/ECProps/ECDelegateDlg.cpp:313
 msgid ""
 "Could not initialize delegation window\n"
 "Please contact your administrator."
@@ -296,18 +773,10 @@ msgstr ""
 "Не удалось открыть окно делегатов\n"
 "Обратитесь к вашему системному администратору."
 
-#: provider/ECProps/ECDelegatePropPage.cpp:248
-#: provider/ECProps/PropPage.cpp:716 provider/ECProps/ECFavoritesDlg.cpp:48
-#: provider/client/SettingsPropPageAdvance.cpp:105
-msgid "Add"
-msgstr "Добавить"
-
-#: provider/ECProps/ECDelegatePropPage.cpp:263
-#: provider/ECProps/PropPage.cpp:723 provider/ECProps/MapOtherUserDlg.cpp:186
-#: provider/client/ECABContainer.cpp:244 provider/client/ECABContainer.cpp:299
-#: provider/client/SettingsPropPageAdvance.cpp:245
-msgid "Global Address Book"
-msgstr "Глобальная адресная книга"
+#: provider/ECProps/CommandBarButtonRecoverDeletedItems.cpp:130
+#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:279
+msgid "You have insufficient permissions to open this store."
+msgstr "У вас не хватает прав для открытия этого хранилища."
 
 #: provider/ECProps/SyncStatusDlg.cpp:65
 msgid "Synchronization Status"
@@ -363,313 +832,47 @@ msgstr "Вход..."
 msgid "Synchronizing ..."
 msgstr "Синхронизация..."
 
-#: provider/ECProps/PropPage.cpp:32
-msgid "Full control"
-msgstr "Полный контроль"
+#: provider/ECProps/OutOfOfficeDlg.cpp:78
+msgid "I am currently Out of the Office"
+msgstr "В настоящее время «Я недоступен»"
 
-#: provider/ECProps/PropPage.cpp:33
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:165
-#: php-ext/include/mapi/class.taskrequest.php:906
-msgid "Owner"
-msgstr "Владелец"
+#: provider/ECProps/OutOfOfficeDlg.cpp:80
+msgid "Out of Office Assistant"
+msgstr "Помощник функции «Я недоступен»"
 
-#: provider/ECProps/PropPage.cpp:34
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:164
-msgid "Secretary"
-msgstr "Редактор"
+#: provider/ECProps/OutOfOfficeDlg.cpp:81
+msgid "I am currently In the Office"
+msgstr "В настоящее время «Я доступен»"
 
-#: provider/ECProps/PropPage.cpp:35
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:163
-msgid "Only read"
-msgstr "Только для чтения"
-
-#: provider/ECProps/PropPage.cpp:36
-msgid "No rights"
-msgstr "Нет доступа"
-
-#: provider/ECProps/PropPage.cpp:192
-msgid "You have insufficient permissions to set permissions"
-msgstr "У вас не хватает прав для установки разрешений"
-
-#: provider/ECProps/PropPage.cpp:195
-msgid ""
-"Unable to set some permissions. Permissions are only allowed on users and "
-"security groups."
+#: provider/ECProps/OutOfOfficeDlg.cpp:83
+msgid "AutoReply only once to each sender with the following text:"
 msgstr ""
-"Невозможно установить некоторые права. Они разрешены лишь для пользователей "
-"и групп безопасности."
-
-#: provider/ECProps/PropPage.cpp:198
-msgid "Unable to set all permissions."
-msgstr "Невозможно установить все права."
-
-#: provider/ECProps/PropPage.cpp:244
-msgid "Unable to get user store"
-msgstr "Не удалось открыть хранилище пользователя"
-
-#: provider/ECProps/PropPage.cpp:417 provider/client/ECDisplayTable.cpp:28
-msgid "Name"
-msgstr "Имя"
-
-#: provider/ECProps/PropPage.cpp:421
-msgid "Permission Level"
-msgstr "Уровень безопасности"
-
-#: provider/ECProps/PropPage.cpp:425
-msgid "A&dd"
-msgstr "До&бавить"
-
-#: provider/ECProps/PropPage.cpp:429
-msgid "Remo&ve"
-msgstr "Удал&ить"
-
-#: provider/ECProps/PropPage.cpp:431
-msgid "&Properties"
-msgstr "С&войства"
-
-#: provider/ECProps/PropPage.cpp:437
-msgid "Profile"
-msgstr "Профиль"
-
-#: provider/ECProps/PropPage.cpp:442
-msgid "&Create items"
-msgstr "С&оздание элементов"
-
-#: provider/ECProps/PropPage.cpp:443
-msgid "Read &items"
-msgstr "Чтение &документов"
-
-#: provider/ECProps/PropPage.cpp:445
-msgid "Create &subfolders"
-msgstr "Создание &подпапок"
-
-#: provider/ECProps/PropPage.cpp:446
-msgid "Folder pe&rmissions"
-msgstr "Права до&ступа для каталога"
-
-#: provider/ECProps/PropPage.cpp:447
-msgid "Folder visi&ble"
-msgstr "Отобр&ажаемые каталоги"
-
-#: provider/ECProps/PropPage.cpp:448
-msgid "F&older contact"
-msgstr "Конт&акты каталога"
-
-#: provider/ECProps/PropPage.cpp:449
-msgid "&Edit items"
-msgstr "&Правка элементов"
-
-#: provider/ECProps/PropPage.cpp:450
-msgid "De&lete items"
-msgstr "Уд&аление элементов"
-
-#: provider/ECProps/PropPage.cpp:451 provider/ECProps/PropPage.cpp:454
-#: provider/ECProps/SyncConfigDlg.cpp:105
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:162
-msgid "None"
-msgstr "Нет"
-
-#: provider/ECProps/PropPage.cpp:452 provider/ECProps/PropPage.cpp:455
-msgid "Own"
-msgstr "Владелец"
-
-#: provider/ECProps/PropPage.cpp:453 provider/ECProps/PropPage.cpp:456
-msgid "All"
-msgstr "Все"
-
-#: provider/ECProps/PropPage.cpp:534
-msgid "<Unknown user or group>"
-msgstr "<Неизвестный пользователь или группа>"
-
-#: provider/ECProps/PropPage.cpp:567 provider/ECProps/PropPage.cpp:1058
-msgid "Other"
-msgstr "Другой"
-
-#: provider/ECProps/PropPage.cpp:748 provider/ECProps/PropPage.cpp:763
-msgid "One or more users cannot be added to the folder access list."
-msgstr ""
-"Не удалось добавить одного или нескольких пользователей в список доступа к "
-"папке."
-
-#: provider/ECProps/PropPage.cpp:748
-msgid "Non-local users cannot be given rights on this server."
-msgstr "Удаленные пользователи не могут получить права на этом сервере."
-
-#: provider/ECProps/PropPage.cpp:763
-msgid "One or more users are already specified."
-msgstr "Один или несколько пользователей уже существуют."
-
-#: provider/ECProps/MapOtherUserDlg.cpp:35
-msgid "Entire Inbox (Permanent)"
-msgstr "Все каталоги (Постоянно)"
-
-#: provider/ECProps/MapOtherUserDlg.cpp:36
-msgid "Calendar (Temporary)"
-msgstr "Календарь (Временно)"
-
-#: provider/ECProps/MapOtherUserDlg.cpp:37
-msgid "Notes (Temporary)"
-msgstr "Заметки (Временно)"
-
-#: provider/ECProps/MapOtherUserDlg.cpp:38
-msgid "Tasks (Temporary)"
-msgstr "Задачи (Временно)"
-
-#: provider/ECProps/MapOtherUserDlg.cpp:39
-msgid "Contacts (Temporary)"
-msgstr "Контакты (Временно)"
-
-#: provider/ECProps/MapOtherUserDlg.cpp:40
-msgid "Inbox (Temporary)"
-msgstr "Входящие (Временно)"
-
-#: provider/ECProps/MapOtherUserDlg.cpp:114
-msgid "User could not be resolved (GAB is unavailable)."
-msgstr ""
-
-#: provider/ECProps/MapOtherUserDlg.cpp:131
-#: provider/client/SettingsPropPageAdvance.cpp:171
-msgid "User could not be resolved."
-msgstr "Невозможно обнаружить пользователя."
-
-#: provider/ECProps/MapOtherUserDlg.cpp:142
-msgid "Select a folder type or cancel."
-msgstr "Выберите тип папки или отмените операцию."
-
-#: provider/ECProps/MapOtherUserDlg.cpp:249
-msgid "Folder of other user"
-msgstr "Каталоги других пользователей"
-
-#: provider/ECProps/MapOtherUserDlg.cpp:251
-#: provider/client/SettingsTabConnection.cpp:85
-#: provider/client/PasswordDlg.cpp:87 provider/client/SettingsDlg.cpp:132
-msgid "Username"
-msgstr "Имя пользователя"
-
-#: provider/ECProps/MapOtherUserDlg.cpp:255
-msgid "Foldertype"
-msgstr "Тип каталога"
-
-#: provider/ECProps/MapOtherUserDlg.cpp:259
-msgid "Ok"
-msgstr "ОK"
-
-#: provider/ECProps/MapOtherUserDlg.cpp:261
-#: provider/client/SettingsPropPageAdvance.cpp:106
-msgid "Name..."
-msgstr "Имя..."
-
-#: provider/ECProps/SyncConfigDlg.cpp:69
-msgid "Configure synchronization"
-msgstr "Настройка синхронизации"
-
-#: provider/ECProps/SyncConfigDlg.cpp:71
-msgid "Time between synchronizations:"
-msgstr "Период синхронизации:"
-
-#: provider/ECProps/SyncConfigDlg.cpp:79
-msgid "1 minute"
-msgstr "1 минута"
-
-#: provider/ECProps/SyncConfigDlg.cpp:81
-msgid "5 minutes"
-msgstr "5 минут"
-
-#: provider/ECProps/SyncConfigDlg.cpp:83
-msgid "15 minutes"
-msgstr "15 минут"
-
-#: provider/ECProps/SyncConfigDlg.cpp:85
-msgid "1 half hour"
-msgstr "30 минут"
-
-#: provider/ECProps/SyncConfigDlg.cpp:87
-msgid "1 hour"
-msgstr "1 час"
-
-#: provider/ECProps/SyncConfigDlg.cpp:97
-msgid "Also start synchronization when:"
-msgstr "Также синхронизировать при:"
-
-#: provider/ECProps/SyncConfigDlg.cpp:107
-msgid "Receive mail"
-msgstr "Получении почты"
-
-#: provider/ECProps/SyncConfigDlg.cpp:109
-msgid "Any change"
-msgstr "При любых изменениях"
-
-#: provider/ECProps/SyncConfigDlg.cpp:119
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:131
-msgid "OK"
-msgstr "ОК"
-
-#: provider/ECProps/SyncConfigDlg.cpp:171
-msgid "Error saving synchronization settings"
-msgstr "Ошибка при сохранении настроек синхронизации"
-
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:118
-msgid "<Unknown>"
-msgstr "<Неизвестный>"
-
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:120
-msgid "Multiple Delegates"
-msgstr "Множественное делегирование"
-
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:123
-msgid "Delegate permissions"
-msgstr "Разделить права"
-
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:133
-msgid "This delegate has the following permissions"
-msgstr "У этого делегата есть следующие права"
-
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:134
-#: provider/client/ECMsgStore.cpp:2464
-msgid "Calendar"
-msgstr "Календарь"
-
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:135
-#: provider/client/ECMsgStore.cpp:2510
-msgid "Tasks"
-msgstr "Задачи"
-
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:136
-#: provider/libserver/ECGenProps.cpp:942 provider/client/ECMsgStore.cpp:2404
-msgid "Inbox"
-msgstr "Входящие"
-
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:137
-#: provider/client/ECMsgStore.cpp:2452
-msgid "Contacts"
-msgstr "Контакты"
-
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:138
-#: provider/client/ECMsgStore.cpp:2498
-msgid "Notes"
-msgstr "Заметки"
-
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:139
-#: provider/client/ECMsgStore.cpp:2486
-msgid "Journal"
-msgstr "Журнал"
-
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:140
-msgid "Delegate receives copies of meeting-related messages sent to me"
-msgstr ""
-"Делегат принимает копии направленных мне сообщений, связанных с собраниями"
-
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:141
-msgid "Automatically send a message to delegate summarizing these permissions"
-msgstr "Автоматически отправлять сообщение с обобщенным разделением этих прав"
-
-#: provider/ECProps/ECDelegatePermissionDlg.cpp:142
-msgid "Delegate can see my private items"
-msgstr "Делегат имеет право просматривать мои личные элементы"
-
-#: provider/ECProps/ECFavoritesDlg.cpp:41
-msgid "Add to favorites"
-msgstr "Добавить в «Избранное»"
+"Единожды отправлять автоответ каждому пользователю с следующим текстом:"
+
+#: provider/ECProps/OutOfOfficeDlg.cpp:84 provider/client/ClientUtil.cpp:341
+msgid "Subject:"
+msgstr "Тема:"
+
+#: provider/ECProps/OutOfOfficeDlg.cpp:85
+msgid "&Save"
+msgstr "&Сохранить"
+
+#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:138
+msgid "Unable to open default store in MAPI session."
+msgstr "Не удалось открыть основное хранилище в сессии MAPI."
+
+#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:165
+#: provider/client/SettingsPropPageAdvance.cpp:189
+msgid "Refusing to add primary store as shared store."
+msgstr "Запрет на добавление основного хранилища в качестве общего хранилища."
+
+#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:174
+msgid "Unable to open this store."
+msgstr "Не удалось открыть это хранилище."
+
+#: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:279
+msgid "Access Denied"
+msgstr "Доступ запрещен"
 
 #: provider/ECProps/ECDeletedMessageRecoveryDlg.cpp:198
 msgid "Recover Deleted Items"
@@ -791,39 +994,64 @@ msgstr "Вызов осуществлен, но не все значения б�
 msgid "The folder and/or messages can not be deleted."
 msgstr "Не удалось удалить каталоги и/или сообщения."
 
-#: provider/libserver/ECDBUpdateProgress.cpp:93
-msgid "Upgrade: "
-msgstr "Обновлено: "
+#: provider/client/SettingsDlg.cpp:38 provider/client/SettingsDlg.cpp:127
+#: provider/client/ECDisplayTable.cpp:27 provider/client/ECDisplayTable.cpp:73
+msgid "General"
+msgstr "Общие"
 
-#: provider/libserver/ECGenProps.cpp:900
-#: provider/client/ECMAPIFolderPublic.cpp:162
-#: provider/client/ECMsgStorePublic.cpp:653
-msgid "Public Folders"
-msgstr "Общие каталоги"
+#: provider/client/SettingsDlg.cpp:128
+msgid "Server settings"
+msgstr "Настройки сервера"
 
-#: provider/libserver/ECGenProps.cpp:944
-msgid "Archive"
-msgstr "Архив"
+#: provider/client/SettingsDlg.cpp:129
+msgid "Server"
+msgstr "Сервер"
 
-#: provider/client/ECMSProvider.cpp:247
-#: provider/client/ECABProviderSwitch.cpp:279
-#: provider/client/EntryPoint.cpp:1102
+#: provider/client/SettingsDlg.cpp:130
+#: provider/client/SettingsTabConnection.cpp:84
+msgid "Port"
+msgstr "Порт"
+
+#: provider/client/SettingsDlg.cpp:131
+msgid "Enable encryption (HTTPS)"
+msgstr "Исп. шифрование (HTTPS)"
+
+#: provider/client/SettingsDlg.cpp:133
+#: provider/client/SettingsTabConnection.cpp:86
+#: provider/client/PasswordDlg.cpp:88
+msgid "Password"
+msgstr "Пароль"
+
+#: provider/client/SettingsDlg.cpp:134
+#: provider/client/SettingsTabConnection.cpp:36
+msgid "Connection"
+msgstr "Соединение"
+
+#: provider/client/SettingsDlg.cpp:135
+msgid "Connection type"
+msgstr "Тип соединения"
+
+#: provider/client/SettingsDlg.cpp:161
+msgid "Online"
+msgstr "Онлайн"
+
+#: provider/client/SettingsDlg.cpp:164
+msgid "Cached Mode"
+msgstr "Кэширующий режим"
+
+#: provider/client/SettingsDlg.cpp:167
+msgid "Detect at startup"
+msgstr "Выбрать при запуске"
+
+#: provider/client/SettingsDlg.cpp:236
 msgid ""
-"Cannot use the profile because you are over the license limit. To continue, "
-"you must purchase additional client licenses."
+"Offline or cached mode for Outlook XP and Outlook 2002 is not supported. If "
+"you wish to use offline functionality, please use Outlook 2000, 2003, 2007 "
+"or later."
 msgstr ""
-"Невозможно использовать этот профиль, так как вы превысили ограничение "
-"лицензии. Для продолжения вам необходимо расширить вашу лицензию."
-
-#: provider/client/ECMSProvider.cpp:251
-#: provider/client/ECABProviderSwitch.cpp:284
-#: provider/client/EntryPoint.cpp:1108
-msgid ""
-"Cannot use the profile because the server was unable to contact the license "
-"server. Please consult your system administrator."
-msgstr ""
-"Невозможно использовать этот профиль, так как не удалось подключиться к "
-"серверу лицензий. Обратитесь к вашему системному администратору."
+"Кэширующий режим не поддержимается в Outlook версии XP и 2002. Если вы "
+"желаете использовать кэширующий режим, воспользуйтесь Outlook версии 2000, "
+"2003, 2007 и выше."
 
 #: provider/client/ECABContainer.cpp:246 provider/client/ECABContainer.cpp:301
 msgid "Global Address Lists"
@@ -832,255 +1060,6 @@ msgstr "Глобальная адресная книга"
 #: provider/client/ECABContainer.cpp:248 provider/client/ECABContainer.cpp:303
 msgid "All Address Lists"
 msgstr "Все адресные списки"
-
-#: provider/client/SettingsTabConnection.cpp:36
-#: provider/client/SettingsDlg.cpp:134
-msgid "Connection"
-msgstr "Соединение"
-
-#: provider/client/SettingsTabConnection.cpp:80
-#: provider/client/SettingsPropPageAdvance.cpp:54
-#: provider/client/SettingsPropPageAdvance.cpp:103
-msgid "Advanced"
-msgstr "Расширенные"
-
-#: provider/client/SettingsTabConnection.cpp:81
-msgid "Proxy"
-msgstr "Прокси"
-
-#: provider/client/SettingsTabConnection.cpp:82
-msgid "Use proxyserver"
-msgstr "Использовать прокси-сервер"
-
-#: provider/client/SettingsTabConnection.cpp:83
-msgid "Proxy server"
-msgstr "Прокси-сервер"
-
-#: provider/client/SettingsTabConnection.cpp:84
-#: provider/client/SettingsDlg.cpp:130
-msgid "Port"
-msgstr "Порт"
-
-#: provider/client/SettingsTabConnection.cpp:86
-#: provider/client/PasswordDlg.cpp:88 provider/client/SettingsDlg.cpp:133
-msgid "Password"
-msgstr "Пароль"
-
-#: provider/client/SettingsTabConnection.cpp:87
-msgid "Use compression"
-msgstr "Использовать сжатие"
-
-#: provider/client/SettingsTabConnection.cpp:88
-msgid "Seconds Until Server Connection timeout"
-msgstr "Время ожидания подключения к серверу в сек."
-
-#: provider/client/CertificateDlg.cpp:63
-msgid "Certificate summary"
-msgstr "Данные о сертификате"
-
-#: provider/client/CertificateDlg.cpp:64
-msgid "View certificate"
-msgstr "Просмотр сертификата"
-
-#: provider/client/CertificateDlg.cpp:65
-msgid "Remember my choice for this certificate"
-msgstr "Запомнить мой выбор для этого сертификата"
-
-#: provider/client/CertificateDlg.cpp:67
-msgid "Hostname"
-msgstr "Имя узла"
-
-# 85%
-# 83%
-#: provider/client/CertificateDlg.cpp:68
-msgid "Holder"
-msgstr "Владелец"
-
-#: provider/client/CertificateDlg.cpp:69
-msgid "Issuer"
-msgstr "Издатель"
-
-#: provider/client/CertificateDlg.cpp:70
-msgid "Expiration"
-msgstr "Временное ограничение"
-
-#: provider/client/CertificateDlg.cpp:112
-msgid "Unable to open registry key for SSL certificate storage"
-msgstr "Не удалось открыть ключ реестра для хранилища сертификатов SSL"
-
-#: provider/client/CertificateDlg.cpp:117
-msgid "Unable to store SSL certificate in registry key."
-msgstr "Не удалось сохранить сертификат SSL в ключе реестра."
-
-#: provider/client/ProviderUtil.cpp:132
-msgid ""
-"Unable to work online! The first time you need a network connection. Retry "
-"if you have the network connection."
-msgstr ""
-"Невозможно работать в режиме «Online»! В начале вам необходимо сетевое "
-"соединение. Повторите, если сеть правильно работает."
-
-#: provider/client/ProviderUtil.cpp:150
-msgid "First Folder Sync..."
-msgstr "Первое обновление каталогов..."
-
-#: provider/client/ProviderUtil.cpp:155
-msgid "Sync folder items"
-msgstr "Обновление элементов каталога"
-
-#: provider/client/ECMsgStore.cpp:2434
-msgid "Outbox"
-msgstr "Исходящие"
-
-#: provider/client/ECMsgStore.cpp:2440
-msgid "Deleted Items"
-msgstr "Удаленные"
-
-#: provider/client/ECMsgStore.cpp:2446
-msgid "Sent Items"
-msgstr "Отправленные"
-
-#: provider/client/ECMsgStore.cpp:2474
-msgid "Drafts"
-msgstr "Черновики"
-
-#: provider/client/ECMsgStore.cpp:2522
-msgid "Junk E-mail"
-msgstr "Нежелательная почта"
-
-#: provider/client/ECMsgStore.cpp:2544
-msgid "RSS Feeds"
-msgstr "Ленты RSS"
-
-#: provider/client/ECMsgStore.cpp:2544
-msgid "RSS Feed comment"
-msgstr "Комментарии лент RSS"
-
-#: provider/client/ECMsgStore.cpp:2548
-msgid "Conversation Action Settings"
-msgstr "Настройки действий при разговоре"
-
-#: provider/client/ECMsgStore.cpp:2552
-msgid "Quick Step Settings"
-msgstr "Быстрая настройка"
-
-#: provider/client/ECMsgStore.cpp:2556
-msgid "Suggested Contacts"
-msgstr "Предлагаемые контакты"
-
-#: provider/client/SettingsPropPageAdvance.cpp:104
-msgid "MailBox"
-msgstr "MailBox"
-
-#: provider/client/SettingsPropPageAdvance.cpp:107
-msgid "Remove"
-msgstr "Удалить"
-
-#: provider/client/SettingsPropPageAdvance.cpp:199
-msgid "User already exists."
-msgstr "Пользователь уже существует."
-
-#: provider/client/ECArchiveAwareMessage.cpp:471
-#: provider/client/ECArchiveAwareMessage.cpp:529
-msgid "Zarafa Archiver"
-msgstr "Архиватор Zarafa"
-
-#: provider/client/ECArchiveAwareMessage.cpp:473
-msgid "An error has occurred while fetching the message from the archive."
-msgstr "Произошла ошибка при получении письма с архива."
-
-#: provider/client/ECArchiveAwareMessage.cpp:475
-msgid "Please contact your system administrator."
-msgstr "Обратитесь к вашему системному администратору."
-
-#: provider/client/ECArchiveAwareMessage.cpp:478 spooler/archive.cpp:335
-msgid "Error code:"
-msgstr "Код ошибки:"
-
-#: provider/client/ECArchiveAwareMessage.cpp:487
-msgid "It seems no valid archiver license is installed."
-msgstr "Не найдена корректная лицензия архиватора."
-
-#: provider/client/ECArchiveAwareMessage.cpp:491
-msgid "The archive could not be found."
-msgstr "Архив не найден."
-
-#: provider/client/ECArchiveAwareMessage.cpp:495
-msgid "You don't have sufficient access to the archive."
-msgstr "Недостаточно прав для доступа к архиву."
-
-#: provider/client/ECArchiveAwareMessage.cpp:502 spooler/archive.cpp:339
-msgid "Error description:"
-msgstr "Описание ошибки:"
-
-#: provider/client/ECArchiveAwareMessage.cpp:531
-msgid "Archives can not be destubbed when working offline."
-msgstr ""
-
-#: provider/client/ECABProviderSwitch.cpp:136
-#: provider/client/ECMSProviderSwitch.cpp:272
-msgid ""
-"Your offline cache database is being upgraded. Outlook will start in online "
-"mode for this session."
-msgstr ""
-"Локальная база данных была обновлена. Outlook в этом сеансе запустится в "
-"режиме прямого подключения."
-
-#: provider/client/ECABProviderSwitch.cpp:209
-#: provider/client/ECMSProviderSwitch.cpp:379
-msgid "Unable to work online! Do you want to switch to offline mode?"
-msgstr ""
-"Невозможно работать в режиме «Online»! Хотите переключиться в автоновный "
-"режим?"
-
-#: provider/client/EntryPoint.cpp:969
-msgid "Unknown username"
-msgstr "Неизвестное имя пользователя"
-
-#: provider/client/EntryPoint.cpp:1071
-msgid "Connecting to the server..."
-msgstr "Соединение с сервером..."
-
-#: provider/client/EntryPoint.cpp:1091
-msgid ""
-"Unable to reach the server.\n"
-"Do you want to save the settings or cancel and re-enter the settings?"
-msgstr ""
-"Не удалось обнаружить сервер.\n"
-"Вы хотите сохранить настройки или необходимо их отменить и ввести снова?"
-
-#: provider/client/EntryPoint.cpp:1186
-msgid "Incorrect username and/or password."
-msgstr "Неправильное имя/некорректный пароль."
-
-#: provider/client/EntryPoint.cpp:1188
-msgid ""
-"Incorrect servername and/or port\n"
-"Check if the server is running."
-msgstr ""
-"Неправильное имя сервера и/или номер порта\n"
-"Проверьте работу сервера."
-
-#: provider/client/EntryPoint.cpp:1190
-msgid "Incorrect version."
-msgstr "Некорретная версия."
-
-#: provider/client/EntryPoint.cpp:1192
-msgid ""
-"An unknown failure has occurred.\n"
-"Please contact your administrator."
-msgstr ""
-"Произошла неизвестная ошибка.\n"
-"Обратитесь к вашему системному администратору."
-
-#: provider/client/EntryPoint.cpp:1218
-msgid "You should restart Outlook for the changes to take effect."
-msgstr "Вы должны перезапустить Outlook для принятия изменений."
-
-#: provider/client/ECDisplayTable.cpp:27 provider/client/ECDisplayTable.cpp:73
-#: provider/client/SettingsDlg.cpp:38 provider/client/SettingsDlg.cpp:127
-msgid "General"
-msgstr "Общие"
 
 #: provider/client/ECDisplayTable.cpp:29
 msgid "First:"
@@ -1234,6 +1213,89 @@ msgstr "Участники"
 msgid "Modify members..."
 msgstr "Управление участниками..."
 
+#: provider/client/SettingsPropPageAdvance.cpp:54
+#: provider/client/SettingsPropPageAdvance.cpp:103
+#: provider/client/SettingsTabConnection.cpp:80
+msgid "Advanced"
+msgstr "Расширенные"
+
+#: provider/client/SettingsPropPageAdvance.cpp:104
+msgid "MailBox"
+msgstr "MailBox"
+
+#: provider/client/SettingsPropPageAdvance.cpp:107
+msgid "Remove"
+msgstr "Удалить"
+
+#: provider/client/SettingsPropPageAdvance.cpp:199
+msgid "User already exists."
+msgstr "Пользователь уже существует."
+
+#: provider/client/SettingsTabConnection.cpp:81
+msgid "Proxy"
+msgstr "Прокси"
+
+#: provider/client/SettingsTabConnection.cpp:82
+msgid "Use proxyserver"
+msgstr "Использовать прокси-сервер"
+
+#: provider/client/SettingsTabConnection.cpp:83
+msgid "Proxy server"
+msgstr "Прокси-сервер"
+
+#: provider/client/SettingsTabConnection.cpp:87
+msgid "Use compression"
+msgstr "Использовать сжатие"
+
+#: provider/client/SettingsTabConnection.cpp:88
+msgid "Seconds Until Server Connection timeout"
+msgstr "Время ожидания подключения к серверу в сек."
+
+#: provider/client/ECExchangeImportContentsChanges.cpp:842
+msgid "Sync Issues"
+msgstr "Ошибки синхронизации"
+
+#: provider/client/ECExchangeImportContentsChanges.cpp:848
+msgid "Conflicts"
+msgstr "Конфликты"
+
+#: provider/client/ECExchangeImportContentsChanges.cpp:854
+msgid "Local Failures"
+msgstr "Локальные ошибки"
+
+#: provider/client/ECExchangeImportContentsChanges.cpp:860
+msgid "Server Failures"
+msgstr "Ошибки сервера"
+
+#: provider/client/ECMSProviderSwitch.cpp:236
+msgid ""
+"Unable to connect to the online server. If you continue, no new connections "
+"will be attempted until you disable the 'Work offline' option in the 'File' "
+"menu."
+msgstr ""
+"Не удалось соединиться с онлайн-сервером. Пока вы не выключите функцию "
+"«Работать автономно» в меню «Файл», новые соединения создаваться не будут."
+
+#: provider/client/ECMSProviderSwitch.cpp:272
+#: provider/client/ECABProviderSwitch.cpp:136
+msgid ""
+"Your offline cache database is being upgraded. Outlook will start in online "
+"mode for this session."
+msgstr ""
+"Локальная база данных была обновлена. Outlook в этом сеансе запустится в "
+"режиме прямого подключения."
+
+#: provider/client/ECMSProviderSwitch.cpp:379
+#: provider/client/ECABProviderSwitch.cpp:209
+msgid "Unable to work online! Do you want to switch to offline mode?"
+msgstr ""
+"Невозможно работать в режиме «Online»! Хотите переключиться в автоновный "
+"режим?"
+
+#: provider/client/PasswordDlg.cpp:83
+msgid "Trying to connect to"
+msgstr "Попытка соединения к"
+
 #: provider/client/ClientUtil.cpp:81
 msgid "Available"
 msgstr "Доступен"
@@ -1270,162 +1332,218 @@ msgstr "Копия:"
 msgid "Sent on:"
 msgstr "Отправить в:"
 
-#: provider/client/ECMSProviderSwitch.cpp:236
+#: provider/client/ECABProviderSwitch.cpp:279
+#: provider/client/ECMSProvider.cpp:247 provider/client/EntryPoint.cpp:1102
 msgid ""
-"Unable to connect to the online server. If you continue, no new connections "
-"will be attempted until you disable the 'Work offline' option in the 'File' "
-"menu."
+"Cannot use the profile because you are over the license limit. To continue, "
+"you must purchase additional client licenses."
 msgstr ""
-"Не удалось соединиться с онлайн-сервером. Пока вы не выключите функцию "
-"«Работать автономно» в меню «Файл», новые соединения создаваться не будут."
+"Невозможно использовать этот профиль, так как вы превысили ограничение "
+"лицензии. Для продолжения вам необходимо расширить вашу лицензию."
 
-#: provider/client/ECExchangeImportContentsChanges.cpp:818
-msgid "Sync Issues"
-msgstr "Ошибки синхронизации"
-
-#: provider/client/ECExchangeImportContentsChanges.cpp:824
-msgid "Conflicts"
-msgstr "Конфликты"
-
-#: provider/client/ECExchangeImportContentsChanges.cpp:830
-msgid "Local Failures"
-msgstr "Локальные ошибки"
-
-#: provider/client/ECExchangeImportContentsChanges.cpp:836
-msgid "Server Failures"
-msgstr "Ошибки сервера"
-
-#: provider/client/PasswordDlg.cpp:83
-msgid "Trying to connect to"
-msgstr "Попытка соединения к"
-
-#: provider/client/SettingsDlg.cpp:128
-msgid "Server settings"
-msgstr "Настройки сервера"
-
-#: provider/client/SettingsDlg.cpp:129
-msgid "Server"
-msgstr "Сервер"
-
-#: provider/client/SettingsDlg.cpp:131
-msgid "Enable encryption (HTTPS)"
-msgstr "Исп. шифрование (HTTPS)"
-
-#: provider/client/SettingsDlg.cpp:135
-msgid "Connection type"
-msgstr "Тип соединения"
-
-#: provider/client/SettingsDlg.cpp:161
-msgid "Online"
-msgstr "Онлайн"
-
-#: provider/client/SettingsDlg.cpp:164
-msgid "Cached Mode"
-msgstr "Кэширующий режим"
-
-#: provider/client/SettingsDlg.cpp:167
-msgid "Detect at startup"
-msgstr "Выбрать при запуске"
-
-#: provider/client/SettingsDlg.cpp:236
+#: provider/client/ECABProviderSwitch.cpp:284
+#: provider/client/ECMSProvider.cpp:251 provider/client/EntryPoint.cpp:1108
 msgid ""
-"Offline or cached mode for Outlook XP and Outlook 2002 is not supported. If "
-"you wish to use offline functionality, please use Outlook 2000, 2003, 2007 "
-"or later."
+"Cannot use the profile because the server was unable to contact the license "
+"server. Please consult your system administrator."
 msgstr ""
-"Кэширующий режим не поддержимается в Outlook версии XP и 2002. Если вы "
-"желаете использовать кэширующий режим, воспользуйтесь Outlook версии 2000, "
-"2003, 2007 и выше."
+"Невозможно использовать этот профиль, так как не удалось подключиться к "
+"серверу лицензий. Обратитесь к вашему системному администратору."
 
-#: provider/contacts/ZCABContainer.cpp:740
+#: provider/client/ECArchiveAwareMessage.cpp:471
+#: provider/client/ECArchiveAwareMessage.cpp:529
+msgid "Zarafa Archiver"
+msgstr "Архиватор Zarafa"
+
+#: provider/client/ECArchiveAwareMessage.cpp:473
+msgid "An error has occurred while fetching the message from the archive."
+msgstr "Произошла ошибка при получении письма с архива."
+
+#: provider/client/ECArchiveAwareMessage.cpp:475
+msgid "Please contact your system administrator."
+msgstr "Обратитесь к вашему системному администратору."
+
+#: provider/client/ECArchiveAwareMessage.cpp:478 spooler/archive.cpp:335
+msgid "Error code:"
+msgstr "Код ошибки:"
+
+#: provider/client/ECArchiveAwareMessage.cpp:487
+msgid "It seems no valid archiver license is installed."
+msgstr "Не найдена корректная лицензия архиватора."
+
+#: provider/client/ECArchiveAwareMessage.cpp:491
+msgid "The archive could not be found."
+msgstr "Архив не найден."
+
+#: provider/client/ECArchiveAwareMessage.cpp:495
+msgid "You don't have sufficient access to the archive."
+msgstr "Недостаточно прав для доступа к архиву."
+
+#: provider/client/ECArchiveAwareMessage.cpp:502 spooler/archive.cpp:339
+msgid "Error description:"
+msgstr "Описание ошибки:"
+
+#: provider/client/ECArchiveAwareMessage.cpp:531
+msgid "Archives can not be destubbed when working offline."
+msgstr ""
+
+#: provider/client/ECMsgStorePublic.cpp:653
+#: provider/client/ECMAPIFolderPublic.cpp:162
+#: provider/libserver/ECGenProps.cpp:905
+msgid "Public Folders"
+msgstr "Общие каталоги"
+
+#: provider/client/EntryPoint.cpp:969
+msgid "Unknown username"
+msgstr "Неизвестное имя пользователя"
+
+#: provider/client/EntryPoint.cpp:1071
+msgid "Connecting to the server..."
+msgstr "Соединение с сервером..."
+
+#: provider/client/EntryPoint.cpp:1091
+msgid ""
+"Unable to reach the server.\n"
+"Do you want to save the settings or cancel and re-enter the settings?"
+msgstr ""
+"Не удалось обнаружить сервер.\n"
+"Вы хотите сохранить настройки или необходимо их отменить и ввести снова?"
+
+#: provider/client/EntryPoint.cpp:1186
+msgid "Incorrect username and/or password."
+msgstr "Неправильное имя/некорректный пароль."
+
+#: provider/client/EntryPoint.cpp:1188
+msgid ""
+"Incorrect servername and/or port\n"
+"Check if the server is running."
+msgstr ""
+"Неправильное имя сервера и/или номер порта\n"
+"Проверьте работу сервера."
+
+#: provider/client/EntryPoint.cpp:1190
+msgid "Incorrect version."
+msgstr "Некорретная версия."
+
+#: provider/client/EntryPoint.cpp:1192
+msgid ""
+"An unknown failure has occurred.\n"
+"Please contact your administrator."
+msgstr ""
+"Произошла неизвестная ошибка.\n"
+"Обратитесь к вашему системному администратору."
+
+#: provider/client/EntryPoint.cpp:1218
+msgid "You should restart Outlook for the changes to take effect."
+msgstr "Вы должны перезапустить Outlook для принятия изменений."
+
+#: provider/client/ProviderUtil.cpp:132
+msgid ""
+"Unable to work online! The first time you need a network connection. Retry "
+"if you have the network connection."
+msgstr ""
+"Невозможно работать в режиме «Online»! В начале вам необходимо сетевое "
+"соединение. Повторите, если сеть правильно работает."
+
+#: provider/client/ProviderUtil.cpp:150
+msgid "First Folder Sync..."
+msgstr "Первое обновление каталогов..."
+
+#: provider/client/ProviderUtil.cpp:155
+msgid "Sync folder items"
+msgstr "Обновление элементов каталога"
+
+#: provider/client/ECMsgStore.cpp:2450
+msgid "Outbox"
+msgstr "Исходящие"
+
+#: provider/client/ECMsgStore.cpp:2456
+msgid "Deleted Items"
+msgstr "Удаленные"
+
+#: provider/client/ECMsgStore.cpp:2462
+msgid "Sent Items"
+msgstr "Отправленные"
+
+#: provider/client/ECMsgStore.cpp:2490
+msgid "Drafts"
+msgstr "Черновики"
+
+#: provider/client/ECMsgStore.cpp:2538
+msgid "Junk E-mail"
+msgstr "Нежелательная почта"
+
+#: provider/client/ECMsgStore.cpp:2560
+msgid "RSS Feeds"
+msgstr "Ленты RSS"
+
+#: provider/client/ECMsgStore.cpp:2560
+msgid "RSS Feed comment"
+msgstr "Комментарии лент RSS"
+
+#: provider/client/ECMsgStore.cpp:2564
+msgid "Conversation Action Settings"
+msgstr "Настройки действий при разговоре"
+
+#: provider/client/ECMsgStore.cpp:2568
+msgid "Quick Step Settings"
+msgstr "Быстрая настройка"
+
+#: provider/client/ECMsgStore.cpp:2572
+msgid "Suggested Contacts"
+msgstr "Предлагаемые контакты"
+
+#: provider/client/CertificateDlg.cpp:63
+msgid "Certificate summary"
+msgstr "Данные о сертификате"
+
+#: provider/client/CertificateDlg.cpp:64
+msgid "View certificate"
+msgstr "Просмотр сертификата"
+
+#: provider/client/CertificateDlg.cpp:65
+msgid "Remember my choice for this certificate"
+msgstr "Запомнить мой выбор для этого сертификата"
+
+#: provider/client/CertificateDlg.cpp:67
+msgid "Hostname"
+msgstr "Имя узла"
+
+# 85%
+# 83%
+#: provider/client/CertificateDlg.cpp:68
+msgid "Holder"
+msgstr "Владелец"
+
+#: provider/client/CertificateDlg.cpp:69
+msgid "Issuer"
+msgstr "Издатель"
+
+#: provider/client/CertificateDlg.cpp:70
+msgid "Expiration"
+msgstr "Временное ограничение"
+
+#: provider/client/CertificateDlg.cpp:112
+msgid "Unable to open registry key for SSL certificate storage"
+msgstr "Не удалось открыть ключ реестра для хранилища сертификатов SSL"
+
+#: provider/client/CertificateDlg.cpp:117
+msgid "Unable to store SSL certificate in registry key."
+msgstr "Не удалось сохранить сертификат SSL в ключе реестра."
+
+#: provider/contacts/ZCABContainer.cpp:761
 msgid "Zarafa Contacts Folders"
 msgstr "Каталог контактов Zarafa"
 
-#: provider/common/SOAPSock.cpp:481
-msgid "Unable to get SSL object from store"
-msgstr "Не удалось получить объект SSL с хранилища"
+#: provider/libserver/ECGenProps.cpp:949
+msgid "Archive"
+msgstr "Архив"
 
-#: provider/common/SOAPSock.cpp:489
-msgid "Unable to get SSL context from SSL object"
-msgstr "Не удалось получить содержание SSL с объекта SSL"
+#: provider/libserver/ECDBUpdateProgress.cpp:93
+msgid "Upgrade: "
+msgstr "Обновлено: "
 
-#: provider/common/SOAPSock.cpp:512
-msgid "No certificate found in connection"
-msgstr "Не найдено сертификатов в соединении"
-
-#: provider/common/SOAPSock.cpp:527
-msgid "Unable to convert OpenSSL to WinCrypt"
-msgstr "Невозможно превратить OpenSSL в WinCrypt"
-
-#: provider/common/SOAPSock.cpp:649
-msgid "The certificate is not trusted and could not be verified."
-msgstr ""
-"Этот сертификат не является доверенным, поэтому его невозможно проверить."
-
-#: provider/common/SOAPSock.cpp:651
-msgid "The certificate is not trusted."
-msgstr "Сертификат является недоверенным."
-
-#: provider/common/SOAPSock.cpp:654
-msgid "The certificate is trusted but does not verify correctly."
-msgstr "Сертификат является доверенным, однако его не удалось проверить."
-
-#: provider/common/SOAPSock.cpp:657
-msgid "Do you wish to continue?"
-msgstr "Вы действительно хотите продолжить?"
-
-#: zarafa-libsync/ECSync.cpp:1949
-msgid ""
-"The synchronization of a folder failed. Press retry to continue or ignore to "
-"supress all errors.\r\n"
-"\r\n"
-"Please contact the system administrator if this problem persists."
-msgstr ""
-"Синхронизация каталога не удалась. Нажмите «Повторить» для продолжения или "
-"«Игнорировать» для пропуска всех ошибок.\r\n"
-"\r\n"
-"Обратитесь к вашему системному администратору в случае повтора проблемы."
-
-# 84%
-#: zarafa-libsync/ECSync.cpp:1951
-#, fuzzy
-msgid "Error codes: "
-msgstr "Код ошибки:"
-
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:922
-msgid "Zarafa Archive"
-msgstr "Архив Zarafa"
-
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:923
-msgid "This folder contains the special archive folders."
-msgstr "Эта папка содержит специальные архивные папки."
-
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:928
-msgid "History"
-msgstr "История"
-
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:929
-msgid ""
-"This folder contains archives that have been replaced by a newer version."
-msgstr "Этот каталог содержит архивы, которые были заменены на новую версию."
-
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:933
-msgid "Outgoing"
-msgstr "Исходящие"
-
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:934
-msgid "This folder contains archives of all outgoing messages."
-msgstr "Этот каталог содержит архивы для всех исходящих сообщений."
-
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:938
-msgid "Deleted"
-msgstr "Удалено"
-
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:939
-msgid "This folder contains archives of messages that have been deleted."
-msgstr "Этот каталог содержит архивы сообщений, которые были удалены."
-
-#: spooler/Spooler.cpp:484
+#: spooler/Spooler.cpp:485
 msgid ""
 "A fatal error occurred while processing your message, and Zarafa is unable "
 "to send your email."
@@ -1467,109 +1585,9 @@ msgstr ""
 "Пользователь или группа, к которому вы пытаетесь отправить сообщение, не "
 "существует."
 
-#: spooler/mailer.cpp:2549
+#: spooler/mailer.cpp:2554
 msgid "Error found while trying to send your message. Error code: "
 msgstr "При отправке сообщения произошла ошибка. Код ошибки: "
-
-#: common/Util.cpp:1728
-msgid "End of Session"
-msgstr "Конец сессии"
-
-#: common/Util.cpp:1731
-msgid "Connection lost"
-msgstr "Соединение потеряно"
-
-#: common/Util.cpp:1734
-msgid "Access denied"
-msgstr "Доступ запрещен"
-
-#: common/Util.cpp:1737
-msgid ""
-"Unable to move or copy folders. Can't copy folder. A top-level can't be "
-"copied to one of its subfolders. Or, you may not have appropriate "
-"permissions for the folder. To check your permissions for the folder, right-"
-"click the folder, and then click Properties on the shortcut menu."
-msgstr ""
-"Не удалось скопировать каталог в собственный подкаталог. Однако возможно, "
-"что недостаточно прав для операции с этим каталогом. Для проверки ваших прав "
-"для каталога щелкните правой кнопкой мыши по нему и в появившемся меню "
-"нажмите «Параметры»."
-
-#: common/Util.cpp:1740
-msgid ""
-"The message store has reached its maximum size. To reduce the amount of data "
-"in this message store, select some items that you no longer need, and "
-"permanently (SHIFT + DEL) delete them."
-msgstr ""
-"Размер хранилища письма достиг максимального размера. Чтобы уменьшить размер "
-"данных в этом хранилище сообщений, выберите элементы, в которых вы больше не "
-"нуждаетесь и безвозвратно удалите их комбинацией Shift + Del."
-
-#: common/Util.cpp:1743
-msgid ""
-"The user canceled the operation, typically by clicking the Cancel button in "
-"a dialog box."
-msgstr ""
-"Пользователь отменил операцию. Как правило, эта операция выполняется "
-"нажатием кнопки \"Отмена\" в диалоговом окне."
-
-#: common/Util.cpp:1746
-msgid "A logon session could not be established."
-msgstr "Вход в сессию невозможен."
-
-#: common/Util.cpp:1749
-msgid ""
-"The name of the folder being moved or copied is the same as that of a "
-"subfolder in the destination folder. The message store provider requires "
-"that folder names be unique. The operation stops without completing."
-msgstr ""
-"Имя каталога может быть использовано внутри собственного подкаталога. "
-"Провайдер хранилища сообщений требует наличие лишь уникальных имен в именах "
-"каталогов. Операция остановлена до её завершения."
-
-#: common/Util.cpp:1752
-msgid ""
-"The operation succeeded, but not all entries were successfully processed, "
-"copied, deleted or moved"
-msgstr ""
-"Операция была выполнена, но не все элементы были успешно приняты, "
-"скопированы, перемещены или удалены"
-
-#: common/Util.cpp:1755
-msgid ""
-"The provider does not have enough information to complete the logon. Or, the "
-"service provider has not been configured."
-msgstr ""
-"Провайдер не имеет достаточной информации для входа в систему. Также "
-"возможно, что провайдер сервиса не настроен."
-
-#: common/Util.cpp:1758
-msgid ""
-"One of the providers cannot log on, but this error should not disable the "
-"other services."
-msgstr ""
-"Один из провайдеров не смог войти, но эта ошибка не должна повлиять на "
-"работу других сервисов."
-
-#: common/Util.cpp:1761
-msgid "A database error or I/O error has occurred."
-msgstr "Произошла ошибка ввода/вывода базы данных."
-
-#: common/Util.cpp:1764
-msgid "The subfolder being deleted contains subfolders."
-msgstr "Удаляемый каталог содержит подкаталоги."
-
-#: common/Util.cpp:1767
-msgid "The subfolder being deleted contains messages."
-msgstr "Удаляемый подкаталог содержит сообщения."
-
-#: common/Util.cpp:1770
-msgid "No description available."
-msgstr "Описание недоступно."
-
-#: common/Util.cpp:1772
-msgid "MAPI error code:"
-msgstr "Код ошибки MAPI:"
 
 #: installer/linux/zarafa-mr-accept:403
 msgid "Recurring meetings are not allowed"
@@ -1587,93 +1605,6 @@ msgstr "Требуемое время недоступно для следующ
 #, php-format
 msgid "%x %X"
 msgstr "%x %X"
-
-#: php-ext/include/mapi/class.meetingrequest.php:1659
-msgid "Accepted"
-msgstr "Принято"
-
-#: php-ext/include/mapi/class.meetingrequest.php:1663
-msgid "Declined"
-msgstr "Отклонено"
-
-#: php-ext/include/mapi/class.meetingrequest.php:1667
-msgid "Tentatively accepted"
-msgstr "Предварительно принято"
-
-#: php-ext/include/mapi/class.meetingrequest.php:1673
-msgid "New Time Proposed"
-msgstr "Предложено новое время"
-
-# 75%
-#: php-ext/include/mapi/class.meetingrequest.php:2692
-msgid "Canceled"
-msgstr "Отменено"
-
-#: php-ext/include/mapi/class.taskrequest.php:881
-msgid "Start Date"
-msgstr "Начало"
-
-#: php-ext/include/mapi/class.taskrequest.php:881
-#: php-ext/include/mapi/class.taskrequest.php:882
-msgid "%A, %B %d, %Y"
-msgstr "%A, %B %d, %Y"
-
-#: php-ext/include/mapi/class.taskrequest.php:882
-msgid "Due Date"
-msgstr "Срок"
-
-#: php-ext/include/mapi/class.taskrequest.php:886
-msgid "Status"
-msgstr "Статус"
-
-#: php-ext/include/mapi/class.taskrequest.php:887
-msgid "Not Started"
-msgstr "Не начато"
-
-#: php-ext/include/mapi/class.taskrequest.php:888
-msgid "In Progress"
-msgstr "В процессе"
-
-#: php-ext/include/mapi/class.taskrequest.php:889
-msgid "Complete"
-msgstr "Завершено"
-
-#: php-ext/include/mapi/class.taskrequest.php:890
-msgid "Wait for other person"
-msgstr "В ожидании других участников"
-
-#: php-ext/include/mapi/class.taskrequest.php:891
-msgid "Deferred"
-msgstr "Отложено"
-
-#: php-ext/include/mapi/class.taskrequest.php:895
-msgid "Percent Complete"
-msgstr "Процентов завершено"
-
-#: php-ext/include/mapi/class.taskrequest.php:898
-msgid "Date Completed"
-msgstr "Время завершения"
-
-#: php-ext/include/mapi/class.taskrequest.php:902
-msgid "Total Work"
-msgstr "Общее время"
-
-#: php-ext/include/mapi/class.taskrequest.php:902
-#: php-ext/include/mapi/class.taskrequest.php:903
-msgid "hours"
-msgstr "часов"
-
-#: php-ext/include/mapi/class.taskrequest.php:903
-msgid "Actual Work"
-msgstr "Рабочее время"
-
-#: php-ext/include/mapi/class.taskrequest.php:911
-msgid "Billing Information"
-msgstr "Расходы"
-
-#: php-ext/include/mapi/class.taskrequest.php:912
-msgid "Mileage"
-msgstr "Расстояние"
 
 #: php-ext/include/mapi/class.recurrence.php:528
 msgid "workday"
@@ -1793,6 +1724,27 @@ msgstr ""
 msgid "Occurs every %s %s effective %s until %s."
 msgstr ""
 
+#: php-ext/include/mapi/class.meetingrequest.php:1659
+msgid "Accepted"
+msgstr "Принято"
+
+#: php-ext/include/mapi/class.meetingrequest.php:1663
+msgid "Declined"
+msgstr "Отклонено"
+
+#: php-ext/include/mapi/class.meetingrequest.php:1667
+msgid "Tentatively accepted"
+msgstr "Предварительно принято"
+
+#: php-ext/include/mapi/class.meetingrequest.php:1673
+msgid "New Time Proposed"
+msgstr "Предложено новое время"
+
+# 75%
+#: php-ext/include/mapi/class.meetingrequest.php:2692
+msgid "Canceled"
+msgstr "Отменено"
+
 #: php-ext/include/mapi/class.mapiexception.php:24
 msgid "You have insufficient privileges to open this object."
 msgstr "Недостаточно прав для открытия этого объекта."
@@ -1821,3 +1773,69 @@ msgstr "Не удалось найти объект."
 #, php-format
 msgid "Unknown MAPI Error: %s"
 msgstr "Неизвестная ошибка MAPI:%s"
+
+#: php-ext/include/mapi/class.taskrequest.php:881
+msgid "Start Date"
+msgstr "Начало"
+
+#: php-ext/include/mapi/class.taskrequest.php:881
+#: php-ext/include/mapi/class.taskrequest.php:882
+msgid "%A, %B %d, %Y"
+msgstr "%A, %B %d, %Y"
+
+#: php-ext/include/mapi/class.taskrequest.php:882
+msgid "Due Date"
+msgstr "Срок"
+
+#: php-ext/include/mapi/class.taskrequest.php:886
+msgid "Status"
+msgstr "Статус"
+
+#: php-ext/include/mapi/class.taskrequest.php:887
+msgid "Not Started"
+msgstr "Не начато"
+
+#: php-ext/include/mapi/class.taskrequest.php:888
+msgid "In Progress"
+msgstr "В процессе"
+
+#: php-ext/include/mapi/class.taskrequest.php:889
+msgid "Complete"
+msgstr "Завершено"
+
+#: php-ext/include/mapi/class.taskrequest.php:890
+msgid "Wait for other person"
+msgstr "В ожидании других участников"
+
+#: php-ext/include/mapi/class.taskrequest.php:891
+msgid "Deferred"
+msgstr "Отложено"
+
+#: php-ext/include/mapi/class.taskrequest.php:895
+msgid "Percent Complete"
+msgstr "Процентов завершено"
+
+#: php-ext/include/mapi/class.taskrequest.php:898
+msgid "Date Completed"
+msgstr "Время завершения"
+
+#: php-ext/include/mapi/class.taskrequest.php:902
+msgid "Total Work"
+msgstr "Общее время"
+
+#: php-ext/include/mapi/class.taskrequest.php:902
+#: php-ext/include/mapi/class.taskrequest.php:903
+msgid "hours"
+msgstr "часов"
+
+#: php-ext/include/mapi/class.taskrequest.php:903
+msgid "Actual Work"
+msgstr "Рабочее время"
+
+#: php-ext/include/mapi/class.taskrequest.php:911
+msgid "Billing Information"
+msgstr "Расходы"
+
+#: php-ext/include/mapi/class.taskrequest.php:912
+msgid "Mileage"
+msgstr "Расстояние"
