@@ -495,25 +495,26 @@ fi
 #
 
 AC_CHECK_HEADERS([ldap.h],
-	[ LIBS=-lldap
-	  AC_MSG_CHECKING([for -lldap without LDAP_DEPRECATED])
+	[ LIBS=-lldap_r
+	  CXXFLAGS="$CXXFLAGS -pthread"
+	  AC_MSG_CHECKING([for -lldap_r without LDAP_DEPRECATED])
 	  AC_LINK_IFELSE(AC_LANG_SOURCE([#include <ldap.h>
 int main() {
     LDAP *l = ldap_init("localhost",389);
 }]),
-		[ LDAP_LIBS=-lldap
+		[ LDAP_LIBS=-lldap_r
 		  LDAP_FLAGS=
 		  want_ldap=yes
 		  AC_MSG_RESULT([yes]) ],
 		[ AC_MSG_RESULT([no])
 		  CXXFLAGS="$CXXFLAGS -DLDAP_DEPRECATED=1"
-		  AC_MSG_CHECKING([for -lldap with LDAP_DEPRECATED])
+		  AC_MSG_CHECKING([for -lldap_r with LDAP_DEPRECATED])
 		  AC_LINK_IFELSE(
 			AC_LANG_SOURCE([#include <ldap.h>
 int main() {
     LDAP *l = ldap_init("localhost",389);
 }]),
-			[ LDAP_LIBS=-lldap
+			[ LDAP_LIBS=-lldap_r
 			  LDAP_FLAGS=-DLDAP_DEPRECATED=1
 			  want_ldap=yes
 			  AC_MSG_RESULT([yes]) ],
