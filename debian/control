@@ -71,7 +71,11 @@ Architecture: any
 Conflicts: zarafa (<< 7.2)
 Replaces: zarafa (<< 7.2)
 Depends: ${shlibs:Depends},
- zarafa-common (= ${binary:Version})
+ dbconfig-common,
+ zarafa-common (= ${binary:Version}),
+ mariadb-client | mysql-client | virtual-mysql-client,
+ ${misc:Depends},
+Suggests: mariadb-server | mysql-server
 Description: Server component for the Zarafa Collaboration Platform
  The key component of the ZCP, providing the server to which ZCP
  clients connect. The server requires a MySQL server to use for

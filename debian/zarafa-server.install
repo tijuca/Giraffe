@@ -15,3 +15,4 @@ usr/share/man/man5/zarafa-ldap.cfg.5
 usr/share/man/man5/zarafa-server.cfg.5
 usr/share/man/man5/zarafa-unix.cfg.5
 usr/share/zarafa/userscripts/
+usr/share/zarafa/debian

@@ -144,6 +144,12 @@ install-arch:
 	# move apache config for zarafa-ws
 	mkdir -p $(INSTDIR)/etc/apache2/sites-available
 
+	# dbconfig-common
+	mkdir -p $(INSTDIR)/usr/share/zarafa/debian
+	cp -a debian/sql/debian-db.cfg.template $(INSTDIR)/usr/share/zarafa/debian
+
+
+
 # move example-config files
 	for package in spooler gateway monitor dagent ical search archiver licensed backup ws; do \
 		mkdir -p $(INSTDIR)/usr/share/doc/zarafa-$$package/example-config; \
@@ -190,8 +196,8 @@ binary-arch-real: install-arch
 	dh_installdocs
 #	dh_installexamples
 #	dh_installmenu
-#	dh_installdebconf	
-#	dh_installlogrotate	
+	dh_installdebconf
+#	dh_installlogrotate
 #	dh_installemacsen
 #	dh_installpam
 #	dh_installmime

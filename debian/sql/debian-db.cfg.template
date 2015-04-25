@@ -1,0 +1,9 @@
+# MySQL database settings
+mysql_host		= _DBC_DBSERVER_
+mysql_port		= _DBC_DBPORT_
+mysql_user		= _DBC_DBUSER_
+mysql_password		= _DBC_DBPASS_
+# Override the default MySQL socket to access mysql locally
+# Works only if the mysql_host value is empty or 'localhost'
+mysql_socket		=
+mysql_database		= _DBC_DBNAME_
