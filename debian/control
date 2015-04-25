@@ -40,8 +40,10 @@ Standards-Version: 3.7.3
 Package: zarafa
 Architecture: all
 Depends: zarafa-server (= ${binary:Version}),
- zarafa-client (= ${binary:Version}),
- zarafa-libmapi (= ${binary:Version}),
+ zarafa-client (>= ${source:Version}), 
+ zarafa-client (<< ${source:Version}.1~),
+ zarafa-libmapi (>= ${source:Version}),
+ zarafa-libmapi (<< ${source:Version}.1~),
  zarafa-utils,
  zarafa-monitor,
  zarafa-spooler,
