@@ -5,7 +5,6 @@ Maintainer: Zarafa Development Team <development@zarafa.com>
 Build-Depends: debhelper (>= 4.0.0),
  binutils (>= 2.12.90.0.9),
  autotools-dev,
- g++,
  automake (>= 1:1.9) | automake1.9,
  autoconf (>= 2.59),
  libtool (>= 1.5),
