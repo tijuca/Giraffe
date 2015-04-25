@@ -1,0 +1,7 @@
+/var/log/zarafa/server.log {
+  rotate 5
+  weekly
+  postrotate
+    /usr/bin/killall -HUP zarafa-server
+  endscript
+}
