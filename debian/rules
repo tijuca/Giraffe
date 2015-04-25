@@ -101,7 +101,6 @@ install-indep:
 	# Add here commands to install the indep part of the package into
 	# debian/<package>-doc.
 	#INSTALLDOC#
-	# because of the dh_clean and zarafa-archiver-extra being arch independant, we need to install these files again
 	$(MAKE) DESTDIR=$(INSTDIR) install -C swig/python/zarafa
 	$(MAKE) DESTDIR=$(INSTDIR) install-man1 -C doc
 	# and remove non za-sync files
@@ -151,7 +150,7 @@ install-arch:
 
 
 # move example-config files
-	for package in spooler gateway monitor dagent ical search archiver licensed backup ws; do \
+	for package in spooler gateway monitor dagent ical search archiver; do \
 		mkdir -p $(INSTDIR)/usr/share/doc/zarafa-$$package/example-config; \
 		mv $(INSTDIR)/usr/share/doc/zarafa/example-config/$$package.cfg $(INSTDIR)/usr/share/doc/zarafa-$$package/example-config; \
 	done
@@ -187,11 +186,6 @@ binary-arch-real: install-arch
 	dh_installdirs
 	dh_install --sourcedir=debian/tmp
 	dh_installchangelogs
-	cp -p $(CURDIR)/installer/licenseagreement/eula.txt $(CURDIR)/debian/python-zcp-license.copyright
-	cp -p $(CURDIR)/installer/licenseagreement/eula.txt $(CURDIR)/debian/zarafa-licensed.copyright
-	cp -p $(CURDIR)/installer/licenseagreement/eula.txt $(CURDIR)/debian/zarafa-backup.copyright
-	cp -p $(CURDIR)/installer/licenseagreement/eula.txt $(CURDIR)/debian/zarafa-multiserver.copyright
-	cp -p $(CURDIR)/installer/licenseagreement/eula.txt $(CURDIR)/debian/zarafa-archiver-extra.copyright
 	cp -p $(CURDIR)/installer/licenseagreement/AGPL-3 $(CURDIR)/debian/copyright
 	dh_installdocs
 #	dh_installexamples
@@ -207,7 +201,6 @@ binary-arch-real: install-arch
 	dh_installinit --name zarafa-gateway
 	dh_installinit --name zarafa-monitor
 	dh_installinit --name zarafa-ical
-	dh_installinit --name zarafa-licensed
 	dh_installinit --name zarafa-search
 	dh_installinit --name zarafa-ws
 #	dh_installcron

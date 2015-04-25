@@ -236,15 +236,6 @@ Depends: ${shlibs:Depends},
 Description: Zarafa Python bindings
  High-level Python bindings for Zarafa
 
-Package: python-zcp-license
-Architecture: any
-Section: non-free/python
-Depends: ${shlibs:Depends},
- python-mapi (= ${binary:Version})
-Description: Python ZCP license bindings
- Using this module, you can create license requests and parse
- the response.
-
 Package: php5-mapi
 Architecture: any
 Section: php
@@ -275,52 +266,6 @@ Depends: php5-mapi,
 Description: The multi-user calendar component for the Zarafa WebAccess.
  In this calendar multiple users can be show side-by-side to get an
  overview of all meetings for easy planning.
-
-Package: zarafa-licensed
-Priority: extra
-Architecture: any
-Section: non-free/mail
-Depends: ${shlibs:Depends},
- lsb-base,
- zarafa-server (= ${binary:Version}),
- zarafa-common (= ${binary:Version}),
- zarafa-client (= ${binary:Version})
-Description: License Daemon for the Zarafa Collaboration Platform
- This package adds a licensing daemon to the Zarafa Collaboration
- Platform. This daemon is needed to run propietary add-ons, like the
- Microsoft Outlook client.
- .
- Without a valid license key, this daemon gives free access for up 
- to 3 users to connect from Microsoft Outlook.
-
-Package: zarafa-backup
-Priority: extra
-Architecture: any
-Section: non-free/mail
-Conflicts: zarafa-licensed (<< 7.2)
-Replaces: zarafa-licensed (<< 7.2)
-Depends: ${shlibs:Depends},
- lsb-base,
- zarafa-client (= ${binary:Version})
-Description: Brick-level backup and restore tools for the Zarafa Collaboration Platform
- Make a brick-level backup of stores in Zarafa and make selective
- restores of that data.
-
-Package: zarafa-multiserver
-Priority: extra
-Architecture: any
-Section: non-free/mail
-Conflicts: zarafa-licensed (<< 7.2)
-Replaces: zarafa-licensed (<< 7.2)
-Depends: ${shlibs:Depends},
- zarafa-server (= ${binary:Version}),
- zarafa-client (= ${binary:Version}),
- zarafa-licensed (= ${binary:Version}),
- python-mapi (= ${binary:Version})
-Description: Multiserver LDAP plugin and tools
- Adds the ldapms plugin possebility to server setups for multiserver
- setups using LDAP or ADS. Users may be moved to different servers
- using the provided zarafa-msr python script.
 
 Package: zarafa-search-plus
 Architecture: any
@@ -354,25 +299,3 @@ Description: Archive messages to a secondary Zarafa server
  server. Clients will still be able to open the message from the
  secondary Zarafa server directly.
 
-Package: zarafa-archiver-extra
-Architecture: all
-Section: non-free/mail
-Depends: python-mapi (= ${binary:Version}),
- python-zcp-license (= ${binary:Version})
-Description: Extra tools to enhance the zarafa-archiver feature set
- Provides za-aclsync to propagate ACL settings in a users primary store
- to his archive(s).
-
-Package: zarafa-ws
-Architecture: any
-Section: non-free/mail
-Depends: python-mapi (>= 7.2),
- zarafa-contacts (>= 7.2),
- python-flask,
- python-dateutil,
- python-openssl,
- zarafa-common (>= 7.2)
-Description: The Zarafa implementation of the Exchange Web Services protocol
- This allows a broad scala of mail, contact and calendar clients that
- support EWS to connect with Zarafa without modification or additional
- configuration.
