@@ -255,6 +255,7 @@ Package: zarafa-webaccess
 Architecture: all
 Section: web
 Depends: php5-mapi
+Recommends: apache2 | httpd
 Description: a web interface for the zarafa collaboration platform
  provides a web-client written in php that makes use of ajax to allow
  users to make full use of the zarafa collaboration platform through a
