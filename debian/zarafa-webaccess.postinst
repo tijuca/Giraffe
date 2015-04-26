@@ -16,6 +16,7 @@ mkdir -p $TMP
 chown www-data:www-data $TMP
 
 chmod 640 $CFGFILE
+chgrp www-data $CFGFILE
 
 # I'm not entirely sure if old distros have 'md5sum'
 # KEY=`dd if=/dev/urandom bs=4096 count=1 2> /dev/null | md5sum | cut -c 1-16`
