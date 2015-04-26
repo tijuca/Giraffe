@@ -3,4 +3,9 @@
 rm -f /usr/share/zarafa-webaccess/plugins
 rm -f /usr/share/zarafa-webaccess/config.php
 
-rm -f /etc/apache2/sites-enabled/zarafa-webaccess.conf
+if [ -e /usr/share/apache2/apache2-maintscript-helper ] ; then
+  . /usr/share/apache2/apache2-maintscript-helper
+  apache2_invoke disconf zarafa-webaccess.conf || exit $?
+fi
+
+#DEBHELPER#

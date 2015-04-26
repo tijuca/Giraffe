@@ -113,9 +113,9 @@ install-indep:
 	cp -ar $(WADIR)/etc/ $(INSTDIR)/etc/
 
 	# add apache config
-	mkdir -p $(WADIR)/etc/apache2/sites-available $(INSTDIR)/etc/apache2/sites-available $(INSTDIR)/usr/share/zarafa-webaccess $(INSTDIR)/var/lib/zarafa-webaccess
-	cp -a $(WADIR)/usr/share/zarafa-webaccess/zarafa-webaccess.conf $(WADIR)/etc/apache2/sites-available/zarafa-webaccess.conf
-	cp -a $(WADIR)/usr/share/zarafa-webaccess/zarafa-webaccess.conf $(INSTDIR)/etc/apache2/sites-available/zarafa-webaccess.conf
+	mkdir -p $(WADIR)/etc/apache2/conf-available $(INSTDIR)/etc/apache2/conf-available $(INSTDIR)/usr/share/zarafa-webaccess $(INSTDIR)/var/lib/zarafa-webaccess
+	cp -a $(WADIR)/usr/share/zarafa-webaccess/zarafa-webaccess.conf $(WADIR)/etc/apache2/conf-available/zarafa-webaccess.conf
+	cp -a $(WADIR)/usr/share/zarafa-webaccess/zarafa-webaccess.conf $(INSTDIR)/etc/apache2/conf-available/zarafa-webaccess.conf
 	cp -ar $(WADIR)/usr/share/zarafa-webaccess/* $(INSTDIR)/usr/share/zarafa-webaccess/
 	cp -ar $(WADIR)/var/lib/zarafa-webaccess/* $(INSTDIR)/var/lib/zarafa-webaccess/
 
