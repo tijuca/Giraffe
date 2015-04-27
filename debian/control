@@ -95,6 +95,7 @@ Description: Debug files for the Zarafa Collaboration Platform
 
 Package: zarafa-dev
 Priority: extra
+Section: libdevel
 Architecture: any
 Depends: zarafa-client (= ${binary:Version}),
  zarafa-libarchiver (= ${binary:Version}),
