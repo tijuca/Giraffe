@@ -88,6 +88,7 @@ Package: zarafa-dbg
 Priority: extra
 Architecture: any
 Depends: ${misc:Depends},
+  zarafa-server | zarafa-client | zarafa-libmapi | python-mapi | php5-mapi
 Section: debug
 Description: Debug files for the Zarafa Collaboration Platform
  This package contains the debug symbols for the Zarafa
