@@ -52,13 +52,13 @@ Depends: zarafa-server (= ${binary:Version}),
  zarafa-gateway,
  zarafa-search-plus,
  ${misc:Depends},
-Description: The Zarafa Collaboration Platform (metapackage depending on the latest version)
- This groupware solution combines the usability of 
- Outlook with the stability and flexibility of a Linux server.
+Description: Complete and feature rich groupware solution
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
  .
- It features a rich web-interface, the Zarafa WebAccess, and provides 
- brilliant integration options with all sorts of clients including 
- all most popular mobile platforms. 
+ This package contains the dependencies to pull in all important parts
+ of ZCP.
 
 Package: zarafa-common
 Architecture: any
@@ -66,8 +66,12 @@ Conflicts: zarafa (<< 7.2)
 Replaces: zarafa (<< 7.2)
 Depends: lsb-base,
  ${misc:Depends},
-Description: Shared files between ZCP services.
- Common components for services of the Zarafa Collaboration Platform.
+Description: Complete and feature rich groupware solution - common files
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains some files common to all packages.
 
 Package: zarafa-server
 Architecture: any
@@ -79,10 +83,13 @@ Depends: ${shlibs:Depends},
  mariadb-client | mysql-client | virtual-mysql-client,
  ${misc:Depends},
 Suggests: mariadb-server | mysql-server
-Description: Server component for the Zarafa Collaboration Platform
- The key component of the ZCP, providing the server to which ZCP
- clients connect. The server requires a MySQL server to use for
- storage.
+Description: Complete and feature rich groupware solution - server component
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package provides the core server component that connects to gateways
+ (like the imap gateway) or the web gui connect to.
 
 Package: zarafa-dbg
 Priority: extra
@@ -90,9 +97,12 @@ Architecture: any
 Depends: ${misc:Depends},
   zarafa-server | zarafa-client | zarafa-libmapi | python-mapi | php5-mapi
 Section: debug
-Description: Debug files for the Zarafa Collaboration Platform
- This package contains the debug symbols for the Zarafa
- Collaboration Platform
+Description: Complete and feature rich groupware solution - debug files
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the debug symbols.
 
 Package: zarafa-dev
 Priority: extra
@@ -102,10 +112,13 @@ Depends: zarafa-client (= ${binary:Version}),
  zarafa-libarchiver (= ${binary:Version}),
  zarafa-libmapi (= ${binary:Version}),
  ${misc:Depends},
-Description: C++ Development files for the Zarafa Collaboration Platform
- Development files to create MAPI programs under Linux for use with
- Zarafa. You can find examples and documentation on the website
- http://developer.zarafa.com/
+Description: Complete and feature rich groupware solution - development files
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the C++ development files.
+
 
 Package: zarafa-client
 Architecture: any
@@ -115,7 +128,13 @@ Depends: ${shlibs:Depends},
  zarafa-libmapi,
  zarafa-lang,
  ${misc:Depends},
-Description: The main libraries for any Zarafa client program. This package is required by all Zarafa client programs.
+Description: Complete and feature rich groupware solution - core libraries
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the core libraries needed by several clients.
+
 
 Package: zarafa-lang
 Architecture: any
@@ -124,7 +143,13 @@ Conflicts: zarafa (<< 7.2),
 Replaces: zarafa (<< 7.2)
 Depends: locales,
  ${misc:Depends},
-Description: Translations for Zarafa components
+Description: Complete and feature rich groupware solution - language files
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the translations in several languages.
+
 
 Package: zarafa-contacts
 Architecture: any
@@ -132,9 +157,13 @@ Depends: ${shlibs:Depends},
  locales,
  zarafa-client (= ${binary:Version}),
  ${misc:Depends},
-Description: MAPI provider adding contact folders in the addressbook
- Additional MAPI provider which finds all contact folders of a user
- and adds the contents transparently into the MAPI addrbook.
+Description: Complete and feature rich groupware solution - contact mapi provider
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package provides adding contact folders in the addressbook.
+
 
 Package: zarafa-libmapi
 Architecture: any
@@ -144,7 +173,13 @@ Replaces: zarafa (<< 7.2),
  zarafa-libs
 Depends: ${shlibs:Depends},
  ${misc:Depends},
-Description: Zarafa MAPI libraries
+Description: Complete and feature rich groupware solution - MAPI libraries
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the MAPI related libraries
+
 
 Package: zarafa-libarchiver
 Architecture: any
@@ -155,6 +190,7 @@ Depends: ${shlibs:Depends},
 Description: Library with shared ZCP archiver functionality
  Library with shared archiver functionality for the Zarafa Collaboration Platform.
 
+
 Package: zarafa-utils
 Architecture: any
 Conflicts: zarafa (<< 7.2)
@@ -163,8 +199,13 @@ Depends: ${shlibs:Depends},
  zarafa-client (= ${binary:Version}),
  zarafa-libarchiver (= ${binary:Version}),
  ${misc:Depends},
-Description: Admin command-line utils for the Zarafa Collaboration Platform
- Commandline clients to control and check the ZCP server.
+Description: Complete and feature rich groupware solution - admin tools
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the command line tools for server administration.
+
 
 Package: zarafa-monitor
 Architecture: any
@@ -174,9 +215,14 @@ Depends: ${shlibs:Depends},
  zarafa-common (= ${binary:Version}),
  zarafa-client (= ${binary:Version}),
  ${misc:Depends},
-Description: Quota Monitor for the Zarafa Collaboration Platform
- Regularly checks stores for total usage. If a quota limit has been
- exceeded, an e-mail will be internally sent to this account.
+Description: Complete and feature rich groupware solution - quota monitor
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the quota monitor that checks stores for total usage
+ and alerts users by email.
+
 
 Package: zarafa-spooler
 Architecture: any
@@ -188,8 +234,14 @@ Depends: ${shlibs:Depends},
  zarafa-libmapi (= ${binary:Version}),
  python-mapi (= ${binary:Version}),
  ${misc:Depends},
-Description: E-mail Spooler for the Zarafa Collaboration Platform
- Sends all outgoing e-mail requests from Zarafa to an SMTP server.
+Description: Complete and feature rich groupware solution - email spooler
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the email spooler that forwards emails from the
+ Zarafa server to an SMTP server.
+
 
 Package: zarafa-dagent
 Architecture: any
@@ -203,9 +255,14 @@ Depends: ${shlibs:Depends},
  php5-cli,
  python-mapi (= ${binary:Version}),
  ${misc:Depends},
-Description: E-Mail Delivery Agent for the Zarafa Collaboration Platform
- Delivers incoming e-mail from your SMTP server to stores in the
- Zarafa server.
+Description: Complete and feature rich groupware solution - delivery agent
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the email delivery agent that delivers incoming
+ email from you SMTP server to the Zarafa server.
+
 
 Package: zarafa-gateway
 Architecture: any
@@ -217,9 +274,14 @@ Depends: ${shlibs:Depends},
  zarafa-client (= ${binary:Version}),
  zarafa-libmapi (= ${binary:Version}),
  ${misc:Depends},
-Description: POP3 and IMAP Gateway for the Zarafa Collaboration Platform
- Provides access to the Zarafa server through the POP3 and IMAP
- protocols.
+Description: Complete and feature rich groupware solution - POP3 and IMAP gateway
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the gateway to access the data stored in your
+ pZarafa server via the POP3 and IMAP protocolls.
+
 
 Package: zarafa-ical
 Architecture: any
@@ -230,9 +292,14 @@ Depends: ${shlibs:Depends},
  zarafa-client (= ${binary:Version}),
  zarafa-libmapi (= ${binary:Version}),
  ${misc:Depends},
-Description: ICal and CalDAV Gateway for the Zarafa Collaboration Platform
- Provides access to the Zarafa server through the ICal and CalDAV
- protocols.
+Description: Complete and feature rich groupware solution - iCal and CalDAV gateway
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the gateway to access the data stored in your
+ pZarafa server via the iCal and CardDAV protocolls.
+
 
 Package: python-mapi
 Architecture: any
@@ -244,9 +311,14 @@ Depends: ${shlibs:Depends},
  zarafa-client (= ${binary:Version}),
  zarafa-libmapi (= ${binary:Version}),
  ${misc:Depends},
-Description: Python MAPI bindings
+Description: Complete and feature rich groupware solution - Python MAPI bindings
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
  Using this module, you can create python programs which use MAPI
  calls to interact with Zarafa.
+
 
 Package: python-zarafa
 Architecture: all
@@ -254,8 +326,15 @@ Section: python
 Depends: ${shlibs:Depends},
  python-mapi,
  ${misc:Depends},
-Description: Zarafa Python bindings
- High-level Python bindings for Zarafa
+Description: Complete and feature rich groupware solution - Python bindings
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ Using this module, you can create python programs which access the
+ Zarafa server using a higher level abstraction than python-mapi
+ provides.
+
 
 Package: php5-mapi
 Architecture: any
@@ -267,9 +346,14 @@ Depends: ${shlibs:Depends},
  zarafa-client (= ${binary:Version}),
  zarafa-libmapi (= ${binary:Version}),
  ${misc:Depends},
-Description: PHP MAPI bindings
+Description: Complete and feature rich groupware solution - PHP MAPI bindings
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
  Using this module, you can create PHP programs which use MAPI
  calls to interact with Zarafa.
+
 
 Package: zarafa-webaccess
 Architecture: all
@@ -277,10 +361,13 @@ Section: web
 Depends: php5-mapi,
  ${misc:Depends},
 Recommends: apache2 | httpd
-Description: a web interface for the zarafa collaboration platform
- provides a web-client written in php that makes use of ajax to allow
- users to make full use of the zarafa collaboration platform through a
- modern web browser.
+Description: Complete and feature rich groupware solution - PHP MAPI bindings
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package provides a complete Web GUI for the Zarafa server.
+
 
 Package: zarafa-search-plus
 Architecture: any
@@ -303,16 +390,10 @@ Depends: ${shlibs:Depends},
  file,
  catdoc,
  ${misc:Depends},
-Description: zarafa indexer using the xapian search engine
-
-Package: zarafa-archiver
-Architecture: any
-Depends: ${shlibs:Depends},
- zarafa-libarchiver (= ${binary:Version}),
- ${misc:Depends},
-Description: Archive messages to a secondary Zarafa server
- To decrease the database size of your production Zarafa server, the
- Zarafa Archiver copies or moves messages to a secondary Zarafa
- server. Clients will still be able to open the message from the
- secondary Zarafa server directly.
+Description: Complete and feature rich groupware solution - indexer
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package provides the search indexer using xapian.
 
