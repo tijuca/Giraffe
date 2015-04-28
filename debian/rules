@@ -64,7 +64,9 @@ config.status:
 	dh_testdir
 	dpkg-parsechangelog | grep Version | sed -e 's/^Version: [0-9]*\.[0-9]*\.[0-9]*\.\([0-9]*\)/\1/g' > $(CURDIR)/revision
 	[ ! -x ./bootstrap.sh ] || ./bootstrap.sh
-	./configure $(CONFIGURE_ARGS) $(CONFFLAG) CXXFLAGS="$(CXXFLAGS)"
+	./configure $(CONFIGURE_ARGS) \
+	    $(CONFFLAG)               \
+	     $(shell dpkg-buildflags --export=configure)
 
 # first entry point of dpkg-buildpackage
 clean:
