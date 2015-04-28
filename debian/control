@@ -282,16 +282,6 @@ Description: a web interface for the zarafa collaboration platform
  users to make full use of the zarafa collaboration platform through a
  modern web browser.
 
-Package: zarafa-webaccess-muc
-Architecture: all
-Section: web
-Depends: php5-mapi,
- zarafa-webaccess,
- ${misc:Depends},
-Description: The multi-user calendar component for the Zarafa WebAccess.
- In this calendar multiple users can be show side-by-side to get an
- overview of all meetings for easy planning.
-
 Package: zarafa-search-plus
 Architecture: any
 Conflicts: zarafa-indexer,
