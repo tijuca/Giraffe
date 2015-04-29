@@ -1,5 +1,7 @@
 #! /bin/sh
 
+set -e
+
 rm -f /usr/share/zarafa-webaccess/plugins
 rm -f /usr/share/zarafa-webaccess/config.php
 
