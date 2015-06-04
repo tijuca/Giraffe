@@ -1,4 +1,3 @@
-etc/zarafa/webaccess-ajax/config.php
 etc/apache2/conf-available/zarafa-webaccess.conf
 usr/share/zarafa-webaccess
 var/lib/zarafa-webaccess/tmp

@@ -1,26 +1,11 @@
 #!/usr/bin/make -f
-# -*- makefile -*-
-# Sample debian/rules that uses debhelper.
-#
-# This file was originally written by Joey Hess and Craig Small.
-# As a special exception, when this file is copied by dh-make into a
-# dh-make output file, you may use that output file without restriction.
-# This special exception was added by Craig Small in version 0.37 of dh-make.
-#
-# Modified to make a template file for a multi-binary package with separated
-# build-arch and build-indep targets  by Bill Allombert 2001
 
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-# This has to be exported to make some magic below work.
-export DH_OPTIONS
-
-# These are used for cross-compiling and for saving the configure script
-# from having to guess our platform (since we know it already)
-DEB_HOST_GNU_TYPE   ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
-DEB_HOST_MULTIARCH  ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
-DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+DEB_RELEASE=$(shell dpkg-parsechangelog -SVersion | sed 's/[^-]\+-//')
+DEB_UVERSION=$(shell  dpkg-parsechangelog -SVersion)
+DEB_BUILD_DIR=debian/build
 
 WADIR=$(CURDIR)/debian/zarafa-webaccess
 
@@ -33,14 +18,7 @@ else
 	CONFFLAG = "--enable-release"
 endif
 
-tversion := $(shell tar --version | head -1 | cut -f4 -d\ | head -c 4)
-ifeq "$(tversion)" "1.14"
-tstrip := --strip-path
-else
-tstrip := --strip-components
-endif
-
-CONFIGURE_ARGS=\
+DEB_CONFIGURE_EXTRA_ARGS :=      \
     --host=$(DEB_HOST_GNU_TYPE) \
     --build=$(DEB_BUILD_GNU_TYPE) \
     --with-distro=debian \
@@ -57,60 +35,28 @@ CONFIGURE_ARGS=\
     --enable-unicode \
     --enable-python \
     --enable-swig \
-   $(NULL)
-
-configure: config.status
-
-config.status:
-	dh_testdir
-	dpkg-parsechangelog | grep Version | sed -e 's/^Version: [0-9]*\.[0-9]*\.[0-9]*\.\([0-9]*\)/\1/g' > $(CURDIR)/revision
-	#[ ./bootstrap.sh ] && ./bootstrap.sh || autoreconf -if
-	./configure $(CONFIGURE_ARGS) \
-	    $(CONFFLAG)               \
-	     $(shell dpkg-buildflags --export=configure)
-
-# first entry point of dpkg-buildpackage
-clean:
-	dh_testdir
-	dh_testroot
-	rm -f build-arch-stamp build-indep-stamp #CONFIGURE-STAMP#
-	# Add here commands to clean up after the build process.
-	[ ! -f Makefile ] || $(MAKE) distclean
-	dh_clean 
-
-# second entry point of dpkg-buildpackage
-build: build-arch build-indep
-
-build-arch: build-arch-stamp
-build-arch-stamp:  config.status
-	# Add here commands to compile the arch part of the package.
-	# compile zarafa
-	$(MAKE)
-	touch build-arch-stamp
-
-build-indep: build-indep-stamp
-build-indep-stamp:  config.status
-	# Add here commands to compile the indep part of the package.
-	touch build-indep-stamp
+    $(CONFFLAG) \
+    $(NULL)
 
 
-# no install entry point
+%:
+	dh $@ --builddirectory=$(DEB_BUILD_DIR) --parallel
 
-install-indep:
-	dh_testdir
-	dh_testroot
-	dh_clean -k -i 
+override_dh_auto_configure:
+	echo ${DEB_UVERSION} > $(CURDIR)/revision
+	[ ./bootstrap.sh ] && ./bootstrap.sh || autoreconf -if
+	dh_auto_configure -- $(DEB_CONFIGURE_EXTRA_ARGS)
 
-	# Add here commands to install the indep part of the package into
-	# debian/<package>-doc.
-	#INSTALLDOC#
-	$(MAKE) DESTDIR=$(INSTDIR) install -C swig/python/zarafa
-	$(MAKE) DESTDIR=$(INSTDIR) install-man1 -C doc
-	# and remove non za-sync files
-	rm -f $(INSTDIR)/usr/share/man/man1/zarafa*
+override_dh_auto_clean:
+	[ ! -f Makefile ] || dh_auto_clean
+
+override_dh_install:
+	# Install docs
+	$(MAKE) DESTDIR=$(INSTDIR) install -C $(DEB_BUILD_DIR)/swig/python/zarafa
+	$(MAKE) DESTDIR=$(INSTDIR) install-man1 -C $(DEB_BUILD_DIR)/doc
 
 	# install web access
-	$(MAKE) DESTDIR=$(WADIR) install-ajax-webaccess
+	$(MAKE) -C $(DEB_BUILD_DIR) DESTDIR=$(WADIR) install-ajax-webaccess
 
 	# copy webaccess content to debian/tmp as well
 	cp -ar $(WADIR)/etc/ $(INSTDIR)/etc/
@@ -122,23 +68,6 @@ install-indep:
 	cp -ar $(WADIR)/usr/share/zarafa-webaccess/* $(INSTDIR)/usr/share/zarafa-webaccess/
 	cp -ar $(WADIR)/var/lib/zarafa-webaccess/* $(INSTDIR)/var/lib/zarafa-webaccess/
 
-	dh_install -i --sourcedir=debian/tmp
-	# linking fckeditor content instead of using the shipped one by Zarafa
-	cd $(CURDIR)/debian/zarafa-webaccess/usr/share/zarafa-webaccess/client/widgets/fckeditor && \
-		ln -sf ../../../../fckeditor/fckeditor.js
-	# linking swfupload.swf from the libjs-swfupload package
-	cd $(CURDIR)/debian/zarafa-webaccess/usr/share/zarafa-webaccess/client/widgets/swfupload && \
-		ln -sf ../../../../javascript/swfupload/swfupload.swf
-
-install-arch:
-	dh_testdir
-	dh_testroot
-	dh_clean -k -s 
-
-	# Add here commands to install the arch part of the package into 
-	# debian/tmp.
-	$(MAKE) DESTDIR=$(INSTDIR) install
-
 	# Don't ship any .la files
 	rm -f $(INSTDIR)/usr/lib/*.la
 
@@ -146,74 +75,26 @@ install-arch:
 	mkdir -p $(INSTDIR)/etc/default
 	install -o root -g root -m 644 debian/zarafa-common.zarafa.default $(INSTDIR)/etc/default/zarafa
 
-	# move license to correct package
-	mkdir -p $(INSTDIR)/usr/share/doc/pacemaker-zarafa
-
-	# link userscripts in /usr/share/zarafa/userscripts
-	mkdir -p $(INSTDIR)/usr/share/zarafa/userscripts
-
-	# move apache config for zarafa-ws
-	mkdir -p $(INSTDIR)/etc/apache2/sites-available
-
 	# dbconfig-common
 	mkdir -p $(INSTDIR)/usr/share/zarafa/debian
 	cp -a debian/sql/debian-db.cfg.template $(INSTDIR)/usr/share/zarafa/debian
 
-
-
-# move example-config files
+	# move example-config files
 	for package in spooler gateway monitor dagent ical search archiver; do \
 		mkdir -p $(INSTDIR)/usr/share/doc/zarafa-$$package/example-config; \
 		mv $(INSTDIR)/usr/share/doc/zarafa/example-config/$$package.cfg $(INSTDIR)/usr/share/doc/zarafa-$$package/example-config; \
 	done
 	mv $(INSTDIR)/usr/share/doc/zarafa/example-config/autorespond $(INSTDIR)/usr/share/doc/zarafa-dagent/example-config
-	mkdir -p $(INSTDIR)/usr/share/doc/zarafa-multiserver/example-config
 
 	# remove compiled python files
 	find $(INSTDIR) -name \*.pyc -exec rm {} \;
-# add php:Depends
-	echo php:Depends=phpapi-$(shell php-config5 --phpapi) > debian/php5-mapi.substvars
 
-# Build architecture independant packages using the common target.
-binary-indep: install-indep
-	dh_testdir -i
-	dh_testroot -i
-	dh_installdirs -i
-#	dh_movefiles -i
-# installs NEWS files
-	dh_installchangelogs -i
-	dh_installdocs -i
-	dh_compress -i
-	dh_python2 --no-guessing-versions --no-package=zarafa-webaccess
-	dh_installdeb -i
-	dh_gencontrol -i
-	dh_md5sums -i
-	dh_builddeb -i
+	# add php:Depends
+	echo "php:Depends=phpapi-$(shell php-config5 --phpapi)" > debian/php5-mapi.substvars
 
-# Build architecture dependant packages using the common target.
-binary-arch-real: install-arch
-	dh_testdir
-	dh_testroot
-	# install empty paths not present in 'make install' from <packagename>.dirs file, in actual package directory, not in tmp.
-	dh_installdirs
-	dh_install --sourcedir=debian/tmp
-	# creating pkg-config path for multiarch support and move zarafa.pc
-	mkdir -p $(CURDIR)/debian/zarafa-dev/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig
-	mv $(INSTDIR)/usr/lib/pkgconfig/zarafa.pc $(CURDIR)/debian/zarafa-dev/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig
-	# fixup missing dev-package shlib symlink
-	cd $(CURDIR)/debian/zarafa-dev/usr/lib && \
-		ln -s libarchiver-core.so.0.0.0 libarchiver-core.so &&\
-		ln -s libzarafaclient.so.0.0.0 libzarafaclient.so
-	dh_installchangelogs
-	cp -p $(CURDIR)/installer/licenseagreement/AGPL-3 $(CURDIR)/debian/copyright
-	dh_installdocs
-#	dh_installexamples
-#	dh_installmenu
-	dh_installdebconf
-	dh_installlogrotate
-#	dh_installemacsen
-#	dh_installpam
-#	dh_installmime
+	dh_install
+
+override_dh_installinit:
 	dh_installinit --name zarafa-server
 	dh_installinit --name zarafa-spooler
 	dh_installinit --name zarafa-dagent
@@ -222,30 +103,10 @@ binary-arch-real: install-arch
 	dh_installinit --name zarafa-ical
 	dh_installinit --name zarafa-search
 	dh_installinit --name zarafa-ws
-#	dh_installcron
-#	dh_installinfo
-#	dh_installman
-	dh_link
-	dh_strip --dbg-package=zarafa-dbg
+
+override_dh_compress:
 	dh_compress -X.py -X.pl -Xusr/share/doc/zarafa/zarafa7-upgrade
-	dh_fixperms
-#	dh_perl
-#	dh_python
-#	dh_pysupport
-	dh_python2 --no-guessing-versions
-	dh_makeshlibs
-	dh_installdeb
-	dh_shlibdeps
-	dh_gencontrol
-	dh_md5sums
-	dh_builddeb
 
-# last entry point of dpkg-buildpackage
-# but the ubuntu buildsystem may call 'binary-arch' insteadof 'binary' target as entry point
-binary-arch: binary
-binary:
-	# make sure these do not run concurrent
-	$(MAKE) -f debian/rules DH_OPTIONS=-a binary-arch-real
-	$(MAKE) -f debian/rules DH_OPTIONS=-i binary-indep
+override_dh_strip:
+	dh_strip --dbg-package=zarafa-dbg
 
-.PHONY: build clean binary-indep binary-arch binary install install-indep install-arch 
