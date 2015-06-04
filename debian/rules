@@ -44,7 +44,7 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
 
 override_dh_auto_configure:
 	echo ${DEB_UVERSION} > $(CURDIR)/revision
-	[ ./bootstrap.sh ] && ./bootstrap.sh || autoreconf -if
+	[ -x ./bootstrap.sh ] && ./bootstrap.sh || true
 	dh_auto_configure -- $(DEB_CONFIGURE_EXTRA_ARGS)
 
 override_dh_auto_clean:
