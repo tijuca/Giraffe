@@ -38,6 +38,7 @@ Build-Depends: debhelper (>= 4.0.0),
  gsoap,
  swig,
 Standards-Version: 3.9.6
+X-Python-Version: 2.7
 
 Package: zarafa
 Architecture: all
@@ -202,7 +203,7 @@ Depends: ${shlibs:Depends},
  zarafa-client (= ${binary:Version}),
  zarafa-libarchiver (= ${binary:Version}),
  ${misc:Depends},
- ${python:Depends}
+ python,
 Description: Complete and feature rich groupware solution - admin tools
  The Zarafa Collaboration Platform (ZCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
@@ -232,12 +233,12 @@ Package: zarafa-spooler
 Architecture: any
 Conflicts: zarafa (<< 7.2)
 Replaces: zarafa (<< 7.2)
-Depends: ${shlibs:Depends},
+Depends: ${misc:Depends},
+ ${shlibs:Depends},
  zarafa-common (= ${binary:Version}),
  zarafa-client (= ${binary:Version}),
  zarafa-libmapi (= ${binary:Version}),
  python-mapi (= ${binary:Version}),
- ${misc:Depends},
 Description: Complete and feature rich groupware solution - email spooler
  The Zarafa Collaboration Platform (ZCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
@@ -251,14 +252,14 @@ Package: zarafa-dagent
 Architecture: any
 Conflicts: zarafa (<< 7.2)
 Replaces: zarafa (<< 7.2)
-Depends: ${shlibs:Depends},
+Depends: ${misc:Depends},
+ ${shlibs:Depends},
  zarafa-common (= ${binary:Version}),
  zarafa-client (= ${binary:Version}),
  zarafa-libmapi (= ${binary:Version}),
  php5-mapi (= ${binary:Version}),
  php5-cli,
  python-mapi (= ${binary:Version}),
- ${misc:Depends},
 Description: Complete and feature rich groupware solution - delivery agent
  The Zarafa Collaboration Platform (ZCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
@@ -311,10 +312,12 @@ Section: python
 Conflicts: zarafa-python
 Replaces: zarafa-python
 Provides: zarafa-python
-Depends: ${shlibs:Depends},
+Depends: ${misc:Depends},
+ ${shlibs:Depends},
+ ${python:Depends},
  zarafa-client (= ${binary:Version}),
  zarafa-libmapi (= ${binary:Version}),
- ${misc:Depends},
+XB-Python-Version: ${python:Versions}
 Description: Complete and feature rich groupware solution - Python MAPI bindings
  The Zarafa Collaboration Platform (ZCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
@@ -327,9 +330,11 @@ Description: Complete and feature rich groupware solution - Python MAPI bindings
 Package: python-zarafa
 Architecture: all
 Section: python
-Depends: ${shlibs:Depends},
+Depends: ${misc:Depends},
+ ${shlibs:Depends},
+ ${python:Depends},
  python-mapi,
- ${misc:Depends},
+XB-Python-Version: ${python:Versions}
 Description: Complete and feature rich groupware solution - Python bindings
  The Zarafa Collaboration Platform (ZCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
