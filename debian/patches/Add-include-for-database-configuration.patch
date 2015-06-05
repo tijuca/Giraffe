@@ -15,4 +15,4 @@ index 813f63e..04dada4 100644
  # and the value of '*' is used to indicate that all connections are proxied
  proxy_header = 
 +
-+!include db-debian.cfg
++!include debian-db.cfg
