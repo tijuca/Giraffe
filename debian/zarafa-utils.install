@@ -10,4 +10,4 @@ usr/share/man/man1/zarafa-passwd.1
 usr/share/man/man1/zarafa-stats.1
 usr/share/man/man1/zarafa-set-oof.1
 usr/share/man/man1/zarafa-mailbox-permissions.1
-etc/bash_completion.d/zarafa-bash-completion.sh
+etc/bash_completion.d/zarafa-bash-completion.sh usr/share/bash-completion/completions/zarafa
