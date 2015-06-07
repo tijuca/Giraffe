@@ -123,6 +123,12 @@ install-indep:
 	cp -ar $(WADIR)/var/lib/zarafa-webaccess/* $(INSTDIR)/var/lib/zarafa-webaccess/
 
 	dh_install -i --sourcedir=debian/tmp
+	# linking fckeditor content instead of using the shipped one by Zarafa
+	cd $(CURDIR)/debian/zarafa-webaccess/usr/share/zarafa-webaccess/client/widgets/fckeditor && \
+		ln -sf ../../../../fckeditor/fckeditor.js
+	# linking swfupload.swf from the libjs-swfupload package
+	cd $(CURDIR)/debian/zarafa-webaccess/usr/share/zarafa-webaccess/client/widgets/swfupload && \
+		ln -sf ../../../../javascript/swfupload/swfupload.swf
 
 install-arch:
 	dh_testdir

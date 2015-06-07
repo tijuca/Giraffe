@@ -362,6 +362,7 @@ Package: zarafa-webaccess
 Architecture: all
 Section: web
 Depends: php5-mapi,
+ fckeditor,
  ${misc:Depends},
 Recommends: apache2 | httpd
 Description: Complete and feature rich groupware solution - PHP MAPI bindings
