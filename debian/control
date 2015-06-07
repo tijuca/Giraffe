@@ -108,6 +108,7 @@ Description: Complete and feature rich groupware solution - debug files
 
 Package: zarafa-dev
 Priority: extra
+Homepage: http://developer.zarafa.com/
 Section: libdevel
 Architecture: any
 Depends: zarafa-client (= ${binary:Version}),
