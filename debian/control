@@ -1,6 +1,7 @@
 Source: zarafa
 Section: mail
 Priority: optional
+Homepage: https://community.zarafa.com/
 Maintainer: Zarafa Development Team <development@zarafa.com>
 Build-Depends: debhelper (>= 4.0.0),
  binutils (>= 2.12.90.0.9),
