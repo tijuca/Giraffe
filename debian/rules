@@ -200,6 +200,10 @@ binary-arch-real: install-arch
 	# creating pkg-config path for multiarch support and move zarafa.pc
 	mkdir -p $(CURDIR)/debian/zarafa-dev/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig
 	mv $(INSTDIR)/usr/lib/pkgconfig/zarafa.pc $(CURDIR)/debian/zarafa-dev/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig
+	# fixup missing dev-package shlib symlink
+	cd $(CURDIR)/debian/zarafa-dev/usr/lib && \
+		ln -s libarchiver-core.so.0.0.0 libarchiver-core.so &&\
+		ln -s libzarafaclient.so.0.0.0 libzarafaclient.so
 	dh_installchangelogs
 	cp -p $(CURDIR)/installer/licenseagreement/AGPL-3 $(CURDIR)/debian/copyright
 	dh_installdocs
