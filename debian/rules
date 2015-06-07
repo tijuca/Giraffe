@@ -19,6 +19,7 @@ export DH_OPTIONS
 # These are used for cross-compiling and for saving the configure script
 # from having to guess our platform (since we know it already)
 DEB_HOST_GNU_TYPE   ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+DEB_HOST_MULTIARCH  ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
 
 WADIR=$(CURDIR)/debian/zarafa-webaccess
@@ -190,6 +191,9 @@ binary-arch-real: install-arch
 	# install empty paths not present in 'make install' from <packagename>.dirs file, in actual package directory, not in tmp.
 	dh_installdirs
 	dh_install --sourcedir=debian/tmp
+	# creating pkg-config path for multiarch support and move zarafa.pc
+	mkdir -p $(CURDIR)/debian/zarafa-dev/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig
+	mv $(INSTDIR)/usr/lib/pkgconfig/zarafa.pc $(CURDIR)/debian/zarafa-dev/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig
 	dh_installchangelogs
 	cp -p $(CURDIR)/installer/licenseagreement/AGPL-3 $(CURDIR)/debian/copyright
 	dh_installdocs

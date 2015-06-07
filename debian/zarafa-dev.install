@@ -14,4 +14,3 @@ usr/include/inetmapi
 usr/include/icalmapi
 usr/include/libfreebusy
 usr/include/libzarafasync
-usr/lib/pkgconfig/zarafa.pc
