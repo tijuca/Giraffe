@@ -42,7 +42,8 @@ X-Python-Version: 2.7
 
 Package: zarafa
 Architecture: all
-Depends: zarafa-server (= ${binary:Version}),
+Depends: zarafa-server (>= ${binary:Version}.1~),
+ zarafa-server (<< ${source:Version}.1~),
  zarafa-client (>= ${source:Version}),
  zarafa-client (<< ${source:Version}.1~),
  zarafa-libmapi (>= ${source:Version}),
