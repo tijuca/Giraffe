@@ -258,11 +258,11 @@ index 669d5ed..b421dd2 100644
  
  install-data-hook:
 diff --git a/spooler/python/plugins/Makefile.am b/spooler/python/plugins/Makefile.am
-index 5d61326..5498f27 100644
+index 66f7ab9..8322f81 100644
 --- a/spooler/python/plugins/Makefile.am
 +++ b/spooler/python/plugins/Makefile.am
 @@ -1,7 +1,7 @@
- EXTRA_DIST = examplerules.py BMP2PNG.py disclaimer.py movetopublic.py movetopublic.cfg
+ EXTRA_DIST = examplerules.py BMP2PNG.py disclaimer.py movetopublic.py movetopublic.cfg uudecode.py
  
  zarafa_dagentdir = ${datadir}/zarafa-dagent/python/plugins
 -zarafa_dagent_SCRIPTS=examplerules.py BMP2PNG.py movetopublic.py
@@ -271,7 +271,7 @@ index 5d61326..5498f27 100644
  zarafa_dagent_configdir = ${zarafa_dagentdir}
  zarafa_dagent_config_DATA=movetopublic.cfg
 diff --git a/spooler/python/plugins/Makefile.in b/spooler/python/plugins/Makefile.in
-index 47a12db..42b8791 100644
+index 271d925..5ac90c3 100644
 --- a/spooler/python/plugins/Makefile.in
 +++ b/spooler/python/plugins/Makefile.in
 @@ -91,10 +91,10 @@ am__uninstall_files_from_dir = { \
@@ -299,7 +299,7 @@ index 47a12db..42b8791 100644
  AMTAR = @AMTAR@
 @@ -311,7 +311,7 @@ top_builddir = @top_builddir@
  top_srcdir = @top_srcdir@
- EXTRA_DIST = examplerules.py BMP2PNG.py disclaimer.py movetopublic.py movetopublic.cfg
+ EXTRA_DIST = examplerules.py BMP2PNG.py disclaimer.py movetopublic.py movetopublic.cfg uudecode.py
  zarafa_dagentdir = ${datadir}/zarafa-dagent/python/plugins
 -zarafa_dagent_SCRIPTS = examplerules.py BMP2PNG.py movetopublic.py
 +zarafa_dagent_DATA = examplerules.py BMP2PNG.py movetopublic.py
