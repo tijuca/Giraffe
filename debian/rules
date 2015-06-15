@@ -107,6 +107,11 @@ override_dh_installinit:
 	dh_installinit --name zarafa-search
 	dh_installinit --name zarafa-ws
 
+override_dh_fixperms:
+	@find $(WADIR)/usr/share/zarafa-webaccess/client/widgets/fckeditor/editor -type f \
+		\( ! -name "*.pl" \) | xargs -I{} chmod -v 644 {}
+	dh_fixperms
+
 override_dh_compress:
 	dh_compress -X.py -X.pl -Xusr/share/doc/zarafa/zarafa7-upgrade
 
