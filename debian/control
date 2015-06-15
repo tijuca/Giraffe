@@ -194,7 +194,12 @@ Depends: ${shlibs:Depends},
  zarafa-common (= ${binary:Version}),
  ${misc:Depends},
 Description: Library with shared ZCP archiver functionality
- Library with shared archiver functionality for the Zarafa Collaboration Platform.
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the library with shared archiver functionality for the
+ Zarafa Collaboration Platform.
 
 
 Package: zarafa-utils
@@ -287,7 +292,7 @@ Description: Complete and feature rich groupware solution - POP3 and IMAP gatewa
  clients including mobile ones. It also features a web interface.
  .
  This package contains the gateway to access the data stored in your
- pZarafa server via the POP3 and IMAP protocolls.
+ Zarafa server via the POP3 and IMAP protocolls.
 
 
 Package: zarafa-ical
@@ -325,7 +330,7 @@ Description: Complete and feature rich groupware solution - Python MAPI bindings
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
- Using this module, you can create python programs which use MAPI
+ Using this module, you can create Python programs which use MAPI
  calls to interact with Zarafa.
 
 
@@ -342,7 +347,7 @@ Description: Complete and feature rich groupware solution - Python bindings
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
- Using this module, you can create python programs which access the
+ Using this module, you can create Python programs which access the
  Zarafa server using a higher level abstraction than python-mapi
  provides.
 
