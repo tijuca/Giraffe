@@ -33,7 +33,7 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
     --with-userscript-prefix=/etc/zarafa/userscripts \
     --with-quotatemplate-prefix=/etc/zarafa/quotamail \
     --disable-static \
-    --enable-tcmalloc \
+    --disable-tcmalloc \
     --enable-epoll \
     --enable-unicode \
     --enable-python \
