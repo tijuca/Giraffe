@@ -312,6 +312,19 @@ Description: Complete and feature rich groupware solution - common files
  .
  This package contains some files common to all packages.
 
+Package: zarafa-contacts
+Architecture: any
+Depends: ${shlibs:Depends},
+ locales,
+ zarafa-client (= ${binary:Version}),
+ ${misc:Depends},
+Description: Complete and feature rich groupware solution - contact mapi provider
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package provides adding contact folders in the addressbook.
+
 Package: zarafa-server
 Architecture: any
 Conflicts: zarafa (<< 7.2)
@@ -372,21 +385,6 @@ Description: Complete and feature rich groupware solution - language files
  clients including mobile ones. It also features a web interface.
  .
  This package contains the translations in several languages.
-
-
-Package: zarafa-contacts
-Architecture: any
-Depends: ${shlibs:Depends},
- locales,
- zarafa-client (= ${binary:Version}),
- ${misc:Depends},
-Description: Complete and feature rich groupware solution - contact mapi provider
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
- flexible groupware solution supporting open source as well as proprietary
- clients including mobile ones. It also features a web interface.
- .
- This package provides adding contact folders in the addressbook.
-
 
 Package: zarafa-utils
 Architecture: any

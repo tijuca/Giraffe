@@ -1,2 +1,2 @@
 etc/mapi/zcontacts.inf
-usr/lib/libzarafacontacts.so*
+usr/lib/zarafa/libzarafacontacts.so
