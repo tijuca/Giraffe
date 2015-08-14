@@ -15,7 +15,7 @@
 ### END INIT INFO
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-DAGENT=/usr/bin/zarafa-dagent
+DAGENT=/usr/sbin/zarafa-dagent
 DESC="Zarafa LMTP dagent"
 NAME=`basename $DAGENT`
 #QUIETDAEMON=--quiet
