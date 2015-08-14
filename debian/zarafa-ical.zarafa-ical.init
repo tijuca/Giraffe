@@ -14,7 +14,7 @@
 ### END INIT INFO
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-ICAL=/usr/bin/zarafa-ical
+ICAL=/usr/sbin/zarafa-ical
 DESC="Zarafa ical gateway"
 NAME=`basename $ICAL`
 #QUIETDAEMON=--quiet

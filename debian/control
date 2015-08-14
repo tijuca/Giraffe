@@ -392,6 +392,37 @@ Description: Complete and feature rich groupware solution - POP3 and IMAP gatewa
  This package contains the gateway to access the data stored in your
  Zarafa server via the POP3 and IMAP protocolls.
 
+Package: zarafa-ical
+Architecture: any
+Conflicts: zarafa (<< 7.2)
+Replaces: zarafa (<< 7.2)
+Depends: ${shlibs:Depends},
+ zarafa-common (= ${binary:Version}),
+ zarafa-client (= ${binary:Version}),
+ libmapi1 (= ${binary:Version}),
+ ${misc:Depends},
+Description: Complete and feature rich groupware solution - iCal and CalDAV gateway
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the gateway to access the data stored in your
+ Zarafa server via the iCal and CardDAV protocolls.
+
+Package: zarafa-lang
+Architecture: any
+Conflicts: zarafa (<< 7.2),
+ zarafa-client (<< 7.2)
+Replaces: zarafa (<< 7.2)
+Depends: locales,
+ ${misc:Depends},
+Description: Complete and feature rich groupware solution - language files
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the translations in several languages.
+
 Package: zarafa-server
 Architecture: any
 Conflicts: zarafa (<< 7.2)
@@ -409,20 +440,6 @@ Description: Complete and feature rich groupware solution - server component
  .
  This package provides the core server component that connects to gateways
  (like the imap gateway) or the web gui connect to.
-
-Package: zarafa-lang
-Architecture: any
-Conflicts: zarafa (<< 7.2),
- zarafa-client (<< 7.2)
-Replaces: zarafa (<< 7.2)
-Depends: locales,
- ${misc:Depends},
-Description: Complete and feature rich groupware solution - language files
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
- flexible groupware solution supporting open source as well as proprietary
- clients including mobile ones. It also features a web interface.
- .
- This package contains the translations in several languages.
 
 Package: zarafa-utils
 Architecture: any
@@ -475,24 +492,6 @@ Description: Complete and feature rich groupware solution - email spooler
  .
  This package contains the email spooler that forwards emails from the
  Zarafa server to an SMTP server.
-
-
-Package: zarafa-ical
-Architecture: any
-Conflicts: zarafa (<< 7.2)
-Replaces: zarafa (<< 7.2)
-Depends: ${shlibs:Depends},
- zarafa-common (= ${binary:Version}),
- zarafa-client (= ${binary:Version}),
- libmapi1 (= ${binary:Version}),
- ${misc:Depends},
-Description: Complete and feature rich groupware solution - iCal and CalDAV gateway
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
- flexible groupware solution supporting open source as well as proprietary
- clients including mobile ones. It also features a web interface.
- .
- This package contains the gateway to access the data stored in your
- pZarafa server via the iCal and CardDAV protocolls.
 
 
 Package: python-mapi
