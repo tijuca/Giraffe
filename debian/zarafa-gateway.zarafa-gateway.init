@@ -14,7 +14,7 @@
 ### END INIT INFO
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-GATEWAY=/usr/bin/zarafa-gateway
+GATEWAY=/usr/sbin/zarafa-gateway
 DESC="Zarafa gateway"
 NAME=`basename $GATEWAY`
 #QUIETDAEMON=--quiet
