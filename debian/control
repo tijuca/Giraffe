@@ -524,7 +524,6 @@ Description: Complete and feature rich groupware solution - admin tools
  .
  This package contains the command line tools for server administration.
 
-
 Package: python-mapi
 Architecture: any
 Section: python
