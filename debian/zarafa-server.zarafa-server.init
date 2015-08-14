@@ -17,7 +17,7 @@
 ### END INIT INFO
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-SERVER=/usr/bin/zarafa-server
+SERVER=/usr/sbin/zarafa-server
 DESC="Zarafa server"
 NAME=`basename $SERVER`
 #QUIETDAEMON=--quiet
