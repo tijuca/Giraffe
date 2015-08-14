@@ -1,3 +1,2 @@
 etc/mapi/zarafa.inf
-usr/lib/libzarafaclient.so*
-usr/lib/libzarafasync.so.*
+usr/lib/zarafa/libzarafaclient.so
