@@ -345,6 +345,19 @@ Description: Complete and feature rich groupware solution - delivery agent
  This package contains the email delivery agent that delivers incoming
  email from you SMTP server to the Zarafa server.
 
+Package: zarafa-dbg
+Priority: extra
+Architecture: any
+Depends: ${misc:Depends},
+  zarafa-server | zarafa-client | libmapi1 | python-mapi | php5-mapi
+Section: debug
+Description: Complete and feature rich groupware solution - debug files
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package contains the debug symbols.
+
 Package: zarafa-server
 Architecture: any
 Conflicts: zarafa (<< 7.2)
@@ -362,19 +375,6 @@ Description: Complete and feature rich groupware solution - server component
  .
  This package provides the core server component that connects to gateways
  (like the imap gateway) or the web gui connect to.
-
-Package: zarafa-dbg
-Priority: extra
-Architecture: any
-Depends: ${misc:Depends},
-  zarafa-server | zarafa-client | libmapi1 | python-mapi | php5-mapi
-Section: debug
-Description: Complete and feature rich groupware solution - debug files
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
- flexible groupware solution supporting open source as well as proprietary
- clients including mobile ones. It also features a web interface.
- .
- This package contains the debug symbols.
 
 Package: zarafa-dev
 Priority: extra
