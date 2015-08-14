@@ -14,7 +14,7 @@
 ### END INIT INFO
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-MONITOR=/usr/bin/zarafa-monitor
+MONITOR=/usr/sbin/zarafa-monitor
 DESC="Zarafa monitor"
 NAME=`basename $MONITOR`
 #QUIETDAEMON=--quiet

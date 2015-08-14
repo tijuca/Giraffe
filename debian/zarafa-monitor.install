@@ -1,6 +1,6 @@
 etc/zarafa/monitor.cfg
 etc/zarafa/quotamail/
-usr/bin/zarafa-monitor
+usr/sbin/zarafa-monitor
 usr/share/doc/zarafa-monitor/
-usr/share/man/man1/zarafa-monitor.1
 usr/share/man/man5/zarafa-monitor.cfg.5
+usr/share/man/man8/zarafa-monitor.8
