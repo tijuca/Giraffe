@@ -1,8 +1,8 @@
 etc/zarafa/spooler.cfg
-usr/bin/zarafa-spooler
+usr/sbin/zarafa-spooler
 usr/share/doc/zarafa-spooler/
-usr/share/man/man1/zarafa-spooler.1
 usr/share/man/man5/zarafa-spooler.cfg.5
+usr/share/man/man8/zarafa-spooler.8
 usr/share/zarafa-spooler/python/
 usr/share/zarafa-spooler/python/plugins/
 var/lib/zarafa/spooler/plugins/

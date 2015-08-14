@@ -15,7 +15,7 @@
 ### END INIT INFO
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-SPOOLER=/usr/bin/zarafa-spooler
+SPOOLER=/usr/sbin/zarafa-spooler
 DESC="Zarafa spooler"
 NAME=`basename $SPOOLER`
 #QUIETDAEMONDAEMON=--quiet
