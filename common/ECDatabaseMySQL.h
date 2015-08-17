@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -68,8 +67,8 @@ typedef unsigned long *	DB_LENGTHS;
 #define MAX_GROUP_CONCAT_LEN		32768
 
 typedef struct _sDatabase {
-	char *lpComment;
-	char *lpSQL;
+	const char *lpComment;
+	const char *lpSQL;
 } sSQLDatabase_t;
 
 class ECDatabaseMySQL
@@ -84,9 +83,9 @@ public:
 	ECRESULT		DoUpdate(const std::string &strQuery, unsigned int *lpulAffectedRows = NULL);
 	ECRESULT		DoInsert(const std::string &strQuery, unsigned int *lpulInsertId = NULL, unsigned int *lpulAffectedRows = NULL);
 	ECRESULT		DoDelete(const std::string &strQuery, unsigned int *lpulAffectedRows = NULL);
-	ECRESULT		DoSequence(const std::string &strSeqName, unsigned int ulCount, unsigned long long *lpllFirstId);
+		ECRESULT		DoSequence(const std::string &strSeqName, unsigned int ulCount, uint64_t *lpllFirstId);
 	
-	virtual sSQLDatabase_t*	GetDatabaseDefs() = 0;
+	virtual const sSQLDatabase_t *GetDatabaseDefs(void) = 0;
 
 	//Result functions
 	unsigned int	GetNumRows(DB_RESULT sResult);
@@ -96,8 +95,8 @@ public:
 	DB_LENGTHS		FetchRowLengths(DB_RESULT sResult);
 
 	std::string		Escape(const std::string &strToEscape);
-	std::string		EscapeBinary(unsigned char *lpData, unsigned int ulLen);
-	std::string		EscapeBinary(std::string &strData);
+	std::string		EscapeBinary(const unsigned char *lpData, unsigned int ulLen);
+	std::string		EscapeBinary(const std::string &strData);
 
 	std::string		GetError();
 	

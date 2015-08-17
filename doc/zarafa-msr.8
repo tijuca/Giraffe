@@ -1,0 +1,81 @@
+'\" t
+.\"     Title: zarafa-msr
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
+.\"      Date: April 2014
+.\"    Manual: Zarafa user reference
+.\"    Source: Zarafa 7.2
+.\"  Language: English
+.\"
+.TH "ZARAFA\-MSR" "8" "April 2014" "Zarafa 7.2" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+zarafa-msr \- Relocates mailboxes from one node to another\&.
+.SH "SYNOPSIS"
+.HP \w'\fBzarafa\-msr\fR\ 'u
+\fBzarafa\-msr\fR [\fICONFIG\fR]
+.SH "DESCRIPTION"
+.PP
+In order to move mailboxes between multi\-server nodes, the mailbox storage relocator is available\&. The
+\fBzarafa\-msr \fR
+tool should be used to relocate mailboxes to other multi\-server nodes\&.
+.SH "INVOCATION"
+.PP
+The only argument required by
+\fBzarafa\-msr\fR
+is an configuration file specifying the details of the relocation operation\&.
+.PP
+\fBzarafa\-msr\fR
+\fICONFIG\fR
+.PP
+When
+\fBzarafa\-msr\fR
+is finished with relocating all mailboxes, it will print
+.PP
+"x migrations have completed successfully, maintaining sync\&."
+.PP
+where x denotes the number of migrated mailboxes\&. The administrator can now stop
+\fBzarafa\-msr\fR
+by pressing Ctrl\-C\&.
+.PP
+\fBzarafa\-msr\fR
+can safely be stopped at any time by pressing Ctrl\-C\&. On the next run it will continue where it left off when it was stopped\&.
+.SH "UPDATING LDAP/ADS"
+.PP
+There are two situations in which it\(cqs safe to update the home servers for the users whose mailboxes have been relocated:
+.PP
+1\&.
+\fBzarafa\-msr\fR
+is still running\&. In this case all changes in the original mailbox will continue to be propagated to the new mailbox\&.
+.PP
+2\&. No changes in the original mailbox can occur\&.
+.PP
+NOTE: Running
+\fBzarafa\-msr\fR
+after the LDAP/ADS has been modified will not work, because it will automatically connect to the new server for the source mailbox\&.
+.SH "AUTHOR"
+.PP
+Written by Zarafa\&.
+.SH "SEE ALSO"
+.PP
+
+\fBzarafa-msr.cfg\fR(5),
+\fBzarafa-msr-verify\fR(8)

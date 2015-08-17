@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -55,7 +54,7 @@
 
 /* conversion from unicode to string8 for rules table data */
 static HRESULT ConvertUnicodeToString8(LPSRestriction lpRes, void *base, convert_context &converter);
-static HRESULT ConvertUnicodeToString8(ACTIONS* lpActions, void *base, convert_context &converter);
+static HRESULT ConvertUnicodeToString8(const ACTIONS *lpActions, void *base, convert_context &converter);
 
 
 ECRulesTableProxy::ECRulesTableProxy(LPMAPITABLE lpTable)
@@ -287,7 +286,8 @@ DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, SetCollapseState, (ULONG,
 
 
 
-HRESULT ConvertUnicodeToString8(WCHAR *lpszW, char **lppszA, void *base, convert_context &converter)
+static HRESULT ConvertUnicodeToString8(const WCHAR *lpszW, char **lppszA,
+    void *base, convert_context &converter)
 {
 	HRESULT hr = hrSuccess;
 	std::string local;
@@ -309,7 +309,8 @@ exit:
 	return hr;
 }
 
-HRESULT ConvertUnicodeToString8(LPSRestriction lpRestriction, void *base, convert_context &converter)
+static HRESULT ConvertUnicodeToString8(LPSRestriction lpRestriction,
+    void *base, convert_context &converter)
 {
 	HRESULT hr = hrSuccess;
 	ULONG i;
@@ -383,7 +384,8 @@ exit:
 	return hr;
 }
 
-HRESULT ConvertUnicodeToString8(LPSRow lpRow, void *base, convert_context &converter)
+static HRESULT ConvertUnicodeToString8(const SRow *lpRow, void *base,
+    convert_context &converter)
 {
 	HRESULT hr = hrSuccess;
 
@@ -405,7 +407,8 @@ exit:
 	return hr;
 }
 
-HRESULT ConvertUnicodeToString8(LPADRLIST lpAdrList, void *base, convert_context &converter)
+static HRESULT ConvertUnicodeToString8(const ADRLIST *lpAdrList, void *base,
+    convert_context &converter)
 {
 	HRESULT hr = hrSuccess;
 
@@ -423,7 +426,7 @@ exit:
 	return hr;
 }
 
-HRESULT ConvertUnicodeToString8(ACTIONS* lpActions, void *base, convert_context &converter)
+static HRESULT ConvertUnicodeToString8(const ACTIONS *lpActions, void *base, convert_context &converter)
 {
 	HRESULT hr = hrSuccess;
 

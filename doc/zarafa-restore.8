@@ -1,0 +1,166 @@
+'\" t
+.\"     Title: zarafa-restore
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
+.\"      Date: April 2014
+.\"    Manual: Zarafa user reference
+.\"    Source: Zarafa 7.2
+.\"  Language: English
+.\"
+.TH "ZARAFA\-RESTORE" "8" "April 2014" "Zarafa 7.2" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+zarafa-restore \- The Zarafa Restore tool
+.SH "SYNOPSIS"
+.HP \w'\fBzarafa\-restore\fR\ 'u
+\fBzarafa\-restore\fR [\fIOPTION\fR...] [\fIRECORDKEY\fR...]
+.SH "DESCRIPTION"
+.PP
+The zarafa\-restore tool restores data from a backup that was created by the zarafa\-backup tool\&. You can search in the index file for the items or folders you wish to restore\&.
+.PP
+Remember the record key, and save it in a file, one per line\&. The record key for containers can be found in the 7th field, for messages in the 5th field\&. The numbers can also be passed as command parameters\&. Please refer to the
+\fBzarafa-backup\fR(8)
+manual to view the index file layout\&.
+.SH "OPTIONS"
+.PP
+The options used to restore are as follows:
+.PP
+\fB\-\-user\fR, \fB\-u\fR \fIusername\fR
+.RS 4
+Restore to this Zarafa user\&. If the
+\fB\-\-from\fR
+is not passed, this will also be used as the backup set name to restore from\&.
+.sp
+In a single\-tenancy environment this option is mandatory when not restoring from the public store\&. For restoring a multi\-tenancy public store,
+\fI\-\-user\fR
+must be used in combination with the name of the tenant\&.
+.RE
+.PP
+\fB\-\-from\fR, \fB\-f\fR \fIusername\fR
+.RS 4
+Restore from this backup set\&. This overrides the default backup set name if you want to restore from another name than to restore to\&.
+.RE
+.PP
+\fB\-\-public\fR, \fB\-p\fR
+.RS 4
+Restore to the public store\&. This option is only for non multi\-tenancy Zarafa servers\&. If you\*(Aqve enabled the enable_hosted_zarafa option in your server, you can restore public data by using the
+\fI\-\-user\fR
+switch with the name of the tenant which you wish to restore\&.
+.RE
+.PP
+\fB\-\-restorefile\fR, \fB\-i\fR \fIfilename\fR
+.RS 4
+Use this file as input for the record keys\&. Each recordkey should be on its own line\&. Use \*(Aq\-\*(Aq as filename when the record keys are to be read from stdin\&.
+.RE
+.PP
+\fB\-\-recurse\fR, \fB\-r\fR
+.RS 4
+When you restore a folder, the folder with its contents will be restored\&. If you add this option, also the subfolders of the given folder are restored\&.
+.RE
+.PP
+\fB\-\-host\fR, \fB\-h\fR \fIpath\fR
+.RS 4
+Connect to the Zarafa server through
+\fIpath\fR, e\&.g\&.
+file:///path/to/socket\&. Default:
+file:///var/run/zarafa\&.
+.RE
+.PP
+\fB\-\-config\fR, \fB\-c\fR \fIfile\fR
+.RS 4
+Use a configuration file\&. See the
+\fBCONFIG\fR()
+section for more information\&.
+.sp
+Default:
+\fI/etc/zarafa/backup\&.cfg\fR
+.RE
+.PP
+\fB\-\-verbose\fR, \fB\-v\fR
+.RS 4
+Print more about which folder is being restored\&.
+.RE
+.PP
+\fB\-\-not\-before\fR, \fB\-b\fR \fIday\-month\-year\fR
+.RS 4
+When an item was created before this date, it will not be restored\&. The date is passed in the specified format, with the \*(Aq\-\*(Aq signs aswell\&.
+.RE
+.PP
+\fB\-\-not\-after\fR, \fB\-a\fR \fIday\-month\-year\fR
+.RS 4
+When an item was created after this date, it will not be restored\&. The date is passed in the specified format, with the \*(Aq\-\*(Aq signs aswell\&.
+.RE
+.SH "EXAMPLES"
+.PP
+Some helper and example scripts can be found in /usr/share/zarafa/zarafa\-backup\-helpers\&. The full\-restore\&.sh script allows you to easely restore the complete backup to a store\&. The readable\-index\&.pl script will create a more readable version of an index file, and print it to the screen\&.
+.PP
+Restore one message from user jane to user john:
+.PP
+
+\fBzarafa\-restore\fR
+\fB\-u\fR
+\fIjohn\fR
+\fB\-f\fR
+\fIjane\fR
+\fB\fI10203040\fR\fR
+.PP
+Restore Inbox and all subfolders from user jane:
+.PP
+
+\fBzarafa\-restore\fR
+\fB\-u\fR
+\fIjane\fR
+\fB\-r\fR
+\fB`grep ^C jane\&.index\&.zbk | grep Inbox | cut \-d: \-f7`\fR
+.SH "CONFIG"
+.PP
+Normally, no configuration file is used or required\&. The following options can be set in the configuation file:
+.PP
+\fBserver_socket\fR
+.RS 4
+Unix socket to find the connection to the Zarafa server\&.
+.sp
+Default:
+\fIfile:///var/run/zarafa\fR
+.RE
+.PP
+\fBsslkey_file\fR
+.RS 4
+Use this file as key to logon to the server\&. This is only used when server_socket is set to an HTTPS transport\&. See the
+\fBzarafa-server\fR(8)
+manual page on how to setup SSL keys\&.
+.sp
+Default: value not set\&.
+.RE
+.PP
+\fBsslkey_pass\fR
+.RS 4
+The password of the SSL key file that is set in sslkey_file\&.
+.sp
+Default: value not set\&.
+.RE
+.SH "AUTHOR"
+.PP
+Written by Zarafa\&.
+.SH "SEE ALSO"
+.PP
+
+\fBzarafa-backup\fR(8)

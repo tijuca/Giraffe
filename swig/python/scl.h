@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,6 +44,8 @@
 // Standard Conversion Library (Currently for Python only)
 #ifndef SCL_H
 #define SCL_H
+
+#include "platform.h"
 
 // Get Py_ssize_t for older versions of python
 #if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
@@ -132,15 +133,15 @@ namespace priv {
 	}
 
 	/**
-	 * Specialization for extracting a long long from a script value.
+	 * Specialization for extracting a int64_t from a script value.
 	 *
 	 * @tparam		_Type	The type of the resulting value.
 	 * @param[in]	Value	The scripted value to convert.
 	 * @param[out]	result	The native value.
 	 */
 	template <>
-	void conv_out<long long>(PyObject* value, LPVOID /*lpBase*/, ULONG /*ulFlags*/, long  long *lpResult) {
-		*lpResult = (long long)PyLong_AsUnsignedLong(value);
+	void conv_out<int64_t>(PyObject* value, LPVOID /*lpBase*/, ULONG /*ulFlags*/, int64_t *lpResult) {
+		*lpResult = (int64_t)PyLong_AsUnsignedLong(value);
 	}
 
 	/**

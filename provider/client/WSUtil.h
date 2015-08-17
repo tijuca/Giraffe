@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -56,46 +55,46 @@
 
 class convert_context;
 
-HRESULT CopyMAPIPropValToSOAPPropVal(propVal *lpPropValDst, LPSPropValue lpPropValSrc, convert_context *lpConverter = NULL);
-HRESULT CopySOAPPropValToMAPIPropVal(LPSPropValue lpPropValDst, struct propVal *lpPropValSrc, void *lpBase, convert_context *lpConverter = NULL);
-HRESULT CopySOAPRowToMAPIRow(void* lpProvider, struct propValArray *lpsRowSrc, LPSPropValue lpsRowDst, void **lpBase, ULONG ulType, convert_context *lpConverter = NULL);
-HRESULT CopySOAPRowSetToMAPIRowSet(void* lpProvider, struct rowSet *lpsRowSetSrc, LPSRowSet *lppRowSetDst, ULONG ulType);
-HRESULT CopySOAPRestrictionToMAPIRestriction(LPSRestriction lpDst, struct restrictTable *lpSrc, void *lpBase, convert_context *lpConverter = NULL);
+HRESULT CopyMAPIPropValToSOAPPropVal(propVal *lpPropValDst, const SPropValue *lpPropValSrc, convert_context *lpConverter = NULL);
+HRESULT CopySOAPPropValToMAPIPropVal(LPSPropValue lpPropValDst, const struct propVal *lpPropValSrc, void *lpBase, convert_context *lpConverter = NULL);
+HRESULT CopySOAPRowToMAPIRow(void *lpProvider, const struct propValArray *lpsRowSrc, LPSPropValue lpsRowDst, void **lpBase, ULONG ulType, convert_context *lpConverter = NULL);
+HRESULT CopySOAPRowSetToMAPIRowSet(void *lpProvider, const struct rowSet *lpsRowSetSrc, LPSRowSet *lppRowSetDst, ULONG ulType);
+HRESULT CopySOAPRestrictionToMAPIRestriction(LPSRestriction lpDst, const struct restrictTable *lpSrc, void *lpBase, convert_context *lpConverter = NULL);
 
-HRESULT CopyMAPIRestrictionToSOAPRestriction(struct restrictTable **lppDst, LPSRestriction lpSrc, convert_context *lpConverter = NULL);
-HRESULT CopyMAPIRowSetToSOAPRowSet(LPSRowSet lpRowSetSrc, struct rowSet **lppsRowSetDst, convert_context *lpConverter = NULL);
-HRESULT CopyMAPIRowToSOAPRow(LPSRow lpRowSrc, struct propValArray *lpsRowDst, convert_context *lpConverter = NULL);
-HRESULT CopySOAPRowToMAPIRow(struct propValArray *lpsRowSrc, LPSPropValue lpsRowDst, void *lpBase, convert_context *lpConverter = NULL);
+HRESULT CopyMAPIRestrictionToSOAPRestriction(struct restrictTable **lppDst, const SRestriction *lpSrc, convert_context *lpConverter = NULL);
+HRESULT CopyMAPIRowSetToSOAPRowSet(const SRowSet *lpRowSetSrc, struct rowSet **lppsRowSetDst, convert_context *lpConverter = NULL);
+HRESULT CopyMAPIRowToSOAPRow(const SRow *lpRowSrc, struct propValArray *lpsRowDst, convert_context *lpConverter = NULL);
+HRESULT CopySOAPRowToMAPIRow(const struct propValArray *lpsRowSrc, LPSPropValue lpsRowDst, void *lpBase, convert_context *lpConverter = NULL);
 
-HRESULT CopySOAPEntryId(entryId *lpSrc, entryId* lpDest);
-HRESULT CopyMAPIEntryIdToSOAPEntryId(ULONG cbEntryIdSrc, LPENTRYID lpEntryIdSrc, entryId** lppDest);
-HRESULT CopyMAPIEntryIdToSOAPEntryId(ULONG cbEntryIdSrc, LPENTRYID lpEntryIdSrc, entryId* lpDest, bool bCheapCopy=false);
-HRESULT CopySOAPEntryIdToMAPIEntryId(entryId* lpSrc, ULONG* lpcbDest, LPENTRYID* lppEntryIdDest, void* lpBase = NULL);
-HRESULT CopySOAPEntryIdToMAPIEntryId(entryId* lpSrc, ULONG ulObjId, ULONG* lpcbDest, LPENTRYID* lppEntryIdDest, void *lpBase = NULL);
-HRESULT CopySOAPEntryIdToMAPIEntryId(entryId* lpSrc, ULONG ulObjId, ULONG ulType, ULONG* lpcbDest, LPENTRYID* lppEntryIdDest, void *lpBase = NULL);
-HRESULT CopyMAPIEntryListToSOAPEntryList(ENTRYLIST *lpMsgList, struct entryList* lpsEntryList);
-HRESULT CopySOAPEntryListToMAPIEntryList(struct entryList* lpsEntryList, LPENTRYLIST* lppMsgList);
+HRESULT CopySOAPEntryId(const entryId *lpSrc, entryId *lpDest);
+HRESULT CopyMAPIEntryIdToSOAPEntryId(ULONG cbEntryIdSrc, const ENTRYID *lpEntryIdSrc, entryId **lppDest);
+HRESULT CopyMAPIEntryIdToSOAPEntryId(ULONG cbEntryIdSrc, const ENTRYID *lpEntryIdSrc, entryId *lpDest, bool bCheapCopy = false);
+HRESULT CopySOAPEntryIdToMAPIEntryId(const entryId *lpSrc, ULONG *lpcbDest, LPENTRYID *lppEntryIdDest, void *lpBase = NULL);
+HRESULT CopySOAPEntryIdToMAPIEntryId(const entryId *lpSrc, ULONG ulObjId, ULONG *lpcbDest, LPENTRYID *lppEntryIdDest, void *lpBase = NULL);
+HRESULT CopySOAPEntryIdToMAPIEntryId(const entryId *lpSrc, ULONG ulObjId, ULONG ulType, ULONG *lpcbDest, LPENTRYID *lppEntryIdDest, void *lpBase = NULL);
+HRESULT CopyMAPIEntryListToSOAPEntryList(const ENTRYLIST *lpMsgList, struct entryList *lpsEntryList);
+HRESULT CopySOAPEntryListToMAPIEntryList(const struct entryList *lpsEntryList, LPENTRYLIST *lppMsgList);
 HRESULT CopyUserClientUpdateStatusFromSOAP(struct userClientUpdateStatusResponse &sUCUS, ULONG ulFlags, LPECUSERCLIENTUPDATESTATUS *lppECUCUS);
 
-HRESULT CopySOAPPropTagArrayToMAPIPropTagArray(struct propTagArray* lpsPropTagArray, LPSPropTagArray* lppPropTagArray, void* lpBase = NULL);
+HRESULT CopySOAPPropTagArrayToMAPIPropTagArray(const struct propTagArray *lpsPropTagArray, LPSPropTagArray *lppPropTagArray, void *lpBase = NULL);
 
 HRESULT FreeABProps(struct propmapPairArray *lpsoapPropmap, struct propmapMVPairArray *lpsoapMVPropmap);
-HRESULT CopyABPropsToSoap(SPROPMAP *lpPropmap, MVPROPMAP *lpMVPropmap, ULONG ulFlags, 
+HRESULT CopyABPropsToSoap(const SPROPMAP *lpPropmap, const MVPROPMAP *lpMVPropmap, ULONG ulFlags, 
 						  struct propmapPairArray **lppsoapPropmap, struct propmapMVPairArray **lppsoapMVPropmap);
-HRESULT CopyABPropsFromSoap(struct propmapPairArray *lpsoapPropmap, struct propmapMVPairArray *lpsoapMVPropmap,
+HRESULT CopyABPropsFromSoap(const struct propmapPairArray *lpsoapPropmap, const struct propmapMVPairArray *lpsoapMVPropmap,
 							SPROPMAP *lpPropmap, MVPROPMAP *lpMVPropmap, void *lpBase, ULONG ulFlags);
 
-HRESULT SoapUserArrayToUserArray(struct userArray* lpUserArray, ULONG ulFLags, ULONG *lpcUsers, LPECUSER* lppsUsers);
-HRESULT SoapUserToUser(struct user *lpUser, ULONG ulFLags, LPECUSER *lppsUser);
+HRESULT SoapUserArrayToUserArray(const struct userArray *lpUserArray, ULONG ulFLags, ULONG *lpcUsers, LPECUSER *lppsUsers);
+HRESULT SoapUserToUser(const struct user *lpUser, ULONG ulFLags, LPECUSER *lppsUser);
 
-HRESULT SoapGroupArrayToGroupArray(struct groupArray* lpGroupArray, ULONG ulFLags, ULONG *lpcGroups, LPECGROUP *lppsGroups);
-HRESULT SoapGroupToGroup(struct group *lpGroup, ULONG ulFLags, LPECGROUP *lppsGroup);
+HRESULT SoapGroupArrayToGroupArray(const struct groupArray *lpGroupArray, ULONG ulFLags, ULONG *lpcGroups, LPECGROUP *lppsGroups);
+HRESULT SoapGroupToGroup(const struct group *lpGroup, ULONG ulFLags, LPECGROUP *lppsGroup);
 
-HRESULT SoapCompanyArrayToCompanyArray(struct companyArray* lpCompanyArray, ULONG ulFLags, ULONG *lpcCompanies, LPECCOMPANY *lppsCompanies);
-HRESULT SoapCompanyToCompany(struct company *lpCompany, ULONG ulFLags, LPECCOMPANY *lppsCompany);
+HRESULT SoapCompanyArrayToCompanyArray(const struct companyArray *lpCompanyArray, ULONG ulFLags, ULONG *lpcCompanies, LPECCOMPANY *lppsCompanies);
+HRESULT SoapCompanyToCompany(const struct company *lpCompany, ULONG ulFLags, LPECCOMPANY *lppsCompany);
 
-HRESULT SvrNameListToSoapMvString8(LPECSVRNAMELIST lpSvrNameList, ULONG ulFLags, struct mv_string8 **lppsSvrNameList); 
-HRESULT SoapServerListToServerList(struct serverList *lpsServerList, ULONG ulFLags, LPECSERVERLIST *lppServerList);
+HRESULT SvrNameListToSoapMvString8(LPECSVRNAMELIST lpSvrNameList, ULONG ulFLags, struct mv_string8 **lppsSvrNameList);
+HRESULT SoapServerListToServerList(const struct serverList *lpsServerList, ULONG ulFLags, LPECSERVERLIST *lppServerList);
 
 int gsoap_connect_unixsocket(struct soap *soap, const char *endpoint, const char *host, int port);
 

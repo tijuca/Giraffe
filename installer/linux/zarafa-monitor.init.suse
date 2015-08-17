@@ -18,7 +18,7 @@
 rc_reset
 
 MONITORCONFIG=/etc/zarafa/monitor.cfg
-MONITORPROGRAM=/usr/bin/zarafa-monitor
+MONITORPROGRAM=/usr/sbin/zarafa-monitor
 
 # Sanity checks.
 #[ -f $MONITORCONFIG ] || exit 0

@@ -5,7 +5,7 @@
 # chkconfig: 345 86 24
 # description: The Zarafa search is an indexer daemon for full-text search \
 #              through all objects (including attachments)
-# processname: /usr/bin/zarafa-search
+# processname: /usr/sbin/zarafa-search
 # config: /etc/zarafa/search.cfg
 # pidfile: /var/run/zarafa-search.pid
 
@@ -21,7 +21,7 @@
 ### END INIT INFO
 
 SEARCHCONFIG=/etc/zarafa/search.cfg
-SEARCHPROGRAM=/usr/bin/zarafa-search
+SEARCHPROGRAM=/usr/sbin/zarafa-search
 
 # Sanity checks.
 [ -x $SEARCHPROGRAM ] || exit 0

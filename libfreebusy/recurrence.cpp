@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,13 +44,13 @@
 #include "platform.h"
 
 #include "recurrence.h"
-#include <math.h>
+#include <cmath>
 #include <mapicode.h>
 #include "stringutil.h"
 #include "ECIConv.h"
-#include <time.h>
+#include <ctime>
 #include "CommonUtil.h"
-#include "mapiutil.h"
+#include <mapiutil.h>
 #include "mapiguidext.h"
 #include "namedprops.h"
 
@@ -62,16 +61,14 @@ using namespace std;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
-recurrence::recurrence()
-{
+recurrence::recurrence() {
 	m_ulMonth = 0x0;
 }
 
-recurrence::~recurrence()
-{
+recurrence::~recurrence() {
 }
 
 /**
@@ -81,8 +78,7 @@ recurrence::~recurrence()
  * @param[in]	ulLen	Length of lpData
  * @param[in]	ulFlags	RECURRENCE_STATE_TASKS if the recurrence is from a task
  */
-HRESULT recurrence::HrLoadRecurrenceState(char *lpData, unsigned int ulLen, ULONG ulFlags)
-{
+HRESULT recurrence::HrLoadRecurrenceState(char *lpData, unsigned int ulLen, ULONG ulFlags) {
 	return m_sRecState.ParseBlob(lpData, ulLen, ulFlags);
 }
 
@@ -487,6 +483,7 @@ UCHAR recurrence::getMonth()
 	struct tm tmMonth;
 	time_t tStart = getStartDate();
 	gmtime_safe(&tStart, &tmMonth);
+
 	return tmMonth.tm_mon+1;
 }
 
@@ -510,7 +507,7 @@ UCHAR recurrence::getWeekNumber()
 
 HRESULT recurrence::setWeekNumber(UCHAR s)
 {
-	// we should be handling monthly recurrence items here, calender type 0xB (hijri) is not supported
+	// we should be handling monthly recurrence items here, calendar type 0xB (hijri) is not supported
 	m_sRecState.ulPatternType = 3;
 	m_sRecState.ulWeekNumber = s;
 	return S_OK;
@@ -1102,7 +1099,6 @@ list<time_t> recurrence::getOccurrencesBetween(time_t begin, time_t end){
 time_t recurrence::calcStartDate()
 {
 	time_t tStart = getStartDateTime();
-	LONG rStart;
 	struct tm tm;
 
 	switch (m_sRecState.ulRecurFrequency) {
@@ -1263,11 +1259,7 @@ time_t recurrence::calcStartDate()
 
 		break;
 	}
-
-
-exit:
 	return tStart;
-
 }
 
 time_t recurrence::calcEndDate()
@@ -1525,33 +1517,42 @@ ULONG recurrence::DaysInMonth(ULONG year, ULONG month)
 
 ULONG recurrence::MonthFromTime(time_t t)
 {
-	struct tm * lpT = gmtime(&t);
-	return lpT->tm_mon + 1;
+	struct tm lpT;
+	gmtime_safe(&t, &lpT);
+
+	return lpT.tm_mon + 1;
 }
 
 ULONG recurrence::YearFromTime(time_t t)
 {
-	struct tm * lpT = gmtime(&t);
-	return lpT->tm_year + 1900;
+	struct tm lpT;
+	gmtime_safe(&t, &lpT);
+
+	return lpT.tm_year + 1900;
 }
 
 ULONG recurrence::AllMonthsFromTime(time_t t)
 {
-	struct tm * lpT = gmtime(&t);
-	return lpT->tm_mon + (lpT->tm_year + 1900 - 1601) * 12;
+	struct tm lpT;
+	gmtime_safe(&t, &lpT);
+
+	return lpT.tm_mon + (lpT.tm_year + 1900 - 1601) * 12;
 }
 
 ULONG recurrence::WeekDayFromTime(time_t t)
 {
-	struct tm lpT = {0};
+	struct tm lpT;
 	gmtime_safe(&t, &lpT);
+
 	return lpT.tm_wday;
 }
 
 ULONG recurrence::MonthDayFromTime(time_t t)
 {
-	struct tm * lpT = gmtime(&t);
-	return lpT->tm_mday;
+	struct tm lpT;
+	gmtime_safe(&t, &lpT);
+
+	return lpT.tm_mday;
 }
 
 bool recurrence::CheckAddValidOccr(time_t tsNow, time_t tsStart, time_t tsEnd, ECLogger *lpLogger, TIMEZONE_STRUCT ttZinfo, ULONG ulBusyStatus, OccrInfo **lppOccrInfoAll, ULONG *lpcValues) {
@@ -1644,10 +1645,10 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd, ECLogger *lpLogger,
                         if (last) {
                                 remainder = (tsDayEnd-tsDayStart) % (60 * 1440); // shouldn't this be m_sRecState.ulPeriod * 60? (see above)
                                 for(tsNow = tsDayEnd-remainder; tsNow >= tsDayStart; tsNow -= 60 * 1440) { //604800 = 60*60*24*7 
-                                        tm *sTm = NULL;
-                                        sTm =  gmtime(&tsNow);
+                                        tm sTm;
+                                        gmtime_safe(&tsNow, &sTm);
 
-                                        if(sTm->tm_wday > 0 && sTm->tm_wday < 6) {
+                                        if(sTm.tm_wday > 0 && sTm.tm_wday < 6) {
                                                 if(CheckAddValidOccr(tsNow, tsStart, tsEnd, lpLogger, ttZinfo, ulBusyStatus, &lpOccrInfoAll, lpcValues)) {
                                                         break;
                                                 }
@@ -1655,15 +1656,14 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd, ECLogger *lpLogger,
                                 }
                         } else {
                                 for(tsNow = tsDayStart ;tsNow <= tsDayEnd; tsNow += 60 * 1440) { //604800 = 60*60*24*7 
-                                        tm *sTm = NULL;
-                                        sTm =  gmtime(&tsNow);
+                                        tm sTm;
+                                        gmtime_safe(&tsNow, &sTm);
                             
-                                        if(sTm->tm_wday > 0 && sTm->tm_wday < 6) {
+                                        if(sTm.tm_wday > 0 && sTm.tm_wday < 6)
                                                 CheckAddValidOccr(tsNow, tsStart, tsEnd, lpLogger, ttZinfo, ulBusyStatus, &lpOccrInfoAll, lpcValues);
                                         }
                                 }
 			}
-		}
 		break;// CASE : DAILY
 
 	case WEEKLY:
@@ -1785,9 +1785,7 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd, ECLogger *lpLogger,
 			time_t tMonthStart = 0;
 			time_t tsMonthNow = 0;
 			ULONG ulValidDay = 0;
-			ULONG ulDaysOfMonths = 0;
 
-			ulDaysOfMonths = countDaysOfMonth(tsNow);
 			if(m_sRecState.ulDayOfMonth != 0) {
 				
 				ulMonthDay = m_sRecState.ulDayOfMonth;

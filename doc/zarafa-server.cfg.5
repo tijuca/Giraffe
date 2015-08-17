@@ -2,12 +2,12 @@
 .\"     Title: zarafa-server.cfg
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: August 2011
+.\"      Date: April 2014
 .\"    Manual: Zarafa user reference
-.\"    Source: Zarafa 7.1
+.\"    Source: Zarafa 7.2
 .\"  Language: English
 .\"
-.TH "ZARAFA\-SERVER\&.CFG" "5" "August 2011" "Zarafa 7.1" "Zarafa user reference"
+.TH "ZARAFA\-SERVER\&.CFG" "5" "April 2014" "Zarafa 7.2" "Zarafa user reference"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -265,7 +265,7 @@ Default:
 .PP
 \fBthread_stacksize\fR
 .RS 4
-This setting might be usefull on 32bit system with a lot of users\&. This setting should not be set too small, or your server will crash\&. The value set is in Kb\&.
+This setting might be useful on 32\-bit system with a lot of users\&. This setting should not be set too small, or your server will crash\&. The value set is in Kb\&.
 .sp
 Default:
 \fI512\fR
@@ -274,7 +274,7 @@ Default:
 \fBlicense_socket\fR
 .RS 4
 Path to the
-\fBzarafa-licensed\fR(1)
+\fBzarafa-licensed\fR(8)
 service\&.
 .sp
 Default:
@@ -284,7 +284,7 @@ Default:
 \fBlicense_timeout\fR
 .RS 4
 Time (in seconds) to wait for a connection to the
-\fBzarafa-licensed\fR(1)
+\fBzarafa-licensed\fR(8)
 before terminating the request\&.
 .sp
 Default:
@@ -336,6 +336,14 @@ Specify whether to prefix each log line with a timestamp in \*(Aqfile\*(Aq loggi
 .sp
 Default:
 \fI1\fR
+.RE
+.PP
+\fBlog_buffer_size\fR
+.RS 4
+Buffer logging in what sized blocks\&. Bigger buffers is better for the performance but it gives lag when running e\&.g\&. multitail or \*(Aqtail \-f\*(Aq on the log\-file\&. If you want to directly see what is happing, set this to e\&.g\&. 1\&. So when debugging: make it a small value, else set it to 4096 or more\&.
+.sp
+Default:
+\fI4096\fR
 .RE
 .SH "EXPLANATION OF THE SECURITY LOGGING SETTINGS PARAMETERS"
 .PP
@@ -450,7 +458,7 @@ Default:
 .PP
 \fBattachment_storage\fR
 .RS 4
-The location where attachments are stored\&. This can be in the MySQL database, or as separate files\&. The drawback of \*(Aqdatabase\*(Aq is that the large data of attachment will push usefull data from the MySQL cache\&. The drawback of separate files is that a mysqldump is not enough for a full disaster recovery\&.
+The location where attachments are stored\&. This can be in the MySQL database, or as separate files\&. The drawback of \*(Aqdatabase\*(Aq is that the large data of attachment will push useful data from the MySQL cache\&. The drawback of separate files is that a mysqldump is not enough for a full disaster recovery\&.
 .sp
 Default:
 \fIfiles\fR
@@ -499,7 +507,7 @@ Default:
 \fBserver_ssl_key_file\fR
 .RS 4
 The file containing the private key and certificate\&. Please read the SSL section in the
-\fBzarafa-server\fR(1)
+\fBzarafa-server\fR(8)
 manual on how to create this file\&.
 .sp
 Default:
@@ -540,16 +548,44 @@ No default set\&.
 \fBsslkeys_path\fR
 .RS 4
 The path which contains public keys of clients which can login over SSL using their key\&. Please read the SSL section in the
-\fBzarafa-server\fR(1)
+\fBzarafa-server\fR(8)
 manual on how to create these files\&.
 .sp
 Default:
 \fI/etc/zarafa/sslkeys\fR
 .RE
 .PP
-\fBserver_ssl_enable_v2\fR
+\fBserver_ssl_protocols\fR
 .RS 4
-Incoming SSL connections normally are v3\&.
+Disabled or enabled protocol names\&. Supported protocol names are
+\fISSLv2\fR,
+\fISSLv3\fR
+and
+\fITLSv1\fR\&. If Zarafa was linked against OpenSSL 1\&.0\&.1 or later there is additional support for the new protocols
+\fITLSv1\&.1\fR
+and
+\fITLSv1\&.2\fR\&. To exclude both, SSLv2 and SSLv3 set
+\fBserver_ssl_protocols\fR
+to
+\fI!SSLv2 !SSLv3\fR\&. SSLv2 is considered unsafe and these connections should not be accepted\&.
+.sp
+Default:
+\fI!SSLv2\fR
+.RE
+.PP
+\fBserver_ssl_ciphers\fR
+.RS 4
+SSL ciphers to use, set to
+\fIALL\fR
+for backward compatibility\&.
+.sp
+Default:
+\fIALL:!LOW:!SSLv2:!EXP:!aNULL\fR
+.RE
+.PP
+\fBserver_ssl_prefer_server_ciphers\fR
+.RS 4
+Prefer the server\*(Aqs order of SSL ciphers over client\*(Aqs\&.
 .sp
 Default:
 \fIno\fR
@@ -879,7 +915,7 @@ Retrieve the users and groups information from an LDAP server\&. All additional 
 \fIunix\fR
 .RS 4
 Retrieve the users and groups information from the Linux password files\&. User information will be read the /etc/passwd file\&. Passwords will be checked agains /etc/shadow\&. Group information will read from /etc/group\&. Use the
-\fBzarafa-admin\fR(1)
+\fBzarafa-admin\fR(8)
 tool to set Zarafa specific attributes on a user\&.
 .sp
 All additional Unix settings are set in a separate config file, which will be defined by the
@@ -1080,7 +1116,7 @@ Default:
 \fBsearch_enabled\fR
 .RS 4
 Use the zarafa\-search indexing service for faster searching\&. Enabling this option requires the
-\fBzarafa-search\fR(1)
+\fBzarafa-search\fR(8)
 service to be running\&.
 .sp
 Default:
@@ -1090,7 +1126,7 @@ Default:
 \fBsearch_socket\fR
 .RS 4
 Path to the
-\fBzarafa-search\fR(1)
+\fBzarafa-search\fR(8)
 service, this option is only required if the server is going to make use of the indexing service\&.
 .sp
 Default:
@@ -1100,7 +1136,7 @@ Default:
 \fBsearch_timeout\fR
 .RS 4
 Time (in seconds) to wait for a connection to the
-\fBzarafa-search\fR(1)
+\fBzarafa-search\fR(8)
 before terminating the indexed search request\&.
 .sp
 Default:
@@ -1216,6 +1252,6 @@ Written by Zarafa\&.
 .SH "SEE ALSO"
 .PP
 
-\fBzarafa-server\fR(1)
-\fBzarafa-ldap.cfg\fR(5)
+\fBzarafa-server\fR(8),
+\fBzarafa-ldap.cfg\fR(5),
 \fBzarafa-unix.cfg\fR(5)

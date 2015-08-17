@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -52,8 +51,8 @@
 #include "restrictionutil.h"
 #include "icaluid.h"
 
-#include "libxml/tree.h"
-#include "libxml/parser.h"
+#include <libxml/tree.h>
+#include <libxml/parser.h>
 #include "PublishFreeBusy.h"
 
 #include <mapi_ptr.h>
@@ -63,7 +62,7 @@ using namespace std;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 /**
@@ -217,7 +216,9 @@ HRESULT iCal::HrHandleIcalPost()
 	ulTagPrivate = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_PRIVATE], PT_BOOLEAN);
 
 	cValues = 3;
-	MAPIAllocateBuffer(CbNewSPropTagArray(cValues), (void **)&lpPropTagArr);
+	if ((hr = MAPIAllocateBuffer(CbNewSPropTagArray(cValues), (void **)&lpPropTagArr)) != hrSuccess)
+		goto exit;
+
 	//Include PR_ENTRYID,PR_LAST_MODIFICATION_TIME & Named Prop GlobalObjUid.
 	lpPropTagArr->cValues = cValues;
 	
@@ -283,7 +284,8 @@ HRESULT iCal::HrHandleIcalPost()
 					continue;// skip new entries
 
 				sbEid.cb = lpRows->aRow[i].lpProps[0].Value.bin.cb;
-				MAPIAllocateBuffer(sbEid.cb,(void**)&sbEid.lpb);
+				if ((hr = MAPIAllocateBuffer(sbEid.cb,(void**)&sbEid.lpb)) != hrSuccess)
+					goto exit;
 				memcpy((void*)sbEid.lpb,lpRows->aRow[i].lpProps[0].Value.bin.lpb,sbEid.cb);
 
 				strUidString =  bin2hex((ULONG)sbUid.cb,(LPBYTE)sbUid.lpb);
@@ -535,8 +537,8 @@ HRESULT iCal::HrDelMessage(SBinary sbEid, bool blCensor)
 	}
 
 	lpEntryList->lpbin[0].cb = sbEid.cb;
-	MAPIAllocateMore(sbEid.cb, lpEntryList,
-			(void**)&lpEntryList->lpbin[0].lpb);
+	if ((hr = MAPIAllocateMore(sbEid.cb, lpEntryList, (void**)&lpEntryList->lpbin[0].lpb)) != hrSuccess)
+		goto exit;
 
 	memcpy((void *)lpEntryList->lpbin[0].lpb,(const void *) sbEid.lpb,sbEid.cb);
 				

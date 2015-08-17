@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -98,7 +97,7 @@ struct sortOrderArray sDefaultSortOrder = {0,0};
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 ULONG sANRProps[] = { PR_DISPLAY_NAME, PR_SMTP_ADDRESS, PR_ACCOUNT, PR_DEPARTMENT_NAME, PR_OFFICE_TELEPHONE_NUMBER, PR_OFFICE_LOCATION, PR_PRIMARY_FAX_NUMBER, PR_SURNAME};
@@ -2638,7 +2637,7 @@ ECRESULT ECGenericObjectTable::SetSortKey(sObjectTableKey* lpsRowItem, unsigned 
  *
  * Due to min/max categories, the order of rows in the key table (m_lpKeyTable) in not predictable by looking
  * only at a new row, since we don't know what the min/max value for the category is. We therefore have a second
- * sorted list of categories which is purely for looking up if a category exists, and what it's min/max value is.
+ * sorted list of categories which is purely for looking up if a category exists, and what its min/max values are.
  * This list is m_mapSortedCategories.
  *
  * The order of rows in m_lpKeyTable is the actual order of rows that will be seen by the MAPI Client.

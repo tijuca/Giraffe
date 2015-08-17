@@ -4,7 +4,7 @@
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
-DAEMON=/usr/bin/zarafa-search
+DAEMON=/usr/sbin/zarafa-search
 CONFIG=/etc/zarafa/search.cfg
 
 #     .........1.........2.........3.........4.........5........!
@@ -14,7 +14,7 @@ DESC="Zarafa Outlook Indexing service"
 #set -e
 
 # exit from init script when disabled, shift away "force" when present
-exit_if_disabled START_ZARAFA_SEARCH $* || shift
+exit_if_disabled START_ZARAFA_SEARCH "$@" || shift
 
 if [ ! -x $DAEMON ] 
 then

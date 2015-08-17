@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,12 +44,13 @@
 #ifndef __MAPI_SVC_H
 #define __MAPI_SVC_H
 
+#include "zcdefs.h"
 #include <map>
 #include <set>
 #include <vector>
 #include <string>
-#include "mapidefs.h"
-#include "mapispi.h"
+#include <mapidefs.h>
+#include <mapispi.h>
 
 typedef std::map<std::string, std::string> inf_section;
 typedef std::map<std::string, inf_section> inf;
@@ -69,7 +69,7 @@ typedef HRESULT(__cdecl *SVC_ABProviderInit)(HINSTANCE hInstance, LPMALLOC lpMal
 											 ULONG * lpulProviderVer, LPABPROVIDER * lppABProvider);
 
 
-class INFLoader {
+class INFLoader _final {
 public:
 	INFLoader();
 	~INFLoader();
@@ -89,7 +89,7 @@ private:
 	std::map<std::string, unsigned int> m_mapDefs;
 };
 
-class SVCProvider {
+class SVCProvider _final {
 public:
 	/* ZARAFA6_ABP, ZARAFA6_MSMDB_private, ZARAFA6_MSMDB_public */
 	SVCProvider();
@@ -103,7 +103,7 @@ private:
 	LPSPropValue m_lpProps; /* PR_* tags from file */
 };
 
-class SVCService {
+class SVCService _final {
 public:
 	/* ZARAFA6, ZCONTACTS */
 	SVCService();
@@ -136,7 +136,7 @@ private:
 	std::map<std::string, SVCProvider*> m_sProviders;
 };
 
-class MAPISVC {
+class MAPISVC _final {
 public:
 	MAPISVC();
 	~MAPISVC();

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -46,9 +45,9 @@
 #include "vtimezone.h"
 #include <mapidefs.h>
 #include <mapicode.h>
-#include <stdlib.h>
-#include <math.h>
-#include <time.h>
+#include <cstdlib>
+#include <cmath>
+#include <ctime>
 
 using namespace std;
 
@@ -135,7 +134,7 @@ time_t ICalTimeTypeToLocal(icalproperty *lpicProp)
  * @param[in]	tt		icaltimetype time
  * @return		tm structure
  */
-struct tm UTC_ICalTime2UnixTime(icaltimetype tt)
+static struct tm UTC_ICalTime2UnixTime(icaltimetype tt)
 {
 	struct tm stm = {0};
 
@@ -164,7 +163,8 @@ struct tm UTC_ICalTime2UnixTime(icaltimetype tt)
  * @return		MAPI error code
  * @retval		MAPI_E_NOT_FOUND	icalcomponent kind not found in vtimezone component, or some part of timezone not found
  */
-HRESULT HrZoneToStruct(icalcomponent_kind kind, icalcomponent* lpVTZ, TIMEZONE_STRUCT *lpsTimeZone)
+static HRESULT HrZoneToStruct(icalcomponent_kind kind, icalcomponent *lpVTZ,
+    TIMEZONE_STRUCT *lpsTimeZone)
 {
 	HRESULT hr = hrSuccess;
 	icalcomponent *icComp = NULL;

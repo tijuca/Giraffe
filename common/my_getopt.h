@@ -32,6 +32,7 @@ extern "C" {
 
 /* UNIX-style short-argument parser */
 extern int my_getopt(int argc, char * argv[], const char *opts);
+extern int my_getopt_reset(void);
 
 extern int my_optind, my_opterr, my_optopt;
 extern char *my_optarg;

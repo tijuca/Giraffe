@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -70,12 +69,12 @@
 #include "Zarafa.h"
 
 #include "ECICS.h"
-#include "edkmdb.h"
+#include <edkmdb.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 //////////////////////////////////////////////////////////////////////
@@ -130,10 +129,10 @@ ECSessionManager::ECSessionManager(ECConfig *lpConfig, ECLogger *lpLogger, ECLog
 
 	//Create session clean up thread
 	err = pthread_create(&m_hSessionCleanerThread, NULL, SessionCleaner, (void*)this);
+        set_thread_name(m_hSessionCleanerThread, "SessionCleanUp");
 	
-	if(err != 0) {
+	if (err != 0)
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to spawn thread for session cleaner! Sessions will live forever!: %s", strerror(err));
-	}
 
     m_lpNotificationManager = new ECNotificationManager(m_lpLogger, m_lpConfig);
 }
@@ -698,7 +697,7 @@ ECRESULT ECSessionManager::CreateSession(struct soap *soap, char *szName, char *
 authenticated:
 	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "User %s from %s authenticated through %s using program %s", szName, from.c_str(), method, szClientApp ? szClientApp : "<unknown>");
 	if (strcmp(ZARAFA_SYSTEM_USER, szName) != 0) {
-		// don't log successfull SYSTEM logins
+		/* Do not log successful SYSTEM logins */
 		LOG_AUDIT(m_lpAudit, "authenticate ok user='%s' from='%s' method='%s' program='%s'",
 				  szName, from.c_str(), method, szClientApp ? szClientApp : "<unknown>");
 	}
@@ -997,9 +996,6 @@ void* ECSessionManager::SessionCleaner(void *lpTmpSessionManager)
 		}
 		pthread_mutex_unlock(&lpSessionManager->m_hExitMutex);
 	}
-
-	// Do not pthread_exit() because linuxthreads is broken and will not free any objects
-	// pthread_exit(0);
 
 	return NULL;
 }

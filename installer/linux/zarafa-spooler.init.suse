@@ -19,7 +19,7 @@
 rc_reset
 
 SPOOLERCONFIG=/etc/zarafa/spooler.cfg
-SPOOLERPROGRAM=/usr/bin/zarafa-spooler
+SPOOLERPROGRAM=/usr/sbin/zarafa-spooler
 
 # Sanity checks.
 #[ -f $SPOOLERCONFIG ] || exit 0

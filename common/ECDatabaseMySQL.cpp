@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -51,13 +50,13 @@
 #include "stringutil.h"
 #include "ECDefs.h"
 #include "ecversion.h"
-#include "mapidefs.h"
+#include <mapidefs.h>
 #include "CommonUtil.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 #ifdef DEBUG
 #define DEBUG_SQL 0
@@ -123,7 +122,7 @@ ECRESULT ECDatabaseMySQL::Connect(ECConfig *lpConfig)
 {
 	ECRESULT		er = erSuccess;
 	std::string		strQuery;
-	char*			lpMysqlPort = lpConfig->GetSetting("mysql_port");
+	const char *lpMysqlPort = lpConfig->GetSetting("mysql_port");
 	DB_RESULT		lpDBResult = NULL;
 	DB_ROW			lpDBRow = NULL;
 
@@ -177,7 +176,8 @@ ECRESULT ECDatabaseMySQL::Connect(ECConfig *lpConfig)
 	}
 
 	lpDBRow = FetchRow(lpDBResult);
-	if (lpDBRow == NULL || lpDBRow[0] == NULL) {
+	/* lpDBRow[0] has the variable name, [1] the value */
+	if (lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL) {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to retrieve max_allowed_packet value. Assuming 16M");
 		m_ulMaxAllowedPacket = (unsigned int)MAX_ALLOWED_PACKET;
 	} else {
@@ -389,7 +389,7 @@ ECRESULT ECDatabaseMySQL::DoDelete(const string &strQuery, unsigned int *lpulAff
  * while waiting for this transaction to end. So, don't call Begin() before calling this function unless you really
  * know what you're doing.
  */
-ECRESULT ECDatabaseMySQL::DoSequence(const std::string &strSeqName, unsigned int ulCount, unsigned long long *lpllFirstId) {
+ECRESULT ECDatabaseMySQL::DoSequence(const std::string &strSeqName, unsigned int ulCount, uint64_t *lpllFirstId) {
 	ECRESULT er = erSuccess;
 	unsigned int ulAffected = 0;
 
@@ -470,7 +470,7 @@ std::string ECDatabaseMySQL::Escape(const std::string &strToEscape)
 	return escaped;
 }
 
-std::string ECDatabaseMySQL::EscapeBinary(unsigned char *lpData, unsigned int ulLen)
+std::string ECDatabaseMySQL::EscapeBinary(const unsigned char *lpData, unsigned int ulLen)
 {
 	ULONG size = ulLen*2+1;
 	char *szEscaped = new char[size];
@@ -487,9 +487,9 @@ std::string ECDatabaseMySQL::EscapeBinary(unsigned char *lpData, unsigned int ul
 	return "'" + escaped + "'";
 }
 
-std::string ECDatabaseMySQL::EscapeBinary(std::string &strData)
+std::string ECDatabaseMySQL::EscapeBinary(const std::string &strData)
 {
-	return EscapeBinary((unsigned char *)strData.c_str(), strData.size());
+	return EscapeBinary(reinterpret_cast<const unsigned char *>(strData.c_str()), strData.size());
 }
 
 std::string ECDatabaseMySQL::GetError()
@@ -580,16 +580,16 @@ ECRESULT ECDatabaseMySQL::CreateDatabase(ECConfig *lpConfig)
 {
 	ECRESULT	er = erSuccess;
 	string		strQuery;
-	char*		lpDatabase = lpConfig->GetSetting("mysql_database");
-	char*		lpMysqlPort = lpConfig->GetSetting("mysql_port");
-	char*		lpMysqlSocket = lpConfig->GetSetting("mysql_socket");
+	const char *lpDatabase = lpConfig->GetSetting("mysql_database");
+	const char *lpMysqlPort = lpConfig->GetSetting("mysql_port");
+	const char *lpMysqlSocket = lpConfig->GetSetting("mysql_socket");
 
 
 	if(*lpMysqlSocket == '\0')
 		lpMysqlSocket = NULL;
 
 	// Zarafa archiver database tables
-	sSQLDatabase_t *sDatabaseTables = GetDatabaseDefs();
+	const sSQLDatabase_t *sDatabaseTables = GetDatabaseDefs();
 
 	er = InitEngine();
 	if(er != erSuccess)

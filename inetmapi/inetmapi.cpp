@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -51,7 +50,7 @@
 #include <string>
 #include <fstream>
 #include <iostream>
-#include <stdlib.h>
+#include <cstdlib>
 
 // vmime
 #include "vmime/vmime.hpp"
@@ -63,7 +62,7 @@
 #include <mapix.h>
 #include <mapiutil.h>
 #include <mapiext.h>
-#include "edkmdb.h"
+#include <edkmdb.h>
 #include "CommonUtil.h"
 #include "charset/convert.h"
 // inetmapi
@@ -73,6 +72,7 @@
 #include "ECVMIMEUtils.h"
 #include "ECMapiUtils.h"
 #include "ECLogger.h"
+#include "mapi_ptr.h"
 
 using namespace std;
 
@@ -194,8 +194,8 @@ INETMAPI_API HRESULT IMToMAPI(IMAPISession *lpSession, IMsgStore *lpMsgStore, IA
 	VMIMEToMAPI *VMToM = NULL;
 	
 	// Sanitize options
-	if(!ValidateCharset((const char*)dopt.default_charset)) {
-		char *charset = "iso-8859-15";
+	if(!ValidateCharset(dopt.default_charset)) {
+		const char *charset = "iso-8859-15";
 		if(lpLogger)
 			lpLogger->Log(EC_LOGLEVEL_FATAL, "Configured default_charset '%s' is invalid. Reverting to '%s'", dopt.default_charset, charset);
 		dopt.default_charset = charset;
@@ -286,11 +286,14 @@ exit:
 // then send it using the provided ECSender object
 INETMAPI_API HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook, IMessage *lpMessage, ECSender *mailer_base, sending_options sopt, ECLogger *lpLogger)
 {
-	HRESULT			hr			= hrSuccess;
-	MAPIToVMIME		*mToVM		= new MAPIToVMIME(lpSession, lpAddrBook, lpLogger, sopt);
+	HRESULT			hr	= hrSuccess;
+	MAPIToVMIME		*mToVM	= new MAPIToVMIME(lpSession, lpAddrBook, lpLogger, sopt);
 	vmime::ref<vmime::message>	vmMessage;
-	ECVMIMESender	*mailer		= dynamic_cast<ECVMIMESender*>(mailer_base);
+	ECVMIMESender		*mailer	= dynamic_cast<ECVMIMESender*>(mailer_base);
 	wstring			wstrError;
+	SPropArrayPtr	ptrProps;
+	SizedSPropTagArray(2, sptaForwardProps) = { 2, { PR_AUTO_FORWARDED, PR_INTERNET_MESSAGE_ID_A } };
+	ULONG cValues = 0;
 
 	if (!mailer) {
 		hr = MAPI_E_INVALID_PARAMETER;
@@ -311,10 +314,18 @@ INETMAPI_API HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook, IM
 	}
 
 	try {
-		// vmime::messageId::generateId() is not random enough since we use forking in the spooler
-		vmime::messageId msgId(generateRandomMessageId(), vmime::platform::getHandler()->getHostName());
+		vmime::messageId msgId;
+		hr = lpMessage->GetProps((LPSPropTagArray)&sptaForwardProps, 0, &cValues, &ptrProps);
+		if (!FAILED(hr) && ptrProps[0].ulPropTag == PR_AUTO_FORWARDED && ptrProps[0].Value.b == TRUE && ptrProps[1].ulPropTag == PR_INTERNET_MESSAGE_ID_A) {
+			// only allow mapi programs to set a messageId for an outgoing message when it comes from rules processing
+			msgId = ptrProps[1].Value.lpszA;
+		} else {
+			// vmime::messageId::generateId() is not random enough since we use forking in the spooler
+			msgId = vmime::messageId(generateRandomMessageId(), vmime::platform::getHandler()->getHostName());
+		}
+		hr = hrSuccess;
 		vmMessage->getHeader()->MessageId()->setValue(msgId);
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Sending message with Message-ID: " + msgId.getId());
+		lpLogger->Log(EC_LOGLEVEL_DEBUG, "Sending message with Message-ID: " + msgId.getId());
 	}
 	catch (vmime::exception& e) {
 		mailer->setError(e.what());
@@ -331,7 +342,7 @@ INETMAPI_API HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook, IM
 		goto exit;
 	}
 	
-	hr = mailer->sendMail(lpAddrBook, lpMessage, vmMessage, sopt.allow_send_to_everyone);
+	hr = mailer->sendMail(lpAddrBook, lpMessage, vmMessage, sopt.allow_send_to_everyone, sopt.always_expand_distr_list);
 
 exit:
 	delete mToVM;

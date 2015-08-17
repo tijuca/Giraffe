@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -60,86 +59,6 @@
 
 #include "../common/ECKeyTable.h"
 
-#ifdef __GNUC__
-#if __GNUC__ < 3
-	#define SGIBASE_NAMESPACE   sgi
-    #include <hash_map.h>
-    namespace sgi { using ::hash_map; }; // inherit globals
-#else
-	#if __GNUC__ == 4 && __GNUC_MINOR__ >= 3 && defined(__DEPRECATED)
-		#undef __DEPRECATED
-	#endif
-
-    #include <ext/hash_map>
-
-    #if __GNUC__ == 3 && __GNUC_MINOR__ == 0
-		#define SGIBASE_NAMESPACE   std
-        namespace sgi = std;               // GCC 3.0
-    #else
-		#define SGIBASE_NAMESPACE  __gnu_cxx
-        namespace sgi = ::__gnu_cxx;       // GCC 3.1 and later
-    #endif
-
-	#if __GNUC__ == 4 && __GNUC_MINOR__ >= 3
-		#define __DEPRECATED 1
-	#endif
-#endif
-#else
-	#define SGIBASE_NAMESPACE       sgi
-	// Win32
-	#include <hash_map>
-
-	// The win32 standard hash_map is different to sgi's hash_map, so we have a workaround here
-	// We basically map the standard SGI interface to the win32 interface, BUT the EqualFunc
-	// function must be a less<> function in win32 (!!), This is automatically fixed when you
-	// use sgi::equal_to as we define this here, but when you define your own EqualFunc, this must
-	// be a less<> function in win32, and equal_to<> in sgi-compatible environments
-	namespace sgi {
-
-		template <typename Key, typename HashFunc, typename EqualFunc>
-			class Traits {
-			private:
-				const HashFunc hasher;
-				const EqualFunc comparer;
-			public:
-				Traits() {};
-				~Traits() {};
-				enum
-					{	// parameters for hash table
-					bucket_size = 4,	// 0 < bucket_size
-					min_buckets = 8};	// min_buckets = 2 ^^ N, 0 < N
-
-				size_t operator() (const Key &a) const { return hasher(a); };
-				bool operator() (const Key &a, const Key &b) const { return comparer(a,b); };
-			};
-
-		template <typename Key, typename Value, typename HashFunc, typename EqualFunc>
-			class hash_map : public stdext::hash_map<Key, Value, Traits<Key, HashFunc, EqualFunc> > { };
-
-		template <typename Key>
-			class hash {
-			public:
-				hash() {};
-				~hash() {};
-
-				size_t operator() (const Key value) const { return stdext::hash_value<Key>(value); }
-			};
-
-		template <typename Key>
-			class equal_to {
-			private:
-				const std::less<Key> comparer;
-			public:
-				equal_to() {};
-				~equal_to() {};
-
-				bool operator() (const Key &a, const Key &b) const { return comparer(a,b); }
-			};
-	}
-#endif
-
-// We now have sgi::hash_map, std::map, google::sparse_hash_map and google::dense_hash_map to choose from
-
 #ifdef HAVE_SPARSEHASH
 #include <google/sparse_hash_map>
 #include <google/dense_hash_map>
@@ -149,11 +68,22 @@ struct hash_map {
 	typedef google::sparse_hash_map<Key,T> Type;
 };
 
+#elif __cplusplus >= 201100L
+#include <unordered_map>
+#define HASH_NAMESPACE std
+
+template<typename Key, typename T>
+struct hash_map {
+	typedef std::unordered_map<Key, T, std::hash<Key>, std::equal_to<Key>> Type;
+};
+
 #else
+#include <boost/unordered_map.hpp>
+#define HASH_NAMESPACE boost
 
 template <typename Key, typename T>
 struct hash_map {
-	typedef sgi::hash_map<Key, T, sgi::hash<Key>, sgi::equal_to<Key> > Type;
+	typedef boost::unordered_map<Key, T, boost::hash<Key>, std::equal_to<Key> > Type;
 };
 
 #endif
@@ -550,8 +480,7 @@ inline unsigned int IPRSHash(const ECsIndexProp& _Keyval1)
 	return hash;
 }
 
-namespace SGIBASE_NAMESPACE
-{
+namespace HASH_NAMESPACE {
 	// hash function for type ECsIndexProp
 	template<>
 	class hash<ECsIndexProp> {
@@ -572,18 +501,6 @@ namespace SGIBASE_NAMESPACE
 					hash<unsigned int> hasher;
 					// @TODO check the hash function!
 					return hasher(value.ulObjId * value.ulTag ) ;
-			}
-	};
-
-	// hash function for type 'unsigned long long'
-	template<>
-	class hash<unsigned long long> {
-		public:
-			hash() {};
-			~hash() {};
-			size_t operator() (const unsigned long long &value) const {
-				hash<size_t> hasher;
-				return hasher(static_cast<size_t>(value));	// @todo: use other half of hash on 32bit platforms.
 			}
 	};
 }

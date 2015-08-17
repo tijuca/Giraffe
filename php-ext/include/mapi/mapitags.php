@@ -12,14 +12,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -1126,6 +1125,8 @@ define('PR_EC_BASE'                                   ,  0x6700);
 define('PR_EC_OUTOFOFFICE'                            ,mapi_prop_tag(PT_BOOLEAN,     PR_EC_BASE+0x60));
 define('PR_EC_OUTOFOFFICE_MSG'                        ,mapi_prop_tag(PT_STRING8,     PR_EC_BASE+0x61));
 define('PR_EC_OUTOFOFFICE_SUBJECT'                    ,mapi_prop_tag(PT_STRING8,     PR_EC_BASE+0x62));
+define('PR_EC_OUTOFOFFICE_FROM',                       mapi_prop_tag(PT_SYSTIME,     PR_EC_BASE+0x63));
+define('PR_EC_OUTOFOFFICE_UNTIL',                      mapi_prop_tag(PT_SYSTIME,     PR_EC_BASE+0x64));
 
 /* quota support */
 define('PR_QUOTA_WARNING_THRESHOLD'                   ,mapi_prop_tag(PT_LONG,        PR_EC_BASE+0x21));
@@ -1211,7 +1212,7 @@ define('PR_ATTR_HIDDEN', mapi_prop_tag(PT_BOOLEAN, 0x10F4));
 /**
  * Addressbook detail properties.
  * It is not defined by MAPI, but to keep in sync with the interface of outlook we have to use these
- * properties. Outlook actually uses these properties for it's addressbook details.
+ * properties. Outlook actually uses these properties for its addressbook details.
  */
 define('PR_HOME2_TELEPHONE_NUMBER_MV'         ,mapi_prop_tag(PT_MV_TSTRING, 0x3A2F));
 define('PR_BUSINESS2_TELEPHONE_NUMBER_MV'     ,mapi_prop_tag(PT_MV_TSTRING, 0x3A1B));

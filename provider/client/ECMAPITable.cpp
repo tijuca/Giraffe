@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -63,7 +62,7 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECMAPITable::ECMAPITable(std::string strName, ECNotifyClient *lpNotifyClient, ULONG ulFlags) : ECUnknown("IMAPITable")
@@ -240,7 +239,7 @@ HRESULT ECMAPITable::Advise(ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, UL
 	if(hr != hrSuccess)
 		goto exit;
 
-	// We lock the connection list seperately
+	// We lock the connection list separately
 	pthread_mutex_lock(&m_hMutexConnectionList);
 	m_ulConnectionList.insert(*lpulConnection);
 	pthread_mutex_unlock(&m_hMutexConnectionList); 
@@ -477,7 +476,8 @@ HRESULT ECMAPITable::Restrict(LPSRestriction lpRestriction, ULONG ulFlags)
     if(m_lpRestrict)
         MAPIFreeBuffer(m_lpRestrict);
     if(lpRestriction) {
-        MAPIAllocateBuffer(sizeof(SRestriction), (void **)&m_lpRestrict);
+        if ((hr = MAPIAllocateBuffer(sizeof(SRestriction), (void **)&m_lpRestrict)) != hrSuccess)
+		goto exit;
         
         hr = Util::HrCopySRestriction(m_lpRestrict, lpRestriction, m_lpRestrict);
 
@@ -557,7 +557,8 @@ HRESULT ECMAPITable::SortTable(LPSSortOrderSet lpSortCriteria, ULONG ulFlags)
 
     if(m_lpSortTable)
         MAPIFreeBuffer(m_lpSortTable);
-    MAPIAllocateBuffer(CbSSortOrderSet(lpSortCriteria), (void **) &m_lpSortTable);
+    if ((hr = MAPIAllocateBuffer(CbSSortOrderSet(lpSortCriteria), (void **) &m_lpSortTable)) != hrSuccess)
+		goto exit;
     memcpy(m_lpSortTable, lpSortCriteria, CbSSortOrderSet(lpSortCriteria));
 
     if(!(ulFlags & TBL_BATCH)) {
@@ -716,13 +717,6 @@ exit:
 HRESULT ECMAPITable::HrSetTableOps(WSTableView *lpTableOps, bool fLoad)
 {
 	HRESULT hr = hrSuccess;
-	SSortOrderSet sSort;
-
-	sSort.cCategories = 0;
-	sSort.cExpanded = 0;
-	sSort.cSorts = 1;
-	sSort.aSort[0].ulOrder = TABLE_SORT_ASCEND;
-	sSort.aSort[0].ulPropTag = PR_DISPLAY_NAME;
 
 	this->lpTableOps = lpTableOps;
 	lpTableOps->AddRef();

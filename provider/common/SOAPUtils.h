@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -56,39 +55,39 @@
 #include <pthread.h>
 
 // SortOrderSets
-void				FreeSortOrderArray(struct sortOrderArray *lpsSortOrder);
-int					CompareSortOrderArray(struct sortOrderArray *lpsSortOrder1, struct sortOrderArray *lpsSortOrder2);
+extern void FreeSortOrderArray(struct sortOrderArray *lpsSortOrder);
+extern int CompareSortOrderArray(const struct sortOrderArray *lpsSortOrder1, const struct sortOrderArray *lpsSortOrder2);
 
 // PropTagArrays
-ECRESULT			CopyPropTagArray(struct soap *soap, struct propTagArray* lpPTsSrc, struct propTagArray** lppsPTsDst);
-void				FreePropTagArray(struct propTagArray *lpsPropTags, bool bFreeBase = true);
+extern ECRESULT CopyPropTagArray(struct soap *soap, const struct propTagArray* lpPTsSrc, struct propTagArray** lppsPTsDst);
+extern void FreePropTagArray(struct propTagArray *lpsPropTags, bool bFreeBase = true);
 
 // RowSets
 void				FreeRowSet(struct rowSet *lpRowSet, bool bBasePointerDel);
 
 // Restrictions
-ECRESULT			FreeRestrictTable(struct restrictTable *lpRestrict, bool base = true);
-ECRESULT			CopyRestrictTable(struct soap *soap, struct restrictTable *lpSrc, struct restrictTable **lppDst);
+extern ECRESULT FreeRestrictTable(struct restrictTable *lpRestrict, bool base = true);
+extern ECRESULT CopyRestrictTable(struct soap *soap, const struct restrictTable *lpSrc, struct restrictTable **lppDst);
 
 // SearchCriteria
-ECRESULT			CopySearchCriteria(struct soap* soap, struct searchCriteria *lpSrc, struct searchCriteria **lppSrc);
-ECRESULT			FreeSearchCriteria(struct searchCriteria *lpSearchCriteria);
+extern ECRESULT CopySearchCriteria(struct soap *soap, const struct searchCriteria *lpSrc, struct searchCriteria **lppDst);
+extern ECRESULT FreeSearchCriteria(struct searchCriteria *lpSearchCriteria);
 
 // PropValArrays
-ECRESULT			FreePropValArray(struct propValArray *lpPropValArray, bool bFreeBase = false);
-struct propVal *	FindProp(struct propValArray *lpPropValArray, unsigned int ulPropTag);
-ECRESULT			CopyPropValArray(struct propValArray *lpSrc, struct propValArray *lpDst, struct soap *soap);
-ECRESULT			CopyPropValArray(struct propValArray *lpSrc, struct propValArray **lppDst, struct soap *soap);
-ECRESULT			MergePropValArray(struct soap *soap, struct propValArray* lpsPropValArray1, struct propValArray* lpsPropValArray2, struct propValArray* lpPropValArrayNew);
+extern ECRESULT FreePropValArray(struct propValArray *lpPropValArray, bool bFreeBase = false);
+extern struct propVal *FindProp(const struct propValArray *lpPropValArray, unsigned int ulPropTag);
+extern ECRESULT CopyPropValArray(const struct propValArray *lpSrc, struct propValArray *lpDst, struct soap *soap);
+extern ECRESULT CopyPropValArray(const struct propValArray *lpSrc, struct propValArray **lppDst, struct soap *soap);
+extern ECRESULT MergePropValArray(struct soap *soap, const struct propValArray *lpsPropValArray1, const struct propValArray *lpsPropValArray2, struct propValArray *lpPropValArrayNew);
 
 // PropVals
-ECRESULT			CompareProp(struct propVal *lpProp1, struct propVal *lpProp2, const ECLocale &locale, int* lpCompareResult);
-ECRESULT			CompareMVPropWithProp(struct propVal *lpMVProp1, struct propVal *lpProp2, unsigned int ulType, const ECLocale &locale, bool* lpfMatch);
+extern ECRESULT CompareProp(const struct propVal *lpProp1, const struct propVal *lpProp2, const ECLocale &locale, int *lpCompareResult);
+extern ECRESULT CompareMVPropWithProp(struct propVal *lpMVProp1, const struct propVal *lpProp2, unsigned int ulType, const ECLocale &locale, bool* lpfMatch);
 
 unsigned int		PropSize(struct propVal *lpProp);
 ECRESULT			FreePropVal(struct propVal *lpProp, bool bBasePointerDel);
-ECRESULT			CopyPropVal(struct propVal *lpSrc, struct propVal *lpDst, struct soap *soap=NULL, bool bTruncate = false);
-ECRESULT			CopyPropVal(struct propVal *lpSrc, struct propVal **lppDst, struct soap *soap=NULL, bool bTruncate = false); /* allocates new lpDst and calls other version */
+ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal *lpDst, struct soap *soap = NULL, bool bTruncate = false);
+ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal **lppDst, struct soap *soap = NULL, bool bTruncate = false); /* allocates new lpDst and calls other version */
 
 // EntryList
 ECRESULT			CopyEntryList(struct soap *soap, struct entryList *lpSrc, struct entryList **lppDst);

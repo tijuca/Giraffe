@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -54,6 +53,7 @@
 #include "ECTPropsPurge.h"
 #include "ECICS.h"
 #include "ECMemStream.h"
+#include "MAPIErrors.h"
 
 #include "charset/convert.h"
 #include "charset/utf8string.h"
@@ -73,7 +73,7 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 /*
@@ -762,7 +762,9 @@ exit:
 	return er;
 }
 
-ECRESULT SerializeProps(struct propValArray *lpPropVals, LPCSTREAMCAPS lpStreamCaps, ECSerializer *lpSink, const NamedPropDefMap *lpNamedPropDefs)
+static ECRESULT SerializeProps(struct propValArray *lpPropVals,
+    LPCSTREAMCAPS lpStreamCaps, ECSerializer *lpSink,
+    const NamedPropDefMap *lpNamedPropDefs)
 {
 	ECRESULT		er = erSuccess;
 	unsigned int	ulCount = 0;
@@ -783,7 +785,8 @@ exit:
 	return er;                
 }
 
-ECRESULT GetBestBody(ECDatabase *lpDatabase, unsigned int ulObjId, string *lpstrBestBody)
+static ECRESULT GetBestBody(ECDatabase *lpDatabase, unsigned int ulObjId,
+    string *lpstrBestBody)
 {
 	ECRESULT er = erSuccess;
 	DB_ROW 			lpDBRow = NULL;
@@ -808,7 +811,10 @@ ECRESULT GetBestBody(ECDatabase *lpDatabase, unsigned int ulObjId, string *lpstr
 	return er;
 }
 
-ECRESULT SerializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAttachmentStorage *lpAttachmentStorage, LPCSTREAMCAPS lpStreamCaps, unsigned int ulObjId, unsigned int ulObjType, unsigned int ulStoreId, GUID *lpsGuid, ULONG ulFlags, ECSerializer *lpSink, bool bTop)
+static ECRESULT SerializeProps(ECSession *lpecSession, ECDatabase *lpDatabase,
+    ECAttachmentStorage *lpAttachmentStorage, LPCSTREAMCAPS lpStreamCaps,
+    unsigned int ulObjId, unsigned int ulObjType, unsigned int ulStoreId,
+    GUID *lpsGuid, ULONG ulFlags, ECSerializer *lpSink, bool bTop)
 {
 	ECRESULT		er = erSuccess;
 	unsigned int	ulCount = 0;
@@ -1061,19 +1067,25 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECDatabase *lpStreamDatabase, 
 			unsigned int ulLen = 0;
 			
 			if (lpAttachmentStorage->ExistAttachment(ulSubObjId, PROP_ID(PR_ATTACH_DATA_BIN))) {
-				er = lpAttachmentStorage->GetSize(ulSubObjId, PROP_ID(PR_ATTACH_DATA_BIN), (ULONG*)&ulLen);
+				unsigned char *data = NULL;
+				size_t temp = 0;
+				er = lpAttachmentStorage->LoadAttachment(NULL, ulSubObjId, PROP_ID(PR_ATTACH_DATA_BIN), &temp, &data);
 				if (er != erSuccess)
 					goto exit;
+
+				ulLen = (unsigned int)temp;
 
 				er = lpSink->Write(&ulLen, sizeof(ulLen), 1);
-				if (er != erSuccess)
+				if (er != erSuccess) {
+					s_free(NULL, data);
 					goto exit;
+				}
 
-				er = lpAttachmentStorage->LoadAttachment(ulSubObjId, PROP_ID(PR_ATTACH_DATA_BIN), (int*)&ulLen, lpSink);
+				er = lpSink->Write(data, 1, ulLen);
+				s_free(NULL, data);
 				if (er != erSuccess)
 					goto exit;
 			} else {
-				ulLen = 0;
 				er = lpSink->Write(&ulLen, sizeof(ulLen), 1);
 				if (er != erSuccess)
 					goto exit;
@@ -1143,7 +1155,9 @@ exit:
 	return er;
 }
 
-ECRESULT DeserializePropVal(struct soap *soap, LPCSTREAMCAPS lpStreamCaps, NamedPropertyMapper &namedPropertyMapper, propVal **lppsPropval, ECSerializer *lpSource)
+static ECRESULT DeserializePropVal(struct soap *soap,
+    LPCSTREAMCAPS lpStreamCaps, NamedPropertyMapper &namedPropertyMapper,
+    propVal **lppsPropval, ECSerializer *lpSource)
 {
 	ECRESULT		er = erSuccess;
 	unsigned int	ulCount;
@@ -1828,7 +1842,7 @@ ECRESULT DeserializeObject(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtt
 exit:
 	if (er != erSuccess) {
 		lpSource->Flush(); // Flush the whole stream
-		lpecSession->GetSessionManager()->GetLogger()->Log(EC_LOGLEVEL_ERROR, "DeserializeObject failed with error code 0x%08x", er);
+		lpecSession->GetSessionManager()->GetLogger()->Log(EC_LOGLEVEL_ERROR, "DeserializeObject failed with error code 0x%08x %s", er, GetMAPIErrorMessage(ZarafaErrorToMAPIError(er, ~0U /* anything that yields UNKNOWN */)));
 	}	
 
 	if (lpPropValArray)

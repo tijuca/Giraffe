@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -78,12 +77,12 @@
 
 #include <list>
 #include <algorithm>
+#include "spmain.h"
+
 using namespace std;
 
-extern ECConfig *g_lpConfig;
-extern ECLogger *g_lpLogger;
-
-HRESULT GetPluginObject(ECLogger *lpLogger, PyMapiPluginFactory *lpPyMapiPluginFactory, PyMapiPlugin **lppPyMapiPlugin)
+static HRESULT GetPluginObject(ECLogger *lpLogger,
+    PyMapiPluginFactory *lpPyMapiPluginFactory, PyMapiPlugin **lppPyMapiPlugin)
 {
     HRESULT hr = hrSuccess;
     PyMapiPlugin *lpPyMapiPlugin = NULL;
@@ -123,7 +122,10 @@ exit:
  * @param[in]	lpExpandedGroups	List of EntryIDs of groups already expanded. Double groups will just be removed.
  * @param[in]	recurrence	true if this function should recurse further.
  */
-HRESULT ExpandRecipientsRecursive(LPADRBOOK lpAddrBook, IMessage *lpMessage, IMAPITable *lpTable, LPSRestriction lpEntryRestriction, ULONG ulRecipType, list<SBinary> *lpExpandedGroups, bool recurrence = true)
+static HRESULT ExpandRecipientsRecursive(LPADRBOOK lpAddrBook,
+    IMessage *lpMessage, IMAPITable *lpTable,
+    LPSRestriction lpEntryRestriction, ULONG ulRecipType,
+    list<SBinary> *lpExpandedGroups, bool recurrence = true)
 {
 	HRESULT			hr = hrSuccess;
 	IMAPITable		*lpContentsTable = NULL;
@@ -331,7 +333,7 @@ exit:
  * @param[in]	lpMessage	The message to expand groups for.
  * @return		HRESULT
  */
-HRESULT ExpandRecipients(LPADRBOOK lpAddrBook, IMessage *lpMessage)
+static HRESULT ExpandRecipients(LPADRBOOK lpAddrBook, IMessage *lpMessage)
 {
 	HRESULT hr = hrSuccess;
 	list<SBinary> lExpandedGroups;
@@ -381,7 +383,7 @@ HRESULT ExpandRecipients(LPADRBOOK lpAddrBook, IMessage *lpMessage)
 	lpRestriction->res.resAnd.lpRes[1].res.resProperty.relop = RELOP_EQ;
 	lpRestriction->res.resAnd.lpRes[1].res.resProperty.ulPropTag = PR_ADDRTYPE_W;
 	lpRestriction->res.resAnd.lpRes[1].res.resProperty.lpProp->ulPropTag = PR_ADDRTYPE_W;
-	lpRestriction->res.resAnd.lpRes[1].res.resProperty.lpProp->Value.lpszW = L"ZARAFA";
+	lpRestriction->res.resAnd.lpRes[1].res.resProperty.lpProp->Value.lpszW = const_cast<wchar_t *>(L"ZARAFA");
 
 	/*
 	 * Setup entry restriction:
@@ -403,7 +405,7 @@ HRESULT ExpandRecipients(LPADRBOOK lpAddrBook, IMessage *lpMessage)
 	lpEntryRestriction->res.resProperty.relop = RELOP_EQ;
 	lpEntryRestriction->res.resProperty.ulPropTag = PR_ADDRTYPE_W;
 	lpEntryRestriction->res.resProperty.lpProp->ulPropTag = PR_ADDRTYPE_W;
-	lpEntryRestriction->res.resProperty.lpProp->Value.lpszW = L"ZARAFA";
+	lpEntryRestriction->res.resProperty.lpProp->Value.lpszW = const_cast<wchar_t *>(L"ZARAFA");
 
 	hr = lpMessage->GetRecipientTable(MAPI_UNICODE, &lpTable);
 	if(hr != hrSuccess) {
@@ -454,27 +456,28 @@ exit:
  * @param[in]	lpMessage		The message to send
  * @return		HRESULT
  */
-HRESULT RewriteRecipients(LPMAPISESSION lpMAPISession, IMessage *lpMessage)
+static HRESULT RewriteRecipients(LPMAPISESSION lpMAPISession,
+    IMessage *lpMessage)
 {
-	HRESULT			hr = hrSuccess;
-	IMAPITable		*lpTable = NULL;
-	LPSRowSet		lpRowSet = NULL;
+	HRESULT		hr = hrSuccess;
+	IMAPITable	*lpTable = NULL;
+	LPSRowSet	lpRowSet = NULL;
 	LPSPropTagArray	lpRecipColumns = NULL;
 	LPSPropValue	lpEmailAddress = NULL;
 	LPSPropValue	lpEmailName = NULL;
 	LPSPropValue	lpAddrType = NULL;
 	LPSPropValue	lpEntryID = NULL;
-	ULONG			cbNewEntryID;
-	LPENTRYID		lpNewEntryID = NULL;
+	ULONG		cbNewEntryID;
+	LPENTRYID	lpNewEntryID = NULL;
 
-	char			*lpszFaxDomain = g_lpConfig->GetSetting("fax_domain");
-	char			*lpszFaxInternational = g_lpConfig->GetSetting("fax_international");
-	string			strFaxMail;
-	wstring			wstrFaxMail, wstrOldFaxMail;
-	LPMAILUSER		lpFaxMailuser = NULL;
+	const char	*const lpszFaxDomain = g_lpConfig->GetSetting("fax_domain");
+	const char	*const lpszFaxInternational = g_lpConfig->GetSetting("fax_international");
+	string		strFaxMail;
+	wstring		wstrFaxMail, wstrOldFaxMail;
+	LPMAILUSER	lpFaxMailuser = NULL;
 	LPSPropValue	lpFaxNumbers = NULL;
-	ULONG			ulObjType;
-	ULONG			cValues;
+	ULONG		ulObjType;
+	ULONG		cValues;
 
 	// contab email_offset: 0: business, 1: home, 2: primary (outlook uses string 'other')
 	SizedSPropTagArray(3, sptaFaxNumbers) = { 3, {PR_BUSINESS_FAX_NUMBER_A, PR_HOME_FAX_NUMBER_A, PR_PRIMARY_FAX_NUMBER_A } };
@@ -581,7 +584,7 @@ HRESULT RewriteRecipients(LPMAPISESSION lpMAPISession, IMessage *lpMessage)
 			wstrOldFaxMail = lpEmailAddress->Value.lpszW; // keep old string for logging
 			// hack values in lpRowSet
 			lpEmailAddress->Value.lpszW = (WCHAR*)wstrFaxMail.c_str();
-			lpAddrType->Value.lpszW = L"SMTP";
+			lpAddrType->Value.lpszW = const_cast<wchar_t *>(L"SMTP");
 			// old value is stuck to the row allocation, so we can override it, but we also must free the new!
 			ECCreateOneOff((LPTSTR)lpEmailName->Value.lpszW, (LPTSTR)L"SMTP", (LPTSTR)wstrFaxMail.c_str(), MAPI_UNICODE, &cbNewEntryID, &lpNewEntryID);
 			lpEntryID->Value.bin.lpb = (LPBYTE)lpNewEntryID;
@@ -717,7 +720,7 @@ exit:
 	return hr;
 }
 
-HRESULT RewriteQuotedRecipients(IMessage *lpMessage)
+static HRESULT RewriteQuotedRecipients(IMessage *lpMessage)
 {
 	HRESULT			hr = hrSuccess;
 	IMAPITable		*lpTable = NULL;
@@ -799,7 +802,7 @@ exit:
  * @param[in]	lpMessage	Message to remove MAPI_P1 recipients from
  * @return		HRESULT
  */
-HRESULT RemoveP1Recipients(IMessage *lpMessage)
+static HRESULT RemoveP1Recipients(IMessage *lpMessage)
 {
 	HRESULT hr = hrSuccess;
 	IMAPITable *lpTable = NULL;
@@ -961,7 +964,7 @@ HRESULT SendUndeliverable(LPADRBOOK lpAddrBook, ECSender *lpMailer, LPMDB lpStor
 
 	// Subject
 	lpPropValue[ulPropPos].ulPropTag = PR_SUBJECT_W;
-	lpPropValue[ulPropPos++].Value.lpszW = L"Undelivered Mail Returned to Sender";
+	lpPropValue[ulPropPos++].Value.lpszW = const_cast<wchar_t *>(L"Undelivered Mail Returned to Sender");
 
 	// Message flags
 	lpPropValue[ulPropPos].ulPropTag = PR_MESSAGE_FLAGS;
@@ -969,7 +972,7 @@ HRESULT SendUndeliverable(LPADRBOOK lpAddrBook, ECSender *lpMailer, LPMDB lpStor
 
 	// Message class
 	lpPropValue[ulPropPos].ulPropTag = PR_MESSAGE_CLASS_W;
-	lpPropValue[ulPropPos++].Value.lpszW = L"REPORT.IPM.Note.NDR";
+	lpPropValue[ulPropPos++].Value.lpszW = const_cast<wchar_t *>(L"REPORT.IPM.Note.NDR");
 
 	// Get the time to add to the message as PR_CLIENT_SUBMIT_TIME
 	GetSystemTimeAsFileTime(&ft);
@@ -1004,11 +1007,11 @@ HRESULT SendUndeliverable(LPADRBOOK lpAddrBook, ECSender *lpMailer, LPMDB lpStor
 
 		// PR_SENDER_ADDRTYPE
 		lpPropValue[ulPropPos].ulPropTag = PR_SENDER_ADDRTYPE_W;
-		lpPropValue[ulPropPos++].Value.lpszW = L"SMTP";
+		lpPropValue[ulPropPos++].Value.lpszW = const_cast<wchar_t *>(L"SMTP");
 
 		// PR_SENT_REPRESENTING_ADDRTYPE
 		lpPropValue[ulPropPos].ulPropTag = PR_SENT_REPRESENTING_ADDRTYPE_W;
-		lpPropValue[ulPropPos++].Value.lpszW = L"SMTP";
+		lpPropValue[ulPropPos++].Value.lpszW = const_cast<wchar_t *>(L"SMTP");
 
 		// PR_SENDER_SEARCH_KEY
 		strMailAddress = convert_to<std::string>(lpUserAdmin->lpszMailAddress);
@@ -1017,7 +1020,8 @@ HRESULT SendUndeliverable(LPADRBOOK lpAddrBook, ECSender *lpMailer, LPMDB lpStor
 		lpPropValue[ulPropPos].ulPropTag = PR_SENDER_SEARCH_KEY;
 		lpPropValue[ulPropPos].Value.bin.cb = 5 + strMailAddress.length(); // 5 = "SMTP:"
 
-		MAPIAllocateMore(lpPropValue[ulPropPos].Value.bin.cb, lpPropValue, (void**)&lpPropValue[ulPropPos].Value.bin.lpb);
+		if ((hr = MAPIAllocateMore(lpPropValue[ulPropPos].Value.bin.cb, lpPropValue, (void**)&lpPropValue[ulPropPos].Value.bin.lpb)) != hrSuccess)
+			goto exit;
 		memcpy(lpPropValue[ulPropPos].Value.bin.lpb, "SMTP:", 5);
 		if(lpPropValue[ulPropPos].Value.bin.cb > 5)
 			memcpy(lpPropValue[ulPropPos].Value.bin.lpb+5, strMailAddress.data(), lpPropValue[ulPropPos].Value.bin.cb - 5);
@@ -1028,7 +1032,8 @@ HRESULT SendUndeliverable(LPADRBOOK lpAddrBook, ECSender *lpMailer, LPMDB lpStor
 
 		lpPropValue[ulPropPos].Value.bin.cb = 5 + strMailAddress.length(); // 5 = "SMTP:"
 
-		MAPIAllocateMore(lpPropValue[ulPropPos].Value.bin.cb, lpPropValue, (void**)&lpPropValue[ulPropPos].Value.bin.lpb);
+		if ((hr = MAPIAllocateMore(lpPropValue[ulPropPos].Value.bin.cb, lpPropValue, (void**)&lpPropValue[ulPropPos].Value.bin.lpb)) != hrSuccess)
+			goto exit;
 		memcpy(lpPropValue[ulPropPos].Value.bin.lpb, "SMTP:", 5);
 		if(lpPropValue[ulPropPos].Value.bin.cb > 5)
 			memcpy(lpPropValue[ulPropPos].Value.bin.lpb+5, strMailAddress.data(), lpPropValue[ulPropPos].Value.bin.cb - 5);
@@ -1217,13 +1222,14 @@ HRESULT SendUndeliverable(LPADRBOOK lpAddrBook, ECSender *lpMailer, LPMDB lpStor
 	}
 
 	ulPropAttachPos = 0;
-	MAPIAllocateBuffer(sizeof(SPropValue) * 4, (void**)&lpPropValueAttach);
+	if ((hr = MAPIAllocateBuffer(sizeof(SPropValue) * 4, (void**)&lpPropValueAttach)) != hrSuccess)
+		goto exit;
 
 	lpPropValueAttach[ulPropAttachPos].ulPropTag = PR_ATTACH_METHOD;
 	lpPropValueAttach[ulPropAttachPos++].Value.ul = ATTACH_EMBEDDED_MSG;
 
 	lpPropValueAttach[ulPropAttachPos].ulPropTag = PR_ATTACH_MIME_TAG_W;
-	lpPropValueAttach[ulPropAttachPos++].Value.lpszW = L"message/rfc822";
+	lpPropValueAttach[ulPropAttachPos++].Value.lpszW = const_cast<wchar_t *>(L"message/rfc822");
 
 	if(PROP_TYPE(lpPropArrayOriginal[OR_SUBJECT].ulPropTag) != PT_ERROR) {
 		lpPropValueAttach[ulPropAttachPos].ulPropTag = CHANGE_PROP_TYPE(PR_DISPLAY_NAME, PROP_TYPE(lpPropArrayOriginal[OR_SUBJECT].ulPropTag));
@@ -1300,12 +1306,16 @@ HRESULT SendUndeliverable(LPADRBOOK lpAddrBook, ECSender *lpMailer, LPMDB lpStor
 		// Only some recipients failed, so add only failed recipients to the MDN message. This causes
 		// resends only to go to those recipients. This means we should add all error recipients to the
 		// recipient list of the MDN message. 
-		MAPIAllocateBuffer(CbNewADRLIST(lpMailer->getRecipientErrorCount()), (void**)&lpMods);
+		if ((hr = MAPIAllocateBuffer(CbNewADRLIST(lpMailer->getRecipientErrorCount()), (void**)&lpMods)) != hrSuccess)
+			goto exit;
+
 		lpMods->cEntries = 0;
 
 		for (ULONG j = 0; j < lpMailer->getRecipientErrorCount(); j++)
 		{
-			MAPIAllocateBuffer(sizeof(SPropValue) * 10, (void**)&lpMods->aEntries[cEntries].rgPropVals);
+			if ((hr = MAPIAllocateBuffer(sizeof(SPropValue) * 10, (void**)&lpMods->aEntries[cEntries].rgPropVals)) != hrSuccess)
+				goto exit;
+
 			ulPropModsPos = 0;
 			lpMods->cEntries = cEntries;
 
@@ -1316,7 +1326,7 @@ HRESULT SendUndeliverable(LPADRBOOK lpAddrBook, ECSender *lpMailer, LPMDB lpStor
 			lpMods->aEntries[cEntries].rgPropVals[ulPropModsPos++].Value.lpszA = (char*)lpMailer->getRecipientErrorEmailAddress(j).c_str();
 
 			lpMods->aEntries[cEntries].rgPropVals[ulPropModsPos].ulPropTag = PR_ADDRTYPE_W;
-			lpMods->aEntries[cEntries].rgPropVals[ulPropModsPos++].Value.lpszW = L"SMTP";
+			lpMods->aEntries[cEntries].rgPropVals[ulPropModsPos++].Value.lpszW = const_cast<wchar_t *>(L"SMTP");
 
 			lpMods->aEntries[cEntries].rgPropVals[ulPropModsPos].ulPropTag = PR_DISPLAY_NAME_W;
 			if(!lpMailer->getRecipientErrorDisplayName(j).empty()) {
@@ -1425,10 +1435,12 @@ exit:
  * @param[in]	lppZarafaEID  The EntryID where the contact points to
  * @return		HRESULT
  */
-HRESULT ContactToZarafa(IMsgStore *lpUserStore, LPADRBOOK lpAddrBook, ULONG cbEntryId, LPENTRYID lpEntryId, ULONG *lpulZarafaEID, LPENTRYID *lppZarafaEID)
+static HRESULT ContactToZarafa(IMsgStore *lpUserStore, LPADRBOOK lpAddrBook,
+    ULONG cbEntryId, const ENTRYID *lpEntryId, ULONG *lpulZarafaEID,
+    LPENTRYID *lppZarafaEID)
 {
 	HRESULT hr = hrSuccess;
-	LPCONTAB_ENTRYID lpContabEntryID = (LPCONTAB_ENTRYID)lpEntryId;
+	const CONTAB_ENTRYID *lpContabEntryID = (LPCONTAB_ENTRYID)lpEntryId;
 	GUID* guid = (GUID*)&lpContabEntryID->muid;
 	ULONG ulObjType;
 	LPMAILUSER lpContact = NULL;
@@ -1540,7 +1552,8 @@ exit:
  * @return		HRESULT
  * @retval		MAPI_E_NOT_FOUND	User not a Zarafa user, or lpSMTPEID is not an One-off EntryID
  */
-HRESULT SMTPToZarafa(LPADRBOOK lpAddrBook, ULONG ulSMTPEID, LPENTRYID lpSMTPEID, ULONG *lpulZarafaEID, LPENTRYID *lppZarafaEID)
+static HRESULT SMTPToZarafa(LPADRBOOK lpAddrBook, ULONG ulSMTPEID,
+    const ENTRYID *lpSMTPEID, ULONG *lpulZarafaEID, LPENTRYID *lppZarafaEID)
 {
 	HRESULT hr = hrSuccess;
 	wstring wstrName, wstrType, wstrEmailAddress;
@@ -1551,11 +1564,14 @@ HRESULT SMTPToZarafa(LPADRBOOK lpAddrBook, ULONG ulSMTPEID, LPENTRYID lpSMTPEID,
 	// representing entryid can also be a one off id, so search the user, and then get the entryid again ..
 	// we then always should have yourself as the sender, otherwise: denied
 	if (ECParseOneOff(lpSMTPEID, ulSMTPEID, wstrName, wstrType, wstrEmailAddress) == hrSuccess) {
-		MAPIAllocateBuffer(CbNewADRLIST(1), (void**)&lpAList);
+		if ((hr = MAPIAllocateBuffer(CbNewADRLIST(1), (void**)&lpAList)) != hrSuccess)
+			goto exit;
+
 		lpAList->cEntries = 1;
 
 		lpAList->aEntries[0].cValues = 1;
-		MAPIAllocateBuffer(sizeof(SPropValue) * lpAList->aEntries[0].cValues, (void**)&lpAList->aEntries[0].rgPropVals);
+		if ((hr = MAPIAllocateBuffer(sizeof(SPropValue) * lpAList->aEntries[0].cValues, (void**)&lpAList->aEntries[0].rgPropVals)) != hrSuccess)
+			goto exit;
 
 		lpAList->aEntries[0].rgPropVals[0].ulPropTag = PR_DISPLAY_NAME_W;
 		lpAList->aEntries[0].rgPropVals[0].Value.lpszW = (WCHAR*)wstrEmailAddress.c_str();
@@ -1605,7 +1621,9 @@ exit:
  * @param[in]	level			Internal parameter to keep track of recursion. Max is 10 levels deep before it gives up.
  * @return		HRESULT
  */
-HRESULT HrFindUserInGroup(LPADRBOOK lpAdrBook, ULONG ulOwnerCB, LPENTRYID lpOwnerEID, ULONG ulDistListCB, LPENTRYID lpDistListEID, ULONG *lpulCmp, int level = 0)
+static HRESULT HrFindUserInGroup(LPADRBOOK lpAdrBook, ULONG ulOwnerCB,
+    LPENTRYID lpOwnerEID, ULONG ulDistListCB, LPENTRYID lpDistListEID,
+    ULONG *lpulCmp, int level = 0)
 {
 	HRESULT hr = hrSuccess;
 	ULONG ulCmp = 0;
@@ -1706,8 +1724,9 @@ exit:
  * @param[out]	lppRepStore		The store of the delegate
  * @return		HRESULT
  */
-HRESULT HrOpenRepresentStore(IAddrBook *lpAddrBook, IMsgStore *lpUserStore, IMAPISession *lpAdminSession,
-							 ULONG ulRepresentCB, LPENTRYID lpRepresentEID, LPMDB *lppRepStore)
+static HRESULT HrOpenRepresentStore(IAddrBook *lpAddrBook,
+    IMsgStore *lpUserStore, IMAPISession *lpAdminSession, ULONG ulRepresentCB,
+    LPENTRYID lpRepresentEID, LPMDB *lppRepStore)
 {
 	HRESULT hr = hrSuccess;
 	ULONG ulObjType = 0;
@@ -1738,14 +1757,14 @@ HRESULT HrOpenRepresentStore(IAddrBook *lpAddrBook, IMsgStore *lpUserStore, IMAP
 
 	hr = lpExchangeManageStore->CreateStoreEntryID(NULL, lpRepAccount->Value.LPSZ, fMapiUnicode, &ulRepStoreCB, &lpRepStoreEID);
 	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to create store entryid for representing user '"TSTRING_PRINTF"', error 0x%08x", lpRepAccount->Value.LPSZ, hr);
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to create store entryid for representing user '" TSTRING_PRINTF "', error 0x%08x", lpRepAccount->Value.LPSZ, hr);
 		goto exit;
 	}
 
 	// Use the admin session to open the store, so we have full rights
 	hr = lpAdminSession->OpenMsgStore(0, ulRepStoreCB, lpRepStoreEID, NULL, MAPI_BEST_ACCESS, &lpRepStore);
 	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open store of representing user '"TSTRING_PRINTF"', error 0x%08x", lpRepAccount->Value.LPSZ, hr);
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open store of representing user '" TSTRING_PRINTF "', error 0x%08x", lpRepAccount->Value.LPSZ, hr);
 		goto exit;
 	}
 
@@ -1787,7 +1806,10 @@ exit:
  * 
  * @return hrSuccess
  */
-HRESULT HrCheckAllowedEntryIDArray(const char *szFunc, const WCHAR* lpszMailer, IAddrBook *lpAddrBook, ULONG ulOwnerCB, LPENTRYID lpOwnerEID, ULONG cValues, SBinary *lpEntryIDs, ULONG *lpulObjType, bool *lpbAllowed)
+static HRESULT HrCheckAllowedEntryIDArray(const char *szFunc,
+    const wchar_t *lpszMailer, IAddrBook *lpAddrBook, ULONG ulOwnerCB,
+    LPENTRYID lpOwnerEID, ULONG cValues, SBinary *lpEntryIDs,
+    ULONG *lpulObjType, bool *lpbAllowed)
 {
 	HRESULT hr = hrSuccess;
 	ULONG ulObjType;
@@ -1837,9 +1859,10 @@ exit:
  * @param[out]	lppRepStore	The store of the delegate when allowed.
  * @return		HRESULT
  */
-HRESULT CheckSendAs(IAddrBook *lpAddrBook, IMsgStore *lpUserStore, IMAPISession *lpAdminSession, ECSender *lpMailer,
-					ULONG ulOwnerCB, LPENTRYID lpOwnerEID, ULONG ulRepresentCB, LPENTRYID lpRepresentEID,
-					bool *lpbAllowed, LPMDB *lppRepStore)
+static HRESULT CheckSendAs(IAddrBook *lpAddrBook, IMsgStore *lpUserStore,
+    IMAPISession *lpAdminSession, ECSender *lpMailer, ULONG ulOwnerCB,
+    LPENTRYID lpOwnerEID, ULONG ulRepresentCB, LPENTRYID lpRepresentEID,
+    bool *lpbAllowed, LPMDB *lppRepStore)
 {
 	HRESULT hr = hrSuccess;
 	bool bAllowed = false;
@@ -1977,7 +2000,10 @@ exit:
  * @return		HRESULT
  * @retval		hrSuccess, always returned, actual return value in lpbAllowed.
  */
-HRESULT CheckDelegate(IAddrBook *lpAddrBook, IMsgStore *lpUserStore, IMAPISession *lpAdminSession, ULONG ulOwnerCB, LPENTRYID lpOwnerEID, ULONG ulRepresentCB, LPENTRYID lpRepresentEID, bool *lpbAllowed, LPMDB *lppRepStore)
+static HRESULT CheckDelegate(IAddrBook *lpAddrBook, IMsgStore *lpUserStore,
+    IMAPISession *lpAdminSession, ULONG ulOwnerCB, LPENTRYID lpOwnerEID,
+    ULONG ulRepresentCB, LPENTRYID lpRepresentEID, bool *lpbAllowed,
+    LPMDB *lppRepStore)
 {
 	HRESULT hr = hrSuccess;
 	bool bAllowed = false;
@@ -2103,7 +2129,9 @@ exit:
  * @param[out]	lppRepMessage The new message in the delegate store.
  * @return		HRESULT
  */
-HRESULT CopyDelegateMessageToSentItems(LPMESSAGE lpMessage, LPMDB lpRepStore, LPMESSAGE *lppRepMessage) {
+static HRESULT CopyDelegateMessageToSentItems(LPMESSAGE lpMessage,
+    LPMDB lpRepStore, LPMESSAGE *lppRepMessage)
+{
 	HRESULT hr = hrSuccess;
 	LPSPropValue lpSentItemsEntryID = NULL;
 	LPMAPIFOLDER lpSentItems = NULL;
@@ -2172,7 +2200,8 @@ exit:
  * @param[in]	lpMsgStore	Message store of the user containing the message of lpEntryId
  * @return		HRESULT
  */
-HRESULT PostSendProcessing(ULONG cbEntryId, LPENTRYID lpEntryId, IMsgStore *lpMsgStore)
+static HRESULT PostSendProcessing(ULONG cbEntryId, const ENTRYID *lpEntryId,
+    IMsgStore *lpMsgStore)
 {
 	HRESULT hr = hrSuccess;
 	LPSPropValue lpObject = NULL;
@@ -2223,11 +2252,11 @@ exit:
  * @retval	MAPI_E_WAIT	Mail has a specific timestamp when it should be sent.
  * @retval	MAPI_W_NO_SERVICE	The SMTP server is not responding correctly.
  */
-HRESULT ProcessMessage(IMAPISession *lpAdminSession, IMAPISession *lpUserSession,
-					   IECServiceAdmin *lpServiceAdmin, IECSecurity *lpSecurity,
-					   IMsgStore *lpUserStore, IAddrBook *lpAddrBook,
-					   ECSender *lpMailer, ULONG cbMsgEntryId, LPENTRYID lpMsgEntryId,
-					   IMessage **lppMessage)
+static HRESULT ProcessMessage(IMAPISession *lpAdminSession,
+    IMAPISession *lpUserSession, IECServiceAdmin *lpServiceAdmin,
+    IECSecurity *lpSecurity, IMsgStore *lpUserStore, IAddrBook *lpAddrBook,
+    ECSender *lpMailer, ULONG cbMsgEntryId, LPENTRYID lpMsgEntryId,
+    IMessage **lppMessage)
 {
 	HRESULT 		hr 				= hrSuccess;
 	LPECUSER		lpUserAdmin		= NULL;
@@ -2286,6 +2315,8 @@ HRESULT ProcessMessage(IMAPISession *lpAdminSession, IMAPISession *lpUserSession
 
 	// Enable SMTP Delivery Status Notifications
 	sopt.enable_dsn = parseBool(g_lpConfig->GetSetting("enable_dsn"));
+
+	sopt.always_expand_distr_list = parseBool(g_lpConfig->GetSetting("expand_groups"));
 
 	// Init plugin system
 	hr = pyMapiPluginFactory.Init(g_lpConfig, g_lpLogger);
@@ -2356,9 +2387,14 @@ HRESULT ProcessMessage(IMAPISession *lpAdminSession, IMAPISession *lpUserSession
 	}
 
 	// fatal, all other log messages are otherwise somewhat meaningless
-	g_lpLogger->Log(EC_LOGLEVEL_INFO, "Sending e-mail for user %ls, subject: '%ls', size: %d",
+	if (g_lpLogger->Log(EC_LOGLEVEL_DEBUG)) {
+		g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Sending e-mail for user %ls, subject: '%ls', size: %d",
 					lpUser->lpszUsername, lpSubject ? lpSubject->Value.lpszW : L"<none>",
 					lpMsgSize ? lpMsgSize->Value.ul : 0);
+	} else {
+		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Sending e-mail for user %ls, size: %d",
+						lpUser->lpszUsername, lpMsgSize ? lpMsgSize->Value.ul : 0);
+	}
 
 	/* 
 
@@ -2464,7 +2500,7 @@ HRESULT ProcessMessage(IMAPISession *lpAdminSession, IMAPISession *lpUserSession
 	sPropSender[0].ulPropTag = PR_SENDER_NAME_W;
 	sPropSender[0].Value.LPSZ = lpUser->lpszFullName;
 	sPropSender[1].ulPropTag = PR_SENDER_ADDRTYPE_W;
-	sPropSender[1].Value.LPSZ = _T("ZARAFA");
+	sPropSender[1].Value.LPSZ = const_cast<TCHAR *>(_T("ZARAFA"));
 	sPropSender[2].ulPropTag = PR_SENDER_EMAIL_ADDRESS_W;
 	sPropSender[2].Value.LPSZ = lpUser->lpszMailAddress;
 
@@ -2528,14 +2564,14 @@ HRESULT ProcessMessage(IMAPISession *lpAdminSession, IMAPISession *lpUserSession
 		 * If we're sending through WebAccess, we're sending the real
 		 * message, and bDoSentMail is true. This will move the
 		 * message to the users sent-items folder (using the entryid
-		 * from the message) and move it using it's entryid. Since we
+		 * from the message) and move it using its entryid. Since we
 		 * didn't save these changes, the original unmodified version
 		 * will be moved to the sent-items folder, and that will show
 		 * the correct From/Sender data.
 		 */
 	}
 
-	if(parseBool(g_lpConfig->GetSetting("expand_groups"))) {
+	if (sopt.always_expand_distr_list) {
 		// Expand recipients with ADDRTYPE=ZARAFA to multiple ADDRTYPE=SMTP recipients
 		hr = ExpandRecipients(lpAddrBook, lpMessage);
 		if(hr != hrSuccess)
@@ -2546,7 +2582,7 @@ HRESULT ProcessMessage(IMAPISession *lpAdminSession, IMAPISession *lpUserSession
 	if (hr != hrSuccess)
 		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to rewrite recipients");
 
-	if(parseBool(g_lpConfig->GetSetting("expand_groups"))) {
+	if (sopt.always_expand_distr_list) {
 		// Only touch recips if we're expanding groups; the rationale is here that the user
 		// has typed a recipient twice if we have duplicates and expand_groups = no, so that's
 		// what the user wanted apparently. What's more, duplicate recips are filtered for RCPT TO
@@ -2556,8 +2592,7 @@ HRESULT ProcessMessage(IMAPISession *lpAdminSession, IMAPISession *lpUserSession
 			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to remove duplicate recipients");
 	}
 
-
-    RewriteQuotedRecipients(lpMessage);
+	RewriteQuotedRecipients(lpMessage);
 
 	hr = ptrPyMapiPlugin->MessageProcessing("PreSending", lpUserSession, lpAddrBook, lpUserStore, NULL, lpMessage, &ulResult);
 	if (hr != hrSuccess)
@@ -2696,7 +2731,9 @@ exit:
  * @param[in]	bDoSentMail	true if the mail should be moved to the "Sent Items" folder of the user.
  * @return		HRESULT
  */
-HRESULT ProcessMessageForked(const wchar_t *szUsername, char *szSMTP, int ulPort, char *szPath, ULONG cbMsgEntryId, LPENTRYID lpMsgEntryId, bool bDoSentMail)
+HRESULT ProcessMessageForked(const wchar_t *szUsername, const char *szSMTP,
+    int ulPort, const char *szPath, ULONG cbMsgEntryId, LPENTRYID lpMsgEntryId,
+    bool bDoSentMail)
 {
 	HRESULT			hr = hrSuccess;
 	IMAPISession	*lpAdminSession = NULL;
@@ -2776,8 +2813,8 @@ HRESULT ProcessMessageForked(const wchar_t *szUsername, char *szSMTP, int ulPort
 	hr = ProcessMessage(lpAdminSession, lpUserSession, lpServiceAdmin, lpSecurity, lpUserStore, lpAddrBook, lpMailer, cbMsgEntryId, lpMsgEntryId, &lpMessage);
 	if (hr != hrSuccess && hr != MAPI_E_WAIT && hr != MAPI_W_NO_SERVICE && lpMessage) {
 		// use lpMailer to set body in SendUndeliverable
-		if (! lpMailer->haveError())
-			lpMailer->setError(_("Error found while trying to send your message. Error code: ")+wstringify(hr,true));
+		if (!lpMailer->haveError())
+			lpMailer->setError(_("Error found while trying to send your message. Error code: ") + wstringify(hr,true));
 		
 		hr = lpServiceAdmin->GetUser(g_cbDefaultEid, (LPENTRYID)g_lpDefaultEid, MAPI_UNICODE, &lpUserAdmin);
 		if (hr != hrSuccess) {

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -42,6 +41,7 @@
  * 
  */
 
+#include "zcdefs.h"
 #include "platform.h"
 #include "ECGetText.h"
 #include "charset/convert.h"
@@ -50,11 +50,11 @@
 #include <string>
 
 #include <pthread.h>
-#include <assert.h>
+#include <cassert>
 
 #ifdef _DEBUG
 #undef THIS_FILE
-static char THIS_FILE[]=__FILE__;
+static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -70,8 +70,7 @@ namespace detail {
 	 *    this assumption is false, this will lead to more conversions, and more memory usage
 	 *    by the cache.
 	 */
-	class converter 
-	{
+	class converter _final {
 	public:
 		/**
 		 * Get the global converter instance.
@@ -98,7 +97,7 @@ namespace detail {
 			pthread_mutex_lock(&m_hCacheLock);
 
 			std::pair<cache_type::iterator, bool> insResult = m_cache.insert(cache_type::value_type(lpsz, std::wstring()));
-			if (insResult.second == true)	// successfull insert, so not found in cache
+			if (insResult.second == true)	// successful insert, so not found in cache
 				insResult.first->second.assign(m_converter.convert_to<std::wstring>(lpsz));
 			
 			const wchar_t *lpszW = insResult.first->second.c_str();

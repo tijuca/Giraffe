@@ -17,7 +17,7 @@
 rc_reset
 
 PRESENCECONFIG=/etc/zarafa/presence.cfg
-PRESENCEPROGRAM=/usr/bin/zarafa-presence
+PRESENCEPROGRAM=/usr/sbin/zarafa-presence
 
 # Sanity checks.
 #[ -f $PRESENCECONFIG ] || exit 0

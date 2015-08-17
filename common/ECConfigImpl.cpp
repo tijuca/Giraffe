@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -42,13 +41,14 @@
  * 
  */
 
+#include "zcdefs.h"
 #include "platform.h"
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <algorithm>
-#include <assert.h>
-#include <limits.h>
+#include <cassert>
+#include <climits>
 
 #include <algorithm>
 #include "stringutil.h"
@@ -63,7 +63,7 @@ using namespace std;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 #include <boost/filesystem.hpp>
@@ -75,8 +75,7 @@ const directive_t ECConfigImpl::s_sDirectives[] = {
 	{ NULL }
 };
 
-class PathCompare
-{
+class PathCompare _final {
 public:
 	PathCompare(const fs::path &ref): m_ref(ref) {}
 	bool operator()(const fs::path &other) { return fs::equivalent(m_ref, other); }
@@ -105,7 +104,8 @@ bool ECConfigImpl::LoadSettings(const char *szFilename)
 	return InitConfigFile(LOADSETTING_OVERWRITE);
 }
 
-int tounderscore(int c) {
+static int tounderscore(int c)
+{
 	if(c == '-')
 		return '_';
 	return c;
@@ -138,7 +138,7 @@ bool ECConfigImpl::ParseParams(int argc, char *argv[], int *lpargidx)
 	for (int i = 0 ; i < argc ; i++) {
 		char *arg = argv[i];
 		if (arg && arg[0] == '-' && arg[1] == '-') {
-			char *eq = strchr(arg, '=');
+			const char *eq = strchr(arg, '=');
 			
 			if (eq) {
 				string strName(arg+2, eq-arg-2);
@@ -209,7 +209,7 @@ bool ECConfigImpl::AddSetting(const char *szName, const char *szValue, const uns
 	return AddSetting(&sSetting, ulGroup ? LOADSETTING_OVERWRITE_GROUP : LOADSETTING_OVERWRITE);
 }
 
-void freeSettings(settingmap_t::value_type entry)
+static void freeSettings(settingmap_t::value_type entry)
 {
 	// see InsertOrReplace
 	delete [] entry.second;
@@ -276,7 +276,7 @@ void ECConfigImpl::InsertOrReplace(settingmap_t *lpMap, const settingkey_t &s, c
 
 	if(i == lpMap->end()) {
 		// Insert new value
-		data = (char *)new char[1024];
+		data = new char[1024];
 		lpMap->insert(make_pair(s, data));
 	} else {
 		// Actually remove and re-insert the map entry since we may be modifying
@@ -294,16 +294,17 @@ void ECConfigImpl::InsertOrReplace(settingmap_t *lpMap, const settingkey_t &s, c
 	data[len] = '\0';
 }
 
-char *ECConfigImpl::GetMapEntry(settingmap_t *lpMap, const char *szName)
+const char *ECConfigImpl::GetMapEntry(const settingmap_t *lpMap,
+    const char *szName)
 {
-	char *retval = NULL;
+	const char *retval = NULL;
 	if (szName) { // feeding NULL pointers, either as source or destinateion, to strcpy() segfaults
 		settingkey_t key = { { 0 }, 0, 0 };
 		strcpy(key.s, szName);
 
 		pthread_rwlock_rdlock(&m_settingsRWLock);
 
-		settingmap_t::iterator itor = lpMap->find(key);
+		settingmap_t::const_iterator itor = lpMap->find(key);
 		if (itor != lpMap->end())
 			retval = itor->second;
 		
@@ -312,26 +313,27 @@ char *ECConfigImpl::GetMapEntry(settingmap_t *lpMap, const char *szName)
 	return retval;
 }
 
-char *ECConfigImpl::GetSetting(const char *szName)
+const char *ECConfigImpl::GetSetting(const char *szName)
 {
 	return GetMapEntry(&m_mapSettings, szName);
 }
 
-char *ECConfigImpl::GetAlias(const char *szName)
+const char *ECConfigImpl::GetAlias(const char *szName)
 {
 	return GetMapEntry(&m_mapAliases, szName);
 }
 
-char* ECConfigImpl::GetSetting(const char *szName, char *equal, char *other)
+const char *ECConfigImpl::GetSetting(const char *szName, const char *equal,
+    const char *other)
 {
-	char *value = this->GetSetting(szName);
+	const char *value = this->GetSetting(szName);
 	if ((value == equal) || (value && equal && !strcmp(value, equal)))
 		return other;
 	else
 		return value;
 }
 
-wchar_t* ECConfigImpl::GetSettingW(const char *szName)
+const wchar_t *ECConfigImpl::GetSettingW(const char *szName)
 {
 	const char *value = GetSetting(szName);
 	pair<ConvertCache::iterator, bool> result = m_convertCache.insert(ConvertCache::value_type(value, L""));
@@ -340,12 +342,13 @@ wchar_t* ECConfigImpl::GetSettingW(const char *szName)
 	if (result.second)
 		iter->second = convert_to<wstring>(value);
 
-	return const_cast<wchar_t*>(iter->second.c_str());
+	return iter->second.c_str();
 }
 
-wchar_t* ECConfigImpl::GetSettingW(const char *szName, wchar_t *equal, wchar_t *other)
+const wchar_t *ECConfigImpl::GetSettingW(const char *szName,
+    const wchar_t *equal, const wchar_t *other)
 {
-	wchar_t *value = this->GetSettingW(szName);
+	const wchar_t *value = this->GetSettingW(szName);
 	if ((value == equal) || (value && equal && !wcscmp(value, equal)))
 		return other;
 	else
@@ -490,8 +493,8 @@ bool ECConfigImpl::ReadConfigFile(const path_type &file, unsigned int ulFlags, u
 		 * Whe should clean it in such a way that it resolves to:
 		 * config_name=bla bla
 		 *
-		 * Be carefull _not_ to remove any whitespace characters
-		 * within the configuration value itself
+		 * Be careful _not_ to remove any whitespace characters
+		 * within the configuration value itself.
 		 */
 		strName = trim(strName, " \t\r\n");
 		strValue = trim(strValue, " \t\r\n");
@@ -515,7 +518,7 @@ exit:
 	return bReturn;
 }
 
-bool ECConfigImpl::HandleDirective(string &strLine, unsigned int ulFlags)
+bool ECConfigImpl::HandleDirective(const string &strLine, unsigned int ulFlags)
 {
 	size_t pos = strLine.find_first_of(" \t", 1);
 	string strName = strLine.substr(1, pos - 1);
@@ -595,7 +598,7 @@ bool ECConfigImpl::AddSetting(const configsetting_t *lpsConfig, unsigned int ulF
 	settingmap_t::iterator iterSettings;
 	settingkey_t s;
 	char *valid = NULL;
-	char *szAlias = NULL;
+	const char *szAlias = NULL;
 	bool bReturnValue = true;
 
 	if (!CopyConfigSetting(lpsConfig, &s))
@@ -702,7 +705,8 @@ bool ECConfigImpl::HasWarnings() {
 	return !warnings.empty();
 }
 
-list<string>* ECConfigImpl::GetWarnings() {
+const list<string> *ECConfigImpl::GetWarnings(void)
+{
 	return &warnings;
 }
 
@@ -724,7 +728,8 @@ bool ECConfigImpl::HasErrors() {
 	return !errors.empty();
 }
 
-list<string>* ECConfigImpl::GetErrors() {
+const list<string> *ECConfigImpl::GetErrors(void)
+{
 	return &errors;
 }
 

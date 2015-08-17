@@ -1,7 +1,4 @@
-lib_LTLIBRARIES = libarchiver.la libarchiver-core.la
-bin_PROGRAMS = zarafa-archiver
-
-
+# -*- Makefile -*-
 
 AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
 	-DARCHIVER_EXTRA \
@@ -11,16 +8,19 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
 	-I${top_srcdir}/provider/soap \
 	-I${top_builddir}/provider/soap \
     $(GSOAP_CFLAGS) \
-	-I${top_srcdir}/common \
+	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
 	$(MYSQL_INCLUDES)
 
+sbin_PROGRAMS = zarafa-archiver
+lib_LTLIBRARIES = libzarafa-archiver.la libzarafa-archiver-core.la
+noinst_DATA = libzarafa-archiver.ldd libzarafa-archiver-core.ldd \
+	zarafa-archiver.ldx
 
+libzarafa_archiver_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_util.la
 
-libarchiver_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la
-
-libarchiver_la_SOURCES = \
+libzarafa_archiver_la_SOURCES = \
 	ArchiverSession.cpp ArchiverSession.h ArchiverSessionPtr.h \
 	archiver-common.cpp archiver-common.h ArchiveControl.h \
 	ArchiveManageImpl.cpp ArchiveManageImpl.h ArchiveManage.h\
@@ -31,15 +31,18 @@ libarchiver_la_SOURCES = \
 	helpers/MAPIPropHelper.cpp helpers/MAPIPropHelper.h \
 	ECArchiverLogger.cpp ECArchiverLogger.h
 
+libzarafa_archiver_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
+	-Wl,--version-script=${top_builddir}/default.sym
+EXTRA_libzarafa_archiver_la_DEPENDENCIES = ${top_builddir}/default.sym
 
 
-libarchiver_core_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_service.la \
-	libarchiver.la \
+libzarafa_archiver_core_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_service.la \
+	libzarafa-archiver.la \
 	$(PROG_LIBS) $(SSL_LIBS) $(MYSQL_LIBS)
 
-libarchiver_core_la_SOURCES = \
+libzarafa_archiver_core_la_SOURCES = \
 	Archiver.cpp Archiver.h AutoMAPI.h\
 	ArchiverImpl.cpp ArchiverImpl.h\
 	operations/instanceidmapper.cpp operations/instanceidmapper.h operations/instanceidmapper_fwd.h \
@@ -53,13 +56,15 @@ libarchiver_core_la_SOURCES = \
 	ArchiveControlImpl.cpp ArchiveControlImpl.h \
 	ECDatabase.h ECDatabase.cpp
 
-
+libzarafa_archiver_core_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
+	-Wl,--version-script=${top_builddir}/default.sym
+EXTRA_libzarafa_archiver_core_la_DEPENDENCIES = ${top_builddir}/default.sym
 
 zarafa_archiver_LDADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la \
-	libarchiver.la libarchiver-core.la \
-	$(PROG_LIBS) ${top_builddir}/common/libcommon_service.la
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_util.la \
+	libzarafa-archiver.la libzarafa-archiver-core.la \
+	$(PROG_LIBS) ${top_builddir}/common/libzcp_common_service.la
 
 zarafa_archiver_SOURCES = main.cpp
 
@@ -68,3 +73,10 @@ zarafa_archiver_SOURCES = main.cpp
 check-syntax:
 	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
 		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2
+
+install-exec-hook:
+	${MKDIR_P} ${DESTDIR}${pkglibdir}
+	ln -fs ${libdir}/libzarafa-archiver.so ${DESTDIR}${pkglibdir}/libarchiver.so
+	ln -fs ${libdir}/libzarafa-archiver-core.so ${DESTDIR}${pkglibdir}/libarchiver-core.so
+
+include ../../global.am

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -80,13 +79,14 @@ using namespace std;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 
 #define CONVERT_TO(_context, _charset, ...) ((_context) ? (_context)->convert_to<_charset>(__VA_ARGS__) : convert_to<_charset>(__VA_ARGS__))
 
-HRESULT CopyMAPIPropValToSOAPPropVal(propVal *lpPropValDst, LPSPropValue lpPropValSrc, convert_context *lpConverter)
+HRESULT CopyMAPIPropValToSOAPPropVal(propVal *lpPropValDst,
+    const SPropValue *lpPropValSrc, convert_context *lpConverter)
 {
 	TRACE_MAPI(TRACE_ENTRY, (char*)__FUNCTION__, " Prop: 0x%X", lpPropValSrc->ulPropTag);
 
@@ -289,11 +289,11 @@ HRESULT CopyMAPIPropValToSOAPPropVal(propVal *lpPropValDst, LPSPropValue lpPropV
 		break;
 	case PT_SRESTRICTION:
 		lpPropValDst->__union = SOAP_UNION_propValData_res;
-		// NOTE: we placed the object pointer in lpszA to make sure it's on the same offset as Value.x on 32bit as 64bit machines
+		// NOTE: we placed the object pointer in lpszA to make sure it is on the same offset as Value.x on 32-bit and 64-bit machines
 		hr = CopyMAPIRestrictionToSOAPRestriction(&lpPropValDst->Value.res, (LPSRestriction)lpPropValSrc->Value.lpszA, lpConverter);
 		break;
 	case PT_ACTIONS: {
-		// NOTE: we placed the object pointer in lpszA to make sure it's on the same offset as Value.x on 32bit as 64bit machines
+		// NOTE: we placed the object pointer in lpszA to make sure it is on the same offset as Value.x on 32-bit and 64-bit machines
 		ACTIONS *lpSrcActions = ((ACTIONS*)lpPropValSrc->Value.lpszA);
 		lpPropValDst->__union = SOAP_UNION_propValData_actions;
 		lpPropValDst->Value.actions = new struct actions;
@@ -372,7 +372,9 @@ exit:
 	return hr;
 }
 
-HRESULT CopySOAPPropValToMAPIPropVal(LPSPropValue lpPropValDst, struct propVal *lpPropValSrc, void *lpBase, convert_context *lpConverter)
+HRESULT CopySOAPPropValToMAPIPropVal(LPSPropValue lpPropValDst,
+    const struct propVal *lpPropValSrc, void *lpBase,
+    convert_context *lpConverter)
 {
 	HRESULT hr = hrSuccess;
 
@@ -647,7 +649,7 @@ HRESULT CopySOAPPropValToMAPIPropVal(LPSPropValue lpPropValDst, struct propVal *
 		break;
 	case PT_SRESTRICTION:
 		if(lpPropValSrc->__union && lpPropValSrc->Value.res) {
-			// NOTE: we place the object pointer in lpszA to make sure it's on the same offset as Value.x on 32bit as 64bit machines
+			// NOTE: we place the object pointer in lpszA to make sure it's on the same offset as Value.x on 32-bit and 64-bit machines
 			ECAllocateMore(sizeof(SRestriction), lpBase, (void **) &lpPropValDst->Value.lpszA);
 			hr = CopySOAPRestrictionToMAPIRestriction((LPSRestriction)lpPropValDst->Value.lpszA, lpPropValSrc->Value.res, lpBase, lpConverter);
 		}else {
@@ -657,7 +659,7 @@ HRESULT CopySOAPPropValToMAPIPropVal(LPSPropValue lpPropValDst, struct propVal *
 		break;
 	case PT_ACTIONS: {
 		if(lpPropValSrc->__union && lpPropValSrc->Value.actions) {
-			// NOTE: we place the object pointer in lpszA to make sure it's on the same offset as Value.x on 32bit as 64bit machines
+			// NOTE: we place the object pointer in lpszA to make sure it is on the same offset as Value.x on 32-bit and 64-bit machines
 			ACTIONS *lpDstActions;
 			ECAllocateMore(sizeof(ACTIONS), lpBase, (void **)&lpPropValDst->Value.lpszA);
 			lpDstActions = (ACTIONS *)lpPropValDst->Value.lpszA;
@@ -754,7 +756,9 @@ exit:
 	return hr;
 }
 
-HRESULT CopySOAPRowToMAPIRow(void* lpProvider, struct propValArray *lpsRowSrc, LPSPropValue lpsRowDst, void **lpBase, ULONG ulType, convert_context *lpConverter)
+HRESULT CopySOAPRowToMAPIRow(void *lpProvider,
+    const struct propValArray *lpsRowSrc, LPSPropValue lpsRowDst,
+    void **lpBase, ULONG ulType, convert_context *lpConverter)
 {
 	HRESULT hr = hrSuccess;
 	int j=0;
@@ -814,7 +818,7 @@ exit:
 	return hr;
 }
 
-HRESULT CopySOAPEntryId(entryId *lpSrc, entryId* lpDst)
+HRESULT CopySOAPEntryId(const entryId *lpSrc, entryId *lpDst)
 {
 	HRESULT hr = hrSuccess;
 
@@ -831,7 +835,8 @@ exit:
 	return hr;
 }
 
-HRESULT CopyMAPIEntryIdToSOAPEntryId(ULONG cbEntryIdSrc, LPENTRYID lpEntryIdSrc, entryId** lppDest)
+HRESULT CopyMAPIEntryIdToSOAPEntryId(ULONG cbEntryIdSrc,
+    const ENTRYID *lpEntryIdSrc, entryId **lppDest)
 {
 	HRESULT hr = hrSuccess;
 
@@ -849,7 +854,8 @@ exit:
 	return hr;
 }
 
-HRESULT CopyMAPIEntryIdToSOAPEntryId(ULONG cbEntryIdSrc, LPENTRYID lpEntryIdSrc, entryId* lpDest, bool bCheapCopy)
+HRESULT CopyMAPIEntryIdToSOAPEntryId(ULONG cbEntryIdSrc,
+    const ENTRYID *lpEntryIdSrc, entryId *lpDest, bool bCheapCopy)
 {
 	HRESULT hr = hrSuccess;
 
@@ -877,7 +883,8 @@ exit:
 	return hr;
 }
 
-HRESULT CopySOAPEntryIdToMAPIEntryId(entryId* lpSrc, ULONG* lpcbDest, LPENTRYID* lppEntryIdDest, void* lpBase)
+HRESULT CopySOAPEntryIdToMAPIEntryId(const entryId *lpSrc, ULONG *lpcbDest,
+    LPENTRYID *lppEntryIdDest, void *lpBase)
 {
 	HRESULT		hr = hrSuccess;
 	LPENTRYID	lpEntryId = NULL;
@@ -908,7 +915,8 @@ exit:
 	return hr;
 }
 
-HRESULT CopySOAPEntryIdToMAPIEntryId(entryId* lpSrc, ULONG ulObjId, ULONG ulType, ULONG* lpcbDest, LPENTRYID* lppEntryIdDest, void *lpBase)
+HRESULT CopySOAPEntryIdToMAPIEntryId(const entryId *lpSrc, ULONG ulObjId,
+    ULONG ulType, ULONG *lpcbDest, LPENTRYID *lppEntryIdDest, void *lpBase)
 {
 	HRESULT		hr = hrSuccess;
 	ULONG		cbEntryId = 0;
@@ -943,12 +951,14 @@ exit:
 	return hr;
 }
 
-HRESULT CopySOAPEntryIdToMAPIEntryId(entryId* lpSrc, ULONG ulObjId, ULONG* lpcbDest, LPENTRYID* lppEntryIdDest, void *lpBase)
+HRESULT CopySOAPEntryIdToMAPIEntryId(const entryId *lpSrc, ULONG ulObjId,
+    ULONG *lpcbDest, LPENTRYID *lppEntryIdDest, void *lpBase)
 {
 	return CopySOAPEntryIdToMAPIEntryId(lpSrc, ulObjId, MAPI_MAILUSER, lpcbDest, lppEntryIdDest, lpBase);
 }
 
-HRESULT CopyMAPIEntryListToSOAPEntryList(ENTRYLIST *lpMsgList, struct entryList* lpsEntryList)
+HRESULT CopyMAPIEntryListToSOAPEntryList(const ENTRYLIST *lpMsgList,
+    struct entryList *lpsEntryList)
 {
 	HRESULT hr = hrSuccess;
 	unsigned int i = 0;
@@ -980,7 +990,8 @@ exit:
 	return hr;
 }
 
-HRESULT CopySOAPEntryListToMAPIEntryList(struct entryList* lpsEntryList, LPENTRYLIST* lppMsgList)
+HRESULT CopySOAPEntryListToMAPIEntryList(const struct entryList *lpsEntryList,
+    LPENTRYLIST *lppMsgList)
 {
 	HRESULT			hr = hrSuccess;
 	unsigned int	i = 0;
@@ -1028,7 +1039,8 @@ exit:
 	return hr;
 }
 
-HRESULT CopySOAPRowToMAPIRow(struct propValArray *lpsRowSrc, LPSPropValue lpsRowDst, void *lpBase, convert_context *lpConverter)
+HRESULT CopySOAPRowToMAPIRow(const struct propValArray *lpsRowSrc,
+    LPSPropValue lpsRowDst, void *lpBase, convert_context *lpConverter)
 {
 	HRESULT hr = hrSuccess;
 	int j=0;
@@ -1051,7 +1063,8 @@ exit:
 	return hr;
 }
 
-HRESULT CopyMAPIRowToSOAPRow(LPSRow lpRowSrc, struct propValArray *lpsRowDst, convert_context *lpConverter)
+HRESULT CopyMAPIRowToSOAPRow(const SRow *lpRowSrc,
+    struct propValArray *lpsRowDst, convert_context *lpConverter)
 {
 	HRESULT hr = hrSuccess;
 	struct propVal* lpPropVal = NULL;
@@ -1080,7 +1093,8 @@ exit:
 	return hr;
 }
 
-HRESULT CopyMAPIRowSetToSOAPRowSet(LPSRowSet lpRowSetSrc, struct rowSet **lppsRowSetDst, convert_context *lpConverter)
+HRESULT CopyMAPIRowSetToSOAPRowSet(const SRowSet *lpRowSetSrc,
+    struct rowSet **lppsRowSetDst, convert_context *lpConverter)
 {
 	HRESULT hr = hrSuccess;
 	struct rowSet *lpsRowSetDst = NULL;
@@ -1114,7 +1128,8 @@ exit:
 }
 
 // Copies a row set, filling in client-side generated values on the fly
-HRESULT CopySOAPRowSetToMAPIRowSet(void* lpProvider, struct rowSet *lpsRowSetSrc, LPSRowSet *lppRowSetDst, ULONG ulType)
+HRESULT CopySOAPRowSetToMAPIRowSet(void *lpProvider,
+    const struct rowSet *lpsRowSetSrc, LPSRowSet *lppRowSetDst, ULONG ulType)
 {
 	HRESULT hr = hrSuccess;
 	ULONG ulRows = 0;
@@ -1144,7 +1159,9 @@ exit:
 	return hr;
 }
 
-HRESULT CopySOAPRestrictionToMAPIRestriction(LPSRestriction lpDst, struct restrictTable *lpSrc, void *lpBase, convert_context *lpConverter)
+HRESULT CopySOAPRestrictionToMAPIRestriction(LPSRestriction lpDst,
+    const struct restrictTable *lpSrc, void *lpBase,
+    convert_context *lpConverter)
 {
 	HRESULT hr = hrSuccess;
 	unsigned int i=0;
@@ -1331,7 +1348,8 @@ exit:
 
 }
 
-HRESULT CopyMAPIRestrictionToSOAPRestriction(struct restrictTable **lppDst, LPSRestriction lpSrc, convert_context *lpConverter)
+HRESULT CopyMAPIRestrictionToSOAPRestriction(struct restrictTable **lppDst,
+    const SRestriction *lpSrc, convert_context *lpConverter)
 {
 	HRESULT hr = hrSuccess;
 	struct restrictTable *lpDst = NULL;
@@ -1505,7 +1523,9 @@ exit:
 	return hr;
 }
 
-HRESULT CopySOAPPropTagArrayToMAPIPropTagArray(struct propTagArray* lpsPropTagArray, LPSPropTagArray* lppPropTagArray, void* lpBase)
+HRESULT CopySOAPPropTagArrayToMAPIPropTagArray(
+    const struct propTagArray *lpsPropTagArray,
+    LPSPropTagArray *lppPropTagArray, void *lpBase)
 {
 	HRESULT			hr = hrSuccess;
 	LPSPropTagArray	lpPropTagArray = NULL;
@@ -1594,8 +1614,9 @@ exit:
 	return hr;
 }
 
-HRESULT CopyABPropsFromSoap(struct propmapPairArray *lpsoapPropmap, struct propmapMVPairArray *lpsoapMVPropmap,
-							SPROPMAP *lpPropmap, MVPROPMAP *lpMVPropmap, void *lpBase, ULONG ulFlags)
+HRESULT CopyABPropsFromSoap(const struct propmapPairArray *lpsoapPropmap,
+    const struct propmapMVPairArray *lpsoapMVPropmap, SPROPMAP *lpPropmap,
+    MVPROPMAP *lpMVPropmap, void *lpBase, ULONG ulFlags)
 {
 	HRESULT hr = hrSuccess;
 	unsigned int nLen = 0;
@@ -1657,8 +1678,10 @@ exit:
 	return hr;
 }
 
-HRESULT CopyABPropsToSoap(SPROPMAP *lpPropmap, MVPROPMAP *lpMVPropmap, ULONG ulFlags, 
-						  struct propmapPairArray **lppsoapPropmap, struct propmapMVPairArray **lppsoapMVPropmap)
+HRESULT CopyABPropsToSoap(const SPROPMAP *lpPropmap,
+    const MVPROPMAP *lpMVPropmap, ULONG ulFlags,
+    struct propmapPairArray **lppsoapPropmap,
+    struct propmapMVPairArray **lppsoapMVPropmap)
 {
 	HRESULT hr = hrSuccess;
 	struct propmapPairArray *soapPropmap = NULL;
@@ -1753,7 +1776,8 @@ HRESULT FreeABProps(struct propmapPairArray *lpsoapPropmap, struct propmapMVPair
 	return hrSuccess;
 }
 
-HRESULT SoapUserToUser(struct user *lpUser, LPECUSER lpsUser, ULONG ulFlags, void *lpBase, convert_context &converter)
+static HRESULT SoapUserToUser(const struct user *lpUser, LPECUSER lpsUser,
+    ULONG ulFlags, void *lpBase, convert_context &converter)
 {
 	HRESULT 	hr		= hrSuccess;
 
@@ -1829,7 +1853,8 @@ exit:
 	return hr;
 }
 
-HRESULT SoapUserArrayToUserArray(struct userArray* lpUserArray, ULONG ulFlags, ULONG *lpcUsers, LPECUSER* lppsUsers)
+HRESULT SoapUserArrayToUserArray(const struct userArray *lpUserArray,
+    ULONG ulFlags, ULONG *lpcUsers, LPECUSER *lppsUsers)
 {
 	HRESULT 		hr = hrSuccess;
 	LPECUSER 		lpECUsers = NULL;
@@ -1857,7 +1882,8 @@ exit:
 	return hr;
 }
 
-HRESULT SoapUserToUser(struct user *lpUser, ULONG ulFlags, LPECUSER *lppsUser)
+HRESULT SoapUserToUser(const struct user *lpUser, ULONG ulFlags,
+    LPECUSER *lppsUser)
 {
 	HRESULT			hr		= hrSuccess;
 	LPECUSER		lpsUser	= NULL;
@@ -1887,7 +1913,9 @@ exit:
 	return hr;
 }
 
-HRESULT SoapGroupToGroup(struct group *lpGroup, LPECGROUP lpsGroup, ULONG ulFlags, void *lpBase, convert_context &converter)
+static HRESULT SoapGroupToGroup(const struct group *lpGroup,
+    LPECGROUP lpsGroup, ULONG ulFlags, void *lpBase,
+    convert_context &converter)
 {
 	HRESULT 	hr = hrSuccess;
 
@@ -1935,7 +1963,8 @@ exit:
 	return hr;
 }
 
-HRESULT SoapGroupArrayToGroupArray(struct groupArray* lpGroupArray, ULONG ulFlags, ULONG *lpcGroups, LPECGROUP *lppsGroups)
+HRESULT SoapGroupArrayToGroupArray(const struct groupArray *lpGroupArray,
+    ULONG ulFlags, ULONG *lpcGroups, LPECGROUP *lppsGroups)
 {
 	HRESULT			hr = hrSuccess;
 	unsigned int	i;
@@ -1967,7 +1996,8 @@ exit:
 	return hr;
 }
 
-HRESULT SoapGroupToGroup(struct group *lpGroup, ULONG ulFlags, LPECGROUP *lppsGroup)
+HRESULT SoapGroupToGroup(const struct group *lpGroup, ULONG ulFlags,
+    LPECGROUP *lppsGroup)
 {
 	HRESULT			hr			= hrSuccess;
 	LPECGROUP		lpsGroup	= NULL;
@@ -1997,7 +2027,9 @@ exit:
 	return hr;
 }
 
-HRESULT SoapCompanyToCompany(struct company *lpCompany, LPECCOMPANY lpsCompany, ULONG ulFlags, void *lpBase, convert_context &converter)
+static HRESULT SoapCompanyToCompany(const struct company *lpCompany,
+    LPECCOMPANY lpsCompany, ULONG ulFlags, void *lpBase,
+    convert_context &converter)
 {
 	HRESULT 	hr		= hrSuccess;
 
@@ -2039,7 +2071,9 @@ exit:
 	return hr;
 }
 
-HRESULT SoapCompanyArrayToCompanyArray(struct companyArray* lpCompanyArray, ULONG ulFlags, ULONG *lpcCompanies, LPECCOMPANY *lppsCompanies)
+HRESULT SoapCompanyArrayToCompanyArray(
+    const struct companyArray *lpCompanyArray, ULONG ulFlags,
+    ULONG *lpcCompanies, LPECCOMPANY *lppsCompanies)
 {
 	HRESULT 		hr = hrSuccess;
 	LPECCOMPANY 	lpECCompanies = NULL;
@@ -2070,7 +2104,8 @@ exit:
 	return hr;
 }
 
-HRESULT SoapCompanyToCompany(struct company *lpCompany, ULONG ulFlags, LPECCOMPANY *lppsCompany)
+HRESULT SoapCompanyToCompany(const struct company *lpCompany, ULONG ulFlags,
+    LPECCOMPANY *lppsCompany)
 {
 	HRESULT			hr			= hrSuccess;
 	LPECCOMPANY		lpsCompany	= NULL;
@@ -2100,7 +2135,8 @@ exit:
 	return hr;
 }
 
-HRESULT SvrNameListToSoapMvString8(LPECSVRNAMELIST lpSvrNameList, ULONG ulFlags, struct mv_string8 **lppsSvrNameList)
+HRESULT SvrNameListToSoapMvString8(LPECSVRNAMELIST lpSvrNameList,
+    ULONG ulFlags, struct mv_string8 **lppsSvrNameList)
 {
 	HRESULT				hr = hrSuccess;
 	struct mv_string8	*lpsSvrNameList = NULL;
@@ -2140,7 +2176,8 @@ exit:
 	return hr;
 }
 
-HRESULT SoapServerListToServerList(struct serverList *lpsServerList, ULONG ulFLags, LPECSERVERLIST *lppServerList)
+HRESULT SoapServerListToServerList(const struct serverList *lpsServerList,
+    ULONG ulFLags, LPECSERVERLIST *lppServerList)
 {
 	HRESULT			hr = hrSuccess;
 	LPECSERVERLIST	lpServerList = NULL;
@@ -2279,7 +2316,7 @@ HRESULT UnWrapServerClientStoreEntry(ULONG cbWrapStoreID, LPENTRYID lpWrapStoreI
 		goto exit;
 	}
 
-	//FIXME: check or it's an zarafa entry?
+	// FIXME: Check whether it is a Zarafa entry?
 
 	peid = (PEID)lpWrapStoreID;
 
@@ -2331,7 +2368,7 @@ HRESULT UnWrapServerClientABEntry(ULONG cbWrapABID, LPENTRYID lpWrapABID, ULONG*
 		goto exit;
 	}
 
-	//FIXME: check or it's an zarafa entry?
+	// FIXME: Check whether it is a Zarafa entry?
 
 	pabeid = (PABEID)lpWrapABID;
 
@@ -2522,7 +2559,8 @@ exit:
 	return hr;
 }
 
-HRESULT CopyMAPISourceKeyToSoapSourceKey(SBinary *lpsMAPISourceKey, struct xsd__base64Binary *lpsSoapSourceKey, void *lpBase)
+static HRESULT CopyMAPISourceKeyToSoapSourceKey(SBinary *lpsMAPISourceKey,
+    struct xsd__base64Binary *lpsSoapSourceKey, void *lpBase)
 {
 	HRESULT						hr = hrSuccess;
 	struct xsd__base64Binary	sSoapSourceKey = {0};
@@ -2629,7 +2667,8 @@ exit:
 	return hr;
 }
 
-HRESULT ConvertString8ToUnicode(char *lpszA, WCHAR **lppszW, void *base, convert_context &converter)
+static HRESULT ConvertString8ToUnicode(const char *lpszA, WCHAR **lppszW,
+    void *base, convert_context &converter)
 {
 	HRESULT hr = hrSuccess;
 	wstring wide;
@@ -2651,7 +2690,8 @@ exit:
 	return hr;
 }
 
-HRESULT ConvertString8ToUnicode(LPSRestriction lpRestriction, void *base, convert_context &converter)
+static HRESULT ConvertString8ToUnicode(LPSRestriction lpRestriction,
+    void *base, convert_context &converter)
 {
 	HRESULT hr = hrSuccess;
 	ULONG i;
@@ -2725,7 +2765,8 @@ exit:
 	return hr;
 }
 
-HRESULT ConvertString8ToUnicode(LPADRLIST lpAdrList, void *base, convert_context &converter)
+static HRESULT ConvertString8ToUnicode(const ADRLIST *lpAdrList, void *base,
+    convert_context &converter)
 {
 	HRESULT hr = hrSuccess;
 
@@ -2743,7 +2784,8 @@ exit:
 	return hr;
 }
 
-HRESULT ConvertString8ToUnicode(ACTIONS* lpActions, void *base, convert_context &converter)
+static HRESULT ConvertString8ToUnicode(const ACTIONS *lpActions, void *base,
+    convert_context &converter)
 {
 	HRESULT hr = hrSuccess;
 

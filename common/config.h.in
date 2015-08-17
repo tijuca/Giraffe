@@ -66,8 +66,14 @@
 /* Define to 1 if you have the `gmtime_r' function. */
 #undef HAVE_GMTIME_R
 
+/* Define to 1 if you have the <google/malloc_extension.h> header file. */
+#undef HAVE_GOOGLE_MALLOC_EXTENSION_H
+
 /* Define to 1 if you have the <google/sparse_hash_map> header file. */
 #undef HAVE_GOOGLE_SPARSE_HASH_MAP
+
+/* Define to 1 if you have the <gperftools/malloc_extension.h> header file. */
+#undef HAVE_GPERFTOOLS_MALLOC_EXTENSION_H
 
 /* Kerberos Single Signon Authentication enabled */
 #undef HAVE_GSSAPI
@@ -123,6 +129,24 @@
 
 /* pam authentication available */
 #undef HAVE_PAM
+
+/* Define to 1 if you have the `pthread_getname_np' function. */
+#undef HAVE_PTHREAD_GETNAME_NP
+
+/* Define to 1 if you have the <pthread_np.h> header file. */
+#undef HAVE_PTHREAD_NP_H
+
+/* 1-arg pthread_setname_np */
+#undef HAVE_PTHREAD_SETNAME_NP_1
+
+/* 2-arg pthread_setname_np */
+#undef HAVE_PTHREAD_SETNAME_NP_2
+
+/* 3-arg pthread_setname_np */
+#undef HAVE_PTHREAD_SETNAME_NP_3
+
+/* 2-arg pthread_set_name_np */
+#undef HAVE_PTHREAD_SET_NAME_NP_2
 
 /* Define to 1 if you have the `random' function. */
 #undef HAVE_RANDOM
@@ -335,3 +359,6 @@
 
 /* Define to `unsigned int' if <sys/types.h> does not define. */
 #undef size_t
+
+/* Define to `int' if <sys/types.h> does not define. */
+#undef ssize_t

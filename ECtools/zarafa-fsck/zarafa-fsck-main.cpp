@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -57,7 +56,7 @@
 
 #include "zarafa-fsck.h"
 
-bool ReadYesNoMessage(string strMessage, string strAuto)
+static bool ReadYesNoMessage(string strMessage, string strAuto)
 {
 	string strReply;
 
@@ -73,7 +72,7 @@ bool ReadYesNoMessage(string strMessage, string strAuto)
 	return (strReply[0] == 'y' || strReply[0] == 'Y');
 }
 
-HRESULT DeleteEntry(LPMAPIFOLDER lpFolder, LPSPropValue lpItemProperty)
+static HRESULT DeleteEntry(LPMAPIFOLDER lpFolder, LPSPropValue lpItemProperty)
 {
 	HRESULT hr = hrSuccess;
 	LPENTRYLIST lpEntryList = NULL;
@@ -104,7 +103,8 @@ exit:
 	return hr;
 }
 
-HRESULT FixProperty(LPMESSAGE lpMessage, string strName, ULONG ulTag, __UPV Value)
+static HRESULT FixProperty(LPMESSAGE lpMessage, string strName, ULONG ulTag,
+    __UPV Value)
 {
 	HRESULT hr = hrSuccess;
 	SPropValue ErrorProp;
@@ -132,7 +132,8 @@ exit:
 	return hr;
 }
 
-HRESULT DetectFolderEntryDetails(LPMESSAGE lpMessage, string *lpName, string *lpClass)
+static HRESULT DetectFolderEntryDetails(LPMESSAGE lpMessage, string *lpName,
+    string *lpClass)
 {
 	HRESULT hr = hrSuccess;
 	LPSPropValue lpPropertyArray;
@@ -182,7 +183,8 @@ exit:
 	return hr;
 }
 
-HRESULT ProcessFolderEntry(ZarafaFsck *lpFsck, LPMAPIFOLDER lpFolder, LPSRow lpRow)
+static HRESULT ProcessFolderEntry(ZarafaFsck *lpFsck, LPMAPIFOLDER lpFolder,
+    LPSRow lpRow)
 {
 	HRESULT hr = hrSuccess;
 	LPSPropValue lpItemProperty = NULL;
@@ -226,7 +228,8 @@ exit:
 	return hr;
 }
 
-HRESULT ProcessFolder(ZarafaFsck *lpFsck, LPMAPIFOLDER lpFolder, string strName)
+static HRESULT ProcessFolder(ZarafaFsck *lpFsck, LPMAPIFOLDER lpFolder,
+    string strName)
 {
 	HRESULT hr = hrSuccess;
 	LPMAPITABLE lpTable = NULL;
@@ -381,7 +384,8 @@ HRESULT ZarafaFsck::DeleteRecipientList(LPMESSAGE lpMessage, std::list<unsigned 
 		lpMods->cRows = 0;
 		for(iter = mapiReciptDel.begin(); iter != mapiReciptDel.end(); iter++) {
 			lpMods->aRow[lpMods->cRows].cValues = 1;
-			MAPIAllocateMore(sizeof(SPropValue), lpMods, (void**)&lpMods->aRow[lpMods->cRows].lpProps);
+			if ((hr = MAPIAllocateMore(sizeof(SPropValue), lpMods, (void**)&lpMods->aRow[lpMods->cRows].lpProps)) != hrSuccess)
+				goto exit;
 			lpMods->aRow[lpMods->cRows].lpProps->ulPropTag = PR_ROWID;
 			lpMods->aRow[lpMods->cRows].lpProps->Value.ul = *iter;
 

@@ -2,12 +2,12 @@
 .\"     Title: zarafa-dagent.cfg
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: August 2011
+.\"      Date: April 2014
 .\"    Manual: Zarafa user reference
-.\"    Source: Zarafa 7.1
+.\"    Source: Zarafa 7.2
 .\"  Language: English
 .\"
-.TH "ZARAFA\-DAGENT\&.CFG" "5" "August 2011" "Zarafa 7.1" "Zarafa user reference"
+.TH "ZARAFA\-DAGENT\&.CFG" "5" "April 2014" "Zarafa 7.2" "Zarafa user reference"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -108,7 +108,7 @@ Default:
 \fBsslkey_file\fR
 .RS 4
 Use this file as key to logon to the server\&. This is only used when server_socket is set to an HTTPS transport\&. See the
-\fBzarafa-server\fR(1)
+\fBzarafa-server\fR(8)
 manual page on how to setup SSL keys\&.
 .sp
 Default: value not set\&.
@@ -194,6 +194,14 @@ Default:
 \fI1\fR
 .RE
 .PP
+\fBlog_buffer_size\fR
+.RS 4
+Buffer logging in what sized blocks\&. Bigger buffers is better for the performance but it gives lag when running e\&.g\&. multitail or \*(Aqtail \-f\*(Aq on the log\-file\&. If you want to directly see what is happing, set this to e\&.g\&. 1\&. So when debugging: make it a small value, else set it to 4096 or more\&.
+.sp
+Default:
+\fI4096\fR
+.RE
+.PP
 \fBlog_level\fR
 .RS 4
 The level of output for logging in the range from 0 to 5\&. 0 means no logging, 5 means full logging\&.
@@ -204,7 +212,7 @@ Default:
 .PP
 \fBlog_raw_message\fR
 .RS 4
-Log the raw message to a file\&. The file is saved to the location specifed in
+Log the raw message to a file\&. The file is saved to the location specified in
 \fBlog_raw_message_path\fR\&.
 .sp
 Default:
@@ -231,12 +239,12 @@ Default:
 .PP
 \fBmr_autoaccepter\fR
 .RS 4
-Zarafa\-dagent can auto\-accept meeting requests if the mr\-accept option is enabled for a user\&. When this option is enabled and a meeting request or meeting cancellation is received, this script is started with the following parameters: /usr/bin/zarafa\-mr\-accept <username> </path/to/dagent\&.cfg> [<ENTRYID>]\&.
+Zarafa\-dagent can auto\-accept meeting requests if the mr\-accept option is enabled for a user\&. When this option is enabled and a meeting request or meeting cancellation is received, this script is started with the following parameters: /usr/sbin/zarafa\-mr\-accept <username> </path/to/dagent\&.cfg> [<ENTRYID>]\&.
 .sp
 If the script is successful (exitcode is 0), then no other actions are performed (eg rules or vacation messages) and the message is not delivered in the inbox\&. If the script exits with a non\-zero exit code, rules and vacation messages are run as usual, and the message is delivered in the inbox (or other folder, depending on rules or options)\&.
 .sp
 Default:
-\fI/usr/bin/zarafa\-mr\-accept\fR
+\fI/usr/sbin/zarafa\-mr\-accept\fR
 .RE
 .PP
 \fBplugin_enabled\fR
@@ -324,4 +332,4 @@ Written by Zarafa\&.
 .SH "SEE ALSO"
 .PP
 
-\fBzarafa-dagent\fR(1)
+\fBzarafa-dagent\fR(8)

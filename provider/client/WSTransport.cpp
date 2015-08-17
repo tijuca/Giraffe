@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -93,7 +92,7 @@ using namespace std;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 
@@ -313,7 +312,15 @@ HRESULT WSTransport::HrLogon(const sGlobalProfileProps &sProfileProps)
 	}
 	
 	// Login with username and password
-	if (SOAP_OK != lpCmd->ns__logon((char*)strUserName.c_str(), (char *)strPassword.c_str(), (char*)strImpersonateUser.c_str(), PROJECT_VERSION_CLIENT_STR, ulCapabilities, ulLogonFlags, sLicenseRequest, m_ecSessionGroupId, (char *)GetAppName().c_str(), (char *)sProfileProps.strClientAppVersion.c_str(), (char *)sProfileProps.strClientAppMisc.c_str(), &sResponse))
+	if (SOAP_OK != lpCmd->ns__logon(const_cast<char *>(strUserName.c_str()),
+	    const_cast<char *>(strPassword.c_str()),
+	    const_cast<char *>(strImpersonateUser.c_str()),
+	    const_cast<char *>(PROJECT_VERSION_CLIENT_STR), ulCapabilities,
+	    ulLogonFlags, sLicenseRequest, m_ecSessionGroupId,
+	    const_cast<char *>(GetAppName().c_str()),
+	    const_cast<char *>(sProfileProps.strClientAppVersion.c_str()),
+	    const_cast<char *>(sProfileProps.strClientAppMisc.c_str()),
+	    &sResponse))
 		er = ZARAFA_E_SERVER_NOT_RESPONDING;
 	else
 		er = sResponse.er;
@@ -323,7 +330,16 @@ HRESULT WSTransport::HrLogon(const sGlobalProfileProps &sProfileProps)
 	// then the password was also simply wrong.
 	if(er == ZARAFA_E_LOGON_FAILED && SymmetricIsCrypted(sProfileProps.strPassword) && !(sResponse.ulCapabilities & ZARAFA_CAP_CRYPT)) {
 		// Login with username and password
-		if (SOAP_OK != lpCmd->ns__logon((char *)strUserName.c_str(), (char *)SymmetricDecrypt(sProfileProps.strPassword).c_str(), (char*)strImpersonateUser.c_str(), PROJECT_VERSION_CLIENT_STR, ulCapabilities, ulLogonFlags, sLicenseRequest, m_ecSessionGroupId, (char *)GetAppName().c_str(), (char *)sProfileProps.strClientAppVersion.c_str(), (char *)sProfileProps.strClientAppMisc.c_str(), &sResponse))
+		if (SOAP_OK != lpCmd->ns__logon(const_cast<char *>(strUserName.c_str()),
+		    const_cast<char *>(SymmetricDecrypt(sProfileProps.strPassword).c_str()),
+		    const_cast<char *>(strImpersonateUser.c_str()),
+		    const_cast<char *>(PROJECT_VERSION_CLIENT_STR),
+		    ulCapabilities, ulLogonFlags, sLicenseRequest,
+		    m_ecSessionGroupId,
+		    const_cast<char *>(GetAppName().c_str()),
+		    const_cast<char *>(sProfileProps.strClientAppVersion.c_str()),
+		    const_cast<char *>(sProfileProps.strClientAppMisc.c_str()),
+		    &sResponse))
 			er = ZARAFA_E_SERVER_NOT_RESPONDING;
 		else
 			er = sResponse.er;
@@ -336,10 +352,10 @@ HRESULT WSTransport::HrLogon(const sGlobalProfileProps &sProfileProps)
 	// Connecting to a server with a lower major version is unsupported. Since the server only
 	// checks if a client isn't too old, we'll prohibit connecting to an old server here.
 	//
-	// During development of 7.1 it's quite anoying that a development client won't connect to
-	// a 7.0 server. On top of that there are currently (12-jul-2011) no protocol differences
+	// During development of 7.1, it is quite annoying that a development client won't connect to
+	// a 7.0 server. On top of that, there are currently (12-jul-2011) no protocol differences
 	// between the two version.
-	// So for now we'll just check the general version, not the major.
+	// So for now, we will just check the general version, not the major.
 	er = ParseZarafaVersion(sResponse.lpszVersion, &ulServerVersion);
 	if (er != erSuccess || ZARAFA_COMPARE_VERSION_TO_GENERAL(ulServerVersion, ZARAFA_CUR_GENERAL) < 0) {
 		hr = MAPI_E_VERSION;
@@ -1207,7 +1223,7 @@ HRESULT WSTransport::HrExportMessageChangesAsStream(ULONG ulFlags, ULONG ulPropT
 	HRESULT hr = hrSuccess;
 	sourceKeyPairArrayPtr ptrsSourceKeyPairs;
 	WSMessageStreamExporterPtr ptrStreamExporter;
-	propTagArray sPropTags = {0, NULL};
+	propTagArray sPropTags = {0, 0};
 	exportMessageChangesAsStreamResponse sResponse = {{0}};
 
 	if (lpChanges == NULL || lpsProps == NULL) {
@@ -1674,7 +1690,8 @@ exit:
 	return hr;
 }
 
-HRESULT WSTransport::HrFinishedMessage(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags)
+HRESULT WSTransport::HrFinishedMessage(ULONG cbEntryID,
+    const ENTRYID *lpEntryID, ULONG ulFlags)
 {
 	HRESULT hr = hrSuccess;
 	ECRESULT er = erSuccess;
@@ -4593,7 +4610,8 @@ HRESULT WSTransport::HrLicenseCapa(unsigned int ulServiceType, char ***lppszCapa
         goto exit;
 
     for(unsigned int i=0; i < sResponse.sCapabilities.__size; i++) {
-        MAPIAllocateMore(strlen(sResponse.sCapabilities.__ptr[i])+1, lpszCapas, (void **) &lpszCapas[i]);
+        if ((hr = MAPIAllocateMore(strlen(sResponse.sCapabilities.__ptr[i])+1, lpszCapas, (void **) &lpszCapas[i])) != hrSuccess)
+		goto exit;
         strcpy(lpszCapas[i], sResponse.sCapabilities.__ptr[i]);
     }
     
@@ -4656,7 +4674,7 @@ exit:
     return hr;
 }
 
-HRESULT WSTransport::HrTestSet(char *szName, char *szValue)
+HRESULT WSTransport::HrTestSet(const char *szName, const char *szValue)
 {
     HRESULT hr = hrSuccess;
     ECRESULT er = erSuccess;
@@ -4665,8 +4683,9 @@ HRESULT WSTransport::HrTestSet(char *szName, char *szValue)
     
     START_SOAP_CALL
     {
-        if(SOAP_OK != m_lpCmd->ns__testSet(m_ecSessionId, szName, szValue, &er))
-            er = ZARAFA_E_NETWORK_ERROR;
+        if (m_lpCmd->ns__testSet(m_ecSessionId, const_cast<char *>(szName),
+            const_cast<char *>(szValue), &er) != SOAP_OK)
+                er = ZARAFA_E_NETWORK_ERROR;
     }
     END_SOAP_CALL
     
@@ -4676,7 +4695,7 @@ exit:
     return hr;
 }
 
-HRESULT WSTransport::HrTestGet(char *szName, char **lpszValue)
+HRESULT WSTransport::HrTestGet(const char *szName, char **lpszValue)
 {
     HRESULT hr = hrSuccess;
 
@@ -4688,10 +4707,11 @@ HRESULT WSTransport::HrTestGet(char *szName, char **lpszValue)
     
     START_SOAP_CALL
     {
-        if(SOAP_OK != m_lpCmd->ns__testGet(m_ecSessionId, szName, &sResponse))
-            er = ZARAFA_E_NETWORK_ERROR;
+        if (m_lpCmd->ns__testGet(m_ecSessionId,
+            const_cast<char *>(szName), &sResponse) != SOAP_OK)
+                er = ZARAFA_E_NETWORK_ERROR;
         else
-            er = sResponse.er;
+                er = sResponse.er;
     }
     END_SOAP_CALL
     

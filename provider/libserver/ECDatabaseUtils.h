@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -84,7 +83,7 @@
 
 // Warning! Code references the ordering of these values! Do not change unless you know what you're doing!
 #define PROPCOLVALUEORDER(_tab) 			_PROPCOL_ULONG(_tab) "," _PROPCOL_STRING(_tab) "," _PROPCOL_BINARY(_tab) "," _PROPCOL_DOUBLE(_tab) "," _PROPCOL_LONGINT(_tab) "," _PROPCOL_HI(_tab) "," _PROPCOL_LO(_tab)
-#define PROPCOLVALUEORDER_TRUNCATED(_tab) 	_PROPCOL_ULONG(_tab) ", LEFT(" _PROPCOL_STRING(_tab) ","STR(TABLE_CAP_STRING)"),LEFT(" _PROPCOL_BINARY(_tab) ","STR(TABLE_CAP_BINARY)")," _PROPCOL_DOUBLE(_tab) "," _PROPCOL_LONGINT(_tab) "," _PROPCOL_HI(_tab) "," _PROPCOL_LO(_tab)
+#define PROPCOLVALUEORDER_TRUNCATED(_tab) 	_PROPCOL_ULONG(_tab) ", LEFT(" _PROPCOL_STRING(_tab) "," STR(TABLE_CAP_STRING) "),LEFT(" _PROPCOL_BINARY(_tab) "," STR(TABLE_CAP_BINARY) ")," _PROPCOL_DOUBLE(_tab) "," _PROPCOL_LONGINT(_tab) "," _PROPCOL_HI(_tab) "," _PROPCOL_LO(_tab)
 enum { VALUE_NR_ULONG=0, VALUE_NR_STRING, VALUE_NR_BINARY, VALUE_NR_DOUBLE, VALUE_NR_LONGINT, VALUE_NR_HILO, VALUE_NR_MAX };
 
 #define PROPCOLORDER "0,properties.tag,properties.type," PROPCOLVALUEORDER(properties)

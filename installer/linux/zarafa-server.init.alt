@@ -8,7 +8,7 @@
 #              authentication backends (unix/pam, db, ldap). It stores the data \
 #              in a MySQL instance, and optionally stores the attachments directly \
 #              on the filesystem.
-# processname: /usr/bin/zarafa-server
+# processname: /usr/sbin/zarafa-server
 # config: /etc/zarafa/server.cfg
 # pidfile: /var/run/zarafa-server.pid
 
@@ -30,7 +30,7 @@
 . /etc/rc.d/init.d/functions
 
 SERVERCONFIG=/etc/zarafa/server.cfg
-SERVERPROGRAM=/usr/bin/zarafa-server
+SERVERPROGRAM=/usr/sbin/zarafa-server
 server=`basename $SERVERPROGRAM`
 LOCKFILE=/var/lock/subsys/$server
 PIDFILE=/var/run/$server.pid

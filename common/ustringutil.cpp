@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -93,7 +92,7 @@ At some point we need to rewqrite these functions to do all the conversion on th
 #include "CommonUtil.h"
 #include "utf8.h"
 
-#include <assert.h>
+#include <cassert>
 
 #if HAVE_ICU
 #include <memory>
@@ -107,16 +106,21 @@ At some point we need to rewqrite these functions to do all the conversion on th
 #include "ustringutil/utfutil.h"
 
 typedef UTF32Iterator	WCharIterator;
+#if __cplusplus >= 201100L
+typedef std::unique_ptr<Collator> unique_ptr_Collator;
+#else
+typedef std::auto_ptr<Collator> unique_ptr_Collator;
+#endif
 
 #else
-#include <string.h>
+#include <cstring>
 #include "charset/convert.h"
 #endif
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 #if !HAVE_ICU
@@ -161,8 +165,8 @@ int ECSortKey::compareTo(const ECSortKey &other) const {
 const char* str_ifind(const char *haystack, const char *needle)
 {
 	locale_t loc = createlocale(LC_CTYPE, "C");
-	char *needlepos = (char*)needle;
-	char *needlestart = (char*)haystack;
+	const char *needlepos = needle;
+	const char *needlestart = haystack;
 
 	while(*haystack) {
 		if (toupper_l(*haystack, loc) == toupper_l(*needlepos, loc)) {
@@ -172,7 +176,7 @@ const char* str_ifind(const char *haystack, const char *needle)
 				goto exit;
 		} else {
 			haystack = needlestart++;
-			needlepos = (char*)needle;
+			needlepos = needle;
 		}
 
 		haystack++;
@@ -313,7 +317,7 @@ int str_compare(const char *s1, const char *s2, const ECLocale &locale)
 	
 #if HAVE_ICU
 	UErrorCode status = U_ZERO_ERROR;
-	std::auto_ptr<Collator> ptrCollator(Collator::createInstance(locale, status));
+	unique_ptr_Collator ptrCollator(Collator::createInstance(locale, status));
 
 	UnicodeString a = StringToUnicode(s1);
 	UnicodeString b = StringToUnicode(s2);
@@ -349,7 +353,7 @@ int str_icompare(const char *s1, const char *s2, const ECLocale &locale)
 	
 #if HAVE_ICU
 	UErrorCode status = U_ZERO_ERROR;
-	std::auto_ptr<Collator> ptrCollator(Collator::createInstance(locale, status));
+	unique_ptr_Collator ptrCollator(Collator::createInstance(locale, status));
 
 	UnicodeString a = StringToUnicode(s1);
 	UnicodeString b = StringToUnicode(s2);
@@ -554,7 +558,7 @@ int wcs_compare(const wchar_t *s1, const wchar_t *s2, const ECLocale &locale)
 	
 #if HAVE_ICU
 	UErrorCode status = U_ZERO_ERROR;
-	std::auto_ptr<Collator> ptrCollator(Collator::createInstance(locale, status));
+	unique_ptr_Collator ptrCollator(Collator::createInstance(locale, status));
 
 	UnicodeString a = UTF32ToUnicode((UChar32*)s1);
 	UnicodeString b = UTF32ToUnicode((UChar32*)s2);
@@ -590,7 +594,7 @@ int wcs_icompare(const wchar_t *s1, const wchar_t *s2, const ECLocale &locale)
 	
 #if HAVE_ICU
 	UErrorCode status = U_ZERO_ERROR;
-	std::auto_ptr<Collator> ptrCollator(Collator::createInstance(locale, status));
+	unique_ptr_Collator ptrCollator(Collator::createInstance(locale, status));
 
 	UnicodeString a = WCHARToUnicode(s1);
 	UnicodeString b = WCHARToUnicode(s2);
@@ -820,7 +824,7 @@ int u8_compare(const char *s1, const char *s2, const ECLocale &locale)
 
 #if HAVE_ICU
 	UErrorCode status = U_ZERO_ERROR;
-	std::auto_ptr<Collator> ptrCollator(Collator::createInstance(locale, status));
+	unique_ptr_Collator ptrCollator(Collator::createInstance(locale, status));
 
 	UnicodeString a = UTF8ToUnicode(s1);
 	UnicodeString b = UTF8ToUnicode(s2);
@@ -858,7 +862,7 @@ int u8_icompare(const char *s1, const char *s2, const ECLocale &locale)
 	
 #if HAVE_ICU
 	UErrorCode status = U_ZERO_ERROR;
-	std::auto_ptr<Collator> ptrCollator(Collator::createInstance(locale, status));
+	unique_ptr_Collator ptrCollator(Collator::createInstance(locale, status));
 
 	UnicodeString a = UTF8ToUnicode(s1);
 	UnicodeString b = UTF8ToUnicode(s2);
@@ -1015,7 +1019,7 @@ unsigned u8_len(const char *s)
 
 }
 
-static struct localemap {
+static const struct localemap {
 	const char *lpszLocaleID;	/*< Posix locale id */
 	ULONG ulLCID;				/*< Windows LCID */
 	const char *lpszLocaleName;	/*< Windows locale name */
@@ -1271,7 +1275,7 @@ ECLocale createLocaleFromName(const char *lpszLocale)
 ECRESULT LocaleIdToLCID(const char *lpszLocaleID, ULONG *lpulLcid)
 {
 	ECRESULT er = erSuccess;
-	struct localemap *lpMapEntry = NULL;
+	const struct localemap *lpMapEntry = NULL;
 
 	ASSERT(lpszLocaleID != NULL);
 	ASSERT(lpulLcid != NULL);
@@ -1294,7 +1298,7 @@ exit:
 ECRESULT LCIDToLocaleId(ULONG ulLcid, const char **lppszLocaleID)
 {
 	ECRESULT er = erSuccess;
-	struct localemap *lpMapEntry = NULL;
+	const struct localemap *lpMapEntry = NULL;
 
 	ASSERT(lppszLocaleID != NULL);
 
@@ -1316,7 +1320,7 @@ exit:
 ECRESULT LocaleIdToLocaleName(const char *lpszLocaleID, const char **lppszLocaleName)
 {
 	ECRESULT er = erSuccess;
-	struct localemap *lpMapEntry = NULL;
+	const struct localemap *lpMapEntry = NULL;
 
 	ASSERT(lpszLocaleID != NULL);
 	ASSERT(lppszLocaleName != NULL);
@@ -1348,7 +1352,8 @@ exit:
  *
  * @returns		ECSortKey object containing the blob
  */
-ECSortKey createSortKey(UnicodeString s, int nCap, const ECLocale &locale)
+static ECSortKey createSortKey(UnicodeString s, int nCap,
+    const ECLocale &locale)
 {
 	if (nCap > 1)
 		s.truncate(nCap);
@@ -1359,7 +1364,7 @@ ECSortKey createSortKey(UnicodeString s, int nCap, const ECLocale &locale)
 
 	CollationKey key;
 	UErrorCode status = U_ZERO_ERROR;
-	std::auto_ptr<Collator> ptrCollator(Collator::createInstance(locale, status));
+	unique_ptr_Collator ptrCollator(Collator::createInstance(locale, status));
 	ptrCollator->getCollationKey(s, key, status);	// Create a collation key for sorting
 
 	return key;

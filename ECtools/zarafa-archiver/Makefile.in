@@ -15,6 +15,11 @@
 
 @SET_MAKE@
 
+# -*- Makefile -*-
+
+# -*- Makefile -*-
+
+
 
 VPATH = @srcdir@
 am__make_dryrun = \
@@ -52,9 +57,10 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-bin_PROGRAMS = zarafa-archiver$(EXEEXT)
+sbin_PROGRAMS = zarafa-archiver$(EXEEXT)
+DIST_COMMON = $(srcdir)/../../global.am $(srcdir)/Makefile.am \
+	$(srcdir)/Makefile.in
 subdir = ECtools/zarafa-archiver
-DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/autoconf/boost.m4 \
 	$(top_srcdir)/autoconf/icu.m4 $(top_srcdir)/autoconf/php.m4 \
@@ -92,41 +98,55 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)"
+am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(sbindir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
-libarchiver_core_la_DEPENDENCIES =  \
+libzarafa_archiver_core_la_DEPENDENCIES =  \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_service.la libarchiver.la \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
-am_libarchiver_core_la_OBJECTS = Archiver.lo ArchiverImpl.lo \
-	instanceidmapper.lo operations.lo copier.lo deleter.lo \
-	stubber.lo transaction.lo postsaveiidupdater.lo \
-	ArchiveControlImpl.lo ECDatabase.lo
-libarchiver_core_la_OBJECTS = $(am_libarchiver_core_la_OBJECTS)
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_service.la \
+	libzarafa-archiver.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+am__dirstamp = $(am__leading_dot)dirstamp
+am_libzarafa_archiver_core_la_OBJECTS = Archiver.lo ArchiverImpl.lo \
+	operations/instanceidmapper.lo operations/operations.lo \
+	operations/copier.lo operations/deleter.lo \
+	operations/stubber.lo operations/transaction.lo \
+	operations/postsaveiidupdater.lo ArchiveControlImpl.lo \
+	ECDatabase.lo
+libzarafa_archiver_core_la_OBJECTS =  \
+	$(am_libzarafa_archiver_core_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
-libarchiver_la_DEPENDENCIES =  \
+libzarafa_archiver_core_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CXXLD) \
+	$(AM_CXXFLAGS) $(CXXFLAGS) \
+	$(libzarafa_archiver_core_la_LDFLAGS) $(LDFLAGS) -o $@
+libzarafa_archiver_la_DEPENDENCIES =  \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la
-am_libarchiver_la_OBJECTS = ArchiverSession.lo archiver-common.lo \
-	ArchiveManageImpl.lo ArchiveStateCollector.lo \
-	ArchiveStateUpdater.lo ArchiveHelper.lo StoreHelper.lo \
-	MAPIPropHelper.lo ECArchiverLogger.lo
-libarchiver_la_OBJECTS = $(am_libarchiver_la_OBJECTS)
-PROGRAMS = $(bin_PROGRAMS)
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_util.la
+am_libzarafa_archiver_la_OBJECTS = ArchiverSession.lo \
+	archiver-common.lo ArchiveManageImpl.lo \
+	ArchiveStateCollector.lo ArchiveStateUpdater.lo \
+	helpers/ArchiveHelper.lo helpers/StoreHelper.lo \
+	helpers/MAPIPropHelper.lo ECArchiverLogger.lo
+libzarafa_archiver_la_OBJECTS = $(am_libzarafa_archiver_la_OBJECTS)
+libzarafa_archiver_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CXXLD) \
+	$(AM_CXXFLAGS) $(CXXFLAGS) $(libzarafa_archiver_la_LDFLAGS) \
+	$(LDFLAGS) -o $@
+PROGRAMS = $(sbin_PROGRAMS)
 am_zarafa_archiver_OBJECTS = main.$(OBJEXT)
 zarafa_archiver_OBJECTS = $(am_zarafa_archiver_OBJECTS)
 zarafa_archiver_DEPENDENCIES =  \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la libarchiver.la \
-	libarchiver-core.la $(am__DEPENDENCIES_1) \
-	${top_builddir}/common/libcommon_service.la
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_util.la \
+	libzarafa-archiver.la libzarafa-archiver-core.la \
+	$(am__DEPENDENCIES_1) \
+	${top_builddir}/common/libzcp_common_service.la
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)/common
 depcomp = $(SHELL) $(top_srcdir)/autoconf/depcomp
 am__depfiles_maybe = depfiles
@@ -169,15 +189,16 @@ am__v_CCLD_0 = @echo "  CCLD  " $@;
 AM_V_GEN = $(am__v_GEN_@AM_V@)
 am__v_GEN_ = $(am__v_GEN_@AM_DEFAULT_V@)
 am__v_GEN_0 = @echo "  GEN   " $@;
-SOURCES = $(libarchiver_core_la_SOURCES) $(libarchiver_la_SOURCES) \
-	$(zarafa_archiver_SOURCES)
-DIST_SOURCES = $(libarchiver_core_la_SOURCES) \
-	$(libarchiver_la_SOURCES) $(zarafa_archiver_SOURCES)
+SOURCES = $(libzarafa_archiver_core_la_SOURCES) \
+	$(libzarafa_archiver_la_SOURCES) $(zarafa_archiver_SOURCES)
+DIST_SOURCES = $(libzarafa_archiver_core_la_SOURCES) \
+	$(libzarafa_archiver_la_SOURCES) $(zarafa_archiver_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
+DATA = $(noinst_DATA)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -193,11 +214,15 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 BOOST_CPPFLAGS = @BOOST_CPPFLAGS@
 BOOST_DATE_TIME_LDFLAGS = @BOOST_DATE_TIME_LDFLAGS@
+BOOST_DATE_TIME_LDPATH = @BOOST_DATE_TIME_LDPATH@
 BOOST_DATE_TIME_LIBS = @BOOST_DATE_TIME_LIBS@
 BOOST_FILESYSTEM_LDFLAGS = @BOOST_FILESYSTEM_LDFLAGS@
+BOOST_FILESYSTEM_LDPATH = @BOOST_FILESYSTEM_LDPATH@
 BOOST_FILESYSTEM_LIBS = @BOOST_FILESYSTEM_LIBS@
+BOOST_LDPATH = @BOOST_LDPATH@
 BOOST_ROOT = @BOOST_ROOT@
 BOOST_SYSTEM_LDFLAGS = @BOOST_SYSTEM_LDFLAGS@
+BOOST_SYSTEM_LDPATH = @BOOST_SYSTEM_LDPATH@
 BOOST_SYSTEM_LIBS = @BOOST_SYSTEM_LIBS@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
@@ -293,6 +318,9 @@ PHP_INCLUDES = @PHP_INCLUDES@
 PHP_LDFLAGS = @PHP_LDFLAGS@
 PHP_SYSCONF_DIR = @PHP_SYSCONF_DIR@
 PHP_VERSION = @PHP_VERSION@
+PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 POW_LIB = @POW_LIB@
 PROG_ANT = @PROG_ANT@
 PROG_LIBS = @PROG_LIBS@
@@ -326,6 +354,7 @@ YACC_EXISTS = @YACC_EXISTS@
 YFLAGS = @YFLAGS@
 ZARAFA_VERSION = @ZARAFA_VERSION@
 ZCPPFLAGS = @ZCPPFLAGS@
+ZPHPCXXFLAGS = @ZPHPCXXFLAGS@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -380,7 +409,6 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-lib_LTLIBRARIES = libarchiver.la libarchiver-core.la
 AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
 	-DARCHIVER_EXTRA \
 	-I${top_srcdir}/mapi4linux/include \
@@ -389,14 +417,18 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
 	-I${top_srcdir}/provider/soap \
 	-I${top_builddir}/provider/soap \
     $(GSOAP_CFLAGS) \
-	-I${top_srcdir}/common \
+	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
 	$(MYSQL_INCLUDES)
 
-libarchiver_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la
+lib_LTLIBRARIES = libzarafa-archiver.la libzarafa-archiver-core.la
+noinst_DATA = libzarafa-archiver.ldd libzarafa-archiver-core.ldd \
+	zarafa-archiver.ldx
 
-libarchiver_la_SOURCES = \
+libzarafa_archiver_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_util.la
+
+libzarafa_archiver_la_SOURCES = \
 	ArchiverSession.cpp ArchiverSession.h ArchiverSessionPtr.h \
 	archiver-common.cpp archiver-common.h ArchiveControl.h \
 	ArchiveManageImpl.cpp ArchiveManageImpl.h ArchiveManage.h\
@@ -407,13 +439,17 @@ libarchiver_la_SOURCES = \
 	helpers/MAPIPropHelper.cpp helpers/MAPIPropHelper.h \
 	ECArchiverLogger.cpp ECArchiverLogger.h
 
-libarchiver_core_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_service.la \
-	libarchiver.la \
+libzarafa_archiver_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
+	-Wl,--version-script=${top_builddir}/default.sym
+
+EXTRA_libzarafa_archiver_la_DEPENDENCIES = ${top_builddir}/default.sym
+libzarafa_archiver_core_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_service.la \
+	libzarafa-archiver.la \
 	$(PROG_LIBS) $(SSL_LIBS) $(MYSQL_LIBS)
 
-libarchiver_core_la_SOURCES = \
+libzarafa_archiver_core_la_SOURCES = \
 	Archiver.cpp Archiver.h AutoMAPI.h\
 	ArchiverImpl.cpp ArchiverImpl.h\
 	operations/instanceidmapper.cpp operations/instanceidmapper.h operations/instanceidmapper_fwd.h \
@@ -427,18 +463,22 @@ libarchiver_core_la_SOURCES = \
 	ArchiveControlImpl.cpp ArchiveControlImpl.h \
 	ECDatabase.h ECDatabase.cpp
 
+libzarafa_archiver_core_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
+	-Wl,--version-script=${top_builddir}/default.sym
+
+EXTRA_libzarafa_archiver_core_la_DEPENDENCIES = ${top_builddir}/default.sym
 zarafa_archiver_LDADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la \
-	libarchiver.la libarchiver-core.la \
-	$(PROG_LIBS) ${top_builddir}/common/libcommon_service.la
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_util.la \
+	libzarafa-archiver.la libzarafa-archiver-core.la \
+	$(PROG_LIBS) ${top_builddir}/common/libzcp_common_service.la
 
 zarafa_archiver_SOURCES = main.cpp
 all: all-am
 
 .SUFFIXES:
-.SUFFIXES: .cpp .lo .o .obj
-$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
+.SUFFIXES: .cpp .la .ldd .lo .o .obj
+$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am $(srcdir)/../../global.am $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -459,6 +499,7 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe)'; \
 	    cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe);; \
 	esac;
+$(srcdir)/../../global.am:
 
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
@@ -500,16 +541,48 @@ clean-libLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
-libarchiver-core.la: $(libarchiver_core_la_OBJECTS) $(libarchiver_core_la_DEPENDENCIES) $(EXTRA_libarchiver_core_la_DEPENDENCIES) 
-	$(AM_V_CXXLD)$(CXXLINK) -rpath $(libdir) $(libarchiver_core_la_OBJECTS) $(libarchiver_core_la_LIBADD) $(LIBS)
-libarchiver.la: $(libarchiver_la_OBJECTS) $(libarchiver_la_DEPENDENCIES) $(EXTRA_libarchiver_la_DEPENDENCIES) 
-	$(AM_V_CXXLD)$(CXXLINK) -rpath $(libdir) $(libarchiver_la_OBJECTS) $(libarchiver_la_LIBADD) $(LIBS)
-install-binPROGRAMS: $(bin_PROGRAMS)
+operations/$(am__dirstamp):
+	@$(MKDIR_P) operations
+	@: > operations/$(am__dirstamp)
+operations/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) operations/$(DEPDIR)
+	@: > operations/$(DEPDIR)/$(am__dirstamp)
+operations/instanceidmapper.lo: operations/$(am__dirstamp) \
+	operations/$(DEPDIR)/$(am__dirstamp)
+operations/operations.lo: operations/$(am__dirstamp) \
+	operations/$(DEPDIR)/$(am__dirstamp)
+operations/copier.lo: operations/$(am__dirstamp) \
+	operations/$(DEPDIR)/$(am__dirstamp)
+operations/deleter.lo: operations/$(am__dirstamp) \
+	operations/$(DEPDIR)/$(am__dirstamp)
+operations/stubber.lo: operations/$(am__dirstamp) \
+	operations/$(DEPDIR)/$(am__dirstamp)
+operations/transaction.lo: operations/$(am__dirstamp) \
+	operations/$(DEPDIR)/$(am__dirstamp)
+operations/postsaveiidupdater.lo: operations/$(am__dirstamp) \
+	operations/$(DEPDIR)/$(am__dirstamp)
+libzarafa-archiver-core.la: $(libzarafa_archiver_core_la_OBJECTS) $(libzarafa_archiver_core_la_DEPENDENCIES) $(EXTRA_libzarafa_archiver_core_la_DEPENDENCIES) 
+	$(AM_V_CXXLD)$(libzarafa_archiver_core_la_LINK) -rpath $(libdir) $(libzarafa_archiver_core_la_OBJECTS) $(libzarafa_archiver_core_la_LIBADD) $(LIBS)
+helpers/$(am__dirstamp):
+	@$(MKDIR_P) helpers
+	@: > helpers/$(am__dirstamp)
+helpers/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) helpers/$(DEPDIR)
+	@: > helpers/$(DEPDIR)/$(am__dirstamp)
+helpers/ArchiveHelper.lo: helpers/$(am__dirstamp) \
+	helpers/$(DEPDIR)/$(am__dirstamp)
+helpers/StoreHelper.lo: helpers/$(am__dirstamp) \
+	helpers/$(DEPDIR)/$(am__dirstamp)
+helpers/MAPIPropHelper.lo: helpers/$(am__dirstamp) \
+	helpers/$(DEPDIR)/$(am__dirstamp)
+libzarafa-archiver.la: $(libzarafa_archiver_la_OBJECTS) $(libzarafa_archiver_la_DEPENDENCIES) $(EXTRA_libzarafa_archiver_la_DEPENDENCIES) 
+	$(AM_V_CXXLD)$(libzarafa_archiver_la_LINK) -rpath $(libdir) $(libzarafa_archiver_la_OBJECTS) $(libzarafa_archiver_la_LIBADD) $(LIBS)
+install-sbinPROGRAMS: $(sbin_PROGRAMS)
 	@$(NORMAL_INSTALL)
-	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
+	@list='$(sbin_PROGRAMS)'; test -n "$(sbindir)" || list=; \
 	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(bindir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(bindir)" || exit 1; \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(sbindir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(sbindir)" || exit 1; \
 	fi; \
 	for p in $$list; do echo "$$p $$p"; done | \
 	sed 's/$(EXEEXT)$$//' | \
@@ -527,23 +600,23 @@ install-binPROGRAMS: $(bin_PROGRAMS)
 	while read type dir files; do \
 	    if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
 	    test -z "$$files" || { \
-	    echo " $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files '$(DESTDIR)$(bindir)$$dir'"; \
-	    $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files "$(DESTDIR)$(bindir)$$dir" || exit $$?; \
+	    echo " $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files '$(DESTDIR)$(sbindir)$$dir'"; \
+	    $(INSTALL_PROGRAM_ENV) $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL_PROGRAM) $$files "$(DESTDIR)$(sbindir)$$dir" || exit $$?; \
 	    } \
 	; done
 
-uninstall-binPROGRAMS:
+uninstall-sbinPROGRAMS:
 	@$(NORMAL_UNINSTALL)
-	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
+	@list='$(sbin_PROGRAMS)'; test -n "$(sbindir)" || list=; \
 	files=`for p in $$list; do echo "$$p"; done | \
 	  sed -e 'h;s,^.*/,,;s/$(EXEEXT)$$//;$(transform)' \
 	      -e 's/$$/$(EXEEXT)/' `; \
 	test -n "$$list" || exit 0; \
-	echo " ( cd '$(DESTDIR)$(bindir)' && rm -f" $$files ")"; \
-	cd "$(DESTDIR)$(bindir)" && rm -f $$files
+	echo " ( cd '$(DESTDIR)$(sbindir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(sbindir)" && rm -f $$files
 
-clean-binPROGRAMS:
-	@list='$(bin_PROGRAMS)'; test -n "$$list" || exit 0; \
+clean-sbinPROGRAMS:
+	@list='$(sbin_PROGRAMS)'; test -n "$$list" || exit 0; \
 	echo " rm -f" $$list; \
 	rm -f $$list || exit $$?; \
 	test -n "$(EXEEXT)" || exit 0; \
@@ -556,12 +629,31 @@ zarafa-archiver$(EXEEXT): $(zarafa_archiver_OBJECTS) $(zarafa_archiver_DEPENDENC
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
+	-rm -f helpers/ArchiveHelper.$(OBJEXT)
+	-rm -f helpers/ArchiveHelper.lo
+	-rm -f helpers/MAPIPropHelper.$(OBJEXT)
+	-rm -f helpers/MAPIPropHelper.lo
+	-rm -f helpers/StoreHelper.$(OBJEXT)
+	-rm -f helpers/StoreHelper.lo
+	-rm -f operations/copier.$(OBJEXT)
+	-rm -f operations/copier.lo
+	-rm -f operations/deleter.$(OBJEXT)
+	-rm -f operations/deleter.lo
+	-rm -f operations/instanceidmapper.$(OBJEXT)
+	-rm -f operations/instanceidmapper.lo
+	-rm -f operations/operations.$(OBJEXT)
+	-rm -f operations/operations.lo
+	-rm -f operations/postsaveiidupdater.$(OBJEXT)
+	-rm -f operations/postsaveiidupdater.lo
+	-rm -f operations/stubber.$(OBJEXT)
+	-rm -f operations/stubber.lo
+	-rm -f operations/transaction.$(OBJEXT)
+	-rm -f operations/transaction.lo
 
 distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ArchiveControlImpl.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ArchiveHelper.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ArchiveManageImpl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ArchiveStateCollector.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ArchiveStateUpdater.Plo@am__quote@
@@ -570,114 +662,50 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ArchiverSession.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ECArchiverLogger.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ECDatabase.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/MAPIPropHelper.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/StoreHelper.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/archiver-common.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/copier.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/deleter.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/instanceidmapper.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/operations.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/postsaveiidupdater.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stubber.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/transaction.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@helpers/$(DEPDIR)/ArchiveHelper.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@helpers/$(DEPDIR)/MAPIPropHelper.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@helpers/$(DEPDIR)/StoreHelper.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@operations/$(DEPDIR)/copier.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@operations/$(DEPDIR)/deleter.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@operations/$(DEPDIR)/instanceidmapper.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@operations/$(DEPDIR)/operations.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@operations/$(DEPDIR)/postsaveiidupdater.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@operations/$(DEPDIR)/stubber.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@operations/$(DEPDIR)/transaction.Plo@am__quote@
 
 .cpp.o:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
+@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ $<
 
 .cpp.obj:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
+@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .cpp.lo:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
+@am__fastdepCXX_TRUE@	$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LTCXXCOMPILE) -c -o $@ $<
-
-instanceidmapper.lo: operations/instanceidmapper.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT instanceidmapper.lo -MD -MP -MF $(DEPDIR)/instanceidmapper.Tpo -c -o instanceidmapper.lo `test -f 'operations/instanceidmapper.cpp' || echo '$(srcdir)/'`operations/instanceidmapper.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/instanceidmapper.Tpo $(DEPDIR)/instanceidmapper.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='operations/instanceidmapper.cpp' object='instanceidmapper.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o instanceidmapper.lo `test -f 'operations/instanceidmapper.cpp' || echo '$(srcdir)/'`operations/instanceidmapper.cpp
-
-operations.lo: operations/operations.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT operations.lo -MD -MP -MF $(DEPDIR)/operations.Tpo -c -o operations.lo `test -f 'operations/operations.cpp' || echo '$(srcdir)/'`operations/operations.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/operations.Tpo $(DEPDIR)/operations.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='operations/operations.cpp' object='operations.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o operations.lo `test -f 'operations/operations.cpp' || echo '$(srcdir)/'`operations/operations.cpp
-
-copier.lo: operations/copier.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT copier.lo -MD -MP -MF $(DEPDIR)/copier.Tpo -c -o copier.lo `test -f 'operations/copier.cpp' || echo '$(srcdir)/'`operations/copier.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/copier.Tpo $(DEPDIR)/copier.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='operations/copier.cpp' object='copier.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o copier.lo `test -f 'operations/copier.cpp' || echo '$(srcdir)/'`operations/copier.cpp
-
-deleter.lo: operations/deleter.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT deleter.lo -MD -MP -MF $(DEPDIR)/deleter.Tpo -c -o deleter.lo `test -f 'operations/deleter.cpp' || echo '$(srcdir)/'`operations/deleter.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/deleter.Tpo $(DEPDIR)/deleter.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='operations/deleter.cpp' object='deleter.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o deleter.lo `test -f 'operations/deleter.cpp' || echo '$(srcdir)/'`operations/deleter.cpp
-
-stubber.lo: operations/stubber.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT stubber.lo -MD -MP -MF $(DEPDIR)/stubber.Tpo -c -o stubber.lo `test -f 'operations/stubber.cpp' || echo '$(srcdir)/'`operations/stubber.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/stubber.Tpo $(DEPDIR)/stubber.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='operations/stubber.cpp' object='stubber.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o stubber.lo `test -f 'operations/stubber.cpp' || echo '$(srcdir)/'`operations/stubber.cpp
-
-transaction.lo: operations/transaction.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT transaction.lo -MD -MP -MF $(DEPDIR)/transaction.Tpo -c -o transaction.lo `test -f 'operations/transaction.cpp' || echo '$(srcdir)/'`operations/transaction.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/transaction.Tpo $(DEPDIR)/transaction.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='operations/transaction.cpp' object='transaction.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o transaction.lo `test -f 'operations/transaction.cpp' || echo '$(srcdir)/'`operations/transaction.cpp
-
-postsaveiidupdater.lo: operations/postsaveiidupdater.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT postsaveiidupdater.lo -MD -MP -MF $(DEPDIR)/postsaveiidupdater.Tpo -c -o postsaveiidupdater.lo `test -f 'operations/postsaveiidupdater.cpp' || echo '$(srcdir)/'`operations/postsaveiidupdater.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/postsaveiidupdater.Tpo $(DEPDIR)/postsaveiidupdater.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='operations/postsaveiidupdater.cpp' object='postsaveiidupdater.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o postsaveiidupdater.lo `test -f 'operations/postsaveiidupdater.cpp' || echo '$(srcdir)/'`operations/postsaveiidupdater.cpp
-
-ArchiveHelper.lo: helpers/ArchiveHelper.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT ArchiveHelper.lo -MD -MP -MF $(DEPDIR)/ArchiveHelper.Tpo -c -o ArchiveHelper.lo `test -f 'helpers/ArchiveHelper.cpp' || echo '$(srcdir)/'`helpers/ArchiveHelper.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/ArchiveHelper.Tpo $(DEPDIR)/ArchiveHelper.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='helpers/ArchiveHelper.cpp' object='ArchiveHelper.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o ArchiveHelper.lo `test -f 'helpers/ArchiveHelper.cpp' || echo '$(srcdir)/'`helpers/ArchiveHelper.cpp
-
-StoreHelper.lo: helpers/StoreHelper.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT StoreHelper.lo -MD -MP -MF $(DEPDIR)/StoreHelper.Tpo -c -o StoreHelper.lo `test -f 'helpers/StoreHelper.cpp' || echo '$(srcdir)/'`helpers/StoreHelper.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/StoreHelper.Tpo $(DEPDIR)/StoreHelper.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='helpers/StoreHelper.cpp' object='StoreHelper.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o StoreHelper.lo `test -f 'helpers/StoreHelper.cpp' || echo '$(srcdir)/'`helpers/StoreHelper.cpp
-
-MAPIPropHelper.lo: helpers/MAPIPropHelper.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT MAPIPropHelper.lo -MD -MP -MF $(DEPDIR)/MAPIPropHelper.Tpo -c -o MAPIPropHelper.lo `test -f 'helpers/MAPIPropHelper.cpp' || echo '$(srcdir)/'`helpers/MAPIPropHelper.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/MAPIPropHelper.Tpo $(DEPDIR)/MAPIPropHelper.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='helpers/MAPIPropHelper.cpp' object='MAPIPropHelper.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o MAPIPropHelper.lo `test -f 'helpers/MAPIPropHelper.cpp' || echo '$(srcdir)/'`helpers/MAPIPropHelper.cpp
 
 mostlyclean-libtool:
 	-rm -f *.lo
 
 clean-libtool:
 	-rm -rf .libs _libs
+	-rm -rf helpers/.libs helpers/_libs
+	-rm -rf operations/.libs operations/_libs
 
 ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
 	list='$(SOURCES) $(HEADERS) $(LISP) $(TAGS_FILES)'; \
@@ -763,11 +791,9 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(LTLIBRARIES) $(PROGRAMS)
-install-binPROGRAMS: install-libLTLIBRARIES
-
+all-am: Makefile $(LTLIBRARIES) $(PROGRAMS) $(DATA)
 installdirs:
-	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)"; do \
+	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(sbindir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -796,17 +822,21 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
+	-rm -f helpers/$(DEPDIR)/$(am__dirstamp)
+	-rm -f helpers/$(am__dirstamp)
+	-rm -f operations/$(DEPDIR)/$(am__dirstamp)
+	-rm -f operations/$(am__dirstamp)
 
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-binPROGRAMS clean-generic clean-libLTLIBRARIES \
-	clean-libtool mostlyclean-am
+clean-am: clean-generic clean-libLTLIBRARIES clean-libtool \
+	clean-sbinPROGRAMS mostlyclean-am
 
 distclean: distclean-am
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ./$(DEPDIR) helpers/$(DEPDIR) operations/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -829,8 +859,9 @@ install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am: install-binPROGRAMS install-libLTLIBRARIES
-
+install-exec-am: install-libLTLIBRARIES install-sbinPROGRAMS
+	@$(NORMAL_INSTALL)
+	$(MAKE) $(AM_MAKEFLAGS) install-exec-hook
 install-html: install-html-am
 
 install-html-am:
@@ -852,7 +883,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ./$(DEPDIR) helpers/$(DEPDIR) operations/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -869,29 +900,42 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-binPROGRAMS uninstall-libLTLIBRARIES
+uninstall-am: uninstall-libLTLIBRARIES uninstall-sbinPROGRAMS
 
-.MAKE: install-am install-strip
+.MAKE: install-am install-exec-am install-strip
 
-.PHONY: CTAGS GTAGS all all-am check check-am clean clean-binPROGRAMS \
-	clean-generic clean-libLTLIBRARIES clean-libtool ctags \
+.PHONY: CTAGS GTAGS all all-am check check-am clean clean-generic \
+	clean-libLTLIBRARIES clean-libtool clean-sbinPROGRAMS ctags \
 	distclean distclean-compile distclean-generic \
 	distclean-libtool distclean-tags distdir dvi dvi-am html \
-	html-am info info-am install install-am install-binPROGRAMS \
-	install-data install-data-am install-dvi install-dvi-am \
-	install-exec install-exec-am install-html install-html-am \
+	html-am info info-am install install-am install-data \
+	install-data-am install-dvi install-dvi-am install-exec \
+	install-exec-am install-exec-hook install-html install-html-am \
 	install-info install-info-am install-libLTLIBRARIES \
 	install-man install-pdf install-pdf-am install-ps \
-	install-ps-am install-strip installcheck installcheck-am \
-	installdirs maintainer-clean maintainer-clean-generic \
-	mostlyclean mostlyclean-compile mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am tags uninstall \
-	uninstall-am uninstall-binPROGRAMS uninstall-libLTLIBRARIES
+	install-ps-am install-sbinPROGRAMS install-strip installcheck \
+	installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags uninstall uninstall-am uninstall-libLTLIBRARIES \
+	uninstall-sbinPROGRAMS
 
 
 check-syntax:
 	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
 		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2
+
+install-exec-hook:
+	${MKDIR_P} ${DESTDIR}${pkglibdir}
+	ln -fs ${libdir}/libzarafa-archiver.so ${DESTDIR}${pkglibdir}/libarchiver.so
+	ln -fs ${libdir}/libzarafa-archiver-core.so ${DESTDIR}${pkglibdir}/libarchiver-core.so
+
+.la.ldd:
+	${AM_V_GEN}${top_srcdir}/lddcheck $< $@
+
+# There is no good POSIX syntax for the following one.. resort to GNUmake
+%.ldx: %
+	${AM_V_GEN}${top_srcdir}/lddcheck $< $@
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

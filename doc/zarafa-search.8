@@ -1,0 +1,100 @@
+'\" t
+.\"     Title: zarafa-search
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
+.\"      Date: April 2014
+.\"    Manual: Zarafa user reference
+.\"    Source: Zarafa 7.2
+.\"  Language: English
+.\"
+.TH "ZARAFA\-SEARCH" "8" "April 2014" "Zarafa 7.2" "Zarafa user reference"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+zarafa-search \- Zarafa Indexed Search Service\&.
+.SH "SYNOPSIS"
+.HP \w'\fBzarafa\-search\fR\ 'u
+\fBzarafa\-search\fR
+.SH "DESCRIPTION"
+.PP
+The zarafa\-search daemon is used to index all messages for all users in the zarafa\-server\&. Indexing messages greatly enhances the search performance of the zarafa\-server\&.
+.PP
+After starting, the search daemon will continuously update the store index files and will keep listening for connections on the configured TCP port and/or Unix socket for search requests from the
+\fBzarafa-server\fR(8)\&.
+.SH "OPTIONS"
+.PP
+The Zarafa search program takes the following configuration options:
+.PP
+\fB\-\-config\fR, \fB\-c\fR \fIfile\fR
+.RS 4
+Specify the location of the configuration file\&.
+.sp
+Default:
+\fI/etc/zarafa/search\&.cfg\fR
+.RE
+.PP
+\fB\-\-foreground\fR, \fB\-F\fR
+.RS 4
+Run in the foreground\&. Normally the zarafa\-search process will daemonize and run in the background\&.
+.RE
+.PP
+\fB\-\-server\-socket\fR, \fB\-s\fR \fIpath\fR
+.RS 4
+Connect to the Zarafa server through
+\fIpath\fR, e\&.g\&.
+file:///path/to/socket\&. Default:
+file:///var/run/zarafa\&.
+.RE
+.PP
+\fB\-\-reindex\fR \fIusername\fR
+.RS 4
+Remove the current index of the given user and start to make a new index immediately\&.
+.sp
+The zarafa\-search daemon must already be running on the same machine\&.
+.RE
+.PP
+When invoked with no options, the zarafa\-search daemon will search for a configuration file in
+/etc/zarafa/search\&.cfg\&. If no configuration file is found, default values are used\&. See
+\fBzarafa-search.cfg\fR(5)
+for all configuration options and their default values\&.
+.SH "USAGE"
+.PP
+Starting the zarafa\-search daemon with an alternative configuration:
+.PP
+
+\fBzarafa\-search\fR\ \&
+\fB\-c\fR\ \&
+\fI/path/to/search\&.cfg\fR
+.PP
+You may also use the init\&.d scripts:
+.PP
+\fB/etc/init\&.d/zarafa\-search\fR
+[\fIstart\fR|
+\fIstop\fR|
+\fIrestart\fR|
+\fIreload\fR]
+.SH "AUTHOR"
+.PP
+Written by Zarafa\&.
+.SH "SEE ALSO"
+.PP
+
+\fBzarafa-server\fR(8),
+\fBzarafa-search.cfg\fR(5)

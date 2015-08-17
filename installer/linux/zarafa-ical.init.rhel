@@ -5,7 +5,7 @@
 # chkconfig: 345 86 24
 # description: The Zarafa iCal Gateway allows users \
 #              to access their calender using the iCal or CalDAV protocol.
-# processname: /usr/bin/zarafa-ical
+# processname: /usr/sbin/zarafa-ical
 # config: /etc/zarafa/ical.cfg
 # pidfile: /var/run/zarafa-ical.pid
 
@@ -21,7 +21,7 @@
 ### END INIT INFO
 
 ICALCONFIG=/etc/zarafa/ical.cfg
-ICALPROGRAM=/usr/bin/zarafa-ical
+ICALPROGRAM=/usr/sbin/zarafa-ical
 
 # Sanity checks.
 [ -x $ICALPROGRAM ] || exit 0

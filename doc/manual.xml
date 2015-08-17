@@ -3,12 +3,12 @@
 "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
 <book>
   <bookinfo>
-    <date>August 2011</date>
+    <date>April 2014</date>
 
-    <releaseinfo>Version 7.1</releaseinfo>
+    <releaseinfo>Version 7.2</releaseinfo>
 
 	<productname>Zarafa</productname>
-	<productnumber>7.1</productnumber>
+	<productnumber>7.2</productnumber>
 
 	<title>Zarafa manual pages</title>
   </bookinfo>
@@ -24,7 +24,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>7</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -90,7 +90,7 @@
 			<listitem>
 			  <para>The gateway server process enables POP3 and/or
 			  IMAP connectivity to the Zarafa server. Users with other
-			  non-Outlook or webaccess clients can still retreive
+			  non-Outlook or webaccess clients can still retrieve
 			  their e-mail from the server.
 			  </para>
 			</listitem>
@@ -191,7 +191,7 @@
 			<listitem>
 			  <para>The Zarafa Web Services server process enables EWS
 			  connectivity to the Zarafa server. Users with other
-			  non-Windows Outlook or WebApp clients can still retreive
+			  non-Windows Outlook or WebApp clients can still retrieve
 			  their e-mail and calendars from the server.
 			  </para>
 			</listitem>
@@ -209,71 +209,71 @@
 		<para>
 		<citerefentry>
 		  <refentrytitle>zarafa-server</refentrytitle>
-		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		  <manvolnum>8</manvolnum>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-spooler</refentrytitle>
-		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		  <manvolnum>8</manvolnum>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-dagent</refentrytitle>
-		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		  <manvolnum>8</manvolnum>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-admin</refentrytitle>
-		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		  <manvolnum>8</manvolnum>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-monitor</refentrytitle>
-		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		  <manvolnum>8</manvolnum>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-gateway</refentrytitle>
-		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		  <manvolnum>8</manvolnum>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-passwd</refentrytitle>
 		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-fsck</refentrytitle>
 		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-backup</refentrytitle>
-		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		  <manvolnum>8</manvolnum>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-restore</refentrytitle>
-		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		  <manvolnum>8</manvolnum>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-ical</refentrytitle>
-		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		  <manvolnum>8</manvolnum>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-licensed</refentrytitle>
-		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		  <manvolnum>8</manvolnum>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-report</refentrytitle>
-		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		  <manvolnum>8</manvolnum>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-stats</refentrytitle>
 		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-cfgchecker</refentrytitle>
-		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		  <manvolnum>8</manvolnum>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-search</refentrytitle>
-		  <manvolnum>1</manvolnum>
-		</citerefentry>
+		  <manvolnum>8</manvolnum>
+		</citerefentry>,
 		<citerefentry>
 		  <refentrytitle>zarafa-ws</refentrytitle>
-		  <manvolnum>1</manvolnum>
+		  <manvolnum>8</manvolnum>
 		</citerefentry>		</para>
 	  </refsection>
 	</refentry>
@@ -285,7 +285,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-dagent</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -480,7 +480,7 @@
 			</term>
 			<listitem>
 			  <para>Do not send a new mail notification to othere
-			  connected clients. This option can be usefull when you
+			  connected clients. This option can be useful when you
 			  have connected Outlook 2000 clients, which will also
 			  process rules when the mail is delivered. This is a bug
 			  workaround, and this option may disappear in the
@@ -549,7 +549,7 @@
 			<term><option>-r</option></term>
 			<listitem><para>Deliver the mail as read. Normally, the
 			message will be marked as unread. This option can be
-			usefull when importing old mail.</para>
+			useful when importing old mail.</para>
 			</listitem>
 		  </varlistentry>
 
@@ -560,7 +560,7 @@
 			</term>
 			<listitem>
 			  <para>Path to autoresponder, e.g.
-			  <filename>/usr/local/bin/zarafa-autorespond</filename>. This
+			  <filename>/usr/local/sbin/zarafa-autorespond</filename>. This
 			  script will be called when the user enabled a vacation
 			  message in the Webaccess settings. When a header
 			  <parameter>X-Zarafa-Vacation</parameter> or
@@ -633,7 +633,7 @@
 				  </listitem>
 				</varlistentry>
 			  </variablelist>
-			  <para>Default: <parameter>/usr/bin/zarafa-autorespond</parameter>.</para>
+			  <para>Default: <parameter>/usr/sbin/zarafa-autorespond</parameter>.</para>
 			</listitem>			
 		  </varlistentry>
 		</variablelist>
@@ -644,11 +644,11 @@
 
 		<para>To deliver an e-mail to a Zarafa user's mailbox:</para>
 
-		<para><command>cat</command> <replaceable>mail</replaceable>
-		<command>|</command> <command>zarafa-dagent</command>
-		<replaceable>username</replaceable></para>
+		<para><command>zarafa-dagent
+		<replaceable>username</replaceable> &lt;
+		<replaceable>mailfile</replaceable></command></para>
 
-		<para>This pipes the input to the dagent via the standard input
+		<para>This passes the input to the dagent via the standard input
 		interface.</para>
 	  </refsection>
 
@@ -677,7 +677,7 @@
 			  transport. See the
 			  <citerefentry>
 				<refentrytitle>zarafa-server</refentrytitle>
-				<manvolnum>1</manvolnum>
+				<manvolnum>8</manvolnum>
 			  </citerefentry>
 			  manual page on how to setup SSL keys.
 			  </para>
@@ -750,8 +750,8 @@
 		<para>
 		  <citerefentry>
 		    <refentrytitle>zarafa-server</refentrytitle>
-		    <manvolnum>1</manvolnum>
-		  </citerefentry>
+		    <manvolnum>8</manvolnum>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-dagent.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
@@ -894,7 +894,7 @@
 			  transport. See the
 			  <citerefentry>
 				<refentrytitle>zarafa-server</refentrytitle>
-				<manvolnum>1</manvolnum>
+				<manvolnum>8</manvolnum>
 			  </citerefentry>
 			  manual page on how to setup SSL keys.
 			  </para>
@@ -1008,6 +1008,19 @@
 		  </varlistentry>
 
 		  <varlistentry>
+			<term><option>log_buffer_size</option></term>
+			<listitem>
+			  <para>Buffer logging in what sized blocks.
+                              Bigger buffers is better for the performance but it gives lag
+                              when running e.g. multitail or 'tail -f' on the log-file. If
+                              you want to directly see what is happing, set this to e.g. 1.
+                              So when debugging: make it a small value, else set it to
+                              4096 or more.</para>
+			  <para>Default: <replaceable>4096</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
 			<term><option>log_level</option></term>
 			<listitem>
 			  <para>The level of output for logging in the range from
@@ -1020,7 +1033,7 @@
             <term><option>log_raw_message</option></term>
             <listitem>
               <para>Log the raw message to a file. The file is saved to the
-				location specifed in <option>log_raw_message_path</option>.
+				location specified in <option>log_raw_message_path</option>.
               </para>
               <para>Default: <replaceable>no</replaceable></para>
             </listitem>
@@ -1058,7 +1071,7 @@
               mr-accept option is enabled for a user. When this option is
               enabled and a meeting request or meeting cancellation is
               received, this script is started with the following parameters:
-              /usr/bin/zarafa-mr-accept &lt;username&gt;
+              /usr/sbin/zarafa-mr-accept &lt;username&gt;
               &lt;/path/to/dagent.cfg&gt; [&lt;ENTRYID&gt;].</para>
               <para>If the script is
               successful (exitcode is 0), then no other actions are performed (eg
@@ -1069,7 +1082,7 @@
               rules or options).
               </para>
               <para>Default:
-              <replaceable>/usr/bin/zarafa-mr-accept</replaceable></para>
+              <replaceable>/usr/sbin/zarafa-mr-accept</replaceable></para>
           	</listitem>
 		  </varlistentry>
 
@@ -1187,7 +1200,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-dagent</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -1201,7 +1214,7 @@
     <refentry>
       <refmeta>
         <refentrytitle>zarafa-autorespond</refentrytitle>
-        <manvolnum>1</manvolnum>
+        <manvolnum>8</manvolnum>
       </refmeta>
 
       <refnamediv>
@@ -1233,7 +1246,99 @@
         <para>
           <citerefentry>
             <refentrytitle>zarafa-dagent</refentrytitle>
-            <manvolnum>1</manvolnum>
+            <manvolnum>8</manvolnum>
+          </citerefentry>
+        </para>
+      </refsection>
+    </refentry>
+
+<!--
+  -+-+-
+    Zarafa auto accepter manual page
+  -+-+-
+-->
+    <refentry>
+      <refmeta>
+        <refentrytitle>zarafa-mr-accept</refentrytitle>
+        <manvolnum>8</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+        <refname>zarafa-mr-accept</refname>
+        <refpurpose>Automatic accepting of meeting requests.</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+        <cmdsynopsis>
+          <command>zarafa-mr-accept</command>
+        </cmdsynopsis>
+      </refsynopsisdiv>
+
+      <refsection>
+        <title>Description</title>
+
+        <para>Script will be called by <command>zarafa-dagent</command> when the user 
+				receives a meeting request or cancellation.	</para>
+		<para>This script should not be executed from the command line.</para>
+      </refsection>
+
+      <refsection>
+        <title>Author</title>
+        <para>Written by Zarafa.</para>
+      </refsection>
+
+      <refsection>
+        <title>See also</title>
+        <para>
+          <citerefentry>
+            <refentrytitle>zarafa-dagent</refentrytitle>
+            <manvolnum>8</manvolnum>
+          </citerefentry>
+        </para>
+      </refsection>
+    </refentry>
+
+<!--
+  -+-+-
+    Zarafa auto processor manual page
+  -+-+-
+-->
+    <refentry>
+      <refmeta>
+        <refentrytitle>zarafa-mr-process</refentrytitle>
+        <manvolnum>8</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+        <refname>zarafa-mr-process</refname>
+        <refpurpose>Automatic processing of meeting requests.</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+        <cmdsynopsis>
+          <command>zarafa-mr-process</command>
+        </cmdsynopsis>
+      </refsynopsisdiv>
+
+      <refsection>
+        <title>Description</title>
+
+        <para>Script will be called by <command>zarafa-dagent</command> when the user 
+				receives a meeting request or cancellation.	</para>
+		<para>This script should not be executed from the command line.</para>
+      </refsection>
+
+      <refsection>
+        <title>Author</title>
+        <para>Written by Zarafa.</para>
+      </refsection>
+
+      <refsection>
+        <title>See also</title>
+        <para>
+          <citerefentry>
+            <refentrytitle>zarafa-dagent</refentrytitle>
+            <manvolnum>8</manvolnum>
           </citerefentry>
         </para>
       </refsection>
@@ -1247,7 +1352,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-server</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -1267,7 +1372,7 @@
 
 		<para>The zarafa-server is the Zafara storage server. It
 		contacts a database server and provides services to Zarafa
-		clients. The user base can be retreived from an external
+		clients. The user base can be retrieved from an external
 		source, like LDAP, or can be setup with a separate list of
 		users.</para>
 
@@ -1378,16 +1483,6 @@
 			  server.
 			  </para>
 			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-		    <term><option>--ignore-unknown-config-options</option></term>
-			<listitem>
-				<para>When unknown options exists in the configuration file
-				the server will report an error and shutdown. Pass this option to
-				ignore unknown options so the server will start.
-				</para>
-            </listitem>
 		  </varlistentry>
 
 		  <varlistentry>
@@ -1502,7 +1597,7 @@
 		the Zarafa server process runs as root by default.</para>
 
 		<para>As an exception for the dagent, a unix user can also
-		connect to it's own store without a password. Any other store
+		connect to its own store without a password. Any other store
 		cannot be accessed this way.</para>
 
 		<para>Direct SSL connections are also possible. The server
@@ -1587,7 +1682,7 @@
 		</para>
 		<para>To create a new certificate for a client service, run
 		the script again. You can create one new certificate for all
-		clients, or seperate certificates for each client.
+		clients, or separate certificates for each client.
 		</para>
 		<para>
 		  <command>
@@ -1672,10 +1767,10 @@
 		  <citerefentry>
 			<refentrytitle>zarafa-server.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
-		  </citerefentry>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-admin</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -1684,7 +1779,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-admin</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 <!--
@@ -2470,7 +2565,7 @@
 			  may receive a warning email when this level is
 			  reached. See
 			  <citerefentry><refentrytitle>zarafa-monitor</refentrytitle>
-			  <manvolnum>1</manvolnum></citerefentry>
+			  <manvolnum>8</manvolnum></citerefentry>
 			  for warning emails. This option is only valid with the
 			  <parameter>-c</parameter> create or
 			  <parameter>-u</parameter> update action.</para>
@@ -2526,7 +2621,7 @@
 			  <para>Set the warning quota level for all users within the specified tenant.
 			  The user may receive a warning email when this level is reached. See
 			  <citerefentry><refentrytitle>zarafa-monitor</refentrytitle>
-			  <manvolnum>1</manvolnum></citerefentry>
+			  <manvolnum>8</manvolnum></citerefentry>
 			  for warning emails.</para>
 			</listitem>
 		  </varlistentry>
@@ -2540,7 +2635,7 @@
 			  <para>Set the soft quota level for all users within the specified tenant.
 			  The user will be unable to receive new emails, bouncing the email back
 			  to the sender. See <citerefentry><refentrytitle>zarafa-monitor</refentrytitle>
-			  <manvolnum>1</manvolnum></citerefentry> for warning emails.</para>
+			  <manvolnum>8</manvolnum></citerefentry> for warning emails.</para>
 			</listitem>
 		  </varlistentry>
 
@@ -2553,7 +2648,7 @@
 			  <para>Set the hard quota level for all users within the specified tenant.
 			  The user will be unable to receive and create new emails. See
 			  <citerefentry><refentrytitle>zarafa-monitor</refentrytitle>
-			  <manvolnum>1</manvolnum></citerefentry> for warning emails.</para>
+			  <manvolnum>8</manvolnum></citerefentry> for warning emails.</para>
 			</listitem>
 		  </varlistentry>
 
@@ -2754,7 +2849,7 @@
 			  transport. See the
 			  <citerefentry>
 				<refentrytitle>zarafa-server</refentrytitle>
-				<manvolnum>1</manvolnum>
+				<manvolnum>8</manvolnum>
 			  </citerefentry>
 			  manual page on how to setup SSL keys.
 			  </para>
@@ -2898,8 +2993,8 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>1</manvolnum>
-		  </citerefentry>
+			<manvolnum>8</manvolnum>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-server.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
@@ -3027,8 +3122,8 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>1</manvolnum>
-		  </citerefentry>
+			<manvolnum>8</manvolnum>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-server.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
@@ -3056,10 +3151,15 @@
 	  <refsynopsisdiv>
 		<cmdsynopsis>
 		  <command>zarafa-set-oof</command>
-		  <arg choice="plain"><replaceable>USERNAME</replaceable></arg>
-		  <arg choice="plain"><replaceable>MODE</replaceable></arg>
-		  <arg choice="opt"><replaceable>SUBJECT</replaceable></arg>
-		  <arg choice="opt"><replaceable>MESSAGE FILE</replaceable></arg>
+		  <arg choice="opt">-h <arg choice="plain"><replaceable>hostname</replaceable></arg></arg>
+		  <arg choice="opt">-m <arg choice="plain"><replaceable>mode</replaceable></arg></arg>
+		  <arg choice="opt">-n <arg choice="plain"><replaceable>msgfile</replaceable></arg></arg>
+		  <arg choice="opt">-p <arg choice="plain"><replaceable>keypass</replaceable></arg></arg>
+		  <arg choice="opt">-s <arg choice="plain"><replaceable>keyfile</replaceable></arg></arg>
+		  <arg choice="opt">-t <arg choice="plain"><replaceable>subject</replaceable></arg></arg>
+		  <arg choice="opt">-u <arg choice="plain"><replaceable>username</replaceable></arg></arg>
+		  <arg choice="opt">--from <arg choice="plain"><replaceable>datetime</replaceable></arg>
+		  --until <arg choice="plain"><replaceable>datetime</replaceable></arg></arg>
 		</cmdsynopsis>
 	  </refsynopsisdiv>
 
@@ -3070,42 +3170,46 @@
 		The Zarafa server must be running for
 		<command>zarafa-set-oof</command> to work.
 		</para>
-
-		<para>You must choose a state, enabled, disabled or don't change,
-		when using this script.</para>
 	  </refsection>
 
 	  <refsection>
-		<title>Actions</title>
-		<para>zarafa-set-oof needs atleast a state command. Valid states are:</para>
+		<title>Options</title>
 
 		<variablelist>
 		  <varlistentry>
-			<term>
-			  <option>0</option>
-			</term>
+		    <term><option>-h</option> <replaceable>hostname</replaceable></term>
+		    <listitem>
+		    <para>Connect to the given Zarafa server. This defaults to
+		    file:///var/run/zarafa.</para>
+		    </listitem>
+		  </varlistentry>
+		</variablelist>
+
+		<variablelist>
+		  <varlistentry>
+			<term><option>-m</option></term>
+			<term><option>--mode</option> <option>0</option></term>
 			<listitem>
 			  <para>Disable the user's out of office reply.</para>
 			</listitem>
 		  </varlistentry>
 
 		  <varlistentry>
-			<term>
-			  <option>1</option>
-			</term>
+			<term><option>-m</option></term>
+			<term><option>--mode</option> <option>1</option></term>
 			<listitem>
 			  <para>Enable the user's out of office reply.</para>
 			</listitem>
 		  </varlistentry>
 		  
 		  <varlistentry>
-			<term>
-			  <option>-</option>
-			</term>
+			<term><option>-m</option></term>
+			<term><option>--mode</option> <option>-</option></term>
 			<listitem>
 				<para>Don't enable or disable the user's out of office
 				reply. Just update the subject and message, unless the
-				user's out of office reply is enabled.</para>
+				user's out of office reply is enabled. This is
+				the default mode.</para>
 				<para>This is useful to update all out of office
 				settings without enabling them and without changing
 				the messages of enabled replies because that might
@@ -3114,34 +3218,61 @@
 			</listitem>
 		  </varlistentry>
 
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Options</title>
-		<para>The options used by actions are as follows:</para>
-
-		<variablelist>
 		  <varlistentry>
-			<term>
-			  <option>SUBJECT</option>
-			</term>
-			<listitem>
-			  <para>Set a new subject for the oof message. This
-			  subject will be placed between square brackets when the
-			  message is sent.</para>
-			</listitem>
+		    <term><option>-n</option></term>
+		    <term><option>--message</option> <replaceable>file</replaceable></term>
+		    <listitem>
+		    <para>Reads the given text file and uses its contents for
+		    the autoreply's message body.</para>
+		    </listitem>
 		  </varlistentry>
 
 		  <varlistentry>
-			<term>
-			  <option>MESSAGE FILE</option>
-			  <replaceable>/path/to/message</replaceable>
-			</term>
-			<listitem>
-			  <para>The contents of this file will be used as
-			  plain text body in the oof email.</para>
-			</listitem>
+		    <term><option>-p</option></term>
+		    <term><option>--sslkey-pass</option> <replaceable>password</replaceable></term>
+		    <listitem>
+		    <para>Use the given password to access the
+		    certificate.</para>
+		    </listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+		    <term><option>-s</option></term>
+		    <term><option>--sslkey-file</option> <replaceable>sslkey</replaceable></term>
+		    <listitem>
+		    <para>Use the given certificate when connecting to the
+		    Zarafa server.</para>
+		    </listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+		    <term><option>-t</option></term>
+		    <term><option>--subject</option> <replaceable>text</replaceable></term>
+		    <listitem>
+		    <para>The subject for Out Of Office messages will be set to
+		    the specified text.</para>
+		    </listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+		    <term><option>-u</option></term>
+		    <term><option>--user</option> <replaceable>name</replaceable></term>
+		    <listitem>
+		    <para>Modify the Out Of Office settings for the particular
+		    user.</para>
+		    </listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+		    <term><option>--from</option></term>
+		    <term><option>--until</option> <replaceable>datetime</replaceable></term>
+		    <listitem>
+		    <para>Limit the OOF responder to the given timeframe.
+		    Both options, or neither of the two, must be specified.
+		    The format to use as argument is to be in the form of
+		    "2015-04-01 23:50" (ISO-8601-like), and is taken to be in
+		    local time.</para>
+		    </listitem>
 		  </varlistentry>
 		</variablelist>
 	  </refsection>
@@ -3160,7 +3291,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-mailbox-permissions</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -3440,8 +3571,8 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>1</manvolnum>
-		  </citerefentry>
+			<manvolnum>8</manvolnum>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-server.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
@@ -3824,7 +3955,7 @@
 		  <varlistentry>
 			<term><option>thread_stacksize</option></term>
 			<listitem>
-			  <para>This setting might be usefull on 32bit system with
+			  <para>This setting might be useful on 32-bit system with
 			  a lot of users. This setting should not be set too
 			  small, or your server will crash. The value set is in
 			  Kb.</para>
@@ -3838,7 +3969,7 @@
 			  <para>Path to the
 				<citerefentry>
 				  <refentrytitle>zarafa-licensed</refentrytitle>
-				  <manvolnum>1</manvolnum>
+				  <manvolnum>8</manvolnum>
 				</citerefentry>
 				service.</para>
 			  <para>Default: <replaceable>/var/run/zarafa-licensed</replaceable></para>
@@ -3851,7 +3982,7 @@
 			  <para>Time (in seconds) to wait for a connection to the
 				<citerefentry>
 				  <refentrytitle>zarafa-licensed</refentrytitle>
-				  <manvolnum>1</manvolnum>
+				  <manvolnum>8</manvolnum>
 				</citerefentry>
 				before terminating the request.</para>
 			  <para>Default: <replaceable>10</replaceable></para>
@@ -3920,6 +4051,19 @@
 			  <para>Specify whether to prefix each log line with a
 			  timestamp in 'file' logging mode.</para>
 			  <para>Default: <replaceable>1</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>log_buffer_size</option></term>
+			<listitem>
+			  <para>Buffer logging in what sized blocks.
+                              Bigger buffers is better for the performance but it gives lag
+                              when running e.g. multitail or 'tail -f' on the log-file. If
+                              you want to directly see what is happing, set this to e.g. 1.
+                              So when debugging: make it a small value, else set it to
+                              4096 or more.</para>
+			  <para>Default: <replaceable>4096</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -4072,7 +4216,7 @@
 			  <para>The location where attachments are stored. This
 			  can be in the MySQL database, or as separate files. The
 			  drawback of 'database' is that the large data of
-			  attachment will push usefull data from the MySQL
+			  attachment will push useful data from the MySQL
 			  cache. The drawback of separate files is that a
 			  mysqldump is not enough for a full disaster recovery.</para>
 			  <para>Default: <replaceable>files</replaceable></para>
@@ -4146,7 +4290,7 @@
 			  <para>The file containing the private key and
 			  certificate. Please read the SSL section in the
 			  <citerefentry><refentrytitle>zarafa-server</refentrytitle>
-			  <manvolnum>1</manvolnum></citerefentry> manual on how to
+			  <manvolnum>8</manvolnum></citerefentry> manual on how to
 			  create this file.
 			  </para>
 			  <para>Default:
@@ -4217,7 +4361,7 @@
 			  which can login over SSL using their key. Please read
 			  the SSL section in the
 			  <citerefentry><refentrytitle>zarafa-server</refentrytitle>
-			  <manvolnum>1</manvolnum></citerefentry> manual on how to
+			  <manvolnum>8</manvolnum></citerefentry> manual on how to
 			  create these files.</para>
 			  <para>Default:
 			  <replaceable>/etc/zarafa/sslkeys</replaceable>
@@ -4226,14 +4370,35 @@
 		  </varlistentry>
 
 		  <varlistentry>
-			<term><option>server_ssl_enable_v2</option></term>
+			<term><option>server_ssl_protocols</option></term>
 			<listitem>
-			  <para>Incoming SSL connections normally are v3.</para>
-			  <para>Default: <replaceable>no</replaceable>
-			  </para>
+			  <para>Disabled or enabled protocol names. Supported protocol names
+			  are <replaceable>SSLv2</replaceable>, <replaceable>SSLv3</replaceable>
+			  and <replaceable>TLSv1</replaceable>. If Zarafa was linked against
+			  OpenSSL 1.0.1 or later there is additional support for the new protocols
+			  <replaceable>TLSv1.1</replaceable> and <replaceable>TLSv1.2</replaceable>.
+			  To exclude both, SSLv2 and SSLv3 set <option>server_ssl_protocols</option>
+			  to <replaceable>!SSLv2 !SSLv3</replaceable>. SSLv2 is considered unsafe
+			  and these connections should not be accepted.</para>
+			  <para>Default: <replaceable>!SSLv2</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
+		  <varlistentry>
+			<term><option>server_ssl_ciphers</option></term>
+			<listitem>
+			  <para>SSL ciphers to use, set to <replaceable>ALL</replaceable> for backward compatibility.</para>
+			  <para>Default: <replaceable>ALL:!LOW:!SSLv2:!EXP:!aNULL</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>server_ssl_prefer_server_ciphers</option></term>
+			<listitem>
+			  <para>Prefer the server's order of SSL ciphers over client's.</para>
+			  <para>Default: <replaceable>no</replaceable></para>
+			</listitem>
+		  </varlistentry>
 		</variablelist>
 	  </refsection>
 
@@ -4708,7 +4873,7 @@
 					will be read the /etc/passwd file. Passwords will
 					be checked agains /etc/shadow. Group information
 					will read from /etc/group. Use the
-					<citerefentry><refentrytitle>zarafa-admin</refentrytitle><manvolnum>1</manvolnum></citerefentry>
+					<citerefentry><refentrytitle>zarafa-admin</refentrytitle><manvolnum>8</manvolnum></citerefentry>
 					tool to set Zarafa specific attributes on a
 					user.</para>
 					<para> All additional Unix settings are set in a
@@ -4973,7 +5138,7 @@
 			  requires the
 				<citerefentry>
 				  <refentrytitle>zarafa-search</refentrytitle>
-				  <manvolnum>1</manvolnum>
+				  <manvolnum>8</manvolnum>
 				</citerefentry>
 			  service to be running.</para>
 			  <para>Default: <replaceable>yes</replaceable></para>
@@ -4986,7 +5151,7 @@
 			  <para>Path to the
 			    <citerefentry>
 				  <refentrytitle>zarafa-search</refentrytitle>
-				  <manvolnum>1</manvolnum>
+				  <manvolnum>8</manvolnum>
 				</citerefentry>
 				service, this option is only required if the server is going
 				to make use of the indexing service.</para>
@@ -5000,7 +5165,7 @@
 			  <para>Time (in seconds) to wait for a connection to the
 				<citerefentry>
 				  <refentrytitle>zarafa-search</refentrytitle>
-				  <manvolnum>1</manvolnum>
+				  <manvolnum>8</manvolnum>
 				</citerefentry>
 				before terminating the indexed search request.</para>
 			  <para>Default: <replaceable>10</replaceable></para>
@@ -5230,12 +5395,12 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>1</manvolnum>
-		  </citerefentry>
+			<manvolnum>8</manvolnum>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-ldap.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
-		  </citerefentry>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-unix.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
@@ -5311,7 +5476,7 @@
 			  <para>Propmap delivers the capabilities to map additional
 			  attributes to addressbook properties (e.g. firstname, lastname,
 			  telephonenumber).</para>
-	  		  <para>In the propmap the configuration names must be the hex propery tag
+	  		  <para>In the propmap the configuration names must be the hex property tag
 			  of the requested property. The value given to the configuration name
 			  must be the LDAP attribute to which the property should be mapped.</para>
 			  <para>Example: !propmap ldap.propmap.cfg</para>
@@ -6186,7 +6351,7 @@
 		  <varlistentry>
 			<term><option>ldap_quota_userwarning_recipients_attribute</option></term>
 			<listitem>
-			 <para>This attribute contains the list of users who will recieve an
+			 <para>This attribute contains the list of users who will receive an
 			 email when a user exceeds his quota. User who exceeds his quota will
 			 be automatically added to the recipients list, this list only indicates
 			 who else will be notified.</para>
@@ -6217,7 +6382,7 @@
 		  <varlistentry>
 			<term><option>ldap_quota_companywarning_recipients_attribute</option></term>
 			<listitem>
-			  <para>This attribute contains the list of users who will recieve an
+			  <para>This attribute contains the list of users who will receive an
 			  email when a tenant exceeds its quota. The system administrator of the
 			  tenant that is over quota will automatically be added to the recipients list,
 			  this list only indicates who else will be notified.</para>
@@ -6277,8 +6442,7 @@
 			  recommended on ADS installations.</para>
 			  <para>Default: <replaceable></replaceable></para>
 			  <para>Recommended for ADS installations: <replaceable>(anr=%s)</replaceable></para>
-			  <para>Optional for OpenLDAP installations:
-			  <replaceable>(|(mail=%s*)(uid=%s*)(cn=*%s*)(fullname=*%s*)(givenname=*%s*)(lastname=*%s*)(sn=*%s*))</replaceable></para>
+			  <para>Optional for OpenLDAP installations: <replaceable>(|(mail=%s*)(uid=%s*)(cn=*%s*)&#x200B;(fullname=*%s*)(givenname=*%s*)(lastname=*%s*)(sn=*%s*))</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -6331,8 +6495,8 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>1</manvolnum>
-		  </citerefentry>
+			<manvolnum>8</manvolnum>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-server.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
@@ -6546,8 +6710,8 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>1</manvolnum>
-		  </citerefentry>
+			<manvolnum>8</manvolnum>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-server.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
@@ -6641,7 +6805,7 @@
 			<term><option>default_domain</option></term>
 			<listitem>
 			  <para>The default domain name to set as e-mail address.
-			  When a user is created, it's email address will be set
+			  When a user is created, its email address will be set
 			  to <replaceable>username@default_domain</replaceable>.
 			  </para>
 			  <para>Default: <replaceable>no default
@@ -6676,7 +6840,7 @@
 		  <varlistentry>
 			<term><option>except_user_uids</option></term>
 			<listitem>
-			  <para>A whitespace seperated list of uids that are within
+			  <para>A whitespace separated list of uids that are within
 			  the min_user_uid and max_user_uid range, but shouldn't be
 			  considered as users.</para>
 			  <para>Default: <replaceable>empty</replaceable>
@@ -6711,7 +6875,7 @@
 		  <varlistentry>
 			<term><option>except_group_gids</option></term>
 			<listitem>
-			  <para>A whitespace seperated list of gids that are within
+			  <para>A whitespace separated list of gids that are within
 			  the min_group_gid and max_group_gid range, but shouldn't be
 			  considered as groups.</para>
 			  <para>Default: <replaceable>empty</replaceable>
@@ -6797,8 +6961,8 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>1</manvolnum>
-		  </citerefentry>
+			<manvolnum>8</manvolnum>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-server.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
@@ -6816,7 +6980,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-spooler</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -6870,7 +7034,7 @@
 			  <para>Specify the location of the spooler.cfg file. If
 			  the spooler.cfg file is not specified, the spooler will
 			  try to load <filename>/etc/zarafa/spooler.cfg</filename>.
-			  If that file is not present, it will continue using it's
+			  If that file is not present, it will continue using its
 			  default settings.</para>
 			</listitem>
 		  </varlistentry>
@@ -6899,17 +7063,6 @@
 			  will daemonize and run in the background.</para>
 			</listitem>
 		  </varlistentry>
-
-		  <varlistentry>
-		    <term><option>--ignore-unknown-config-options</option></term>
-			<listitem>
-				<para>When unknown options exists in the configuration file
-				the spooler will report an error and shutdown. Pass this option to
-				ignore unknown options so the spooler will start.
-				</para>
-            </listitem>
-		  </varlistentry>
-
 		</variablelist>
 	  </refsection>
 
@@ -6982,10 +7135,10 @@
 		  <citerefentry>
 			<refentrytitle>zarafa-spooler.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
-		  </citerefentry>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -7149,7 +7302,7 @@
 			  transport. See the
 			  <citerefentry>
 				<refentrytitle>zarafa-server</refentrytitle>
-				<manvolnum>1</manvolnum>
+				<manvolnum>8</manvolnum>
 			  </citerefentry>
 			  manual page on how to setup SSL keys.
 			  </para>
@@ -7218,6 +7371,19 @@
 		  </varlistentry>
 
 		  <varlistentry>
+			<term><option>log_buffer_size</option></term>
+			<listitem>
+			  <para>Buffer logging in what sized blocks.
+                              Bigger buffers is better for the performance but it gives lag
+                              when running e.g. multitail or 'tail -f' on the log-file. If
+                              you want to directly see what is happing, set this to e.g. 1.
+                              So when debugging: make it a small value, else set it to
+                              4096 or more.</para>
+			  <para>Default: <replaceable>4096</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
 			<term><option>log_level</option></term>
 			<listitem>
 			  <para>The level of output for logging in the range from
@@ -7230,7 +7396,7 @@
 			<term><option>max_threads</option></term>
 			<listitem>
 			  <para>The maximum number of threads used to send outgoing messages.
-			  For each email in the outgoing queue a seperate thread will be started
+			  For each email in the outgoing queue a separate thread will be started
 			  in order to allow multiple emails to be send out simultaneously.</para>
 			  <para>Default: <replaceable>5</replaceable></para>
 			</listitem>
@@ -7481,7 +7647,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-spooler</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -7495,7 +7661,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-gateway</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -7575,17 +7741,6 @@
 			  will daemonize and run in the background.</para>
 			</listitem>
 		  </varlistentry>
-
-	      <varlistentry>
-		    <term><option>--ignore-unknown-config-options</option></term>
-			<listitem>
-				<para>When unknown options exists in the configuration file
-				the gateway will report an error and shutdown. Pass this option to
-				ignore unknown options so the gateway will start.
-				</para>
-            </listitem>
-		  </varlistentry>
-
 		  </variablelist>
 		</para>
 	  </refsection>
@@ -7646,10 +7801,10 @@
 		  <citerefentry>
 			<refentrytitle>zarafa-gateway.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
-		  </citerefentry>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -8090,11 +8245,32 @@
 		  </varlistentry>
 
 		  <varlistentry>
-			<term><option>ssl_enable_v2</option></term>
+			<term><option>ssl_protocols</option></term>
 			<listitem>
-			  <para>Accept SSLv2 only connections. SSLv2 is considered
-			  unsafe, and these connections should not be
-			  accepted.</para>
+			  <para>Disabled or enabled protocol names. Supported protocol names
+			  are <replaceable>SSLv2</replaceable>, <replaceable>SSLv3</replaceable>
+			  and <replaceable>TLSv1</replaceable>. If Zarafa was linked against
+			  OpenSSL 1.0.1 or later there is additional support for the new protocols
+			  <replaceable>TLSv1.1</replaceable> and <replaceable>TLSv1.2</replaceable>.
+			  To exclude both, SSLv2 and SSLv3 set <option>ssl_protocols</option>
+			  to <replaceable>!SSLv2 !SSLv3</replaceable>. SSLv2 is considered unsafe
+			  and these connections should not be accepted.</para>
+			  <para>Default: <replaceable>!SSLv2</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>ssl_ciphers</option></term>
+			<listitem>
+			  <para>SSL ciphers to use, set to <replaceable>ALL</replaceable> for backward compatibility.</para>
+			  <para>Default: <replaceable>ALL:!LOW:!SSLv2:!EXP:!aNULL</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>ssl_prefer_server_ciphers</option></term>
+			<listitem>
+			  <para>Prefer the server's order of SSL ciphers over client's.</para>
 			  <para>Default: <replaceable>no</replaceable></para>
 			</listitem>
 		  </varlistentry>
@@ -8157,6 +8333,19 @@
 			</listitem>
 		  </varlistentry>
 
+		  <varlistentry>
+			<term><option>log_buffer_size</option></term>
+			<listitem>
+			  <para>Buffer logging in what sized blocks.
+                              Bigger buffers is better for the performance but it gives lag
+                              when running e.g. multitail or 'tail -f' on the log-file. If
+                              you want to directly see what is happing, set this to e.g. 1.
+                              So when debugging: make it a small value, else set it to
+                              4096 or more.</para>
+			  <para>Default: <replaceable>4096</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
 		</variablelist>
 	  </refsection>
 
@@ -8195,7 +8384,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-gateway</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -8209,7 +8398,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-monitor</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -8264,7 +8453,7 @@
 			  <para>Specify the location of the monitor.cfg file. If
 			  the monitor.cfg file is not specified, the monitor will
 			  try to load <filename>/etc/zarafa/monitor.cfg</filename>.
-			  If that file is not present, it will continue using it's
+			  If that file is not present, it will continue using its
 			  default settings.</para>
 			  <para>Default: <replaceable>/etc/zarafa/monitor.cfg</replaceable></para>
 			</listitem>
@@ -8294,17 +8483,6 @@
 			  will daemonize and run in the background.</para>
 			</listitem>
 		  </varlistentry>
-
-		  <varlistentry>
-		    <term><option>--ignore-unknown-config-options</option></term>
-			<listitem>
-				<para>When unknown options exists in the configuration file
-				the monitor service will report an error and shutdown. Pass this option to
-				ignore unknown options so the monitor service will start.
-				</para>
-            </listitem>
-		  </varlistentry>
-
 	    </variablelist>
 	  </refsection>
 
@@ -8363,10 +8541,10 @@
 		  <citerefentry>
 			<refentrytitle>zarafa-monitor.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
-		  </citerefentry>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -8531,7 +8709,7 @@
 			  transport. See the
 			  <citerefentry>
 				<refentrytitle>zarafa-server</refentrytitle>
-				<manvolnum>1</manvolnum>
+				<manvolnum>8</manvolnum>
 			  </citerefentry>
 			  manual page on how to setup SSL keys.
 			  </para>
@@ -8596,6 +8774,19 @@
 			  <para>Specify whether to prefix each log line with a
 			  timestamp in 'file' logging mode.</para>
 			  <para>Default: <replaceable>1</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>log_buffer_size</option></term>
+			<listitem>
+			  <para>Buffer logging in what sized blocks.
+                              Bigger buffers is better for the performance but it gives lag
+                              when running e.g. multitail or 'tail -f' on the log-file. If
+                              you want to directly see what is happing, set this to e.g. 1.
+                              So when debugging: make it a small value, else set it to
+                              4096 or more.</para>
+			  <para>Default: <replaceable>4096</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -8717,7 +8908,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-monitor</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -8773,7 +8964,7 @@
 			</term>
 			<listitem>
 			  <para>The name of the user to login with, and to check
-			  the calender of.</para>
+			  the calendar of.</para>
 			</listitem>
 		  </varlistentry>
 
@@ -8924,7 +9115,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>7</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -8938,7 +9129,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-backup</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -8957,8 +9148,8 @@
 		<title>Description</title>
 
 		<para>The zarafa-backup tool creates a backup of a store. The
-		data of emails, calender items, contacts, etc. are stored in a
-		binary file. You can use the zarafa-restore tool to retreive
+		data of emails, calendar items, contacts, etc. are stored in a
+		binary file. You can use the zarafa-restore tool to retrieve
 		backed up items.</para>
 
 		<para>Some items are not backed up, like the rules created by
@@ -9273,7 +9464,7 @@
 			</term>
 			<listitem>
 			  <para>Do not backup the public store. This can be
-			  usefull with -a or -s &lt;company&gt; options.</para>
+			  useful with -a or -s &lt;company&gt; options.</para>
 			</listitem>
 		  </varlistentry>
 
@@ -9328,7 +9519,7 @@
 			  <option>-v</option>
 			</term>
 			<listitem>
-			  <para>Print more ouput during the backup. Prints every folder with item count.</para>
+			  <para>Print more output during the backup. Prints every folder with item count.</para>
 			</listitem>
 		  </varlistentry>
 
@@ -9368,7 +9559,7 @@
 			  transport. See the
 			  <citerefentry>
 				<refentrytitle>zarafa-server</refentrytitle>
-				<manvolnum>1</manvolnum>
+				<manvolnum>8</manvolnum>
 			  </citerefentry>
 			  manual page on how to setup SSL keys.
 			  </para>
@@ -9398,7 +9589,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-restore</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -9413,7 +9604,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-restore</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -9442,7 +9633,7 @@
 		field, for messages in the 5th field. The numbers can also be
 		passed as command parameters. Please refer to the
 		<citerefentry><refentrytitle>zarafa-backup</refentrytitle>
-		<manvolnum>1</manvolnum></citerefentry> manual to view the
+		<manvolnum>8</manvolnum></citerefentry> manual to view the
 		index file layout.</para>
 	  </refsection>
 
@@ -9504,7 +9695,7 @@
 			</term>
 			<listitem>
 			  <para>Use this file as input for the record keys. Each
-			  recordkey should be on it's own line. Use '-' as
+			  recordkey should be on its own line. Use '-' as
 			  filename when the record keys are to be read from
 			  stdin.</para>
 			</listitem>
@@ -9516,7 +9707,7 @@
 			  <option>-r</option>
 			</term>
 			<listitem>
-			  <para>When you restore a folder, the folder with it's
+			  <para>When you restore a folder, the folder with its
 			  contents will be restored. If you add this option, also
 			  the subfolders of the given folder are restored.</para>
 			</listitem>
@@ -9639,7 +9830,7 @@
 			  transport. See the
 			  <citerefentry>
 				<refentrytitle>zarafa-server</refentrytitle>
-				<manvolnum>1</manvolnum>
+				<manvolnum>8</manvolnum>
 			  </citerefentry>
 			  manual page on how to setup SSL keys.
 			  </para>
@@ -9669,7 +9860,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-backup</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -9683,7 +9874,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-ical</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -9759,17 +9950,6 @@
 			  will daemonize and run in the background.</para>
 			</listitem>
 	  	  </varlistentry>
-
-		  <varlistentry>
-		    <term><option>--ignore-unknown-config-options</option></term>
-			<listitem>
-				<para>When unknown options exists in the configuration file
-				the ical service will report an error and shutdown. Pass this option to
-				ignore unknown options so the ical service will start.
-				</para>
-            </listitem>
-		  </varlistentry>
-
 		  </variablelist>
 		</para>
 	  </refsection>
@@ -9830,10 +10010,10 @@
 		  <citerefentry>
 			<refentrytitle>zarafa-ical.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
-		  </citerefentry>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -10091,11 +10271,32 @@
 		  </varlistentry>
 
 		  <varlistentry>
-			<term><option>ssl_enable_v2</option></term>
+			<term><option>ssl_protocols</option></term>
 			<listitem>
-			  <para>Accept SSLv2 only connections. SSLv2 is considered
-			  unsafe, and these connections should not be
-			  accepted.</para>
+			  <para>Disabled or enabled protocol names. Supported protocol names
+			  are <replaceable>SSLv2</replaceable>, <replaceable>SSLv3</replaceable>
+			  and <replaceable>TLSv1</replaceable>. If Zarafa was linked against
+			  OpenSSL 1.0.1 or later there is additional support for the new protocols
+			  <replaceable>TLSv1.1</replaceable> and <replaceable>TLSv1.2</replaceable>.
+			  To exclude both, SSLv2 and SSLv3 set <option>ssl_protocols</option>
+			  to <replaceable>!SSLv2 !SSLv3</replaceable>. SSLv2 is considered unsafe
+			  and these connections should not be accepted.</para>
+			  <para>Default: <replaceable>!SSLv2</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>ssl_ciphers</option></term>
+			<listitem>
+			  <para>SSL ciphers to use, set to <replaceable>ALL</replaceable> for backward compatibility.</para>
+			  <para>Default: <replaceable>ALL:!LOW:!SSLv2:!EXP:!aNULL</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>ssl_prefer_server_ciphers</option></term>
+			<listitem>
+			  <para>Prefer the server's order of SSL ciphers over client's.</para>
 			  <para>Default: <replaceable>no</replaceable></para>
 			</listitem>
 		  </varlistentry>
@@ -10159,6 +10360,19 @@
 		  </varlistentry>
 
 		  <varlistentry>
+			<term><option>log_buffer_size</option></term>
+			<listitem>
+			  <para>Buffer logging in what sized blocks.
+                              Bigger buffers is better for the performance but it gives lag
+                              when running e.g. multitail or 'tail -f' on the log-file. If
+                              you want to directly see what is happing, set this to e.g. 1.
+                              So when debugging: make it a small value, else set it to
+                              4096 or more.</para>
+			  <para>Default: <replaceable>4096</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
 		    <term><option>enable_ical_get</option></term>
 		    <listitem>
 		      <para>Enable the ical GET method to download an entire
@@ -10209,7 +10423,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-ical</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -10222,7 +10436,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-licensed</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -10299,17 +10513,6 @@
 			  will daemonize and run in the background.</para>
 			</listitem>
 		  </varlistentry>
-
-	      <varlistentry>
-		    <term><option>--ignore-unknown-config-options</option></term>
-			<listitem>
-				<para>When unknown options exists in the configuration file
-				the license service will report an error and shutdown. Pass this option to
-				ignore unknown options so the license service will start.
-				</para>
-            </listitem>
-		  </varlistentry>
-
 		  </variablelist>
 		</para>
 	  </refsection>
@@ -10370,10 +10573,10 @@
 		  <citerefentry>
 			<refentrytitle>zarafa-licensed.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
-		  </citerefentry>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -10463,7 +10666,7 @@
 				  transport. See the
 				  <citerefentry>
 						<refentrytitle>zarafa-server</refentrytitle>
-						<manvolnum>1</manvolnum>
+						<manvolnum>8</manvolnum>
 				  </citerefentry>
 				  manual page on how to setup SSL keys.
 				  </para>
@@ -10600,6 +10803,19 @@
 		  </varlistentry>
 
 		  <varlistentry>
+			<term><option>log_buffer_size</option></term>
+			<listitem>
+			  <para>Buffer logging in what sized blocks.
+                              Bigger buffers is better for the performance but it gives lag
+                              when running e.g. multitail or 'tail -f' on the log-file. If
+                              you want to directly see what is happing, set this to e.g. 1.
+                              So when debugging: make it a small value, else set it to
+                              4096 or more.</para>
+			  <para>Default: <replaceable>4096</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
 			<term><option>log_level</option></term>
 			<listitem>
 			  <para>The level of output for logging in the range from
@@ -10667,7 +10883,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-licensed</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -10748,7 +10964,7 @@
 				  transport. See the
 				  <citerefentry>
 						<refentrytitle>zarafa-server</refentrytitle>
-						<manvolnum>1</manvolnum>
+						<manvolnum>8</manvolnum>
 				  </citerefentry>
 				  manual page on how to setup SSL keys.
 				  </para>
@@ -10770,7 +10986,7 @@
 			<term><option>backup_servers</option></term>
 			<listitem>
 			  <para>Only servers in this list will be processed by the
-			  backup tool. Servernames are SPACE seperated. Default is
+			  backup tool. Servernames are SPACE separated. Default is
 			  empty, processing all servers.</para>
 			  <para>Default: value not set.</para>
 			</listitem>
@@ -10804,7 +11020,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-backup</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -10818,7 +11034,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-report</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -11022,7 +11238,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-admin</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -11036,7 +11252,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-cfgchecker</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -11201,7 +11417,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>7</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -11215,7 +11431,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-search</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -11237,11 +11453,11 @@
 		enhances the search performance of the zarafa-server.
 		</para>
 
-		<para>After starting, the search daemon will continuesly update the
+		<para>After starting, the search daemon will continuously update the
 		store index files and will keep listening for connections on
 		the configured TCP port and/or Unix socket for search requests
 		from the <citerefentry>
-	    <refentrytitle>zarafa-server</refentrytitle><manvolnum>1</manvolnum>
+	    <refentrytitle>zarafa-server</refentrytitle><manvolnum>8</manvolnum>
 		</citerefentry>.</para>
 	  </refsection>
 
@@ -11276,9 +11492,9 @@
 		  </varlistentry>
 
 		  <varlistentry>
-			<term><option>--host</option></term>
+			<term><option>--server-socket</option></term>
 			<term>
-			  <option>-h</option>
+			  <option>-s</option>
 			  <replaceable>path</replaceable>
 			</term>
 			<listitem>
@@ -11287,23 +11503,6 @@
 			  <filename>file:///path/to/socket</filename>. Default:
 			  <filename>file:///var/run/zarafa</filename>.</para>
 			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>-V</option></term>
-			<listitem>
-			  <para>Print the version and exit.</para>
-			</listitem>
-		  </varlistentry>
-
-	      <varlistentry>
-		    <term><option>--ignore-unknown-config-options</option></term>
-			<listitem>
-				<para>When unknown options exists in the configuration file
-				the search daemon will report an error and shutdown. Pass this option to
-				ignore unknown options so zarafa-search will start.
-				</para>
-            </listitem>
 		  </varlistentry>
 
 	      <varlistentry>
@@ -11335,8 +11534,8 @@
 		<title>Usage</title>
 		<para>Starting the zarafa-search daemon with an alternative configuration:</para>
 		<para>
-		  <command>zarafa-search</command>
-		  <option>-c</option>
+		  <command>zarafa-search</command>&nbsp; 
+		  <option>-c</option>&nbsp;
 		  <replaceable>/path/to/search.cfg</replaceable>
 		</para>
 
@@ -11358,8 +11557,8 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>1</manvolnum>
-		  </citerefentry>
+			<manvolnum>8</manvolnum>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-search.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
@@ -11432,16 +11631,15 @@
 	  </refsection>
 
 	  <refsection>
-		<title>Explanation of the Server Settings parameters</title>
+		<title>Explanation of the Service Settings parameters</title>
 
 		<variablelist>
+
 		  <varlistentry>
-			<term><option>server_socket</option></term>
+			<term><option>index_path</option></term>
 			<listitem>
-			  <para>Socket to find the connection to the Zarafa
-			  server.</para>
-			  <para>Default:
-			  <parameter>file:///var/run/zarafa</parameter></para>
+			  <para>Directory under which all index files will be placed.</para>
+			  <para>Default: <replaceable>/var/lib/zarafa/index/</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -11516,16 +11714,26 @@
 	  </refsection>
 
 	  <refsection>
-		<title>Explanation of the SSL Settings parameters</title>
+		<title>Explanation of the Server Settings parameters</title>
 
 		<variablelist>
+		  <varlistentry>
+			<term><option>server_socket</option></term>
+			<listitem>
+			  <para>Socket to find the connection to the Zarafa
+			  server.</para>
+			  <para>Default:
+			  <parameter>file:///var/run/zarafa</parameter></para>
+			</listitem>
+		  </varlistentry>
+
 		  <varlistentry>
 			<term><option>ssl_key_file</option></term>
 			<listitem>
 			  <para>The file containing the private key and
 			  certificate. Please read the SSL section in the
 			  <citerefentry><refentrytitle>zarafa-server</refentrytitle>
-			  <manvolnum>1</manvolnum></citerefentry> manual on how to
+			  <manvolnum>8</manvolnum></citerefentry> manual on how to
 			  create this file.
 			  </para>
 			  <para>Default:
@@ -11545,29 +11753,6 @@
 			</listitem>
 		  </varlistentry>
 
-		  <varlistentry>
-			<term><option>ssl_private_key_file</option></term>
-			<listitem>
-			  <para>zarafa-search will use this file as private
-			  key for SSL TLS. This file can be created with:
-			  <command>openssl genrsa -out /etc/zarafa/search/privkey.pem 2048</command>.</para>
-			  <para>Default:
-			  <replaceable>/etc/zarafa/search/privkey.pem</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>ssl_certificate_file</option></term>
-			<listitem>
-			  <para>zarafa-search will use this file as
-			  certificate for SSL TLS. A self-signed certificate
-			  can be created with: <command>openssl req -new -x509
-			  -key /etc/zarafa/search/privkey.pem -out /etc/zarafa/search/cert.pem
-			  -days 1095</command>.</para>
-			  <para>Default:
-			  <replaceable>/etc/zarafa/search/cert.pem</replaceable></para>
-			</listitem>
-		  </varlistentry>
 <!--
 		  <varlistentry>
 			<term><option>ssl_verify_client</option></term>
@@ -11600,7 +11785,51 @@
 	  </refsection>
 
 	  <refsection>
-		<title>Explanation of the Logging Settings parameters</title>
+		<title>Explanation of the Listen Settings parameters</title>
+
+		<variablelist>
+		  <varlistentry>
+			<term><option>server_bind_name</option></term>
+			<listitem>
+			  <para>Connection path to which other processes can
+			  connect with the zarafa-search for performing search
+			  queries.</para><para>Use
+			  <replaceable>http://0.0.0.0:port</replaceable> to listen
+			  as an HTTP service on all network interfaces on the
+			  given <replaceable>port</replaceable> number.</para>
+			  <para>Default: <replaceable>file:///var/run/zarafa-search</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>ssl_private_key_file</option></term>
+			<listitem>
+			  <para>zarafa-search will use this file as private
+			  key for SSL TLS. This file can be created with:
+			  <command>openssl genrsa -out /etc/zarafa/search/privkey.pem 2048</command>.</para>
+			  <para>Default:
+			  <replaceable>/etc/zarafa/search/privkey.pem</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>ssl_certificate_file</option></term>
+			<listitem>
+			  <para>zarafa-search will use this file as
+			  certificate for SSL TLS. A self-signed certificate
+			  can be created with: <command>openssl req -new -x509
+			  -key /etc/zarafa/search/privkey.pem -out /etc/zarafa/search/cert.pem
+			  -days 1095</command>.</para>
+			  <para>Default:
+			  <replaceable>/etc/zarafa/search/cert.pem</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		</variablelist>
+	  </refsection>
+
+	  <refsection>
+		<title>Explanation of the Log Settings parameters</title>
 
 		<variablelist>
 		  <varlistentry>
@@ -11634,21 +11863,21 @@
 		  </varlistentry>
 
 		  <varlistentry>
+			<term><option>log_level</option></term>
+			<listitem>
+			  <para>The level of output for logging in the range from
+			  0 to 5. 0 means no logging, 5 means full logging.</para>
+			  <para>Default: <replaceable>2</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
 			<term><option>log_file</option></term>
 			<listitem>
 			  <para>When logging to a file, specify the filename in
 			  this parameter. Use <replaceable>-</replaceable> (minus
 			  sign) for stderr output.</para>
 			  <para>Default: <replaceable>/var/log/zarafa/search.log</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>log_level</option></term>
-			<listitem>
-			  <para>The level of output for logging in the range from
-			  0 to 5. 0 means no logging, 5 means full logging.</para>
-			  <para>Default: <replaceable>2</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -11661,80 +11890,82 @@
 			</listitem>
 		  </varlistentry>
 
+		  <varlistentry>
+			<term><option>log_buffer_size</option></term>
+			<listitem>
+			  <para>Buffer logging in what sized blocks.
+                              Bigger buffers is better for the performance but it gives lag
+                              when running e.g. multitail or 'tail -f' on the log-file. If
+                              you want to directly see what is happing, set this to e.g. 1.
+                              So when debugging: make it a small value, else set it to
+                              4096 or more.</para>
+			  <para>Default: <replaceable>4096</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
 		</variablelist>
 	  </refsection>
 
 	  <refsection>
-		<title>Explanation of the Search Settings parameters</title>
+		<title>Explanation of the Advanced Settings parameters</title>
 
 		<variablelist>
 		  <varlistentry>
-			<term><option>server_bind_name</option></term>
-			<listitem>
-			  <para>Connection path to which other processes can
-			  connect with the zarafa-search for performing search
-			  queries.</para><para>Use
-			  <replaceable>http://0.0.0.0:port</replaceable> to listen
-			  as an HTTP service on all network interfaces on the
-			  given <replaceable>port</replaceable> number.</para>
-			  <para>Default: <replaceable>file:///var/run/zarafa-search</replaceable></para>
-			</listitem>
+		    <term><option>term_cache_size</option></term>
+		    <listitem>
+		      <para>The size in bytes of the term cache used when writing
+		      terms to the index. A larger term cache will increase indexing
+		      speed when indexing large number of documents in a single
+		      store. This will barely affect incremental updates after the
+		      initial indexing has finished. This value may contain a
+			  k, m or g multiplier.
+		      </para>
+		      <para>Default: 64M</para>
+		    </listitem>
 		  </varlistentry>
 
 		  <varlistentry>
-			<term><option>index_path</option></term>
-			<listitem>
-			  <para>Directory under which all index files will be placed.</para>
-			  <para>Default: <replaceable>/var/lib/zarafa/index/</replaceable></para>
-			</listitem>
+		    <term><option>index_exclude_properties</option></term>
+		    <listitem>
+		      <para>Some properties are ignored because they contain
+		      unrelated information for users to find their messages
+		      on. A default set of ignored property ids is set here,
+		      but can be expanded. Only the id part of a property is
+		      needed, and must be string typed properties. The field
+		      is space separated.
+		      </para>
+		      <para>Default: 007D 0064 0C1E 0075 678E 678F</para>
+		    </listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+		    <term><option>index_processes</option></term>
+		    <listitem>
+		      <para>Number of indexing processes used during initial 
+                      indexing. Setting this to a higher value can greatly 
+                      speed up initial indexing, especially when attachments 
+                      are indexed.
+		      </para>
+		      <para>Default: 1</para>
+		    </listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+		    <term><option>search_engine</option></term>
+		    <listitem>
+		      <para>Backend search engine (currently only xapian is 
+                      supported).
+		      </para>
+		      <para>Default: xapian</para>
+		    </listitem>
 		  </varlistentry>
 
 		</variablelist>
 	  </refsection>
 
-	  <refsection>
-		<title>Explanation of the Index Optimize Schedule parameters</title>
-
-		<variablelist>
-		  <varlistentry>
-			<term><option>optimize_start</option></term>
-			<listitem>
-			  <para>Start the optimization routine at this hour every
-			  day. The routine optimizes every index, removing old
-			  data and recompressing it, making it faster and
-			  smaller. Notation is in 24h format, default starts at 2 am.</para>
-			  <para>Default: <replaceable>2</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>optimize_stop</option></term>
-			<listitem>
-			  <para>Stop the optimization routine at this hour when
-			  not all files were processed. The routine will continue
-			  were left off the next day it's started. The current
-			  file being processed will be finished, so the time will
-			  be passed. Notation is in 24h format, default stops at 5
-			  am.</para>
-			  <para>Default: <replaceable>5</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>optimize_age</option></term>
-			<listitem>
-			  <para>Only optimize the index file if it wasn't optmized
-			  for the past X days. Notation is in days, default is to
-			  optimize an index each week.</para>
-			  <para>Default: <replaceable>7</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		</variablelist>
-	  </refsection>
 
 	  <refsection>
-		<title>Explanation of the Attachment Search Settings parameters</title>
+		<title>Explanation of the Attachment Settings parameters</title>
 
 		<variablelist>
 		  <varlistentry>
@@ -11757,46 +11988,6 @@
 			  be indexed. This value may contain a k, m or g
 			  multiplier.</para>
 			  <para>Default: <replaceable>5M</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>index_attachment_parser</option></term>
-			<listitem>
-			  <para>For indexing attachment each file must be converted into plain-text by a parser.
-			  For this purpose the <replaceable>attachments_parser</replaceable> script has been
-			  installed which can be configured to parse specific mime-types.</para>
-			  <para>It is highly advisable to check the <replaceable>attachments_parser.db</replaceable>
-			  file to add or remove parser command for specific mime-types and/or file-extensions.</para>
-			  <para>Default: <replaceable>/etc/zarafa/searchscripts/attachments_parser</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>index_attachment_parser_max_memory</option></term>
-			<listitem>
-			  <para>Limit the maximum amount of memory (in bytes) the parser may use for converting the
-			  attachment into plain-text. If this limit is exceeded the parser will be killed and the attachment
-			  will not be completely converted. If the value is set to <replaceable>0</replaceable> the
-			  limit is considered as infinite.</para>
-			  <para>The attachment parser depends on external tools to convert attachments to plain-text,
-			  by limiting the amount of resources the parser is allowed to use problems can be prevented
-			  when the selected external tool misbehaves with certain attachments.</para>
-			  <para>Default: <replaceable>0</replaceable> bytes</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-		    <term><option>index_attachment_parser_max_cputime</option></term>
-			<listitem>
-			  <para>Limit the maximum cpu time (in seconds) the parser may use for converting the attachment
-			  into plain-text. If this limit is exceeded the parser will be killed and the attachment
-			  will not be completely converted. If the value is set to <replaceable>0</replaceable> the
-			  limit is considered as infinite.</para>
-			  <para>The attachment parser depends on external tools to convert attachments to plain-text,
-			  by limiting the amount of resources the parser is allowed to use problems can be prevented
-			  when the selected external tool misbehaves with certain attachments.</para>
-			  <para>Default: <replaceable>0</replaceable> seconds</para>
 			</listitem>
 		  </varlistentry>
 
@@ -11825,54 +12016,9 @@
 			</listitem>
 		  </varlistentry>
 
-		  <varlistentry>
-		  	<term><option>index_max_clauses</option></term>
-		  	<listitem>
-		  	  <para>This is the maximum number of clauses that can be
-		  	  present in a Lucene search query, after expansion. You can raise
-		  	  this limit if you are experiencing a Too Many Clauses error
-		  	  during searches.
-		  	  </para>
-			  <para>Default: <replaceable>50000</replaceable> clauses</para>
-		  	</listitem>
-		  </varlistentry>
-
 		</variablelist>
 	  </refsection>
 
-	  <refsection>
-		<title>Explanation of the Index Filters Settings parameters</title>
-
-		<variablelist>
-		  <varlistentry>
-		    <term><option>index_exclude_properties</option></term>
-		    <listitem>
-		      <para>Some properties are ignored because they contain
-		      unrelated information for users to find their messages
-		      on. A default set of ignored property ids is set here,
-		      but can be expanded. Only the id part of a property is
-		      needed, and must be string typed properties. The field
-		      is space separated.
-		      </para>
-		      <para>Default: 007D 0064 0C1E 0075 678E 678F</para>
-		    </listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-		    <term><option>term_cache_size</option></term>
-		    <listitem>
-		      <para>The size in bytes of the term cache used when writing
-		      terms to the index. A larger term cache will increase indexing
-		      speed when indexing large number of documents in a single
-		      store. This will barely affect incremental updates after the
-		      initial indexing has finished. This value may contain a
-			  k, m or g multiplier.
-		      </para>
-		      <para>Default: 64M</para>
-		    </listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
 
 	  <refsection>
 		<title>Author</title>
@@ -11884,7 +12030,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-search</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -11899,7 +12045,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-archiver</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -11959,7 +12105,7 @@
 			  archived. Otherwise all stores are archived. Optionally the
 			  <parameter>--local-only</parameter> option can be set to only
 			  archive stores that exist on the server to which
-			  zarafa-archiver is connected (usualy the local server).</para>
+			  zarafa-archiver is connected (usually the local server).</para>
 			</listitem>
 		  </varlistentry>
 
@@ -11972,7 +12118,7 @@
 			  cleaned. Otherwise all stores are cleaned. Optionally the
 			  <parameter>--local-only</parameter> option can be set to only
 			  cleanup archives of users that have their primary store  on the
-			  server to which  zarafa-archiver is connected (usualy the local
+			  server to which  zarafa-archiver is connected (usually the local
 			  server).</para>
 			</listitem>
 		  </varlistentry>
@@ -12099,7 +12245,7 @@
 			</term>
 			<listitem>
 			  <para>Use this option to specify the path to the archive
-			  server. This is usefull when using the archiver in a
+			  server. This is useful when using the archiver in a
 			  non-multiserver setup.</para>
 			</listitem>
 		  </varlistentry>
@@ -12213,8 +12359,8 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>1</manvolnum>
-		  </citerefentry>
+			<manvolnum>8</manvolnum>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-archiver.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
@@ -12308,7 +12454,7 @@
 			  transport. See the
 			  <citerefentry>
 				<refentrytitle>zarafa-server</refentrytitle>
-				<manvolnum>1</manvolnum>
+				<manvolnum>8</manvolnum>
 			  </citerefentry>
 			  manual page on how to setup SSL keys.
 			  </para>
@@ -12492,7 +12638,7 @@
 		  <varlistentry>
 			<term><option>auto_attach_writable</option></term>
 			<listitem>
-			  <para> Specify whether an auto attached archive will be granted
+			  <para>Specify whether an auto attached archive will be granted
 			  write permissions for the user it's attached to.
 			  </para>
 			  <para>Default: <replaceable>yes</replaceable></para>
@@ -12546,6 +12692,19 @@
 			  <para>Specify whether to prefix each log line with a
 			  timestamp in 'file' logging mode.</para>
 			  <para>Default: <replaceable>1</replaceable></para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>log_buffer_size</option></term>
+			<listitem>
+			  <para>Buffer logging in what sized blocks.
+                              Bigger buffers is better for the performance but it gives lag
+                              when running e.g. multitail or 'tail -f' on the log-file. If
+                              you want to directly see what is happing, set this to e.g. 1.
+                              So when debugging: make it a small value, else set it to
+                              4096 or more.</para>
+			  <para>Default: <replaceable>4096</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -12653,7 +12812,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-archiver</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -12668,7 +12827,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-msr</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -12745,10 +12904,10 @@
 		  <citerefentry>
 			<refentrytitle>zarafa-msr.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
-		  </citerefentry>
+		  </citerefentry>,
 		  <citerefentry>
-			<refentrytitle>zarafa-msr</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<refentrytitle>zarafa-msr-verify</refentrytitle>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -12938,7 +13097,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-msr</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -12952,7 +13111,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-msr-verify</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -13019,10 +13178,10 @@
 		  <citerefentry>
 			<refentrytitle>zarafa-msr.cfg</refentrytitle>
 			<manvolnum>5</manvolnum>
-		  </citerefentry>
+		  </citerefentry>,
 		  <citerefentry>
 			<refentrytitle>zarafa-msr</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -13036,7 +13195,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa7-upgrade</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -13103,7 +13262,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>za-aclsync</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -13202,7 +13361,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>za-aclset</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -13316,7 +13475,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>za-restore</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -13461,7 +13620,7 @@
 			  <option>--select-source</option>
 			</term>
 			<listitem>
-			  <para>Select the source archive(s) by providing a comma seperated
+			  <para>Select the source archive(s) by providing a comma separated
 			  list of archive indexes. The indexes specify which archives to
 			  restore from. The --detach, --unhook and --remove options only
 			  apply to the selected archives."</para>
@@ -13539,7 +13698,7 @@
 	<refentry>
 	  <refmeta>
 		<refentrytitle>zarafa-ws</refentrytitle>
-		<manvolnum>1</manvolnum>
+		<manvolnum>8</manvolnum>
 	  </refmeta>
 
 	  <refnamediv>
@@ -13772,7 +13931,7 @@
 			  transport, or when using a multi-server setup. See the
 			  <citerefentry>
 				<refentrytitle>zarafa-server</refentrytitle>
-				<manvolnum>1</manvolnum>
+				<manvolnum>8</manvolnum>
 			  </citerefentry>
 			  manual page on how to setup SSL keys.
 			  </para>
@@ -13913,7 +14072,7 @@
 		<para>
 		  <citerefentry>
 			<refentrytitle>zarafa-ws</refentrytitle>
-			<manvolnum>1</manvolnum>
+			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>

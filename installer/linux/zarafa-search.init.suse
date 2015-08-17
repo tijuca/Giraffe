@@ -18,7 +18,7 @@
 rc_reset
 
 SEARCHCONFIG=/etc/zarafa/search.cfg
-SEARCHPROGRAM=/usr/bin/zarafa-search
+SEARCHPROGRAM=/usr/sbin/zarafa-search
 
 # Sanity checks.
 #[ -f $SEARCHCONFIG ] || exit 0
@@ -33,6 +33,7 @@ if [ -z "$ZARAFA_LOCALE" ]; then
 fi
 
 search=`basename $SEARCHPROGRAM`
+PIDFILE=/var/run/$search.pid
 
 case "$1" in
     start)
@@ -46,7 +47,7 @@ case "$1" in
 
     stop)
 		echo -n "Stopping Zarafa search "
-		killproc -t15 $search
+		killproc -t15 -p $PIDFILE python
 		rc_status -v
 		;;
 
@@ -57,13 +58,13 @@ case "$1" in
 
 	reload)
 		echo -n "Restarting Zarafa search: "
-		killproc $search -SIGHUP
+		killproc -p $PIDFILE -SIGHUP python
 		rc_status -v
 		;;
 
     status)
 		echo -n "Checking for Zarafa search "
-		checkproc $search
+		checkproc -p $PIDFILE python
 		rc_status -v
 		;;
 

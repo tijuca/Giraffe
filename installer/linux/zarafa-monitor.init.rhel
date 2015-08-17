@@ -5,7 +5,7 @@
 # chkconfig: 345 86 24
 # description: The Zarafa Quota Monitor watches the store sizes \
 #              of users, and sends warning emails when limits are exceeded.
-# processname: /usr/bin/zarafa-monitor
+# processname: /usr/sbin/zarafa-monitor
 # config: /etc/zarafa/monitor.cfg
 # pidfile: /var/run/zarafa-monitor.pid
 
@@ -21,7 +21,7 @@
 ### END INIT INFO
 
 MONITORCONFIG=/etc/zarafa/monitor.cfg
-MONITORPROGRAM=/usr/bin/zarafa-monitor
+MONITORPROGRAM=/usr/sbin/zarafa-monitor
 
 # Sanity checks.
 [ -x $MONITORPROGRAM ] || exit 0

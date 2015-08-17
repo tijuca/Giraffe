@@ -4,6 +4,8 @@ import os
 import locale
 import sys
 import getopt
+import datetime
+import time
 
 try:
     import MAPI
@@ -20,6 +22,8 @@ except ImportError, e:
 PR_EC_OUTOFOFFICE                   = PROP_TAG(PT_BOOLEAN,    PR_EC_BASE+0x60)
 PR_EC_OUTOFOFFICE_MSG               = PROP_TAG(PT_TSTRING,    PR_EC_BASE+0x61)
 PR_EC_OUTOFOFFICE_SUBJECT           = PROP_TAG(PT_TSTRING,    PR_EC_BASE+0x62)
+PR_EC_OUTOFOFFICE_FROM              = PROP_TAG(PT_SYSTIME,    PR_EC_BASE+0x63)
+PR_EC_OUTOFOFFICE_UNTIL             = PROP_TAG(PT_SYSTIME,    PR_EC_BASE+0x64)
 
 MODE_ENABLE = 1
 MODE_DISABLE = 2
@@ -35,6 +39,8 @@ def print_help():
     print "   -m, --mode          0 to disable out of office (default), 1 to enable"
     print ""
     print "optional arguments:"
+    print "   --from              specify the date/time when oof should become active"
+    print "   --until             specify the date/time when oof should become inactive again"
     print "   -t, --subject       specify the subject to be set in oof message"
     print "   -n, --message       text file containing body of out of office message"
     print "   -h, --host          Host to connect with. Default: file:///var/run/zarafa"
@@ -64,7 +70,7 @@ def main(argv = None):
         argv = sys.argv
 
     try:
-        opts, args = getopt.gnu_getopt(argv, "h:s:p:u:m:t:n:he", ['host=', 'sslkey-file=', 'sslkey-pass=', 'user=', 'mode=', 'subject=', 'message=', 'help', ])
+        opts, args = getopt.gnu_getopt(argv, "h:s:p:u:m:t:n:he", ['from=', 'until=', 'host=', 'sslkey-file=', 'sslkey-pass=', 'user=', 'mode=', 'subject=', 'message=', 'help', ])
     except getopt.GetoptError, err:
         # print help information and exit:
         print str(err)
@@ -76,7 +82,9 @@ def main(argv = None):
     host = os.getenv('ZARAFA_SOCKET','file:///var/run/zarafa')
     sslkey_file = None
     sslkey_pass = None
-    mode = '-'
+    mode = MODE_UPDATE_ONLY
+    date_from = None
+    date_until = None
     username = None 
     subject = None
     message = None
@@ -99,6 +107,10 @@ def main(argv = None):
             else:
                 enabled = False
                 mode = MODE_DISABLE
+	elif o in ("--from"):
+	    date_from = datetime.datetime.strptime(a, "%Y-%m-%d %H:%M")
+	elif o in ("--until"):
+	    date_until = datetime.datetime.strptime(a, "%Y-%m-%d %H:%M")
         elif o in ('-t', '--subject'):
             subject = a
         elif o in ('-n', '--message'):
@@ -134,20 +146,42 @@ def main(argv = None):
     if mode != MODE_UPDATE_ONLY:
         try:
             oldstatus = st.GetProps([PR_EC_OUTOFOFFICE], 0)[0].Value
-            if oldstatus == enabled and enabled:
-                print "Out of office for user '%s' already enabled, skipping." % username
-            elif oldstatus == enabled and not enabled:
+            if oldstatus == enabled and not enabled:
                 print "Out of office for user '%s' already disabled, skipping." % username
             elif enabled:
                 st.SetProps([SPropValue(PR_EC_OUTOFOFFICE, enabled)])
+                if date_from and date_until:
+                    t1 = MAPI.Time.FileTime(0)
+                    t1.unixtime = time.mktime(date_from.timetuple())
+                    t2 = MAPI.Time.FileTime(0)
+                    t2.unixtime = time.mktime(date_until.timetuple())
+                    p1 = SPropValue(PR_EC_OUTOFOFFICE_FROM, t1)
+                    p2 = SPropValue(PR_EC_OUTOFOFFICE_UNTIL, t2)
+                    st.SetProps([p1, p2])
+                else:
+                    st.DeleteProps([PR_EC_OUTOFOFFICE_FROM, PR_EC_OUTOFOFFICE_UNTIL])
                 print "Out of office enabled for user '%s'" % username
             else:
                 st.SetProps([SPropValue(PR_EC_OUTOFOFFICE, enabled)])
                 print "Out of office disabled for user '%s'" % username
         except:
             print "Unable to set out of office for user '%s'" % username
+            raise
 
     if mode != MODE_DISABLE:
+        if date_from and date_until:
+            try:
+                t1 = MAPI.Time.FileTime(0)
+                t1.unixtime = time.mktime(date_from.timetuple())
+                t2 = MAPI.Time.FileTime(0)
+                t2.unixtime = time.mktime(date_until.timetuple())
+                p1 = SPropValue(PR_EC_OUTOFOFFICE_FROM, t1)
+                p2 = SPropValue(PR_EC_OUTOFOFFICE_UNTIL, t2)
+                st.SetProps([p1, p2])
+            except:
+                print "Unable to update OOF date restriction for user '%s'" % username
+                raise
+
         if subject:
             try:
                 oldsubject = st.GetProps([PR_EC_OUTOFOFFICE_SUBJECT], 0)[0].Value

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -87,11 +86,11 @@ static const LONGLONG UnitsPerHalfMinute = 300000000;
  * Platform independent functions
  */
 HRESULT	UnixTimeToFileTime(time_t t, FILETIME *ft);
-HRESULT	FileTimeToUnixTime(FILETIME &ft, time_t *t);
+HRESULT	FileTimeToUnixTime(const FILETIME &ft, time_t *t);
 void	UnixTimeToFileTime(time_t t, int *hi, unsigned int *lo);
 time_t	FileTimeToUnixTime(unsigned int hi, unsigned int lo);
 void	RTimeToFileTime(LONG rtime, FILETIME *pft);
-void	FileTimeToRTime(FILETIME *pft, LONG* prtime);
+void	FileTimeToRTime(const FILETIME *pft, LONG *prtime);
 HRESULT	UnixTimeToRTime(time_t unixtime, LONG *rtime);
 HRESULT	RTimeToUnixTime(LONG rtime, time_t *unixtime);
 time_t SystemTimeToUnixTime(SYSTEMTIME stime);
@@ -162,5 +161,15 @@ void	sleep_ms(unsigned int millis);
 #define MEMORY_USAGE_STRING(str)			(str.capacity() + 1)
 #define MEMORY_USAGE_MULTIMAP(items, map)	MEMORY_USAGE_MAP(items, map)
 
+extern ssize_t read_retry(int, void *, size_t);
+extern ssize_t write_retry(int, const void *, size_t);
+
+#include <string>
+#include <pthread.h>
+void set_thread_name(pthread_t tid, const std::string & name);
+void my_readahead(const int fd);
+void give_filesize_hint(const int fd, const off_t len);
+
+bool force_buffers_to_disk(const int fd);
 
 #endif // PLATFORM_H

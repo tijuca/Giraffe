@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -52,15 +51,15 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 // These charset should all be supported by iconv
 
 // @see http://msdn.microsoft.com/en-us/library/dd317756(VS.85).aspx
 // this list is incomplete
-struct CPMAP {
-    char *charset;
+static const struct CPMAP {
+    const char *charset;
     ULONG codepage;
 } CPMAP[] = {
   { "DIN_66003",		20106 },
@@ -83,8 +82,7 @@ struct CPMAP {
   { "iso-2022-jp",	 	50220 },
   { "iso-2022-jp",	 	50222 },
   { "iso-2022-kr",	 	50225 },
-  { "windows-1252",	 	1252 }, // ordering is important.. for outgoing message we want to send windows-1252, not iso
-  { "iso-8859-1",	 	1252 },
+  { "windows-1252",	 	1252 },
   { "iso-8859-1",	 	28591 },
   { "iso-8859-2",	 	28592 },
   { "iso-8859-3", 		28593 },
@@ -101,8 +99,8 @@ struct CPMAP {
   { "koi8-u",			21866 },
   { "shift-jis",	 	932 },
   { "shift_jis",	 	932 },
-  { "unicode",		 	1200 },
-  { "unicodebig",	 	1201 },
+  { "unicode",		 	1200 }, /* UTF-16LE and BMP-only */
+  { "unicodebig",	 	1201 }, /* UTF-16BE and BMP-only */
   { "utf-7",		 	65000 },
   { "utf-8",		 	65001 },
   { "windows-1250",	 	1250 },
@@ -124,7 +122,7 @@ struct CPMAP {
  * @param[out]	lppszCharset	Pointer to internal structure containing iconv charset string
  * @retval MAPI_E_NOT_FOUND on unknown codepage, lppszCharset will be unchanged.
  */
-HRESULT HrGetCharsetByCP(ULONG codepage, char **lppszCharset)
+HRESULT HrGetCharsetByCP(ULONG codepage, const char **lppszCharset)
 {
     HRESULT hr = hrSuccess;
     unsigned int i = 0;

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -77,8 +76,11 @@ struct soap_connection_thread {
  * 
  * @return the socket we're listening on, or -1 for failure.
  */
-int create_pipe_socket(const char *unix_socket, ECConfig *lpConfig, ECLogger *lpLogger, bool bInit, int mode) {
+static int create_pipe_socket(const char *unix_socket, ECConfig *lpConfig,
+    ECLogger *lpLogger, bool bInit, int mode)
+{
 	int s;
+	int er = 0;
 	struct sockaddr_un saddr;
 	memset(&saddr, 0, sizeof(struct sockaddr_un));
 
@@ -94,19 +96,28 @@ int create_pipe_socket(const char *unix_socket, ECConfig *lpConfig, ECLogger *lp
 	
 	unlink(unix_socket);
 
-        if (bind(s, (struct sockaddr*)&saddr, 2 + strlen(unix_socket)) == -1) {
-                lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to socket %s. This is usually caused by an other proces (most likely an other zarafa-server) already using this port. This program will terminate now.", unix_socket);
+	if (bind(s, (struct sockaddr*)&saddr, 2 + strlen(unix_socket)) == -1) {
+		lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to socket %s (%s). This is usually caused by another process (most likely another zarafa-server) already using this port. This program will terminate now.", unix_socket, strerror(errno));
                 kill(0, SIGTERM);
                 exit(1);
         }
 
-	chmod(unix_socket,mode);
+	er = chmod(unix_socket,mode);
+	if(er) {
+		lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to chmod socket %s. Error: %s", unix_socket, strerror(errno));
+		closesocket(s);
+		return -1;
+	}
 
-	unix_chown(unix_socket, lpConfig->GetSetting("run_as_user"), lpConfig->GetSetting("run_as_group"));
+	if(er) {
+		lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to chown socket %s, to %s:%s. Error: %s", unix_socket, lpConfig->GetSetting("run_as_user"), lpConfig->GetSetting("run_as_group"), strerror(errno));
+		closesocket(s);
+		return -1;
+	}
 	
 	if(listen(s,8) == -1) {
 		lpLogger->Log(EC_LOGLEVEL_FATAL, "Can't listen on unix socket %s", unix_socket);
-		close(s);
+		closesocket(s);
 		return -1;
 	}
 
@@ -122,7 +133,8 @@ int create_pipe_socket(const char *unix_socket, ECConfig *lpConfig, ECLogger *lp
  * this problem, we make sure that most FD's under 1024 are free for use by external libraries, while
  * we use the range 1024 -> 8192
  */
-int relocate_fd(int fd, ECLogger *lpLogger) {
+int relocate_fd(int fd, ECLogger *lpLogger)
+{
 	// If we only have a 1024-fd limit, just return the original fd
 	if(getdtablesize() <= 1024)
 		return fd;
@@ -207,7 +219,7 @@ ECRESULT ECSoapServerConnection::ListenTCP(const char* lpServerName, int nServer
 
         lpsSoap->socket = socket = soap_bind(lpsSoap, lpServerName, nServerPort, 100);
         if (socket == -1) {
-                m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to port %d: %s. This is usually caused by an other proces (most likely an other zarafa-server) already using this port. This program will terminate now.", nServerPort, lpsSoap->fault->faultstring);
+                m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to port %d: %s. This is usually caused by another process (most likely another zarafa-server) already using this port. This program will terminate now.", nServerPort, lpsSoap->fault->faultstring);
                 kill(0, SIGTERM);
                 exit(1);
         }
@@ -232,12 +244,12 @@ ECRESULT ECSoapServerConnection::ListenSSL(const char* lpServerName, int nServer
 	int			socket = SOAP_INVALID_SOCKET;
 	struct soap	*lpsSoap = NULL;
 	char *server_ssl_protocols = strdup(m_lpConfig->GetSetting("server_ssl_protocols"));
-	char *server_ssl_ciphers = m_lpConfig->GetSetting("server_ssl_ciphers");
+	const char *server_ssl_ciphers = m_lpConfig->GetSetting("server_ssl_ciphers");
 	char *ssl_name = NULL;
 	int ssl_op = 0, ssl_include = 0, ssl_exclude = 0;
 
 	if(lpServerName == NULL) {
-		free(server_ssl_ciphers);
+		free(server_ssl_protocols);
 		er = ZARAFA_E_INVALID_PARAMETER;
 		goto exit;
 	}
@@ -347,7 +359,7 @@ ECRESULT ECSoapServerConnection::ListenSSL(const char* lpServerName, int nServer
 
         lpsSoap->socket = socket = soap_bind(lpsSoap, lpServerName, nServerPort, 100);
         if (socket == -1) {
-                m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to port %d: %s (SSL). This is usually caused by an other proces (most likely an other zarafa-server) already using this port. This program will terminate now.", nServerPort, lpsSoap->fault->faultstring);
+                m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to port %d: %s (SSL). This is usually caused by another process (most likely another zarafa-server) already using this port. This program will terminate now.", nServerPort, lpsSoap->fault->faultstring);
                 kill(0, SIGTERM);
                 exit(1);
         }

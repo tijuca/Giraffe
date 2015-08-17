@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -73,7 +72,7 @@ using namespace std;
 
 #ifdef _DEBUG
 #undef THIS_FILE
-static char THIS_FILE[]=__FILE__;
+static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -283,7 +282,7 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 	ULONG			cSrcValues = 0;
 	ULONG			cbTmp = 0;
 	LPBYTE			lpByteTmp = NULL;
-	LPTSTR			lpMsgClass = NULL;
+	const TCHAR *lpMsgClass = NULL;
 	LPTSTR			lpReportText = NULL;
 	LPTSTR			lpReadText = NULL;
 	FILETIME		ft;	
@@ -438,7 +437,7 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 	lpDestPropValue[ulCurDestValues++].Value.ul = 0;
 
 	lpDestPropValue[ulCurDestValues].ulPropTag = PR_MESSAGE_CLASS;
-	lpDestPropValue[ulCurDestValues++].Value.LPSZ = lpMsgClass;
+	lpDestPropValue[ulCurDestValues++].Value.LPSZ = const_cast<TCHAR *>(lpMsgClass);
 	
 	lpDestPropValue[ulCurDestValues].ulPropTag = PR_REPORT_TEXT;
 	lpDestPropValue[ulCurDestValues++].Value.LPSZ = lpReportText;
@@ -918,6 +917,7 @@ HRESULT ClientUtil::ConvertMSEMSProps(ULONG cValues, LPSPropValue pValues, ULONG
 		{ "log_file","-" },
 		{ "log_level","2", CONFIGSETTING_RELOADABLE },
 		{ "log_timestamp","1" },
+		{ "log_buffer_size",	"4096" },
 		{ NULL, NULL },
 	};
 	ECConfig *lpConfig = ECConfig::Create(settings);
@@ -981,24 +981,29 @@ HRESULT ClientUtil::ConvertMSEMSProps(ULONG cValues, LPSPropValue pValues, ULONG
 		szUsername = strrchr(szUsername, '=')+1;
 
 	lpProps[cProps].ulPropTag = PR_EC_PATH;
-	MAPIAllocateMore(strServerPath.size() + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA);
+	if ((hr = MAPIAllocateMore(strServerPath.size() + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
+		goto exit;
 	strcpy(lpProps[cProps++].Value.lpszA, strServerPath.c_str());
 
 	strUsername = convert_to<std::wstring>(szUsername);
 	lpProps[cProps].ulPropTag = PR_EC_USERNAME;
-	MAPIAllocateMore((strUsername.size() + 1) * sizeof(TCHAR), lpProps, (void**)&lpProps[cProps].Value.lpszW);
+	if ((hr = MAPIAllocateMore((strUsername.size() + 1) * sizeof(TCHAR), lpProps, (void**)&lpProps[cProps].Value.lpszW)) != hrSuccess)
+		goto exit;
 	wcscpy(lpProps[cProps++].Value.lpszW, strUsername.c_str());
 
 	lpProps[cProps].ulPropTag = PR_EC_USERPASSWORD;
-	MAPIAllocateMore(sizeof(TCHAR), lpProps, (void**)&lpProps[cProps].Value.LPSZ);
+	if ((hr = MAPIAllocateMore(sizeof(TCHAR), lpProps, (void**)&lpProps[cProps].Value.LPSZ)) != hrSuccess)
+		goto exit;
 	_tcscpy(lpProps[cProps++].Value.LPSZ, L"");
 
 	lpProps[cProps].ulPropTag = PR_EC_SSLKEY_FILE;
-	MAPIAllocateMore(strlen(lpConfig->GetSetting("ssl_key_file")) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA);
+	if ((hr = MAPIAllocateMore(strlen(lpConfig->GetSetting("ssl_key_file")) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
+		goto exit;
 	strcpy(lpProps[cProps++].Value.lpszA, lpConfig->GetSetting("ssl_key_file"));
 
 	lpProps[cProps].ulPropTag = PR_EC_SSLKEY_PASS;
-	MAPIAllocateMore(strlen(lpConfig->GetSetting("ssl_key_pass")) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA);
+	if ((hr = MAPIAllocateMore(strlen(lpConfig->GetSetting("ssl_key_pass")) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
+		goto exit;
 	strcpy(lpProps[cProps++].Value.lpszA, lpConfig->GetSetting("ssl_key_pass"));
 
 	lpProps[cProps].ulPropTag = PR_EC_FLAGS; // Since we're emulating exchange, use 22-byte exchange-style sourcekeys
@@ -1007,7 +1012,8 @@ HRESULT ClientUtil::ConvertMSEMSProps(ULONG cValues, LPSPropValue pValues, ULONG
 	lpProfileName = PpropFindProp(pValues, cValues, PR_PROFILE_NAME_A);
 	if(lpProfileName) {
 		lpProps[cProps].ulPropTag = PR_PROFILE_NAME_A;
-		MAPIAllocateMore(strlen(lpProfileName->Value.lpszA) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA);
+		if ((hr = MAPIAllocateMore(strlen(lpProfileName->Value.lpszA) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
+			goto exit;
 		strcpy(lpProps[cProps++].Value.lpszA, lpProfileName->Value.lpszA);
 	}
 	
@@ -1063,39 +1069,6 @@ HRESULT HrCreateEntryId(GUID guidStore, unsigned int ulObjType, ULONG* lpcbEntry
 	*lppEntryId = lpEntryId;
 
 exit:
-
-	return hr;
-}
-
-HRESULT HrGetServerPath(LPMAILUSER lpsMailUser, std::string *lpstrServerPath)
-{
-	HRESULT			hr = hrSuccess;
-	ULONG			cbResult = 0;
-	LPSPropValue	lpsResult = NULL;
-
-	SizedSPropTagArray(1, sServerPathProp) = {1, {PR_EC_SERVERPATH}};
-
-	if (!lpsMailUser || !lpstrServerPath)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	hr = lpsMailUser->GetProps((LPSPropTagArray)&sServerPathProp, 0, &cbResult, &lpsResult);
-	if (hr != hrSuccess)
-		goto exit;
-
-	if (cbResult != 1 || lpsResult->Value.lpszA == NULL)
-	{
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-	*lpstrServerPath = lpsResult->Value.lpszA;
-
-exit:
-	if (lpsResult)
-		ECFreeBuffer(lpsResult);
 
 	return hr;
 }

@@ -1,10 +1,8 @@
 ACLOCAL_AMFLAGS = -I autoconf
 
-if ! OSS_ONLY
-PROSUBS = liblicense licensed libtimezone libcalendar 
-endif
 
-SUBDIRS = common libfreebusy mapi4linux zarafa-libsync $(PROSUBS) provider libicalmapi inetmapi
+SUBDIRS = . common m4lcommon mapi4linux libfreebusy zarafa-libsync \
+          $(PROSUBS) provider libicalmapi inetmapi
 if WITH_PHP
 SUBDIRS += php-ext
 endif
@@ -18,17 +16,24 @@ SUBDIRS += swig
 endif
 endif
 
-#EXTRA_DIST = version common/ecversion.h php-webclient-ajax
-EXTRA_DIST = version versionheader.sh common/ecversion.h php-webclient-ajax LICENSE.txt CONTRIBUTORS.txt AGPL-3
+if !OSS_ONLY
+SUBDIRS += testunit
+endif
 
-BUILT_SOURCES = common/ecversion.h
+#EXTRA_DIST = version common/ecversion.h php-webclient-ajax
+EXTRA_DIST = version versionheader.sh common/ecversion.h php-webclient-ajax \
+	LICENSE.txt CONTRIBUTORS.txt AGPL-3 TRADEMARKS.txt \
+	lddcheck global.am
+
+BUILT_SOURCES = source-moved-check common/ecversion.h
+
+.PHONY: source-moved-check
+source-moved-check:
+	@${top_srcdir}/pwdcheck.sh "${abs_top_builddir}"
 
 common/ecversion.h: versionheader.sh
 	sh ${top_srcdir}/versionheader.sh > common/ecversion.h
 
-if ! OSS_ONLY
-CLEANFILES=common/ecversion.h
-endif
 
 dist-hook:
 	find $(distdir) -type d -name .svn -exec rm -rf {} \; 2>/dev/null || true
@@ -55,3 +60,5 @@ install-ajax-webaccess:
 		msgfmt -f -v -o $${po%.po}.mo $$po; \
 		rm $$po; \
 	done
+
+default.sym: ${top_builddir}/config.status

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,6 +44,7 @@
 #ifndef ECSERIALIZER_H
 #define ECSERIALIZER_H
 
+#include "zcdefs.h"
 #include <ZarafaCode.h>
 
 struct IStream;
@@ -72,21 +72,16 @@ public:
 	virtual ECRESULT Stat(ULONG *lpulRead, ULONG *lpulWritten) = 0;
 };
 
-class ECStreamSerializer : public ECSerializer
+class ECStreamSerializer _final : public ECSerializer
 {
 public:
 	ECStreamSerializer(IStream *lpBuffer);
-	~ECStreamSerializer();
-
-	ECRESULT SetBuffer(void *lpBuffer);
-
-	ECRESULT Write(const void *ptr, size_t size, size_t nmemb);
-	ECRESULT Read(void *ptr, size_t size, size_t nmemb);
-
-	ECRESULT Skip(size_t size, size_t nmemb);
-	ECRESULT Flush();
-	
-	ECRESULT Stat(ULONG *lpulRead, ULONG *lpulWritten);
+	ECRESULT SetBuffer(void *lpBuffer) _override;
+	ECRESULT Write(const void *ptr, size_t size, size_t nmemb) _override;
+	ECRESULT Read(void *ptr, size_t size, size_t nmemb) _override;
+	ECRESULT Skip(size_t size, size_t nmemb) _override;
+	ECRESULT Flush(void) _override;
+	ECRESULT Stat(ULONG *lpulRead, ULONG *lpulWritten) _override;
 
 private:
 	IStream *m_lpBuffer;
@@ -94,23 +89,19 @@ private:
 	ULONG m_ulWritten;
 };
 
-class ECFifoSerializer : public ECSerializer
+class ECFifoSerializer _final : public ECSerializer
 {
 public:
 	enum eMode { serialize, deserialize };
 
 	ECFifoSerializer(ECFifoBuffer *lpBuffer, eMode mode);
-	~ECFifoSerializer();
-
-	ECRESULT SetBuffer(void *lpBuffer);
-
-	ECRESULT Write(const void *ptr, size_t size, size_t nmemb);
-	ECRESULT Read(void *ptr, size_t size, size_t nmemb);
-
-	ECRESULT Skip(size_t size, size_t nmemb);
-	ECRESULT Flush();
-	
-	ECRESULT Stat(ULONG *lpulRead, ULONG *lpulWritten);
+	virtual ~ECFifoSerializer(void);
+	ECRESULT SetBuffer(void *lpBuffer) _override;
+	ECRESULT Write(const void *ptr, size_t size, size_t nmemb) _override;
+	ECRESULT Read(void *ptr, size_t size, size_t nmemb) _override;
+	ECRESULT Skip(size_t size, size_t nmemb) _override;
+	ECRESULT Flush(void) _override;
+	ECRESULT Stat(ULONG *lpulRead, ULONG *lpulWritten) _override;
 
 private:
 	ECFifoBuffer *m_lpBuffer;

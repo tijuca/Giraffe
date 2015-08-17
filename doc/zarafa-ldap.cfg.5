@@ -2,12 +2,12 @@
 .\"     Title: zarafa-ldap.cfg
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: August 2011
+.\"      Date: April 2014
 .\"    Manual: Zarafa user reference
-.\"    Source: Zarafa 7.1
+.\"    Source: Zarafa 7.2
 .\"  Language: English
 .\"
-.TH "ZARAFA\-LDAP\&.CFG" "5" "August 2011" "Zarafa 7.1" "Zarafa user reference"
+.TH "ZARAFA\-LDAP\&.CFG" "5" "April 2014" "Zarafa 7.2" "Zarafa user reference"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -68,7 +68,7 @@ Example: !include common\&.cfg
 .RS 4
 Propmap delivers the capabilities to map additional attributes to addressbook properties (e\&.g\&. firstname, lastname, telephonenumber)\&.
 .sp
-In the propmap the configuration names must be the hex propery tag of the requested property\&. The value given to the configuration name must be the LDAP attribute to which the property should be mapped\&.
+In the propmap the configuration names must be the hex property tag of the requested property\&. The value given to the configuration name must be the LDAP attribute to which the property should be mapped\&.
 .sp
 Example: !propmap ldap\&.propmap\&.cfg
 .RE
@@ -873,7 +873,7 @@ Default:
 .PP
 \fBldap_quota_userwarning_recipients_attribute\fR
 .RS 4
-This attribute contains the list of users who will recieve an email when a user exceeds his quota\&. User who exceeds his quota will be automatically added to the recipients list, this list only indicates who else will be notified\&.
+This attribute contains the list of users who will receive an email when a user exceeds his quota\&. User who exceeds his quota will be automatically added to the recipients list, this list only indicates who else will be notified\&.
 .sp
 Default:
 \fIzarafaQuotaUserWarningRecipients\fR
@@ -906,7 +906,7 @@ Default: Empty, using
 .PP
 \fBldap_quota_companywarning_recipients_attribute\fR
 .RS 4
-This attribute contains the list of users who will recieve an email when a tenant exceeds its quota\&. The system administrator of the tenant that is over quota will automatically be added to the recipients list, this list only indicates who else will be notified\&.
+This attribute contains the list of users who will receive an email when a tenant exceeds its quota\&. The system administrator of the tenant that is over quota will automatically be added to the recipients list, this list only indicates who else will be notified\&.
 .sp
 Default:
 \fIzarafaQuotaCompanyWarningRecipients\fR
@@ -961,7 +961,7 @@ Recommended for ADS installations:
 \fI(anr=%s)\fR
 .sp
 Optional for OpenLDAP installations:
-\fI(|(mail=%s*)(uid=%s*)(cn=*%s*)(fullname=*%s*)(givenname=*%s*)(lastname=*%s*)(sn=*%s*))\fR
+\fI(|(mail=%s*)(uid=%s*)(cn=*%s*)\:(fullname=*%s*)(givenname=*%s*)(lastname=*%s*)(sn=*%s*))\fR
 .RE
 .PP
 \fBldap_filter_cutoff_elements\fR
@@ -990,5 +990,5 @@ Written by Zarafa\&.
 .SH "SEE ALSO"
 .PP
 
-\fBzarafa-server\fR(1)
+\fBzarafa-server\fR(8),
 \fBzarafa-server.cfg\fR(5)

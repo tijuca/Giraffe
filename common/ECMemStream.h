@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,6 +44,7 @@
 #ifndef ECMEMSTREAM_H
 #define ECMEMSTREAM_H
 
+#include "zcdefs.h"
 #include "ECUnknown.h"
 
 /* The ECMemBlock class is basically a random-access block of data that can be
@@ -56,7 +56,7 @@
  */
 
 
-class ECMemBlock : public ECUnknown {
+class ECMemBlock _final : public ECUnknown {
 private:
 	ECMemBlock(char *buffer, ULONG ulDataLen, ULONG ulFlags);
 	~ECMemBlock();
@@ -64,7 +64,7 @@ private:
 public:
 	static HRESULT	Create(char *buffer, ULONG ulDataLen, ULONG ulFlags, ECMemBlock **lppStream);
 
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _override;
 
 	virtual HRESULT	ReadAt(ULONG ulPos, ULONG ulLen, char *buffer, ULONG *ulBytesRead);
 	virtual HRESULT WriteAt(ULONG ulPos, ULONG ulLen, char *buffer, ULONG *ulBytesWritten);
@@ -87,7 +87,7 @@ private:
  * This is an IStream-compatible wrapper for ECMemBlock
  */
 
-class ECMemStream : public ECUnknown {
+class ECMemStream _final : public ECUnknown {
 public:
 	typedef HRESULT (*CommitFunc)(IStream *lpStream, void *lpParam);
 	typedef HRESULT (*DeleteFunc)(void *lpParam); /* Caller's function to remove lpParam data from memory */
@@ -103,8 +103,8 @@ public:
 	static  HRESULT	Create(ECMemBlock *lpMemBlock, ULONG ulFlags, CommitFunc lpCommitFunc, DeleteFunc lpDeleteFunc,
 						   void *lpParam, ECMemStream **lppStream);
 
-	virtual ULONG Release();
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
+	virtual ULONG Release(void) _override;
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _override;
 
 	virtual HRESULT Read(void *pv, ULONG cb, ULONG *pcbRead);
 	virtual HRESULT Write(const void *pv, ULONG cb, ULONG *pcbWritten);
@@ -121,23 +121,23 @@ public:
 	virtual ULONG GetSize();
 	virtual char* GetBuffer();
 
-	class xStream : public IStream {
+	class xStream _final : public IStream {
 		// AddRef and Release from ECUnknown
-		virtual ULONG   __stdcall AddRef();
-		virtual ULONG   __stdcall Release();
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, LPVOID *lppInterface);
+		virtual ULONG   __stdcall AddRef(void) _override;
+		virtual ULONG   __stdcall Release(void) _override;
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, LPVOID *lppInterface) _override;
 
-		virtual HRESULT __stdcall Read(void *pv, ULONG cb, ULONG *pcbRead);
-		virtual HRESULT __stdcall Write(const void *pv, ULONG cb, ULONG *pcbWritten);
-		virtual HRESULT __stdcall Seek(LARGE_INTEGER dlibmove, DWORD dwOrigin, ULARGE_INTEGER *plibNewPosition);
-		virtual HRESULT __stdcall SetSize(ULARGE_INTEGER libNewSize);
-		virtual HRESULT __stdcall CopyTo(IStream *pstm, ULARGE_INTEGER cb, ULARGE_INTEGER *pcbRead, ULARGE_INTEGER *pcbWritten);
-		virtual HRESULT __stdcall Commit(DWORD grfCommitFlags);
-		virtual HRESULT __stdcall Revert();
-		virtual HRESULT __stdcall LockRegion(ULARGE_INTEGER libOffset, ULARGE_INTEGER cb, DWORD dwLockType);
-		virtual HRESULT __stdcall UnlockRegion(ULARGE_INTEGER libOffset, ULARGE_INTEGER cb, DWORD dwLockType);
-		virtual HRESULT __stdcall Stat(STATSTG *pstatstg, DWORD grfStatFlag);
-		virtual HRESULT __stdcall Clone(IStream **ppstm);
+		virtual HRESULT __stdcall Read(void *pv, ULONG cb, ULONG *pcbRead) _override;
+		virtual HRESULT __stdcall Write(const void *pv, ULONG cb, ULONG *pcbWritten) _override;
+		virtual HRESULT __stdcall Seek(LARGE_INTEGER dlibmove, DWORD dwOrigin, ULARGE_INTEGER *plibNewPosition) _override;
+		virtual HRESULT __stdcall SetSize(ULARGE_INTEGER libNewSize) _override;
+		virtual HRESULT __stdcall CopyTo(IStream *pstm, ULARGE_INTEGER cb, ULARGE_INTEGER *pcbRead, ULARGE_INTEGER *pcbWritten) _override;
+		virtual HRESULT __stdcall Commit(DWORD grfCommitFlags) _override;
+		virtual HRESULT __stdcall Revert() _override;
+		virtual HRESULT __stdcall LockRegion(ULARGE_INTEGER libOffset, ULARGE_INTEGER cb, DWORD dwLockType) _override;
+		virtual HRESULT __stdcall UnlockRegion(ULARGE_INTEGER libOffset, ULARGE_INTEGER cb, DWORD dwLockType) _override;
+		virtual HRESULT __stdcall Stat(STATSTG *pstatstg, DWORD grfStatFlag) _override;
+		virtual HRESULT __stdcall Clone(IStream **ppstm) _override;
 	} m_xStream;
 
 private:

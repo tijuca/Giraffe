@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -46,7 +45,7 @@
 
 #include "platform.h"
 
-#include <math.h>
+#include <cmath>
 
 extern "C" {
 	// Remove these defines to remove warnings
@@ -505,7 +504,7 @@ HRESULT PHPArraytoPropValueArray(zval* phpArray, void *lpBase, ULONG *lpcValues,
 				GET_MV_HASH() \
 				CHECK_EMPTY_MV_ARRAY(mapimvmember, mapilpmember) \
 				lpPropValue[cvalues].Value.mapimvmember.cValues = countarray; \
-				MAPIAllocateMore(sizeof(lpPropValue[cvalues].Value.mapimvmember.mapilpmember[0]) * countarray, lpBase ? lpBase : lpPropValue, (void**)&lpPropValue[cvalues].Value.mapimvmember.mapilpmember); \
+				MAPI_G(hr) = MAPIAllocateMore(sizeof(lpPropValue[cvalues].Value.mapimvmember.mapilpmember[0]) * countarray, lpBase ? lpBase : lpPropValue, (void**)&lpPropValue[cvalues].Value.mapimvmember.mapilpmember); \
 				for (j = 0; j < countarray; j++) { \
 					zend_hash_get_current_data(dataHash, (void **) &dataEntry); \
 					convert_to_##type##_ex(dataEntry); \
@@ -544,7 +543,8 @@ HRESULT PHPArraytoPropValueArray(zval* phpArray, void *lpBase, ULONG *lpcValues,
 				CHECK_EMPTY_MV_ARRAY(MVft, lpft);
 
 				lpPropValue[cvalues].Value.MVft.cValues = countarray;
-				MAPIAllocateMore(sizeof(FILETIME) * countarray, lpBase ? lpBase : lpPropValue, (void**)&lpPropValue[cvalues].Value.MVft.lpft);
+				if ((MAPI_G(hr) = MAPIAllocateMore(sizeof(FILETIME) * countarray, lpBase ? lpBase : lpPropValue, (void**)&lpPropValue[cvalues].Value.MVft.lpft)) != hrSuccess)
+					goto exit;
 				for (j = 0; j < countarray; j++) {
 					zend_hash_get_current_data(dataHash, (void **) &dataEntry);
 					convert_to_long_ex(dataEntry);
@@ -559,7 +559,8 @@ HRESULT PHPArraytoPropValueArray(zval* phpArray, void *lpBase, ULONG *lpcValues,
 				GET_MV_HASH();
 				CHECK_EMPTY_MV_ARRAY(MVbin, lpbin);
 
-				MAPIAllocateMore(sizeof(SBinary) * countarray, lpBase ? lpBase : lpPropValue, (void**)&lpPropValue[cvalues].Value.MVbin.lpbin);
+				if ((MAPI_G(hr) = MAPIAllocateMore(sizeof(SBinary) * countarray, lpBase ? lpBase : lpPropValue, (void**)&lpPropValue[cvalues].Value.MVbin.lpbin)) != hrSuccess)
+					goto exit;
 				for (h = 0, j = 0; j < countarray; j++) {
 					zend_hash_get_current_data(dataHash, (void **) &dataEntry);
 					convert_to_string_ex(dataEntry);
@@ -582,12 +583,15 @@ HRESULT PHPArraytoPropValueArray(zval* phpArray, void *lpBase, ULONG *lpcValues,
 				GET_MV_HASH();
 				CHECK_EMPTY_MV_ARRAY(MVszA, lppszA);
 
-				MAPIAllocateMore(sizeof(char*) * countarray, lpBase ? lpBase : lpPropValue, (void**)&lpPropValue[cvalues].Value.MVszA.lppszA);
+				if ((MAPI_G(hr) = MAPIAllocateMore(sizeof(char*) * countarray, lpBase ? lpBase : lpPropValue, (void**)&lpPropValue[cvalues].Value.MVszA.lppszA)) != hrSuccess)
+					goto exit;
 				for (h = 0, j = 0; j < countarray; j++) {
 					zend_hash_get_current_data(dataHash, (void **) &dataEntry);
 					convert_to_string_ex(dataEntry);
 					
 					MAPI_G(hr) = MAPIAllocateMore(dataEntry[0]->value.str.len+1, lpBase ? lpBase : lpPropValue, (void **) &lpPropValue[cvalues].Value.MVszA.lppszA[h]);
+					if (MAPI_G(hr) != hrSuccess)
+						goto exit;
 					
 					strncpy(lpPropValue[cvalues].Value.MVszA.lppszA[h], dataEntry[0]->value.str.val, dataEntry[0]->value.str.len+1);
 					h++;
@@ -601,7 +605,8 @@ HRESULT PHPArraytoPropValueArray(zval* phpArray, void *lpBase, ULONG *lpcValues,
 				GET_MV_HASH();
 				CHECK_EMPTY_MV_ARRAY(MVguid, lpguid);
 
-				MAPIAllocateMore(sizeof(GUID) * countarray, lpBase ? lpBase : lpPropValue, (void**)&lpPropValue[cvalues].Value.MVguid.lpguid);
+				if ((MAPI_G(hr) = MAPIAllocateMore(sizeof(GUID) * countarray, lpBase ? lpBase : lpPropValue, (void**)&lpPropValue[cvalues].Value.MVguid.lpguid)) != hrSuccess)
+					goto exit;
 				for (h = 0, j = 0; j < countarray; j++) {
 					zend_hash_get_current_data(dataHash, (void **) &dataEntry);
 					convert_to_string_ex(dataEntry);
@@ -642,12 +647,14 @@ HRESULT PHPArraytoPropValueArray(zval* phpArray, void *lpBase, ULONG *lpcValues,
 					goto exit;
 				}
 
-				MAPIAllocateMore(sizeof(ACTIONS), lpBase ? lpBase : lpPropValue, (void**)&lpPropValue[cvalues].Value.lpszA);
+				if ((MAPI_G(hr) = MAPIAllocateMore(sizeof(ACTIONS), lpBase ? lpBase : lpPropValue, (void**)&lpPropValue[cvalues].Value.lpszA)) != hrSuccess)
+					goto exit;
 				lpActions = (ACTIONS*)lpPropValue[cvalues].Value.lpszA;
 				lpActions->ulVersion = EDK_RULES_VERSION;
 				lpActions->cActions = countarray;
 
-				MAPIAllocateMore(sizeof(ACTION)*lpActions->cActions, lpBase ? lpBase : lpPropValue, (void**)&lpActions->lpAction);
+				if ((MAPI_G(hr) = MAPIAllocateMore(sizeof(ACTION)*lpActions->cActions, lpBase ? lpBase : lpPropValue, (void**)&lpActions->lpAction)) != hrSuccess)
+					goto exit;
 				memset(lpActions->lpAction, 0, sizeof(ACTION)*lpActions->cActions);
 
 				for (j=0; j < countarray; j++) {
@@ -963,7 +970,9 @@ HRESULT PHPArraytoRowList(zval *phpArray, void *lpBase, LPROWLIST *lppRowList TS
 	count = zend_hash_num_elements(target_hash);
 
 	// allocate memory to store the array of pointers
-	MAPIAllocateBuffer(CbNewADRLIST(count), (void **)&lpRowList);
+	MAPI_G(hr) = MAPIAllocateBuffer(CbNewADRLIST(count), (void **)&lpRowList);
+	if (MAPI_G(hr) != hrSuccess)
+		goto exit;
 
 	zend_hash_internal_pointer_reset(target_hash);
 

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -48,7 +47,7 @@
 #include "my_getopt.h"
 #include "charset/convert.h"
 
-#include <math.h>
+#include <cmath>
 #include <mapidefs.h>
 #include <mapispi.h>
 #include <mapix.h>
@@ -67,7 +66,7 @@
 
 using namespace std;
 
-bool verbose = false;
+static bool verbose = false;
 
 enum modes {
 	MODE_INVALID = 0, MODE_CHANGE_PASSWD, MODE_HELP
@@ -78,12 +77,13 @@ enum {
 	OPT_HOST
 };
 
-struct option long_options[] = {
+static const struct option long_options[] = {
 		{ "help", 0, NULL, OPT_HELP },
 		{ "host", 1, NULL, OPT_HOST }
 };
 
-void print_help(char *name) {
+static void print_help(const char *name)
+{
 	cout << "Usage:" << endl;
 	cout << name << " [action] [options]" << endl << endl;
 	cout << "Actions: [-u] " << endl;
@@ -101,13 +101,8 @@ void print_help(char *name) {
 	cout << endl;
 }
 
-int parse_yesno(char *opt) {
-	if (opt[0] == 'y' || opt[0] == '1')
-		return 1;
-	return 0;
-}
-
-HRESULT UpdatePassword(char* lpPath, char* lpUsername, char* lpPassword, char* lpNewPassword)
+static HRESULT UpdatePassword(const char *lpPath, const char *lpUsername,
+    const char *lpPassword, const char *lpNewPassword)
 {
 	HRESULT hr = hrSuccess;
 	LPMAPISESSION lpSession = NULL;
@@ -130,7 +125,7 @@ HRESULT UpdatePassword(char* lpPath, char* lpUsername, char* lpPassword, char* l
 
 	ECLogger *lpLogger = NULL;
 	if (verbose)
-		lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-");
+		lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false, 0);
 	else
 		lpLogger = new ECLogger_Null();
 	hr = HrOpenECSession(lpLogger, &lpSession, "zarafa-passwd", PROJECT_SVN_REV_STR, strwUsername.c_str(), strwPassword.c_str(), lpPath, EC_PROFILE_FLAGS_NO_NOTIFICATIONS | EC_PROFILE_FLAGS_NO_PUBLIC_STORE, NULL, NULL);
@@ -209,13 +204,13 @@ exit:
 int main(int argc, char* argv[])
 {
 	HRESULT hr = hrSuccess;
-	char*	username = NULL;
-	char*	newpassword = NULL;
+	const char *username = NULL;
+	const char *newpassword = NULL;
 	char	szOldPassword[80];
 	char	szNewPassword[80];
-	char*	oldpassword = NULL;
-	char*	repassword = NULL;
-	char*	path = NULL;
+	const char *oldpassword = NULL;
+	const char *repassword = NULL;
+	const char *path = NULL;
 	modes	mode = MODE_INVALID;
 	int		passprompt = 1;
 

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,22 +44,23 @@
 #ifndef ECLICENSECLIENT_H
 #define ECLICENSECLIENT_H
 
+#include "zcdefs.h"
 #include <vector>
 #include <string>
 
 #include "ECChannelClient.h"
 #include "ZarafaCode.h"
 
-class ECLicenseClient : public ECChannelClient{
+class ECLicenseClient _final : public ECChannelClient{
 public:
-    ECLicenseClient(char *szLicensePath, unsigned int ulTimeOut);
+    ECLicenseClient(const char *szLicensePath, unsigned int ulTimeOut);
     ~ECLicenseClient();
     
     ECRESULT GetCapabilities(unsigned int ulServiceType, std::vector<std::string > &lstCapabilities);
     ECRESULT QueryCapability(unsigned int ulServiceType, const std::string &strCapability, bool *lpbResult);
     ECRESULT GetSerial(unsigned int ulServiceType, std::string &lpstrSerial, std::vector<std::string> &lstCALs);
     ECRESULT GetInfo(unsigned int ulServiceType, unsigned int *lpulUserCount);
-    ECRESULT Auth(unsigned char *lpData, unsigned int ulSize, unsigned char **lpResponse, unsigned int *lpulResponseSize);
+    ECRESULT Auth(const unsigned char *lpData, unsigned int ulSize, unsigned char **lpResponse, unsigned int *lpulResponseSize);
     ECRESULT SetSerial(unsigned int ulServiceType, const std::string &strSerial, const std::vector<std::string> &lstCALs);
 
 private:

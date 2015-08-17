@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -46,18 +45,6 @@
 #define ECDATABASEUPDATE_H
 
 #include "ECLogger.h"
-
-typedef struct _sUpdateList {
-	unsigned int ulVersion;
-	unsigned int ulVersionMin; // Version to start the update
-	char *lpszLogComment;
-	ECRESULT (*lpFunction)(ECDatabase* lpDatabase);
-}sUpdateList_t;
-
-typedef struct _sNewDatabase {
-	char *lpComment;
-	char *lpSQL;
-}sSQLDatabase_t;
 
 ECRESULT UpdateDatabaseCreateVersionsTable(ECDatabase *lpDatabase);
 ECRESULT UpdateDatabaseCreateSearchFolders(ECDatabase *lpDatabase);

@@ -18,7 +18,7 @@
 rc_reset
 
 ICALCONFIG=/etc/zarafa/ical.cfg
-ICALPROGRAM=/usr/bin/zarafa-ical
+ICALPROGRAM=/usr/sbin/zarafa-ical
 
 # Sanity checks.
 #[ -f $CALDAVCONFIG ] || exit 0

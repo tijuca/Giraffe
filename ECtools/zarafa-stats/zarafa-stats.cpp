@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -71,7 +70,7 @@ using namespace std;
 
 enum eTableType { INVALID_STATS = -1, SYSTEM_STATS, SESSION_STATS, USER_STATS, COMPANY_STATS, SERVER_STATS, SESSION_TOP, OPTION_HOST, OPTION_USER, OPTION_DUMP };
 
-struct option long_options[] = {
+static const struct option long_options[] = {
 		{ "system", 0, NULL, SYSTEM_STATS },
 		{ "sessions", 0, NULL, SESSION_STATS },
 		{ "users", 0, NULL, USER_STATS },
@@ -122,11 +121,11 @@ const static SizedSSortOrderSet(2, tableSortServers) =
   }
 };
 
-LPSSortOrderSet sortorders[] = {
+static const LPSSortOrderSet sortorders[] = {
 	(LPSSortOrderSet)&tableSortSystem, (LPSSortOrderSet)&tableSortSession,
 	(LPSSortOrderSet)&tableSortUser, (LPSSortOrderSet)&tableSortCompany, (LPSSortOrderSet)&tableSortServers
 };
-ULONG ulTableProps[] = {
+static const ULONG ulTableProps[] = {
 	PR_EC_STATSTABLE_SYSTEM, PR_EC_STATSTABLE_SESSIONS,
 	PR_EC_STATSTABLE_USERS, PR_EC_STATSTABLE_COMPANY, PR_EC_STATSTABLE_SERVERS
 };
@@ -162,17 +161,17 @@ typedef struct _SESSION {
     }
 } SESSION;
 
-bool sort_sessionid(const SESSION &a, const SESSION &b) { return a.ullSessionId < b.ullSessionId; } // && group < ?
-bool sort_user(const SESSION &a, const SESSION &b) { return a.strUser < b.strUser; }
-bool sort_busy(const SESSION &a, const SESSION &b) { return a.strBusy < b.strBusy; }
-bool sort_ippeer(const SESSION &a, const SESSION &b) { return a.strIP < b.strIP || (a.strIP == b.strIP && a.strPeer < b.strPeer); }
-bool sort_version(const SESSION &a, const SESSION &b) { return a.strClientVersion < b.strClientVersion; }
-bool sort_app(const SESSION &a, const SESSION &b) { return a.strClientApp < b.strClientApp; }
+static bool sort_sessionid(const SESSION &a, const SESSION &b) { return a.ullSessionId < b.ullSessionId; } // && group < ?
+static bool sort_user(const SESSION &a, const SESSION &b) { return a.strUser < b.strUser; }
+static bool sort_ippeer(const SESSION &a, const SESSION &b) { return a.strIP < b.strIP || (a.strIP == b.strIP && a.strPeer < b.strPeer); }
+static bool sort_version(const SESSION &a, const SESSION &b) { return a.strClientVersion < b.strClientVersion; }
+static bool sort_app(const SESSION &a, const SESSION &b) { return a.strClientApp < b.strClientApp; }
 
 typedef bool(*SortFuncPtr)(const SESSION&, const SESSION&);
-SortFuncPtr sortfunc;
+static SortFuncPtr sortfunc;
 
-std::string GetString(LPSPropValue lpProps, ULONG cValues, ULONG ulPropTag)
+static std::string GetString(LPSPropValue lpProps, ULONG cValues,
+    ULONG ulPropTag)
 {
     LPSPropValue lpProp = PpropFindProp(lpProps, cValues, ulPropTag);
     
@@ -199,21 +198,8 @@ std::string GetString(LPSPropValue lpProps, ULONG cValues, ULONG ulPropTag)
     return "";
 }
 
-std::string GetPidName(int pid)
-{
-    std::string procpath = "/proc/" + stringify(pid) + "/exe";
-    char s[1024];
-    memset(s, 0, sizeof(s));
-
-    if(readlink(procpath.c_str(), s, sizeof(s)) == -1)
-        return stringify(pid) + " <defunct>";
-    
-    s[sizeof(s)-1] = 0;
-
-    return stringify(pid) + " " + basename(s);    
-}
-
-unsigned long long GetLongLong(LPSPropValue lpProps, ULONG cValues, ULONG ulPropTag)
+static unsigned long long GetLongLong(LPSPropValue lpProps, ULONG cValues,
+    ULONG ulPropTag)
 {
     LPSPropValue lpProp = PpropFindProp(lpProps, cValues, ulPropTag);
     
@@ -228,7 +214,7 @@ unsigned long long GetLongLong(LPSPropValue lpProps, ULONG cValues, ULONG ulProp
     return 0;
 }
 
-double GetDouble(LPSPropValue lpProps, ULONG cValues, ULONG ulPropTag)
+static double GetDouble(LPSPropValue lpProps, ULONG cValues, ULONG ulPropTag)
 {
     LPSPropValue lpProp = PpropFindProp(lpProps, cValues, ulPropTag);
     
@@ -242,7 +228,7 @@ double GetDouble(LPSPropValue lpProps, ULONG cValues, ULONG ulPropTag)
     return 0;
 }
 
-void showtop(LPMDB lpStore, bool bLocal)
+static void showtop(LPMDB lpStore, bool bLocal)
 {
 #ifdef HAVE_CURSES_H
     HRESULT hr = hrSuccess;
@@ -561,7 +547,8 @@ exit:
 #endif
 }
  
-void dumptable(eTableType eTable, LPMDB lpStore, bool humanreadable) {
+static void dumptable(eTableType eTable, LPMDB lpStore, bool humanreadable)
+{
 	HRESULT hr = hrSuccess;
 	IMAPITable *lpTable = NULL;
 	LPSRowSet lpRowSet = NULL;
@@ -590,7 +577,7 @@ exit:
 		lpTable->Release();
 }
 
-void print_help(char *name)
+static void print_help(const char *name)
 {
 	cout << "Usage:" << endl;
 	cout << name << " <options> [table]" << endl << endl;
@@ -619,7 +606,7 @@ int main(int argc, char *argv[])
 	wstring strwUsername;
 	wstring strwPassword;
 	bool humanreadable(true);
-	ECLogger *const lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-");
+	ECLogger *const lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false, 0);
 
 	setlocale(LC_MESSAGES, "");
 	setlocale(LC_CTYPE, "");

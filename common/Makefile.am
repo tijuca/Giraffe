@@ -1,116 +1,107 @@
-lib_LTLIBRARIES = libcommon_util.la libcommon_mapi.la libcommon_ssl.la libcommon_service.la
+# -*- Makefile -*-
 
-# keep subdirs for these headers
-charset_HEADERS = charset/convert.h charset/traits.h charset/utf32string.h charset/utf8string.h charset/utf16string.h charset/convstring.h charset/localeutil.h
-charsetdir = $(includedir)/zarafa/charset
-utf8_HEADERS = utf8/checked.h utf8/core.h utf8/unchecked.h
-utf8dir = $(includedir)/zarafa/utf8
-ustringutil_HEADERS = ustringutil/utfutil.h
-ustringutildir = $(includedir)/zarafa/ustringutil
-mapiptr_HEADERS = mapi_ptr/mapi_array_ptr.h mapi_ptr/mapi_memory_ptr.h mapi_ptr/mapi_object_ptr.h mapi_ptr/mapi_rowset_ptr.h
-mapiptrdir = $(includedir)/zarafa/mapi_ptr
-
-libcommon_mapi_la_include_HEADERS = rtfutil.h mapiext.h ECGuid.h ECTags.h ECDefs.h IECSecurity.h IECServiceAdmin.h IECSpooler.h		\
-				  IECUnknown.h IECExportChanges.h IECExportAddressbookChanges.h IECStatsCollector.h IECImportAddressbookChanges.h	\
-				  ECUnknown.h ECMemStream.h ECMemTable.h ECKeyTable.h Util.h ECDebug.h namedprops.h mapiguidext.h edkguid.h			\
-				  IMAPIOffline.h IECMultiStoreTable.h restrictionutil.h favoritesutil.h ZarafaCode.h platform.linux.h md5.h			\
-				  base64.h ECLogger.h ECConfig.h ECConfigImpl.h EMSAbTag.h my_getopt.h codepage.h ECScheduler.h stringutil.h		\
-				  Trace.h UnixUtil.h ECIConv.h ustringutil.h SymmetricCrypt.h SSLUtil.h ECChannel.h platform.h CommonUtil.h			\
-				  mapicontact.h IECLicense.h ECABEntryID.h RecurrenceState.h ECFifoBuffer.h ECSerializer.h IECSingleInstance.h		\
-				  IECChangeAdvisor.h IECChangeAdviseSink.h IECImportContentsChanges.h IECTestProtocol.h auto_free.h ECCache.h		\
-				  TimeUtil.h ECGetText.h ECInvariantChecker.h tstring.h mapi_ptr.h utf8.h ECRestriction.h threadutil.h				\
-				  HtmlToTextParser.h HtmlEntity.h userutil.h ECFeatures.h ECFeatureList.h ECDebugPrint.h ECInterfaceDefs.h			\
-				  HrException.h ECIterators.h ECACL.h pthreadutil.h ECThreadPool.h MAPINotifSink.h \
-				  ECDatabaseMySQL.h fileutil.h IStreamAdapter.h IECExchangeModifyTable.h IECImportHierarchyChanges.h \
-				  ConsoleTable.h MAPIConsoleTable.h ECFifoStream.h ECMAPIDebug.h boost_compat.h ECChannelClient.h MAPIErrors.h \
-				  $(charset_HEADERS) $(utf8_HEADERS) $(ustringutil_HEADERS) $(mapiptr_HEADERS)
-
-libcommon_mapi_la_includedir = $(includedir)/zarafa
-
-data_DATA = zarafa.pc
-datadir = $(libdir)/pkgconfig
-
-AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
+AM_CPPFLAGS = ${ZCPPFLAGS} ${DEBUGFLAGS} ${BOOST_CPPFLAGS} \
+	-I${top_srcdir}/m4lcommon \
 	-I${top_srcdir}/mapi4linux/include -I${top_srcdir}/provider/common \
-	-I${top_srcdir}/libfreebusy $(MYSQL_INCLUDES)
+	-I${top_srcdir}/libfreebusy ${MYSQL_INCLUDES}
 
-libcommon_mapi_la_LDFLAGS = ${AM_LDFLAGS} -static
-libcommon_mapi_la_SOURCES = CommonUtil.cpp  \
-			rtfutil.cpp					    \
-			codepage.cpp					\
-			ECGuid.cpp					    \
-			ECUnknown.cpp					\
-			ECMemStream.cpp					\
-			ECFifoStream.cpp				\
-			ECMemTable.cpp					\
-			ECKeyTable.cpp					\
-			Util.cpp 					    \
-			ECDebug.cpp					    \
-			favoritesutil.cpp				\
-			ZarafaCode.cpp					\
-			HtmlToTextParser.cpp			\
-			HtmlEntity.cpp					\
-			ECABEntryID.cpp					\
-			ECDebugPrint.cpp				\
-			ECIterators.cpp					\
-			MAPINotifSink.cpp				\
-			IStreamAdapter.cpp				\
-			MAPIConsoleTable.cpp			\
-			ECMAPIDebug.cpp					\
-			MAPIErrors.cpp
+pkgincludedir = ${includedir}/zarafa
+pkgconfdir = ${libdir}/pkgconfig
+pkgconf_DATA = zarafa.pc
 
-libcommon_util_la_LDFLAGS = ${AM_LDFLAGS} -static
-libcommon_util_la_SOURCES = platform.cpp			\
-			platform.linux.cpp						\
-			md5.cpp									\
-			base64.cpp								\
-			ECLogger.cpp							\
-			ECConfig.cpp							\
-			ECConfigImpl.cpp						\
-			ECFifoBuffer.cpp						\
-			ECSerializer.cpp						\
-			ECCache.cpp								\
-			my_getopt.cpp							\
-			ECScheduler.cpp							\
-			stringutil.cpp							\
-			Trace.cpp								\
-			UnixUtil.cpp							\
-			ECIConv.cpp								\
-			ustringutil.cpp							\
-			SymmetricCrypt.cpp						\
-			charset/convert.cpp						\
-			charset/convstring.cpp					\
-			charset/traits.cpp						\
-			charset/localeutil.cpp					\
-			TimeUtil.cpp							\
-			RecurrenceState.cpp						\
-			ECGetText.cpp							\
-			threadutil.cpp							\
-			ECRestriction.cpp						\
-			userutil.cpp							\
-			ECFeatures.cpp							\
-			ECACL.cpp								\
-			fileutil.cpp							\
-			ECThreadPool.cpp						\
-			ConsoleTable.cpp
+lib_LTLIBRARIES = \
+	libzcp_common_util.la libzcp_common_mapi.la \
+	libzcp_common_ssl.la libzcp_common_service.la
+noinst_DATA = \
+	libzcp_common_util.ldd libzcp_common_mapi.ldd \
+	libzcp_common_ssl.ldd libzcp_common_service.ldd
+
+#
+# libzcp_common_util
+#
+nobase_pkginclude_HEADERS = \
+	ConsoleTable.h ECACL.h ECCache.h ECConfig.h ECConfigImpl.h \
+	ECFifoBuffer.h ECGetText.h ECIConv.h ECLogger.h \
+	ECScheduler.h ECSerializer.h ECThreadPool.h StatsClient.h \
+	SymmetricCrypt.h TimeUtil.h TmpPath.h Trace.h UnixUtil.h \
+	base64.h fileutil.h md5.h my_getopt.h \
+	platform.linux.h platform.h pthreadutil.h \
+	stringutil.h threadutil.h ustringutil.h utf8.h zcdefs.h \
+	charset/convert.h charset/traits.h charset/utf32string.h \
+	charset/utf8string.h charset/utf16string.h charset/convstring.h \
+	charset/localeutil.h \
+	ustringutil/utfutil.h \
+	utf8/checked.h utf8/core.h utf8/unchecked.h
+libzcp_common_util_la_SOURCES = \
+	ConsoleTable.cpp ECACL.cpp ECCache.cpp ECConfig.cpp ECConfigImpl.cpp \
+	ECFifoBuffer.cpp ECGetText.cpp ECIConv.cpp ECLogger.cpp \
+	ECScheduler.cpp ECSerializer.cpp ECThreadPool.cpp StatsClient.cpp \
+	SymmetricCrypt.cpp TimeUtil.cpp TmpPath.cpp Trace.cpp UnixUtil.cpp \
+	base64.cpp fileutil.cpp md5.cpp my_getopt.cpp \
+	platform.cpp platform.linux.cpp \
+	stringutil.cpp threadutil.cpp ustringutil.cpp \
+	charset/convert.cpp charset/convstring.cpp charset/traits.cpp \
+	charset/localeutil.cpp
+libzcp_common_util_la_LIBADD = \
+	-lpthread -lz ${BOOST_FILESYSTEM_LIBS} ${UUID_LIBS}
+libzcp_common_util_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
+	-Wl,--version-script=${top_builddir}/default.sym
+EXTRA_libzcp_common_util_la_DEPENDENCIES = ${top_builddir}/default.sym
 
 if HAVE_ICU
-libcommon_util_la_SOURCES += ustringutil/utfutil.cpp
+libzcp_common_util_la_SOURCES += ustringutil/utfutil.cpp
+libzcp_common_util_la_LIBADD += ${ICU_LIBS}
 endif
 
-libcommon_ssl_la_LDFLAGS = ${AM_LDFLAGS} -static
-libcommon_ssl_la_SOURCES = 							\
-			SSLUtil.cpp								\
-			ECChannelClient.cpp						\
-			ECChannel.cpp
+#
+# libzcp_common_mapi
+#
+nobase_pkginclude_HEADERS += \
+	ECABEntryID.h ECDebug.h ECDebugPrint.h ECGuid.h \
+	ECFifoStream.h ECKeyTable.h ECMemStream.h ECUnknown.h \
+	HtmlEntity.h HtmlToTextParser.h IStreamAdapter.h \
+	MAPIErrors.h ZarafaCode.h codepage.h rtfutil.h
+libzcp_common_mapi_la_SOURCES = \
+	ECABEntryID.cpp ECDebug.cpp ECDebugPrint.cpp ECGuid.cpp \
+	ECFifoStream.cpp ECKeyTable.cpp ECMemStream.cpp ECUnknown.cpp \
+	HtmlEntity.cpp HtmlToTextParser.cpp IStreamAdapter.cpp \
+	MAPIErrors.cpp ZarafaCode.cpp codepage.cpp rtfutil.cpp
+libzcp_common_mapi_la_LIBADD = libzcp_common_util.la -lpthread
+libzcp_common_mapi_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
+	-Wl,--version-script=${top_builddir}/default.sym
+EXTRA_libzcp_common_mapi_la_DEPENDENCIES = ${top_builddir}/default.sym
 
-libcommon_service_la_LDFLAGS = ${AM_LDFLAGS} -static
-libcommon_service_la_SOURCES = ECDatabaseMySQL.cpp
+#
+# libzcp_common_ssl
+#
+nobase_pkginclude_HEADERS += ECChannel.h ECChannelClient.h SSLUtil.h
+libzcp_common_ssl_la_SOURCES = ECChannel.cpp ECChannelClient.cpp SSLUtil.cpp
+libzcp_common_ssl_la_LIBADD = libzcp_common_util.la -lpthread ${SSL_LIBS}
+libzcp_common_ssl_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
+	-Wl,--version-script=${top_builddir}/default.sym
+EXTRA_libzcp_common_ssl_la_DEPENDENCIES = ${top_builddir}/default.sym
 
-# remove double installed headers
-install-data-hook:
-	for f in $(charset_HEADERS) $(utf8_HEADERS) $(ustringutil_HEADERS) $(mapiptr_HEADERS); do rm ${DESTDIR}/$(includedir)/zarafa/`basename $$f`; done
+#
+# libzcp_common_service
+#
+nobase_pkginclude_HEADERS += ECDatabaseMySQL.h
+libzcp_common_service_la_SOURCES = ECDatabaseMySQL.cpp
+libzcp_common_service_la_LIBADD = libzcp_common_util.la -lpthread ${MYSQL_LIBS}
+libzcp_common_service_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
+	-Wl,--version-script=${top_builddir}/default.sym
+EXTRA_libzcp_common_service_la_DEPENDENCIES = ${top_builddir}/default.sym
+
+
+# Create historic symlinks (e.g. older snapshots of zstatsd use it) for build
+install-exec-hook:
+	${MKDIR_P} ${DESTDIR}${pkglibdir}
+	ln -fs ${libdir}/libzcp_common_util.so ${DESTDIR}${pkglibdir}/libcommon_util.so
+	ln -fs ${libdir}/libzcp_common_mapi.so ${DESTDIR}${pkglibdir}/libcommon_mapi.so
+	ln -fs ${libdir}/libzcp_common_ssl.so ${DESTDIR}${pkglibdir}/libcommon_ssl.so
+	ln -fs ${libdir}/libzcp_common_service.so ${DESTDIR}${pkglibdir}/libcommon_service.so
 
 check-syntax:
 	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
 		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2
+
+include ../global.am

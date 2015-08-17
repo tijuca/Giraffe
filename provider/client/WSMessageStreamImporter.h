@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,6 +44,7 @@
 #ifndef WSMessageStreamImporter_INCLUDED
 #define WSMessageStreamImporter_INCLUDED
 
+#include "zcdefs.h"
 #include "ECUnknown.h"
 #include "mapi_ptr.h"
 #include "soapStub.h"
@@ -61,7 +61,7 @@ class WSMessageStreamImporter;
  * This class represents the data sink into which the stream data can be written.
  * It is returned from WSMessageStreamImporter::StartTransfer.
  */
-class WSMessageStreamSink : public ECUnknown
+class WSMessageStreamSink _final : public ECUnknown
 {
 public:
 	static HRESULT Create(ECFifoBuffer *lpFifoBuffer, ULONG ulTimeout, WSMessageStreamImporter *lpImporter, WSMessageStreamSink **lppSink);
@@ -85,9 +85,9 @@ typedef mapi_object_ptr<WSMessageStreamSink> WSMessageStreamSinkPtr;
  * The actual import call to the server is deferred until StartTransfer is called. When that
  * happens, the actual transfer is done on a worker thread so the calling thread can start writing
  * data in the returned WSMessageStreamSink. Once the returned stream is deleted, GetAsyncResult can
- * be used to wait for the worker and obtain it's return values.
+ * be used to wait for the worker and obtain its return values.
  */
-class WSMessageStreamImporter : public ECUnknown, private ECWaitableTask
+class WSMessageStreamImporter _final : public ECUnknown, private ECWaitableTask
 {
 public:
 	static HRESULT Create(ULONG ulFlags, ULONG ulSyncId, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG cbFolderEntryID, LPENTRYID lpFolderEntryID, bool bNewMessage, LPSPropValue lpConflictItems, WSTransport *lpTransport, WSMessageStreamImporter **lppStreamImporter);

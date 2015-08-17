@@ -3061,7 +3061,7 @@ namespace swig {
 }
 
 
-	#include "mapidefs.h"			// HRESULT
+	#include <mapidefs.h>			// HRESULT
 	#include "ZarafaCmd.nsmap"		// To get the namespace symbol
 	#include "ECLicenseClient.h"
 	#include "licenseclient_conv.h"

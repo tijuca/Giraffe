@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,26 +44,27 @@
 #ifndef ECOFFLINEABIMPORTER_INCLUDED
 #define ECOFFLINEABIMPORTER_INCLUDED
 
+#include "zcdefs.h"
 #include <IECImportAddressbookChanges.h>
 #include <IECServiceAdmin.h>
 
 class ECLogger;
 
-class OfflineABImporter : public IECImportAddressbookChanges {
+class OfflineABImporter _final : public IECImportAddressbookChanges {
 public:
 	OfflineABImporter(IECServiceAdmin *lpDstServiceAdmin, IECServiceAdmin *lpSrcServiceAdmin);
 	~OfflineABImporter();
 	
-	virtual ULONG __stdcall AddRef();
-	virtual ULONG __stdcall Release();
-	virtual HRESULT __stdcall QueryInterface(REFIID iid, void **lpvoid);
+	virtual ULONG __stdcall AddRef(void) _override;
+	virtual ULONG __stdcall Release(void) _override;
+	virtual HRESULT __stdcall QueryInterface(REFIID iid, void **lpvoid) _override;
 
-	virtual HRESULT __stdcall GetLastError(HRESULT hr, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
-	virtual HRESULT __stdcall Config(LPSTREAM lpState, ULONG ulFlags);
-	virtual HRESULT __stdcall UpdateState(LPSTREAM lpState);
+	virtual HRESULT __stdcall GetLastError(HRESULT hr, ULONG ulFlags, LPMAPIERROR *lppMAPIError) _override;
+	virtual HRESULT __stdcall Config(LPSTREAM lpState, ULONG ulFlags) _override;
+	virtual HRESULT __stdcall UpdateState(LPSTREAM lpState) _override;
 			
-	virtual HRESULT __stdcall ImportABChange(ULONG ulObjType, ULONG cbObjId, LPENTRYID lpObjId);
-	virtual HRESULT __stdcall ImportABDeletion(ULONG ulType, ULONG cbObjId, LPENTRYID lpObjId);
+	virtual HRESULT __stdcall ImportABChange(ULONG ulObjType, ULONG cbObjId, LPENTRYID lpObjId) _override;
+	virtual HRESULT __stdcall ImportABDeletion(ULONG ulType, ULONG cbObjId, LPENTRYID lpObjId) _override;
 
 private:
 	IECServiceAdmin *m_lpSrcServiceAdmin;

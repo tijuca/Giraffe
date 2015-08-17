@@ -51,8 +51,8 @@ export PATH="${SCRIPTPATH}:${PATH}"
 
 # Use awk to obtain and execute the command for this attachment
 CMD="`awk -F'\`' '/^([^#]*;)*'${ARG}'[ \t;]+([^#]*;)*/ { print \$2 }' ${SCRIPTPATH}/attachments_parser.db | head -n 1`"
-cat /dev/stdin 2>/dev/null | eval "${CMD}"
-RV=${PIPESTATUS[1]}
+eval "${CMD}"
+RV=$?
 
 # Clean up temporary directory including all files generated during parsing.
 if [ -d ${TMPBASE} ]; then

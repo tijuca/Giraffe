@@ -15,6 +15,10 @@
 
 @SET_MAKE@
 
+# -*- Makefile -*-
+
+# -*- Makefile -*-
+
 VPATH = @srcdir@
 am__make_dryrun = \
   { \
@@ -51,8 +55,9 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+DIST_COMMON = $(srcdir)/../../global.am $(srcdir)/Makefile.am \
+	$(srcdir)/Makefile.in
 subdir = provider/soap
-DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/autoconf/boost.m4 \
 	$(top_srcdir)/autoconf/icu.m4 $(top_srcdir)/autoconf/php.m4 \
@@ -63,25 +68,54 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/common/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-LTLIBRARIES = $(noinst_LTLIBRARIES)
-libsoapclient_la_LIBADD =
-nodist_libsoapclient_la_OBJECTS = libsoapclient_la-soapC.lo \
-	libsoapclient_la-soapClient.lo
-libsoapclient_la_OBJECTS = $(nodist_libsoapclient_la_OBJECTS)
+am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
+am__vpath_adj = case $$p in \
+    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+    *) f=$$p;; \
+  esac;
+am__strip_dir = f=`echo $$p | sed -e 's|^.*/||'`;
+am__install_max = 40
+am__nobase_strip_setup = \
+  srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*|]/\\\\&/g'`
+am__nobase_strip = \
+  for p in $$list; do echo "$$p"; done | sed -e "s|$$srcdirstrip/||"
+am__nobase_list = $(am__nobase_strip_setup); \
+  for p in $$list; do echo "$$p $$p"; done | \
+  sed "s| $$srcdirstrip/| |;"' / .*\//!s/ .*/ ./; s,\( .*\)/[^/]*$$,\1,' | \
+  $(AWK) 'BEGIN { files["."] = "" } { files[$$2] = files[$$2] " " $$1; \
+    if (++n[$$2] == $(am__install_max)) \
+      { print $$2, files[$$2]; n[$$2] = 0; files[$$2] = "" } } \
+    END { for (dir in files) print dir, files[dir] }'
+am__base_list = \
+  sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
+  sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
+am__uninstall_files_from_dir = { \
+  test -z "$$files" \
+    || { test ! -d "$$dir" && test ! -f "$$dir" && test ! -r "$$dir"; } \
+    || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
+         $(am__cd) "$$dir" && rm -f $$files; }; \
+  }
+am__installdirs = "$(DESTDIR)$(libdir)"
+LTLIBRARIES = $(lib_LTLIBRARIES)
+am__DEPENDENCIES_1 =
+libzarafa_soapclient_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
+nodist_libzarafa_soapclient_la_OBJECTS = soapC.lo soapClient.lo
+libzarafa_soapclient_la_OBJECTS =  \
+	$(nodist_libzarafa_soapclient_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
-libsoapclient_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
+libzarafa_soapclient_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CXXLD) \
-	$(libsoapclient_la_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) \
+	$(AM_CXXFLAGS) $(CXXFLAGS) $(libzarafa_soapclient_la_LDFLAGS) \
 	$(LDFLAGS) -o $@
-libsoapserver_la_LIBADD =
-nodist_libsoapserver_la_OBJECTS = libsoapserver_la-soapC.lo \
-	libsoapserver_la-soapServer.lo
-libsoapserver_la_OBJECTS = $(nodist_libsoapserver_la_OBJECTS)
-libsoapserver_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
+libzarafa_soapserver_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
+nodist_libzarafa_soapserver_la_OBJECTS = soapC.lo soapServer.lo
+libzarafa_soapserver_la_OBJECTS =  \
+	$(nodist_libzarafa_soapserver_la_OBJECTS)
+libzarafa_soapserver_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CXXLD) \
-	$(libsoapserver_la_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) \
+	$(AM_CXXFLAGS) $(CXXFLAGS) $(libzarafa_soapserver_la_LDFLAGS) \
 	$(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)/common
 depcomp = $(SHELL) $(top_srcdir)/autoconf/depcomp
@@ -109,8 +143,8 @@ am__v_CXXLD_0 = @echo "  CXXLD " $@;
 AM_V_GEN = $(am__v_GEN_@AM_V@)
 am__v_GEN_ = $(am__v_GEN_@AM_DEFAULT_V@)
 am__v_GEN_0 = @echo "  GEN   " $@;
-SOURCES = $(nodist_libsoapclient_la_SOURCES) \
-	$(nodist_libsoapserver_la_SOURCES)
+SOURCES = $(nodist_libzarafa_soapclient_la_SOURCES) \
+	$(nodist_libzarafa_soapserver_la_SOURCES)
 DIST_SOURCES =
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
@@ -122,7 +156,7 @@ CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
-AM_CXXFLAGS = @AM_CXXFLAGS@
+AM_CXXFLAGS = ${ZCXXFLAGS} -Wno-vla -Wno-sign-compare ${DEBUGCFLAGS}
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AM_LDFLAGS = @AM_LDFLAGS@
 AR = @AR@
@@ -132,11 +166,15 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 BOOST_CPPFLAGS = @BOOST_CPPFLAGS@
 BOOST_DATE_TIME_LDFLAGS = @BOOST_DATE_TIME_LDFLAGS@
+BOOST_DATE_TIME_LDPATH = @BOOST_DATE_TIME_LDPATH@
 BOOST_DATE_TIME_LIBS = @BOOST_DATE_TIME_LIBS@
 BOOST_FILESYSTEM_LDFLAGS = @BOOST_FILESYSTEM_LDFLAGS@
+BOOST_FILESYSTEM_LDPATH = @BOOST_FILESYSTEM_LDPATH@
 BOOST_FILESYSTEM_LIBS = @BOOST_FILESYSTEM_LIBS@
+BOOST_LDPATH = @BOOST_LDPATH@
 BOOST_ROOT = @BOOST_ROOT@
 BOOST_SYSTEM_LDFLAGS = @BOOST_SYSTEM_LDFLAGS@
+BOOST_SYSTEM_LDPATH = @BOOST_SYSTEM_LDPATH@
 BOOST_SYSTEM_LIBS = @BOOST_SYSTEM_LIBS@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
@@ -232,6 +270,9 @@ PHP_INCLUDES = @PHP_INCLUDES@
 PHP_LDFLAGS = @PHP_LDFLAGS@
 PHP_SYSCONF_DIR = @PHP_SYSCONF_DIR@
 PHP_VERSION = @PHP_VERSION@
+PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 POW_LIB = @POW_LIB@
 PROG_ANT = @PROG_ANT@
 PROG_LIBS = @PROG_LIBS@
@@ -265,6 +306,7 @@ YACC_EXISTS = @YACC_EXISTS@
 YFLAGS = @YFLAGS@
 ZARAFA_VERSION = @ZARAFA_VERSION@
 ZCPPFLAGS = @ZCPPFLAGS@
+ZPHPCXXFLAGS = @ZPHPCXXFLAGS@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -319,15 +361,23 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-noinst_LTLIBRARIES = libsoapserver.la libsoapclient.la 
-AM_CPPFLAGS = ${ZCPPFLAGS}
+AM_CPPFLAGS = ${ZCPPFLAGS} -I${top_srcdir}/mapi4linux/include \
+              -I${top_srcdir}/provider/include ${GSOAP_CFLAGS}
 
-#libsoapserver_la_CXXFLAGS = ${AM_CXXFLAGS} -Wno-vla -Wno-sign-compare $(DEBUGFLAGS) $(GSOAP_CFLAGS) -I${top_srcdir}/mapi4linux/include -I${top_srcdir}/provider/include ${GSOAP_CFLAGS}
-#libsoapclient_la_CXXFLAGS = ${AM_CXXFLAGS} -Wno-vla -Wno-sign-compare $(DEBUGFLAGS) $(GSOAP_CFLAGS) -I${top_srcdir}/mapi4linux/include -I${top_srcdir}/provider/include ${GSOAP_CFLAGS}
-libsoapserver_la_CXXFLAGS = ${AM_CXXFLAGS} -Wno-sign-compare $(DEBUGFLAGS) $(GSOAP_CFLAGS) -I${top_srcdir}/mapi4linux/include -I${top_srcdir}/provider/include ${GSOAP_CFLAGS}
-libsoapclient_la_CXXFLAGS = ${AM_CXXFLAGS} -Wno-sign-compare $(DEBUGFLAGS) $(GSOAP_CFLAGS) -I${top_srcdir}/mapi4linux/include -I${top_srcdir}/provider/include ${GSOAP_CFLAGS}
-nodist_libsoapserver_la_SOURCES = soapC.cpp soapServer.cpp
-nodist_libsoapclient_la_SOURCES = soapC.cpp soapClient.cpp
+lib_LTLIBRARIES = libzarafa_soapserver.la libzarafa_soapclient.la
+#noinst_DATA = libzarafa_soapserver.ldd libzarafa_soapclient.ldd
+nodist_libzarafa_soapserver_la_SOURCES = soapC.cpp soapServer.cpp
+libzarafa_soapserver_la_LIBADD = ${GSOAP_LIBS}
+libzarafa_soapserver_la_LDFLAGS = ${AM_LDFLAGS} \
+	-Wl,--version-script=${top_builddir}/default.sym
+
+EXTRA_libzarafa_soapserver_la_DEPENDENCIES = ${top_builddir}/default.sym
+nodist_libzarafa_soapclient_la_SOURCES = soapC.cpp soapClient.cpp
+libzarafa_soapclient_la_LIBADD = ${GSOAP_LIBS}
+libzarafa_soapclient_la_LDFLAGS = ${AM_LDFLAGS} \
+	-Wl,--version-script=${top_builddir}/default.sym
+
+EXTRA_libzarafa_soapclient_la_DEPENDENCIES = ${top_builddir}/default.sym
 SOAPHEADER = ${top_srcdir}/provider/include/ZarafaProto.h
 SOAP_INC = ${top_srcdir}/provider/include/
 SOAP_NS = ZarafaCmd.nsmap ZarafaCmd.wsdl
@@ -343,8 +393,8 @@ all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
 .SUFFIXES:
-.SUFFIXES: .cpp .lo .o .obj
-$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
+.SUFFIXES: .cpp .la .ldd .lo .o .obj
+$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am $(srcdir)/../../global.am $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -365,6 +415,7 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe)'; \
 	    cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe);; \
 	esac;
+$(srcdir)/../../global.am:
 
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
@@ -374,19 +425,42 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
+install-libLTLIBRARIES: $(lib_LTLIBRARIES)
+	@$(NORMAL_INSTALL)
+	@list='$(lib_LTLIBRARIES)'; test -n "$(libdir)" || list=; \
+	list2=; for p in $$list; do \
+	  if test -f $$p; then \
+	    list2="$$list2 $$p"; \
+	  else :; fi; \
+	done; \
+	test -z "$$list2" || { \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(libdir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(libdir)" || exit 1; \
+	  echo " $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL) $(INSTALL_STRIP_FLAG) $$list2 '$(DESTDIR)$(libdir)'"; \
+	  $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL) $(INSTALL_STRIP_FLAG) $$list2 "$(DESTDIR)$(libdir)"; \
+	}
 
-clean-noinstLTLIBRARIES:
-	-test -z "$(noinst_LTLIBRARIES)" || rm -f $(noinst_LTLIBRARIES)
-	@list='$(noinst_LTLIBRARIES)'; for p in $$list; do \
+uninstall-libLTLIBRARIES:
+	@$(NORMAL_UNINSTALL)
+	@list='$(lib_LTLIBRARIES)'; test -n "$(libdir)" || list=; \
+	for p in $$list; do \
+	  $(am__strip_dir) \
+	  echo " $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=uninstall rm -f '$(DESTDIR)$(libdir)/$$f'"; \
+	  $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=uninstall rm -f "$(DESTDIR)$(libdir)/$$f"; \
+	done
+
+clean-libLTLIBRARIES:
+	-test -z "$(lib_LTLIBRARIES)" || rm -f $(lib_LTLIBRARIES)
+	@list='$(lib_LTLIBRARIES)'; for p in $$list; do \
 	  dir="`echo $$p | sed -e 's|/[^/]*$$||'`"; \
 	  test "$$dir" != "$$p" || dir=.; \
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
-libsoapclient.la: $(libsoapclient_la_OBJECTS) $(libsoapclient_la_DEPENDENCIES) $(EXTRA_libsoapclient_la_DEPENDENCIES) 
-	$(AM_V_CXXLD)$(libsoapclient_la_LINK)  $(libsoapclient_la_OBJECTS) $(libsoapclient_la_LIBADD) $(LIBS)
-libsoapserver.la: $(libsoapserver_la_OBJECTS) $(libsoapserver_la_DEPENDENCIES) $(EXTRA_libsoapserver_la_DEPENDENCIES) 
-	$(AM_V_CXXLD)$(libsoapserver_la_LINK)  $(libsoapserver_la_OBJECTS) $(libsoapserver_la_LIBADD) $(LIBS)
+libzarafa_soapclient.la: $(libzarafa_soapclient_la_OBJECTS) $(libzarafa_soapclient_la_DEPENDENCIES) $(EXTRA_libzarafa_soapclient_la_DEPENDENCIES) 
+	$(AM_V_CXXLD)$(libzarafa_soapclient_la_LINK) -rpath $(libdir) $(libzarafa_soapclient_la_OBJECTS) $(libzarafa_soapclient_la_LIBADD) $(LIBS)
+libzarafa_soapserver.la: $(libzarafa_soapserver_la_OBJECTS) $(libzarafa_soapserver_la_DEPENDENCIES) $(EXTRA_libzarafa_soapserver_la_DEPENDENCIES) 
+	$(AM_V_CXXLD)$(libzarafa_soapserver_la_LINK) -rpath $(libdir) $(libzarafa_soapserver_la_OBJECTS) $(libzarafa_soapserver_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -394,59 +468,33 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libsoapclient_la-soapC.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libsoapclient_la-soapClient.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libsoapserver_la-soapC.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libsoapserver_la-soapServer.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/soapC.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/soapClient.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/soapServer.Plo@am__quote@
 
 .cpp.o:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
+@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ $<
 
 .cpp.obj:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
+@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .cpp.lo:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
+@am__fastdepCXX_TRUE@	$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LTCXXCOMPILE) -c -o $@ $<
-
-libsoapclient_la-soapC.lo: soapC.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libsoapclient_la_CXXFLAGS) $(CXXFLAGS) -MT libsoapclient_la-soapC.lo -MD -MP -MF $(DEPDIR)/libsoapclient_la-soapC.Tpo -c -o libsoapclient_la-soapC.lo `test -f 'soapC.cpp' || echo '$(srcdir)/'`soapC.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libsoapclient_la-soapC.Tpo $(DEPDIR)/libsoapclient_la-soapC.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='soapC.cpp' object='libsoapclient_la-soapC.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libsoapclient_la_CXXFLAGS) $(CXXFLAGS) -c -o libsoapclient_la-soapC.lo `test -f 'soapC.cpp' || echo '$(srcdir)/'`soapC.cpp
-
-libsoapclient_la-soapClient.lo: soapClient.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libsoapclient_la_CXXFLAGS) $(CXXFLAGS) -MT libsoapclient_la-soapClient.lo -MD -MP -MF $(DEPDIR)/libsoapclient_la-soapClient.Tpo -c -o libsoapclient_la-soapClient.lo `test -f 'soapClient.cpp' || echo '$(srcdir)/'`soapClient.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libsoapclient_la-soapClient.Tpo $(DEPDIR)/libsoapclient_la-soapClient.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='soapClient.cpp' object='libsoapclient_la-soapClient.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libsoapclient_la_CXXFLAGS) $(CXXFLAGS) -c -o libsoapclient_la-soapClient.lo `test -f 'soapClient.cpp' || echo '$(srcdir)/'`soapClient.cpp
-
-libsoapserver_la-soapC.lo: soapC.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libsoapserver_la_CXXFLAGS) $(CXXFLAGS) -MT libsoapserver_la-soapC.lo -MD -MP -MF $(DEPDIR)/libsoapserver_la-soapC.Tpo -c -o libsoapserver_la-soapC.lo `test -f 'soapC.cpp' || echo '$(srcdir)/'`soapC.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libsoapserver_la-soapC.Tpo $(DEPDIR)/libsoapserver_la-soapC.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='soapC.cpp' object='libsoapserver_la-soapC.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libsoapserver_la_CXXFLAGS) $(CXXFLAGS) -c -o libsoapserver_la-soapC.lo `test -f 'soapC.cpp' || echo '$(srcdir)/'`soapC.cpp
-
-libsoapserver_la-soapServer.lo: soapServer.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libsoapserver_la_CXXFLAGS) $(CXXFLAGS) -MT libsoapserver_la-soapServer.lo -MD -MP -MF $(DEPDIR)/libsoapserver_la-soapServer.Tpo -c -o libsoapserver_la-soapServer.lo `test -f 'soapServer.cpp' || echo '$(srcdir)/'`soapServer.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libsoapserver_la-soapServer.Tpo $(DEPDIR)/libsoapserver_la-soapServer.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='soapServer.cpp' object='libsoapserver_la-soapServer.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libsoapserver_la_CXXFLAGS) $(CXXFLAGS) -c -o libsoapserver_la-soapServer.lo `test -f 'soapServer.cpp' || echo '$(srcdir)/'`soapServer.cpp
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -541,6 +589,9 @@ check: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) check-am
 all-am: Makefile $(LTLIBRARIES)
 installdirs:
+	for dir in "$(DESTDIR)$(libdir)"; do \
+	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
+	done
 install: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) install-am
 install-exec: install-exec-am
@@ -576,7 +627,7 @@ maintainer-clean-generic:
 	-test -z "$(BUILT_SOURCES)" || rm -f $(BUILT_SOURCES)
 clean: clean-am
 
-clean-am: clean-generic clean-libtool clean-noinstLTLIBRARIES \
+clean-am: clean-generic clean-libLTLIBRARIES clean-libtool \
 	mostlyclean-am
 
 distclean: distclean-am
@@ -603,7 +654,7 @@ install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am:
+install-exec-am: install-libLTLIBRARIES
 
 install-html: install-html-am
 
@@ -643,31 +694,39 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am:
+uninstall-am: uninstall-libLTLIBRARIES
 
 .MAKE: all check install install-am install-strip
 
 .PHONY: CTAGS GTAGS all all-am check check-am clean clean-generic \
-	clean-libtool clean-noinstLTLIBRARIES ctags distclean \
+	clean-libLTLIBRARIES clean-libtool ctags distclean \
 	distclean-compile distclean-generic distclean-libtool \
 	distclean-tags distdir dvi dvi-am html html-am info info-am \
 	install install-am install-data install-data-am install-dvi \
 	install-dvi-am install-exec install-exec-am install-html \
-	install-html-am install-info install-info-am install-man \
-	install-pdf install-pdf-am install-ps install-ps-am \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	pdf pdf-am ps ps-am tags uninstall uninstall-am
+	install-html-am install-info install-info-am \
+	install-libLTLIBRARIES install-man install-pdf install-pdf-am \
+	install-ps install-ps-am install-strip installcheck \
+	installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags uninstall uninstall-am uninstall-libLTLIBRARIES
 
 
 $(SOAP_CPP_SRC) : ns.xsd
 ns.xsd: $(SOAPHEADER)
-	$(GSOAP_SOAPCPP2) -x -I$(SOAP_INC) $< >& /dev/null
+	$(GSOAP_SOAPCPP2) -x -I$(SOAP_INC) $<
 
 check-syntax:
 	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
 		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2
+
+.la.ldd:
+	${AM_V_GEN}${top_srcdir}/lddcheck $< $@
+
+# There is no good POSIX syntax for the following one.. resort to GNUmake
+%.ldx: %
+	${AM_V_GEN}${top_srcdir}/lddcheck $< $@
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

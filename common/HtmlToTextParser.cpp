@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,7 +44,7 @@
 #include "platform.h"
 #include "HtmlToTextParser.h"
 #include "HtmlEntity.h"
-#include <wctype.h>
+#include <cwctype>
 
 
 CHtmlToTextParser::CHtmlToTextParser(void)
@@ -230,7 +229,7 @@ void CHtmlToTextParser::parseTag(const WCHAR* &lpwHTML)
 	bool bTagName = true;
 	bool bTagEnd = false;
 	bool bParseAttrs = false;
-	MapParser::iterator iterTag;
+	MapParser::const_iterator iterTag;
 
 	std::wstring tagName;
 
@@ -433,7 +432,7 @@ void CHtmlToTextParser::parseTagBA()
 
 bool CHtmlToTextParser::addURLAttribute(const WCHAR *lpattr, bool bSpaces) {
 
-	MapAttrs::iterator	iter;
+	MapAttrs::const_iterator iter;
 
 	if (stackAttrs.empty())
 		return false;
@@ -514,7 +513,7 @@ void CHtmlToTextParser::parseTagUL() {
 	listInfoStack.push(listInfo);
 }
 
-std::wstring inttostring(unsigned int x) {
+static std::wstring inttostring(unsigned int x) {
 	WCHAR buf[33];
 	swprintf(buf, 33, L"%u", x);
 	return buf;

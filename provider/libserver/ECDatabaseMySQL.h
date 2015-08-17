@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -49,6 +48,7 @@
 #ifndef ECDATABASEMYSQL_H
 #define ECDATABASEMYSQL_H
 
+#include "zcdefs.h"
 #include <pthread.h>
 #include <mysql.h>
 #include <string>
@@ -57,69 +57,69 @@
 
 class ECConfig;
 
-class ECDatabaseMySQL : public ECDatabase
+class ECDatabaseMySQL _final : public ECDatabase
 {
 public:
 	ECDatabaseMySQL(ECLogger *lpLogger, ECConfig *lpConfig);
 	virtual ~ECDatabaseMySQL();
 
 	// Embedded mysql
-	static ECRESULT	InitLibrary(char* lpDatabaseDir, char *lpConfigFile, ECLogger *lpLogger);
-	static void UnloadLibrary();
+	static ECRESULT	InitLibrary(const char *lpDatabaseDir, const char *lpConfigFile, ECLogger *lpLogger);
+	static void UnloadLibrary(ECLogger * = NULL);
 
-	ECRESULT		Connect();
-	ECRESULT		Close();
-	ECRESULT		DoSelect(const std::string &strQuery, DB_RESULT *lpResult, bool fStreamResult = false);
-	ECRESULT		DoSelectMulti(const std::string &strQuery);
-	ECRESULT		DoUpdate(const std::string &strQuery, unsigned int *lpulAffectedRows = NULL);
-	ECRESULT		DoInsert(const std::string &strQuery, unsigned int *lpulInsertId = NULL, unsigned int *lpulAffectedRows = NULL);
-	ECRESULT		DoDelete(const std::string &strQuery, unsigned int *lpulAffectedRows = NULL);
-	ECRESULT		DoSequence(const std::string &strSeqName, unsigned int ulCount, unsigned long long *lpllFirstId);
+	ECRESULT Connect(void) _override;
+	ECRESULT Close(void) _override;
+	ECRESULT DoSelect(const std::string &strQuery, DB_RESULT *lpResult, bool fStreamResult = false) _override;
+	ECRESULT DoSelectMulti(const std::string &strQuery) _override;
+	ECRESULT DoUpdate(const std::string &strQuery, unsigned int *lpulAffectedRows = NULL) _override;
+	ECRESULT DoInsert(const std::string &strQuery, unsigned int *lpulInsertId = NULL, unsigned int *lpulAffectedRows = NULL) _override;
+	ECRESULT DoDelete(const std::string &strQuery, unsigned int *lpulAffectedRows = NULL) _override;
+	ECRESULT DoSequence(const std::string &strSeqName, unsigned int ulCount, unsigned long long *lpllFirstId) _override;
 
 	//Result functions
-	unsigned int	GetNumRows(DB_RESULT sResult);
-	unsigned int	GetNumRowFields(DB_RESULT sResult);
-	unsigned int	GetRowIndex(DB_RESULT sResult, const std::string &strFieldname);
-	virtual ECRESULT		GetNextResult(DB_RESULT *sResult);
-	virtual ECRESULT		FinalizeMulti();
+	unsigned int GetNumRows(DB_RESULT sResult) _override;
+	unsigned int GetNumRowFields(DB_RESULT sResult) _override;
+	unsigned int GetRowIndex(DB_RESULT sResult, const std::string &strFieldname) _override;
+	virtual ECRESULT GetNextResult(DB_RESULT *sResult) _override;
+	virtual ECRESULT FinalizeMulti(void) _override;
 
-	DB_ROW			FetchRow(DB_RESULT sResult);
-	DB_LENGTHS		FetchRowLengths(DB_RESULT sResult);
+	DB_ROW FetchRow(DB_RESULT sResult) _override;
+	DB_LENGTHS FetchRowLengths(DB_RESULT sResult) _override;
 
-	std::string		Escape(const std::string &strToEscape);
-	std::string		EscapeBinary(unsigned char *lpData, unsigned int ulLen);
-	std::string		EscapeBinary(const std::string& strData);
-    std::string 	FilterBMP(const std::string &strToFilter);
+	std::string Escape(const std::string &strToEscape) _override;
+	std::string EscapeBinary(unsigned char *lpData, unsigned int ulLen) _override;
+	std::string EscapeBinary(const std::string& strData) _override;
+	std::string FilterBMP(const std::string &strToFilter) _override;
 
-	void			ResetResult(DB_RESULT sResult);
+	void ResetResult(DB_RESULT sResult) _override;
 
-	ECRESULT		ValidateTables();
+	ECRESULT ValidateTables(void) _override;
 
-	std::string		GetError();
-	DB_ERROR		GetLastError();
-	bool			SuppressLockErrorLogging(bool bSuppress);
+	std::string GetError(void) _override;
+	DB_ERROR GetLastError(void) _override;
+	bool SuppressLockErrorLogging(bool bSuppress) _override;
 	
-	ECRESULT		Begin();
-	ECRESULT		Commit();
-	ECRESULT		Rollback();
+	ECRESULT Begin(void) _override;
+	ECRESULT Commit(void) _override;
+	ECRESULT Rollback(void) _override;
 	
-	unsigned int	GetMaxAllowedPacket();
+	unsigned int GetMaxAllowedPacket(void) _override;
 
-	void			ThreadInit();
-	void			ThreadEnd();
+	void ThreadInit(void) _override;
+	void ThreadEnd(void) _override;
 
 	// Database maintenance functions
-	ECRESULT		CreateDatabase();
+	ECRESULT CreateDatabase(void) _override;
 	// Main update unit
-	ECRESULT		UpdateDatabase(bool bForceUpdate, std::string &strReport);
-	ECRESULT		InitializeDBState();
+	ECRESULT UpdateDatabase(bool bForceUpdate, std::string &strReport) _override;
+	ECRESULT InitializeDBState(void) _override;
 
-	ECLogger*		GetLogger();
+	ECLogger *GetLogger(void) _override;
 
-	std::string		GetDatabaseDir();
+	std::string GetDatabaseDir(void) _override;
 	
-	ECRESULT		CheckExistColumn(const std::string &strTable, const std::string &strColumn, bool *lpbExist);
-	ECRESULT		CheckExistIndex(const std::string strTable, const std::string &strKey, bool *lpbExist);
+	ECRESULT CheckExistColumn(const std::string &strTable, const std::string &strColumn, bool *lpbExist) _override;
+	ECRESULT CheckExistIndex(const std::string strTable, const std::string &strKey, bool *lpbExist) _override;
 
 public:
 	// Freememory methods

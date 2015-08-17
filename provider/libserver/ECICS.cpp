@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,8 +44,8 @@
 #include "platform.h"
 
 #include "Zarafa.h"
-#include "mapidefs.h"
-#include "edkmdb.h"
+#include <mapidefs.h>
+#include <edkmdb.h>
 
 #include "stringutil.h"
 #include "ECSessionManager.h"
@@ -66,7 +65,7 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 extern ECSessionManager*	g_lpSessionManager;
@@ -91,7 +90,8 @@ inline ABChangeRecord::ABChangeRecord(ULONG _id, const std::string &_strItem, co
 typedef std::list<ABChangeRecord> ABChangeRecordList;
 
 
-bool isICSChange(unsigned int ulChange){
+static bool isICSChange(unsigned int ulChange)
+{
 	switch(ulChange){
 		case ICS_MESSAGE_CHANGE:
 		case ICS_MESSAGE_FLAG:
@@ -154,7 +154,9 @@ exit:
 	return er;
 }
 
-ECRESULT ConvertABEntryIDToSoapSourceKey(struct soap *soap, ECSession *lpSession, bool bUseV1, unsigned int cbEntryId, char *lpEntryId, xsd__base64Binary *lpSourceKey)
+static ECRESULT ConvertABEntryIDToSoapSourceKey(struct soap *soap,
+    ECSession *lpSession, bool bUseV1, unsigned int cbEntryId,
+    char *lpEntryId, xsd__base64Binary *lpSourceKey)
 {
 	ECRESULT			er			= erSuccess;
 	unsigned int		cbAbeid		= cbEntryId;
@@ -199,8 +201,9 @@ exit:
 	return er;
 }
 
-void AddChangeKeyToChangeList(std::string * strChangeList, ULONG cbChangeKey, const char * lpChangeKey){
-
+static void AddChangeKeyToChangeList(std::string *strChangeList,
+    ULONG cbChangeKey, const char *lpChangeKey)
+{
 	if(cbChangeKey <= sizeof(GUID) || cbChangeKey > 255)
 		return;
 

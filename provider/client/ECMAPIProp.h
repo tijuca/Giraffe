@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,6 +44,7 @@
 #ifndef ECMAPIPROP_H
 #define ECMAPIPROP_H
 
+#include "zcdefs.h"
 #include "Zarafa.h"
 #include "IECSecurity.h"
 #include "ECGenericProp.h"
@@ -59,7 +59,7 @@ class ECMsgStore;
 class ECMAPIProp : public ECGenericProp
 {
 protected:
-	ECMAPIProp(void *lpProvider, ULONG ulObjType, BOOL fModify, ECMAPIProp *lpRoot, char *szClassName = NULL);
+	ECMAPIProp(void *lpProvider, ULONG ulObjType, BOOL fModify, ECMAPIProp *lpRoot, const char *szClassName = NULL);
 	virtual ~ECMAPIProp();
 
 public:
@@ -118,13 +118,12 @@ public:
 
 
 public:	
-	class xMAPIProp : public IMAPIProp
-	{
+	class xMAPIProp _final : public IMAPIProp {
 	public:
 		// From IUnknown
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void** lppInterface);
-		virtual ULONG __stdcall AddRef();
-		virtual ULONG __stdcall Release();	
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _override;
+		virtual ULONG __stdcall AddRef(void) _override;
+		virtual ULONG __stdcall Release(void) _override;
 		
 		// From IMAPIProp
 		virtual HRESULT __stdcall GetLastError(HRESULT hError, ULONG ulFlags, LPMAPIERROR * lppMapiError);
@@ -140,18 +139,17 @@ public:
 		virtual HRESULT __stdcall GetIDsFromNames(ULONG cNames, LPMAPINAMEID * ppNames, ULONG ulFlags, LPSPropTagArray * pptaga);
 	} m_xMAPIProp;
 
-	class xECSecurity : public IECSecurity
-	{
+	class xECSecurity _final : public IECSecurity {
 	public:
-		virtual ULONG AddRef();
-		virtual ULONG Release();
-		virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
+		virtual ULONG AddRef(void) _override;
+		virtual ULONG Release(void) _override;
+		virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _override;
 		
-		virtual HRESULT GetOwner(ULONG *lpcbOwner, LPENTRYID *lppOwner);
-		virtual HRESULT GetPermissionRules(int ulType, ULONG* lpcPermissions, LPECPERMISSION* lppECPermissions);
-		virtual HRESULT SetPermissionRules(ULONG cPermissions, LPECPERMISSION lpECPermissions);
-		virtual HRESULT GetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, LPECUSER *lppsUsers);
-		virtual HRESULT GetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcGroups, LPECGROUP *lppsGroups);
+		virtual HRESULT GetOwner(ULONG *lpcbOwner, LPENTRYID *lppOwner) _override;
+		virtual HRESULT GetPermissionRules(int ulType, ULONG *lpcPermissions, LPECPERMISSION *lppECPermissions) _override;
+		virtual HRESULT SetPermissionRules(ULONG cPermissions, LPECPERMISSION lpECPermissions) _override;
+		virtual HRESULT GetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, LPECUSER *lppsUsers) _override;
+		virtual HRESULT GetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcGroups, LPECGROUP *lppsGroups) _override;
 		virtual HRESULT GetCompanyList(ULONG ulFlags, ULONG *lpcCompanies, LPECCOMPANY *lppCompanies);
 	} m_xECSecurity;
 

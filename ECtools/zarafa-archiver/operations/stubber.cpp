@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -167,7 +166,7 @@ HRESULT Stubber::ProcessEntry(LPMESSAGE lpMessage)
 	sProps[0].Value.b = 1;
 	
 	sProps[1].ulPropTag = PR_BODY;
-	sProps[1].Value.LPSZ = _T("This message is archived...");
+	sProps[1].Value.LPSZ = const_cast<TCHAR *>(_T("This message is archived..."));
 
 	sProps[2].ulPropTag = PR_ICON_INDEX;
 	sProps[2].Value.l = 2;
@@ -208,7 +207,7 @@ HRESULT Stubber::ProcessEntry(LPMESSAGE lpMessage)
 		}
 		
 		sProp.ulPropTag = PR_ATTACH_FILENAME;
-		sProp.Value.LPSZ = _T("dummy");
+		sProp.Value.LPSZ = const_cast<TCHAR *>(_T("dummy"));
 		hr = ptrAttach->SetProps(1, &sProp, NULL);
 		if (hr != hrSuccess) {
 			Logger()->Log(EC_LOGLEVEL_FATAL, "Failed to set attachment properties. (hr=%s)", stringify(hr, true).c_str());

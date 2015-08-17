@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,18 +44,28 @@
 #ifndef ustringutil_INCLUDED
 #define ustringutil_INCLUDED
 
+#include "zcdefs.h"
 #include "ZarafaCode.h"
 #include <string>
 
 #if HAVE_ICU
 #include <unicode/coll.h>
 #include <unicode/sortkey.h>
-typedef Locale ECLocale;
-typedef CollationKey ECSortKey;
+/* With typedefs, our ABI would always change */
+class ECLocale _final : public Locale {
+	public:
+	ECLocale(void) : Locale() {};
+	ECLocale(const Locale &s) : Locale(s) {};
+};
+class ECSortKey _final : public CollationKey {
+	public:
+	ECSortKey(void) : CollationKey() {};
+	ECSortKey(const CollationKey &s) : CollationKey(s) {};
+};
 #else
 
 //typedef locale_t ECLocale;
-class ECLocale {
+class ECLocale _final {
 public:
 	ECLocale();
 	ECLocale(int category, const char *locale);
@@ -76,7 +85,7 @@ private:
 };
 
 
-class ECSortKey {
+class ECSortKey _final {
 public:
 	ECSortKey(const unsigned char *lpSortData, unsigned int cbSortData);
 	ECSortKey(const ECSortKey &other);

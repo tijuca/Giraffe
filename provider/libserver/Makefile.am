@@ -1,16 +1,26 @@
-noinst_LTLIBRARIES = libserver.la
+# -*- Makefile -*-
 
-AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
+AM_CPPFLAGS = ${ZCPPFLAGS} ${DEBUGFLAGS} ${BOOST_CPPFLAGS} \
 	-I${top_srcdir}/mapi4linux/include \
 	-I${top_srcdir}/provider/libserver -I${top_srcdir}/provider/plugins \
 	-I${top_srcdir}/provider/include -I${top_srcdir}/provider/common \
 	-I${top_srcdir}/provider/client -I${top_builddir}/provider/soap \
 	-I${top_srcdir}/provider/soap \
-	-I${top_srcdir}/common -DPKGLIBDIR='"${pkglibdir}"' \
-	$(MYSQL_INCLUDES) $(GSOAP_CFLAGS) $(SSL_CFLAGS) $(SSL_HAS_EVP_PKEY_CMP) $(KRB5_CFLAGS)
+	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
+	-DPKGLIBDIR='"${pkglibdir}"' \
+	${MYSQL_INCLUDES} ${GSOAP_CFLAGS} ${SSL_CFLAGS} \
+	${SSL_HAS_EVP_PKEY_CMP} ${KRB5_CFLAGS} ${TCMALLOC_CFLAGS}
 
-libserver_la_SOURCES = \
-	ZarafaCmd.cpp \
+# We are not actually using any linked symbols from tcmalloc's header files,
+# so linking to tcmalloc is not done, not here at least. It is done in
+# provider/zarafa/Makefile.am. Probably such that other components including
+# libzarafa_server.la (provider/plugins/) _don't_ get tcmalloc.
+
+lib_LTLIBRARIES = libzarafa_server.la
+#noinst_DATA = libserver.ldd
+
+libzarafa_server_la_SOURCES = \
+	ZarafaCmd.cpp ZarafaCmd.h \
 	ECABObjectTable.cpp ECABObjectTable.h \
 	ECCacheManager.cpp ECCacheManager.h \
 	ECDBDef.h ECDatabase.h \
@@ -60,7 +70,16 @@ libserver_la_SOURCES = \
 	ECTestProtocol.cpp ECTestProtocol.h \
 	ZarafaCmdUtil.cpp ZarafaCmdUtil.h \
 	ECLockManager.cpp ECLockManager.h
+libzarafa_server_la_LIBADD = \
+	../../common/libzcp_common_util.la ../common/libzarafacommon.la \
+	-lpthread ${KRB5_LIBS} ${MYSQL_LIBS} ${PAM_LIBS} ${SSL_LIBS}
+libzarafa_server_la_LDFLAGS = ${AM_LDFLAGS} \
+	-Wl,--version-script=${top_builddir}/default.sym
+EXTRA_libzarafa_server_la_DEPENDENCIES = ${top_builddir}/default.sym
+
 
 check-syntax:
 	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
 		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2
+
+include ../../global.am

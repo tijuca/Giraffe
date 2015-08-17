@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -211,7 +210,7 @@ HRESULT ArchiverSession::Init(const char *lpszServerPath, const char *lpszSslPat
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Unable to open Admin ArchiverSession.");
 		switch (hr) {
 		case MAPI_E_NETWORK_ERROR:
-			m_lpLogger->Log(EC_LOGLEVEL_INFO, "The server is not running, or not accessable through %s.", lpszServerPath);
+			m_lpLogger->Log(EC_LOGLEVEL_INFO, "The server is not running, or not accessible through %s.", lpszServerPath);
 			break;
 		case MAPI_E_LOGON_FAILED:
 		case MAPI_E_NO_ACCESS:
@@ -854,7 +853,10 @@ HRESULT ArchiverSession::CreateArchiveStore(const tstring& strUserName, const ts
 	if (hr != hrSuccess)
 		goto exit;
 
-	hr = ptrRoot->CreateFolder(FOLDER_GENERIC, _T("IPM_SUBTREE"), _T(""), &IID_IMAPIFolder, fMapiUnicode, &ptrIpmSubtree);
+	hr = ptrRoot->CreateFolder(FOLDER_GENERIC,
+	     const_cast<TCHAR *>(_T("IPM_SUBTREE")),
+	     const_cast<TCHAR *>(_T("")), &IID_IMAPIFolder, fMapiUnicode,
+	     &ptrIpmSubtree);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -897,6 +899,7 @@ HRESULT ArchiverSession::ValidateArchiverLicense() const
 	} else if ((ulArchivedUsers+5) >= ulMaxUsers) { //@todo which warning limit?
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "You almost reached the archived user limit. Archived users %d of %d", ulArchivedUsers, ulMaxUsers);
 	}
+
 
 exit:
 	return hr;

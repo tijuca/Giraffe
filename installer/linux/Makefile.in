@@ -53,7 +53,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 @OSS_ONLY_FALSE@am__append_1 = ldapms.openldap.cfg ldapms.active-directory.cfg
-@OSS_ONLY_FALSE@am__append_2 = licensed.cfg example-msr.cfg backup.cfg
+@OSS_ONLY_FALSE@am__append_2 = licensed.cfg example-msr.cfg backup.cfg php-mapi.cfg
 @OSS_ONLY_FALSE@am__append_3 = zarafa-licensed.init.rhel zarafa-ws.init.rhel
 @OSS_ONLY_FALSE@am__append_4 = zarafa-licensed.init.suse zarafa-ws.init.suse
 @OSS_ONLY_FALSE@am__append_5 = zarafa-licensed.init.cbs4 zarafa-ws.init.cbs4
@@ -61,8 +61,8 @@ host_triplet = @host@
 subdir = installer/linux
 DIST_COMMON = $(am__dist_data_config_DATA_DIST) \
 	$(am__dist_sysconf_cert_DATA_DIST) \
-	$(am__dist_sysconf_config_DATA_DIST) $(dist_bin_SCRIPTS) \
-	$(dist_data_DATA) $(dist_sysconf_bc_DATA) \
+	$(am__dist_sysconf_config_DATA_DIST) $(dist_data_DATA) \
+	$(dist_sbin_SCRIPTS) $(dist_sysconf_bc_DATA) \
 	$(dist_sysconf_cron_SCRIPTS) $(dist_sysconf_rotate_DATA) \
 	$(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -102,14 +102,14 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(sysconf_crondir)" \
-	"$(DESTDIR)$(sysconf_initdir)" "$(DESTDIR)$(datadir)" \
-	"$(DESTDIR)$(data_configdir)" "$(DESTDIR)$(sysconf_bcdir)" \
-	"$(DESTDIR)$(sysconf_certdir)" \
+am__installdirs = "$(DESTDIR)$(sbindir)" \
+	"$(DESTDIR)$(sysconf_crondir)" "$(DESTDIR)$(sysconf_initdir)" \
+	"$(DESTDIR)$(datadir)" "$(DESTDIR)$(data_configdir)" \
+	"$(DESTDIR)$(sysconf_bcdir)" "$(DESTDIR)$(sysconf_certdir)" \
 	"$(DESTDIR)$(sysconf_configdir)" \
 	"$(DESTDIR)$(sysconf_rotatedir)" \
 	"$(DESTDIR)$(sysconf_sysconfigdir)"
-SCRIPTS = $(dist_bin_SCRIPTS) $(dist_sysconf_cron_SCRIPTS) \
+SCRIPTS = $(dist_sbin_SCRIPTS) $(dist_sysconf_cron_SCRIPTS) \
 	$(sysconf_init_SCRIPTS)
 AM_V_GEN = $(am__v_GEN_@AM_V@)
 am__v_GEN_ = $(am__v_GEN_@AM_DEFAULT_V@)
@@ -127,15 +127,15 @@ am__can_run_installinfo = \
 am__dist_data_config_DATA_DIST = server.cfg unix.cfg ldap.propmap.cfg \
 	spooler.cfg gateway.cfg monitor.cfg dagent.cfg ical.cfg \
 	search.cfg autorespond archiver.cfg ws.cfg presence.cfg \
-	licensed.cfg example-msr.cfg backup.cfg ldap.openldap.cfg \
-	ldap.active-directory.cfg ldapms.openldap.cfg \
-	ldapms.active-directory.cfg
+	licensed.cfg example-msr.cfg backup.cfg php-mapi.cfg \
+	ldap.openldap.cfg ldap.active-directory.cfg \
+	ldapms.openldap.cfg ldapms.active-directory.cfg
 am__dist_sysconf_cert_DATA_DIST = addtrust.crt
 am__dist_sysconf_config_DATA_DIST = server.cfg unix.cfg \
 	ldap.propmap.cfg spooler.cfg gateway.cfg monitor.cfg \
 	dagent.cfg ical.cfg search.cfg autorespond archiver.cfg ws.cfg \
 	presence.cfg licensed.cfg example-msr.cfg backup.cfg \
-	ldap.openldap.cfg ldap.active-directory.cfg \
+	php-mapi.cfg ldap.openldap.cfg ldap.active-directory.cfg \
 	ldapms.openldap.cfg ldapms.active-directory.cfg
 DATA = $(dist_data_DATA) $(dist_data_config_DATA) \
 	$(dist_sysconf_bc_DATA) $(dist_sysconf_cert_DATA) \
@@ -154,11 +154,15 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 BOOST_CPPFLAGS = @BOOST_CPPFLAGS@
 BOOST_DATE_TIME_LDFLAGS = @BOOST_DATE_TIME_LDFLAGS@
+BOOST_DATE_TIME_LDPATH = @BOOST_DATE_TIME_LDPATH@
 BOOST_DATE_TIME_LIBS = @BOOST_DATE_TIME_LIBS@
 BOOST_FILESYSTEM_LDFLAGS = @BOOST_FILESYSTEM_LDFLAGS@
+BOOST_FILESYSTEM_LDPATH = @BOOST_FILESYSTEM_LDPATH@
 BOOST_FILESYSTEM_LIBS = @BOOST_FILESYSTEM_LIBS@
+BOOST_LDPATH = @BOOST_LDPATH@
 BOOST_ROOT = @BOOST_ROOT@
 BOOST_SYSTEM_LDFLAGS = @BOOST_SYSTEM_LDFLAGS@
+BOOST_SYSTEM_LDPATH = @BOOST_SYSTEM_LDPATH@
 BOOST_SYSTEM_LIBS = @BOOST_SYSTEM_LIBS@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
@@ -254,6 +258,9 @@ PHP_INCLUDES = @PHP_INCLUDES@
 PHP_LDFLAGS = @PHP_LDFLAGS@
 PHP_SYSCONF_DIR = @PHP_SYSCONF_DIR@
 PHP_VERSION = @PHP_VERSION@
+PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 POW_LIB = @POW_LIB@
 PROG_ANT = @PROG_ANT@
 PROG_LIBS = @PROG_LIBS@
@@ -287,6 +294,7 @@ YACC_EXISTS = @YACC_EXISTS@
 YFLAGS = @YFLAGS@
 ZARAFA_VERSION = @ZARAFA_VERSION@
 ZCPPFLAGS = @ZCPPFLAGS@
+ZPHPCXXFLAGS = @ZPHPCXXFLAGS@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -390,7 +398,7 @@ dist_data_DATA = \
 
 BUILT_SOURCES = ldap.openldap.cfg ldap.active-directory.cfg \
 	$(am__append_1)
-dist_bin_SCRIPTS = zarafa-autorespond zarafa-mr-accept
+dist_sbin_SCRIPTS = zarafa-autorespond zarafa-mr-accept zarafa-mr-process
 sysconf_rotatedir = ${sysconfdir}/logrotate.d
 dist_sysconf_rotate_DATA = zarafa.logrotate
 sysconf_crondir = ${sysconfdir}/cron.daily
@@ -437,12 +445,12 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
-install-dist_binSCRIPTS: $(dist_bin_SCRIPTS)
+install-dist_sbinSCRIPTS: $(dist_sbin_SCRIPTS)
 	@$(NORMAL_INSTALL)
-	@list='$(dist_bin_SCRIPTS)'; test -n "$(bindir)" || list=; \
+	@list='$(dist_sbin_SCRIPTS)'; test -n "$(sbindir)" || list=; \
 	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(bindir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(bindir)" || exit 1; \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(sbindir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(sbindir)" || exit 1; \
 	fi; \
 	for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
@@ -461,17 +469,17 @@ install-dist_binSCRIPTS: $(dist_bin_SCRIPTS)
 	while read type dir files; do \
 	     if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
 	     test -z "$$files" || { \
-	       echo " $(INSTALL_SCRIPT) $$files '$(DESTDIR)$(bindir)$$dir'"; \
-	       $(INSTALL_SCRIPT) $$files "$(DESTDIR)$(bindir)$$dir" || exit $$?; \
+	       echo " $(INSTALL_SCRIPT) $$files '$(DESTDIR)$(sbindir)$$dir'"; \
+	       $(INSTALL_SCRIPT) $$files "$(DESTDIR)$(sbindir)$$dir" || exit $$?; \
 	     } \
 	; done
 
-uninstall-dist_binSCRIPTS:
+uninstall-dist_sbinSCRIPTS:
 	@$(NORMAL_UNINSTALL)
-	@list='$(dist_bin_SCRIPTS)'; test -n "$(bindir)" || exit 0; \
+	@list='$(dist_sbin_SCRIPTS)'; test -n "$(sbindir)" || exit 0; \
 	files=`for p in $$list; do echo "$$p"; done | \
 	       sed -e 's,.*/,,;$(transform)'`; \
-	dir='$(DESTDIR)$(bindir)'; $(am__uninstall_files_from_dir)
+	dir='$(DESTDIR)$(sbindir)'; $(am__uninstall_files_from_dir)
 install-dist_sysconf_cronSCRIPTS: $(dist_sysconf_cron_SCRIPTS)
 	@$(NORMAL_INSTALL)
 	@list='$(dist_sysconf_cron_SCRIPTS)'; test -n "$(sysconf_crondir)" || list=; \
@@ -737,7 +745,7 @@ check: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) check-am
 all-am: Makefile $(SCRIPTS) $(DATA)
 installdirs:
-	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(sysconf_crondir)" "$(DESTDIR)$(sysconf_initdir)" "$(DESTDIR)$(datadir)" "$(DESTDIR)$(data_configdir)" "$(DESTDIR)$(sysconf_bcdir)" "$(DESTDIR)$(sysconf_certdir)" "$(DESTDIR)$(sysconf_configdir)" "$(DESTDIR)$(sysconf_rotatedir)" "$(DESTDIR)$(sysconf_sysconfigdir)"; do \
+	for dir in "$(DESTDIR)$(sbindir)" "$(DESTDIR)$(sysconf_crondir)" "$(DESTDIR)$(sysconf_initdir)" "$(DESTDIR)$(datadir)" "$(DESTDIR)$(data_configdir)" "$(DESTDIR)$(sysconf_bcdir)" "$(DESTDIR)$(sysconf_certdir)" "$(DESTDIR)$(sysconf_configdir)" "$(DESTDIR)$(sysconf_rotatedir)" "$(DESTDIR)$(sysconf_sysconfigdir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: $(BUILT_SOURCES)
@@ -804,7 +812,7 @@ install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am: install-dist_binSCRIPTS
+install-exec-am: install-dist_sbinSCRIPTS
 
 install-html: install-html-am
 
@@ -842,8 +850,8 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-dist_binSCRIPTS uninstall-dist_dataDATA \
-	uninstall-dist_data_configDATA uninstall-dist_sysconf_bcDATA \
+uninstall-am: uninstall-dist_dataDATA uninstall-dist_data_configDATA \
+	uninstall-dist_sbinSCRIPTS uninstall-dist_sysconf_bcDATA \
 	uninstall-dist_sysconf_certDATA \
 	uninstall-dist_sysconf_configDATA \
 	uninstall-dist_sysconf_cronSCRIPTS \
@@ -856,8 +864,8 @@ uninstall-am: uninstall-dist_binSCRIPTS uninstall-dist_dataDATA \
 	distclean distclean-generic distclean-libtool distdir dvi \
 	dvi-am html html-am info info-am install install-am \
 	install-data install-data-am install-data-hook \
-	install-dist_binSCRIPTS install-dist_dataDATA \
-	install-dist_data_configDATA install-dist_sysconf_bcDATA \
+	install-dist_dataDATA install-dist_data_configDATA \
+	install-dist_sbinSCRIPTS install-dist_sysconf_bcDATA \
 	install-dist_sysconf_certDATA install-dist_sysconf_configDATA \
 	install-dist_sysconf_cronSCRIPTS \
 	install-dist_sysconf_rotateDATA install-dvi install-dvi-am \
@@ -868,8 +876,8 @@ uninstall-am: uninstall-dist_binSCRIPTS uninstall-dist_dataDATA \
 	installcheck installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-generic \
 	mostlyclean-libtool pdf pdf-am ps ps-am uninstall uninstall-am \
-	uninstall-dist_binSCRIPTS uninstall-dist_dataDATA \
-	uninstall-dist_data_configDATA uninstall-dist_sysconf_bcDATA \
+	uninstall-dist_dataDATA uninstall-dist_data_configDATA \
+	uninstall-dist_sbinSCRIPTS uninstall-dist_sysconf_bcDATA \
 	uninstall-dist_sysconf_certDATA \
 	uninstall-dist_sysconf_configDATA \
 	uninstall-dist_sysconf_cronSCRIPTS \

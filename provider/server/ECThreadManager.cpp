@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,7 +44,7 @@
 #include "platform.h"
 #include "ECThreadManager.h"
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <algorithm>
 #include <stringutil.h>
 
@@ -57,12 +56,14 @@
 #include "ECSessionManager.h"
 #include "ECStatsCollector.h"
 #include "ECServerEntrypoint.h"
+#include "ECSoapServerConnection.h"
 
 // errors from stdsoap2.h, differs per gSOAP release
 #define RETURN_CASE(x) \
 	case x: \
 		return #x;
-string GetSoapError(int err)
+
+static string GetSoapError(int err)
 {
 	switch (err) {
 		RETURN_CASE(SOAP_EOF)
@@ -128,6 +129,7 @@ ECWorkerThread::ECWorkerThread(ECLogger *lpLogger, ECThreadManager *lpManager, E
 		if(pthread_create(&m_thread, NULL, ECWorkerThread::Work, this) != 0) {
 			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to start thread: %s", strerror(errno));
 		} else {
+			set_thread_name(m_thread, "ECWorkerThread");
 			pthread_detach(m_thread);
 		}
 	}
@@ -137,6 +139,9 @@ ECPriorityWorkerThread::ECPriorityWorkerThread(ECLogger *lpLogger, ECThreadManag
 {
     if(pthread_create(&m_thread, NULL, ECWorkerThread::Work, this) != 0) {
         m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to start thread: %s", strerror(errno));
+    }
+    else {
+	set_thread_name(m_thread, "ECPriorityWorkerThread");
     }
 	// do not detach
 }
@@ -162,6 +167,8 @@ void *ECWorkerThread::Work(void *lpParam)
     lpThis->m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Started%sthread %08x", lpPrio ? " priority " : " ", (ULONG)pthread_self());
     
     while(1) {
+		set_thread_name(pthread_self(), "z-s: idle thread");
+
         // Get the next work item, don't wait for new items
         if(lpThis->m_lpDispatcher->GetNextWorkItem(&lpWorkItem, false, lpPrio != NULL) != erSuccess) {
             // Nothing in the queue, notify that we're idle now
@@ -180,6 +187,8 @@ void *ECWorkerThread::Work(void *lpParam)
                 continue;
             }
         }
+
+		set_thread_name(pthread_self(), format("z-s: %s", lpWorkItem->soap->host).c_str());
 
 		// For SSL connections, we first must do the handshake and pass it back to the queue
 		if (lpWorkItem->soap->ctx && !lpWorkItem->soap->ssl) {
@@ -256,10 +265,10 @@ done:
             // thread is done processing the item, so any time spent in this thread until now can be accounted in that session.
             g_lpSessionManager->RemoveBusyState(((SOAPINFO *)lpWorkItem->soap->user)->ulLastSessionId, pthread_self());
             
-			// Track cpu usage server-wide
-			g_lpStatsCollector->Increment(SCN_SOAP_REQUESTS);
-		    g_lpStatsCollector->Increment(SCN_PROCESSING_TIME, (long long)((dblEnd - dblStart) * 1000));
-		    g_lpStatsCollector->Increment(SCN_RESPONSE_TIME, (long long)((dblEnd - lpWorkItem->dblReceiveStamp) * 1000));
+		// Track cpu usage server-wide
+		g_lpStatsCollector->Increment(SCN_SOAP_REQUESTS);
+		g_lpStatsCollector->Increment(SCN_PROCESSING_TIME, int64_t((dblEnd - dblStart) * 1000));
+		g_lpStatsCollector->Increment(SCN_RESPONSE_TIME, int64_t((dblEnd - lpWorkItem->dblReceiveStamp) * 1000));
 
             // Clear memory used by soap calls. Note that this does not actually
             // undo our soap_new2() call so the soap object is still valid after these calls
@@ -312,7 +321,7 @@ ECThreadManager::~ECThreadManager()
         ulThreads = m_lstThreads.size();
         pthread_mutex_unlock(&m_mutexThreads);
         if(ulThreads > 0) {
-            m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Still waiting for %d threads to exit", ulThreads);
+            m_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Still waiting for %d worker threads to exit", ulThreads);
             Sleep(1000);
         }
         else
@@ -415,6 +424,9 @@ ECWatchDog::ECWatchDog(ECConfig *lpConfig, ECLogger *lpLogger, ECDispatcher *lpD
     if(pthread_create(&m_thread, NULL, ECWatchDog::Watch, this) != 0) {
         m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to start watchdog thread: %s", strerror(errno));
     }
+    else {
+	set_thread_name(m_thread, "ECWatchDog");
+}
 }
 
 ECWatchDog::~ECWatchDog()
@@ -872,9 +884,9 @@ ECRESULT ECDispatcherSelect::MainLoop()
 						else if (ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY)
 							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Accepted incoming connection from file://%s", m_lpConfig->GetSetting("server_pipe_priority"));
 						else
-							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Accepted incoming%sconnection from %d.%d.%d.%d",
+							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Accepted incoming%sconnection from %s",
 											ulType == CONNECTION_TYPE_SSL ? " SSL ":" ",
-											(int)((newsoap->ip >> 24)&0xFF), (int)((newsoap->ip >> 16)&0xFF), (int)((newsoap->ip >> 8)&0xFF), (int)(newsoap->ip&0xFF));
+											newsoap->host);
 					}
                     newsoap->socket = relocate_fd(newsoap->socket, m_lpLogger);
 					g_lpStatsCollector->Max(SCN_MAX_SOCKET_NUMBER, (LONGLONG)newsoap->socket);
@@ -1049,9 +1061,9 @@ ECRESULT ECDispatcherEPoll::MainLoop()
 						else if (ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY)
 							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Accepted incoming connection from file://%s", m_lpConfig->GetSetting("server_pipe_priority"));
 						else
-							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Accepted incoming%sconnection from %d.%d.%d.%d",
+							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Accepted incoming%sconnection from %s",
 											ulType == CONNECTION_TYPE_SSL ? " SSL ":" ",
-											(int)((newsoap->ip >> 24)&0xFF), (int)((newsoap->ip >> 16)&0xFF), (int)((newsoap->ip >> 8)&0xFF), (int)(newsoap->ip&0xFF));
+											newsoap->host);
 					}
 					newsoap->socket = relocate_fd(newsoap->socket, m_lpLogger);
 					g_lpStatsCollector->Max(SCN_MAX_SOCKET_NUMBER, (LONGLONG)newsoap->socket);

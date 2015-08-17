@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -54,12 +53,12 @@
 
 #include "freebusytags.h"
 #include "mapiext.h"
-#include "edkmdb.h"
+#include <edkmdb.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 BOOL leapyear(short year)
@@ -667,13 +666,16 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 		First item is Months
 		Second item is the Freebusy data
 	*/
-	MAPIAllocateBuffer(2 * sizeof(SPropValue), (void**)&lpPropFBDataArray);
+	if ((hr = MAPIAllocateBuffer(2 * sizeof(SPropValue), (void**)&lpPropFBDataArray)) != hrSuccess)
+		goto exit;
 	
 	lpPropFBDataArray[0].Value.MVl.cValues = 0;
 	lpPropFBDataArray[1].Value.MVbin.cValues = 0;
 
-	MAPIAllocateMore((ulMonths+1) * sizeof(ULONG), lpPropFBDataArray, (void**)&lpPropFBDataArray[0].Value.MVl.lpl);	 // +1 for free/busy in two months
-	MAPIAllocateMore((ulMonths+1) * sizeof(SBinary), lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin); // +1 for free/busy in two months
+	if ((hr = MAPIAllocateMore((ulMonths+1) * sizeof(ULONG), lpPropFBDataArray, (void**)&lpPropFBDataArray[0].Value.MVl.lpl)) != hrSuccess)	 // +1 for free/busy in two months
+		goto exit;
+	if ((hr = MAPIAllocateMore((ulMonths+1) * sizeof(SBinary), lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin)) != hrSuccess) // +1 for free/busy in two months
+		goto exit;
 
 	//memset(&lpPropFBDataArray[1].Value.MVbin.lpbin, 0, ulArrayItems);
 
@@ -684,7 +686,8 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 
 	bFound = false;
 
-	while(lpfbBlockList->Next(&fbBlk) == hrSuccess && iMonth < (LONG)ulMonths)
+	while (lpfbBlockList->Next(&fbBlk) == hrSuccess &&
+	       iMonth < static_cast<LONG>(ulMonths))
 	{
 
 		if(fbBlk.m_fbstatus == fbStatus || fbStatus == fbZarafaAllBusy)
@@ -703,7 +706,8 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 				lpPropFBDataArray[0].Value.MVl.cValues++;
 				lpPropFBDataArray[1].Value.MVbin.cValues++;
 
-				MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb);
+				if ((hr = MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb)) != hrSuccess)
+					goto exit;
 				lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb = 0;
 				
 			}
@@ -739,7 +743,8 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 					lpPropFBDataArray[0].Value.MVl.cValues++;
 					lpPropFBDataArray[1].Value.MVbin.cValues++;
 
-					MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb);
+					if ((hr = MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb)) != hrSuccess)
+						goto exit;
 					lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb = 0;
 				
 					fbEvent.rtmStart = 0;					
@@ -760,7 +765,8 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 				lpPropFBDataArray[0].Value.MVl.cValues++;
 				lpPropFBDataArray[1].Value.MVbin.cValues++;
 
-				MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb);
+				if ((hr = MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb)) != hrSuccess)
+					goto exit;
 				lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb = 0;
 
 				fbEvent.rtmStart = 0;
@@ -780,7 +786,7 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 			bFound = true;
 			ASSERT(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb <= ulMaxItemDataSize);
 		}
-		ASSERT(iMonth == -1 || iMonth < (ulMonths+1));
+		ASSERT(iMonth == -1 || (iMonth >= 0 && static_cast<ULONG>(iMonth) < (ulMonths+1)));
 		ASSERT(lpPropFBDataArray[1].Value.MVbin.cValues <= (ulMonths+1));
 		ASSERT(lpPropFBDataArray[0].Value.MVl.cValues <= (ulMonths+1));
 	}
@@ -883,7 +889,8 @@ HRESULT HrAddFBBlock(OccrInfo sOccrInfo, OccrInfo **lppsOccrInfo, ULONG *lpcValu
 	else
 		ulModVal = 1;
 
-	MAPIAllocateBuffer(sizeof(sOccrInfo) * ulModVal, (void **)&lpsNewOccrInfo);	
+	if ((hr = MAPIAllocateBuffer(sizeof(sOccrInfo) * ulModVal, (void **)&lpsNewOccrInfo)) != hrSuccess)
+		goto exit;
 	
 	if(lpsInputOccrInfo)
 		hr = HrCopyFBBlockSet(lpsNewOccrInfo, lpsInputOccrInfo, (*lpcValues));

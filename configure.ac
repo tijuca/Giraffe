@@ -1,12 +1,12 @@
 AC_PREREQ(2.60)
-m4_define([zarafa_version], esyscmd(cat version.in | tr -d '\n'))
+m4_define([zarafa_version], esyscmd(tr -d '\n' <version.in))
 AC_INIT([Zarafa], [zarafa_version], [zarafa-dev@zarafa.com])
 AC_CONFIG_SRCDIR([provider/server/ECServer.cpp])
 AC_CONFIG_HEADERS([common/config.h])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_CONFIG_MACRO_DIR([autoconf])
 # because webaccess has too deep dirs for default tar-v7, we need something "better"
-AM_INIT_AUTOMAKE([1.10 foreign tar-ustar])
+AM_INIT_AUTOMAKE([1.10 foreign tar-ustar subdir-objects])
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
 # used in the pkgconfig file
@@ -79,10 +79,18 @@ case "$host_os" in
 		;;
 esac
 
+>conftest.cpp
+ZPHPCXXFLAGS=""
+if $CXX -Wno-narrowing -c conftest.cpp; then
+	ZPHPCXXFLAGS="-Wno-narrowing"
+fi
+rm -f conftest.*
+AC_SUBST([ZPHPCXXFLAGS])
+
 # default to debug mode
 # disable write-strings: too much complains about "" being 'cast' to char* (since const char* is not in the declarations) on g++-4.2 and higher
-ZCPPFLAGS="$ZCPPFLAGS $BUILDOS -DHAVE_CONFIG_H"
-ZCXXFLAGS="$ZCXXFLAGS -g -rdynamic -Wall -Wno-write-strings"
+ZCPPFLAGS="$BUILDOS -DHAVE_CONFIG_H"
+ZCXXFLAGS="-Wall -Wmissing-declarations -Wno-write-strings"
 if ! test "$want_release" = "yes"; then
 # when using -pedantic, -Wno-long-long is required
 # only add -pedantic in non-release mode, since a header in php5 contains a , too much in an enum, which triggers a compile error.
@@ -175,6 +183,14 @@ AC_ARG_ENABLE(profiling,
 	  fi
     ])
 
+AC_ARG_ENABLE(coverage,
+  AC_HELP_STRING([--enable-coverage], [enable coverage (--coverage)]),
+    [ if test "${enableval}" = "yes"; then
+		ZCXXFLAGS="$ZCXXFLAGS -g --coverage -fprofile-arcs -ftest-coverage"
+		ZLDFLAGS="$LDFLAGS -lgcov"
+	  fi
+    ])
+
 # test offline possibility
 AC_DEFUN([OFFLINE_CONFIG],[
   AC_ARG_ENABLE(offline, AC_HELP_STRING([--enable-offline],[Compile zarafa-server as the offline server]),
@@ -228,6 +244,7 @@ AC_C_CONST
 AC_C_INLINE
 AC_C_RESTRICT
 AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
 AC_HEADER_TIME
 AC_STRUCT_TM
 
@@ -373,63 +390,124 @@ AC_CHECK_FUNCS([mysql_set_character_set])
 LIBS=$LIBS_system
 CXXFLAGS=$CXXFLAGS_system
 
+#---------------------------------------------
+# pthread setname (4 non-portable variants...)
+#---------------------------------------------
+LIBS="-pthread $LIBS"
+AC_CHECK_HEADERS([pthread_np.h])
+define(pthread_np_preamble,[
+  #include <pthread.h>
+  #if HAVE_PTHREAD_NP_H
+  #  include <pthread_np.h>
+  #endif
+])
+# 2-arg setname (e.g. Linux/glibc, QNX, IBM)
+AC_MSG_CHECKING([for 2-arg pthread_setname_np])
+AC_LINK_IFELSE([AC_LANG_PROGRAM(pthread_np_preamble, [
+    pthread_setname_np(pthread_self(), "foo")
+])], [
+  AC_DEFINE(HAVE_PTHREAD_SETNAME_NP_2, 1, [2-arg pthread_setname_np])
+  AC_MSG_RESULT([yes])
+], [
+  AC_MSG_RESULT([no])
+
+  # 2-arg set_name (e.g. FreeBSD, OpenBSD)
+  AC_MSG_CHECKING([for 2-arg pthread_set_name_np])
+  AC_LINK_IFELSE([AC_LANG_PROGRAM(pthread_np_preamble, [
+      return pthread_set_name_np(pthread_self(), "foo");
+  ])], [
+    AC_DEFINE(HAVE_PTHREAD_SET_NAME_NP_2, 1, [2-arg pthread_set_name_np])
+    AC_MSG_RESULT([yes])
+  ], [
+    AC_MSG_RESULT([no])
+
+    # 1-arg setname (e.g. Darwin)
+    AC_MSG_CHECKING([for 1-arg pthread_setname_np])
+    AC_LINK_IFELSE([AC_LANG_PROGRAM(pthread_np_preamble, [
+        return pthread_setname_np("foo");
+    ])], [
+      AC_DEFINE(HAVE_PTHREAD_SETNAME_NP_1, 1, [1-arg pthread_setname_np])
+      AC_MSG_RESULT([yes])
+    ], [
+      AC_MSG_RESULT([no])
+
+      # 3-arg setname (e.g. NetBSD)
+      AC_MSG_CHECKING([for 3-arg pthread_setname_np])
+      AC_LINK_IFELSE([AC_LANG_PROGRAM(pthread_np_preamble, [
+          return pthread_setname_np(pthread_self(), "foo", NULL);
+      ])], [
+        AC_DEFINE(HAVE_PTHREAD_SETNAME_NP_3, 1, [3-arg pthread_setname_np])
+        AC_MSG_RESULT([yes])
+      ], [
+        AC_MSG_RESULT([no])
+      ])
+    ])
+  ])
+])
+#---------------------------------------------
+# end pthread_setname stuff
+#---------------------------------------------
+
+CXXFLAGS="$CXXFLAGS_system $ZCXXFLAGS"
+LDFLAGS="$LDFLAGS_system $ZLDFLAGS"
+AC_CHECK_FUNCS([pthread_getname_np])
+
+VMIME_CFLAGS=""
+VMIME_LIBS="-lvmime"
 
 AC_ARG_WITH(vmime-prefix,
   AC_HELP_STRING([--with-vmime-prefix=PATH],[libvmime prefix, e.g. /usr/local, default /usr]),
   [
   VMIME_PREFIX="$withval"
-  ],
-  [
-  VMIME_PREFIX="/usr"
+  VMIME_CFLAGS="$VMIME_CFLAGS -I$VMIME_PREFIX/include"
+  VMIME_LIBS="$VMIME_LIBS -L$VMIME_PREFIX/lib -L$VMIME_PREFIX/lib64 -R$VMIME_PREFIX/lib -R$VMIME_PREFIX/lib64"
   ])
-VMIME_CFLAGS="-I$VMIME_PREFIX/include"
-VMIME_LIBS="-L$VMIME_PREFIX/lib -L$VMIME_PREFIX/lib64 -R$VMIME_PREFIX/lib -R$VMIME_PREFIX/lib64 -lvmime"
 AC_SUBST(VMIME_CFLAGS)
 AC_SUBST(VMIME_LIBS)
 
+GSOAP_CFLAGS="-DWITH_OPENSSL -DWITH_GZIP"
+GSOAP_LIBS="-lgsoapssl++"
+AC_MSG_CHECKING([gsoap])
 AC_ARG_WITH(gsoap-prefix,
   AC_HELP_STRING([--with-gsoap-prefix=PATH],[gsoap prefix, e.g. /usr/local, default /usr]),
   [
   GSOAP_PREFIX="$withval"
+  GSOAP_SOAPCPP2="$GSOAP_PREFIX/bin/soapcpp2"
+  GSOAP_CFLAGS="$GSOAP_CFLAGS -I$GSOAP_PREFIX/include"
+  # Hardcoding directories is bad… they may contain libraries of mismatching archictecture
+  GSOAP_LIBS="$GSOAP_LIBS -L$GSOAP_PREFIX/lib -L$GSOAP_PREFIX/lib64 -R$GSOAP_PREFIX/lib -R$GSOAP_PREFIX/lib64"
   ],
   [
   GSOAP_PREFIX="/usr"
+  GSOAP_SOAPCPP2="soapcpp2"
   ])
-GSOAP_CFLAGS="-DWITH_OPENSSL -DWITH_GZIP -I$GSOAP_PREFIX/include"
 # Gsoap 2.8.13 introduced the -z1 flag for depreacted old-style C++ service proxies and objects ( https://www.cs.fsu.edu/~engelen/changelog.html )
-GSOAP_SOAPCPP2=$($GSOAP_PREFIX/bin/soapcpp2 -z1 &> /dev/null && echo "$GSOAP_PREFIX/bin/soapcpp2 -z1 " || echo "$GSOAP_PREFIX/bin/soapcpp2 ")
-GSOAP_LIBS="-L$GSOAP_PREFIX/lib -L$GSOAP_PREFIX/lib64 -R$GSOAP_PREFIX/lib -R$GSOAP_PREFIX/lib64 -lgsoapssl++"
+GSOAP_SOAPCPP2=$(mkdir -p "conftest.$$" && cd "conftest.$$" && "$GSOAP_SOAPCPP2" -z1 </dev/null >/dev/null 2>/dev/null && echo "$GSOAP_SOAPCPP2 -z1 " || echo "$GSOAP_SOAPCPP2")
+rm -Rf "conftest.$$"
+AC_MSG_RESULT([$GSOAP_SOAPCPP2])
 AC_SUBST(GSOAP_CFLAGS)
 AC_SUBST(GSOAP_LIBS)
 AC_SUBST(GSOAP_SOAPCPP2)
 
+ICAL_CFLAGS=""
+ICAL_LIBS="-lical -licalss"
 AC_ARG_WITH(ical-prefix,
   AC_HELP_STRING([--with-ical-prefix=PATH],[libical prefix, e.g. /usr/local, default /usr]),
   [
   ICAL_PREFIX="${withval}"
-  ],
-  [
-  ICAL_PREFIX="/usr"
+  ICAL_CFLAGS="$ICAL_CFLAGS -I$ICAL_PREFIX/include"
+  # Hardcoding directories is bad… they may contain libraries of mismatching archictecture
+  ICAL_LIBS="$ICAL_LIBS -L$ICAL_PREFIX/lib -L$ICAL_PREFIX/lib64 -R$ICAL_PREFIX/lib -R$ICAL_PREFIX/lib64"
   ])
-ICAL_CFLAGS="-I$ICAL_PREFIX/include"
-ICAL_LIBS="-L$ICAL_PREFIX/lib -L$ICAL_PREFIX/lib64 -R$ICAL_PREFIX/lib -R$ICAL_PREFIX/lib64 -lical -licalss"
 AC_SUBST(ICAL_CFLAGS)
 AC_SUBST(ICAL_LIBS)
 
 if test "$want_tcmalloc" = "yes"; then
-    AC_ARG_WITH(tcmalloc-prefix,
-      AC_HELP_STRING([--with-tcmalloc-prefix=PATH],[tcmalloc prefix, e.g. /usr/local/, default /usr]),
-      [
-      TCMALLOC_PREFIX="${withval}"
-      ],
-      [
-      TCMALLOC_PREFIX="/usr"
-      ])
-    TCMALLOC_CFLAGS="-I$TCMALLOC_PREFIX/include"
-    TCMALLOC_LIBS="-L$TCMALLOC_PREFIX/lib -L$TCMALLOC_PREFIX/lib64 -R$TCMALLOC_PREFIX/lib -R$TCMALLOC_PREFIX/lib64 -ltcmalloc_minimal"
-    AC_DEFINE(HAVE_TCMALLOC, [1], [Google TCMalloc enabled])
-    AC_SUBST(TCMALLOC_CFLAGS)
-    AC_SUBST(TCMALLOC_LIBS)
+	PKG_CHECK_MODULES([TCMALLOC], [libtcmalloc_minimal])
+	CPPFLAGS="$CPPFLAGS $TCMALLOC_CFLAGS"
+	AC_CHECK_HEADERS([gperftools/malloc_extension.h google/malloc_extension.h])
+	CPPFLAGS="$CPPFLAGS_system"
+	AC_DEFINE(HAVE_TCMALLOC, [1], [Google TCMalloc enabled])
 fi
 
 # Check for sparsehash availability
@@ -661,7 +739,7 @@ AC_SUBST(PROG_LIBS)
 
 # done testing C++ requirements
 AC_LANG_POP
-# set out compileflags
+dnl Set default project flags. On overriding AM_CXXFLAGS, include ${ZCXXFLAGS}
 AM_CXXFLAGS="$ZCXXFLAGS"
 AM_LDFLAGS="$ZLDFLAGS"
 AC_SUBST([ZCPPFLAGS])
@@ -675,6 +753,7 @@ AC_CONFIG_FILES([Makefile
 		mapi4linux/Makefile
 		mapi4linux/include/Makefile
 		mapi4linux/src/Makefile
+		m4lcommon/Makefile
 		php-ext/Makefile
 		provider/Makefile
 		provider/client/Makefile
@@ -729,29 +808,12 @@ AC_CONFIG_FILES([Makefile
 		zarafa-libsync/Makefile
 
 		common/zarafa.pc
+		default.sym
+		mapi4linux/src/libmapi.sym
 		version
 		specialbuild
 ])
 dnl non-oss files
-if test -d `dirname $0`/licensed; then
-AC_CONFIG_FILES([
-		liblicense/Makefile
-		licensed/Makefile
-		libtimezone/Makefile
-		libcalendar/Makefile
-		libcalendar/src/Makefile
-		libcalendar/include/Makefile
-		ECtools/zarafa-backup/Makefile
-		ECtools/zarafa-backup/helpers/Makefile
-		ECtools/zarafa-report/Makefile
-		ECtools/zarafa-msr/Makefile
-		ECtools/zarafa-ocf/Makefile
-		ECtools/za-extra/Makefile
-		ECtools/zarafa-ws/Makefile
-		ECtools/zarafa-ws/etc/Makefile
-		ECtools/zarafa-presence/Makefile
-])
-fi
 
 AC_OUTPUT
 

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -48,10 +47,10 @@
 #include "platform.h"
 
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
-#include <signal.h>
+#include <csignal>
 
 #include <mapi.h>
 #include <mapix.h>
@@ -59,7 +58,7 @@
 #include <mapidefs.h>
 
 #include <mapiguid.h>
-#include <ctype.h>
+#include <cctype>
 #include "my_getopt.h"
 
 #include "ECScheduler.h"
@@ -73,8 +72,9 @@
 
 using namespace std;
 
-void deleteThreadMonitor(LPECTHREADMONITOR lpThreadMonitor, bool base = false) {
-
+static void deleteThreadMonitor(LPECTHREADMONITOR lpThreadMonitor,
+    bool base = false)
+{
 	if(lpThreadMonitor == NULL)
 		return;
 
@@ -88,15 +88,16 @@ void deleteThreadMonitor(LPECTHREADMONITOR lpThreadMonitor, bool base = false) {
 		delete lpThreadMonitor;
 }
 
-LPECTHREADMONITOR	m_lpThreadMonitor;
+static LPECTHREADMONITOR	m_lpThreadMonitor;
 
-pthread_mutex_t		m_hExitMutex;
-pthread_cond_t		m_hExitSignal;
-pthread_t			mainthread;
+static pthread_mutex_t		m_hExitMutex;
+static pthread_cond_t		m_hExitSignal;
+static pthread_t			mainthread;
 
-HRESULT running_service( char* szPath );
+static HRESULT running_service(const char *szPath);
 
-void sighandle(int sig) {
+static void sighandle(int sig)
+{
 	// Win32 has unix semantics and therefore requires us to reset the signal handler.
 	signal(SIGTERM , sighandle);
 	signal(SIGINT  , sighandle);	// CTRL+C
@@ -109,8 +110,9 @@ void sighandle(int sig) {
 	pthread_cond_signal(&m_hExitSignal);
 }
 
-void sighup(int signr) {
-	// In Win32, the signal is sent in a seperate, special signal thread. So this test is
+static void sighup(int signr)
+{
+	// In Win32, the signal is sent in a separate, special signal thread. So this test is
 	// not needed or required.
 	if (pthread_equal(pthread_self(), mainthread)==0)
 		return;
@@ -122,7 +124,7 @@ void sighup(int signr) {
 
 		if (m_lpThreadMonitor->lpLogger) {
 			if (m_lpThreadMonitor->lpConfig) {
-				char *ll = m_lpThreadMonitor->lpConfig->GetSetting("log_level");
+				const char *ll = m_lpThreadMonitor->lpConfig->GetSetting("log_level");
 				int new_ll = ll ? atoi(ll) : 2;
 				m_lpThreadMonitor->lpLogger->SetLoglevel(new_ll);
 			}
@@ -134,55 +136,18 @@ void sighup(int signr) {
 }
 
 // SIGSEGV catcher
-#include <execinfo.h>
-
-void sigsegv(int signr)
+static void sigsegv(int signr)
 {
-	void *bt[64];
-	int i, n;
-	char **btsymbols;
-
-	if(!m_lpThreadMonitor || !m_lpThreadMonitor->lpLogger)
-		goto exit;
-
-	switch (signr) {
-	case SIGSEGV:
-		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Caught SIGSEGV (%d), traceback:", signr);
-		break;
-	case SIGBUS:
-		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Caught SIGBUS (%d), possible invalid mapped memory access, traceback:", signr);
-		break;
-	case SIGABRT:
-		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Caught SIGABRT (%d), out of memory or unhandled exception, traceback:", signr);
-		break;
-	};
-
-	n = backtrace(bt, 64);
-
-	btsymbols = backtrace_symbols(bt, n);
-
-	for (i = 0; i < n; i++) {
-		if (btsymbols)
-			m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "%p %s", bt[i], btsymbols[i]);
-		else
-			m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "%p", bt[i]);
-	}
-
-	m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_NOTICE, "When reporting this traceback, please include Linux distribution name, system architecture and Zarafa version.");
-
-exit:
-	kill(0, signr);
+	generic_sigsegv_handler(m_lpThreadMonitor->lpLogger, "Monitor", PROJECT_VERSION_MONITOR_STR, signr);
 }
 
-
-void print_help(char *name) {
+static void print_help(const char *name)
+{
 	cout << "Usage:\n" << endl;
 	cout << name << " [-F] [-h|--host <serverpath>] [-c|--config <configfile>]" << endl;
 	cout << "  -F\t\tDo not run in the background" << endl;
 	cout << "  -h path\tUse alternate connect path (e.g. file:///var/run/socket).\n\t\tDefault: file:///var/run/zarafa" << endl;
 	cout << "  -c filename\tUse alternate config file (e.g. /etc/zarafa-monitor.cfg)\n\t\tDefault: /etc/zarafa/monitor.cfg" << endl;
-	cout << endl;
-	cout << "  --ignore-unknown-config-options\tStart even if the configuration file contains invalid config options" << endl;
 	cout << endl;
 }
 
@@ -190,14 +155,14 @@ int main(int argc, char *argv[]) {
 
 	HRESULT hr = hrSuccess;
 	const char *szConfig = ECConfig::GetDefaultPath("monitor.cfg");
-	char *szPath = NULL;
+	const char *szPath = NULL;
 	int c;
 	int daemonize = 1;
 	bool bIgnoreUnknownConfigOptions = false;
 
 
 	// Default settings
-	const configsetting_t lpDefaults[] = {
+	static const configsetting_t lpDefaults[] = {
 		{ "smtp_server","localhost" },
 		{ "server_socket", CLIENT_ADMIN_SOCKET },
 		{ "run_as_user", "" },
@@ -208,6 +173,7 @@ int main(int argc, char *argv[]) {
 		{ "log_file","/var/log/zarafa/monitor.log" },
 		{ "log_level","2", CONFIGSETTING_RELOADABLE },
 		{ "log_timestamp","1" },
+		{ "log_buffer_size",	"4096" },
 		{ "sslkey_file", "" },
 		{ "sslkey_pass", "", CONFIGSETTING_EXACT },
 		{ "quota_check_interval", "15" },
@@ -229,7 +195,7 @@ int main(int argc, char *argv[]) {
 		OPT_FOREGROUND,
 		OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS
 	};
-	struct option long_options[] = {
+	static const struct option long_options[] = {
 		{ "help", 0, NULL, OPT_HELP },
 		{ "host", 1, NULL, OPT_HOST },
 		{ "config", 1, NULL, OPT_CONFIG },
@@ -281,7 +247,7 @@ int main(int argc, char *argv[]) {
 
 	m_lpThreadMonitor->lpConfig = ECConfig::Create(lpDefaults);
 	if (!m_lpThreadMonitor->lpConfig->LoadSettings(szConfig) || !m_lpThreadMonitor->lpConfig->ParseParams(argc-my_optind, &argv[my_optind], NULL) || (!bIgnoreUnknownConfigOptions && m_lpThreadMonitor->lpConfig->HasErrors())) {
-		m_lpThreadMonitor->lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-"); // create fatal logger without a timestamp to stderr
+		m_lpThreadMonitor->lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false, 0); // create fatal logger without a timestamp to stderr
 		LogConfigErrors(m_lpThreadMonitor->lpConfig, m_lpThreadMonitor->lpLogger);
 		hr = E_FAIL;
 		goto exit;
@@ -348,7 +314,7 @@ exit:
 	return hr == hrSuccess ? 0 : 1;
 }
 
-HRESULT running_service( char* szPath)
+static HRESULT running_service(const char *szPath)
 {
 	HRESULT			hr = hrSuccess;
 	ECScheduler*	lpECScheduler = NULL;
@@ -368,7 +334,7 @@ HRESULT running_service( char* szPath)
 	if (ulInterval == 0)
 		ulInterval = 15;
 
-	m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_NOTICE, "Starting zarafa-monitor version " PROJECT_VERSION_MONITOR_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
+	m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting zarafa-monitor version " PROJECT_VERSION_MONITOR_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
 
 	// Add Quota monitor
 	hr = lpECScheduler->AddSchedule(SCHEDULE_MINUTES, ulInterval, ECQuotaMonitor::Create, m_lpThreadMonitor);

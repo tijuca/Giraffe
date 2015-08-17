@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,6 +44,7 @@
 #ifndef ECSEARCHCLIENT_H
 #define ECSEARCHCLIENT_H
 
+#include "zcdefs.h"
 #include <map>
 #include <set>
 #include <string>
@@ -61,7 +61,7 @@ typedef struct {
 
 typedef std::set<unsigned int> setindexprops_t;
 
-class ECSearchClient : public ECChannelClient {
+class ECSearchClient _final : public ECChannelClient {
 public:
 	ECSearchClient(const char *szIndexerPath, unsigned int ulTimeOut);
 	~ECSearchClient();
@@ -71,8 +71,8 @@ public:
 	ECRESULT SyncRun();
 	
 private:
-	ECRESULT Scope(std::string &strServer, std::string& strStore, std::list<unsigned int>& ulFolders);
-	ECRESULT Find(std::set<unsigned int> &setFields, std::string strTerm);
+	ECRESULT Scope(const std::string &strServer, const std::string &strStore, const std::list<unsigned int> &ulFolders);
+	ECRESULT Find(const std::set<unsigned int> &setFields, const std::string &strTerm);
 	ECRESULT Query(std::list<unsigned int> &lstMatches);
 };
 

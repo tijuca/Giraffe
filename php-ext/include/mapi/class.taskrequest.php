@@ -12,14 +12,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -333,7 +332,7 @@
 			mapi_setprops($outgoing, array(
 				PR_MESSAGE_CLASS => "IPM.TaskRequest", 		/* class is task request */
 				$this->props['taskstate'] => tdsOWNNEW, 	/* for the recipient the task is new */
-				$this->props['taskmode'] => tdmtTaskReq,	/* for the recipient it's a request */
+				$this->props['taskmode'] => tdmtTaskReq,	/* for the recipient, it is a request */
 				$this->props['updatecount'] => 1,			/* version 2 is in the attachment */
 				PR_SUBJECT => $prefix . $messageprops[PR_SUBJECT],
 				PR_ICON_INDEX => 0xFFFFFFFF,				/* show assigned icon */

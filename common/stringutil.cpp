@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -52,7 +51,7 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 std::string stringify(unsigned int x, bool usehex, bool _signed) {
@@ -70,7 +69,7 @@ std::string stringify(unsigned int x, bool usehex, bool _signed) {
 	return szBuff;
 }
 
-std::string stringify_int64(long long x, bool usehex) {
+std::string stringify_int64(int64_t x, bool usehex) {
 	std::ostringstream s;
 
 	if (usehex) {
@@ -100,7 +99,7 @@ std::string stringify_double(double x, int prec, bool bLocale) {
 		try {
 			std::locale l("");
 			s.imbue(l);
-		} catch (std::runtime_error &e) {
+		} catch (std::runtime_error &) {
 			// locale not available, print in C
 		}
 		s << x;
@@ -148,7 +147,7 @@ std::wstring wstringify(unsigned int x, bool usehex, bool _signed)
 	return s.str();
 }
 
-std::wstring wstringify_int64(long long x, bool usehex)
+std::wstring wstringify_int64(int64_t x, bool usehex)
 {
 	std::wostringstream s;
 
@@ -162,7 +161,7 @@ std::wstring wstringify_int64(long long x, bool usehex)
 	return s.str();
 }
 
-std::wstring wstringify_uint64(unsigned long long x, bool usehex)
+std::wstring wstringify_uint64(uint64_t x, bool usehex)
 {
 	std::wostringstream s;
 
@@ -237,7 +236,7 @@ int memsubstr(const void* haystack, size_t haystackSize, const void* needle, siz
 	return 1;
 }
 
-std::string str_storage(unsigned long long ulBytes, bool bUnlimited) {
+std::string str_storage(uint64_t ulBytes, bool bUnlimited) {
 	static double MB = 1024.0 * 1024.0;
 
 	if (ulBytes == 0 && bUnlimited)
@@ -336,8 +335,8 @@ std::string ServerNamePortToURL(const char *lpszType, const char *lpszServerName
 
 std::string shell_escape(std::string str)
 {
-	std::string::iterator start;
-	std::string::iterator ptr;
+	std::string::const_iterator start;
+	std::string::const_iterator ptr;
 	std::string escaped;
 
 	start = ptr = str.begin();
@@ -403,7 +402,7 @@ std::vector<std::string> tokenize(const std::string &strInput, const char sep, b
 
 std::string concatenate(std::vector<std::string> &elements, const std::string &delimeters)
 {
-	std::vector<std::string>::iterator iter;
+	std::vector<std::string>::const_iterator iter;
 	std::string concat;
 
     if (!elements.empty()) {
@@ -481,7 +480,7 @@ std::string hex2bin(const std::wstring &input)
 
 std::string bin2hex(unsigned int inLength, const unsigned char *input)
 {
-	const char digits[] = "0123456789ABCDEF";
+	static const char digits[] = "0123456789ABCDEF";
 	std::string buffer;
 
 	if (!input)
@@ -503,7 +502,7 @@ std::string bin2hex(const std::string &input)
 
 std::wstring bin2hexw(unsigned int inLength, const unsigned char *input)
 {
-	const wchar_t digits[] = L"0123456789ABCDEF";
+	static const wchar_t digits[] = L"0123456789ABCDEF";
 	std::wstring buffer;
 
 	if (!input)
@@ -559,7 +558,7 @@ std::string StringEscape(const char* input, const char *tokens, const char escap
 std::string urlEncode(const std::string &input)
 {
 	std::string output;
-	const char digits[] = "0123456789ABCDEF";
+	static const char digits[] = "0123456789ABCDEF";
 
 	output.reserve(input.length());
 	for (size_t i = 0; i < input.length(); i++) 
@@ -741,7 +740,7 @@ void StringCRLFtoLF(const std::wstring &strInput, std::wstring *lpstrOutput) {
 void StringLFtoCRLF(std::string &strInOut)
 {
 	std::string strOutput;
-	std::string::iterator i;
+	std::string::const_iterator i;
 
 	strOutput.reserve(strInOut.size());
 
@@ -779,4 +778,18 @@ std::string forcealnum(const std::string& str, const char *szAdditional)
     }
 
     return out;
+}
+
+std::string format(const char *const fmt, ...) {
+        char *buffer = NULL;
+        va_list ap;
+
+        va_start(ap, fmt);
+        (void)vasprintf(&buffer, fmt, ap);
+        va_end(ap);
+
+        std::string result = buffer;
+        free(buffer);
+
+        return result;
 }

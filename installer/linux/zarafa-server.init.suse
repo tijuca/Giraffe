@@ -21,7 +21,7 @@
 rc_reset
 
 SERVERCONFIG=/etc/zarafa/server.cfg
-SERVERPROGRAM=/usr/bin/zarafa-server
+SERVERPROGRAM=/usr/sbin/zarafa-server
 
 # Sanity checks.
 #[ -f $SERVERCONFIG ] || exit 0

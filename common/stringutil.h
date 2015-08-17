@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,6 +44,7 @@
 #ifndef _STRINGUTIL_H
 #define _STRINGUTIL_H
 
+#include <cstdarg>
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -79,14 +79,14 @@ static inline std::string strToLower(std::string f) {
 
 // Use casting if passing hard coded values.
 std::string stringify(unsigned int x, bool usehex = false, bool _signed = false);
-std::string stringify_int64(long long x, bool usehex = false);
+std::string stringify_int64(int64_t x, bool usehex = false);
 std::string stringify_float(float x);
 std::string stringify_double(double x, int prec = 18, bool bLocale = false);
 std::string stringify_datetime(time_t x);
 
 std::wstring wstringify(unsigned int x, bool usehex = false, bool _signed = false);
-std::wstring wstringify_int64(long long x, bool usehex = false);
-std::wstring wstringify_uint64(unsigned long long x, bool usehex = false);
+std::wstring wstringify_int64(int64_t x, bool usehex = false);
+std::wstring wstringify_uint64(uint64_t x, bool usehex = false);
 std::wstring wstringify_float(float x);
 std::wstring wstringify_double(double x, int prec = 18);
 
@@ -111,7 +111,7 @@ int memsubstr(const void* haystack, size_t haystackSize, const void* needle, siz
 
 std::string striconv(const std::string &strinput, const char *lpszFromCharset, const char *lpszToCharset);
 
-std::string str_storage(unsigned long long ulBytes, bool bUnlimited = true);
+std::string str_storage(uint64_t ulBytes, bool bUnlimited = true);
 
 std::string PrettyIP(long unsigned int ip);
 std::string GetServerNameFromPath(const char *szPath);
@@ -211,5 +211,6 @@ _Tp join(_InputIterator __first, _InputIterator __last, _Tp __sep)
     return s;
 }
 
+std::string format(const char *const fmt, ...);
 
 #endif

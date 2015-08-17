@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -53,7 +52,7 @@
 #include "Util.h"
 #include "edkguid.h"
 #include "ECGuid.h"
-#include "mapiguid.h"
+#include <mapiguid.h>
 #include "ECMessage.h"
 #include "ECDebug.h"
 
@@ -72,7 +71,7 @@
 
 #ifdef _DEBUG
 #undef THIS_FILE
-static char THIS_FILE[]=__FILE__;
+static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -199,26 +198,31 @@ HRESULT ECExchangeImportContentsChanges::GetLastError(HRESULT hResult, ULONG ulF
 	if (hr != hrSuccess)
 		goto exit;
 
-	MAPIAllocateBuffer(sizeof(MAPIERROR),(void **)&lpMapiError);
+	if ((hr = MAPIAllocateBuffer(sizeof(MAPIERROR),(void **)&lpMapiError)) != hrSuccess)
+		goto exit;
 	
 	if ((ulFlags & MAPI_UNICODE) == MAPI_UNICODE) {
 		std::wstring wstrErrorMsg = convert_to<std::wstring>(lpszErrorMsg);
 		std::wstring wstrCompName = convert_to<std::wstring>(g_strProductName.c_str());
 
-		MAPIAllocateMore(sizeof(std::wstring::value_type) * (wstrErrorMsg.size() + 1), lpMapiError, (void**)&lpMapiError->lpszError);
+		if ((hr = MAPIAllocateMore(sizeof(std::wstring::value_type) * (wstrErrorMsg.size() + 1), lpMapiError, (void**)&lpMapiError->lpszError)) != hrSuccess)
+			goto exit;
 		wcscpy((wchar_t*)lpMapiError->lpszError, wstrErrorMsg.c_str());
 
-		MAPIAllocateMore(sizeof(std::wstring::value_type) * (wstrCompName.size() + 1), lpMapiError, (void**)&lpMapiError->lpszComponent);
+		if ((hr = MAPIAllocateMore(sizeof(std::wstring::value_type) * (wstrCompName.size() + 1), lpMapiError, (void**)&lpMapiError->lpszComponent)) != hrSuccess)
+			goto exit;
 		wcscpy((wchar_t*)lpMapiError->lpszComponent, wstrCompName.c_str()); 
 
 	} else {
 		std::string strErrorMsg = convert_to<std::string>(lpszErrorMsg);
 		std::string strCompName = convert_to<std::string>(g_strProductName.c_str());
 
-		MAPIAllocateMore(strErrorMsg.size() + 1, lpMapiError, (void**)&lpMapiError->lpszError);
+		if ((hr = MAPIAllocateMore(strErrorMsg.size() + 1, lpMapiError, (void**)&lpMapiError->lpszError)) != hrSuccess)
+			goto exit;
 		strcpy((char*)lpMapiError->lpszError, strErrorMsg.c_str());
 
-		MAPIAllocateMore(strCompName.size() + 1, lpMapiError, (void**)&lpMapiError->lpszComponent);
+		if ((hr = MAPIAllocateMore(strCompName.size() + 1, lpMapiError, (void**)&lpMapiError->lpszComponent)) != hrSuccess)
+			goto exit;
 		strcpy((char*)lpMapiError->lpszComponent, strCompName.c_str());
 	}
 
@@ -449,7 +453,9 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageDeletion(ULONG ulFlags, LP
 	EntryList.lpbin = NULL;
 	EntryList.cValues = 0;
 	
-	MAPIAllocateBuffer(sizeof(SBinary)* lpSourceEntryList->cValues, (LPVOID*)&EntryList.lpbin);
+	if ((hr = MAPIAllocateBuffer(sizeof(SBinary)* lpSourceEntryList->cValues, (LPVOID*)&EntryList.lpbin)) != hrSuccess)
+		goto exit;
+
 	for(ulSKNr = 0; ulSKNr < lpSourceEntryList->cValues; ulSKNr++){
 		hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId, m_lpSourceKey->Value.bin.cb, m_lpSourceKey->Value.bin.lpb, lpSourceEntryList->lpbin[ulSKNr].cb, lpSourceEntryList->lpbin[ulSKNr].lpb, &EntryList.lpbin[EntryList.cValues].cb, (LPENTRYID*)&EntryList.lpbin[EntryList.cValues].lpb);
 		if(hr == MAPI_E_NOT_FOUND){
@@ -1166,7 +1172,8 @@ HRESULT ECExchangeImportContentsChanges::SetMessageInterface(REFIID refiid)
  * @retval	hrSuccess			All entries from the list are found. The list will be empty on exit.
  * @retval	MAPI_E_NOT_FOUND	Not all entries from the list were found.
  */
-HRESULT HrRestrictionContains(LPSRestriction lpRestriction, std::list<SBinary> &lstEntryIds)
+static HRESULT HrRestrictionContains(const SRestriction *lpRestriction,
+    std::list<SBinary> &lstEntryIds)
 {
 	typedef std::list<SBinary>::iterator iterator;
 
@@ -1223,7 +1230,9 @@ HRESULT HrRestrictionContains(LPSRestriction lpRestriction, std::list<SBinary> &
  * @retval	MAPI_E_NOT_FOUND	lpAdditionalREN contains all three entryids, but not all of them
  *								were found in lpRestriction.
  */
-HRESULT HrVerifyRemindersRestriction(LPSRestriction lpRestriction, LPSPropValue lpAdditionalREN)
+static HRESULT
+HrVerifyRemindersRestriction(const SRestriction *lpRestriction,
+    const SPropValue *lpAdditionalREN)
 {
 	std::list<SBinary> lstEntryIds;
 

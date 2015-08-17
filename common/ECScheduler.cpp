@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,12 +44,12 @@
 #include "platform.h"
 #include "ECScheduler.h"
 // ETIMEDOUT in linux is in errno, windows has this though pthread.h
-#include <errno.h>
+#include <cerrno>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 
@@ -74,6 +73,7 @@ ECScheduler::ECScheduler(ECLogger *lpLogger)
 	pthread_cond_init(&m_hExitSignal, NULL);
 	//Create Scheduler thread
 	pthread_create(&m_hMainThread, NULL, ScheduleThread, (void*)this);
+	set_thread_name(m_hMainThread, "ECScheduler:main");
 }
 
 ECScheduler::~ECScheduler(void)
@@ -189,11 +189,8 @@ void* ECScheduler::ScheduleThread(void* lpTmpScheduler)
 
 	time_t				ttime;
 
-	if(lpScheduler == NULL) {
-	    // Do not pthread_exit() because linuxthreads is broken and will not free any objects
-		// pthread_exit((void*)-1);
-		return 0;
-    }
+	if (lpScheduler == NULL)
+		return NULL;
 
 	while(TRUE)
 	{
@@ -232,6 +229,8 @@ void* ECScheduler::ScheduleThread(void* lpTmpScheduler)
                     continue;
                 }
 
+				set_thread_name(hThread, "ECScheduler:worker");
+
 				iterScheduleList->tLastRunTime = ttime;
 
 				if((err = pthread_join(hThread, (void**)&lperThread)) != 0) {
@@ -254,8 +253,5 @@ void* ECScheduler::ScheduleThread(void* lpTmpScheduler)
 		}
 	}
 
-	// Do not pthread_exit() because linuxthreads is broken and will not free any objects
-    // pthread_exit(0);
-
-    return NULL;
+	return NULL;
 }

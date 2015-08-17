@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,6 +44,7 @@
 #ifndef ECEXCHANGEEXPORTCHANGES_H
 #define ECEXCHANGEEXPORTCHANGES_H
 
+#include "zcdefs.h"
 #include <mapidefs.h>
 #include <vector>
 #include <set>
@@ -60,7 +60,7 @@
 
 #include "WSMessageStreamExporter.h"
 
-class ECExchangeExportChanges : public ECUnknown {
+class ECExchangeExportChanges _final : public ECUnknown {
 protected:
 	ECExchangeExportChanges(ECMsgStore *lpStore, const std::string& strSK, const wchar_t *szDisplay, unsigned int ulSyncType);
 	virtual ~ECExchangeExportChanges();
@@ -84,11 +84,11 @@ private:
 	void LogMessageProps(int loglevel, ULONG cValues, LPSPropValue lpPropArray);
 
 private:
-	class xECExportChanges : public IECExportChanges {
+	class xECExportChanges _final : public IECExportChanges {
 		// IUnknown
-		virtual ULONG __stdcall AddRef();
-		virtual ULONG __stdcall Release();
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface);
+		virtual ULONG __stdcall AddRef(void) _override;
+		virtual ULONG __stdcall Release(void) _override;
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _override;
 
 		// IExchangeExportChanges
 		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
@@ -96,10 +96,10 @@ private:
 		virtual HRESULT __stdcall Synchronize(ULONG FAR * pulSteps, ULONG FAR * pulProgress);
 		virtual HRESULT __stdcall UpdateState(LPSTREAM lpStream);
 
-		virtual HRESULT __stdcall ConfigSelective(ULONG ulPropTag, LPENTRYLIST lpEntries, LPENTRYLIST lpParents, ULONG ulFlags, LPUNKNOWN lpCollector, LPSPropTagArray lpIncludeProps, LPSPropTagArray lpExcludeProps, ULONG ulBufferSize);
-		virtual HRESULT __stdcall GetChangeCount(ULONG *lpcChanges);
-		virtual HRESULT __stdcall SetMessageInterface(REFIID refiid);
-		virtual HRESULT __stdcall SetLogger(ECLogger *lpLogger);
+		virtual HRESULT __stdcall ConfigSelective(ULONG ulPropTag, LPENTRYLIST lpEntries, LPENTRYLIST lpParents, ULONG ulFlags, LPUNKNOWN lpCollector, LPSPropTagArray lpIncludeProps, LPSPropTagArray lpExcludeProps, ULONG ulBufferSize) _override;
+		virtual HRESULT __stdcall GetChangeCount(ULONG *lpcChanges) _override;
+		virtual HRESULT __stdcall SetMessageInterface(REFIID refiid) _override;
+		virtual HRESULT __stdcall SetLogger(ECLogger *lpLogger) _override;
 	} m_xECExportChanges;
 	
 	HRESULT ExportMessageChanges();
@@ -153,7 +153,7 @@ private:
 
 	ECLogger			*m_lpLogger;
 	clock_t				m_clkStart;
-	struct tms			m_tmsStart;
+	struct z_tms			m_tmsStart;
 	
 	HRESULT AddProcessedChanges(ChangeList &lstChanges);
 	

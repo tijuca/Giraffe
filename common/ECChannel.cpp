@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -46,7 +45,7 @@
 
 #include "ECChannel.h"
 #include "stringutil.h"
-#include <signal.h>
+#include <csignal>
 #include <sys/types.h>
 #include <sys/select.h>
 #include <sys/socket.h>
@@ -56,14 +55,12 @@
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 
-#include <errno.h>
+#include <cerrno>
 #include <mapicode.h>
-
-#       define closesocket(fd) close(fd)
 
 #ifdef _DEBUG
 #undef THIS_FILE
-static char THIS_FILE[]=__FILE__;
+static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -88,10 +85,10 @@ SSL_CTX* ECChannel::lpCTX = NULL;
 
 HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig, ECLogger *lpLogger) {
 	HRESULT hr = hrSuccess;
-	char *szFile = NULL;
-	char *szPath = NULL;
+	const char *szFile = NULL;
+	const char *szPath = NULL;
  	char *ssl_protocols = strdup(lpConfig->GetSetting("ssl_protocols"));
- 	char *ssl_ciphers = lpConfig->GetSetting("ssl_ciphers");
+	const char *ssl_ciphers = lpConfig->GetSetting("ssl_ciphers");
  	char *ssl_name = NULL;
  	int ssl_op = 0, ssl_include = 0, ssl_exclude = 0;
 
@@ -255,7 +252,7 @@ ECChannel::~ECChannel() {
 		SSL_free(lpSSL);
 		lpSSL = NULL;
 	}
-	close(fd);
+	closesocket(fd);
 }
 
 HRESULT ECChannel::HrEnableTLS(ECLogger *const lpLogger) {
@@ -357,7 +354,8 @@ HRESULT ECChannel::HrReadLine(std::string * strBuffer, ULONG ulMaxBuffer) {
 	return hr;
 }
 
-HRESULT ECChannel::HrWriteString(char * szBuffer) {
+HRESULT ECChannel::HrWriteString(const char *szBuffer)
+{
 	HRESULT hr = hrSuccess;
 
 	if(!szBuffer)
@@ -401,7 +399,7 @@ HRESULT ECChannel::HrWriteString(const std::string & strBuffer) {
  * 
  * @retval		MAPI_E_CALL_FAILED	unable to write data to socket
  */
-HRESULT ECChannel::HrWriteLine(char *szBuffer, int len) {
+HRESULT ECChannel::HrWriteLine(const char *szBuffer, int len) {
 	std::string strLine;
 
 	if (len == 0)
@@ -441,7 +439,14 @@ HRESULT ECChannel::HrReadAndDiscardBytes(ULONG ulByteCount) {
 		else
 			ulRead = recv(fd, szBuffer, ulRead, 0);
 
-		if (ulRead == 0 || ulRead == (ULONG)-1 || ulRead > ulByteCount)
+		if (ulRead == (ULONG)-1) {
+			if (errno == EINTR)
+				continue;
+
+			return MAPI_E_NETWORK_ERROR;
+		}
+
+		if (ulRead == 0 || ulRead > ulByteCount)
 			return MAPI_E_NETWORK_ERROR;
 
 		ulTotRead += ulRead;
@@ -463,7 +468,14 @@ HRESULT ECChannel::HrReadBytes(char *szBuffer, ULONG ulByteCount) {
 		else
 			ulRead = recv(fd, szBuffer + ulTotRead, ulByteCount - ulTotRead, 0);
 
-		if (ulRead == 0 || ulRead == (ULONG)-1 || ulRead > ulByteCount)
+		if (ulRead == (ULONG)-1) {
+			if (errno == EINTR)
+				continue;
+
+			return MAPI_E_NETWORK_ERROR;
+		}
+
+		if (ulRead == 0 || ulRead > ulByteCount)
 			return MAPI_E_NETWORK_ERROR;
 
 		ulTotRead += ulRead;
@@ -486,7 +498,7 @@ HRESULT ECChannel::HrReadBytes(std::string * strBuffer, ULONG ulByteCount) {
 	try {
 		buffer = new char[ulByteCount + 1];
 	}
-	catch (std::exception &e) {
+	catch (std::exception &) {
 		hr = MAPI_E_NOT_ENOUGH_MEMORY;
 		goto exit;
 	}
@@ -514,14 +526,17 @@ HRESULT ECChannel::HrSelect(int seconds) {
 	if(lpSSL && SSL_pending(lpSSL))
 		return hrSuccess;
 
-retry:
 	FD_ZERO(&fds);
 	FD_SET(fd, &fds);
 
 	res = select(fd + 1, &fds, NULL, NULL, &timeout);
 	if (res == -1) {
 		if (errno == EINTR)
-			goto retry;
+			/*
+			 * We _must_ return to the caller so it gets a chance
+			 * to e.g. shut down as a result of SIGTERM.
+			 */
+			return MAPI_E_CANCEL;
 
 		return MAPI_E_NETWORK_ERROR;
 	}
@@ -557,7 +572,10 @@ char * ECChannel::fd_gets(char *buf, int *lpulLen) {
 		return NULL;
 
 	do {
-		// return NULL when we read nothing: other side closed it's writing socket
+		/*
+		 * Return NULL when we read nothing:
+		 * other side has closed its writing socket.
+		 */
 		int n = recv(fd, bp, len, MSG_PEEK);
 
 		if (n == 0)
@@ -574,20 +592,20 @@ char * ECChannel::fd_gets(char *buf, int *lpulLen) {
 			n = newline - bp + 1;
 
 	retry:
-		n = recv(fd, bp, n, 0);
+		int recv_n = recv(fd, bp, n, 0);
 
-		if (n == 0)
+		if (recv_n == 0)
 			return NULL;
 
-		if (n == -1) {
+		if (recv_n == -1) {
 			if (errno == EINTR)
 				goto retry;
 
 			return NULL;
 		}
 
-		bp += n;
-		len -= n;
+		bp += recv_n;
+		len -= recv_n;
 	}
 	while(!newline && len > 0);
 
@@ -614,7 +632,10 @@ char * ECChannel::SSL_gets(char *buf, int *lpulLen) {
 		return NULL;
 
 	do {
-		// return NULL when we read nothing: other side closed it's writing socket
+		/*
+		 * Return NULL when we read nothing:
+		 * other side has closed its writing socket.
+		 */
 		if ((n = SSL_peek(lpSSL, bp, len)) <= 0)
 			return NULL;
 
@@ -680,9 +701,9 @@ HRESULT HrListen(ECLogger *lpLogger, const char *szPath, int *lpulListenSocket)
 	// make files with permissions 0666
 	prevmask = umask(0111);
 
-        if (bind(fd, (struct sockaddr *)&sun_addr, sizeof(sun_addr)) == -1) {
+	if (bind(fd, (struct sockaddr *)&sun_addr, sizeof(sun_addr)) == -1) {
                 if (lpLogger)
-                        lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to socket %s. This is usually caused by an other proces (most likely an other zarafa-server) already using this port. This program will terminate now.", szPath);
+			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to socket %s (%s). This is usually caused by another process (most likely another zarafa-server) already using this port. This program will terminate now.", szPath, strerror(errno));
                 kill(0, SIGTERM);
                 exit(1);
         }
@@ -727,16 +748,13 @@ HRESULT HrListen(ECLogger *lpLogger, const char *szBind, int ulPort, int *lpulLi
 		goto exit;
 	}
 
-	// TODO: should be configurable?
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt)) == -1) {
-		if (lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to set reuseaddr socket option.");
-	}
+		// TODO: should be configurable?
+		if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char *>(&opt), sizeof(opt)) == -1)
+			lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to set reuseaddr socket option: %s", strerror(errno));
 
-	if (bind(fd, (struct sockaddr *)&sin_addr, sizeof(sin_addr)) == -1) {
-		closesocket(fd);
-		if (lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to socket. This is usually caused by an other proces (most likely an other zarafa-server) already using this port. This program will terminate now.");
+		if (bind(fd, (struct sockaddr *)&sin_addr, sizeof(sin_addr)) == -1) {
+			if (lpLogger)
+				lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to port %d (%s). This is usually caused by another process (most likely another zarafa-server) already using this port. This program will terminate now.", ulPort, strerror(errno));
 		kill(0, SIGTERM);
 		exit(1);
 	}
@@ -762,6 +780,11 @@ HRESULT HrAccept(ECLogger *lpLogger, int ulListenFD, ECChannel **lppChannel)
 	struct sockaddr_in client;
 	ECChannel *lpChannel = NULL;
 	socklen_t len = sizeof(client);
+
+#ifdef TCP_FASTOPEN
+	int qlen = SOMAXCONN;
+	setsockopt(ulListenFD, SOL_TCP, TCP_FASTOPEN, &qlen, sizeof(qlen));
+#endif
 
 	if (ulListenFD < 0 || lppChannel == NULL) {
 		hr = MAPI_E_INVALID_PARAMETER;

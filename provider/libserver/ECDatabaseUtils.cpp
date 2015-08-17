@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -62,7 +61,7 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECRESULT GetPropSize(DB_ROW lpRow, DB_LENGTHS lpLen, unsigned int *lpulSize)
@@ -105,7 +104,8 @@ ECRESULT GetPropSize(DB_ROW lpRow, DB_LENGTHS lpLen, unsigned int *lpulSize)
 
 
 // Case insensitive find
-size_t ci_find_substr(const std::string& first, const std::string& second)
+static size_t
+ci_find_substr(const std::string &first, const std::string &second)
 {
 	std::string lc_first(first);
 	std::transform(lc_first.begin(), lc_first.end(), lc_first.begin(), ::tolower);
@@ -194,7 +194,7 @@ ECRESULT CopySOAPPropValToDatabasePropVal(struct propVal *lpPropVal, unsigned in
 			er = ZARAFA_E_INVALID_PARAMETER;
 			goto exit;
 		}
-		strColData = stringify_int64(lpPropVal->Value.li);
+		strColData = stringify_int64(int64_t(lpPropVal->Value.li));
 		*lpulColNr = VALUE_NR_LONGINT;
 		break;
 	case PT_UNICODE:
@@ -483,7 +483,7 @@ ECRESULT ParseMVProp(char* lpRowData, ULONG ulSize, unsigned int *lpulLastPos, s
 	*lpulLastPos = (lpEnd - lpRowData) + 1 + ulLen;
 
 exit:
-	return erSuccess;
+	return er;
 }
 
 ULONG GetColOffset(unsigned int ulPropTag)

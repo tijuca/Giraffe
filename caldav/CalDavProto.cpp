@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -46,22 +45,23 @@
 #include "PublishFreeBusy.h"
 #include "CalDavProto.h"
 #include "mapi_ptr.h"
+#include "MAPIErrors.h"
 
 using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 
 /**
  * Maping of caldav properties to Mapi properties
  */
-struct sMymap {
+static const struct sMymap {
 	unsigned int ulPropTag;
-	char *name;
+	const char *name;
 } sPropMap[] = {
 	{ PR_LOCAL_COMMIT_TIME_MAX, "getctag" },
 	{ PR_LAST_MODIFICATION_TIME, "getetag" },
@@ -88,7 +88,9 @@ struct sMymap {
  * 
  * @return the (named) property tag for the xml data, (named are set to PT_BINARY)
  */
-ULONG GetPropIDForXMLProp(LPMAPIPROP lpObj, const WEBDAVPROPNAME &sXmlPropName, convert_context &converter, ULONG ulFlags = 0)
+static ULONG GetPropIDForXMLProp(LPMAPIPROP lpObj,
+    const WEBDAVPROPNAME &sXmlPropName, convert_context &converter,
+    ULONG ulFlags = 0)
 {
 	HRESULT hr = hrSuccess;
 	LPMAPINAMEID lpNameID = NULL;
@@ -282,9 +284,8 @@ HRESULT CalDAV::HrHandlePropfindRoot(WEBDAVREQSTPROPS *sDavReqstProps, WEBDAVMUL
 	}
 
 	hr = lpMapiProp->GetProps((LPSPropTagArray)lpPropTagArr, 0, &cbsize, &lpSpropVal);
-	if (FAILED(hr))
-	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error in GetProps for user %ls, error code : 0x%08X", m_wstrUser.c_str(), hr);
+	if (FAILED(hr)) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error in GetProps for user %ls, error code: 0x%08X %s", m_wstrUser.c_str(), hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 	hr = hrSuccess;
@@ -297,9 +298,10 @@ HRESULT CalDAV::HrHandlePropfindRoot(WEBDAVREQSTPROPS *sDavReqstProps, WEBDAVMUL
 
 	// map values and properties in WEBDAVRESPONSE structure.
 	hr = HrMapValtoStruct(lpMapiProp, lpSpropVal, cbsize, NULL, 0, false, &(lpsDavProp->lstProps), &sDavResp);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandlePropfindRoot HrMapValtoStruct failed 0x%08x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
-	
+	}
 
 	HrSetDavPropName(&(lpsDavMulStatus->sPropName), "multistatus", WEBDAVNS);
 	lpsDavMulStatus->lstResp.push_back(sDavResp);
@@ -371,8 +373,10 @@ HRESULT CalDAV::HrListCalEntries(WEBDAVREQSTPROPS *lpsWebRCalQry, WEBDAVMULTISTA
 	if (!lpsWebRCalQry->sFilter.lstFilters.empty())
 	{
 		hr = HrGetOneProp(m_lpUsrFld, PR_CONTAINER_CLASS_A, &lpsPropVal);
-		if (hr != hrSuccess)
+		if (hr != hrSuccess) {
+			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrListCalEntries HrGetOneProp failed 0x%08x %s", hr, GetMAPIErrorMessage(hr));
 			goto exit;
+		}
 
 		if (lpsWebRCalQry->sFilter.lstFilters.back() == "VTODO"
 			&& strncmp(lpsPropVal->Value.lpszA, "IPF.Task", strlen("IPF.Task")))
@@ -388,9 +392,8 @@ HRESULT CalDAV::HrListCalEntries(WEBDAVREQSTPROPS *lpsWebRCalQry, WEBDAVMULTISTA
 	}
 
 	hr = m_lpUsrFld->GetContentsTable(0, &lpTable);
-	if(hr != hrSuccess)
-	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error in GetContentsTable, error code : 0x%08X", hr);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error in GetContentsTable, error code : 0x%08X %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
@@ -399,16 +402,16 @@ HRESULT CalDAV::HrListCalEntries(WEBDAVREQSTPROPS *lpsWebRCalQry, WEBDAVMULTISTA
 	CREATE_RESTRICTION(lpsRestriction);
 	CREATE_RES_OR(lpsRestriction, lpsRestriction, 3);
 	sResData.ulPropTag = PR_MESSAGE_CLASS_A;
-	sResData.Value.lpszA = "IPM.Appointment";
+	sResData.Value.lpszA = const_cast<char *>("IPM.Appointment");
 	DATA_RES_CONTENT(lpsRestriction, lpsRestriction->res.resOr.lpRes[0], FL_IGNORECASE|FL_PREFIX, PR_MESSAGE_CLASS_A, &sResData);
-	sResData.Value.lpszA = "IPM.Meeting";
+	sResData.Value.lpszA = const_cast<char *>("IPM.Meeting");
 	DATA_RES_CONTENT(lpsRestriction, lpsRestriction->res.resOr.lpRes[1], FL_IGNORECASE|FL_PREFIX, PR_MESSAGE_CLASS_A, &sResData);
-	sResData.Value.lpszA = "IPM.Task";
+	sResData.Value.lpszA = const_cast<char *>("IPM.Task");
 	DATA_RES_CONTENT(lpsRestriction, lpsRestriction->res.resOr.lpRes[2], FL_IGNORECASE|FL_PREFIX, PR_MESSAGE_CLASS_A, &sResData);
 		
 	hr = lpTable->Restrict(lpsRestriction, 0);
 	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to restrict folder contents, error code: 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to restrict folder contents, error code: 0x%08X %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
@@ -440,8 +443,8 @@ HRESULT CalDAV::HrListCalEntries(WEBDAVREQSTPROPS *lpsWebRCalQry, WEBDAVMULTISTA
 
 	hr = m_lpUsrFld->GetProps((LPSPropTagArray)lpPropTagArr, 0, &cValues, &lpProps);
 	if (FAILED(hr)) {
-		 m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to receive folder properties, error 0x%08X", hr);
-		 goto exit;
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to receive folder properties, error 0x%08X %s", hr, GetMAPIErrorMessage(hr));
+		goto exit;
 	}
 
 
@@ -496,8 +499,10 @@ HRESULT CalDAV::HrListCalEntries(WEBDAVREQSTPROPS *lpsWebRCalQry, WEBDAVMULTISTA
 					strConvVal = bin2hex(lpRowSet->aRow[ulRowCntr].lpProps[2].Value.bin.cb, lpRowSet->aRow[ulRowCntr].lpProps[2].Value.bin.lpb);
 					hr = hrSuccess;
 				}
-				else if(hr != hrSuccess)
+				else if (hr != hrSuccess) {
+					m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CreateAndGetGuid failed: 0x%08x %s", hr, GetMAPIErrorMessage(hr));
 					continue;
+				}
 			} else {
 				strConvVal = urlEncode(strConvVal);
 			}
@@ -589,7 +594,7 @@ HRESULT CalDAV::HrHandleReport(WEBDAVRPTMGET *sWebRMGet, WEBDAVMULTISTATUS *sWeb
 	
 	hr = m_lpUsrFld->GetContentsTable(0, &lpTable);
 	if(hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error in GetContentsTable, error code : 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error in GetContentsTable, error code: 0x%08X %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
@@ -599,9 +604,8 @@ HRESULT CalDAV::HrHandleReport(WEBDAVRPTMGET *sWebRMGet, WEBDAVMULTISTATUS *sWeb
 	cbsize = (ULONG)sDavProp.lstProps.size() + 2;
 
 	hr = MAPIAllocateBuffer(CbNewSPropTagArray(cbsize), (void **)&lpPropTagArr);
-	if(hr != hrSuccess)
-	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error allocating memory, error code : 0x%08X", hr);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error allocating memory, error code: 0x%08X %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 	
@@ -644,12 +648,14 @@ HRESULT CalDAV::HrHandleReport(WEBDAVRPTMGET *sWebRMGet, WEBDAVMULTISTATUS *sWeb
 		sWebResponse.sStatus = WEBDAVVALUE();
 
 		hr = HrMakeRestriction(sWebDavVal.strValue, m_lpNamedProps, &lpsRoot);
-		if (hr != hrSuccess)
+		if (hr != hrSuccess) {
+			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleReport HrMakeRestriction failed 0x%08x %s", hr, GetMAPIErrorMessage(hr));
 			goto next;
+		}
 		
 		hr = lpTable->FindRow(lpsRoot, BOOKMARK_BEGINNING, 0);
 		if (hr != hrSuccess)
-			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Entry not found (%s), error code : 0x%08X", sWebDavVal.strValue.c_str(), hr);
+			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Entry not found (%s), error code: 0x%08X %s", sWebDavVal.strValue.c_str(), hr, GetMAPIErrorMessage(hr));
 
 		// conversion if everthing goes ok, otherwise, add empty item with failed status field
 		// we need to return all items requested in the multistatus reply, otherwise sunbird will stop, displaying nothing to the user.
@@ -805,20 +811,28 @@ HRESULT CalDAV::HrHandlePropertySearch(WEBDAVRPTMGET *sWebRMGet, WEBDAVMULTISTAT
 
 	// Open Global Address book
 	hr = m_lpAddrBook->GetDefaultDir(&sbEid.cb, (LPENTRYID*)&sbEid.lpb);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandlePropertySearch GetDefaultDir failed: 0x%08x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	hr = m_lpSession->OpenEntry(sbEid.cb, (LPENTRYID)sbEid.lpb, NULL, 0, &ulObjType, (LPUNKNOWN *)&lpAbCont);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandlePropertySearch OpenEntry failed: 0x%08x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 	
 	hr = lpAbCont->GetContentsTable(0, &lpTable);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandlePropertySearch GetContentsTable failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	hr = lpTable->GetRowCount(0, &ulObjType);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandlePropertySearch GetRowCount failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	// create restriction
 	CREATE_RESTRICTION(lpsRoot);
@@ -830,12 +844,16 @@ HRESULT CalDAV::HrHandlePropertySearch(WEBDAVRPTMGET *sWebRMGet, WEBDAVMULTISTAT
 		wstring content = U2W(iterWebVal->strValue);
 
 		hr = MAPIAllocateMore(sizeof(SPropValue), lpsRoot, (void**)&lpsPropVal);
-		if (hr != hrSuccess)
+		if (hr != hrSuccess) {
+			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandlePropertySearch MAPIAllocateMore(1) failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 			goto exit;
+		}
 
 		hr = MAPIAllocateMore(sizeof(wchar_t) * (content.length() + 1), lpsRoot, (void**)&lpsPropVal->Value.lpszW);
-		if (hr != hrSuccess)
+		if (hr != hrSuccess) {
+			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandlePropertySearch MAPIAllocateMore(2) failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 			goto exit;
+		}
 
 		lpsPropVal->ulPropTag = GetPropIDForXMLProp(lpAbCont, iterWebVal->sPropName, m_converter);
 		memcpy(lpsPropVal->Value.lpszW, content.c_str(), sizeof(wchar_t) * (content.length() + 1));
@@ -850,9 +868,8 @@ HRESULT CalDAV::HrHandlePropertySearch(WEBDAVRPTMGET *sWebRMGet, WEBDAVMULTISTAT
 	cbsize = (ULONG)sDavProp.lstProps.size() + 3;
 
 	hr = MAPIAllocateBuffer(CbNewSPropTagArray(cbsize), (void **)&lpPropTagArr);
-	if (hr != hrSuccess)
-	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error allocating memory, error code : 0x%08X", hr);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error allocating memory, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 	
@@ -872,17 +889,23 @@ HRESULT CalDAV::HrHandlePropertySearch(WEBDAVRPTMGET *sWebRMGet, WEBDAVMULTISTAT
 	}
 
 	hr = lpTable->SetColumns((LPSPropTagArray)lpPropTagArr, 0);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandlePropertySearch SetColumns failed 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 	
 	// restrict table
 	hr = lpTable->Restrict(lpsRoot, 0);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandlePropertySearch restrict failed 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	hr = lpTable->GetRowCount(0, &ulObjType);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandlePropertySearch getrowcount failed 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	HrSetDavPropName(&(sWebResponse.sPropName), "response", WEBDAVNS);
 	HrSetDavPropName(&sWebMStatus->sPropName, "multistatus", WEBDAVNS);
@@ -985,14 +1008,14 @@ HRESULT CalDAV::HrHandleDelete()
 
 	hr = HrGetOneProp(m_lpDefStore, PR_IPM_WASTEBASKET_ENTRYID, &lpPropWstBxEID);
 	if(hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error finding \"Deleted items\" folder, error code : 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error finding \"Deleted items\" folder, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 	
 	hr = m_lpDefStore->OpenEntry(lpPropWstBxEID->Value.bin.cb, (LPENTRYID)lpPropWstBxEID->Value.bin.lpb, NULL, MAPI_MODIFY, &ulObjType, (LPUNKNOWN*)&lpWastBoxFld);
 	if (hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error opening \"Deleted items\" folder, error code : 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error opening \"Deleted items\" folder, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 	
@@ -1004,8 +1027,10 @@ HRESULT CalDAV::HrHandleDelete()
 	}
 
 	hr = m_lpUsrFld->GetProps((LPSPropTagArray)&lpPropTagArr, 0, &cValues, &lpProps);
-	if(FAILED(hr))
+	if (FAILED(hr)) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleDelete getprops failed 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	// Entry ID
 	if (lpProps[0].ulPropTag != PT_ERROR)
@@ -1017,18 +1042,24 @@ HRESULT CalDAV::HrHandleDelete()
 	
 	//Create Entrylist
 	hr = MAPIAllocateBuffer(sizeof(ENTRYLIST), (void**)&lpEntryList);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleDelete mapiallocatebuffer failed 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	lpEntryList->cValues = 1;
 
 	hr = MAPIAllocateMore(sizeof(SBinary), lpEntryList, (void**)&lpEntryList->lpbin);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleDelete mapiallocatemore failed 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 	
 	hr = MAPIAllocateMore(sbEid.cb, lpEntryList, (void**)&lpEntryList->lpbin[0].lpb);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleDelete mapiallocatemore(2) failed 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	lpEntryList->lpbin[0].cb = sbEid.cb;
 	memcpy((void*)lpEntryList->lpbin[0].lpb, (const void*)sbEid.lpb, sbEid.cb);
@@ -1043,12 +1074,12 @@ HRESULT CalDAV::HrHandleDelete()
 				wstrFldTmpName = wstrFldName + wstringify(nFldId);
 				nFldId++;
 			} else {
-				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error Deleting Folder error code : 0x%08X", hr);
+				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error Deleting Folder error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 				goto exit;
 			}
 
 		} else if (hr != hrSuccess ) {
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error Deleting Folder error code : 0x%08X", hr);
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error Deleting Folder error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 			goto exit;
 		} else
 			break;
@@ -1112,7 +1143,7 @@ HRESULT CalDAV::HrMoveEntry(const std::string &strGuid, LPMAPIFOLDER lpDestFolde
 	hr = HrFindAndGetMessage(strGuid, m_lpUsrFld, m_lpNamedProps, &lpMessage);
 	if (hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Entry to be deleted not found: 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Entry to be deleted not found: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
@@ -1141,18 +1172,24 @@ HRESULT CalDAV::HrMoveEntry(const std::string &strGuid, LPMAPIFOLDER lpDestFolde
 	
 	//Create Entrylist
 	hr = MAPIAllocateBuffer(sizeof(ENTRYLIST), (void**)&lpEntryList);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrMoveEntry MAPIAllocateBuffer failed 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	lpEntryList->cValues = 1;
 
 	hr = MAPIAllocateMore(sizeof(SBinary), lpEntryList, (void**)&lpEntryList->lpbin);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrMoveEntry MAPIAllocateMore failed 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 	
 	hr = MAPIAllocateMore(sbEid.cb, lpEntryList, (void**)&lpEntryList->lpbin[0].lpb);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrMoveEntry MAPIAllocateMore(2) failed 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	lpEntryList->lpbin[0].cb = sbEid.cb;
 	memcpy((void*)lpEntryList->lpbin[0].lpb, (const void*)sbEid.lpb, sbEid.cb);
@@ -1169,7 +1206,7 @@ HRESULT CalDAV::HrMoveEntry(const std::string &strGuid, LPMAPIFOLDER lpDestFolde
 		hr = HrPublishDefaultCalendar(m_lpSession, m_lpDefStore, time(NULL), FB_PUBLISH_DURATION, m_lpLogger);
 
 	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error Publishing Freebusy, error code : 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error Publishing Freebusy, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		hr = hrSuccess;
 	}
 
@@ -1237,9 +1274,8 @@ HRESULT CalDAV::HrPut()
 		blNewEntry = true;
 
 		hr = m_lpUsrFld->CreateMessage(NULL, 0, &lpMessage);
-		if(hr != hrSuccess)
-		{
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error creating new message, error code : 0x%08X", hr);
+		if (hr != hrSuccess) {
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error creating new message, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 			goto exit;
 		}
 
@@ -1250,9 +1286,8 @@ HRESULT CalDAV::HrPut()
 		sProp.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_APPTTSREF], PT_STRING8);
 		sProp.Value.lpszA = (char*)strGuid.c_str();
 		hr = HrSetOneProp(lpMessage, &sProp);
-		if (hr != hrSuccess)
-		{
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error adding property to new message, error code : 0x%08X", hr);
+		if (hr != hrSuccess) {
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error adding property to new message, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 			goto exit;
 		}
 	}
@@ -1269,7 +1304,7 @@ HRESULT CalDAV::HrPut()
 	hr = lpICalToMapi->ParseICal(strIcal, m_strCharset, m_strSrvTz, m_lpLoginUser, 0);
 	if(hr!=hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error Parsing ical data in PUT request, error code : 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error Parsing ical data in PUT request, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Error Parsing ical data : %s", strIcal.c_str());
 		goto exit;
 	}
@@ -1277,7 +1312,7 @@ HRESULT CalDAV::HrPut()
 	if (lpICalToMapi->GetItemCount() == 0)
 	{
 		hr = MAPI_E_INVALID_OBJECT;
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "No message in ical data in PUT request, error code : 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "No message in ical data in PUT request, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
@@ -1285,12 +1320,14 @@ HRESULT CalDAV::HrPut()
 		m_lpLogger->Log(EC_LOGLEVEL_WARNING, "More than one message found in PUT, trying to combine messages");
 	
 	hr = HrGetOneProp(m_lpUsrFld, PR_CONTAINER_CLASS_A, &lpsPropVal);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrPut get property PR_CONTAINER_CLASS_A failed 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	hr = lpICalToMapi->GetItemInfo(0, &etype, &ttLastModTime, &sbUid);
-	if(hr != hrSuccess)
-	{
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrPut no access(1) 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		hr = MAPI_E_NO_ACCESS;
 		goto exit;
 	}
@@ -1299,6 +1336,7 @@ HRESULT CalDAV::HrPut()
 	if ((etype == VEVENT && strncmp(lpsPropVal->Value.lpszA, "IPF.Appointment", strlen("IPF.Appointment")))
 		|| (etype == VTODO && strncmp(lpsPropVal->Value.lpszA, "IPF.Task", strlen("IPF.Task"))))
 	{
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrPut no access(2) 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		hr = MAPI_E_NO_ACCESS;
 		goto exit;
 	}
@@ -1306,7 +1344,7 @@ HRESULT CalDAV::HrPut()
 	hr = lpICalToMapi->GetItem(0, 0, lpMessage);
 	if(hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error converting ical data to Mapi message in PUT request, error code : 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error converting ical data to Mapi message in PUT request, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
@@ -1316,8 +1354,8 @@ HRESULT CalDAV::HrPut()
 		eIcalType eSubType = VEVENT;
 
 		hr = lpICalToMapi->GetItemInfo(n, &eSubType, NULL, &sbSubUid);
-		if(hr != hrSuccess)
-		{
+		if (hr != hrSuccess) {
+			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrPut no access(3) 0x%x %s", hr, GetMAPIErrorMessage(hr));
 			hr = MAPI_E_NO_ACCESS;
 			goto exit;
 		}
@@ -1332,15 +1370,14 @@ HRESULT CalDAV::HrPut()
 		hr = lpICalToMapi->GetItem(n, 0, lpMessage);
 		if(hr != hrSuccess)
 		{
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error converting ical data to Mapi message in PUT request, error code : 0x%08X", hr);
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error converting ical data to Mapi message in PUT request, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 			goto exit;
 		}
 	}
 
 	hr = lpMessage->SaveChanges(0);
-	if(hr != hrSuccess)
-	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error saving Mapi message in PUT request, error code : 0x%08X", hr);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error saving Mapi message in PUT request, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
@@ -1353,7 +1390,7 @@ HRESULT CalDAV::HrPut()
 	if(m_ulFolderFlag & DEFAULT_FOLDER) {
 		if (HrPublishDefaultCalendar(m_lpSession, m_lpDefStore, time(NULL), FB_PUBLISH_DURATION, m_lpLogger) != hrSuccess) {
 			// @todo already logged, since we pass the logger in the publish function?
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error Publishing Freebusy, error code : 0x%08X", hr);
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error Publishing Freebusy, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		}
 	}
 	
@@ -1401,29 +1438,28 @@ HRESULT CalDAV::CreateAndGetGuid(SBinary sbEid, ULONG ulPropTag, std::string *lp
 	LPSPropValue lpProp = NULL;
 
 	hr = m_lpActiveStore->OpenEntry(sbEid.cb, (LPENTRYID)sbEid.lpb, NULL, MAPI_BEST_ACCESS, &ulObjType, (LPUNKNOWN*)&lpMessage);
-	if (hr != hrSuccess)
-	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error opening message to add Guid, error code : 0x%08X", hr);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error opening message to add Guid, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
 	hr = HrCreateGlobalID(ulPropTag, NULL, &lpProp);
-	if (hr != hrSuccess)
-	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error creating Guid, error code : 0x%08X", hr);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error creating Guid, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
 	hr = lpMessage->SetProps(1, lpProp, NULL);
-	if (hr != hrSuccess)
-	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error while adding Guid to message, error code : 0x%08X", hr);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error while adding Guid to message, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
 	hr = lpMessage->SaveChanges(0);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::CreateAndGetGuid SaveChanges failed 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	*lpstrGuid = bin2hex(lpProp->Value.bin.cb, lpProp->Value.bin.lpb);
 
@@ -1476,23 +1512,27 @@ HRESULT CalDAV::HrHandleMkCal(WEBDAVPROP *lpsDavProp)
 	// @todo handle conflicts better. caldav conflicts on the url (guid), not the folder name...
 
 	hr = m_lpIPMSubtree->CreateFolder(FOLDER_GENERIC, (LPTSTR)wstrNewFldName.c_str(), NULL, NULL, MAPI_UNICODE, &lpUsrFld);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleMkCal create folder failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 	
 	sPropValSet[0].ulPropTag = PR_CONTAINER_CLASS_A;
 	sPropValSet[0].Value.lpszA = (char*)strContainerClass.c_str();
 	sPropValSet[1].ulPropTag = PR_COMMENT_A;
-	sPropValSet[1].Value.lpszA = "Created by CalDAV Gateway";
+	sPropValSet[1].Value.lpszA = const_cast<char *>("Created by CalDAV Gateway");
 
 	hr = lpUsrFld->SetProps(2, (LPSPropValue)&sPropValSet, NULL);
-	if(hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleMkCal SetProps failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 	
 	ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_FLDID], PT_UNICODE);
 	// saves the url name (guid) into the guid named property, @todo fix function name to reflect action better
 	hr = HrAddProperty(lpUsrFld, ulPropTag, true, &m_wstrFldName);
 	if(hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Cannot Add named property, error code : 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Cannot Add named property, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
@@ -1578,21 +1618,24 @@ HRESULT CalDAV::HrListCalendar(WEBDAVREQSTPROPS *sDavProp, WEBDAVMULTISTATUS *lp
 	if (m_ulFolderFlag & SINGLE_FOLDER)
 	{
 		hr = m_lpUsrFld->GetProps(lpPropTagArr, 0, (ULONG *)&cbsize, &lpsPropSingleFld);
-		if (FAILED(hr))
+		if (FAILED(hr)) {
+			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrListCalendar GetProps failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 			goto exit;
+		}
 
 		hr = HrMapValtoStruct(m_lpUsrFld, lpsPropSingleFld, cbsize, NULL, 0, true, &lpsDavProp->lstProps, &sDavResponse);
-		if (hr != hrSuccess)
+		if (hr != hrSuccess) {
+			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrListCalendar HrMapValtoStruct failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 			goto exit;
+		}
 
 		lpsMulStatus->lstResp.push_back(sDavResponse);
 		goto exit;
 	}
 
 	hr = HrGetSubCalendars(m_lpSession, m_lpIPMSubtree, NULL, &lpHichyTable);
-	if(hr != hrSuccess)
-	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error retrieving subcalendars for IPM_Subtree, error code : 0x%08X", hr);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error retrieving subcalendars for IPM_Subtree, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
@@ -1604,6 +1647,7 @@ HRESULT CalDAV::HrListCalendar(WEBDAVREQSTPROPS *sDavProp, WEBDAVMULTISTATUS *lp
 		hr = HrGetOneProp(m_lpActiveStore, PR_IPM_WASTEBASKET_ENTRYID, &lpSpropWbEID);
 		if(hr != hrSuccess)
 		{
+			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrListCalendar HrGetOneProp(PR_IPM_WASTEBASKET_ENTRYID) failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 			hr = hrSuccess;
 			goto nowaste;
 		}
@@ -1625,13 +1669,18 @@ HRESULT CalDAV::HrListCalendar(WEBDAVREQSTPROPS *sDavProp, WEBDAVMULTISTATUS *lp
 
 nowaste:
 	hr = lpHichyTable->SetColumns(lpPropTagArr, 0);
-	if(hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrListCalendar SetColumns failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
-	if (lpDelHichyTable)
+	if (lpDelHichyTable) {
 		hr = lpDelHichyTable->SetColumns(lpPropTagArr, 0);
-	if(hr != hrSuccess)
-		goto exit;
+		if (hr != hrSuccess) {
+			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrListCalendar SetColumns(2) failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
+			goto exit;
+		}
+	}
 
 	while(1)
 	{
@@ -1669,9 +1718,8 @@ nowaste:
 				// @todo boolean should become default return proptag if save fails, PT_NULL for no default
 				hr = HrAddProperty(m_lpActiveStore, lpRowsALL->aRow[i].lpProps[0].Value.bin, ulPropTagFldId, true, &wstrFldPath);
 
-			if (hr != hrSuccess || wstrFldPath.empty())
-			{
-				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error adding Folder id property, error code : 0x%08X", hr);
+			if (hr != hrSuccess || wstrFldPath.empty()) {
+				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error adding Folder id property, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 				continue;
 			}
 			// @todo FOLDER_PREFIX only needed for ulPropTagFldId versions
@@ -1879,19 +1927,22 @@ HRESULT CalDAV::HrHandlePost()
 	ICalToMapi *lpIcalToMapi = NULL;
 
 	hr = m_lpRequest->HrGetBody(&strIcal);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandlePost HrGetBody failed 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 	
 	CreateICalToMapi(m_lpDefStore, m_lpAddrBook, false, &lpIcalToMapi);
 	if (!lpIcalToMapi)
 	{
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandlePost CreateICalToMapi failed 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		hr = MAPI_E_NOT_ENOUGH_MEMORY;
 		goto exit;
 	}
 
 	hr = lpIcalToMapi->ParseICal(strIcal, m_strCharset, m_strSrvTz, m_lpLoginUser, 0);
 	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to parse received ical message: 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to parse received ical message: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
@@ -1928,8 +1979,10 @@ HRESULT CalDAV::HrHandleFreebusy(ICalToMapi *lpIcalToMapi)
 	SPropValuePtr ptrEmail;
 
 	hr = lpIcalToMapi->GetFreeBusyInfo(&tStart, &tEnd, &strUID, &lstUsers);	
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleFreebusy GetFreeBusyInfo failed 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	CreateMapiToICal(m_lpAddrBook, "utf-8", &lpMapiToIcal);
 	if (!lpMapiToIcal) {
@@ -1938,20 +1991,28 @@ HRESULT CalDAV::HrHandleFreebusy(ICalToMapi *lpIcalToMapi)
 	}
 
 	hr = ECFreeBusySupport::Create(&lpecFBSupport);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleFreebusy ECFreeBusySupport::Create failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	hr = lpecFBSupport->QueryInterface(IID_IFreeBusySupport, (void**)&lpFBSupport);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleFreebusy QueryInterface(IID_IFreeBusySupport) failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	hr = lpecFBSupport->Open(m_lpSession, m_lpDefStore, true);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleFreebusy open session failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	hr = HrGetOneProp(m_lpActiveUser, PR_SMTP_ADDRESS_A, &ptrEmail);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleFreebusy get prop smtp address a failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	sWebFbInfo.strOrganiser = ptrEmail->Value.lpszA;
 	sWebFbInfo.tStart = tStart;
@@ -1966,8 +2027,10 @@ HRESULT CalDAV::HrHandleFreebusy(ICalToMapi *lpIcalToMapi)
 	}
 	
 	hr = WebDav::HrPostFreeBusy(&sWebFbInfo);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleFreebusy WebDav::HrPostFreeBusy failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 exit:
 	if (lpFBSupport)
@@ -2011,20 +2074,28 @@ HRESULT CalDAV::HrHandleMeeting(ICalToMapi *lpIcalToMapi)
 	}
 
 	hr = m_lpDefStore->GetProps((LPSPropTagArray)&sPropTagArr, 0, &cValues, &lpsGetPropVal);
-	if (hr != hrSuccess && cValues != 2)
+	if (hr != hrSuccess && cValues != 2) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleMeeting GetProps failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	hr = m_lpDefStore->OpenEntry(lpsGetPropVal[0].Value.bin.cb, (LPENTRYID) lpsGetPropVal[0].Value.bin.lpb, NULL, MAPI_BEST_ACCESS, &ulObjType, (LPUNKNOWN*)&lpOutbox);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleMeeting OpenEntry failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	hr = lpOutbox->CreateMessage(NULL, MAPI_BEST_ACCESS, &lpNewMsg);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleMeeting CreateMessage failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
-	hr = lpIcalToMapi->GetItem( 0, IC2M_NO_ORGANIZER, lpNewMsg);
-	if (hr != hrSuccess)
+	hr = lpIcalToMapi->GetItem(0, IC2M_NO_ORGANIZER, lpNewMsg);
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleMeeting GetItem failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	lpsSetPropVals[0].ulPropTag = PR_SENTMAIL_ENTRYID;
 	lpsSetPropVals[0].Value.bin = lpsGetPropVal[1].Value.bin;
@@ -2033,16 +2104,20 @@ HRESULT CalDAV::HrHandleMeeting(ICalToMapi *lpIcalToMapi)
 	lpsSetPropVals[1].Value.b = false;
 
 	hr = lpNewMsg->SetProps(2, lpsSetPropVals, NULL);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleMeeting SetProps failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	hr = lpNewMsg->SaveChanges(KEEP_OPEN_READWRITE);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrHandleMeeting SaveChanges failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	hr = lpNewMsg->SubmitMessage(0);
 	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to submit message: 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to submit message: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
@@ -2083,21 +2158,21 @@ HRESULT CalDAV::HrConvertToIcal(LPSPropValue lpEid, MapiToICal *lpMtIcal, ULONG 
 	hr = m_lpActiveStore->OpenEntry(lpEid->Value.bin.cb, (LPENTRYID)lpEid->Value.bin.lpb, NULL, MAPI_BEST_ACCESS, &ulObjType, (LPUNKNOWN *)&lpMessage);
 	if (hr != hrSuccess && ulObjType == MAPI_MESSAGE)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error opening calendar entry, error code : 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error opening calendar entry, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
 	hr = lpMtIcal->AddMessage(lpMessage, m_strSrvTz, ulFlags);
 	if (hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error converting mapi message to ical, error code : 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error converting mapi message to ical, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
 	hr = lpMtIcal->Finalize(0, NULL, lpstrIcal);
 	if (hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error creating ical data, error code : 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error creating ical data, error code : 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
@@ -2270,7 +2345,7 @@ HRESULT CalDAV::HrMapValtoStruct(LPMAPIPROP lpObj, LPSPropValue lpProps, ULONG u
 				HrSetDavPropName(&(sWebVal.sPropName), "comp","name", "VEVENT", CALDAVNS);
 				sWebProperty.lstValues.push_back(sWebVal);
 
-				// actually even only for the standard calender folder
+				// actually even only for the standard calendar folder
 				HrSetDavPropName(&(sWebVal.sPropName), "comp","name", "VFREEBUSY", CALDAVNS);
 				sWebProperty.lstValues.push_back(sWebVal);
 			}
@@ -2434,8 +2509,10 @@ HRESULT CalDAV::HrGetCalendarOrder(SBinary sbEid, std::string *lpstrCalendarOrde
 
 	// get default calendar folder entry id from root container
 	hr = HrGetOneProp(lpRootCont, PR_IPM_APPOINTMENT_ENTRYID, &lpProp);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrGetCalendarOrder getprop PR_IPM_APPOINTMENT_ENTRYID failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	hr = m_lpActiveStore->CompareEntryIDs(sbEid.cb, (LPENTRYID)sbEid.lpb, lpProp->Value.bin.cb, (LPENTRYID)lpProp->Value.bin.lpb, 0, &ulResult);
 	if (hr == hrSuccess && ulResult == TRUE)
@@ -2474,16 +2551,20 @@ HRESULT CalDAV::HrMove()
 	std::string strGuid;
 	
 	hr = m_lpRequest->HrGetDestination(&strDestination);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrMove HrGetDestination failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	hr = HrParseURL(strDestination, NULL, NULL, &strDestFolder);
 	if (hr != hrSuccess)
 		goto exit;
 
 	hr = HrFindFolder(m_lpActiveStore, m_lpIPMSubtree, m_lpNamedProps, m_lpLogger, U2W(strDestFolder), &lpDestFolder);
-	if (hr != hrSuccess)
+	if (hr != hrSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "CalDAV::HrMove HrFindFolder failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 	
 	strGuid = StripGuid(strDestination);
 

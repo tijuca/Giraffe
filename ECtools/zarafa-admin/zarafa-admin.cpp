@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -47,7 +46,7 @@
 #include <iostream>
 #include "my_getopt.h"
 
-#include <math.h>
+#include <cmath>
 #include <mapidefs.h>
 #include <mapispi.h>
 #include <mapix.h>
@@ -92,7 +91,7 @@
 
 using namespace std;
 
-bool verbose = false;
+static bool verbose = false;
 
 enum modes {
 	MODE_INVALID = 0, MODE_LIST_USERS, MODE_CREATE_PUBLIC,
@@ -169,7 +168,7 @@ enum {
 	OPT_RESET_FOLDER_COUNT
 };
 
-struct option long_options[] = {
+static const struct option long_options[] = {
 	{ "create-store", 1, NULL, OPT_CREATE_STORE },
 	{ "delete-store", 1, NULL, OPT_DELETE_STORE },
 	{ "hook-store", 1, NULL, OPT_HOOK_STORE },
@@ -234,7 +233,8 @@ struct option long_options[] = {
  *
  * @param[in]	name	The name of the program (arg[0])
  */
-void print_help(char *name) {
+static void print_help(const char *name)
+{
 	ConsoleTable ct(0,0);
 	cout << "Usage:" << endl;
 	cout << name << " [action] [options]" << endl << endl;
@@ -363,7 +363,8 @@ void print_help(char *name) {
  *
  * @return	char	The typed password if ok, or NULL when failed.
  */
-char *get_password() {
+static char *get_password(void)
+{
 	static char password[80] = {0};
 	char *s = NULL;
 
@@ -391,7 +392,8 @@ char *get_password() {
  * @param[in]	char*	String containing a boolean
  * @return		int		1 for true (yes) or 0 for false (no).
  */
-int parse_yesno(char *opt) {
+static int parse_yesno(const char *opt)
+{
 	if (opt[0] == 'y' || opt[0] == '1')
 		return 1;
 	return 0;
@@ -404,7 +406,7 @@ int parse_yesno(char *opt) {
  *
  * @return time string "m / %d / %y %T"
  */
-std::string FiletimeToString(FILETIME ft)
+static std::string FiletimeToString(FILETIME ft)
 {
 	time_t timestamp;
 	tm local;
@@ -420,7 +422,7 @@ std::string FiletimeToString(FILETIME ft)
 	return d;
 }
 
-std::string UnixtimeToString(time_t timestamp)
+static std::string UnixtimeToString(time_t timestamp)
 {
 
 	tm local;
@@ -440,7 +442,8 @@ std::string UnixtimeToString(time_t timestamp)
  * @param[in]	lpQuota			Optional ECQuota object with a users quota settings
  * @param[in]	lpQuotaStatus	Optional ECQuotaStatus object with the storesize of a user
  */
-void print_quota(LPECQUOTA lpQuota, LPECQUOTASTATUS lpQuotaStatus, bool isPublic = false)
+static void print_quota(const ECQUOTA *lpQuota,
+    const ECQUOTASTATUS *lpQuotaStatus, bool isPublic = false)
 {
 	if (lpQuota) {
 		// watch the not:
@@ -481,8 +484,9 @@ void print_quota(LPECQUOTA lpQuota, LPECQUOTASTATUS lpQuotaStatus, bool isPublic
  * @param[in]	hard		New hard level for user, or -1 for default system settings
  * @param[in]	print		Prints old and new quota settings for a user (optional, default false)
  */
-HRESULT setQuota(IECServiceAdmin *lpServiceAdmin, ULONG cbEid, LPENTRYID lpEid, int quota, bool udefault,
-		long long warn, long long soft, long long hard, bool print = false, bool company = false)
+static HRESULT setQuota(IECServiceAdmin *lpServiceAdmin, ULONG cbEid,
+    LPENTRYID lpEid, int quota, bool udefault, long long warn, long long soft,
+    long long hard, bool print = false, bool company = false)
 {
 	HRESULT hr = hrSuccess;
 	LPECQUOTASTATUS lpsQuotaStatus = NULL;
@@ -525,7 +529,9 @@ HRESULT setQuota(IECServiceAdmin *lpServiceAdmin, ULONG cbEid, LPENTRYID lpEid, 
 	if (print) {
 		hr = lpServiceAdmin->GetQuotaStatus(cbEid, lpEid, &lpsQuotaStatus);
 		if(hr != hrSuccess) {
-			cerr << "Unable to request updated quota information: " << stringify(hr, true) << endl;
+			cerr << "Unable to request updated quota information: " <<
+				GetMAPIErrorMessage(hr) << " (" <<
+				stringify(hr, true) << ")" << endl;
 			goto exit;
 		}
 
@@ -551,7 +557,7 @@ exit:
  * @param[in]	ulPropTag	A MAPI proptag
  * @return		string		The PR_ string of a property, or the number.
  */
-string getMapiPropertyString(ULONG ulPropTag)
+static string getMapiPropertyString(ULONG ulPropTag)
 {
 #define PROP_TO_STRING(__proptag) \
 	case PROP_ID(__proptag): return #__proptag
@@ -605,7 +611,9 @@ string getMapiPropertyString(ULONG ulPropTag)
  * @param[in]	lpECCompanies	Array of ECCompany structs
  * @param[in]	bList			true to list with comma's separation, otherwise enters are used.
  */
-void print_companies(unsigned int cCompanies, LPECCOMPANY lpECCompanies, bool bList) {
+static void print_companies(unsigned int cCompanies,
+    const ECCOMPANY *lpECCompanies, bool bList)
+{
 	for (unsigned int i = 0; i< cCompanies; i++) {
 		if (!bList)
 			cout << ((i > 0) ? ", " : "");
@@ -626,7 +634,9 @@ void print_companies(unsigned int cCompanies, LPECCOMPANY lpECCompanies, bool bL
  * @param[in]	lpECGroups	Array of ECGroup structs
  * @param[in]	bList		true to list with comma's separation, otherwise enters are used.
  */
-void print_groups(unsigned int cGroups, LPECGROUP lpECGroups, bool bList) {
+static void print_groups(unsigned int cGroups, const ECGROUP *lpECGroups,
+    bool bList)
+{
 	for (unsigned int i = 0; i < cGroups; i++) {
 		if (!bList)
 			cout << ((i > 0) ? ", " : "");
@@ -647,7 +657,9 @@ void print_groups(unsigned int cGroups, LPECGROUP lpECGroups, bool bList) {
  * @param[in]	lpECUsers	Array of ECUser structs
  * @param[in]	bShowHomeServer	true to print home server in multiserver environment if available
  */
-void print_users(unsigned int cUsers, LPECUSER lpECUsers, bool bShowHomeServer = false) {
+static void print_users(unsigned int cUsers, const ECUSER *lpECUsers,
+    bool bShowHomeServer = false)
+{
 	ConsoleTable ct(cUsers, bShowHomeServer?3:2);
 
 	ct.SetHeader(0, "Username");
@@ -676,7 +688,8 @@ void print_users(unsigned int cUsers, LPECUSER lpECUsers, bool bShowHomeServer =
  * @param[in]	lpPropmap	SPROPMAP struct, custom addressbook properties
  * @param[in]	lpMVPropmap	MVSPROPMAP struct, custom addressbook multi-valued properties
  */
-void print_extra_settings(SPROPMAP *lpPropmap, MVPROPMAP *lpMVPropmap)
+static void print_extra_settings(const SPROPMAP *lpPropmap,
+    const MVPROPMAP *lpMVPropmap)
 {
 	unsigned int c = 0;
 
@@ -723,7 +736,8 @@ void print_extra_settings(SPROPMAP *lpPropmap, MVPROPMAP *lpMVPropmap)
  * @param[in]	lpECCompany			ECCompany struct
  * @param[in]	lpECAdministrator	ECUser struct with the administrator of this company
  */
-void print_company_settings(LPECCOMPANY lpECCompany, LPECUSER lpECAdministrator)
+static void print_company_settings(const ECCOMPANY *lpECCompany,
+    const ECUSER *lpECAdministrator)
 {
 	cout << "Companyname:\t\t" << (LPSTR)lpECCompany->lpszCompanyname << endl;
 	cout << "Sysadmin:\t\t" << (LPSTR)lpECAdministrator->lpszUsername << endl;
@@ -740,7 +754,7 @@ void print_company_settings(LPECCOMPANY lpECCompany, LPECUSER lpECAdministrator)
  *
  * @param[in]	lpECGroups	ECGroup struct
  */
-void print_group_settings(LPECGROUP lpECGroup)
+static void print_group_settings(const ECGROUP *lpECGroup)
 {
 	cout << "Groupname:\t\t" << (LPSTR)lpECGroup->lpszGroupname << endl;
 	cout << "Fullname:\t\t" << (LPSTR)lpECGroup->lpszFullname << endl;
@@ -756,7 +770,7 @@ void print_group_settings(LPECGROUP lpECGroup)
  * @param[in]	eClass	Returns a user readable string for this objectclass
  * @return		string
  */
-string ClassToString(objectclass_t eClass)
+static string ClassToString(objectclass_t eClass)
 {
 	switch (eClass) {
 		case ACTIVE_USER:
@@ -794,7 +808,9 @@ string ClassToString(objectclass_t eClass)
  * @param[in]	bDeclineRecurring	Meeting request settings of user
  * @param[in]	lstArchives			List of attached archives
  */
-void print_user_settings(IMsgStore *lpStore, LPECUSER lpECUser, bool bAutoAccept, bool bDeclineConflict, bool bDeclineRecur, const ArchiveList &lstArchives, LPECUSERCLIENTUPDATESTATUS lpECUCUS)
+static void print_user_settings(IMsgStore *lpStore, const ECUSER *lpECUser,
+    bool bAutoAccept, bool bDeclineConflict, bool bDeclineRecur,
+    const ArchiveList &lstArchives, const ECUSERCLIENTUPDATESTATUS *lpECUCUS)
 {
 	LPSPropValue lpProps = NULL;
 	SizedSPropTagArray(2, sptaProps) = {2, { PR_LAST_LOGON_TIME, PR_LAST_LOGOFF_TIME } };
@@ -886,7 +902,8 @@ void print_user_settings(IMsgStore *lpStore, LPECUSER lpECUser, bool bAutoAccept
  * @param[in]	lpszName		Name to resolve, using type in ulClass
  * @return		MAPI error code
  */
-HRESULT print_archive_details(LPMAPISESSION lpSession, IECUnknown *lpECMsgStore, const char *lpszName)
+static HRESULT print_archive_details(LPMAPISESSION lpSession,
+    IECUnknown *lpECMsgStore, const char *lpszName)
 {
 	HRESULT hr = hrSuccess;
 	ECServiceAdminPtr ptrServiceAdmin;
@@ -939,7 +956,9 @@ exit:
  * @param[out] lpcbEntryID	Size of the wrapped orphan store entryid.
  * @param[out] lppEntryID	Pointer to the wrapped entryid from the orphan store entryid.
  */
-HRESULT CreateOrphanStoreEntryID(char *lpServerUrl, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG *lpcbEntryID, LPENTRYID *lppEntryID)
+static HRESULT CreateOrphanStoreEntryID(const char *lpServerUrl,
+    ULONG cbEntryID, LPENTRYID lpEntryID, ULONG *lpcbEntryID,
+    LPENTRYID *lppEntryID)
 {
 	HRESULT hr = hrSuccess;
 	ULONG cbNewEntryID = 0;
@@ -983,7 +1002,9 @@ exit:
  * @param[out] lpcbEntryID		The orphan store entryid size.
  * @param[out] lppEntryID		Pointer to the entry of the orphan store.
  */
-HRESULT GetOrphanStoreInfo(IECServiceAdmin *lpServiceAdmin, GUID *lpStoreGuid, char *lpServerUrl, wstring &strUsername, wstring &strCompanyName, ULONG *lpcbEntryID, LPENTRYID *lppEntryID)
+static HRESULT GetOrphanStoreInfo(IECServiceAdmin *lpServiceAdmin,
+    GUID *lpStoreGuid, const char *lpServerUrl, wstring &strUsername,
+    wstring &strCompanyName, ULONG *lpcbEntryID, LPENTRYID *lppEntryID)
 {
 	HRESULT hr = hrSuccess;
 	MAPITablePtr ptrTable;
@@ -1065,7 +1086,8 @@ exit:
  * @param[in] lpPublicStore	Public store to open or create the 'deleted stores' folder
  * @param[out] Pointer to a pointer of folder 'Deleted stores'.
  */
-HRESULT OpenDeletedStoresFolder(LPMDB lpPublicStore, LPMAPIFOLDER *lppFolderStores)
+static HRESULT OpenDeletedStoresFolder(LPMDB lpPublicStore,
+    LPMAPIFOLDER *lppFolderStores)
 {
 	HRESULT hr = hrSuccess;
 	LPMAPIFOLDER lpFolderSubTree = NULL;
@@ -1175,7 +1197,8 @@ exit:
  * @param[in] strCompanyname name whose belongs the public store. If empty it opens the default public store.
  * @param[out] lppPublicStore Pointer to the public store
  */
-HRESULT GetPublicStore(LPMAPISESSION lpSession, LPMDB lpMsgStore, wstring &strCompanyname, LPMDB *lppPublicStore)
+static HRESULT GetPublicStore(LPMAPISESSION lpSession, LPMDB lpMsgStore,
+    const wstring &strCompanyname, LPMDB *lppPublicStore)
 {
 	HRESULT hr = hrSuccess;
 	ULONG cbEntryID = 0;
@@ -1212,7 +1235,7 @@ exit:
 	return hr;
 }
 
-const char* StoreTypeToString(ULONG ulStoreType)
+static const char *StoreTypeToString(ULONG ulStoreType)
 {
 	switch (ulStoreType) {
 		case ECSTORE_TYPE_PRIVATE:
@@ -1237,7 +1260,7 @@ const char* StoreTypeToString(ULONG ulStoreType)
  * @param[in]	lpServiceAdmin	Zarafa Administrator service object
  * @result		HRESULT			MAPI Error code
  */
-HRESULT list_orphans(IECServiceAdmin *lpServiceAdmin)
+static HRESULT list_orphans(IECServiceAdmin *lpServiceAdmin)
 {
 	HRESULT hr = hrSuccess;
 	ULONG i = 0;
@@ -1356,7 +1379,7 @@ exit:
 	return hr;
 }
 
-LPMVPROPMAPENTRY FindMVPropmapEntry(LPECUSER lpUser, ULONG ulPropTag)
+static LPMVPROPMAPENTRY FindMVPropmapEntry(LPECUSER lpUser, ULONG ulPropTag)
 {
 	for (unsigned i = 0; i < lpUser->sMVPropmap.cEntries; ++i) {
 		if (lpUser->sMVPropmap.lpEntries[i].ulPropId == ulPropTag) {
@@ -1379,7 +1402,8 @@ LPMVPROPMAPENTRY FindMVPropmapEntry(LPECUSER lpUser, ULONG ulPropTag)
  * @param[in]	lpszName		Name to resolve, using type in ulClass
  * @return		MAPI error code
  */
-HRESULT print_details(LPMAPISESSION lpSession, IECUnknown *lpECMsgStore, objectclass_t ulClass, const char *lpszName)
+static HRESULT print_details(LPMAPISESSION lpSession, IECUnknown *lpECMsgStore,
+    objectclass_t ulClass, const char *lpszName)
 {
 	HRESULT hr = hrSuccess;
 	LPECUSER lpECUser = NULL;
@@ -1558,7 +1582,9 @@ HRESULT print_details(LPMAPISESSION lpSession, IECUnknown *lpECMsgStore, objectc
 
 			hr = lpServiceAdmin->GetUserClientUpdateStatus(cbObjectId, lpObjectId, 0, &lpECUCUS);
 			if (hr != hrSuccess) {
-				cerr << "Unable to get auto update status. Error code: " << stringify(hr, true) << endl;
+				cerr << "Unable to get auto update status: " <<
+					GetMAPIErrorMessage(hr) << " (" <<
+					stringify(hr, true) << ")" << endl;
 				hr = hrSuccess;
 			}
 			print_user_settings(lpStore, lpECUser, bAutoAccept, bDeclineConflict, bDeclineRecurring, lstArchives, lpECUCUS);
@@ -1633,7 +1659,11 @@ HRESULT print_details(LPMAPISESSION lpSession, IECUnknown *lpECMsgStore, objectc
 				cout << "Archive details on node '" << (LPSTR)lpArchiveServers->lpszValues[i] << "':" << endl;
 				hrTmp = HrGetRemoteAdminStore(lpSession, ptrAdminStore, lpArchiveServers->lpszValues[i], 0, &ptrRemoteAdminStore);
 				if (FAILED(hrTmp)) {
-					cerr << "Unable to access node '" << (LPSTR)lpArchiveServers->lpszValues[i] << "'. Error code: " << stringify(hrTmp, true) << " (" << GetMAPIErrorMessage(hrTmp) << ")" << endl;
+					cerr << "Unable to access node '" <<
+						(LPSTR)lpArchiveServers->lpszValues[i] <<
+						"': " << GetMAPIErrorMessage(hr) <<
+						"(" << stringify(hrTmp, true) <<
+						")" << endl;
 					continue;
 				}
 
@@ -1691,7 +1721,8 @@ exit:
  * @param[in]	lpCompany		The company to request users from. NULL EntryID in a non-hosted environment
  * @return		MAPI Error code
  */
-HRESULT ListUsers(IECServiceAdmin *lpServiceAdmin, LPECCOMPANY lpCompany)
+static HRESULT ListUsers(IECServiceAdmin *lpServiceAdmin,
+    LPECCOMPANY lpCompany)
 {
 	HRESULT		hr = hrSuccess;
 	ECUSER*		lpECUsers = NULL;
@@ -1721,7 +1752,8 @@ exit:
  * @param[in]	lpCompany		The company to request users from. NULL EntryID in a non-hosted environment
  * @return		HRESULT			MAPI Error code
  */
-HRESULT ListGroups(IECServiceAdmin *lpServiceAdmin, LPECCOMPANY lpCompany)
+static HRESULT ListGroups(IECServiceAdmin *lpServiceAdmin,
+    LPECCOMPANY lpCompany)
 {
 	HRESULT		hr = hrSuccess;
 	ECGROUP*	lpECGroups = NULL;
@@ -1752,7 +1784,7 @@ exit:
  * @param[in]	lpServiceAdmin	IECServiceAdmin on SYSTEM store
  * @return		HRESULT			MAPI Error code
  */
-HRESULT SyncUsers(IECServiceAdmin *lpServiceAdmin)
+static HRESULT SyncUsers(IECServiceAdmin *lpServiceAdmin)
 {
 	HRESULT hr = hrSuccess;
 
@@ -1775,7 +1807,9 @@ exit:
  * @param[in]	lpWork			Function to call given any company found in this function.
  * @return		HRESULT			MAPI Error code
  */
-HRESULT ForEachCompany(IECServiceAdmin *lpServiceAdmin, const char *lpszCompanyName, HRESULT (*lpWork)(IECServiceAdmin *, LPECCOMPANY))
+static HRESULT ForEachCompany(IECServiceAdmin *lpServiceAdmin,
+    const char *lpszCompanyName,
+    HRESULT (*lpWork)(IECServiceAdmin *, LPECCOMPANY))
 {
 	HRESULT hr = hrSuccess;
 	ULONG cbCompanyId = 0;
@@ -1830,7 +1864,8 @@ exit:
 	return hr;
 }
 
-HRESULT ForceResyncFor(LPMAPISESSION lpSession, LPMDB lpAdminStore, const char *lpszAccount, const char *lpszHomeMDB)
+static HRESULT ForceResyncFor(LPMAPISESSION lpSession, LPMDB lpAdminStore,
+    const char *lpszAccount, const char *lpszHomeMDB)
 {
 	HRESULT hr = hrSuccess;
 	ExchangeManageStorePtr ptrEMS;
@@ -1872,7 +1907,7 @@ exit:
 	return hr;
 }
 
-HRESULT ForceResyncAll(LPMAPISESSION lpSession, LPMDB lpAdminStore)
+static HRESULT ForceResyncAll(LPMAPISESSION lpSession, LPMDB lpAdminStore)
 {
 	HRESULT			hr = hrSuccess;
 	AddrBookPtr		ptrAdrBook;
@@ -1974,8 +2009,11 @@ HRESULT ForceResyncAll(LPMAPISESSION lpSession, LPMDB lpAdminStore)
 
 			hr = ForceResyncFor(lpSession, lpAdminStore, ptrRows[i].lpProps[0].Value.lpszA, ptrRows[i].lpProps[1].Value.lpszA);
 			if (hr != hrSuccess) {
-				cerr << "Failed to force resync for user " << ptrRows[i].lpProps[0].Value.lpszA
-					<< " " << stringify(hr, true) << endl;
+				cerr << "Failed to force resync for user " <<
+					ptrRows[i].lpProps[0].Value.lpszA <<
+					": " << GetMAPIErrorMessage(hr) <<
+					" (" << stringify(hr, true) << ")" <<
+					endl;
 				bFail = true;
 				continue;
 			}
@@ -1989,7 +2027,8 @@ exit:
 	return hr;
 }
 
-HRESULT ForceResync(LPMAPISESSION lpSession, LPMDB lpAdminStore, const list<string> &lstUsernames)
+static HRESULT ForceResync(LPMAPISESSION lpSession, LPMDB lpAdminStore,
+    const list<string> &lstUsernames)
 {
 	HRESULT hr = hrSuccess;
 	list<string>::const_iterator iUsername;
@@ -1998,8 +2037,9 @@ HRESULT ForceResync(LPMAPISESSION lpSession, LPMDB lpAdminStore, const list<stri
 	for (iUsername = lstUsernames.begin(); iUsername != lstUsernames.end(); ++iUsername) {
 		hr = ForceResyncFor(lpSession, lpAdminStore, iUsername->c_str(), NULL);
 		if (hr != hrSuccess) {
-			cerr << "Failed to force resync for user " << *iUsername
-				<< " " << stringify(hr, true) << endl;
+			cerr << "Failed to force resync for user " <<
+				*iUsername << ": " << GetMAPIErrorMessage(hr) <<
+				" (" << stringify(hr, true) << ")" << endl;
 			bFail = true;
 			continue;
 		}
@@ -2011,7 +2051,7 @@ HRESULT ForceResync(LPMAPISESSION lpSession, LPMDB lpAdminStore, const list<stri
 	return hr;
 }
 
-HRESULT DisplayUserCount(LPMDB lpAdminStore)
+static HRESULT DisplayUserCount(LPMDB lpAdminStore)
 {
 	HRESULT hr = hrSuccess;
 	MAPITablePtr ptrSystemTable;
@@ -2040,7 +2080,7 @@ HRESULT DisplayUserCount(LPMDB lpAdminStore)
 		goto exit;
 
 	sPropDisplayName.ulPropTag = PR_DISPLAY_NAME_A;
-	sPropDisplayName.Value.lpszA = "usercnt_";
+	sPropDisplayName.Value.lpszA = const_cast<char *>("usercnt_");
 
 	hr = ECContentRestriction(FL_PREFIX, PR_DISPLAY_NAME_A, &sPropDisplayName, ECRestriction::Cheap).CreateMAPIRestriction(&ptrRestriction);
 	if (hr != hrSuccess)
@@ -2161,7 +2201,8 @@ exit:
 	return hr;
 }
 
-HRESULT ResetFolderCount(LPMAPISESSION lpSession, LPMDB lpAdminStore, const char *lpszAccount)
+static HRESULT ResetFolderCount(LPMAPISESSION lpSession, LPMDB lpAdminStore,
+    const char *lpszAccount)
 {
 	HRESULT hr = hrSuccess;
 	ExchangeManageStorePtr ptrEMS;
@@ -2304,7 +2345,8 @@ struct lstr
 	}
 };
 
-HRESULT fillMVPropmap(ECUSER &sECUser, ULONG ulPropTag, int index, set<string, lstr> &sFeatures, void *lpBase)
+static HRESULT fillMVPropmap(ECUSER &sECUser, ULONG ulPropTag, int index,
+    set<string, lstr> &sFeatures, void *lpBase)
 {
 	HRESULT hr = hrSuccess;
 
@@ -2379,7 +2421,7 @@ int main(int argc, char* argv[])
 	LPECUSER lpSenders = NULL;
 
 	objectclass_t ulClass = OBJECTCLASS_UNKNOWN;
-	char *detailstype = NULL;
+	const char *detailstype = NULL;
 	char *username = NULL;
 	char *groupname = NULL;
 	char *companyname = NULL;
@@ -2389,7 +2431,7 @@ int main(int argc, char* argv[])
 	char *fullname = NULL;
 	char *new_username = NULL;
 	char *storeguid = NULL;
-	char *path = NULL;
+	const char *path = NULL;
 	char *lang = NULL;
 	char *feature = NULL;
 	char *node = NULL;
@@ -2815,7 +2857,7 @@ int main(int argc, char* argv[])
 
 	if (mode == MODE_HELP) {
 		print_help(argv[0]);
-		cout << endl << "Please read zarafa-admin(1) for detailed information by typing 'man zarafa-admin'." << endl << endl;
+		cout << endl << "Please read zarafa-admin(8) for detailed information by typing 'man zarafa-admin'." << endl << endl;
 		return 0;
 	}
 
@@ -3017,13 +3059,13 @@ int main(int argc, char* argv[])
 		 * - explicit config file given, but was not found
 		 * - default config file loaded, but contains errors
 		 * This makes that we do not complain for errors when an "invalid" config was given but did load ok.
-		 * This is a trick that people can use to give the spooler or dagent config for it's client SSL settings,
+		 * This is a trick that people can use to give the spooler or dagent a config for its client SSL settings,
 		 * which are the only settings used by the zarafa-admin program.
 		 */
 		if ((!bHaveConfig && bExplicitConfig) || (bHaveConfig && !bExplicitConfig && lpsConfig->HasErrors())) {
 			cerr << "Error while reading configuration file " << szConfig << endl;
 			// create fatal logger without a timestamp to stderr
-			lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-");
+			lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false, 0);
 			LogConfigErrors(lpsConfig, lpLogger);
 			lpLogger->Release();
 			return 1;
@@ -3039,6 +3081,13 @@ int main(int argc, char* argv[])
 			return 1;
 		}
 	}
+
+	if (verbose)
+		lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false, 0);
+	else
+		lpLogger = new ECLogger_Null();
+
+	HrSetLogger(lpLogger);
 
 	//Init mapi
 	hr = MAPIInitialize(NULL);
@@ -3059,24 +3108,20 @@ int main(int argc, char* argv[])
 		path = GetServerUnixSocket(path);
 	}
 
-	if (verbose)
-		lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-");
-	else
-		lpLogger = new ECLogger_Null();
 	hr = HrOpenECAdminSession(lpLogger, &lpSession, "zarafa-admin", PROJECT_SVN_REV_STR, path, EC_PROFILE_FLAGS_NO_NOTIFICATIONS, lpsConfig->GetSetting("sslkey_file", "", NULL), lpsConfig->GetSetting("sslkey_pass", "", NULL));
-	lpLogger->Release();
 	if(hr != hrSuccess) {
-		cerr << "Unable to open Admin session." << endl;
+		cerr << "Unable to open Admin session: " <<
+			GetMAPIErrorMessage(hr) << " (" <<
+			stringify(hr, true) << ")" << endl;
 		switch (hr) {
 			case MAPI_E_NETWORK_ERROR:
-				cerr << "The server is not running, or not accessable through " << path << "." << endl;
+				cerr << "The server is not running, or not accessible through " << path << "." << endl;
 				break;
 			case MAPI_E_LOGON_FAILED:
 			case MAPI_E_NO_ACCESS:
 				cerr << "Access was denied on " << path << "." << endl;
 				break;
 			default:
-				cerr << "Unknown cause " << stringify(hr,true) << "." << endl;
 				break;
 		};
 		goto exit;
@@ -3084,7 +3129,9 @@ int main(int argc, char* argv[])
 
 	hr = HrOpenDefaultStore(lpSession,&lpMsgStore);
 	if(hr != hrSuccess) {
-		cerr << "Unable to open Admin store, " << stringify(hr,true) << endl;
+		cerr << "Unable to open Admin store: " <<
+			GetMAPIErrorMessage(hr) << " (" <<
+			stringify(hr,true) << ")" << endl;
 		goto exit;
 	}
 
@@ -3093,10 +3140,12 @@ int main(int argc, char* argv[])
 
 		hr = HrGetRemoteAdminStore(lpSession, lpMsgStore, (LPTSTR)node, 0, &ptrRemoteStore);
 		if (hr != hrSuccess) {
-			cerr << "Unable to connect to node '" << node << "'" << endl;
+			cerr << "Unable to connect to node '" << node << "':" <<
+				GetMAPIErrorMessage(hr) << " (" <<
+				stringify(hr, true) << ")" << endl;
 			switch (hr) {
 				case MAPI_E_NETWORK_ERROR:
-					cerr << "The server is not running, or not accessable." << endl;
+					cerr << "The server is not running, or not accessible." << endl;
 					break;
 				case MAPI_E_LOGON_FAILED:
 				case MAPI_E_NO_ACCESS:
@@ -3106,9 +3155,8 @@ int main(int argc, char* argv[])
 					cerr << "Node '" << node << "' is unknown." << endl;
 					break;
 				default:
-					cerr << "Unknown cause " << stringify(hr,true) << "." << endl;
 					break;
-			};
+			}
 			goto exit;
 		}
 
@@ -3178,7 +3226,8 @@ int main(int argc, char* argv[])
 				}
 			} else {
 				cbCompanyId = g_cbEveryoneEid;
-				MAPIAllocateBuffer(g_cbEveryoneEid, (void**)&lpCompanyId);
+				if ((hr = MAPIAllocateBuffer(g_cbEveryoneEid, (void**)&lpCompanyId)) != hrSuccess)
+					goto exit;
 				memcpy(lpCompanyId, g_lpEveryoneEid, g_cbEveryoneEid);
 			}
 
@@ -3553,12 +3602,6 @@ int main(int argc, char* argv[])
 						goto exit;
 					}
 
-					// if the user did not select an active/inactive state on the command-line,
-					// then check what the status was before zarafa-admin started; that status
-					// will then be re-used
-					if (isnonactive == -1)
-						isnonactive = lpECUser -> ulObjClass == NONACTIVE_USER;
-
 					// lpECUser memory will be kept alive to let the SetUser() call work
 					for (ULONG i = 0; i < lpECUser->sMVPropmap.cEntries; i++) {
 						if (lpECUser->sMVPropmap.lpEntries[i].ulPropId == PR_EC_ENABLED_FEATURES_A) {
@@ -3582,6 +3625,12 @@ int main(int argc, char* argv[])
 
 					if(new_username || password || passprompt || emailadr || fullname || isadmin != -1 || isnonactive != -1 || feature) {
 						memset(&sECUser, 0, sizeof(sECUser));
+
+						// if the user did not select an active/inactive state on the command-line,
+						// then check what the status was before zarafa-admin started; that status
+						// will then be re-used
+						if (isnonactive == -1)
+							isnonactive = lpECUser -> ulObjClass == NONACTIVE_USER;
 
 						// copy static info
 						sECUser.sUserId.cb = cbUserId;
@@ -4146,7 +4195,8 @@ int main(int argc, char* argv[])
 					}
 
 					cbUserId = lpECUser[1].sUserId.cb;
-					MAPIAllocateBuffer(cbUserId, (void**)&lpUserId);
+					if ((hr = MAPIAllocateBuffer(cbUserId, (void**)&lpUserId)) != hrSuccess)
+						goto exit;
 					memcpy(lpUserId, lpECUser[1].sUserId.lpb, cbUserId);
 					MAPIFreeBuffer(lpECUser);
 					lpECUser = NULL;
@@ -4398,15 +4448,14 @@ exit:
 		MAPIFreeBuffer(lpServerDetails);
 
 	MAPIUninitialize();
+	lpLogger->Release();
+	lpLogger = NULL;
 
 	if (lpsConfig)
 		delete lpsConfig;
 
 	SSL_library_cleanup();
 
-	if (hr == hrSuccess)
-		return 0;
-	else
-		return 1;
+	return hr == hrSuccess ? 0 : 1;
 }
 

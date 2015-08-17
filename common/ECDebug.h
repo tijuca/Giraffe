@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -50,7 +49,7 @@
 #include <mapi.h>
 #include <mapix.h>
 #include <mapicode.h>
-#include "edkmdb.h"
+#include <edkmdb.h>
 
 #include "ECDefs.h"
 
@@ -67,33 +66,33 @@ struct MAPIResultCodes
 struct INFOGUID {
 	int		ulType; //0=mapi,1=exchange,2=new,3=zarafa,4=windows/other, 10=ontdekte
 	GUID	*guid;
-	char*	szguidname;
+	const char *szguidname;
 };
 
 std::string GetMAPIErrorDescription( HRESULT hResult );
 
 std::string DBGGUIDToString(REFIID iid);
-std::string MapiNameIdListToString(ULONG cNames, LPMAPINAMEID * ppNames, LPSPropTagArray pptaga = NULL);
-std::string MapiNameIdToString(LPMAPINAMEID pNameId);
+std::string MapiNameIdListToString(ULONG cNames, const MAPINAMEID *const *ppNames, const SPropTagArray *pptaga = NULL);
+std::string MapiNameIdToString(const MAPINAMEID *pNameId);
 
-std::string PropNameFromPropTagArray(LPSPropTagArray lpPropTagArray);
-std::string PropNameFromPropArray(ULONG cValues, LPSPropValue lpPropArray);
+std::string PropNameFromPropTagArray(const SPropTagArray *lpPropTagArray);
+std::string PropNameFromPropArray(ULONG cValues, const SPropValue *lpPropArray);
 std::string PropNameFromPropTag(ULONG ulPropTag);
-std::string RestrictionToString(LPSRestriction lpRestriction, unsigned int indent=0);
-std::string RowToString(LPSRow lpRow);
-std::string RowSetToString(LPSRowSet lpRows);
-std::string AdrRowSetToString(LPADRLIST lpAdrList, LPFlagList lpFlagList);
-std::string RowEntryToString(LPROWENTRY lpRowEntry);
-std::string RowListToString(LPROWLIST lprowList);
-std::string ActionToString(LPACTION lpAction);
+std::string RestrictionToString(const SRestriction *lpRestriction, unsigned int indent=0);
+std::string RowToString(const SRow *lpRow);
+std::string RowSetToString(const SRowSet *lpRows);
+std::string AdrRowSetToString(const ADRLIST *lpAdrList, const FlagList *lpFlagList);
+std::string RowEntryToString(const ROWENTRY *lpRowEntry);
+std::string RowListToString(const ROWLIST *lprowList);
+std::string ActionToString(const ACTION *lpAction);
 
-std::string SortOrderToString(LPSSortOrder lpSort);
-std::string SortOrderSetToString(LPSSortOrderSet lpSortCriteria);
+std::string SortOrderToString(const SSortOrder *lpSort);
+std::string SortOrderSetToString(const SSortOrderSet *lpSortCriteria);
 
-std::string NotificationToString(ULONG cNotification, LPNOTIFICATION lpNotification);
+std::string NotificationToString(ULONG cNotification, const NOTIFICATION *lpNotification);
 
-std::string ProblemArrayToString(LPSPropProblemArray lpProblemArray);
-std::string unicodetostr(WCHAR *lpszW);
+std::string ProblemArrayToString(const SPropProblemArray *lpProblemArray);
+std::string unicodetostr(const wchar_t *lpszW);
 
 const char *MsgServiceContextToString(ULONG ulContext);
 const char *ResourceTypeToString(ULONG ulResourceType);
@@ -101,10 +100,10 @@ const char *ResourceTypeToString(ULONG ulResourceType);
 //Internal used only
 std::string RelationalOperatorToString(ULONG relop);
 std::string FuzzyLevelToString(ULONG ulFuzzyLevel);
-std::string PropValueToString(LPSPropValue  lpPropValue);
+std::string PropValueToString(const SPropValue *lpPropValue);
 
 std::string ABFlags(ULONG ulFlag);
-std::string EntryListToString(LPENTRYLIST lpMsgList);
-std::string PermissionRulesToString(ULONG cPermissions, LPECPERMISSION lpECPermissions);
+std::string EntryListToString(const ENTRYLIST *lpMsgList);
+std::string PermissionRulesToString(ULONG cPermissions, const ECPERMISSION *lpECPermissions);
 
 #endif

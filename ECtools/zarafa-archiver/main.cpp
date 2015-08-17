@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -68,7 +67,7 @@ enum modes
     MODE_AUTO_ATTACH
 };
 
-const char* modename(modes mode)
+static const char *modename(modes mode)
 {
     const char* retval = "";
     switch (mode) {
@@ -113,7 +112,7 @@ const char* modename(modes mode)
  * @param[in]	lpszName
  *					The name of the application to use in the output.
  */
-void print_help(ostream &ostr, const char *lpszName)
+static void print_help(ostream &ostr, const char *lpszName)
 {
     ostr << endl;
     ostr << "Usage:" << endl;
@@ -178,7 +177,8 @@ void print_help(ostream &ostr, const char *lpszName)
  *
  * @todo	Make a nicer message about what went wrong based on modeSet and modeReq.
  */
-void print_mode_error(modes modeSet, modes modeReq, const char *lpszName)
+static void print_mode_error(modes modeSet, modes modeReq,
+    const char *lpszName)
 {
     cerr << "Cannot select more than one mode!" << endl;
     print_help(cerr, lpszName);
@@ -217,7 +217,7 @@ enum cmdOptions {
     OPT_HELP
 };
 
-struct option long_options[] = {
+static const struct option long_options[] = {
     { "user", 			   required_argument,   NULL, OPT_USER		       },
     { "attach-to",		   required_argument,	NULL, OPT_ATTACH	       },
     { "detach-from",	   required_argument,	NULL, OPT_DETACH	       },
@@ -238,8 +238,8 @@ struct option long_options[] = {
     { NULL, 			   no_argument, 		NULL, 0				       }
 };
 
-inline LPTSTR toLPTST(const char* lpszString, convert_context& converter) { return lpszString ? converter.convert_to<LPTSTR>(lpszString) : NULL; }
-inline const char* yesno(bool bValue) { return bValue ? "yes" : "no"; }
+static inline LPTSTR toLPTST(const char* lpszString, convert_context& converter) { return lpszString ? converter.convert_to<LPTSTR>(lpszString) : NULL; }
+static inline const char *yesno(bool bValue) { return bValue ? "yes" : "no"; }
 
 /**
  * Program entry point
@@ -267,7 +267,7 @@ int main(int argc, char *argv[])
 
     const char *lpszConfig = Archiver::GetConfigPath();
 
-    const configsetting_t lpDefaults[] = {
+    static const configsetting_t lpDefaults[] = {
         { "pid_file", "/var/run/zarafa-archiver.pid" },
         { NULL, NULL }
     };

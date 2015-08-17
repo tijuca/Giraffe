@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -47,7 +46,7 @@
 
 #include <mapidefs.h>
 #include <mapispi.h>
-#include "edkmdb.h"
+#include <edkmdb.h>
 #include "mapiext.h"
 #include "freebusytags.h"
 #include "stringutil.h"
@@ -56,7 +55,7 @@
 #include "EMSAbTag.h"
 #include "ECABEntryID.h"
 
-#include "mapiguid.h"
+#include <mapiguid.h>
 #include "mapiguidext.h"
 #include "edkguid.h"
 #include "ECGuid.h"
@@ -74,7 +73,7 @@ using namespace std;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 #define RETURN_ERROR_CASE(x) \
@@ -91,7 +90,7 @@ static char THIS_FILE[] = __FILE__;
 /**
  * Guid debug list
  */
-INFOGUID sGuidList[] = {
+static const INFOGUID sGuidList[] = {
 //Mapi
 	{0, (GUID*)&IID_IUnknown, "IID_IUnknown"},
 	{0, (GUID*)&IID_IMAPISession, "IID_IMAPISession"},
@@ -428,7 +427,7 @@ std::string GetMAPIErrorDescription(HRESULT hResult)
 	return szResult;
 }
 
-std::string	PropNameFromPropArray(ULONG cValues, LPSPropValue lpPropArray)
+std::string PropNameFromPropArray(ULONG cValues, const SPropValue *lpPropArray)
 {
 	std::string data;
 	
@@ -452,7 +451,7 @@ std::string	PropNameFromPropArray(ULONG cValues, LPSPropValue lpPropArray)
 	return data;
 }
 
-std::string	PropNameFromPropTagArray(LPSPropTagArray lpPropTagArray)
+std::string PropNameFromPropTagArray(const SPropTagArray *lpPropTagArray)
 {
 	std::string data;
 	
@@ -1889,6 +1888,8 @@ std::string	PropNameFromPropTag(ULONG ulPropTag)
 		RETURN_PROP_CASE(PR_EC_OUTOFOFFICE);
 		RETURN_PROP_CASE(PR_EC_OUTOFOFFICE_MSG);
 		RETURN_PROP_CASE(PR_EC_OUTOFOFFICE_SUBJECT);
+		RETURN_PROP_CASE(PR_EC_OUTOFOFFICE_FROM);
+		RETURN_PROP_CASE(PR_EC_OUTOFOFFICE_UNTIL);
 
 		RETURN_PROP_CASE(PR_EC_WEBACCESS_SETTINGS);
 		RETURN_PROP_CASE(PR_EC_RECIPIENT_HISTORY);
@@ -2002,7 +2003,8 @@ std::string FuzzyLevelToString(ULONG ulFuzzyLevel)
 	return strResult;
 }
 
-std::string RestrictionToString(LPSRestriction lpRestriction, unsigned int indent)
+std::string RestrictionToString(const SRestriction *lpRestriction,
+    unsigned int indent)
 {
 	std::string strResult;
 	unsigned int i = 0;
@@ -2131,12 +2133,12 @@ std::string RestrictionToString(LPSRestriction lpRestriction, unsigned int inden
 	return strResult;
 }
 
-std::string unicodetostr(WCHAR *lpszW)
+std::string unicodetostr(const wchar_t *lpszW)
 {
 	return convert_to<std::string>(lpszW);
 }
 
-std::string PropValueToString(LPSPropValue  lpPropValue)
+std::string PropValueToString(const SPropValue *lpPropValue)
 {
 	std::string strResult;
 
@@ -2253,7 +2255,7 @@ std::string PropValueToString(LPSPropValue  lpPropValue)
 return strResult;
 }
 
-std::string RowToString(LPSRow lpRow)
+std::string RowToString(const SRow *lpRow)
 {
 	std::string strResult;
 
@@ -2288,7 +2290,8 @@ std::string ABFlags(ULONG ulFlag)
 	return strResult;
 }
 
-std::string AdrRowSetToString(LPADRLIST lpAdrList, LPFlagList lpFlagList)
+std::string AdrRowSetToString(const ADRLIST *lpAdrList,
+    const FlagList *lpFlagList)
 {
 	std::string strResult;
 
@@ -2303,7 +2306,7 @@ std::string AdrRowSetToString(LPADRLIST lpAdrList, LPFlagList lpFlagList)
 	return strResult;
 }
 
-std::string RowSetToString(LPSRowSet lpRows)
+std::string RowSetToString(const SRowSet *lpRows)
 {
 // 	return "DEBUG OFF";
 
@@ -2320,7 +2323,7 @@ std::string RowSetToString(LPSRowSet lpRows)
 	return strResult;
 }
 
-std::string RowEntryToString(LPROWENTRY lpRowEntry)
+std::string RowEntryToString(const ROWENTRY *lpRowEntry)
 {
 	std::string strResult;
 	if(lpRowEntry == NULL)
@@ -2333,7 +2336,7 @@ std::string RowEntryToString(LPROWENTRY lpRowEntry)
 	return strResult;
 }
 
-std::string RowListToString(LPROWLIST lpRowList)
+std::string RowListToString(const ROWLIST *lpRowList)
 {
 	std::string strResult;
 
@@ -2348,12 +2351,12 @@ std::string RowListToString(LPROWLIST lpRowList)
 	return strResult;
 }
 
-std::string ActionToString(LPACTION lpAction)
+std::string ActionToString(const ACTION *lpAction)
 {
 	return "Action struct: NOT IMPLEMENTED";
 }
 
-std::string SortOrderToString(LPSSortOrder lpSort)
+std::string SortOrderToString(const SSortOrder *lpSort)
 {
 	std::string strResult;
 
@@ -2381,7 +2384,7 @@ std::string SortOrderToString(LPSSortOrder lpSort)
 	return strResult;
 }
 
-std::string SortOrderSetToString(LPSSortOrderSet lpSortCriteria)
+std::string SortOrderSetToString(const SSortOrderSet *lpSortCriteria)
 {
 
 	std::string strResult;
@@ -2399,7 +2402,7 @@ std::string SortOrderSetToString(LPSSortOrderSet lpSortCriteria)
 	return strResult;
 }
 
-std::string EntryListToString(LPENTRYLIST lpMsgList)
+std::string EntryListToString(const ENTRYLIST *lpMsgList)
 {
 	std::string str;
 
@@ -2418,7 +2421,8 @@ std::string EntryListToString(LPENTRYLIST lpMsgList)
 	return str;
 }
 
-std::string Notification_ErrorToString(ERROR_NOTIFICATION* lpErr)
+static const std::string
+Notification_ErrorToString(const ERROR_NOTIFICATION *lpErr)
 {
 	std::string str;
 
@@ -2435,7 +2439,8 @@ std::string Notification_ErrorToString(ERROR_NOTIFICATION* lpErr)
  * @param[in]	lpNewmail	newmail struct of a notification to convert to string
  * @return		std::string	string with hex representations of binary data
  */
-std::string Notification_NewMailToString(NEWMAIL_NOTIFICATION* lpNewmail)
+static std::string
+Notification_NewMailToString(const NEWMAIL_NOTIFICATION *lpNewmail)
 {
 	std::string str;
 
@@ -2459,7 +2464,8 @@ exit:
 	return str;
 }
 
-std::string Notification_ObjectToString(OBJECT_NOTIFICATION* lpObj)
+static std::string
+Notification_ObjectToString(const OBJECT_NOTIFICATION *lpObj)
 {
 	std::string str;
 
@@ -2494,7 +2500,7 @@ exit:
 	return str;
 }
 
-std::string TableEventToString(ULONG ulTableEvent)
+static std::string TableEventToString(ULONG ulTableEvent)
 {
 	std::string str;
 
@@ -2534,7 +2540,8 @@ std::string TableEventToString(ULONG ulTableEvent)
 
 	return str;
 }
-std::string Notification_TableToString(TABLE_NOTIFICATION* lpTab)
+
+static std::string Notification_TableToString(const TABLE_NOTIFICATION *lpTab)
 {
 	std::string str;
 
@@ -2557,7 +2564,8 @@ exit:
 	return str;
 }
 
-std::string Notification_StatusObjToString(STATUS_OBJECT_NOTIFICATION* lpStatobj)
+static std::string
+Notification_StatusObjToString(const STATUS_OBJECT_NOTIFICATION *lpStatobj)
 {
 	std::string str;
 
@@ -2568,7 +2576,8 @@ std::string Notification_StatusObjToString(STATUS_OBJECT_NOTIFICATION* lpStatobj
 	return str;
 }
 
-std::string Notification_ExtendedToString(EXTENDED_NOTIFICATION* lpExt)
+static std::string
+Notification_ExtendedToString(const EXTENDED_NOTIFICATION *lpExt)
 {
 	std::string str;
 
@@ -2588,7 +2597,8 @@ std::string Notification_ExtendedToString(EXTENDED_NOTIFICATION* lpExt)
 exit:
 	return str;
 }
-std::string EventTypeToString(ULONG ulEventType)
+
+static std::string EventTypeToString(ULONG ulEventType)
 {
 	std::string str;
 
@@ -2636,7 +2646,8 @@ std::string EventTypeToString(ULONG ulEventType)
 	return str;
 }
 
-std::string NotificationToString(ULONG cNotification, LPNOTIFICATION lpNotification)
+std::string NotificationToString(ULONG cNotification,
+    const NOTIFICATION *lpNotification)
 {
 	std::string str;
 
@@ -2688,7 +2699,8 @@ std::string NotificationToString(ULONG cNotification, LPNOTIFICATION lpNotificat
 	return str;
 }
 
-std::string PermissionRulesToString(ULONG cPermissions, LPECPERMISSION lpECPermissions)
+std::string PermissionRulesToString(ULONG cPermissions,
+    const ECPERMISSION *lpECPermissions)
 {
 	std::string		str;
 	unsigned int	ulUserId = 0;
@@ -2713,7 +2725,7 @@ std::string PermissionRulesToString(ULONG cPermissions, LPECPERMISSION lpECPermi
 	return str;
 }
 
-std::string ProblemArrayToString(LPSPropProblemArray lpProblemArray)
+std::string ProblemArrayToString(const SPropProblemArray *lpProblemArray)
 {
 	std::string str;
 	ULONG i;
@@ -2724,7 +2736,7 @@ std::string ProblemArrayToString(LPSPropProblemArray lpProblemArray)
 	str = "Problems: ( " + stringify(lpProblemArray->cProblem) + "\n";
 
 	for (i = 0; i < lpProblemArray->cProblem; i++) {
-		SPropProblem *p = &lpProblemArray->aProblem[i];
+		const SPropProblem *p = &lpProblemArray->aProblem[i];
 		str += "  ( ulIndex: " + stringify(p->ulIndex, true) + " ulPropTag: " + stringify(p->ulPropTag, true) + " scode: " + stringify(p->scode, true) + "),\n";
 	}
 
@@ -2758,7 +2770,7 @@ std::string DBGGUIDToString(REFIID iid)
 	return guidIDD;
 }
 
-std::string MapiNameIdToString(LPMAPINAMEID pNameId)
+std::string MapiNameIdToString(const MAPINAMEID *pNameId)
 {
 	std::string str;
 
@@ -2778,7 +2790,8 @@ std::string MapiNameIdToString(LPMAPINAMEID pNameId)
 	return str;
 }
 
-std::string MapiNameIdListToString(ULONG cNames, LPMAPINAMEID * ppNames, LPSPropTagArray pptaga)
+std::string MapiNameIdListToString(ULONG cNames,
+    const MAPINAMEID *const *ppNames, const SPropTagArray *pptaga)
 {
 	std::string str;
 	ULONG i;

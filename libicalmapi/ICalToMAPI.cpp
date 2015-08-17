@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -411,7 +410,7 @@ HRESULT ICalToMapiImpl::GetFreeBusyInfo(time_t *lptstart, time_t *lptend, std::s
 /**
  * Sets mapi properties in Imessage object from the icalitem.
  *
- * @param[in]		ulPosition		specifies the message that is to be retreived
+ * @param[in]		ulPosition		specifies the message that is to be retrieved
  * @param[in]		ulFlags			conversion flags
  * @arg @c IC2M_NO_RECIPIENTS skip recipients in conversion from ICal to MAPI
  * @arg @c IC2M_APPEND_ONLY	do not delete properties in lpMessage that are not present in ICal, but possebly are in lpMessage
@@ -678,7 +677,8 @@ HRESULT ICalToMapiImpl::SaveRecipList(std::list<icalrecip> *lplstRecip, ULONG ul
 		if ((ulFlag & IC2M_NO_ORGANIZER) && iRecip->ulRecipientType == MAPI_ORIG)
 			continue;
 			
-		MAPIAllocateBuffer(sizeof(SPropValue)*10, (void**)&lpRecipients->aEntries[i].rgPropVals);
+		if ((hr = MAPIAllocateBuffer(sizeof(SPropValue)*10, (void**)&lpRecipients->aEntries[i].rgPropVals)) != hrSuccess)
+			goto exit;
 		lpRecipients->aEntries[i].cValues = 10;
 
 		lpRecipients->aEntries[i].rgPropVals[0].ulPropTag = PR_RECIPIENT_TYPE;
@@ -692,17 +692,19 @@ HRESULT ICalToMapiImpl::SaveRecipList(std::list<icalrecip> *lplstRecip, ULONG ul
 		
 		lpRecipients->aEntries[i].rgPropVals[3].ulPropTag = PR_ENTRYID;
 		lpRecipients->aEntries[i].rgPropVals[3].Value.bin.cb = iRecip->cbEntryID;
-		MAPIAllocateMore(iRecip->cbEntryID, lpRecipients->aEntries[i].rgPropVals, (void**)&lpRecipients->aEntries[i].rgPropVals[3].Value.bin.lpb);
+		if ((hr = MAPIAllocateMore(iRecip->cbEntryID, lpRecipients->aEntries[i].rgPropVals, (void**)&lpRecipients->aEntries[i].rgPropVals[3].Value.bin.lpb)) != hrSuccess)
+			goto exit;
 		memcpy(lpRecipients->aEntries[i].rgPropVals[3].Value.bin.lpb, iRecip->lpEntryID, iRecip->cbEntryID);
 		
 		lpRecipients->aEntries[i].rgPropVals[4].ulPropTag = PR_ADDRTYPE_W;
-		lpRecipients->aEntries[i].rgPropVals[4].Value.lpszW = L"SMTP";
+		lpRecipients->aEntries[i].rgPropVals[4].Value.lpszW = const_cast<wchar_t *>(L"SMTP");
 
 		strSearch = "SMTP:" + converter.convert_to<std::string>(iRecip->strEmail);
 		transform(strSearch.begin(), strSearch.end(), strSearch.begin(), ::toupper);
 		lpRecipients->aEntries[i].rgPropVals[5].ulPropTag = PR_SEARCH_KEY;
 		lpRecipients->aEntries[i].rgPropVals[5].Value.bin.cb = strSearch.size() + 1;
-		MAPIAllocateMore(strSearch.size()+1, lpRecipients->aEntries[i].rgPropVals, (void **)&lpRecipients->aEntries[i].rgPropVals[5].Value.bin.lpb);
+		if ((hr = MAPIAllocateMore(strSearch.size()+1, lpRecipients->aEntries[i].rgPropVals, (void **)&lpRecipients->aEntries[i].rgPropVals[5].Value.bin.lpb)) != hrSuccess)
+			goto exit;
 		memcpy(lpRecipients->aEntries[i].rgPropVals[5].Value.bin.lpb, strSearch.c_str(), strSearch.size()+1);
 
 		lpRecipients->aEntries[i].rgPropVals[6].ulPropTag = PR_EMAIL_ADDRESS_W;

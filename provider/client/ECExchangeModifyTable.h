@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,10 +44,11 @@
 #ifndef EC_EXCHANGE_MODIFY_TABLE_H
 #define EC_EXCHANGE_MODIFY_TABLE_H
 
+#include "zcdefs.h"
 #include "ECUnknown.h"
 #include "ECMemTable.h"
-#include "mapidefs.h"
-#include "edkmdb.h"
+#include <mapidefs.h>
+#include <edkmdb.h>
 #include "IECExchangeModifyTable.h"
 
 class ECExchangeModifyTable : public ECUnknown {
@@ -68,12 +68,12 @@ public:
 	static HRESULT __stdcall CreateRulesTable(ECMAPIProp *lpParent, ULONG ulFlags, LPEXCHANGEMODIFYTABLE *lppObj);
 	static HRESULT __stdcall CreateACLTable(ECMAPIProp *lpParent, ULONG ulFlags, LPEXCHANGEMODIFYTABLE *lppObj);
 
-	class xExchangeModifyTable : public IExchangeModifyTable {
+	class xExchangeModifyTable _final : public IExchangeModifyTable {
 	public:
 		// From IUnknown
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void** lppInterface);
-		virtual ULONG __stdcall AddRef();
-		virtual ULONG __stdcall Release();
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _override;
+		virtual ULONG __stdcall AddRef(void) _override;
+		virtual ULONG __stdcall Release(void) _override;
 
 		// From IExchangeModifyTable
 		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
@@ -81,19 +81,19 @@ public:
 		virtual HRESULT __stdcall ModifyTable(ULONG ulFlags, LPROWLIST lpMods);
 	} m_xExchangeModifyTable;
 
-	class xECExchangeModifyTable : public IECExchangeModifyTable {
+	class xECExchangeModifyTable _final : public IECExchangeModifyTable {
 		// From IUnknown
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void** lppInterface);
-		virtual ULONG __stdcall AddRef();
-		virtual ULONG __stdcall Release();
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _override;
+		virtual ULONG __stdcall AddRef(void) _override;
+		virtual ULONG __stdcall Release(void) _override;
 
 		// From IExchangeModifyTable
-		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
-		virtual HRESULT __stdcall GetTable(ULONG ulFlags, LPMAPITABLE *lppTable);
-		virtual HRESULT __stdcall ModifyTable(ULONG ulFlags, LPROWLIST lpMods);
+		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError) _override;
+		virtual HRESULT __stdcall GetTable(ULONG ulFlags, LPMAPITABLE *lppTable) _override;
+		virtual HRESULT __stdcall ModifyTable(ULONG ulFlags, LPROWLIST lpMods) _override;
 
 		// From IECExchangeModifyTable
-		virtual HRESULT __stdcall DisablePushToServer();
+		virtual HRESULT __stdcall DisablePushToServer(void) _override;
 	} m_xECExchangeModifyTable;
 
 private:
@@ -120,12 +120,12 @@ public:
 	HRESULT __stdcall ActionCount(ULONG *lpcActions);
 	HRESULT __stdcall GetAction(ULONG ulActionNumber, LARGE_INTEGER *lpruleid, LPACTION *lppAction);
 
-	class xExchangeRuleAction : public IExchangeRuleAction {
+	class xExchangeRuleAction _final : public IExchangeRuleAction {
 	public:
 		// From IUnknown
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void** lppInterface);
-		virtual ULONG __stdcall AddRef();
-		virtual ULONG __stdcall Release();
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _override;
+		virtual ULONG __stdcall AddRef(void) _override;
+		virtual ULONG __stdcall Release(void) _override;
 
 		virtual HRESULT __stdcall ActionCount(ULONG *lpcActions);
 		virtual HRESULT __stdcall GetAction(ULONG ulActionNumber, LARGE_INTEGER *lpruleid, LPACTION *lppAction);

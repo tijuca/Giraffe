@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -51,7 +50,7 @@
 
 #ifdef _DEBUG
 #undef THIS_FILE
-static char THIS_FILE[]=__FILE__;
+static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -60,10 +59,6 @@ ECStreamSerializer::ECStreamSerializer(IStream *lpBuffer)
 {
 	SetBuffer(lpBuffer);
 	m_ulRead = m_ulWritten = 0;
-}
-
-ECStreamSerializer::~ECStreamSerializer()
-{
 }
 
 ECRESULT ECStreamSerializer::SetBuffer(void *lpBuffer)
@@ -76,7 +71,12 @@ ECRESULT ECStreamSerializer::Write(const void *ptr, size_t size, size_t nmemb)
 {
 	ECRESULT er = erSuccess;
 	ULONG cbWritten = 0;
-	char tmp[8];
+	union {
+		char c[8];
+		short s;
+		int i;
+		long long ll;
+	} tmp;
 
 	if (ptr == NULL)
 		return ZARAFA_E_INVALID_PARAMETER;
@@ -87,20 +87,20 @@ ECRESULT ECStreamSerializer::Write(const void *ptr, size_t size, size_t nmemb)
 		break;
 	case 2:
 		for (size_t x = 0; x < nmemb && er == erSuccess; ++x) {
-			((short *)tmp)[0] = htons(((const short *)ptr)[x]);
-			er = m_lpBuffer->Write(tmp, size, &cbWritten);
+			tmp.s = htons(((const short *)ptr)[x]);
+			er = m_lpBuffer->Write(&tmp, size, &cbWritten);
 		}
 		break;
 	case 4:
 		for (size_t x = 0; x < nmemb && er == erSuccess; ++x) {
-			((int *)tmp)[0] = htonl(((const int *)ptr)[x]);
-			er = m_lpBuffer->Write(tmp, size, &cbWritten);
+			tmp.i = htonl(((const int *)ptr)[x]);
+			er = m_lpBuffer->Write(&tmp, size, &cbWritten);
 		}
 		break;
 	case 8:
 		for (size_t x = 0; x < nmemb && er == erSuccess; ++x) {
-			((long long *)tmp)[0] = htonll(((const long long *)ptr)[x]);
-			er = m_lpBuffer->Write(tmp, size, &cbWritten);
+			tmp.ll = htonll(((const long long *)ptr)[x]);
+			er = m_lpBuffer->Write(&tmp, size, &cbWritten);
 		}
 		break;
 	default:
@@ -232,7 +232,12 @@ ECRESULT ECFifoSerializer::SetBuffer(void *lpBuffer)
 ECRESULT ECFifoSerializer::Write(const void *ptr, size_t size, size_t nmemb)
 {
 	ECRESULT er = erSuccess;
-	char tmp[8];
+	union {
+		char c[8];
+		short s;
+		int i;
+		long long ll;
+	} tmp;
 
 	if (m_mode != serialize)
 		return ZARAFA_E_NO_SUPPORT;
@@ -246,20 +251,20 @@ ECRESULT ECFifoSerializer::Write(const void *ptr, size_t size, size_t nmemb)
 		break;
 	case 2:
 		for (size_t x = 0; x < nmemb && er == erSuccess; ++x) {
-			((short *)tmp)[0] = htons(((const short *)ptr)[x]);
-			er = m_lpBuffer->Write(tmp, size, STR_DEF_TIMEOUT, NULL);
+			tmp.s = htons(((const short *)ptr)[x]);
+			er = m_lpBuffer->Write(&tmp, size, STR_DEF_TIMEOUT, NULL);
 		}
 		break;
 	case 4:
 		for (size_t x = 0; x < nmemb && er == erSuccess; ++x) {
-			((int *)tmp)[0] = htonl(((const int *)ptr)[x]);
-			er = m_lpBuffer->Write(tmp, size, STR_DEF_TIMEOUT, NULL);
+			tmp.i = htonl(((const int *)ptr)[x]);
+			er = m_lpBuffer->Write(&tmp, size, STR_DEF_TIMEOUT, NULL);
 		}
 		break;
 	case 8:
 		for (size_t x = 0; x < nmemb && er == erSuccess; ++x) {
-			((long long *)tmp)[0] = htonll(((const long long *)ptr)[x]);
-			er = m_lpBuffer->Write(tmp, size, STR_DEF_TIMEOUT, NULL);
+			tmp.ll = htonll(((const long long *)ptr)[x]);
+			er = m_lpBuffer->Write(&tmp, size, STR_DEF_TIMEOUT, NULL);
 		}
 		break;
 	default:

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -49,22 +48,26 @@
  * Functions and (type)definitions that are needed for the Linux platform
  *
  */
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 
 #include <pthread.h>
-#include <string.h>		/* memset, etc.. */
-#include <ctype.h>		/* 64bit int definition */
+#include <cstring>		/* memset, etc.. */
+#include <cctype>		/* 64bit int definition */
 #include <dlfcn.h>
-#include <stddef.h>
+#include <cstddef>
 #include <libgen.h>
 #include <byteswap.h>
 #include <endian.h>
-#include <errno.h>
-#include <locale.h>
+#include <cerrno>
+#include <clocale>
 
 #define __STDC_FORMAT_MACROS
-#include <inttypes.h>
+#if defined(__cplusplus) && __cplusplus >= 200300L
+#	include <cstdint>
+#else
+#	include <stdint.h>
+#endif
 #include <string>
 
 #ifdef HAVE_UNISTD_H
@@ -81,7 +84,7 @@
 #define UNUSED_VAR __attribute__((unused))
 #endif
 
-#include <assert.h>
+#include <cassert>
 /* windows compatible asserts ? */
 #define ASSERT assert
 #define _ASSERT assert
@@ -122,8 +125,10 @@ inline int _vsnprintf_l(char *str, size_t size, const char *format, locale_t loc
 #define _atoi64 atoll
 
 #define CreateDir(dir, mode) mkdir(dir, mode)
+#define closesocket(fd) close(fd)
 
 /* base types */
+#include <sys/types.h>
 typedef void			VOID;
 typedef unsigned char	BYTE;
 typedef unsigned char	UCHAR;
@@ -139,9 +144,9 @@ typedef unsigned int	UINT;
 typedef UINT*			LPUINT;
 typedef unsigned int	ULONG;
 typedef ULONG*			LPULONG;
-typedef long long		LONGLONG;
+typedef int64_t		LONGLONG;
 typedef LONGLONG*		LPLONGLONG;
-typedef unsigned long long	ULONGLONG;
+typedef uint64_t	ULONGLONG;
 typedef ULONGLONG*		LPULONGLONG;
 
 typedef int	LONG;
@@ -725,5 +730,8 @@ time_t GetProcessTime();
  * NOTE: For non-static methods the this pointer has index 1.
  **/
 #define __LIKE_PRINTF(_fmt, _va) __attribute__((format(printf, _fmt, _va)))
+
+#define z_tms tms
+#define z_times times
 
 #endif // PLATFORM_LINUX_H

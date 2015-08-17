@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -51,11 +50,12 @@
 #include <mapiext.h>
 #include <mapix.h>
 #include <mapiutil.h>
-#include <math.h>
+#include <cmath>
 #include <algorithm>
 #include "freebusy.h"
 
-bool operator ==(SPropValue spv, ULONG ulPropTag) {
+static bool operator ==(SPropValue spv, ULONG ulPropTag)
+{
 	return spv.ulPropTag == ulPropTag;
 }
 
@@ -624,7 +624,7 @@ HRESULT ICalRecurrence::HrMakeMAPIException(icalcomponent *lpEventRoot, icalcomp
 					if (hr != hrSuccess)
 						goto exit;
 					sPropVal.ulPropTag = PR_SUBJECT_W;
-					sPropVal.Value.lpszW = L"";
+					sPropVal.Value.lpszW = const_cast<wchar_t *>(L"");
 					lpEx->lstMsgProps.push_back(sPropVal);
 					break;
 				case 1:
@@ -633,7 +633,7 @@ HRESULT ICalRecurrence::HrMakeMAPIException(icalcomponent *lpEventRoot, icalcomp
 					if (hr != hrSuccess)
 						goto exit;
 					sPropVal.ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_LOCATION], PT_UNICODE);
-					sPropVal.Value.lpszW = L"";
+					sPropVal.Value.lpszW = const_cast<wchar_t *>(L"");
 					lpEx->lstMsgProps.push_back(sPropVal);
 					break;
 				case 2:
@@ -753,7 +753,8 @@ HRESULT ICalRecurrence::HrMakeMAPIRecurrence(recurrence *lpRecurrence, LPSPropTa
 		goto exit;
 
 	// adjust number of props
-	MAPIAllocateBuffer(sizeof(SPropValue)*4, (void**)&lpPropVal);
+	if ((hr = MAPIAllocateBuffer(sizeof(SPropValue)*4, (void**)&lpPropVal)) != hrSuccess)
+		goto exit;
 
 	lpPropVal[i].ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_RECURRING], PT_BOOLEAN);
 	lpPropVal[i].Value.b = TRUE;
