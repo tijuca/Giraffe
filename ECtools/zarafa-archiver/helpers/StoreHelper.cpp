@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -821,8 +820,10 @@ HRESULT StoreHelper::SetupSearchStubFolder(LPMAPIFOLDER lpSearchFolder, const EC
 	sPropStubbed.ulPropTag = PROP_STUBBED; 
 	sPropStubbed.Value.b = 1;
 
-	sPropMsgClass[0].ulPropTag = PR_MESSAGE_CLASS; sPropMsgClass[0].Value.LPSZ = _T("IPM.Note");
-	sPropMsgClass[1].ulPropTag = PR_MESSAGE_CLASS; sPropMsgClass[1].Value.LPSZ = _T("IPM.Note.");	// RES_CONTENT w FL_PREFIX
+	sPropMsgClass[0].ulPropTag = PR_MESSAGE_CLASS;
+	sPropMsgClass[0].Value.LPSZ = const_cast<TCHAR *>(_T("IPM.Note"));
+	sPropMsgClass[1].ulPropTag = PR_MESSAGE_CLASS;
+	sPropMsgClass[1].Value.LPSZ = const_cast<TCHAR *>(_T("IPM.Note.")); // RES_CONTENT w FL_PREFIX
 
 	// Create/Update the search folder that tracks non-stubbed archived message that are not flagged to be never stubbed.
 	resStubFolder.append(
@@ -868,15 +869,24 @@ HRESULT StoreHelper::GetClassCheckRestriction(ECOrRestriction *lpresClassCheck)
 	SPropValue sPropMsgClass[9];
 	ECOrRestriction resClassCheck;
 
-	sPropMsgClass[0].ulPropTag = PR_MESSAGE_CLASS; sPropMsgClass[0].Value.LPSZ = _T("IPM.Note");
-	sPropMsgClass[1].ulPropTag = PR_MESSAGE_CLASS; sPropMsgClass[1].Value.LPSZ = _T("IPM.Note.");	// RES_CONTENT w FL_PREFIX
-	sPropMsgClass[2].ulPropTag = PR_MESSAGE_CLASS; sPropMsgClass[2].Value.LPSZ = _T("IPM.Schedule.Meeting.Request");
-	sPropMsgClass[3].ulPropTag = PR_MESSAGE_CLASS; sPropMsgClass[3].Value.LPSZ = _T("IPM.Schedule.Meeting.Resp.Pos");
-	sPropMsgClass[4].ulPropTag = PR_MESSAGE_CLASS; sPropMsgClass[4].Value.LPSZ = _T("IPM.Schedule.Meeting.Resp.Neg");
-	sPropMsgClass[5].ulPropTag = PR_MESSAGE_CLASS; sPropMsgClass[5].Value.LPSZ = _T("IPM.Schedule.Meeting.Resp.Tent");
-	sPropMsgClass[6].ulPropTag = PR_MESSAGE_CLASS; sPropMsgClass[6].Value.LPSZ = _T("IPM.Schedule.Meeting.Canceled");
-	sPropMsgClass[7].ulPropTag = PR_MESSAGE_CLASS; sPropMsgClass[7].Value.LPSZ = _T("Report.IPM.Note.NDR");
-	sPropMsgClass[8].ulPropTag = PR_MESSAGE_CLASS; sPropMsgClass[8].Value.LPSZ = _T("Report.IPM.Note.IPNRN");
+	sPropMsgClass[0].ulPropTag = PR_MESSAGE_CLASS;
+	sPropMsgClass[0].Value.LPSZ = const_cast<TCHAR *>(_T("IPM.Note"));
+	sPropMsgClass[1].ulPropTag = PR_MESSAGE_CLASS;
+	sPropMsgClass[1].Value.LPSZ = const_cast<TCHAR *>(_T("IPM.Note.")); // RES_CONTENT w FL_PREFIX
+	sPropMsgClass[2].ulPropTag = PR_MESSAGE_CLASS;
+	sPropMsgClass[2].Value.LPSZ = const_cast<TCHAR *>(_T("IPM.Schedule.Meeting.Request"));
+	sPropMsgClass[3].ulPropTag = PR_MESSAGE_CLASS;
+	sPropMsgClass[3].Value.LPSZ = const_cast<TCHAR *>(_T("IPM.Schedule.Meeting.Resp.Pos"));
+	sPropMsgClass[4].ulPropTag = PR_MESSAGE_CLASS;
+	sPropMsgClass[4].Value.LPSZ = const_cast<TCHAR *>(_T("IPM.Schedule.Meeting.Resp.Neg"));
+	sPropMsgClass[5].ulPropTag = PR_MESSAGE_CLASS;
+	sPropMsgClass[5].Value.LPSZ = const_cast<TCHAR *>(_T("IPM.Schedule.Meeting.Resp.Tent"));
+	sPropMsgClass[6].ulPropTag = PR_MESSAGE_CLASS;
+	sPropMsgClass[6].Value.LPSZ = const_cast<TCHAR *>(_T("IPM.Schedule.Meeting.Canceled"));
+	sPropMsgClass[7].ulPropTag = PR_MESSAGE_CLASS;
+	sPropMsgClass[7].Value.LPSZ = const_cast<TCHAR *>(_T("Report.IPM.Note.NDR"));
+	sPropMsgClass[8].ulPropTag = PR_MESSAGE_CLASS;
+	sPropMsgClass[8].Value.LPSZ = const_cast<TCHAR *>(_T("Report.IPM.Note.IPNRN"));
 
 	// Build the message class restriction.
 	resClassCheck.append(

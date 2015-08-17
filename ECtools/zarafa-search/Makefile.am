@@ -1,4 +1,4 @@
-dist_bin_SCRIPTS = zarafa-search zarafa-search-xapian-compact.py
+dist_sbin_SCRIPTS = zarafa-search zarafa-search-xapian-compact.py
 
 EXTRA_DIST = setup.py		\
 	zarafa_search/__init__.py \

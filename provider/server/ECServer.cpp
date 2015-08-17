@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -59,9 +58,11 @@
 #include "ECPluginFactory.h"
 
 
+#include "ECNotificationManager.h"
 #include "ECSessionManager.h"
 #include "ECStatsCollector.h"
-#include <signal.h>
+#include "ECStatsTables.h"
+#include <csignal>
 
 #include "UnixUtil.h"
 #include "ECLicenseClient.h"
@@ -70,6 +71,7 @@
 #include <sys/stat.h>
 #include "ECScheduler.h"
 #include "ZarafaCode.h"
+#include "ZarafaCmd.h"
 
 #include "ECServerEntrypoint.h"
 #include "SSLUtil.h"
@@ -82,13 +84,15 @@
 
 
 #if HAVE_ICU
-#include "unicode/uclean.h"
+#include <unicode/uclean.h>
 #endif
+
+#include "TmpPath.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 // The following value is based on:
@@ -100,6 +104,8 @@ static char THIS_FILE[] = __FILE__;
 // list of all possible 32bit architectures because if the architecture is unknown we'll
 // have to go with the safe value which is for 64bit.
 #define MYSQL_MIN_THREAD_STACK (256*1024)
+
+const char upgrade_lock_file[] = "/tmp/zarafa-upgrade-lock";
 
 extern ECSessionManager*    g_lpSessionManager;
 
@@ -146,7 +152,9 @@ void zarafa_notify_done(struct soap *soap)
 }
 
 // Called from ECStatsTables to get server stats
-void zarafa_get_server_stats(unsigned int *lpulQueueLength, double *lpdblAge, unsigned int *lpulThreadCount, unsigned int *lpulIdleThreads)
+void zarafa_get_server_stats(unsigned int *lpulQueueLength,
+    double *lpdblAge, unsigned int *lpulThreadCount,
+    unsigned int *lpulIdleThreads)
 {
     g_lpSoapServerConn->GetStats(lpulQueueLength, lpdblAge, lpulThreadCount, lpulIdleThreads);
 }
@@ -156,7 +164,7 @@ void zarafa_get_server_stats(unsigned int *lpulQueueLength, double *lpdblAge, un
  * 
  * @param[in] sig signal received
  */
-void process_signal(int sig)
+static void process_signal(int sig)
 {
 	LOG_AUDIT(g_lpAudit, "zarafa-server signalled sig=%d", sig);
 
@@ -171,7 +179,7 @@ void process_signal(int sig)
 	if (m_bDatabaseUpdateIgnoreSignals) {
 		g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "WARNING: Database upgrade is taking place.");
 		g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "  Please be patient, and don't try to kill the zarafa-server process.");
-		g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "  It may leave your database in an inconsistant state.");
+		g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "  It may leave your database in an inconsistent state.");
 		return;
 	}	
 
@@ -179,6 +187,7 @@ void process_signal(int sig)
 		return; // already in exit state!
 
 	switch (sig) {
+	case SIGINT:
 	case SIGTERM:
 		if(g_lpLogger)
 			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Shutting down");
@@ -208,7 +217,7 @@ void process_signal(int sig)
 
 			g_lpSessionManager->GetPluginFactory()->SignalPlugins(sig);
 
-			char *ll = g_lpConfig->GetSetting("log_level");
+			const char *ll = g_lpConfig->GetSetting("log_level");
 			int new_ll = ll ? strtol(ll, NULL, 0) : 2;
 			g_lpLogger->SetLoglevel(new_ll);
 			g_lpLogger->Reset();
@@ -236,7 +245,7 @@ void process_signal(int sig)
  *
  * @return NULL 
  */
-void* signal_handler(void*)
+static void *signal_handler(void *)
 {
 	int sig;
 
@@ -257,47 +266,12 @@ void* signal_handler(void*)
 // SIGSEGV catcher
 #include <execinfo.h>
 
-void sigsegv(int signr)
+static void sigsegv(int signr)
 {
-	void *bt[64];
-	int i, n;
-	char **btsymbols;
-
-	LOG_AUDIT(g_lpAudit, "zarafa-server signalled sig=%d", signr);
-
-	if(!g_lpLogger)
-		goto exit;
-
-	switch (signr) {
-	case SIGSEGV:
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Caught SIGSEGV (%d), traceback:", signr);
-		break;
-	case SIGBUS:
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Caught SIGBUS (%d), possible invalid mapped memory access, traceback:", signr);
-		break;
-	case SIGABRT:
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Caught SIGABRT (%d), out of memory or unhandled exception, traceback:", signr);
-		break;
-	};
-
-	n = backtrace(bt, 64);
-        
-	btsymbols = backtrace_symbols(bt, n);
-
-	for (i = 0; i < n; i++) {
-		if (btsymbols)
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "%p %s", bt[i], btsymbols[i]);
-		else
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "%p", bt[i]);
+	generic_sigsegv_handler(g_lpLogger, "Server", PROJECT_VERSION_SERVER_STR, signr);
 	}
 
-	g_lpLogger->Log(EC_LOGLEVEL_FATAL, "When reporting this traceback, please include Linux distribution name, system architecture and Zarafa version.");
-
-exit:
-	kill(0, signr);
-}
-
-ECRESULT check_database_innodb(ECDatabase *lpDatabase)
+static ECRESULT check_database_innodb(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
 #ifndef EMBEDDED_MYSQL
@@ -328,7 +302,7 @@ exit:
 	return er;
 }
 
-ECRESULT check_database_attachments(ECDatabase *lpDatabase)
+static ECRESULT check_database_attachments(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
 	string strQuery;
@@ -384,7 +358,7 @@ exit:
 	return er;
 }
 
-ECRESULT check_distributed_zarafa(ECDatabase *lpDatabase)
+static ECRESULT check_distributed_zarafa(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
 	string strQuery;
@@ -422,7 +396,7 @@ exit:
 	return er;
 }
 
-ECRESULT check_attachment_storage_permissions()
+static ECRESULT check_attachment_storage_permissions(void)
 {
 	ECRESULT er = erSuccess;
 
@@ -449,7 +423,7 @@ exit:
 	return er;
 }
 
-ECRESULT check_database_tproperties_key(ECDatabase *lpDatabase)
+static ECRESULT check_database_tproperties_key(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
 	string strQuery, strTable;
@@ -524,7 +498,7 @@ exit:
 	return er;
 }
 
-ECRESULT check_database_thread_stack(ECDatabase *lpDatabase)
+static ECRESULT check_database_thread_stack(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
 	string strQuery;
@@ -571,7 +545,7 @@ exit:
  * empty, gets the current FQDN through DNS lookups, and updates the
  * server_hostname value in the config object.
  */
-ECRESULT check_server_fqdn()
+static ECRESULT check_server_fqdn(void)
 {
 	ECRESULT er = erSuccess;
 	int rc;
@@ -579,7 +553,7 @@ ECRESULT check_server_fqdn()
 	struct sockaddr_in saddr = {0};
 	struct addrinfo hints = {0};
 	struct addrinfo *aiResult = NULL;
-	char *option;
+	const char *option;
 
 	// If admin has set the option, we're not using DNS to check the name
 	option = g_lpConfig->GetSetting("server_hostname");
@@ -627,7 +601,7 @@ exit:
  * 
  * @return always returns erSuccess
  */
-ECRESULT check_server_configuration()
+static ECRESULT check_server_configuration(void)
 {
 	ECRESULT		er = erSuccess;
 	bool			bHaveErrors = false;
@@ -755,7 +729,7 @@ int main(int argc, char* argv[])
 		OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS,
 		OPT_IGNORE_DB_THREAD_STACK_SIZE
 	};
-	struct option long_options [] = {
+	static const struct option long_options[] = {
 		{ "help", 0, NULL, OPT_HELP },	// help text
 		{ "config", 1, NULL, OPT_CONFIG },	// config file
 		{ "restart-searches", 0, NULL, OPT_RESTART_SEARCHES },
@@ -796,7 +770,6 @@ int main(int argc, char* argv[])
 			cout << "     --ignore-attachment-storage-conflict    Start even if the attachment_storage config option changed" << endl;
 			cout << "     --override-multiserver-lock             Start in multiserver mode even if multiserver mode is locked" << endl;
 			cout << "     --force-database-upgrade                Start upgrade from 6.x database and continue running if upgrade is complete" << endl;
-			cout << "     --ignore-unknown-config-options         Start even if the configuration file contains invalid config options" << endl;
 			cout << "     --ignore-db-thread-stack-size           Start even if the thread_stack setting for MySQL is too low" << endl;
 			return 0;
 		case 'V':
@@ -837,7 +810,8 @@ int main(int argc, char* argv[])
 #define ZARAFA_SERVER_PIPE "/var/run/zarafa"
 #define ZARAFA_SERVER_PRIO "/var/run/zarafa-prio"
 
-void InitBindTextDomain() {
+static void InitBindTextDomain(void)
+{
 	// Set gettext codeset, used for generated folder name translations
 	bind_textdomain_codeset("zarafa", "UTF-8");
 }
@@ -868,7 +842,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 	// SIGSEGV backtrace support
 	stack_t st = {0};
 	struct sigaction act = {{0}};
-	FILE *tmplock = NULL;
+	int tmplock = -1;
 	struct stat dir = {0};
 	struct passwd *runasUser = NULL;
 
@@ -938,6 +912,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		{ "log_file",					"-" },
 		{ "log_level",					"2", CONFIGSETTING_RELOADABLE },
 		{ "log_timestamp",				"1" },
+		{ "log_buffer_size",	"4096" },
 		// security log options
 		{ "audit_log_enabled",			"no" },
 		{ "audit_log_method",			"syslog" },
@@ -969,7 +944,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		{ "cache_quota_size",			"1M", CONFIGSETTING_SIZE },		// 1Mb
 		{ "cache_quota_lifetime",		"1" },							// 1 minute
 		{ "cache_user_size",			"1M", CONFIGSETTING_SIZE },		// 48 bytes per struct, can hold 21k+ users, allocated 2x (user and ueid cache)
-		{ "cache_userdetails_size",		"3M", CONFIGSETTING_SIZE },		// 120 bytes per struct, can hold 21k+ users (was 2.5Mb, no float in size)
+		{ "cache_userdetails_size",		"25M", CONFIGSETTING_SIZE },		// 120 bytes per struct, can hold 21k+ users (was 2.5Mb, no float in size)
 		{ "cache_userdetails_lifetime", "5" },							// 5 minutes
 		{ "cache_acl_size",				"1M", CONFIGSETTING_SIZE },		// 1Mb, acl table cache
 		{ "cache_store_size",			"1M", CONFIGSETTING_SIZE },		// 1Mb, store table cache (storeid, storeguid), 40 bytes
@@ -990,8 +965,8 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		{ "enable_sso_ntlmauth",	"no", CONFIGSETTING_UNUSED },			// default disables ntlm_auth, so we don't log errors on useless things
 		{ "enable_sso",				"no", CONFIGSETTING_RELOADABLE },			// autodetect between Kerberos and NTLM
 		{ "session_ip_check",		"yes", CONFIGSETTING_RELOADABLE },			// check session id comes from same ip address (or not)
-		{ "hide_everyone",			"no", CONFIGSETTING_RELOADABLE },			// whether internal group Everyone should be removed for users
-		{ "hide_system",			"no", CONFIGSETTING_RELOADABLE },			// whether internal user SYSTEM should be removed for users
+		{ "hide_everyone",			"yes", CONFIGSETTING_RELOADABLE },			// whether internal group Everyone should be removed for users
+		{ "hide_system",			"yes", CONFIGSETTING_RELOADABLE },			// whether internal user SYSTEM should be removed for users
 		{ "enable_gab",				"yes", CONFIGSETTING_RELOADABLE },			// whether the GAB is enabled
         { "enable_enhanced_ics",    "yes", CONFIGSETTING_RELOADABLE },			// (dis)allow enhanced ICS operations (stream and notifications)
         { "enable_sql_procedures",  "no" },			// (dis)allow SQL procedures (requires mysql config stack adjustment), not reloadable because in the middle of the streaming flip
@@ -1014,15 +989,15 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		{ "search_timeout",			"10", CONFIGSETTING_RELOADABLE },
 
 		{ "threads",				"8", CONFIGSETTING_RELOADABLE },
-        { "watchdog_max_age",		"500", CONFIGSETTING_RELOADABLE },
-        { "watchdog_frequency",		"1", CONFIGSETTING_RELOADABLE },
+		{ "watchdog_max_age",		"500", CONFIGSETTING_RELOADABLE },
+		{ "watchdog_frequency",		"1", CONFIGSETTING_RELOADABLE },
         
-        { "folder_max_items",		"1000000", CONFIGSETTING_RELOADABLE },
-        { "default_sort_locale_id",		"en_US", CONFIGSETTING_RELOADABLE },
-        { "sync_gab_realtime",			"yes", CONFIGSETTING_RELOADABLE },
-        { "max_deferred_records",		"0", CONFIGSETTING_RELOADABLE },
+		{ "folder_max_items",		"1000000", CONFIGSETTING_RELOADABLE },
+		{ "default_sort_locale_id",		"en_US", CONFIGSETTING_RELOADABLE },
+		{ "sync_gab_realtime",			"yes", CONFIGSETTING_RELOADABLE },
+		{ "max_deferred_records",		"0", CONFIGSETTING_RELOADABLE },
 		{ "max_deferred_records_folder", "20", CONFIGSETTING_RELOADABLE },
-        { "enable_test_protocol",		"no", CONFIGSETTING_RELOADABLE },
+		{ "enable_test_protocol",		"no", CONFIGSETTING_RELOADABLE },
 		{ "disabled_features", "imap pop3", CONFIGSETTING_RELOADABLE },
 		{ "counter_reset", "yes", CONFIGSETTING_RELOADABLE },
 		{ "mysql_group_concat_max_len", "21844", CONFIGSETTING_RELOADABLE },
@@ -1030,6 +1005,8 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		{ "embedded_attachment_limit", "20", CONFIGSETTING_RELOADABLE },
 		{ "proxy_header", "", CONFIGSETTING_RELOADABLE },
 		{ "owner_auto_full_access", "true" },
+		{ "attachment_files_fsync", "false", 0 },
+		{ "tmp_path", "/tmp" },
 		{ NULL, NULL },
 	};
 
@@ -1050,7 +1027,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 	g_lpConfig = ECConfig::Create(lpDefaults);
 	
 	if (!g_lpConfig->LoadSettings(szConfig) || !g_lpConfig->ParseParams(argc, argv, NULL) || (!m_bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) ) {
-		g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-"); // create info logger without a timestamp to stderr
+		g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false, 0); // create info logger without a timestamp to stderr
 		LogConfigErrors(g_lpConfig, g_lpLogger);
 		retval = -1;
 		goto exit;
@@ -1067,13 +1044,16 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 	if (m_bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())
 		LogConfigErrors(g_lpConfig, g_lpLogger);
 
+	if (!TmpPath::getInstance() -> OverridePath(g_lpConfig))
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Ignoring invalid path-setting!");
+
 	g_lpAudit = CreateLogger(g_lpConfig, szName, "ZarafaServer", true);
 	if (g_lpAudit)
 		g_lpAudit->Log(EC_LOGLEVEL_NOTICE, "zarafa-server startup uid=%d", getuid());
 	else
 		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Audit logging not enabled.");
 
-	g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Starting zarafa-server version " PROJECT_VERSION_SERVER_STR ", pid %d", getpid());
+	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting zarafa-server version " PROJECT_VERSION_SERVER_STR ", pid %d", getpid());
 
 	if (g_lpConfig->HasWarnings())
 		LogConfigErrors(g_lpConfig, g_lpLogger);
@@ -1139,21 +1119,6 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 	// setup connection handler
 	g_lpSoapServerConn = new ECSoapServerConnection(g_lpConfig, g_lpLogger);
 
-	// Priority queue is always enabled, create as first socket, so this socket is returned first too on activity
-	er = g_lpSoapServerConn->ListenPipe(g_lpConfig->GetSetting("server_pipe_priority"), true);
-	if (er != erSuccess) {
-		retval = -1;
-		goto exit;
-	}
-	// Setup a pipe connection
-	if (bPipeEnabled) {
-		er = g_lpSoapServerConn->ListenPipe(g_lpConfig->GetSetting("server_pipe_name"));
-		if (er != erSuccess) {
-			retval = -1;
-			goto exit;
-		}
-	}
-
 	// Setup a tcp connection
 	if (bTCPEnabled)
 	{
@@ -1176,6 +1141,21 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 							g_lpConfig->GetSetting("server_ssl_ca_path","",NULL)	// CA certificate path of thrusted sources
 							);
 		if(er != erSuccess) {
+			retval = -1;
+			goto exit;
+		}
+	}
+
+	// Priority queue is always enabled, create as first socket, so this socket is returned first too on activity
+	er = g_lpSoapServerConn->ListenPipe(g_lpConfig->GetSetting("server_pipe_priority"), true);
+	if (er != erSuccess) {
+		retval = -1;
+		goto exit;
+	}
+	// Setup a pipe connection
+	if (bPipeEnabled) {
+		er = g_lpSoapServerConn->ListenPipe(g_lpConfig->GetSetting("server_pipe_name"));
+		if (er != erSuccess) {
 			retval = -1;
 			goto exit;
 		}
@@ -1267,13 +1247,13 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 
 	if (m_bNPTL) {
 		// normally ignore these signals
-		signal(SIGINT, SIG_IGN);
 		signal(SIGUSR1, SIG_IGN);
 		signal(SIGUSR2, SIG_IGN);
 		signal(SIGPIPE, SIG_IGN);
 
 		// block these signals to handle only in the thread by sigwait()
 		sigemptyset(&signal_mask);
+		sigaddset(&signal_mask, SIGINT);
 		sigaddset(&signal_mask, SIGTERM);
 		sigaddset(&signal_mask, SIGHUP);
 
@@ -1282,6 +1262,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		// create signal handler thread, will handle all blocked signals
 		// must be done after the daemonize
 		pthread_create(&signal_thread, NULL, signal_handler, NULL);
+	        set_thread_name(signal_thread, "SignalHThread");
 	} else
 	{
 		// reset signals to normal server usage
@@ -1324,8 +1305,9 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 	m_bDatabaseUpdateIgnoreSignals = true;
 
 	// add a lock file to disable the /etc/init.d scripts
-	tmplock = fopen("/tmp/zarafa-upgrade-lock","w");
-	if (!tmplock)
+	tmplock = open(upgrade_lock_file, O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+
+	if (tmplock == -1)
 		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: Unable to place upgrade lockfile: %s", strerror(errno));
 
 #ifdef EMBEDDED_MYSQL
@@ -1350,9 +1332,11 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 	er = lpDatabaseFactory->UpdateDatabase(m_bForceDatabaseUpdate, dbError);
 
 	// remove lock file
-	if (tmplock) {
-		fclose(tmplock);
-		unlink("/tmp/zarafa-upgrade-lock");
+	if (tmplock != -1) {
+		if (unlink(upgrade_lock_file) == -1)
+			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: Unable to delete upgrade lockfile (%s): %s", upgrade_lock_file, strerror(errno));
+
+		close(tmplock);
 	}
 
 	if(er == ZARAFA_E_INVALID_VERSION) {
@@ -1474,7 +1458,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 	
 exit:
 	if (g_lpAudit)
-		g_lpAudit->Log(EC_LOGLEVEL_NOTICE, "zarafa-server shutdown in progress");
+		g_lpAudit->Log(EC_LOGLEVEL_ALWAYS, "zarafa-server shutdown in progress");
 
 	delete g_lpSoapServerConn;
 
@@ -1493,14 +1477,14 @@ exit:
 
 	SSL_library_cleanup(); //cleanup memory so valgrind is happy
 
-	zarafa_unloadlibrary();
+	zarafa_unloadlibrary(g_lpLogger);
 
 	rand_free();
 
 	delete g_lpConfig;
 
 	if (g_lpLogger) {
-		g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Server shutdown complete.");
+		g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Server shutdown complete.");
 		g_lpLogger->Release();
 	}
 	if (g_lpAudit)

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -177,6 +176,8 @@ HRESULT ArchiveControlImpl::Init()
 		m_cleanupAction = caDelete;
 	else if (stricmp(lpszCleanupAction, "store") == 0)
 		m_cleanupAction = caStore;
+	else if (stricmp(lpszCleanupAction, "none") == 0)
+		m_cleanupAction = caNone;
 	else {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unknown cleanup_action specified in config: '%s'", lpszCleanupAction);
 		hr = MAPI_E_INVALID_PARAMETER;
@@ -378,7 +379,7 @@ HRESULT ArchiveControlImpl::ProcessAll(bool bLocalOnly, fnProcess_t fnProcess)
 		goto exit;
 	}
 
-	m_lpLogger->Log(EC_LOGLEVEL_INFO, "Processing "SIZE_T_PRINTF"%s users.", lstUsers.size(), (bLocalOnly ? " local" : ""));
+	m_lpLogger->Log(EC_LOGLEVEL_INFO, "Processing " SIZE_T_PRINTF "%s users.", lstUsers.size(), (bLocalOnly ? " local" : ""));
 	for (iUser = lstUsers.begin(); iUser != lstUsers.end(); ++iUser) {
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Processing user '" TSTRING_PRINTF "'.", iUser->c_str());
 		HRESULT hrTmp = (this->*fnProcess)(*iUser);
@@ -1119,22 +1120,26 @@ HRESULT ArchiveControlImpl::CleanupArchive(const SObjectEntry &archiveEntry, IMs
 	std::set_difference(setEntries.begin(), setEntries.end(), setRefs.begin(), setRefs.end(), std::inserter(setDead, setDead.begin()));
 	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Found " SIZE_T_PRINTF " dead entries in archive.", setDead.size());
 	
-	if (!setDead.empty()) {
-		if (m_cleanupAction == caStore)
-			hr = MoveAndDetachMessages(ptrArchiveHelper, ptrArchiveFolder, setDead);
-		else
-			hr = DeleteMessages(ptrArchiveFolder, setDead);
-	}
-	
-	if (m_cleanupAction == caDelete) {
-		// If the cleanup action is delete, we need to cleanup the hierarchy after cleaning the
-		// messages because we won't delete non-empty folders. So we want to get rid of the
-		// messages first.
-		hr = CleanupHierarchy(ptrArchiveHelper, ptrArchiveFolder, lpUserStore);
-		if (hr != hrSuccess) {
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to cleanup hierarchy.");
-			goto exit;
+	if (m_cleanupAction != caNone) {
+		if (!setDead.empty()) {
+			if (m_cleanupAction == caStore)
+				hr = MoveAndDetachMessages(ptrArchiveHelper, ptrArchiveFolder, setDead);
+			else
+				hr = DeleteMessages(ptrArchiveFolder, setDead);
 		}
+		
+		if (m_cleanupAction == caDelete) {
+			// If the cleanup action is delete, we need to cleanup the hierarchy after cleaning the
+			// messages because we won't delete non-empty folders. So we want to get rid of the
+			// messages first.
+			hr = CleanupHierarchy(ptrArchiveHelper, ptrArchiveFolder, lpUserStore);
+			if (hr != hrSuccess) {
+				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to cleanup hierarchy.");
+				goto exit;
+			}
+		}
+	} else {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "cleanup_action is set to none, therefore skipping cleanup action.");
 	}
 
 exit:
@@ -1530,7 +1535,7 @@ HRESULT ArchiveControlImpl::MoveAndDetachMessages(ArchiveHelperPtr ptrArchiveHel
 	MAPIFolderPtr ptrDelItemsFolder;
 	EntryListPtr ptrMessageList;
 
-	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Moving "SIZE_T_PRINTF" messages to the special 'Deleted Items' folder...", setEIDs.size());
+	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Moving " SIZE_T_PRINTF " messages to the special 'Deleted Items' folder...", setEIDs.size());
 
 	hr = ptrArchiveHelper->GetDeletedItemsFolder(&ptrDelItemsFolder);
 	if (hr != hrSuccess) {
@@ -1540,7 +1545,7 @@ HRESULT ArchiveControlImpl::MoveAndDetachMessages(ArchiveHelperPtr ptrArchiveHel
 
 	hr = MAPIAllocateBuffer(sizeof(ENTRYLIST), &ptrMessageList);
 	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to allocate "SIZE_T_PRINTF" bytes of memory. (hr=0x%08x)", sizeof(ENTRYLIST), hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to allocate " SIZE_T_PRINTF " bytes of memory. (hr=0x%08x)", sizeof(ENTRYLIST), hr);
 		goto exit;
 	}
 
@@ -1548,11 +1553,11 @@ HRESULT ArchiveControlImpl::MoveAndDetachMessages(ArchiveHelperPtr ptrArchiveHel
 
 	hr = MAPIAllocateMore(sizeof(SBinary) * setEIDs.size(), ptrMessageList, (LPVOID*)&ptrMessageList->lpbin);
 	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to allocate "SIZE_T_PRINTF" bytes of memory. (hr=0x%08x)", sizeof(SBinary) * setEIDs.size(), hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to allocate " SIZE_T_PRINTF " bytes of memory. (hr=0x%08x)", sizeof(SBinary) * setEIDs.size(), hr);
 		goto exit;
 	}
 
-	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Processing "SIZE_T_PRINTF" messages", setEIDs.size());
+	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Processing " SIZE_T_PRINTF " messages", setEIDs.size());
 	for (EntryIDSet::const_iterator i = setEIDs.begin(); i != setEIDs.end(); ++i) {
 		ULONG ulType;
 		MAPIPropPtr ptrMessage;
@@ -1673,11 +1678,11 @@ HRESULT ArchiveControlImpl::DeleteMessages(LPMAPIFOLDER lpArchiveFolder, const E
 	HRESULT hr = hrSuccess;
 	EntryListPtr ptrMessageList;
 	
-	m_lpLogger->Log(EC_LOGLEVEL_INFO, "Deleting "SIZE_T_PRINTF" messages...", setEIDs.size());
+	m_lpLogger->Log(EC_LOGLEVEL_INFO, "Deleting " SIZE_T_PRINTF " messages...", setEIDs.size());
 
 	hr = MAPIAllocateBuffer(sizeof(ENTRYLIST), &ptrMessageList);
 	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to allocate "SIZE_T_PRINTF" bytes of memory. (hr=0x%08x)", sizeof(ENTRYLIST), hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to allocate " SIZE_T_PRINTF " bytes of memory. (hr=0x%08x)", sizeof(ENTRYLIST), hr);
 		goto exit;
 	}
 
@@ -1685,11 +1690,11 @@ HRESULT ArchiveControlImpl::DeleteMessages(LPMAPIFOLDER lpArchiveFolder, const E
 
 	hr = MAPIAllocateMore(sizeof(SBinary) * setEIDs.size(), ptrMessageList, (LPVOID*)&ptrMessageList->lpbin);
 	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to allocate "SIZE_T_PRINTF" bytes of memory. (hr=0x%08x)", sizeof(SBinary) * setEIDs.size(), hr);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to allocate " SIZE_T_PRINTF " bytes of memory. (hr=0x%08x)", sizeof(SBinary) * setEIDs.size(), hr);
 		goto exit;
 	}
 
-	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Processing "SIZE_T_PRINTF" messages", setEIDs.size());
+	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Processing " SIZE_T_PRINTF " messages", setEIDs.size());
 	for (EntryIDSet::const_iterator i = setEIDs.begin(); i != setEIDs.end(); ++i) {
 		ptrMessageList->lpbin[ptrMessageList->cValues].cb = i->size();
 		ptrMessageList->lpbin[ptrMessageList->cValues++].lpb = *i;

@@ -64,7 +64,7 @@ class Plugin:
                 suggest.append(db.get_spelling_suggestion(term) or term)
         log.info('performing query: %s' % query)
         qp.set_database(db)
-        query = qp.parse_query(query, xapian.QueryParser.FLAG_BOOLEAN|xapian.QueryParser.FLAG_PHRASE|xapian.QueryParser.FLAG_LOVEHATE|xapian.QueryParser.FLAG_BOOLEAN_ANY_CASE|xapian.QueryParser.FLAG_WILDCARD)
+        query = qp.parse_query(query, xapian.QueryParser.FLAG_BOOLEAN|xapian.QueryParser.FLAG_PHRASE|xapian.QueryParser.FLAG_WILDCARD)
         enquire = xapian.Enquire(db)
         enquire.set_query(query)
         matches = []

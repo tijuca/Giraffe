@@ -6,7 +6,7 @@
 # description: The Zarafa Spooler is responsible for converting \
 #              MAPI messages to the internet format and sending \
 #              using your MTA as configured.
-# processname: /usr/bin/zarafa-spooler
+# processname: /usr/sbin/zarafa-spooler
 # config: /etc/zarafa/spooler.cfg
 # pidfile: /var/run/zarafa-spooler.pid
 
@@ -26,7 +26,7 @@
 . /etc/rc.d/init.d/functions
 
 SPOOLERCONFIG=/etc/zarafa/spooler.cfg
-SPOOLERPROGRAM=/usr/bin/zarafa-spooler
+SPOOLERPROGRAM=/usr/sbin/zarafa-spooler
 spooler=`basename $SPOOLERPROGRAM`
 LOCKFILE=/var/lock/subsys/$spooler
 PIDFILE=/var/run/$spooler.pid

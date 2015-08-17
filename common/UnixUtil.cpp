@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -50,10 +49,11 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <grp.h>
-#include <errno.h>
-#include <string.h>
-#include <stdlib.h>
-#include <signal.h>
+#include <cerrno>
+#include <cstring>
+#include <cstdlib>
+#include <csignal>
+#include <sys/file.h>
 #include <sys/resource.h>
 
 #include <string>
@@ -61,8 +61,7 @@ using namespace std;
 
 int unix_runas(ECConfig *lpConfig, ECLogger *lpLogger) {
 	if (strcmp(lpConfig->GetSetting("run_as_group"),"")) {
-		struct group *gr;
-		gr = (struct group *) getgrnam(lpConfig->GetSetting("run_as_group"));
+		const struct group *gr = getgrnam(lpConfig->GetSetting("run_as_group"));
 		if (!gr) {
 			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to run as group '%s'", lpConfig->GetSetting("run_as_group"));
 			return -1;
@@ -83,8 +82,7 @@ int unix_runas(ECConfig *lpConfig, ECLogger *lpLogger) {
 	}
 
 	if (strcmp(lpConfig->GetSetting("run_as_user"),"")) {
-		struct passwd *pw;
-		pw = (struct passwd *) getpwnam(lpConfig->GetSetting("run_as_user"));
+		const struct passwd *pw = getpwnam(lpConfig->GetSetting("run_as_user"));
 		if (!pw) {
 			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to run as user '%s'", lpConfig->GetSetting("run_as_user"));
 			return -1;
@@ -111,15 +109,15 @@ int unix_runas(ECConfig *lpConfig, ECLogger *lpLogger) {
 }
 
 int unix_chown(const char *filename, const char *username, const char *groupname) {
-	struct group *gr = NULL;
-	struct passwd *pw = NULL;
+	const struct group *gr = NULL;
+	const struct passwd *pw = NULL;
 	uid_t uid;
 	gid_t gid;
 
 	gid = getgid();
 
 	if (groupname && strcmp(groupname,"")) {
-		gr = (struct group *) getgrnam(groupname);
+		gr = getgrnam(groupname);
 		if (gr)
 			gid = gr->gr_gid;
 	}
@@ -127,7 +125,7 @@ int unix_chown(const char *filename, const char *username, const char *groupname
 	uid = getuid();
 
 	if (username && strcmp(username,"")) {
-		pw = (struct passwd *) getpwnam(username);
+		pw = getpwnam(username);
 		if (pw)
 			uid = pw->pw_uid;
 	}
@@ -148,7 +146,9 @@ void unix_coredump_enable(ECLogger *logger)
 	logger->Log(EC_LOGLEVEL_FATAL, "Unable to raise coredump filesize limit");
 }
 
-int unix_create_pidfile(char *argv0, ECConfig *lpConfig, ECLogger *lpLogger, bool bForce) {
+int unix_create_pidfile(const char *argv0, ECConfig *lpConfig,
+    ECLogger *lpLogger, bool bForce)
+{
 	string pidfilename = string("/var/run/")+string(argv0)+string(".pid");
 	FILE *pidfile;
 	int oldpid;
@@ -202,7 +202,7 @@ int unix_create_pidfile(char *argv0, ECConfig *lpConfig, ECLogger *lpLogger, boo
 
 int unix_daemonize(ECConfig *lpConfig, ECLogger *lpLogger) {
 	int ret;
-	char *path = lpConfig->GetSetting("running_path");
+	const char *path = lpConfig->GetSetting("running_path");
 
 	ret = fork();
 	if (ret == -1) {

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -65,7 +64,7 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 typedef struct {
@@ -91,6 +90,7 @@ ECSearchFolders::ECSearchFolders(ECSessionManager *lpSessionManager, ECDatabaseF
     pthread_cond_init(&m_condEvents, NULL);
     
     pthread_create(&m_threadProcess, NULL, ECSearchFolders::ProcessThread, (void *)this);
+    set_thread_name(m_threadProcess, "SearchFolders");
 }
 
 ECSearchFolders::~ECSearchFolders() {
@@ -208,7 +208,7 @@ ECRESULT ECSearchFolders::SetSearchCriteria(unsigned int ulStoreId, unsigned int
     ECRESULT er =erSuccess;
 
     if(lpSearchCriteria == NULL) {
-        //Always return successfull, so outlook 2007 works
+        /* Always return successful, so that Outlook 2007 works */
         CancelSearchFolder(ulStoreId, ulFolderId);
     } else {
 
@@ -348,6 +348,7 @@ ECRESULT ECSearchFolders::AddSearchFolder(unsigned int ulStoreId, unsigned int u
             m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to spawn thread for search: %s", strerror(err));
             er = ZARAFA_E_NOT_ENOUGH_MEMORY;
         }
+	set_thread_name(lpSearchFolder->sThreadId, "SearchFolders:Folder");
     }
     
     pthread_mutex_unlock(&m_mutexMapSearchFolders);

@@ -1,15 +1,23 @@
-noinst_LTLIBRARIES = libsoapserver.la libsoapclient.la 
+# -*- Makefile -*-
 
-AM_CPPFLAGS = ${ZCPPFLAGS}
+AM_CPPFLAGS = ${ZCPPFLAGS} -I${top_srcdir}/mapi4linux/include \
+              -I${top_srcdir}/provider/include ${GSOAP_CFLAGS}
+AM_CXXFLAGS = ${ZCXXFLAGS} -Wno-vla -Wno-sign-compare ${DEBUGCFLAGS}
 
-#libsoapserver_la_CXXFLAGS = ${AM_CXXFLAGS} -Wno-vla -Wno-sign-compare $(DEBUGFLAGS) $(GSOAP_CFLAGS) -I${top_srcdir}/mapi4linux/include -I${top_srcdir}/provider/include ${GSOAP_CFLAGS}
-#libsoapclient_la_CXXFLAGS = ${AM_CXXFLAGS} -Wno-vla -Wno-sign-compare $(DEBUGFLAGS) $(GSOAP_CFLAGS) -I${top_srcdir}/mapi4linux/include -I${top_srcdir}/provider/include ${GSOAP_CFLAGS}
+lib_LTLIBRARIES = libzarafa_soapserver.la libzarafa_soapclient.la
+#noinst_DATA = libzarafa_soapserver.ldd libzarafa_soapclient.ldd
 
-libsoapserver_la_CXXFLAGS = ${AM_CXXFLAGS} -Wno-sign-compare $(DEBUGFLAGS) $(GSOAP_CFLAGS) -I${top_srcdir}/mapi4linux/include -I${top_srcdir}/provider/include ${GSOAP_CFLAGS}
-libsoapclient_la_CXXFLAGS = ${AM_CXXFLAGS} -Wno-sign-compare $(DEBUGFLAGS) $(GSOAP_CFLAGS) -I${top_srcdir}/mapi4linux/include -I${top_srcdir}/provider/include ${GSOAP_CFLAGS}
+nodist_libzarafa_soapserver_la_SOURCES = soapC.cpp soapServer.cpp
+libzarafa_soapserver_la_LIBADD = ${GSOAP_LIBS}
+libzarafa_soapserver_la_LDFLAGS = ${AM_LDFLAGS} \
+	-Wl,--version-script=${top_builddir}/default.sym
+EXTRA_libzarafa_soapserver_la_DEPENDENCIES = ${top_builddir}/default.sym
 
-nodist_libsoapserver_la_SOURCES = soapC.cpp soapServer.cpp
-nodist_libsoapclient_la_SOURCES = soapC.cpp soapClient.cpp
+nodist_libzarafa_soapclient_la_SOURCES = soapC.cpp soapClient.cpp
+libzarafa_soapclient_la_LIBADD = ${GSOAP_LIBS}
+libzarafa_soapclient_la_LDFLAGS = ${AM_LDFLAGS} \
+	-Wl,--version-script=${top_builddir}/default.sym
+EXTRA_libzarafa_soapclient_la_DEPENDENCIES = ${top_builddir}/default.sym
 
 SOAPHEADER = ${top_srcdir}/provider/include/ZarafaProto.h
 SOAP_INC = ${top_srcdir}/provider/include/
@@ -22,7 +30,7 @@ SOAP_CPP_SRC=$(SOAP_CPP_CLIENT) soapServer.cpp $(SOAP_H_FILES) $(SOAP_NS) $(SOAP
 
 $(SOAP_CPP_SRC) : ns.xsd
 ns.xsd: $(SOAPHEADER)
-	$(GSOAP_SOAPCPP2) -x -I$(SOAP_INC) $< >& /dev/null
+	$(GSOAP_SOAPCPP2) -x -I$(SOAP_INC) $<
 
 #libsoapserver_a_LDADD=$(SOAP_CPP_LIB)
 BUILT_SOURCES=ns.xsd $(SOAP_CPP_SRC)
@@ -31,3 +39,5 @@ CLEANFILES=$(SOAP_CPP_SRC) *.req.xml *.res.xml *.wsdl *.nsmap *.xsd *Proxy\.h *~
 check-syntax:
 	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
 		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2
+
+include ../../global.am

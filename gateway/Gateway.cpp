@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -43,7 +42,7 @@
  */
 
 #include "platform.h"
-#include <signal.h>
+#include <csignal>
 
 
 #include <inetmapi.h>
@@ -58,12 +57,12 @@
 #include <CommonUtil.h>
 #include <stringutil.h>
 #include <iostream>
-#include <stdio.h>
+#include <cstdio>
 #include <string>
 #include <vector>
 #include <algorithm>
-#include <stdlib.h>
-#include <errno.h>
+#include <cstdlib>
+#include <cerrno>
 
 #include "ECLogger.h"
 #include "ECConfig.h"
@@ -77,10 +76,12 @@
 #include "SSLUtil.h"
 #include "stringutil.h"
 
+#include "TmpPath.h"
+
 #include "UnixUtil.h"
 
 #if HAVE_ICU
-#include "unicode/uclean.h"
+#include <unicode/uclean.h>
 #endif
 
 /**
@@ -88,22 +89,24 @@
  * @{
  */
 
-int daemonize = 1;
+static int daemonize = 1;
 int quit = 0;
-bool bThreads = false;
-char *szPath = NULL;
-ECLogger *g_lpLogger = NULL;
-ECConfig *g_lpConfig = NULL;
-pthread_t mainthread;
-int nChildren = 0;
-std::string g_strHostString;
+static bool bThreads = false;
+static const char *szPath;
+static ECLogger *g_lpLogger = NULL;
+static ECConfig *g_lpConfig = NULL;
+static pthread_t mainthread;
+static int nChildren = 0;
+static std::string g_strHostString;
 
-void sigterm(int s) {
+static void sigterm(int s)
+{
 	quit = 1;
 }
 
-void sighup(int sig) {
-	// In Win32, the signal is sent in a seperate, special signal thread. So this test is
+static void sighup(int sig)
+{
+	// In Win32, the signal is sent in a separate, special signal thread. So this test is
 	// not needed or required.
 	if (bThreads && pthread_equal(pthread_self(), mainthread)==0)
 		return;
@@ -114,7 +117,7 @@ void sighup(int sig) {
 
 	if (g_lpLogger) {
 		if (g_lpConfig) {
-			char *ll = g_lpConfig->GetSetting("log_level");
+			const char *ll = g_lpConfig->GetSetting("log_level");
 			int new_ll = ll ? atoi(ll) : 2;
 			g_lpLogger->SetLoglevel(new_ll);
 		}
@@ -124,64 +127,28 @@ void sighup(int sig) {
 	}
 }
 
-void sigchld(int)
+static void sigchld(int)
 {
 	int stat;
 	while (waitpid (-1, &stat, WNOHANG) > 0) nChildren--;
 }
 
 // SIGSEGV catcher
-#include <execinfo.h>
-
-void sigsegv(int signr)
+static void sigsegv(int signr)
 {
-	void *bt[64];
-	int i, n;
-	char **btsymbols;
-
-	if(!g_lpLogger)
-		goto exit;
-
-	switch (signr) {
-	case SIGSEGV:
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Pid %d caught SIGSEGV (%d), traceback:", getpid(), signr);
-		break;
-	case SIGBUS:
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Pid %d caught SIGBUS (%d), possible invalid mapped memory access, traceback:", getpid(), signr);
-		break;
-	case SIGABRT:
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Pid %d caught SIGABRT (%d), out of memory or unhandled exception, traceback:", getpid(), signr);
-		break;
-	};
-
-	n = backtrace(bt, 64);
-
-	btsymbols = backtrace_symbols(bt, n);
-
-	for (i = 0; i < n; i++) {
-		if (btsymbols)
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "%p %s", bt[i], btsymbols[i]);
-		else
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "%p", bt[i]);
-	}
-
-	g_lpLogger->Log(EC_LOGLEVEL_FATAL, "When reporting this traceback, please include Linux distribution name, system architecture and Zarafa version.");
-
-exit:
-	kill(getpid(), signr);
+	generic_sigsegv_handler(g_lpLogger, "Gateway", PROJECT_VERSION_GATEWAY_STR, signr);
 }
 
-HRESULT running_service(char *szPath, char *servicename);
+static HRESULT running_service(const char *szPath, const char *servicename);
 
-void print_help(char *name) {
+static void print_help(const char *name)
+{
 	cout << "Usage:\n" << endl;
 	cout << name << " [-F] [-h|--host <serverpath>] [-c|--config <configfile>]" << endl;
 	cout << "  -F\t\tDo not run in the background" << endl;
 	cout << "  -h path\tUse alternate connect path (e.g. file:///var/run/socket).\n\t\tDefault: file:///var/run/zarafa" << endl;
 	cout << "  -V Print version info." << endl;
 	cout << "  -c filename\tUse alternate config file (e.g. /etc/zarafa-gateway.cfg)\n\t\tDefault: /etc/zarafa/gateway.cfg" << endl;
-	cout << endl;
-	cout << "  --ignore-unknown-config-options\tStart even if the configuration file contains invalid config options" << endl;
 	cout << endl;
 }
 
@@ -195,7 +162,8 @@ struct HandlerArgs {
 	bool bUseSSL;
 };
 
-void *Handler(void *lpArg) {
+static void *Handler(void *lpArg)
+{
 	HandlerArgs *lpHandlerArgs = (HandlerArgs *) lpArg;
 	ECChannel *lpChannel = lpHandlerArgs->lpChannel;
 	ECLogger *lpLogger = lpHandlerArgs->lpLogger;
@@ -235,6 +203,9 @@ void *Handler(void *lpArg) {
 	while (!bQuit && !quit) {
 		// check for data
 		hr = lpChannel->HrSelect(60);
+		if (hr == MAPI_E_CANCEL)
+			/* signalled - reevaluate bQuit */
+			continue;
 		if (hr == MAPI_E_TIMEOUT) {
 			timeouts++;
 			if (timeouts < client->getTimeoutMinutes()) {
@@ -308,10 +279,9 @@ exit:
 	/** free ssl error data **/
 	ERR_remove_state(0);
 
-	if (bThreads) nChildren--;
+	if (bThreads)
+		nChildren--;
 
-	// Do not pthread_exit() because linuxthreads is broken and will not free any objects
-	// pthread_exit(NULL);
 	return NULL;
 }
 
@@ -324,7 +294,7 @@ int main(int argc, char *argv[]) {
 
 	const char *szConfig = ECConfig::GetDefaultPath("gateway.cfg");
 
-	const configsetting_t lpDefaults[] = {
+	static const configsetting_t lpDefaults[] = {
 		{ "server_bind", "0.0.0.0" },
 		{ "run_as_user", "" },
 		{ "run_as_group", "" },
@@ -365,6 +335,8 @@ int main(int argc, char *argv[]) {
 		{ "log_file", "-" },
 		{ "log_level", "2", CONFIGSETTING_RELOADABLE },
 		{ "log_timestamp", "1" },
+		{ "log_buffer_size",	"4096" },
+		{ "tmp_path", "/tmp" },
 		{ NULL, NULL },
 	};
 	enum {
@@ -374,7 +346,7 @@ int main(int argc, char *argv[]) {
 		OPT_FOREGROUND,
 		OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS
 	};
-	struct option long_options[] = {
+	static const struct option long_options[] = {
 		{"help", 0, NULL, OPT_HELP},
 		{"host", 1, NULL, OPT_HOST},
 		{"config", 1, NULL, OPT_CONFIG},
@@ -419,19 +391,24 @@ int main(int argc, char *argv[]) {
 			return 1;
 		}
 	}
+
 	// Setup config
 	g_lpConfig = ECConfig::Create(lpDefaults);
 	if (!g_lpConfig->LoadSettings(szConfig) || !g_lpConfig->ParseParams(argc-my_optind, &argv[my_optind], NULL) || (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
-		g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-");	// create logger without a timestamp to stderr
+		g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false, 0);	// create logger without a timestamp to stderr
 		LogConfigErrors(g_lpConfig, g_lpLogger);
 		hr = E_FAIL;
 		goto exit;
 	}
+
 	// Setup logging
 	g_lpLogger = CreateLogger(g_lpConfig, argv[0], "ZarafaGateway");
 
 	if ((bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) || g_lpConfig->HasWarnings())
 		LogConfigErrors(g_lpConfig, g_lpLogger);
+
+	if (!TmpPath::getInstance() -> OverridePath(g_lpConfig))
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Ignoring invalid path-setting!");
 
 	if (strncmp(g_lpConfig->GetSetting("process_model"), "thread", strlen("thread")) == 0) {
 		bThreads = true;
@@ -453,7 +430,7 @@ int main(int argc, char *argv[]) {
 	hr = running_service(szPath, argv[0]);
 
 exit:
-    ssl_threading_cleanup();
+	ssl_threading_cleanup();
     
 	if (g_lpConfig)
 		delete g_lpConfig;
@@ -470,7 +447,8 @@ exit:
  * @param[in]	szPath		Unused, should be removed.
  * @param[in]	servicename	Name of the service, used to create a unix pidfile.
  */
-HRESULT running_service(char *szPath, char *servicename) {
+static HRESULT running_service(const char *szPath, const char *servicename)
+{
 	HRESULT hr = hrSuccess;
 	int ulListenPOP3 = 0, ulListenPOP3s = 0;
 	int ulListenIMAP = 0, ulListenIMAPs = 0;
@@ -491,12 +469,12 @@ HRESULT running_service(char *szPath, char *servicename) {
 	if (bThreads) {
 		pthread_attr_init(&ThreadAttr);
 		if (pthread_attr_setdetachstate(&ThreadAttr, PTHREAD_CREATE_DETACHED) != 0) {
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not set thread attribute to detached");
+			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't set thread attribute to detached");
 			goto exit;
 		}
 		// 1Mb of stack space per thread
 		if (pthread_attr_setstacksize(&ThreadAttr, 1024 * 1024)) {
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not set thread stack size to 1Mb");
+			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't set thread stack size to 1Mb");
 			goto exit;
 		}
 	}
@@ -617,7 +595,7 @@ HRESULT running_service(char *szPath, char *servicename) {
 	if (bThreads == false)
 		g_lpLogger = StartLoggerProcess(g_lpConfig, g_lpLogger); // maybe replace logger
 
-	g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Starting zarafa-gateway version " PROJECT_VERSION_GATEWAY_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
+	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting zarafa-gateway version " PROJECT_VERSION_GATEWAY_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
 
 	// Mainloop
 	while (!quit) {
@@ -687,21 +665,26 @@ HRESULT running_service(char *szPath, char *servicename) {
 			g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Starting worker %s for %s request", model, method);
 			if (bThreads) {
 				if (pthread_create(&POP3Thread, &ThreadAttr, Handler, lpHandlerArgs) != 0) {
-					g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not create %s %s.", method, model);
+					g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't create %s %s.", method, model);
 					// just keep running
 					delete lpHandlerArgs->lpChannel;
 					delete lpHandlerArgs;
 					hr = hrSuccess;
-				} else {
+				}
+				else {
 					nChildren++;
 				}
 
-			} else {
+				set_thread_name(POP3Thread, "ZGateway " + std::string(method));
+			}
+			else {
 				if (unix_fork_function(Handler, lpHandlerArgs, nCloseFDs, pCloseFDs) < 0) {
-					g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not create %s %s.", method, model);
+					g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't create %s %s.", method, model);
 					// just keep running
-				} else
+				}
+				else {
 					nChildren++;
+				}
 				// main handler always closes information it doesn't need
 				delete lpHandlerArgs->lpChannel;
 				delete lpHandlerArgs;
@@ -744,16 +727,21 @@ HRESULT running_service(char *szPath, char *servicename) {
 					delete lpHandlerArgs->lpChannel;
 					delete lpHandlerArgs;
 					hr = hrSuccess;
-				} else {
+				}
+				else {
 					nChildren++;
 				}
 
-			} else {
+				set_thread_name(IMAPThread, "ZGateway " + std::string(method));
+			}
+			else {
 				if (unix_fork_function(Handler, lpHandlerArgs, nCloseFDs, pCloseFDs) < 0) {
 					g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not create %s %s.", method, model);
 					// just keep running
-				} else
+				}
+				else {
 					nChildren++;
+				}
 				// main handler always closes information it doesn't need
 				delete lpHandlerArgs->lpChannel;
 				delete lpHandlerArgs;
@@ -766,7 +754,7 @@ HRESULT running_service(char *szPath, char *servicename) {
 		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Incoming traffic was not for me??");
 	}
 
-	g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "POP3/IMAP Gateway will now exit");
+	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "POP3/IMAP Gateway will now exit");
 
 	// in forked mode, send all children the exit signal
 	if (bThreads == false) {

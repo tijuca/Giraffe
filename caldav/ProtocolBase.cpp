@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -283,7 +282,7 @@ HRESULT ProtocolBase::HrInitializeClass()
 			hr = m_lpActiveStore->OpenEntry(lpDefaultProp->Value.bin.cb, (LPENTRYID)lpDefaultProp->Value.bin.lpb, NULL, MAPI_BEST_ACCESS, &ulType, (LPUNKNOWN*)&m_lpUsrFld);
 			if (hr != hrSuccess)
 			{
-				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open default calender for user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
+				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open default calendar for user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
 				goto exit;
 			}
 
@@ -304,7 +303,7 @@ HRESULT ProtocolBase::HrInitializeClass()
 		m_lpRequest->HrGetHeaderValue("User-Agent", &strAgent);
 
 		// /caldav/
-		// /caldav/username/ (which we return in XML data! (and shouldn't)), since this isn't a calender, but /caldav/username/Calendar/ is.
+		// /caldav/username/ (which we return in XML data! (and shouldn't)), since this isn't a calendar, but /caldav/username/Calendar/ is.
 		if ((strAgent.find("Sunbird/1") != string::npos || strAgent.find("Lightning/1") != string::npos) && parts.size() <= 2) {
 			// Mozilla Sunbird / Lightning doesn't handle listing of calendars, only contents.
 			// We therefore redirect them to the default calendar url.

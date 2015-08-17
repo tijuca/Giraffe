@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -42,24 +41,28 @@
  * 
  */
 
+#include "zcdefs.h"
 #include "platform.h"
 
 #include <sys/select.h>
 #include <sys/time.h>
 #include <iconv.h>
-#include <string.h>
-#include <ctype.h>
-#include <time.h>
+#include <cstring>
+#include <cstdio>
+#include <cctype>
+#include <ctime>
 #include <mapicode.h>			// return codes
 #include <unistd.h>
 #include <sys/types.h>
 #include <fcntl.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <limits.h>
+#include <cstdlib>
+#include <cerrno>
+#include <climits>
 
 #include <string>
 #include <map>
+
+#include "TmpPath.h"
 
 #ifdef __APPLE__
 // bsd
@@ -72,8 +75,7 @@
 #define ICONV_CONST
 #endif
 
-unsigned int seed = 0;
-bool rand_init_done = false;
+static bool rand_init_done = false;
 
 bool operator!=(GUID a, GUID b) {
 	if (memcmp((void*)&a, (void*)&b, sizeof(GUID)) == 0)
@@ -144,33 +146,15 @@ void GetSystemTimeAsFileTime(FILETIME *ft) {
  * @param[in] inLen size of buffer, inclusive \0 char
  * @param[in,out] lpBuffer buffer to place path in
  * 
- * @return length used in lpBuffer, 0 on failure
+ * @return length used or what would've been required if it would fit in lpBuffer
  */
-DWORD GetTempPath(DWORD inLen, char *lpBuffer)
-{
-	const char *env = NULL;
-	DWORD len;
+DWORD GetTempPath(DWORD inLen, char *lpBuffer) {
+	unsigned int outLen = snprintf(lpBuffer, inLen, "%s/", TmpPath::getInstance() -> getTempPath().c_str());
 
-	env = getenv("TMP");
-	if (!env || env[0] == '\0')
-		env = getenv("TEMP");
-	if (!env || env[0] == '\0')
-		env = "/tmp/";
-
-	len = strlen(env);
-	if ((len+2) > inLen)		// +1 for / +1 for \0 characters
+	if (outLen > inLen)
 		return 0;
 
-	strcpy(lpBuffer, env);
-
-	// add trailing / at end
-	if (lpBuffer[len-1] != '/') {
-		lpBuffer[len] = '/';
-		len++;
-		lpBuffer[len] = '\0';
-	}
-
-	return len;
+	return outLen;
 }
 
 void Sleep(unsigned int msec) {
@@ -182,7 +166,7 @@ void Sleep(unsigned int msec) {
 	nanosleep(&ts, NULL);
 }
 
-void rand_fail()
+static void rand_fail(void)
 {
 	fprintf(stderr, "Cannot access/use /dev/urandom, this is fatal (%s)\n", strerror(errno));
 	kill(0, SIGTERM);
@@ -275,7 +259,7 @@ void sleep_ms(unsigned int millis)
 
 #if DEBUG_PTHREADS
 
-class Lock {
+class Lock _final {
 public:
        Lock() { locks = 0; busy = 0; dblTime = 0; };
        ~Lock() {};
@@ -286,9 +270,9 @@ public:
        double dblTime;
 };
 
-std::map<std::string, Lock> my_pthread_map;
-pthread_mutex_t my_mutex;
-int init = 0;
+static std::map<std::string, Lock> my_pthread_map;
+static pthread_mutex_t my_mutex;
+static int init = 0;
 
 #undef pthread_mutex_lock
 int my_pthread_mutex_lock(const char *file, unsigned int line, pthread_mutex_t *__mutex)
@@ -388,7 +372,7 @@ int my_pthread_rwlock_wrlock(const char *file, unsigned int line, pthread_rwlock
 
 std::string dump_pthread_locks()
 {
-       std::map<std::string, Lock>::iterator i;
+	std::map<std::string, Lock>::const_iterator i;
        std::string strLog;
        char s[2048];
 

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -54,14 +53,15 @@
 
 #ifdef _DEBUG
 #undef THIS_FILE
-static char THIS_FILE[]=__FILE__;
+static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
 
-pthread_mutex_t*	ssl_locks = NULL;
+static pthread_mutex_t *ssl_locks;
 
-void ssl_lock(int mode, int n, const char *file, int line) {
+static void ssl_lock(int mode, int n, const char *file, int line)
+{
 	if (mode & CRYPTO_LOCK) {
 		pthread_mutex_lock(&ssl_locks[n]);
 	} else {
@@ -69,7 +69,8 @@ void ssl_lock(int mode, int n, const char *file, int line) {
 	}
 }
 
-unsigned long ssl_id_function() {
+static unsigned long ssl_id_function(void)
+{
     return ((unsigned long) pthread_self());
 }
 
@@ -136,7 +137,7 @@ void ssl_random_init()
 	}
 }
 
-void ssl_random(bool b64bit, unsigned long long *lpullId)
+void ssl_random(bool b64bit, uint64_t *lpullId)
 {
 	BIGNUM bn;
 	BN_init(&bn);

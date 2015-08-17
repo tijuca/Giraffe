@@ -5,7 +5,7 @@
 # chkconfig: 345 86 24
 # description: The Zarafa Gateway allows users \
 #              to access their email using the POP3 or IMAP protocol.
-# processname: /usr/bin/zarafa-gateway
+# processname: /usr/sbin/zarafa-gateway
 # config: /etc/zarafa/gateway.cfg
 # pidfile: /var/run/zarafa-gateway.pid
 
@@ -21,7 +21,7 @@
 ### END INIT INFO
 
 GATEWAYCONFIG=/etc/zarafa/gateway.cfg
-GATEWAYPROGRAM=/usr/bin/zarafa-gateway
+GATEWAYPROGRAM=/usr/sbin/zarafa-gateway
 
 # Sanity checks.
 [ -x $GATEWAYPROGRAM ] || exit 0

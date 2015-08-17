@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -59,14 +58,14 @@
 #include <mapitags.h>
 
 #include <sys/times.h>
-#include <time.h>
+#include <ctime>
 
 #include <algorithm>
 #include <sstream>
 #include <set>
 #include <deque>
 #include <algorithm>
-#include <stdio.h>
+#include <cstdio>
 
 #include "ECTags.h"
 #include "stringutil.h"
@@ -109,30 +108,34 @@
 
 #include "ZarafaCmdUtil.h"
 #include "ECThreadPool.h"
+#include "ZarafaCmd.h"
 
-#ifdef HAVE_TCMALLOC
-#include "google/malloc_extension.h"
+#if defined(HAVE_GPERFTOOLS_MALLOC_EXTENSION_H)
+#	include <gperftools/malloc_extension.h>
+#elif defined(HAVE_GOOGLE_MALLOC_EXTENSION_H)
+#	include <google/malloc_extension.h>
 #endif
 
 #define STRIN_FIX(s) (bSupportUnicode ? (s) : ECStringCompat::WTF1252_to_UTF8(soap, (s)))
 #define STROUT_FIX(s) (bSupportUnicode ? (s) : ECStringCompat::UTF8_to_WTF1252(soap, (s)))
 #define STROUT_FIX_CPY(s) (bSupportUnicode ? s_strcpy(soap, (s)) : ECStringCompat::UTF8_to_WTF1252(soap, (s)))
 
-#define LOG_SOAP_DEBUG(logger, _msg, ...) if (logger->Log(EC_LOGLEVEL_DEBUG|EC_LOGLEVEL_SOAP)) { logger->Log(EC_LOGLEVEL_DEBUG|EC_LOGLEVEL_SOAP, "soap: "_msg, ##__VA_ARGS__); }
+#define LOG_SOAP_DEBUG(logger, _msg, ...) if (logger->Log(EC_LOGLEVEL_DEBUG|EC_LOGLEVEL_SOAP)) { logger->Log(EC_LOGLEVEL_DEBUG|EC_LOGLEVEL_SOAP, "soap: " _msg, ##__VA_ARGS__); }
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 extern ECSessionManager*	g_lpSessionManager;
 extern ECStatsCollector*	g_lpStatsCollector;
 
 // Hold the status of the softdelete purge system
-bool g_bPurgeSoftDeleteStatus = FALSE;
+static bool g_bPurgeSoftDeleteStatus = FALSE;
 
-ECRESULT CreateEntryId(GUID guidStore, unsigned int ulObjType, entryId** lppEntryId)
+static ECRESULT CreateEntryId(GUID guidStore, unsigned int ulObjType,
+    entryId **lppEntryId)
 {
 	ECRESULT	er = erSuccess;
 	entryId*	lpEntryId = NULL;
@@ -183,7 +186,8 @@ exit:
  * @retval	ZARAFA_E_INVALID_PARAMATER	One or more parameters are invalid.
  * @retval	ZARAFA_E_NOT_FOUND			The local is is not found.
  */
-ECRESULT GetLocalId(entryId sUserId, unsigned int ulLegacyUserId, unsigned int *lpulUserId, objectid_t *lpsExternId)
+static ECRESULT GetLocalId(entryId sUserId, unsigned int ulLegacyUserId,
+    unsigned int *lpulUserId, objectid_t *lpsExternId)
 {
 	ECRESULT 		er = erSuccess;
 	unsigned int	ulUserId = 0;
@@ -255,7 +259,8 @@ exit:
  * @retval	ZARAFA_E_INVALID_PARAMETER	One or more parameters are invalid.
  * @retval	ZARAFA_E_NOT_FOUND			The user specified by ulUserId was not found.
  */
-ECRESULT CheckUserStore(ECSession *lpecSession, unsigned ulUserId, unsigned ulStoreType, bool *lpbHasLocalStore)
+static ECRESULT CheckUserStore(ECSession *lpecSession, unsigned ulUserId,
+    unsigned ulStoreType, bool *lpbHasLocalStore)
 {
 	ECRESULT er = erSuccess;
 	objectdetails_t	sDetails;
@@ -288,7 +293,8 @@ exit:
 	return er;
 }
 
-ECRESULT GetABEntryID(unsigned int ulUserId, soap *lpSoap, entryId *lpUserId)
+static ECRESULT GetABEntryID(unsigned int ulUserId, soap *lpSoap,
+    entryId *lpUserId)
 {
 	ECRESULT			er = erSuccess;
 	entryId				sUserId = {0};
@@ -320,7 +326,9 @@ exit:
 	return er;
 }
 
-ECRESULT PeerIsServer(struct soap *soap, const std::string &strServerName, const std::string &strHttpPath, const std::string &strSslPath, bool *lpbResult)
+static ECRESULT PeerIsServer(struct soap *soap,
+    const std::string &strServerName, const std::string &strHttpPath,
+    const std::string &strSslPath, bool *lpbResult)
 {
 	ECRESULT		er = erSuccess;
 	bool			bResult = false;
@@ -441,7 +449,7 @@ ECRESULT GetBestServerPath(struct soap *soap, ECSession *lpecSession, const std:
 	std::string		strHttpPath;
 	std::string		strSslPath;
 	std::string		strProxyPath;
-	char *			szProxyHeader = lpecSession->GetSessionManager()->GetConfig()->GetSetting("proxy_header");
+	const char *szProxyHeader = lpecSession->GetSessionManager()->GetConfig()->GetSetting("proxy_header");
 
 	if (soap == NULL || soap->user == NULL || lpstrServerPath == NULL)
 	{
@@ -521,12 +529,12 @@ exit:
 
 
 // exception: This function does internal Begin + Commit/Rollback
-ECRESULT MoveObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt* lplObjectIds, unsigned int ulDestFolderId, unsigned int ulSyncId);
+static ECRESULT MoveObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt* lplObjectIds, unsigned int ulDestFolderId, unsigned int ulSyncId);
 // these functions don't do Begin + Commit/Rollback
-ECRESULT WriteProps(struct soap *soap, ECSession *lpecSession, ECDatabase *lpDatabase, ECAttachmentStorage *lpAttachmentStorage, struct saveObject *lpsSaveObj, unsigned int ulObjId, bool fNewItem, unsigned int ulSyncId, struct saveObject *lpsReturnObj, bool *lpfHaveChangeKey, FILETIME *ftCreated, FILETIME *ftModified);
+static ECRESULT WriteProps(struct soap *soap, ECSession *lpecSession, ECDatabase *lpDatabase, ECAttachmentStorage *lpAttachmentStorage, struct saveObject *lpsSaveObj, unsigned int ulObjId, bool fNewItem, unsigned int ulSyncId, struct saveObject *lpsReturnObj, bool *lpfHaveChangeKey, FILETIME *ftCreated, FILETIME *ftModified);
 
-ECRESULT DoNotifySubscribe(ECSession *lpecSession, unsigned long long ulSessionId, struct notifySubscribe *notifySubscribe);
-ECRESULT SaveLogonTime(ECSession *lpecSession, bool bLogon);
+static ECRESULT DoNotifySubscribe(ECSession *lpecSession, unsigned long long ulSessionId, struct notifySubscribe *notifySubscribe);
+static ECRESULT SaveLogonTime(ECSession *lpecSession, bool bLogon);
 
 
 /**
@@ -573,7 +581,7 @@ int ns__logon(struct soap *soap, char *user, char *pass, char *impersonate, char
 
 
 	lpsResponse->ulSessionId = sessionID;
-	lpsResponse->lpszVersion = "0,"PROJECT_VERSION_SERVER_STR;
+	lpsResponse->lpszVersion = const_cast<char *>("0," PROJECT_VERSION_SERVER_STR);
 	lpsResponse->ulCapabilities = ZARAFA_LATEST_CAPABILITIES;
 
 	if (clientCaps & ZARAFA_CAP_COMPRESSION) {
@@ -659,14 +667,14 @@ int ns__ssoLogon(struct soap *soap, ULONG64 ulSessionId, char *szUsername, char 
 	ECSESSIONID		newSessionID = 0;
 	GUID			sServerGuid = {0};
 	xsd__base64Binary *lpOutput = NULL;
-	char*			lpszEnabled = NULL;
+	const char *lpszEnabled = NULL;
 	ECLicenseClient*lpLicenseClient = NULL;
 	struct timespec startTimes = {0}, endTimes = {0};
 	double          dblStart = GetTimeOfDay();
 
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &startTimes);
 
-    LOG_SOAP_DEBUG(g_lpSessionManager->GetLogger(), "%020"PRIu64": S ssoLogon", ulSessionId);
+	LOG_SOAP_DEBUG(g_lpSessionManager->GetLogger(), "%020" PRIu64 ": S ssoLogon", ulSessionId);
 
 	if (!lpInput || lpInput->__size == 0 || lpInput->__ptr == NULL || !szUsername || !szClientVersion)
 		goto exit;
@@ -759,7 +767,7 @@ int ns__ssoLogon(struct soap *soap, ULONG64 ulSessionId, char *szUsername, char 
 	}
 
 	lpsResponse->ulSessionId = newSessionID;
-	lpsResponse->lpszVersion = "0,"PROJECT_VERSION_SERVER_STR;
+	lpsResponse->lpszVersion = const_cast<char *>("0," PROJECT_VERSION_SERVER_STR);
 	lpsResponse->ulCapabilities = ZARAFA_LATEST_CAPABILITIES;
 
 	if (clientCaps & ZARAFA_CAP_COMPRESSION) {
@@ -816,7 +824,7 @@ nosso:
 
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &endTimes);
 
-	LOG_SOAP_DEBUG(g_lpSessionManager->GetLogger(), "%020"PRIu64": E ssoLogon 0x%08x %f %f", ulSessionId, er, timespec2dbl(endTimes) - timespec2dbl(startTimes), GetTimeOfDay() - dblStart);
+	LOG_SOAP_DEBUG(g_lpSessionManager->GetLogger(), "%020" PRIu64 ": E ssoLogon 0x%08x %f %f", ulSessionId, er, timespec2dbl(endTimes) - timespec2dbl(startTimes), GetTimeOfDay() - dblStart);
 
 	return SOAP_OK;
 }
@@ -833,7 +841,7 @@ int ns__logoff(struct soap *soap, ULONG64 ulSessionId, unsigned int *result)
 
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &startTimes);
 
-    LOG_SOAP_DEBUG(g_lpSessionManager->GetLogger(), "%020"PRIu64": S logoff", ulSessionId);
+	LOG_SOAP_DEBUG(g_lpSessionManager->GetLogger(), "%020" PRIu64 ": S logoff", ulSessionId);
 
 	er = g_lpSessionManager->ValidateSession(soap, ulSessionId, &lpecSession, true);
 	if(er != erSuccess)
@@ -854,7 +862,7 @@ exit:
     *result = er;
 
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &endTimes);
-	LOG_SOAP_DEBUG(g_lpSessionManager->GetLogger(), "%020"PRIu64": E logoff 0x%08x %f %f", ulSessionId, 0, timespec2dbl(endTimes) - timespec2dbl(startTimes), GetTimeOfDay() - dblStart);
+	LOG_SOAP_DEBUG(g_lpSessionManager->GetLogger(), "%020" PRIu64 ": E logoff 0x%08x %f %f", ulSessionId, 0, timespec2dbl(endTimes) - timespec2dbl(startTimes), GetTimeOfDay() - dblStart);
 
     return SOAP_OK;
 }
@@ -865,9 +873,9 @@ exit:
     double			dblStart = GetTimeOfDay(); \
     ECSession		*lpecSession = NULL; \
     unsigned int 	*lpResultVar = &resultvar; \
-	char            *szFname = #fname; \
+	const char *szFname = #fname; \
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &startTimes); \
-	LOG_SOAP_DEBUG(g_lpSessionManager->GetLogger(), "%020"PRIu64": S %s", ulSessionId, szFname); \
+	LOG_SOAP_DEBUG(g_lpSessionManager->GetLogger(), "%020" PRIu64 ": S %s", ulSessionId, szFname); \
 	er = g_lpSessionManager->ValidateSession(soap, ulSessionId, &lpecSession, true);\
 	const bool bSupportUnicode = (er == erSuccess ? (lpecSession->GetCapabilities() & ZARAFA_CAP_UNICODE) != 0 : false); \
 	const ECStringCompat stringCompat(bSupportUnicode); \
@@ -882,7 +890,7 @@ __soapentry_exit: \
     *lpResultVar = er; \
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &endTimes); \
     if(lpecSession) { \
-		LOG_SOAP_DEBUG(g_lpSessionManager->GetLogger(), "%020"PRIu64": E %s 0x%08x %f %f", ulSessionId, szFname, er, timespec2dbl(endTimes) - timespec2dbl(startTimes), GetTimeOfDay() - dblStart); \
+		LOG_SOAP_DEBUG(g_lpSessionManager->GetLogger(), "%020" PRIu64 ": E %s 0x%08x %f %f", ulSessionId, szFname, er, timespec2dbl(endTimes) - timespec2dbl(startTimes), GetTimeOfDay() - dblStart); \
 		lpecSession->UpdateBusyState(pthread_self(), SESSION_STATE_SENDING); \
         lpecSession->Unlock(); \
     } \
@@ -930,7 +938,7 @@ int ns__##fname(struct soap *soap, ULONG64 ulSessionId, ##__VA_ARGS__) \
 
 
 // Save the current time as the last logon time for the logged-on user of lpecSession
-ECRESULT SaveLogonTime(ECSession *lpecSession, bool bLogon) 
+static ECRESULT SaveLogonTime(ECSession *lpecSession, bool bLogon) 
 {
     ECRESULT er = erSuccess;
     unsigned int ulUserId = 0;
@@ -978,7 +986,9 @@ exit:
     return er;
 }
 
-ECRESULT PurgeSoftDelete(ECSession *lpecSession, unsigned int ulLifetime, unsigned int *lpulMessages, unsigned int *lpulFolders, unsigned int *lpulStores, bool *lpbExit)
+static ECRESULT PurgeSoftDelete(ECSession *lpecSession,
+    unsigned int ulLifetime, unsigned int *lpulMessages,
+    unsigned int *lpulFolders, unsigned int *lpulStores, bool *lpbExit)
 {
 	ECRESULT 		er = erSuccess;
 	ECDatabase*		lpDatabase = NULL;
@@ -1372,13 +1382,26 @@ SOAP_ENTRY_START(getStore, lpsResponse->er, entryId* lpsEntryId, struct getStore
 	}
 
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
-	lpDBLen = lpDatabase->FetchRowLengths(lpDBResult);
-
-	if( lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL ||
-		lpDBLen == NULL || lpDBLen[1] == 0 )
-	{
+	if (lpDBRow == NULL) {
 		er = ZARAFA_E_DATABASE_ERROR; // this should never happen
 		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "getStore(): no rows from db");
+		goto exit;
+	}
+	lpDBLen = lpDatabase->FetchRowLengths(lpDBResult);
+	/*
+	 * Avoid processing SQL NULL, or memory blocks that are not
+	 * NUL-terminated.
+	 * Ensure the GUID (lpDBRow[1]) is not empty. (Perhaps check for
+	 * !=16 instead of ==0?)
+	 */
+	if (lpDBLen == NULL || lpDBRow[0] == NULL ||
+	    lpDBRow[1] == NULL || lpDBRow[2] == NULL ||
+	    memchr(lpDBRow[0], '\0', lpDBLen[0] + 1) == NULL ||
+	    memchr(lpDBRow[2], '\0', lpDBLen[2] + 1) == NULL ||
+	    lpDBLen[1] == 0) {
+		er = ZARAFA_E_DATABASE_ERROR;
+		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR,
+			"getStore(): received trash rows from db");
 		goto exit;
 	}
 
@@ -1443,7 +1466,10 @@ exit:
 }
 SOAP_ENTRY_END()
 
-ECRESULT ReadProps(struct soap *soap, ECSession *lpecSession, unsigned int ulObjId, unsigned ulObjType, unsigned int ulObjTypeParent, CHILDPROPS sChildProps, struct propTagArray *lpsPropTag, struct propValArray *lpsPropVal)
+static ECRESULT ReadProps(struct soap *soap, ECSession *lpecSession,
+    unsigned int ulObjId, unsigned ulObjType, unsigned int ulObjTypeParent,
+    CHILDPROPS sChildProps, struct propTagArray *lpsPropTag,
+    struct propValArray *lpsPropVal)
 {
 	ECRESULT er = erSuccess;
 
@@ -1731,7 +1757,9 @@ SOAP_ENTRY_START(loadProp, lpsResponse->er, entryId sEntryId, unsigned int ulObj
 		if (er != erSuccess)
 			goto exit;
 
-		er = lpAttachmentStorage->LoadAttachment(soap, ulObjId, PROP_ID(ulPropTag), &lpsResponse->lpPropVal->Value.bin->__size, &lpsResponse->lpPropVal->Value.bin->__ptr);
+		size_t atsize = 0;
+		er = lpAttachmentStorage->LoadAttachment(soap, ulObjId, PROP_ID(ulPropTag), &atsize, &lpsResponse->lpPropVal->Value.bin->__ptr);
+		lpsResponse->lpPropVal->Value.bin->__size = atsize;
 		if (er != erSuccess)
 			goto exit;
 	}
@@ -1757,7 +1785,8 @@ exit:
 SOAP_ENTRY_END()
 
 //TODO: flag to get size of normal folder or deleted folders
-ECRESULT GetFolderSize(ECDatabase* lpDatabase, unsigned int ulFolderId, long long* lpllFolderSize)
+static ECRESULT GetFolderSize(ECDatabase *lpDatabase, unsigned int ulFolderId,
+    long long *lpllFolderSize)
 {
 
 	ECRESULT		er = erSuccess;
@@ -1844,7 +1873,11 @@ exit:
  *
  * @todo unclear comment -> sync id only to saveObject !
  */
-ECRESULT WriteProps(struct soap *soap, ECSession *lpecSession, ECDatabase *lpDatabase, ECAttachmentStorage *lpAttachmentStorage, struct saveObject *lpsSaveObj, unsigned int ulObjId, bool fNewItem, unsigned int ulSyncId, struct saveObject *lpsReturnObj, bool *lpfHaveChangeKey, FILETIME *lpftCreated, FILETIME *lpftModified)
+static ECRESULT WriteProps(struct soap *soap, ECSession *lpecSession,
+    ECDatabase *lpDatabase, ECAttachmentStorage *lpAttachmentStorage,
+    struct saveObject *lpsSaveObj, unsigned int ulObjId, bool fNewItem,
+    unsigned int ulSyncId, struct saveObject *lpsReturnObj,
+    bool *lpfHaveChangeKey, FILETIME *lpftCreated, FILETIME *lpftModified)
 {
 	ECRESULT		er;
     std::string		strInsertQuery;
@@ -2478,7 +2511,9 @@ exit:
 }
 
 // You need to check the permissions before you call this function
-ECRESULT DeleteProps(ECSession *lpecSession, ECDatabase *lpDatabase, ULONG ulObjId, struct propTagArray *lpsPropTags) {
+static ECRESULT DeleteProps(ECSession *lpecSession, ECDatabase *lpDatabase,
+    ULONG ulObjId, struct propTagArray *lpsPropTags)
+{
 	ECRESULT er = erSuccess;
 	int				i;
 	std::string		strQuery;
@@ -2526,9 +2561,12 @@ exit:
 	return er;
 }
 
-unsigned int SaveObject(struct soap *soap, ECSession *lpecSession, ECDatabase *lpDatabase, ECAttachmentStorage *lpAttachmentStorage,
-						unsigned int ulStoreId, unsigned int ulParentObjId, unsigned int ulParentType, unsigned int ulFlags,
-						unsigned int ulSyncId, struct saveObject *lpsSaveObj, struct saveObject *lpsReturnObj, unsigned int ulLevel, bool *lpfHaveChangeKey = NULL)
+static unsigned int SaveObject(struct soap *soap, ECSession *lpecSession,
+    ECDatabase *lpDatabase, ECAttachmentStorage *lpAttachmentStorage,
+    unsigned int ulStoreId, unsigned int ulParentObjId,
+    unsigned int ulParentType, unsigned int ulFlags, unsigned int ulSyncId,
+    struct saveObject *lpsSaveObj, struct saveObject *lpsReturnObj,
+    unsigned int ulLevel, bool *lpfHaveChangeKey = NULL)
 {
 	ECRESULT er = erSuccess;
 	ALLOC_DBRESULT();
@@ -2912,7 +2950,7 @@ SOAP_ENTRY_START(saveObject, lpsLoadObjectResponse->er, entryId sParentEntryId, 
 			if (er != erSuccess)
 			    goto exit;
 		} else {
-			// existing item, search parent ourselves cause the client just sent it's store entryid (see ECMsgStore::OpenEntry())
+			// existing item, search parent ourselves because the client just sent its store entryid (see ECMsgStore::OpenEntry())
 			er = g_lpSessionManager->GetCacheManager()->GetObject(lpsSaveObj->ulServerId, &ulParentObjId, NULL, &ulObjFlags, &ulObjType);
 			if (er != erSuccess)
 				goto exit;
@@ -3135,7 +3173,10 @@ exit:
 }
 SOAP_ENTRY_END()
 
-ECRESULT LoadObject(struct soap *soap, ECSession *lpecSession, unsigned int ulObjId, unsigned int ulObjType, unsigned int ulParentObjType, struct saveObject *lpsSaveObj, std::map<unsigned int, CHILDPROPS> *lpChildProps)
+static ECRESULT LoadObject(struct soap *soap, ECSession *lpecSession,
+    unsigned int ulObjId, unsigned int ulObjType, unsigned int ulParentObjType,
+    struct saveObject *lpsSaveObj,
+    std::map<unsigned int, CHILDPROPS> *lpChildProps)
 {
 	ECRESULT 		er = erSuccess;
 	ECAttachmentStorage *lpAttachmentStorage = NULL;
@@ -3427,7 +3468,11 @@ SOAP_ENTRY_END()
 
 // if lpsNewEntryId is NULL this function create a new entryid
 // if lpsOrigSourceKey is NULL this function creates a new sourcekey
-ECRESULT CreateFolder(ECSession *lpecSession, ECDatabase *lpDatabase, unsigned int ulParentId, entryId *lpsNewEntryId, unsigned int type, char *name, char *comment, bool openifexists, bool bNotify, unsigned int ulSyncId, struct xsd__base64Binary *lpsOrigSourceKey, unsigned int *lpFolderId, bool *lpbExist)
+static ECRESULT CreateFolder(ECSession *lpecSession, ECDatabase *lpDatabase,
+    unsigned int ulParentId, entryId *lpsNewEntryId, unsigned int type,
+    const char *name, char *comment, bool openifexists, bool bNotify,
+    unsigned int ulSyncId, const struct xsd__base64Binary *lpsOrigSourceKey,
+    unsigned int *lpFolderId, bool *lpbExist)
 {
 	ECRESULT		er = erSuccess;
 	ALLOC_DBRESULT();
@@ -3741,7 +3786,9 @@ SOAP_ENTRY_END()
  *
  * @param[out]	lpulTableId	Server table id for this new table.
  */
-ECRESULT OpenTable(ECSession *lpecSession, entryId sEntryId, unsigned int ulTableType, unsigned int ulType, unsigned int ulFlags, unsigned int *lpulTableId)
+static ECRESULT OpenTable(ECSession *lpecSession, entryId sEntryId,
+    unsigned int ulTableType, unsigned int ulType, unsigned int ulFlags,
+    unsigned int *lpulTableId)
 {
     ECRESULT er = erSuccess;
 	objectid_t	sExternId;
@@ -4514,7 +4561,8 @@ exit:
 }
 SOAP_ENTRY_END()
 
-ECRESULT DoNotifySubscribe(ECSession *lpecSession, unsigned long long ulSessionId, struct notifySubscribe *notifySubscribe)
+static ECRESULT DoNotifySubscribe(ECSession *lpecSession,
+    unsigned long long ulSessionId, struct notifySubscribe *notifySubscribe)
 {
 	ECRESULT er = erSuccess;
 	unsigned int ulKey = 0;
@@ -4907,10 +4955,11 @@ exit:
 }
 SOAP_ENTRY_END()
 
-SOAP_ENTRY_START(getReceiveFolder, lpsReceiveFolder->er, entryId sStoreId, char* lpszMessageClass, struct receiveFolderResponse *lpsReceiveFolder)
+SOAP_ENTRY_START(getReceiveFolder, lpsReceiveFolder->er, entryId sStoreId, char* msg_class, struct receiveFolderResponse *lpsReceiveFolder)
 {
+	const char *lpszMessageClass = msg_class;
 	unsigned int	ulStoreid = 0;
-	char			*lpDest;
+	const char *lpDest;
 	USE_DATABASE();
 
 	lpszMessageClass = STRIN_FIX(lpszMessageClass);
@@ -4973,8 +5022,9 @@ exit:
 SOAP_ENTRY_END()
 
 // FIXME: should be able to delete an entry too
-SOAP_ENTRY_START(setReceiveFolder, *result, entryId sStoreId, entryId* lpsEntryId, char* lpszMessageClass, unsigned int *result)
+SOAP_ENTRY_START(setReceiveFolder, *result, entryId sStoreId, entryId* lpsEntryId, char* msg_class, unsigned int *result)
 {
+	const char *lpszMessageClass = msg_class;
 	bool			bIsUpdate = false;
 	unsigned int	ulCheckStoreId = 0;
 	unsigned int	ulStoreid = 0;
@@ -7683,7 +7733,9 @@ typedef struct{
 }COPYITEM;
 
 // Move one or more messages and/or moved a softdeleted message to a normal message
-ECRESULT MoveObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt* lplObjectIds, unsigned int ulDestFolderId, unsigned int ulSyncId)
+static ECRESULT MoveObjects(ECSession *lpSession, ECDatabase *lpDatabase,
+    ECListInt* lplObjectIds, unsigned int ulDestFolderId,
+    unsigned int ulSyncId)
 {
 	ECRESULT		er = erSuccess;
 	bool			bPartialCompletion = false;
@@ -7825,12 +7877,12 @@ ECRESULT MoveObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt* lp
 
 	cCopyItems = lstCopyItems.size();
 
-	// Move the messages to an other folder
+	// Move the messages to another folder
 	for(iterCopyItems=lstCopyItems.begin(); iterCopyItems != lstCopyItems.end(); iterCopyItems++) {
 		sObjectTableKey key(iterCopyItems->ulId, 0);
 		struct propVal sPropIMAPId;
 
-		// Check or it is a move to the same parent, skip them
+		// Check whether it is a move to the same parent, and if so, skip them.
 		if(iterCopyItems->ulParent == ulDestFolderId && (iterCopyItems->ulFlags&MSGFLAG_DELETED) == 0)
 			continue;
 
@@ -8079,7 +8131,10 @@ exit:
  * @FIXME It is possible to send notifications before a commit, this can give issues with the cache! 
  * 			This function should be refactored
  */
-ECRESULT CopyObject(ECSession *lpecSession, ECAttachmentStorage *lpAttachmentStorage, unsigned int ulObjId, unsigned int ulDestFolderId, bool bIsRoot, bool bDoNotification, bool bDoTableNotification, unsigned int ulSyncId)
+static ECRESULT CopyObject(ECSession *lpecSession,
+    ECAttachmentStorage *lpAttachmentStorage, unsigned int ulObjId,
+    unsigned int ulDestFolderId, bool bIsRoot, bool bDoNotification,
+    bool bDoTableNotification, unsigned int ulSyncId)
 {
 	ECRESULT		er = erSuccess;
 	ECDatabase		*lpDatabase = NULL;
@@ -8400,7 +8455,9 @@ exit:
  *
  * @note please check the object type before you call this function, the type should be MAPI_FOLDER
  */
-ECRESULT CopyFolderObjects(struct soap *soap, ECSession *lpecSession, unsigned int ulFolderFrom, unsigned int ulDestFolderId, char *lpszNewFolderName, bool bCopySubFolder, unsigned int ulSyncId)
+static ECRESULT CopyFolderObjects(struct soap *soap, ECSession *lpecSession,
+    unsigned int ulFolderFrom, unsigned int ulDestFolderId,
+    char *lpszNewFolderName, bool bCopySubFolder, unsigned int ulSyncId)
 {
 	ECRESULT		er = erSuccess;
 	ECDatabase		*lpDatabase = NULL;
@@ -9268,7 +9325,7 @@ SOAP_ENTRY_START(hookStore, *result, unsigned int ulStoreType, entryId sUserId, 
 		goto exit;
 
 	// one store has only one entry point in the hierarchy
-	// (may be zero, when the user returns to it's original store, so the owner field stays the same)
+	// (may be zero, when the user returns to its original store, so the owner field stays the same)
 	if (ulAffected > 1) {
 		er = ZARAFA_E_COLLISION;
 		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "hookStore(): owned by multiple users (3)");
@@ -9397,11 +9454,11 @@ exit:
 }
 SOAP_ENTRY_END()
 
-void* SoftDeleteRemover(void* lpTmpMain)
+void *SoftDeleteRemover(void *lpTmpMain)
 {
 	ECRESULT		er = erSuccess;
 	ECRESULT*		lper = NULL;
-	char*			lpszSetting = NULL;
+	const char *lpszSetting = NULL;
 	unsigned int	ulDeleteTime = 0;
 	unsigned int	ulFolders = 0;
 	unsigned int	ulStores = 0;
@@ -9446,12 +9503,8 @@ exit:
 	lper = new ECRESULT;
 	*lper = er;
 
-	// Do not pthread_exit() because linuxthreads is broken and will not free any objects
-	// pthread_exit((void*)lper);
-
 	return (void *)lper;
 }
-
 
 SOAP_ENTRY_START(checkExistObject, *result, entryId sEntryId, unsigned int ulFlags, unsigned int *result)
 {
@@ -10628,7 +10681,7 @@ typedef struct _MTOMStreamInfo {
 
 typedef MTOMStreamInfo * LPMTOMStreamInfo;
 
-ECRESULT SerializeObject(void *arg)
+static ECRESULT SerializeObject(void *arg)
 {
 	ECRESULT            er = erSuccess;
 	LPMTOMStreamInfo	lpStreamInfo = NULL;
@@ -10651,7 +10704,8 @@ ECRESULT SerializeObject(void *arg)
 	return er;
 }
 
-void *MTOMReadOpen(struct soap* soap, void *handle, const char *id, const char* /*type*/, const char* /*options*/)
+static void *MTOMReadOpen(struct soap *soap, void *handle, const char *id,
+    const char* /*type*/, const char* /*options*/)
 {
 	LPMTOMStreamInfo	lpStreamInfo = NULL;
 
@@ -10690,7 +10744,8 @@ void *MTOMReadOpen(struct soap* soap, void *handle, const char *id, const char* 
 	return (void *)lpStreamInfo;
 }
 
-size_t MTOMRead(struct soap* /*soap*/, void *handle, char *buf, size_t len)
+static size_t MTOMRead(struct soap * /*soap*/, void *handle,
+    char *buf, size_t len)
 {
 	ECRESULT			er = erSuccess;
 	LPMTOMStreamInfo		lpStreamInfo = (LPMTOMStreamInfo)handle;
@@ -10705,7 +10760,8 @@ size_t MTOMRead(struct soap* /*soap*/, void *handle, char *buf, size_t len)
 	
 	return cbRead;
 }
-void MTOMReadClose(struct soap* soap, void *handle)
+
+static void MTOMReadClose(struct soap *soap, void *handle)
 { 
 	LPMTOMStreamInfo		lpStreamInfo = (LPMTOMStreamInfo)handle;
 	
@@ -10714,10 +10770,10 @@ void MTOMReadClose(struct soap* soap, void *handle)
 	lpStreamInfo->lpSessionInfo->lpCurrentReadStream = NULL; // Cleanup done
 
 	// We get here when the last call to MTOMRead returned 0 OR when
-	// an error occured within gSOAP's bowels. In the last case we need
-	// to close the FIFO to make sure the writing thread won't lock up.
-	// Since gSOAP won't be reading from the FIFO in any case once we
-	// read this point it's safe to just close the FIFO.
+	// an error occured within gSOAP's bowels. In the latter case, we need
+	// to close the FIFO to make sure the writing thread will not lock up.
+	// Since gSOAP will not be reading from the FIFO in any case once we
+	// read this point, it is safe to just close the FIFO.
 	lpStreamInfo->lpFifoBuffer->Close(ECFifoBuffer::cfRead);
 	if (lpStreamInfo->lpTask) {
 		lpStreamInfo->lpTask->wait();	 // Todo: use result() to wait and get result
@@ -10727,9 +10783,9 @@ void MTOMReadClose(struct soap* soap, void *handle)
 	lpStreamInfo->lpFifoBuffer = NULL;
 }
 
-void MTOMWriteClose(struct soap *soap, void *handle);
+static void MTOMWriteClose(struct soap *soap, void *handle);
 
-void MTOMSessionDone(struct soap *soap, void *param)
+static void MTOMSessionDone(struct soap *soap, void *param)
 {
 	MTOMSessionInfo *lpInfo = (MTOMSessionInfo *)param;
 
@@ -10969,7 +11025,7 @@ exit:
 }
 SOAP_ENTRY_END()
 
-ECRESULT DeserializeObject(void *arg)
+static ECRESULT DeserializeObject(void *arg)
 {
 	LPMTOMStreamInfo	lpStreamInfo = NULL;
 	ECSerializer		*lpSource = NULL;
@@ -10985,7 +11041,9 @@ ECRESULT DeserializeObject(void *arg)
 	return er;
 }
 
-void *MTOMWriteOpen(struct soap* soap, void *handle, const char * /*id*/, const char* /*type*/, const char* /*description*/, enum soap_mime_encoding /*encoding*/)
+static void *MTOMWriteOpen(struct soap *soap, void *handle,
+    const char * /*id*/, const char * /*type*/, const char * /*description*/,
+    enum soap_mime_encoding /*encoding*/)
 {
 	LPMTOMStreamInfo	lpStreamInfo = NULL;
 	lpStreamInfo = (LPMTOMStreamInfo)handle;
@@ -11005,7 +11063,8 @@ void *MTOMWriteOpen(struct soap* soap, void *handle, const char * /*id*/, const 
 	return handle;
 }
 
-int MTOMWrite(struct soap* soap, void *handle, const char *buf, size_t len)
+static int MTOMWrite(struct soap *soap, void *handle,
+    const char *buf, size_t len)
 {
 	ECRESULT			er = erSuccess;
 	LPMTOMStreamInfo	lpStreamInfo = NULL;
@@ -11025,7 +11084,7 @@ int MTOMWrite(struct soap* soap, void *handle, const char *buf, size_t len)
 	return SOAP_OK;
 }
 
-void MTOMWriteClose(struct soap *soap, void *handle)
+static void MTOMWriteClose(struct soap *soap, void *handle)
 {
 	ECRESULT er = erSuccess;
 
@@ -11218,8 +11277,8 @@ SOAP_ENTRY_START(importMessageFromStream, *result, unsigned int ulFlags, unsigne
 	soap->fmimewrite = &MTOMWrite;
 	soap->fmimewriteclose= &MTOMWriteClose;
 
-	// We usualy don't pass database object to other threads. However, since
-	// we wan't to be able to perform a complete rollback we need to pass it
+	// We usually do not pass database objects to other threads. However, since
+	// we want to be able to perform a complete rollback we need to pass it
 	// to thread that processes the data and puts it in the database.
 	lpsStreamInfo = (MTOMStreamInfo *)soap_malloc(soap, sizeof(MTOMStreamInfo));
 	lpsStreamInfo->ulObjectId = ulObjectId;

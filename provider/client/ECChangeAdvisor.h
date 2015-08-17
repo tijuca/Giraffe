@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,6 +44,7 @@
 #ifndef ECCHANGEADVISOR_H
 #define ECCHANGEADVISOR_H
 
+#include "zcdefs.h"
 #include <mapidefs.h>
 #include <mapispi.h>
 
@@ -64,7 +64,7 @@ class ECLogger;
  * ECChangeAdvisor: Implementation IECChangeAdvisor, which allows one to register for 
  *                  change notifications on folders.
  */
-class ECChangeAdvisor : public ECUnknown
+class ECChangeAdvisor _final : public ECUnknown
 {
 protected:
 	/**
@@ -169,20 +169,20 @@ private:
 	 */
 	HRESULT							PurgeStates();
 
-	class xECChangeAdvisor : public IECChangeAdvisor {
+	class xECChangeAdvisor _final : public IECChangeAdvisor {
 		// IUnknown
-		virtual ULONG __stdcall AddRef();
-		virtual ULONG __stdcall Release();
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **pInterface);
+		virtual ULONG __stdcall AddRef(void) _override;
+		virtual ULONG __stdcall Release(void) _override;
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **pInterface) _override;
 
 		// IECChangeAdvisor
-		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
-		virtual HRESULT __stdcall Config(LPSTREAM lpStream, LPGUID lpGUID, LPECCHANGEADVISESINK lpAdviseSink, ULONG ulFlags);
-		virtual HRESULT __stdcall UpdateState(LPSTREAM lpStream);
-		virtual HRESULT __stdcall AddKeys(LPENTRYLIST lpEntryList);
-		virtual HRESULT __stdcall RemoveKeys(LPENTRYLIST lpEntryList);
-		virtual HRESULT __stdcall IsMonitoringSyncId(ULONG ulSyncId);
-		virtual HRESULT __stdcall UpdateSyncState(ULONG ulSyncId, ULONG ulChangeId);
+		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError) _override;
+		virtual HRESULT __stdcall Config(LPSTREAM lpStream, LPGUID lpGUID, LPECCHANGEADVISESINK lpAdviseSink, ULONG ulFlags) _override;
+		virtual HRESULT __stdcall UpdateState(LPSTREAM lpStream) _override;
+		virtual HRESULT __stdcall AddKeys(LPENTRYLIST lpEntryList) _override;
+		virtual HRESULT __stdcall RemoveKeys(LPENTRYLIST lpEntryList) _override;
+		virtual HRESULT __stdcall IsMonitoringSyncId(ULONG ulSyncId) _override;
+		virtual HRESULT __stdcall UpdateSyncState(ULONG ulSyncId, ULONG ulChangeId) _override;
 	} m_xECChangeAdvisor;
 
 

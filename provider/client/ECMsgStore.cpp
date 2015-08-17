@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -96,7 +95,7 @@ using namespace std;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 // FIXME: from libserver/ECMAPI.h
@@ -118,8 +117,11 @@ const static SizedSPropTagArray(NUM_RFT_PROPS, sPropRFTColumns) =
 /**
  * ECMsgStore
  **/
-ECMsgStore::ECMsgStore(char *lpszProfname, LPMAPISUP lpSupport, WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags, BOOL fIsSpooler, BOOL fIsDefaultStore, BOOL bOfflineStore) : ECMAPIProp(NULL, MAPI_STORE, fModify, NULL, "IMsgStore") {
-
+ECMsgStore::ECMsgStore(const char *lpszProfname, LPMAPISUP lpSupport,
+    WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags,
+    BOOL fIsSpooler, BOOL fIsDefaultStore, BOOL bOfflineStore) :
+	ECMAPIProp(NULL, MAPI_STORE, fModify, NULL, "IMsgStore")
+{
 	TRACE_MAPI(TRACE_ENTRY, "ECMsgStore::ECMsgStore","");
 
 	this->lpSupport = lpSupport;
@@ -224,7 +226,9 @@ ECMsgStore::~ECMsgStore() {
 }
 
 //FIXME: remove duplicate profilename
-HRESULT GetIMsgStoreObject(BOOL bOffline, std::string strProfname, BOOL bModify, ECMapProvider* lpmapProviders, IMAPISupport *lpMAPISup, ULONG cbEntryId, LPENTRYID lpEntryId, LPMDB* lppIMsgStore)
+static HRESULT GetIMsgStoreObject(BOOL bOffline, std::string strProfname,
+    BOOL bModify, ECMapProvider *lpmapProviders, IMAPISupport *lpMAPISup,
+    ULONG cbEntryId, LPENTRYID lpEntryId, LPMDB *lppIMsgStore)
 {
 	HRESULT hr = hrSuccess;
 	PROVIDER_INFO sProviderInfo;
@@ -355,7 +359,12 @@ HRESULT ECMsgStore::HrSetReleaseCallback(ECUnknown *lpObject, RELEASECALLBACK lp
 
 	return hrSuccess;
 }
-HRESULT	ECMsgStore::Create(char * lpszProfname, LPMAPISUP lpSupport, WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags, BOOL fIsSpooler, BOOL fIsDefaultStore, BOOL bOfflineStore, ECMsgStore **lppECMsgStore) {
+
+HRESULT	ECMsgStore::Create(const char *lpszProfname, LPMAPISUP lpSupport,
+    WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags,
+    BOOL fIsSpooler, BOOL fIsDefaultStore, BOOL bOfflineStore,
+    ECMsgStore **lppECMsgStore)
+{
 	HRESULT hr = hrSuccess;
 
 	ECMsgStore *lpStore = new ECMsgStore(lpszProfname, lpSupport, lpTransport, fModify, ulProfileFlags, fIsSpooler, fIsDefaultStore, bOfflineStore);
@@ -1004,7 +1013,6 @@ HRESULT ECMsgStore::GetReceiveFolderTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 	ECMemTableView*	lpView = NULL;
 	ECMemTable*		lpMemTable = NULL;
 	LPSRowSet		lpsRowSet = NULL;
-	SPropValue		sPropValue;
 	unsigned int	i;
 	LPSPropTagArray lpPropTagArray = NULL;
 
@@ -1035,9 +1043,6 @@ HRESULT ECMsgStore::GetReceiveFolderTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 
 	for(i=0; i<lpsRowSet->cRows; i++)
 	{
-		sPropValue.ulPropTag = PR_ROWID;
-		sPropValue.Value.ul = i;
-
 		hr = lpMemTable->HrModifyRow(ECKeyTable::TABLE_ROW_ADD, NULL, lpsRowSet->aRow[i].lpProps, NUM_RFT_PROPS);
 		if(hr != hrSuccess)
 			goto exit;
@@ -1350,7 +1355,8 @@ HRESULT	ECMsgStore::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFl
 				goto exit;
 
 			lpsPropValue->ulPropTag = PR_EMSMDB_SECTION_UID;
-			MAPIAllocateMore(sizeof(GUID), lpBase, (void **) &lpsPropValue->Value.bin.lpb);
+			if ((hr = MAPIAllocateMore(sizeof(GUID), lpBase, (void **) &lpsPropValue->Value.bin.lpb)) != hrSuccess)
+				goto exit;
 			memcpy(lpsPropValue->Value.bin.lpb, lpProp->Value.bin.lpb, sizeof(GUID));
 			lpsPropValue->Value.bin.cb = sizeof(GUID);
 			break;
@@ -1831,7 +1837,8 @@ HRESULT ECMsgStore::GetPublicFolderTable(LPTSTR lpszServerName, LPMAPITABLE *lpp
 //
 
 // Create the freebusy folder on a private store
-HRESULT CreatePrivateFreeBusyData(LPMAPIFOLDER lpRootFolder, LPMAPIFOLDER lpInboxFolder, LPMAPIFOLDER lpCalendarFolder)
+static HRESULT CreatePrivateFreeBusyData(LPMAPIFOLDER lpRootFolder,
+    LPMAPIFOLDER lpInboxFolder, LPMAPIFOLDER lpCalendarFolder)
 {
 	// Global
 	HRESULT				hr = hrSuccess;
@@ -1849,7 +1856,7 @@ HRESULT CreatePrivateFreeBusyData(LPMAPIFOLDER lpRootFolder, LPMAPIFOLDER lpInbo
 
 	///////////////////////////////
 	// Freebusy mv propery
-	// This property will be fill in on an other place
+	// This property will be fill in on another place
 	hr = ECAllocateBuffer(sizeof(SPropValue), (void**)&lpFBPropValue);
 	if(hr != hrSuccess)
 		goto exit;
@@ -1902,10 +1909,10 @@ HRESULT CreatePrivateFreeBusyData(LPMAPIFOLDER lpRootFolder, LPMAPIFOLDER lpInbo
 		goto exit;
 
 	lpPropValue[cCurValues].ulPropTag = PR_MESSAGE_CLASS_A;
-	lpPropValue[cCurValues++].Value.lpszA = "IPM.Microsoft.ScheduleData.FreeBusy";
+	lpPropValue[cCurValues++].Value.lpszA = const_cast<char *>("IPM.Microsoft.ScheduleData.FreeBusy");
 
 	lpPropValue[cCurValues].ulPropTag = PR_SUBJECT_A;
-	lpPropValue[cCurValues++].Value.lpszA = "LocalFreebusy";
+	lpPropValue[cCurValues++].Value.lpszA = const_cast<char *>("LocalFreebusy");
 
 	lpPropValue[cCurValues].ulPropTag = PR_FREEBUSY_NUM_MONTHS;
 	lpPropValue[cCurValues++].Value.ul = ECFREEBUSY_DEFAULT_PUBLISH_MONTHS;
@@ -1959,10 +1966,10 @@ HRESULT CreatePrivateFreeBusyData(LPMAPIFOLDER lpRootFolder, LPMAPIFOLDER lpInbo
 		goto exit;
 
 	lpPropValue[cCurValues].ulPropTag = PR_MESSAGE_CLASS_A;
-	lpPropValue[cCurValues++].Value.lpszA = "IPM.Microsoft.ScheduleData.FreeBusy";
+	lpPropValue[cCurValues++].Value.lpszA = const_cast<char *>("IPM.Microsoft.ScheduleData.FreeBusy");
 
 	lpPropValue[cCurValues].ulPropTag = PR_SUBJECT_A;
-	lpPropValue[cCurValues++].Value.lpszA = "LocalFreebusy";
+	lpPropValue[cCurValues++].Value.lpszA = const_cast<char *>("LocalFreebusy");
 
 	lpPropValue[cCurValues].ulPropTag = PR_FREEBUSY_NUM_MONTHS;
 	lpPropValue[cCurValues++].Value.ul = ECFREEBUSY_DEFAULT_PUBLISH_MONTHS;
@@ -2103,14 +2110,20 @@ exit:
  * @param fHidden TRUE if the folder must be marked hidden with PR_ATTR_HIDDEN
  * @return result
  */ 
-HRESULT ECMsgStore::CreateAdditionalFolder(IMAPIFolder *lpRootFolder, IMAPIFolder *lpInboxFolder, IMAPIFolder *lpSubTreeFolder, ULONG ulType, LPTSTR lpszFolderName, LPTSTR lpszComment, LPTSTR lpszContainerType, bool fHidden)
+HRESULT ECMsgStore::CreateAdditionalFolder(IMAPIFolder *lpRootFolder,
+    IMAPIFolder *lpInboxFolder, IMAPIFolder *lpSubTreeFolder, ULONG ulType,
+    const TCHAR *lpszFolderName, const TCHAR *lpszComment,
+    const TCHAR *lpszContainerType, bool fHidden)
 {
 	HRESULT hr = hrSuccess;
 	IMAPIFolder *lpMAPIFolder = NULL;
 	LPSPropValue lpPropValueEID = NULL;
 	SPropValue sPropValue;
 	
-	hr = lpSubTreeFolder->CreateFolder(FOLDER_GENERIC, lpszFolderName, lpszComment, &IID_IMAPIFolder, OPEN_IF_EXISTS | fMapiUnicode, &lpMAPIFolder);
+	hr = lpSubTreeFolder->CreateFolder(FOLDER_GENERIC,
+	     const_cast<LPTSTR>(lpszFolderName),
+	     const_cast<LPTSTR>(lpszComment), &IID_IMAPIFolder,
+	     OPEN_IF_EXISTS | fMapiUnicode, &lpMAPIFolder);
 	if(hr != hrSuccess)
 		goto exit;
 	
@@ -2120,7 +2133,7 @@ HRESULT ECMsgStore::CreateAdditionalFolder(IMAPIFolder *lpRootFolder, IMAPIFolde
 		goto exit;
 
 	sPropValue.ulPropTag = PR_CONTAINER_CLASS;
-	sPropValue.Value.LPSZ = lpszContainerType;
+	sPropValue.Value.LPSZ = const_cast<LPTSTR>(lpszContainerType);
 
 	// Set container class
 	hr = HrSetOneProp(lpMAPIFolder, &sPropValue);
@@ -2197,8 +2210,11 @@ HRESULT ECMsgStore::CreateStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpU
 	if (hr != hrSuccess)
 		goto exit;
 
-	// Create a temporary transport, because the new ECMsgStore object will logoff the transport, even if
-	// the refcount isn't 0 yet. That would cause the current instance to lose it's transport.
+	/*
+	 * Create a temporary transport, because the new ECMsgStore object will
+	 * logoff the transport, even if the refcount is not 0 yet. That would
+	 * cause the current instance to lose its transport.
+	 */
 	hr = lpTransport->CloneAndRelogon(&lpTempTransport);
 	if (hr != hrSuccess)
 		goto exit;
@@ -2359,7 +2375,7 @@ HRESULT ECMsgStore::CreateStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpU
 
 		// Set store displayname
 		lpPropValue[1].ulPropTag = PR_DISPLAY_NAME_W;
-		lpPropValue[1].Value.lpszW = L"Public folder"; //FIXME: set the right public folder name here?
+		lpPropValue[1].Value.lpszW = const_cast<wchar_t *>(L"Public folder"); //FIXME: set the right public folder name here?
 
 		// Set the property into the store
 		hr = lpecMsgStore->SetProps(cValues, lpPropValue, NULL);
@@ -2884,7 +2900,11 @@ exit:
 	return hr;
 }
 
-HRESULT ECMsgStore::CreateSpecialFolder(LPMAPIFOLDER lpFolderParent, ECMAPIProp *lpFolderPropSet, LPTSTR lpszFolderName, LPTSTR lpszFolderComment, unsigned int ulPropTag, unsigned int ulMVPos, LPTSTR lpszContainerClass, LPMAPIFOLDER *lppMAPIFolder)
+HRESULT ECMsgStore::CreateSpecialFolder(LPMAPIFOLDER lpFolderParent,
+    ECMAPIProp *lpFolderPropSet, const TCHAR *lpszFolderName,
+    const TCHAR *lpszFolderComment, unsigned int ulPropTag,
+    unsigned int ulMVPos, const TCHAR *lpszContainerClass,
+    LPMAPIFOLDER *lppMAPIFolder)
 {
 	HRESULT 		hr = hrSuccess;
 	LPMAPIFOLDER	lpMAPIFolder = NULL;
@@ -2900,7 +2920,10 @@ HRESULT ECMsgStore::CreateSpecialFolder(LPMAPIFOLDER lpFolderParent, ECMAPIProp 
 	}
 
 	// Create the folder
-	hr = lpFolderParent->CreateFolder(FOLDER_GENERIC, lpszFolderName, lpszFolderComment, &IID_IMAPIFolder, OPEN_IF_EXISTS | fMapiUnicode, &lpMAPIFolder);
+	hr = lpFolderParent->CreateFolder(FOLDER_GENERIC,
+	     const_cast<LPTSTR>(lpszFolderName),
+	     const_cast<LPTSTR>(lpszFolderComment), &IID_IMAPIFolder,
+	     OPEN_IF_EXISTS | fMapiUnicode, &lpMAPIFolder);
 	if(hr != hrSuccess)
 		goto exit;
 
@@ -3479,7 +3502,8 @@ exit:
 	return hr;
 }
 
-HRESULT ECMsgStore::DeleteFromMasterOutgoingTable(ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags)
+HRESULT ECMsgStore::DeleteFromMasterOutgoingTable(ULONG cbEntryId,
+    const ENTRYID *lpEntryId, ULONG ulFlags)
 {
 	HRESULT hr = hrSuccess;
 
@@ -3984,11 +4008,17 @@ HRESULT ECMsgStore::xMsgStore::GetNamesFromIDs(LPSPropTagArray * pptaga, LPGUID 
 	return hr;
 }
 
-HRESULT ECMsgStore::xMsgStore::GetIDsFromNames(ULONG cNames, LPMAPINAMEID * ppNames, ULONG ulFlags, LPSPropTagArray * pptaga) {
+HRESULT ECMsgStore::xMsgStore::GetIDsFromNames(ULONG cNames,
+    MAPINAMEID **ppNames, ULONG ulFlags, LPSPropTagArray *pptaga)
+{
 	TRACE_MAPI(TRACE_ENTRY, "IMsgStore::GetIDsFromNames", "");
 	METHOD_PROLOGUE_(ECMsgStore, MsgStore);
 	HRESULT hr = pThis->GetIDsFromNames(cNames, ppNames, ulFlags, pptaga);
-	TRACE_MAPI(TRACE_RETURN, "IMsgStore::GetIDsFromNames", "%s\n%s", GetMAPIErrorDescription(hr).c_str(), MapiNameIdListToString(cNames, ppNames, (hr==hrSuccess)?(*pptaga):NULL).c_str());
+	TRACE_MAPI(TRACE_RETURN, "IMsgStore::GetIDsFromNames", "%s\n%s",
+		GetMAPIErrorDescription(hr).c_str(),
+		MapiNameIdListToString(cNames,
+			const_cast<const MAPINAMEID *const *>(ppNames),
+			hr == hrSuccess ? *pptaga : NULL).c_str());
 	return hr;
 }
 
@@ -4591,7 +4621,8 @@ HRESULT ECMsgStore::xECSpooler::GetMasterOutgoingTable(ULONG ulFlags, IMAPITable
 	return pThis->GetMasterOutgoingTable(ulFlags, lppOutgoingTable);
 }
 
-HRESULT ECMsgStore::xECSpooler::DeleteFromMasterOutgoingTable(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags)
+HRESULT ECMsgStore::xECSpooler::DeleteFromMasterOutgoingTable(ULONG cbEntryID,
+    const ENTRYID *lpEntryID, ULONG ulFlags)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECSpooler::DeleteFromMasterOutgoingTable", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECSpooler);

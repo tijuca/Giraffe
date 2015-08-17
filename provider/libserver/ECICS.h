@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -66,7 +65,7 @@ public:
             ulSize = s.ulSize;
         } 
     }
-    SOURCEKEY(unsigned int ulSize, char *lpData) { 
+    SOURCEKEY(unsigned int ulSize, const char *lpData) { 
 		if (lpData) {
 			this->lpData = new char[ulSize];
 			memcpy(this->lpData, lpData, ulSize);
@@ -79,7 +78,7 @@ public:
         // Use 22-byte sourcekeys (16 bytes GUID + 6 bytes counter)
         ulSize = sizeof(GUID) + 6;
         lpData = new char [ulSize]; 
-        memcpy(lpData, (char *)&guid, sizeof(guid)); 
+        memcpy(lpData, reinterpret_cast<const char *>(&guid), sizeof(guid)); 
         memcpy(lpData+sizeof(GUID), &ullId, ulSize - sizeof(GUID)); 
     }
     SOURCEKEY(struct xsd__base64Binary &sourcekey) {
@@ -124,7 +123,7 @@ public:
     
     operator unsigned char *() const { return (unsigned char *)lpData; }
     
-    operator const std::string () const { return std::string((char *)lpData, ulSize); }
+    operator const std::string () const { return std::string(lpData, ulSize); }
     
     unsigned int 	size() const { return ulSize; }
 	bool			empty() const { return ulSize == 0; } 

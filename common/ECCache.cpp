@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -51,7 +50,7 @@
 
 #ifdef _DEBUG
 #undef THIS_FILE
-static char THIS_FILE[]=__FILE__;
+static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -77,11 +76,17 @@ void ECCacheBase::RequestStats(void(callback)(const std::string &, const std::st
 
 void ECCacheBase::DumpStats(ECLogger *lpLogger)
 {
+	unsigned long long z;
 	std::string strName;
 	
 	strName = m_strCachename + " cache size:";
-	lpLogger->Log(EC_LOGLEVEL_FATAL, "  %-30s  %8lu (%8llu bytes) (usage %.02f%%)", strName.c_str(), ItemCount(), Size(), Size() / (double)MaxSize() * 100.0);
-	
+	z = Size();
+	lpLogger->Log(EC_LOGLEVEL_FATAL,
+		"  %-30s  %8lu (%8llu bytes) (usage %.02f%%)",
+		strName.c_str(), ItemCount(), z, z / (double)MaxSize() * 100.0);
 	strName = m_strCachename + " cache hits:";
-	lpLogger->Log(EC_LOGLEVEL_FATAL, "  %-30s  %8llu / %llu (%.02f%%)", strName.c_str(), ValidCount(), HitCount(), ValidCount() / (double)HitCount() * 100.0);
+	z = ValidCount();
+	lpLogger->Log(EC_LOGLEVEL_FATAL, "  %-30s  %8llu / %llu (%.02f%%)",
+		strName.c_str(), z, static_cast<unsigned long long>(HitCount()),
+		z / (double)HitCount() * 100.0);
 }

@@ -4,7 +4,7 @@
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
-DAEMON=/usr/bin/zarafa-server
+DAEMON=/usr/sbin/zarafa-server
 CONFIG=/etc/zarafa/server.cfg
 
 #     .........1.........2.........3.........4.........5........!
@@ -14,7 +14,7 @@ DESC="Zarafa Collaboration Platform's Storage Server"
 #set -e
 
 # exit from init script when disabled, shift away "force" when present
-exit_if_disabled START_ZARAFA_SERVER $* || shift
+exit_if_disabled START_ZARAFA_SERVER "$@" || shift
 
 if [ ! -x $DAEMON ] 
 then

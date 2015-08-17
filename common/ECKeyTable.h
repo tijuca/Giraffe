@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -81,6 +80,7 @@
  */
 
 
+#include "zcdefs.h"
 #include "ZarafaCode.h"
 
 #include <list>
@@ -126,23 +126,23 @@ struct idcompare
 #define TABLEROW_FLAG_FLOAT		0x00000002
 #define TABLEROW_FLAG_STRING	0x00000004
 
-class ECTableRow {
+class ECTableRow _final {
 public:
-	ECTableRow(sObjectTableKey sKey, unsigned int ulSortCols, unsigned int *lpSortLen, unsigned char *lpFlags, unsigned char **lppSortData, bool fHidden);
+	ECTableRow(sObjectTableKey sKey, unsigned int ulSortCols, const unsigned int *lpSortLen, const unsigned char *lpFlags, unsigned char **lppSortData, bool fHidden);
 	ECTableRow(const ECTableRow &other);
 	~ECTableRow();
 
 	unsigned int GetObjectSize();
 
-	static bool rowcompare(ECTableRow *a, ECTableRow *b);
-	static bool rowcompare(unsigned int ulSortColsA, int *lpSortLenA, unsigned char **lppSortKeysA, unsigned char *lpSortFlagsA, unsigned int ulSortColsB, int *lpSortLenB, unsigned char **lppSortKeysB, unsigned char *lpSortFlagsB, bool fIgnoreOrder = false);
-	static bool rowcompareprefix(unsigned int ulSortColPrefix, unsigned int ulSortColsA, int *lpSortLenA, unsigned char **lppSortKeysA, unsigned char *lpSortFlagsA, unsigned int ulSortColsB, int *lpSortLenB, unsigned char **lppSortKeysB, unsigned char *lpSortFlagsB);
+	static bool rowcompare(const ECTableRow *a, const ECTableRow *b);
+	static bool rowcompare(unsigned int ulSortColsA, const int *lpSortLenA, unsigned char **lppSortKeysA, const unsigned char *lpSortFlagsA, unsigned int ulSortColsB, const int *lpSortLenB, unsigned char **lppSortKeysB, const unsigned char *lpSortFlagsB, bool fIgnoreOrder = false);
+	static bool rowcompareprefix(unsigned int ulSortColPrefix, unsigned int ulSortColsA, const int *lpSortLenA, unsigned char **lppSortKeysA, const unsigned char *lpSortFlagsA, unsigned int ulSortColsB, const int *lpSortLenB, unsigned char **lppSortKeysB, const unsigned char *lpSortFlagsB);
 
 	bool operator < (const ECTableRow &other) const;
 	
 
 private:
-	void initSortCols(unsigned int ulSortCols, int * lpSortLen, unsigned char * lpFlags, unsigned char ** lppSortData);
+	void initSortCols(unsigned int ulSortCols, const int *lpSortLen, const unsigned char *lpFlags, unsigned char ** lppSortData);
 	void freeSortCols();
 	ECTableRow& operator = (const ECTableRow &other);
 public:
@@ -173,7 +173,7 @@ typedef struct {
 
 typedef std::map<unsigned int, sBookmarkPosition> ECBookmarkMap;
 
-class ECKeyTable {
+class ECKeyTable _final {
 public:
 	/* this MUST be the same definitions as TABLE_NOTIFICATION event types passed in ulTableEvent */
 
@@ -187,10 +187,10 @@ public:
 	ECKeyTable();
 	~ECKeyTable();
 
-	ECRESULT	UpdateRow(UpdateType ulType, const sObjectTableKey* lpsRowItem, unsigned int ulSortCols, unsigned int *lpSortLen, unsigned char *lpFlags, unsigned char **lppSortData, sObjectTableKey* lpsPrevRow, bool fHidden = false, UpdateType *lpulAction = NULL);
+	ECRESULT	UpdateRow(UpdateType ulType, const sObjectTableKey *lpsRowItem, unsigned int ulSortCols, const unsigned int *lpSortLen, const unsigned char *lpFlags, unsigned char **lppSortData, sObjectTableKey *lpsPrevRow, bool fHidden = false, UpdateType *lpulAction = NULL);
 	ECRESULT	GetPreviousRow(const sObjectTableKey *lpsRowItem, sObjectTableKey *lpsPrevItem);
 	ECRESULT	SeekRow(unsigned int ulBookmark, int lSeekTo, int *lplRowsSought);
-	ECRESULT	SeekId(sObjectTableKey *lpsRowItem);
+	ECRESULT	SeekId(const sObjectTableKey *lpsRowItem);
 	ECRESULT	GetRowCount(unsigned int *ulRowCount, unsigned int *ulCurrentRow);
 	ECRESULT	QueryRows(unsigned int ulRows, ECObjectTableList* lpRowList, bool bDirBackward, unsigned int ulFlags, bool bShowHidden = false);
 	ECRESULT	Clear();

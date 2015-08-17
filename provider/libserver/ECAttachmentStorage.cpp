@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -43,9 +42,9 @@
  */
 
 #include "platform.h"
-
+#include <climits>
 #include <mapidefs.h>
-#include <errno.h>
+#include <cerrno>
 
 #include <algorithm>
 
@@ -55,14 +54,22 @@
 
 #include <ECSerializer.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+	#include <unistd.h>
+
 #include "ECAttachmentStorage.h"
 #include "SOAPUtils.h"
-#include "mapitags.h"
+#include "MAPIErrors.h"
+#include <mapitags.h>
 #include "stringutil.h"
 #include "StreamUtil.h"
 
 // chunk size for attachment blobs, must be equal or larger than MAX, MAX may never shrink below 384*1024.
-#define CHUNK_SIZE 384*1024
+#define CHUNK_SIZE (384 * 1024)
+
+// as adviced by http://www.zlib.net/manual.html we use an 128KB buffer; default is only 8KB
+#define ZLIB_BUFFER_SIZE std::max(CHUNK_SIZE, 128 * 1024)
 
 /*
  * Locking requirements of ECAttachmentStorage:
@@ -126,13 +133,24 @@ ECRESULT ECAttachmentStorage::CreateAttachmentStorage(ECDatabase *lpDatabase, EC
 	ECAttachmentStorage *lpAttachmentStorage = NULL;
 
 	if (lpDatabase == NULL) {
-	        lpLogger->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::CreateAttachmentStorage(): DB na yet");
+	        lpLogger->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::CreateAttachmentStorage(): DB na yet");
 
 		return ZARAFA_E_DATABASE_ERROR; // somebody called this function too soon.
 	}
 
-	if (strcmp(lpConfig->GetSetting("attachment_storage"), "files") == 0) {
-		lpAttachmentStorage = new ECFileAttachment(lpDatabase, lpConfig->GetSetting("attachment_path"), atoi(lpConfig->GetSetting("attachment_compression")), lpLogger);
+	const char *ans = lpConfig->GetSetting("attachment_storage");
+	const char *dir = lpConfig->GetSetting("attachment_path");
+	if (dir == NULL) {
+		lpLogger->Log(EC_LOGLEVEL_ERROR, "No attachment_path set despite attachment_storage=files. Falling back to database attachments.");
+		ans = NULL;
+	}
+	if (ans != NULL && strcmp(ans, "files") == 0) {
+		const char *const sync_files_par = lpConfig->GetSetting("attachment_files_fsync");
+		bool sync_files = sync_files_par == NULL || strcmp_ci(sync_files_par, "yes") == 0;
+		const char *comp = lpConfig->GetSetting("attachment_compression");
+		unsigned int complvl = (comp == NULL) ? 0 : strtoul(comp, NULL, 0);
+
+		lpAttachmentStorage = new ECFileAttachment(lpDatabase, dir, complvl, lpLogger, sync_files);
 	} else {
 		lpAttachmentStorage = new ECDatabaseAttachment(lpDatabase, lpLogger);
 	}
@@ -167,7 +185,7 @@ ECRESULT ECAttachmentStorage::GetSingleInstanceId(ULONG ulObjId, ULONG ulTag, UL
 
 	er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess) {
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::GetSingleInstanceId(): DoSelect() failed %x", er);
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::GetSingleInstanceId(): DoSelect() failed %x", er);
 		goto exit;
 	}
 
@@ -175,7 +193,7 @@ ECRESULT ECAttachmentStorage::GetSingleInstanceId(ULONG ulObjId, ULONG ulTag, UL
 
 	if (!lpDBRow || !lpDBRow[0]) {
 		er = ZARAFA_E_NOT_FOUND;
-		// m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::GetSingleInstanceId(): FetchRow() failed %x", er);
+		// m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::GetSingleInstanceId(): FetchRow() failed %x", er);
 		goto exit;
 	}
 
@@ -229,7 +247,7 @@ ECRESULT ECAttachmentStorage::GetSingleInstanceIds(std::list<ULONG> &lstObjIds, 
 
 	while ((lpDBRow = m_lpDatabase->FetchRow(lpDBResult)) != NULL) {
 		if (lpDBRow[0] == NULL) {
-			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::GetSingleInstanceIds(): column contains NULL");
+			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::GetSingleInstanceIds(): column contains NULL");
 			er = ZARAFA_E_DATABASE_ERROR;
 			goto exit;
 		}
@@ -311,7 +329,7 @@ ECRESULT ECAttachmentStorage::GetSingleInstanceParents(ULONG ulInstanceId, std::
 	while ((lpDBRow = m_lpDatabase->FetchRow(lpDBResult)) != NULL) {
 		if (lpDBRow[0] == NULL) {
 			er = ZARAFA_E_DATABASE_ERROR;
-			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::GetSingleInstanceParents(): column contains NULL");
+			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::GetSingleInstanceParents(): column contains NULL");
 			goto exit;
 		}
 
@@ -394,7 +412,7 @@ ECRESULT ECAttachmentStorage::GetOrphanedSingleInstances(std::list<ULONG> &lstIn
 
 	er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess) {
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::GetOrphanedSingleInstances(): DoSelect failed %x", er);
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::GetOrphanedSingleInstances(): DoSelect failed %x", er);
 		goto exit;
 	}
 
@@ -408,7 +426,7 @@ ECRESULT ECAttachmentStorage::GetOrphanedSingleInstances(std::list<ULONG> &lstIn
 	while ((lpDBRow = m_lpDatabase->FetchRow(lpDBResult)) != NULL) {
 		if (lpDBRow[0] == NULL) {
 			er = ZARAFA_E_DATABASE_ERROR;
-			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::GetOrphanedSingleInstances(): column contains NULL");
+			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::GetOrphanedSingleInstances(): column contains NULL");
 			goto exit;
 		}
 
@@ -456,7 +474,7 @@ bool ECAttachmentStorage::ExistAttachment(ULONG ulObjId, ULONG ulPropId)
  * 
  * @return Zarafa error code
  */
-ECRESULT ECAttachmentStorage::LoadAttachment(struct soap *soap, ULONG ulObjId, ULONG ulPropId, int *lpiSize, unsigned char **lppData)
+ECRESULT ECAttachmentStorage::LoadAttachment(struct soap *soap, ULONG ulObjId, ULONG ulPropId, size_t *lpiSize, unsigned char **lppData)
 {
 	ECRESULT er = erSuccess;
 	ULONG ulInstanceId = 0;
@@ -486,7 +504,7 @@ exit:
  * 
  * @return Zarafa error code
  */
-ECRESULT ECAttachmentStorage::LoadAttachment(ULONG ulObjId, ULONG ulPropId, int *lpiSize, ECSerializer *lpSink)
+ECRESULT ECAttachmentStorage::LoadAttachment(ULONG ulObjId, ULONG ulPropId, size_t *lpiSize, ECSerializer *lpSink)
 {
 	ECRESULT er = erSuccess;
 	ULONG ulInstanceId = 0;
@@ -518,7 +536,7 @@ exit:
  * 
  * @return Zarafa error code
  */
-ECRESULT ECAttachmentStorage::SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool bDeleteOld, int iSize, unsigned char *lpData, ULONG *lpulInstanceId)
+ECRESULT ECAttachmentStorage::SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool bDeleteOld, size_t iSize, unsigned char *lpData, ULONG *lpulInstanceId)
 {
 	ECRESULT er = erSuccess;
 	ULONG ulInstanceId = 0;
@@ -547,7 +565,7 @@ ECRESULT ECAttachmentStorage::SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool
 		"(" + stringify(ulObjId) + ", " + stringify(ulPropId) + ")";
 	er = m_lpDatabase->DoInsert(strQuery, (unsigned int*)&ulInstanceId);
 	if (er != erSuccess) {
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::SaveAttachment(): DoInsert failed %x", er);
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::SaveAttachment(): DoInsert failed %x", er);
 		goto exit;
 	}
 
@@ -574,7 +592,7 @@ exit:
  * 
  * @return Zarafa error code
  */
-ECRESULT ECAttachmentStorage::SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool bDeleteOld, int iSize, ECSerializer *lpSource, ULONG *lpulInstanceId)
+ECRESULT ECAttachmentStorage::SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool bDeleteOld, size_t iSize, ECSerializer *lpSource, ULONG *lpulInstanceId)
 {
 	ECRESULT er = erSuccess;
 	ULONG ulInstanceId = 0;
@@ -598,7 +616,7 @@ ECRESULT ECAttachmentStorage::SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool
 		"(" + stringify(ulObjId) + ", " + stringify(ulPropId) + ")";
 	er = m_lpDatabase->DoInsert(strQuery, (unsigned int*)&ulInstanceId);
 	if (er != erSuccess) {
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::SaveAttachment(): DoInsert failed %x", er);
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::SaveAttachment(): DoInsert failed %x", er);
 		goto exit;
 	}
 
@@ -683,7 +701,7 @@ ECRESULT ECAttachmentStorage::CopyAttachment(ULONG ulObjId, ULONG ulNewObjId)
 
 	er = m_lpDatabase->DoInsert(strQuery);
 	if (er != erSuccess) {
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::CopyAttachment(): DoInsert failed %x", er);
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::CopyAttachment(): DoInsert failed %x", er);
 		goto exit;
 	}
 
@@ -735,7 +753,7 @@ ECRESULT ECAttachmentStorage::DeleteAttachments(std::list<ULONG> lstDeleteObject
 
 	er = m_lpDatabase->DoDelete(strQuery);
 	if (er != erSuccess) {
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::DeleteAttachments(): DoDelete failed %x", er);
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::DeleteAttachments(): DoDelete failed %x", er);
 		goto exit;
 	}
 
@@ -806,7 +824,7 @@ ECRESULT ECAttachmentStorage::DeleteAttachment(ULONG ulObjId, ULONG ulPropId, bo
 
 	er = m_lpDatabase->DoDelete(strQuery);
 	if (er != erSuccess) {
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::DeleteAttachment(): DoDelete failed %x", er);
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::DeleteAttachment(): DoDelete failed %x", er);
 		goto exit;
 	}
 
@@ -832,7 +850,7 @@ exit:
  * 
  * @return Zarafa error code
  */
-ECRESULT ECAttachmentStorage::GetSize(ULONG ulObjId, ULONG ulPropId, ULONG *lpulSize)
+ECRESULT ECAttachmentStorage::GetSize(ULONG ulObjId, ULONG ulPropId, size_t *lpulSize)
 {
 	ECRESULT er = erSuccess;
 	ULONG ulInstanceId = 0;
@@ -885,7 +903,7 @@ bool ECDatabaseAttachment::ExistAttachmentInstance(ULONG ulInstanceId)
 
 	er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess) {
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::ExistAttachmentInstance(): DoSelect failed %x", er);
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::ExistAttachmentInstance(): DoSelect failed %x", er);
 		goto exit;
 	}
 
@@ -893,7 +911,7 @@ bool ECDatabaseAttachment::ExistAttachmentInstance(ULONG ulInstanceId)
 
 	if (!lpDBRow || !lpDBRow[0]) {
 		er = ZARAFA_E_NOT_FOUND;
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::ExistAttachmentInstance(): FetchRow failed %x", er);
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::ExistAttachmentInstance(): FetchRow failed %x", er);
 	}
 
 exit:
@@ -913,34 +931,33 @@ exit:
  * 
  * @return Zarafa error code
  */
-ECRESULT ECDatabaseAttachment::LoadAttachmentInstance(struct soap *soap, ULONG ulInstanceId, int *lpiSize, unsigned char **lppData)
+ECRESULT ECDatabaseAttachment::LoadAttachmentInstance(struct soap *soap, ULONG ulInstanceId, size_t *lpiSize, unsigned char **lppData)
 {
 	ECRESULT er = erSuccess;
-	int iSize = 0;
-	int iReadSize = 0;
+	size_t iSize = 0;
+	size_t iReadSize = 0;
 	unsigned char *lpData = NULL;
 	std::string strQuery;
 	DB_RESULT lpDBResult = NULL;
 	DB_ROW lpDBRow = NULL;
 	DB_LENGTHS lpDBLen = NULL;
 
-
 	// we first need to know the complete size of the attachment (some old databases don't have the correct chunk size)
 	strQuery = "SELECT SUM(LENGTH(val_binary)) FROM lob WHERE instanceid = " + stringify(ulInstanceId);
 	er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess) {
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::LoadAttachmentInstance(): DoSelect failed %x", er);
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::LoadAttachmentInstance(): DoSelect failed %x", er);
 		goto exit;
 	}
 
 	lpDBRow = m_lpDatabase->FetchRow(lpDBResult);
 	if (lpDBRow == NULL || lpDBRow[0] == NULL) {
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECDatabaseAttachment::LoadAttachmentInstance(): no row returned");
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECDatabaseAttachment::LoadAttachmentInstance(): no row returned");
 		goto exit;
 	}
 
-	iSize = atoi(lpDBRow[0]);
+	iSize = strtoul(lpDBRow[0], NULL, 0);
 
 	m_lpDatabase->FreeResult(lpDBResult);
 	lpDBResult = NULL;
@@ -950,7 +967,7 @@ ECRESULT ECDatabaseAttachment::LoadAttachmentInstance(struct soap *soap, ULONG u
 
 	er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess) {
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::LoadAttachmentInstance(): DoSelect(2) failed %x", er);
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::LoadAttachmentInstance(): DoSelect(2) failed %x", er);
 		goto exit;
 	}
 
@@ -958,9 +975,9 @@ ECRESULT ECDatabaseAttachment::LoadAttachmentInstance(struct soap *soap, ULONG u
 
 	while ((lpDBRow = m_lpDatabase->FetchRow(lpDBResult))) {
 		if (lpDBRow[0] == NULL) {
-			// broken attachment !
+			// broken attachment!
 			er = ZARAFA_E_DATABASE_ERROR;
-			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECDatabaseAttachment::LoadAttachmentInstance(): column contained NULL");
+			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECDatabaseAttachment::LoadAttachmentInstance(): column contained NULL");
 			goto exit;
 		}
 
@@ -975,7 +992,7 @@ ECRESULT ECDatabaseAttachment::LoadAttachmentInstance(struct soap *soap, ULONG u
 
 exit:
 	if (er != erSuccess && lpData && !soap)
-		delete lpData;
+		delete [] lpData;
 
 	if (lpDBResult)
 		m_lpDatabase->FreeResult(lpDBResult);
@@ -992,10 +1009,10 @@ exit:
  * 
  * @return 
  */
-ECRESULT ECDatabaseAttachment::LoadAttachmentInstance(ULONG ulInstanceId, int *lpiSize, ECSerializer *lpSink)
+ECRESULT ECDatabaseAttachment::LoadAttachmentInstance(ULONG ulInstanceId, size_t *lpiSize, ECSerializer *lpSink)
 {
 	ECRESULT er = erSuccess;
-	int iReadSize = 0;
+	size_t iReadSize = 0;
 	std::string strQuery;
 	DB_RESULT lpDBResult = NULL;
 	DB_ROW lpDBRow = NULL;
@@ -1006,7 +1023,7 @@ ECRESULT ECDatabaseAttachment::LoadAttachmentInstance(ULONG ulInstanceId, int *l
 
 	er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess) {
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::LoadAttachmentInstance(): DoSelect failed %x", er);
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::LoadAttachmentInstance(): DoSelect failed %x", er);
 		goto exit;
 	}
 
@@ -1014,14 +1031,14 @@ ECRESULT ECDatabaseAttachment::LoadAttachmentInstance(ULONG ulInstanceId, int *l
 		if (lpDBRow[0] == NULL) {
 			// broken attachment !
 			er = ZARAFA_E_DATABASE_ERROR;
-			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECDatabaseAttachment::LoadAttachmentInstance(): column contained NULL");
+			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECDatabaseAttachment::LoadAttachmentInstance(): column contained NULL");
 			goto exit;
 		}
 
 		lpDBLen = m_lpDatabase->FetchRowLengths(lpDBResult);
 		er = lpSink->Write(lpDBRow[0], 1, lpDBLen[0]);
 		if (er != erSuccess) {
-			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::LoadAttachmentInstance(): Write failed %x", er);
+			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::LoadAttachmentInstance(): Write failed %x", er);
 			goto exit;
 		}
 
@@ -1052,22 +1069,18 @@ exit:
  * 
  * @return Zarafa error code
  */
-ECRESULT ECDatabaseAttachment::SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, int iSize, unsigned char *lpData)
+ECRESULT ECDatabaseAttachment::SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, size_t iSize, unsigned char *lpData)
 {
 	ECRESULT er = erSuccess;
 	std::string strQuery;
-	int	iChunkSize;
-	int	iSizeLeft;
-	int	iPtr;
-	unsigned int ulChunk;
 
 	// make chunks of 393216 bytes (384*1024)
-	iSizeLeft = iSize;
-	iPtr = 0;
-	ulChunk = 0;
+	size_t iSizeLeft = iSize;
+	size_t iPtr = 0;
+	size_t ulChunk = 0;
 
-	while (iSizeLeft > 0) {
-		iChunkSize = iSizeLeft < CHUNK_SIZE ? iSizeLeft : CHUNK_SIZE;
+	do {
+		size_t iChunkSize = iSizeLeft < CHUNK_SIZE ? iSizeLeft : CHUNK_SIZE;
 
 		strQuery = (std::string)"INSERT INTO lob (instanceid, chunkid, tag, val_binary) VALUES (" +
 			stringify(ulInstanceId) + ", " + stringify(ulChunk) + ", " + stringify(ulPropId) +
@@ -1075,14 +1088,14 @@ ECRESULT ECDatabaseAttachment::SaveAttachmentInstance(ULONG ulInstanceId, ULONG 
 
 		er = m_lpDatabase->DoInsert(strQuery);
 		if (er != erSuccess) {
-			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::SaveAttachmentInstance(): DoInsert failed %x", er);
+			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::SaveAttachmentInstance(): DoInsert failed %x", er);
 			goto exit;
 		}
 
 		ulChunk++;
 		iSizeLeft -= iChunkSize;
 		iPtr += iChunkSize;
-	}
+	} while (iSizeLeft > 0);
 
 exit:
 	return er;
@@ -1103,21 +1116,18 @@ exit:
  * 
  * @return Zarafa error code
  */
-ECRESULT ECDatabaseAttachment::SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, int iSize, ECSerializer *lpSource)
+ECRESULT ECDatabaseAttachment::SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, size_t iSize, ECSerializer *lpSource)
 {
 	ECRESULT er = erSuccess;
 	std::string strQuery;
-	int	iChunkSize;
-	int	iSizeLeft;
-	unsigned int ulChunk;
 	unsigned char szBuffer[CHUNK_SIZE] = {0};
 
 	// make chunks of 393216 bytes (384*1024)
-	iSizeLeft = iSize;
-	ulChunk = 0;
+	size_t iSizeLeft = iSize;
+	size_t ulChunk = 0;
 
 	while (iSizeLeft > 0) {
-		iChunkSize = iSizeLeft < CHUNK_SIZE ? iSizeLeft : CHUNK_SIZE;
+		size_t iChunkSize = iSizeLeft < CHUNK_SIZE ? iSizeLeft : CHUNK_SIZE;
 
 		er = lpSource->Read(szBuffer, 1, iChunkSize);
 		if (er != erSuccess)
@@ -1129,7 +1139,7 @@ ECRESULT ECDatabaseAttachment::SaveAttachmentInstance(ULONG ulInstanceId, ULONG 
 
 		er = m_lpDatabase->DoInsert(strQuery);
 		if (er != erSuccess) {
-			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::SaveAttachmentInstance(): DoInsert failed %x", er);
+			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::SaveAttachmentInstance(): DoInsert failed %x", er);
 			goto exit;
 		}
 
@@ -1199,7 +1209,7 @@ ECRESULT ECDatabaseAttachment::DeleteAttachmentInstance(ULONG ulInstanceId, bool
  * 
  * @return Zarafa error code
  */
-ECRESULT ECDatabaseAttachment::GetSizeInstance(ULONG ulInstanceId, ULONG *lpulSize, bool *lpbCompressed)
+ECRESULT ECDatabaseAttachment::GetSizeInstance(ULONG ulInstanceId, size_t *lpulSize, bool *lpbCompressed)
 {
 	ECRESULT er = erSuccess; 
 	std::string strQuery; 
@@ -1209,18 +1219,18 @@ ECRESULT ECDatabaseAttachment::GetSizeInstance(ULONG ulInstanceId, ULONG *lpulSi
 	strQuery = "SELECT SUM(LENGTH(val_binary)) FROM lob WHERE instanceid = " + stringify(ulInstanceId);
 	er = m_lpDatabase->DoSelect(strQuery, &lpDBResult); 
 	if (er != erSuccess)  {
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECAttachmentStorage::GetSizeInstance(): DoSelect failed %x", er);
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECAttachmentStorage::GetSizeInstance(): DoSelect failed %x", er);
 		goto exit; 
 	}
 
 	lpDBRow = m_lpDatabase->FetchRow(lpDBResult); 
 	if (lpDBRow == NULL || lpDBRow[0] == NULL) { 
 		er = ZARAFA_E_DATABASE_ERROR; 
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECDatabaseAttachment::GetSizeInstance(): now row or column contained NULL");
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECDatabaseAttachment::GetSizeInstance(): now row or column contained NULL");
 		goto exit; 
 	} 
  	 
-	*lpulSize = atoui(lpDBRow[0]); 
+	*lpulSize = strtoul(lpDBRow[0], NULL, 0);
 	if (lpbCompressed)
 		*lpbCompressed = false;
  	 
@@ -1248,23 +1258,40 @@ ECRESULT ECDatabaseAttachment::Rollback()
 
 
 // Attachment storage is in separate files
-ECFileAttachment::ECFileAttachment(ECDatabase *lpDatabase, std::string basepath, unsigned int ulCompressionLevel, ECLogger *lpLogger)
-	: ECAttachmentStorage(lpDatabase, ulCompressionLevel)
-{
+ECFileAttachment::ECFileAttachment(ECDatabase *lpDatabase, std::string basepath, unsigned int ulCompressionLevel, ECLogger *lpLogger, const bool force_changes_to_disk) : ECAttachmentStorage(lpDatabase, ulCompressionLevel) {
 	m_basepath = basepath;
 	m_lpLogger = lpLogger;
-	
+
 	if (m_basepath.empty())
 		m_basepath = "/var/lib/zarafa";
+
+	this -> force_changes_to_disk = force_changes_to_disk;
+
+	m_dirFd = -1;
+	m_dirp = NULL;
+
+	if (force_changes_to_disk) {
+		m_dirp = opendir(m_basepath.c_str());
+
+		if (m_dirp)
+			m_dirFd = dirfd(m_dirp);
+
+		if (m_dirFd == -1)
+			m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Problem opening directory file %s: %s - attachment storage atomicity not guaranteed", m_basepath.c_str(), strerror(errno));
+	}
+
+	attachment_size_safety_limit = 512 * 1024 * 1024; // FIXME make configurable
 	
 	m_bTransaction = false;
 }
 
 ECFileAttachment::~ECFileAttachment()
 {
-	if(m_bTransaction) {
+	if (m_dirp != NULL)
+		closedir(m_dirp);
+
+	if (m_bTransaction)
 		ASSERT(FALSE);
-	}
 }
 
 /** 
@@ -1276,24 +1303,138 @@ ECFileAttachment::~ECFileAttachment()
  */
 bool ECFileAttachment::ExistAttachmentInstance(ULONG ulInstanceId)
 {
+#	define z_stat stat
 	ECRESULT er = erSuccess;
 	string filename = CreateAttachmentFilename(ulInstanceId, m_bFileCompression);
-	FILE *f = NULL;
 
-	f = fopen(filename.c_str(), "r");
-	if (!f) {
+	struct z_stat st;
+	if (z_stat(filename.c_str(), &st) == -1) {
 		filename = CreateAttachmentFilename(ulInstanceId, !m_bFileCompression);
-		f = fopen(filename.c_str(), "r");
-	}
-	if (!f) {
-		er = ZARAFA_E_NOT_FOUND;
-		goto exit;
-	}
 
-	fclose(f);
+		if (z_stat(filename.c_str(), &st) == -1) {
+			er = ZARAFA_E_NOT_FOUND;
+			goto exit;
+		}
+	}
 
 exit:
 	return er == erSuccess;
+#undef z_stat
+}
+
+/**
+ * @uclen:	number of uncompressed bytes that is requested
+ */
+static ssize_t gzread_retry(ECLogger *log, gzFile fp, void *data, size_t uclen)
+{
+	ssize_t read_total = 0;
+	char *buf = static_cast<char *>(data);
+
+	if (uclen == 0)
+		/* Avoid useless churn. */
+		return 0;
+
+	while (uclen > 0) {
+		int chunk_size = (uclen > INT_MAX) ? INT_MAX : uclen;
+		int ret = gzread(fp, buf, chunk_size);
+
+		/*
+		 * Save @errno now, since gzerror() code looks prone to
+		 * reset it.
+		 */
+		int saved_errno = errno;
+		int zerror;
+		const char *zerrstr = gzerror(fp, &zerror);
+
+		if (ret < 0 && zerror == Z_ERRNO &&
+		    (saved_errno == EINTR || saved_errno == EAGAIN))
+			/* Server delay (cf. gzread_write) */
+			continue;
+		if (ret < 0 && zerror == Z_ERRNO) {
+			log->Log(EC_LOGLEVEL_ERROR, "gzread: %s (%d): %s",
+			         zerrstr, zerror, strerror(saved_errno));
+			return ret;
+		}
+		if (ret < 0) {
+			log->Log(EC_LOGLEVEL_ERROR, "gzread: %s (%d)",
+			         zerrstr, zerror);
+			return ret;
+		}
+		if (ret == 0)
+			/*
+			 * EOF (since we already excluded chunk_size==0
+			 * requests).
+			 */
+			break;
+		buf += ret;
+		read_total += ret;
+		uclen -= ret;
+	}
+	return read_total;
+}
+
+static ssize_t
+gzwrite_retry(ECLogger *log, gzFile fp, const void *data, size_t uclen)
+{
+	size_t wrote_total = 0;
+	const char *buf = static_cast<const char *>(data);
+
+	if (uclen == 0)
+		/* Avoid useless churn. */
+		return 0;
+
+	while (uclen > 0) {
+		int chunk_size = (uclen > INT_MAX) ? INT_MAX : uclen;
+		int ret = gzwrite(fp, buf, chunk_size);
+		int saved_errno = errno;
+		int zerror;
+		const char *zerrstr = gzerror(fp, &zerror);
+
+		if (ret < 0 && zerror == Z_ERRNO &&
+		    (saved_errno == EINTR || saved_errno == EAGAIN))
+			/*
+			 * Choosing to continue reading can delay server
+			 * shutdown... but we are in a soap handler, so
+			 * whatelse could we do.
+			 */
+			continue;
+		if (ret < 0 && zerror == Z_ERRNO) {
+			log->Log(EC_LOGLEVEL_ERROR, "gzwrite: %s (%d): %s",
+			         zerrstr, zerror, strerror(saved_errno));
+			return ret;
+		}
+		if (ret < 0) {
+			log->Log(EC_LOGLEVEL_ERROR, "gzwrite: %s (%d)",
+			         zerrstr, zerror);
+			return ret;
+		}
+		if (ret == 0)
+			/* ??? - could happen if the file is not open for write */
+			break;
+		buf += ret;
+		wrote_total += ret;
+		uclen -= ret;
+	}
+	return wrote_total;
+}
+
+bool ECFileAttachment::VerifyInstanceSize(const ULONG instanceId, const size_t expectedSize, const std::string & filename) {
+	bool bCompressed = false;
+	size_t ulSize = 0;
+	if (GetSizeInstance(instanceId, &ulSize, &bCompressed) != erSuccess) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::VerifyInstanceSize(): Failed verifying size of %s", filename.c_str());
+		return false;
+	}
+
+	if (ulSize != expectedSize) {
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "ECFileAttachment::VerifyInstanceSize(): Uncompressed size unexpected for %s: expected %lu, got %lu.", filename.c_str(), static_cast<unsigned long>(expectedSize), static_cast<unsigned long>(ulSize));
+		return false;
+	}
+
+	if (ulSize > attachment_size_safety_limit)
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "ECFileAttachment::VerifyInstanceSize(): Overly large file (%lu/%lu): %s", static_cast<unsigned long>(expectedSize), static_cast<unsigned long>(ulSize), filename.c_str());
+
+	return true;
 }
 
 /** 
@@ -1306,91 +1447,164 @@ exit:
  * 
  * @return Zarafa error code
  */
-ECRESULT ECFileAttachment::LoadAttachmentInstance(struct soap *soap, ULONG ulInstanceId, int *lpiSize, unsigned char **lppData)
-{
+ECRESULT ECFileAttachment::LoadAttachmentInstance(struct soap *soap, ULONG ulInstanceId, size_t *lpiSize, unsigned char **lppData) {
 	ECRESULT er = erSuccess;
 	string filename;
-	FILE *fp = NULL;
-	gzFile gzfp = NULL;
 	unsigned char *lpData = NULL;
-	ULONG ulSize = 0;
-	LONG lReadSize = 0;
 	bool bCompressed = false;
 	int fd = -1;
+	gzFile gzfp = NULL;
 
-	/*
-	 * First we need to determine the (uncompressed) filesize
-	 */
-	er = GetSizeInstance(ulInstanceId, &ulSize, &bCompressed);
-	if (er != erSuccess)
-		goto exit;
+	*lpiSize = 0;
 
 	filename = CreateAttachmentFilename(ulInstanceId, bCompressed);
-	lpData = s_alloc<unsigned char>(soap, ulSize);
-	if (lpData == NULL) {
-		er = ZARAFA_E_NOT_ENOUGH_MEMORY;
-		goto exit;
+
+	fd = open(filename.c_str(), O_RDONLY);
+	if (fd == -1) {
+		bCompressed = !bCompressed;
+
+		filename = CreateAttachmentFilename(ulInstanceId, bCompressed);
+
+		fd = open(filename.c_str(), O_RDONLY);
 	}
 
-	fp = fopen(filename.c_str(), "r");
-	if (!fp) {
+	if (fd == -1) {
 		er = ZARAFA_E_NOT_FOUND;
 		goto exit;
 	}
 
-	/* fileno *MUST* succeed according to the man-page; if it does it returns -1.
-	 * This should simply cause a ZARAFA_E_NOT_FOUND later on.
-	 * It would be rather unusual if fileno fails because only microseconds ago we were able to do an
-	 * fopen on the file.
-	 */
-	fd = fileno(fp);
+	my_readahead(fd);
 
 	/*
 	 * CreateAttachmentFilename Already checked if we are working with an compressed or uncompressed file,
 	 * no need to perform retries when our first guess (which is based on CreateAttachmentFilename) fails.
 	 */
 	if (bCompressed) {
+		unsigned char *temp = NULL;
+
 		/* Compressed attachment */
 		gzfp = gzdopen(fd, "rb");
 		if (!gzfp) {
-			er = ZARAFA_E_NOT_FOUND;
+			// do not use ZARAFA_E_NOT_FOUND: the file is already open so it exists
+			// so something else is going wrong here
+			er = ZARAFA_E_UNKNOWN;
 			goto exit;
 		}
 
-		lReadSize = gzread(gzfp, lpData, ulSize);
-		if (lReadSize < 0) {
-		    m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Error while reading attachment data from %s: %s", filename.c_str(), strerror(errno));
+#if ZLIB_VERNUM >= 0x1240
+		if (gzbuffer(gzfp, ZLIB_BUFFER_SIZE) == -1)
+			m_lpLogger->Log(EC_LOGLEVEL_WARNING, "gzbuffer failed");
+#endif
+
+		size_t memory_block_size = 0;
+		*lpiSize = 0;
+
+		for(;;)
+		{
+			int ret = -1;
+
+			if (memory_block_size == *lpiSize) {
+				if (memory_block_size)
+					memory_block_size *= 2;
+				else
+					memory_block_size = CHUNK_SIZE;
+
+				unsigned char *new_temp = reinterpret_cast<unsigned char *>(realloc(temp, memory_block_size));
+				if (!new_temp) {
+					// first free memory or the logging may fail too
+					free(temp);
+					temp = NULL;
+
+					m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::LoadAttachmentInstance(SOAP): Out of memory while reading %s", filename.c_str());
+					er = ZARAFA_E_UNABLE_TO_COMPLETE;
+					goto exit;
+				}
+
+				temp = new_temp;
+			}
+
+			ret = gzread_retry(m_lpLogger, gzfp, &temp[*lpiSize], memory_block_size - *lpiSize);
+
+			if (ret < 0) {
+				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::LoadAttachmentInstance(SOAP): Error while gzreading attachment data from %s", filename.c_str());
+				er = ZARAFA_E_DATABASE_ERROR;
+				break;
+			}
+
+			if (ret == 0)
+				break;
+
+			*lpiSize += ret;
+
+			if (*lpiSize >= attachment_size_safety_limit) {
+				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::LoadAttachmentInstance(SOAP): Size safety limit (%lu) reached for %s (compressed)", static_cast<unsigned long>(attachment_size_safety_limit), filename.c_str());
+				er = ZARAFA_E_DATABASE_ERROR;
+				break;
+			}
+		}
+
+		if (er == erSuccess && !VerifyInstanceSize(ulInstanceId, *lpiSize, filename))
+			er = ZARAFA_E_DATABASE_ERROR;
+
+		if (er == erSuccess) {
+			lpData = s_alloc<unsigned char>(soap, *lpiSize);
+
+			memcpy(lpData, temp, *lpiSize);
+		}
+
+		free(temp);
+	}
+	else {
+		ssize_t lReadSize = 0;
+
+		struct stat st;
+		if (fstat(fd, &st) == -1)
+		{
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::LoadAttachmentInstance(SOAP): Error while doing fstat on %s: %s", filename.c_str(), strerror(errno));
 			er = ZARAFA_E_DATABASE_ERROR;
 			goto exit;
 		}
-		if (ulSize != (ULONG)lReadSize) {
+
+
+		*lpiSize = st.st_size;
+
+		if (*lpiSize >= attachment_size_safety_limit) {
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::LoadAttachmentInstance(SOAP): Size safety limit (%lu) reached for %s (uncompressed)", static_cast<unsigned long>(attachment_size_safety_limit), filename.c_str());
 			er = ZARAFA_E_DATABASE_ERROR;
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECFileAttachment::LoadAttachmentInstance(): on-disk size %lu differs %lu", (ULONG)lReadSize, ulSize);
 			goto exit;
 		}
-	} else {
+
+		lpData = s_alloc<unsigned char>(soap, *lpiSize);
+
 		/* Uncompressed attachment */
-		lReadSize = (LONG)fread(lpData, 1, ulSize, fp);
+		lReadSize = read_retry(fd, lpData, *lpiSize);
+		if (lReadSize < 0) {
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::LoadAttachmentInstance(SOAP): Error while reading attachment data from %s: %s", filename.c_str(), strerror(errno));
+			er = ZARAFA_E_DATABASE_ERROR;
+			goto exit;
+		}
 
-		if (ulSize != (ULONG)lReadSize) {
-		    m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Short read while reading attachment data from %s", filename.c_str());
+		if (lReadSize != static_cast<ssize_t>(*lpiSize)) {
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::LoadAttachmentInstance(SOAP): Short read while reading attachment data from %s: expected %lu, got %lu.", filename.c_str(), static_cast<unsigned long>(*lpiSize), static_cast<unsigned long>(lReadSize));
 			er = ZARAFA_E_DATABASE_ERROR;
 			goto exit;
 		}
 	}
 
-	*lpiSize = ulSize;
 	*lppData = lpData;
 
 exit:
-	/* ignore the result: it is odd if this call fails but it is not fatal if the kernel buffers the file */
-	if (fd != -1)
-		(void)posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
+	if (er != erSuccess)
+		delete [] lpData;
 
 	if (gzfp)
+	{
 		gzclose(gzfp);
-	if (fp)
-		fclose(fp);
+		fd = -1;
+	}
+
+	if (fd != -1)
+		close(fd);
 
 	return er;
 }
@@ -1404,102 +1618,141 @@ exit:
  * 
  * @return 
  */
-ECRESULT ECFileAttachment::LoadAttachmentInstance(ULONG ulInstanceId, int *lpiSize, ECSerializer *lpSink)
-{
+ECRESULT ECFileAttachment::LoadAttachmentInstance(ULONG ulInstanceId, size_t *lpiSize, ECSerializer *lpSink) {
 	ECRESULT er = erSuccess;
 	string filename;
-	FILE *fp = NULL;
-	gzFile gzfp = NULL;
-	ULONG ulReadSize = 0;
-	LONG lReadNow = 0;
-	ULONG ulSize = 0;
 	bool bCompressed = false;
-	char buffer[0x1000] = {0};
+	char buffer[CHUNK_SIZE];
 	int fd = -1;
+	gzFile gzfp = NULL;
 
-	/*
-	 * First we need to determine the (uncompressed) filesize
-	 */
-	er = GetSizeInstance(ulInstanceId, &ulSize, &bCompressed);
-	if (er != erSuccess)
-		goto exit;
+	*lpiSize = 0;
 
 	filename = CreateAttachmentFilename(ulInstanceId, bCompressed);
 
-	fp = fopen(filename.c_str(), "r");
-	if (!fp) {
-		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECFileAttachment::LoadAttachmentInstance(): cannot open %s", filename.c_str());
+	fd = open(filename.c_str(), O_RDONLY);
+	if (fd == -1) {
+		er = ZARAFA_E_NOT_FOUND;
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::LoadAttachmentInstance(): cannot open %s", filename.c_str());
 		goto exit;
 	}
 
-	/* fileno *MUST* succeed according to the man-page; if it does it returns -1.
-	 * This should simply cause a ZARAFA_E_NOT_FOUND later on.
-	 * It would be rather unusual if fileno fails because only microseconds ago we were able to do an
-	 * fopen on the file.
-	 */
-	fd = fileno(fp);
+	my_readahead(fd);
 
 	if (bCompressed) {
 		/* Compressed attachment */
 		gzfp = gzdopen(fd, "rb");
 		if (!gzfp) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = ZARAFA_E_UNKNOWN;
 			goto exit;
 		}
-		while (ulReadSize < ulSize) {
-			lReadNow = gzread(gzfp, buffer, sizeof(buffer));
+
+#if ZLIB_VERNUM >= 0x1240
+		if (gzbuffer(gzfp, ZLIB_BUFFER_SIZE) == -1)
+			m_lpLogger->Log(EC_LOGLEVEL_WARNING, "gzbuffer failed");
+#endif
+
+		for(;;) {
+			ssize_t lReadNow = gzread_retry(m_lpLogger, gzfp, buffer, sizeof(buffer));
 			if (lReadNow < 0) {
-			    m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Error while reading attachment data from %s: %s", filename.c_str(), strerror(errno));
+				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::LoadAttachmentInstance(): Error while gzreading attachment data from %s.", filename.c_str());
 				er = ZARAFA_E_DATABASE_ERROR;
 				goto exit;
 			}
-			if (lReadNow > 0) {
-				lpSink->Write(buffer, 1, lReadNow);
-				ulReadSize += lReadNow;
-			}
-			if ((ULONG)lReadNow < sizeof(buffer))
+
+			if (lReadNow == 0)
 				break;
+
+			lpSink->Write(buffer, 1, lReadNow);
+
+			*lpiSize += lReadNow;
 		}
-		if (ulSize != ulReadSize) {
+
+		if (er == erSuccess && !VerifyInstanceSize(ulInstanceId, *lpiSize, filename))
 			er = ZARAFA_E_DATABASE_ERROR;
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECFileAttachment::LoadAttachmentInstance(): on-disk size %lu differs %lu", ulReadSize, ulSize);
-			goto exit;
-		}
-	} else {
-		while (ulReadSize < ulSize) {
-			lReadNow = (ULONG)fread(buffer, 1, sizeof(buffer), fp);
-			if (lReadNow == 0 && ferror(fp)) {
-				m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Error while reading attachment data from %s: %s", filename.c_str(), strerror(errno));
+	}
+	else {
+		for(;;) {
+			ssize_t lReadNow = read_retry(fd, buffer, sizeof(buffer));
+			if (lReadNow < 0) {
+				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::LoadAttachmentInstance(SOAP): Error while reading attachment data from %s: %s", filename.c_str(), strerror(errno));
 				er = ZARAFA_E_DATABASE_ERROR;
 				goto exit;
 			}
-			if (lReadNow > 0) {
-				lpSink->Write(buffer, 1, lReadNow);
-				ulReadSize += lReadNow;
-			}
-			if ((ULONG)lReadNow < sizeof(buffer))
+
+			if (lReadNow == 0)
 				break;
-		}
-		if (ulSize != ulReadSize) {
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Short read while reading attachment data from %s", filename.c_str());
-			er = ZARAFA_E_DATABASE_ERROR;
-			goto exit;
+
+			lpSink->Write(buffer, 1, lReadNow);
+
+			*lpiSize += lReadNow;
 		}
 	}
 
-	*lpiSize = ulSize;
-
 exit:
-	if (fd != -1)
-		(void)posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
-
-	if (gzfp)
+	if (gzfp) {
 		gzclose(gzfp);
-	if (fp)
-		fclose(fp);
+		fd = -1;
+	}
+
+	if (fd != -1)
+		close(fd);
 
 	return er;
+}
+
+static bool EvaluateCompressibleness(const uint8_t *const lpData, const size_t iSize) {
+	// If a file is smallar than the (usual) blocksize of the filesystem
+	// then don't bother compressing it; it will give no gain as the
+	// whole block will be read anyway when it is retrieved from disk.
+	// In theory we could still try to compress it to see if the result
+	// is smaller than 60: if a file is 60 bytes or less in size, then
+	// it can be stored into the inode itself (at least for the ext4
+	// filesystem). But note: gzip has a metadata overhead of 18 bytes
+	// (see http://en.wikipedia.org/wiki/Gzip#File_format ) so a file
+	// should be compressible to at most 42 bytes.
+	if (iSize <= 4096)
+		return false;
+
+	// ZIP (also most OpenOffice documents; those are multiple files in a ZIP-file)
+	if (lpData[0] == 'P' && lpData[1] == 'K' && lpData[2] == 0x03 && lpData[3] == 0x04)
+		return false;
+
+	// JPEG
+	if (lpData[0] == 0xff && lpData[1] == 0xd8)
+		return false;
+
+	// GIF
+	if (lpData[0] == 'G' && lpData[1] == 'I' && lpData[2] == 'F' && lpData[3] == '8')
+		return false;
+
+	// PNG
+	if (lpData[0] == 0x89 && lpData[1] == 0x50 && lpData[2] == 0x4e && lpData[3] == 0x47 && lpData[4] == 0x0d && lpData[5] == 0x0a && lpData[6] == 0x1a && lpData[7] == 0x0a)
+		return false;
+
+	// RAR
+	if (lpData[0] == 0x52 && lpData[1] == 0x61 && lpData[2] == 0x72 && lpData[3] == 0x21 && lpData[4] == 0x1A && lpData[5] == 0x07)
+		return false;
+
+	// GZIP
+	if (lpData[0] == 0x1f && lpData[1] == 0x8b)
+		return false;
+
+	// XZ
+	if (lpData[0] == 0xfd && lpData[1] == '7' && lpData[2] == 'z' && lpData[3] == 'X' && lpData[4] == 'Z' && lpData[5] == 0x00)
+		return false;
+
+	// BZ (.bz2 et al)
+	if (lpData[0] == 0x42 && lpData[1] == 0x5A && lpData[2] == 0x68)
+		return false;
+
+	// MP3
+	if ((lpData[0] == 0x49 && lpData[1] == 0x44 && lpData[2] == 0x33) || (lpData[0] == 0xff && lpData[1] == 0xfb))
+		return false;
+
+	// FIXME what to do with PDF? ('%PDF')
+
+	return true;
 }
 
 /** 
@@ -1512,51 +1765,71 @@ exit:
  * 
  * @return Zarafa error code
  */
-ECRESULT ECFileAttachment::SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, int iSize, unsigned char *lpData)
+ECRESULT ECFileAttachment::SaveAttachmentInstance(ULONG ulInstanceId,
+    ULONG ulPropId, size_t iSize, unsigned char *lpData)
 {
+	bool compressible = EvaluateCompressibleness(lpData, iSize);
+
+	bool compressAttachment = compressible ? m_bFileCompression && iSize : false;
+
 	ECRESULT er = erSuccess;
-	string filename = CreateAttachmentFilename(ulInstanceId, m_bFileCompression && iSize);
-	int iWritten;
+	string filename = CreateAttachmentFilename(ulInstanceId, compressAttachment);
+	gzFile gzfp = NULL;
+	int fd = -1;
 
 	// no need to remove the file, just overwrite it
-	if (m_bFileCompression && iSize) {
-		gzFile gzfp = gzopen(filename.c_str(), std::string("wb" + m_CompressionLevel).c_str());
+	if (compressAttachment) {
+		gzfp = gzopen(filename.c_str(), std::string("wb" + m_CompressionLevel).c_str());
 		if (!gzfp) {
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to write attachment '%s' - %s.", filename.c_str(), strerror(errno));
-			er = ZARAFA_E_DATABASE_ERROR;
-			goto exit;
-		}
-		iWritten = gzwrite(gzfp, lpData, iSize);
-		gzclose(gzfp);
-	} else {
-		FILE *f = fopen(filename.c_str(), "w");
-		if (!f) {
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to write attachment '%s' - %s.", filename.c_str(), strerror(errno));
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to gzopen attachment %s for writing: %s", filename.c_str(), strerror(errno));
 			er = ZARAFA_E_DATABASE_ERROR;
 			goto exit;
 		}
 
-		// this helps preventing filesystem fragmentation as the
-		// kernel can now look for the best disk allocation
-		// pattern as it knows how much date is going to be
-		// inserted
-		posix_fallocate(fileno(f), 0, iSize);
+		ssize_t iWritten = gzwrite_retry(m_lpLogger, gzfp, lpData, iSize);
+		if (iWritten != static_cast<ssize_t>(iSize)) {
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to gzwrite %lu bytes to attachment %s, returned %lu.",
+				static_cast<unsigned long>(iSize), filename.c_str(), static_cast<unsigned long>(iWritten));
+			er = ZARAFA_E_DATABASE_ERROR;
+			goto exit;
+		}
+	}
+	else {
+		fd = open(filename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR | S_IRUSR);
 
-		iWritten = fwrite(lpData, 1, iSize, f);
-		fclose(f);
+		if (fd < 0) {
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open attachment %s for writing: %s", filename.c_str(), strerror(errno));
+			er = ZARAFA_E_DATABASE_ERROR;
+			goto exit;
+		}
+
+		give_filesize_hint(fd, iSize);
+
+		ssize_t iWritten = write_retry(fd, lpData, iSize);
+		if (iWritten != static_cast<ssize_t>(iSize)) {
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to write %lu bytes to attachment %s: %s. Returned %lu.",
+				static_cast<unsigned long>(iSize), filename.c_str(), strerror(errno), static_cast<unsigned long>(iWritten));
+			er = ZARAFA_E_DATABASE_ERROR;
+			goto exit;
+		}
 	}
 
 	// set in transaction before disk full check to remove empty file
 	if(m_bTransaction)
 		m_setNewAttachment.insert(ulInstanceId);
 
-	if (iWritten != iSize) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to write attachment, disk full");
-		er = ZARAFA_E_DATABASE_ERROR;
-		goto exit;
-	}
-
 exit:
+	if (gzfp != NULL) {
+		int ret = gzclose(gzfp);
+		if (ret != Z_OK) {
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "gzclose on attachment %s failed: %s",
+				filename.c_str(), (ret == Z_ERRNO) ? strerror(errno) : gzerror(gzfp, NULL));
+			er = ZARAFA_E_DATABASE_ERROR;
+		}
+		fd = -1;
+	}
+	if (fd != -1)
+		close(fd);
 	return er;
 }
 
@@ -1570,87 +1843,130 @@ exit:
  * 
  * @return Zarafa error code
  */
-ECRESULT ECFileAttachment::SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, int iSize, ECSerializer *lpSource)
+ECRESULT ECFileAttachment::SaveAttachmentInstance(ULONG ulInstanceId,
+    ULONG ulPropId, size_t iSize, ECSerializer *lpSource)
 {
 	ECRESULT er = erSuccess;
 	string filename = CreateAttachmentFilename(ulInstanceId, m_bFileCompression);
 	unsigned char szBuffer[CHUNK_SIZE];
-	int iSizeLeft;
-	int iChunkSize;
-	int iWritten;
+	size_t iSizeLeft = iSize;
 
-	iSizeLeft = iSize;
-
-	//no need to remove the file, just overwrite it
-	if (m_bFileCompression) {
-		gzFile gzfp = gzopen(filename.c_str(), std::string("wb" + m_CompressionLevel).c_str());
-		if (!gzfp) {
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to write attachment '%s' - %s.", filename.c_str(), strerror(errno));
-			er = ZARAFA_E_DATABASE_ERROR;
-			goto exit;
-		}
-
-		// file created on disk, now in transaction
-		if (m_bTransaction)
-			m_setNewAttachment.insert(ulInstanceId);
-
-		while (iSizeLeft > 0) {
-			iChunkSize = iSizeLeft < CHUNK_SIZE ? iSizeLeft : CHUNK_SIZE;
-
-			er = lpSource->Read(szBuffer, 1, iChunkSize);
-			if (er != erSuccess) {
-				gzclose(gzfp);
-				goto exit;
-			}
-
-			iWritten = gzwrite(gzfp, szBuffer, iChunkSize);
-			if (iWritten == 0)
-				break;
-			iSizeLeft -= iChunkSize;
-		}
-		gzclose(gzfp);
-	} else {
-		FILE *f = fopen(filename.c_str(), "w");
-		if (!f) {
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to write attachment '%s' - %s.", filename.c_str(), strerror(errno));
-			er = ZARAFA_E_DATABASE_ERROR;
-			goto exit;
-		}
-
-		// this helps preventing filesystem fragmentation as the
-		// kernel can now look for the best disk allocation
-		// pattern as it knows how much date is going to be
-		// inserted
-		posix_fallocate(fileno(f), 0, iSize);
-
-		// file created on disk, now in transaction
-		if (m_bTransaction)
-			m_setNewAttachment.insert(ulInstanceId);
-
-		while (iSizeLeft > 0) {
-			iChunkSize = iSizeLeft < CHUNK_SIZE ? iSizeLeft : CHUNK_SIZE;
-
-			er = lpSource->Read(szBuffer, 1, iChunkSize);
-			if (er != erSuccess) {
-				fclose(f);
-				goto exit;
-			}
-
-			iWritten = fwrite(szBuffer, 1, iChunkSize, f);
-			if (iWritten == 0)
-				break;
-			iSizeLeft -= iChunkSize;
-		}
-		fclose(f);
-		
-	}
-	if (iSizeLeft) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to write streaming attachment, disk full");
+	int fd = open(filename.c_str(), O_RDWR | O_CREAT, S_IWUSR | S_IRUSR);
+	if (fd == -1) {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open attachment %s for writing: %s.",
+			filename.c_str(), strerror(errno));
 		er = ZARAFA_E_DATABASE_ERROR;
 		goto exit;
 	}
 
+	//no need to remove the file, just overwrite it
+	if (m_bFileCompression) {
+		gzFile gzfp = gzdopen(fd, std::string("wb" + m_CompressionLevel).c_str());
+		if (!gzfp) {
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to gzdopen attachment %s for writing: %s",
+				filename.c_str(), strerror(errno));
+			er = ZARAFA_E_DATABASE_ERROR;
+			goto exit;
+		}
+
+		// file created on disk, now in transaction
+		if (m_bTransaction)
+			m_setNewAttachment.insert(ulInstanceId);
+
+		while (iSizeLeft > 0) {
+			size_t iChunkSize = iSizeLeft < CHUNK_SIZE ? iSizeLeft : CHUNK_SIZE;
+
+			er = lpSource->Read(szBuffer, 1, iChunkSize);
+			if (er != erSuccess) {
+				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Problem retrieving attachment from ECSource: %s (0x%x)", GetMAPIErrorMessage(ZarafaErrorToMAPIError(er, ~0U /* anything yielding UNKNOWN */)), er);
+				er = ZARAFA_E_DATABASE_ERROR;
+				break;
+			}
+
+			ssize_t iWritten = gzwrite_retry(m_lpLogger, gzfp, szBuffer, iChunkSize);
+			if (iWritten != static_cast<ssize_t>(iChunkSize)) {
+				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to gzwrite %lu bytes to attachment %s, returned %lu",
+					static_cast<unsigned long>(iChunkSize), filename.c_str(), static_cast<unsigned long>(iWritten));
+				er = ZARAFA_E_DATABASE_ERROR;
+				break;
+			}
+
+			iSizeLeft -= iChunkSize;
+		}
+
+		if (er == erSuccess) {
+			if (gzflush(gzfp, Z_FINISH)) {
+				int saved_errno = errno;
+				int zerror;
+				const char *zstrerr = gzerror(gzfp, &zerror);
+				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "gzflush failed: %s (%d)", zstrerr, zerror);
+				if (zerror == Z_ERRNO)
+					m_lpLogger->Log(EC_LOGLEVEL_ERROR, "gzflush failed: stdio says: %s", strerror(saved_errno));
+				er = ZARAFA_E_DATABASE_ERROR;
+			}
+
+			if (force_changes_to_disk && !force_buffers_to_disk(fd)) {
+				m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Problem syncing file %s: %s", filename.c_str(), strerror(errno));
+				er = ZARAFA_E_DATABASE_ERROR;
+			}
+		}
+
+		int ret = gzclose(gzfp);
+		if (ret != Z_OK) {
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Problem closing file %s: %s",
+				filename.c_str(), (ret == Z_ERRNO) ? strerror(errno) : gzerror(gzfp, NULL));
+			er = ZARAFA_E_DATABASE_ERROR;
+		}
+
+		// if gzclose fails, we can't know if the fd is still valid or not
+		fd = -1;
+	}
+	else {
+		give_filesize_hint(fd, iSize);
+
+		// file created on disk, now in transaction
+		if (m_bTransaction)
+			m_setNewAttachment.insert(ulInstanceId);
+
+		while (iSizeLeft > 0) {
+			size_t iChunkSize = iSizeLeft < CHUNK_SIZE ? iSizeLeft : CHUNK_SIZE;
+
+			er = lpSource->Read(szBuffer, 1, iChunkSize);
+			if (er != erSuccess) {
+				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Problem retrieving attachment from ECSource: %s (0x%x)", GetMAPIErrorMessage(ZarafaErrorToMAPIError(er, ~0U)), er);
+				er = ZARAFA_E_DATABASE_ERROR;
+				break;
+			}
+
+			ssize_t iWritten = write_retry(fd, szBuffer, iChunkSize);
+			if (iWritten != static_cast<ssize_t>(iChunkSize)) {
+				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to write %lu bytes to streaming attachment: %s",
+					static_cast<unsigned long>(iChunkSize), strerror(errno));
+				er = ZARAFA_E_DATABASE_ERROR;
+				break;
+			}
+
+			iSizeLeft -= iChunkSize;
+		}
+
+		if (er == erSuccess) {
+			if (force_changes_to_disk && !force_buffers_to_disk(fd)) {
+				m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Problem syncing file %s: %s", filename.c_str(), strerror(errno));
+				er = ZARAFA_E_DATABASE_ERROR;
+			}
+		}
+
+		close(fd);
+		fd = -1;
+	}
+
 exit:
+	if (er == erSuccess && m_dirFd != -1 && fsync(m_dirFd) == -1)
+		m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Problem syncing parent directory of %s: %s", filename.c_str(), strerror(errno));
+
+	if (fd != -1)
+		close(fd);
+
 	return er;
 }
 
@@ -1675,7 +1991,7 @@ ECRESULT ECFileAttachment::DeleteAttachmentInstances(std::list<ULONG> &lstDelete
 	}
 
 	if (errors)
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECFileAttachment::DeleteAttachmentInstances(): %x delete fails", errors);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::DeleteAttachmentInstances(): %x delete fails", errors);
 
 	return errors == 0 ? erSuccess : ZARAFA_E_DATABASE_ERROR;
 }
@@ -1708,7 +2024,7 @@ ECRESULT ECFileAttachment::MarkAttachmentForDeletion(ULONG ulInstanceId)
 		er = ZARAFA_E_NOT_FOUND;
 	else {
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECFileAttachment::MarkAttachmentForDeletion(): cannot mark %lu", ulInstanceId);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::MarkAttachmentForDeletion(): cannot mark %u", ulInstanceId);
 	}
 
 exit:
@@ -1743,7 +2059,7 @@ ECRESULT ECFileAttachment::RestoreMarkedAttachment(ULONG ulInstanceId)
         er = ZARAFA_E_NOT_FOUND;
     else {
         er = ZARAFA_E_DATABASE_ERROR;
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECFileAttachment::RestoreMarkedAttachment(): cannot mark %lu", ulInstanceId);
+	m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::RestoreMarkedAttachment(): cannot mark %u", ulInstanceId);
 	}
 exit:
 	return er;
@@ -1774,7 +2090,7 @@ ECRESULT ECFileAttachment::DeleteMarkedAttachment(ULONG ulInstanceId)
 		er = ZARAFA_E_NO_ACCESS;
 	else if (errno != ENOENT) { // ignore "file not found" error
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECFileAttachment::DeleteMarkedAttachment() cannot delete instance %lu", ulInstanceId);
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::DeleteMarkedAttachment() cannot delete instance %u", ulInstanceId);
 	}
 
 exit:
@@ -1822,8 +2138,8 @@ ECRESULT ECFileAttachment::DeleteAttachmentInstance(ULONG ulInstanceId, bool bRe
 			er = ZARAFA_E_NO_ACCESS;
 		else if (errno != ENOENT) { // ignore "file not found" error
 			er = ZARAFA_E_DATABASE_ERROR;
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECFileAttachment::DeleteAttachmentInstance() id %lu fail", ulInstanceId);
-	}
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::DeleteAttachmentInstance() id %u fail", ulInstanceId);
+		}
 	}
 
 exit:
@@ -1863,12 +2179,12 @@ std::string ECFileAttachment::CreateAttachmentFilename(ULONG ulInstanceId, bool 
  * 
  * @return Zarafa error code
  */
-ECRESULT ECFileAttachment::GetSizeInstance(ULONG ulInstanceId, ULONG *lpulSize, bool *lpbCompressed)
+ECRESULT ECFileAttachment::GetSizeInstance(ULONG ulInstanceId, size_t *lpulSize, bool *lpbCompressed)
 {
 	ECRESULT er = erSuccess;
 	string filename = CreateAttachmentFilename(ulInstanceId, m_bFileCompression);
 	FILE *f = NULL;
-	ULONG ulSize = 0;
+	size_t ulSize = 0;
 	bool bCompressed = m_bFileCompression;
 
 	/*
@@ -1884,30 +2200,52 @@ ECRESULT ECFileAttachment::GetSizeInstance(ULONG ulInstanceId, ULONG *lpulSize, 
 	if (!f) {
 		filename = CreateAttachmentFilename(ulInstanceId, !m_bFileCompression);
 		bCompressed = !m_bFileCompression;
+
 		f = fopen(filename.c_str(), "r");
 	}
+
 	if (!f) {
+		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::GetSizeInstance(): file %s cannot be accessed (%s)", filename.c_str(), strerror(errno));
 		er = ZARAFA_E_NOT_FOUND;
 		goto exit;
 	}
 
 	if (!bCompressed) {
 		/* Uncompressed attachment */
-		fseek(f, 0, SEEK_END);
+		if (fseek(f, 0, SEEK_END) == -1) {
+			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::GetSizeInstance(): file %s fseek failed: %s", filename.c_str(), strerror(errno));
+			er = ZARAFA_E_DATABASE_ERROR;
+			goto exit;
+		}
+
 		ulSize = ftell(f);
-	} else {
+	}
+	else {
 		/* Compressed attachment */
-		fseek(f, -4, SEEK_END);
-		fread(&ulSize, 1, 4, f);
+		if (fseek(f, -4, SEEK_END) == -1) {
+			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::GetSizeInstance(): file %s fseek (compressed file) failed: %s", filename.c_str(), strerror(errno));
+			er = ZARAFA_E_DATABASE_ERROR;
+			goto exit;
+		}
+
+		uint32_t atsize;
+		if (fread(&atsize, 1, 4, f) != 4) {
+			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::GetSizeInstance(): file %s fread failed: %s", filename.c_str(), strerror(errno));
+			er = ZARAFA_E_DATABASE_ERROR;
+			goto exit;
+		}
+		ulSize = atsize;
 	}
 
-	fclose(f);
-
 	*lpulSize = ulSize;
+
 	if (lpbCompressed)
 		*lpbCompressed = bCompressed;
 
 exit:
+	if (f)
+		fclose(f);
+
 	return er;
 }
 
@@ -1959,7 +2297,7 @@ ECRESULT ECFileAttachment::Commit()
 	if (bError) {
 		ASSERT(FALSE);
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECFileAttachment::Commit() error during commit");
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::Commit() error during commit");
 	}
 
     m_setNewAttachment.clear();
@@ -2001,10 +2339,10 @@ ECRESULT ECFileAttachment::Rollback()
 	m_setNewAttachment.clear();
 	m_setMarkedAttachment.clear();
 	
-    if (bError) {
+	if (bError) {
 		ASSERT(FALSE);
-        er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECFileAttachment::Rollback() error");
+		er = ZARAFA_E_DATABASE_ERROR;
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "ECFileAttachment::Rollback() error");
 	}
 
 exit:

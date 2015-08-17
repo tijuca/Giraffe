@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -75,7 +74,7 @@ public:
 	static ECConfig* Create(const configsetting_t *lpDefaults, const char **lpszDirectives = lpszDEFAULTDIRECTIVES);
 	static const char* GetDefaultPath(const char* lpszBasename);
 
-	virtual ~ECConfig();
+	virtual ~ECConfig(void) {};
 
 	virtual bool	LoadSettings(const char *szFilename) = 0;
 	virtual bool	LoadSettings(const wchar_t *szFilename);
@@ -85,18 +84,18 @@ public:
 
 	virtual bool	AddSetting(const char *szName, const char *szValue, const unsigned int ulGroup = 0) = 0;
 
-	virtual char*	GetSetting(const char *szName) = 0;
-	virtual char*	GetSetting(const char *szName, char *equal, char *other) = 0;
-	virtual wchar_t* GetSettingW(const char *szName) = 0;
-	virtual wchar_t* GetSettingW(const char *szName, wchar_t *equal, wchar_t *other) = 0;
+	virtual const char *GetSetting(const char *szName) = 0;
+	virtual const char *GetSetting(const char *szName, const char *equal, const char *other) = 0;
+	virtual const wchar_t *GetSettingW(const char *szName) = 0;
+	virtual const wchar_t *GetSettingW(const char *szName, const wchar_t *equal, const wchar_t *other) = 0;
 
 	virtual std::list<configsetting_t> GetSettingGroup(unsigned int ulGroup) = 0;
 	virtual std::list<configsetting_t> GetAllSettings() = 0;
 
 	virtual bool	HasWarnings() = 0;
-	virtual std::list<std::string>* GetWarnings() = 0;
+	virtual const std::list<std::string> *GetWarnings(void) = 0;
 	virtual bool	HasErrors() = 0;
-	virtual std::list<std::string>* GetErrors() = 0;
+	virtual const std::list<std::string> *GetErrors(void) = 0;
 
 	virtual bool WriteSettingToFile(const char *szName, const char *szValue, const char* szFileName) = 0;
 	virtual bool WriteSettingsToFile(const char* szFileName) = 0;

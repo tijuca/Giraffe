@@ -15,6 +15,8 @@
 
 @SET_MAKE@
 
+# -*- Makefile -*-
+
 
 VPATH = @srcdir@
 am__make_dryrun = \
@@ -57,8 +59,9 @@ host_triplet = @host@
 @OSS_ONLY_FALSE@am__append_3 = licensereq.py mapitimezone.py mapicalendar.py
 @OSS_ONLY_FALSE@am__append_4 = licensereq.py mapitimezone.py mapicalendar.py 
 @OSS_ONLY_FALSE@am__append_5 = licensereq.py mapitimezone.py mapicalendar.py
+DIST_COMMON = $(srcdir)/../../global.am $(srcdir)/Makefile.am \
+	$(srcdir)/Makefile.in
 subdir = swig/python
-DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/autoconf/boost.m4 \
 	$(top_srcdir)/autoconf/icu.m4 $(top_srcdir)/autoconf/php.m4 \
@@ -101,13 +104,14 @@ am__installdirs = "$(DESTDIR)$(pythonexeclibdir)" \
 LTLIBRARIES = $(noinst_LTLIBRARIES) $(pythonexeclib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 _MAPICore_la_DEPENDENCIES = ${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la \
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_util.la \
 	${top_builddir}/zarafa-libsync/libzarafasync.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
+am__dirstamp = $(am__leading_dot)dirstamp
 am__MAPICore_la_OBJECTS = _MAPICore_la-conversion.lo \
-	_MAPICore_la-mapi_wrap.lo _MAPICore_la-director_util.lo
+	_MAPICore_la-mapi_wrap.lo ../_MAPICore_la-director_util.lo
 _MAPICore_la_OBJECTS = $(am__MAPICore_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -117,9 +121,9 @@ _MAPICore_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
 	$(CXXFLAGS) $(_MAPICore_la_LDFLAGS) $(LDFLAGS) -o $@
 _RecurrenceState_la_DEPENDENCIES =  \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_util.la \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am__RecurrenceState_la_OBJECTS = conversion.lo RecurrenceState_wrap.lo
 _RecurrenceState_la_OBJECTS = $(am__RecurrenceState_la_OBJECTS)
 _RecurrenceState_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
@@ -127,8 +131,8 @@ _RecurrenceState_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
 	$(AM_CXXFLAGS) $(CXXFLAGS) $(_RecurrenceState_la_LDFLAGS) \
 	$(LDFLAGS) -o $@
 _archiver_la_DEPENDENCIES =  \
-	${top_builddir}/ECtools/zarafa-archiver/libarchiver.la \
-	${top_builddir}/ECtools/zarafa-archiver/libarchiver-core.la \
+	${top_builddir}/ECtools/zarafa-archiver/libzarafa-archiver.la \
+	${top_builddir}/ECtools/zarafa-archiver/libzarafa-archiver-core.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am__archiver_la_OBJECTS = _archiver_la-archiver_wrap.lo \
 	_archiver_la-archiver_conv.lo
@@ -138,10 +142,11 @@ _archiver_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
 	$(CXXFLAGS) $(_archiver_la_LDFLAGS) $(LDFLAGS) -o $@
 _icalmapi_la_DEPENDENCIES = ${top_builddir}/mapi4linux/src/libmapi.la \
 	${top_builddir}/libicalmapi/libicalmapi.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la \
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_util.la \
 	${top_builddir}/libfreebusy/libfreebusy.la \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am__icalmapi_la_OBJECTS = _icalmapi_la-conversion.lo \
 	_icalmapi_la-icalmapi_wrap.lo
 _icalmapi_la_OBJECTS = $(am__icalmapi_la_OBJECTS)
@@ -149,8 +154,8 @@ _icalmapi_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
 	$(CXXFLAGS) $(_icalmapi_la_LDFLAGS) $(LDFLAGS) -o $@
 _inetmapi_la_DEPENDENCIES = ${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la \
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_util.la \
 	${top_builddir}/inetmapi/libinetmapi.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 am__inetmapi_la_OBJECTS = _inetmapi_la-conversion.lo \
@@ -161,9 +166,9 @@ _inetmapi_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
 	$(CXXFLAGS) $(_inetmapi_la_LDFLAGS) $(LDFLAGS) -o $@
 _libcommon_la_DEPENDENCIES =  \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_util.la \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am__libcommon_la_OBJECTS = conversion.lo libcommon_wrap.lo
 _libcommon_la_OBJECTS = $(am__libcommon_la_OBJECTS)
 _libcommon_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
@@ -173,9 +178,9 @@ _libcommon_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
 _libfreebusy_la_DEPENDENCIES =  \
 	${top_builddir}/mapi4linux/src/libmapi.la \
 	${top_builddir}/libfreebusy/libfreebusy.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_util.la \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am__libfreebusy_la_OBJECTS = _libfreebusy_la-conversion.lo \
 	_libfreebusy_la-libfreebusy_wrap.lo \
 	_libfreebusy_la-libfreebusy_conv.lo
@@ -187,10 +192,10 @@ _libfreebusy_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
 _licenseclient_la_DEPENDENCIES =  \
 	${top_builddir}/provider/common/libzarafacommon.la \
 	$(am__DEPENDENCIES_1) \
-	${top_builddir}/provider/soap/libsoapclient.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la \
-	${top_builddir}/common/libcommon_ssl.la \
+	${top_builddir}/provider/soap/libzarafa_soapclient.la \
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_util.la \
+	${top_builddir}/common/libzcp_common_ssl.la \
 	${top_builddir}/mapi4linux/src/libmapi.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
@@ -202,10 +207,9 @@ _licenseclient_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CXXLD) \
 	$(AM_CXXFLAGS) $(CXXFLAGS) $(_licenseclient_la_LDFLAGS) \
 	$(LDFLAGS) -o $@
-@OSS_ONLY_FALSE@_licensereq_la_DEPENDENCIES =  \
-@OSS_ONLY_FALSE@	${top_builddir}/liblicense/liblicense.la \
-@OSS_ONLY_FALSE@	${top_builddir}/common/libcommon_mapi.la \
-@OSS_ONLY_FALSE@	${top_builddir}/common/libcommon_util.la \
+@OSS_ONLY_FALSE@_licensereq_la_DEPENDENCIES = ${top_builddir}/liblicense/libzarafa_license.la \
+@OSS_ONLY_FALSE@	${top_builddir}/common/libzcp_common_mapi.la \
+@OSS_ONLY_FALSE@	${top_builddir}/common/libzcp_common_util.la \
 @OSS_ONLY_FALSE@	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 @OSS_ONLY_FALSE@	$(am__DEPENDENCIES_1)
 am___licensereq_la_SOURCES_DIST = licensereq_wrap.cxx
@@ -220,7 +224,7 @@ _licensereq_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
 @OSS_ONLY_FALSE@_mapicalendar_la_DEPENDENCIES =  \
 @OSS_ONLY_FALSE@	${top_builddir}/mapi4linux/src/libmapi.la \
 @OSS_ONLY_FALSE@	${top_builddir}/libcalendar/src/libmapicalendar.la \
-@OSS_ONLY_FALSE@	${top_builddir}/common/libcommon_util.la \
+@OSS_ONLY_FALSE@	${top_builddir}/common/libzcp_common_util.la \
 @OSS_ONLY_FALSE@	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am___mapicalendar_la_SOURCES_DIST = conversion.h conversion.cpp \
 	mapicalendar_wrap.cxx mapicalendar_wrap.h ../director_util.h \
@@ -228,7 +232,7 @@ am___mapicalendar_la_SOURCES_DIST = conversion.h conversion.cpp \
 @OSS_ONLY_FALSE@am__mapicalendar_la_OBJECTS =  \
 @OSS_ONLY_FALSE@	_mapicalendar_la-conversion.lo \
 @OSS_ONLY_FALSE@	_mapicalendar_la-mapicalendar_wrap.lo \
-@OSS_ONLY_FALSE@	_mapicalendar_la-director_util.lo
+@OSS_ONLY_FALSE@	../_mapicalendar_la-director_util.lo
 _mapicalendar_la_OBJECTS = $(am__mapicalendar_la_OBJECTS)
 _mapicalendar_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CXXLD) \
@@ -238,7 +242,7 @@ _mapicalendar_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
 @OSS_ONLY_FALSE@_mapitimezone_la_DEPENDENCIES =  \
 @OSS_ONLY_FALSE@	${top_builddir}/mapi4linux/src/libmapi.la \
 @OSS_ONLY_FALSE@	${top_builddir}/libtimezone/libmapitimezone.la \
-@OSS_ONLY_FALSE@	${top_builddir}/common/libcommon_util.la \
+@OSS_ONLY_FALSE@	${top_builddir}/common/libzcp_common_util.la \
 @OSS_ONLY_FALSE@	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am___mapitimezone_la_SOURCES_DIST = conversion.h conversion.cpp \
 	mapitimezone_wrap.cxx
@@ -318,7 +322,7 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
-DATA = $(data_DATA)
+DATA = $(data_DATA) $(noinst_DATA)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
@@ -365,11 +369,15 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 BOOST_CPPFLAGS = @BOOST_CPPFLAGS@
 BOOST_DATE_TIME_LDFLAGS = @BOOST_DATE_TIME_LDFLAGS@
+BOOST_DATE_TIME_LDPATH = @BOOST_DATE_TIME_LDPATH@
 BOOST_DATE_TIME_LIBS = @BOOST_DATE_TIME_LIBS@
 BOOST_FILESYSTEM_LDFLAGS = @BOOST_FILESYSTEM_LDFLAGS@
+BOOST_FILESYSTEM_LDPATH = @BOOST_FILESYSTEM_LDPATH@
 BOOST_FILESYSTEM_LIBS = @BOOST_FILESYSTEM_LIBS@
+BOOST_LDPATH = @BOOST_LDPATH@
 BOOST_ROOT = @BOOST_ROOT@
 BOOST_SYSTEM_LDFLAGS = @BOOST_SYSTEM_LDFLAGS@
+BOOST_SYSTEM_LDPATH = @BOOST_SYSTEM_LDPATH@
 BOOST_SYSTEM_LIBS = @BOOST_SYSTEM_LIBS@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
@@ -465,6 +473,9 @@ PHP_INCLUDES = @PHP_INCLUDES@
 PHP_LDFLAGS = @PHP_LDFLAGS@
 PHP_SYSCONF_DIR = @PHP_SYSCONF_DIR@
 PHP_VERSION = @PHP_VERSION@
+PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 POW_LIB = @POW_LIB@
 PROG_ANT = @PROG_ANT@
 PROG_LIBS = @PROG_LIBS@
@@ -498,6 +509,7 @@ YACC_EXISTS = @YACC_EXISTS@
 YFLAGS = @YFLAGS@
 ZARAFA_VERSION = @ZARAFA_VERSION@
 ZCPPFLAGS = @ZCPPFLAGS@
+ZPHPCXXFLAGS = @ZPHPCXXFLAGS@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -555,27 +567,31 @@ top_srcdir = @top_srcdir@
 pythonexeclib_LTLIBRARIES = _MAPICore.la _inetmapi.la _icalmapi.la \
 	_licenseclient.la $(am__append_1)
 noinst_LTLIBRARIES = _libcommon.la _archiver.la _libfreebusy.la _RecurrenceState.la
+noinst_DATA = _MAPICore.ldd _inetmapi.ldd _icalmapi.ldd \
+	_libcommon.ldd _archiver.ldd _libfreebusy.ldd _RecurrenceState.ldd
+
 SUBDIRS = zarafa
 
 # disable warnings since code is mostly generated
 AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) \
 	-I$(top_srcdir)/mapi4linux/include -I$(top_srcdir)/provider/common \
-	-I${top_srcdir}/common $(PYTHON_INCLUDES) -I${top_srcdir}/swig -w \
+	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
+	$(PYTHON_INCLUDES) -I${top_srcdir}/swig -w \
 	-DSWIG_PYTHON_OUTPUT_TUPLE -DSWIG_TYPE_TABLE=MAPI
 
 _MAPICore_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/zarafa-libsync
 _MAPICore_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
 _MAPICore_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-						${top_builddir}/common/libcommon_mapi.la \
-						${top_builddir}/common/libcommon_util.la \
+						${top_builddir}/common/libzcp_common_mapi.la \
+						${top_builddir}/common/libzcp_common_util.la \
 						${top_builddir}/zarafa-libsync/libzarafasync.la \
 						$(XML2_LIBS) $(PROG_LIBS) $(PYTHON_LIBS)
 
 _inetmapi_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/inetmapi
 _inetmapi_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
 _inetmapi_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-						${top_builddir}/common/libcommon_mapi.la \
-						${top_builddir}/common/libcommon_util.la \
+						${top_builddir}/common/libzcp_common_mapi.la \
+						${top_builddir}/common/libzcp_common_util.la \
 						${top_builddir}/inetmapi/libinetmapi.la \
 						$(PROG_LIBS) $(PYTHON_LIBS)
 
@@ -583,40 +599,41 @@ _icalmapi_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/libicalmapi -I${top_srcdi
 _icalmapi_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
 _icalmapi_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
 						${top_builddir}/libicalmapi/libicalmapi.la \
-						${top_builddir}/common/libcommon_mapi.la \
-						${top_builddir}/common/libcommon_util.la \
+						${top_builddir}/common/libzcp_common_mapi.la \
+						${top_builddir}/common/libzcp_common_util.la \
 						${top_builddir}/libfreebusy/libfreebusy.la \
-						$(PROG_LIBS) $(PYTHON_LIBS)
+						$(ICAL_LIBS) $(PROG_LIBS) $(PYTHON_LIBS)
 
 _archiver_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/ECtools/zarafa-archiver
 _archiver_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version -rpath '$(libdir)'
-_archiver_la_LIBADD = ${top_builddir}/ECtools/zarafa-archiver/libarchiver.la \
-						${top_builddir}/ECtools/zarafa-archiver/libarchiver-core.la \
-						$(PROG_LIBS) $(PYTHON_LIBS)
+_archiver_la_LIBADD = \
+	${top_builddir}/ECtools/zarafa-archiver/libzarafa-archiver.la \
+	${top_builddir}/ECtools/zarafa-archiver/libzarafa-archiver-core.la \
+	$(PROG_LIBS) $(PYTHON_LIBS)
 
 _licenseclient_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/provider/common -I${top_builddir}/provider/soap -I${top_srcdir}/provider/soap ${GSOAP_CFLAGS}
 _licenseclient_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
 _licenseclient_la_LIBADD = ${top_builddir}/provider/common/libzarafacommon.la \
 						${GSOAP_LIBS} \
-						${top_builddir}/provider/soap/libsoapclient.la \
-						${top_builddir}/common/libcommon_mapi.la \
-						${top_builddir}/common/libcommon_util.la \
-						${top_builddir}/common/libcommon_ssl.la \
+						${top_builddir}/provider/soap/libzarafa_soapclient.la \
+						${top_builddir}/common/libzcp_common_mapi.la \
+						${top_builddir}/common/libzcp_common_util.la \
+						${top_builddir}/common/libzcp_common_ssl.la \
 						${top_builddir}/mapi4linux/src/libmapi.la \
 						$(PROG_LIBS) $(SSL_LIBS) $(PYTHON_LIBS)
 
 @OSS_ONLY_FALSE@_licensereq_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/provider/common -I${top_builddir}/provider/soap -I${top_srcdir}/provider/soap -I${top_srcdir}/liblicense ${GSOAP_CFLAGS}
 @OSS_ONLY_FALSE@_licensereq_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
-@OSS_ONLY_FALSE@_licensereq_la_LIBADD = ${top_builddir}/liblicense/liblicense.la \
-@OSS_ONLY_FALSE@						${top_builddir}/common/libcommon_mapi.la \
-@OSS_ONLY_FALSE@						${top_builddir}/common/libcommon_util.la \
+@OSS_ONLY_FALSE@_licensereq_la_LIBADD = ${top_builddir}/liblicense/libzarafa_license.la \
+@OSS_ONLY_FALSE@						${top_builddir}/common/libzcp_common_mapi.la \
+@OSS_ONLY_FALSE@						${top_builddir}/common/libzcp_common_util.la \
 @OSS_ONLY_FALSE@						$(PROG_LIBS) $(SSL_LIBS) $(PYTHON_LIBS)
 
 @OSS_ONLY_FALSE@_mapitimezone_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/libtimezone
 @OSS_ONLY_FALSE@_mapitimezone_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
 @OSS_ONLY_FALSE@_mapitimezone_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
 @OSS_ONLY_FALSE@						  ${top_builddir}/libtimezone/libmapitimezone.la \
-@OSS_ONLY_FALSE@						  ${top_builddir}/common/libcommon_util.la \
+@OSS_ONLY_FALSE@						  ${top_builddir}/common/libzcp_common_util.la \
 @OSS_ONLY_FALSE@						  $(PROG_LIBS) $(PYTHON_LIBS)
 
 @OSS_ONLY_FALSE@_mapicalendar_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/libcalendar/include \
@@ -625,29 +642,29 @@ _licenseclient_la_LIBADD = ${top_builddir}/provider/common/libzarafacommon.la \
 @OSS_ONLY_FALSE@_mapicalendar_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
 @OSS_ONLY_FALSE@_mapicalendar_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
 @OSS_ONLY_FALSE@						  ${top_builddir}/libcalendar/src/libmapicalendar.la \
-@OSS_ONLY_FALSE@						  ${top_builddir}/common/libcommon_util.la \
+@OSS_ONLY_FALSE@						  ${top_builddir}/common/libzcp_common_util.la \
 @OSS_ONLY_FALSE@						  $(PROG_LIBS) $(PYTHON_LIBS)
 
 
 # noinst_ and rpath will generate the _libcommon.so file
 _libcommon_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version -rpath '$(libdir)'
 _libcommon_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-					   ${top_builddir}/common/libcommon_mapi.la \
-					   ${top_builddir}/common/libcommon_util.la \
+					   ${top_builddir}/common/libzcp_common_mapi.la \
+					   ${top_builddir}/common/libzcp_common_util.la \
 				  	   $(PROG_LIBS) $(PYTHON_LIBS)
 
 _RecurrenceState_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version -rpath '$(libdir)'
 _RecurrenceState_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la \
-	${top_builddir}/common/libcommon_util.la \
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/common/libzcp_common_util.la \
 	$(PROG_LIBS) $(PYTHON_LIBS)
 
 _libfreebusy_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/libfreebusy
 _libfreebusy_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
 _libfreebusy_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
 						 ${top_builddir}/libfreebusy/libfreebusy.la \
-						 ${top_builddir}/common/libcommon_mapi.la \
-                         ${top_builddir}/common/libcommon_util.la \
+						 ${top_builddir}/common/libzcp_common_mapi.la \
+                         ${top_builddir}/common/libzcp_common_util.la \
                          $(PROG_LIBS) $(PYTHON_LIBS)
 
 BUILT_SOURCES = mapi_wrap.cxx mapi_wrap.h inetmapi_wrap.cxx \
@@ -682,8 +699,8 @@ all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
 .SUFFIXES:
-.SUFFIXES: .cpp .cxx .lo .o .obj
-$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
+.SUFFIXES: .cpp .cxx .la .ldd .lo .o .obj
+$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am $(srcdir)/../../global.am $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -704,6 +721,7 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe)'; \
 	    cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe);; \
 	esac;
+$(srcdir)/../../global.am:
 
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
@@ -754,6 +772,14 @@ clean-pythonexeclibLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
+../$(am__dirstamp):
+	@$(MKDIR_P) ..
+	@: > ../$(am__dirstamp)
+../$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) ../$(DEPDIR)
+	@: > ../$(DEPDIR)/$(am__dirstamp)
+../_MAPICore_la-director_util.lo: ../$(am__dirstamp) \
+	../$(DEPDIR)/$(am__dirstamp)
 _MAPICore.la: $(_MAPICore_la_OBJECTS) $(_MAPICore_la_DEPENDENCIES) $(EXTRA__MAPICore_la_DEPENDENCIES) 
 	$(AM_V_CXXLD)$(_MAPICore_la_LINK) -rpath $(pythonexeclibdir) $(_MAPICore_la_OBJECTS) $(_MAPICore_la_LIBADD) $(LIBS)
 _RecurrenceState.la: $(_RecurrenceState_la_OBJECTS) $(_RecurrenceState_la_DEPENDENCIES) $(EXTRA__RecurrenceState_la_DEPENDENCIES) 
@@ -772,6 +798,8 @@ _licenseclient.la: $(_licenseclient_la_OBJECTS) $(_licenseclient_la_DEPENDENCIES
 	$(AM_V_CXXLD)$(_licenseclient_la_LINK) -rpath $(pythonexeclibdir) $(_licenseclient_la_OBJECTS) $(_licenseclient_la_LIBADD) $(LIBS)
 _licensereq.la: $(_licensereq_la_OBJECTS) $(_licensereq_la_DEPENDENCIES) $(EXTRA__licensereq_la_DEPENDENCIES) 
 	$(AM_V_CXXLD)$(_licensereq_la_LINK) $(am__licensereq_la_rpath) $(_licensereq_la_OBJECTS) $(_licensereq_la_LIBADD) $(LIBS)
+../_mapicalendar_la-director_util.lo: ../$(am__dirstamp) \
+	../$(DEPDIR)/$(am__dirstamp)
 _mapicalendar.la: $(_mapicalendar_la_OBJECTS) $(_mapicalendar_la_DEPENDENCIES) $(EXTRA__mapicalendar_la_DEPENDENCIES) 
 	$(AM_V_CXXLD)$(_mapicalendar_la_LINK) $(am__mapicalendar_la_rpath) $(_mapicalendar_la_OBJECTS) $(_mapicalendar_la_LIBADD) $(LIBS)
 _mapitimezone.la: $(_mapitimezone_la_OBJECTS) $(_mapitimezone_la_DEPENDENCIES) $(EXTRA__mapitimezone_la_DEPENDENCIES) 
@@ -779,13 +807,18 @@ _mapitimezone.la: $(_mapitimezone_la_OBJECTS) $(_mapitimezone_la_DEPENDENCIES) $
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
+	-rm -f ../_MAPICore_la-director_util.$(OBJEXT)
+	-rm -f ../_MAPICore_la-director_util.lo
+	-rm -f ../_mapicalendar_la-director_util.$(OBJEXT)
+	-rm -f ../_mapicalendar_la-director_util.lo
 
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@../$(DEPDIR)/_MAPICore_la-director_util.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../$(DEPDIR)/_mapicalendar_la-director_util.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/RecurrenceState_wrap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_MAPICore_la-conversion.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_MAPICore_la-director_util.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_MAPICore_la-mapi_wrap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_archiver_la-archiver_conv.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_archiver_la-archiver_wrap.Plo@am__quote@
@@ -800,7 +833,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_licenseclient_la-licenseclient_wrap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_licensereq_la-licensereq_wrap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_mapicalendar_la-conversion.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_mapicalendar_la-director_util.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_mapicalendar_la-mapicalendar_wrap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_mapitimezone_la-conversion.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_mapitimezone_la-mapitimezone_wrap.Plo@am__quote@
@@ -808,22 +840,25 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcommon_wrap.Plo@am__quote@
 
 .cpp.o:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
+@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ $<
 
 .cpp.obj:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
+@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .cpp.lo:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
+@am__fastdepCXX_TRUE@	$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LTCXXCOMPILE) -c -o $@ $<
@@ -842,12 +877,12 @@ _MAPICore_la-mapi_wrap.lo: mapi_wrap.cxx
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_MAPICore_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o _MAPICore_la-mapi_wrap.lo `test -f 'mapi_wrap.cxx' || echo '$(srcdir)/'`mapi_wrap.cxx
 
-_MAPICore_la-director_util.lo: ../director_util.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_MAPICore_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT _MAPICore_la-director_util.lo -MD -MP -MF $(DEPDIR)/_MAPICore_la-director_util.Tpo -c -o _MAPICore_la-director_util.lo `test -f '../director_util.cpp' || echo '$(srcdir)/'`../director_util.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/_MAPICore_la-director_util.Tpo $(DEPDIR)/_MAPICore_la-director_util.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='../director_util.cpp' object='_MAPICore_la-director_util.lo' libtool=yes @AMDEPBACKSLASH@
+../_MAPICore_la-director_util.lo: ../director_util.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_MAPICore_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT ../_MAPICore_la-director_util.lo -MD -MP -MF ../$(DEPDIR)/_MAPICore_la-director_util.Tpo -c -o ../_MAPICore_la-director_util.lo `test -f '../director_util.cpp' || echo '$(srcdir)/'`../director_util.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) ../$(DEPDIR)/_MAPICore_la-director_util.Tpo ../$(DEPDIR)/_MAPICore_la-director_util.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='../director_util.cpp' object='../_MAPICore_la-director_util.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_MAPICore_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o _MAPICore_la-director_util.lo `test -f '../director_util.cpp' || echo '$(srcdir)/'`../director_util.cpp
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_MAPICore_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o ../_MAPICore_la-director_util.lo `test -f '../director_util.cpp' || echo '$(srcdir)/'`../director_util.cpp
 
 _archiver_la-archiver_wrap.lo: archiver_wrap.cxx
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_archiver_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT _archiver_la-archiver_wrap.lo -MD -MP -MF $(DEPDIR)/_archiver_la-archiver_wrap.Tpo -c -o _archiver_la-archiver_wrap.lo `test -f 'archiver_wrap.cxx' || echo '$(srcdir)/'`archiver_wrap.cxx
@@ -947,12 +982,12 @@ _mapicalendar_la-mapicalendar_wrap.lo: mapicalendar_wrap.cxx
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_mapicalendar_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o _mapicalendar_la-mapicalendar_wrap.lo `test -f 'mapicalendar_wrap.cxx' || echo '$(srcdir)/'`mapicalendar_wrap.cxx
 
-_mapicalendar_la-director_util.lo: ../director_util.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_mapicalendar_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT _mapicalendar_la-director_util.lo -MD -MP -MF $(DEPDIR)/_mapicalendar_la-director_util.Tpo -c -o _mapicalendar_la-director_util.lo `test -f '../director_util.cpp' || echo '$(srcdir)/'`../director_util.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/_mapicalendar_la-director_util.Tpo $(DEPDIR)/_mapicalendar_la-director_util.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='../director_util.cpp' object='_mapicalendar_la-director_util.lo' libtool=yes @AMDEPBACKSLASH@
+../_mapicalendar_la-director_util.lo: ../director_util.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_mapicalendar_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT ../_mapicalendar_la-director_util.lo -MD -MP -MF ../$(DEPDIR)/_mapicalendar_la-director_util.Tpo -c -o ../_mapicalendar_la-director_util.lo `test -f '../director_util.cpp' || echo '$(srcdir)/'`../director_util.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) ../$(DEPDIR)/_mapicalendar_la-director_util.Tpo ../$(DEPDIR)/_mapicalendar_la-director_util.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='../director_util.cpp' object='../_mapicalendar_la-director_util.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_mapicalendar_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o _mapicalendar_la-director_util.lo `test -f '../director_util.cpp' || echo '$(srcdir)/'`../director_util.cpp
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_mapicalendar_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o ../_mapicalendar_la-director_util.lo `test -f '../director_util.cpp' || echo '$(srcdir)/'`../director_util.cpp
 
 _mapitimezone_la-conversion.lo: conversion.cpp
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_mapitimezone_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT _mapitimezone_la-conversion.lo -MD -MP -MF $(DEPDIR)/_mapitimezone_la-conversion.Tpo -c -o _mapitimezone_la-conversion.lo `test -f 'conversion.cpp' || echo '$(srcdir)/'`conversion.cpp
@@ -969,22 +1004,25 @@ _mapitimezone_la-mapitimezone_wrap.lo: mapitimezone_wrap.cxx
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(_mapitimezone_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o _mapitimezone_la-mapitimezone_wrap.lo `test -f 'mapitimezone_wrap.cxx' || echo '$(srcdir)/'`mapitimezone_wrap.cxx
 
 .cxx.o:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
+@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ $<
 
 .cxx.obj:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
+@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .cxx.lo:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
+@am__fastdepCXX_TRUE@	$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LTCXXCOMPILE) -c -o $@ $<
@@ -994,6 +1032,7 @@ mostlyclean-libtool:
 
 clean-libtool:
 	-rm -rf .libs _libs
+	-rm -rf ../.libs ../_libs
 install-dataDATA: $(data_DATA)
 	@$(NORMAL_INSTALL)
 	@list='$(data_DATA)'; test -n "$(datadir)" || list=; \
@@ -1243,6 +1282,8 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
+	-rm -f ../$(DEPDIR)/$(am__dirstamp)
+	-rm -f ../$(am__dirstamp)
 
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
@@ -1254,7 +1295,7 @@ clean-am: clean-generic clean-libtool clean-noinstLTLIBRARIES \
 	clean-pythonexeclibLTLIBRARIES mostlyclean-am
 
 distclean: distclean-recursive
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ../$(DEPDIR) ./$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -1300,7 +1341,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-recursive
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ../$(DEPDIR) ./$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -1370,13 +1411,13 @@ archiver_wrap.cxx: ../archiver.i archiver_python.i
 	$(SWIG_EXEC) -I${top_srcdir}/ECtools/zarafa-archiver -Wall -python -c++ -threads -o ${top_builddir}/swig/python/archiver_wrap.cxx ${top_srcdir}/swig/archiver.i
 
 libcommon_wrap.cxx: ../libcommon.i
-	$(SWIG_EXEC) -I${top_srcdir}/common -I${top_srcdir/swig} -Wall -python -c++ -threads -o ${top_builddir}/swig/python/libcommon_wrap.cxx ${top_srcdir}/swig/libcommon.i
+	$(SWIG_EXEC) -I${top_srcdir}/common -I${top_srcdir}/m4lcommon -I${top_srcdir/swig} -Wall -python -c++ -threads -o ${top_builddir}/swig/python/libcommon_wrap.cxx ${top_srcdir}/swig/libcommon.i
 
 RecurrenceState_wrap.cxx: ../RecurrenceState.i
-	$(SWIG_EXEC) -I${top_srcdir}/common -I${top_srcdir/swig} -Wall -python -c++ -threads -o ${top_builddir}/swig/python/RecurrenceState_wrap.cxx ${top_srcdir}/swig/RecurrenceState.i
+	$(SWIG_EXEC) -I${top_srcdir}/common -I${top_srcdir}/m4lcommon -I${top_srcdir/swig} -Wall -python -c++ -threads -o ${top_builddir}/swig/python/RecurrenceState_wrap.cxx ${top_srcdir}/swig/RecurrenceState.i
 
 licenseclient_wrap.cxx: ../licenseclient.i
-	$(SWIG_EXEC) -I${top_srcdir}/provider/common -I${top_srcdir}/common -I${top_srcdir/swig} -Wall -python -c++ -threads -o ${top_builddir}/swig/python/licenseclient_wrap.cxx ${top_srcdir}/swig/licenseclient.i
+	$(SWIG_EXEC) -I${top_srcdir}/provider/common -I${top_srcdir}/common -I${top_srcdir}/m4lcommon -I${top_srcdir/swig} -Wall -python -c++ -threads -o ${top_builddir}/swig/python/licenseclient_wrap.cxx ${top_srcdir}/swig/licenseclient.i
 
 # make dist seems to want to create this file regardless of the OSS_ONLY flag.
 licensereq_wrap.cxx: ../licensereq.i
@@ -1386,11 +1427,11 @@ libfreebusy_wrap.cxx: ../libfreebusy.i
 	$(SWIG_EXEC) -I${top_srcdir}/libfreebusy -I${top_srcdir/swig}  -Wall -python -c++ -threads -o ${top_builddir}/swig/python/libfreebusy_wrap.cxx ${top_srcdir}/swig/libfreebusy.i
 
 mapitimezone_wrap.cxx: ../mapitimezone.i
-	$(SWIG_EXEC) $(SWIG_OPTS) -I${top_srcdir}/common -I${top_srcdir/swig} -Wall -python -c++ -threads -o ${top_builddir}/swig/python/mapitimezone_wrap.cxx ${top_srcdir}/swig/mapitimezone.i
+	$(SWIG_EXEC) $(SWIG_OPTS) -I${top_srcdir}/common -I${top_srcdir}/m4lcommon -I${top_srcdir/swig} -Wall -python -c++ -threads -o ${top_builddir}/swig/python/mapitimezone_wrap.cxx ${top_srcdir}/swig/mapitimezone.i
 
 mapicalendar_wrap.h: mapicalendar_wrap.cxx
 mapicalendar_wrap.cxx: ../mapicalendar.i
-	$(SWIG_EXEC) $(SWIG_OPTS) -I${top_srcdir}/common -I${top_srcdir/swig} -I${top_srcdir}/zarafa-libsync -Wall -python -c++ -threads -o ${top_builddir}/swig/python/mapicalendar_wrap.cxx ${top_srcdir}/swig/mapicalendar.i
+	$(SWIG_EXEC) $(SWIG_OPTS) -I${top_srcdir}/common -I${top_srcdir}/m4lcommon -I${top_srcdir/swig} -I${top_srcdir}/zarafa-libsync -Wall -python -c++ -threads -o ${top_builddir}/swig/python/mapicalendar_wrap.cxx ${top_srcdir}/swig/mapicalendar.i
 
 check-syntax:
 	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
@@ -1401,6 +1442,13 @@ install-exec-local:
 	test -n "$(DESTDIR)" && pyroot="--root=$(DESTDIR)"; \
 	test "$(DISTRO)" = "suse" -o "$(DISTRO)" = "sles" && pyrpm="--record-rpm=INSTALLED_FILES"; \
 	cd ${top_srcdir}/swig/python/ && ${PYTHON} setup.py install $${pyroot} --prefix="$(prefix)" --install-purelib $(pythonexeclibdir) $${pyrpm}
+
+.la.ldd:
+	${AM_V_GEN}${top_srcdir}/lddcheck $< $@
+
+# There is no good POSIX syntax for the following one.. resort to GNUmake
+%.ldx: %
+	${AM_V_GEN}${top_srcdir}/lddcheck $< $@
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

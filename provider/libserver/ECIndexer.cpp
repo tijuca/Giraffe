@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -70,7 +69,7 @@
  * @return result
  */
  
-BOOL NormalizeRestrictionIsFalse(struct restrictTable *lpRestrict)
+static BOOL NormalizeRestrictionIsFalse(const struct restrictTable *lpRestrict)
 {
     std::set<unsigned int> setExist;
     std::set<unsigned int> setNotExist;
@@ -113,7 +112,7 @@ exit:
  * @param lpRestrict[in,out] Restriction to normalize
  * @return result
  */
-ECRESULT NormalizeRestrictionNestedAnd(struct restrictTable *lpRestrict)
+static ECRESULT NormalizeRestrictionNestedAnd(struct restrictTable *lpRestrict)
 {
     ECRESULT er = erSuccess;
     std::list<struct restrictTable *> lstClauses;
@@ -183,7 +182,8 @@ exit:
  * @param setExcludeProps Set of properties that are not indexed (prop id only)
  * @return result
  */
-ECRESULT NormalizeGetMultiSearch(struct restrictTable *lpRestrict, const std::set<unsigned int> &setExcludeProps, SIndexedTerm& sMultiSearch)
+static ECRESULT NormalizeGetMultiSearch(struct restrictTable *lpRestrict,
+    const std::set<unsigned int> &setExcludeProps, SIndexedTerm &sMultiSearch)
 {
     ECRESULT er = erSuccess;
     
@@ -271,7 +271,10 @@ exit:
  * If there are multiple OR clauses inside the initial AND clause, and the search fields DIFFER, then the FIRST 'OR'
  * field is used for the multifield search.
  */
-ECRESULT NormalizeRestrictionMultiFieldSearch(struct restrictTable *lpRestrict, const std::set<unsigned int> &setExcludeProps, std::list<SIndexedTerm> *lpMultiSearches)
+static ECRESULT NormalizeRestrictionMultiFieldSearch(
+    struct restrictTable *lpRestrict,
+    const std::set<unsigned int> &setExcludeProps,
+    std::list<SIndexedTerm> *lpMultiSearches)
 {
     ECRESULT er = erSuccess;
     SIndexedTerm sMultiSearch;
@@ -326,7 +329,10 @@ ECRESULT NormalizeRestrictionMultiFieldSearch(struct restrictTable *lpRestrict, 
  * - Derive multi-field searches from top-level AND clause (from OR clauses with substring searches, or direct substring searches)
  */
   
-ECRESULT NormalizeGetOptimalMultiFieldSearch(struct restrictTable *lpRestrict, const std::set<unsigned int> &setExcludeProps, std::list<SIndexedTerm> *lpMultiSearches )
+static ECRESULT NormalizeGetOptimalMultiFieldSearch(
+    struct restrictTable *lpRestrict,
+    const std::set<unsigned int> &setExcludeProps,
+    std::list<SIndexedTerm> *lpMultiSearches)
 {
     ECRESULT er = erSuccess;
     

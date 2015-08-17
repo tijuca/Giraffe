@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,6 +44,7 @@
 #ifndef ECEXPORTADDRESSBOOKCHANGES_H
 #define ECEXPORTADDRESSBOOKCHANGES_H
 
+#include "zcdefs.h"
 #include <set>
 
 #include "ECABContainer.h"
@@ -68,16 +68,16 @@ private:
 	static bool LeftPrecedesRight(const ICSCHANGE &left, const ICSCHANGE &right);
 
 private:
-	class xECExportAddressbookChanges : public IECExportAddressbookChanges {
+	class xECExportAddressbookChanges _final : public IECExportAddressbookChanges {
 		// IUnknown
-		virtual ULONG __stdcall AddRef();
-		virtual ULONG __stdcall Release();
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface);
+		virtual ULONG __stdcall AddRef(void) _override;
+		virtual ULONG __stdcall Release(void) _override;
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _override;
 		
 		// IECExportAddressbookChanges
-		virtual HRESULT __stdcall Config(LPSTREAM lpState, ULONG ulFlags, IECImportAddressbookChanges *lpCollector);
-		virtual HRESULT __stdcall Synchronize(ULONG *lpulSteps, ULONG *lpulProgress);
-		virtual HRESULT __stdcall UpdateState(LPSTREAM lpState);
+		virtual HRESULT __stdcall Config(LPSTREAM lpState, ULONG ulFlags, IECImportAddressbookChanges *lpCollector) _override;
+		virtual HRESULT __stdcall Synchronize(ULONG *lpulSteps, ULONG *lpulProgress) _override;
+		virtual HRESULT __stdcall UpdateState(LPSTREAM lpState) _override;
 
 	} m_xECExportAddressbookChanges;
 	

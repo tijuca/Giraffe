@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -73,7 +72,7 @@
 
 #include <mapiext.h>
 
-#include <stdarg.h>
+#include <cstdarg>
 
 #include <openssl/ssl.h>
 #include <openssl/evp.h>
@@ -85,14 +84,14 @@
 #include "ECUserManagement.h"
 #include "SOAPUtils.h"
 #include "SOAPDebug.h"
-#include "edkmdb.h"
+#include <edkmdb.h>
 #include "ECDBDef.h"
 #include "ZarafaCmdUtil.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 #define MAX_PARENT_LIMIT 64
@@ -654,7 +653,7 @@ exit:
 			m_lpAudit->Log(EC_LOGLEVEL_FATAL, "access allowed objectid=%d type=%d ownername='%s' username='%s' rights='%s'",
 						   ulObjId, ulType, strStoreOwner.c_str(), strUsername.c_str(), RightsToString(ulecRights));
 		} else {
-			// you probably don't want to log all what a user does in it's own store, do you?
+			// you probably do not want to log all what a user does in their own store, do you?
 			m_lpAudit->Log(EC_LOGLEVEL_INFO, "access allowed objectid=%d type=%d userid=%d", ulObjId, ulType, m_ulUserID);
 		}
 	}
@@ -1529,9 +1528,9 @@ exit:
 ECRESULT ECSecurity::GetUserQuota(unsigned int ulUserId, bool bGetUserDefault, quotadetails_t *lpDetails)
 {
 	ECRESULT er = erSuccess;
-	char* lpszWarnQuota = NULL;
-	char* lpszSoftQuota = NULL;
-	char* lpszHardQuota = NULL;
+	const char *lpszWarnQuota = NULL;
+	const char *lpszSoftQuota = NULL;
+	const char *lpszHardQuota = NULL;
 	quotadetails_t quotadetails;
 	objectid_t sExternId;
 	unsigned int ulCompanyId;

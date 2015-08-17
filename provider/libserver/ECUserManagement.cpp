@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -84,7 +83,7 @@ namespace bpt = boost::posix_time;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 #ifndef AB_UNICODE_OK
 #define AB_UNICODE_OK ((ULONG) 0x00000040)
@@ -129,7 +128,8 @@ static bool execute_script(const char *scriptname, ECLogger *lpLogger, ...) {
 	return unix_system(lpLogger, scriptname, scriptname, env);
 }
 
-std::string HostnameFromSoap(struct soap *soap)
+#if 0
+static std::string HostnameFromSoap(struct soap *soap)
 {
 	/*
 	 * Is the client connecting using an IP address or fully qualified hostname?
@@ -151,9 +151,10 @@ std::string HostnameFromSoap(struct soap *soap)
 		return ip;
 	}
 	return std::string(soap->host);
-}																		
+}
+#endif
 
-const char* ObjectClassToName(objectclass_t objclass)
+static const char *ObjectClassToName(objectclass_t objclass)
 {
 	switch (objclass) {
 	case OBJECTCLASS_UNKNOWN:
@@ -189,7 +190,7 @@ const char* ObjectClassToName(objectclass_t objclass)
 	};
 }
 
-const char* RelationTypeToName(userobject_relation_t type)
+static const char *RelationTypeToName(userobject_relation_t type)
 {
 	switch(type) {
 	case OBJECTRELATION_GROUP_MEMBER:
@@ -242,7 +243,7 @@ ECRESULT ECUserManagement::AuthUserAndSync(const char* szLoginname, const char* 
 	bool bHosted = m_lpSession->GetSessionManager()->IsHostedSupported();
 	objectid_t sCompany(CONTAINER_COMPANY);
 	string error;
-	char *szAuthMethod = NULL;
+	const char *szAuthMethod = NULL;
 
 	er = GetThreadLocalPlugin(m_lpPluginFactory, &lpPlugin, m_lpLogger);
 	if(er != erSuccess)
@@ -1858,8 +1859,8 @@ ECRESULT ECUserManagement::SearchObjectAndSync(const char* szSearchString, unsig
 	string strCompanyname;
 	ECSecurity *lpSecurity = NULL;
 	UserPlugin *lpPlugin = NULL;
-	char *szHideEveryone = NULL;
-	char *szHideSystem = NULL;
+	const char *szHideEveryone = NULL;
+	const char *szHideSystem = NULL;
 	objectid_t sCompanyId;
 	std::map<unsigned int, std::list<unsigned int> > mapMatches;
 
@@ -2030,7 +2031,7 @@ done:
 		if(mapMatches.begin()->second.size() == 1) {
 			ulId = *mapMatches.begin()->second.begin();
 		} else {
-			// size() cannot be 0 otherwise it wouldn't be there at all. So apparently it's > 1, so it's ambiguous
+			// size() cannot be 0. Otherwise, it would not be there at all. So apparently, it is > 1, so it is ambiguous.
 			m_lpLogger->Log(EC_LOGLEVEL_INFO, "Resolved multiple users for search %s.", szSearchString);
 			er = ZARAFA_E_COLLISION;
 			goto exit;
@@ -2277,8 +2278,8 @@ ECRESULT ECUserManagement::GetUserAndCompanyFromLoginName(const string &strLogin
 	size_t pos_a, pos_b;
 
 	if (!bHosted || pos_u == string::npos || pos_c == string::npos) {
-		/* When hosted is enabled, return a warning. Otherwise
-		 * this call was successfull */
+		/* When hosted is enabled, return a warning. Otherwise,
+		 * this call was successful. */
 		if (bHosted)
 			er = ZARAFA_W_PARTIAL_COMPLETION;
 		username = strLoginName;
@@ -2313,8 +2314,8 @@ ECRESULT ECUserManagement::GetUserAndCompanyFromLoginName(const string &strLogin
 	if ((!start.empty() && pos_s == string::npos) ||
 		(!middle.empty() && pos_m == string::npos) ||
 		(!end.empty() && pos_e == string::npos)) {
-		/* When hosted is enabled, return a warning. Otherwise
-		 * this call was successfull */
+		/* When hosted is enabled, return a warning. Otherwise,
+		 * this call was successful. */
 		if (strLoginName != ZARAFA_ACCOUNT_SYSTEM &&
 			strLoginName != ZARAFA_ACCOUNT_EVERYONE)
 				er = ZARAFA_E_INVALID_PARAMETER;

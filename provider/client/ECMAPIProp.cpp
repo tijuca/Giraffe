@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -74,7 +73,7 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 static struct rights ECPermToRightsCheap(const ECPERMISSION &p)
@@ -111,7 +110,9 @@ private:
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 
-ECMAPIProp::ECMAPIProp(void *lpProvider, ULONG ulObjType, BOOL fModify, ECMAPIProp *lpRoot, char *szClassName) : ECGenericProp(lpProvider, ulObjType, fModify, szClassName)
+ECMAPIProp::ECMAPIProp(void *lpProvider, ULONG ulObjType, BOOL fModify,
+    ECMAPIProp *lpRoot, const char *szClassName) :
+	ECGenericProp(lpProvider, ulObjType, fModify, szClassName)
 {
 	TRACE_MAPI(TRACE_ENTRY, "ECMAPIProp::ECMAPIProp","");
 	
@@ -512,7 +513,7 @@ HRESULT ECMAPIProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfac
 				sProp.Value.bin.lpb = NULL;
 			} else {
 				// Handles lpszA and lpszW since they are the same field in the union
-				sProp.Value.lpszW = L"";
+				sProp.Value.lpszW = const_cast<wchar_t *>(L"");
 			}
 				
 			hr = HrSetRealProp(&sProp);
@@ -887,7 +888,7 @@ HRESULT ECMAPIProp::HrStreamCommit(IStream *lpStream, void *lpData)
 		lpPropValue->Value.lpszA = buffer;
 		break;
 	case PT_UNICODE:
-		*(WCHAR*)(&buffer[ulSize]) = 0;
+		memset(&buffer[ulSize], 0, sizeof(wchar_t));
 		lpPropValue->Value.lpszW = (WCHAR *)buffer;
 		break;
 	case PT_BINARY:

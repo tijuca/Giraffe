@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -93,15 +92,16 @@ documentation and/or software.
 
 #include "md5.h"
 
-#include <assert.h>
+#include <cassert>
 #include <iostream>
+#include <cstring>
 
 using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 // MD5 simple initialization method
@@ -119,8 +119,8 @@ MD5::MD5(){
 // operation, processing another message block, and updating the
 // context.
 
-void MD5::update (uint1 *input, uint4 input_length) {
-
+void MD5::update(const uint1 *input, uint4 input_length)
+{
   uint4 input_index, buffer_index;
   uint4 buffer_space;                // how much space is left in buffer
 
@@ -304,7 +304,9 @@ unsigned char *MD5::raw_digest(){
   if (!finalized){
     cerr << "MD5::raw_digest:  Can't get digest if you haven't "<<
       "finalized the digest!" <<endl;
-    return (unsigned char*)"";
+		s = new uint1[1];
+		s[0] = '\0';
+		return s;
   }
   s = new uint1[16];
   memcpy(s, digest, 16);
@@ -321,7 +323,9 @@ char *MD5::hex_digest(){
   if (!finalized){
     cerr << "MD5::hex_digest:  Can't get digest if you haven't "<<
       "finalized the digest!" <<endl;
-    return "";
+		s = new char[1];
+		s[0] = '\0';
+		return s;
   }
 
   s = new char[33];
@@ -339,7 +343,9 @@ char *MD5::hex_digest(){
 
 ostream& operator<<(ostream &stream, MD5 context){
 
-  stream << context.hex_digest();
+	char *d = context.hex_digest();
+	stream << d;
+	delete[] d;
   return stream;
 }
 
@@ -391,8 +397,8 @@ void MD5::init(){
 
 
 // MD5 basic transformation. Transforms state based on block.
-void MD5::transform (uint1 block[64]){
-
+void MD5::transform(const uint1 *block)
+{
   uint4 a = state[0], b = state[1], c = state[2], d = state[3], x[16];
 
   decode (x, block, 64);
@@ -485,7 +491,8 @@ void MD5::transform (uint1 block[64]){
 
 // Encodes input (UINT4) into output (unsigned char). Assumes len is
 // a multiple of 4.
-void MD5::encode (uint1 *output, uint4 *input, uint4 len) {
+void MD5::encode(uint1 *output, const uint4 *input, uint4 len)
+{
 
   unsigned int i, j;
 
@@ -502,40 +509,14 @@ void MD5::encode (uint1 *output, uint4 *input, uint4 len) {
 
 // Decodes input (unsigned char) into output (UINT4). Assumes len is
 // a multiple of 4.
-void MD5::decode (uint4 *output, uint1 *input, uint4 len){
-
+void MD5::decode(uint4 *output, const uint1 *input, uint4 len)
+{
   unsigned int i, j;
 
   for (i = 0, j = 0; j < len; i++, j += 4)
     output[i] = ((uint4)input[j]) | (((uint4)input[j+1]) << 8) |
       (((uint4)input[j+2]) << 16) | (((uint4)input[j+3]) << 24);
 }
-
-
-
-
-
-// Note: Replace "for loop" with standard memcpy if possible.
-void MD5::memcpy (uint1 *output, uint1 *input, uint4 len){
-
-  unsigned int i;
-
-  for (i = 0; i < len; i++)
-    output[i] = input[i];
-}
-
-
-
-// Note: Replace "for loop" with standard memset if possible.
-void MD5::memset (uint1 *output, uint1 value, uint4 len){
-
-  unsigned int i;
-
-  for (i = 0; i < len; i++)
-    output[i] = value;
-}
-
-
 
 // ROTATE_LEFT rotates x left n bits.
 

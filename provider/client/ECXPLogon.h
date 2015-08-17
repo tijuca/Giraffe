@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,9 +44,10 @@
 #ifndef ECXPLOGON_H
 #define ECXPLOGON_H
 
+#include "zcdefs.h"
 #include "ECUnknown.h"
 #include "IMAPIOffline.h"
-#include "pthread.h"
+#include <pthread.h>
 #include <string>
 
 /*typedef struct _MAILBOX_INFO {
@@ -82,11 +82,11 @@ public:
 	virtual HRESULT ValidateState(ULONG ulUIParam, ULONG ulFlags);
 	virtual HRESULT FlushQueues(ULONG ulUIParam, ULONG cbTargetTransport, LPENTRYID lpTargetTransport, ULONG ulFlags);
 
-	class xXPLogon : public IXPLogon {
+	class xXPLogon _final : public IXPLogon {
 		// IUnknown
-		virtual ULONG __stdcall AddRef();
-		virtual ULONG __stdcall Release();
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface);
+		virtual ULONG __stdcall AddRef(void) _override;
+		virtual ULONG __stdcall Release(void) _override;
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _override;
 
 		//IXPLogon
 		virtual HRESULT __stdcall AddressTypes(ULONG * lpulFlags, ULONG * lpcAdrType, LPTSTR ** lpppszAdrTypeArray, ULONG * lpcMAPIUID, LPMAPIUID ** lpppUIDArray);
@@ -105,11 +105,11 @@ public:
 	} m_xXPLogon;
 
 private:
-	class xMAPIAdviseSink : public IMAPIAdviseSink {
+	class xMAPIAdviseSink _final : public IMAPIAdviseSink {
 	public:
-		HRESULT __stdcall QueryInterface(REFIID refiid, void ** lppInterface);
-		ULONG __stdcall AddRef();
-		ULONG __stdcall Release();
+		HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _override;
+		ULONG __stdcall AddRef(void) _override;
+		ULONG __stdcall Release(void) _override;
 
 		ULONG __stdcall OnNotify(ULONG cNotif, LPNOTIFICATION lpNotifs);
 	} m_xMAPIAdviseSink;

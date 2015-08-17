@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -51,13 +50,13 @@
 #include <vector>
 #include <string>
 #include <stringutil.h>
-#include <errno.h>
+#include <cerrno>
 #define BUFSIZE 4096
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 convert_exception::convert_exception(enum exception_type type, const std::string &message)
@@ -156,7 +155,7 @@ namespace details {
             strto = strto.substr(0,pos);
             std::vector<std::string> vOptions = tokenize(options, ",");
             std::vector<std::string> vOptionsFiltered;
-            std::vector<std::string>::iterator i;
+            std::vector<std::string>::const_iterator i;
 
             i = vOptions.begin();
             while(i != vOptions.end()) {
@@ -215,9 +214,10 @@ namespace details {
 						// Convert the codepoint to '&#12345;'
 						std::wstring wstrEntity = L"&#";
 						size_t cbEntity;
-						unsigned int code = *(wchar_t *)lpSrc;
+						wchar_t code;
 						const char *lpEntity;
 						
+						memcpy(&code, lpSrc, sizeof(code));
 						wstrEntity += wstringify(code);
 						wstrEntity += L";";
 						cbEntity = wstrEntity.size() * sizeof(wchar_t);
@@ -275,7 +275,7 @@ convert_context::~convert_context()
 void convert_context::persist_code(context_key &key, unsigned flags)
 {
 	if (flags & pfToCode) {
-		code_set::iterator iCode = m_codes.find(key.tocode);
+		code_set::const_iterator iCode = m_codes.find(key.tocode);
 		if (iCode == m_codes.end()) {
 			char *tocode = new char[strlen(key.tocode) + 1];
 			memcpy(tocode, key.tocode, strlen(key.tocode) + 1);
@@ -284,7 +284,7 @@ void convert_context::persist_code(context_key &key, unsigned flags)
 		key.tocode = *iCode;
 	}
 	if (flags & pfFromCode) {
-		code_set::iterator iCode = m_codes.find(key.fromcode);
+		code_set::const_iterator iCode = m_codes.find(key.fromcode);
 		if (iCode == m_codes.end()) {
 			char *fromcode = new char[strlen(key.fromcode) + 1];
 			memcpy(fromcode, key.fromcode, strlen(key.fromcode) + 1);

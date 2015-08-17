@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,9 +44,10 @@
 #ifndef ECTHREADUTIL_H
 #define ECTHREADUTIL_H
 
+#include "zcdefs.h"
 #include <pthread.h>
 
-class CPthreadMutex {
+class CPthreadMutex _final {
 public:
 	CPthreadMutex(bool bRecurse = false);
 	~CPthreadMutex();
@@ -60,7 +60,7 @@ private:
 };
 
 
-class scoped_lock {
+class scoped_lock _final {
 public:
 	scoped_lock(pthread_mutex_t &mutex) : m_mutex(mutex) {
 		pthread_mutex_lock(&m_mutex);
@@ -83,7 +83,7 @@ private:
 
 
 template<int(*fnlock)(pthread_rwlock_t*)>
-class scoped_rwlock {
+class scoped_rwlock _final {
 public:
 	scoped_rwlock(pthread_rwlock_t &rwlock) : m_rwlock(rwlock) {
 		fnlock(&m_rwlock);

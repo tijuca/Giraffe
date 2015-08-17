@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -61,12 +60,12 @@
 
 #include "IECExchangeModifyTable.h"
 #include "PyMapiPlugin.h"
+#include "spmain.h"
 
 using namespace std;
 
-extern ECConfig *g_lpConfig;
-
-HRESULT GetRecipStrings(LPMESSAGE lpMessage, std::wstring &wstrTo, std::wstring &wstrCc, std::wstring &wstrBcc)
+static HRESULT GetRecipStrings(LPMESSAGE lpMessage, std::wstring &wstrTo,
+    std::wstring &wstrCc, std::wstring &wstrBcc)
 {
 	HRESULT hr = hrSuccess;
 	SRowSetPtr ptrRows;
@@ -116,7 +115,7 @@ exit:
 	return hr;
 }
 
-HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
+static HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 {
 	HRESULT hr = hrSuccess;
 	SPropArrayPtr ptrBodies;
@@ -224,7 +223,8 @@ HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 		}
 
 		sNewBody.Value.lpszW = (WCHAR*)strForwardText.c_str();
-	} else {
+	}
+	else {
 		// HTML body (or rtf, but nuts to editing that!)
 		string strFind("<body");
 		const char* pos;
@@ -288,7 +288,7 @@ exit:
 	return hr;
 }
 
-HRESULT CreateOutboxMessage(LPMDB lpOrigStore, LPMESSAGE *lppMessage)
+static HRESULT CreateOutboxMessage(LPMDB lpOrigStore, LPMESSAGE *lppMessage)
 {
 	HRESULT hr = hrSuccess;
 	LPMAPIFOLDER lpOutbox = NULL;
@@ -317,7 +317,8 @@ exit:
 	return hr;
 }
 
-HRESULT CreateReplyCopy(LPMAPISESSION lpSession, LPMDB lpOrigStore, IMAPIProp *lpOrigMessage, LPMESSAGE lpTemplate, LPMESSAGE *lppMessage)
+static HRESULT CreateReplyCopy(LPMAPISESSION lpSession, LPMDB lpOrigStore,
+    IMAPIProp *lpOrigMessage, LPMESSAGE lpTemplate, LPMESSAGE *lppMessage)
 {
 	HRESULT hr = hrSuccess;
 	LPMESSAGE lpReplyMessage = NULL;
@@ -420,7 +421,7 @@ HRESULT CreateReplyCopy(LPMAPISESSION lpSession, LPMDB lpOrigStore, IMAPIProp *l
 		PROPMAP_INIT(lpReplyMessage);
 
 		sPropVal.ulPropTag = PROP_ZarafaRuleAction;
-		sPropVal.Value.lpszW = L"reply";
+		sPropVal.Value.lpszW = const_cast<wchar_t *>(L"reply");
 
 		hr = HrSetOneProp(lpReplyMessage, &sPropVal);
 		if (hr != hrSuccess)
@@ -495,7 +496,9 @@ exit:
  * 
  * @return MAPI error code
  */
-HRESULT CheckRecipients(ECLogger *lpLogger, LPADRBOOK lpAdrBook, IMAPIProp *lpMessage, LPADRLIST lpRuleRecipients, bool bOpDelegate, LPADRLIST *lppNewRecipients)
+static HRESULT CheckRecipients(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
+    IMAPIProp *lpMessage, LPADRLIST lpRuleRecipients, bool bOpDelegate,
+    bool bIncludeAsP1, LPADRLIST *lppNewRecipients)
 {
 	HRESULT hr = hrSuccess;
 	LPADRLIST lpRecipients = NULL;
@@ -548,6 +551,18 @@ HRESULT CheckRecipients(ECLogger *lpLogger, LPADRBOOK lpAdrBook, IMAPIProp *lpMe
 			goto exit;
 		}
 
+        if(bIncludeAsP1) {
+            LPSPropValue lpRecipType = PpropFindProp(lpRecipients->aEntries[lpRecipients->cEntries].rgPropVals, lpRecipients->aEntries[lpRecipients->cEntries].cValues, PR_RECIPIENT_TYPE);
+            
+            if(!lpRecipType) {
+                lpLogger->Log(EC_LOGLEVEL_FATAL, "Attempt to add recipient with no PR_RECIPIENT_TYPE");
+                hr = MAPI_E_INVALID_PARAMETER;
+                goto exit;
+            }
+            
+            lpRecipType->Value.ul = MAPI_P1;
+        }
+
 		lpRecipients->cEntries++;
 	}
 
@@ -573,7 +588,10 @@ exit:
 	return hr;
 }
 
-HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook, LPMDB lpOrigStore, LPMESSAGE lpOrigMessage, LPADRLIST lpRuleRecipients, bool bOpDelegate, bool bDoPreserveSender, bool bDoNotMunge, bool bForwardAsAttachment, LPMESSAGE *lppMessage)
+static HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
+    LPMDB lpOrigStore, LPMESSAGE lpOrigMessage, LPADRLIST lpRuleRecipients,
+    bool bOpDelegate, bool bDoPreserveSender, bool bDoNotMunge,
+    bool bForwardAsAttachment, LPMESSAGE *lppMessage)
 {
 	HRESULT hr = hrSuccess;
 	LPMESSAGE lpFwdMsg = NULL;
@@ -584,8 +602,7 @@ HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook, LPMDB lpOrigS
 	LPATTACH lpAttach = NULL;
 	LPMESSAGE lpAttachMsg = NULL;
 
-	SizedSPropTagArray (9, sExcludeFromCopyForward) = { 9, {
-		PR_MESSAGE_RECIPIENTS,
+	SizedSPropTagArray (10, sExcludeFromCopyForward) = { 10, {
 		PR_TRANSPORT_MESSAGE_HEADERS,
 		PR_SENT_REPRESENTING_ENTRYID,
 		PR_SENT_REPRESENTING_NAME,
@@ -594,11 +611,14 @@ HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook, LPMDB lpOrigS
 		PR_SENT_REPRESENTING_SEARCH_KEY,
 		PR_READ_RECEIPT_REQUESTED,
 		PR_ORIGINATOR_DELIVERY_REPORT_REQUESTED,
+		PR_MESSAGE_FLAGS,
+		PR_MESSAGE_RECIPIENTS, // This must be the last entry, see bDoNotMunge
 	} };
 
-	SizedSPropTagArray (2, sExcludeFromCopyRedirect) = { 2, {
-		PR_MESSAGE_RECIPIENTS,
+	SizedSPropTagArray (3, sExcludeFromCopyRedirect) = { 3, {
 		PR_TRANSPORT_MESSAGE_HEADERS,
+		PR_MESSAGE_FLAGS,
+		PR_MESSAGE_RECIPIENTS, // This must be the last entry, see bDoNotMunge
 	} };
 
 	SizedSPropTagArray(1, sExcludeFromAttachedForward) = { 1, {
@@ -611,11 +631,12 @@ HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook, LPMDB lpOrigS
 	wstring strSubject;
 
 	if (lpRuleRecipients == NULL || lpRuleRecipients->cEntries == 0) {
+	    lpLogger->Log(EC_LOGLEVEL_FATAL, "No rule recipient");
 		hr = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	}
 
-	hr = CheckRecipients(lpLogger, lpAdrBook, lpOrigMessage, lpRuleRecipients, bOpDelegate, &lpRecipients);
+	hr = CheckRecipients(lpLogger, lpAdrBook, lpOrigMessage, lpRuleRecipients, bOpDelegate, bDoNotMunge, &lpRecipients);
 	if (hr == MAPI_E_UNABLE_TO_COMPLETE)
 		goto exit;
 	if (hr != hrSuccess)
@@ -635,6 +656,23 @@ HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook, LPMDB lpOrigS
 		lpExclude = (LPSPropTagArray)&sExcludeFromCopyRedirect;
 	else
 		lpExclude = (LPSPropTagArray)&sExcludeFromCopyForward;
+
+    if(bDoNotMunge) {
+        // The idea here is to enable 'resend' mode and to include the original recipient list. What will
+        // happen is that the original recipient list will be used to generate the headers of the message, but
+        // only the MAPI_P1 recipients will be used to send the message to. This is exactly what we want. So
+        // with bDoNotMunge, we copy the original recipient from the original message, and set MSGFLAG_RESEND.
+        
+        // Later on, we set the actual recipient to MAPI_P1
+        SPropValue sPropResend;
+        sPropResend.ulPropTag = PR_MESSAGE_FLAGS;
+        sPropResend.Value.ul = MSGFLAG_UNSENT | MSGFLAG_RESEND | MSGFLAG_READ;
+        
+        lpExclude->cValues--; // strip PR_MESSAGE_RECIPIENTS, since original recipients should be used
+        hr = HrSetOneProp(lpFwdMsg, &sPropResend);
+        if(hr != hrSuccess)
+            goto exit;
+    }
 
 	if (bForwardAsAttachment) {
 		hr = lpFwdMsg->CreateAttach(NULL, 0, &ulANr, &lpAttach);
@@ -671,7 +709,8 @@ HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook, LPMDB lpOrigS
 
 		lpAttach->Release();
 		lpAttach = NULL;
-	} else {	
+	}
+	else {	
 		hr = lpOrigMessage->CopyTo(0, NULL, lpExclude, 0, NULL, &IID_IMessage, lpFwdMsg, 0, NULL);
 		if (hr != hrSuccess)
 			goto exit;
@@ -703,7 +742,7 @@ HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook, LPMDB lpOrigS
 
 	if (bForwardAsAttachment) {
 		sForwardProps[cfp].ulPropTag = PR_MESSAGE_CLASS;
-		sForwardProps[cfp++].Value.lpszW = L"IPM.Note";
+		sForwardProps[cfp++].Value.lpszW = const_cast<wchar_t *>(L"IPM.Note");
 	}
 
 	if (parseBool(g_lpConfig->GetSetting("set_rule_headers", NULL, "yes"))) {
@@ -719,8 +758,16 @@ HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook, LPMDB lpOrigS
 	if (hr != hrSuccess)
 		goto exit;
 
-	if (!bDoNotMunge && !bForwardAsAttachment)
+	if (!bDoNotMunge && !bForwardAsAttachment) {
+		// because we're forwarding this as a new message, clear the old received message id
+		SizedSPropTagArray(1, sptaDeleteProps) = { 1, { PR_INTERNET_MESSAGE_ID } };
+
+		hr = lpFwdMsg->DeleteProps((LPSPropTagArray)&sptaDeleteProps, NULL);
+		if(hr != hrSuccess)
+			goto exit;
+
 		MungeForwardBody(lpFwdMsg, lpOrigMessage);
+	}
 
 	*lppMessage = lpFwdMsg;
 
@@ -744,7 +791,7 @@ exit:
 }
 
 // HRESULT HrDelegateMessage(LPMAPISESSION lpSession, LPEXCHANGEMANAGESTORE lpIEMS, IMAPIProp *lpMessage, LPADRENTRY lpAddress, ECLogger *lpLogger)
-HRESULT HrDelegateMessage(IMAPIProp *lpMessage)
+static HRESULT HrDelegateMessage(IMAPIProp *lpMessage)
 {
 	HRESULT hr = hrSuccess;
 	SPropValue sNewProps[6] = {{0}};
@@ -796,9 +843,8 @@ exit:
 	return hr;
 }
 
-
 // lpMessage: gets EntryID, maybe pass this and close message in DAgent.cpp
-HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPADRBOOK lpAdrBook, LPMDB lpOrigStore, LPMAPIFOLDER lpOrigInbox, IMessage **lppMessage, ECLogger *lpLogger) {
+HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPADRBOOK lpAdrBook, LPMDB lpOrigStore, LPMAPIFOLDER lpOrigInbox, IMessage **lppMessage, ECLogger *lpLogger, StatsClient *const sc) {
 	HRESULT hr = hrSuccess;
     IExchangeModifyTable *lpTable = NULL;
     IMAPITable *lpView = NULL;
@@ -831,6 +877,7 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 	IECExchangeModifyTable *lpECModifyTable = NULL;
 	ULONG ulResult= 0;
 
+	sc -> countInc("rules", "invocations");
 
     hr = lpOrigInbox->OpenProperty(PR_RULES_TABLE, &IID_IExchangeModifyTable, 0, 0, (LPUNKNOWN *)&lpTable);
 	if (hr != hrSuccess) {
@@ -857,7 +904,6 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 	}
 
 	//TODO do something with ulResults
-
     hr = lpTable->GetTable(0, &lpView);
 	if(hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "HrProcessRules(): GetTable failed %x", hr);
@@ -877,7 +923,6 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 	}
 
 	while (TRUE) {
-
         hr = lpView->QueryRows(1, 0, &lpRowSet);
 	if (hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "HrProcessRules(): QueryRows failed %x", hr);
@@ -886,6 +931,8 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 
         if (lpRowSet->cRows == 0)
             break;
+
+		sc -> countAdd("rules", "n_rules", int64_t(lpRowSet->cRows));
 
         lpRuleName = PpropFindProp(lpRowSet->aRow[0].lpProps, lpRowSet->aRow[0].cValues, CHANGE_PROP_TYPE(PR_RULE_NAME, PT_STRING8));
 		if (lpRuleName)
@@ -928,7 +975,10 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 			lpLogger->Log(EC_LOGLEVEL_INFO, (std::string)"Rule " + strRule + " doesn't match");
 			goto nextrule;
 		}	
+
 		lpLogger->Log(EC_LOGLEVEL_INFO, (std::string)"Rule " + strRule + " matches");
+
+		sc -> countAdd("rules", "n_actions", int64_t(lpActions->cActions));
 
 		for(ULONG n=0; n<lpActions->cActions; n++) {
 
@@ -936,6 +986,8 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 			switch(lpActions->lpAction[n].acttype) {
 			case OP_MOVE:
 			case OP_COPY:
+					sc -> countInc("rules", "copy_move");
+
 				if (lpActions->lpAction[n].acttype == OP_COPY)
 					lpLogger->Log(EC_LOGLEVEL_DEBUG, "Rule action: copying e-mail");
 				else
@@ -998,6 +1050,7 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 
 			case OP_REPLY:
 			case OP_OOF_REPLY:
+					sc -> countInc("rules", "reply_and_oof");
 				if (lpActions->lpAction[n].acttype == OP_REPLY)
 					lpLogger->Log(EC_LOGLEVEL_DEBUG, "Rule action: replying e-mail");
 				else
@@ -1025,6 +1078,7 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 				break;
 
 			case OP_FORWARD:
+					sc -> countInc("rules", "forward");
 				// TODO: test lpActions->lpAction[n].ulActionFlavor
 				// FWD_PRESERVE_SENDER			1
 				// FWD_DO_NOT_MUNGE_MSG			2
@@ -1074,6 +1128,7 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 				break;
 
 			case OP_BOUNCE:
+					sc -> countInc("rules", "bounce");
 				// scBounceCode?
 				// TODO:
 				// 1. make copy of lpMessage, needs CopyTo() function
@@ -1083,6 +1138,7 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 				break;
 
 			case OP_DELEGATE:
+					sc -> countInc("rules", "delegate");
 				
 				if (lpActions->lpAction[n].lpadrlist->cEntries == 0) {
 					lpLogger->Log(EC_LOGLEVEL_DEBUG, "Delegating rule doesn't have recipients");
@@ -1115,14 +1171,17 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 			// will become a DAM atm, so I won't even bother implementing these ...
 
 			case OP_DEFER_ACTION:
-				// DAM crud, but outlook doesn't check these messages .. yet
+				sc -> countInc("rules", "defer");
+					// DAM crud, but outlook doesn't check these messages... yet
 				lpLogger->Log(EC_LOGLEVEL_WARNING, (std::string)"Rule "+strRule+": DEFER client actions are currently unsupported");
 				break;
 			case OP_TAG:
-				// sure .. WHEN YOU STOP WITH THE FRIGGIN' DEFER ACTION MESSAGES!! dork!
+				sc -> countInc("rules", "tag");
+				// sure. WHEN YOU STOP WITH THE FRIGGIN' DEFER ACTION MESSAGES!!
 				lpLogger->Log(EC_LOGLEVEL_WARNING, (std::string)"Rule "+strRule+": TAG actions are currently unsupported");
 				break;
 			case OP_DELETE:
+					sc -> countInc("rules", "delete");
 				// since *lppMessage wasn't yet saved in the server, we can just return a special MAPI Error code here,
 				// this will trigger the out-of-office mail (according to microsoft), but not save the message and drop it.
 				// The error code will become hrSuccess automatically after returning from the post processing function.
@@ -1131,6 +1190,7 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 				goto exit;
 				break;
 			case OP_MARK_AS_READ:
+					sc -> countInc("rules", "mark_read");
 				// add prop read
 				lpLogger->Log(EC_LOGLEVEL_WARNING, (std::string)"Rule "+strRule+": MARK AS READ actions are currently unsupported");
 				break;
@@ -1206,6 +1266,9 @@ exit:
 
 	if (lpRowSet)
 		FreeProws(lpRowSet);
+
+	if (hr != hrSuccess)
+		sc -> countInc("rules", "invocations_fail");
 
 	return hr;
 }

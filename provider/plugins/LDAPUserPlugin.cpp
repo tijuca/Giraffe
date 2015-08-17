@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -52,8 +51,8 @@
 #include <set>
 #include <list>
 
-#include <errno.h>
-#include <assert.h>
+#include <cerrno>
+#include <cassert>
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>
 #endif
@@ -94,8 +93,14 @@ extern "C" {
 
 /**
  * Wrapper for freeing a berelement
+ *
+ * Needs external linkage in g++ 4.x.
  */
-void ber_auto_free(BerElement *ber) { ber_free(ber, 0); }
+extern void ber_auto_free(BerElement *);
+void ber_auto_free(BerElement *ber)
+{
+	ber_free(ber, 0);
+}
 
 typedef auto_free<char, auto_free_dealloc<void*, void, ldap_memfree> >auto_free_ldap_attribute;
 typedef auto_free<BerElement, auto_free_dealloc<BerElement*, void, ber_auto_free> >auto_free_ldap_berelement;
@@ -261,14 +266,16 @@ private:
 
 /* Make life a bit less boring */
 #define CONFIG_TO_ATTR(__attrs, __var, __config)			\
-	char *__var = m_config->GetSetting(__config, "", NULL);	\
+	const char *__var = m_config->GetSetting(__config, "", NULL);	\
 	if (__var)												\
 		(__attrs)->add(__var);
 
 auto_ptr<LDAPCache> LDAPUserPlugin::m_lpCache = auto_ptr<LDAPCache>(new LDAPCache());
 
-LDAPUserPlugin::LDAPUserPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *shareddata)
-	: UserPlugin(pluginlock, shareddata), m_ldap(NULL), m_iconv(NULL), m_iconvrev(NULL)
+LDAPUserPlugin::LDAPUserPlugin(pthread_mutex_t *pluginlock,
+    ECPluginSharedData *shareddata) :
+	UserPlugin(pluginlock, shareddata), m_ldap(NULL), m_iconv(NULL),
+	m_iconvrev(NULL), ldapServerIndex(0)
 {
 	// LDAP Defaults
 	const configsetting_t lpDefaults[] = {
@@ -396,46 +403,47 @@ LDAPUserPlugin::LDAPUserPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *
 	m_config = shareddata->CreateConfig(lpDefaults, lpszAllowedDirectives);
 	if (!m_config)
 		throw runtime_error(string("Not a valid configuration file."));
-}
-
-// index of the last ldap server to which we could connect
-long unsigned int ldapServerIndex = 0;
-std::vector<std::string> ldap_servers;
-
-void LDAPUserPlugin::InitPlugin() throw(exception)
-{
-	char *ldap_binddn = m_config->GetSetting("ldap_bind_user");
-	char *ldap_bindpw = m_config->GetSetting("ldap_bind_passwd");
 
 	// get the list of ldap urls and split them
-	char *ldap_uri = m_config->GetSetting("ldap_uri");
+	const char *const ldap_uri = m_config->GetSetting("ldap_uri");
 
 	if (ldap_uri && strlen(ldap_uri))
 		ldap_servers = tokenize(std::string(ldap_uri), ' ', true);
 	else {
-		const char *ldap_host = m_config->GetSetting("ldap_host");
-		const char *ldap_port = m_config->GetSetting("ldap_port");
+		const char *const ldap_host = m_config->GetSetting("ldap_host");
+		const char *const ldap_port = m_config->GetSetting("ldap_port");
+		const char *const ldap_proto = m_config->GetSetting("ldap_protocol");
 
-		char buffer[4096] = { 0 }; // using this as win32 does not have asprintf
+		std::string url;
 
-		if (strcmp(m_config->GetSetting("ldap_protocol"), "ldaps") == 0)
-			snprintf(buffer, sizeof buffer, "ldaps://%s:%s", ldap_host, ldap_port);
+		if (ldap_proto != NULL && strcmp(ldap_proto, "ldaps") == 0)
+			url = format("ldaps://%s:%s", ldap_host, ldap_port);
 		else
-			snprintf(buffer, sizeof buffer, "ldap://%s:%s", ldap_host, ldap_port);
+			url = format("ldap://%s:%s", ldap_host, ldap_port);
 
-		ldap_servers.push_back(buffer);
+		ldap_servers.push_back(url);
 	}
 
 	if (ldap_servers.empty())
 		throw ldap_error(string("No LDAP servers configured in ldap.cfg"));
+}
 
-	/**
-	 *  @todo encode the user and password, now it's depended in which charset the config is saved
-	 */
+void LDAPUserPlugin::InitPlugin() throw(exception)
+{
+	const char *ldap_binddn = m_config->GetSetting("ldap_bind_user");
+	const char *ldap_bindpw = m_config->GetSetting("ldap_bind_passwd");
+
+	/* FIXME encode the user and password, now it depends on which charset the config is saved in */
 	m_ldap = ConnectLDAP(ldap_binddn, ldap_bindpw);
 
-	m_iconv =    new ECIConv("UTF-8", m_config->GetSetting("ldap_server_charset"));
+	const char *ldap_server_charset = m_config->GetSetting("ldap_server_charset");
+	m_iconv = new ECIConv("UTF-8", ldap_server_charset);
+	if (!m_iconv -> canConvert())
+		throw ldap_error(format("Cannot convert %s to UTF8", ldap_server_charset));
+
 	m_iconvrev = new ECIConv(m_config->GetSetting("ldap_server_charset"), "UTF-8");
+	if (!m_iconvrev -> canConvert())
+		throw ldap_error(format("Cannot convert UTF-8 to %s", ldap_server_charset));
 }
 
 LDAP *LDAPUserPlugin::ConnectLDAP(const char *bind_dn, const char *bind_pw) throw(exception) {
@@ -521,7 +529,7 @@ LDAP *LDAPUserPlugin::ConnectLDAP(const char *bind_dn, const char *bind_pw) thro
 		m_logger->Log(EC_LOGLEVEL_WARNING, "LDAP (simple-) bind failed: %s", ldap_err2string(rc));
 
 	fail:
-		// see if an other (if any) server does work
+		// see if another (if any) server does work
 		ldapServerIndex++;
 		if (ldapServerIndex >= ldap_servers.size())
 			ldapServerIndex = 0;
@@ -591,8 +599,8 @@ void LDAPUserPlugin::my_ldap_search_s(char *base, int scope, char *filter, char 
 	if (m_ldap == NULL || LDAP_API_ERROR(result)) {
 		// try 1 reconnect and retry, and if that fails, just completely fail
 		// We need this because LDAP server connections can timeout
-		char *ldap_binddn = m_config->GetSetting("ldap_bind_user");
-		char *ldap_bindpw = m_config->GetSetting("ldap_bind_passwd");
+		const char *ldap_binddn = m_config->GetSetting("ldap_bind_user");
+		const char *ldap_bindpw = m_config->GetSetting("ldap_bind_passwd");
 
 		if (m_ldap != NULL) {
 			if (ldap_unbind_s(m_ldap) == -1)
@@ -646,7 +654,7 @@ exit:
 
 	// In rare situations ldap_search_s can return LDAP_SUCCESS, but leave res at NULL. This
 	// seems to happen when the connection to the server is lost at a very specific time.
-	// The problem is that libldap checks it's input parameters with an assert. So the next
+	// The problem is that libldap checks its input parameters with an assert. So the next
 	// call to ldap_find_first will cause an assertion to kick in because the result from
 	// ldap_search_s is inconsistent.
 	// The easiest way around this is to net let this function return with a NULL result.
@@ -656,7 +664,7 @@ exit:
 	}
 }
 
-std::list<std::string> LDAPUserPlugin::GetClasses(char *lpszClasses)
+std::list<std::string> LDAPUserPlugin::GetClasses(const char *lpszClasses)
 {
 	std::vector<std::string> vecClasses = tokenize(lpszClasses, ',');
 	std::list<std::string> lstClasses;
@@ -682,7 +690,7 @@ bool LDAPUserPlugin::MatchClasses(std::set<std::string> setClasses, std::list<st
 	return true;
 }
 
-std::string LDAPUserPlugin::GetObjectClassFilter(char *lpszObjectClassAttr, char *lpszClasses)
+std::string LDAPUserPlugin::GetObjectClassFilter(const char *lpszObjectClassAttr, const char *lpszClasses)
 {
 	std::list<std::string> lstObjectClasses = GetClasses(lpszClasses);
 	std::string filter;
@@ -721,24 +729,24 @@ objectid_t LDAPUserPlugin::GetObjectIdForEntry(LDAPMessage *entry)
 	string			dynamicgroup_unique;
 	string			object_uid;
 
-	char *class_attr = m_config->GetSetting("ldap_object_type_attribute");
-	char *nonactive_attr = m_config->GetSetting("ldap_nonactive_attribute");
-	char *resource_attr = m_config->GetSetting("ldap_resource_type_attribute");
-	char *security_attr = m_config->GetSetting("ldap_group_security_attribute");
-	char *security_attr_type = m_config->GetSetting("ldap_group_security_attribute_type");
+	const char *class_attr = m_config->GetSetting("ldap_object_type_attribute");
+	const char *nonactive_attr = m_config->GetSetting("ldap_nonactive_attribute");
+	const char *resource_attr = m_config->GetSetting("ldap_resource_type_attribute");
+	const char *security_attr = m_config->GetSetting("ldap_group_security_attribute");
+	const char *security_attr_type = m_config->GetSetting("ldap_group_security_attribute_type");
 
-	char *user_unique_attr = m_config->GetSetting("ldap_user_unique_attribute");
-	char *group_unique_attr = m_config->GetSetting("ldap_group_unique_attribute");
-	char *company_unique_attr = m_config->GetSetting("ldap_company_unique_attribute");
-	char *addresslist_unique_attr = m_config->GetSetting("ldap_addresslist_unique_attribute");
-	char *dynamicgroup_unique_attr = m_config->GetSetting("ldap_dynamicgroup_unique_attribute");
+	const char *user_unique_attr = m_config->GetSetting("ldap_user_unique_attribute");
+	const char *group_unique_attr = m_config->GetSetting("ldap_group_unique_attribute");
+	const char *company_unique_attr = m_config->GetSetting("ldap_company_unique_attribute");
+	const char *addresslist_unique_attr = m_config->GetSetting("ldap_addresslist_unique_attribute");
+	const char *dynamicgroup_unique_attr = m_config->GetSetting("ldap_dynamicgroup_unique_attribute");
 
-	char *class_user_type = m_config->GetSetting("ldap_user_type_attribute_value");
-	char *class_contact_type = m_config->GetSetting("ldap_contact_type_attribute_value");
-	char *class_group_type = m_config->GetSetting("ldap_group_type_attribute_value");
-	char *class_company_type = m_config->GetSetting("ldap_company_type_attribute_value");
-	char *class_address_type = m_config->GetSetting("ldap_addresslist_type_attribute_value");
-	char *class_dynamic_type = m_config->GetSetting("ldap_dynamicgroup_type_attribute_value");
+	const char *class_user_type = m_config->GetSetting("ldap_user_type_attribute_value");
+	const char *class_contact_type = m_config->GetSetting("ldap_contact_type_attribute_value");
+	const char *class_group_type = m_config->GetSetting("ldap_group_type_attribute_value");
+	const char *class_company_type = m_config->GetSetting("ldap_company_type_attribute_value");
+	const char *class_address_type = m_config->GetSetting("ldap_addresslist_type_attribute_value");
+	const char *class_dynamic_type = m_config->GetSetting("ldap_dynamicgroup_type_attribute_value");
 
 	FOREACH_ATTR(entry) {
 		if (class_attr && stricmp(att, class_attr) == 0)
@@ -979,7 +987,7 @@ auto_ptr<signatures_t> LDAPUserPlugin::getAllObjectsByFilter(const string &based
 
 string LDAPUserPlugin::getSearchBase(const objectid_t &company) throw(std::exception)
 {
-	char *lpszSearchBase = m_config->GetSetting("ldap_search_base");
+	const char *lpszSearchBase = m_config->GetSetting("ldap_search_base");
 	string search_base;
 
 	if (!lpszSearchBase)
@@ -1004,9 +1012,9 @@ string LDAPUserPlugin::getSearchBase(const objectid_t &company) throw(std::excep
 string LDAPUserPlugin::getServerSearchFilter()
 {
 	string filter, subfilter;
-	char *objecttype = m_config->GetSetting("ldap_object_type_attribute", "", NULL);
-	char *servertype = m_config->GetSetting("ldap_server_type_attribute_value", "", NULL);
-	char *serverfilter = m_config->GetSetting("ldap_server_search_filter");
+	const char *objecttype = m_config->GetSetting("ldap_object_type_attribute", "", NULL);
+	const char *servertype = m_config->GetSetting("ldap_server_type_attribute_value", "", NULL);
+	const char *serverfilter = m_config->GetSetting("ldap_server_search_filter");
 
 	if (!objecttype)
 		throw runtime_error("No object type attribute defined");
@@ -1028,18 +1036,18 @@ string LDAPUserPlugin::getServerSearchFilter()
 string LDAPUserPlugin::getSearchFilter(objectclass_t objclass) throw(std::exception)
 {
 	string filter, subfilter;
-	char *objecttype = m_config->GetSetting("ldap_object_type_attribute","",NULL);
-	char *usertype = m_config->GetSetting("ldap_user_type_attribute_value","",NULL);
-	char *contacttype = m_config->GetSetting("ldap_contact_type_attribute_value","",NULL);
-	char *grouptype = m_config->GetSetting("ldap_group_type_attribute_value","",NULL);
-	char *companytype = m_config->GetSetting("ldap_company_type_attribute_value","",NULL);
-	char *addresslisttype = m_config->GetSetting("ldap_addresslist_type_attribute_value","",NULL);
-	char *dynamicgrouptype = m_config->GetSetting("ldap_dynamicgroup_type_attribute_value","",NULL);
-	char *userfilter = m_config->GetSetting("ldap_user_search_filter");
-	char *groupfilter = m_config->GetSetting("ldap_group_search_filter");
-	char *companyfilter = m_config->GetSetting("ldap_company_search_filter");
-	char *addresslistfilter = m_config->GetSetting("ldap_addresslist_search_filter");
-	char *dynamicgroupfilter = m_config->GetSetting("ldap_dynamicgroup_search_filter");
+	const char *objecttype = m_config->GetSetting("ldap_object_type_attribute", "", NULL);
+	const char *usertype = m_config->GetSetting("ldap_user_type_attribute_value", "", NULL);
+	const char *contacttype = m_config->GetSetting("ldap_contact_type_attribute_value", "", NULL);
+	const char *grouptype = m_config->GetSetting("ldap_group_type_attribute_value", "", NULL);
+	const char *companytype = m_config->GetSetting("ldap_company_type_attribute_value", "", NULL);
+	const char *addresslisttype = m_config->GetSetting("ldap_addresslist_type_attribute_value", "", NULL);
+	const char *dynamicgrouptype = m_config->GetSetting("ldap_dynamicgroup_type_attribute_value", "", NULL);
+	const char *userfilter = m_config->GetSetting("ldap_user_search_filter");
+	const char *groupfilter = m_config->GetSetting("ldap_group_search_filter");
+	const char *companyfilter = m_config->GetSetting("ldap_company_search_filter");
+	const char *addresslistfilter = m_config->GetSetting("ldap_addresslist_search_filter");
+	const char *dynamicgroupfilter = m_config->GetSetting("ldap_dynamicgroup_search_filter");
 
 	if (!objecttype)
 		throw runtime_error("No object type attribute defined");
@@ -1515,11 +1523,11 @@ objectsignature_t LDAPUserPlugin::resolveName(objectclass_t objclass, const stri
 	auto_ptr<attrArray> attrs = auto_ptr<attrArray>(new attrArray(6));
 	auto_ptr<signatures_t> signatures;
 
-	char *loginname_attr = m_config->GetSetting("ldap_loginname_attribute", "", NULL);
-	char *groupname_attr = m_config->GetSetting("ldap_groupname_attribute", "", NULL);
-	char *dyngroupname_attr = m_config->GetSetting("ldap_dynamicgroupname_attribute", "", NULL);
-	char *companyname_attr = m_config->GetSetting("ldap_companyname_attribute", "", NULL);
-	char *addresslistname_attr = m_config->GetSetting("ldap_addresslist_name_attribute", "", NULL);
+	const char *loginname_attr = m_config->GetSetting("ldap_loginname_attribute", "", NULL);
+	const char *groupname_attr = m_config->GetSetting("ldap_groupname_attribute", "", NULL);
+	const char *dyngroupname_attr = m_config->GetSetting("ldap_dynamicgroupname_attribute", "", NULL);
+	const char *companyname_attr = m_config->GetSetting("ldap_companyname_attribute", "", NULL);
+	const char *addresslistname_attr = m_config->GetSetting("ldap_addresslist_name_attribute", "", NULL);
 
 	if (company.id.empty()) {
 		LOG_PLUGIN_DEBUG("%s Class %x, Name %s", __FUNCTION__, objclass, name.c_str());
@@ -1607,7 +1615,7 @@ objectsignature_t LDAPUserPlugin::resolveName(objectclass_t objclass, const stri
 objectsignature_t LDAPUserPlugin::authenticateUser(const string &username, const string &password, const objectid_t &company) throw(std::exception)
 {
 	struct timeval tstart, tend;
-	char *authmethod = m_config->GetSetting("ldap_authentication_method");
+	const char *authmethod = m_config->GetSetting("ldap_authentication_method");
 	objectsignature_t id;
 	LONGLONG	llelapsedtime;
 
@@ -1818,8 +1826,8 @@ typedef struct {
 	objectclass_t objclass;		//!< resolveObject(s)FromAttributeType 1st parameter
 	string ldap_attr;			//!< resolveObjectFromAttributeType 2nd parameter
 	list<string> ldap_attrs;	//!< resolveObjectsFromAttributeType 2nd parameter
-	char *relAttr;				//!< resolveObject(s)FromAttributeType 3rd parameter
-	char *relAttrType;			//!< resolveObject(s)FromAttributeType 4th parameter
+	const char *relAttr;		//!< resolveObject(s)FromAttributeType 3rd parameter
+	const char *relAttrType;	//!< resolveObject(s)FromAttributeType 4th parameter
 	property_key_t propname;	//!< object prop to add/set from the result
 	std::string result_attr;	//!< optional: attribute to use from resulting object(s), if none then unique id
 } postaction;
@@ -2475,11 +2483,10 @@ auto_ptr<signatures_t> LDAPUserPlugin::getParentObjectsForObject(userobject_rela
 	objectclass_t		parentobjclass = OBJECTCLASS_UNKNOWN;
 
 	string ldap_basedn;
-	char *unique_attr = NULL;
-	char *member_attr = NULL;
-	char *member_attr_type = NULL;
-	char *member_attr_rel = NULL;
-	char *modify_attr = NULL;
+	const char *unique_attr = NULL;
+	const char *member_attr = NULL;
+	const char *member_attr_type = NULL;
+	const char *member_attr_rel = NULL;
 
 	switch (childobject.objclass) {
 	case OBJECTCLASS_USER:
@@ -2523,7 +2530,7 @@ auto_ptr<signatures_t> LDAPUserPlugin::getParentObjectsForObject(userobject_rela
 		parentobjclass = CONTAINER_COMPANY;
 		member_attr = m_config->GetSetting("ldap_company_view_attribute");
 		member_attr_type = m_config->GetSetting("ldap_company_view_attribute_type");
-		member_attr_rel = m_config->GetSetting("ldap_company_view_relation_attribute","",NULL);
+		member_attr_rel = m_config->GetSetting("ldap_company_view_relation_attribute", "", NULL);
 		// restrict to have only companies, nevery anything else
 		if (!member_attr_rel)
 			member_attr_rel = m_config->GetSetting("ldap_company_unique_attribute");
@@ -2554,8 +2561,6 @@ auto_ptr<signatures_t> LDAPUserPlugin::getParentObjectsForObject(userobject_rela
 		throw runtime_error("Cannot obtain parents for relation " + stringify(relation));
 		break;
 	}
-
-	modify_attr = m_config->GetSetting("ldap_last_modification_attribute");
 
 	ldap_basedn = getSearchBase();
 	ldap_filter = getSearchFilter(parentobjclass);
@@ -2597,11 +2602,11 @@ auto_ptr<signatures_t> LDAPUserPlugin::getSubObjectsForObject(userobject_relatio
 	string			companyDN;
 	objectclass_t	childobjclass = OBJECTCLASS_UNKNOWN;
 
-	char *unique_attr = NULL;
-	char *unique_attr_type = NULL;
-	char *member_attr = NULL;
-	char *member_attr_type = NULL;
-	char *base_attr = NULL;
+	const char *unique_attr = NULL;
+	const char *unique_attr_type = NULL;
+	const char *member_attr = NULL;
+	const char *member_attr_type = NULL;
+	const char *base_attr = NULL;
 
 	auto_ptr<attrArray> member_attr_rel = auto_ptr<attrArray>(new attrArray(5));
 	auto_ptr<attrArray> child_unique_attr = auto_ptr<attrArray>(new attrArray(5));
@@ -2855,9 +2860,10 @@ auto_ptr<serverdetails_t> LDAPUserPlugin::getServerDetails(const string &server)
 }
 
 // Convert unsigned char to 2-char hex string
-std::string toHex(unsigned char n) {
+static std::string toHex(unsigned char n)
+{
 	std::string s;
-	static char digits[] = "0123456789ABCDEF";
+	static const char digits[] = "0123456789ABCDEF";
 
 	s += digits[n >> 4];
 	s += digits[n & 0xf];
@@ -2906,7 +2912,7 @@ auto_ptr<quotadetails_t> LDAPUserPlugin::getQuota(const objectid_t &id, bool bGe
 	string dn;
 	auto_ptr<quotadetails_t> quotaDetails = auto_ptr<quotadetails_t>(new quotadetails_t());
 
-	char *multiplier_s = m_config->GetSetting("ldap_quota_multiplier");
+	const char *multiplier_s = m_config->GetSetting("ldap_quota_multiplier");
 	long long multiplier = 1L;
 	if (multiplier_s) {
 		multiplier = fromstring<const char *, long long>(multiplier_s);

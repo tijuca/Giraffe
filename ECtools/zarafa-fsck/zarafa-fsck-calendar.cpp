@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -109,7 +108,7 @@ HRESULT ZarafaFsckCalendar::ValidateMinimalNamedFields(LPMESSAGE lpMessage)
 		}
 	}
 
-	/* If we are here, we were succcessfull */
+	/* If we are here, we were succcessful. */
 	hr = hrSuccess;
 
 exit:
@@ -320,7 +319,7 @@ HRESULT ZarafaFsckCalendar::ValidateTimestamps(LPMESSAGE lpMessage)
 		}
 	}
 
-        /* If we are here, we were succcessfull */
+        /* If we are here, we were succcessful. */
         hr = hrSuccess;
 
 exit:
@@ -343,7 +342,6 @@ HRESULT ZarafaFsckCalendar::ValidateRecurrence(LPMESSAGE lpMessage)
 	LPSPropTagArray lpPropertyTagArray = NULL;
 	BOOL bRecurring = FALSE;
 	LONG ulType = 0;
-	LPSTR lpPattern = "";
 	char *lpData = NULL;
 	unsigned int ulLen = 0;
 
@@ -479,19 +477,19 @@ HRESULT ZarafaFsckCalendar::ValidateRecurrence(LPMESSAGE lpMessage)
 	
 			switch (ulType) {
 			case 1:
-				Value.lpszA = "Daily";
+				Value.lpszA = const_cast<char *>("Daily");
 				break;
 			case 2:
-				Value.lpszA = "Weekly";
+				Value.lpszA = const_cast<char *>("Weekly");
 				break;
 			case 3:
-				Value.lpszA = "Monthly";
+				Value.lpszA = const_cast<char *>("Monthly");
 				break;
 			case 4:
-				Value.lpszA = "Yearly";
+				Value.lpszA = const_cast<char *>("Yearly");
 				break;
 			default:
-				Value.lpszA = "Invalid";
+				Value.lpszA = const_cast<char *>("Invalid");
 				break;
 			}
 
@@ -598,10 +596,8 @@ HRESULT ZarafaFsckCalendar::ValidateRecurrence(LPMESSAGE lpMessage)
         if (hr != hrSuccess)
             goto exit;
 	}
-	
-	lpPattern = lpPropertyArray[E_RECURRENCE_PATTERN].Value.lpszA;
 
-    /* If we are here, we were succcessfull */
+    /* If we are here, we were succcessful. */
     hr = hrSuccess;
 
 exit:

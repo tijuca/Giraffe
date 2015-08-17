@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -47,8 +46,8 @@
 
 #include <sys/stat.h>
 #include <memory.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include <cstdlib>
+#include <cstdio>
 
 using namespace std;
 
@@ -69,7 +68,7 @@ ECConfigCheck::~ECConfigCheck()
 {
 }
 
-string clearCharacters(string s, string whitespaces)
+static string clearCharacters(string s, const string &whitespaces)
 {
 	size_t pos = 0;
 
@@ -80,8 +79,8 @@ string clearCharacters(string s, string whitespaces)
 	 * Whe should clean it in such a way that it resolves to:
 	 * config_name=bla bla
 	 *
-	 * Be carefull _not_ to remove any whitespace characters
-	 * within the configuration value itself
+	 * Be careful _not_ to remove any whitespace characters
+	 * within the configuration value itself.
 	 */
 	pos = s.find_first_not_of(whitespaces);
 	s.erase(0, pos);

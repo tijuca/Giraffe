@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -46,7 +45,7 @@
 
 #include <mapidefs.h>
 #include <mapitags.h>
-#include "edkmdb.h"
+#include <edkmdb.h>
 #include "ECGuid.h"
 #include <Zarafa.h>
 
@@ -61,7 +60,7 @@ using namespace std;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 class MVPropProxy
@@ -91,7 +90,8 @@ public:
 		}
 	}
 
-	ECRESULT compare(unsigned int ulIndex, struct propVal *lpProp, const ECLocale &locale, int *lpnCompareResult) {
+	ECRESULT compare(unsigned int ulIndex, const struct propVal *lpProp, const ECLocale &locale, int *lpnCompareResult)
+	{
 		ECRESULT er = erSuccess;
 		int nCompareResult = 0;
 
@@ -179,7 +179,8 @@ void FreeSortOrderArray(struct sortOrderArray *lpsSortOrder)
 
 }
 
-int CompareSortOrderArray(struct sortOrderArray *lpsSortOrder1, struct sortOrderArray *lpsSortOrder2)
+int CompareSortOrderArray(const struct sortOrderArray *lpsSortOrder1,
+    const struct sortOrderArray *lpsSortOrder2)
 {
 	int i;
 
@@ -203,7 +204,8 @@ int CompareSortOrderArray(struct sortOrderArray *lpsSortOrder1, struct sortOrder
 	return 0;
 }
 
-ECRESULT CopyPropTagArray(struct soap *soap, struct propTagArray* lpPTsSrc, struct propTagArray** lppsPTsDst)
+ECRESULT CopyPropTagArray(struct soap *soap,
+    const struct propTagArray *lpPTsSrc, struct propTagArray **lppsPTsDst)
 {
 	ECRESULT er = erSuccess;
 	struct propTagArray* lpPTsDst = NULL;
@@ -250,7 +252,8 @@ void FreePropTagArray(struct propTagArray *lpsPropTags, bool bFreeBase)
  * @param[in]	ulPropTagq		Property to search for in array, type may also be PT_UNSPECIFIED to find the first match on the PROP_ID
  * @return		propVal*		Direct pointer into the propValArray where the found property is, or NULL if not found.
  */
-struct propVal *FindProp(struct propValArray *lpPropValArray, unsigned int ulPropTag)
+struct propVal *FindProp(const struct propValArray *lpPropValArray,
+    unsigned int ulPropTag)
 {
 	int i = 0;
 
@@ -269,7 +272,7 @@ struct propVal *FindProp(struct propValArray *lpPropValArray, unsigned int ulPro
 /*
 this function check if the right proptag with the value and is't null
 */
-ECRESULT PropCheck(struct propVal *lpProp)
+static ECRESULT PropCheck(const struct propVal *lpProp)
 {
 	ECRESULT er = erSuccess;
 
@@ -403,7 +406,8 @@ ECRESULT PropCheck(struct propVal *lpProp)
 	return er;
 }
 
-ECRESULT CompareABEID(struct propVal *lpProp1, struct propVal *lpProp2, int* lpCompareResult)
+static ECRESULT CompareABEID(const struct propVal *lpProp1,
+    const struct propVal *lpProp2, int *lpCompareResult)
 {
 	ECRESULT er = erSuccess;
 	int iResult = 0;
@@ -412,8 +416,8 @@ ECRESULT CompareABEID(struct propVal *lpProp1, struct propVal *lpProp2, int* lpC
 	ASSERT(lpProp2 != NULL && PROP_TYPE(lpProp2->ulPropTag) == PT_BINARY);
 	ASSERT(lpCompareResult != NULL);
 
-	PABEID peid1 = (PABEID)lpProp1->Value.bin->__ptr;
-	PABEID peid2 = (PABEID)lpProp2->Value.bin->__ptr;
+	const ABEID *peid1 = (PABEID)lpProp1->Value.bin->__ptr;
+	const ABEID *peid2 = (PABEID)lpProp2->Value.bin->__ptr;
 
 	if (memcmp(&peid1->guid, &MUIDECSAB, sizeof(GUID)) || memcmp(&peid2->guid, &MUIDECSAB, sizeof(GUID))) {
 		er = ZARAFA_E_INVALID_PARAMETER;
@@ -428,7 +432,7 @@ ECRESULT CompareABEID(struct propVal *lpProp1, struct propVal *lpProp2, int* lpC
 			iResult = (int)(peid1->ulId - peid2->ulId);
 		
 		else
-			iResult = strcmp((char*)peid1->szExId, (char*)peid2->szExId);
+			iResult = strcmp((const char *)peid1->szExId, (const char *)peid2->szExId);
 	} else {
 		/**
 		 * Different ABEID version, so check on the legacy ulId field. This implies that
@@ -448,7 +452,9 @@ exit:
 	return er;
 }
 
-ECRESULT CompareProp(struct propVal *lpProp1, struct propVal *lpProp2, const ECLocale &locale, int* lpCompareResult)
+ECRESULT CompareProp(const struct propVal *lpProp1,
+    const struct propVal *lpProp2, const ECLocale &locale,
+    int *lpCompareResult)
 {
 	ECRESULT	er = erSuccess;
 	int			nCompareResult = 0;
@@ -457,9 +463,9 @@ ECRESULT CompareProp(struct propVal *lpProp1, struct propVal *lpProp2, const ECL
 	unsigned int ulPropTag2;
 
 	// List of prperties that get special treatment
-	struct {
+	static const struct {
 		ULONG		ulPropTag;
-		ECRESULT	(*lpfnComparer)(struct propVal*, struct propVal*, int*);
+		ECRESULT	(*lpfnComparer)(const struct propVal *, const struct propVal *, int *);
 	} sSpecials[] = {
 		{PR_ADDRESS_BOOK_ENTRYID, &CompareABEID},
 	};
@@ -709,7 +715,9 @@ exit:
  * ulType is one of the RELOP_xx types. The result returned will indicate that at least one of the values in lpMVProp positively 
  * matched the RELOP_xx comparison with lpProp2.
  **/
-ECRESULT CompareMVPropWithProp(struct propVal *lpMVProp1, struct propVal *lpProp2, unsigned int ulType, const ECLocale &locale, bool* lpfMatch)
+ECRESULT CompareMVPropWithProp(struct propVal *lpMVProp1,
+    const struct propVal *lpProp2, unsigned int ulType, const ECLocale &locale,
+    bool *lpfMatch)
 {
 	ECRESULT	er = erSuccess;
 	int			nCompareResult = -1; // Default, Don't change this to 0
@@ -1107,7 +1115,8 @@ exit:
 	return er;
 }
 
-ECRESULT CopyPropVal(struct propVal *lpSrc, struct propVal *lpDst, struct soap *soap, bool bTruncate)
+ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal *lpDst,
+    struct soap *soap, bool bTruncate)
 {
 	ECRESULT er = erSuccess;
 	int i;
@@ -1288,7 +1297,8 @@ exit:
 	return er;
 }
 
-ECRESULT CopyPropVal(struct propVal *lpSrc, struct propVal **lppDst, struct soap *soap, bool bTruncate)
+ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal **lppDst,
+    struct soap *soap, bool bTruncate)
 {
 	ECRESULT er = erSuccess;
 	struct propVal *lpDst;
@@ -1309,7 +1319,8 @@ exit:
 	return er;
 }
 
-ECRESULT CopyPropValArray(struct propValArray *lpSrc, struct propValArray **lppDst, struct soap *soap)
+ECRESULT CopyPropValArray(const struct propValArray *lpSrc,
+    struct propValArray **lppDst, struct soap *soap)
 {
 	ECRESULT er = erSuccess;
 	struct propValArray *lpDst = NULL;
@@ -1336,7 +1347,8 @@ exit:
 	return er;
 }
 
-ECRESULT CopyPropValArray(struct propValArray *lpSrc, struct propValArray *lpDst, struct soap *soap)
+ECRESULT CopyPropValArray(const struct propValArray *lpSrc,
+    struct propValArray *lpDst, struct soap *soap)
 {
 	ECRESULT er = erSuccess;
 	int i;
@@ -1367,7 +1379,8 @@ exit:
 }
 
 
-ECRESULT CopyRestrictTable(struct soap *soap, struct restrictTable *lpSrc, struct restrictTable **lppDst)
+ECRESULT CopyRestrictTable(struct soap *soap,
+    const struct restrictTable *lpSrc, struct restrictTable **lppDst)
 {
 	ECRESULT er = erSuccess;
 	struct restrictTable *lpDst = NULL;
@@ -1911,9 +1924,11 @@ exit:
 
 }
 
-struct propVal* SpropValFindPropVal(struct propValArray* lpsPropValArray, unsigned int ulPropTag)
+static const struct propVal *
+SpropValFindPropVal(const struct propValArray *lpsPropValArray,
+    unsigned int ulPropTag)
 {
-	struct propVal* lpPropVal= NULL;
+	const struct propVal *lpPropVal = NULL;
 	int i;
 
 	if(PROP_TYPE(ulPropTag) == PT_ERROR)
@@ -1936,11 +1951,14 @@ exit:
 }
 
 // NOTE: PropValArray 2 overruled PropValArray 1, except if proptype is PT_ERROR
-ECRESULT MergePropValArray(struct soap *soap, struct propValArray* lpsPropValArray1, struct propValArray* lpsPropValArray2, struct propValArray* lpPropValArrayNew)
+ECRESULT MergePropValArray(struct soap *soap,
+    const struct propValArray *lpsPropValArray1,
+    const struct propValArray *lpsPropValArray2,
+    struct propValArray *lpPropValArrayNew)
 {
 	ECRESULT		er = erSuccess;
 	int i;
-	struct propVal*	lpsPropVal;
+	const struct propVal *lpsPropVal;
 
 	lpPropValArrayNew->__ptr = s_alloc<struct propVal>(soap, lpsPropValArray1->__size + lpsPropValArray2->__size);
 	lpPropValArrayNew->__size = 0;
@@ -1976,7 +1994,8 @@ exit:
 	return er;
 }
 
-ECRESULT CopySearchCriteria(struct soap *soap, struct searchCriteria *lpSrc, struct searchCriteria **lppDst)
+ECRESULT CopySearchCriteria(struct soap *soap,
+    const struct searchCriteria *lpSrc, struct searchCriteria **lppDst)
 {
 	ECRESULT er = erSuccess;
 	struct searchCriteria *lpDst = NULL;
@@ -2043,8 +2062,10 @@ ECRESULT CopyUserObjectDetailsToSoap(unsigned int ulId, entryId *lpUserEid, cons
  * Copy extra user details into propmap, (only the string values)
  *
  */
-ECRESULT CopyAnonymousDetailsToSoap(struct soap *soap, const objectdetails_t &details, bool bCopyBinary,
-									struct propmapPairArray **lppsoapPropmap, struct propmapMVPairArray **lppsoapMVPropmap)
+static ECRESULT CopyAnonymousDetailsToSoap(struct soap *soap,
+    const objectdetails_t &details, bool bCopyBinary,
+    struct propmapPairArray **lppsoapPropmap,
+    struct propmapMVPairArray **lppsoapMVPropmap)
 {
 	ECRESULT er = erSuccess;
 	struct propmapPairArray *lpsoapPropmap = NULL;
@@ -2117,8 +2138,9 @@ ECRESULT CopyAnonymousDetailsToSoap(struct soap *soap, const objectdetails_t &de
 	return er;
 }
 
-ECRESULT CopyAnonymousDetailsFromSoap(struct propmapPairArray *lpsoapPropmap, struct propmapMVPairArray *lpsoapMVPropmap,
-									  objectdetails_t *details)
+static ECRESULT
+CopyAnonymousDetailsFromSoap(struct propmapPairArray *lpsoapPropmap,
+    struct propmapMVPairArray *lpsoapMVPropmap, objectdetails_t *details)
 {
 	if (lpsoapPropmap) {
 		for (unsigned int i = 0; i < lpsoapPropmap->__size; i++) {
@@ -2162,7 +2184,7 @@ ECRESULT CopyUserDetailsToSoap(unsigned int ulId, entryId *lpUserEid, const obje
 	lpUser->lpszMailAddress = s_strcpy(soap, details.GetPropString(OB_PROP_S_EMAIL).c_str());
 	lpUser->lpszFullName = s_strcpy(soap, details.GetPropString(OB_PROP_S_FULLNAME).c_str());
 	lpUser->ulIsAdmin = details.GetPropInt(OB_PROP_I_ADMINLEVEL);
-	lpUser->lpszPassword = "";
+	lpUser->lpszPassword = const_cast<char *>("");
 	lpUser->lpszServername = s_strcpy(soap, details.GetPropString(OB_PROP_S_SERVERNAME).c_str());
 	lpUser->ulIsABHidden = details.GetPropBool(OB_PROP_B_AB_HIDDEN);
 	lpUser->ulCapacity = details.GetPropInt(OB_PROP_I_RESOURCE_CAPACITY);

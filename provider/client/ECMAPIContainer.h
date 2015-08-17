@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -49,6 +48,7 @@
 #ifndef ECMAPICONTAINER
 #define ECMAPICONTAINER
 
+#include "zcdefs.h"
 #include <mapidefs.h>
 #include "WSTransport.h"
 #include "ECMsgStore.h"
@@ -57,7 +57,7 @@
 class ECMAPIContainer : public ECMAPIProp
 {
 public:
-	ECMAPIContainer(ECMsgStore *lpMsgStore, ULONG ulObjType, BOOL fModify, char *szClassName);
+	ECMAPIContainer(ECMsgStore *lpMsgStore, ULONG ulObjType, BOOL fModify, const char *szClassName);
 	virtual ~ECMAPIContainer();
 
 	// IUnknown
@@ -74,12 +74,12 @@ public:
 	virtual HRESULT CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems);
 	virtual HRESULT CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems);
 
-	class xMAPIContainer : public IMAPIContainer {
+	class xMAPIContainer _final : public IMAPIContainer {
 		public:
 		// From IUnknown
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void** lppInterface);
-		virtual ULONG __stdcall AddRef();
-		virtual ULONG __stdcall Release();	
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _override;
+		virtual ULONG __stdcall AddRef(void) _override;
+		virtual ULONG __stdcall Release(void) _override;
 
 		// From IMAPIContainer
 		virtual HRESULT __stdcall GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable);

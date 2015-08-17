@@ -2,12 +2,12 @@
 .\"     Title: zarafa-search.cfg
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: August 2011
+.\"      Date: April 2014
 .\"    Manual: Zarafa user reference
-.\"    Source: Zarafa 7.1
+.\"    Source: Zarafa 7.2
 .\"  Language: English
 .\"
-.TH "ZARAFA\-SEARCH\&.CFG" "5" "August 2011" "Zarafa 7.1" "Zarafa user reference"
+.TH "ZARAFA\-SEARCH\&.CFG" "5" "April 2014" "Zarafa 7.2" "Zarafa user reference"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -65,14 +65,14 @@ Include and process
 .sp
 Example: !include common\&.cfg
 .RE
-.SH "EXPLANATION OF THE SERVER SETTINGS PARAMETERS"
+.SH "EXPLANATION OF THE SERVICE SETTINGS PARAMETERS"
 .PP
-\fBserver_socket\fR
+\fBindex_path\fR
 .RS 4
-Socket to find the connection to the Zarafa server\&.
+Directory under which all index files will be placed\&.
 .sp
 Default:
-\fIfile:///var/run/zarafa\fR
+\fI/var/lib/zarafa/index/\fR
 .RE
 .PP
 \fBrun_as_user\fR
@@ -111,12 +111,20 @@ Limit the number of results returned to the server\&. If set to a nonzero value,
 .sp
 Default:\fI0\fR
 .RE
-.SH "EXPLANATION OF THE SSL SETTINGS PARAMETERS"
+.SH "EXPLANATION OF THE SERVER SETTINGS PARAMETERS"
+.PP
+\fBserver_socket\fR
+.RS 4
+Socket to find the connection to the Zarafa server\&.
+.sp
+Default:
+\fIfile:///var/run/zarafa\fR
+.RE
 .PP
 \fBssl_key_file\fR
 .RS 4
 The file containing the private key and certificate\&. Please read the SSL section in the
-\fBzarafa-server\fR(1)
+\fBzarafa-server\fR(8)
 manual on how to create this file\&.
 .sp
 Default:
@@ -128,6 +136,21 @@ Default:
 Enter you password here when your key file contains a password to be readable\&.
 .sp
 No default set\&.
+.RE
+.SH "EXPLANATION OF THE LISTEN SETTINGS PARAMETERS"
+.PP
+\fBserver_bind_name\fR
+.RS 4
+Connection path to which other processes can connect with the zarafa\-search for performing search queries\&.
+.sp
+Use
+\fIhttp://0\&.0\&.0\&.0:port\fR
+to listen as an HTTP service on all network interfaces on the given
+\fIport\fR
+number\&.
+.sp
+Default:
+\fIfile:///var/run/zarafa\-search\fR
 .RE
 .PP
 \fBssl_private_key_file\fR
@@ -147,7 +170,7 @@ zarafa\-search will use this file as certificate for SSL TLS\&. A self\-signed c
 Default:
 \fI/etc/zarafa/search/cert\&.pem\fR
 .RE
-.SH "EXPLANATION OF THE LOGGING SETTINGS PARAMETERS"
+.SH "EXPLANATION OF THE LOG SETTINGS PARAMETERS"
 .PP
 \fBlog_method\fR
 .RS 4
@@ -169,6 +192,14 @@ Default:
 \fIfile\fR
 .RE
 .PP
+\fBlog_level\fR
+.RS 4
+The level of output for logging in the range from 0 to 5\&. 0 means no logging, 5 means full logging\&.
+.sp
+Default:
+\fI2\fR
+.RE
+.PP
 \fBlog_file\fR
 .RS 4
 When logging to a file, specify the filename in this parameter\&. Use
@@ -179,14 +210,6 @@ Default:
 \fI/var/log/zarafa/search\&.log\fR
 .RE
 .PP
-\fBlog_level\fR
-.RS 4
-The level of output for logging in the range from 0 to 5\&. 0 means no logging, 5 means full logging\&.
-.sp
-Default:
-\fI2\fR
-.RE
-.PP
 \fBlog_timestamp\fR
 .RS 4
 Specify whether to prefix each log line with a timestamp in \*(Aqfile\*(Aq logging mode\&.
@@ -194,55 +217,44 @@ Specify whether to prefix each log line with a timestamp in \*(Aqfile\*(Aq loggi
 Default:
 \fI1\fR
 .RE
-.SH "EXPLANATION OF THE SEARCH SETTINGS PARAMETERS"
 .PP
-\fBserver_bind_name\fR
+\fBlog_buffer_size\fR
 .RS 4
-Connection path to which other processes can connect with the zarafa\-search for performing search queries\&.
-.sp
-Use
-\fIhttp://0\&.0\&.0\&.0:port\fR
-to listen as an HTTP service on all network interfaces on the given
-\fIport\fR
-number\&.
+Buffer logging in what sized blocks\&. Bigger buffers is better for the performance but it gives lag when running e\&.g\&. multitail or \*(Aqtail \-f\*(Aq on the log\-file\&. If you want to directly see what is happing, set this to e\&.g\&. 1\&. So when debugging: make it a small value, else set it to 4096 or more\&.
 .sp
 Default:
-\fIfile:///var/run/zarafa\-search\fR
+\fI4096\fR
+.RE
+.SH "EXPLANATION OF THE ADVANCED SETTINGS PARAMETERS"
+.PP
+\fBterm_cache_size\fR
+.RS 4
+The size in bytes of the term cache used when writing terms to the index\&. A larger term cache will increase indexing speed when indexing large number of documents in a single store\&. This will barely affect incremental updates after the initial indexing has finished\&. This value may contain a k, m or g multiplier\&.
+.sp
+Default: 64M
 .RE
 .PP
-\fBindex_path\fR
+\fBindex_exclude_properties\fR
 .RS 4
-Directory under which all index files will be placed\&.
+Some properties are ignored because they contain unrelated information for users to find their messages on\&. A default set of ignored property ids is set here, but can be expanded\&. Only the id part of a property is needed, and must be string typed properties\&. The field is space separated\&.
 .sp
-Default:
-\fI/var/lib/zarafa/index/\fR
-.RE
-.SH "EXPLANATION OF THE INDEX OPTIMIZE SCHEDULE PARAMETERS"
-.PP
-\fBoptimize_start\fR
-.RS 4
-Start the optimization routine at this hour every day\&. The routine optimizes every index, removing old data and recompressing it, making it faster and smaller\&. Notation is in 24h format, default starts at 2 am\&.
-.sp
-Default:
-\fI2\fR
+Default: 007D 0064 0C1E 0075 678E 678F
 .RE
 .PP
-\fBoptimize_stop\fR
+\fBindex_processes\fR
 .RS 4
-Stop the optimization routine at this hour when not all files were processed\&. The routine will continue were left off the next day it\*(Aqs started\&. The current file being processed will be finished, so the time will be passed\&. Notation is in 24h format, default stops at 5 am\&.
+Number of indexing processes used during initial indexing\&. Setting this to a higher value can greatly speed up initial indexing, especially when attachments are indexed\&.
 .sp
-Default:
-\fI5\fR
+Default: 1
 .RE
 .PP
-\fBoptimize_age\fR
+\fBsearch_engine\fR
 .RS 4
-Only optimize the index file if it wasn\*(Aqt optmized for the past X days\&. Notation is in days, default is to optimize an index each week\&.
+Backend search engine (currently only xapian is supported)\&.
 .sp
-Default:
-\fI7\fR
+Default: xapian
 .RE
-.SH "EXPLANATION OF THE ATTACHMENT SEARCH SETTINGS PARAMETERS"
+.SH "EXPLANATION OF THE ATTACHMENT SETTINGS PARAMETERS"
 .PP
 \fBindex_attachments\fR
 .RS 4
@@ -262,46 +274,6 @@ Default:
 \fI5M\fR
 .RE
 .PP
-\fBindex_attachment_parser\fR
-.RS 4
-For indexing attachment each file must be converted into plain\-text by a parser\&. For this purpose the
-\fIattachments_parser\fR
-script has been installed which can be configured to parse specific mime\-types\&.
-.sp
-It is highly advisable to check the
-\fIattachments_parser\&.db\fR
-file to add or remove parser command for specific mime\-types and/or file\-extensions\&.
-.sp
-Default:
-\fI/etc/zarafa/searchscripts/attachments_parser\fR
-.RE
-.PP
-\fBindex_attachment_parser_max_memory\fR
-.RS 4
-Limit the maximum amount of memory (in bytes) the parser may use for converting the attachment into plain\-text\&. If this limit is exceeded the parser will be killed and the attachment will not be completely converted\&. If the value is set to
-\fI0\fR
-the limit is considered as infinite\&.
-.sp
-The attachment parser depends on external tools to convert attachments to plain\-text, by limiting the amount of resources the parser is allowed to use problems can be prevented when the selected external tool misbehaves with certain attachments\&.
-.sp
-Default:
-\fI0\fR
-bytes
-.RE
-.PP
-\fBindex_attachment_parser_max_cputime\fR
-.RS 4
-Limit the maximum cpu time (in seconds) the parser may use for converting the attachment into plain\-text\&. If this limit is exceeded the parser will be killed and the attachment will not be completely converted\&. If the value is set to
-\fI0\fR
-the limit is considered as infinite\&.
-.sp
-The attachment parser depends on external tools to convert attachments to plain\-text, by limiting the amount of resources the parser is allowed to use problems can be prevented when the selected external tool misbehaves with certain attachments\&.
-.sp
-Default:
-\fI0\fR
-seconds
-.RE
-.PP
 \fBindex_attachment_mime_filter\fR
 .RS 4
 Some attachments are not intresting to run through the parser\&. With this option you can filter out attachment which have a specific mimetype\&. Only the first part of the mimetype should be given here\&. Good examples of a mimetype to filter is \*(Aqimage\*(Aq, \*(Aqaudio\*(Aq and \*(Aqvideo\*(Aq\&. This field is space separated\&.
@@ -315,34 +287,10 @@ As the mime filter above, but works on the attachment extension\&. This is only 
 .sp
 Default:
 .RE
-.PP
-\fBindex_max_clauses\fR
-.RS 4
-This is the maximum number of clauses that can be present in a Lucene search query, after expansion\&. You can raise this limit if you are experiencing a Too Many Clauses error during searches\&.
-.sp
-Default:
-\fI50000\fR
-clauses
-.RE
-.SH "EXPLANATION OF THE INDEX FILTERS SETTINGS PARAMETERS"
-.PP
-\fBindex_exclude_properties\fR
-.RS 4
-Some properties are ignored because they contain unrelated information for users to find their messages on\&. A default set of ignored property ids is set here, but can be expanded\&. Only the id part of a property is needed, and must be string typed properties\&. The field is space separated\&.
-.sp
-Default: 007D 0064 0C1E 0075 678E 678F
-.RE
-.PP
-\fBterm_cache_size\fR
-.RS 4
-The size in bytes of the term cache used when writing terms to the index\&. A larger term cache will increase indexing speed when indexing large number of documents in a single store\&. This will barely affect incremental updates after the initial indexing has finished\&. This value may contain a k, m or g multiplier\&.
-.sp
-Default: 64M
-.RE
 .SH "AUTHOR"
 .PP
 Written by Zarafa\&.
 .SH "SEE ALSO"
 .PP
 
-\fBzarafa-search\fR(1)
+\fBzarafa-search\fR(8)

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -48,7 +47,7 @@
 #include <vmime/vmime.hpp>
 #include <list>
 #include <mapix.h>
-#include "mapidefs.h"
+#include <mapidefs.h>
 #include "ECLogger.h"
 #include "options.h"
 #include "charset/convert.h"
@@ -80,6 +79,8 @@ typedef struct sMailState {
 	};
 } sMailState;
 
+void ignoreError(void *ctx, const char *msg, ...);
+
 class VMIMEToMAPI
 {
 public:
@@ -105,6 +106,11 @@ private:
 	HRESULT handleRecipients(vmime::ref<vmime::header> vmHeader, IMessage* lpMessage);
 	HRESULT modifyRecipientList(LPADRLIST lpRecipients, vmime::ref<vmime::addressList> vmAddressList, ULONG ulRecipType);
 	HRESULT modifyFromAddressBook(LPSPropValue *lppPropVals, ULONG *lpulValues, const char *email, const WCHAR *fullname, ULONG ulRecipType, LPSPropTagArray lpPropsList);
+
+	std::string content_transfer_decode(vmime::ref<vmime::body>) const;
+	vmime::charset get_mime_encoding(vmime::ref<vmime::header>, vmime::ref<vmime::body>) const;
+	int renovate_encoding(std::string &, const std::vector<std::string> &);
+	int renovate_encoding(std::wstring &, std::string &, const std::vector<std::string> &);
 
 	HRESULT handleTextpart(vmime::ref<vmime::header> vmHeader, vmime::ref<vmime::body> vmBody, IMessage* lpMessage, bool bAppendBody);
 	HRESULT handleHTMLTextpart(vmime::ref<vmime::header> vmHeader, vmime::ref<vmime::body> vmBody, IMessage* lpMessage, bool bAppendBody);

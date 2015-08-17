@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -74,6 +73,7 @@ extern ECConfig *g_lpConfig;
 extern ECSessionManager* g_lpSessionManager;
 extern ECStatsCollector* g_lpStatsCollector;
 
+static bool GetLatestVersionAtServer(const char *, unsigned int, ClientVersion *);
 
 /*
  * Handles the HTTP GET command from soap, only the client update install may be downloaded.
@@ -87,7 +87,7 @@ int HandleClientUpdate(struct soap *soap)
 	std::string strPath;
 
 	int nRet = 404;				// default return file not found to soap
-	char *szClientUpdatePath = NULL;
+	const char *szClientUpdatePath = NULL;
 	char *szCurrentVersion = NULL;
 	char *szReq = NULL;
 	char *szReqEnd = NULL;
@@ -333,7 +333,8 @@ int CompareVersions(ClientVersion Version1, ClientVersion Version2)
 
 //zarafaclient-6.20-1234.msi
 //zarafaclient-*.*-*.msi
-bool GetLatestVersionAtServer(char *szUpdatePath, unsigned int ulTrackid, ClientVersion *lpLatestVersion)
+static bool GetLatestVersionAtServer(const char *szUpdatePath,
+    unsigned int ulTrackid, ClientVersion *lpLatestVersion)
 {
 	ClientVersion tempVersion = {0};
 	ClientVersion latestVersion = {0};
@@ -395,7 +396,8 @@ exit:
 /**
  * Convert clientversion struct to string
  */
-bool VersionToString(const ClientVersion &clientVersion, std::string *lpstrVersion)
+static bool VersionToString(const ClientVersion &clientVersion,
+    std::string *lpstrVersion)
 {
 	char szBuf[255];
 
@@ -446,7 +448,7 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 	std::string strQuery;
 	time_t	tNow = 0;
 
-	char *lpszClientUpdatePath = g_lpConfig->GetSetting("client_update_path");
+	const char *lpszClientUpdatePath = g_lpConfig->GetSetting("client_update_path");
 	unsigned int ulLogLevel = atoui(g_lpConfig->GetSetting("client_update_log_level"));
 
 	if (!parseBool(g_lpConfig->GetSetting("client_update_enabled"))) {
@@ -488,7 +490,7 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 		PrettyIP(soap->ip).c_str() );
 
 	if (!sClientUpdateInfo.szComputerName)
-		sClientUpdateInfo.szComputerName = ""; //Client has no name?
+		sClientUpdateInfo.szComputerName = const_cast<char *>(""); //Client has no name?
 
 	if(!sClientUpdateInfo.szUsername) {
 		er = ZARAFA_E_NO_ACCESS;
@@ -638,6 +640,9 @@ exit:
 	if (er && fd)
 		fclose(fd);
 
+	soap->mode &= ~SOAP_XML_TREE;
+	soap->omode &= ~SOAP_XML_TREE;
+
 	return SOAP_OK;
 }
 
@@ -648,8 +653,8 @@ int ns__setClientUpdateStatus(struct soap *soap, struct clientUpdateStatusReques
 	ECDatabase  *lpDatabase = NULL;
 	std::string strQuery;
 
-	char *lpszClientUpdatePath = g_lpConfig->GetSetting("client_update_path");
-	char *lpszLogPath = g_lpConfig->GetSetting("client_update_log_path");
+	const char *lpszClientUpdatePath = g_lpConfig->GetSetting("client_update_path");
+	const char *lpszLogPath = g_lpConfig->GetSetting("client_update_log_path");
 
 	if (!parseBool(g_lpConfig->GetSetting("client_update_enabled"))) {
 		er = ZARAFA_E_NO_SUPPORT;

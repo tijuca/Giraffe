@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -50,11 +49,14 @@
 #include "VMIMEToMAPI.h"
 #include "ECGuid.h"
 
+#include <algorithm>
 #include <string>
 #include <fstream>
 #include <iostream>
-#include <stdlib.h>
-#include <string.h>
+#include <cassert>
+#include <cctype>
+#include <cstdlib>
+#include <cstring>
 
 // string.hpp doesn't always include all subincludes
 #include <boost/algorithm/string/replace.hpp>
@@ -96,6 +98,8 @@
 #include "ICalToMAPI.h"
 
 using namespace std;
+
+static const char im_charset_unspec[] = "unspecified";
 
 /**
  * VMIMEToMAPI default constructor
@@ -285,8 +289,7 @@ HRESULT VMIMEToMAPI::convertVMIMEToMAPI(const string &input, IMessage *lpMessage
 			attProps[nProps++].Value.ul = ATTACH_BY_VALUE;
 
 			attProps[nProps].ulPropTag = PR_ATTACH_MIME_TAG_W;
-			attProps[nProps++].Value.lpszW = L"multipart/signed";
-			
+			attProps[nProps++].Value.lpszW = const_cast<wchar_t *>(L"multipart/signed");
 			attProps[nProps].ulPropTag = PR_RENDERING_POSITION;
 			attProps[nProps++].Value.ul = -1;
 
@@ -303,7 +306,7 @@ HRESULT VMIMEToMAPI::convertVMIMEToMAPI(const string &input, IMessage *lpMessage
 
 			// saved, so mark the message so outlook knows how to find the encoded message
 			sPropSMIMEClass.ulPropTag = PR_MESSAGE_CLASS_W;
-			sPropSMIMEClass.Value.lpszW = L"IPM.Note.SMIME.MultipartSigned";
+			sPropSMIMEClass.Value.lpszW = const_cast<wchar_t *>(L"IPM.Note.SMIME.MultipartSigned");
 
 			hr = lpMessage->SetProps(1, &sPropSMIMEClass, NULL);
 			if (hr != hrSuccess) {
@@ -394,13 +397,13 @@ HRESULT VMIMEToMAPI::fillMAPIMail(vmime::ref<vmime::message> vmMessage, IMessage
 	SPropValue sPropDefaults[3];
 
 	sPropDefaults[0].ulPropTag = PR_MESSAGE_CLASS_W;
-	sPropDefaults[0].Value.lpszW = L"IPM.Note";
+	sPropDefaults[0].Value.lpszW = const_cast<wchar_t *>(L"IPM.Note");
 	sPropDefaults[1].ulPropTag = PR_MESSAGE_FLAGS;
 	sPropDefaults[1].Value.ul = (m_dopt.mark_as_read ? MSGFLAG_READ : 0) | MSGFLAG_UNMODIFIED;
 
 	// Default codepage is UTF-8, might be overwritten when writing
 	// the body (plain or html). So this is only in effect when an
-	// e-mail doesn't specify it's charset.  We use UTF-8 since it's
+	// e-mail does not specify its charset.  We use UTF-8 since it is
 	// compatible with us-ascii, and the conversion from plain-text
 	// only to HTML by the client will use this codepage. This makes
 	// sure the generated HTML version of plaintext only mails
@@ -468,10 +471,10 @@ HRESULT VMIMEToMAPI::fillMAPIMail(vmime::ref<vmime::message> vmMessage, IMessage
 			if (receivedMDN.getDisposition().getType() == vmime::dispositionTypes::DELETED)
 			{
 				sPropDefaults[0].ulPropTag = PR_MESSAGE_CLASS_W;
-				sPropDefaults[0].Value.lpszW = L"REPORT.IPM.Note.IPNNRN";				
+				sPropDefaults[0].Value.lpszW = const_cast<wchar_t *>(L"REPORT.IPM.Note.IPNNRN");
 			} else {
 				sPropDefaults[0].ulPropTag = PR_MESSAGE_CLASS_W;
-				sPropDefaults[0].Value.lpszW = L"REPORT.IPM.Note.IPNRN";
+				sPropDefaults[0].Value.lpszW = const_cast<wchar_t *>(L"REPORT.IPM.Note.IPNRN");
 			}
 
 			string strId = "<"+receivedMDN.getOriginalMessageId().getId()+">";
@@ -721,8 +724,7 @@ HRESULT VMIMEToMAPI::handleHeaders(vmime::ref<vmime::header> vmHeader, IMessage*
 				msgProps[nProps++].Value.bin.lpb = (BYTE*)strFromSearchKey.c_str();
 
 				msgProps[nProps].ulPropTag = PR_SENT_REPRESENTING_ADDRTYPE_W;
-				msgProps[nProps++].Value.lpszW = L"SMTP";
-			
+				msgProps[nProps++].Value.lpszW = const_cast<wchar_t *>(L"SMTP");
 				hr = ECCreateOneOff((LPTSTR)wstrFromName.c_str(), (LPTSTR)L"SMTP", (LPTSTR)m_converter.convert_to<wstring>(strFromEmail).c_str(),
 									MAPI_UNICODE | MAPI_SEND_NO_RICH_INFO, &cbFromEntryID, &lpFromEntryID);
 				if(hr != hrSuccess)
@@ -773,8 +775,7 @@ HRESULT VMIMEToMAPI::handleHeaders(vmime::ref<vmime::header> vmHeader, IMessage*
 				msgProps[nProps++].Value.bin.lpb = (BYTE*)strSenderSearchKey.c_str();
 
 				msgProps[nProps].ulPropTag = PR_SENDER_ADDRTYPE_W;
-				msgProps[nProps++].Value.lpszW = L"SMTP";
-			
+				msgProps[nProps++].Value.lpszW = const_cast<wchar_t *>(L"SMTP");
 				hr = ECCreateOneOff((LPTSTR)wstrSenderName.c_str(), (LPTSTR)L"SMTP", (LPTSTR)m_converter.convert_to<wstring>(strSenderEmail).c_str(),
 									MAPI_UNICODE | MAPI_SEND_NO_RICH_INFO, &cbSenderEntryID, &lpSenderEntryID);
 				if(hr != hrSuccess)
@@ -997,12 +998,14 @@ HRESULT VMIMEToMAPI::handleHeaders(vmime::ref<vmime::header> vmHeader, IMessage*
 			LPMAPINAMEID lpNameID = NULL;
 			LPSPropTagArray lpPropTags = NULL;
 
-			MAPIAllocateBuffer(sizeof(MAPINAMEID), (void**)&lpNameID);
+			if ((hr = MAPIAllocateBuffer(sizeof(MAPINAMEID), (void**)&lpNameID)) != hrSuccess)
+				goto exit;
 			lpNameID->lpguid = (GUID*)&PS_INTERNET_HEADERS;
 			lpNameID->ulKind = MNID_STRING;
 
 			int vlen = mbstowcs(NULL, name.c_str(), 0) +1;
-			MAPIAllocateMore(vlen*sizeof(WCHAR), lpNameID, (void**)&lpNameID->Kind.lpwstrName);
+			if ((hr = MAPIAllocateMore(vlen*sizeof(WCHAR), lpNameID, (void**)&lpNameID->Kind.lpwstrName)) != hrSuccess)
+				goto exit;
 			mbstowcs(lpNameID->Kind.lpwstrName, name.c_str(), vlen);
 
 			hr = lpMessage->GetIDsFromNames(1, &lpNameID, MAPI_CREATE, &lpPropTags);
@@ -1360,7 +1363,7 @@ HRESULT VMIMEToMAPI::modifyRecipientList(LPADRLIST lpRecipients, vmime::ref<vmim
 			memcpy(lpRecipients->aEntries[iRecipNum].rgPropVals[3].Value.bin.lpb, lpEntryID, cbEntryID);
 
 			lpRecipients->aEntries[iRecipNum].rgPropVals[4].ulPropTag	= PR_ADDRTYPE_W;
-			lpRecipients->aEntries[iRecipNum].rgPropVals[4].Value.lpszW = L"SMTP";
+			lpRecipients->aEntries[iRecipNum].rgPropVals[4].Value.lpszW = const_cast<wchar_t *>(L"SMTP");
 
 			strSearch = "SMTP:"+strEmail;
 			transform(strSearch.begin(), strSearch.end(), strSearch.begin(), ::toupper);
@@ -1493,7 +1496,7 @@ HRESULT VMIMEToMAPI::modifyFromAddressBook(LPSPropValue *lppPropVals, ULONG *lpu
 		ASSERT(lpProp);
 		if (!lpProp) {
 			lpLogger->Log(EC_LOGLEVEL_WARNING, "Missing PR_ADDRTYPE_W for search entry: email %s, fullname %ls", email ? email : "null", fullname ? fullname : L"null");
-			sRecipProps[cValues].Value.lpszW = L"ZARAFA";
+			sRecipProps[cValues].Value.lpszW = const_cast<wchar_t *>(L"ZARAFA");
 		} else {
 			sRecipProps[cValues].Value.lpszW = lpProp->Value.lpszW;
 		}
@@ -1923,7 +1926,7 @@ next:
 
 			hr = CreateICalToMapi(lpMessage, m_lpAdrBook, true, &lpIcalMapi);
 			if (hr != hrSuccess) {
-				lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to create ical convertor: 0x%08X", hr);
+				lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to create ical converter: 0x%08X", hr);
 				goto exit;
 			}
 
@@ -1988,7 +1991,7 @@ next:
 
 			// Mark the message so outlook knows how to find the encoded message
 			sPropSMIMEClass.ulPropTag = PR_MESSAGE_CLASS_W;
-			sPropSMIMEClass.Value.lpszW = L"IPM.Note.SMIME";
+			sPropSMIMEClass.Value.lpszW = const_cast<wchar_t *>(L"IPM.Note.SMIME");
 
 			hr = lpMessage->SetProps(1, &sPropSMIMEClass, NULL);
 			if (hr != hrSuccess) {
@@ -2041,6 +2044,122 @@ exit:
 }
 
 /**
+ * Decode the MIME part as per its Content-Transfer-Encoding header.
+ * @im_body:	Internet Message / VMIME body object
+ *
+ * Returns the transfer-decoded data.
+ */
+std::string
+VMIMEToMAPI::content_transfer_decode(vmime::ref<vmime::body> im_body) const
+{
+	/* TODO: Research how conversion could be minimized using streams. */
+	std::string data;
+	vmime::utility::outputStreamStringAdapter str_adap(data);
+	vmime::ref<const vmime::contentHandler> im_cont =
+		im_body->getContents();
+
+	try {
+		im_cont->extract(str_adap);
+	} catch (vmime::exceptions::no_encoder_available &e) {
+		lpLogger->Log(EC_LOGLEVEL_WARNING,
+			"VMIME could not process the Content-Transfer-Encoding \"%s\" (%s). Reading part raw.",
+			im_cont->getEncoding().generate().c_str(), e.what());
+		im_cont->extractRaw(str_adap);
+	}
+	return data;
+}
+
+/**
+ * Attempt to repair some data streams with illegal/unknown encodings.
+ * @charset:	character set as specified in Content-Type,
+ * 		or what we so far know the encoding to be
+ * @data:	data stream
+ *
+ * The function changes (may change) the mail @data in-place and returns the
+ * new character set for it.
+ */
+vmime::charset
+VMIMEToMAPI::get_mime_encoding(vmime::ref<vmime::header> im_header,
+    vmime::ref<vmime::body> im_body) const
+{
+	vmime::ref<const vmime::contentTypeField> ctf =
+		im_header->ContentType().dynamicCast<vmime::contentTypeField>();
+
+	if (ctf != NULL && ctf->hasParameter("charset"))
+		return im_body->getCharset();
+
+	return vmime::charset(im_charset_unspec);
+}
+
+/**
+ * Try decoding the MIME body with a bunch of character sets
+ * @out:	transformed string is put here
+ * 		(is permitted to be the same variable as @in)
+ * @in:		any body text
+ * @cs:		list of character sets to try, ordered by descending preference
+ *
+ * Interpret the body text in various character sets and see in which one
+ * all input characters appear to be valid codepoints. If none match, it
+ * will be forcibly sanitized, possibly losing characters.
+ * The string will also be type-converted in the process.
+ * The index of the chosen character set will be returned.
+ */
+int VMIMEToMAPI::renovate_encoding(std::string &data,
+    const std::vector<std::string> &cs)
+{
+	assert(cs.size() > 0);
+	for (size_t i = 0; i < cs.size(); ++i) {
+		const char *name = cs[i].c_str();
+		try {
+			data = m_converter.convert_to<std::string>(
+			       (cs[i] + "//NOFORCE").c_str(),
+			       data, rawsize(data), name);
+			lpLogger->Log(EC_LOGLEVEL_DEBUG,
+				"renovate_encoding: reading data using charset \"%s\" succeeded.",
+				name);
+			return i;
+		} catch (convert_exception &ce) {
+			/*
+			 * Basically, choices other than the first are subpar
+			 * and may not yield an RFC-compliant result (but
+			 * perhaps a readable one nevertheless). Therefore,
+			 * be very vocant about bad mail on the first failed
+			 * one.
+			 */
+			unsigned int lvl = EC_LOGLEVEL_DEBUG;
+			if (i == 0)
+				lvl = EC_LOGLEVEL_WARNING;
+			lpLogger->Log(lvl,
+				"renovate_encoding: reading data using charset \"%s\" did not succeed: %s",
+				name, ce.what());
+		}
+	}
+	/*
+	 * We have no more alternatives, so pick most preferential one and
+	 * do it with FORCE. If it now throws an exception, there is nothing
+	 * we can do for now.
+	 */
+	const char *name = cs[0].c_str();
+	data = m_converter.convert_to<std::string>(
+	       (cs[0] + "//FORCE").c_str(), data, rawsize(data), name);
+	lpLogger->Log(EC_LOGLEVEL_DEBUG,
+		"renovate_encoding: forced interpretation as charset \"%s\".", name);
+	return 0;
+}
+
+int VMIMEToMAPI::renovate_encoding(std::wstring &out, std::string &in,
+    const std::vector<std::string> &cs)
+{
+	int pick = renovate_encoding(in, cs);
+	if (pick < 0)
+		return pick;
+	const char *name = cs[pick].c_str();
+	out = m_converter.convert_to<std::wstring>(in.c_str(),
+	      rawsize(in), name);
+	return pick;
+}
+
+/**
  * Saves a plain text body part in the body or creates a new attachment.
  *
  * @param[in]	vmHeader	header describing contents of vmBody.
@@ -2052,57 +2171,58 @@ exit:
  */
 HRESULT VMIMEToMAPI::handleTextpart(vmime::ref<vmime::header> vmHeader, vmime::ref<vmime::body> vmBody, IMessage* lpMessage, bool bAppendBody) {
 	HRESULT hr = S_OK;
-	std::string strBuffOut;
 	IStream *lpStream = NULL;
-	LARGE_INTEGER liZero = {{0,0}};
-	ULONG ulFlags = MAPI_MODIFY;
 
 	if (m_mailState.bodyLevel < BODY_PLAIN || (m_mailState.bodyLevel == BODY_PLAIN && bAppendBody)) {
 		// we have no body, or need to append more plain text body parts
 		try {
-			std::wstring strUnicodeText;
-			vmime::charset bodyCharset;
 			SPropValue sCodepage;
 
-			// @todo research how conversion can be minimized using streams
-			vmime::utility::outputStreamStringAdapter os(strBuffOut);
-			try {
-				vmBody->getContents()->extract(os);
-			}
-			catch (vmime::exceptions::no_encoder_available &e) {
-				lpLogger->Log(EC_LOGLEVEL_FATAL, "Incorrect encoder for text body: %s, trying to recover", vmBody->getContents()->getEncoding().generate().c_str());
-				vmBody->getContents()->extractRaw(os);
-			}
-						
-			// Convert the body to something MAPI is expecting to have in PR_BODY
+			/* process Content-Transfer-Encoding */
+			std::string strBuffOut = content_transfer_decode(vmBody);
 
-			bodyCharset = getCompatibleCharset(vmBody->getCharset());
-			if(bodyCharset == vmime::charsets::US_ASCII)
-				// silently upgrade us-ascii to default charset
-				bodyCharset = vmime::charset(m_dopt.default_charset);
-
-			try {
-				strUnicodeText = m_converter.convert_to<wstring>(strBuffOut, rawsize(strBuffOut), bodyCharset.getName().c_str());
-			} catch (const unknown_charset_exception &uce) {
-				lpLogger->Log(EC_LOGLEVEL_WARNING, "Charset '%s' of body invalid, forcing charset to %s and possibly losing information.",
-							  bodyCharset.getName().c_str(), m_dopt.default_charset);
-				// Assume body of default charset when the charset is invalid
-				bodyCharset = vmime::charset(m_dopt.default_charset);
-				strUnicodeText = m_converter.convert_to<wstring>(CHARSET_WCHAR "//IGNORE", strBuffOut, rawsize(strBuffOut), bodyCharset.getName().c_str());
-			} catch (const convert_exception &ce) {
-				lpLogger->Log(EC_LOGLEVEL_WARNING, "Charset '%s' of body incorrect: '%s', forcing charset and possibly losing information.",
-							  bodyCharset.getName().c_str(), ce.what());
-				strUnicodeText = m_converter.convert_to<wstring>(CHARSET_WCHAR "//IGNORE", strBuffOut, rawsize(strBuffOut), bodyCharset.getName().c_str());
+			/* repair unrecognized Content-Types */
+			vmime::charset mime_charset =
+				get_mime_encoding(vmHeader, vmBody);
+			if (mime_charset == im_charset_unspec) {
+				lpLogger->Log(EC_LOGLEVEL_DEBUG, "No charset specified in text/plain MIME part header, defaulting to ASCII.");
+				mime_charset = vmime::charsets::US_ASCII;
 			}
 
-			if (HrGetCPByCharset(bodyCharset.getName().c_str(), &sCodepage.Value.ul) != hrSuccess) {
+			/*
+			 * We write to PR_BODY_W, so we need the text in a
+			 * std::wstring.
+			 */
+			std::wstring strUnicodeText;
+
+			/* Try candidates in order of preference */
+			std::vector<std::string> cs_cand;
+			cs_cand.push_back(mime_charset.getName());
+			cs_cand.push_back(m_dopt.default_charset);
+			cs_cand.push_back(vmime::charsets::US_ASCII);
+
+			int cs_best = renovate_encoding(strUnicodeText,
+			              strBuffOut, cs_cand);
+			if (cs_best < 0)
+				lpLogger->Log(EC_LOGLEVEL_ERROR, "Text part did not validate in any character set.");
+			/*
+			 * PR_BODY_W cannot deal with U+0000 characters
+			 * (even though the underlying wchar_t encoding may
+			 * successfully involve 0x00 bytes).
+			 */
+			strUnicodeText.erase(std::remove(strUnicodeText.begin(), strUnicodeText.end(), L'\0'), strUnicodeText.end());
+
+			if (HrGetCPByCharset(cs_cand[cs_best].c_str(), &sCodepage.Value.ul) != hrSuccess) {
 				// we have no matching win32 codepage, so convert the HTML from plaintext in utf-8 for compatibility.
 				sCodepage.Value.ul = 65001;
+				strBuffOut = m_converter.convert_to<std::string>("UTF-8", strBuffOut, rawsize(strBuffOut), cs_cand[cs_best].c_str());
+				lpLogger->Log(EC_LOGLEVEL_INFO, "Upgrading text/plain MIME body to UTF-8 for compatibility");
 			}
 			sCodepage.ulPropTag = PR_INTERNET_CPID;
 			HrSetOneProp(lpMessage, &sCodepage);
 
 			// create new or reset body
+			ULONG ulFlags = MAPI_MODIFY;
 			if (m_mailState.bodyLevel < BODY_PLAIN || !bAppendBody)
 				ulFlags |= MAPI_CREATE;
 
@@ -2111,6 +2231,7 @@ HRESULT VMIMEToMAPI::handleTextpart(vmime::ref<vmime::header> vmHeader, vmime::r
 				goto exit;
 
 			if (bAppendBody) {
+				static const LARGE_INTEGER liZero = {{0, 0}};
 				hr = lpStream->Seek(liZero, SEEK_END, NULL);
 				if (hr != hrSuccess)
 					goto exit;
@@ -2171,68 +2292,112 @@ exit:
  *   become an attachment.
  * @return		MAPI error code.
  * @retval		MAPI_E_CALL_FAILED	Caught an exception, which breaks the conversion.
+ *
+ * On the matter of character sets:
+ *
+ * 	“Using a <meta> tag for something like content-type and encoding is
+ * 	highly ironic, since without knowing those things, you couldn't parse
+ * 	the file to get the value of the meta tag.”
+ *	— https://stackoverflow.com/q/4696499
+ *
+ * From that alone it already follows that encodings given inside the object
+ * itself are second-class.
+ *
+ * Two other considerations remain:
+ *
+ * 1. If a mail relay in the transport chain decides to recode a message (say,
+ *    change it from ISO-8859-1 to ISO-8859-15), it should not modify the
+ *    message content. (I claim that most MTAs do not even know HTML, nor
+ *    should they.) Therefore, the new encoding must be conveyed external to
+ *    the content, namely by means of the Content-Type field. => We must ignore
+ *    the <meta> tag.
+ *
+ * 2. If decoding the MIME part with the Content-Type encoding produces an
+ *    error (e.g. found a sequence that is undefined in this encoding), yet
+ *    decoding the MIME part with the <meta> encoding succeeds, we still
+ *    cannot be sure that the <meta> tag is the right one to use.
+ *    => Could be transmission corruption or willful malignent mangling of
+ *    the message.
+ *
+ * MIME hdr   META hdr   RFC says   MUAs do    Desired result
+ * --------------------------------------------------------------
+ * unspec     unspec     us-ascii   us-ascii   us-ascii
+ * unspec     present    unspec     us-ascii   meta
+ * present    unspec     mime       mime       mime
+ * present    present    mime       mime       try mime, then meta
+ *
+ * Ideally, the message should be stored raw, and the mail body never be
+ * changed unless it is 100% certain that the transformation is unambiguously
+ * reversible. Like, how RFC5322 systems actually do it.
+ * But with conversion to MAPI, we have this seemingly lossy conversion
+ * stage. :-(
  */
 HRESULT VMIMEToMAPI::handleHTMLTextpart(vmime::ref<vmime::header> vmHeader, vmime::ref<vmime::body> vmBody, IMessage* lpMessage, bool bAppendBody) {
 	HRESULT		hr				= hrSuccess;
 	IStream*	lpHTMLStream	= NULL; 
 	ULONG		cbWritten		= 0;
 	std::string strHTML;
-	char *		lpszCharset 	= NULL;
-	LARGE_INTEGER liZero = {{0,0}};
-	ULONG ulFlags = MAPI_MODIFY;
+	const char *lpszCharset = NULL;
 	SPropValue sCodepage;
 
 	if (m_mailState.bodyLevel < BODY_HTML || (m_mailState.bodyLevel == BODY_HTML && bAppendBody)) {
 		// we're overriding a plain text body, setting a new HTML body or appending HTML data
 		try {
-			vmime::charset bodyCharset("us-ascii");
-			vmime::charset htmlCharset("us-ascii");
+			/* process Content-Transfer-Encoding */
+			strHTML = content_transfer_decode(vmBody);
 
-			vmime::utility::outputStreamStringAdapter os(strHTML);
-			try {
-				vmBody->getContents()->extract(os);
-			}
-			catch (vmime::exceptions::no_encoder_available &e) {
-				lpLogger->Log(EC_LOGLEVEL_FATAL, "Incorrect encoder for html body: %s, trying to recover", vmBody->getContents()->getEncoding().generate().c_str());
-				vmBody->getContents()->extractRaw(os);
+			/* repair unrecognized Content-Types */
+			vmime::charset mime_charset =
+				get_mime_encoding(vmHeader, vmBody);
+			if (mime_charset == im_charset_unspec)
+				lpLogger->Log(EC_LOGLEVEL_DEBUG, "No charset specified in text/html MIME part header");
+
+			/* Look for fallback in HTML */
+			vmime::charset html_charset(im_charset_unspec);
+			if (getCharsetFromHTML(strHTML, &html_charset) == hrSuccess &&
+			    html_charset != mime_charset &&
+			    mime_charset != im_charset_unspec)
+				/*
+				 * This is not actually a problem, it can
+				 * happen when an MTA transcodes it.
+				 */
+				lpLogger->Log(EC_LOGLEVEL_DEBUG, "MIME headers declare charset \"%s\", while HTML meta tag declares \"%s\".",
+					mime_charset.getName().c_str(),
+					html_charset.getName().c_str());
+
+			if (mime_charset == im_charset_unspec &&
+			    html_charset == im_charset_unspec) {
+				lpLogger->Log(EC_LOGLEVEL_DEBUG, "No MIME charset and no HTML charset, defaulting to US-ASCII");
+				mime_charset = html_charset = vmime::charsets::US_ASCII;
+			} else if (mime_charset == im_charset_unspec) {
+				/* only place to name cset is <meta> */
+				mime_charset = html_charset;
+			} else if (html_charset == im_charset_unspec) {
+				/* only place to name cset is MIME header */
+				html_charset = mime_charset;
 			}
 
-			if (vmHeader->ContentType().dynamicCast<vmime::contentTypeField>()->hasParameter("charset")) {
-				bodyCharset = getCompatibleCharset(vmBody->getCharset());
-			}
+			/* Try candidates in order of preference */
+			std::vector<std::string> cs_cand;
+			cs_cand.push_back(mime_charset.getName());
+			if (mime_charset != html_charset)
+				cs_cand.push_back(html_charset.getName());
+			cs_cand.push_back(m_dopt.default_charset);
+			cs_cand.push_back(vmime::charsets::US_ASCII);
+			int cs_best = renovate_encoding(strHTML, cs_cand);
+			if (cs_best < 0)
+				lpLogger->Log(EC_LOGLEVEL_ERROR, "HTML part did not validate in any character set.");
+			/*
+			 * PR_HTML is a PT_BINARY, and can handle 0x00 bytes
+			 * (e.g. in case of UTF-16 encoding).
+			 */
 
-			if (getCharsetFromHTML(strHTML, &htmlCharset) == hrSuccess && htmlCharset != bodyCharset) {
-				lpLogger->Log(EC_LOGLEVEL_WARNING, "Charset mentioned in email %s is different than charset in HTML %s. Using HTML charset.", bodyCharset.getName().c_str(), htmlCharset.getName().c_str());
-				bodyCharset = htmlCharset;
-			}
-
-			if(bodyCharset == vmime::charsets::US_ASCII)
-				// silently upgrade us-ascii to us-ascii compatible single byte charset and more widely used iso-8859-15
-				bodyCharset = vmime::charset(m_dopt.default_charset);
-
-			try {
-				// check charset validity
-				// since this text is saved in a PT_BINARY, it needs to be valid data to convert to the plain-text version.
-				m_converter.convert_to<std::string>((bodyCharset.getName() + "//NOFORCE").c_str(), strHTML, rawsize(strHTML), bodyCharset.getName().c_str());
-			}
-			catch (convert_exception &ce) {
-				lpLogger->Log(EC_LOGLEVEL_FATAL, "Incorrect charset for html body: %s, trying to recover", bodyCharset.getName().c_str());
-				try {
-					strHTML = m_converter.convert_to<std::string>((bodyCharset.getName() + "//FORCE").c_str(), strHTML, rawsize(strHTML), bodyCharset.getName().c_str());
-					lpLogger->Log(EC_LOGLEVEL_INFO, "Recover successful");
-				} catch (std::exception &e) {
-					// bodyCharset is not even an existing charset
-					lpLogger->Log(EC_LOGLEVEL_ERROR, "Recover failed, forcing to %s", m_dopt.default_charset);
-					bodyCharset = vmime::charset(m_dopt.default_charset);
-				}
-			}
-			
 			// write codepage for PR_HTML property
-			if (HrGetCPByCharset(bodyCharset.getName().c_str(), &sCodepage.Value.ul) != hrSuccess) {
+			if (HrGetCPByCharset(cs_cand[cs_best].c_str(), &sCodepage.Value.ul) != hrSuccess) {
 				// we have no matching win32 codepage, so choose utf-8 and convert body using iconv, (note: HTML is already "charset-sanitized", should not throw error here)
 				sCodepage.Value.ul = 65001;
-				strHTML = m_converter.convert_to<std::string>("UTF-8", strHTML, rawsize(strHTML), bodyCharset.getName().c_str());
-				lpLogger->Log(EC_LOGLEVEL_INFO, "Changing HTML charset to UTF-8 for compatibility");
+				strHTML = m_converter.convert_to<std::string>("UTF-8", strHTML, rawsize(strHTML), cs_cand[cs_best].c_str());
+				lpLogger->Log(EC_LOGLEVEL_INFO, "Upgrading text/html MIME body to UTF-8 for compatibility");
 			}
 			
 			if (bAppendBody && m_mailState.bodyLevel == BODY_HTML && m_mailState.ulLastCP && sCodepage.Value.ul != m_mailState.ulLastCP) {
@@ -2262,12 +2427,12 @@ HRESULT VMIMEToMAPI::handleHTMLTextpart(vmime::ref<vmime::header> vmHeader, vmim
 				
 				if(sCodepage.Value.ul != 65001) {
 					// Convert new body part to utf-8
-					strHTML = m_converter.convert_to<std::string>("UTF-8", strHTML, rawsize(strHTML), bodyCharset.getName().c_str());
+					strHTML = m_converter.convert_to<std::string>("UTF-8", strHTML, rawsize(strHTML), mime_charset.getName().c_str());
 				}
 				
 				// Everything is utf-8 now
 				sCodepage.Value.ul = 65001;
-				bodyCharset = "utf-8";
+				mime_charset = "utf-8";
 			}
 			
 			m_mailState.ulLastCP = sCodepage.Value.ul;
@@ -2278,7 +2443,7 @@ HRESULT VMIMEToMAPI::handleHTMLTextpart(vmime::ref<vmime::header> vmHeader, vmim
 			// we may have received a text part to append to the HTML body
 			if (vmHeader->ContentType()->getValue().dynamicCast<vmime::mediaType>()->getSubType() == vmime::mediaTypes::TEXT_PLAIN) {
 				// escape and wrap with <pre> tags
-				std::wstring strwBody = m_converter.convert_to<std::wstring>(CHARSET_WCHAR "//IGNORE", strHTML, rawsize(strHTML), bodyCharset.getName().c_str());
+				std::wstring strwBody = m_converter.convert_to<std::wstring>(CHARSET_WCHAR "//IGNORE", strHTML, rawsize(strHTML), mime_charset.getName().c_str());
 				strHTML = "<pre>";
 				hr = Util::HrTextToHtml(strwBody.c_str(), strHTML, sCodepage.Value.ul);
 				if (hr != hrSuccess)
@@ -2303,6 +2468,7 @@ HRESULT VMIMEToMAPI::handleHTMLTextpart(vmime::ref<vmime::header> vmHeader, vmim
 		}
 
 		// create new or reset body
+		ULONG ulFlags = MAPI_MODIFY;
 		if (m_mailState.bodyLevel == BODY_NONE || (m_mailState.bodyLevel < BODY_HTML && !bAppendBody))
 			ulFlags |= MAPI_CREATE;
 
@@ -2311,6 +2477,7 @@ HRESULT VMIMEToMAPI::handleHTMLTextpart(vmime::ref<vmime::header> vmHeader, vmim
 			goto exit;
 
 		if (bAppendBody) {
+			static const LARGE_INTEGER liZero = {{0, 0}};
 			hr = lpHTMLStream->Seek(liZero, SEEK_END, NULL);
 			if (hr != hrSuccess)
 				goto exit;
@@ -2556,9 +2723,11 @@ namespace charsetHelper {
 		{"gb2312", "gb18030"},			// gb18030 is an extended version of gb2312
 		{"x-gbk", "gb18030"},			// gb18030 > gbk > gb2312. x-gbk is an alias of gbk, which is not listed in iconv.
 		{"ks_c_5601-1987", "cp949"},	// cp949 is euc-kr with UHC extensions
-		{"iso-8859-8-i", "iso-8859-8"}	// logical vs visual order, does not matter. http://mirror.hamakor.org.il/archives/linux-il/08-2004/11445.html
+		{"iso-8859-8-i", "iso-8859-8"},	// logical vs visual order, does not matter. http://mirror.hamakor.org.il/archives/linux-il/08-2004/11445.html
+		{"unicode", "utf-8"}, /* UTF-16 BOM + UTF-8 content */
 	};
 }
+
 vmime::charset VMIMEToMAPI::getCompatibleCharset(const vmime::charset &vmCharset)
 {
 	vmime::charset vmComp(vmCharset);
@@ -2582,13 +2751,15 @@ vmime::charset VMIMEToMAPI::getCompatibleCharset(const vmime::charset &vmCharset
 	return vmComp;
 }
 
-static htmlNodePtr find_node(htmlNodePtr lpNode, const xmlChar *name)
+static htmlNodePtr find_node(htmlNodePtr lpNode, const char *name)
 {
 	htmlNodePtr node = NULL;
 
 	for (node = lpNode; node; node = node->next) {
+		if (node->type != XML_ELEMENT_NODE)
+			continue;
 		htmlNodePtr child = NULL;
-		if (xmlStrcasecmp(node->name, name) == 0)
+		if (xmlStrcasecmp(node->name, reinterpret_cast<const xmlChar *>(name)) == 0)
 			break;
 		child = find_node(node->children, name);
 		if (child)
@@ -2597,14 +2768,63 @@ static htmlNodePtr find_node(htmlNodePtr lpNode, const xmlChar *name)
 	return node;
 }
 
+void ignoreError(void *ctx, const char *msg, ...)
+{
+}
+
 /**
- * Find meta tag with charset information
- * in the HTML body to determain the real charset.
+ * Determine character set from a possibly broken Content-Type value.
+ * @in:		string in the form of m{^text/foo\s*(;?\s*key=value)*}
  *
- * @param[in] strHTML HTML body to parse
- * @param[out] htmlCharset vmime compatible charset from charset mentioned in html text
+ * Attempt to extract the character set parameter, e.g. from a HTML <meta> tag,
+ * or from a Content-Type MIME header (though we do not use it for MIME headers
+ * currently).
+ */
+static std::string fix_content_type_charset(const char *in)
+{
+	const char *cset = im_charset_unspec, *cset_end = im_charset_unspec;
+
+	while (!isspace(*in) && *in != '\0')	/* skip type */
+		++in;
+	while (*in != '\0') {
+		while (isspace(*in))
+			++in; /* skip possible whitespace before ';' */
+		if (*in == ';') {
+			++in;
+			while (isspace(*in))	/* skip WS after ';' */
+				++in;
+		}
+		if (strnicmp(in, "charset=", 8) == 0) {
+			in += 8;
+			cset = in;
+			while (!isspace(*in) && *in != ';' && *in != '\0')
+				++in;	/* skip value */
+			cset_end = in;
+			continue;
+			/* continue parsing for more charset= values */
+		}
+		while (!isspace(*in) && *in != ';' && *in != '\0')
+			++in;
+	}
+	return std::string(cset, cset_end - cset);
+}
+
+/**
+ * Find alternate backup character set declaration
  *
- * @return MAPI Error code
+ * @strHTML:		input MIME body part (HTML document)
+ * @htmlCharset:	result from HTML <meta>
+ *
+ * In the MIME body, attempt to find the character set declaration in the
+ * <meta> tag of the HTML document. This function requires that the HTML
+ * skeleton is encoded in US-ASCII.
+ *
+ * If the MIME header specifies, for example, Content-Type: text/html;
+ * charset=utf-16, then this function will not find anything -- and that is
+ * correct, because if the MIME body is encoded in UTF-16, whatever else there
+ * is in <meta> is, if it is not UTF-16, is likely wrong to begin with.
+ *
+ * Returns a MAPI error code.
  */
 HRESULT VMIMEToMAPI::getCharsetFromHTML(const string &strHTML, vmime::charset *htmlCharset)
 {
@@ -2612,57 +2832,62 @@ HRESULT VMIMEToMAPI::getCharsetFromHTML(const string &strHTML, vmime::charset *h
 	htmlDocPtr lpDoc = NULL;
 	htmlNodePtr lpNode = NULL;
 	xmlChar *lpValue = NULL;
-	std::string strValue("text/html; charset="); // ready to parse in vmime code
-	vmime::ref<vmime::headerField> ctf;
+	std::string charset;
 
 	// really lazy html parsing and disable all error reporting
+        xmlSetGenericErrorFunc(NULL, ignoreError); // disable stderr output (ZCP-13337)
+
+        /* Parser will automatically lower-case element and attribute names */
 	lpDoc = htmlReadMemory(strHTML.c_str(), strHTML.length(), "", NULL, HTML_PARSE_RECOVER | HTML_PARSE_NOWARNING | HTML_PARSE_NOERROR);
 	if (!lpDoc) {
-		lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to parse HTML body");
+		lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to parse HTML document");
 		goto exit;
 	}
 
-	lpNode = find_node(xmlDocGetRootElement(lpDoc), (const xmlChar*)"head");
+	lpNode = find_node(xmlDocGetRootElement(lpDoc), "head");
 	if (!lpNode) {
-		lpLogger->Log(EC_LOGLEVEL_INFO, "HTML body does not contain HEAD information");
+		lpLogger->Log(EC_LOGLEVEL_DEBUG, "HTML document contains no HEAD tag");
 		goto exit;
 	}
 
-	lpNode = lpNode->children;
-	while (lpNode) {
-		if (xmlStrcasecmp(lpNode->name, (const xmlChar*)"meta") == 0) {
-			// HTML 4, <meta http-equiv="Content-Type" content="text/html; charset=...">
-			lpValue = xmlGetProp(lpNode, (const xmlChar*)"http-equiv");
-			if (lpValue && xmlStrcasecmp(lpValue, (const xmlChar*)"Content-Type") == 0) {
-				xmlFree(lpValue);
-				lpValue = xmlGetProp(lpNode, (const xmlChar*)"content");
-				if (lpValue)
-					strValue = (char*)lpValue;
-				else
-					strValue = "text/html";
-				break;
-			}
-			if (lpValue)
-				xmlFree(lpValue);
-			lpValue = NULL;
-
-			// HTML 5, <meta charset="...">
-			lpValue = xmlGetProp(lpNode, (const xmlChar*)"charset");
+	for (lpNode = lpNode->children; lpNode != NULL; lpNode = lpNode->next) {
+		if (lpNode->type != XML_ELEMENT_NODE)
+			continue;
+		if (xmlStrcasecmp(lpNode->name,
+		    reinterpret_cast<const xmlChar *>("meta")) != 0)
+			continue;
+		// HTML 4, <meta http-equiv="Content-Type" content="text/html; charset=...">
+		lpValue = xmlGetProp(lpNode, (const xmlChar*)"http-equiv");
+		if (lpValue && xmlStrcasecmp(lpValue, (const xmlChar*)"Content-Type") == 0) {
+			xmlFree(lpValue);
+			lpValue = xmlGetProp(lpNode, (const xmlChar*)"content");
 			if (lpValue) {
-				strValue.append((char*)lpValue);
-				break;
+				lpLogger->Log(EC_LOGLEVEL_DEBUG, "HTML4 meta tag found: charset=\"%s\"", lpValue);
+				charset = fix_content_type_charset(reinterpret_cast<const char *>(lpValue));
 			}
+			break;
 		}
-		lpNode = lpNode->next;
+		if (lpValue)
+			xmlFree(lpValue);
+		lpValue = NULL;
+
+		// HTML 5, <meta charset="...">
+		lpValue = xmlGetProp(lpNode, (const xmlChar*)"charset");
+		if (lpValue) {
+			lpLogger->Log(EC_LOGLEVEL_DEBUG, "HTML5 meta tag found: charset=\"%s\"", lpValue);
+			charset = reinterpret_cast<char *>(lpValue);
+			break;
+		}
 	}
 	if (!lpValue) {
-		lpLogger->Log(EC_LOGLEVEL_WARNING, "HTML body does not contain meta charset information");
+		lpLogger->Log(EC_LOGLEVEL_DEBUG, "HTML body does not contain meta charset information");
 		goto exit;
 	}
 
-	ctf = vmime::headerFieldFactory::getInstance()->create("Content-Type", strValue);
-
 	try {
+		vmime::ref<vmime::headerField> ctf =
+			vmime::headerFieldFactory::getInstance()->
+			create("Content-Type", "text/html; charset=" + charset);
 		*htmlCharset = getCompatibleCharset(ctf.dynamicCast<vmime::contentTypeField>()->getCharset());
 	}
 	catch(vmime::exceptions::no_such_parameter & e) {
@@ -2671,6 +2896,7 @@ HRESULT VMIMEToMAPI::getCharsetFromHTML(const string &strHTML, vmime::charset *h
 		*htmlCharset = getCompatibleCharset(vmime::charset(m_dopt.default_charset));
 	}
 
+	lpLogger->Log(EC_LOGLEVEL_DEBUG, "HTML charset adjusted to \"%s\"", htmlCharset->getName().c_str());
 	hr = hrSuccess;
 
 exit:
@@ -3583,7 +3809,7 @@ void imopt_default_sending_options(sending_options *sopt) {
 	sopt->add_received_date = false;
 	sopt->use_tnef = 0;
 	sopt->force_utf8 = false;
-	sopt->charset_upgrade = "windows-1252";
+	sopt->charset_upgrade = const_cast<char *>("windows-1252");
 	sopt->allow_send_to_everyone = true;
 	sopt->enable_dsn = true;
 }

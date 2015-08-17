@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -55,10 +54,10 @@
 
 #include "Util.h"
 #include "ECExchangeModifyTable.h"
-#include "mapicode.h"
+#include <mapicode.h>
 #include "edkguid.h"
 #include "ECGuid.h"
-#include "mapiguid.h"
+#include <mapiguid.h>
 
 #include "Trace.h"
 #include "ECDebug.h"
@@ -72,7 +71,7 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 static LPWSTR WTF1252_to_WCHAR(LPCSTR szWTF1252, LPVOID lpBase, convert_context *lpConverter)
@@ -198,7 +197,11 @@ HRESULT __stdcall ECExchangeModifyTable::CreateRulesTable(ECMAPIProp *lpParent, 
 				goto empty;
 			szXML[statRulesData.cbSize.LowPart] = 0;
 			hr = HrDeserializeTable(szXML, ecTable, &ulRuleId);
-			// if the data was corrupted, or imported from exchange, it's incompatible, so return an empty table
+			/*
+			 * If the data was corrupted, or imported from
+			 * Exchange, it is incompatible, so return an
+			 * empty table.
+			 */
 			if (hr != hrSuccess) {
 				ecTable->HrClear(); // just to be sure
 				goto empty;
@@ -532,7 +535,8 @@ HRESULT ECExchangeModifyTable::SaveACLS(ECMAPIProp *lpecMapiProp, ECMemTable *lp
 			}
 
 			lpECPermissions[cECPerm].sUserId.cb = sEntryId.__size;
-			MAPIAllocateMore(lpECPermissions[cECPerm].sUserId.cb, lpECPermissions, (void**)&lpECPermissions[cECPerm].sUserId.lpb);
+			if ((hr = MAPIAllocateMore(lpECPermissions[cECPerm].sUserId.cb, lpECPermissions, (void**)&lpECPermissions[cECPerm].sUserId.lpb)) != hrSuccess)
+				goto exit;
 			memcpy(lpECPermissions[cECPerm].sUserId.lpb, sEntryId.__ptr, sEntryId.__size);
 
 			FreeEntryId(&sEntryId, false);
@@ -684,7 +688,11 @@ HRESULT ECExchangeModifyTable::HrDeserializeTable(char *lpSerialized, ECMemTable
 			goto exit;
 
 		for (n = 0; n < cValues; n++) {
-			// If a string type is PT_STRING8, it's old and assumed to be WTF-1252.
+			/*
+			 * If a string type is PT_STRING8, it is old and
+			 * assumed to be in WTF-1252 (CP-1252 values directly
+			 * transcoded into UTF-8).
+			 */
 			if (PROP_TYPE(lpProps[n].ulPropTag) == PT_STRING8) {
 				lpProps[n].ulPropTag = CHANGE_PROP_TYPE(lpProps[n].ulPropTag, PT_UNICODE);
 				lpProps[n].Value.lpszW = WTF1252_to_WCHAR(lpProps[n].Value.lpszA, lpProps, &converter);

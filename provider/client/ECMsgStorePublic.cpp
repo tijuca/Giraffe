@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -64,7 +63,7 @@ using namespace std;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECMsgStorePublic::ECMsgStorePublic(char *lpszProfname, LPMAPISUP lpSupport, WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags, BOOL fIsSpooler, BOOL bOfflineStore) :
@@ -259,7 +258,8 @@ HRESULT ECMsgStorePublic::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID
 		ePublicEntryID = ePE_FavoriteSubFolder;
 
 		// Replace the original entryid because this one is only readable
-		MAPIAllocateBuffer(cbEntryID, (void**)&lpEntryIDIntern);
+		if ((hr = MAPIAllocateBuffer(cbEntryID, (void**)&lpEntryIDIntern)) != hrSuccess)
+			goto exit;
 		memcpy(lpEntryIDIntern, lpEntryID, cbEntryID);
 
 		// Remove Flags intern
@@ -869,7 +869,8 @@ HRESULT ECMsgStorePublic::Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulE
 		goto exit;
 	} else if (lpEntryID && (lpEntryID->abFlags[3] & ZARAFA_FAVORITE)) {
 		// Replace the original entryid because this one is only readable
-		MAPIAllocateBuffer(cbEntryID, (void**)&lpEntryIDIntern);
+		if ((hr = MAPIAllocateBuffer(cbEntryID, (void**)&lpEntryIDIntern)) != hrSuccess)
+			goto exit;
 		memcpy(lpEntryIDIntern, lpEntryID, cbEntryID);
 
 		// Remove Flags intern

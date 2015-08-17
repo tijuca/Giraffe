@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -87,7 +86,7 @@ namespace bfs = boost::filesystem;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 #define WHITESPACE " \t\n\r"
@@ -349,7 +348,7 @@ ECSession::ECSession(const std::string& strSourceAddr, ECSESSIONID sessionID, EC
 
 	m_bCheckIP = strcmp(lpSessionManager->GetConfig()->GetSetting("session_ip_check"), "no") != 0;
 
-	// Offline implements it's own versions of these objects
+	// Offline implements its own versions of these objects
 	if (bIsOffline == false) {
 		m_lpUserManagement = new ECUserManagement(this, m_lpSessionManager->GetPluginFactory(), m_lpSessionManager->GetConfig(), m_lpSessionManager->GetLogger());
 		m_lpEcSecurity = new ECSecurity(this, m_lpSessionManager->GetConfig(), m_lpSessionManager->GetLogger(), m_lpSessionManager->GetAudit());
@@ -922,7 +921,7 @@ exit:
 ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, const char* lpszImpersonateUser)
 {
 	ECRESULT 		er = erSuccess;
-	char			*p = NULL;
+	const char *p = NULL;
 	bool			allowLocalUsers = false;
 	int				pid = 0;
 	char			*ptr = NULL;
@@ -1046,7 +1045,7 @@ ECRESULT ECAuthSession::ValidateUserCertificate(struct soap* soap, const char* l
 	EVP_PKEY		*storedkey = NULL;
 	int				res = -1;
 
-	char			*sslkeys_path = m_lpSessionManager->GetConfig()->GetSetting("sslkeys_path","",NULL);
+	const char *sslkeys_path = m_lpSessionManager->GetConfig()->GetSetting("sslkeys_path", "", NULL);
 	BIO 			*biofile = NULL;
 
 	bfs::path		keysdir;
@@ -1095,12 +1094,11 @@ ECRESULT ECAuthSession::ValidateUserCertificate(struct soap* soap, const char* l
 		}
 
 		for (bfs::directory_iterator key(keysdir); key != key_last; key++) {
-			const char *lpFileName = NULL;
-
 			if (is_directory(key->status()))
 				continue;
 
-			lpFileName = path_to_string(key->path()).c_str();
+			std::string filename = path_to_string(key->path());
+			const char *lpFileName = filename.c_str();
 
 			biofile = BIO_new_file(lpFileName, "r");
 			if (!biofile) {
@@ -1273,7 +1271,7 @@ ECRESULT ECAuthSession::ValidateSSOData_KRB5(struct soap* soap, const char* lpsz
 
 	gss_name_t gssServername = GSS_C_NO_NAME;
 	gss_buffer_desc gssInputBuffer = GSS_C_EMPTY_BUFFER;
-	char *szHostname = NULL;
+	const char *szHostname = NULL;
 	std::string principal;
 
 	gss_name_t gssUsername = GSS_C_NO_NAME;
@@ -1420,7 +1418,7 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 	struct xsd__base64Binary *lpOutput = NULL;
 	char buffer[NTLMBUFFER];
 	std::string strEncoded, strDecoded, strAnswer;
-	size_t bytes = 0;
+	ssize_t bytes = 0;
 	char separator = '\\';      // get config version
 	fd_set fds;
 	int max, ret;
@@ -1535,11 +1533,17 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 	FD_SET(m_stderr, &fds);
 	max = m_stderr > m_stdout ? m_stderr : m_stdout;
 
+retry:
 	ret = select(max+1, &fds, NULL, NULL, &tv);
 	if (ret < 0) {
+		if (errno == EINTR)
+			goto retry;
+
 		m_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, string("Error while waiting for data from ntlm_auth: ") + strerror(errno));
 		goto exit;
-	} else if (ret == 0) {
+	}
+
+	if (ret == 0) {
 		// timeout
 		m_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "Timeout while reading from ntlm_auth");
 		goto exit;
@@ -1549,6 +1553,8 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 	if (FD_ISSET(m_stderr, &fds)) {
 		// log stderr of ntlm_auth to logfile (loop?)
 		bytes = read(m_stderr, buffer, NTLMBUFFER-1);
+		if (bytes >= 0)
+			buffer[bytes] = '\0';
 		// print in lower level. if ntlm_auth was not installed (kerberos only environment), you won't care that ntlm_auth doesn't work.
 		// login error is returned to the client, which was expected anyway.
 		m_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_NOTICE, string("Received error from ntlm_auth:\n") + buffer);
@@ -1558,13 +1564,31 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 	// stdout is mandatory, so always read from this pipe
 	memset(buffer, 0, NTLMBUFFER);
 	bytes = read(m_stdout, buffer, NTLMBUFFER-1);
-	if (bytes == (size_t)-1) {
+	if (bytes < 0) {
 		m_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, string("Unable to read data from ntlm_auth: ") + strerror(errno));
+		goto exit;
+	} else if (bytes == 0) {
+		m_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Nothing read from ntlm_auth");
+		goto exit;
+	}
+	if (buffer[bytes-1] == '\n')
+		/*
+		 * Strip newline right away, it is not useful for logging,
+		 * nor for base64_decode.
+		 */
+		buffer[--bytes] = '\0';
+	if (bytes < 2) {
+		/* Ensure buffer[0]==.. && buffer[1]==.. is valid to do */
+		m_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Short reply from ntlm_auth");
 		goto exit;
 	}
 
-	// make answer all data after the command replay
-	strAnswer.assign(buffer, 3, bytes-3-1); // -1 because of \n
+	if (bytes >= 3)
+		/*
+		 * Extract response text (if any) following the reply code
+		 * (and space). Else left empty.
+		 */
+		strAnswer.assign(buffer + 3, bytes - 3);
 
 	if (buffer[0] == 'B' && buffer[1] == 'H') {
 		// Broken Helper
@@ -1586,6 +1610,11 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 		// Samba default runs in UTF-8 and setting 'unix charset' to windows-1252 in the samba config will break ntlm_auth
 		// convert the username before we use it in Zarafa
 		ECIConv iconv("windows-1252", "utf-8");
+		if (!iconv.canConvert()) {
+			m_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Problem setting up windows-1252 to utf-8 converter");
+			goto exit;
+		}
+
 		strAnswer = iconv.convert(strAnswer);
 
 		m_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Found username (%s)", strAnswer.c_str());
@@ -1627,8 +1656,7 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 		er = ZARAFA_E_LOGON_FAILED;
 	} else {
 		// unknown response?
-		buffer[bytes-1] = '\0'; // strip enter
-		m_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "Unknown response from ntlm_auth: %s", buffer);
+		m_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Unknown response from ntlm_auth: %.*s", static_cast<int>(bytes), buffer);
 		er = ZARAFA_E_CALL_FAILED;
 		goto exit;
 	}

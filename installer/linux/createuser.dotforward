@@ -10,5 +10,5 @@
 
 HOMEDIR=`getent passwd $ZARAFA_USER | cut -d: -f6`
 
-echo "\"| /usr/bin/zarafa-dagent $ZARAFA_USER\"" > $HOMEDIR/.forward
+echo "\"| /usr/sbin/zarafa-dagent $ZARAFA_USER\"" > $HOMEDIR/.forward
 chown $ZARAFA_USER.$ZARAFA_USER $HOMEDIR/.forward

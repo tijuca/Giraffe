@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -83,7 +82,7 @@ documentation and/or software.
 
 */
 
-#include <stdio.h>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 
@@ -94,7 +93,7 @@ class MD5 {
 public:
 // methods for controlled operation:
   MD5              ();  // simple initializer
-  void  update     (unsigned char *input, unsigned int input_length);
+  void  update     (const unsigned char *input, unsigned int input_length);
   void  update     (istream& stream);
   void  update     (FILE *file);
   void  update     (ifstream& stream);
@@ -102,7 +101,7 @@ public:
 
 // constructors for special circumstances.  All these constructors finalize
 // the MD5 context.
-  MD5              (unsigned char *string); // digest string, finalize
+  MD5              (const unsigned char *string); // digest string, finalize
   MD5              (istream& stream);       // digest stream, finalize
   MD5              (FILE *file);            // digest file, close, finalize
   MD5              (ifstream& stream);      // digest stream, close, finalize
@@ -130,13 +129,11 @@ private:
 
 // last, the private methods, mostly static:
   void init             ();               // called by all constructors
-  void transform        (uint1 *buffer);  // does the real update work.  Note 
+  void transform        (const uint1 *buffer);  // does the real update work.  Note
                                           // that length is implied to be 64.
 
-  static void encode    (uint1 *dest, uint4 *src, uint4 length);
-  static void decode    (uint4 *dest, uint1 *src, uint4 length);
-  static void memcpy    (uint1 *dest, uint1 *src, uint4 length);
-  static void memset    (uint1 *start, uint1 val, uint4 length);
+  static void encode    (uint1 *dest, const uint4 *src, uint4 length);
+  static void decode    (uint4 *dest, const uint1 *src, uint4 length);
 
   static inline uint4  rotate_left (uint4 x, uint4 n);
   static inline uint4  F           (uint4 x, uint4 y, uint4 z);

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -59,6 +58,7 @@
 #include <mapiext.h>
 #include <edkmdb.h>
 #include <mapiguidext.h>
+#include "mapi_ptr.h"
 
 #include "tnef.h"
 
@@ -368,7 +368,7 @@ HRESULT MAPIToVMIME::handleSingleAttachment(IMessage* lpMessage, LPSRow lpRow, v
 	LPSPropValue	lpAMClass = NULL;
 	LPSPropValue	lpAMAttach = NULL;
 	LPSPropValue	lpMIMETag = NULL;
-	WCHAR*			szFilename = NULL;  // just a reference, don't free
+	const wchar_t *szFilename = NULL;  // just a reference, don't free
 	vmime::mediaType vmMIMEType;
 	std::string		strBoundary;
 	bool			bSendBinary = true;
@@ -410,7 +410,7 @@ HRESULT MAPIToVMIME::handleSingleAttachment(IMessage* lpMessage, LPSRow lpRow, v
 			goto exit;
 		}
 
-		// Check whether we're sending a calender object
+		// Check whether we're sending a calendar object
 		// if so, we do not need to create a message-in-message object, but just attach the ics file.
 		hr = HrGetOneProp(lpAttachedMessage, PR_MESSAGE_CLASS_A, &lpAMClass);
 		if (hr == hrSuccess &&
@@ -1152,7 +1152,7 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage, vmime::ref<vmime::m
 	LPSPropValue			lpInternetCPID		= NULL;
 	LPSPropValue			lpMsgClass			= NULL;
 	vmime::ref<vmime::message> 	vmMessage;
-	char *					lpszCharset			= NULL;
+	const char *lpszCharset = NULL;
 	char *					lpszRawSMTP			= NULL;
 	LPMAPITABLE				lpAttachmentTable	= NULL;
 	LPSRowSet				lpRows				= NULL;
@@ -1163,9 +1163,10 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage, vmime::ref<vmime::m
 	SizedSPropTagArray(2, sPropAttachColumns) = {2, { PR_ATTACH_NUM, PR_ATTACH_MIME_TAG} };
 
 	if (HrGetOneProp(lpMessage, PR_MESSAGE_CLASS_A, &lpMsgClass) != hrSuccess) {
-		MAPIAllocateBuffer(sizeof(SPropValue), (void**)&lpMsgClass);
+		if ((hr = MAPIAllocateBuffer(sizeof(SPropValue), (void**)&lpMsgClass)) != hrSuccess)
+			goto exit;
 		lpMsgClass->ulPropTag = PR_MESSAGE_CLASS_A;
-		lpMsgClass->Value.lpszA = "IPM.Note";
+		lpMsgClass->Value.lpszA = const_cast<char *>("IPM.Note");
 	}
 
 	// Get the outgoing charset we want to be using
@@ -1281,7 +1282,8 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage, vmime::ref<vmime::m
 			std::string strRawSMTP = lpszRawSMTP;
 			vmime::ref<SMIMEMessage> vmSMIMEMessage = vmime::create<SMIMEMessage>();
 			
-			vmMessage->getHeader()->removeField(vmMessage->getHeader()->findField(vmime::fields::MIME_VERSION));
+			// not sure why this was needed, and causes problems, eg ZCP-12994.
+			//vmMessage->getHeader()->removeField(vmMessage->getHeader()->findField(vmime::fields::MIME_VERSION));
 			
 			*vmSMIMEMessage->getHeader() = *vmMessage->getHeader();
 			vmSMIMEMessage->setSMIMEBody(strRawSMTP);
@@ -1292,7 +1294,7 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage, vmime::ref<vmime::m
 			LPMAPINAMEID lpNameID = NULL;
 			LPSPropTagArray lpPropTags = NULL;
 			LPSPropValue lpPropContentType = NULL;
-			char *lpszContentType = NULL;
+			const char *lpszContentType = NULL;
 
 			hr = MAPIAllocateBuffer(sizeof(MAPINAMEID), (void**)&lpNameID);
 			if (hr != hrSuccess) {
@@ -1302,7 +1304,7 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage, vmime::ref<vmime::m
 
 			lpNameID->lpguid = (GUID*)&PS_INTERNET_HEADERS;
 			lpNameID->ulKind = MNID_STRING;
-			lpNameID->Kind.lpwstrName = L"Content-Type";
+			lpNameID->Kind.lpwstrName = const_cast<wchar_t *>(L"Content-Type");
 
 			hr = lpMessage->GetIDsFromNames(1, &lpNameID, MAPI_CREATE, &lpPropTags);
 			if (hr != hrSuccess) {
@@ -1808,7 +1810,7 @@ exit:
  */
 HRESULT MAPIToVMIME::handleExtraHeaders(IMessage *lpMessage, vmime::ref<vmime::header> vmHeader) {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpMessageId = NULL;
+	SPropValuePtr ptrMessageId;
 	LPSPropValue lpImportance = NULL;
 	LPSPropValue lpPriority = NULL;
 	LPSPropValue lpConversationIndex = NULL;
@@ -1818,31 +1820,25 @@ HRESULT MAPIToVMIME::handleExtraHeaders(IMessage *lpMessage, vmime::ref<vmime::h
 	vmime::headerFieldFactory* hff = vmime::headerFieldFactory::getInstance();
 	LPSPropValue lpExpiryTime = NULL;
 
-	// Conversation headers. New Message-Id header is set just before sending.		
-	if (HrGetOneProp(lpMessage, PR_IN_REPLY_TO_ID_A, &lpMessageId) == hrSuccess) {
-		vmime::ref<vmime::messageId> mid = vmime::create<vmime::messageId>(lpMessageId->Value.lpszA);
+	// Conversation headers. New Message-Id header is set just before sending.
+	if (HrGetOneProp(lpMessage, PR_IN_REPLY_TO_ID_A, &ptrMessageId) == hrSuccess && strlen(ptrMessageId->Value.lpszA) > 0) {
+		vmime::ref<vmime::messageId> mid = vmime::create<vmime::messageId>(ptrMessageId->Value.lpszA);
 		vmHeader->InReplyTo()->getValue().dynamicCast<vmime::messageIdSequence>()->appendMessageId(mid);
-		MAPIFreeBuffer(lpMessageId);
 	}
-	lpMessageId = NULL;
 
 	// Outlook never adds this property
-	if (HrGetOneProp(lpMessage, PR_INTERNET_REFERENCES_A, &lpMessageId) == hrSuccess) {
-		vmime::ref<vmime::messageId> mid = vmime::create<vmime::messageId>(lpMessageId->Value.lpszA);
+	if (HrGetOneProp(lpMessage, PR_INTERNET_REFERENCES_A, &ptrMessageId) == hrSuccess && strlen(ptrMessageId->Value.lpszA) > 0) {
+		vmime::ref<vmime::messageId> mid = vmime::create<vmime::messageId>(ptrMessageId->Value.lpszA);
 		vmHeader->References()->getValue().dynamicCast<vmime::messageIdSequence>()->appendMessageId(mid);
-		MAPIFreeBuffer(lpMessageId);
 	}
-	lpMessageId = NULL;
 
 	// only for message-in-message items, add Message-ID header from MAPI
-	if (sopt.msg_in_msg && HrGetOneProp(lpMessage, PR_INTERNET_MESSAGE_ID_A, &lpMessageId) == hrSuccess) {
-		vmHeader->MessageId()->setValue(lpMessageId->Value.lpszA);
-		MAPIFreeBuffer(lpMessageId);
+	if (sopt.msg_in_msg && HrGetOneProp(lpMessage, PR_INTERNET_MESSAGE_ID_A, &ptrMessageId) == hrSuccess && strlen(ptrMessageId->Value.lpszA) > 0) {
+		vmHeader->MessageId()->setValue(ptrMessageId->Value.lpszA);
 	}
-	lpMessageId = NULL;
 
 	// priority settings
-	char* priomap[3] = { "5 (Lowest)", "3 (Normal)", "1 (Highest)" }; // 2 and 4 cannot be set from outlook
+	static const char *const priomap[3] = { "5 (Lowest)", "3 (Normal)", "1 (Highest)" }; // 2 and 4 cannot be set from outlook
 	if (HrGetOneProp(lpMessage, PR_IMPORTANCE, &lpImportance) == hrSuccess) {
 		vmHeader->appendField(hff->create("X-Priority", priomap[min(2, (int)(lpImportance->Value.ul)&3)])); // IMPORTANCE_* = 0..2
 	} else if (HrGetOneProp(lpMessage, PR_PRIORITY, &lpPriority) == hrSuccess) {
@@ -1851,7 +1847,7 @@ HRESULT MAPIToVMIME::handleExtraHeaders(IMessage *lpMessage, vmime::ref<vmime::h
 
 	// When adding a X-Priority, spamassassin may add a severe punishment because no User-Agent header
 	// or X-Mailer header is present. So we set the X-Mailer header :)
-	vmHeader->appendField(hff->create("X-Mailer", "Zarafa "PROJECT_VERSION_DOT_STR"-"PROJECT_SVN_REV_STR));
+	vmHeader->appendField(hff->create("X-Mailer", "Zarafa " PROJECT_VERSION_DOT_STR "-" PROJECT_SVN_REV_STR));
 
 	// PR_CONVERSATION_INDEX
 	if (HrGetOneProp(lpMessage, PR_CONVERSATION_INDEX, &lpConversationIndex) == hrSuccess) {
@@ -1879,7 +1875,7 @@ HRESULT MAPIToVMIME::handleExtraHeaders(IMessage *lpMessage, vmime::ref<vmime::h
 	}
 
 	if (HrGetOneProp(lpMessage, PR_SENSITIVITY, &lpSensitivity) == hrSuccess) {
-		char *strSens;
+		const char *strSens;
 		switch (lpSensitivity->Value.ul) {
 		case SENSITIVITY_PERSONAL:
 			strSens = "Personal";
@@ -1929,7 +1925,8 @@ HRESULT MAPIToVMIME::handleExtraHeaders(IMessage *lpMessage, vmime::ref<vmime::h
 }
 
 /**
- * Open the contact of the user it it's contact folder and rewrite to usable e-mail recipient.
+ * Open the contact of the user if it is a contact folder and rewrite it to a
+ * usable e-mail recipient.
  *
  * @param[in]	cValues	Number of properties in lpProps (unused)
  * @param[in]	lpProps	EntryID of contact in 1st property
@@ -2297,7 +2294,7 @@ exit:
 
 /**
  * Adds a TNEF (winmail.dat) attachment to the message, if special
- * outlook data needs to be sent. May add iCal for calender items
+ * outlook data needs to be sent. May add iCal for calendar items
  * instead of TNEF.
  *
  * @param[in]	lpMessage	Message to get Reply-To value of.

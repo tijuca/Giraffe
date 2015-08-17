@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -48,6 +47,7 @@
 #include <pthread.h>
 #include <set>
 #include <list>
+#include "zcdefs.h"
 
 
 class ECTask;
@@ -57,8 +57,7 @@ class ECTask;
  * The amount of workers can be modified at run time, but is not automatically
  * adjusted based on the task queue length or age.
  */
-class ECThreadPool
-{
+class ECThreadPool _final {
 private:	// types
 	struct STaskInfo {
 		ECTask			*lpTask;
@@ -71,7 +70,7 @@ private:	// types
 	
 public:
 	ECThreadPool(unsigned ulThreadCount);
-	~ECThreadPool();
+	virtual ~ECThreadPool(void);
 	
 	virtual bool dispatch(ECTask *lpTask, bool bTakeOwnership = false);
 	unsigned threadCount() const;
@@ -114,41 +113,6 @@ inline unsigned ECThreadPool::threadCount() const {
 	return m_setThreads.size() - m_ulTermReq;
 }
 
-
-
-
-/**
- * This class represents a threadpool with a dynamic amount of worker threads.
- * The amount of threads is based on the task queue length and age.
- *
- * Note: This is class is not implemented
- */
-class ECDynamicThreadPool : public ECThreadPool
-{
-public:
-	ECDynamicThreadPool(unsigned ulMinThreads, unsigned ulMaxThreads, unsigned ulMaxQueueAge = 500, unsigned ulThreadTimeout = 5000);
-	~ECDynamicThreadPool();
-	
-	virtual bool dispatch(ECTask *lpTask, bool bTakeOwnership = false);
-	
-	unsigned minThreadCount() const;
-	void setMinThreadCount(unsigned ulMinThreads);
-	
-	unsigned maxThreadCount() const;
-	void setMaxThreadCount(unsigned ulMaxThreads);
-	
-	unsigned maxQueueAge() const;
-	void setMaxQueueAge(unsigned ulMaxQueueAge);
-
-	unsigned maxQueueLength() const;
-	void setMaxQueueLength() const;
-	
-	unsigned threadTimeout() const;
-	void setThreadTimeout(unsigned ulThreadTimeout);
-};
-
-
-
 /**
  * This class represents a task that can be dispatched on an ECThreadPool or
  * derived object.
@@ -159,14 +123,14 @@ public:
 class ECTask
 {
 public:
-	virtual ~ECTask();
+	virtual ~ECTask(void) {};
 	virtual void execute();
 	
 	bool dispatchOn(ECThreadPool *lpThreadPool, bool bTransferOwnership = false);
 	
 protected:
 	virtual void run() = 0;
-	ECTask();
+	ECTask(void) {};
 	
 private:
 	// Make the object non-copyable
@@ -207,7 +171,7 @@ public:
 	
 public:
 	virtual ~ECWaitableTask();
-	virtual void execute();
+	virtual void execute(void) _override;
 	
 	bool done() const;
 	bool wait(unsigned timeout = WAIT_INFINITE, unsigned waitMask = Done) const;
@@ -236,7 +200,7 @@ inline bool ECWaitableTask::done() const {
  * To call a function with more than one argument boost::bind can be used.
  */
 template<typename _Rt, typename _Fn, typename _At>
-class ECDeferredFunc : public ECWaitableTask
+class ECDeferredFunc _final : public ECWaitableTask
 {
 public:
 	/**
@@ -247,7 +211,8 @@ public:
 	ECDeferredFunc(_Fn fn, const _At &arg) : m_fn(fn), m_arg(arg)
 	{ }
 	
-	virtual void run() {
+	virtual void run(void) _override
+	{
 		m_result = m_fn(m_arg);
 	}
 	

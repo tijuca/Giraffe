@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -51,6 +50,7 @@
 #include <algorithm>
 #include "ECLogger.h"
 #include "recurrence.h"
+#include "MAPIErrors.h"
 
 #include "restrictionutil.h"
 #include "ECFreeBusyUpdate.h"
@@ -65,7 +65,7 @@ using namespace std;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 /** 
@@ -103,13 +103,13 @@ HRESULT HrPublishDefaultCalendar(IMAPISession *lpSession, IMsgStore *lpDefStore,
 
 	hr = lpFreeBusy->HrGetResctItems(&lpTable);
 	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_INFO, "Error while finding messages for free/busy publish, error code: 0x%08X", hr);
+		lpLogger->Log(EC_LOGLEVEL_INFO, "Error while finding messages for free/busy publish, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
 	hr = lpFreeBusy->HrProcessTable(lpTable, &lpFBblocks, &cValues);
 	if(hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_INFO, "Error while finding free/busy blocks, error code: 0x%08X  ", hr);
+		lpLogger->Log(EC_LOGLEVEL_INFO, "Error while finding free/busy blocks, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 
@@ -120,14 +120,14 @@ HRESULT HrPublishDefaultCalendar(IMAPISession *lpSession, IMsgStore *lpDefStore,
 
 	hr = lpFreeBusy->HrMergeBlocks(&lpFBblocks, &cValues);
 	if(hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_INFO, "Error while merging free/busy blocks, entries: %d, error code: 0x%08X  ", cValues, hr);
+		lpLogger->Log(EC_LOGLEVEL_INFO, "Error while merging free/busy blocks, entries: %d, error code: 0x%x %s", cValues, hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 	lpLogger->Log(EC_LOGLEVEL_DEBUG, "Publishing %d free/busy blocks", cValues);
 
 	hr = lpFreeBusy->HrPublishFBblocks(lpFBblocks, cValues);
 	if(hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_INFO, "Error while publishing free/busy blocks, entries: %d, error code: 0x%08X  ", cValues, hr);
+		lpLogger->Log(EC_LOGLEVEL_INFO, "Error while publishing free/busy blocks, entries: %d, error code: 0x%x %s", cValues, hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
 	
@@ -366,7 +366,7 @@ HRESULT PublishFreeBusy::HrProcessTable(IMAPITable *lpTable, FBBlock_1 **lppfbBl
 				{
 					hr = lpRecurrence.HrLoadRecurrenceState((char *)(lpRowSet->aRow[i].lpProps[4].Value.bin.lpb),lpRowSet->aRow[i].lpProps[4].Value.bin.cb, 0);
 					if(FAILED(hr)) {
-						m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error loading recurrence state, error code : 0x%08X", hr);
+						m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error loading recurrence state, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 						continue;
 					}
 
@@ -378,7 +378,7 @@ HRESULT PublishFreeBusy::HrProcessTable(IMAPITable *lpTable, FBBlock_1 **lppfbBl
 
 					hr = lpRecurrence.HrGetItems( m_tsStart, m_tsEnd, m_lpLogger, ttzInfo, ulFbStatus, &lpOccrInfo, lpcValues);
 					if (hr != hrSuccess || !lpOccrInfo) {
-						m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error expanding items for recurring item, error code : 0x%08X", hr);
+						m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error expanding items for recurring item, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 						continue;
 					}
 				}
@@ -400,7 +400,7 @@ HRESULT PublishFreeBusy::HrProcessTable(IMAPITable *lpTable, FBBlock_1 **lppfbBl
 				
 				hr = HrAddFBBlock(sOccrBlock, &lpOccrInfo, lpcValues);
 				if (hr != hrSuccess) {
-					m_lpLogger->Log( EC_LOGLEVEL_DEBUG, "Error adding occurrence block to list, error code : 0x%08X", hr);
+					m_lpLogger->Log( EC_LOGLEVEL_DEBUG, "Error adding occurrence block to list, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 					goto exit;
 				}
 			}

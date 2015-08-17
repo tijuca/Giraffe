@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -42,24 +41,24 @@
  * 
  */
 
-#define PROJECT_VERSION_SERVER          7,2,0,48204
-#define PROJECT_VERSION_SERVER_STR      "7,2,0,48204"
-#define PROJECT_VERSION_CLIENT          7,2,0,48204
-#define PROJECT_VERSION_CLIENT_STR      "7,2,0,48204"
-#define PROJECT_VERSION_EXT_STR         "7,2,0,48204"
-#define PROJECT_VERSION_SPOOLER_STR     "7,2,0,48204"
-#define PROJECT_VERSION_GATEWAY_STR     "7,2,0,48204"
-#define PROJECT_VERSION_CALDAV_STR      "7,2,0,48204"
-#define PROJECT_VERSION_DAGENT_STR      "7,2,0,48204"
-#define PROJECT_VERSION_PROFADMIN_STR   "7,2,0,48204"
-#define PROJECT_VERSION_MONITOR_STR     "7,2,0,48204"
-#define PROJECT_VERSION_PASSWD_STR      "7,2,0,48204"
-#define PROJECT_VERSION_FBSYNCER_STR    "7,2,0,48204"
-#define PROJECT_VERSION_SEARCH_STR      "7,2,0,48204"
-#define PROJECT_VERSION_ARCHIVER_STR    "7,2,0,48204"
-#define PROJECT_VERSION_DOT_STR         "7.2.0"
+#define PROJECT_VERSION_SERVER          7,2,1,51272
+#define PROJECT_VERSION_SERVER_STR      "7,2,1,51272"
+#define PROJECT_VERSION_CLIENT          7,2,1,51272
+#define PROJECT_VERSION_CLIENT_STR      "7,2,1,51272"
+#define PROJECT_VERSION_EXT_STR         "7,2,1,51272"
+#define PROJECT_VERSION_SPOOLER_STR     "7,2,1,51272"
+#define PROJECT_VERSION_GATEWAY_STR     "7,2,1,51272"
+#define PROJECT_VERSION_CALDAV_STR      "7,2,1,51272"
+#define PROJECT_VERSION_DAGENT_STR      "7,2,1,51272"
+#define PROJECT_VERSION_PROFADMIN_STR   "7,2,1,51272"
+#define PROJECT_VERSION_MONITOR_STR     "7,2,1,51272"
+#define PROJECT_VERSION_PASSWD_STR      "7,2,1,51272"
+#define PROJECT_VERSION_FBSYNCER_STR    "7,2,1,51272"
+#define PROJECT_VERSION_SEARCH_STR      "7,2,1,51272"
+#define PROJECT_VERSION_ARCHIVER_STR    "7,2,1,51272"
+#define PROJECT_VERSION_DOT_STR         "7.2.1"
 #define PROJECT_SPECIALBUILD            "beta"
-#define PROJECT_SVN_REV_STR             "48204"
+#define PROJECT_SVN_REV_STR             "51272"
 #define PROJECT_VERSION_MAJOR           7
 #define PROJECT_VERSION_MINOR           2
-#define PROJECT_VERSION_REVISION        48204
+#define PROJECT_VERSION_REVISION        51272

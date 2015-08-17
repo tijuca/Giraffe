@@ -48,7 +48,6 @@ Main classes:
 # Python 2.5 doesn't have with
 from __future__ import with_statement
 
-
 import contextlib
 import cPickle as pickle
 import csv
@@ -71,7 +70,9 @@ import pwd
 import socket
 import sys
 import StringIO
+import struct
 import threading
+import time
 import traceback
 import mailbox
 from email.parser import Parser
@@ -83,6 +84,7 @@ from MAPI.Util import *
 from MAPI.Util.Generators import *
 import MAPI.Util.AddressBook
 import MAPI.Tags
+import MAPI.Time
 import _MAPICore
 import inetmapi
 import icalmapi
@@ -106,12 +108,27 @@ except NameError:
 PS_INTERNET_HEADERS = DEFINE_OLEGUID(0x00020386, 0, 0)
 NAMED_PROPS_INTERNET_HEADERS = [MAPINAMEID(PS_INTERNET_HEADERS, MNID_STRING, u'x-original-to'),]
 
-# XXX clean up and improve for common guids/namepaces
+# XXX from common/mapiguidext.h
 PSETID_Archive = DEFINE_GUID(0x72e98ebc, 0x57d2, 0x4ab5, 0xb0, 0xaa, 0xd5, 0x0a, 0x7b, 0x53, 0x1c, 0xb9)
+PSETID_Appointment = DEFINE_OLEGUID(0x00062002, 0, 0)
+PSETID_Task = DEFINE_OLEGUID(0x00062003, 0, 0)
+PSETID_Address = DEFINE_OLEGUID(0x00062004, 0, 0)
+PSETID_Common = DEFINE_OLEGUID(0x00062008, 0, 0)
+PSETID_Log = DEFINE_OLEGUID(0x0006200A, 0, 0)
+PSETID_Note = DEFINE_OLEGUID(0x0006200E, 0, 0)
+
 NAMED_PROPS_ARCHIVER = [MAPINAMEID(PSETID_Archive, MNID_STRING, u'store-entryids'), MAPINAMEID(PSETID_Archive, MNID_STRING, u'item-entryids'), MAPINAMEID(PSETID_Archive, MNID_STRING, u'stubbed'),]
 
-GUID_NAMESPACE = {PSETID_Archive: 'archive'}
-NAMESPACE_GUID = {'archive': PSETID_Archive}
+GUID_NAMESPACE = {
+    PSETID_Archive: 'archive',
+    PSETID_Common: 'common',
+    PSETID_Appointment: 'appointment',
+    PSETID_Task: 'task',
+    PSETID_Address: 'address',
+    PSETID_Log: 'log',
+    PS_INTERNET_HEADERS: 'internet_headers',
+}
+NAMESPACE_GUID = dict((b,a) for (a,b) in GUID_NAMESPACE.items()) 
 
 # XXX copied from common/ECDefs.h
 def OBJECTCLASS(__type, __class):
@@ -127,20 +144,44 @@ def DEFINE_ABEID(type, id):
     return struct.pack("4B16s3I4B", 0, 0, 0, 0, MUIDECSAB, 0, type, id, 0, 0, 0, 0)
 EID_EVERYONE = DEFINE_ABEID(MAPI_DISTLIST, 1)
 
+def _stream(mapiobj, proptag):
+    stream = mapiobj.OpenProperty(proptag, IID_IStream, 0, 0)
+    data = []
+    while True:
+        blup = stream.Read(0xFFFFF) # 1 MB
+        if len(blup) == 0:
+            break
+        data.append(blup)
+    data = ''.join(data)
+    if PROP_TYPE(proptag) == PT_UNICODE:
+        data = data.decode('utf-32le') # under windows them be utf-16le?
+    return data
+
 def _prop(self, mapiobj, proptag):
     if isinstance(proptag, (int, long)):
-        return Property(mapiobj, HrGetOneProp(mapiobj, proptag))
+        try:
+            sprop = HrGetOneProp(mapiobj, proptag)
+        except MAPIErrorNotEnoughMemory:
+            data = _stream(mapiobj, proptag)
+            sprop = SPropValue(proptag, data)
+        return Property(mapiobj, sprop)
     else:
-        namespace, name = proptag.split(':')
-        for prop in self.props(namespace=namespace): # XXX megh
+        namespace, name = proptag.split(':') # XXX syntax
+        if name.isdigit(): # XXX
+            name = int(name)
+        for prop in self.props(namespace=namespace): # XXX sloow, streaming
             if prop.name == name:
                 return prop
+        raise MAPIErrorNotFound
 
 def _props(mapiobj, namespace=None):
+    # XXX show and stream large properties
     proptags = mapiobj.GetPropList(MAPI_UNICODE)
     sprops = mapiobj.GetProps(proptags, MAPI_UNICODE)
     props = [Property(mapiobj, sprop) for sprop in sprops]
-    return [p for p in sorted(props) if not namespace or p.namespace == namespace]
+    for p in sorted(props):
+        if not namespace or p.namespace == namespace:
+            yield p
 
 def _state(mapiobj, associated=False):
     exporter = mapiobj.OpenProperty(PR_CONTENTS_SYNCHRONIZER, IID_IExchangeExportChanges, 0, 0)
@@ -180,6 +221,7 @@ def _sync(server, syncobj, importer, state, log, max_changes, associated=False):
         except MAPIError, e:
             if log:
                 log.warn("Received a MAPI error or timeout (error=0x%x, retry=%d/5)" % (e.hr, retry))
+            time.sleep(5)
             if retry < 5:
                 retry += 1
             else:
@@ -198,6 +240,21 @@ def _openentry_raw(mapistore, entryid, flags): # avoid underwater action for arc
     except MAPIErrorInterfaceNotSupported:
         return mapistore.OpenEntry(entryid, None, flags)
 
+def _unpack_short(s, pos):
+    return struct.unpack_from('<H', s, pos)[0]
+
+def _unpack_long(s, pos):
+    return struct.unpack_from('<L', s, pos)[0]
+
+def _pack_long(i):
+    return struct.pack('<L', i)
+
+def _rectime_to_unixtime(t):
+    return (t - 194074560) * 60
+
+def _unixtime_to_rectime(t):
+    return int(t/60) + 194074560
+
 class ZarafaException(Exception):
     pass
 
@@ -208,6 +265,22 @@ class ZarafaNotFoundException(ZarafaException):
     pass
 
 
+class SPropDelayedValue(SPropValue):
+    def __init__(self, mapiobj, proptag):
+        self.mapiobj = mapiobj
+        self.ulPropTag = proptag
+        self._Value = None
+
+    @property
+    def Value(self):
+        if self._Value is None:
+            try:
+                self._Value = _stream(self.mapiobj, self.ulPropTag)
+            except MAPIErrorNotFound: # XXX eg normalized subject streaming broken..?
+                self._Value = None
+        return self._Value
+
+
 class Property(object):
     """ 
 Wrapper around MAPI properties 
@@ -216,10 +289,23 @@ Wrapper around MAPI properties
 
     def __init__(self, parent_mapiobj, mapiobj): # XXX rethink attributes, names.. add guidname..?
         self._parent_mapiobj = parent_mapiobj
-        self.mapiobj = mapiobj # SPropValue
+
+        if PROP_TYPE(mapiobj.ulPropTag) == PT_ERROR and mapiobj.Value == MAPI_E_NOT_ENOUGH_MEMORY:
+            for proptype in (PT_BINARY, PT_UNICODE): # XXX slow, incomplete?
+                proptag = (mapiobj.ulPropTag & 0xffff0000) | proptype
+                try:
+                    HrGetOneProp(parent_mapiobj, proptag)
+                except MAPIErrorNotEnoughMemory:
+                    mapiobj = SPropDelayedValue(parent_mapiobj, proptag)
+                    break
+                except MAPIErrorNotFound:
+                    pass
 
         self.proptag = mapiobj.ulPropTag
         self.id_ = self.proptag >> 16
+        self.mapiobj = mapiobj
+        self._value = None
+
         self.idname = REV_TAG.get(self.proptag) # XXX slow, often unused: make into properties?
         self.type_ = PROP_TYPE(self.proptag)
         self.typename = REV_TYPE.get(self.type_)
@@ -229,11 +315,6 @@ Wrapper around MAPI properties
         self.guid = None
         self.name = None
         self.namespace = None
-
-        if self.type_ == PT_SYSTIME: # XXX generalize, property
-            self._value = datetime.datetime.utcfromtimestamp(self.mapiobj.Value.unixtime)
-        else:
-            self._value = self.mapiobj.Value
 
         if self.named:
             try:
@@ -247,31 +328,52 @@ Wrapper around MAPI properties
                 pass
 
     def get_value(self):
+        if self._value is None:
+            if self.type_ == PT_SYSTIME: # XXX generalize, property?
+                #
+                # The datetime object is of "naive" type, has local time and
+                # no TZ info. :-(
+                #
+                self._value = datetime.datetime.fromtimestamp(self.mapiobj.Value.unixtime)
+
+            else:
+                self._value = self.mapiobj.Value
         return self._value
 
     def set_value(self, value):
         self._value = value
+        if self.type_ == PT_SYSTIME:
+            # Timezones are handled.
+            value = MAPI.Time.unixtime(time.mktime(value.timetuple()))
         self._parent_mapiobj.SetProps([SPropValue(self.proptag, value)])
         self._parent_mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
     value = property(get_value, set_value)
 
-    def strval(self, sep=','):
+    @property
+    def strid(self):
+        if self.named:
+            return '%s:%s' % (self.namespace, self.name)
+        else:
+            return self.idname if self.idname else ''
+
+    @property
+    def strval(self):
         def flatten(v):
             if isinstance(v, list):
-                return sep.join(flatten(e) for e in v)
+                return ','.join(flatten(e) for e in v)
             elif isinstance(v, bool):
                 return '01'[v]
-            elif self.type_ == PT_BINARY:
+            elif self.type_ in (PT_BINARY, PT_MV_BINARY):
                 return v.encode('hex').upper()
             else:
                 return unicode(v).encode('utf-8')
-        return flatten(self._value)
+        return flatten(self.value)
 
     def __lt__(self, prop):
         return self.proptag < prop.proptag
 
     def __unicode__(self):
-        return u'Property(%s, %s)' % (self.name if self.named else self.idname, repr(self._value))
+        return u'Property(%s)' % self.strid
 
     # TODO: check if data is binary and convert it to hex
     def __repr__(self):
@@ -298,28 +400,31 @@ class Table(object):
     def header(self):
         return [REV_TAG.get(c, hex(c)) for c in self.mapitable.QueryColumns(0)]
 
-    def rows(self): # XXX custom Row class, with dict-like access? namedtuple?
+    def rows(self):
         try:
             for row in self.mapitable.QueryRows(-1, 0):
                 yield [Property(self.server.mapistore, c) for c in row]
         except MAPIErrorNotFound:
             pass
 
-    # TODO: refactor function
     def dict_rows(self):
-        if self.proptag == PR_EC_STATSTABLE_SYSTEM:
-            try:
-                return dict([(row[0].Value, row[2].Value) for row in self.mapitable.QueryRows(-1, 0)])
-            except MAPIErrorNotFound:
-                pass
-        else:
-            try:
-                return (dict([(c.ulPropTag, c.Value) for c in row]) for row in self.mapitable.QueryRows(-1, 0))
-            except MAPIErrorNotFound:
-                pass
+        for row in self.mapitable.QueryRows(-1, 0):
+            yield dict((c.ulPropTag, c.Value) for c in row)
 
+    def dict_(self, key, value):
+        d = {}
+        for row in self.mapitable.QueryRows(-1, 0):
+            d[PpropFindProp(row, key).Value] = PpropFindProp(row, value).Value
+        return d
+
+    def index(self, key):
+        d = {}
+        for row in self.mapitable.QueryRows(-1, 0):
+            d[PpropFindProp(row, key).Value] = dict((c.ulPropTag, c.Value) for c in row)
+        return d
+ 
     def data(self, header=False):
-        data = [[p.strval() for p in row] for row in self.rows()]
+        data = [[p.strval for p in row] for row in self.rows()]
         if header:
             data = [self.header] + data
         return data
@@ -368,6 +473,7 @@ Looks at command-line to see if another server address or other related options 
 
     def __init__(self, options=None, config=None, sslkey_file=None, sslkey_pass=None, server_socket=None, auth_user=None, auth_pass=None, log=None, service=None):
         self.log = log
+        self.service = service
         self.server_socket = self.sslkey_file = self.sslkey_pass = None
 
         # get cmd-line options
@@ -388,6 +494,7 @@ Looks at command-line to see if another server address or other related options 
                 config = globals()['Config'](None, filename=config_file) # XXX snarf
             except IOError:
                 pass
+        self.config = config
 
         # get defaults
         if os.getenv('ZARAFA_SOCKET'): # env variable used in testset
@@ -426,8 +533,12 @@ Looks at command-line to see if another server address or other related options 
         self.ems = self.mapistore.QueryInterface(IID_IExchangeManageStore)
         entryid = HrGetOneProp(self.mapistore, PR_STORE_ENTRYID).Value
         self.pseudo_url = entryid[entryid.find('pseudo:'):-1] # XXX ECSERVER
-        self.name = self.pseudo_url[9:]
+        self.name = self.pseudo_url[9:] # XXX get this kind of stuff from pr_ec_statstable_servers..?
         self._archive_sessions = {}
+
+    def nodes(self): # XXX delay mapi sessions until actually needed
+        for row in self.table(PR_EC_STATSTABLE_SERVERS).dict_rows():
+            yield Server(options=self.options, config=self.config, sslkey_file=self.sslkey_file, sslkey_pass=self.sslkey_pass, server_socket=row[PR_EC_STATS_SERVER_HTTPSURL], log=self.log, service=self.service)
 
     def table(self, name, restriction=None, order=None, columns=None):
         return Table(self, self.mapistore.OpenProperty(name, IID_IMAPITable, MAPI_UNICODE, 0), name, restriction=restriction, order=order, columns=columns)
@@ -571,9 +682,7 @@ Looks at command-line to see if another server address or other related options 
         companyeid = self.sa.CreateCompany(ECCOMPANY(name, None), MAPI_UNICODE)
         return self.company(name)
 
-    def store(self, guid):
-        """ Return :class:`store <Store>` with given GUID; raise exception if not found """
-
+    def _store(self, guid):
         if len(guid) != 32:
             raise ZarafaException("invalid store id: '%s'" % guid)
         try:
@@ -581,11 +690,20 @@ Looks at command-line to see if another server address or other related options 
         except:
             raise ZarafaException("invalid store id: '%s'" % guid)
         table = self.ems.GetMailboxTable(None, 0) # XXX merge with Store.__init__
-        table.SetColumns([PR_ENTRYID, PR_EC_STORETYPE], 0)
+        table.SetColumns([PR_ENTRYID], 0)
         table.Restrict(SPropertyRestriction(RELOP_EQ, PR_STORE_RECORD_KEY, SPropValue(PR_STORE_RECORD_KEY, storeid)), TBL_BATCH)
         for row in table.QueryRows(-1, 0):
-             return Store(self, self.mapisession.OpenMsgStore(0, row[0].Value, None, MDB_WRITE), row[1].Value == ECSTORE_TYPE_PUBLIC)
+            return self.mapisession.OpenMsgStore(0, row[0].Value, None, MDB_WRITE)
         raise ZarafaException("no such store: '%s'" % guid)
+
+    def groups(self):
+        for name in MAPI.Util.AddressBook.GetGroupList(self.mapisession, None, MAPI_UNICODE):
+            yield Group(name, self)
+
+    def store(self, guid):
+        """ Return :class:`store <Store>` with given GUID; raise exception if not found """
+
+        return Store(self, self._store(guid))
 
     def get_store(self, guid):
         """ Return :class:`store <Store>` with given GUID or *None* if not found """
@@ -604,16 +722,17 @@ Looks at command-line to see if another server address or other related options 
         """
 
         table = self.ems.GetMailboxTable(None, 0)
-        table.SetColumns([PR_DISPLAY_NAME_W, PR_ENTRYID, PR_EC_STORETYPE], 0)
+        table.SetColumns([PR_DISPLAY_NAME_W, PR_ENTRYID], 0)
         for row in table.QueryRows(-1, 0):
-            store = Store(self, self.mapisession.OpenMsgStore(0, row[1].Value, None, MDB_WRITE), row[2].Value == ECSTORE_TYPE_PUBLIC)
+            store = Store(self, self.mapisession.OpenMsgStore(0, row[1].Value, None, MDB_WRITE))
             if system or store.public or (store.user and store.user.name != 'SYSTEM'):
                 yield store
 
     def create_store(self, public=False):
         if public:
             mapistore = self.sa.CreateStore(ECSTORE_TYPE_PUBLIC, EID_EVERYONE)
-            return Store(self, mapistore, True)
+            return Store(self, mapistore)
+        # XXX
 
     def unhook_store(self, user):
         store = user.store
@@ -623,6 +742,10 @@ Looks at command-line to see if another server address or other related options 
     def hook_store(self, store, user):
         self.sa.HookStore(ECSTORE_TYPE_PRIVATE, user.userid.decode('hex'), store.guid.decode('hex'))
         return store.guid
+
+    def sync_users(self):
+        # Flush user cache on the server
+        self.sa.SyncUsers(None)
 
     @property
     def public_store(self):
@@ -657,10 +780,31 @@ Looks at command-line to see if another server address or other related options 
     def __repr__(self):
         return unicode(self).encode(sys.stdout.encoding or 'utf8')
 
+class Group(object):
+    def __init__(self, name, server=None):
+        self.server = server or Server()
+        self.name = name
+
+    def users(self):
+        _ecgroup = self.server.sa.GetGroup(self.server.sa.ResolveGroupName(self.name, MAPI_UNICODE), MAPI_UNICODE)
+        for ecuser in self.server.sa.GetUserListOfGroup(_ecgroup.GroupID, MAPI_UNICODE):
+            if ecuser.Username == 'SYSTEM':
+                continue
+            try:
+                yield User(ecuser.Username, self.server)
+            except ZarafaException: # XXX everyone, groups are included as users..
+                pass
+
+    def __unicode__(self):
+        return u"Group('%s')" % self.name
+
+    def __repr__(self):
+        return unicode(self).encode(sys.stdout.encoding or 'utf8')
+
 class Company(object):
     """ Company class """
 
-    def __init__(self, server, name):
+    def __init__(self, server, name): # XXX Company(name)
         self._name = name = unicode(name)
         self.server = server
         if name != u'Default': # XXX
@@ -683,10 +827,10 @@ class Company(object):
             pubstore = GetPublicStore(self.server.mapisession)
             if pubstore is None:
                 return None
-            return Store(self.server, pubstore, True)
+            return Store(self.server, pubstore)
         publicstoreid = self.server.ems.CreateStoreEntryID(None, self._name, MAPI_UNICODE)
         publicstore = self.server.mapisession.OpenMsgStore(0, publicstoreid, None, MDB_WRITE)
-        return Store(self.server, publicstore, True)
+        return Store(self.server, publicstore)
 
     def create_store(self, public=False):
         if public:
@@ -694,7 +838,8 @@ class Company(object):
                 mapistore = self.server.sa.CreateStore(ECSTORE_TYPE_PUBLIC, EID_EVERYONE)
             else:
                 mapistore = self.server.sa.CreateStore(ECSTORE_TYPE_PUBLIC, self._eccompany.CompanyID)
-            return Store(self.server, mapistore, True)
+            return Store(self.server, mapistore)
+        # XXX
 
     def user(self, name):
         """ Return :class:`user <User>` with given name; raise exception if not found """
@@ -723,6 +868,14 @@ class Company(object):
         self.server.create_user(name, password=password, company=self._name)
         return self.user('%s@%s' % (name, self._name))
 
+    def groups(self):
+        if self.name == u'Default': # XXX
+            for ecgroup in self.server.sa.GetGroupList(None, MAPI_UNICODE):
+                yield Group(ecgroup.Groupname, self)
+        else:
+            for ecgroup in self.server.sa.GetGroupList(self._eccompany.CompanyID, MAPI_UNICODE):
+                yield Group(ecgroup.Groupname, self)
+
     @property
     def quota(self):
         """ Company :class:`Quota` """
@@ -733,7 +886,7 @@ class Company(object):
             return Quota(self.server, self._eccompany.CompanyID)
 
     def __unicode__(self):
-        return u'Company(%s)' % self._name
+        return u"Company('%s')" % self._name
 
     def __repr__(self):
         return unicode(self).encode(sys.stdout.encoding or 'utf8')
@@ -744,17 +897,27 @@ class Store(object):
     
     """
 
-    def __init__(self, server, mapistore, public=False):
+    def __init__(self, server, mapiobj=None):
+        if isinstance(server, str): # XXX fix args
+            guid, server = server, Server()
+            mapiobj = server._store(guid)
         self.server = server
-        self.mapiobj = mapistore
-        self.public = public
+        self.mapiobj = mapiobj
         self._root = self.mapiobj.OpenEntry(None, None, 0)
+
+    @property
+    def public(self):
+        return self.prop(PR_MDB_PROVIDER).mapiobj.Value == ZARAFA_STORE_PUBLIC_GUID
 
     @property
     def guid(self):
         """ Store GUID """
 
-        return bin2hex(HrGetOneProp(self.mapiobj, PR_STORE_RECORD_KEY).Value)
+        return bin2hex(self.prop(PR_STORE_RECORD_KEY).value)
+
+    @property
+    def hierarchyid(self):
+        return  self.prop(PR_EC_HIERARCHYID).value
 
     @property
     def root(self):
@@ -894,7 +1057,7 @@ class Store(object):
 
         # determine root folder
         if system:
-            root = self.mapiobj.OpenEntry(None, None, 0)
+            root = self._root
         else:
             try:
                 if self.public:
@@ -932,7 +1095,7 @@ class Store(object):
     def size(self):
         """ Store size """
 
-        return HrGetOneProp(self.mapiobj, PR_MESSAGE_SIZE_EXTENDED).Value
+        return self.prop(PR_MESSAGE_SIZE_EXTENDED).value
 
     def config_item(self, name):
         item = Item()
@@ -942,11 +1105,13 @@ class Store(object):
     @property
     def last_logon(self):
         """ Return :datetime Last logon of a user on this store """
+
         return self.prop(PR_LAST_LOGON_TIME).value or None
 
     @property
     def last_logoff(self):
         """ Return :datetime of the last logoff of a user on this store """
+
         return self.prop(PR_LAST_LOGOFF_TIME).value or None
 
     @property
@@ -963,7 +1128,7 @@ class Store(object):
         return _props(self.mapiobj)
 
     def __unicode__(self):
-        return u'Store(%s)' % self.guid
+        return u"Store('%s')" % self.guid
 
     def __repr__(self):
         return unicode(self).encode(sys.stdout.encoding or 'utf8')
@@ -993,28 +1158,62 @@ class Folder(object):
     @property
     def parent(self):
         """Return :class:`parent <Folder>` or None"""
-        # PR_PARENT_ENTRYID for the message store root folder is it's own PR_ENTRYID
+        # PR_PARENT_ENTRYID for the message store root folder is its own PR_ENTRYID
         try:
             return Folder(self.store, self.prop(PR_PARENT_ENTRYID).value)
         except MAPIErrorNotFound: # XXX: Should not happen
             return None
 
     @property
-    def folderid(self):
-        return HrGetOneProp(self.mapiobj, PR_EC_HIERARCHYID).Value
+    def hierarchyid(self):
+        return self.prop(PR_EC_HIERARCHYID).value
+
+    @property
+    def folderid(self): # XXX remove?
+        return self.hierarchyid
+
+    @property
+    def subfolder_count(self):
+        ''' Number of direct subfolders '''
+
+        return self.prop(PR_FOLDER_CHILD_COUNT).value
 
     @property
     def name(self):
         """ Folder name """
 
         try:
-            return HrGetOneProp(self.mapiobj, PR_DISPLAY_NAME_W).Value
+            return self.prop(PR_DISPLAY_NAME_W).value
         except MAPIErrorNotFound:
-            return u'ROOT'
+            if self.entryid == self.store.root.entryid: # Root folder's PR_DISPLAY_NAME_W is never set
+                return u'ROOT'
+            else:
+                return u''
 
     @name.setter
     def name(self, name):
         self.mapiobj.SetProps([SPropValue(PR_DISPLAY_NAME_W, unicode(name))])
+        self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+
+    @property
+    def container_class(self):
+        '''
+        Property which describes the type of items a folder holds, possible values
+        * IPF.Appointment
+        * IPF.Contact
+        * IPF.Journal
+        * IPF.Note
+        * IPF.StickyNote
+        * IPF.Task
+
+        https://msdn.microsoft.com/en-us/library/aa125193(v=exchg.65).aspx
+        '''
+
+        return self.prop(PR_CONTAINER_CLASS).value
+
+    @container_class.setter
+    def container_class(self, value):
+        self.mapiobj.SetProps([SPropValue(PR_CONTAINER_CLASS, unicode(value))])
         self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
 
     def item(self, entryid):
@@ -1029,7 +1228,11 @@ class Folder(object):
     def items(self):
         """ Return all :class:`items <Item>` in folder, reverse sorted on received date """
 
-        table = self.mapiobj.GetContentsTable(self.content_flag)
+        try:
+            table = self.mapiobj.GetContentsTable(self.content_flag)
+        except MAPIErrorNoSupport:
+            return
+
         table.SortTable(SSortOrderSet([SSort(PR_MESSAGE_DELIVERY_TIME, TABLE_SORT_DESCEND)], 0, 0), 0) # XXX configure
         while True:
             rows = table.QueryRows(50, 0)
@@ -1068,11 +1271,15 @@ class Folder(object):
     def size(self): # XXX bit slow perhaps? :P
         """ Folder size """
 
-        size = 0
-        table = self.mapiobj.GetContentsTable(self.content_flag)
+        try:
+            table = self.mapiobj.GetContentsTable(self.content_flag)
+        except MAPIErrorNoSupport:
+            return 0
+
         table.SetColumns([PR_MESSAGE_SIZE], 0)
         table.SeekRow(BOOKMARK_BEGINNING, 0)
         rows = table.QueryRows(-1, 0)
+        size = 0
         for row in rows:
             size += row[0].Value
         return size
@@ -1085,7 +1292,11 @@ class Folder(object):
 
         """
 
-        return self.mapiobj.GetContentsTable(self.content_flag).GetRowCount(0) # XXX PR_CONTENT_COUNT, PR_ASSOCIATED_CONTENT_COUNT
+        try:
+            return self.mapiobj.GetContentsTable(self.content_flag).GetRowCount(0) # XXX PR_CONTENT_COUNT, PR_ASSOCIATED_CONTENT_COUNT
+        except MAPIErrorNoSupport:
+            return 0
+
 
     def _get_entryids(self, items):
         if isinstance(items, (Item, Folder)):
@@ -1163,9 +1374,12 @@ class Folder(object):
                     for subfolder in folder.folders(depth=depth+1):
                         yield subfolder
 
-    def create_folder(self, name):
+    def create_folder(self, name, **kwargs):
         mapifolder = self.mapiobj.CreateFolder(FOLDER_GENERIC, unicode(name), u'', None, MAPI_UNICODE)
-        return Folder(self.store, HrGetOneProp(mapifolder, PR_ENTRYID).Value)
+        folder = Folder(self.store, HrGetOneProp(mapifolder, PR_ENTRYID).Value)
+        for key, val in kwargs.items():
+            setattr(folder, key, val)
+        return folder
 
     def prop(self, proptag):
         return _prop(self, self.mapiobj, proptag)
@@ -1202,17 +1416,17 @@ class Folder(object):
 
     def readmbox(self, location):
         for message in mailbox.mbox(location):
-            newitem = Item(self, message.__str__())
+            newitem = Item(self, eml=message.__str__(), create=True)
 
-    def mbox(self, location):
+    def mbox(self, location): # FIXME: inconsistent with maildir()
         mboxfile = mailbox.mbox(location)
         mboxfile.lock()
         for item in self.items():
             mboxfile.add(item.eml())
         mboxfile.unlock()
 
-    def maildir(self):
-        destination = mailbox.MH(self.name)
+    def maildir(self, location='.'):
+        destination = mailbox.MH(location + '/' + self.name)
         destination.lock()
         for item in self.items():
             destination.add(item.eml())
@@ -1220,7 +1434,7 @@ class Folder(object):
 
     def read_maildir(self, location):
         for message in mailbox.MH(location):
-            newitem = Item(self, message.__str__())
+            newitem = Item(self, eml=message.__str__(), create=True)
 
     @property
     def associated(self):
@@ -1330,6 +1544,10 @@ class Item(object):
         return bin2hex(HrGetOneProp(self.mapiobj, PR_ENTRYID).Value)
 
     @property
+    def hierarchyid(self):
+        return HrGetOneProp(self.mapiobj, PR_EC_HIERARCHYID).Value
+
+    @property
     def sourcekey(self):
         """ Item sourcekey """
 
@@ -1342,9 +1560,9 @@ class Item(object):
         """ Item subject or *None* if no subject """
 
         try:
-            return HrGetOneProp(self.mapiobj, PR_SUBJECT_W).Value
+            return self.prop(PR_SUBJECT_W).value
         except MAPIErrorNotFound:
-            pass
+            return u''
 
     @subject.setter
     def subject(self, x):
@@ -1354,7 +1572,33 @@ class Item(object):
     @property
     def body(self):
         """ Item :class:`body <Body>` """
+
         return Body(self) # XXX return None if no body..?
+
+    @property
+    def size(self):
+        """ Item size """
+
+        return self.prop(PR_MESSAGE_SIZE).value
+
+    @property
+    def message_class(self):
+        return self.prop(PR_MESSAGE_CLASS).value
+
+    @message_class.setter
+    def message_class(self, messageclass):
+        # FIXME: Add all possible PR_MESSAGE_CLASS values
+        '''
+        MAPI Message classes:
+        * IPM.Note.SMIME.MultipartSigned - smime signed email
+        * IMP.Note                       - normal email
+        * IPM.Note.SMIME                 - smime encypted email
+        * IPM.StickyNote                 - note
+        * IPM.Appointment                - appointment
+        * IPM.Task                       - task
+        '''
+        self.mapiobj.SetProps([SPropValue(PR_MESSAGE_CLASS, unicode(messageclass))])
+        self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
 
     @body.setter
     def body(self, x):
@@ -1384,12 +1628,30 @@ class Item(object):
     @property
     def folder(self):
         """ Parent :class:`Folder` of an item """
+
         if self._folder:
             return self._folder
         try:
             return Folder(self.store, HrGetOneProp(self.mapiobj, PR_PARENT_ENTRYID).Value)
         except MAPIErrorNotFound:
             pass
+
+    @property
+    def importance(self):
+        """ Importance """
+
+        # TODO: userfriendly repr of value
+        try:
+            return self.prop(PR_IMPORTANCE).value
+        except MAPIErrorNotFound:
+            pass
+
+    @importance.setter
+    def importance(self, value):
+        ''' Set importance '''
+
+        self.mapiobj.SetProps([SPropValue(PR_IMPORTANCE, value)])
+        self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
 
     def prop(self, proptag):
         return _prop(self, self.mapiobj, proptag)
@@ -1435,10 +1697,13 @@ class Item(object):
     def eml(self):
         """ Return .eml version of item """
 
-        if not self.emlfile:
-            sopt = inetmapi.sending_options()
-            sopt.no_recipients_workaround = True
-            self.emlfile = inetmapi.IMToINet(self.store.server.mapisession, None, self.mapiobj, sopt)
+        if self.emlfile is None:
+            try:
+                self.emlfile = _stream(self.mapiobj, PR_EC_IMAP_EMAIL)
+            except MAPIErrorNotFound:
+                sopt = inetmapi.sending_options()
+                sopt.no_recipients_workaround = True
+                self.emlfile = inetmapi.IMToINet(self.store.server.mapisession, None, self.mapiobj, sopt)
         return self.emlfile
 
     def vcf(self): # XXX don't we have this builtin somewhere? very basic for now
@@ -1470,6 +1735,7 @@ class Item(object):
         self.mapiobj.SetProps(props)
         self.mapiobj.SubmitMessage(0)
 
+
     @property
     def sender(self):
         """ Sender :class:`Address` """
@@ -1496,13 +1762,36 @@ class Item(object):
     def to(self):
         return self.recipients() # XXX filter
 
+    @property 
+    def start(self): # XXX optimize, guid
+        return self.prop('common:34070').value
+
+    @property 
+    def end(self): # XXX optimize, guid
+        return self.prop('common:34071').value
+
+    @property
+    def recurring(self):
+        return item.prop('appointment:33315').value
+
+    @property
+    def recurrence(self):
+        return Recurrence(self)
+
     @to.setter
     def to(self, addrs):
         if isinstance(addrs, (str, unicode)):
-            addrs = [Address(email=s.strip()) for s in unicode(addrs).split(';')]
+            addrs2 = []
+            for addr in unicode(addrs).split(';'): # XXX use python email module here?
+                if '<' in addr:
+                    name = addr[:addr.find('<')].strip()
+                    email = addr[addr.find('<')+1:addr.find('>')].strip()
+                    addrs2.append(Address(name=name, email=email))
+                else:
+                    addrs2.append(Address(email=addr.strip()))
         ab = self.server.mapisession.OpenAddressBook(0, None, 0) # XXX
         names = []
-        for addr in addrs:
+        for addr in addrs2:
             names.append([
                 SPropValue(PR_RECIPIENT_TYPE, MAPI_TO), 
                 SPropValue(PR_DISPLAY_NAME_W, addr.name or u'nobody'), 
@@ -1513,17 +1802,37 @@ class Item(object):
         self.mapiobj.ModifyRecipients(0, names)
         self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE) # XXX needed?
 
+    def delete(self, items):
+        # XXX attachments
+        if isinstance(items, Property):
+            proptags = [items.proptag]
+        else:
+            proptags = [item.proptag for item in items]
+        if proptags:
+            self.mapiobj.DeleteProps(proptags)
+            self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+
     def _dump(self):
         d = {}
         props = []
+#        bestbody_tag = libcommon.Util.GetBestBody(self.mapiobj, MAPI_UNICODE)
         for prop in self.props():
+#            if prop.proptag == bestbody_tag:
+#                continue
             if prop.id_ >= 0x8000:
                 props.append((prop.proptag, prop.mapiobj.Value, self.mapiobj.GetNamesFromIDs([prop.proptag], None, 0)[0]))
             else:
                 props.append((prop.proptag, prop.mapiobj.Value, None))
+#        if bestbody_tag == PR_BODY_W:
+#            props.append((PR_BODY_W, self.body.text, None))
+#        elif bestbody_tag == PR_HTML: # XXX other cases (PR_NULL, PR_RTF_COMPRESSED..?)
+#            props.append((PR_HTML, self.body.html, None))
         d['props'] =  props
         d['recipients'] = [[(prop.proptag, prop.mapiobj.Value) for prop in row] for row in self.table(PR_MESSAGE_RECIPIENTS)]
-        d['attachments'] = []
+        d['attachments'] = [[(prop.proptag, prop.mapiobj.Value) for prop in row] for row in self.table(PR_MESSAGE_ATTACHMENTS)]
+        d['attach_data'] = {}
+        for att in self.attachments():
+            d['attach_data'][att.number] = att.data
         return d
 
     def dump(self, f):
@@ -1541,6 +1850,16 @@ class Item(object):
         self.mapiobj.SetProps(props)
         recipients = [[SPropValue(proptag, value) for (proptag, value) in row] for row in d['recipients']]
         self.mapiobj.ModifyRecipients(0, recipients)
+        attachments = [[SPropValue(proptag, value) for (proptag, value) in row] for row in d['attachments']]
+        for props in attachments:
+            (id_, attach) = self.mapiobj.CreateAttach(None, 0)
+            attach.SetProps(props)
+            if id_ in d['attach_data']: # XXX
+                data = d['attach_data'][id_] 
+                stream = attach.OpenProperty(PR_ATTACH_DATA_BIN, IID_IStream, 0, MAPI_MODIFY | MAPI_CREATE)
+                stream.Write(data)
+                stream.Commit(0)
+                attach.SaveChanges(KEEP_OPEN_READWRITE)
         self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE) # XXX needed?
 
     def load(self, f):
@@ -1567,16 +1886,9 @@ class Body:
 
         try:
             mapiitem = self.mapiitem._arch_item # XXX server already goes 'underwater'.. check details
-            stream = mapiitem.OpenProperty(PR_BODY_W, IID_IStream, 0, 0)
-            data = []
-            while True:
-                blup = stream.Read(0xFFFFF) # 1 MB
-                if len(blup) == 0:
-                    break
-                data.append(blup)
-            return ''.join(data).decode('utf-32le') # XXX under windows this be utf-16le or something
+            return _stream(mapiitem, PR_BODY_W) # under windows them be utf-16le?
         except MAPIErrorNotFound:
-            pass
+            return u''
 
     @property
     def html(self): # XXX decode using PR_INTERNET_CPID
@@ -1584,22 +1896,77 @@ class Body:
 
         try:
             mapiitem = self.mapiitem._arch_item
-            stream = mapiitem.OpenProperty(PR_HTML, IID_IStream, 0, 0)
-            data = []
-            while True:
-                blup = stream.Read(0xFFFFF) # 1 MB
-                if len(blup) == 0:
-                    break
-                data.append(blup)
-            return ''.join(data) # XXX do we need to do something about encodings? 
+            return _stream(mapiitem, PR_HTML)
         except MAPIErrorNotFound:
-            pass
+            return ''
 
     def __unicode__(self):
         return u'Body()'
 
     def __repr__(self):
         return unicode(self).encode(sys.stdout.encoding or 'utf8')
+
+class Recurrence:
+    def __init__(self, item): # XXX just readable start/end for now
+        # TODO: add check if we actually have a recurrence, otherwise we throw a mapi exception which might not be desirable
+        value = item.prop('appointment:33302').value # recurrencestate
+        SHORT, LONG = 2, 4
+        pos = 5 * SHORT + 3 * LONG 
+
+        self.recurrence_frequency = _unpack_short(value, 2 * SHORT)
+        self.patterntype = _unpack_short(value, 3 * SHORT)
+        self.calendar_type = _unpack_short(value, 4 * SHORT)
+        self.first_datetime = _unpack_long(value, 5 * SHORT)
+        self.period = _unpack_long(value , 5 * SHORT + LONG) # 12 for year, coincedence?
+
+        # TODO: use a library
+        weekdays = {0: 'Sunday', 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday'}
+        # FIXME: somehow set a property with the pattern
+        if self.patterntype == 1: # Weekly recurrence
+            self.pattern = _unpack_long(value, pos) # WeekDays
+            pos += LONG
+
+            # TODO: global function for month/yearly?
+            represenation = []
+            for index, week in weekdays.iteritems():
+                if (self.pattern >> index ) & 1:
+                    represenation.append(week)
+            self.week_pattern = ', '.join(represenation) # FIXME: name?
+
+        if self.patterntype in (2, 4, 10, 12): # Monthly recurrence
+            self.pattern = _unpack_long(value, pos) # Day Of Month
+            pos += LONG
+        elif self.patterntype in (3, 11): # Yearly recurrence
+            weekdays = _unpack_long(value, pos)
+            weeknumber = _unpack_long(value, pos)
+            pos += 2*LONG # WeekNumber/  WeekDays?
+
+        self.endtype = _unpack_long(value, pos)
+        pos += LONG
+        self.occurrence_count = _unpack_long(value, pos)
+        pos += LONG
+        self.first_dow = _unpack_long(value, pos)
+        pos += LONG
+
+        delcount = _unpack_long(value, pos)
+        pos += LONG + delcount*LONG
+        modcount = _unpack_long(value, pos)
+        pos += LONG + modcount*LONG
+
+        self.start = datetime.datetime.fromtimestamp(_rectime_to_unixtime(_unpack_long(value, pos)))
+        pos += LONG
+        self.end = datetime.datetime.fromtimestamp(_rectime_to_unixtime(_unpack_long(value, pos)))
+
+        pos += 2 * LONG
+        self.startime_offset = _unpack_long(value, pos) # XXX: type?
+        pos += LONG
+        self.endime_offset = _unpack_long(value, pos) # XXX: type?
+
+        # FIXME: move to class Item?
+        self.clipend = item.prop('appointment:33334').value
+        self.clipstart = item.prop('appointment:33333').value 
+        self.recurrence_pattern = item.prop('appointment:33330').value
+        self.invited = item.prop('appointment:33321').value
 
 class Outofoffice(object):
     """
@@ -1633,7 +2000,7 @@ class Outofoffice(object):
         try:
             return self.store.prop(PR_EC_OUTOFOFFICE_SUBJECT).value
         except MAPIErrorNotFound:
-            return None
+            return u''
 
     @subject.setter
     def subject(self, value):
@@ -1646,11 +2013,45 @@ class Outofoffice(object):
         try:
             return self.store.prop(PR_EC_OUTOFOFFICE_MSG).value
         except MAPIErrorNotFound:
-            return None
+            return u''
 
     @message.setter
     def message(self, value):
         self.store.mapiobj.SetProps([SPropValue(PR_EC_OUTOFOFFICE_MSG, value)])
+
+    @property
+    def date_from(self):
+        """ Out-of-office is activated from the particular datetime onwards """
+        try:
+            return self.store.prop(PR_EC_OUTOFOFFICE_FROM).value
+        except MAPIErrorNotFound:
+            return None
+
+    @date_from.setter
+    def date_from(self, value):
+        if value is None:
+            self.store.mapiobj.DeleteProps([PR_EC_OUTOFOFFICE_FROM])
+        else:
+            value = MAPI.Time.unixtime(time.mktime(value.timetuple()))
+            self.store.mapiobj.SetProps([SPropValue(PR_EC_OUTOFOFFICE_FROM, value)])
+        self.store.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+
+    @property
+    def date_until(self):
+        """ Out-of-office is activated until the particular datetime """
+        try:
+            return self.store.prop(PR_EC_OUTOFOFFICE_UNTIL).value
+        except MAPIErrorNotFound:
+            return None
+
+    @date_until.setter
+    def date_until(self, value):
+        if value is None:
+            self.store.mapiobj.DeleteProps([PR_EC_OUTOFOFFICE_UNTIL])
+        else:
+            value = MAPI.Time.unixtime(time.mktime(value.timetuple()))
+            self.store.mapiobj.SetProps([SPropValue(PR_EC_OUTOFOFFICE_UNTIL, value)])
+        self.store.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
 
     def __unicode__(self):
         return u'Outofoffice(%s)' % self.subject
@@ -1707,6 +2108,10 @@ class Attachment(object):
         self._data = None
 
     @property
+    def number(self):
+        return HrGetOneProp(self.att, PR_ATTACH_NUM).Value
+
+    @property
     def mimetype(self):
         """ Mime-type or *None* if not found """
 
@@ -1736,21 +2141,12 @@ class Attachment(object):
     def data(self):
         """ Binary data """
 
-        if self._data is not None:
-            return self._data
-        try:
-            method = HrGetOneProp(self.att, PR_ATTACH_METHOD).Value # XXX unused
-            stream = self.att.OpenProperty(PR_ATTACH_DATA_BIN, IID_IStream, 0, 0)
-        except MAPIErrorNotFound:
-            self._data = ''
-            return self._data
-        data = []
-        while True:
-            blup = stream.Read(0xFFFFF) # 1 MB
-            if len(blup) == 0:
-                break
-            data.append(blup)
-        self._data = ''.join(data)
+        if self._data is None:
+            try:
+                method = HrGetOneProp(self.att, PR_ATTACH_METHOD).Value # XXX is this just here to raise an exception?
+                self._data = _stream(self.att, PR_ATTACH_DATA_BIN)
+            except MAPIErrorNotFound:
+                self._data = ''
         return self._data
 
     # file-like behaviour
@@ -1892,8 +2288,18 @@ class User(object):
 
         return Quota(self.server, self._ecuser.UserID)
 
+    @property
+    def outofoffice(self):
+        """ User :class:`Outofoffice` """
+
+        return self.store.outofoffice
+
+    def groups(self):
+        for g in self.server.sa.GetGroupListOfUser(self._ecuser.UserID, MAPI_UNICODE):
+            yield Group(g.Groupname, self.server)
+
     def __unicode__(self):
-        return u'User(%s)' % self._name
+        return u"User('%s')" % self._name
 
     def __repr__(self):
         return unicode(self).encode(sys.stdout.encoding or 'utf8')
@@ -1937,7 +2343,11 @@ class Quota(object):
             self._warning_limit = quota.llWarnSize
             self._soft_limit = quota.llSoftSize
             self._hard_limit = quota.llHardSize
-
+            # XXX: logical name for variable
+            # Use default quota set in /etc/zarafa/server.cfg
+            self._use_default_quota = quota.bUseDefaultQuota
+            # XXX: is this for multitendancy?
+            self._isuser_default_quota = quota.bIsUserDefaultQuota
 
     @property
     def warning_limit(self):
@@ -1967,8 +2377,7 @@ class Quota(object):
 
     @hard_limit.setter
     def hard_limit(self, value):
-        self._update(hard_limit=value)
-
+        self.update(hard_limit=value)
 
     def update(self, **kwargs):
         """
@@ -1992,6 +2401,12 @@ class Quota(object):
             return [self.server.user(ecuser.Username) for ecuser in self.server.sa.GetQuotaRecipients(self.userid, 0)]
         else:
             return []
+
+    def __unicode__(self):
+        return u'Quota(warning=%s, soft=%s, hard=%s)' % (_bytes_to_human(self.warning_limit), _bytes_to_human(self.soft_limit), _bytes_to_human(self.hard_limit))
+
+    def __repr__(self):
+        return unicode(self).encode(sys.stdout.encoding or 'utf8')
 
 class TrackingContentsImporter(ECImportContentsChanges):
     def __init__(self, server, importer, log):
@@ -2017,7 +2432,7 @@ class TrackingContentsImporter(ECImportContentsChanges):
                 mapistore = self.server.mapisession.OpenMsgStore(0, store_entryid, None, 0)
             item = Item()
             item.server = self.server
-            item.store = Store(self.server, mapistore) # XXX public arg? improve item constructor to do more
+            item.store = Store(self.server, mapistore)
             try:
                 item.mapiobj = _openentry_raw(mapistore, entryid.Value, 0)
                 item.folderid = PpropFindProp(props, PR_EC_PARENT_HIERARCHYID).Value
@@ -2025,7 +2440,8 @@ class TrackingContentsImporter(ECImportContentsChanges):
                 item.docid = props[0].Value
                 # item.folderid = props[1].Value # XXX 
                 item.storeid = bin2hex(props[2].Value)
-                self.importer.update(item, flags)
+                if hasattr(self.importer, 'update'):
+                    self.importer.update(item, flags)
             except (MAPIErrorNotFound, MAPIErrorNoAccess): # XXX, mail already deleted, can we do this in a cleaner way?
                 if self.log:
                     self.log.debug('received change for entryid %s, but it could not be opened' % bin2hex(entryid.Value))
@@ -2045,7 +2461,8 @@ class TrackingContentsImporter(ECImportContentsChanges):
                 item = Item()
                 item.server = self.server
                 item._sourcekey = bin2hex(entry)
-                self.importer.delete(item, flags)
+                if hasattr(self.importer, 'delete'):
+                    self.importer.delete(item, flags)
         except Exception, e:
             if self.log:
                 self.log.error('could not process delete for entries: %s' % [bin2hex(entry) for entry in entries])
@@ -2122,6 +2539,10 @@ def daemonize(func, options=None, foreground=False, args=[], log=None, config=No
 #                    if not sys.argv[0] in cmdline[:2]:
 #                        # break the lock if it's another process
 #                        pidfile.break_lock()
+        if uid is not None and gid is not None:
+            for h in log.handlers:
+                if isinstance(h, logging.handlers.WatchedFileHandler):
+                    os.chown(h.baseFilename, uid, gid)
         with daemon.DaemonContext(
                 pidfile=pidfile,
                 uid=uid,
@@ -2221,6 +2642,8 @@ Available options:
     if 'm' in options: parser.add_option('-m', '--modify', dest='modify', action='store_true', help='Depending on program, enable database modification')
     if 'v' in options: parser.add_option('-v', '--verbose', dest='verbose', action='store_true', help='Depending on program, enable verbose output')
     if 'V' in options: parser.add_option('-V', '--version', dest='version', action='store_true', help='Show program version')
+
+    if 'w' in options: parser.add_option('-w', '--workers', dest='workers', help='Number of parallel worker processes', metavar='N', type='int')
 
     return parser
 

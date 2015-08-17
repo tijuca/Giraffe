@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -60,7 +59,7 @@
 
 #include "ecversion.h"
 
-#include "mapidefs.h"
+#include <mapidefs.h>
 #include "ECConversion.h"
 #include "SOAPUtils.h"
 #include "ECSearchFolders.h"
@@ -74,7 +73,7 @@ using namespace std;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 #ifdef DEBUG
 #define DEBUG_SQL 0
@@ -91,7 +90,19 @@ static char THIS_FILE[] = __FILE__;
 // why.
 #define MAX_ALLOWED_PACKET			16776192
 
-sUpdateList_t	sUpdateList[] = {
+typedef struct _sUpdateList {
+	unsigned int ulVersion;
+	unsigned int ulVersionMin; // Version to start the update
+	const char *lpszLogComment;
+	ECRESULT (*lpFunction)(ECDatabase* lpDatabase);
+} sUpdateList_t;
+
+typedef struct _sNewDatabase {
+	const char *lpComment;
+	const char *lpSQL;
+} sSQLDatabase_t;
+
+static const sUpdateList_t sUpdateList[] = {
 	// Updates from version 5.02 to 5.10
 	{ Z_UPDATE_CREATE_VERSIONS_TABLE, 0, "Create table: versions", UpdateDatabaseCreateVersionsTable },
 	{ Z_UPDATE_CREATE_SEARCHFOLDERS_TABLE, 0, "Create table: searchresults", UpdateDatabaseCreateSearchFolders },
@@ -191,9 +202,9 @@ sUpdateList_t	sUpdateList[] = {
 	{ Z_UPDATE_UPDATE_WLINK_RECKEY, 0, "Updating wunderbar record keys", UpdateWLinkRecordKeys },
 };
 
-static char *server_groups[] = {
+static const char *const server_groups[] = {
   "zarafa",
-  (char *)NULL
+  NULL,
 };
 
 typedef struct {
@@ -314,7 +325,7 @@ const char *szStreamObj =
 
 "END\n";
 
-STOREDPROCS stored_procedures[] = {
+static const STOREDPROCS stored_procedures[] = {
 	{ "GetProps", szGetProps },
 	{ "PrepareGetProps", szPrepareGetProps },
 	{ "GetBestBody", szGetBestBody },
@@ -353,7 +364,8 @@ ECDatabaseMySQL::~ECDatabaseMySQL()
 	pthread_mutex_destroy(&m_hMutexMySql);
 }
 
-ECRESULT ECDatabaseMySQL::InitLibrary(char* lpDatabaseDir, char* lpConfigFile, ECLogger *lpLogger)
+ECRESULT ECDatabaseMySQL::InitLibrary(const char *lpDatabaseDir,
+    const char *lpConfigFile, ECLogger *lpLogger)
 {
 	ECRESULT	er = erSuccess;
 	string		strDatabaseDir;
@@ -372,13 +384,18 @@ ECRESULT ECDatabaseMySQL::InitLibrary(char* lpDatabaseDir, char* lpConfigFile, E
     	strConfigFile+= lpConfigFile;
     }
 	
-	char *server_args[] = {
+	const char *server_args[] = {
 		"zarafa",		/* this string is not used */
-		(char*)strConfigFile.c_str(),
-		(char*)strDatabaseDir.c_str(),
+		strConfigFile.c_str(),
+		strDatabaseDir.c_str(),
 	};
-
-	if((ret = mysql_library_init(arraySize(server_args), server_args, server_groups)) != 0) {
+	/*
+	 * mysql's function signature stinks, and even their samples
+	 * do the cast :(
+	 */
+	if ((ret = mysql_library_init(arraySize(server_args),
+	     const_cast<char **>(server_args),
+	     const_cast<char **>(server_groups))) != 0) {
 		lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to initialize mysql: error 0x%08X", ret);
 		er = ZARAFA_E_DATABASE_ERROR;
 		goto exit;
@@ -421,10 +438,20 @@ exit:
 	return er;
 }
 
-void ECDatabaseMySQL::UnloadLibrary() 
+void ECDatabaseMySQL::UnloadLibrary(ECLogger *l)
 {
+	/*
+	 * MySQL will timeout waiting for its own threads if the mysql
+	 * initialization was done in another thread than the one where
+	 * mysql_*_end() is called. [Global problem - it also affects
+	 * projects other than Zarafa's.] :(
+	 */
+	if (l != NULL)
+		l->Log(EC_LOGLEVEL_NOTICE, "Waiting for mysql_server_end");
 	mysql_server_end();// mysql > 4.1.10 = mysql_library_end();
 
+	if (l != NULL)
+		l->Log(EC_LOGLEVEL_NOTICE, "Waiting for mysql_library_end");
 	mysql_library_end();
 }
 
@@ -524,8 +551,8 @@ ECRESULT ECDatabaseMySQL::Connect()
 {
 	ECRESULT		er = erSuccess;
 	std::string		strQuery;
-	char*			lpMysqlPort = m_lpConfig->GetSetting("mysql_port");
-	char*			lpMysqlSocket = m_lpConfig->GetSetting("mysql_socket");
+	const char *lpMysqlPort = m_lpConfig->GetSetting("mysql_port");
+	const char *lpMysqlSocket = m_lpConfig->GetSetting("mysql_socket");
 	DB_RESULT		lpDBResult = NULL;
 	DB_ROW			lpDBRow = NULL;
 	unsigned int	gcm = 0;
@@ -575,7 +602,8 @@ ECRESULT ECDatabaseMySQL::Connect()
 	    goto exit;
 	
 	lpDBRow = FetchRow(lpDBResult);
-	if(lpDBRow == NULL || lpDBRow[0] == NULL) {
+	/* lpDBRow[0] has the variable name, [1] the value */
+	if(lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL) {
 	    m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to retrieve max_allowed_packet value. Assuming 16M");
 	    m_ulMaxAllowedPacket = (unsigned int)MAX_ALLOWED_PACKET;
     } else {
@@ -1401,15 +1429,15 @@ ECRESULT ECDatabaseMySQL::CreateDatabase()
 {
 	ECRESULT	er = erSuccess;
 	string		strQuery;
-	char*		lpDatabase = m_lpConfig->GetSetting("mysql_database");
-	char*		lpMysqlPort = m_lpConfig->GetSetting("mysql_port");
-	char*		lpMysqlSocket = m_lpConfig->GetSetting("mysql_socket");
+	const char *lpDatabase = m_lpConfig->GetSetting("mysql_database");
+	const char *lpMysqlPort = m_lpConfig->GetSetting("mysql_port");
+	const char *lpMysqlSocket = m_lpConfig->GetSetting("mysql_socket");
 
 	if(*lpMysqlSocket == '\0')
 		lpMysqlSocket = NULL;
 
 	// Zarafa database tables
-	sSQLDatabase_t sDatabaseTables[] = {
+	static const sSQLDatabase_t sDatabaseTables[] = {
 		{"acl", Z_TABLEDEF_ACL},
 		{"hierarchy", Z_TABLEDEF_HIERARCHY},
 		{"names", Z_TABLEDEF_NAMES},
@@ -1442,7 +1470,7 @@ ECRESULT ECDatabaseMySQL::CreateDatabase()
 	};
 
 	// Zarafa database default data
-	sSQLDatabase_t sDatabaseData[] = {
+	static const sSQLDatabase_t sDatabaseData[] = {
 		{"users", Z_TABLEDATA_USERS},
 		{"stores", Z_TABLEDATA_STORES},
 		{"hierarchy", Z_TABLEDATA_HIERARCHY},

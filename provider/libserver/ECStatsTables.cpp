@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -61,13 +60,11 @@
 
 #include "ECStatsCollector.h"
 
-#ifdef HAVE_TCMALLOC
-#include "google/malloc_extension.h"
+#if defined(HAVE_GPERFTOOLS_MALLOC_EXTENSION_H)
+#	include <gperftools/malloc_extension.h>
+#elif defined(HAVE_GOOGLE_MALLOC_EXTENSION_H)
+#	include <google/malloc_extension.h>
 #endif
-
-
-// Link to provider/server
-void zarafa_get_server_stats(unsigned int *lpulQueueLen, double *lpDblQueueAge, unsigned int *lpulThreads, unsigned int *lpulIdleThreads);
 
 /*
   System stats
@@ -528,7 +525,7 @@ ECRESULT ECSessionStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis, 
 				lpsRowSet->__ptr[i].__ptr[k].Value.mvszA.__ptr = s_alloc<char*>(soap, iterSD->second.busystates.size());
 
 				for (j = 0, iterBS = iterSD->second.busystates.begin(); iterBS != iterSD->second.busystates.end(); j++, iterBS++) {
-					char *szState;
+					const char *szState;
 					if(iterBS->state == SESSION_STATE_PROCESSING)
 						szState = "P";
 					else if(iterBS->state == SESSION_STATE_SENDING)

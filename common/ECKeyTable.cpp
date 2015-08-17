@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -49,6 +48,7 @@
 
 #include <list>
 #include <map>
+#include <cassert>
 
 #include "ECKeyTable.h" 
 #include "ustringutil.h"
@@ -56,7 +56,7 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 bool operator!=(const sObjectTableKey& a, const sObjectTableKey& b)
@@ -117,7 +117,9 @@ bool operator>(const sObjectTableKey& a, const sObjectTableKey& b)
  * Rows are immutable, changes are done with a delete/add
  */
 
-ECTableRow::ECTableRow(sObjectTableKey sKey, unsigned int ulSortCols, unsigned int * lpSortLen, unsigned char *lpFlags, unsigned char **lppSortData, bool fHidden)
+ECTableRow::ECTableRow(sObjectTableKey sKey, unsigned int ulSortCols,
+    const unsigned int *lpSortLen, const unsigned char *lpFlags,
+    unsigned char **lppSortData, bool fHidden)
 {
 	this->sKey = sKey;
 	this->lpParent = NULL;
@@ -129,10 +131,13 @@ ECTableRow::ECTableRow(sObjectTableKey sKey, unsigned int ulSortCols, unsigned i
 	this->ulHeight = 0;
 	this->fHidden = fHidden;
 
-	initSortCols(ulSortCols, (int *)lpSortLen, lpFlags, lppSortData);
+	initSortCols(ulSortCols, reinterpret_cast<const int *>(lpSortLen),
+	             lpFlags, lppSortData);
 }
 
-void ECTableRow::initSortCols(unsigned int ulSortCols, int * lpSortLen, unsigned char * lpFlags, unsigned char ** lppSortData) {
+void ECTableRow::initSortCols(unsigned int ulSortCols, const int *lpSortLen,
+    const unsigned char *lpFlags, unsigned char **lppSortData)
+{
 	unsigned int i=0;
 	int len = 0;
 
@@ -148,7 +153,9 @@ void ECTableRow::initSortCols(unsigned int ulSortCols, int * lpSortLen, unsigned
 	this->lppSortKeys = new unsigned char *[ulSortCols];
 
 	// Copy sort lengths
-	memcpy(this->lpSortLen, lpSortLen, sizeof(unsigned int) * ulSortCols);
+	assert(ulSortCols == 0 || lpSortLen != NULL);
+	if (ulSortCols != 0)
+		memcpy(this->lpSortLen, lpSortLen, sizeof(unsigned int) * ulSortCols);
 
 	// Copy sort keys
 	for(i=0;i<ulSortCols;i++) {
@@ -220,8 +227,7 @@ ECTableRow::~ECTableRow()
  * Columns that must be sorted in descending order have a NEGATIVE lpSortLen[] entry. We split
  * this into the ascending and descending cases below.
  */
-
-bool ECTableRow::rowcompare (ECTableRow *a, ECTableRow *b)
+bool ECTableRow::rowcompare(const ECTableRow *a, const ECTableRow *b)
 {
 	// The root node is before anything!
 	if(a->fRoot && !b->fRoot)
@@ -233,7 +239,12 @@ bool ECTableRow::rowcompare (ECTableRow *a, ECTableRow *b)
 }
 
 // Does a normal row compare between two rows
-bool ECTableRow::rowcompare (unsigned int ulSortColsA, int *lpSortLenA, unsigned char **lppSortKeysA, unsigned char *lpSortFlagsA, unsigned int ulSortColsB, int *lpSortLenB, unsigned char **lppSortKeysB, unsigned char *lpSortFlagsB, bool fIgnoreOrder) {
+bool ECTableRow::rowcompare(unsigned int ulSortColsA, const int *lpSortLenA,
+    unsigned char **lppSortKeysA, const unsigned char *lpSortFlagsA,
+    unsigned int ulSortColsB, const int *lpSortLenB,
+    unsigned char **lppSortKeysB, const unsigned char *lpSortFlagsB,
+    bool fIgnoreOrder)
+{
 	unsigned int i=0;
 	bool ret = false;
 	unsigned int ulSortCols;
@@ -298,7 +309,12 @@ bool ECTableRow::rowcompare (unsigned int ulSortColsA, int *lpSortLenA, unsigned
 }
 
 // Compares a row by looking only at a certain prefix of sort columns
-bool ECTableRow::rowcompareprefix (unsigned int ulPrefix, unsigned int ulSortColsA, int *lpSortLenA, unsigned char **lppSortKeysA, unsigned char *lpSortFlagsA, unsigned int ulSortColsB, int *lpSortLenB, unsigned char **lppSortKeysB, unsigned char *lpSortFlagsB) {
+bool ECTableRow::rowcompareprefix(unsigned int ulPrefix,
+    unsigned int ulSortColsA, const int *lpSortLenA,
+    unsigned char **lppSortKeysA, const unsigned char *lpSortFlagsA,
+    unsigned int ulSortColsB, const int *lpSortLenB,
+    unsigned char **lppSortKeysB, const unsigned char *lpSortFlagsB)
+{
     return ECTableRow::rowcompare(ulSortColsA > ulPrefix ? ulPrefix : ulSortColsA, lpSortLenA, lppSortKeysA, lpSortFlagsA,
                                   ulSortColsB > ulPrefix ? ulPrefix : ulSortColsB, lpSortLenB, lppSortKeysB, lpSortFlagsB);
 }
@@ -400,11 +416,15 @@ ECRESULT ECKeyTable::UpdateCounts(ECTableRow *lpRow)
 	return er;	
 }
 
-ECRESULT ECKeyTable::UpdateRow(UpdateType ulType, const sObjectTableKey* lpsRowItem, unsigned int ulSortCols, unsigned int *lpSortLen, unsigned char *lpFlags, unsigned char **lppSortData, sObjectTableKey* lpsPrevRow, bool fHidden, UpdateType *lpulAction)
+ECRESULT ECKeyTable::UpdateRow(UpdateType ulType,
+    const sObjectTableKey *lpsRowItem, unsigned int ulSortCols,
+    const unsigned int *lpSortLen, const unsigned char *lpFlags,
+    unsigned char **lppSortData, sObjectTableKey *lpsPrevRow, bool fHidden,
+    UpdateType *lpulAction)
 {
 	ECRESULT er = erSuccess;
 	ECTableRow *lpRow = NULL;
-	ECTableRowMap::iterator iterMap;
+	ECTableRowMap::const_iterator iterMap;
 	ECTableRow *lpNewRow = NULL;
 	unsigned int fLeft = 0;
 	bool fRelocateCursor = false;
@@ -736,7 +756,7 @@ ECRESULT ECKeyTable::Clear()
 	return erSuccess;
 }
 
-ECRESULT ECKeyTable::SeekId(sObjectTableKey *lpsRowItem)
+ECRESULT ECKeyTable::SeekId(const sObjectTableKey *lpsRowItem)
 {
 	ECRESULT er = erSuccess;
 	ECTableRowMap::iterator iterMap;

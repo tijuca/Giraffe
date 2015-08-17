@@ -17,7 +17,7 @@ then stored mimetype and if neither are present by using python-magic.
 
 """
 
-MAX_TIME = 60 # time limit: 60 seconds # XXX get from cfg
+MAX_TIME = 10 # time limit: 10 seconds # XXX get from cfg
 MAX_MEMORY = 256*10**6 # max mem usage: 256 MB # XXX get from cfg
 
 CONVERT_ODF = 'unzip -p %(file)s content.xml | %(xmltotext)s -'

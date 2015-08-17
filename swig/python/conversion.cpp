@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -48,7 +47,7 @@
 #include <mapicode.h>
 #include <mapiutil.h>
 #include <edkmdb.h>
-#include "Python.h"
+#include <Python.h>
 #include "charset/convert.h"
 #include "conversion.h"
 #include "scl.h"
@@ -210,15 +209,19 @@ wchar_t * CopyPyUnicode(wchar_t **lpWide, PyObject *o, void *lpBase)
         
     size = PyUnicode_GetSize(unicode);
     
-    MAPIAllocateMore((size + 1) * sizeof(wchar_t), lpBase, (void **)lpWide);
-        
-    PyUnicode_AsWideChar((PyUnicodeObject *)unicode, *lpWide, size);
-    
-    (*lpWide)[size] = '\0';
- 
+    if (MAPIAllocateMore((size + 1) * sizeof(wchar_t), lpBase, (void **)lpWide) == hrSuccess) {
+	    PyUnicode_AsWideChar((PyUnicodeObject *)unicode, *lpWide, size);
+	    
+	    (*lpWide)[size] = '\0';
+	 
+	    Py_DECREF(unicode);
+	    
+	    return *lpWide;
+    }
+
     Py_DECREF(unicode);
-    
-    return *lpWide;
+
+    return NULL;
 }
 
 int Object_is_list_of(PyObject *object, TypeCheckFunc fnTypeCheck)
@@ -529,7 +532,8 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 				lpProp->Value.lpszA = PyString_AsString(Value);
 			else {
 				PyString_AsStringAndSize(Value, &lpstr, &size);
-				MAPIAllocateMore(size + 1, lpBase, (LPVOID*)&lpProp->Value.lpszA);
+				if (MAPIAllocateMore(size + 1, lpBase, (LPVOID*)&lpProp->Value.lpszA) != hrSuccess)
+					goto exit;
 				memcpy(lpProp->Value.lpszA, lpstr, size + 1);
 			}
 			break;
@@ -577,7 +581,8 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 				if (ulFlags == CONV_COPY_SHALLOW)
 					lpProp->Value.lpguid = (LPGUID)lpstr;
 				else {
-					MAPIAllocateMore(sizeof(GUID), lpBase, (LPVOID*)&lpProp->Value.lpguid);
+					if (MAPIAllocateMore(sizeof(GUID), lpBase, (LPVOID*)&lpProp->Value.lpguid) != hrSuccess)
+						goto exit;
 					memcpy(lpProp->Value.lpguid, lpstr, sizeof(GUID));
 				}
 			}
@@ -589,7 +594,8 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 			if (ulFlags == CONV_COPY_SHALLOW)
 				lpProp->Value.bin.lpb = (LPBYTE)lpstr;
 			else {
-				MAPIAllocateMore(size, lpBase, (LPVOID*)&lpProp->Value.bin.lpb);
+				if (MAPIAllocateMore(size, lpBase, (LPVOID*)&lpProp->Value.bin.lpb) != hrSuccess)
+					goto exit;
 				memcpy(lpProp->Value.bin.lpb, lpstr, size);
 			}
 			lpProp->Value.bin.cb = size;
@@ -597,12 +603,14 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 		}
 
 		case PT_SRESTRICTION: {
-			MAPIAllocateMore(sizeof(SRestriction), lpBase, (void**)&lpProp->Value.lpszA);
+			if (MAPIAllocateMore(sizeof(SRestriction), lpBase, (void**)&lpProp->Value.lpszA) != hrSuccess)
+				goto exit;
 			Object_to_LPSRestriction(Value, (LPSRestriction)lpProp->Value.lpszA, lpBase);
 			break;
 		}
 		case PT_ACTIONS: {
-			MAPIAllocateMore(sizeof(ACTIONS), lpBase, (void**)&lpProp->Value.lpszA);
+			if (MAPIAllocateMore(sizeof(ACTIONS), lpBase, (void**)&lpProp->Value.lpszA) != hrSuccess)
+				goto exit;
 			Object_to_LPACTIONS(Value, (ACTIONS*)lpProp->Value.lpszA, lpBase);
 			break;
 		}
@@ -616,7 +624,8 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 			int n = 0; \
 			\
 			if (len) { \
-				MAPIAllocateMore(sizeof(*lpProp->Value.MV##MVname.lp##MVelem) * len, lpBase, (void **)&lpProp->Value.MV##MVname.lp##MVelem); \
+				if (MAPIAllocateMore(sizeof(*lpProp->Value.MV##MVname.lp##MVelem) * len, lpBase, (void **)&lpProp->Value.MV##MVname.lp##MVelem) != hrSuccess) \
+					goto exit; \
 				while((elem = PyIter_Next(iter))) {						\
 					Sub(lpProp->Value.MV##MVname.lp##MVelem[n]) = As(elem); \
 					Py_DECREF(elem);									\
@@ -649,7 +658,8 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 			PyObject *elem = NULL;
 			int n = 0;
 
-			MAPIAllocateMore(sizeof(SDateTimeArray) * len, lpBase, (void **)&lpProp->Value.MVft.lpft);
+			if (MAPIAllocateMore(sizeof(SDateTimeArray) * len, lpBase, (void **)&lpProp->Value.MVft.lpft) != hrSuccess)
+				goto exit;
 			while((elem = PyIter_Next(iter))) {
 				lpProp->Value.MVft.lpft[n] = Object_to_FILETIME(elem);
 				Py_DECREF(elem);
@@ -668,13 +678,15 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 			PyObject *elem = NULL;
 			int n = 0;
 
-			MAPIAllocateMore(sizeof(*lpProp->Value.MVszA.lppszA) * len, lpBase, (LPVOID*)&lpProp->Value.MVszA.lppszA);
+			if (MAPIAllocateMore(sizeof(*lpProp->Value.MVszA.lppszA) * len, lpBase, (LPVOID*)&lpProp->Value.MVszA.lppszA) != hrSuccess)
+				goto exit;
 			while((elem = PyIter_Next(iter))) {
 				if (ulFlags == CONV_COPY_SHALLOW)
 					lpProp->Value.MVszA.lppszA[n] = PyString_AsString(elem);
 				else {
 					PyString_AsStringAndSize(elem, &lpstr, &size);
-					MAPIAllocateMore(size+1, lpBase, (LPVOID*)&lpProp->Value.MVszA.lppszA[n]);
+					if (MAPIAllocateMore(size+1, lpBase, (LPVOID*)&lpProp->Value.MVszA.lppszA[n]) != hrSuccess)
+						goto exit;
 					memcpy(lpProp->Value.MVszA.lppszA[n], lpstr, size+1);
 				}
 
@@ -694,13 +706,15 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 			PyObject *elem = NULL;
 			int n = 0;
 
-			MAPIAllocateMore(sizeof(SBinaryArray) * len, lpBase, (void **)&lpProp->Value.MVbin.lpbin);
+			if (MAPIAllocateMore(sizeof(SBinaryArray) * len, lpBase, (void **)&lpProp->Value.MVbin.lpbin) != hrSuccess)
+				goto exit;
 			while((elem = PyIter_Next(iter))) {
 				PyString_AsStringAndSize(elem, &lpstr, &size);
 				if (ulFlags == CONV_COPY_SHALLOW)
 					lpProp->Value.MVbin.lpbin[n].lpb = (LPBYTE)lpstr;
 				else {
-					MAPIAllocateMore(size, lpBase, (LPVOID*)&lpProp->Value.MVbin.lpbin[n].lpb);
+					if (MAPIAllocateMore(size, lpBase, (LPVOID*)&lpProp->Value.MVbin.lpbin[n].lpb) != hrSuccess)
+						goto exit;
 					memcpy(lpProp->Value.MVbin.lpbin[n].lpb, lpstr, size);
 				}
 				lpProp->Value.MVbin.lpbin[n].cb = size;
@@ -721,7 +735,8 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 			PyObject *elem = NULL;
 			int n = 0;
 
-			MAPIAllocateMore(sizeof(*lpProp->Value.MVszW.lppszW) * len, lpBase, (LPVOID*)&lpProp->Value.MVszW.lppszW);
+			if (MAPIAllocateMore(sizeof(*lpProp->Value.MVszW.lppszW) * len, lpBase, (LPVOID*)&lpProp->Value.MVszW.lppszW) != hrSuccess)
+				goto exit;
 			while((elem = PyIter_Next(iter))) {
 				if (ulFlags == CONV_COPY_SHALLOW && NATIVE_UNICODE)
 					lpProp->Value.MVszW.lppszW[n] = (WCHAR*)PyUnicode_AsUnicode(elem);
@@ -747,7 +762,8 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 			int n = 0;
 			char *guid;
 
-			MAPIAllocateMore(sizeof(GUID) * len, lpBase, (void **)&lpProp->Value.MVguid.lpguid);
+			if (MAPIAllocateMore(sizeof(GUID) * len, lpBase, (void **)&lpProp->Value.MVguid.lpguid) != hrSuccess)
+				goto exit;
 			while((elem = PyIter_Next(iter))) {
 				PyString_AsStringAndSize(elem, &guid, &size);
 				if(size != sizeof(GUID)) {
@@ -782,11 +798,15 @@ LPSPropValue Object_to_LPSPropValue(PyObject *object, ULONG ulFlags, void *lpBas
 {
 	LPSPropValue lpProp = NULL;
 
-	if(lpBase)
-		MAPIAllocateMore(sizeof(SPropValue), lpBase, (void **)&lpProp);
+	if(lpBase) {
+		if (MAPIAllocateMore(sizeof(SPropValue), lpBase, (void **)&lpProp) != hrSuccess)
+			return NULL;
+	}
 	else {
-		MAPIAllocateBuffer(sizeof(SPropValue), (void **)&lpProp);
-	lpBase = lpProp;
+		if (MAPIAllocateBuffer(sizeof(SPropValue), (void **)&lpProp) != hrSuccess)
+			return NULL;
+
+		lpBase = lpProp;
 	}
 
 	Object_to_LPSPropValue(object, lpProp, ulFlags, lpBase);
@@ -821,7 +841,9 @@ LPSPropValue	List_to_LPSPropValue(PyObject *object, ULONG *cValues, ULONG ulFlag
 
 	size = PyObject_Size(object);
 
-	MAPIAllocateBuffer(sizeof(SPropValue)*size, (void**)&lpProps);
+	if (MAPIAllocateBuffer(sizeof(SPropValue)*size, (void**)&lpProps) != hrSuccess)
+		goto exit;
+
 	memset(lpProps, 0, sizeof(SPropValue)*size);
 
 	while((elem = PyIter_Next(iter))) {
@@ -879,7 +901,8 @@ LPSPropTagArray	List_to_LPSPropTagArray(PyObject *object, ULONG /*ulFlags*/)
 		goto exit;
 	}
 
-	MAPIAllocateBuffer(CbNewSPropTagArray(len), (void **)&lpPropTagArray);
+	if (MAPIAllocateBuffer(CbNewSPropTagArray(len), (void **)&lpPropTagArray) != hrSuccess)
+		goto exit;
 
 	iter = PyObject_GetIter(object);
 	if(iter == NULL)
@@ -972,7 +995,10 @@ void Object_to_LPSRestriction(PyObject *object, LPSRestriction lpsRestriction, v
 		len = PyObject_Length(sub);
 
 		// Handle RES_AND and RES_OR the same since they are binary-compatible
-		MAPIAllocateMore(sizeof(SRestriction) * len, lpBase, (void **)&lpsRestriction->res.resAnd.lpRes);
+		if (MAPIAllocateMore(sizeof(SRestriction) * len, lpBase, (void **)&lpsRestriction->res.resAnd.lpRes) != hrSuccess) {
+			PyErr_SetString(PyExc_RuntimeError, "Out of memory");
+			goto exit;
+		}
 
 		iter = PyObject_GetIter(sub);
 		if(iter == NULL)
@@ -998,7 +1024,11 @@ void Object_to_LPSRestriction(PyObject *object, LPSRestriction lpsRestriction, v
 			goto exit;
 		}
 
-		MAPIAllocateMore(sizeof(SRestriction), lpBase, (void **)&lpsRestriction->res.resNot.lpRes);
+		if (MAPIAllocateMore(sizeof(SRestriction), lpBase, (void **)&lpsRestriction->res.resNot.lpRes) != hrSuccess) {
+			PyErr_SetString(PyExc_RuntimeError, "Out of memory");
+			goto exit;
+		}
+
 		Object_to_LPSRestriction(sub, lpsRestriction->res.resNot.lpRes, lpBase);
 
 		if(PyErr_Occurred())
@@ -1101,7 +1131,10 @@ void Object_to_LPSRestriction(PyObject *object, LPSRestriction lpsRestriction, v
 		}
 
 		lpsRestriction->res.resSub.ulSubObject = PyLong_AsUnsignedLong(ulPropTag);
-		MAPIAllocateMore(sizeof(SRestriction), lpBase, (void **)&lpsRestriction->res.resSub.lpRes);
+		if (MAPIAllocateMore(sizeof(SRestriction), lpBase, (void **)&lpsRestriction->res.resSub.lpRes) != hrSuccess) {
+			PyErr_SetString(PyExc_RuntimeError, "Out of memory");
+			goto exit;
+		}
 		Object_to_LPSRestriction(sub, lpsRestriction->res.resSub.lpRes, lpBase);
 
 		if(PyErr_Occurred())
@@ -1117,7 +1150,11 @@ void Object_to_LPSRestriction(PyObject *object, LPSRestriction lpsRestriction, v
 			goto exit;
 		}
 
-		MAPIAllocateMore(sizeof(SRestriction), lpBase, (void **)&lpsRestriction->res.resComment.lpRes);
+		if (MAPIAllocateMore(sizeof(SRestriction), lpBase, (void **)&lpsRestriction->res.resComment.lpRes) != hrSuccess) {
+			PyErr_SetString(PyExc_RuntimeError, "Out of memory");
+			goto exit;
+		}
+		
 		Object_to_LPSRestriction(sub, lpsRestriction->res.resComment.lpRes, lpBase);
 
 		if(PyErr_Occurred())
@@ -1184,7 +1221,8 @@ LPSRestriction	Object_to_LPSRestriction(PyObject *object, void *lpBase)
 	if(object == Py_None)
 		return NULL;
 
-	MAPIAllocateBuffer(sizeof(SRestriction), (void **)&lpRestriction);
+	if (MAPIAllocateBuffer(sizeof(SRestriction), (void **)&lpRestriction) != hrSuccess)
+		goto exit;
 
 	Object_to_LPSRestriction(object, lpRestriction);
 
@@ -1193,6 +1231,7 @@ LPSRestriction	Object_to_LPSRestriction(PyObject *object, void *lpBase)
 		return NULL;
 	}
 
+exit:
 	return lpRestriction;
 }
 
@@ -1615,7 +1654,8 @@ LPSSortOrderSet	Object_to_LPSSortOrderSet(PyObject *object)
 		goto exit;
 	}
 
-	MAPIAllocateBuffer(CbNewSSortOrderSet(len), (void **)&lpsSortOrderSet);
+	if (MAPIAllocateBuffer(CbNewSSortOrderSet(len), (void **)&lpsSortOrderSet) != hrSuccess)
+		goto exit;
 
 	iter = PyObject_GetIter(aSort);
 	if(iter == NULL)
@@ -1755,7 +1795,9 @@ LPSRowSet		List_to_LPSRowSet(PyObject *list, ULONG ulFlags)
 
 	// Zero out the whole struct so that failures halfway don't leave the struct
 	// in an uninitialized state for FreeProws()
-	MAPIAllocateBuffer(CbNewSRowSet(len), (void **)&lpsRowSet);
+	if (MAPIAllocateBuffer(CbNewSRowSet(len), (void **)&lpsRowSet) != hrSuccess)
+		goto exit;
+
 	memset(lpsRowSet, 0, CbNewSRowSet(len));
 
 	while((elem = PyIter_Next(iter))) {
@@ -1900,7 +1942,9 @@ LPSPropProblemArray List_to_LPSPropProblemArray(PyObject *list, ULONG /*ulFlags*
 	if(!iter)
 		goto exit;
 
-	MAPIAllocateBuffer(CbNewSPropProblemArray(len), (void **)&lpsProblems);
+	if (MAPIAllocateBuffer(CbNewSPropProblemArray(len), (void **)&lpsProblems) != hrSuccess)
+		goto exit;
+
 	memset(lpsProblems, 0, CbNewSPropProblemArray(len));
 
 	while((elem = PyIter_Next(iter))) {
@@ -1998,7 +2042,10 @@ void Object_to_LPMAPINAMEID(PyObject *elem, LPMAPINAMEID *lppName, void *lpBase)
 	ULONG ulKind = 0;
 	Py_ssize_t len = 0;
 
-	MAPIAllocateMore(sizeof(MAPINAMEID), lpBase, (void **)&lpName);
+	if (MAPIAllocateMore(sizeof(MAPINAMEID), lpBase, (void **)&lpName) != hrSuccess) {
+		PyErr_SetString(PyExc_RuntimeError, "Out of memory");
+		goto exit;
+	}
 	memset(lpName, 0, sizeof(MAPINAMEID));
 
 	kind = PyObject_GetAttrString(elem, "kind");
@@ -2075,7 +2122,9 @@ LPMAPINAMEID *	List_to_p_LPMAPINAMEID(PyObject *list, ULONG *lpcNames, ULONG /*u
 
 	len = PyObject_Length(list);
 
-	MAPIAllocateBuffer(sizeof(LPMAPINAMEID) * len, (void **)&lpNames);
+	if (MAPIAllocateBuffer(sizeof(LPMAPINAMEID) * len, (void **)&lpNames) != hrSuccess)
+		goto exit;
+
 	memset(lpNames, 0, sizeof(LPMAPINAMEID) * len);
 
 	while((elem = PyIter_Next(iter))) {
@@ -2125,9 +2174,13 @@ LPENTRYLIST		List_to_LPENTRYLIST(PyObject *list)
 
 	len = PyObject_Length(list);
 
-	MAPIAllocateBuffer(sizeof(*lpEntryList), (void **)&lpEntryList);
+	if (MAPIAllocateBuffer(sizeof(*lpEntryList), (void **)&lpEntryList) != hrSuccess)
+		goto exit;
+
+	if (MAPIAllocateMore(len * sizeof *lpEntryList->lpbin, lpEntryList, (void**)&lpEntryList->lpbin) != hrSuccess)
+		goto exit;
+
 	lpEntryList->cValues = len;
-	MAPIAllocateMore(len * sizeof *lpEntryList->lpbin, lpEntryList, (void**)&lpEntryList->lpbin);
 
 	while((elem = PyIter_Next(iter))) {
 		char *ptr;
@@ -2138,7 +2191,8 @@ LPENTRYLIST		List_to_LPENTRYLIST(PyObject *list)
 			goto exit;
 
 		lpEntryList->lpbin[i].cb = strlen;
-		MAPIAllocateMore(strlen, lpEntryList, (void**)&lpEntryList->lpbin[i].lpb);
+		if (MAPIAllocateMore(strlen, lpEntryList, (void**)&lpEntryList->lpbin[i].lpb) != hrSuccess)
+			goto exit;
 		memcpy(lpEntryList->lpbin[i].lpb, ptr, strlen);
 
 		i++;
@@ -2312,7 +2366,9 @@ NOTIFICATION *	Object_to_LPNOTIFICATION(PyObject *obj)
 	if(obj == Py_None)
 		return NULL;
 
-	MAPIAllocateBuffer(sizeof(NOTIFICATION), (void**)&lpNotif);
+	if (MAPIAllocateBuffer(sizeof(NOTIFICATION), (void**)&lpNotif) != hrSuccess)
+		goto exit;
+
 	memset(lpNotif, 0, sizeof(NOTIFICATION));
 
 	if(PyObject_IsInstance(obj, PyTypeNEWMAIL_NOTIFICATION))
@@ -2418,7 +2474,8 @@ LPFlagList		List_to_LPFlagList(PyObject *list)
 
 	len = PyObject_Length(list);
 
-	MAPIAllocateBuffer(CbNewFlagList(len), (void **)&lpList);
+	if (MAPIAllocateBuffer(CbNewFlagList(len), (void **)&lpList) != hrSuccess)
+		goto exit;
 
 	while((elem = PyIter_Next(iter))) {
 		lpList->ulFlag[i] = PyLong_AsUnsignedLong(elem);
@@ -2495,7 +2552,8 @@ LPREADSTATE		List_to_LPREADSTATE(PyObject *list, ULONG *lpcElements)
 
 	len = PyObject_Length(list);
 
-	MAPIAllocateBuffer(len * sizeof *lpList, (void **)&lpList);
+	if (MAPIAllocateBuffer(len * sizeof *lpList, (void **)&lpList) != hrSuccess)
+		goto exit;
 
 	while((elem = PyIter_Next(iter))) {
 		HRESULT hr;
@@ -2618,7 +2676,8 @@ LPCIID			List_to_LPCIID(PyObject *list, ULONG *cInterfaces)
 
 	len = PyObject_Length(list);
 
-	MAPIAllocateBuffer(len * sizeof *lpList, (void **)&lpList);
+	if (MAPIAllocateBuffer(len * sizeof *lpList, (void **)&lpList) != hrSuccess)
+		goto exit;
 
 	while((elem = PyIter_Next(iter))) {
 		char *ptr = NULL;
@@ -2771,7 +2830,7 @@ exit:
 LPECGROUP Object_to_LPECGROUP(PyObject *elem, ULONG ulFlags)
 {
 	static conv_out_info<ECGROUP> conv_info[] = {
-		{conv_out_default<ECGROUP, LPTSTR, &ECGROUP::lpszGroupname>, "Username"},
+		{conv_out_default<ECGROUP, LPTSTR, &ECGROUP::lpszGroupname>, "Groupname"},
 		{conv_out_default<ECGROUP, LPTSTR, &ECGROUP::lpszFullname>, "Fullname"},
 		{conv_out_default<ECGROUP, LPTSTR, &ECGROUP::lpszFullEmail>, "Email"},
 		{conv_out_default<ECGROUP, unsigned int, &ECGROUP::ulIsABHidden>, "IsHidden"},
@@ -2939,7 +2998,8 @@ LPROWLIST List_to_LPROWLIST(PyObject *object, ULONG ulFlags)
 		goto exit;
 	}
 
-	MAPIAllocateBuffer(CbNewROWLIST(len), (void **)&lpRowList);
+	if (MAPIAllocateBuffer(CbNewROWLIST(len), (void **)&lpRowList) != hrSuccess)
+		goto exit;
 
 	iter = PyObject_GetIter(object);
 	if (iter == NULL)
@@ -3014,8 +3074,6 @@ void DoException(HRESULT hr)
 	}
 
 	PyErr_SetObject(errortype, ex);
-
-exit:
 	if (ex)
 		Py_DECREF(ex);
 	if (errormap)
@@ -3063,9 +3121,9 @@ LPECQUOTA Object_to_LPECQUOTA(PyObject *elem)
 	static conv_out_info<ECQUOTA> conv_info[] = {
 		{conv_out_default<ECQUOTA, bool, &ECQUOTA::bUseDefaultQuota>, "bUseDefaultQuota"},
 		{conv_out_default<ECQUOTA, bool, &ECQUOTA::bIsUserDefaultQuota>, "bIsUserDefaultQuota"},
-		{conv_out_default<ECQUOTA, long long, &ECQUOTA::llWarnSize>, "llWarnSize"},
-		{conv_out_default<ECQUOTA, long long, &ECQUOTA::llSoftSize>, "llSoftSize"},
-		{conv_out_default<ECQUOTA, long long, &ECQUOTA::llHardSize>, "llHardSize"},
+		{conv_out_default<ECQUOTA, int64_t, &ECQUOTA::llWarnSize>, "llWarnSize"},
+		{conv_out_default<ECQUOTA, int64_t, &ECQUOTA::llSoftSize>, "llSoftSize"},
+		{conv_out_default<ECQUOTA, int64_t, &ECQUOTA::llHardSize>, "llHardSize"},
 	};
 
 	HRESULT hr = hrSuccess;
@@ -3119,7 +3177,8 @@ LPECSVRNAMELIST List_to_LPECSVRNAMELIST(PyObject *object)
 		goto exit;
 	}
 
-	MAPIAllocateBuffer(sizeof(ECSVRNAMELIST)+(sizeof(LPECSERVER) * len), (void**)&lpSvrNameList);
+	if (MAPIAllocateBuffer(sizeof(ECSVRNAMELIST)+(sizeof(LPECSERVER) * len), (void**)&lpSvrNameList) != hrSuccess)
+		goto exit;
 
 	memset(lpSvrNameList, 0, sizeof(ECSVRNAMELIST)+(sizeof(LPECSERVER) * len) );
 
@@ -3240,8 +3299,6 @@ PyObject *Object_from_STATSTG(STATSTG *lpStatStg)
 	cbSize = PyLong_FromLongLong(lpStatStg->cbSize.QuadPart);
 
 	result = PyObject_CallFunction(PyTypeSTATSTG, "(O)", cbSize);
-
-exit:
 	if(cbSize) {
 		Py_DECREF(cbSize);
 	}

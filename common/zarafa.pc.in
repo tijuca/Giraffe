@@ -7,5 +7,5 @@ Name: zarafa
 Description: Zarafa custom development
 Version: @ZARAFA_VERSION@
 Requires:
-Libs: -L${libdir} -lmapi @PROG_LIBS@
+Libs: -L${libdir} -lmapi
 Cflags: -I${includedir}/mapi4linux/ -I${includedir}/zarafa/ -DUNICODE

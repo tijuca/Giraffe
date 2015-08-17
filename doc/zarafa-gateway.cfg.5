@@ -2,12 +2,12 @@
 .\"     Title: zarafa-gateway.cfg
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: August 2011
+.\"      Date: April 2014
 .\"    Manual: Zarafa user reference
-.\"    Source: Zarafa 7.1
+.\"    Source: Zarafa 7.2
 .\"  Language: English
 .\"
-.TH "ZARAFA\-GATEWAY\&.CF" "5" "August 2011" "Zarafa 7.1" "Zarafa user reference"
+.TH "ZARAFA\-GATEWAY\&.CF" "5" "April 2014" "Zarafa 7.2" "Zarafa user reference"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -325,9 +325,37 @@ The path with the files to verify the clients certificates with\&.
 Default: value not set\&.
 .RE
 .PP
-\fBssl_enable_v2\fR
+\fBssl_protocols\fR
 .RS 4
-Accept SSLv2 only connections\&. SSLv2 is considered unsafe, and these connections should not be accepted\&.
+Disabled or enabled protocol names\&. Supported protocol names are
+\fISSLv2\fR,
+\fISSLv3\fR
+and
+\fITLSv1\fR\&. If Zarafa was linked against OpenSSL 1\&.0\&.1 or later there is additional support for the new protocols
+\fITLSv1\&.1\fR
+and
+\fITLSv1\&.2\fR\&. To exclude both, SSLv2 and SSLv3 set
+\fBssl_protocols\fR
+to
+\fI!SSLv2 !SSLv3\fR\&. SSLv2 is considered unsafe and these connections should not be accepted\&.
+.sp
+Default:
+\fI!SSLv2\fR
+.RE
+.PP
+\fBssl_ciphers\fR
+.RS 4
+SSL ciphers to use, set to
+\fIALL\fR
+for backward compatibility\&.
+.sp
+Default:
+\fIALL:!LOW:!SSLv2:!EXP:!aNULL\fR
+.RE
+.PP
+\fBssl_prefer_server_ciphers\fR
+.RS 4
+Prefer the server\*(Aqs order of SSL ciphers over client\*(Aqs\&.
 .sp
 Default:
 \fIno\fR
@@ -378,6 +406,14 @@ Specify whether to prefix each log line with a timestamp in \*(Aqfile\*(Aq loggi
 Default:
 \fI1\fR
 .RE
+.PP
+\fBlog_buffer_size\fR
+.RS 4
+Buffer logging in what sized blocks\&. Bigger buffers is better for the performance but it gives lag when running e\&.g\&. multitail or \*(Aqtail \-f\*(Aq on the log\-file\&. If you want to directly see what is happing, set this to e\&.g\&. 1\&. So when debugging: make it a small value, else set it to 4096 or more\&.
+.sp
+Default:
+\fI4096\fR
+.RE
 .SH "RELOADING"
 .PP
 The following options are reloadable by sending the zarafa\-gateway process a HUP signal:
@@ -397,4 +433,4 @@ Written by Zarafa\&.
 .SH "SEE ALSO"
 .PP
 
-\fBzarafa-gateway\fR(1)
+\fBzarafa-gateway\fR(8)

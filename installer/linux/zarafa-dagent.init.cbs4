@@ -4,7 +4,7 @@
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
-DAEMON=/usr/bin/zarafa-dagent
+DAEMON=/usr/sbin/zarafa-dagent
 CONFIG=/etc/zarafa/dagent.cfg
 
 #     .........1.........2.........3.........4.........5........!
@@ -14,7 +14,7 @@ DESC="Zarafa LMTP Delivery agent"
 #set -e
 
 # exit from init script when disabled, shift away "force" when present
-exit_if_disabled START_ZARAFA_DAGENT $* || shift
+exit_if_disabled START_ZARAFA_DAGENT "$@" || shift
 
 if [ ! -x $DAEMON ] 
 then

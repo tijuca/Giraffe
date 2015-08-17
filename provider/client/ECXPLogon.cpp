@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -53,7 +52,7 @@
 #include "mapiguidext.h"
 #include "ECGuid.h"
 #include "mapiext.h"
-#include "edkmdb.h"
+#include <edkmdb.h>
 #include "edkguid.h"
 
 #include "Zarafa.h"
@@ -75,11 +74,11 @@
 
 #ifdef _DEBUG
 #undef THIS_FILE
-static char THIS_FILE[]=__FILE__;
+static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
-HRESULT HrGetECMsgStore(IMAPIProp *lpProp, ECMsgStore **lppECMsgStore)
+static HRESULT HrGetECMsgStore(IMAPIProp *lpProp, ECMsgStore **lppECMsgStore)
 {
 	HRESULT hr = hrSuccess;
 	LPSPropValue lpPropVal = NULL;
@@ -361,7 +360,6 @@ HRESULT ECXPLogon::SubmitMessage(ULONG ulFlags, LPMESSAGE lpMessage, ULONG * lpu
 	
 	ULONG ulRow = 0;
 	ULONG ulRowCount = 0;
-	bool bRecipUpdate = false;
 
 	LPSPropValue lpEntryID = NULL;
 	LPSPropValue lpECObject = NULL;
@@ -553,7 +551,6 @@ HRESULT ECXPLogon::SubmitMessage(ULONG ulFlags, LPMESSAGE lpMessage, ULONG * lpu
 			_tcsicmp(lpsPropValue->Value.LPSZ, TRANSPORT_ADDRESS_TYPE_FAX) == 0)
 		{
 			lpsResponsibility->Value.b = TRUE;
-			bRecipUpdate = true;
 		}
 	}
 
@@ -760,9 +757,9 @@ ULONG ECXPLogon::OnNotify(ULONG cNotif, LPNOTIFICATION lpNotifs){
 	return S_OK;
 }
 
-LPTSTR GetStatusString(ULONG ulFlags)
+static const TCHAR *GetStatusString(ULONG ulFlags)
 {
-	LPTSTR lpszStatus = NULL;
+	const TCHAR *lpszStatus = NULL;
 
 	if (ulFlags & STATUS_INBOUND_ACTIVE)
 		lpszStatus = _T("Uploading messages...");
@@ -789,7 +786,7 @@ HRESULT ECXPLogon::HrUpdateTransportStatus()
     HRESULT hResult;
     ULONG cProps = 2;
     SPropValue rgProps[2];
-    LPTSTR lpszStatus = NULL;
+	const TCHAR *lpszStatus = NULL;
 	
     //  Store the new Transport Provider Status Code. 
 

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,14 +44,17 @@
 #ifndef ECCACHE_INCLUDED
 #define ECCACHE_INCLUDED
 
+#include "zcdefs.h"
+#include <cassert>
 #include <list>
 #include <string>
-#include <assert.h>
+
+#include "platform.h"
 
 class ECLogger;
 
 template<typename Key>
-class KeyEntry {
+class KeyEntry _final {
 public:
 	Key key;
 	time_t ulLastAccess;
@@ -79,7 +81,7 @@ class ECCacheBase
 {
 public:
 	typedef unsigned long		count_type;
-	typedef unsigned long long	size_type;
+		typedef uint64_t	size_type;
 
 	virtual ~ECCacheBase();
 
@@ -119,7 +121,7 @@ private:
 
 
 template<typename _MapType>
-class ECCache : public ECCacheBase
+class ECCache _final : public ECCacheBase
 {
 public:
 	typedef typename _MapType::key_type		key_type;
@@ -138,12 +140,12 @@ public:
 		return erSuccess;
 	}
 	
-	count_type ItemCount() const
+	count_type ItemCount() const _override
 	{
 		return m_map.size();
 	}
 	
-	size_type Size() const
+	size_type Size() const _override
 	{
 		// it works with map and hash_map
 		return (m_map.size() * (sizeof(typename _MapType::value_type) + sizeof(_MapType) )) + m_ulSize;
@@ -158,7 +160,7 @@ public:
 		if(iter == m_map.end()) {
 			er = ZARAFA_E_NOT_FOUND;
 			goto exit;
-		}
+ 		}
 
 		m_ulSize -= GetCacheAdditionalSize(iter->second);
 		m_ulSize -= GetCacheAdditionalSize(key);
@@ -256,7 +258,7 @@ public:
 	}
 	
 	// Used in ECCacheManager::SetCell, where the content of a cache item is modified.
-	ECRESULT AddToSize(long long ulSize)
+		ECRESULT AddToSize(int64_t ulSize)
 	{
 		m_ulSize += ulSize;
 		return erSuccess;

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,7 +44,8 @@
 #ifndef ECCHANNEL_H
 #define ECCHANNEL_H
 
-#include <stdio.h>
+#include "zcdefs.h"
+#include <cstdio>
 #include <iostream>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -62,7 +62,7 @@
 // this ensures that the ECChannel class is responsible for reading, writing
 // and culling newline characters.
 
-class ECChannel {
+class ECChannel _final {
 public:
 	ECChannel(int socket);
 	~ECChannel();
@@ -71,9 +71,9 @@ public:
 
 	HRESULT HrGets(char *szBuffer, ULONG ulBufSize, ULONG *lpulRead);
 	HRESULT HrReadLine(std::string * strBuffer, ULONG ulMaxBuffer = 65536);
-	HRESULT HrWriteString(char * szBuffer);
+	HRESULT HrWriteString(const char *szBuffer);
 	HRESULT HrWriteString(const std::string & strBuffer);
-	HRESULT HrWriteLine(char *szBuffer, int len = 0);
+	HRESULT HrWriteLine(const char *szBuffer, int len = 0);
 	HRESULT HrWriteLine(const std::string & strBuffer);
 	HRESULT HrReadBytes(char *szBuffer, ULONG ulByteCount);
 	HRESULT HrReadBytes(std::string * strBuffer, ULONG ulByteCount);

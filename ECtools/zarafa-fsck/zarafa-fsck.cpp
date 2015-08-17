@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -96,7 +95,7 @@ enum {
 	OPT_ALL
 };
 
-struct option long_options[] = {
+static const struct option long_options[] = {
 	{ "help",	0, NULL, OPT_HELP },
 	{ "host",	1, NULL, OPT_HOST },
 	{ "pass",	1, NULL, OPT_PASS },
@@ -117,7 +116,7 @@ struct option long_options[] = {
 	{}
 };
 
-void print_help(char *strName)
+static void print_help(const char *strName)
 {
 	cout << "Calendar item validator tool" << endl;
 	cout << endl;
@@ -146,7 +145,7 @@ void print_help(char *strName)
 	cout << "[--all]\tCheck all folders" << endl;
 }
 
-void disclaimer(bool acceptDisclaimer)
+static void disclaimer(bool acceptDisclaimer)
 {
 	std::string dummy;
 
@@ -248,7 +247,8 @@ exit:
 	return hr;
 }
 
-HRESULT DetectFolderDetails(LPMAPIFOLDER lpFolder, string *lpName, string *lpClass, ULONG *lpFolderType)
+static HRESULT DetectFolderDetails(LPMAPIFOLDER lpFolder, string *lpName,
+    string *lpClass, ULONG *lpFolderType)
 {
 	HRESULT hr = hrSuccess;
 	LPSPropValue lpPropertyArray = NULL;
@@ -298,7 +298,9 @@ exit:
 	return hr;
 }
 
-HRESULT RunFolderValidation(const std::set<std::string> &setFolderIgnore, LPMAPIFOLDER lpRootFolder, LPSRow lpRow, CHECKMAP checkmap)
+static HRESULT
+RunFolderValidation(const std::set<std::string> &setFolderIgnore,
+    LPMAPIFOLDER lpRootFolder, LPSRow lpRow, CHECKMAP checkmap)
 {
 	HRESULT hr = hrSuccess;
 	LPSPropValue lpItemProperty = NULL;
@@ -372,7 +374,9 @@ exit:
 	return hr;
 }
 
-HRESULT RunStoreValidation(char* strHost, char* strUser, char* strPass, char *strAltUser, bool bPublic, CHECKMAP checkmap)
+static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
+    const char *strPass, const char *strAltUser, bool bPublic,
+    CHECKMAP checkmap)
 {
 	HRESULT hr = hrSuccess;
 	LPMAPISESSION lpSession = NULL;
@@ -395,7 +399,7 @@ HRESULT RunStoreValidation(char* strHost, char* strUser, char* strPass, char *st
 	LPSPropValue lpAddRenProp = NULL;
 	ULONG cbEntryIDSrc = 0;
 	LPENTRYID lpEntryIDSrc = NULL;
-	ECLogger *const lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-");
+	ECLogger *const lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false, 0);
 
 	hr = MAPIInitialize(NULL);
 	if (hr != hrSuccess) {
@@ -439,7 +443,10 @@ HRESULT RunStoreValidation(char* strHost, char* strUser, char* strPass, char *st
             goto exit;
         }
 
-        hr = lpIEMS->CreateStoreEntryID(L"", (LPTSTR)strwAltUsername.c_str(), MAPI_UNICODE | OPENSTORE_HOME_LOGON, &cbUserStoreEntryID, &lpUserStoreEntryID);
+        hr = lpIEMS->CreateStoreEntryID(const_cast<wchar_t *>(L""),
+             (LPTSTR)strwAltUsername.c_str(),
+             MAPI_UNICODE | OPENSTORE_HOME_LOGON, &cbUserStoreEntryID,
+             &lpUserStoreEntryID);
         if (hr != hrSuccess) {
             cout << "Cannot get user store id for user" << endl;
             goto exit;
@@ -547,9 +554,9 @@ int main(int argc, char *argv[])
 {
 	HRESULT hr = hrSuccess;
 	CHECKMAP checkmap;
-	char* strHost = NULL;
+	const char *strHost = NULL;
 	char* strUser = NULL;
-	char* strPass = "";
+	const char *strPass = "";
 	char* strAltUser = NULL;
 	int c;
 	bool bAll = false;

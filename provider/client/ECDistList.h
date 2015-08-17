@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,6 +44,7 @@
 #ifndef ECDISTLIST
 #define ECDISTLIST
 
+#include "zcdefs.h"
 #include "ECABContainer.h"
 
 class ECDistList : public ECABContainer
@@ -65,12 +65,12 @@ public:
 	virtual HRESULT	QueryInterface(REFIID refiid, void **lppInterface);
 	virtual HRESULT OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk);
 
-	class xDistList : public IDistList {
+	class xDistList _final : public IDistList {
 		public:
 		// From IUnknown
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void** lppInterface);
-		virtual ULONG __stdcall AddRef();
-		virtual ULONG __stdcall Release();	
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _override;
+		virtual ULONG __stdcall AddRef(void) _override;
+		virtual ULONG __stdcall Release(void) _override;
 
 		// From IABContainer
 		virtual HRESULT __stdcall CreateEntry(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulCreateFlags, LPMAPIPROP* lppMAPIPropEntry);

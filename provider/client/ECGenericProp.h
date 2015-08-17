@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,6 +44,7 @@
 #ifndef ECGENERICPROP_H
 #define ECGENERICPROP_H
 
+#include "zcdefs.h"
 #include "ECUnknown.h"
 #include "IECPropStorage.h"
 #include "ECPropertyEntry.h"
@@ -79,7 +79,7 @@ typedef ECPropertyEntryMap::iterator			ECPropertyEntryIterator;
 class ECGenericProp : public ECUnknown
 {
 protected:
-	ECGenericProp(void *lpProvider, ULONG ulObjType, BOOL fModify, char *szClassName = NULL);
+	ECGenericProp(void *lpProvider, ULONG ulObjType, BOOL fModify, const char *szClassName = NULL);
 	virtual ~ECGenericProp();
 
 public:
@@ -152,13 +152,12 @@ public:
 	virtual HRESULT GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID FAR * lppPropNames, ULONG ulFlags, LPSPropTagArray FAR * lppPropTags);
 
 public:
-	class xMAPIProp : public IMAPIProp
-	{
+	class xMAPIProp _final : public IMAPIProp {
 	public:
 		// From IUnknown
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void** lppInterface);
-		virtual ULONG __stdcall AddRef();
-		virtual ULONG __stdcall Release();	
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _override;
+		virtual ULONG __stdcall AddRef(void) _override;
+		virtual ULONG __stdcall Release(void) _override;
 		
 		// From IMAPIProp
 		virtual HRESULT __stdcall GetLastError(HRESULT hError, ULONG ulFlags, LPMAPIERROR * lppMapiError);
@@ -174,16 +173,16 @@ public:
 		virtual HRESULT __stdcall GetIDsFromNames(ULONG cNames, LPMAPINAMEID * ppNames, ULONG ulFlags, LPSPropTagArray * pptaga);
 	} m_xMAPIProp;
 
-	class xECSingleInstance : public IECSingleInstance {
+	class xECSingleInstance _final : public IECSingleInstance {
 	public:
 		// IUnknown
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface);
-		virtual ULONG __stdcall AddRef();
-		virtual ULONG __stdcall Release();
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _override;
+		virtual ULONG __stdcall AddRef(void) _override;
+		virtual ULONG __stdcall Release(void) _override;
 
 		// IECSingleInstance
-		virtual HRESULT __stdcall GetSingleInstanceId(ULONG *lpcbInstanceID, LPENTRYID *lppInstanceID);
-		virtual HRESULT __stdcall SetSingleInstanceId(ULONG cbInstanceID, LPENTRYID lpInstanceID);
+		virtual HRESULT __stdcall GetSingleInstanceId(ULONG *lpcbInstanceID, LPENTRYID *lppInstanceID) _override;
+		virtual HRESULT __stdcall SetSingleInstanceId(ULONG cbInstanceID, LPENTRYID lpInstanceID) _override;
 	} m_xECSingleInstance;
 
 protected:

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -50,6 +49,9 @@
 #include <set>
 #include <string>
 
+#include <dirent.h>
+#include <sys/types.h>
+
 class ECSerializer;
 class ECLogger;
 
@@ -64,15 +66,15 @@ public:
 
 	/* Single Instance Attachment wrappers (should not be overridden by subclasses) */
 	bool ExistAttachment(ULONG ulObjId, ULONG ulPropId);
-	ECRESULT LoadAttachment(struct soap *soap, ULONG ulObjId, ULONG ulPropId, int *lpiSize, unsigned char **lppData);
-	ECRESULT LoadAttachment(ULONG ulObjId, ULONG ulPropId, int *lpiSize, ECSerializer *lpSink);
-	ECRESULT SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool bDeleteOld, int iSize, unsigned char *lpData, ULONG *lpulInstanceId);
-	ECRESULT SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool bDeleteOld, int iSize, ECSerializer *lpSource, ULONG *lpulInstanceId);
+	ECRESULT LoadAttachment(struct soap *soap, ULONG ulObjId, ULONG ulPropId, size_t *lpiSize, unsigned char **lppData);
+	ECRESULT LoadAttachment(ULONG ulObjId, ULONG ulPropId, size_t *lpiSize, ECSerializer *lpSink);
+	ECRESULT SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool bDeleteOld, size_t iSize, unsigned char *lpData, ULONG *lpulInstanceId);
+	ECRESULT SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool bDeleteOld, size_t iSize, ECSerializer *lpSource, ULONG *lpulInstanceId);
 	ECRESULT SaveAttachment(ULONG ulObjId, ULONG ulPropId, bool bDeleteOld, ULONG ulInstanceId, ULONG *lpulInstanceId);
 	ECRESULT CopyAttachment(ULONG ulObjId, ULONG ulNewObjId);
 	ECRESULT DeleteAttachments(std::list<ULONG> lstDeleteObjects);
 	ECRESULT DeleteAttachment(ULONG ulObjId, ULONG ulPropId);
-	ECRESULT GetSize(ULONG ulObjId, ULONG ulPropId, ULONG *lpulSize);
+	ECRESULT GetSize(ULONG ulObjId, ULONG ulPropId, size_t *lpulSize);
 
 	/* Convert ObjectId (hierarchyid) into Instance Id */
 	ECRESULT GetSingleInstanceId(ULONG ulObjId, ULONG ulPropId, ULONG *lpulInstanceId);
@@ -92,13 +94,13 @@ protected:
 	virtual ~ECAttachmentStorage();
 	
 	/* Single Instance Attachment handlers (must be overridden by subclasses) */
-	virtual ECRESULT LoadAttachmentInstance(struct soap *soap, ULONG ulInstanceId, int *lpiSize, unsigned char **lppData) = 0;
-	virtual ECRESULT LoadAttachmentInstance(ULONG ulInstanceId, int *lpiSize, ECSerializer *lpSink) = 0;
-	virtual ECRESULT SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, int iSize, unsigned char *lpData) = 0;
-	virtual ECRESULT SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, int iSize, ECSerializer *lpSource) = 0;
+	virtual ECRESULT LoadAttachmentInstance(struct soap *soap, ULONG ulInstanceId, size_t *lpiSize, unsigned char **lppData) = 0;
+	virtual ECRESULT LoadAttachmentInstance(ULONG ulInstanceId, size_t *lpiSize, ECSerializer *lpSink) = 0;
+	virtual ECRESULT SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, size_t iSize, unsigned char *lpData) = 0;
+	virtual ECRESULT SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, size_t iSize, ECSerializer *lpSource) = 0;
 	virtual ECRESULT DeleteAttachmentInstances(std::list<ULONG> &lstDeleteInstances, bool bReplace) = 0;
 	virtual ECRESULT DeleteAttachmentInstance(ULONG ulInstanceId, bool bReplace) = 0;
-	virtual ECRESULT GetSizeInstance(ULONG ulInstanceId, ULONG *lpulSize, bool *lpbCompressed = NULL) = 0;
+	virtual ECRESULT GetSizeInstance(ULONG ulInstanceId, size_t *lpulSize, bool *lpbCompressed = NULL) = 0;
 
 private:
 	/* Add reference between Object and Single Instance */
@@ -126,13 +128,13 @@ protected:
 
 	/* Single Instance Attachment handlers */
 	virtual bool ExistAttachmentInstance(ULONG ulInstanceId);
-	virtual ECRESULT LoadAttachmentInstance(struct soap *soap, ULONG ulInstanceId, int *lpiSize, unsigned char **lppData);
-	virtual ECRESULT LoadAttachmentInstance(ULONG ulInstanceId, int *lpiSize, ECSerializer *lpSink);
-	virtual ECRESULT SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, int iSize, unsigned char *lpData);
-	virtual ECRESULT SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, int iSize, ECSerializer *lpSource);
+	virtual ECRESULT LoadAttachmentInstance(struct soap *soap, ULONG ulInstanceId, size_t *lpiSize, unsigned char **lppData);
+	virtual ECRESULT LoadAttachmentInstance(ULONG ulInstanceId, size_t *lpiSize, ECSerializer *lpSink);
+	virtual ECRESULT SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, size_t iSize, unsigned char *lpData);
+	virtual ECRESULT SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, size_t iSize, ECSerializer *lpSource);
 	virtual ECRESULT DeleteAttachmentInstances(std::list<ULONG> &lstDeleteInstances, bool bReplace);
 	virtual ECRESULT DeleteAttachmentInstance(ULONG ulInstanceId, bool bReplace);
-	virtual ECRESULT GetSizeInstance(ULONG ulInstanceId, ULONG *lpulSize, bool *lpbCompressed = NULL);
+	virtual ECRESULT GetSizeInstance(ULONG ulInstanceId, size_t *lpulSize, bool *lpbCompressed = NULL);
 
 	virtual ECRESULT Begin();
 	virtual ECRESULT Commit();
@@ -143,33 +145,40 @@ protected:
 
 class ECFileAttachment : public ECAttachmentStorage {
 public:
-	ECFileAttachment(ECDatabase *lpDatabase, std::string basepath, unsigned int ulCompressionLevel, ECLogger *lpLogger);
+	ECFileAttachment(ECDatabase *lpDatabase, std::string basepath, unsigned int ulCompressionLevel, ECLogger *lpLogger, const bool force_changes_to_disk);
 
 protected:
 	virtual ~ECFileAttachment();
 	
 	/* Single Instance Attachment handlers */
 	virtual bool ExistAttachmentInstance(ULONG ulInstanceId);
-	virtual ECRESULT LoadAttachmentInstance(struct soap *soap, ULONG ulInstanceId, int *lpiSize, unsigned char **lppData);
-	virtual ECRESULT LoadAttachmentInstance(ULONG ulObjId, int *lpiSize, ECSerializer *lpSink);
-	virtual ECRESULT SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, int iSize, unsigned char *lpData);
-	virtual ECRESULT SaveAttachmentInstance(ULONG ulObjId, ULONG ulPropId, int iSize, ECSerializer *lpSource);
+	virtual ECRESULT LoadAttachmentInstance(struct soap *soap, ULONG ulInstanceId, size_t *lpiSize, unsigned char **lppData);
+	virtual ECRESULT LoadAttachmentInstance(ULONG ulObjId, size_t *lpiSize, ECSerializer *lpSink);
+	virtual ECRESULT SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, size_t iSize, unsigned char *lpData);
+	virtual ECRESULT SaveAttachmentInstance(ULONG ulObjId, ULONG ulPropId, size_t iSize, ECSerializer *lpSource);
 	virtual ECRESULT DeleteAttachmentInstances(std::list<ULONG> &lstDeleteInstances, bool bReplace);
 	virtual ECRESULT DeleteAttachmentInstance(ULONG ulInstanceId, bool bReplace);
-	virtual ECRESULT GetSizeInstance(ULONG ulInstanceId, ULONG *lpulSize, bool *lpbCompressed = NULL);
+	virtual ECRESULT GetSizeInstance(ULONG ulInstanceId, size_t *lpulSize, bool *lpbCompressed = NULL);
 
 	virtual ECRESULT Begin();
 	virtual ECRESULT Commit();
 	virtual ECRESULT Rollback();
+
 private:
 	std::string CreateAttachmentFilename(ULONG ulInstanceId, bool bCompressed);
 
+	size_t attachment_size_safety_limit;
+
 	int m_dirFd;
+	DIR *m_dirp;
+	bool force_changes_to_disk;
 
 	/* helper functions for transacted deletion */
 	ECRESULT MarkAttachmentForDeletion(ULONG ulInstanceId);
 	ECRESULT DeleteMarkedAttachment(ULONG ulInstanceId);
 	ECRESULT RestoreMarkedAttachment(ULONG ulInstanceId);
+
+	bool VerifyInstanceSize(const ULONG ulInstanceId, const size_t expectedSize, const std::string & filename);
 
 	std::string m_basepath;
 	bool m_bTransaction;

@@ -52,8 +52,7 @@ CONFIG = {
     # 0x678E: PR_EC_IMAP_BODY
     # 0x678F: PR_EC_IMAP_BODYSTRUCTURE
     # 0x001A: PR_MESSAGE_CLASS # XXX add to cfg
-    # 0x1013: PR_BODY_HTML # XXX add to cfg
-    'index_exclude_properties': Config.integer(multiple=True, base=16, default=[0x007D, 0x0064, 0x0C1E, 0x0075, 0x678E, 0x678F, 0x001A, 0x1013]),
+    'index_exclude_properties': Config.integer(multiple=True, base=16, default=[0x007D, 0x0064, 0x0C1E, 0x0075, 0x678E, 0x678F, 0x001A]),
     'index_path': Config.string(default='/var/lib/zarafa/search/'),
     'index_processes': Config.integer(default=1),
     'limit_results': Config.integer(default=0),
@@ -171,7 +170,7 @@ class FolderImporter:
         self.serverid, self.config, self.plugin, self.log = args
         self.changes = self.deletes = self.attachments = 0
         self.mapping_db = os.path.join(self.config['index_path'], self.serverid+'_mapping')
-        self.excludes = set(self.config['index_exclude_properties'])
+        self.excludes = set(self.config['index_exclude_properties']+[0x1000, 0x1009, 0x1013, 0x678C]) # PR_BODY, PR_RTF_COMPRESSED, PR_HTML, PR_EC_IMAP_EMAIL
         self.term_cache_size = 0
 
     def update(self, item, flags):
@@ -197,8 +196,7 @@ class FolderImporter:
                         self.attachments += 1
                         attach_text.append(plaintext.get(a, mimetype=a.mimetype, log=self.log))
                     attach_text.append(u' '+(a.filename or u''))
-            doc['mapi34140'] = u' '.join(attach_text) # XXX wrong property, and above 0x8000..
-            doc['mapi4096'] = (item.body.text or u'') + doc['mapi34140'] # XXX
+            doc['mapi4096'] = item.body.text + u' ' + u' '.join(attach_text)
             doc['data'] = 'subject: %s\n' % item.subject
             db_put(self.mapping_db, item.sourcekey, '%s %s' % (storeid, item.folder.entryid)) # ICS doesn't remember which store a change belongs to..
             self.plugin.update(doc)
@@ -248,6 +246,7 @@ class Service(zarafa.Service):
 
         self.reindex_queue = Queue()
         index_path = self.config['index_path']
+        os.umask(0077)
         if not os.path.exists(index_path):
             os.makedirs(index_path)
         self.state_db = os.path.join(index_path, self.server.guid+'_state')

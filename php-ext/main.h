@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -50,7 +49,7 @@
 * Thread safe global variable
 ***************************************************************/
 // ZTS is Zend Thread Safety
-// but is isn't defined, as it's seems to be experimental in php4
+// but it is not defined, as it seems to be experimental in php4
 // and maybe better in php5, but I haven't got the slightest clue yet.
 #ifdef ZTS
 #include "TSRM.h"
@@ -93,28 +92,28 @@ static int le_mapi_advisesink;
 * When adding or changing a entry here, don't forget to 
 * add or change the same entry in class.mapi.php 
 */
-static char* name_mapi_session = "MAPI Session";
-static char* name_mapi_table = "MAPI Table";
-static char* name_mapi_rowset = "MAPI Rowset";
-static char* name_mapi_msgstore = "MAPI Message Store";
-static char* name_mapi_addrbook = "MAPI Addressbook";
-static char* name_mapi_mailuser = "MAPI Mail User";
-static char* name_mapi_distlist = "MAPI Distribution List";
-static char* name_mapi_abcont = "MAPI Addressbook Container";
-static char* name_mapi_folder = "MAPI Folder";
-static char* name_mapi_message = "MAPI Message";
-static char* name_mapi_attachment = "MAPI Attachment";
-static char* name_mapi_property = "MAPI Property";
-static char* name_mapi_modifytable = "MAPI Exchange Modify Table";
-static char* name_istream = "IStream Interface";
-static char* name_fb_support = "Freebusy Support Interface";
-static char* name_fb_data = "Freebusy Data Interface";
-static char* name_fb_update = "Freebusy Update Interface";
-static char* name_fb_enumblock = "Freebusy Enumblock Interface";
-static char* name_mapi_exportchanges = "ICS Export Changes";
-static char* name_mapi_importhierarchychanges = "ICS Import Hierarchy Changes";
-static char* name_mapi_importcontentschanges = "ICS Import Contents Changes";
-static char* name_mapi_advisesink = "MAPI Advise sink";
+static const char *name_mapi_session       = "MAPI Session";
+static const char *name_mapi_table         = "MAPI Table";
+static const char *name_mapi_rowset        = "MAPI Rowset";
+static const char *name_mapi_msgstore      = "MAPI Message Store";
+static const char *name_mapi_addrbook      = "MAPI Addressbook";
+static const char *name_mapi_mailuser      = "MAPI Mail User";
+static const char *name_mapi_distlist      = "MAPI Distribution List";
+static const char *name_mapi_abcont        = "MAPI Addressbook Container";
+static const char *name_mapi_folder        = "MAPI Folder";
+static const char *name_mapi_message       = "MAPI Message";
+static const char *name_mapi_attachment    = "MAPI Attachment";
+static const char *name_mapi_property      = "MAPI Property";
+static const char *name_mapi_modifytable   = "MAPI Exchange Modify Table";
+static const char *name_istream            = "IStream Interface";
+static const char *name_fb_support         = "Freebusy Support Interface";
+static const char *name_fb_data            = "Freebusy Data Interface";
+static const char *name_fb_update          = "Freebusy Update Interface";
+static const char *name_fb_enumblock       = "Freebusy Enumblock Interface";
+static const char *name_mapi_exportchanges = "ICS Export Changes";
+static const char *name_mapi_importhierarchychanges = "ICS Import Hierarchy Changes";
+static const char *name_mapi_importcontentschanges  = "ICS Import Contents Changes";
+static const char *name_mapi_advisesink             = "MAPI Advise sink";
 
 /**
 * common used variables

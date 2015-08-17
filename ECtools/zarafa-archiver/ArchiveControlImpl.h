@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -84,7 +83,7 @@ class ECArchiverLogger;
  * they're stubbed or not. These messages are processed in step 3 if they match the
  * restriction for this step.
  *
- * After a message is processed in a particular step, it's state will change, causing
+ * After a message is processed in a particular step, its state will change, causing
  * it to be removed from the searchfolder for that step and be added to the searchfolder
  * for the next step(s). A message processed in step 1 will be added to the searchfolder
  * for both step 2 and step 3. After step 3 has been processed, the message will be
@@ -120,7 +119,7 @@ class ECArchiverLogger;
  * if the searchfolders were instant, the message would be processed in these steps
  * if it would match the restriction defined for those steps.
  *
- * The alternate approach is thus to take the following actions at a successfull
+ * The alternate approach is thus to take the following actions at a successful
  * completion of step 1:
  * 1. Check if deletion is enabled
  * 2. If so, check if the message matches the restriction for the deletion step
@@ -194,7 +193,7 @@ private:
     HRESULT purgesoftdeleteditems(LPMAPIFOLDER folder, const tstring& strUser);
 	
 private:
-	enum eCleanupAction { caDelete, caStore };
+	enum eCleanupAction { caDelete, caStore, caNone };
 
 	ArchiverSessionPtr m_ptrSession;
 	ECConfig *m_lpConfig;

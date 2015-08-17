@@ -6,7 +6,7 @@
 # description: The Zarafa Delivery Agent in LMTP mode can be used to \
 #              run the zarafa-dagent as a daemon. The Zarafa Delivery \
 #              Agent can also be used as a standalone program.
-# processname: /usr/bin/zarafa-dagent
+# processname: /usr/sbin/zarafa-dagent
 # config: /etc/zarafa/dagent.cfg
 # pidfile: /var/run/zarafa-dagent.pid
 
@@ -29,7 +29,7 @@ WITHOUT_RC_COMPAT=1
 . /etc/init.d/functions
 
 DAGENTCONFIG=/etc/zarafa/dagent.cfg
-DAGENTPROGRAM=/usr/bin/zarafa-dagent
+DAGENTPROGRAM=/usr/sbin/zarafa-dagent
 dagent=`basename $DAGENTPROGRAM`
 PIDFILE=/var/run/$dagent.pid
 LOCKFILE=/var/lock/subsys/$dagent

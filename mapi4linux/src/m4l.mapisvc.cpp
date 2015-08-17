@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -46,17 +45,18 @@
 #include "stringutil.h"
 
 #include "m4l.mapisvc.h"
-#include "mapix.h"
-#include "mapidefs.h"
-#include "mapicode.h"
-#include "mapitags.h"
-#include "mapiutil.h"
+#include <mapix.h>
+#include <mapidefs.h>
+#include <mapicode.h>
+#include <mapitags.h>
+#include <mapiutil.h>
 #include "boost_compat.h"
 
 #include "Util.h"
 
 #include <iostream>
 #include <arpa/inet.h>
+#include <climits>
 
 #include <boost/algorithm/string.hpp>
 namespace ba = boost::algorithm;
@@ -207,7 +207,7 @@ exit:
 	if (fp)
 		fclose(fp);
 
-	return hrSuccess;
+	return hr;
 }
 
 /** 
@@ -413,6 +413,7 @@ HRESULT SVCService::Init(const INFLoader& cINF, const inf_section* infService)
 	vector<string> prop;
 	LPSPropValue lpSO;
 	void **cf;
+	char filename[PATH_MAX + 1];
 
 	hr = MAPIAllocateBuffer(sizeof(SPropValue) * infService->size(), (void**)&m_lpProps);
 	if (hr != hrSuccess)
@@ -451,6 +452,11 @@ HRESULT SVCService::Init(const INFLoader& cINF, const inf_section* infService)
 	}
 
 	m_dl = dlopen(lpSO->Value.lpszA, RTLD_NOW);
+	if (!m_dl) {
+		snprintf(filename, PATH_MAX + 1, "%s%c%s", PKGLIBDIR, PATH_SEPARATOR, lpSO->Value.lpszA);
+		m_dl = dlopen(filename, RTLD_NOW);
+	}
+
 	if (!m_dl) {
 		cerr << "Unable to load " << lpSO->Value.lpszA << ": " << dlerror() << endl;
 		hr = MAPI_E_NOT_FOUND;

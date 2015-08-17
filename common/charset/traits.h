@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,11 +44,12 @@
 #ifndef traits_INCLUDED
 #define traits_INCLUDED
 
+#include "zcdefs.h"
 #include <string>
-#include <string.h>
+#include <cstring>
 
 template <typename _Type>
-class iconv_charset {
+class iconv_charset _final {
 };
 
 #define CHARSET_CHAR "//TRANSLIT"
@@ -61,7 +61,7 @@ void setCharsetBestAttempt(std::string &strCharset);
 
 // Multibyte character specializations
 template <>
-class iconv_charset<std::string> {
+class iconv_charset<std::string> _final {
 public:
 	static const char *name() {
 		return CHARSET_CHAR;	// Current locale
@@ -75,7 +75,7 @@ public:
 };
 
 template <>
-class iconv_charset<char*> {
+class iconv_charset<char *> _final {
 public:
 	static const char *name() {
 		return CHARSET_CHAR;	// Current locale
@@ -89,7 +89,7 @@ public:
 };
 
 template <>
-class iconv_charset<const char*> {
+class iconv_charset<const char *> _final {
 public:
 	static const char *name() {
 		return CHARSET_CHAR;	// Current locale
@@ -103,7 +103,7 @@ public:
 };
 
 template <size_t _N>
-class iconv_charset<char [_N]> {
+class iconv_charset<char[_N]> _final {
 public:
 	static const char *name() {
 		return CHARSET_CHAR;	// Current locale
@@ -117,7 +117,7 @@ public:
 };
 
 template <size_t _N>
-class iconv_charset<const char [_N]> {
+class iconv_charset<const char[_N]> _final {
 public:
 	static const char *name() {
 		return CHARSET_CHAR;	// Current locale
@@ -133,7 +133,7 @@ public:
 
 // Wide character specializations
 template <>
-class iconv_charset<std::wstring> {
+class iconv_charset<std::wstring> _final {
 public:
 	static const char *name() {
 		return CHARSET_WCHAR;
@@ -147,7 +147,7 @@ public:
 };
 
 template <>
-class iconv_charset<wchar_t*> {
+class iconv_charset<wchar_t *> _final {
 public:
 	static const char *name() {
 		return CHARSET_WCHAR;
@@ -161,7 +161,7 @@ public:
 };
 
 template <>
-class iconv_charset<const wchar_t*> {
+class iconv_charset<const wchar_t *> _final {
 public:
 	static const char *name() {
 		return CHARSET_WCHAR;
@@ -175,7 +175,7 @@ public:
 };
 
 template <size_t _N>
-class iconv_charset<wchar_t [_N]> {
+class iconv_charset<wchar_t[_N]> _final {
 public:
 	static const char *name() {
 		return CHARSET_WCHAR;	// Current locale
@@ -189,7 +189,7 @@ public:
 };
 
 template <size_t _N>
-class iconv_charset<const wchar_t [_N]> {
+class iconv_charset<const wchar_t[_N]> _final {
 public:
 	static const char *name() {
 		return CHARSET_WCHAR;	// Current locale

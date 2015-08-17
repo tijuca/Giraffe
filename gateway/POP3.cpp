@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -43,8 +42,8 @@
  */
 
 #include "platform.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
 #include <algorithm>
 
@@ -306,7 +305,7 @@ HRESULT POP3::HrResponse(const string &strResult, const string &strResponse) {
 std::string POP3::GetCapabilityString()
 {
 	string strCapabilities;
-	char *plain = lpConfig->GetSetting("disable_plaintext_auth");
+	const char *plain = lpConfig->GetSetting("disable_plaintext_auth");
 
 	// capabilities we always have
 	strCapabilities = "\r\nCAPA\r\nTOP\r\nUIDL\r\nRESP-CODES\r\nAUTH-RESP-CODE\r\n";
@@ -395,7 +394,7 @@ exit:
  */
 HRESULT POP3::HrCmdUser(const string &strUser) {
 	HRESULT hr = hrSuccess;
-	char *plain = lpConfig->GetSetting("disable_plaintext_auth");
+	const char *plain = lpConfig->GetSetting("disable_plaintext_auth");
 
 	if (!lpChannel->UsingSsl() && lpChannel->sslctx() && plain && strcmp(plain, "yes") == 0) {
 		hr = HrResponse(POP3_RESP_AUTH_ERROR, "Plaintext authentication disallowed on non-secure (SSL/TLS) connections");
@@ -424,7 +423,7 @@ HRESULT POP3::HrCmdUser(const string &strUser) {
  */
 HRESULT POP3::HrCmdPass(const string &strPass) {
 	HRESULT hr = hrSuccess;
-	char *plain = lpConfig->GetSetting("disable_plaintext_auth");
+	const char *plain = lpConfig->GetSetting("disable_plaintext_auth");
 
 	if (!lpChannel->UsingSsl() && lpChannel->sslctx() && plain && strcmp(plain, "yes") == 0) {
 		hr = HrResponse(POP3_RESP_AUTH_ERROR, "Plaintext authentication disallowed on non-secure (SSL/TLS) connections");

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -42,8 +41,8 @@
  * 
  */
 
-#include <string.h>
-#include <stdlib.h>
+#include <cstring>
+#include <cstdlib>
 #include "rtf.h"
 
 static const unsigned int crctable[256] = {
@@ -113,10 +112,10 @@ static const unsigned int crctable[256] = {
   0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d,
 };
 
-unsigned int crc32(char *data, unsigned int len)
+static unsigned int crc32(const char *data, unsigned int len)
 {
 	unsigned int crc = 0;
-	char *p = data;
+	const char *p = data;
 
 	while(len--) {
 		crc = (crc >> 8) ^ crctable[(crc ^ *p++) & 0xff];
@@ -126,13 +125,12 @@ unsigned int crc32(char *data, unsigned int len)
 }
 
 // Based on jtnef (TNEFUtils.java)
-
-char * lpPrebuf="{\\rtf1\\ansi\\mac\\deff0\\deftab720{\\fonttbl;}" \
-	 	"{\\f0\\fnil \\froman \\fswiss \\fmodern \\fscript " \
-		"\\fdecor MS Sans SerifSymbolArialTimes New RomanCourier" \
-		"{\\colortbl\\red0\\green0\\blue0\n\r\\par " \
-		"\\pard\\plain\\f0\\fs20\\b\\i\\u\\tab\\tx";
-																				
+static const char lpPrebuf[] =
+	"{\\rtf1\\ansi\\mac\\deff0\\deftab720{\\fonttbl;}"
+	"{\\f0\\fnil \\froman \\fswiss \\fmodern \\fscript "
+	"\\fdecor MS Sans SerifSymbolArialTimes New RomanCourier"
+	"{\\colortbl\\red0\\green0\\blue0\n\r\\par "
+	"\\pard\\plain\\f0\\fs20\\b\\i\\u\\tab\\tx";
 
 struct RTFHeader {
 	unsigned int ulCompressedSize;
@@ -165,7 +163,8 @@ unsigned int rtf_decompress(char *lpDest, char *lpSrc, unsigned int ulBufSize)
 	unsigned char c2 = 0;
 	unsigned int ulOffset = 0;
 	unsigned int ulSize = 0;
-	
+	const unsigned int prebufSize = strlen(lpPrebuf);
+
 	// Check if we have a full header
 	if(ulBufSize < sizeof(RTFHeader)) 
 		return 1;
@@ -178,13 +177,13 @@ unsigned int rtf_decompress(char *lpDest, char *lpSrc, unsigned int ulBufSize)
 		return 0;
 	} else if(lpHeader->ulMagic == 0x75465a4c) {
 		// Allocate a buffer to decompress into (uncompressed size plus prebuffered data)
-		lpBuffer = new char[lpHeader->ulUncompressedSize + strlen(lpPrebuf)];
-		memcpy(lpBuffer, lpPrebuf, strlen(lpPrebuf));
+		lpBuffer = new char[lpHeader->ulUncompressedSize + prebufSize];
+		memcpy(lpBuffer, lpPrebuf, prebufSize);
 		
 		// Start writing just after the prebuffered data
-		lpWrite = lpBuffer + strlen(lpPrebuf);
+		lpWrite = lpBuffer + prebufSize;
 		
-		while(lpWrite < lpBuffer + lpHeader->ulUncompressedSize + strlen(lpPrebuf)) {
+		while(lpWrite < lpBuffer + lpHeader->ulUncompressedSize + prebufSize) {
 			// Get next bit from flags
 			ulFlags = ulFlagNr++ % 8 == 0 ? *lpSrc++ : ulFlags >> 1;
 			
@@ -215,7 +214,7 @@ unsigned int rtf_decompress(char *lpDest, char *lpSrc, unsigned int ulBufSize)
 				if(ulOffset > (unsigned int)(lpWrite - lpBuffer))
 					ulOffset -= 4096;
 					 
-				while(ulSize) {
+				while(ulSize && lpWrite < lpBuffer + lpHeader->ulUncompressedSize + prebufSize && ulOffset < lpHeader->ulUncompressedSize + prebufSize) {
 					*lpWrite++ = lpBuffer[ulOffset++]; 
 					ulSize--;
 				}
@@ -224,11 +223,10 @@ unsigned int rtf_decompress(char *lpDest, char *lpSrc, unsigned int ulBufSize)
 				if(lpSrc >= lpStart + ulBufSize) 
 					break;
 			}
-			
 		}
 
 		// Copy back the data without the prebuffer
-		memcpy(lpDest, lpBuffer + strlen(lpPrebuf), lpHeader->ulUncompressedSize);
+		memcpy(lpDest, lpBuffer + prebufSize, lpHeader->ulUncompressedSize);
 		delete [] lpBuffer;
 		return 0;
 	} else {
@@ -239,7 +237,9 @@ unsigned int rtf_decompress(char *lpDest, char *lpSrc, unsigned int ulBufSize)
 }
 
 // Find pattern in buffer, and return the longest match found.
-void strmatch(const char *lpszBuffer, unsigned int cbBuffer, const char *lpszPattern, unsigned int cbPattern, const char **lppszMatch, unsigned int *lpcbMatch)
+static void strmatch(const char *lpszBuffer, unsigned int cbBuffer,
+    const char *lpszPattern, unsigned int cbPattern, const char **lppszMatch,
+    unsigned int *lpcbMatch)
 {
 	const char		*lpszBufCur = lpszBuffer;
 	const char		*lpszPatCur = NULL;

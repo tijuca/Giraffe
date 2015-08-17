@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -169,7 +168,7 @@ public:
 	virtual HRESULT HrSubmitMessage(ULONG cbMessageID, LPENTRYID lpMessageID, ULONG ulFlags);
 
 	// Outgoing Queue Finished message
-	virtual HRESULT HrFinishedMessage(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags);
+	virtual HRESULT HrFinishedMessage(ULONG cbEntryID, const ENTRYID *lpEntryID, ULONG ulFlags);
 	virtual HRESULT HrAbortSubmit(ULONG cbEntryID, LPENTRYID lpEntryID);
 	virtual HRESULT HrIsMessageInQueue(ULONG cbEntryID, LPENTRYID lpEntryID);
 
@@ -300,8 +299,8 @@ public:
 
 	/* Test protocol */
 	virtual HRESULT HrTestPerform(char *szCommand, unsigned int ulArgs, char *lpszArgs[]);
-	virtual HRESULT HrTestSet(char *szName, char *szValue);
-	virtual HRESULT HrTestGet(char *szName, char **szValue);
+	virtual HRESULT HrTestSet(const char *szName, const char *szValue);
+	virtual HRESULT HrTestGet(const char *szName, char **szValue);
 
 	/* Return Session information */
 	virtual HRESULT HrGetSessionId(ECSESSIONID *lpSessionId, ECSESSIONGROUPID *lpSessionGroupId);

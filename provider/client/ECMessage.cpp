@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -76,7 +75,7 @@ using namespace std;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 #define MAX_TABLE_PROPSIZE 8192
@@ -121,7 +120,7 @@ ECMessage::ECMessage(ECMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFl
 	this->HrAddPropHandlers(PR_MESSAGE_RECIPIENTS,		GetPropHandler       ,DefaultSetPropIgnore,	(void*) this, FALSE, FALSE);
 
 	// Handlers for the various body types
-	this->HrAddPropHandlers(PR_BODY,					GetPropHandler		 ,DefaultSetPropSetReal,	(void*) this, FALSE, FALSE);
+	this->HrAddPropHandlers(PR_BODY,					GetPropHandler		 ,DefaultSetPropSetReal,	(void*) this, TRUE, FALSE);
 	this->HrAddPropHandlers(PR_RTF_COMPRESSED,			GetPropHandler		 ,DefaultSetPropSetReal,	(void*) this, FALSE, FALSE);
 
 	// Workaround for support html in outlook 2000/xp need SetPropHandler
@@ -1468,16 +1467,6 @@ HRESULT ECMessage::SubmitMessage(ULONG ulFlags)
 	if(HR_FAILED(hr))
 		goto exit;
 
-	if(cValue == 1 && lpsPropArray != NULL && PROP_TYPE(lpsPropArray->ulPropTag) != PT_ERROR && (lpsPropArray->Value.ul & MSGFLAG_RESEND))
-	{
-		hr = this->GetMsgStore()->lpSupport->SpoolerNotify(NOTIFY_READYTOSEND, NULL);
-		if(hr != hrSuccess)
-			goto exit;
-
-		hr = this->GetMsgStore()->lpSupport->PrepareSubmit(&this->m_xMessage, &ulPreFlags);
-		if(hr != hrSuccess)
-			goto exit;
-	}
 
 	if(lpsPropArray->ulPropTag == PR_MESSAGE_FLAGS) {
 		// Re-set 'unsent' as it is obviously not sent if we're submitting it ... This allows you to send a message
@@ -1753,7 +1742,8 @@ HRESULT ECMessage::SetReadFlag(ULONG ulFlags)
 	    goto exit;
 
     // Server update OK, change local flags also
-    MAPIAllocateBuffer(sizeof(SPropValue), (void **)&lpPropFlags);
+    if ((hr = MAPIAllocateBuffer(sizeof(SPropValue), (void **)&lpPropFlags)) != hrSuccess)
+		goto exit;
     hr = HrGetRealProp(PR_MESSAGE_FLAGS, ulFlags, lpPropFlags, lpPropFlags);
     if(hr != hrSuccess)
         goto exit;
@@ -2131,7 +2121,8 @@ HRESULT ECMessage::UpdateTable(ECMemTable *lpTable, ULONG ulObjType, ULONG ulObj
 					goto exit;
 
 				// add new props
-				MAPIAllocateBuffer(sizeof(SPropValue)*ulProps, (void**)&lpNewProps);
+				if ((hr = MAPIAllocateBuffer(sizeof(SPropValue)*ulProps, (void**)&lpNewProps)) != hrSuccess)
+					goto exit;
 
 				for (i = 0, iterPropVals = (*iterObjects)->lstProperties->begin(); iterPropVals != (*iterObjects)->lstProperties->end(); iterPropVals++, i++) {
 					(*iterPropVals).CopyToByRef(&lpNewProps[i]);
@@ -2331,7 +2322,7 @@ HRESULT ECMessage::SyncSubject()
 	if(lpszColon == NULL) {
 		//Set emtpy PR_SUBJECT_PREFIX
 		lpPropArray[1].ulPropTag = PR_SUBJECT_PREFIX_W;
-		lpPropArray[1].Value.lpszW = L"";
+		lpPropArray[1].Value.lpszW = const_cast<wchar_t *>(L"");
 
 		hr = HrSetRealProp(&lpPropArray[1]);
 		if(hr != hrSuccess)
@@ -2355,9 +2346,9 @@ HRESULT ECMessage::SyncSubject()
 
 			wcstol(lpPropArray[1].Value.lpszW, &lpszEnd, 10);
 			if (lpszEnd == lpszColon)
-				lpPropArray[1].Value.lpszW = L"";	// skip a numeric prefix
+				lpPropArray[1].Value.lpszW = const_cast<wchar_t *>(L""); // skip a numeric prefix
 		} else
-			lpPropArray[1].Value.lpszW = L"";	// emtpy PR_SUBJECT_PREFIX
+			lpPropArray[1].Value.lpszW = const_cast<wchar_t *>(L""); // emtpy PR_SUBJECT_PREFIX
 
 		hr = HrSetRealProp(&lpPropArray[1]);
 		if (hr != hrSuccess)
@@ -2574,9 +2565,9 @@ HRESULT	ECMessage::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFla
 		if((lpMessage->m_bRecipsDirty && lpMessage->SyncRecips() != erSuccess) || lpMessage->HrGetRealProp(ulPropTag, ulFlags, lpBase, lpsPropValue) != erSuccess) {
 			lpsPropValue->ulPropTag = ulPropTag;
 			if(PROP_TYPE(ulPropTag) == PT_UNICODE)
-				lpsPropValue->Value.lpszW = L"";
+				lpsPropValue->Value.lpszW = const_cast<wchar_t *>(L"");
 			else
-				lpsPropValue->Value.lpszA = "";
+				lpsPropValue->Value.lpszA = const_cast<char *>("");
 		}
 		break;
 
@@ -2911,7 +2902,7 @@ struct findobject_if {
 
 // Copies the server object IDs from lpSrc into lpDest by matching the correct object type
 // and unique ID for each object.
-HRESULT HrCopyObjIDs(MAPIOBJECT *lpDest, MAPIOBJECT *lpSrc)
+static HRESULT HrCopyObjIDs(MAPIOBJECT *lpDest, const MAPIOBJECT *lpSrc)
 {
     HRESULT hr = hrSuccess;
     ECMapiObjects::iterator iterSrc;

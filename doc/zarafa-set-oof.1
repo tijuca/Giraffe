@@ -2,12 +2,12 @@
 .\"     Title: zarafa-set-oof
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.76.1 <http://docbook.sf.net/>
-.\"      Date: August 2011
+.\"      Date: April 2014
 .\"    Manual: Zarafa user reference
-.\"    Source: Zarafa 7.1
+.\"    Source: Zarafa 7.2
 .\"  Language: English
 .\"
-.TH "ZARAFA\-SET\-OOF" "1" "August 2011" "Zarafa 7.1" "Zarafa user reference"
+.TH "ZARAFA\-SET\-OOF" "1" "April 2014" "Zarafa 7.2" "Zarafa user reference"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -31,46 +31,64 @@
 zarafa-set-oof \- Control a user\*(Aqs out of office settings\&.
 .SH "SYNOPSIS"
 .HP \w'\fBzarafa\-set\-oof\fR\ 'u
-\fBzarafa\-set\-oof\fR \fIUSERNAME\fR \fIMODE\fR [\fISUBJECT\fR] [\fIMESSAGE\ FILE\fR]
+\fBzarafa\-set\-oof\fR [\-h\ \fIhostname\fR] [\-m\ \fImode\fR] [\-n\ \fImsgfile\fR] [\-p\ \fIkeypass\fR] [\-s\ \fIkeyfile\fR] [\-t\ \fIsubject\fR] [\-u\ \fIusername\fR] [\-\-from\ \fIdatetime\fR\ \-\-until\ \fIdatetime\fR]
 .SH "DESCRIPTION"
 .PP
 This tool can be used to change a user\*(Aqs out of office settings\&. The Zarafa server must be running for
 \fBzarafa\-set\-oof\fR
 to work\&.
+.SH "OPTIONS"
 .PP
-You must choose a state, enabled, disabled or don\*(Aqt change, when using this script\&.
-.SH "ACTIONS"
+\fB\-h\fR \fIhostname\fR
+.RS 4
+Connect to the given Zarafa server\&. This defaults to file:///var/run/zarafa\&.
+.RE
 .PP
-zarafa\-set\-oof needs atleast a state command\&. Valid states are:
-.PP
-\fB0\fR
+\fB\-m\fR, \fB\-\-mode\fR \fB0\fR
 .RS 4
 Disable the user\*(Aqs out of office reply\&.
 .RE
 .PP
-\fB1\fR
+\fB\-m\fR, \fB\-\-mode\fR \fB1\fR
 .RS 4
 Enable the user\*(Aqs out of office reply\&.
 .RE
 .PP
-\fB\-\fR
+\fB\-m\fR, \fB\-\-mode\fR \fB\-\fR
 .RS 4
-Don\*(Aqt enable or disable the user\*(Aqs out of office reply\&. Just update the subject and message, unless the user\*(Aqs out of office reply is enabled\&.
+Don\*(Aqt enable or disable the user\*(Aqs out of office reply\&. Just update the subject and message, unless the user\*(Aqs out of office reply is enabled\&. This is the default mode\&.
 .sp
 This is useful to update all out of office settings without enabling them and without changing the messages of enabled replies because that might overwrite some useful information that a user has set\&.
 .RE
-.SH "OPTIONS"
 .PP
-The options used by actions are as follows:
-.PP
-\fBSUBJECT\fR
+\fB\-n\fR, \fB\-\-message\fR \fIfile\fR
 .RS 4
-Set a new subject for the oof message\&. This subject will be placed between square brackets when the message is sent\&.
+Reads the given text file and uses its contents for the autoreply\*(Aqs message body\&.
 .RE
 .PP
-\fBMESSAGE FILE\fR \fI/path/to/message\fR
+\fB\-p\fR, \fB\-\-sslkey\-pass\fR \fIpassword\fR
 .RS 4
-The contents of this file will be used as plain text body in the oof email\&.
+Use the given password to access the certificate\&.
+.RE
+.PP
+\fB\-s\fR, \fB\-\-sslkey\-file\fR \fIsslkey\fR
+.RS 4
+Use the given certificate when connecting to the Zarafa server\&.
+.RE
+.PP
+\fB\-t\fR, \fB\-\-subject\fR \fItext\fR
+.RS 4
+The subject for Out Of Office messages will be set to the specified text\&.
+.RE
+.PP
+\fB\-u\fR, \fB\-\-user\fR \fIname\fR
+.RS 4
+Modify the Out Of Office settings for the particular user\&.
+.RE
+.PP
+\fB\-\-from\fR, \fB\-\-until\fR \fIdatetime\fR
+.RS 4
+Limit the OOF responder to the given timeframe\&. Both options, or neither of the two, must be specified\&. The format to use as argument is to be in the form of "2015\-04\-01 23:50" (ISO\-8601\-like), and is taken to be in local time\&.
 .RE
 .SH "AUTHOR"
 .PP

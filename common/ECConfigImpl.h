@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,6 +44,8 @@
 #ifndef ECCONFIGIMPL_H
 #define ECCONFIGIMPL_H
 
+#include "zcdefs.h"
+
 using namespace std;
 
 #include "ECConfig.h"
@@ -53,7 +54,7 @@ using namespace std;
 #include <set>
 #include <list>
 #include <string>
-#include <string.h>
+#include <cstring>
 #include <pthread.h>
 
 #include <boost/filesystem/path.hpp>
@@ -97,35 +98,35 @@ typedef struct {
 #define LOADSETTING_OVERWRITE_RELOAD	0x0010	/* Same as CONFIG_LOAD_OVERWRITE but only if option is marked reloadable */
 #define LOADSETTING_CMDLINE_PARAM		0x0020	/* This setting is being set from commandline parameters. Sets the option non-reloadable */
 
-class ECConfigImpl : public ECConfig {
+class ECConfigImpl _final : public ECConfig {
 public:
 	ECConfigImpl(const configsetting_t *lpDefaults, const char **lpszDirectives);
 	~ECConfigImpl();
 
-	bool	LoadSettings(const char *szFilename);
-	virtual bool    ParseParams(int argc, char *argv[], int *lpargidx);
-	const char *	GetSettingsPath();
-	bool	ReloadSettings();
+	bool LoadSettings(const char *szFilename) _override;
+	virtual bool ParseParams(int argc, char *argv[], int *lpargidx) _override;
+	const char *GetSettingsPath(void) _override;
+	bool ReloadSettings(void) _override;
 
-	bool	AddSetting(const char *szName, const char *szValue, const unsigned int ulGroup = 0);
+	bool AddSetting(const char *szName, const char *szValue, const unsigned int ulGroup = 0) _override;
 
 	void	AddWriteSetting(const char *szName, const char *szValue, const unsigned int ulGroup = 0);
 
-	char*	GetSetting(const char *szName);
-	char*	GetSetting(const char *szName, char *equal, char *other);
-	wchar_t* GetSettingW(const char *szName);
-	wchar_t* GetSettingW(const char *szName, wchar_t *equal, wchar_t *other);
+	const char *GetSetting(const char *szName) _override;
+	const char *GetSetting(const char *szName, const char *equal, const char *other) _override;
+	const wchar_t *GetSettingW(const char *szName) _override;
+	const wchar_t *GetSettingW(const char *szName, const wchar_t *equal, const wchar_t *other) _override;
 
-	std::list<configsetting_t> GetSettingGroup(unsigned int ulGroup);
-	std::list<configsetting_t> GetAllSettings();
+	std::list<configsetting_t> GetSettingGroup(unsigned int ulGroup) _override;
+	std::list<configsetting_t> GetAllSettings(void) _override;
 
-	bool	HasWarnings();
-	std::list<std::string>* GetWarnings();
-	bool	HasErrors();
-	std::list<std::string>* GetErrors();
+	bool HasWarnings(void) _override;
+	const std::list<std::string> *GetWarnings(void) _override;
+	bool HasErrors(void) _override;
+	const std::list<std::string> *GetErrors(void) _override;
 
-	bool    WriteSettingToFile(const char *szName, const char *szValue, const char* szFileName);
-	bool WriteSettingsToFile(const char* szFileName);
+	bool WriteSettingToFile(const char *szName, const char *szValue, const char *szFileName) _override;
+	bool WriteSettingsToFile(const char *szFileName) _override;
 
 private:
 	typedef boost::filesystem::path path_type;
@@ -134,15 +135,15 @@ private:
 	bool	InitConfigFile(unsigned int ulFlags);
 	bool	ReadConfigFile(const path_type &file, unsigned int ulFlags, unsigned int ulGroup = 0);
 
-	bool	HandleDirective(std::string &strLine, unsigned int ulFlags);
+	bool	HandleDirective(const std::string &strLine, unsigned int ulFlags);
 	bool	HandleInclude(const char *lpszArgs, unsigned int ulFlags);
 	bool	HandlePropMap(const char *lpszArgs, unsigned int ulFlags);
 
 	size_t  GetSize(const char *szValue);
 	void	InsertOrReplace(settingmap_t *lpMap, const settingkey_t &s, const char* szValue, bool bIsSize);
 
-	char*	GetMapEntry(settingmap_t *lpMap, const char *szName);
-	char*	GetAlias(const char *szAlias);
+	const char *GetMapEntry(const settingmap_t *lpMap, const char *szName);
+	const char *GetAlias(const char *szAlias);
 
 	bool	AddSetting(const configsetting_t *lpsConfig, unsigned int ulFlags);
 	void	AddAlias(const configsetting_t *lpsAlias);

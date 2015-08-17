@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -44,17 +43,17 @@
 
 #include "platform.h"
 
-#include <stdlib.h>
-#include <math.h> // for pow() 
+#include <cstdlib>
+#include <cmath> // for pow() 
 
 #include "m4l.mapiutil.h"
 #include "m4l.mapidefs.h"
 #include "m4l.mapix.h"
 #include "m4l.debug.h"
-#include "mapi.h"
+#include <mapi.h>
 #include <mapix.h>
 #include <mapiutil.h>
-#include "mapidefs.h"
+#include <mapidefs.h>
 
 #include "ECDebug.h"
 #include "ECTags.h"
@@ -229,7 +228,7 @@ HRESULT __stdcall HrThisThreadAdviseSink(LPMAPIADVISESINK lpAdviseSink, LPMAPIAD
 // rtf funcions
 
 // This is called when a user calls Commit() on a wrapped (uncompressed) RTF Stream
-HRESULT RTFCommitFunc(IStream *lpUncompressedStream, void *lpData)
+static HRESULT RTFCommitFunc(IStream *lpUncompressedStream, void *lpData)
 {
 	HRESULT hr = hrSuccess;
 	IStream *lpCompressedStream = (IStream *)lpData;
@@ -396,9 +395,7 @@ HRESULT __stdcall RTFSync(LPMESSAGE lpMessage, ULONG ulFlags, BOOL * lpfMessageU
 
 
 //--- php-ext used functions
-HRESULT __stdcall HrQueryAllRows(LPMAPITABLE lpTable, LPSPropTagArray lpPropTags, LPSRestriction lpRestriction,
-					   LPSSortOrderSet lpSortOrderSet, LONG crowsMax, LPSRowSet *lppRows) {
-
+HRESULT __stdcall HrQueryAllRows(LPMAPITABLE lpTable, LPSPropTagArray lpPropTags, LPSRestriction lpRestriction, LPSSortOrderSet lpSortOrderSet, LONG crowsMax, LPSRowSet *lppRows) {
 	TRACE_MAPILIB1(TRACE_ENTRY, "HrQueryAllRows", "%s", PropNameFromPropTagArray(lpPropTags).c_str());
 	HRESULT hr = hrSuccess;
 
@@ -434,8 +431,7 @@ exit:
 	return hr;
 }
 
-HRESULT __stdcall HrGetOneProp(IMAPIProp *lpProp, ULONG ulPropTag, LPSPropValue *lppPropVal)
-{
+HRESULT __stdcall HrGetOneProp(IMAPIProp *lpProp, ULONG ulPropTag, LPSPropValue *lppPropVal) {
 	TRACE_MAPILIB1(TRACE_ENTRY, "HrGetOneProp", "%08x", ulPropTag);
 	HRESULT hr = hrSuccess;
 	SPropTagArray sPropTag;
@@ -536,25 +532,28 @@ HRESULT __stdcall BuildDisplayTable(LPALLOCATEBUFFER lpAllocateBuffer, LPALLOCAT
 	return hr;
 }
 
-#pragma pack(1)
+#pragma pack(push, 1)
 typedef struct  {
 	char ulReserved1;
 	char ftTime[5];
 	GUID guid;
 } CONVERSATION_INDEX;
+#pragma pack(pop)
 
 HRESULT __stdcall ScCreateConversationIndex (ULONG cbParent,
 						LPBYTE lpbParent,
 						ULONG FAR *	lpcbConvIndex,
 						LPBYTE FAR * lppbConvIndex)
 {
+	HRESULT hr = hrSuccess;
 	TRACE_MAPILIB1(TRACE_ENTRY, "ScCreateConversationIndex", "%s", lpbParent ? bin2hex(cbParent, lpbParent).c_str() : "<null>");
 	ULONG cbConvIndex = 0;
 	BYTE *pbConvIndex = NULL;
 
 	if(cbParent == 0) {
 		FILETIME ft;
-		MAPIAllocateBuffer(sizeof(CONVERSATION_INDEX), (void **)&pbConvIndex);
+		if ((hr = MAPIAllocateBuffer(sizeof(CONVERSATION_INDEX), (void **)&pbConvIndex)) != hrSuccess)
+			goto exit;
 		cbConvIndex = sizeof(CONVERSATION_INDEX);
 
 		CONVERSATION_INDEX *ci = (CONVERSATION_INDEX*)pbConvIndex;
@@ -567,7 +566,8 @@ HRESULT __stdcall ScCreateConversationIndex (ULONG cbParent,
 		FILETIME parent;
 		FILETIME diff;
 
-		MAPIAllocateBuffer(cbParent + 5, (void **)&pbConvIndex);
+		if ((hr = MAPIAllocateBuffer(cbParent + 5, (void **)&pbConvIndex)) != hrSuccess)
+			goto exit;
 		cbConvIndex = cbParent+5;
 		memcpy(pbConvIndex, lpbParent, cbParent);
 
@@ -585,7 +585,9 @@ HRESULT __stdcall ScCreateConversationIndex (ULONG cbParent,
 	*lpcbConvIndex = cbConvIndex;
 
 	TRACE_MAPILIB1(TRACE_RETURN, "ScCreateConversationIndex", "%s", bin2hex(cbConvIndex, pbConvIndex).c_str());
-	return hrSuccess;
+
+exit:
+	return hr;
 }
 
 SCODE __stdcall ScDupPropset( int cprop,  LPSPropValue rgprop,  LPALLOCATEBUFFER lpAllocateBuffer,  LPSPropValue FAR * prgprop )
@@ -1174,23 +1176,28 @@ HRESULT GetConnectionProperties(LPSPropValue lpServer, LPSPropValue lpUsername, 
 		szUsername = strrchr(szUsername, '=')+1;
 
 	lpProps[cProps].ulPropTag = PR_EC_PATH;
-	MAPIAllocateMore(strServerPath.size() + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA);
+	if ((hr = MAPIAllocateMore(strServerPath.size() + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
+		goto exit;
 	memcpy(lpProps[cProps++].Value.lpszA, strServerPath.c_str(),strServerPath.size() + 1);
 
 	lpProps[cProps].ulPropTag = PR_EC_USERNAME_A;
-	MAPIAllocateMore(strlen(szUsername) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA);
+	if ((hr = MAPIAllocateMore(strlen(szUsername) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
+		goto exit;
 	memcpy(lpProps[cProps++].Value.lpszA, szUsername, strlen(szUsername) + 1);
 
 	lpProps[cProps].ulPropTag = PR_EC_USERPASSWORD_A;
-	MAPIAllocateMore(1, lpProps, (void**)&lpProps[cProps].Value.lpszA);
+	if ((hr = MAPIAllocateMore(1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
+		goto exit;
 	memcpy(lpProps[cProps++].Value.lpszA, "", 1);
 
 	lpProps[cProps].ulPropTag = PR_EC_SSLKEY_FILE;
-	MAPIAllocateMore(strlen(m4l_lpConfig->GetSetting("ssl_key_file")) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA);
+	if ((hr = MAPIAllocateMore(strlen(m4l_lpConfig->GetSetting("ssl_key_file")) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
+		goto exit;
 	memcpy(lpProps[cProps++].Value.lpszA, m4l_lpConfig->GetSetting("ssl_key_file"), strlen(m4l_lpConfig->GetSetting("ssl_key_file")) + 1);
 
 	lpProps[cProps].ulPropTag = PR_EC_SSLKEY_PASS;
-	MAPIAllocateMore(strlen(m4l_lpConfig->GetSetting("ssl_key_pass")) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA);
+	if ((hr = MAPIAllocateMore(strlen(m4l_lpConfig->GetSetting("ssl_key_pass")) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
+		goto exit;
 	memcpy(lpProps[cProps++].Value.lpszA, m4l_lpConfig->GetSetting("ssl_key_pass"), strlen(m4l_lpConfig->GetSetting("ssl_key_pass")) + 1);
 
 	*lpcValues = cProps;

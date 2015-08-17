@@ -7,7 +7,7 @@ endif
 
 AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) \
 	-I$(top_srcdir)/mapi4linux/include -I$(top_srcdir)/provider/common \
-	-I${top_srcdir}/common
+	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon
 
 EXTRA_DIST = edkmdb.i mapi.i mapiutil.i mapidefs.i mapicode.i mapix.i	\
 	mapinotifsink.i typemap.i helpers.i IECExportChanges.i				\
@@ -17,9 +17,6 @@ EXTRA_DIST = edkmdb.i mapi.i mapiutil.i mapidefs.i mapicode.i mapix.i	\
 	libfreebusy.i zarafasync.i ECLogger.i RecurrenceState.i				\
 	RecurrenceState.swig.h
 
-if ! OSS_ONLY
-EXTRA_DIST += licensereq.i mapicalendar.i mapitimezone.i
-endif
 
 check-syntax:
 	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \

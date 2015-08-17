@@ -9,7 +9,7 @@
 TMPFILE="`mktemp`"
 
 # Write data from standard input directly into temporary file.
-cat /dev/stdin > ${TMPFILE}
+cat > ${TMPFILE}
 
 # Caller needs to be informed on where the data went to.
 echo ${TMPFILE}

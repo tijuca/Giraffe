@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -51,7 +50,7 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECFreeBusyUpdate::ECFreeBusyUpdate(IMessage* lpMessage)
@@ -193,8 +192,8 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
 	RTimeToUnixTime(rtmStart, &tmUnixStart);
 	RTimeToUnixTime(rtmEnd, &tmUnixEnd);
 
-	tmStart = *gmtime(&tmUnixStart);
-	tmEnd = *gmtime(&tmUnixEnd);
+	gmtime_safe(&tmUnixStart, &tmStart);
+	gmtime_safe(&tmUnixEnd, &tmEnd);
 
 	ulMonths = DiffYearMonthToMonth(&tmStart, &tmEnd);
 	if(ulMonths == 0)
@@ -202,7 +201,8 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
 
 	cValues = 9;
 	cProps = 0;
-	MAPIAllocateBuffer(sizeof(SPropValue) * cValues, (void**)&lpPropArray);
+	if ((hr = MAPIAllocateBuffer(sizeof(SPropValue) * cValues, (void**)&lpPropArray)) != hrSuccess)
+		goto exit;
 
 	lpPropArray[cProps].ulPropTag = PR_FREEBUSY_LAST_MODIFIED;
 	lpPropArray[cProps++].Value.ft = ft;
@@ -225,9 +225,7 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
   	if(hr != hrSuccess)
 		goto exit;
 
-
-	if(CreateFBProp(fbZarafaAllBusy, ulMonths, PR_FREEBUSY_ALL_MONTHS, PR_FREEBUSY_ALL_EVENTS, &m_fbBlockList, &lpPropFBDataArray) == hrSuccess)
-	{
+	if (CreateFBProp(fbZarafaAllBusy, ulMonths, PR_FREEBUSY_ALL_MONTHS, PR_FREEBUSY_ALL_EVENTS, &m_fbBlockList, &lpPropFBDataArray) == hrSuccess) {
 		hr = m_lpMessage->SetProps(2, lpPropFBDataArray, NULL);
 		if(hr != hrSuccess)
 			goto exit;

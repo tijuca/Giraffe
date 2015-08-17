@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -44,18 +43,21 @@
 
 #include "platform.h"
 
+#include <fcntl.h>
 
 #include <mapidefs.h>
 #include <mapicode.h>
-#include <limits.h>
+#include <climits>
 #include <pthread.h>
 
 #include <sys/stat.h>
 
+#include "TmpPath.h"
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 HRESULT UnixTimeToFileTime(time_t t, FILETIME *ft)
@@ -69,7 +71,7 @@ HRESULT UnixTimeToFileTime(time_t t, FILETIME *ft)
 	return hrSuccess;
 }
 
-HRESULT FileTimeToUnixTime(FILETIME &ft, time_t *t)
+HRESULT FileTimeToUnixTime(const FILETIME &ft, time_t *t)
 {
 	__int64 l;
 
@@ -117,20 +119,24 @@ time_t FileTimeToUnixTime(unsigned int hi, unsigned int lo)
 void RTimeToFileTime(LONG rtime, FILETIME *pft)
 {
 	// ASSERT(pft != NULL);
-	ULARGE_INTEGER *puli = (ULARGE_INTEGER *)pft;
-	puli->QuadPart = rtime * UnitsPerMinute;
+	ULONGLONG q = rtime;
+	q *= UnitsPerMinute;
+	pft->dwLowDateTime  = q & 0xFFFFFFFF;
+	pft->dwHighDateTime = q >> 32;
 }
  
-void FileTimeToRTime(FILETIME *pft, LONG* prtime)
+void FileTimeToRTime(const FILETIME *pft, LONG *prtime)
 {
 	// ASSERT(pft != NULL);
 	// ASSERT(prtime != NULL);
 
-	ULARGE_INTEGER uli = *(ULARGE_INTEGER *)pft;
+	ULONGLONG q = pft->dwHighDateTime;
+	q <<= 32;
+	q |= pft->dwLowDateTime;
 
-	uli.QuadPart += UnitsPerHalfMinute;
-	uli.QuadPart /= UnitsPerMinute;
-	*prtime = uli.LowPart;
+	q += UnitsPerHalfMinute;
+	q /= UnitsPerMinute;
+	*prtime = q & 0x7FFFFFFF;
 }
 
 HRESULT RTimeToUnixTime(LONG rtime, time_t *unixtime)
@@ -447,3 +453,77 @@ double GetTimeOfDay()
 	return (double)tv.tv_sec + ((double)tv.tv_usec / 1000000); // usec = microsec = 1 millionth of a second
 }
 
+void set_thread_name(pthread_t tid, const std::string & name)
+{
+#ifdef HAVE_PTHREAD_SETNAME_NP_2
+	if (name.size() > 15)
+		pthread_setname_np(tid, name.substr(0, 15).c_str());
+	else
+		pthread_setname_np(tid, name.c_str());
+#endif
+}
+
+ssize_t read_retry(int fd, void *data, size_t len)
+{
+	char *buf = static_cast<char *>(data);
+	size_t tread = 0;
+
+	while (len > 0) {
+		ssize_t ret = read(fd, buf, len);
+		if (ret < 0 && (errno == EINTR || errno == EAGAIN))
+			continue;
+		if (ret < 0)
+			return ret;
+		if (ret == 0)
+			break;
+		len -= ret;
+		buf += ret;
+		tread += ret;
+	}
+	return tread;
+}
+
+ssize_t write_retry(int fd, const void *data, size_t len)
+{
+	const char *buf = static_cast<const char *>(data);
+	size_t twrote = 0;
+
+	while (len > 0) {
+		ssize_t ret = write(fd, buf, len);
+		if (ret < 0 && (errno == EINTR || errno == EAGAIN))
+			continue;
+		if (ret < 0)
+			return ret;
+		if (ret == 0)
+			break;
+		len -= ret;
+		buf += ret;
+		twrote += ret;
+	}
+	return twrote;
+}
+
+bool force_buffers_to_disk(const int fd)
+{
+	if (fsync(fd) == -1)
+	    return false;
+
+	return true;
+}
+
+void my_readahead(const int fd)
+{
+	struct stat st;
+
+	if (fstat(fd, &st) == 0)
+		(void)readahead(fd, 0, st.st_size);
+}
+
+void give_filesize_hint(const int fd, const off_t len)
+{
+	// this helps preventing filesystem fragmentation as the
+	// kernel can now look for the best disk allocation
+	// pattern as it knows how much date is going to be
+	// inserted
+	posix_fallocate(fd, 0, len);
+}

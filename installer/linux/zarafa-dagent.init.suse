@@ -19,7 +19,7 @@
 rc_reset
 
 DAGENTCONFIG=/etc/zarafa/dagent.cfg
-DAGENTPROGRAM=/usr/bin/zarafa-dagent
+DAGENTPROGRAM=/usr/sbin/zarafa-dagent
 
 # Sanity checks.
 #[ -f $DAGENTCONFIG ] || exit 0

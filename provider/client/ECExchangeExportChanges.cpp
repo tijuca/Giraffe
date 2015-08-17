@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -53,7 +52,7 @@
 #include "Util.h"
 #include "ECGuid.h"
 #include "edkguid.h"
-#include "mapiguid.h"
+#include <mapiguid.h>
 #include "mapiext.h"
 
 #include <mapiutil.h>
@@ -76,7 +75,7 @@
 
 #ifdef _DEBUG
 #undef THIS_FILE
-static char THIS_FILE[]=__FILE__;
+static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -204,20 +203,24 @@ HRESULT ECExchangeExportChanges::GetLastError(HRESULT hResult, ULONG ulFlags, LP
 		std::wstring wstrErrorMsg = convert_to<std::wstring>(lpszErrorMsg);
 		std::wstring wstrCompName = convert_to<std::wstring>(g_strProductName.c_str());
 
-		MAPIAllocateMore(sizeof(std::wstring::value_type) * (wstrErrorMsg.size() + 1), lpMapiError, (void**)&lpMapiError->lpszError);
+		if ((hr = MAPIAllocateMore(sizeof(std::wstring::value_type) * (wstrErrorMsg.size() + 1), lpMapiError, (void**)&lpMapiError->lpszError)) != hrSuccess)
+			goto exit;
 		wcscpy((wchar_t*)lpMapiError->lpszError, wstrErrorMsg.c_str());
 
-		MAPIAllocateMore(sizeof(std::wstring::value_type) * (wstrCompName.size() + 1), lpMapiError, (void**)&lpMapiError->lpszComponent);
+		if ((hr = MAPIAllocateMore(sizeof(std::wstring::value_type) * (wstrCompName.size() + 1), lpMapiError, (void**)&lpMapiError->lpszComponent)) != hrSuccess)
+			goto exit;
 		wcscpy((wchar_t*)lpMapiError->lpszComponent, wstrCompName.c_str());
 
 	} else {
 		std::string strErrorMsg = convert_to<std::string>(lpszErrorMsg);
 		std::string strCompName = convert_to<std::string>(g_strProductName.c_str());
 
-		MAPIAllocateMore(strErrorMsg.size() + 1, lpMapiError, (void**)&lpMapiError->lpszError);
+		if ((hr = MAPIAllocateMore(strErrorMsg.size() + 1, lpMapiError, (void**)&lpMapiError->lpszError)) != hrSuccess)
+			goto exit;
 		strcpy((char*)lpMapiError->lpszError, strErrorMsg.c_str());
 
-		MAPIAllocateMore(strCompName.size() + 1, lpMapiError, (void**)&lpMapiError->lpszComponent);
+		if ((hr = MAPIAllocateMore(strCompName.size() + 1, lpMapiError, (void**)&lpMapiError->lpszComponent)) != hrSuccess)
+			goto exit;
 		strcpy((char*)lpMapiError->lpszComponent, strCompName.c_str());
 	}
 
@@ -539,7 +542,7 @@ HRESULT ECExchangeExportChanges::Synchronize(ULONG FAR * lpulSteps, ULONG FAR * 
 	}
 
 	if (*lpulProgress == 0 && m_lpLogger->Log(EC_LOGLEVEL_DEBUG))
-		m_clkStart = times(&m_tmsStart);
+		m_clkStart = z_times(&m_tmsStart);
 
 	if(m_ulSyncType == ICS_SYNC_CONTENTS){
 		hr = ExportMessageChanges();
@@ -603,8 +606,8 @@ progress:
 
 			if(m_ulChanges) {
 				if (m_lpLogger->Log(EC_LOGLEVEL_DEBUG)) {
-					struct tms	tmsEnd = {0};
-					clock_t		clkEnd = times(&tmsEnd);
+					struct z_tms	tmsEnd = {0};
+					clock_t		clkEnd = z_times(&tmsEnd);
 					double		dblDuration = 0;
 					char		szDuration[64] = {0};
 
@@ -1404,12 +1407,14 @@ HRESULT ECExchangeExportChanges::ExportMessageFlags(){
 	if(m_lstFlag.empty())
 		goto exit;
 
-	MAPIAllocateBuffer(sizeof(READSTATE) * m_lstFlag.size(), (LPVOID *)&lpReadState);
+	if ((hr = MAPIAllocateBuffer(sizeof(READSTATE) * m_lstFlag.size(), (LPVOID *)&lpReadState)) != hrSuccess)
+		goto exit;
 
 	ulCount = 0;
 	for(lpChange = m_lstFlag.begin(); lpChange != m_lstFlag.end(); lpChange++){
 
-		MAPIAllocateMore(lpChange->sSourceKey.cb, lpReadState, (LPVOID *)&lpReadState[ulCount].pbSourceKey);
+		if ((hr = MAPIAllocateMore(lpChange->sSourceKey.cb, lpReadState, (LPVOID *)&lpReadState[ulCount].pbSourceKey)) != hrSuccess)
+			goto exit;
 		lpReadState[ulCount].cbSourceKey = lpChange->sSourceKey.cb;
 		memcpy(lpReadState[ulCount].pbSourceKey, lpChange->sSourceKey.lpb, lpChange->sSourceKey.cb );
 		lpReadState[ulCount].ulFlags = lpChange->ulFlags;
@@ -1763,10 +1768,13 @@ HRESULT ECExchangeExportChanges::ChangesToEntrylist(std::list<ICSCHANGE> * lpLst
 	ULONG			ulCount = 0;
 	std::list<ICSCHANGE>::iterator lpChange;
 
-	MAPIAllocateBuffer(sizeof(ENTRYLIST), (LPVOID *)&lpEntryList);
+	if ((hr = MAPIAllocateBuffer(sizeof(ENTRYLIST), (LPVOID *)&lpEntryList)) != hrSuccess)
+		goto exit;
+
 	lpEntryList->cValues = lpLstChanges->size();
 	if(lpEntryList->cValues > 0){
-		MAPIAllocateMore(sizeof(SBinary) * lpEntryList->cValues, lpEntryList, (LPVOID *)&lpEntryList->lpbin);
+		if ((hr = MAPIAllocateMore(sizeof(SBinary) * lpEntryList->cValues, lpEntryList, (LPVOID *)&lpEntryList->lpbin)) != hrSuccess)
+			goto exit;
 	}else{
 		lpEntryList->lpbin = NULL;
 	}
@@ -1774,7 +1782,8 @@ HRESULT ECExchangeExportChanges::ChangesToEntrylist(std::list<ICSCHANGE> * lpLst
 	for(lpChange = lpLstChanges->begin(); lpChange != lpLstChanges->end(); lpChange++){
 
 		lpEntryList->lpbin[ulCount].cb = lpChange->sSourceKey.cb;
-		MAPIAllocateMore(lpChange->sSourceKey.cb, lpEntryList, (void **)&lpEntryList->lpbin[ulCount].lpb);
+		if ((hr = MAPIAllocateMore(lpChange->sSourceKey.cb, lpEntryList, (void **)&lpEntryList->lpbin[ulCount].lpb)) != hrSuccess)
+			goto exit;
 		memcpy(lpEntryList->lpbin[ulCount].lpb, lpChange->sSourceKey.lpb, lpChange->sSourceKey.cb);
 		ulCount++;
 	}
@@ -1783,6 +1792,7 @@ HRESULT ECExchangeExportChanges::ChangesToEntrylist(std::list<ICSCHANGE> * lpLst
 
 	*lppEntryList = lpEntryList;
 
+exit:
 	if(hr != hrSuccess && lpEntryList)
 		MAPIFreeBuffer(lpEntryList);
 

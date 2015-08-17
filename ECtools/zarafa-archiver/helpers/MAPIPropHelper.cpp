@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -188,9 +187,9 @@ HRESULT MAPIPropHelper::GetMessageState(ArchiverSessionPtr ptrSession, MessageSt
 		ulState |= MessageState::msStubbed;
 
 	if (PROP_TYPE(ptrMessageProps[IDX_DIRTY].ulPropTag) != PT_ERROR && ptrMessageProps[IDX_DIRTY].Value.b == TRUE) {
-		// If for some reason both dirty and stubbed are set it's safest to mark the message
-		// as stubbed. That might cause the archive to miss out some changes, but if we'd mark
-		// it as dirty we might be rearchiving a stub, loosing all interesting information.
+		// If, for some reason, both dirty and stubbed are set, it is safest to mark the message
+		// as stubbed. That might cause the archive to miss out some changes, but if we marked
+		// it as dirty, we might be rearchiving a stub, loosing all interesting information.
 		if ((ulState & MessageState::msStubbed) == 0)
 			ulState |= MessageState::msDirty;
 	}
@@ -268,7 +267,7 @@ HRESULT MAPIPropHelper::GetMessageState(ArchiverSessionPtr ptrSession, MessageSt
 				 * processed was copied because we were able to open the original reference, which should
 				 * have been removed either way.
 				 * However, because of a currently (13-07-2011) unknown issue, the moved message can be
-				 * opened with it's old entryid. This is probably a cache issue.
+				 * opened with its old entryid. This is probably a cache issue.
 				 * If this happens, the message just opened is the same message as the one that's being
 				 * processed. That can be easily verified by comparing the record key.
 				 */
@@ -644,7 +643,7 @@ HRESULT MAPIPropHelper::SetClean()
 
 
 /**
- * Detach an object from it's archived version.
+ * Detach an object from its archived version.
  * This does not cause the reference in the archived version to be removed.
  *
  * @return HRESULT

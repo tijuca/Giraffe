@@ -4,7 +4,7 @@
 #
 # chkconfig: 345 86 24
 # description: The Zarafa Presence Daemon
-# processname: /usr/bin/zarafa-presence
+# processname: /usr/sbin/zarafa-presence
 # config: /etc/zarafa/presence.cfg
 # pidfile: /var/run/zarafa-presence.pid
 
@@ -19,7 +19,7 @@
 ### END INIT INFO
 
 PRESENCECONFIG=/etc/zarafa/presence.cfg
-PRESENCEPROGRAM=/usr/bin/zarafa-presence
+PRESENCEPROGRAM=/usr/sbin/zarafa-presence
 
 # Sanity checks.
 [ -x $PRESENCEPROGRAM ] || exit 0

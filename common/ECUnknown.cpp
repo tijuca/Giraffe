@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -54,10 +53,11 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
-ECUnknown::ECUnknown(char *szClassName) {
+ECUnknown::ECUnknown(const char *szClassName)
+{
 	this->m_cRef = 0;
 	this->szClassName = szClassName;
 	this->lpParent = NULL;
@@ -178,7 +178,7 @@ HRESULT ECUnknown::SetParent(ECUnknown *lpParent) {
  * 
  * @return this is a parent of lpObject, or not
  */
-BOOL ECUnknown::IsParentOf(ECUnknown *lpObject) {
+BOOL ECUnknown::IsParentOf(const ECUnknown *lpObject) {
 	while (lpObject && lpObject->lpParent) {
 		if (lpObject->lpParent == this)
 			return TRUE;
@@ -194,8 +194,8 @@ BOOL ECUnknown::IsParentOf(ECUnknown *lpObject) {
  * 
  * @return lpObject is a parent of this, or not
  */
-BOOL ECUnknown::IsChildOf(ECUnknown *lpObject) {
-	std::list<ECUnknown *>::iterator i;
+BOOL ECUnknown::IsChildOf(const ECUnknown *lpObject) {
+	std::list<ECUnknown *>::const_iterator i;
 	if (lpObject) {
 		for (i = lpObject->lstChildren.begin(); i != lpObject->lstChildren.end(); i++) {
 			if (this == *i)

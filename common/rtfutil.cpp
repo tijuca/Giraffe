@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -63,15 +62,17 @@ using namespace std;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
+
+static const char szHex[] = "0123456789ABCDEF";
 
 // Charsets used in \fcharsetXXX (from http://msdn.microsoft.com/library/default.asp?url=/library/en-us/dnrtfspec/html/rtfspec_6.asp )
 // charset "" is the ANSI codepage specified in \ansicpg
 // charset NULL means 'no conversion', ie direct 1-to-1 translation to UNICODE 
-struct _rtfcharset {
+static const struct _rtfcharset {
 	int id;
-	char *charset;
+	const char *charset;
 } RTFCHARSET[] = {
 	{0, ""}, // This is actually the codepage specified in \ansicpg
 	{1, ""}, // default charset, probably also the codepage in \ansicpg
@@ -104,7 +105,7 @@ struct _rtfcharset {
 
 struct RTFSTATE {
 	int ulFont;
-	char *szCharset;
+	const char *szCharset;
 	bool bInFontTbl;
 	bool bInColorTbl;
 	bool bInSkipTbl;
@@ -125,7 +126,7 @@ typedef map<int,int> fontmap_t;
  * @param[out]	lpszCharset static charset string
  * @retval		MAPI_E_NOT_FOUND if id was unknown
  */
-HRESULT HrGetCharsetByRTFID(int id, char **lpszCharset)
+static HRESULT HrGetCharsetByRTFID(int id, const char **lpszCharset)
 {
 	unsigned int i = 0;
 	
@@ -143,7 +144,7 @@ HRESULT HrGetCharsetByRTFID(int id, char **lpszCharset)
  * @param[in]	lpCommand	RTF command string, without leading \
  * @return	bool
  */
-bool isRTFIgnoreCommand(char* lpCommand)
+static bool isRTFIgnoreCommand(const char *lpCommand)
 {
 	bool bIgnore = false;
 
@@ -192,7 +193,8 @@ static void InitRTFState(RTFSTATE *sState)
 	sState->ulSkipChars = 0;
 }
 
-std::wstring RTFFlushStateOutput(convert_context &convertContext, RTFSTATE *sState, ULONG ulState)
+static std::wstring RTFFlushStateOutput(convert_context &convertContext,
+    RTFSTATE *sState, ULONG ulState)
 {
 	std::wstring wstrUnicode;
 
@@ -214,12 +216,13 @@ std::wstring RTFFlushStateOutput(convert_context &convertContext, RTFSTATE *sSta
  * @param[out]	lpStrHTMLOut	HTML output in requested ulCodepage
  * @param[out]	ulCodepage		codepage for HTML output
  */
-HRESULT HrExtractHTMLFromRTF(std::string &lpStrRTFIn, std::string &lpStrHTMLOut, ULONG ulCodepage)
+HRESULT HrExtractHTMLFromRTF(const std::string &lpStrRTFIn,
+    std::string &lpStrHTMLOut, ULONG ulCodepage)
 {
 	HRESULT hr = hrSuccess;
-	char *szInput = (char *)lpStrRTFIn.c_str();
-	char *szANSICharset = "us-ascii";
-	char *szHTMLCharset;
+	const char *szInput = lpStrRTFIn.c_str();
+	const char *szANSICharset = "us-ascii";
+	const char *szHTMLCharset;
 	std::string strConvertCharset;
 	std::wstring strOutput;
 	int ulState = 0;
@@ -286,7 +289,7 @@ HRESULT HrExtractHTMLFromRTF(std::string &lpStrRTFIn, std::string &lpStrHTMLOut,
                     sState[ulState].szCharset = szANSICharset;
 				} else if(strcmp(szCommand,"fcharset") == 0) {
 					if(sState[ulState].bInFontTbl) {
-						mapFontToCharset.insert(make_pair<int,int>(sState[ulState].ulFont, lArg));
+						mapFontToCharset.insert(pair<int, int>(sState[ulState].ulFont, lArg));
 					}
 				} else if(strcmp(szCommand,"htmltag") == 0) {
 				} else if(strcmp(szCommand,"mhtmltag") == 0) {
@@ -363,7 +366,6 @@ HRESULT HrExtractHTMLFromRTF(std::string &lpStrRTFIn, std::string &lpStrHTMLOut,
 			} 
 			else if(*szInput == '\'') {
 				unsigned int ulChar;
-				char szHex[] = "0123456789ABCDEF";
 				
 				while(*szInput == '\'')
 				{
@@ -450,13 +452,14 @@ exit:
  * @param[out]	lpStrHTMLOut	HTML output in requested ulCodepage
  * @param[out]	ulCodepage		codepage for HTML output
  */
-HRESULT HrExtractHTMLFromTextRTF(std::string &lpStrRTFIn, std::string &lpStrHTMLOut, ULONG ulCodepage)
+HRESULT HrExtractHTMLFromTextRTF(const std::string &lpStrRTFIn,
+    std::string &lpStrHTMLOut, ULONG ulCodepage)
 {
 	HRESULT hr = hrSuccess;
 	std::wstring wstrUnicodeTmp;
-	char *szInput = (char *)lpStrRTFIn.c_str();
-	char *szANSICharset = "us-ascii";
-	char *szHTMLCharset;
+	const char *szInput = lpStrRTFIn.c_str();
+	const char *szANSICharset = "us-ascii";
+	const char *szHTMLCharset;
 	std::string strConvertCharset;
 	std::wstring strOutput;
 	int ulState = 0;
@@ -538,7 +541,7 @@ HRESULT HrExtractHTMLFromTextRTF(std::string &lpStrRTFIn, std::string &lpStrHTML
                     sState[ulState].szCharset = szANSICharset;
 				} else if(strcmp(szCommand,"fcharset") == 0) {
 					if(sState[ulState].bInFontTbl) {
-						mapFontToCharset.insert(make_pair<int,int>(sState[ulState].ulFont, lArg));
+						mapFontToCharset.insert(pair<int, int>(sState[ulState].ulFont, lArg));
 					}
 				} else if(strcmp(szCommand,"htmltag") == 0) {
 				} else if(strcmp(szCommand,"mhtmltag") == 0) {
@@ -621,7 +624,6 @@ HRESULT HrExtractHTMLFromTextRTF(std::string &lpStrRTFIn, std::string &lpStrHTML
 			} 
 			else if(*szInput == '\'') {
 				unsigned int ulChar;
-				char szHex[] = "0123456789ABCDEF";
 				
 				// Dump output data until now, if we're switching charsets
 				if(szANSICharset == NULL || strcmp(sState[ulState].szCharset, szANSICharset) != 0) {
@@ -761,13 +763,14 @@ exit:
  *
  * @todo Export the right HTML tags, now only plain stuff
  */
-HRESULT HrExtractHTMLFromRealRTF(std::string &lpStrRTFIn, std::string &lpStrHTMLOut, ULONG ulCodepage)
+HRESULT HrExtractHTMLFromRealRTF(const std::string &lpStrRTFIn,
+    std::string &lpStrHTMLOut, ULONG ulCodepage)
 {
 	HRESULT hr = hrSuccess;
 	std::wstring wstrUnicodeTmp;
-	char *szInput = (char *)lpStrRTFIn.c_str();
-	char *szANSICharset = "us-ascii";
-	char *szHTMLCharset;
+	const char *szInput = lpStrRTFIn.c_str();
+	const char *szANSICharset = "us-ascii";
+	const char *szHTMLCharset;
 	std::string strConvertCharset;
 	std::wstring strOutput;
 	int ulState = 0;
@@ -847,7 +850,7 @@ HRESULT HrExtractHTMLFromRealRTF(std::string &lpStrRTFIn, std::string &lpStrHTML
 					sState[ulState].szCharset = szANSICharset;
 				} else if(strcmp(szCommand,"fcharset") == 0) {
 					if(sState[ulState].bInFontTbl) {
-						mapFontToCharset.insert(make_pair<int,int>(sState[ulState].ulFont, lArg));
+						mapFontToCharset.insert(pair<int, int>(sState[ulState].ulFont, lArg));
 					}
 				} else if(strcmp(szCommand,"htmltag") == 0) {
 				} else if(strcmp(szCommand,"latentstyles") == 0) {
@@ -997,7 +1000,6 @@ HRESULT HrExtractHTMLFromRealRTF(std::string &lpStrRTFIn, std::string &lpStrHTML
 			} 
 			else if(*szInput == '\'') {
 				unsigned int ulChar;
-				char szHex[] = "0123456789ABCDEF";
 				std::wstring wstrUnicode;
 				
 				while(*szInput == '\'')
@@ -1135,11 +1137,12 @@ bool isrtftext(const char *buf, unsigned int len)
  * @return	mapi error code
  * @retval	MAPI_E_NOT_ENOUGH_MEMORY	too many states in rtf, > 256
  */
-HRESULT HrExtractBODYFromTextRTF(std::string &lpStrRTFIn, std::wstring &strBodyOut)
+HRESULT HrExtractBODYFromTextRTF(const std::string &lpStrRTFIn,
+    std::wstring &strBodyOut)
 {
 	HRESULT hr = hrSuccess;
-	char *szInput = (char *)lpStrRTFIn.c_str();
-	char *szANSICharset = "us-ascii";
+	const char *szInput = lpStrRTFIn.c_str();
+	const char *szANSICharset = "us-ascii";
 	int ulState = 0;
 	RTFSTATE sState[RTF_MAXSTATE];	
 	fontmap_t mapFontToCharset;
@@ -1191,7 +1194,7 @@ HRESULT HrExtractBODYFromTextRTF(std::string &lpStrRTFIn, std::wstring &strBodyO
 					sState[ulState].szCharset = szANSICharset;
 				} else if(strcmp(szCommand,"fcharset") == 0) {
 					if(sState[ulState].bInFontTbl) {
-						mapFontToCharset.insert(make_pair<int,int>(sState[ulState].ulFont, lArg));
+						mapFontToCharset.insert(pair<int, int>(sState[ulState].ulFont, lArg));
 					}
 				} else if(strcmp(szCommand,"htmltag") == 0) {
 				} else if(strcmp(szCommand,"mhtmltag") == 0) {
@@ -1276,7 +1279,6 @@ HRESULT HrExtractBODYFromTextRTF(std::string &lpStrRTFIn, std::wstring &strBodyO
 			} 
 			else if(*szInput == '\'') {
 				unsigned int ulChar = 0;
-				char szHex[] = "0123456789ABCDEF";
 				
 				szInput++;
 				

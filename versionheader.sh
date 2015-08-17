@@ -1,21 +1,23 @@
 #!/bin/bash
 
-SVNCOPATH=`dirname $0`
-svnrev=`svnversion -nc ${SVNCOPATH} | sed -e 's/^[^:]*://;s/[MS]//'`
-if [ -d ".git" -a $svnrev = 'exported' ]; then
-	svnrev=$(git svn info|grep Revision|awk '{print $2}')
-elif [ -z $svnrev ]; then
-	svnrev=0
-fi
-
 if [ -f revision ]; then
-    svnrev="`cat revision | grep [0-9]`"
+	svnrev="`cat revision | sed s/[^0-9]//g`"
+else
+	svnrev=$(svnversion -nc `dirname "$0"` | awk -F: '{print $NF}' | sed 's/[^0-9]//g')
+	if [ -z "$svnrev" ]; then
+	    if [ -f ".git/svn/.metadata" ]; then
+		svnrev=$(git svn info | grep Revision | awk '{print $2}')
+	    else
+		svnrev=0
+	    fi
+	fi
+
 fi
 
 dot_version=`cat version`
-major_version=`cat version | sed -e 's;\.[\.0-9a-zA-Z]*$;;'`
-minor_version=`cat version | sed -e 's;^\([^.]*\)\.\([^.]*\)\(\.\([^.]*\)\)*;\2;'`
-comma_version=`cat version | sed -e 's;\.[a-zA-Z]*$;;g' -e 's;\.;\,;g'`,$svnrev
+major_version=`sed <version -e 's;\.[\.0-9a-zA-Z]*$;;'`
+minor_version=`sed <version -e 's;^\([^.]*\)\.\([^.]*\)\(\.\([^.]*\)\)*;\2;'`
+comma_version=`sed <version -e 's;\.[a-zA-Z]*$;;g' -e 's;\.;\,;g'`,$svnrev
 specialbuild=`cat specialbuild`
 
 cat << EOF

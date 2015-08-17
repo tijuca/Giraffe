@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -74,7 +73,7 @@ using namespace std;
 
 #include <edkguid.h>
 
-#include <wchar.h>
+#include <cwchar>
 #include "charset/convert.h"
 #include "charset/utf8string.h"
 
@@ -84,10 +83,12 @@ typedef mapi_memory_ptr<ECUSER>	ECUserPtr;
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
-ECMSProvider::ECMSProvider(ULONG ulFlags, char *szClassName) : ECUnknown(szClassName) {
+ECMSProvider::ECMSProvider(ULONG ulFlags, const char *szClassName) :
+    ECUnknown(szClassName)
+{
 	TRACE_MAPI(TRACE_ENTRY, "ECMSProvider::ECMSProvider","");
 	
 	m_ulFlags = ulFlags;
@@ -249,7 +250,7 @@ HRESULT ECMSProvider::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszPro
 
 	}
 
-	// We don't count lpMSLogon as a child, because it's lifetime is coupled to lpMsgStore
+	// We don't count lpMSLogon as a child, because its lifetime is coupled to lpMsgStore
 	if(lppMSLogon) {
 		hr = ECMSLogon::Create(lpECMsgStore, &lpECMSLogon);
 

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,8 +44,9 @@
 #ifndef ECUNKNOWN_H
 #define ECUNKNOWN_H
 
+#include "zcdefs.h"
 #include "IECUnknown.h"
-#include "pthread.h"
+#include <pthread.h>
 
 #include <list>
 #include <mapi.h>
@@ -79,29 +79,28 @@
 
 class ECUnknown : public IECUnknown {
 public:
-	ECUnknown(char *szClassName = NULL);
+	ECUnknown(const char *szClassName = NULL);
 	virtual ~ECUnknown();
 
-	virtual ULONG AddRef();
-	virtual ULONG Release();
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
+	virtual ULONG AddRef(void) _override;
+	virtual ULONG Release(void) _override;
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _override;
 
 	virtual HRESULT AddChild(ECUnknown *lpChild);
 	virtual HRESULT RemoveChild(ECUnknown *lpChild);
 
-	class xUnknown : public IUnknown
-	{
+	class xUnknown _final : public IUnknown {
 	public:
 		// From IUnknown
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void** lppInterface);
-		virtual ULONG __stdcall AddRef();
-		virtual ULONG __stdcall Release();	
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _override;
+		virtual ULONG __stdcall AddRef(void) _override;
+		virtual ULONG __stdcall Release(void) _override;
 	} m_xUnknown;
 
 	// lpParent is public because it is always thread-safe and valid
 	ECUnknown				*lpParent;
-	virtual BOOL IsParentOf(ECUnknown *lpObject);
-	virtual BOOL IsChildOf(ECUnknown *lpObject);
+	virtual BOOL IsParentOf(const ECUnknown *lpObject);
+	virtual BOOL IsChildOf(const ECUnknown *lpObject);
 
 protected:
 	// Called by AddChild
@@ -111,7 +110,7 @@ protected:
 	virtual HRESULT			Suicide();
 
 	ULONG					m_cRef;
-	char					*szClassName;
+	const char *szClassName;
 	std::list<ECUnknown *>	lstChildren; 
 	pthread_mutex_t mutex;
 

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -57,7 +56,7 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 pthread_key_t database_key;
@@ -79,7 +78,7 @@ void AddDatabaseObject(ECDatabase* lpDatabase)
 	pthread_mutex_unlock(&g_hMutexDBObjectList);
 }
 
-void database_destroy(void *lpParam)
+static void database_destroy(void *lpParam)
 {
 	ECDatabase *lpDatabase = (ECDatabase *)lpParam;
 
@@ -92,14 +91,15 @@ void database_destroy(void *lpParam)
 	delete lpDatabase;
 }
 
-void plugin_destroy(void *lpParam)
+static void plugin_destroy(void *lpParam)
 {
 	UserPlugin *lpPlugin = (UserPlugin *)lpParam;
 
 	delete lpPlugin;
 }
 
-ECRESULT zarafa_initlibrary(char* lpDatabaseDir, char* lpConfigFile, ECLogger *lpLogger)
+ECRESULT zarafa_initlibrary(const char *lpDatabaseDir,
+    const char *lpConfigFile, ECLogger *lpLogger)
 {
 	ECRESULT er = erSuccess;
 
@@ -117,7 +117,7 @@ ECRESULT zarafa_initlibrary(char* lpDatabaseDir, char* lpConfigFile, ECLogger *l
 	// Init mutex for database object list
 	pthread_mutex_init(&g_hMutexDBObjectList, NULL);
 
-    er = ECDatabaseMySQL::InitLibrary(lpDatabaseDir, lpConfigFile, lpLogger);
+	er = ECDatabaseMySQL::InitLibrary(lpDatabaseDir, lpConfigFile, lpLogger);
 
 	g_lpStatsCollector = new ECStatsCollector();
 	
@@ -128,7 +128,7 @@ exit:
 	return er;
 }
 
-ECRESULT zarafa_unloadlibrary() 
+ECRESULT zarafa_unloadlibrary(ECLogger *logger)
 {
 	ECRESULT er = erSuccess;
 	std::set<ECDatabase*>::iterator	iterDBObject, iNext;
@@ -166,7 +166,7 @@ ECRESULT zarafa_unloadlibrary()
 	// remove mutex for database object list
 	pthread_mutex_destroy(&g_hMutexDBObjectList);
 	
-	ECDatabaseMySQL::UnloadLibrary();
+	ECDatabaseMySQL::UnloadLibrary(logger);
 
 	g_bInitLib = false;
 
@@ -238,11 +238,13 @@ exit:
 	return er;
 }
 
-void zarafa_resetstats() {
+#if 0
+static void zarafa_resetstats(void)
+{
 	if (g_lpStatsCollector)
 		g_lpStatsCollector->Reset();
 }
-
+#endif
 
 /**
  * Called for each HTTP header in a request, handles the proxy header
@@ -259,9 +261,10 @@ void zarafa_resetstats() {
  * @param[in] vak Value part of the header (right of the :)
  * @return SOAP_OK or soap error
  */
-int zarafa_fparsehdr(struct soap *soap, const char *key, const char *val)
+static int zarafa_fparsehdr(struct soap *soap, const char *key,
+    const char *val)
 {
-	char *szProxy = g_lpSessionManager->GetConfig()->GetSetting("proxy_header");
+	const char *szProxy = g_lpSessionManager->GetConfig()->GetSetting("proxy_header");
 	if(strlen(szProxy) > 0 && stricmp(key, szProxy) == 0) {
 		((SOAPINFO *)soap->user)->bProxy = true;
 	}
@@ -272,7 +275,7 @@ int zarafa_fparsehdr(struct soap *soap, const char *key, const char *val)
 // Called just after a new soap connection is established
 void zarafa_new_soap_connection(CONNECTION_TYPE ulType, struct soap *soap)
 {
-	char *szProxy = g_lpSessionManager->GetConfig()->GetSetting("proxy_header");
+	const char *szProxy = g_lpSessionManager->GetConfig()->GetSetting("proxy_header");
 	SOAPINFO *lpInfo = new SOAPINFO;
 	lpInfo->ulConnectionType = ulType;
 	lpInfo->bProxy = false;

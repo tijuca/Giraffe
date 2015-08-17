@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -55,7 +54,7 @@
 #include "icaluid.h"
 #include "nameids.h"
 #include "stringutil.h"
-#include "time.h"
+#include <ctime>
 #include "mapi_ptr.h"
 #include "namedprops.h"
 #include "base64.h"
@@ -170,7 +169,8 @@ HRESULT VConverter::HrICal2MAPI(icalcomponent *lpEventRoot, icalcomponent *lpEve
 	}
 
 	lpIcalItem = new icalitem;
-	MAPIAllocateBuffer(sizeof(void*), &lpIcalItem->base);
+	if ((hr = MAPIAllocateBuffer(sizeof(void*), &lpIcalItem->base)) != hrSuccess)
+		goto exit;
 	lpIcalItem->lpRecurrence = NULL;
 
 	// ---------------------------
@@ -321,6 +321,7 @@ exit:
  */
 HRESULT VConverter::HrMakeBinaryUID(const std::string &strUid, void *base, SPropValue *lpPropValue)
 {
+	HRESULT hr = hrSuccess;
 	SPropValue sPropValue;
 	std::string strBinUid;
 	std::string strByteArrayID = "040000008200E00074C5B7101A82E008";
@@ -339,13 +340,15 @@ HRESULT VConverter::HrMakeBinaryUID(const std::string &strUid, void *base, SProp
 
 	// Caller sets .ulPropTag
 	sPropValue.Value.bin.cb = strBinUid.size();
-	MAPIAllocateMore(sPropValue.Value.bin.cb, base, (void**)&sPropValue.Value.bin.lpb);
+	if ((hr = MAPIAllocateMore(sPropValue.Value.bin.cb, base, (void**)&sPropValue.Value.bin.lpb)) != hrSuccess)
+		goto exit;
 	memcpy(sPropValue.Value.bin.lpb, strBinUid.data(), sPropValue.Value.bin.cb);
 
 	// set return value
 	*lpPropValue = sPropValue;
 
-	return hrSuccess;
+exit:
+	return hr;
 }
 
 /**
@@ -532,7 +535,8 @@ HRESULT VConverter::HrCompareUids(icalitem *lpIcalItem, icalcomponent *lpicEvent
 	if (hr != hrSuccess)
 		goto exit;
 
-	MAPIAllocateBuffer(sizeof(SPropValue), (void**)&lpPropVal);
+	if ((hr = MAPIAllocateBuffer(sizeof(SPropValue), (void**)&lpPropVal)) != hrSuccess)
+		goto exit;
 
 	hr = HrMakeBinaryUID(strUid, lpPropVal, lpPropVal);
 	if (hr != hrSuccess)
@@ -647,7 +651,8 @@ HRESULT VConverter::HrHandleExceptionGuid(icalcomponent *lpiEvent, void *base, S
 	strBinUid = hex2bin(strUid);
 
 	lpsProp->Value.bin.cb = strBinUid.size();
-	MAPIAllocateMore(strBinUid.size(), base, (void**)&lpsProp->Value.bin.lpb);
+	if ((hr = MAPIAllocateMore(strBinUid.size(), base, (void**)&lpsProp->Value.bin.lpb)) != hrSuccess)
+		goto exit;
 	memcpy(lpsProp->Value.bin.lpb, strBinUid.data(), lpsProp->Value.bin.cb);
 
 exit:
@@ -786,7 +791,7 @@ HRESULT VConverter::HrAddSimpleHeaders(icalcomponent *lpicEvent, icalitem *lpIca
 		sPropVal.ulPropTag = PR_BODY_W;
 		hr = HrCopyString(m_converter, m_strCharset, lpIcalItem->base, icalproperty_get_description(lpicProp), &sPropVal.Value.lpszW);
 		if (hr != hrSuccess)
-			sPropVal.Value.lpszW = L"";
+			sPropVal.Value.lpszW = const_cast<wchar_t *>(L"");
 		lpIcalItem->lstMsgProps.push_back(sPropVal);
 	} else {
 		lpIcalItem->lstDelPropTags.push_back(PR_BODY_W);
@@ -797,7 +802,7 @@ HRESULT VConverter::HrAddSimpleHeaders(icalcomponent *lpicEvent, icalitem *lpIca
 	if (lpicProp) {
 		hr = HrCopyString(m_converter, m_strCharset, lpIcalItem->base, icalproperty_get_location(lpicProp), &sPropVal.Value.lpszW);
 		if (hr != hrSuccess)
-			sPropVal.Value.lpszW = L"";
+			sPropVal.Value.lpszW = const_cast<wchar_t *>(L"");
 
 		sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_LOCATION], PT_UNICODE);
 		lpIcalItem->lstMsgProps.push_back(sPropVal);
@@ -928,7 +933,9 @@ HRESULT VConverter::HrAddBusyStatus(icalcomponent *lpicEvent, icalproperty_metho
 			// X-MICROSOFT-CDO-INTENDEDBUSYSTATUS:FREE
 			if (strcmp(icalproperty_get_x_name(lpicProp), "X-MICROSOFT-CDO-INTENDEDSTATUS") == 0) {
 				const char *lpVal = icalproperty_get_x(lpicProp);
-				if (strcmp(lpVal, "FREE") == 0)
+				if (lpVal == NULL)
+					sPropVal.Value.ul = 2; /* like else case */
+				else if (strcmp(lpVal, "FREE") == 0)
 					sPropVal.Value.ul = 0;
 				else if (strcmp(lpVal, "TENTATIVE") == 0)
 					sPropVal.Value.ul = 1;
@@ -1017,7 +1024,7 @@ HRESULT VConverter::HrAddXHeaders(icalcomponent *lpicEvent, icalitem *lpIcalItem
 			if (lpicValue)
 				icalvalue_free(lpicValue);
 
-		}else if (strncmp(icalproperty_get_x_name(lpicProp), "X-MOZ-GENERATION", strlen("X-MOZ-GENERATION")) == 0) {
+		} else if (strcmp(icalproperty_get_x_name(lpicProp), "X-MOZ-GENERATION") == 0) {
 
 			lpicValue = icalvalue_new_from_string(ICAL_INTEGER_VALUE, icalproperty_get_x(lpicProp));
 			ulMaxCounter = std::max(ulMaxCounter, icalvalue_get_integer(lpicValue));
@@ -1026,11 +1033,14 @@ HRESULT VConverter::HrAddXHeaders(icalcomponent *lpicEvent, icalitem *lpIcalItem
 			if (lpicValue)
 				icalvalue_free(lpicValue);
 
-		}else if (strncmp(icalproperty_get_x_name(lpicProp), "X-MOZ-SEND-INVITATIONS", strlen("X-MOZ-SEND-INVITATIONS")) == 0) {
+		} else if (strcmp(icalproperty_get_x_name(lpicProp), "X-MOZ-SEND-INVITATIONS") == 0) {
 
 			lpicValue =  icalvalue_new_from_string(ICAL_X_VALUE, icalproperty_get_x(lpicProp));
 			sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_MOZSENDINVITE], PT_BOOLEAN);
-			sPropVal.Value.b = (strncmp(icalvalue_get_x(lpicValue), "TRUE", strlen("TRUE"))? 0 : 1);
+			const char *x = icalvalue_get_x(lpicValue);
+			if (x == NULL)
+				x = "";
+			sPropVal.Value.b = strcmp(x, "TRUE") ? 0 : 1;
 			lpIcalItem->lstMsgProps.push_back(sPropVal);
 			
 			if (lpicValue)
@@ -1510,7 +1520,7 @@ HRESULT VConverter::HrAddReminder(icalcomponent *lpicEventRoot, icalcomponent *l
 			icalvalue_free(lpicValue);
 			bHasMozAck = true;
 		}
-		else if (strncmp(icalproperty_get_x_name(lpicProp), "X-MOZ-SNOOZE-TIME", strlen("X-MOZ-SNOOZE-TIME")) == 0) {
+		else if (strcmp(icalproperty_get_x_name(lpicProp), "X-MOZ-SNOOZE-TIME") == 0) {
 			// x properties always return a char* as value :(
 			lpicValue = icalvalue_new_from_string(ICAL_DATETIME_VALUE, icalproperty_get_x(lpicProp));
 			ttReminderNext = icaltime_as_timet_with_zone(icalvalue_get_datetime(lpicValue), NULL); // no timezone			
@@ -1529,13 +1539,14 @@ HRESULT VConverter::HrAddReminder(icalcomponent *lpicEventRoot, icalcomponent *l
 				lpIcalItem->lstMsgProps.push_back(sPropVal);
 			}
 			icalvalue_free(lpicValue);
-		}else if (strncmp(icalproperty_get_x_name(lpicProp), "X-MICROSOFT-RTF", strlen("X-MICROSOFT-RTF")) == 0) {
+		} else if (strcmp(icalproperty_get_x_name(lpicProp), "X-MICROSOFT-RTF") == 0) {
 			lpicValue =  icalvalue_new_from_string(ICAL_X_VALUE, icalproperty_get_x(lpicProp));
 			string rtf = base64_decode(icalvalue_get_x(lpicValue));
 			sPropVal.ulPropTag = PR_RTF_COMPRESSED;
 			sPropVal.Value.bin.cb = rtf.size();
 			
-			MAPIAllocateMore(sPropVal.Value.bin.cb, lpIcalItem->base, (LPVOID*)&sPropVal.Value.bin.lpb);
+			if ((hr = MAPIAllocateMore(sPropVal.Value.bin.cb, lpIcalItem->base, (LPVOID*)&sPropVal.Value.bin.lpb)) != hrSuccess)
+				goto exit;
 			memcpy(sPropVal.Value.bin.lpb, (LPBYTE)rtf.c_str(), sPropVal.Value.bin.cb);
 
 			lpIcalItem->lstMsgProps.push_back(sPropVal);
@@ -2040,7 +2051,7 @@ HRESULT VConverter::HrSetOrganizerAndAttendees(LPMESSAGE lpParentMsg, LPMESSAGE 
 	else
 	{
 		// strMessageClass == "IPM.Schedule.Meeting.Request", "IPM.Schedule.Meeting.Canceled" or ....?
-		// strMessageClass == "IPM.Appointment": normal calender item
+		// strMessageClass == "IPM.Appointment": normal calendar item
 
 		// If we're dealing with a meeting, preset status to 1. PROP_MEETINGSTATUS may not be set
 		if (strMessageClass.compare(0, string("IPM.Schedule.Meeting").length(), string("IPM.Schedule.Meeting")) == 0)
@@ -3344,7 +3355,7 @@ HRESULT VConverter::HrRetrieveAlldayStatus(icalcomponent *lpicEvent, bool *lpblI
 	bool blIsAllday = false;
 
 	// Note: we do not set bIsAllDay to true when (END-START)%24h == 0
-	// If the user forced it's ical client not to set this to 'true', it really wants an item that is a multiple of 24h, but specify the times too.
+	// If the user forced his ICAL client not to set this to 'true', it really wants an item that is a multiple of 24h, but specify the times too.
 
 	icStart = icalcomponent_get_dtstart(lpicEvent);
 	if (icStart.is_date)
@@ -3574,7 +3585,7 @@ HRESULT VConverter::HrMAPI2ICal(LPMESSAGE lpMessage, icalproperty_method *lpicMe
 	// Set keywords / CATEGORIES
 	lpPropVal = PpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_KEYWORDS], PT_MV_UNICODE));
 	if (lpPropVal && lpPropVal->Value.MVszA.cValues > 0) {
-		// The categories need to be comma-seperated
+		// The categories need to be comma-separated
 		wstrBuf.reserve(lpPropVal->Value.MVszW.cValues * 50); // 50 chars per category is a wild guess, but more than enough
 		for (ulCount = 0; ulCount < lpPropVal->Value.MVszW.cValues; ulCount++) {
 			if (ulCount)

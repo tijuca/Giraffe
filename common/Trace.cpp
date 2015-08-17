@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -44,14 +43,14 @@
 
 #include "platform.h"
 
-#include <stdio.h>
-#include <stdarg.h>
+#include <cstdio>
+#include <cstdarg>
 #include "Trace.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 #ifdef WITH_TRACING
@@ -79,9 +78,10 @@ static char THIS_FILE[] = __FILE__;
 // Limit the debug results, 0 is endless
 #define BUFFER_LIMIT		0 // 8096
 
-void TraceMsg(char* lpMsg, int time, char *func, char *format, va_list va)
+static void TraceMsg(const char *lpMsg, int time, const char *func,
+    const char *format, va_list va)
 {
-	char* lpTraceType = NULL;
+	const char *lpTraceType = NULL;
 	char* buffer = NULL;
 	char debug[1024];
 	int	 len=0;
@@ -138,7 +138,7 @@ void TraceMsg(char* lpMsg, int time, char *func, char *format, va_list va)
 		pos = _vsnprintf(buffer+pos, len-pos, format, va);
 
 	if(pos == -1) {
-		//Indicate that the string isn't compleet
+		/* Indicate that the string is not complete */
 		buffer[len-6] = '.';
 		buffer[len-5] = '.';
 		buffer[len-4] = '.';
@@ -154,8 +154,8 @@ void TraceMsg(char* lpMsg, int time, char *func, char *format, va_list va)
 
 }
 
-void TraceMapi(int time, char *func, char *format, ...) {
-
+void TraceMapi(int time, const char *func, const char *format, ...)
+{
 	va_list va;
 
 	if(!DO_TRACE_MAPI)
@@ -168,8 +168,8 @@ void TraceMapi(int time, char *func, char *format, ...) {
 	va_end(va);
 }
 
-void TraceMapiLib(int time, char *func, char *format, ...) {
-
+void TraceMapiLib(int time, const char *func, const char *format, ...)
+{
 	va_list va;
 
 	if(!DO_TRACE_MAPI)
@@ -182,8 +182,8 @@ void TraceMapiLib(int time, char *func, char *format, ...) {
 	va_end(va);
 }
 
-
-void TraceNotify(int time, char *func, char *format, ...) {
+void TraceNotify(int time, const char *func, const char *format, ...)
+{
 	va_list va; 
 
 	if(!DO_TRACE_NOTIF)
@@ -196,7 +196,8 @@ void TraceNotify(int time, char *func, char *format, ...) {
 	va_end(va);
 }
 
-void TraceSoap(int time, char *func, char *format, ...) {
+void TraceSoap(int time, const char *func, const char *format, ...)
+{
 	va_list va; 
 
 	if(!DO_TRACE_SOAP)
@@ -209,7 +210,9 @@ void TraceSoap(int time, char *func, char *format, ...) {
 	va_end(va);
 }
 
-void TraceInternals(int time, char *tracetype, char *func, char *format, ...) {
+void TraceInternals(int time, const char *tracetype, const char *func,
+    const char *format, ...)
+{
 	va_list va; 
 
 	if(!DO_TRACE_INT)
@@ -223,7 +226,8 @@ void TraceInternals(int time, char *tracetype, char *func, char *format, ...) {
 }
 
 
-void TraceStream(int time, char *func, char *format, ...) {
+void TraceStream(int time, const char *func, const char *format, ...)
+{
 	va_list va; 
 
 	if(!DO_TRACE_STREAM)
@@ -236,7 +240,8 @@ void TraceStream(int time, char *func, char *format, ...) {
 	va_end(va);
 }
 
-void TraceECMapi(int time, char *func, char *format, ...) {
+void TraceECMapi(int time, const char *func, const char *format, ...)
+{
 	va_list va; 
 
 	va_start(va, format);
@@ -246,7 +251,8 @@ void TraceECMapi(int time, char *func, char *format, ...) {
 	va_end(va);
 }
 
-void TraceExt(int time, char *func, char *format, ...) {
+void TraceExt(int time, const char *func, const char *format, ...)
+{
 	va_list va; 
 
 	if(!DO_TRACE_EXT)
@@ -259,7 +265,8 @@ void TraceExt(int time, char *func, char *format, ...) {
 	va_end(va);
 }
 
-void TraceRelease(char *format, ...) {
+void TraceRelease(const char *format, ...)
+{
 	char debug[1024];
 	va_list va; 
 	va_start(va, format);

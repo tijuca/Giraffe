@@ -3392,10 +3392,11 @@ SWIGINTERN _do *new__do(){
 				delivery_options *dopt = new delivery_options; 
 				imopt_default_delivery_options(dopt);
 				dopt->default_charset = strdup(dopt->default_charset); /* avoid free problems */
+				/* elaborate on free problems? */
 				return dopt;
 			}
 SWIGINTERN void delete__do(_do *self){
-				free(self->default_charset);
+				free(const_cast<char *>(self->default_charset));
 			}
 
 SWIGINTERN int

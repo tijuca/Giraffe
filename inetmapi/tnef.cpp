@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -81,7 +80,7 @@
 
 // The mapping between Microsoft Mail IPM classes and those used in MAPI
 // see: http://msdn2.microsoft.com/en-us/library/ms527360.aspx
-struct _sClassMap {
+static const struct _sClassMap {
 	const char *szScheduleClass;
 	const char *szMAPIClass;
 } sClassMap[] = {
@@ -96,7 +95,8 @@ struct _sClassMap {
 	{ "IPM.Microsoft Mail.Note",			"IPM" }
 };
 
-const char *FindMAPIClassByScheduleClass(char *szSClass) {
+static const char *FindMAPIClassByScheduleClass(const char *szSClass)
+{
 	unsigned int i = 0;
 
 	for(i=0;i<sizeof(sClassMap)/sizeof(sClassMap[0]);i++) {
@@ -108,7 +108,9 @@ const char *FindMAPIClassByScheduleClass(char *szSClass) {
 	return NULL;
 }
 
-const char *FindScheduleClassByMAPIClass(char *szMAPIClass) {
+#if 0
+static const char *FindScheduleClassByMAPIClass(const char *szMAPIClass)
+{
 	unsigned int i = 0;
 
 	for(i=0;i<sizeof(sClassMap)/sizeof(sClassMap[0]);i++) {
@@ -119,6 +121,7 @@ const char *FindScheduleClassByMAPIClass(char *szMAPIClass) {
 
 	return NULL;
 }
+#endif
 
 /**
  * Returns TRUE if the given property tag is in the given property tag array
@@ -128,7 +131,7 @@ const char *FindScheduleClassByMAPIClass(char *szMAPIClass) {
  * @retval	true	ulPropTag is alread present in lpPropList
  * @retval	false	ulPropTag is not present in lpPropList
  */
-bool PropTagInPropList(ULONG ulPropTag, LPSPropTagArray lpPropList)
+static bool PropTagInPropList(ULONG ulPropTag, const SPropTagArray *lpPropList)
 {
 	if (lpPropList == NULL)
 		return false;
@@ -209,7 +212,8 @@ void ECTNEF::FreeAttachmentData(tnefattachment* lpTnefAtt)
  * @retval MAPI_E_INVALID_PARAMETER invalid lpStream of lppPropValue pointer
  * @retval MAPI_E_INVALID_TYPE invalid ulPropTag
  */
-HRESULT StreamToPropValue(IStream* lpStream, ULONG ulPropTag, LPSPropValue* lppPropValue)
+static HRESULT StreamToPropValue(IStream *lpStream, ULONG ulPropTag,
+    LPSPropValue *lppPropValue)
 {
 	HRESULT			hr = hrSuccess;
 	LPSPropValue	lpPropValue = NULL;
@@ -510,9 +514,11 @@ HRESULT	ECTNEF::ExtractProps(ULONG ulFlags, LPSPropTagArray lpPropList)
 				goto exit;
 			}
 
-			MAPIAllocateBuffer(sizeof(SPropValue), (void**)&lpProp);
+			if ((hr = MAPIAllocateBuffer(sizeof(SPropValue), (void**)&lpProp)) != hrSuccess)
+				goto exit;
 			lpProp->ulPropTag = PR_ATTACH_FILENAME_A;
-			MAPIAllocateMore(ulSize, lpProp, (void**)&lpProp->Value.lpszA);
+			if ((hr = MAPIAllocateMore(ulSize, lpProp, (void**)&lpProp->Value.lpszA)) != hrSuccess)
+				goto exit;
 			memcpy(lpProp->Value.lpszA, lpBuffer, ulSize);
 			lpTnefAtt->lstProps.push_back(lpProp);
 			break;
@@ -523,9 +529,11 @@ HRESULT	ECTNEF::ExtractProps(ULONG ulFlags, LPSPropTagArray lpPropList)
 				goto exit;
 			}
 
-			MAPIAllocateBuffer(sizeof(SPropValue), (void**)&lpProp);
+			if ((hr = MAPIAllocateBuffer(sizeof(SPropValue), (void**)&lpProp)) != hrSuccess)
+				goto exit;
 			lpProp->ulPropTag = PR_ATTACH_RENDERING;
-			MAPIAllocateMore(ulSize, lpProp, (void**)&lpProp->Value.bin.lpb);
+			if ((hr = MAPIAllocateMore(ulSize, lpProp, (void**)&lpProp->Value.bin.lpb)) != hrSuccess)
+				goto exit;
 			lpProp->Value.bin.cb = ulSize;
 			memcpy(lpProp->Value.bin.lpb, lpBuffer, ulSize);
 			lpTnefAtt->lstProps.push_back(lpProp);

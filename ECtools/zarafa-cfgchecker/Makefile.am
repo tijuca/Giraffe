@@ -1,8 +1,15 @@
+# -*- Makefile -*-
+
+AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) \
+	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon
+
 noinst_PROGRAMS = zarafa-cfgchecker
+noinst_DATA = zarafa-cfgchecker.ldx
 
-AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) -I${top_srcdir}/common
-
-zarafa_cfgchecker_LDADD = ${top_builddir}/common/libcommon_util.la ${top_builddir}/common/libcommon_mapi.la $(PROG_LIBS) ${top_builddir}/mapi4linux/src/libmapi.la
+zarafa_cfgchecker_LDADD = \
+	${top_builddir}/common/libzcp_common_util.la \
+	${top_builddir}/common/libzcp_common_mapi.la \
+	$(PROG_LIBS) ${top_builddir}/mapi4linux/src/libmapi.la
 
 zarafa_cfgchecker_SOURCES = \
 	zarafa-cfg.cpp \
@@ -19,3 +26,5 @@ zarafa_cfgchecker_SOURCES = \
 check-syntax:
 	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
 		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2 $(zarafa_cfg_SOURCES)
+
+include ../../global.am

@@ -15,6 +15,11 @@
 
 @SET_MAKE@
 
+# -*- Makefile -*-
+
+# -*- Makefile -*-
+
+
 
 VPATH = @srcdir@
 am__make_dryrun = \
@@ -52,9 +57,10 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-subdir = zarafa-libsync
 DIST_COMMON = $(libzarafasync_la_include_HEADERS) \
-	$(srcdir)/Makefile.am $(srcdir)/Makefile.in
+	$(srcdir)/../global.am $(srcdir)/Makefile.am \
+	$(srcdir)/Makefile.in
+subdir = zarafa-libsync
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/autoconf/boost.m4 \
 	$(top_srcdir)/autoconf/icu.m4 $(top_srcdir)/autoconf/php.m4 \
@@ -96,8 +102,8 @@ am__installdirs = "$(DESTDIR)$(libdir)" \
 	"$(DESTDIR)$(libzarafasync_la_includedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libzarafasync_la_DEPENDENCIES =  \
-	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/mapi4linux/src/libmapi.la
 am_libzarafasync_la_OBJECTS = ECSync.lo ECSyncLog.lo ECSyncUtil.lo \
 	ECSyncContext.lo ECOfflineABImporter.lo ECSyncSettings.lo \
 	ECResyncSet.lo
@@ -105,6 +111,10 @@ libzarafasync_la_OBJECTS = $(am_libzarafasync_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
+libzarafasync_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CXXLD) \
+	$(AM_CXXFLAGS) $(CXXFLAGS) $(libzarafasync_la_LDFLAGS) \
+	$(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)/common
 depcomp = $(SHELL) $(top_srcdir)/autoconf/depcomp
 am__depfiles_maybe = depfiles
@@ -138,6 +148,7 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
+DATA = $(noinst_DATA)
 HEADERS = $(libzarafasync_la_include_HEADERS)
 ETAGS = etags
 CTAGS = ctags
@@ -154,11 +165,15 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 BOOST_CPPFLAGS = @BOOST_CPPFLAGS@
 BOOST_DATE_TIME_LDFLAGS = @BOOST_DATE_TIME_LDFLAGS@
+BOOST_DATE_TIME_LDPATH = @BOOST_DATE_TIME_LDPATH@
 BOOST_DATE_TIME_LIBS = @BOOST_DATE_TIME_LIBS@
 BOOST_FILESYSTEM_LDFLAGS = @BOOST_FILESYSTEM_LDFLAGS@
+BOOST_FILESYSTEM_LDPATH = @BOOST_FILESYSTEM_LDPATH@
 BOOST_FILESYSTEM_LIBS = @BOOST_FILESYSTEM_LIBS@
+BOOST_LDPATH = @BOOST_LDPATH@
 BOOST_ROOT = @BOOST_ROOT@
 BOOST_SYSTEM_LDFLAGS = @BOOST_SYSTEM_LDFLAGS@
+BOOST_SYSTEM_LDPATH = @BOOST_SYSTEM_LDPATH@
 BOOST_SYSTEM_LIBS = @BOOST_SYSTEM_LIBS@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
@@ -254,6 +269,9 @@ PHP_INCLUDES = @PHP_INCLUDES@
 PHP_LDFLAGS = @PHP_LDFLAGS@
 PHP_SYSCONF_DIR = @PHP_SYSCONF_DIR@
 PHP_VERSION = @PHP_VERSION@
+PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 POW_LIB = @POW_LIB@
 PROG_ANT = @PROG_ANT@
 PROG_LIBS = @PROG_LIBS@
@@ -287,6 +305,7 @@ YACC_EXISTS = @YACC_EXISTS@
 YFLAGS = @YFLAGS@
 ZARAFA_VERSION = @ZARAFA_VERSION@
 ZCPPFLAGS = @ZCPPFLAGS@
+ZPHPCXXFLAGS = @ZPHPCXXFLAGS@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -341,15 +360,16 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-lib_LTLIBRARIES = libzarafasync.la
-AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
+AM_CPPFLAGS = ${ZCPPFLAGS} ${DEBUGFLAGS} ${BOOST_CPPFLAGS} \
 	-I${top_srcdir}/mapi4linux/include	\
 	-I${top_srcdir}/provider/common 	\
-	-I${top_srcdir}/common
+	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon
 
+lib_LTLIBRARIES = libzarafasync.la
+noinst_DATA = libzarafasync.ldd
 libzarafasync_la_LIBADD = \
-	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libcommon_mapi.la
+	${top_builddir}/common/libzcp_common_mapi.la \
+	${top_builddir}/mapi4linux/src/libmapi.la
 
 libzarafasync_la_includedir = $(includedir)/libzarafasync
 libzarafasync_la_include_HEADERS = ECLibSync.h ECSync.h ECSyncLog.h	\
@@ -358,11 +378,15 @@ libzarafasync_la_include_HEADERS = ECLibSync.h ECSync.h ECSyncLog.h	\
 libzarafasync_la_SOURCES = ECSync.cpp ECSyncLog.cpp ECSyncUtil.cpp	\
 	ECSyncContext.cpp ECOfflineABImporter.cpp ECSyncSettings.cpp ECResyncSet.cpp
 
+libzarafasync_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
+	-Wl,--version-script=${top_builddir}/default.sym
+
+EXTRA_libzarafasync_la_DEPENDENCIES = ${top_builddir}/default.sym
 all: all-am
 
 .SUFFIXES:
-.SUFFIXES: .cpp .lo .o .obj
-$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
+.SUFFIXES: .cpp .la .ldd .lo .o .obj
+$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am $(srcdir)/../global.am $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -383,6 +407,7 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe)'; \
 	    cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe);; \
 	esac;
+$(srcdir)/../global.am:
 
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
@@ -425,7 +450,7 @@ clean-libLTLIBRARIES:
 	  rm -f "$${dir}/so_locations"; \
 	done
 libzarafasync.la: $(libzarafasync_la_OBJECTS) $(libzarafasync_la_DEPENDENCIES) $(EXTRA_libzarafasync_la_DEPENDENCIES) 
-	$(AM_V_CXXLD)$(CXXLINK) -rpath $(libdir) $(libzarafasync_la_OBJECTS) $(libzarafasync_la_LIBADD) $(LIBS)
+	$(AM_V_CXXLD)$(libzarafasync_la_LINK) -rpath $(libdir) $(libzarafasync_la_OBJECTS) $(libzarafasync_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -442,22 +467,25 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ECSyncUtil.Plo@am__quote@
 
 .cpp.o:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
+@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ $<
 
 .cpp.obj:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
+@am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .cpp.lo:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
+@am__fastdepCXX_TRUE@	$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCXX_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LTCXXCOMPILE) -c -o $@ $<
@@ -573,7 +601,7 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(LTLIBRARIES) $(HEADERS)
+all-am: Makefile $(LTLIBRARIES) $(DATA) $(HEADERS)
 installdirs:
 	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(libzarafasync_la_includedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
@@ -702,6 +730,13 @@ uninstall-am: uninstall-libLTLIBRARIES \
 check-syntax:
 	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
 		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2
+
+.la.ldd:
+	${AM_V_GEN}${top_srcdir}/lddcheck $< $@
+
+# There is no good POSIX syntax for the following one.. resort to GNUmake
+%.ldx: %
+	${AM_V_GEN}${top_srcdir}/lddcheck $< $@
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

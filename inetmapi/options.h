@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -54,7 +53,7 @@ typedef struct _do {
 	bool add_imap_data;				// Save IMAP optimizations to the server
 	bool parse_smime_signed;		// Parse actual S/MIME content instead of just writing out the S/MIME data to a single attachment
 	LPSBinary user_entryid;			// If not NULL, specifies the entryid of the user for whom we are delivering. If set, allows generating PR_MESSAGE_*_ME properties.
-	char *default_charset;			// Specifies the default charset to use when none is found in the source message, or when us-ascii is used in the source message. Note that this charset *must* be a superset of us-ascii
+	const char *default_charset;		// Specifies the default charset to use when none is found in the source message, or when us-ascii is used in the source message. Note that this charset *must* be a superset of us-ascii
 } delivery_options;
 
 typedef struct _so {
@@ -68,6 +67,7 @@ typedef struct _so {
 	char *charset_upgrade;
 	bool allow_send_to_everyone;
 	bool enable_dsn;				/**< Enable SMTP Delivery Status Notifications */
+	bool always_expand_distr_list;
 } sending_options;
 
 void INETMAPI_API imopt_default_delivery_options(delivery_options *dopt);

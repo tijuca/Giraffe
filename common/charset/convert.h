@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -45,6 +44,7 @@
 #ifndef convert_INCLUDED
 #define convert_INCLUDED
 
+#include "zcdefs.h"
 #include <map>
 #include <set>
 #include <list>
@@ -78,8 +78,7 @@ private:
 /**
  * @brief	Unknown charset
  */
-class unknown_charset_exception : public convert_exception
-{
+class unknown_charset_exception _final : public convert_exception {
 public:
 	unknown_charset_exception(const std::string &message);
 };
@@ -87,8 +86,7 @@ public:
 /**
  * @brief	Illegal sequence
  */
-class illegal_sequence_exception : public convert_exception
-{
+class illegal_sequence_exception _final : public convert_exception {
 public:
 	illegal_sequence_exception(const std::string &message);
 };
@@ -151,7 +149,7 @@ namespace details {
 	 * @brief	Default converter from one charset to another with string types.
 	 */
 	template <typename _To_Type, typename _From_Type>
-	class iconv_context : public iconv_context_base
+	class iconv_context _final : public iconv_context_base
 	{
 	public:
 		/**
@@ -210,7 +208,7 @@ namespace details {
 		}
 		
 	private:
-		void append(const char *lpBuf, size_t cbBuf) throw() {
+		void append(const char *lpBuf, size_t cbBuf) throw() _override {
 			m_to.append(reinterpret_cast<typename _To_Type::const_pointer>(lpBuf), cbBuf / sizeof(typename _To_Type::value_type));
 		}
 
@@ -227,7 +225,7 @@ namespace details {
 	 * that case the string is merely copied.
 	 */
 	template <typename _Type>
-	class convert_helper {
+	class convert_helper _final {
 	public:
 		/**
 		 * @brief Converts a string to a string with the same charset.
@@ -258,7 +256,7 @@ namespace details {
 
 
 /**
- * @brief	Converts a string to a string wirh a different charset.
+ * @brief	Converts a string to a string with a different charset.
  *
  * This is the function to call when a one of conversion from one charset to 
  * another is required. The to- and from charsets are implicitly determined by
@@ -331,8 +329,7 @@ inline _To_Type convert_to(const char *tocode, const _From_Type &_from, size_t c
  * same context. This basically means that the details::iconv_context classes can
  * be reused, removing the need to recreate them for each conversion.
  */
-class convert_context
-{
+class convert_context _final {
 public:
 	/**
 	 * @brief Constructor.
@@ -398,7 +395,7 @@ private:
 	 * identical. In that case the string is merely copied.
 	 */
 	template <typename _Type>
-	class helper {
+	class helper _final {
 	public:
 		/**
 		 * @brief Constructor.
@@ -477,7 +474,7 @@ private:
 	 * the caller will end up with a pointer to non-existing data.
 	 */
 	template <typename _Type>
-	class helper<_Type*> {
+	class helper<_Type *> _final {
 	public:
 		typedef std::basic_string<_Type> string_type;
 	
@@ -581,7 +578,7 @@ private:
 	/**
 	 * @brief Sort predicate for the context_map;
 	 */
-	class context_predicate {
+	class context_predicate _final {
 	public:
 		bool operator()(const context_key &lhs, const context_key &rhs) const throw() {
 			int r = strcmp(lhs.fromtype, rhs.fromtype);
@@ -768,15 +765,13 @@ private:
 #define TO_UTF8_DEF(_ptr)					\
 	TO_UTF8(converter, (_ptr), ulFlags)
 
-
-
-#ifdef MAPIDEFS_H
-
 namespace details {
 
 	HRESULT HrFromException(const convert_exception &ce);
 
 } // namespace details
+
+#ifdef MAPIDEFS_H
 
 /**
  * @brief	Converts a string from one charset to another. Failure is indicated

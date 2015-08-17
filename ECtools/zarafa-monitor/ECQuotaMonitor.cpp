@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -78,7 +77,7 @@
 #include <string>
 using namespace std;
 
-#include "boost/algorithm/string.hpp"
+#include <boost/algorithm/string.hpp>
 
 #define QUOTA_CONFIG_MSG "Zarafa.Quota"
 
@@ -132,7 +131,7 @@ void* ECQuotaMonitor::Create(void* lpVoid)
 	time_t				tmStart = 0;
 	time_t				tmEnd = 0;
 
-	char* lpPath = lpThreadMonitor->lpConfig->GetSetting("server_socket");
+	const char *lpPath = lpThreadMonitor->lpConfig->GetSetting("server_socket");
 
 	lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_INFO, "Quota monitor starting");
 
@@ -341,7 +340,7 @@ HRESULT ECQuotaMonitor::CheckCompanyQuota(LPECCOMPANY lpecCompany)
 	LPMDB				lpAdminStore = NULL;
 
 	set<string> setServers;
-	char *lpszServersConfig;
+	const char *lpszServersConfig;
 	std::set<string, stricmp_comparison> setServersConfig;
 	set<string>::iterator iServers;
 	char *lpszConnection = NULL;
@@ -623,7 +622,7 @@ HRESULT ECQuotaMonitor::CreateMailFromTemplate(TemplateVariables *lpVars, string
 {
 	HRESULT hr = hrSuccess;
 	string strTemplateConfig;
-	char *lpszTemplate = NULL;
+	const char *lpszTemplate = NULL;
 	FILE *fp = NULL;
 	char cBuffer[TEMPLATE_LINE_LENGTH];
 	string strLine;
@@ -828,7 +827,7 @@ HRESULT ECQuotaMonitor::CreateMessageProperties(LPECUSER lpecToUser, LPECUSER lp
 
 	/* Messageclass */
 	lpPropArray[ulPropArrayCur].ulPropTag = PR_MESSAGE_CLASS_A;
-	lpPropArray[ulPropArrayCur++].Value.lpszA = "IPM.Note.StorageQuotaWarning";
+	lpPropArray[ulPropArrayCur++].Value.lpszA = const_cast<char *>("IPM.Note.StorageQuotaWarning");
 
 	/* Priority */
 	lpPropArray[ulPropArrayCur].ulPropTag = PR_PRIORITY;
@@ -856,7 +855,7 @@ HRESULT ECQuotaMonitor::CreateMessageProperties(LPECUSER lpecToUser, LPECUSER lp
 
 	/* RCVD_REPRESENTING_* properties */
 	lpPropArray[ulPropArrayCur].ulPropTag = PR_RCVD_REPRESENTING_ADDRTYPE_A;
-	lpPropArray[ulPropArrayCur++].Value.lpszA = "SMTP";
+	lpPropArray[ulPropArrayCur++].Value.lpszA = const_cast<char *>("SMTP");
 
 	lpPropArray[ulPropArrayCur].ulPropTag = PR_RCVD_REPRESENTING_EMAIL_ADDRESS_A;
 	lpPropArray[ulPropArrayCur++].Value.lpszA = (lpecToUser->lpszMailAddress ? (LPSTR)lpecToUser->lpszMailAddress : (LPSTR)"");
@@ -887,7 +886,7 @@ HRESULT ECQuotaMonitor::CreateMessageProperties(LPECUSER lpecToUser, LPECUSER lp
 
 	/* RECEIVED_BY_* properties */
 	lpPropArray[ulPropArrayCur].ulPropTag = PR_RECEIVED_BY_ADDRTYPE_A;
-	lpPropArray[ulPropArrayCur++].Value.lpszA = "SMTP";
+	lpPropArray[ulPropArrayCur++].Value.lpszA = const_cast<char *>("SMTP");
 
 	lpPropArray[ulPropArrayCur].ulPropTag = PR_RECEIVED_BY_EMAIL_ADDRESS_A;
 	lpPropArray[ulPropArrayCur++].Value.lpszA = (lpecToUser->lpszMailAddress ? (LPSTR)lpecToUser->lpszMailAddress : (LPSTR)"");
@@ -917,7 +916,7 @@ HRESULT ECQuotaMonitor::CreateMessageProperties(LPECUSER lpecToUser, LPECUSER lp
 
 	/* System user, PR_SENDER* */
 	lpPropArray[ulPropArrayCur].ulPropTag = PR_SENDER_ADDRTYPE_A;
-	lpPropArray[ulPropArrayCur++].Value.lpszA = "SMTP";
+	lpPropArray[ulPropArrayCur++].Value.lpszA = const_cast<char *>("SMTP");
 
 	lpPropArray[ulPropArrayCur].ulPropTag = PR_SENDER_EMAIL_ADDRESS_A;
 	lpPropArray[ulPropArrayCur++].Value.lpszA = (lpecFromUser->lpszMailAddress ? (LPSTR)lpecFromUser->lpszMailAddress : (LPSTR)"");
@@ -947,7 +946,7 @@ HRESULT ECQuotaMonitor::CreateMessageProperties(LPECUSER lpecToUser, LPECUSER lp
 
 	/* System user, PR_SENT_REPRESENTING* */
 	lpPropArray[ulPropArrayCur].ulPropTag = PR_SENT_REPRESENTING_ADDRTYPE_A;
-	lpPropArray[ulPropArrayCur++].Value.lpszA = "SMTP";
+	lpPropArray[ulPropArrayCur++].Value.lpszA = const_cast<char *>("SMTP");
 
 	lpPropArray[ulPropArrayCur].ulPropTag = PR_SENT_REPRESENTING_EMAIL_ADDRESS_A;
 	lpPropArray[ulPropArrayCur++].Value.lpszA = (lpecFromUser->lpszMailAddress ? (LPSTR)lpecFromUser->lpszMailAddress : (LPSTR)"");
@@ -1047,7 +1046,9 @@ HRESULT ECQuotaMonitor::CreateRecipientList(ULONG cToUsers, LPECUSER lpToUsers, 
 			goto exit;
 		}
 
-		hr = HrCreateEmailSearchKey("SMTP", (char*)lpToUsers[i].lpszMailAddress, &cbUserSearchKey, &lpUserSearchKey);
+		hr = HrCreateEmailSearchKey("SMTP",
+		     reinterpret_cast<const char *>(lpToUsers[i].lpszMailAddress),
+		     &cbUserSearchKey, &lpUserSearchKey);
 		if (hr != hrSuccess) {
 			m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed creating email searchkey: 0x%08X", hr);
 			goto exit;
@@ -1066,7 +1067,7 @@ HRESULT ECQuotaMonitor::CreateRecipientList(ULONG cToUsers, LPECUSER lpToUsers, 
 		lpAddrList->aEntries[i].rgPropVals[3].Value.lpszA = (lpToUsers[i].lpszMailAddress ? (LPSTR)lpToUsers[i].lpszMailAddress : (LPSTR)"");
 
 		lpAddrList->aEntries[i].rgPropVals[4].ulPropTag = PR_ADDRTYPE_A;
-		lpAddrList->aEntries[i].rgPropVals[4].Value.lpszA = "SMTP";
+		lpAddrList->aEntries[i].rgPropVals[4].Value.lpszA = const_cast<char *>("SMTP");
 
 		hr = MAPIAllocateMore(cbUserEntryid, lpAddrList->aEntries[i].rgPropVals,
 							  (void**)&lpAddrList->aEntries[i].rgPropVals[5].Value.bin.lpb);
@@ -1283,7 +1284,7 @@ HRESULT ECQuotaMonitor::CheckQuotaInterval(LPMDB lpStore, LPMESSAGE *lppMessage,
 	HRESULT hr = hrSuccess;
 	MessagePtr ptrMessage;
 	SPropValuePtr ptrProp;
-	char *lpResendInterval = NULL;
+	const char *lpResendInterval = NULL;
 	ULONG ulResendInterval = 0;
 	FILETIME ft;
 	FILETIME ftNextRun;
@@ -1442,7 +1443,7 @@ HRESULT ECQuotaMonitor::Notify(LPECUSER lpecUser, LPECCOMPANY lpecCompany, LPECQ
 
 	/* Go through all stores to deliver the mail to all recipients.
 	 *
-	 * Note that we will parse the template for each recipient seperately,
+	 * Note that we will parse the template for each recipient separately,
 	 * this is done to support better language support later on where each user
 	 * will get a notification mail in his prefered language.
 	 */

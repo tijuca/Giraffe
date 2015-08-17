@@ -56,9 +56,8 @@ ldapms.openldap.cfg: ldap.m4
 ldapms.active-directory.cfg: ldap.m4
 	m4 -DTYPE=ADS -DMULTISERVER=1 ${top_srcdir}/installer/linux/ldap.m4 > $@
 
-
 bindir = ${prefix}/bin
-dist_bin_SCRIPTS = zarafa-autorespond zarafa-mr-accept
+dist_sbin_SCRIPTS = zarafa-autorespond zarafa-mr-accept zarafa-mr-process
 
 sysconf_rotatedir = ${sysconfdir}/logrotate.d
 dist_sysconf_rotate_DATA = zarafa.logrotate
@@ -70,17 +69,6 @@ sysconf_bcdir = ${sysconfdir}/bash_completion.d
 dist_sysconf_bc_DATA = zarafa-bash-completion.sh
 
 sysconf_certdir = ${sysconfdir}/zarafa/report-ca
-if ! OSS_ONLY
-BUILT_SOURCES += ldapms.openldap.cfg ldapms.active-directory.cfg
-
-config_files += licensed.cfg example-msr.cfg backup.cfg
-rhel_initscript_files += zarafa-licensed.init.rhel zarafa-ws.init.rhel
-suse_initscript_files += zarafa-licensed.init.suse zarafa-ws.init.suse
-cbs4_initscript_files += zarafa-licensed.init.cbs4 zarafa-ws.init.cbs4
-alt_initscript_files += zarafa-licensed.init.alt zarafa-ws.init.alt
-
-dist_sysconf_cert_DATA = addtrust.crt
-endif
 
 config_files += $(BUILT_SOURCES)
 EXTRA_DIST = $(BUILT_SOURCES) ldap.m4 \

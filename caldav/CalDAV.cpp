@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -43,14 +42,17 @@
  */
 
 #include "platform.h"
-#include "CalDAV.h"
+#include "mapidefs.h"
+#include "ECChannel.h"
+#include <mapix.h>
+#include "MAPIErrors.h"
 #include "Http.h"
 #include "CalDavUtil.h"
 #include "iCal.h"
 #include "WebDav.h"
 #include "CalDavProto.h"
 #include "ProtocolBase.h"
-#include <signal.h>
+#include <csignal>
 
 #include <iostream>
 #include <string>
@@ -62,20 +64,22 @@
 #include "CommonUtil.h"
 #include "SSLUtil.h"
 
+#include "TmpPath.h"
+
 using namespace std;
 
 #include <execinfo.h>
 #include "UnixUtil.h"
 
 #if HAVE_ICU
-#include "unicode/uclean.h"
+#include <unicode/uclean.h>
 #endif
 
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 
@@ -84,22 +88,31 @@ struct HandlerArgs {
 	bool bUseSSL;
 };
 
-bool g_bDaemonize = true;
-bool g_bQuit = false;
-bool g_bThreads = false;
-ECLogger *g_lpLogger = NULL;
-ECConfig *g_lpConfig = NULL;
-pthread_t mainthread;
-int nChildren = 0;
+static bool g_bDaemonize = true;
+static bool g_bQuit = false;
+static bool g_bThreads = false;
+static ECLogger *g_lpLogger = NULL;
+static ECConfig *g_lpConfig = NULL;
+static pthread_t mainthread;
+static int nChildren = 0;
+
+static HRESULT HrSetupListeners(int *lpulNormalSocket, int *lpulSecureSocket);
+static HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket);
+static HRESULT HrStartHandlerClient(ECChannel *lpChannel, bool bUseSSL, int nCloseFDs, int *pCloseFDs);
+
+static void *HandlerClient(void *lpArg);
+static HRESULT HrHandleRequest(ECChannel *lpChannel);
 
 #define KEEP_ALIVE_TIME 300
 
-void sigterm(int) {
+static void sigterm(int)
+{
 	g_bQuit = true;
 }
 
-void sighup(int) {
-	// In Win32, the signal is sent in a seperate, special signal thread. So this test is
+static void sighup(int)
+{
+	// In Win32, the signal is sent in a separate, special signal thread. So this test is
 	// not needed or required.
 	if (g_bThreads && pthread_equal(pthread_self(), mainthread)==0)
 		return;
@@ -110,7 +123,7 @@ void sighup(int) {
 
 	if (g_lpLogger) {
 		if (g_lpConfig) {
-			char *ll = g_lpConfig->GetSetting("log_level");
+			const char *ll = g_lpConfig->GetSetting("log_level");
 			int new_ll = ll ? atoi(ll) : 2;
 			g_lpLogger->SetLoglevel(new_ll);
 		}
@@ -121,50 +134,19 @@ void sighup(int) {
 }
 
 
-void sigchld(int) {
+static void sigchld(int)
+{
 	int stat;
 	while (waitpid (-1, &stat, WNOHANG) > 0) nChildren--;
 }
 
-void sigsegv(int signr)
+static void sigsegv(int signr)
 {
-	void *bt[64];
-	int i, n;
-	char **btsymbols;
-
-	if (!g_lpLogger)
-		goto exit;
-
-	switch (signr) {
-	case SIGSEGV:
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Pid %d caught SIGSEGV (%d), traceback:", getpid(), signr);
-		break;
-	case SIGBUS:
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Pid %d caught SIGBUS (%d), possible invalid mapped memory access, traceback:", getpid(), signr);
-		break;
-	case SIGABRT:
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Pid %d caught SIGABRT (%d), out of memory or unhandled exception, traceback:", getpid(), signr);
-		break;
-	};
-
-	n = backtrace(bt, 64);
-
-	btsymbols = backtrace_symbols(bt, n);
-
-	for (i = 0; i < n; i++) {
-		if (btsymbols)
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "%p %s", bt[i], btsymbols[i]);
-		else
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "%p", bt[i]);
+	generic_sigsegv_handler(g_lpLogger, "CalDAV", PROJECT_VERSION_GATEWAY_STR, signr);
 	}
 
-	g_lpLogger->Log(EC_LOGLEVEL_FATAL, "When reporting this traceback, please include Linux distribution name, system architecture and Zarafa version.");
-
-exit:
-	kill(getpid(), signr);
-}
-
-void PrintHelp(char *name) {
+static void PrintHelp(const char *name)
+{
 	cout << "Usage:\n" << endl;
 	cout << name << " [-h] [-F] [-V] [-c <configfile>]" << endl;
 	cout << "  -F\t\tDo not run in the background" << endl;
@@ -172,11 +154,10 @@ void PrintHelp(char *name) {
 	cout << "  -V\t\tPrint version info." << endl;
 	cout << "  -c filename\tUse alternate config file (e.g. /etc/zarafa/ical.cfg)\n\t\tDefault: /etc/zarafa/ical.cfg" << endl;
 	cout << endl;
-	cout << "  --ignore-unknown-config-options\tStart even if the configuration file contains invalid config options" << endl;
-	cout << endl;
 }
 
-void PrintVersion() {
+static void PrintVersion(void)
+{
 	cout << "Product version:\t"  <<  PROJECT_VERSION_CALDAV_STR << endl << "File version:\t\t" << PROJECT_SVN_REV_STR << endl;
 }
 
@@ -193,7 +174,7 @@ int main(int argc, char **argv) {
 	// Configuration
 	char opt = '\0';
 	const char *lpszCfg = ECConfig::GetDefaultPath("ical.cfg");
-	const configsetting_t lpDefaults[] = {
+	static const configsetting_t lpDefaults[] = {
 		{ "run_as_user", "" },
 		{ "run_as_group", "" },
 		{ "pid_file", "/var/run/zarafa-ical.pid" },
@@ -212,6 +193,7 @@ int main(int argc, char **argv) {
 		{ "log_file", "/var/log/zarafa/ical.log" },
 		{ "log_level", "3", CONFIGSETTING_RELOADABLE },
 		{ "log_timestamp", "1" },
+		{ "log_buffer_size", "4096" },
         { "ssl_private_key_file", "/etc/zarafa/ical/privkey.pem" },
         { "ssl_certificate_file", "/etc/zarafa/ical/cert.pem" },
 		{ "ssl_protocols", "!SSLv2" },
@@ -220,13 +202,14 @@ int main(int argc, char **argv) {
         { "ssl_verify_client", "no" },
         { "ssl_verify_file", "" },
         { "ssl_verify_path", "" },
+		{ "tmp_path", "/tmp" },
 		{ NULL, NULL },
 	};
 	enum {
 		OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS
 	};
 
-	struct option long_options[] = {
+	static const struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
 		{"config", required_argument, NULL, 'c'},
 		{"version", no_argument, NULL, 'v'},
@@ -268,7 +251,7 @@ int main(int argc, char **argv) {
 
 	g_lpConfig = ECConfig::Create(lpDefaults);
 	if (!g_lpConfig->LoadSettings(lpszCfg) || !g_lpConfig->ParseParams(argc-my_optind, &argv[my_optind], NULL) || (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
-		g_lpLogger = new ECLogger_File(1, 0, "-");
+		g_lpLogger = new ECLogger_File(1, 0, "-", false, 0);
 		LogConfigErrors(g_lpConfig, g_lpLogger);
 		goto exit;
 	}
@@ -282,6 +265,9 @@ int main(int argc, char **argv) {
 	if ((bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) || g_lpConfig->HasWarnings())
 		LogConfigErrors(g_lpConfig, g_lpLogger);
 
+	if (!TmpPath::getInstance() -> OverridePath(g_lpConfig))
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Ignoring invalid path-setting!");
+
 	if (strncmp(g_lpConfig->GetSetting("process_model"), "thread", strlen("thread")) == 0)
 		g_bThreads = true;
 
@@ -294,7 +280,7 @@ int main(int argc, char **argv) {
 		goto exit;
 	}
 
-	hr = HrSetupListners(&ulListenCalDAV, &ulListenCalDAVs);
+	hr = HrSetupListeners(&ulListenCalDAV, &ulListenCalDAVs);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -339,14 +325,14 @@ int main(int argc, char **argv) {
 	if (g_bThreads)
 		mainthread = pthread_self();
 
-	g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Starting zarafa-ical version " PROJECT_VERSION_CALDAV_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
+	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting zarafa-ical version " PROJECT_VERSION_CALDAV_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
 
 	hr = HrProcessConnections(ulListenCalDAV, ulListenCalDAVs);
 	if (hr != hrSuccess)
 		goto exit;
 
 
-	g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "CalDAV Gateway will now exit");
+	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "CalDAV Gateway will now exit");
 
 	// in forked mode, send all children the exit signal
 	if (g_bThreads == false) {
@@ -365,7 +351,7 @@ int main(int argc, char **argv) {
 		if (nChildren)
 			g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Forced shutdown with %d processes left", nChildren);
 		else
-			g_lpLogger->Log(EC_LOGLEVEL_INFO, "CalDAV Gateway shutdown complete");
+			g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "CalDAV Gateway shutdown complete");
 	}
 
 exit:
@@ -399,7 +385,7 @@ exit:
 
 }
 
-HRESULT HrSetupListners(int *lpulNormal, int *lpulSecure)
+static HRESULT HrSetupListeners(int *lpulNormal, int *lpulSecure)
 {
 	HRESULT hr = hrSuccess;
 	bool bListen = false;
@@ -426,10 +412,10 @@ HRESULT HrSetupListners(int *lpulNormal, int *lpulSecure)
 	if (bListen) {
 		hr = HrListen(g_lpLogger, g_lpConfig->GetSetting("server_bind"), ulPortICal, &ulNormalSocket);
 		if (hr != hrSuccess) {
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Could not listen on port %d. (0x%08X)", ulPortICal, hr);
+			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Could not listen on port %d. (0x%08X %s)", ulPortICal, hr, GetMAPIErrorMessage(hr));
 			bListen = false;
 		} else {
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Listening on port %d.", ulPortICal);
+			g_lpLogger->Log(EC_LOGLEVEL_INFO, "Listening on port %d.", ulPortICal);
 		}
 	}
 
@@ -439,12 +425,12 @@ HRESULT HrSetupListners(int *lpulNormal, int *lpulSecure)
 		if (hr == hrSuccess) {
 			hr = HrListen(g_lpLogger, g_lpConfig->GetSetting("server_bind"), ulPortICalS, &ulSecureSocket);
 			if (hr != hrSuccess) {
-				g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Could not listen on secure port %d. (0x%08X)", ulPortICalS, hr);
+				g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Could not listen on secure port %d. (0x%08X %s)", ulPortICalS, hr, GetMAPIErrorMessage(hr));
 				bListenSecure = false;
 			}
 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Listening on secure port %d.", ulPortICalS);
 		} else {
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Could not listen on secure port %d. (0x%08X)", ulPortICalS, hr);
+			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Could not listen on secure port %d. (0x%08X %s)", ulPortICalS, hr, GetMAPIErrorMessage(hr));
 			bListenSecure = false;
 		}
 	}
@@ -471,7 +457,7 @@ exit:
  * @param[in]	ulSecureSocket	Listening socket of incoming HTTPS connections
  * @retval MAPI error code
  */
-HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
+static HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
 {
 	HRESULT hr = hrSuccess;
 	fd_set readfds = {{0}};
@@ -531,7 +517,7 @@ HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
 			bUseSSL = true;
 			hr = HrAccept(g_lpLogger, ulSecureSocket, &lpChannel);
 			if (hr != hrSuccess) {
-				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not accept incoming secure connection on port %d. (0x%08X)", atoi(g_lpConfig->GetSetting("ical_port")), hr);
+				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not accept incoming secure connection on port %d. (0x%08X %s)", atoi(g_lpConfig->GetSetting("ical_port")), hr, GetMAPIErrorMessage(hr));
 				continue;
 			}
 		} else {
@@ -541,7 +527,7 @@ HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
 		hr = HrStartHandlerClient(lpChannel, bUseSSL, nCloseFDs, pCloseFDs);
 		if (hr != hrSuccess) {
 			delete lpChannel;	// destructor closes sockets
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Handling client connection failed. (0x%08X)", hr);
+			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Handling client connection failed. (0x%08X %s)", hr, GetMAPIErrorMessage(hr));
 			continue;
 		}
 		if (g_bThreads == false)
@@ -561,7 +547,8 @@ HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
  * @param[in]	pCloseFDs	Array of FDs to close in child process
  * @retval E_FAIL when thread of child did not start
  */
-HRESULT HrStartHandlerClient(ECChannel *lpChannel, bool bUseSSL, int nCloseFDs, int *pCloseFDs)
+static HRESULT HrStartHandlerClient(ECChannel *lpChannel, bool bUseSSL,
+    int nCloseFDs, int *pCloseFDs)
 {
 	HRESULT hr = hrSuccess;
 	pthread_attr_t pThreadAttr;
@@ -583,7 +570,10 @@ HRESULT HrStartHandlerClient(ECChannel *lpChannel, bool bUseSSL, int nCloseFDs, 
 			hr = E_FAIL;
 			goto exit;
 		}
-	} else {
+
+		set_thread_name(pThread, "ZCalDAV" + lpChannel -> GetIPAddress());
+	}
+	else {
 		if (unix_fork_function(HandlerClient, lpHandlerArgs, nCloseFDs, pCloseFDs) < 0) {
 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not create process.");
 			hr = E_FAIL;
@@ -599,7 +589,7 @@ exit:
 	return hr;
 }
 
-void *HandlerClient(void *lpArg)
+static void *HandlerClient(void *lpArg)
 {
 	HRESULT hr = hrSuccess;
 	HandlerArgs *lpHandlerArgs = (HandlerArgs *) lpArg;
@@ -613,9 +603,11 @@ void *HandlerClient(void *lpArg)
 		goto exit;
     }
 
-	while(1)
-	{
+	while (!g_bQuit) {
 		hr = lpChannel->HrSelect(KEEP_ALIVE_TIME);
+		if (hr == MAPI_E_CANCEL)
+			/* signalled - reevaluate g_bQuit */
+			continue;
 		if (hr != hrSuccess) {
 			g_lpLogger->Log(EC_LOGLEVEL_INFO, "Request timeout, closing connection");
 			break;
@@ -636,7 +628,7 @@ exit:
 	return NULL;
 }
 
-HRESULT HrHandleRequest(ECChannel *lpChannel)
+static HRESULT HrHandleRequest(ECChannel *lpChannel)
 {
 	HRESULT hr = hrSuccess;
 	std::wstring wstrUser;
@@ -693,7 +685,7 @@ HRESULT HrHandleRequest(ECChannel *lpChannel)
 
 	hr = HrParseURL(strUrl, &ulFlag);
 	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client request is invalid: 0x%08X", hr);
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client request is invalid: 0x%08X %s", hr, GetMAPIErrorMessage(hr));
 		lpRequest->HrResponseHeader(400, "Bad Request: " + stringify(hr,true));
 		goto exit;
 	}
@@ -721,7 +713,7 @@ HRESULT HrHandleRequest(ECChannel *lpChannel)
 		lpRequest->HrGetMethod(&strMethod);
 		hr = HrAuthenticate(g_lpLogger, strUserAgent, strUserAgentVersion, wstrUser, wstrPass, g_lpConfig->GetSetting("server_socket"), &lpSession);
 		if (hr != hrSuccess)
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Login failed (0x%08X), resending authentication request", hr);
+			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Login failed (0x%08X %s), resending authentication request", hr, GetMAPIErrorMessage(hr));
 	}
 	if (hr != hrSuccess) {
 		if(ulFlag & SERVICE_ICAL)
@@ -761,7 +753,7 @@ HRESULT HrHandleRequest(ECChannel *lpChannel)
 
 exit:
 	if(hr != hrSuccess && !strMethod.empty() && hr != MAPI_E_NOT_ME)
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error processing %s request, error code 0x%08x", strMethod.c_str(), hr);
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error processing %s request, error code 0x%08x %s", strMethod.c_str(), hr, GetMAPIErrorMessage(hr));
 
 	if ( lpRequest && hr != MAPI_E_USER_CANCEL ) // do not send response to client if connection closed by client.
 		hr = lpRequest->HrFinalize();

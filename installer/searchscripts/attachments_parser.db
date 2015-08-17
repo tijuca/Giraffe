@@ -19,22 +19,22 @@
 # The command will be detected and executed by the attachments_parser script,
 # to test the command the following can be done to check the result:
 #
-#		cat <attachment> | <command>
+#		<command> < <attachment>
 #
-text/plain;txt	`cat /dev/stdin`
+text/plain;txt	`cat`
 text/html;html;htm	`FILE=$(zmktemp); w3m -dump -T text/html -s -O utf-8 $FILE`
 application/xml;text/xml;xml	`xsltproc ${SCRIPTPATH}/xmltotext.xslt -`
 application/pdf;pdf	`pdftotext -q -nopgbrk $(zmktemp) /dev/stdout`
 application/msword;doc `catdoc -s cp1252 -d utf-8 -f ascii -w /dev/stdin`
 application/mspowerpoint;application/powerpoint;application/x-mspowerpoint;application/vnd.ms-powerpoint;ppt	`catppt -s cp1252 -d utf-8 /dev/stdin`
 application/excel;application/x-excel;application/x-msexcel;application/vnd.ms-excel;xls	`xls2csv -s cp1252 -d utf-8 -c ' ' /dev/stdin`
-application/vnd.openxmlformats-officedocument.wordprocessingml.document;docx	`zmktemp | unzip -p $(cat /dev/stdin) word/document.xml | xsltproc ${SCRIPTPATH}/xmltotext.xslt -`
-application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;xlsx	`zmktemp | unzip -o -qq $(cat /dev/stdin) -d $TMPDIR; for i in $(find $TMPDIR -name \*.xml); do xsltproc ${SCRIPTPATH}/xmltotext.xslt $i; done`
-application/vnd.openxmlformats-officedocument.presentationml.presentation;pptx	`zmktemp | unzip -o -qq $(cat /dev/stdin) -d $TMPDIR; for i in $(find $TMPDIR -name \*.xml); do xsltproc ${SCRIPTPATH}/xmltotext.xslt $i; done`
-application/vnd.oasis.opendocument.text;odt `zmktemp | unzip -p $(cat /dev/stdin) content.xml | xsltproc ${SCRIPTPATH}/xmltotext.xslt -`
-application/vnd.oasis.opendocument.spreadsheet;ods	`zmktemp | unzip -p $(cat /dev/stdin) content.xml | xsltproc ${SCRIPTPATH}/xmltotext.xslt -`
-application/vnd.oasis.opendocument.presentation;odp	`zmktemp | unzip -p $(cat /dev/stdin) content.xml | xsltproc ${SCRIPTPATH}/xmltotext.xslt -`
+application/vnd.openxmlformats-officedocument.wordprocessingml.document;docx	`zmktemp | unzip -p $(cat) word/document.xml | xsltproc ${SCRIPTPATH}/xmltotext.xslt -`
+application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;xlsx	`zmktemp | unzip -o -qq $(cat) -d $TMPDIR; for i in $(find $TMPDIR -name \*.xml); do xsltproc ${SCRIPTPATH}/xmltotext.xslt $i; done`
+application/vnd.openxmlformats-officedocument.presentationml.presentation;pptx	`zmktemp | unzip -o -qq $(cat) -d $TMPDIR; for i in $(find $TMPDIR -name \*.xml); do xsltproc ${SCRIPTPATH}/xmltotext.xslt $i; done`
+application/vnd.oasis.opendocument.text;odt `zmktemp | unzip -p $(cat) content.xml | xsltproc ${SCRIPTPATH}/xmltotext.xslt -`
+application/vnd.oasis.opendocument.spreadsheet;ods	`zmktemp | unzip -p $(cat) content.xml | xsltproc ${SCRIPTPATH}/xmltotext.xslt -`
+application/vnd.oasis.opendocument.presentation;odp	`zmktemp | unzip -p $(cat) content.xml | xsltproc ${SCRIPTPATH}/xmltotext.xslt -`
 image/gif;image/jpeg;image/png;image/tiff;gif;jpg;jpeg;png;tif;tiff	`echo -n`
 
 # fallback if the mimetype was not specified
-application/octet-stream `FILE=$(zmktemp); cat $FILE | attachments_parser mime $(file --mime-type $FILE | awk '{print $2}' | sed -e 's%application/octet-stream%stop_loop%')`
+application/octet-stream `FILE=$(zmktemp); attachments_parser < $FILE mime $(file --mime-type $FILE | awk '{print $2}' | sed -e 's%application/octet-stream%stop_loop%')`

@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -44,8 +43,8 @@
 
 #include <platform.h>
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 
 #include <sstream>
 #include <iostream>
@@ -71,7 +70,7 @@
 #include <base64.h>
 #include <options.h>
 
-#include "edkmdb.h"
+#include <edkmdb.h>
 #include "stringutil.h"
 #include "codepage.h"
 #include "charset/convert.h"
@@ -91,7 +90,7 @@ using namespace std;
  * @ingroup gateway_imap
  * @{
  */
-string strMonth[] = {
+const string strMonth[] = {
 	"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 };
 
@@ -101,7 +100,7 @@ string strMonth[] = {
  * @param[in]	strInput	string to find prefix in
  * @param[in]	strPrefix	test if input starts with this string
  */
-bool Prefix(const std::string &strInput, std::string strPrefix)
+static bool Prefix(const std::string &strInput, const std::string &strPrefix)
 {
     return (strInput.compare(0, strPrefix.size(), strPrefix) == 0);
 }
@@ -109,7 +108,9 @@ bool Prefix(const std::string &strInput, std::string strPrefix)
 /**
  * IMAP class constructor
  */
-IMAP::IMAP(char *szServerPath, ECChannel *lpChannel, ECLogger *lpLogger, ECConfig *lpConfig) : ClientProto(szServerPath, lpChannel, lpLogger, lpConfig)
+IMAP::IMAP(const char *szServerPath, ECChannel *lpChannel, ECLogger *lpLogger,
+    ECConfig *lpConfig) :
+	ClientProto(szServerPath, lpChannel, lpLogger, lpConfig)
 {
 	lpSession = NULL;
 	lpStore = NULL;
@@ -742,8 +743,8 @@ HRESULT IMAP::HrProcessContinue(const string &strInput)
 std::string IMAP::GetCapabilityString(bool bAllFlags)
 {
 	string strCapabilities;
-	char *idle = lpConfig->GetSetting("imap_capability_idle");
-	char *plain = lpConfig->GetSetting("disable_plaintext_auth");
+	const char *idle = lpConfig->GetSetting("imap_capability_idle");
+	const char *plain = lpConfig->GetSetting("disable_plaintext_auth");
 
 	// capabilities we always have
 	strCapabilities = "CAPABILITY IMAP4rev1 LITERAL+";
@@ -915,7 +916,7 @@ HRESULT IMAP::HrCmdAuthenticate(const string &strTag, string strAuthMethod, cons
 	HRESULT hr2 = hrSuccess;
 	vector<string> vAuth;
 
-	char *plain = lpConfig->GetSetting("disable_plaintext_auth");
+	const char *plain = lpConfig->GetSetting("disable_plaintext_auth");
 
 	// If plaintext authentication was disabled any authentication attempt must be refused very soon
 	if (!lpChannel->UsingSsl() && lpChannel->sslctx() && plain && strcmp(plain, "yes") == 0) {
@@ -985,7 +986,7 @@ HRESULT IMAP::HrCmdLogin(const string &strTag, const string &strUser, const stri
 	size_t i;
 	wstring strwUsername;
 	wstring strwPassword;
-	char *plain = lpConfig->GetSetting("disable_plaintext_auth");
+	const char *plain = lpConfig->GetSetting("disable_plaintext_auth");
 
 	// strUser isn't sent in imap style utf-7, but \ is escaped, so strip those
 	for (i=0; i < strUser.length(); i++) {
@@ -1267,7 +1268,7 @@ HRESULT IMAP::HrCmdCreate(const string &strTag, const string &strFolderParam) {
 		}
 
 		sFolderClass.ulPropTag = PR_CONTAINER_CLASS_A;
-		sFolderClass.Value.lpszA = "IPF.Note";
+		sFolderClass.Value.lpszA = const_cast<char *>("IPF.Note");
 		hr = HrSetOneProp(lpSubFolder, &sFolderClass);
 		if (hr != hrSuccess)
 			goto exit;
@@ -1494,7 +1495,7 @@ HRESULT IMAP::HrCmdRename(const string &strTag, const string &strExistingFolderP
 			}
 
 			sFolderClass.ulPropTag = PR_CONTAINER_CLASS_A;
-			sFolderClass.Value.lpszA = "IPF.Note";
+			sFolderClass.Value.lpszA = const_cast<char *>("IPF.Note");
 			hr = HrSetOneProp(lpSubFolder, &sFolderClass);
 			if (hr != hrSuccess)
 				goto exit;
@@ -3305,7 +3306,8 @@ HRESULT IMAP::HrExpungeDeleted(const string &strTag, const string &strCommand, L
 
 	if(lpRows->cRows) {
         sEntryList.cValues = 0;
-        MAPIAllocateBuffer(sizeof(SBinary) * lpRows->cRows, (LPVOID *) &sEntryList.lpbin);
+        if ((hr = MAPIAllocateBuffer(sizeof(SBinary) * lpRows->cRows, (LPVOID *) &sEntryList.lpbin)) != hrSuccess)
+		goto exit;
 
         for (ULONG ulMailnr = 0; ulMailnr < lpRows->cRows; ulMailnr++) {
 			hr = lpFolder->SetMessageStatus(lpRows->aRow[ulMailnr].lpProps[EID].Value.bin.cb, (LPENTRYID)lpRows->aRow[ulMailnr].lpProps[EID].Value.bin.lpb,
@@ -4020,7 +4022,7 @@ HRESULT IMAP::HrGetSubTree(list<SFolder> &lstFolders, SBinary &sEntryID, wstring
 		    break;
         }
 
-		WCHAR *foldername = L"";
+		const wchar_t *foldername = L"";
 		bSubfolders = true;
 		bMailFolder = true;
 
@@ -4395,7 +4397,7 @@ HRESULT IMAP::HrPropertyFetchRow(LPSPropValue lpProps, ULONG cValues, string &st
 	sending_options sopt;
 	imopt_default_sending_options(&sopt);
 	sopt.no_recipients_workaround = true;	// do not stop processing mail on empty recipient table
-	sopt.alternate_boundary = "=_ZG_static";
+	sopt.alternate_boundary = const_cast<char *>("=_ZG_static");
 	sopt.force_utf8 = parseBool(lpConfig->GetSetting("imap_generate_utf8"));
 	string strMessage;
 	string strMessagePart;
@@ -4851,7 +4853,7 @@ HRESULT IMAP::HrGetMessageEnvelope(string &strResponse, LPMESSAGE lpMessage) {
 	HRESULT hr = hrSuccess;
 	LPSPropValue lpPropVal = NULL;
 	LPSPropValue lpInternetCPID = NULL;
-	char *lpszCharset = NULL;
+	const char *lpszCharset = NULL;
 	string strCharset;
 	bool bIgnoreCharsetErrors = false;
 	LPMAPITABLE lpTable = NULL;
@@ -5276,7 +5278,7 @@ exit:
 }
 
 /** 
- * Convert a sequence number to it's actual number. It will either
+ * Convert a sequence number to its actual number. It will either
  * return a number or a UID, depending on the input.
  * A special treatment for 
  * 
@@ -5860,7 +5862,8 @@ HRESULT IMAP::HrCopy(const list<ULONG> &lstMails, const string &strFolderParam, 
 		goto exit;
 
 	sEntryList.cValues = lstMails.size();
-	MAPIAllocateBuffer(sizeof(SBinary) * lstMails.size(), (LPVOID *) &sEntryList.lpbin);
+	if ((hr = MAPIAllocateBuffer(sizeof(SBinary) * lstMails.size(), (LPVOID *) &sEntryList.lpbin)) != hrSuccess)
+		goto exit;
 	ulCount = 0;
 
 	for (lpMail = lstMails.begin(); lpMail != lstMails.end(); lpMail++) {
@@ -5983,9 +5986,8 @@ HRESULT IMAP::HrSearch(vector<string> &lstSearchCriteria, ULONG &ulStartCriteria
 	}
 
 	hr = MAPIAllocateBuffer(sizeof(SRestriction), (LPVOID *) &lpRootRestrict);
-	if (hr != hrSuccess) {
+	if (hr != hrSuccess)
 		goto exit;
-	}
 
 	lstRestrictions.push_back(lpRootRestrict);
 
@@ -6733,73 +6735,11 @@ HRESULT IMAP::HrSearch(vector<string> &lstSearchCriteria, ULONG &ulStartCriteria
 			lpPropVal->Value.lpszA = szBuffer;
 			lpExtraRestriction[1].res.resContent.lpProp = lpPropVal;
 			ulStartCriteria += 2;
-		} else if (strSearchCriterium.compare("TO") == 0 || strSearchCriterium.compare("CC") == 0 || strSearchCriterium.compare("BCC") == 0) {
-		    
-/*		    SPropValue sPropRecipType, sPropDisplay, sPropEmail;
-		    
-			if (lstSearchCriteria.size() - ulStartCriteria <= 1) {
-				hr = MAPI_E_CALL_FAILED;
-				goto exit;
 			}
+		else if (strSearchCriterium.compare("TO") == 0 || strSearchCriterium.compare("CC") == 0 || strSearchCriterium.compare("BCC") == 0) {
+		    char *szField = NULL;
+		    char *szSearch = NULL;
 
-            // Make a subrestriction looking for (TYPE == MAPI_TO && (DISPLAY_NAME == VALUE || EMAIL_ADDRESS == VALUE))
-			lpRestriction->rt = RES_SUBRESTRICTION;
-            lpRestriction->res.resSub.ulSubObject = PR_MESSAGE_RECIPIENTS;
-            
-            hr = MAPIAllocateMore(sizeof(SRestriction), lpRootRestrict, (void **)&lpRestriction->res.resSub.lpRes);
-            if(hr != hrSuccess)
-                goto exit;
-                
-            lpRestriction->res.resSub.lpRes->rt = RES_AND;
-            lpRestriction->res.resSub.lpRes->res.resAnd.cRes = 2;
-            
-            hr = MAPIAllocateMore(sizeof(SRestriction)*2, lpRootRestrict, (void **)&lpRestriction->res.resSub.lpRes->res.resAnd.lpRes);
-            if(hr != hrSuccess)
-                goto exit;
-                
-                
-            sPropRecipType.ulPropTag = PR_RECIPIENT_TYPE;
-            if(strSearchCriterium == "TO")
-                sPropRecipType.Value.ul = MAPI_TO;
-            else if(strSearchCriterium == "CC")
-                sPropRecipType.Value.ul = MAPI_CC;
-            else
-                sPropRecipType.Value.ul = MAPI_BCC;
-
-            lpRestriction->res.resSub.lpRes->res.resAnd.lpRes[0].rt = RES_PROPERTY;
-            lpRestriction->res.resSub.lpRes->res.resAnd.lpRes[0].res.resProperty.ulPropTag = PR_RECIPIENT_TYPE;
-            lpRestriction->res.resSub.lpRes->res.resAnd.lpRes[0].res.resProperty.lpProp = &sPropRecipType;
-            lpRestriction->res.resSub.lpRes->res.resAnd.lpRes[0].res.resProperty.relop = RELOP_EQ;
-            
-            lpRestriction->res.resSub.lpRes->res.resAnd.lpRes[1].rt = RES_OR;
-            lpRestriction->res.resSub.lpRes->res.resAnd.lpRes[1].res.resOr.cRes = 2;
-            hr = MAPIAllocateMore(sizeof(SRestriction)*2, lpRootRestrict, (void **)&lpRestriction->res.resSub.lpRes->res.resAnd.lpRes[1].res.resOr.lpRes);
-            if(hr != hrSuccess)
-                goto exit;
-                
-            
-            sPropDisplay.ulPropTag = PR_DISPLAY_NAME;
-            sPropDisplay.Value.lpszA = (char *)lstSearchCriteria[ulStartCriteria + 1].c_str();
-
-            sPropEmail.ulPropTag = PR_EMAIL_ADDRESS;
-            sPropEmail.Value.lpszA = (char *)lstSearchCriteria[ulStartCriteria + 1].c_str();
-
-            lpRestriction->res.resSub.lpRes->res.resAnd.lpRes[1].res.resOr.lpRes[0].rt = RES_CONTENT;
-            lpRestriction->res.resSub.lpRes->res.resAnd.lpRes[1].res.resOr.lpRes[0].res.resContent.ulPropTag = PR_DISPLAY_NAME;
-            lpRestriction->res.resSub.lpRes->res.resAnd.lpRes[1].res.resOr.lpRes[0].res.resContent.lpProp = &sPropDisplay;
-            lpRestriction->res.resSub.lpRes->res.resAnd.lpRes[1].res.resOr.lpRes[0].res.resContent.ulFuzzyLevel = FL_SUBSTRING | FL_IGNORECASE;
-
-            lpRestriction->res.resSub.lpRes->res.resAnd.lpRes[1].res.resOr.lpRes[1].rt = RES_CONTENT;
-            lpRestriction->res.resSub.lpRes->res.resAnd.lpRes[1].res.resOr.lpRes[1].res.resContent.ulPropTag = PR_EMAIL_ADDRESS;
-            lpRestriction->res.resSub.lpRes->res.resAnd.lpRes[1].res.resOr.lpRes[1].res.resContent.lpProp = &sPropEmail;
-            lpRestriction->res.resSub.lpRes->res.resAnd.lpRes[1].res.resOr.lpRes[1].res.resContent.ulFuzzyLevel = FL_SUBSTRING | FL_IGNORECASE;
-            
-			ulStartCriteria += 2;
-			*/
-			
-		    char *szField;
-		    char *szSearch;
-		    
 			if (lstSearchCriteria.size() - ulStartCriteria <= 1) {
 				hr = MAPI_E_CALL_FAILED;
 				goto exit;
@@ -7056,7 +6996,8 @@ HRESULT IMAP::HrSearch(vector<string> &lstSearchCriteria, ULONG &ulStartCriteria
 	
 	sAndRestriction.rt = RES_AND;
 	sAndRestriction.res.resAnd.cRes = 2;
-	MAPIAllocateMore(sizeof(SRestriction) * 2, lpRootRestrict, (void **)&sAndRestriction.res.resAnd.lpRes);
+	if ((hr = MAPIAllocateMore(sizeof(SRestriction) * 2, lpRootRestrict, (void **)&sAndRestriction.res.resAnd.lpRes)) != hrSuccess)
+		goto exit;
 	sAndRestriction.res.resAnd.lpRes[0] = sPropertyRestriction;
 	sAndRestriction.res.resAnd.lpRes[1] = *lpRootRestrict;
 		

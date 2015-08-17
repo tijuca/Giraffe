@@ -11,14 +11,13 @@
  * license. Therefore any rights, title and interest in our trademarks 
  * remain entirely with us.
  * 
- * Our trademark policy, <http://www.zarafa.com/zarafa-trademark-policy>,
- * allows you to use our trademarks in connection with Propagation and 
- * certain other acts regarding the Program. In any case, if you propagate 
- * an unmodified version of the Program you are allowed to use the term 
- * "Zarafa" to indicate that you distribute the Program. Furthermore you 
- * may use our trademarks where it is necessary to indicate the intended 
- * purpose of a product or service provided you use it in accordance with 
- * honest business practices. For questions please contact Zarafa at 
+ * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
+ * in connection with Propagation and certain other acts regarding the Program.
+ * In any case, if you propagate an unmodified version of the Program you are
+ * allowed to use the term "Zarafa" to indicate that you distribute the Program.
+ * Furthermore you may use our trademarks where it is necessary to indicate the
+ * intended purpose of a product or service provided you use it in accordance
+ * with honest business practices. For questions please contact Zarafa at
  * trademark@zarafa.com.
  *
  * The interactive user interface of the software displays an attribution 
@@ -44,10 +43,10 @@
 
 #include "platform.h"
 
-#include <string.h>
+#include <cstring>
 #include <iostream>
-#include <errno.h>
-#include <limits.h>
+#include <cerrno>
+#include <climits>
 
 #include "ECPluginFactory.h"
 #include "ECConfig.h"
@@ -61,7 +60,7 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
+static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECPluginFactory::ECPluginFactory(ECConfig *config, ECLogger *logger, IECStatsCollector *lpStatsCollector, bool bHosted, bool bDistributed) {
@@ -94,8 +93,8 @@ ECRESULT ECPluginFactory::CreateUserPlugin(UserPlugin **lppPlugin) {
 	m_getUserPluginInstance = (UserPlugin* (*)(pthread_mutex_t*, ECPluginSharedData *)) getUserPluginInstance;
 #else
     if(m_dl == NULL) {    
-        char *pluginpath = m_config->GetSetting("plugin_path");
-        char *pluginname = m_config->GetSetting("user_plugin");
+        const char *pluginpath = m_config->GetSetting("plugin_path");
+        const char *pluginname = m_config->GetSetting("user_plugin");
         char filename[PATH_MAX + 1];
 
         if (!pluginpath || !strcmp(pluginpath, "")) {
@@ -115,30 +114,30 @@ ECRESULT ECPluginFactory::CreateUserPlugin(UserPlugin **lppPlugin) {
         if (!m_dl) {
             m_logger->Log(EC_LOGLEVEL_FATAL, "Failed to load %s: %s", filename, dlerror());
             m_logger->Log(EC_LOGLEVEL_FATAL, "Please correct your configuration file and set the 'plugin_path' and 'user_plugin' options.");
-            return ZARAFA_E_NOT_FOUND;
+            goto out;
         }
 
         int (*fngetUserPluginInstance)() = (int (*)()) dlsym(m_dl, "getUserPluginVersion");
         if (fngetUserPluginInstance == NULL) {
             m_logger->Log(EC_LOGLEVEL_FATAL, "Failed to load getUserPluginVersion from plugin: %s", dlerror());
-            return ZARAFA_E_NOT_FOUND;
+            goto out;
         }
         int version = fngetUserPluginInstance(); 
         if (version != PROJECT_VERSION_REVISION) {
-            m_logger->Log(EC_LOGLEVEL_FATAL, "Version of the plugin is not the same for the server. Expected %d, plugin %d", PROJECT_VERSION_REVISION, version);
-            return ZARAFA_E_NOT_FOUND;
-        }
+		m_logger->Log(EC_LOGLEVEL_FATAL, "Version of the plugin %s is not the same for the server. Expected %d, plugin %d", filename, PROJECT_VERSION_REVISION, version);
+		goto out;
+	}
     
         m_getUserPluginInstance = (UserPlugin* (*)(pthread_mutex_t *, ECPluginSharedData *)) dlsym(m_dl, "getUserPluginInstance");
         if (m_getUserPluginInstance == NULL) {
             m_logger->Log(EC_LOGLEVEL_FATAL, "Failed to load getUserPluginInstance from plugin: %s", dlerror());
-            return ZARAFA_E_NOT_FOUND;
+            goto out;
         }
 
         m_deleteUserPluginInstance = (void (*)(UserPlugin *)) dlsym(m_dl, "deleteUserPluginInstance");
         if (m_deleteUserPluginInstance == NULL) {
             m_logger->Log(EC_LOGLEVEL_FATAL, "Failed to load deleteUserPluginInstance from plugin: %s", dlerror());
-            return ZARAFA_E_NOT_FOUND;
+            goto out;
         }
     }
 #endif
@@ -154,6 +153,12 @@ ECRESULT ECPluginFactory::CreateUserPlugin(UserPlugin **lppPlugin) {
 	*lppPlugin = lpPlugin;
 
 	return erSuccess;
+
+ out:
+	if (m_dl)
+		dlclose(m_dl);
+	m_dl = NULL;
+	return ZARAFA_E_NOT_FOUND;
 }
 
 void ECPluginFactory::SignalPlugins(int signal)
