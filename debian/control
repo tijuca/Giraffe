@@ -581,19 +581,3 @@ Description: Complete and feature rich groupware solution - PHP MAPI bindings
  Using this module, you can create PHP programs which use MAPI
  calls to interact with Zarafa.
 
-
-Package: zarafa-webaccess
-Architecture: all
-Section: web
-Depends: php5-mapi,
- fckeditor,
- libjs-swfupload,
- ${misc:Depends},
-Recommends: apache2 | httpd
-Description: Complete and feature rich groupware solution - WebAccess modul
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
- flexible groupware solution supporting open source as well as proprietary
- clients including mobile ones. It also features a web interface.
- .
- This package provides a complete Web GUI for the Zarafa server.
-

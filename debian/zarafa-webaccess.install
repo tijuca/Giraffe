@@ -1,4 +1,0 @@
-etc/apache2/conf-available/zarafa-webaccess.conf
-usr/share/zarafa-webaccess
-var/lib/zarafa-webaccess/tmp
-var/lib/zarafa-webaccess/plugins

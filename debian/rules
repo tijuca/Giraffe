@@ -10,8 +10,6 @@ DEB_RELEASE=$(shell dpkg-parsechangelog -SVersion | sed 's/[^-]\+-//')
 DEB_UVERSION=$(shell  dpkg-parsechangelog -SVersion)
 DEB_BUILD_DIR=debian/build
 
-WADIR=$(CURDIR)/debian/zarafa-webaccess
-
 INSTDIR=$(CURDIR)/debian/tmp
 SMARTYVER=2.6.14
 
@@ -57,20 +55,6 @@ override_dh_install:
 	# Install docs
 	$(MAKE) DESTDIR=$(INSTDIR) install -C $(DEB_BUILD_DIR)/swig/python/zarafa
 	$(MAKE) DESTDIR=$(INSTDIR) install-man1 -C $(DEB_BUILD_DIR)/doc
-
-	# install web access
-	$(MAKE) -C $(DEB_BUILD_DIR) DESTDIR=$(WADIR) install-ajax-webaccess
-
-	# copy webaccess content to debian/tmp as well
-	cp -ar $(WADIR)/etc/ $(INSTDIR)/etc/
-
-	# add apache config
-	mkdir -p $(WADIR)/etc/apache2/conf-available $(INSTDIR)/etc/apache2/conf-available $(INSTDIR)/usr/share/zarafa-webaccess $(INSTDIR)/var/lib/zarafa-webaccess
-	cp -a $(WADIR)/usr/share/zarafa-webaccess/zarafa-webaccess.conf $(WADIR)/etc/apache2/conf-available/zarafa-webaccess.conf
-	cp -a $(WADIR)/usr/share/zarafa-webaccess/zarafa-webaccess.conf $(INSTDIR)/etc/apache2/conf-available/zarafa-webaccess.conf
-	cp -ar $(WADIR)/usr/share/zarafa-webaccess/* $(INSTDIR)/usr/share/zarafa-webaccess/
-	cp -ar $(WADIR)/var/lib/zarafa-webaccess/* $(INSTDIR)/var/lib/zarafa-webaccess/
-
 	# Don't ship any .la files
 	rm -f $(INSTDIR)/usr/lib/*.la
 
@@ -106,11 +90,6 @@ override_dh_installinit:
 	dh_installinit --name zarafa-ical
 	dh_installinit --name zarafa-search
 	dh_installinit --name zarafa-ws
-
-override_dh_fixperms:
-	@find $(WADIR)/usr/share/zarafa-webaccess/client/widgets/fckeditor/editor -type f \
-		\( ! -name "*.pl" \) | xargs -I{} chmod -v 644 {}
-	dh_fixperms
 
 override_dh_compress:
 	dh_compress -X.py -X.pl -Xusr/share/doc/zarafa/zarafa7-upgrade
