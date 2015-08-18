@@ -261,7 +261,7 @@ Description: Complete and feature rich groupware solution - string library
 
 Package: zarafa
 Architecture: all
-Depends: zarafa-server (>= ${binary:Version}.1~),
+Depends: zarafa-server (>= ${binary:Version}),
  zarafa-server (<< ${source:Version}.1~),
  zarafa-client (>= ${source:Version}),
  zarafa-client (<< ${source:Version}.1~),
