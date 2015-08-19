@@ -1,3 +1,5 @@
 etc/zarafa/search.cfg
-usr/bin/zarafa-search
+usr/sbin/zarafa-search
 usr/lib/python*/*/zarafa_search/
+usr/share/man/man5/zarafa-search.cfg.5
+usr/share/man/man8/zarafa-search.8

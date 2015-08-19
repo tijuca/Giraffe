@@ -443,6 +443,35 @@ Description: Complete and feature rich groupware solution - quota monitor
  This package contains the quota monitor that checks stores for total usage
  and alerts users by email.
 
+Package: zarafa-search-plus
+Architecture: any
+Conflicts: zarafa-indexer,
+ zarafa-search
+Replaces: zarafa-indexer,
+ zarafa-search
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ bash (>= 3.0),
+ catdoc,
+ coreutils (>= 5.93),
+ file,
+ gawk,
+ lsb-base,
+ mktemp (>= 1.5),
+ poppler-utils,
+ python,
+ python-xapian,
+ python-zarafa,
+ unzip,
+ w3m,
+ xsltproc
+Description: Complete and feature rich groupware solution - indexer
+ The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package provides the search indexer using xapian.
+
 Package: zarafa-server
 Architecture: any
 Conflicts: zarafa (<< 7.2)
@@ -569,34 +598,4 @@ Description: Complete and feature rich groupware solution - WebAccess modul
  clients including mobile ones. It also features a web interface.
  .
  This package provides a complete Web GUI for the Zarafa server.
-
-
-Package: zarafa-search-plus
-Architecture: any
-Conflicts: zarafa-indexer,
- zarafa-search
-Replaces: zarafa-indexer,
- zarafa-search
-Depends: ${shlibs:Depends},
- ${misc:Depends},
- bash (>= 3.0),
- catdoc,
- coreutils (>= 5.93),
- file,
- gawk,
- lsb-base,
- mktemp (>= 1.5),
- poppler-utils,
- python,
- python-xapian,
- python-zarafa,
- unzip,
- w3m,
- xsltproc
-Description: Complete and feature rich groupware solution - indexer
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
- flexible groupware solution supporting open source as well as proprietary
- clients including mobile ones. It also features a web interface.
- .
- This package provides the search indexer using xapian.
 

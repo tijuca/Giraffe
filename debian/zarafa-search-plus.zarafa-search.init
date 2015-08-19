@@ -14,7 +14,7 @@
 ### END INIT INFO
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-SEARCH=/usr/bin/zarafa-search
+SEARCH=/usr/sbin/zarafa-search
 DESC="Zarafa search"
 NAME=`basename $SEARCH`
 #QUIETDAEMON=--quiet
