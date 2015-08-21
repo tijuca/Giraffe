@@ -12,17 +12,8 @@ dbc_dbuser=zarafa
 dbc_dbname=zarafa
 dbc_go zarafa-server $@
 
-logs() {
-    chown root:adm ${LOGDIR}
-    chmod 750 ${LOGDIR}
-}
-
 case "$1" in
-    configure)
-	logs
-    ;;
-
-    abort-upgrade|abort-remove|abort-deconfigure)
+    abort-upgrade|abort-remove|abort-deconfigure|configure)
     ;;
 
     *)
