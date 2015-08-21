@@ -7,6 +7,7 @@ Subject: Add include for database configuration
  1 file changed, 2 insertions(+)
 
 diff --git a/installer/linux/server.cfg b/installer/linux/server.cfg
+index 292dbd6..94591f2 100644
 --- a/installer/linux/server.cfg
 +++ b/installer/linux/server.cfg
 @@ -461,3 +461,5 @@ embedded_attachment_limit = 20
