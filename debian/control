@@ -2,7 +2,8 @@ Source: zarafa
 Section: mail
 Priority: optional
 Homepage: https://community.zarafa.com/
-Maintainer: Zarafa Development Team <development@zarafa.com>
+Maintainer: Giraffe Maintainers <pkg-giraffe-maintainers@lists.alioth.debian.org>
+Uploaders: Carsten Schoenert <c.schoenert@t-online.de>, Matthias Geerdsen <matthias@vorlons.info>
 Build-Depends: debhelper (>= 4.0.0),
  binutils (>= 2.12.90.0.9),
  autotools-dev,
