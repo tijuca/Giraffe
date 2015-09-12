@@ -3,3 +3,5 @@ usr/sbin/zarafa-gateway
 usr/share/doc/zarafa-gateway/
 usr/share/man/man5/zarafa-gateway.cfg.5
 usr/share/man/man8/zarafa-gateway.8
+
+usr/share/doc/zarafa/example-config/gateway.cfg usr/share/doc/zarafa-gateway/example-config

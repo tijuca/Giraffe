@@ -67,11 +67,10 @@ override_dh_install:
 	cp -a debian/sql/debian-db.cfg.template $(INSTDIR)/usr/share/zarafa/debian
 
 	# move example-config files
-	for package in spooler gateway monitor dagent ical search archiver; do \
+	for package in archiver; do \
 		mkdir -p $(INSTDIR)/usr/share/doc/zarafa-$$package/example-config; \
 		mv $(INSTDIR)/usr/share/doc/zarafa/example-config/$$package.cfg $(INSTDIR)/usr/share/doc/zarafa-$$package/example-config; \
 	done
-	mv $(INSTDIR)/usr/share/doc/zarafa/example-config/autorespond $(INSTDIR)/usr/share/doc/zarafa-dagent/example-config
 
 	# remove compiled python files
 	find $(INSTDIR) -name \*.pyc -exec rm {} \;
@@ -79,7 +78,7 @@ override_dh_install:
 	# add php:Depends
 	echo "php:Depends=phpapi-$(shell php-config5 --phpapi)" > debian/php5-mapi.substvars
 
-	dh_install
+	DH_VERBOSE=1 dh_install
 
 override_dh_installinit:
 	dh_installinit --name zarafa-server
