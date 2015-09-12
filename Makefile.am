@@ -23,7 +23,7 @@ endif
 #EXTRA_DIST = version common/ecversion.h php-webclient-ajax
 EXTRA_DIST = version versionheader.sh common/ecversion.h php-webclient-ajax \
 	LICENSE.txt CONTRIBUTORS.txt AGPL-3 TRADEMARKS.txt \
-	lddcheck global.am
+	lddcheck global.am pwdcheck.sh
 
 BUILT_SOURCES = source-moved-check common/ecversion.h
 

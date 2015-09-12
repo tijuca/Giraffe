@@ -42,6 +42,7 @@
  */
 
 #include "platform.h"
+#include <cassert>
 #include "ECSubRestriction.h"
 
 #include <mapidefs.h>
@@ -74,6 +75,7 @@ static ECRESULT GetSubRestrictionRecursive(struct restrictTable *lpRestrict,
         
     if(lpulCount == NULL) // If the caller didn't want to count restrictions, we still want to count internally
         lpulCount = &ulCount;
+    assert(lpRestrict != NULL);
     
     switch(lpRestrict->ulType) {
         case RES_AND:
@@ -202,6 +204,7 @@ ECRESULT RunSubRestriction(ECSession *lpSession, void *lpECODStore, struct restr
 	if (lpObjects->empty())
 		goto exit;				// nothing to search in, return success.
     
+    assert(lpRestrict != NULL);
     switch(lpRestrict->ulSubObject) {
         case PR_MESSAGE_RECIPIENTS:
             ulType = MAPI_MAILUSER;
