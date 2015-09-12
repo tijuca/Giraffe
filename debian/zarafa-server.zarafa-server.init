@@ -51,6 +51,7 @@ case "$1" in
 	log_begin_msg "Starting $DESC: $NAME"
 	export LC_ALL=$ZARAFA_LOCALE
 	export LANG=$ZARAFA_LOCALE
+	chown zarafa /var/lib/zarafa
 	start-stop-daemon --start $QUIETDAEMON --pidfile $PIDFILE --exec $SERVER -- $SERVER_OPTS
 	log_end_msg $?
 	unset LC_ALL LANG
