@@ -1,0 +1,180 @@
+From: =?utf-8?q?Guido_G=C3=BCnther?= <agx@sigxcpu.org>
+Date: Sat, 12 Sep 2015 21:04:09 +0200
+Subject: Be pessimistic about daemon startup
+
+Only return with true if we managed to get to the main loop. Otherwise
+return with an error. This fixes lots of situations where the daemon
+claimed to start but didn't (e.g. when not being able to connect
+to the database or to write to the attachment folder).
+---
+ provider/server/ECServer.cpp | 23 ++---------------------
+ 1 file changed, 2 insertions(+), 21 deletions(-)
+
+diff --git a/provider/server/ECServer.cpp b/provider/server/ECServer.cpp
+index 10e3f23..6744628 100644
+--- a/provider/server/ECServer.cpp
++++ b/provider/server/ECServer.cpp
+@@ -818,7 +818,7 @@ static void InitBindTextDomain(void)
+ 
+ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+ {
+-	int				retval = 0;
++	int			retval = -1;
+ 	ECRESULT		er = erSuccess;
+ 
+ 	ECDatabaseFactory*	lpDatabaseFactory = NULL;
+@@ -1029,7 +1029,6 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+ 	if (!g_lpConfig->LoadSettings(szConfig) || !g_lpConfig->ParseParams(argc, argv, NULL) || (!m_bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) ) {
+ 		g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false, 0); // create info logger without a timestamp to stderr
+ 		LogConfigErrors(g_lpConfig, g_lpLogger);
+-		retval = -1;
+ 		goto exit;
+ 	}
+ 
+@@ -1037,7 +1036,6 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+ 	g_lpLogger = CreateLogger(g_lpConfig, szName, "ZarafaServer");
+ 	if (!g_lpLogger) {
+ 		fprintf(stderr, "Error in log configuration, unable to resume.\n");
+-		retval = -1;
+ 		goto exit;
+ 	}
+ 
+@@ -1062,24 +1060,20 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+ 		// directory will be created using startup (probably root) and then chowned to the new 'runas' username
+ 		if (CreatePath(g_lpConfig->GetSetting("attachment_path")) != 0) {
+ 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to create attachment directory '%s'", g_lpConfig->GetSetting("attachment_path"));
+-			retval = -1;
+ 			goto exit;
+ 		}
+ 		if (stat(g_lpConfig->GetSetting("attachment_path"), &dir) != 0) {
+ 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to stat attachment directory '%s', error: %s", g_lpConfig->GetSetting("attachment_path"), strerror(errno));
+-			retval = -1;
+ 			goto exit;
+ 		}
+ 		runasUser = getpwnam(g_lpConfig->GetSetting("run_as_user","","root"));
+ 		if (runasUser == NULL) {
+ 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Fatal: run_as_user '%s' is unknown", g_lpConfig->GetSetting("run_as_user","","root"));
+-			retval = -1;
+ 			goto exit;
+ 		}
+ 		if (runasUser->pw_uid != dir.st_uid) {
+ 			if (unix_chown(g_lpConfig->GetSetting("attachment_path"), g_lpConfig->GetSetting("run_as_user"), g_lpConfig->GetSetting("run_as_group")) != 0) {
+ 				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to change ownership for attachment directory '%s'", g_lpConfig->GetSetting("attachment_path"));
+-				retval = -1;
+ 				goto exit;
+ 			}
+ 		}
+@@ -1125,7 +1119,6 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+ 		er = g_lpSoapServerConn->ListenTCP(g_lpConfig->GetSetting("server_bind"), atoi(g_lpConfig->GetSetting("server_tcp_port")),
+ 										   parseBool(g_lpConfig->GetSetting("client_update_enabled")));
+ 		if(er != erSuccess) {
+-			retval = -1;
+ 			goto exit;
+ 		}
+ 	}
+@@ -1141,7 +1134,6 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+ 							g_lpConfig->GetSetting("server_ssl_ca_path","",NULL)	// CA certificate path of thrusted sources
+ 							);
+ 		if(er != erSuccess) {
+-			retval = -1;
+ 			goto exit;
+ 		}
+ 	}
+@@ -1149,14 +1141,12 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+ 	// Priority queue is always enabled, create as first socket, so this socket is returned first too on activity
+ 	er = g_lpSoapServerConn->ListenPipe(g_lpConfig->GetSetting("server_pipe_priority"), true);
+ 	if (er != erSuccess) {
+-		retval = -1;
+ 		goto exit;
+ 	}
+ 	// Setup a pipe connection
+ 	if (bPipeEnabled) {
+ 		er = g_lpSoapServerConn->ListenPipe(g_lpConfig->GetSetting("server_pipe_name"));
+ 		if (er != erSuccess) {
+-			retval = -1;
+ 			goto exit;
+ 		}
+ 	}
+@@ -1169,7 +1159,6 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+ 	if(er == ZARAFA_E_DATABASE_NOT_FOUND) {
+ 		er = lpDatabaseFactory->CreateDatabase();
+ 		if(er != erSuccess) {
+-			retval = -1;
+ 			goto exit;
+ 		}
+ 
+@@ -1178,7 +1167,6 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+ 
+ 	if(er != erSuccess) {
+ 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to connect to database: %s", dbError.c_str());
+-		retval = -1;
+ 		goto exit;
+ 	}
+ 	g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Connection to database '%s' succeeded", g_lpConfig->GetSetting("mysql_database"));
+@@ -1215,14 +1203,12 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+ 	// fork if needed and drop privileges as requested.
+ 	// this must be done before we do anything with pthreads
+ 	if (daemonize && unix_daemonize(g_lpConfig, g_lpLogger)) {
+-		retval = -1;
+ 		goto exit;
+ 	}
+ 	if (!daemonize)
+ 		setsid();
+ 	unix_create_pidfile(szName, g_lpConfig, g_lpLogger);
+ 	if (unix_runas(g_lpConfig, g_lpLogger)) {
+-		retval = -1;
+ 		goto exit;
+ 	}
+ 
+@@ -1286,13 +1272,11 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+ 					sleep_ms(2000);
+ 				} else {
+ 					g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Failed to determine if distributed features are allowed, assuming unavailable.");
+-					retval = -1;
+ 					goto exit;
+ 				}
+ 			} else {
+ 				if (!bLicensed) {
+ 					g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Your license key does not allow the usage of the distributed features.");
+-					retval = -1;
+ 					goto exit;
+ 				}
+ 				break;
+@@ -1345,13 +1329,11 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+ 		if(m_bIgnoreDatabaseVersionConflict == false) {
+ 			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "   You can force the server to start with --ignore-database-version-conflict");
+ 			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "   Warning, you can lose data! If you don't know what you're doing, you shouldn't be using this option!");
+-			retval = -1;
+ 			goto exit;
+ 		}
+ 	}else if(er != erSuccess) {
+ 		if (er != ZARAFA_E_USER_CANCEL)
+ 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't update the database: %s", dbError.c_str());
+-		retval = -1;
+ 		goto exit;
+ 	}
+ 	
+@@ -1404,7 +1386,6 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+ 	// This also starts several threads, like SessionCleaner, NotificationThread and TPropsPurge.
+ 	if(zarafa_init(g_lpConfig, g_lpLogger, g_lpAudit, hosted, distributed) != erSuccess) {		// create SessionManager
+ 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to initialize zarafa session manager");
+-		retval = -1;
+ 		goto exit;
+ 	}
+ 
+@@ -1418,7 +1399,6 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+ 	er = g_lpSessionManager->GetSearchFolders()->LoadSearchFolders();
+ 	if (er != erSuccess) {
+ 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to load searchfolders");
+-		retval = -1;
+ 		goto exit;
+ 	}
+ 	
+@@ -1438,6 +1418,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+ 	g_lpStatsCollector->SetTime(SCN_SERVER_STARTTIME, time(NULL));
+ 
+ 	// Enter main accept loop
++	retval = 0;
+ 	while(!g_Quit) {
+ 		// Select on the sockets
+ 		er = g_lpSoapServerConn->MainLoop();

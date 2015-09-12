@@ -1,3 +1,4 @@
 Add-include-for-database-configuration.patch
 remove-not-needed-targets-from-main-Makefile.patch
 run-daemons-as-zarafa-zarafa.patch
+Be-pessimistic-about-daemon-startup.patch
