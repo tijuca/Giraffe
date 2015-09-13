@@ -42,6 +42,7 @@ Build-Depends: debhelper (>= 4.0.0),
  swig,
 Standards-Version: 3.9.6
 X-Python-Version: 2.7
+Testsuite: autopkgtest
 
 Package: libfreebusy0
 Architecture: any
