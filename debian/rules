@@ -41,7 +41,7 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
 
 
 %:
-	dh $@ --builddirectory=$(DEB_BUILD_DIR) --parallel
+	dh $@ --builddirectory=$(DEB_BUILD_DIR) --parallel --with systemd
 
 override_dh_auto_configure:
 	echo ${DEB_UVERSION} > $(CURDIR)/revision

@@ -1,0 +1,18 @@
+[Unit]
+Description=Zarafa Server
+After=network.target
+After=local-fs.target
+After=remote-fs.target
+After=mysql.service
+Documentation=man:zarafa-server(8)
+
+[Service]
+Type=simple
+ExecStartPre=/bin/chown zarafa /var/lib/zarafa
+ExecStart=/usr/sbin/zarafa-server -F -c /etc/zarafa/server.cfg
+KillMode=process
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
+

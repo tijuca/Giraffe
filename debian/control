@@ -5,6 +5,7 @@ Homepage: https://community.zarafa.com/
 Maintainer: Giraffe Maintainers <pkg-giraffe-maintainers@lists.alioth.debian.org>
 Uploaders: Carsten Schoenert <c.schoenert@t-online.de>, Matthias Geerdsen <matthias@vorlons.info>
 Build-Depends: debhelper (>= 4.0.0),
+ dh-systemd (>= 1.5),
  binutils (>= 2.12.90.0.9),
  autotools-dev,
  automake (>= 1:1.9),
