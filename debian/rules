@@ -66,12 +66,6 @@ override_dh_install:
 	mkdir -p $(INSTDIR)/usr/share/zarafa/debian
 	cp -a debian/sql/debian-db.cfg.template $(INSTDIR)/usr/share/zarafa/debian
 
-	# move example-config files
-	for package in archiver; do \
-		mkdir -p $(INSTDIR)/usr/share/doc/zarafa-$$package/example-config; \
-		mv $(INSTDIR)/usr/share/doc/zarafa/example-config/$$package.cfg $(INSTDIR)/usr/share/doc/zarafa-$$package/example-config; \
-	done
-
 	# remove compiled python files
 	find $(INSTDIR) -name \*.pyc -exec rm {} \;
 
