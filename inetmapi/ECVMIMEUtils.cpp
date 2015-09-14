@@ -53,6 +53,8 @@
 #include "CommonUtil.h"
 #include "charset/convert.h"
 
+#include "stringutil.h"
+
 #include <mapi.h>
 #include <mapitags.h>
 #include <mapidefs.h>
@@ -111,7 +113,7 @@ ECVMIMESender::~ECVMIMESender() {
  * This function takes a MAPI table, reads all items from it, expands any groups and adds all expanded recipients into the passed
  * recipient table. Group expansion is recursive.
  */
-HRESULT ECVMIMESender::HrAddRecipsFromTable(LPADRBOOK lpAdrBook, IMAPITable *lpTable, vmime::mailboxList &recipients, std::set<std::wstring> &setGroups, std::set<std::wstring> &setRecips, bool bAllowEveryone, bool bAlwaysExpandDistrList)
+HRESULT ECVMIMESender::HrAddRecipsFromTable(LPADRBOOK lpAdrBook, IMAPITable *lpTable, vmime::mailboxList &recipients, std::set<std::wstring> &setGroups, std::set<std::wstring> &setRecips, bool bAllowEveryone, bool bAlwaysExpandDistributionList)
 {
 	HRESULT hr = hrSuccess;
 	LPSRowSet lpRowSet = NULL;
@@ -125,15 +127,17 @@ HRESULT ECVMIMESender::HrAddRecipsFromTable(LPADRBOOK lpAdrBook, IMAPITable *lpT
 	for (ULONG i = 0; i < lpRowSet->cRows; i++) {
 		LPSPropValue lpPropObjectType = PpropFindProp( lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_OBJECT_TYPE);
 
-		bool bAddrFetchSuccess = HrGetAddress(lpAdrBook, lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_ENTRYID, PR_DISPLAY_NAME_W, PR_ADDRTYPE_W, PR_EMAIL_ADDRESS_W, strName, strType, strEmail) == hrSuccess;
-		
-		if (bAddrFetchSuccess && (lpPropObjectType == NULL || lpPropObjectType->Value.ul == MAPI_MAILUSER || (lpPropObjectType->Value.ul == MAPI_DISTLIST && !bAlwaysExpandDistrList))) {
-			if (bAddrFetchSuccess) {
-				if(!strEmail.empty() && setRecips.find(strEmail) == setRecips.end()) {
-					recipients.appendMailbox(vmime::create<vmime::mailbox>(convert_to<string>(strEmail)));
-					setRecips.insert(strEmail);
-					lpLogger->Log(EC_LOGLEVEL_DEBUG, "RCPT TO: %ls", strEmail.c_str());	
-				}
+		// see if there's an e-mail address associated with the list
+		// if that's the case, then we send to that address and not all individual recipients in that list
+		bool bAddrFetchSuccess = HrGetAddress(lpAdrBook, lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_ENTRYID, PR_DISPLAY_NAME_W, PR_ADDRTYPE_W, PR_EMAIL_ADDRESS_W, strName, strType, strEmail) == hrSuccess && !strEmail.empty();
+
+		bool bItemIsAUser = lpPropObjectType == NULL || lpPropObjectType->Value.ul == MAPI_MAILUSER;
+
+		if (bAddrFetchSuccess && bItemIsAUser) {
+			if (setRecips.find(strEmail) == setRecips.end()) {
+				recipients.appendMailbox(vmime::create<vmime::mailbox>(convert_to<string>(strEmail)));
+				setRecips.insert(strEmail);
+				lpLogger->Log(EC_LOGLEVEL_DEBUG, "RCPT TO: %ls", strEmail.c_str());	
 			}
 		}
 		else if (lpPropObjectType->Value.ul == MAPI_DISTLIST) {
@@ -156,16 +160,26 @@ HRESULT ECVMIMESender::HrAddRecipsFromTable(LPADRBOOK lpAdrBook, IMAPITable *lpT
 				}
 			}
 
-			// Recursively expand all recipients in the group
-			hr = HrExpandGroup(lpAdrBook, lpGroupName, lpGroupEntryID, recipients, setGroups, setRecips, bAllowEveryone);
-			if (hr == MAPI_E_TOO_COMPLEX || hr == MAPI_E_INVALID_PARAMETER) {
-				// ignore group nesting loop and non user/group types (eg. companies)
-				hr = hrSuccess;
-			} else if (hr != hrSuccess) {
-				// eg. MAPI_E_NOT_FOUND
-				lpLogger->Log(EC_LOGLEVEL_ERROR, "Error while expanding group. Group: %ls, error: 0x%08x", lpGroupName ? lpGroupName->Value.lpszW : L"<unknown>", hr);
-				error = std::wstring(L"Error in group '") + (lpGroupName ? lpGroupName->Value.lpszW : L"<unknown>") + L"', unable to send e-mail";
-				goto exit;
+			if (bAlwaysExpandDistributionList || !bAddrFetchSuccess || wcscasecmp(strType.c_str(), L"SMTP") != 0) {
+				// Recursively expand all recipients in the group
+				hr = HrExpandGroup(lpAdrBook, lpGroupName, lpGroupEntryID, recipients, setGroups, setRecips, bAllowEveryone);
+
+				if (hr == MAPI_E_TOO_COMPLEX || hr == MAPI_E_INVALID_PARAMETER) {
+					// ignore group nesting loop and non user/group types (eg. companies)
+					hr = hrSuccess;
+				} else if (hr != hrSuccess) {
+					// eg. MAPI_E_NOT_FOUND
+					lpLogger->Log(EC_LOGLEVEL_ERROR, "Error while expanding group. Group: %ls, error: 0x%08x", lpGroupName ? lpGroupName->Value.lpszW : L"<unknown>", hr);
+					error = std::wstring(L"Error in group '") + (lpGroupName ? lpGroupName->Value.lpszW : L"<unknown>") + L"', unable to send e-mail";
+					goto exit;
+				}
+			} else {
+				if (setRecips.find(strEmail) == setRecips.end()) {
+					recipients.appendMailbox(vmime::create<vmime::mailbox>(convert_to<string>(strEmail)));
+					setRecips.insert(strEmail);
+
+					lpLogger->Log(EC_LOGLEVEL_DEBUG, "Sending to group-address %s instead of expanded list", convert_to<std::string>(strEmail).c_str());
+				}
 			}
 		}
 	}
