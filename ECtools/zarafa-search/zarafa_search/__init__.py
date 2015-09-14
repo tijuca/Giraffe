@@ -85,7 +85,7 @@ class SearchWorker(zarafa.Worker):
         config, plugin = self.service.config, self.service.plugin
         def response(conn, msg):
             self.log.info('Response: ' + msg)
-            conn.send(msg+'\r\n')
+            conn.sendall(msg+'\r\n')
         s = zarafa.server_socket(config['server_bind_name'], ssl_key=config['ssl_private_key_file'], ssl_cert=config['ssl_certificate_file'], log=self.log)
         while True:
             with log_exc(self.log):
@@ -320,7 +320,7 @@ class Service(zarafa.Service):
                     store = user.store
             if store: # XXX check all keys first
                 with closing(zarafa.client_socket(self.config['server_bind_name'], ssl_cert=self.config['ssl_certificate_file'])) as s:
-                    s.send('REINDEX %s\r\n' % store.guid)
+                    s.sendall('REINDEX %s\r\n' % store.guid)
                     s.recv(1024)
             else:
                 print "no such user/store: %s" % key

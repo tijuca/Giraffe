@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Styles>
+	<Style name="Heading 1" element="h1" />
+	<Style name="Heading 2" element="h2" />
+	<Style name="Heading 3" element="h3" />
+	<Style name="Heading 4" element="h4" />
+	<Style name="Heading 5" element="h5" />
+	<Style name="Heading 6" element="h6" />
+	<Style name="Paragraph" element="p" />
+	<Style name="Document Block" element="div" />
+	<Style name="Preformatted Text" element="pre" />
+	<Style name="Address" element="address" />
+	
+	<Style name="Marker: Yellow" element="span">
+		<Style name="background-color" value="Yellow" />
+	</Style>
+	<Style name="Marker: Green" element="span">
+		<Style name="background-color" value="Lime" />
+	</Style>
+</Styles>
