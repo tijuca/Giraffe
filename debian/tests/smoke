@@ -20,9 +20,24 @@ EOF
 apt-get -y install mariadb-server
 apt-get -y install zarafa-server zarafa-utils
 
+# Check that we have a running server and can create users
 zarafa-admin -l | grep -qs "SYSTEM.*Zarafa"
 zarafa-admin  -c testadmin -p r00tme \
               -e admin@example.com -f "Your admin" -a 1 | grep -qs "User created."
+
+
+apt-get -y install zarafa-dagent python-zarafa
+# Check that we can deliver and retrieve mail
+cat <<EOF | zarafa-dagent -n -v testadmin
+From: hwm@example.com
+To: testadmin@example.com
+Subject: the towers
+EOF
+
+cd debian/tests
+export AUTH_USER='testadmin'
+export AUTH_PASS='r00tme'
+nosetests
 
 echo 'Smoke test of zarafa server succesful'
 exit 0
