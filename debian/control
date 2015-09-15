@@ -278,6 +278,7 @@ Depends: zarafa-server (>= ${binary:Version}),
  zarafa-gateway,
  zarafa-search-plus,
  ${misc:Depends},
+Suggests: zarafa-webapp
 Description: Metapackage for the Zarafa Collaboration Platform
  The Zarafa Collaboration Platform (ZCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
