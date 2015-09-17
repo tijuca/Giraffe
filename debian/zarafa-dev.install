@@ -1,6 +1,4 @@
 usr/lib/pkgconfig/zarafa.pc
-usr/lib/zarafa/libarchiver.so
-usr/lib/zarafa/libarchiver-core.so
 usr/lib/zarafa/libcommon_mapi.so
 usr/lib/zarafa/libcommon_service.so
 usr/lib/zarafa/libcommon_ssl.so
@@ -9,8 +7,6 @@ usr/lib/libfreebusy.so
 usr/lib/libicalmapi.so
 usr/lib/libinetmapi.so
 usr/lib/libzarafa_mapi.so
-usr/lib/libzarafa-archiver.so
-usr/lib/libzarafa-archiver-core.so
 usr/lib/libzarafa_server.so
 usr/lib/libzarafa_soapclient.so
 usr/lib/libzarafa_soapserver.so
