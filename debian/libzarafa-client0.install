@@ -1,2 +1,3 @@
 etc/mapi/zarafa.inf
 usr/lib/zarafa/libzarafaclient.so
+usr/lib/libzarafa_soapclient.so.*
