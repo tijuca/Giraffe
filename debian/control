@@ -82,7 +82,7 @@ Description: Complete and feature rich groupware solution - MAPI library
  messages. Used by zarafa-spooler and zarafa-dagent for sending and receiving
  mail, respectively.
 
-Package: libmapi1
+Package: libzarafa-mapi1
 Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends},
@@ -199,7 +199,6 @@ Description: Metapackage for the Zarafa Collaboration Platform
 Package: libzarafa-client0
 Architecture: any
 Depends: ${shlibs:Depends},
- libmapi1,
  zarafa-lang,
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - core libraries
@@ -241,7 +240,6 @@ Depends: ${misc:Depends},
  ${shlibs:Depends},
  zarafa-common (= ${binary:Version}),
  libzarafa-client0 (= ${binary:Version}),
- libmapi1 (= ${binary:Version}),
  php5-mapi (= ${binary:Version}),
  php5-cli,
  python-mapi (= ${binary:Version}),
@@ -257,7 +255,7 @@ Package: zarafa-dbg
 Priority: extra
 Architecture: any
 Depends: ${misc:Depends},
-  zarafa-server | libzarafa-client0 | libmapi1 | python-mapi | php5-mapi
+  zarafa-server | libzarafa-client0 | libzarafa-mapi1 | python-mapi | php5-mapi
 Section: debug
 Description: Complete and feature rich groupware solution - debug files
  The Zarafa Collaboration Platform (ZCP) is a complete, stable and
@@ -273,7 +271,7 @@ Section: libdevel
 Architecture: any
 Depends: libzarafa-client0 (= ${binary:Version}),
  libzarafa-archiver0 (= ${binary:Version}),
- libmapi1 (= ${binary:Version}),
+ libzarafa-mapi1 (= ${binary:Version}),
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - development files
  The Zarafa Collaboration Platform (ZCP) is a complete, stable and
@@ -288,7 +286,6 @@ Suggests: python-mapi
 Depends: ${shlibs:Depends},
  zarafa-common (= ${binary:Version}),
  libzarafa-client0 (= ${binary:Version}),
- libmapi1 (= ${binary:Version}),
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - POP3 and IMAP gateway
  The Zarafa Collaboration Platform (ZCP) is a complete, stable and
@@ -303,7 +300,6 @@ Architecture: any
 Depends: ${shlibs:Depends},
  zarafa-common (= ${binary:Version}),
  libzarafa-client0 (= ${binary:Version}),
- libmapi1 (= ${binary:Version}),
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - iCal and CalDAV gateway
  The Zarafa Collaboration Platform (ZCP) is a complete, stable and
@@ -330,7 +326,6 @@ Depends: ${misc:Depends},
  ${shlibs:Depends},
  zarafa-common (= ${binary:Version}),
  libzarafa-client0 (= ${binary:Version}),
- libmapi1 (= ${binary:Version}),
  php5-mapi (= ${binary:Version}),
  php5-cli,
  python-mapi (= ${binary:Version}),
@@ -421,7 +416,6 @@ Depends: ${misc:Depends},
  ${shlibs:Depends},
  ${python:Depends},
  libzarafa-client0 (= ${binary:Version}),
- libmapi1 (= ${binary:Version}),
 XB-Python-Version: ${python:Versions}
 Description: Complete and feature rich groupware solution - Python MAPI bindings
  The Zarafa Collaboration Platform (ZCP) is a complete, stable and
@@ -454,7 +448,6 @@ Section: php
 Depends: ${shlibs:Depends},
  ${php:Depends},
  libzarafa-client0 (= ${binary:Version}),
- libmapi1 (= ${binary:Version}),
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - PHP MAPI bindings
  The Zarafa Collaboration Platform (ZCP) is a complete, stable and

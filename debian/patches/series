@@ -1,3 +1,4 @@
 Add-include-for-database-configuration.patch
 run-daemons-as-zarafa-zarafa.patch
 Be-pessimistic-about-daemon-startup.patch
+Rename-libmapi-to-libzarafa_mapi.patch
