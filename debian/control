@@ -47,10 +47,6 @@ Testsuite: autopkgtest
 
 Package: libfreebusy0
 Architecture: any
-Breaks: zarafa (<< 7.2),
- zarafa-client (<< 7.2)
-Replaces: zarafa (<< 7.2),
- zarafa-libs
 Depends: ${shlibs:Depends},
          ${misc:Depends},
 Description: Complete and feature rich groupware solution - Free/Busy library
@@ -63,10 +59,6 @@ Description: Complete and feature rich groupware solution - Free/Busy library
 
 Package: libicalmapi1
 Architecture: any
-Breaks: zarafa (<< 7.2),
- libmapi1 (<< 7.2), zarafa-libs (<< 7.2)
-Replaces: zarafa (<< 7.2),
- libmapi1 (<< 7.2), zarafa-libs (<< 7.2)
 Depends: ${shlibs:Depends},
          ${misc:Depends},
 Description: Complete and feature rich groupware solution - iCal/MAPI library
@@ -78,10 +70,6 @@ Description: Complete and feature rich groupware solution - iCal/MAPI library
 
 Package: libinetmapi1
 Architecture: any
-Breaks: zarafa (<< 7.2),
- libmapi1 (<< 7.2), zarafa-libs (<< 7.2)
-Replaces: zarafa (<< 7.2),
- libmapi1 (<< 7.2), zarafa-libs (<< 7.2)
 Depends: ${shlibs:Depends},
          ${misc:Depends},
 Description: Complete and feature rich groupware solution - MAPI library
@@ -96,10 +84,6 @@ Description: Complete and feature rich groupware solution - MAPI library
 
 Package: libmapi1
 Architecture: any
-Conflicts: zarafa (<< 7.2),
- libmapi1 (<< 7.2)
-Replaces: zarafa (<< 7.2),
- libmapi1 (<< 7.2)
 Depends: ${shlibs:Depends},
          ${misc:Depends},
 Description: Complete and feature rich groupware solution - messaging library
@@ -113,9 +97,6 @@ Description: Complete and feature rich groupware solution - messaging library
 
 Package: libzarafa-archiver0
 Architecture: any
-Breaks: zarafa (<< 7.2),
- zarafa-libarchiver (<< 7.2)
-Replaces: zarafa-libarchiver (<< 7.2)
 Depends: ${shlibs:Depends},
  ${misc:Depends}
 Description: Complete and feature rich groupware solution - shared archiver
@@ -128,9 +109,6 @@ Description: Complete and feature rich groupware solution - shared archiver
 
 Package: libzarafa-archiver-core0
 Architecture: any
-Breaks: zarafa (<< 7.2),
- zarafa-libarchiver (<< 7.2)
-Replaces: zarafa-libarchiver (<< 7.2)
 Depends: ${shlibs:Depends},
  ${misc:Depends}
 Description: Complete and feature rich groupware solution - shared archiver core
@@ -143,10 +121,6 @@ Description: Complete and feature rich groupware solution - shared archiver core
 
 Package: libzarafa-server0
 Architecture: any
-Breaks: zarafa (<< 7.2),
- libmapi1 (<< 7.2)
-Replaces: zarafa (<< 7.2),
- libmapi1 (<< 7.2)
 Depends: ${shlibs:Depends},
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - core server library
@@ -158,10 +132,6 @@ Description: Complete and feature rich groupware solution - core server library
 
 Package: libzarafa-soapclient0
 Architecture: any
-Breaks: zarafa (<< 7.2),
- libmapi1 (<< 7.2)
-Replaces: zarafa (<< 7.2),
- libmapi1 (<< 7.2)
 Depends: ${shlibs:Depends},
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - soap client handler
@@ -174,10 +144,6 @@ Description: Complete and feature rich groupware solution - soap client handler
 
 Package: libzarafa-soapserver0
 Architecture: any
-Breaks: zarafa (<< 7.2),
- libmapi1 (<< 7.2)
-Replaces: zarafa (<< 7.2),
- libmapi1 (<< 7.2)
 Depends: ${shlibs:Depends},
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - soap server handler
@@ -190,10 +156,6 @@ Description: Complete and feature rich groupware solution - soap server handler
 
 Package: libzarafasync0
 Architecture: any
-Breaks: zarafa (<< 7.2),
- zarafa-client (<< 7.2)
-Replaces: zarafa (<< 7.2),
- zarafa-client (<< 7.2)
 Depends: ${shlibs:Depends},
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - sync library
@@ -205,10 +167,6 @@ Description: Complete and feature rich groupware solution - sync library
 
 Package: libzcp-common0
 Architecture: any
-Breaks: zarafa (<< 7.2),
- libmapi1 (<< 7.2),
-Replaces: zarafa (<< 7.2),
- libmapi1 (<< 7.2),
 Depends: ${shlibs:Depends},
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - MAPI libraries
@@ -240,8 +198,6 @@ Description: Metapackage for the Zarafa Collaboration Platform
 
 Package: libzarafa-client0
 Architecture: any
-Breaks: zarafa (<< 7.2)
-Replaces: zarafa (<< 7.2)
 Depends: ${shlibs:Depends},
  libmapi1,
  zarafa-lang,
@@ -256,8 +212,6 @@ Description: Complete and feature rich groupware solution - core libraries
 
 Package: zarafa-common
 Architecture: any
-Breaks: zarafa (<< 7.2)
-Replaces: zarafa (<< 7.2)
 Depends: ${misc:Depends},
  adduser,
  lsb-base
@@ -283,8 +237,6 @@ Description: Complete and feature rich groupware solution - contact mapi provide
 
 Package: zarafa-dagent
 Architecture: any
-Breaks: zarafa (<< 7.2)
-Replaces: zarafa (<< 7.2)
 Depends: ${misc:Depends},
  ${shlibs:Depends},
  zarafa-common (= ${binary:Version}),
@@ -333,8 +285,6 @@ Description: Complete and feature rich groupware solution - development files
 Package: zarafa-gateway
 Architecture: any
 Suggests: python-mapi
-Breaks: zarafa (<< 7.2)
-Replaces: zarafa (<< 7.2)
 Depends: ${shlibs:Depends},
  zarafa-common (= ${binary:Version}),
  libzarafa-client0 (= ${binary:Version}),
@@ -350,8 +300,6 @@ Description: Complete and feature rich groupware solution - POP3 and IMAP gatewa
 
 Package: zarafa-ical
 Architecture: any
-Breaks: zarafa (<< 7.2)
-Replaces: zarafa (<< 7.2)
 Depends: ${shlibs:Depends},
  zarafa-common (= ${binary:Version}),
  libzarafa-client0 (= ${binary:Version}),
@@ -367,9 +315,6 @@ Description: Complete and feature rich groupware solution - iCal and CalDAV gate
 
 Package: zarafa-lang
 Architecture: all
-Breaks: zarafa (<< 7.2),
- zarafa-client (<< 7.2)
-Replaces: zarafa (<< 7.2)
 Depends: locales,
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - language files
@@ -381,8 +326,6 @@ Description: Complete and feature rich groupware solution - language files
 
 Package: zarafa-monitor
 Architecture: any
-Breaks: zarafa (<< 7.2)
-Replaces: zarafa (<< 7.2)
 Depends: ${misc:Depends},
  ${shlibs:Depends},
  zarafa-common (= ${binary:Version}),
@@ -401,10 +344,6 @@ Description: Complete and feature rich groupware solution - quota monitor
 
 Package: zarafa-search-plus
 Architecture: all
-Conflicts: zarafa-indexer,
- zarafa-search
-Replaces: zarafa-indexer,
- zarafa-search
 Depends: ${shlibs:Depends},
  ${misc:Depends},
  bash (>= 3.0),
@@ -431,8 +370,6 @@ Description: Complete and feature rich groupware solution - indexer
 
 Package: zarafa-server
 Architecture: any
-Breaks: zarafa (<< 7.2)
-Replaces: zarafa (<< 7.2)
 Depends: ${shlibs:Depends},
  dbconfig-common,
  zarafa-common (= ${binary:Version}),
@@ -449,8 +386,6 @@ Description: Complete and feature rich groupware solution - server component
 
 Package: zarafa-spooler
 Architecture: any
-Breaks: zarafa (<< 7.2)
-Replaces: zarafa (<< 7.2)
 Depends: ${misc:Depends},
  ${shlibs:Depends},
  zarafa-common (= ${binary:Version}),
@@ -467,8 +402,6 @@ Description: Complete and feature rich groupware solution - email spooler
 
 Package: zarafa-utils
 Architecture: any
-Breaks: zarafa (<< 7.2)
-Replaces: zarafa (<< 7.2)
 Depends: ${shlibs:Depends},
  libzarafa-client0 (= ${binary:Version}),
  libzarafa-archiver0 (= ${binary:Version}),
@@ -484,9 +417,6 @@ Description: Complete and feature rich groupware solution - admin tools
 Package: python-mapi
 Architecture: any
 Section: python
-Conflicts: zarafa-python
-Replaces: zarafa-python
-Provides: zarafa-python
 Depends: ${misc:Depends},
  ${shlibs:Depends},
  ${python:Depends},
@@ -521,8 +451,6 @@ Description: Complete and feature rich groupware solution - Python bindings
 Package: php5-mapi
 Architecture: any
 Section: php
-Breaks: zarafa (<< 7.2)
-Replaces: zarafa (<< 7.2)
 Depends: ${shlibs:Depends},
  ${php:Depends},
  libzarafa-client0 (= ${binary:Version}),
