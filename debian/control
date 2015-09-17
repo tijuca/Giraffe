@@ -444,7 +444,7 @@ Description: Complete and feature rich groupware solution - quota monitor
  and alerts users by email.
 
 Package: zarafa-search-plus
-Architecture: any
+Architecture: all
 Conflicts: zarafa-indexer,
  zarafa-search
 Replaces: zarafa-indexer,
