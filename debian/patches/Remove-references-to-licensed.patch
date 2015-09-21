@@ -1,0 +1,91 @@
+From: Mark Dufour <m.dufour@zarafa.com>
+Date: Mon, 21 Sep 2015 19:42:16 +0200
+Subject: Remove references to licensed
+
+not shipped in the OSS version
+---
+ doc/manual.xml | 43 +++----------------------------------------
+ 1 file changed, 3 insertions(+), 40 deletions(-)
+
+diff --git a/doc/manual.xml b/doc/manual.xml
+index c565421..d9ef097 100644
+--- a/doc/manual.xml
++++ b/doc/manual.xml
+@@ -1528,16 +1528,6 @@
+ 			  <para>The server configuration file.</para>
+ 			</listitem>
+ 		  </varlistentry>
+-		  <varlistentry>
+-			<term><filename>/etc/zarafa/license/base</filename></term>
+-			<term><filename>/etc/zarafa/license/*</filename></term>
+-			<listitem>
+-			  <para>The base file contains your license key. When you
+-			  have extra CAL license keys, these are found in the
+-			  other files available in the license/ directory, one key
+-			  per file. This directory is configurable.</para>
+-			</listitem>
+-		  </varlistentry>
+ 		</variablelist>
+ 		<para>Configuration options for user plugins are in their
+ 		respective configuration file. The name of these files is set
+@@ -2432,8 +2422,7 @@
+ 			  <option>--user-count</option>
+ 			</term>
+ 			<listitem>
+-			  <para>Shows an overview of user counts per type of user,
+-			  and how much are allowed by your current license.</para>
++			  <para>Shows an overview of user counts per type of user</para>
+ 			</listitem>
+ 		  </varlistentry>
+ 
+@@ -3607,7 +3596,7 @@
+ 		<para>The <filename>server.cfg</filename> is a configuration file for
+ 		the zarafa-server process. <filename>server.cfg</filename>
+ 		contains instructions for the software to set up the database
+-		environment, logging system and license.</para>
++		environment and logging system.</para>
+ 	  </refsection>
+ 
+ 	  <refsection>
+@@ -3738,7 +3727,7 @@
+ 		  <varlistentry>
+ 			<term><option>server_pipe_priority</option></term>
+ 			<listitem>
+-			  <para>Priority unix socket to listen on. This socket is only used by the zarafa-licensed daemon.</para>
++			  <para>Priority unix socket to listen on.</para>
+ 			  <para>Default:
+ 			  <replaceable>/var/run/zarafa-prio</replaceable></para>
+ 			</listitem>
+@@ -3963,32 +3952,6 @@
+ 			</listitem>
+ 		  </varlistentry>
+ 
+-		  <varlistentry>
+-			<term><option>license_socket</option></term>
+-			<listitem>
+-			  <para>Path to the
+-				<citerefentry>
+-				  <refentrytitle>zarafa-licensed</refentrytitle>
+-				  <manvolnum>8</manvolnum>
+-				</citerefentry>
+-				service.</para>
+-			  <para>Default: <replaceable>/var/run/zarafa-licensed</replaceable></para>
+-			</listitem>
+-		  </varlistentry>
+-
+-		  <varlistentry>
+-			<term><option>license_timeout</option></term>
+-			<listitem>
+-			  <para>Time (in seconds) to wait for a connection to the
+-				<citerefentry>
+-				  <refentrytitle>zarafa-licensed</refentrytitle>
+-				  <manvolnum>8</manvolnum>
+-				</citerefentry>
+-				before terminating the request.</para>
+-			  <para>Default: <replaceable>10</replaceable></para>
+-			</listitem>
+-		  </varlistentry>
+-
+ 		</variablelist>
+ 	  </refsection>
+ 
