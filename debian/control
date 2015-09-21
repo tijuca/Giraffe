@@ -3,7 +3,11 @@ Section: mail
 Priority: optional
 Homepage: https://community.zarafa.com/
 Maintainer: Giraffe Maintainers <pkg-giraffe-maintainers@lists.alioth.debian.org>
-Uploaders: Carsten Schoenert <c.schoenert@t-online.de>, Matthias Geerdsen <matthias@vorlons.info>
+Uploaders: Carsten Schoenert <c.schoenert@t-online.de>,
+ Matthias Geerdsen <matthias@vorlons.info>,
+ Mark Dufour <m.dufour@zarafa.com>,
+ Folkert van Heusden <f.vanheusden@zarafa.com>,
+ Guido Günther <agx@sigxcpu.org>
 Build-Depends: debhelper (>= 4.0.0),
  dh-systemd (>= 1.5),
  dh-autoreconf,
