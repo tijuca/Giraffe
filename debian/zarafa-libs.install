@@ -1,0 +1,15 @@
+usr/lib/libzcp_common_mapi.so.*
+usr/lib/libzcp_common_service.so.*
+usr/lib/libzcp_common_ssl.so.*
+usr/lib/libzcp_common_util.so.*
+usr/lib/libfreebusy.so.*
+usr/lib/libicalmapi.so.*
+usr/lib/libinetmapi.so.*
+usr/lib/libzarafa_mapi.so.*
+usr/lib/libzarafa_server.so.*
+usr/lib/libzarafa_soapserver.so.*
+# From libzarafa-client
+etc/mapi/zarafa.inf
+usr/lib/zarafa/libzarafaclient.so
+usr/lib/libzarafa_soapclient.so.*
+usr/lib/libzarafasync.so.*
