@@ -85,7 +85,7 @@ override_dh_installinit:
 	dh_installinit --name zarafa-ws
 
 override_dh_compress:
-	dh_compress -X.py -X.pl -Xusr/share/doc/zarafa/zarafa7-upgrade
+	dh_compress -X.py -X.pl
 
 override_dh_strip:
 	dh_strip --dbg-package=zarafa-dbg
