@@ -57,6 +57,8 @@ override_dh_install:
 	$(MAKE) DESTDIR=$(INSTDIR) install-man1 -C $(DEB_BUILD_DIR)/doc
 	# Don't ship any .la files
 	rm -f $(INSTDIR)/usr/lib/*.la
+	# Make sure docs end up in zarafa-server
+	mv $(INSTDIR)/usr/share/doc/zarafa $(INSTDIR)/usr/share/doc/zarafa-server
 
 	# since this is not linked to an initscript anymore, install the file ourselves.
 	mkdir -p $(INSTDIR)/etc/default

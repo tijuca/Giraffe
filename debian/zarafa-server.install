@@ -8,7 +8,7 @@ usr/lib/zarafa/dbplugin.so
 usr/lib/zarafa/ldapplugin.so
 usr/lib/zarafa/unixplugin.so
 usr/sbin/zarafa-server
-usr/share/doc/zarafa/
+usr/share/doc/zarafa-server/
 usr/share/man/man5/zarafa-ldap.cfg.5
 usr/share/man/man5/zarafa-server.cfg.5
 usr/share/man/man5/zarafa-unix.cfg.5
