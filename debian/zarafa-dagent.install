@@ -4,8 +4,8 @@ usr/sbin/zarafa-dagent
 usr/sbin/zarafa-autorespond
 usr/sbin/zarafa-mr-accept
 usr/sbin/zarafa-mr-process
-usr/share/doc/zarafa/example-config/autorespond usr/share/doc/zarafa-dagent/example-config
-usr/share/doc/zarafa/example-config/dagent.cfg  usr/share/doc/zarafa-dagent/example-config
+/usr/share/doc/zarafa-server/example-config/autorespond usr/share/doc/zarafa-dagent/example-config
+/usr/share/doc/zarafa-server/example-config/dagent.cfg  usr/share/doc/zarafa-dagent/example-config
 usr/share/man/man5/zarafa-dagent.cfg.5
 usr/share/man/man8/zarafa-autorespond.8
 usr/share/man/man8/zarafa-dagent.8
