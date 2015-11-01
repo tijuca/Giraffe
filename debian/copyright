@@ -57,54 +57,6 @@ Copyright: 2005-2015, Zarafa B.V. and its licensors
   2002-2009, Vincent Richard <vincent@vincent-richard.net>
 License: GPL-3 or AGPL-3
 
-Files: php-webclient-ajax/client/layout/js/date-picker-setup.js
-Copyright: 2002-2003, Mihai Bazon http://dynarch.com/mishoo
-  2005-2015, Zarafa B.V. and its licensors
-License: AGPL-3
-
-Files: php-webclient-ajax/client/layout/js/date-picker.js
-Copyright: Mihai Bazon, 2002-2005 www.bazon.net/mishoo
-  2005-2015, Zarafa B.V. and its licensors
-License: AGPL-3
-
-Files: php-webclient-ajax/client/widgets/fckeditor/*
-Copyright: 2003-2009, Frederico Caldeira Knabben
-License: MPL-1.1
-
-Files: php-webclient-ajax/client/widgets/swfupload/swfupload.js
-Copyright: 2006-2007, Lars Huring, Olov Nilzen and Mammon Media
-  2007-2008, Jake Roberts
-  2005-2015, Zarafa B.V. and its licensors
-License: Expat or AGPL-3
-
-Files: php-webclient-ajax/server/PEAR/*
-Copyright: 2005-2015, Zarafa B.V. and its licensors
-License: PHP-3.0 or AGPL-3
-
-Files: php-webclient-ajax/server/PEAR/JSON.php
-Copyright: 2005-2015, Zarafa B.V. and its licensors
-License: BSD-2 or AGPL-3
-
-Files: php-webclient-ajax/server/PEAR/XML/Parser.php
-Copyright: 2005-2015, Zarafa B.V. and its licensors
-  1997-2004, Stig Bakken <ssb@fast.no>
-             Tomas V.V.Cox <cox@idecnet.com>
-             Stephan Schmidt <schst@php-tools.net>
-License: PHP-3.0 or AGPL-3
-
-Files: php-webclient-ajax/server/PEAR/XML/Serializer.php
-  php-webclient-ajax/server/PEAR/XML/Unserializer.php
-  php-webclient-ajax/server/PEAR/XML/Util.php
-  php-webclient-ajax/server/PEAR/XML/Parser/Simple.php
-Copyright: 2005-2015, Zarafa B.V. and its licensors
-  1997-2004, Stephan Schmidt <schst@php-tools.net>
-License: PHP-3.0 or AGPL-3
-
-Files: php-webclient-ajax/server/core/htmlfilter.php
-Copyright: 2005-2015, Zarafa B.V. and its licensors
-  1999-2010, The SquirrelMail Project Team
-License: GPL-2+ or AGPL-3
-
 Files: provider/include/xop.h
 Copyright: 2005-2015, Zarafa B.V. and its licensors
   2000-2005, Robert van Engelen, Genivia Inc.
@@ -850,10 +802,6 @@ License: BSD-2
  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-License: PHP-3.0
- The complete text of the PHP-3.0 license can be found in the
- `license-PHP-3.0' file in the same directory as this file.
 
 License: OTHER-1
  Copying and distribution of this file, with or without modification, are
