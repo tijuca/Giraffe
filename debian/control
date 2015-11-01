@@ -77,8 +77,8 @@ Description: Metapackage for the Zarafa Collaboration Platform
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
- This package contains the dependencies to pull in all important parts
- of ZCP.
+ This metapackage contains the dependencies to pull in all important parts of
+ Zarafa Communication Platform.
 
 Package: zarafa-common
 Architecture: any
