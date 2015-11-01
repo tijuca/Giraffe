@@ -1,5 +1,5 @@
-zarafa (7.2.0-47552) unstable; urgency=low
+zarafa (7.2.1~RC51272+dfsg1-1) experimental; urgency=low
 
-  * Current release.
+  * Initial upload to experimental (Closes: #658433)
 
- -- Zarafa Development <development@zarafa.com>  Tue, 20 Jan 2015 10:25:03 +0100
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 01 Nov 2015 13:31:52 +0100
