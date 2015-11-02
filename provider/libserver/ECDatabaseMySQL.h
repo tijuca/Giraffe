@@ -129,6 +129,7 @@ private:
     
 	ECRESULT InitEngine();
 	ECRESULT IsInnoDBSupported();
+	ECRESULT InitializeDBStateInner(void);
 	
 	ECRESULT _Update(const std::string &strQuery, unsigned int *lpulAffectedRows);
 	ECRESULT Query(const std::string &strQuery);
