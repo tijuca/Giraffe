@@ -1,2 +1,4 @@
 version=3
-http://download.zarafa.com/community/final/7.2/\d\.\d\.(?:\d|(?:\d{2}))-(.+)/sourcecode/zarafa-(\d\.\d\.\d)\.tar\.gz
+
+opts="uversionmangle=s/\.-RC/~rc/;s/.[0-9]+$//;s/$/+dfsg1/" \
+  http://download.zarafa.com/community/final/7.2/\d\.\d\.(?:\d|(?:\d{2}))-(.+)/sourcecode/zarafa-(\d\.\d\.\d)-(.+)\.tar\.gz

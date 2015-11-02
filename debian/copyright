@@ -1,6 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: Zarafa
 Source: https://download.zarafa.com/community/
+Files-Excluded: php-webclient-ajax/*
 
 Files: *
 Copyright: 2005-2015, Zarafa B.V. and its licensors
