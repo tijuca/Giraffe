@@ -1,3 +1,11 @@
+zarafa (7.2.1+dfsg1-1) experimental; urgency=medium
+
+  * [e44d3da] watch: Handle released upstream tarballs.  They carry a SVN
+    revision as well. Also filter out the PHP web client.
+  * [4b82a45] New upstream version 7.2.1+dfsg1
+
+ -- Guido Günther <agx@sigxcpu.org>  Tue, 03 Nov 2015 09:34:17 +0100
+
 zarafa (7.2.1~RC51272+dfsg1-1) experimental; urgency=low
 
   * Initial upload to experimental (Closes: #658433)
