@@ -50,6 +50,15 @@ Copyright: 2006, Nemanja Trifunovic
   2005-2015, Zarafa B.V. and its licensors
 License: Expat or AGPL-3
 
+Files: ECtools/zarafa-search/zarafa_search/magic.py
+Copyright: Adam Hupp, adam@hupp.org
+License: Expat
+Comment: Upstream licensed the work under the MIT license which is also
+ known as Expat license (https://www.debian.org/legal/licenses/mit)
+ Upstream source can be found on  https://github.com/ahupp/python-magic
+ Note the upstream license informtion in
+ https://github.com/ahupp/python-magic/blob/master/LICENSE
+
 Files: inetmapi/MAPISMTPTransport.cpp
   inetmapi/MAPISMTPTransport.h
   inetmapi/mapiTextPart.cpp
