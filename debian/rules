@@ -84,7 +84,6 @@ override_dh_installinit:
 	dh_installinit --name zarafa-monitor
 	dh_installinit --name zarafa-ical
 	dh_installinit --name zarafa-search
-	dh_installinit --name zarafa-ws
 
 override_dh_compress:
 	dh_compress -X.py -X.pl
