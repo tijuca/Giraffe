@@ -1,0 +1,22 @@
+From: Carsten Schoenert <c.schoenert@t-online.de>
+Date: Sun, 1 May 2016 08:06:05 +0200
+Subject: adding .NOTPARALLEL target to swig/python/Makefiel.am
+
+The installation of the *.so fails sometimes due race conditions by
+parallel running make instances. The installation is save if only one
+make process is allowed.
+---
+ swig/python/Makefile.am | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/swig/python/Makefile.am b/swig/python/Makefile.am
+index d9d0624..a18795e 100644
+--- a/swig/python/Makefile.am
++++ b/swig/python/Makefile.am
+@@ -172,3 +172,6 @@ install-exec-local:
+ 	rm -Rf build
+ 
+ include ../../global.am
++
++.NOTPARALLEL:
++

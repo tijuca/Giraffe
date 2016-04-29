@@ -8,10 +8,10 @@ not shipped in the OSS version
  1 file changed, 3 insertions(+), 40 deletions(-)
 
 diff --git a/doc/manual.xml b/doc/manual.xml
-index c565421..d9ef097 100644
+index 6176782..79c3bdc 100644
 --- a/doc/manual.xml
 +++ b/doc/manual.xml
-@@ -1528,16 +1528,6 @@
+@@ -1538,16 +1538,6 @@
  			  <para>The server configuration file.</para>
  			</listitem>
  		  </varlistentry>
@@ -28,7 +28,7 @@ index c565421..d9ef097 100644
  		</variablelist>
  		<para>Configuration options for user plugins are in their
  		respective configuration file. The name of these files is set
-@@ -2432,8 +2422,7 @@
+@@ -2442,8 +2432,7 @@
  			  <option>--user-count</option>
  			</term>
  			<listitem>
@@ -38,7 +38,7 @@ index c565421..d9ef097 100644
  			</listitem>
  		  </varlistentry>
  
-@@ -3607,7 +3596,7 @@
+@@ -3619,7 +3608,7 @@
  		<para>The <filename>server.cfg</filename> is a configuration file for
  		the zarafa-server process. <filename>server.cfg</filename>
  		contains instructions for the software to set up the database
@@ -47,16 +47,16 @@ index c565421..d9ef097 100644
  	  </refsection>
  
  	  <refsection>
-@@ -3738,7 +3727,7 @@
+@@ -3750,7 +3739,7 @@
  		  <varlistentry>
  			<term><option>server_pipe_priority</option></term>
  			<listitem>
 -			  <para>Priority unix socket to listen on. This socket is only used by the zarafa-licensed daemon.</para>
 +			  <para>Priority unix socket to listen on.</para>
  			  <para>Default:
- 			  <replaceable>/var/run/zarafa-prio</replaceable></para>
+ 			  <replaceable>/var/run/zarafad/prio.sock</replaceable></para>
  			</listitem>
-@@ -3963,32 +3952,6 @@
+@@ -3975,32 +3964,6 @@
  			</listitem>
  		  </varlistentry>
  
@@ -69,7 +69,7 @@ index c565421..d9ef097 100644
 -				  <manvolnum>8</manvolnum>
 -				</citerefentry>
 -				service.</para>
--			  <para>Default: <replaceable>/var/run/zarafa-licensed</replaceable></para>
+-			  <para>Default: <replaceable>/var/run/zarafad/licensed.sock</replaceable></para>
 -			</listitem>
 -		  </varlistentry>
 -

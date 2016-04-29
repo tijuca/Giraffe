@@ -1,0 +1,21 @@
+From: Carsten Schoenert <c.schoenert@t-online.de>
+Date: Sat, 16 Apr 2016 09:26:36 +0200
+Subject: adding additional c++ flags for C++11
+
+---
+ configure.ac | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/configure.ac b/configure.ac
+index 5713753..17e3754 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -79,7 +79,7 @@ ZCPPFLAGS="$BUILDOS -DHAVE_CONFIG_H \
+ 	-I\${top_srcdir}/inetmapi/include \
+ 	-I\${top_srcdir}/swig/include \
+ 	-I\${top_srcdir}/swig/python/include"
+-ZCXXFLAGS="-Wall -Wmissing-declarations -Wno-write-strings"
++ZCXXFLAGS="-Wall -Wmissing-declarations -Wno-write-strings -std=c++11"
+ 
+ # programs that use files >2gb need 64bit file support
+ LFS_CFLAGS=`getconf LFS_CFLAGS`

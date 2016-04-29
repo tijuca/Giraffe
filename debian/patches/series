@@ -4,3 +4,6 @@ Be-pessimistic-about-daemon-startup.patch
 Rename-libmapi-to-libzarafa_mapi.patch
 Remove-archiver-related-code.patch
 Remove-references-to-licensed.patch
+adding-additional-c-flags-for-C-11.patch
+adding-additional-changes-due-gsoap-2.8.30.patch
+adding-.NOTPARALLEL-target-to-swig-python-Makefiel.am.patch

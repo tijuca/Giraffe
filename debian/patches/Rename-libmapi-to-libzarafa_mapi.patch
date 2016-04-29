@@ -4,140 +4,395 @@ Subject: Rename libmapi to libzarafa_mapi
 
 so avoid a conflict with the openchange libmapi.
 ---
- ECtools/zarafa-admin/Makefile.am      |  2 +-
- ECtools/zarafa-archiver/Makefile.am   |  6 +++---
- ECtools/zarafa-cfgchecker/Makefile.am |  2 +-
- ECtools/zarafa-fsck/Makefile.am       |  2 +-
- ECtools/zarafa-monitor/Makefile.am    |  2 +-
- ECtools/zarafa-passwd/Makefile.am     |  2 +-
- ECtools/zarafa-stats/Makefile.am      |  2 +-
+ ECtools/Makefile.am                   | 18 ++++----
+ ECtools/zarafa-admin/Makefile.am      | 24 ++++++++++
+ ECtools/zarafa-archiver/Makefile.am   | 82 +++++++++++++++++++++++++++++++++++
+ ECtools/zarafa-cfgchecker/Makefile.am | 30 +++++++++++++
+ ECtools/zarafa-fsck/Makefile.am       | 22 ++++++++++
+ ECtools/zarafa-monitor/Makefile.am    | 21 +++++++++
+ ECtools/zarafa-passwd/Makefile.am     | 21 +++++++++
+ ECtools/zarafa-stats/Makefile.am      | 28 ++++++++++++
  caldav/Makefile.am                    |  2 +-
- common/zarafa.pc.in                   |  2 +-
+ common/zarafa.pc.in                   |  4 +-
  gateway/Makefile.am                   |  2 +-
  inetmapi/Makefile.am                  |  2 +-
  libfreebusy/Makefile.am               |  2 +-
  libicalmapi/Makefile.am               |  2 +-
- mapi4linux/src/Makefile.am            | 12 ++++++------
+ mapi4linux/src/Makefile.am            | 12 ++---
  php-ext/Makefile.am                   |  2 +-
  provider/client/Makefile.am           |  2 +-
  provider/contacts/Makefile.am         |  2 +-
- spooler/Makefile.am                   |  4 ++--
- swig/python/Makefile.am               | 14 +++++++-------
- testunit/Makefile.am                  |  2 +-
+ spooler/Makefile.am                   |  4 +-
+ swig/python/Makefile.am               | 19 ++++----
+ testunit/Makefile.am                  | 16 +++++++
  zarafa-libsync/Makefile.am            |  2 +-
- 21 files changed, 35 insertions(+), 35 deletions(-)
+ 22 files changed, 282 insertions(+), 37 deletions(-)
+ create mode 100644 ECtools/zarafa-admin/Makefile.am
+ create mode 100644 ECtools/zarafa-archiver/Makefile.am
+ create mode 100644 ECtools/zarafa-cfgchecker/Makefile.am
+ create mode 100644 ECtools/zarafa-fsck/Makefile.am
+ create mode 100644 ECtools/zarafa-monitor/Makefile.am
+ create mode 100644 ECtools/zarafa-passwd/Makefile.am
+ create mode 100644 ECtools/zarafa-stats/Makefile.am
+ create mode 100644 testunit/Makefile.am
 
-diff --git a/ECtools/zarafa-admin/Makefile.am b/ECtools/zarafa-admin/Makefile.am
-index d423cc7..c1fd02b 100644
---- a/ECtools/zarafa-admin/Makefile.am
-+++ b/ECtools/zarafa-admin/Makefile.am
-@@ -8,7 +8,7 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
- sbin_PROGRAMS = zarafa-admin
- noinst_DATA = zarafa-admin.ldx
- 
--zarafa_admin_LDADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-+zarafa_admin_LDADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
- 	${top_builddir}/common/libzcp_common_mapi.la \
- 	${top_builddir}/common/libzcp_common_util.la \
- 	${top_builddir}/common/libzcp_common_ssl.la \
-diff --git a/ECtools/zarafa-archiver/Makefile.am b/ECtools/zarafa-archiver/Makefile.am
-index 8150861..915e863 100644
---- a/ECtools/zarafa-archiver/Makefile.am
-+++ b/ECtools/zarafa-archiver/Makefile.am
-@@ -16,7 +16,7 @@ lib_LTLIBRARIES = libzarafa-archiver.la libzarafa-archiver-core.la
- noinst_DATA = libzarafa-archiver.ldd libzarafa-archiver-core.ldd \
- 	zarafa-archiver.ldx
- 
--libzarafa_archiver_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-+libzarafa_archiver_la_LIBADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
- 	${top_builddir}/common/libzcp_common_mapi.la \
- 	${top_builddir}/common/libzcp_common_util.la
- 
-@@ -36,7 +36,7 @@ libzarafa_archiver_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
- EXTRA_libzarafa_archiver_la_DEPENDENCIES = ${top_builddir}/default.sym
- 
- 
--libzarafa_archiver_core_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-+libzarafa_archiver_core_la_LIBADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
- 	${top_builddir}/common/libzcp_common_mapi.la \
- 	${top_builddir}/common/libzcp_common_service.la \
- 	libzarafa-archiver.la \
-@@ -60,7 +60,7 @@ libzarafa_archiver_core_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
- 	-Wl,--version-script=${top_builddir}/default.sym
- EXTRA_libzarafa_archiver_core_la_DEPENDENCIES = ${top_builddir}/default.sym
- 
--zarafa_archiver_LDADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-+zarafa_archiver_LDADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
- 	${top_builddir}/common/libzcp_common_mapi.la \
- 	${top_builddir}/common/libzcp_common_util.la \
- 	libzarafa-archiver.la libzarafa-archiver-core.la \
-diff --git a/ECtools/zarafa-cfgchecker/Makefile.am b/ECtools/zarafa-cfgchecker/Makefile.am
-index a7862b2..c0fe6fe 100644
---- a/ECtools/zarafa-cfgchecker/Makefile.am
-+++ b/ECtools/zarafa-cfgchecker/Makefile.am
-@@ -9,7 +9,7 @@ noinst_DATA = zarafa-cfgchecker.ldx
- zarafa_cfgchecker_LDADD = \
- 	${top_builddir}/common/libzcp_common_util.la \
- 	${top_builddir}/common/libzcp_common_mapi.la \
--	$(PROG_LIBS) ${top_builddir}/mapi4linux/src/libmapi.la
-+	$(PROG_LIBS) ${top_builddir}/mapi4linux/src/libzarafa_mapi.la
- 
- zarafa_cfgchecker_SOURCES = \
- 	zarafa-cfg.cpp \
-diff --git a/ECtools/zarafa-fsck/Makefile.am b/ECtools/zarafa-fsck/Makefile.am
-index db26388..e3045f5 100644
---- a/ECtools/zarafa-fsck/Makefile.am
-+++ b/ECtools/zarafa-fsck/Makefile.am
-@@ -8,7 +8,7 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
- bin_PROGRAMS = zarafa-fsck
- noinst_DATA = zarafa-fsck.ldx
- 
--zarafa_fsck_LDADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-+zarafa_fsck_LDADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
- 	${top_builddir}/common/libzcp_common_mapi.la \
- 	${top_builddir}/common/libzcp_common_util.la \
- 	$(PROG_LIBS)
-diff --git a/ECtools/zarafa-monitor/Makefile.am b/ECtools/zarafa-monitor/Makefile.am
-index 10715a6..1ec4eec 100644
---- a/ECtools/zarafa-monitor/Makefile.am
-+++ b/ECtools/zarafa-monitor/Makefile.am
-@@ -7,7 +7,7 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
- sbin_PROGRAMS = zarafa-monitor
- noinst_DATA = zarafa-monitor.ldx
- 
--zarafa_monitor_LDADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-+zarafa_monitor_LDADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
- 	${top_builddir}/common/libzcp_common_mapi.la \
- 	${top_builddir}/common/libzcp_common_util.la \
- 	$(PROG_LIBS)
-diff --git a/ECtools/zarafa-passwd/Makefile.am b/ECtools/zarafa-passwd/Makefile.am
-index 0ec528d..506bc5f 100644
---- a/ECtools/zarafa-passwd/Makefile.am
-+++ b/ECtools/zarafa-passwd/Makefile.am
-@@ -7,7 +7,7 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
- bin_PROGRAMS = zarafa-passwd
- noinst_DATA = zarafa-passwd.ldx
- 
--zarafa_passwd_LDADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-+zarafa_passwd_LDADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
- 	${top_builddir}/common/libzcp_common_mapi.la \
- 	${top_builddir}/common/libzcp_common_util.la \
- 	$(PROG_LIBS)
-diff --git a/ECtools/zarafa-stats/Makefile.am b/ECtools/zarafa-stats/Makefile.am
-index 3c3e3d5..e63a17d 100644
---- a/ECtools/zarafa-stats/Makefile.am
-+++ b/ECtools/zarafa-stats/Makefile.am
-@@ -14,7 +14,7 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
- # which overrides the ncurses lib selection >:-(
- zarafa_stats_LDADD = \
- 	$(NCURSES_LIBS) \
+diff --git a/ECtools/Makefile.am b/ECtools/Makefile.am
+index 68bb0cb..a887d7f 100644
+--- a/ECtools/Makefile.am
++++ b/ECtools/Makefile.am
+@@ -24,7 +24,7 @@ zarafa_admin_SOURCES = \
+ zarafa_admin_CPPFLAGS = \
+ 	${AM_CPPFLAGS} -I${top_srcdir}/ECtools/archiver
+ zarafa_admin_LDADD = \
 -	${top_builddir}/mapi4linux/src/libmapi.la \
 +	${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
  	${top_builddir}/common/libzcp_common_mapi.la \
  	${top_builddir}/common/libzcp_common_util.la \
- 	$(PROG_LIBS)
+ 	${top_builddir}/common/libzcp_common_ssl.la \
+@@ -38,7 +38,7 @@ zarafa_archiver_CPPFLAGS = \
+ 	-I${top_builddir}/provider/soap -I${top_srcdir}/ECtools/archiver \
+ 	${GSOAP_CFLAGS} ${MYSQL_INCLUDES}
+ zarafa_archiver_LDADD = \
+-	${top_builddir}/mapi4linux/src/libmapi.la \
++	${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
+ 	${top_builddir}/common/libzcp_common_mapi.la \
+ 	${top_builddir}/common/libzcp_common_util.la \
+ 	libzarafa-archiver.la libzarafa-archiver-core.la \
+@@ -68,7 +68,7 @@ zarafa_cfgchecker_SOURCES = \
+ zarafa_cfgchecker_LDADD = \
+ 	${top_builddir}/common/libzcp_common_util.la \
+ 	${top_builddir}/common/libzcp_common_mapi.la \
+-	${top_builddir}/mapi4linux/src/libmapi.la ${PROG_LIBS}
++	${top_builddir}/mapi4linux/src/libzarafa_mapi.la ${PROG_LIBS}
+ 
+ 
+ zarafa_fsck_SOURCES = \
+@@ -81,7 +81,7 @@ zarafa_fsck_SOURCES = \
+ zarafa_fsck_CPPFLAGS = \
+ 	${AM_CPPFLAGS} -I${top_srcdir}/libicalmapi
+ zarafa_fsck_LDADD = \
+-	${top_builddir}/mapi4linux/src/libmapi.la \
++	${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
+ 	${top_builddir}/common/libzcp_common_mapi.la \
+ 	${top_builddir}/common/libzcp_common_util.la \
+ 	${PROG_LIBS}
+@@ -93,7 +93,7 @@ zarafa_monitor_SOURCES = \
+ 	monitor/ECQuotaMonitor.h \
+ 	monitor/ECQuotaMonitor.cpp
+ zarafa_monitor_LDADD = \
+-	${top_builddir}/mapi4linux/src/libmapi.la \
++	${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
+ 	${top_builddir}/common/libzcp_common_mapi.la \
+ 	${top_builddir}/common/libzcp_common_util.la \
+ 	${PROG_LIBS}
+@@ -102,7 +102,7 @@ zarafa_monitor_LDADD = \
+ zarafa_passwd_SOURCES = \
+ 	passwd/zarafa-passwd.cpp
+ zarafa_passwd_LDADD = \
+-	${top_builddir}/mapi4linux/src/libmapi.la \
++	${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
+ 	${top_builddir}/common/libzcp_common_mapi.la \
+ 	${top_builddir}/common/libzcp_common_util.la \
+ 	${PROG_LIBS}
+@@ -116,7 +116,7 @@ zarafa_stats_CPPFLAGS = \
+ # which overrides the ncurses lib selection >:-(
+ zarafa_stats_LDADD = \
+ 	${NCURSES_LIBS} \
+-	${top_builddir}/mapi4linux/src/libmapi.la \
++	${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
+ 	${top_builddir}/common/libzcp_common_mapi.la \
+ 	${top_builddir}/common/libzcp_common_util.la \
+ 	${PROG_LIBS}
+@@ -146,7 +146,7 @@ libzarafa_archiver_la_SOURCES = \
+ libzarafa_archiver_la_CPPFLAGS = ${zarafa_archiver_CPPFLAGS}
+ libzarafa_archiver_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
+ 	-Wl,--version-script=${top_builddir}/default.sym
+-libzarafa_archiver_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
++libzarafa_archiver_la_LIBADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
+ 	${top_builddir}/common/libzcp_common_mapi.la \
+ 	${top_builddir}/common/libzcp_common_util.la
+ EXTRA_libzarafa_archiver_la_DEPENDENCIES = ${top_builddir}/default.sym
+@@ -185,7 +185,7 @@ libzarafa_archiver_core_la_LDFLAGS = \
+ 	${AM_LDFLAGS} -no-undefined \
+ 	-Wl,--version-script=${top_builddir}/default.sym
+ libzarafa_archiver_core_la_LIBADD = \
+-	${top_builddir}/mapi4linux/src/libmapi.la \
++	${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
+ 	${top_builddir}/common/libzcp_common_mapi.la \
+ 	${top_builddir}/common/libzcp_common_service.la \
+ 	libzarafa-archiver.la \
+diff --git a/ECtools/zarafa-admin/Makefile.am b/ECtools/zarafa-admin/Makefile.am
+new file mode 100644
+index 0000000..c1fd02b
+--- /dev/null
++++ b/ECtools/zarafa-admin/Makefile.am
+@@ -0,0 +1,24 @@
++# -*- Makefile -*-
++
++AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
++	-I${top_srcdir}/mapi4linux/include \
++	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
++	-I${top_srcdir}/ECtools/zarafa-archiver
++
++sbin_PROGRAMS = zarafa-admin
++noinst_DATA = zarafa-admin.ldx
++
++zarafa_admin_LDADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
++	${top_builddir}/common/libzcp_common_mapi.la \
++	${top_builddir}/common/libzcp_common_util.la \
++	${top_builddir}/common/libzcp_common_ssl.la \
++	${top_builddir}/ECtools/zarafa-archiver/libzarafa-archiver.la \
++	$(PROG_LIBS) $(SSL_LIBS)
++
++zarafa_admin_SOURCES = zarafa-admin.cpp
++
++check-syntax:
++	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
++		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2
++
++include ../../global.am
+diff --git a/ECtools/zarafa-archiver/Makefile.am b/ECtools/zarafa-archiver/Makefile.am
+new file mode 100644
+index 0000000..915e863
+--- /dev/null
++++ b/ECtools/zarafa-archiver/Makefile.am
+@@ -0,0 +1,82 @@
++# -*- Makefile -*-
++
++AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
++	-DARCHIVER_EXTRA \
++	-I${top_srcdir}/mapi4linux/include \
++	-I${top_srcdir}/provider/client \
++	-I${top_srcdir}/provider/include \
++	-I${top_srcdir}/provider/soap \
++	-I${top_builddir}/provider/soap \
++    $(GSOAP_CFLAGS) \
++	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
++	$(MYSQL_INCLUDES)
++
++sbin_PROGRAMS = zarafa-archiver
++lib_LTLIBRARIES = libzarafa-archiver.la libzarafa-archiver-core.la
++noinst_DATA = libzarafa-archiver.ldd libzarafa-archiver-core.ldd \
++	zarafa-archiver.ldx
++
++libzarafa_archiver_la_LIBADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
++	${top_builddir}/common/libzcp_common_mapi.la \
++	${top_builddir}/common/libzcp_common_util.la
++
++libzarafa_archiver_la_SOURCES = \
++	ArchiverSession.cpp ArchiverSession.h ArchiverSessionPtr.h \
++	archiver-common.cpp archiver-common.h ArchiveControl.h \
++	ArchiveManageImpl.cpp ArchiveManageImpl.h ArchiveManage.h\
++	ArchiveStateCollector.cpp ArchiveStateCollector.h \
++	ArchiveStateUpdater.cpp ArchiveStateUpdater.h archivestateupdater_fwd.h \
++	helpers/ArchiveHelper.cpp helpers/ArchiveHelper.h \
++	helpers/StoreHelper.cpp helpers/StoreHelper.h \
++	helpers/MAPIPropHelper.cpp helpers/MAPIPropHelper.h \
++	ECArchiverLogger.cpp ECArchiverLogger.h
++
++libzarafa_archiver_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
++	-Wl,--version-script=${top_builddir}/default.sym
++EXTRA_libzarafa_archiver_la_DEPENDENCIES = ${top_builddir}/default.sym
++
++
++libzarafa_archiver_core_la_LIBADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
++	${top_builddir}/common/libzcp_common_mapi.la \
++	${top_builddir}/common/libzcp_common_service.la \
++	libzarafa-archiver.la \
++	$(PROG_LIBS) $(SSL_LIBS) $(MYSQL_LIBS)
++
++libzarafa_archiver_core_la_SOURCES = \
++	Archiver.cpp Archiver.h AutoMAPI.h\
++	ArchiverImpl.cpp ArchiverImpl.h\
++	operations/instanceidmapper.cpp operations/instanceidmapper.h operations/instanceidmapper_fwd.h \
++	operations/operations.cpp operations/operations.h operations/operations_fwd.h \
++	operations/copier.cpp operations/copier.h \
++	operations/deleter.cpp operations/deleter.h \
++	operations/stubber.cpp operations/stubber.h \
++	operations/transaction.cpp operations/transaction.h operations/transaction_fwd.h \
++	operations/postsaveaction.h \
++	operations/postsaveiidupdater.cpp operations/postsaveiidupdater.h \
++	ArchiveControlImpl.cpp ArchiveControlImpl.h \
++	ECDatabase.h ECDatabase.cpp
++
++libzarafa_archiver_core_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
++	-Wl,--version-script=${top_builddir}/default.sym
++EXTRA_libzarafa_archiver_core_la_DEPENDENCIES = ${top_builddir}/default.sym
++
++zarafa_archiver_LDADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
++	${top_builddir}/common/libzcp_common_mapi.la \
++	${top_builddir}/common/libzcp_common_util.la \
++	libzarafa-archiver.la libzarafa-archiver-core.la \
++	$(PROG_LIBS) ${top_builddir}/common/libzcp_common_service.la
++
++zarafa_archiver_SOURCES = main.cpp
++
++
++
++check-syntax:
++	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
++		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2
++
++install-exec-hook:
++	${MKDIR_P} ${DESTDIR}${pkglibdir}
++	ln -fs ${libdir}/libzarafa-archiver.so ${DESTDIR}${pkglibdir}/libarchiver.so
++	ln -fs ${libdir}/libzarafa-archiver-core.so ${DESTDIR}${pkglibdir}/libarchiver-core.so
++
++include ../../global.am
+diff --git a/ECtools/zarafa-cfgchecker/Makefile.am b/ECtools/zarafa-cfgchecker/Makefile.am
+new file mode 100644
+index 0000000..c0fe6fe
+--- /dev/null
++++ b/ECtools/zarafa-cfgchecker/Makefile.am
+@@ -0,0 +1,30 @@
++# -*- Makefile -*-
++
++AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) \
++	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon
++
++noinst_PROGRAMS = zarafa-cfgchecker
++noinst_DATA = zarafa-cfgchecker.ldx
++
++zarafa_cfgchecker_LDADD = \
++	${top_builddir}/common/libzcp_common_util.la \
++	${top_builddir}/common/libzcp_common_mapi.la \
++	$(PROG_LIBS) ${top_builddir}/mapi4linux/src/libzarafa_mapi.la
++
++zarafa_cfgchecker_SOURCES = \
++	zarafa-cfg.cpp \
++	ECConfigCheck.cpp ECConfigCheck.h \
++	LDAPConfigCheck.cpp LDAPConfigCheck.h \
++	UnixConfigCheck.cpp UnixConfigCheck.h \
++	ServerConfigCheck.cpp ServerConfigCheck.h \
++	GatewayConfigCheck.cpp GatewayConfigCheck.h \
++	IcalConfigCheck.cpp IcalConfigCheck.h \
++	MonitorConfigCheck.cpp MonitorConfigCheck.h \
++	DAgentConfigCheck.cpp DAgentConfigCheck.h \
++	SpoolerConfigCheck.cpp SpoolerConfigCheck.h 
++
++check-syntax:
++	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
++		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2 $(zarafa_cfg_SOURCES)
++
++include ../../global.am
+diff --git a/ECtools/zarafa-fsck/Makefile.am b/ECtools/zarafa-fsck/Makefile.am
+new file mode 100644
+index 0000000..e3045f5
+--- /dev/null
++++ b/ECtools/zarafa-fsck/Makefile.am
+@@ -0,0 +1,22 @@
++# -*- Makefile -*-
++
++AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
++	-I${top_srcdir}/mapi4linux/include \
++	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
++	-I${top_srcdir}/libicalmapi
++
++bin_PROGRAMS = zarafa-fsck
++noinst_DATA = zarafa-fsck.ldx
++
++zarafa_fsck_LDADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
++	${top_builddir}/common/libzcp_common_mapi.la \
++	${top_builddir}/common/libzcp_common_util.la \
++	$(PROG_LIBS)
++
++zarafa_fsck_SOURCES = zarafa-fsck.cpp zarafa-fsck-main.cpp zarafa-fsck-calendar.cpp zarafa-fsck-contact.cpp zarafa-fsck-task.cpp zarafa-fsck.h
++
++check-syntax:
++	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
++		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2 $(zarafa_fsck_SOURCES)
++
++include ../../global.am
+diff --git a/ECtools/zarafa-monitor/Makefile.am b/ECtools/zarafa-monitor/Makefile.am
+new file mode 100644
+index 0000000..1ec4eec
+--- /dev/null
++++ b/ECtools/zarafa-monitor/Makefile.am
+@@ -0,0 +1,21 @@
++# -*- Makefile -*-
++
++AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
++	-I${top_srcdir}/mapi4linux/include \
++	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon
++
++sbin_PROGRAMS = zarafa-monitor
++noinst_DATA = zarafa-monitor.ldx
++
++zarafa_monitor_LDADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
++	${top_builddir}/common/libzcp_common_mapi.la \
++	${top_builddir}/common/libzcp_common_util.la \
++	$(PROG_LIBS)
++
++zarafa_monitor_SOURCES = zarafa-monitor.cpp ECMonitorDefs.h ECQuotaMonitor.h ECQuotaMonitor.cpp
++
++check-syntax:
++	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
++		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2
++
++include ../../global.am
+diff --git a/ECtools/zarafa-passwd/Makefile.am b/ECtools/zarafa-passwd/Makefile.am
+new file mode 100644
+index 0000000..506bc5f
+--- /dev/null
++++ b/ECtools/zarafa-passwd/Makefile.am
+@@ -0,0 +1,21 @@
++# -*- Makefile -*-
++
++AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
++	-I${top_srcdir}/mapi4linux/include \
++	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon
++
++bin_PROGRAMS = zarafa-passwd
++noinst_DATA = zarafa-passwd.ldx
++
++zarafa_passwd_LDADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
++	${top_builddir}/common/libzcp_common_mapi.la \
++	${top_builddir}/common/libzcp_common_util.la \
++	$(PROG_LIBS)
++
++zarafa_passwd_SOURCES = zarafa-passwd.cpp
++
++check-syntax:
++	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
++		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2
++
++include ../../global.am
+diff --git a/ECtools/zarafa-stats/Makefile.am b/ECtools/zarafa-stats/Makefile.am
+new file mode 100644
+index 0000000..e63a17d
+--- /dev/null
++++ b/ECtools/zarafa-stats/Makefile.am
+@@ -0,0 +1,28 @@
++# -*- Makefile -*-
++
++bin_PROGRAMS = zarafa-stats
++noinst_DATA = zarafa-stats.ldx
++
++
++AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
++	$(NCURSES_FLAGS) \
++	-I${top_srcdir}/mapi4linux/include \
++	-I${top_srcdir}/libfreebusy	\
++	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon
++
++# ncurses needs to come first, because ICU_LIBS erroneously has -L/usr/lib64
++# which overrides the ncurses lib selection >:-(
++zarafa_stats_LDADD = \
++	$(NCURSES_LIBS) \
++	${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
++	${top_builddir}/common/libzcp_common_mapi.la \
++	${top_builddir}/common/libzcp_common_util.la \
++	$(PROG_LIBS)
++
++zarafa_stats_SOURCES = zarafa-stats.cpp
++
++check-syntax:
++	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
++		-fsyntax-only -fmessage-length=0 ${CHK_SOURCES} -Wall -Wformat=2
++
++include ../../global.am
 diff --git a/caldav/Makefile.am b/caldav/Makefile.am
-index f6010a3..ba421d1 100644
+index b80ceb7..25289de 100644
 --- a/caldav/Makefile.am
 +++ b/caldav/Makefile.am
 @@ -18,7 +18,7 @@ zarafa_ical_SOURCES = CalDAV.cpp \
@@ -150,21 +405,22 @@ index f6010a3..ba421d1 100644
  	${top_builddir}/common/libzcp_common_util.la \
  	${top_builddir}/libicalmapi/libicalmapi.la \
 diff --git a/common/zarafa.pc.in b/common/zarafa.pc.in
-index 2dabac4..15a8a09 100644
+index 02ecf62..e05e174 100644
 --- a/common/zarafa.pc.in
 +++ b/common/zarafa.pc.in
 @@ -7,5 +7,5 @@ Name: zarafa
  Description: Zarafa custom development
- Version: @ZARAFA_VERSION@
+ Version: @PACKAGE_VERSION@
  Requires:
 -Libs: -L${libdir} -lmapi
+-Cflags: -I${includedir} -I${includedir}/mapi4linux -DUNICODE @icu_uc_CFLAGS@ @icu_i18n_CFLAGS@
 +Libs: -L${libdir} -lzarafa_mapi
- Cflags: -I${includedir}/mapi4linux/ -I${includedir}/zarafa/ -DUNICODE
++Cflags: -I${includedir} -I${includedir}/mapi4linux -I${includedir}/zarafa/ -DUNICODE @icu_uc_CFLAGS@ @icu_i18n_CFLAGS@
 diff --git a/gateway/Makefile.am b/gateway/Makefile.am
-index bda5e18..7401839 100644
+index 0838f8b..9e919b7 100644
 --- a/gateway/Makefile.am
 +++ b/gateway/Makefile.am
-@@ -9,7 +9,7 @@ sbin_PROGRAMS = zarafa-gateway
+@@ -10,7 +10,7 @@ sbin_PROGRAMS = zarafa-gateway
  noinst_DATA = zarafa-gateway.ldx
  
  zarafa_gateway_LDADD = ${top_builddir}/inetmapi/libinetmapi.la \
@@ -174,10 +430,10 @@ index bda5e18..7401839 100644
  	${top_builddir}/common/libzcp_common_util.la \
  	${top_builddir}/common/libzcp_common_ssl.la \
 diff --git a/inetmapi/Makefile.am b/inetmapi/Makefile.am
-index e5da583..e31269d 100644
+index d7611ec..2a846ba 100644
 --- a/inetmapi/Makefile.am
 +++ b/inetmapi/Makefile.am
-@@ -20,7 +20,7 @@ libinetmapi_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
+@@ -22,7 +22,7 @@ libinetmapi_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
  EXTRA_libinetmapi_la_DEPENDENCIES = ${top_builddir}/default.sym
  
  libinetmapi_la_LIBADD = \
@@ -285,7 +541,7 @@ index 018c991..4215344 100644
  
  libzarafacontacts_la_SOURCES = epcontact.cpp ZCABData.h \
 diff --git a/spooler/Makefile.am b/spooler/Makefile.am
-index 3875474..3e283c5 100644
+index 065bd02..aaa9d85 100644
 --- a/spooler/Makefile.am
 +++ b/spooler/Makefile.am
 @@ -14,7 +14,7 @@ sbin_PROGRAMS = zarafa-dagent zarafa-spooler
@@ -298,7 +554,7 @@ index 3875474..3e283c5 100644
  	${top_builddir}/common/libzcp_common_util.la \
  	${top_builddir}/common/libzcp_common_ssl.la \
 @@ -23,7 +23,7 @@ zarafa_dagent_LDADD = ${top_builddir}/inetmapi/libinetmapi.la \
- 	$(PROG_LIBS) $(SSL_LIBS) $(PYTHON_LIBS) $(XML2_LIBS)
+ 	$(PROG_LIBS) $(SSL_LIBS) $(PYTHON_LIBS) $(XML2_LIBS) ${icu_uc_LIBS}
  
  zarafa_spooler_LDADD = ${top_builddir}/inetmapi/libinetmapi.la \
 -	${top_builddir}/mapi4linux/src/libmapi.la \
@@ -307,37 +563,56 @@ index 3875474..3e283c5 100644
  	${top_builddir}/common/libzcp_common_util.la \
  	${top_builddir}/common/libzcp_common_ssl.la \
 diff --git a/swig/python/Makefile.am b/swig/python/Makefile.am
-index 5e03457..4f68550 100644
+index 6940350..bceb1c9 100644
 --- a/swig/python/Makefile.am
 +++ b/swig/python/Makefile.am
-@@ -15,7 +15,7 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) \
+@@ -7,7 +7,7 @@ SWIG_CXXFLAGS = -Wall -python -c++ -threads \
  
+ lib_LTLIBRARIES = libzcp_pyconv.la libzcp_pydirector.la
+ pyexec_LTLIBRARIES = _MAPICore.la _inetmapi.la _icalmapi.la _licenseclient.la
+-noinst_LTLIBRARIES = _libcommon.la _archiver.la _libfreebusy.la _RecurrenceState.la
++noinst_LTLIBRARIES = _libcommon.la _libfreebusy.la _RecurrenceState.la
+ noinst_DATA = libzcp_pyconv.ldd _MAPICore.ldd _inetmapi.ldd _icalmapi.ldd \
+ 	_libcommon.ldd _archiver.ldd _libfreebusy.ldd _RecurrenceState.ldd \
+ 	_licenseclient.ldd
+@@ -22,7 +22,8 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) \
+ libzcp_pyconv_la_SOURCES = conversion.cpp conversion.h
+ libzcp_pyconv_la_LDFLAGS = -Wl,--version-script=${top_builddir}/default.sym
+ libzcp_pyconv_la_LIBADD  = ${PYTHON_LIBS} \
+-	${top_builddir}/mapi4linux/src/libmapi.la
++	${top_builddir}/mapi4linux/src/libzarafa_mapi.la
++
+ libzcp_pydirector_la_SOURCES = ../director_util.cpp ../director_util.h
+ libzcp_pydirector_la_LDFLAGS = -Wl,--version-script=${top_builddir}/default.sym
+ libzcp_pydirector_la_LIBADD  = -lpthread
+@@ -30,7 +31,7 @@ libzcp_pydirector_la_LIBADD  = -lpthread
  _MAPICore_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/zarafa-libsync
  _MAPICore_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
--_MAPICore_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-+_MAPICore_la_LIBADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
- 						${top_builddir}/common/libzcp_common_mapi.la \
- 						${top_builddir}/common/libzcp_common_util.la \
- 						${top_builddir}/zarafa-libsync/libzarafasync.la \
-@@ -23,7 +23,7 @@ _MAPICore_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
- 
+ _MAPICore_la_LIBADD = libzcp_pyconv.la libzcp_pydirector.la \
+-	${top_builddir}/mapi4linux/src/libmapi.la \
++	${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
+ 	${top_builddir}/common/libzcp_common_mapi.la \
+ 	${top_builddir}/common/libzcp_common_util.la \
+ 	${top_builddir}/zarafa-libsync/libzarafasync.la \
+@@ -39,7 +40,7 @@ _MAPICore_la_LIBADD = libzcp_pyconv.la libzcp_pydirector.la \
  _inetmapi_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/inetmapi
  _inetmapi_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
--_inetmapi_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-+_inetmapi_la_LIBADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
- 						${top_builddir}/common/libzcp_common_mapi.la \
- 						${top_builddir}/common/libzcp_common_util.la \
- 						${top_builddir}/inetmapi/libinetmapi.la \
-@@ -31,7 +31,7 @@ _inetmapi_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
- 
+ _inetmapi_la_LIBADD = libzcp_pyconv.la \
+-	${top_builddir}/mapi4linux/src/libmapi.la \
++	${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
+ 	${top_builddir}/common/libzcp_common_mapi.la \
+ 	${top_builddir}/common/libzcp_common_util.la \
+ 	${top_builddir}/inetmapi/libinetmapi.la \
+@@ -48,7 +49,7 @@ _inetmapi_la_LIBADD = libzcp_pyconv.la \
  _icalmapi_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/libicalmapi -I${top_srcdir}/libfreebusy
  _icalmapi_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
--_icalmapi_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-+_icalmapi_la_LIBADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
- 						${top_builddir}/libicalmapi/libicalmapi.la \
- 						${top_builddir}/common/libzcp_common_mapi.la \
- 						${top_builddir}/common/libzcp_common_util.la \
-@@ -53,26 +53,26 @@ _licenseclient_la_LIBADD = ${top_builddir}/provider/common/libzarafacommon.la \
+ _icalmapi_la_LIBADD = libzcp_pyconv.la \
+-	${top_builddir}/mapi4linux/src/libmapi.la \
++	${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
+ 	${top_builddir}/libicalmapi/libicalmapi.la \
+ 	${top_builddir}/common/libzcp_common_mapi.la \
+ 	${top_builddir}/common/libzcp_common_util.la \
+@@ -70,27 +71,27 @@ _licenseclient_la_LIBADD = ${top_builddir}/provider/common/libzarafacommon.la \
  						${top_builddir}/common/libzcp_common_mapi.la \
  						${top_builddir}/common/libzcp_common_util.la \
  						${top_builddir}/common/libzcp_common_ssl.la \
@@ -348,37 +623,49 @@ index 5e03457..4f68550 100644
  
  # noinst_ and rpath will generate the _libcommon.so file
  _libcommon_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version -rpath '$(libdir)'
--_libcommon_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-+_libcommon_la_LIBADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
+-_libcommon_la_LIBADD = libzcp_pyconv.la ${top_builddir}/mapi4linux/src/libmapi.la \
++_libcommon_la_LIBADD = libzcp_pyconv.la ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
  					   ${top_builddir}/common/libzcp_common_mapi.la \
  					   ${top_builddir}/common/libzcp_common_util.la \
  				  	   $(PROG_LIBS) $(PYTHON_LIBS)
  
  _RecurrenceState_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version -rpath '$(libdir)'
--_RecurrenceState_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-+_RecurrenceState_la_LIBADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
+ _RecurrenceState_la_LIBADD = libzcp_pyconv.la \
+-	${top_builddir}/mapi4linux/src/libmapi.la \
++	${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
  	${top_builddir}/common/libzcp_common_mapi.la \
  	${top_builddir}/common/libzcp_common_util.la \
  	$(PROG_LIBS) $(PYTHON_LIBS)
  
  _libfreebusy_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/libfreebusy
  _libfreebusy_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
--_libfreebusy_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-+_libfreebusy_la_LIBADD = ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
+-_libfreebusy_la_LIBADD = libzcp_pyconv.la ${top_builddir}/mapi4linux/src/libmapi.la \
++_libfreebusy_la_LIBADD = libzcp_pyconv.la ${top_builddir}/mapi4linux/src/libzarafa_mapi.la \
  						 ${top_builddir}/libfreebusy/libfreebusy.la \
  						 ${top_builddir}/common/libzcp_common_mapi.la \
                           ${top_builddir}/common/libzcp_common_util.la \
 diff --git a/testunit/Makefile.am b/testunit/Makefile.am
-index 6b18066..eea377b 100644
---- a/testunit/Makefile.am
+new file mode 100644
+index 0000000..eea377b
+--- /dev/null
 +++ b/testunit/Makefile.am
-@@ -12,5 +12,5 @@ check_PROGRAMS =
- TESTS = ${check_PROGRAMS}
- 
- imtomapi_SOURCES = imtomapi.cpp
--imtomapi_LDADD = ../inetmapi/libinetmapi.la ../mapi4linux/src/libmapi.la \
+@@ -0,0 +1,16 @@
++# -*- Makefile -*-
++
++AM_CPPFLAGS = ${ZCPPFLAGS} -I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
++              -I${top_srcdir}/mapi4linux/include -I${top_srcdir}/inetmapi \
++              -DSOURCEDIR=\"${abs_srcdir}\"
++
++# Always build tests to ensure they line up with the API.
++noinst_PROGRAMS = imtomapi ${check_PROGRAMS}
++# Programs to run during `make check`.
++# imtomapi is left out for now since it requires a running zarafa-server.
++check_PROGRAMS =
++TESTS = ${check_PROGRAMS}
++
++imtomapi_SOURCES = imtomapi.cpp
 +imtomapi_LDADD = ../inetmapi/libinetmapi.la ../mapi4linux/src/libzarafa_mapi.la \
- 	../common/libzcp_common_util.la ../common/libzcp_common_mapi.la
++	../common/libzcp_common_util.la ../common/libzcp_common_mapi.la
 diff --git a/zarafa-libsync/Makefile.am b/zarafa-libsync/Makefile.am
 index 89646d5..b87b9b6 100644
 --- a/zarafa-libsync/Makefile.am
