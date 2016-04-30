@@ -45,6 +45,7 @@ Build-Depends: debhelper (>= 4.0.0),
  libgsoap-dev,
  gsoap,
  swig,
+ xmlto,
 Standards-Version: 3.9.6
 X-Python-Version: 2.7
 Testsuite: autopkgtest
