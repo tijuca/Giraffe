@@ -1,53 +1,27 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "zcdefs.h"
-#include "platform.h"
+#include <zarafa/zcdefs.h>
+#include <zarafa/platform.h>
 
 #include <string>
 #include <memory>
 #include <map>
-#include "ustringutil.h"
+#include <zarafa/ustringutil.h>
 
 #include <mapi.h>
 #include <mapidefs.h>
@@ -57,33 +31,37 @@
 #include <cerrno>
 #include <iconv.h>
 
-#include "ECLogger.h"
-#include "CommonUtil.h"
-#include "ECTags.h"
-#include "ECGuid.h"
-#include "Util.h"
-#include "stringutil.h"
-#include "base64.h"
-#include "mapi_ptr.h"
+#include <zarafa/ECLogger.h>
+#include <zarafa/CommonUtil.h>
+#include <zarafa/ECTags.h>
+#include <zarafa/ECGuid.h>
+#include <zarafa/Util.h>
+#include <zarafa/stringutil.h>
+#include <zarafa/base64.h>
+#include <zarafa/mapi_ptr.h>
 
-#include "charset/convert.h"
-#include "charset/utf16string.h"
+#include <zarafa/charset/convert.h>
+#include <zarafa/charset/utf16string.h>
 
-#include "mapiext.h"
+#include <zarafa/mapiext.h>
 #include "freebusytags.h"
 
-#include "edkguid.h"
-#include "mapiguidext.h"
+#include <edkguid.h>
+#include <zarafa/mapiguidext.h>
 #include <edkmdb.h>
-#include "IECUnknown.h"
-#include "IECServiceAdmin.h"
-#include "EMSAbTag.h"
-#include "ECRestriction.h"
-#include "MAPIErrors.h"
+#include <zarafa/IECUnknown.h>
+#include <zarafa/IECServiceAdmin.h>
+#include <zarafa/EMSAbTag.h>
+#include <zarafa/ECRestriction.h>
+#include <zarafa/MAPIErrors.h>
 
 #include <sys/types.h>
+#ifdef WIN32
+#include <ws2tcpip.h>
+#else
 #include <sys/socket.h>
 #include <netdb.h>
+#endif
 
 using namespace std;
 
@@ -95,15 +73,34 @@ static const char THIS_FILE[] = __FILE__;
 
 #define PROFILEPREFIX		"ec-adm-"
 
+/* Indexes of the sPropNewMailColumns property array */
+enum {
+	NEWMAIL_ENTRYID,		// Array Indexes
+	NEWMAIL_PARENT_ENTRYID,
+	NEWMAIL_MESSAGE_CLASS,
+	NEWMAIL_MESSAGE_FLAGS,
+	NUM_NEWMAIL_PROPS,		// Array size
+};
 
-bool operator ==(SBinary left, SBinary right)
+/* Newmail Notify columns */
+static const SizedSPropTagArray(4, sPropNewMailColumns) = {
+	4,
+	{
+		PR_ENTRYID,
+		PR_PARENT_ENTRYID,
+		PR_MESSAGE_CLASS_A,
+		PR_MESSAGE_FLAGS,
+	}
+};
+
+bool operator ==(const SBinary &left, const SBinary &right)
 {
-	return (left.cb == right.cb && memcmp(left.lpb, right.lpb, left.cb) == 0);
+	return left.cb == right.cb && memcmp(left.lpb, right.lpb, left.cb) == 0;
 }
 
-bool operator <(SBinary left, SBinary right)
+bool operator <(const SBinary &left, const SBinary &right)
 {
-	return ((left.cb < right.cb) || (left.cb == right.cb && memcmp(left.lpb, right.lpb, left.cb) < 0));
+	return left.cb < right.cb || (left.cb == right.cb && memcmp(left.lpb, right.lpb, left.cb) < 0);
 }
 
 const char *GetServerUnixSocket(const char *szPreferred)
@@ -114,7 +111,7 @@ const char *GetServerUnixSocket(const char *szPreferred)
 	else if (szPreferred && szPreferred[0] != '\0')
 		return szPreferred;
 	else
-		return CLIENT_ADMIN_SOCKET;
+		return "";
 }
 
 /** 
@@ -172,7 +169,7 @@ exit:
  *
  * @param[in]	username	Username to logon to Zarafa
  * @param[in]	password	Password of the username
- * @param[in]	path		In URI form. Eg. file:///var/run/zarafa
+ * @param[in]	path		In URI form. Eg. file:///var/run/zarafad/server.sock
  * @param[in]	szProfName	Name of the profile to create
  * @param[in]	ulProfileFlags See EC_PROFILE_FLAGS_* in common/ECTags.h
  * @param[in]	sslkey_file	May be NULL. Logon with this sslkey instead of password.
@@ -214,7 +211,7 @@ HRESULT CreateProfileTemp(ECLogger *const lpLogger, const WCHAR *username, const
 	
 	hr = lpServiceAdmin->CreateMsgService((LPTSTR)"ZARAFA6", (LPTSTR)"", 0, 0);
 	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_FATAL, "CreateProfileTemp(): CreateMsgService failed %x: %s", hr, GetMAPIErrorMessage(hr));
+		lpLogger->Log(EC_LOGLEVEL_FATAL, "CreateProfileTemp(): CreateMsgService ZARAFA6 failed: %s (%x)", GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
 
@@ -264,48 +261,48 @@ HRESULT CreateProfileTemp(ECLogger *const lpLogger, const WCHAR *username, const
 
 	i = 0;
 	sProps[i].ulPropTag = PR_EC_PATH;
-	sProps[i].Value.lpszA = (char*)path;
-	i++;
+	sProps[i].Value.lpszA = const_cast<char *>(path != NULL && *path != '\0' ? path : "default:");
+	++i;
 
 	sProps[i].ulPropTag = PR_EC_USERNAME_W;
 	sProps[i].Value.lpszW = (WCHAR*)username;
-	i++;
+	++i;
 
 	sProps[i].ulPropTag = PR_EC_USERPASSWORD_W;
 	sProps[i].Value.lpszW = (WCHAR*)password;
-	i++;
+	++i;
 
 	sProps[i].ulPropTag = PR_EC_FLAGS;
 	sProps[i].Value.ul = ulProfileFlags;
-	i++;
+	++i;
 
 	sProps[i].ulPropTag = PR_PROFILE_NAME_A;
 	sProps[i].Value.lpszA = (char*)szProfName;
-	i++;
+	++i;
 
 	if (sslkey_file) {
 		// always add ssl keys info as we might be redirected to an ssl connection
 		sProps[i].ulPropTag = PR_EC_SSLKEY_FILE;
 		sProps[i].Value.lpszA = (char*)sslkey_file;
-		i++;
+		++i;
 
 		if (sslkey_password) {
 			sProps[i].ulPropTag = PR_EC_SSLKEY_PASS;
 			sProps[i].Value.lpszA = (char*)sslkey_password;
-			i++;
+			++i;
 		}
 	}
 
 	if (app_version) {
 		sProps[i].ulPropTag = PR_EC_STATS_SESSION_CLIENT_APPLICATION_VERSION;
 		sProps[i].Value.lpszA = (char*)app_version;
-		i++;
+		++i;
 	}
 
 	if (app_misc) {
 		sProps[i].ulPropTag = PR_EC_STATS_SESSION_CLIENT_APPLICATION_MISC;
 		sProps[i].Value.lpszA = (char*)app_misc;
-		i++;
+		++i;
 	}
 
 	hr = lpServiceAdmin->ConfigureMsgService((MAPIUID *)lpServiceUID->Value.bin.lpb, 0, 0, i, sProps);
@@ -376,35 +373,27 @@ HRESULT HrOpenECSession(ECLogger *const lpLogger, IMAPISession **lppSession, con
 		strcpy(szProfName, profname);
 	}
 
-	if(szPath != NULL) {
-		if (sslkey_file != NULL) {
-			FILE *ssltest = fopen(sslkey_file, "r");
-			if (!ssltest) {
-				lpLogger->Log(EC_LOGLEVEL_FATAL, "Cannot access %s: %s", sslkey_file, strerror(errno));
+	if (sslkey_file != NULL) {
+		FILE *ssltest = fopen(sslkey_file, "r");
+		if (!ssltest) {
+			lpLogger->Log(EC_LOGLEVEL_FATAL, "Cannot access %s: %s", sslkey_file, strerror(errno));
 
-				// do not pass sslkey if the file does not exists
-				// otherwise normal connections do not work either
-				sslkey_file = NULL;
-				sslkey_password = NULL;
-			}
-			else {
-				// TODO: test password of certificate
-				fclose(ssltest);
-			}
+			// do not pass sslkey if the file does not exist
+			// otherwise normal connections do not work either
+			sslkey_file = NULL;
+			sslkey_password = NULL;
 		}
-
-		hr = CreateProfileTemp(lpLogger, szUsername, szPassword, szPath, (const char*)szProfName, ulProfileFlags, sslkey_file, sslkey_password, app_version, app_misc); 
-		if (hr != hrSuccess)
-			lpLogger->Log(EC_LOGLEVEL_WARNING, "CreateProfileTemp(SSL) failed: %x: %s", hr, GetMAPIErrorMessage(hr));
-	} else {
-		// these connections cannot be ssl, so no keys needed
-		hr = CreateProfileTemp(lpLogger, szUsername, szPassword, GetServerUnixSocket(), (const char*)szProfName, ulProfileFlags, NULL, NULL, app_version, app_misc);
-		if (hr != hrSuccess)
-			lpLogger->Log(EC_LOGLEVEL_WARNING, "CreateProfileTemp(PLAIN) failed: %x: %s", hr, GetMAPIErrorMessage(hr));
+		else {
+			// TODO: test password of certificate
+			fclose(ssltest);
+		}
 	}
 
-	if (hr != hrSuccess)
+	hr = CreateProfileTemp(lpLogger, szUsername, szPassword, szPath, (const char*)szProfName, ulProfileFlags, sslkey_file, sslkey_password, app_version, app_misc);
+	if (hr != hrSuccess) {
+		lpLogger->Log(EC_LOGLEVEL_WARNING, "CreateProfileTemp failed: %x: %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
+	}
 
 	// Log on the the profile
 	hr = MAPILogonEx(0, (LPTSTR)szProfName, (LPTSTR)"", MAPI_EXTENDED | MAPI_NEW_SESSION | MAPI_NO_MAIL, &lpMAPISession);
@@ -418,10 +407,7 @@ HRESULT HrOpenECSession(ECLogger *const lpLogger, IMAPISession **lppSession, con
 exit:
 	// always try to delete the temporary profile
 	DeleteProfileTemp(szProfName);
-		
-	if (szProfName)
-		delete [] szProfName;
-
+	delete[] szProfName;
 	return hr;
 }
 
@@ -609,15 +595,13 @@ HRESULT GetProxyStoreObject(IMsgStore *lpMsgStore, IMsgStore **lppMsgStore)
 
 		hr = lpECMsgStore->QueryInterface(IID_IMsgStore, (void**)lppMsgStore);
 	} else {
-		// Possible object already wrapped, gives the orignale object back
+		// Possible object already wrapped, gives the original object back
 		(*lppMsgStore) = lpMsgStore;
 		(*lppMsgStore)->AddRef();
 	}
 
 exit:
-	if (lpPropValue)
-		MAPIFreeBuffer(lpPropValue);
-
+	MAPIFreeBuffer(lpPropValue);
 	if (lpProxyStoreObject)
 		lpProxyStoreObject->Release();
 
@@ -641,9 +625,7 @@ HRESULT HrOpenDefaultStore(IMAPISession *lpMAPISession, ULONG ulFlags, IMsgStore
 	*lppMsgStore = lpMsgStore;
 
 exit:
-	if(lpEntryID)
-		MAPIFreeBuffer(lpEntryID);
-
+	MAPIFreeBuffer(lpEntryID);
 	return hr;
 }
 
@@ -697,9 +679,7 @@ HRESULT HrOpenECPublicStore(IMAPISession *lpMAPISession, ULONG ulFlags, IMsgStor
 	*lppMsgStore = lpMsgStore;
 
 exit:
-	if(lpEntryID)
-		MAPIFreeBuffer(lpEntryID);
-		
+	MAPIFreeBuffer(lpEntryID);
 	return hr;
 }
 
@@ -838,8 +818,7 @@ HRESULT HrRemoveECMailBox(LPPROVIDERADMIN lpProviderAdmin, LPMAPIUID lpsProvider
 		lpNewProp->Value.bin.cb	= 0;
 		lpNewProp->ulPropTag	= PR_STORE_PROVIDERS;
 
-		for(i=0; i < lpGlobalProps->Value.bin.cb / sizeof(MAPIUID); i++)
-		{
+		for (i = 0; i < lpGlobalProps->Value.bin.cb / sizeof(MAPIUID); ++i) {
 			if(memcmp(lpGlobalProps->Value.bin.lpb+(sizeof(MAPIUID) * i), lpsProviderUID, sizeof(MAPIUID)) != 0)
 			{
 				memcpy(lpNewProp->Value.bin.lpb+lpNewProp->Value.bin.cb, lpGlobalProps->Value.bin.lpb+(sizeof(MAPIUID) * i), sizeof(MAPIUID));
@@ -863,23 +842,13 @@ HRESULT HrRemoveECMailBox(LPPROVIDERADMIN lpProviderAdmin, LPMAPIUID lpsProvider
 	hr = lpProviderAdmin->DeleteProvider(lpsProviderUID);
 	//FIXME: unknown error 0x80070005 by delete (HACK)
 	hr = hrSuccess;
-	if(hr != hrSuccess)
-		goto exit;
-
 exit:
 
 	if(lpGlobalProfSect)
 		lpGlobalProfSect->Release();
-
-	if(lpsPropTagArray)
-		MAPIFreeBuffer(lpsPropTagArray);
-
-	if(lpGlobalProps)
-		MAPIFreeBuffer(lpGlobalProps);
-
-	if(lpNewProp)
-		MAPIFreeBuffer(lpNewProp);
-
+	MAPIFreeBuffer(lpsPropTagArray);
+	MAPIFreeBuffer(lpGlobalProps);
+	MAPIFreeBuffer(lpNewProp);
 	return hr;
 }
 
@@ -1145,7 +1114,8 @@ HRESULT ECParseOneOff(const ENTRYID *lpEntryID, ULONG cbEntryID,
 
 		str.assign((utf16string::pointer)lpBuffer);
 		// can be 0 length
-		name = convert_to<std::wstring>(str);
+		if ((hr = TryConvert(str, name)) != hrSuccess)
+			goto exit;
 		lpBuffer += (str.length() + 1) * sizeof(unsigned short);
 
 		str.assign((utf16string::pointer)lpBuffer);
@@ -1153,7 +1123,8 @@ HRESULT ECParseOneOff(const ENTRYID *lpEntryID, ULONG cbEntryID,
 			hr = MAPI_E_INVALID_PARAMETER;
 			goto exit;
 		}
-		type = convert_to<std::wstring>(str);
+		if ((hr = TryConvert(str, type)) != hrSuccess)
+			goto exit;
 		lpBuffer += (str.length() + 1) * sizeof(unsigned short);
 
 		str.assign((utf16string::pointer)lpBuffer);
@@ -1161,7 +1132,8 @@ HRESULT ECParseOneOff(const ENTRYID *lpEntryID, ULONG cbEntryID,
 			hr = MAPI_E_INVALID_PARAMETER;
 			goto exit;
 		}
-		addr = convert_to<std::wstring>(str);
+		if ((hr = TryConvert(str, addr)) != hrSuccess)
+			goto exit;
 		lpBuffer += (str.length() + 1) * sizeof(unsigned short);
 		
 	} else {
@@ -1183,7 +1155,8 @@ HRESULT ECParseOneOff(const ENTRYID *lpEntryID, ULONG cbEntryID,
 			hr = MAPI_E_INVALID_PARAMETER;
 			goto exit;
 		}
-		type = convert_to<std::wstring>(str);
+		if ((hr = TryConvert(str, type)) != hrSuccess)
+			goto exit;
 		lpBuffer += str.length() + 1;
 
 		str = (char*)lpBuffer;
@@ -1191,7 +1164,8 @@ HRESULT ECParseOneOff(const ENTRYID *lpEntryID, ULONG cbEntryID,
 			hr = MAPI_E_INVALID_PARAMETER;
 			goto exit;
 		}
-		addr = convert_to<std::wstring>(str);
+		if ((hr = TryConvert(str, addr)) != hrSuccess)
+			goto exit;
 		lpBuffer += str.length() + 1;
 	}
 
@@ -1260,7 +1234,7 @@ std::string ToQuotedPrintable(const std::string &input, std::string charset, boo
 	if (header)
 		tmp = "=?"+charset+"?Q?";
 
-	for (i = 0; i < input.size(); i++) {
+	for (i = 0; i < input.size(); ++i) {
 		if ((unsigned char)input[i] > 127) {
 			tmp.push_back('=');
 			tmp.push_back(digits[((unsigned char)input[i]>>4)]);
@@ -1381,9 +1355,7 @@ HRESULT HrNewMailNotification(IMsgStore* lpMDB, IMessage* lpMessage)
 
 exit:
 	// Newmail notify
-	if(lpNewMailPropArray)
-		MAPIFreeBuffer(lpNewMailPropArray);
-
+	MAPIFreeBuffer(lpNewMailPropArray);
 	return hr;
 }
 
@@ -1419,7 +1391,7 @@ HRESULT HrCreateEmailSearchKey(const char *lpszEmailType,
 	*lppByte = lpByte;
 	*cb = size;
 exit:
-	if(hr != hrSuccess && lpByte != NULL)
+	if (hr != hrSuccess)
 		MAPIFreeBuffer(lpByte);
 
 	return hr;
@@ -1519,9 +1491,7 @@ HRESULT HrGetAddress(IMAPISession *lpSession, IMessage *lpMessage, ULONG ulPropT
 	hr = HrGetAddress(lpSession, lpProps, cValues, ulPropTagEntryID, ulPropTagName, ulPropTagType, ulPropTagEmailAddress, strName, strType, strEmailAddress);
 
 exit:
-	if (lpProps)
-		MAPIFreeBuffer(lpProps);
-
+	MAPIFreeBuffer(lpProps);
 	return hr;
 }
 
@@ -1567,9 +1537,7 @@ HRESULT HrGetAddress(LPADRBOOK lpAdrBook, IMessage *lpMessage, ULONG ulPropTagEn
 	hr = HrGetAddress(lpAdrBook, lpProps, cValues, ulPropTagEntryID, ulPropTagName, ulPropTagType, ulPropTagEmailAddress, strName, strType, strEmailAddress);
 
 exit:
-	if (lpProps)
-		MAPIFreeBuffer(lpProps);
-
+	MAPIFreeBuffer(lpProps);
 	return hr;
 }
 
@@ -1660,19 +1628,15 @@ static HRESULT HrResolveToSMTP(LPADRBOOK lpAdrBook,
     }
     
 exit:
-    if(lpAdrList)
-        FreePadrlist(lpAdrList);
+	if (lpAdrList)
+		FreePadrlist(lpAdrList);
     
-    if(lpEmailAddress)
-        MAPIFreeBuffer(lpEmailAddress);
+	MAPIFreeBuffer(lpEmailAddress);
+	MAPIFreeBuffer(lpSMTPAddress);
+	if (lpMailUser)
+		lpMailUser->Release();
         
-    if(lpSMTPAddress)
-        MAPIFreeBuffer(lpSMTPAddress);
-        
-    if(lpMailUser)
-        lpMailUser->Release();
-        
-    return hr;
+	return hr;
 }
 
 /**
@@ -1812,10 +1776,7 @@ HRESULT HrGetAddress(LPADRBOOK lpAdrBook, LPENTRYID lpEntryID, ULONG cbEntryID, 
 exit:
 	if(lpMailUser)
 		lpMailUser->Release();
-
-	if(lpMailUserProps)
-		MAPIFreeBuffer(lpMailUserProps);
-
+	MAPIFreeBuffer(lpMailUserProps);
 	return hr;
 }
 
@@ -1908,16 +1869,13 @@ exit:
 
 	if(lpMDB)
 		lpMDB->Release();
-
-	if(lpPropValue)
-		MAPIFreeBuffer(lpPropValue);
-
+	MAPIFreeBuffer(lpPropValue);
 	return hr;
 }
 
 // This is a class that implements IMAPIProp's GetProps(), and nothing else. Its data
 // is retrieved from the passed lpProps/cValues property array
-class ECRowWrapper _final : public IMAPIProp {
+class ECRowWrapper _zcp_final : public IMAPIProp {
 public:
 	ECRowWrapper(LPSPropValue lpProps, ULONG cValues) : m_cValues(cValues), m_lpProps(lpProps) {};
 	~ECRowWrapper() {};
@@ -1939,7 +1897,7 @@ public:
 		if ((hr = MAPIAllocateBuffer(sizeof(SPropValue) * lpTags->cValues, (void **) &lpProps)) != hrSuccess)
 			return hr;
 
-		for(i=0; i<lpTags->cValues; i++) {
+		for (i = 0; i<lpTags->cValues; ++i) {
 			bError = FALSE;
 			lpFind = PpropFindProp(m_lpProps, m_cValues, CHANGE_PROP_TYPE(lpTags->aulPropTag[i], PT_UNSPECIFIED));
 			if(lpFind && PROP_TYPE(lpFind->ulPropTag) != PT_ERROR) {
@@ -2033,14 +1991,14 @@ static HRESULT GetRestrictTagsRecursive(const SRestriction *lpRestriction,
 
 	switch(lpRestriction->rt) {
 		case RES_AND:
-			for(i=0;i<lpRestriction->res.resAnd.cRes;i++) {
+			for (i = 0; i < lpRestriction->res.resAnd.cRes; ++i) {
 				hr = GetRestrictTagsRecursive(&lpRestriction->res.resAnd.lpRes[i], lpList, ulLevel+1);
 				if(hr != hrSuccess)
 					goto exit;
 			}
 			break;
 		case RES_OR:
-			for(i=0;i<lpRestriction->res.resOr.cRes;i++) {
+			for (i = 0; i < lpRestriction->res.resOr.cRes; ++i) {
 				hr = GetRestrictTagsRecursive(&lpRestriction->res.resOr.lpRes[i], lpList, ulLevel+1);
 				if(hr != hrSuccess)
 					goto exit;
@@ -2087,7 +2045,7 @@ static HRESULT GetRestrictTags(const SRestriction *lpRestriction,
 {
 	HRESULT hr = hrSuccess;
 	std::list<unsigned int> lstTags;
-	std::list<unsigned int>::iterator iterTags;
+	std::list<unsigned int>::const_iterator iterTags;
 	ULONG n = 0;
 
 	LPSPropTagArray lpTags = NULL;
@@ -2104,10 +2062,9 @@ static HRESULT GetRestrictTags(const SRestriction *lpRestriction,
 	lstTags.sort();
 	lstTags.unique();
 
-	for(iterTags = lstTags.begin(); iterTags != lstTags.end() && n < lpTags->cValues; iterTags++) {
-		lpTags->aulPropTag[n] = *iterTags;
-		n++;
-	}
+	for (iterTags = lstTags.begin();
+	     iterTags != lstTags.end() && n < lpTags->cValues; ++iterTags)
+		lpTags->aulPropTag[n++] = *iterTags;
 	
 	lpTags->cValues = n;
 
@@ -2122,10 +2079,7 @@ HRESULT TestRestriction(LPSRestriction lpCondition, ULONG cValues, LPSPropValue 
 	ECRowWrapper *lpRowWrapper = new ECRowWrapper(lpPropVals, cValues);
 
 	hr = TestRestriction(lpCondition, (IMAPIProp *)lpRowWrapper, locale, ulLevel);
-
-	if(lpRowWrapper)
-		delete lpRowWrapper;
-
+	delete lpRowWrapper;
 	return hr;
 }
 
@@ -2152,7 +2106,7 @@ HRESULT TestRestriction(LPSRestriction lpCondition, IMAPIProp *lpMessage, const 
 	switch (lpCondition->rt) {
 	// loops
 	case RES_AND:
-		for (c = 0; c < lpCondition->res.resAnd.cRes; c++) {
+		for (c = 0; c < lpCondition->res.resAnd.cRes; ++c) {
 			hr = TestRestriction(&lpCondition->res.resAnd.lpRes[c], lpMessage, locale, ulLevel+1);
 			if (hr != hrSuccess) {
 				fMatch = false;
@@ -2162,7 +2116,7 @@ HRESULT TestRestriction(LPSRestriction lpCondition, IMAPIProp *lpMessage, const 
 		}
 		break;
 	case RES_OR:
-		for (c = 0; c < lpCondition->res.resAnd.cRes; c++) {
+		for (c = 0; c < lpCondition->res.resAnd.cRes; ++c) {
 			hr = TestRestriction(&lpCondition->res.resOr.lpRes[c], lpMessage, locale, ulLevel+1);
 			if (hr == hrSuccess) {
 				fMatch = true;
@@ -2382,19 +2336,14 @@ HRESULT TestRestriction(LPSRestriction lpCondition, IMAPIProp *lpMessage, const 
 	};
 
 exit:
-	if (lpRowWrapper)
-		delete lpRowWrapper;
+	delete lpRowWrapper;
 	if (lpRowSet)
 		FreeProws(lpRowSet);
-	if (lpTags)
-		MAPIFreeBuffer(lpTags);
+	MAPIFreeBuffer(lpTags);
 	if (lpTable)
 		lpTable->Release();
-	if (lpProp)
-		MAPIFreeBuffer(lpProp);
-	if (lpProp2)
-		MAPIFreeBuffer(lpProp2);
-
+	MAPIFreeBuffer(lpProp);
+	MAPIFreeBuffer(lpProp2);
 	if (fMatch)
 		return hrSuccess;
 	else if (hr == hrSuccess)
@@ -2405,7 +2354,38 @@ exit:
 HRESULT GetClientVersion(unsigned int* ulVersion)
 {
 	HRESULT hr = hrSuccess;
+#ifdef WIN32
+	DWORD dwType = 0;
+	char	szData[255];
+	DWORD	cbData = 255;
+	char* lpFind = NULL;
+	HKEY	hKeyRoot = NULL;
+	
+	if(RegOpenKeyExA(HKEY_CLASSES_ROOT, "Outlook.Application\\CurVer", 0, KEY_READ, &hKeyRoot) != ERROR_SUCCESS) {
+		hr = MAPI_E_NOT_FOUND;
+		goto exit;
+	}
+
+	if(RegQueryValueExA(hKeyRoot, NULL, NULL, &dwType, (LPBYTE)szData, &cbData) != ERROR_SUCCESS || dwType != REG_SZ) {
+		hr = MAPI_E_NOT_FOUND;
+		goto exit;
+	}
+
+	// Outlook.Application.xx
+	lpFind = strrchr(szData, '.');
+	if(lpFind == NULL) {
+		hr = MAPI_E_NOT_FOUND;
+		goto exit;
+	}
+	++lpFind;
+	*ulVersion = atoui(lpFind);	
+
+exit:
+	if(hKeyRoot)
+		RegCloseKey(hKeyRoot);
+#else
 	*ulVersion = CLIENT_VERSION_LATEST;
+#endif
 
 	return hr;
 }
@@ -2576,13 +2556,8 @@ found:
 
 exit:
 	lpNullLogger->Release();
-
-	if (lpPropFolder)
-		MAPIFreeBuffer(lpPropFolder);
-
-	if (lpPropIPMSubtree)
-		MAPIFreeBuffer(lpPropIPMSubtree);
-
+	MAPIFreeBuffer(lpPropFolder);
+	MAPIFreeBuffer(lpPropIPMSubtree);
 	if (lpFoundFolder)
 		lpFoundFolder->Release();
 
@@ -2646,10 +2621,7 @@ HRESULT HrOpenUserMsgStore(LPMAPISESSION lpSession, LPMDB lpStore, WCHAR *lpszUs
 exit:
 	if (lpMsgStore)
 		lpMsgStore->Release();
-
-	if (lpStoreEntryID)
-		MAPIFreeBuffer(lpStoreEntryID);
-
+	MAPIFreeBuffer(lpStoreEntryID);
 	if (lpExchManageStore)
 		lpExchManageStore->Release();
 
@@ -2693,8 +2665,8 @@ ECPropMapEntry::ECPropMapEntry(const ECPropMapEntry &other) {
 
 ECPropMapEntry::~ECPropMapEntry()
 {
-    if(m_sMAPINameId.ulKind == MNID_STRING && m_sMAPINameId.Kind.lpwstrName)
-        delete [] m_sMAPINameId.Kind.lpwstrName;
+	if (m_sMAPINameId.ulKind == MNID_STRING)
+		delete[] m_sMAPINameId.Kind.lpwstrName;
 }
     
 MAPINAMEID* ECPropMapEntry::GetMAPINameId() { 
@@ -2715,8 +2687,8 @@ HRESULT ECPropMap::Resolve(IMAPIProp *lpMAPIProp) {
     HRESULT hr = hrSuccess;
     MAPINAMEID **lppNames = NULL;
     std::list<ECPropMapEntry>::iterator i;
-    std::list<ULONG *>::iterator j;
-    std::list<ULONG>::iterator k;
+    std::list<ULONG *>::const_iterator j;
+    std::list<ULONG>::const_iterator k;
     int n = 0;
     LPSPropTagArray lpPropTags = NULL;
 
@@ -2728,9 +2700,8 @@ HRESULT ECPropMap::Resolve(IMAPIProp *lpMAPIProp) {
     // Do GetIDsFromNames() and store result in correct places
     lppNames = new MAPINAMEID *[lstNames.size()];
     
-    for(i=lstNames.begin(); i != lstNames.end(); i++) {
+    for (i = lstNames.begin(); i != lstNames.end(); ++i)
         lppNames[n++] = i->GetMAPINameId();
-    }
     
     hr = lpMAPIProp->GetIDsFromNames(n, lppNames, MAPI_CREATE, &lpPropTags);
     if(hr != hrSuccess)
@@ -2738,17 +2709,13 @@ HRESULT ECPropMap::Resolve(IMAPIProp *lpMAPIProp) {
     
     n = 0;
     k = lstTypes.begin();
-    for(j=lstVars.begin(); j != lstVars.end(); j++, k++) {
+    for (j = lstVars.begin(); j != lstVars.end(); ++j, ++k)
         *(*j) = CHANGE_PROP_TYPE(lpPropTags->aulPropTag[n++], *k);
-    }
     
 exit:
-    if(lpPropTags)
-        MAPIFreeBuffer(lpPropTags);
-    if(lppNames)
-        delete [] lppNames;
-        
-    return hr;        
+	MAPIFreeBuffer(lpPropTags);
+	delete[] lppNames;
+	return hr;
 }
 
 /**
@@ -2808,10 +2775,7 @@ exit:
 
 	if (lpRootFld)
 		lpRootFld->Release();
-
-	if (lpPropDefFld)
-		MAPIFreeBuffer(lpPropDefFld);
-	
+	MAPIFreeBuffer(lpPropDefFld);
 	return hr;
 }
 
@@ -2845,7 +2809,7 @@ HRESULT HrGetAllProps(IMAPIProp *lpProp, ULONG ulFlags, ULONG *lpcValues, LPSPro
 	if(FAILED(hr))
 		goto exit;
 		
-	for(unsigned int i=0; i < cValues; i++) {
+	for (unsigned int i = 0; i < cValues; ++i) {
 		if(PROP_TYPE(lpProps[i].ulPropTag) == PT_ERROR && lpProps[i].Value.err == MAPI_E_NOT_ENOUGH_MEMORY) {
 			if(PROP_TYPE(lpTags->aulPropTag[i]) != PT_STRING8 && PROP_TYPE(lpTags->aulPropTag[i]) != PT_UNICODE && PROP_TYPE(lpTags->aulPropTag[i]) != PT_BINARY)
 				continue;
@@ -2956,7 +2920,7 @@ HRESULT __stdcall UnWrapStoreEntryID(ULONG cbOrigEntry, LPENTRYID lpOrigEntry, U
 	*lppUnWrappedEntry = lpEntryID;
 
 exit:
-	if (hr!= hrSuccess && lpEntryID)
+	if (hr != hrSuccess)
 		MAPIFreeBuffer(lpEntryID);
 
 	return hr;
@@ -3021,7 +2985,7 @@ HRESULT DoAddress(IAddrBook *lpAdrBook, ULONG* hWnd, LPADRPARM lpAdrParam, LPADR
 		}
 
 		// Same for lpAdrParam
-		for(unsigned int i=0; i < sAdrParam.cDestFields; i++) {
+		for (unsigned int i = 0; i < sAdrParam.cDestFields; ++i) {
 			std::string strField = convert_to<string>((LPWSTR)sAdrParam.lppszDestTitles[i]);
 
 			vDestFields.push_back(strField);
@@ -3042,8 +3006,8 @@ HRESULT DoAddress(IAddrBook *lpAdrBook, ULONG* hWnd, LPADRPARM lpAdrParam, LPADR
 		// MAPI_UNICODE was requested, but the addressbook did not support it. This means we have to convert all the PT_STRING8 data
 		// back to PT_UNICODE.
 
-		for(unsigned int i=0; i < lpResult->cEntries; i++) {
-			for(unsigned int j=0; j < lpResult->aEntries[i].cValues; j++) {
+		for (unsigned int i = 0; i < lpResult->cEntries; ++i) {
+			for (unsigned int j = 0; j < lpResult->aEntries[i].cValues; ++j) {
 				if(PROP_TYPE(lpResult->aEntries[i].rgPropVals[j].ulPropTag) == PT_STRING8) {
 					std::wstring wstrData = convert_to<wstring>(lpResult->aEntries[i].rgPropVals[j].Value.lpszA);
 
@@ -3301,21 +3265,14 @@ static HRESULT OpenLocalFBMessage(DGMessageType eDGMsgType,
 	*lppFBMessage = lpMessage;
 
 exit:
-	if(lpszExplicitClass)
-		MAPIFreeBuffer(lpszExplicitClass);
-
-	if(lpAppEntryID)
-		MAPIFreeBuffer(lpAppEntryID);
+	MAPIFreeBuffer(lpszExplicitClass);
+	MAPIFreeBuffer(lpAppEntryID);
 	if(lpRoot)
 		lpRoot->Release();
-	if(lpPropFB)
-		MAPIFreeBuffer(lpPropFB);
-	if(lpPropFBNew)
-		MAPIFreeBuffer(lpPropFBNew);
-	if(lpEntryID)
-		MAPIFreeBuffer(lpEntryID);
-	if(lpEntryIDInbox)
-		MAPIFreeBuffer(lpEntryIDInbox);
+	MAPIFreeBuffer(lpPropFB);
+	MAPIFreeBuffer(lpPropFBNew);
+	MAPIFreeBuffer(lpEntryID);
+	MAPIFreeBuffer(lpEntryIDInbox);
 	if(lpInbox)
 		lpInbox->Release();
 
@@ -3442,8 +3399,7 @@ HRESULT GetAutoAcceptSettings(IMsgStore *lpMsgStore, bool *lpbAutoAccept, bool *
 	*lpbDeclineRecurring = bDeclineRecurring;
 
 exit:
-	if(lpProps)
-		MAPIFreeBuffer(lpProps);
+	MAPIFreeBuffer(lpProps);
 	if(lpLocalFBMessage)
 		lpLocalFBMessage->Release();
 

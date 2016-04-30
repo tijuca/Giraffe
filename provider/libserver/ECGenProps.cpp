@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <mapitags.h>
 #include <mapidefs.h>
@@ -50,20 +24,20 @@
 #include <libintl.h>
 
 #include "ECMAPI.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 #include "SOAPUtils.h"
 #include "soapH.h"
 #include "ECStoreObjectTable.h"
 #include "ECGenProps.h"
 #include "Zarafa.h"
-#include "ECDefs.h"
+#include <zarafa/ECDefs.h>
 #include "ECUserManagement.h"
 #include "ECSecurity.h"
 #include "ECSessionManager.h"
 #include "ECLockManager.h"
 
 #include <edkmdb.h>
-#include <mapiext.h>
+#include <zarafa/mapiext.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -385,15 +359,15 @@ ECRESULT ECGenProps::GetPropComputed(struct soap *soap, unsigned int ulObjType, 
 		{
 			char* c = lpPropVal->Value.lpszA;
 			while (c < lpszColon && isdigit(*c))
-				c++; // test for all digits prefix
+				++c; // test for all digits prefix
 			if (c != lpszColon)
 			{
-				lpszColon++; // skip ':'
+				++lpszColon; // skip ':'
 				size_t newlength = strlen(lpszColon);
-				if ((newlength > 0) && (lpszColon[0] == ' '))
+				if (newlength > 0 && lpszColon[0] == ' ')
 				{
-					lpszColon++; // skip space
-					newlength--; // adjust length
+					++lpszColon; // skip space
+					--newlength; // adjust length
 				}
 				lpPropVal->Value.lpszA = s_alloc<char>(soap, newlength + 1);
 				memcpy(lpPropVal->Value.lpszA, lpszColon, newlength);
@@ -865,12 +839,10 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 
 	*lpPropVal = sPropVal;
 exit:
-	if(sPropTagArray.__ptr)
-		delete[] sPropTagArray.__ptr;
+	delete[] sPropTagArray.__ptr;
 
 	if(soap == NULL) { // soap != NULL gsoap will cleanup the memory
-		if (sPropValArray.__ptr) 
-			delete[] sPropValArray.__ptr;
+		delete[] sPropValArray.__ptr;
 
 		if (er != erSuccess)
 			FreePropVal(&sPropVal, false);
@@ -969,7 +941,7 @@ ECRESULT ECGenProps::GetStoreName(struct soap *soap, ECSession* lpSession, unsig
 
         strFormat = string(lpSession->GetSessionManager()->GetConfig()->GetSetting("storename_format"));
 
-        for (int i = 0; i < sPropValArray.__size; i++) {
+        for (int i = 0; i < sPropValArray.__size; ++i) {
             string sub;
             size_t pos = 0;
 
@@ -1008,9 +980,7 @@ ECRESULT ECGenProps::GetStoreName(struct soap *soap, ECSession* lpSession, unsig
 	*lppStoreName = lpStoreName;
 
 exit:
-	if(sPropTagArray.__ptr)
-		delete[] sPropTagArray.__ptr;
-
+	delete[] sPropTagArray.__ptr;
 	return er;
 }
 

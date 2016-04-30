@@ -1,49 +1,24 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 #ifndef ECICS_H
 #define ECICS_H
 
+#include <zarafa/zcdefs.h>
 #include "ECSession.h"
 
 #include <set>
@@ -51,9 +26,9 @@
 // This class is used to pass SOURCEKEYs internally between parts of the server backend. You can use it as a char* to get the data, use size() to get the size,
 // and have various ways of creating new SOURCEKEYs, including using a GUID and an ID, which is used for zarafa-generated source keys.
 
-class SOURCEKEY {
+class SOURCEKEY _zcp_final {
 public:
-    SOURCEKEY() { lpData = NULL; ulSize = 0; };
+    SOURCEKEY(void) : lpData(NULL), ulSize(0) {}
     SOURCEKEY(const SOURCEKEY &s) { 
         if(&s == this) return; 
         if(s.ulSize == 0) { 
@@ -78,7 +53,7 @@ public:
         // Use 22-byte sourcekeys (16 bytes GUID + 6 bytes counter)
         ulSize = sizeof(GUID) + 6;
         lpData = new char [ulSize]; 
-        memcpy(lpData, reinterpret_cast<const char *>(&guid), sizeof(guid)); 
+        memcpy(lpData, &guid, sizeof(guid));
         memcpy(lpData+sizeof(GUID), &ullId, ulSize - sizeof(GUID)); 
     }
     SOURCEKEY(struct xsd__base64Binary &sourcekey) {
@@ -87,12 +62,12 @@ public:
         this->ulSize = sourcekey.__size;
     }
     ~SOURCEKEY() { 
-        if(lpData) delete [] lpData; 
+	delete[] lpData; 
     }
     
     SOURCEKEY&  operator= (const SOURCEKEY &s) { 
         if(&s == this) return *this; 
-        if(lpData) delete [] lpData; 
+        delete[] lpData; 
         lpData = new char[s.ulSize]; 
         memcpy(lpData, s.lpData, s.ulSize); 
         ulSize = s.ulSize; 
@@ -132,7 +107,7 @@ private:
     unsigned int ulSize;
 };
 
-ECRESULT AddChange(BTSession *lpecSession, unsigned int ulSyncId, SOURCEKEY sSourceKey, SOURCEKEY sParentSourceKey, unsigned int ulChange, unsigned int ulFlags = 0, bool fForceNewChangeKey = false, std::string * lpstrChangeKey = NULL, std::string * lpstrChangeList = NULL);
+ECRESULT AddChange(BTSession *lpecSession, unsigned int ulSyncId, const SOURCEKEY &sSourceKey, const SOURCEKEY &sParentSourceKey, unsigned int ulChange, unsigned int ulFlags = 0, bool fForceNewChangeKey = false, std::string *lpstrChangeKey = NULL, std::string *lpstrChangeList = NULL);
 ECRESULT AddABChange(BTSession *lpecSession, unsigned int ulChange, SOURCEKEY sSourceKey, SOURCEKEY sParentSourceKey);
 ECRESULT GetChanges(struct soap *soap, ECSession *lpSession, SOURCEKEY sSourceKeyFolder, unsigned int ulSyncId, unsigned int ulChangeId, unsigned int ulChangeType, unsigned int ulFlags, struct restrictTable *lpsRestrict, unsigned int *lpulMaxChangeId, icsChangesArray **lppChanges);
 ECRESULT GetSyncStates(struct soap *soap, ECSession *lpSession, mv_long ulaSyncId, syncStateArray *lpsaSyncState);

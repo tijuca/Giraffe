@@ -1,54 +1,28 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 #ifndef ECCONFIGIMPL_H
 #define ECCONFIGIMPL_H
 
-#include "zcdefs.h"
+#include <zarafa/zcdefs.h>
 
 using namespace std;
 
-#include "ECConfig.h"
+#include <zarafa/ECConfig.h>
 
 #include <map>
 #include <set>
@@ -98,35 +72,35 @@ typedef struct {
 #define LOADSETTING_OVERWRITE_RELOAD	0x0010	/* Same as CONFIG_LOAD_OVERWRITE but only if option is marked reloadable */
 #define LOADSETTING_CMDLINE_PARAM		0x0020	/* This setting is being set from commandline parameters. Sets the option non-reloadable */
 
-class ECConfigImpl _final : public ECConfig {
+class ECConfigImpl _zcp_final : public ECConfig {
 public:
-	ECConfigImpl(const configsetting_t *lpDefaults, const char **lpszDirectives);
+	ECConfigImpl(const configsetting_t *lpDefaults, const char *const *lpszDirectives);
 	~ECConfigImpl();
 
-	bool LoadSettings(const char *szFilename) _override;
-	virtual bool ParseParams(int argc, char *argv[], int *lpargidx) _override;
-	const char *GetSettingsPath(void) _override;
-	bool ReloadSettings(void) _override;
+	bool LoadSettings(const char *szFilename) _zcp_override;
+	virtual bool ParseParams(int argc, char *argv[], int *lpargidx) _zcp_override;
+	const char *GetSettingsPath(void) _zcp_override;
+	bool ReloadSettings(void) _zcp_override;
 
-	bool AddSetting(const char *szName, const char *szValue, const unsigned int ulGroup = 0) _override;
+	bool AddSetting(const char *szName, const char *szValue, const unsigned int ulGroup = 0) _zcp_override;
 
 	void	AddWriteSetting(const char *szName, const char *szValue, const unsigned int ulGroup = 0);
 
-	const char *GetSetting(const char *szName) _override;
-	const char *GetSetting(const char *szName, const char *equal, const char *other) _override;
-	const wchar_t *GetSettingW(const char *szName) _override;
-	const wchar_t *GetSettingW(const char *szName, const wchar_t *equal, const wchar_t *other) _override;
+	const char *GetSetting(const char *szName) _zcp_override;
+	const char *GetSetting(const char *szName, const char *equal, const char *other) _zcp_override;
+	const wchar_t *GetSettingW(const char *szName) _zcp_override;
+	const wchar_t *GetSettingW(const char *szName, const wchar_t *equal, const wchar_t *other) _zcp_override;
 
-	std::list<configsetting_t> GetSettingGroup(unsigned int ulGroup) _override;
-	std::list<configsetting_t> GetAllSettings(void) _override;
+	std::list<configsetting_t> GetSettingGroup(unsigned int ulGroup) _zcp_override;
+	std::list<configsetting_t> GetAllSettings(void) _zcp_override;
 
-	bool HasWarnings(void) _override;
-	const std::list<std::string> *GetWarnings(void) _override;
-	bool HasErrors(void) _override;
-	const std::list<std::string> *GetErrors(void) _override;
+	bool HasWarnings(void) _zcp_override;
+	const std::list<std::string> *GetWarnings(void) _zcp_override;
+	bool HasErrors(void) _zcp_override;
+	const std::list<std::string> *GetErrors(void) _zcp_override;
 
-	bool WriteSettingToFile(const char *szName, const char *szValue, const char *szFileName) _override;
-	bool WriteSettingsToFile(const char *szFileName) _override;
+	bool WriteSettingToFile(const char *szName, const char *szValue, const char *szFileName) _zcp_override;
+	bool WriteSettingsToFile(const char *szFileName) _zcp_override;
 
 private:
 	typedef boost::filesystem::path path_type;

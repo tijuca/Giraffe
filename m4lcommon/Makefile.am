@@ -1,5 +1,7 @@
 # -*- Makefile -*-
 
+SUBDIRS = include/zarafa
+
 AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
 	-DMAPICONFIGDIR=\"${MAPICONFIGDIR}\" \
 	-DPKGLIBDIR=\"${pkglibdir}\" \
@@ -9,20 +11,14 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
 
 noinst_LTLIBRARIES = libm4lcommon.la
 
-pkgincludedir = ${includedir}/zarafa
-mapiptrdir = ${pkgincludedir}/mapi_ptr
+m4lincludedir = ${includedir}/mapi4linux
 
-pkginclude_HEADERS = \
-	CommonUtil.h \
-	ECDefs.h \
+m4linclude_HEADERS = include/edkguid.h
+noinst_HEADERS = \
 	ECFeatureList.h \
-	ECInterfaceDefs.h \
 	ECInvariantChecker.h \
 	ECIterators.h \
 	ECMAPIDebug.h \
-	ECMemTable.h \
-	ECTags.h \
-	EMSAbTag.h \
 	HrException.h \
 	IECChangeAdviseSink.h \
 	IECChangeAdvisor.h \
@@ -32,35 +28,14 @@ pkginclude_HEADERS = \
 	IECImportAddressbookChanges.h \
 	IECImportContentsChanges.h \
 	IECImportHierarchyChanges.h \
-	IECLicense.h \
 	IECMultiStoreTable.h \
-	IECSecurity.h \
-	IECServiceAdmin.h \
-	IECSingleInstance.h \
 	IECSpooler.h \
-	IECStatsCollector.h \
 	IECTestProtocol.h \
-	IECUnknown.h \
 	IMAPIOffline.h \
 	MAPIConsoleTable.h \
 	MAPINotifSink.h \
-	Util.h \
-	auto_free.h \
-	boost_compat.h \
-	edkguid.h \
 	favoritesutil.h \
-	mapi_ptr.h \
-	mapicontact.h \
-	mapiext.h \
-	mapiguidext.h \
-	namedprops.h \
-	restrictionutil.h \
-	tstring.h
-mapiptr_HEADERS = \
-	mapi_ptr/mapi_array_ptr.h \
-	mapi_ptr/mapi_memory_ptr.h \
-	mapi_ptr/mapi_object_ptr.h \
-	mapi_ptr/mapi_rowset_ptr.h
+	mapicontact.h
 # These were split off libcommon_mapi
 libm4lcommon_la_SOURCES = \
 	CommonUtil.cpp ECIterators.cpp \
@@ -73,9 +48,8 @@ libm4lcommon_la_LIBADD = \
 	-lpthread
 
 
-pkginclude_HEADERS += \
-	ECFeatures.h ECRestriction.h \
-	RecurrenceState.h userutil.h
+noinst_HEADERS += \
+	ECFeatures.h
 # These were split off libcommon_util
 libm4lcommon_la_SOURCES += \
 	ECFeatures.cpp ECRestriction.cpp \

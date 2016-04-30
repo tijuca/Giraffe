@@ -6,6 +6,8 @@ AM_CPPFLAGS = ${ZCPPFLAGS} ${DEBUGFLAGS} ${GSOAP_CFLAGS} \
 	-I${top_builddir}/provider/soap -I${top_srcdir}/provider/soap \
 	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon
 
+pkginclude_HEADERS = include/zarafa/ZarafaUser.h
+
 noinst_LTLIBRARIES = libzarafacommon.la
 #noinst_DATA = libzarafacommon.ldd
 

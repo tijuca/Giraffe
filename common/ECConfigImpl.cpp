@@ -1,62 +1,37 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "zcdefs.h"
-#include "platform.h"
+#include <zarafa/zcdefs.h>
+#include <zarafa/platform.h>
 
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
 #include <cassert>
+#ifdef LINUX
 #include <climits>
+#endif
 
 #include <algorithm>
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 #include "ECConfigImpl.h"
 
-#include "charset/convert.h"
-
-#include "boost_compat.h"
+#include <zarafa/charset/convert.h>
+#include <zarafa/boost_compat.h>
 
 using namespace std;
 
@@ -75,24 +50,25 @@ const directive_t ECConfigImpl::s_sDirectives[] = {
 	{ NULL }
 };
 
-class PathCompare _final {
+class PathCompare _zcp_final {
 public:
 	PathCompare(const fs::path &ref): m_ref(ref) {}
-	bool operator()(const fs::path &other) { return fs::equivalent(m_ref, other); }
+	bool operator()(const fs::path &other) const { return fs::equivalent(m_ref, other); }
 private:
 	const fs::path &m_ref;
 };
 
 // Configuration file parser
 
-ECConfigImpl::ECConfigImpl(const configsetting_t *lpDefaults, const char **lpszDirectives)
+ECConfigImpl::ECConfigImpl(const configsetting_t *lpDefaults,
+    const char *const *lpszDirectives)
 {
 	pthread_rwlock_init(&m_settingsRWLock, NULL);
-	
+	m_szConfigFile = NULL;
 	m_lpDefaults = lpDefaults;
 
 	// allowed directives in this config object
-	for (int i = 0; lpszDirectives != NULL && lpszDirectives[i] != NULL; i++)
+	for (int i = 0; lpszDirectives != NULL && lpszDirectives[i] != NULL; ++i)
 		m_lDirectives.push_back(lpszDirectives[i]);
 
 	InitDefaults(LOADSETTING_INITIALIZING | LOADSETTING_UNKNOWN | LOADSETTING_OVERWRITE);
@@ -106,9 +82,7 @@ bool ECConfigImpl::LoadSettings(const char *szFilename)
 
 static int tounderscore(int c)
 {
-	if(c == '-')
-		return '_';
-	return c;
+	return c == '-' ? '_' : c;
 }
 
 /**
@@ -135,7 +109,7 @@ static int tounderscore(int c)
  */
 bool ECConfigImpl::ParseParams(int argc, char *argv[], int *lpargidx)
 {
-	for (int i = 0 ; i < argc ; i++) {
+	for (int i = 0; i < argc; ++i) {
 		char *arg = argv[i];
 		if (arg && arg[0] == '-' && arg[1] == '-') {
 			const char *eq = strchr(arg, '=');
@@ -247,7 +221,8 @@ size_t ECConfigImpl::GetSize(const char *szValue)
 		char *end = NULL;
 		rv = strtoul(szValue, &end, 10);
 		if (rv && end > szValue && *end != '\0') {
-			while (*end != '\0' && (*end == ' ' || *end == '\t')) end++;
+			while (*end != '\0' && (*end == ' ' || *end == '\t'))
+				++end;
 			switch (tolower(*end)) {
 				case 'k': rv *= 1024; break;
 				case 'm': rv *= 1024*1024; break;
@@ -298,18 +273,20 @@ const char *ECConfigImpl::GetMapEntry(const settingmap_t *lpMap,
     const char *szName)
 {
 	const char *retval = NULL;
-	if (szName) { // feeding NULL pointers, either as source or destinateion, to strcpy() segfaults
-		settingkey_t key = { { 0 }, 0, 0 };
-		strcpy(key.s, szName);
+	if (szName == NULL)
+		return NULL;
 
-		pthread_rwlock_rdlock(&m_settingsRWLock);
+	settingkey_t key = {""};
+	if (strlen(szName) >= sizeof(key.s))
+		return NULL;
 
-		settingmap_t::const_iterator itor = lpMap->find(key);
-		if (itor != lpMap->end())
-			retval = itor->second;
-		
-		pthread_rwlock_unlock(&m_settingsRWLock);
-	}
+	strcpy(key.s, szName);
+	pthread_rwlock_rdlock(&m_settingsRWLock);
+
+	settingmap_t::const_iterator itor = lpMap->find(key);
+	if (itor != lpMap->end())
+		retval = itor->second;
+	pthread_rwlock_unlock(&m_settingsRWLock);
 	return retval;
 }
 
@@ -327,7 +304,7 @@ const char *ECConfigImpl::GetSetting(const char *szName, const char *equal,
     const char *other)
 {
 	const char *value = this->GetSetting(szName);
-	if ((value == equal) || (value && equal && !strcmp(value, equal)))
+	if (value == equal || (value && equal && !strcmp(value, equal)))
 		return other;
 	else
 		return value;
@@ -349,7 +326,7 @@ const wchar_t *ECConfigImpl::GetSettingW(const char *szName,
     const wchar_t *equal, const wchar_t *other)
 {
 	const wchar_t *value = this->GetSettingW(szName);
-	if ((value == equal) || (value && equal && !wcscmp(value, equal)))
+	if (value == equal || (value && equal && !wcscmp(value, equal)))
 		return other;
 	else
 		return value;
@@ -360,7 +337,7 @@ list<configsetting_t> ECConfigImpl::GetSettingGroup(unsigned int ulGroup)
 	list<configsetting_t> lGroup;
 	configsetting_t sSetting;
 
-	for (settingmap_t::iterator iter = m_mapSettings.begin(); iter != m_mapSettings.end(); iter++) {
+	for (settingmap_t::iterator iter = m_mapSettings.begin(); iter != m_mapSettings.end(); ++iter) {
 		if ((iter->first.ulGroup & ulGroup) == ulGroup) {
 			if (CopyConfigSetting(&iter->first, iter->second, &sSetting))
 				lGroup.push_back(sSetting);
@@ -375,7 +352,7 @@ std::list<configsetting_t> ECConfigImpl::GetAllSettings()
 	list<configsetting_t> lSettings;
 	configsetting_t sSetting;
 
-	for (settingmap_t::iterator iter = m_mapSettings.begin(); iter != m_mapSettings.end(); iter++) {
+	for (settingmap_t::iterator iter = m_mapSettings.begin(); iter != m_mapSettings.end(); ++iter) {
 		if (CopyConfigSetting(&iter->first, iter->second, &sSetting))
 			lSettings.push_back(sSetting);
 	}
@@ -398,7 +375,7 @@ bool ECConfigImpl::InitDefaults(unsigned int ulFlags)
 				AddAlias(&m_lpDefaults[i]);
 		} else
 			AddSetting(&m_lpDefaults[i], ulFlags);
-		i++;
+		++i;
 	}
 
 	return true;
@@ -716,7 +693,7 @@ bool ECConfigImpl::HasErrors() {
 	/* First validate the configuration settings */
 	pthread_rwlock_rdlock(&m_settingsRWLock);
 
-	for (iterSettings = m_mapSettings.begin(); iterSettings != m_mapSettings.end(); iterSettings++) {
+	for (iterSettings = m_mapSettings.begin(); iterSettings != m_mapSettings.end(); ++iterSettings) {
 		if (iterSettings->first.ulFlags & CONFIGSETTING_NONEMPTY) {
 			if (!iterSettings->second || strlen(iterSettings->second) == 0)
 				errors.push_back("Option '" + string(iterSettings->first.s) + "' cannot be empty!");
@@ -810,7 +787,7 @@ bool ECConfigImpl::WriteSettingsToFile(const char* szFileName)
 
 	for(iterSettings = m_mapSettings.begin(); 
 		iterSettings != m_mapSettings.end();
-		iterSettings++)
+		++iterSettings)
 	{
 
 		szName = iterSettings->first.s;
@@ -822,8 +799,13 @@ bool ECConfigImpl::WriteSettingsToFile(const char* szFileName)
 	out.close();
 
 // the stdio functions does not work in win release mode in some cases
+#ifdef WIN32 
+	CopyFileA(szFileName, pathBakFile.string().c_str(), false); // Backup
+	CopyFileA(pathOutFile.string().c_str(), szFileName, false);
+#else
 	remove(szFileName);
 	rename(path_to_string(pathOutFile).c_str(),szFileName);
+#endif
 
 	return true;
 }

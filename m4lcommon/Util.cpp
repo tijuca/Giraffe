@@ -1,48 +1,22 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "zcdefs.h"
-#include "platform.h"
+#include <zarafa/zcdefs.h>
+#include <zarafa/platform.h>
 
 #include <mapidefs.h>
 #include <mapiutil.h>
@@ -55,31 +29,30 @@
 
 #include <edkmdb.h>
 
-#include "Util.h"
-#include "ECIConv.h"
-#include "CommonUtil.h"
-#include "stringutil.h"
-#include "charset/convert.h"
-#include "tstring.h"
+#include <zarafa/Util.h>
+#include <zarafa/ECIConv.h>
+#include <zarafa/CommonUtil.h>
+#include <zarafa/stringutil.h>
+#include <zarafa/charset/convert.h>
+#include <zarafa/tstring.h>
 
 #include "ECMemStream.h"
-#include "IECSingleInstance.h"
-#include "ECGuid.h"
-#include "codepage.h"
+#include <zarafa/IECSingleInstance.h>
+#include <zarafa/ECGuid.h>
+#include <zarafa/codepage.h>
 #include "rtfutil.h"
-#include "mapiext.h"
+#include <zarafa/mapiext.h>
 
-#include "ustringutil.h"
-#include "mapi_ptr.h"
+#include <zarafa/ustringutil.h>
+#include <zarafa/mapi_ptr.h>
 
 #include "HtmlToTextParser.h"
-#include "ECLogger.h"
+#include <zarafa/ECLogger.h>
 #include "HtmlEntity.h"
 
 using namespace std;
 
-#include "ECGetText.h"
-#include "charset/convert.h"
+#include <zarafa/ECGetText.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -92,12 +65,12 @@ static const char THIS_FILE[] = __FILE__;
 // HACK: prototypes may differ depending on the compiler and/or system (the
 // second parameter may or may not be 'const'). This redeclaration is a hack
 // to have a common prototype "iconv_cast".
-class iconv_HACK _final {
+class iconv_HACK _zcp_final {
 public:
 	iconv_HACK(const char** ptr) : m_ptr(ptr) { }
 
 	// the compiler will choose the right operator
-	operator const char**() { return m_ptr; }
+	operator const char **(void) const { return m_ptr; }
 	operator char**() { return const_cast <char**>(m_ptr); }
 
 private:
@@ -105,7 +78,7 @@ private:
 };
 
 
-class PropTagCompare _final {
+class PropTagCompare _zcp_final {
 public:
 	PropTagCompare() {}
 	bool operator()(ULONG lhs, ULONG rhs) const { 
@@ -142,12 +115,11 @@ HRESULT Util::HrAddToPropertyArray(const SPropValue *lpSrc, ULONG cValues,
 	if (hr != hrSuccess)
 		goto exit;
 
-	for(i=0;i<cValues;i++) {
+	for (i = 0; i < cValues; ++i) {
 		hr = HrCopyProperty(&lpDest[n], &lpSrc[i], lpDest);
 
 		if(hr == hrSuccess)
-			n++;
-
+			++n;
 		hr = hrSuccess;
 	}
 
@@ -158,8 +130,7 @@ HRESULT Util::HrAddToPropertyArray(const SPropValue *lpSrc, ULONG cValues,
 	} else {
 
 		hr = HrCopyProperty(&lpDest[n], lpToAdd, lpDest);
-
-		n++;
+		++n;
 	}
 
 	if(hr != hrSuccess)
@@ -194,9 +165,7 @@ bool Util::FHasHTML(IMAPIProp *lpProp)
 		hr = MAPI_E_NOT_FOUND;
 
 exit:
-	if(lpPropSupport)
-		MAPIFreeBuffer(lpPropSupport);
-
+	MAPIFreeBuffer(lpPropSupport);
 	return hr == hrSuccess;
 }
 
@@ -222,19 +191,17 @@ HRESULT	Util::HrMergePropertyArrays(const SPropValue *lpSrc, ULONG cValues,
 	ULONG i = 0;
 	LPSPropValue lpProps = NULL;
 
-	for (i = 0; i < cValues; i ++) {
+	for (i = 0; i < cValues; ++i)
 		mapPropSource[lpSrc[i].ulPropTag] = &lpSrc[i];
-	}
-
-	for (i = 0; i < cAddValues; i ++) {
+	for (i = 0; i < cAddValues; ++i)
 		mapPropSource[lpAdds[i].ulPropTag] = &lpAdds[i];
-	}
 
 	hr = MAPIAllocateBuffer(sizeof(SPropValue)*mapPropSource.size(), (void**)&lpProps);
 	if (hr != hrSuccess)
 		goto exit;
 
-	for (i = 0, iterPropSource = mapPropSource.begin(); iterPropSource != mapPropSource.end(); iterPropSource++, i++) {
+	for (i = 0, iterPropSource = mapPropSource.begin();
+	     iterPropSource != mapPropSource.end(); ++iterPropSource, ++i) {
 		hr = Util::HrCopyProperty(&lpProps[i], iterPropSource->second, lpProps);
 		if (hr != hrSuccess)
 			goto exit;
@@ -245,9 +212,7 @@ HRESULT	Util::HrMergePropertyArrays(const SPropValue *lpSrc, ULONG cValues,
 	lpProps = NULL;
 
 exit:
-	if (lpProps)
-		MAPIFreeBuffer(lpProps);
-
+	MAPIFreeBuffer(lpProps);
 	return hr;
 }
 
@@ -276,12 +241,12 @@ HRESULT Util::HrCopyPropertyArrayByRef(const SPropValue *lpSrc, ULONG cValues,
 	if (hr != hrSuccess)
 		goto exit;
     
-    for (i = 0; i < cValues; i++) {
+    for (i = 0; i < cValues; ++i) {
         if(!bExcludeErrors || PROP_TYPE(lpSrc[i].ulPropTag) != PT_ERROR) {
             hr = HrCopyPropertyByRef(&lpDest[n], &lpSrc[i]);
         
             if(hr == hrSuccess)
-                n++;
+                ++n;
             
             hr = hrSuccess;
         }
@@ -318,12 +283,12 @@ HRESULT Util::HrCopyPropertyArray(const SPropValue *lpSrc, ULONG cValues,
 	if (hr != hrSuccess)
 		goto exit;
 
-	for (i = 0; i < cValues; i++) {
+	for (i = 0; i < cValues; ++i) {
 	    if(!bExcludeErrors || PROP_TYPE(lpSrc[i].ulPropTag) != PT_ERROR) {
     		hr = HrCopyProperty(&lpDest[n], &lpSrc[i], lpDest);
 
 	    	if(hr == hrSuccess)
-		    	n++;
+			++n;
 
     		hr = hrSuccess;
         }
@@ -353,7 +318,7 @@ HRESULT Util::HrCopyPropertyArray(const SPropValue *lpSrc, ULONG cValues,
 	HRESULT hr = hrSuccess;
 	unsigned int i;
 
-	for (i = 0; i < cValues; i++) {
+	for (i = 0; i < cValues; ++i) {
 		hr = HrCopyProperty(&lpDest[i], &lpSrc[i], lpBase);
 
 		if(hr != hrSuccess)
@@ -381,7 +346,7 @@ HRESULT Util::HrCopyPropertyArrayByRef(const SPropValue *lpSrc, ULONG cValues,
 	HRESULT hr = hrSuccess;
 	unsigned int i;
 
-	for (i = 0; i < cValues; i++) {
+	for (i = 0; i < cValues; ++i) {
 		hr = HrCopyPropertyByRef(&lpDest[i], &lpSrc[i]);
 
 		if(hr != hrSuccess)
@@ -583,7 +548,7 @@ HRESULT Util::HrCopyProperty(LPSPropValue lpDest, const SPropValue *lpSrc,
 		hr = lpfAllocMore(sizeof(LPSTR *) * lpSrc->Value.MVszA.cValues, lpBase, (void **)&lpDest->Value.MVszA.lppszA);
 		if (hr != hrSuccess)
 			goto exit;
-		for (ULONG i = 0; i < lpSrc->Value.MVszA.cValues; i++) {
+		for (ULONG i = 0; i < lpSrc->Value.MVszA.cValues; ++i) {
 			int datalength = strlen(lpSrc->Value.MVszA.lppszA[i]) + 1;
 			hr = lpfAllocMore(datalength, lpBase, (void **)&lpDest->Value.MVszA.lppszA[i]);
 			if (hr != hrSuccess)
@@ -596,7 +561,7 @@ HRESULT Util::HrCopyProperty(LPSPropValue lpDest, const SPropValue *lpSrc,
 		hr = lpfAllocMore(sizeof(LPWSTR *) * lpSrc->Value.MVszW.cValues, lpBase, (void **)&lpDest->Value.MVszW.lppszW);
 		if (hr != hrSuccess)
 			goto exit;
-		for (ULONG i = 0; i < lpSrc->Value.MVszW.cValues; i++) {
+		for (ULONG i = 0; i < lpSrc->Value.MVszW.cValues; ++i) {
 			hr = lpfAllocMore(wcslen(lpSrc->Value.MVszW.lppszW[i]) * sizeof(WCHAR) + sizeof(WCHAR), lpBase, (void**)&lpDest->Value.MVszW.lppszW[i]);
 			if (hr != hrSuccess)
 				goto exit;
@@ -608,7 +573,7 @@ HRESULT Util::HrCopyProperty(LPSPropValue lpDest, const SPropValue *lpSrc,
 		hr = lpfAllocMore(sizeof(SBinary) * lpSrc->Value.MVbin.cValues, lpBase, (void **)&lpDest->Value.MVbin.lpbin);
 		if (hr != hrSuccess)
 			goto exit;
-		for (ULONG i = 0; i < lpSrc->Value.MVbin.cValues; i++) {
+		for (ULONG i = 0; i < lpSrc->Value.MVbin.cValues; ++i) {
 			hr = lpfAllocMore(lpSrc->Value.MVbin.lpbin[i].cb, lpBase, (void **)&lpDest->Value.MVbin.lpbin[i].lpb);
 			if (hr != hrSuccess)
 				goto exit;
@@ -694,7 +659,7 @@ HRESULT	Util::HrCopySRestriction(LPSRestriction lpDest,
 			if (hr != hrSuccess)
 				goto exit;
 
-			for(i=0;i<lpSrc->res.resAnd.cRes;i++) {
+			for (i = 0; i < lpSrc->res.resAnd.cRes; ++i) {
 				hr = HrCopySRestriction(&lpDest->res.resAnd.lpRes[i], &lpSrc->res.resAnd.lpRes[i], lpBase);
 				if(hr != hrSuccess)
 					goto exit;
@@ -706,7 +671,7 @@ HRESULT	Util::HrCopySRestriction(LPSRestriction lpDest,
 			if (hr != hrSuccess)
 				goto exit;
 
-			for(i=0;i<lpSrc->res.resOr.cRes;i++) {
+			for (i = 0; i < lpSrc->res.resOr.cRes; ++i) {
 				hr = HrCopySRestriction(&lpDest->res.resOr.lpRes[i], &lpSrc->res.resOr.lpRes[i], lpBase);
 				if(hr != hrSuccess)
 					goto exit;
@@ -812,7 +777,7 @@ HRESULT	Util::HrCopyActions(ACTIONS *lpDest, const ACTIONS *lpSrc,
 
 	memset(lpDest->lpAction, 0, sizeof(ACTION) * lpSrc->cActions);
 
-	for (i = 0; i < lpSrc->cActions; i++) {
+	for (i = 0; i < lpSrc->cActions; ++i) {
 		hr = HrCopyAction(&lpDest->lpAction[i], &lpSrc->lpAction[i], lpBase);
 		if(hr != hrSuccess)
 			goto exit;
@@ -915,12 +880,11 @@ HRESULT Util::HrCopySRowSet(LPSRowSet lpDest, const SRowSet *lpSrc,
 	unsigned int i;
 
 	lpDest->cRows = 0;
-	for (i = 0; i < lpSrc->cRows; i++) {
+	for (i = 0; i < lpSrc->cRows; ++i) {
 		hr = HrCopySRow(&lpDest->aRow[i], &lpSrc->aRow[i], lpBase);
 		if (hr != hrSuccess)
 			goto exit;
-
-		lpDest->cRows++;
+		++lpDest->cRows;
 	}
 
 exit:
@@ -1002,7 +966,7 @@ HRESULT Util::HrCopyUnicodePropTagArray(ULONG ulFlags,
 	if (hr != hrSuccess)
 		goto exit;
 
-	for (ULONG n = 0; n < lpSrc->cValues; n++) {
+	for (ULONG n = 0; n < lpSrc->cValues; ++n) {
 		if (PROP_TYPE(lpSrc->aulPropTag[n]) == PT_STRING8 || PROP_TYPE(lpSrc->aulPropTag[n]) == PT_UNICODE)
 			lpPropTagArray->aulPropTag[n] = CHANGE_PROP_TYPE(lpSrc->aulPropTag[n], ((ulFlags & MAPI_UNICODE) ? PT_UNICODE : PT_STRING8));
 		else
@@ -1203,7 +1167,7 @@ HRESULT Util::CompareProp(const SPropValue *lpProp1, const SPropValue *lpProp2,
 		
 	case PT_MV_I2:
 		if (lpProp1->Value.MVi.cValues == lpProp2->Value.MVi.cValues) {
-			for(i=0; i < lpProp1->Value.MVi.cValues; i++) {
+			for (i = 0; i < lpProp1->Value.MVi.cValues; ++i) {
 				nCompareResult = lpProp1->Value.MVi.lpi[i] - lpProp2->Value.MVi.lpi[i];
 				if(nCompareResult != 0)
 					break;
@@ -1213,7 +1177,7 @@ HRESULT Util::CompareProp(const SPropValue *lpProp1, const SPropValue *lpProp2,
 		break;
 	case PT_MV_LONG:
 		if (lpProp1->Value.MVl.cValues == lpProp2->Value.MVl.cValues) {
-			for(i=0; i < lpProp1->Value.MVl.cValues; i++) {
+			for (i = 0; i < lpProp1->Value.MVl.cValues; ++i) {
 				nCompareResult = lpProp1->Value.MVl.lpl[i] - lpProp2->Value.MVl.lpl[i];
 				if(nCompareResult != 0)
 					break;
@@ -1223,7 +1187,7 @@ HRESULT Util::CompareProp(const SPropValue *lpProp1, const SPropValue *lpProp2,
 		break;
 	case PT_MV_R4:
 		if (lpProp1->Value.MVflt.cValues == lpProp2->Value.MVflt.cValues) {
-			for(i=0; i < lpProp1->Value.MVflt.cValues; i++) {
+			for (i = 0; i < lpProp1->Value.MVflt.cValues; ++i) {
 				nCompareResult = lpProp1->Value.MVflt.lpflt[i] - lpProp2->Value.MVflt.lpflt[i];
 				if(nCompareResult != 0)
 					break;
@@ -1234,7 +1198,7 @@ HRESULT Util::CompareProp(const SPropValue *lpProp1, const SPropValue *lpProp2,
 	case PT_MV_DOUBLE:
 	case PT_MV_APPTIME:
 		if (lpProp1->Value.MVdbl.cValues == lpProp2->Value.MVdbl.cValues) {
-			for(i=0; i < lpProp1->Value.MVdbl.cValues; i++) {
+			for (i = 0; i < lpProp1->Value.MVdbl.cValues; ++i) {
 				nCompareResult = lpProp1->Value.MVdbl.lpdbl[i] - lpProp2->Value.MVdbl.lpdbl[i];
 				if(nCompareResult != 0)
 					break;
@@ -1244,7 +1208,7 @@ HRESULT Util::CompareProp(const SPropValue *lpProp1, const SPropValue *lpProp2,
 		break;
 	case PT_MV_I8:
 		if (lpProp1->Value.MVli.cValues == lpProp2->Value.MVli.cValues) {
-			for(i=0; i < lpProp1->Value.MVli.cValues; i++) {
+			for (i = 0; i < lpProp1->Value.MVli.cValues; ++i) {
 				nCompareResult = (int)(lpProp1->Value.MVli.lpli[i].QuadPart - lpProp2->Value.MVli.lpli[i].QuadPart);
 				if(nCompareResult != 0)
 					break;
@@ -1255,7 +1219,7 @@ HRESULT Util::CompareProp(const SPropValue *lpProp1, const SPropValue *lpProp2,
 	case PT_MV_SYSTIME:
 	case PT_MV_CURRENCY:
 		if (lpProp1->Value.MVcur.cValues == lpProp2->Value.MVcur.cValues) {
-			for(i=0; i < lpProp1->Value.MVcur.cValues; i++) {
+			for (i = 0; i < lpProp1->Value.MVcur.cValues; ++i) {
 				if(lpProp1->Value.MVcur.lpcur[i].Hi == lpProp2->Value.MVcur.lpcur[i].Hi)
 					nCompareResult = lpProp1->Value.MVcur.lpcur[i].Lo - lpProp2->Value.MVcur.lpcur[i].Lo;
 				else
@@ -1276,7 +1240,7 @@ HRESULT Util::CompareProp(const SPropValue *lpProp1, const SPropValue *lpProp2,
 		break;
 	case PT_MV_BINARY:
 		if (lpProp1->Value.MVbin.cValues == lpProp2->Value.MVbin.cValues) {
-			for(i=0; i < lpProp1->Value.MVbin.cValues; i++) {
+			for (i = 0; i < lpProp1->Value.MVbin.cValues; ++i) {
 				nCompareResult = CompareSBinary(lpProp1->Value.MVbin.lpbin[i], lpProp2->Value.MVbin.lpbin[i]);
 				if(nCompareResult != 0)
 					break;
@@ -1286,7 +1250,7 @@ HRESULT Util::CompareProp(const SPropValue *lpProp1, const SPropValue *lpProp2,
 		break;
 	case PT_MV_UNICODE:
 		if (lpProp1->Value.MVszW.cValues == lpProp2->Value.MVszW.cValues) {
-			for(i=0; i < lpProp1->Value.MVszW.cValues; i++) {
+			for (i = 0; i < lpProp1->Value.MVszW.cValues; ++i) {
 				if (lpProp1->Value.MVszW.lppszW[i] && lpProp2->Value.MVszW.lppszW[i])
 					nCompareResult = wcscasecmp(lpProp1->Value.MVszW.lppszW[i], lpProp2->Value.MVszW.lppszW[i]);
 				else
@@ -1300,7 +1264,7 @@ HRESULT Util::CompareProp(const SPropValue *lpProp1, const SPropValue *lpProp2,
 		break;
 	case PT_MV_STRING8:
 		if (lpProp1->Value.MVszA.cValues == lpProp2->Value.MVszA.cValues) {
-			for(i=0; i < lpProp1->Value.MVszA.cValues; i++) {
+			for (i = 0; i < lpProp1->Value.MVszA.cValues; ++i) {
 				if (lpProp1->Value.MVszA.lppszA[i] && lpProp2->Value.MVszA.lppszA[i])
 					nCompareResult = stricmp(lpProp1->Value.MVszA.lppszA[i], lpProp2->Value.MVszA.lppszA[i]);
 				else
@@ -1374,12 +1338,12 @@ unsigned int Util::PropSize(const SPropValue *lpProp)
 		return 8 * lpProp->Value.MVli.cValues;
 	case PT_MV_UNICODE:
 		ulSize = 0;
-		for(i=0; i < lpProp->Value.MVszW.cValues; i++)
+		for (i = 0; i < lpProp->Value.MVszW.cValues; ++i)
 			ulSize += (lpProp->Value.MVszW.lppszW[i]) ? wcslen(lpProp->Value.MVszW.lppszW[i]) : 0;
 		return ulSize;
 	case PT_MV_STRING8:
 		ulSize = 0;
-		for(i=0; i < lpProp->Value.MVszA.cValues; i++)
+		for (i = 0; i < lpProp->Value.MVszA.cValues; ++i)
 			ulSize += (lpProp->Value.MVszA.lppszA[i]) ? strlen(lpProp->Value.MVszA.lppszA[i]) : 0;
 		return ulSize;
 	case PT_MV_SYSTIME:
@@ -1387,7 +1351,7 @@ unsigned int Util::PropSize(const SPropValue *lpProp)
 		return 8 * lpProp->Value.MVcur.cValues;	
 	case PT_MV_BINARY:
 		ulSize = 0;
-		for(i=0; i < lpProp->Value.MVbin.cValues; i++)
+		for (i = 0; i < lpProp->Value.MVbin.cValues; ++i)
 			ulSize+= lpProp->Value.MVbin.lpbin[i].cb;
 		return ulSize;
 	case PT_MV_CLSID:
@@ -1498,7 +1462,7 @@ HRESULT Util::HrTextToHtml(IStream *text, IStream *html, ULONG ulCodepage)
 		cRead /= sizeof(WCHAR);
 
 		// escape some characters in HTML
-		for (i = 0; i < cRead; i++) {
+		for (i = 0; i < cRead; ++i) {
 			if (lpBuffer[i] == ' ') {
 				if ((i+1) < cRead && lpBuffer[i+1] == ' ')
 					strHtml += L"&nbsp;";
@@ -1549,10 +1513,7 @@ HRESULT Util::HrTextToHtml(IStream *text, IStream *html, ULONG ulCodepage)
 exit:
 	if (cd != (iconv_t)-1)
 		iconv_close(cd);
-
-	if (writeBuffer)
-		delete [] writeBuffer;
-
+	delete[] writeBuffer;
 	return hr;
 }
 
@@ -1581,7 +1542,7 @@ HRESULT Util::HrTextToHtml(const WCHAR *text, std::string &strHTML, ULONG ulCode
 	}
 
 	// escape some characters in HTML
-	for (ULONG i = 0; text[i] != '\0'; i++) {
+	for (ULONG i = 0; text[i] != '\0'; ++i) {
 		if (text[i] == ' ') {
 			if (text[i+1] == ' ')
 				wHTML += L"&nbsp;";
@@ -1675,8 +1636,7 @@ HRESULT Util::HrTextToRtf(IStream *text, IStream *rtf)
 
 		cRead /= sizeof(WCHAR);
 
-		for (i = 0; i < cRead; i++) {
-
+		for (i = 0; i < cRead; ++i) {
 			switch (c[i]) {
 			case 0:
 				break;
@@ -1744,7 +1704,7 @@ LONG Util::FindPropInArray(const SPropTagArray *lpPropTags, ULONG ulPropTag)
 	if (!lpPropTags)
 		return -1;
 
-	for(i=0 ; i < lpPropTags->cValues; i++) {
+	for (i = 0; i < lpPropTags->cValues; ++i) {
 		if(lpPropTags->aulPropTag[i] == ulPropTag)
 			break;
 		if(PROP_TYPE(ulPropTag) == PT_UNSPECIFIED && PROP_ID(lpPropTags->aulPropTag[i]) == PROP_ID(ulPropTag))
@@ -1869,8 +1829,7 @@ bool Util::ValidatePropTagArray(const SPropTagArray *lpPropTagArray)
 		goto exit;
 	}
 
-	for(i=0; i < lpPropTagArray->cValues; i++)
-	{
+	for (i = 0; i < lpPropTagArray->cValues; ++i) {
 		switch (PROP_TYPE(lpPropTagArray->aulPropTag[i]))
 		{
 			case PT_UNSPECIFIED:
@@ -2220,7 +2179,7 @@ HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
         // Process special tag input
         if(lpwHTML[pos] == '<' && !inTag) {
             if(StrCaseCompare(lpwHTML, L"<!--", pos))
-                ulCommentMode++;
+                ++ulCommentMode;
             
             if(ulCommentMode == 0) {
                 if(StrCaseCompare(lpwHTML, L"<STYLE", pos))
@@ -2243,10 +2202,9 @@ HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
                 inTag = true;
                 bFirstText = true;
                 
-                if(ulCommentMode) {
+                if(ulCommentMode)
                     // Inside comment now
-                    ulCommentMode++;
-                }
+                    ++ulCommentMode;
             }
         }
         
@@ -2283,7 +2241,8 @@ HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
             pos+=5;
 		} else if(!inTag && !ulCommentMode && !ulStyleMode && lpwHTML[pos] == '&' && CHtmlEntity::validateHtmlEntity(std::wstring(lpwHTML + pos, 10)) ) {
 			size_t semicolon = pos;
-			while (lpwHTML[semicolon] && lpwHTML[semicolon] != ';') semicolon++;
+			while (lpwHTML[semicolon] && lpwHTML[semicolon] != ';')
+				++semicolon;
 
             if (lpwHTML[semicolon]) {
                 std::wstring strEntity;
@@ -2322,7 +2281,7 @@ HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
                 strRTF += "}";
                 
             if(pos > 2 && StrCaseCompare(lpwHTML, L"-->", pos-2) && ulCommentMode) {
-                ulCommentMode--;
+                --ulCommentMode;
                 
                 if(ulCommentMode == 1) {
                     ulCommentMode = 0;
@@ -2336,10 +2295,10 @@ HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
             }
 
             if(ulStyleMode == 1)
-                ulStyleMode++;
+                ++ulStyleMode;
                 
             if(ulParMode == 1)
-                ulParMode++;
+                ++ulParMode;
                 
             if(ulStyleMode == 2) {
                 // Output the style content as a tag
@@ -2362,7 +2321,7 @@ HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
         
         
         // Next char
-        pos++;
+        ++pos;
 
         // Set correct state flag (RTF_IN*)
         if(!(type & RTF_FLAG_CLOSE)) {
@@ -2442,7 +2401,7 @@ HRESULT Util::bin2hex(ULONG inLength, LPBYTE input, char **output, void *parent)
 	if (hr != hrSuccess)
 		goto exit;
 
-	for (i = 0, j = 0; i < inLength; i++) {
+	for (i = 0, j = 0; i < inLength; ++i) {
 		buffer[j++] = digits[input[i]>>4];
 		buffer[j++] = digits[input[i]&0x0F];
 	}
@@ -2521,7 +2480,7 @@ HRESULT Util::hex2bin(const char *input, size_t len, LPBYTE output)
 		goto exit;
 	}
 
-	for (i = 0, j = 0; i < len; j++) {
+	for (i = 0, j = 0; i < len; ++j) {
 		output[j] = x2b(input[i++]) << 4;
 		output[j] |= x2b(input[i++]);
 	}
@@ -2703,7 +2662,7 @@ HRESULT Util::FindInterface(LPCIID lpIID, ULONG ulIIDs, LPCIID lpIIDs) {
 	if (!lpIIDs || !lpIID)
 		goto exit;
 
-	for (i = 0; i < ulIIDs; i++) {
+	for (i = 0; i < ulIIDs; ++i) {
 		if (*lpIID == lpIIDs[i]) {
 			hr = hrSuccess;
 			break;
@@ -2790,9 +2749,7 @@ HRESULT Util::CopyRecipients(LPMESSAGE lpSrc, LPMESSAGE lpDest) {
 		goto exit;
 
 exit:
-	if (lpTableColumns)
-		MAPIFreeBuffer(lpTableColumns);
-
+	MAPIFreeBuffer(lpTableColumns);
 	if (lpRows)
 		FreeProws(lpRows);
 
@@ -2846,9 +2803,7 @@ exit:
 		lpSrcInstance->Release();
 	if (lpDstInstance)
 		lpDstInstance->Release();
-	if (lpInstanceID)
-		MAPIFreeBuffer(lpInstanceID);
-
+	MAPIFreeBuffer(lpInstanceID);
 	return hr;
 }
 
@@ -2935,7 +2890,7 @@ HRESULT Util::CopyAttachments(LPMESSAGE lpSrc, LPMESSAGE lpDest, LPSRestriction 
 	if (hr != hrSuccess)
 		goto exit;
 
-	for (ULONG i=0; i < lpRows->cRows; i++) {
+	for (ULONG i = 0; i < lpRows->cRows; ++i) {
 		lpAttachNum = PpropFindProp(lpRows->aRow[i].lpProps, lpRows->aRow[i].cValues, PR_ATTACH_NUM);
 		if (!lpAttachNum) {
 			bPartial = true;
@@ -2986,12 +2941,8 @@ next_attach:
 		hr = MAPI_W_PARTIAL_COMPLETION;
 
 exit:
-	if (lpHasAttach)
-		MAPIFreeBuffer(lpHasAttach);
-
-	if (lpTableColumns)
-		MAPIFreeBuffer(lpTableColumns);
-
+	MAPIFreeBuffer(lpHasAttach);
+	MAPIFreeBuffer(lpTableColumns);
 	if (lpRows)
 		FreeProws(lpRows);
 
@@ -3174,7 +3125,7 @@ HRESULT Util::CopyContents(ULONG ulWhat, LPMAPIFOLDER lpSrc, LPMAPIFOLDER lpDest
 
 		lpDeleteEntries->cValues = 0;
 
-		for (ULONG i = 0; i < lpRowSet->cRows; i++) {
+		for (ULONG i = 0; i < lpRowSet->cRows; ++i) {
 			hr = lpSrc->OpenEntry(lpRowSet->aRow[i].lpProps[0].Value.bin.cb, (LPENTRYID)lpRowSet->aRow[i].lpProps[0].Value.bin.lpb, &IID_IMessage, 0, &ulObj, (LPUNKNOWN*)&lpSrcMessage);
 			if (hr != hrSuccess) {
 				bPartial = true;
@@ -3201,7 +3152,7 @@ HRESULT Util::CopyContents(ULONG ulWhat, LPMAPIFOLDER lpSrc, LPMAPIFOLDER lpDest
 			} else if (ulFlags & MAPI_MOVE) {
 				lpDeleteEntries->lpbin[lpDeleteEntries->cValues].cb = lpRowSet->aRow[i].lpProps[0].Value.bin.cb;
 				lpDeleteEntries->lpbin[lpDeleteEntries->cValues].lpb = lpRowSet->aRow[i].lpProps[0].Value.bin.lpb;
-				lpDeleteEntries->cValues++;
+				++lpDeleteEntries->cValues;
 			}
 next_item:
 			if (lpDestMessage) {
@@ -3230,9 +3181,7 @@ next_item:
 		hr = MAPI_W_PARTIAL_COMPLETION;
 
 exit:
-	if (lpDeleteEntries)
-		MAPIFreeBuffer(lpDeleteEntries);
-
+	MAPIFreeBuffer(lpDeleteEntries);
 	if (lpDestMessage)
 		lpDestMessage->Release();
 
@@ -3484,7 +3433,7 @@ HRESULT Util::DoCopyTo(LPCIID lpSrcInterface, LPVOID lpSrcObj, ULONG ciidExclude
 
 	// filter excludes
 	if (lpExcludeProps || sExtraExcludes.cValues != 0) {
-		for (ULONG i = 0; i < lpSPropTagArray->cValues; i++) {
+		for (ULONG i = 0; i < lpSPropTagArray->cValues; ++i) {
 			if (lpExcludeProps && Util::FindPropInArray(lpExcludeProps, CHANGE_PROP_TYPE(lpSPropTagArray->aulPropTag[i], PT_UNSPECIFIED)) != -1)
 				lpSPropTagArray->aulPropTag[i] = PR_NULL;
 			else if (Util::FindPropInArray((LPSPropTagArray)&sExtraExcludes, CHANGE_PROP_TYPE(lpSPropTagArray->aulPropTag[i], PT_UNSPECIFIED)) != -1)
@@ -3537,10 +3486,7 @@ exit:
 	// Partial warning when data was copied.
 	if (bPartial)
 		hr = MAPI_W_PARTIAL_COMPLETION;
-
-	if (lpSPropTagArray)
-		MAPIFreeBuffer(lpSPropTagArray);
-
+	MAPIFreeBuffer(lpSPropTagArray);
 	if (lpPropSrc)
 		lpPropSrc->Release();
 
@@ -3693,7 +3639,7 @@ HRESULT Util::DoCopyProps(LPCIID lpSrcInterface, LPVOID lpSrcObj, LPSPropTagArra
 		if (hr != hrSuccess)
 			goto exit;
 
-		for (ULONG i = 0; i < lpIncludeProps->cValues; i++) {
+		for (ULONG i = 0; i < lpIncludeProps->cValues; ++i) {
 			if (Util::FindPropInArray(lpsDestPropArray, lpIncludeProps->aulPropTag[i]) != -1) {
 				// hr = MAPI_E_COLLISION;
 				// goto exit;
@@ -3733,7 +3679,7 @@ HRESULT Util::DoCopyProps(LPCIID lpSrcInterface, LPVOID lpSrcObj, LPSPropTagArra
 		}
 	}
 
-	for (ULONG i = 0; i < lpIncludeProps->cValues; i++) {
+	for (ULONG i = 0; i < lpIncludeProps->cValues; ++i) {
 		bool isProblem = false;
 
 		// TODO: ?
@@ -3873,11 +3819,8 @@ next_include_check:
 					goto exit;
 			}
 
-			if (lpAttachMethod) {
-				MAPIFreeBuffer(lpAttachMethod);
-				lpAttachMethod = NULL;
-			}
-
+			MAPIFreeBuffer(lpAttachMethod);
+			lpAttachMethod = NULL;
 			if (lpDestStream) {
 				lpDestStream->Release();
 				lpDestStream = NULL;
@@ -3914,11 +3857,11 @@ next_include_check:
 		goto exit;
 
 	// get named props
-	for (ULONG i = 0; i < cValues; i++) {
+	for (ULONG i = 0; i < cValues; ++i) {
 		lpsDestTagArray->aulPropTag[i] = lpProps[i].ulPropTag;
 
 		if (PROP_ID(lpProps[i].ulPropTag) >= 0x8000)
-			cNames++;
+			++cNames;
 	}
 
 	if (cNames) {
@@ -3928,10 +3871,9 @@ next_include_check:
 
 		lpsSrcNameTagArray->cValues = cNames;
 		cNames = 0;
-		for (ULONG i = 0; i < cValues; i++) {
+		for (ULONG i = 0; i < cValues; ++i)
 			if (PROP_ID(lpProps[i].ulPropTag) >= 0x8000)
 				lpsSrcNameTagArray->aulPropTag[cNames++] = lpProps[i].ulPropTag;
-		}
 
 		// ignore warnings on unknown named properties, but don't copy those either (see PT_ERROR below)
 		hr = lpSrcProp->GetNamesFromIDs(&lpsSrcNameTagArray, NULL, 0, &cNames, &lppNames);
@@ -3943,7 +3885,7 @@ next_include_check:
 			goto exit;
 
 		// make new lookup map for lpProps[] -> lpsDestNameTag[]
-		for (ULONG i=0, j=0; i < cValues && j < cNames; i++) {
+		for (ULONG i = 0, j = 0; i < cValues && j < cNames; ++i) {
 			if (PROP_ID(lpProps[i].ulPropTag) == PROP_ID(lpsSrcNameTagArray->aulPropTag[j])) {
 				if (PROP_TYPE(lpsDestNameTagArray->aulPropTag[j]) != PT_ERROR) {
 					// replace with new proptag, so we can open the correct property
@@ -3953,7 +3895,7 @@ next_include_check:
 					lpsDestTagArray->aulPropTag[i] = PROP_TAG(PT_ERROR, PROP_ID(lpsDestNameTagArray->aulPropTag[j]));
 					// don't even return a warning because although not all data could be copied
 				}
-				j++;
+				++j;
 			}
 		}
 	}
@@ -3967,7 +3909,7 @@ next_include_check:
 	}
 
 	// find all MAPI_E_NOT_ENOUGH_MEMORY errors
-	for (ULONG i = 0; i < cValues; i++) {
+	for (ULONG i = 0; i < cValues; ++i) {
 		if (PROP_TYPE(lpProps[i].ulPropTag) == PT_ERROR && (lpProps[i].Value.err == MAPI_E_NOT_ENOUGH_MEMORY || 
 			(PROP_ID(lpProps[i].ulPropTag) == PROP_ID(PR_BODY) || 
 			 PROP_ID(lpProps[i].ulPropTag) == PROP_ID(PR_HTML) ||
@@ -4002,8 +3944,8 @@ next_stream_prop:
 		}
 	}
 
-	// set destination proptags in orignal properties
-	for (ULONG i=0; i < cValues; i++) {
+	// set destination proptags in original properties
+	for (ULONG i = 0; i < cValues; ++i) {
 		lpProps[i].ulPropTag = lpsDestTagArray->aulPropTag[i];
 
 		// Reset PT_ERROR properties because outlook xp pst doesn't support to set props this.
@@ -4029,27 +3971,18 @@ exit:
 
 	if (hr != hrSuccess) {
 		// may not return a problem set when we have an warning/error code in hr
-		if (lpProblems)
-			MAPIFreeBuffer(lpProblems);
+		MAPIFreeBuffer(lpProblems);
 	} else {
 		if (lppProblems)
 			*lppProblems = lpProblems;
-		else if (lpProblems)
+		else
 			MAPIFreeBuffer(lpProblems);
 	}
 
-	if (lppNames)
-		MAPIFreeBuffer(lppNames);
-
-	if (lpsSrcNameTagArray)
-		MAPIFreeBuffer(lpsSrcNameTagArray);
-
-	if (lpsDestNameTagArray)
-		MAPIFreeBuffer(lpsDestNameTagArray);
-
-	if (lpsDestTagArray)
-		MAPIFreeBuffer(lpsDestTagArray);
-
+	MAPIFreeBuffer(lppNames);
+	MAPIFreeBuffer(lpsSrcNameTagArray);
+	MAPIFreeBuffer(lpsDestNameTagArray);
+	MAPIFreeBuffer(lpsDestTagArray);
 	if (lpSrcMessage)
 		lpSrcMessage->Release();
 
@@ -4061,28 +3994,17 @@ exit:
 
 	if (lpDestStream)
 		lpDestStream->Release();
-
-	if (lpAttachMethod)
-		MAPIFreeBuffer(lpAttachMethod);
-
+	MAPIFreeBuffer(lpAttachMethod);
 	if (lpSrcProp)
 		lpSrcProp->Release();
 
 	if (lpDestProp)
 		lpDestProp->Release();
-
-	if (lpProps)
-		MAPIFreeBuffer(lpProps);
-
-	if (lpsDestPropArray)
-		MAPIFreeBuffer(lpsDestPropArray);
-
+	MAPIFreeBuffer(lpProps);
+	MAPIFreeBuffer(lpsDestPropArray);
 	if (lpZarafa)
 		lpZarafa->Release();
-
-	if (lpZObj)
-		MAPIFreeBuffer(lpZObj);
-
+	MAPIFreeBuffer(lpZObj);
 	return hr;
 }
 
@@ -4138,10 +4060,7 @@ exit:
 
 	if (lpSrcStream)
 		lpSrcStream->Release();
-
-	if (lpIMAPProps)
-		MAPIFreeBuffer(lpIMAPProps);
-
+	MAPIFreeBuffer(lpIMAPProps);
 	return hr;
 }
 
@@ -4167,10 +4086,11 @@ HRESULT Util::HrDeleteIMAPData(LPMESSAGE lpMsg)
  * 
  * @return MAPI error code
  */
-HRESULT Util::HrGetQuotaStatus(IMsgStore *lpMsgStore, LPECQUOTA lpsQuota, LPECQUOTASTATUS *lppsQuotaStatus)
+HRESULT Util::HrGetQuotaStatus(IMsgStore *lpMsgStore, ECQUOTA *lpsQuota,
+    ECQUOTASTATUS **lppsQuotaStatus)
 {
 	HRESULT			hr = hrSuccess;
-	LPECQUOTASTATUS	lpsQuotaStatus = NULL;
+	ECQUOTASTATUS *lpsQuotaStatus = NULL;
 	LPSPropValue 	lpProps = NULL;
     SizedSPropTagArray(1, sptaProps) = {1, {PR_MESSAGE_SIZE_EXTENDED}};
     ULONG 			cValues = 0;
@@ -4209,12 +4129,8 @@ HRESULT Util::HrGetQuotaStatus(IMsgStore *lpMsgStore, LPECQUOTA lpsQuota, LPECQU
 	lpsQuotaStatus = NULL;
 	
 exit:
-	if (lpsQuotaStatus)
-		MAPIFreeBuffer(lpsQuotaStatus);
-		
-	if (lpProps)
-		MAPIFreeBuffer(lpProps);
-
+	MAPIFreeBuffer(lpsQuotaStatus);
+	MAPIFreeBuffer(lpProps);
 	return hr;
 }
 
@@ -4303,18 +4219,10 @@ HRESULT Util::HrDeleteResidualProps(LPMESSAGE lpDestMsg, LPMESSAGE lpSourceMsg, 
 	hr = lpDestMsg->SaveChanges(KEEP_OPEN_READWRITE);
 
 exit:
-	if (lpsMappedPropArray)
-		MAPIFreeBuffer(lpsMappedPropArray);
-
-	if (lppPropNames)
-		MAPIFreeBuffer(lppPropNames);
-
-	if (lpsNamedPropArray)
-		MAPIFreeBuffer(lpsNamedPropArray);
-
-	if (lpsPropArray)
-		MAPIFreeBuffer(lpsPropArray);
-
+	MAPIFreeBuffer(lpsMappedPropArray);
+	MAPIFreeBuffer(lppPropNames);
+	MAPIFreeBuffer(lpsNamedPropArray);
+	MAPIFreeBuffer(lpsPropArray);
 	return hr;
 }
 
@@ -4343,7 +4251,7 @@ HRESULT Util::HrFindEntryIDs(ULONG cbEID, LPENTRYID lpEID, ULONG cbEntryIDs, LPS
 		goto exit;
 	}
 
-	for (i = 0; bFound == FALSE && i < cbEntryIDs; i++) {
+	for (i = 0; bFound == FALSE && i < cbEntryIDs; ++i) {
 		if (PROP_TYPE(lpEntryIDs[i].ulPropTag) != PT_BINARY)
 			continue;
 		if (cbEID != lpEntryIDs[i].Value.bin.cb)

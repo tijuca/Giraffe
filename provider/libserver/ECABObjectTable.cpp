@@ -1,56 +1,30 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include "Zarafa.h"
-#include "ZarafaCode.h"
+#include <zarafa/ZarafaCode.h>
 
 #include <mapidefs.h>
 #include <mapitags.h>
-#include "mapiext.h"
+#include <zarafa/mapiext.h>
 
-#include <EMSAbTag.h>
+#include <zarafa/EMSAbTag.h>
 
 #include "SOAPUtils.h"
 #include "ECABObjectTable.h"
@@ -58,7 +32,7 @@
 
 #include "ECSession.h"
 #include "ECSessionManager.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -110,7 +84,7 @@ ECABObjectTable::ECABObjectTable(ECSession *lpSession, unsigned int ulABId, unsi
 
 	struct sortOrderArray sDefaultSortOrder = {
 		sObjectType,
-		sizeof(sObjectType) / sizeof(sObjectType[0]),
+		ARRAY_SIZE(sObjectType),
 	};
 
 	SetSortOrder(&sDefaultSortOrder, 0, 0);
@@ -118,8 +92,7 @@ ECABObjectTable::ECABObjectTable(ECSession *lpSession, unsigned int ulABId, unsi
 
 ECABObjectTable::~ECABObjectTable()
 {
-	if(m_lpObjectData)
-		delete (ECODAB*)m_lpObjectData;
+	delete (ECODAB *)m_lpObjectData;
 }
 
 ECRESULT ECABObjectTable::Create(ECSession *lpSession, unsigned int ulABId, unsigned int ulABType, unsigned int ulABParentId, unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale, ECABObjectTable **lppTable)
@@ -134,7 +107,7 @@ ECRESULT ECABObjectTable::Create(ECSession *lpSession, unsigned int ulABId, unsi
 ECRESULT ECABObjectTable::GetColumnsAll(ECListInt* lplstProps)
 {
 	ECRESULT		er = erSuccess;
-	ECObjectTableMap::iterator		iterObjects;
+	ECObjectTableMap::const_iterator iterObjects;
 	ECODAB *lpODAB = (ECODAB*)m_lpObjectData;
 
 	pthread_mutex_lock(&m_hLock);
@@ -177,7 +150,7 @@ ECRESULT ECABObjectTable::ReloadTableMVData(ECObjectTableList* lplistRows, ECLis
 	ECRESULT			er = erSuccess;
 	ECListIntIterator	iterListMVPropTag;
 
-	ECObjectTableList::iterator	iterListRows;
+	ECObjectTableList::const_iterator iterListRows;
 
 	ASSERT(lplistMVPropTag->size() <2); //FIXME: Limit of one 1 MV column
 
@@ -193,10 +166,10 @@ ECRESULT ECABObjectTable::GetMVRowCount(unsigned int ulObjId, unsigned int *lpul
 {
 	ECRESULT er = erSuccess;
     ECObjectTableList			listRows;
-	ECObjectTableList::iterator iterListRows;
-	ECObjectTableMap::iterator		iterIDs;
+	ECObjectTableList::const_iterator iterListRows;
+	ECObjectTableMap::const_iterator iterIDs;
 
-	ECListInt::iterator	iterListMVPropTag;
+	ECListInt::const_iterator iterListMVPropTag;
 
 	pthread_mutex_lock(&m_hLock);
 
@@ -235,7 +208,7 @@ struct filter_objects {
 	unsigned int m_ulFlags;
 	filter_objects(unsigned int ulFlags) : m_ulFlags(ulFlags) {}
 
-	bool operator()(const localobjectdetails_t &details)
+	bool operator()(const localobjectdetails_t &details) const
 	{
 		return
 			((m_ulFlags & AB_FILTER_SYSTEM) &&
@@ -279,9 +252,7 @@ ECRESULT ECABObjectTable::LoadHierarchyAddressList(unsigned int ulObjectId, unsi
 	}
 
 exit:
-	if (lpObjects)
-		delete lpObjects;
-
+	delete lpObjects;
 	return er;
 }
 
@@ -317,9 +288,7 @@ ECRESULT ECABObjectTable::LoadHierarchyCompany(unsigned int ulObjectId, unsigned
 	}
 
 exit:
-	if (lpObjects)
-		delete lpObjects;
-
+	delete lpObjects;
 	return er;
 }
 
@@ -361,10 +330,17 @@ ECRESULT ECABObjectTable::LoadHierarchyContainer(unsigned int ulObjectId, unsign
 		 *    in the hierarchy view. The user will not be allowed to open it, so it isn't a real security risk,
 		 *    but since we still have issue (1) open, we might as well disable the hierarchy view
 		 *    containers completely. */
+#ifdef HAVE_OFFLINE_SUPPORT
+		lpObjects = new std::list<localobjectdetails_t>();
+#else
 		er = LoadHierarchyCompany(ulObjectId, ulFlags, &lpObjects);
 		if (er != erSuccess)
 			goto exit;
+#endif
 	} else if (ulObjectId == ZARAFA_UID_GLOBAL_ADDRESS_LISTS) {
+#ifdef HAVE_OFFLINE_SUPPORT
+		lpObjects = new std::list<localobjectdetails_t>();
+#else
 		if (lpSession->GetSecurity()->GetUserId() == ZARAFA_UID_SYSTEM) {
 			er = ZARAFA_E_INVALID_PARAMETER;
 			goto exit;
@@ -373,6 +349,7 @@ ECRESULT ECABObjectTable::LoadHierarchyContainer(unsigned int ulObjectId, unsign
 		er = LoadHierarchyAddressList(ulObjectId, ulFlags, &lpObjects);
 		if (er != erSuccess)
 			goto exit;
+#endif
 	} else {
 		/*
 		 * Normal container
@@ -387,9 +364,7 @@ ECRESULT ECABObjectTable::LoadHierarchyContainer(unsigned int ulObjectId, unsign
 	}
 
 exit:
-	if (lpObjects)
-		delete lpObjects;
-
+	delete lpObjects;
 	return er;
 }
 
@@ -414,9 +389,7 @@ ECRESULT ECABObjectTable::LoadContentsAddressList(unsigned int ulObjectId, unsig
 	}
 
 exit:
-	if (lpObjects)
-		delete lpObjects;
-
+	delete lpObjects;
 	return er;
 }
 
@@ -441,9 +414,7 @@ ECRESULT ECABObjectTable::LoadContentsCompany(unsigned int ulObjectId, unsigned 
 	}
 
 exit:
-	if (lpObjects)
-		delete lpObjects;
-
+	delete lpObjects;
 	return er;
 }
 
@@ -468,9 +439,7 @@ ECRESULT ECABObjectTable::LoadContentsDistlist(unsigned int ulObjectId, unsigned
 	}
 
 exit:
-	if (lpObjects)
-		delete lpObjects;
-
+	delete lpObjects;
 	return er;
 }
 
@@ -481,7 +450,7 @@ ECRESULT ECABObjectTable::Load()
 	sObjectTableKey sRowItem;
 
 	std::list<localobjectdetails_t> *lpObjects = NULL;
-	std::list<localobjectdetails_t>::iterator iterObjects;
+	std::list<localobjectdetails_t>::const_iterator iterObjects;
 	std::list<unsigned int> lstObjects;
 	unsigned int ulObjectId = 0;
 	unsigned int ulObjectFilter = 0;
@@ -491,9 +460,9 @@ ECRESULT ECABObjectTable::Load()
 	if(lpODAB->ulABParentId != 0 && parseBool(lpSession->GetSessionManager()->GetConfig()->GetSetting("enable_gab")) == false && lpSession->GetSecurity()->GetAdminLevel() == 0)
 	    goto exit;
 
-    er = lpSession->GetSecurity()->IsUserObjectVisible(lpODAB->ulABParentId);
-    if (er != erSuccess)
-        goto exit;
+	er = lpSession->GetSecurity()->IsUserObjectVisible(lpODAB->ulABParentId);
+	if (er != erSuccess)
+		goto exit;
 
 	/*
 	 * Check if we are loading the contents or hierarchy
@@ -589,7 +558,7 @@ ECRESULT ECABObjectTable::Load()
 		}
 	}
 
-	for (iterObjects = lpObjects->begin(); iterObjects != lpObjects->end(); iterObjects++) {
+	for (iterObjects = lpObjects->begin(); iterObjects != lpObjects->end(); ++iterObjects) {
 		/* Only add visible items */
 		if (lpSession->GetSecurity()->IsUserObjectVisible(iterObjects->ulId) != erSuccess)
 			continue;
@@ -600,8 +569,6 @@ ECRESULT ECABObjectTable::Load()
 	er = LoadRows(&lstObjects, 0);
 
 exit:
-	if(lpObjects)
-		delete lpObjects;
-
+	delete lpObjects;
 	return er;
 }

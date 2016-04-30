@@ -1,69 +1,43 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ClientUtil.h"
 
-#include "ECGetText.h"
+#include <zarafa/ECGetText.h>
 
 #include <mapi.h>
 #include <mapidefs.h>
 #include <mapiutil.h>
 
-#include "CommonUtil.h"
+#include <zarafa/CommonUtil.h>
 #include "WSTransport.h"
-#include "ECConfig.h"
+#include <zarafa/ECConfig.h>
 
 #include "Zarafa.h"
-#include "ECGuid.h"
-#include "edkguid.h"
-#include "mapiguidext.h"
-#include "mapiext.h"
+#include <zarafa/ECGuid.h>
+#include <edkguid.h>
+#include <zarafa/mapiguidext.h>
+#include <zarafa/mapiext.h>
 
 #include "Mem.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 
-#include "charset/convstring.h"
+#include <zarafa/charset/convstring.h>
 #include "EntryPoint.h"
 
 #include <boost/algorithm/string/case_conv.hpp>
@@ -100,7 +74,7 @@ HRESULT ClientUtil::HrInitializeStatusRow (const char * lpszProviderDisplay, ULO
 		if(hResult != hrSuccess)
 			goto exit;
 		memcpy(lpspvStatusRow[cCurVal].Value.lpszA, lpszProviderDisplay, size);
-		cCurVal++;
+		++cCurVal;
 
 	// Set the PR_DISPLAY_NAME property
 		lpspvStatusRow[cCurVal].ulPropTag = PR_DISPLAY_NAME_A;
@@ -108,7 +82,7 @@ HRESULT ClientUtil::HrInitializeStatusRow (const char * lpszProviderDisplay, ULO
 		if(hResult != hrSuccess)
 			goto exit;
 		memcpy(lpspvStatusRow[cCurVal].Value.lpszA, lpszProviderDisplay, size);
-		cCurVal++;
+		++cCurVal;
 	}
 
 	// PR_PROVIDER_DLL_NAME
@@ -148,9 +122,7 @@ HRESULT ClientUtil::HrInitializeStatusRow (const char * lpszProviderDisplay, ULO
 	hResult = lpMAPISup->ModifyStatusRow(cCurVal, lpspvStatusRow, ulFlags);
 
 exit:
-	if(lpspvStatusRow)
-		MAPIFreeBuffer(lpspvStatusRow);
-
+	MAPIFreeBuffer(lpspvStatusRow);
 	return hResult;
 }
 
@@ -163,7 +135,7 @@ HRESULT ClientUtil::HrSetIdentity(WSTransport *lpTransport, LPMAPISUP lpMAPISup,
 	ULONG			cbEID = 0;
 	ULONG			cValues = 0;
 	ULONG			ulSize = 0;
-	LPECUSER		lpUser = NULL;
+	ECUSER *lpUser = NULL;
 	tstring			strProfileSenderSearchKey;
 	LPSPropValue	lpIdentityProps = NULL;
 
@@ -246,16 +218,9 @@ exit:
 		MAPIFreeBuffer(lpIdentityProps);
 		*lppIdentityProps = NULL;	// just to be sure...
 	}
-
-	if(lpEntryStore)
-		MAPIFreeBuffer(lpEntryStore);
-
-	if(lpEID)
-		MAPIFreeBuffer(lpEID);
-
-	if (lpUser)
-		MAPIFreeBuffer(lpUser);
-
+	MAPIFreeBuffer(lpEntryStore);
+	MAPIFreeBuffer(lpEID);
+	MAPIFreeBuffer(lpUser);
 	return hr;
 }
 
@@ -509,7 +474,8 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 
 		lpDestPropValue[ulCurDestValues++].ulPropTag = PR_CONVERSATION_INDEX;
 
-		if(lpByteTmp){ MAPIFreeBuffer(lpByteTmp); lpByteTmp = NULL;}
+		MAPIFreeBuffer(lpByteTmp);
+		lpByteTmp = NULL;
 	}
 
 	if(lpSrcPropValue[RR_IMPORTANCE].ulPropTag == PR_IMPORTANCE)
@@ -674,16 +640,9 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 exit:
 	if(lpBodyStream)
 		lpBodyStream->Release();
-
-	if(lpDestPropValue)
-		MAPIFreeBuffer(lpDestPropValue);
-	
-	if(lpSrcPropValue)
-		MAPIFreeBuffer(lpSrcPropValue);
-
-	if(lpByteTmp)
-		MAPIFreeBuffer(lpByteTmp);
-
+	MAPIFreeBuffer(lpDestPropValue);
+	MAPIFreeBuffer(lpSrcPropValue);
+	MAPIFreeBuffer(lpByteTmp);
 	if(lpMods)
 		FreePadrlist(lpMods);	
 
@@ -821,15 +780,9 @@ HRESULT ClientUtil::GetGlobalProfileProperties(LPPROFSECT lpGlobalProfSect, stru
 	hr = hrSuccess;
 
 exit:
-	if(lpPropEMS)
-		MAPIFreeBuffer(lpPropEMS);
-
-	if(lpsPropArray)
-		MAPIFreeBuffer(lpsPropArray);
-
-	if(lpsEMSPropArray)
-		MAPIFreeBuffer(lpsEMSPropArray);
-
+	MAPIFreeBuffer(lpPropEMS);
+	MAPIFreeBuffer(lpsPropArray);
+	MAPIFreeBuffer(lpsEMSPropArray);
 	return hr;
 }
 
@@ -868,9 +821,7 @@ HRESULT ClientUtil::GetGlobalProfileDeligateStoresProp(LPPROFSECT lpGlobalProfSe
 	hr = hrSuccess;
 
 exit:
-	if(lpsPropValue)
-		MAPIFreeBuffer(lpsPropValue);
-
+	MAPIFreeBuffer(lpsPropValue);
 	return hr;
 }
 
@@ -882,7 +833,32 @@ exit:
  */
 HRESULT ClientUtil::GetConfigPath(std::string *lpConfigPath)
 {
+#ifdef WIN32
+	HRESULT hr = hrSuccess;
+	HKEY hKey = NULL;
+	char szDir[MAX_PATH];
+	ULONG cbDir = 0;
+
+	hr = RegOpenKeyExA(HKEY_LOCAL_MACHINE, "Software\\Zarafa\\ExchangeRedirector", 0, KEY_READ, &hKey);
+	if(hr != hrSuccess)
+		goto exit;
+
+	cbDir = MAX_PATH;
+
+	hr = RegQueryValueExA(hKey, "InstallDir", NULL, NULL, (BYTE*)szDir, &cbDir);
+	if(hr != hrSuccess)
+		goto exit;
+
+	lpConfigPath->assign(szDir);
+
+exit:
+	if(hKey)
+		RegCloseKey(hKey);
+
+	return hr;
+#else
 	return MAPI_E_NO_SUPPORT;
+#endif
 }
 
 /**
@@ -915,9 +891,9 @@ HRESULT ClientUtil::ConvertMSEMSProps(ULONG cValues, LPSPropValue pValues, ULONG
 		{ "server_address", "" },
 		{ "log_method","file" },
 		{ "log_file","-" },
-		{ "log_level","2", CONFIGSETTING_RELOADABLE },
+		{ "log_level", "3", CONFIGSETTING_RELOADABLE },
 		{ "log_timestamp","1" },
-		{ "log_buffer_size",	"4096" },
+		{ "log_buffer_size", "0" },
 		{ NULL, NULL },
 	};
 	ECConfig *lpConfig = ECConfig::Create(settings);
@@ -965,7 +941,7 @@ HRESULT ClientUtil::ConvertMSEMSProps(ULONG cValues, LPSPropValue pValues, ULONG
 	if (hr != hrSuccess)
 		goto exit;
 
-	if (strlen(lpConfig->GetSetting("server_address")) > 0) {
+	if (lpConfig->GetSetting("server_address")[0]) {
 		strServerPath = (std::string)"https://" + lpConfig->GetSetting("server_address") + ":" + lpConfig->GetSetting("ssl_port") + "/zarafa";
 	} else {
 		if(!lpServer) {
@@ -1023,12 +999,9 @@ HRESULT ClientUtil::ConvertMSEMSProps(ULONG cValues, LPSPropValue pValues, ULONG
 	*lppProps = lpProps;
 
 exit:
-	if (hr != hrSuccess && lpProps)
+	if (hr != hrSuccess)
 		MAPIFreeBuffer(lpProps);
-
-	if(lpConfig)
-		delete lpConfig;
-
+	delete lpConfig;
 	return hr;
 }
 
@@ -1039,26 +1012,21 @@ Zarafa entryid functions
 
 HRESULT HrCreateEntryId(GUID guidStore, unsigned int ulObjType, ULONG* lpcbEntryId, LPENTRYID* lppEntryId)
 {
-	HRESULT		hr = hrSuccess;
+	HRESULT		hr;
 	EID			eid;
 	ULONG		cbEntryId = 0;
 	LPENTRYID	lpEntryId = NULL;
 
-	if(lpcbEntryId == NULL || lppEntryId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if(CoCreateGuid(&eid.uniqueId) != hrSuccess) {
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
-	}
+	if (lpcbEntryId == NULL || lppEntryId == NULL)
+		return MAPI_E_INVALID_PARAMETER;
+	if (CoCreateGuid(&eid.uniqueId) != hrSuccess)
+		return MAPI_E_CALL_FAILED;
 
 	cbEntryId = CbNewEID("");
 
 	hr = ECAllocateBuffer(cbEntryId, (void**)&lpEntryId); 
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	eid.guid = guidStore;
 	eid.usType = ulObjType;
@@ -1067,10 +1035,7 @@ HRESULT HrCreateEntryId(GUID guidStore, unsigned int ulObjType, ULONG* lpcbEntry
 
 	*lpcbEntryId = cbEntryId;
 	*lppEntryId = lpEntryId;
-
-exit:
-
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -1090,7 +1055,6 @@ exit:
  */
 HRESULT HrGetServerURLFromStoreEntryId(ULONG cbEntryId, LPENTRYID lpEntryId, std::string& rServerPath, bool *lpbIsPseudoUrl)
 {
-	HRESULT	hr = hrSuccess;
 	PEID	peid = (PEID)lpEntryId;
 	EID_V0*	peid_V0 = NULL;
 
@@ -1099,10 +1063,8 @@ HRESULT HrGetServerURLFromStoreEntryId(ULONG cbEntryId, LPENTRYID lpEntryId, std
 	char*	lpTmpServerName = NULL;
 	bool	bIsPseudoUrl = false;
 
-	if (lpEntryId == NULL || lpbIsPseudoUrl == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpEntryId == NULL || lpbIsPseudoUrl == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	if (peid->ulVersion == 0) 
 	{
@@ -1117,26 +1079,18 @@ HRESULT HrGetServerURLFromStoreEntryId(ULONG cbEntryId, LPENTRYID lpEntryId, std
 		lpTmpServerName = (char*)peid->szServer;
 	}
 
-	if (ulSize >= ulMaxSize) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
+	if (ulSize >= ulMaxSize)
+		return MAPI_E_NOT_FOUND;
 	if (strnicmp(lpTmpServerName, "pseudo://", 9) == 0)
 		bIsPseudoUrl = true;
 	else if (strnicmp(lpTmpServerName, "http://", 7) && 
 			 strnicmp(lpTmpServerName, "https://", 8) && 
 			 strnicmp(lpTmpServerName, "file://", 7))
-	{
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
+		return MAPI_E_NOT_FOUND;
 
 	rServerPath = lpTmpServerName;
 	*lpbIsPseudoUrl = bIsPseudoUrl;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -1186,26 +1140,13 @@ exit:
 
 HRESULT HrCompareEntryIdWithStoreGuid(ULONG cbEntryID, LPENTRYID lpEntryID, LPCGUID guidStore)
 {
-	HRESULT hr = hrSuccess;
-
-	if (lpEntryID == NULL || guidStore == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if (cbEntryID < 20) {
-		hr = MAPI_E_INVALID_ENTRYID;
-		goto exit;
-	}
-
-	if (memcmp(lpEntryID->ab, guidStore, sizeof(GUID)) != 0) {
-		hr = MAPI_E_INVALID_ENTRYID;
-		goto exit;
-	}
-
-exit:
-
-	return hr;
+	if (lpEntryID == NULL || guidStore == NULL)
+		return MAPI_E_INVALID_PARAMETER;
+	if (cbEntryID < 20)
+		return MAPI_E_INVALID_ENTRYID;
+	if (memcmp(lpEntryID->ab, guidStore, sizeof(GUID)) != 0)
+		return MAPI_E_INVALID_ENTRYID;
+	return hrSuccess;
 }
 
 HRESULT GetPublicEntryId(enumPublicEntryID ePublicEntryID, GUID guidStore, void *lpBase, ULONG *lpcbEntryID, LPENTRYID *lppEntryID)
@@ -1228,16 +1169,12 @@ HRESULT GetPublicEntryId(enumPublicEntryID ePublicEntryID, GUID guidStore, void 
 			eid.uniqueId.Data4[7] = 3;
 			break;
 		default:
-			hr = MAPI_E_INVALID_PARAMETER;
-			goto exit;
-			break;
+			return MAPI_E_INVALID_PARAMETER;
 	}
 
 
-	if (lpcbEntryID == NULL || lppEntryID == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpcbEntryID == NULL || lppEntryID == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	cbEntryID = CbEID(&eid);
 
@@ -1246,15 +1183,13 @@ HRESULT GetPublicEntryId(enumPublicEntryID ePublicEntryID, GUID guidStore, void 
 	else
 		hr = MAPIAllocateBuffer(cbEntryID, (void**)&lpEntryID);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	memcpy(lpEntryID, &eid, cbEntryID);
 
 	*lpcbEntryID = cbEntryID;
 	*lppEntryID = lpEntryID;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 BOOL CompareMDBProvider(LPBYTE lpguid, const GUID *lpguidZarafa) {
@@ -1265,5 +1200,13 @@ BOOL CompareMDBProvider(MAPIUID* lpguid, const GUID *lpguidZarafa)
 {
 	if (memcmp(lpguid, lpguidZarafa, sizeof(GUID)) == 0)
 		return TRUE;
+#ifdef WIN32
+		if ((memcmp(lpguidZarafa, &ZARAFA_SERVICE_GUID, sizeof(GUID)) == 0 && memcmp(lpguid, &MSEMS_SERVICE_GUID, sizeof(GUID)) == 0) ||
+			(memcmp(lpguidZarafa, &ZARAFA_STORE_PUBLIC_GUID, sizeof(GUID)) == 0 && memcmp(lpguid, &MSEMS_PUBLIC_STORE_GUID, sizeof(GUID)) == 0) ||
+			(memcmp(lpguidZarafa, &ZARAFA_STORE_DELEGATE_GUID, sizeof(GUID)) == 0 && memcmp(lpguid, &MSEMS_DELEGATE_GUID, sizeof(GUID)) == 0) )
+		{
+			return TRUE;
+		}
+#endif
 	return FALSE;
 }

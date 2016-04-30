@@ -6,7 +6,7 @@
 # description: The Zarafa Presence Daemon
 # processname: /usr/sbin/zarafa-presence
 # config: /etc/zarafa/presence.cfg
-# pidfile: /var/run/zarafa-presence.pid
+# pidfile: /var/run/zarafad/presence.pid
 
 ### BEGIN INIT INFO
 # Provides: zarafa-presence
@@ -38,11 +38,12 @@ fi
 RETVAL=0
 presence=`basename $PRESENCEPROGRAM`
 lockfile=/var/lock/subsys/$presence
-pidfile=/var/run/$presence.pid
+pidfile=/var/run/zarafad/presence.pid
 
 start() {
 	# Start in background, always succeeds
 	echo -n $"Starting $presence: "
+	install -dm0775 -o zarafa -g zarafa /var/run/zarafad
 	export LC_ALL=$ZARAFA_LOCALE
 	export LANG=$ZARAFA_LOCALE
 	daemon $PRESENCEPROGRAM $PRESENCECONFIG_OPT

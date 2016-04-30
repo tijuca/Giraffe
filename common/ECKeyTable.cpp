@@ -1,58 +1,24 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
-
-#include <utility>
-#include <algorithm>
-
-#include <list>
-#include <map>
+#include <zarafa/platform.h>
 #include <cassert>
-
-#include "ECKeyTable.h" 
-#include "ustringutil.h"
-
+#include <zarafa/ECKeyTable.h> 
+#include <zarafa/ustringutil.h>
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
@@ -158,7 +124,7 @@ void ECTableRow::initSortCols(unsigned int ulSortCols, const int *lpSortLen,
 		memcpy(this->lpSortLen, lpSortLen, sizeof(unsigned int) * ulSortCols);
 
 	// Copy sort keys
-	for(i=0;i<ulSortCols;i++) {
+	for (i = 0; i < ulSortCols; ++i) {
 		len = lpSortLen[i];
 		len = len < 0 ? -len : len;
 
@@ -198,19 +164,15 @@ void ECTableRow::freeSortCols()
 {
 	unsigned int i=0;
 
-	if(lpSortLen)
-		delete [] lpSortLen;
-
+	delete[] lpSortLen;
 	if(lppSortKeys)
 	{
-		for(i=0;i<ulSortCols;i++)
+		for (i = 0; i < ulSortCols; ++i)
 			delete [] lppSortKeys[i];
 
 		delete [] lppSortKeys;
 	}
-
-	if(lpFlags)
-		delete [] lpFlags;
+	delete[] lpFlags;
 }
 
 ECTableRow::~ECTableRow()
@@ -251,7 +213,7 @@ bool ECTableRow::rowcompare(unsigned int ulSortColsA, const int *lpSortLenA,
 	
 	ulSortCols = ulSortColsA < ulSortColsB ? ulSortColsA : ulSortColsB;
 
-	for(i=0;i<ulSortCols;i++) {
+	for (i = 0; i < ulSortCols; ++i) {
 	    int cmp = 0;
 	    
 	    if(lpSortFlagsA && lpSortFlagsA[i] & TABLEROW_FLAG_FLOAT) {
@@ -330,16 +292,15 @@ bool ECTableRow::operator <(const ECTableRow &other) const
  *
  * @return Object size in bytes
  */
-unsigned int ECTableRow::GetObjectSize()
+unsigned int ECTableRow::GetObjectSize(void) const
 {
 	unsigned int ulSize = sizeof(*this);
 
 	if (ulSortCols > 0)
 	{
 		ulSize+= (sizeof(unsigned char) + sizeof(unsigned char) + sizeof(unsigned int)) * ulSortCols; // flag, SortKey, Sortlen
-		for(unsigned int i=0; i<ulSortCols; i++) {
+		for (unsigned int i = 0; i < ulSortCols; ++i)
 			ulSize += lpSortLen[i];
-		}
 	}
 
 	return ulSize;
@@ -368,10 +329,7 @@ ECKeyTable::ECKeyTable()
 ECKeyTable::~ECKeyTable()
 {
 	Clear();
-
-	if(lpRoot)
-		delete lpRoot;
-
+	delete lpRoot;
 	pthread_mutex_destroy(&mLock);
 }
 
@@ -603,8 +561,7 @@ ECRESULT ECKeyTable::UpdateRow(UpdateType ulType,
 				}
 				
 				// Delete the unused new node
-				if(lpNewRow) delete lpNewRow;
-
+				delete lpNewRow;
 				goto exit;
 			} else {
 				// new row data is different, so delete the old row now
@@ -866,12 +823,11 @@ exit:
 // Intern function, no locking
 ECRESULT ECKeyTable::InvalidateBookmark(ECTableRow *lpRow)
 {
-	ECRESULT er = erSuccess;
 	ECBookmarkMap::iterator	iPosition, iRemove;
 
 	// Nothing todo
 	if (m_mapBookmarks.empty())
-		goto exit;
+		return erSuccess;
 
 	for(iPosition = m_mapBookmarks.begin(); iPosition != m_mapBookmarks.end(); )
 	{
@@ -879,12 +835,10 @@ ECRESULT ECKeyTable::InvalidateBookmark(ECTableRow *lpRow)
 			iRemove = iPosition++;
 			m_mapBookmarks.erase(iRemove);
 		} else {
-			iPosition++;
+			++iPosition;
 		}
 	}
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 
@@ -1017,22 +971,19 @@ exit:
 // Intern function, no locking
 ECRESULT ECKeyTable::CurrentRow(ECTableRow *lpRow, unsigned int *lpulCurrentRow)
 {
-	ECRESULT er = erSuccess;
 	unsigned int ulCurrentRow = 0;
 
-	if (lpulCurrentRow == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpulCurrentRow == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	if(lpRow == NULL) {
 		*lpulCurrentRow = lpRoot->ulBranchCount;
-		goto exit;
+		return erSuccess;
 	}
 
 	if(lpRow == lpRoot) {
 		*lpulCurrentRow = 0;
-		goto exit;
+		return erSuccess;
 	}
 
 	if (lpRow->lpLeft)
@@ -1047,9 +998,7 @@ ECRESULT ECKeyTable::CurrentRow(ECTableRow *lpRow, unsigned int *lpulCurrentRow)
 	}
 
 	*lpulCurrentRow = ulCurrentRow;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 /*
@@ -1081,7 +1030,7 @@ ECRESULT ECKeyTable::QueryRows(unsigned int ulRows, ECObjectTableList* lpRowList
 		
 		if(!lpCurrent->fHidden || bShowHidden) {
     		lpRowList->push_back(lpCurrent->sKey);
-    		ulRows--;
+		--ulRows;
         }
 		
 		if(bDirBackward == true && lpCurrent == lpRoot->lpRight)
@@ -1566,7 +1515,7 @@ unsigned int ECKeyTable::GetObjectSize()
 	
 	ulSize += MEMORY_USAGE_MAP(mapRow.size(), ECTableRowMap);
 
-	for(iterRow = mapRow.begin(); iterRow != mapRow.end(); iterRow++)
+	for (iterRow = mapRow.begin(); iterRow != mapRow.end(); ++iterRow)
 		ulSize += iterRow->second->GetObjectSize();
 
 	ulSize += MEMORY_USAGE_MAP(m_mapBookmarks.size(), ECBookmarkMap);
@@ -1637,17 +1586,10 @@ ECRESULT ECKeyTable::UpdatePartialSortKey(sObjectTableKey *lpsRowItem, unsigned 
     
 exit:
 	pthread_mutex_unlock(&mLock);
-
-    if (lppSortKeys)
-        delete [] lppSortKeys;
-        
-    if (lpSortLen)
-        delete [] lpSortLen;
-        
-    if (lpFlags)
-        delete [] lpFlags;
-    
-    return er;
+	delete[] lppSortKeys;
+	delete[] lpSortLen;
+	delete[] lpFlags;
+	return er;
 }
 
 /**

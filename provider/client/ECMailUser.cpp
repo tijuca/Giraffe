@@ -1,60 +1,34 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 // ECMailUser.cpp: implementation of the ECMailUser class.
 //
 //////////////////////////////////////////////////////////////////////
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include "resource.h"
 #include <mapiutil.h>
 #include "Zarafa.h"
-#include "CommonUtil.h"
+#include <zarafa/CommonUtil.h>
 #include "ECMailUser.h"
 
 #include "Mem.h"
-#include "ECGuid.h"
-#include "ECDebug.h"
+#include <zarafa/ECGuid.h>
+#include <zarafa/ECDebug.h>
 
 #include "ECDisplayTable.h"
 
@@ -110,55 +84,101 @@ HRESULT	ECMailUser::QueryInterface(REFIID refiid, void **lppInterface)
 
 HRESULT ECMailUser::TableRowGetProp(void* lpProvider, struct propVal *lpsPropValSrc, LPSPropValue lpsPropValDst, void **lpBase, ULONG ulType)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_NOT_FOUND;
-
-	return hr;
+	return MAPI_E_NOT_FOUND;
 }
 
 HRESULT ECMailUser::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
 {
 	HRESULT			hr = MAPI_E_NOT_FOUND;
 
-	if (lpiid == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpiid == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	if (ulFlags & MAPI_CREATE)
-    {
 		// Don't support creating any sub-objects
-		hr = MAPI_E_NO_ACCESS;
-        goto exit;
-    }
+		return MAPI_E_NO_ACCESS;
 
 	switch(ulPropTag) {
+#if defined(_WIN32) && !defined(WINCE)
+	case PR_DETAILS_TABLE:
+		if (*lpiid != IID_IMAPITable)
+			return MAPI_E_INTERFACE_NOT_SUPPORTED;
+
+		hr = ECDisplayTable::CreateDisplayTable(arraySize(rgdtIMailUserPage), rgdtIMailUserPage, (LPMAPITABLE *) lppUnk);
+		if (hr != hrSuccess)
+			return hr;
+
+		break;
+	case PR_BUSINESS2_TELEPHONE_NUMBER_O:
+		if (*lpiid != IID_IMAPITable)
+			return MAPI_E_INTERFACE_NOT_SUPPORTED;
+
+		hr = ECDisplayTable::CreateTableFromProperty(this, lpiid, ulInterfaceOptions, PR_BUSINESS2_TELEPHONE_NUMBER, PR_BUSINESS2_TELEPHONE_NUMBER, lppUnk);
+		if (hr != hrSuccess)
+			return hr;
+
+		break;
+	case PR_HOME2_TELEPHONE_NUMBER_O:
+		if (*lpiid != IID_IMAPITable)
+			return MAPI_E_INTERFACE_NOT_SUPPORTED;
+
+		hr = ECDisplayTable::CreateTableFromProperty(this, lpiid, ulInterfaceOptions, PR_HOME2_TELEPHONE_NUMBER, PR_HOME2_TELEPHONE_NUMBER, lppUnk);
+		if (hr != hrSuccess)
+			return hr;
+
+		break;
+	case PR_EMS_AB_MANAGER_O:
+		if (*lpiid != IID_IMAPITable)
+			return MAPI_E_INTERFACE_NOT_SUPPORTED;
+
+		hr = ECDisplayTable::CreateTableFromResolved(this, lpiid, ulInterfaceOptions, CHANGE_PROP_TYPE(PR_EMS_AB_MANAGER, PT_BINARY), lppUnk);
+		if (hr != hrSuccess)
+			return hr;
+
+		break;
+	case PR_EMS_AB_PROXY_ADDRESSES_O:
+		if (*lpiid != IID_IMAPITable)
+			return MAPI_E_INTERFACE_NOT_SUPPORTED;
+
+		hr = ECDisplayTable::CreateTableFromProperty(this, lpiid, ulInterfaceOptions, PR_SMTP_ADDRESS, PR_EMS_AB_PROXY_ADDRESSES, lppUnk);
+		if (hr != hrSuccess)
+			return hr;
+
+		break;
+	case PR_EMS_AB_IS_MEMBER_OF_DL_O:
+		if (*lpiid != IID_IMAPITable)
+			return MAPI_E_INTERFACE_NOT_SUPPORTED;
+
+		hr = ECDisplayTable::CreateTableFromResolved(this, lpiid, ulInterfaceOptions, PR_EMS_AB_IS_MEMBER_OF_DL_T, lppUnk);
+		if (hr != hrSuccess)
+			return hr;
+
+		break;
+	case PR_EMS_AB_REPORTS_O:
+		if (*lpiid != IID_IMAPITable)
+			return MAPI_E_INTERFACE_NOT_SUPPORTED;
+
+		hr = ECDisplayTable::CreateTableFromResolved(this, lpiid, ulInterfaceOptions, PR_EMS_AB_REPORTS_T, lppUnk);
+		if (hr != hrSuccess)
+			return hr;
+
+		break;
+#endif
 	default:
 		hr = ECABProp::OpenProperty(ulPropTag, lpiid, ulInterfaceOptions, ulFlags, lppUnk);
 		break;
 	}
-
-exit:
 	return hr;
 }
 
 HRESULT ECMailUser::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
 {
-	HRESULT hr = hrSuccess;
-	
-	hr = this->GetABStore()->m_lpMAPISup->DoCopyTo(&IID_IMailUser, &this->m_xMailUser, ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-
-	return hr;
+	return this->GetABStore()->m_lpMAPISup->DoCopyTo(&IID_IMailUser, &this->m_xMailUser, ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
 
 HRESULT ECMailUser::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = this->GetABStore()->m_lpMAPISup->DoCopyProps(&IID_IMailUser, &this->m_xMailUser, lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-
-	return hr;
+	return this->GetABStore()->m_lpMAPISup->DoCopyProps(&IID_IMailUser, &this->m_xMailUser, lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
 
 //////////////////////////////////////////////

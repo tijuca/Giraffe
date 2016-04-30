@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "WSMessageStreamImporter.h"
 #include "WSUtil.h"
 #include "ECSyncSettings.h"
@@ -64,25 +38,19 @@ static const char THIS_FILE[]=__FILE__;
  */
 HRESULT WSMessageStreamSink::Create(ECFifoBuffer *lpFifoBuffer, ULONG ulTimeout, WSMessageStreamImporter *lpImporter, WSMessageStreamSink **lppSink)
 {
-	HRESULT hr = hrSuccess;
 	WSMessageStreamSinkPtr ptrSink;
 
-	if (lpFifoBuffer == NULL || lppSink == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpFifoBuffer == NULL || lppSink == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	try {
 		ptrSink.reset(new WSMessageStreamSink(lpFifoBuffer, ulTimeout, lpImporter));
 	} catch (const std::bad_alloc &) {
-		hr = MAPI_E_NOT_ENOUGH_MEMORY;
-		goto exit;
+		return MAPI_E_NOT_ENOUGH_MEMORY;
 	}
 
 	*lppSink = ptrSink.release();
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -121,7 +89,6 @@ HRESULT WSMessageStreamSink::Write(LPVOID lpData, ULONG cbData)
 WSMessageStreamSink::WSMessageStreamSink(ECFifoBuffer *lpFifoBuffer, ULONG ulTimeout, WSMessageStreamImporter *lpImporter)
 : m_lpFifoBuffer(lpFifoBuffer)
 , m_lpImporter(lpImporter)
-, m_ulTimeout(ulTimeout)
 { }
 
 /**
@@ -197,46 +164,31 @@ exit:
 
 HRESULT WSMessageStreamImporter::StartTransfer(WSMessageStreamSink **lppSink)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	WSMessageStreamSinkPtr ptrSink;
 	
-	if (m_threadPool.dispatch(this) == false) {
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
-	}
+	if (!m_threadPool.dispatch(this))
+		return MAPI_E_CALL_FAILED;
 
 	hr = WSMessageStreamSink::Create(&m_fifoBuffer, m_ulTimeout, this, &ptrSink);
 	if (hr != hrSuccess) {
 		m_fifoBuffer.Close(ECFifoBuffer::cfWrite);
-		goto exit;
+		return hr;
 	}
 
 	AddChild(ptrSink);
-
 	*lppSink = ptrSink.release();
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT WSMessageStreamImporter::GetAsyncResult(HRESULT *lphrResult)
 {
-	HRESULT hr = hrSuccess;
-
-	if (lphrResult == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if (wait(m_ulTimeout) == false) {
-		hr = MAPI_E_TIMEOUT;
-		goto exit;
-	}
-
+	if (lphrResult == NULL)
+		return MAPI_E_INVALID_PARAMETER;
+	if (!wait(m_ulTimeout))
+		return MAPI_E_TIMEOUT;
 	*lphrResult = m_hr;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 WSMessageStreamImporter::WSMessageStreamImporter(ULONG ulFlags, ULONG ulSyncId, const entryId &sEntryId, const entryId &sFolderEntryId, bool bNewMessage, const propVal &sConflictItems, WSTransport *lpTransport, ULONG ulBufferSize, ULONG ulTimeout)

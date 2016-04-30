@@ -1,0 +1,11 @@
+[Unit]
+Description=Zarafa Collaboration Platform Delivery Agent
+Documentation=man:zarafa-dagent(8) man:zarafa-dagent.cfg(5)
+
+[Service]
+Type=simple
+Environment=LC_ALL=C LANG=C
+ExecStart=/usr/sbin/zarafa-dagent -l -c /etc/zarafa/dagent.cfg
+
+[Install]
+WantedBy=multi-user.target

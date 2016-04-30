@@ -1,55 +1,29 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "../platform.h"
-#include "convert.h"
+#include <zarafa/platform.h>
+#include <zarafa/charset/convert.h>
 
 #include <mapicode.h>
 
 #include <numeric>
 #include <vector>
 #include <string>
-#include <stringutil.h>
+#include <zarafa/stringutil.h>
 #include <cerrno>
 #define BUFSIZE 4096
 
@@ -93,7 +67,7 @@ namespace details {
 		ICONV_HACK(const char** ptr) : m_ptr(ptr) { }
 
 		// the compiler will choose the right operator
-		operator const char**() { return m_ptr; }
+		operator const char **(void) const { return m_ptr; }
 		operator char**() { return const_cast <char**>(m_ptr); }
 
 	private:
@@ -108,15 +82,14 @@ namespace details {
 	 * which are the source and destination charsets, respectively. The 'tocode' may take
 	 * some extra options, separated with '//' from the charset, and then separated by commas
 	 *
-	 * This function accepts values accepted by GNU iconv, plus it also accepts the FORCE
-	 * modifier, eg.:
+	 * This function accepts values accepted by GNU iconv:
 	 *
-	 * iso-8859-1//TRANSLIT,FORCE
+	 * iso-8859-1//TRANSLIT,IGNORE
 	 * windows-1252//TRANSLIT
 	 *
 	 * The 'fromcode' can also take modifiers but they are ignored by iconv.
 	 *
-	 * Also, instead of FORCE, the HTMLENTITY modifier can be used, eg:
+	 * Also, instead of IGNORE, the HTMLENTITY modifier can be used, eg:
 	 *
 	 * iso-8859-1//HTMLENTITY
 	 *
@@ -126,9 +99,9 @@ namespace details {
 	 * other characters are represented by an HTML entity. Note: the HTMLENTITY modifier may only
 	 * be applied when the fromcode is CHARSET_WCHAR (this is purely an implementation limitation)
 	 *
-     * Note that in release builds, the FORCE flag is implicit. This means that a conversion error
-     * is never generated. If you require an error on conversion problems, you must pass the NOFORCE
-     * modifier. This has no effect in debug builds.
+	 * Release builds default to //IGNORE (due to -DFORCE_CHARSET_CONVERSION
+	 * added by ./configure --enable-release), while debug builds default
+	 * to //NOIGNORE.
 	 *
 	 * @param tocode Destination charset
 	 * @param fromcode Source charset
@@ -136,8 +109,8 @@ namespace details {
 	iconv_context_base::iconv_context_base(const char* tocode, const char* fromcode)
 	{
 #ifdef FORCE_CHARSET_CONVERSION		
-		// We now default to forcing conversion; this makes sure that we don't SIGABORT
-		// when some bad input from a user fails to convert. This means that the 'FORCE'
+		// We now default to ignoring illegal sequences during conversion; this makes sure that we don't SIGABORT
+		// when some bad input from a user fails to convert. This means that the 'IGNORE'
 		// flag is on by default; specifying it is not useful.
 		m_bForce = true;
 #else
@@ -159,14 +132,14 @@ namespace details {
 
             i = vOptions.begin();
             while(i != vOptions.end()) {
-                if(*i == "FORCE") {
+                if (*i == "IGNORE" || *i == "FORCE") {
                     m_bForce = true;
-                } else if(*i == "NOFORCE") {
+                } else if (*i == "NOIGNORE" || *i == "NOFORCE") {
                     m_bForce = false;
                 } else if(*i == "HTMLENTITIES" && stricmp(fromcode, CHARSET_WCHAR) == 0) {
                 	m_bHTML = true;
                 } else vOptionsFiltered.push_back(*i);
-				i++;
+				++i;
             }
 
 			if(!vOptionsFiltered.empty()) {
@@ -207,9 +180,9 @@ namespace details {
 			if (err == (size_t)(-1) && cbDst == sizeof(buf)) {
 				if(m_bHTML) {
 					if(cbSrc < sizeof(wchar_t)) {
-						// Do what //FORCE would have done
-						lpSrc++;
-						cbSrc--;
+						// Do what //IGNORE would have done
+						++lpSrc;
+						--cbSrc;
 					} else {
 						// Convert the codepoint to '&#12345;'
 						std::wstring wstrEntity = L"&#";
@@ -238,8 +211,8 @@ namespace details {
 				} else if(m_bForce) {
 					// Force conversion by skipping this character
 					if(cbSrc) {
-						lpSrc++;
-						cbSrc--;
+						++lpSrc;
+						--cbSrc;
 					}
 				} else {
 					throw illegal_sequence_exception(strerror(errno));
@@ -258,7 +231,7 @@ namespace details {
 	
 } // namespace details
 
-convert_context::convert_context() throw()
+convert_context::convert_context()
 {}
 
 convert_context::~convert_context()

@@ -8,7 +8,7 @@
 #              Agent can also be used as a standalone program.
 # processname: /usr/sbin/zarafa-dagent
 # config: /etc/zarafa/dagent.cfg
-# pidfile: /var/run/zarafa-dagent.pid
+# pidfile: /var/run/zarafad/dagent.pid
 
 ### BEGIN INIT INFO
 # Provides: zarafa-dagent
@@ -31,7 +31,7 @@ WITHOUT_RC_COMPAT=1
 DAGENTCONFIG=/etc/zarafa/dagent.cfg
 DAGENTPROGRAM=/usr/sbin/zarafa-dagent
 dagent=`basename $DAGENTPROGRAM`
-PIDFILE=/var/run/$dagent.pid
+PIDFILE=/var/run/zarafad/dagent.pid
 LOCKFILE=/var/lock/subsys/$dagent
 RETVAL=0
 
@@ -48,6 +48,7 @@ if [ -z "$ZARAFA_LOCALE" ]; then
 fi
 
 start() {
+	install -dm0775 -o zarafa -g zarafa /var/run/zarafad
 	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $dagent $DAGENTCONFIG_OPT
 	RETVAL=$?
 	
@@ -55,10 +56,13 @@ start() {
 }
 
 stop() {
+	stop_daemon --pidfile "/var/run/$dagent.pid" --lockfile "$LOCKFILE" $dagent
+	RETVAL2="$?"
 	stop_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $dagent
 	RETVAL=$?
 	
-	return $RETVAL
+	test "$RETVAL2" -eq 0 || test "$RETVAL" -eq 0
+	return $?
 }
 
 restart() {

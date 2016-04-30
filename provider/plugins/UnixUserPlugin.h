@@ -1,44 +1,18 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 // -*- Mode: c++ -*-
@@ -47,7 +21,7 @@
 
 #include <stdexcept>
 #include <string>
-#include <ECIConv.h>
+#include <zarafa/ECIConv.h>
 
 #include "plugin.h"
 #include "DBBase.h"
@@ -82,7 +56,7 @@ public:
 	 * @throw runtime_error When configuration file could not be loaded
 	 * @throw notsupported When multi-server or multi-company support is enabled.
 	 */
-	UnixUserPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *lpSharedData) throw(std::exception);
+	UnixUserPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *lpSharedData);
 
     /**
 	 * Destructor
@@ -92,7 +66,7 @@ public:
     /**
 	 * Initialize plugin
 	 */
-	void InitPlugin() throw(std::exception);
+	void InitPlugin();
 
 	/**
 	 * Resolve name and company to objectsignature
@@ -110,7 +84,7 @@ public:
 	 * @throw objectnotfound When no object was found.
 	 * @throw runtime_error When an unsupported objectclass was requested.
 	 */
-	virtual objectsignature_t resolveName(objectclass_t objclass, const string &name, const objectid_t &company) throw(std::exception);
+	virtual objectsignature_t resolveName(objectclass_t objclass, const string &name, const objectid_t &company);
 
     /**
 	 * Authenticate user with username and password
@@ -126,7 +100,7 @@ public:
 	 * @throw objectnotfound When no user with the given name exists.
 	 * @throw login_error When the wrong password is provied or the user is nonactive.
 	 */
-	virtual objectsignature_t authenticateUser(const string &username, const string &password, const objectid_t &company) throw(std::exception);
+	virtual objectsignature_t authenticateUser(const string &username, const string &password, const objectid_t &company);
 
     /**
 	 * Request a list of objects for a particular company and specified objectclass.
@@ -140,7 +114,7 @@ public:
 	 * @return The list of object signatures of all objects which were found
 	 * @throw std::exception
 	 */
-	virtual auto_ptr<signatures_t> getAllObjects(const objectid_t &company, objectclass_t objclass) throw(std::exception);
+	virtual auto_ptr<signatures_t> getAllObjects(const objectid_t &company, objectclass_t objclass);
 
 	/**
 	 * Obtain the object details for the given object
@@ -153,7 +127,7 @@ public:
 	 * @return The objectdetails for the given objectid
 	 * @throw std::exception
 	 */
-	virtual auto_ptr<objectdetails_t> getObjectDetails(const objectid_t &objectid) throw (std::exception);
+	virtual auto_ptr<objectdetails_t> getObjectDetails(const objectid_t &objectid);
 
     /**
 	 * Obtain the object details for the given objects
@@ -166,7 +140,7 @@ public:
 	 * @return A map of objectid with the matching objectdetails
 	 * @throw std::exception
 	 */
-	virtual auto_ptr<map<objectid_t, objectdetails_t> > getObjectDetails(const list<objectid_t> &objectids) throw(std::exception);
+	virtual auto_ptr<map<objectid_t, objectdetails_t> > getObjectDetails(const list<objectid_t> &objectids);
 
     /**
 	 * Get all children for a parent for a given relation type.
@@ -182,7 +156,7 @@ public:
 	 * @return A list of object signatures of the children of the parent.
 	 * @throw std::exception
 	 */
-	virtual auto_ptr<signatures_t> getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentobject) throw(std::exception);
+	virtual auto_ptr<signatures_t> getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentobject);
 
     /**
 	 * Request all parents for a childobject for a given relation type.
@@ -198,7 +172,7 @@ public:
 	 * @return A list of object signatures of the parents of the child.
 	 * @throw std::exception
 	 */
-	virtual auto_ptr<signatures_t> getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childobject) throw(std::exception);
+	virtual auto_ptr<signatures_t> getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childobject);
 
 	/**
 	 * Search for all objects which match the given string,
@@ -215,7 +189,7 @@ public:
 	 * @return List of object signatures which match the given string
 	 * @throw objectnotfound When no object was found
 	 */
-	virtual auto_ptr<signatures_t> searchObject(const string &match, unsigned int ulFlags) throw(std::exception);
+	virtual auto_ptr<signatures_t> searchObject(const string &match, unsigned int ulFlags);
 
     /**
 	 * Obtain details for the public store
@@ -225,7 +199,7 @@ public:
 	 * @return The public store details
 	 * @throw notsupported Always when this function is called
 	 */
-	virtual auto_ptr<objectdetails_t> getPublicStoreDetails() throw(std::exception);
+	virtual auto_ptr<objectdetails_t> getPublicStoreDetails();
 
 	/**
 	 * Obtain the objectdetails for a server
@@ -237,7 +211,7 @@ public:
 	 * @return The server details
 	 * @throw notsupported Always when this function is called
 	 */
-	virtual auto_ptr<serverdetails_t> getServerDetails(const string &server) throw(std::exception);
+	virtual auto_ptr<serverdetails_t> getServerDetails(const string &server);
 	
 	/**
 	 * Obtain server list
@@ -245,7 +219,7 @@ public:
 	 * @return list of servers
 	 * @throw runtime_error LDAP query failure
 	 */
-	virtual auto_ptr<serverlist_t> getServers() throw(std::exception);
+	virtual auto_ptr<serverlist_t> getServers();
 
 	/**
 	 * Create object in plugin
@@ -257,7 +231,7 @@ public:
 	 * @return The objectsignature of the created object.
 	 * @throw notimplemented Always when this function is called
 	 */
-	virtual objectsignature_t createObject(const objectdetails_t &details) throw(std::exception);
+	virtual objectsignature_t createObject(const objectdetails_t &details);
 
 	/**
 	 * Update an object with new details
@@ -273,7 +247,7 @@ public:
 	 *					List of configuration names which should be removed from the object
 	 * @throw runtime_error When OB_PROP_S_PASSWORD, OB_PROP_S_LOGIN, OB_PROP_S_FULLNAME or is non-empty.
 	 */
-	virtual void changeObject(const objectid_t &id, const objectdetails_t &details, const std::list<std::string> *lpRemove) throw(std::exception);
+	virtual void changeObject(const objectid_t &id, const objectdetails_t &details, const std::list<std::string> *lpRemove);
 
     /**
 	 * Delete object from plugin
@@ -284,7 +258,7 @@ public:
 	 *					The objectid which should be deleted
 	 * @throw notimplemented Always when this function is called
 	 */
-	virtual void deleteObject(const objectid_t &id) throw(std::exception);
+	virtual void deleteObject(const objectid_t &id);
 
 	/**
 	 * Modify id of object in plugin
@@ -297,7 +271,7 @@ public:
 	 *					The new objectid
 	 * @throw notsupported Always when this function is called
 	 */
-	virtual void modifyObjectId(const objectid_t &oldId, const objectid_t &newId) throw(std::exception);
+	virtual void modifyObjectId(const objectid_t &oldId, const objectid_t &newId);
 
 	/**
 	 * Add relation between child and parent. This can be used
@@ -317,7 +291,7 @@ public:
 	 * @throw notimplemented when an unsupported relation is requested
 	 */	 
 	virtual void addSubObjectRelation(userobject_relation_t relation,
-									  const objectid_t &parentobject, const objectid_t &childobject) throw(std::exception);
+									  const objectid_t &parentobject, const objectid_t &childobject);
 
 	/**
 	 * Delete relation between child and parent, this can be used
@@ -337,10 +311,10 @@ public:
 	 * @throw notimplemented when an unsupported relation is requested
 	 */
 	virtual void deleteSubObjectRelation(userobject_relation_t relation,
-										 const objectid_t &parentobject, const objectid_t &childobject) throw(std::exception);
+										 const objectid_t &parentobject, const objectid_t &childobject);
 
 private:
-	ECIConv *m_iconv, *m_iconvrev;
+	ECIConv *m_iconv;
 
 	/**
 	 * Find a user with specific name
@@ -353,7 +327,7 @@ private:
 	 *					A buffer which will contain the strings for pwd
 	 * @throw objectnotfound If no user was found.
 	 */
-	void findUserID(const string &id, struct passwd *pwd, char *buffer) throw(std::exception);
+	void findUserID(const string &id, struct passwd *pwd, char *buffer);
 
 	/**
 	 * Find a user with specific name
@@ -366,7 +340,7 @@ private:
 	 *					A buffer which will contain the strings for pwd
 	 * @throw objectnotfound If no user was found.
 	 */
-	void findUser(const string &name, struct passwd *pwd, char *buffer) throw(std::exception);
+	void findUser(const string &name, struct passwd *pwd, char *buffer);
 
 	/**
 	 * Find a group with specific ID
@@ -379,7 +353,7 @@ private:
 	 *					A buffer which will contain the strings for grp
 	 * @throw objectnotfound If no group was found.
 	 */
-	void findGroupID(const string &id, struct group *grp, char *buffer) throw(std::exception);
+	void findGroupID(const string &id, struct group *grp, char *buffer);
 
 	/**
 	 * Find a group with specific name
@@ -392,7 +366,7 @@ private:
 	 *					A buffer which will contain the strings for grp
 	 * @throw objectnotfound If no group was found.
 	 */
-	void findGroup(const string &name, struct group *grp, char *buffer) throw(std::exception);
+	void findGroup(const string &name, struct group *grp, char *buffer);
 
 	/**
 	 * Resolve user name to objectsignature
@@ -404,7 +378,7 @@ private:
 	 * @return The objectsignature of the resolved object
 	 * @throw std::exception
 	 */
-	objectsignature_t resolveUserName(const string &name) throw(std::exception);
+	objectsignature_t resolveUserName(const string &name);
 
 	/**
 	 * Resolve group name to objectsignature
@@ -416,7 +390,7 @@ private:
 	 * @return The objectsignature of the resolved object
 	 * @throw std::exception
 	 */
-	objectsignature_t resolveGroupName(const string &name) throw(std::exception);
+	objectsignature_t resolveGroupName(const string &name);
 
 	/**
 	 * Match a user with given search query
@@ -456,7 +430,7 @@ private:
 	 *					match the name or email address otherwise a partial match is allowed.
 	 * @return List of objectsignatures
 	 */
-	auto_ptr<signatures_t> getAllUserObjects(const string &match = string(), unsigned int ulFlags = 0) throw(std::exception);
+	auto_ptr<signatures_t> getAllUserObjects(const string &match = string(), unsigned int ulFlags = 0);
 
 	/**
 	 * Create a list containing all groups which optionally match the search term.
@@ -468,7 +442,7 @@ private:
 	 *					match the name or email address otherwise a partial match is allowed.
 	 * @return List of objectsignatures
 	 */
-	auto_ptr<signatures_t> getAllGroupObjects(const string &match = string(), unsigned int ulFlags = 0) throw(std::exception);
+	auto_ptr<signatures_t> getAllGroupObjects(const string &match = string(), unsigned int ulFlags = 0);
 
 	/**
 	 * Copy object details from struct passwd to objectdetails

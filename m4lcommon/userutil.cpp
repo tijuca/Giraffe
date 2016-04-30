@@ -1,73 +1,47 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "zcdefs.h"
-#include "platform.h"
+#include <zarafa/zcdefs.h>
+#include <zarafa/platform.h>
 
 #include <mapi.h>
 #include <mapiutil.h>
-#include "ECLogger.h"
+#include <zarafa/ECLogger.h>
 
-#include "userutil.h"
+#include <zarafa/userutil.h>
 
-#include <charset/utf8string.h>
-#include <charset/convert.h>
-#include "ECDefs.h"
-#include "ECGuid.h"
-#include "IECServiceAdmin.h"
+#include <zarafa/charset/utf8string.h>
+#include <zarafa/charset/convert.h>
+#include <zarafa/ECDefs.h>
+#include <zarafa/ECGuid.h>
+#include <zarafa/IECServiceAdmin.h>
 #include <edkmdb.h>
-#include "edkguid.h"
-#include "IECLicense.h"
-#include "CommonUtil.h"
-#include "ECRestriction.h"
-#include "mapi_ptr.h"
-#include "mapiguidext.h"
+#include <edkguid.h>
+#include <zarafa/IECLicense.h>
+#include <zarafa/CommonUtil.h>
+#include <zarafa/ECRestriction.h>
+#include <zarafa/mapi_ptr.h>
+#include <zarafa/mapiguidext.h>
 
 using namespace std;
 
 typedef mapi_object_ptr<IECLicense, IID_IECLicense>ECLicensePtr;
 
-class servername _final {
+class servername _zcp_final {
 public:
 	servername(LPCTSTR lpszName): m_strName(lpszName) {}
 	servername(const servername &other): m_strName(other.m_strName) {}
@@ -95,11 +69,11 @@ static HRESULT GetMailboxDataPerServer(ECLogger *lpLogger, IMAPISession *lpSessi
 static HRESULT UpdateServerList(ECLogger *lpLogger, IABContainer *lpContainer, std::set<servername> &listServers);
 
 
-class UserCountCollector _final : public DataCollector
+class UserCountCollector _zcp_final : public DataCollector
 {
 public:
 	UserCountCollector();
-	virtual HRESULT CollectData(LPMAPITABLE lpStoreTable) _override;
+	virtual HRESULT CollectData(LPMAPITABLE lpStoreTable) _zcp_override;
 	unsigned int result() const;
 
 private:
@@ -107,13 +81,13 @@ private:
 };
 
 template <typename string_type, ULONG prAccount>
-class UserListCollector _final : public DataCollector
+class UserListCollector _zcp_final : public DataCollector
 {
 public:
 	UserListCollector(IMAPISession *lpSession);
 
-	virtual HRESULT GetRequiredPropTags(LPMAPIPROP lpProp, LPSPropTagArray *lppPropTagArray) const _override;
-	virtual HRESULT CollectData(LPMAPITABLE lpStoreTable) _override;
+	virtual HRESULT GetRequiredPropTags(LPMAPIPROP lpProp, LPSPropTagArray *lppPropTagArray) const _zcp_override;
+	virtual HRESULT CollectData(LPMAPITABLE lpStoreTable) _zcp_override;
 	void swap_result(std::list<string_type> *lplstUsers);
 
 private:
@@ -193,7 +167,6 @@ HRESULT	UserListCollector<string_type, prAccount>::GetRequiredPropTags(LPMAPIPRO
 template<typename string_type, ULONG prAccount>
 HRESULT UserListCollector<string_type, prAccount>::CollectData(LPMAPITABLE lpStoreTable) {
 	HRESULT hr = hrSuccess;
-	std::list<string_type> lstUsers;
 
 	while (true) {
 		SRowSetPtr ptrRows;
@@ -224,9 +197,6 @@ HRESULT UserListCollector<string_type, prAccount>::CollectData(LPMAPITABLE lpSto
 		if (ptrRows.size() < 50)
 			break;
 	}
-
-	lstUsers.splice(m_lstUsers.end(), lstUsers);
-
 exit:
 	return hr;
 }
@@ -263,7 +233,7 @@ HRESULT ValidateArchivedUserCount(ECLogger *lpLogger, IMAPISession *lpMapiSessio
 	//@todo use PR_EC_OBJECT property
 	hr = HrOpenDefaultStore(lpMapiSession, &ptrStore);
 	if(hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open default store: 0x%08X", hr);
+		lpLogger->Log(EC_LOGLEVEL_CRIT, "Unable to open default store: 0x%08X", hr);
 		goto exit;
 	}
 
@@ -355,7 +325,7 @@ HRESULT GetMailboxData(ECLogger *lpLogger, IMAPISession *lpMapiSession, const ch
 	convert_context		converter;
 	
 	ECSVRNAMELIST	*lpSrvNameList = NULL;
-	LPECSERVERLIST	lpSrvList = NULL;
+	ECSERVERLIST *lpSrvList = NULL;
 
 	SizedSPropTagArray(1, sCols) = {1, { PR_ENTRYID } };
 
@@ -408,8 +378,7 @@ HRESULT GetMailboxData(ECLogger *lpLogger, IMAPISession *lpMapiSession, const ch
 		if (hr != hrSuccess)
 			goto exit;
 		
-		for (unsigned int i = 0; i < ptrRows.size(); i++) {
-
+		for (unsigned int i = 0; i < ptrRows.size(); ++i) {
 			if (ptrRows[i].lpProps[0].ulPropTag != PR_ENTRYID) {
 				lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to get entryid to open tenancy Address Book");
 				hr = MAPI_E_INVALID_PARAMETER;
@@ -457,7 +426,8 @@ HRESULT GetMailboxData(ECLogger *lpLogger, IMAPISession *lpMapiSession, const ch
 		goto exit;
 
 	lpSrvNameList->cServers = 0;
-	for(std::set<servername>::iterator iServer = listServers.begin(); iServer != listServers.end(); iServer++)
+	for (std::set<servername>::const_iterator iServer = listServers.begin();
+	     iServer != listServers.end(); ++iServer)
 		lpSrvNameList->lpszaServer[lpSrvNameList->cServers++] = iServer->c_str();
 
 	hr = ptrServiceAdmin->GetServerDetails(lpSrvNameList, MAPI_UNICODE, &lpSrvList);
@@ -473,13 +443,14 @@ HRESULT GetMailboxData(ECLogger *lpLogger, IMAPISession *lpMapiSession, const ch
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "Details for one or more requested servers was not found.");
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "This usually indicates a misconfigured home server for a user.");
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "Requested servers:");
-			for(std::set<servername>::iterator iServer = listServers.begin(); iServer != listServers.end(); iServer++)
+			for (std::set<servername>::const_iterator iServer = listServers.begin();
+			     iServer != listServers.end(); ++iServer)
 				lpLogger->Log(EC_LOGLEVEL_ERROR, "* %ls", iServer->c_str());
 		}
 		goto exit;
 	} else {
 
-		for (ULONG i = 0; i < lpSrvList->cServers; i++) {
+		for (ULONG i = 0; i < lpSrvList->cServers; ++i) {
 			wchar_t *wszPath = NULL;
 
 			lpLogger->Log(EC_LOGLEVEL_INFO, "Check server: '%ls' ssl='%ls' flag=%08x", 
@@ -517,12 +488,8 @@ HRESULT GetMailboxData(ECLogger *lpLogger, IMAPISession *lpMapiSession, const ch
 	}
 
 exit:
-	if (lpSrvNameList)
-		MAPIFreeBuffer(lpSrvNameList);
-
-	if (lpSrvList)
-		MAPIFreeBuffer(lpSrvList);
-
+	MAPIFreeBuffer(lpSrvNameList);
+	MAPIFreeBuffer(lpSrvList);
 	return hr;
 }
 
@@ -587,7 +554,7 @@ HRESULT GetMailboxDataPerServer(ECLogger *lpLogger, IMAPISession *lpSession,
 	if (hr != hrSuccess)
 		goto exit;
 
-	lpCollector->GetRestriction(ptrStoreAdmin, &ptrRestriction);
+	hr = lpCollector->GetRestriction(ptrStoreAdmin, &ptrRestriction);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -670,7 +637,7 @@ HRESULT UpdateServerList(ECLogger *lpLogger, IABContainer *lpContainer, std::set
 		if (ptrRows.empty())
 			break;
 
-		for (unsigned int i = 0; i < ptrRows.size(); i++) {
+		for (unsigned int i = 0; i < ptrRows.size(); ++i) {
 			if(ptrRows[i].lpProps[0].ulPropTag == PR_EC_HOMESERVER_NAME_W) {
 				listServers.insert(ptrRows[i].lpProps[0].Value.lpszW);
 

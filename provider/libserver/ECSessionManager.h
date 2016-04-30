@@ -1,44 +1,18 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 // ECSessionManager.h: interface for the ECSessionManager class.
@@ -57,13 +31,13 @@
 #include "ECSearchFolders.h"
 #include "ECDatabaseFactory.h"
 #include "ECCacheManager.h"
-#include "ECLogger.h"
 #include "ECPluginFactory.h"
 #include "ECServerEntrypoint.h"
 #include "ECSessionGroup.h"
 #include "ECNotificationManager.h"
 #include "ECLockManager.h"
 
+class ECLogger;
 class ECTPropsPurge;
 
 using namespace std;
@@ -115,7 +89,7 @@ class SOURCEKEY;
 class ECSessionManager
 {
 public:
-	ECSessionManager(ECConfig *lpConfig, ECLogger *logger, ECLogger *audit, bool bHostedZarafa, bool bDistributedZarafa);
+	ECSessionManager(ECConfig *lpConfig, ECLogger *audit, bool bHostedZarafa, bool bDistributedZarafa);
 	virtual ~ECSessionManager();
 
 	virtual ECRESULT CreateAuthSession(struct soap *soap, unsigned int ulCapabilities, ECSESSIONID *sessionID, ECAuthSession **lppAuthSession, bool bRegisterSession, bool bLockSession);
@@ -171,8 +145,8 @@ public:
 	void GetStats(sSessionManagerStats &sStats);
 	ECRESULT DumpStats();
 
-	bool IsHostedSupported();
-	bool IsDistributedSupported();
+	bool IsHostedSupported(void) { return m_bHostedZarafa; }
+	bool IsDistributedSupported(void) { return m_bDistributedZarafa; }
 	ECRESULT GetLicensedUsers(unsigned int ulServiceType, unsigned int* lpulLicensedUsers);
 	ECRESULT GetServerGUID(GUID* lpServerGuid);
 
@@ -199,13 +173,12 @@ public:
 	ULONG GetSortLCID(ULONG ulStoreId);
 	ECLocale GetSortLocale(ULONG ulStoreId);
 
-	ECCacheManager*	GetCacheManager();
-	ECSearchFolders* GetSearchFolders();
-	ECConfig*		GetConfig();
-	ECLogger*		GetLogger();
-	ECLogger*		GetAudit();
-	ECPluginFactory* GetPluginFactory();
-	ECLockManager*	GetLockManager();
+	ECCacheManager *GetCacheManager(void) { return m_lpECCacheManager; }
+	ECSearchFolders *GetSearchFolders(void) { return m_lpSearchFolders; }
+	ECConfig *GetConfig(void) { return m_lpConfig; }
+	ECLogger *GetAudit(void) { return m_lpAudit; }
+	ECPluginFactory *GetPluginFactory(void) { return m_lpPluginFactory; }
+	ECLockManager *GetLockManager(void) { return m_ptrLockManager.get(); }
 
 protected:
 	BTSession* 			GetSession(ECSESSIONID sessionID, bool fLockSession = false);
@@ -226,7 +199,6 @@ protected:
 	ECConfig*			m_lpConfig;
 	bool				bExit;
 	ECCacheManager*		m_lpECCacheManager;
-	ECLogger*			m_lpLogger;
 	ECLogger*			m_lpAudit;
 	ECDatabaseFactory*	m_lpDatabaseFactory;
 	ECPluginFactory*	m_lpPluginFactory;

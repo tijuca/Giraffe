@@ -1,57 +1,31 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <iostream>
 #include "ECDatabaseMySQL.h"
 #include "mysqld_error.h"
 
-#include "stringutil.h"
-#include "ECDefs.h"
-#include "ecversion.h"
+#include <zarafa/stringutil.h>
+#include <zarafa/ECDefs.h>
+#include <zarafa/ecversion.h>
 #include <mapidefs.h>
-#include "CommonUtil.h"
+#include <zarafa/CommonUtil.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -74,6 +48,7 @@ ECDatabaseMySQL::ECDatabaseMySQL(ECLogger *lpLogger)
 	m_bLocked			= false;
 	m_bAutoLock			= true;
 	m_lpLogger			= lpLogger;
+	m_lpLogger->AddRef();
 
 	// Create a mutex handle for mysql
 	pthread_mutexattr_t mattr;
@@ -85,6 +60,7 @@ ECDatabaseMySQL::ECDatabaseMySQL(ECLogger *lpLogger)
 ECDatabaseMySQL::~ECDatabaseMySQL()
 {
 	Close();
+	m_lpLogger->Release();
 
 	// Close the mutex handle of mysql
 	pthread_mutex_destroy(&m_hMutexMySql);
@@ -92,13 +68,10 @@ ECDatabaseMySQL::~ECDatabaseMySQL()
 
 ECRESULT ECDatabaseMySQL::InitEngine()
 {
-	ECRESULT er = erSuccess;
-
 	//Init mysql and make a connection
 	if (!m_bMysqlInitialize && mysql_init(&m_lpMySQL) == NULL) {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::InitEngine() mysql_init failed");
-		er = ZARAFA_E_DATABASE_ERROR;
-		goto exit;
+		return ZARAFA_E_DATABASE_ERROR;
 	}
 
 	m_bMysqlInitialize = true;
@@ -107,9 +80,7 @@ ECRESULT ECDatabaseMySQL::InitEngine()
 	// mysql < 5.0.4 default on, mysql 5.0.4 > reconnection default off
 	// Zarafa always wants to reconnect
 	m_lpMySQL.reconnect = 1;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECLogger* ECDatabaseMySQL::GetLogger()
@@ -144,7 +115,7 @@ ECRESULT ECDatabaseMySQL::Connect(ECConfig *lpConfig)
 		else
 			er = ZARAFA_E_DATABASE_ERROR;
 
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::Connect(): database access error %d", er);
+		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::Connect(): database access error %d, mysql error: %s", er, mysql_error(&m_lpMySQL));
 
 		goto exit;
 	}
@@ -325,21 +296,16 @@ ECRESULT ECDatabaseMySQL::DoUpdate(const string &strQuery, unsigned int *lpulAff
 
 ECRESULT ECDatabaseMySQL::_Update(const string &strQuery, unsigned int *lpulAffectedRows)
 {
-	ECRESULT er = erSuccess;
-
 	if (Query(strQuery) != 0) {
 		// FIXME: Add the mysql error system ?
 		// er = nMysqlError;
-		er = ZARAFA_E_DATABASE_ERROR;
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::_Update(): Failed invoking '%s'", strQuery.c_str());
-		goto exit;
+		return ZARAFA_E_DATABASE_ERROR;
 	}
 
 	if(lpulAffectedRows)
 		*lpulAffectedRows = GetAffectedRows();
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECDatabaseMySQL::DoInsert(const string &strQuery, unsigned int *lpulInsertId, unsigned int *lpulAffectedRows)
@@ -390,14 +356,14 @@ ECRESULT ECDatabaseMySQL::DoDelete(const string &strQuery, unsigned int *lpulAff
  * know what you're doing.
  */
 ECRESULT ECDatabaseMySQL::DoSequence(const std::string &strSeqName, unsigned int ulCount, uint64_t *lpllFirstId) {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	unsigned int ulAffected = 0;
 
 	// Attempt to update the sequence in an atomic fashion
 	er = DoUpdate("UPDATE settings SET value=LAST_INSERT_ID(value+1)+" + stringify(ulCount-1) + " WHERE name = '" + strSeqName + "'", &ulAffected);
 	if(er != erSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::DoSequence() UPDATE failed %d", er);
-		goto exit;
+		return er;
 	}
 
 	// If the setting was missing, insert it now, starting at sequence 1 (not 0 for safety - maybe there's some if(ulSequenceId) code somewhere)
@@ -405,13 +371,11 @@ ECRESULT ECDatabaseMySQL::DoSequence(const std::string &strSeqName, unsigned int
 		er = Query("INSERT INTO settings (name, value) VALUES('" + strSeqName + "',LAST_INSERT_ID(1)+" + stringify(ulCount-1) + ")");
 		if(er != erSuccess) {
 			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::DoSequence() INSERT INTO failed %d", er);
-			goto exit;
+			return er;
 		}
 	}
 
 	*lpllFirstId = mysql_insert_id(&m_lpMySQL);
-
-exit:
 	return er;
 }
 
@@ -492,7 +456,7 @@ std::string ECDatabaseMySQL::EscapeBinary(const std::string &strData)
 	return EscapeBinary(reinterpret_cast<const unsigned char *>(strData.c_str()), strData.size());
 }
 
-std::string ECDatabaseMySQL::GetError()
+const char *ECDatabaseMySQL::GetError(void)
 {
 	if (m_bMysqlInitialize == false)
 		return "MYSQL not initialized";
@@ -542,7 +506,7 @@ ECRESULT ECDatabaseMySQL::IsInnoDBSupported()
 
 	er = DoSelect("SHOW ENGINES", &lpResult);
 	if(er != erSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to query supported database engines. Error: %s", GetError().c_str());
+		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to query supported database engines. Error: %s", GetError());
 		goto exit;
 	}
 
@@ -578,7 +542,7 @@ exit:
 
 ECRESULT ECDatabaseMySQL::CreateDatabase(ECConfig *lpConfig)
 {
-	ECRESULT	er = erSuccess;
+	ECRESULT er;
 	string		strQuery;
 	const char *lpDatabase = lpConfig->GetSetting("mysql_database");
 	const char *lpMysqlPort = lpConfig->GetSetting("mysql_port");
@@ -593,7 +557,7 @@ ECRESULT ECDatabaseMySQL::CreateDatabase(ECConfig *lpConfig)
 
 	er = InitEngine();
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	// Connect
 	if (mysql_real_connect
@@ -609,45 +573,39 @@ ECRESULT ECDatabaseMySQL::CreateDatabase(ECConfig *lpConfig)
         ) == NULL)
 	{
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Failed to connect to database: Error: %s", mysql_error(&m_lpMySQL));
-		er = ZARAFA_E_DATABASE_ERROR;
-		goto exit;
+		return ZARAFA_E_DATABASE_ERROR;
 	}
 
 	if(lpDatabase == NULL) {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Unable to create database: Unknown database");
-		er = ZARAFA_E_DATABASE_ERROR;
-		goto exit;
+		return ZARAFA_E_DATABASE_ERROR;
 	}
 
 	m_lpLogger->Log(EC_LOGLEVEL_NOTICE,"Create database %s", lpDatabase);
 
 	er = IsInnoDBSupported();
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	strQuery = "CREATE DATABASE IF NOT EXISTS `"+std::string(lpConfig->GetSetting("mysql_database"))+"`";
 	if(Query(strQuery) != erSuccess){
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Unable to create database: %s", GetError().c_str());
-		er = ZARAFA_E_DATABASE_ERROR;
-		goto exit;
+		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Unable to create database: %s", GetError());
+		return ZARAFA_E_DATABASE_ERROR;
 	}
 
 	strQuery = "USE `"+std::string(lpConfig->GetSetting("mysql_database"))+"`";
 	er = DoInsert(strQuery);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	// Database tables
-	for (unsigned int i=0; sDatabaseTables[i].lpSQL != NULL; i++)
-	{
+	for (unsigned int i = 0; sDatabaseTables[i].lpSQL != NULL; ++i) {
 		m_lpLogger->Log(EC_LOGLEVEL_NOTICE,"Create table: %s", sDatabaseTables[i].lpComment);
 		er = DoInsert(sDatabaseTables[i].lpSQL);
 		if(er != erSuccess)
-			goto exit;
+			return er;
 	}
 
 	m_lpLogger->Log(EC_LOGLEVEL_NOTICE,"Database is created");
-
-exit:
-	return er;
+	return erSuccess;
 }

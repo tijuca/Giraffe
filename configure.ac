@@ -2,16 +2,11 @@ AC_PREREQ(2.60)
 m4_define([zarafa_version], esyscmd(tr -d '\n' <version.in))
 AC_INIT([Zarafa], [zarafa_version], [zarafa-dev@zarafa.com])
 AC_CONFIG_SRCDIR([provider/server/ECServer.cpp])
-AC_CONFIG_HEADERS([common/config.h])
+AC_CONFIG_HEADERS([common/config.h common/include/zarafa/zconfig.h])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_CONFIG_MACRO_DIR([autoconf])
-# because webaccess has too deep dirs for default tar-v7, we need something "better"
-AM_INIT_AUTOMAKE([1.10 foreign tar-ustar subdir-objects])
+AM_INIT_AUTOMAKE([1.10 foreign subdir-objects])
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
-
-# used in the pkgconfig file
-ZARAFA_VERSION=zarafa_version
-AC_SUBST(ZARAFA_VERSION)
 
 ECCLIENT_LIBRARY_VERSION=1:0:0
 AC_SUBST(ECCLIENT_LIBRARY_VERSION)
@@ -23,37 +18,22 @@ AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_CXX
 AC_PROG_INSTALL
-AC_PROG_MAKE_SET
-AC_PROG_LEX
-AC_PROG_YACC
 AC_PATH_PROG(PROG_XMLTO, xmlto)	# not an error if not found, just no manual pages
 AC_PATH_PROG(PROG_ANT, ant)		# not an error if not found, no 'make dist' (waxt package)
-AM_PROG_CC_C_O
+PKG_PROG_PKG_CONFIG
+
+AC_PATH_PROG([SWIG_EXEC], [swig])
+AS_IF([test "x$SWIG_EXEC" = "x"], [AC_MSG_ERROR([Cannot find swig binary])])
+
+
+AM_PATH_PYTHON([2.5])
+PYTHON_LIBS=$("$PYTHON" -c "import distutils.sysconfig as x; print('-lpython' + x.get_config_var('VERSION') + ' ' + x.get_config_var('LIBS') + ' ' + x.get_config_var('SYSLIBS'))")
+PYTHON_INCLUDES=$("$PYTHON" -c "import distutils.sysconfig as x; print('-I' + x.get_python_inc())")
+AC_SUBST([PYTHON_LIBS])
+AC_SUBST([PYTHON_INCLUDES])
 
 abs_top_srcdir=`cd $srcdir; pwd`
 abs_top_builddir=`pwd`
-
-# Lex / Yacc version
-if test "x$LEX" = "x" -o "x$LEX" = "x:"; then
-    AC_MSG_ERROR([Lexer not found. Please install flex])
-elif test "x$LEX" = "xflex"; then
-   LEX_DEFINE=-DWITH_FLEX
-   LEX_FLAGS="-l"
-else
-   LEX_DEFINE=-DWITH_LEX
-   LEX_FLAGS=
-fi
-AC_SUBST(LEX_DEFINE)
-AC_SUBST(LEX_FLAGS)
-
-AC_PROG_YACC
-if test x"$YACC" = "xyacc"; then
-  AC_CHECK_PROG([YACC_EXISTS], [yacc], [yes], [no])
-  if test x"$YACC_EXISTS" != xyes; then
-    AC_MSG_ERROR([[bison/byacc/yacc not found.
-          Please install bison]])
-  fi
-fi
 
 #
 # construct default CXXFLAGS
@@ -89,13 +69,17 @@ AC_SUBST([ZPHPCXXFLAGS])
 
 # default to debug mode
 # disable write-strings: too much complains about "" being 'cast' to char* (since const char* is not in the declarations) on g++-4.2 and higher
-ZCPPFLAGS="$BUILDOS -DHAVE_CONFIG_H"
+ZCPPFLAGS="$BUILDOS -DHAVE_CONFIG_H \
+	-I\${top_builddir}/common/include \
+	-I\${top_srcdir}/common/include \
+	-I\${top_srcdir}/m4lcommon/include \
+	-I\${top_srcdir}/provider/common/include \
+	-I\${top_srcdir}/provider/libserver/include \
+	-I\${top_srcdir}/ECtools/archiver/include \
+	-I\${top_srcdir}/inetmapi/include \
+	-I\${top_srcdir}/swig/include \
+	-I\${top_srcdir}/swig/python/include"
 ZCXXFLAGS="-Wall -Wmissing-declarations -Wno-write-strings"
-if ! test "$want_release" = "yes"; then
-# when using -pedantic, -Wno-long-long is required
-# only add -pedantic in non-release mode, since a header in php5 contains a , too much in an enum, which triggers a compile error.
-  ZCXXFLAGS="$ZCXXFLAGS -pedantic -Wno-long-long"
-fi
 
 # programs that use files >2gb need 64bit file support
 LFS_CFLAGS=`getconf LFS_CFLAGS`
@@ -118,7 +102,7 @@ AC_CHECK_LIB([pthread], [pthread_create], [ZCXXFLAGS="$ZCXXFLAGS -pthread"], AC_
 # enable/disable options
 #
 
-AC_ARG_ENABLE(release, AC_HELP_STRING([--enable-release],[enable release mode (compile flags -O2 and no DEBUG defines)]),
+AC_ARG_ENABLE([release], AS_HELP_STRING([--enable-release], [enable release mode (compile flags -O2 and no DEBUG defines)]),
   [want_release=${enableval}],[want_release=no])
 if test "$want_release" = "yes"; then
     ZCPPFLAGS="$ZCPPFLAGS -DNDEBUG -DFORCE_CHARSET_CONVERSION"
@@ -126,44 +110,38 @@ if test "$want_release" = "yes"; then
 else
 # -fPIC must be present on x86_64 when -O2 isn't used
     ZCXXFLAGS="$ZCXXFLAGS -fPIC"
+    ZCXXFLAGS="$ZCXXFLAGS -pedantic -Wno-long-long"
 fi
 
-AC_ARG_ENABLE(unicode, AC_HELP_STRING([--enable-unicode],[enable unicode mode (compile flags -DUNICODE)]),
+AC_ARG_ENABLE([unicode], AS_HELP_STRING([--enable-unicode], [enable unicode mode (compile flags -DUNICODE)]),
   [want_unicode=${enableval}],[want_unicode=yes])
+SWIG_FLAGS=""
 if test "$want_unicode" = "yes"; then
     ZCPPFLAGS="$ZCPPFLAGS -DUNICODE"
+    SWIG_FLAGS="-DUNICODE "
 fi
+AC_SUBST([SWIG_FLAGS])
 
-AC_ARG_ENABLE(tcmalloc, AC_HELP_STRING([--enable-tcmalloc],[enable use of tcmalloc minimal lib]),
+AC_ARG_ENABLE([tcmalloc], AS_HELP_STRING([--enable-tcmalloc], [enable use of tcmalloc minimal lib]),
   [want_tcmalloc=${enableval}],[want_tcmalloc=no])
 
-AC_ARG_ENABLE(sparsehash, AC_HELP_STRING([--enable-sparsehash],[enable use of sparsehash]),
+AC_ARG_ENABLE([sparsehash], AS_HELP_STRING([--enable-sparsehash], [enable use of sparsehash]),
   [want_sparsehash=${enableval}],[want_sparsehash=no])
 
 AC_MSG_CHECKING([specified Linux distribution name])
-AC_ARG_WITH(distro, AC_HELP_STRING([--with-distro],[set distribution name, used for sysconfig and initscripts only. available: rhel, alt, suse or sles]),
+AC_ARG_WITH([distro], AS_HELP_STRING([--with-distro], [set distribution name, used for sysconfig and initscripts only. available: rhel, alt, suse or sles]),
   [with_distro=${withval}],[with_distro=rhel])
-if test "$with_distro" != "rhel" -a "$with_distro" != "suse" -a "$with_distro" != "sles" -a "$with_distro" != "alt" -a "$with_distro" != "cbs4"; then
-   AC_MSG_RESULT([unknown distro, using rhel instead])
-   with_distro=rhel
+if test "$with_distro" != "rhel" -a "$with_distro" != "suse" -a \
+   "$with_distro" != "sles" -a "$with_distro" != "alt" -a \
+   "$with_distro" != "cbs4" -a "$with_distro" != "debian"; then
+	AC_MSG_ERROR([unknown distro])
 else
-   AC_MSG_RESULT([using $with_distro])
+	AC_MSG_RESULT([using $with_distro])
 fi
 DISTRO=$with_distro
 AC_SUBST(DISTRO)
 
-AC_ARG_ENABLE(oss, AC_HELP_STRING([--enable-oss],[enable opensource mode]),
-  [want_oss=${enableval}],[want_oss=no])
-AC_MSG_CHECKING([non-oss distro files])
-if test "$want_oss" = "no" -a ! -d `dirname $0`/licensed; then
-   AC_MSG_RESULT([not found])
-   want_oss="yes"
-else
-   AC_MSG_RESULT([ok])
-fi
-AM_CONDITIONAL([OSS_ONLY], [test "$want_oss" = yes])
-
-AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],[enable debug mode (Adds debug code)]),
+AC_ARG_ENABLE([debug], AS_HELP_STRING([--enable-debug], [enable debug mode (Adds debug code)]),
   [want_debug=${enableval}],[want_debug=no])
 if test "$want_debug" = "yes"; then
     DEBUGFLAGS="-DDEBUG"
@@ -176,77 +154,77 @@ AC_SUBST(DEBUGFLAGS)
 
 # profiling
 AC_ARG_ENABLE(profiling,
-  AC_HELP_STRING([--enable-profiling], [enable profiling (-pg)]),
+  AS_HELP_STRING([--enable-profiling], [enable profiling (-pg)]),
     [ if test "${enableval}" = "yes"; then
 		ZCXXFLAGS="$ZCXXFLAGS -pg"
-		ZLDFLAGS="$LDFLAGS -pg"
+		ZLDFLAGS="$ZLDFLAGS -pg"
 	  fi
     ])
 
 AC_ARG_ENABLE(coverage,
-  AC_HELP_STRING([--enable-coverage], [enable coverage (--coverage)]),
+  AS_HELP_STRING([--enable-coverage], [enable coverage (--coverage)]),
     [ if test "${enableval}" = "yes"; then
 		ZCXXFLAGS="$ZCXXFLAGS -g --coverage -fprofile-arcs -ftest-coverage"
-		ZLDFLAGS="$LDFLAGS -lgcov"
+		ZLDFLAGS="$ZLDFLAGS -lgcov"
 	  fi
     ])
 
 # test offline possibility
-AC_DEFUN([OFFLINE_CONFIG],[
-  AC_ARG_ENABLE(offline, AC_HELP_STRING([--enable-offline],[Compile zarafa-server as the offline server]),
+  AC_ARG_ENABLE([offline], AS_HELP_STRING([--enable-offline], [Compile zarafa-server as the offline server]),
   [
   	ZCPPFLAGS="$ZCPPFLAGS -DHAVE_OFFLINE_SUPPORT"
   ])
-])
-if ! test "$want_oss" = "yes"; then
-   OFFLINE_CONFIG
-fi
 
 # MAPI config files
 AC_ARG_WITH(mapi-configdir,
-  AC_HELP_STRING([--with-mapi-configdir=PATH],[path to install the libmapi config (provider) files (default /etc/mapi)]),
-  [MAPICONFIGDIR=${withval}],[MAPICONFIGDIR=/etc/mapi])
+  AS_HELP_STRING([--with-mapi-configdir=PATH], [path to install the libmapi config (provider) files (default /etc/mapi)]),
+  [MAPICONFIGDIR=${withval}],[MAPICONFIGDIR='${sysconfdir}/mapi'])
 AC_SUBST(MAPICONFIGDIR)
-
-# Timezones
-AC_ARG_WITH(mapi-timezonedir,
-  AC_HELP_STRING([--with-mapi-timezonedir=PATH],[path to install MAPI timezone definition files (default /usr/share/zarafa/timezones)]),
-  [TIMEZONEDIR=${withval}],[TIMEZONEDIR=/usr/share/zarafa/timezones])
-AC_SUBST(TIMEZONEDIR)
 
 # user create scripts location
 AC_ARG_WITH(userscript-prefix,
-  AC_HELP_STRING([--with-userscript-prefix=PATH],[path to install the userscripts in (default /etc/zarafa/userscripts)]),
-  [USERSCRIPTDIR=${withval}],[USERSCRIPTDIR=/etc/zarafa/userscripts])
+  AS_HELP_STRING([--with-userscript-prefix=PATH], [path to install the userscripts in (default SYSCONFDIR/zarafa/userscripts)]),
+  [USERSCRIPTDIR=${withval}],[USERSCRIPTDIR='/etc/zarafa/userscripts'])
 AC_SUBST(USERSCRIPTDIR)
+AS_IF([echo "$USERSCRIPTDIR" | grep -q '\$'],
+	[AC_MSG_ERROR([Variable expansion unfortunately not supported for --with-userscript-prefix])])
 
 # quota warning templates location
 AC_ARG_WITH(quotatemplate-prefix,
-  AC_HELP_STRING([--with-quotatemplate-prefix=PATH],[path to install the quota warning templates in (default /etc/zarafa/quotamail)]),
-  [QUOTATEMPLATEDIR=${withval}],[QUOTATEMPLATEDIR=/etc/zarafa/quotamail])
+  AS_HELP_STRING([--with-quotatemplate-prefix=PATH], [path to install the quota warning templates in (default SYSCONFDIR/zarafa/quotamail)]),
+  [QUOTATEMPLATEDIR=${withval}],[QUOTATEMPLATEDIR='${sysconfdir}/zarafa/quotamail'])
 AC_SUBST(QUOTATEMPLATEDIR)
 
 # search scripts location
 AC_ARG_WITH(searchscripts-prefix,
-  AC_HELP_STRING([--with-searchscripts-prefix=PATH],[path to install the search scripts in (default /etc/zarafa/searchscripts)]),
-  [SEARCHSCRIPTSDIR=${withval}],[SEARCHSCRIPTSDIR=/etc/zarafa/searchscripts])
+  AS_HELP_STRING([--with-searchscripts-prefix=PATH], [path to install the search scripts in (default SYSCONFDIR/zarafa/searchscripts)]),
+  [SEARCHSCRIPTSDIR=${withval}],[SEARCHSCRIPTSDIR='${sysconfdir}/zarafa/searchscripts'])
 AC_SUBST(SEARCHSCRIPTSDIR)
 
-#
-# find required headers and functions
-#
-
-AC_HEADER_STDC
-
-# Checks for typedefs, structures, and compiler characteristics.
-AC_HEADER_STDBOOL
-AC_C_CONST
-AC_C_INLINE
-AC_C_RESTRICT
-AC_TYPE_SIZE_T
-AC_TYPE_SSIZE_T
-AC_HEADER_TIME
-AC_STRUCT_TM
+AC_ARG_WITH([systemunitdir],
+	[AS_HELP_STRING([--with-systemunitdir=PATH], [Path to systemd service unit directory])],
+	[systemunitdir="$withval"],
+	[
+		systemunitdir=$("$PKG_CONFIG" systemd --variable systemdsystemunitdir 2>/dev/null)
+		AS_IF([test -z "$systemunitdir"], [systemunitdir='${prefix}/lib/systemd/system'])
+	])
+AC_SUBST([systemunitdir])
+AC_ARG_WITH([sysusersdir],
+	[AS_HELP_STRING([--with-sysusersdir=PATH], [Path to sysusers config directory])],
+	[sysusersdir="$withval"],
+	[
+		sysusersdir=$("$PKG_CONFIG" systemd --variable sysusersdir 2>/dev/null)
+		AS_IF([test -z "$sysusersdir"], [sysusersdir='${prefix}/lib/sysusers.d'])
+	])
+AC_SUBST([sysusersdir])
+AC_ARG_WITH([tmpfilesdir],
+	[AS_HELP_STRING([--with-tmpfilesdir=PATH], [Path to tmpfiles config directory])],
+	[tmpfilesdir="$withval"],
+	[
+		tmpfilesdir=$("$PKG_CONFIG" systemd --variable tmpfilesdir 2>/dev/null)
+		AS_IF([test -z "$tmpfilesdir"], [tmpfilesdir='${prefix}/lib/tmpfiles.d'])
+	])
+AC_SUBST([tmpfilesdir])
 
 # zarafa-stats requires ncurses(w) for --top
 # check wide version before non-wide version
@@ -274,31 +252,13 @@ AC_DEFUN([LIBNCURSES_WITH_CONFIG],[
 ])
 LIBNCURSES_WITH_CONFIG
 
-AC_CHECK_HEADERS([memory.h stddef.h stdlib.h string.h sys/timeb.h wchar.h syslog.h sys/un.h sys/ucred.h sys/stat.h openssl/ssl.h zlib.h])
-
-# Checks for library functions.
-AC_FUNC_MALLOC
-AC_FUNC_MEMCMP
-AC_FUNC_MKTIME
-AC_FUNC_REALLOC
-AC_FUNC_STRFTIME
-AC_FUNC_STRTOD
-AC_FUNC_VPRINTF
-AC_TYPE_SIGNAL
-AC_CHECK_FUNCS([random gettimeofday ftime localtime_r timegm gmtime gmtime_r memchr memset select socket strchr strerror strrchr strstr strtol strtoul strtoll strtoull sscanf strtof_l strtod_l wctomb mbtowc dcgettext getpeereid gethostbyname_r getpwnam_r vsyslog snprintf sprintf_l vsnprintf_l])
+AC_CHECK_HEADERS([syslog.h sys/un.h sys/stat.h])
+AC_CHECK_FUNCS([timegm getpeereid getpwnam_r vsyslog vsnprintf_l])
 
 
 #
 # find required/optional libraries
 #
-
-# checks for swig (optional if files are already generated in make dist) and python
-SWIG_CHECK_SWIG
-SWIG_CHECK_PYTHON
-if test "$want_unicode" = "yes"; then
-   SWIG_FLAGS="-DUNICODE"
-fi
-AC_SUBST(SWIG_FLAGS)
 
 AC_ARG_WITH([php], [AS_HELP_STRING([--without-php], [Disable building PHP components])])
 AM_CONDITIONAL([WITH_PHP], [test "$with_php" != "no"])
@@ -311,7 +271,7 @@ AS_IF([test "$with_php" != "no"], [
 
 # Checks for libxml2
 AC_DEFUN([LIBXML_WITH_XML2_CONFIG],[
-  AC_ARG_WITH(xml2-config, AC_HELP_STRING([--with-xml2-config=PATH],[path to the xml2-config script of libxml2]),
+  AC_ARG_WITH([xml2-config], AS_HELP_STRING([--with-xml2-config=PATH], [path to the xml2-config script of libxml2]),
     [XML2_CONFIG=${withval}],[XML2_CONFIG=xml2-config])
 
   AC_MSG_CHECKING([for xml2-config presence])
@@ -348,10 +308,10 @@ AM_CONDITIONAL([WITH_XML2], [test "$XML2_CONFIG" != "" -a -x "`which $XML2_CONFI
 
 # Checks for MySQL 4.1 or better
 AC_DEFUN([MYSQL_WITH_MYSQL_CONFIG],[
-  AC_ARG_WITH(mysql-config, AC_HELP_STRING([--with-mysql-config=PATH], [path to the mysql-config script of mysql 4.1]),
+  AC_ARG_WITH([mysql-config], AS_HELP_STRING([--with-mysql-config=PATH], [path to the mysql-config script of mysql 4.1]),
     [MYSQL_CONFIG=${withval}],[MYSQL_CONFIG=mysql_config])
 
-  AC_ARG_ENABLE(embedded-mysql, AC_HELP_STRING([--enable-embedded-mysql],[Compile zarafa-server with the embedded MySQL server]),
+  AC_ARG_ENABLE([embedded-mysql], AS_HELP_STRING([--enable-embedded-mysql], [Compile zarafa-server with the embedded MySQL server]),
   [
 	EMBEDDED=1
 	ZCPPFLAGS="$ZCPPFLAGS -DEMBEDDED_MYSQL"
@@ -456,7 +416,7 @@ VMIME_CFLAGS=""
 VMIME_LIBS="-lvmime"
 
 AC_ARG_WITH(vmime-prefix,
-  AC_HELP_STRING([--with-vmime-prefix=PATH],[libvmime prefix, e.g. /usr/local, default /usr]),
+  AS_HELP_STRING([--with-vmime-prefix=PATH], [libvmime prefix, e.g. /usr/local, default /usr]),
   [
   VMIME_PREFIX="$withval"
   VMIME_CFLAGS="$VMIME_CFLAGS -I$VMIME_PREFIX/include"
@@ -465,11 +425,13 @@ AC_ARG_WITH(vmime-prefix,
 AC_SUBST(VMIME_CFLAGS)
 AC_SUBST(VMIME_LIBS)
 
-GSOAP_CFLAGS="-DWITH_OPENSSL -DWITH_GZIP"
+dnl Stupid gsoap not abstracting properly! If our -Ds do not match with what
+dnl gsoap was compiled with, we are in trouble.
+GSOAP_CFLAGS="-DWITH_OPENSSL -DWITH_GZIP -DHAVE_OPENSSL_SSL_H -DHAVE_ZLIB_H"
 GSOAP_LIBS="-lgsoapssl++"
 AC_MSG_CHECKING([gsoap])
 AC_ARG_WITH(gsoap-prefix,
-  AC_HELP_STRING([--with-gsoap-prefix=PATH],[gsoap prefix, e.g. /usr/local, default /usr]),
+  AS_HELP_STRING([--with-gsoap-prefix=PATH], [gsoap prefix, e.g. /usr/local, default /usr]),
   [
   GSOAP_PREFIX="$withval"
   GSOAP_SOAPCPP2="$GSOAP_PREFIX/bin/soapcpp2"
@@ -492,7 +454,7 @@ AC_SUBST(GSOAP_SOAPCPP2)
 ICAL_CFLAGS=""
 ICAL_LIBS="-lical -licalss"
 AC_ARG_WITH(ical-prefix,
-  AC_HELP_STRING([--with-ical-prefix=PATH],[libical prefix, e.g. /usr/local, default /usr]),
+  AS_HELP_STRING([--with-ical-prefix=PATH], [libical prefix, e.g. /usr/local, default /usr]),
   [
   ICAL_PREFIX="${withval}"
   ICAL_CFLAGS="$ICAL_CFLAGS -I$ICAL_PREFIX/include"
@@ -591,29 +553,33 @@ iconv_t i; i = iconv_open("", "");
 AC_SUBST(ICONV_LIBS)
 LIBS=$LIBS_system
 
-AC_MSG_CHECKING([for crypt])
-AC_LINK_IFELSE([ AC_LANG_SOURCE([int main() {
-  char crypt();  crypt();
-}]) ],
-	[ AC_MSG_RESULT([yes]) ],
-	[ AC_MSG_RESULT([no])
-	  AC_CHECK_LIB([crypt], [crypt], [CRYPT_LIBS="-lcrypt"], AC_MSG_ERROR([required library libcrypt missing or unusable])) ])
-LIBS=$LIBS_system
-AC_SUBST(CRYPT_LIBS)
-
-# Only specific links with uuid and dl, clients only with crypto and ssl for ssl connections
-SSL_LIBS=
-# TODO: version of ssl check??
-# ssl before crypto, because of dependancies
-AC_CHECK_LIB([ssl], [SSL_accept], [SSL_LIBS="$SSL_LIBS -lssl"], AC_MSG_ERROR([required library libssl missing or unusable]))
-AC_CHECK_LIB([crypto], [BIO_accept], [SSL_LIBS="$SSL_LIBS -lcrypto"], AC_MSG_ERROR([required library libcrypto missing or unusable]))
-AC_SUBST(SSL_LIBS)
+AC_SEARCH_LIBS([crypt_r], [crypt], [CRYPT_LIBS="-lcrypt"; LIBS="$LIBS_system"])
+AC_SUBST([CRYPT_LIBS])
+PKG_CHECK_EXISTS([libssl],
+	[
+		PKG_CHECK_MODULES([SSL], [libssl], [], [ssl_LIBS=-lssl])
+	],
+	[
+		AC_CHECK_LIB([ssl], [SSL_accept], [SSL_LIBS="-lssl"], AC_MSG_ERROR([required library libssl missing or unusable]))
+		AC_SUBST([SSL_LIBS])
+	])
+PKG_CHECK_EXISTS([libcrypto],
+	[
+		PKG_CHECK_MODULES([CRYPTO], [libcrypto])
+	],
+	[
+		AC_CHECK_LIB([crypto], [BIO_accept], [CRYPTO_LIBS="-lcrypto"], AC_MSG_ERROR([required library libcrypto missing or unusable]))
+		AC_SUBST([CRYPTO_LIBS])
+	])
+ZCPPFLAGS="$ZCPPFLAGS $CRYPTO_CFLAGS"
 LIBS=$LIBS_system
 
 # OpenSSL check for new EVP_PKEY_cmp() function
-LIBS="$LIBS $SSL_LIBS"
+LIBS="$LIBS $CRYPTO_LIBS"
+CPPFLAGS="$CPPFLAGS $CRYPTO_CFLAGS"
 AC_CHECK_FUNCS([EVP_PKEY_cmp])
 LIBS=$LIBS_system
+CPPFLAGS=$CPPFLAGS_system
 
 # Check for pam library (optional)
 PAM_LIBS=
@@ -626,7 +592,7 @@ AM_CONDITIONAL([WITH_PAM], [test "$PAM_LIBS" != ""])
 
 # Check for kerberos library (optional)
 AC_DEFUN([LIBKRB5_WITH_KRB5_CONFIG],[
-  AC_ARG_WITH(krb5-config, AC_HELP_STRING([--with-krb5-config=PATH],[path to the krb5-config script of libkrb5]),
+  AC_ARG_WITH([krb5-config], AS_HELP_STRING([--with-krb5-config=PATH], [path to the krb5-config script of libkrb5]),
     [KRB5_CONFIG=${withval}],[KRB5_CONFIG=krb5-config])
 
   AC_MSG_CHECKING([for krb5-config presence])
@@ -671,6 +637,12 @@ AC_CHECK_LIB([curl], [curl_easy_perform], [CURL_LIBS="-lcurl"], AC_MSG_ERROR([re
 AC_SUBST(CURL_LIBS)
 fi # oss only
 
+# Check for libs3 amazon s3 availability
+LIBS_system="$LIBS"
+AC_CHECK_HEADERS([libs3.h])
+AC_SEARCH_LIBS([S3_initialize], [s3], [s3_LIBS="-ls3"; LIBS="$LIBS_system"])
+AC_SUBST([s3_LIBS])
+
 AC_CHECK_FUNCS([uuid_create], UUID_LIBS="",	dnl uuid_create is in libc on FreeBSD
   AC_CHECK_LIB([uuid], [uuid_create],
     UUID_LIBS="-luuid"
@@ -702,7 +674,7 @@ AC_CHECK_FUNCS([gettext], INTL_LIBS="", dnl gettext in libc
 AC_SUBST(INTL_LIBS)
 
 # check epoll support
-AC_ARG_ENABLE(epoll, AC_HELP_STRING([--enable-epoll], [enable building epoll socket handling]), [want_epoll=${enableval}], [want_epoll=no])
+AC_ARG_ENABLE([epoll], AS_HELP_STRING([--enable-epoll], [enable building epoll socket handling]), [want_epoll=${enableval}], [want_epoll=no])
 AM_CONDITIONAL(WITH_EPOLL, test "$want_epoll" = "yes")
 if test "$want_epoll" = "yes"; then
 AC_CHECK_FUNCS([epoll_create])
@@ -718,23 +690,55 @@ BOOST_SMART_PTR
 BOOST_FILESYSTEM([mt])
 BOOST_DATE_TIME([mt])
 
-AC_ARG_ENABLE(icu, AC_HELP_STRING([--enable-icu],[enable icu support]), [want_icu=${enableval}],[want_icu=auto])
-if test "$want_icu" = "no"; then
-	have_icu=0
-elif test "$want_icu" = "auto"; then
-	AC_CHECK_ICU([3.4],
-		[ have_icu=1 
-		  AC_DEFINE([HAVE_ICU], [1], [Defined if the requested minimum ICU version is satisfied]) ],
-		[ have_icu=0 ])
-elif test "$want_icu" = "yes"; then
-	AC_CHECK_ICU([3.4],
-		[ have_icu=1 
-		  AC_DEFINE([HAVE_ICU], [1], [Defined if the requested minimum ICU version is satisfied]) ])
-fi
-AM_CONDITIONAL([HAVE_ICU], [ test "$have_icu" -eq 1 ])
+dnl The "Locale" class is in icu-uc.
+dnl The "CollationKey" class is in icu-i18n.
+req_icu_uc="icu-uc"
+req_icu_i18n="icu-i18n"
+AC_ARG_ENABLE([icu], AS_HELP_STRING([--enable-icu], [enable icu support]), [want_icu=${enableval}], [want_icu=auto])
+PKG_CHECK_EXISTS([icu-uc], [have_icu=1], [have_icu=0])
+PKG_CHECK_EXISTS([icu-i18n], [have_icu=1], [have_icu=0])
+AS_IF([test "$have_icu" = 1], [AC_MSG_RESULT([Found ICU with modern pkg-config files])])
+AS_IF([test "$have_icu" = 0], [
+	dnl RHEL 6 / icu 4.x
+	PKG_CHECK_EXISTS([icu], [
+		req_icu_uc="icu"
+		req_icu_i18n="icu"
+		AC_MSG_RESULT([Found ICU with old-style pkg-config files])
+	])
+])
+AS_IF([test "$want_icu" = "auto"], [
+	PKG_CHECK_MODULES([icu_uc], [$req_icu_uc], [have_icu=1], [have_icu=0])
+	PKG_CHECK_MODULES([icu_i18n], [$req_icu_i18n], [have_icu=1], [have_icu=0])
+])
+AS_IF([test "$have_icu" = 0], [
+	AC_CHECK_HEADERS([unicode/coll.h], [have_icu=2])
+])
+AS_IF([test "$have_icu" = 1], [
+	dnl PKG_CHECK_EXISTS only tests, and never logs.
+	dnl Now that we know we want PKG_CHECK, do it for real:
+	PKG_CHECK_MODULES([icu_uc], [$req_icu_uc])
+	PKG_CHECK_MODULES([icu_i18n], [$req_icu_i18n])
+])
+AS_IF([test "$have_icu" = 2], [
+	AC_MSG_RESULT([Found ICU by header file])
+	icu_uc_CFLAGS=""
+	icu_i18n_CFLAGS=""
+	icu_uc_LIBS="-licuuc"
+	icu_i18n_LIBS="-licui18n"
+	AC_SUBST([icu_uc_LIBS])
+	AC_SUBST([icu_i18n_LIBS])
+])
+AS_IF([test "$want_icu" = "yes" && test "$have_icu" = 0], [
+	AC_MSG_ERROR([ICU was requested but not found])
+])
+AS_IF([test "$have_icu" != 0], [
+	AC_DEFINE([ZCP_USES_ICU], [1], [Defined if ZCP was built with ICU])
+])
+AM_CONDITIONAL([HAVE_ICU], [test "$have_icu" -ne 0])
+ZCPPFLAGS="$ZCPPFLAGS $icu_uc_CFLAGS $icu_i18n_CFLAGS"
 
 # all libs for programs, because functions are in static common stuff
-PROG_LIBS="$UUID_LIBS $INTL_LIBS $ICONV_LIBS $GZ_LIBS $ICU_LIBS"
+PROG_LIBS="$UUID_LIBS $INTL_LIBS $ICONV_LIBS $GZ_LIBS"
 AC_SUBST(PROG_LIBS)
 
 # done testing C++ requirements
@@ -754,6 +758,7 @@ AC_CONFIG_FILES([Makefile
 		mapi4linux/include/Makefile
 		mapi4linux/src/Makefile
 		m4lcommon/Makefile
+		m4lcommon/include/zarafa/Makefile
 		php-ext/Makefile
 		provider/Makefile
 		provider/client/Makefile
@@ -765,20 +770,17 @@ AC_CONFIG_FILES([Makefile
 		provider/server/Makefile
 		provider/soap/Makefile
 		inetmapi/Makefile
+		inetmapi/include/inetmapi/Makefile
 		spooler/Makefile
 		spooler/python/Makefile
 		spooler/python/plugins/Makefile
 		common/Makefile
+		common/include/zarafa/Makefile
 		ECtools/Makefile
-		ECtools/zarafa-admin/Makefile
-		ECtools/zarafa-passwd/Makefile
-		ECtools/zarafa-monitor/Makefile
-		ECtools/zarafa-fsck/Makefile
-		ECtools/zarafa-cfgchecker/Makefile
-		ECtools/zarafa-stats/Makefile
-		ECtools/zarafa-archiver/Makefile
-		ECtools/zarafa-search/Makefile
-		ECtools/zarafa-utils/Makefile
+		ECtools/archiver/include/zarafa/Makefile
+		ECtools/backup-plus/Makefile
+		ECtools/presence/Makefile
+		ECtools/search/Makefile
 		installer/Makefile
 		installer/linux/Makefile
 		installer/userscripts/Makefile
@@ -803,7 +805,9 @@ AC_CONFIG_FILES([Makefile
 		libicalmapi/Makefile
 		caldav/Makefile
 		swig/Makefile
+		swig/include/zarafa/Makefile
 		swig/python/Makefile
+		swig/python/include/zarafa/Makefile
 		swig/python/zarafa/Makefile
 		zarafa-libsync/Makefile
 
@@ -816,6 +820,7 @@ AC_CONFIG_FILES([Makefile
 dnl non-oss files
 
 AC_OUTPUT
+ln -Tfsv "${abs_top_srcdir}" "@"
 
 AC_MSG_RESULT([
 Install prefix	:	$prefix
@@ -854,11 +859,12 @@ Curl libs	:	$CURL_LIBS
 Pam libs	:	$PAM_LIBS
 Krb5 libs	:	$KRB5_LIBS
 TCMalloc lib	:	$TCMALLOC_LIBS
+S3 lib		:	$s3_LIBS
 Boost		:
  Flags		:	$BOOST_CPPFLAGS
  FS ldflags	:	$BOOST_FILESYSTEM_LDFLAGS
  FS libs	:	$BOOST_FILESYSTEM_LIBS
-ICU libs	:	$ICU_LIBS
-Swig 		:	$want_swig
-Python module	:	$want_python
+ICU libs	:	$icu_uc_LIBS $icu_i18n_LIBS
+Python flags	:	$PYTHON_INCLUDES
+Python libs	:	$PYTHON_LIBS
 ])

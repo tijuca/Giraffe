@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ECFBBlockList.h"
 
 #ifdef _DEBUG
@@ -93,8 +67,7 @@ HRESULT ECFBBlockList::Merge(FBBlock_1* lpFBBlock)
 		goto exit;
 	}
 
-	for(FBIter = m_FBMap.begin(); FBIter != m_FBMap.end(); FBIter++)
-	{
+	for (FBIter = m_FBMap.begin(); FBIter != m_FBMap.end(); ++FBIter) {
 		if(FBIter->second.m_tmEnd == lpFBBlock->m_tmStart)
 		{
 			FBIter->second.m_tmEnd = lpFBBlock->m_tmEnd;
@@ -138,8 +111,7 @@ HRESULT ECFBBlockList::Next(FBBlock_1* pblk)
 	if (pblk->m_tmStart < m_tmRestictStart)
 		pblk->m_tmStart = m_tmRestictStart;
 
-	m_FBIter++;
-
+	++m_FBIter;
 exit:
 	return hr;
 }
@@ -157,13 +129,11 @@ HRESULT ECFBBlockList::Skip(LONG items)
 		Restrict(m_tmRestictStart, m_tmRestictEnd);
 	}
 
-	for(LONG i=0; i < items; i++)
-	{
+	for (LONG i = 0; i < items; ++i) {
 		// Check if you are at the end of the list or the item doesn't matched with the restriction
 		if(m_FBIter == m_FBMap.end() || (m_tmRestictEnd != 0 && (ULONG)m_FBIter->second.m_tmStart > (ULONG)m_tmRestictEnd) )
 			break; //FIXME: gives a error or always oke?
-
-		m_FBIter++;
+		++m_FBIter;
 	}
 
 	return hrSuccess;
@@ -182,8 +152,7 @@ HRESULT ECFBBlockList::Restrict(LONG tmStart, LONG tmEnd)
 		
 		if( (ULONG)m_FBIter->second.m_tmEnd > (ULONG)m_tmRestictStart )
 			break;
-
-		m_FBIter++;
+		++m_FBIter;
 	}
 
 	return S_OK;
@@ -205,7 +174,7 @@ void ECFBBlockList::Clear()
 ULONG ECFBBlockList::Size()
 {
 	ULONG			size = 0;
-	mapFB::iterator	FBIter;
+	mapFB::const_iterator FBIter;
 
 	FBIter = m_FBMap.begin();
 	
@@ -214,15 +183,14 @@ ULONG ECFBBlockList::Size()
 		
 		if( (ULONG)FBIter->second.m_tmEnd > (ULONG)m_tmRestictStart )
 			break;
-
-		FBIter++;
+		++FBIter;
 	}
 
 	// loop while you reached end of list or doesn't mached with the restriction
 	while(FBIter != m_FBMap.end() && (m_tmRestictEnd == 0 || (ULONG)FBIter->second.m_tmStart <= (ULONG)m_tmRestictEnd))
 	{
-		size++;
-		FBIter++;
+		++size;
+		++FBIter;
 	}	
 
 	return size;
@@ -231,7 +199,7 @@ ULONG ECFBBlockList::Size()
 HRESULT ECFBBlockList::GetEndTime(LONG *lprtmEnd)
 {
 	HRESULT			hr = hrSuccess;
-	mapFB::iterator	FBIter;
+	mapFB::const_iterator FBIter;
 	LONG			ulEnd = 0;
 	bool			bFound = false;
 
@@ -244,7 +212,7 @@ HRESULT ECFBBlockList::GetEndTime(LONG *lprtmEnd)
 	while(FBIter != m_FBMap.end() && (m_tmRestictEnd == 0 || (ULONG)FBIter->second.m_tmStart <= (ULONG)m_tmRestictEnd))
 	{
 		ulEnd = FBIter->second.m_tmEnd;	
-		FBIter++;		
+		++FBIter;
 		bFound = true;
 	}	
 

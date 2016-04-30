@@ -1,55 +1,29 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 // ECXPProvider.cpp: implementation of the ECXPProvider class.
 //
 //////////////////////////////////////////////////////////////////////
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include <mapi.h>
 #include <mapispi.h>
 #include <mapiutil.h>
-#include "ECGuid.h"
+#include <zarafa/ECGuid.h>
 
 
 #include "Zarafa.h"
@@ -59,15 +33,15 @@
 #include "WSTransport.h"
 #include "Mem.h"
 
-#include "Util.h"
+#include <zarafa/Util.h>
 
-#include "ECDebug.h"
+#include <zarafa/ECDebug.h>
 
 #include "ClientUtil.h"
 #include "EntryPoint.h"
 
-#include <charset/convstring.h>
-#include "ECGetText.h"
+#include <zarafa/charset/convstring.h>
+#include <zarafa/ECGetText.h>
 
 #ifdef _DEBUG
 #undef THIS_FILE
@@ -107,9 +81,7 @@ HRESULT ECXPProvider::QueryInterface(REFIID refiid, void **lppInterface)
 
 HRESULT ECXPProvider::Shutdown(ULONG * lpulFlags)
 {
-	HRESULT hr = hrSuccess;
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECXPProvider::TransportLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG * lpulFlags, LPMAPIERROR * lppMAPIError, LPXPLOGON * lppXPLogon)
@@ -117,7 +89,7 @@ HRESULT ECXPProvider::TransportLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTST
 	HRESULT			hr = hrSuccess;
 	ECXPLogon		*lpXPLogon = NULL;
 	WSTransport		*lpTransport = NULL;
-	ECMapProvider::iterator iterMap;
+	ECMapProvider::const_iterator iterMap;
 	std::string		strServerURL;
 	std::string		strUniqueId;
 	BOOL			bOffline = FALSE;

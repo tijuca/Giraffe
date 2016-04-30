@@ -1,55 +1,29 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include "DBBase.h"
-#include "ECDefs.h"
-#include "EMSAbTag.h"
-#include "stringutil.h"
-#include "md5.h"
+#include <zarafa/ECDefs.h>
+#include <zarafa/EMSAbTag.h>
+#include <zarafa/stringutil.h>
+#include <zarafa/md5.h>
 #include <mapidefs.h>
-#include "base64.h"
+#include <zarafa/base64.h>
 
 ZARAFA_API ECRESULT GetDatabaseObject(ECDatabase **lppDatabase);
 
@@ -61,13 +35,13 @@ DBPlugin::~DBPlugin() {
     // Do not delete m_lpDatabase as it is freed when the thread exits
 }
 
-void DBPlugin::InitPlugin() throw(std::exception) {
+void DBPlugin::InitPlugin() {
 
 	if(GetDatabaseObject(&m_lpDatabase) != erSuccess)
 	    throw runtime_error(string("db_init: cannot get handle to database"));
 }
 
-auto_ptr<signatures_t> DBPlugin::getAllObjects(const objectid_t &company, objectclass_t objclass) throw(std::exception)
+auto_ptr<signatures_t> DBPlugin::getAllObjects(const objectid_t &company, objectclass_t objclass)
 {
 	string strQuery =
 		"SELECT om.externid, om.objectclass, op.value "
@@ -90,9 +64,9 @@ auto_ptr<signatures_t> DBPlugin::getAllObjects(const objectid_t &company, object
 	return CreateSignatureList(strQuery);
 }
 
-auto_ptr<objectdetails_t> DBPlugin::getObjectDetails(const objectid_t &objectid) throw(std::exception)
+auto_ptr<objectdetails_t> DBPlugin::getObjectDetails(const objectid_t &objectid)
 {
-	auto_ptr<map<objectid_t, objectdetails_t> > objectdetails = auto_ptr<map<objectid_t, objectdetails_t> >(NULL);
+	auto_ptr<map<objectid_t, objectdetails_t> > objectdetails;
 	list<objectid_t> objectids;
 
 	objectids.push_back(objectid);
@@ -104,13 +78,13 @@ auto_ptr<objectdetails_t> DBPlugin::getObjectDetails(const objectid_t &objectid)
 	return auto_ptr<objectdetails_t>(new objectdetails_t(objectdetails->begin()->second));
 }
 
-auto_ptr<map<objectid_t, objectdetails_t> > DBPlugin::getObjectDetails(const list<objectid_t> &objectids) throw (std::exception)
+auto_ptr<map<objectid_t, objectdetails_t> > DBPlugin::getObjectDetails(const list<objectid_t> &objectids)
 {
 	map<objectid_t,objectdetails_t> *mapdetails = new map<objectid_t,objectdetails_t>;
 	map<objectid_t,objectdetails_t>::iterator iterDetails;
 	ECRESULT er;
 	map<objectclass_t, string> objectstrings;
-	map<objectclass_t, string>::iterator iterStrings;
+	std::map<objectclass_t, std::string>::const_iterator iterStrings;
 	string strQuery;
 	string strSubQuery;
 	DB_RESULT_AUTOFREE lpResult(m_lpDatabase);
@@ -119,22 +93,23 @@ auto_ptr<map<objectid_t, objectdetails_t> > DBPlugin::getObjectDetails(const lis
 	objectdetails_t details;
 	objectid_t lastid;
 	objectid_t curid;
-
-	list<objectid_t>::iterator iterID;
+	std::list<objectid_t>::const_iterator iterID;
 
 	if(objectids.empty())
 		return auto_ptr<map<objectid_t, objectdetails_t> >(mapdetails);
 
 	LOG_PLUGIN_DEBUG("%s N=%d", __FUNCTION__, (int)objectids.size());
 
-	for (list<objectid_t>::const_iterator i = objectids.begin(); i != objectids.end(); i++) {
+	for (std::list<objectid_t>::const_iterator i = objectids.begin();
+	     i != objectids.end(); ++i) {
 		if (!objectstrings[i->objclass].empty())
 			objectstrings[i->objclass] += ", ";
 		objectstrings[i->objclass] += "'" + m_lpDatabase->Escape(i->id) + "'";
 	}
 
 	/* Create subquery which combines all externids with the matching objectclass */
-	for (iterStrings = objectstrings.begin(); iterStrings != objectstrings.end(); iterStrings++) {
+	for (iterStrings = objectstrings.begin();
+	     iterStrings != objectstrings.end(); ++iterStrings) {
 		if (iterStrings != objectstrings.begin())
 			strSubQuery += " OR ";
 		strSubQuery += "(o.externid IN (" + iterStrings->second + ") "
@@ -265,7 +240,7 @@ auto_ptr<map<objectid_t, objectdetails_t> > DBPlugin::getObjectDetails(const lis
 	return auto_ptr<map<objectid_t, objectdetails_t> >(mapdetails);
 }
 
-auto_ptr<signatures_t> DBPlugin::getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentobject) throw(std::exception)
+auto_ptr<signatures_t> DBPlugin::getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentobject)
 {
 	string strQuery =
 		"SELECT o.externid, o.objectclass, modtime.value "
@@ -286,7 +261,7 @@ auto_ptr<signatures_t> DBPlugin::getSubObjectsForObject(userobject_relation_t re
 	return CreateSignatureList(strQuery);
 }
 
-auto_ptr<signatures_t> DBPlugin::getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childobject) throw(std::exception)
+auto_ptr<signatures_t> DBPlugin::getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childobject)
 {
 	string strQuery =
 		"SELECT o.externid, o.objectclass, modtime.value "
@@ -312,7 +287,7 @@ struct props {
 	const char *column;
 };
 
-void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &details, const std::list<std::string> *lpDeleteProps) throw(std::exception)
+void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &details, const std::list<std::string> *lpDeleteProps)
 {
 	ECRESULT er;
 	string strQuery;
@@ -323,9 +298,9 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 	string strData;
 	string strMD5Pw;
 	property_map anonymousProps;
-	property_map::iterator iterAnonymous;
+	property_map::const_iterator iterAnonymous;
 	property_mv_map anonymousMVProps;
-	property_mv_map::iterator iterMVAnonymous;
+	property_mv_map::const_iterator iterMVAnonymous;
 	std::list<std::string>::const_iterator iterProps;
 	unsigned int ulOrderId = 0;
 
@@ -369,7 +344,8 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 
 		bFirstOne = true;
 
-		for (iterProps = lpDeleteProps->begin(); iterProps != lpDeleteProps->end(); iterProps++) {
+		for (iterProps = lpDeleteProps->begin();
+		     iterProps != lpDeleteProps->end(); ++iterProps) {
 			if (!bFirstOne)
 				strDeleteQuery += ",";
 			strDeleteQuery += *iterProps;
@@ -429,13 +405,13 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 			strQuery += "((" + strSubQuery + "),'" + m_lpDatabase->Escape(sValidProps[i].column) + "','" +  m_lpDatabase->Escape(propvalue) + "')";
 			bFirstOne = false;
 		}
-
-		i++;
+		++i;
 	}
 
 	/* Load optional anonymous attributes */
 	anonymousProps = details.GetPropMapAnonymous();
-	for (iterAnonymous = anonymousProps.begin(); iterAnonymous != anonymousProps.end(); iterAnonymous++) {
+	for (iterAnonymous = anonymousProps.begin();
+	     iterAnonymous != anonymousProps.end(); ++iterAnonymous) {
 		if (!iterAnonymous->second.empty()) {
 			if (!bFirstOne)
 				strQuery += ",";
@@ -468,7 +444,8 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 		" AND propname IN (";
 
 	anonymousMVProps = details.GetPropMapListAnonymous();
-	for (iterMVAnonymous = anonymousMVProps.begin(); iterMVAnonymous != anonymousMVProps.end(); iterMVAnonymous++) {
+	for (iterMVAnonymous = anonymousMVProps.begin();
+	     iterMVAnonymous != anonymousMVProps.end(); ++iterMVAnonymous) {
 		ulOrderId = 0;
 
 		if (!bFirstDel)
@@ -479,7 +456,8 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 		if (iterMVAnonymous->second.empty())
 			continue;
 
-		for (iterProps = iterMVAnonymous->second.begin(); iterProps != iterMVAnonymous->second.end(); iterProps++) {
+		for (iterProps = iterMVAnonymous->second.begin();
+		     iterProps != iterMVAnonymous->second.end(); ++iterProps) {
 			if (!iterProps->empty()) {
 				if (!bFirstOne)
 					strQuery += ",";
@@ -493,7 +471,7 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 					"'" + m_lpDatabase->Escape(stringify(iterMVAnonymous->first, true)) + "',"
 					"" + stringify(ulOrderId) + ","
 					"'" +  m_lpDatabase->Escape(strData) + "')";
-				ulOrderId++;
+				++ulOrderId;
 				bFirstOne = false;
 			}
 		}
@@ -530,7 +508,7 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 	}
 }
 
-objectsignature_t DBPlugin::createObject(const objectdetails_t &details) throw(std::exception)
+objectsignature_t DBPlugin::createObject(const objectdetails_t &details)
 {
 	objectid_t objectid;
 
@@ -553,7 +531,7 @@ objectsignature_t DBPlugin::createObject(const objectdetails_t &details) throw(s
 	return objectsignature_t(objectid, string());
 }
 
-void DBPlugin::deleteObject(const objectid_t &objectid) throw(std::exception)
+void DBPlugin::deleteObject(const objectid_t &objectid)
 {
 	ECRESULT er;
 	string strQuery;
@@ -649,7 +627,7 @@ void DBPlugin::deleteObject(const objectid_t &objectid) throw(std::exception)
 		throw objectnotfound("db_user: " + objectid.id);
 }
 
-void DBPlugin::addSubObjectRelation(userobject_relation_t relation, const objectid_t &parentobject, const objectid_t &childobject) throw(std::exception)
+void DBPlugin::addSubObjectRelation(userobject_relation_t relation, const objectid_t &parentobject, const objectid_t &childobject)
 {
 	ECRESULT er = erSuccess;
 	DB_RESULT_AUTOFREE lpResult(m_lpDatabase);
@@ -695,7 +673,7 @@ void DBPlugin::addSubObjectRelation(userobject_relation_t relation, const object
 		throw runtime_error(string("db_query: ") + strerror(er));
 }
 
-void DBPlugin::deleteSubObjectRelation(userobject_relation_t relation, const objectid_t &parentobject, const objectid_t &childobject) throw(std::exception)
+void DBPlugin::deleteSubObjectRelation(userobject_relation_t relation, const objectid_t &parentobject, const objectid_t &childobject)
 {
 	ECRESULT er = erSuccess;
 	string strQuery;
@@ -729,7 +707,7 @@ void DBPlugin::deleteSubObjectRelation(userobject_relation_t relation, const obj
 		throw objectnotfound("db_user: relation " + parentobject.id);
 }
 
-auto_ptr<signatures_t> DBPlugin::searchObjects(const string &match, const char *search_props[], const char *return_prop, unsigned int ulFlags) throw(std::exception) {
+auto_ptr<signatures_t> DBPlugin::searchObjects(const string &match, const char *search_props[], const char *return_prop, unsigned int ulFlags) {
 	string signature;
 	objectid_t objectid;
 	auto_ptr<signatures_t> lpSignatures = auto_ptr<signatures_t>(new signatures_t());
@@ -767,7 +745,7 @@ auto_ptr<signatures_t> DBPlugin::searchObjects(const string &match, const char *
 		strMatchPrefix = " = ";
 	}
 
-	for (unsigned int i = 0; search_props[i] != NULL; i++) {
+	for (unsigned int i = 0; search_props[i] != NULL; ++i) {
 		strQuery += "(op.propname='" + (string)search_props[i] + "' AND op.value " + strMatchPrefix + " '" + strMatch + "')";
 		if (search_props[i + 1] != NULL)
 			strQuery += " OR ";
@@ -787,7 +765,7 @@ auto_ptr<signatures_t> DBPlugin::searchObjects(const string &match, const char *
 	return lpSignatures;
 }
 
-auto_ptr<quotadetails_t> DBPlugin::getQuota(const objectid_t &objectid, bool bGetUserDefault) throw(std::exception)
+auto_ptr<quotadetails_t> DBPlugin::getQuota(const objectid_t &objectid, bool bGetUserDefault)
 {
 	auto_ptr<quotadetails_t> lpDetails;
 	ECRESULT er = erSuccess;
@@ -840,7 +818,7 @@ auto_ptr<quotadetails_t> DBPlugin::getQuota(const objectid_t &objectid, bool bGe
 	return lpDetails;
 }
 
-void DBPlugin::setQuota(const objectid_t &objectid, const quotadetails_t &quotadetails) throw(std::exception)
+void DBPlugin::setQuota(const objectid_t &objectid, const quotadetails_t &quotadetails)
 {
 	ECRESULT er = erSuccess;
 	string strQuery;
@@ -882,7 +860,7 @@ void DBPlugin::setQuota(const objectid_t &objectid, const quotadetails_t &quotad
 		throw runtime_error(string("db_query: ") + strerror(er));
 }
 
-auto_ptr<signatures_t> DBPlugin::CreateSignatureList(const std::string &query) throw(std::exception)
+auto_ptr<signatures_t> DBPlugin::CreateSignatureList(const std::string &query)
 {
 	ECRESULT er = erSuccess;
 	auto_ptr<signatures_t> objectlist = auto_ptr<signatures_t>(new signatures_t());
@@ -920,18 +898,12 @@ auto_ptr<signatures_t> DBPlugin::CreateSignatureList(const std::string &query) t
 
 ECRESULT DBPlugin::CreateMD5Hash(const std::string &strData, std::string* lpstrResult)
 {
-	ECRESULT er = erSuccess;
-	MD5 *crypt = NULL;
-	char *hex = NULL;
+	MD5_CTX crypt;
 	std::string salt;
 	std::ostringstream s;
 
-	if (strData.empty() || lpstrResult == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	crypt = new MD5();
+	if (strData.empty() || lpstrResult == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	s.setf(ios::hex, ios::basefield);
 	s.fill('0');
@@ -939,36 +911,25 @@ ECRESULT DBPlugin::CreateMD5Hash(const std::string &strData, std::string* lpstrR
 	s << rand_mt();
 	salt = s.str();
 
-	crypt->update((unsigned char*)salt.c_str(), (unsigned int)salt.size());
-	crypt->update((unsigned char*)strData.c_str(), (unsigned int)strData.size());
-	crypt->finalize();
-
-	hex = crypt->hex_digest();
-
-	(*lpstrResult) = salt+hex;
-
-exit:
-	if(hex)
-		delete [] hex;
-
-	if(crypt)
-		delete crypt;
-
-	return er;
+	MD5_Init(&crypt);
+	MD5_Update(&crypt, salt.c_str(), salt.size());
+	MD5_Update(&crypt, strData.c_str(), strData.size());
+	*lpstrResult = salt + zcp_md5_final_hex(&crypt);
+	return erSuccess;
 }
 
 void DBPlugin::addSendAsToDetails(const objectid_t &objectid, objectdetails_t *lpDetails)
 {
 	auto_ptr<signatures_t> sendas;
-	signatures_t::iterator iter;
+	signatures_t::const_iterator iter;
 
 	sendas = getSubObjectsForObject(OBJECTRELATION_USER_SENDAS, objectid);
 
-	for (iter = sendas->begin(); iter != sendas->end(); iter++)
+	for (iter = sendas->begin(); iter != sendas->end(); ++iter)
 		lpDetails->AddPropObject(OB_PROP_LO_SENDAS, iter->id);
 }
 
-auto_ptr<abprops_t> DBPlugin::getExtraAddressbookProperties() throw(std::exception)
+auto_ptr<abprops_t> DBPlugin::getExtraAddressbookProperties()
 {
 	ECRESULT er = erSuccess;
 	auto_ptr<abprops_t> proplist = auto_ptr<abprops_t>(new abprops_t());
@@ -982,7 +943,7 @@ auto_ptr<abprops_t> DBPlugin::getExtraAddressbookProperties() throw(std::excepti
 	strTable[0] = (string)DB_OBJECTPROPERTY_TABLE;
 	strTable[1] = (string)DB_OBJECTMVPROPERTY_TABLE;
 
-	for (unsigned int i = 0; i < 2; i++) {
+	for (unsigned int i = 0; i < 2; ++i) {
 		strQuery =
 			"SELECT op.propname "
 			"FROM " + strTable[i] + " AS op "
@@ -1006,7 +967,7 @@ auto_ptr<abprops_t> DBPlugin::getExtraAddressbookProperties() throw(std::excepti
 	return proplist;
 }
 
-void DBPlugin::removeAllObjects(objectid_t except) throw(std::exception)
+void DBPlugin::removeAllObjects(objectid_t except)
 {
 	ECRESULT er = erSuccess;
 	std::string strQuery;
@@ -1027,7 +988,6 @@ void DBPlugin::CreateObjectWithExternId(const objectid_t &objectid, const object
 	ECRESULT er;
 	string strQuery;
 	DB_RESULT_AUTOFREE lpResult(m_lpDatabase);
-	DB_ROW lpDBRow = NULL;
 
 	// check if object already exists
 	strQuery = 

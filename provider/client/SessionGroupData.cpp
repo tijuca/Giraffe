@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <mapicode.h>
 #include <mapix.h>
@@ -120,24 +94,22 @@ HRESULT SessionGroupData::GetOrCreateNotifyMaster(ECNotifyMaster **lppMaster)
 
 HRESULT SessionGroupData::GetTransport(WSTransport **lppTransport)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	WSTransport *lpTransport = NULL;
 
 	hr = WSTransport::Create(MDB_NO_DIALOG, &lpTransport);
 	if (hr != hrSuccess) 
-		goto exit;
+		return hr;
 
 	hr = lpTransport->HrLogon(m_sProfileProps);
 	if (hr != hrSuccess) 
-		goto exit;
+		return hr;
 
 	// Since we are doing request that take max EC_SESSION_KEEPALIVE_TIME, set timeout to that plus 10 seconds
 	lpTransport->HrSetRecvTimeout(EC_SESSION_KEEPALIVE_TIME + 10);
 
 	*lppTransport = lpTransport;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 ECSESSIONGROUPID SessionGroupData::GetSessionGroupId()
@@ -150,10 +122,8 @@ ULONG SessionGroupData::AddRef()
 	ULONG cRef;
     
 	pthread_mutex_lock(&m_hRefMutex);
-    m_cRef++;
-	cRef = m_cRef;
-    pthread_mutex_unlock(&m_hRefMutex);
-	
+	cRef = ++m_cRef;
+	pthread_mutex_unlock(&m_hRefMutex);
 	return cRef;
 }
 
@@ -162,10 +132,8 @@ ULONG SessionGroupData::Release()
 	ULONG cRef;
     
 	pthread_mutex_lock(&m_hRefMutex);
-	m_cRef--;
-    cRef = m_cRef;
-    pthread_mutex_unlock(&m_hRefMutex);
-
+	cRef = --m_cRef;
+	pthread_mutex_unlock(&m_hRefMutex);
 	return cRef;
 }
 

@@ -1,55 +1,31 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include <platform.h>
+#include <zarafa/platform.h>
 
+#ifdef LINUX
 #include <sys/un.h>
 #include <sys/socket.h>
+#endif
 
-#include <base64.h>
-#include <ECChannel.h>
-#include <ECDefs.h>
-#include <stringutil.h>
+#include <zarafa/base64.h>
+#include <zarafa/ECChannel.h>
+#include <zarafa/ECDefs.h>
+#include <zarafa/stringutil.h>
 
 #include "ECSearchClient.h"
 
@@ -65,27 +41,24 @@ ECSearchClient::~ECSearchClient()
 
 ECRESULT ECSearchClient::GetProperties(setindexprops_t &setProps)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	std::vector<std::string> lstResponse;
 	std::vector<std::string> lstProps;
-	std::vector<std::string>::iterator iter;
+	std::vector<std::string>::const_iterator iter;
 
 	er = DoCmd("PROPS", lstResponse);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	setProps.clear();
 	if (lstResponse.empty())
-		goto exit; // No properties
+		return erSuccess; // No properties
 
 	lstProps = tokenize(lstResponse[0], " ");
 
-	for (iter = lstProps.begin(); iter != lstProps.end(); iter++) {
+	for (iter = lstProps.begin(); iter != lstProps.end(); ++iter)
 		setProps.insert(atoui(iter->c_str()));
-	}
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 /**
@@ -101,29 +74,25 @@ exit:
 ECRESULT ECSearchClient::Scope(const std::string &strServer,
     const std::string &strStore, const std::list<unsigned int> &lstFolders)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	std::vector<std::string> lstResponse;
 	std::string strScope;
 
 	er = Connect();
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	strScope = "SCOPE " + strServer + " " + strStore;
-	for (std::list<unsigned int>::const_iterator i = lstFolders.begin(); i != lstFolders.end(); i++)
+	for (std::list<unsigned int>::const_iterator i = lstFolders.begin();
+	     i != lstFolders.end(); ++i)
 		strScope += " " + stringify(*i);
 
 	er = DoCmd(strScope, lstResponse);
 	if (er != erSuccess)
-		goto exit;
-
-	if (!lstResponse.empty()) {
-		er = ZARAFA_E_BAD_VALUE;
-		goto exit;
-	}
-
-exit:
-	return er;
+		return er;
+	if (!lstResponse.empty())
+		return ZARAFA_E_BAD_VALUE;
+	return erSuccess;
 }
 
 /**
@@ -139,7 +108,7 @@ exit:
 ECRESULT ECSearchClient::Find(const std::set<unsigned int> &setFields,
     const std::string &strTerm)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	std::vector<std::string> lstResponse;
 	std::string strFind;
 
@@ -154,15 +123,10 @@ ECRESULT ECSearchClient::Find(const std::set<unsigned int> &setFields,
 
 	er = DoCmd(strFind, lstResponse);
 	if (er != erSuccess)
-		goto exit;
-
-	if (!lstResponse.empty()) {
-		er = ZARAFA_E_BAD_VALUE;
-		goto exit;
-	}
-
-exit:
-	return er;
+		return er;
+	if (!lstResponse.empty())
+		return ZARAFA_E_BAD_VALUE;
+	return erSuccess;
 }
 
 /**
@@ -173,7 +137,7 @@ exit:
  */
 ECRESULT ECSearchClient::Query(std::list<unsigned int> &lstMatches)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	std::vector<std::string> lstResponse;
 	std::vector<std::string> lstResponseIds;
 	
@@ -181,20 +145,16 @@ ECRESULT ECSearchClient::Query(std::list<unsigned int> &lstMatches)
 
 	er = DoCmd("QUERY", lstResponse);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 		
 	if (lstResponse.empty())
-		goto exit; // No matches
+		return erSuccess; /* no matches */
 
 	lstResponseIds = tokenize(lstResponse[0], " ");
 
-	for (unsigned int i = 0; i < lstResponseIds.size(); i++) {
+	for (unsigned int i = 0; i < lstResponseIds.size(); ++i)
 		lstMatches.push_back(atoui(lstResponseIds[i].c_str()));
-	}
-
-exit:
-
-	return er;
+	return erSuccess;
 }
 
 /**
@@ -216,24 +176,19 @@ exit:
  
 ECRESULT ECSearchClient::Query(GUID *lpServerGuid, GUID *lpStoreGuid, std::list<unsigned int>& lstFolders, std::list<SIndexedTerm> &lstSearches, std::list<unsigned int> &lstMatches)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	std::string strServer = bin2hex(sizeof(GUID), (unsigned char *)lpServerGuid);
 	std::string strStore = bin2hex(sizeof(GUID), (unsigned char *)lpStoreGuid);
 
 	er = Scope(strServer, strStore, lstFolders);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
-	for(std::list<SIndexedTerm>::iterator i = lstSearches.begin(); i != lstSearches.end(); i++) {
+	for (std::list<SIndexedTerm>::const_iterator i = lstSearches.begin();
+	     i != lstSearches.end(); ++i)
 		Find(i->setFields, i->strTerm);
-	}
 
-	er = Query(lstMatches);
-	if (er != erSuccess)
-		goto exit;
-
-exit:
-	return er;
+	return Query(lstMatches);
 }
 
 ECRESULT ECSearchClient::SyncRun()

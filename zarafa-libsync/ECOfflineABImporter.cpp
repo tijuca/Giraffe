@@ -1,54 +1,28 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include <platform.h>
+#include <zarafa/platform.h>
 
 #include "ECOfflineABImporter.h"
 #include "ECSyncLog.h"
 
-#include <ECLogger.h>
-#include <ECABEntryID.h>
-#include <stringutil.h>
+#include <zarafa/ECLogger.h>
+#include <zarafa/ECABEntryID.h>
+#include <zarafa/stringutil.h>
 
 #include <mapix.h>
 #include <edkmdb.h>
@@ -110,80 +84,80 @@ HRESULT OfflineABImporter::ImportABChange(ULONG ulObjType, ULONG cbObjId, LPENTR
 	ECCOMPANY *lpsCheckDstCompany = NULL;
 	std::list<ECENTRYID> lstSrcMembers;
 	std::list<ECENTRYID> lstDstMembers;
-	std::list<ECENTRYID>::iterator iterSrcMembers;
-	std::list<ECENTRYID>::iterator iterDstMembers;
+	std::list<ECENTRYID>::const_iterator iterSrcMembers;
+	std::list<ECENTRYID>::const_iterator iterDstMembers;
 	ULONG cDstUsers = 0;		
-	LPECUSER lpDstUsers = NULL;
+	ECUSER *lpDstUsers = NULL;
 	ULONG cSrcUsers = 0;
-	LPECUSER lpSrcUsers = NULL;
+	ECUSER *lpSrcUsers = NULL;
 	ULONG cDstGroups = 0;		
-	LPECGROUP lpDstGroups = NULL;
+	ECGROUP *lpDstGroups = NULL;
 	ULONG cSrcGroups = 0;		
-	LPECGROUP lpSrcGroups = NULL;
+	ECGROUP *lpSrcGroups = NULL;
 	ULONG ulMemberObjType = 0;
 
 	if(ulObjType == MAPI_MAILUSER) {
 		// Get the source data
-		LOG_DEBUG(m_lpLogger, "ImportABChange: GetUser type=MAPI_MAILUSER, id=%s", bin2hex(cbObjId, (LPBYTE)lpObjId).c_str());
+		ZLOG_DEBUG(m_lpLogger, "ImportABChange: GetUser type=MAPI_MAILUSER, id=%s", bin2hex(cbObjId, (LPBYTE)lpObjId).c_str());
 		hr = m_lpSrcServiceAdmin->GetUser(cbObjId, lpObjId, MAPI_UNICODE, &lpsSrcUser);
 		if (hr == MAPI_E_NOT_FOUND){
-			LOG_DEBUG(m_lpLogger, "%s", "ImportABChange: hr=MAPI_E_NOT_FOUND (deleted, so OK)");
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=MAPI_E_NOT_FOUND (deleted, so OK)");
 			hr = hrSuccess; // we'll get a delete in a later change
 			goto exit;
 		}
 		if(hr != hrSuccess) {
-			LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 			goto exit;
 		}
 
 		lpsSrcUser->lpszPassword = (LPTSTR)L"Dummy";
 
 		// FIXME admin/nonactive
-		LOG_DEBUG(m_lpLogger, "ImportABChange: SetUser username=%S, id=%s", lpsSrcUser->lpszUsername, bin2hex(lpsSrcUser->sUserId.cb, lpsSrcUser->sUserId.lpb).c_str());
+		ZLOG_DEBUG(m_lpLogger, "ImportABChange: SetUser username=%ls, id=%s", lpsSrcUser->lpszUsername, bin2hex(lpsSrcUser->sUserId.cb, lpsSrcUser->sUserId.lpb).c_str());
 		hr = m_lpDstServiceAdmin->SetUser(lpsSrcUser, MAPI_UNICODE);
 		if(hr != hrSuccess) {
-			LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 			goto exit;
 		}
 			
 	} else if (ulObjType == MAPI_DISTLIST) {
-		LOG_DEBUG(m_lpLogger, "ImportABChange: GetGroup type=MAPI_DISTLIST, id=%s", bin2hex(cbObjId, (LPBYTE)lpObjId).c_str());
+		ZLOG_DEBUG(m_lpLogger, "ImportABChange: GetGroup type=MAPI_DISTLIST, id=%s", bin2hex(cbObjId, (LPBYTE)lpObjId).c_str());
 		hr = m_lpSrcServiceAdmin->GetGroup(cbObjId, lpObjId, MAPI_UNICODE, &lpsSrcGroup);
 		if (hr == MAPI_E_NOT_FOUND){
-			LOG_DEBUG(m_lpLogger, "%s", "ImportABChange: hr=MAPI_E_NOT_FOUND (deleted, so OK)");
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=MAPI_E_NOT_FOUND (deleted, so OK)");
 			hr = hrSuccess; // we'll get a delete in a later change
 			goto exit;
 		}
 		if (hr != hrSuccess) {
-			LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 			goto exit;
 		}
 
-		LOG_DEBUG(m_lpLogger, "ImportABChange: SetGroup groupname=%S, id=%s", (LPWSTR)lpsSrcGroup->lpszGroupname, bin2hex(lpsSrcGroup->sGroupId.cb, lpsSrcGroup->sGroupId.lpb).c_str());
+		ZLOG_DEBUG(m_lpLogger, "ImportABChange: SetGroup groupname=%ls, id=%s", (LPWSTR)lpsSrcGroup->lpszGroupname, bin2hex(lpsSrcGroup->sGroupId.cb, lpsSrcGroup->sGroupId.lpb).c_str());
 		hr = m_lpDstServiceAdmin->SetGroup(lpsSrcGroup, MAPI_UNICODE);
 		if(hr != hrSuccess) {
-			LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 			goto exit;
 		}
 			
 		/* Sync group members */
 		
 		/* Get source members */
-		LOG_DEBUG(m_lpLogger, "%s", "ImportABChange: GetUserListOfGroup (from source)");
+		ZLOG_DEBUG(m_lpLogger, "ImportABChange: GetUserListOfGroup (from source)");
 		hr = m_lpSrcServiceAdmin->GetUserListOfGroup(cbObjId, lpObjId, MAPI_UNICODE, &cSrcUsers, &lpSrcUsers);
 		if(hr != hrSuccess) {
-			LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 			goto exit;
 		}
-		LOG_DEBUG(m_lpLogger, "ImportABChange: count=%u", cSrcUsers);
+		ZLOG_DEBUG(m_lpLogger, "ImportABChange: count=%u", cSrcUsers);
 			
-		for (unsigned int i = 0; i < cSrcUsers; i++) {
+		for (unsigned int i = 0; i < cSrcUsers; ++i) {
 			if (GetNonPortableObjectType(lpSrcUsers[i].sUserId.cb, (LPENTRYID)lpSrcUsers[i].sUserId.lpb, &ulMemberObjType) != hrSuccess) {
-				LOG_DEBUG(m_lpLogger, "%s", "ImportABChange: GetNonPortableObjectType failed");
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: GetNonPortableObjectType failed");
 				continue;
 			}
 			if (ulMemberObjType != MAPI_MAILUSER) {
-				LOG_DEBUG(m_lpLogger, "ImportABChange: objecttype=%u, not MAPI_MAILUSER(6)", ulMemberObjType);
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: objecttype=%u, not MAPI_MAILUSER(6)", ulMemberObjType);
 				continue;		// skip group-in-group
 			}
 			GeneralizeEntryIdInPlace(lpSrcUsers[i].sUserId.cb, (LPENTRYID)lpSrcUsers[i].sUserId.lpb);
@@ -191,21 +165,21 @@ HRESULT OfflineABImporter::ImportABChange(ULONG ulObjType, ULONG cbObjId, LPENTR
 		}
 		
 		/* Get destination members */
-		LOG_DEBUG(m_lpLogger, "%s", "ImportABChange: GetUserListOfGroup (to destination)");
+		ZLOG_DEBUG(m_lpLogger, "ImportABChange: GetUserListOfGroup (to destination)");
 		hr = m_lpDstServiceAdmin->GetUserListOfGroup(lpsSrcGroup->sGroupId.cb, (LPENTRYID)lpsSrcGroup->sGroupId.lpb, MAPI_UNICODE, &cDstUsers, &lpDstUsers);
 		if(hr != hrSuccess) {
-			LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 			goto exit;
 		}
-		LOG_DEBUG(m_lpLogger, "ImportABChange: count=%u", cDstUsers);
+		ZLOG_DEBUG(m_lpLogger, "ImportABChange: count=%u", cDstUsers);
 		
-		for (unsigned int i = 0; i < cDstUsers; i++) {
+		for (unsigned int i = 0; i < cDstUsers; ++i) {
 			if (GetNonPortableObjectType(lpDstUsers[i].sUserId.cb, (LPENTRYID)lpDstUsers[i].sUserId.lpb, &ulMemberObjType) != hrSuccess) {
-				LOG_DEBUG(m_lpLogger, "%s", "ImportABChange: GetNonPortableObjectType failed");
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: GetNonPortableObjectType failed");
 				continue;
 			}
 			if (ulMemberObjType != MAPI_MAILUSER) {
-				LOG_DEBUG(m_lpLogger, "ImportABChange: objecttype=%u, not MAPI_MAILUSER(6)", ulMemberObjType);
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: objecttype=%u, not MAPI_MAILUSER(6)", ulMemberObjType);
 				continue;		// skip group-in-group
 			}
 			GeneralizeEntryIdInPlace(lpDstUsers[i].sUserId.cb, (LPENTRYID)lpDstUsers[i].sUserId.lpb);
@@ -230,41 +204,41 @@ HRESULT OfflineABImporter::ImportABChange(ULONG ulObjType, ULONG cbObjId, LPENTR
 				
 			if(*iterSrcMembers < *iterDstMembers) {
 				/* The item in iterSrcMembers is not in iterDstMembers, add it */
-				LOG_DEBUG(m_lpLogger, "ImportABChange: AddGroupUser (to destination) id=%s", bin2hex(iterSrcMembers->cb, (LPBYTE)iterSrcMembers->lpb).c_str());
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: AddGroupUser (to destination) id=%s", bin2hex(iterSrcMembers->cb, (LPBYTE)iterSrcMembers->lpb).c_str());
 				hr = m_lpDstServiceAdmin->AddGroupUser(lpsSrcGroup->sGroupId.cb, (LPENTRYID)lpsSrcGroup->sGroupId.lpb, iterSrcMembers->cb, (LPENTRYID)iterSrcMembers->lpb);
 				if(hr != hrSuccess) {
-					LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+					ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 					goto exit;
 				}
-				iterSrcMembers++;
+				++iterSrcMembers;
 			} else {
 				/* The item in iterDstMembers is not in iterSrcMembers, remove it */
-				LOG_DEBUG(m_lpLogger, "ImportABChange: AddGroupUser (from destination) id=%s", bin2hex(iterDstMembers->cb, (LPBYTE)iterDstMembers->lpb).c_str());
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: AddGroupUser (from destination) id=%s", bin2hex(iterDstMembers->cb, (LPBYTE)iterDstMembers->lpb).c_str());
 				hr = m_lpDstServiceAdmin->DeleteGroupUser(lpsSrcGroup->sGroupId.cb, (LPENTRYID)lpsSrcGroup->sGroupId.lpb, iterDstMembers->cb, (LPENTRYID)iterDstMembers->lpb);
 				if(hr != hrSuccess) {
-					LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+					ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 					goto exit;
 				}
-				iterDstMembers++;
+				++iterDstMembers;
 			}
 		}
 		
-		for(;iterSrcMembers != lstSrcMembers.end(); iterSrcMembers++) {
+		for (; iterSrcMembers != lstSrcMembers.end(); ++iterSrcMembers) {
 			/* Anything left in 'src' shoul de added to 'dst' */
-			LOG_DEBUG(m_lpLogger, "ImportABChange: AddGroupUser (to destination) id=%s", bin2hex(iterSrcMembers->cb, (LPBYTE)iterSrcMembers->lpb).c_str());
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: AddGroupUser (to destination) id=%s", bin2hex(iterSrcMembers->cb, (LPBYTE)iterSrcMembers->lpb).c_str());
 			hr = m_lpDstServiceAdmin->AddGroupUser(lpsSrcGroup->sGroupId.cb, (LPENTRYID)lpsSrcGroup->sGroupId.lpb, iterSrcMembers->cb, (LPENTRYID)iterSrcMembers->lpb);
 			if(hr != hrSuccess) {
-				LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 				goto exit; 
 			}
 		}
 		
-		for(;iterDstMembers != lstDstMembers.end(); iterDstMembers++) {
+		for (; iterDstMembers != lstDstMembers.end(); ++iterDstMembers) {
 			/* Anything left in 'dst should be deleted */
-			LOG_DEBUG(m_lpLogger, "ImportABChange: AddGroupUser (from destination) id=%s", bin2hex(iterDstMembers->cb, (LPBYTE)iterDstMembers->lpb).c_str());
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: AddGroupUser (from destination) id=%s", bin2hex(iterDstMembers->cb, (LPBYTE)iterDstMembers->lpb).c_str());
 			hr = m_lpDstServiceAdmin->DeleteGroupUser(lpsSrcGroup->sGroupId.cb, (LPENTRYID)lpsSrcGroup->sGroupId.lpb, iterDstMembers->cb, (LPENTRYID)iterDstMembers->lpb);
 			if(hr != hrSuccess) {
-				LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 				goto exit;
 			}
 		}
@@ -273,21 +247,21 @@ HRESULT OfflineABImporter::ImportABChange(ULONG ulObjType, ULONG cbObjId, LPENTR
 					
 		/* FIXME: Sync groups in groups */
 	} else if (ulObjType == MAPI_ABCONT) {
-		LOG_DEBUG(m_lpLogger, "ImportABChange: GetCompany (from source) type=MAPI_ABCONT, id=%s", bin2hex(cbObjId, (LPBYTE)lpObjId).c_str());
+		ZLOG_DEBUG(m_lpLogger, "ImportABChange: GetCompany (from source) type=MAPI_ABCONT, id=%s", bin2hex(cbObjId, (LPBYTE)lpObjId).c_str());
 		hr = m_lpSrcServiceAdmin->GetCompany(cbObjId, lpObjId, MAPI_UNICODE, &lpsSrcCompany);
 		if (hr == MAPI_E_NO_SUPPORT) {
-			LOG_DEBUG(m_lpLogger, "%s", "ImportABChange: hr=MAPI_E_NO_SUPPORT. The container is an addresslist, not a company. Ignoring");
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=MAPI_E_NO_SUPPORT. The container is an addresslist, not a company. Ignoring");
 			hr = hrSuccess;
 			goto exit;
 		} else if (hr == MAPI_E_NOT_FOUND) {
-			LOG_DEBUG(m_lpLogger, "%s", "ImportABChange: hr=MAPI_E_NOT_FOUND. Checking destination.");
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=MAPI_E_NOT_FOUND. Checking destination.");
 			hr = m_lpDstServiceAdmin->GetCompany(cbObjId, lpObjId, MAPI_UNICODE, &lpsSrcCompany);
 			if (hr == MAPI_E_NOT_FOUND) {
-				LOG_DEBUG(m_lpLogger, "%s", "ImportABChange: hr=MAPI_E_NOT_FOUND. So it doesn't exist on either side.");
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=MAPI_E_NOT_FOUND. So it doesn't exist on either side.");
 				hr = hrSuccess;
 				goto exit; /* No need to sync anything */
 			} else if (hr != hrSuccess) {
-				LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 				goto exit;
 			}
 
@@ -297,49 +271,49 @@ HRESULT OfflineABImporter::ImportABChange(ULONG ulObjType, ULONG cbObjId, LPENTR
 			 * Go through the user and grouplist to delete all members of this company
 			 * unfortunately we don't know which users belong to which company
 			 * so we must check all users */
-			LOG_DEBUG(m_lpLogger, "ImportABChange: ImportABDeletion type=MAPI_ABCONT, id=%s", bin2hex(cbObjId, (LPBYTE)lpObjId).c_str());
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: ImportABDeletion type=MAPI_ABCONT, id=%s", bin2hex(cbObjId, (LPBYTE)lpObjId).c_str());
 			hr = ImportABDeletion(MAPI_ABCONT, cbObjId, lpObjId);
 			if (hr != hrSuccess) {
-				LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 				goto exit;
 			}
 
-			LOG_DEBUG(m_lpLogger, "%s", "ImportABChange: GetGroupList (from destination)");
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: GetGroupList (from destination)");
 			hr = m_lpDstServiceAdmin->GetGroupList(0, NULL, MAPI_UNICODE, &cDstGroups, &lpDstGroups);
 			if (hr != hrSuccess) {
-				LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 				goto exit;
 			}
-			LOG_DEBUG(m_lpLogger, "ImportABChange: count=%u", cDstGroups);
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: count=%u", cDstGroups);
 
-			for (unsigned int i = 0; i < cDstGroups; i++) {
-				LOG_DEBUG(m_lpLogger, "ImportABChange: GetGroup (from source) id=%s", bin2hex(lpDstGroups[i].sGroupId.cb, (LPBYTE)lpDstGroups[i].sGroupId.lpb).c_str());
+			for (unsigned int i = 0; i < cDstGroups; ++i) {
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: GetGroup (from source) id=%s", bin2hex(lpDstGroups[i].sGroupId.cb, (LPBYTE)lpDstGroups[i].sGroupId.lpb).c_str());
 				hr = m_lpSrcServiceAdmin->GetGroup(lpDstGroups[i].sGroupId.cb, (LPENTRYID)lpDstGroups[i].sGroupId.lpb, MAPI_UNICODE, &lpsSrcGroup);
 				if (hr == MAPI_E_NOT_FOUND) {
-					LOG_DEBUG(m_lpLogger, "ImportABChange: ImportABDeletion type=MAPI_ABCONT, id=%s", bin2hex(lpDstGroups[i].sGroupId.cb, (LPBYTE)lpDstGroups[i].sGroupId.lpb).c_str());
+					ZLOG_DEBUG(m_lpLogger, "ImportABChange: ImportABDeletion type=MAPI_ABCONT, id=%s", bin2hex(lpDstGroups[i].sGroupId.cb, (LPBYTE)lpDstGroups[i].sGroupId.lpb).c_str());
 					hr = ImportABDeletion(MAPI_DISTLIST, lpDstGroups[i].sGroupId.cb, (LPENTRYID)lpDstGroups[i].sGroupId.lpb);
 				}
 				if (hr != hrSuccess) {
-					LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+					ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 					goto exit;
 				}
 			}
 	
-			LOG_DEBUG(m_lpLogger, "%s", "ImportABChange: GetUserList (from destination)");
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: GetUserList (from destination)");
 			hr = m_lpDstServiceAdmin->GetUserList(0, NULL, MAPI_UNICODE, &cDstUsers, &lpDstUsers);
 			if (hr != hrSuccess)
 				goto exit;
-			LOG_DEBUG(m_lpLogger, "ImportABChange: count=%u", cDstUsers);
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: count=%u", cDstUsers);
 
-			for (unsigned int i = 0; i < cDstUsers; i++) {
-				LOG_DEBUG(m_lpLogger, "ImportABChange: GetUser (from source) id=%s", bin2hex(lpDstUsers[i].sUserId.cb, (LPBYTE)lpDstUsers[i].sUserId.lpb).c_str());
+			for (unsigned int i = 0; i < cDstUsers; ++i) {
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: GetUser (from source) id=%s", bin2hex(lpDstUsers[i].sUserId.cb, (LPBYTE)lpDstUsers[i].sUserId.lpb).c_str());
 				hr = m_lpSrcServiceAdmin->GetUser(lpDstUsers[i].sUserId.cb, (LPENTRYID)lpDstUsers[i].sUserId.lpb, MAPI_UNICODE, &lpsSrcUser);
 				if (hr == MAPI_E_NOT_FOUND) {
-					LOG_DEBUG(m_lpLogger, "ImportABChange: ImportABDeletion type=MAPI_ABCONT, id=%s", bin2hex(lpDstUsers[i].sUserId.cb, (LPBYTE)lpDstUsers[i].sUserId.lpb).c_str());
+					ZLOG_DEBUG(m_lpLogger, "ImportABChange: ImportABDeletion type=MAPI_ABCONT, id=%s", bin2hex(lpDstUsers[i].sUserId.cb, (LPBYTE)lpDstUsers[i].sUserId.lpb).c_str());
 					hr = ImportABDeletion(MAPI_MAILUSER, lpDstUsers[i].sUserId.cb, (LPENTRYID)lpDstUsers[i].sUserId.lpb);
 				}
 				if (hr != hrSuccess) {
-					LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+					ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 					goto exit;
 				}
 			}
@@ -347,7 +321,7 @@ HRESULT OfflineABImporter::ImportABChange(ULONG ulObjType, ULONG cbObjId, LPENTR
 			// Company, users and/or groups are deleted.
 			goto exit;
 		} else if (hr != hrSuccess) {
-			LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 			goto exit;
 		}
 
@@ -356,18 +330,18 @@ HRESULT OfflineABImporter::ImportABChange(ULONG ulObjType, ULONG cbObjId, LPENTR
 		 * then the rights or the name was changed and we don't need
 		 * to sync the user/grouplist.
 		 */
-		LOG_DEBUG(m_lpLogger, "ImportABChange: GetCompany (from destination) type=MAPI_ABCONT, id=%s", bin2hex(lpsSrcCompany->sCompanyId.cb, (LPBYTE)lpsSrcCompany->sCompanyId.lpb).c_str());
+		ZLOG_DEBUG(m_lpLogger, "ImportABChange: GetCompany (from destination) type=MAPI_ABCONT, id=%s", bin2hex(lpsSrcCompany->sCompanyId.cb, (LPBYTE)lpsSrcCompany->sCompanyId.lpb).c_str());
 		hr = m_lpDstServiceAdmin->GetCompany(lpsSrcCompany->sCompanyId.cb, (LPENTRYID)lpsSrcCompany->sCompanyId.lpb, MAPI_UNICODE, &lpsCheckDstCompany);
 		if (hr != hrSuccess && hr != MAPI_E_NOT_FOUND) {
-			LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 			goto exit;
 		}
 
 		/* Sync company name */
-		LOG_DEBUG(m_lpLogger, "ImportABChange: SetCompany comapnyname=%S, id=%s", (LPWSTR)lpsSrcCompany->lpszCompanyname, bin2hex(lpsSrcCompany->sCompanyId.cb, lpsSrcCompany->sCompanyId.lpb).c_str());
+		ZLOG_DEBUG(m_lpLogger, "ImportABChange: SetCompany comapnyname=%ls, id=%s", (LPWSTR)lpsSrcCompany->lpszCompanyname, bin2hex(lpsSrcCompany->sCompanyId.cb, lpsSrcCompany->sCompanyId.lpb).c_str());
 		hr = m_lpDstServiceAdmin->SetCompany(lpsSrcCompany, MAPI_UNICODE);
 		if (hr != hrSuccess) {
-			LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 			goto exit;
 		}
 
@@ -376,40 +350,40 @@ HRESULT OfflineABImporter::ImportABChange(ULONG ulObjType, ULONG cbObjId, LPENTR
 			* Sync users/groups by requesting the members of the company
 			* and calling ImportABChange recurively to add the members
 			*/
-			LOG_DEBUG(m_lpLogger, "%s", "ImportABChange: GetUserList (from source)");
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: GetUserList (from source)");
 			hr = m_lpSrcServiceAdmin->GetUserList(cbObjId, lpObjId, MAPI_UNICODE, &cSrcUsers, &lpSrcUsers);
 			if (hr != hrSuccess) {
-				LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 				goto exit;
 			}
-			LOG_DEBUG(m_lpLogger, "ImportABChange: count=%u", cDstUsers);
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: count=%u", cDstUsers);
 
-			for (unsigned int i = 0; i < cSrcUsers; i++) {
-				LOG_DEBUG(m_lpLogger, "ImportABChange: ImportABChange type=MAPI_MAILUSER, id=%s", bin2hex(lpSrcUsers[i].sUserId.cb, (LPBYTE)lpSrcUsers[i].sUserId.lpb).c_str());
+			for (unsigned int i = 0; i < cSrcUsers; ++i) {
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: ImportABChange type=MAPI_MAILUSER, id=%s", bin2hex(lpSrcUsers[i].sUserId.cb, (LPBYTE)lpSrcUsers[i].sUserId.lpb).c_str());
 				hr = ImportABChange(MAPI_MAILUSER, lpSrcUsers[i].sUserId.cb, (LPENTRYID)lpSrcUsers[i].sUserId.lpb);
 				if (hr != hrSuccess) {
-					LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+					ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 					goto exit;
 				}
 			}
 
-			LOG_DEBUG(m_lpLogger, "%s", "ImportABChange: GetGroupList (from source)");
+			ZLOG_DEBUG(m_lpLogger, "ImportABChange: GetGroupList (from source)");
 			hr = m_lpSrcServiceAdmin->GetGroupList(cbObjId, lpObjId, MAPI_UNICODE, &cSrcGroups, &lpSrcGroups);
 			if (hr != hrSuccess) {
-				LOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
+				ZLOG_DEBUG(m_lpLogger, "ImportABChange: hr=%s", stringify(hr, true).c_str());
 				goto exit;
 			}
 
-			for (unsigned int i = 0; i < cSrcGroups; i++) {
+			for (unsigned int i = 0; i < cSrcGroups; ++i) {
 				bool bEveryone = false;
 				hr = EntryIdIsEveryone(lpSrcGroups[i].sGroupId.cb, (LPENTRYID)lpSrcGroups[i].sGroupId.lpb, &bEveryone);
 				if (hr != hrSuccess) {
-					LOG_DEBUG(m_lpLogger, "ImportABChange: EntryIdIsEveryone failed, hr=%s", stringify(hr, true).c_str());
+					ZLOG_DEBUG(m_lpLogger, "ImportABChange: EntryIdIsEveryone failed, hr=%s", stringify(hr, true).c_str());
 					goto exit;
 				}
 
 				if (!bEveryone) {
-					LOG_DEBUG(m_lpLogger, "ImportABChange: ImportABChange type=MAPI_DISTLIST, id=%s", bin2hex(lpSrcGroups[i].sGroupId.cb, (LPBYTE)lpSrcGroups[i].sGroupId.lpb).c_str());
+					ZLOG_DEBUG(m_lpLogger, "ImportABChange: ImportABChange type=MAPI_DISTLIST, id=%s", bin2hex(lpSrcGroups[i].sGroupId.cb, (LPBYTE)lpSrcGroups[i].sGroupId.lpb).c_str());
 					hr = ImportABChange(MAPI_DISTLIST, lpSrcGroups[i].sGroupId.cb, (LPENTRYID)lpSrcGroups[i].sGroupId.lpb);
 					if (hr != hrSuccess)
 						goto exit;
@@ -417,35 +391,19 @@ HRESULT OfflineABImporter::ImportABChange(ULONG ulObjType, ULONG cbObjId, LPENTR
 			}
 		}
 	} else {
-		LOG_DEBUG(m_lpLogger, "ImportABChange: Invalid type=%u", ulObjType);
+		ZLOG_DEBUG(m_lpLogger, "ImportABChange: Invalid type=%u", ulObjType);
 		hr = MAPI_E_INVALID_TYPE;
 	}
 
 exit:
-	if(lpsSrcUser)
-		MAPIFreeBuffer(lpsSrcUser);
-		
-	if(lpsSrcGroup)
-		MAPIFreeBuffer(lpsSrcGroup);
-		
-	if(lpsSrcCompany)
-		MAPIFreeBuffer(lpsSrcCompany);
-
-	if(lpsCheckDstCompany)
-		MAPIFreeBuffer(lpsCheckDstCompany);
-
-	if(lpDstUsers)
-		MAPIFreeBuffer(lpDstUsers);
-
-	if(lpSrcUsers)
-		MAPIFreeBuffer(lpSrcUsers);
-		
-	if(lpDstGroups)
-		MAPIFreeBuffer(lpDstGroups);
-
-	if(lpSrcGroups)
-		MAPIFreeBuffer(lpSrcGroups);
-
+	MAPIFreeBuffer(lpsSrcUser);
+	MAPIFreeBuffer(lpsSrcGroup);
+	MAPIFreeBuffer(lpsSrcCompany);
+	MAPIFreeBuffer(lpsCheckDstCompany);
+	MAPIFreeBuffer(lpDstUsers);
+	MAPIFreeBuffer(lpSrcUsers);
+	MAPIFreeBuffer(lpDstGroups);
+	MAPIFreeBuffer(lpSrcGroups);
 	return hr;
 }
 	

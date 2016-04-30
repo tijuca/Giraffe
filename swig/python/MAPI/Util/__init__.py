@@ -29,7 +29,7 @@ def OpenECSession(user, password, path, **keywords):
         prop = PpropFindProp(rows[0], PR_SERVICE_UID)
         uid = prop.Value
         profprops = list()
-        profprops.append(SPropValue(PR_EC_PATH, path))
+        profprops.append(SPropValue(PR_EC_PATH, path if path else "default:"))
         if isinstance(user, unicode):
             profprops.append(SPropValue(PR_EC_USERNAME_W, user))
         else:

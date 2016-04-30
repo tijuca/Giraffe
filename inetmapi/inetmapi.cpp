@@ -1,48 +1,22 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
-#include "stringutil.h"
+#include <zarafa/platform.h>
+#include <zarafa/stringutil.h>
 
 // Damn windows header defines max which break C++ header files
 #undef max
@@ -56,23 +30,27 @@
 #include "vmime/vmime.hpp"
 #include "vmime/textPartFactory.hpp"
 #include "mapiTextPart.h"
+#ifdef _WIN32
+#include "vmime/platforms/windows/windowsHandler.hpp"
+#else
 #include "vmime/platforms/posix/posixHandler.hpp"
+#endif
 
 // mapi
 #include <mapix.h>
 #include <mapiutil.h>
-#include <mapiext.h>
+#include <zarafa/mapiext.h>
 #include <edkmdb.h>
-#include "CommonUtil.h"
-#include "charset/convert.h"
+#include <zarafa/CommonUtil.h>
+#include <zarafa/charset/convert.h>
 // inetmapi
-#include "inetmapi.h"
+#include <inetmapi/inetmapi.h>
 #include "VMIMEToMAPI.h"
 #include "MAPIToVMIME.h"
 #include "ECVMIMEUtils.h"
 #include "ECMapiUtils.h"
-#include "ECLogger.h"
-#include "mapi_ptr.h"
+#include <zarafa/ECLogger.h>
+#include <zarafa/mapi_ptr.h>
 
 using namespace std;
 
@@ -123,37 +101,14 @@ bool ECSender::haveError() {
 	return ! error.empty();
 }
 
-const unsigned int ECSender::getRecipientErrorCount() const
+const std::vector<sFailedRecip> &ECSender::getPermanentFailedRecipients(void) const
 {
-	return lstFailedRecipients.size();
+	return mPermanentFailedRecipients;
 }
 
-const unsigned int ECSender::getRecipientErrorSMTPCode(unsigned int offset) const
+const std::vector<sFailedRecip> &ECSender::getTemporaryFailedRecipients() const
 {
-	if (offset >= lstFailedRecipients.size())
-		return 0;
-	return lstFailedRecipients[offset].ulSMTPcode;
-}
-
-const string ECSender::getRecipientErrorText(unsigned int offset) const
-{
-	if (offset >= lstFailedRecipients.size())
-		return string();
-	return lstFailedRecipients[offset].strSMTPResponse;
-}
-
-const wstring ECSender::getRecipientErrorDisplayName(unsigned int offset) const
-{
-	if (offset >= lstFailedRecipients.size())
-		return wstring();
-	return lstFailedRecipients[offset].strRecipName;
-}
-
-const string ECSender::getRecipientErrorEmailAddress(unsigned int offset) const
-{
-	if (offset >= lstFailedRecipients.size())
-		return string();
-	return lstFailedRecipients[offset].strRecipEmail;
+	return mTemporaryFailedRecipients;
 }
 
 pthread_mutex_t vmInitLock = PTHREAD_MUTEX_INITIALIZER;
@@ -164,7 +119,11 @@ static void InitializeVMime()
 		vmime::platform::getHandler();
 	}
 	catch (vmime::exceptions::no_platform_handler &) {
+#ifdef _WIN32
+		vmime::platform::setHandler<vmime::platforms::windows::windowsHandler>();
+#else
 		vmime::platform::setHandler<vmime::platforms::posix::posixHandler>();
+#endif
 		// need to have a unique indentifier in the mediaType
 		vmime::textPartFactory::getInstance()->registerType<vmime::mapiTextPart>(vmime::mediaType(vmime::mediaTypes::TEXT, "mapi"));
 		// init our random engine for random message id generation
@@ -197,7 +156,7 @@ INETMAPI_API HRESULT IMToMAPI(IMAPISession *lpSession, IMsgStore *lpMsgStore, IA
 	if(!ValidateCharset(dopt.default_charset)) {
 		const char *charset = "iso-8859-15";
 		if(lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_FATAL, "Configured default_charset '%s' is invalid. Reverting to '%s'", dopt.default_charset, charset);
+			lpLogger->Log(EC_LOGLEVEL_WARNING, "Configured default_charset '%s' is invalid. Reverting to '%s'", dopt.default_charset, charset);
 		dopt.default_charset = charset;
 	}
 
@@ -216,19 +175,18 @@ INETMAPI_API HRESULT IMToMAPI(IMAPISession *lpSession, IMsgStore *lpMsgStore, IA
 // Read properties from lpMessage object and fill a buffer with internet rfc822 format message
 INETMAPI_API HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook, IMessage *lpMessage, char** lppbuf, sending_options sopt, ECLogger *lpLogger)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	std::ostringstream oss;
 	char *lpszData = NULL;
 
 	hr = IMToINet(lpSession, lpAddrBook, lpMessage, oss, sopt, lpLogger);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
         
 	lpszData = new char[oss.str().size()+1];
 	strcpy(lpszData, oss.str().c_str());
 
 	*lppbuf = lpszData;
-exit:    
 	return hr;
 }
 
@@ -270,14 +228,9 @@ INETMAPI_API HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook, IM
 	}
 	
 exit:
-	if (lpTime)
-		MAPIFreeBuffer(lpTime);
-
-	if (lpMessageId)
-		MAPIFreeBuffer(lpMessageId);
-	
+	MAPIFreeBuffer(lpTime);
+	MAPIFreeBuffer(lpMessageId);
 	delete mToVM;
-
 	return hr;
 }
 

@@ -1,60 +1,34 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include "WSMAPIPropStorage.h"
 
 #include "Mem.h"
-#include "ECGuid.h"
+#include <zarafa/ECGuid.h>
 
 // Utils
 #include "SOAPUtils.h"
 #include "WSUtil.h"
-#include "Util.h"
+#include <zarafa/Util.h>
 #include "ZarafaUtil.h"
 
-#include <charset/convert.h>
+#include <zarafa/charset/convert.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -203,9 +177,9 @@ HRESULT WSMAPIPropStorage::HrMapiObjectToSoapObject(MAPIOBJECT *lpsMapiObject, s
 	HRESULT hr = hrSuccess;
 	unsigned int size;
 	unsigned int i;
-	std::list<ULONG>::iterator iterDelProps;
-	std::list<ECProperty>::iterator iterModProps;
-	ECMapiObjects::iterator iterChildren;
+	std::list<ULONG>::const_iterator iterDelProps;
+	std::list<ECProperty>::const_iterator iterModProps;
+	ECMapiObjects::const_iterator iterChildren;
 	ULONG ulPropId = 0;
 	GUID sServerGUID = {0};
 	GUID sSIGUID = {0};
@@ -240,7 +214,9 @@ HRESULT WSMAPIPropStorage::HrMapiObjectToSoapObject(MAPIOBJECT *lpsMapiObject, s
 		lpSaveObj->delProps.__ptr = new unsigned int[size];
 		lpSaveObj->delProps.__size = size;
 		i = 0;
-		for (iterDelProps = lpsMapiObject->lstDeleted->begin(); iterDelProps != lpsMapiObject->lstDeleted->end(); iterDelProps++, i++)
+		for (iterDelProps = lpsMapiObject->lstDeleted->begin();
+		     iterDelProps != lpsMapiObject->lstDeleted->end();
+		     ++iterDelProps, ++i)
 			lpSaveObj->delProps.__ptr[i] = *iterDelProps;
 	} else {
 		lpSaveObj->delProps.__ptr = NULL;
@@ -252,7 +228,10 @@ HRESULT WSMAPIPropStorage::HrMapiObjectToSoapObject(MAPIOBJECT *lpsMapiObject, s
 	if (size != 0) {
 		lpSaveObj->modProps.__ptr = new struct propVal[size];
 		i = 0;
-		for (iterModProps = lpsMapiObject->lstModified->begin(); iterModProps != lpsMapiObject->lstModified->end(); iterModProps++) {
+		for (iterModProps = lpsMapiObject->lstModified->begin();
+		     iterModProps != lpsMapiObject->lstModified->end();
+		     ++iterModProps)
+		{
 			SPropValue tmp = iterModProps->GetMAPIPropValRef();
 
 			if( PROP_ID(tmp.ulPropTag) == ulPropId) {
@@ -266,7 +245,7 @@ HRESULT WSMAPIPropStorage::HrMapiObjectToSoapObject(MAPIOBJECT *lpsMapiObject, s
 
 			hr = CopyMAPIPropValToSOAPPropVal(&lpSaveObj->modProps.__ptr[i], &tmp, lpConverter);
 			if(hr == hrSuccess)
-				i++;
+				++i;
 		}
 		lpSaveObj->modProps.__size = i;
 	} else {
@@ -283,7 +262,9 @@ HRESULT WSMAPIPropStorage::HrMapiObjectToSoapObject(MAPIOBJECT *lpsMapiObject, s
 			lpSaveObj->__ptr = new struct saveObject[size];
 			i = 0;
 			size = 0;
-			for (iterChildren = lpsMapiObject->lstChildren->begin(); iterChildren != lpsMapiObject->lstChildren->end(); iterChildren++, i++) {
+			for (iterChildren = lpsMapiObject->lstChildren->begin();
+			     iterChildren != lpsMapiObject->lstChildren->end();
+			     ++iterChildren, ++i) {
 				// Only send children if:
 				// - Modified AND NOT deleted
 				// - Deleted AND loaded from server (locally created/deleted items with no server ID needn't be sent)
@@ -306,17 +287,16 @@ exit:
 
 HRESULT WSMAPIPropStorage::HrUpdateSoapObject(MAPIOBJECT *lpsMapiObject, struct saveObject *lpsSaveObj, convert_context *lpConverter)
 {
-	HRESULT hr = hrSuccess;
-	ECMapiObjects::iterator iter;
-	std::list<ECProperty>::iterator iterProps;
+	HRESULT hr;
+	ECMapiObjects::const_iterator iter;
+	std::list<ECProperty>::const_iterator iterProps;
 	SPropValue sData;
 	ULONG ulPropId = 0;
 	int i;
 
 	if (lpConverter == NULL) {
 		convert_context converter;
-		hr = HrUpdateSoapObject(lpsMapiObject, lpsSaveObj, &converter);
-		goto exit;
+		return HrUpdateSoapObject(lpsMapiObject, lpsSaveObj, &converter);
 	}
 
 	/* FIXME: Support Multiple Single Instances */
@@ -324,14 +304,16 @@ HRESULT WSMAPIPropStorage::HrUpdateSoapObject(MAPIOBJECT *lpsMapiObject, struct 
 		/* Check which property this Instance ID is for */
 		hr = HrSIEntryIDToID(lpsSaveObj->lpInstanceIds->__ptr[0].__size, lpsSaveObj->lpInstanceIds->__ptr[0].__ptr, NULL, NULL, (unsigned int*)&ulPropId);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		/* Instance ID was incorrect, remove it */
 		FreeEntryList(lpsSaveObj->lpInstanceIds, true);
 		lpsSaveObj->lpInstanceIds = NULL;
 
 		/* Search for the correct property and copy it into the soap object, note that we already allocated the required memory... */
-		for (iterProps = lpsMapiObject->lstModified->begin(); iterProps != lpsMapiObject->lstModified->end(); iterProps++) {
+		for (iterProps = lpsMapiObject->lstModified->begin();
+		     iterProps != lpsMapiObject->lstModified->end();
+		     ++iterProps) {
 			sData = iterProps->GetMAPIPropValRef();
 
 			if (PROP_ID(sData.ulPropTag) != ulPropId)
@@ -340,15 +322,13 @@ HRESULT WSMAPIPropStorage::HrUpdateSoapObject(MAPIOBJECT *lpsMapiObject, struct 
 			// Extra check for protect the modProps array
 			if(lpsSaveObj->modProps.__size+1 > lpsMapiObject->lstModified->size() ) {
 				ASSERT(FALSE);
-				hr = MAPI_E_NOT_ENOUGH_MEMORY;
-				goto exit;
+				return MAPI_E_NOT_ENOUGH_MEMORY;
 			}
 
 			hr = CopyMAPIPropValToSOAPPropVal(&lpsSaveObj->modProps.__ptr[lpsSaveObj->modProps.__size], &sData, lpConverter);
 			if(hr != hrSuccess)
-				goto exit;
-
-			lpsSaveObj->modProps.__size++;
+				return hr;
+			++lpsSaveObj->modProps.__size;
 			break;
 		}
 
@@ -356,19 +336,17 @@ HRESULT WSMAPIPropStorage::HrUpdateSoapObject(MAPIOBJECT *lpsMapiObject, struct 
 		ASSERT(!(iterProps == lpsMapiObject->lstModified->end()) );
 	}
 
-	for (i = 0; i < lpsSaveObj->__size; i++) {
+	for (i = 0; i < lpsSaveObj->__size; ++i) {
 		MAPIOBJECT find(lpsSaveObj->__ptr[i].ulObjType, lpsSaveObj->__ptr[i].ulClientId);
 		iter = lpsMapiObject->lstChildren->find(&find);
 		
 		if(iter != lpsMapiObject->lstChildren->end()) {
 			hr = HrUpdateSoapObject(*iter, &lpsSaveObj->__ptr[i], lpConverter);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 	}
-	
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 void WSMAPIPropStorage::DeleteSoapObject(struct saveObject *lpSaveObj)
@@ -376,30 +354,26 @@ void WSMAPIPropStorage::DeleteSoapObject(struct saveObject *lpSaveObj)
 	int i;
 
 	if (lpSaveObj->__ptr) {
-		for (i = 0; i < lpSaveObj->__size; i++)
+		for (i = 0; i < lpSaveObj->__size; ++i)
 			DeleteSoapObject(&lpSaveObj->__ptr[i]);
 		delete [] lpSaveObj->__ptr;
 	}
 
 	if (lpSaveObj->modProps.__ptr) {
-		for (i = 0; i < lpSaveObj->modProps.__size; i++)
+		for (i = 0; i < lpSaveObj->modProps.__size; ++i)
 			FreePropVal(&lpSaveObj->modProps.__ptr[i], false);
 		delete [] lpSaveObj->modProps.__ptr;
 	}
 
-	if (lpSaveObj->delProps.__ptr)
-		delete [] lpSaveObj->delProps.__ptr;
-
+	delete[] lpSaveObj->delProps.__ptr;
 	if (lpSaveObj->lpInstanceIds)
 		FreeEntryList(lpSaveObj->lpInstanceIds, true);
 }
 
 ECRESULT WSMAPIPropStorage::EcFillPropTags(struct saveObject *lpsSaveObj, MAPIOBJECT *lpsMapiObj)
 {
-	for (int i = 0; i < lpsSaveObj->delProps.__size; i++) {
+	for (int i = 0; i < lpsSaveObj->delProps.__size; ++i)
 		lpsMapiObj->lstAvailable->push_back(lpsSaveObj->delProps.__ptr[i]);
-	}
-
 	return erSuccess;
 }
 
@@ -409,7 +383,7 @@ ECRESULT WSMAPIPropStorage::EcFillPropValues(struct saveObject *lpsSaveObj, MAPI
 	LPSPropValue lpsProp = NULL;
 	convert_context	context;
 
-	for (int i = 0; i < lpsSaveObj->modProps.__size; i++) {
+	for (int i = 0; i < lpsSaveObj->modProps.__size; ++i) {
 		ECAllocateBuffer(sizeof(SPropValue), (void **)&lpsProp);
 
 		ec = CopySOAPPropValToMAPIPropVal(lpsProp, &lpsSaveObj->modProps.__ptr[i], lpsProp, &context);
@@ -429,8 +403,7 @@ ECRESULT WSMAPIPropStorage::EcFillPropValues(struct saveObject *lpsSaveObj, MAPI
 // removes current list of del/mod props, and sets server changes in the lists
 HRESULT WSMAPIPropStorage::HrUpdateMapiObject(MAPIOBJECT *lpClientObj, struct saveObject *lpsServerObj)
 {
-	HRESULT hr = hrSuccess;
-	ECMapiObjects::iterator iterObj, iterDel;
+	ECMapiObjects::const_iterator iterObj, iterDel;
 	int i;
 
 	lpClientObj->ulObjId = lpsServerObj->ulServerId;
@@ -459,18 +432,15 @@ HRESULT WSMAPIPropStorage::HrUpdateMapiObject(MAPIOBJECT *lpClientObj, struct sa
 	}
 
 	/* FIXME: Support Multiple Single Instances */
-	if (lpsServerObj->lpInstanceIds && lpsServerObj->lpInstanceIds->__size) {
-		if (CopySOAPEntryIdToMAPIEntryId(&lpsServerObj->lpInstanceIds->__ptr[0], &lpClientObj->cbInstanceID, (LPENTRYID *)&lpClientObj->lpInstanceID) != hrSuccess) {
-			hr = MAPI_E_INVALID_PARAMETER;
-			goto exit;
-		}
-	}
+	if (lpsServerObj->lpInstanceIds && lpsServerObj->lpInstanceIds->__size &&
+	    CopySOAPEntryIdToMAPIEntryId(&lpsServerObj->lpInstanceIds->__ptr[0], &lpClientObj->cbInstanceID, (LPENTRYID *)&lpClientObj->lpInstanceID) != hrSuccess)
+		return MAPI_E_INVALID_PARAMETER;
 
 	for (iterObj = lpClientObj->lstChildren->begin(); iterObj != lpClientObj->lstChildren->end(); ) {
 		if ((*iterObj)->bDelete) {
 			// this child was removed, so we don't need it anymore
 			iterDel = iterObj;
-			iterObj++;
+			++iterObj;
 			FreeMapiObject(*iterDel);
 			lpClientObj->lstChildren->erase(iterDel);
 		} else if ((*iterObj)->bChanged) {
@@ -479,26 +449,23 @@ HRESULT WSMAPIPropStorage::HrUpdateMapiObject(MAPIOBJECT *lpClientObj, struct sa
 			while (i < lpsServerObj->__size) {
 				if ((*iterObj)->ulUniqueId == lpsServerObj->__ptr[i].ulClientId && (*iterObj)->ulObjType == lpsServerObj->__ptr[i].ulObjType)
 					break;
-				i++;
+				++i;
 			}
 			if (i == lpsServerObj->__size) {
 				// huh?
 				ASSERT(false);
-				hr = MAPI_E_NOT_FOUND;
-				goto exit;
+				return MAPI_E_NOT_FOUND;
 			}
 
 			HrUpdateMapiObject(*iterObj, &lpsServerObj->__ptr[i]);
 
-			iterObj++;
+			++iterObj;
 		} else {
-			iterObj++;
+			++iterObj;
 			// this was never sent to the server, so it is not going to be in the server object
 		}
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT WSMAPIPropStorage::HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject)
@@ -554,7 +521,7 @@ exit:
 }
 
 ECRESULT WSMAPIPropStorage::ECSoapObjectToMapiObject(struct saveObject *lpsSaveObj, MAPIOBJECT *lpsMapiObject) {
-	ECRESULT ec = erSuccess;
+	ECRESULT ec;
 	int i = 0;
 	MAPIOBJECT *mo = NULL;
 	ULONG ulAttachUniqueId = 0;
@@ -571,7 +538,7 @@ ECRESULT WSMAPIPropStorage::ECSoapObjectToMapiObject(struct saveObject *lpsSaveO
 	lpsMapiObject->ulObjType = lpsSaveObj->ulObjType;
 
 	// children
-	for (i = 0; i < lpsSaveObj->__size; i++) {
+	for (i = 0; i < lpsSaveObj->__size; ++i) {
 		switch (lpsSaveObj->__ptr[i].ulObjType) {
 		case MAPI_ATTACH:
 			AllocNewMapiObject(ulAttachUniqueId++, lpsSaveObj->__ptr[i].ulServerId, lpsSaveObj->__ptr[i].ulObjType, &mo);
@@ -596,15 +563,11 @@ ECRESULT WSMAPIPropStorage::ECSoapObjectToMapiObject(struct saveObject *lpsSaveO
 	}
 
 	/* FIXME: Support Multiple Single Instances */
-	if (lpsSaveObj->lpInstanceIds && lpsSaveObj->lpInstanceIds->__size) {
-		if (CopySOAPEntryIdToMAPIEntryId(&lpsSaveObj->lpInstanceIds->__ptr[0], &lpsMapiObject->cbInstanceID, (LPENTRYID *)&lpsMapiObject->lpInstanceID) != hrSuccess) {
-			ec = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
-	}
+	if (lpsSaveObj->lpInstanceIds && lpsSaveObj->lpInstanceIds->__size &&
+	    CopySOAPEntryIdToMAPIEntryId(&lpsSaveObj->lpInstanceIds->__ptr[0], &lpsMapiObject->cbInstanceID, (LPENTRYID *)&lpsMapiObject->lpInstanceID) != hrSuccess)
+		return ZARAFA_E_INVALID_PARAMETER;
 
-exit:
-	return ec;
+	return erSuccess;
 }
 
 // Register an advise without an extra server call
@@ -618,18 +581,12 @@ HRESULT WSMAPIPropStorage::RegisterAdvise(ULONG ulEventMask, ULONG ulConnection)
 
 HRESULT WSMAPIPropStorage::GetEntryIDByRef(ULONG *lpcbEntryID, LPENTRYID *lppEntryID)
 {
-	HRESULT hr = hrSuccess;
-
-	if (lpcbEntryID == NULL || lppEntryID == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpcbEntryID == NULL || lppEntryID == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	*lpcbEntryID = m_sEntryId.__size;
 	*lppEntryID = (LPENTRYID)m_sEntryId.__ptr;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT WSMAPIPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)

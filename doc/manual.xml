@@ -390,7 +390,7 @@
 			  <para>Connect to the Zarafa server through
 			  <replaceable>path</replaceable>, e.g.
 			  <filename>file:///path/to/socket</filename>. Default:
-			  <filename>file:///var/run/zarafa</filename>.</para>
+			  <filename>file:///var/run/zarafad/server.sock</filename>.</para>
 			</listitem>
 		  </varlistentry>
 
@@ -665,7 +665,7 @@
 			  <para>Unix socket to find the connection to the Zarafa
 			  server.</para>
 			  <para>Default:
-			  <parameter>file:///var/run/zarafa</parameter></para>
+			  <parameter>file:///var/run/zarafad/server.sock</parameter></para>
 			</listitem>
 		  </varlistentry>
 
@@ -830,8 +830,8 @@
 		  <varlistentry>
 			<term><option>server_bind</option></term>
 			<listitem>
-			  <para>IP address to bind to. 0.0.0.0 for any address.</para>
-			  <para>Default: <replaceable>0.0.0.0</replaceable></para>
+			  <para>Bind to a particular IP address. Leave empty to bind to all addresses.</para>
+			  <para>Default: (empty)</para>
 			</listitem>
 		  </varlistentry>
 
@@ -841,7 +841,7 @@
 			  <para>Unix socket to find the connection to the Zarafa
 			  server.</para>
 			  <para>Default:
-			  <parameter>file:///var/run/zarafa</parameter></para>
+			  <parameter>file:///var/run/zarafad/server.sock</parameter></para>
 			</listitem>
 		  </varlistentry>
 
@@ -881,7 +881,7 @@
 			  service.
 			  </para>
 			  <para>Default:
-			  <replaceable>/var/run/zarafa-dagent.pid</replaceable>
+			  <replaceable>/var/run/zarafad/dagent.pid</replaceable>
 			  </para>
 			</listitem>
 		  </varlistentry>
@@ -1011,12 +1011,8 @@
 			<term><option>log_buffer_size</option></term>
 			<listitem>
 			  <para>Buffer logging in what sized blocks.
-                              Bigger buffers is better for the performance but it gives lag
-                              when running e.g. multitail or 'tail -f' on the log-file. If
-                              you want to directly see what is happing, set this to e.g. 1.
-                              So when debugging: make it a small value, else set it to
-                              4096 or more.</para>
-			  <para>Default: <replaceable>4096</replaceable></para>
+                              The special value 0 selects line buffering.</para>
+			  <para>Default: <replaceable>0</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -1083,6 +1079,20 @@
               </para>
               <para>Default:
               <replaceable>/usr/sbin/zarafa-mr-accept</replaceable></para>
+          	</listitem>
+		  </varlistentry>
+
+          <varlistentry>
+          	<term><option>mr_autoprocessor</option></term>
+          	<listitem>
+              <para>Zarafa-dagent can auto-process meeting requests. When
+              this is
+              enabled and a meeting request, response or meeting cancellation is
+              received, this script is started with the following parameters:
+              /usr/bin/zarafa-mr-process &lt;username&gt;
+              &lt;/path/to/dagent.cfg&gt; [&lt;ENTRYID&gt;].</para>
+              <para>Default:
+              <replaceable>/usr/bin/zarafa-mr-process</replaceable></para>
           	</listitem>
 		  </varlistentry>
 
@@ -2787,7 +2797,8 @@
 			  <para>Connect to the Zarafa server through
 			  <replaceable>path</replaceable>, e.g.
 			  <filename>file:///path/to/socket</filename>. Default:
-			  <filename>file:///var/run/zarafa</filename>. This option
+			  <filename>file:///var/run/zarafad/server.sock</filename>.
+			  This option
 			  can always be specified.</para>
 			</listitem>
 		  </varlistentry>
@@ -2837,7 +2848,7 @@
 			  <para>Unix socket to find the connection to the Zarafa
 			  server.</para>
 			  <para>Default:
-			  <parameter>file:///var/run/zarafa</parameter></para>
+			  <parameter>file:///var/run/zarafad/server.sock</parameter></para>
 			</listitem>
 		  </varlistentry>
 
@@ -3106,7 +3117,8 @@
 			  <para>Connect to the Zarafa server through
 			  <replaceable>path</replaceable>, e.g.
 			  <filename>file:///path/to/socket</filename>. Default:
-			  <filename>file:///var/run/zarafa</filename>. This option
+			  <filename>file:///var/run/zarafad/server.sock</filename>.
+			  This option
 			  can always be specified.</para>
 			</listitem>
 		  </varlistentry>
@@ -3180,7 +3192,7 @@
 		    <term><option>-h</option> <replaceable>hostname</replaceable></term>
 		    <listitem>
 		    <para>Connect to the given Zarafa server. This defaults to
-		    file:///var/run/zarafa.</para>
+		    file:///var/run/zarafad/server.sock.</para>
 		    </listitem>
 		  </varlistentry>
 		</variablelist>
@@ -3397,7 +3409,7 @@
 			<listitem>
 			  <para>Use URL to connect to the zarafa-server. Default
 			  is
-			  <replaceable>file:///var/run/zarafa</replaceable>.</para>
+			  <replaceable>file:///var/run/zarafad/server.sock</replaceable>.</para>
 			</listitem>
 		  </varlistentry>
 
@@ -3651,12 +3663,12 @@
 		  <varlistentry>
 			<term><option>server_bind</option></term>
 			<listitem>
-			  <para>IP address to bind to. 0.0.0.0 for any
-			  address. Keep in mind that both Webaccess and Outlook
-			  should be able to connect. The Webaccess normally
-			  connects on 127.0.0.1, and Outlook over the
-			  network.</para>
-			  <para>Default: <replaceable>0.0.0.0</replaceable></para>
+			  <para>IP address to bind to. Leave empty to bind to
+			  all addresses. Keep in mind that both Webaccess and Outlook
+			  must be able to connect. The Webaccess normally
+			  connects on ::1/127.0.0.1, and Outlook from remote
+			  networks.</para>
+			  <para>Default: (empty)</para>
 			</listitem>
 		  </varlistentry>
 
@@ -3731,7 +3743,7 @@
 			<listitem>
 			  <para>Unix socket to listen on.</para>
 			  <para>Default:
-			  <replaceable>/var/run/zarafa</replaceable></para>
+			  <replaceable>/var/run/zarafad/server.sock</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -3740,7 +3752,7 @@
 			<listitem>
 			  <para>Priority unix socket to listen on. This socket is only used by the zarafa-licensed daemon.</para>
 			  <para>Default:
-			  <replaceable>/var/run/zarafa-prio</replaceable></para>
+			  <replaceable>/var/run/zarafad/prio.sock</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -3849,7 +3861,7 @@
 			  service.
 			  </para>
 			  <para>Default:
-			  <replaceable>/var/run/zarafa-server.pid</replaceable>
+			  <replaceable>/var/run/zarafad/server.pid</replaceable>
 			  </para>
 			</listitem>
 		  </varlistentry>
@@ -3972,7 +3984,7 @@
 				  <manvolnum>8</manvolnum>
 				</citerefentry>
 				service.</para>
-			  <para>Default: <replaceable>/var/run/zarafa-licensed</replaceable></para>
+			  <para>Default: <replaceable>/var/run/zarafad/licensed.sock</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -4058,12 +4070,8 @@
 			<term><option>log_buffer_size</option></term>
 			<listitem>
 			  <para>Buffer logging in what sized blocks.
-                              Bigger buffers is better for the performance but it gives lag
-                              when running e.g. multitail or 'tail -f' on the log-file. If
-                              you want to directly see what is happing, set this to e.g. 1.
-                              So when debugging: make it a small value, else set it to
-                              4096 or more.</para>
-			  <para>Default: <replaceable>4096</replaceable></para>
+                              The special value 0 selects line buffering.</para>
+			  <para>Default: <replaceable>0</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -5155,7 +5163,7 @@
 				</citerefentry>
 				service, this option is only required if the server is going
 				to make use of the indexing service.</para>
-			  <para>Default: <replaceable>file:///var/run/zarafa-search</replaceable></para>
+			  <para>Default: <replaceable>file:///var/run/zarafad/search.sock</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -6507,221 +6515,6 @@
 
 <!--
   -+-+-
-	Zarafa LDAP Multi Server Configuration file manual page
-  -+-+-
--->
-
-	<refentry>
-	  <refmeta>
-		<refentrytitle>zarafa-ldapms.cfg</refentrytitle>
-		<manvolnum>5</manvolnum>
-	  </refmeta>
-
-	  <refnamediv>
-		<refname>zarafa-ldapms.cfg</refname>
-		<refpurpose>The Zarafa LDAP Multiserver configuration file</refpurpose>
-	  </refnamediv>
-
-	  <refsynopsisdiv>
-		<para><command>ldapms.cfg</command></para>
-	  </refsynopsisdiv>
-
-	  <refsection>
-		<title>Description</title>
-
-		<para>The <filename>ldapms.cfg</filename> is a configuration
-		file for LDAPMS user plugin, used for multiserver setups. All
-		options to correctly retrieve user and group information can
-		be set here.</para>
-		<para>Please rever to
-		<citerefentry>
-		  <refentrytitle>zarafa-ldap.cfg</refentrytitle>
-		  <manvolnum>5</manvolnum>
-		</citerefentry>
-		for all normal LDAP settings. This manual page only discusses
-		the extra options for multiserver environments.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>File format</title>
-
-		<para>The file consists of one big section, but parameters can be
-		grouped by functionality.</para>
-
-		<para>The parameters are written in the form:</para>
-
-		<para><option>name</option> = <replaceable>value</replaceable></para>
-
-		<para>The file is line-based. Each newline-terminated line
-		represents either a comment, nothing, a parameter or a directive.
-		A line beginning with `#' is considered a comment, and will be
-		ignored	by Zarafa. Parameter names are case sensitive. Lines
-		beginning with `!' are directives.</para>
-
-		<para>Directives are written in the form:</para>
-
-		<para>!<option>directive</option> <replaceable>[argument(s)]
-		</replaceable></para>
-
-		<para>The following directives exist:</para>
-		<variablelist>
-		  <varlistentry>
-		    <term><option>include</option></term>
-		    <listitem>
-		      <para>Include and process <replaceable>argument</replaceable>
-		      </para>
-		      <para>Example: !include common.cfg</para>
-		    </listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Explanation of each parameter</title>
-
-		<variablelist>
-		  <varlistentry>
-			<term><option>ldap_user_server_attribute</option></term>
-			<listitem>
-			  <para>This value is the unique name of the server on
-			  which the users store is available.</para>
-			  <para>Default: <replaceable>zarafaUserServer</replaceable>
-			  </para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>ldap_company_server_attribute</option></term>
-			<listitem>
-			  <para>This value is the unique name of the server on
-			  which the public store for a tenant is available.</para>
-			  <para>Default: <replaceable>zarafaCompanyServer</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-		    <term><option>ldap_server_address_attribute</option></term>
-		    <listitem>
-		      <para>The attribute which contains the address of the
-		      server. This is used by servers to redirect a client to
-		      the correct server.</para>
-		      <para>Default: Empty</para>
-		    </listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-		    <term><option>ldap_server_http_port_attribute</option></term>
-		    <listitem>
-		      <para>The attribute that contains the port on which the
-		      server listens for HTTP connections.</para>
-		      <para>Default: <replaceable>zarafaHttpPort</replaceable>
-		      </para>
-		    </listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-		    <term><option>ldap_server_ssl_port_attribute</option></term>
-		    <listitem>
-		      <para>The attribute that contains the port on which the
-		      server listens for SSL connections.</para>
-		      <para>Default: <replaceable>zarafaSslPort</replaceable>
-		      </para>
-		    </listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-		    <term><option>ldap_server_file_path_attribute</option></term>
-		    <listitem>
-		      <para>The attribute that contains the path on which the
-		      server listens for unix socket connections in Linux or
-		      named pipe connections in MS Windows.</para>
-		      <para>Default: <replaceable>zarafaFilePath</replaceable>
-		      </para>
-		    </listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-		    <term><option>ldap_server_proxy_url_attribute</option></term>
-		    <listitem>
-		      <para>If the node is accessed through a reverse HTTP proxy, it
-		      should be accessed using this URL. See the manual page entry
-		      of proxy_header in the
-		      <citerefentry><refentrytitle>zarafa-server.cfg</refentrytitle><manvolnum>5</manvolnum></citerefentry> manpage for
-		      details on when this value is used.</para>
-		      <para>Default: <replaceable>zarafaProxyURL</replaceable>
-		      </para>
-		    </listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-		    <term><option>ldap_server_contains_public_attribute</option></term>
-		    <listitem>
-		      <para>The attribute that determines if a server contains the
-		      public store for a non-hosted environment.</para>
-		      <para>Default: <replaceable>zarafaContainsPublic</replaceable>
-		      </para>
-		    </listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-		    <term><option>ldap_server_search_filter</option></term>
-		    <listitem>
-		      <para>Add an extra filter to the server search.</para>
-			  <para>Default for OpenLDAP is empty.</para>
-			  <para>Default for ADS: <replaceable>(objectClass=Computer)</replaceable></para>
-		    </listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-		    <term><option>ldap_server_unique_attribute</option></term>
-		    <listitem>
-		      <para>This is the unique attribute of a server which is
-			  never going to change, unless the server is removed from
-			  LDAP.</para>
-			  <para>Default: <replaceable>cn</replaceable></para>
-		    </listitem>
-		  </varlistentry>
-
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Files</title>
-
-		<variablelist>
-		  <varlistentry>
-			<term><filename>/etc/zarafa/server.cfg</filename></term>
-			<listitem><para>The server configuration file.</para></listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term><filename>/etc/zarafa/ldap.cfg</filename></term>
-			<listitem><para>The Zarafa LDAP configuration file.</para></listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Author</title>
-		<para>Written by Zarafa.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>See also</title>
-		<para>
-		  <citerefentry>
-			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>8</manvolnum>
-		  </citerefentry>,
-		  <citerefentry>
-			<refentrytitle>zarafa-server.cfg</refentrytitle>
-			<manvolnum>5</manvolnum>
-		  </citerefentry>
-		</para>
-	  </refsection>
-	</refentry>
-
-<!--
-  -+-+-
 	Zarafa unix user plugin configuration file manual page (5.0 ready)
   -+-+-
 -->
@@ -7049,7 +6842,8 @@
 			  <para>Connect to the Zarafa server through
 			  <replaceable>path</replaceable>, e.g.
 			  <filename>file:///path/to/socket</filename>. Default:
-			  <filename>file:///var/run/zarafa</filename>. Overrides the config file setting.</para>
+			  <filename>file:///var/run/zarafad/server.sock</filename>.
+			  Overrides the config file setting.</para>
 			</listitem>
 		  </varlistentry>
 
@@ -7236,7 +7030,7 @@
 			  <para>Unix socket to find the connection to the Zarafa
 			  server.</para>
 			  <para>Default:
-			  <parameter>file:///var/run/zarafa</parameter></para>
+			  <parameter>file:///var/run/zarafad/server.sock</parameter></para>
 			</listitem>
 		  </varlistentry>
 
@@ -7276,7 +7070,7 @@
 			  service.
 			  </para>
 			  <para>Default:
-			  <replaceable>/var/run/zarafa-spooler.pid</replaceable>
+			  <replaceable>/var/run/zarafad/spooler.pid</replaceable>
 			  </para>
 			</listitem>
 		  </varlistentry>
@@ -7374,12 +7168,8 @@
 			<term><option>log_buffer_size</option></term>
 			<listitem>
 			  <para>Buffer logging in what sized blocks.
-                              Bigger buffers is better for the performance but it gives lag
-                              when running e.g. multitail or 'tail -f' on the log-file. If
-                              you want to directly see what is happing, set this to e.g. 1.
-                              So when debugging: make it a small value, else set it to
-                              4096 or more.</para>
-			  <para>Default: <replaceable>4096</replaceable></para>
+                              The special value 0 selects line buffering.</para>
+			  <para>Default: <replaceable>0</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -7727,7 +7517,8 @@
 				<para>Connect to the Zarafa server through
 				<replaceable>path</replaceable>, e.g.
 				<filename>file:///path/to/socket</filename>. Default:
-				<filename>file:///var/run/zarafa</filename>. Overrides the config file setting.</para>
+				<filename>file:///var/run/zarafad/server.sock</filename>.
+				Overrides the config file setting.</para>
 			  </listitem>
 			</varlistentry>
 
@@ -7881,8 +7672,8 @@
 		  <varlistentry>
 			<term><option>server_bind</option></term>
 			<listitem>
-			  <para>IP address to bind to. 0.0.0.0 for any address.</para>
-			  <para>Default: <replaceable>0.0.0.0</replaceable></para>
+			  <para>IP address to bind to. Leave empty to bind to all addresses.</para>
+			  <para>Default: (empty)</para>
 			</listitem>
 		  </varlistentry>
 
@@ -8031,7 +7822,7 @@
 			  service.
 			  </para>
 			  <para>Default:
-			  <replaceable>/var/run/zarafa-gateway.pid</replaceable>
+			  <replaceable>/var/run/zarafad/gateway.pid</replaceable>
 			  </para>
 			</listitem>
 		  </varlistentry>
@@ -8186,7 +7977,9 @@
 			<term><option>disable_plaintext_auth</option></term>
 			<listitem>
 			  <para>Disable all plaintext POP3 and IMAP authentications unless
-			  SSL/TLS is used. Obviously this requires at least
+			  SSL/TLS is used (except for connections originating
+			  from localhost, to allow saslauthd with rimap).
+			  Obviously, this requires at least
 			  <replaceable>ssl_private_key_file</replaceable> and
 			  <replaceable>ssl_certificate_file</replaceable> to take effect.</para>
 			  <para>Default: <replaceable>no</replaceable></para>
@@ -8337,12 +8130,8 @@
 			<term><option>log_buffer_size</option></term>
 			<listitem>
 			  <para>Buffer logging in what sized blocks.
-                              Bigger buffers is better for the performance but it gives lag
-                              when running e.g. multitail or 'tail -f' on the log-file. If
-                              you want to directly see what is happing, set this to e.g. 1.
-                              So when debugging: make it a small value, else set it to
-                              4096 or more.</para>
-			  <para>Default: <replaceable>4096</replaceable></para>
+                              The special value 0 selects line buffering.</para>
+			  <para>Default: <replaceable>0</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -8469,7 +8258,7 @@
 			  <para>Connect to the Zarafa server through
 			  <replaceable>path</replaceable>, e.g.
 			  <filename>file:///path/to/socket</filename>. Default:
-			  <filename>file:///var/run/zarafa</filename>.</para>
+			  <filename>file:///var/run/zarafad/server.sock</filename>.</para>
 			</listitem>
 		  </varlistentry>
 
@@ -8644,7 +8433,7 @@
 			  <para>Connection URL to find the connection to the Zarafa
 			  server.</para>
 			  <para>Default:
-			  <parameter>file:///var/run/zarafa</parameter></para>
+			  <parameter>file:///var/run/zarafad/server.sock</parameter></para>
 			</listitem>
 		  </varlistentry>
 
@@ -8683,7 +8472,7 @@
 			  used by the init.d script to correctly stop/restart the
 			  service.
 			  </para>
-			  <para>Default value: /var/run/zarafa-monitor.pid
+			  <para>Default value: /var/run/zarafad/monitor.pid
 			  </para>
 			</listitem>
 		  </varlistentry>
@@ -8781,12 +8570,8 @@
 			<term><option>log_buffer_size</option></term>
 			<listitem>
 			  <para>Buffer logging in what sized blocks.
-                              Bigger buffers is better for the performance but it gives lag
-                              when running e.g. multitail or 'tail -f' on the log-file. If
-                              you want to directly see what is happing, set this to e.g. 1.
-                              So when debugging: make it a small value, else set it to
-                              4096 or more.</para>
-			  <para>Default: <replaceable>4096</replaceable></para>
+                              The special value 0 selects line buffering.</para>
+			  <para>Default: <replaceable>0</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -9021,7 +8806,7 @@
 			  <para>Connect to the Zarafa server through
 			  <replaceable>path</replaceable>, e.g.
 			  <filename>file:///path/to/socket</filename>. Default:
-			  <filename>file:///var/run/zarafa</filename>.</para>
+			  <filename>file:///var/run/zarafad/server.sock</filename>.</para>
 			</listitem>
 		  </varlistentry>
 
@@ -9116,751 +8901,6 @@
 		  <citerefentry>
 			<refentrytitle>zarafa</refentrytitle>
 			<manvolnum>7</manvolnum>
-		  </citerefentry>
-		</para>
-	  </refsection>
-	</refentry>
-
-<!--
-  -+-+-
-	Zarafa Backup manual page (5.10 ready)
-  -+-+-
--->
-	<refentry>
-	  <refmeta>
-		<refentrytitle>zarafa-backup</refentrytitle>
-		<manvolnum>8</manvolnum>
-	  </refmeta>
-
-	  <refnamediv>
-		<refname>zarafa-backup</refname>
-		<refpurpose>The Zarafa Backup tool</refpurpose>
-	  </refnamediv>
-
-	  <refsynopsisdiv>
-		<cmdsynopsis>
-		  <command>zarafa-backup</command>
-		  <arg rep="repeat"><replaceable>OPTION</replaceable></arg>
-		</cmdsynopsis>
-	  </refsynopsisdiv>
-
-	  <refsection>
-		<title>Description</title>
-
-		<para>The zarafa-backup tool creates a backup of a store. The
-		data of emails, calendar items, contacts, etc. are stored in a
-		binary file. You can use the zarafa-restore tool to retrieve
-		backed up items.</para>
-
-		<para>Some items are not backed up, like the rules created by
-		the user, specific view information, selected sorting, etc.
-		</para>
-
-		<para>Therefore, this backup tool cannot be used as a disaster
-		recovery method. Please refer to the 'Zarafa Backup &amp;
-		Performance' documentation on the Zarafa site for common
-		available backup methods.
-		</para>
-
-		<para>The backup tool currently automatically detects if a
-		full backup or an incremental backup is possible. This may
-		change in the future.
-		</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Index file layout</title>
-		<para>The backup tool will create 2 files for each store that
-		is backed up. username.data.zbk will contain the data of the
-		store. username.index.zbk is an text index of data data
-		file. The file contains a number of fields per line, separated
-		by a colon. The first field is either 'R' (root), 'C'
-		(container) or 'M' (message). The Root line contains 4 fields:
-		<variablelist>
-		  <varlistentry>
-			<term>1st field: marker</term>
-			<listitem>
-			  <para>R: Root marker</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>2nd field: unique id length</term>
-			<listitem>
-			  <para>[0-9]+: number of characters in following
-			  id</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>3rd field: unique id</term>
-			<listitem>
-			  <para>The unique id of the root. This key matches the
-			  parent field of containers which are directly on the
-			  root level, eg. Inbox, Outbox, Calendar, etc.</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>4th field: username</term>
-			<listitem>
-			  <para>The name of the user of the backup.</para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-		</para>
-		<para>A container line contains 11 fields:
-		<variablelist>
-		  <varlistentry>
-			<term>1st field: marker</term>
-			<listitem>
-			  <para>C: Container marker</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>2nd field: unique parent id length</term>
-			<listitem>
-			  <para>[0-9]+: number of characters in following
-			  id</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>3rd field: unique parent id</term>
-			<listitem>
-			  <para>The unique id of the parent of this
-			  container. This key matches the id field of the parent
-			  container.</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>4th field: unique id length</term>
-			<listitem>
-			  <para>[0-9]+: number of characters in following
-			  id</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>5th field: unique id</term>
-			<listitem>
-			  <para>The unique id of this container. Other containers
-			  and messages may have this id in their parent id
-			  field.</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>6th field: record key length</term>
-			<listitem>
-			  <para>The length of the record key in the next
-			  field.</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>7th field: record key</term>
-			<listitem>
-			  <para>The record key of the item. Use this key to
-			  restore the item.</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>8th field: content count</term>
-			<listitem>
-			  <para>The number of items in this container, excluding
-			  other containers. You can use this as a hint, the
-			  restore program does not use this number.</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>9th field: last modification time</term>
-			<listitem>
-			  <para>Unix timestamp of the date the container was last
-			  modified.</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>10th field: type of container</term>
-			<listitem>
-			  <para>This is the type of the container. Eg: IPF.Note
-			  for a mail folder, IPF.Appointment for a calendar folder.</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>11th field: container name</term>
-			<listitem>
-			  <para>The name of the container when it was
-			  backed up. The restored folder will have this name. As an
-			  exception of the separator, this field can contain a
-			  colon.</para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-		</para>
-		<para>A message line contains 9 fields:
-		<variablelist>
-		  <varlistentry>
-			<term>1st field: marker</term>
-			<listitem>
-			  <para>M: Message marker</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>2nd field: unique parent id length</term>
-			<listitem>
-			  <para>[0-9]+: number of characters in following
-			  id</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>3rd field: unique parent id</term>
-			<listitem>
-			  <para>The unique id of the message. This key matches the
-			  id field of the parent container.</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>4th field: record key length</term>
-			<listitem>
-			  <para>The length of the record key in the next
-			  field.</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>5th field: record key</term>
-			<listitem>
-			  <para>The record key of the item. Use this key to
-			  restore the item.</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>6th field: last modification time</term>
-			<listitem>
-			  <para>Unix timestamp of the date the message was last
-			  modified.</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>7th field: type of message</term>
-			<listitem>
-			  <para>This is the type of the message. Eg: IPM.Note
-			  for an email, IPM.Appointment for a calendar item.</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>8th field: offset in the data file</term>
-			<listitem>
-			  <para>The restore tool needs to know where the item
-			  begins in the data file. This offset is the startpoint
-			  in the datafile.</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term>9th field: subject of the message</term>
-			<listitem>
-			  <para>This is a description of the message. You can use
-			  this to find items you want to restore.</para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-		</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Options</title>
-		<para>The options used to backup are as follows:</para>
-
-		<variablelist>
-		  <varlistentry>
-			<term><option>--user</option></term>
-			<term>
-			  <option>-u</option>
-			  <replaceable>username</replaceable>
-			</term>
-			<listitem>
-			  <para>Backup the store of one user.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--public</option></term>
-			<term>
-			  <option>-p</option>
-			</term>
-			<listitem>
-			  <para>Backup the public store. The file names will be
-			  Public.data.zbk and Public.index.zbk.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--all</option></term>
-			<term>
-			  <option>-a</option>
-			</term>
-			<listitem>
-			  <para>Backup the store of all users, including the public store.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--company</option></term>
-			<term>
-			  <option>-s</option>
-			  <replaceable>tenant</replaceable>
-			</term>
-			<listitem>
-			  <para>Backup all users and public store of specific tenant.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--company-public</option></term>
-			<term>
-			  <option>-P</option>
-			  <replaceable>companyname</replaceable>
-			</term>
-			<listitem>
-			  <para>Backup the public store for a specific tenant. The file names will be
-			  named after the tenant.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--store</option></term>
-			<term>
-			  <option>-i</option>
-			  <replaceable>storeguid</replaceable>
-			</term>
-			<listitem>
-			  <para>Backup store with the specified store guid. This can be used
-			  to backup orphaned stores. Use <replaceable>zarafa-admin
-			  --list-orphans</replaceable> to get a list of orphaned stores and
-			  their guids.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--output</option></term>
-			<term>
-			  <option>-o</option>
-			  <replaceable>path</replaceable>
-			</term>
-			<listitem>
-			  <para>Store backup files in specified output directory.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--skip-junk</option></term>
-			<term>
-			  <option>-J</option>
-			</term>
-			<listitem>
-			  <para>Do not backup the junkmail folder. Since this
-			  folder is likely to contain only spam, this folder is
-			  skipable.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--skip-public</option></term>
-			<term>
-			  <option>-N</option>
-			</term>
-			<listitem>
-			  <para>Do not backup the public store. This can be
-			  useful with -a or -s &lt;company&gt; options.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--host</option></term>
-			<term>
-			  <option>-h</option>
-			  <replaceable>path</replaceable>
-			</term>
-			<listitem>
-			  <para>Connect to the Zarafa server through
-			  <replaceable>path</replaceable>, e.g.
-			  <filename>file:///path/to/socket</filename>. Default:
-			  <filename>file:///var/run/zarafa</filename>.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--config</option></term>
-			<term>
-			  <option>-c</option>
-			  <replaceable>file</replaceable>
-			</term>
-			<listitem>
-			  <para>Use a configuration file. See the
-			  <citerefentry><refentrytitle>CONFIG</refentrytitle></citerefentry>
-			  section for more information.</para>
-			  <para>Default: <replaceable>/etc/zarafa/backup.cfg</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--threads</option></term>
-			<term>
-			  <option>-t</option>
-			  <replaceable>N</replaceable>
-			</term>
-			<listitem>
-			  <para>Use multiple threads during the backup of multiple
-			  stores. Depending on the number of CPUs and disks you
-			  have, you can increase this number to a sensible value
-			  for your setup. All users within a company space will be
-			  backedup simultaneously. On a non-hosted environment,
-			  this means all users in the setup.</para>
-			  <para>Default: <replaceable>1</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--verbose</option></term>
-			<term>
-			  <option>-v</option>
-			</term>
-			<listitem>
-			  <para>Print more output during the backup. Prints every folder with item count.</para>
-			</listitem>
-		  </varlistentry>
-
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Examples</title>
-
-		<para>Backup one user:</para>
-		<para><command>zarafa-backup</command> <option>-u</option>
-		<replaceable>loginname</replaceable></para>
-	  </refsection>
-
-	  <refsection>
-		<title>Config</title>
-
-		<para>Normally, no configuration file is used or required. The
-		following options can be set in the configuation file:</para>
-
-		<variablelist>
-		  <varlistentry>
-			<term><option>server_socket</option></term>
-			<listitem>
-			  <para>Unix socket to find the connection to the Zarafa
-			  server.</para>
-			  <para>Default:
-			  <parameter>file:///var/run/zarafa</parameter></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>sslkey_file</option></term>
-			<listitem>
-			  <para>Use this file as key to logon to the server. This
-			  is only used when server_socket is set to an HTTPS
-			  transport. See the
-			  <citerefentry>
-				<refentrytitle>zarafa-server</refentrytitle>
-				<manvolnum>8</manvolnum>
-			  </citerefentry>
-			  manual page on how to setup SSL keys.
-			  </para>
-			  <para>Default: value not set.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>sslkey_pass</option></term>
-			<listitem>
-			  <para>The password of the SSL key file that is set in
-			  sslkey_file.
-			  </para>
-			  <para>Default: value not set.</para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Author</title>
-		<para>Written by Zarafa.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>See also</title>
-		<para>
-		  <citerefentry>
-			<refentrytitle>zarafa-restore</refentrytitle>
-			<manvolnum>8</manvolnum>
-		  </citerefentry>
-		</para>
-	  </refsection>
-	</refentry>
-
-<!--
-  -+-+-
-	Zarafa Restore manual page (5.10 ready)
-  -+-+-
--->
-
-	<refentry>
-	  <refmeta>
-		<refentrytitle>zarafa-restore</refentrytitle>
-		<manvolnum>8</manvolnum>
-	  </refmeta>
-
-	  <refnamediv>
-		<refname>zarafa-restore</refname>
-		<refpurpose>The Zarafa Restore tool</refpurpose>
-	  </refnamediv>
-
-	  <refsynopsisdiv>
-		<cmdsynopsis>
-		  <command>zarafa-restore</command>
-		  <arg rep="repeat"><replaceable>OPTION</replaceable></arg>
-		  <arg rep="repeat"><replaceable>RECORDKEY</replaceable></arg>
-		</cmdsynopsis>
-	  </refsynopsisdiv>
-
-	  <refsection>
-		<title>Description</title>
-
-		<para>The zarafa-restore tool restores data from a backup that
-		was created by the zarafa-backup tool. You can search in the
-		index file for the items or folders you wish to
-		restore.</para>
-
-		<para>Remember the record key, and save it in a file, one per
-		line. The record key for containers can be found in the 7th
-		field, for messages in the 5th field. The numbers can also be
-		passed as command parameters. Please refer to the
-		<citerefentry><refentrytitle>zarafa-backup</refentrytitle>
-		<manvolnum>8</manvolnum></citerefentry> manual to view the
-		index file layout.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Options</title>
-		<para>The options used to restore are as follows:</para>
-
-		<variablelist>
-		  <varlistentry>
-			<term><option>--user</option></term>
-			<term>
-			  <option>-u</option>
-			  <replaceable>username</replaceable>
-			</term>
-			<listitem>
-			  <para>Restore to this Zarafa user. If the
-			  <option>--from</option> is not passed, this will also be
-			  used as the backup set name to restore from.</para>
-	  		  <para>In a single-tenancy environment this option is
-			  mandatory when not restoring from the public store. For
-			  restoring a multi-tenancy public store, <parameter>--user</parameter>
-			  must be used in combination with the name of the tenant.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--from</option></term>
-			<term>
-			  <option>-f</option>
-			  <replaceable>username</replaceable>
-			</term>
-			<listitem>
-			  <para>Restore from this backup set. This overrides the
-			  default backup set name if you want to restore from
-			  another name than to restore to.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--public</option></term>
-			<term>
-			  <option>-p</option>
-			</term>
-			<listitem>
-			  <para>Restore to the public store. This option is only
-			  for non multi-tenancy Zarafa servers. If you've enabled
-			  the enable_hosted_zarafa option in your server, you can
-			  restore public data by using the
-			  <parameter>--user</parameter> switch with the name
-			  of the tenant which you wish to restore.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--restorefile</option></term>
-			<term>
-			  <option>-i</option>
-			  <replaceable>filename</replaceable>
-			</term>
-			<listitem>
-			  <para>Use this file as input for the record keys. Each
-			  recordkey should be on its own line. Use '-' as
-			  filename when the record keys are to be read from
-			  stdin.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--recurse</option></term>
-			<term>
-			  <option>-r</option>
-			</term>
-			<listitem>
-			  <para>When you restore a folder, the folder with its
-			  contents will be restored. If you add this option, also
-			  the subfolders of the given folder are restored.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--host</option></term>
-			<term>
-			  <option>-h</option>
-			  <replaceable>path</replaceable>
-			</term>
-			<listitem>
-			  <para>Connect to the Zarafa server through
-			  <replaceable>path</replaceable>, e.g.
-			  <filename>file:///path/to/socket</filename>. Default:
-			  <filename>file:///var/run/zarafa</filename>.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--config</option></term>
-			<term>
-			  <option>-c</option>
-			  <replaceable>file</replaceable>
-			</term>
-			<listitem>
-			  <para>Use a configuration file. See the
-			  <citerefentry><refentrytitle>CONFIG</refentrytitle></citerefentry>
-			  section for more information.</para>
-			  <para>Default: <replaceable>/etc/zarafa/backup.cfg</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--verbose</option></term>
-			<term>
-			  <option>-v</option>
-			</term>
-			<listitem>
-			  <para>Print more about which folder is being restored.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--not-before</option></term>
-			<term>
-			  <option>-b</option>
-			  <replaceable>day-month-year</replaceable>
-			</term>
-			<listitem>
-			  <para>When an item was created before this date, it will
-			  not be restored. The date is passed in the specified
-			  format, with the '-' signs aswell.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--not-after</option></term>
-			<term>
-			  <option>-a</option>
-			  <replaceable>day-month-year</replaceable>
-			</term>
-			<listitem>
-			  <para>When an item was created after this date, it will
-			  not be restored. The date is passed in the specified
-			  format, with the '-' signs aswell.</para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Examples</title>
-		<para>Some helper and example scripts can be found in
-		/usr/share/zarafa/zarafa-backup-helpers. The full-restore.sh
-		script allows you to easely restore the complete backup to a
-		store. The readable-index.pl script will create a more
-		readable version of an index file, and print it to the screen.
-		</para>
-
-		<para>Restore one message from user jane to user john:</para>
-		<para>
-		  <command>zarafa-restore</command>
-		  <option>-u</option> <replaceable>john</replaceable>
-		  <option>-f</option> <replaceable>jane</replaceable>
-		  <option><replaceable>10203040</replaceable></option>
-		</para>
-
-		<para>Restore Inbox and all subfolders from user jane:</para>
-		<para>
-		  <command>zarafa-restore</command>
-		  <option>-u</option> <replaceable>jane</replaceable>
-		  <option>-r</option>
-		  <option>`grep ^C jane.index.zbk | grep Inbox | cut -d: -f7`</option>
-		</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Config</title>
-
-		<para>Normally, no configuration file is used or required. The
-		following options can be set in the configuation file:</para>
-
-		<variablelist>
-		  <varlistentry>
-			<term><option>server_socket</option></term>
-			<listitem>
-			  <para>Unix socket to find the connection to the Zarafa
-			  server.</para>
-			  <para>Default:
-			  <parameter>file:///var/run/zarafa</parameter></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>sslkey_file</option></term>
-			<listitem>
-			  <para>Use this file as key to logon to the server. This
-			  is only used when server_socket is set to an HTTPS
-			  transport. See the
-			  <citerefentry>
-				<refentrytitle>zarafa-server</refentrytitle>
-				<manvolnum>8</manvolnum>
-			  </citerefentry>
-			  manual page on how to setup SSL keys.
-			  </para>
-			  <para>Default: value not set.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>sslkey_pass</option></term>
-			<listitem>
-			  <para>The password of the SSL key file that is set in
-			  sslkey_file.
-			  </para>
-			  <para>Default: value not set.</para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Author</title>
-		<para>Written by Zarafa.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>See also</title>
-		<para>
-		  <citerefentry>
-			<refentrytitle>zarafa-backup</refentrytitle>
-			<manvolnum>8</manvolnum>
 		  </citerefentry>
 		</para>
 	  </refsection>
@@ -10090,8 +9130,8 @@
 		  <varlistentry>
 			<term><option>server_bind</option></term>
 			<listitem>
-			  <para>IP address to bind to. 0.0.0.0 for any address.</para>
-			  <para>Default: <replaceable>0.0.0.0</replaceable></para>
+			  <para>IP address to bind to. Leave empty to bind to all addresses.</para>
+			  <para>Default: (empty)</para>
 			</listitem>
 		  </varlistentry>
 
@@ -10184,7 +9224,7 @@
 			  service.
 			  </para>
 			  <para>Default:
-			  <replaceable>/var/run/zarafa-ical.pid</replaceable>
+			  <replaceable>/var/run/zarafad/ical.pid</replaceable>
 			  </para>
 			</listitem>
 		  </varlistentry>
@@ -10363,12 +9403,8 @@
 			<term><option>log_buffer_size</option></term>
 			<listitem>
 			  <para>Buffer logging in what sized blocks.
-                              Bigger buffers is better for the performance but it gives lag
-                              when running e.g. multitail or 'tail -f' on the log-file. If
-                              you want to directly see what is happing, set this to e.g. 1.
-                              So when debugging: make it a small value, else set it to
-                              4096 or more.</para>
-			  <para>Default: <replaceable>4096</replaceable></para>
+                              The special value 0 selects line buffering.</para>
+			  <para>Default: <replaceable>0</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -10428,664 +9464,6 @@
 		</para>
 	  </refsection>
 	</refentry>
-<!--
-  -+-+-
-	Zarafa licensed manual page
-  -+-+-
--->
-	<refentry>
-	  <refmeta>
-		<refentrytitle>zarafa-licensed</refentrytitle>
-		<manvolnum>8</manvolnum>
-	  </refmeta>
-
-	  <refnamediv>
-		<refname>zarafa-licensed</refname>
-		<refpurpose>Start the Zarafa license server.</refpurpose>
-	  </refnamediv>
-
-	  <refsynopsisdiv>
-		<cmdsynopsis>
-		  <command>zarafa-licensed</command>
-		  <arg choice="opt" rep="repeat">
-			<replaceable>OPTION</replaceable>
-		  </arg>
-		</cmdsynopsis>
-	  </refsynopsisdiv>
-
-	  <refsection>
-		<title>Description</title>
-
-		<para>The zarafa-licensed is used for license queries from non-free
-		parts of the Zarafa suite. If you wish to use any non-free part of
-		Zarafa, you will need to install, configure and run the
-		zarafa-licensed server.
-		</para>
-
-		<para>The default settings of the zarafa-licensed program are defined
-		in <citerefentry>
-		<refentrytitle>zarafa-licensed.cfg</refentrytitle>
-		<manvolnum>5</manvolnum>
-		</citerefentry>.
-		</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Options</title>
-
-		<para>Various options are possible. None of these options are
-		required.</para>
-
-		<para>
-		  <variablelist>
-			<varlistentry>
-			  <term><option>--config</option></term>
-			  <term>
-				<option>-c</option>
-				<replaceable>licensed.cfg</replaceable>
-			  </term>
-			  <listitem>
-				<para>Specify the location of the licensed.cfg file. If
-				the licensed.cfg file is not specified, the license server
-				will continue using its default settings.</para>
-				<para>Default: <replaceable>/etc/zarafa/licensed.cfg</replaceable></para>
-			  </listitem>
-			</varlistentry>
-
-			<varlistentry>
-			  <term><option>--help</option></term>
-			  <term>
-				<option>-h</option>
-			  </term>
-			  <listitem>
-				<para>Shows the help message of the license server.
-				</para>
-			  </listitem>
-			</varlistentry>
-
-		  <varlistentry>
-			<term><option>--foreground</option></term>
-			<term>
-			  <option>-F</option>
-			</term>
-			<listitem>
-			  <para>Run in the foreground. Normally the license server
-			  will daemonize and run in the background.</para>
-			</listitem>
-		  </varlistentry>
-		  </variablelist>
-		</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Signals</title>
-		<para>The following signals can be sent to the zarafa-license
-		process:</para>
-		<variablelist>
-		  <varlistentry>
-			<term><option>HUP</option></term>
-			<listitem>
-			  <para>When the HUP signal is received, some options from
-			  the configuration file are reloaded. The reloadable
-			  options are listed in the
-			  <citerefentry><refentrytitle>zarafa-licensed.cfg</refentrytitle>
-			  <manvolnum>5</manvolnum></citerefentry> manual page.</para>
-			  <para>Also, when using <replaceable>log_method =
-			  file</replaceable>, the logfile will be closed and a new
-			  logfile will be opened. You can use this signal in your
-			  logrotate system.</para>
-			</listitem>
-		  </varlistentry>
-		  <varlistentry>
-			<term><option>TERM</option></term>
-			<listitem>
-			  <para>To gracefully let the service exit, the normal TERM
-			  signal is used.</para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Usage</title>
-
-		<para>To start the license server:</para>
-
-		<para><command>zarafa-licensed</command></para>
-
-		<para>The zarafa-licensed process will keep running. You may also use
-		the init.d scripts:</para>
-
-		<para><command>/etc/init.d/zarafa-licensed</command>
-		[<replaceable>start</replaceable>|
-		<replaceable>stop</replaceable>|
-		<replaceable>restart</replaceable>]</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Author</title>
-		<para>Written by Zarafa.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>See also</title>
-		<para>
-		  <citerefentry>
-			<refentrytitle>zarafa-licensed.cfg</refentrytitle>
-			<manvolnum>5</manvolnum>
-		  </citerefentry>,
-		  <citerefentry>
-			<refentrytitle>zarafa-server</refentrytitle>
-			<manvolnum>8</manvolnum>
-		  </citerefentry>
-		</para>
-	  </refsection>
-	</refentry>
-<!--
-  -+-+-
-	Zarafa license server configuration file
-  -+-+-
--->
-	<refentry>
-	  <refmeta>
-		<refentrytitle>zarafa-licensed.cfg</refentrytitle>
-		<manvolnum>5</manvolnum>
-	  </refmeta>
-
-	  <refnamediv>
-		<refname>zarafa-licensed.cfg</refname>
-		<refpurpose>The Zarafa licensed configuration file</refpurpose>
-	  </refnamediv>
-
-	  <refsynopsisdiv>
-		<para><command>licensed.cfg</command></para>
-	  </refsynopsisdiv>
-
-	  <refsection>
-		<title>Description</title>
-
-		<para>The <filename>licensed.cfg</filename> is a configuration
-		file for the Zarafa license server. <filename>licensed.cfg</filename>
-		contains instructions for the software to set up the logging system
-		and the licensing part of Zarafa.
-		</para>
-	  </refsection>
-
-	  <refsection>
-		<title>File format</title>
-
-		<para>The file consists of one big section, but parameters can
-		be grouped by functionality. The types of parameters are:
-		server and log.</para>
-
-		<para>The parameters are written in the form</para>
-
-		<para>
-		  <parameter>name</parameter> =
-		  <option>value</option>
-		</para>
-
-		<para>The file is line-based - that is, each
-		newline-terminated line represents either a comment, nothing
-		or a parameter.</para>
-
-		<para>A line beginning with # is considered a comment, and
-		will be ignored by Zarafa.</para>
-
-		<para>Parameter names are case sensitive.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Explanation of each parameter</title>
-
-		<variablelist>
-		  <varlistentry>
-			<term><option>server_pipe_name</option></term>
-			<listitem>
-			  <para>Unix socket to listen on.</para>
-			  <para>Default:
-			  <replaceable>/var/run/zarafa-licensed</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>server_socket</option></term>
-			<listitem>
-			  <para>Unix socket to find the connection to the Zarafa
-			  server.</para>
-			  <para>Default:
-			  <parameter>file:///var/run/zarafa</parameter></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-				<term><option>sslkey_file</option></term>
-				<listitem>
-				  <para>Use this file as key to logon to the server. This
-				  is only used when server_socket is set to an HTTPS
-				  transport. See the
-				  <citerefentry>
-						<refentrytitle>zarafa-server</refentrytitle>
-						<manvolnum>8</manvolnum>
-				  </citerefentry>
-				  manual page on how to setup SSL keys.
-				  </para>
-				  <para>Default: value not set.</para>
-				</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-				<term><option>sslkey_pass</option></term>
-				<listitem>
-				  <para>The password of the SSL key file that is set in
-				  sslkey_file.
-				  </para>
-				  <para>Default: value not set.</para>
-				</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>license_path</option></term>
-			<listitem>
-			  <para>The path to the license directory. This directory
-			  should contain a file named <filename>base</filename>
-			  with the serial number. All other files in this
-			  directory can contain a CALs (Client Access License),
-			  one per file.</para>
-			  <para>Default:
-			  <replaceable>/etc/zarafa/license</replaceable>
-			  </para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>run_as_user</option></term>
-			<listitem>
-			  <para>After correctly starting, the server process will
-			  become this user, dropping root privileges. Note that
-			  the log file needs to be writeable by this user, and the
-			  directory too to create new logfiles after
-			  logrotation. This can also be achieved by setting the
-			  correct group and permissions.
-			  </para>
-			  <para>Default value is empty, not changing the user
-			  after starting.
-			  </para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>run_as_group</option></term>
-			<listitem>
-			  <para>After correctly starting, the server process will
-			  become this group, dropping root privileges.
-			  </para>
-			  <para>Default value is empty, not changing the group
-			  after starting.
-			  </para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>pid_file</option></term>
-			<listitem>
-			  <para>Write the process ID number to this file. This is
-			  used by the init.d script to correctly stop/restart the
-			  service.
-			  </para>
-			  <para>Default:
-			  <replaceable>/var/run/zarafa-licensed.pid</replaceable>
-			  </para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>running_path</option></term>
-			<listitem>
-			  <para>Change directory to this path when running in
-			  daemonize mode. When using the -F switch to run in the
-			  foreground the directory will not be changed.
-			  </para>
-			  <para>Default:
-			  <replaceable>/</replaceable>
-			  </para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>log_method</option></term>
-			<listitem>
-			  <para>The method which should be used for logging. Valid
-			  values are:</para>
-
-			  <variablelist>
-				<varlistentry>
-				  <term><replaceable>syslog</replaceable></term>
-				  <listitem>
-					<para>Use the Linux system log. All messages will
-					be written to the mail facility. See also <citerefentry>
-					<refentrytitle>syslog.conf</refentrytitle>
-					<manvolnum>5</manvolnum>
-					</citerefentry>.</para>
-				  </listitem>
-				</varlistentry>
-
-				<varlistentry>
-				  <term><replaceable>file</replaceable></term>
-				  <listitem>
-					<para>Log to a file. The filename will be
-					specified in <option>log_file</option>.</para>
-				  </listitem>
-				</varlistentry>
-			  </variablelist>
-
-			  <para>Default: <replaceable>file</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>log_file</option></term>
-			<listitem>
-			  <para>When logging to a file, specify the filename in
-			  this parameter. Use <replaceable>-</replaceable> (minus
-			  sign) for stderr output.</para>
-			  <para>Default: <replaceable>/var/log/zarafa/licensed.log</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>log_timestamp</option></term>
-			<listitem>
-			  <para>Specify whether to prefix each log line with a
-			  timestamp in 'file' logging mode.</para>
-			  <para>Default: <replaceable>1</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>log_buffer_size</option></term>
-			<listitem>
-			  <para>Buffer logging in what sized blocks.
-                              Bigger buffers is better for the performance but it gives lag
-                              when running e.g. multitail or 'tail -f' on the log-file. If
-                              you want to directly see what is happing, set this to e.g. 1.
-                              So when debugging: make it a small value, else set it to
-                              4096 or more.</para>
-			  <para>Default: <replaceable>4096</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>log_level</option></term>
-			<listitem>
-			  <para>The level of output for logging in the range from
-			  0 to 5. 0 means no logging, 5 means full logging.</para>
-			  <para>Default: <replaceable>2</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>report_path</option></term>
-			<listitem>
-			  <para>The path to a directory where to store the report
-			  logging. Report logging is only enabled if you have a
-			  report-based license from Zarafa.</para>
-			  <para>Default: <replaceable>/var/lib/zarafa/report</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>report_ca</option></term>
-			<listitem>
-			  <para>The path to a directory containing the SSL CA
-			information for zarafa-report. This is needed for secure upload
-			of your license information if your license requires this.</para>
-			  <para>Default: <replaceable>/etc/zarafa/report-ca</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Reloading</title>
-		<para>The following options are reloadable by sending the
-		zarafa-licensed process a HUP signal:</para>
-
-		<variablelist>
-		  <varlistentry>
-			<term>log_level</term>
-			<listitem><para></para></listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Files</title>
-
-		<variablelist>
-		  <varlistentry>
-			<term><filename>/etc/zarafa/licensed.cfg</filename></term>
-			<listitem>
-			  <para>The Zarafa license server configuration file.</para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Author</title>
-		<para>Written by Zarafa.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>See also</title>
-		<para>
-		  <citerefentry>
-			<refentrytitle>zarafa-licensed</refentrytitle>
-			<manvolnum>8</manvolnum>
-		  </citerefentry>
-		</para>
-	  </refsection>
-	</refentry>
-<!--
-  -+-+-
-	Zarafa backup / restore configuration file
-  -+-+-
--->
-	<refentry>
-	  <refmeta>
-		<refentrytitle>zarafa-backup.cfg</refentrytitle>
-		<manvolnum>5</manvolnum>
-	  </refmeta>
-
-	  <refnamediv>
-		<refname>zarafa-backup.cfg</refname>
-		<refpurpose>The Zarafa backup and restore configuration file</refpurpose>
-	  </refnamediv>
-
-	  <refsynopsisdiv>
-		<para><command>backup.cfg</command></para>
-	  </refsynopsisdiv>
-
-	  <refsection>
-		<title>Description</title>
-
-		<para>The <filename>backup.cfg</filename> is a configuration
-		file for the Zarafa backup and restore tools. <filename>backup.cfg</filename>
-		contains instructions for the software to set up the
-		connection to Zarafa and backup parameters.
-		</para>
-	  </refsection>
-
-	  <refsection>
-		<title>File format</title>
-
-		<para>The file consists of one big section, but parameters can
-		be grouped by functionality. The types of parameters are:
-		server and log.</para>
-
-		<para>The parameters are written in the form</para>
-
-		<para>
-		  <parameter>name</parameter> =
-		  <option>value</option>
-		</para>
-
-		<para>The file is line-based - that is, each
-		newline-terminated line represents either a comment, nothing
-		or a parameter.</para>
-
-		<para>A line beginning with # is considered a comment, and
-		will be ignored by Zarafa.</para>
-
-		<para>Parameter names are case sensitive.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Explanation of each parameter</title>
-
-		<variablelist>
-		  <varlistentry>
-			<term><option>server_socket</option></term>
-			<listitem>
-			  <para>Unix socket to find the connection to the Zarafa
-			  server.</para>
-			  <para>Default:
-			  <parameter>file:///var/run/zarafa</parameter></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-				<term><option>sslkey_file</option></term>
-				<listitem>
-				  <para>Use this file as key to logon to the server. This
-				  is only used when server_socket is set to an HTTPS
-				  transport. See the
-				  <citerefentry>
-						<refentrytitle>zarafa-server</refentrytitle>
-						<manvolnum>8</manvolnum>
-				  </citerefentry>
-				  manual page on how to setup SSL keys.
-				  </para>
-				  <para>Default: value not set.</para>
-				</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-				<term><option>sslkey_pass</option></term>
-				<listitem>
-				  <para>The password of the SSL key file that is set in
-				  sslkey_file.
-				  </para>
-				  <para>Default: value not set.</para>
-				</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>backup_servers</option></term>
-			<listitem>
-			  <para>Only servers in this list will be processed by the
-			  backup tool. Servernames are SPACE separated. Default is
-			  empty, processing all servers.</para>
-			  <para>Default: value not set.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>threads</option></term>
-			<listitem>
-			  <para>Use multiple threads during the backup of multiple
-			  stores. Depending on the number of CPUs and disks you
-			  have, you can increase this number to a sensible value
-			  for your setup. All users within a company space will be
-			  backedup simultaneously. On a non-hosted environment,
-			  this means all users in the setup.</para>
-			  <para>This setting can be overwritten by the
-			  <option>--threads</option> commandline option.</para>
-			  <para>Default: <replaceable>1</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Author</title>
-		<para>Written by Zarafa.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>See also</title>
-		<para>
-		  <citerefentry>
-			<refentrytitle>zarafa-backup</refentrytitle>
-			<manvolnum>8</manvolnum>
-		  </citerefentry>
-		</para>
-	  </refsection>
-	</refentry>
-
-<!--
-  -+-+-
-  	Zarafa Report manual page
-  -+-+-
--->
-	<refentry>
-	  <refmeta>
-		<refentrytitle>zarafa-report</refentrytitle>
-		<manvolnum>8</manvolnum>
-	  </refmeta>
-
-	  <refnamediv>
-		<refname>zarafa-report</refname>
-		<refpurpose>Creates a secure connection with
-		https://report.zarafa.com/ for license reports.</refpurpose>
-	  </refnamediv>
-
-	  <refsynopsisdiv>
-		<cmdsynopsis>
-		  <command>zarafa-report</command>
-		  <arg rep="repeat"><replaceable>OPTION</replaceable></arg>
-		</cmdsynopsis>
-	  </refsynopsisdiv>
-
-	  <refsection>
-		<title>Description</title>
-
-		<para>In some setups, zarafa-licensed needs to report license
-		usage to Zarafa. This program will send these reports using
-		HTTPS. This program will be automatically started by the
-		<command>zarafa-licensed</command> daemon.
-		</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Options</title>
-		<para>The Zarafa report program takes the following configuration
-		options:</para>
-
-		<variablelist>
-		  <varlistentry>
-			<term>
-			  <option>--ca-path</option>
-			  <replaceable>ca-path</replaceable>
-			</term>
-			<listitem>
-			  <para>
-				Path to directory containg CA certificates.
-			  </para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Author</title>
-		<para>Written by Zarafa.</para>
-	  </refsection>
-	</refentry>
-
 <!--
   -+-+-
 	Zarafa Stats manual page
@@ -11222,7 +9600,7 @@
 			  <para>Connect to the Zarafa server through
 			  <replaceable>path</replaceable>, e.g.
 			  <filename>file:///path/to/socket</filename>. Default:
-			  <filename>file:///var/run/zarafa</filename>.</para>
+			  <filename>file:///var/run/zarafad/server.sock</filename>.</para>
 			</listitem>
 		  </varlistentry>
 		</variablelist>
@@ -11501,7 +9879,7 @@
 			  <para>Connect to the Zarafa server through
 			  <replaceable>path</replaceable>, e.g.
 			  <filename>file:///path/to/socket</filename>. Default:
-			  <filename>file:///var/run/zarafa</filename>.</para>
+			  <filename>file:///var/run/zarafad/server.sock</filename>.</para>
 			</listitem>
 		  </varlistentry>
 
@@ -11679,7 +10057,7 @@
 			  service.
 			  </para>
 			  <para>Default:
-			  <replaceable>/var/run/zarafa-search.pid</replaceable>
+			  <replaceable>/var/run/zarafad/search.pid</replaceable>
 			  </para>
 			</listitem>
 		  </varlistentry>
@@ -11723,7 +10101,7 @@
 			  <para>Socket to find the connection to the Zarafa
 			  server.</para>
 			  <para>Default:
-			  <parameter>file:///var/run/zarafa</parameter></para>
+			  <parameter>file:///var/run/zarafad/server.sock</parameter></para>
 			</listitem>
 		  </varlistentry>
 
@@ -11795,9 +10173,9 @@
 			  connect with the zarafa-search for performing search
 			  queries.</para><para>Use
 			  <replaceable>http://0.0.0.0:port</replaceable> to listen
-			  as an HTTP service on all network interfaces on the
+			  as an HTTP service on all IPv4 interfaces on the
 			  given <replaceable>port</replaceable> number.</para>
-			  <para>Default: <replaceable>file:///var/run/zarafa-search</replaceable></para>
+			  <para>Default: <replaceable>file:///var/run/zarafad/search.sock</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -11894,12 +10272,8 @@
 			<term><option>log_buffer_size</option></term>
 			<listitem>
 			  <para>Buffer logging in what sized blocks.
-                              Bigger buffers is better for the performance but it gives lag
-                              when running e.g. multitail or 'tail -f' on the log-file. If
-                              you want to directly see what is happing, set this to e.g. 1.
-                              So when debugging: make it a small value, else set it to
-                              4096 or more.</para>
-			  <para>Default: <replaceable>4096</replaceable></para>
+                              The special value 0 selects line buffering.</para>
+			  <para>Default: <replaceable>0</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -12037,6 +10411,375 @@
 
 	</refentry>
 
+<!--
+  -+-+-
+	Zarafa Backup Plus manual page
+  -+-+-
+-->
+	<refentry>
+	  <refmeta>
+		<refentrytitle>zarafa-backup-plus</refentrytitle>
+		<manvolnum>8</manvolnum>
+	  </refmeta>
+
+	  <refnamediv>
+		<refname>zarafa-backup-plus</refname>
+		<refpurpose>The Zarafa Backup tool</refpurpose>
+	  </refnamediv>
+
+	  <refsynopsisdiv>
+		<cmdsynopsis>
+		  <command>zarafa-backup-plus</command>
+		  <arg rep="repeat"><replaceable>OPTION</replaceable></arg>
+		  <arg><replaceable>PATH</replaceable></arg>
+		</cmdsynopsis>
+	  </refsynopsisdiv>
+
+	  <refsection>
+		<title>Description</title>
+
+		<para>Zarafa-backup is used to create or restore backups
+		of user data, such as one or more stores or folders. This
+		includes emails, calendar items, contacts, etc., as well as
+		user settings such as rules, permissions and WebApp settings.
+		</para>
+
+		<para>Backups are performed incrementally, when for a given
+		user/store there already exists a backup directory. This
+		means that only the changes which occurred since the last backup
+		run are processed.
+		</para>
+
+		<para>For backup (not restore) it is possible to process
+		multiple stores in parallel.
+		</para>
+
+		<para>There are options to inspect the contents of a backup
+		directory, and to restore only individual messages/items.
+		</para>
+	  </refsection>
+
+	  <refsection>
+		<title>Options</title>
+
+		<variablelist>
+
+		  <varlistentry>
+			<term><option>--user</option></term>
+			<term>
+			  <option>-u</option>
+			  <replaceable>NAME</replaceable>
+			</term>
+
+			<listitem>
+			  <para>Backup data of the specified user. Multiple users may be specified. By default, all users are included. When restoring, restore into the store of the specified user.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--restore</option></term>
+
+			<listitem>
+			  <para>Restore the contents of the specified backup directory. The respective store is determined automatically, but may also be specified explicitly, for example using <parameter>--user</parameter>.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--stats</option></term>
+			<listitem>
+			  <para>List folders contained in specified backup directory in CSV format. Folder sizes are shown for each folder.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--index</option></term>
+			<listitem>
+			  <para>List messages/items contained in specified backup directory in CSV format. Sourcekeys, respective folders, last modified dates and subjects are shown for each message/item.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>--sourcekey</option>
+			  <replaceable>SOURCEKEY</replaceable>
+			</term>
+			<listitem>
+			  <para>Restore message/item with specified sourcekey (as shown using <parameter>--index</parameter>). Must be combined with <parameter>--restore</parameter>. Multiple sourcekeys may be specified.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term>
+			  <option>--restore-root</option>
+			  <replaceable>PATH</replaceable>
+			</term>
+			<listitem>
+			  <para>When restoring, place data under folder with specific path (or name), for example 'some_folder' or 'Inbox/some_subfolder'.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--folder</option></term>
+			<term>
+			  <option>-f</option>
+			  <replaceable>PATH</replaceable>
+			</term>
+			<listitem>
+			  <para>Backup/restore only folder(s) with specified path. Multiple folders may be specified. Subfolders may be included using <parameter>--recursive</parameter>.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--recursive</option></term>
+			<listitem>
+			  <para>When specifying folders (<parameter>--folder</parameter>), also include subfolders in backup/restore.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--worker-processes</option></term>
+			<term>
+			  <option>-w</option>
+			  <replaceable>N</replaceable>
+			</term>
+			<listitem>
+			  <para>When backing up data from multiple stores, process these stores in parallel, using the specified number of workers.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--period-begin</option></term>
+			<term>
+			  <option>-b</option>
+			  <replaceable>DATE</replaceable>
+			</term>
+			<listitem>
+			  <para>Backup/restore data which was last modified on or after the specified date (YYYY-MM-DD).</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--period-end</option></term>
+			<term>
+			  <option>-e</option>
+			  <replaceable>DATE</replaceable>
+			</term>
+			<listitem>
+			  <para>Backup/restore data which was last modified before the specified date (YYYY-MM-DD).</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--skip-junk</option></term>
+			<listitem>
+			  <para>Do not backup/restore junk folder.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--skip-deleted</option></term>
+			<listitem>
+			  <para>Do not backup/restore deleted mail folder.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--skip-public</option></term>
+			<listitem>
+			  <para>Do not backup/restore public store.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--skip-attachments</option></term>
+			<listitem>
+			  <para>Do not backup/restore attachments.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--skip-meta</option></term>
+			<listitem>
+			  <para>Do not backup/restore meta data, such as settings, permissions and rules.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--only-meta</option></term>
+			<listitem>
+			  <para>Only backup/restore meta data, such as settings, permissions and rules.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--output-dir</option></term>
+			<term>
+			  <option>-O</option>
+			  <replaceable>PATH</replaceable>
+			</term>
+			<listitem>
+			  <para>Create/update backup directories in the specified directory, instead of the local directory.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--company</option></term>
+			<term>
+			  <option>-C</option>
+			  <replaceable>NAME</replaceable>
+			</term>
+			<listitem>
+			  <para>Backup users and public store for specified company.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--store</option></term>
+			<term>
+			  <option>-S</option>
+			  <replaceable>GUID</replaceable>
+			</term>
+			<listitem>
+			  <para>Backup specified store. Instead of a GUID, 'public' may also be specified, to denote the public store.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--log-level</option></term>
+			<term>
+			  <option>-l</option>
+			  <replaceable>NAME</replaceable>
+			</term>
+			<listitem>
+			  <para>Specify log-level, for example, 'error', 'warning' 'info' or 'debug'.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--config</option></term>
+			<term>
+			  <option>-c</option>
+			  <replaceable>FILE</replaceable>
+			</term>
+			<listitem>
+			  <para>Load configuration settings from specified file.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--server-socket</option></term>
+			<term>
+			  <option>-s</option>
+			  <replaceable>SOCKET</replaceable>
+			</term>
+			<listitem>
+			  <para>Connect to Zarafa server through specified socket.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--auth-user</option></term>
+			<term>
+			  <option>-U</option>
+			  <replaceable>NAME</replaceable>
+			</term>
+			<listitem>
+			  <para>Authenticate as specified user.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--auth-pass</option></term>
+			<term>
+			  <option>-P</option>
+			  <replaceable>PASS</replaceable>
+			</term>
+			<listitem>
+			  <para>Authenticate with specified password.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--ssl-key</option></term>
+			<term>
+			  <option>-k</option>
+			  <replaceable>FILE</replaceable>
+			</term>
+			<listitem>
+			  <para>Specify SSL key file.</para>
+			</listitem>
+		  </varlistentry>
+
+		  <varlistentry>
+			<term><option>--ssl-pass</option></term>
+			<term>
+			  <option>-p</option>
+			  <replaceable>PASSWORD</replaceable>
+			</term>
+			<listitem>
+			  <para>Specify SSL key password.</para>
+			</listitem>
+		  </varlistentry>
+
+		</variablelist>
+	  </refsection>
+
+	  <refsection>
+		<title>Examples</title>
+
+		<para>Backup user 'henk', creating/updating a backup directory with the same name:</para>
+		<para>
+		  <command>zarafa-backup -u henk</command>
+		</para>
+
+		<para>Restore the same user (possibly on another server):</para>
+		<para>
+		  <command>zarafa-backup --restore henk</command>
+		</para>
+
+		<para>Backup users 'henk' and 'fred', in parallel, in a specified directory:</para>
+		<para>
+		  <command>zarafa-backup -u henk -u fred -w 2 -O backups</command>
+		</para>
+
+		<para>Search for message with specific subject:</para>
+		<para>
+		  <command>zarafa-backup --index backups/henk | grep subject</command>
+		</para>
+
+		<para>Restore single message:</para>
+		<para>
+		  <command>zarafa-backup --restore backup/henk --sourcekey 72EE69D0A283408E89BFC35AD251E9B3830000000000</command>
+		</para>
+
+		<para>Restore single message:</para>
+		<para>
+		  <command>zarafa-backup --restore backup/henk --sourcekey 72EE69D0A283408E89BFC35AD251E9B3830000000000</command>
+		</para>
+
+		<para>Backup calendars of all users:</para>
+		<para>
+		  <command>zarafa-backup -f Calendar -O calendars</command>
+		</para>
+
+		<para>Recursively restore inbox of 'fred' into store of 'henk', in certain subfolder:</para>
+		<para>
+		  <command>zarafa-backup --restore fred -f Inbox -u henk --recursive --restore-root from_fred</command>
+		</para>
+
+		<para>Restore everything last modified in 2014:</para>
+		<para>
+		  <command>zarafa-backup --restore fred -b 2014-01-01 -e 2015-01-01</command>
+		</para>
+
+	  </refsection>
+
+	  <refsection>
+		<title>Author</title>
+		<para>Written by Zarafa.</para>
+	  </refsection>
+
+	</refentry>
 <!--
   -+-+-
 	Zarafa Archiver manual page
@@ -12442,7 +11185,7 @@
 			  <para>Unix socket to find the connection to the Zarafa
 			  server.</para>
 			  <para>Default:
-			  <parameter>file:///var/run/zarafa</parameter></para>
+			  <parameter>file:///var/run/zarafad/server.sock</parameter></para>
 			</listitem>
 		  </varlistentry>
 
@@ -12699,12 +11442,8 @@
 			<term><option>log_buffer_size</option></term>
 			<listitem>
 			  <para>Buffer logging in what sized blocks.
-                              Bigger buffers is better for the performance but it gives lag
-                              when running e.g. multitail or 'tail -f' on the log-file. If
-                              you want to directly see what is happing, set this to e.g. 1.
-                              So when debugging: make it a small value, else set it to
-                              4096 or more.</para>
-			  <para>Default: <replaceable>4096</replaceable></para>
+                              The special value 0 selects line buffering.</para>
+			  <para>Default: <replaceable>0</replaceable></para>
 			</listitem>
 		  </varlistentry>
 
@@ -12723,7 +11462,7 @@
 			  <para>The location of the pid file used to guarantee
               only one instance of zarafa-archiver is running
               in non-administrative mode.</para>
-			  <para>Default: <replaceable>/var/run/zarafa-archiver.pid
+			  <para>Default: <replaceable>/var/run/zarafad/archiver.pid
 			  </replaceable></para>
 			</listitem>
 		  </varlistentry>
@@ -12818,375 +11557,6 @@
 	  </refsection>
 	</refentry>
 
-
- <!--
-  -+-+-
-	Mailbox Storage Relocator manual page
-  -+-+-
--->
-	<refentry>
-	  <refmeta>
-		<refentrytitle>zarafa-msr</refentrytitle>
-		<manvolnum>8</manvolnum>
-	  </refmeta>
-
-	  <refnamediv>
-		<refname>zarafa-msr</refname>
-		<refpurpose>Relocates mailboxes from one node to another.</refpurpose>
-	  </refnamediv>
-
-	  <refsynopsisdiv>
-		<cmdsynopsis>
-		  <command>zarafa-msr</command>
-		  <arg><replaceable>CONFIG</replaceable></arg>
-		</cmdsynopsis>
-	  </refsynopsisdiv>
-
-	  <refsection>
-		<title>Description</title>
-
-		<para>In order to move mailboxes between multi-server nodes, the
-		mailbox storage relocator is available. The <command>zarafa-msr
-		</command> tool should be used to relocate mailboxes to other
-		multi-server nodes.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Invocation</title>
-
-		<para>The only argument required by <command>zarafa-msr</command> is an
-		configuration file specifying the details of the relocation operation.
-		</para>
-
-		<para><command>zarafa-msr</command> <replaceable>CONFIG</replaceable>
-		</para>
-
-		<para>When <command>zarafa-msr</command> is finished with relocating
-		all mailboxes, it will print</para>
-
-		<para>"x migrations have completed successfully, maintaining sync."
-		</para>
-
-		<para>where x denotes the number of migrated mailboxes. The
-		administrator can now stop <command>zarafa-msr</command> by pressing
-		Ctrl-C.</para>
-
-		<para><command>zarafa-msr</command> can safely be stopped at any time
-		by pressing Ctrl-C. On the next run it will continue where it left off
-		when it was stopped.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Updating LDAP/ADS</title>
-
-		<para>There are two situations in which it’s safe to update the home
-		servers for the users whose mailboxes have been relocated:</para>
-
-		<para> 1. <command>zarafa-msr</command> is still running. In this case all
-		changes in the original mailbox will continue to be propagated to
-		the new mailbox.</para>
-
-		<para>2. No changes in the original mailbox can occur.</para>
-
-		<para>NOTE: Running <command>zarafa-msr</command> after the LDAP/ADS
-		has been modified will not work, because it will automatically connect
-		to the new server for the source mailbox.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Author</title>
-		<para>Written by Zarafa.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>See also</title>
-		<para>
-		  <citerefentry>
-			<refentrytitle>zarafa-msr.cfg</refentrytitle>
-			<manvolnum>5</manvolnum>
-		  </citerefentry>,
-		  <citerefentry>
-			<refentrytitle>zarafa-msr-verify</refentrytitle>
-			<manvolnum>8</manvolnum>
-		  </citerefentry>
-		</para>
-	  </refsection>
-	</refentry>
-
-<!--
-  -+-+-
-	Mailbox Storage Relocator config manual page
-  -+-+-
--->
-	<refentry>
-	  <refmeta>
-		<refentrytitle>zarafa-msr.cfg</refentrytitle>
-		<manvolnum>5</manvolnum>
-	  </refmeta>
-
-	  <refnamediv>
-		<refname>zarafa-msr.cfg</refname>
-		<refpurpose>The Mailbox Storage Relocator configuration file
-		</refpurpose>
-	  </refnamediv>
-
-	  <refsynopsisdiv>
-		<para><command>zarafa-msr.cfg</command></para>
-	  </refsynopsisdiv>
-
-	  <refsection>
-		<title>Description</title>
-
-		<para>The <filename>zarafa-msr.cfg</filename> is a configuration
-		file for the Mailbox Storage Relocator. <filename>zarafa-msr.cfg
-		</filename> contains instructions for the software to set up the
-		connection with the cluster and describe which user stores are to be
-		relocated to which node.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>File format</title>
-
-		<para>The <filename>zarafa-msr.cfg</filename> file contains of three
-		sections:</para>
-
-		<para>Connection: This section contains information on how to connect to
-		a particular node in the multi-server cluster.</para>
-
-		<para>Servers: This section is an optional section that contains a list
-		of server aliases. These aliases can be used in the Mapping section
-		when a lot of mailboxes are relocated to the same server.</para>
-
-		<para>Mapping: This section contains the list of usernames and the
-		destination node for their mailboxes. The destination node can be a
-		full server path or an alias specified in the Servers section.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>The Connection Section</title>
-
-		<para>The connection setting contains the following options:</para>
-
-		<variablelist>
-		  <varlistentry>
-			<term><option>serverpath</option></term>
-			<listitem>
-			  <para>Path to the server. Can be any node in the cluster.</para>
-			  <para>Default:
-			  <parameter>file:///var/run/zarafa</parameter></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>sslkey_file</option></term>
-			<listitem>
-			  <para>Path the the SSL key file.</para>
-			  <para>Default: value not set.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>sslkey_pass</option></term>
-			<listitem>
-			  <para>Password for the SSL key specified with sslkey_file.</para>
-			  <para>Default: value not set.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>bidirectional</option></term>
-			<listitem>
-			  <para>If yes, then perform bidirectional synchronization
-			  between source and destination stores. If no, then only
-			  unidirectional (migration) replication is used (from source to
-			  dest)</para>
-			  <para>Default: yes</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>workers</option></term>
-			<listitem>
-			  <para>Specifies the number of parallel workers to use to
-			  migrate the stores.</para>
-			  <para>Default: 4</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>force_source</option></term>
-			<listitem>
-			  <para>Normally, the source server is only used to provide an
-			  entry point into the source cluster; If the store of the user
-			  to be migrated is on a different host, then zarafa-msr
-			  automatically redirects to the correct source server. If this
-			  option is 'yes', then no such redirection is performed. This
-			  is useful if the user has already been migrated to the
-			  new (destination) server, and a final MSR sync is required
-			  between the old store and the new (active) store. If you fail
-			  to set force_source to 'yes' in this case, MSR will fail
-			  since source and destination store will be the same.</para>
-			  <para>Default: no</para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>The Servers Section</title>
-
-		<para>The servers section has no predefined options. Instead the format
-		is</para>
-
-		<para><replaceable>server_alias</replaceable>: <replaceable>server_path</replaceable></para>
-
-		<para>As many items as needed can be placed in this section.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>The Mapping Section</title>
-
-		<para>The mapping section has no predefined options. Instead, the format
-		is</para>
-
-		<para><replaceable>username</replaceable>: <replaceable>destination_node</replaceable></para>
-
-		<para>destination_node can either be the full path to the node or a
-		reference to one of the servers from the Servers section. In the case
-		of a reference, the syntax is</para>
-
-		<para><replaceable>username</replaceable>: %(<replaceable>server_alias</replaceable>)s</para>
-
-		<para>As many items as needed can be placed in this section.</para>
-
-		<para>To relocate the public store a special name should be used for the
-		username:</para>
-
-		<para>1. In a multi-tenant environment, the name of the tenant for which
-		to relocate the public store must be used.</para>
-
-		<para>2. In a single-tenant environment, the special name __public__ must
-		be used.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>The Logging Section</title>
-
-		<para>The logging setting contains the following options:</para>
-
-		<variablelist>
-		  <varlistentry>
-			<term><option>log_file</option></term>
-			<listitem>
-			  <para>Path of the log file to write to.</para>
-			  <para>Default:
-			  <parameter>zarafa-msr.log</parameter> (in the working directory)</para>
-			</listitem>
-		  </varlistentry>
-
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Author</title>
-		<para>Written by Zarafa.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>See also</title>
-		<para>
-		  <citerefentry>
-			<refentrytitle>zarafa-msr</refentrytitle>
-			<manvolnum>8</manvolnum>
-		  </citerefentry>
-		</para>
-	  </refsection>
-	</refentry>
-
- <!--
-  -+-+-
-	Mailbox Storage Relocator Verify manual page
-  -+-+-
--->
-	<refentry>
-	  <refmeta>
-		<refentrytitle>zarafa-msr-verify</refentrytitle>
-		<manvolnum>8</manvolnum>
-	  </refmeta>
-
-	  <refnamediv>
-		<refname>zarafa-msr-verify</refname>
-		<refpurpose>Compares the content of the source and
-		destination store after a relocation.</refpurpose>
-	  </refnamediv>
-
-	  <refsynopsisdiv>
-		<cmdsynopsis>
-		  <command>zarafa-msr</command>
-		  <arg><replaceable>OPTIONS</replaceable></arg>
-		  <arg><replaceable>CONFIG</replaceable></arg>
-		</cmdsynopsis>
-	  </refsynopsisdiv>
-
-	  <refsection>
-		<title>Description</title>
-
-		<para>Once a user has been relocated from one multi-server
-		node to another, this tool can be used to compare the
-		content of the two stores in order to verify if all messages
-		have realy been relocated.</para>
-
-		<para>The config file is expected to be in the same format as
-		the one used for <replaceable>zarafa-msr</replaceable>.
-		Usually the same configuration file should be used.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Options</title>
-
-		<variablelist>
-		  <varlistentry>
-			<term>
-			  <option>--correct</option>
-			</term>
-			<listitem>
-			  <para>Attempt to correct mismatches. Currently
-			  this only removes messages that exist in the
-			  destination store but not in the source store.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>--help</option>
-			</term>
-			<listitem>
-			  <para>Show a help message.</para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Author</title>
-		<para>Written by Zarafa.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>See also</title>
-		<para>
-		  <citerefentry>
-			<refentrytitle>zarafa-msr.cfg</refentrytitle>
-			<manvolnum>5</manvolnum>
-		  </citerefentry>,
-		  <citerefentry>
-			<refentrytitle>zarafa-msr</refentrytitle>
-			<manvolnum>8</manvolnum>
-		  </citerefentry>
-		</para>
-	  </refsection>
-	</refentry>
-
 <!--
   -+-+-
 	Zarafa 7 Upgrade
@@ -13253,831 +11623,6 @@
 	  </refsection>
 	</refentry>
 
-
- <!--
-  -+-+-
-	Zarafa Archive ACL Sync manual page
-  -+-+-
--->
-	<refentry>
-	  <refmeta>
-		<refentrytitle>za-aclsync</refentrytitle>
-		<manvolnum>8</manvolnum>
-	  </refmeta>
-
-	  <refnamediv>
-		<refname>za-aclsync</refname>
-		<refpurpose>Synchronizes archive ACL settings with those of the
-		primary store.</refpurpose>
-	  </refnamediv>
-
-	  <refsynopsisdiv>
-		<cmdsynopsis>
-		  <command>za-aclsync</command>
-		  <arg rep="repeat"><replaceable>OPTION</replaceable></arg>
-		  <arg rep="repeat"><replaceable>USERS</replaceable></arg>
-		</cmdsynopsis>
-	  </refsynopsisdiv>
-
-	  <refsection>
-		<title>Description</title>
-
-		<para>When a user has set permissions for others on his or her store
-		or folders, the other user will need at least read-permissions on this
-		persons archive as well in order to read stubbed messages or access
-		the archive directly. These permissions can not be set by the owner of
-		the archive if the archive was attached without write privileges. Even
-		if the user has write permissions, it's a nuisance to have to set all
-		the permissions twice (or more if multiple archives are attached).
-		</para>
-
-		<para><command>za-aclsync</command> can be used to propagate the
-		ACL settings from the primary store to the archives. However, no user
-		will ever get more right on a store or folder than the owner of the
-		archive. So if the archive was attached without write permissions, no
-		user will get write permissions on the archive.</para>
-
-		<para>For every archived foler in an archived store <command>za-aclsync
-		</command>will first determine the rights for the owner of the archive.
-		Then it will get all the entries from the ACL of the current folder
-		except those of the owner. Each right will be masked with the rights
-		of the owner before being added to the ACL of the archive folder.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Options</title>
-
-		<variablelist>
-		  <varlistentry>
-			<term>
-			  <option>-h</option>
-			  <replaceable>serverpath</replaceable>
-			</term>
-			<listitem>
-			  <para>Host to connect with.</para>
-			  <para>Default: <replaceable>file:///var/run/zarafa
-			  </replaceable></para>
-			  <para>Three formats are allowed for this option:</para>
-			  <para><option>UNIX socket</option> : file://<replaceable>path_to_the_UNIX_socket</replaceable></para>
-			  <para><option>HTTP</option> : http://<replaceable>host_or_IP</replaceable>:<replaceable>port</replaceable>/zarafa</para>
-			  <para><option>Secure HTTP</option> : https://<replaceable>host_or_IP</replaceable>:<replaceable>port</replaceable>/zarafa</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>-s</option>
-			  <replaceable>sslkey-file</replaceable>
-			</term>
-			<listitem>
-			  <para>SSL key file for authentication.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>-p</option>
-			  <replaceable>sslkey-pass</replaceable>
-			</term>
-			<listitem>
-			  <para>Password for the SSL key file.</para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Author</title>
-		<para>Written by Zarafa.</para>
-	  </refsection>
-
-	</refentry>
-
-<!--
-  -+-+-
-	Zarafa Archive ACL Set manual page
-  -+-+-
--->
-	<refentry>
-	  <refmeta>
-		<refentrytitle>za-aclset</refentrytitle>
-		<manvolnum>8</manvolnum>
-	  </refmeta>
-
-	  <refnamediv>
-		<refname>za-aclset</refname>
-		<refpurpose>Reset the archive ACL settings for the owner.</refpurpose>
-	  </refnamediv>
-
-	  <refsynopsisdiv>
-		<cmdsynopsis>
-		  <command>za-aclset</command>
-		  <arg rep="repeat"><replaceable>OPTION</replaceable></arg>
-		  <arg rep="repeat"><replaceable>USERS</replaceable></arg>
-		</cmdsynopsis>
-	  </refsynopsisdiv>
-
-	  <refsection>
-		<title>Description</title>
-		<para><command>za-aclset</command> sets or updates the permissions on
-		an archive store for the owner of that store.</para>
-		
-		<para>When an archive is attached to a store, the owner of the store
-		gets read-only or read/write permissions on the archive based on the
-		configuration or command line options passed at the time of attaching.
-		Also when an archive is attached to a store of a non-active user, no
-		permissions for that non-active user are set because that's not
-		possible.</para>
-		
-		<para>In the first case it can be desirable to change the permissions
-		at a later time because of company policy changes or because the
-		original setting was just wrong.</para>
-		
-		<para>In the second case, if the user is converted to an active user,
-		it's required to reset the permissions because the owner won't have
-		any permissions on his archive.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Options</title>
-
-		<variablelist>
-		  <varlistentry>
-			<term>
-			  <option>-h</option>
-			  <replaceable>serverpath</replaceable>
-			</term>
-			<listitem>
-			  <para>Host to connect with.</para>
-			  <para>Default: <replaceable>file:///var/run/zarafa
-			  </replaceable></para>
-			  <para>Three formats are allowed for this option:</para>
-			  <para><option>UNIX socket</option> : file://<replaceable>path_to_the_UNIX_socket</replaceable></para>
-			  <para><option>HTTP</option> : http://<replaceable>host_or_IP</replaceable>:<replaceable>port</replaceable>/zarafa</para>
-			  <para><option>Secure HTTP</option> : https://<replaceable>host_or_IP</replaceable>:<replaceable>port</replaceable>/zarafa</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>-s</option>
-			  <replaceable>sslkey-file</replaceable>
-			</term>
-			<listitem>
-			  <para>SSL key file for authentication.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>-p</option>
-			  <replaceable>sslkey-pass</replaceable>
-			</term>
-			<listitem>
-			  <para>Password for the SSL key file.</para>
-			</listitem>
-		  </varlistentry>
-		  
-		  <varlistentry>
-			<term><option>-w</option></term>
-			<listitem>
-			  <para>By default <command>za-aclset</command> makes an archive read-only
-			  for the user. By passing this option, the user will get
-			  read/write permissions in the attached archive.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>--writable</option>
-			  <replaceable>yes|no</replaceable>
-			</term>
-			<listitem>
-			  <para>Explicitly enable or disable write permissions when
-			  setting permissions.</para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Author</title>
-		<para>Written by Zarafa.</para>
-	  </refsection>
-
-	</refentry>
-
-<!--
-  -+-+-
-	Zarafa Archive Restore manual page
-  -+-+-
--->
-	<refentry>
-	  <refmeta>
-		<refentrytitle>za-restore</refentrytitle>
-		<manvolnum>8</manvolnum>
-	  </refmeta>
-
-	  <refnamediv>
-		<refname>za-restore</refname>
-		<refpurpose>Restore all stubbed and removed messages in a primary store
-		with the messages found in the currently or previously attached
-		archives(s).</refpurpose>
-	  </refnamediv>
-
-	  <refsynopsisdiv>
-		<cmdsynopsis>
-		  <command>za-restore</command>
-		  <arg rep="repeat"><replaceable>OPTION</replaceable></arg>
-		  <arg rep="repeat"><replaceable>USER</replaceable></arg>
-		</cmdsynopsis>
-	  </refsynopsisdiv>
-
-	  <refsection>
-		<title>Description</title>
-
-		<para>za-restore can be used to repopulate a primary store to a state
-		where no archive is required to read any message. In a less cryptic way
-		this means that all stubbed messages are destubbed and all messages that
-		were deleted after archiving are restored.</para>
-
-		<para>The advantage of using za-restore over dragging the messages back
-		from the archive in Outlook or Webaccess is that the restores messages
-		are sanitized, allowing them to be properly rearchived later.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Strategy</title>
-
-		<para>The strategy taken by za-restore is that it iterates through all
-		folder in the primary store, and tries to open the archive folders that
-		are attached to that store. There can be more than one attached archive
-		folder, and these folders are not required to exist in an archive that
-		is currently attached. So folders of previously used archives will be
-		restored as well if they still exist.</para>
-
-		<para>Once the archives have been resolved, za-restore will create a list
-		of restorable messages based on the reference entryid found in the
-		archived copies. When multiple archives are found, multiple archived
-		copies for the same primary message can exist. In that case za-restore
-		will choose the most recent one.</para>
-
-		<para>Once the list of restorable messages is complete, za-restore will
-		start restoring by first determining if the primary message, referenced
-		by the reference entryid from the archived copies exist and if so if it
-		is stubbed. If the primary message exists and is not stubbed, there's
-		no need to restore anything. If the message exists but is stubbed, it
-		will be destubbed. If the primary message does not exist, a new message
-		is created based on the archived copy. In this case the archived copy
-		is updated so it will reference the newly created message. This is
-		needed to make sure a subsequent run of za-restore won't create another
-		copy.</para>
-
-	  </refsection>
-
-	  <refsection>
-		<title>Options</title>
-
-		<variablelist>
-		  <varlistentry>
-			<term>
-			  <option>-h</option>
-			  <replaceable>serverpath</replaceable>
-			</term>
-			<listitem>
-			  <para>Host to connect with.</para>
-			  <para>Default: <replaceable>file:///var/run/zarafa</replaceable>
-			  </para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>-s</option>
-			  <replaceable>sslkey-file</replaceable>
-			</term>
-			<listitem>
-			  <para>SSL key file for authentication.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>-p</option>
-			  <replaceable>sslkey-pass</replaceable>
-			</term>
-			<listitem>
-			  <para>Password for the SSL key file.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>-l</option>
-			  <replaceable>log_file</replaceable>
-			</term>
-			<listitem>
-			  <para>Select the logfile to log to.</para>
-			  <para>Default: <replaceable>za-restore.log</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>--detach</option>
-			</term>
-			<listitem>
-			  <para>Detach the selected or all archive stores before starting
-			  the restore procedure. This avoids the archiver from re archiving
-			  restored messages.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>--unhook</option>
-			</term>
-			<listitem>
-			  <para>Unhook the selected ot all archive stores once the restore
-			  process has completed. This implies --detach and only works on
-			  archive stores.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>--remove</option>
-			</term>
-			<listitem>
-			  <para>Remove the selected ot all archive stores once the restore
-			  process has completed. This implies--unhook and only works on
-			  archive stores.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>--select-source</option>
-			</term>
-			<listitem>
-			  <para>Select the source archive(s) by providing a comma separated
-			  list of archive indexes. The indexes specify which archives to
-			  restore from. The --detach, --unhook and --remove options only
-			  apply to the selected archives."</para>
-			  <para>The archive indexes can be obtained by listing the attached
-			  archives for a user: zarafa-archiver -u <replaceable>user
-			  </replaceable> -l.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>-v</option>
-			  <replaceable>verbose</replaceable>
-			</term>
-			<listitem>
-			  <para>Increase console loglevel. Can be specified multiple times.
-			  </para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>-q</option>
-			  <replaceable>quiet</replaceable>
-			</term>
-			<listitem>
-			  <para>Decrease console loglevel. Can be specified multiple times.
-			  </para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>-N</option>
-			  <replaceable>dry-run</replaceable>
-			</term>
-			<listitem>
-			  <para>Don't actually modify anything.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>--help</option>
-			</term>
-			<listitem>
-			  <para>Show the help message on the console.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term>
-			  <option>--log-log-source</option>
-			</term>
-			<listitem>
-			  <para>Log the source file and line numbers in the log file. This
-			  is only useful for debugging purposes.</para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Author</title>
-		<para>Written by Zarafa.</para>
-	  </refsection>
-
-	</refentry>
-
-<!--
-  -+-+-
-	Zarafa Web Services manual page
-  -+-+-
--->
-	<refentry>
-	  <refmeta>
-		<refentrytitle>zarafa-ws</refentrytitle>
-		<manvolnum>8</manvolnum>
-	  </refmeta>
-
-	  <refnamediv>
-		<refname>zarafa-ws</refname>
-		<refpurpose>Zarafa Web Services adds access to clients which
-		use the Exchange Web Services protocol.</refpurpose>
-	  </refnamediv>
-
-	  <refsynopsisdiv>
-		<cmdsynopsis>
-		  <command>zarafa-ws</command>
-		  <arg rep="repeat"><replaceable>OPTION</replaceable></arg>
-		</cmdsynopsis>
-	  </refsynopsisdiv>
-
-	  <refsection>
-		<title>Description</title>
-
-		<para>Zarafa Web Services gives access to a whole new range of
-		clients, like Outlook 2011 for Mac, Evolution and many
-		others.</para>
-
-		<para>There are also a lot of other systems which use EWS to
-		communicate with MAPI providers, which now can also be
-		used.</para>
-
-		<para>The default settings of the zarafa-ws service are defined
-		in <citerefentry>
-		<refentrytitle>zarafa-ws.cfg</refentrytitle>
-		<manvolnum>5</manvolnum>
-		</citerefentry>.
-		</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Options</title>
-
-		<variablelist>
-		  <varlistentry>
-			<term><option>--config</option></term>
-			<term>
-			  <option>-c</option>
-			  <replaceable>ws.cfg</replaceable>
-			</term>
-			<listitem>
-			  <para>Specify the location of the ws.cfg file. If the
-			  ws.cfg file is not specified, the zarafa-ws service
-			  will try to use /etc/zarafa/ws.cfg or continue using
-			  its default settings.</para>
-			  <para>Default: <replaceable>/etc/zarafa/ws.cfg</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--foreground</option></term>
-			<term><option>-F</option></term>
-			<listitem>
-			  <para>Run in the foreground. Normally the gateway
-			  will daemonize and run in the background.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>--threaded</option></term>
-			<listitem>
-			  <para>Run requests in threads instead of forks. Not
-			  recommended.</para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Usage</title>
-
-		<para>To start the zarafa-ws service:</para>
-
-		<para><command>zarafa-ws</command></para>
-
-		<para>The process will keep running. You may also use
-		the init.d scripts:</para>
-
-		<para><command>/etc/init.d/zarafa-ws</command>
-		[<replaceable>start</replaceable>|
-		<replaceable>stop</replaceable>|
-		<replaceable>restart</replaceable>]</para>
-	  </refsection>
-
-	  <refsection>
-		<title>See also</title>
-		<para>
-		  <citerefentry>
-			<refentrytitle>zarafa-ws.cfg</refentrytitle>
-			<manvolnum>5</manvolnum>
-		  </citerefentry>
-		</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Author</title>
-		<para>Written by Zarafa.</para>
-	  </refsection>
-	</refentry>
-
-<!--
-  -+-+-
-	Zarafa Web Services Configuration file manual page
-  -+-+-
--->
-	<refentry>
-	  <refmeta>
-		<refentrytitle>zarafa-ws.cfg</refentrytitle>
-		<manvolnum>5</manvolnum>
-	  </refmeta>
-
-	  <refnamediv>
-		<refname>zarafa-ws.cfg</refname>
-		<refpurpose>The Zarafa Web Services configuration file</refpurpose>
-	  </refnamediv>
-
-	  <refsynopsisdiv>
-		<para><command>ws.cfg</command></para>
-	  </refsynopsisdiv>
-
-	  <refsection>
-		<title>Description</title>
-
-		<para>The <filename>ws.cfg</filename> is a configuration
-		file for the Zarafa Web Services. <filename>ws.cfg</filename>
-		contains instructions for the software to set up the logging
-		system and to enable incoming SSL connections.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>File format</title>
-		
-		<para>The file consists of one big section, but parameters can be
-		grouped by functionality.</para>
-
-		<para>The parameters are written in the form:</para>
-
-		<para><option>name</option> = <replaceable>value</replaceable></para>
-
-		<para>The file is line-based. Each newline-terminated line
-		represents either a comment, nothing, a parameter or a directive.
-		A line beginning with `#' is considered a comment, and will be
-		ignored	by Zarafa. Parameter names are case sensitive.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>Explanation of each parameter</title>
-
-		<variablelist>
-		  <varlistentry>
-			<term><option>server_bind</option></term>
-			<listitem>
-			  <para>IP address to bind to. 0.0.0.0 for any address.</para>
-			  <para>Default: <replaceable>0.0.0.0</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>server_port</option></term>
-			<listitem>
-			  <para>Listen on this port for incoming connections.</para>
-			  <para>Default: <replaceable>808</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>server_ssl_enable</option></term>
-			<listitem>
-			  <para>To enable incoming SSL connections, set this to
-			  'yes' and provide an SSL certificate file without an
-			  password in server_ssl_keyfile.</para>
-			  <para>Default: <replaceable>no</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>server_ssl_keyfile</option></term>
-			<listitem>
-			  <para>A PEM encoded ssl private certificate to use for
-			  incoming SSL connections.</para>
-			  <para>Default: <replaceable></replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>server_ssl_keypass</option></term>
-			<listitem>
-			  <para>The password which decodes the
-			  <replaceable>server_ssl_keyfile</replaceable>
-			  certificate.</para>
-			  <para>Default: <replaceable></replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>server_http_compression_allow</option></term>
-			<listitem>
-			  <para>Enable or disable HTTP compression in the
-			  service.</para>
-			  <para>Default: <replaceable>true</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>server_http_chunksize</option></term>
-			<listitem>
-			  <para>The maximum HTTP chunk to send.</para>
-			  <para>Default: <replaceable>512kib</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>server_socket</option></term>
-			<listitem>
-			  <para>The Zarafa server socket to connect to. Either use
-			  the unix socket, or the SSL socket of Zarafa.</para>
-			  <para>Default: <replaceable>file://var/run/zarafa</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>sslkey_file</option></term>
-			<listitem>
-			  <para>Use this file as key to logon to the server. This
-			  is only used when server_socket is set to an HTTPS
-			  transport, or when using a multi-server setup. See the
-			  <citerefentry>
-				<refentrytitle>zarafa-server</refentrytitle>
-				<manvolnum>8</manvolnum>
-			  </citerefentry>
-			  manual page on how to setup SSL keys.
-			  </para>
-			  <para>Default: value not set.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>sslkey_pass</option></term>
-			<listitem>
-			  <para>The password of the SSL key file that is set in
-			  sslkey_file.
-			  </para>
-			  <para>Default: value not set.</para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>run_as_user</option></term>
-			<listitem>
-			  <para>After correctly starting, the gateway process will
-			  become this user, dropping root privileges. Note that
-			  the log file needs to be writeable by this user, and the
-			  directory too to create new logfiles after
-			  logrotation. This can also be achieved by setting the
-			  correct group and permissions.
-			  </para>
-			  <para>Default value is empty, not changing the user
-			  after starting.
-			  </para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>run_as_group</option></term>
-			<listitem>
-			  <para>After correctly starting, the gateway process will
-			  become this group, dropping root privileges.
-			  </para>
-			  <para>Default value is empty, not changing the group
-			  after starting.
-			  </para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>running_path</option></term>
-			<listitem>
-			  <para>Change directory to this path when running in
-			  daemonize mode. When using the -F switch to run in the
-			  foreground the directory will not be changed.
-			  </para>
-			  <para>Default:
-			  <replaceable>/</replaceable>
-			  </para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>pid_file</option></term>
-			<listitem>
-			  <para>Write the process ID number to this file. This is
-			  used by the init.d script to correctly stop/restart the
-			  service.
-			  </para>
-			  <para>Default:
-			  <replaceable>/var/run/zarafa-ws.pid</replaceable>
-			  </para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>process_model</option></term>
-			<listitem>
-			  <para>You can change the process model between
-			  <replaceable>fork</replaceable> and
-			  <replaceable>threaded</replaceable>. The forked model uses
-			  somewhat more resources, but if a crash is triggered,
-			  this will only affect one user. In the threaded model, a
-			  crash means all users are affected, and will not be able
-			  to use the service.</para>
-			  <para>Default:
-			  <replaceable>fork</replaceable>
-			  </para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>log_file</option></term>
-			<listitem>
-			  <para>Specify the filename of the log in this parameter. Use
-			  <replaceable>-</replaceable> (minus sign) for stderr
-			  output.</para>
-			  <para>Default: <replaceable>/var/log/zarafa/ws.log</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>log_level</option></term>
-			<listitem>
-			  <para>The level of output for logging. The following words are available, each level includes the previous:
-			  fatal, error, warning, info, debug.</para>
-			  <para>Default: <replaceable>error</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		  <varlistentry>
-			<term><option>log_dev_info</option></term>
-			<listitem>
-			  <para>Enable special development logging.</para>
-			  <para>Default: <replaceable>false</replaceable></para>
-			</listitem>
-		  </varlistentry>
-
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Files</title>
-
-		<variablelist>
-		  <varlistentry>
-			<term><filename>/etc/zarafa/ws.cfg</filename></term>
-			<listitem>
-			  <para>The Zarafa Web Services configuration file.</para>
-			</listitem>
-		  </varlistentry>
-		</variablelist>
-	  </refsection>
-
-	  <refsection>
-		<title>Author</title>
-		<para>Written by Zarafa.</para>
-	  </refsection>
-
-	  <refsection>
-		<title>See also</title>
-		<para>
-		  <citerefentry>
-			<refentrytitle>zarafa-ws</refentrytitle>
-			<manvolnum>8</manvolnum>
-		  </citerefentry>
-		</para>
-	  </refsection>
-	</refentry>
-	
   </reference>
 </book>
 

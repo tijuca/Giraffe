@@ -1,48 +1,22 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include <platform.h>
-#include "UnixUtil.h"
+#include <zarafa/platform.h>
+#include <zarafa/UnixUtil.h>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -59,49 +33,54 @@
 #include <string>
 using namespace std;
 
+static int unix_runpath(ECConfig *conf)
+{
+	const char *path = conf->GetSetting("running_path");
+	int ret;
+
+	if (path != NULL) {
+		ret = chdir(path);
+		if (ret != 0)
+			ec_log_err("Unable to run in given path \"%s\": %s", path, strerror(errno));
+	}
+	if (path == NULL || ret != 0) {
+		ret = chdir("/");
+		if (ret != 0)
+			ec_log_err("chdir /: %s\n", strerror(errno));
+	}
+	return ret;
+}
+
 int unix_runas(ECConfig *lpConfig, ECLogger *lpLogger) {
-	if (strcmp(lpConfig->GetSetting("run_as_group"),"")) {
-		const struct group *gr = getgrnam(lpConfig->GetSetting("run_as_group"));
+	const char *group = lpConfig->GetSetting("run_as_group");
+	const char *user  = lpConfig->GetSetting("run_as_user");
+	int ret;
+
+	ret = unix_runpath(lpConfig);
+	if (ret != 0)
+		return ret;
+
+	if (group != NULL && *group != '\0') {
+		const struct group *gr = getgrnam(group);
 		if (!gr) {
-			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to run as group '%s'", lpConfig->GetSetting("run_as_group"));
+			lpLogger->Log(EC_LOGLEVEL_ERROR, "Looking up group \"%s\" failed: %s", group, strerror(errno));
 			return -1;
 		}
-		if (getgid() != gr->gr_gid) {
-			if (setgid(gr->gr_gid) != 0) {
-				switch (errno) {
-				case EPERM:
-					lpLogger->Log(EC_LOGLEVEL_FATAL, "Not enough permissions to change to group '%s'.", gr->gr_name);
-					break;
-				default:
-					lpLogger->Log(EC_LOGLEVEL_FATAL, "Unknown error while setting user id: %d", errno);
-					break;
-				};
-				return -1;
-			}
+		if (getgid() != gr->gr_gid && setgid(gr->gr_gid) != 0) {
+			lpLogger->Log(EC_LOGLEVEL_CRIT, "Changing to group \"%s\" failed: %s", gr->gr_name, strerror(errno));
+			return -1;
 		}
 	}
 
-	if (strcmp(lpConfig->GetSetting("run_as_user"),"")) {
-		const struct passwd *pw = getpwnam(lpConfig->GetSetting("run_as_user"));
+	if (user != NULL && *user != '\0') {
+		const struct passwd *pw = getpwnam(user);
 		if (!pw) {
-			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to run as user '%s'", lpConfig->GetSetting("run_as_user"));
+			lpLogger->Log(EC_LOGLEVEL_ERROR, "Looking up user \"%s\" failed: %s", user, strerror(errno));
 			return -1;
 		}
-		if (getuid() != pw->pw_uid) {
-			if (setuid(pw->pw_uid) != 0) {
-				switch (errno) {
-				case EAGAIN:
-					lpLogger->Log(EC_LOGLEVEL_FATAL, "EGAIN error while setting user id.");
-					break;
-				case EPERM:
-					lpLogger->Log(EC_LOGLEVEL_FATAL, "Not enough permissions to change to user '%s'.", pw->pw_name);
-					break;
-				default:
-					lpLogger->Log(EC_LOGLEVEL_FATAL, "Unknown error while setting user id: %d", errno);
-					break;
-				};
-				return -1;
-			}
+		if (getuid() != pw->pw_uid && setuid(pw->pw_uid) != 0) {
+			lpLogger->Log(EC_LOGLEVEL_CRIT, "Changing to user \"%s\" failed: %s", pw->pw_name, strerror(errno));
+			return -1;
 		}
 	}
 
@@ -139,17 +118,14 @@ void unix_coredump_enable(ECLogger *logger)
 
 	limit.rlim_cur = RLIM_INFINITY;
 	limit.rlim_max = RLIM_INFINITY;
-	if (setrlimit(RLIMIT_CORE, &limit) == 0)
-		return;
-	if (logger == NULL)
-		return;
-	logger->Log(EC_LOGLEVEL_FATAL, "Unable to raise coredump filesize limit");
+	if (setrlimit(RLIMIT_CORE, &limit) < 0 && logger != NULL)
+		logger->Log(EC_LOGLEVEL_ERROR, "Unable to raise coredump filesize limit: %s", strerror(errno));
 }
 
 int unix_create_pidfile(const char *argv0, ECConfig *lpConfig,
     ECLogger *lpLogger, bool bForce)
 {
-	string pidfilename = string("/var/run/")+string(argv0)+string(".pid");
+	string pidfilename = "/var/run/zarafad/" + string(argv0) + ".pid";
 	FILE *pidfile;
 	int oldpid;
 	char tmp[255];
@@ -202,7 +178,11 @@ int unix_create_pidfile(const char *argv0, ECConfig *lpConfig,
 
 int unix_daemonize(ECConfig *lpConfig, ECLogger *lpLogger) {
 	int ret;
-	const char *path = lpConfig->GetSetting("running_path");
+
+	// make sure we daemonize in an always existing directory
+	ret = unix_runpath(lpConfig);
+	if (ret != 0)
+		return ret;
 
 	ret = fork();
 	if (ret == -1) {
@@ -226,16 +206,6 @@ int unix_daemonize(ECConfig *lpConfig, ECLogger *lpLogger) {
 	fclose(stdin);
 	freopen("/dev/null", "a+", stdout);
 	freopen("/dev/null", "a+", stderr);
-
-	// make sure we daemonize in an always existing directory
-	if (path) {
-		ret = chdir(path);
-		if (ret)
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to run in given path '%s': %s", path, strerror(errno));
-	}
-
-	if (!path || ret)
-		chdir("/");
 
 	return 0;
 }
@@ -273,7 +243,7 @@ int unix_fork_function(void*(func)(void*), void *param, int nCloseFDs, int *pClo
 		// reset the SIGHUP signal to default, not to trigger the config/logfile reload signal too often on 'killall <process>'
 		signal(SIGHUP, SIG_DFL);
 		// close filedescriptors
-		for (int n = 0; n < nCloseFDs && pCloseFDs; n++)
+		for (int n = 0; n < nCloseFDs && pCloseFDs != NULL; ++n)
 			if (pCloseFDs[n] >= 0)
 				close(pCloseFDs[n]);
 		func(param);
@@ -299,7 +269,9 @@ int unix_fork_function(void*(func)(void*), void *param, int nCloseFDs, int *pClo
  * 
  * @return new process pid, or -1 on failure.
  */
-pid_t unix_popen_rw(ECLogger *lpLogger, const char *lpszCommand, int *lpulIn, int *lpulOut, popen_rlimit_array *lpLimits, const char **env, bool bNonBlocking, bool bStdErr)
+static pid_t unix_popen_rw(const char *lpszCommand, int *lpulIn, int *lpulOut,
+    popen_rlimit_array *lpLimits, const char **env, bool bNonBlocking,
+    bool bStdErr)
 {
 	int ulIn[2];
 	int ulOut[2];
@@ -334,13 +306,11 @@ pid_t unix_popen_rw(ECLogger *lpLogger, const char *lpszCommand, int *lpulIn, in
 		setsid();
 
 		/* If provided set rlimit settings */
-		if (lpLimits) {
-			for (unsigned int i = 0; i < lpLimits->cValues; i++) {
+		if (lpLimits != NULL)
+			for (unsigned int i = 0; i < lpLimits->cValues; ++i)
 				if (setrlimit(lpLimits->sLimit[i].resource, &lpLimits->sLimit[i].limit) != 0)
-					lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to set rlimit for popen - resource %d, errno %d",
+					ec_log_err("Unable to set rlimit for popen - resource %d, errno %d",
 								  lpLimits->sLimit[i].resource, errno);
-			}
-		}
 
 		if (execle("/bin/sh", "sh", "-c", lpszCommand, NULL, env) == 0)
 			_exit(EXIT_SUCCESS);
@@ -358,56 +328,6 @@ pid_t unix_popen_rw(ECLogger *lpLogger, const char *lpszCommand, int *lpulIn, in
 	return pid;
 }
 
-/** 
- * Closes the filedescriptors opened by unix_popen_rw, and waits for
- * the given pid to exit. If pid did not yet exit, a TERM signal will
- * be sent to the pid, and wait for it to close.
- * 
- * @param rfd The read part of the pipe, will be closed, except when -1 is passed
- * @param wfd The write part of the pipe, will be closed, except when -1 is passed
- * @param pid The pid to handle on
- * 
- * @return The exit code of the pid, or -1 for failure of this function
- */
-int unix_pclose(int rfd, int wfd, pid_t pid)
-{
-	int rc = 0;
-	int retval = 0;
-	int signal = SIGTERM;
-	int kills = 0;
-
-	// close the filedescriptors, makes the child exit if it didn't already.
-	if (wfd >= 0)
-		close(wfd);
-
-	if (rfd >= 0)
-		close(rfd);
-
-	while (true) {
-		// we need to send the pid a signal if waitpid fails, so add WNOHANG
-		rc = waitpid(pid, &retval, WNOHANG | WUNTRACED);
-		if (rc == 0) {
-			if (kills > 1) {
-				// we've tried everything, so let this slide and maybe leave some zombie hanging around
-				retval = -1;
-				break;
-			}
-			// The child pid has not exited yet. Send it the TERM signal to the complete group and try again
-			kill(-pid, signal);
-			kills++;
-			// next time this happens, it really needs to die!
-			signal = SIGKILL;
-			// we need to sleep to give the kernel some time to progress the death of the child
-			sleep(1);
-			continue;
-		} else {
-			break;
-		}
-	}
-
-	return retval;
-}
-
 /**
  * Start an external process
  *
@@ -422,10 +342,10 @@ int unix_pclose(int rfd, int wfd, pid_t pid)
  *
  * @return Returns TRUE on success, FALSE on failure
  */
-bool unix_system(ECLogger *lpLogger, const char *lpszLogName, const char *lpszCommand, const char **env)
+bool unix_system(const char *lpszLogName, const char *lpszCommand, const char **env)
 {
 	int fdin = 0, fdout = 0;
-	int pid = unix_popen_rw(lpLogger, lpszCommand, &fdin, &fdout, NULL, env, false, true);
+	int pid = unix_popen_rw(lpszCommand, &fdin, &fdout, NULL, env, false, true);
 	char buffer[1024];
 	int status = 0;
 	bool rv = true;
@@ -434,8 +354,7 @@ bool unix_system(ECLogger *lpLogger, const char *lpszLogName, const char *lpszCo
 	
 	while (fgets(buffer, sizeof(buffer), fp)) {
 		buffer[strlen(buffer) - 1] = '\0'; // strip enter
-		if(lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "%s[%d]: %s", lpszLogName, pid, buffer);
+		ec_log_debug("%s[%d]: %s", lpszLogName, pid, buffer);
 	}
 	
 	fclose(fp);
@@ -446,26 +365,26 @@ bool unix_system(ECLogger *lpLogger, const char *lpszLogName, const char *lpszCo
 #ifdef WEXITSTATUS
 		if(WIFEXITED(status)) { /* Child exited by itself */
 			if(WEXITSTATUS(status)) {
-				lpLogger->Log(EC_LOGLEVEL_ERROR, "Command '%s' exited with non-zero status %d", lpszCommand, WEXITSTATUS(status));
+				ec_log_err("Command `%s` exited with non-zero status %d", lpszCommand, WEXITSTATUS(status));
 				rv = false;
 			}
 			else
-				lpLogger->Log(EC_LOGLEVEL_INFO, "Command '%s' run successful", lpszCommand);
+				ec_log_info("Command `%s` ran successfully", lpszCommand);
 		} else if(WIFSIGNALED(status)) {        /* Child was killed by a signal */
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Command '%s' was killed by signal %d", lpszCommand, WTERMSIG(status));
+			ec_log_err("Command `%s` was killed by signal %d", lpszCommand, WTERMSIG(status));
 			rv = false;
 		} else {                        /* Something strange happened */
-			lpLogger->Log(EC_LOGLEVEL_ERROR, string("Command ") + lpszCommand + " terminated abnormally");
+			ec_log_err(string("Command `") + lpszCommand + "` terminated abnormally");
 			rv = false;
 		}
 #else
 		if (status)
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Command '%s' exited with status %d", lpszCommand, status);
+			ec_log_err("Command `%s` exited with status %d", lpszCommand, status);
 		else
-			lpLogger->Log(EC_LOGLEVEL_INFO, "Command '%s' run successful", lpszCommand);
+			ec_log_info("Command `%s` ran successfully", lpszCommand);
 #endif
 	} else {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, string("System call `system' failed: ") + strerror(errno));
+		ec_log_err(string("System call \"system\" failed: ") + strerror(errno));
 		rv = false;
 	}
 	

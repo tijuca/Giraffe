@@ -41,6 +41,7 @@ server=`basename $SERVERPROGRAM`
 case "$1" in
     start)
 		echo -n "Starting the Zarafa Server "
+		install -dm0775 -o zarafa -g zarafa /var/run/zarafad
 		export LC_ALL=$ZARAFA_LOCALE
 		export LANG=$ZARAFA_LOCALE
 		$SERVERPROGRAM $SERVERCONFIG_OPT

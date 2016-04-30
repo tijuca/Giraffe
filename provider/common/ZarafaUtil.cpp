@@ -1,55 +1,29 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include "ZarafaUtil.h"
 #include <mapicode.h>
-#include "../common/stringutil.h"
-#include "../common/base64.h"
+#include <zarafa/stringutil.h>
+#include <zarafa/base64.h>
 
 #include <mapidefs.h>
-#include "ECGuid.h"
+#include <zarafa/ECGuid.h>
 #include "ZarafaVersions.h"
 
 #ifdef _DEBUG
@@ -60,43 +34,36 @@ static const char THIS_FILE[] = __FILE__;
 
 bool IsZarafaEntryId(ULONG cb, LPBYTE lpEntryId)
 {
-	bool	bZarafaEntry = false;
 	EID*	peid = NULL;
 
 	if(lpEntryId == NULL)
-		goto exit;
+		return false;
 
 	peid = (PEID)lpEntryId;
 
+	/* TODO: maybe also a check on objType */
 	if( (cb == sizeof(EID) && peid->ulVersion == 1) ||
 		(cb == sizeof(EID_V0) && peid->ulVersion == 0 ) )
-		bZarafaEntry = true;
+		return true;
 
-	//TODO: maybe also a check on objType
-exit:
-	return bZarafaEntry;
+	return false;
 }
 
 bool ValidateZarafaEntryId(ULONG cb, LPBYTE lpEntryId, unsigned int ulCheckType)
 {
 
-	bool	bOk = false;
 	EID*	peid = NULL;
 
 	if(lpEntryId == NULL)
-		goto exit;
+		return false;
 
 	peid = (PEID)lpEntryId;
 
 	if( ((cb == sizeof(EID) && peid->ulVersion == 1) ||
 		 (cb == sizeof(EID_V0) && peid->ulVersion == 0 ) ) &&
 		 peid->usType == ulCheckType)
-	{
-		bOk = true;
-	}
-
-exit:
-	return bOk;
+		return true;
+	return false;
 }
 
 /**
@@ -111,80 +78,54 @@ exit:
 bool ValidateZarafaEntryList(LPENTRYLIST lpMsgList, unsigned int ulCheckType)
 {
 
-	bool	bOk = true;
 	EID*	peid = NULL;
 
-	if(lpMsgList == NULL) {
-		bOk = false;
-		goto exit;
-	}
+	if (lpMsgList == NULL)
+		return false;
 
-	for(ULONG i=0; i < lpMsgList->cValues; i++)
-	{
+	for (ULONG i = 0; i < lpMsgList->cValues; ++i) {
 		peid = (PEID)lpMsgList->lpbin[i].lpb;
 
 		if( !(((lpMsgList->lpbin[i].cb == sizeof(EID) && peid->ulVersion == 1) ||
 			 (lpMsgList->lpbin[i].cb == sizeof(EID_V0) && peid->ulVersion == 0 ) ) &&
 			 peid->usType == ulCheckType))
-		{
-			bOk = false;
-			goto exit;
-		}
+			return false;
 	}
-
-exit:
-	return bOk;
+	return true;
 }
 
 ECRESULT GetStoreGuidFromEntryId(ULONG cb, LPBYTE lpEntryId, LPGUID lpguidStore)
 {
-	ECRESULT er = erSuccess;
 	EID*	peid = NULL;
 
-	if(lpEntryId == NULL || lpguidStore == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if(lpEntryId == NULL || lpguidStore == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	peid = (PEID)lpEntryId;
 
 	if(!((cb == sizeof(EID) && peid->ulVersion == 1) ||
 		 (cb == sizeof(EID_V0) && peid->ulVersion == 0 )) )
-	{
-		er = ZARAFA_E_INVALID_ENTRYID;
-		goto exit;
-	}
+		return ZARAFA_E_INVALID_ENTRYID;
 
 	memcpy(lpguidStore, &peid->guid, sizeof(GUID));
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT GetObjTypeFromEntryId(ULONG cb, LPBYTE lpEntryId, unsigned int* lpulObjType)
 {
-	ECRESULT er = erSuccess;
 	EID*	peid = NULL;
 
-	if(lpEntryId == NULL || lpulObjType == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpEntryId == NULL || lpulObjType == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	peid = (PEID)lpEntryId;
 
 	if(!((cb == sizeof(EID) && peid->ulVersion == 1) ||
 		 (cb == sizeof(EID_V0) && peid->ulVersion == 0 )) )
-	{
-		er = ZARAFA_E_INVALID_ENTRYID;
-		goto exit;
-	}
-
+		return ZARAFA_E_INVALID_ENTRYID;
 
 	*lpulObjType = peid->usType;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT GetObjTypeFromEntryId(entryId sEntryId,  unsigned int* lpulObjType) {
@@ -211,23 +152,18 @@ HRESULT HrGetObjTypeFromEntryId(ULONG cb, LPBYTE lpEntryId, unsigned int* lpulOb
 
 ECRESULT ABEntryIDToID(ULONG cb, LPBYTE lpEntryId, unsigned int* lpulID, objectid_t* lpsExternId, unsigned int* lpulMapiType)
 {
-	ECRESULT		er = erSuccess;
 	PABEID			lpABEID = NULL;
 	unsigned int	ulID = 0;
 	objectid_t		sExternId;
 	objectclass_t	sClass = ACTIVE_USER;
 
-	if(lpEntryId == NULL || lpulID == NULL || cb < CbNewABEID("")) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpEntryId == NULL || lpulID == NULL || cb < CbNewABEID(""))
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	lpABEID = (PABEID)lpEntryId;
 
-	if (memcmp(&lpABEID->guid, &MUIDECSAB, sizeof(GUID)) != 0) {
-		er = ZARAFA_E_INVALID_ENTRYID;
-		goto exit;
-	}
+	if (memcmp(&lpABEID->guid, &MUIDECSAB, sizeof(GUID)) != 0)
+		return ZARAFA_E_INVALID_ENTRYID;
 
 	ulID = lpABEID->ulId;
 	MAPITypeToType(lpABEID->ulType, &sClass);
@@ -242,36 +178,22 @@ ECRESULT ABEntryIDToID(ULONG cb, LPBYTE lpEntryId, unsigned int* lpulID, objecti
 
 	if (lpulMapiType)
 		*lpulMapiType = lpABEID->ulType;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ABEntryIDToID(entryId* lpsEntryId, unsigned int* lpulID, objectid_t* lpsExternId, unsigned int *lpulMapiType)
 {
-	ECRESULT er = erSuccess;
-
-	if(lpsEntryId == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	er = ABEntryIDToID(lpsEntryId->__size, lpsEntryId->__ptr, lpulID, lpsExternId, lpulMapiType);
-
-exit:
-	return er;
+	if (lpsEntryId == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
+	return ABEntryIDToID(lpsEntryId->__size, lpsEntryId->__ptr, lpulID, lpsExternId, lpulMapiType);
 }
 
 ECRESULT SIEntryIDToID(ULONG cb, LPBYTE lpInstanceId, LPGUID guidServer, unsigned int *lpulInstanceId, unsigned int *lpulPropId)
 {
-	ECRESULT er = erSuccess;
-	LPSIEID lpInstanceEid = NULL;
+	LPSIEID lpInstanceEid;
 
-	if (lpInstanceId == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (lpInstanceId == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 	lpInstanceEid = (LPSIEID)lpInstanceId;
 
 	if (guidServer)
@@ -280,9 +202,7 @@ ECRESULT SIEntryIDToID(ULONG cb, LPBYTE lpInstanceId, LPGUID guidServer, unsigne
 		*lpulInstanceId = lpInstanceEid->ulId;
 	if (lpulPropId)
 		*lpulPropId = lpInstanceEid->ulType;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 /**
@@ -299,12 +219,9 @@ int SortCompareABEID(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, L
 	PABEID peid2 = (PABEID)lpEntryID2;
 
 	if (lpEntryID1 == NULL || lpEntryID2 == NULL)
-		goto exit;
-
-	if (peid1->ulVersion != peid2->ulVersion) {
-		rv = peid1->ulVersion - peid2->ulVersion;
-		goto exit;
-	}
+		return 0;
+	if (peid1->ulVersion != peid2->ulVersion)
+		return peid1->ulVersion - peid2->ulVersion;
 
 	// sort: user(6), group(8), company(4)
 	if (peid1->ulType != peid2->ulType)  {
@@ -322,89 +239,66 @@ int SortCompareABEID(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, L
 		rv = strcmp((char*)peid1->szExId, (char*)peid2->szExId);
 	}
 	if (rv != 0)
-		goto exit;
-
+		return rv;
 	rv = memcmp(&peid1->guid, &peid2->guid, sizeof(GUID));
 	if (rv != 0)
-		goto exit;
-
-exit:
-	return rv;
+		return rv;
+	return 0;
 }
 
 bool CompareABEID(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2)
 {
-	bool fTheSame = false;
-
 	PABEID peid1 = (PABEID)lpEntryID1;
 	PABEID peid2 = (PABEID)lpEntryID2;
 
 	if (lpEntryID1 == NULL || lpEntryID2 == NULL)
-		goto exit;
+		return false;
 
 	if (peid1->ulVersion == peid2->ulVersion)
 	{
 		if(cbEntryID1 != cbEntryID2)
-			goto exit;
-
+			return false;
 		if(cbEntryID1 < CbNewABEID(""))
-			goto exit;
-
+			return false;
 		if (peid1->ulVersion == 0) {
 			if(peid1->ulId != peid2->ulId)
-				goto exit;
+				return false;
 		} else {
 			if (strcmp((char*)peid1->szExId, (char*)peid2->szExId))
-				goto exit;
+				return false;
 		}
 	}
 	else
 	{
 		if (cbEntryID1 < CbNewABEID("") || cbEntryID2 < CbNewABEID(""))
-			goto exit;
-
+			return false;
 		if(peid1->ulId != peid2->ulId)
-			goto exit;
+			return false;
 	}
 
 	if(peid1->guid != peid2->guid)
-		goto exit;
-
+		return false;
 	if(peid1->ulType != peid2->ulType)
-		goto exit;
-
-	fTheSame = true;
-
-exit:
-	return fTheSame;
+		return false;
+	return true;
 }
 
 HRESULT HrSIEntryIDToID(ULONG cb, LPBYTE lpInstanceId, LPGUID guidServer, unsigned int *lpulInstanceId, unsigned int *lpulPropId)
 {
-	HRESULT hr = S_OK;
-
-	if(lpInstanceId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	hr = ZarafaErrorToMAPIError( SIEntryIDToID(cb, lpInstanceId, guidServer, lpulInstanceId, lpulPropId) );
-
-exit:
-	return hr;
+	if(lpInstanceId == NULL)
+		return MAPI_E_INVALID_PARAMETER;
+	return ZarafaErrorToMAPIError(SIEntryIDToID(cb, lpInstanceId, guidServer, lpulInstanceId, lpulPropId));
 }
 
 ECRESULT ABIDToEntryID(struct soap *soap, unsigned int ulID, const objectid_t& sExternId, entryId *lpsEntryId)
 {
-	ECRESULT		er			= erSuccess;
+	ECRESULT er;
 	PABEID			lpUserEid	= NULL;
 	std::string		strEncExId  = base64_encode((unsigned char*)sExternId.id.c_str(), sExternId.id.size());
 	unsigned int	ulLen       = 0;
 
-	if (lpsEntryId == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpsEntryId == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	ulLen = CbNewABEID(strEncExId.c_str());
 	lpUserEid = (PABEID)s_alloc<char>(soap, ulLen);
@@ -412,8 +306,8 @@ ECRESULT ABIDToEntryID(struct soap *soap, unsigned int ulID, const objectid_t& s
 	lpUserEid->ulId = ulID;
 	er = TypeToMAPIType(sExternId.objclass, &lpUserEid->ulType);
 	if (er != erSuccess) {
-		free(lpUserEid);
-		goto exit;				// 	or make default type user?
+		s_free(soap, lpUserEid);
+		return er; /* or make default type user? */
 	}
 
 	memcpy(&lpUserEid->guid, &MUIDECSAB, sizeof(GUID));
@@ -428,23 +322,18 @@ ECRESULT ABIDToEntryID(struct soap *soap, unsigned int ulID, const objectid_t& s
 
 	lpsEntryId->__size = ulLen;
 	lpsEntryId->__ptr = (unsigned char*)lpUserEid;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT SIIDToEntryID(struct soap *soap, LPGUID guidServer, unsigned int ulInstanceId, unsigned int ulPropId, entryId *lpsInstanceId)
 {
-	ECRESULT er = erSuccess;
 	LPSIEID lpInstanceEid = NULL;
 	ULONG ulSize = 0;
 
 	ASSERT(ulPropId < 0x0000FFFF);
 
-	if (lpsInstanceId == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpsInstanceId == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	ulSize = sizeof(SIEID) + sizeof(GUID);
 
@@ -459,24 +348,14 @@ ECRESULT SIIDToEntryID(struct soap *soap, LPGUID guidServer, unsigned int ulInst
 
 	lpsInstanceId->__size = ulSize;
 	lpsInstanceId->__ptr = (unsigned char *)lpInstanceEid;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT SIEntryIDToID(entryId* sInstanceId, LPGUID guidServer, unsigned int *lpulInstanceId, unsigned int *lpulPropId)
 {
-	ECRESULT er = erSuccess;
-
-	if (sInstanceId == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	er = SIEntryIDToID(sInstanceId->__size, sInstanceId->__ptr, guidServer, lpulInstanceId, lpulPropId);
-
-exit:
-	return er;
+	if (sInstanceId == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
+	return SIEntryIDToID(sInstanceId->__size, sInstanceId->__ptr, guidServer, lpulInstanceId, lpulPropId);
 }
 
 // NOTE: when using this function, we can never be sure that we return the actual objectclass_t.
@@ -485,13 +364,10 @@ exit:
 // users table id, or extern id of the user too!
 ECRESULT MAPITypeToType(ULONG ulMAPIType, objectclass_t *lpsUserObjClass)
 {
-	ECRESULT			er = erSuccess;
 	objectclass_t		sUserObjClass = OBJECTCLASS_UNKNOWN;
 
-	if (lpsUserObjClass == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpsUserObjClass == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	switch (ulMAPIType) {
 	case MAPI_MAILUSER:
@@ -504,25 +380,19 @@ ECRESULT MAPITypeToType(ULONG ulMAPIType, objectclass_t *lpsUserObjClass)
 		sUserObjClass = OBJECTCLASS_CONTAINER;
 		break;
 	default:
-		er = ZARAFA_E_INVALID_TYPE;
-		goto exit;
+		return ZARAFA_E_INVALID_TYPE;
 	}
 
 	*lpsUserObjClass = sUserObjClass;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT TypeToMAPIType(objectclass_t sUserObjClass, ULONG *lpulMAPIType)
 {
-	ECRESULT		er = erSuccess;
 	ULONG			ulMAPIType = MAPI_MAILUSER;
 
-	if (lpulMAPIType == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpulMAPIType == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	// Check for correctness of mapping!
 	switch (OBJECTCLASS_TYPE(sUserObjClass))
@@ -537,14 +407,11 @@ ECRESULT TypeToMAPIType(objectclass_t sUserObjClass, ULONG *lpulMAPIType)
 		ulMAPIType = MAPI_ABCONT;
 		break;
 	default:
-		er = ZARAFA_E_INVALID_TYPE;
-		goto exit;
+		return ZARAFA_E_INVALID_TYPE;
 	}
 
 	*lpulMAPIType = ulMAPIType;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 /**
@@ -560,7 +427,6 @@ exit:
  */
 ECRESULT ParseZarafaVersion(const std::string &strVersion, unsigned int *lpulVersion)
 {
-	ECRESULT er = ZARAFA_E_INVALID_PARAMETER;
 	const char *lpszStart = strVersion.c_str();
 	char *lpszEnd = NULL;
 	unsigned int ulGeneral, ulMajor, ulMinor;
@@ -573,22 +439,19 @@ ECRESULT ParseZarafaVersion(const std::string &strVersion, unsigned int *lpulVer
 
 	ulGeneral = strtoul(lpszStart, &lpszEnd, 10);
 	if (lpszEnd == NULL || lpszEnd == lpszStart || *lpszEnd != ',')
-		goto exit;
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	lpszStart = lpszEnd + 1;
 	ulMajor = strtoul(lpszStart, &lpszEnd, 10);
 	if (lpszEnd == NULL || lpszEnd == lpszStart || *lpszEnd != ',')
-		goto exit;
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	lpszStart = lpszEnd + 1;
 	ulMinor = strtoul(lpszStart, &lpszEnd, 10);
 	if (lpszEnd == NULL || lpszEnd == lpszStart || (*lpszEnd != ',' && *lpszEnd != '\0'))
-		goto exit;
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	if (lpulVersion)
 		*lpulVersion = MAKE_ZARAFA_VERSION(ulGeneral, ulMajor, ulMinor);
-	er = erSuccess;
-
-exit:
-	return er;
+	return erSuccess;
 }

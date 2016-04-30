@@ -1,59 +1,33 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 // ECXPLogon.cpp: implementation of the ECXPLogon class.
 //
 //////////////////////////////////////////////////////////////////////
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include <mapi.h>
 #include <mapispi.h>
 #include <mapiutil.h>
-#include "mapiguidext.h"
-#include "ECGuid.h"
-#include "mapiext.h"
+#include <zarafa/mapiguidext.h>
+#include <zarafa/ECGuid.h>
+#include <zarafa/mapiext.h>
 #include <edkmdb.h>
-#include "edkguid.h"
+#include <edkguid.h>
 
 #include "Zarafa.h"
 #include "ECXPLogon.h"
@@ -61,15 +35,15 @@
 #include "WSTransport.h"
 #include "Mem.h"
 #include "ClientUtil.h"
-#include "CommonUtil.h"
+#include <zarafa/CommonUtil.h>
 #include "ECMsgStore.h"
 #include "ECMessage.h"
 
-#include "ZarafaCode.h"
+#include <zarafa/ZarafaCode.h>
 
-#include "ECDebug.h"
-#include "ECRestriction.h"
-#include "mapi_ptr.h"
+#include <zarafa/ECDebug.h>
+#include <zarafa/ECRestriction.h>
+#include <zarafa/mapi_ptr.h>
 
 
 #ifdef _DEBUG
@@ -80,21 +54,19 @@ static const char THIS_FILE[]=__FILE__;
 
 static HRESULT HrGetECMsgStore(IMAPIProp *lpProp, ECMsgStore **lppECMsgStore)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	LPSPropValue lpPropVal = NULL;
 	ECMAPIProp *lpECMAPIProp = NULL;
 
 	hr = HrGetOneProp(lpProp, PR_EC_OBJECT, &lpPropVal);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	lpECMAPIProp = (ECMAPIProp *)lpPropVal->Value.lpszA;
 
 	*lppECMsgStore = lpECMAPIProp->GetMsgStore();
 	(*lppECMsgStore)->AddRef();
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -154,29 +126,29 @@ HRESULT ECXPLogon::QueryInterface(REFIID refiid, void **lppInterface)
 
 HRESULT ECXPLogon::AddressTypes(ULONG * lpulFlags, ULONG * lpcAdrType, LPTSTR ** lpppszAdrTypeArray, ULONG * lpcMAPIUID, LPMAPIUID ** lpppUIDArray)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	if(m_lppszAdrTypeArray == NULL) {
 
 		hr = ECAllocateBuffer(sizeof(TCHAR *) * 3, (LPVOID *)&m_lppszAdrTypeArray);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		hr = ECAllocateMore((_tcslen(TRANSPORT_ADDRESS_TYPE_SMTP)+1) * sizeof(TCHAR), m_lppszAdrTypeArray, (LPVOID *)&m_lppszAdrTypeArray[0]);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		_tcscpy(m_lppszAdrTypeArray[0], TRANSPORT_ADDRESS_TYPE_SMTP);
 
 		hr = ECAllocateMore((_tcslen(TRANSPORT_ADDRESS_TYPE_ZARAFA)+1) * sizeof(TCHAR), m_lppszAdrTypeArray, (LPVOID *)&m_lppszAdrTypeArray[1]);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		_tcscpy(m_lppszAdrTypeArray[1], TRANSPORT_ADDRESS_TYPE_ZARAFA);
 
 		hr = ECAllocateMore((_tcslen(TRANSPORT_ADDRESS_TYPE_FAX)+1) * sizeof(TCHAR), m_lppszAdrTypeArray, (LPVOID *)&m_lppszAdrTypeArray[2]);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		_tcscpy(m_lppszAdrTypeArray[2], TRANSPORT_ADDRESS_TYPE_FAX);
 	}
@@ -186,26 +158,19 @@ HRESULT ECXPLogon::AddressTypes(ULONG * lpulFlags, ULONG * lpcAdrType, LPTSTR **
 	*lpppUIDArray = NULL; // We could specify the Zarafa addressbook's UID here to stop the MAPI spooler doing expansions on them (IE EntryID -> Email address)
 	*lpcAdrType = 3;
 	*lpppszAdrTypeArray = m_lppszAdrTypeArray;
-
-exit:
-	return hr;	
+	return hrSuccess;
 }
 
 HRESULT ECXPLogon::RegisterOptions(ULONG * lpulFlags, ULONG * lpcOptions, LPOPTIONDATA * lppOptions)
 {
-	HRESULT hr = hrSuccess;
-
 	*lpulFlags = 0;//fMapiUnicode ?
 	*lpcOptions = 0;
 	*lppOptions = NULL;
-	
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECXPLogon::TransportNotify(ULONG * lpulFlags, LPVOID * lppvData)
 {
-	HRESULT hr = hrSuccess;
-
 	if(*lpulFlags & NOTIFY_ABORT_DEFERRED) {
 		//FIXME: m_ulTransportStatus 
 		// doe iets met lppvData
@@ -241,30 +206,19 @@ HRESULT ECXPLogon::TransportNotify(ULONG * lpulFlags, LPVOID * lppvData)
 	if(*lpulFlags & NOTIFY_END_OUTBOUND_FLUSH) {
 		m_ulTransportStatus &= ~STATUS_OUTBOUND_FLUSH;
 	}
-
-	hr = HrUpdateTransportStatus();
-
-	return hr;
+	return HrUpdateTransportStatus();
 }
 
 HRESULT ECXPLogon::Idle(ULONG ulFlags)
 {
-	HRESULT hr = hrSuccess;
-
 	// The MAPI spooler periodically calls the IXPLogon::Idle method during times when the system is idle
-
 	// We do nothing ..
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECXPLogon::TransportLogoff(ULONG ulFlags)
 {
-	HRESULT hr = hrSuccess;
-
-//	hr = MAPI_E_CALL_FAILED;
-
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -337,18 +291,15 @@ HRESULT ECXPLogon::ClearOldSubmittedMessages(LPMAPIFOLDER lpFolder)
 	if (hr != hrSuccess)
 		goto exit;
 
-	for (unsigned int i = 0; i < ptrRows.size(); i++) {
+	for (unsigned int i = 0; i < ptrRows.size(); ++i)
 		if(ptrRows[i].lpProps[0].ulPropTag == PR_ENTRYID)
 			lpDeleteItemEntryList->lpbin[lpDeleteItemEntryList->cValues++] = ptrRows[i].lpProps[0].Value.bin;
-	}
 
 	if(lpDeleteItemEntryList->cValues > 0)
 		hr = lpFolder->DeleteMessages(lpDeleteItemEntryList, 0, NULL, 0); //Delete message on the server
 
 exit:
-	if (lpDeleteItemEntryList)
-		MAPIFreeBuffer(lpDeleteItemEntryList);
-
+	MAPIFreeBuffer(lpDeleteItemEntryList);
 	return hr;
 }
 
@@ -374,8 +325,6 @@ HRESULT ECXPLogon::SubmitMessage(ULONG ulFlags, LPMESSAGE lpMessage, ULONG * lpu
 	ENTRYLIST sDelete;
 	IMsgStore *lpMsgStore = NULL;
 	ULONG ulType = 0;
-
-	ULONG ulSize;
 	ULONG ulValue;
 	
 	struct timespec sTimeOut;
@@ -500,8 +449,18 @@ HRESULT ECXPLogon::SubmitMessage(ULONG ulFlags, LPMESSAGE lpMessage, ULONG * lpu
 	}
 
 	gettimeofday(&sNow,NULL);
-	ulSize = sizeof(ULONG);
 	ulValue = 300; // Default wait for max 5 min
+#ifdef WIN32
+	{
+		HKEY hKey;
+		ULONG ulSize = sizeof(ULONG);
+
+		if(RegOpenKeyExA(HKEY_CURRENT_USER, "Software\\Zarafa\\Client", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+			RegQueryValueExA(hKey, "SubmitTimeOut", NULL, NULL, (BYTE*)&ulValue, &ulSize);
+			RegCloseKey(hKey);
+		}
+	}
+#endif /* WIN32 */
 	sTimeOut.tv_sec = sNow.tv_sec + ulValue;
 	sTimeOut.tv_nsec = sNow.tv_usec * 1000;
 	if(ETIMEDOUT == pthread_cond_timedwait(&m_hExitSignal, &m_hExitMutex, &sTimeOut)){
@@ -537,8 +496,7 @@ HRESULT ECXPLogon::SubmitMessage(ULONG ulFlags, LPMESSAGE lpMessage, ULONG * lpu
 	if (hr != erSuccess)
 		goto exit;
 
-	for (ulRow=0; ulRow < lpRecipRows->cRows; ulRow++)
-    {
+	for (ulRow = 0; ulRow < lpRecipRows->cRows; ++ulRow) {
 		LPSPropValue lpsPropValue = PpropFindProp(lpRecipRows->aRow[ulRow].lpProps, lpRecipRows->aRow[ulRow].cValues, PR_ADDRTYPE);
 		LPSPropValue lpsResponsibility = PpropFindProp(lpRecipRows->aRow[ulRow].lpProps, lpRecipRows->aRow[ulRow].cValues, PR_RESPONSIBILITY);
 
@@ -565,10 +523,7 @@ HRESULT ECXPLogon::SubmitMessage(ULONG ulFlags, LPMESSAGE lpMessage, ULONG * lpu
 exit:
 	if (lpMsgStore)
 		lpMsgStore->Release();
-
-	if (lpECObject)
-		MAPIFreeBuffer(lpECObject);
-
+	MAPIFreeBuffer(lpECObject);
 	if (lpOnlineStore)
 		lpOnlineStore->Release();
 
@@ -583,10 +538,7 @@ exit:
 
 	if (lpSubmitFolder)
 		lpSubmitFolder->Release();
-
-	if(lpEntryID)
-		MAPIFreeBuffer(lpEntryID);
-
+	MAPIFreeBuffer(lpEntryID);
 	if(lpRecipRows)
 		FreeProws (lpRecipRows);
 
@@ -681,53 +633,35 @@ HRESULT ECXPLogon::SetOutgoingProps (LPMESSAGE lpMessage)
 
 HRESULT ECXPLogon::EndMessage(ULONG ulMsgRef, ULONG * lpulFlags)
 {
-	HRESULT hr = hrSuccess;
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECXPLogon::Poll(ULONG * lpulIncoming)
 {
-	HRESULT hr = hrSuccess;
-
 	*lpulIncoming = 0;
 	//lpulIncoming [out] Value indicating the existence of inbound messages. 
 	//A nonzero value indicates that there are inbound messages.
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECXPLogon::StartMessage(ULONG ulFlags, LPMESSAGE lpMessage, ULONG * lpulMsgRef)
 {
-	HRESULT hr = hrSuccess;
-	
 	*lpulMsgRef = 0;
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECXPLogon::OpenStatusEntry(LPCIID lpInterface, ULONG ulFlags, ULONG * lpulObjType, LPMAPISTATUS * lppEntry)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_CALL_FAILED;
-
-	return hr;
+	return MAPI_E_CALL_FAILED;
 }
 
 HRESULT ECXPLogon::ValidateState(ULONG ulUIParam, ULONG ulFlags)
 {
-	HRESULT hr = hrSuccess;
-
-//	hr = MAPI_E_CALL_FAILED;
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECXPLogon::FlushQueues(ULONG ulUIParam, ULONG cbTargetTransport, LPENTRYID lpTargetTransport, ULONG ulFlags)
 {
-	HRESULT hr = hrSuccess;
-
 	//The outbound message queue or queues should be flushed. 
 	if (ulFlags & FLUSH_UPLOAD){
 		m_ulTransportStatus |= STATUS_OUTBOUND_FLUSH;
@@ -739,15 +673,11 @@ HRESULT ECXPLogon::FlushQueues(ULONG ulUIParam, ULONG cbTargetTransport, LPENTRY
 		m_ulTransportStatus |= STATUS_INBOUND_FLUSH;
 	}
 
-	hr = HrUpdateTransportStatus();
-
-//	hr = MAPI_E_CALL_FAILED;
-
-	return hr;
+	return HrUpdateTransportStatus();
 }
 
 ULONG ECXPLogon::OnNotify(ULONG cNotif, LPNOTIFICATION lpNotifs){
-	for(unsigned int i=0; i < cNotif; i++) {
+	for (unsigned int i = 0; i < cNotif; ++i) {
 		if(lpNotifs[i].ulEventType == fnevObjectDeleted) {
 			pthread_mutex_lock(&m_hExitMutex);
 			pthread_cond_signal(&m_hExitSignal);

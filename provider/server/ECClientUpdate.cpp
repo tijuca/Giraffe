@@ -1,55 +1,29 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
-#include "ZarafaCode.h"
+#include <zarafa/platform.h>
+#include <zarafa/ZarafaCode.h>
 #include "soapH.h"
 #include "ECClientUpdate.h"
 #include "ECLicenseClient.h"
-#include "stringutil.h"
-#include "base64.h"
-#include "ECLogger.h"
-#include "ECConfig.h"
+#include <zarafa/stringutil.h>
+#include <zarafa/base64.h>
+#include <zarafa/ECLogger.h>
+#include <zarafa/ECConfig.h>
 
 #include <boost/filesystem.hpp>
 namespace bfs = boost::filesystem;
@@ -63,7 +37,7 @@ namespace ba = boost::algorithm;
 #include "ECSessionManager.h"
 #include "ECDatabase.h"
 #include "ECStatsCollector.h"
-#include "boost_compat.h"
+#include <zarafa/boost_compat.h>
 
 /* class and add constructor params? */
 extern ECRESULT GetBestServerPath(struct soap *soap, ECSession *lpecSession, const std::string &strServerName, std::string *lpstrServerPath);
@@ -148,7 +122,7 @@ int HandleClientUpdate(struct soap *soap)
 	// the version comes as "/autoupdate/6.20.1.1234", convert it to "6.20.1.1234"
 	szCurrentVersion = soap->path + strlen("/autoupdate");
 	if (szCurrentVersion[0] == '/')
-		szCurrentVersion++;
+		++szCurrentVersion;
 
 	if (szCurrentVersion[0] != '\0') {
 		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Client update: The current client version is %s.", szCurrentVersion);
@@ -191,7 +165,7 @@ int HandleClientUpdate(struct soap *soap)
 		goto exit;
 	}
 
-	g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: Sending client %s new installer %s", PrettyIP(soap->ip).c_str(), strClientMSIName.c_str());
+	g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: Sending client %s new installer %s", soap->host, strClientMSIName.c_str());
 
 	// application/msi-installer ?
 	soap->http_content = "binary";
@@ -214,11 +188,8 @@ int HandleClientUpdate(struct soap *soap)
 	nRet = SOAP_OK;
 
 exit:
-	if (lpLicenseResponse)
-		delete [] lpLicenseResponse;
-
-	if (lpLicenseClient)
-		delete lpLicenseClient;
+	delete[] lpLicenseResponse;
+	delete lpLicenseClient;
 
 	if (fd)
 		fclose(fd);
@@ -231,7 +202,11 @@ bool ConvertAndValidatePath(const char *lpszClientUpdatePath, const std::string 
 	bool bRet = false;
 	size_t nTempLen = 0;
 	std::string strFile;
+#ifdef WIN32
+	char cPathSeparator = '\\';
+#else
 	char cPathSeparator = '/';
+#endif
 
 	if (lpstrDownloadFile == NULL || lpszClientUpdatePath == NULL)
 		goto exit;
@@ -240,7 +215,11 @@ bool ConvertAndValidatePath(const char *lpszClientUpdatePath, const std::string 
 	nTempLen = strFile.length();
 
 	// not 100% correct, but good enough
+#ifdef WIN32
+	if (strstr(strFile.c_str(), "\\.."))
+#else
 	if (strstr(strFile.c_str(), "/.."))
+#endif
 	{
 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Client update: Update path contains invalid .. to previous path.");
 		goto exit;
@@ -353,7 +332,8 @@ static bool GetLatestVersionAtServer(const char *szUpdatePath,
 		}
 
 		bfs::directory_iterator update_last;
-		for (bfs::directory_iterator update(updatesdir); update != update_last; update++) {
+		for (bfs::directory_iterator update(updatesdir);
+		     update != update_last; ++update) {
 			const bfs::file_type file_type = update->status().type();
 			if (file_type != bfs::regular_file && file_type != bfs::symlink_file) {
 				continue;
@@ -487,7 +467,7 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 		(sClientUpdateInfo.szClientVersion) ? sClientUpdateInfo.szClientVersion : "-",
 		(sClientUpdateInfo.szWindowsVersion) ? sClientUpdateInfo.szWindowsVersion : "-",
 		(sClientUpdateInfo.szClientIPList) ? sClientUpdateInfo.szClientIPList : "-",
-		PrettyIP(soap->ip).c_str() );
+		soap->host);
 
 	if (!sClientUpdateInfo.szComputerName)
 		sClientUpdateInfo.szComputerName = const_cast<char *>(""); //Client has no name?
@@ -536,7 +516,7 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 				goto exit;
 
 			lpsResponse->lpszServerPath = s_strcpy(soap, strServerPath.c_str());// Server Path must always utf8 (also in 6.40.x)
-			g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Client update: trackid: 0x%08X, User '%s' is redirected to '%s'", sClientUpdateInfo.ulTrackId, sClientUpdateInfo.szUsername, lpsResponse->lpszServerPath);
+			ec_log_info("Client update: trackid: 0x%08X, User \"%s\" is redirected to \"%s\"", sClientUpdateInfo.ulTrackId, sClientUpdateInfo.szUsername, lpsResponse->lpszServerPath);
 			g_lpStatsCollector->Increment(SCN_REDIRECT_COUNT, 1);
 			er = ZARAFA_E_UNABLE_TO_COMPLETE;
 			goto exit;
@@ -631,11 +611,8 @@ exit:
 
 	lpsResponse->er = er;
 
-	if (lpLicenseResponse)
-		delete [] lpLicenseResponse;
-
-	if (lpLicenseClient)
-		delete lpLicenseClient;
+	delete[] lpLicenseResponse;
+	delete lpLicenseClient;
 
 	if (er && fd)
 		fclose(fd);
@@ -735,8 +712,7 @@ int ns__setClientUpdateStatus(struct soap *soap, struct clientUpdateStatusReques
 			content = soap_get_mime_attachment(soap, (void*)strFile.c_str());
 			if (!content)
 				break;
-
-			ulFile++;
+			++ulFile;
 		}
 
 		if (soap->error) {

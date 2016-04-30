@@ -1,49 +1,23 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
-#include "ECLogger.h"
+#include <zarafa/ECLogger.h>
 #include "ECSessionManager.h"
 #include "ECStatsCollector.h"
 
@@ -52,6 +26,7 @@
 #include "ECServerEntrypoint.h"
 
 #include "ECSessionManagerOffline.h"
+#include "ECS3Attachment.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -88,6 +63,7 @@ static void database_destroy(void *lpParam)
 
 	pthread_mutex_unlock(&g_hMutexDBObjectList);
 
+	lpDatabase->ThreadEnd();
 	delete lpDatabase;
 }
 
@@ -98,8 +74,7 @@ static void plugin_destroy(void *lpParam)
 	delete lpPlugin;
 }
 
-ECRESULT zarafa_initlibrary(const char *lpDatabaseDir,
-    const char *lpConfigFile, ECLogger *lpLogger)
+ECRESULT zarafa_initlibrary(const char *lpDatabaseDir, const char *lpConfigFile)
 {
 	ECRESULT er = erSuccess;
 
@@ -116,9 +91,7 @@ ECRESULT zarafa_initlibrary(const char *lpDatabaseDir,
 
 	// Init mutex for database object list
 	pthread_mutex_init(&g_hMutexDBObjectList, NULL);
-
-	er = ECDatabaseMySQL::InitLibrary(lpDatabaseDir, lpConfigFile, lpLogger);
-
+	er = ECDatabaseMySQL::InitLibrary(lpDatabaseDir, lpConfigFile);
 	g_lpStatsCollector = new ECStatsCollector();
 	
 	//TODO: with an error remove all variables and g_bInitLib = false
@@ -128,10 +101,10 @@ exit:
 	return er;
 }
 
-ECRESULT zarafa_unloadlibrary(ECLogger *logger)
+ECRESULT zarafa_unloadlibrary(void)
 {
 	ECRESULT er = erSuccess;
-	std::set<ECDatabase*>::iterator	iterDBObject, iNext;
+	std::set<ECDatabase *>::const_iterator iterDBObject, iNext;
 
 	if(!g_bInitLib) {
 		er = ZARAFA_E_NOT_INITIALIZED;
@@ -152,8 +125,7 @@ ECRESULT zarafa_unloadlibrary(ECLogger *logger)
 	while( iterDBObject != g_lpDBObjectList.end())
 	{
 		iNext = iterDBObject;
-		iNext++;
-
+		++iNext;
 		delete (*iterDBObject);
 
 		g_lpDBObjectList.erase(iterDBObject);
@@ -165,16 +137,14 @@ ECRESULT zarafa_unloadlibrary(ECLogger *logger)
 
 	// remove mutex for database object list
 	pthread_mutex_destroy(&g_hMutexDBObjectList);
-	
-	ECDatabaseMySQL::UnloadLibrary(logger);
-
+	ECDatabaseMySQL::UnloadLibrary();
 	g_bInitLib = false;
 
 exit:
 	return er;
 }
 
-ECRESULT zarafa_init(ECConfig* lpConfig, ECLogger* lpLogger, ECLogger* lpAudit, bool bHostedZarafa, bool bDistributedZarafa)
+ECRESULT zarafa_init(ECConfig *lpConfig, ECLogger *lpAudit, bool bHostedZarafa, bool bDistributedZarafa)
 {
 	ECRESULT er = erSuccess;
 
@@ -183,7 +153,11 @@ ECRESULT zarafa_init(ECConfig* lpConfig, ECLogger* lpLogger, ECLogger* lpAudit, 
 		goto exit;
 	}
 
-    g_lpSessionManager = new ECSessionManager(lpConfig, lpLogger, lpAudit, bHostedZarafa, bDistributedZarafa);
+#ifdef HAVE_OFFLINE_SUPPORT
+    g_lpSessionManager = new ECSessionManagerOffline(lpConfig, bHostedZarafa, bDistributedZarafa);
+#else
+    g_lpSessionManager = new ECSessionManager(lpConfig, lpAudit, bHostedZarafa, bDistributedZarafa);
+#endif
 	
 	er = g_lpSessionManager->LoadSettings();
 	if(er != erSuccess)
@@ -192,7 +166,10 @@ ECRESULT zarafa_init(ECConfig* lpConfig, ECLogger* lpLogger, ECLogger* lpAudit, 
 	er = g_lpSessionManager->CheckUserLicense();
 	if (er != erSuccess)
 		goto exit;
-
+#ifdef HAVE_LIBS3_H
+        if (strcmp(lpConfig->GetSetting("attachment_storage"), "s3") == 0)
+                ECS3Attachment::StaticInit(lpConfig);
+#endif
 exit:
 	return er;
 }
@@ -207,31 +184,33 @@ void zarafa_removeallsessions()
 ECRESULT zarafa_exit()
 {
 	ECRESULT er = erSuccess;
-	std::set<ECDatabase*>::iterator	iterDBObject;
+	std::set<ECDatabase *>::const_iterator iterDBObject;
 
 	if(!g_bInitLib) {
 		er = ZARAFA_E_NOT_INITIALIZED;
 		goto exit;
 	}
 
+#ifdef HAVE_LIBS3_H
+        if (g_lpSessionManager && strcmp(g_lpSessionManager->GetConfig()->GetSetting("attachment_storage"), "s3") == 0)
+                ECS3Attachment::StaticDeinit();
+#endif
+
 	// delete our plugin of the mainthread: requires ECPluginFactory to be alive, because that holds the dlopen() result
 	plugin_destroy(pthread_getspecific(plugin_key));
 
-	if (g_lpSessionManager)
-		delete g_lpSessionManager;
+	delete g_lpSessionManager;
 	g_lpSessionManager = NULL;
 
-	if (g_lpStatsCollector)
-		delete g_lpStatsCollector;
+	delete g_lpStatsCollector;
 	g_lpStatsCollector = NULL;
 
 	// Close all database connections
 	pthread_mutex_lock(&g_hMutexDBObjectList);
 
-	for(iterDBObject = g_lpDBObjectList.begin(); iterDBObject != g_lpDBObjectList.end(); iterDBObject++)
-	{
+	for (iterDBObject = g_lpDBObjectList.begin();
+	     iterDBObject != g_lpDBObjectList.end(); ++iterDBObject)
 		(*iterDBObject)->Close();		
-	}
 	pthread_mutex_unlock(&g_hMutexDBObjectList);
 
 exit:
@@ -281,7 +260,7 @@ void zarafa_new_soap_connection(CONNECTION_TYPE ulType, struct soap *soap)
 	lpInfo->bProxy = false;
 	soap->user = (void *)lpInfo;
 	
-	if(strlen(szProxy) > 0) {
+	if (szProxy[0]) {
 		if(strcmp(szProxy, "*") == 0) {
 			// Assume everything is proxied
 			lpInfo->bProxy = true; 
@@ -335,7 +314,6 @@ ECRESULT GetDatabaseObject(ECDatabase **lppDatabase)
 		return ZARAFA_E_INVALID_PARAMETER;
 	}
 
-	ECDatabaseFactory db(g_lpSessionManager->GetConfig(), g_lpSessionManager->GetLogger());
-
+	ECDatabaseFactory db(g_lpSessionManager->GetConfig());
 	return GetThreadLocalDatabase(&db, lppDatabase);
 }

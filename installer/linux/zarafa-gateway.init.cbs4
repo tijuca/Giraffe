@@ -26,6 +26,7 @@ case "$1" in
   start)
   	console_start "$DESC "
 	lcd_start $NAME
+	install -dm0775 -o zarafa -g zarafa /var/run/zarafad
 	startproc $DAEMON -c $CONFIG
 	rc_exit $?
 	;;

@@ -1,48 +1,28 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include <platform.h>
+#include <zarafa/platform.h>
 
+#ifdef WIN32
+// For WSAIoctl
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#include <Wincrypt.h>
+#endif
 
 #include <mapidefs.h>
 #include <mapicode.h>
@@ -51,39 +31,46 @@
 
 #include <fstream>
 
-#include "ECIConv.h"
+#include <zarafa/ECIConv.h>
 #include "WSTransport.h"
 #include "ProviderUtil.h"
 #include "SymmetricCrypt.h"
 #include "soapH.h"
 #include "ZarafaUtil.h"
 
+#ifdef WIN32
+// SSO security context
+// use WIN32 security model (?)
+#define SECURITY_WIN32
+#include <Security.h>
+#include "ECLicense.h"
+#endif
 
 // The header files we use for communication with the server
-#include "ZarafaCode.h"
+#include <zarafa/ZarafaCode.h>
 #include "soapZarafaCmdProxy.h"
 #include "ZarafaCmd.nsmap"
 #include "Mem.h"
-#include "ECGuid.h"
+#include <zarafa/ECGuid.h>
 
 #include "SOAPUtils.h"
 #include "WSUtil.h"
-#include "mapiext.h"
+#include <zarafa/mapiext.h>
 
 #include "WSABTableView.h"
 #include "WSABPropStorage.h"
-#include "ecversion.h"
+#include <zarafa/ecversion.h>
 #include "ClientUtil.h"
 #include "ECSessionGroupManager.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 #include "ZarafaVersions.h"
 
-#include "charset/convert.h"
-#include "charset/utf8string.h"
-#include "charset/convstring.h"
+#include <zarafa/charset/convert.h>
+#include <zarafa/charset/utf8string.h>
+#include <zarafa/charset/convstring.h>
 
 #include "SOAPSock.h"
-#include "mapi_ptr.h"
+#include <zarafa/mapi_ptr.h>
 #include "WSMessageStreamExporter.h"
 #include "WSMessageStreamImporter.h"
 
@@ -175,24 +162,22 @@ HRESULT WSTransport::Create(ULONG ulUIFlags, WSTransport **lppTransport)
 /* Creates a transport working on the same session and session group as this transport */
 HRESULT WSTransport::HrClone(WSTransport **lppTransport)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	WSTransport *lpTransport = NULL;
 
 	hr = WSTransport::Create(m_ulUIFlags, &lpTransport);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	hr = CreateSoapTransport(m_ulUIFlags, m_sProfileProps, &lpTransport->m_lpCmd);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 	
 	lpTransport->m_ecSessionId = this->m_ecSessionId;
 	lpTransport->m_ecSessionGroupId = this->m_ecSessionGroupId;
 
 	*lppTransport = lpTransport;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT WSTransport::HrOpenTransport(LPMAPISUP lpMAPISup, WSTransport **lppTransport, BOOL bOffline)
@@ -214,6 +199,12 @@ HRESULT WSTransport::HrOpenTransport(LPMAPISUP lpMAPISup, WSTransport **lppTrans
 	if(hr != hrSuccess)
 		goto exit;
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	if(bOffline) {
+		GetOfflineServerURL(lpMAPISup, &sProfileProps.strServerPath);
+		// Use online path on error
+    }
+#endif
 
 	// Log on the transport to the server
 	hr = lpTransport->HrLogon(sProfileProps);
@@ -249,7 +240,7 @@ HRESULT WSTransport::UnLockSoap()
 	return erSuccess;
 }
 
-HRESULT WSTransport::HrLogon(const sGlobalProfileProps &sProfileProps)
+HRESULT WSTransport::HrLogon2(const struct sGlobalProfileProps &sProfileProps)
 {
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
@@ -270,6 +261,17 @@ HRESULT WSTransport::HrLogon(const sGlobalProfileProps &sProfileProps)
 	
 	LockSoap();
 
+#ifdef WIN32
+	ULONG ulTrackingId = rand_mt();
+
+	// Request licensed access to the server, unless we're talking to the offline server
+	if(sProfileProps.strServerPath.substr(0,7) != "file://") {
+		if(CreateLicenseRequestEnc(ulTrackingId, SERVICE_TYPE_ZCP, ZARAFA_SERVICE_OUTLOOK, strUserName, &sLicenseRequest.__ptr, (unsigned int *)&sLicenseRequest.__size) != erSuccess) {
+			hr = MAPI_E_INVALID_PARAMETER;
+			goto exit;
+		}
+	}
+#endif
 
 	if (strncmp("file:", sProfileProps.strServerPath.c_str(), 5) == 0)
 		bPipeConnection = true;
@@ -298,7 +300,10 @@ HRESULT WSTransport::HrLogon(const sGlobalProfileProps &sProfileProps)
 		ulCapabilities |= ZARAFA_CAP_LARGE_SESSIONID;
 
 	if (bPipeConnection == false) {
-		// all connections except pipes use compression
+		/*
+		 * All connections except pipes request compression. The server
+		 * can still reject the request.
+		 */
 		if(! (sProfileProps.ulProfileFlags & EC_PROFILE_FLAGS_NO_COMPRESSION))
 			ulCapabilities |= ZARAFA_CAP_COMPRESSION; // only to remote server .. windows?
 
@@ -328,10 +333,12 @@ HRESULT WSTransport::HrLogon(const sGlobalProfileProps &sProfileProps)
 	// If the user was denied, and the server did not support encryption, and the password was encrypted, decrypt it now
 	// so that we support older servers. If the password was not encrypted, then it was just wrong, and if the server supported encryption
 	// then the password was also simply wrong.
-	if(er == ZARAFA_E_LOGON_FAILED && SymmetricIsCrypted(sProfileProps.strPassword) && !(sResponse.ulCapabilities & ZARAFA_CAP_CRYPT)) {
+	if (er == ZARAFA_E_LOGON_FAILED &&
+	    SymmetricIsCrypted(sProfileProps.strPassword.c_str()) &&
+	    !(sResponse.ulCapabilities & ZARAFA_CAP_CRYPT)) {
 		// Login with username and password
 		if (SOAP_OK != lpCmd->ns__logon(const_cast<char *>(strUserName.c_str()),
-		    const_cast<char *>(SymmetricDecrypt(sProfileProps.strPassword).c_str()),
+		    const_cast<char *>(SymmetricDecrypt(sProfileProps.strPassword.c_str()).c_str()),
 		    const_cast<char *>(strImpersonateUser.c_str()),
 		    const_cast<char *>(PROJECT_VERSION_CLIENT_STR),
 		    ulCapabilities, ulLogonFlags, sLicenseRequest,
@@ -363,7 +370,27 @@ HRESULT WSTransport::HrLogon(const sGlobalProfileProps &sProfileProps)
 	}
 
 
+#if defined WIN32 && !defined _DEBUG
+	// Check license info
 
+	// For backward-compatibility: don't check license if server doesn't support licensing (pre 6.20), and don't check on the offline server
+	if(sProfileProps.strServerPath.substr(0,7) != "file://" && sResponse.ulCapabilities & ZARAFA_CAP_LICENSE_SERVER) {
+		hr = ProcessLicenseResponseEnc(ulTrackingId, sResponse.sLicenseResponse.__ptr, sResponse.sLicenseResponse.__size, &m_llFlags);
+
+		if(hr != erSuccess)
+			goto exit;
+	}
+#endif
+
+#ifdef WIN32
+	// For BES, we only support it if we have ZARAFA_SERVICE_BES. The only way to detect that we're Bes is by checking the calling program, BlackBerryAgent.exe
+	if (stricmp(GetAppName().c_str(), "BlackBerryAgent.exe") == 0 && (m_llFlags & (1 << ZARAFA_SERVICE_BES)) == 0) {
+		TRACE_RELEASE("You do not have the correct license to use BlackBerry Enterprise Server with Zarafa");
+		hr = MAPI_E_NO_SUPPORT;
+		goto exit;
+	}
+
+#endif
 
 	ecSessionId = sResponse.ulSessionId;
 	ulServerCapabilities = sResponse.ulCapabilities;
@@ -383,7 +410,11 @@ auth: // User have a logon
 	}
 
 	if (ulServerCapabilities & ZARAFA_CAP_COMPRESSION) {
-		soap_set_imode(lpCmd->soap, SOAP_ENC_ZLIB);	// also autodetected
+		/*
+		 * GSOAP autodetects incoming compression, so even if not
+		 * explicitly enabled, it will be accepted.
+		 */
+		soap_set_imode(lpCmd->soap, SOAP_ENC_ZLIB);
 		soap_set_omode(lpCmd->soap, SOAP_ENC_ZLIB | SOAP_IO_CHUNK);
 	}
 
@@ -395,9 +426,7 @@ auth: // User have a logon
 exit:
 
 	UnLockSoap();
-
-	if (sLicenseRequest.__ptr)
-		delete[] sLicenseRequest.__ptr;
+	delete[] sLicenseRequest.__ptr;
 
 	if(hr != hrSuccess) {
 	    // UGLY FIX: due to the ugly code above that does lpCmd = m_lpCmd
@@ -411,16 +440,31 @@ exit:
 	return hr;
 }
 
+HRESULT WSTransport::HrLogon(const struct sGlobalProfileProps &in_props)
+{
+	if (in_props.strServerPath.compare("default:") != 0)
+		return HrLogon2(in_props);
+	struct sGlobalProfileProps p = in_props;
+#ifdef WIN32
+	p.strServerPath = "file://\\\\.\\pipe\\zarafa";
+	return HrLogon2(p);
+#else
+	p.strServerPath = "file:///var/run/zarafad/server.sock";
+	HRESULT ret = HrLogon2(p);
+	if (ret != MAPI_E_NETWORK_ERROR)
+		return ret;
+	p.strServerPath = "file:///var/run/zarafa";
+	return HrLogon2(p);
+#endif
+}
+
 HRESULT WSTransport::HrSetRecvTimeout(unsigned int ulSeconds)
 {
-	HRESULT		hr = hrSuccess;
+	if (this->m_lpCmd == NULL)
+		return MAPI_E_NOT_INITIALIZED;
 
-	if(this->m_lpCmd)
-		this->m_lpCmd->soap->recv_timeout = ulSeconds;
-	else
-		hr = MAPI_E_NOT_INITIALIZED;
-
-	return hr;
+	this->m_lpCmd->soap->recv_timeout = ulSeconds;
+	return hrSuccess;
 }
 
 
@@ -494,27 +538,170 @@ exit:
 
 HRESULT WSTransport::HrReLogon()
 {
-	HRESULT hr = hrSuccess;
-	SESSIONRELOADLIST::iterator iter;
+	HRESULT hr;
+	SESSIONRELOADLIST::const_iterator iter;
 
 	hr = HrLogon(m_sProfileProps);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// Notify new session to listeners
 	pthread_mutex_lock(&m_mutexSessionReload);
-	for(iter = m_mapSessionReload.begin(); iter != m_mapSessionReload.end(); iter++) {
+	for (iter = m_mapSessionReload.begin();
+	     iter != m_mapSessionReload.end(); ++iter)
 		iter->second.second(iter->second.first, this->m_ecSessionId);
-	}
 	pthread_mutex_unlock(&m_mutexSessionReload);
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 ECRESULT WSTransport::TrySSOLogon(ZarafaCmd* lpCmd, LPCSTR szServer, utf8string strUsername, utf8string strImpersonateUser, unsigned int ulCapabilities, ECSESSIONGROUPID ecSessionGroupId, char *szAppName, ECSESSIONID* lpSessionId, unsigned int* lpulServerCapabilities, unsigned long long *lpllFlags, LPGUID lpsServerGuid, const std::string appVersion, const std::string appMisc)
 {
 	ECRESULT		er = ZARAFA_E_LOGON_FAILED;
+#ifdef WIN32
+	std::string strPrincipal("zarafa/");
+	SECURITY_STATUS	SecStatus;
+	PSecPkgInfo		lpPackageInfo = NULL;
+	ULONG			cPackages = 0;
+	ULONG			ulPid = 0;
+	CredHandle		hCredential;
+	CtxtHandle		hNewContext;
+	SecBuffer		OutSecBuffer, InSecBuffer[2];
+	SecBufferDesc	OutSecBufferDesc, InSecBufferDesc;
+	ULONG			fContextAttr = 0;
+	unsigned int	ulServerVersion = 0;
+	struct xsd__base64Binary sSSOData;
+	struct ssoLogonResponse sResponse;
+	struct xsd__base64Binary sLicenseRequest;
+
+	OutSecBuffer.pvBuffer = NULL;	// auto allocated by InitializeSecurityContext(), but freed by us
+
+	SecInvalidateHandle(&hCredential);
+	SecInvalidateHandle(&hNewContext);
+
+	ULONG ulTrackingId = rand_mt();
+
+	if(CreateLicenseRequestEnc(ulTrackingId, SERVICE_TYPE_ZCP, ZARAFA_SERVICE_OUTLOOK, strUsername, &sLicenseRequest.__ptr, (unsigned int*)&sLicenseRequest.__size) != erSuccess) {
+		er = ZARAFA_E_INVALID_PARAMETER;
+		goto exit;
+	}
+
+	strPrincipal += szServer;
+
+	SecStatus = EnumerateSecurityPackages(&cPackages, &lpPackageInfo);
+	if (SecStatus != SEC_E_OK)
+		goto exit;
+
+	for (ulPid = 0; ulPid < cPackages; ++ulPid) {
+		// find auto detect method, always (?) first item in the list
+		// TODO: config option to force a method?
+		if (_tcsicmp(_T("Negotiate"), lpPackageInfo[ulPid].Name) == 0)
+			break;
+	}
+	if (ulPid == cPackages)
+		goto exit;
+
+	SecStatus = AcquireCredentialsHandle(/*service?? principal*/ NULL, /*package*/ lpPackageInfo[ulPid].Name,
+		/*fCredentialUse*/ SECPKG_CRED_OUTBOUND, /*pvLoginID*/ NULL,
+		/*pAuthData*/ NULL, /*pGetKeyFn*/ NULL, /*pvGetKeyArgument*/ NULL, &hCredential, NULL);
+
+	if (SecStatus != SEC_E_OK)
+		goto exit;
+
+	// setup security buffer descriptor
+	OutSecBufferDesc.ulVersion = SECBUFFER_VERSION;
+	OutSecBufferDesc.cBuffers = 1;
+	OutSecBufferDesc.pBuffers = &OutSecBuffer;
+	OutSecBuffer.BufferType = SECBUFFER_TOKEN;
+	OutSecBuffer.cbBuffer = lpPackageInfo[ulPid].cbMaxToken;
+	OutSecBuffer.pvBuffer = NULL;
+
+	// query identification packet
+	SecStatus = InitializeSecurityContextA(&hCredential, NULL /*1st time context*/, (SEC_CHAR*)strPrincipal.c_str(),
+		ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_CONFIDENTIALITY | ISC_REQ_CONNECTION,
+		0, SECURITY_NATIVE_DREP, NULL, 0, &hNewContext, &OutSecBufferDesc, &fContextAttr, NULL);
+	if (SecStatus != SEC_E_OK && SecStatus != SEC_I_CONTINUE_NEEDED && SecStatus != SEC_I_COMPLETE_AND_CONTINUE) {
+		er = ZARAFA_E_LOGON_FAILED;
+		goto exit;
+	}
+
+	// send to server
+	sSSOData.__ptr = (unsigned char*)OutSecBufferDesc.pBuffers->pvBuffer;
+	sSSOData.__size = OutSecBufferDesc.pBuffers->cbBuffer;
+
+	if (SOAP_OK != lpCmd->ns__ssoLogon(0, (char*)strUsername.c_str(), (char*)strImpersonateUser.c_str(), &sSSOData, PROJECT_VERSION_CLIENT_STR, ulCapabilities, sLicenseRequest, ecSessionGroupId, szAppName, (char *)appVersion.c_str(), (char *)appMisc.c_str(), &sResponse))
+		goto exit;
+
+	while (sResponse.er == ZARAFA_E_SSO_CONTINUE) {
+		// setup inbut buffer
+		InSecBufferDesc.ulVersion = SECBUFFER_VERSION;
+		InSecBufferDesc.cBuffers = 2;
+		InSecBufferDesc.pBuffers = InSecBuffer;
+		InSecBuffer[0].BufferType = SECBUFFER_TOKEN;
+		InSecBuffer[0].cbBuffer = sResponse.lpOutput->__size;
+		InSecBuffer[0].pvBuffer = (void*)sResponse.lpOutput->__ptr;
+		InSecBuffer[1].BufferType = SECBUFFER_EMPTY;
+		InSecBuffer[1].cbBuffer = 0;
+		InSecBuffer[1].pvBuffer = NULL;
+
+		// reset output buffer
+		FreeContextBuffer(OutSecBuffer.pvBuffer);
+		OutSecBufferDesc.ulVersion = SECBUFFER_VERSION;
+		OutSecBufferDesc.cBuffers = 1;
+		OutSecBufferDesc.pBuffers = &OutSecBuffer;
+		OutSecBuffer.BufferType = SECBUFFER_TOKEN;
+		OutSecBuffer.cbBuffer = lpPackageInfo[ulPid].cbMaxToken;
+		OutSecBuffer.pvBuffer = NULL;
+
+		// feed response to windows
+		SecStatus = InitializeSecurityContext(NULL, &hNewContext, NULL,	ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_CONFIDENTIALITY | ISC_REQ_CONNECTION,
+			0, SECURITY_NATIVE_DREP, &InSecBufferDesc, 0, &hNewContext, &OutSecBufferDesc, &fContextAttr, NULL);
+		if (FAILED(SecStatus))
+			goto exit;
+
+		// feed response to zarafa
+		sSSOData.__ptr = (unsigned char*)OutSecBufferDesc.pBuffers->pvBuffer;
+		sSSOData.__size = OutSecBufferDesc.pBuffers->cbBuffer;
+
+		if (SOAP_OK != lpCmd->ns__ssoLogon(sResponse.ulSessionId, (char*)strUsername.c_str(), (char*)strImpersonateUser.c_str(), &sSSOData, PROJECT_VERSION_CLIENT_STR, ulCapabilities, sLicenseRequest, ecSessionGroupId, szAppName, (char *)appVersion.c_str(), (char *)appMisc.c_str(), &sResponse))
+			goto exit;
+	}
+	er = sResponse.er;
+	if (er != erSuccess)
+		goto exit;
+
+	// Check license info
+	er = ProcessLicenseResponseEnc(ulTrackingId, sResponse.sLicenseResponse.__ptr, sResponse.sLicenseResponse.__size, lpllFlags);
+	if(er != erSuccess)
+		goto exit;
+
+	// Connecting to a server of with a lower major version is unsupported. Since the server only
+	// checks if a client isn't too old, we'll prohibit connecting to an old server here.
+	er = ParseZarafaVersion(sResponse.lpszVersion, &ulServerVersion);
+	if (er != erSuccess || ZARAFA_COMPARE_VERSION_TO_MAJOR(ulServerVersion, ZARAFA_CUR_MAJOR) < 0) {
+		er = ZARAFA_E_INVALID_VERSION;
+		goto exit;
+	}
+
+	*lpSessionId = sResponse.ulSessionId;
+	*lpulServerCapabilities = sResponse.ulCapabilities;
+
+	if (sResponse.sServerGuid.__ptr != NULL && sResponse.sServerGuid.__size == sizeof *lpsServerGuid)
+		memcpy(lpsServerGuid, sResponse.sServerGuid.__ptr, sizeof *lpsServerGuid);
+
+exit:
+	delete[] sLicenseRequest.__ptr;
+	if (OutSecBuffer.pvBuffer)
+		FreeContextBuffer(OutSecBuffer.pvBuffer);
+
+	if (lpPackageInfo)
+		FreeContextBuffer(lpPackageInfo);
+
+	if (SecIsValidHandle(&hCredential))
+		FreeCredentialHandle(&hCredential);
+
+	if (SecIsValidHandle(&hNewContext))
+		DeleteSecurityContext(&hNewContext);
+#endif
 	return er;
 }
 
@@ -890,35 +1077,20 @@ exit:
 
 HRESULT WSTransport::HrOpenTableOps(ULONG ulType, ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID, ECMsgStore *lpMsgStore, WSTableView **lppTableOps)
 {
-	HRESULT hr = hrSuccess;
-	
 	/*
 	FIXME: Do a check ?
-	if(peid->ulType != MAPI_FOLDER && peid->ulType != MAPI_MESSAGE) {
-		hr = MAPI_E_INVALID_ENTRYID;
-		goto exit;
-	}*/
-
-	hr = WSStoreTableView::Create(ulType, ulFlags, m_lpCmd, &m_hDataLock, m_ecSessionId, cbEntryID, lpEntryID, lpMsgStore, this, lppTableOps);
-	if(hr != hrSuccess)
-		goto exit;
-
-exit:
-	return hr;
+	if (peid->ulType != MAPI_FOLDER && peid->ulType != MAPI_MESSAGE)
+		return MAPI_E_INVALID_ENTRYID;
+	*/
+	return WSStoreTableView::Create(ulType, ulFlags, m_lpCmd, &m_hDataLock, m_ecSessionId, cbEntryID, lpEntryID, lpMsgStore, this, lppTableOps);
 }
 
 HRESULT WSTransport::HrOpenABTableOps(ULONG ulType, ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID, ECABLogon* lpABLogon, WSTableView **lppTableOps)
 {
-	HRESULT hr = hrSuccess;
-	
-	/*if(peid->ulType != MAPI_FOLDER && peid->ulType != MAPI_MESSAGE) {
-		hr = MAPI_E_INVALID_ENTRYID;
-		goto exit;
-	}*/
-
-	hr = WSABTableView::Create(ulType, ulFlags, m_lpCmd, &m_hDataLock, m_ecSessionId, cbEntryID, lpEntryID, lpABLogon, this, lppTableOps);
-
-	return hr;
+	/*if (peid->ulType != MAPI_FOLDER && peid->ulType != MAPI_MESSAGE)
+		return MAPI_E_INVALID_ENTRYID;
+	*/
+	return WSABTableView::Create(ulType, ulFlags, m_lpCmd, &m_hDataLock, m_ecSessionId, cbEntryID, lpEntryID, lpABLogon, this, lppTableOps);
 }
 
 HRESULT WSTransport::HrOpenMailBoxTableOps(ULONG ulFlags, ECMsgStore *lpMsgStore, WSTableView **lppTableView)
@@ -1138,9 +1310,7 @@ HRESULT WSTransport::HrSubscribeMulti(const ECLISTSYNCADVISE &lstSyncAdvises, UL
 
 
 exit:
-	if (notSubscribeArray.__ptr)
-		MAPIFreeBuffer(notSubscribeArray.__ptr);
-
+	MAPIFreeBuffer(notSubscribeArray.__ptr);
 	UnLockSoap();
 
 	return hr;
@@ -1193,10 +1363,7 @@ HRESULT WSTransport::HrUnSubscribeMulti(const ECLISTCONNECTION &lstConnections)
 
 exit:
 	UnLockSoap();
-
-	if (ulConnArray.__ptr)
-		delete [] ulConnArray.__ptr;
-
+	delete[] ulConnArray.__ptr;
 	return hr;
 }
 
@@ -1273,22 +1440,18 @@ exit:
 
 HRESULT WSTransport::HrGetMessageStreamImporter(ULONG ulFlags, ULONG ulSyncId, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG cbFolderEntryID, LPENTRYID lpFolderEntryID, bool bNewMessage, LPSPropValue lpConflictItems, WSMessageStreamImporter **lppStreamImporter)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	WSMessageStreamImporterPtr ptrStreamImporter;
 
-	if ((m_ulServerCapabilities & ZARAFA_CAP_ENHANCED_ICS) == 0) {
-		hr = MAPI_E_NO_SUPPORT;
-		goto exit;
-	}
+	if ((m_ulServerCapabilities & ZARAFA_CAP_ENHANCED_ICS) == 0)
+		return MAPI_E_NO_SUPPORT;
 
 	hr = WSMessageStreamImporter::Create(ulFlags, ulSyncId, cbEntryID, lpEntryID, cbFolderEntryID, lpFolderEntryID, bNewMessage, lpConflictItems, this, &ptrStreamImporter);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	*lppStreamImporter = ptrStreamImporter.release();
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT WSTransport::HrGetIDsFromNames(LPMAPINAMEID *lppPropNames, ULONG cNames, ULONG ulFlags, ULONG **lpServerIDs)
@@ -1307,7 +1470,7 @@ HRESULT WSTransport::HrGetIDsFromNames(LPMAPINAMEID *lppPropNames, ULONG cNames,
 	ECAllocateBuffer(sizeof(struct namedProp) * cNames, (void **)&sNamedProps.__ptr);
 	memset(sNamedProps.__ptr, 0 , sizeof(struct namedProp) * cNames);
 
-	for(i=0;i<cNames;i++) {	
+	for (i = 0; i < cNames; ++i) {	
 		switch(lppPropNames[i]->ulKind) {
 		case MNID_ID:
 			ECAllocateMore(sizeof(unsigned int), sNamedProps.__ptr,(void **)&sNamedProps.__ptr[i].lpId);
@@ -1393,7 +1556,7 @@ HRESULT WSTransport::HrGetNamesFromIDs(LPSPropTagArray lpsPropTags, LPMAPINAMEID
 	ECAllocateBuffer(sizeof(LPMAPINAMEID) * sResponse.lpsNames.__size, (void **) &lppNames);
 
 	// Loop through all the returned names, and put it into the return value
-	for(i=0;i<sResponse.lpsNames.__size;i++) {
+	for (i = 0; i < sResponse.lpsNames.__size; ++i) {
 		// Each MAPINAMEID must be allocated
 		ECAllocateMore(sizeof(MAPINAMEID), lppNames, (void **) &lppNames[i]);
 
@@ -1467,8 +1630,7 @@ HRESULT WSTransport::HrGetReceiveFolderTable(ULONG ulFlags, ULONG cbStoreEntryID
 	memset(lpsRowSet, 0, CbNewSRowSet(sReceiveFolders.sFolderArray.__size));
 	lpsRowSet->cRows = sReceiveFolders.sFolderArray.__size;
 
-	for(i=0; i < sReceiveFolders.sFolderArray.__size; i++)
-	{
+	for (i = 0; i < sReceiveFolders.sFolderArray.__size; ++i) {
 		ulRowId = i+1;
 
 		lpsRowSet->aRow[i].cValues = NUM_RFT_PROPS;
@@ -1920,7 +2082,8 @@ exit:
  * @param[out]	lppUserId	The entry id of the new user
  * @return		HRESULT		MAPI error code.
  */
-HRESULT WSTransport::HrCreateUser(LPECUSER lpECUser, ULONG ulFlags, ULONG *lpcbUserId, LPENTRYID *lppUserId)
+HRESULT WSTransport::HrCreateUser(ECUSER *lpECUser, ULONG ulFlags,
+    ULONG *lpcbUserId, LPENTRYID *lppUserId)
 {
 	HRESULT	hr = hrSuccess;
 	ECRESULT er = erSuccess;
@@ -1982,12 +2145,13 @@ exit:
  * @param[out]	lppECUser	Pointer to an ECUSER object that contains the user details
  * @return		HRESULT		MAPI error code.
  */
-HRESULT WSTransport::HrGetUser(ULONG cbUserID, LPENTRYID lpUserID, ULONG ulFlags, LPECUSER *lppECUser)
+HRESULT WSTransport::HrGetUser(ULONG cbUserID, LPENTRYID lpUserID,
+    ULONG ulFlags, ECUSER **lppECUser)
 {
 	HRESULT	hr = hrSuccess;
 	ECRESULT er = erSuccess;
 	struct getUserResponse	sResponse;
-	LPECUSER lpECUser = NULL;
+	ECUSER *lpECUser = NULL;
 	entryId	sUserId = {0};
 	ULONG ulUserId = 0;
 
@@ -2039,7 +2203,7 @@ exit:
  * @param[in]	ulFlags		MAPI_UNICODE, values in user struct will be PT_UNICODE, otherwise in PT_STRING8
  * @return		HRESULT		MAPI error code.
  */
-HRESULT WSTransport::HrSetUser(LPECUSER lpECUser, ULONG ulFlags)
+HRESULT WSTransport::HrSetUser(ECUSER *lpECUser, ULONG ulFlags)
 {
 	HRESULT	hr = hrSuccess;
 	ECRESULT er = erSuccess;
@@ -2289,7 +2453,8 @@ exit:
  * @param[out]	lppsUsers		Array of ECUSER objects.
  * @return		HRESULT			MAPI error code.
  */
-HRESULT WSTransport::HrGetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, LPECUSER* lppsUsers)
+HRESULT WSTransport::HrGetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId,
+    ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -2345,7 +2510,8 @@ exit:
  * @param[out]	lppUserId	The entry id of the new group
  * @return		HRESULT		MAPI error code.
  */
-HRESULT WSTransport::HrCreateGroup(LPECGROUP lpECGroup, ULONG ulFlags, ULONG *lpcbGroupId, LPENTRYID *lppGroupId)
+HRESULT WSTransport::HrCreateGroup(ECGROUP *lpECGroup, ULONG ulFlags,
+    ULONG *lpcbGroupId, LPENTRYID *lppGroupId)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -2402,7 +2568,7 @@ exit:
  * @param[in]	ulFlags		MAPI_UNICODE, values in group struct will be PT_UNICODE, otherwise in PT_STRING8
  * @return		HRESULT		MAPI error code.
  */
-HRESULT WSTransport::HrSetGroup(LPECGROUP lpECGroup, ULONG ulFlags)
+HRESULT WSTransport::HrSetGroup(ECGROUP *lpECGroup, ULONG ulFlags)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -2457,11 +2623,12 @@ exit:
  * @param[out]	lppECGroup	Pointer to an ECGROUP object that contains the group details
  * @return		HRESULT		MAPI error code.
  */
-HRESULT WSTransport::HrGetGroup(ULONG cbGroupID, LPENTRYID lpGroupID, ULONG ulFlags, LPECGROUP *lppECGroup)
+HRESULT WSTransport::HrGetGroup(ULONG cbGroupID, LPENTRYID lpGroupID,
+    ULONG ulFlags, ECGROUP **lppECGroup)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
-	LPECGROUP lpGroup = NULL;
+	ECGROUP *lpGroup = NULL;
 	entryId sGroupId = {0};
 
 	struct getGroupResponse sResponse;
@@ -2539,7 +2706,8 @@ exit:
  * @param[out]	lppSenders	Array of ECUSER objects.
  * @return		HRESULT		MAPI error code.
  */
-HRESULT WSTransport::HrGetSendAsList(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcSenders, LPECUSER *lppSenders)
+HRESULT WSTransport::HrGetSendAsList(ULONG cbUserId, LPENTRYID lpUserId,
+    ULONG ulFlags, ULONG *lpcSenders, ECUSER **lppSenders)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -2649,7 +2817,8 @@ exit:
 	return hr;
 }
 
-HRESULT WSTransport::HrGetUserClientUpdateStatus(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, LPECUSERCLIENTUPDATESTATUS *lppECUCUS)
+HRESULT WSTransport::HrGetUserClientUpdateStatus(ULONG cbUserId,
+    LPENTRYID lpUserId, ULONG ulFlags, ECUSERCLIENTUPDATESTATUS **lppECUCUS)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -2808,7 +2977,8 @@ exit:
  * @param[out]	lppsGroups		Array of ECGROUP objects.
  * @return		HRESULT			MAPI error code.
  */
-HRESULT WSTransport::HrGetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcGroups, LPECGROUP *lppsGroups)
+HRESULT WSTransport::HrGetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId,
+    ULONG ulFlags, ULONG *lpcGroups, ECGROUP **lppsGroups)
 {
 	ECRESULT	er = erSuccess;
 	HRESULT		hr = hrSuccess;
@@ -2931,7 +3101,8 @@ exit:
  * @param[out]	lppsUsers		Array of ECUSER objects.
  * @return		HRESULT			MAPI error code.
  */
-HRESULT WSTransport::HrGetUserListOfGroup(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG ulFlags, ULONG *lpcUsers, LPECUSER *lppsUsers)
+HRESULT WSTransport::HrGetUserListOfGroup(ULONG cbGroupId, LPENTRYID lpGroupId,
+    ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -2979,7 +3150,8 @@ exit:
  * @param[out]	lppsGroups		Array of ECGROUP objects.
  * @return		HRESULT			MAPI error code.
  */
-HRESULT WSTransport::HrGetGroupListOfUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcGroup, LPECGROUP *lppsGroups)
+HRESULT WSTransport::HrGetGroupListOfUser(ULONG cbUserId, LPENTRYID lpUserId,
+    ULONG ulFlags, ULONG *lpcGroup, ECGROUP **lppsGroups)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -3026,7 +3198,8 @@ exit:
  * @param[out]	lppCompanyId	The entry id of the new company
  * @return		HRESULT			MAPI error code.
  */
-HRESULT WSTransport::HrCreateCompany(LPECCOMPANY lpECCompany, ULONG ulFlags, ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId)
+HRESULT WSTransport::HrCreateCompany(ECCOMPANY *lpECCompany, ULONG ulFlags,
+    ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -3111,7 +3284,7 @@ exit:
  * @param[in]	ulFlags		MAPI_UNICODE, values in company struct will be PT_UNICODE, otherwise in PT_STRING8
  * @return		HRESULT		MAPI error code.
  */
-HRESULT WSTransport::HrSetCompany(LPECCOMPANY lpECCompany, ULONG ulFlags)
+HRESULT WSTransport::HrSetCompany(ECCOMPANY *lpECCompany, ULONG ulFlags)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -3169,11 +3342,12 @@ exit:
  * @param[out]	lppECCompany	Pointer to an ECOMPANY object that contains the company details
  * @return		HRESULT			MAPI error code.
  */
-HRESULT WSTransport::HrGetCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, LPECCOMPANY *lppECCompany)
+HRESULT WSTransport::HrGetCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId,
+    ULONG ulFlags, ECCOMPANY **lppECCompany)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
-	LPECCOMPANY lpCompany = NULL;
+	ECCOMPANY *lpCompany = NULL;
 	struct getCompanyResponse sResponse;
 	entryId sCompanyId = {0};
 
@@ -3259,7 +3433,8 @@ exit:
  * @param[out]	lppsCompanies	Pointer to an array of ECCOMPANY objects.
  * @return		HRESULT			MAPI error code.
  */
-HRESULT WSTransport::HrGetCompanyList(ULONG ulFlags, ULONG *lpcCompanies, LPECCOMPANY *lppsCompanies)
+HRESULT WSTransport::HrGetCompanyList(ULONG ulFlags, ULONG *lpcCompanies,
+    ECCOMPANY **lppsCompanies)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -3377,7 +3552,9 @@ exit:
  * @param[out]	lppsCompanies	Array of ECCOMPANY objects.
  * @return		HRESULT			MAPI error code.
  */
-HRESULT WSTransport::HrGetRemoteViewList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags,  ULONG *lpcCompanies, LPECCOMPANY *lppsCompanies)
+HRESULT WSTransport::HrGetRemoteViewList(ULONG cbCompanyId,
+    LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcCompanies,
+    ECCOMPANY **lppsCompanies)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -3498,7 +3675,8 @@ exit:
  * @param[out]	lppsUsers		Array of ECUSER objects.
  * @return		HRESULT			MAPI error code.
  */
-HRESULT WSTransport::HrGetRemoteAdminList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, LPECUSER *lppsUsers)
+HRESULT WSTransport::HrGetRemoteAdminList(ULONG cbCompanyId,
+    LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -3537,12 +3715,14 @@ exit:
 	return hr;
 }
 
-HRESULT WSTransport::HrGetPermissionRules(int ulType, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG* lpcPermissions, LPECPERMISSION* lppECPermissions)
+HRESULT WSTransport::HrGetPermissionRules(int ulType, ULONG cbEntryID,
+    LPENTRYID lpEntryID, ULONG *lpcPermissions,
+    ECPERMISSION **lppECPermissions)
 {
 	ECRESULT		er = erSuccess;
 	HRESULT			hr = hrSuccess;
 	entryId			sEntryId = {0}; // Do not free
-	LPECPERMISSION	lpECPermissions = NULL;
+	ECPERMISSION *lpECPermissions = NULL;
 	
 	LPENTRYID		lpUnWrapStoreID = NULL;
 	ULONG			cbUnWrapStoreID = 0;
@@ -3575,8 +3755,7 @@ HRESULT WSTransport::HrGetPermissionRules(int ulType, ULONG cbEntryID, LPENTRYID
 	END_SOAP_CALL
 
 	ECAllocateBuffer(sizeof(ECPERMISSION) * sRightResponse.pRightsArray->__size, (void**)&lpECPermissions);
-	for(unsigned int i = 0; i < sRightResponse.pRightsArray->__size; i++)
-	{
+	for (unsigned int i = 0; i < sRightResponse.pRightsArray->__size; ++i) {
 		lpECPermissions[i].ulRights	= sRightResponse.pRightsArray->__ptr[i].ulRights;
 		lpECPermissions[i].ulState	= sRightResponse.pRightsArray->__ptr[i].ulState;
 		lpECPermissions[i].ulType	= sRightResponse.pRightsArray->__ptr[i].ulType;
@@ -3602,7 +3781,8 @@ exit:
 	return hr;
 }
 
-HRESULT WSTransport::HrSetPermissionRules(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG cPermissions, LPECPERMISSION lpECPermissions)
+HRESULT WSTransport::HrSetPermissionRules(ULONG cbEntryID, LPENTRYID lpEntryID,
+    ULONG cPermissions, ECPERMISSION *lpECPermissions)
 {
 	ECRESULT		er = erSuccess;
 	HRESULT			hr = hrSuccess;
@@ -3631,16 +3811,15 @@ HRESULT WSTransport::HrSetPermissionRules(ULONG cbEntryID, LPENTRYID lpEntryID, 
 	sEntryId.__size = cbUnWrapStoreID;
 
 	// Count the updated items
-	for(i=0; i < cPermissions; i++){
+	for (i = 0; i < cPermissions; ++i)
 		if(lpECPermissions[i].ulState != RIGHT_NORMAL)
-			nChangedItems++;
-	}
+			++nChangedItems;
 
 	rArray.__ptr = s_alloc<rights>(m_lpCmd->soap, nChangedItems);
 	rArray.__size = nChangedItems;
 
 	nItem = 0;
-	for(i=0; i < cPermissions; i++){
+	for (i = 0 ; i < cPermissions; ++i) {
 		if(lpECPermissions[i].ulState != RIGHT_NORMAL){
 			rArray.__ptr[nItem].ulRights = lpECPermissions[i].ulRights;
 			rArray.__ptr[nItem].ulState	 = lpECPermissions[i].ulState;
@@ -3650,8 +3829,7 @@ HRESULT WSTransport::HrSetPermissionRules(ULONG cbEntryID, LPENTRYID lpEntryID, 
 			hr = CopyMAPIEntryIdToSOAPEntryId(lpECPermissions[i].sUserId.cb, (LPENTRYID)lpECPermissions[i].sUserId.lpb, &rArray.__ptr[nItem].sUserId, true);
 			if (hr != hrSuccess)
 				goto exit;
-
-			nItem++;
+			++nItem;
 		}
 	}
 
@@ -3767,8 +3945,7 @@ HRESULT WSTransport::HrResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlag
 	ASSERT(sResponse.aFlags.__size == lpFlagList->cFlags);
 	ASSERT((ULONG)sResponse.sRowSet.__size == lpAdrList->cEntries);
 
-	for (i = 0; i < sResponse.aFlags.__size; i++)
-	{
+	for (i = 0; i < sResponse.aFlags.__size; ++i) {
 		// Set the resolved items
 		if(lpFlagList->ulFlag[i] == MAPI_UNRESOLVED && sResponse.aFlags.__ptr[i] == MAPI_RESOLVED)
 		{
@@ -3830,12 +4007,13 @@ exit:
 	return hr;
 }
 
-HRESULT WSTransport::GetQuota(ULONG cbUserId, LPENTRYID lpUserId, bool bGetUserDefault, LPECQUOTA* lppsQuota)
+HRESULT WSTransport::GetQuota(ULONG cbUserId, LPENTRYID lpUserId,
+    bool bGetUserDefault, ECQUOTA **lppsQuota)
 {
 	ECRESULT				er = erSuccess;
 	HRESULT					hr = hrSuccess;
 	struct quotaResponse	sResponse;
-	LPECQUOTA				lpsQuota =  NULL;
+	ECQUOTA *lpsQuota =  NULL;
 	entryId					sUserId = {0};
 	
 	LockSoap();
@@ -3874,7 +4052,8 @@ HRESULT WSTransport::GetQuota(ULONG cbUserId, LPENTRYID lpUserId, bool bGetUserD
 	return hr;
 }
 
-HRESULT WSTransport::SetQuota(ULONG cbUserId, LPENTRYID lpUserId, LPECQUOTA lpsQuota)
+HRESULT WSTransport::SetQuota(ULONG cbUserId, LPENTRYID lpUserId,
+    ECQUOTA *lpsQuota)
 {
 	ECRESULT				er = erSuccess;
 	HRESULT					hr = hrSuccess;
@@ -3985,7 +4164,8 @@ exit:
 	return hr;
 }
 
-HRESULT WSTransport::GetQuotaRecipients(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcUsers, LPECUSER *lppsUsers)
+HRESULT WSTransport::GetQuotaRecipients(ULONG cbUserId, LPENTRYID lpUserId,
+    ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
 {
 	ECRESULT	er = erSuccess;
 	HRESULT		hr = hrSuccess;
@@ -4024,12 +4204,13 @@ exit:
 	return hr;
 }
 
-HRESULT WSTransport::GetQuotaStatus(ULONG cbUserId, LPENTRYID lpUserId, LPECQUOTASTATUS* lppsQuotaStatus)
+HRESULT WSTransport::GetQuotaStatus(ULONG cbUserId, LPENTRYID lpUserId,
+    ECQUOTASTATUS **lppsQuotaStatus)
 {
 	ECRESULT				er = erSuccess;
 	HRESULT					hr = hrSuccess;
 	struct quotaStatus		sResponse;
-	LPECQUOTASTATUS			lpsQuotaStatus =  NULL;
+	ECQUOTASTATUS *lpsQuotaStatus =  NULL;
 	entryId					sUserId = {0};
 	
 	LockSoap();
@@ -4204,7 +4385,8 @@ exit:
 	return hr;
 }
 
-HRESULT WSTransport::HrGetServerDetails(LPECSVRNAMELIST lpServerNameList, ULONG ulFlags, LPECSERVERLIST* lppsServerList)
+HRESULT WSTransport::HrGetServerDetails(ECSVRNAMELIST *lpServerNameList,
+    ULONG ulFlags, ECSERVERLIST **lppsServerList)
 {
 	ECRESULT						er = erSuccess;
 	HRESULT							hr = hrSuccess;
@@ -4278,7 +4460,7 @@ HRESULT WSTransport::HrGetChanges(const std::string& sourcekey, ULONG ulSyncId, 
 
 	ECAllocateBuffer(sResponse.sChangesArray.__size * sizeof(ICSCHANGE), (void**)&lpChanges);
 
-	for(i=0;i<sResponse.sChangesArray.__size;i++) {
+	for (i = 0; i < sResponse.sChangesArray.__size; ++i) {
 		lpChanges[i].ulChangeId = sResponse.sChangesArray.__ptr[i].ulChangeId;
 		lpChanges[i].ulChangeType = sResponse.sChangesArray.__ptr[i].ulChangeType;
 		lpChanges[i].ulFlags = sResponse.sChangesArray.__ptr[i].ulFlags;
@@ -4436,10 +4618,7 @@ HRESULT WSTransport::HrGetSyncStates(const ECLISTSYNCID &lstSyncId, ECLISTSYNCST
 
 exit:
 	UnLockSoap();
-
-	if (ulaSyncId.__ptr)
-		delete[] ulaSyncId.__ptr;
-
+	delete[] ulaSyncId.__ptr;
 	return hr;
 }
 
@@ -4528,9 +4707,7 @@ HRESULT WSTransport::HrSetLockState(ULONG cbEntryID, LPENTRYID lpEntryID, bool b
 	{
 		if (SOAP_OK != m_lpCmd->ns__setLockState(m_ecSessionId, eidMessage, bLocked, &er))
 			er = ZARAFA_E_NETWORK_ERROR;
-		else
-			er = er;
-        
+		/* else: er is already set and good to use */
 	}
 	END_SOAP_CALL
 
@@ -4609,7 +4786,7 @@ HRESULT WSTransport::HrLicenseCapa(unsigned int ulServiceType, char ***lppszCapa
     if(hr != hrSuccess)
         goto exit;
 
-    for(unsigned int i=0; i < sResponse.sCapabilities.__size; i++) {
+    for (unsigned int i = 0; i < sResponse.sCapabilities.__size; ++i) {
         if ((hr = MAPIAllocateMore(strlen(sResponse.sCapabilities.__ptr[i])+1, lpszCapas, (void **) &lpszCapas[i])) != hrSuccess)
 		goto exit;
         strcpy(lpszCapas[i], sResponse.sCapabilities.__ptr[i]);
@@ -4768,7 +4945,7 @@ HRESULT WSTransport::AddSessionReloadCallback(void *lpParam, SESSIONRELOADCALLBA
 	m_mapSessionReload[m_ulReloadId] = data;
 	if(lpulId)
 		*lpulId = m_ulReloadId;
-	m_ulReloadId++;
+	++m_ulReloadId;
 	pthread_mutex_unlock(&m_mutexSessionReload);
 
 	return hrSuccess;
@@ -4777,7 +4954,7 @@ HRESULT WSTransport::AddSessionReloadCallback(void *lpParam, SESSIONRELOADCALLBA
 HRESULT WSTransport::RemoveSessionReloadCallback(ULONG ulId)
 {
 	HRESULT hr = hrSuccess;
-	SESSIONRELOADLIST::iterator iter;
+	SESSIONRELOADLIST::const_iterator iter;
 	
 	pthread_mutex_lock(&m_mutexSessionReload);
 
@@ -4884,8 +5061,9 @@ exit:
 
 std::string WSTransport::GetAppName()
 {
-    if(!m_strAppName.empty())
-        return m_strAppName;
+	if (!m_strAppName.empty())
+		return m_strAppName;
+#ifdef LINUX
 	std::string procpath = "/proc/" + stringify(getpid()) + "/cmdline";
 	std::string s;
 
@@ -4895,6 +5073,14 @@ std::string WSTransport::GetAppName()
 		m_strAppName = "<unknown>";
 	else
 		m_strAppName = basename((char *)s.c_str());
+#else
+    char s[1024];
+    GetModuleFileNameA(0, s, sizeof(s));
+    
+    s[sizeof(s)-1] = 0;
+    
+    m_strAppName = basename(s);
+#endif    
     return m_strAppName;
 }
 
@@ -4915,9 +5101,7 @@ HRESULT WSTransport::HrEnsureSession()
     if(hr != MAPI_E_NETWORK_ERROR && hr != MAPI_E_END_OF_SESSION)
         hr = hrSuccess;
 
-    if(szValue)
-        MAPIFreeBuffer(szValue);
-        
+    MAPIFreeBuffer(szValue);
     return hr;
 }
 

@@ -7,7 +7,7 @@
 #              through all objects (including attachments)
 # processname: /usr/sbin/zarafa-search
 # config: /etc/zarafa/search.cfg
-# pidfile: /var/run/zarafa-search.pid
+# pidfile: /var/run/zarafad/search.pid
 
 ### BEGIN INIT INFO
 # Provides: zarafa-search
@@ -27,7 +27,7 @@ SEARCHCONFIG=/etc/zarafa/search.cfg
 SEARCHPROGRAM=/usr/sbin/zarafa-search
 search=`basename $SEARCHPROGRAM`
 LOCKFILE=/var/lock/subsys/$search
-PIDFILE=/var/run/$search.pid
+PIDFILE=/var/run/zarafad/search.pid
 RETVAL=0
 
 # Sanity checks.
@@ -42,6 +42,7 @@ if [ -z "$ZARAFA_LOCALE" ]; then
 fi
 
 start() {
+	install -dm0775 -o zarafa -g zarafa /var/run/zarafad
 	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $search
 	RETVAL=$?
 
@@ -49,10 +50,13 @@ start() {
 }
 
 stop() {
+	stop_daemon --pidfile "/var/run/$search.pid" --lockfile "$LOCKFILE" $search
+	RETVAL2="$?"
 	stop_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $search
 	RETVAL=$?
 
-	return $RETVAL
+	test "$RETVAL2" -eq 0 || "$RETVAL" -eq 0
+	return $?
 }
 
 restart() {

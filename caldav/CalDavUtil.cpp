@@ -1,51 +1,25 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "CalDavUtil.h"
-#include "EMSAbTag.h"
-#include "charset/convert.h"
-#include "mapi_ptr.h"
+#include <zarafa/EMSAbTag.h>
+#include <zarafa/charset/convert.h>
+#include <zarafa/mapi_ptr.h>
 
 using namespace std;
 
@@ -67,8 +41,6 @@ static const char THIS_FILE[] = __FILE__;
  */
 HRESULT HrAuthenticate(ECLogger *const lpLogger, const std::string & appVersion, const std::string & appMisc, const std::wstring &wstrUser, const std::wstring &wstrPass, std::string strPath, IMAPISession **lppSession)
 {
-	HRESULT hr = hrSuccess;	
-
 	// @todo: if login with utf8 username is not possible, lookup user from addressbook? but how?
 	return HrOpenECSession(lpLogger, lppSession, appVersion.c_str(), appMisc.c_str(), wstrUser.c_str(), wstrPass.c_str(), strPath.c_str(), 0, NULL, NULL, NULL);
 }
@@ -118,9 +90,7 @@ HRESULT HrAddProperty(IMAPIProp *lpMapiProp, ULONG ulPropTag, bool bFldId, std::
 		wstrProperty->assign(lpMsgProp->Value.lpszW);
 
 exit:
-	if(lpMsgProp)
-		MAPIFreeBuffer(lpMsgProp);
-
+	MAPIFreeBuffer(lpMsgProp);
 	return hr;
 }
 
@@ -487,7 +457,7 @@ std::string StripGuid(const std::string &strInput)
 	if(ulFoundSlash == string::npos)
 		ulFoundSlash = 0;
 	else
-		ulFoundSlash++;
+		++ulFoundSlash;
 
 	ulFound = strInput.rfind(".ics");
 	if(ulFound != wstring::npos)
@@ -632,20 +602,15 @@ bool HasDelegatePerm(IMsgStore *lpDefStore, IMsgStore *lpSharedStore)
 	if (hr != hrSuccess)
 		goto exit;
 
-	if (lpProp)
-	{
-		MAPIFreeBuffer(lpProp);
-		lpProp = NULL;
-	}
-
+	MAPIFreeBuffer(lpProp);
+	lpProp = NULL;
 	hr = HrGetOneProp(lpFbMessage, PR_SCHDINFO_DELEGATE_ENTRYIDS, &lpProp);
 	if (hr != hrSuccess)
 		goto exit;
 
-	for (ULONG i = 0; i < lpProp->Value.MVbin.cValues ; i++)
-	{
-		if (lpProp->Value.MVbin.lpbin[i].cb == lpMailBoxEid->Value.bin.cb
-			 && !memcmp((const void *) lpProp->Value.MVbin.lpbin[i].lpb, (const void *)lpMailBoxEid->Value.bin.lpb, lpMailBoxEid->Value.bin.cb))
+	for (ULONG i = 0; i < lpProp->Value.MVbin.cValues; ++i) {
+		if (lpProp->Value.MVbin.lpbin[i].cb == lpMailBoxEid->Value.bin.cb &&
+		    memcmp(lpProp->Value.MVbin.lpbin[i].lpb, lpMailBoxEid->Value.bin.lpb, lpMailBoxEid->Value.bin.cb) == 0)
 		{
 			blFound = true;
 			ulPos = i;
@@ -656,12 +621,8 @@ bool HasDelegatePerm(IMsgStore *lpDefStore, IMsgStore *lpSharedStore)
 	if (!blFound)
 		goto exit;
 	
-	if (lpProp)
-	{
-		MAPIFreeBuffer(lpProp);
-		lpProp = NULL;
-	}
-
+	MAPIFreeBuffer(lpProp);
+	lpProp = NULL;
 	hr = HrGetOneProp(lpFbMessage, PR_DELEGATE_FLAGS, &lpProp);
 	if (hr != hrSuccess)
 		goto exit;
@@ -672,12 +633,8 @@ bool HasDelegatePerm(IMsgStore *lpDefStore, IMsgStore *lpSharedStore)
 		blDelegatePerm = false;
 
 exit:
-	
-	if (lpMailBoxEid)
-		MAPIFreeBuffer(lpMailBoxEid);
-
-	if (lpProp)
-		MAPIFreeBuffer(lpProp);
+	MAPIFreeBuffer(lpMailBoxEid);
+	MAPIFreeBuffer(lpProp);
 
 	if (lpFbMessage)
 		lpFbMessage->Release();
@@ -708,10 +665,7 @@ bool IsPrivate(LPMESSAGE lpMessage, ULONG ulPropIDPrivate)
 		bIsPrivate = true;
 	
 exit:
-	
-	if(lpPropPrivate)
-		MAPIFreeBuffer(lpPropPrivate);
-
+	MAPIFreeBuffer(lpPropPrivate);
 	return bIsPrivate;
 }
 
@@ -882,7 +836,7 @@ HRESULT HrGetFreebusy(MapiToICal *lpMapiToIcal, IFreeBusySupport* lpFBSupport, I
 	LONG lMaxblks = 100;
 	LONG lblkFetched = 0;
 	WEBDAVFBUSERINFO sWebFbUserInfo;
-	std::list<std::string>::iterator itUsers;
+	std::list<std::string>::const_iterator itUsers;
 	LPADRLIST lpAdrList = NULL;
 	FlagListPtr ptrFlagList;
 	LPSPropValue lpEntryID = NULL;
@@ -916,7 +870,7 @@ HRESULT HrGetFreebusy(MapiToICal *lpMapiToIcal, IFreeBusySupport* lpFBSupport, I
 	ptrFlagList->cFlags = cUsers;
 
 	
-	for (itUsers = lplstUsers->begin(), cUsers = 0; itUsers != lplstUsers->end(); itUsers++, cUsers++) {
+	for (itUsers = lplstUsers->begin(), cUsers = 0; itUsers != lplstUsers->end(); ++itUsers, ++cUsers) {
 		lpAdrList->aEntries[cUsers].cValues = 1;
 
 		hr = MAPIAllocateBuffer(sizeof(SPropValue), (void **)&lpAdrList->aEntries[cUsers].rgPropVals);
@@ -940,7 +894,7 @@ HRESULT HrGetFreebusy(MapiToICal *lpMapiToIcal, IFreeBusySupport* lpFBSupport, I
 		goto exit;
 
 	// Get the user entryids
-	for (cUsers = 0; cUsers < lpAdrList->cEntries; cUsers++) {
+	for (cUsers = 0; cUsers < lpAdrList->cEntries; ++cUsers) {
 
 		if (ptrFlagList->ulFlag[cUsers] == MAPI_RESOLVED) {
 			lpEntryID = PpropFindProp(lpAdrList->aEntries[cUsers].rgPropVals, lpAdrList->aEntries[cUsers].cValues, PR_ENTRYID);
@@ -973,8 +927,7 @@ HRESULT HrGetFreebusy(MapiToICal *lpMapiToIcal, IFreeBusySupport* lpFBSupport, I
 
 	itUsers = lplstUsers->begin();
 	// iterate through all users
-	for(ULONG i = 0; i < cUsers; i++)
-	{
+	for (ULONG i = 0; i < cUsers; ++i) {
 		strIcal.clear();
 
 		if (!lppFBData[i])
@@ -1013,7 +966,7 @@ next:
 		sWebFbUserInfo.strIcal = strIcal;
 		lpFbInfo->lstFbUserInfo.push_back(sWebFbUserInfo);
 
-		itUsers++;
+		++itUsers;
 
 		lpMapiToIcal->ResetObject();
 		
@@ -1021,8 +974,7 @@ next:
 			lpEnumBlock->Release();
 		lpEnumBlock = NULL;
 
-		if(lpsFBblks)
-			MAPIFreeBuffer(lpsFBblks);
+		MAPIFreeBuffer(lpsFBblks);
 		lpsFBblks = NULL;
 
 		lblkFetched = 0;
@@ -1031,14 +983,12 @@ next:
 	hr = hrSuccess;
 
 exit:
-	if (lpUsers)
-		MAPIFreeBuffer(lpUsers);
-
+	MAPIFreeBuffer(lpUsers);
 	if (lpAdrList)
 		FreePadrlist(lpAdrList);
 	
 	if (lppFBData) {
-		for(ULONG i = 0; i < cUsers; i++)
+		for (ULONG i = 0; i < cUsers; ++i)
 			if (lppFBData[i])
 				lppFBData[i]->Release();
 		MAPIFreeBuffer(lppFBData);

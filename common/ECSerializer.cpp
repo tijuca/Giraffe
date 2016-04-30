@@ -1,49 +1,25 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
+#ifdef LINUX
 #include <arpa/inet.h>
+#endif
 
 #include "ECFifoBuffer.h"
 #include "ECSerializer.h"
@@ -115,24 +91,20 @@ ECRESULT ECStreamSerializer::Write(const void *ptr, size_t size, size_t nmemb)
 
 ECRESULT ECStreamSerializer::Read(void *ptr, size_t size, size_t nmemb)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	ULONG cbRead = 0;
 
-	if (ptr == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (ptr == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	er = m_lpBuffer->Read(ptr, size * nmemb, &cbRead);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	m_ulRead += cbRead;
 
-	if (cbRead != size * nmemb) {
-		er = ZARAFA_E_CALL_FAILED;
-		goto exit;
-	}
+	if (cbRead != size * nmemb)
+		return ZARAFA_E_CALL_FAILED;
 
 	switch (size) {
 	case 1: break;
@@ -152,8 +124,6 @@ ECRESULT ECStreamSerializer::Read(void *ptr, size_t size, size_t nmemb)
 		er = ZARAFA_E_INVALID_PARAMETER;
 		break;
 	}
-
-exit:
 	return er;
 }
 
@@ -167,33 +137,28 @@ ECRESULT ECStreamSerializer::Skip(size_t size, size_t nmemb)
 	while(total < (nmemb*size)) {
 		er = m_lpBuffer->Read(buffer, std::min(sizeof(buffer), (size * nmemb) - total), &read);
 		if(er != erSuccess)
-			goto exit;
-		
+			return er;
 		total += read;
 	}
-	
-exit:
 	return er;
 }
 
 ECRESULT ECStreamSerializer::Flush()
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	ULONG cbRead = 0;
 	char buf[16384];
 	
 	while(true) {
 		er = m_lpBuffer->Read(buf, sizeof(buf), &cbRead);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 
 		m_ulRead += cbRead;
 
 		if(cbRead < sizeof(buf))
 			break;
 	}
-
-exit:
 	return er;
 }
 
@@ -279,29 +244,22 @@ ECRESULT ECFifoSerializer::Write(const void *ptr, size_t size, size_t nmemb)
 
 ECRESULT ECFifoSerializer::Read(void *ptr, size_t size, size_t nmemb)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	ECFifoBuffer::size_type cbRead = 0;
 
-	if (m_mode != deserialize) {
-		er = ZARAFA_E_NO_SUPPORT;
-		goto exit;
-	}
-
-	if (ptr == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (m_mode != deserialize)
+		return ZARAFA_E_NO_SUPPORT;
+	if (ptr == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	er = m_lpBuffer->Read(ptr, size * nmemb, STR_DEF_TIMEOUT, &cbRead);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	m_ulRead += cbRead;
 
-	if (cbRead !=  size * nmemb) {
-		er = ZARAFA_E_CALL_FAILED;
-		goto exit;
-	}
+	if (cbRead != size * nmemb)
+		return ZARAFA_E_CALL_FAILED;
 	
 
 	switch (size) {
@@ -322,8 +280,6 @@ ECRESULT ECFifoSerializer::Read(void *ptr, size_t size, size_t nmemb)
 		er = ZARAFA_E_INVALID_PARAMETER;
 		break;
 	}
-
-exit:
 	return er;
 }
 
@@ -343,30 +299,26 @@ ECRESULT ECFifoSerializer::Skip(size_t size, size_t nmemb)
 	er = Read(buf, size, nmemb);
 
 exit:
-	if (buf)
-		delete [] buf;
-
+	delete[] buf;
 	return er;
 }
 
 ECRESULT ECFifoSerializer::Flush()
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	size_t cbRead = 0;
 	char buf[16384];
 	
 	while(true) {
 		er = m_lpBuffer->Read(buf, sizeof(buf), STR_DEF_TIMEOUT, &cbRead);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 
 		m_ulRead += cbRead;
 
 		if(cbRead < sizeof(buf))
 			break;
 	}
-
-exit:
 	return er;
 }
 

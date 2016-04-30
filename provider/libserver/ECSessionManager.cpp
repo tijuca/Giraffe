@@ -1,53 +1,28 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 /// ECSessionManager.cpp: implementation of the ECSessionManager class.
 //
 //////////////////////////////////////////////////////////////////////
-#include "platform.h"
+#include <zarafa/platform.h>
  
  
 #include <algorithm>
+#include <new>
 #include <typeinfo>
 
 #include <mapidefs.h>
@@ -65,7 +40,7 @@
 #include "ECSecurity.h"
 #include "SSLUtil.h"
 
-#include "Trace.h"
+#include <zarafa/Trace.h>
 #include "Zarafa.h"
 
 #include "ECICS.h"
@@ -81,14 +56,16 @@ static const char THIS_FILE[] = __FILE__;
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 
-ECSessionManager::ECSessionManager(ECConfig *lpConfig, ECLogger *lpLogger, ECLogger *lpAudit, bool bHostedZarafa, bool bDistributedZarafa)
+ECSessionManager::ECSessionManager(ECConfig *lpConfig, ECLogger *lpAudit,
+    bool bHostedZarafa, bool bDistributedZarafa)
 {
 	int err = 0;
 
 	bExit					= FALSE;
 	m_lpConfig				= lpConfig;
-	m_lpLogger				= lpLogger;
 	m_lpAudit				= lpAudit;
+	if (m_lpAudit)
+		m_lpAudit->AddRef();
 	m_bHostedZarafa			= bHostedZarafa;
 	m_bDistributedZarafa	= bDistributedZarafa;
 	m_lpDatabase			= NULL;
@@ -104,14 +81,11 @@ ECSessionManager::ECSessionManager(ECConfig *lpConfig, ECLogger *lpLogger, ECLog
 	//Terminate Event
 	pthread_cond_init(&m_hExitSignal, NULL);
 
-	m_lpDatabaseFactory = new ECDatabaseFactory(lpConfig, lpLogger);
-	m_lpPluginFactory = new ECPluginFactory(lpConfig, lpLogger, g_lpStatsCollector, bHostedZarafa, bDistributedZarafa);
-
-	m_lpECCacheManager = new ECCacheManager(lpConfig, m_lpDatabaseFactory, lpLogger);
-	m_lpSearchFolders = new ECSearchFolders(this, m_lpDatabaseFactory, lpLogger);
-
-	m_lpTPropsPurge = new ECTPropsPurge(lpConfig, lpLogger, m_lpDatabaseFactory);
-
+	m_lpDatabaseFactory = new ECDatabaseFactory(lpConfig);
+	m_lpPluginFactory = new ECPluginFactory(lpConfig, g_lpStatsCollector, bHostedZarafa, bDistributedZarafa);
+	m_lpECCacheManager = new ECCacheManager(lpConfig, m_lpDatabaseFactory);
+	m_lpSearchFolders = new ECSearchFolders(this, m_lpDatabaseFactory);
+	m_lpTPropsPurge = new ECTPropsPurge(lpConfig, m_lpDatabaseFactory);
 	m_ptrLockManager = ECLockManager::Create();
 	
 	m_lpServerGuid = NULL;
@@ -132,36 +106,29 @@ ECSessionManager::ECSessionManager(ECConfig *lpConfig, ECLogger *lpLogger, ECLog
         set_thread_name(m_hSessionCleanerThread, "SessionCleanUp");
 	
 	if (err != 0)
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to spawn thread for session cleaner! Sessions will live forever!: %s", strerror(err));
+		ec_log_crit("Unable to spawn thread for session cleaner! Sessions will live forever!: %s", strerror(err));
 
-    m_lpNotificationManager = new ECNotificationManager(m_lpLogger, m_lpConfig);
+	m_lpNotificationManager = new ECNotificationManager();
 }
 
 ECSessionManager::~ECSessionManager()
 {
 	int err = 0;
-	SESSIONMAP::iterator iSession, iSessionNext;
+	SESSIONMAP::const_iterator iSession, iSessionNext;
 
 	pthread_mutex_lock(&m_hExitMutex);
 	bExit = TRUE;
 	pthread_cond_signal(&m_hExitSignal);
 
 	pthread_mutex_unlock(&m_hExitMutex);
-
-	if(m_lpTPropsPurge)
-		delete m_lpTPropsPurge;
-
-	if(m_lpDatabase)
-		delete m_lpDatabase;
-
-	if(m_lpDatabaseFactory)
-		delete m_lpDatabaseFactory;
+	delete m_lpTPropsPurge;
+	delete m_lpDatabase;
+	delete m_lpDatabaseFactory;
 		
 	err = pthread_join(m_hSessionCleanerThread, NULL);
 	
-	if(err != 0) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to join session cleaner thread: %s", strerror(err));
-	}
+	if (err != 0)
+		ec_log_crit("Unable to join session cleaner thread: %s", strerror(err));
 
 	pthread_rwlock_wrlock(&m_hCacheRWLock);
 			
@@ -170,32 +137,25 @@ ECSessionManager::~ECSessionManager()
 	while(iSession != m_mapSessions.end()) {
 		delete iSession->second;
 		iSessionNext = iSession;
-		iSessionNext++;
-
-		m_lpLogger->Log(EC_LOGLEVEL_INFO, "End of session (shutdown) %llu", iSession->first);
+		++iSessionNext;
+		ec_log_info("End of session (shutdown) %llu",
+			static_cast<unsigned long long>(iSession->first));
 
 		m_mapSessions.erase(iSession);
 
 		iSession = iSessionNext;
 	}
 	
-	if(m_lpNotificationManager)
-	    delete m_lpNotificationManager;
-
+	delete m_lpNotificationManager;
 //#ifdef DEBUG
 	// Clearing the cache takes too long while shutting down
-	if(m_lpECCacheManager)
-		delete m_lpECCacheManager;
+	delete m_lpECCacheManager;
 //#endif
-
-	if(m_lpSearchFolders)
-		delete m_lpSearchFolders;
-
-	if(m_lpPluginFactory)
-		delete m_lpPluginFactory;
-
-	if(m_lpServerGuid)
-		delete m_lpServerGuid;
+	delete m_lpSearchFolders;
+	delete m_lpPluginFactory;
+	delete m_lpServerGuid;
+	if (m_lpAudit != NULL)
+		m_lpAudit->Release();
 
 	// Release ownership of the rwlock object.
 	pthread_rwlock_unlock(&m_hCacheRWLock);
@@ -291,8 +251,8 @@ ECRESULT ECSessionManager::CheckUserLicense()
 		goto exit;
 
 	if (ulLicense & USERMANAGEMENT_USER_LICENSE_EXCEEDED) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to start server: Your license doesn't permit this amount of users.");
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Stop your zarafa-license service, start the zarafa-server and remove users to resolve the problem.");
+		ec_log_err("Failed to start server: Your license does not permit this amount of users.");
+		ec_log_err("Stop your zarafa-license service, start the zarafa-server and remove users to resolve the problem.");
 		er = ZARAFA_E_NO_ACCESS;
 		goto exit;
 	}
@@ -326,7 +286,7 @@ ECRESULT ECSessionManager::GetSessionGroup(ECSESSIONGROUPID sessionGroupID, ECSe
 		lpSessionGroup = new ECSessionGroup(sessionGroupID, this);
 		g_lpStatsCollector->Increment(SCN_SESSIONGROUPS_CREATED);
 	} else {
-		SESSIONGROUPMAP::iterator iter = m_mapSessionGroups.find(sessionGroupID);
+		SESSIONGROUPMAP::const_iterator iter = m_mapSessionGroups.find(sessionGroupID);
 		/* Check if the SessionGroup already exists on the server */
 		if (iter == m_mapSessionGroups.end()) {
 			// "upgrade" lock to insert new session
@@ -358,7 +318,7 @@ ECRESULT ECSessionManager::DeleteIfOrphaned(ECSessionGroup *lpGroup)
 		pthread_rwlock_wrlock(&m_hGroupLock);
 
     	/* Check if the SessionGroup actually exists, if it doesn't just return without error */
-    	SESSIONGROUPMAP::iterator i = m_mapSessionGroups.find(id);
+	SESSIONGROUPMAP::const_iterator i = m_mapSessionGroups.find(id);
     	if (i == m_mapSessionGroups.end()) {
     	    pthread_rwlock_unlock(&m_hGroupLock);
     	    goto exit;
@@ -385,7 +345,7 @@ exit:
 
 BTSession* ECSessionManager::GetSession(ECSESSIONID sessionID, bool fLockSession) {
 
-	SESSIONMAP::iterator iIterator;
+	SESSIONMAP::const_iterator iIterator;
 	BTSession *lpSession = NULL;
 		
 	//TRACE_INTERNAL(TRACE_ENTRY, "ECSessionManager", "GetSession", "%lu", sessionID);
@@ -411,22 +371,21 @@ ECRESULT ECSessionManager::RemoveAllSessions()
 {
 	ECRESULT		er = erSuccess;
 	BTSession		*lpSession = NULL;
-	SESSIONMAP::iterator iIterSession, iSessionNext;
+	SESSIONMAP::const_iterator iIterSession, iSessionNext;
 	std::list<BTSession *> lstSessions;
-	std::list<BTSession *>::iterator iterSessionList;
+	std::list<BTSession *>::const_iterator iterSessionList;
 	
 	// Lock the session map since we're going to remove all the sessions.
 	pthread_rwlock_wrlock(&m_hCacheRWLock);
 
-	m_lpLogger->Log(EC_LOGLEVEL_INFO, "Shutdown all current sessions");
+	ec_log_info("Shutdown all current sessions");
 
 	iIterSession = m_mapSessions.begin();
 	while(iIterSession != m_mapSessions.end())
 	{
 		lpSession = iIterSession->second;
 		iSessionNext = iIterSession;
-		iSessionNext++;
-
+		++iSessionNext;
 		m_mapSessions.erase(iIterSession);
 
 		iIterSession = iSessionNext;
@@ -438,9 +397,9 @@ ECRESULT ECSessionManager::RemoveAllSessions()
 	pthread_rwlock_unlock(&m_hCacheRWLock);
 	
 	// Do the actual session deletes, while the session map is not locked (!)
-	for(iterSessionList = lstSessions.begin(); iterSessionList != lstSessions.end(); iterSessionList++) {
+	for (iterSessionList = lstSessions.begin();
+	     iterSessionList != lstSessions.end(); ++iterSessionList)
 	    delete *iterSessionList;
-	}
 	
 	return er;
 }
@@ -449,14 +408,14 @@ ECRESULT ECSessionManager::CancelAllSessions(ECSESSIONID sessionIDException)
 {
 	ECRESULT		er = erSuccess;
 	BTSession		*lpSession = NULL;
-	SESSIONMAP::iterator iIterSession, iSessionNext;
+	SESSIONMAP::const_iterator iIterSession, iSessionNext;
 	std::list<BTSession *> lstSessions;
-	std::list<BTSession *>::iterator iterSessionList;
+	std::list<BTSession *>::const_iterator iterSessionList;
 	
 	// Lock the session map since we're going to remove all the sessions.
 	pthread_rwlock_wrlock(&m_hCacheRWLock);
 
-	m_lpLogger->Log(EC_LOGLEVEL_INFO, "Shutdown all current sessions");
+	ec_log_info("Shutdown all current sessions");
 
 	iIterSession = m_mapSessions.begin();
 	while(iIterSession != m_mapSessions.end())
@@ -464,8 +423,7 @@ ECRESULT ECSessionManager::CancelAllSessions(ECSESSIONID sessionIDException)
 		if(iIterSession->first != sessionIDException) {
 			lpSession = iIterSession->second;
 			iSessionNext = iIterSession;
-			iSessionNext++;
-
+			++iSessionNext;
 			// Tell the notification manager to wake up anyone waiting for this session
 			m_lpNotificationManager->NotifyChange(iIterSession->first);
 			
@@ -475,7 +433,7 @@ ECRESULT ECSessionManager::CancelAllSessions(ECSESSIONID sessionIDException)
 
 			lstSessions.push_back(lpSession);
 		} else {
-			iIterSession++;
+			++iIterSession;
 		}
 	}
 
@@ -483,9 +441,9 @@ ECRESULT ECSessionManager::CancelAllSessions(ECSESSIONID sessionIDException)
 	pthread_rwlock_unlock(&m_hCacheRWLock);
 	
 	// Do the actual session deletes, while the session map is not locked (!)
-	for(iterSessionList = lstSessions.begin(); iterSessionList != lstSessions.end(); iterSessionList++) {
+	for (iterSessionList = lstSessions.begin();
+	     iterSessionList != lstSessions.end(); ++iterSessionList)
 	    delete *iterSessionList;
-	}
 	
 	return er;
 }
@@ -495,13 +453,13 @@ ECRESULT ECSessionManager::CancelAllSessions(ECSESSIONID sessionIDException)
 ECRESULT ECSessionManager::ForEachSession(void(*callback)(ECSession*, void*), void *obj)
 {
 	ECRESULT er = erSuccess;
-	SESSIONMAP::iterator iIterSession;
+	SESSIONMAP::const_iterator iIterSession;
 
 	pthread_rwlock_rdlock(&m_hCacheRWLock);
 
-	for (iIterSession = m_mapSessions.begin(); iIterSession != m_mapSessions.end(); iIterSession++) {
+	for (iIterSession = m_mapSessions.begin();
+	     iIterSession != m_mapSessions.end(); ++iIterSession)
 		callback(dynamic_cast<ECSession*>(iIterSession->second), obj);
-	}
 
 	pthread_rwlock_unlock(&m_hCacheRWLock);
 
@@ -590,7 +548,7 @@ ECRESULT ECSessionManager::ValidateBTSession(struct soap *soap, ECSESSIONID sess
 		goto exit;
 	}
 
-	// Enable compression if client is capable
+	/* Enable compression if client desired and granted */
 	if (lpSession->GetCapabilities() & ZARAFA_CAP_COMPRESSION) {
 		soap_set_imode(soap, SOAP_ENC_ZLIB);
 		soap_set_omode(soap, SOAP_ENC_ZLIB | SOAP_IO_CHUNK);
@@ -611,30 +569,26 @@ exit:
 
 ECRESULT ECSessionManager::CreateAuthSession(struct soap *soap, unsigned int ulCapabilities, ECSESSIONID *sessionID, ECAuthSession **lppAuthSession, bool bRegisterSession, bool bLockSession)
 {
-	ECRESULT er = erSuccess;
 	ECAuthSession *lpAuthSession = NULL;
 	ECSESSIONID newSessionID;
 
 	CreateSessionID(ulCapabilities, &newSessionID);
 
-	lpAuthSession = new ECAuthSession(GetSourceAddr(soap), newSessionID, m_lpDatabaseFactory, this, ulCapabilities);
-	if (lpAuthSession) {
-	    if (bLockSession) {
+	lpAuthSession = new(std::nothrow) ECAuthSession(GetSourceAddr(soap), newSessionID, m_lpDatabaseFactory, this, ulCapabilities);
+	if (lpAuthSession == NULL)
+		return ZARAFA_E_NOT_ENOUGH_MEMORY;
+	if (bLockSession)
 	        lpAuthSession->Lock();
-	    }
-		if (bRegisterSession) {
-			pthread_rwlock_wrlock(&m_hCacheRWLock);
-			m_mapSessions.insert( SESSIONMAP::value_type(newSessionID, lpAuthSession) );
-			pthread_rwlock_unlock(&m_hCacheRWLock);
-			g_lpStatsCollector->Increment(SCN_SESSIONS_CREATED);
-		}
+	if (bRegisterSession) {
+		pthread_rwlock_wrlock(&m_hCacheRWLock);
+		m_mapSessions.insert( SESSIONMAP::value_type(newSessionID, lpAuthSession) );
+		pthread_rwlock_unlock(&m_hCacheRWLock);
+		g_lpStatsCollector->Increment(SCN_SESSIONS_CREATED);
+	}
 
-		*sessionID = newSessionID;
-		*lppAuthSession = lpAuthSession;
-	} else
-		er = ZARAFA_E_NOT_ENOUGH_MEMORY;
-
-	return er;
+	*sessionID = newSessionID;
+	*lppAuthSession = lpAuthSession;
+	return erSuccess;
 }
 
 ECRESULT ECSessionManager::CreateSession(struct soap *soap, char *szName, char *szPassword, char *szImpersonateUser, char *szClientVersion, char *szClientApp, const char *szClientAppVersion, const char *szClientAppMisc, unsigned int ulCapabilities, ECSESSIONGROUPID sessionGroupID, ECSESSIONID *lpSessionID, ECSession **lppSession, bool fLockSession, bool fAllowUidAuth)
@@ -654,7 +608,7 @@ ECRESULT ECSessionManager::CreateSession(struct soap *soap, char *szName, char *
 		from = string("file://") + m_lpConfig->GetSetting("server_pipe_name");
 	} else {
 		// connected over network
-		from = PrettyIP(soap->ip);
+		from = soap->host;
 	}
 
 	er = this->CreateAuthSession(soap, ulCapabilities, lpSessionID, &lpAuthSession, false, false);
@@ -683,10 +637,10 @@ ECRESULT ECSessionManager::CreateSession(struct soap *soap, char *szName, char *
 	}
 
 	// whoops, out of auth options.
-	m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Failed to authenticate user %s from %s using program %s",
+	ec_log_warn("Failed to authenticate user \"%s\" from \"%s\" using program \"%s\"",
 					szName, from.c_str(), szClientApp ? szClientApp : "<unknown>");
 
-	LOG_AUDIT(m_lpAudit, "authenticate failed user='%s' from='%s' program='%s'",
+	ZLOG_AUDIT(m_lpAudit, "authenticate failed user='%s' from='%s' program='%s'",
 			  szName, from.c_str(), szClientApp ? szClientApp : "<unknown>");
 
 	er = ZARAFA_E_LOGON_FAILED;			
@@ -695,35 +649,36 @@ ECRESULT ECSessionManager::CreateSession(struct soap *soap, char *szName, char *
 
 
 authenticated:
-	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "User %s from %s authenticated through %s using program %s", szName, from.c_str(), method, szClientApp ? szClientApp : "<unknown>");
+	ec_log_debug("User \"%s\" from \"%s\" authenticated through \"%s\" using program %s", szName, from.c_str(), method, szClientApp ? szClientApp : "<unknown>");
 	if (strcmp(ZARAFA_SYSTEM_USER, szName) != 0) {
 		/* Do not log successful SYSTEM logins */
-		LOG_AUDIT(m_lpAudit, "authenticate ok user='%s' from='%s' method='%s' program='%s'",
+		ZLOG_AUDIT(m_lpAudit, "authenticate ok user='%s' from='%s' method='%s' program='%s'",
 				  szName, from.c_str(), method, szClientApp ? szClientApp : "<unknown>");
 	}
 
 	er = RegisterSession(lpAuthSession, sessionGroupID, szClientVersion, szClientApp, szClientAppVersion, szClientAppMisc, lpSessionID, &lpSession, fLockSession);
 	if (er != erSuccess) {
 		if (er == ZARAFA_E_NO_ACCESS && szImpersonateUser != NULL && *szImpersonateUser != '\0') {
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed attempt to impersonate user %s by user %s", szImpersonateUser, szName);
-			LOG_AUDIT(m_lpAudit, "impersonate failed user='%s', from='%s' program='%s' impersonator='%s'",
+			ec_log_err("Failed attempt to impersonate user \"%s\" by user \"%s\"", szImpersonateUser, szName);
+			ZLOG_AUDIT(m_lpAudit, "impersonate failed user='%s', from='%s' program='%s' impersonator='%s'",
 					  szImpersonateUser, from.c_str(), szClientApp ? szClientApp : "<unknown>", szName);
 		} else
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "User %s authenticated, but failed to create session. Error 0x%08X", szName, er);
+			ec_log_err("User \"%s\" authenticated, but failed to create session. Error 0x%08X", szName, er);
 		goto exit;
 	}
 	if (!szImpersonateUser || *szImpersonateUser == '\0')
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "User %s receives session %llu", szName, *lpSessionID);
+		ec_log_debug("User \"%s\" receives session %llu",
+			szName, static_cast<unsigned long long>(*lpSessionID));
 	else {
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "User %s impersonated by %s receives session %llu", szImpersonateUser, szName, *lpSessionID);
-		LOG_AUDIT(m_lpAudit, "impersonate ok user='%s', from='%s' program='%s' impersonator='%s'",
+		ec_log_debug("User \"%s\" impersonated by \"%s\" receives session %llu",
+			szImpersonateUser, szName,
+			static_cast<unsigned long long>(*lpSessionID));
+		ZLOG_AUDIT(m_lpAudit, "impersonate ok user='%s', from='%s' program='%s' impersonator='%s'",
 				  szImpersonateUser, from.c_str(), szClientApp ? szClientApp : "<unknown>", szName);
 	}
 
 exit:
-	if (lpAuthSession)
-		delete lpAuthSession;
-
+	delete lpAuthSession;
 	*lppSession = lpSession;
 
 	return er;
@@ -733,12 +688,11 @@ ECRESULT ECSessionManager::RegisterSession(ECAuthSession *lpAuthSession, ECSESSI
 {
 	ECRESULT	er = erSuccess;
 	ECSession	*lpSession = NULL;
-	ECSessionGroup *lpSessionGroup = NULL;
 	ECSESSIONID	newSID = 0;
 
 	er = lpAuthSession->CreateECSession(sessionGroupID, szClientVersion ? szClientVersion : "", szClientApp ? szClientApp : "", szClientApplicationVersion ? szClientApplicationVersion : "", szClientApplicationMisc ? szClientApplicationMisc : "", &newSID, &lpSession);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	if (fLockSession)
 		lpSession->Lock();
@@ -751,11 +705,6 @@ ECRESULT ECSessionManager::RegisterSession(ECAuthSession *lpAuthSession, ECSESSI
 	*lppSession = lpSession;
 
 	g_lpStatsCollector->Increment(SCN_SESSIONS_CREATED);
-	
-exit:
-	/* SessionGroup could have been created for this session, if creation failed, just kill it immediately */
-	if (er != erSuccess && lpSessionGroup)
-		DeleteIfOrphaned(lpSessionGroup);
 
 	return er;
 }
@@ -768,7 +717,7 @@ ECRESULT ECSessionManager::CreateSessionInternal(ECSession **lppSession, unsigne
 
 	CreateSessionID(ZARAFA_CAP_LARGE_SESSIONID, &newSID);
 
-	lpSession = new ECSession("<internal>", newSID, 0, m_lpDatabaseFactory, this, 0, false, ECSession::METHOD_NONE, 0, "internal", "zarafa-server", "", "");
+	lpSession = new(std::nothrow) ECSession("<internal>", newSID, 0, m_lpDatabaseFactory, this, 0, false, ECSession::METHOD_NONE, 0, "internal", "zarafa-server", "", "");
 	if(lpSession == NULL) {
 		er = ZARAFA_E_LOGON_FAILED;
 		goto exit;
@@ -780,7 +729,8 @@ ECRESULT ECSessionManager::CreateSessionInternal(ECSession **lppSession, unsigne
 		goto exit;
 	}
 
-	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "New internal session (%llu)", newSID);
+	ec_log_debug("New internal session (%llu)",
+		static_cast<unsigned long long>(newSID));
 
 	g_lpStatsCollector->Increment(SCN_SESSIONS_INTERNAL_CREATED);
 
@@ -803,7 +753,8 @@ ECRESULT ECSessionManager::RemoveSession(ECSESSIONID sessionID){
 	ECRESULT	hr			= erSuccess;
 	BTSession	*lpSession	= NULL;
 	
-	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "End of session (logoff) %llu", sessionID);
+	ec_log_debug("End of session (logoff) %llu",
+		static_cast<unsigned long long>(sessionID));
 	g_lpStatsCollector->Increment(SCN_SESSIONS_DELETED);
 
 	// Make sure no other thread can read or write the sessions list
@@ -828,7 +779,7 @@ ECRESULT ECSessionManager::RemoveSession(ECSESSIONID sessionID){
 		if(lpSession->Shutdown(5 * 60 * 1000) == erSuccess)
 			delete lpSession;
 		else
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Session failed to shut down: skipping logoff");
+			ec_log_err("Session failed to shut down: skipping logoff");
 	}
 		
     // Tell the notification manager to wake up anyone waiting for this session
@@ -851,10 +802,10 @@ ECRESULT ECSessionManager::RemoveSession(ECSESSIONID sessionID){
  */
 ECRESULT ECSessionManager::AddNotification(notification *notifyItem, unsigned int ulKey, unsigned int ulStore, unsigned int ulFolderId, unsigned int ulFlags) {
 	
-	SESSIONGROUPMAP::iterator	iIterator;
-	std::multimap<unsigned int, ECSESSIONGROUPID>::iterator iterObjectSubscription;
+	SESSIONGROUPMAP::const_iterator	iIterator;
+	std::multimap<unsigned int, ECSESSIONGROUPID>::const_iterator iterObjectSubscription;
 	std::set<ECSESSIONGROUPID> setGroups;
-	std::set<ECSESSIONGROUPID>::iterator iterGroups;
+	std::set<ECSESSIONGROUPID>::const_iterator iterGroups;
 	
 	ECRESULT				hr = erSuccess;
 	
@@ -871,13 +822,13 @@ ECRESULT ECSessionManager::AddNotification(notification *notifyItem, unsigned in
 	while(iterObjectSubscription != m_mapObjectSubscriptions.end() && iterObjectSubscription->first == ulStore) {
 		// Send a notification only once to a session group, even if it has subscribed multiple times
 		setGroups.insert(iterObjectSubscription->second);
-		iterObjectSubscription++;
+		++iterObjectSubscription;
 	}
 	
 	pthread_mutex_unlock(&m_mutexObjectSubscriptions);
 
 	// Send each subscribed session group one notification
-	for (iterGroups = setGroups.begin(); iterGroups != setGroups.end(); iterGroups++){
+	for (iterGroups = setGroups.begin(); iterGroups != setGroups.end(); ++iterGroups) {
 		pthread_rwlock_rdlock(&m_hGroupLock);
 		iIterator = m_mapSessionGroups.find(*iterGroups);
 		if(iIterator != m_mapSessionGroups.end())
@@ -924,7 +875,7 @@ exit:
 
 void* ECSessionManager::SessionCleaner(void *lpTmpSessionManager)
 {
-	SESSIONMAP::iterator	iIterator, iRemove;
+	SESSIONMAP::const_iterator iIterator, iRemove;
 	time_t					lCurTime;
 	ECSessionManager*		lpSessionManager = (ECSessionManager *)lpTmpSessionManager;
 	int						lResult;
@@ -952,10 +903,11 @@ void* ECSessionManager::SessionCleaner(void *lpTmpSessionManager)
 				iRemove = iIterator++;
 				// Remove the session from the list, no new threads can start on this session after this point.
 				g_lpStatsCollector->Increment(SCN_SESSIONS_TIMEOUT);
-				lpSessionManager->m_lpLogger->Log(EC_LOGLEVEL_INFO, "End of session (timeout) %llu", iRemove->first);
+				ec_log_info("End of session (timeout) %llu",
+					static_cast<unsigned long long>(iRemove->first));
 				lpSessionManager->m_mapSessions.erase(iRemove);
 			} else {
-				iIterator++;
+				++iIterator;
 			}
 		}
 
@@ -963,7 +915,9 @@ void* ECSessionManager::SessionCleaner(void *lpTmpSessionManager)
 		pthread_rwlock_unlock(&lpSessionManager->m_hCacheRWLock);
 
 		// Now, remove all the session. It will wait until all running threads for that session have exited.
-		for (list<BTSession*>::iterator iSessions = lstSessions.begin(); iSessions != lstSessions.end(); iSessions++) {
+		for (std::list<BTSession *>::const_iterator iSessions = lstSessions.begin();
+		     iSessions != lstSessions.end(); ++iSessions)
+		{
 			if((*iSessions)->Shutdown(5 * 60 * 1000) == erSuccess) 
 				delete *iSessions;
 			else {
@@ -971,7 +925,7 @@ void* ECSessionManager::SessionCleaner(void *lpTmpSessionManager)
 				// should only happen if some bit of code has locked the session and failed to unlock it. There are now
 				// two options: delete the session anyway and hope we don't segfault, or leak the session. We choose
 				// the latter.
-				lpSessionManager->m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Session failed to shut down: skipping clean");
+				ec_log_err("Session failed to shut down: skipping clean");
 			}
 		}
 
@@ -1051,11 +1005,11 @@ exit:
 
 ECRESULT ECSessionManager::UpdateSubscribedTables(ECKeyTable::UpdateType ulType, TABLESUBSCRIPTION sSubscription, std::list<unsigned int> &lstChildId)
 {
-	SESSIONMAP::iterator	iterSession;
+	SESSIONMAP::const_iterator iterSession;
 	ECRESULT		er = erSuccess;
 	std::set<ECSESSIONID> setSessions;
-	std::set<ECSESSIONID>::iterator iterSubscribedSession;
-	std::multimap<TABLESUBSCRIPTION, ECSESSIONID>::iterator iterSubscriptions;
+	std::set<ECSESSIONID>::const_iterator iterSubscribedSession;
+	std::multimap<TABLESUBSCRIPTION, ECSESSIONID>::const_iterator iterSubscriptions;
 
 	BTSession	*lpBTSession = NULL;
 		
@@ -1065,7 +1019,7 @@ ECRESULT ECSessionManager::UpdateSubscribedTables(ECKeyTable::UpdateType ulType,
     iterSubscriptions = m_mapTableSubscriptions.find(sSubscription);
     while(iterSubscriptions != m_mapTableSubscriptions.end() && iterSubscriptions->first == sSubscription) {
         setSessions.insert(iterSubscriptions->second);
-        iterSubscriptions++;
+        ++iterSubscriptions;
     }
     
     pthread_mutex_unlock(&m_mutexTableSubscriptions);
@@ -1074,7 +1028,9 @@ ECRESULT ECSessionManager::UpdateSubscribedTables(ECKeyTable::UpdateType ulType,
     // sessions have the same table opened at one time.
 
     // For each of the sessions that are interested, send the table change
-	for(iterSubscribedSession = setSessions.begin(); iterSubscribedSession != setSessions.end(); iterSubscribedSession++) {
+	for (iterSubscribedSession = setSessions.begin();
+	     iterSubscribedSession != setSessions.end();
+	     ++iterSubscribedSession) {
 		// Get session
 		pthread_rwlock_rdlock(&m_hCacheRWLock);
 		lpBTSession = GetSession(*iterSubscribedSession, true);
@@ -1088,13 +1044,13 @@ ECRESULT ECSessionManager::UpdateSubscribedTables(ECKeyTable::UpdateType ulType,
 	    	    continue;
 			}
 	    	
-	    	if (sSubscription.ulType == TABLE_ENTRY::TABLE_TYPE_GENERIC) 
-                lpSession->GetTableManager()->UpdateTables(ulType, sSubscription.ulObjectFlags, sSubscription.ulRootObjectId, lstChildId, sSubscription.ulObjectType);
-            else if(sSubscription.ulType == TABLE_ENTRY::TABLE_TYPE_OUTGOINGQUEUE)
-    			lpSession->GetTableManager()->UpdateOutgoingTables(ulType, sSubscription.ulRootObjectId, lstChildId, sSubscription.ulObjectFlags, sSubscription.ulObjectType);
+			if (sSubscription.ulType == TABLE_ENTRY::TABLE_TYPE_GENERIC)
+				lpSession->GetTableManager()->UpdateTables(ulType, sSubscription.ulObjectFlags, sSubscription.ulRootObjectId, lstChildId, sSubscription.ulObjectType);
+			else if (sSubscription.ulType == TABLE_ENTRY::TABLE_TYPE_OUTGOINGQUEUE)
+				lpSession->GetTableManager()->UpdateOutgoingTables(ulType, sSubscription.ulRootObjectId, lstChildId, sSubscription.ulObjectFlags, sSubscription.ulObjectType);
 
 			lpBTSession->Unlock();
-        }
+		}
 	}
 
 	return er;
@@ -1322,28 +1278,19 @@ exit:
 ECRESULT ECSessionManager::NotificationChange(const set<unsigned int> &syncIds, unsigned int ulChangeId, unsigned int ulChangeType)
 {
 	ECRESULT					er = erSuccess;
-	SESSIONGROUPMAP::iterator	iIterator;
+	SESSIONGROUPMAP::const_iterator iIterator;
 	
 	pthread_rwlock_rdlock(&m_hGroupLock);
 
 	// Send the notification to all sessionsgroups so that any client listening for these
 	// notifications can receive them
-	for(iIterator = m_mapSessionGroups.begin(); iIterator != m_mapSessionGroups.end(); iIterator++)
+	for (iIterator = m_mapSessionGroups.begin();
+	     iIterator != m_mapSessionGroups.end(); ++iIterator)
 		iIterator->second->AddChangeNotification(syncIds, ulChangeId, ulChangeType);
 	
 	pthread_rwlock_unlock(&m_hGroupLock);
 
 	return er;
-}
-
-ECCacheManager*	ECSessionManager::GetCacheManager()
-{
-	return m_lpECCacheManager;
-}
-
-ECSearchFolders* ECSessionManager::GetSearchFolders()
-{
-	return m_lpSearchFolders;
 }
 
 /**
@@ -1390,8 +1337,8 @@ void ECSessionManager::GetStats(void(callback)(const std::string &, const std::s
  */
 void ECSessionManager::GetStats(sSessionManagerStats &sStats)
 {
-	SESSIONMAP::iterator		iIterator;
-	SESSIONGROUPMAP::iterator	itersg;
+	SESSIONMAP::const_iterator iIterator;
+	SESSIONGROUPMAP::const_iterator itersg;
 	list<ECSession*> vSessions;
 
 	memset(&sStats, 0, sizeof(sSessionManagerStats));
@@ -1410,9 +1357,9 @@ void ECSessionManager::GetStats(sSessionManagerStats &sStats)
 	sStats.group.ulItems = m_mapSessionGroups.size();
 	sStats.group.ullSize = MEMORY_USAGE_HASHMAP(sStats.group.ulItems, SESSIONGROUPMAP);
 
-	for (itersg = m_mapSessionGroups.begin(); itersg != m_mapSessionGroups.end(); itersg++) {
+	for (itersg = m_mapSessionGroups.begin();
+	     itersg != m_mapSessionGroups.end(); ++itersg)
 		sStats.group.ullSize += itersg->second->GetObjectSize();
-	}
 
 	pthread_rwlock_unlock(&m_hGroupLock);
 
@@ -1454,44 +1401,24 @@ ECRESULT ECSessionManager::DumpStats()
 	sSearchFolderStats sSearchStats;
 
 	GetStats(sSessionStats);
-
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Session stats:");
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "  Sessions : %u (%llu bytes)", sSessionStats.session.ulItems, sSessionStats.session.ullSize);
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "  Locked   : %d", sSessionStats.session.ulLocked);
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "  Groups   : %u (%llu bytes)" ,sSessionStats.group.ulItems, sSessionStats.group.ullSize);
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "  PersistentByConnection : %u (%u bytes)" ,sSessionStats.ulPersistentByConnection, sSessionStats.ulPersistentByConnectionSize);
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "  PersistentBySession    : %u (%u bytes)" , sSessionStats.ulPersistentBySession, sSessionStats.ulPersistentBySessionSize);
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Subscription stats:");
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "  Table : %u (%u bytes)", sSessionStats.ulTableSubscriptions,  sSessionStats.ulTableSubscriptionSize);
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "  Object: %u (%u bytes)", sSessionStats.ulObjectSubscriptions, sSessionStats.ulObjectSubscriptionSize);
-
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Table stats:");
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "  Open tables: %u (%llu bytes)", sSessionStats.session.ulOpenTables, sSessionStats.session.ulTableSize);
-
+	ec_log_info("Session stats:");
+	ec_log_info("  Sessions : %u (%llu bytes)", sSessionStats.session.ulItems, static_cast<unsigned long long>(sSessionStats.session.ullSize));
+	ec_log_info("  Locked   : %d", sSessionStats.session.ulLocked);
+	ec_log_info("  Groups   : %u (%llu bytes)" ,sSessionStats.group.ulItems, static_cast<unsigned long long>(sSessionStats.group.ullSize));
+	ec_log_info("  PersistentByConnection : %u (%u bytes)" ,sSessionStats.ulPersistentByConnection, sSessionStats.ulPersistentByConnectionSize);
+	ec_log_info("  PersistentBySession    : %u (%u bytes)" , sSessionStats.ulPersistentBySession, sSessionStats.ulPersistentBySessionSize);
+	ec_log_info("Subscription stats:");
+	ec_log_info("  Table : %u (%u bytes)", sSessionStats.ulTableSubscriptions,  sSessionStats.ulTableSubscriptionSize);
+	ec_log_info("  Object: %u (%u bytes)", sSessionStats.ulObjectSubscriptions, sSessionStats.ulObjectSubscriptionSize);
+	ec_log_info("Table stats:");
+	ec_log_info("  Open tables: %u (%llu bytes)", sSessionStats.session.ulOpenTables, static_cast<unsigned long long>(sSessionStats.session.ulTableSize));
 	m_lpSearchFolders->GetStats(sSearchStats);
-
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "SearchFolders:");
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "  Stores    : %u", sSearchStats.ulStores);
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "  Folders   : %u", sSearchStats.ulFolders);
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "  Queue     : %u", sSearchStats.ulEvents);
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL, "  Mem usage : %llu Bytes", sSearchStats.ullSize);
-
+	ec_log_info("SearchFolders:");
+	ec_log_info("  Stores    : %u", sSearchStats.ulStores);
+	ec_log_info("  Folders   : %u", sSearchStats.ulFolders);
+	ec_log_info("  Queue     : %u", sSearchStats.ulEvents);
+	ec_log_info("  Mem usage : %llu Bytes", static_cast<unsigned long long>(sSearchStats.ullSize));
 	return this->m_lpECCacheManager->DumpStats();
-}
-
-ECConfig* ECSessionManager::GetConfig()
-{
-	return m_lpConfig;
-}
-
-ECLogger* ECSessionManager::GetLogger()
-{
-	return m_lpLogger;
-}
-
-ECLogger* ECSessionManager::GetAudit()
-{
-	return m_lpAudit;
 }
 
 ECRESULT ECSessionManager::GetLicensedUsers(unsigned int ulServiceType, unsigned int* lpulLicensedUsers)
@@ -1499,6 +1426,7 @@ ECRESULT ECSessionManager::GetLicensedUsers(unsigned int ulServiceType, unsigned
 	ECRESULT er = erSuccess;
 	unsigned int ulLicensedUsers = 0;
 
+#ifdef LINUX	
     ECLicenseClient *lpLicenseClient = NULL;
 	lpLicenseClient = new ECLicenseClient(GetConfig()->GetSetting("license_socket"), atoui(GetConfig()->GetSetting("license_timeout")) );
 	
@@ -1510,30 +1438,13 @@ ECRESULT ECSessionManager::GetLicensedUsers(unsigned int ulServiceType, unsigned
 	}
 	
 	delete lpLicenseClient;
+#else
+    ulLicensedUsers = 0;
+#endif
 
 	*lpulLicensedUsers = ulLicensedUsers;
 
 	return er;
-}
-
-bool ECSessionManager::IsHostedSupported()
-{
-	return m_bHostedZarafa;
-}
-
-bool ECSessionManager::IsDistributedSupported()
-{
-	return m_bDistributedZarafa;
-}
-
-ECPluginFactory* ECSessionManager::GetPluginFactory()
-{
-	return m_lpPluginFactory;
-}
-
-ECLockManager* ECSessionManager::GetLockManager()
-{
-	return m_ptrLockManager.get();
 }
 
 ECRESULT ECSessionManager::GetServerGUID(GUID* lpServerGuid){
@@ -1570,9 +1481,8 @@ ECRESULT ECSessionManager::GetNewSourceKey(SOURCEKEY* lpSourceKey){
 	}
 
 	*lpSourceKey = SOURCEKEY(*m_lpServerGuid, m_ullSourceKeyAutoIncrement + 1);
-    m_ullSourceKeyAutoIncrement++;
-	m_ulSourceKeyQueue--;
-
+	++m_ullSourceKeyAutoIncrement;
+	--m_ulSourceKeyQueue;
 	pthread_mutex_unlock(&m_hSourceKeyAutoIncrementMutex);
 
 exit:
@@ -1612,8 +1522,8 @@ ECRESULT ECSessionManager::SetSessionPersistentConnection(ECSESSIONID sessionID,
 ECRESULT ECSessionManager::RemoveSessionPersistentConnection(unsigned int ulPersistentConnectionId)
 {
 	ECRESULT er = erSuccess;
-	PERSISTENTBYCONNECTION::iterator iterConnection;
-	PERSISTENTBYSESSION::iterator iterSession;
+	PERSISTENTBYCONNECTION::const_iterator iterConnection;
+	PERSISTENTBYSESSION::const_iterator iterSession;
 
 	pthread_mutex_lock(&m_mutexPersistent);
 
@@ -1640,7 +1550,7 @@ exit:
 
 BOOL ECSessionManager::IsSessionPersistent(ECSESSIONID sessionID)
 {
-	PERSISTENTBYSESSION::iterator iterSession;
+	PERSISTENTBYSESSION::const_iterator iterSession;
 
 	pthread_mutex_lock(&m_mutexPersistent);
 	iterSession = m_mapPersistentBySession.find(sessionID);
@@ -1680,7 +1590,7 @@ ECRESULT ECSessionManager::GetNewSequence(SEQUENCE seq, unsigned long long *lpll
 		}
 		m_ulSeqIMAPQueue = 50;
 	}
-	m_ulSeqIMAPQueue--;
+	--m_ulSeqIMAPQueue;
 	*lpllSeqId = m_ulSeqIMAP++;
 
 	pthread_mutex_unlock(&m_hSeqMutex);
@@ -1697,7 +1607,7 @@ ECRESULT ECSessionManager::CreateDatabaseConnection()
 	if(m_lpDatabase == NULL) {
 		er = m_lpDatabaseFactory->CreateDatabaseObject(&m_lpDatabase, strError);
 		if(er != erSuccess) {
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to open connection to database: %s", strError.c_str());
+			ec_log_crit("Unable to open connection to database: %s", strError.c_str());
 			goto exit;
 		}
 	}
@@ -1741,7 +1651,7 @@ ECRESULT ECSessionManager::UnsubscribeTableEvents(TABLE_ENTRY::TABLE_TYPE ulType
     while(iter != m_mapTableSubscriptions.end() && iter->first == sSubscription) {
         if(iter->second == sessionID)
             break;
-        iter++;
+        ++iter;
     }
     
     if(iter != m_mapTableSubscriptions.end()) {
@@ -1775,7 +1685,9 @@ ECRESULT ECSessionManager::UnsubscribeObjectEvents(unsigned int ulStoreId, ECSES
     pthread_mutex_lock(&m_mutexObjectSubscriptions);
     i = m_mapObjectSubscriptions.find(ulStoreId);
     
-    while(i != m_mapObjectSubscriptions.end() && i->first == ulStoreId && i->second != sessionID) i++;
+	while (i != m_mapObjectSubscriptions.end() && i->first == ulStoreId &&
+	    i->second != sessionID)
+		++i;
     
     if(i != m_mapObjectSubscriptions.end()) {
         m_mapObjectSubscriptions.erase(i);

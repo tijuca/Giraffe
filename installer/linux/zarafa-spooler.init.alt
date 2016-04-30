@@ -8,7 +8,7 @@
 #              using your MTA as configured.
 # processname: /usr/sbin/zarafa-spooler
 # config: /etc/zarafa/spooler.cfg
-# pidfile: /var/run/zarafa-spooler.pid
+# pidfile: /var/run/zarafad/spooler.pid
 
 ### BEGIN INIT INFO
 # Provides: zarafa-spooler
@@ -29,7 +29,7 @@ SPOOLERCONFIG=/etc/zarafa/spooler.cfg
 SPOOLERPROGRAM=/usr/sbin/zarafa-spooler
 spooler=`basename $SPOOLERPROGRAM`
 LOCKFILE=/var/lock/subsys/$spooler
-PIDFILE=/var/run/$spooler.pid
+PIDFILE=/var/run/zarafad/spooler.pid
 RETVAL=0
 
 # Sanity checks.
@@ -44,6 +44,7 @@ if [ -z "$ZARAFA_LOCALE" ]; then
 fi
 
 start() {
+	install -dm0775 -o zarafa -g zarafa /var/run/zarafad
 	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $spooler
 	RETVAL=$?
 
@@ -51,10 +52,13 @@ start() {
 }
 
 stop() {
+	stop_daemon --pidfile "/var/run/$spooler.pid" --lockfile "$LOCKFILE" $spooler
+	RETVAL2="$?"
 	stop_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $spooler
 	RETVAL=$?
 
-	return $RETVAL
+	test "$RETVAL2" -eq 0 || "$RETVAL" -eq 0
+	return $?
 }
 
 restart() {

@@ -1,53 +1,27 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <mapix.h>
-#include "ECGuid.h"
+#include <zarafa/ECGuid.h>
 #include "ECMemStream.h"
-#include "Trace.h"
-#include "ECDebug.h"
+#include <zarafa/Trace.h>
+#include <zarafa/ECDebug.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -87,10 +61,8 @@ ECMemBlock::ECMemBlock(char *buffer, ULONG ulDataLen, ULONG ulFlags) : ECUnknown
 
 ECMemBlock::~ECMemBlock()
 {
-	if(lpCurrent)
-		free(lpCurrent);
-
-	if((ulFlags & STGM_TRANSACTED) && lpOriginal)
+	free(lpCurrent);
+	if (ulFlags & STGM_TRANSACTED)
 		free(lpOriginal);
 }
 
@@ -132,16 +104,13 @@ HRESULT	ECMemBlock::ReadAt(ULONG ulPos, ULONG ulLen, char *buffer, ULONG *ulByte
 
 HRESULT ECMemBlock::WriteAt(ULONG ulPos, ULONG ulLen, char *buffer, ULONG *ulBytesWritten)
 {
-	HRESULT hr = hrSuccess;
 	ULONG dsize = ulPos + ulLen;
 	
 	if(cbTotal < dsize) {
 		ULONG newsize = cbTotal + ((dsize/EC_MEMBLOCK_SIZE)+1)*EC_MEMBLOCK_SIZE;	// + atleast 8k
 		char *lpNew = (char *)realloc(lpCurrent, newsize);
-		if (lpNew == NULL) {
-			hr = MAPI_E_NOT_ENOUGH_MEMORY;
-			goto exit;
-		}
+		if (lpNew == NULL)
+			return MAPI_E_NOT_ENOUGH_MEMORY;
 
 		lpCurrent = lpNew;
 		memset(lpCurrent+cbTotal, 0, newsize-cbTotal);	// clear new alloced mem
@@ -155,16 +124,13 @@ HRESULT ECMemBlock::WriteAt(ULONG ulPos, ULONG ulLen, char *buffer, ULONG *ulByt
 
 	if(ulBytesWritten)
 		*ulBytesWritten = ulLen;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMemBlock::Commit()
 {
 	if(ulFlags & STGM_TRANSACTED) {
-		if(lpOriginal)
-			free(lpOriginal);
+		free(lpOriginal);
 		lpOriginal = NULL;
 
 		lpOriginal = (char *)malloc(cbCurrent);
@@ -181,8 +147,7 @@ HRESULT ECMemBlock::Commit()
 HRESULT ECMemBlock::Revert()
 {
 	if(ulFlags & STGM_TRANSACTED) {
-		if(lpCurrent)
-			free(lpCurrent);
+		free(lpCurrent);
 		lpCurrent = NULL;
 
 		lpCurrent = (char *)malloc(cbOriginal);
@@ -206,10 +171,7 @@ HRESULT ECMemBlock::SetSize(ULONG ulSize)
 
 	if(ulSize > cbCurrent)
 		memset(lpNew+cbCurrent, 0, ulSize-cbCurrent);
-
-	if(lpCurrent)
-		free(lpCurrent);
-
+	free(lpCurrent);
 	lpCurrent = lpNew;
 	cbCurrent = ulSize;
 	cbTotal = ulSize;
@@ -299,7 +261,6 @@ ULONG ECMemStream::Release()
 HRESULT	ECMemStream::Create(char *buffer, ULONG ulDataLen, ULONG ulFlags, CommitFunc lpCommitFunc, DeleteFunc lpDeleteFunc,
 							void *lpParam, ECMemStream **lppStream)
 {
-	HRESULT hr = hrSuccess;
 	ECMemStream *lpStream = NULL;
 
 	try {
@@ -307,16 +268,12 @@ HRESULT	ECMemStream::Create(char *buffer, ULONG ulDataLen, ULONG ulFlags, Commit
 	} catch (std::exception &) {
 		return MAPI_E_NOT_ENOUGH_MEMORY;
 	}
-
-	hr = lpStream->QueryInterface(IID_ECMemStream, (void **)lppStream);
-
-	return hr;
+	return lpStream->QueryInterface(IID_ECMemStream, (void **)lppStream);
 }
 
 HRESULT	ECMemStream::Create(ECMemBlock *lpMemBlock, ULONG ulFlags, CommitFunc lpCommitFunc, DeleteFunc lpDeleteFunc,
 							void *lpParam, ECMemStream **lppStream)
 {
-	HRESULT hr = hrSuccess;
 	ECMemStream *lpStream = NULL;
 
 	try {
@@ -324,10 +281,7 @@ HRESULT	ECMemStream::Create(ECMemBlock *lpMemBlock, ULONG ulFlags, CommitFunc lp
 	} catch (std::exception &) {
 		return MAPI_E_NOT_ENOUGH_MEMORY;
 	}
-
-	hr = lpStream->QueryInterface(IID_ECMemStream, (void **)lppStream);
-
-	return hr;
+	return lpStream->QueryInterface(IID_ECMemStream, (void **)lppStream);
 }
 
 HRESULT ECMemStream::Read(void *pv, ULONG cb, ULONG *pcbRead)
@@ -353,19 +307,16 @@ HRESULT ECMemStream::Read(void *pv, ULONG cb, ULONG *pcbRead)
 
 HRESULT ECMemStream::Write(const void *pv, ULONG cb, ULONG *pcbWritten)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG ulWritten = 0;
 
 	if(!(ulFlags&STGM_WRITE))
-	{
-		hr = MAPI_E_NO_ACCESS;
-		goto exit;
-	}
+		return MAPI_E_NO_ACCESS;
 
 	hr = this->lpMemBlock->WriteAt((ULONG)this->liPos.QuadPart, cb, (char *)pv, &ulWritten);
 
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	liPos.QuadPart += ulWritten;
 
@@ -379,20 +330,18 @@ HRESULT ECMemStream::Write(const void *pv, ULONG cb, ULONG *pcbWritten)
 	// no point in committing already. We simply defer the commit until the stream is Released
 	if(!(ulFlags & STGM_TRANSACTED) && !(ulFlags & STGM_SHARE_EXCLUSIVE)) 
 		Commit(0);
-exit:
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMemStream::Seek(LARGE_INTEGER dlibmove, DWORD dwOrigin, ULARGE_INTEGER *plibNewPosition)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG ulSize = 0;
 
 	hr = this->lpMemBlock->GetSize(&ulSize);
 
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	switch(dwOrigin) {
 	case SEEK_SET:
@@ -413,38 +362,32 @@ HRESULT ECMemStream::Seek(LARGE_INTEGER dlibmove, DWORD dwOrigin, ULARGE_INTEGER
 
 	if(plibNewPosition)
 		plibNewPosition->QuadPart = liPos.QuadPart;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMemStream::SetSize(ULARGE_INTEGER libNewSize)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	if(!(ulFlags&STGM_WRITE))
-	{
-		hr = MAPI_E_NO_ACCESS;
-		goto exit;
-	}
+		return MAPI_E_NO_ACCESS;
 
 	hr = lpMemBlock->SetSize((ULONG)libNewSize.QuadPart);
 
 	this->fDirty = TRUE;
-exit:
 	return hr;
 }
 
 HRESULT ECMemStream::CopyTo(IStream *pstm, ULARGE_INTEGER cb, ULARGE_INTEGER *pcbRead, ULARGE_INTEGER *pcbWritten)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG ulOffset = 0;
 	ULONG ulWritten = 0;
 	ULONG ulSize = 0;
 	
 	hr = lpMemBlock->GetSize(&ulSize);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	ASSERT(liPos.u.HighPart == 0);
 	ulOffset = liPos.u.LowPart;
@@ -463,9 +406,7 @@ HRESULT ECMemStream::CopyTo(IStream *pstm, ULARGE_INTEGER cb, ULARGE_INTEGER *pc
 		pcbWritten->QuadPart = ulOffset - liPos.u.LowPart;
 
 	liPos.QuadPart = ulOffset;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMemStream::Commit(DWORD grfCommitFlags)
@@ -520,36 +461,29 @@ HRESULT ECMemStream::LockRegion(ULARGE_INTEGER libOffset, ULARGE_INTEGER cb, DWO
 
 HRESULT ECMemStream::UnlockRegion(ULARGE_INTEGER libOffset, ULARGE_INTEGER cb, DWORD dwLockType)
 {
-	HRESULT hr = STG_E_INVALIDFUNCTION;
-
-	hr=hrSuccess; //hack for loadsim
-
-	return hr;
+	return hrSuccess; //hack for loadsim
+	//return STG_E_INVALIDFUNCTION;
 }
 
 HRESULT ECMemStream::Stat(STATSTG *pstatstg, DWORD grfStatFlag)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG ulSize = 0;
 
-	if (pstatstg == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (pstatstg == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	hr = this->lpMemBlock->GetSize(&ulSize);
 
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	memset(pstatstg, 0, sizeof(STATSTG));
 	pstatstg->cbSize.QuadPart = ulSize;
 
 	pstatstg->type = STGTY_STREAM;
 	pstatstg->grfMode = ulFlags;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMemStream::Clone(IStream **ppstm)

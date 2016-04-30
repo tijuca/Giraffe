@@ -37,7 +37,7 @@ def main(argv = None):
     if len(argv) < 2:
         print "Usage: %s <username>" % argv[0]
         return 1
-    session = OpenECSession(argv[1], '', os.getenv('ZARAFA_SOCKET','file:///var/run/zarafa'))
+    session = OpenECSession(argv[1], "", os.getenv("ZARAFA_SOCKET", "default:"))
     store = GetDefaultStore(session)
     root = store.OpenEntry(None, None, 0)
     ceid = root.GetProps([PR_IPM_APPOINTMENT_ENTRYID], 0)[0]

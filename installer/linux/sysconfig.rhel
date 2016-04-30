@@ -1,9 +1,0 @@
-#
-# Locale setting for all Zarafa services
-#
-ZARAFA_LOCALE="C"
-
-#
-# Locale setting for Zarafa userscripts
-#
-ZARAFA_USERSCRIPT_LOCALE="C"

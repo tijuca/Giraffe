@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ZCMAPIProp.h"
 #include "ZCABData.h"
 
@@ -50,11 +24,11 @@
 #include <mapicode.h>
 #include <mapiutil.h>
 
-#include "Util.h"
-#include "ECGuid.h"
-#include "mapi_ptr.h"
-#include "namedprops.h"
-#include "mapiguidext.h"
+#include <zarafa/Util.h>
+#include <zarafa/ECGuid.h>
+#include <zarafa/mapi_ptr.h>
+#include <zarafa/namedprops.h>
+#include <zarafa/mapiguidext.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -71,8 +45,7 @@ ZCMAPIProp::ZCMAPIProp(ULONG ulObjType, const char *szClassName) :
 
 ZCMAPIProp::~ZCMAPIProp()
 {
-	if (m_base)
-		MAPIFreeBuffer(m_base);
+	MAPIFreeBuffer(m_base);
 }
 
 #define ADD_PROP_OR_EXIT(dest, src, base, propid) {						\
@@ -305,7 +278,7 @@ HRESULT ZCMAPIProp::ConvertProps(IMAPIProp *lpContact, ULONG cbEntryID, LPENTRYI
 		goto exit;
 
 	if (ulIndex < 3) {
-		for (ULONG i = 0; i < ulNames; i++) {
+		for (ULONG i = 0; i < ulNames; ++i) {
 			mnNamedProps[i].Kind.lID += (ulIndex * 0x10);
 			lppNames[i] = &mnNamedProps[i];
 		}
@@ -335,9 +308,7 @@ HRESULT ZCMAPIProp::ConvertProps(IMAPIProp *lpContact, ULONG cbEntryID, LPENTRYI
 		hr = ConvertDistList(ptrNameTags, cValues, ptrContactProps);
 
 exit:
-	if (lppNames)
-		MAPIFreeBuffer(lppNames);
-
+	MAPIFreeBuffer(lppNames);
 	return hr;
 }
 
@@ -398,7 +369,9 @@ HRESULT ZCMAPIProp::SaveChanges(ULONG ulFlags)
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ZCMAPIProp::CopyOneProp(convert_context &converter, ULONG ulFlags, std::map<short, SPropValue>::iterator i, LPSPropValue lpProp, LPSPropValue lpBase)
+HRESULT ZCMAPIProp::CopyOneProp(convert_context &converter, ULONG ulFlags,
+    const std::map<short, SPropValue>::const_iterator &i, LPSPropValue lpProp,
+    LPSPropValue lpBase)
 {
 	HRESULT hr = hrSuccess;
 
@@ -435,7 +408,7 @@ exit:
 HRESULT ZCMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG * lpcValues, LPSPropValue * lppPropArray)
 {
 	HRESULT hr = hrSuccess;
-	std::map<short, SPropValue>::iterator i;
+	std::map<short, SPropValue>::const_iterator i;
 	ULONG j = 0;
 	LPSPropValue lpProps = NULL;
 	convert_context converter;
@@ -449,7 +422,7 @@ HRESULT ZCMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULON
 		if (hr != hrSuccess)
 			goto exit;
 
-		for (i = m_mapProperties.begin(), j = 0; i != m_mapProperties.end(); i++, j++) {
+		for (i = m_mapProperties.begin(), j = 0; i != m_mapProperties.end(); ++i, ++j) {
 			hr = CopyOneProp(converter, ulFlags, i, &lpProps[j], lpProps);
 			if (hr != hrSuccess)
 				goto exit;				
@@ -462,7 +435,7 @@ HRESULT ZCMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULON
 		if (hr != hrSuccess)
 			goto exit;
 
-		for (ULONG n = 0, j = 0; n < lpPropTagArray->cValues; n++, j++) {
+		for (ULONG n = 0, j = 0; n < lpPropTagArray->cValues; ++n, ++j) {
 			i = m_mapProperties.find(PROP_ID(lpPropTagArray->aulPropTag[n]));
 			if (i == m_mapProperties.end()) {
 				lpProps[j].ulPropTag = CHANGE_PROP_TYPE(lpPropTagArray->aulPropTag[n], PT_ERROR);
@@ -482,9 +455,7 @@ HRESULT ZCMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULON
 	lpProps = NULL;
 
 exit:
-	if (lpProps)
-		MAPIFreeBuffer(lpProps);
-
+	MAPIFreeBuffer(lpProps);
 	return hr;
 }
 
@@ -500,7 +471,7 @@ HRESULT ZCMAPIProp::GetPropList(ULONG ulFlags, LPSPropTagArray * lppPropTagArray
 {
 	HRESULT hr = hrSuccess;
 	LPSPropTagArray lpPropTagArray = NULL;
-	std::map<short, SPropValue>::iterator i;
+	std::map<short, SPropValue>::const_iterator i;
 	ULONG j = 0;
 
 	hr = MAPIAllocateBuffer(CbNewSPropTagArray(m_mapProperties.size()), (void**)&lpPropTagArray);
@@ -508,7 +479,7 @@ HRESULT ZCMAPIProp::GetPropList(ULONG ulFlags, LPSPropTagArray * lppPropTagArray
 		goto exit;
 
 	lpPropTagArray->cValues = m_mapProperties.size();
-	for (i = m_mapProperties.begin(); i != m_mapProperties.end(); i++, j++) {
+	for (i = m_mapProperties.begin(); i != m_mapProperties.end(); ++i, ++j) {
 		lpPropTagArray->aulPropTag[j] = i->second.ulPropTag;
 		if ((ulFlags & MAPI_UNICODE) == 0 && PROP_TYPE(lpPropTagArray->aulPropTag[j]) == PT_UNICODE)
 			lpPropTagArray->aulPropTag[j] = CHANGE_PROP_TYPE(lpPropTagArray->aulPropTag[j], PT_STRING8);

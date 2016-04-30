@@ -1,58 +1,32 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ECDatabase.h"
 
 #include <mapidefs.h>
 #include <mapitags.h>
-#include "EMSAbTag.h"
+#include <zarafa/EMSAbTag.h>
 
 #include "ECSessionManager.h"
 #include "ECConvenientDepthABObjectTable.h"
 #include "ECSession.h"
 #include "ECMAPI.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -83,7 +57,7 @@ ECRESULT ECConvenientDepthABObjectTable::Create(ECSession *lpSession, unsigned i
 ECRESULT ECConvenientDepthABObjectTable::QueryRowData(ECGenericObjectTable *lpGenTable, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bTableData,bool bTableLimit)
 {
     ECRESULT er = erSuccess;
-    ECObjectTableList::iterator iterRow;
+    ECObjectTableList::const_iterator iterRow;
     unsigned int n = 0;
     struct propVal *lpProp = NULL;
     ECConvenientDepthABObjectTable *lpThis = (ECConvenientDepthABObjectTable *)lpGenTable;
@@ -93,7 +67,7 @@ ECRESULT ECConvenientDepthABObjectTable::QueryRowData(ECGenericObjectTable *lpGe
         goto exit;
 
     // Insert the PR_DEPTH for all the rows since the row engine has no knowledge of depth
-    for(iterRow=lpRowList->begin(); iterRow != lpRowList->end(); iterRow++, n++) {
+    for (iterRow = lpRowList->begin(); iterRow != lpRowList->end(); ++iterRow, ++n) {
         lpProp = FindProp(&(*lppRowSet)->__ptr[n], PROP_TAG(PT_ERROR, PROP_ID(PR_DEPTH)));
         
         if(lpProp) {
@@ -125,10 +99,10 @@ ECRESULT ECConvenientDepthABObjectTable::Load()
 	ECODAB *lpODAB = (ECODAB*)m_lpObjectData;
 	sObjectTableKey	sRowItem;
 	std::list<localobjectdetails_t> *lpSubObjects = NULL;
-	std::list<localobjectdetails_t>::iterator iterSubObjects;
+	std::list<localobjectdetails_t>::const_iterator iterSubObjects;
 	
 	std::list<CONTAINERINFO> lstObjects;
-	std::list<CONTAINERINFO>::iterator objectIter;
+	std::list<CONTAINERINFO>::const_iterator objectIter;
 	CONTAINERINFO root;
 
 	if (lpODAB->ulABType != MAPI_ABCONT) {
@@ -144,9 +118,9 @@ ECRESULT ECConvenientDepthABObjectTable::Load()
 	lstObjects.push_back(root);
 
     // 'Recursively' loop through all our containers and add each of those children to our object list
-    for(objectIter = lstObjects.begin(); objectIter != lstObjects.end(); objectIter++) {
+    for (objectIter = lstObjects.begin(); objectIter != lstObjects.end(); ++objectIter) {
         if(LoadHierarchyContainer(objectIter->ulId, 0, &lpSubObjects) == erSuccess) {
-            for(iterSubObjects = lpSubObjects->begin(); iterSubObjects != lpSubObjects->end(); iterSubObjects++) {
+            for (iterSubObjects = lpSubObjects->begin(); iterSubObjects != lpSubObjects->end(); ++iterSubObjects) {
                 CONTAINERINFO folder;
                 folder.ulId = iterSubObjects->ulId;
                 folder.ulDepth = objectIter->ulDepth+1;
@@ -160,7 +134,7 @@ ECRESULT ECConvenientDepthABObjectTable::Load()
     }
 
     // Add all the rows into the row engine, except the root object (the folder itself does not show in its own hierarchy table)
-	for (objectIter = lstObjects.begin(); objectIter != lstObjects.end(); objectIter++) {
+	for (objectIter = lstObjects.begin(); objectIter != lstObjects.end(); ++objectIter) {
 	    if(objectIter->ulId != lpODAB->ulABParentId) {
     	    m_mapDepth[objectIter->ulId] = objectIter->ulDepth;
     	    m_mapPath[objectIter->ulId] = objectIter->strPath;
@@ -169,8 +143,6 @@ ECRESULT ECConvenientDepthABObjectTable::Load()
 	}
 
 exit:
-    if (lpSubObjects)
-        delete lpSubObjects;
-
-    return er;
+	delete lpSubObjects;
+	return er;
 }

@@ -1,61 +1,35 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "iCal.h"
 #include "CalDavUtil.h"
 
 #include <vector>
 
-#include "CommonUtil.h"
-#include "restrictionutil.h"
+#include <zarafa/CommonUtil.h>
+#include <zarafa/restrictionutil.h>
 #include "icaluid.h"
 
 #include <libxml/tree.h>
 #include <libxml/parser.h>
 #include "PublishFreeBusy.h"
 
-#include <mapi_ptr.h>
+#include <zarafa/mapi_ptr.h>
 
 using namespace std;
 
@@ -165,9 +139,7 @@ exit:
 	else
 		m_lpRequest->HrResponseHeader(500, "Internal Server Error");
 	
-	if (lpProp)
-		MAPIFreeBuffer(lpProp);
-
+	MAPIFreeBuffer(lpProp);
 	if (lpContents)
 		lpContents->Release();
 
@@ -192,7 +164,6 @@ HRESULT iCal::HrHandleIcalPost()
 	SBinary sbUid = {0,0};
 	ULONG ulItemCount = 0;
 	ULONG ulProptag = 0;
-	ULONG ulTagPrivate = 0;
 	ULONG cValues = 0;
 	ICalToMapi *lpICalToMapi = NULL;
 	time_t tLastMod = 0;
@@ -208,13 +179,11 @@ HRESULT iCal::HrHandleIcalPost()
 	map<std::string, FILETIME> mpSrvTimes;
 	map<std::string,SBinary> mpSrvEntries;
 	
-	map<std::string, int>::iterator mpIterI;
-	map<std::string,SBinary>::iterator mpIterJ;	
+	map<std::string, int>::const_iterator mpIterI;
+	map<std::string,SBinary>::const_iterator mpIterJ;
 
 
 	ulProptag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_GOID], PT_BINARY);
-	ulTagPrivate = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_PRIVATE], PT_BOOLEAN);
-
 	cValues = 3;
 	if ((hr = MAPIAllocateBuffer(CbNewSPropTagArray(cValues), (void **)&lpPropTagArr)) != hrSuccess)
 		goto exit;
@@ -241,8 +210,7 @@ HRESULT iCal::HrHandleIcalPost()
 
 	//map of Ical entries.
 	//generate map for each entry's UID and Position.
-	for(ULONG i = 0; i < ulItemCount; i++)
-	{
+	for (ULONG i = 0; i < ulItemCount; ++i) {
 		hr = lpICalToMapi->GetItemInfo(i, &etype, &tLastMod, &sbEid);
 		if (hr != hrSuccess || etype != VEVENT)
 			continue;
@@ -274,8 +242,7 @@ HRESULT iCal::HrHandleIcalPost()
 		if (lpRows->cRows == 0)
 			break;
 
-		for (ULONG i=0; i < lpRows->cRows; i++)
-		{
+		for (ULONG i = 0; i < lpRows->cRows; ++i) {
 			if (lpRows->aRow[i].lpProps[0].ulPropTag == PR_ENTRYID)
 			{
 				if(lpRows->aRow[i].lpProps[2].ulPropTag == ulProptag)
@@ -286,7 +253,7 @@ HRESULT iCal::HrHandleIcalPost()
 				sbEid.cb = lpRows->aRow[i].lpProps[0].Value.bin.cb;
 				if ((hr = MAPIAllocateBuffer(sbEid.cb,(void**)&sbEid.lpb)) != hrSuccess)
 					goto exit;
-				memcpy((void*)sbEid.lpb,lpRows->aRow[i].lpProps[0].Value.bin.lpb,sbEid.cb);
+				memcpy(sbEid.lpb, lpRows->aRow[i].lpProps[0].Value.bin.lpb, sbEid.cb);
 
 				strUidString =  bin2hex((ULONG)sbUid.cb,(LPBYTE)sbUid.lpb);
 			
@@ -320,7 +287,7 @@ HRESULT iCal::HrHandleIcalPost()
 				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to Delete Message : 0x%08X", hr);
 				goto exit;
 			}
-			mpIterJ++;
+			++mpIterJ;
 		}
 		else if(mpIcalEntries.end() != mpIterI && mpSrvEntries.end() == mpIterJ)
 		{
@@ -330,7 +297,7 @@ HRESULT iCal::HrHandleIcalPost()
 				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to Add New Message : 0x%08X", hr);
 				goto exit;
 			}
-			mpIterI++;
+			++mpIterI;
 		}
 		else if(mpSrvEntries.end() != mpIterJ && mpIcalEntries.end() != mpIterI )
 		{
@@ -391,11 +358,8 @@ exit:
 	else
 		m_lpRequest->HrResponseHeader(500,"Internal Server Error");
 
-	for( mpIterJ = mpSrvEntries.begin(); mpIterJ != mpSrvEntries.end() ; mpIterJ++ )
-	{
-		if(mpIterJ->second.lpb)
-			MAPIFreeBuffer(mpIterJ->second.lpb);
-	}
+	for (mpIterJ = mpSrvEntries.begin(); mpIterJ != mpSrvEntries.end(); ++mpIterJ)
+		MAPIFreeBuffer(mpIterJ->second.lpb);
 	
 	if(lpContTable)
 		lpContTable->Release();
@@ -406,9 +370,7 @@ exit:
 	if(lpICalToMapi)
 		delete lpICalToMapi;
 	
-	if(lpPropTagArr)
-		MAPIFreeBuffer(lpPropTagArr);
-	
+	MAPIFreeBuffer(lpPropTagArr);
 	mpSrvEntries.clear();
 	mpIcalEntries.clear();
 	mpSrvTimes.clear();
@@ -540,7 +502,7 @@ HRESULT iCal::HrDelMessage(SBinary sbEid, bool blCensor)
 	if ((hr = MAPIAllocateMore(sbEid.cb, lpEntryList, (void**)&lpEntryList->lpbin[0].lpb)) != hrSuccess)
 		goto exit;
 
-	memcpy((void *)lpEntryList->lpbin[0].lpb,(const void *) sbEid.lpb,sbEid.cb);
+	memcpy(lpEntryList->lpbin[0].lpb, sbEid.lpb, sbEid.cb);
 				
 	hr = m_lpUsrFld->DeleteMessages(lpEntryList, 0, NULL, MESSAGE_DIALOG);
 	if(hr != hrSuccess)
@@ -550,9 +512,7 @@ HRESULT iCal::HrDelMessage(SBinary sbEid, bool blCensor)
 	}
 
 exit:
-	if (lpEntryList)
-		MAPIFreeBuffer(lpEntryList);
-
+	MAPIFreeBuffer(lpEntryList);
 	if(lpMessage)
 		lpMessage->Release();
 
@@ -669,8 +629,7 @@ HRESULT iCal::HrGetIcal(IMAPITable *lpTable, bool blCensorPrivate, std::string *
 		if (lpRows->cRows == 0)
 			break;
 
-		for (ULONG i=0; i < lpRows->cRows; i++)
-		{
+		for (ULONG i = 0; i < lpRows->cRows; ++i) {
 			blCensor = blCensorPrivate; // reset censor flag for next message
 			ulFlag = 0;
 
@@ -726,9 +685,7 @@ exit:
 	if (lpMessage)
 		lpMessage->Release();
 
-	if (lpMtIcal)
-		delete lpMtIcal;
-
+	delete lpMtIcal;
 	return hr;
 }
 
@@ -784,12 +741,8 @@ exit:
 	else
 		m_lpRequest->HrResponseHeader(500,"Internal Server Error");
 
-	if (lpWstBoxEid)
-		MAPIFreeBuffer(lpWstBoxEid);
-
-	if (lpFldEid)
-		MAPIFreeBuffer(lpFldEid);
-
+	MAPIFreeBuffer(lpWstBoxEid);
+	MAPIFreeBuffer(lpFldEid);
 	if (lpWasteBoxFld)
 		lpWasteBoxFld->Release();
 

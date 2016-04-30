@@ -1,52 +1,26 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
-#include "stringutil.h"
-#include "charset/convert.h"
+#include <zarafa/platform.h>
+#include <zarafa/stringutil.h>
+#include <zarafa/charset/convert.h>
 #include <sstream>
 
-#include "ECIConv.h"
+#include <zarafa/ECIConv.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -216,8 +190,8 @@ int memsubstr(const void* haystack, size_t haystackSize, const void* needle, siz
 	while(pos < haystackSize)
 	{
 		if(*databuf == *searchbuf){
-			searchbuf++;
-			match++;
+			++searchbuf;
+			++match;
 
 			if(match == needleSize)
 				return 0;
@@ -229,8 +203,8 @@ int memsubstr(const void* haystack, size_t haystackSize, const void* needle, siz
 			match = 0;
 		}
 
-		databuf++;
-		pos++;
+		++databuf;
+		++pos;
 	}
 
 	return 1;
@@ -243,20 +217,6 @@ std::string str_storage(uint64_t ulBytes, bool bUnlimited) {
 		return "unlimited";
 
 	return stringify_double((double)ulBytes / MB, 2) + " MB";
-}
-
-std::string PrettyIP(long unsigned int ip) {
-    std::string strPretty;
-    
-    strPretty += stringify((ip >> 24)&0xFF);
-    strPretty += ".";
-    strPretty += stringify((ip >> 16)&0xFF);
-    strPretty += ".";
-    strPretty += stringify((ip >> 8)&0xFF);
-    strPretty += ".";
-    strPretty += stringify(ip&0xFF);
-    
-    return strPretty;
 }
 
 std::string GetServerNameFromPath(const char *szPath) {
@@ -313,19 +273,19 @@ std::string GetServerPortFromPath(const char *szPath) {
 std::string ServerNamePortToURL(const char *lpszType, const char *lpszServerName, const char *lpszServerPort, const char *lpszExtra) {
 	std::string strURL;
 
-	if (lpszType && strlen(lpszType) > 0) {
+	if (lpszType && lpszType[0]) {
 		strURL.append(lpszType);
 		strURL.append("://");
 	}
 
 	strURL.append(lpszServerName);
 
-	if (lpszServerPort && strlen(lpszServerPort) > 0) {
+	if (lpszServerPort && lpszServerPort[0]) {
 		strURL.append(":");
 		strURL.append(lpszServerPort);
 	}
 
-	if (strnicmp(lpszType,"http", 4) == 0 && lpszExtra && strlen(lpszExtra) > 0) {
+	if (strnicmp(lpszType,"http", 4) == 0 && lpszExtra && lpszExtra[0]) {
 		strURL.append("/");
 		strURL.append(lpszExtra);
 	}
@@ -342,7 +302,7 @@ std::string shell_escape(std::string str)
 	start = ptr = str.begin();
 	while (ptr != str.end()) {
 		while (ptr != str.end() && *ptr != '\'')
-			ptr++;
+			++ptr;
 
 		escaped += std::string(start, ptr);
 		if (ptr == str.end())
@@ -406,7 +366,7 @@ std::string concatenate(std::vector<std::string> &elements, const std::string &d
 	std::string concat;
 
     if (!elements.empty()) {
-		for (iter = elements.begin(); iter != elements.end(); iter++)
+		for (iter = elements.begin(); iter != elements.end(); ++iter)
 			concat += *iter + delimeters;
 		concat.erase(concat.end() - delimeters.size());
 	}
@@ -487,7 +447,7 @@ std::string bin2hex(unsigned int inLength, const unsigned char *input)
 		return buffer;
 
 	buffer.reserve(inLength * 2);
-	for (unsigned int i = 0; i < inLength; i++) {
+	for (unsigned int i = 0; i < inLength; ++i) {
 		buffer += digits[input[i]>>4];
 		buffer += digits[input[i]&0x0F];
 	}
@@ -509,7 +469,7 @@ std::wstring bin2hexw(unsigned int inLength, const unsigned char *input)
 		return buffer;
 
 	buffer.reserve(inLength * 2);
-	for (unsigned int i = 0; i < inLength; i++) {
+	for (unsigned int i = 0; i < inLength; ++i) {
 		buffer += digits[input[i]>>4];
 		buffer += digits[input[i]&0x0F];
 	}
@@ -532,13 +492,12 @@ std::string StringEscape(const char* input, const char *tokens, const char escap
 		if(input[i] == 0)
 			break;
 		
-		for(t=0; tokens[t] != 0; t++) {
+		for (t = 0; tokens[t] != 0; ++t)
 			if (input[i] == tokens[t])
 				strEscaped += escape;
-		}
 
 		strEscaped += input[i];
-		i++;
+		++i;
 	}
 
 	return strEscaped;
@@ -561,8 +520,7 @@ std::string urlEncode(const std::string &input)
 	static const char digits[] = "0123456789ABCDEF";
 
 	output.reserve(input.length());
-	for (size_t i = 0; i < input.length(); i++) 
-	{
+	for (size_t i = 0; i < input.length(); ++i) {
 		if (input[i] <= 127) {
 			switch (input[i]) {
 			case ':':
@@ -635,8 +593,7 @@ std::string urlDecode(const std::string &input)
 	std::string output;
 
 	output.reserve(input.length());
-	for (size_t i = 0; i < input.length(); i++) 
-	{
+	for (size_t i = 0; i < input.length(); ++i) {
 		if (input[i] == '%' && input.length() > i + 2)
 		{
 			unsigned char c;
@@ -663,12 +620,12 @@ std::string urlDecode(const std::string &input)
  */
 void BufferLFtoCRLF(size_t size, const char *input, char *output, size_t *outsize) {
 	size_t j = 0;
-	for (size_t i = 0; i < size; i++) {
+	for (size_t i = 0; i < size; ++i) {
 		if (input[i] == '\r') {
 			if ((i+1) < size && input[i+1] == '\n') {
 				output[j++] = '\r';
 				output[j++] = '\n';
-				i++;
+				++i;
 			} else {
 				output[j++] = '\r';
 				output[j++] = '\n';
@@ -744,12 +701,11 @@ void StringLFtoCRLF(std::string &strInOut)
 
 	strOutput.reserve(strInOut.size());
 
-	for (i = strInOut.begin(); i != strInOut.end(); i++) {
+	for (i = strInOut.begin(); i != strInOut.end(); ++i)
 		if (*i == '\n' && i != strInOut.begin() && *(i-1) != '\r')
 			strOutput.append("\r\n");
 		else
 			strOutput.append(1, *i);
-	}
 
 	swap(strInOut, strOutput);
 }
@@ -768,14 +724,13 @@ std::string forcealnum(const std::string& str, const char *szAdditional)
 {
     std::string out;
 
-    for(std::string::const_iterator i = str.begin(); i != str.end(); i++) {
+    for (std::string::const_iterator i = str.begin(); i != str.end(); ++i)
         if(isalnum(*i))
             out += *i;
         else if(szAdditional && strchr(szAdditional, *i) != NULL)
             out += *i;
         else
             out += '_';
-    }
 
     return out;
 }

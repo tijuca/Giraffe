@@ -8,7 +8,7 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) $(PYTHON_INCLUDES) \
 	-I${top_srcdir}/inetmapi -I${top_srcdir}/provider/common \
 	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
 	-I${top_srcdir}/libfreebusy \
-	-I${top_srcdir}/ECtools/zarafa-archiver
+	-I${top_srcdir}/ECtools/archiver
 
 sbin_PROGRAMS = zarafa-dagent zarafa-spooler
 noinst_DATA = zarafa-dagent.ldx zarafa-spooler.ldx
@@ -18,17 +18,17 @@ zarafa_dagent_LDADD = ${top_builddir}/inetmapi/libinetmapi.la \
 	${top_builddir}/common/libzcp_common_mapi.la \
 	${top_builddir}/common/libzcp_common_util.la \
 	${top_builddir}/common/libzcp_common_ssl.la \
-	${top_builddir}/ECtools/zarafa-archiver/libzarafa-archiver.la \
-	${top_builddir}/ECtools/zarafa-archiver/libzarafa-archiver-core.la \
-	$(PROG_LIBS) $(SSL_LIBS) $(PYTHON_LIBS) $(XML2_LIBS)
+	${top_builddir}/ECtools/libzarafa-archiver.la \
+	${top_builddir}/ECtools/libzarafa-archiver-core.la \
+	$(PROG_LIBS) $(SSL_LIBS) $(PYTHON_LIBS) $(XML2_LIBS) ${icu_uc_LIBS}
 
 zarafa_spooler_LDADD = ${top_builddir}/inetmapi/libinetmapi.la \
 	${top_builddir}/mapi4linux/src/libmapi.la \
 	${top_builddir}/common/libzcp_common_mapi.la \
 	${top_builddir}/common/libzcp_common_util.la \
 	${top_builddir}/common/libzcp_common_ssl.la \
-	${top_builddir}/ECtools/zarafa-archiver/libzarafa-archiver.la \
-	${top_builddir}/ECtools/zarafa-archiver/libzarafa-archiver-core.la \
+	${top_builddir}/ECtools/libzarafa-archiver.la \
+	${top_builddir}/ECtools/libzarafa-archiver-core.la \
 	$(PROG_LIBS) $(PYTHON_LIBS) $(XML2_LIBS)
 
 zarafa_dagent_SOURCES = \

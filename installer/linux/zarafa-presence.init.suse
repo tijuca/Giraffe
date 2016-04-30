@@ -36,6 +36,7 @@ presence=`basename $PRESENCEPROGRAM`
 case "$1" in
     start)
 		echo -n "Starting Zarafa presence "
+		install -dm0775 -o zarafa -g zarafa /var/run/zarafad
 		export LC_ALL=$ZARAFA_LOCALE
 		export LANG=$ZARAFA_LOCALE
 		$PRESENCEPROGRAM $PRESENCECONFIG_OPT

@@ -1,49 +1,28 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
+#ifdef WIN32
+#include <direct.h>
+#include <io.h>
+#else
 #include <fcntl.h>
+#endif
 
 #include <mapidefs.h>
 #include <mapicode.h>
@@ -51,6 +30,7 @@
 #include <pthread.h>
 
 #include <sys/stat.h>
+#include <sys/time.h> /* gettimeofday */
 
 #include "TmpPath.h"
 
@@ -116,6 +96,9 @@ time_t FileTimeToUnixTime(unsigned int hi, unsigned int lo)
 	return t;
 }
 
+static const LONGLONG UnitsPerMinute = 600000000;
+static const LONGLONG UnitsPerHalfMinute = 300000000;
+
 void RTimeToFileTime(LONG rtime, FILETIME *pft)
 {
 	// ASSERT(pft != NULL);
@@ -141,36 +124,24 @@ void FileTimeToRTime(const FILETIME *pft, LONG *prtime)
 
 HRESULT RTimeToUnixTime(LONG rtime, time_t *unixtime)
 {
-	HRESULT hr = hrSuccess;
 	FILETIME ft;
 
-	if(unixtime == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (unixtime == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 	RTimeToFileTime(rtime, &ft);
 	FileTimeToUnixTime(ft, unixtime);
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT UnixTimeToRTime(time_t unixtime, LONG *rtime)
 {
-	HRESULT hr = hrSuccess;
 	FILETIME ft;
 
-	if(rtime == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (rtime == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 	UnixTimeToFileTime(unixtime, &ft);
 	FileTimeToRTime(&ft, rtime);
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 // time only, not date!
@@ -292,35 +263,36 @@ ULONG SecondsToIntTime(ULONG seconds)
 	return CreateIntTime(seconds, minutes, hours);
 }
 
-bool operator ==(FILETIME a, FILETIME b) {
+bool operator ==(const FILETIME &a, const FILETIME &b)
+{
 	return a.dwLowDateTime == b.dwLowDateTime && a.dwHighDateTime == b.dwHighDateTime;
 }
 
-bool operator >(FILETIME a, FILETIME b)
+bool operator >(const FILETIME &a, const FILETIME &b)
 {
 	return ((a.dwHighDateTime > b.dwHighDateTime) ||
 		((a.dwHighDateTime == b.dwHighDateTime) &&
 		 (a.dwLowDateTime > b.dwLowDateTime)));
 }
 
-bool operator >=(FILETIME a, FILETIME b)
+bool operator >=(const FILETIME &a, const FILETIME &b)
 {
 	return a > b || a == b;
 }
 
-bool operator <(FILETIME a, FILETIME b)
+bool operator <(const FILETIME &a, const FILETIME &b)
 {
 	return ((a.dwHighDateTime < b.dwHighDateTime) ||
 		((a.dwHighDateTime == b.dwHighDateTime) &&
 		 (a.dwLowDateTime < b.dwLowDateTime)));
 }
 
-bool operator <=(FILETIME a, FILETIME b)
+bool operator <=(const FILETIME &a, const FILETIME &b)
 {
 	return a < b || a == b;
 }
 
-time_t operator -(FILETIME a, FILETIME b)
+time_t operator -(const FILETIME &a, const FILETIME &b)
 {
 	time_t aa, bb;
 
@@ -343,11 +315,17 @@ time_t timegm(struct tm *t) {
 	// SuSE 9.1 segfaults when putenv() is used in a detached thread on the next getenv() call.
 	// so use setenv() on linux, putenv() on others.
 
+#ifdef LINUX
 	setenv("TZ", "UTC0", 1);
 	tzset();
+#else
+	if(putenv("TZ=UTC0") != -1)
+		_tzset();
+#endif
 
 	convert = mktime(t);
 
+#ifdef LINUX
 	if (s_tz) {
 		setenv("TZ", s_tz, 1);
 		tzset();
@@ -355,10 +333,16 @@ time_t timegm(struct tm *t) {
 		unsetenv("TZ");
 		tzset();
 	}
-
-	if(s_tz)
-		free(s_tz);
-
+#else
+	if (s_tz) {
+		putenv(s_tz);
+		_tzset();
+	} else {
+		putenv("TZ=");
+		_tzset();
+	}
+#endif
+	free(s_tz);
 	return convert;
 }
 #endif
@@ -366,7 +350,15 @@ time_t timegm(struct tm *t) {
 struct tm* gmtime_safe(const time_t* timer, struct tm *result)
 {
 	struct tm *tmp = NULL;
+#ifdef WIN32
+	tmp = gmtime(timer);
+	if(tmp) {
+		*result = *tmp; // copy data
+		tmp = result; // switch pointer
+	}
+#else
 	tmp = gmtime_r(timer, result);
+#endif
 
 	if(tmp == NULL)
 		memset(result, 0, sizeof(struct tm));
@@ -374,7 +366,8 @@ struct tm* gmtime_safe(const time_t* timer, struct tm *result)
 	return tmp;
 }
 
-double timespec2dbl(timespec t) {
+double timespec2dbl(const struct timespec &t)
+{
     return (double)t.tv_sec + t.tv_nsec/1000000000.0;
 }
 
@@ -387,7 +380,7 @@ struct timespec GetDeadline(unsigned int ulTimeoutMs)
 	now.tv_sec += ulTimeoutMs / 1000;
 	now.tv_usec += 1000 * (ulTimeoutMs % 1000);
 	if (now.tv_usec >= 1000000) {
-		now.tv_sec++;
+		++now.tv_sec;
 		now.tv_usec -= 1000000;
 	}
 
@@ -404,10 +397,17 @@ int CreatePath(const char *createpath)
 	char *path = strdup(createpath);
 
 	// Remove trailing slashes
-	while(path[strlen(path)-1] == '/' || path[strlen(path)-1] == '\\') {
-		path[strlen(path)-1] = 0;
-	}
+	size_t len = strlen(path);
+	while (len > 0 && (path[len-1] == '/' || path[len-1] == '\\'))
+		path[--len] = 0;
 
+#ifdef WIN32
+	if (path[len-1] == ':') {
+		// do not try to create driverletters
+		free(path);
+		return 0;
+	}
+#endif
 
 	if(stat(path, &s) == 0) {
 		if(s.st_mode & S_IFDIR) {
@@ -469,7 +469,11 @@ ssize_t read_retry(int fd, void *data, size_t len)
 	size_t tread = 0;
 
 	while (len > 0) {
+#ifdef _WIN32
+		ssize_t ret = _read(fd, buf, len);
+#else
 		ssize_t ret = read(fd, buf, len);
+#endif
 		if (ret < 0 && (errno == EINTR || errno == EAGAIN))
 			continue;
 		if (ret < 0)
@@ -489,7 +493,11 @@ ssize_t write_retry(int fd, const void *data, size_t len)
 	size_t twrote = 0;
 
 	while (len > 0) {
+#ifdef WIN32
+		ssize_t ret = _write(fd, buf, len);
+#else
 		ssize_t ret = write(fd, buf, len);
+#endif
 		if (ret < 0 && (errno == EINTR || errno == EAGAIN))
 			continue;
 		if (ret < 0)
@@ -505,25 +513,33 @@ ssize_t write_retry(int fd, const void *data, size_t len)
 
 bool force_buffers_to_disk(const int fd)
 {
+#ifdef WIN32
+	_commit(fd);
+#else
 	if (fsync(fd) == -1)
 	    return false;
+#endif
 
 	return true;
 }
 
 void my_readahead(const int fd)
 {
+#ifndef WIN32
 	struct stat st;
 
 	if (fstat(fd, &st) == 0)
 		(void)readahead(fd, 0, st.st_size);
+#endif
 }
 
 void give_filesize_hint(const int fd, const off_t len)
 {
+#ifndef WIN32
 	// this helps preventing filesystem fragmentation as the
 	// kernel can now look for the best disk allocation
 	// pattern as it knows how much date is going to be
 	// inserted
 	posix_fallocate(fd, 0, len);
+#endif
 }

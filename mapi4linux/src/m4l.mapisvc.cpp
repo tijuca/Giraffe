@@ -1,48 +1,22 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
-#include "stringutil.h"
+#include <zarafa/platform.h>
+#include <zarafa/stringutil.h>
 
 #include "m4l.mapisvc.h"
 #include <mapix.h>
@@ -50,12 +24,14 @@
 #include <mapicode.h>
 #include <mapitags.h>
 #include <mapiutil.h>
-#include "boost_compat.h"
+#include <zarafa/boost_compat.h>
 
-#include "Util.h"
+#include <zarafa/Util.h>
 
 #include <iostream>
+#ifndef WIN32
 #include <arpa/inet.h>
+#endif
 #include <climits>
 
 #include <boost/algorithm/string.hpp>
@@ -111,18 +87,24 @@ HRESULT INFLoader::LoadINFs()
 	HRESULT hr = hrSuccess;
 	vector<string> paths = GetINFPaths();
 
-	for (vector<string>::iterator i = paths.begin(); i != paths.end(); i++) {
+	for (std::vector<std::string>::const_iterator i = paths.begin();
+	     i != paths.end(); ++i)
+	{
 		bfs::path infdir(*i);
 		if (!bfs::exists(infdir))
 			// silently continue or print init error?
 			continue;
 
 		bfs::directory_iterator inffile_last;
-		for (bfs::directory_iterator inffile(infdir); inffile != inffile_last; inffile++) {
+		for (bfs::directory_iterator inffile(infdir);
+		     inffile != inffile_last; ++inffile) {
 			if (is_directory(inffile->status()))
 				continue;
 
  			string strFilename = path_to_string(inffile->path());
+#ifdef WIN32
+			transform(strFilename.begin(), strFilename.begin(), strFilename.end(), ::tolower);
+#endif
 			string::size_type pos = strFilename.rfind(".inf", strFilename.size(), strlen(".inf"));
 
 			if (pos == string::npos || strFilename.size() - pos != strlen(".inf"))
@@ -237,12 +219,18 @@ const inf_section* INFLoader::GetSection(const string& strSectionName) const
 vector<string> INFLoader::GetINFPaths()
 {
 	vector<string> ret;
+#ifdef WIN32
+	// @todo fix real path
+	ret.push_back("%CommonProgramFiles%\\System\\MSMAPI\\1033\\MAPISVC.INF");
+	ret.push_back("%CommonProgramFiles(86)%\\System\\MSMAPI\\1033\\MAPISVC.INF");
+#else
 	char *env = getenv("MAPI_CONFIG_PATH");
 	if (env)
 		ba::split(ret, env, ba::is_any_of(":"), ba::token_compress_on);
 	else
 	// @todo, load both, or just one?
 		ret.push_back(MAPICONFIGDIR);
+#endif
 	return ret;
 }
 
@@ -269,7 +257,8 @@ HRESULT INFLoader::MakeProperty(const std::string& strTag, const std::string& st
 		set<string> vValues;
 		sProp.Value.ul = 0;
 		ba::split(vValues, strData, ba::is_any_of("| \t"), ba::token_compress_on);
-		for (set<string>::iterator i = vValues.begin(); i != vValues.end(); i++)
+		for (std::set<std::string>::const_iterator i = vValues.begin();
+		     i != vValues.end(); ++i)
 			sProp.Value.ul |= DefinitionFromString(*i, false);
 		break;
 	}
@@ -334,8 +323,7 @@ SVCProvider::SVCProvider()
 
 SVCProvider::~SVCProvider()
 {
-	if (m_lpProps)
-		MAPIFreeBuffer(m_lpProps);
+	MAPIFreeBuffer(m_lpProps);
 }
 
 /** 
@@ -360,12 +348,11 @@ HRESULT SVCProvider::Init(const INFLoader& cINF, const inf_section* infProvider)
 	if (hr != hrSuccess)
 		goto exit;
 
-	for (m_cValues = 0, iSection = infProvider->begin(); iSection != infProvider->end(); iSection++) {
+	for (m_cValues = 0, iSection = infProvider->begin();
+	     iSection != infProvider->end(); ++iSection)
 		// add properties to list
 		if (cINF.MakeProperty(iSection->first, iSection->second, m_lpProps, &m_lpProps[m_cValues]) == hrSuccess)
-			m_cValues++;
-	}
-
+			++m_cValues;
 exit:
 	return hr;
 }
@@ -389,9 +376,9 @@ SVCService::~SVCService()
 	if (m_dl)
 		dlclose(m_dl);
 #endif
-	if (m_lpProps)
-		MAPIFreeBuffer(m_lpProps);
-	for (std::map<std::string, SVCProvider*>::iterator i = m_sProviders.begin(); i != m_sProviders.end(); i++)
+	MAPIFreeBuffer(m_lpProps);
+	for (std::map<std::string, SVCProvider *>::iterator i = m_sProviders.begin();
+	     i != m_sProviders.end(); ++i)
 		delete i->second;
 }
 
@@ -419,17 +406,20 @@ HRESULT SVCService::Init(const INFLoader& cINF, const inf_section* infService)
 	if (hr != hrSuccess)
 		goto exit;
 
-	for (m_cValues = 0, iSection = infService->begin(); iSection != infService->end(); iSection++) {
+	for (m_cValues = 0, iSection = infService->begin();
+	     iSection != infService->end(); ++iSection) {
 		// convert section to class
 		if (iSection->first.compare("Providers") == 0) {
 			// make new providers list
 			// *new function, new loop
 			ba::split(prop, iSection->second, ba::is_any_of(", \t"), ba::token_compress_on);
 
-			for (vector<string>::iterator i = prop.begin(); i != prop.end(); i++) {
+			for (std::vector<std::string>::const_iterator i = prop.begin();
+			     i != prop.end(); ++i)
+			{
 				infProvider = cINF.GetSection(*i);
 
-				pair<std::map<std::string, SVCProvider*>::iterator, bool> prov = m_sProviders.insert(make_pair(*i, new SVCProvider()));
+				std::pair<std::map<std::string, SVCProvider *>::const_iterator, bool> prov = m_sProviders.insert(make_pair(*i, new SVCProvider()));
 				if (prov.second == false)
 					continue;	// already exists
 
@@ -438,7 +428,7 @@ HRESULT SVCService::Init(const INFLoader& cINF, const inf_section* infService)
 		} else {
 			// add properties to list
 			if (cINF.MakeProperty(iSection->first, iSection->second, m_lpProps, &m_lpProps[m_cValues]) == hrSuccess)
-				m_cValues++;
+				++m_cValues;
 		}
 	}
 
@@ -452,10 +442,12 @@ HRESULT SVCService::Init(const INFLoader& cINF, const inf_section* infService)
 	}
 
 	m_dl = dlopen(lpSO->Value.lpszA, RTLD_NOW);
+#ifndef WIN32
 	if (!m_dl) {
 		snprintf(filename, PATH_MAX + 1, "%s%c%s", PKGLIBDIR, PATH_SEPARATOR, lpSO->Value.lpszA);
 		m_dl = dlopen(filename, RTLD_NOW);
 	}
+#endif
 
 	if (!m_dl) {
 		cerr << "Unable to load " << lpSO->Value.lpszA << ": " << dlerror() << endl;
@@ -494,10 +486,9 @@ exit:
 HRESULT SVCService::CreateProviders(IProviderAdmin *lpProviderAdmin)
 {
 	HRESULT hr = hrSuccess;
-	std::map<std::string, SVCProvider*>::iterator i;
+	std::map<std::string, SVCProvider *>::const_iterator i;
 
-	for (i = m_sProviders.begin(); i != m_sProviders.end(); i++) 
-	{
+	for (i = m_sProviders.begin(); i != m_sProviders.end(); ++i)  {
 		// CreateProvider will find the provider properties itself. the property parameters can be used for other properties.
 		hr = lpProviderAdmin->CreateProvider((TCHAR*)i->first.c_str(), 0, NULL, 0, 0, NULL);
 		if (hr != hrSuccess)
@@ -515,7 +506,7 @@ LPSPropValue SVCService::GetProp(ULONG ulPropTag)
 
 SVCProvider* SVCService::GetProvider(LPTSTR lpszProvider, ULONG ulFlags)
 {
-	std::map<std::string, SVCProvider*>::iterator i = m_sProviders.find((const char*)lpszProvider);
+	std::map<std::string, SVCProvider*>::const_iterator i = m_sProviders.find(reinterpret_cast<const char *>(lpszProvider));
 	if (i == m_sProviders.end())
 		return NULL;
 	return i->second;
@@ -525,7 +516,8 @@ vector<SVCProvider*> SVCService::GetProviders()
 {
 	vector<SVCProvider*> ret;
 
-	for (std::map<std::string, SVCProvider*>::iterator i = m_sProviders.begin(); i != m_sProviders.end(); i++)
+	for (std::map<std::string, SVCProvider *>::const_iterator i = m_sProviders.begin();
+	     i != m_sProviders.end(); ++i)
 		ret.push_back(i->second);
 	return ret;
 }
@@ -551,7 +543,8 @@ MAPISVC::MAPISVC()
 
 MAPISVC::~MAPISVC()
 {
-	for (std::map<std::string, SVCService*>::iterator i = m_sServices.begin(); i != m_sServices.end(); i++)
+	for (std::map<std::string, SVCService *>::const_iterator i = m_sServices.begin();
+	     i != m_sServices.end(); ++i)
 		delete i->second;
 }
 
@@ -570,7 +563,7 @@ HRESULT MAPISVC::Init()
 
 	infServices = inf.GetSection("Services");
 
-	for (iServices = infServices->begin(); iServices != infServices->end(); iServices++) {
+	for (iServices = infServices->begin(); iServices != infServices->end(); ++iServices) {
 		// ZARAFA6, ZCONTACTS
 		infService = inf.GetSection(iServices->first);
 
@@ -602,7 +595,7 @@ exit:
  */
 HRESULT MAPISVC::GetService(LPTSTR lpszService, ULONG ulFlags, SVCService **lppService)
 {
-	std::map<std::string, SVCService*>::iterator i;
+	std::map<std::string, SVCService *>::const_iterator i;
 	
 	i = m_sServices.find((char*)lpszService);
 	if (i == m_sServices.end())
@@ -624,10 +617,10 @@ HRESULT MAPISVC::GetService(LPTSTR lpszService, ULONG ulFlags, SVCService **lppS
  */
 HRESULT MAPISVC::GetService(char* lpszDLLName, SVCService **lppService)
 {
-	std::map<std::string, SVCService*>::iterator i;
+	std::map<std::string, SVCService *>::const_iterator i;
 	LPSPropValue lpDLLName;
 
-	for (i = m_sServices.begin(); i != m_sServices.end(); i++) {
+	for (i = m_sServices.begin(); i != m_sServices.end(); ++i) {
 		lpDLLName = i->second->GetProp(PR_SERVICE_DLL_NAME_A);
 		if (!lpDLLName || !lpDLLName->Value.lpszA)
 			continue;

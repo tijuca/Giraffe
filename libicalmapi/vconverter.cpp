@@ -1,63 +1,37 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "vconverter.h"
 #include "valarm.h"
 #include "icalrecurrence.h"
 #include <mapi.h>
 #include <mapiutil.h>
-#include "mapiext.h"
-#include "restrictionutil.h"
-#include "CommonUtil.h"
-#include "Util.h"
+#include <zarafa/mapiext.h>
+#include <zarafa/restrictionutil.h>
+#include <zarafa/CommonUtil.h>
+#include <zarafa/Util.h>
 #include "icaluid.h"
 #include "nameids.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 #include <ctime>
-#include "mapi_ptr.h"
-#include "namedprops.h"
-#include "base64.h"
+#include <zarafa/mapi_ptr.h>
+#include <zarafa/namedprops.h>
+#include <zarafa/base64.h>
 
 using namespace std;
 
@@ -374,9 +348,7 @@ bool VConverter::bIsUserLoggedIn(const std::wstring &strUser)
 		blRetVal = true;
 	
 exit:
-	if (lpUserProp)
-		MAPIFreeBuffer(lpUserProp);
-
+	MAPIFreeBuffer(lpUserProp);
 	return blRetVal;
 }
 
@@ -398,7 +370,7 @@ HRESULT VConverter::HrResolveUser(void *base , std::list<icalrecip> *lplstIcalRe
 	ULONG cbDDEntryID;
 	IABContainer *lpAddrFolder = NULL;
 	FlagList *lpFlagList = NULL;
-	std::list<icalrecip>::iterator iIcalRecip;
+	std::list<icalrecip>::const_iterator iIcalRecip;
 	icalrecip icalRecipient;
 	ULONG ulRecpCnt = 0;
 	ULONG ulRetn = 0;
@@ -427,7 +399,8 @@ HRESULT VConverter::HrResolveUser(void *base , std::list<icalrecip> *lplstIcalRe
 
 	lpAdrList->cEntries = ulRecpCnt;
 
-	for (iIcalRecip = lplstIcalRecip->begin(), ulRecpCnt = 0; iIcalRecip != lplstIcalRecip->end(); iIcalRecip++, ulRecpCnt++) {
+	for (iIcalRecip = lplstIcalRecip->begin(), ulRecpCnt = 0;
+	     iIcalRecip != lplstIcalRecip->end(); ++iIcalRecip, ++ulRecpCnt) {
 		lpAdrList->aEntries[ulRecpCnt].cValues = 1;
 
 		hr = MAPIAllocateBuffer(sizeof(SPropValue), (void **) &lpAdrList->aEntries[ulRecpCnt].rgPropVals);
@@ -452,8 +425,8 @@ HRESULT VConverter::HrResolveUser(void *base , std::list<icalrecip> *lplstIcalRe
 		goto exit;
 
 	//reset the recepients with mapped names
-	for(icalRecipient = lplstIcalRecip->front(), ulRecpCnt = 0 ; ulRecpCnt < lplstIcalRecip->size(); ulRecpCnt++)
-	{
+	for (icalRecipient = lplstIcalRecip->front(), ulRecpCnt = 0;
+	     ulRecpCnt < lplstIcalRecip->size(); ++ulRecpCnt) {
 		if (lpFlagList->ulFlag[ulRecpCnt] == MAPI_RESOLVED)
 		{
 			lpMappedProp = PpropFindProp(lpAdrList->aEntries[ulRecpCnt].rgPropVals, lpAdrList->aEntries[ulRecpCnt].cValues, PR_DISPLAY_NAME_W);
@@ -498,21 +471,14 @@ HRESULT VConverter::HrResolveUser(void *base , std::list<icalrecip> *lplstIcalRe
 	}
 
 exit:
-	if (lpUsrEidProp)
-		MAPIFreeBuffer(lpUsrEidProp);
-
-	if (lpFlagList)
-		MAPIFreeBuffer(lpFlagList);
-
+	MAPIFreeBuffer(lpUsrEidProp);
+	MAPIFreeBuffer(lpFlagList);
 	if (lpAdrList)
 		FreeProws((LPSRowSet)lpAdrList);
 
 	if (lpAddrFolder)
 		lpAddrFolder->Release();
-
-	if (lpDDEntryID)
-		MAPIFreeBuffer(lpDDEntryID);
-
+	MAPIFreeBuffer(lpDDEntryID);
 	return hr;
 }
 
@@ -549,9 +515,7 @@ HRESULT VConverter::HrCompareUids(icalitem *lpIcalItem, icalcomponent *lpicEvent
 		hr = MAPI_E_BAD_VALUE;
 
 exit:
-	if (lpPropVal)
-		MAPIFreeBuffer(lpPropVal);
-
+	MAPIFreeBuffer(lpPropVal);
 	return hr;
 }
 
@@ -876,7 +840,7 @@ HRESULT VConverter::HrAddBusyStatus(icalcomponent *lpicEvent, icalproperty_metho
 	HRESULT hr = hrSuccess;
 	SPropValue sPropVal;
 	icalproperty* lpicProp = NULL;
-	std::list<icalrecip>::iterator iIcalRecip;	
+	std::list<icalrecip>::const_iterator iIcalRecip;
 
 	// default: busy
 	// 0: free
@@ -1092,7 +1056,7 @@ HRESULT VConverter::HrAddCategories(icalcomponent *lpicEvent, icalitem *lpIcalIt
 	icalproperty *lpicProp = NULL;
 	const char* lpszCategories = NULL;
 	std::vector<std::string> vCategories;
-	std::vector<std::string>::iterator iCats;
+	std::vector<std::string>::const_iterator iCats;
 	int i;
 
 	// Set keywords / CATEGORIES
@@ -1111,13 +1075,14 @@ HRESULT VConverter::HrAddCategories(icalcomponent *lpicEvent, icalitem *lpIcalIt
 	if (hr != hrSuccess)
 		goto exit;
 
-	for (i = 0, iCats = vCategories.begin(); iCats != vCategories.end(); iCats++, i++) {
+	for (i = 0, iCats = vCategories.begin();
+	     iCats != vCategories.end(); ++iCats, ++i) {
 		int length = iCats->length() + 1;
 		hr = MAPIAllocateMore(length, lpIcalItem->base, (void **) &sPropVal.Value.MVszA.lppszA[i]);
 		if (hr != hrSuccess)
 			goto exit;
 
-		memcpy((void*)sPropVal.Value.MVszA.lppszA[i], iCats->c_str(), length);
+		memcpy(sPropVal.Value.MVszA.lppszA[i], iCats->c_str(), length);
 	}
 
 	sPropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_KEYWORDS], PT_MV_STRING8);
@@ -1217,10 +1182,10 @@ HRESULT VConverter::HrAddRecipients(icalcomponent *lpicEvent, icalitem *lpIcalIt
 	std::string strType;
 	icalproperty *lpicProp = NULL;
 	icalparameter *lpicParam = NULL;
-	icalrecip icrAttendee;
-	ULONG cbEntryID;
+	icalrecip icrAttendee = {0};
+	ULONG cbEntryID = 0;
 	LPENTRYID lpEntryID = NULL;
-	ULONG cbEntryIDOneOff;
+	ULONG cbEntryIDOneOff = 0;
 	LPENTRYID lpEntryIDOneOff = NULL;
 	LPSPropValue lpsPropVal = NULL;
 
@@ -1381,12 +1346,8 @@ HRESULT VConverter::HrAddRecipients(icalcomponent *lpicEvent, icalitem *lpIcalIt
 	}
 
 exit:
-	if (lpsPropVal)
-		MAPIFreeBuffer(lpsPropVal);
-
-	if (lpEntryIDOneOff)
-		MAPIFreeBuffer(lpEntryIDOneOff);
-
+	MAPIFreeBuffer(lpsPropVal);
+	MAPIFreeBuffer(lpEntryIDOneOff);
 	return hr;
 }
 
@@ -1454,9 +1415,7 @@ HRESULT VConverter::HrAddReplyRecipients(icalcomponent *lpicEvent, icalitem *lpI
 	}
 
 exit:
-	if (lpEntryID)
-		MAPIFreeBuffer(lpEntryID);
-
+	MAPIFreeBuffer(lpEntryID);
 	return hr;
 }
 
@@ -1828,28 +1787,38 @@ HRESULT VConverter::HrSetTimeProperty(time_t tStamp, bool bDateOnly, icaltimezon
 	HRESULT hr = hrSuccess;
 	icaltimetype ittStamp;
 
-	if(bDateOnly && !lpicTZinfo) {
+	// if (bDateOnly && !lpicTZinfo)
+	/*
+	 * ZCP-12962: Disregarding tzinfo. Even a minor miscalculation can
+	 * cause a day shift; if possible, we should probably improve the
+	 * actual calculation when we encounter such a problem.
+	 */
+	if (bDateOnly) {
 		struct tm date;
 		// We have a problem now. This is a 'date' property type, so time information should not be sent. However,
 		// the timestamp in tStamp *does* have a time part, which is indicating the start of the day in GMT (so, this
 		// would be say 23:00 in central europe, and 03:00 in brasil). This means that if we 'just' take the date part
 		// of the timestamp, you will get the wrong day if you're east of GMT. Unfortunately, we don't know the
 		// timezone either, so we have to do some guesswork. What we do now is a 'round to closest date'. This will
-		// basically work for any timezone that has an offset between GMT+12 and GMT-11. So the 4th at 23:00 will become
+		// basically work for any timezone that has an offset between GMT+13 and GMT-10. So the 4th at 23:00 will become
 		// the 5h, and the 5th at 03:00 will become the 5th.
-		
-		// So this is a known problem for users in kiribati (GMT+13, GMT+14) and Samoa (GMT+13) which will be
-		// interpreted as GMT-11 and GMT-10, causing a day offset in allday meetings. Sorry.
-		
+
+		/* So this is a known problem for users in GMT+14, GMT-12 and
+		 * GMT-11 (Kiribati, Samoa, ..). Sorry. Fortunately, there are
+		 * not many people in these timezones. For this to work
+		 * correctly, clients should store the correct timezone in the
+		 * appointment (WebApp does not do this currently), and we need
+		 * to consider timezones here again.
+		 */
 		gmtime_r(&tStamp, &date);
 		
-		if(date.tm_hour >= 12) {
+		if (date.tm_hour >= 11) {
 			// Move timestamp up one day so that later conversion to date-only will be correct
 			tStamp += 86400;
 		}
 	}
 	
-	if (lpicTZinfo)
+	if (!bDateOnly && lpicTZinfo != NULL)
 		ittStamp = icaltime_from_timet_with_zone(tStamp, bDateOnly, lpicTZinfo);
 	else
 		ittStamp = icaltime_from_timet_with_zone(tStamp, bDateOnly, icaltimezone_get_utc_timezone());
@@ -2011,7 +1980,7 @@ HRESULT VConverter::HrSetOrganizerAndAttendees(LPMESSAGE lpParentMsg, LPMESSAGE 
 			icalproperty_add_parameter(lpicProp, icalparameter_new_cn(m_converter.convert_to<string>(m_strCharset.c_str(), wstrBuf, rawsize(wstrBuf), CHARSET_WCHAR).c_str()));
 		
 		wstrBuf = L"mailto:" + strSenderEmailAddr;
-		if (!strSenderEmailAddr.empty() && (strSenderEmailAddr != strRepsSenderEmailAddr))
+		if (!strSenderEmailAddr.empty() && strSenderEmailAddr != strRepsSenderEmailAddr)
 			icalproperty_add_parameter(lpicProp, icalparameter_new_sentby(m_converter.convert_to<string>(wstrBuf).c_str()));
 
 		icalcomponent_add_property(lpicEvent, lpicProp);
@@ -2101,7 +2070,7 @@ HRESULT VConverter::HrSetOrganizerAndAttendees(LPMESSAGE lpParentMsg, LPMESSAGE 
 				icalproperty_add_parameter(lpicProp, icalparameter_new_cn(m_converter.convert_to<string>(m_strCharset.c_str(), wstrBuf, rawsize(wstrBuf), CHARSET_WCHAR).c_str()) );
 
 			wstrBuf = L"mailto:" + strSenderEmailAddr;
-			if(!strSenderEmailAddr.empty() && (strSenderEmailAddr != strRepsSenderEmailAddr) )
+			if (!strSenderEmailAddr.empty() && strSenderEmailAddr != strRepsSenderEmailAddr)
 				icalproperty_add_parameter(lpicProp, icalparameter_new_sentby(m_converter.convert_to<string>(m_strCharset.c_str(), wstrBuf, rawsize(wstrBuf), CHARSET_WCHAR).c_str()) );
 
 			icalcomponent_add_property(lpicEvent, lpicProp);
@@ -2114,9 +2083,7 @@ HRESULT VConverter::HrSetOrganizerAndAttendees(LPMESSAGE lpParentMsg, LPMESSAGE 
 	*lpicMethod = icMethod;
 
 exit:
-	if (lpSpropVal)
-		MAPIFreeBuffer (lpSpropVal);
-
+	MAPIFreeBuffer(lpSpropVal);
 	if (lpRows)
 		FreeProws(lpRows);
 
@@ -2225,7 +2192,7 @@ HRESULT VConverter::HrSetICalAttendees(LPMESSAGE lpMessage, const std::wstring &
 		goto exit;
 	
 	// Set all recipients into icalcomponent lpicEvent
-	for (ulCount = 0; ulCount < lpRows->cRows; ulCount++) {
+	for (ulCount = 0; ulCount < lpRows->cRows; ++ulCount) {
 		// ZARAFA types go correct because of addressbook, (slow?, should use PR_SMTP_ADDRESS?)
 		// SMTP types go correct because of PR_EMAIL_ADDRESS 
 		hr = HrGetAddress(m_lpAdrBook, lpRows->aRow[ulCount].lpProps, lpRows->aRow[ulCount].cValues,
@@ -2347,9 +2314,7 @@ HRESULT VConverter::HrSetBusyStatus(LPMESSAGE lpMessage, ULONG ulBusyStatus, ica
 	
 	icalproperty_set_x_name(lpicProp, "X-MICROSOFT-CDO-INTENDEDSTATUS"); 
 	icalcomponent_add_property(lpicEvent, lpicProp);
-
-	if(lpSpropVal)
-		MAPIFreeBuffer(lpSpropVal);
+	MAPIFreeBuffer(lpSpropVal);
 	return hrSuccess;
 }
 
@@ -2672,10 +2637,7 @@ HRESULT VConverter::HrSetBody(LPMESSAGE lpMessage, icalproperty **lppicProp)
 exit:
 	if (lpStream)
 		lpStream->Release();
-
-	if (lpBody)
-		delete [] lpBody;
-
+	delete[] lpBody;
 	return hr;
 }
 
@@ -2936,7 +2898,7 @@ HRESULT VConverter::HrSetRecurrence(LPMESSAGE lpMessage, icalcomponent *lpicEven
 	// other: CREATED, LAST-MODIFIED, DTSTAMP, UID (copy from original)
 	// and then exception properties are replaced
 	ulModCount = cRecurrence.getModifiedCount();
-	for (ULONG i = 0; i < ulModCount; i++) {
+	for (ULONG i = 0; i < ulModCount; ++i) {
 		
 		SPropValuePtr  lpMsgProps;
 		ULONG ulMsgProps = 0;
@@ -3137,16 +3099,9 @@ exit:
 
 	if (lpException)
 		lpException->Release();
-
-	if (lpSpropArray)
-		MAPIFreeBuffer(lpSpropArray);
-
-	if (lpPropTagArr)
-		MAPIFreeBuffer(lpPropTagArr);
-
-	if (lpRecurrenceData)
-		delete [] lpRecurrenceData;
-
+	MAPIFreeBuffer(lpSpropArray);
+	MAPIFreeBuffer(lpPropTagArr);
+	delete[] lpRecurrenceData;
 	if (lpStream)
 		lpStream->Release();
 
@@ -3174,7 +3129,7 @@ HRESULT VConverter::HrUpdateReminderTime(icalcomponent *lpicEvent, LONG lReminde
 		goto exit;
 	}
 
-	memset((void *) &sittTrigger, 0, sizeof(icaltriggertype));
+	memset(&sittTrigger, 0, sizeof(icaltriggertype));
 	sittTrigger.duration = icaldurationtype_from_int(-1 * lReminder * 60); // set seconds
 
 	lpicProp = icalcomponent_get_first_property(lpicAlarm, ICAL_TRIGGER_PROPERTY);
@@ -3264,10 +3219,7 @@ exit:
 
 	if (lpRows)
 		FreeProws(lpRows);
-
-	if (lpAttachRestrict)
-		MAPIFreeBuffer(lpAttachRestrict);
-
+	MAPIFreeBuffer(lpAttachRestrict);
 	if (lpAttachTable)
 		lpAttachTable->Release();
 
@@ -3456,12 +3408,8 @@ HRESULT VConverter::HrMAPI2ICal(LPMESSAGE lpMessage, icalproperty_method *lpicMe
 	*lpEventList = lstEvents;
 
 exit:
-	if (lpSpropValArray)
-		MAPIFreeBuffer(lpSpropValArray);
-
-	if (lpPropTagArray)
-		MAPIFreeBuffer(lpPropTagArray);
-
+	MAPIFreeBuffer(lpSpropValArray);
+	MAPIFreeBuffer(lpPropTagArray);
 	if (lpicEvent)
 		icalcomponent_free(lpicEvent);
 
@@ -3587,7 +3535,7 @@ HRESULT VConverter::HrMAPI2ICal(LPMESSAGE lpMessage, icalproperty_method *lpicMe
 	if (lpPropVal && lpPropVal->Value.MVszA.cValues > 0) {
 		// The categories need to be comma-separated
 		wstrBuf.reserve(lpPropVal->Value.MVszW.cValues * 50); // 50 chars per category is a wild guess, but more than enough
-		for (ulCount = 0; ulCount < lpPropVal->Value.MVszW.cValues; ulCount++) {
+		for (ulCount = 0; ulCount < lpPropVal->Value.MVszW.cValues; ++ulCount) {
 			if (ulCount)
 				wstrBuf += L",";
 			wstrBuf += lpPropVal->Value.MVszW.lppszW[ulCount];
@@ -3609,7 +3557,7 @@ HRESULT VConverter::HrMAPI2ICal(LPMESSAGE lpMessage, icalproperty_method *lpicMe
 	// Set contacts
 	lpPropVal = PpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_CONTACTS], PT_MV_UNICODE));
 	if (lpPropVal) {
-		for (ulCount = 0; ulCount < lpPropVal->Value.MVszW.cValues; ulCount++) {
+		for (ulCount = 0; ulCount < lpPropVal->Value.MVszW.cValues; ++ulCount) {
 			lpProp = icalproperty_new_contact(m_converter.convert_to<string>(m_strCharset.c_str(), lpPropVal->Value.MVszW.lppszW[ulCount], rawsize(lpPropVal->Value.MVszW.lppszW[ulCount]), CHARSET_WCHAR).c_str());
 			icalcomponent_add_property(lpEvent, lpProp);
 		}
@@ -3714,8 +3662,6 @@ HRESULT VConverter::HrMAPI2ICal(LPMESSAGE lpMessage, icalproperty_method *lpicMe
 		*lpstrTZid = strTZid;
 
 exit:
-	if (lpMsgProps)
-		MAPIFreeBuffer(lpMsgProps);
-
+	MAPIFreeBuffer(lpMsgProps);
 	return hr;
 }

@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <algorithm>
 
@@ -50,12 +24,14 @@
 #include "ECNotifyClient.h"
 #include "ECNotifyMaster.h"
 #include "ECSessionGroupManager.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 #include "SOAPUtils.h"
 #include "WSTransport.h"
 
+#ifdef LINUX
 #include <sys/signal.h>
 #include <sys/types.h>
+#endif
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -70,11 +46,14 @@ inline ECNotifySink::ECNotifySink(ECNotifyClient *lpClient, NOTIFYCALLBACK fnCal
 	, m_fnCallback(fnCallback)
 { }
 
-inline HRESULT ECNotifySink::Notify(ULONG ulConnection, NOTIFYLIST lNotifications) {
+inline HRESULT ECNotifySink::Notify(ULONG ulConnection,
+    const NOTIFYLIST &lNotifications) const
+{
 	return CALL_MEMBER_FN(*m_lpClient, m_fnCallback)(ulConnection, lNotifications);
 }
 
-inline bool ECNotifySink::IsClient(ECNotifyClient *lpClient) {
+inline bool ECNotifySink::IsClient(const ECNotifyClient *lpClient) const
+{
 	return lpClient == m_lpClient;
 }
 
@@ -199,7 +178,7 @@ struct findConnectionClient
 
 	findConnectionClient(ECNotifyClient* lpClient) : lpClient(lpClient) {}
 
-	bool operator()(NOTIFYCONNECTIONCLIENTMAP::value_type &entry)
+	bool operator()(const NOTIFYCONNECTIONCLIENTMAP::value_type &entry) const
 	{
 		return entry.second.IsClient(lpClient);
 	}
@@ -237,8 +216,7 @@ HRESULT ECNotifyMaster::ReserveConnection(ULONG *lpulConnection)
 	pthread_mutex_lock(&m_hMutex);
 
 	*lpulConnection = m_ulConnection;
-	m_ulConnection++;
-
+	++m_ulConnection;
 	pthread_mutex_unlock(&m_hMutex);
 
 	return hrSuccess;
@@ -283,11 +261,13 @@ HRESULT ECNotifyMaster::StartNotifyWatch()
 	/* Make thread joinable which we need during shutdown */
 	pthread_attr_setdetachstate(&m_hAttrib, PTHREAD_CREATE_JOINABLE);
 
+#ifdef LINUX
 	/* 1Mb of stack space per thread */
 	if (pthread_attr_setstacksize(&m_hAttrib, 1024 * 1024)) {
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
 	}
+#endif
 
 	if (pthread_create(&m_hThread, &m_hAttrib, NotifyWatch, (void *)this)) {
 		hr = MAPI_E_CALL_FAILED;
@@ -364,8 +344,10 @@ void* ECNotifyMaster::NotifyWatch(void *pTmpNotifyMaster)
 	notifyResponse					notifications;
 	bool							bReconnect = false;
 
+#ifdef LINUX
 	/* Ignore SIGPIPE which may be caused by HrGetNotify writing to the closed socket */
 	signal(SIGPIPE, SIG_IGN);
+#endif
 
 	while (!pNotifyMaster->m_bThreadExit) {
 		memset(&notifications, 0, sizeof(notifications));
@@ -375,7 +357,7 @@ void* ECNotifyMaster::NotifyWatch(void *pTmpNotifyMaster)
 
 		/* 'exitable' sleep before reconnect */
 		if (bReconnect) {
-			for (ULONG i = 10; i > 0; i--) {
+			for (ULONG i = 10; i > 0; --i) {
 				Sleep(100);
 				if (pNotifyMaster->m_bThreadExit)
 					goto exit;
@@ -430,15 +412,16 @@ void* ECNotifyMaster::NotifyWatch(void *pTmpNotifyMaster)
 			if (pNotifyMaster->m_bThreadExit)
 				goto exit;
 			else {
-				NOTIFYCLIENTLIST::iterator iterNotifyClients;
+				NOTIFYCLIENTLIST::const_iterator iterNotifyClients;
 
 				// We have a new session ID, notify reload
 
 				pthread_mutex_lock(&pNotifyMaster->m_hMutex);
 
-				for(iterNotifyClients = pNotifyMaster->m_listNotifyClients.begin(); iterNotifyClients != pNotifyMaster->m_listNotifyClients.end(); iterNotifyClients++) {
+				for (iterNotifyClients = pNotifyMaster->m_listNotifyClients.begin();
+				     iterNotifyClients != pNotifyMaster->m_listNotifyClients.end();
+				     ++iterNotifyClients)
 					(*iterNotifyClients)->NotifyReload();
-				}
 
 				pthread_mutex_unlock(&pNotifyMaster->m_hMutex);
 				continue;
@@ -460,7 +443,7 @@ void* ECNotifyMaster::NotifyWatch(void *pTmpNotifyMaster)
 		 * Loop through all notifications and sort them by connection number
 		 * with these mappings we can later send all notifications per connection to the appropriate client.
 		 */
-		for (ULONG item = 0; item < pNotifyArray->__size; item++) {
+		for (ULONG item = 0; item < pNotifyArray->__size; ++item) {
 			ULONG ulConnection = pNotifyArray->__ptr[item].ulConnection;
 
 			// No need to do a find before an insert with a default object.
@@ -470,8 +453,11 @@ void* ECNotifyMaster::NotifyWatch(void *pTmpNotifyMaster)
 			iterNotifications->second.push_back(&pNotifyArray->__ptr[item]);
 		}
 
-		for (iterNotifications = mapNotifications.begin(); iterNotifications != mapNotifications.end(); iterNotifications++) {
-			NOTIFYCONNECTIONCLIENTMAP::iterator iterClient;
+		for (iterNotifications = mapNotifications.begin();
+		     iterNotifications != mapNotifications.end();
+		     ++iterNotifications)
+		{
+			NOTIFYCONNECTIONCLIENTMAP::const_iterator iterClient;
 
 			/*
 			 * Check if we have a client registered for this connection

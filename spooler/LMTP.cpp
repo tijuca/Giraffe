@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -53,21 +27,23 @@
 #include <mapicode.h>
 #include <mapidefs.h>
 #include <mapiutil.h>
-#include <inetmapi.h>
-#include <mapiext.h>
+#include <inetmapi/inetmapi.h>
+#include <zarafa/mapiext.h>
 
-#include <CommonUtil.h>
+#include <zarafa/CommonUtil.h>
+#include <zarafa/MAPIErrors.h>
 #include <fileutil.h>
-#include <ECTags.h>
-#include "ECChannel.h"
+#include <zarafa/ECTags.h>
+#include <zarafa/ECChannel.h>
 #include "LMTP.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 #include "fileutil.h"
 
 using namespace std;
 
 
-LMTP::LMTP(ECChannel *lpChan, char *szServerPath, ECLogger *lpLog, ECConfig *lpConf) {
+LMTP::LMTP(ECChannel *lpChan, const char *szServerPath, ECLogger *lpLog, ECConfig *lpConf)
+{
     m_lpChannel = lpChan;
     m_lpLogger = lpLog;
     m_lpConfig = lpConf;
@@ -135,7 +111,8 @@ HRESULT LMTP::HrResponse(const string &strResponse)
 
 	hr = m_lpChannel->HrWriteLine(strResponse);
 	if (hr != hrSuccess)
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "LMTP write error");
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "LMTP write error: %s (%x)",
+			GetMAPIErrorMessage(hr), hr);
 
 	return hr;
 }
@@ -192,16 +169,15 @@ HRESULT LMTP::HrCommandMAILFROM(const string &strFrom, std::string *const strAdd
  */
 HRESULT LMTP::HrCommandRCPTTO(const string &strTo, string *strUnresolved)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = HrParseAddress(strTo, strUnresolved);
+	HRESULT hr = HrParseAddress(strTo, strUnresolved);
 	
 	if (hr == hrSuccess) {
-		if(m_lpLogger->Log(EC_LOGLEVEL_DEBUG))
-		    m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Resolved command '%s' to recipient address '%s'", strTo.c_str(), strUnresolved->c_str());
-    } else {
-	    m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Invalid recipient address in command '%s'", strTo.c_str());
-    }
+		if (m_lpLogger->Log(EC_LOGLEVEL_DEBUG))
+			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Resolved command '%s' to recipient address '%s'", strTo.c_str(), strUnresolved->c_str());
+	} else {
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Invalid recipient address in command '%s': %s (%x)",
+			strTo.c_str(), GetMAPIErrorMessage(hr), hr);
+	}
 	
 	return hr;
 }
@@ -224,7 +200,8 @@ HRESULT LMTP::HrCommandDATA(FILE *tmp)
 
 	hr = HrResponse("354 2.1.5 Start mail input; end with <CRLF>.<CRLF>");
 	if (hr != hrSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error during DATA communication with client.");
+		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error during DATA communication with client: %s (%x).",
+			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
 
@@ -232,7 +209,8 @@ HRESULT LMTP::HrCommandDATA(FILE *tmp)
 	while (1) {
 		hr = m_lpChannel->HrReadLine(&inBuffer);
 		if (hr != hrSuccess) {
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error during DATA communication with client.");
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error during DATA communication with client: %s (%x).",
+				GetMAPIErrorMessage(hr), hr);
 			goto exit;
 		}
 

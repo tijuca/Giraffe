@@ -1,72 +1,46 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "zcdefs.h"
-#include <platform.h>
+#include <zarafa/zcdefs.h>
+#include <zarafa/platform.h>
 
 #include "ECSyncContext.h"
 #include "ECOfflineABImporter.h"
 #include "ECSyncUtil.h"
 #include "ECSyncSettings.h"
-#include "threadutil.h"
+#include <zarafa/threadutil.h>
 
 #include <IECExportAddressbookChanges.h>
 #include <IECExportChanges.h>
 #include <IECChangeAdvisor.h>
 
-#include <ECUnknown.h>
-#include <ECGuid.h>
-#include <ECTags.h>
-#include <ECLogger.h>
-#include <stringutil.h>
+#include <zarafa/ECUnknown.h>
+#include <zarafa/ECGuid.h>
+#include <zarafa/ECTags.h>
+#include <zarafa/ECLogger.h>
+#include <zarafa/stringutil.h>
 
 #include <mapix.h>
-#include <mapiext.h>
+#include <zarafa/mapiext.h>
 #include <mapiutil.h>
 #include <edkguid.h>
 #include <edkmdb.h>
 
-#include <mapi_ptr.h>
+#include <zarafa/mapi_ptr.h>
 typedef mapi_object_ptr<IECChangeAdvisor, IID_IECChangeAdvisor> ECChangeAdvisorPtr;
 //DEFINEMAPIPTR(ECChangeAdvisor);
 typedef mapi_object_ptr<IECChangeAdviseSink, IID_IECChangeAdviseSink> ECChangeAdviseSinkPtr;
@@ -82,7 +56,7 @@ static const char THIS_FILE[] = __FILE__;
 
 
 #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
-class ECChangeAdviseSink _final : public ECUnknown
+class ECChangeAdviseSink _zcp_final : public ECUnknown
 {
 public:
 	typedef ULONG(ECSyncContext::*NOTIFYCALLBACK)(ULONG,LPENTRYLIST);
@@ -115,22 +89,22 @@ public:
 	}
 
 private:
-	class xECChangeAdviseSink _final : public IECChangeAdviseSink {
+	class xECChangeAdviseSink _zcp_final : public IECChangeAdviseSink {
 	public:
 		// IUnknown
-		virtual ULONG __stdcall AddRef(void) _override
+		virtual ULONG __stdcall AddRef(void) _zcp_override
 		{
 			METHOD_PROLOGUE_(ECChangeAdviseSink, ECChangeAdviseSink);
 			return pThis->AddRef();
 		}
 
-		virtual ULONG __stdcall Release(void) _override
+		virtual ULONG __stdcall Release(void) _zcp_override
 		{
 			METHOD_PROLOGUE_(ECChangeAdviseSink, ECChangeAdviseSink);
 			return pThis->Release();
 		}
 
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **pInterface) _override
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **pInterface) _zcp_override
 		{
 			METHOD_PROLOGUE_(ECChangeAdviseSink, ECChangeAdviseSink);
 			return pThis->QueryInterface(refiid, pInterface);
@@ -150,7 +124,7 @@ private:
 
 static HRESULT HrCreateECChangeAdviseSink(ECSyncContext *lpsSyncContext,
     ECChangeAdviseSink::NOTIFYCALLBACK fnCallback,
-    LPECCHANGEADVISESINK *lppAdviseSink)
+    IECChangeAdviseSink **lppAdviseSink)
 {
 	HRESULT				hr = hrSuccess;
 	ECChangeAdviseSink	*lpAdviseSink = NULL;
@@ -184,6 +158,7 @@ ECSyncContext::ECSyncContext(LPMDB lpStore, ECLogger *lpLogger)
 {
 	pthread_mutex_init(&m_hMutex, NULL);
 
+	m_lpLogger->AddRef();
 	m_lpStore->AddRef();
 
 	if (m_lpSettings->ChangeNotificationsEnabled())
@@ -201,6 +176,7 @@ ECSyncContext::~ECSyncContext()
 	if (m_lpStore)
 		m_lpStore->Release();
 
+	m_lpLogger->Release();
 	pthread_mutex_destroy(&m_hMutex);
 }
 
@@ -247,15 +223,12 @@ HRESULT ECSyncContext::HrGetReceiveFolder(LPMAPIFOLDER *lppInboxFolder)
 exit:
 	if (lpInboxFolder)
 		lpInboxFolder->Release();
-
-	if (lpEntryID)
-		MAPIFreeBuffer(lpEntryID);
-
+	MAPIFreeBuffer(lpEntryID);
 	return hr;
 }
 
 
-HRESULT ECSyncContext::HrGetChangeAdvisor(LPECCHANGEADVISOR *lppChangeAdvisor)
+HRESULT ECSyncContext::HrGetChangeAdvisor(IECChangeAdvisor **lppChangeAdvisor)
 {
 	HRESULT	hr = hrSuccess;
 
@@ -337,7 +310,7 @@ exit:
 }
 
 
-HRESULT ECSyncContext::HrGetChangeAdviseSink(LPECCHANGEADVISESINK *lppChangeAdviseSink)
+HRESULT ECSyncContext::HrGetChangeAdviseSink(IECChangeAdviseSink **lppChangeAdviseSink)
 {
 	ASSERT(m_lpChangeAdviseSink != NULL);
 	return m_lpChangeAdviseSink->QueryInterface(IID_IECChangeAdviseSink, (void**)lppChangeAdviseSink);
@@ -448,7 +421,7 @@ HRESULT ECSyncContext::HrGetSteps(SBinary *lpEntryID, SBinary *lpSourceKey, ULON
 	ULONG ulType = 0;
 	SSyncState sSyncState = {0};
 	IECChangeAdvisor *lpECA = NULL;
-	NotifiedSyncIdMap::iterator iterNotifiedSyncId;
+	NotifiedSyncIdMap::const_iterator iterNotifiedSyncId;
 	bool bNotified = false;
 
 	ASSERT(lpulSteps != NULL);
@@ -549,10 +522,7 @@ exit:
 
 	if (lpStream)
 		lpStream->Release();
-
-	if (lpPropVal)
-		MAPIFreeBuffer(lpPropVal);
-
+	MAPIFreeBuffer(lpPropVal);
 	if (lpFolder)
 		lpFolder->Release();
 
@@ -680,7 +650,7 @@ HRESULT ECSyncContext::HrLoadSyncStatus(SBinary *lpsSyncState)
 
 	ulStatusCount = *((ULONG*)(lpsSyncState->lpb+4));
 
-	LOG_DEBUG(m_lpLogger, "Loading sync status stream: version=%u, items=%u", ulVersion, ulStatusCount);
+	ZLOG_DEBUG(m_lpLogger, "Loading sync status stream: version=%u, items=%u", ulVersion, ulStatusCount);
 
 	ulPos = 8;
 	for (ulStatusNumber = 0; ulStatusNumber < ulStatusCount; ++ulStatusNumber) {
@@ -702,7 +672,7 @@ HRESULT ECSyncContext::HrLoadSyncStatus(SBinary *lpsSyncState)
 			goto exit;
 		}
 
-		LOG_DEBUG(m_lpLogger, "  Stream %u: size=%u, sourcekey=%s", ulStatusNumber, ulSize, bin2hex(strSourceKey.size(), (unsigned char*)strSourceKey.data()).c_str());
+		ZLOG_DEBUG(m_lpLogger, "  Stream %u: size=%u, sourcekey=%s", ulStatusNumber, ulSize, bin2hex(strSourceKey.size(), (unsigned char*)strSourceKey.data()).c_str());
 
 		hr = CreateStreamOnHGlobal(GlobalAlloc(GPTR, ulSize), true, &lpStream);
 		if (hr != hrSuccess)
@@ -725,7 +695,7 @@ exit:
 HRESULT ECSyncContext::HrSaveSyncStatus(LPSPropValue *lppSyncStatusProp)
 {
 	HRESULT hr = hrSuccess;
-	StatusStreamMap::iterator iSyncStatus;
+	StatusStreamMap::const_iterator iSyncStatus;
 	std::string strSyncStatus;
 	ULONG ulSize = 0;
 	ULONG ulVersion = EC_SYNC_STATUS_VERSION;
@@ -740,7 +710,7 @@ HRESULT ECSyncContext::HrSaveSyncStatus(LPSPropValue *lppSyncStatusProp)
 	ulSize = m_mapSyncStatus.size();
 	strSyncStatus.append((char*)&ulSize, 4);
 
-	LOG_DEBUG(m_lpLogger, "Saving sync status stream: items=%u", ulSize);
+	ZLOG_DEBUG(m_lpLogger, "Saving sync status stream: items=%u", ulSize);
 
 	for (iSyncStatus = m_mapSyncStatus.begin(); iSyncStatus != m_mapSyncStatus.end(); ++iSyncStatus) {
 		ulSize = iSyncStatus->first.size();
@@ -754,7 +724,7 @@ HRESULT ECSyncContext::HrSaveSyncStatus(LPSPropValue *lppSyncStatusProp)
 		ulSize = sStat.cbSize.LowPart;
 		strSyncStatus.append((char*)&ulSize, 4);
 
-		LOG_DEBUG(m_lpLogger, "  Stream: size=%u, sourcekey=%s", ulSize, bin2hex(iSyncStatus->first.size(), (unsigned char*)iSyncStatus->first.data()).c_str());
+		ZLOG_DEBUG(m_lpLogger, "  Stream: size=%u, sourcekey=%s", ulSize, bin2hex(iSyncStatus->first.size(), (unsigned char*)iSyncStatus->first.data()).c_str());
 
 		hr = iSyncStatus->second->Seek(liPos, STREAM_SEEK_SET, NULL);
 		if (hr != hrSuccess)
@@ -786,12 +756,8 @@ HRESULT ECSyncContext::HrSaveSyncStatus(LPSPropValue *lppSyncStatusProp)
 	lpSyncStatusProp = NULL;
 
 exit:
-	if (lpSyncStatusProp)
-		MAPIFreeBuffer(lpSyncStatusProp);
-
-	if (lpszStream)
-		delete[] lpszStream;
-
+	MAPIFreeBuffer(lpSyncStatusProp);
+	delete[] lpszStream;
 	return hr;
 }
 
@@ -810,9 +776,7 @@ HRESULT ECSyncContext::HrGetSyncStatusStream(LPMAPIFOLDER lpFolder, LPSTREAM *lp
 		goto exit;
 
 exit:
-	if (lpPropVal)
-		MAPIFreeBuffer(lpPropVal);
-
+	MAPIFreeBuffer(lpPropVal);
 	return hr;
 }
 
@@ -822,12 +786,9 @@ HRESULT ECSyncContext::HrGetSyncStatusStream(SBinary *lpsSourceKey, LPSTREAM *lp
 	HRESULT hr = hrSuccess;
 	LPSTREAM lpStream = NULL;
 	std::string strSourceKey;
-	StatusStreamMap::iterator iStatusStream;
-	ULONG ulSize;
+	StatusStreamMap::const_iterator iStatusStream;
 
 	strSourceKey.assign((char*)lpsSourceKey->lpb, lpsSourceKey->cb);
-
-	ulSize = m_mapSyncStatus.size();
 	iStatusStream = m_mapSyncStatus.find(strSourceKey);
 
 	if (iStatusStream != m_mapSyncStatus.end()) {

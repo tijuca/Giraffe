@@ -7,7 +7,7 @@
 
 %include "std_string.i"
 %include "cstring.i"
-%include "typemap.i"
+%include <zarafa/typemap.i>
 
 // Create class output parameters (both conversions)
 %typemap(in,numinputs=0) (ICALMAPICLASS **) ($basetype *temp) {

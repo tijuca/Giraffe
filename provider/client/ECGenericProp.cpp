@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include <mapidefs.h>
 #include "WSTransport.h"
 #include "ECGenericProp.h"
@@ -49,13 +23,13 @@
 #include "Zarafa.h"
 #include "ZarafaUtil.h"
 #include "Mem.h"
-#include "Util.h"
+#include <zarafa/Util.h>
 
-#include "ECGuid.h"
+#include <zarafa/ECGuid.h>
 
-#include "ECDebug.h"
+#include <zarafa/ECDebug.h>
 
-#include "charset/convert.h"
+#include <zarafa/charset/convert.h>
 #include "EntryPoint.h"
 
 #ifdef _DEBUG
@@ -105,7 +79,7 @@ ECGenericProp::~ECGenericProp()
 		FreeMapiObject(m_sMapiObject);
 
 	if(lstProps) {
-		for(iterProps = lstProps->begin(); iterProps != lstProps->end(); iterProps++)
+		for (iterProps = lstProps->begin(); iterProps != lstProps->end(); ++iterProps)
 			iterProps->second.DeleteProperty();
 
 		delete lstProps;
@@ -113,10 +87,7 @@ ECGenericProp::~ECGenericProp()
 
 	if(lpStorage)
 		lpStorage->Release();
-
-	if(m_lpEntryId)
-		MAPIFreeBuffer(m_lpEntryId);
-
+	MAPIFreeBuffer(m_lpEntryId);
 	pthread_mutex_destroy(&m_hMutexMAPIObject);
 }
 
@@ -140,16 +111,8 @@ HRESULT ECGenericProp::SetProvider(void* lpProvider)
 
 HRESULT ECGenericProp::SetEntryId(ULONG cbEntryId, LPENTRYID lpEntryId)
 {
-	HRESULT hr;
-
 	ASSERT(m_lpEntryId == NULL);
-	
-	hr = Util::HrCopyEntryId(cbEntryId, lpEntryId, &m_cbEntryId, &m_lpEntryId);
-	if(hr != hrSuccess)
-		goto exit;
-
-exit:
-	return hr;
+	return Util::HrCopyEntryId(cbEntryId, lpEntryId, &m_cbEntryId, &m_lpEntryId);
 }
 
 // Add a property handler. Usually called by a subclass
@@ -243,7 +206,7 @@ HRESULT ECGenericProp::HrSetRealProp(SPropValue *lpsPropValue)
 
 	// Property is now added/modified and marked 'dirty' for saving
 exit:
-	if(hr != hrSuccess && lpProperty)
+	if (hr != hrSuccess)
 		delete lpProperty;
 
 	dwLastError = hr;
@@ -472,9 +435,8 @@ HRESULT ECGenericProp::HrSetClean()
 	ECPropertyEntryIterator iterProps;
 
 	// also remove deleted marked properties, since the object isn't reloaded from the server anymore
-	for(iterProps = lstProps->begin(); iterProps != lstProps->end(); iterProps++) {
-			iterProps->second.HrSetClean();
-	}
+	for (iterProps = lstProps->begin(); iterProps != lstProps->end(); ++iterProps)
+		iterProps->second.HrSetClean();
 
 	m_setDeletedProps.clear();
 
@@ -495,13 +457,12 @@ HRESULT ECGenericProp::HrRemoveModifications(MAPIOBJECT *lpsMapiObject, ULONG ul
 
 	lpsMapiObject->lstDeleted->remove(ulPropTag);
 
-	for(iterProps = lpsMapiObject->lstModified->begin(); iterProps != lpsMapiObject->lstModified->end(); iterProps++) {
+	for (iterProps = lpsMapiObject->lstModified->begin();
+	     iterProps != lpsMapiObject->lstModified->end(); ++iterProps)
 		if(iterProps->GetPropTag() == ulPropTag) {
 			lpsMapiObject->lstModified->erase(iterProps);
 			break;
 		}
-	}
-
 	return hr;
 }
 
@@ -552,9 +513,7 @@ HRESULT ECGenericProp::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR 
 	*lppMAPIError = lpMapiError;
 
 exit:
-	if (lpszErrorMsg)
-		MAPIFreeBuffer(lpszErrorMsg);
-
+	MAPIFreeBuffer(lpszErrorMsg);
 	if( hr != hrSuccess && lpMapiError)
 		ECFreeBuffer(lpMapiError);
 
@@ -566,9 +525,9 @@ HRESULT ECGenericProp::SaveChanges(ULONG ulFlags)
 {
 	HRESULT			hr = hrSuccess;
 	ECPropertyEntryIterator iterProps;
-	std::list<ULONG>::iterator iterPropTags;
-	std::list<ECProperty>::iterator iterPropVals;
-	std::set<ULONG>::iterator iterDelProps;
+	std::list<ULONG>::const_iterator iterPropTags;
+	std::list<ECProperty>::const_iterator iterPropVals;
+	std::set<ULONG>::const_iterator iterDelProps;
 
 	pthread_mutex_lock(&m_hMutexMAPIObject);
 
@@ -597,15 +556,15 @@ HRESULT ECGenericProp::SaveChanges(ULONG ulFlags)
 
 	// save into m_sMapiObject
 	
-	for (iterDelProps = m_setDeletedProps.begin(); iterDelProps != m_setDeletedProps.end(); iterDelProps++) {
+	for (iterDelProps = m_setDeletedProps.begin();
+	     iterDelProps != m_setDeletedProps.end(); ++iterDelProps) {
 		// Make sure the property is not present in deleted/modified list
 		HrRemoveModifications(m_sMapiObject, *iterDelProps);
 
 		m_sMapiObject->lstDeleted->push_back(*iterDelProps);
 	}
 
-	for (iterProps = lstProps->begin(); iterProps != lstProps->end(); iterProps++) {
-
+	for (iterProps = lstProps->begin(); iterProps != lstProps->end(); ++iterProps) {
 		// Property is dirty, so we have to save it
 		if (iterProps->second.FIsDirty()) {
 			// Save in the 'modified' list
@@ -643,8 +602,8 @@ HRESULT ECGenericProp::SaveChanges(ULONG ulFlags)
 	// that save to ECParentStorage, the object will be untouched. The code below will do nothing.
 
 	// Large properties received
-	for(iterPropTags = m_sMapiObject->lstAvailable->begin(); iterPropTags != m_sMapiObject->lstAvailable->end(); iterPropTags++) {
-		
+	for (iterPropTags = m_sMapiObject->lstAvailable->begin();
+	     iterPropTags != m_sMapiObject->lstAvailable->end(); ++iterPropTags) {
 		// ONLY if not present
 		iterProps = lstProps->find(PROP_ID(*iterPropTags));
 		if (iterProps == lstProps->end() || iterProps->second.GetPropTag() != *iterPropTags) {
@@ -655,13 +614,13 @@ HRESULT ECGenericProp::SaveChanges(ULONG ulFlags)
 	m_sMapiObject->lstAvailable->clear();
 
 	// Normal properties with value
-	for (iterPropVals = m_sMapiObject->lstProperties->begin(); iterPropVals != m_sMapiObject->lstProperties->end(); iterPropVals++) {
+	for (iterPropVals = m_sMapiObject->lstProperties->begin();
+	     iterPropVals != m_sMapiObject->lstProperties->end(); ++iterPropVals)
 		// don't add any 'error' types ... (the storage object shouldn't really give us these anyway ..)
 		if (PROP_TYPE((*iterPropVals).GetPropTag()) != PT_ERROR) {
 			SPropValue tmp = iterPropVals->GetMAPIPropValRef();
 			HrSetRealProp(&tmp);
 		}
-	}
 
 	// Note that we currently don't support the server removing properties after the SaveObject call
 
@@ -692,19 +651,14 @@ exit:
 // Check if property is dirty (delete properties gives MAPI_E_NOT_FOUND)
 HRESULT ECGenericProp::IsPropDirty(ULONG ulPropTag, BOOL *lpbDirty)
 {
-	HRESULT					hr = hrSuccess;
 	ECPropertyEntryIterator iterProps;
 
 	iterProps = lstProps->find(PROP_ID(ulPropTag));
-	if(iterProps == lstProps->end() || (PROP_TYPE(ulPropTag) != PT_UNSPECIFIED && ulPropTag != iterProps->second.GetPropTag()) ) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
+	if (iterProps == lstProps->end() || (PROP_TYPE(ulPropTag) != PT_UNSPECIFIED && ulPropTag != iterProps->second.GetPropTag()))
+		return MAPI_E_NOT_FOUND;
 	
 	*lpbDirty = iterProps->second.FIsDirty();
-
-exit: 
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -718,19 +672,14 @@ exit:
  */
 HRESULT ECGenericProp::HrSetCleanProperty(ULONG ulPropTag)
 {
-	HRESULT					hr = hrSuccess;
 	ECPropertyEntryIterator iterProps;
 
 	iterProps = lstProps->find(PROP_ID(ulPropTag));
-	if(iterProps == lstProps->end() || (PROP_TYPE(ulPropTag) != PT_UNSPECIFIED && ulPropTag != iterProps->second.GetPropTag()) ) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
+	if (iterProps == lstProps->end() || (PROP_TYPE(ulPropTag) != PT_UNSPECIFIED && ulPropTag != iterProps->second.GetPropTag()))
+		return MAPI_E_NOT_FOUND;
 	
 	iterProps->second.HrSetClean();
-
-exit: 
-	return hr;
+	return hrSuccess;
 }
 
 // Get the handler(s) for a given property tag
@@ -764,7 +713,7 @@ exit:
 
 HRESULT ECGenericProp::HrSetPropStorage(IECPropStorage *lpStorage, BOOL fLoadProps)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	SPropValue sPropValue;
 
 	if(this->lpStorage)
@@ -778,21 +727,17 @@ HRESULT ECGenericProp::HrSetPropStorage(IECPropStorage *lpStorage, BOOL fLoadPro
 	if(fLoadProps) {
 		hr = HrLoadProps();
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 			
 		if(HrGetRealProp(PR_OBJECT_TYPE, 0, NULL, &sPropValue, m_ulMaxPropSize) == hrSuccess) {
 			// The server sent a PR_OBJECT_TYPE, check if it is correct
-			if(this->ulObjType != sPropValue.Value.ul) {
+			if (this->ulObjType != sPropValue.Value.ul)
 				// Return NOT FOUND because the entryid given was the incorrect type. This means
 				// that the object was basically not found.
-				hr = MAPI_E_NOT_FOUND;
-				goto exit;
-			}
+				return MAPI_E_NOT_FOUND;
 		}
 	}
-exit:
-		
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECGenericProp::HrLoadEmptyProps()
@@ -815,8 +760,8 @@ HRESULT ECGenericProp::HrLoadProps()
 {
 	HRESULT			hr = hrSuccess;
 	ECPropertyEntryIterator iterProps;
-	std::list<ULONG>::iterator iterPropTags;
-	std::list<ECProperty>::iterator iterPropVals;
+	std::list<ULONG>::const_iterator iterPropTags;
+	std::list<ECProperty>::const_iterator iterPropVals;
 
 	if(lpStorage == NULL)
 		return MAPI_E_CALL_FAILED;
@@ -835,7 +780,7 @@ HRESULT ECGenericProp::HrLoadProps()
 		m_sMapiObject = NULL;
 
 		// only remove my own properties: keep recipients and attachment tables
-		for(iterProps = lstProps->begin(); iterProps != lstProps->end(); iterProps++)
+		for (iterProps = lstProps->begin(); iterProps != lstProps->end(); ++iterProps)
 			iterProps->second.DeleteProperty();
 
 		lstProps->clear();
@@ -851,14 +796,16 @@ HRESULT ECGenericProp::HrLoadProps()
 
 	// Add *all* the entries as with empty values; values for these properties will be
 	// retrieved on-demand
-	for(iterPropTags = m_sMapiObject->lstAvailable->begin(); iterPropTags != m_sMapiObject->lstAvailable->end(); iterPropTags++) {
+	for (iterPropTags = m_sMapiObject->lstAvailable->begin();
+	     iterPropTags != m_sMapiObject->lstAvailable->end(); ++iterPropTags) {
 		ECPropertyEntry entry(*iterPropTags);
 
 		lstProps->insert(std::make_pair(PROP_ID(*iterPropTags), entry));
 	}
 
 	// Load properties
-	for (iterPropVals = m_sMapiObject->lstProperties->begin(); iterPropVals != m_sMapiObject->lstProperties->end(); iterPropVals++) {
+	for (iterPropVals = m_sMapiObject->lstProperties->begin();
+	     iterPropVals != m_sMapiObject->lstProperties->end(); ++iterPropVals) {
 		// don't add any 'error' types ... (the storage object shouldn't really give us these anyway ..)
 		if (PROP_TYPE((*iterPropVals).GetPropTag()) != PT_ERROR) {
 			SPropValue tmp = iterPropVals->GetMAPIPropValRef();
@@ -969,7 +916,7 @@ HRESULT ECGenericProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, U
 
 	ECAllocateBuffer(sizeof(SPropValue) * lpGetPropTagArray->cValues, (LPVOID *)&lpsPropValue);
 
-	for(i=0;i < lpGetPropTagArray->cValues; i++) {
+	for (i = 0; i < lpGetPropTagArray->cValues; ++i) {
 		if(HrGetHandler(lpGetPropTagArray->aulPropTag[i], NULL, &lpfnGetProp, &lpParam) == hrSuccess) {
 			lpsPropValue[i].ulPropTag = lpGetPropTagArray->aulPropTag[i];
 
@@ -1004,7 +951,7 @@ exit:
 
 HRESULT ECGenericProp::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropTagArray)
 {
-	HRESULT				hr = hrSuccess;
+	HRESULT hr;
 	LPSPropTagArray		lpPropTagArray = NULL;
 	int					n = 0;
 
@@ -1014,7 +961,7 @@ HRESULT ECGenericProp::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropT
 	if(lstProps == NULL) {
 		hr = HrLoadProps();
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 	}			
 
 	// The size of the property tag array is never larger than (static properties + generated properties)
@@ -1023,8 +970,8 @@ HRESULT ECGenericProp::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropT
 	// Some will overlap so we've actually allocated slightly too much memory
 
 	// Add the callback types first
-	for(iterCallBack = lstCallBack.begin(); iterCallBack != lstCallBack.end(); iterCallBack++) {
-
+	for (iterCallBack = lstCallBack.begin();
+	     iterCallBack != lstCallBack.end(); ++iterCallBack) {
 		// Don't add 'hidden' properties
 		if(iterCallBack->second.fHidden)
 			continue;
@@ -1055,7 +1002,7 @@ HRESULT ECGenericProp::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropT
 	}
 
 	// Then add the others, if not added yet
-	for(iterProps = lstProps->begin(); iterProps != lstProps->end() ; iterProps++) {
+	for (iterProps = lstProps->begin(); iterProps != lstProps->end(); ++iterProps) {
 		if(HrGetHandler(iterProps->second.GetPropTag(),NULL,NULL,NULL) != 0) {
 			ULONG ulPropTag = iterProps->second.GetPropTag();
 
@@ -1074,10 +1021,7 @@ HRESULT ECGenericProp::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropT
 	lpPropTagArray->cValues = n;
 
 	*lppPropTagArray = lpPropTagArray;
-
-exit:
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECGenericProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
@@ -1103,7 +1047,7 @@ HRESULT ECGenericProp::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSProp
 	if(hr != hrSuccess)
 		goto exit;
 
-	for(unsigned int i=0;i<cValues;i++) {
+	for (unsigned int i = 0; i < cValues; ++i) {
 		// Ignore the PR_NULL property tag and all properties with a type of PT_ERROR;
 		// no changes and report no problems in the SPropProblemArray structure. 
 		if(PROP_TYPE(lpPropArray[i].ulPropTag) == PR_NULL ||
@@ -1120,7 +1064,7 @@ HRESULT ECGenericProp::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSProp
 			lpProblems->aProblem[nProblem].scode = hrT;
 			lpProblems->aProblem[nProblem].ulIndex = i;
 			lpProblems->aProblem[nProblem].ulPropTag = lpPropArray[i].ulPropTag; // Hold here the real property
-			nProblem++;
+			++nProblem;
 		}
 	}
 
@@ -1162,20 +1106,15 @@ HRESULT ECGenericProp::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProble
 	LPSPropProblemArray		lpProblems = NULL;
 	int						nProblem = 0;
 
-	if (!lpPropTagArray) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpPropTagArray == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	// over-allocate the problem array
 	er = ECAllocateBuffer(CbNewSPropProblemArray(lpPropTagArray->cValues), (LPVOID *)&lpProblems);
-	if (er != erSuccess) {
-		hr = MAPI_E_NOT_ENOUGH_MEMORY;
-		goto exit;
-	}
+	if (er != erSuccess)
+		return MAPI_E_NOT_ENOUGH_MEMORY;
 
-	for(unsigned int i=0;i<lpPropTagArray->cValues;i++) {
-
+	for (unsigned int i = 0; i < lpPropTagArray->cValues; ++i) {
 		// See if it's computed
 		iterCallBack = lstCallBack.find(PROP_ID(lpPropTagArray->aulPropTag[i]));
 
@@ -1185,7 +1124,7 @@ HRESULT ECGenericProp::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProble
 			lpProblems->aProblem[nProblem].scode = MAPI_E_COMPUTED;
 			lpProblems->aProblem[nProblem].ulIndex = i;
 			lpProblems->aProblem[nProblem].ulPropTag = lpPropTagArray->aulPropTag[i];
-			nProblem++;
+			++nProblem;
 		} else {
 
 			hrT = HrDeleteRealProp(lpPropTagArray->aulPropTag[i],FALSE);
@@ -1195,7 +1134,7 @@ HRESULT ECGenericProp::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProble
 				lpProblems->aProblem[nProblem].scode = hrT;
 				lpProblems->aProblem[nProblem].ulIndex = i;
 				lpProblems->aProblem[nProblem].ulPropTag = lpPropTagArray->aulPropTag[i];
-				nProblem++;
+				++nProblem;
 			}
 		}
 	}
@@ -1210,8 +1149,6 @@ HRESULT ECGenericProp::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProble
 	} else {
 		ECFreeBuffer(lpProblems);
 	}
-	
-exit:
 	return hr;
 }
 

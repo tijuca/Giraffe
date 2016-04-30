@@ -1,49 +1,23 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
-
-#include "ECLogger.h"
+#include <zarafa/platform.h>
+#include <ctime>
+#include <zarafa/ECLogger.h>
 
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
@@ -55,7 +29,12 @@
 #include "ECSoapServerConnection.h"
 #include "ECServerEntrypoint.h"
 #include "ECClientUpdate.h"
-#include "UnixUtil.h"
+#ifdef LINUX
+#	include <dirent.h>
+#	include <fcntl.h>
+#	include <unistd.h>
+#	include <zarafa/UnixUtil.h>
+#endif
 
 extern ECLogger *g_lpLogger;
 
@@ -64,7 +43,15 @@ struct soap_connection_thread {
 	struct soap*			lpSoap;
 };
 
+#ifdef WIN32
+// used for std::set<pthread_t>
+bool operator<(const pthread_t &pta, const pthread_t &ptb)
+{
+	return pta.p < ptb.p;
+}
+#endif
 
+#ifdef LINUX
 /** 
  * Creates a AF_UNIX socket in a given location and starts to listen
  * on that socket.
@@ -92,13 +79,18 @@ static int create_pipe_socket(const char *unix_socket, ECConfig *lpConfig,
 	
 	memset(&saddr,0,sizeof(saddr));
 	saddr.sun_family = AF_UNIX;
-	memcpy(saddr.sun_path,unix_socket,strlen(unix_socket)+1);
-	
+	if (strlen(unix_socket) >= sizeof(saddr.sun_path)) {
+		lpLogger->Log(EC_LOGLEVEL_ERROR, "UNIX domain socket path \"%s\" is too long", unix_socket);
+		return -1;
+	}
+	strncpy(saddr.sun_path, unix_socket, sizeof(saddr.sun_path));
 	unlink(unix_socket);
 
 	if (bind(s, (struct sockaddr*)&saddr, 2 + strlen(unix_socket)) == -1) {
 		lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to socket %s (%s). This is usually caused by another process (most likely another zarafa-server) already using this port. This program will terminate now.", unix_socket, strerror(errno));
+#ifdef LINUX
                 kill(0, SIGTERM);
+#endif
                 exit(1);
         }
 
@@ -109,13 +101,15 @@ static int create_pipe_socket(const char *unix_socket, ECConfig *lpConfig,
 		return -1;
 	}
 
+#ifdef LINUX
 	if(er) {
 		lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to chown socket %s, to %s:%s. Error: %s", unix_socket, lpConfig->GetSetting("run_as_user"), lpConfig->GetSetting("run_as_group"), strerror(errno));
 		closesocket(s);
 		return -1;
 	}
+#endif
 	
-	if(listen(s,8) == -1) {
+	if (listen(s, SOMAXCONN) == -1) {
 		lpLogger->Log(EC_LOGLEVEL_FATAL, "Can't listen on unix socket %s", unix_socket);
 		closesocket(s);
 		return -1;
@@ -124,33 +118,115 @@ static int create_pipe_socket(const char *unix_socket, ECConfig *lpConfig,
 	return s;
 }
 
-/* ALERT! Big hack!
- *
- * This function relocates an open file descriptor to a new file descriptor above 1024. The
- * reason we do this, is because although we support many open fd's up to FD_SETSIZE, libraries
- * that we use may not (most notably libldap). This means that if a new socket is allocated within
- * libldap as socket 1025, libldap will fail because it was compiled with FD_SETSIZE=1024. To fix
- * this problem, we make sure that most FD's under 1024 are free for use by external libraries, while
- * we use the range 1024 -> 8192
- */
-int relocate_fd(int fd, ECLogger *lpLogger)
-{
-	// If we only have a 1024-fd limit, just return the original fd
-	if(getdtablesize() <= 1024)
-		return fd;
+#else
 
-	int relocated = fcntl(fd, F_DUPFD, 1024);
-	
-	if(relocated < 0) {
-		// OMG we have more than FD_SETSIZE-1024 sockets in use ?? Expect problems!
-		lpLogger->Log(EC_LOGLEVEL_FATAL, "WARNING: Out of file descriptors, more than %d sockets in use. You cannot increase this value, so you must decrease socket usage.", getdtablesize()-1024);
-		relocated = fd; // might as well try using FD's under 1024 ....
-	} else {
-		close(fd);
+//////////////////////////////////////////////////////////////////////
+// Named pipe functions
+//
+
+// Create a namedpipe in windows 
+// the function must be called very time you have used the pipe
+static int create_pipe_socket(const char *lpszPipename, ECConfig *lpConfig,
+    ECLogger *lpLogger, bool bInit, int mode)
+{
+	HANDLE hPipe;
+
+	DWORD dwOpenMode = PIPE_ACCESS_DUPLEX | // read/write access 
+					FILE_FLAG_OVERLAPPED; // overlapped mode
+
+	if (bInit) {
+		// block create multiple instances of a pipe
+		dwOpenMode |= FILE_FLAG_FIRST_PIPE_INSTANCE;
 	}
-	
-	return relocated;
+
+	hPipe = CreateNamedPipeA( 
+					lpszPipename,             // pipe name 
+					dwOpenMode, 
+					PIPE_TYPE_BYTE |       // byte-oriented
+					PIPE_READMODE_BYTE |   
+					PIPE_WAIT,               // blocking mode 
+					PIPE_UNLIMITED_INSTANCES, // max. instances  
+					0x10000,                  // output buffer size 
+					0x10000,                  // input buffer size 
+					1000,					// client time-out 
+					NULL);                    // default security attribute 
+
+	if (hPipe == INVALID_HANDLE_VALUE) 
+	{
+		lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to create pipe %s", lpszPipename);
+		return SOAP_INVALID_SOCKET;
+	}
+
+	return (int)hPipe;
 }
+
+// Override the soap function fsend
+//  Send data over a namedpipe
+int gsoap_win_fsend(struct soap *soap, const char *s, size_t n)
+{
+	DWORD ulWritten; 
+
+	if(WriteFile((HANDLE)soap->socket, s, n, &ulWritten, NULL))
+		return SOAP_OK;
+	else
+		return SOAP_ERR;
+}
+
+// Override the soap function frecv
+//  receive date from a namedpipe
+size_t gsoap_win_frecv(struct soap *soap, char *s, size_t n)
+{
+	DWORD ulRead;
+
+	if(ReadFile((HANDLE)soap->socket, s, n, &ulRead, NULL))
+		return ulRead;
+	else
+		return 0;
+}
+
+// Override the soap function tcp_disconnect
+//  close the namedpipe
+int gsoap_win_fclose(struct soap *soap)
+{
+	if((HANDLE)soap->socket == INVALID_HANDLE_VALUE)
+		return SOAP_OK;
+
+	zarafa_disconnect_soap_connection(soap);
+
+	// Flush the data so the client gets any left-over data, then disconnect and close the socket
+	FlushFileBuffers((HANDLE)soap->socket);
+	DisconnectNamedPipe((HANDLE)soap->socket);
+	CloseHandle((HANDLE)soap->socket); // ignore errors
+
+	// Master and socket are the same
+	soap->socket = (int)INVALID_HANDLE_VALUE;
+	soap->master = (int)INVALID_HANDLE_VALUE;
+
+	return SOAP_OK;
+}
+
+// Override the soap function tcp_disconnect
+//  close master, ignored by using namedpipe
+int gsoap_win_closesocket(struct soap *soap, SOAP_SOCKET fd)
+{
+	// is used only to close the master socket in a server upon soap_done()
+	// skip this for namedpipe
+	return SOAP_OK;
+}
+
+// Override the soap function tcp_shutdownsocket
+//  shutdown a socket ignored by using namedpipe
+int gsoap_win_shutdownsocket(struct soap *soap, SOAP_SOCKET fd, int how)
+{
+	//  is used after completing a send operation to send TCP FIN 
+	return SOAP_OK;
+}
+
+
+//////////////////////////////////////////////////////////////////////
+// TCP/SSL socket functions
+//
+#endif // #ifdef LINUX
 
 /*
  * Handles the HTTP GET command from soap, only the client update install may be downloaded.
@@ -161,7 +237,7 @@ static int http_get(struct soap *soap)
 {
 	int nRet = 404;
 
-	if (!soap || !soap->path)
+	if (soap == NULL)
 		goto exit;
 
 	if (strncmp(soap->path, "/autoupdate", strlen("/autoupdate")) == 0) {
@@ -181,7 +257,9 @@ ECSoapServerConnection::ECSoapServerConnection(ECConfig* lpConfig, ECLogger* lpL
 {
 	m_lpConfig = lpConfig;
 	m_lpLogger = lpLogger;
+	m_lpLogger->AddRef();
 
+#ifdef LINUX
 #ifdef USE_EPOLL
 	m_lpDispatcher = new ECDispatcherEPoll(lpLogger, lpConfig, ECSoapServerConnection::CreatePipeSocketCallback, this);
 	m_lpLogger->Log(EC_LOGLEVEL_INFO, "Using epoll events");
@@ -189,12 +267,15 @@ ECSoapServerConnection::ECSoapServerConnection(ECConfig* lpConfig, ECLogger* lpL
 	m_lpDispatcher = new ECDispatcherSelect(lpLogger, lpConfig, ECSoapServerConnection::CreatePipeSocketCallback, this);
 	m_lpLogger->Log(EC_LOGLEVEL_INFO, "Using select events");
 #endif
+#else
+	m_lpDispatcher = new ECDispatcherWin32(lpLogger, lpConfig, ECSoapServerConnection::CreatePipeSocketCallback, this);
+#endif
 }
 
 ECSoapServerConnection::~ECSoapServerConnection(void)
 {
-    if(m_lpDispatcher)
-        delete m_lpDispatcher;
+	delete m_lpDispatcher;
+	m_lpLogger->Release();
 }
 
 ECRESULT ECSoapServerConnection::ListenTCP(const char* lpServerName, int nServerPort, bool bEnableGET)
@@ -215,12 +296,16 @@ ECRESULT ECSoapServerConnection::ListenTCP(const char* lpServerName, int nServer
 	if (bEnableGET)
 		lpsSoap->fget = http_get;
 
+#ifdef LINUX
 	lpsSoap->bind_flags = SO_REUSEADDR;
+#endif
 
-        lpsSoap->socket = socket = soap_bind(lpsSoap, lpServerName, nServerPort, 100);
+	lpsSoap->socket = socket = soap_bind(lpsSoap, *lpServerName == '\0' ? NULL : lpServerName, nServerPort, 100);
         if (socket == -1) {
                 m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to port %d: %s. This is usually caused by another process (most likely another zarafa-server) already using this port. This program will terminate now.", nServerPort, lpsSoap->fault->faultstring);
+#ifdef LINUX
                 kill(0, SIGTERM);
+#endif
                 exit(1);
         }
 
@@ -247,9 +332,11 @@ ECRESULT ECSoapServerConnection::ListenSSL(const char* lpServerName, int nServer
 	const char *server_ssl_ciphers = m_lpConfig->GetSetting("server_ssl_ciphers");
 	char *ssl_name = NULL;
 	int ssl_op = 0, ssl_include = 0, ssl_exclude = 0;
+#if !defined(OPENSSL_NO_ECDH) && defined(NID_X9_62_prime256v1)
+	EC_KEY *ecdh;
+#endif
 
 	if(lpServerName == NULL) {
-		free(server_ssl_protocols);
 		er = ZARAFA_E_INVALID_PARAMETER;
 		goto exit;
 	}
@@ -279,14 +366,21 @@ ECRESULT ECSoapServerConnection::ListenSSL(const char* lpServerName, int nServer
 	}
 
 	SSL_CTX_set_options(lpsSoap->ctx, SSL_OP_ALL);
-
+#if !defined(OPENSSL_NO_ECDH) && defined(NID_X9_62_prime256v1)
+	ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+	if (ecdh != NULL) {
+		SSL_CTX_set_options(lpsSoap->ctx, SSL_OP_SINGLE_ECDH_USE);
+		SSL_CTX_set_tmp_ecdh(lpsSoap->ctx, ecdh);
+		EC_KEY_free(ecdh);
+	}
+#endif
 	ssl_name = strtok(server_ssl_protocols, " ");
 	while(ssl_name != NULL) {
 		int ssl_proto = 0;
 		bool ssl_neg = false;
 
 		if (*ssl_name == '!') {
-			ssl_name++;
+			++ssl_name;
 			ssl_neg = true;
 		}
 
@@ -355,12 +449,16 @@ ECRESULT ECSoapServerConnection::ListenSSL(const char* lpServerName, int nServer
 	// request certificate from client, is OK if not present.
 	SSL_CTX_set_verify(lpsSoap->ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, NULL);
 
+#ifdef LINUX
 	lpsSoap->bind_flags = SO_REUSEADDR;
+#endif
 
-        lpsSoap->socket = socket = soap_bind(lpsSoap, lpServerName, nServerPort, 100);
+	lpsSoap->socket = socket = soap_bind(lpsSoap, *lpServerName == '\0' ? NULL : lpServerName, nServerPort, 100);
         if (socket == -1) {
                 m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to port %d: %s (SSL). This is usually caused by another process (most likely another zarafa-server) already using this port. This program will terminate now.", nServerPort, lpsSoap->fault->faultstring);
+#ifdef LINUX
                 kill(0, SIGTERM);
+#endif
                 exit(1);
         }
 
@@ -372,6 +470,8 @@ ECRESULT ECSoapServerConnection::ListenSSL(const char* lpServerName, int nServer
 	m_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Listening for SSL connections on port %d", nServerPort);
 
 exit:
+	free(server_ssl_protocols);
+
 	if (er != erSuccess && lpsSoap) {
 		soap_free(lpsSoap);
 	}
@@ -409,11 +509,24 @@ ECRESULT ECSoapServerConnection::ListenPipe(const char* lpPipeName, bool bPriori
 		goto exit;
 	}
 
+#ifdef WIN32
+	// The windows pipe must overwrite some soap functions 
+	// because is doesn't work with sockets but with handles.
+	lpsSoap->fsend = gsoap_win_fsend;
+	lpsSoap->frecv = gsoap_win_frecv;
+	lpsSoap->fclose = gsoap_win_fclose;
+	lpsSoap->fclosesocket = gsoap_win_closesocket;
+	lpsSoap->fshutdownsocket = gsoap_win_shutdownsocket;
+
+	// Unused
+	lpsSoap->faccept = NULL;
+	lpsSoap->fopen = NULL;
+
+#endif
 	lpsSoap->master = sPipe;
 
 	lpsSoap->peerlen = 0;
-	memset((void*)&lpsSoap->peer, 0, sizeof(lpsSoap->peer));
-
+	memset(&lpsSoap->peer, 0, sizeof(lpsSoap->peer));
 	m_lpDispatcher->AddListenSocket(lpsSoap);
 
 	// Manually check for attachments, independant of streaming support

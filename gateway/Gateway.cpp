@@ -1,61 +1,42 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include "config.h"
+#include <zarafa/platform.h>
+#include <climits>
 #include <csignal>
 
+#ifdef WIN32
+#include "ECNTService.h"
+#include <process.h>
+#else
+#endif
 
-#include <inetmapi.h>
+#include <inetmapi/inetmapi.h>
 
 #include <mapi.h>
 #include <mapix.h>
 #include <mapidefs.h>
 #include <mapicode.h>
-#include <mapiext.h>
+#include <zarafa/mapiext.h>
 #include <mapiguid.h>
 
-#include <CommonUtil.h>
-#include <stringutil.h>
+#include <zarafa/CommonUtil.h>
+#include <zarafa/stringutil.h>
 #include <iostream>
 #include <cstdio>
 #include <string>
@@ -64,23 +45,26 @@
 #include <cstdlib>
 #include <cerrno>
 
-#include "ECLogger.h"
-#include "ECConfig.h"
-#include "my_getopt.h"
+#include <zarafa/ECLogger.h>
+#include <zarafa/ECConfig.h>
+#include <zarafa/MAPIErrors.h>
+#include <zarafa/my_getopt.h>
 
-#include "ECChannel.h"
+#include <zarafa/ECChannel.h>
 #include "POP3.h"
 #include "IMAP.h"
-#include "ecversion.h"
+#include <zarafa/ecversion.h>
 
 #include "SSLUtil.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 
 #include "TmpPath.h"
 
-#include "UnixUtil.h"
+#ifdef LINUX
+#include <zarafa/UnixUtil.h>
+#endif
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 #include <unicode/uclean.h>
 #endif
 
@@ -104,12 +88,15 @@ static void sigterm(int s)
 	quit = 1;
 }
 
+#ifdef LINUX
 static void sighup(int sig)
 {
 	// In Win32, the signal is sent in a separate, special signal thread. So this test is
 	// not needed or required.
+#ifdef LINUX
 	if (bThreads && pthread_equal(pthread_self(), mainthread)==0)
 		return;
+#endif
 	if (g_lpConfig) {
 		if (!g_lpConfig->ReloadSettings() && g_lpLogger)
 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to reload configuration file, continuing with current settings.");
@@ -118,7 +105,7 @@ static void sighup(int sig)
 	if (g_lpLogger) {
 		if (g_lpConfig) {
 			const char *ll = g_lpConfig->GetSetting("log_level");
-			int new_ll = ll ? atoi(ll) : 2;
+			int new_ll = ll ? atoi(ll) : EC_LOGLEVEL_WARNING;
 			g_lpLogger->SetLoglevel(new_ll);
 		}
 
@@ -130,14 +117,17 @@ static void sighup(int sig)
 static void sigchld(int)
 {
 	int stat;
-	while (waitpid (-1, &stat, WNOHANG) > 0) nChildren--;
+	while (waitpid(-1, &stat, WNOHANG) > 0)
+		--nChildren;
 }
 
 // SIGSEGV catcher
-static void sigsegv(int signr)
+static void sigsegv(int signr, siginfo_t *si, void *uc)
 {
-	generic_sigsegv_handler(g_lpLogger, "Gateway", PROJECT_VERSION_GATEWAY_STR, signr);
+	generic_sigsegv_handler(g_lpLogger, "Gateway",
+		PROJECT_VERSION_GATEWAY_STR, signr, si, uc);
 }
+#endif
 
 static HRESULT running_service(const char *szPath, const char *servicename);
 
@@ -146,9 +136,15 @@ static void print_help(const char *name)
 	cout << "Usage:\n" << endl;
 	cout << name << " [-F] [-h|--host <serverpath>] [-c|--config <configfile>]" << endl;
 	cout << "  -F\t\tDo not run in the background" << endl;
-	cout << "  -h path\tUse alternate connect path (e.g. file:///var/run/socket).\n\t\tDefault: file:///var/run/zarafa" << endl;
+	cout << "  -h path\tUse alternate connect path (e.g. file:///var/run/socket).\n\t\tDefault: file:///var/run/zarafad/server.sock" << endl;
 	cout << "  -V Print version info." << endl;
 	cout << "  -c filename\tUse alternate config file (e.g. /etc/zarafa-gateway.cfg)\n\t\tDefault: /etc/zarafa/gateway.cfg" << endl;
+#if defined(WIN32)
+	cout << endl;
+	cout << "  Windows service options" << endl;
+	cout << "  -i\t\tInstall as service." << endl;
+	cout << "  -u\t\tRemove the service." << endl;
+#endif
 	cout << endl;
 }
 
@@ -179,9 +175,11 @@ static void *Handler(void *lpArg)
 	// not required anymore
 	delete lpHandlerArgs;
 
+#ifdef LINUX
 	// make sure the pipe logger does not exit when this handler exits, but only frees the memory.
 	if (dynamic_cast<ECLogger_Pipe*>(lpLogger) != NULL)
 		dynamic_cast<ECLogger_Pipe*>(lpLogger)->Disown();
+#endif
 
 	std::string inBuffer;
 	HRESULT hr;
@@ -207,8 +205,7 @@ static void *Handler(void *lpArg)
 			/* signalled - reevaluate bQuit */
 			continue;
 		if (hr == MAPI_E_TIMEOUT) {
-			timeouts++;
-			if (timeouts < client->getTimeoutMinutes()) {
+			if (++timeouts < client->getTimeoutMinutes()) {
 				// ignore select() timeout for 5 (POP3) or 30 (IMAP) minutes
 				continue;
 			}
@@ -265,7 +262,7 @@ static void *Handler(void *lpArg)
 	}
 
 exit:
-	lpLogger->Log(EC_LOGLEVEL_NOTICE, "Client %s thread exiting", lpChannel->GetIPAddress().c_str());
+	lpLogger->Log(EC_LOGLEVEL_NOTICE, "Client %s thread exiting", lpChannel->peer_addr());
 
 	client->HrDone(false);	// HrDone does not send an error string to the client
 	delete client;
@@ -280,7 +277,7 @@ exit:
 	ERR_remove_state(0);
 
 	if (bThreads)
-		nChildren--;
+		--nChildren;
 
 	return NULL;
 }
@@ -292,16 +289,23 @@ int main(int argc, char *argv[]) {
 
 	ssl_threading_setup();
 
+#ifdef LINUX
 	const char *szConfig = ECConfig::GetDefaultPath("gateway.cfg");
+#else
+	const char *szConfig = "gateway.cfg";
+	ECNTService ecNTService;
+#endif
 
 	static const configsetting_t lpDefaults[] = {
-		{ "server_bind", "0.0.0.0" },
-		{ "run_as_user", "" },
-		{ "run_as_group", "" },
-		{ "pid_file", "/var/run/zarafa-gateway.pid" },
-		{ "running_path", "/" },
+		{ "server_bind", "" },
+#ifdef LINUX
+		{ "run_as_user", "zarafa" },
+		{ "run_as_group", "zarafa" },
+		{ "pid_file", "/var/run/zarafad/gateway.pid" },
+		{ "running_path", "/var/lib/zarafa" },
 		{ "process_model", "fork" },
 		{ "coredump_enabled", "no" },
+#endif
 		{ "pop3_enable", "yes" },
 		{ "pop3_port", "110" },
 		{ "pop3s_enable", "no" },
@@ -333,14 +337,14 @@ int main(int argc, char *argv[]) {
 		{ "ssl_prefer_server_ciphers", "no" },
 		{ "log_method", "file" },
 		{ "log_file", "-" },
-		{ "log_level", "2", CONFIGSETTING_RELOADABLE },
+		{ "log_level", "3", CONFIGSETTING_RELOADABLE },
 		{ "log_timestamp", "1" },
-		{ "log_buffer_size",	"4096" },
+		{ "log_buffer_size", "0" },
 		{ "tmp_path", "/tmp" },
 		{ NULL, NULL },
 	};
 	enum {
-		OPT_HELP,
+		OPT_HELP = UCHAR_MAX + 1,
 		OPT_HOST,
 		OPT_CONFIG,
 		OPT_FOREGROUND,
@@ -365,11 +369,11 @@ int main(int argc, char *argv[]) {
 		switch (c) {
 		case OPT_CONFIG:
 		case 'c':
-			szConfig = my_optarg;
+			szConfig = optarg;
 			break;
 		case OPT_HOST:
 		case 'h':
-			szPath = my_optarg;
+			szPath = optarg;
 			break;
 		case 'i':				// Install service
 		case 'u':				// Uninstall service
@@ -394,18 +398,26 @@ int main(int argc, char *argv[]) {
 
 	// Setup config
 	g_lpConfig = ECConfig::Create(lpDefaults);
-	if (!g_lpConfig->LoadSettings(szConfig) || !g_lpConfig->ParseParams(argc-my_optind, &argv[my_optind], NULL) || (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
-		g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false, 0);	// create logger without a timestamp to stderr
-		LogConfigErrors(g_lpConfig, g_lpLogger);
+	if (!g_lpConfig->LoadSettings(szConfig) ||
+	    !g_lpConfig->ParseParams(argc - optind, &argv[optind], NULL) ||
+	    (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
+#ifdef WIN32
+		g_lpLogger = new ECLogger_Eventlog(EC_LOGLEVEL_INFO, "ZarafaGateway");
+#else
+		g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false);	// create logger without a timestamp to stderr
+#endif
+		ec_log_set(g_lpLogger);
+		LogConfigErrors(g_lpConfig);
 		hr = E_FAIL;
 		goto exit;
 	}
 
 	// Setup logging
 	g_lpLogger = CreateLogger(g_lpConfig, argv[0], "ZarafaGateway");
+	ec_log_set(g_lpLogger);
 
 	if ((bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) || g_lpConfig->HasWarnings())
-		LogConfigErrors(g_lpConfig, g_lpLogger);
+		LogConfigErrors(g_lpConfig);
 
 	if (!TmpPath::getInstance() -> OverridePath(g_lpConfig))
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Ignoring invalid path-setting!");
@@ -421,6 +433,16 @@ int main(int argc, char *argv[]) {
 	if (!szPath)
 		szPath = g_lpConfig->GetSetting("server_socket");
 
+#ifdef _WIN32
+	// Parse for standard arguments (install, uninstall, version etc.)
+	if (!ecNTService.ParseStandardArgs(argc, argv)) {
+		ecNTService.StartService(szPath);
+	}
+
+	hr = ecNTService.m_Status.dwWin32ExitCode;
+	if (hr != ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
+		goto exit;
+#endif
 
 	g_strHostString = g_lpConfig->GetSetting("server_hostname", NULL, "");
 	if (g_strHostString.empty())
@@ -430,14 +452,38 @@ int main(int argc, char *argv[]) {
 	hr = running_service(szPath, argv[0]);
 
 exit:
+	if (hr != hrSuccess)
+		fprintf(stderr, "%s: Startup failed: %s (%x). Please check the logfile (%s) for details.\n",
+			argv[0], GetMAPIErrorMessage(hr), hr, g_lpConfig->GetSetting("log_file"));
 	ssl_threading_cleanup();
-    
-	if (g_lpConfig)
-		delete g_lpConfig;
-
+	delete g_lpConfig;
 	DeleteLogger(g_lpLogger);
 
 	return hr == hrSuccess ? 0 : 1;
+}
+
+static int gw_listen_on(const char *service, const char *interface,
+    const char *port_str, int *fd, int *fdlist, size_t *lsize)
+{
+	if (port_str == NULL) {
+		ec_log_crit("No port selected for %s", service);
+		return E_FAIL;
+	}
+	char *end = NULL;
+	uint16_t port = strtoul(port_str, &end, 0);
+	if (port == 0 || (end != NULL && *end != '\0')) {
+		ec_log_crit("\"%s\" is not an acceptable port number", port_str);
+		return E_FAIL;
+	}
+	HRESULT hr = HrListen(ec_log_get(), interface, port, fd);
+	if (hr != hrSuccess) {
+		ec_log_crit("Unable to listen on port %u", port);
+		return E_FAIL;
+	}
+	ec_log_info("Listening on port %u for %s", port, service);
+	fdlist[*lsize] = *fd;
+	++*lsize;
+	return hrSuccess;
 }
 
 /**
@@ -454,17 +500,21 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 	int ulListenIMAP = 0, ulListenIMAPs = 0;
 	bool bListenPOP3, bListenPOP3s;
 	bool bListenIMAP, bListenIMAPs;
-	int nCloseFDs = 0, pCloseFDs[4] = {0};
+	int pCloseFDs[4] = {0};
+	size_t nCloseFDs = 0;
 	fd_set readfds;
 	int err = 0;
 	pthread_attr_t ThreadAttr;
+	const char *const interface = g_lpConfig->GetSetting("server_bind");
 
+#ifdef LINUX
 	// SIGSEGV backtrace support
 	stack_t st;
 	struct sigaction act;
 
 	memset(&st, 0, sizeof(st));
 	memset(&act, 0, sizeof(act));
+#endif
 
 	if (bThreads) {
 		pthread_attr_init(&ThreadAttr);
@@ -472,13 +522,26 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't set thread attribute to detached");
 			goto exit;
 		}
+#ifdef LINUX
 		// 1Mb of stack space per thread
 		if (pthread_attr_setstacksize(&ThreadAttr, 1024 * 1024)) {
 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't set thread stack size to 1Mb");
 			goto exit;
 		}
+#endif
 	}
 
+#ifdef WIN32
+	// Initialize Winsock
+	WSADATA wsaData;
+	int iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
+
+	if (iResult != NO_ERROR){
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't initialize Winsock");
+		hr = E_FAIL;
+		goto exit;
+	}
+#endif
 
 	bListenPOP3 = (strcmp(g_lpConfig->GetSetting("pop3_enable"), "yes") == 0);
 	bListenPOP3s = (strcmp(g_lpConfig->GetSetting("pop3s_enable"), "yes") == 0);
@@ -501,52 +564,34 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 
 	// Setup sockets
 	if (bListenPOP3) {
-		hr = HrListen(g_lpLogger, g_lpConfig->GetSetting("server_bind"), atoi(g_lpConfig->GetSetting("pop3_port")), &ulListenPOP3);
-		if (hr != hrSuccess) {
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to listen on port %s", g_lpConfig->GetSetting("pop3_port"));
-			hr = E_FAIL;
+		hr = gw_listen_on("pop3", interface, g_lpConfig->GetSetting("pop3_port"),
+		     &ulListenPOP3, pCloseFDs, &nCloseFDs);
+		if (hr != hrSuccess)
 			goto exit;
-		}
-		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Listening on port %s for POP3", g_lpConfig->GetSetting("pop3_port"));
-		pCloseFDs[nCloseFDs++] = ulListenPOP3;
 	}
-
 	if (bListenPOP3s) {
-		hr = HrListen(g_lpLogger, g_lpConfig->GetSetting("server_bind"), atoi(g_lpConfig->GetSetting("pop3s_port")), &ulListenPOP3s);
-		if (hr != hrSuccess) {
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to listen on port %s", g_lpConfig->GetSetting("pop3s_port"));
-			hr = E_FAIL;
+		hr = gw_listen_on("pop3s", interface, g_lpConfig->GetSetting("pop3s_port"),
+		     &ulListenPOP3s, pCloseFDs, &nCloseFDs);
+		if (hr != hrSuccess)
 			goto exit;
-		}
-		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Listening on port %s for POP3s", g_lpConfig->GetSetting("pop3s_port"));
-		pCloseFDs[nCloseFDs++] = ulListenPOP3s;
 	}
-
 	if (bListenIMAP) {
-		hr = HrListen(g_lpLogger, g_lpConfig->GetSetting("server_bind"), atoi(g_lpConfig->GetSetting("imap_port")), &ulListenIMAP);
-		if (hr != hrSuccess) {
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to listen on port %s", g_lpConfig->GetSetting("imap_port"));
-			hr = E_FAIL;
+		hr = gw_listen_on("imap", interface, g_lpConfig->GetSetting("imap_port"),
+		     &ulListenIMAP, pCloseFDs, &nCloseFDs);
+		if (hr != hrSuccess)
 			goto exit;
-		}
-		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Listening on port %s for IMAP", g_lpConfig->GetSetting("imap_port"));
-		pCloseFDs[nCloseFDs++] = ulListenIMAP;
 	}
-
 	if (bListenIMAPs) {
-		hr = HrListen(g_lpLogger, g_lpConfig->GetSetting("server_bind"), atoi(g_lpConfig->GetSetting("imaps_port")), &ulListenIMAPs);
-		if (hr != hrSuccess) {
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to listen on port %s", g_lpConfig->GetSetting("imaps_port"));
-			hr = E_FAIL;
+		hr = gw_listen_on("imaps", interface, g_lpConfig->GetSetting("imaps_port"),
+		     &ulListenIMAPs, pCloseFDs, &nCloseFDs);
+		if (hr != hrSuccess)
 			goto exit;
-		}
-		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Listening on port %s for IMAPs", g_lpConfig->GetSetting("imaps_port"));
-		pCloseFDs[nCloseFDs++] = ulListenIMAPs;
 	}
 
 	// Setup signals
 	signal(SIGTERM, sigterm);
 	signal(SIGINT, sigterm);
+#ifdef LINUX
 	signal(SIGHUP, sighup);
 	signal(SIGCHLD, sigchld);
 	signal(SIGPIPE, SIG_IGN);
@@ -555,20 +600,16 @@ static HRESULT running_service(const char *szPath, const char *servicename)
     st.ss_flags = 0;
     st.ss_size = 65536;
   
-    act.sa_handler = sigsegv;
-    act.sa_flags = SA_ONSTACK | SA_RESETHAND;
+	act.sa_sigaction = sigsegv;
+	act.sa_flags = SA_ONSTACK | SA_RESETHAND | SA_SIGINFO;
   
     sigaltstack(&st, NULL);
     sigaction(SIGSEGV, &act, NULL);
     sigaction(SIGBUS, &act, NULL);
     sigaction(SIGABRT, &act, NULL);
+#endif
 
-	// Setup MAPI
-	hr = MAPIInitialize(NULL);
-	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to initialize MAPI");
-		goto exit;
-	}
+#ifdef LINUX
     // Set max open file descriptors to FD_SETSIZE .. higher than this number
     // is a bad idea, as it will start breaking select() calls.
     struct rlimit file_limit;
@@ -584,16 +625,23 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 
 	// fork if needed and drop privileges as requested.
 	// this must be done before we do anything with pthreads
+	if (unix_runas(g_lpConfig, g_lpLogger))
+		goto exit;
 	if (daemonize && unix_daemonize(g_lpConfig, g_lpLogger))
 		goto exit;
 	if (!daemonize)
 		setsid();
 	unix_create_pidfile(servicename, g_lpConfig, g_lpLogger);
-	if (unix_runas(g_lpConfig, g_lpLogger))
-		goto exit;
-
 	if (bThreads == false)
 		g_lpLogger = StartLoggerProcess(g_lpConfig, g_lpLogger); // maybe replace logger
+	ec_log_set(g_lpLogger);
+#endif
+	hr = MAPIInitialize(NULL);
+	if (hr != hrSuccess) {
+		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to initialize MAPI: %s (%x)",
+			GetMAPIErrorMessage(hr), hr);
+		goto exit;
+	}
 
 	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting zarafa-gateway version " PROJECT_VERSION_GATEWAY_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
 
@@ -672,7 +720,7 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 					hr = hrSuccess;
 				}
 				else {
-					nChildren++;
+					++nChildren;
 				}
 
 				set_thread_name(POP3Thread, "ZGateway " + std::string(method));
@@ -683,7 +731,7 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 					// just keep running
 				}
 				else {
-					nChildren++;
+					++nChildren;
 				}
 				// main handler always closes information it doesn't need
 				delete lpHandlerArgs->lpChannel;
@@ -729,7 +777,7 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 					hr = hrSuccess;
 				}
 				else {
-					nChildren++;
+					++nChildren;
 				}
 
 				set_thread_name(IMAPThread, "ZGateway " + std::string(method));
@@ -740,7 +788,7 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 					// just keep running
 				}
 				else {
-					nChildren++;
+					++nChildren;
 				}
 				// main handler always closes information it doesn't need
 				delete lpHandlerArgs->lpChannel;
@@ -756,14 +804,16 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 
 	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "POP3/IMAP Gateway will now exit");
 
+#ifdef LINUX
 	// in forked mode, send all children the exit signal
 	if (bThreads == false) {
 		signal(SIGTERM, SIG_IGN);
 		kill(0, SIGTERM);
 	}
+#endif
 
 	// wait max 10 seconds (init script waits 15 seconds)
-	for(int i = 10; (nChildren && i); i--) {
+	for (int i = 10; nChildren != 0 && i != 0; --i) {
 		if (i % 5 == 0)
 			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Waiting for %d processes to exit", nChildren);
 		sleep(1);
@@ -785,11 +835,15 @@ exit:
 	if (bThreads)
 		pthread_attr_destroy(&ThreadAttr);
 
-	if(st.ss_sp)
-		free(st.ss_sp);
+#ifdef LINUX
+	free(st.ss_sp);
+#endif
 
+#ifdef WIN32
+	WSACleanup();
+#endif
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 	// cleanup ICU data so valgrind is happy
 	u_cleanup();
 #endif

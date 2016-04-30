@@ -1,62 +1,36 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ECMsgStorePublic.h"
 
 #include "ECMAPIFolder.h"
-#include "CommonUtil.h"
-#include "Util.h"
+#include <zarafa/CommonUtil.h>
+#include <zarafa/Util.h>
 #include "ClientUtil.h"
 #include "ZarafaUtil.h"
-#include "ECGetText.h"
+#include <zarafa/ECGetText.h>
 
-#include <mapiext.h>
+#include <zarafa/mapiext.h>
 #include <mapiutil.h>
 
 #include "ECMAPIFolderPublic.h"
 
-#include "ECGuid.h"
+#include <zarafa/ECGuid.h>
 
 using namespace std;
 
@@ -100,16 +74,9 @@ ECMsgStorePublic::~ECMsgStorePublic(void)
 
 	if (m_lpIPMSubTree)
 		m_lpIPMSubTree->Release();
-
-	if (m_lpIPMSubTreeID)
-		MAPIFreeBuffer(m_lpIPMSubTreeID);
-
-	if (m_lpIPMFavoritesID)
-		MAPIFreeBuffer(m_lpIPMFavoritesID);
-
-	if (m_lpIPMPublicFoldersID)
-		MAPIFreeBuffer(m_lpIPMPublicFoldersID);
-
+	MAPIFreeBuffer(m_lpIPMSubTreeID);
+	MAPIFreeBuffer(m_lpIPMFavoritesID);
+	MAPIFreeBuffer(m_lpIPMPublicFoldersID);
 	TRACE_MAPI(TRACE_RETURN, "~ECMsgStorePublic::ECMsgStorePublic","");
 
 }
@@ -129,11 +96,7 @@ HRESULT	ECMsgStorePublic::Create(char *lpszProfname, LPMAPISUP lpSupport, WSTran
 
 HRESULT ECMsgStorePublic::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	HRESULT hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
-
-	hr = ECMsgStore::QueryInterface(refiid, lppInterface);
-
-	return hr;
+	return ECMsgStore::QueryInterface(refiid, lppInterface);
 }
 
 HRESULT ECMsgStorePublic::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase)
@@ -189,18 +152,13 @@ HRESULT ECMsgStorePublic::SetPropHandler(ULONG ulPropTag, void* lpProvider, LPSP
 
 HRESULT ECMsgStorePublic::SetEntryId(ULONG cbEntryId, LPENTRYID lpEntryId)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	
 	hr = ECMsgStore::SetEntryId(cbEntryId, lpEntryId);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
-	hr = BuildIPMSubTree();
-	if(hr != hrSuccess)
-		goto exit;
-
-exit:
-	return hr;
+	return BuildIPMSubTree();
 }
 
 HRESULT ECMsgStorePublic::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk)
@@ -335,7 +293,8 @@ HRESULT ECMsgStorePublic::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID
 		if(hr != hrSuccess)
 			goto exit;
 
-		if (lpsPropValue) { MAPIFreeBuffer(lpsPropValue); lpsPropValue = NULL; }
+		MAPIFreeBuffer(lpsPropValue);
+		lpsPropValue = NULL;
 
 		// Get the parent entryid of a folder an check if this is the online subtree entryid. When it is, 
 		// change the parent to the static parent entryid
@@ -352,10 +311,10 @@ HRESULT ECMsgStorePublic::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID
 				lpMAPIFolder->SetParentID(this->m_cIPMPublicFoldersID, this->m_lpIPMPublicFoldersID);
 		}
 
-		if (lpParentProp) { MAPIFreeBuffer(lpParentProp); lpParentProp = NULL; }
-		if (lpsPropValue) { MAPIFreeBuffer(lpsPropValue); lpsPropValue = NULL; }
-
-
+		MAPIFreeBuffer(lpParentProp);
+		lpParentProp = NULL;
+		MAPIFreeBuffer(lpsPropValue);
+		lpsPropValue = NULL;
 		AddChild(lpMAPIFolder);
 
 		if(lpInterface)
@@ -388,43 +347,35 @@ exit:
 
 	if (lpPropStorage)
 		lpPropStorage->Release();
-
-	if (lpsPropValue)
-		MAPIFreeBuffer(lpsPropValue);
-
-	if (lpEntryIDIntern)
-		MAPIFreeBuffer(lpEntryIDIntern);
-
-	if (lpParentProp)
-		MAPIFreeBuffer(lpParentProp);
-
+	MAPIFreeBuffer(lpsPropValue);
+	MAPIFreeBuffer(lpEntryIDIntern);
+	MAPIFreeBuffer(lpParentProp);
 	return hr;
 }
 
 HRESULT ECMsgStorePublic::InitEntryIDs()
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	if (m_lpIPMSubTreeID == NULL) {
 		hr = ::GetPublicEntryId(ePE_IPMSubtree, GetStoreGuid(), NULL, &m_cIPMSubTreeID, &m_lpIPMSubTreeID);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 
 	if (m_lpIPMPublicFoldersID == NULL) {
 		hr = ::GetPublicEntryId(ePE_PublicFolders, GetStoreGuid(), NULL, &m_cIPMPublicFoldersID, &m_lpIPMPublicFoldersID);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 
 	if (m_lpIPMFavoritesID == NULL) {
 		hr = ::GetPublicEntryId(ePE_Favorites, GetStoreGuid(), NULL, &m_cIPMFavoritesID, &m_lpIPMFavoritesID);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMsgStorePublic::GetPublicEntryId(enumPublicEntryID ePublicEntryID, void *lpBase, ULONG *lpcbEntryID, LPENTRYID *lppEntryID)
@@ -480,19 +431,17 @@ exit:
 
 HRESULT ECMsgStorePublic::ComparePublicEntryId(enumPublicEntryID ePublicEntryID, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG *lpulResult)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG ulResult = 0;
 	ULONG cbPublicID = 0;
 	LPENTRYID lpPublicID = NULL;
 
 	hr = InitEntryIDs();
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
-	if (lpEntryID == NULL || lpulResult == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpEntryID == NULL || lpulResult == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	switch(ePublicEntryID)
 	{
@@ -509,17 +458,15 @@ HRESULT ECMsgStorePublic::ComparePublicEntryId(enumPublicEntryID ePublicEntryID,
 			lpPublicID = m_lpIPMFavoritesID;
 			break;
 		default:
-			hr = MAPI_E_INVALID_PARAMETER;
-			goto exit;
+			return MAPI_E_INVALID_PARAMETER;
 	}
 
 	hr = GetMsgStore()->CompareEntryIDs(cbEntryID, lpEntryID, cbPublicID, lpPublicID, 0, &ulResult);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	*lpulResult = ulResult;
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMsgStorePublic::BuildIPMSubTree()
@@ -560,15 +507,13 @@ HRESULT ECMsgStorePublic::BuildIPMSubTree()
 	hr = GetPublicEntryId(ePE_Favorites, lpProps, &lpProps[cProps].Value.bin.cb, (LPENTRYID*)&lpProps[cProps].Value.bin.lpb);
 	if(hr != hrSuccess)
 		goto exit;
-	
-	cProps++;
+	++cProps;
 
 	lpProps[cProps].ulPropTag = PR_LONGTERM_ENTRYID_FROM_TABLE;
 	hr = GetPublicEntryId(ePE_Favorites, lpProps, &lpProps[cProps].Value.bin.cb, (LPENTRYID*)&lpProps[cProps].Value.bin.lpb);
 	if(hr != hrSuccess)
 		goto exit;
-	
-	cProps++;
+	++cProps;
 
 	lpProps[cProps].ulPropTag = PR_DISPLAY_TYPE;
 	lpProps[cProps++].Value.ul = DT_FOLDER;
@@ -580,8 +525,7 @@ HRESULT ECMsgStorePublic::BuildIPMSubTree()
 	hr = GetPublicEntryId(ePE_IPMSubtree, lpProps, &lpProps[cProps].Value.bin.cb, (LPENTRYID*)&lpProps[cProps].Value.bin.lpb);
 	if (hr != hrSuccess)
 		goto exit;
-
-	cProps++;
+	++cProps;
 
 	lpProps[cProps].ulPropTag = PR_DISPLAY_NAME_W;
 	lpProps[cProps++].Value.lpszW = _W("Favorites"); // FIXME: Use dynamic name, read from global profile (like exchange)
@@ -592,12 +536,11 @@ HRESULT ECMsgStorePublic::BuildIPMSubTree()
 	lpProps[cProps++].Value.ul = 0;
 
 	if (ECMAPIProp::DefaultMAPIGetProp(PR_STORE_ENTRYID, this, 0, &lpProps[cProps], this, lpProps) == hrSuccess)
-		cProps++;
+		++cProps;
 	if (ECMAPIProp::DefaultMAPIGetProp(PR_STORE_RECORD_KEY, this, 0, &lpProps[cProps], this, lpProps) == hrSuccess)
-		cProps++;
+		++cProps;
 	if (ECMAPIProp::DefaultMAPIGetProp(PR_STORE_SUPPORT_MASK, this, 0, &lpProps[cProps], this, lpProps) == hrSuccess)
-		cProps++;
-
+		++cProps;
 
 	lpProps[cProps].ulPropTag = PR_INSTANCE_KEY;
 	lpProps[cProps].Value.bin.cb = sizeof(ULONG)*2;
@@ -607,15 +550,13 @@ HRESULT ECMsgStorePublic::BuildIPMSubTree()
 
 	memset(lpProps[cProps].Value.bin.lpb, 0, lpProps[cProps].Value.bin.cb );
 	memcpy(lpProps[cProps].Value.bin.lpb, &ulRowId, sizeof(ULONG));
-
-	cProps++;
+	++cProps;
 
 	lpProps[cProps].ulPropTag = PR_RECORD_KEY;
 	hr = GetPublicEntryId(ePE_Favorites, lpProps, &lpProps[cProps].Value.bin.cb, (LPENTRYID*)&lpProps[cProps].Value.bin.lpb);
 	if(hr != hrSuccess)
 		goto exit;
-	
-	cProps++;
+	++cProps;
 
 	lpProps[cProps].ulPropTag = PR_ACCESS;
 	lpProps[cProps++].Value.ul = MAPI_ACCESS_READ;
@@ -653,8 +594,7 @@ HRESULT ECMsgStorePublic::BuildIPMSubTree()
 	///////////////////////////////////////////////////
 	// the folder "Public Folders"
 	//
-	ulRowId++;
-
+	++ulRowId;
 	cProps = 0;
 	cMaxProps = 20;
 
@@ -666,15 +606,13 @@ HRESULT ECMsgStorePublic::BuildIPMSubTree()
 	hr = ((ECMsgStorePublic*)GetMsgStore())->GetPublicEntryId(ePE_PublicFolders, lpProps, &lpProps[cProps].Value.bin.cb, (LPENTRYID*)&lpProps[cProps].Value.bin.lpb);
 	if(hr != hrSuccess)
 		goto exit;
-	
-	cProps++;
+	++cProps;
 	
 	lpProps[cProps].ulPropTag = PR_LONGTERM_ENTRYID_FROM_TABLE;
 	hr = GetPublicEntryId(ePE_PublicFolders, lpProps, &lpProps[cProps].Value.bin.cb, (LPENTRYID*)&lpProps[cProps].Value.bin.lpb);
 	if(hr != hrSuccess)
 		goto exit;
-	
-	cProps++;
+	++cProps;
 
 	lpProps[cProps].ulPropTag = PR_DISPLAY_TYPE;
 	lpProps[cProps++].Value.ul = DT_FOLDER;
@@ -686,8 +624,7 @@ HRESULT ECMsgStorePublic::BuildIPMSubTree()
 	hr = GetPublicEntryId(ePE_IPMSubtree, lpProps, &lpProps[cProps].Value.bin.cb, (LPENTRYID*)&lpProps[cProps].Value.bin.lpb);
 	if (hr != hrSuccess)
 		goto exit;
-
-	cProps++;
+	++cProps;
 
 	lpProps[cProps].ulPropTag = PR_DISPLAY_NAME_W;
 	lpProps[cProps++].Value.lpszW = _W("Public Folders"); // FIXME: Use dynamic name, read from global profile (like exchange)
@@ -698,11 +635,11 @@ HRESULT ECMsgStorePublic::BuildIPMSubTree()
 	lpProps[cProps++].Value.ul = 0;
 
 	if (ECMAPIProp::DefaultMAPIGetProp(PR_STORE_ENTRYID, this, 0, &lpProps[cProps], this, lpProps) == hrSuccess)
-		cProps++;
+		++cProps;
 	if (ECMAPIProp::DefaultMAPIGetProp(PR_STORE_RECORD_KEY, this, 0, &lpProps[cProps], this, lpProps) == hrSuccess)
-		cProps++;
+		++cProps;
 	if (ECMAPIProp::DefaultMAPIGetProp(PR_STORE_SUPPORT_MASK, this, 0, &lpProps[cProps], this, lpProps) == hrSuccess)
-		cProps++;
+		++cProps;
 
 	lpProps[cProps].ulPropTag = PR_INSTANCE_KEY;
 	lpProps[cProps].Value.bin.cb = sizeof(ULONG)*2;
@@ -712,15 +649,13 @@ HRESULT ECMsgStorePublic::BuildIPMSubTree()
 
 	memset(lpProps[cProps].Value.bin.lpb, 0, lpProps[cProps].Value.bin.cb );
 	memcpy(lpProps[cProps].Value.bin.lpb, &ulRowId, sizeof(ULONG));
-
-	cProps++;
+	++cProps;
 
 	lpProps[cProps].ulPropTag = PR_RECORD_KEY;
 	hr = GetPublicEntryId(ePE_PublicFolders, lpProps, &lpProps[cProps].Value.bin.cb, (LPENTRYID*)&lpProps[cProps].Value.bin.lpb);
 	if(hr != hrSuccess)
 		goto exit;
-	
-	cProps++;
+	++cProps;
 
 	lpProps[cProps].ulPropTag = PR_ACCESS;
 	lpProps[cProps++].Value.ul = 2; //FIXME: use variable
@@ -758,9 +693,7 @@ HRESULT ECMsgStorePublic::BuildIPMSubTree()
 	m_lpIPMSubTree = lpIPMSubTree;
 
 exit:
-	if (lpProps)
-		MAPIFreeBuffer(lpProps);
-
+	MAPIFreeBuffer(lpProps);
 	return hr;
 }
 
@@ -833,16 +766,9 @@ exit:
 		lpTmpTransport->HrLogOff();
 		lpTmpTransport->Release();
 	}
-
-	if (lpStoreEntryID)
-		MAPIFreeBuffer(lpStoreEntryID);
-
-	if (lpEntryId)
-		MAPIFreeBuffer(lpEntryId);
-
-	if (lpPropValue)
-		MAPIFreeBuffer(lpPropValue);
-
+	MAPIFreeBuffer(lpStoreEntryID);
+	MAPIFreeBuffer(lpEntryId);
+	MAPIFreeBuffer(lpPropValue);
 	if (lpFolder)
 		lpFolder->Release();
 
@@ -882,8 +808,6 @@ HRESULT ECMsgStorePublic::Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulE
 	hr = ECMsgStore::Advise(cbEntryID, lpEntryID, ulEventMask, lpAdviseSink, lpulConnection);
 
 exit:
-	if (lpEntryIDIntern)
-		MAPIFreeBuffer(lpEntryIDIntern);
-
+	MAPIFreeBuffer(lpEntryIDIntern);
 	return hr;
 }

@@ -1,44 +1,18 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 // -*- Mode: c++ -*-
@@ -47,14 +21,29 @@
 
 #include <stdexcept>
 #include <string>
-#include <ECIConv.h>
+#include <zarafa/ECIConv.h>
 
 #include <set>
 
+#ifdef WIN32
+// Disable LDAP_UNICODE to avoid wide string versions
+#ifdef LDAP_UNICODE
+	#undef LDAP_UNICODE
+#endif
+#define LDAP_UNICODE 0
+
+// Use native win32 ldap lib
+#include <winldap.h>
+#include <winber.h>
+// Win32 has two extra parameters for start_tls
+#undef ldap_start_tls_s
+#define ldap_start_tls_s(a,b,c)	ldap_start_tls_sA(a,NULL,NULL,b,c)
+#else
 // OpenLDAP
 #include <ldap.h>
 // win32 defines this because of clashing types, so we use this define outside win32 too
 #define LDAP_TIMEVAL struct timeval
+#endif
 
 #include "plugin.h"
 #include "LDAPCache.h"
@@ -108,7 +97,7 @@ public:
 	 *
 	 * @throw std::exception
 	 */
-	virtual void InitPlugin() throw(std::exception);
+	virtual void InitPlugin();
 
 	/**
 	 * Resolve name and company to objectsignature
@@ -126,7 +115,7 @@ public:
 	 * @throw objectnotfound When no object was found with the requested name or objectclass
 	 * @throw collison_error When more then one object was found with the requested name
 	 */
-	virtual objectsignature_t resolveName(objectclass_t objclass, const string &name, const objectid_t &company) throw(std::exception);
+	virtual objectsignature_t resolveName(objectclass_t objclass, const string &name, const objectid_t &company);
 
 	/**
 	 * Authenticate user with username and password
@@ -143,7 +132,7 @@ public:
 	 *					This objectid can be empty.
 	 * @return The objectsignature of the authenticated user
 	 */
-	virtual objectsignature_t authenticateUser(const string &username, const string &password, const objectid_t &company) throw(std::exception);
+	virtual objectsignature_t authenticateUser(const string &username, const string &password, const objectid_t &company);
 
 	/**
 	 * Request a list of objects for a particular company and specified objectclass.
@@ -156,7 +145,7 @@ public:
 	 *					The objectclass can be partially unknown (OBJECTCLASS_UNKNOWN, MAILUSER_UNKNOWN, ...)
 	 * @return The list of object signatures of all objects which were found
 	 */
-	virtual auto_ptr<signatures_t> getAllObjects(const objectid_t &company, objectclass_t objclass) throw(std::exception);
+	virtual auto_ptr<signatures_t> getAllObjects(const objectid_t &company, objectclass_t objclass);
 
 	/**
 	 * Obtain the object details for the given object
@@ -168,7 +157,7 @@ public:
 	 * @return The objectdetails for the given objectid
 	 * @throw objectnotfound When the object was not found
 	 */
-	virtual auto_ptr<objectdetails_t> getObjectDetails(const objectid_t &objectid) throw(std::exception);
+	virtual auto_ptr<objectdetails_t> getObjectDetails(const objectid_t &objectid);
 
 	/**
 	 * Obtain the object details for the given objects
@@ -181,7 +170,7 @@ public:
 	 * @remarks The methode returns a whole set of objectdetails but user may be missing if the user
 	 * 			details cannot be retrieved for some reason.
 	 */
-	virtual auto_ptr<map<objectid_t, objectdetails_t> > getObjectDetails(const list<objectid_t> &objectids) throw(std::exception);
+	virtual auto_ptr<map<objectid_t, objectdetails_t> > getObjectDetails(const list<objectid_t> &objectids);
 
 	/**
 	 * Get all children for a parent for a given relation type.
@@ -194,7 +183,7 @@ public:
 	 * @return A list of object signatures of the children of the parent.
 	 * @throw When an unsupported object relation was requested
 	 */
-	virtual auto_ptr<signatures_t> getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentobject) throw(std::exception);
+	virtual auto_ptr<signatures_t> getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentobject);
 
 	/**
 	 * Request all parents for a childobject for a given relation type.
@@ -207,7 +196,7 @@ public:
 	 * @return A list of object signatures of the parents of the child.
 	 * @throw runtime_error When an unsupported object relation was requested
 	 */
-	virtual auto_ptr<signatures_t> getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childobject) throw(std::exception);
+	virtual auto_ptr<signatures_t> getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childobject);
 
 	/**
 	 * Search for all objects which match the given string,
@@ -221,7 +210,7 @@ public:
 	 * @return List of object signatures which match the given string
 	 * @throw objectnotfound When no objects were found
 	 */
-	virtual auto_ptr<signatures_t> searchObject(const string &match, unsigned int ulFlags) throw(std::exception);
+	virtual auto_ptr<signatures_t> searchObject(const string &match, unsigned int ulFlags);
 
 	/**
 	 * Obtain details for the public store
@@ -231,7 +220,7 @@ public:
 	 * @throw objectnotfound When no public store was found
 	 * @throw toomanyobjects When more then one public store has been found
 	 */
-	virtual auto_ptr<objectdetails_t> getPublicStoreDetails() throw(std::exception);
+	virtual auto_ptr<objectdetails_t> getPublicStoreDetails();
 
 	/**
 	 * Obtain the objectdetails for a server
@@ -243,7 +232,7 @@ public:
 	 * @throw objectnotfound When no server has been found with the given name
 	 * @throw toomanyobjects When more then one server have been found with the given name
 	 */
-	virtual auto_ptr<serverdetails_t> getServerDetails(const string &server) throw(std::exception);
+	virtual auto_ptr<serverdetails_t> getServerDetails(const string &server);
 
 	/**
 	 * Obtain server list
@@ -251,7 +240,7 @@ public:
 	 * @return list of servers
 	 * @throw runtime_error LDAP query failure
 	 */
-	virtual auto_ptr<serverlist_t> getServers() throw(std::exception);
+	virtual auto_ptr<serverlist_t> getServers();
 
 	/**
 	 * Update an object with new details
@@ -266,7 +255,7 @@ public:
 	 *					List of configuration names which should be removed from the object
 	 * @throw notimplemented Always when the function is called.
 	 */
-	virtual void changeObject(const objectid_t &id, const objectdetails_t &details, const std::list<std::string> *lpRemove) throw(std::exception);
+	virtual void changeObject(const objectid_t &id, const objectdetails_t &details, const std::list<std::string> *lpRemove);
 
 	/**
 	 * Create object in plugin
@@ -278,7 +267,7 @@ public:
 	 * @return The objectsignature of the created object.
 	 * @throw notimplemented Always when the function is called.
 	 */
-	virtual objectsignature_t createObject(const objectdetails_t &details) throw(std::exception);
+	virtual objectsignature_t createObject(const objectdetails_t &details);
 
     /**
 	 * Delete object from plugin
@@ -289,7 +278,7 @@ public:
 	 *					The objectid which should be deleted
 	 * @throw notimplemented Always when the function is called.
 	 */
-	virtual void deleteObject(const objectid_t &id) throw(std::exception);
+	virtual void deleteObject(const objectid_t &id);
 
 	/**
 	 * Modify id of object in plugin
@@ -302,7 +291,7 @@ public:
 	 *					The new objectid
 	 * @throw notsupported Always when this function is called
 	 */
-	virtual void modifyObjectId(const objectid_t &oldId, const objectid_t &newId) throw(std::exception);
+	virtual void modifyObjectId(const objectid_t &oldId, const objectid_t &newId);
 
 	/**
 	 * Add relation between child and parent. This can be used
@@ -321,7 +310,7 @@ public:
 	 * @throw notimplemented Always when the function is called.
 	 */
 	virtual void addSubObjectRelation(userobject_relation_t relation,
-									  const objectid_t &parentobject, const objectid_t &childobject) throw(std::exception);
+									  const objectid_t &parentobject, const objectid_t &childobject);
 
 	/**
 	 * Delete relation between child and parent, this can be used
@@ -339,7 +328,7 @@ public:
 	 * @throw notimplemented Always when the function is called.
 	 */
 	virtual void deleteSubObjectRelation(userobject_relation_t relation,
-										 const objectid_t& parentobject, const objectid_t &childobject) throw(std::exception);
+										 const objectid_t& parentobject, const objectid_t &childobject);
 
 	/**
 	 * Get quota information from object.
@@ -354,7 +343,7 @@ public:
 	 *					Boolean to indicate if the userdefault quota must be requested.
 	 * @throw runtime_error When the LDAP query failed
 	 */	 
-	virtual auto_ptr<quotadetails_t> getQuota(const objectid_t &id, bool bGetUserDefault) throw(std::exception);
+	virtual auto_ptr<quotadetails_t> getQuota(const objectid_t &id, bool bGetUserDefault);
 
     /**
 	 * Set quota information on object
@@ -367,7 +356,7 @@ public:
 	 *					The quota information which should be written to the object
 	 * @throw notimplemented Always when the function is called.
 	 */
-	virtual void setQuota(const objectid_t &id, const quotadetails_t &quotadetails) throw(std::exception);
+	virtual void setQuota(const objectid_t &id, const quotadetails_t &quotadetails);
 
 	/**
 	 * Get extra properties which are set in the object details for the addressbook
@@ -376,9 +365,9 @@ public:
 	 *
 	 * @return	a list of properties
 	 */
-	virtual auto_ptr<abprops_t> getExtraAddressbookProperties() throw(std::exception);
+	virtual auto_ptr<abprops_t> getExtraAddressbookProperties();
 
-	virtual void removeAllObjects(objectid_t except) throw(std::exception);
+	virtual void removeAllObjects(objectid_t except);
 
 protected:
 	/**
@@ -478,7 +467,7 @@ private:
 	 * @return LDAP pointer
 	 * @throw ldap_error When no connection could be established
 	 */
-	LDAP *ConnectLDAP(const char *bind_dn, const char *bind_pw) throw(std::exception);
+	LDAP *ConnectLDAP(const char *bind_dn, const char *bind_pw);
 
 	/**
 	 * Authenticate by user bind
@@ -494,7 +483,7 @@ private:
 	 * @throw login_error When the username and password are incorrect.
 	 */
 	objectsignature_t authenticateUserBind(const string &username, const string &password,
-										   const objectid_t &company = objectid_t(CONTAINER_COMPANY)) throw(std::exception);
+										   const objectid_t &company = objectid_t(CONTAINER_COMPANY));
 
 	/**
 	 * Authenticate by username and password
@@ -511,7 +500,7 @@ private:
 	 * @throw login_error When the username and password are incorrect.
 	 */
 	objectsignature_t authenticateUserPassword(const string &username, const string &password,
-											   const objectid_t &company = objectid_t(CONTAINER_COMPANY)) throw(std::exception);
+											   const objectid_t &company = objectid_t(CONTAINER_COMPANY));
 
 	/**
 	 * Convert objectid to a DN
@@ -523,7 +512,7 @@ private:
 	 * @throw objectnotfound When no object was found with the given objectid.
 	 * @throw toomanyobjects When more then one object was returned with the objectid.
 	 */
-	string objectUniqueIDtoObjectDN(const objectid_t &uniqueid, bool cache = true) throw(std::exception);
+	string objectUniqueIDtoObjectDN(const objectid_t &uniqueid, bool cache = true);
 
 	/**
 	 * Convert a DN to an object signature
@@ -537,7 +526,7 @@ private:
 	 * @throw objectnotfound When the DN does not exist or does not match the object class.
 	 * @throw toomanyobjects When more then one object was found
 	 */
-	objectsignature_t objectDNtoObjectSignature(objectclass_t objclass, const string &dn) throw(std::exception);
+	objectsignature_t objectDNtoObjectSignature(objectclass_t objclass, const string &dn);
 
 	/**
 	 * Convert a list of DN's to a list of object signatures
@@ -549,7 +538,7 @@ private:
 	 *					List of DN's
 	 * @return The list of objectsignatures
 	 */
-	auto_ptr<signatures_t> objectDNtoObjectSignatures(objectclass_t objclass, const list<string> &dn) throw(std::exception);
+	auto_ptr<signatures_t> objectDNtoObjectSignatures(objectclass_t objclass, const list<string> &dn);
 
 	/**
 	 * Escape binary data to escaped string
@@ -592,7 +581,7 @@ private:
 	 * @return The search base
 	 * @throw runtime_error When the configuration option ldap_search_base is empty.
 	 */
-	string getSearchBase(const objectid_t &company = objectid_t(CONTAINER_COMPANY)) throw(std::exception);
+	string getSearchBase(const objectid_t &company = objectid_t(CONTAINER_COMPANY));
 
 	/**
 	 * Create a search filter for servers
@@ -610,7 +599,7 @@ private:
 	 * @return The search filter for the specified object class
 	 * @throw runtime_error when an invalid objectclass is requested or configuration options are missing.
 	 */
-	string getSearchFilter(objectclass_t objclass = OBJECTCLASS_UNKNOWN) throw(std::exception);
+	string getSearchFilter(objectclass_t objclass = OBJECTCLASS_UNKNOWN);
 
 	/**
 	 * Create LDAP search filter based on the object data and the attribute in which the date should
@@ -663,7 +652,7 @@ private:
 	 */
 	objectsignature_t resolveObjectFromAttribute(objectclass_t objclass,
 												 const string &AttrData, const char* lpAttr,
-												 const objectid_t &company = objectid_t(CONTAINER_COMPANY)) throw(std::exception);
+												 const objectid_t &company = objectid_t(CONTAINER_COMPANY));
 
 	/**
 	 * Resolve objects from attribute data
@@ -683,7 +672,7 @@ private:
 	 */
 	auto_ptr<signatures_t> resolveObjectsFromAttribute(objectclass_t objclass,
 													   const list<string> &objects, const char* lpAttr,
-													   const objectid_t &company = objectid_t(CONTAINER_COMPANY)) throw(std::exception);
+													   const objectid_t &company = objectid_t(CONTAINER_COMPANY));
 
 	/**
 	 * Resolve objects from attribute data by checking if the data contains
@@ -704,7 +693,7 @@ private:
 	 */
 	auto_ptr<signatures_t> resolveObjectsFromAttributes(objectclass_t objclass,
 														const list<string> &objects, const char** lppAttr,
-														const objectid_t &company = objectid_t(CONTAINER_COMPANY)) throw(std::exception);
+														const objectid_t &company = objectid_t(CONTAINER_COMPANY));
 
 	/**
 	 * Resolve object from attribute data depending on the attribute type
@@ -728,7 +717,7 @@ private:
 	 */
 	objectsignature_t resolveObjectFromAttributeType(objectclass_t objclass,
 													 const string &AttrData, const char* lpAttr, const char* lpAttrType,
-													 const objectid_t &company = objectid_t(CONTAINER_COMPANY)) throw (std::exception);
+													 const objectid_t &company = objectid_t(CONTAINER_COMPANY));
 
 	/**
 	 * Resolve objects from attribute data depending on the attribute type
@@ -750,7 +739,7 @@ private:
 	 */
 	auto_ptr<signatures_t> resolveObjectsFromAttributeType(objectclass_t objclass,
 														   const list<string> &objects, const char* lpAttr, const char* lpAttrType,
-														   const objectid_t &company = objectid_t(CONTAINER_COMPANY)) throw(std::exception);
+														   const objectid_t &company = objectid_t(CONTAINER_COMPANY));
 
 	/**
 	 * Resolve objects from attribute data by checking if the data contains
@@ -774,7 +763,7 @@ private:
 	 */
 	auto_ptr<signatures_t> resolveObjectsFromAttributesType(objectclass_t objclass,
 															const list<string> &objects, const char** lppAttr, const char* lpAttrType,
-															const objectid_t &company = objectid_t(CONTAINER_COMPANY)) throw(std::exception);
+															const objectid_t &company = objectid_t(CONTAINER_COMPANY));
 
 	/**
 	 * Determine attribute data for a specific object id
@@ -789,7 +778,7 @@ private:
 	 * @throw toomanyobjects When multiple objects were found
 	 * @throw data_error When the requested attribute does not exist on the object of uniqueid
 	 */
-	string objectUniqueIDtoAttributeData(const objectid_t &uniqueid, const char* lpAttr) throw(std::exception);
+	string objectUniqueIDtoAttributeData(const objectid_t &uniqueid, const char* lpAttr);
 
 	/**
 	 * Determine attribute data for a specific DN
@@ -803,7 +792,7 @@ private:
 	 * @throw objectnotfound When DN does not point to an existing object
 	 * @throw toomanyobjects When multiple objects were found
 	 */
-	string objectDNtoAttributeData(const string &dn, const char *lpAttr) throw(std::exception);
+	string objectDNtoAttributeData(const string &dn, const char *lpAttr);
 
 	/**
 	 * Apply filter to LDAP and request all object signatures
@@ -824,7 +813,7 @@ private:
 	 * @throw runtime_error When the LDAP query failed
 	 */
 	auto_ptr<signatures_t> getAllObjectsByFilter(const string &basedn, const int scope, const string &search_filter,
-												 const string &strCompanyDN, bool bCache) throw(std::exception);
+												 const string &strCompanyDN, bool bCache);
 
 	/**
 	 * Detecmine object id from LDAP result entry
@@ -875,7 +864,7 @@ private:
 	 *
 	 * @todo return value lppres
 	 */
-	void my_ldap_search_s(char *base, int scope, char *filter, char *attrs[], int attrsonly, LDAPMessage **lppres, LDAPControl **serverControls = NULL) throw(std::exception);
+	void my_ldap_search_s(char *base, int scope, char *filter, char *attrs[], int attrsonly, LDAPMessage **lppres, LDAPControl **serverControls = NULL);
 
 
 	/**

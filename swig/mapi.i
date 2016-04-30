@@ -2,18 +2,18 @@
 
 %{
 #undef LOCK_WRITE
-#include <platform.h>
+#include <zarafa/platform.h>
 #include <mapi.h>
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapiutil.h>
-#include "IECServiceAdmin.h"
+#include <zarafa/IECServiceAdmin.h>
 #include "IECSpooler.h"
 #include "IECTestProtocol.h"
 #include "IECMultiStoreTable.h"
 #include "IECExportChanges.h"
-#include "IECLicense.h"
-#include "mapi_ptr.h"
+#include <zarafa/IECLicense.h>
+#include <zarafa/mapi_ptr.h>
 
 // DIRTIEST HACK IN THE WORLD WARNING: we need to fix the broken swig output for mapi_wrap.h .....
 #pragma include_alias( "mapi_wrap.h", "mapi_wrap_fixed.h" )
@@ -27,7 +27,7 @@
 #endif
 
 #include "MAPINotifSink.h"
-#include "director_util.h"
+#include <zarafa/director_util.h>
 
 HRESULT MAPIInitialize_Multithreaded() {
 	MAPIINIT_0 init = {0, MAPI_MULTITHREAD_NOTIFICATIONS};
@@ -37,7 +37,7 @@ HRESULT MAPIInitialize_Multithreaded() {
 
 %}
 
-%include "typemap.i"
+%include <zarafa/typemap.i>
 
 HRESULT MAPIInitialize_Multithreaded();
 
@@ -232,7 +232,7 @@ public:
 
 
 %{
-#include <ECGuid.h>
+#include <zarafa/ECGuid.h>
 #include <edkguid.h>
 
 swig_type_info *TypeFromIID(REFIID iid)
@@ -310,7 +310,7 @@ LPCIID IIDFromType(const char *type)
 // Directors for IStream
 
 %{
-#include "swig_iunknown.h"
+#include <zarafa/swig_iunknown.h>
 
 typedef IUnknownImplementor<IStream> Stream;
 %}

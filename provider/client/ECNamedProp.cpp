@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <mapitags.h>
 #include <mapidefs.h>
@@ -127,15 +101,12 @@ ECNamedProp::ECNamedProp(WSTransport *lpTransport)
 
 ECNamedProp::~ECNamedProp()
 {
-	std::map<MAPINAMEID *, ULONG,ltmap>::iterator iterMap;
+	std::map<MAPINAMEID *, ULONG, ltmap>::const_iterator iterMap;
 
 	// Clear all the cached names
-	for(iterMap = mapNames.begin(); iterMap != mapNames.end(); iterMap++) {
-		if(iterMap->first) {
+	for (iterMap = mapNames.begin(); iterMap != mapNames.end(); ++iterMap)
+		if(iterMap->first)
 			ECFreeBuffer(iterMap->first);
-		}
-	}
-
 	if(lpTransport)
 		lpTransport->Release();
 }
@@ -163,14 +134,14 @@ HRESULT ECNamedProp::GetNamesFromIDs(LPSPropTagArray FAR * lppPropTags, LPGUID l
 	ECAllocateBuffer(sizeof(LPMAPINAMEID) * lpsPropTags->cValues, (void **)&lppPropNames);
 
 	// Pass 1, local reverse mapping (FAST)
-	for(i=0;i<lpsPropTags->cValues; i++) {
-		if(ResolveReverseLocal(PROP_ID(lpsPropTags->aulPropTag[i]), lpPropSetGuid, ulFlags, lppPropNames, &lppPropNames[i]) != hrSuccess) {
+	for (i = 0; i < lpsPropTags->cValues; ++i)
+		if (ResolveReverseLocal(PROP_ID(lpsPropTags->aulPropTag[i]),
+		    lpPropSetGuid, ulFlags, lppPropNames,
+		    &lppPropNames[i]) != hrSuccess)
 			lppPropNames[i] = NULL;
-		}
-	}
 
 	// Pass 2, cache reverse mapping (FAST)
-	for(i=0;i<lpsPropTags->cValues; i++) {
+	for (i = 0; i < lpsPropTags->cValues; ++i) {
 		if(lppPropNames[i] == NULL) {
 			if(PROP_ID(lpsPropTags->aulPropTag[i]) > SERVER_NAMED_OFFSET) {
 				ResolveReverseCache(PROP_ID(lpsPropTags->aulPropTag[i]), lpPropSetGuid, ulFlags, lppPropNames, &lppPropNames[i]);
@@ -185,14 +156,12 @@ HRESULT ECNamedProp::GetNamesFromIDs(LPSPropTagArray FAR * lppPropTags, LPGUID l
 
 	cUnresolved = 0;
 	// Pass 3, server reverse lookup (SLOW)
-	for(i=0;i<lpsPropTags->cValues;i++) {
-		if(lppPropNames[i] == NULL ) {
+	for (i = 0; i < lpsPropTags->cValues; ++i)
+		if (lppPropNames[i] == NULL)
 			if(PROP_ID(lpsPropTags->aulPropTag[i]) > SERVER_NAMED_OFFSET) {
 				lpsUnresolved->aulPropTag[cUnresolved] = PROP_ID(lpsPropTags->aulPropTag[i]) - SERVER_NAMED_OFFSET;
-				cUnresolved++;
+				++cUnresolved;
 			}
-		}
-	}
 	lpsUnresolved->cValues = cUnresolved;
 
 	if(cUnresolved > 0) {
@@ -207,26 +176,21 @@ HRESULT ECNamedProp::GetNamesFromIDs(LPSPropTagArray FAR * lppPropTags, LPGUID l
 			goto exit;
 		}
 
-		for(i=0;i<cResolved;i++) {
+		for (i = 0; i < cResolved; ++i)
 			if(lppResolved[i] != NULL)
 				UpdateCache(lpsUnresolved->aulPropTag[i] + SERVER_NAMED_OFFSET, lppResolved[i]);
-		}
 
 		// re-scan the cache
-		for(i=0;i<lpsPropTags->cValues; i++) {
-			if(lppPropNames[i] == NULL) {
-				if(PROP_ID(lpsPropTags->aulPropTag[i]) > SERVER_NAMED_OFFSET) {
+		for (i = 0; i < lpsPropTags->cValues; ++i)
+			if (lppPropNames[i] == NULL)
+				if (PROP_ID(lpsPropTags->aulPropTag[i]) > SERVER_NAMED_OFFSET)
 					ResolveReverseCache(PROP_ID(lpsPropTags->aulPropTag[i]), lpPropSetGuid, ulFlags, lppPropNames, &lppPropNames[i]);
-				} 
-			}
-		}
 	}
 
 	// Check for errors
-	for(i=0;i<lpsPropTags->cValues; i++) {
+	for (i = 0; i < lpsPropTags->cValues; ++i)
 		if(lppPropNames[i] == NULL)
 			hr = MAPI_W_ERRORS_RETURNED;
-	}
 
 	*lpppPropNames = lppPropNames;
 	*lpcPropNames = lpsPropTags->cValues;
@@ -261,7 +225,7 @@ HRESULT ECNamedProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID FAR * lppPro
 	}
 
 	// Sanity check input
-	for(i=0;i<cPropNames;i++) {
+	for (i = 0; i < cPropNames; ++i) {
 		if(lppPropNames[i] == NULL) {
 			hr = MAPI_E_INVALID_PARAMETER;
 			goto exit;
@@ -277,29 +241,25 @@ HRESULT ECNamedProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID FAR * lppPro
 
 
 	// Pass 1, resolve static (local) names (FAST)
-	for(i=0;i<cPropNames;i++) {
+	for (i = 0; i < cPropNames; ++i)
 		if(lppPropNames[i] == NULL || ResolveLocal(lppPropNames[i], &lpsPropTagArray->aulPropTag[i]) != hrSuccess)
 			lpsPropTagArray->aulPropTag[i] = PROP_TAG(PT_ERROR, 0);
-	}
 
 	// Pass 2, resolve names from local cache (FAST)
-	for(i=0;i<cPropNames;i++) {
-		if(lppPropNames[i] != NULL && lpsPropTagArray->aulPropTag[i] == PROP_TAG(PT_ERROR, 0)) {
+	for (i = 0; i < cPropNames; ++i)
+		if (lppPropNames[i] != NULL && lpsPropTagArray->aulPropTag[i] == PROP_TAG(PT_ERROR, 0))
 			ResolveCache(lppPropNames[i], &lpsPropTagArray->aulPropTag[i]);
-		}
-	}
 
 	// Pass 3, resolve names from server (SLOW, but decreases in frequency with store lifetime)
 
 	lppPropNamesUnresolved = new MAPINAMEID * [lpsPropTagArray->cValues]; // over-allocated
 
 	// Get a list of unresolved names
-	for(i=0;i<cPropNames;i++) {
+	for (i = 0; i < cPropNames; ++i)
 		if(lpsPropTagArray->aulPropTag[i] == PROP_TAG(PT_ERROR, 0) && lppPropNames[i] != NULL ) {
 			lppPropNamesUnresolved[cUnresolved] = lppPropNames[i];
-			cUnresolved++;
+			++cUnresolved;
 		}
-	}
 
 	if(cUnresolved) {
 		// Let the server resolve these names 
@@ -309,28 +269,25 @@ HRESULT ECNamedProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID FAR * lppPro
 			goto exit;
 
 		// Put the names into the local cache for all the IDs the server gave us
-		for(i=0;i<cUnresolved;i++) {
+		for (i = 0; i < cUnresolved; ++i)
 			if(lpServerIDs[i] != 0)
 				UpdateCache(lpServerIDs[i] + SERVER_NAMED_OFFSET, lppPropNamesUnresolved[i]);
-		}
 
 		// Pass 4, re-resolve from local cache (FAST)
-		for(i=0;i<cPropNames;i++) {
-			if(lppPropNames[i] != NULL && lpsPropTagArray->aulPropTag[i] == PROP_TAG(PT_ERROR, 0)) {
+		for (i = 0; i < cPropNames; ++i)
+			if (lppPropNames[i] != NULL &&
+			    lpsPropTagArray->aulPropTag[i] == PROP_TAG(PT_ERROR, 0))
 				ResolveCache(lppPropNames[i], &lpsPropTagArray->aulPropTag[i]);
-			}
-		}
 	}
 	
 	// Finally, check for any errors left in the returned structure
 	hr = hrSuccess;
 
-	for(i=0;i<cPropNames;i++) {
+	for (i = 0; i < cPropNames; ++i)
 		if(lpsPropTagArray->aulPropTag[i] == PROP_TAG(PT_ERROR, 0)) {
 			hr = MAPI_W_ERRORS_RETURNED;
 			break;
 		}
-	}
 
 	*lppPropTags = lpsPropTagArray;
 	lpsPropTagArray = NULL;
@@ -339,9 +296,7 @@ exit:
 	if(lpsPropTagArray)
 		ECFreeBuffer(lpsPropTagArray);
 
-	if(lppPropNamesUnresolved)
-		delete [] lppPropNamesUnresolved;
-	
+	delete[] lppPropNamesUnresolved;
 	if(lpServerIDs)
 		ECFreeBuffer(lpServerIDs);
 
@@ -350,40 +305,32 @@ exit:
 
 HRESULT ECNamedProp::ResolveLocal(MAPINAMEID *lpName, ULONG *ulPropTag)
 {
-	HRESULT	hr = hrSuccess;
-	unsigned int i = 0;
-
 	// We can only locally resolve MNID_ID types of named properties
-	if(lpName->ulKind != MNID_ID) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
+	if (lpName->ulKind != MNID_ID)
+		return MAPI_E_NOT_FOUND;
 
 	// Loop through our local names to see if the named property is in there
-	for(i=0;i<sizeof(sLocalNames) / sizeof(sLocalNames[0]); i++) {
+	for (size_t i = 0; i < ARRAY_SIZE(sLocalNames); ++i) {
 		if(memcmp(&sLocalNames[i].guid,lpName->lpguid,sizeof(GUID))==0 && sLocalNames[i].ulMin <= lpName->Kind.lID && sLocalNames[i].ulMax >= lpName->Kind.lID) {
 			// Found it, calculate the ID and return it.
 			*ulPropTag = PROP_TAG(PT_UNSPECIFIED, sLocalNames[i].ulMappedId + lpName->Kind.lID - sLocalNames[i].ulMin);
-			goto exit;
+			return hrSuccess;
 		}
 	}
 
 	// Couldn't find it ...
-	hr = MAPI_E_NOT_FOUND;
-
-exit:
-	return hr;
+	return MAPI_E_NOT_FOUND;
 }
 
 HRESULT ECNamedProp::ResolveReverseCache(ULONG ulId, LPGUID lpGuid, ULONG ulFlags, void *lpBase, MAPINAMEID **lppName)
 {
 	HRESULT hr = MAPI_E_NOT_FOUND;
-	std::map<MAPINAMEID *, ULONG,ltmap>::iterator iterMap;
+	std::map<MAPINAMEID *, ULONG, ltmap>::const_iterator iterMap;
 
 	// Loop through the map to find the reverse-lookup of the named property. This could be speeded up by
 	// used a bimap (bi-directional map)
 
-	for(iterMap = mapNames.begin(); iterMap != mapNames.end(); iterMap++) {
+	for (iterMap = mapNames.begin(); iterMap != mapNames.end(); ++iterMap)
 		if(iterMap->second == ulId) { // FIXME match GUID
 			if(lpGuid) {
 				ASSERT(memcmp(lpGuid, iterMap->first->lpguid, sizeof(GUID)) == 0); // TEST michel
@@ -392,7 +339,6 @@ HRESULT ECNamedProp::ResolveReverseCache(ULONG ulId, LPGUID lpGuid, ULONG ulFlag
 			hr = HrCopyNameId(iterMap->first, lppName, lpBase);
 			break;
 		}
-	}
 
 	return hr;
 }
@@ -400,7 +346,6 @@ HRESULT ECNamedProp::ResolveReverseCache(ULONG ulId, LPGUID lpGuid, ULONG ulFlag
 HRESULT ECNamedProp::ResolveReverseLocal(ULONG ulId, LPGUID lpGuid, ULONG ulFlags, void *lpBase, MAPINAMEID **lppName)
 {
 	HRESULT		hr = hrSuccess;
-	unsigned int i = 0;
 	MAPINAMEID*	lpName = NULL; 
 
 	// Local mapping is only for MNID_ID
@@ -410,7 +355,7 @@ HRESULT ECNamedProp::ResolveReverseLocal(ULONG ulId, LPGUID lpGuid, ULONG ulFlag
 	}
 
 	// Loop through the local names to see if we can reverse-map the id
-	for(i=0;i<sizeof(sLocalNames) / sizeof(sLocalNames[0]); i++) {
+	for (size_t i = 0; i < ARRAY_SIZE(sLocalNames); ++i) {
 		if((lpGuid == NULL || memcmp(&sLocalNames[i].guid, lpGuid, sizeof(GUID)) == 0) && ulId >= sLocalNames[i].ulMappedId && ulId < sLocalNames[i].ulMappedId + (sLocalNames[i].ulMax - sLocalNames[i].ulMin + 1)) {
 			// Found it !
 			ECAllocateMore(sizeof(MAPINAMEID), lpBase, (void **)&lpName);
@@ -461,21 +406,14 @@ exit:
 
 HRESULT ECNamedProp::ResolveCache(MAPINAMEID *lpName, ULONG *lpulPropTag)
 {
-	HRESULT	hr = hrSuccess;
-
-	std::map<MAPINAMEID *,ULONG,ltmap>::iterator iterMap;
+	std::map<MAPINAMEID *, ULONG, ltmap>::const_iterator iterMap;
 
 	iterMap = mapNames.find(lpName);
 
-	if(iterMap == mapNames.end()) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
+	if (iterMap == mapNames.end())
+		return MAPI_E_NOT_FOUND;
 	*lpulPropTag = PROP_TAG(PT_UNSPECIFIED, iterMap->second);
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /* This copies a MAPINAMEID struct using ECAllocate* functions. Therefore, the

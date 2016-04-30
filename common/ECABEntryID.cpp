@@ -1,49 +1,23 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
-#include "ECABEntryID.h"
-#include "ECGuid.h"
+#include <zarafa/platform.h>
+#include <zarafa/ECABEntryID.h>
+#include <zarafa/ECGuid.h>
 
 #include <mapicode.h>
 
@@ -87,15 +61,11 @@ const unsigned int	g_cbSystemEid = sizeof(g_sSystemEid);
 static HRESULT CheckEntryId(unsigned int cbEntryId, const ENTRYID *lpEntryId,
     unsigned int ulId, unsigned int ulType, bool *lpbResult)
 {
-	HRESULT	hr = hrSuccess;
 	bool	bResult = true;
 	PABEID	lpEid = NULL;
 
 	if (cbEntryId < sizeof(ABEID) || lpEntryId == NULL || lpbResult == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+		return MAPI_E_INVALID_PARAMETER;
 
 	lpEid = (PABEID)lpEntryId;
 	if (lpEid->ulId != ulId)
@@ -104,13 +74,11 @@ static HRESULT CheckEntryId(unsigned int cbEntryId, const ENTRYID *lpEntryId,
 	else if (lpEid->ulType != ulType)
 		bResult = false;
 
-	else if (lpEid->ulVersion == 1 && strlen(lpEid->szExId) > 0)
+	else if (lpEid->ulVersion == 1 && lpEid->szExId[0])
 		bResult = false;
 
 	*lpbResult = bResult;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT EntryIdIsDefault(unsigned int cbEntryId, const ENTRYID *lpEntryId,
@@ -134,47 +102,28 @@ HRESULT EntryIdIsEveryone(unsigned int cbEntryId, const ENTRYID *lpEntryId,
 HRESULT GetNonPortableObjectId(unsigned int cbEntryId,
     const ENTRYID *lpEntryId, unsigned int *lpulObjectId)
 {
-	HRESULT hr = hrSuccess;
-
 	if (cbEntryId < sizeof(ABEID) || lpEntryId == NULL || lpulObjectId == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+		return MAPI_E_INVALID_PARAMETER;
 	*lpulObjectId = ((PABEID)lpEntryId)->ulId;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT GetNonPortableObjectType(unsigned int cbEntryId,
     const ENTRYID *lpEntryId, ULONG *lpulObjectType)
 {
-	HRESULT hr = hrSuccess;
-
 	if (cbEntryId < sizeof(ABEID) || lpEntryId == NULL || lpulObjectType == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+		return MAPI_E_INVALID_PARAMETER;
 	*lpulObjectType = ((PABEID)lpEntryId)->ulType;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT GeneralizeEntryIdInPlace(unsigned int cbEntryId,
     const ENTRYID *lpEntryId)
 {
-	HRESULT	hr = hrSuccess;
 	PABEID	lpAbeid = NULL;
 
-	if (cbEntryId < sizeof(ABEID) || lpEntryId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (cbEntryId < sizeof(ABEID) || lpEntryId == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	lpAbeid = (PABEID)lpEntryId;
 	switch (lpAbeid->ulVersion) {
@@ -192,7 +141,7 @@ HRESULT GeneralizeEntryIdInPlace(unsigned int cbEntryId,
 		// server will understand the entry id, regardless of the version number. We will
 		// downgrade anyway be as compatible as possible in that case.
 		case 1:
-			if (strlen(lpAbeid->szExId) > 0)	// remove the 'legacy ulId field'	
+			if (lpAbeid->szExId[0])	// remove the 'legacy ulId field'
 				lpAbeid->ulId = 0;			
 			else {								// downgrade to version 0
 				ASSERT(cbEntryId == sizeof(ABEID));
@@ -204,7 +153,5 @@ HRESULT GeneralizeEntryIdInPlace(unsigned int cbEntryId,
 			ASSERT(FALSE);
 			break;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }

@@ -7,7 +7,7 @@
 #              to access their email using the POP3 or IMAP protocol.
 # processname: /usr/sbin/zarafa-gateway
 # config: /etc/zarafa/gateway.cfg
-# pidfile: /var/run/zarafa-gateway.pid
+# pidfile: /var/run/zarafad/gateway.pid
 
 ### BEGIN INIT INFO
 # Provides: zarafa-gateway
@@ -27,7 +27,7 @@ GATEWAYCONFIG=/etc/zarafa/gateway.cfg
 GATEWAYPROGRAM=/usr/sbin/zarafa-gateway
 gateway=`basename $GATEWAYPROGRAM`
 LOCKFILE=/var/lock/subsys/$gateway
-PIDFILE=/var/run/$gateway.pid
+PIDFILE=/var/run/zarafad/gateway.pid
 RETVAL=0
 
 # Sanity checks.
@@ -42,6 +42,7 @@ if [ -z "$ZARAFA_LOCALE" ]; then
 fi
 
 start() {
+	install -dm0775 -o zarafa -g zarafa /var/run/zarafad
 	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $gateway
 	RETVAL=$?
 
@@ -49,10 +50,13 @@ start() {
 }
 
 stop() {
+	stop_daemon --pidfile "/var/run/$gateway.pid" --lockfile "$LOCKFILE" $gateway
+	RETVAL2="$?"
 	stop_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $gateway
 	RETVAL=$?
 
-	return $RETVAL
+	test "$RETVAL2" -eq 0 || "$RETVAL" -eq 0
+	return $?
 }
 
 restart() {

@@ -1,60 +1,35 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 #ifndef ECCACHE_INCLUDED
 #define ECCACHE_INCLUDED
 
-#include "zcdefs.h"
-#include <cassert>
+#include <zarafa/zcdefs.h>
 #include <list>
 #include <string>
+#include <vector>
+#include <cassert>
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 class ECLogger;
 
 template<typename Key>
-class KeyEntry _final {
+class KeyEntry _zcp_final {
 public:
 	Key key;
 	time_t ulLastAccess;
@@ -96,19 +71,19 @@ public:
 	// Decrement the valid count. Used from ECCacheManger::GetCell.
 	void DecrementValidCount() { 
 		assert(m_ulCacheValid >= 1);
-		m_ulCacheValid--;
+		--m_ulCacheValid;
 	}
 
 	// Call the provided callback with some statistics.
 	void RequestStats(void(callback)(const std::string &, const std::string &, const std::string &, void*), void *obj);
 
-	// Dump statistics to the provided logger.
-	void DumpStats(ECLogger *lpLogger);
+	// Dump statistics
+	void DumpStats(void) const;
 
 protected:
 	ECCacheBase(const std::string &strCachename, size_type ulMaxSize, long lMaxAge);
-	void IncrementHitCount() { m_ulCacheHit++; }
-	void IncrementValidCount() { m_ulCacheValid++; }
+	void IncrementHitCount(void) { ++m_ulCacheHit; }
+	void IncrementValidCount(void) { ++m_ulCacheValid; }
 	void ClearCounters() { m_ulCacheHit = m_ulCacheValid = 0; }
 
 private:
@@ -121,7 +96,7 @@ private:
 
 
 template<typename _MapType>
-class ECCache _final : public ECCacheBase
+class ECCache _zcp_final : public ECCacheBase
 {
 public:
 	typedef typename _MapType::key_type		key_type;
@@ -140,12 +115,12 @@ public:
 		return erSuccess;
 	}
 	
-	count_type ItemCount() const _override
+	count_type ItemCount() const _zcp_override
 	{
 		return m_map.size();
 	}
 	
-	size_type Size() const _override
+	size_type Size() const _zcp_override
 	{
 		// it works with map and hash_map
 		return (m_map.size() * (sizeof(typename _MapType::value_type) + sizeof(_MapType) )) + m_ulSize;
@@ -153,21 +128,16 @@ public:
 
 	ECRESULT RemoveCacheItem(const key_type &key) 
 	{
-		ECRESULT er = erSuccess;
 		typename _MapType::iterator iter;
 
 		iter = m_map.find(key);
-		if(iter == m_map.end()) {
-			er = ZARAFA_E_NOT_FOUND;
-			goto exit;
- 		}
+		if (iter == m_map.end())
+			return ZARAFA_E_NOT_FOUND;
 
 		m_ulSize -= GetCacheAdditionalSize(iter->second);
 		m_ulSize -= GetCacheAdditionalSize(key);
 		m_map.erase(iter);
-
-	exit:
-		return er;
+		return erSuccess;
 	}
 	
 	ECRESULT GetCacheItem(const key_type &key, mapped_type **lppValue)
@@ -175,24 +145,26 @@ public:
 		ECRESULT er = erSuccess;
 		time_t	tNow  = GetProcessTime();
 		typename _MapType::iterator iter;
-		typename _MapType::iterator iterDelete;
 
 		iter = m_map.find(key);
 		
 		if (iter != m_map.end()) {
 			// Cache age of the cached item, if expired remove the item from the cache
 			if (MaxAge() != 0 && (long)(tNow - iter->second.ulLastAccess) >= MaxAge()) {
+				/*
+				 * Because of templates, there is no guarantee
+				 * that m_map keeps iterators valid while
+				 * elements are deleted from it. Track them in
+				 * a separate delete list.
+				 */
+				std::vector<key_type> dl;
 
 				// Loop through all items and check
-				for (iter = m_map.begin(); iter != m_map.end();) {
-					if ((long)(tNow - iter->second.ulLastAccess) >= MaxAge()) {
-						iterDelete = iter;
-						iter++;
-						m_map.erase(iterDelete);
-					} else {
-						iter++;
-					}
-				}
+				for (iter = m_map.begin(); iter != m_map.end(); ++iter)
+					if ((long)(tNow - iter->second.ulLastAccess) >= MaxAge())
+						dl.push_back(iter->first);
+				for (typename std::vector<key_type>::const_iterator i = dl.begin(); i != dl.end(); ++i)
+					m_map.erase(*i);
 				er = ZARAFA_E_NOT_FOUND;
 			} else {
 				*lppValue = &iter->second;
@@ -267,19 +239,19 @@ public:
 private:
 	ECRESULT PurgeCache(float ratio)
 	{
-		std::list<KeyEntry<typename _MapType::iterator> > lstEntries;
-		typename std::list<KeyEntry<typename _MapType::iterator> >::iterator iterEntry;
+		std::list<KeyEntry<key_type> > lstEntries;
+		typename std::list<KeyEntry<key_type> >::iterator iterEntry;
 		typename _MapType::iterator iterMap;
 
-		for(iterMap = m_map.begin(); iterMap != m_map.end(); iterMap++) {
-			KeyEntry<typename _MapType::iterator> k;
-			k.key = iterMap;
+		for (iterMap = m_map.begin(); iterMap != m_map.end(); ++iterMap) {
+			KeyEntry<key_type> k;
+			k.key = iterMap->first;
 			k.ulLastAccess = iterMap->second.ulLastAccess;
 
 			lstEntries.push_back(k);
 		}
 
-		lstEntries.sort(KeyEntryOrder<typename _MapType::iterator>);
+		lstEntries.sort(KeyEntryOrder<key_type>);
 
 		// We now have a list of all cache items, sorted by access time, (oldest first)
 		unsigned int ulDelete = (unsigned int)(m_map.size() * ratio);
@@ -287,8 +259,8 @@ private:
 		// Remove the oldest ulDelete entries from the cache, removing [ratio] % of all
 		// cache entries.
 		for (iterEntry = lstEntries.begin(); iterEntry != lstEntries.end() && ulDelete > 0; ++iterEntry, --ulDelete) {
-			iterMap = iterEntry->key;
-
+			iterMap = m_map.find(iterEntry->key);
+			assert(iterMap != m_map.end());
 			m_ulSize -= GetCacheAdditionalSize(iterMap->second);
 			m_ulSize -= GetCacheAdditionalSize(iterMap->first);
 			m_map.erase(iterMap);

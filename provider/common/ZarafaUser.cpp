@@ -1,50 +1,24 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
-#include "stringutil.h"
-#include "ZarafaUser.h"
+#include <zarafa/stringutil.h>
+#include <zarafa/ZarafaUser.h>
 
 #include <sstream>
 
@@ -58,7 +32,8 @@ template<int(*fnCmp)(const char*, const char*)>
 class StringComparer {
 public:
 	StringComparer(const std::string &str): m_str(str) {}
-	bool operator()(const std::string &other) {
+	bool operator()(const std::string &other) const
+	{
 		return m_str.size() == other.size() && fnCmp(m_str.c_str(), other.c_str()) == 0;
 	}
 
@@ -101,12 +76,12 @@ objectid_t::objectid_t()
 	objclass = OBJECTCLASS_UNKNOWN;
 }
 
-bool objectid_t::operator==(const objectid_t &x)
+bool objectid_t::operator==(const objectid_t &x) const
 {
 	return this->objclass == x.objclass && this->id == x.id;
 }
 
-bool objectid_t::operator!=(const objectid_t &x)
+bool objectid_t::operator!=(const objectid_t &x) const
 {
 	return this->objclass != x.objclass || this->id != x.id;
 }
@@ -125,101 +100,114 @@ objectdetails_t::objectdetails_t(const objectdetails_t &objdetails) {
 	m_mapMVProps = objdetails.m_mapMVProps;
 }
 
-unsigned int objectdetails_t::GetPropInt(const property_key_t &propname) const {
+unsigned int objectdetails_t::GetPropInt(property_key_t propname) const
+{
 	property_map::const_iterator item = m_mapProps.find(propname);
-    if(item != m_mapProps.end()) {
-        return atoi(item->second.c_str());
-    } else return 0;
+	return item == m_mapProps.end() ? 0 : atoi(item->second.c_str());
 }
 
-bool objectdetails_t::GetPropBool(const property_key_t &propname) const {
+bool objectdetails_t::GetPropBool(property_key_t propname) const
+{
 	property_map::const_iterator item = m_mapProps.find(propname);
-    if(item != m_mapProps.end()) {
-        return atoi(item->second.c_str());
-    } else return false;
+	return item == m_mapProps.end() ? false : atoi(item->second.c_str());
 }
 
-std::string	objectdetails_t::GetPropString(const property_key_t &propname) const {
+std::string objectdetails_t::GetPropString(property_key_t propname) const
+{
 	property_map::const_iterator item = m_mapProps.find(propname);
-    if(item != m_mapProps.end()) {
-        return item->second;
-    } else return std::string();
+	return item == m_mapProps.end() ? std::string() : item->second;
 }
 
-objectid_t objectdetails_t::GetPropObject(const property_key_t &propname) const {
+objectid_t objectdetails_t::GetPropObject(property_key_t propname) const
+{
 	property_map::const_iterator item = m_mapProps.find(propname);
-	if (item != m_mapProps.end()) {
-		return objectid_t(item->second);
-	} else return objectid_t();
+	return item == m_mapProps.end() ? objectid_t() : objectid_t(item->second);
 }
 
-void objectdetails_t::SetPropInt(const property_key_t &propname, unsigned int value) {
+void objectdetails_t::SetPropInt(property_key_t propname, unsigned int value)
+{
     m_mapProps[propname].assign(stringify(value));
 }
 
-void objectdetails_t::SetPropBool(const property_key_t &propname, bool value) {
+void objectdetails_t::SetPropBool(property_key_t propname, bool value)
+{
     m_mapProps[propname].assign(value ? "1" : "0");
 }
 
-void objectdetails_t::SetPropString(const property_key_t &propname, const std::string &value) {
+void objectdetails_t::SetPropString(property_key_t propname,
+    const std::string &value)
+{
     m_mapProps[propname].assign(value);
 }
 
-void objectdetails_t::SetPropListString(const property_key_t &propname, const std::list<std::string> &value) {
+void objectdetails_t::SetPropListString(property_key_t propname,
+    const std::list<std::string> &value)
+{
 	m_mapMVProps[propname].assign(value.begin(), value.end());
 }
 
-void objectdetails_t::SetPropObject(const property_key_t &propname, const objectid_t &value) {
+void objectdetails_t::SetPropObject(property_key_t propname,
+    const objectid_t &value)
+{
 	m_mapProps[propname].assign(((objectid_t)value).tostring());
 }
 
-void objectdetails_t::AddPropInt(const property_key_t &propname, unsigned int value) {
+void objectdetails_t::AddPropInt(property_key_t propname, unsigned int value)
+{
 	m_mapMVProps[propname].push_back(stringify(value));
 }
 
-void objectdetails_t::AddPropString(const property_key_t &propname, const std::string &value) {
+void objectdetails_t::AddPropString(property_key_t propname,
+    const std::string &value)
+{
 	m_mapMVProps[propname].push_back(value);
 }
 
-void objectdetails_t::AddPropObject(const property_key_t &propname, const objectid_t &value) {
+void objectdetails_t::AddPropObject(property_key_t propname,
+    const objectid_t &value)
+{
 	m_mapMVProps[propname].push_back(((objectid_t)value).tostring());
 }
 
-std::list<unsigned int> objectdetails_t::GetPropListInt(const property_key_t &propname) const {
+std::list<unsigned int>
+objectdetails_t::GetPropListInt(property_key_t propname) const
+{
 	property_mv_map::const_iterator mvitem = m_mapMVProps.find(propname);
-	if (mvitem != m_mapMVProps.end()) {
-		std::list<unsigned int> l;
-		for (std::list<std::string>::const_iterator i = mvitem->second.begin(); i != mvitem->second.end(); i++)
-			l.push_back(atoui(i->c_str()));
-		return l;
-	} else return std::list<unsigned int>();
+	if (mvitem == m_mapMVProps.end())
+		return std::list<unsigned int>();
+	std::list<unsigned int> l;
+	for (std::list<std::string>::const_iterator i = mvitem->second.begin(); i != mvitem->second.end(); ++i)
+		l.push_back(atoui(i->c_str()));
+	return l;
 }
 
-std::list<std::string> objectdetails_t::GetPropListString(const property_key_t &propname) const {
+std::list<std::string>
+objectdetails_t::GetPropListString(property_key_t propname) const
+{
 	property_mv_map::const_iterator mvitem = m_mapMVProps.find(propname);
 	if (mvitem != m_mapMVProps.end()) return mvitem->second;
 	else return std::list<std::string>();
 }
 
-std::list<objectid_t> objectdetails_t::GetPropListObject(const property_key_t &propname) const {
+std::list<objectid_t>
+objectdetails_t::GetPropListObject(property_key_t propname) const
+{
 	property_mv_map::const_iterator mvitem = m_mapMVProps.find(propname);
-	if (mvitem != m_mapMVProps.end()) {
-		std::list<objectid_t> l;
-		for (std::list<std::string>::const_iterator i = mvitem->second.begin(); i != mvitem->second.end(); i++)
-			l.push_back(objectid_t(*i));
-		return l;
-	} else return std::list<objectid_t>();
+	if (mvitem == m_mapMVProps.end())
+		return std::list<objectid_t>();
+	std::list<objectid_t> l;
+	for (std::list<std::string>::const_iterator i = mvitem->second.begin(); i != mvitem->second.end(); ++i)
+		l.push_back(objectid_t(*i));
+	return l;
 }
 
 property_map objectdetails_t::GetPropMapAnonymous() const {
 	property_map anonymous;
 	property_map::const_iterator iter;
 
-	for (iter = m_mapProps.begin(); iter != m_mapProps.end(); iter++) {
+	for (iter = m_mapProps.begin(); iter != m_mapProps.end(); ++iter)
 		if (((unsigned int)iter->first) & 0xffff0000)
 			anonymous.insert(*iter);
-	}
-
 	return anonymous;
 }
 
@@ -227,26 +215,28 @@ property_mv_map objectdetails_t::GetPropMapListAnonymous() const {
 	property_mv_map anonymous;
 	property_mv_map::const_iterator iter;
 
-	for (iter = m_mapMVProps.begin(); iter != m_mapMVProps.end(); iter++) {
+	for (iter = m_mapMVProps.begin(); iter != m_mapMVProps.end(); ++iter)
 		if (((unsigned int)iter->first) & 0xffff0000)
 			anonymous.insert(*iter);
-	}
-
 	return anonymous;
 }
 
-bool objectdetails_t::HasProp(const property_key_t &propname) const {
+bool objectdetails_t::HasProp(property_key_t propname) const
+{
 	return m_mapProps.find(propname) != m_mapProps.end() || m_mapMVProps.find(propname) != m_mapMVProps.end();
 }
 
-bool objectdetails_t::PropListStringContains(const property_key_t &propname, const std::string &value, bool ignoreCase) const {
+bool objectdetails_t::PropListStringContains(property_key_t propname,
+    const std::string &value, bool ignoreCase) const
+{
 	const std::list<std::string> list = GetPropListString(propname);
 	if (ignoreCase)
 		return std::find_if(list.begin(), list.end(), StringComparer<stricmp>(value)) != list.end();
 	return std::find_if(list.begin(), list.end(), StringComparer<strcmp>(value)) != list.end();
 }
 
-void objectdetails_t::ClearPropList(const property_key_t &propname) {
+void objectdetails_t::ClearPropList(property_key_t propname)
+{
 	m_mapMVProps[propname].clear();
 }
 
@@ -265,10 +255,9 @@ void objectdetails_t::MergeFrom(const objectdetails_t &from) {
 
 	ASSERT(this->m_objclass == from.m_objclass);
 
-	for (fi = from.m_mapProps.begin(); fi != from.m_mapProps.end(); fi++)
+	for (fi = from.m_mapProps.begin(); fi != from.m_mapProps.end(); ++fi)
 		this->m_mapProps[fi->first].assign(fi->second);
-
-	for (fmvi = from.m_mapMVProps.begin(); fmvi != from.m_mapMVProps.end(); fmvi++)
+	for (fmvi = from.m_mapMVProps.begin(); fmvi != from.m_mapMVProps.end(); ++fmvi)
 		this->m_mapMVProps[fmvi->first].assign(fmvi->second.begin(), fmvi->second.end());
 }
 
@@ -281,43 +270,39 @@ unsigned int objectdetails_t::GetObjectSize()
 {
 	unsigned int ulSize = sizeof(*this);
 	property_map::const_iterator i;
-	property_mv_map::iterator mvi;
-	std::list<std::string>::iterator istr;
+	property_mv_map::const_iterator mvi;
+	std::list<std::string>::const_iterator istr;
 
 	ulSize += MEMORY_USAGE_MAP(m_mapProps.size(), property_map);
-	for (i = m_mapProps.begin(); i != m_mapProps.end(); i++)
+	for (i = m_mapProps.begin(); i != m_mapProps.end(); ++i)
 		ulSize += MEMORY_USAGE_STRING(i->second);
 
 	ulSize += MEMORY_USAGE_MAP(m_mapMVProps.size(), property_mv_map);
-
-	for (mvi = m_mapMVProps.begin(); mvi != m_mapMVProps.end(); mvi++) {
-		for (istr = mvi->second.begin(); istr != mvi->second.end(); istr++)
+	for (mvi = m_mapMVProps.begin(); mvi != m_mapMVProps.end(); ++mvi)
+		for (istr = mvi->second.begin(); istr != mvi->second.end(); ++istr)
 			ulSize += MEMORY_USAGE_STRING((*istr));
-	}
-
 	return ulSize;
 }
 
-std::string objectdetails_t::ToStr()
+std::string objectdetails_t::ToStr(void) const
 {
 	std::string str;
-    property_map::const_iterator i;
-    property_mv_map::iterator mvi;
-    std::list<std::string>::iterator istr;
-
+	property_map::const_iterator i;
+	property_mv_map::const_iterator mvi;
+	std::list<std::string>::const_iterator istr;
 
 	str = "propmap: ";
-	for (i = m_mapProps.begin(); i != m_mapProps.end(); i++) {
+	for (i = m_mapProps.begin(); i != m_mapProps.end(); ++i) {
 		if(i != m_mapProps.begin())  str+= ", ";
 		str+= stringify(i->first) + "='";
 		str+= i->second + "'";
 	}
 
 	str += " mvpropmap: ";
-	for (mvi = m_mapMVProps.begin(); mvi != m_mapMVProps.end(); mvi++) {
+	for (mvi = m_mapMVProps.begin(); mvi != m_mapMVProps.end(); ++mvi) {
 		if(mvi != m_mapMVProps.begin()) str += ", ";
 		str += stringify(mvi->first) + "=(";
-		for (istr = mvi->second.begin(); istr != mvi->second.end(); istr++) {
+		for (istr = mvi->second.begin(); istr != mvi->second.end(); ++istr) {
 			if(istr != mvi->second.begin()) str +=", ";
 			str += *istr;
 		}
@@ -393,6 +378,6 @@ std::string serverdetails_t::GetSslPath() const {
 	return std::string();	
 }
 
-std::string serverdetails_t::GetProxyPath() const {
+const std::string &serverdetails_t::GetProxyPath() const {
 	return m_strProxyPath;
 }

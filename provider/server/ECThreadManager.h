@@ -1,55 +1,30 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 #ifndef ECTHREADMANAGER_H
 #define ECTHREADMANAGER_H
 
+#include <zarafa/zcdefs.h>
 #include <queue>
 #include <set>
 
-#include "ECLogger.h"
-#include "ECConfig.h"
-#include "ZarafaCode.h"
+#include <zarafa/ECLogger.h>
+#include <zarafa/ECConfig.h>
+#include <zarafa/ZarafaCode.h>
 #include "SOAPUtils.h"
 #include "soapH.h"
 
@@ -62,27 +37,27 @@ typedef struct {
     double dblReceiveStamp;		// time at which activity was detected on the socket
 } WORKITEM;
 
-typedef struct ACTIVESOCKET {
+typedef struct ACTIVESOCKET _zcp_final {
     struct soap *soap;
     time_t ulLastActivity;
     
     bool operator < (const ACTIVESOCKET &a) const { return a.soap->socket < this->soap->socket; };
 } ACTIVESOCKET;
 
-class FindSocket {
+class FindSocket _zcp_final {
 public:
 	FindSocket(SOAP_SOCKET s) { this->s = s; };
 
-	bool operator()(const ACTIVESOCKET &a) { return a.soap->socket == s; };
+	bool operator()(const ACTIVESOCKET &a) const { return a.soap->socket == s; }
 private:
 	SOAP_SOCKET s;
 };
 
-class FindListenSocket {
+class FindListenSocket _zcp_final {
 public:
 	FindListenSocket(SOAP_SOCKET s) { this->s = s; };
 
-	bool operator()(struct soap *soap) { return soap->socket == s; };
+	bool operator()(struct soap *soap) const { return soap->socket == s; }
 private:
 	SOAP_SOCKET s;
 };
@@ -112,7 +87,7 @@ protected:
     ECDispatcher *m_lpDispatcher;
 };
 
-class ECPriorityWorkerThread : public ECWorkerThread {
+class ECPriorityWorkerThread _zcp_final : public ECWorkerThread {
 public:
 	ECPriorityWorkerThread(ECLogger *lpLogger, ECThreadManager *lpManager, ECDispatcher *lpDispatcher);
 	// The destructor is public since this thread isn't detached, we wait for the thread and clean it
@@ -123,7 +98,7 @@ public:
  * It is the thread manager's job to keep track of processing threads, and adding or removing threads
  * when requested. 
  */
-class ECThreadManager {
+class ECThreadManager _zcp_final {
 public:
     // ulThreads is the normal number of threads that are started; These threads are pre-started and will be in an idle state.
     ECThreadManager(ECLogger *lpLogger, ECDispatcher *lpDispatcher, unsigned int ulThreads);
@@ -159,7 +134,7 @@ private:
  *
  * Thread deletion is done by the Thread Manager.
  */
-class ECWatchDog {
+class ECWatchDog _zcp_final {
 public:
     ECWatchDog(ECConfig *lpConfig, ECLogger *lpLogger, ECDispatcher *lpDispatcher, ECThreadManager *lpThreadManager);
     ~ECWatchDog();
@@ -171,8 +146,6 @@ private:
     ECConfig *			m_lpConfig;
     ECDispatcher *		m_lpDispatcher;
     ECThreadManager*	m_lpThreadManager;
-    double				m_dblAge;
-    double				m_dblMaxFreq;
     pthread_t			m_thread;
     bool				m_bExit;
     pthread_mutex_t		m_mutexExit;
@@ -252,7 +225,7 @@ protected:
 	int			m_nSendTimeout;
 };
 
-class ECDispatcherSelect : public ECDispatcher {
+class ECDispatcherSelect _zcp_final : public ECDispatcher {
 private:
     int			m_fdRescanRead;
     int			m_fdRescanWrite;
@@ -269,7 +242,7 @@ public:
 };
 
 #ifdef HAVE_EPOLL_CREATE
-class ECDispatcherEPoll : public ECDispatcher {
+class ECDispatcherEPoll _zcp_final : public ECDispatcher {
 private:
 	int m_fdMax;
 	int m_epFD;
@@ -286,6 +259,39 @@ public:
 };
 #endif
 
+#ifdef WIN32
+class ECDispatcherWin32 _zcp_final : public ECDispatcher {
+private:
+	// Windows handler
+	HANDLE					m_hRescanEvent;
+public:
+    ECDispatcherWin32(ECLogger *lpLogger, ECConfig *lpConfig, CREATEPIPESOCKETCALLBACK lpCallback, void *lpCallbackParam);
+    virtual ~ECDispatcherWin32();
+
+    virtual ECRESULT MainLoop();
+
+    virtual ECRESULT ShutDown();
+
+    virtual ECRESULT NotifyRestart(SOAP_SOCKET s);
+
+	enum {
+		SOCKETTYPE_TCP = 1, 
+		SOCKETTYPE_PIPE,
+		SOCKETTYPE_RESCAN,
+		SOCKETTYPE_TCP_LISTEN,
+		SOCKETTYPE_PIPE_LISTEN
+	};
+	typedef struct 
+	{
+		int type;
+		char buffer[1];
+		DWORD dwRead;
+		OVERLAPPED sOverlapped;
+		bool bPending;
+		bool bEOF;
+	} ECSOCKETDATA;
+};
+#endif
 
 
 #endif

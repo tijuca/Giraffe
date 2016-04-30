@@ -1,57 +1,31 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "favoritesutil.h"
 
 #include <edkmdb.h>
 
-#include "mapiext.h"
-#include "restrictionutil.h"
-#include "CommonUtil.h"
+#include <zarafa/mapiext.h>
+#include <zarafa/restrictionutil.h>
+#include <zarafa/CommonUtil.h>
 
-#include <tstring.h>
-#include <charset/convstring.h>
+#include <zarafa/tstring.h>
+#include <zarafa/charset/convstring.h>
 
 #include <string>
 using namespace std;
@@ -121,9 +95,7 @@ HRESULT GetShortcutFolder(LPMAPISESSION lpSession, LPTSTR lpszFolderName, LPTSTR
 		goto exit;
 
 exit:
-	if (lpPropValue)
-		MAPIFreeBuffer(lpPropValue);
-
+	MAPIFreeBuffer(lpPropValue);
 	if(lpFolder)
 		lpFolder->Release();
 
@@ -195,9 +167,7 @@ HRESULT CreateShortcutFolder(IMsgStore *lpMsgStore, LPTSTR lpszFolderName, LPTST
 		goto exit;
 
 exit:
-	if (lpProp)
-		MAPIFreeBuffer(lpProp);
-
+	MAPIFreeBuffer(lpProp);
 	if (lpFolder)
 		lpFolder->Release();
 
@@ -222,7 +192,7 @@ HRESULT DelFavoriteFolder(IMAPIFolder *lpShortcutFolder, LPSPropValue lpPropSour
 	LPENTRYLIST lpsMsgList = NULL;
 	SizedSPropTagArray(2, sPropDelFavo) = {2, { PR_ENTRYID, PR_FAV_PUBLIC_SOURCE_KEY }};
 	std::list<string>	listSourceKey;
-	std::list<string>::iterator ilistSourceKey;
+	std::list<std::string>::const_iterator ilistSourceKey;
 	string strSourceKey;
 	SPropValue sPropSourceKey;
 	ULONG ulMaxRows = 0;
@@ -279,7 +249,7 @@ HRESULT DelFavoriteFolder(IMAPIFolder *lpShortcutFolder, LPSPropValue lpPropSour
 		goto exit;
 
 	memcpy(lpsMsgList->lpbin[lpsMsgList->cValues].lpb, lpRows->aRow[0].lpProps[0].Value.bin.lpb, lpsMsgList->lpbin[lpsMsgList->cValues].cb);
-	lpsMsgList->cValues++;
+	++lpsMsgList->cValues;
 
 	strSourceKey.assign((char*)lpRows->aRow[0].lpProps[1].Value.bin.lpb, lpRows->aRow[0].lpProps[1].Value.bin.cb);
 	listSourceKey.push_back(strSourceKey);
@@ -287,7 +257,8 @@ HRESULT DelFavoriteFolder(IMAPIFolder *lpShortcutFolder, LPSPropValue lpPropSour
 	if (lpRows){ FreeProws(lpRows); lpRows = NULL; }
 	FREE_RESTRICTION(lpRestriction);
 
-	for(ilistSourceKey = listSourceKey.begin(); ilistSourceKey != listSourceKey.end(); ilistSourceKey++)
+	for (ilistSourceKey = listSourceKey.begin();
+	     ilistSourceKey != listSourceKey.end(); ++ilistSourceKey)
 	{
 		sPropSourceKey.ulPropTag = PR_FAV_PUBLIC_SOURCE_KEY;
 		sPropSourceKey.Value.bin.cb = ilistSourceKey->size();
@@ -322,7 +293,7 @@ HRESULT DelFavoriteFolder(IMAPIFolder *lpShortcutFolder, LPSPropValue lpPropSour
 			if ((hr = MAPIAllocateMore(lpsMsgList->lpbin[lpsMsgList->cValues].cb, lpsMsgList, (void **) &lpsMsgList->lpbin[lpsMsgList->cValues].lpb)) != hrSuccess)
 				goto exit;
 			memcpy(lpsMsgList->lpbin[lpsMsgList->cValues].lpb, lpRows->aRow[0].lpProps[0].Value.bin.lpb, lpsMsgList->lpbin[lpsMsgList->cValues].cb);
-			lpsMsgList->cValues++;
+			++lpsMsgList->cValues;
 
 			// Add sourcekey into the list
 			strSourceKey.assign((char*)lpRows->aRow[0].lpProps[1].Value.bin.lpb, lpRows->aRow[0].lpProps[1].Value.bin.cb);
@@ -345,10 +316,7 @@ exit:
 
 	if (lpRows)
 		FreeProws(lpRows);
-
-	if (lpsMsgList)
-		MAPIFreeBuffer(lpsMsgList);
-
+	MAPIFreeBuffer(lpsMsgList);
 	return hr;
 }
 
@@ -454,10 +422,7 @@ HRESULT AddToFavorite(IMAPIFolder *lpShortcutFolder, ULONG ulLevel, LPCTSTR lpsz
 
 exit:
 	FREE_RESTRICTION(lpRestriction);
-
-	if (lpNewPropArray)
-		MAPIFreeBuffer(lpNewPropArray);
-
+	MAPIFreeBuffer(lpNewPropArray);
 	if (lpMessage)
 		lpMessage->Release();
 
@@ -509,8 +474,8 @@ HRESULT AddFavoriteFolder(LPMAPIFOLDER lpShortcutFolder, LPMAPIFOLDER lpFolder, 
 	if (hr != hrSuccess)
 		goto exit;
 
-	if (lpsPropArray) { MAPIFreeBuffer(lpsPropArray); lpsPropArray = NULL; }
-
+	MAPIFreeBuffer(lpsPropArray);
+	lpsPropArray = NULL;
 
 	if (ulFlags == FAVO_FOLDER_LEVEL_SUB) {
 		ulFolderFlags = CONVENIENT_DEPTH;
@@ -563,11 +528,7 @@ exit:
 
 	if (lpRows)
 		FreeProws(lpRows);
-
-	if (lpsPropArray)
-		MAPIFreeBuffer(lpsPropArray);
-
-
+	MAPIFreeBuffer(lpsPropArray);
 	return hr;
 }
 
@@ -638,12 +599,9 @@ HRESULT GetFavorite(IMAPIFolder *lpShortcutFolder, ULONG ulFlags, IMAPIFolder *l
 	*lppShortCutPropValues = lpShortCutPropValues;
 	*lpcValues = cShortCutValues;
 exit:
-	if (hr != hrSuccess && lpShortCutPropValues)
+	if (hr != hrSuccess)
 		MAPIFreeBuffer(lpShortCutPropValues);
-
-	if (lpPropSourceKey)
-		MAPIFreeBuffer(lpPropSourceKey);
-
+	MAPIFreeBuffer(lpPropSourceKey);
 	if (lpTable)
 		lpTable->Release();
 

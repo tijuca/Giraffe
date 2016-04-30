@@ -1,53 +1,31 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ECArchiveAwareMsgStore.h"
 #include "ECArchiveAwareMessage.h"
-#include "ECGuid.h"
-#include "mapi_ptr.h"
-#include "threadutil.h"
+#include <zarafa/ECGuid.h>
+#include <zarafa/mapi_ptr.h>
+#include <zarafa/threadutil.h>
 
+#if defined WIN32 && !defined _DEBUG
+#include "ECLicense.h"
+#include "ECMAPILicense.h"
+#endif
 
 
 ECArchiveAwareMsgStore::ECArchiveAwareMsgStore(char *lpszProfname, LPMAPISUP lpSupport, WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags, BOOL fIsSpooler, BOOL fIsDefaultStore, BOOL bOfflineStore)
@@ -92,7 +70,7 @@ HRESULT ECArchiveAwareMsgStore::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, 
 
 HRESULT ECArchiveAwareMsgStore::OpenItemFromArchive(LPSPropValue lpPropStoreEIDs, LPSPropValue lpPropItemEIDs, ECMessage **lppMessage)
 {
-	HRESULT				hr = hrSuccess;
+	HRESULT hr;
 	BinaryList			lstStoreEIDs;
 	BinaryList			lstItemEIDs;
 	BinaryListIterator	iterStoreEID;
@@ -105,15 +83,12 @@ HRESULT ECArchiveAwareMsgStore::OpenItemFromArchive(LPSPropValue lpPropStoreEIDs
 		PROP_TYPE(lpPropStoreEIDs->ulPropTag) != PT_MV_BINARY ||
 		PROP_TYPE(lpPropItemEIDs->ulPropTag) != PT_MV_BINARY ||
 		lpPropStoreEIDs->Value.MVbin.cValues != lpPropItemEIDs->Value.MVbin.cValues)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+		return MAPI_E_INVALID_PARAMETER;
 
 	// First get a list of items that could be retrieved from cached archive stores.
 	hr = CreateCacheBasedReorderedList(lpPropStoreEIDs->Value.MVbin, lpPropItemEIDs->Value.MVbin, &lstStoreEIDs, &lstItemEIDs);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	iterStoreEID = lstStoreEIDs.begin();
 	iterIterEID = lstItemEIDs.begin();
@@ -123,7 +98,7 @@ HRESULT ECArchiveAwareMsgStore::OpenItemFromArchive(LPSPropValue lpPropStoreEIDs
 
 		hr = GetArchiveStore(*iterStoreEID, &ptrArchiveStore);
 		if (hr == MAPI_E_NO_SUPPORT)
-			goto exit;	// No need to try any other archives.
+			return hr;	// No need to try any other archives.
 		if (hr != hrSuccess) {
 			continue;
 		}
@@ -136,15 +111,10 @@ HRESULT ECArchiveAwareMsgStore::OpenItemFromArchive(LPSPropValue lpPropStoreEIDs
 		break;
 	}
 
-	if (iterStoreEID == lstStoreEIDs.end()) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
+	if (iterStoreEID == lstStoreEIDs.end())
+		return MAPI_E_NOT_FOUND;
 	if (ptrArchiveMessage)
 		hr = ptrArchiveMessage->QueryInterface(IID_ECMessage, (LPVOID*)lppMessage);
-
-exit:
 	return hr;
 }
 
@@ -178,14 +148,14 @@ HRESULT ECArchiveAwareMsgStore::CreateCacheBasedReorderedList(SBinaryArray sbaSt
 
 HRESULT ECArchiveAwareMsgStore::GetArchiveStore(LPSBinary lpStoreEID, ECMsgStore **lppArchiveStore)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	const std::vector<BYTE> eid(lpStoreEID->lpb, lpStoreEID->lpb + lpStoreEID->cb);
-	MsgStoreMap::iterator iterStore = m_mapStores.find(eid);
+	MsgStoreMap::const_iterator iterStore = m_mapStores.find(eid);
 	if (iterStore != m_mapStores.end()) {
 		hr = iterStore->second->QueryInterface(IID_ECMsgStore, (LPVOID*)lppArchiveStore);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	} 
 	
 	else {
@@ -204,25 +174,36 @@ HRESULT ECArchiveAwareMsgStore::GetArchiveStore(LPSBinary lpStoreEID, ECMsgStore
 
 		hr = QueryInterface(IID_ECMsgStoreOnline, &ptrUnknown);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		hr = ptrUnknown->QueryInterface(IID_ECMsgStore, &ptrOnlineStore);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
+#if defined WIN32 && !defined _DEBUG
+		// This is the place where the client eventually gets the first time
+		// an archive store is openend in order to retrieve an archived message
+		// that will be used to destub a message.
+		// This seems like an appropriate place to check if we're actually allowed
+		// to perform destubbing. If allowed we get here only once per archive store.
+		// If destubbing is not allowed we'll get here more often, but one shouldn't
+		// have any stubs to begin with if destubbing isn't allowed.
+		if (HrCheckLicense(&ptrOnlineStore->m_xMsgStore, SERVICE_TYPE_ARCHIVE, ZARAFA_ARCHIVE_DEFAULT) != hrSuccess)
+			return MAPI_E_NO_SUPPORT;
+#endif
 	
 		hr = UnWrapStoreEntryID(lpStoreEID->cb, (LPENTRYID)lpStoreEID->lpb, &cbEntryID, &ptrEntryID);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		hr = HrGetServerURLFromStoreEntryId(cbEntryID, ptrEntryID, ServerURL, &bIsPseudoUrl);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		if (bIsPseudoUrl) {
 			hr = HrResolvePseudoUrl(ptrOnlineStore->lpTransport, ServerURL.c_str(), strServer, &bIsPeer);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 			
 			if (!bIsPeer)
 				ServerURL = strServer;
@@ -232,7 +213,7 @@ HRESULT ECArchiveAwareMsgStore::GetArchiveStore(LPSBinary lpStoreEID, ECMsgStore
 				// logged off when ptrOnlineStore gets destroyed (at the end of this finction).
 				hr = ptrOnlineStore->lpTransport->CloneAndRelogon(&ptrTransport);
 				if (hr != hrSuccess)
-					goto exit;
+					return hr;
 			}
 		}
 
@@ -241,39 +222,37 @@ HRESULT ECArchiveAwareMsgStore::GetArchiveStore(LPSBinary lpStoreEID, ECMsgStore
 			// to another server than the one we're connected with.
 			hr = ptrOnlineStore->lpTransport->CreateAndLogonAlternate(ServerURL.c_str(), &ptrTransport);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 
 		hr = ECMsgStore::Create((char*)GetProfileName(), this->lpSupport, ptrTransport, FALSE, 0, FALSE, FALSE, FALSE, &ptrArchiveStore);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		// Get a propstorage for the message store
 		hr = ptrTransport->HrOpenPropStorage(0, NULL, cbEntryID, ptrEntryID, 0, &ptrPropStorage);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		// Set up the message store to use this storage
 		hr = ptrArchiveStore->HrSetPropStorage(ptrPropStorage, FALSE);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		// Setup callback for session change
 		hr = ptrTransport->AddSessionReloadCallback(ptrArchiveStore, ECMsgStore::Reload, NULL);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		hr = ptrArchiveStore->SetEntryId(cbEntryID, ptrEntryID);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		hr = ptrArchiveStore->QueryInterface(IID_ECMsgStore, (LPVOID*)lppArchiveStore);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		m_mapStores.insert(MsgStoreMap::value_type(eid, ptrArchiveStore));
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }

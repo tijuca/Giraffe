@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 // Damn windows header defines max which break C++ header files
 #undef max
@@ -50,20 +24,20 @@
 
 #include "ECVMIMEUtils.h"
 #include "MAPISMTPTransport.h"
-#include "CommonUtil.h"
-#include "charset/convert.h"
+#include <zarafa/CommonUtil.h>
+#include <zarafa/charset/convert.h>
 
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 
 #include <mapi.h>
 #include <mapitags.h>
 #include <mapidefs.h>
 #include <mapiutil.h>
 #include <mapix.h>
-#include "mapiext.h"
-#include <EMSAbTag.h>
-#include "ECABEntryID.h"
-#include "mapi_ptr.h"
+#include <zarafa/mapiext.h>
+#include <zarafa/EMSAbTag.h>
+#include <zarafa/ECABEntryID.h>
+#include <zarafa/mapi_ptr.h>
 
 using namespace std;
 
@@ -124,7 +98,7 @@ HRESULT ECVMIMESender::HrAddRecipsFromTable(LPADRBOOK lpAdrBook, IMAPITable *lpT
 		goto exit;
 
 	// Get all recipients from the group
-	for (ULONG i = 0; i < lpRowSet->cRows; i++) {
+	for (ULONG i = 0; i < lpRowSet->cRows; ++i) {
 		LPSPropValue lpPropObjectType = PpropFindProp( lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues, PR_OBJECT_TYPE);
 
 		// see if there's an e-mail address associated with the list
@@ -292,10 +266,7 @@ exit:
 		
 	if(lpGroup)
 		lpGroup->Release();
-		
-	if(lpEmailAddress)
-		MAPIFreeBuffer(lpEmailAddress);
-		
+	MAPIFreeBuffer(lpEmailAddress);
 	return hr;
 }
 
@@ -341,9 +312,7 @@ HRESULT ECVMIMESender::HrMakeRecipientsList(LPADRBOOK lpAdrBook, LPMESSAGE lpMes
 		goto exit;
 	
 exit:
-	if (lpMessageFlags)
-		MAPIFreeBuffer(lpMessageFlags);
-
+	MAPIFreeBuffer(lpMessageFlags);
 	if (lpRTable)
 		lpRTable->Release();
 
@@ -363,10 +332,8 @@ HRESULT ECVMIMESender::sendMail(LPADRBOOK lpAdrBook, LPMESSAGE lpMessage, vmime:
 	vmime::ref<vmime::messaging::transport>	vmTransport;
 	vmime::ref<vmime::net::smtp::MAPISMTPTransport> mapiTransport = NULL;
 
-	if (!lpMessage || !vmMessage) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpMessage == NULL || vmMessage == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	smtpresult = 0;
 	error.clear();
@@ -397,20 +364,18 @@ HRESULT ECVMIMESender::sendMail(LPADRBOOK lpAdrBook, LPMESSAGE lpMessage, vmime:
 
 		if (expeditor.isEmpty()) {
 			// cancel this message as unsendable, would otherwise be thrown out of transport::send()
-			hr = MAPI_W_CANCEL_MESSAGE;
 			error = L"No expeditor in e-mail";
-			goto exit;
+			return MAPI_W_CANCEL_MESSAGE;
 		}
 
 		hr = HrMakeRecipientsList(lpAdrBook, lpMessage, vmMessage, recipients, bAllowEveryone, bAlwaysExpandDistrList);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		if (recipients.isEmpty()) {
 			// cancel this message as unsendable, would otherwise be thrown out of transport::send()
-			hr = MAPI_W_CANCEL_MESSAGE;
 			error = L"No recipients in e-mail";
-			goto exit;
+			return MAPI_W_CANCEL_MESSAGE;
 		}
 
         // Remove BCC headers from the message we're about to send
@@ -441,67 +406,80 @@ HRESULT ECVMIMESender::sendMail(LPADRBOOK lpAdrBook, LPMESSAGE lpMessage, vmime:
 			mapiTransport->setLogger(lpLogger);
 
 		// send the email already!
+		bool ok = false;
 		try {
 			vmTransport->connect();
 		} catch (vmime::exception &e) {
 			// special error, smtp server not respoding, so try later again
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "Connect to SMTP: %s. E-Mail will be tried again later.", e.what());
-			hr = MAPI_W_NO_SERVICE;
-			goto exit;
+			return MAPI_W_NO_SERVICE;
 		}
 
 		try {
 			vmTransport->send(expeditor, recipients, isAdapter, str.length(), NULL);
 			vmTransport->disconnect();
+			ok = true;
 		}
 		catch (vmime::exceptions::command_error& e) {
-			if (mapiTransport)
-				lstFailedRecipients = mapiTransport->getRecipientErrorList();
+			if (mapiTransport != NULL) {
+				mPermanentFailedRecipients = mapiTransport->getPermanentFailedRecipients();
+				mTemporaryFailedRecipients = mapiTransport->getTemporaryFailedRecipients();
+			}
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "SMTP: %s Response: %s", e.what(), e.response().c_str());
 			smtpresult = atoi(e.response().substr(0, e.response().find_first_of(" ")).c_str());
 			error = convert_to<wstring>(e.response());
 			// message should be cancelled, unsendable, test by smtp result code.
-			hr = MAPI_W_CANCEL_MESSAGE;
-			goto exit;
+			return MAPI_W_CANCEL_MESSAGE;
 		} 
 		catch (vmime::exceptions::no_recipient& e) {
-			if (mapiTransport)
-				lstFailedRecipients = mapiTransport->getRecipientErrorList();
+			if (mapiTransport != NULL) {
+				mPermanentFailedRecipients = mapiTransport->getPermanentFailedRecipients();
+				mTemporaryFailedRecipients = mapiTransport->getTemporaryFailedRecipients();
+			}
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "SMTP: %s Name: %s", e.what(), e.name());
 			//smtpresult = atoi(e.response().substr(0, e.response().find_first_of(" ")).c_str());
 			//error = convert_to<wstring>(e.response());
 			// message should be cancelled, unsendable, test by smtp result code.
-			hr = MAPI_W_CANCEL_MESSAGE;
-			goto exit;
+			return MAPI_W_CANCEL_MESSAGE;
 		} 
 		catch (vmime::exception &e) {
-			// special error, smtp server not respoding, so try later again
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "SMTP: %s. E-Mail will be tried again later.", e.what());
-			hr = MAPI_W_NO_SERVICE;
-			goto exit;
 		}
 
-		if (mapiTransport && mapiTransport->getRecipientErrorCount() > 0) {
-			// hr value returned to spooler
-			hr = MAPI_W_PARTIAL_COMPLETION;
-			lstFailedRecipients = mapiTransport->getRecipientErrorList();
-			error = L"Unable to reach all recipients";
-			smtpresult = 250;	// ok value
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "SMTP Error: Not all recipients could be reached. User will be notified.");
+		if (mapiTransport != NULL) {
+			/*
+			 * Multiple invalid recipients can cause the opponent
+			 * mail server (e.g. Postfix) to disconnect. In that
+			 * case, fail those recipients.
+			 */
+			mPermanentFailedRecipients = mapiTransport->getPermanentFailedRecipients();
+			mTemporaryFailedRecipients = mapiTransport->getTemporaryFailedRecipients();
+
+			if (mPermanentFailedRecipients.size() == static_cast<size_t>(recipients.getMailboxCount())) {
+				ec_log_err("SMTP: e-mail will be not be tried again: all recipients failed.");
+				return MAPI_W_CANCEL_MESSAGE;
+			} else if (!mTemporaryFailedRecipients.empty()) {
+				ec_log_err("SMTP: e-mail will be tried again: some recipients failed.");
+				return MAPI_W_PARTIAL_COMPLETION;
+			} else if (!mPermanentFailedRecipients.empty()) {
+				ec_log_err("SMTP: some recipients failed.");
+				return MAPI_W_PARTIAL_COMPLETION;
+			} else if (mTemporaryFailedRecipients.empty() && mPermanentFailedRecipients.empty() && !ok) {
+				// special error, smtp server not respoding, so try later again
+				ec_log_err("SMTP: e-mail will be tried again.");
+				return MAPI_W_NO_SERVICE;
+			}
 		}
 	}
 	catch (vmime::exception& e) {
 		// connection_greeting_error, ...?
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "%s", e.what());
 		error = convert_to<wstring>(e.what());
-		hr = MAPI_E_NETWORK_ERROR;
+		return MAPI_E_NETWORK_ERROR;
 	}
 	catch (std::exception& e) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "%s",e.what());
 		error = convert_to<wstring>(e.what());
-		hr = MAPI_E_NETWORK_ERROR;
+		return MAPI_E_NETWORK_ERROR;
 	}
-
-exit:
 	return hr;
 }

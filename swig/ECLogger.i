@@ -2,7 +2,7 @@
 // ECLogger director
 ////////////////////////////
 %{
-#include "ECLogger.h"
+#include <zarafa/ECLogger.h>
 
 class IECSimpleLogger {
 public:
@@ -10,7 +10,7 @@ public:
 	virtual HRESULT Log(unsigned int loglevel, const char *szMessage) = 0;
 };
 
-#include "swig_iunknown.h"
+#include <zarafa/swig_iunknown.h>
 typedef IUnknownImplementor<IECSimpleLogger> ECSimpleLogger;
 
 class ECLoggerProxy : public ECLogger {

@@ -1,60 +1,34 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ECMemTablePublic.h"
 
 #include "Mem.h"
-#include "ECGuid.h"
-#include "edkguid.h"
-#include "Util.h"
+#include <zarafa/ECGuid.h>
+#include <edkguid.h>
+#include <zarafa/Util.h>
 #include "ClientUtil.h"
 
 #include <edkmdb.h>
-#include <mapiext.h>
+#include <zarafa/mapiext.h>
 
 #include "ECMsgStorePublic.h"
-#include "restrictionutil.h"
+#include <zarafa/restrictionutil.h>
 #include "favoritesutil.h"
 
 #ifdef _DEBUG
@@ -87,8 +61,7 @@ ECMemTablePublic::~ECMemTablePublic(void)
 	if (m_lpShortCutAdviseSink)
 		m_lpShortCutAdviseSink->Release();
 
-	for (iterFolder = m_mapRelation.begin(); iterFolder != m_mapRelation.end(); iterFolder++)
-	{
+	for (iterFolder = m_mapRelation.begin(); iterFolder != m_mapRelation.end(); ++iterFolder) {
 		if (iterFolder->second.ulAdviseConnectionId > 0)
 			m_lpECParentFolder->GetMsgStore()->Unadvise(iterFolder->second.ulAdviseConnectionId);
 
@@ -103,16 +76,9 @@ ECMemTablePublic::~ECMemTablePublic(void)
 
 HRESULT ECMemTablePublic::Create(ECMAPIFolderPublic *lpECParentFolder, ECMemTablePublic **lppECMemTable)
 {
-	HRESULT hr = hrSuccess;
-	ECMemTablePublic *lpMemTable = NULL;
-	
 	SizedSPropTagArray(12, sPropsHierarchyColumns) = {12, { PR_ENTRYID, PR_DISPLAY_NAME, PR_CONTENT_COUNT, PR_CONTENT_UNREAD, PR_STORE_ENTRYID, PR_STORE_RECORD_KEY, PR_STORE_SUPPORT_MASK, PR_INSTANCE_KEY, PR_RECORD_KEY, PR_ACCESS, PR_ACCESS_LEVEL, PR_CONTAINER_CLASS} };
-
-	lpMemTable = new ECMemTablePublic(lpECParentFolder, (LPSPropTagArray)&sPropsHierarchyColumns, PR_ROWID);
-
-	hr = lpMemTable->QueryInterface(IID_ECMemTablePublic, (void **)lppECMemTable);
-
-	return hr;
+	ECMemTablePublic *lpMemTable = new ECMemTablePublic(lpECParentFolder, (LPSPropTagArray)&sPropsHierarchyColumns, PR_ROWID);
+	return lpMemTable->QueryInterface(IID_ECMemTablePublic, reinterpret_cast<void **>(lppECMemTable));
 }
 
 HRESULT ECMemTablePublic::QueryInterface(REFIID refiid, void **lppInterface)
@@ -142,8 +108,7 @@ static LONG __stdcall AdviseShortCutCallback(void *lpContext, ULONG cNotif,
 
 	lpMemTablePublic->AddRef(); // Besure we have the object
 
-	for(ULONG i=0; i < cNotif; i++)
-	{
+	for (ULONG i = 0; i < cNotif; ++i) {
 		if(lpNotif[i].ulEventType != fnevTableModified)
 		{
 			ASSERT(FALSE);
@@ -178,12 +143,11 @@ static LONG __stdcall AdviseShortCutCallback(void *lpContext, ULONG cNotif,
 						break;
 
 					lpMemTablePublic->ModifyRow(&lpRows->aRow[0].lpProps[SC_INSTANCE_KEY].Value.bin, &lpRows->aRow[0]);
-
-					if (lpRows){ FreeProws(lpRows); lpRows = NULL; }
-
-				} //while(true)
-				
+					FreeProws(lpRows);
+					lpRows = NULL;
+				}
 				break;
+
 			default:
 				break;
 		}
@@ -205,20 +169,21 @@ static LONG __stdcall AdviseFolderCallback(void *lpContext, ULONG cNotif,
 		return S_OK;
 	}
 
-	ECMemTablePublic::ECMAPFolderRelation::iterator	iterFolder;
+	ECMemTablePublic::ECMAPFolderRelation::const_iterator iterFolder;
 	ECMemTablePublic *lpMemTablePublic = (ECMemTablePublic*)lpContext;
 	ULONG ulResult;
 	SBinary sInstanceKey;
 
 	lpMemTablePublic->AddRef(); // Besure we have the object
 
-	for(ULONG i=0; i < cNotif; i++)
-	{
+	for (ULONG i = 0; i < cNotif; ++i) {
 		switch (lpNotif[i].ulEventType)
 		{
 			case fnevObjectModified:
 			case fnevObjectDeleted:
-				for (iterFolder = lpMemTablePublic->m_mapRelation.begin(); iterFolder != lpMemTablePublic->m_mapRelation.end(); iterFolder++)
+				for (iterFolder = lpMemTablePublic->m_mapRelation.begin();
+				     iterFolder != lpMemTablePublic->m_mapRelation.end();
+				     ++iterFolder)
 				{
 					if (lpMemTablePublic->m_lpECParentFolder->GetMsgStore()->CompareEntryIDs(iterFolder->second.cbEntryID, iterFolder->second.lpEntryID,lpNotif[i].info.obj.cbEntryID, lpNotif[i].info.obj.lpEntryID, 0, &ulResult) == hrSuccess && ulResult == TRUE)
 					{
@@ -254,7 +219,6 @@ static LONG __stdcall AdviseFolderCallback(void *lpContext, ULONG cNotif,
 HRESULT ECMemTablePublic::Init(ULONG ulFlags)
 {
 	HRESULT hr = hrSuccess;
-	ULONG ulRowId = 0;
 	IMAPIFolder *lpShortcutFolder = NULL;
 	LPMAPITABLE lpShortcutTable = NULL;
 	LPSRestriction lpRestriction = NULL;
@@ -288,9 +252,8 @@ HRESULT ECMemTablePublic::Init(ULONG ulFlags)
 			DATA_FP_RES_PROPERTY(lpRestriction, lpRestriction->res.resAnd.lpRes[0], RELOP_EQ, PR_FAV_PARENT_SOURCE_KEY, &m_lpECParentFolder->m_xMAPIFolder, PR_SOURCE_KEY);
 		}
 
-		if (lpPropTmp) { MAPIFreeBuffer(lpPropTmp); lpPropTmp = NULL; }
-
-
+		MAPIFreeBuffer(lpPropTmp);
+		lpPropTmp = NULL;
 		hr  = lpShortcutTable->Restrict(lpRestriction, MAPI_DEFERRED_ERRORS);
 		if (hr != hrSuccess)
 			goto exit;
@@ -310,8 +273,6 @@ HRESULT ECMemTablePublic::Init(ULONG ulFlags)
 				goto exit;
 		}
 
-		ulRowId = 1;
-
 		while(true)
 		{
 			hr = lpShortcutTable->QueryRows (1, 0, &lpRows);
@@ -322,10 +283,9 @@ HRESULT ECMemTablePublic::Init(ULONG ulFlags)
 				break;
 
 			ModifyRow(&lpRows->aRow[0].lpProps[SC_INSTANCE_KEY].Value.bin, &lpRows->aRow[0]);
-
-			if (lpRows){ FreeProws(lpRows); lpRows = NULL; }
-
-		} //while(true)
+			FreeProws(lpRows);
+			lpRows = NULL;
+		}
 
 		hr = lpShortcutTable->QueryInterface(IID_IMAPITable, (void **)&m_lpShortcutTable);
 		if (hr != hrSuccess)
@@ -333,21 +293,14 @@ HRESULT ECMemTablePublic::Init(ULONG ulFlags)
 	}
 
 exit:
-	if (lpPropTmp) 
-		MAPIFreeBuffer(lpPropTmp);
-
+	MAPIFreeBuffer(lpPropTmp);
 	if (lpShortcutTable)
 		lpShortcutTable->Release();
 
 	if (lpShortcutFolder)
 		lpShortcutFolder->Release();
-
-	if (lpRestriction)
-		MAPIFreeBuffer(lpRestriction);
-
-	if (lpPropTmp)
-		MAPIFreeBuffer(lpPropTmp);
-
+	MAPIFreeBuffer(lpRestriction);
+	MAPIFreeBuffer(lpPropTmp);
 	if (lpRows)
 		FreeProws(lpRows);
 
@@ -374,7 +327,7 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 	LPENTRYID lpFolderID = NULL;
 	LPENTRYID lpRecordKeyID = NULL;
 	std::string strInstanceKey;
-	ECMAPFolderRelation::iterator	iterRel;
+	ECMAPFolderRelation::const_iterator iterRel;
 	ECKeyTable::UpdateType	ulUpdateType; 
 	ULONG ulRowId;
 	ULONG ulConnection = 0;
@@ -446,15 +399,14 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 	lpProps[cProps].ulPropTag = PR_RECORD_KEY;
 	lpProps[cProps].Value.bin.cb = cbEntryID;
 	lpProps[cProps].Value.bin.lpb = (LPBYTE)lpRecordKeyID;
-
-	cProps++;
+	++cProps;
 
 	// Set this folder as parent
 	if (ECGenericProp::DefaultGetProp(PR_ENTRYID, m_lpECParentFolder->GetMsgStore(), 0, &lpProps[cProps], m_lpECParentFolder, lpProps) == hrSuccess) {
 		lpProps[cProps].ulPropTag = PR_PARENT_ENTRYID;
 
 		((LPENTRYID)lpProps[cProps].Value.bin.lpb)->abFlags[3] =  ZARAFA_FAVORITE;
-		cProps++;
+		++cProps;
 	}
 
 	lpProps[cProps].ulPropTag = PR_DISPLAY_TYPE;
@@ -541,8 +493,7 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 	else
 		hr = hrSuccess;
 
-	for (ULONG i=0; i < ulPropsFolder; i++)
-	{
+	for (ULONG i = 0; i < ulPropsFolder; ++i) {
 		if (PROP_TYPE(lpPropsFolder[i].ulPropTag) == PT_ERROR)
 			continue;
 
@@ -596,27 +547,16 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 		}
 
 		m_mapRelation.insert(ECMAPFolderRelation::value_type(strInstanceKey, sRelFolder));
-		
-		m_ulRowId++;
+		++m_ulRowId;
 	}
 
 exit:
-
-	if (lpRecordKeyID)
-		MAPIFreeBuffer(lpRecordKeyID);
-
+	MAPIFreeBuffer(lpRecordKeyID);
 	if (lpFolderReal)
 		lpFolderReal->Release(); 
-
-	if (lpPropsFolder) 
-		MAPIFreeBuffer(lpPropsFolder);
-
-	if (lpProps) 
-		MAPIFreeBuffer(lpProps);
-
-	if (lpFolderID) 
-		MAPIFreeBuffer(lpFolderID);
-
+	MAPIFreeBuffer(lpPropsFolder);
+	MAPIFreeBuffer(lpProps);
+	MAPIFreeBuffer(lpFolderID);
 	if (hr != hrSuccess && ulConnection > 0)
 		m_lpECParentFolder->GetMsgStore()->Unadvise(ulConnection);
 
@@ -633,23 +573,19 @@ exit:
 
 HRESULT ECMemTablePublic::DelRow(SBinary* lpInstanceKey)
 {
-	HRESULT hr = hrSuccess;
 	std::string strInstanceKey;
 	SPropValue sKeyProp;
 	ECMAPFolderRelation::iterator	iterRel;
 
-	if (lpInstanceKey == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpInstanceKey == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	strInstanceKey.assign((char*)lpInstanceKey->lpb, lpInstanceKey->cb);
 
 	iterRel = m_mapRelation.find(strInstanceKey);
 
 	if (iterRel == m_mapRelation.end() )
-		goto exit;
-
+		return hrSuccess;
 
 	sKeyProp.ulPropTag = PR_ROWID;
 	sKeyProp.Value.ul = iterRel->second.ulRowID;
@@ -662,9 +598,7 @@ HRESULT ECMemTablePublic::DelRow(SBinary* lpInstanceKey)
 	FreeRelation(&iterRel->second);
 
 	m_mapRelation.erase(iterRel);
-	
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 void ECMemTablePublic::FreeRelation(t_sRelation* lpRelation)
@@ -677,8 +611,5 @@ void ECMemTablePublic::FreeRelation(t_sRelation* lpRelation)
 
 	if (lpRelation->lpAdviseSink)
 		lpRelation->lpAdviseSink->Release();
-
-	if (lpRelation->lpEntryID)
-		MAPIFreeBuffer(lpRelation->lpEntryID);
-
+	MAPIFreeBuffer(lpRelation->lpEntryID);
 }

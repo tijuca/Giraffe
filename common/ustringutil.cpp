@@ -1,44 +1,18 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 /**
@@ -87,14 +61,15 @@ performed on the complete strings before the actual comparison is even started.
 At some point we need to rewqrite these functions to do all the conversion on the fly to minimize processing.
 */
 
-#include "platform.h"
-#include "ustringutil.h"
-#include "CommonUtil.h"
+#include "config.h"
+#include <zarafa/platform.h>
+#include <zarafa/ustringutil.h>
+#include <zarafa/CommonUtil.h>
 #include "utf8.h"
 
 #include <cassert>
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 #include <memory>
 #include <unicode/unorm.h>
 #include <unicode/coll.h>
@@ -105,7 +80,11 @@ At some point we need to rewqrite these functions to do all the conversion on th
 
 #include "ustringutil/utfutil.h"
 
+#ifdef WIN32
+typedef UCharIterator	WCharIterator;
+#else
 typedef UTF32Iterator	WCharIterator;
+#endif
 #if __cplusplus >= 201100L
 typedef std::unique_ptr<Collator> unique_ptr_Collator;
 #else
@@ -114,7 +93,7 @@ typedef std::auto_ptr<Collator> unique_ptr_Collator;
 
 #else
 #include <cstring>
-#include "charset/convert.h"
+#include <zarafa/charset/convert.h>
 #endif
 
 #ifdef _DEBUG
@@ -123,7 +102,7 @@ typedef std::auto_ptr<Collator> unique_ptr_Collator;
 static const char THIS_FILE[] = __FILE__;
 #endif
 
-#if !HAVE_ICU
+#ifndef ZCP_USES_ICU
 ECSortKey::ECSortKey(const unsigned char *lpSortData, unsigned int cbSortData)
 	: m_lpSortData(lpSortData)
 	, m_cbSortData(cbSortData)
@@ -170,7 +149,7 @@ const char* str_ifind(const char *haystack, const char *needle)
 
 	while(*haystack) {
 		if (toupper_l(*haystack, loc) == toupper_l(*needlepos, loc)) {
-			needlepos++;
+			++needlepos;
 
 			if(*needlepos == 0)
 				goto exit;
@@ -179,7 +158,7 @@ const char* str_ifind(const char *haystack, const char *needle)
 			needlepos = needle;
 		}
 
-		haystack++;
+		++haystack;
 	}
 	needlestart = NULL;
 
@@ -205,13 +184,17 @@ bool str_equals(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = StringToUnicode(s1);
     UnicodeString b = StringToUnicode(s2);
 
     return a.compare(b) == 0;
 #else
+#ifdef WIN32
+	return strcoll_l(s1, s2, locale) == 0;
+#else
 	return strcmp(s1, s2) == 0;
+#endif	
 #endif
 }
 
@@ -231,13 +214,17 @@ bool str_iequals(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = StringToUnicode(s1);
     UnicodeString b = StringToUnicode(s2);
 
     return a.caseCompare(b, 0) == 0;
 #else
+#ifdef WIN32
+	return stricoll_l(s1, s2, locale) == 0;
+#else
 	return strcasecmp_l(s1, s2, locale) == 0;
+#endif
 #endif
 }
 
@@ -257,7 +244,7 @@ bool str_startswith(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = StringToUnicode(s1);
     UnicodeString b = StringToUnicode(s2);
 
@@ -265,7 +252,11 @@ bool str_startswith(const char *s1, const char *s2, const ECLocale &locale)
 
 #else
 	size_t cb2 = strlen(s2);
+#ifdef WIN32
+	return strlen(s1) >= cb2 ? (strncoll_l(s1, s2, cb2, locale) == 0) : false;
+#else
 	return strlen(s1) >= cb2 ? (strncmp(s1, s2, cb2) == 0) : false;
+#endif
 #endif
 }
 
@@ -285,14 +276,18 @@ bool str_istartswith(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = StringToUnicode(s1);
     UnicodeString b = StringToUnicode(s2);
 
     return a.caseCompare(0, b.length(), b, 0) == 0;
 #else
 	size_t cb2 = strlen(s2);
+#ifdef WIN32
+	return strlen(s1) >= cb2 ? (strnicoll_l(s1, s2, cb2, locale) == 0) : false;
+#else
 	return strlen(s1) >= cb2 ? (strncasecmp_l(s1, s2, cb2, locale) == 0) : false;
+#endif
 #endif
 }
 
@@ -315,7 +310,7 @@ int str_compare(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 	
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 	UErrorCode status = U_ZERO_ERROR;
 	unique_ptr_Collator ptrCollator(Collator::createInstance(locale, status));
 
@@ -324,7 +319,11 @@ int str_compare(const char *s1, const char *s2, const ECLocale &locale)
 
 	return ptrCollator->compare(a,b,status);
 #else
+#ifdef WIN32
+	int r = strcoll_l(s1, s2, locale);
+#else
 	int r = strcmp(s1, s2);
+#endif
 	return (r < 0 ? -1 : (r > 0 ? 1 : 0));
 #endif
 }
@@ -351,7 +350,7 @@ int str_icompare(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 	
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 	UErrorCode status = U_ZERO_ERROR;
 	unique_ptr_Collator ptrCollator(Collator::createInstance(locale, status));
 
@@ -363,7 +362,11 @@ int str_icompare(const char *s1, const char *s2, const ECLocale &locale)
 
 	return ptrCollator->compare(a,b,status);
 #else
+#ifdef WIN32
+	int r = stricoll_l(s1, s2, locale);
+#else
 	int r = strcasecmp_l(s1, s2, locale);
+#endif
 	return (r < 0 ? -1 : (r > 0 ? 1 : 0));
 #endif
 }
@@ -390,13 +393,25 @@ bool str_contains(const char *haystack, const char *needle, const ECLocale &loca
 	assert(haystack);
 	assert(needle);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = StringToUnicode(haystack);
     UnicodeString b = StringToUnicode(needle);
 
     return u_strstr(a.getTerminatedBuffer(), b.getTerminatedBuffer());
 #else
+#ifdef WIN32
+	const size_t cbHaystack = strlen(haystack);
+	const size_t cbNeedle = strlen(needle);
+	const char *lpHay = haystack;
+	while (cbHaystack - (lpHay - haystack) >= cbNeedle) {
+		if (strncoll_l(lpHay, needle, cbNeedle, locale) == 0)
+			return true;
+		++lpHay;
+	}
+	return false;
+#else
 	return strstr(haystack, needle) != NULL;
+#endif
 #endif
 }
 
@@ -416,7 +431,7 @@ bool str_icontains(const char *haystack, const char *needle, const ECLocale &loc
 	assert(haystack);
 	assert(needle);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = StringToUnicode(haystack);
     UnicodeString b = StringToUnicode(needle);
 
@@ -425,7 +440,19 @@ bool str_icontains(const char *haystack, const char *needle, const ECLocale &loc
 
     return u_strstr(a.getTerminatedBuffer(), b.getTerminatedBuffer());
 #else
+#ifdef WIN32
+	const size_t cbHaystack = strlen(haystack);
+	const size_t cbNeedle = strlen(needle);
+	const char *lpHay = haystack;
+	while (cbHaystack - (lpHay - haystack) >= cbNeedle) {
+		if (strnicoll_l(lpHay, needle, cbNeedle, locale) == 0)
+			return true;
+		++lpHay;
+	}
+	return false;
+#else
 	return strcasestr(haystack, needle) != NULL;
+#endif
 #endif
 }
 
@@ -447,13 +474,17 @@ bool wcs_equals(const wchar_t *s1, const wchar_t *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = WCHARToUnicode(s1);
     UnicodeString b = WCHARToUnicode(s2);
 
     return a.compare(b) == 0;
 #else
+#ifdef WIN32
+	return wcscoll_l(s1, s2, locale) == 0;
+#else
 	return wcscmp(s1, s2) == 0;
+#endif
 #endif
 }
 
@@ -473,13 +504,17 @@ bool wcs_iequals(const wchar_t *s1, const wchar_t *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = WCHARToUnicode(s1);
     UnicodeString b = WCHARToUnicode(s2);
 
     return a.caseCompare(b, 0) == 0;
 #else
+#ifdef WIN32
+	return wcsicoll_l(s1, s2, locale) == 0;
+#else
 	return wcscasecmp_l(s1, s2, locale) == 0;
+#endif
 #endif
 }
 
@@ -499,14 +534,18 @@ bool wcs_startswith(const wchar_t *s1, const wchar_t *s2, const ECLocale &locale
 	assert(s1);
 	assert(s2);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = WCHARToUnicode(s1);
     UnicodeString b = WCHARToUnicode(s2);
 
     return a.compare(0, b.length(), b) == 0;
 #else
 	size_t cb2 = wcslen(s2);
+#ifdef WIN32
+	return wcslen(s1) >= cb2 ? (wcsncoll_l(s1, s2, cb2, locale) == 0) : false;
+#else
 	return wcslen(s1) >= cb2 ? (wcsncmp(s1, s2, cb2) == 0) : false;
+#endif
 #endif
 }
 
@@ -526,14 +565,18 @@ bool wcs_istartswith(const wchar_t *s1, const wchar_t *s2, const ECLocale &local
 	assert(s1);
 	assert(s2);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = WCHARToUnicode(s1);
     UnicodeString b = WCHARToUnicode(s2);
 
     return a.caseCompare(0, b.length(), b, 0) == 0;
 #else
 	size_t cb2 = wcslen(s2);
+#ifdef WIN32
+	return wcslen(s1) >= cb2 ? (wcsnicoll_l(s1, s2, cb2, locale) == 0) : false;
+#else
 	return wcslen(s1) >= cb2 ? (wcsncasecmp_l(s1, s2, cb2, locale) == 0) : false;
+#endif
 #endif
 }
 
@@ -556,7 +599,7 @@ int wcs_compare(const wchar_t *s1, const wchar_t *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 	
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 	UErrorCode status = U_ZERO_ERROR;
 	unique_ptr_Collator ptrCollator(Collator::createInstance(locale, status));
 
@@ -565,7 +608,11 @@ int wcs_compare(const wchar_t *s1, const wchar_t *s2, const ECLocale &locale)
 
 	return ptrCollator->compare(a,b,status);
 #else
+#ifdef WIN32
+	int r = wcscoll_l(s1, s2, locale);
+#else
 	int r = wcscmp(s1, s2);
+#endif
 	return (r < 0 ? -1 : (r > 0 ? 1 : 0));
 #endif
 }
@@ -592,7 +639,7 @@ int wcs_icompare(const wchar_t *s1, const wchar_t *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 	
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 	UErrorCode status = U_ZERO_ERROR;
 	unique_ptr_Collator ptrCollator(Collator::createInstance(locale, status));
 
@@ -604,7 +651,11 @@ int wcs_icompare(const wchar_t *s1, const wchar_t *s2, const ECLocale &locale)
 
 	return ptrCollator->compare(a,b,status);
 #else
+#ifdef WIN32
+	int r = wcsicoll_l(s1, s2, locale);
+#else
 	int r = wcscasecmp_l(s1, s2, locale);
+#endif
 	return (r < 0 ? -1 : (r > 0 ? 1 : 0));
 #endif
 }
@@ -631,13 +682,25 @@ bool wcs_contains(const wchar_t *haystack, const wchar_t *needle, const ECLocale
 	assert(haystack);
 	assert(needle);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = WCHARToUnicode(haystack);
     UnicodeString b = WCHARToUnicode(needle);
 
     return u_strstr(a.getTerminatedBuffer(), b.getTerminatedBuffer());
 #else
+#ifdef WIN32
+	const size_t cbHaystack = wcslen(haystack);
+	const size_t cbNeedle = wcslen(needle);
+	const wchar_t *lpHay = haystack;
+	while (cbHaystack - (lpHay - haystack) >= cbNeedle) {
+		if (wcsncoll_l(lpHay, needle, cbNeedle, locale) == 0)
+			return true;
+		++lpHay;
+	}
+	return false;
+#else
 	return wcsstr(haystack, needle) != NULL;
+#endif
 #endif
 }
 
@@ -663,7 +726,7 @@ bool wcs_icontains(const wchar_t *haystack, const wchar_t *needle, const ECLocal
 	assert(haystack);
 	assert(needle);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = WCHARToUnicode(haystack);
     UnicodeString b = WCHARToUnicode(needle);
 
@@ -676,9 +739,13 @@ bool wcs_icontains(const wchar_t *haystack, const wchar_t *needle, const ECLocal
 	const size_t cbNeedle = wcslen(needle);
 	const wchar_t *lpHay = haystack;
 	while (cbHaystack - (lpHay - haystack) >= cbNeedle) {
+#ifdef WIN32
+		if (wcsnicoll_l(lpHay, needle, cbNeedle, locale) == 0)
+#else
 		if (wcsncasecmp_l(lpHay, needle, cbNeedle, locale) == 0)
+#endif
 			return true;
-		lpHay++;
+		++lpHay;
 	}
 	return false;
 #endif
@@ -703,7 +770,7 @@ bool u8_equals(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = UTF8ToUnicode(s1);
     UnicodeString b = UTF8ToUnicode(s2);
 
@@ -732,7 +799,7 @@ bool u8_iequals(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = UTF8ToUnicode(s1);
     UnicodeString b = UTF8ToUnicode(s2);
 
@@ -761,7 +828,7 @@ bool u8_startswith(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = UTF8ToUnicode(s1);
     UnicodeString b = UTF8ToUnicode(s2);
 
@@ -790,7 +857,7 @@ bool u8_istartswith(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = UTF8ToUnicode(s1);
     UnicodeString b = UTF8ToUnicode(s2);
 
@@ -822,7 +889,7 @@ int u8_compare(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 	UErrorCode status = U_ZERO_ERROR;
 	unique_ptr_Collator ptrCollator(Collator::createInstance(locale, status));
 
@@ -860,7 +927,7 @@ int u8_icompare(const char *s1, const char *s2, const ECLocale &locale)
 	assert(s1);
 	assert(s2);
 	
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 	UErrorCode status = U_ZERO_ERROR;
 	unique_ptr_Collator ptrCollator(Collator::createInstance(locale, status));
 
@@ -901,7 +968,7 @@ bool u8_contains(const char *haystack, const char *needle, const ECLocale &local
 	assert(haystack);
 	assert(needle);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = UTF8ToUnicode(haystack);
     UnicodeString b = UTF8ToUnicode(needle);
 
@@ -930,7 +997,7 @@ bool u8_icontains(const char *haystack, const char *needle, const ECLocale &loca
 	assert(haystack);
 	assert(needle);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
     UnicodeString a = UTF8ToUnicode(haystack);
     UnicodeString b = UTF8ToUnicode(needle);
 
@@ -1264,9 +1331,17 @@ static const struct localemap {
 
 ECLocale createLocaleFromName(const char *lpszLocale)
 {
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 	return Locale::createFromName(lpszLocale);
 #else
+#ifdef WIN32
+	ECRESULT er = LocaleIdToLocaleName(lpszLocale, &lpszLocale);
+	if (er != erSuccess)
+		lpszLocale = "";
+
+#endif
+	if (lpszLocale == NULL)
+		lpszLocale = "";
 	// We only need LC_CTYPE and LC_COLLATE, but createlocale doesn't support that
 	return ECLocale(localemask(LC_ALL), lpszLocale);
 #endif
@@ -1274,7 +1349,6 @@ ECLocale createLocaleFromName(const char *lpszLocale)
 
 ECRESULT LocaleIdToLCID(const char *lpszLocaleID, ULONG *lpulLcid)
 {
-	ECRESULT er = erSuccess;
 	const struct localemap *lpMapEntry = NULL;
 
 	ASSERT(lpszLocaleID != NULL);
@@ -1284,20 +1358,14 @@ ECRESULT LocaleIdToLCID(const char *lpszLocaleID, ULONG *lpulLcid)
 		if (stricmp(localeMap[i].lpszLocaleID, lpszLocaleID) == 0)
 			lpMapEntry = &localeMap[i];
 
-	if (!lpMapEntry) {
-		er = ZARAFA_E_NOT_FOUND;
-		goto exit;
-	}
-
+	if (lpMapEntry == NULL)
+		return ZARAFA_E_NOT_FOUND;
 	*lpulLcid = lpMapEntry->ulLCID;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT LCIDToLocaleId(ULONG ulLcid, const char **lppszLocaleID)
 {
-	ECRESULT er = erSuccess;
 	const struct localemap *lpMapEntry = NULL;
 
 	ASSERT(lppszLocaleID != NULL);
@@ -1306,20 +1374,14 @@ ECRESULT LCIDToLocaleId(ULONG ulLcid, const char **lppszLocaleID)
 		if (localeMap[i].ulLCID == ulLcid)
 			lpMapEntry = &localeMap[i];
 
-	if (!lpMapEntry) {
-		er = ZARAFA_E_NOT_FOUND;
-		goto exit;
-	}
-
+	if (lpMapEntry == NULL)
+		return ZARAFA_E_NOT_FOUND;
 	*lppszLocaleID = lpMapEntry->lpszLocaleID;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT LocaleIdToLocaleName(const char *lpszLocaleID, const char **lppszLocaleName)
 {
-	ECRESULT er = erSuccess;
 	const struct localemap *lpMapEntry = NULL;
 
 	ASSERT(lpszLocaleID != NULL);
@@ -1329,18 +1391,13 @@ ECRESULT LocaleIdToLocaleName(const char *lpszLocaleID, const char **lppszLocale
 		if (stricmp(localeMap[i].lpszLocaleID, lpszLocaleID) == 0)
 			lpMapEntry = &localeMap[i];
 
-	if (!lpMapEntry) {
-		er = ZARAFA_E_NOT_FOUND;
-		goto exit;
-	}
-
+	if (lpMapEntry == NULL)
+		return ZARAFA_E_NOT_FOUND;
 	*lppszLocaleName = lpMapEntry->lpszLocaleName;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 /**
  * Create a locale independant blob that can be used to sort
  * strings fast. This is used when a string would be compared
@@ -1415,7 +1472,7 @@ void createSortKeyData(const char *s, int nCap, const ECLocale &locale, unsigned
 	ASSERT(lpcbKey != NULL);
 	ASSERT(lppKey != NULL);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 	createSortKeyData(UnicodeString(s), nCap, locale, lpcbKey, lppKey);
 #else
 	std::wstring wstrTmp = convert_to<std::wstring>(s);
@@ -1439,9 +1496,13 @@ void createSortKeyData(const wchar_t *s, int nCap, const ECLocale &locale, unsig
 	ASSERT(lpcbKey != NULL);
 	ASSERT(lppKey != NULL);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 	UnicodeString ustring;
+#ifdef WIN32
+	ustring = s;
+#else
 	ustring = UTF32ToUnicode((const UChar32*)s);
+#endif
 	createSortKeyData(ustring, nCap, locale, lpcbKey, lppKey);
 #else
 	ASSERT((locale_t)locale != NULL);
@@ -1473,7 +1534,7 @@ void createSortKeyDataFromUTF8(const char *s, int nCap, const ECLocale &locale, 
 	ASSERT(lpcbKey != NULL);
 	ASSERT(lppKey != NULL);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 	createSortKeyData(UTF8ToUnicode(s), nCap, locale, lpcbKey, lppKey);
 #else
 	std::wstring wstrTmp = convert_to<std::wstring>(s, rawsize(s), "UTF-8");
@@ -1497,7 +1558,7 @@ ECSortKey createSortKeyFromUTF8(const char *s, int nCap, const ECLocale &locale)
 {
 	ASSERT(s != NULL);
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 	return createSortKey(UTF8ToUnicode(s), nCap, locale);
 #else
 	unsigned int cbKey = 0;
@@ -1525,7 +1586,7 @@ int compareSortKeys(unsigned int cbKey1, const unsigned char *lpKey1, unsigned i
 	ASSERT(!(cbKey1 != 0 && lpKey1 == NULL));
 	ASSERT(!(cbKey2 != 0 && lpKey2 == NULL));
 
-#if HAVE_ICU
+#ifdef ZCP_USES_ICU
 	CollationKey ckA(lpKey1, cbKey1);
 	CollationKey ckB(lpKey2, cbKey2);
 
@@ -1550,7 +1611,7 @@ int compareSortKeys(unsigned int cbKey1, const unsigned char *lpKey1, unsigned i
 #endif
 }
 
-#if !HAVE_ICU
+#ifndef ZCP_USES_ICU
 ECLocale::ECLocale()
 : m_locale(createlocale(LC_ALL, ""))
 , m_category(LC_ALL)

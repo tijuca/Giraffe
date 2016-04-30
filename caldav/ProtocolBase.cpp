@@ -1,52 +1,26 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ProtocolBase.h"
-#include "stringutil.h"
-#include "CommonUtil.h"
+#include <zarafa/stringutil.h>
+#include <zarafa/CommonUtil.h>
 #include "CalDavUtil.h"
-#include "mapi_ptr.h"
+#include <zarafa/mapi_ptr.h>
 
 using namespace std;
 
@@ -54,6 +28,7 @@ ProtocolBase::ProtocolBase(Http *lpRequest, IMAPISession *lpSession, ECLogger *l
 	m_lpRequest = lpRequest;
 	m_lpSession = lpSession;
 	m_lpLogger  = lpLogger;
+	m_lpLogger->AddRef();
 
 	m_lpUsrFld = NULL;
 	m_lpIPMSubtree = NULL;
@@ -71,8 +46,7 @@ ProtocolBase::ProtocolBase(Http *lpRequest, IMAPISession *lpSession, ECLogger *l
 
 ProtocolBase::~ProtocolBase()
 {
-	if (m_lpNamedProps)
-		MAPIFreeBuffer(m_lpNamedProps);
+	MAPIFreeBuffer(m_lpNamedProps);
 
 	if (m_lpLoginUser)
 		m_lpLoginUser->Release();
@@ -94,6 +68,7 @@ ProtocolBase::~ProtocolBase()
 
 	if (m_lpActiveStore)
 		m_lpActiveStore->Release();
+	m_lpLogger->Release();
 }
 
 /**
@@ -116,7 +91,6 @@ HRESULT ProtocolBase::HrInitializeClass()
 	LPSPropValue lpFldProp = NULL;
 	SPropValuePtr lpEntryID;
 	ULONG ulRes = 0;
-	bool blCreateIFNf = false;
 	bool bIsPublic = false;
 	ULONG ulType = 0;
 	MAPIFolderPtr lpRoot;
@@ -144,10 +118,6 @@ HRESULT ProtocolBase::HrInitializeClass()
 	bIsPublic = m_ulUrlFlag & REQ_PUBLIC;
 	if (m_wstrFldOwner.empty())
 		m_wstrFldOwner = m_wstrUser;
-
-	// we may (try to) create the folder on new ical data writes
-	if ( (!strMethod.compare("PUT")) && (m_ulUrlFlag & SERVICE_ICAL))
-		blCreateIFNf = true;
 
 	hr = m_lpSession->OpenAddressBook(0, NULL, 0, &m_lpAddrBook);
 	if(hr != hrSuccess)
@@ -357,12 +327,8 @@ HRESULT ProtocolBase::HrInitializeClass()
 
 
 exit:
-	if(lpFldProp)
-		MAPIFreeBuffer(lpFldProp);
-
-	if(lpDefaultProp)
-		MAPIFreeBuffer(lpDefaultProp);
-
+	MAPIFreeBuffer(lpFldProp);
+	MAPIFreeBuffer(lpDefaultProp);
 	return hr;
 }
 

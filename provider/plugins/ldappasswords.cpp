@@ -1,48 +1,22 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
-#include "base64.h"
+#include <zarafa/platform.h>
+#include <zarafa/base64.h>
 #include "plugin.h"
 
 #include <openssl/des.h>
@@ -59,7 +33,6 @@
 using namespace std;
 
 
-static const char saltchars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789./";
 static const char b64chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 /** 
@@ -105,42 +78,10 @@ static void b64_encode(char *out, const unsigned char *in, unsigned int len) {
 	out[j++] = 0;
 }
 
-static bool p_rand_get(char *p, int n)
-{
-	int fd = open("/dev/urandom", O_RDONLY);
-	
-	if (fd == -1)
-		return false;
-
-	// handle EINTR
-	while(n > 0)
-	{
-		int rc = read(fd, p, n);
-
-		if (rc == 0)
-			return false;
-
-		if (rc == -1)
-		{
-			if (errno == EINTR)
-				continue;
-
-			return false;
-		}
-
-		p += rc;
-		n -= rc;
-	}
-
-	close(fd);
-
-	return true;
-}
-
 static char *password_encrypt_crypt(const char *data, unsigned int len) {
 	char salt[3];
-	if (!p_rand_get(salt, 2))
-		return NULL;
+	rand_get(salt, 2);
+	salt[2] = '\0';
 
 	char cryptbuf[32];
 	DES_fcrypt(data, salt, cryptbuf);
@@ -204,9 +145,7 @@ static char *password_encrypt_smd5(const char *data, unsigned int len) {
 	char b64_out[MD5_DIGEST_LENGTH * 4 / 3 + 4];
 	char *res;
 
-	if (!p_rand_get((char *)salt, 4))
-		return NULL;
-
+	rand_get(reinterpret_cast<char *>(salt), 4);
 	MD5_Init(&ctx);
 	MD5_Update(&ctx, data, len);
 	MD5_Update(&ctx, salt, 4);
@@ -253,10 +192,8 @@ static char *password_encrypt_ssha(const char *data, unsigned int len, bool bSal
 
 	pwd.assign(data, len);
 	if (bSalted) {
-		if (!p_rand_get((char *)salt, 4))
-			return NULL;
-
-		pwd.append((const char*)salt, 4);
+		rand_get(reinterpret_cast<char *>(salt), sizeof(salt));
+		pwd.append(reinterpret_cast<const char *>(salt), sizeof(salt));
 	}
 
 	SHA1((const unsigned char*)pwd.c_str(), pwd.length(), SHA_out);

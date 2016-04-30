@@ -1,7 +1,7 @@
 %module libcommon
 
 %{
-    #include <platform.h>
+    #include <zarafa/platform.h>
     #include <mapi.h>
     #include <mapidefs.h>
     #include <mapicode.h>
@@ -10,10 +10,15 @@
     #include "HtmlToTextParser.h"
     #include "rtfutil.h"
     #include "favoritesutil.h"
-    #include "Util.h"
-	#include "ECLogger.h"
+    #include <zarafa/Util.h>
+	#include <zarafa/ECLogger.h>
     #include "fileutil.h"
 	#include "IStreamAdapter.h"
+    // FIXME: why cant we get this from typemap_python
+    #if PY_MAJOR_VERSION >= 3
+        #define PyString_AsStringAndSize(value, input, size) \
+                PyBytes_AsStringAndSize(value, input, size)
+    #endif
 %}
 
 %include "wchar.i"
@@ -21,7 +26,7 @@
 %include "cstring.i"
 %include "cwstring.i"
 %include "std_string.i"
-%include "typemap.i"
+%include <zarafa/typemap.i>
 
 class CHtmlToTextParser {
     public:
@@ -65,6 +70,7 @@ class CHtmlToTextParser {
 		goto fail;
 }
 
+bool ConvertFileFromUCS2ToUTF8(const std::string &, const std::string &);
 
 // some common/rtfutil.h functions
 HRESULT HrExtractHTMLFromRTF(std::string lpStrRTFIn, std::string &OUTPUT, ULONG ulCodepage);
@@ -88,13 +94,6 @@ public:
                static ULONG GetBestBody(ULONG cValues, LPSPropValue lpProps, ULONG ulFlags) { return Util::GetBestBody(lpProps, cValues, ulFlags); }
        }
 };
-
-// functions from common/fileutil.h
-%inline %{
-    bool ConvertFileFromUCS2ToUTF8(std::string strSrcFileName, std::string strDstFileName) {
-        return ConvertFileFromUCS2ToUTF8(NULL, strSrcFileName, strDstFileName);
-    }
-%}
 
 %feature("notabstract") IStreamAdapter;
 

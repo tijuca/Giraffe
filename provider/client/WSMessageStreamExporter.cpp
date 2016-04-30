@@ -1,51 +1,25 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "WSMessageStreamExporter.h"
 #include "WSSerializedMessage.h"
 #include "WSTransport.h"
-#include "charset/convert.h"
+#include <zarafa/charset/convert.h>
 #include "WSUtil.h"
 
 #ifdef _DEBUG
@@ -132,36 +106,29 @@ bool WSMessageStreamExporter::IsDone() const
  */
 HRESULT WSMessageStreamExporter::GetSerializedMessage(ULONG ulIndex, WSSerializedMessage **lppSerializedMessage)
 {
-	HRESULT hr = hrSuccess;
 	StreamInfoMap::const_iterator iStreamInfo;
 	WSSerializedMessagePtr ptrMessage;
 
-	if (ulIndex != m_ulExpectedIndex || lppSerializedMessage == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (ulIndex != m_ulExpectedIndex || lppSerializedMessage == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	iStreamInfo = m_mapStreamInfo.find(ulIndex);
 	if (iStreamInfo == m_mapStreamInfo.end()) {
 		++m_ulExpectedIndex;
-		hr = SYNC_E_OBJECT_DELETED;
-		goto exit;
+		return SYNC_E_OBJECT_DELETED;
 	}
 
 	try {
 		ptrMessage.reset(new WSSerializedMessage(m_ptrTransport->m_lpCmd->soap, iStreamInfo->second->id, iStreamInfo->second->cbPropVals, iStreamInfo->second->ptrPropVals.get()));
 	} catch(const std::bad_alloc &) {
-		hr = MAPI_E_NOT_ENOUGH_MEMORY;
-		goto exit;
+		return MAPI_E_NOT_ENOUGH_MEMORY;
 	}
 
 	AddChild(ptrMessage);
 
 	++m_ulExpectedIndex;
 	*lppSerializedMessage = ptrMessage.release();	
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 WSMessageStreamExporter::WSMessageStreamExporter()
@@ -178,6 +145,6 @@ WSMessageStreamExporter::~WSMessageStreamExporter()
 		m_ptrTransport->m_lpCmd->soap->fshutdownsocket(m_ptrTransport->m_lpCmd->soap, m_ptrTransport->m_lpCmd->soap->socket, 0);
 	}
 
-	for (StreamInfoMap::iterator i = m_mapStreamInfo.begin(); i != m_mapStreamInfo.end(); ++i)
+	for (StreamInfoMap::const_iterator i = m_mapStreamInfo.begin(); i != m_mapStreamInfo.end(); ++i)
 		delete i->second;
 }

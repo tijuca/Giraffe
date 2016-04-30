@@ -1,76 +1,52 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 // ECSecurity.cpp: implementation of the ECSecurity class.
 //
 //////////////////////////////////////////////////////////////////////
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
+#ifdef LINUX
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pwd.h>
 #include <dirent.h>
+#endif
 
 #include "ECDatabaseUtils.h"
 #include "ECDatabase.h"
 #include "ECSessionManager.h"
 #include "ECSession.h"
 
-#include "ECDefs.h"
+#include <zarafa/ECDefs.h>
 #include "ECSecurity.h"
 
-#include "stringutil.h"
-#include "Trace.h"
+#include <zarafa/stringutil.h>
+#include <zarafa/Trace.h>
 #include "Zarafa.h"
-#include "md5.h"
+#include <zarafa/md5.h>
 
-#include "ECDefs.h"
+#include <zarafa/ECDefs.h>
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapitags.h>
 
-#include <mapiext.h>
+#include <zarafa/mapiext.h>
 
 #include <cstdarg>
 
@@ -104,12 +80,13 @@ static const char THIS_FILE[] = __FILE__;
  * @param[in] lpLogger log object for normal logging
  * @param[in] lpAudit optional log object for auditing
  */
-ECSecurity::ECSecurity(ECSession *lpSession, ECConfig *lpConfig, ECLogger *lpLogger, ECLogger *lpAudit)
+ECSecurity::ECSecurity(ECSession *lpSession, ECConfig *lpConfig, ECLogger *lpAudit)
 {
 	m_lpSession = lpSession;
 	m_lpConfig = lpConfig;
-	m_lpLogger = lpLogger;
 	m_lpAudit = lpAudit;
+	if (m_lpAudit != NULL)
+		m_lpAudit->AddRef();
 	m_lpGroups = NULL;
 	m_lpViewCompanies = NULL;
 	m_lpAdminCompanies = NULL;
@@ -121,12 +98,11 @@ ECSecurity::ECSecurity(ECSession *lpSession, ECConfig *lpConfig, ECLogger *lpLog
 
 ECSecurity::~ECSecurity()
 {
-	if(m_lpGroups)
-		delete m_lpGroups;
-	if(m_lpViewCompanies)
-		delete m_lpViewCompanies;
-	if(m_lpAdminCompanies)
-		delete m_lpAdminCompanies;
+	delete m_lpGroups;
+	delete m_lpViewCompanies;
+	delete m_lpAdminCompanies;
+	if (m_lpAudit != NULL)
+		m_lpAudit->Release();
 }
 
 /** 
@@ -191,7 +167,8 @@ exit:
 // helper class to remember groups we've seen to break endless loops
 class cUniqueGroup {
 public:
-	bool operator()(const localobjectdetails_t &obj) {
+	bool operator()(const localobjectdetails_t &obj) const
+	{
 		return m_seen.find(obj) != m_seen.end();
 	}
 
@@ -235,7 +212,7 @@ ECRESULT ECSecurity::GetGroupsForUser(unsigned int ulUserId, std::list<localobje
 			cSeenGroups.m_seen.insert(*iterGroups);
 
 			std::list<localobjectdetails_t> *lpGroupInGroups = NULL;
-			std::list<localobjectdetails_t>::iterator li;
+			std::list<localobjectdetails_t>::const_iterator li;
 
 			er = m_lpSession->GetUserManagement()->GetParentObjectsOfObjectAndSync(OBJECTRELATION_GROUP_MEMBER,
 																				   iterGroups->ulId, &lpGroupInGroups, USERMANAGEMENT_IDS_ONLY);
@@ -245,8 +222,7 @@ ECRESULT ECSecurity::GetGroupsForUser(unsigned int ulUserId, std::list<localobje
 				delete lpGroupInGroups;
 			}
 			er = erSuccess;		// Ignore error (eg. cannot use that function on group Everyone)
-
-			iterGroups++;
+			++iterGroups;
 		}
 	}
 
@@ -268,7 +244,7 @@ ECRESULT ECSecurity::GetObjectPermission(unsigned int ulObjId, unsigned int* lpu
 {
 	ECRESULT		er = erSuccess;
 	unsigned int	i = 0;
-	list<localobjectdetails_t>::iterator iterGroups;
+	std::list<localobjectdetails_t>::const_iterator iterGroups;
 	struct rightsArray *lpRights = NULL;
 	unsigned		ulCurObj = ulObjId;
 	bool 			bFoundACL = false;
@@ -285,32 +261,27 @@ ECRESULT ECSecurity::GetObjectPermission(unsigned int ulObjId, unsigned int* lpu
 		if(m_lpSession->GetSessionManager()->GetCacheManager()->GetACLs(ulCurObj, &lpRights) == erSuccess) {
 			// This object has ACL's, check if any of them are for this user
 
-			for(i=0;i<lpRights->__size;i++) {
+			for (i = 0; i < lpRights->__size; ++i)
 				if(lpRights->__ptr[i].ulType == ACCESS_TYPE_GRANT && lpRights->__ptr[i].ulUserid == m_ulUserID) {
 					*lpulRights |= lpRights->__ptr[i].ulRights;
 					bFoundACL = true;
 				}
-			}
 
 			// Check for the company we are in and add the permissions
-			for (i = 0; i < lpRights->__size; i++) {
+			for (i = 0; i < lpRights->__size; ++i)
 				if (lpRights->__ptr[i].ulType == ACCESS_TYPE_GRANT && lpRights->__ptr[i].ulUserid == m_ulCompanyID) {
 					*lpulRights |= lpRights->__ptr[i].ulRights;
 					bFoundACL = true;
 				}
-			}
 
 			// Also check for groups that we are in, and add those permissions
-			if(m_lpGroups || GetGroupsForUser(m_ulUserID, &m_lpGroups) == erSuccess) {
-				for(iterGroups = m_lpGroups->begin(); iterGroups != m_lpGroups->end(); iterGroups++) {
-					for(i=0;i<lpRights->__size;i++) {
+			if(m_lpGroups || GetGroupsForUser(m_ulUserID, &m_lpGroups) == erSuccess)
+				for (iterGroups = m_lpGroups->begin(); iterGroups != m_lpGroups->end(); ++iterGroups)
+					for (i = 0; i < lpRights->__size; ++i)
 						if(lpRights->__ptr[i].ulType == ACCESS_TYPE_GRANT && lpRights->__ptr[i].ulUserid == iterGroups->ulId) {
 							*lpulRights |= lpRights->__ptr[i].ulRights;
 							bFoundACL = true;
 						}
-					}
-				}
-			}
 		}
 
 		if(lpRights)
@@ -335,10 +306,8 @@ ECRESULT ECSecurity::GetObjectPermission(unsigned int ulObjId, unsigned int* lpu
 		// This can really only happen if you have a broken tree in the database, eg a record which has
 		// parent == id. To break out of the loop we limit the depth to 64 which is very deep in practice. This means
 		// that you never have any rights for folders that are more than 64 levels of folders away from their ACL ..
-		ulDepth++;
-		
-		if(ulDepth > MAX_PARENT_LIMIT) {
-			m_lpSession->GetSessionManager()->GetLogger()->Log(EC_LOGLEVEL_FATAL, "Maximum depth reached for object %d, deepest object: %d", ulObjId, ulCurObj);
+		if (++ulDepth > MAX_PARENT_LIMIT) {
+			ec_log_err("Maximum depth reached for object %d, deepest object: %d", ulObjId, ulCurObj);
 			er = erSuccess;
 			goto exit;
 		}
@@ -368,12 +337,7 @@ ECRESULT ECSecurity::HaveObjectPermission(unsigned int ulObjId, unsigned int ulA
 	unsigned int	ulRights = 0;
 
 	GetObjectPermission(ulObjId, &ulRights);
-
-	if((ulRights & ulACLMask) > 0) {
-		return erSuccess;
-	} else {
-		return ZARAFA_E_NO_ACCESS;
-	}
+	return (ulRights & ulACLMask) ? erSuccess : ZARAFA_E_NO_ACCESS;
 }
 
 /** 
@@ -391,16 +355,7 @@ ECRESULT ECSecurity::IsOwner(unsigned int ulObjId)
 	unsigned int	ulOwner = 0;
 
 	er = GetOwner(ulObjId, &ulOwner);
-	if (er != erSuccess || ulOwner != m_ulUserID)
-	{
-		er = ZARAFA_E_NO_ACCESS;
-		goto exit;
-	}
-
-	er = erSuccess;
-
-exit:
-	return er;
+	return er != erSuccess || ulOwner != m_ulUserID ? ZARAFA_E_NO_ACCESS : erSuccess;
 }
 
 /** 
@@ -419,14 +374,7 @@ ECRESULT ECSecurity::GetOwner(unsigned int ulObjId, unsigned int *lpulOwnerId)
 	*lpulOwnerId = 0;
 
 	er = m_lpSession->GetSessionManager()->GetCacheManager()->GetOwner(ulObjId, lpulOwnerId);
-	if (er != erSuccess)
-	{
-		er = ZARAFA_E_NOT_FOUND;
-		goto exit;
-	}
-
-exit:
-	return er;
+	return er != erSuccess ? ZARAFA_E_NOT_FOUND : er;
 }
 
 /** 
@@ -457,7 +405,7 @@ ECRESULT ECSecurity::CheckDeletedParent(unsigned int ulId)
 		}
 
 		ulId = ulParentObjId;
-		ulDepth++;
+		++ulDepth;
 	} while (ulObjType != MAPI_STORE && ulParentObjId != CACHE_NO_PARENT && ulDepth <= MAX_PARENT_LIMIT);
 
 	// return error when max depth is reached, so we don't create folders and messages deeper than the limit
@@ -709,13 +657,12 @@ ECRESULT ECSecurity::GetRights(unsigned int objid, int ulType, struct rightsArra
 		lpsRightsArray->__size = ulCount;
 
 		memset(lpsRightsArray->__ptr, 0, sizeof(struct rights) * ulCount);
-
-		for(i=0; i < ulCount; i++){
+		for (i = 0; i < ulCount; ++i) {
 			lpDBRow = lpDatabase->FetchRow(lpDBResult);
 
 			if(lpDBRow == NULL) {
 				er = ZARAFA_E_DATABASE_ERROR;
-				m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECSecurity::GetRights(): row is null");
+				ec_log_err("ECSecurity::GetRights(): row is null");
 				goto exit;
 			}
 
@@ -787,8 +734,7 @@ ECRESULT ECSecurity::SetRights(unsigned int objid, struct rightsArray *lpsRights
 	// Invalidate cache for this object
 	m_lpSession->GetSessionManager()->GetCacheManager()->Update(fnevObjectModified, objid);
 
-	for(i=0; i< lpsRightsArray->__size; i++)
-	{
+	for (i = 0; i< lpsRightsArray->__size; ++i) {
 		// FIXME: check for each object if it belongs to the store we're logged into (except for admin)
 
 		// Get the correct local id
@@ -820,7 +766,7 @@ ECRESULT ECSecurity::SetRights(unsigned int objid, struct rightsArray *lpsRights
 			sDetails.GetClass() != ACTIVE_USER &&
 			sDetails.GetClass() != DISTLIST_SECURITY &&
 			sDetails.GetClass() != CONTAINER_COMPANY) {
-				ulErrors++;
+				++ulErrors;
 				continue;
 		}
 
@@ -923,7 +869,7 @@ ECRESULT ECSecurity::GetUserCompany(unsigned int *lpulCompanyId)
 ECRESULT ECSecurity::GetViewableCompanyIds(unsigned int ulFlags, list<localobjectdetails_t> **lppObjects)
 {
 	ECRESULT er = erSuccess;
-	list<localobjectdetails_t>::iterator iter;
+	std::list<localobjectdetails_t>::const_iterator iter;
 
 	/*
 	 * We have the viewable companies stored in our cache,
@@ -944,7 +890,8 @@ ECRESULT ECSecurity::GetViewableCompanyIds(unsigned int ulFlags, list<localobjec
 	 * too many entries in the list. We need to filter those out now.
 	 */
 	*lppObjects = new list<localobjectdetails_t>();
-	for (iter = m_lpViewCompanies->begin(); iter != m_lpViewCompanies->end(); iter++) {
+	for (iter = m_lpViewCompanies->begin();
+	     iter != m_lpViewCompanies->end(); ++iter) {
 		if ((m_ulUserID != 0) &&
 			(ulFlags & USERMANAGEMENT_ADDRESSBOOK) &&
 			iter->GetPropBool(OB_PROP_B_AB_HIDDEN))
@@ -972,7 +919,7 @@ exit:
 ECRESULT ECSecurity::IsUserObjectVisible(unsigned int ulUserObjectId)
 {
 	ECRESULT er = erSuccess;
-	list<localobjectdetails_t>::iterator iterCompany;
+	std::list<localobjectdetails_t>::const_iterator iterCompany;
 	objectid_t sExternId;
 	unsigned int ulCompanyId;
 
@@ -999,13 +946,12 @@ ECRESULT ECSecurity::IsUserObjectVisible(unsigned int ulUserObjectId)
 		if (er != erSuccess)
 			goto exit;
 	}
-
-	for (iterCompany = m_lpViewCompanies->begin(); iterCompany != m_lpViewCompanies->end(); iterCompany++) {
+	for (iterCompany = m_lpViewCompanies->begin();
+	     iterCompany != m_lpViewCompanies->end(); ++iterCompany)
 		if (iterCompany->ulId == ulCompanyId) {
 			er = erSuccess;
 			goto exit;
 		}
-	}
 
 	/* Item was not found */
 	er = ZARAFA_E_NOT_FOUND;
@@ -1068,7 +1014,7 @@ ECRESULT ECSecurity::GetViewableCompanies(unsigned int ulFlags, list<localobject
 	*lppObjects = lpObjects;
 
 exit:
-	if (er != erSuccess && lpObjects)
+	if (er != erSuccess)
 		delete lpObjects;
 
 	return er;
@@ -1102,17 +1048,17 @@ ECRESULT ECSecurity::GetAdminCompanies(unsigned int ulFlags, list<localobjectdet
 	for (iterObjects = lpObjects->begin(); iterObjects != lpObjects->end(); ) {
 		if (IsUserObjectVisible(iterObjects->ulId) != erSuccess) {
 			iterObjectsRemove = iterObjects;
-			iterObjects++;
+			++iterObjects;
 			lpObjects->erase(iterObjectsRemove);
 		} else {
-			iterObjects++;
+			++iterObjects;
 		}
 	}
 
 	*lppObjects = lpObjects;
 
 exit:
-	if (er != erSuccess && lpObjects)
+	if (er != erSuccess)
 		delete lpObjects;
 
 	return er;
@@ -1234,7 +1180,7 @@ exit:
 ECRESULT ECSecurity::IsAdminOverUserObject(unsigned int ulUserObjectId)
 {
 	ECRESULT er = ZARAFA_E_NO_ACCESS;
-	list<localobjectdetails_t>::iterator objectIter;
+	std::list<localobjectdetails_t>::const_iterator objectIter;
 	unsigned int ulCompanyId;
 	objectdetails_t objectdetails;
 	objectid_t sExternId;
@@ -1282,13 +1228,12 @@ ECRESULT ECSecurity::IsAdminOverUserObject(unsigned int ulUserObjectId)
 		if (er != erSuccess)
 			goto exit;
 	}
-
-	for (objectIter = m_lpAdminCompanies->begin(); objectIter != m_lpAdminCompanies->end(); objectIter++) {
+	for (objectIter = m_lpAdminCompanies->begin();
+	     objectIter != m_lpAdminCompanies->end(); ++objectIter)
 		if (objectIter->ulId == ulCompanyId) {
 			er = erSuccess;
 			goto exit;
 		}
-	}
 
 	/* Item was not found, so no access */
 	er = ZARAFA_E_NO_ACCESS;
@@ -1364,7 +1309,7 @@ ECRESULT ECSecurity::GetStoreSize(unsigned int ulObjId, long long* lpllStoreSize
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if(lpDBRow == NULL || lpDBRow[0] == NULL) {
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECSecurity::GetStoreSize(): row is null");
+		ec_log_err("ECSecurity::GetStoreSize(): row is null");
 		goto exit;
 	}
 
@@ -1420,7 +1365,7 @@ ECRESULT ECSecurity::GetUserSize(unsigned int ulUserId, long long* lpllUserSize)
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if (lpDBRow == NULL) {
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECSecurity::GetUserSize(): row is null");
+		ec_log_err("ECSecurity::GetUserSize(): row is null");
 		goto exit;
 	}
 
@@ -1648,7 +1593,8 @@ unsigned int ECSecurity::GetObjectSize()
 	
 
 	if (m_lpGroups) {
-		for (iter = m_lpGroups->begin(), ulItems = 0; iter != m_lpGroups->end(); iter++, ulItems++) 
+		for (iter = m_lpGroups->begin(), ulItems = 0;
+		     iter != m_lpGroups->end(); ++iter, ++ulItems)
 			ulSize += iter->GetObjectSize();
 
 		ulSize += MEMORY_USAGE_LIST(ulItems, list<localobjectdetails_t>);
@@ -1656,7 +1602,8 @@ unsigned int ECSecurity::GetObjectSize()
 
 	if (m_lpViewCompanies)
 	{
-		for (iter = m_lpViewCompanies->begin(), ulItems = 0; iter != m_lpViewCompanies->end(); iter++, ulItems++)
+		for (iter = m_lpViewCompanies->begin(), ulItems = 0;
+		     iter != m_lpViewCompanies->end(); ++iter, ++ulItems)
 			ulSize += iter->GetObjectSize();
 
 		ulSize += MEMORY_USAGE_LIST(ulItems, list<localobjectdetails_t>);
@@ -1664,7 +1611,8 @@ unsigned int ECSecurity::GetObjectSize()
 
 	if (m_lpAdminCompanies)
 	{
-		for (iter = m_lpAdminCompanies->begin(), ulItems = 0; iter != m_lpAdminCompanies->end(); iter++, ulItems++)
+		for (iter = m_lpAdminCompanies->begin(), ulItems = 0;
+		     iter != m_lpAdminCompanies->end(); ++iter, ++ulItems)
 			ulSize += iter->GetObjectSize();
 
 		ulSize += MEMORY_USAGE_LIST(ulItems, list<localobjectdetails_t>);

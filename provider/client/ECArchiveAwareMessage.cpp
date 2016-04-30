@@ -1,65 +1,42 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ECArchiveAwareMsgStore.h"
 #include "ECArchiveAwareAttach.h"
-#include "ECGuid.h"
-#include "edkguid.h"
-#include "mapi_ptr.h"
+#include <zarafa/ECGuid.h>
+#include <edkguid.h>
+#include <zarafa/mapi_ptr.h>
 #include "IECPropStorage.h"
 #include "Mem.h"
 
-#include <mapiext.h>
-#include "mapiguidext.h"
+#include <zarafa/mapiext.h>
+#include <zarafa/mapiguidext.h>
 #include "ECArchiveAwareMessage.h"
-#include "ECGetText.h"
-#include "stringutil.h"
+#include <zarafa/ECGetText.h>
+#include <zarafa/stringutil.h>
 
 #include <sstream>
-#include "ECDebug.h"
-#include "charset/convert.h"
+#include <zarafa/ECDebug.h>
+#include <zarafa/charset/convert.h>
 
+#ifdef HAVE_OFFLINE_SUPPORT
+#include "ECOfflineState.h"
+#endif
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -84,20 +61,14 @@ private:
 
 HRESULT ECArchiveAwareMessageFactory::Create(ECMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFlags, BOOL bEmbedded, ECMAPIProp* lpRoot, ECMessage **lppMessage) const
 {
-	HRESULT hr = hrSuccess;
 	ECArchiveAwareMsgStore *lpArchiveAwareStore = dynamic_cast<ECArchiveAwareMsgStore*>(lpMsgStore);
 
 	// New and embedded messages don't need to be archive aware. Also if the calling store
 	// is not archive aware, the message won't.
-	if (fNew || bEmbedded || lpArchiveAwareStore == NULL) {
-		hr = ECMessage::Create(lpMsgStore, fNew, fModify, ulFlags, bEmbedded, lpRoot, lppMessage);
-		goto exit;
-	}
+	if (fNew || bEmbedded || lpArchiveAwareStore == NULL)
+		return ECMessage::Create(lpMsgStore, fNew, fModify, ulFlags, bEmbedded, lpRoot, lppMessage);
 
-	hr = ECArchiveAwareMessage::Create(lpArchiveAwareStore, FALSE, fModify, ulFlags, lppMessage);
-
-exit:
-	return hr;
+	return ECArchiveAwareMessage::Create(lpArchiveAwareStore, FALSE, fModify, ulFlags, lppMessage);
 }
 
 
@@ -118,14 +89,8 @@ ECArchiveAwareMessage::~ECArchiveAwareMessage()
 
 HRESULT	ECArchiveAwareMessage::Create(ECArchiveAwareMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFlags, ECMessage **lppMessage)
 {
-	HRESULT hr = hrSuccess;
-	ECArchiveAwareMessage *lpMessage = NULL;
-
-	lpMessage = new ECArchiveAwareMessage(lpMsgStore, fNew, fModify, ulFlags);
-
-	hr = lpMessage->QueryInterface(IID_ECMessage, (void **)lppMessage);
-
-	return hr;
+	ECArchiveAwareMessage *lpMessage = new ECArchiveAwareMessage(lpMsgStore, fNew, fModify, ulFlags);
+	return lpMessage->QueryInterface(IID_ECMessage, reinterpret_cast<void **>(lppMessage));
 }
 
 HRESULT ECArchiveAwareMessage::HrLoadProps()
@@ -141,11 +106,21 @@ HRESULT ECArchiveAwareMessage::HrLoadProps()
 	if (m_mode == MODE_STUBBED) {
 		const BOOL fModifyCopy = this->fModify;
 		ECMsgStore *lpMsgStore = GetMsgStore();
+#ifdef HAVE_OFFLINE_SUPPORT
+		ECOfflineState::OFFLINESTATE state;
+#endif
 
 		// @todo: Put in MergePropsFromStub
 		SizedSPropTagArray(4, sptaDeleteProps) = {4, {PR_RTF_COMPRESSED, PR_BODY, PR_HTML, PR_ICON_INDEX}};
 		SizedSPropTagArray(6, sptaRestoreProps) = {6, {PR_RTF_COMPRESSED, PR_BODY, PR_HTML, PR_ICON_INDEX, PR_MESSAGE_CLASS, PR_MESSAGE_SIZE}};
 
+#ifdef HAVE_OFFLINE_SUPPORT
+		// Check if we're allowing online logons
+		if (ECOfflineState::GetOfflineState(lpMsgStore->GetProfileName(), &state) == hrSuccess && state == ECOfflineState::OFFLINESTATE_OFFLINE) {
+			hr = CreateInfoMessage((LPSPropTagArray)&sptaDeleteProps, CreateOfflineWarnBodyUtf8());
+			goto exit;
+		}
+#endif
 
 		if (!m_ptrArchiveMsg) {
 			ECArchiveAwareMsgStore *lpStore = dynamic_cast<ECArchiveAwareMsgStore*>(lpMsgStore);
@@ -207,7 +182,7 @@ exit:
 
 HRESULT	ECArchiveAwareMessage::HrSetRealProp(SPropValue *lpsPropValue)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	if (m_bLoading) {
 		/*
@@ -225,7 +200,7 @@ HRESULT	ECArchiveAwareMessage::HrSetRealProp(SPropValue *lpsPropValue)
 			if (!m_bNamedPropsMapped) {
 				hr = MapNamedProps();
 				if (hr != hrSuccess)
-					goto exit;
+					return hr;
 			}
 
 			// Check the various props.
@@ -238,7 +213,7 @@ HRESULT	ECArchiveAwareMessage::HrSetRealProp(SPropValue *lpsPropValue)
 				if (hr == hrSuccess)
 					hr = Util::HrCopyProperty(m_ptrStoreEntryIDs, lpsPropValue, m_ptrStoreEntryIDs);
 				if (hr != hrSuccess)
-					goto exit;
+					return hr;
 			}
 
 			else if (lpsPropValue->ulPropTag == PROP_ARCHIVE_ITEM_ENTRYIDS) {
@@ -250,7 +225,7 @@ HRESULT	ECArchiveAwareMessage::HrSetRealProp(SPropValue *lpsPropValue)
 				if (hr == hrSuccess)
 					hr = Util::HrCopyProperty(m_ptrItemEntryIDs, lpsPropValue, m_ptrItemEntryIDs);
 				if (hr != hrSuccess)
-					goto exit;
+					return hr;
 			}
 
 			else if (lpsPropValue->ulPropTag == PROP_STUBBED) {
@@ -277,8 +252,6 @@ HRESULT	ECArchiveAwareMessage::HrSetRealProp(SPropValue *lpsPropValue)
 		 */
 		m_bChanged = true;
 	}
-
-exit:
 	return hr;
 }
 
@@ -374,24 +347,22 @@ HRESULT ECArchiveAwareMessage::ModifyRecipients(ULONG ulFlags, LPADRLIST lpMods)
 
 HRESULT ECArchiveAwareMessage::SaveChanges(ULONG ulFlags)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	SizedSPropTagArray(1, sptaStubbedProp) = {1, {PROP_STUBBED}};
 
-	if (!fModify) {
-		hr = MAPI_E_NO_ACCESS;
-		goto exit;
-	}
+	if (!fModify)
+		return MAPI_E_NO_ACCESS;
 
 	// We can't use this->lstProps here since that would suggest things have changed because we might have
 	// destubbed ourselves, which is a change from the object model point of view.
 	if (!m_bChanged)
-		goto exit;
+		return hrSuccess;
 
 	// From here on we're no longer stubbed.
 	if (m_bNamedPropsMapped) {
 		hr = DeleteProps((LPSPropTagArray)&sptaStubbedProp, NULL);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 
 	if (m_mode == MODE_STUBBED || m_mode == MODE_ARCHIVED) {
@@ -402,17 +373,11 @@ HRESULT ECArchiveAwareMessage::SaveChanges(ULONG ulFlags)
 
 		hr = SetProps(1, &propDirty, NULL);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		m_mode = MODE_DIRTY;	// We have an archived version that's now out of sync.
 	}
-
-	hr = ECMessage::SaveChanges(ulFlags);
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-	return hr;
+	return ECMessage::SaveChanges(ulFlags);
 }
 
 HRESULT ECArchiveAwareMessage::SetPropHandler(ULONG ulPropTag, void* /*lpProvider*/, LPSPropValue lpsPropValue, void *lpParam)
@@ -426,6 +391,7 @@ HRESULT ECArchiveAwareMessage::SetPropHandler(ULONG ulPropTag, void* /*lpProvide
 			hr = lpMessage->ECMessage::HrSetRealProp(lpsPropValue);	// Don't call our own overridden HrSetRealProp
 		else
 			hr = MAPI_E_COMPUTED;
+		break;
 	default:
 		hr = MAPI_E_NOT_FOUND;
 		break;

@@ -1,57 +1,32 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
+#include <new>
 #include "m4l.mapidefs.h"
 #include "m4l.mapix.h"
 #include "m4l.debug.h"
 #include "m4l.mapiutil.h"
 
-#include "ECDebug.h"
-#include "Util.h"
-#include "ECMemTable.h"
-#include "charset/convert.h"
-#include "ustringutil.h"
+#include <zarafa/ECDebug.h>
+#include <zarafa/Util.h>
+#include <zarafa/ECMemTable.h>
+#include <zarafa/charset/convert.h>
+#include <zarafa/ustringutil.h>
 
 #include <mapi.h>
 #include <mapicode.h>
@@ -59,8 +34,8 @@
 #include <mapix.h>
 #include <mapiutil.h>
 
-#include "ECConfig.h"
-#include "CommonUtil.h"
+#include <zarafa/ECConfig.h>
+#include <zarafa/CommonUtil.h>
 
 #include <set>
 
@@ -72,10 +47,9 @@ M4LMAPIProp::M4LMAPIProp() {
 }
 
 M4LMAPIProp::~M4LMAPIProp() {
-	list<LPSPropValue>::iterator i;
-	for(i = properties.begin(); i != properties.end(); i++) {
+	std::list<LPSPropValue>::const_iterator i;
+	for (i = properties.begin(); i != properties.end(); ++i)
 		MAPIFreeBuffer(*i);
-	}
 	properties.clear();
 }
 
@@ -109,15 +83,15 @@ HRESULT M4LMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULO
 		if (hr != hrSuccess)
 			goto exit;
 
-		for (c = 0, i = properties.begin(); i != properties.end(); i++, c++) {
+		for (c = 0, i = properties.begin(); i != properties.end(); ++i, ++c) {
 			// perform unicode conversion if required
-			if ((ulFlags & MAPI_UNICODE) && (PROP_TYPE((*i)->ulPropTag) == PT_STRING8)) {
+			if ((ulFlags & MAPI_UNICODE) && PROP_TYPE((*i)->ulPropTag) == PT_STRING8) {
 				sConvert.ulPropTag = CHANGE_PROP_TYPE((*i)->ulPropTag, PT_UNICODE);
 				unicode = converter.convert_to<wstring>((*i)->Value.lpszA);
 				sConvert.Value.lpszW = (WCHAR*)unicode.c_str();
 
 				lpCopy = &sConvert;
-			} else if (((ulFlags & MAPI_UNICODE) == 0) && (PROP_TYPE((*i)->ulPropTag) == PT_UNICODE)) {
+			} else if ((ulFlags & MAPI_UNICODE) == 0 && PROP_TYPE((*i)->ulPropTag) == PT_UNICODE) {
 				sConvert.ulPropTag = CHANGE_PROP_TYPE((*i)->ulPropTag, PT_STRING8);
 				ansi = converter.convert_to<string>((*i)->Value.lpszW);
 				sConvert.Value.lpszA = (char*)ansi.c_str();
@@ -136,8 +110,8 @@ HRESULT M4LMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULO
 		if (hr != hrSuccess)
 			goto exit;
 
-		for (c = 0; c < lpPropTagArray->cValues; c++) {
-			for (i = properties.begin(); i != properties.end(); i++) {
+		for (c = 0; c < lpPropTagArray->cValues; ++c) {
+			for (i = properties.begin(); i != properties.end(); ++i) {
 				if (PROP_ID((*i)->ulPropTag) == PROP_ID(lpPropTagArray->aulPropTag[c])) {
 					// perform unicode conversion if required
 					if (PROP_TYPE((*i)->ulPropTag) == PT_STRING8 && 
@@ -172,7 +146,7 @@ HRESULT M4LMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULO
 						hr = MAPIAllocateMore((*i)->Value.MVszA.cValues * sizeof(WCHAR*), props, (void**)&sConvert.Value.MVszW.lppszW);
 						if (hr != hrSuccess)
 							goto exit;
-						for (ULONG c = 0; c < (*i)->Value.MVszA.cValues; c++) {
+						for (ULONG c = 0; c < (*i)->Value.MVszA.cValues; ++c) {
 							unicode = converter.convert_to<wstring>((*i)->Value.MVszA.lppszA[c]);
 							hr = MAPIAllocateMore(unicode.length() * sizeof(WCHAR) + sizeof(WCHAR), props, (void**)&sConvert.Value.MVszW.lppszW[c]);
 							if (hr != hrSuccess)
@@ -192,7 +166,7 @@ HRESULT M4LMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULO
 						hr = MAPIAllocateMore((*i)->Value.MVszW.cValues * sizeof(char*), props, (void**)&sConvert.Value.MVszA.lppszA);
 						if (hr != hrSuccess)
 							goto exit;
-						for (ULONG c = 0; c < (*i)->Value.MVszW.cValues; c++) {
+						for (ULONG c = 0; c < (*i)->Value.MVszW.cValues; ++c) {
 							ansi = converter.convert_to<string>((*i)->Value.MVszW.lppszW[c]);
 							hr = MAPIAllocateMore(ansi.length() + 1, props, (void**)&sConvert.Value.MVszA.lppszA[c]);
 							if (hr != hrSuccess)
@@ -227,7 +201,7 @@ HRESULT M4LMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULO
 	*lppPropArray = props;
 
 exit:
-	if (FAILED(hr) && props)
+	if (FAILED(hr))
 		MAPIFreeBuffer(props);
 
 	TRACE_MAPILIB2(TRACE_RETURN, "IMAPIProp::GetProps", "%s\n%s", GetMAPIErrorDescription(hr).c_str(), PropNameFromPropArray(*lpcValues, *lppPropArray).c_str());
@@ -259,7 +233,7 @@ HRESULT M4LMAPIProp::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropPr
 		goto exit;
 	}
 
-	for (c=0; c<cValues; c++) {
+	for (c = 0; c < cValues; ++c) {
 		// TODO: return MAPI_E_INVALID_PARAMETER, if multivalued property in 
 		//       the array and its cValues member is set to zero.		
 		if (PROP_TYPE(lpPropArray[c].ulPropTag) == PT_OBJECT) {
@@ -269,7 +243,7 @@ HRESULT M4LMAPIProp::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropPr
 	}
 
     // remove possible old properties
-	for (c=0; c<cValues; c++) {
+	for (c = 0; c < cValues; ++c) {
 		for(i = properties.begin(); i != properties.end(); ) {
 			if ( PROP_ID((*i)->ulPropTag) == PROP_ID(lpPropArray[c].ulPropTag) && 
 				(*i)->ulPropTag != PR_NULL && 
@@ -280,13 +254,13 @@ HRESULT M4LMAPIProp::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropPr
 				properties.erase(del);
 				break;
 			} else {
-				i++;
+				++i;
 			}
 		}
 	}
 
     // set new properties
-	for (c=0; c<cValues; c++) {
+	for (c = 0; c < cValues; ++c) {
 		// Ignore PR_NULL property tag and all properties with a type of PT_ERROR
 		if(PROP_TYPE(lpPropArray[c].ulPropTag) == PT_ERROR || 
 			lpPropArray[c].ulPropTag == PR_NULL)
@@ -316,8 +290,8 @@ HRESULT M4LMAPIProp::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemA
 	HRESULT hr = hrSuccess;
 	list<LPSPropValue>::iterator i;
 
-	for (ULONG c = 0; c < lpPropTagArray->cValues; c++) {
-		for (i = properties.begin(); i != properties.end(); i++) {
+	for (ULONG c = 0; c < lpPropTagArray->cValues; ++c) {
+		for (i = properties.begin(); i != properties.end(); ++i) {
 			// @todo check PT_STRING8 vs PT_UNICODE
 			if ((*i)->ulPropTag == lpPropTagArray->aulPropTag[c] ||
 				(PROP_TYPE((*i)->ulPropTag) == PT_UNSPECIFIED && PROP_ID((*i)->ulPropTag) == PROP_ID(lpPropTagArray->aulPropTag[c])) )
@@ -371,7 +345,7 @@ ULONG M4LMAPIProp::Release() {
 HRESULT M4LMAPIProp::QueryInterface(REFIID refiid, void **lpvoid) {
 	TRACE_MAPILIB(TRACE_ENTRY, "IMAPIProp::QueryInterface", "");
 	HRESULT hr = hrSuccess;
-	if ((refiid == IID_IMAPIProp) || (refiid == IID_IUnknown)) {
+	if (refiid == IID_IMAPIProp || refiid == IID_IUnknown) {
 		AddRef();
 		*lpvoid = (IMAPIProp *)this;
 		hr = hrSuccess;
@@ -442,8 +416,38 @@ HRESULT M4LProfSect::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfa
 HRESULT M4LProfSect::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray* lppProblems) {
 	HRESULT hr = hrSuccess;
 
+#ifdef WIN32
+	ULONG ulcTmpValues = 0;
+	LPSPropValue lpTmpProps = NULL; 
+	LPSPropValue lpDisplayname = NULL;
+	LPSPropValue lpServer = NULL;
+	LPSPropValue lpUsername = NULL;
+
+	if (bGlobalProf) { 
+		lpServer = PpropFindProp(lpPropArray, cValues, PR_PROFILE_HOME_SERVER); 
+		lpUsername = PpropFindProp(lpPropArray, cValues, PR_PROFILE_USER);
+		lpDisplayname = PpropFindProp(lpPropArray, cValues, PR_DISPLAY_NAME);
+
+		if (lpServer && lpUsername) 
+		{
+			hr = GetConnectionProperties(lpServer, lpUsername, &ulcTmpValues, &lpTmpProps); 
+			if (hr != hrSuccess) 
+				goto exit;
+
+			cValues = ulcTmpValues; 
+			lpPropArray = lpTmpProps;
+		}
+
+		if (lpDisplayname)
+			M4LMAPIProp::SetProps(1, lpDisplayname, NULL); //ignore errors
+	}
+#endif
 	hr = M4LMAPIProp::SetProps(cValues, lpPropArray, lppProblems);
 
+#ifdef WIN32
+exit:
+	MAPIFreeBuffer(lpTmpProps);
+#endif
 
 	return hr;
 }
@@ -483,7 +487,7 @@ HRESULT M4LProfSect::QueryInterface(REFIID refiid, void **lpvoid) {
 	TRACE_MAPILIB(TRACE_ENTRY, "M4LProfSect::QueryInterface", "");
 	HRESULT hr = hrSuccess;
 
-	if ((refiid == IID_IProfSect) || (refiid == IID_IMAPIProp) || (refiid == IID_IUnknown)) {
+	if (refiid == IID_IProfSect || refiid == IID_IMAPIProp || refiid == IID_IUnknown) {
 		AddRef();
 		*lpvoid = (IProfSect *)this;
 		hr = hrSuccess;
@@ -655,7 +659,7 @@ HRESULT M4LMAPITable::QueryInterface(REFIID refiid, void **lpvoid) {
 	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPITable::QueryInterface", "");
 	HRESULT hr = hrSuccess;
 
-	if ((refiid == IID_IMAPITable) || (refiid == IID_IUnknown)) {
+	if (refiid == IID_IMAPITable || refiid == IID_IUnknown) {
 		AddRef();
 		*lpvoid = (IMAPITable *)this;
 		hr = hrSuccess;
@@ -678,8 +682,7 @@ M4LProviderAdmin::M4LProviderAdmin(M4LMsgServiceAdmin* new_msa, char *szService)
 }
 
 M4LProviderAdmin::~M4LProviderAdmin() {
-	if(szService)
-		free(szService);
+	free(szService);
 }
 
 HRESULT M4LProviderAdmin::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR* lppMAPIError) {
@@ -692,7 +695,7 @@ HRESULT M4LProviderAdmin::GetProviderTable(ULONG ulFlags, LPMAPITABLE* lppTable)
 	HRESULT hr = hrSuccess;
 	ULONG cValues = 0;
 	LPSPropValue lpsProps = NULL;
-	list<providerEntry *>::iterator i;
+	list<providerEntry *>::const_iterator i;
 	ECMemTable *lpTable = NULL;
 	ECMemTableView *lpTableView = NULL;
 	LPSPropValue lpDest = NULL;
@@ -714,7 +717,7 @@ HRESULT M4LProviderAdmin::GetProviderTable(ULONG ulFlags, LPMAPITABLE* lppTable)
 		goto exit;
 	
 	// Loop through all providers, add each to the table
-	for(i=msa->providers.begin(); i != msa->providers.end(); i++) {
+	for (i = msa->providers.begin(); i != msa->providers.end(); ++i) {
 		if(szService) {
 			if(strcmp(szService, (*i)->servicename.c_str()) != 0)
 				continue;
@@ -747,22 +750,14 @@ HRESULT M4LProviderAdmin::GetProviderTable(ULONG ulFlags, LPMAPITABLE* lppTable)
 	
 exit:
 	pthread_mutex_unlock(&msa->m_mutexserviceadmin);
-
-	if (lpPropTagArray)
-		MAPIFreeBuffer(lpPropTagArray);
-
+	MAPIFreeBuffer(lpPropTagArray);
 	if (lpTableView)
 		lpTableView->Release();
 
 	if (lpTable)
 		lpTable->Release();
-
-	if (lpDest)
-		MAPIFreeBuffer(lpDest);
-	
-	if (lpsProps)
-		MAPIFreeBuffer(lpsProps);
-	
+	MAPIFreeBuffer(lpDest);
+	MAPIFreeBuffer(lpsProps);
 	TRACE_MAPILIB1(TRACE_RETURN, "M4LProviderAdmin::GetProviderTable", "0x%08x", hr);
 	return hr;
 }
@@ -814,7 +809,7 @@ HRESULT M4LProviderAdmin::CreateProvider(LPTSTR lpszProvider, ULONG cValues, LPS
 
 	entry = new providerEntry;
 
-	entry->profilesection = new M4LProfSect();
+	entry->profilesection = new(std::nothrow) M4LProfSect();
 	if(!entry->profilesection) {
 		delete entry;
 		entry = NULL;
@@ -849,34 +844,34 @@ HRESULT M4LProviderAdmin::CreateProvider(LPTSTR lpszProvider, ULONG cValues, LPS
 	sProps[nProps].ulPropTag = PR_INSTANCE_KEY;
 	sProps[nProps].Value.bin.lpb = (BYTE *)&entry->uid;
 	sProps[nProps].Value.bin.cb = sizeof(GUID);
-	nProps++;
+	++nProps;
 
 	sProps[nProps].ulPropTag = PR_PROVIDER_UID;
 	sProps[nProps].Value.bin.lpb = (BYTE *)&entry->uid;
 	sProps[nProps].Value.bin.cb = sizeof(GUID);
-	nProps++;
+	++nProps;
 
 	lpResource = PpropFindProp(lpProviderProps, cProviderProps, PR_RESOURCE_TYPE);
 	if (!lpResource || lpResource->Value.ul == MAPI_STORE_PROVIDER) {
 		sProps[nProps].ulPropTag = PR_OBJECT_TYPE;
 		sProps[nProps].Value.ul = MAPI_STORE;
-		nProps++;
+		++nProps;
 
 		lpResource = PpropFindProp(lpProviderProps, cProviderProps, PR_RESOURCE_FLAGS);
 
 		sProps[nProps].ulPropTag = PR_DEFAULT_STORE;
 		sProps[nProps].Value.b = (lpResource && (lpResource->Value.ul & STATUS_DEFAULT_STORE) == STATUS_DEFAULT_STORE);
-		nProps++;
+		++nProps;
 	} else if (lpResource->Value.ul == MAPI_AB_PROVIDER) {
 		sProps[nProps].ulPropTag = PR_OBJECT_TYPE;
 		sProps[nProps].Value.ul = MAPI_ADDRBOOK;
-		nProps++;
+		++nProps;
 	}
 
 	sProps[nProps].ulPropTag = PR_SERVICE_UID;
 	sProps[nProps].Value.bin.lpb = (BYTE *)&lpService->muid;
 	sProps[nProps].Value.bin.cb = sizeof(GUID);
-	nProps++;
+	++nProps;
 
 	hr = entry->profilesection->SetProps(nProps, sProps, NULL);
 	if (hr != hrSuccess)
@@ -904,11 +899,9 @@ exit:
 		delete entry;
 	}
 
-	if (lpsPropValProfileName)
-		MAPIFreeBuffer(lpsPropValProfileName);
-
+	MAPIFreeBuffer(lpsPropValProfileName);
 	TRACE_MAPILIB1(TRACE_RETURN, "M4LProviderAdmin::CreateProvider", "0x%08x", hr);
-    return hr;
+	return hr;
 }
 
 HRESULT M4LProviderAdmin::DeleteProvider(LPMAPIUID lpUID) {
@@ -916,7 +909,7 @@ HRESULT M4LProviderAdmin::DeleteProvider(LPMAPIUID lpUID) {
 	TRACE_MAPILIB(TRACE_ENTRY, "M4LProviderAdmin::DeleteProvider", "");
 	list<providerEntry*>::iterator i;
 	
-	for(i = msa->providers.begin(); i != msa->providers.end(); i++) {
+	for (i = msa->providers.begin(); i != msa->providers.end(); ++i) {
 		if(memcmp(&(*i)->uid, lpUID, sizeof(MAPIUID)) == 0) {
 			(*i)->profilesection->Release();
 			delete *i;
@@ -971,7 +964,7 @@ HRESULT M4LProviderAdmin::QueryInterface(REFIID refiid, void **lpvoid) {
 	TRACE_MAPILIB(TRACE_ENTRY, "M4LProviderAdmin::QueryInterface", "");
 	HRESULT hr = hrSuccess;
 
-	if ((refiid == IID_IProviderAdmin) || (refiid == IID_IUnknown)) {
+	if (refiid == IID_IProviderAdmin || refiid == IID_IUnknown) {
 		AddRef();
 		*lpvoid = (IProviderAdmin *)this;
 		hr = hrSuccess;
@@ -1010,7 +1003,7 @@ ULONG M4LMAPIAdviseSink::Release() {
 HRESULT M4LMAPIAdviseSink::QueryInterface(REFIID refiid, void **lpvoid) {
 	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPIAdviseSink::QueryInterface", "");
 	HRESULT hr = hrSuccess;
-	if ((refiid == IID_IMAPIAdviseSink) || (refiid == IID_IUnknown)) {
+	if (refiid == IID_IMAPIAdviseSink || refiid == IID_IUnknown) {
 		AddRef();
 		*lpvoid = (IMAPIAdviseSink *)this;
 		hr = hrSuccess;
@@ -1110,7 +1103,7 @@ ULONG M4LMAPIContainer::Release() {
 HRESULT M4LMAPIContainer::QueryInterface(REFIID refiid, void **lpvoid) {
 	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPIContainer::QueryInterface", "");
 	HRESULT hr = hrSuccess;
-	if ((refiid == IID_IMAPIContainer) || (refiid == IID_IMAPIProp) || (refiid == IID_IUnknown)) {
+	if (refiid == IID_IMAPIContainer || refiid == IID_IMAPIProp || refiid == IID_IUnknown) {
 		AddRef();
 		*lpvoid = (IMAPIContainer *)this;
 		hr = hrSuccess;
@@ -1173,7 +1166,7 @@ HRESULT M4LABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE* lppTable) 
 	std::list<LPMAPITABLE> lHierarchies;
 	std::set<ULONG> stProps;
 	LPSPropTagArray lpColumns = NULL;
-	for (iter = m_lABEntries.begin(); iter != m_lABEntries.end(); iter++) {
+	for (iter = m_lABEntries.begin(); iter != m_lABEntries.end(); ++iter) {
 		ULONG ulObjType;
 		LPABCONT lpABContainer = NULL;
 		LPMAPITABLE lpABHierarchy = NULL;
@@ -1203,9 +1196,7 @@ HRESULT M4LABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE* lppTable) 
 		if (lpABHierarchy)
 			lpABHierarchy->Release();
 		lpABHierarchy = NULL;
-
-		if (lpPropArray)
-			MAPIFreeBuffer(lpPropArray);
+		MAPIFreeBuffer(lpPropArray);
 		lpPropArray = NULL;
 	}
 
@@ -1225,10 +1216,12 @@ HRESULT M4LABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE* lppTable) 
 		goto exit;
 
 	// get enough columns from queryrows to add the PR_ROWID
-	lpColumns->cValues++;
+	++lpColumns->cValues;
 
 	n = 0;
-	for (std::list<LPMAPITABLE>::iterator i = lHierarchies.begin(); i != lHierarchies.end(); i++) {
+	for (std::list<LPMAPITABLE>::const_iterator i = lHierarchies.begin();
+	     i != lHierarchies.end(); ++i)
+	{
 		LPSRowSet lpsRows = NULL;
 
 		hr = (*i)->SetColumns(lpColumns, 0);
@@ -1264,12 +1257,10 @@ HRESULT M4LABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE* lppTable) 
 	hr = lpTableView->QueryInterface(IID_IMAPITable, (void **)lppTable);
 
 exit:
-	for (std::list<LPMAPITABLE>::iterator i = lHierarchies.begin(); i != lHierarchies.end(); i++)
+	for (std::list<LPMAPITABLE>::const_iterator i = lHierarchies.begin();
+	     i != lHierarchies.end(); ++i)
 		(*i)->Release();
-
-	if (lpColumns)
-		MAPIFreeBuffer(lpColumns);
-
+	MAPIFreeBuffer(lpColumns);
 	if (lpTableView)
 		lpTableView->Release();
 
@@ -1294,7 +1285,7 @@ HRESULT M4LABContainer::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID l
 	memcpy(&muidEntry, (LPBYTE)lpEntryID + 4, sizeof(MAPIUID));
 
 	// locate provider
-	for (iter = m_lABEntries.begin(); iter != m_lABEntries.end(); iter++) {
+	for (iter = m_lABEntries.begin(); iter != m_lABEntries.end(); ++iter) {
 		if (memcmp(&muidEntry, &iter->muid, sizeof(MAPIUID)) == 0)
 		{
 			lpABLogon = iter->lpABLogon;
@@ -1380,7 +1371,7 @@ ULONG M4LABContainer::Release() {
 HRESULT M4LABContainer::QueryInterface(REFIID refiid, void **lpvoid) {
 	TRACE_MAPILIB(TRACE_ENTRY, "M4LABContainer::QueryInterface", "");
 	HRESULT hr = hrSuccess;
-	if ((refiid == IID_IABContainer) || (refiid == IID_IMAPIContainer) || (refiid == IID_IMAPIProp) || (refiid == IID_IUnknown)) {
+	if (refiid == IID_IABContainer || refiid == IID_IMAPIContainer || refiid == IID_IMAPIProp || refiid == IID_IUnknown) {
 		AddRef();
 		*lpvoid = (IABContainer *)this;
 		hr = hrSuccess;

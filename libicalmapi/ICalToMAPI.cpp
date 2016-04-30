@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ICalToMAPI.h"
 #include "vconverter.h"
 #include "vtimezone.h"
@@ -52,12 +26,12 @@
 #include "icalrecurrence.h"
 #include <mapix.h>
 #include <mapiutil.h>
-#include "mapiext.h"
-#include "restrictionutil.h"
+#include <zarafa/mapiext.h>
+#include <zarafa/restrictionutil.h>
 #include <libical/ical.h>
 #include <algorithm>
 #include <vector>
-#include "charset/convert.h"
+#include <zarafa/charset/convert.h>
 
 class ICalToMapiImpl : public ICalToMapi {
 public:
@@ -77,9 +51,9 @@ public:
 private:
 	void Clean();
 
-	HRESULT SaveAttendeesString(std::list<icalrecip> *lplstRecip, LPMESSAGE lpMessage);
-	HRESULT SaveProps(std::list<SPropValue> *lpPropList, LPMAPIPROP lpMapiProp);
-	HRESULT SaveRecipList(std::list<icalrecip> *lplstRecip, ULONG ulFlag, LPMESSAGE lpMessage);
+	HRESULT SaveAttendeesString(const std::list<icalrecip> *lplstRecip, LPMESSAGE lpMessage);
+	HRESULT SaveProps(const std::list<SPropValue> *lpPropList, LPMAPIPROP lpMapiProp);
+	HRESULT SaveRecipList(const std::list<icalrecip> *lplstRecip, ULONG ulFlag, LPMESSAGE lpMessage);
 	LPSPropTagArray m_lpNamedProps;
 	ULONG m_ulErrorCount;
 
@@ -138,9 +112,7 @@ ICalToMapiImpl::ICalToMapiImpl(IMAPIProp *lpPropObj, LPADRBOOK lpAdrBook, bool b
 ICalToMapiImpl::~ICalToMapiImpl()
 {
 	Clean();
-
-	if (m_lpNamedProps)
-		MAPIFreeBuffer(m_lpNamedProps);
+	MAPIFreeBuffer(m_lpNamedProps);
 }
 
 /** 
@@ -151,7 +123,7 @@ ICalToMapiImpl::~ICalToMapiImpl()
 void ICalToMapiImpl::Clean()
 {
 	m_ulErrorCount = 0;
-	for (std::vector<icalitem*>::iterator i = m_vMessages.begin(); i != m_vMessages.end(); i++) {
+	for (std::vector<icalitem *>::const_iterator i = m_vMessages.begin(); i != m_vMessages.end(); ++i) {
 		if ((*i)->lpRecurrence)
 			delete (*i)->lpRecurrence;
 		MAPIFreeBuffer((*i)->base);
@@ -308,11 +280,8 @@ HRESULT ICalToMapiImpl::ParseICal(const std::string& strIcal, const std::string&
 			}
 		}
 next:
-		if (lpVEC) {
-			delete lpVEC;
-			lpVEC = NULL;
-		}
-
+		delete lpVEC;
+		lpVEC = NULL;
 		lpicComponent = icalcomponent_get_next_component(lpicCalendar, ICAL_ANY_COMPONENT);
 	}
 	hr = hrSuccess;
@@ -324,9 +293,7 @@ next:
 // 		hr = MAPI_W_ERRORS_RETURNED;
 
 exit:
-	if (lpVEC)
-		delete lpVEC;
-
+	delete lpVEC;
 	if (lpicCalendar)
 		icalcomponent_free(lpicCalendar);
 
@@ -395,9 +362,9 @@ HRESULT ICalToMapiImpl::GetFreeBusyInfo(time_t *lptstart, time_t *lptend, std::s
 	if (!m_bHaveFreeBusy)
 		return MAPI_E_NOT_FOUND;
 
-	if (lptstart)
-		*lptend = m_tFbEnd;
 	if (lptend)
+		*lptend = m_tFbEnd;
+	if (lptstart != NULL)
 		*lptstart = m_tFbStart;
 	if (lpstrUID)
 		*lpstrUID = m_strUID;
@@ -424,8 +391,8 @@ HRESULT ICalToMapiImpl::GetItem(ULONG ulPosition, ULONG ulFlags, LPMESSAGE lpMes
 	HRESULT hr = hrSuccess;
 	ICalRecurrence cRec;
 	icalitem *lpItem = NULL;
-	std::vector<icalitem*>::iterator iItem;
-	std::list<icalitem::exception>::iterator iEx;
+	std::vector<icalitem *>::const_iterator iItem;
+	std::list<icalitem::exception>::const_iterator iEx;
 	ULONG ulANr = 0;
 	LPATTACH lpAttach = NULL;
 	LPMESSAGE lpExMsg = NULL;
@@ -517,7 +484,7 @@ HRESULT ICalToMapiImpl::GetItem(ULONG ulPosition, ULONG ulFlags, LPMESSAGE lpMes
 	if (hr != hrSuccess)
 		goto exit;
 
-	for (ULONG i = 0; i < lpRows->cRows; i++) {
+	for (ULONG i = 0; i < lpRows->cRows; ++i) {
 		lpPropVal = PpropFindProp(lpRows->aRow[i].lpProps, lpRows->aRow[i].cValues, PR_ATTACH_NUM);
 		if (lpPropVal == NULL)
 			continue;
@@ -534,15 +501,16 @@ next:
 		// TODO: log error if any?
 		
 		// check if all exceptions are valid
-		for (iEx = lpItem->lstExceptionAttachments.begin(); iEx != lpItem->lstExceptionAttachments.end(); iEx++) {
-			
+		for (iEx = lpItem->lstExceptionAttachments.begin();
+		     iEx != lpItem->lstExceptionAttachments.end(); ++iEx) {
 			if (cRec.HrValidateOccurrence(lpItem, *iEx) == false) {
 				hr = MAPI_E_INVALID_OBJECT;
 				goto exit;
 			}
 		}
 
-		for (iEx = lpItem->lstExceptionAttachments.begin(); iEx != lpItem->lstExceptionAttachments.end(); iEx++) {
+		for (iEx = lpItem->lstExceptionAttachments.begin();
+		     iEx != lpItem->lstExceptionAttachments.end(); ++iEx) {
 			hr = lpMessage->CreateAttach(NULL, 0, &ulANr, &lpAttach);
 			if (hr != hrSuccess)
 				goto exit;
@@ -594,10 +562,7 @@ exit:
 
 	if (lpRows)
 		FreeProws(lpRows);
-
-	if (lpsPTA)
-		MAPIFreeBuffer(lpsPTA);
-
+	MAPIFreeBuffer(lpsPTA);
 	if (lpAttach)
 		lpAttach->Release();
 
@@ -616,10 +581,11 @@ exit:
  * 
  * @return MAPI error code
  */
-HRESULT ICalToMapiImpl::SaveProps(std::list<SPropValue> *lpPropList, LPMAPIPROP lpMapiProp)
+HRESULT ICalToMapiImpl::SaveProps(const std::list<SPropValue> *lpPropList,
+    LPMAPIPROP lpMapiProp)
 {
 	HRESULT hr = hrSuccess;
-	std::list<SPropValue>::iterator iProps;
+	std::list<SPropValue>::const_iterator iProps;
 	LPSPropValue lpsPropVals = NULL;
 	int i;
 
@@ -629,7 +595,8 @@ HRESULT ICalToMapiImpl::SaveProps(std::list<SPropValue> *lpPropList, LPMAPIPROP 
 		goto exit;
 
 	// @todo: add exclude list or something? might set props the caller doesn't want (see vevent::HrAddTimes())
-	for (i = 0, iProps = lpPropList->begin(); iProps != lpPropList->end(); iProps++, i++)
+	for (i = 0, iProps = lpPropList->begin();
+	     iProps != lpPropList->end(); ++iProps, ++i)
 		lpsPropVals[i] = *iProps;
 
 	hr = lpMapiProp->SetProps(i, lpsPropVals, NULL);
@@ -637,9 +604,7 @@ HRESULT ICalToMapiImpl::SaveProps(std::list<SPropValue> *lpPropList, LPMAPIPROP 
 		goto exit;
 
 exit:
-	if (lpsPropVals)
-		MAPIFreeBuffer(lpsPropVals);
-
+	MAPIFreeBuffer(lpsPropVals);
 	return hr;
 }
 
@@ -653,11 +618,12 @@ exit:
  * 
  * @return MAPI error code
  */
-HRESULT ICalToMapiImpl::SaveRecipList(std::list<icalrecip> *lplstRecip, ULONG ulFlag, LPMESSAGE lpMessage)
+HRESULT ICalToMapiImpl::SaveRecipList(const std::list<icalrecip> *lplstRecip,
+    ULONG ulFlag, LPMESSAGE lpMessage)
 {
 	HRESULT hr = hrSuccess;
 	LPADRLIST lpRecipients = NULL;
-	std::list<icalrecip>::iterator iRecip;
+	std::list<icalrecip>::const_iterator iRecip;
 	std::string strSearch;
 	ULONG i = 0;
 	convert_context converter;
@@ -668,7 +634,7 @@ HRESULT ICalToMapiImpl::SaveRecipList(std::list<icalrecip> *lplstRecip, ULONG ul
 
 	lpRecipients->cEntries = 0;
 
-	for (iRecip = lplstRecip->begin(); iRecip != lplstRecip->end(); iRecip++) {
+	for (iRecip = lplstRecip->begin(); iRecip != lplstRecip->end(); ++iRecip) {
 		// iRecip->ulRecipientType
 		// strEmail
 		// strName
@@ -719,8 +685,8 @@ HRESULT ICalToMapiImpl::SaveRecipList(std::list<icalrecip> *lplstRecip, ULONG ul
 		lpRecipients->aEntries[i].rgPropVals[9].ulPropTag = PR_RECIPIENT_TRACKSTATUS;
 		lpRecipients->aEntries[i].rgPropVals[9].Value.ul = iRecip->ulTrackStatus;
 
-		lpRecipients->cEntries++;
-		i++;
+		++lpRecipients->cEntries;
+		++i;
 	}
 
 	// flag 0: remove old recipient table, and add the new list
@@ -747,11 +713,11 @@ exit:
  * @note  The properties dispidNonSendableCC, dispidNonSendableBCC are not set
  *
  */
-HRESULT ICalToMapiImpl::SaveAttendeesString(std::list<icalrecip> *lplstRecip, LPMESSAGE lpMessage)
+HRESULT ICalToMapiImpl::SaveAttendeesString(const std::list<icalrecip> *lplstRecip, LPMESSAGE lpMessage)
 {
 	HRESULT hr = hrSuccess;
 
-	std::list<icalrecip>::iterator iRecip;
+	std::list<icalrecip>::const_iterator iRecip;
 	std::wstring strAllAttendees;
 	std::wstring strToAttendees;
 	std::wstring strCCAttendees;
@@ -762,8 +728,7 @@ HRESULT ICalToMapiImpl::SaveAttendeesString(std::list<icalrecip> *lplstRecip, LP
 		goto exit;
 
 	// Create attendees string
-	for (iRecip = lplstRecip->begin(); iRecip != lplstRecip->end(); iRecip++) {
-
+	for (iRecip = lplstRecip->begin(); iRecip != lplstRecip->end(); ++iRecip) {
 		if (iRecip->ulRecipientType == MAPI_ORIG)
 			continue;
 
@@ -796,8 +761,6 @@ HRESULT ICalToMapiImpl::SaveAttendeesString(std::list<icalrecip> *lplstRecip, LP
 		goto exit;
 
 exit:
-	if(lpsPropValue)
-		MAPIFreeBuffer(lpsPropValue);
-
+	MAPIFreeBuffer(lpsPropValue);
 	return hr;
 }

@@ -1,60 +1,34 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "icalrecurrence.h"
 #include "vconverter.h"
 #include "nameids.h"
 #include "valarm.h"
 #include <mapicode.h>
-#include <mapiext.h>
+#include <zarafa/mapiext.h>
 #include <mapix.h>
 #include <mapiutil.h>
 #include <cmath>
 #include <algorithm>
 #include "freebusy.h"
 
-static bool operator ==(SPropValue spv, ULONG ulPropTag)
+static bool operator ==(const SPropValue &spv, ULONG ulPropTag)
 {
 	return spv.ulPropTag == ulPropTag;
 }
@@ -202,7 +176,7 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 			i = 0;
 			while (icRRule.by_day[i] != ICAL_RECURRENCE_ARRAY_MAX) {
 				ulWeekDays |= (1 << (icRRule.by_day[i] - 1));
-				i++;
+				++i;
 			}
 			// handle the BYSETPOS value
 			if (icRRule.by_set_pos[0] != ICAL_RECURRENCE_ARRAY_MAX) {
@@ -345,9 +319,7 @@ HRESULT ICalRecurrence::HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, ica
 	lpRec = NULL;
 
 exit:
-	if (lpRec)
-		delete lpRec;
-
+	delete lpRec;
 	return hr;
 }
 /**
@@ -503,8 +475,9 @@ HRESULT ICalRecurrence::HrMakeMAPIException(icalcomponent *lpEventRoot, icalcomp
 	lpEx->lstMsgProps.push_back(sPropVal);
 
 	// copy properties to exception and test if changed
-	for (iProp = lpIcalItem->lstMsgProps.begin(); iProp != lpIcalItem->lstMsgProps.end(); iProp++) {
-		for (i = 0; i < sptaCopy.cValues; i++) {
+	for (iProp = lpIcalItem->lstMsgProps.begin();
+	     iProp != lpIcalItem->lstMsgProps.end(); ++iProp) {
+		for (i = 0; i < sptaCopy.cValues; ++i) {
 			if (sptaCopy.aulPropTag[i] == (*iProp).ulPropTag) {
 				abOldPresent[i] = true;
 				if (sptaCopy.aulPropTag[i] != PR_BODY) // no need to copy body
@@ -612,7 +585,7 @@ HRESULT ICalRecurrence::HrMakeMAPIException(icalcomponent *lpEventRoot, icalcomp
 	// make sure these are not removed :| (body, label, reminderset, reminder minutes)
 	abNewPresent[2] = abNewPresent[3] = abNewPresent[4] = abNewPresent[5] = true;
 	// test if properties were just removed
-	for (i = 0; i < sptaCopy.cValues; i++) {
+	for (i = 0; i < sptaCopy.cValues; ++i) {
 		if (abOldPresent[i] == true && abNewPresent[i] == false) {
 			iProp = find(lpEx->lstMsgProps.begin(), lpEx->lstMsgProps.end(), sptaCopy.aulPropTag[i]);
 			if (iProp != lpEx->lstMsgProps.end()) {
@@ -758,24 +731,24 @@ HRESULT ICalRecurrence::HrMakeMAPIRecurrence(recurrence *lpRecurrence, LPSPropTa
 
 	lpPropVal[i].ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_RECURRING], PT_BOOLEAN);
 	lpPropVal[i].Value.b = TRUE;
-	i++;
+	++i;
 
 	// TODO: combine with icon index in vevent .. the item may be a meeting request (meeting+recurring==1027)
 	lpPropVal[i].ulPropTag = PR_ICON_INDEX;
 	lpPropVal[i].Value.ul = ICON_APPT_RECURRING;
-	i++;
+	++i;
 
 	lpPropVal[i].ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_RECURRENCESTATE], PT_BINARY);
 	lpPropVal[i].Value.bin.lpb = (BYTE*)lpRecBlob;
 	lpPropVal[i].Value.bin.cb = ulRecBlob;
-	i++;
+	++i;
 
 	hr = HrGetOneProp(lpMessage, CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_RECURRENCEPATTERN], PT_STRING8), &lpsPropRecPattern);
 	if(hr != hrSuccess)
 	{
 		lpPropVal[i].ulPropTag = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_RECURRENCEPATTERN], PT_STRING8);
 		lpPropVal[i].Value.lpszA = (char*)strHRS.c_str();
-		i++;
+		++i;
 	}
 
 	hr = lpMessage->SetProps(i, lpPropVal, NULL);
@@ -783,15 +756,9 @@ HRESULT ICalRecurrence::HrMakeMAPIRecurrence(recurrence *lpRecurrence, LPSPropTa
 		goto exit;
 
 exit:
-	if (lpPropVal)
-		MAPIFreeBuffer(lpPropVal);
-
-	if(lpRecBlob)
-		MAPIFreeBuffer(lpRecBlob);
-
-	if(lpsPropRecPattern)
-		MAPIFreeBuffer(lpsPropRecPattern);
-
+	MAPIFreeBuffer(lpPropVal);
+	MAPIFreeBuffer(lpRecBlob);
+	MAPIFreeBuffer(lpsPropRecPattern);
 	return hr;
 }
 
@@ -825,9 +792,7 @@ bool ICalRecurrence::HrValidateOccurrence(icalitem *lpItem, icalitem::exception 
 		bIsValid = true;
 
 exit:	
-	if (lpFBBlocksAll)
-		MAPIFreeBuffer(lpFBBlocksAll);
-
+	MAPIFreeBuffer(lpFBBlocksAll);
 	return bIsValid;
 }
 
@@ -846,7 +811,7 @@ HRESULT ICalRecurrence::HrCreateICalRecurrence(TIMEZONE_STRUCT sTimeZone, bool b
 	HRESULT hr = hrSuccess;
 	icalrecurrencetype icRRule;
 	std::list<time_t> lstExceptions;
-	std::list<time_t>::iterator iException;
+	std::list<time_t>::const_iterator iException;
 	icaltimetype ittExDate;
 	TIMEZONE_STRUCT sTZgmt = {0};
 
@@ -861,7 +826,8 @@ HRESULT ICalRecurrence::HrCreateICalRecurrence(TIMEZONE_STRUCT sTimeZone, bool b
 	lstExceptions = lpRecurrence->getDeletedExceptions();
 	if (!lstExceptions.empty()) {
 		// add EXDATE props
-		for (iException = lstExceptions.begin(); iException != lstExceptions.end(); iException++) {
+		for (iException = lstExceptions.begin();
+		     iException != lstExceptions.end(); ++iException) {
 			if(bIsAllDay)
 			{
 				ittExDate = icaltime_from_timet(LocalToUTC(*iException, sTZgmt), bIsAllDay);
@@ -1019,11 +985,9 @@ HRESULT ICalRecurrence::WeekDaysToICalArray(ULONG ulWeekDays, struct icalrecurre
 {
 	int i = 0, j = 0;
 
-	for (i = 0; i < 7; i++) {
-		if ((ulWeekDays >> i) & 1) {
+	for (i = 0; i < 7; ++i)
+		if ((ulWeekDays >> i) & 1)
 			lpRec->by_day[j++] = i+1;
-		}
-	}
 	lpRec->by_day[j] = ICAL_RECURRENCE_ARRAY_MAX;
 	return hrSuccess;
 }

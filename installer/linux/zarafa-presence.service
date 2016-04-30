@@ -1,0 +1,10 @@
+[Unit]
+Description=Zarafa Collaboration Platform Presence Daemon
+
+[Service]
+Type=simple
+Environment=LC_ALL=C LANG=C
+ExecStart=/usr/sbin/zarafa-presence -F
+
+[Install]
+WantedBy=multi-user.target

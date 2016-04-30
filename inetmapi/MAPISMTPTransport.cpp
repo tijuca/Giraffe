@@ -1,44 +1,18 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 // based on src/net/smtp/SMTPTransport.cpp, but with additions
@@ -67,7 +41,8 @@
 // the GNU General Public License cover the whole combination.
 //
 
-#include "platform.h"
+#include <zarafa/platform.h>
+#include <zarafa/stringutil.h>
 #include "MAPISMTPTransport.h"
 #include "vmime/net/smtp/SMTPResponse.hpp"
 
@@ -79,8 +54,9 @@
 #include "vmime/utility/stringUtils.hpp"
 #include "vmime/net/defaultConnectionInfos.hpp"
 
-#include "ECLogger.h"
-#include "charset/traits.h"
+#include <zarafa/ECDebugPrint.h>
+#include <zarafa/ECLogger.h>
+#include <zarafa/charset/traits.h>
 
 #if VMIME_HAVE_SASL_SUPPORT
 	#include "vmime/security/sasl/SASLContext.hpp"
@@ -112,7 +88,8 @@ namespace smtp {
 MAPISMTPTransport::MAPISMTPTransport(ref <session> sess, ref <security::authenticator> auth, const bool secured)
 	: transport(sess, getInfosInstance(), auth), m_socket(NULL),
 	  m_authentified(false), m_extendedSMTP(false), m_timeoutHandler(NULL),
-	  m_isSMTPS(secured), m_secured(false), m_bDSNRequest(false)
+	  m_isSMTPS(secured), m_secured(false), m_lpLogger(NULL),
+	  m_bDSNRequest(false)
 {
 }
 
@@ -130,6 +107,8 @@ MAPISMTPTransport::~MAPISMTPTransport()
 	{
 		// Ignore
 	}
+	if (m_lpLogger != NULL)
+		m_lpLogger->Release();
 }
 
 
@@ -453,38 +432,22 @@ void MAPISMTPTransport::authenticateSASL()
 				}
 				catch (exceptions::sasl_exception& e)
 				{
-					if (challenge)
-					{
-						delete [] challenge;
-						challenge = NULL;
-					}
-
-					if (resp)
-					{
-						delete [] resp;
-						resp = NULL;
-					}
-
+					delete[] challenge;
+					challenge = NULL;
+					delete[] resp;
+					resp = NULL;
 					// Cancel SASL exchange
 					sendRequest("*");
 				}
 				catch (...)
 				{
-					if (challenge)
-						delete [] challenge;
-
-					if (resp)
-						delete [] resp;
-
+					delete[] challenge;
+					delete[] resp;
 					throw;
 				}
 
-				if (challenge)
-					delete [] challenge;
-
-				if (resp)
-					delete [] resp;
-
+				delete[] challenge;
+				delete[] resp;
 				break;
 			}
 			default:
@@ -645,14 +608,15 @@ void MAPISMTPTransport::send(const mailbox& expeditor, const mailboxList& recipi
 
 	sendRequest(strSend);
 
-	if ((resp = readResponse())->getCode() != 250)
-	{
+	resp = readResponse();
+	if (resp->getCode() / 10 != 25) {
 		internalDisconnect();
 		throw exceptions::command_error("MAIL", resp->getText());
 	}
 
 	// Emit a "RCPT TO" command for each recipient
-	m_lstFailedRecipients.clear();
+	mTemporaryFailedRecipients.clear();
+	mPermanentFailedRecipients.clear();
 	for (int i = 0 ; i < recipients.getMailboxCount() ; ++i)
 	{
 		const mailbox& mbox = *recipients.getMailboxAt(i);
@@ -666,18 +630,41 @@ void MAPISMTPTransport::send(const mailbox& expeditor, const mailboxList& recipi
 		resp = readResponse();
 		code = resp->getCode();
 
-		if (code != 250)
-		{
-			sFailedRecip entry;
-			entry.strRecipName = (WCHAR*)mbox.getName().getConvertedText(charset(CHARSET_WCHAR)).c_str(); // does this work?, or convert to utf-8 then wstring?
-			entry.strRecipEmail = mbox.getEmail();
-			entry.ulSMTPcode = code;
-			entry.strSMTPResponse = resp->getText();
-			m_lstFailedRecipients.push_back(entry);
-                               
-			if (m_lpLogger)
-				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "SMTP Error:" + resp->getText());
+		sFailedRecip entry;
+		entry.strRecipName = (WCHAR*)mbox.getName().getConvertedText(charset(CHARSET_WCHAR)).c_str(); // does this work?, or convert to utf-8 then wstring?
+		entry.strRecipEmail = mbox.getEmail();
+		entry.ulSMTPcode = code;
+		entry.strSMTPResponse = resp->getText();
+
+		if (code / 10 == 25) {
+			continue;
+		} else if (code == 421) {
+			/* 421 4.7.0 localhorse.lh Error: too many errors */
+			ec_log_err("RCPT line gave SMTP error: %d %s. (and now?)",
+				resp->getCode(), resp->getText().c_str());
+			break;
+		} else if (code / 100 == 5) {
+			/*
+			 * Example Postfix codes:
+			 * 501 5.1.3 Bad recipient address syntax  (RCPT TO: <with spaces>)
+			 * 550 5.1.1 <fox>: Recipient address rejected: User unknown in virtual mailbox table
+			 * 550 5.7.1 REJECT action without code by means of e.g. /etc/postfix/header_checks
+			 */
+			mPermanentFailedRecipients.push_back(entry);
+			ec_log_err("RCPT line gave SMTP error %d %s. (no retry)",
+				resp->getCode(), resp->getText().c_str());
+			continue;
+		} else if (code / 100 != 4) {
+			mPermanentFailedRecipients.push_back(entry);
+			ec_log_err("RCPT line gave unexpected SMTP reply %d %s. (no retry)",
+				resp->getCode(), resp->getText().c_str());
+			continue;
 		}
+
+		/* Other 4xx codes (disk full, ... ?) */
+		mTemporaryFailedRecipients.push_back(entry);
+		ec_log_err("RCPT line gave SMTP error: %d %s. (will be retried)",
+			resp->getCode(), resp->getText().c_str());
 	}
 
 	// Send the message data
@@ -687,7 +674,7 @@ void MAPISMTPTransport::send(const mailbox& expeditor, const mailboxList& recipi
 	if ((resp = readResponse())->getCode() != 354)
 	{
 		internalDisconnect();
-		throw exceptions::command_error("DATA", resp->getText());
+		throw exceptions::command_error("DATA", format("%d %s", resp->getCode(), resp->getText().c_str()));
 	}
 
 	// Stream copy with "\n." to "\n.." transformation
@@ -704,7 +691,7 @@ void MAPISMTPTransport::send(const mailbox& expeditor, const mailboxList& recipi
 	if ((resp = readResponse())->getCode() != 250)
 	{
 		internalDisconnect();
-		throw exceptions::command_error("DATA", resp->getText());
+		throw exceptions::command_error("DATA", format("%d %s", resp->getCode(), resp->getText().c_str()));
 	} else {
 		// postfix: 2.0.0 Ok: queued as B36E73608E
 		// qmail: ok 1295860788 qp 29154
@@ -714,20 +701,25 @@ void MAPISMTPTransport::send(const mailbox& expeditor, const mailboxList& recipi
 	}
 }
 
-// new functions               
-const int MAPISMTPTransport::getRecipientErrorCount() const
-{                              
-	return m_lstFailedRecipients.size();
-}                              
-                               
-const std::vector<sFailedRecip> MAPISMTPTransport::getRecipientErrorList() const
-{                              
-	return m_lstFailedRecipients;
-}                              
-                               
+const std::vector<sFailedRecip> &
+MAPISMTPTransport::getPermanentFailedRecipients(void) const
+{
+	return mPermanentFailedRecipients;
+}
+
+const std::vector<sFailedRecip> &
+MAPISMTPTransport::getTemporaryFailedRecipients(void) const
+{
+	return mTemporaryFailedRecipients;
+}
+
 void MAPISMTPTransport::setLogger(ECLogger *lpLogger)
 {                              
+	if (m_lpLogger != NULL)
+		m_lpLogger->Release();
 	m_lpLogger = lpLogger;
+	if (m_lpLogger != NULL)
+		m_lpLogger->AddRef();
 }                              
 
 void MAPISMTPTransport::requestDSN(BOOL bRequest, const std::string &strTrackid)

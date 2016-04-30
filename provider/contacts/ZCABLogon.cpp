@@ -1,54 +1,28 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
-#include "Trace.h"
+#include <zarafa/platform.h>
+#include <zarafa/Trace.h>
 #include "ZCABLogon.h"
 #include "ZCABContainer.h"
-#include "ECTags.h"
-#include "ECDebug.h"
-#include "ECDebugPrint.h"
-#include "ECGuid.h"
+#include <zarafa/ECTags.h>
+#include <zarafa/ECDebug.h>
+#include <zarafa/ECDebugPrint.h>
+#include <zarafa/ECGuid.h>
 #include "Zarafa.h"
 #include <mapix.h>
 #include <edkmdb.h>
@@ -113,11 +87,7 @@ HRESULT ZCABLogon::QueryInterface(REFIID refiid, void **lppInterface)
 
 HRESULT ZCABLogon::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_CALL_FAILED;
-
-	return hr;
+	return MAPI_E_CALL_FAILED;
 }
 
 HRESULT ZCABLogon::Logoff(ULONG ulFlags)
@@ -180,11 +150,10 @@ exit:
 
 HRESULT ZCABLogon::ClearFolderList()
 {
-	for (std::vector<zcabFolderEntry>::iterator i = m_lFolders.begin(); i != m_lFolders.end(); i++) {
-		if (i->lpStore)
-			MAPIFreeBuffer(i->lpStore);
-		if (i->lpFolder)
-			MAPIFreeBuffer(i->lpFolder);
+	for (std::vector<zcabFolderEntry>::const_iterator i = m_lFolders.begin();
+	     i != m_lFolders.end(); ++i) {
+		MAPIFreeBuffer(i->lpStore);
+		MAPIFreeBuffer(i->lpFolder);
 	}
 	m_lFolders.clear();
 	return hrSuccess;
@@ -261,13 +230,10 @@ HRESULT ZCABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 			lpFolderProps[2].ulPropTag == PR_ZC_CONTACT_FOLDER_NAMES_W &&
 			lpFolderProps[0].Value.MVbin.cValues == lpFolderProps[1].Value.MVbin.cValues &&
 			lpFolderProps[1].Value.MVbin.cValues == lpFolderProps[2].Value.MVszW.cValues)
-		{
-			for (ULONG c = 0; c < lpFolderProps[1].Value.MVbin.cValues; c++) {
+			for (ULONG c = 0; c < lpFolderProps[1].Value.MVbin.cValues; ++c)
 				AddFolder(lpFolderProps[2].Value.MVszW.lppszW[c],
 						  lpFolderProps[0].Value.MVbin.lpbin[c].cb, lpFolderProps[0].Value.MVbin.lpbin[c].lpb,
 						  lpFolderProps[1].Value.MVbin.lpbin[c].cb, lpFolderProps[1].Value.MVbin.lpbin[c].lpb);
-			}
-		}
 
 		hr = ZCABContainer::Create(&m_lFolders, NULL, m_lpMAPISup, this, &lpRootContainer);
 		if (hr != hrSuccess)
@@ -305,10 +271,7 @@ HRESULT ZCABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 exit:
 	if (lpProfileSection)
 		lpProfileSection->Release();
-
-	if (lpFolderProps)
-		MAPIFreeBuffer(lpFolderProps);
-
+	MAPIFreeBuffer(lpFolderProps);
 	if (lpRootContainer)
 		lpRootContainer->Release();
 
@@ -346,38 +309,22 @@ exit:
 
 HRESULT ZCABLogon::Unadvise(ULONG ulConnection)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_NO_SUPPORT;
-
-	return hr;
+	return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT ZCABLogon::OpenStatusEntry(LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPMAPISTATUS * lppMAPIStatus)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_NO_SUPPORT;
-
-	return hr;
+	return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT ZCABLogon::OpenTemplateID(ULONG cbTemplateID, LPENTRYID lpTemplateID, ULONG ulTemplateFlags, LPMAPIPROP lpMAPIPropData, LPCIID lpInterface, LPMAPIPROP * lppMAPIPropNew, LPMAPIPROP lpMAPIPropSibling)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_NO_SUPPORT;
-
-	return hr;
+	return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT ZCABLogon::GetOneOffTable(ULONG ulFlags, LPMAPITABLE * lppTable)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_NO_SUPPORT;
-
-	return hr;
+	return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT ZCABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, LPADRLIST lpRecipList)

@@ -1,71 +1,38 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ECMessageStreamImporterIStreamAdapter.h"
-#include "ECInterfaceDefs.h"
+#include <zarafa/ECInterfaceDefs.h>
 
 HRESULT ECMessageStreamImporterIStreamAdapter::Create(WSMessageStreamImporter *lpStreamImporter, IStream **lppStream)
 {
-	HRESULT hr = hrSuccess;
 	ECMessageStreamImporterIStreamAdapterPtr ptrAdapter;
 
-	if (lpStreamImporter == NULL || lppStream == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpStreamImporter == NULL || lppStream == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	try {
 		ptrAdapter.reset(new ECMessageStreamImporterIStreamAdapter(lpStreamImporter));
 	} catch (const std::bad_alloc &) {
-		hr = MAPI_E_NOT_ENOUGH_MEMORY;
-		goto exit;
+		return MAPI_E_NOT_ENOUGH_MEMORY;
 	}
 
-	hr = ptrAdapter->QueryInterface(IID_IStream, (LPVOID*)lppStream);
-
-exit:
-	return hr;
+	return ptrAdapter->QueryInterface(IID_IStream, reinterpret_cast<LPVOID *>(lppStream));
 }
 
 HRESULT ECMessageStreamImporterIStreamAdapter::QueryInterface(REFIID refiid, void **lppInterface)
@@ -86,23 +53,22 @@ HRESULT ECMessageStreamImporterIStreamAdapter::Read(void* /*pv*/, ULONG /*cb*/, 
 
 HRESULT ECMessageStreamImporterIStreamAdapter::Write(const void *pv, ULONG cb, ULONG *pcbWritten)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	if (!m_ptrSink) {
 		hr = m_ptrStreamImporter->StartTransfer(&m_ptrSink);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 
 	hr = m_ptrSink->Write((LPVOID)pv, cb);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	if (pcbWritten)
 		*pcbWritten = cb;
 
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 // IStream
@@ -123,21 +89,17 @@ HRESULT ECMessageStreamImporterIStreamAdapter::CopyTo(IStream* /*pstm*/, ULARGE_
 
 HRESULT ECMessageStreamImporterIStreamAdapter::Commit(DWORD /*grfCommitFlags*/)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	HRESULT hrAsync = hrSuccess;
 
-	if (!m_ptrSink) {
-		hr = MAPI_E_UNCONFIGURED;
-		goto exit;
-	}
+	if (m_ptrSink == NULL)
+		return MAPI_E_UNCONFIGURED;
 
 	m_ptrSink.reset();
 
 	hr = m_ptrStreamImporter->GetAsyncResult(&hrAsync);
 	if (hr == hrSuccess)
 		hr = hrAsync;
-
-exit:
 	return hr;
 }
 

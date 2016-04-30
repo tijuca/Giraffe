@@ -6,7 +6,7 @@
 # description: The Zarafa Presence Daemon
 # processname: /usr/sbin/zarafa-presence
 # config: /etc/zarafa/presence.cfg
-# pidfile: /var/run/zarafa-presence.pid
+# pidfile: /var/run/zarafad/presence.pid
 
 ### BEGIN INIT INFO
 # Provides: zarafa-presence
@@ -25,7 +25,7 @@ PRESENCECONFIG=/etc/zarafa/presence.cfg
 PRESENCEPROGRAM=/usr/sbin/zarafa-presence
 presence=`basename $PRESENCEPROGRAM`
 LOCKFILE=/var/lock/subsys/$presence
-PIDFILE=/var/run/$presence.pid
+PIDFILE=/var/run/zarafad/presence.pid
 RETVAL=0
 
 # Sanity checks.
@@ -40,6 +40,7 @@ if [ -z "$ZARAFA_LOCALE" ]; then
 fi
 
 start() {
+	install -dm0775 -o zarafa -g zarafa /var/run/zarafad
 	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $presence
 	RETVAL=$?
 
@@ -47,10 +48,13 @@ start() {
 }
 
 stop() {
+	stop_daemon --pidfile "/var/run/$presence.pid" --lockfile "$LOCKFILE" $presence
+	RETVAL2="$?"
 	stop_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $presence
 	RETVAL=$?
 
-	return $RETVAL
+	test "$RETVAL2" -eq 0 || "$RETVAL" -eq 0
+	return $?
 }
 
 restart() {

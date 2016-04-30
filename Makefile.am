@@ -2,44 +2,30 @@ ACLOCAL_AMFLAGS = -I autoconf
 
 
 SUBDIRS = . common m4lcommon mapi4linux libfreebusy zarafa-libsync \
-          $(PROSUBS) provider libicalmapi inetmapi
+          provider libicalmapi inetmapi
 if WITH_PHP
 SUBDIRS += php-ext
 endif
-SUBDIRS += ECtools spooler gateway caldav installer po doc
+SUBDIRS += ECtools spooler gateway caldav installer po doc swig
 
-if WITH_SWIG
-SUBDIRS += swig
-else
-if WITH_PYTHON
-SUBDIRS += swig
-endif
-endif
-
-if !OSS_ONLY
-SUBDIRS += testunit
-endif
-
-#EXTRA_DIST = version common/ecversion.h php-webclient-ajax
-EXTRA_DIST = version versionheader.sh common/ecversion.h php-webclient-ajax \
-	LICENSE.txt CONTRIBUTORS.txt AGPL-3 TRADEMARKS.txt \
+#EXTRA_DIST = version php-webclient-ajax
+EXTRA_DIST = version versionheader.sh php-webclient-ajax \
+	LICENSE.txt CONTRIBUTORS.txt AGPL-3 \
 	lddcheck global.am pwdcheck.sh
 
-BUILT_SOURCES = source-moved-check common/ecversion.h
+BUILT_SOURCES = source-moved-check common/include/zarafa/ecversion.h
+
+sbin_SCRIPTS = tools/python-scripts/zarafa-cachestat.py
 
 .PHONY: source-moved-check
 source-moved-check:
 	@${top_srcdir}/pwdcheck.sh "${abs_top_builddir}"
 
-common/ecversion.h: versionheader.sh
-	sh ${top_srcdir}/versionheader.sh > common/ecversion.h
-
+common/include/zarafa/ecversion.h: versionheader.sh
+	sh ${top_srcdir}/versionheader.sh >$@
 
 dist-hook:
 	find $(distdir) -type d -name .svn -exec rm -rf {} \; 2>/dev/null || true
-if OSS_ONLY
-	[ -x $(top_srcdir)/fixup-distro.sh ] && $(top_srcdir)/fixup-distro.sh $(distdir)
-endif
 
 install-ajax-webaccess:
 	install -d -m 755 $(DESTDIR)/usr/share

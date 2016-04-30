@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <mapi.h>
 #include <mapidefs.h>
@@ -49,10 +23,10 @@
 #include <mapiutil.h>
 
 #include "freebusyutil.h"
-#include <stringutil.h>
+#include <zarafa/stringutil.h>
 
 #include "freebusytags.h"
-#include "mapiext.h"
+#include <zarafa/mapiext.h>
 #include <edkmdb.h>
 
 #ifdef _DEBUG
@@ -97,7 +71,7 @@ HRESULT getMaxMonthMinutes(short year, short month, short* minutes)
 	case 2:
 		days = 28;
 		if(leapyear(year))
-			days++;
+			++days;
 		break;
 	}
 
@@ -151,9 +125,7 @@ HRESULT GetFreeBusyFolder(IMsgStore* lpPublicStore, IMAPIFolder** lppFreeBusyFol
 		goto exit;
 
 exit:
-	if (lpPropArrayFreeBusy)
-		MAPIFreeBuffer(lpPropArrayFreeBusy);
-
+	MAPIFreeBuffer(lpPropArrayFreeBusy);
 	if(lpMapiFolder)
 		lpMapiFolder->Release();
 
@@ -342,8 +314,7 @@ HRESULT GetFreeBusyMessage(IMAPISession* lpSession, IMsgStore* lpPublicStore, IM
 
 			// move the old entryids to the new array
 			if(lpPropfbEntryids) {
-				for(i = 0; i < lpPropfbEntryids->Value.MVbin.cValues; i++)
-				{
+				for (i = 0; i < lpPropfbEntryids->Value.MVbin.cValues; ++i) {
 					lpPropfbEntryidsNew->Value.MVbin.lpbin[i].cb = lpPropfbEntryids->Value.MVbin.lpbin[i].cb;
 					lpPropfbEntryidsNew->Value.MVbin.lpbin[i].lpb = lpPropfbEntryids->Value.MVbin.lpbin[i].lpb; //cheap copy
 				}
@@ -399,31 +370,17 @@ HRESULT GetFreeBusyMessage(IMAPISession* lpSession, IMsgStore* lpPublicStore, IM
 		goto exit;
 
 exit:
-
-	if(lpPropEmail)
-		MAPIFreeBuffer(lpPropEmail);
-	
-	if(lpPropName)
-		MAPIFreeBuffer(lpPropName);
-
+	MAPIFreeBuffer(lpPropEmail);
+	MAPIFreeBuffer(lpPropName);
 	if(lpMailUser)
 		lpMailUser->Release();
 
 	if(lpAdrBook)
 		lpAdrBook->Release();
-
-	if(lpInboxEntry)
-		MAPIFreeBuffer(lpInboxEntry);
-
-	if(lpPropfbEntryidsNew)
-		MAPIFreeBuffer(lpPropfbEntryidsNew);
-	
-	if(lpPropFBMessage)
-		MAPIFreeBuffer(lpPropFBMessage);
-
-	if(lpPropfbEntryids)
-		MAPIFreeBuffer(lpPropfbEntryids);
-
+	MAPIFreeBuffer(lpInboxEntry);
+	MAPIFreeBuffer(lpPropfbEntryidsNew);
+	MAPIFreeBuffer(lpPropFBMessage);
+	MAPIFreeBuffer(lpPropfbEntryids);
 	if(lpFolder)
 		lpFolder->Release();
 
@@ -465,17 +422,14 @@ HRESULT ParseFBEvents(FBStatus fbSts, LPSPropValue lpMonth, LPSPropValue lpEvent
 
 	memset(&fbBlock, 0, sizeof(fbBlock));
 
-	for(ULONG i = 0; i < lpEvent->Value.MVbin.cValues; i++)
-	{
-		
+	for (ULONG i = 0; i < lpEvent->Value.MVbin.cValues; ++i) {
 		if(lpEvent->Value.MVbin.lpbin[i].cb == 0) // notting to do
 			continue;
 
 		cEvents = lpEvent->Value.MVbin.lpbin[i].cb / sizeof(sfbEvent);
 		lpfbEvents = (sfbEvent*)lpEvent->Value.MVbin.lpbin[i].lpb;
 
-		for(ULONG j=0; j < cEvents; j++)
-		{
+		for (ULONG j = 0; j < cEvents; ++j) {
 			memset(&tmTmp, 0, sizeof(struct tm));
 			tmTmp.tm_year = FB_YEAR(lpMonth->Value.MVl.lpl[i]) - 1900;
 			tmTmp.tm_mon = FB_MONTH(lpMonth->Value.MVl.lpl[i])-1;
@@ -602,9 +556,7 @@ HRESULT GetFreeBusyMessageData(IMessage* lpMessage, LONG* lprtmStart, LONG* lprt
 		*lprtmEnd = 0;
 
 exit:
-	if (lpPropArrayFBData)
-		MAPIFreeBuffer(lpPropArrayFBData);
-
+	MAPIFreeBuffer(lpPropArrayFBData);
 	return hr;
 }
 
@@ -653,13 +605,6 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 
 	// Set the list on the begin
 	lpfbBlockList->Reset();
-
-	if(lpfbBlockList->Size() == 0)
-	{
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
 	ulMaxItemDataSize = (lpfbBlockList->Size() + 1 ) * sizeof(sfbEvent); // +1 block, for free/busy in two months
 
 	/*
@@ -700,12 +645,10 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 			
 			if(tmStart.tm_year > ulLastYear || tmStart.tm_mon > ulLastMonth)
 			{
-				iMonth++;
-
+				++iMonth;
 				lpPropFBDataArray[0].Value.MVl.lpl[iMonth] =  FB_YEARMONTH((tmStart.tm_year+1900), (tmStart.tm_mon+1));
-				lpPropFBDataArray[0].Value.MVl.cValues++;
-				lpPropFBDataArray[1].Value.MVbin.cValues++;
-
+				++lpPropFBDataArray[0].Value.MVl.cValues;
+				++lpPropFBDataArray[1].Value.MVbin.cValues;
 				if ((hr = MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb)) != hrSuccess)
 					goto exit;
 				lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb = 0;
@@ -730,18 +673,16 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 				// Set the day on the begin of the month because: if mday is 31 and the next month is 30 then you get the wrong month
 				tmTmp.tm_mday = 1;
 				
-				for(i=1; i < ulDiffMonths && lpPropFBDataArray[0].Value.MVl.cValues < ulMonths; i++)
-				{
-					iMonth++;
+				for (i = 1; i < ulDiffMonths && lpPropFBDataArray[0].Value.MVl.cValues < ulMonths; ++i) {
+					++iMonth;
 					tmTmp.tm_isdst = -1;
-
-					tmTmp.tm_mon++;
+					++tmTmp.tm_mon;
 					mktime(&tmTmp);
 					
 
 					lpPropFBDataArray[0].Value.MVl.lpl[iMonth] = FB_YEARMONTH((tmTmp.tm_year+1900), (tmTmp.tm_mon+1));
-					lpPropFBDataArray[0].Value.MVl.cValues++;
-					lpPropFBDataArray[1].Value.MVbin.cValues++;
+					++lpPropFBDataArray[0].Value.MVl.cValues;
+					++lpPropFBDataArray[1].Value.MVbin.cValues;
 
 					if ((hr = MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb)) != hrSuccess)
 						goto exit;
@@ -756,14 +697,14 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 					ASSERT(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb <= ulMaxItemDataSize);
 				}
 
-				iMonth++;
-				tmTmp.tm_mon++;	
+				++iMonth;
+				++tmTmp.tm_mon;
 				tmTmp.tm_isdst = -1;
 				mktime(&tmTmp);
 
 				lpPropFBDataArray[0].Value.MVl.lpl[iMonth] = FB_YEARMONTH((tmTmp.tm_year+1900), (tmTmp.tm_mon+1));
-				lpPropFBDataArray[0].Value.MVl.cValues++;
-				lpPropFBDataArray[1].Value.MVbin.cValues++;
+				++lpPropFBDataArray[0].Value.MVl.cValues;
+				++lpPropFBDataArray[1].Value.MVbin.cValues;
 
 				if ((hr = MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb)) != hrSuccess)
 					goto exit;
@@ -800,7 +741,7 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 	*lppPropFBDataArray = lpPropFBDataArray;
 
 exit:
-	if(hr != hrSuccess && lpPropFBDataArray)
+	if (hr != hrSuccess)
 		MAPIFreeBuffer(lpPropFBDataArray);
 
 	return hr;
@@ -838,8 +779,7 @@ std::string GetDebugFBBlock(LONG celt, FBBlock_1* pblk)
 	str= "celt: "+stringify(celt);
 	str+= "\n";
 
-	for(int i=0; i < celt; i++)
-	{
+	for (int i = 0; i < celt; ++i) {
 		str+= "block: "+stringify(i);
 		str+= "\n\tstart: "+stringify(pblk[i].m_tmStart);
 		str+= "\n\tend: "+stringify(pblk[i].m_tmEnd);
@@ -863,10 +803,8 @@ HRESULT HrCopyFBBlockSet(OccrInfo *lpDest, OccrInfo *lpSrc, ULONG ulcValues)
 	HRESULT hr = hrSuccess;	
 	ULONG i = 0;
 
-	for(i = 0; i < ulcValues ; i++) {
+	for (i = 0; i < ulcValues; ++i)
 		lpDest[i] = lpSrc[i];
-	}
-
 	return hr;
 }
 
@@ -903,10 +841,7 @@ HRESULT HrAddFBBlock(OccrInfo sOccrInfo, OccrInfo **lppsOccrInfo, ULONG *lpcValu
 	*lppsOccrInfo = lpsNewOccrInfo;
 
 exit:
-
-	if(lpsInputOccrInfo)
-		MAPIFreeBuffer(lpsInputOccrInfo);
-
+	MAPIFreeBuffer(lpsInputOccrInfo);
 	return hr;
 }
 

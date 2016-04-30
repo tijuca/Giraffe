@@ -1,53 +1,27 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <mapiutil.h>
 #include <edkguid.h>
 #include <list>
 
-#include "ECGetText.h"
+#include <zarafa/ECGetText.h>
 
 #include "Mem.h"
 #include "ECMessage.h"
@@ -57,15 +31,15 @@
 #include "ECMAPIProp.h"
 #include "WSTransport.h"
 
-#include "ECTags.h"
+#include <zarafa/ECTags.h>
 
-#include "ECGuid.h"
-#include "ECDebug.h"
+#include <zarafa/ECGuid.h>
+#include <zarafa/ECDebug.h>
 
-#include "mapiext.h"
+#include <zarafa/mapiext.h>
 
 #include "freebusytags.h"
-#include "CommonUtil.h"
+#include <zarafa/CommonUtil.h>
 #include "ClientUtil.h"
 #include "ZarafaUtil.h"
 
@@ -78,17 +52,17 @@
 #include "ProviderUtil.h"
 #include "EntryPoint.h"
 
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 #include "ECOfflineState.h"
 
 #include "ECExchangeModifyTable.h"
 
-#include <mapi_ptr.h>
+#include <zarafa/mapi_ptr.h>
 typedef mapi_memory_ptr<char> MAPIStringPtr;
 typedef mapi_object_ptr<WSTransport> WSTransportPtr;
 typedef mapi_object_ptr<ECMessage, IID_ECMessage> ECMessagePtr;
 
-#include <charset/convstring.h>
+#include <zarafa/charset/convstring.h>
 
 using namespace std;
 
@@ -207,9 +181,7 @@ ECMsgStore::~ECMsgStore() {
 	if(m_lpNotifyClient)
 		m_lpNotifyClient->Release();
 
-	if(lpNamedProp)
-		delete lpNamedProp;
-
+	delete lpNamedProp;
 	if(lpStorage) {
 		// Release our propstorage since it is registered on lpTransport
 		lpStorage->Release();
@@ -236,6 +208,17 @@ static HRESULT GetIMsgStoreObject(BOOL bOffline, std::string strProfname,
 	LPSPropValue lpsPropValue = NULL;
 	char *lpszProfileName = NULL;
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	// Check if we're allowing online logons
+	if(bOffline == FALSE) {
+		ECOfflineState::OFFLINESTATE state;
+
+		if(ECOfflineState::GetOfflineState(strProfname, &state) == hrSuccess && state == ECOfflineState::OFFLINESTATE_OFFLINE) {
+			hr = MAPI_E_NETWORK_ERROR;
+			goto exit;
+		}
+	}
+#endif
 
 	hr = lpMAPISup->OpenProfileSection((LPMAPIUID)&MUID_PROFILE_INSTANCE, 0, &lpProfSect);
 	if(hr != hrSuccess)
@@ -252,14 +235,17 @@ static HRESULT GetIMsgStoreObject(BOOL bOffline, std::string strProfname,
 	if (hr != hrSuccess)
 		goto exit;
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	if (bOffline)
+		hr = sProviderInfo.lpMSProviderOffline->Logon(lpMAPISup, 0, (LPTSTR)lpszProfileName, cbEntryId, lpEntryId, (bModify)?(MAPI_BEST_ACCESS|MDB_NO_DIALOG):MDB_NO_DIALOG, NULL, NULL, NULL, NULL, NULL, lppIMsgStore);
+	else
+#endif
 		hr = sProviderInfo.lpMSProviderOnline->Logon(lpMAPISup, 0, (LPTSTR)lpszProfileName, cbEntryId, lpEntryId, (bModify)?(MAPI_BEST_ACCESS|MDB_NO_DIALOG):MDB_NO_DIALOG, NULL, NULL, NULL, NULL, NULL, lppIMsgStore);
 	if (hr != hrSuccess)
 		goto exit;
 
 exit:
-	if(lpsPropValue)
-		MAPIFreeBuffer(lpsPropValue);
-
+	MAPIFreeBuffer(lpsPropValue);
 	if(lpProfSect)
 		lpProfSect->Release();
 
@@ -285,6 +271,29 @@ HRESULT ECMsgStore::QueryInterface(REFIID refiid, void **lppInterface)
 			REGISTER_INTERFACE(IID_IExchangeManageStore, &this->m_xExchangeManageStore);
 			REGISTER_INTERFACE(IID_IExchangeManageStore6, &this->m_xExchangeManageStore6);
 			REGISTER_INTERFACE(IID_IExchangeManageStoreEx, &this->m_xExchangeManageStoreEx);
+#ifdef HAVE_OFFLINE_SUPPORT
+		} else {
+			IMsgStore *lpOnline = NULL;
+			ECMsgStore *lpChild = NULL;
+
+			hr = GetIMsgStoreObject(FALSE, this->m_strProfname, fModify, &g_mapProviders, lpSupport, m_cbEntryId, m_lpEntryId, (LPMDB*)&lpOnline);
+			if (hr != hrSuccess)
+				return hr;
+
+			if (lpOnline->QueryInterface(IID_ECMsgStore, (void**)&lpChild) != hrSuccess) {
+				lpOnline->Release();
+				return MAPI_E_INTERFACE_NOT_SUPPORTED;
+			}
+			
+			AddChild(lpChild);
+
+			hr = lpOnline->QueryInterface(refiid, lppInterface);
+
+			lpChild->Release();
+			lpOnline->Release();
+
+			return hr;
+#endif
 		}
 	}
 
@@ -293,6 +302,31 @@ HRESULT ECMsgStore::QueryInterface(REFIID refiid, void **lppInterface)
 	REGISTER_INTERFACE(IID_IECSecurity, &this->m_xECSecurity);
 	REGISTER_INTERFACE(IID_IProxyStoreObject, &this->m_xProxyStoreObject);
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	if (refiid == IID_ECMsgStoreOffline && ((m_ulProfileFlags&EC_PROFILE_FLAGS_OFFLINE) == EC_PROFILE_FLAGS_OFFLINE) && m_fIsDefaultStore == TRUE)
+	{
+		if (m_bOfflineStore == TRUE) {
+			*lppInterface = &this->m_xMsgStore;
+			AddRef();
+			return hrSuccess;
+		}
+
+		hr = GetIMsgStoreObject(TRUE, this->m_strProfname, fModify, &g_mapProviders, lpSupport, m_cbEntryId, m_lpEntryId, (LPMDB*)lppInterface);
+		if (hr != hrSuccess)
+			return hr;
+		
+		ECMsgStore *lpChild = NULL;
+
+		if ( ((LPMDB)*lppInterface)->QueryInterface(IID_ECMsgStore, (void**)&lpChild) != hrSuccess)
+			return MAPI_E_INTERFACE_NOT_SUPPORTED;
+		
+		AddChild(lpChild);
+
+		lpChild->Release();
+
+		return hrSuccess;
+	}
+#endif
 
 	if (refiid == IID_ECMsgStoreOnline)
 	{
@@ -321,6 +355,13 @@ HRESULT ECMsgStore::QueryInterface(REFIID refiid, void **lppInterface)
 		return hrSuccess;
 	}
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	/*if(refiid == IID_IMAPIOfflineMgr) {
+		AddRef();
+		*lpvoid = &this->m_xMAPIOfflineMgr;
+		return hrSuccess;
+	}*/
+#endif
 
 	// is admin store?
 	REGISTER_INTERFACE(IID_IECMultiStoreTable, &this->m_xECMultiStoreTable);
@@ -379,36 +420,24 @@ HRESULT	ECMsgStore::Create(const char *lpszProfname, LPMAPISUP lpSupport,
 
 HRESULT ECMsgStore::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray *lppProblems)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	hr = ECMAPIProp::SetProps(cValues, lpPropArray, lppProblems);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
-	hr = ECMAPIProp::SaveChanges(KEEP_OPEN_READWRITE);
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-
-	return hr;
+	return ECMAPIProp::SaveChanges(KEEP_OPEN_READWRITE);
 }
 
 HRESULT ECMsgStore::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray FAR * lppProblems)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	hr = ECMAPIProp::DeleteProps(lpPropTagArray, lppProblems);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
-	hr = ECMAPIProp::SaveChanges(KEEP_OPEN_READWRITE);
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-
-	return hr;
+	return ECMAPIProp::SaveChanges(KEEP_OPEN_READWRITE);
 }
 
 HRESULT ECMsgStore::SaveChanges(ULONG ulFlags)
@@ -420,10 +449,8 @@ HRESULT ECMsgStore::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfac
 {
 	HRESULT hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
 
-	if (lpiid == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpiid == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	if(ulPropTag == PR_RECEIVE_FOLDER_SETTINGS) {
 		if (*lpiid == IID_IMAPITable && IsPublicStore() == false)
@@ -467,7 +494,6 @@ HRESULT ECMsgStore::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfac
 	} else
 		hr = ECMAPIProp::OpenProperty(ulPropTag, lpiid, ulInterfaceOptions, ulFlags, lppUnk);
 
-exit:
 	return hr;
 }
 
@@ -618,30 +644,24 @@ exit:
 }
 
 HRESULT ECMsgStore::Unadvise(ULONG ulConnection) {
-	HRESULT hr = hrSuccess;
-
-	if(m_ulProfileFlags & EC_PROFILE_FLAGS_NO_NOTIFICATIONS) {
-		hr = MAPI_E_NO_SUPPORT;
-		goto exit;
-	}
+	if (m_ulProfileFlags & EC_PROFILE_FLAGS_NO_NOTIFICATIONS)
+		return MAPI_E_NO_SUPPORT;
 
 	ASSERT(m_lpNotifyClient != NULL);
 
 	m_lpNotifyClient->Unadvise(ulConnection);
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMsgStore::Reload(void *lpParam, ECSESSIONID sessionid)
 {
 	HRESULT hr = hrSuccess;
 	ECMsgStore *lpThis = (ECMsgStore *)lpParam;
-	std::set<ULONG>::iterator iter;
+	std::set<ULONG>::const_iterator iter;
 
-	for(iter = lpThis->m_setAdviseConnections.begin(); iter != lpThis->m_setAdviseConnections.end(); iter++) {
+	for (iter = lpThis->m_setAdviseConnections.begin();
+	     iter != lpThis->m_setAdviseConnections.end(); ++iter)
 		lpThis->m_lpNotifyClient->Reregister(*iter);
-	}
-
 	return hr;
 }
 
@@ -905,28 +925,17 @@ exit:
 
 	if(lpPropStorage)
 		lpPropStorage->Release();
-
-	if(lpRootEntryID)
-		MAPIFreeBuffer(lpRootEntryID);
-
+	MAPIFreeBuffer(lpRootEntryID);
 	return hr;
 }
 
 HRESULT ECMsgStore::SetReceiveFolder(LPTSTR lpszMessageClass, ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID)
 {
-	HRESULT hr = hrSuccess;
-
 	// Non supported function for publicfolder
-	if(IsPublicStore() == TRUE) {
-		hr = MAPI_E_NO_SUPPORT;
-		goto exit;
-	}
+	if (IsPublicStore() == TRUE)
+		return MAPI_E_NO_SUPPORT;
 
-	hr = lpTransport->HrSetReceiveFolder(this->m_cbEntryId, this->m_lpEntryId, convstring(lpszMessageClass, ulFlags), cbEntryID, lpEntryID);
-
-exit:
-
-	return hr;
+	return lpTransport->HrSetReceiveFolder(this->m_cbEntryId, this->m_lpEntryId, convstring(lpszMessageClass, ulFlags), cbEntryID, lpEntryID);
 }
 
 // If the open store a publicstore
@@ -953,26 +962,21 @@ BOOL ECMsgStore::IsDelegateStore()
 
 HRESULT ECMsgStore::GetReceiveFolder(LPTSTR lpszMessageClass, ULONG ulFlags, ULONG *lpcbEntryID, LPENTRYID *lppEntryID, LPTSTR *lppszExplicitClass)
 {
-	HRESULT		hr = hrSuccess;
+	HRESULT hr;
 	ULONG		cbEntryID = 0;
 	LPENTRYID	lpEntryID = NULL;
 	utf8string	strExplicitClass;
 
 	// Non supported function for publicfolder
-	if(IsPublicStore() == TRUE) {
-		hr = MAPI_E_NO_SUPPORT;
-		goto exit;
-	}
-
+	if (IsPublicStore() == TRUE)
+		return MAPI_E_NO_SUPPORT;
 	// Check input/output variables
-	if(lpcbEntryID == NULL || lppEntryID == NULL) { // lppszExplicitClass may NULL
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpcbEntryID == NULL || lppEntryID == NULL) // lppszExplicitClass may NULL
+		return MAPI_E_INVALID_PARAMETER;
 
 	hr = lpTransport->HrGetReceiveFolder(this->m_cbEntryId, this->m_lpEntryId, convstring(lpszMessageClass, ulFlags), &cbEntryID, &lpEntryID, lppszExplicitClass ? &strExplicitClass : NULL);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	if(lpEntryID) {
 		*lpcbEntryID = cbEntryID;
@@ -988,7 +992,7 @@ HRESULT ECMsgStore::GetReceiveFolder(LPTSTR lpszMessageClass, ULONG ulFlags, ULO
 			
 			hr = MAPIAllocateBuffer(sizeof(std::wstring::value_type) * (dst.length() + 1), (void**)lppszExplicitClass);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 			
 			wcscpy((wchar_t*)*lppszExplicitClass, dst.c_str());
 		} else {
@@ -996,15 +1000,12 @@ HRESULT ECMsgStore::GetReceiveFolder(LPTSTR lpszMessageClass, ULONG ulFlags, ULO
 			
 			hr = MAPIAllocateBuffer(dst.length() + 1, (void**)lppszExplicitClass);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 			
 			strcpy((char*)*lppszExplicitClass, dst.c_str());
 		}
 	}
-
-exit:
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMsgStore::GetReceiveFolderTable(ULONG ulFlags, LPMAPITABLE *lppTable)
@@ -1041,8 +1042,7 @@ HRESULT ECMsgStore::GetReceiveFolderTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 	if(hr != hrSuccess)
 		goto exit;
 
-	for(i=0; i<lpsRowSet->cRows; i++)
-	{
+	for (i = 0; i < lpsRowSet->cRows; ++i) {
 		hr = lpMemTable->HrModifyRow(ECKeyTable::TABLE_ROW_ADD, NULL, lpsRowSet->aRow[i].lpProps, NUM_RFT_PROPS);
 		if(hr != hrSuccess)
 			goto exit;
@@ -1058,9 +1058,7 @@ HRESULT ECMsgStore::GetReceiveFolderTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 		goto exit;
 
 exit:
-	if (lpPropTagArray)
-		MAPIFreeBuffer(lpPropTagArray);
-
+	MAPIFreeBuffer(lpPropTagArray);
 	if(lpsRowSet)
 		FreeProws(lpsRowSet);
 
@@ -1074,31 +1072,19 @@ exit:
 }
 
 HRESULT ECMsgStore::StoreLogoff(ULONG *lpulFlags) {
-	HRESULT hr = hrSuccess;
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMsgStore::AbortSubmit(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags)
 {
-	HRESULT hr = hrSuccess;
-
 	// Non supported function for publicfolder
-	if(IsPublicStore() == TRUE) {
-		hr = MAPI_E_NO_SUPPORT;
-		goto exit;
-	}
-
+	if (IsPublicStore() == TRUE)
+		return MAPI_E_NO_SUPPORT;
 	// Check input/output variables
-	if(lpEntryID == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpEntryID == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
-	hr = lpTransport->HrAbortSubmit(cbEntryID, lpEntryID);
-
-exit:
-	return hr;
+	return lpTransport->HrAbortSubmit(cbEntryID, lpEntryID);
 }
 
 HRESULT ECMsgStore::GetOutgoingQueue(ULONG ulFlags, LPMAPITABLE *lppTable)
@@ -1294,32 +1280,26 @@ exit:
 
 HRESULT ECMsgStore::NotifyNewMail(LPNOTIFICATION lpNotification)
 {
-	HRESULT		hr = hrSuccess;
+	HRESULT hr;
 
 	// Only supported by the MAPI spooler
-	/*if(this->IsSpooler() == false) {
-		hr = MAPI_E_NO_SUPPORT;
-		goto exit;
-	}*/
+	/* if (this->IsSpooler() == false)
+		return MAPI_E_NO_SUPPORT;
+	*/
 
 	// Check input/output variables
-	if(lpNotification == NULL || lpNotification->info.newmail.lpParentID == NULL || lpNotification->info.newmail.lpEntryID == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpNotification == NULL || lpNotification->info.newmail.lpParentID == NULL || lpNotification->info.newmail.lpEntryID == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	hr = HrCompareEntryIdWithStoreGuid(lpNotification->info.newmail.cbEntryID, lpNotification->info.newmail.lpEntryID, &GetStoreGuid());
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	hr = HrCompareEntryIdWithStoreGuid(lpNotification->info.newmail.cbParentID, lpNotification->info.newmail.lpParentID, &GetStoreGuid());
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
-	hr = lpTransport->HrNotify(lpNotification);
-
-exit:
-	return hr;
+	return lpTransport->HrNotify(lpNotification);
 }
 
 HRESULT	ECMsgStore::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase)
@@ -1473,10 +1453,7 @@ HRESULT	ECMsgStore::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFl
 exit:
 	if(lpProfSect)
 		lpProfSect->Release();
-
-	if(lpProp)
-		MAPIFreeBuffer(lpProp);
-
+	MAPIFreeBuffer(lpProp);
 	return hr;
 }
 
@@ -1499,24 +1476,22 @@ HRESULT	ECMsgStore::SetPropHandler(ULONG ulPropTag, void* lpProvider, LPSPropVal
 
 HRESULT ECMsgStore::SetEntryId(ULONG cbEntryId, LPENTRYID lpEntryId)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	ASSERT(m_lpNotifyClient == NULL);
 
 	hr = ECGenericProp::SetEntryId(cbEntryId, lpEntryId);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	if(! (m_ulProfileFlags & EC_PROFILE_FLAGS_NO_NOTIFICATIONS)) {
 		// Create Notifyclient
 		hr = ECNotifyClient::Create(MAPI_STORE, this, m_ulProfileFlags, lpSupport, &m_lpNotifyClient);
 		ASSERT(m_lpNotifyClient != NULL);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 const GUID& ECMsgStore::GetStoreGuid()
@@ -1526,14 +1501,8 @@ const GUID& ECMsgStore::GetStoreGuid()
 
 HRESULT ECMsgStore::GetWrappedStoreEntryID(ULONG* lpcbWrapped, LPENTRYID* lppWrapped)
 {
-	HRESULT hr = hrSuccess;
-
 	//hr = WrapStoreEntryID(0, ZARAFA_DLL_NAME, CbEID(peid), (LPENTRYID)peid, &cbWrapped, &lpWrapped);
-	hr = lpSupport->WrapStoreEntryID(this->m_cbEntryId, this->m_lpEntryId, lpcbWrapped, lppWrapped);
-	if (hr != hrSuccess)
-		goto exit;
-exit:
-	return hr;
+	return lpSupport->WrapStoreEntryID(this->m_cbEntryId, this->m_lpEntryId, lpcbWrapped, lppWrapped);
 }
 
 // This is a function special for the spooler to get the right store entryid
@@ -1657,48 +1626,31 @@ HRESULT ECMsgStore::CreateStoreEntryID(LPTSTR lpszMsgStoreDN, LPTSTR lpszMailbox
 exit:
 	if (lpTmpTransport)
 		lpTmpTransport->Release();
-
-	if(lpStoreEntryID)
-		MAPIFreeBuffer(lpStoreEntryID);
-
+	MAPIFreeBuffer(lpStoreEntryID);
 	return hr;
 }
 
 HRESULT ECMsgStore::CreateStoreEntryID2(ULONG cValues, LPSPropValue lpProps, ULONG ulFlags, ULONG *lpcbEntryID, LPENTRYID *lppEntryID)
 {
-	HRESULT hr = hrSuccess;
 	LPSPropValue lpMsgStoreDN, lpMailboxDN;
 
 	lpMsgStoreDN = PpropFindProp(lpProps, cValues, PR_PROFILE_MDB_DN);
 	lpMailboxDN = PpropFindProp(lpProps, cValues, PR_PROFILE_MAILBOX);
 
-	if(!lpMsgStoreDN || !lpMailboxDN) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpMsgStoreDN == NULL || lpMailboxDN == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
-	hr = CreateStoreEntryID((LPTSTR)lpMsgStoreDN->Value.lpszA, (LPTSTR)lpMailboxDN->Value.lpszA, ulFlags & ~MAPI_UNICODE, lpcbEntryID, lppEntryID);
-
-exit:
-	return hr;
+	return CreateStoreEntryID((LPTSTR)lpMsgStoreDN->Value.lpszA, (LPTSTR)lpMailboxDN->Value.lpszA, ulFlags & ~MAPI_UNICODE, lpcbEntryID, lppEntryID);
 }
 
 HRESULT ECMsgStore::EntryIDFromSourceKey(ULONG cFolderKeySize, BYTE *lpFolderSourceKey,	ULONG cMessageKeySize, BYTE *lpMessageSourceKey, ULONG *lpcbEntryID, LPENTRYID *lppEntryID)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrEntryIDFromSourceKey(this->m_cbEntryId, this->m_lpEntryId, cFolderKeySize, lpFolderSourceKey, cMessageKeySize, lpMessageSourceKey, lpcbEntryID, lppEntryID);
-
-	return hr;
+	return lpTransport->HrEntryIDFromSourceKey(this->m_cbEntryId, this->m_lpEntryId, cFolderKeySize, lpFolderSourceKey, cMessageKeySize, lpMessageSourceKey, lpcbEntryID, lppEntryID);
 }
 
 HRESULT ECMsgStore::GetRights(ULONG cbUserEntryID, LPENTRYID lpUserEntryID, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG *lpulRights)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_NOT_FOUND;
-
-	return hr;
+	return MAPI_E_NOT_FOUND;
 }
 
 /**
@@ -1786,9 +1738,7 @@ HRESULT ECMsgStore::GetMailboxTable(LPTSTR lpszServerName, LPMAPITABLE *lppTable
 	lpMsgStore->AddChild(lpTable);
 
 exit:
-	if (lpEntryId)
-		MAPIFreeBuffer(lpEntryId);
-
+	MAPIFreeBuffer(lpEntryId);
 	if (lpMsgStoreOtherServer)
 		lpMsgStoreOtherServer->Release();
 
@@ -1825,11 +1775,7 @@ exit:
  */
 HRESULT ECMsgStore::GetPublicFolderTable(LPTSTR lpszServerName, LPMAPITABLE *lppTable, ULONG ulFlags)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_NOT_FOUND;
-
-	return hr;
+	return MAPI_E_NOT_FOUND;
 }
 
 /////////////////////////////
@@ -2088,9 +2034,7 @@ HRESULT ECMsgStore::AddRenAdditionalFolder(IMAPIFolder *lpFolder, ULONG ulType, 
 		goto exit;
 		
 exit:
-	if(lpRenEntryIDs)
-		MAPIFreeBuffer(lpRenEntryIDs);
-		
+	MAPIFreeBuffer(lpRenEntryIDs);
 	return hr;
 }
 
@@ -2159,9 +2103,7 @@ HRESULT ECMsgStore::CreateAdditionalFolder(IMAPIFolder *lpRootFolder,
 		goto exit;
 
 exit:
-	if (lpPropValueEID)
-		MAPIFreeBuffer(lpPropValueEID);
-		
+	MAPIFreeBuffer(lpPropValueEID);
 	if (lpMAPIFolder)
 		lpMAPIFolder->Release();
 		
@@ -2194,9 +2136,9 @@ HRESULT ECMsgStore::CreateStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpU
 
 	ECPERMISSION		sPermission;
 
-	LPECUSER			lpECUser = NULL;
-	LPECCOMPANY			lpECCompany = NULL;
-	LPECGROUP			lpECGroup = NULL;
+	ECUSER *lpECUser = NULL;
+	ECCOMPANY *lpECCompany = NULL;
+	ECGROUP *lpECGroup = NULL;
 
 	std::string			strBuffer;
 
@@ -2746,7 +2688,7 @@ HRESULT ECMsgStore::CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYI
 
 		hr = UnWrapServerClientStoreEntry(cbTmp, lpTmp, &cbStoreId, &lpStoreId);
 		if (hr != hrSuccess) {
-			if (lpTmp && lpTmp != *lppStoreId)
+			if (lpTmp != *lppStoreId)
 				MAPIFreeBuffer(lpTmp);
 			goto exit;
 		}
@@ -2780,9 +2722,9 @@ HRESULT ECMsgStore::CreateEmptyStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYI
 	}
 
 exit:
-	if (*lpcbStoreId == 0 && lpStoreId)
+	if (lpcbStoreId != NULL && *lpcbStoreId == 0)
 		MAPIFreeBuffer(lpStoreId);
-	if (*lpcbStoreId == 0 && lpRootId)
+	if (lpcbStoreId != NULL && *lpcbStoreId == 0)
 		MAPIFreeBuffer(lpRootId);
 
 	return hr;
@@ -2790,29 +2732,17 @@ exit:
 
 HRESULT ECMsgStore::HookStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId, LPGUID lpGuid)
 {
-	HRESULT			hr = hrSuccess;
-
-	hr = lpTransport->HrHookStore(ulStoreType, cbUserId, lpUserId, lpGuid, 0);
-
-	return hr;
+	return lpTransport->HrHookStore(ulStoreType, cbUserId, lpUserId, lpGuid, 0);
 }
 
 HRESULT ECMsgStore::UnhookStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lpUserId)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrUnhookStore(ulStoreType, cbUserId, lpUserId, 0);
-
-	return hr;
+	return lpTransport->HrUnhookStore(ulStoreType, cbUserId, lpUserId, 0);
 }
 
 HRESULT ECMsgStore::RemoveStore(LPGUID lpGuid)
 {
-	HRESULT			hr = hrSuccess;
-
-	hr = lpTransport->HrRemoveStore(lpGuid, 0);
-
-	return hr;
+	return lpTransport->HrRemoveStore(lpGuid, 0);
 }
 
 HRESULT ECMsgStore::ResolveStore(LPGUID lpGuid, ULONG *lpulUserID, ULONG* lpcbStoreID, LPENTRYID* lppStoreID)
@@ -2828,9 +2758,7 @@ HRESULT ECMsgStore::ResolveStore(LPGUID lpGuid, ULONG *lpulUserID, ULONG* lpcbSt
 	hr = WrapStoreEntryID(0, (LPTSTR)ZARAFA_DLL_NAME, cbStoreEntryID, lpStoreEntryID, lpcbStoreID, lppStoreID);
 
 exit:
-	if(lpStoreEntryID)
-		MAPIFreeBuffer(lpStoreEntryID);
-
+	MAPIFreeBuffer(lpStoreEntryID);
 	return hr;
 }
 
@@ -2857,31 +2785,28 @@ HRESULT ECMsgStore::SetSpecialEntryIdOnFolder(LPMAPIFOLDER lpFolder, ECMAPIProp 
 			ECAllocateMore(sizeof(SBinary)*lpPropMVValueNew->Value.MVbin.cValues, lpPropMVValueNew, (void**)&lpPropMVValueNew->Value.MVbin.lpbin);
 			memset(lpPropMVValueNew->Value.MVbin.lpbin, 0, sizeof(SBinary)*lpPropMVValueNew->Value.MVbin.cValues);
 
-			for(unsigned int i=0; i <lpPropMVValueNew->Value.MVbin.cValues; i++)
-			{
+			for (unsigned int i = 0; i <lpPropMVValueNew->Value.MVbin.cValues; ++i)
 				if(ulMVPos == i)
 					lpPropMVValueNew->Value.MVbin.lpbin[i] = lpPropValue->Value.bin;
-			}
 		}else{
 			lpPropMVValueNew->Value.MVbin.cValues = (lpPropMVValue->Value.MVbin.cValues < ulMVPos)? lpPropValue->Value.bin.cb : ulMVPos+1;
 			ECAllocateMore(sizeof(SBinary)*lpPropMVValueNew->Value.MVbin.cValues, lpPropMVValueNew, (void**)&lpPropMVValueNew->Value.MVbin.lpbin);
 
 			memset(lpPropMVValueNew->Value.MVbin.lpbin, 0, sizeof(SBinary)*lpPropMVValueNew->Value.MVbin.cValues);
 
-			for(unsigned int i=0; i <lpPropMVValueNew->Value.MVbin.cValues; i++)
-			{
+			for (unsigned int i = 0; i < lpPropMVValueNew->Value.MVbin.cValues; ++i)
 				if(ulMVPos == i)
 					lpPropMVValueNew->Value.MVbin.lpbin[i] = lpPropValue->Value.bin;
 				else
 					lpPropMVValueNew->Value.MVbin.lpbin[i] = lpPropMVValue->Value.MVbin.lpbin[i];
-			}
 		}
 
 		lpPropMVValueNew->ulPropTag = ulPropTag;
 
 		// Set the property into the right folder
 		hr = lpFolderPropSet->SetProps(1, lpPropMVValueNew, NULL);
-		if(hr != hrSuccess)
+		ECFreeBuffer(lpPropMVValueNew);
+		if (hr != hrSuccess)
 			goto exit;
 	}else{
 		// Set the property tag value
@@ -2973,384 +2898,233 @@ exit:
 	return hr;
 }
 
-HRESULT ECMsgStore::CreateUser(LPECUSER lpECUser, ULONG ulFlags, ULONG *lpcbUserId, LPENTRYID *lppUserId)
+HRESULT ECMsgStore::CreateUser(ECUSER *lpECUser, ULONG ulFlags,
+    ULONG *lpcbUserId, LPENTRYID *lppUserId)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrCreateUser(lpECUser, ulFlags, lpcbUserId, lppUserId);
-
-	return hr;
+	return lpTransport->HrCreateUser(lpECUser, ulFlags, lpcbUserId, lppUserId);
 }
 
-HRESULT ECMsgStore::SetUser(LPECUSER lpECUser, ULONG ulFlags)
+HRESULT ECMsgStore::SetUser(ECUSER *lpECUser, ULONG ulFlags)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrSetUser(lpECUser, ulFlags);
-
-	return hr;
+	return lpTransport->HrSetUser(lpECUser, ulFlags);
 }
 
-HRESULT ECMsgStore::GetUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, LPECUSER *lppECUser)
+HRESULT ECMsgStore::GetUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags,
+    ECUSER **lppECUser)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrGetUser(cbUserId, lpUserId, ulFlags, lppECUser);
-
-	return hr;
+	return lpTransport->HrGetUser(cbUserId, lpUserId, ulFlags, lppECUser);
 }
 
 HRESULT ECMsgStore::DeleteUser(ULONG cbUserId, LPENTRYID lpUserId)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrDeleteUser(cbUserId, lpUserId);
-
-	return hr;
+	return lpTransport->HrDeleteUser(cbUserId, lpUserId);
 }
 
 HRESULT ECMsgStore::ResolveUserName(LPCTSTR lpszUserName, ULONG ulFlags, ULONG *lpcbUserId, LPENTRYID *lppUserId)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrResolveUserName(lpszUserName, ulFlags, lpcbUserId, lppUserId);
-
-	return hr;
+	return lpTransport->HrResolveUserName(lpszUserName, ulFlags, lpcbUserId, lppUserId);
 }
 
-HRESULT ECMsgStore::GetSendAsList(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcSenders, LPECUSER *lppSenders)
+HRESULT ECMsgStore::GetSendAsList(ULONG cbUserId, LPENTRYID lpUserId,
+    ULONG ulFlags, ULONG *lpcSenders, ECUSER **lppSenders)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrGetSendAsList(cbUserId, lpUserId, ulFlags, lpcSenders, lppSenders);
-
-	return hr;
+	return lpTransport->HrGetSendAsList(cbUserId, lpUserId, ulFlags, lpcSenders, lppSenders);
 }
 
 HRESULT ECMsgStore::AddSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbSenderId, LPENTRYID lpSenderId)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrAddSendAsUser(cbUserId, lpUserId, cbSenderId, lpSenderId);
-
-	return hr;
+	return lpTransport->HrAddSendAsUser(cbUserId, lpUserId, cbSenderId, lpSenderId);
 }
 
 HRESULT ECMsgStore::DelSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbSenderId, LPENTRYID lpSenderId)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrDelSendAsUser(cbUserId, lpUserId, cbSenderId, lpSenderId);
-
-	return hr;
+	return lpTransport->HrDelSendAsUser(cbUserId, lpUserId, cbSenderId, lpSenderId);
 }
 
-HRESULT ECMsgStore::GetUserClientUpdateStatus(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, LPECUSERCLIENTUPDATESTATUS *lppECUCUS)
+HRESULT ECMsgStore::GetUserClientUpdateStatus(ULONG cbUserId,
+    LPENTRYID lpUserId, ULONG ulFlags, ECUSERCLIENTUPDATESTATUS **lppECUCUS)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrGetUserClientUpdateStatus(cbUserId, lpUserId, ulFlags, lppECUCUS);
-
-	return hr;
+	return lpTransport->HrGetUserClientUpdateStatus(cbUserId, lpUserId, ulFlags, lppECUCUS);
 }
 
 HRESULT ECMsgStore::RemoveAllObjects(ULONG cbUserId, LPENTRYID lpUserId)
 {
-	HRESULT hr = hrSuccess;
-	
-	hr = lpTransport->HrRemoveAllObjects(cbUserId, lpUserId);
-	
-	return hr;
+	return lpTransport->HrRemoveAllObjects(cbUserId, lpUserId);
 }
 
 HRESULT ECMsgStore::ResolveGroupName(LPCTSTR lpszGroupName, ULONG ulFlags, ULONG *lpcbGroupId, LPENTRYID *lppGroupId)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrResolveGroupName(lpszGroupName, ulFlags, lpcbGroupId, lppGroupId);
-
-	return hr;
+	return lpTransport->HrResolveGroupName(lpszGroupName, ulFlags, lpcbGroupId, lppGroupId);
 }
 
-HRESULT ECMsgStore::CreateGroup(LPECGROUP lpECGroup, ULONG ulFlags, ULONG *lpcbGroupId, LPENTRYID *lppGroupId)
+HRESULT ECMsgStore::CreateGroup(ECGROUP *lpECGroup, ULONG ulFlags,
+    ULONG *lpcbGroupId, LPENTRYID *lppGroupId)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrCreateGroup(lpECGroup, ulFlags, lpcbGroupId, lppGroupId);
-
-	return hr;
+	return lpTransport->HrCreateGroup(lpECGroup, ulFlags, lpcbGroupId, lppGroupId);
 }
 
-HRESULT ECMsgStore::SetGroup(LPECGROUP lpECGroup, ULONG ulFlags)
+HRESULT ECMsgStore::SetGroup(ECGROUP *lpECGroup, ULONG ulFlags)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrSetGroup(lpECGroup, ulFlags);
-
-	return hr;
+	return lpTransport->HrSetGroup(lpECGroup, ulFlags);
 }
 
-HRESULT ECMsgStore::GetGroup(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG ulFlags, LPECGROUP *lppECGroup)
+HRESULT ECMsgStore::GetGroup(ULONG cbGroupId, LPENTRYID lpGroupId,
+    ULONG ulFlags, ECGROUP **lppECGroup)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrGetGroup(cbGroupId, lpGroupId, ulFlags, lppECGroup);
-
-	return hr;
+	return lpTransport->HrGetGroup(cbGroupId, lpGroupId, ulFlags, lppECGroup);
 }
 
 HRESULT ECMsgStore::DeleteGroup(ULONG cbGroupId, LPENTRYID lpGroupId)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrDeleteGroup(cbGroupId, lpGroupId);
-
-	return hr;
+	return lpTransport->HrDeleteGroup(cbGroupId, lpGroupId);
 }
-
 
 //Group and user functions
 HRESULT ECMsgStore::DeleteGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG cbUserId, LPENTRYID lpUserId)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrDeleteGroupUser(cbGroupId, lpGroupId, cbUserId, lpUserId);
-
-	return hr;
+	return lpTransport->HrDeleteGroupUser(cbGroupId, lpGroupId, cbUserId, lpUserId);
 }
 
 HRESULT ECMsgStore::AddGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG cbUserId, LPENTRYID lpUserId)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrAddGroupUser(cbGroupId, lpGroupId, cbUserId, lpUserId);
-
-	return hr;
+	return lpTransport->HrAddGroupUser(cbGroupId, lpGroupId, cbUserId, lpUserId);
 }
 
-HRESULT ECMsgStore::GetUserListOfGroup(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG ulFlags, ULONG *lpcUsers, LPECUSER *lppsUsers)
+HRESULT ECMsgStore::GetUserListOfGroup(ULONG cbGroupId, LPENTRYID lpGroupId,
+    ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrGetUserListOfGroup(cbGroupId, lpGroupId, ulFlags, lpcUsers, lppsUsers);
-
-	return hr;
+	return lpTransport->HrGetUserListOfGroup(cbGroupId, lpGroupId, ulFlags, lpcUsers, lppsUsers);
 }
 
-HRESULT ECMsgStore::GetGroupListOfUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcGroups, LPECGROUP *lppsGroups)
+HRESULT ECMsgStore::GetGroupListOfUser(ULONG cbUserId, LPENTRYID lpUserId,
+    ULONG ulFlags, ULONG *lpcGroups, ECGROUP **lppsGroups)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrGetGroupListOfUser(cbUserId, lpUserId, ulFlags, lpcGroups, lppsGroups);
-
-	return hr;
+	return lpTransport->HrGetGroupListOfUser(cbUserId, lpUserId, ulFlags, lpcGroups, lppsGroups);
 }
 
-HRESULT ECMsgStore::CreateCompany(LPECCOMPANY lpECCompany, ULONG ulFlags, ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId)
+HRESULT ECMsgStore::CreateCompany(ECCOMPANY *lpECCompany, ULONG ulFlags,
+    ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrCreateCompany(lpECCompany, ulFlags, lpcbCompanyId, lppCompanyId);
-
-	return hr;
+	return lpTransport->HrCreateCompany(lpECCompany, ulFlags, lpcbCompanyId, lppCompanyId);
 }
 
 HRESULT ECMsgStore::DeleteCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrDeleteCompany(cbCompanyId, lpCompanyId);
-
-	return hr;
+	return lpTransport->HrDeleteCompany(cbCompanyId, lpCompanyId);
 }
 
-HRESULT ECMsgStore::SetCompany(LPECCOMPANY lpECCompany, ULONG ulFlags)
+HRESULT ECMsgStore::SetCompany(ECCOMPANY *lpECCompany, ULONG ulFlags)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrSetCompany(lpECCompany, ulFlags);
-
-	return hr;
+	return lpTransport->HrSetCompany(lpECCompany, ulFlags);
 }
 
-HRESULT ECMsgStore::GetCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, LPECCOMPANY *lppECCompany)
+HRESULT ECMsgStore::GetCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId,
+    ULONG ulFlags, ECCOMPANY **lppECCompany)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrGetCompany(cbCompanyId, lpCompanyId, ulFlags, lppECCompany);
-
-	return hr;
+	return lpTransport->HrGetCompany(cbCompanyId, lpCompanyId, ulFlags, lppECCompany);
 }
 
 HRESULT ECMsgStore::ResolveCompanyName(LPCTSTR lpszCompanyName, ULONG ulFlags, ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrResolveCompanyName(lpszCompanyName, ulFlags, lpcbCompanyId, lppCompanyId);
-
-	return hr;
+	return lpTransport->HrResolveCompanyName(lpszCompanyName, ulFlags, lpcbCompanyId, lppCompanyId);
 }
 
-HRESULT ECMsgStore::GetCompanyList(ULONG ulFlags, ULONG *lpcCompanies, LPECCOMPANY *lppsCompanies)
+HRESULT ECMsgStore::GetCompanyList(ULONG ulFlags, ULONG *lpcCompanies,
+    ECCOMPANY **lppsCompanies)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrGetCompanyList(ulFlags, lpcCompanies, lppsCompanies);
-
-	return hr;
+	return lpTransport->HrGetCompanyList(ulFlags, lpcCompanies, lppsCompanies);
 }
 
 HRESULT ECMsgStore::AddCompanyToRemoteViewList(ULONG cbSetCompanyId, LPENTRYID lpSetCompanyId, ULONG cbCompanyId, LPENTRYID lpCompanyId)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrAddCompanyToRemoteViewList(cbSetCompanyId, lpSetCompanyId, cbCompanyId, lpCompanyId);
-
-	return hr;
+	return lpTransport->HrAddCompanyToRemoteViewList(cbSetCompanyId, lpSetCompanyId, cbCompanyId, lpCompanyId);
 }
 
 HRESULT ECMsgStore::DelCompanyFromRemoteViewList(ULONG cbSetCompanyId, LPENTRYID lpSetCompanyId, ULONG cbCompanyId, LPENTRYID lpCompanyId)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrDelCompanyFromRemoteViewList(cbSetCompanyId, lpSetCompanyId, cbCompanyId, lpCompanyId);
-
-	return hr;
+	return lpTransport->HrDelCompanyFromRemoteViewList(cbSetCompanyId, lpSetCompanyId, cbCompanyId, lpCompanyId);
 }
 
-HRESULT ECMsgStore::GetRemoteViewList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcCompanies, LPECCOMPANY *lppsCompanies)
+HRESULT ECMsgStore::GetRemoteViewList(ULONG cbCompanyId, LPENTRYID lpCompanyId,
+    ULONG ulFlags, ULONG *lpcCompanies, ECCOMPANY **lppsCompanies)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrGetRemoteViewList(cbCompanyId, lpCompanyId, ulFlags, lpcCompanies, lppsCompanies);
-
-	return hr;
+	return lpTransport->HrGetRemoteViewList(cbCompanyId, lpCompanyId, ulFlags, lpcCompanies, lppsCompanies);
 }
 
 HRESULT ECMsgStore::AddUserToRemoteAdminList(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbCompanyId, LPENTRYID lpCompanyId)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrAddUserToRemoteAdminList(cbUserId, lpUserId, cbCompanyId, lpCompanyId);
-
-	return hr;
+	return lpTransport->HrAddUserToRemoteAdminList(cbUserId, lpUserId, cbCompanyId, lpCompanyId);
 }
 
 HRESULT ECMsgStore::DelUserFromRemoteAdminList(ULONG cbUserId, LPENTRYID lpUserId, ULONG cbCompanyId, LPENTRYID lpCompanyId)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrDelUserFromRemoteAdminList(cbUserId, lpUserId, cbCompanyId, lpCompanyId);
-
-	return hr;
+	return lpTransport->HrDelUserFromRemoteAdminList(cbUserId, lpUserId, cbCompanyId, lpCompanyId);
 }
 
-HRESULT ECMsgStore::GetRemoteAdminList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, LPECUSER *lppsUsers)
+HRESULT ECMsgStore::GetRemoteAdminList(ULONG cbCompanyId,
+    LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrGetRemoteAdminList(cbCompanyId, lpCompanyId, ulFlags, lpcUsers, lppsUsers);
-
-	return hr;
+	return lpTransport->HrGetRemoteAdminList(cbCompanyId, lpCompanyId, ulFlags, lpcUsers, lppsUsers);
 }
 
 HRESULT ECMsgStore::SyncUsers(ULONG cbCompanyId, LPENTRYID lpCompanyId)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->HrSyncUsers(cbCompanyId, lpCompanyId);
-
-	return hr;
+	return lpTransport->HrSyncUsers(cbCompanyId, lpCompanyId);
 }
 
-HRESULT ECMsgStore::GetQuota(ULONG cbUserId, LPENTRYID lpUserId, bool bGetUserDefault, LPECQUOTA* lppsQuota)
+HRESULT ECMsgStore::GetQuota(ULONG cbUserId, LPENTRYID lpUserId,
+    bool bGetUserDefault, ECQUOTA **lppsQuota)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->GetQuota(cbUserId, lpUserId, bGetUserDefault, lppsQuota);
-
-	return hr;
+	return lpTransport->GetQuota(cbUserId, lpUserId, bGetUserDefault, lppsQuota);
 }
 
-HRESULT ECMsgStore::SetQuota(ULONG cbUserId, LPENTRYID lpUserId, LPECQUOTA lpsQuota)
+HRESULT ECMsgStore::SetQuota(ULONG cbUserId, LPENTRYID lpUserId,
+    ECQUOTA *lpsQuota)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->SetQuota(cbUserId, lpUserId, lpsQuota);
-
-	return hr;
+	return lpTransport->SetQuota(cbUserId, lpUserId, lpsQuota);
 }
 
 HRESULT ECMsgStore::AddQuotaRecipient(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG cbRecipientId, LPENTRYID lpRecipientId, ULONG ulType)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->AddQuotaRecipient(cbCompanyId, lpCompanyId, cbRecipientId, lpRecipientId, ulType);
-
-	return hr;
+	return lpTransport->AddQuotaRecipient(cbCompanyId, lpCompanyId, cbRecipientId, lpRecipientId, ulType);
 }
 
 HRESULT ECMsgStore::DeleteQuotaRecipient(ULONG cbCompanyId, LPENTRYID lpCmopanyId, ULONG cbRecipientId, LPENTRYID lpRecipientId, ULONG ulType)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->DeleteQuotaRecipient(cbCompanyId, lpCmopanyId, cbRecipientId, lpRecipientId, ulType);
-
-	return hr;
+	return lpTransport->DeleteQuotaRecipient(cbCompanyId, lpCmopanyId, cbRecipientId, lpRecipientId, ulType);
 }
 
-HRESULT ECMsgStore::GetQuotaRecipients(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcUsers, LPECUSER *lppsUsers)
+HRESULT ECMsgStore::GetQuotaRecipients(ULONG cbUserId, LPENTRYID lpUserId,
+    ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->GetQuotaRecipients(cbUserId, lpUserId, ulFlags, lpcUsers, lppsUsers);
-
-	return hr;
+	return lpTransport->GetQuotaRecipients(cbUserId, lpUserId, ulFlags, lpcUsers, lppsUsers);
 }
 
-HRESULT ECMsgStore::GetQuotaStatus(ULONG cbUserId, LPENTRYID lpUserId, LPECQUOTASTATUS* lppsQuotaStatus)
+HRESULT ECMsgStore::GetQuotaStatus(ULONG cbUserId, LPENTRYID lpUserId,
+    ECQUOTASTATUS **lppsQuotaStatus)
 {
-	HRESULT	hr = hrSuccess;
-
-	hr = lpTransport->GetQuotaStatus(cbUserId, lpUserId, lppsQuotaStatus);
-
-	return hr;
+	return lpTransport->GetQuotaStatus(cbUserId, lpUserId, lppsQuotaStatus);
 }
 
 HRESULT ECMsgStore::PurgeSoftDelete(ULONG ulDays)
 {
-    HRESULT hr = hrSuccess;
-    
-    hr = lpTransport->HrPurgeSoftDelete(ulDays);
-    
-    return hr;
+	return lpTransport->HrPurgeSoftDelete(ulDays);
 }
 
 HRESULT ECMsgStore::PurgeCache(ULONG ulFlags)
 {
-    HRESULT hr = hrSuccess;
-    
-    hr = lpTransport->HrPurgeCache(ulFlags);
-    
-    return hr;
+	return lpTransport->HrPurgeCache(ulFlags);
 }
 
 HRESULT ECMsgStore::PurgeDeferredUpdates(ULONG *lpulRemaining)
 {
-	HRESULT hr = hrSuccess;
-	
-	hr = lpTransport->HrPurgeDeferredUpdates(lpulRemaining);
-	
-	return hr;
+	return lpTransport->HrPurgeDeferredUpdates(lpulRemaining);
 }
 
-HRESULT ECMsgStore::GetServerDetails(LPECSVRNAMELIST lpServerNameList, ULONG ulFlags, LPECSERVERLIST* lppsServerList)
+HRESULT ECMsgStore::GetServerDetails(ECSVRNAMELIST *lpServerNameList,
+    ULONG ulFlags, ECSERVERLIST **lppsServerList)
 {
-	HRESULT hr = hrSuccess;
-	
-	hr = lpTransport->HrGetServerDetails(lpServerNameList, ulFlags, lppsServerList);
-	
-	return hr;
+	return lpTransport->HrGetServerDetails(lpServerNameList, ulFlags, lppsServerList);
 }
 
 HRESULT ECMsgStore::OpenUserStoresTable(ULONG ulFlags, LPMAPITABLE *lppTable)
@@ -3396,16 +3170,12 @@ exit:
 
 HRESULT ECMsgStore::ResolvePseudoUrl(char *lpszPseudoUrl, char **lppszServerPath, bool *lpbIsPeer)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrResolvePseudoUrl(lpszPseudoUrl, lppszServerPath, lpbIsPeer);
-
-	return hr;
+	return lpTransport->HrResolvePseudoUrl(lpszPseudoUrl, lppszServerPath, lpbIsPeer);
 }
 
 HRESULT ECMsgStore::GetPublicStoreEntryID(ULONG ulFlags, ULONG* lpcbStoreID, LPENTRYID* lppStoreID)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG cbStoreID;
 	EntryIdPtr ptrStoreID;
 	std::string strRedirServer;
@@ -3416,50 +3186,42 @@ HRESULT ECMsgStore::GetPublicStoreEntryID(ULONG ulFlags, ULONG* lpcbStoreID, LPE
 
 		hr = lpTransport->CreateAndLogonAlternate(strRedirServer.c_str(), &ptrTransport);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		hr = ptrTransport->HrGetPublicStore(ulFlags, &cbStoreID, &ptrStoreID);
 	}
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
-	hr = lpSupport->WrapStoreEntryID(cbStoreID, ptrStoreID, lpcbStoreID, lppStoreID);
-
-exit:
-	return hr;
+	return lpSupport->WrapStoreEntryID(cbStoreID, ptrStoreID, lpcbStoreID, lppStoreID);
 }
 
 HRESULT ECMsgStore::GetArchiveStoreEntryID(LPCTSTR lpszUserName, LPCTSTR lpszServerName, ULONG ulFlags, ULONG* lpcbStoreID, LPENTRYID* lppStoreID)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG cbStoreID;
 	EntryIdPtr ptrStoreID;
 
-	if (lpszUserName == NULL || lpcbStoreID == NULL || lppStoreID == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpszUserName == NULL || lpcbStoreID == NULL || lppStoreID == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	if (lpszServerName != NULL) {
 		WSTransportPtr ptrTransport;
 
 		hr = GetTransportToNamedServer(lpTransport, lpszServerName, ulFlags, &ptrTransport);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		hr = ptrTransport->HrResolveTypedStore(convstring(lpszUserName, ulFlags), ECSTORE_TYPE_ARCHIVE, &cbStoreID, &ptrStoreID);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	} else {
 		hr = lpTransport->HrResolveTypedStore(convstring(lpszUserName, ulFlags), ECSTORE_TYPE_ARCHIVE, &cbStoreID, &ptrStoreID);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 
-	hr = lpSupport->WrapStoreEntryID(cbStoreID, ptrStoreID, lpcbStoreID, lppStoreID);
-
-exit:
-	return hr;
+	return lpSupport->WrapStoreEntryID(cbStoreID, ptrStoreID, lpcbStoreID, lppStoreID);
 }
 
 HRESULT ECMsgStore::ResetFolderCount(ULONG cbEntryId, LPENTRYID lpEntryId, ULONG *lpulUpdates)
@@ -3505,19 +3267,11 @@ exit:
 HRESULT ECMsgStore::DeleteFromMasterOutgoingTable(ULONG cbEntryId,
     const ENTRYID *lpEntryId, ULONG ulFlags)
 {
-	HRESULT hr = hrSuccess;
-
 	// Check input/output variables
-	if(lpEntryId == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpEntryId == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
-	hr = this->lpTransport->HrFinishedMessage(cbEntryId, lpEntryId, EC_SUBMIT_MASTER | ulFlags);
-
-exit:
-
-	return hr;
+	return this->lpTransport->HrFinishedMessage(cbEntryId, lpEntryId, EC_SUBMIT_MASTER | ulFlags);
 }
 
 
@@ -3527,47 +3281,27 @@ exit:
 
 HRESULT ECMsgStore::SetCurrentState(ULONG ulFlags, ULONG ulMask, ULONG ulState, void* pReserved)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_NO_SUPPORT;
-
-	return hr;
+	return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT ECMsgStore::GetCapabilities(ULONG *pulCapabilities)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_NO_SUPPORT;
-
-	return hr;
+	return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT ECMsgStore::GetCurrentState(ULONG* pulState)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_NO_SUPPORT;
-
-	return hr;
+	return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT ECMsgStore::Advise(ULONG ulFlags, MAPIOFFLINE_ADVISEINFO* pAdviseInfo, ULONG* pulAdviseToken)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_NO_SUPPORT;
-
-	return hr;
+	return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT ECMsgStore::Unadvise(ULONG ulFlags,ULONG ulAdviseToken)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_NO_SUPPORT;
-
-	return hr;
+	return MAPI_E_NO_SUPPORT;
 }
 
 //////////////////////////
@@ -3576,19 +3310,12 @@ HRESULT ECMsgStore::Unadvise(ULONG ulFlags,ULONG ulAdviseToken)
 
 HRESULT ECMsgStore::UnwrapNoRef(LPVOID *ppvObject) 
 {
-	HRESULT hr = hrSuccess;
-
-	if (ppvObject == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (ppvObject == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	// Because the function UnwrapNoRef return a non referenced object, QueryInterface isn't needed.
 	*ppvObject = &this->m_xMsgStoreProxy;	
-	
-exit:
-
-	return hr;
+	return hrSuccess;
 }
 
 //////////////////////////
@@ -3639,56 +3366,32 @@ exit:
 
 HRESULT ECMsgStore::LicenseAuth(unsigned char *lpData, unsigned int ulSize, unsigned char **lppResponse, unsigned int * lpulResponseData)
 {
-    HRESULT hr = hrSuccess;
-    
-    hr = lpTransport->HrLicenseAuth(lpData, ulSize, lppResponse, lpulResponseData);
-    
-    return hr;
+	return lpTransport->HrLicenseAuth(lpData, ulSize, lppResponse, lpulResponseData);
 }
 
 HRESULT ECMsgStore::LicenseCapa(unsigned int ulServiceType, char ***lppszCapas, unsigned int *lpulSize)
 {
-    HRESULT hr = hrSuccess;
-    
-    hr = lpTransport->HrLicenseCapa(ulServiceType, lppszCapas, lpulSize);
-    
-    return hr;
+	return lpTransport->HrLicenseCapa(ulServiceType, lppszCapas, lpulSize);
 }
 
 HRESULT ECMsgStore::LicenseUsers(unsigned int ulServiceType, unsigned int *lpulUsers)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = lpTransport->HrLicenseUsers(ulServiceType, lpulUsers);
-
-	return hr;
+	return lpTransport->HrLicenseUsers(ulServiceType, lpulUsers);
 }
 
 HRESULT ECMsgStore::TestPerform(char *szCommand, unsigned int ulArgs, char **lpszArgs)
 {
-	HRESULT hr = hrSuccess;
-	
-	hr = lpTransport->HrTestPerform(szCommand, ulArgs, lpszArgs);
-	
-	return hr;
+	return lpTransport->HrTestPerform(szCommand, ulArgs, lpszArgs);
 }
 
 HRESULT ECMsgStore::TestSet(char *szName, char *szValue)
 {
-	HRESULT hr = hrSuccess;
-	
-	hr = lpTransport->HrTestSet(szName, szValue);
-	
-	return hr;
+	return lpTransport->HrTestSet(szName, szValue);
 }
 
 HRESULT ECMsgStore::TestGet(char *szName, char **szValue)
 {
-	HRESULT hr = hrSuccess;
-	
-	hr = lpTransport->HrTestGet(szName, szValue);
-	
-	return hr;
+	return lpTransport->HrTestGet(szName, szValue);
 }
 
 /**
@@ -3713,43 +3416,32 @@ HRESULT ECMsgStore::TestGet(char *szName, char **szValue)
  */
 HRESULT ECMsgStore::MsgStoreDnToPseudoUrl(const utf8string &strMsgStoreDN, utf8string *lpstrPseudoUrl)
 {
-	HRESULT hr = hrSuccess;
 	vector<string> parts;
 	vector<string>::const_reverse_iterator riPart;
 
 	parts = tokenize(strMsgStoreDN.str(), "/");
 
 	// We need at least 2 parts.
-	if (parts.size() < 2) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (parts.size() < 2)
+		return MAPI_E_INVALID_PARAMETER;
 
 	// Check if the last part equals 'cn=Microsoft Private MDB'
 	riPart = parts.rbegin();
-	if (stricmp(riPart->c_str(), "cn=Microsoft Private MDB") != 0) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (stricmp(riPart->c_str(), "cn=Microsoft Private MDB") != 0)
+		return MAPI_E_INVALID_PARAMETER;
 
 	// Check if the for last part starts with 'cn='
-	riPart++;
-	if (strnicmp(riPart->c_str(), "cn=", 3) != 0) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	++riPart;
+	if (strnicmp(riPart->c_str(), "cn=", 3) != 0)
+		return MAPI_E_INVALID_PARAMETER;
 
 	// If the server has no home server information for a user, the servername will be set to 'Unknown'
 	// Return MAPI_E_NO_SUPPORT in that case.
-	if (stricmp(riPart->c_str(), "cn=Unknown") == 0) {
-		hr = MAPI_E_NO_SUPPORT;
-		goto exit;
-	}
+	if (stricmp(riPart->c_str(), "cn=Unknown") == 0)
+		return MAPI_E_NO_SUPPORT;
 
 	*lpstrPseudoUrl = utf8string::from_string("pseudo://" + riPart->substr(3));
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -3768,22 +3460,16 @@ exit:
  */
 HRESULT ECMsgStore::ExportMessageChangesAsStream(ULONG ulFlags, ULONG ulPropTag, std::vector<ICSCHANGE> &sChanges, ULONG ulStart, ULONG ulCount, LPSPropTagArray lpsProps, WSMessageStreamExporter **lppsStreamExporter)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	WSMessageStreamExporterPtr ptrStreamExporter;
 	WSTransportPtr ptrTransport;
 
-	if (ulStart > sChanges.size()) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (ulStart > sChanges.size())
+		return MAPI_E_INVALID_PARAMETER;
 	if (ulStart + ulCount > sChanges.size())
 		ulCount = sChanges.size() - ulStart;
-
-	if (ulCount == 0) {
-		hr = MAPI_E_UNABLE_TO_COMPLETE;
-		goto exit;
-	}
+	if (ulCount == 0)
+		return MAPI_E_UNABLE_TO_COMPLETE;
 
 	// Need to clone the transport since we want to be able to use our own transport for other things
 	// while the streaming is going on; you should be able to intermix Synchronize() calls on the exporter
@@ -3791,16 +3477,14 @@ HRESULT ECMsgStore::ExportMessageChangesAsStream(ULONG ulFlags, ULONG ulPropTag,
 	// Synchronize() calls.
 	hr = GetMsgStore()->lpTransport->CloneAndRelogon(&ptrTransport);
 	if (hr != hrSuccess)
-		goto exit;
-	
+		return hr;
+
 	hr = ptrTransport->HrExportMessageChangesAsStream(ulFlags, ulPropTag, &sChanges.front(), ulStart, ulCount, lpsProps, &ptrStreamExporter);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	*lppsStreamExporter = ptrStreamExporter.release();
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 
@@ -4173,7 +3857,8 @@ HRESULT ECMsgStore::xECServiceAdmin::ResolveStore(LPGUID lpGuid, ULONG *lpulUser
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::CreateUser(LPECUSER lpECUser, ULONG ulFlags, ULONG *lpcbUserId, LPENTRYID *lppUserId)
+HRESULT ECMsgStore::xECServiceAdmin::CreateUser(ECUSER *lpECUser,
+    ULONG ulFlags, ULONG *lpcbUserId, LPENTRYID *lppUserId)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::CreateUser", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4182,7 +3867,7 @@ HRESULT ECMsgStore::xECServiceAdmin::CreateUser(LPECUSER lpECUser, ULONG ulFlags
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::SetUser(LPECUSER lpECUser, ULONG ulFlags)
+HRESULT ECMsgStore::xECServiceAdmin::SetUser(ECUSER *lpECUser, ULONG ulFlags)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::SetUser", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4191,7 +3876,8 @@ HRESULT ECMsgStore::xECServiceAdmin::SetUser(LPECUSER lpECUser, ULONG ulFlags)
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, LPECUSER *lppECUser)
+HRESULT ECMsgStore::xECServiceAdmin::GetUser(ULONG cbUserId,
+    LPENTRYID lpUserId, ULONG ulFlags, ECUSER **lppECUser)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetUser", "userid=%d", ABEID_ID(lpUserId));
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4209,7 +3895,8 @@ HRESULT ECMsgStore::xECServiceAdmin::DeleteUser(ULONG cbUserId, LPENTRYID lpUser
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, LPECUSER* lpsUsers)
+HRESULT ECMsgStore::xECServiceAdmin::GetUserList(ULONG cbCompanyId,
+    LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lpsUsers)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetUserList", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4218,7 +3905,8 @@ HRESULT ECMsgStore::xECServiceAdmin::GetUserList(ULONG cbCompanyId, LPENTRYID lp
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetSendAsList(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcSenders, LPECUSER *lppSenders)
+HRESULT ECMsgStore::xECServiceAdmin::GetSendAsList(ULONG cbUserId,
+    LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcSenders, ECUSER **lppSenders)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetSendAsList", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4245,7 +3933,8 @@ HRESULT ECMsgStore::xECServiceAdmin::DelSendAsUser(ULONG cbUserId, LPENTRYID lpU
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetUserClientUpdateStatus(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, LPECUSERCLIENTUPDATESTATUS *lppECUCUS)
+HRESULT ECMsgStore::xECServiceAdmin::GetUserClientUpdateStatus(ULONG cbUserId,
+    LPENTRYID lpUserId, ULONG ulFlags, ECUSERCLIENTUPDATESTATUS **lppECUCUS)
 {
     TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetUserClientUpdateStatus", "");
     METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4281,7 +3970,8 @@ HRESULT ECMsgStore::xECServiceAdmin::ResolveUserName(LPCTSTR lpszUserName, ULONG
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::CreateGroup(LPECGROUP lpECGroup, ULONG ulFlags, ULONG *lpcbGroupId, LPENTRYID *lppGroupId)
+HRESULT ECMsgStore::xECServiceAdmin::CreateGroup(ECGROUP *lpECGroup,
+    ULONG ulFlags, ULONG *lpcbGroupId, LPENTRYID *lppGroupId)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::CreateGroup", "%s", (lpECGroup->lpszGroupname)?lpECGroup->lpszGroupname:(LPTSTR)"NULL");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4290,7 +3980,8 @@ HRESULT ECMsgStore::xECServiceAdmin::CreateGroup(LPECGROUP lpECGroup, ULONG ulFl
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::SetGroup(LPECGROUP lpECGroup, ULONG ulFlags)
+HRESULT ECMsgStore::xECServiceAdmin::SetGroup(ECGROUP *lpECGroup,
+    ULONG ulFlags)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::SetGroup", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4299,7 +3990,8 @@ HRESULT ECMsgStore::xECServiceAdmin::SetGroup(LPECGROUP lpECGroup, ULONG ulFlags
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetGroup(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG ulFlags, LPECGROUP *lppECGroup)
+HRESULT ECMsgStore::xECServiceAdmin::GetGroup(ULONG cbGroupId,
+    LPENTRYID lpGroupId, ULONG ulFlags, ECGROUP **lppECGroup)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetGroup", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4317,7 +4009,9 @@ HRESULT ECMsgStore::xECServiceAdmin::DeleteGroup(ULONG cbGroupId, LPENTRYID lpGr
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcGroups, LPECGROUP *lppsGroups)
+HRESULT ECMsgStore::xECServiceAdmin::GetGroupList(ULONG cbCompanyId,
+    LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcGroups,
+    ECGROUP **lppsGroups)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetGroupList", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4345,7 +4039,8 @@ HRESULT ECMsgStore::xECServiceAdmin::AddGroupUser(ULONG cbGroupId, LPENTRYID lpG
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetUserListOfGroup(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG ulFlags, ULONG *lpcUsers, LPECUSER *lppsUsers)
+HRESULT ECMsgStore::xECServiceAdmin::GetUserListOfGroup(ULONG cbGroupId,
+    LPENTRYID lpGroupId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetUserListOfGroup", "group=%s", bin2hex(cbGroupId, (unsigned char*)lpGroupId).c_str());
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4354,7 +4049,8 @@ HRESULT ECMsgStore::xECServiceAdmin::GetUserListOfGroup(ULONG cbGroupId, LPENTRY
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetGroupListOfUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcGroups, LPECGROUP *lppsGroups)
+HRESULT ECMsgStore::xECServiceAdmin::GetGroupListOfUser(ULONG cbUserId,
+    LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcGroups, ECGROUP **lppsGroups)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetGroupListOfUser", "user=%d", ABEID_ID(lpUserId));
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4363,7 +4059,8 @@ HRESULT ECMsgStore::xECServiceAdmin::GetGroupListOfUser(ULONG cbUserId, LPENTRYI
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::CreateCompany(LPECCOMPANY lpECCompany, ULONG ulFlags, ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId)
+HRESULT ECMsgStore::xECServiceAdmin::CreateCompany(ECCOMPANY *lpECCompany,
+    ULONG ulFlags, ULONG *lpcbCompanyId, LPENTRYID *lppCompanyId)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::CreateCompany", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4381,7 +4078,8 @@ HRESULT ECMsgStore::xECServiceAdmin::DeleteCompany(ULONG cbCompanyId, LPENTRYID 
 	return hr; 
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::SetCompany(LPECCOMPANY lpECCompany, ULONG ulFlags)
+HRESULT ECMsgStore::xECServiceAdmin::SetCompany(ECCOMPANY *lpECCompany,
+    ULONG ulFlags)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::SetCompany", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4390,7 +4088,8 @@ HRESULT ECMsgStore::xECServiceAdmin::SetCompany(LPECCOMPANY lpECCompany, ULONG u
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, LPECCOMPANY *lppECCompany)
+HRESULT ECMsgStore::xECServiceAdmin::GetCompany(ULONG cbCompanyId,
+    LPENTRYID lpCompanyId, ULONG ulFlags, ECCOMPANY **lppECCompany)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetCompany", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4408,7 +4107,8 @@ HRESULT ECMsgStore::xECServiceAdmin::ResolveCompanyName(LPCTSTR lpszCompanyName,
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetCompanyList(ULONG ulFlags, ULONG *lpcCompanies, LPECCOMPANY *lppsCompanies)
+HRESULT ECMsgStore::xECServiceAdmin::GetCompanyList(ULONG ulFlags,
+    ULONG *lpcCompanies, ECCOMPANY **lppsCompanies)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetCompanyList", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4435,7 +4135,9 @@ HRESULT ECMsgStore::xECServiceAdmin::DelCompanyFromRemoteViewList(ULONG cbSetCom
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetRemoteViewList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcCompanies, LPECCOMPANY *lppsCompanies)
+HRESULT ECMsgStore::xECServiceAdmin::GetRemoteViewList(ULONG cbCompanyId,
+    LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcCompanies,
+    ECCOMPANY **lppsCompanies)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetRemoteViewList", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4462,7 +4164,8 @@ HRESULT ECMsgStore::xECServiceAdmin::DelUserFromRemoteAdminList(ULONG cbUserId, 
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetRemoteAdminList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, LPECUSER *lppsUsers)
+HRESULT ECMsgStore::xECServiceAdmin::GetRemoteAdminList(ULONG cbCompanyId,
+    LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetRemoteAdminList", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4480,7 +4183,8 @@ HRESULT ECMsgStore::xECServiceAdmin::SyncUsers(ULONG cbCompanyId, LPENTRYID lpCo
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetQuota(ULONG cbUserId, LPENTRYID lpUserId, bool bGetUserDefault, LPECQUOTA* lppsQuota)
+HRESULT ECMsgStore::xECServiceAdmin::GetQuota(ULONG cbUserId,
+    LPENTRYID lpUserId, bool bGetUserDefault, ECQUOTA **lppsQuota)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetQuota", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4489,7 +4193,8 @@ HRESULT ECMsgStore::xECServiceAdmin::GetQuota(ULONG cbUserId, LPENTRYID lpUserId
 	return hr;
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::SetQuota(ULONG cbUserId, LPENTRYID lpUserId, LPECQUOTA lpsQuota)
+HRESULT ECMsgStore::xECServiceAdmin::SetQuota(ULONG cbUserId,
+    LPENTRYID lpUserId, ECQUOTA *lpsQuota)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::SetQuota", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4512,14 +4217,16 @@ HRESULT ECMsgStore::xECServiceAdmin::DeleteQuotaRecipient(ULONG cbCompanyId, LPE
 	return pThis->DeleteQuotaRecipient(cbCompanyId, lpCmopanyId, cbRecipientId, lpRecipientId, ulType);
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetQuotaRecipients(ULONG cbUserId, LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcUsers, LPECUSER *lppsUsers)
+HRESULT ECMsgStore::xECServiceAdmin::GetQuotaRecipients(ULONG cbUserId,
+    LPENTRYID lpUserId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetQuotarecipients", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
 	return pThis->GetQuotaRecipients(cbUserId, lpUserId, ulFlags, lpcUsers, lppsUsers);
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetQuotaStatus(ULONG cbUserId, LPENTRYID lpUserId, LPECQUOTASTATUS* lppsQuotaStatus)
+HRESULT ECMsgStore::xECServiceAdmin::GetQuotaStatus(ULONG cbUserId,
+    LPENTRYID lpUserId, ECQUOTASTATUS **lppsQuotaStatus)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetQuotaStatus", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);
@@ -4547,7 +4254,8 @@ HRESULT ECMsgStore::xECServiceAdmin::PurgeDeferredUpdates(ULONG *lpulRemaining)
 	return pThis->PurgeDeferredUpdates(lpulRemaining);
 }
 
-HRESULT ECMsgStore::xECServiceAdmin::GetServerDetails(LPECSVRNAMELIST lpServerNameList, ULONG ulFlags, LPECSERVERLIST* lppsServerList)
+HRESULT ECMsgStore::xECServiceAdmin::GetServerDetails(ECSVRNAMELIST *lpServerNameList,
+    ULONG ulFlags, ECSERVERLIST **lppsServerList)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IECServiceAdmin::GetServerDetails", "");
 	METHOD_PROLOGUE_(ECMsgStore, ECServiceAdmin);

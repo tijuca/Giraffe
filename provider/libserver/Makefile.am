@@ -16,6 +16,8 @@ AM_CPPFLAGS = ${ZCPPFLAGS} ${DEBUGFLAGS} ${BOOST_CPPFLAGS} \
 # provider/zarafa/Makefile.am. Probably such that other components including
 # libzarafa_server.la (provider/plugins/) _don't_ get tcmalloc.
 
+pkginclude_HEADERS = include/zarafa/ECPluginSharedData.h
+
 lib_LTLIBRARIES = libzarafa_server.la
 #noinst_DATA = libserver.ldd
 
@@ -58,6 +60,7 @@ libzarafa_server_la_SOURCES = \
 	ECMultiStoreTable.cpp ECMultiStoreTable.h \
 	ECUserStoreTable.cpp ECUserStoreTable.h \
 	ECConversion.cpp ECConversion.h \
+	ECS3Attachment.cpp ECS3Attachment.h \
 	ECAttachmentStorage.cpp ECAttachmentStorage.h \
 	ECStatsCollector.cpp ECStatsCollector.h \
 	ECStatsTables.cpp ECStatsTables.h \
@@ -72,7 +75,9 @@ libzarafa_server_la_SOURCES = \
 	ECLockManager.cpp ECLockManager.h
 libzarafa_server_la_LIBADD = \
 	../../common/libzcp_common_util.la ../common/libzarafacommon.la \
-	-lpthread ${KRB5_LIBS} ${MYSQL_LIBS} ${PAM_LIBS} ${SSL_LIBS}
+	-lpthread ${icu_i18n_LIBS} ${icu_uc_LIBS} \
+	${KRB5_LIBS} ${MYSQL_LIBS} ${PAM_LIBS} ${SSL_LIBS} \
+	${TCMALLOC_LIBS} ${s3_LIBS}
 libzarafa_server_la_LDFLAGS = ${AM_LDFLAGS} \
 	-Wl,--version-script=${top_builddir}/default.sym
 EXTRA_libzarafa_server_la_DEPENDENCIES = ${top_builddir}/default.sym

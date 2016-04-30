@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ECFreeBusyUpdate.h"
 #include "freebusytags.h"
 
@@ -110,11 +84,8 @@ HRESULT ECFreeBusyUpdate::PublishFreeBusy(FBBlock_1 *lpBlocks, ULONG nBlocks)
 		goto exit;
 	}
 
-	for(ULONG i=0; i < nBlocks; i++)
-	{
+	for (ULONG i = 0; i < nBlocks; ++i)
 		m_fbBlockList.Add(&lpBlocks[i]);
-	}
-
 exit:
 	return hr;
 }
@@ -197,7 +168,7 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
 
 	ulMonths = DiffYearMonthToMonth(&tmStart, &tmEnd);
 	if(ulMonths == 0)
-		ulMonths++;
+		++ulMonths;
 
 	cValues = 9;
 	cProps = 0;
@@ -229,11 +200,8 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
 		hr = m_lpMessage->SetProps(2, lpPropFBDataArray, NULL);
 		if(hr != hrSuccess)
 			goto exit;
-
-		if(lpPropFBDataArray){ 
-			MAPIFreeBuffer(lpPropFBDataArray); 
-			lpPropFBDataArray = NULL;
-		}
+		MAPIFreeBuffer(lpPropFBDataArray);
+		lpPropFBDataArray = NULL;
 	}
 
 	if(CreateFBProp(fbBusy, ulMonths, PR_FREEBUSY_BUSY_MONTHS, PR_FREEBUSY_BUSY_EVENTS, &m_fbBlockList, &lpPropFBDataArray) == hrSuccess)
@@ -241,11 +209,8 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
 		hr = m_lpMessage->SetProps(2, lpPropFBDataArray, NULL);
 		if(hr != hrSuccess)
 			goto exit;
-
-		if(lpPropFBDataArray){
-			MAPIFreeBuffer(lpPropFBDataArray);
-			lpPropFBDataArray = NULL;
-		}
+		MAPIFreeBuffer(lpPropFBDataArray);
+		lpPropFBDataArray = NULL;
 	}
 	
 	if(CreateFBProp(fbTentative, ulMonths, PR_FREEBUSY_TENTATIVE_MONTHS,PR_FREEBUSY_TENTATIVE_EVENTS, &m_fbBlockList, &lpPropFBDataArray) == hrSuccess)
@@ -253,8 +218,8 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
 		hr = m_lpMessage->SetProps(2, lpPropFBDataArray, NULL);
 		if(hr != hrSuccess)
 			goto exit;
-
-		if(lpPropFBDataArray){ MAPIFreeBuffer(lpPropFBDataArray); lpPropFBDataArray = NULL; }
+		MAPIFreeBuffer(lpPropFBDataArray);
+		lpPropFBDataArray = NULL;
 	}
 
 	if(CreateFBProp(fbOutOfOffice, ulMonths, PR_FREEBUSY_OOF_MONTHS,PR_FREEBUSY_OOF_EVENTS, &m_fbBlockList, &lpPropFBDataArray) == hrSuccess)
@@ -262,8 +227,8 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
 		hr = m_lpMessage->SetProps(2, lpPropFBDataArray, NULL);
 		if(hr != hrSuccess)
 			goto exit;
-
-		if(lpPropFBDataArray){ MAPIFreeBuffer(lpPropFBDataArray); lpPropFBDataArray = NULL; }
+		MAPIFreeBuffer(lpPropFBDataArray);
+		lpPropFBDataArray = NULL;
 	}
 
 	hr = m_lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
@@ -272,13 +237,8 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
 
 exit:
 	m_fbBlockList.Reset();
-
-	if(lpPropArray)
-		MAPIFreeBuffer(lpPropArray);
-
-	if(lpPropFBDataArray)
-		MAPIFreeBuffer(lpPropFBDataArray);
-
+	MAPIFreeBuffer(lpPropArray);
+	MAPIFreeBuffer(lpPropFBDataArray);
 	return hr;
 }
 

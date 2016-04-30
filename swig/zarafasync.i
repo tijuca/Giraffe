@@ -11,7 +11,7 @@
 %include "std_string.i"
 %include "std_wstring.i"
 %include "cstring.i"
-%include "typemap.i"
+%include <zarafa/typemap.i>
 
 #ifdef HAVE_OFFLINE_SUPPORT
 

@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <sstream>
 
@@ -64,14 +38,14 @@
 #include "ECDatabaseUtils.h"
 #include "ECSecurity.h"
 #include "ECSubRestriction.h"
-#include "ECDefs.h"
+#include <zarafa/ECDefs.h>
 #include "SOAPUtils.h"
-#include "stringutil.h"
-#include "Trace.h"
+#include <zarafa/stringutil.h>
+#include <zarafa/Trace.h>
 #include "ECServerEntrypoint.h"
 #include "ECMailBoxTable.h"
 
-#include "mapiext.h"
+#include <zarafa/mapiext.h>
 #include <edkmdb.h>
 
 #ifdef _DEBUG
@@ -100,17 +74,17 @@ unsigned int sCompanyStatsProps[] = { PR_EC_COMPANY_NAME, PR_EC_COMPANY_ADMIN, P
 unsigned int sServerStatsProps[] = { PR_EC_STATS_SERVER_NAME, PR_EC_STATS_SERVER_HOST, PR_EC_STATS_SERVER_HTTPPORT, PR_EC_STATS_SERVER_SSLPORT, PR_EC_STATS_SERVER_PROXYURL, PR_EC_STATS_SERVER_HTTPURL,
 									 PR_EC_STATS_SERVER_HTTPSURL, PR_EC_STATS_SERVER_FILEURL };
 
-struct propTagArray sPropTagArrayContents = { (unsigned int *)&sContentsProps, arraySize(sContentsProps)};
-struct propTagArray sPropTagArrayHierarchy = { (unsigned int *)&sHierarchyProps, arraySize(sHierarchyProps)};
-struct propTagArray sPropTagArrayABContents = { (unsigned int *)&sABContentsProps, arraySize(sABContentsProps)};
-struct propTagArray sPropTagArrayABHierarchy = { (unsigned int *)&sABHierarchyProps, arraySize(sABHierarchyProps)};
-struct propTagArray sPropTagArrayUserStores = { (unsigned int *)&sUserStoresProps, arraySize(sUserStoresProps)};
+struct propTagArray sPropTagArrayContents = { (unsigned int *)&sContentsProps, ARRAY_SIZE(sContentsProps)};
+struct propTagArray sPropTagArrayHierarchy = { (unsigned int *)&sHierarchyProps, ARRAY_SIZE(sHierarchyProps)};
+struct propTagArray sPropTagArrayABContents = { (unsigned int *)&sABContentsProps, ARRAY_SIZE(sABContentsProps)};
+struct propTagArray sPropTagArrayABHierarchy = { (unsigned int *)&sABHierarchyProps, ARRAY_SIZE(sABHierarchyProps)};
+struct propTagArray sPropTagArrayUserStores = { (unsigned int *)&sUserStoresProps, ARRAY_SIZE(sUserStoresProps)};
 
-struct propTagArray sPropTagArraySystemStats = { (unsigned int *)&sSystemStatsProps, arraySize(sSystemStatsProps)};
-struct propTagArray sPropTagArraySessionStats = { (unsigned int *)&sSessionStatsProps, arraySize(sSessionStatsProps)};
-struct propTagArray sPropTagArrayUserStats = { (unsigned int *)&sUserStatsProps, arraySize(sUserStatsProps)};
-struct propTagArray sPropTagArrayCompanyStats = { (unsigned int *)&sCompanyStatsProps, arraySize(sCompanyStatsProps)};
-struct propTagArray sPropTagArrayServerStats = { (unsigned int *)&sServerStatsProps, arraySize(sServerStatsProps)};
+struct propTagArray sPropTagArraySystemStats = { (unsigned int *)&sSystemStatsProps, ARRAY_SIZE(sSystemStatsProps)};
+struct propTagArray sPropTagArraySessionStats = { (unsigned int *)&sSessionStatsProps, ARRAY_SIZE(sSessionStatsProps)};
+struct propTagArray sPropTagArrayUserStats = { (unsigned int *)&sUserStatsProps, ARRAY_SIZE(sUserStatsProps)};
+struct propTagArray sPropTagArrayCompanyStats = { (unsigned int *)&sCompanyStatsProps, ARRAY_SIZE(sCompanyStatsProps)};
+struct propTagArray sPropTagArrayServerStats = { (unsigned int *)&sServerStatsProps, ARRAY_SIZE(sServerStatsProps)};
 
 ECTableManager::ECTableManager(ECSession *lpSession)
 {
@@ -125,8 +99,8 @@ ECTableManager::ECTableManager(ECSession *lpSession)
 
 ECTableManager::~ECTableManager()
 {
-	map<unsigned int, TABLE_ENTRY *>::iterator iterTables;
-	map<unsigned int, TABLE_ENTRY *>::iterator iterNext;
+	std::map<unsigned int, TABLE_ENTRY *>::const_iterator iterTables;
+	std::map<unsigned int, TABLE_ENTRY *>::const_iterator iterNext;
 
 	pthread_mutex_lock(&hListMutex);
 
@@ -134,7 +108,7 @@ ECTableManager::~ECTableManager()
 	// Clean up tables, if CloseTable(..) isn't called 
 	while(iterTables != mapTable.end()) {
 		iterNext = iterTables;
-		iterNext++;
+		++iterNext;
 		CloseTable(iterTables->first);
 		iterTables = iterNext;
 	}
@@ -174,9 +148,7 @@ void ECTableManager::AddTableEntry(TABLE_ENTRY *lpEntry, unsigned int *lpulTable
             // Other table types don't need updates from other sessions
             break;
     }
-
-	ulNextTableId++;
-
+	++ulNextTableId;
 	pthread_mutex_unlock(&hListMutex);
 	
 }
@@ -234,7 +206,7 @@ ECRESULT ECTableManager::OpenOutgoingQueueTable(unsigned int ulStoreId, unsigned
 
 		// Item found without entryid, item already deleted, so delete the item from the queue
 		if (lpDBRow[1] == NULL) {
-			lpSession->GetSessionManager()->GetLogger()->Log(EC_LOGLEVEL_ERROR, "Removing stray object %s from outgoing table", lpDBRow[0]);
+			ec_log_err("Removing stray object \"%s\" from outgoing table", lpDBRow[0]);
 			strQuery = "DELETE FROM outgoingqueue WHERE hierarchy_id=" + string(lpDBRow[0]);
 			
 			lpDatabase->DoDelete(strQuery); //ignore errors
@@ -300,7 +272,7 @@ exit:
 	if (lpTable)
 		lpTable->Release();
 
-	if (er != erSuccess && lpEntry)
+	if (er != erSuccess)
 		delete lpEntry;
 
 	return er;
@@ -369,8 +341,8 @@ ECRESULT ECTableManager::OpenGenericTable(unsigned int ulParent, unsigned int ul
         }
 	} else if(ulObjType == MAPI_FOLDER && (ulFlags & CONVENIENT_DEPTH))
 		er = ECConvenientDepthObjectTable::Create(lpSession, ulStoreId, &sGuid, ulParent, ulObjType, ulFlags, locale, (ECConvenientDepthObjectTable**)&lpTable);
-    else
-    	er = ECStoreObjectTable::Create(lpSession, ulStoreId, &sGuid, ulParent, ulObjType, ulFlags, 0, locale, &lpTable);
+	else
+		er = ECStoreObjectTable::Create(lpSession, ulStoreId, &sGuid, ulParent, ulObjType, ulFlags, 0, locale, &lpTable);
 
 	if (er != erSuccess)
 		goto exit;
@@ -409,9 +381,9 @@ static void AuditStatsAccess(ECSession *lpSession, const char *access, const cha
 		
 		lpSession->GetSecurity()->GetUsername(&strUsername);
 		if (lpSession->GetSecurity()->GetImpersonator(&strImpersonator) == erSuccess) {
-			LOG_AUDIT(lpSession->GetSessionManager()->GetAudit(), "access %s table='%s stats' username=%s impersonator=%s", access, table, strUsername.c_str(), strImpersonator.c_str());
+			ZLOG_AUDIT(lpSession->GetSessionManager()->GetAudit(), "access %s table='%s stats' username=%s impersonator=%s", access, table, strUsername.c_str(), strImpersonator.c_str());
 		} else {
-			LOG_AUDIT(lpSession->GetSessionManager()->GetAudit(), "access %s table='%s stats' username=%s", access, table, strUsername.c_str());
+			ZLOG_AUDIT(lpSession->GetSessionManager()->GetAudit(), "access %s table='%s stats' username=%s", access, table, strUsername.c_str());
 		}
 	}
 }
@@ -515,10 +487,8 @@ ECRESULT ECTableManager::OpenStatsTable(unsigned int ulTableType, unsigned int u
 	AddTableEntry(lpEntry, lpulTableId);
 
 exit:
-	if (er != erSuccess) {
-		if (lpEntry)
-			delete lpEntry;
-	}
+	if (er != erSuccess)
+		delete lpEntry;
 
 	if (lpTable)
 		lpTable->Release();
@@ -555,7 +525,7 @@ exit:
 	if (lpTable)
 		lpTable->Release();
 
-	if (er != erSuccess && lpEntry)
+	if (er != erSuccess)
 		delete lpEntry;
 
 	return er;
@@ -607,7 +577,7 @@ ECRESULT ECTableManager::GetTable(unsigned int ulTableId, ECGenericObjectTable *
 {
 	ECRESULT		er = erSuccess;
 	ECGenericObjectTable	*lpTable = NULL;
-	map<unsigned int, TABLE_ENTRY *>::iterator iterTables;
+	std::map<unsigned int, TABLE_ENTRY *>::const_iterator iterTables;
 
 	pthread_mutex_lock(&hListMutex);
 
@@ -636,7 +606,7 @@ exit:
 ECRESULT ECTableManager::CloseTable(unsigned int ulTableId)
 {
 	ECRESULT er = erSuccess;
-	map<unsigned int, TABLE_ENTRY *>::iterator iterTables;
+	std::map<unsigned int, TABLE_ENTRY *>::const_iterator iterTables;
 	TABLE_ENTRY *lpEntry = NULL;
 
 	pthread_mutex_lock(&hListMutex);
@@ -682,14 +652,14 @@ ECRESULT ECTableManager::CloseTable(unsigned int ulTableId)
 ECRESULT ECTableManager::UpdateOutgoingTables(ECKeyTable::UpdateType ulType, unsigned ulStoreId, std::list<unsigned int> &lstObjId, unsigned int ulFlags, unsigned int ulObjType)
 {
 	ECRESULT er = erSuccess;
-	map<unsigned int, TABLE_ENTRY *>::iterator iterTables;
-	map<unsigned int, unsigned int>::iterator iterFolders;
+	std::map<unsigned int, TABLE_ENTRY *>::const_iterator iterTables;
+	std::map<unsigned int, unsigned int>::const_iterator iterFolders;
 
 	sObjectTableKey	sRow;
 
 	pthread_mutex_lock(&hListMutex);
 
-	for(iterTables = mapTable.begin(); iterTables != mapTable.end(); iterTables++) {
+	for (iterTables = mapTable.begin(); iterTables != mapTable.end(); ++iterTables) {
 		if(	iterTables->second->ulTableType == TABLE_ENTRY::TABLE_TYPE_OUTGOINGQUEUE &&
 			(iterTables->second->sTable.sOutgoingQueue.ulStoreId == ulStoreId ||
 			 iterTables->second->sTable.sOutgoingQueue.ulStoreId == 0) &&
@@ -710,7 +680,7 @@ ECRESULT ECTableManager::UpdateOutgoingTables(ECKeyTable::UpdateType ulType, uns
 ECRESULT ECTableManager::UpdateTables(ECKeyTable::UpdateType ulType, unsigned int ulFlags, unsigned int ulObjId, std::list<unsigned int> &lstChildId, unsigned int ulObjType)
 {
 	ECRESULT er = erSuccess;
-	map<unsigned int, TABLE_ENTRY *>::iterator iterTables;
+	std::map<unsigned int, TABLE_ENTRY *>::const_iterator iterTables;
 	sObjectTableKey	sRow;
 
 	pthread_mutex_lock(&hListMutex);
@@ -719,7 +689,7 @@ ECRESULT ECTableManager::UpdateTables(ECKeyTable::UpdateType ulType, unsigned in
 	// manager, and then update the row if required.
 
 	// First, do all the actual contents tables and hierarchy tables
-	for(iterTables = mapTable.begin(); iterTables != mapTable.end(); iterTables++) {
+	for (iterTables = mapTable.begin(); iterTables != mapTable.end(); ++iterTables) {
 		if(	iterTables->second->ulTableType == TABLE_ENTRY::TABLE_TYPE_GENERIC &&
 			iterTables->second->sTable.sGeneric.ulParentId == ulObjId && 
 			iterTables->second->sTable.sGeneric.ulObjectFlags == ulFlags &&
@@ -746,7 +716,7 @@ ECRESULT ECTableManager::UpdateTables(ECKeyTable::UpdateType ulType, unsigned in
  */
 ECRESULT ECTableManager::GetStats(unsigned int *lpulTables, unsigned int *lpulObjectSize)
 {
-	TABLEENTRYMAP::iterator iterEntry;
+	TABLEENTRYMAP::const_iterator iterEntry;
 	unsigned int ulSize = 0;
 	unsigned int ulTables = 0; 
 	
@@ -755,10 +725,9 @@ ECRESULT ECTableManager::GetStats(unsigned int *lpulTables, unsigned int *lpulOb
 	ulTables = mapTable.size();
 	ulSize = MEMORY_USAGE_MAP(ulTables, TABLEENTRYMAP);
 
-	for(iterEntry = mapTable.begin(); iterEntry !=  mapTable.end(); iterEntry++) {
+	for (iterEntry = mapTable.begin(); iterEntry !=  mapTable.end(); ++iterEntry)
 		if(iterEntry->second->ulTableType != TABLE_ENTRY::TABLE_TYPE_SYSTEMSTATS) // Skip system stats since it would recursively include itself
 			ulSize += iterEntry->second->lpTable->GetObjectSize();
-	}
 
 	pthread_mutex_unlock(&hListMutex);
 

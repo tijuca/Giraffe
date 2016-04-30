@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <mapidefs.h>
 #include <mapitags.h>
@@ -52,7 +26,7 @@
 #include "ECDatabaseFactory.h"
 #include "ECDatabaseUtils.h"
 #include "SOAPUtils.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 #include "ECSessionManager.h"
 
 #include <pthread.h>
@@ -161,8 +135,7 @@ ECRESULT CopySOAPPropValToDatabasePropVal(struct propVal *lpPropVal, unsigned in
 		*lpulColNr = VALUE_NR_DOUBLE;
 		if (ci_find_substr(strColData, std::string("nan")) != std::string::npos) {
 			strColData = "0.0";
-			extern ECSessionManager* g_lpSessionManager;
-			g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_DEBUG, "%s:%d double value (%f) found, stringified to %s.", __FUNCTION__, __LINE__, lpPropVal->Value.dbl, strColData.c_str());
+			ec_log_debug("%s:%d double value (%f) found, stringified to %s.", __FUNCTION__, __LINE__, lpPropVal->Value.dbl, strColData.c_str());
 		}
 	break;
 	case PT_CURRENCY:
@@ -432,7 +405,8 @@ exit:
 }
 // by table 
 
-ECRESULT ParseMVPropCount(char* lpRowData, ULONG ulSize, unsigned int *lpulLastPos, int *lpnItemCount)
+ECRESULT ParseMVPropCount(const char *lpRowData, ULONG ulSize,
+    unsigned int *lpulLastPos, int *lpnItemCount)
 {
 	ULONG	ulPos = *lpulLastPos;
 	ULONG	ulIter = ulPos;
@@ -441,7 +415,7 @@ ECRESULT ParseMVPropCount(char* lpRowData, ULONG ulSize, unsigned int *lpulLastP
 	ASSERT(ulPos < ulSize);
 
 	while(ulIter < ulSize && lpRowData[ulIter] != ':')
-		ulIter++;
+		++ulIter;
 	
 	strSize.insert(0, lpRowData+ulPos, ulIter - ulPos);
 
@@ -451,7 +425,8 @@ ECRESULT ParseMVPropCount(char* lpRowData, ULONG ulSize, unsigned int *lpulLastP
 	return erSuccess;
 }
 
-ECRESULT ParseMVProp(char* lpRowData, ULONG ulSize, unsigned int *lpulLastPos, std::string *lpstrData)
+ECRESULT ParseMVProp(const char *lpRowData, ULONG ulSize,
+    unsigned int *lpulLastPos, std::string *lpstrData)
 {
 	ECRESULT er = erSuccess;
 
@@ -531,14 +506,15 @@ ULONG GetColOffset(unsigned int ulPropTag)
 	return ulField;
 }
 
-std::string GetPropColOrder(unsigned int ulPropTag, std::string strSubQuery)
+std::string GetPropColOrder(unsigned int ulPropTag,
+    const std::string &strSubQuery)
 {
 	std::string strPropColOrder = "0," + stringify(PROP_ID(ulPropTag)) + "," + stringify(PROP_TYPE(ulPropTag));
 	unsigned int ulField = 0;
 	
 	ulField = GetColOffset(ulPropTag);
 	
-	for(unsigned int i=3; i<FIELD_NR_MAX; i++) {
+	for (unsigned int i = 3; i < FIELD_NR_MAX; ++i) {
 		strPropColOrder += ",";
 		if(i == ulField)
 			strPropColOrder += "(" + strSubQuery + ")";
@@ -689,8 +665,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		lpPropVal->Value.mvi.__size = atoi(lpRow[FIELD_NR_ID]);
 		lpPropVal->Value.mvi.__ptr = s_alloc<short int>(soap, lpPropVal->Value.mvi.__size);
 		ulLastPos = 0;
-		for(i=0; i < lpPropVal->Value.mvi.__size; i++)
-		{
+		for (i = 0; i < lpPropVal->Value.mvi.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_ULONG], lpLen[FIELD_NR_ULONG], &ulLastPos, &strData);
 			lpPropVal->Value.mvi.__ptr[i] = (short)atoui((char *)strData.c_str());
 		}
@@ -705,8 +680,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		lpPropVal->Value.mvl.__size = atoi(lpRow[FIELD_NR_ID]);
 		lpPropVal->Value.mvl.__ptr = s_alloc<unsigned int>(soap, lpPropVal->Value.mvl.__size);
 		ulLastPos = 0;
-		for(i=0; i < lpPropVal->Value.mvl.__size; i++)
-		{
+		for (i = 0; i < lpPropVal->Value.mvl.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_ULONG], lpLen[FIELD_NR_ULONG], &ulLastPos, &strData);
 			lpPropVal->Value.mvl.__ptr[i] = atoui((char*)strData.c_str());
 		}
@@ -721,8 +695,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		lpPropVal->Value.mvflt.__size = atoi(lpRow[FIELD_NR_ID]);
 		lpPropVal->Value.mvflt.__ptr = s_alloc<float>(soap, lpPropVal->Value.mvflt.__size);
 		ulLastPos = 0;
-		for(i=0; i < lpPropVal->Value.mvflt.__size; i++)
-		{
+		for (i = 0; i < lpPropVal->Value.mvflt.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_DOUBLE], lpLen[FIELD_NR_DOUBLE], &ulLastPos, &strData);
 			lpPropVal->Value.mvflt.__ptr[i] = (float)strtod_l(strData.c_str(), NULL, loc);
 		}
@@ -738,8 +711,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		lpPropVal->Value.mvdbl.__size = atoi(lpRow[FIELD_NR_ID]);
 		lpPropVal->Value.mvdbl.__ptr = s_alloc<double>(soap, lpPropVal->Value.mvdbl.__size);
 		ulLastPos = 0;
-		for(i=0; i < lpPropVal->Value.mvdbl.__size; i++)
-		{
+		for (i = 0; i < lpPropVal->Value.mvdbl.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_DOUBLE], lpLen[FIELD_NR_DOUBLE], &ulLastPos, &strData);
 			lpPropVal->Value.mvdbl.__ptr[i] = strtod_l(strData.c_str(), NULL, loc);
 		}
@@ -755,15 +727,13 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		lpPropVal->Value.mvhilo.__ptr = s_alloc<hiloLong>(soap, lpPropVal->Value.mvhilo.__size);
 		//Scan low
 		ulLastPos = 0;
-		for(i=0; i < lpPropVal->Value.mvhilo.__size; i++)
-		{
+		for (i = 0; i < lpPropVal->Value.mvhilo.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_LO], lpLen[FIELD_NR_LO], &ulLastPos, &strData);
 			lpPropVal->Value.mvhilo.__ptr[i].lo = atoui((char*)strData.c_str());
 		}
 		//Scan high
 		ulLastPos = 0;
-		for(i=0; i < lpPropVal->Value.mvhilo.__size; i++)
-		{
+		for (i = 0; i < lpPropVal->Value.mvhilo.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_HI], lpLen[FIELD_NR_HI], &ulLastPos, &strData);
 			lpPropVal->Value.mvhilo.__ptr[i].hi = atoi((char*)strData.c_str());
 		}
@@ -778,8 +748,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		lpPropVal->Value.mvbin.__size = atoi(lpRow[FIELD_NR_ID]);
 		lpPropVal->Value.mvbin.__ptr = s_alloc<struct xsd__base64Binary>(soap, lpPropVal->Value.mvbin.__size);
 		ulLastPos = 0;
-		for(i=0; i < lpPropVal->Value.mvbin.__size; i++)
-		{
+		for (i = 0; i < lpPropVal->Value.mvbin.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_BINARY], lpLen[FIELD_NR_BINARY], &ulLastPos, &strData);
 			lpPropVal->Value.mvbin.__ptr[i].__size = strData.size();
 			lpPropVal->Value.mvbin.__ptr[i].__ptr = s_alloc<unsigned char>(soap, lpPropVal->Value.mvbin.__ptr[i].__size);
@@ -796,8 +765,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		lpPropVal->Value.mvszA.__size = atoi(lpRow[FIELD_NR_ID]);
 		lpPropVal->Value.mvszA.__ptr = s_alloc<char *>(soap, lpPropVal->Value.mvszA.__size);
 		ulLastPos = 0;
-		for(i=0; i < lpPropVal->Value.mvszA.__size; i++)
-		{
+		for (i = 0; i < lpPropVal->Value.mvszA.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_STRING], lpLen[FIELD_NR_STRING], &ulLastPos, &strData);
 			lpPropVal->Value.mvszA.__ptr[i] = s_alloc<char>(soap, strData.size() + 1);
 			memcpy(lpPropVal->Value.mvszA.__ptr[i], strData.c_str(), strData.size() + 1);
@@ -814,8 +782,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		lpPropVal->Value.mvli.__size = atoi(lpRow[FIELD_NR_ID]);
 		lpPropVal->Value.mvli.__ptr = s_alloc<LONG64>(soap, lpPropVal->Value.mvli.__size);
 		ulLastPos = 0;
-		for(i=0; i < lpPropVal->Value.mvli.__size; i++)
-		{
+		for (i = 0; i < lpPropVal->Value.mvli.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_LONGINT], lpLen[FIELD_NR_LONGINT], &ulLastPos, &strData);
 			lpPropVal->Value.mvli.__ptr[i] = _atoi64(strData.c_str());
 		}

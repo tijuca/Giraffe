@@ -1,54 +1,28 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include <cassert>
 #include "ECSubRestriction.h"
 
 #include <mapidefs.h>
 #include <mapitags.h>
 
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 #include "ECSession.h"
 #include "ECStoreObjectTable.h"
 #include "ECGenericObjectTable.h"
@@ -79,14 +53,14 @@ static ECRESULT GetSubRestrictionRecursive(struct restrictTable *lpRestrict,
     
     switch(lpRestrict->ulType) {
         case RES_AND:
-            for(i=0;i<lpRestrict->lpAnd->__size;i++) {
+            for (i = 0; i < lpRestrict->lpAnd->__size; ++i) {
                 er = GetSubRestrictionRecursive(lpRestrict->lpAnd->__ptr[i], lpulCount, ulSubRestriction, lppSubRestrict, maxdepth-1);
                 if(er != erSuccess)
                     goto exit;
             }        
             break;
         case RES_OR:
-            for(i=0;i<lpRestrict->lpOr->__size;i++) {
+            for (i = 0; i < lpRestrict->lpOr->__size; ++i) {
                 er = GetSubRestrictionRecursive(lpRestrict->lpOr->__ptr[i], lpulCount, ulSubRestriction, lppSubRestrict, maxdepth-1);
                 if(er != erSuccess)
                     goto exit;
@@ -112,7 +86,7 @@ static ECRESULT GetSubRestrictionRecursive(struct restrictTable *lpRestrict,
             }
             // Counting subrestrictions
             if(lpulCount)
-                (*lpulCount)++;
+			++*lpulCount;
                     
             break;
         
@@ -157,7 +131,7 @@ ECRESULT RunSubRestrictions(ECSession *lpSession, void *lpECODStore, struct rest
     
     lpResults = new SUBRESTRICTIONRESULTS;
     
-    for(i=0;i<ulCount;i++) {
+    for (i = 0; i < ulCount; ++i) {
         er = GetSubRestriction(lpRestrict, i, &lpSubRestrict);
         if(er != erSuccess)
             goto exit;
@@ -184,10 +158,10 @@ ECRESULT RunSubRestriction(ECSession *lpSession, void *lpECODStore, struct restr
     DB_RESULT lpDBResult = NULL;
     DB_ROW lpRow = NULL;
     struct propTagArray *lpPropTags = NULL;
-    ECObjectTableList::iterator iterObject;
+    ECObjectTableList::const_iterator iterObject;
     ECObjectTableList lstSubObjects;
     std::map<unsigned int, unsigned int> mapParent;
-    std::map<unsigned int, unsigned int>::iterator iterParent;
+    std::map<unsigned int, unsigned int>::const_iterator iterParent;
     SUBRESTRICTIONRESULT *lpResult = new SUBRESTRICTIONRESULT;
     struct rowSet *lpRowSet = NULL;
     bool fMatch = false;
@@ -198,9 +172,8 @@ ECRESULT RunSubRestriction(ECSession *lpSession, void *lpECODStore, struct restr
     ECDatabase *lpDatabase = NULL;
 
 	er = lpSession->GetDatabase(&lpDatabase);
-    if(er != erSuccess)
-        goto exit;
-
+	if (er != erSuccess)
+		goto exit;
 	if (lpObjects->empty())
 		goto exit;				// nothing to search in, return success.
     
@@ -225,7 +198,7 @@ ECRESULT RunSubRestriction(ECSession *lpSession, void *lpECODStore, struct restr
     // Get the subobject id's we're querying from the database
     strQuery = "SELECT hierarchy.parent, hierarchy.id FROM hierarchy WHERE hierarchy.type = " + stringify(ulType) + " AND hierarchy.parent IN (";
     
-    for(iterObject = lpObjects->begin(); iterObject != lpObjects->end(); iterObject++) {
+    for (iterObject = lpObjects->begin(); iterObject != lpObjects->end(); ++iterObject) {
         strQuery += stringify(iterObject->ulObjId);
         strQuery += ",";
     }
@@ -274,7 +247,7 @@ ECRESULT RunSubRestriction(ECSession *lpSession, void *lpECODStore, struct restr
         
     iterObject = lstSubObjects.begin();
     // Loop through all the rows, see if they match
-    for(i=0;i<lpRowSet->__size;i++) {
+    for (i = 0; i < lpRowSet->__size; ++i) {
         er = ECGenericObjectTable::MatchRowRestrict(lpSession->GetSessionManager()->GetCacheManager(), &lpRowSet->__ptr[i], lpRestrict->lpSubObject, NULL, locale, &fMatch);
         if(er != erSuccess)
             goto exit;
@@ -291,7 +264,8 @@ ECRESULT RunSubRestriction(ECSession *lpSession, void *lpECODStore, struct restr
         // Optimisation possibility: if one of the subobjects matches, we shouldn't bother checking
         // other subobjects. This is a rather minor optimisation though.
         
-        iterObject++; // lstSubObjects will always be in the same order as lpRowSet
+        ++iterObject;
+        // lstSubObjects will always be in the same order as lpRowSet
     }
 
 exit:
@@ -316,11 +290,11 @@ exit:
 ECRESULT FreeSubRestrictionResults(SUBRESTRICTIONRESULTS *lpResults) {
     ECRESULT er = erSuccess;
     
-    SUBRESTRICTIONRESULTS::iterator iterResults;
+    SUBRESTRICTIONRESULTS::const_iterator iterResults;
     
-    for(iterResults = lpResults->begin(); iterResults != lpResults->end(); iterResults++) {
-        delete *iterResults;
-    }
+	for (iterResults = lpResults->begin(); iterResults != lpResults->end();
+	     ++iterResults)
+		delete *iterResults;
     
     delete lpResults;
     

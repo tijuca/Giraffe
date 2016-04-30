@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include "WSUtil.h"
 #include "WSTransport.h"
@@ -52,21 +26,21 @@
 #include <mapidefs.h>
 #include <mapiutil.h>
 
-#include "Util.h"
+#include <zarafa/Util.h>
 #include "ECExchangeModifyTable.h"
 #include <mapicode.h>
-#include "edkguid.h"
-#include "ECGuid.h"
+#include <edkguid.h>
+#include <zarafa/ECGuid.h>
 #include <mapiguid.h>
 
-#include "Trace.h"
-#include "ECDebug.h"
+#include <zarafa/Trace.h>
+#include <zarafa/ECDebug.h>
 
 #include "ZarafaUtil.h"
-#include "charset/convert.h"
+#include <zarafa/charset/convert.h>
 #include "utf8.h"
 
-#include "ECInterfaceDefs.h"
+#include <zarafa/ECInterfaceDefs.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -221,10 +195,7 @@ empty:
 exit:
 	if (ecTable)
 		ecTable->Release();
-
-	if (szXML)
-		delete [] szXML;
-
+	delete[] szXML;
 	if (lpRulesData)
 		lpRulesData->Release();
 
@@ -252,13 +223,11 @@ HRESULT __stdcall ECExchangeModifyTable::GetTable(ULONG ulFlags, LPMAPITABLE *lp
 
 	hr = m_ecTable->HrGetView(createLocaleFromName(""), m_ulFlags, &lpView);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	hr = lpView->QueryInterface(IID_IMAPITable, (void **)lppTable);
 
 	lpView->Release();
-
-exit:
 	return hr;
 }
 
@@ -281,7 +250,7 @@ HRESULT __stdcall ECExchangeModifyTable::ModifyTable(ULONG ulFlags, LPROWLIST lp
 			goto exit;
 	}
 
-	for(i=0;i<lpMods->cEntries;i++) {
+	for (i = 0; i < lpMods->cEntries; ++i) {
 		switch(lpMods->aEntries[i].ulRowFlags) {
 			case ROW_ADD:
 			case ROW_MODIFY:
@@ -311,13 +280,8 @@ HRESULT __stdcall ECExchangeModifyTable::ModifyTable(ULONG ulFlags, LPROWLIST lp
 				hr = m_ecTable->HrModifyRow(ulFlagsRow, lpFind, lpProps, cValues);
 				if(hr != hrSuccess)
 					goto exit;
-
-
-				if (lpPropRemove) {
-					MAPIFreeBuffer(lpPropRemove);
-					lpPropRemove = NULL;
-				}
-
+				MAPIFreeBuffer(lpPropRemove);
+				lpPropRemove = NULL;
 				break;
 			case ROW_REMOVE:
 				hr = m_ecTable->HrModifyRow(ECKeyTable::TABLE_ROW_DELETE, NULL, lpMods->aEntries[i].rgPropVals, lpMods->aEntries[i].cValues);
@@ -367,12 +331,8 @@ done:
 		goto exit;
 
 exit:
-	if(szXML)
-		delete [] szXML;
-
-	if(lpPropRemove)
-		MAPIFreeBuffer(lpPropRemove);
-
+	delete[] szXML;
+	MAPIFreeBuffer(lpPropRemove);
 	return hr;
 }
 
@@ -382,10 +342,10 @@ HRESULT ECExchangeModifyTable::OpenACLS(ECMAPIProp *lpecMapiProp, ULONG ulFlags,
 	HRESULT hr = hrSuccess;
 	IECSecurity *lpSecurity = NULL;
 	ULONG cPerms = 0;
-	LPECPERMISSION lpECPerms = NULL;
+	ECPERMISSION *lpECPerms = NULL;
 	SPropValue	lpsPropMember[4];
-	LPECUSER lpECUser = NULL;
-	LPECGROUP lpECGroup = NULL;
+	ECUSER *lpECUser = NULL;
+	ECGROUP *lpECGroup = NULL;
 	WCHAR* lpMemberName = NULL;
 	unsigned int ulUserid = 0;
 
@@ -405,7 +365,7 @@ HRESULT ECExchangeModifyTable::OpenACLS(ECMAPIProp *lpecMapiProp, ULONG ulFlags,
 	// Default exchange PR_MEMBER_ID ids
 	//  0 = default acl
 	// -1 = Anonymous acl
-	for (ULONG i=0; i<cPerms; i++) {
+	for (ULONG i = 0; i < cPerms; ++i) {
 		if (lpECPerms[i].ulType == ACCESS_TYPE_GRANT)
 		{
 			
@@ -441,25 +401,19 @@ HRESULT ECExchangeModifyTable::OpenACLS(ECMAPIProp *lpecMapiProp, ULONG ulFlags,
 			hr = lpTable->HrModifyRow(ECKeyTable::TABLE_ROW_ADD, &lpsPropMember[0], lpsPropMember, 4);
 			if(hr != hrSuccess)
 				goto exit;
-
-			if (lpECUser) { MAPIFreeBuffer(lpECUser); lpECUser = NULL;}
-			if (lpECGroup) { MAPIFreeBuffer(lpECGroup); lpECGroup = NULL;}
+			MAPIFreeBuffer(lpECUser);
+			lpECUser = NULL;
+			MAPIFreeBuffer(lpECGroup);
+			lpECGroup = NULL;
 		}
 	}
 
 exit:
-	if (lpECPerms)
-		MAPIFreeBuffer(lpECPerms);
-
+	MAPIFreeBuffer(lpECPerms);
 	if (lpSecurity)
 		lpSecurity->Release();
-
-	if (lpECUser)
-		MAPIFreeBuffer(lpECUser);
-
-	if (lpECGroup) 
-		MAPIFreeBuffer(lpECGroup);
-
+	MAPIFreeBuffer(lpECUser);
+	MAPIFreeBuffer(lpECGroup);
 	return hr;
 }
 
@@ -480,7 +434,7 @@ HRESULT ECExchangeModifyTable::SaveACLS(ECMAPIProp *lpecMapiProp, ECMemTable *lp
 	LPSPropValue lpMemberRights = NULL; //do not free
 	LPSPropValue lpMemberID = NULL; //do not free
 	
-	LPECPERMISSION lpECPermissions = NULL;
+	ECPERMISSION *lpECPermissions = NULL;
 	ULONG			cECPerm = 0;
 
 	entryId sEntryId = {0};
@@ -500,8 +454,7 @@ HRESULT ECExchangeModifyTable::SaveACLS(ECMAPIProp *lpecMapiProp, ECMemTable *lp
 	if (hr != hrSuccess)
 		goto exit;
 
-	for(ULONG i=0; i < lpRowSet->cRows; i++)
-	{
+	for (ULONG i = 0; i < lpRowSet->cRows; ++i) {
 		if (lpulStatus[i]  == ECROW_NORMAL)
 			continue;
 
@@ -543,8 +496,7 @@ HRESULT ECExchangeModifyTable::SaveACLS(ECMAPIProp *lpecMapiProp, ECMemTable *lp
 		}
 
 		lpECPermissions[cECPerm].ulRights = lpMemberRights->Value.ul&ecRightsAll;
-
-		cECPerm++;
+		++cECPerm;
 	}
 
 	if (cECPerm > 0)
@@ -557,19 +509,11 @@ HRESULT ECExchangeModifyTable::SaveACLS(ECMAPIProp *lpecMapiProp, ECMemTable *lp
 exit:
 	if (lpSecurity)
 		lpSecurity->Release();
-
-	if (lpECPermissions)
-		MAPIFreeBuffer(lpECPermissions);
-	
-	if(lpIDs)
-		MAPIFreeBuffer(lpIDs);
-
+	MAPIFreeBuffer(lpECPermissions);
+	MAPIFreeBuffer(lpIDs);
 	if(lpRowSet)
 		FreeProws(lpRowSet);
-
-	if(lpulStatus)
-		MAPIFreeBuffer(lpulStatus);
-
+	MAPIFreeBuffer(lpulStatus);
 	return hr;
 }
 
@@ -637,8 +581,7 @@ exit:
 		FreeRowSet(lpSOAPRowSet, true);
 	if(lpRowSet)
 		FreeProws(lpRowSet);
-	if(lpCols)
-		MAPIFreeBuffer(lpCols);
+	MAPIFreeBuffer(lpCols);
 	if(lpView)
 		lpView->Release();
 
@@ -666,7 +609,10 @@ HRESULT ECExchangeModifyTable::HrDeserializeTable(char *lpSerialized, ECMemTable
 	soap.is = &is;
 	soap_set_imode(&soap, SOAP_C_UTFSTRING);
 	soap_begin(&soap);
-	soap_begin_recv(&soap);
+	if (soap_begin_recv(&soap) != 0) {
+		hr = MAPI_E_NETWORK_FAILURE;
+		goto exit;
+	}
 	if (!soap_get_rowSet(&soap, &sSOAPRowSet, "tableData", "rowSet")) {
 		hr = MAPI_E_CORRUPT_DATA;
 		goto exit;
@@ -677,7 +623,7 @@ HRESULT ECExchangeModifyTable::HrDeserializeTable(char *lpSerialized, ECMemTable
 	if(hr != hrSuccess)
 		goto exit;
 
-	for (i = 0; i < lpsRowSet->cRows; i++) {
+	for (i = 0; i < lpsRowSet->cRows; ++i) {
 		// Note: the ECKeyTable only uses an ULONG as the key.
 		//       Information placed in the HighPart of this PT_I8 is lost!
 		sRowId.ulPropTag = PR_RULE_ID;
@@ -687,7 +633,7 @@ HRESULT ECExchangeModifyTable::HrDeserializeTable(char *lpSerialized, ECMemTable
 		if(hr != hrSuccess)
 			goto exit;
 
-		for (n = 0; n < cValues; n++) {
+		for (n = 0; n < cValues; ++n) {
 			/*
 			 * If a string type is PT_STRING8, it is old and
 			 * assumed to be in WTF-1252 (CP-1252 values directly
@@ -711,10 +657,7 @@ HRESULT ECExchangeModifyTable::HrDeserializeTable(char *lpSerialized, ECMemTable
 exit:
 	if(lpsRowSet)
 		FreeProws(lpsRowSet);
-
-	if (lpProps)
-		MAPIFreeBuffer(lpProps);
-
+	MAPIFreeBuffer(lpProps);
 	soap_destroy(&soap);
 	soap_end(&soap); // clean up allocated temporaries 
 

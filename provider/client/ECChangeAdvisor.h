@@ -1,59 +1,33 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 #ifndef ECCHANGEADVISOR_H
 #define ECCHANGEADVISOR_H
 
-#include "zcdefs.h"
+#include <zarafa/zcdefs.h>
 #include <mapidefs.h>
 #include <mapispi.h>
 
 #include <pthread.h>	
 
-#include <ECUnknown.h>
+#include <zarafa/ECUnknown.h>
 #include <IECChangeAdvisor.h>
 #include "ECICS.h"
-#include "ZarafaCode.h"
+#include <zarafa/ZarafaCode.h>
 
 #include <map>
 
@@ -64,7 +38,7 @@ class ECLogger;
  * ECChangeAdvisor: Implementation IECChangeAdvisor, which allows one to register for 
  *                  change notifications on folders.
  */
-class ECChangeAdvisor _final : public ECUnknown
+class ECChangeAdvisor _zcp_final : public ECUnknown
 {
 protected:
 	/**
@@ -109,7 +83,7 @@ public:
 
 	// IECChangeAdvisor
 	virtual HRESULT GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
-	virtual HRESULT Config(LPSTREAM lpStream, LPGUID lpGUID, LPECCHANGEADVISESINK lpAdviseSink, ULONG ulFlags);
+	virtual HRESULT Config(LPSTREAM lpStream, LPGUID lpGUID, IECChangeAdviseSink *lpAdviseSink, ULONG ulFlags);
 	virtual HRESULT UpdateState(LPSTREAM lpStream);
 	virtual HRESULT AddKeys(LPENTRYLIST lpEntryList);
 	virtual HRESULT RemoveKeys(LPENTRYLIST lpEntryList);
@@ -169,25 +143,25 @@ private:
 	 */
 	HRESULT							PurgeStates();
 
-	class xECChangeAdvisor _final : public IECChangeAdvisor {
+	class xECChangeAdvisor _zcp_final : public IECChangeAdvisor {
 		// IUnknown
-		virtual ULONG __stdcall AddRef(void) _override;
-		virtual ULONG __stdcall Release(void) _override;
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **pInterface) _override;
+		virtual ULONG __stdcall AddRef(void) _zcp_override;
+		virtual ULONG __stdcall Release(void) _zcp_override;
+		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **pInterface) _zcp_override;
 
 		// IECChangeAdvisor
-		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError) _override;
-		virtual HRESULT __stdcall Config(LPSTREAM lpStream, LPGUID lpGUID, LPECCHANGEADVISESINK lpAdviseSink, ULONG ulFlags) _override;
-		virtual HRESULT __stdcall UpdateState(LPSTREAM lpStream) _override;
-		virtual HRESULT __stdcall AddKeys(LPENTRYLIST lpEntryList) _override;
-		virtual HRESULT __stdcall RemoveKeys(LPENTRYLIST lpEntryList) _override;
-		virtual HRESULT __stdcall IsMonitoringSyncId(ULONG ulSyncId) _override;
-		virtual HRESULT __stdcall UpdateSyncState(ULONG ulSyncId, ULONG ulChangeId) _override;
+		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError) _zcp_override;
+		virtual HRESULT __stdcall Config(LPSTREAM lpStream, LPGUID lpGUID, IECChangeAdviseSink *lpAdviseSink, ULONG ulFlags) _zcp_override;
+		virtual HRESULT __stdcall UpdateState(LPSTREAM lpStream) _zcp_override;
+		virtual HRESULT __stdcall AddKeys(LPENTRYLIST lpEntryList) _zcp_override;
+		virtual HRESULT __stdcall RemoveKeys(LPENTRYLIST lpEntryList) _zcp_override;
+		virtual HRESULT __stdcall IsMonitoringSyncId(ULONG ulSyncId) _zcp_override;
+		virtual HRESULT __stdcall UpdateSyncState(ULONG ulSyncId, ULONG ulChangeId) _zcp_override;
 	} m_xECChangeAdvisor;
 
 
 	ECMsgStore				*m_lpMsgStore;
-	LPECCHANGEADVISESINK	m_lpChangeAdviseSink;
+	IECChangeAdviseSink *m_lpChangeAdviseSink;
 	ULONG					m_ulFlags;
 	pthread_mutex_t			m_hConnectionLock;
 	ConnectionMap			m_mapConnections;

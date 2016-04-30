@@ -1,59 +1,33 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "m4l.mapispi.h"
 #include "m4l.mapiutil.h"
 #include "m4l.mapix.h"
 #include "m4l.debug.h"
 
 #include <mapi.h>
-#include "CommonUtil.h"
-#include "Util.h"
-#include "ECGuid.h"
+#include <zarafa/CommonUtil.h>
+#include <zarafa/Util.h>
+#include <zarafa/ECGuid.h>
 
 #include <algorithm>
-#include "mapi_ptr.h"
+#include <zarafa/mapi_ptr.h>
 
 M4LMAPIGetSession::M4LMAPIGetSession(LPMAPISESSION new_session) {
 	ASSERT(new_session);
@@ -85,7 +59,7 @@ HRESULT M4LMAPIGetSession::QueryInterface(REFIID refiid, void **lpvoid) {
 	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::QueryInterface", "");
 	HRESULT hr = hrSuccess;
 
-    if ((refiid == IID_IMAPIGetSession) || (refiid == IID_IUnknown)) {
+	if (refiid == IID_IMAPIGetSession || refiid == IID_IUnknown) {
 		AddRef();
 		*lpvoid = (IMAPISupport *)this;
 		hr = hrSuccess;
@@ -111,12 +85,10 @@ M4LMAPISupport::M4LMAPISupport(LPMAPISESSION new_session, LPMAPIUID lpUid, SVCSe
 }
 
 M4LMAPISupport::~M4LMAPISupport() {
-	M4LSUPPORTADVISES::iterator i;
+	M4LSUPPORTADVISES::const_iterator i;
 
-    if(this->lpsProviderUID)
-        delete lpsProviderUID;
-
-	for (i = m_advises.begin(); i != m_advises.end(); i++)
+	delete lpsProviderUID;
+	for (i = m_advises.begin(); i != m_advises.end(); ++i)
 		MAPIFreeBuffer(i->second.lpKey);
 
 	pthread_mutex_destroy(&m_advises_mutex);
@@ -154,7 +126,7 @@ HRESULT M4LMAPISupport::Subscribe(LPNOTIFKEY lpKey, ULONG ulEventMask, ULONG ulF
 
 	pthread_mutex_lock(&m_advises_mutex);
 
-	m_connections++;
+	++m_connections;
 	m_advises.insert(M4LSUPPORTADVISES::value_type(m_connections, M4LSUPPORTADVISE(lpNewKey, ulEventMask, ulFlags, lpAdviseSink)));
 	*lpulConnection = m_connections;
 
@@ -189,7 +161,7 @@ HRESULT M4LMAPISupport::Notify(LPNOTIFKEY lpKey, ULONG cNotification, LPNOTIFICA
 	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::Notify", "");
 	HRESULT hr = hrSuccess;
 	LPMAPIADVISESINK lpAdviseSink = NULL;
-	M4LSUPPORTADVISES::iterator iter;
+	M4LSUPPORTADVISES::const_iterator iter;
 
 	pthread_mutex_lock(&m_advises_mutex);
 
@@ -227,8 +199,8 @@ HRESULT M4LMAPISupport::ModifyStatusRow(ULONG cValues, LPSPropValue lpColumnVals
 
 HRESULT M4LMAPISupport::OpenProfileSection(LPMAPIUID lpUid, ULONG ulFlags, LPPROFSECT * lppProfileObj) {
 	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::OpenProfileSection", "");
-    if(lpUid == NULL)
-        lpUid = lpsProviderUID;
+	if (lpUid == NULL)
+		lpUid = lpsProviderUID;
         
 	HRESULT hr = session->OpenProfileSection(lpUid, NULL, ulFlags, lppProfileObj);
 
@@ -387,7 +359,7 @@ HRESULT M4LMAPISupport::CopyMessages(LPCIID lpSrcInterface, LPVOID lpSrcFolder, 
 
 	lpDeleteEntries->cValues = 0;
 
-	for (i = 0; i < lpMsgList->cValues; i++) {
+	for (i = 0; i < lpMsgList->cValues; ++i) {
 		hr = lpSource->OpenEntry(lpMsgList->lpbin[i].cb, (LPENTRYID)lpMsgList->lpbin[i].lpb, &IID_IMessage, 0, &ulObjType, (LPUNKNOWN*)&lpSrcMessage);
 		if (hr != hrSuccess) {
 			// partial, or error to calling client?
@@ -415,7 +387,7 @@ HRESULT M4LMAPISupport::CopyMessages(LPCIID lpSrcInterface, LPVOID lpSrcFolder, 
 		} else if (ulFlags & MAPI_MOVE) {
 			lpDeleteEntries->lpbin[lpDeleteEntries->cValues].cb = lpMsgList->lpbin[i].cb;
 			lpDeleteEntries->lpbin[lpDeleteEntries->cValues].lpb = lpMsgList->lpbin[i].lpb;
-			lpDeleteEntries->cValues++;
+			++lpDeleteEntries->cValues;
 		}
 
 next_item:
@@ -437,9 +409,7 @@ next_item:
 		hr = MAPI_W_PARTIAL_COMPLETION;
 
 exit:
-	if (lpDeleteEntries)
-		MAPIFreeBuffer(lpDeleteEntries);
-
+	MAPIFreeBuffer(lpDeleteEntries);
 	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::CopyMessages", "0x%08x", hr);
 	return hr;
 }
@@ -516,10 +486,7 @@ exit:
 
 	if (lpFolder)
 		lpFolder->Release();
-
-	if (lpSourceName)
-		MAPIFreeBuffer(lpSourceName);
-
+	MAPIFreeBuffer(lpSourceName);
 	if (lpSubFolder)
 		lpSubFolder->Release();
 
@@ -677,8 +644,8 @@ HRESULT M4LMAPISupport::ExpandRecips(LPMESSAGE lpMessage, ULONG * lpulFlags) {
 
 		// find all unknown properties in the rows, reference-copy those from the original recipient
 		// ModifyRecipients() will actually copy the data
-		for (ULONG c = 0; c < ptrMembers.size(); c++) {
-			for (ULONG i = 0; i < ptrMembers[c].cValues; i++) {
+		for (ULONG c = 0; c < ptrMembers.size(); ++c) {
+			for (ULONG i = 0; i < ptrMembers[c].cValues; ++i) {
 				LPSPropValue lpRecipProp = NULL;
 
 				if (PROP_TYPE(ptrMembers[c].lpProps[i].ulPropTag) != PT_ERROR)
@@ -808,7 +775,7 @@ HRESULT M4LMAPISupport::QueryInterface(REFIID refiid, void **lpvoid) {
 	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::QueryInterface", "");
 	HRESULT hr = hrSuccess;
 
-    if ((refiid == IID_IMAPISup) || (refiid == IID_IUnknown)) {
+	if (refiid == IID_IMAPISup || refiid == IID_IUnknown) {
 		AddRef();
 		*lpvoid = (IMAPISupport *)this;
 		hr = hrSuccess;
