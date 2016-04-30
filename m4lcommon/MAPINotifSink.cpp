@@ -1,50 +1,24 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "MAPINotifSink.h"
 
-#include "Util.h"
+#include <zarafa/Util.h>
 
 #include <mapi.h>
 #include <mapix.h>
@@ -204,21 +178,28 @@ static HRESULT CopyNotification(const NOTIFICATION *lpSrc, void *lpBase,
         case fnevTableModified:
             lpDst->info.tab.ulTableEvent = lpSrc->info.tab.ulTableEvent;
             lpDst->info.tab.hResult = lpSrc->info.tab.hResult;
-            Util::HrCopyProperty(&lpDst->info.tab.propPrior, &lpSrc->info.tab.propPrior, lpBase);
-            Util::HrCopyProperty(&lpDst->info.tab.propIndex, &lpSrc->info.tab.propIndex, lpBase);
+            hr = Util::HrCopyProperty(&lpDst->info.tab.propPrior, &lpSrc->info.tab.propPrior, lpBase);
+            if (hr != hrSuccess)
+		goto exit;
+            hr = Util::HrCopyProperty(&lpDst->info.tab.propIndex, &lpSrc->info.tab.propIndex, lpBase);
+            if (hr != hrSuccess)
+		goto exit;
             if ((hr = MAPIAllocateMore(lpSrc->info.tab.row.cValues * sizeof(SPropValue), lpBase, (void **)&lpDst->info.tab.row.lpProps)) != hrSuccess)
 		goto exit;
-            Util::HrCopyPropertyArray(lpSrc->info.tab.row.lpProps, lpSrc->info.tab.row.cValues, lpDst->info.tab.row.lpProps, lpBase);
+            hr = Util::HrCopyPropertyArray(lpSrc->info.tab.row.lpProps, lpSrc->info.tab.row.cValues, lpDst->info.tab.row.lpProps, lpBase);
+            if (hr != hrSuccess)
+                goto exit;
             lpDst->info.tab.row.cValues = lpSrc->info.tab.row.cValues;
             break;
         case fnevStatusObjectModified:
             MAPICopyMem(lpSrc->info.statobj.cbEntryID, 		lpSrc->info.statobj.lpEntryID, 		lpBase, &lpDst->info.statobj.cbEntryID, 	(void**)&lpDst->info.statobj.lpEntryID);
             if ((hr = MAPIAllocateMore(lpSrc->info.statobj.cValues * sizeof(SPropValue), lpBase, (void **)&lpDst->info.statobj.lpPropVals)) != hrSuccess)
 			goto exit;
-            Util::HrCopyPropertyArray(lpSrc->info.statobj.lpPropVals, lpSrc->info.statobj.cValues, lpDst->info.statobj.lpPropVals, lpBase);
+            hr = Util::HrCopyPropertyArray(lpSrc->info.statobj.lpPropVals, lpSrc->info.statobj.cValues, lpDst->info.statobj.lpPropVals, lpBase);
+            if (hr != hrSuccess)
+                goto exit;
             lpDst->info.statobj.cValues = lpSrc->info.statobj.cValues;
             break;
-        
     }
 
 exit:
@@ -250,9 +231,9 @@ MAPINotifSink::~MAPINotifSink() {
     pthread_cond_destroy(&m_hCond);
     pthread_mutex_destroy(&m_hMutex);
 
-	std::list<NOTIFICATION *>::iterator iterNotif;
+	std::list<NOTIFICATION *>::const_iterator iterNotif;
 
-    for(iterNotif = m_lstNotifs.begin(); iterNotif != m_lstNotifs.end(); iterNotif++) 
+	for (iterNotif = m_lstNotifs.begin(); iterNotif != m_lstNotifs.end(); ++iterNotif)
 		MAPIFreeBuffer(*iterNotif);	
 
 	m_lstNotifs.clear();
@@ -266,7 +247,7 @@ ULONG MAPINotifSink::OnNotify(ULONG cNotifications, LPNOTIFICATION lpNotificatio
 	LPNOTIFICATION lpNotif;
     
 	pthread_mutex_lock(&m_hMutex);
-	for(unsigned int i=0; i < cNotifications; i++) {
+	for (unsigned int i = 0; i < cNotifications; ++i) {
 		if (MAPIAllocateBuffer(sizeof(NOTIFICATION), (LPVOID*)&lpNotif) != hrSuccess) {
 			rc = 1;
 			break;
@@ -287,7 +268,7 @@ ULONG MAPINotifSink::OnNotify(ULONG cNotifications, LPNOTIFICATION lpNotificatio
 HRESULT MAPINotifSink::GetNotifications(ULONG *lpcNotif, LPNOTIFICATION *lppNotifications, BOOL fNonBlock, ULONG timeout)
 {
     HRESULT hr = hrSuccess;
-    std::list<NOTIFICATION *>::iterator iterNotif;
+    std::list<NOTIFICATION *>::const_iterator iterNotif;
     ULONG cNotifs = 0;
     struct timespec t;
     
@@ -311,15 +292,14 @@ HRESULT MAPINotifSink::GetNotifications(ULONG *lpcNotif, LPNOTIFICATION *lppNoti
 	LPNOTIFICATION lpNotifications = NULL;
     
 	if ((hr = MAPIAllocateBuffer(sizeof(NOTIFICATION) * m_lstNotifs.size(), (void **) &lpNotifications)) == hrSuccess) {
-		for(iterNotif = m_lstNotifs.begin(); iterNotif != m_lstNotifs.end(); iterNotif++) {
+		for (iterNotif = m_lstNotifs.begin(); iterNotif != m_lstNotifs.end(); ++iterNotif) {
 			if(CopyNotification(*iterNotif, lpNotifications, &lpNotifications[cNotifs]) == 0) 
-				cNotifs++;
-				MAPIFreeBuffer(*iterNotif);
-			}
-
+				++cNotifs;
+			MAPIFreeBuffer(*iterNotif);
 		}
+	}
 
-		m_lstNotifs.clear();
+	m_lstNotifs.clear();
     
 	pthread_mutex_unlock(&m_hMutex);       
 

@@ -10,7 +10,7 @@
 #              on the filesystem.
 # processname: /usr/sbin/zarafa-server
 # config: /etc/zarafa/server.cfg
-# pidfile: /var/run/zarafa-server.pid
+# pidfile: /var/run/zarafad/server.pid
 
 ### BEGIN INIT INFO
 # Provides: zarafa-server
@@ -47,11 +47,12 @@ fi
 RETVAL=0
 server=`basename $SERVERPROGRAM`
 lockfile=/var/lock/subsys/$server
-pidfile=/var/run/$server.pid
+pidfile=/var/run/zarafad/server.pid
 
 start() {
 	# Start in background, always succeeds
 	echo -n $"Starting $server: "
+	install -dm0775 -o zarafa -g zarafa /var/run/zarafad
 	export LC_ALL=$ZARAFA_LOCALE
 	export LANG=$ZARAFA_LOCALE
 	daemon $SERVERPROGRAM $SERVERCONFIG_OPT
@@ -73,7 +74,7 @@ stop() {
 	fi
 	# Cannot use killproc, because it has no timeout feature;
 	# zarafa-server may take up to 60 seconds to shutdown.
-	ZARAFAPID=`cat /var/run/zarafa-server.pid 2>/dev/null`
+	ZARAFAPID=`cat /var/run/zarafad/server.pid 2>/dev/null`
 	if [ -z "$ZARAFAPID" -o ! -n "$ZARAFAPID" ]; then
 		echo -n "Program ID of $server not found, trying to stop anyway: "
 		killall $SERVERPROGRAM >/dev/null 2>&1

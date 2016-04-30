@@ -5,7 +5,7 @@ includedir=@includedir@
 
 Name: zarafa
 Description: Zarafa custom development
-Version: @ZARAFA_VERSION@
+Version: @PACKAGE_VERSION@
 Requires:
 Libs: -L${libdir} -lmapi
-Cflags: -I${includedir}/mapi4linux/ -I${includedir}/zarafa/ -DUNICODE
+Cflags: -I${includedir} -I${includedir}/mapi4linux -DUNICODE @icu_uc_CFLAGS@ @icu_i18n_CFLAGS@

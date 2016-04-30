@@ -1,10 +1,15 @@
+#!/bin/bash
 # -*- Mode: sh -*-
 # bash completion for Zarafa admin command
+
+shopt -q extglob
+_zarafa_old_extglob=$?
+shopt -s extglob
 
 _zarafa__hosts()
 {
 	local host_completes
-	host_completes='file:///var/run/zarafa http://localhost:236/zarafa https://localhost:237/zarafa'
+	host_completes='file:///var/run/zarafad/server.sock http://localhost:236/zarafa https://localhost:237/zarafa'
 	COMPREPLY=( $( compgen -W "$host_completes" -- ${COMP_WORDS[COMP_CWORD]} ) )
 	return 0
 }
@@ -385,3 +390,7 @@ _zarafa_archiver_options()
 	return 0
 }
 complete -F _zarafa_archiver_options zarafa-archiver
+
+if test "$_zarafa_old_extglob" != 0; then
+	shopt -u extglob
+fi

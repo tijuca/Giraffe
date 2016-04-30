@@ -1,53 +1,27 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include "soapH.h"
 
 #include "SOAPUtils.h"
 #include "ECDatabase.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 #include <sstream>
 
 #include "ECConversion.h"
@@ -63,6 +37,9 @@ static const char THIS_FILE[] = __FILE__;
 // Convert search criteria of zarafa version 5.2x to 6
 ECRESULT ConvertSearchCriteria52XTo6XX(ECDatabase *lpDatabase, char* lpData, struct searchCriteria **lppNewSearchCriteria)
 {
+	if (lpDatabase == NULL || lpData == NULL || lppNewSearchCriteria == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
+
 	ECRESULT er = erSuccess;
 	
 	DB_ROW lpDBRow = NULL;
@@ -78,11 +55,6 @@ ECRESULT ConvertSearchCriteria52XTo6XX(ECDatabase *lpDatabase, char* lpData, str
 	std::string xmldata(lpData);
 	std::istringstream xml(xmldata);
 
-	if (lpDatabase == NULL || lpData == NULL || lppNewSearchCriteria == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
 	// We use the soap serializer / deserializer to store the data
 	soap_set_mode(&xmlsoap, SOAP_XML_TREE | SOAP_C_UTFSTRING);
 
@@ -93,11 +65,17 @@ ECRESULT ConvertSearchCriteria52XTo6XX(ECDatabase *lpDatabase, char* lpData, str
 	xmlsoap.recvfd = -1;
 	xmlsoap.is = &xml;
 	soap_default_searchCriteria52X(&xmlsoap, lpSearchCriteria);
-	soap_begin_recv(&xmlsoap);
+	if (soap_begin_recv(&xmlsoap) != 0) {
+		er = ZARAFA_E_NETWORK_ERROR;
+		goto exit;
+	}
 	soap_get_searchCriteria52X(&xmlsoap, lpSearchCriteria, "SearchCriteria", NULL);
 
 	// We now have the object, allocated by xmlsoap object,
-	soap_end_recv(&xmlsoap);
+	if (soap_end_recv(&xmlsoap) != 0) {
+		er = ZARAFA_E_NETWORK_ERROR;
+		goto exit;
+	}
 
 	lpNewSearchCriteria = new struct searchCriteria;
 	memset(lpNewSearchCriteria, 0, sizeof(struct searchCriteria));
@@ -126,8 +104,7 @@ ECRESULT ConvertSearchCriteria52XTo6XX(ECDatabase *lpDatabase, char* lpData, str
 
 		// Get them from the database
 		strQuery = "SELECT val_binary FROM indexedproperties WHERE tag=0x0FFF AND hierarchyid IN ("; //PR_ENTRYID
-		for (i=0; i < lpSearchCriteria->lpFolders->__size; i++)
-		{
+		for (i = 0; i < lpSearchCriteria->lpFolders->__size; ++i) {
 			if (i != 0)strQuery+= ",";
 			strQuery+= stringify(lpSearchCriteria->lpFolders->__ptr[i]);
 		}
@@ -151,8 +128,7 @@ ECRESULT ConvertSearchCriteria52XTo6XX(ECDatabase *lpDatabase, char* lpData, str
 			memcpy(lpNewSearchCriteria->lpFolders->__ptr[i].__ptr, (unsigned char*) lpDBRow[0], lpDBLenths[0]);
 
 			lpNewSearchCriteria->lpFolders->__ptr[i].__size = (unsigned int) lpDBLenths[0];
-			
-			lpNewSearchCriteria->lpFolders->__size++;
+			++lpNewSearchCriteria->lpFolders->__size;
 		}
 		
 	} //if (lpSearchCriteria...)
@@ -166,8 +142,7 @@ exit:
 	if (er != erSuccess && lpNewSearchCriteria)
 		FreeSearchCriteria(lpNewSearchCriteria);
 
-	if (lpSearchCriteria)
-		delete lpSearchCriteria;
+	delete lpSearchCriteria;
 
 	if (lpDBResult)
 		lpDatabase->FreeResult(lpDBResult);
@@ -212,18 +187,18 @@ SOAP_FMAC3 struct searchCriteria52X * SOAP_FMAC4 soap_in_searchCriteria52X(struc
 		for (;;)
 		{	soap->error = SOAP_TAG_MISMATCH;
 			if (soap_flag_lpRestrict && soap->error == SOAP_TAG_MISMATCH)
-				if (soap_in_PointerTorestrictTable(soap, "lpRestrict", &a->lpRestrict, "restrictTable"))
-				{	soap_flag_lpRestrict--;
+				if (soap_in_PointerTorestrictTable(soap, "lpRestrict", &a->lpRestrict, "restrictTable")) {
+					--soap_flag_lpRestrict;
 					continue;
 				}
 			if (soap_flag_lpFolders && soap->error == SOAP_TAG_MISMATCH)
-				if (soap_in_PointerToentryList52X(soap, "lpFolders", &a->lpFolders, "entryList"))
-				{	soap_flag_lpFolders--;
+				if (soap_in_PointerToentryList52X(soap, "lpFolders", &a->lpFolders, "entryList")) {
+					--soap_flag_lpFolders;
 					continue;
 				}
 			if (soap_flag_ulFlags && soap->error == SOAP_TAG_MISMATCH)
-				if (soap_in_unsignedInt(soap, "ulFlags", &a->ulFlags, "xsd:unsignedInt"))
-				{	soap_flag_ulFlags--;
+				if (soap_in_unsignedInt(soap, "ulFlags", &a->ulFlags, "xsd:unsignedInt")) {
+					--soap_flag_ulFlags;
 					continue;
 				}
 			if (soap->error == SOAP_TAG_MISMATCH)
@@ -233,7 +208,7 @@ SOAP_FMAC3 struct searchCriteria52X * SOAP_FMAC4 soap_in_searchCriteria52X(struc
 			if (soap->error)
 				return NULL;
 		}
-		if ((soap->mode & SOAP_XML_STRICT) && (soap_flag_ulFlags > 0))
+		if ((soap->mode & SOAP_XML_STRICT) && soap_flag_ulFlags > 0)
 		{	soap->error = SOAP_OCCURS;
 			return NULL;
 		}
@@ -289,8 +264,8 @@ SOAP_FMAC3 struct entryList52X * SOAP_FMAC4 soap_in_entryList52X(struct soap *so
 			if (soap_flag___ptr && soap->error == SOAP_TAG_MISMATCH)
 			{	unsigned int *p;
 				soap_new_block(soap);
-				for (a->__size = 0; !soap_element_begin_in(soap, "item", 1, type); a->__size++)
-				{	p = (unsigned int *)soap_push_block(soap, NULL, sizeof(unsigned int));
+				for (a->__size = 0; !soap_element_begin_in(soap, "item", 1, type); ++a->__size) {
+					p = (unsigned int *)soap_push_block(soap, NULL, sizeof(unsigned int));
 					soap_default_unsignedInt(soap, p);
 					soap_revert(soap);
 					if (!soap_in_unsignedInt(soap, "item", p, "xsd:unsignedInt"))

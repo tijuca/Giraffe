@@ -1,48 +1,22 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include <platform.h>
-#include <stringutil.h>
+#include <zarafa/platform.h>
+#include <zarafa/stringutil.h>
 #include <ZarafaICS.h>
 
 #include "ECStoreObjectTable.h"
@@ -56,7 +30,7 @@
 #include <string>
 #include <algorithm>
 
-#include "ECLogger.h"
+#include <zarafa/ECLogger.h>
 extern ECLogger* g_lpLogger;
 
 #ifdef _DEBUG
@@ -439,7 +413,6 @@ public:
 	unsigned int GetMaxChangeId() const;
 	
 private:
-	unsigned int	m_ulChangeId;
 	unsigned int	m_ulSyncId;
 	MESSAGESET		m_setMessages;
 	unsigned int	m_ulMaxFolderChange;
@@ -447,8 +420,7 @@ private:
 };
 
 LegacyProcessor::LegacyProcessor(unsigned int ulChangeId, unsigned int ulSyncId, const MESSAGESET &setMessages, unsigned int ulMaxFolderChange)
-	: m_ulChangeId(ulChangeId)
-	, m_ulSyncId(ulSyncId)
+	: m_ulSyncId(ulSyncId)
 	, m_setMessages(setMessages)
 	, m_ulMaxFolderChange(ulMaxFolderChange)
 	, m_ulMaxChangeId(ulChangeId)
@@ -625,9 +597,7 @@ ECRESULT ECGetContentChangesHelper::Create(struct soap *soap, ECSession *lpSessi
 	lpHelper = NULL;
 	
 exit:
-	if (lpHelper)
-		delete lpHelper;
-		
+	delete lpHelper;
 	return er;
 }
 
@@ -672,7 +642,7 @@ ECRESULT ECGetContentChangesHelper::Init()
 		
 	if ((lpDBRow = m_lpDatabase->FetchRow(lpDBResult)) == NULL || lpDBRow == NULL) {
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECGetContentChangesHelper::Init(): fetchrow failed");
+		ec_log_err("ECGetContentChangesHelper::Init(): fetchrow failed");
 		goto exit;
 	}
 	
@@ -762,11 +732,8 @@ exit:
  
 ECGetContentChangesHelper::~ECGetContentChangesHelper()
 {
-	if (m_lpQueryCreator)
-		delete m_lpQueryCreator;
-		
-	if(m_lpMsgProcessor)
-		delete m_lpMsgProcessor;
+	delete m_lpQueryCreator;
+	delete m_lpMsgProcessor;
 }
 	
 ECRESULT ECGetContentChangesHelper::QueryDatabase(DB_RESULT *lppDBResult)
@@ -805,64 +772,65 @@ exit:
 	return er;
 }
 
-ECRESULT ECGetContentChangesHelper::ProcessRow(DB_ROW lpDBRow, DB_LENGTHS lpDBLen)
+ECRESULT ECGetContentChangesHelper::ProcessRows(const std::vector<DB_ROW> &db_rows, const std::vector<DB_LENGTHS> &db_lengths)
 {
 	ECRESULT		er = erSuccess;
-	bool			fMatch = true;
 	unsigned int	ulChangeType = 0;
 	unsigned int	ulFlags = 0;
-	
-	ASSERT(lpDBRow);
-	ASSERT(lpDBLen);
-	
-	if (lpDBRow[icsSourceKey] == NULL || lpDBRow[icsParentSourceKey] == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECGetContentChangesHelper::ProcessRow(): row null");
-		goto exit;
-	}
+	DB_ROW lpDBRow;
+	DB_LENGTHS lpDBLen;
+	std::set<SOURCEKEY> *matches = NULL;
 
 	if (m_lpsRestrict) {
 		ASSERT(m_lpSession);
-		er = MatchRestriction(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey]), m_lpsRestrict, &fMatch);
-		if (er == ZARAFA_E_NOT_FOUND) {
-			er = erSuccess;
-			fMatch = false;
-		} else if (er != erSuccess)
+		er = MatchRestrictions(db_rows, db_lengths, m_lpsRestrict, &matches);
+		if (er != erSuccess)
 			goto exit;
 	}
-	
+
 	ASSERT(m_lpMsgProcessor);
-	if (fMatch) {
-		er = m_lpMsgProcessor->ProcessAccepted(lpDBRow, lpDBLen, &ulChangeType, &ulFlags);
-		if (m_lpsRestrict)
-			m_setNewMessages.insert(MESSAGESET::value_type(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey]), SAuxMessageData(SOURCEKEY(lpDBLen[icsParentSourceKey], lpDBRow[icsParentSourceKey]), ICS_CHANGE_FLAG_NEW, ulFlags)));
-	} else
-		er = m_lpMsgProcessor->ProcessRejected(lpDBRow, lpDBLen, &ulChangeType);
-	
-	if (er != erSuccess)
-		goto exit;
-		
-	// If ulChangeType equals 0 we can skip this message
-	if (ulChangeType == 0)
-		goto exit;
-		
-	m_lpChanges->__ptr[m_ulChangeCnt].ulChangeId = lpDBRow[icsID] ? atoui(lpDBRow[icsID]) : 0;
-	
-	m_lpChanges->__ptr[m_ulChangeCnt].sSourceKey.__ptr = (unsigned char *)soap_malloc(m_soap, lpDBLen[icsSourceKey]);
-	m_lpChanges->__ptr[m_ulChangeCnt].sSourceKey.__size = lpDBLen[icsSourceKey];
-	memcpy(m_lpChanges->__ptr[m_ulChangeCnt].sSourceKey.__ptr, lpDBRow[icsSourceKey], lpDBLen[icsSourceKey]);
+	for (size_t i = 0; i < db_rows.size(); ++i) {
+		bool fMatch = true;
 
-	m_lpChanges->__ptr[m_ulChangeCnt].sParentSourceKey.__ptr = (unsigned char *)soap_malloc(m_soap, lpDBLen[icsParentSourceKey]);
-	m_lpChanges->__ptr[m_ulChangeCnt].sParentSourceKey.__size = lpDBLen[icsParentSourceKey];
-	memcpy(m_lpChanges->__ptr[m_ulChangeCnt].sParentSourceKey.__ptr, lpDBRow[icsParentSourceKey], lpDBLen[icsParentSourceKey]);
+		lpDBRow = db_rows[i];
+		lpDBLen = db_lengths[i];
+		if (m_lpsRestrict != NULL)
+			fMatch = matches->find(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey])) != matches->end();
+		ulChangeType = 0;
+		ulFlags = 0;
+		if (fMatch) {
+			er = m_lpMsgProcessor->ProcessAccepted(lpDBRow, lpDBLen, &ulChangeType, &ulFlags);
+			if (m_lpsRestrict != NULL)
+				m_setNewMessages.insert(MESSAGESET::value_type(SOURCEKEY(lpDBLen[icsSourceKey],
+					lpDBRow[icsSourceKey]), SAuxMessageData(SOURCEKEY(lpDBLen[icsParentSourceKey],
+					lpDBRow[icsParentSourceKey]), ICS_CHANGE_FLAG_NEW, ulFlags)));
+		} else {
+			er = m_lpMsgProcessor->ProcessRejected(lpDBRow, lpDBLen, &ulChangeType);
+		}
+		if (er != erSuccess)
+			goto exit;
 
-	m_lpChanges->__ptr[m_ulChangeCnt].ulChangeType = ulChangeType;
+		// If ulChangeType equals 0 we can skip this message
+		if (ulChangeType == 0)
+			continue;
 
-	m_lpChanges->__ptr[m_ulChangeCnt].ulFlags = ulFlags;
+		m_lpChanges->__ptr[m_ulChangeCnt].ulChangeId = lpDBRow[icsID] ? atoui(lpDBRow[icsID]) : 0;
 
-	m_ulChangeCnt++;
-	
+		m_lpChanges->__ptr[m_ulChangeCnt].sSourceKey.__ptr = (unsigned char *)soap_malloc(m_soap, lpDBLen[icsSourceKey]);
+		m_lpChanges->__ptr[m_ulChangeCnt].sSourceKey.__size = lpDBLen[icsSourceKey];
+		memcpy(m_lpChanges->__ptr[m_ulChangeCnt].sSourceKey.__ptr, lpDBRow[icsSourceKey], lpDBLen[icsSourceKey]);
+
+		m_lpChanges->__ptr[m_ulChangeCnt].sParentSourceKey.__ptr = (unsigned char *)soap_malloc(m_soap, lpDBLen[icsParentSourceKey]);
+		m_lpChanges->__ptr[m_ulChangeCnt].sParentSourceKey.__size = lpDBLen[icsParentSourceKey];
+		memcpy(m_lpChanges->__ptr[m_ulChangeCnt].sParentSourceKey.__ptr, lpDBRow[icsParentSourceKey], lpDBLen[icsParentSourceKey]);
+
+		m_lpChanges->__ptr[m_ulChangeCnt].ulChangeType = ulChangeType;
+
+		m_lpChanges->__ptr[m_ulChangeCnt].ulFlags = ulFlags;
+		++m_ulChangeCnt;
+	}
 exit:
+	free(matches);
 	return er;
 }
 
@@ -870,7 +838,7 @@ ECRESULT ECGetContentChangesHelper::ProcessResidualMessages()
 {
 	ECRESULT				er = erSuccess;
 	MESSAGESET				setResiduals;
-	MESSAGESET::iterator	iterMessage;
+	MESSAGESET::const_iterator iterMessage;
 
 	ASSERT(m_lpMsgProcessor);
 	er = m_lpMsgProcessor->GetResidualMessages(&setResiduals);
@@ -894,8 +862,7 @@ ECRESULT ECGetContentChangesHelper::ProcessResidualMessages()
 		m_lpChanges->__ptr[m_ulChangeCnt].ulChangeType = ICS_HARD_DELETE;
 		
 		m_lpChanges->__ptr[m_ulChangeCnt].ulFlags = 0;
-		
-		m_ulChangeCnt++;
+		++m_ulChangeCnt;
 	}	
 	
 exit:
@@ -920,6 +887,11 @@ ECRESULT ECGetContentChangesHelper::Finalize(unsigned int *lpulMaxChange, icsCha
 	
 	ASSERT(m_lpMsgProcessor != NULL);
 	ulMaxChange = m_lpMsgProcessor->GetMaxChangeId();
+
+	if(m_ulFlags & 0x80000) {
+		*lpulMaxChange = ulMaxChange;
+		goto exit;
+	}
 	
 	// If there were no changes and this was not the initial sync, we only need to purge all too-new-syncedmessages.
 	// If this is the initial sync, we might need to write the empty restricted set marker, so we can't
@@ -979,7 +951,7 @@ ECRESULT ECGetContentChangesHelper::Finalize(unsigned int *lpulMaxChange, icsCha
 		while ((lpDBRow = m_lpDatabase->FetchRow(lpDBResult))) {
 			if (lpDBRow == NULL || lpDBRow[0] == NULL) {
 				er = ZARAFA_E_DATABASE_ERROR; // this should never happen
-				m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECGetContentChangesHelper::Finalize(): row null or column null");
+				ec_log_err("ECGetContentChangesHelper::Finalize(): row null or column null");
 				goto exit;
 			}
 			setChangeIds.insert(atoui(lpDBRow[0]));
@@ -990,7 +962,7 @@ ECRESULT ECGetContentChangesHelper::Finalize(unsigned int *lpulMaxChange, icsCha
 
 		if (!setChangeIds.empty()) {
 			std::set<unsigned int> setDeleteIds;
-			std::set<unsigned int>::iterator iter;
+			std::set<unsigned int>::const_iterator iter;
 			
 			/* Remove obsolete states
 			 *
@@ -999,12 +971,12 @@ ECRESULT ECGetContentChangesHelper::Finalize(unsigned int *lpulMaxChange, icsCha
 			 *    We do this since if the client requests state X, it can never request state X+1
 			 *    later unless X+1 is the state that was generated from this request. We can therefore
 			 *    remove any state > X at this point, since state X+1 will be inserted later
-			 * 2) Remove any states that are older than the state that was requested minus two
+			 * 2) Remove any states that are older than the state that was requested minus nine
 			 *    We cannot remove state X since the client may re-request this state (eg if the export
 			 *    failed due to network error, or if the export is interrupted before ending). We also
-			 *    do not remove state X-1 and X-2 so that we support some sort of rollback of the client.
-			 *    This may happen if the client is restored to an old state. In practice removing X-1 and
-			 *    X-2 will probably not cause any real problems though, and the number 2 is pretty
+			 *    do not remove state X-9 to X-1 so that we support some sort of rollback of the client.
+			 *    This may happen if the client is restored to an old state. In practice removing X-9 to
+			 *    X-1 will probably not cause any real problems though, and the number 9 is pretty
 			 *    arbitrary.
 			 */
 
@@ -1017,13 +989,13 @@ ECRESULT ECGetContentChangesHelper::Finalize(unsigned int *lpulMaxChange, icsCha
 
 			// Find all message states that are equal or lower than the changeset that changes were requested from
 			iter = setChangeIds.lower_bound(m_ulChangeId);
-			// Reverse up to two message states (less if they do not exist)
-			for (int i = 0; iter != setChangeIds.begin() && i < 2; ++i, --iter);
-			// Remove message states that are older than X-2 (rule 2)
+			// Reverse up to nine message states (less if they do not exist)
+			for (int i = 0; iter != setChangeIds.begin() && i < 9; ++i, --iter);
+			// Remove message states that are older than X-9 (rule 2)
 			std::copy(setChangeIds.begin(), iter, std::inserter(setDeleteIds, setDeleteIds.begin()));
 
 			if (!setDeleteIds.empty()) {
-				ASSERT(setChangeIds.size() - setDeleteIds.size() <= 2);
+				ASSERT(setChangeIds.size() - setDeleteIds.size() <= 9);
 				
 				strQuery = "DELETE FROM syncedmessages WHERE sync_id=" + stringify(m_ulSyncId) + " AND change_id IN (";
 				for (iter = setDeleteIds.begin(); iter != setDeleteIds.end(); ++iter) {
@@ -1061,72 +1033,95 @@ exit:
 	return er;
 }
 
-ECRESULT ECGetContentChangesHelper::MatchRestriction(const SOURCEKEY &sSourceKey, struct restrictTable *lpsRestrict, bool *lpfMatch)
+ECRESULT ECGetContentChangesHelper::MatchRestrictions(const std::vector<DB_ROW> &db_rows,
+    const std::vector<DB_LENGTHS> &db_lengths,
+    struct restrictTable *restrict, std::set<SOURCEKEY> **matches_p)
 {
-    ECRESULT er = erSuccess;
-    unsigned int ulObjId = 0;
-    ECObjectTableList lstRows;
-    ECObjectTableList::value_type sRow;
-    ECODStore sODStore;
-    bool fMatch = false;
-    struct propTagArray *lpPropTags = NULL;
-    struct rowSet *lpRowSet = NULL;
+	ECRESULT er = erSuccess;
+	unsigned int ulObjId = 0;
+	ECObjectTableList lstRows;
+	ECObjectTableList::value_type sRow;
+	ECODStore sODStore;
+	bool fMatch = false;
+	std::vector<SOURCEKEY> source_keys;
+	std::map<ECsIndexProp, unsigned int> index_objs;
+	struct propTagArray *lpPropTags = NULL;
+	struct rowSet *lpRowSet = NULL;
+	std::set<SOURCEKEY> *matches = new std::set<SOURCEKEY>;
+	std::vector<unsigned int> cbdata;
+	std::vector<unsigned char *> lpdata;
+	std::vector<unsigned int> objectids;
 
-    memset(&sODStore, 0, sizeof(sODStore));
+	memset(&sODStore, 0, sizeof(sODStore));
 
-	// Add change key and predecessor change list
-	er = g_lpSessionManager->GetCacheManager()->GetObjectFromProp(PROP_ID(PR_SOURCE_KEY), sSourceKey.size(), sSourceKey, &ulObjId);
-    if(er != erSuccess)
-        goto exit;
+	for (size_t i = 0; i < db_rows.size(); ++i) {
+		lpdata.push_back(reinterpret_cast<unsigned char *>(db_rows[i][icsSourceKey]));
+		cbdata.push_back(db_lengths[i][icsSourceKey]);
+	}
 
-    er = g_lpSessionManager->GetCacheManager()->GetObject(ulObjId, NULL, NULL, NULL, &sODStore.ulObjType);
-    if(er != erSuccess)
-    	goto exit;
+	er = g_lpSessionManager->GetCacheManager()->GetObjectsFromProp(PROP_ID(PR_SOURCE_KEY), cbdata, lpdata, index_objs);
+	if (er != erSuccess)
+		goto exit;
+
+	for (std::map<ECsIndexProp, unsigned int>::const_iterator i = index_objs.begin();
+	     i != index_objs.end(); ++i)
+	{
+		sRow.ulObjId = i->second;
+		sRow.ulOrderId = 0;
+		lstRows.push_back(sRow);
+		source_keys.push_back(SOURCEKEY(i->first.cbData, reinterpret_cast<const char *>(i->first.lpData)));
+		ulObjId = i->second; /* no need to split QueryRowData call per-objtype (always same) */
+	}
+
+	er = g_lpSessionManager->GetCacheManager()->GetObject(ulObjId, NULL, NULL, NULL, &sODStore.ulObjType);
+	if (er != erSuccess)
+		goto exit;
+
+	er = ECGenericObjectTable::GetRestrictPropTags(restrict, NULL, &lpPropTags);
+	if (er != erSuccess)
+		goto exit;
 
 	sODStore.lpGuid = new GUID;
 
 	er = g_lpSessionManager->GetCacheManager()->GetStore(ulObjId, &sODStore.ulStoreId, sODStore.lpGuid);
-	if(er != erSuccess)
+	if (er != erSuccess)
 		goto exit;
-
-	er = ECGenericObjectTable::GetRestrictPropTags(lpsRestrict, NULL, &lpPropTags);
-	if(er != erSuccess)
-		goto exit;
-
-	sRow.ulObjId = ulObjId;
-	sRow.ulOrderId = 0;
-
-	lstRows.push_back(sRow);
 
 	ASSERT(m_lpSession);
 	// NULL for soap, not m_soap. We'll free this ourselves
 	er = ECStoreObjectTable::QueryRowData(NULL, NULL, m_lpSession, &lstRows, lpPropTags, &sODStore, &lpRowSet, false, false);
-	if(er != erSuccess)
+	if (er != erSuccess)
 		goto exit;
 
-	if(lpRowSet->__size != 1) {
+	if (lpRowSet->__size < 0 ||
+	    static_cast<size_t>(lpRowSet->__size) != lstRows.size()) {
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECGetContentChangesHelper::MatchRestriction(): unexpected row count");
+		ec_log_err("ECGetContentChangesHelper::MatchRestriction(): unexpected row count");
 		goto exit;
 	}
 
-	// @todo: Get a proper locale for the case insensitive comparisons inside MatchRowRestrict
-	er = ECGenericObjectTable::MatchRowRestrict(g_lpSessionManager->GetCacheManager(), &lpRowSet->__ptr[0], lpsRestrict, NULL, createLocaleFromName(""), &fMatch);
-	if(er != erSuccess)
-		goto exit;
+	for (int j = 0; j < lpRowSet->__size; ++j) {
+		// @todo: Get a proper locale for the case insensitive comparisons inside MatchRowRestrict
+		er = ECGenericObjectTable::MatchRowRestrict(g_lpSessionManager->GetCacheManager(), &lpRowSet->__ptr[j], restrict, NULL, createLocaleFromName(""), &fMatch);
+		if(er != erSuccess)
+			goto exit;
+		if (fMatch)
+			matches->insert(source_keys[j]);
+	}
 
-    *lpfMatch = fMatch;
+	*matches_p = matches;
+	matches = NULL;
 
 exit:
-	if(sODStore.lpGuid)
-		delete sODStore.lpGuid;
-    if(lpPropTags)
-        FreePropTagArray(lpPropTags);
+	delete sODStore.lpGuid;
 
-    if(lpRowSet)
-        FreeRowSet(lpRowSet, true);
-
-    return er;
+	if(lpPropTags)
+		FreePropTagArray(lpPropTags);
+	if(lpRowSet)
+		FreeRowSet(lpRowSet, true);
+	if (matches != NULL)
+		delete matches;
+	return er;
 }
 
 ECRESULT ECGetContentChangesHelper::GetSyncedMessages(unsigned int ulSyncId, unsigned int ulChangeId, LPMESSAGESET lpsetMessages)
@@ -1157,7 +1152,7 @@ ECRESULT ECGetContentChangesHelper::GetSyncedMessages(unsigned int ulSyncId, uns
 		lpDBLen = m_lpDatabase->FetchRowLengths(lpDBResult);
 		if (lpDBRow == NULL || lpDBLen == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL) {
 			er = ZARAFA_E_DATABASE_ERROR; // this should never happen
-			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECGetContentChangesHelper::GetSyncedMessages(): row or columns null");
+			ec_log_err("ECGetContentChangesHelper::GetSyncedMessages(): row or columns null");
 			goto exit;
 		}
 

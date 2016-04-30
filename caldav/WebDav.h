@@ -1,44 +1,18 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 #ifndef _WEBDAV_H_
@@ -177,18 +151,18 @@ private:
 
 	HRESULT RespStructToXml(WEBDAVMULTISTATUS *sDavMStatus, std::string *strXml);
 	HRESULT GetNs(std::string *szPrefx, std::string *strNs);
-	HRESULT RegisterNs(std::string strNs, std::string *strPrefix);
-	HRESULT WriteData(xmlTextWriterPtr xmlWriter, WEBDAVVALUE sWebVal,std::string *szNsPrefix);
-	HRESULT WriteNode(xmlTextWriterPtr xmlWriter, WEBDAVPROPNAME sWebPrName,std::string *szNsPrefix);
-	HRESULT HrWriteSResponse(xmlTextWriterPtr xmlWriter,std::string *lpstrNsPrefix, WEBDAVRESPONSE sResponse);
-	HRESULT HrWriteResponseProps(xmlTextWriterPtr xmlWriter, std::string *lpstrNsPrefix, std::list<WEBDAVPROPERTY> *lstProps);
-	HRESULT HrWriteSPropStat(xmlTextWriterPtr xmlWriter,std::string *lpstrNsPrefix, WEBDAVPROPSTAT sPropStat);
-	HRESULT HrWriteItems(xmlTextWriterPtr xmlWriter, std::string *lpstrNsPrefix,WEBDAVPROPERTY *lpsWebProprty);
+	void RegisterNs(std::string strNs, std::string *strPrefix);
+	HRESULT WriteData(xmlTextWriter *xmlWriter, const WEBDAVVALUE &sWebVal, std::string *szNsPrefix);
+	HRESULT WriteNode(xmlTextWriter *xmlWriter, const WEBDAVPROPNAME &sWebPrName, std::string *szNsPrefix);
+	HRESULT HrWriteSResponse(xmlTextWriter *xmlWriter, std::string *lpstrNsPrefix, const WEBDAVRESPONSE &sResponse);
+	HRESULT HrWriteResponseProps(xmlTextWriter *xmlWriter, std::string *lpstrNsPrefix, std::list<WEBDAVPROPERTY> *lstProps);
+	HRESULT HrWriteSPropStat(xmlTextWriter *xmlWriter, std::string *lpstrNsPrefix, const WEBDAVPROPSTAT &sPropStat);
+	HRESULT HrWriteItems(xmlTextWriter *xmlWriter, std::string *lpstrNsPrefix, WEBDAVPROPERTY *lpsWebProprty);
 
-	HRESULT HrSetDavPropName(WEBDAVPROPNAME *lpsDavPropName,xmlNode *lpXmlNode);
+	void HrSetDavPropName(WEBDAVPROPNAME *lpsDavPropName,xmlNode *lpXmlNode);
 protected:
-	HRESULT HrSetDavPropName(WEBDAVPROPNAME *lpsDavPropName,std::string strPropName,std::string strNs);
-	HRESULT HrSetDavPropName(WEBDAVPROPNAME *lpsDavPropName,std::string strPropName, std::string strPropAttribName, std::string strPropAttribValue, std::string strNs);
+	void HrSetDavPropName(WEBDAVPROPNAME *lpsDavPropName, const std::string &strPropName, const std::string &strNs);
+	void HrSetDavPropName(WEBDAVPROPNAME *lpsDavPropName, const std::string &strPropName, const std::string &strPropAttribName, const std::string &strPropAttribValue, const std::string &strNs);
 
 };
 

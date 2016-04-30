@@ -1,62 +1,37 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include "rules.h"
 #include <mapi.h>
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapiutil.h>
-#include <mapiext.h>
+#include <zarafa/mapiext.h>
 #include <edkmdb.h>
 #include <edkguid.h>
-#include "stringutil.h"
-#include "Util.h"
-#include "CommonUtil.h"
-#include "ECLogger.h"
-#include "mapi_ptr.h"
-#include "mapiguidext.h"
+#include <zarafa/stringutil.h>
+#include <zarafa/Util.h>
+#include <zarafa/CommonUtil.h>
+#include <zarafa/ECLogger.h>
+#include <zarafa/MAPIErrors.h>
+#include <zarafa/mapi_ptr.h>
+#include <zarafa/mapiguidext.h>
 
 #include "IECExchangeModifyTable.h"
 #include "PyMapiPlugin.h"
@@ -181,6 +156,8 @@ static HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 		strForwardText = L"From: ";
 		if (PROP_TYPE(ptrInfo[0].ulPropTag) != PT_ERROR)
 			strForwardText += ptrInfo[0].Value.lpszW;
+		else if (PROP_TYPE(ptrInfo[1].ulPropTag) != PT_ERROR)
+			strForwardText += ptrInfo[1].Value.lpszW;
 		
 		if (PROP_TYPE(ptrInfo[1].ulPropTag) != PT_ERROR) {
 			strForwardText += L" <";
@@ -237,10 +214,12 @@ static HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 		pos = str_ifind(strHTML.c_str(), strFind.c_str());
 		pos = pos ? pos + strFind.length() : strHTML.c_str();
 		// if body tag was not found, this will make it be placed after the first tag, probably <html>
-		if ((pos == strHTML.c_str() && *pos == '<') || (pos != strHTML.c_str())) {
+		if ((pos == strHTML.c_str() && *pos == '<') || pos != strHTML.c_str()) {
 			// not all html bodies start actually using tags, so only seek if we find a <, or if we found a body tag starting point.
-			while (*pos && *pos != '>') pos++;
-			if (*pos == '>') pos++;
+			while (*pos && *pos != '>')
+				++pos;
+			if (*pos == '>')
+				++pos;
 		}
 
 
@@ -250,6 +229,14 @@ static HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 				Util::HrTextToHtml(ptrInfo[0].Value.lpszW, strHTMLForwardText, ulCharset);
 			else if (PROP_TYPE(ptrInfo[1].ulPropTag) != PT_ERROR)
 				Util::HrTextToHtml(ptrInfo[1].Value.lpszW, strHTMLForwardText, ulCharset);
+
+			if (PROP_TYPE(ptrInfo[1].ulPropTag) != PT_ERROR) {
+				strHTMLForwardText += " &lt;<a href=\"mailto:";
+				Util::HrTextToHtml(ptrInfo[1].Value.lpszW, strHTMLForwardText, ulCharset);
+				strHTMLForwardText += "\">";
+				Util::HrTextToHtml(ptrInfo[1].Value.lpszW, strHTMLForwardText, ulCharset);
+				strHTMLForwardText += "</a>&gt;";
+			}
 
 			strHTMLForwardText += "<br><b>Sent:</b> ";
 			if (PROP_TYPE(ptrInfo[2].ulPropTag) != PT_ERROR) {
@@ -308,9 +295,7 @@ static HRESULT CreateOutboxMessage(LPMDB lpOrigStore, LPMESSAGE *lppMessage)
 		goto exit;
 
 exit:
-	if (lpOutboxEntryID)
-		MAPIFreeBuffer(lpOutboxEntryID);
-
+	MAPIFreeBuffer(lpOutboxEntryID);
 	if (lpOutbox)
 		lpOutbox->Release();
 
@@ -381,8 +366,7 @@ static HRESULT CreateReplyCopy(LPMAPISESSION lpSession, LPMDB lpOrigStore,
 				goto exit;
 		}
 	}
-	if (lpProp)
-		MAPIFreeBuffer(lpProp);
+	MAPIFreeBuffer(lpProp);
 	lpProp = NULL;
 	hr = hrSuccess;
 
@@ -393,8 +377,7 @@ static HRESULT CreateReplyCopy(LPMAPISESSION lpSession, LPMDB lpOrigStore,
 		if (hr != hrSuccess)
 			goto exit;
 	}
-	if (lpProp)
-		MAPIFreeBuffer(lpProp);
+	MAPIFreeBuffer(lpProp);
 	lpProp = NULL;
 	hr = hrSuccess;
 
@@ -468,19 +451,10 @@ static HRESULT CreateReplyCopy(LPMAPISESSION lpSession, LPMDB lpOrigStore,
 exit:
 	if (lpReplyMessage)
 		lpReplyMessage->Release();
-
-	if (lpProp)
-		MAPIFreeBuffer(lpProp);
-
-	if (lpSentMailEntryID)
-		MAPIFreeBuffer(lpSentMailEntryID);
-
-	if (lpFrom)
-		MAPIFreeBuffer(lpFrom);
-
-	if (lpReplyRecipient)
-		MAPIFreeBuffer(lpReplyRecipient);
-
+	MAPIFreeBuffer(lpProp);
+	MAPIFreeBuffer(lpSentMailEntryID);
+	MAPIFreeBuffer(lpFrom);
+	MAPIFreeBuffer(lpReplyRecipient);
 	return hr;
 }
 
@@ -525,7 +499,7 @@ static HRESULT CheckRecipients(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
 
 	lpRecipients->cEntries = 0;
 
-	for (ULONG i = 0; i < lpRuleRecipients->cEntries; i++) {
+	for (ULONG i = 0; i < lpRuleRecipients->cEntries; ++i) {
 		hr = HrGetAddress(lpAdrBook, lpRuleRecipients->aEntries[i].rgPropVals, lpRuleRecipients->aEntries[i].cValues, PR_ENTRYID,
 						  CHANGE_PROP_TYPE(PR_DISPLAY_NAME, PT_UNSPECIFIED), CHANGE_PROP_TYPE(PR_ADDRTYPE, PT_UNSPECIFIED), CHANGE_PROP_TYPE(PR_SMTP_ADDRESS, PT_UNSPECIFIED), 
 						  strRuleName, strRuleType, strRuleAddress);
@@ -562,8 +536,7 @@ static HRESULT CheckRecipients(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
             
             lpRecipType->Value.ul = MAPI_P1;
         }
-
-		lpRecipients->cEntries++;
+		++lpRecipients->cEntries;
 	}
 
 	if (lpRecipients->cEntries == 0) {
@@ -581,10 +554,7 @@ static HRESULT CheckRecipients(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
 exit:
 	if (lpRecipients)
 		FreeProws((LPSRowSet)lpRecipients);
-
-	if (lpMsgClass)
-		MAPIFreeBuffer(lpMsgClass);
-
+	MAPIFreeBuffer(lpMsgClass);
 	return hr;
 }
 
@@ -668,7 +638,7 @@ static HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
         sPropResend.ulPropTag = PR_MESSAGE_FLAGS;
         sPropResend.Value.ul = MSGFLAG_UNSENT | MSGFLAG_RESEND | MSGFLAG_READ;
         
-        lpExclude->cValues--; // strip PR_MESSAGE_RECIPIENTS, since original recipients should be used
+		--lpExclude->cValues; // strip PR_MESSAGE_RECIPIENTS, since original recipients should be used
         hr = HrSetOneProp(lpFwdMsg, &sPropResend);
         if(hr != hrSuccess)
             goto exit;
@@ -772,12 +742,8 @@ static HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
 	*lppMessage = lpFwdMsg;
 
 exit:
-	if (lpSentMailEntryID)
-		MAPIFreeBuffer(lpSentMailEntryID);
-
-	if (lpOrigSubject)
-		MAPIFreeBuffer(lpOrigSubject);
-
+	MAPIFreeBuffer(lpSentMailEntryID);
+	MAPIFreeBuffer(lpOrigSubject);
 	if (lpRecipients && lpRecipients != lpRuleRecipients)
 		FreeProws((LPSRowSet)lpRecipients);
 
@@ -837,14 +803,16 @@ static HRESULT HrDelegateMessage(IMAPIProp *lpMessage)
 	hr = lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
 
 exit:
-	if (lpProps)
-		MAPIFreeBuffer(lpProps);
-
+	MAPIFreeBuffer(lpProps);
 	return hr;
 }
 
 // lpMessage: gets EntryID, maybe pass this and close message in DAgent.cpp
-HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPADRBOOK lpAdrBook, LPMDB lpOrigStore, LPMAPIFOLDER lpOrigInbox, IMessage **lppMessage, ECLogger *lpLogger, StatsClient *const sc) {
+HRESULT HrProcessRules(const std::string &recip, PyMapiPlugin *pyMapiPlugin,
+    LPMAPISESSION lpSession, LPADRBOOK lpAdrBook, LPMDB lpOrigStore,
+    LPMAPIFOLDER lpOrigInbox, IMessage **lppMessage, ECLogger *lpLogger,
+    StatsClient *const sc)
+{
 	HRESULT hr = hrSuccess;
     IExchangeModifyTable *lpTable = NULL;
     IMAPITable *lpView = NULL;
@@ -940,6 +908,7 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 		else
 			strRule = "(no name)";
 
+		lpLogger->Log(EC_LOGLEVEL_DEBUG, "Processing rule %s for %s", strRule.c_str(), recip.c_str());
 		lpRuleState = PpropFindProp(lpRowSet->aRow[0].lpProps, lpRowSet->aRow[0].cValues, PR_RULE_STATE);
 		if (lpRuleState) {
 			if (!(lpRuleState->Value.i & ST_ENABLED)) {
@@ -980,8 +949,7 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 
 		sc -> countAdd("rules", "n_actions", int64_t(lpActions->cActions));
 
-		for(ULONG n=0; n<lpActions->cActions; n++) {
-
+		for (ULONG n = 0; n < lpActions->cActions; ++n) {
 			// do action
 			switch(lpActions->lpAction[n].acttype) {
 			case OP_MOVE:
@@ -998,12 +966,14 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 										  lpActions->lpAction[n].actMoveCopy.lpFldEntryId, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType,
 										  (IUnknown**)&lpDestFolder);
 				if (hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_INFO, (std::string)"Rule "+strRule+": Unable to open folder through session, trying through store");
+					std::string msg = std::string("Rule ") + strRule + ": Unable to open folder through session, trying through store: %s (%x)";
+					lpLogger->Log(EC_LOGLEVEL_INFO, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 
 					hr = lpSession->OpenMsgStore(0, lpActions->lpAction[n].actMoveCopy.cbStoreEntryId,
 													lpActions->lpAction[n].actMoveCopy.lpStoreEntryId, NULL, MAPI_BEST_ACCESS, &lpDestStore);
 					if (hr != hrSuccess) {
-						lpLogger->Log(EC_LOGLEVEL_ERROR, (std::string)"Rule "+strRule+": Unable to open destination store");
+						std::string msg = std::string("Rule ") + strRule + ": Unable to open destination store: %s (%x)";
+						lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 						goto nextact;
 					}
 
@@ -1011,35 +981,40 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 												lpActions->lpAction[n].actMoveCopy.lpFldEntryId, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType,
 												(IUnknown**)&lpDestFolder);
 					if (hr != hrSuccess || ulObjType != MAPI_FOLDER) {
-						lpLogger->Log(EC_LOGLEVEL_ERROR, (std::string)"Rule "+strRule+": Unable to open destination folder");
+						std::string msg = std::string("Rule ") + strRule + ": Unable to open destination folder: %s (%x)";
+						lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 						goto nextact;
 					}
 				}
 
 				hr = lpDestFolder->CreateMessage(NULL, 0, &lpNewMessage);
 				if(hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to create e-mail for rule " + strRule);
+					std::string msg = "Unable to create e-mail for rule: %s (%x)" + strRule;
+					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					goto exit;
 				}
 					
 				hr = (*lppMessage)->CopyTo(0, NULL, NULL, 0, NULL, &IID_IMessage, lpNewMessage, 0, NULL);
 				if(hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to copy e-mail for rule " + strRule);
+					std::string msg = "Unable to copy e-mail for rule: %s (%x)" + strRule;
+					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					goto exit;
 				}
 
 				hr = Util::HrCopyIMAPData((*lppMessage), lpNewMessage);
 				// the function only returns errors on get/setprops, not when the data is just missing
 				if (hr != hrSuccess) {
+					std::string msg = "Unable to copy IMAP data e-mail for rule " + strRule + ", continuing: %s (%x)";
+					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					hr = hrSuccess;
-					lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to copy IMAP data e-mail for rule " + strRule + ", continuing");
 					goto exit;
 				}
 
 				// Save the copy in its new location
 				hr = lpNewMessage->SaveChanges(0);
 				if (hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_ERROR, (std::string)"Rule "+strRule+": Unable to copy/move message");
+					std::string msg = std::string("Rule ") + strRule + ": Unable to copy/move message: %s (%x)";
+					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					goto nextact;
 				}
 				if (lpActions->lpAction[n].acttype == OP_MOVE)
@@ -1060,19 +1035,22 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 											lpActions->lpAction[n].actReply.lpEntryId, &IID_IMessage, 0, &ulObjType,
 											(IUnknown**)&lpTemplate);
 				if (hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_ERROR, (std::string)"Rule "+strRule+": Unable to open reply message");
+					std::string msg = std::string("Rule ") + strRule + ": Unable to open reply message: %s (%x)";
+					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					goto nextact;
 				}
 
 				hr = CreateReplyCopy(lpSession, lpOrigStore, *lppMessage, lpTemplate, &lpReplyMsg);
 				if (hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_ERROR, (std::string)"Rule "+strRule+": Unable to create reply message");
+					std::string msg = std::string("Rule ") + strRule + ": Unable to create reply message: %s (%x)";
+					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					goto nextact;
 				}
 
 				hr = lpReplyMsg->SubmitMessage(0);
 				if (hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_ERROR, (std::string)"Rule "+strRule+": Unable to send reply message");
+					std::string msg = std::string("Rule ") + strRule + ": Unable to send reply message: %s (%x)";
+					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					goto nextact;
 				}
 				break;
@@ -1113,13 +1091,15 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 									   lpActions->lpAction[n].ulActionFlavor & FWD_AS_ATTACHMENT,
 									   &lpFwdMsg);
 				if (hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_ERROR, (std::string)"Rule "+strRule+": FORWARD Unable to create forward message");
+					std::string msg = std::string("Rule ") + strRule + ": FORWARD Unable to create forward message: %s (%x)";
+					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					goto nextact;
 				}
 
 				hr = lpFwdMsg->SubmitMessage(0);
 				if (hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_ERROR, (std::string)"Rule "+strRule+": FORWARD Unable to send forward message");
+					std::string msg = std::string("Rule ") + strRule + ": FORWARD Unable to send forward message: %s (%x)";
+					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					goto nextact;
 				}
 
@@ -1148,20 +1128,23 @@ HRESULT HrProcessRules(PyMapiPlugin *pyMapiPlugin, LPMAPISESSION lpSession, LPAD
 
 				hr = CreateForwardCopy(lpLogger, lpAdrBook, lpOrigStore, *lppMessage, lpActions->lpAction[n].lpadrlist, true, true, true, false, &lpFwdMsg);
 				if (hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_ERROR, (std::string)"Rule "+strRule+": DELEGATE Unable to create delegate message");
+					std::string msg = std::string("Rule ") + strRule + ": DELEGATE Unable to create delegate message: %s (%x)";
+					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					goto nextact;
 				}
 
 				// set delegate properties
 				hr = HrDelegateMessage(lpFwdMsg);
 				if (hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_ERROR, (std::string)"Rule "+strRule+": DELEGATE Unable to modify delegate message");
+					std::string msg = std::string("Rule ") + strRule + ": DELEGATE Unable to modify delegate message: %s (%x)";
+					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					goto nextact;
 				}
 
 				hr = lpFwdMsg->SubmitMessage(0);
 				if (hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_ERROR, (std::string)"Rule "+strRule+": DELEGATE Unable to send delegate message");
+					std::string msg = std::string("Rule ") + strRule + ": DELEGATE Unable to send delegate message: %s (%x)";
+					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					goto nextact;
 				}
 

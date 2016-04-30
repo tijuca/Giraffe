@@ -1,44 +1,18 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 #ifndef __M4L_MAPITAGS_H_
@@ -54,7 +28,7 @@
  *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include <mapidefs.h>		/* we include this here too for the PROP_ID definitions */
 
 /* Determine if a property is transmittable. */
@@ -84,8 +58,6 @@
 #define PR_CONTENT_LENGTH                           PROP_TAG( PT_LONG,      0x0009)
 #define PR_CONTENT_RETURN_REQUESTED                 PROP_TAG( PT_BOOLEAN,   0x000A)
 
-
-
 #define PR_CONVERSATION_KEY                         PROP_TAG( PT_BINARY,    0x000B)
 
 #define PR_CONVERSION_EITS                          PROP_TAG( PT_BINARY,    0x000C)
@@ -107,10 +79,6 @@
 #define PR_MESSAGE_CLASS_A                          PROP_TAG( PT_STRING8,   0x001A)
 #define PR_MESSAGE_DELIVERY_ID                      PROP_TAG( PT_BINARY,    0x001B)
 
-
-
-
-
 #define PR_MESSAGE_SECURITY_LABEL                   PROP_TAG( PT_BINARY,    0x001E)
 #define PR_OBSOLETED_IPMS                           PROP_TAG( PT_BINARY,    0x001F)
 #define PR_ORIGINALLY_INTENDED_RECIPIENT_NAME       PROP_TAG( PT_BINARY,    0x0020)
@@ -119,12 +87,8 @@
 #define PR_ORIGINATOR_DELIVERY_REPORT_REQUESTED     PROP_TAG( PT_BOOLEAN,   0x0023)
 #define PR_ORIGINATOR_RETURN_ADDRESS                PROP_TAG( PT_BINARY,    0x0024)
 
-
-
 #define PR_PARENT_KEY                               PROP_TAG( PT_BINARY,    0x0025)
 #define PR_PRIORITY                                 PROP_TAG( PT_LONG,      0x0026)
-
-
 
 #define PR_ORIGIN_CHECK                             PROP_TAG( PT_BINARY,    0x0027)
 #define PR_PROOF_OF_SUBMISSION_REQUESTED            PROP_TAG( PT_BOOLEAN,   0x0028)
@@ -564,7 +528,6 @@
 
 /* Proptags 0x35E8-0x35FF reserved for folders "guaranteed" by PR_VALID_FOLDER_MASK */
 
-
 /*
  *  Folder and AB Container properties
  */
@@ -640,7 +603,6 @@
 #define PR_DISPLAY_TYPE                             PROP_TAG( PT_LONG,      0x3900)
 #define PR_TEMPLATEID                               PROP_TAG( PT_BINARY,    0x3902)
 #define PR_PRIMARY_CAPABILITY                       PROP_TAG( PT_BINARY,    0x3904)
-
 
 /*
  *  Mail user properties
@@ -793,14 +755,12 @@
 #define PR_BUSINESS_ADDRESS_POSTAL_CODE_W           PR_POSTAL_CODE_W
 #define PR_BUSINESS_ADDRESS_POSTAL_CODE_A           PR_POSTAL_CODE_A
 
-
 #define PR_POST_OFFICE_BOX                          PROP_TAG( PT_TSTRING,   0x3A2B)
 #define PR_POST_OFFICE_BOX_W                        PROP_TAG( PT_UNICODE,   0x3A2B)
 #define PR_POST_OFFICE_BOX_A                        PROP_TAG( PT_STRING8,   0x3A2B)
 #define PR_BUSINESS_ADDRESS_POST_OFFICE_BOX         PR_POST_OFFICE_BOX
 #define PR_BUSINESS_ADDRESS_POST_OFFICE_BOX_W       PR_POST_OFFICE_BOX_W
 #define PR_BUSINESS_ADDRESS_POST_OFFICE_BOX_A       PR_POST_OFFICE_BOX_A
-
 
 #define PR_TELEX_NUMBER                             PROP_TAG( PT_TSTRING,   0x3A2C)
 #define PR_TELEX_NUMBER_W                           PROP_TAG( PT_UNICODE,   0x3A2C)
@@ -821,7 +781,6 @@
 
 #define PR_WEDDING_ANNIVERSARY                      PROP_TAG( PT_SYSTIME, 0x3A41)
 #define PR_BIRTHDAY                                 PROP_TAG( PT_SYSTIME, 0x3A42)
-
 
 #define PR_HOBBIES                                  PROP_TAG( PT_TSTRING, 0x3A43)
 #define PR_HOBBIES_W                                PROP_TAG( PT_UNICODE, 0x3A43)
@@ -904,8 +863,6 @@
 #define PR_CHILDRENS_NAMES_W                        PROP_TAG( PT_MV_UNICODE, 0x3A58)
 #define PR_CHILDRENS_NAMES_A                        PROP_TAG( PT_MV_STRING8, 0x3A58)
 
-
-
 #define PR_HOME_ADDRESS_CITY                        PROP_TAG( PT_TSTRING, 0x3A59)
 #define PR_HOME_ADDRESS_CITY_W                      PROP_TAG( PT_UNICODE, 0x3A59)
 #define PR_HOME_ADDRESS_CITY_A                      PROP_TAG( PT_STRING8, 0x3A59)
@@ -953,7 +910,6 @@
 #define PR_OTHER_ADDRESS_POST_OFFICE_BOX            PROP_TAG( PT_TSTRING, 0x3A64)
 #define PR_OTHER_ADDRESS_POST_OFFICE_BOX_W          PROP_TAG( PT_UNICODE, 0x3A64)
 #define PR_OTHER_ADDRESS_POST_OFFICE_BOX_A          PROP_TAG( PT_STRING8, 0x3A64)
-
 
 /*
  *  Profile section properties
@@ -1037,6 +993,5 @@
 
 #define PROP_ID_SECURE_MIN                          0x67F0
 #define PROP_ID_SECURE_MAX                          0x67FF
-
 
 #endif  /* MAPITAGS_H */

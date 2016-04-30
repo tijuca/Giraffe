@@ -1,8 +1,5 @@
 /* common/config.h.in.  Generated from configure.ac by autoheader.  */
 
-/* Define to 1 if you have the `alarm' function. */
-#undef HAVE_ALARM
-
 /* Defined if the requested minimum BOOST version is satisfied */
 #undef HAVE_BOOST
 
@@ -24,29 +21,17 @@
 /* Define to 1 if you have the <curses.h> header file. */
 #undef HAVE_CURSES_H
 
-/* Define to 1 if you have the `dcgettext' function. */
-#undef HAVE_DCGETTEXT
-
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
 /* Define to 1 if you have the `dlopen' function. */
 #undef HAVE_DLOPEN
 
-/* Define to 1 if you don't have `vprintf' but do have `_doprnt.' */
-#undef HAVE_DOPRNT
-
 /* Define to 1 if you have the `epoll_create' function. */
 #undef HAVE_EPOLL_CREATE
 
 /* Define to 1 if you have the `EVP_PKEY_cmp' function. */
 #undef HAVE_EVP_PKEY_CMP
-
-/* Define to 1 if you have the `ftime' function. */
-#undef HAVE_FTIME
-
-/* Define to 1 if you have the `gethostbyname_r' function. */
-#undef HAVE_GETHOSTBYNAME_R
 
 /* Define to 1 if you have the `getpeereid' function. */
 #undef HAVE_GETPEEREID
@@ -56,15 +41,6 @@
 
 /* Define to 1 if you have the `gettext' function. */
 #undef HAVE_GETTEXT
-
-/* Define to 1 if you have the `gettimeofday' function. */
-#undef HAVE_GETTIMEOFDAY
-
-/* Define to 1 if you have the `gmtime' function. */
-#undef HAVE_GMTIME
-
-/* Define to 1 if you have the `gmtime_r' function. */
-#undef HAVE_GMTIME_R
 
 /* Define to 1 if you have the <google/malloc_extension.h> header file. */
 #undef HAVE_GOOGLE_MALLOC_EXTENSION_H
@@ -80,9 +56,6 @@
 
 /* Define to 1 if you have the `gss_acquire_cred' function. */
 #undef HAVE_GSS_ACQUIRE_CRED
-
-/* Defined if the requested minimum ICU version is satisfied */
-#undef HAVE_ICU
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
@@ -102,30 +75,14 @@
 /* Define to 1 if you have the `ldap_start_tls_s' function. */
 #undef HAVE_LDAP_START_TLS_S
 
-/* Define to 1 if you have the `localtime_r' function. */
-#undef HAVE_LOCALTIME_R
-
-/* Define to 1 if your system has a GNU libc compatible `malloc' function, and
-   to 0 otherwise. */
-#undef HAVE_MALLOC
-
-/* Define to 1 if you have the `mbtowc' function. */
-#undef HAVE_MBTOWC
-
-/* Define to 1 if you have the `memchr' function. */
-#undef HAVE_MEMCHR
+/* Define to 1 if you have the <libs3.h> header file. */
+#undef HAVE_LIBS3_H
 
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
-/* Define to 1 if you have the `memset' function. */
-#undef HAVE_MEMSET
-
 /* Define to 1 if you have the `mysql_set_character_set' function. */
 #undef HAVE_MYSQL_SET_CHARACTER_SET
-
-/* Define to 1 if you have the <openssl/ssl.h> header file. */
-#undef HAVE_OPENSSL_SSL_H
 
 /* pam authentication available */
 #undef HAVE_PAM
@@ -148,39 +105,11 @@
 /* 2-arg pthread_set_name_np */
 #undef HAVE_PTHREAD_SET_NAME_NP_2
 
-/* Define to 1 if you have the `random' function. */
-#undef HAVE_RANDOM
-
-/* Define to 1 if your system has a GNU libc compatible `realloc' function,
-   and to 0 otherwise. */
-#undef HAVE_REALLOC
-
-/* Define to 1 if you have the `select' function. */
-#undef HAVE_SELECT
-
 /* Define to 1 if you have the <shadow.h> header file. */
 #undef HAVE_SHADOW_H
 
-/* Define to 1 if you have the `snprintf' function. */
-#undef HAVE_SNPRINTF
-
-/* Define to 1 if you have the `socket' function. */
-#undef HAVE_SOCKET
-
 /* Google sparsehash available */
 #undef HAVE_SPARSEHASH
-
-/* Define to 1 if you have the `sprintf_l' function. */
-#undef HAVE_SPRINTF_L
-
-/* Define to 1 if you have the `sscanf' function. */
-#undef HAVE_SSCANF
-
-/* Define to 1 if stdbool.h conforms to C99. */
-#undef HAVE_STDBOOL_H
-
-/* Define to 1 if you have the <stddef.h> header file. */
-#undef HAVE_STDDEF_H
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
@@ -188,44 +117,11 @@
 /* Define to 1 if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
 
-/* Define to 1 if you have the `strchr' function. */
-#undef HAVE_STRCHR
-
-/* Define to 1 if you have the `strerror' function. */
-#undef HAVE_STRERROR
-
-/* Define to 1 if you have the `strftime' function. */
-#undef HAVE_STRFTIME
-
 /* Define to 1 if you have the <strings.h> header file. */
 #undef HAVE_STRINGS_H
 
 /* Define to 1 if you have the <string.h> header file. */
 #undef HAVE_STRING_H
-
-/* Define to 1 if you have the `strrchr' function. */
-#undef HAVE_STRRCHR
-
-/* Define to 1 if you have the `strstr' function. */
-#undef HAVE_STRSTR
-
-/* Define to 1 if you have the `strtod_l' function. */
-#undef HAVE_STRTOD_L
-
-/* Define to 1 if you have the `strtof_l' function. */
-#undef HAVE_STRTOF_L
-
-/* Define to 1 if you have the `strtol' function. */
-#undef HAVE_STRTOL
-
-/* Define to 1 if you have the `strtoll' function. */
-#undef HAVE_STRTOLL
-
-/* Define to 1 if you have the `strtoul' function. */
-#undef HAVE_STRTOUL
-
-/* Define to 1 if you have the `strtoull' function. */
-#undef HAVE_STRTOULL
 
 /* Define to 1 if you have the <syslog.h> header file. */
 #undef HAVE_SYSLOG_H
@@ -233,17 +129,8 @@
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
 
-/* Define to 1 if you have the <sys/timeb.h> header file. */
-#undef HAVE_SYS_TIMEB_H
-
-/* Define to 1 if you have the <sys/time.h> header file. */
-#undef HAVE_SYS_TIME_H
-
 /* Define to 1 if you have the <sys/types.h> header file. */
 #undef HAVE_SYS_TYPES_H
-
-/* Define to 1 if you have the <sys/ucred.h> header file. */
-#undef HAVE_SYS_UCRED_H
 
 /* Define to 1 if you have the <sys/un.h> header file. */
 #undef HAVE_SYS_UN_H
@@ -254,14 +141,14 @@
 /* Define to 1 if you have the `timegm' function. */
 #undef HAVE_TIMEGM
 
+/* Define to 1 if you have the <unicode/coll.h> header file. */
+#undef HAVE_UNICODE_COLL_H
+
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
 /* Define to 1 if you have the `uuid_create' function. */
 #undef HAVE_UUID_CREATE
-
-/* Define to 1 if you have the `vprintf' function. */
-#undef HAVE_VPRINTF
 
 /* Define to 1 if you have the `vsnprintf_l' function. */
 #undef HAVE_VSNPRINTF_L
@@ -269,24 +156,9 @@
 /* Define to 1 if you have the `vsyslog' function. */
 #undef HAVE_VSYSLOG
 
-/* Define to 1 if you have the <wchar.h> header file. */
-#undef HAVE_WCHAR_H
-
-/* Define to 1 if you have the `wctomb' function. */
-#undef HAVE_WCTOMB
-
-/* Define to 1 if you have the <zlib.h> header file. */
-#undef HAVE_ZLIB_H
-
-/* Define to 1 if the system has the type `_Bool'. */
-#undef HAVE__BOOL
-
 /* Define to the sub-directory in which libtool stores uninstalled libraries.
    */
 #undef LT_OBJDIR
-
-/* Define to 1 if your C compiler doesn't accept -c and -o together. */
-#undef NO_MINUS_C_MINUS_O
 
 /* Name of package */
 #undef PACKAGE
@@ -309,56 +181,11 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
-/* Define as the return type of signal handlers (`int' or `void'). */
-#undef RETSIGTYPE
-
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
-
-/* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
-#undef TIME_WITH_SYS_TIME
-
-/* Define to 1 if your <sys/time.h> declares `struct tm'. */
-#undef TM_IN_SYS_TIME
 
 /* Version number of package */
 #undef VERSION
 
-/* Define to 1 if `lex' declares `yytext' as a `char *' by default, not a
-   `char[]'. */
-#undef YYTEXT_POINTER
-
-/* Define to empty if `const' does not conform to ANSI C. */
-#undef const
-
-/* Define to `__inline__' or `__inline' if that's what the C compiler
-   calls it, or to nothing if 'inline' is not supported under any name.  */
-#ifndef __cplusplus
-#undef inline
-#endif
-
-/* Define to rpl_malloc if the replacement function should be used. */
-#undef malloc
-
-/* Define to rpl_realloc if the replacement function should be used. */
-#undef realloc
-
-/* Define to the equivalent of the C99 'restrict' keyword, or to
-   nothing if this is not supported.  Do not define if restrict is
-   supported directly.  */
-#undef restrict
-/* Work around a bug in Sun C++: it does not support _Restrict or
-   __restrict__, even though the corresponding Sun C compiler ends up with
-   "#define restrict _Restrict" or "#define restrict __restrict__" in the
-   previous line.  Perhaps some future version of Sun C++ will work with
-   restrict; if so, hopefully it defines __RESTRICT like Sun C does.  */
-#if defined __SUNPRO_CC && !defined __RESTRICT
-# define _Restrict
-# define __restrict__
-#endif
-
-/* Define to `unsigned int' if <sys/types.h> does not define. */
-#undef size_t
-
-/* Define to `int' if <sys/types.h> does not define. */
-#undef ssize_t
+/* Defined if ZCP was built with ICU */
+#undef ZCP_USES_ICU

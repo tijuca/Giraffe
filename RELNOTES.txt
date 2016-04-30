@@ -1,0 +1,121 @@
+Release notes for 7.2.3
+=======================
+
+Enhancements:
+* Avoid compression on all kinds of localhost connections
+* dagent: better error reporting on duplicate email addresses
+* dagent can log rules processed for a user (at "debug" log_level)
+* pyza: add basic search API
+* preview for Amazon S3 storage backend for attachments
+
+Fixes:
+* record all mail references so that MUAs show threading (ZCP-11358)
+* backup-plus: deal with special characters in user names
+* do not stop LDAP entry retrieval after one page (1000 entries)
+* avoid crash when Search Index has truncated ENTRYIDs
+
+Changes:
+* gateway: non-SSL plaintext authentication is offered if connection
+  originates from localhost
+* the "fatal" log level is now called "crit" (for critical),
+  since in the fewest case were the reported conditions actually
+  fatal (= program-terminating). This may be relevant if you do
+  automated log analysis.
+
+
+Release notes for 7.2.2
+=======================
+
+Enhancements:
+
+* Within systemd environments, if you want to make (best) use of
+  journald, "log_file" should be set to "syslog" rather than "-"
+  (stderr).
+
+* IPv6 support in zarafa-server and zarafa-ws.
+  To enable, the "server_bind" parameter in the respective
+  configuration file needs to be set to an IPv6 address. Use of the
+  so-called IPv6 Unspecified Address, ::, makes the service reachable
+  on both IPv6 and IPv4 on all addresses.
+
+* IPv6 support in all other daemons.
+  To enable, the "server_bind" parameter in the respective
+  configuration file must be empty, or be commented out, or (if only
+  IPv6 service is desired) be assigned an IPv6 address.
+
+* IPv6 support in connecting clients
+
+* backup-plus: technology preview for a new implementation of a
+  backup utility
+
+* Elliptic Curve Diffie Hellman Exchange (ECDHE) support for TLS
+* dagent: new "mr_autoprocess" parameter available for dagent.cfg
+* dagent: allow empty Out Of Office bodies and improve reporting
+  in case no mail is sent
+* dagent/spooler: add anti-loop headers for Exchange and Vacation
+* python: support UTF-8 in .vcf files
+* zarafa-set-oof gained the --dump-json option
+* mapi4linux: connecting to the default server socket location is
+  possible by passing NULL/"" as the target path to HrOpenECSession.
+
+Fixes:
+
+* inetmapi: The MAPI to Internet Email translator avoids emitting
+  mails for invalid addresses (e.g. no '@' in it). This way, spooler
+  won't spam the SMTP server with unhandlable mails.
+* dagent: avoid crash/hang on shutdown
+* dagent: retain attachment status for top-level part
+* gateway: improved IMAP RFC conformance
+* gateway: ZARAFA-type addresses are now resolved to SMTP type before
+  being emitted over IMAP
+* ldapplugin: avoid crash when bad server URI is configured
+* presence: do not report failure on proper shutdown
+
+Changes:
+
+* Most daemons are now started using an unprivileged user. Be sure that
+  "run_as_user" and "run_as_group" are commented out to use the default,
+  "zarafa". If using our prebuilt DEB/RPM packages, this user and group
+  will be created on installation (if not already present).
+
+* If you use PAM authentication with /etc/shadow, be aware that the
+  server needs to run as a user/group able to read it.
+
+* Permissions on directories like /var/lib/zarafa/* may need to be
+  adjusted, especially if you use custom locations. We chose not to
+  automatically recurisvely chown all of them, because it can
+  potentially take a long time and be incorrect.
+
+* To facilitate use of IPv6 on a single socket, zarafa-dagent no longer
+  binds to the IPv4-only 127.0.0.1 by default. It is advised to review
+  your firewall settings and perhaps block port 2003 if applicable.
+
+* Default AF_LOCAL socket locations have changed to /var/run/zarafad.
+  Review your /etc/zarafa/*.cfg for the value after installation that
+  they are consistent. _Also_ check the LDAP tree (if applicable) for
+  the zarafaFilePath attribute of objects which may also carry the
+  socket location.
+
+* Default PID file locations have changed to /var/run/zarafad.
+  Check for duplicate programs running on non-systemd services.
+
+* Several fixes to character set recognition. The MIME RFCs are
+  pretty clear on where the declarations of charset can be found
+  (ZCP looked elsewhere), what characters are allowed where, and
+  how MIME parts are to be parsed.
+
+* calendar: disregard timezones for all-day events so that they
+  always start and end at 00:00.
+* gateway: tone down log level for successful logins
+* server: improved reporting in case all file descriptors are used up
+* server: raise default cache size from 16 to 32 megabytes
+* Corrected improper "fatal" severity level for some more messages
+
+Notes:
+
+* Files in /var/run/zarafad may continue to be owned by root -
+  this is a normal condition even if you set run_as_user/group to something.
+
+* The "server_bind" parameter was previously, and continues to be, documented
+  to require an address, not a hostname. This is now enforced with new use of
+  getaddrinfo(3).

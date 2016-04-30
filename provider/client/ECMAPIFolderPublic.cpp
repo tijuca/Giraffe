@@ -1,73 +1,47 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include "ECMAPIFolderPublic.h"
 
 #include "Mem.h"
-#include "ECGuid.h"
-#include "edkguid.h"
-#include "CommonUtil.h"
-#include "Util.h"
+#include <zarafa/ECGuid.h>
+#include <edkguid.h>
+#include <zarafa/CommonUtil.h>
+#include <zarafa/Util.h>
 #include "ClientUtil.h"
 #include "ZarafaUtil.h"
 
-#include "ECDebug.h"
+#include <zarafa/ECDebug.h>
 
 #include <edkmdb.h>
-#include <mapiext.h>
+#include <zarafa/mapiext.h>
 
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 #include "ECMsgStorePublic.h"
 #include "ECMemTablePublic.h"
 
 #include "favoritesutil.h"
-#include "restrictionutil.h"
+#include <zarafa/restrictionutil.h>
 
-#include <charset/convstring.h>
+#include <zarafa/charset/convstring.h>
 
-#include "ECGetText.h"
+#include <zarafa/ECGetText.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -216,7 +190,7 @@ HRESULT ECMAPIFolderPublic::GetPropHandler(ULONG ulPropTag, void* lpProvider, UL
 
 				hr = MAPIAllocateMore((strTmp.size() + 1) * sizeof(WCHAR), lpBase, (void**)&lpsPropValue->Value.lpszW);
 				if (hr != hrSuccess) 
-					goto exit;
+					return hr;
 
 				wcscpy(lpsPropValue->Value.lpszW, strTmp.c_str());
 				lpsPropValue->ulPropTag = PR_DISPLAY_NAME_W;
@@ -225,7 +199,7 @@ HRESULT ECMAPIFolderPublic::GetPropHandler(ULONG ulPropTag, void* lpProvider, UL
 
 				hr = MAPIAllocateMore(strTmp.size() + 1, lpBase, (void**)&lpsPropValue->Value.lpszA);
 				if (hr != hrSuccess) 
-					goto exit;
+					return hr;
 
 				strcpy(lpsPropValue->Value.lpszA, strTmp.c_str());
 				lpsPropValue->ulPropTag = PR_DISPLAY_NAME_A;
@@ -285,7 +259,7 @@ HRESULT ECMAPIFolderPublic::GetPropHandler(ULONG ulPropTag, void* lpProvider, UL
 		// entryid on the server (only used for "Public Folders" folder)
 		if (lpFolder->m_lpEntryId) {
 			if ((hr = MAPIAllocateMore(lpFolder->m_cbEntryId, lpBase, (LPVOID*)&lpsPropValue->Value.bin.lpb)) != hrSuccess)
-				goto exit;
+				return hr;
 			memcpy(lpsPropValue->Value.bin.lpb, lpFolder->m_lpEntryId, lpFolder->m_cbEntryId);
 
 			lpsPropValue->Value.bin.cb = lpFolder->m_cbEntryId;
@@ -299,8 +273,6 @@ HRESULT ECMAPIFolderPublic::GetPropHandler(ULONG ulPropTag, void* lpProvider, UL
 		hr = MAPI_E_NOT_FOUND;
 		break;
 	}
-
-exit:
 	return hr;
 }
 
@@ -380,9 +352,7 @@ HRESULT ECMAPIFolderPublic::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTabl
 	}
 
 exit:
-	if (lpPropTagArray)
-		MAPIFreeBuffer(lpPropTagArray);
-
+	MAPIFreeBuffer(lpPropTagArray);
 	if (lpMemTable)
 		lpMemTable->Release();
 
@@ -461,64 +431,53 @@ HRESULT ECMAPIFolderPublic::SaveChanges(ULONG ulFlags)
 
 HRESULT ECMAPIFolderPublic::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray *lppProblems)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	hr = ECMAPIContainer::SetProps(cValues, lpPropArray, lppProblems);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	if (lpStorage)
 	{
 		hr = ECMAPIContainer::SaveChanges(KEEP_OPEN_READWRITE);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-exit:
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMAPIFolderPublic::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray FAR * lppProblems)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	hr = ECMAPIContainer::DeleteProps(lpPropTagArray, lppProblems);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	if (lpStorage)
 	{
 		hr = ECMAPIContainer::SaveChanges(KEEP_OPEN_READWRITE);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-exit:
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMAPIFolderPublic::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	unsigned int ulObjType = 0;
 
 	if (cbEntryID > 0)
 	{
 		hr = HrGetObjTypeFromEntryId(cbEntryID, (LPBYTE)lpEntryID, &ulObjType);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		if (ulObjType == MAPI_FOLDER && m_ePublicEntryID == ePE_FavoriteSubFolder)
 			lpEntryID->abFlags[3] = ZARAFA_FAVORITE;
 	}
-
-	hr = ECMAPIFolder::OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, lpulObjType, lppUnk);
-	
-exit:
-
-	return hr;
+	return ECMAPIFolder::OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, lpulObjType, lppUnk);
 }
 
 HRESULT ECMAPIFolderPublic::SetEntryId(ULONG cbEntryId, LPENTRYID lpEntryId)
@@ -652,10 +611,7 @@ exit:
 
 	if (lpShortcutFolder)
 		lpShortcutFolder->Release();
-
-	if (lpProp)
-		MAPIFreeBuffer(lpProp);
-
+	MAPIFreeBuffer(lpProp);
 	return hr;
 }
 
@@ -706,10 +662,7 @@ HRESULT ECMAPIFolderPublic::CopyMessages(LPENTRYLIST lpMsgList, LPCIID lpInterfa
 exit:
 	if (lpMapiFolder)
 		lpMapiFolder->Release();
-
-	if(lpPropArray)
-		MAPIFreeBuffer(lpPropArray);
-
+	MAPIFreeBuffer(lpPropArray);
 	return hr;
 }
 

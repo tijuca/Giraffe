@@ -1,51 +1,25 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
-#include "base64.h"
+#include <zarafa/platform.h>
+#include <zarafa/base64.h>
 
 #include <string>
-#include <charset/convert.h>
+#include <zarafa/charset/convert.h>
 #include <cassert>
 #include "SymmetricCrypt.h"
 
@@ -70,14 +44,9 @@ static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
-bool SymmetricIsCrypted(const std::string &strCrypted)
+bool SymmetricIsCrypted(const char *c)
 {
-	std::string strPrefix = strCrypted.substr(0,4);
-
-	if(strPrefix == "{1}:" || strPrefix == "{2}:")
-		return true;
-	else
-		return false;
+	return strncmp(c, "{1}:", 4) == 0 || strncmp(c, "{2}:", 4) == 0;
 }
 
 /**
@@ -95,14 +64,9 @@ bool SymmetricIsCrypted(const std::string &strCrypted)
  * @retval	true	The provided string was encrypted.
  * @retval	false 	The provided string was not encrypted.
  */
-bool SymmetricIsCrypted(const std::wstring &wstrCrypted)
+bool SymmetricIsCrypted(const wchar_t *c)
 {
-	std::wstring wstrPrefix = wstrCrypted.substr(0,4);
-
-	if(wstrPrefix == L"{1}:" || wstrPrefix == L"{2}:")
-		return true;
-	else
-		return false;
+	return wcsncmp(c, L"{1}:", 4) == 0 || wcsncmp(c, L"{2}:", 4) == 0;
 }
 
 /**
@@ -115,21 +79,13 @@ bool SymmetricIsCrypted(const std::wstring &wstrCrypted)
  */
 std::string SymmetricCrypt(const std::wstring &strPlain)
 {
-	std::string strUTF8ed = convert_to<std::string>("UTF-8", strPlain, rawsize(strPlain), CHARSET_WCHAR);
-	std::string strXORed;
+	std::string u = convert_to<std::string>("UTF-8", strPlain, rawsize(strPlain), CHARSET_WCHAR);
+	size_t z = u.size();
 
-	// Do the XOR 0xa5
-	for(unsigned int i = 0; i < strUTF8ed.size(); i++) {
-		strXORed.append(1, (unsigned char)(((unsigned char)strUTF8ed.at(i)) ^ 0xa5));
-	}
-
+	for (size_t i = 0; i < z; ++i)
+		u[i] ^= 0xA5;
 	// Do the base64 encode
-	std::string strBase64 = base64_encode((const unsigned char *)strXORed.c_str(), strXORed.size());
-
-	// Prefix with {1}:
-	std::string strCrypted = (std::string)"{2}:" + strBase64;
-
-	return strCrypted;
+	return "{2}:" + base64_encode(reinterpret_cast<const unsigned char *>(u.c_str()), z);
 }
 
 /**
@@ -159,16 +115,16 @@ std::wstring SymmetricCryptW(const std::wstring &strPlain)
  */
 static std::string SymmetricDecryptBlob(unsigned int ulAlg, const std::string &strXORed)
 {
-	std::string strRaw;
+	std::string strRaw = strXORed;
+	size_t z = strRaw.size();
 	
 	assert(ulAlg == 1 || ulAlg == 2);
 
-	for(unsigned int i = 0; i < strXORed.size(); i++) {
-		strRaw.append(1, (unsigned char)(((unsigned char)strXORed.at(i)) ^ 0xa5));
-	}
+	for (unsigned int i = 0; i < z; ++i)
+		strRaw[i] ^= 0xA5;
 	
 	// Check the encoding algorithm. If it equals 1, the raw data is windows-1252.
-	// Otherwise, it must be 2, which means it is allready UTF-8.
+	// Otherwise, it must be 2, which means it is already UTF-8.
 	if (ulAlg == 1)
 		strRaw = convert_to<std::string>("UTF-8", strRaw, rawsize(strRaw), "WINDOWS-1252");
 	
@@ -185,16 +141,13 @@ static std::string SymmetricDecryptBlob(unsigned int ulAlg, const std::string &s
  * 
  * @return	THe decrypted password encoded in UTF-8.
  */
-std::string SymmetricDecrypt(const std::string &strCrypted)
+std::string SymmetricDecrypt(const char *strCrypted)
 {
-	if(!SymmetricIsCrypted(strCrypted))
+	if (!SymmetricIsCrypted(strCrypted))
 		return "";
-
-	// Remove prefix
-	std::string strBase64 = convert_to<std::string>(strCrypted.substr(4));
-	std::string strXORed = base64_decode(strBase64);
-	
-	return SymmetricDecryptBlob(strCrypted.at(1) - '0', strXORed);
+	// Length has been guaranteed to be >=4.
+	return SymmetricDecryptBlob(strCrypted[1] - '0',
+		base64_decode(convert_to<std::string>(strCrypted + 4)));
 }
 
 /**
@@ -207,16 +160,13 @@ std::string SymmetricDecrypt(const std::string &strCrypted)
  * 
  * @return	THe decrypted password encoded in UTF-8.
  */
-std::string SymmetricDecrypt(const std::wstring &wstrCrypted)
+std::string SymmetricDecrypt(const wchar_t *wstrCrypted)
 {
-	if(!SymmetricIsCrypted(wstrCrypted))
+	if (!SymmetricIsCrypted(wstrCrypted))
 		return "";
-
-	// Remove prefix
-	std::string strBase64 = convert_to<std::string>(wstrCrypted.substr(4));
-	std::string strXORed = base64_decode(strBase64);
-
-	return SymmetricDecryptBlob(wstrCrypted.at(1) - '0', strXORed);
+	// Length has been guaranteed to be >=4.
+	return SymmetricDecryptBlob(wstrCrypted[1] - '0',
+		base64_decode(convert_to<std::string>(wstrCrypted + 4)));
 }
 
 /**
@@ -229,7 +179,7 @@ std::string SymmetricDecrypt(const std::wstring &wstrCrypted)
  * 
  * @return	THe decrypted password encoded in in UTF-16/32 (depending on type of wchar_t).
  */
-std::wstring SymmetricDecryptW(const std::wstring &wstrCrypted)
+std::wstring SymmetricDecryptW(const wchar_t *wstrCrypted)
 {
 	const std::string strDecrypted = SymmetricDecrypt(wstrCrypted);
 	return convert_to<std::wstring>(strDecrypted, rawsize(strDecrypted), "UTF-8");

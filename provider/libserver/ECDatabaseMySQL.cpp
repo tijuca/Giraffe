@@ -1,64 +1,38 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <iostream>
 #include <errmsg.h>
 #include "ECDatabaseMySQL.h"
 #include "mysqld_error.h"
 
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 
-#include "ECDefs.h"
+#include <zarafa/ECDefs.h>
 #include "ECDBDef.h"
 #include "ECUserManagement.h"
-#include "ECConfig.h"
-#include "ECLogger.h"
-#include "MAPIErrors.h"
-#include "ZarafaCode.h"
+#include <zarafa/ECConfig.h>
+#include <zarafa/ECLogger.h>
+#include <zarafa/MAPIErrors.h>
+#include <zarafa/ZarafaCode.h>
 
-#include "ecversion.h"
+#include <zarafa/ecversion.h>
 
 #include <mapidefs.h>
 #include "ECConversion.h"
@@ -68,6 +42,9 @@
 #include "ECDatabaseUpdate.h"
 #include "ECStatsCollector.h"
 
+#ifdef HAVE_OFFLINE_SUPPORT
+#include "ECDBUpdateProgress.h"
+#endif
 
 using namespace std;
 
@@ -81,7 +58,8 @@ static const char THIS_FILE[] = __FILE__;
 #define DEBUG_TRANSACTION 0
 #endif
 
-#define LOG_SQL_DEBUG(_plog, _msg, ...) if ((_plog)->Log(EC_LOGLEVEL_DEBUG|EC_LOGLEVEL_SQL)) (_plog)->Log(EC_LOGLEVEL_DEBUG|EC_LOGLEVEL_SQL, _msg, ##__VA_ARGS__)
+#define LOG_SQL_DEBUG(_msg, ...) \
+	ec_log(EC_LOGLEVEL_DEBUG | EC_LOGLEVEL_SQL, _msg, ##__VA_ARGS__)
 
 // The maximum packet size. This is automatically also the maximum
 // size of a single entry in the database. This means that PR_BODY, PR_COMPRESSED_RTF
@@ -102,6 +80,20 @@ typedef struct _sNewDatabase {
 	const char *lpComment;
 	const char *lpSQL;
 } sSQLDatabase_t;
+
+class zcp_versiontuple _zcp_final {
+	public:
+	zcp_versiontuple(unsigned int maj = 0, unsigned int min = 0,
+	    unsigned int mic = 0, unsigned int rev = 0, unsigned int dbs = 0) :
+		v_major(maj), v_minor(min), v_micro(mic),
+		v_rev(rev), v_schema(dbs)
+	{
+	}
+	std::string stringify(char sep = '.') const;
+	int compare(const zcp_versiontuple &) const;
+	/* stupid major(3) function uses a #define in glibc */
+	unsigned int v_major, v_minor, v_micro, v_rev, v_schema;
+};
 
 static const sUpdateList_t sUpdateList[] = {
 	// Updates from version 5.02 to 5.10
@@ -201,6 +193,9 @@ static const sUpdateList_t sUpdateList[] = {
 	
 	// Update from 7.0 to 7.1
 	{ Z_UPDATE_UPDATE_WLINK_RECKEY, 0, "Updating wunderbar record keys", UpdateWLinkRecordKeys },
+
+	// New in 7.2.2
+	{ Z_UPDATE_VERSIONTBL_MICRO, 0, "Add \"micro\" column to \"versions\" table", UpdateVersionsTbl },
 };
 
 static const char *const server_groups[] = {
@@ -219,7 +214,7 @@ typedef struct {
  * Mode 2 = Plaintext only
  */
  
-const char *szGetProps =
+static const char szGetProps[] =
 "CREATE PROCEDURE GetProps(IN hid integer, IN mode integer)\n"
 "BEGIN\n"
 "  DECLARE bestbody INT;\n"
@@ -243,7 +238,7 @@ const char *szGetProps =
 "    FROM mvproperties LEFT JOIN names ON (mvproperties.tag-0x8501)=names.id WHERE hierarchyid=hid AND (tag <= 0x8500 OR names.id IS NOT NULL) GROUP BY tag, mvproperties.type; \n"
 "END;\n";
 
-const char *szPrepareGetProps =
+static const char szPrepareGetProps[] =
 "CREATE PROCEDURE PrepareGetProps(IN hid integer)\n"
 "BEGIN\n"
 "  SELECT 0, tag, properties.type, val_ulong, val_string, val_binary, val_double, val_longint, val_hi, val_lo, hierarchy.id, names.nameid, names.namestring, names.guid\n"
@@ -261,7 +256,7 @@ const char *szPrepareGetProps =
 "END;\n";
 
 
-const char *szGetBestBody = 
+static const char szGetBestBody[] =
 "CREATE PROCEDURE GetBestBody(hid integer, OUT bestbody integer)\n"
 "DETERMINISTIC\n"
 "BEGIN\n"
@@ -273,7 +268,7 @@ const char *szGetBestBody =
 "  SELECT tag INTO bestbody FROM properties WHERE hierarchyid=hid AND tag IN (0x1009, 0x1013) ORDER BY tag LIMIT 1;\n"
 "END;\n";
 
-const char *szStreamObj = 
+static const char szStreamObj[] =
 "# Read a type-5 (Message) item from the database, output properties and subobjects\n"
 "CREATE PROCEDURE StreamObj(IN rootid integer, IN maxdepth integer, IN mode integer)\n"
 "BEGIN\n"
@@ -335,13 +330,39 @@ static const STOREDPROCS stored_procedures[] = {
 
 std::string	ECDatabaseMySQL::m_strDatabaseDir;
 
-ECDatabaseMySQL::ECDatabaseMySQL(ECLogger *lpLogger, ECConfig *lpConfig)
+std::string zcp_versiontuple::stringify(char sep) const
+{
+	return ::stringify(v_major) + sep + ::stringify(v_minor) + sep +
+	       ::stringify(v_micro) + sep + ::stringify(v_rev) + sep +
+	       ::stringify(v_schema);
+}
+
+int zcp_versiontuple::compare(const zcp_versiontuple &rhs) const
+{
+	if (v_major < rhs.v_major)
+		return -1;
+	if (v_major > rhs.v_major)
+		return 1;
+	if (v_minor < rhs.v_minor)
+		return -1;
+	if (v_minor > rhs.v_minor)
+		return 1;
+	if (v_micro < rhs.v_micro)
+		return -1;
+	if (v_micro > rhs.v_micro)
+		return 1;
+	if (v_rev < rhs.v_rev)
+		return -1;
+	if (v_rev > rhs.v_rev)
+		return 1;
+	return 0;
+}
+
+ECDatabaseMySQL::ECDatabaseMySQL(ECConfig *lpConfig)
 {
 	m_bMysqlInitialize	= false;
 	m_bConnected		= false;
-	m_bLocked			= false;
 	m_bAutoLock			= true;
-	m_lpLogger			= lpLogger;
 	m_lpConfig			= lpConfig;
 	m_bSuppressLockErrorLogging = false;
 
@@ -360,13 +381,12 @@ ECDatabaseMySQL::ECDatabaseMySQL(ECLogger *lpLogger, ECConfig *lpConfig)
 ECDatabaseMySQL::~ECDatabaseMySQL()
 {
 	Close();
-
 	// Close the mutex handle of mysql
 	pthread_mutex_destroy(&m_hMutexMySql);
 }
 
 ECRESULT ECDatabaseMySQL::InitLibrary(const char *lpDatabaseDir,
-    const char *lpConfigFile, ECLogger *lpLogger)
+    const char *lpConfigFile)
 {
 	ECRESULT	er = erSuccess;
 	string		strDatabaseDir;
@@ -397,7 +417,7 @@ ECRESULT ECDatabaseMySQL::InitLibrary(const char *lpDatabaseDir,
 	if ((ret = mysql_library_init(arraySize(server_args),
 	     const_cast<char **>(server_args),
 	     const_cast<char **>(server_groups))) != 0) {
-		lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to initialize mysql: error 0x%08X", ret);
+		ec_log_crit("Unable to initialize mysql: error 0x%08X", ret);
 		er = ZARAFA_E_DATABASE_ERROR;
 		goto exit;
 	}
@@ -415,6 +435,31 @@ ECRESULT ECDatabaseMySQL::InitializeDBState(void)
 {
 	ECRESULT ret = InitializeDBStateInner();
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	/* Only do this recovery on the Windows thing */
+	if (ret == erSuccess)
+		return ret;
+
+	/* Start "repair" */
+	ec_log_err("InitializeDBState unsuccessful: %s (%d). Attempting drop, and retry.",
+		GetMAPIErrorMessage(ZarafaErrorToMAPIError(ret, hrSuccess)),
+		ret);
+	ret = DoUpdate("DROP TABLE mysql.proc");
+	if (ret != erSuccess)
+		goto exit;
+	ret = DoUpdate("DROP TABLE mysql.plugin");
+	if (ret != erSuccess)
+		goto exit;
+	ret = DoUpdate("DROP TABLE mysql.innodb_table_stats");
+	if (ret != erSuccess)
+		goto exit;
+	ret = DoUpdate("DROP TABLE mysql.innodb_index_stats");
+	if (ret != erSuccess)
+		goto exit;
+	return InitializeDBStateInner();
+ exit:
+	ec_log_err("Error during drop");
+#endif
 
 	return ret;
 }
@@ -423,8 +468,40 @@ ECRESULT ECDatabaseMySQL::InitializeDBStateInner()
 {
 	ECRESULT er = erSuccess;
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	// Unsure the stored procedures table is available
 	
-	for(unsigned int i = 0; i < arraySize(stored_procedures); i++) {
+	const char szProc[] =
+		"CREATE TABLE IF NOT EXISTS mysql.proc (db char(64) collate utf8_bin DEFAULT '' NOT NULL, name char(64) DEFAULT '' NOT NULL, type enum('FUNCTION','PROCEDURE') NOT NULL, specific_name char(64) DEFAULT '' NOT NULL, language enum('SQL') DEFAULT 'SQL' NOT NULL, sql_data_access enum( 'CONTAINS_SQL', 'NO_SQL', 'READS_SQL_DATA', 'MODIFIES_SQL_DATA') DEFAULT 'CONTAINS_SQL' NOT NULL, is_deterministic enum('YES','NO') DEFAULT 'NO' NOT NULL, security_type enum('INVOKER','DEFINER') DEFAULT 'DEFINER' NOT NULL, param_list blob NOT NULL, returns longblob NOT NULL, body longblob NOT NULL, definer char(141) collate utf8_bin DEFAULT '' NOT NULL, created timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, modified timestamp NOT NULL DEFAULT '0000-00-00 00:00:00', sql_mode set( 'REAL_AS_FLOAT', 'PIPES_AS_CONCAT', 'ANSI_QUOTES', 'IGNORE_SPACE', 'IGNORE_BAD_TABLE_OPTIONS', 'ONLY_FULL_GROUP_BY', 'NO_UNSIGNED_SUBTRACTION', 'NO_DIR_IN_CREATE', 'POSTGRESQL', 'ORACLE', 'MSSQL', 'DB2', 'MAXDB', 'NO_KEY_OPTIONS', 'NO_TABLE_OPTIONS', 'NO_FIELD_OPTIONS', 'MYSQL323', 'MYSQL40', 'ANSI', 'NO_AUTO_VALUE_ON_ZERO', 'NO_BACKSLASH_ESCAPES', 'STRICT_TRANS_TABLES', 'STRICT_ALL_TABLES', 'NO_ZERO_IN_DATE', 'NO_ZERO_DATE', 'INVALID_DATES', 'ERROR_FOR_DIVISION_BY_ZERO', 'TRADITIONAL', 'NO_AUTO_CREATE_USER', 'HIGH_NOT_PRECEDENCE', 'NO_ENGINE_SUBSTITUTION', 'PAD_CHAR_TO_FULL_LENGTH') DEFAULT '' NOT NULL, comment text collate utf8_bin NOT NULL, character_set_client char(32) collate utf8_bin, collation_connection char(32) collate utf8_bin, db_collation char(32) collate utf8_bin, body_utf8 longblob, PRIMARY KEY (db,name,type)) engine=MyISAM character set utf8 comment='Stored Procedures';";
+	const char szPlugin[] =
+		"CREATE TABLE IF NOT EXISTS mysql.plugin (name varchar(64) DEFAULT '' NOT NULL, dl varchar(128) DEFAULT '' NOT NULL, PRIMARY KEY (name)) engine=MyISAM CHARACTER SET utf8 COLLATE utf8_general_ci comment='MySQL plugins';";
+	const char szInnoStats[] =
+		"CREATE TABLE IF NOT EXISTS mysql.innodb_table_stats ( database_name VARCHAR(64) NOT NULL, table_name VARCHAR(64) NOT NULL, last_update TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, n_rows BIGINT UNSIGNED NOT NULL, clustered_index_size BIGINT UNSIGNED NOT NULL, sum_of_other_index_sizes BIGINT UNSIGNED NOT NULL, PRIMARY KEY (database_name, table_name)) ENGINE=INNODB DEFAULT CHARSET=utf8 COLLATE=utf8_bin STATS_PERSISTENT=0;";
+	const char szInnoIndexStats[] =
+		"CREATE TABLE IF NOT EXISTS mysql.innodb_index_stats ( database_name VARCHAR(64) NOT NULL, table_name VARCHAR(64) NOT NULL, index_name VARCHAR(64) NOT NULL, last_update TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, stat_name VARCHAR(64) NOT NULL, stat_value BIGINT UNSIGNED NOT NULL, sample_size BIGINT UNSIGNED, stat_description VARCHAR(1024) NOT NULL, PRIMARY KEY (database_name, table_name, index_name, stat_name)) ENGINE=INNODB DEFAULT CHARSET=utf8 COLLATE=utf8_bin STATS_PERSISTENT=0;";
+
+	er = DoUpdate("CREATE DATABASE IF NOT EXISTS mysql");
+	if(er != erSuccess)
+		goto exit;
+
+	er = DoUpdate(szProc);
+	if(er != erSuccess)
+		goto exit;
+		
+	er = DoUpdate(szPlugin);
+	if(er != erSuccess)
+		goto exit;
+
+	er = DoUpdate(szInnoStats);
+	if(er != erSuccess)
+		goto exit;
+
+	er = DoUpdate(szInnoIndexStats);
+	if(er != erSuccess)
+		goto exit;
+#endif
+	
+	for (unsigned int i = 0; i < arraySize(stored_procedures); ++i) {
 		er = DoUpdate(std::string("DROP PROCEDURE IF EXISTS ") + stored_procedures[i].szName);
 		if(er != erSuccess)
 			goto exit;
@@ -433,11 +510,11 @@ ECRESULT ECDatabaseMySQL::InitializeDBStateInner()
 		if(er != erSuccess) {
 			int err = mysql_errno(&m_lpMySQL);
 			if (err == ER_DBACCESS_DENIED_ERROR) {
-				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "zarafa-server is not allowed to create stored procedures");
-				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Please grant CREATE ROUTINE permissions to the mysql user '%s' on the '%s' database",
+				ec_log_err("zarafa-server is not allowed to create stored procedures");
+				ec_log_err("Please grant CREATE ROUTINE permissions to the mysql user \"%s\" on the \"%s\" database",
 								m_lpConfig->GetSetting("mysql_user"), m_lpConfig->GetSetting("mysql_database"));
 			} else {
-				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "zarafa-server is unable to create stored procedures, error %d", err);
+				ec_log_err("zarafa-server is unable to create stored procedures, error %d", err);
 			}
 			goto exit;
 		}
@@ -447,7 +524,7 @@ exit:
 	return er;
 }
 
-void ECDatabaseMySQL::UnloadLibrary(ECLogger *l)
+void ECDatabaseMySQL::UnloadLibrary(void)
 {
 	/*
 	 * MySQL will timeout waiting for its own threads if the mysql
@@ -455,12 +532,9 @@ void ECDatabaseMySQL::UnloadLibrary(ECLogger *l)
 	 * mysql_*_end() is called. [Global problem - it also affects
 	 * projects other than Zarafa's.] :(
 	 */
-	if (l != NULL)
-		l->Log(EC_LOGLEVEL_NOTICE, "Waiting for mysql_server_end");
+	ec_log_notice("Waiting for mysql_server_end");
 	mysql_server_end();// mysql > 4.1.10 = mysql_library_end();
-
-	if (l != NULL)
-		l->Log(EC_LOGLEVEL_NOTICE, "Waiting for mysql_library_end");
+	ec_log_notice("Waiting for mysql_library_end");
 	mysql_library_end();
 }
 
@@ -472,7 +546,7 @@ ECRESULT ECDatabaseMySQL::InitEngine()
 
 	//Init mysql and make a connection
 	if(mysql_init(&m_lpMySQL) == NULL) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::InitEngine(): mysql_init failed");
+		ec_log_crit("ECDatabaseMySQL::InitEngine(): mysql_init failed");
 		er = ZARAFA_E_DATABASE_ERROR;
 		goto exit;
 	}
@@ -488,12 +562,6 @@ ECRESULT ECDatabaseMySQL::InitEngine()
 
 exit:
 	return er;
-}
-
-ECLogger* ECDatabaseMySQL::GetLogger()
-{
-	ASSERT(m_lpLogger);
-	return m_lpLogger;
 }
 
 std::string ECDatabaseMySQL::GetDatabaseDir()
@@ -526,7 +594,8 @@ exit:
 	return er;
 }
 
-ECRESULT ECDatabaseMySQL::CheckExistIndex(const std::string strTable, const std::string &strKey, bool *lpbExist)
+ECRESULT ECDatabaseMySQL::CheckExistIndex(const std::string &strTable,
+    const std::string &strKey, bool *lpbExist)
 {
 	ECRESULT		er = erSuccess;
 	std::string		strQuery;
@@ -585,7 +654,7 @@ ECRESULT ECDatabaseMySQL::Connect()
 			er = ZARAFA_E_DATABASE_NOT_FOUND;
 		else
 			er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::Connect(): mysql connect fail %x", er);
+		ec_log_err("ECDatabaseMySQL::Connect(): mysql connect fail %x", er);
 		goto exit;
 	}
 	
@@ -613,7 +682,7 @@ ECRESULT ECDatabaseMySQL::Connect()
 	lpDBRow = FetchRow(lpDBResult);
 	/* lpDBRow[0] has the variable name, [1] the value */
 	if(lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL) {
-	    m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to retrieve max_allowed_packet value. Assuming 16M");
+	    ec_log_warn("Unable to retrieve max_allowed_packet value. Assuming 16M");
 	    m_ulMaxAllowedPacket = (unsigned int)MAX_ALLOWED_PACKET;
     } else {
         m_ulMaxAllowedPacket = atoui(lpDBRow[1]);
@@ -624,26 +693,26 @@ ECRESULT ECDatabaseMySQL::Connect()
 #if HAVE_MYSQL_SET_CHARACTER_SET
 	// function since mysql 5.0.7
 	if (mysql_set_character_set(&m_lpMySQL, "utf8")) {
-	    m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to set character set to 'utf8'");
+	    ec_log_err("Unable to set character set to \"utf8\"");
 		er = ZARAFA_E_DATABASE_ERROR;
 		goto exit;
 	}
 #else
 	if (Query("set character_set_client = 'utf8'") != 0) {
-		m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to set character_set_client value");
+		ec_log_warn("Unable to set character_set_client value");
 		goto exit;
 	}
 	if (Query("set character_set_connection = 'utf8'") != 0) {
-		m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to set character_set_connection value");
+		ec_log_warn("Unable to set character_set_connection value");
 		goto exit;
 	}
 	if (Query("set character_set_results = 'utf8'") != 0) {
-		m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to set character_set_results value");
+		ec_log_warn("Unable to set character_set_results value");
 		goto exit;
 	}
 #endif
 	if (Query("set max_sp_recursion_depth = 255") != 0) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to set recursion depth");
+		ec_log_err("Unable to set recursion depth");
 		er = ZARAFA_E_DATABASE_ERROR;
 		goto exit;
 	}
@@ -655,12 +724,12 @@ ECRESULT ECDatabaseMySQL::Connect()
 		
 	strQuery = (string)"SET SESSION group_concat_max_len = " + stringify(gcm);
 	if(Query(strQuery) != erSuccess ) {
-	    m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to set group_concat_max_len value");
+	    ec_log_warn("Unable to set group_concat_max_len value");
 	}
 
 	// changing the SESSION max_allowed_packet is removed since mysql 5.1, and GLOBAL is for SUPER users only, so just give a warning
 	if (m_ulMaxAllowedPacket < MAX_ALLOWED_PACKET)
-		m_lpLogger->Log(EC_LOGLEVEL_WARNING, "max_allowed_packet is smaller than 16M (%d). You are advised to increase this value by adding max_allowed_packet=16M in the [mysqld] section of my.cnf.", m_ulMaxAllowedPacket);
+		ec_log_warn("max_allowed_packet is smaller than 16M (%d). You are advised to increase this value by adding max_allowed_packet=16M in the [mysqld] section of my.cnf.", m_ulMaxAllowedPacket);
 
 	if (m_lpMySQL.server_version) {
 		// m_lpMySQL.server_version is a C type string (char*) containing something like "5.5.37-0+wheezy1" (MySQL),
@@ -668,7 +737,7 @@ ECRESULT ECDatabaseMySQL::Connect()
 		// The following code may look funny, but it is correct, see http://www.cplusplus.com/reference/cstdlib/strtol/
 		long int majorversion = strtol(m_lpMySQL.server_version, NULL, 10);
 		// Check for over/underflow and version.
-		if ((errno != ERANGE) && (majorversion >= 5)) {
+		if (errno != ERANGE && majorversion >= 5) {
 			// this option was introduced in mysql 5.0, so let's not even try on 4.1 servers
 			strQuery = "SET SESSION sql_mode = 'STRICT_ALL_TABLES,NO_UNSIGNED_SUBTRACTION'";
 			Query(strQuery); // ignore error
@@ -705,24 +774,15 @@ ECRESULT ECDatabaseMySQL::Close()
 }
 
 // Get database ownership
-bool ECDatabaseMySQL::Lock()
+void ECDatabaseMySQL::Lock()
 {
-
 	pthread_mutex_lock(&m_hMutexMySql);
-
-	m_bLocked = true;
-
-	return m_bLocked;
 }
 
 // Release the database ownership
-bool ECDatabaseMySQL::UnLock()
+void ECDatabaseMySQL::UnLock()
 {
 	pthread_mutex_unlock(&m_hMutexMySql);
-
-	m_bLocked = false;
-		
-	return m_bLocked;
 }
 
 bool ECDatabaseMySQL::isConnected() {
@@ -746,13 +806,13 @@ ECRESULT ECDatabaseMySQL::Query(const string &strQuery) {
 	ECRESULT er = erSuccess;
 	int err;
 	
-	LOG_SQL_DEBUG(m_lpLogger, "SQL [%08lu]: \"%s;\"", m_lpMySQL.thread_id, strQuery.c_str()); 
+	LOG_SQL_DEBUG("SQL [%08lu]: \"%s;\"", m_lpMySQL.thread_id, strQuery.c_str());
 
 	// use mysql_real_query to be binary safe ( http://dev.mysql.com/doc/mysql/en/mysql-real-query.html )
 	err = mysql_real_query( &m_lpMySQL, strQuery.c_str(), strQuery.length() );
 
 	if(err && (mysql_errno(&m_lpMySQL) == CR_SERVER_LOST || mysql_errno(&m_lpMySQL) == CR_SERVER_GONE_ERROR)) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "SQL [%08lu] info: Try to reconnect", m_lpMySQL.thread_id);
+		ec_log_warn("SQL [%08lu] info: Try to reconnect", m_lpMySQL.thread_id);
 			
 		er = Close();
 		if(er != erSuccess)
@@ -768,7 +828,7 @@ ECRESULT ECDatabaseMySQL::Query(const string &strQuery) {
 
 	if(err) {
 		if (!m_bSuppressLockErrorLogging || GetLastError() == DB_E_UNKNOWN)
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "SQL [%08lu] Failed: %s, Query Size: %lu, Query: \"%s\"", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL), (long unsigned int)strQuery.size(), strQuery.c_str()); 
+			ec_log_err("SQL [%08lu] Failed: %s, Query Size: %lu, Query: \"%s\"", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL), static_cast<unsigned long>(strQuery.size()), strQuery.c_str());
 		er = ZARAFA_E_DATABASE_ERROR;
 		// Don't assert on ER_NO_SUCH_TABLE because it's an anticipated error in the db upgrade code.
 		if (mysql_errno(&m_lpMySQL) != ER_NO_SUCH_TABLE)
@@ -808,19 +868,19 @@ ECRESULT ECDatabaseMySQL::DoSelect(const string &strQuery, DB_RESULT *lppResult,
 		
 	if( Query(strQuery) != erSuccess ) {
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::DoSelect(): query failed");
+		ec_log_err("ECDatabaseMySQL::DoSelect(): query failed");
 		goto exit;
 	}
 
-	if(fStreamResult)
-    	lpResult = mysql_use_result( &m_lpMySQL );
-    else
-    	lpResult = mysql_store_result( &m_lpMySQL );
+	if (fStreamResult)
+		lpResult = mysql_use_result(&m_lpMySQL);
+	else
+		lpResult = mysql_store_result(&m_lpMySQL);
     
 	if( lpResult == NULL ) {
 		er = ZARAFA_E_DATABASE_ERROR;
 		if (!m_bSuppressLockErrorLogging || GetLastError() == DB_E_UNKNOWN)
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "SQL [%08lu] result failed: %s, Query: \"%s\"", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL), strQuery.c_str()); 
+			ec_log_err("SQL [%08lu] result failed: %s, Query: \"%s\"", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL), strQuery.c_str());
 	}
 
 	g_lpStatsCollector->Increment(SCN_DATABASE_SELECTS);
@@ -855,7 +915,7 @@ ECRESULT ECDatabaseMySQL::DoSelectMulti(const string &strQuery) {
 		
 	if( Query(strQuery) != erSuccess ) {
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::DoSelectMulti(): select failed");
+		ec_log_err("ECDatabaseMySQL::DoSelectMulti(): select failed");
 		goto exit;
 	}
 	
@@ -899,13 +959,13 @@ ECRESULT ECDatabaseMySQL::GetNextResult(DB_RESULT *lppResult) {
 		
 	if(ret < 0) {
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "SQL [%08lu] next_result failed: expected more results", m_lpMySQL.thread_id);
+		ec_log_err("SQL [%08lu] next_result failed: expected more results", m_lpMySQL.thread_id);
 		goto exit;
 	}
 	
 	if(ret > 0) {
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "SQL [%08lu] next_result of multi-resultset failed: %s", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL)); 
+		ec_log_err("SQL [%08lu] next_result of multi-resultset failed: %s", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL));
 		goto exit;
 	}		
 
@@ -913,7 +973,7 @@ ECRESULT ECDatabaseMySQL::GetNextResult(DB_RESULT *lppResult) {
    	if(lpResult == NULL) {
    		// I think this can only happen on the first result set of a query since otherwise mysql_next_result() would already fail
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "SQL [%08lu] result failed: %s", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL)); 
+		ec_log_err("SQL [%08lu] result failed: %s", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL));
 		goto exit;
    	}
 
@@ -954,7 +1014,7 @@ ECRESULT ECDatabaseMySQL::FinalizeMulti() {
 	lpResult = mysql_store_result(&m_lpMySQL);
 	
 	if(lpResult != NULL) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "SQL [%08lu] result failed: unexpected results received at end of batch", m_lpMySQL.thread_id);
+		ec_log_err("SQL [%08lu] result failed: unexpected results received at end of batch", m_lpMySQL.thread_id);
 		er = ZARAFA_E_DATABASE_ERROR;
 		goto exit;
 	}
@@ -1012,7 +1072,7 @@ ECRESULT ECDatabaseMySQL::_Update(const string &strQuery, unsigned int *lpulAffe
 		// FIXME: Add the mysql error system ?
 		// er = nMysqlError;
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::_Update() query failed");
+		ec_log_err("ECDatabaseMySQL::_Update() query failed");
 		goto exit;
 	}
 	
@@ -1289,7 +1349,7 @@ void ECDatabaseMySQL::ResetResult(DB_RESULT sResult) {
 	mysql_data_seek((MYSQL_RES *)sResult, 0);
 }
 
-std::string ECDatabaseMySQL::GetError()
+const char *ECDatabaseMySQL::GetError(void)
 {
 	if(m_bMysqlInitialize == false)
 		return "MYSQL not initialized";
@@ -1331,9 +1391,9 @@ ECRESULT ECDatabaseMySQL::Begin() {
 
 #ifdef DEBUG
 #if DEBUG_TRANSACTION
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL,"%08X: BEGIN", &m_lpMySQL);
+	ec_log_debug("%08X: BEGIN", &m_lpMySQL);
 	if(m_ulTransactionState != 0) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"BEGIN ALREADY ISSUED");
+		ec_log_debug("BEGIN ALREADY ISSUED");
 		ASSERT(("BEGIN ALREADY ISSUED", FALSE));
 	}
 	m_ulTransactionState = 1;
@@ -1349,9 +1409,9 @@ ECRESULT ECDatabaseMySQL::Commit() {
 	
 #ifdef DEBUG
 #if DEBUG_TRANSACTION
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL,"%08X: COMMIT", &m_lpMySQL);
+	ec_log_debug("%08X: COMMIT", &m_lpMySQL);
 	if(m_ulTransactionState != 1) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"NO BEGIN ISSUED");
+		ec_log_debug("NO BEGIN ISSUED");
 		ASSERT(("NO BEGIN ISSUED", FALSE));
 	}
 	m_ulTransactionState = 0;
@@ -1363,18 +1423,40 @@ ECRESULT ECDatabaseMySQL::Commit() {
 
 ECRESULT ECDatabaseMySQL::Rollback() {
 	ECRESULT er = erSuccess;
+#ifdef HAVE_OFFLINE_SUPPORT
+	const char *lpQuery = "SHOW ENGINE INNODB STATUS";
+	int err = 0;
+#endif
 
 	er = Query("ROLLBACK");
 	
 #ifdef DEBUG
 #if DEBUG_TRANSACTION
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL,"%08X: ROLLBACK", &m_lpMySQL);
+	ec_log_debug("%08X: ROLLBACK", &m_lpMySQL);
 	if(m_ulTransactionState != 1) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"NO BEGIN ISSUED");
+		ec_log_debug("NO BEGIN ISSUED");
 		ASSERT(("NO BEGIN ISSUED", FALSE));
 	}
 	m_ulTransactionState = 0;
 #endif
+#endif
+#ifdef HAVE_OFFLINE_SUPPORT
+	// We'll log the innodb status after each rollback. This shouldn't
+	// happen too much though.
+	err = mysql_real_query(&m_lpMySQL, lpQuery, strlen(lpQuery));
+	if (!err) {
+		MYSQL_RES *lpResult = mysql_use_result(&m_lpMySQL);
+		if (lpResult) {
+			MYSQL_ROW row = mysql_fetch_row(lpResult);
+			if (row) {
+				unsigned int fields = mysql_num_fields(lpResult);
+				for (unsigned int i = 0; i < fields; ++i)
+					if (row[i])
+						ec_log_err("%s", row[i]);
+			}
+			mysql_free_result(lpResult);
+		}
+	}
 #endif
 
 	return er;
@@ -1400,7 +1482,7 @@ ECRESULT ECDatabaseMySQL::IsInnoDBSupported()
 
 	er = DoSelect("SHOW ENGINES", &lpResult);
 	if(er != erSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to query supported database engines. Error: %s", GetError().c_str());
+		ec_log_crit("Unable to query supported database engines. Error: %s", GetError());
 		goto exit;
 	}
 
@@ -1410,19 +1492,19 @@ ECRESULT ECDatabaseMySQL::IsInnoDBSupported()
 
 		if (stricmp(lpDBRow[1], "DISABLED") == 0) {
 			// mysql has run with innodb enabled once, but disabled this.. so check your log.
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "INNODB engine is disabled. Please re-enable the INNODB engine. Check your MySQL log for more information or comment out skip-innodb in the mysql configuration file.");
+			ec_log_crit("INNODB engine is disabled. Please re-enable the INNODB engine. Check your MySQL log for more information or comment out skip-innodb in the mysql configuration file.");
 			er = ZARAFA_E_DATABASE_ERROR;
 			goto exit;
 		} else if (stricmp(lpDBRow[1], "YES") != 0 && stricmp(lpDBRow[1], "DEFAULT") != 0) {
 			// mysql is incorrectly configured or compiled.
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "INNODB engine is not supported. Please enable the INNODB engine in the mysql configuration file.");
+			ec_log_crit("INNODB engine is not supported. Please enable the INNODB engine in the mysql configuration file.");
 			er = ZARAFA_E_DATABASE_ERROR;
 			goto exit;
 		}
 		break;
 	}
 	if (lpDBRow == NULL) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to find 'InnoDB' engine from the mysql server. Probably INNODB is not supported.");
+		ec_log_crit("Unable to find the \"InnoDB\" engine from the mysql server. Probably INNODB is not supported.");
 		er = ZARAFA_E_DATABASE_ERROR;
 		goto exit;
 	}
@@ -1503,17 +1585,17 @@ ECRESULT ECDatabaseMySQL::CreateDatabase()
 			lpMysqlSocket, 0) == NULL)
 	{
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::CreateDatabase(): mysql connect failed");
+		ec_log_err("ECDatabaseMySQL::CreateDatabase(): mysql connect failed");
 		goto exit;
 	}
 
 	if(lpDatabase == NULL) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Unable to create database: Unknown database");
+		ec_log_crit("Unable to create database: Unknown database");
 		er = ZARAFA_E_DATABASE_ERROR;
 		goto exit;
 	}
 
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Create database %s", lpDatabase);
+	ec_log_notice("Creating database \"%s\"", lpDatabase);
 
 	er = IsInnoDBSupported();
 	if(er != erSuccess)
@@ -1521,7 +1603,7 @@ ECRESULT ECDatabaseMySQL::CreateDatabase()
 
 	strQuery = "CREATE DATABASE IF NOT EXISTS `"+std::string(m_lpConfig->GetSetting("mysql_database"))+"`";
 	if(Query(strQuery) != erSuccess){
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Unable to create database: %s", GetError().c_str());
+		ec_log_crit("Unable to create database: %s", GetError());
 		er = ZARAFA_E_DATABASE_ERROR;
 		goto exit;
 	}
@@ -1532,18 +1614,16 @@ ECRESULT ECDatabaseMySQL::CreateDatabase()
 		goto exit;
 
 	// Database tables
-	for (unsigned int i=0; i < (sizeof(sDatabaseTables) / sizeof(sSQLDatabase_t)); i++)
-	{
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Create table: %s", sDatabaseTables[i].lpComment);
+	for (size_t i = 0; i < ARRAY_SIZE(sDatabaseTables); ++i) {
+		ec_log_info("Creating table \"%s\"", sDatabaseTables[i].lpComment);
 		er = DoInsert(sDatabaseTables[i].lpSQL);
 		if(er != erSuccess)
 			goto exit;	
 	}
 
 	// Add the default table data
-	for (unsigned int i=0; i < (sizeof(sDatabaseData) / sizeof(sSQLDatabase_t)); i++)
-	{
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Add table data for: %s", sDatabaseData[i].lpComment);
+	for (size_t i = 0; i < ARRAY_SIZE(sDatabaseData); ++i) {
+		ec_log_info("Add table data for \"%s\"", sDatabaseData[i].lpComment);
 		er = DoInsert(sDatabaseData[i].lpSQL);
 		if(er != erSuccess)
 			goto exit;
@@ -1559,7 +1639,8 @@ ECRESULT ECDatabaseMySQL::CreateDatabase()
 		goto exit;
 
 	// Loop throught the update list
-	for (unsigned int i=Z_UPDATE_RELEASE_ID; i < (sizeof(sUpdateList) / sizeof(sUpdateList_t)); i++)
+	for (size_t i = Z_UPDATE_RELEASE_ID;
+	     i < ARRAY_SIZE(sUpdateList); ++i)
 	{
 		er = UpdateDatabaseVersion(sUpdateList[i].ulVersion);
 		if(er != erSuccess)
@@ -1567,20 +1648,44 @@ ECRESULT ECDatabaseMySQL::CreateDatabase()
 	}
 
 	
-	m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Database is created");
+	ec_log_notice("Database has been created");
 
 exit:
 	return er;
 }
 
-ECRESULT ECDatabaseMySQL::GetDatabaseVersion(unsigned int *lpulMajor, unsigned int *lpulMinor, unsigned int *lpulRevision, unsigned int *lpulDatabaseRevision)
+static inline bool row_has_null(DB_ROW row, size_t z)
+{
+	if (row == NULL)
+		return true;
+	while (z-- > 0)
+		if (row[z] == NULL)
+			return true;
+	return false;
+}
+
+ECRESULT ECDatabaseMySQL::GetDatabaseVersion(zcp_versiontuple *dbv)
 {
 	ECRESULT		er = erSuccess;
 	string			strQuery;
 	DB_RESULT		lpResult = NULL;
 	DB_ROW			lpDBRow = NULL;
+	bool have_micro;
 
-	strQuery = "SELECT major,minor,revision,databaserevision FROM versions ORDER BY major DESC, minor DESC, revision DESC, databaserevision DESC LIMIT 1";
+	/* Check if the "micro" column already exists (it does since v64) */
+	er = DoSelect("SELECT databaserevision FROM versions WHERE databaserevision>=64 LIMIT 1", &lpResult);
+	if (er != erSuccess)
+		goto exit;
+	have_micro = GetNumRows(lpResult) > 0;
+	FreeResult(lpResult);
+
+	strQuery = "SELECT major, minor";
+	strQuery += have_micro ? ", micro" : ", 0";
+	strQuery += ", revision, databaserevision FROM versions ORDER BY major DESC, minor DESC";
+	if (have_micro)
+		strQuery += ", micro DESC";
+	strQuery += ", revision DESC, databaserevision DESC LIMIT 1";
+
 	er = DoSelect(strQuery, &lpResult);
 	if(er != erSuccess && mysql_errno(&m_lpMySQL) != ER_NO_SUCH_TABLE)
 		goto exit;
@@ -1597,14 +1702,12 @@ ECRESULT ECDatabaseMySQL::GetDatabaseVersion(unsigned int *lpulMajor, unsigned i
 		lpDBRow = FetchRow(lpResult);
 		er = ZARAFA_E_UNKNOWN_DATABASE;
 
-		while(lpResult)
-		{
-			if(lpDBRow != NULL && lpDBRow[0] != NULL && stricmp(lpDBRow[0], "storeid") == 0)
-			{
-				*lpulMajor = 5;
-				*lpulMinor = 0;
-				*lpulRevision = 0;
-				*lpulDatabaseRevision = 0;
+		while (lpDBRow != NULL) {
+			if (lpDBRow[0] != NULL && stricmp(lpDBRow[0], "storeid") == 0) {
+				dbv->v_major  = 5;
+				dbv->v_minor  = 0;
+				dbv->v_rev    = 0;
+				dbv->v_schema = 0;
 				er = erSuccess;
 				break;
 			}
@@ -1615,16 +1718,17 @@ ECRESULT ECDatabaseMySQL::GetDatabaseVersion(unsigned int *lpulMajor, unsigned i
 	}
 
 	lpDBRow = FetchRow(lpResult);
-	if( lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL || lpDBRow[3] == NULL) {
+	if (row_has_null(lpDBRow, 5)) {
 		er = ZARAFA_E_DATABASE_ERROR;
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::GetDatabaseVersion(): NULL row or columns");
+		ec_log_err("ECDatabaseMySQL::GetDatabaseVersion(): NULL row or columns");
 		goto exit;
 	}
 
-	*lpulMajor = atoui(lpDBRow[0]);
-	*lpulMinor = atoui(lpDBRow[1]);
-	*lpulRevision = atoui(lpDBRow[2]);
-	*lpulDatabaseRevision = atoui(lpDBRow[3]);
+	dbv->v_major  = strtoul(lpDBRow[0], NULL, 0);
+	dbv->v_minor  = strtoul(lpDBRow[1], NULL, 0);
+	dbv->v_micro  = strtoul(lpDBRow[2], NULL, 0);
+	dbv->v_rev    = strtoul(lpDBRow[3], NULL, 0);
+	dbv->v_schema = strtoul(lpDBRow[4], NULL, 0);
 
 exit:
 	if(lpResult)
@@ -1653,9 +1757,8 @@ ECRESULT ECDatabaseMySQL::IsUpdateDone(unsigned int ulDatabaseRevision, unsigned
 		er = ZARAFA_E_NOT_FOUND;
 
 exit:
-    if(lpResult)
-        FreeResult(lpResult);
-
+	if(lpResult != NULL)
+		FreeResult(lpResult);
 	return er;
 }
 
@@ -1680,9 +1783,8 @@ ECRESULT ECDatabaseMySQL::GetFirstUpdate(unsigned int *lpulDatabaseRevision)
 
 
 exit:
-    if(lpResult)
-        FreeResult(lpResult);
-
+	if (lpResult != NULL)
+		FreeResult(lpResult);
 	return er;
 }
 
@@ -1697,15 +1799,14 @@ exit:
 ECRESULT ECDatabaseMySQL::UpdateDatabase(bool bForceUpdate, std::string &strReport)
 {
 	ECRESULT		er = erSuccess;
-	unsigned int	ulMajor = 0;
-	unsigned int	ulMinor = 0;
-	unsigned int	ulRevision = 0;
-	unsigned int	ulDatabaseRevision = 0;
 	bool			bUpdated = false;
 	bool			bSkipped = false;
 	unsigned int	ulDatabaseRevisionMin = 0;
+	zcp_versiontuple stored_ver;
+	zcp_versiontuple program_ver(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_MICRO, PROJECT_VERSION_REVISION, Z_UPDATE_LAST);
+	int cmp;
 
-	er = GetDatabaseVersion(&ulMajor, &ulMinor, &ulRevision, &ulDatabaseRevision);
+	er = GetDatabaseVersion(&stored_ver);
 	if(er != erSuccess)
 		goto exit;
 
@@ -1715,21 +1816,18 @@ ECRESULT ECDatabaseMySQL::UpdateDatabase(bool bForceUpdate, std::string &strRepo
 		goto exit;
 
 	//default error
-	strReport = "Unable to upgrade zarafa from version ";
-	strReport+= stringify(ulMajor) + std::string(".") + stringify(ulMinor) + std::string(".")+stringify(ulRevision);
-	strReport+= std::string(" to ");
-	strReport+= std::string(PROJECT_VERSION_DOT_STR) + std::string(".")+std::string(PROJECT_SVN_REV_STR);
+	strReport = "Unable to upgrade zarafa from version " +
+	            stored_ver.stringify() + " to " + program_ver.stringify();
 
 	// Check version
-	if(ulMajor == PROJECT_VERSION_MAJOR && ulMinor == PROJECT_VERSION_MINOR && ulRevision == PROJECT_VERSION_REVISION && ulDatabaseRevision == Z_UPDATE_LAST) {
+	cmp = stored_ver.compare(program_ver);
+	if (cmp == 0 && stored_ver.v_schema == Z_UPDATE_LAST) {
 		// up to date
 		goto exit;
-	}else if((ulMajor == PROJECT_VERSION_MAJOR && ulMinor == PROJECT_VERSION_MINOR && ulRevision > PROJECT_VERSION_REVISION) ||
-			 (ulMajor == PROJECT_VERSION_MAJOR && ulMinor > PROJECT_VERSION_MINOR) || 
-			 (ulMajor > PROJECT_VERSION_MAJOR)) {
+	} else if (cmp > 0) {
 		// Start a old server with a new database
-		strReport = "Database version (" +stringify(ulRevision)+","+stringify(ulDatabaseRevision) +
-			") is newer than the server version (" + stringify(PROJECT_VERSION_REVISION)+","+stringify(Z_UPDATE_LAST) + ")";
+		strReport = "Database version (" + stored_ver.stringify(',') +
+		            ") is newer than the server version (" + program_ver.stringify(',') + ")";
 		er = ZARAFA_E_INVALID_VERSION;
 		goto exit;
 	}
@@ -1737,22 +1835,22 @@ ECRESULT ECDatabaseMySQL::UpdateDatabase(bool bForceUpdate, std::string &strRepo
 	this->m_bForceUpdate = bForceUpdate;
 
 	if (bForceUpdate)
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Manually forced the database upgrade; the option '--force-database-upgrade' was given.");
+		ec_log_warn("Manually forced the database upgrade because the option \"--force-database-upgrade\" was given.");
 
 	// Loop throught the update list
-	for (unsigned int i=ulDatabaseRevisionMin; i < (sizeof(sUpdateList) / sizeof(sUpdateList_t)); i++)
+	for (size_t i = ulDatabaseRevisionMin;
+	     i < ARRAY_SIZE(sUpdateList); ++i)
 	{
-
 		if ( (ulDatabaseRevisionMin > 0 && IsUpdateDone(sUpdateList[i].ulVersion) == hrSuccess) ||
-			(sUpdateList[i].ulVersionMin != 0 && ulDatabaseRevision >= sUpdateList[i].ulVersion && 
-			ulDatabaseRevision >= sUpdateList[i].ulVersionMin) ||
+			(sUpdateList[i].ulVersionMin != 0 && stored_ver.v_schema >= sUpdateList[i].ulVersion &&
+			stored_ver.v_schema >= sUpdateList[i].ulVersionMin) ||
 			(sUpdateList[i].ulVersionMin != 0 && IsUpdateDone(sUpdateList[i].ulVersionMin, PROJECT_VERSION_REVISION) == hrSuccess))
 		{
 			// Update already done, next
 			continue;
 		}
 
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Start: %s", sUpdateList[i].lpszLogComment );
+		ec_log_info("Start: %s", sUpdateList[i].lpszLogComment);
 
 		er = Begin();
 		if(er != erSuccess)
@@ -1767,7 +1865,7 @@ ECRESULT ECDatabaseMySQL::UpdateDatabase(bool bForceUpdate, std::string &strRepo
 			goto exit; // Reason should be logged in the update itself.
 		} else if (er != hrSuccess) {
 			Rollback();
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Failed: Rollback database");
+			ec_log_err("Failed: Rollback database");
 			goto exit;
 		}
 
@@ -1778,9 +1876,7 @@ ECRESULT ECDatabaseMySQL::UpdateDatabase(bool bForceUpdate, std::string &strRepo
 		er = Commit();
 		if(er != erSuccess)
 			goto exit;
-
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"%s: %s", bSkipped ? "Skipped" : "Done", sUpdateList[i].lpszLogComment);
-
+		ec_log_notice("%s: %s", bSkipped ? "Skipped" : "Done", sUpdateList[i].lpszLogComment);
 		bUpdated = true;
 	}
 
@@ -1801,10 +1897,24 @@ ECRESULT ECDatabaseMySQL::UpdateDatabaseVersion(unsigned int ulDatabaseRevision)
 {
 	ECRESULT	er = erSuccess;
 	string		strQuery;
+	DB_RESULT result;
+	bool have_micro;
+
+	/* Check for "micro" column (present in v64+) */
+	er = DoSelect("SELECT databaserevision FROM versions WHERE databaserevision>=64 LIMIT 1", &result);
+	if (er != erSuccess)
+		goto exit;
+	have_micro = GetNumRows(result) > 0;
+	FreeResult(result);
 
 	// Insert version number
-	strQuery = "INSERT INTO versions (major, minor, revision, databaserevision, updatetime) VALUES(";
+	strQuery = "INSERT INTO versions (major, minor, ";
+	if (have_micro)
+		strQuery += "micro, ";
+	strQuery += "revision, databaserevision, updatetime) VALUES(";
 	strQuery += stringify(PROJECT_VERSION_MAJOR) + std::string(", ") + stringify(PROJECT_VERSION_MINOR) + std::string(", ");
+	if (have_micro)
+		strQuery += stringify(PROJECT_VERSION_MICRO) + std::string(", ");
 	strQuery += std::string("'") + std::string(PROJECT_SVN_REV_STR) +  std::string("', ") + stringify(ulDatabaseRevision) + ", FROM_UNIXTIME("+stringify(time(NULL))+") )";
 
 	er = DoInsert(strQuery);
@@ -1823,20 +1933,20 @@ ECRESULT ECDatabaseMySQL::ValidateTables()
 	string		strQuery;
 	list<std::string> listTables;
 	list<std::string> listErrorTables;
-	list<std::string>::iterator iterTables;
+	list<std::string>::const_iterator iterTables;
 	DB_RESULT	lpResult = NULL;
 	DB_ROW		lpDBRow = NULL;
 
 	er = DoSelect("SHOW TABLES", &lpResult);
 	if(er != erSuccess) {
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Unable to get all tables from the mysql database. %s", GetError().c_str());
+		ec_log_err("Unable to get all tables from the mysql database. %s", GetError());
 		goto exit;
 	}
 
 	// Get all tables of the database
 	while( (lpDBRow = FetchRow(lpResult))) {
 		if (lpDBRow == NULL || lpDBRow[0] == NULL) {
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Wrong table information.");
+			ec_log_err("Wrong table information.");
 			er = ZARAFA_E_DATABASE_ERROR;
 			goto exit;
 		}
@@ -1846,21 +1956,21 @@ ECRESULT ECDatabaseMySQL::ValidateTables()
 	if(lpResult) FreeResult(lpResult);
 	lpResult = NULL;
 
-	for(iterTables = listTables.begin(); iterTables != listTables.end(); iterTables++) {
+	for (iterTables = listTables.begin(); iterTables != listTables.end(); ++iterTables) {
 		er = DoSelect("CHECK TABLE " + *iterTables, &lpResult);
 		if(er != erSuccess) {
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Unable to check table '%s'", iterTables->c_str());
+			ec_log_err("Unable to check table \"%s\"", iterTables->c_str());
 			goto exit;
 		}
 
 		lpDBRow = FetchRow(lpResult);
 		if (lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL) {
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Wrong check table information.");
+			ec_log_err("Wrong check table information.");
 			er = ZARAFA_E_DATABASE_ERROR;
 			goto exit;
 		}
 
-		m_lpLogger->Log(EC_LOGLEVEL_INFO,"%30s | %15s | %s", lpDBRow[0], lpDBRow[2], lpDBRow[3]);
+		ec_log_info("%30s | %15s | %s", lpDBRow[0], lpDBRow[2], lpDBRow[3]);
 		if (strcmp(lpDBRow[2], "error") == 0)
 			listErrorTables.insert(listErrorTables.end(), lpDBRow[0]);
 
@@ -1870,20 +1980,42 @@ ECRESULT ECDatabaseMySQL::ValidateTables()
 
 	if (!listErrorTables.empty())
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Rebuild tables.");
-		for(iterTables = listErrorTables.begin(); iterTables != listErrorTables.end(); iterTables++) {
+		ec_log_notice("Rebuilding tables.");
+#ifdef HAVE_OFFLINE_SUPPORT
+		ECDBUpdateProgress *lpProgress = NULL;
+		unsigned int cUpdate = 0;
 
+		ECDBUpdateProgress::GetInstance(listErrorTables.size(), this, &lpProgress);
+#endif
+		for (iterTables = listErrorTables.begin();
+		     iterTables != listErrorTables.end(); ++iterTables) {
+#ifdef HAVE_OFFLINE_SUPPORT
+			if (lpProgress) {
+				er = lpProgress->Start(cUpdate); 
+				if(er != erSuccess) {
+					ec_log_err("Rebuild of tables canceled by user.");
+					goto exit;
+				}
+			}
+#endif
 
 			er = DoUpdate("ALTER TABLE " + *iterTables + " FORCE");
 			if(er != erSuccess) {
-				m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Unable to fix table '%s'", iterTables->c_str());
+				ec_log_crit("Unable to fix table \"%s\"", iterTables->c_str());
 				break;
 			}
+#ifdef HAVE_OFFLINE_SUPPORT
+			if (lpProgress)
+				lpProgress->Finish(cUpdate++);
+#endif
 		}
+#ifdef HAVE_OFFLINE_SUPPORT
+		ECDBUpdateProgress::DestroyInstance();
+#endif
 		if(er != erSuccess) {
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Rebuild tables failed. Error code 0x%08x", er);
+			ec_log_crit("Rebuild tables failed. Error code 0x%08x", er);
 		} else {
-			m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Rebuild tables done.");
+			ec_log_notice("Rebuilding tables done.");
 		}
 	}//	if (!listErrorTables.empty())
 

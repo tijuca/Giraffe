@@ -1,58 +1,32 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include "recurrence.h"
 #include <cmath>
 #include <mapicode.h>
-#include "stringutil.h"
-#include "ECIConv.h"
+#include <zarafa/stringutil.h>
+#include <zarafa/ECIConv.h>
 #include <ctime>
-#include "CommonUtil.h"
+#include <zarafa/CommonUtil.h>
 #include <mapiutil.h>
-#include "mapiguidext.h"
-#include "namedprops.h"
+#include <zarafa/mapiguidext.h>
+#include <zarafa/namedprops.h>
 
 #include <iostream>
 #include <algorithm>
@@ -135,11 +109,11 @@ HRESULT recurrence::HrGetRecurrenceState(char **lppData, unsigned int *lpulLen, 
 
 		daycount = 0;
 		dayskip = -1;
-		for (int j = 0; j < 7; j++) {
+		for (int j = 0; j < 7; ++j) {
 			if (m_sRecState.ulWeekDays & (1<<((tm.tm_wday + j)%7))) {
 				if (dayskip == -1)
 					dayskip = j;
-				daycount++;
+				++daycount;
 			}
 		}
 		// dayskip is the number of days to skip from the startdate until the first occurrence
@@ -167,7 +141,7 @@ HRESULT recurrence::HrGetRecurrenceState(char **lppData, unsigned int *lpulLen, 
 		rStart = ((((12%m_sRecState.ulPeriod) * (( ((tm.tm_year + 1900)) - 1601)%m_sRecState.ulPeriod)) % m_sRecState.ulPeriod) + ( ((tm.tm_mon)) ))%m_sRecState.ulPeriod;
 
 		m_sRecState.ulFirstDateTime = 0;
-		for (int i=0; i < rStart; i++)
+		for (int i = 0; i < rStart; ++i)
 			m_sRecState.ulFirstDateTime += MonthInSeconds(1601 + (i/12), (i%12)+1) / 60;
 
 		break;
@@ -536,20 +510,21 @@ std::list<time_t> recurrence::getDeletedExceptions() {
 	std::list<time_t> lstDeletes;
 	std::vector<unsigned int> lstDeletedInstanceDates;
 	std::vector<unsigned int>::iterator d;
-	std::vector<RecurrenceState::Exception>::iterator iExceptions;
+	std::vector<RecurrenceState::Exception>::const_iterator iExceptions;
 
 
 	// make copy of struct info
 	lstDeletedInstanceDates = m_sRecState.lstDeletedInstanceDates;
 
-	for (iExceptions = m_sRecState.lstExceptions.begin(); iExceptions != m_sRecState.lstExceptions.end(); iExceptions++) {
+	for (iExceptions = m_sRecState.lstExceptions.begin(); iExceptions != m_sRecState.lstExceptions.end(); ++iExceptions) {
 		// if startofday(exception.basedata) == present in lstDeletes, that's a move, so remove from deletes list
 		d = find(lstDeletedInstanceDates.begin(), lstDeletedInstanceDates.end(), iExceptions->ulOriginalStartDate - (iExceptions->ulOriginalStartDate % 1440));
 		if (d != lstDeletedInstanceDates.end())
 			lstDeletedInstanceDates.erase(d);
 	}
 
-	for (d = lstDeletedInstanceDates.begin(); d != lstDeletedInstanceDates.end(); d++) {
+	for (d = lstDeletedInstanceDates.begin();
+	     d != lstDeletedInstanceDates.end(); ++d) {
 		RTimeToUnixTime(*d, &tDayDelete);
 		lstDeletes.push_back(tDayDelete + offset);
 	}
@@ -561,13 +536,14 @@ std::list<time_t> recurrence::getModifiedOccurrences() {
 	time_t tDayModified;
 	std::list<time_t> lstModified;
 	std::vector<unsigned int> lstModifiedInstanceDates;
-	std::vector<unsigned int>::iterator d;
-	std::vector<RecurrenceState::Exception>::iterator iExceptions;
+	std::vector<unsigned int>::const_iterator d;
+	std::vector<RecurrenceState::Exception>::const_iterator iExceptions;
 
 	// make copy of struct info
 	lstModifiedInstanceDates = m_sRecState.lstModifiedInstanceDates;
 
-	for (iExceptions = m_sRecState.lstExceptions.begin(); iExceptions != m_sRecState.lstExceptions.end(); iExceptions++) {
+	for (iExceptions = m_sRecState.lstExceptions.begin();
+	     iExceptions != m_sRecState.lstExceptions.end(); ++iExceptions) {
 		RTimeToUnixTime(iExceptions->ulOriginalStartDate, &tDayModified);
 		lstModified.push_back(tDayModified);
 	}
@@ -858,14 +834,13 @@ std::list<time_t> recurrence::getDeletedOccurrences()
 // ?
 HRESULT recurrence::getChangedOccurrence(time_t t, changed_occurrence_type *c)
 {
-	for (list<changed_occurrence_type>::iterator i = changed_occurrences.begin(); i != changed_occurrences.end(); i++)
-	{
+	for (std::list<changed_occurrence_type>::const_iterator i = changed_occurrences.begin();
+	     i != changed_occurrences.end(); ++i)
 		if (DayStartOf(i->basedate) == DayStartOf(t))
 		{
 			*c = *i;
 			return S_OK;
 		}
-	}
 	return S_FALSE;
 }
 
@@ -881,13 +856,12 @@ HRESULT recurrence::setChangedOccurrence(changed_occurrence_type c){
 HRESULT recurrence::removeChangedOccurrence(time_t t){
 	if(!isChangedOccurrence(t))
 		return MAPI_E_CALL_FAILED;
-	for(list<changed_occurrence_type>::iterator i = changed_occurrences.begin(); i != changed_occurrences.end(); i++){
+	for (std::list<changed_occurrence_type>::const_iterator i = changed_occurrences.begin();
+	     i != changed_occurrences.end(); ++i)
 		if(DayStartOf(i->basedate) == DayStartOf(t)){
 			changed_occurrences.erase(i);
 			return S_OK;
 		}
-
-	}
 	return MAPI_E_NOT_FOUND;
 }
 
@@ -896,10 +870,10 @@ list<recurrence::changed_occurrence_type> recurrence::getChangedOccurrences(){
 }
 
 bool recurrence::isException(time_t t){
-	for(list<time_t>::iterator i = exceptions.begin(); i != exceptions.end(); i++){
+	for (std::list<time_t>::const_iterator i = exceptions.begin();
+	     i != exceptions.end(); ++i)
 		if(DayStartOf(*i) == DayStartOf(t))
 			return true;
-	}
 	return false;
 }
 
@@ -916,10 +890,10 @@ bool recurrence::isOccurrence(time_t time){
 		return false;
 
 	//loop through changed occurrences
-	for(list<changed_occurrence_type>::iterator change = changed_occurrences.begin(); change != changed_occurrences.end(); change++ ){
+	for (std::list<changed_occurrence_type>::const_iterator change = changed_occurrences.begin();
+	     change != changed_occurrences.end(); ++change)
 		if(change->startdate == time)
 			return true;
-	}
 	return isRuleOccurrence(time);
 }
 
@@ -982,18 +956,18 @@ bool recurrence::isRuleOccurrence(time_t time){
 }
 
 bool recurrence::isDeletedOccurrence(time_t t){
-	for(list<time_t>::iterator i = deleted_occurrences.begin(); i != deleted_occurrences.end(); i++){
+	for (std::list<time_t>::const_iterator i = deleted_occurrences.begin();
+	     i != deleted_occurrences.end(); ++i)
 		if(DayStartOf(*i) == DayStartOf(t))
 			return true;
-	}
 	return false;
 }
 
 bool recurrence::isChangedOccurrence(time_t t){
-	for(list<changed_occurrence_type>::iterator i = changed_occurrences.begin(); i != changed_occurrences.end(); i++){
+	for (std::list<changed_occurrence_type>::const_iterator i = changed_occurrences.begin();
+	     i != changed_occurrences.end(); ++i)
 		if(DayStartOf(i->basedate) == DayStartOf(t))
 			return true;
-	}
 	return false;
 }
 
@@ -1006,8 +980,7 @@ bool recurrence::isAfter(time_t tStamp)
 	case DAILY:
 		break;
 	case WEEKLY:
-		for (char i = 0; i < 7; i++)
-		{
+		for (char i = 0; i < 7; ++i) {
 			if (m_sRecState.ulWeekDays & (1<<i))
 			{
 				if (tmStamp.tm_wday < i)
@@ -1080,10 +1053,11 @@ list<time_t> recurrence::getOccurrencesBetween(time_t begin, time_t end){
 		return occurrences;
 
 	//first add all changed_occurrences with startdate between begin and end
-	for(list<changed_occurrence_type>::iterator changed = changed_occurrences.begin(); changed != changed_occurrences.end(); changed++){
+	for (std::list<changed_occurrence_type>::const_iterator changed = changed_occurrences.begin();
+	     changed != changed_occurrences.end(); ++changed)
 		if(changed->startdate > begin && changed->startdate < end)
 			occurrences.push_back(changed->startdate);
-	}
+
 	//check startdate & enddate
 	if(end < this->startdate)
 		return occurrences;
@@ -1113,11 +1087,11 @@ time_t recurrence::calcStartDate()
 
 		daycount = 0;
 		dayskip = -1;
-		for (int j = 0; j < 7; j++) {
+		for (int j = 0; j < 7; ++j) {
 			if (m_sRecState.ulWeekDays & (1<<((tm.tm_wday + j)%7))) {
 				if (dayskip == -1)
 					dayskip = j;
-				daycount++;
+				++daycount;
 			}
 		}
 		// dayskip is the number of days to skip from the startdate until the first occurrence
@@ -1148,25 +1122,28 @@ time_t recurrence::calcStartDate()
 
 
 			// If the previous calculation gave us a start date *before* the original start date, then we need to skip to the next occurrence
-			if ( m_sRecState.ulRecurFrequency == RF_MONTHLY && m_sRecState.ulDayOfMonth < tm.tm_mday) {
+			if (m_sRecState.ulRecurFrequency == RF_MONTHLY &&
+			    static_cast<int>(m_sRecState.ulDayOfMonth) < tm.tm_mday) {
 				// Monthly, go to next occurrence in 'everyn' months
 				count = m_sRecState.ulPeriod;
 			} else if (m_sRecState.ulRecurFrequency == RF_YEARLY) {
 
-				if ( ( getMonth()-1 < tm.tm_mon) || ( getMonth()-1 == tm.tm_mon && m_sRecState.ulDayOfMonth < tm.tm_mday) ) {
+				if (getMonth() - 1 < tm.tm_mon || (getMonth() - 1 == tm.tm_mon && static_cast<int>(m_sRecState.ulDayOfMonth) < tm.tm_mday))
 					// Yearly, go to next occurrence in 'everyn' months minus difference in first occurence and original date
 					count = (m_sRecState.ulPeriod - (tm.tm_mon - (getMonth()-1)));
-				} else if (getMonth()-1 > tm.tm_mon) {
+				else if (getMonth()-1 > tm.tm_mon)
 					count = (getMonth()-1) - tm.tm_mon;
-				}
 			}
 
 			int curmonth = tm.tm_mon + 1;
 			int curyear = tm.tm_year + 1900;
-			for (int i=0; i < count; i++) {
+			for (unsigned int i = 0; i < count; ++i) {
 				tStart += MonthInSeconds(curyear, curmonth); 
-				if (curmonth == 12) { curmonth = 0; curyear++; }
-				curmonth++;
+				if (curmonth == 12) {
+					curmonth = 0;
+					++curyear;
+				}
+				++curmonth;
 			}
 			// "start" is now pointing to the first occurrence, except that it will overshoot if the
             // month in which it occurs has less days than specified as the day of the month. So 31st
@@ -1175,9 +1152,8 @@ time_t recurrence::calcStartDate()
             // month.
 			if ( m_sRecState.ulDayOfMonth >= 28 &&  m_sRecState.ulDayOfMonth <=31) {
 				gmtime_safe(&tStart, &tm);
-				if(tm.tm_mday < m_sRecState.ulDayOfMonth) {
+				if (tm.tm_mday < static_cast<int>(m_sRecState.ulDayOfMonth))
 					tStart -= tm.tm_mday * 24 * 60 *60;
-				}
 			}
 		} else if (m_sRecState.ulPatternType == PT_MONTH_NTH) {
 
@@ -1191,8 +1167,7 @@ time_t recurrence::calcStartDate()
 			// Find the first valid day (from the original start date)
 			int day = -1;
 			bool bMoveMonth = false;
-			for (int i = 0; i < 7; i++) {
-
+			for (int i = 0; i < 7; ++i) {
 				if (m_sRecState.ulWeekNumber == 5 && (1<< (tm.tm_wday - i)%7) & m_sRecState.ulWeekDays) {
 					day = DaysInMonth(tm.tm_year+1900, tm.tm_mon+1) - i;
 					if (day < tm.tm_mday)
@@ -1219,10 +1194,13 @@ time_t recurrence::calcStartDate()
 
 				int curmonth = tm.tm_mon + 1;
 				int curyear = tm.tm_year + 1900;
-				for (int i=0; i < count; i++) {
+				for (unsigned int i = 0; i < count; ++i) {
 					tStart += MonthInSeconds(curyear, curmonth); 
-					if (curmonth == 12) { curmonth = 0; curyear++; }
-					curmonth++;
+					if (curmonth == 12) {
+						curmonth = 0;
+						++curyear;
+					}
+					++curmonth;
 				}
 
 			} else {
@@ -1231,14 +1209,20 @@ time_t recurrence::calcStartDate()
 		            int curmonth = tm.tm_mon + 1;
 		            int curyear = tm.tm_year + 1900;
 					if (m_sRecState.ulWeekNumber == 5) {
-						if (curmonth == 12) { curmonth = 0; curyear++; }
-						curmonth++;
+						if (curmonth == 12) {
+							curmonth = 0;
+							++curyear;
+						}
+						++curmonth;
 					}
 
-					for (int i = 0; i < m_sRecState.ulPeriod; i++) {
+					for (unsigned int i = 0; i < m_sRecState.ulPeriod; ++i) {
 						tStart += MonthInSeconds(curyear, curmonth);
-						if (curmonth == 12) { curmonth = 0; curyear++; }
-						curmonth++;
+						if (curmonth == 12) {
+							curmonth = 0;
+							++curyear;
+						}
+						++curmonth;
 					}
 				}
 
@@ -1246,7 +1230,7 @@ time_t recurrence::calcStartDate()
 
 			// Seek to the right day (tStart should be the first day or the last day of the month.
 			gmtime_safe(&tStart, &tm);
-			for (int i = 0; i < 7; i++) {
+			for (int i = 0; i < 7; ++i) {
 				if (m_sRecState.ulWeekNumber == 5 && (1<< (tm.tm_wday - i)%7) & m_sRecState.ulWeekDays) {
 					tStart -= i * 24 * 60 *60;
 					break;
@@ -1298,14 +1282,13 @@ time_t recurrence::calcEndDate()
 		tEnd += fwd * 7 * 24 * 60 * 60;
 		gmtime_safe(&tEnd, &tm);
 
-		for (int j = 1; m_sRecState.ulWeekDays != 0 && rest>0; j++)
-		{
+		for (int j = 1; m_sRecState.ulWeekDays != 0 && rest > 0; ++j) {
 			if ((tm.tm_wday + j)%7 == (int)getFirstDOW())
 				tEnd += (m_sRecState.ulPeriod-1) * 7 *24*60*60;
 
 			// If this is a matching day, once less occurrence to process
 			if(m_sRecState.ulWeekDays & (1<<((tm.tm_wday+j)%7)) )
-				rest--;
+				--rest;
 
 			// next day
 			tEnd += 24*60*60;
@@ -1316,24 +1299,24 @@ time_t recurrence::calcEndDate()
 	case RF_YEARLY:
 		gmtime_safe(&tStart, &tm);
 		tm.tm_year += 1900;		// 1900 based
-		tm.tm_mon++;			// 1 based
+		++tm.tm_mon; // 1-based
 
 		fwd = (m_sRecState.ulOccurrenceCount-1) * m_sRecState.ulPeriod;
 
 		while (fwd > 0) {
 			tEnd += MonthInSeconds(tm.tm_year, tm.tm_mon);
 			if (tm.tm_mon%12 == 0) {
-				tm.tm_year++;
+				++tm.tm_year;
 				tm.tm_mon = 1;
 			} else {
-				tm.tm_mon++;
+				++tm.tm_mon;
 			}
-			fwd--;
+			--fwd;
 		}
 
 		gmtime_safe(&tEnd, &tm);
 		tm.tm_year += 1900;
-		tm.tm_mon++;
+		++tm.tm_mon;
 
 		if (m_sRecState.ulPatternType == 2) {
 			// month, (monthend?)
@@ -1354,10 +1337,10 @@ time_t recurrence::calcEndDate()
 				tEnd -= (tm.tm_mday-1) * 24 * 60 * 60;
 			}
 
-			for (daycount = 0; daycount < 7; daycount++) {
+			for (daycount = 0; daycount < 7; ++daycount) {
 				gmtime_safe(&tEnd, &tm);
 				tm.tm_year += 1900;
-				tm.tm_mon++;
+				++tm.tm_mon;
 
 				if (m_sRecState.ulWeekNumber == 5 && (1<<(tm.tm_wday - daycount)%7) & m_sRecState.ulWeekDays) {
 					tEnd -= tm.tm_mday * 24 * 60 * 60;
@@ -1407,7 +1390,7 @@ ULONG recurrence::calcCount()
 			// ulPeriod is stored in days (so this is always 1, right?)
 			ulCount = (getEndDate() - getStartDate()) / (24*60*60) / m_sRecState.ulPeriod;
 			// this one isn't one short?
-			ulCount--;
+			--ulCount;
 		} else {
 			// ulPeriod is stored in minutes
 			ulCount = (getEndDate() - getStartDate()) / 60 / m_sRecState.ulPeriod;
@@ -1438,10 +1421,10 @@ time_t recurrence::MonthsInSeconds(ULONG months)
 {
 	ULONG year = 1601;
 	ULONG days = 0;
-	for (ULONG m = 0; m < months; m++) {
+	for (ULONG m = 0; m < months; ++m) {
 		days += DaysInMonth((m+1)%12, year);
 		if (m%12)
-			year++;
+			++year;
 	}
 	return days * 24 * 60 * 60;
 }
@@ -1589,7 +1572,7 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd, ECLogger *lpLogger,
 	HRESULT hr = 0;
 	ECLogger *lpNullLogger = new ECLogger_Null();
 	time_t tsNow = 0;
-	time_t tsDayNow;	
+	time_t tsDayNow = 0;
 	time_t tsOccStart = 0;
 	time_t tsOccEnd = 0;
 	time_t tsDayEnd = 0;
@@ -1675,7 +1658,7 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd, ECLogger *lpLogger,
                         remainder = (tsDayEnd-tsDayStart) % (m_sRecState.ulPeriod * 604800);
                         for(tsNow = tsDayEnd-remainder; tsNow >= tsDayStart; tsNow -= (m_sRecState.ulPeriod * 604800)) { //604800 = 60*60*24*7 
                                // Loop through the whole following week to the first occurrence of the week, add each day that is specified
-                                for(int i = 6; i >= 0; i--) {
+                                for (int i = 6; i >= 0; --i) {
                                         ULONG ulWday = 0;
                     
                                         tsDayNow = tsNow + i * 1440 * 60; // 60 * 60 * 24 = 1440
@@ -1696,7 +1679,7 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd, ECLogger *lpLogger,
                 } else {
                         for(tsNow = tsDayStart; tsNow <= tsDayEnd; tsNow += (m_sRecState.ulPeriod * 604800)) { //604800 = 60*60*24*7 
                                 // Loop through the whole following week to the first occurrence of the week, add each day that is specified
-                                for(int i = 0; i < 7; i++) {
+                                for (int i = 0; i < 7; ++i) {
                                         ULONG ulWday = 0;
                             
                                         tsDayNow = tsNow + i * 1440 * 60; // 60 * 60 * 24 = 1440
@@ -1738,13 +1721,13 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd, ECLogger *lpLogger,
 			} else if( m_sRecState.ulWeekNumber != 0 && m_sRecState.ulWeekDays != 0) {
 				if (m_sRecState.ulWeekNumber < 5) {
 					ulDayCounter = 0;
-					for(ULONG ulDay = 0; ulDay < DaysInMonth(YearFromTime(tsNow), MonthFromTime(tsNow)); ulDay++) {
+					for (ULONG ulDay = 0; ulDay < DaysInMonth(YearFromTime(tsNow), MonthFromTime(tsNow)); ++ulDay) {
 
 						tsDayNow = tsNow + ulDay * 60 * 60 * 24;
 						ulWday = WeekDayFromTime(tsDayNow);
 						
 						if (m_sRecState.ulWeekDays & ( 1<< ulWday))
-							ulDayCounter++;
+							++ulDayCounter;
 
 						if (m_sRecState.ulWeekNumber == ulDayCounter) {
 							ulValidDay = ulDay;
@@ -1800,7 +1783,7 @@ HRESULT recurrence::HrGetItems(time_t tsStart, time_t tsEnd, ECLogger *lpLogger,
 				
 				tsMonthNow = tsNow + DaysTillMonth(tsNow, getMonth()-1) * 24 * 60 * 60;
 				lpLogger->Log(EC_LOGLEVEL_DEBUG, "Checking yearly nth Weekday Occrrence ulMonthNow: %s",ctime(&tsMonthNow));		
-				for(int ulDay = 0; ulDay < 7; ulDay++) {
+				for (int ulDay = 0; ulDay < 7; ++ulDay) {
 
 					tsDayNow = tsMonthNow + ulDay * 60 * 60 * 24;
 					ulWday = WeekDayFromTime(tsDayNow);
@@ -1928,14 +1911,13 @@ exit:
 bool recurrence::isDeletedOccurrence(time_t tsOccDate)
 {
 	std::list<time_t> lstDeletedOcc;
-	std::list<time_t>::iterator iterLstOcc;
+	std::list<time_t>::const_iterator iterLstOcc;
 	lstDeletedOcc = getDeletedExceptions();
 	
-	for(iterLstOcc = lstDeletedOcc.begin() ; iterLstOcc != lstDeletedOcc.end() ; iterLstOcc++)
-	{
+	for (iterLstOcc = lstDeletedOcc.begin();
+	     iterLstOcc != lstDeletedOcc.end(); ++iterLstOcc)
 		if(tsOccDate == *iterLstOcc)
 			return true;
-	}
 	return false;
 }
 
@@ -1947,15 +1929,13 @@ bool recurrence::isDeletedOccurrence(time_t tsOccDate)
 bool recurrence::isException(time_t tsOccDate)
 {
 	std::list<time_t> lstModifiedOcc;
-	std::list<time_t>::iterator iterLstOcc;
+	std::list<time_t>::const_iterator iterLstOcc;
 	lstModifiedOcc = getModifiedOccurrences();
 	
-	for(iterLstOcc = lstModifiedOcc.begin() ; iterLstOcc != lstModifiedOcc.end() ; iterLstOcc++)
-	{
-
+	for (iterLstOcc = lstModifiedOcc.begin();
+	     iterLstOcc != lstModifiedOcc.end(); ++iterLstOcc)
 		if(StartOfDay(tsOccDate) == StartOfDay(*iterLstOcc))
 			return true;
-	}
 	return false;
 }
 
@@ -1982,10 +1962,9 @@ ULONG recurrence::DaysTillMonth(time_t tsDate, ULONG ulMonth)
 {
 	ULONG ulDays = 0;
 
-	for (ULONG ul = MonthFromTime(tsDate); ul < ulMonth + MonthFromTime(tsDate); ul++)
-	{
+	for (ULONG ul = MonthFromTime(tsDate);
+	     ul < ulMonth + MonthFromTime(tsDate); ++ul)
 		ulDays += DaysInMonth(YearFromTime(tsDate), ul);
-	}
 
 	return ulDays;
 }

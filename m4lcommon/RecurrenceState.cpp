@@ -1,65 +1,47 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "zcdefs.h"
-#include "platform.h"
+#include <zarafa/zcdefs.h>
+#include <zarafa/platform.h>
 
 #include <cstdio>
 #include <mapi.h>
 #include <mapix.h>
 #include <mapicode.h>
 
-#include "stringutil.h"
-#include "RecurrenceState.h"
-#include "charset/convert.h"
-#include "charset/utf16string.h"
+#include <zarafa/stringutil.h>
+#include <zarafa/RecurrenceState.h>
+#include <zarafa/charset/convert.h>
+#include <zarafa/charset/utf16string.h>
 
+#ifndef WIN32
 #define DEBUGREAD 0
 #if DEBUGREAD
 #include <arpa/inet.h>			// nasty hack to display write bytes as read bytes using hton.()
 #define DEBUGPRINT(x, args...) fprintf(stderr, x, ##args)
 #else
 #define DEBUGPRINT(x, args...)
+#endif
+#else
+	#ifdef LINUX
+		#define DEBUGPRINT(...)
+	#else
+		#define DEBUGPRINT	__noop
+	#endif
 #endif
 
 #ifdef _DEBUG
@@ -68,7 +50,7 @@ static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
-class BinReader _final {
+class BinReader _zcp_final {
 public:
     BinReader(char *lpData, unsigned int ulLen) {
         this->m_lpData = lpData;
@@ -139,7 +121,7 @@ private:
     unsigned int m_ulCursor;
 };
 
-class BinWriter _final {
+class BinWriter _zcp_final {
 public:
     BinWriter() {};
     ~BinWriter() {};
@@ -187,45 +169,45 @@ private:
     std::string m_strData;
 };
 
-#define READDATA(x, type) 	{ \
-                                if(data.Read##type(&x) < 0) \
-                                { \
-                                    hr = MAPI_E_NOT_FOUND; \
-                                    goto exit; \
-                                } \
-                                DEBUGPRINT("%s\n", #x); \
-                            }
+#define READDATA(x, type) \
+	do { \
+		if (data.Read##type(&(x)) < 0) { \
+			hr = MAPI_E_NOT_FOUND; \
+			goto exit; \
+		} \
+		DEBUGPRINT("%s\n", #x); \
+	} while (false)
 
-#define READSTRING(x, len) 	{ \
-                                if(data.ReadString(&x, len) < 0) \
-                                { \
-                                    hr = MAPI_E_NOT_FOUND; \
-                                    goto exit; \
-                                } \
-                                if(len > 0) \
-                                    DEBUGPRINT("%s\n", #x); \
-                            }
+#define READSTRING(x, len) \
+	do { \
+		if (data.ReadString(&(x), len) < 0) { \
+			hr = MAPI_E_NOT_FOUND; \
+			goto exit; \
+		} \
+		if (len > 0) \
+			DEBUGPRINT("%s\n", #x); \
+	} while (false)
                             
 #define READSHORT(x) READDATA(x, Short)
 #define READLONG(x) READDATA(x, Long)
 #define READBYTE(x) READDATA(x, Byte)
 
-#define WRITEBYTE(x) { \
-		DEBUGPRINT("%02X %10u %08X %s\n", x, x, x, #x);	\
+#define WRITEBYTE(x) do { \
+		DEBUGPRINT("%02X %10u %08X %s\n", (x), (x), (x), #x); \
 		data.WriteByte(x); \
-	}
-#define WRITESHORT(x) { \
-		DEBUGPRINT("%04X %10u %08X %s\n", htons(x), x, x, #x);	\
+	} while (false)
+#define WRITESHORT(x) do { \
+		DEBUGPRINT("%04X %10u %08X %s\n", htons(x), (x), (x), #x); \
 		data.WriteShort(x); \
-	}
-#define WRITELONG(x) { \
-		DEBUGPRINT("%08X %10u %08X %s\n", htonl(x), x, x, #x);	\
+	} while (false)
+#define WRITELONG(x) do { \
+		DEBUGPRINT("%08X %10u %08X %s\n", htonl(x), (x), (x), #x); \
 		data.WriteLong(x); \
-	}
-#define WRITESTRING(x, l) { \
-		DEBUGPRINT("%d\t%s\t%s\n", l, x, #x);	\
-		data.WriteString(x,l); \
-	}
+	} while (false)
+#define WRITESTRING(x, l) do { \
+		DEBUGPRINT("%d\t%s\t%s\n", (l), (x), #x); \
+		data.WriteString((x), (l)); \
+	} while (false)
 
 RecurrenceState::RecurrenceState()
 {
@@ -278,7 +260,7 @@ HRESULT RecurrenceState::ParseBlob(char *lpData, unsigned int ulLen, ULONG ulFla
     HRESULT hr = hrSuccess;
     unsigned int ulReservedBlock1Size;
     unsigned int ulReservedBlock2Size;
-    std::vector<Exception>::iterator iterExceptions;
+    std::vector<Exception>::const_iterator iterExceptions;
     bool bReadValid = false; // Read is valid if first set of exceptions was read ok
 	bool bExtended = false;	 // false if we need to sync extended data from "normal" data
 	convert_context converter;
@@ -314,7 +296,7 @@ HRESULT RecurrenceState::ParseBlob(char *lpData, unsigned int ulLen, ULONG ulFla
     READLONG(ulFirstDOW);
     READLONG(ulDeletedInstanceCount);
 
-    for(i = 0; i< ulDeletedInstanceCount; i++) {
+    for (i = 0; i < ulDeletedInstanceCount; ++i) {
         unsigned int ulDeletedInstanceDate;
         READLONG(ulDeletedInstanceDate);
         lstDeletedInstanceDates.push_back(ulDeletedInstanceDate);
@@ -322,7 +304,7 @@ HRESULT RecurrenceState::ParseBlob(char *lpData, unsigned int ulLen, ULONG ulFla
     
     READLONG(ulModifiedInstanceCount);
     
-    for(i = 0; i<ulModifiedInstanceCount; i++) {
+    for (i = 0; i < ulModifiedInstanceCount; ++i) {
         unsigned int ulModifiedInstanceDate;
         READLONG(ulModifiedInstanceDate);
         lstModifiedInstanceDates.push_back(ulModifiedInstanceDate);
@@ -341,7 +323,7 @@ HRESULT RecurrenceState::ParseBlob(char *lpData, unsigned int ulLen, ULONG ulFla
 
     READSHORT(ulExceptionCount);
     
-    for(i=0; i<ulExceptionCount; i++) {
+    for (i = 0; i < ulExceptionCount; ++i) {
         unsigned int ulSubjectLength;
         unsigned int ulSubjectLength2;
         unsigned int ulLocationLength;
@@ -402,7 +384,9 @@ HRESULT RecurrenceState::ParseBlob(char *lpData, unsigned int ulLen, ULONG ulFla
     READLONG(ulReservedBlock1Size);
     READSTRING(strReservedBlock1, ulReservedBlock1Size);
 
-    for(iterExceptions = lstExceptions.begin(); iterExceptions != lstExceptions.end(); iterExceptions++) {
+    for (iterExceptions = lstExceptions.begin();
+         iterExceptions != lstExceptions.end(); ++iterExceptions)
+    {
         ExtendedException sExtendedException;
         unsigned int ulReservedBlock1Size;
         unsigned int ulReservedBlock2Size;
@@ -466,7 +450,7 @@ exit:
 		if (!bExtended) {
 			lstExtendedExceptions.clear(); // remove any half exception maybe read
 
-			for (ULONG i = 0; i < ulExceptionCount; i++) {
+			for (ULONG i = 0; i < ulExceptionCount; ++i) {
 				ExtendedException cEx;
 
 				cEx.ulChangeHighlightValue = 0;
@@ -506,7 +490,7 @@ HRESULT RecurrenceState::GetBlob(char **lppData, unsigned int *lpulLen, void *ba
 {
     HRESULT hr = hrSuccess;
     BinWriter data;
-    std::vector<Exception>::iterator j = lstExceptions.begin();
+    std::vector<Exception>::const_iterator j = lstExceptions.begin();
     
     // There is one hard requirement: there must be as many Exceptions as there are ExtendedExceptions. Other
     // inconstencies are also bad, but we need at least that to even write the stream
@@ -539,15 +523,15 @@ HRESULT RecurrenceState::GetBlob(char **lppData, unsigned int *lpulLen, void *ba
     WRITELONG(ulFirstDOW);
     WRITELONG(ulDeletedInstanceCount);
     
-    for(std::vector<unsigned int>::iterator i = lstDeletedInstanceDates.begin(); i != lstDeletedInstanceDates.end(); i++) {
-        WRITELONG(*i);
-    }
+	for (std::vector<unsigned int>::const_iterator i = lstDeletedInstanceDates.begin();
+	     i != lstDeletedInstanceDates.end(); ++i)
+		WRITELONG(*i);
     
     WRITELONG(ulModifiedInstanceCount);
     
-    for(std::vector<unsigned int>::iterator i = lstModifiedInstanceDates.begin(); i != lstModifiedInstanceDates.end(); i++) {
-        WRITELONG(*i);
-    }
+	for (std::vector<unsigned int>::const_iterator i = lstModifiedInstanceDates.begin();
+	     i != lstModifiedInstanceDates.end(); ++i)
+		WRITELONG(*i);
     
     WRITELONG(ulStartDate);
     WRITELONG(ulEndDate);
@@ -559,7 +543,7 @@ HRESULT RecurrenceState::GetBlob(char **lppData, unsigned int *lpulLen, void *ba
     
     WRITESHORT(ulExceptionCount);
     
-    for(std::vector<Exception>::iterator i = lstExceptions.begin(); i != lstExceptions.end(); i++) {
+    for (std::vector<Exception>::const_iterator i = lstExceptions.begin(); i != lstExceptions.end(); ++i) {
         WRITELONG(i->ulStartDateTime);
         WRITELONG(i->ulEndDateTime);
         WRITELONG(i->ulOriginalStartDate);
@@ -609,7 +593,7 @@ HRESULT RecurrenceState::GetBlob(char **lppData, unsigned int *lpulLen, void *ba
     WRITELONG((ULONG)strReservedBlock1.size());
     WRITESTRING(strReservedBlock1.c_str(), (ULONG)strReservedBlock1.size());
 
-    for(std::vector<ExtendedException>::iterator i = lstExtendedExceptions.begin(); i != lstExtendedExceptions.end(); i++) {
+    for (std::vector<ExtendedException>::const_iterator i = lstExtendedExceptions.begin(); i != lstExtendedExceptions.end(); ++i) {
         if(ulWriterVersion2 >= 0x00003009) {
             WRITELONG((ULONG)i->strReserved.size()+4);
             WRITELONG(i->ulChangeHighlightValue);
@@ -641,8 +625,7 @@ HRESULT RecurrenceState::GetBlob(char **lppData, unsigned int *lpulLen, void *ba
             WRITELONG((ULONG)i->strReservedBlock2.size());
             WRITESTRING(i->strReservedBlock2.c_str(), (ULONG)i->strReservedBlock2.size());
         }
-        
-        j++;
+        ++j;
     }    
 
     WRITELONG((ULONG)strReservedBlock2.size());

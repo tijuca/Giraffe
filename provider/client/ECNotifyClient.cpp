@@ -1,66 +1,43 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 // ECNotifyClient.cpp: implementation of the ECNotifyClient class.
 //
 //////////////////////////////////////////////////////////////////////
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <mapispi.h>
 #include <mapix.h>
 
-#include "ECDebug.h"
+#include <zarafa/ECDebug.h>
 #include "ECMsgStore.h"
 #include "ECNotifyClient.h"
 #include "ECSessionGroupManager.h"
-#include "ECGuid.h"
+#include <zarafa/ECGuid.h>
 #include "SOAPUtils.h"
 #include "WSUtil.h"
-#include "Util.h"
-#include "stringutil.h"
-#include "mapiext.h"
+#include <zarafa/Util.h>
+#include <zarafa/stringutil.h>
+#include <zarafa/mapiext.h>
 
+#ifdef WIN32
+#define NOTIFY_THROUGH_SUPPORT_OBJECT
+#endif
 
 #define MAX_NOTIFS_PER_CALL 64
 
@@ -137,7 +114,8 @@ ECNotifyClient::~ECNotifyClient()
 	 * This is however not always the case, but ECNotifyMaster and Server will remove all
 	 * advises when the session is removed.
 	 */
-	for (ECMAPADVISE::iterator i = m_mapAdvise.begin(); i != m_mapAdvise.end(); i++) {
+	for (ECMAPADVISE::const_iterator i = m_mapAdvise.begin();
+	     i != m_mapAdvise.end(); ++i) {
 		if (i->second->lpAdviseSink)
 			i->second->lpAdviseSink->Release();
 
@@ -145,7 +123,8 @@ ECNotifyClient::~ECNotifyClient()
 	}
 	m_mapAdvise.clear();
 
-	for (ECMAPCHANGEADVISE::iterator i = m_mapChangeAdvise.begin(); i != m_mapChangeAdvise.end(); i++) {
+	for (ECMAPCHANGEADVISE::const_iterator i = m_mapChangeAdvise.begin();
+	     i != m_mapChangeAdvise.end(); ++i) {
 		if (i->second->lpAdviseSink != NULL)
 			i->second->lpAdviseSink->Release();
 
@@ -282,17 +261,16 @@ HRESULT ECNotifyClient::RegisterAdvise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventM
 	*lpulConnection = ulConnection;
 exit:
 #ifdef NOTIFY_THROUGH_SUPPORT_OBJECT
-	if(lpKeySupport)
-		MAPIFreeBuffer(lpKeySupport);
+	MAPIFreeBuffer(lpKeySupport);
 #endif
-
-	if (pEcAdvise && hr != hrSuccess)
+	if (hr != hrSuccess)
 		MAPIFreeBuffer(pEcAdvise);
 
 	return hr;
 }
 
-HRESULT ECNotifyClient::RegisterChangeAdvise(ULONG ulSyncId, ULONG ulChangeId, LPECCHANGEADVISESINK lpChangeAdviseSink, ULONG *lpulConnection)
+HRESULT ECNotifyClient::RegisterChangeAdvise(ULONG ulSyncId, ULONG ulChangeId,
+    IECChangeAdviseSink *lpChangeAdviseSink, ULONG *lpulConnection)
 {
 	HRESULT			hr = MAPI_E_NO_SUPPORT;
 	ECCHANGEADVISE*	pEcAdvise = NULL;
@@ -341,7 +319,7 @@ HRESULT ECNotifyClient::RegisterChangeAdvise(ULONG ulSyncId, ULONG ulChangeId, L
 	*lpulConnection = ulConnection;
 
 exit:
-	if (pEcAdvise && hr != hrSuccess)
+	if (hr != hrSuccess)
 		MAPIFreeBuffer(pEcAdvise);
 
 	return hr;
@@ -349,7 +327,7 @@ exit:
 
 HRESULT ECNotifyClient::UnRegisterAdvise(ULONG ulConnection)
 {
-	HRESULT hr	= hrSuccess;
+	HRESULT hr;
 	ECMAPADVISE::iterator iIterAdvise;
 	ECMAPCHANGEADVISE::iterator iIterChangeAdvise;
 
@@ -358,7 +336,7 @@ HRESULT ECNotifyClient::UnRegisterAdvise(ULONG ulConnection)
 	 */
 	hr = m_lpNotifyMaster->DropConnection(ulConnection);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	pthread_mutex_lock(&m_hMutex);
 
@@ -388,8 +366,6 @@ HRESULT ECNotifyClient::UnRegisterAdvise(ULONG ulConnection)
 		
 	// Release ownership of the mutex object.
 	pthread_mutex_unlock(&m_hMutex);
-exit:
-
 	return hr;
 }
 
@@ -424,7 +400,8 @@ exit:
 	return hr;
 }
 
-HRESULT ECNotifyClient::Advise(const ECLISTSYNCSTATE &lstSyncStates, LPECCHANGEADVISESINK lpChangeAdviseSink, ECLISTCONNECTION *lplstConnections)
+HRESULT ECNotifyClient::Advise(const ECLISTSYNCSTATE &lstSyncStates,
+    IECChangeAdviseSink *lpChangeAdviseSink, ECLISTCONNECTION *lplstConnections)
 {
 	TRACE_NOTIFY(TRACE_ENTRY, "ECNotifyClient::AdviseICS", "");
 
@@ -538,7 +515,7 @@ HRESULT ECNotifyClient::Unadvise(const ECLISTCONNECTION &lstConnections)
 HRESULT ECNotifyClient::Reregister(ULONG ulConnection, ULONG cbKey, LPBYTE lpKey)
 {
 	HRESULT hr = hrSuccess;
-	ECMAPADVISE::iterator iter;
+	ECMAPADVISE::const_iterator iter;
 
 	pthread_mutex_lock(&m_hMutex);
 
@@ -575,11 +552,11 @@ exit:
 HRESULT ECNotifyClient::ReleaseAll()
 {
 	HRESULT hr			= hrSuccess;
-	ECMAPADVISE::iterator iIterAdvise;
+	ECMAPADVISE::const_iterator iIterAdvise;
 
 	pthread_mutex_lock(&m_hMutex);
 
-	for(iIterAdvise = m_mapAdvise.begin(); iIterAdvise != m_mapAdvise.end(); iIterAdvise++){
+	for (iIterAdvise = m_mapAdvise.begin(); iIterAdvise != m_mapAdvise.end(); ++iIterAdvise) {
 		iIterAdvise->second->lpAdviseSink->Release();
 		iIterAdvise->second->lpAdviseSink = NULL;
 	}
@@ -595,7 +572,7 @@ typedef std::list<LPSBinary> BINARYLIST;
 HRESULT ECNotifyClient::NotifyReload()
 {
 	HRESULT hr = hrSuccess;
-	ECMAPADVISE::iterator		iterAdvise;
+	ECMAPADVISE::const_iterator iterAdvise;
 	struct notification notif;
 	struct notificationTable table;
 	NOTIFYLIST notifications;
@@ -618,12 +595,9 @@ HRESULT ECNotifyClient::NotifyReload()
 
 	// Don't send the notification while we are locked
 	pthread_mutex_lock(&m_hMutex);
-	for(iterAdvise = m_mapAdvise.begin(); iterAdvise != m_mapAdvise.end(); iterAdvise++) {
-		if(iterAdvise->second->cbKey == 4) {
+	for (iterAdvise = m_mapAdvise.begin(); iterAdvise != m_mapAdvise.end(); ++iterAdvise)
+		if (iterAdvise->second->cbKey == 4)
 			Notify(iterAdvise->first, notifications);
-		}
-	}
-
 	pthread_mutex_unlock(&m_hMutex);
 
 	return hr;
@@ -635,11 +609,12 @@ HRESULT ECNotifyClient::Notify(ULONG ulConnection, const NOTIFYLIST &lNotificati
 	HRESULT						hr = hrSuccess;
 	LPNOTIFICATION				lpNotifs = NULL;
 	NOTIFYLIST::const_iterator	iterNotify;
-	ECMAPADVISE::iterator		iterAdvise;
+	ECMAPADVISE::const_iterator iterAdvise;
 	NOTIFICATIONLIST			notifications;
-	NOTIFICATIONLIST::iterator	iterNotification;
+	NOTIFICATIONLIST::const_iterator iterNotification;
 
-	for (iterNotify = lNotifications.begin(); iterNotify != lNotifications.end(); iterNotify++) {
+	for (iterNotify = lNotifications.begin();
+	     iterNotify != lNotifications.end(); ++iterNotify) {
 		LPNOTIFICATION tmp = NULL;
 
 		hr = CopySOAPNotificationToMAPINotification(m_lpProvider, *iterNotify, &tmp);
@@ -675,7 +650,7 @@ HRESULT ECNotifyClient::Notify(ULONG ulConnection, const NOTIFYLIST &lNotificati
 			while (iterNotification != notifications.end() && i < MAX_NOTIFS_PER_CALL) {
 				/* We can do a straight memcpy here because pointers are still intact */
 				memcpy(&lpNotifs[i++], *iterNotification, sizeof(NOTIFICATION));
-				iterNotification++;
+				++iterNotification;
 			}
 
 			/* Send notification to the listener */
@@ -702,21 +677,19 @@ HRESULT ECNotifyClient::Notify(ULONG ulConnection, const NOTIFYLIST &lNotificati
 				lpKey = NULL;
 			}
 
-			if(lpNotifs) {
-				MAPIFreeBuffer(lpNotifs);
-				lpNotifs = NULL;
-			}
+			MAPIFreeBuffer(lpNotifs);
+			lpNotifs = NULL;
 		}
 	}
 
 	pthread_mutex_unlock(&m_hMutex);
 
 exit:
-	if (lpNotifs)
-		MAPIFreeBuffer(lpNotifs);
+	MAPIFreeBuffer(lpNotifs);
 
 	/* Release all notifications */
-	for (iterNotification = notifications.begin(); iterNotification != notifications.end(); iterNotification++)
+	for (iterNotification = notifications.begin();
+	     iterNotification != notifications.end(); ++iterNotification)
 		MAPIFreeBuffer(*iterNotification);
 
 	return hr;
@@ -727,9 +700,9 @@ HRESULT ECNotifyClient::NotifyChange(ULONG ulConnection, const NOTIFYLIST &lNoti
 	HRESULT						hr = hrSuccess;
 	LPENTRYLIST					lpSyncStates = NULL;
 	NOTIFYLIST::const_iterator	iterNotify;
-	ECMAPCHANGEADVISE::iterator	iterAdvise;
+	ECMAPCHANGEADVISE::const_iterator iterAdvise;
 	BINARYLIST					syncStates;
-	BINARYLIST::iterator		iterSyncStates;
+	BINARYLIST::const_iterator iterSyncStates;
 
 	/* Create a straight array of MAX_NOTIFS_PER_CALL sync states */
 	hr = MAPIAllocateBuffer(sizeof *lpSyncStates, (void**)&lpSyncStates);
@@ -742,7 +715,8 @@ HRESULT ECNotifyClient::NotifyChange(ULONG ulConnection, const NOTIFYLIST &lNoti
 		goto exit;
 	memset(lpSyncStates->lpbin, 0, sizeof *lpSyncStates->lpbin * MAX_NOTIFS_PER_CALL);
 
-	for (iterNotify = lNotifications.begin(); iterNotify != lNotifications.end(); iterNotify++) {
+	for (iterNotify = lNotifications.begin();
+	     iterNotify != lNotifications.end(); ++iterNotify) {
 		LPSBinary	tmp = NULL;
 
 		hr = CopySOAPChangeNotificationToSyncState(*iterNotify, &tmp, lpSyncStates);
@@ -774,7 +748,7 @@ HRESULT ECNotifyClient::NotifyChange(ULONG ulConnection, const NOTIFYLIST &lNoti
 			while (iterSyncStates != syncStates.end() && lpSyncStates->cValues < MAX_NOTIFS_PER_CALL) {
 				/* We can do a straight memcpy here because pointers are still intact */
 				memcpy(&lpSyncStates->lpbin[lpSyncStates->cValues++], *iterSyncStates, sizeof *lpSyncStates->lpbin);
-				iterSyncStates++;
+				++iterSyncStates;
 			}
 
 			/* Send notification to the listener */
@@ -787,20 +761,11 @@ HRESULT ECNotifyClient::NotifyChange(ULONG ulConnection, const NOTIFYLIST &lNoti
 	pthread_mutex_unlock(&m_hMutex);
 
 exit:
-	if (lpSyncStates)
-		MAPIFreeBuffer(lpSyncStates);
-
+	MAPIFreeBuffer(lpSyncStates);
 	return hrSuccess;
 }
 
 HRESULT ECNotifyClient::UpdateSyncStates(const ECLISTSYNCID &lstSyncId, ECLISTSYNCSTATE *lplstSyncState)
 {
-	HRESULT							hr = hrSuccess;
-
-	hr = m_lpTransport->HrGetSyncStates(lstSyncId, lplstSyncState);
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-	return hr;
+	return m_lpTransport->HrGetSyncStates(lstSyncId, lplstSyncState);
 }

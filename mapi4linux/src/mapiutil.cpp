@@ -1,48 +1,22 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
-
+#include <zarafa/platform.h>
+#include <new>
 #include <cstdlib>
 #include <cmath> // for pow() 
 
@@ -55,17 +29,17 @@
 #include <mapiutil.h>
 #include <mapidefs.h>
 
-#include "ECDebug.h"
-#include "ECTags.h"
-#include "stringutil.h"
-#include "Util.h"
+#include <zarafa/ECDebug.h>
+#include <zarafa/ECTags.h>
+#include <zarafa/stringutil.h>
+#include <zarafa/Util.h>
 
 #include "ECMemStream.h"
-#include "mapiguidext.h"
+#include <zarafa/mapiguidext.h>
 
 #include "rtf.h"
 
-#include "charset/convstring.h"
+#include <zarafa/charset/convstring.h>
 
 ULONG __stdcall UlRelease(LPVOID lpUnknown)
 {
@@ -89,7 +63,7 @@ LPSPropValue __stdcall PpropFindProp(LPSPropValue lpPropArray, ULONG cValues, UL
 	if (lpPropArray == NULL)
 		goto exit;
 
-	for (ULONG i=0; i<cValues; i++) {
+	for (ULONG i = 0; i<cValues; ++i) {
 		if ((lpPropArray[i].ulPropTag == ulPropTag) ||
 			(PROP_TYPE(ulPropTag) == PT_UNSPECIFIED && PROP_ID(lpPropArray[i].ulPropTag) == PROP_ID(ulPropTag))) {
 			lpValue = &lpPropArray[i];
@@ -111,7 +85,7 @@ LPSPropValue __stdcall LpValFindProp(ULONG ulPropTag, ULONG cValues, LPSPropValu
 	if (lpProps == NULL)
 		goto exit;
 
-	for(ULONG i=0;i<cValues;i++) {
+	for (ULONG i = 0; i < cValues; ++i) {
 		if(PROP_ID(lpProps[i].ulPropTag) == PROP_ID(ulPropTag)) {
 			lpValue = &lpProps[i];
 			break;
@@ -179,10 +153,8 @@ void __stdcall FreeProws(LPSRowSet lpRows) {
 	if(lpRows == NULL)
 		return;
 
-	for(i=0;i<lpRows->cRows;i++) {
-		if(lpRows->aRow[i].lpProps != NULL)
-			MAPIFreeBuffer(lpRows->aRow[i].lpProps);
-	}
+	for (i = 0; i < lpRows->cRows; ++i)
+		MAPIFreeBuffer(lpRows->aRow[i].lpProps);
 	MAPIFreeBuffer(lpRows);
 	TRACE_MAPILIB(TRACE_RETURN, "FreeProws", "");
 }
@@ -201,7 +173,7 @@ HRESULT __stdcall HrAllocAdviseSink(LPNOTIFCALLBACK lpFunction, void *lpContext,
 	HRESULT hr = hrSuccess;
 	IMAPIAdviseSink *lpSink = NULL;
 
-	lpSink = new M4LMAPIAdviseSink(lpFunction, lpContext);
+	lpSink = new(std::nothrow) M4LMAPIAdviseSink(lpFunction, lpContext);
 	if (!lpSink) {
 		hr = MAPI_E_NOT_ENOUGH_MEMORY;
 		goto exit;
@@ -290,12 +262,8 @@ static HRESULT RTFCommitFunc(IStream *lpUncompressedStream, void *lpData)
 	}
 
 exit:
-	if(lpCompressed)
-		free(lpCompressed);
-
-	if(lpUncompressed)
-		free(lpUncompressed);
-
+	free(lpCompressed);
+	free(lpUncompressed);
 	return hr;
 }
 
@@ -375,13 +343,8 @@ HRESULT __stdcall WrapCompressedRTFStream(LPSTREAM lpCompressedRTFStream, ULONG 
 exit:
 	if(lpUncompressedStream)
 		lpUncompressedStream->Release();
-		
-	if(lpCompressed)
-		free(lpCompressed);
-		
-	if(lpUncompressed)
-		free(lpUncompressed);
-
+	free(lpCompressed);
+	free(lpUncompressed);
 	return hr;
 }
 
@@ -487,6 +450,7 @@ BOOL __stdcall FPropExists(LPMAPIPROP lpMapiProp, ULONG ulPropTag)
 
 
 /* Actually not part of MAPI */
+#ifdef LINUX
 HRESULT __stdcall CreateStreamOnHGlobal(void *hGlobal, BOOL fDeleteOnRelease, IStream **lppStream)
 {
 	HRESULT hr = hrSuccess;
@@ -510,6 +474,7 @@ exit:
 	
 	return hr;
 }
+#endif
 
 HRESULT __stdcall OpenStreamOnFile(LPALLOCATEBUFFER lpAllocateBuffer, LPFREEBUFFER lpFreeBuffer, ULONG ulFlags,
 													 LPTSTR lpszFileName, LPTSTR lpszPrefix, LPSTREAM FAR * lppStream)
@@ -648,7 +613,7 @@ SCODE __stdcall ScCopyProps( int cprop,  LPSPropValue rgprop,  LPVOID pvDst,  UL
 	BYTE *lpHeap = (BYTE *)pvDst + sizeof(SPropValue) * cprop;
 	LPSPropValue lpProp = (LPSPropValue)pvDst;
 
-	for(int i =0 ; i< cprop; i++) {
+	for (int i = 0 ; i < cprop; ++i) {
 		lpProp[i] = rgprop[i];
 
 		switch(PROP_TYPE(rgprop[i].ulPropTag)) {
@@ -666,56 +631,56 @@ SCODE __stdcall ScCopyProps( int cprop,  LPSPropValue rgprop,  LPVOID pvDst,  UL
 			lpProp[i].Value.i = rgprop[i].Value.i;
 			break;
 		case PT_MV_SHORT:
-			for (ULONG j = 0; j < rgprop[i].Value.MVi.cValues; j++)
+			for (ULONG j = 0; j < rgprop[i].Value.MVi.cValues; ++j)
 				lpProp[i].Value.MVi.lpi[j] = rgprop[i].Value.MVi.lpi[j];
 			break;
 		case PT_LONG:
 			lpProp[i].Value.l = rgprop[i].Value.l;
 			break;
 		case PT_MV_LONG:
-			for (ULONG j = 0; j < rgprop[i].Value.MVl.cValues; j++)
+			for (ULONG j = 0; j < rgprop[i].Value.MVl.cValues; ++j)
 				lpProp[i].Value.MVl.lpl[j] = rgprop[i].Value.MVl.lpl[j];
 			break;
 		case PT_LONGLONG:
 			memcpy(&lpProp[i].Value.li, &rgprop[i].Value.li, sizeof(rgprop[i].Value.li));
 			break;
 		case PT_MV_LONGLONG:
-			for (ULONG j = 0; j < rgprop[i].Value.MVli.cValues; j++)
+			for (ULONG j = 0; j < rgprop[i].Value.MVli.cValues; ++j)
 				memcpy(&lpProp[i].Value.MVli.lpli[j], &rgprop[i].Value.MVli.lpli[j], sizeof(rgprop[i].Value.MVli.lpli[j]));
 			break;
 		case PT_FLOAT:
 			lpProp[i].Value.flt = rgprop[i].Value.flt;
 			break;
 		case PT_MV_FLOAT:
-			for (ULONG j = 0; j < rgprop[i].Value.MVflt.cValues; j++)
+			for (ULONG j = 0; j < rgprop[i].Value.MVflt.cValues; ++j)
 				lpProp[i].Value.MVflt.lpflt[j] = rgprop[i].Value.MVflt.lpflt[j];
 			break;
 		case PT_DOUBLE:
 			lpProp[i].Value.dbl = rgprop[i].Value.dbl;
 			break;
 		case PT_MV_DOUBLE:
-			for (ULONG j = 0; j < rgprop[i].Value.MVdbl.cValues; j++)
+			for (ULONG j = 0; j < rgprop[i].Value.MVdbl.cValues; ++j)
 				lpProp[i].Value.MVdbl.lpdbl[j] = rgprop[i].Value.MVdbl.lpdbl[j];
 			break;
 		case PT_CURRENCY:
 			memcpy(&lpProp[i].Value.cur, &rgprop[i].Value.cur, sizeof(rgprop[i].Value.cur));
 			break;
 		case PT_MV_CURRENCY:
-			for (ULONG j = 0; j < rgprop[i].Value.MVcur.cValues; j++)
+			for (ULONG j = 0; j < rgprop[i].Value.MVcur.cValues; ++j)
 				memcpy(&lpProp[i].Value.MVcur.lpcur[j], &rgprop[i].Value.MVcur.lpcur[j], sizeof(rgprop[i].Value.MVcur.lpcur[j]));
 			break;
 		case PT_SYSTIME:
 			memcpy(&lpProp[i].Value.ft, &rgprop[i].Value.ft, sizeof(rgprop[i].Value.ft));
 			break;
 		case PT_MV_SYSTIME:
-			for (ULONG j = 0; j < rgprop[i].Value.MVft.cValues; j++)
+			for (ULONG j = 0; j < rgprop[i].Value.MVft.cValues; ++j)
 				memcpy(&lpProp[i].Value.MVft.lpft[j], &rgprop[i].Value.MVft.lpft[j], sizeof(rgprop[i].Value.MVft.lpft[j]));
 			break;
 		case PT_APPTIME:
 			lpProp[i].Value.at = rgprop[i].Value.at;
 			break;
 		case PT_MV_APPTIME:
-			for (ULONG j = 0; j < rgprop[i].Value.MVat.cValues; j++)
+			for (ULONG j = 0; j < rgprop[i].Value.MVat.cValues; ++j)
 				lpProp[i].Value.MVat.lpat[j] = rgprop[i].Value.MVat.lpat[j];
 			break;
 
@@ -740,7 +705,7 @@ SCODE __stdcall ScCopyProps( int cprop,  LPSPropValue rgprop,  LPVOID pvDst,  UL
 			COPY_STRING8(lpHeap, lpProp[i].Value.lpszA, rgprop[i].Value.lpszA);
 			break;
 		case PT_MV_STRING8:
-			for (ULONG j = 0; j < rgprop[i].Value.MVszA.cValues; j++)
+			for (ULONG j = 0; j < rgprop[i].Value.MVszA.cValues; ++j)
 				COPY_STRING8(lpHeap, lpProp[i].Value.MVszA.lppszA[j], rgprop[i].Value.MVszA.lppszA[j]);
 			break;
 
@@ -755,7 +720,7 @@ SCODE __stdcall ScCopyProps( int cprop,  LPSPropValue rgprop,  LPVOID pvDst,  UL
 			COPY_BINARY(lpHeap, lpProp[i].Value.bin, rgprop[i].Value.bin);
 			break;
 		case PT_MV_BINARY:
-			for (ULONG j = 0; j < rgprop[i].Value.MVbin.cValues; j++)
+			for (ULONG j = 0; j < rgprop[i].Value.MVbin.cValues; ++j)
 				COPY_BINARY(lpHeap, lpProp[i].Value.MVbin.lpbin[j], rgprop[i].Value.MVbin.lpbin[j]);
 			break;
 
@@ -768,7 +733,7 @@ SCODE __stdcall ScCopyProps( int cprop,  LPSPropValue rgprop,  LPVOID pvDst,  UL
 			COPY_UNICODE(lpHeap, lpProp[i].Value.lpszW, rgprop[i].Value.lpszW);
 			break;
 		case PT_MV_UNICODE:
-			for (ULONG j = 0; j < rgprop[i].Value.MVszW.cValues; j++)
+			for (ULONG j = 0; j < rgprop[i].Value.MVszW.cValues; ++j)
 				COPY_UNICODE(lpHeap, lpProp[i].Value.MVszW.lppszW[j], rgprop[i].Value.MVszW.lppszW[j]);
 			break;
 		default:
@@ -788,7 +753,7 @@ SCODE __stdcall ScCountProps(int cValues, LPSPropValue lpPropArray, ULONG *lpcb)
 	SCODE sc = S_OK;
 	ULONG ulSize = 0;
 
-	for(int i = 0; i<cValues;i++) {
+	for (int i = 0; i < cValues; ++i) {
 		ulSize += sizeof(SPropValue);
 
 		switch(PROP_TYPE(lpPropArray[i].ulPropTag)) {
@@ -801,7 +766,7 @@ SCODE __stdcall ScCountProps(int cValues, LPSPropValue lpPropArray, ULONG *lpcb)
 			break;
 		case PT_MV_STRING8:
 			ulSize += sizeof(LPTSTR) * lpPropArray[i].Value.MVszA.cValues;
-			for (unsigned int j = 0; j < lpPropArray[i].Value.MVszA.cValues; j++)
+			for (unsigned int j = 0; j < lpPropArray[i].Value.MVszA.cValues; ++j)
 				ulSize += strlen(lpPropArray[i].Value.MVszA.lppszA[j])+1;
 			break;
 		case PT_BINARY:
@@ -809,7 +774,7 @@ SCODE __stdcall ScCountProps(int cValues, LPSPropValue lpPropArray, ULONG *lpcb)
 			break;
 		case PT_MV_BINARY:
 			ulSize += sizeof(SBinary) * lpPropArray[i].Value.MVbin.cValues;
-			for (unsigned int j = 0; j < lpPropArray[i].Value.MVbin.cValues; j++)
+			for (unsigned int j = 0; j < lpPropArray[i].Value.MVbin.cValues; ++j)
 				ulSize += lpPropArray[i].Value.MVbin.lpbin[j].cb;
 			break;
 		case PT_UNICODE:
@@ -817,7 +782,7 @@ SCODE __stdcall ScCountProps(int cValues, LPSPropValue lpPropArray, ULONG *lpcb)
 			break;
 		case PT_MV_UNICODE:
 			ulSize += sizeof(LPWSTR) * lpPropArray[i].Value.MVszW.cValues;
-			for (unsigned int j = 0; j < lpPropArray[i].Value.MVszW.cValues; j++)
+			for (unsigned int j = 0; j < lpPropArray[i].Value.MVszW.cValues; ++j)
 				ulSize += (lstrlenW(lpPropArray[i].Value.MVszW.lppszW[j]) + 1) * sizeof(WCHAR);
 			break;
 		case PT_CLSID:
@@ -884,8 +849,12 @@ LPTSTR __stdcall SzFindCh(LPCTSTR lpsz, USHORT ch)
 int __stdcall MNLS_CompareStringW(LCID Locale, DWORD dwCmpFlags, LPCWSTR lpString1, int cchCount1, LPCWSTR lpString2, int cchCount2)
 {
 	TRACE_MAPILIB4(TRACE_ENTRY, "MNLS_CompareStringW", "%d %S, %d %S", cchCount1, lpString1, cchCount2, lpString2);
+#ifdef WIN32
+	int ulCmp = CompareStringW(Locale, dwCmpFlags, lpString1, cchCount1, lpString2, cchCount2);
+#else
 	// FIXME: we're ignoring Locale, dwCmpFlags, cchCount1 and cchCount2
 	int ulCmp = wcscmp((LPWSTR)lpString1, (LPWSTR)lpString2);
+#endif
 	TRACE_MAPILIB1(TRACE_RETURN, "MNLS_CompareStringW", "%d", ulCmp);
 	return ulCmp;
 }
@@ -1050,11 +1019,8 @@ LPWSTR __stdcall EncodeID(ULONG cbEID, LPENTRYID rgbID, LPWSTR *lpWString)
 		goto exit;
 
 	for (i = 0, pbSrc = (LPBYTE)rgbID, pwzDst = pwzIDEncoded;
-		 i < cbEID;
-		 i++, pbSrc++, pwzDst++)
-	{
+	     i < cbEID; ++i, ++pbSrc, ++pwzDst)
 		*pwzDst = (WCHAR) (*pbSrc + kwBaseOffset);
-	}
 
 	// Ensure NULL terminated
 	*pwzDst = L'\0';
@@ -1166,7 +1132,7 @@ HRESULT GetConnectionProperties(LPSPropValue lpServer, LPSPropValue lpUsername, 
 	if (hr != hrSuccess)
 		goto exit;
 
-	if (strlen(m4l_lpConfig->GetSetting("server_address")) > 0)
+	if (m4l_lpConfig->GetSetting("server_address")[0])
 		strServerPath = (std::string)"https://" + m4l_lpConfig->GetSetting("server_address") + ":" + m4l_lpConfig->GetSetting("ssl_port") + "/zarafa";
 	else
 		strServerPath = (std::string)"https://" + lpServer->Value.lpszA + ":" + m4l_lpConfig->GetSetting("ssl_port") + "/zarafa";
@@ -1204,7 +1170,7 @@ HRESULT GetConnectionProperties(LPSPropValue lpServer, LPSPropValue lpUsername, 
 	*lppProps = lpProps;
 
 exit:
-	if (hr != hrSuccess && lpProps)
+	if (hr != hrSuccess)
 		MAPIFreeBuffer(lpProps);
 
 	return hr;

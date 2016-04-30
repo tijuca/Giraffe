@@ -1,52 +1,28 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 #ifndef ZARAFACMD_UTIL_H
 #define ZARAFACMD_UTIL_H
 
+#include <zarafa/zcdefs.h>
 #include "ECICS.h"
 #include "SOAPUtils.h"
 
+#include <exception>
 #include <map>
 #include <set>
 #include <list>
@@ -55,7 +31,7 @@
 // Above EC_TABLE_CHANGE_THRESHOLD, a TABLE_CHANGE notification is sent instead of individual notifications
 #define EC_TABLE_CHANGE_THRESHOLD 10
 
-class EntryId {
+class EntryId _zcp_final {
 public:
     EntryId() { 
         updateStruct();
@@ -87,21 +63,29 @@ public:
         return *this;
     }
 
+	/* EID_V0 is marked packed, so direct-access w/o memcpy is ok */
+
     unsigned int type() const {
-        EID_V0 *d = (EID_V0 *)m_data.data();
-        
-        return d->usType;
+		if (m_data.size() < sizeof(EID_V0))
+			throw runtime_error("entryid is not of type EID_V0");
+		EID_V0 *d = reinterpret_cast<EID_V0 *>(const_cast<char *>(m_data.data()));
+		return d->usType;
     }
 
+#if 0
     unsigned int flags() const {
-        EID_V0 *d = (EID_V0 *)m_data.data();
-        
-        return d->usFlags;
+		if (m_data.size() < sizeof(EID_V0))
+			throw runtime_error("entryid is not of type EID_V0");
+		EID_V0 *d = reinterpret_cast<EID_V0 *>(const_cast<char *>(m_data.data()));
+		return d->usFlags;
     }
+#endif
     
     void setFlags(unsigned int ulFlags) {
-        EID_V0 *d = (EID_V0 *)m_data.data();
-        d->usFlags = ulFlags;
+		if (m_data.size() < sizeof(EID_V0))
+			throw runtime_error("entryid is not of type EID_V0");
+		EID_V0 *d = reinterpret_cast<EID_V0 *>(const_cast<char *>(m_data.data()));
+		d->usFlags = ulFlags;
     }
 
     bool operator == (const EntryId &s) const {
@@ -155,7 +139,7 @@ typedef struct _TCN {
 	unsigned int ulType;
 } TABLECHANGENOTIFICATION;
 
-class PARENTINFO {
+class PARENTINFO _zcp_final {
 public:
     PARENTINFO() : lItems(0), lFolders(0), lAssoc(0), lDeleted(0), lDeletedFolders(0), lDeletedAssoc(0), lUnread(0), ulStoreId(0) { }
     ~PARENTINFO() { }

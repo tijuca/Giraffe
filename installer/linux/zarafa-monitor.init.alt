@@ -7,7 +7,7 @@
 #              of users, and sends warning emails when limits are exceeded.
 # processname: /usr/sbin/zarafa-monitor
 # config: /etc/zarafa/monitor.cfg
-# pidfile: /var/run/zarafa-monitor.pid
+# pidfile: /var/run/zarafad/monitor.pid
 
 ### BEGIN INIT INFO
 # Provides: zarafa-monitor
@@ -27,7 +27,7 @@ MONITORCONFIG=/etc/zarafa/monitor.cfg
 MONITORPROGRAM=/usr/sbin/zarafa-monitor
 monitor=`basename $MONITORPROGRAM`
 LOCKFILE=/var/lock/subsys/$monitor
-PIDFILE=/var/run/$monitor.pid
+PIDFILE=/var/run/zarafad/monitor.pid
 RETVAL=0
 
 # Sanity checks.
@@ -42,6 +42,7 @@ if [ -z "$ZARAFA_LOCALE" ]; then
 fi
 
 start() {
+	install -dm0775 -o zarafa -g zarafa /var/run/zarafad
 	start_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $monitor
 	RETVAL=$?
 
@@ -49,10 +50,13 @@ start() {
 }
 
 stop() {
+	stop_daemon --pidfile "/var/run/$monitor.pid" --lockfile "$LOCKFILE" $monitor
+	RETVAL2="$?"
 	stop_daemon --pidfile "$PIDFILE" --lockfile "$LOCKFILE" $monitor
 	RETVAL=$?
 
-	return $RETVAL
+	test "$RETVAL2" -eq 0 || "$RETVAL" -eq 0
+	return $?
 }
 
 restart() {

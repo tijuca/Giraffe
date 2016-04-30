@@ -2,7 +2,7 @@
 
 AM_CPPFLAGS = ${ZCPPFLAGS} -I${top_srcdir}/mapi4linux/include \
               -I${top_srcdir}/provider/include ${GSOAP_CFLAGS}
-AM_CXXFLAGS = ${ZCXXFLAGS} -Wno-vla -Wno-sign-compare ${DEBUGCFLAGS}
+AM_CXXFLAGS = ${ZCXXFLAGS} -Wno-sign-compare
 
 lib_LTLIBRARIES = libzarafa_soapserver.la libzarafa_soapclient.la
 #noinst_DATA = libzarafa_soapserver.ldd libzarafa_soapclient.ldd

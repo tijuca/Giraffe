@@ -1,49 +1,24 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 // STL defines
+#include <exception>
 #include <set>
 #include <string>
 #include <list>
@@ -52,8 +27,8 @@
 // mapi defines
 #include <mapidefs.h>
 #include <mapitags.h>
-#include "mapiext.h"
-#include <EMSAbTag.h>
+#include <zarafa/mapiext.h>
+#include <zarafa/EMSAbTag.h>
 #include <edkmdb.h>
 #include "ECMAPI.h"
 
@@ -97,8 +72,7 @@ ECRESULT GetSourceKey(unsigned int ulObjId, SOURCEKEY *lpSourceKey)
 	*lpSourceKey = SOURCEKEY(cbData, (char *)lpData);
 
 exit:
-	if(lpData)
-		delete [] lpData;
+	delete[] lpData;
 	return er;
 }
 
@@ -230,7 +204,7 @@ ECRESULT ExpandDeletedItems(ECSession *lpSession, ECDatabase *lpDatabase, ECList
 	std::string strQuery;
 	std::set<unsigned int> setIDs;
 	ECListDeleteItems lstDeleteItems;
-	ECListDeleteItems::iterator iterDeleteItems;
+	ECListDeleteItems::const_iterator iterDeleteItems;
 	ECListDeleteItems lstContainerItems;
 	DELETEITEM sItem;
 	ECSessionManager *lpSessionManager = NULL;
@@ -246,8 +220,9 @@ ECRESULT ExpandDeletedItems(ECSession *lpSession, ECDatabase *lpDatabase, ECList
 	lpCacheManager = lpSessionManager->GetCacheManager();
 
 	// First, put all the root objects in the list
-	for(iListObjectId = lpsObjectList->begin(); iListObjectId != lpsObjectList->end(); iListObjectId++) {
-
+	for (iListObjectId = lpsObjectList->begin();
+	     iListObjectId != lpsObjectList->end(); ++iListObjectId)
+	{
 		sItem.fRoot = true;
 		
 		//Free database results
@@ -341,9 +316,9 @@ ECRESULT ExpandDeletedItems(ECSession *lpSession, ECDatabase *lpDatabase, ECList
 
 	// Now, run through the list, adding children to the bottom of the list. This means
 	// we're actually running width-first, and don't have to do anything recursive.
-	for(iterDeleteItems=lstDeleteItems.begin(); iterDeleteItems != lstDeleteItems.end(); iterDeleteItems++) 
+	for (iterDeleteItems=lstDeleteItems.begin();
+	     iterDeleteItems != lstDeleteItems.end(); ++iterDeleteItems)
 	{
-
 		// Free database results
 		if(lpDBResult) { lpDatabase->FreeResult(lpDBResult); lpDBResult = NULL; }
 
@@ -430,17 +405,15 @@ exit:
 ECRESULT DeleteObjectUpdateICS(ECSession *lpSession, unsigned int ulFlags, ECListDeleteItems &lstDeleted, unsigned int ulSyncId)
 {
 	ECRESULT er = erSuccess;
-	ECListDeleteItems::iterator iterDeleteItems;
+	ECListDeleteItems::const_iterator iterDeleteItems;
 
-	for(iterDeleteItems=lstDeleted.begin(); iterDeleteItems != lstDeleted.end(); iterDeleteItems++)
-	{
+	for (iterDeleteItems = lstDeleted.begin();
+	     iterDeleteItems != lstDeleted.end(); ++iterDeleteItems)
 		// ICS update
 		if (iterDeleteItems->ulObjType == MAPI_MESSAGE && iterDeleteItems->ulParentType == MAPI_FOLDER)
 			AddChange(lpSession, ulSyncId, iterDeleteItems->sSourceKey, iterDeleteItems->sParentSourceKey, ulFlags & EC_DELETE_HARD_DELETE ? ICS_MESSAGE_HARD_DELETE : ICS_MESSAGE_SOFT_DELETE);
-		else if (iterDeleteItems->ulObjType == MAPI_FOLDER && !(iterDeleteItems->ulFlags & FOLDER_SEARCH)) {
+		else if (iterDeleteItems->ulObjType == MAPI_FOLDER && !(iterDeleteItems->ulFlags & FOLDER_SEARCH))
 			AddChange(lpSession, ulSyncId, iterDeleteItems->sSourceKey, iterDeleteItems->sParentSourceKey, ulFlags & EC_DELETE_HARD_DELETE ? ICS_FOLDER_HARD_DELETE : ICS_FOLDER_SOFT_DELETE);
-		}
-	}
 
 	return er;
 }
@@ -466,14 +439,14 @@ static ECRESULT CheckICSDeleteScope(ECDatabase *lpDatabase,
 		er = CheckWithinLastSyncedMessagesSet(lpDatabase, ulSyncId, iterDeleteItems->sSourceKey);
 		if (er == ZARAFA_E_NOT_FOUND) {
 			// ignore delete of message
-			g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_DEBUG, "Message not in sync scope, ignoring delete");
+			ec_log_debug("Message not in sync scope, ignoring delete");
 			FreeDeleteItem(&(*iterDeleteItems));
 			lstDeleted.erase(iterDeleteItems++);
 			er = erSuccess;
 		} else if (er != erSuccess)
 			goto exit;
 		else
-			iterDeleteItems++;
+			++iterDeleteItems;
 	}
 
 exit:
@@ -498,12 +471,13 @@ ECRESULT DeleteObjectStoreSize(ECSession *lpSession, ECDatabase *lpDatabase, uns
 	ECRESULT er = erSuccess;
 	std::map<unsigned int, long long> mapStoreSize;
 
-	ECListDeleteItems::iterator iterDeleteItems;
-	std::map<unsigned int, long long>::iterator iterStoreSizeItems;
+	ECListDeleteItems::const_iterator iterDeleteItems;
+	std::map<unsigned int, long long>::const_iterator iterStoreSizeItems;
 
 //TODO: check or foldersize also is used
 
-	for(iterDeleteItems=lstDeleted.begin(); iterDeleteItems != lstDeleted.end(); iterDeleteItems++) {
+	for (iterDeleteItems = lstDeleted.begin();
+	     iterDeleteItems != lstDeleted.end(); ++iterDeleteItems) {
 		// Get size of all the messages
 		if( iterDeleteItems->ulObjType == MAPI_MESSAGE && 
 			iterDeleteItems->ulParentType == MAPI_FOLDER && 
@@ -519,10 +493,11 @@ ECRESULT DeleteObjectStoreSize(ECSession *lpSession, ECDatabase *lpDatabase, uns
 	}
 
 	// Update store size for each store
-	for(iterStoreSizeItems=mapStoreSize.begin(); iterStoreSizeItems != mapStoreSize.end() && er == erSuccess; iterStoreSizeItems++) {
-		if ( iterStoreSizeItems->second > 0)	
+	for (iterStoreSizeItems = mapStoreSize.begin();
+	     iterStoreSizeItems != mapStoreSize.end() && er == erSuccess;
+	     ++iterStoreSizeItems)
+		if (iterStoreSizeItems->second > 0)
 			er = UpdateObjectSize(lpDatabase, iterStoreSizeItems->first, MAPI_STORE, UPDATE_SUB, iterStoreSizeItems->second);
-	}
 
 	return er;
 }
@@ -545,7 +520,7 @@ ECRESULT DeleteObjectStoreSize(ECSession *lpSession, ECDatabase *lpDatabase, uns
 ECRESULT DeleteObjectSoft(ECSession *lpSession, ECDatabase *lpDatabase, unsigned int ulFlags, ECListDeleteItems &lstDeleteItems, ECListDeleteItems &lstDeleted)
 {
 	ECRESULT er = erSuccess;
-	ECListDeleteItems::iterator iterDeleteItems;
+	ECListDeleteItems::const_iterator iterDeleteItems;
 
 	FILETIME ft;
 	std::string strInclauseOQQ;
@@ -555,11 +530,11 @@ ECRESULT DeleteObjectSoft(ECSession *lpSession, ECDatabase *lpDatabase, unsigned
 	PARENTINFO pi;
 	
 	std::map<unsigned int, PARENTINFO> mapFolderCounts;
-	std::map<unsigned int, PARENTINFO>::iterator iterFolderCounts;
+	std::map<unsigned int, PARENTINFO>::const_iterator iterFolderCounts;
 
 	// Build where condition
-	for(iterDeleteItems=lstDeleteItems.begin(); iterDeleteItems != lstDeleteItems.end(); iterDeleteItems++) {
-
+	for (iterDeleteItems=lstDeleteItems.begin();
+	     iterDeleteItems != lstDeleteItems.end(); ++iterDeleteItems) {
 		if( (iterDeleteItems->ulObjType == MAPI_MESSAGE && iterDeleteItems->ulParentType == MAPI_FOLDER) || 
 			  iterDeleteItems->ulObjType == MAPI_FOLDER  || iterDeleteItems->ulObjType == MAPI_STORE) 
 		{
@@ -583,18 +558,18 @@ ECRESULT DeleteObjectSoft(ECSession *lpSession, ECDatabase *lpDatabase, unsigned
                 	if((iterDeleteItems->ulFlags & MSGFLAG_DELETED) == 0) {
 						if(iterDeleteItems->ulObjType == MAPI_MESSAGE) {
 							if(iterDeleteItems->ulFlags & MAPI_ASSOCIATED) {
-								mapFolderCounts[iterDeleteItems->ulParent].lAssoc--;
-								mapFolderCounts[iterDeleteItems->ulParent].lDeletedAssoc++;
+								--mapFolderCounts[iterDeleteItems->ulParent].lAssoc;
+								++mapFolderCounts[iterDeleteItems->ulParent].lDeletedAssoc;
 							} else {
-									mapFolderCounts[iterDeleteItems->ulParent].lItems--;
-								mapFolderCounts[iterDeleteItems->ulParent].lDeleted++;
+								--mapFolderCounts[iterDeleteItems->ulParent].lItems;
+								++mapFolderCounts[iterDeleteItems->ulParent].lDeleted;
 								if((iterDeleteItems->ulMessageFlags & MSGFLAG_READ) == 0)
-									mapFolderCounts[iterDeleteItems->ulParent].lUnread--;
+									--mapFolderCounts[iterDeleteItems->ulParent].lUnread;
 							}
 						}
 						if(iterDeleteItems->ulObjType == MAPI_FOLDER) {
-							mapFolderCounts[iterDeleteItems->ulParent].lFolders--;
-							mapFolderCounts[iterDeleteItems->ulParent].lDeletedFolders++;
+							--mapFolderCounts[iterDeleteItems->ulParent].lFolders;
+							++mapFolderCounts[iterDeleteItems->ulParent].lDeletedFolders;
 						}
 					}
 				}
@@ -642,8 +617,8 @@ ECRESULT DeleteObjectSoft(ECSession *lpSession, ECDatabase *lpDatabase, unsigned
 	// Add properties: PR_DELETED_ON
 	GetSystemTimeAsFileTime(&ft);
 
-	for(iterDeleteItems=lstDeleteItems.begin(); iterDeleteItems != lstDeleteItems.end(); iterDeleteItems++)
-	{
+	for (iterDeleteItems=lstDeleteItems.begin();
+	     iterDeleteItems != lstDeleteItems.end(); ++iterDeleteItems) {
 		if( iterDeleteItems->fRoot == true && 
 			( (iterDeleteItems->ulObjType == MAPI_MESSAGE && iterDeleteItems->ulParentType == MAPI_FOLDER) || 
 			iterDeleteItems->ulObjType == MAPI_FOLDER  || iterDeleteItems->ulObjType == MAPI_STORE) )
@@ -699,7 +674,7 @@ ECRESULT DeleteObjectHard(ECSession *lpSession, ECDatabase *lpDatabase, ECAttach
 	PARENTINFO pi;
 	
 	std::map<unsigned int, PARENTINFO> mapFolderCounts;
-	std::map<unsigned int, PARENTINFO>::iterator iterFolderCounts;
+	std::map<unsigned int, PARENTINFO>::const_iterator iterFolderCounts;
 
 	int i;
 
@@ -760,30 +735,29 @@ ECRESULT DeleteObjectHard(ECSession *lpSession, ECDatabase *lpDatabase, ECAttach
 				if(iterDeleteItems->ulObjType == MAPI_MESSAGE) {
 					if(iterDeleteItems->ulFlags == MAPI_ASSOCIATED) {
 						// Delete associated
-						mapFolderCounts[iterDeleteItems->ulParent].lAssoc--;
+						--mapFolderCounts[iterDeleteItems->ulParent].lAssoc;
 					} else if(iterDeleteItems->ulFlags == 0) {
 						// Deleting directly from normal item, count normal and unread items
-						mapFolderCounts[iterDeleteItems->ulParent].lItems--;
+						--mapFolderCounts[iterDeleteItems->ulParent].lItems;
 						if((iterDeleteItems->ulMessageFlags & MSGFLAG_READ) == 0)
-							mapFolderCounts[iterDeleteItems->ulParent].lUnread--;
+							--mapFolderCounts[iterDeleteItems->ulParent].lUnread;
 					} else if(iterDeleteItems->ulFlags == (MAPI_ASSOCIATED | MSGFLAG_DELETED)) {
 						// Deleting softdeleted associated item
-						mapFolderCounts[iterDeleteItems->ulParent].lDeletedAssoc--;
+						--mapFolderCounts[iterDeleteItems->ulParent].lDeletedAssoc;
 					} else {
 						// Deleting normal softdeleted item
-						mapFolderCounts[iterDeleteItems->ulParent].lDeleted--;
+						--mapFolderCounts[iterDeleteItems->ulParent].lDeleted;
 					}
 				}
 				if(iterDeleteItems->ulObjType == MAPI_FOLDER) {
-					if((iterDeleteItems->ulFlags & MSGFLAG_DELETED) == 0) {
-						mapFolderCounts[iterDeleteItems->ulParent].lFolders--;
-					} else {
-						mapFolderCounts[iterDeleteItems->ulParent].lDeletedFolders--;
-					}
+					if ((iterDeleteItems->ulFlags & MSGFLAG_DELETED) == 0)
+						--mapFolderCounts[iterDeleteItems->ulParent].lFolders;
+					else
+						--mapFolderCounts[iterDeleteItems->ulParent].lDeletedFolders;
 				}
 			}
-			i++;
-			iterDeleteItems++;
+			++i;
+			++iterDeleteItems;
 		}
 
 		// Start transaction
@@ -905,7 +879,7 @@ ECRESULT DeleteObjectCacheUpdate(ECSession *lpSession, unsigned int ulFlags, ECL
 	ECRESULT er = erSuccess;
 	ECSessionManager *lpSessionManager = NULL;
 	ECCacheManager *lpCacheManager = NULL;
-	ECListDeleteItems::iterator iterDeleteItems;
+	ECListDeleteItems::const_iterator iterDeleteItems;
 
 	if (lpSession == NULL) {
 		er = ZARAFA_E_INVALID_PARAMETER;
@@ -916,8 +890,8 @@ ECRESULT DeleteObjectCacheUpdate(ECSession *lpSession, unsigned int ulFlags, ECL
 	lpCacheManager = lpSessionManager->GetCacheManager();
 
 	// Remove items from cache and update the outgoing queue
-	for(iterDeleteItems=lstDeleted.begin(); iterDeleteItems != lstDeleted.end(); iterDeleteItems++) {
-
+	for (iterDeleteItems = lstDeleted.begin();
+	     iterDeleteItems != lstDeleted.end(); ++iterDeleteItems) {
 		// update the cache
 		lpCacheManager->Update(fnevObjectDeleted, iterDeleteItems->ulId);
 
@@ -949,7 +923,7 @@ ECRESULT DeleteObjectNotifications(ECSession *lpSession, unsigned int ulFlags, E
 	ECListDeleteItems::iterator iterDeleteItems;
 
 	std::list<unsigned int> lstParent;
-	std::list<unsigned int>::iterator iterParent;
+	std::list<unsigned int>::const_iterator iterParent;
 	ECMapTableChangeNotifications mapTableChangeNotifications;
 	//std::set<unsigned int>	setFolderParents;
 	size_t cDeleteditems = lstDeleted.size();
@@ -963,8 +937,8 @@ ECRESULT DeleteObjectNotifications(ECSession *lpSession, unsigned int ulFlags, E
 	lpSessionManager = lpSession->GetSessionManager();
 
 	// Now, send the notifications for MAPI_MESSAGE and MAPI_FOLDER types
-	for(iterDeleteItems=lstDeleted.begin(); iterDeleteItems != lstDeleted.end(); iterDeleteItems++)
-	{
+	for (iterDeleteItems = lstDeleted.begin();
+	     iterDeleteItems != lstDeleted.end(); ++iterDeleteItems) {
 		// Update the outgoing queue
 		// Remove the item from both the local and master outgoing queues
 		if( (iterDeleteItems->ulFlags & MSGFLAG_SUBMIT) && iterDeleteItems->ulParentType == MAPI_FOLDER && iterDeleteItems->ulObjType == MAPI_MESSAGE) {
@@ -1007,8 +981,7 @@ ECRESULT DeleteObjectNotifications(ECSession *lpSession, unsigned int ulFlags, E
 	// Now, send each parent folder a notification that it has been altered and send
 	// its parent a notification (ie the grandparent of the deleted object) that its
 	// hierarchy table has been changed.
-	for(iterParent = lstParent.begin(); iterParent != lstParent.end(); iterParent++) {
-
+	for (iterParent = lstParent.begin(); iterParent != lstParent.end(); ++iterParent) {
 		if(cDeleteditems >= EC_TABLE_CHANGE_THRESHOLD) {
 
 			// Find the set of notifications to send for the current parent.
@@ -1128,7 +1101,7 @@ ECRESULT DeleteObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt *
 	ECRESULT er = erSuccess;
 	ECListDeleteItems lstDeleteItems;
 	ECListDeleteItems lstDeleted;
-	ECListDeleteItems::iterator iterDeleteItems;
+	ECListDeleteItems::const_iterator iterDeleteItems;
 	ECSearchFolders *lpSearchFolders = NULL;
 	ECSessionManager *lpSessionManager = NULL;
 	
@@ -1160,20 +1133,20 @@ ECRESULT DeleteObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt *
 	// Collect recursive parent objects, validate item and check the permissions
 	er = ExpandDeletedItems(lpSession, lpDatabase, lpsObjectList, ulFlags, bCheckPermission, &lstDeleteItems);
 	if (er != erSuccess) {
-		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Error while expanding delete item list, error code: %u", er);
+		ec_log_info("Error while expanding delete item list, error code %u", er);
 		goto exit;
 	}
 
 	// Remove search results for deleted folders
-	if ((ulFlags&EC_DELETE_STORE)) {
+	if (ulFlags & EC_DELETE_STORE)
 		lpSearchFolders->RemoveSearchFolder(*lpsObjectList->begin());
-	} else {
-		for(iterDeleteItems=lstDeleteItems.begin(); iterDeleteItems != lstDeleteItems.end(); iterDeleteItems++) {
-			if(iterDeleteItems->ulObjType == MAPI_FOLDER && iterDeleteItems->ulFlags == FOLDER_SEARCH) {
+	else
+		for (iterDeleteItems = lstDeleteItems.begin();
+		     iterDeleteItems != lstDeleteItems.end();
+		     ++iterDeleteItems)
+			if (iterDeleteItems->ulObjType == MAPI_FOLDER &&
+			    iterDeleteItems->ulFlags == FOLDER_SEARCH)
 				lpSearchFolders->RemoveSearchFolder(iterDeleteItems->ulStoreId, iterDeleteItems->ulId);
-			}
-		}
-	}
 
 	// before actual delete check items which are outside the sync scope
 	if (ulSyncId != 0) {
@@ -1186,7 +1159,7 @@ ECRESULT DeleteObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt *
 	else
 		er = DeleteObjectSoft(lpSession, lpDatabase, ulFlags, lstDeleteItems, lstDeleted);
 	if (er != erSuccess) {
-		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Error while deleting expanded item list, error code: %u", er);
+		ec_log_info("Error while deleting expanded item list, error code %u", er);
 		goto exit;
 	}
 
@@ -1196,26 +1169,28 @@ ECRESULT DeleteObjects(ECSession *lpSession, ECDatabase *lpDatabase, ECListInt *
 		// Update store size
 		er = DeleteObjectStoreSize(lpSession, lpDatabase, ulFlags, lstDeleted);
 		if(er!= erSuccess) {
-			g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Error while updating store sizes after delete, error code: %u", er);
+			ec_log_info("Error while updating store sizes after delete, error code %u", er);
 			goto exit;
 		}
 
 		// Update ICS
 		er = DeleteObjectUpdateICS(lpSession, ulFlags, lstDeleted, ulSyncId);
 		if (er != erSuccess) {
-			g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Error while updating ICS after delete, error code: %u", er);
+			ec_log_info("Error while updating ICS after delete, error code %u", er);
 			goto exit;
 		}
 
 		// Update local commit time on top level folders
-		for(iterDeleteItems=lstDeleteItems.begin(); iterDeleteItems != lstDeleteItems.end(); iterDeleteItems++) {
+		for (iterDeleteItems = lstDeleteItems.begin();
+		     iterDeleteItems != lstDeleteItems.end();
+		     ++iterDeleteItems) {
 			if( !(ulFlags & EC_DELETE_HARD_DELETE) && iterDeleteItems->fRoot &&
 				iterDeleteItems->ulParentType == MAPI_FOLDER && iterDeleteItems->ulObjType == MAPI_MESSAGE)
 			{
 				// directly hard-delete the item is not supported for updating PR_LOCAL_COMMIT_TIME_MAX
 				er = WriteLocalCommitTimeMax(NULL, lpDatabase, iterDeleteItems->ulParent, NULL);
 				if (er != erSuccess) {
-					g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Error while updating folder access time after delete, error code: %u", er);
+					ec_log_info("Error while updating folder access time after delete, error code %u", er);
 					goto exit;
 				}
 				// the folder will receive a changed notification anyway, since items are being deleted from it
@@ -1297,18 +1272,16 @@ exit:
 
 void FreeDeleteItem(DELETEITEM *src)
 {
-	if(src->sEntryId.__ptr)
-		delete [] src->sEntryId.__ptr;
+	delete[] src->sEntryId.__ptr;
 }
 
 void FreeDeletedItems(ECListDeleteItems *lplstDeleteItems)
 {
 	ECListDeleteItems::iterator iterDeleteItems;
 	
-	for(iterDeleteItems=lplstDeleteItems->begin(); iterDeleteItems != lplstDeleteItems->end(); iterDeleteItems++) {
+	for (iterDeleteItems = lplstDeleteItems->begin();
+	     iterDeleteItems != lplstDeleteItems->end(); ++iterDeleteItems)
 		FreeDeleteItem(&(*iterDeleteItems));
-	}
-
 	lplstDeleteItems->clear();
 }
 
@@ -1327,7 +1300,7 @@ void FreeDeletedItems(ECListDeleteItems *lplstDeleteItems)
 ECRESULT UpdateTProp(ECDatabase *lpDatabase, unsigned int ulPropTag, unsigned int ulFolderId, ECListInt *lpObjectIDs) {
     ECRESULT er = erSuccess;
     std::string strQuery;
-    ECListInt::iterator iObjectid;
+    ECListInt::const_iterator iObjectid;
     
     if(lpObjectIDs->empty())
         goto exit; // Nothing to do
@@ -1336,8 +1309,7 @@ ECRESULT UpdateTProp(ECDatabase *lpDatabase, unsigned int ulPropTag, unsigned in
     strQuery = "UPDATE tproperties JOIN properties on properties.hierarchyid=tproperties.hierarchyid AND properties.tag=tproperties.tag AND properties.type=tproperties.type SET tproperties.val_ulong = properties.val_ulong "
     			"WHERE properties.tag = " + stringify(PROP_ID(ulPropTag)) + " AND properties.type = " + stringify(PROP_TYPE(ulPropTag)) + " AND tproperties.folderid = " + stringify(ulFolderId) + " AND properties.hierarchyid IN (";
     			
-    for(iObjectid = lpObjectIDs->begin(); iObjectid != lpObjectIDs->end(); iObjectid++) {
-
+    for (iObjectid = lpObjectIDs->begin(); iObjectid != lpObjectIDs->end(); ++iObjectid) {
         if(iObjectid != lpObjectIDs->begin())
             strQuery += ",";
 
@@ -1399,7 +1371,7 @@ ECRESULT UpdateFolderCount(ECDatabase *lpDatabase, unsigned int ulFolderId, unsi
 	if(er != erSuccess)
 		goto exit;
 	if (ulType != MAPI_FOLDER) {
-		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_INFO, "Not updating folder count %d for non-folder object %d type %d", lDelta, ulFolderId, ulType);
+		ec_log_info("Not updating folder count %d for non-folder object %d type %d", lDelta, ulFolderId, ulType);
 		ASSERT(ulType == MAPI_FOLDER);
 		goto exit;
 	}
@@ -1452,7 +1424,7 @@ ECRESULT MapEntryIdToObjectId(ECSession *lpecSession, ECDatabase *lpDatabase, UL
 
 	er = RemoveStaleIndexedProp(lpDatabase, PR_ENTRYID, sEntryId.__ptr, sEntryId.__size);
 	if(er != erSuccess) {
-		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ERROR: Collision detected while setting entryid. objectid=%u, entryid=%s, user=%u", ulObjId, bin2hex(sEntryId.__size, (unsigned char *)sEntryId.__ptr).c_str(), lpecSession->GetSecurity()->GetUserId());
+		ec_log_crit("ERROR: Collision detected while setting entryid. objectid=%u, entryid=%s, user=%u", ulObjId, bin2hex(sEntryId.__size, (unsigned char *)sEntryId.__ptr).c_str(), lpecSession->GetSecurity()->GetUserId());
 		er = ZARAFA_E_DATABASE_ERROR;
 		goto exit;
 	}
@@ -1680,7 +1652,7 @@ ECRESULT WriteSingleProp(ECDatabase *lpDatabase, unsigned int ulObjId, unsigned 
 	if (bColumnProp)
 		strQueryAppend += stringify(ulFolderId) + ",";
 
-	for(unsigned int k=0; k<VALUE_NR_MAX; k++) {
+	for (unsigned int k = 0; k < VALUE_NR_MAX; ++k) {
 		if(k==ulColId) {
 			strQueryAppend += strColData;
 		} else {
@@ -1743,7 +1715,7 @@ ECRESULT GetNamesFromIDs(struct soap *soap, ECDatabase *lpDatabase, struct propT
 	lpsNames->__size = lpPropTags->__size;
 	memset(lpsNames->__ptr, 0, sizeof(struct namedProp) * lpPropTags->__size);
 
-	for(i=0;i<lpPropTags->__size;i++) {
+	for (i = 0; i < lpPropTags->__size; ++i) {
 		strQuery = "SELECT nameid, namestring, guid FROM names WHERE id=" + stringify(lpPropTags->__ptr[i]-1);
 
 		er = lpDatabase->DoSelect(strQuery, &lpDBResult);
@@ -1775,7 +1747,7 @@ ECRESULT GetNamesFromIDs(struct soap *soap, ECDatabase *lpDatabase, struct propT
 				}
 			} else {
 				er = ZARAFA_E_DATABASE_ERROR;
-				g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "GetNamesFromIDs(): row/col NULL");
+				ec_log_crit("GetNamesFromIDs(): row/col NULL");
 				goto exit;
 			}
 		} else {
@@ -1843,10 +1815,10 @@ ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId, unsigned i
 
     // Lock the counters now since the locking order is normally counters/foldercontent/storesize/localcommittimemax. So our lock order
     // is now counters/foldercontent/counters which is compatible (*cough* in theory *cough*)
-    strQuery = "SELECT val_ulong FROM properties WHERE hierarchyid = " + stringify(ulObjId) + " FOR UPDATE";
-    er = lpDatabase->DoSelect(strQuery, NULL); // don't care about the result
-    if (er != erSuccess)
-        goto exit;
+	strQuery = "SELECT val_ulong FROM properties WHERE hierarchyid = " + stringify(ulObjId) + " FOR UPDATE";
+	er = lpDatabase->DoSelect(strQuery, NULL); // don't care about the result
+	if (er != erSuccess)
+		goto exit;
 	
 	// Gets counters from hierarchy: cc, acc, dmc, dac, cfc, dfc
 	// use for update, since the update query below must see the same values, mysql should already block here.
@@ -1858,7 +1830,7 @@ ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId, unsigned i
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if(lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL || lpDBRow[3] == NULL || lpDBRow[4] == NULL) {
 		er = ZARAFA_E_DATABASE_ERROR;
-		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ResetFolderCount(): row/col NULL (1)");
+		ec_log_crit("ResetFolderCount(): row/col NULL (1)");
 		goto exit;
 	}
 	
@@ -1887,7 +1859,7 @@ ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId, unsigned i
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if(lpDBRow == NULL || lpDBRow[0] == NULL) {
 		er = ZARAFA_E_DATABASE_ERROR;
-		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ResetFolderCount(): row/col NULL (2)");
+		ec_log_crit("ResetFolderCount(): row/col NULL (2)");
 		goto exit;
 	}
 	
@@ -2044,11 +2016,9 @@ ECRESULT RemoveStaleIndexedProp(ECDatabase *lpDatabase, unsigned int ulPropTag, 
         g_lpSessionManager->GetCacheManager()->RemoveIndexData(ulPropTag, cbSize, lpData);
     }
 	else {
-        // Caller wanted to remove the entry, but we can't since it is in use
-        er = ZARAFA_E_COLLISION;
-	g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "RemoveStaleIndexedProp(): caller wanted to remove the entry, but we can't since it is in use");
-    }
-
+		er = ZARAFA_E_COLLISION;
+		ec_log_crit("RemoveStaleIndexedProp(): caller wanted to remove the entry, but we cannot since it is in use");
+	}
 exit:
 	if (lpDBResult)
 		lpDatabase->FreeResult(lpDBResult);
@@ -2085,7 +2055,8 @@ ECRESULT ApplyFolderCounts(ECDatabase *lpDatabase, const std::map<unsigned int, 
     ECRESULT er = erSuccess;
     
 	// Update folder counts
-	for(std::map<unsigned int, PARENTINFO>::const_iterator iterFolderCounts = mapFolderCounts.begin(); iterFolderCounts != mapFolderCounts.end(); iterFolderCounts++) {
+	for (std::map<unsigned int, PARENTINFO>::const_iterator iterFolderCounts = mapFolderCounts.begin();
+	     iterFolderCounts != mapFolderCounts.end(); ++iterFolderCounts) {
 	    er = ApplyFolderCounts(lpDatabase, iterFolderCounts->first, iterFolderCounts->second);
 	    if(er != erSuccess)
 	        goto exit;
@@ -2107,7 +2078,7 @@ static ECRESULT LockFolders(ECDatabase *lpDatabase, bool bShared,
     
     strQuery = "SELECT * FROM properties WHERE hierarchyid IN(";
     
-    for(i = setParents.begin(); i != setParents.end(); i++) {
+    for (i = setParents.begin(); i != setParents.end(); ++i) {
         strQuery += stringify(*i);
         strQuery += ",";
     }
@@ -2139,20 +2110,25 @@ static ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag,
     std::string strQuery;
     
     // See if we can get the object IDs for the passed objects from the cache
-    for(std::set<std::string>::const_iterator i = setIds.begin(); i != setIds.end(); i++) {
+    for (std::set<std::string>::const_iterator i = setIds.begin();
+         i != setIds.end(); ++i) {
         if(g_lpSessionManager->GetCacheManager()->QueryObjectFromProp(ulTag, i->size(), (unsigned char *)i->data(), &ulId) == erSuccess) {
             if(ulTag == PROP_ID(PR_SOURCE_KEY))
                 setFolders.insert(ulId);
             else if(ulTag == PROP_ID(PR_ENTRYID)) {
                 EntryId eid(*i);
                 
-                if(eid.type() == MAPI_FOLDER) {
-                    setFolders.insert(ulId);
-                } else if(eid.type() == MAPI_MESSAGE) {
-                    setMessages.insert(ulId);
-                } else {
-                    ASSERT(false); // You should not attempt to lock things other than messages and folders
-                }
+		try {
+			if (eid.type() == MAPI_FOLDER)
+				setFolders.insert(ulId);
+			else if (eid.type() == MAPI_MESSAGE)
+				setMessages.insert(ulId);
+			else
+				ASSERT(false);
+		} catch (runtime_error &e) {
+			ec_log_err("eid.type(): %s\n", e.what());
+			ASSERT(false);
+		}
             }
             else {
                 ASSERT(false);
@@ -2165,7 +2141,9 @@ static ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag,
     if(!setUncached.empty()) {    
         // For the items that were uncached, go directly to their parent (or the item itself for folders) in the DB
         strQuery = "SELECT hierarchyid, hierarchy.type, hierarchy.parent FROM indexedproperties JOIN hierarchy ON hierarchy.id=indexedproperties.hierarchyid WHERE tag = " + stringify(ulTag) + " AND val_binary IN(";
-        for(std::set<std::string>::iterator i= setUncached.begin(); i != setUncached.end(); i++) {
+        for (std::set<std::string>::const_iterator i = setUncached.begin();
+             i != setUncached.end(); ++i)
+        {
             if(i != setUncached.begin())
                 strQuery += ",";
             strQuery += lpDatabase->EscapeBinary(*i);
@@ -2191,7 +2169,9 @@ static ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag,
     }
         
     // For the items that were cached, but messages, find their parents in the cache first
-    for(std::set<unsigned int>::iterator i = setMessages.begin(); i != setMessages.end(); i++) {
+    for (std::set<unsigned int>::const_iterator i = setMessages.begin();
+         i != setMessages.end(); ++i)
+    {
         unsigned int ulParent = 0;
         
         if(g_lpSessionManager->GetCacheManager()->QueryParent(*i, &ulParent) == erSuccess) {
@@ -2204,7 +2184,9 @@ static ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag,
     // Query uncached parents from the database
     if(!setUncachedMessages.empty()) {
         strQuery = "SELECT parent FROM hierarchy WHERE id IN(";
-        for(std::set<unsigned int>::iterator i = setUncachedMessages.begin(); i != setUncachedMessages.end(); i++) {
+        for (std::set<unsigned int>::const_iterator i = setUncachedMessages.begin();
+             i != setUncachedMessages.end(); ++i)
+        {
             if(i != setUncachedMessages.begin())
                 strQuery += ",";
             strQuery += stringify(*i);
@@ -2281,9 +2263,13 @@ ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const EntryId &entryid, unsign
     std::set<EntryId> set;
     
     // No locking needed for stores
-    if(entryid.type() == MAPI_STORE) {
-        return lpDatabase->Begin();
-    }
+	try {
+		if (entryid.type() == MAPI_STORE)
+			return lpDatabase->Begin();
+	} catch (runtime_error &e) {
+		ec_log_err("entryid.type(): %s\n", e.what());
+		return ZARAFA_E_INVALID_PARAMETER;
+	}
     
     set.insert(entryid);
     
@@ -2305,7 +2291,7 @@ ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const SOURCEKEY &sourcekey, un
 ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQuery, bool fUnicode, unsigned int ulObjId, unsigned int ulParentId, unsigned int ulMaxSize, ChildPropsMap *lpChildProps, NamedPropDefMap *lpNamedPropDefs)
 {
     ECRESULT er = erSuccess;
-	ChildPropsMap::iterator iterChild;
+	ChildPropsMap::const_iterator iterChild;
 	unsigned int ulSize;
 	struct propVal sPropVal;
     unsigned int ulChildId;
@@ -2356,9 +2342,9 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
         lpDBLen = lpDatabase->FetchRowLengths(lpDBResult);
 
         if(lpDBLen == NULL) {
-            er = ZARAFA_E_DATABASE_ERROR; // this should never happen
-	g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "PrepareReadProps(): FetchRowLengths failed");
-            goto exit;
+		er = ZARAFA_E_DATABASE_ERROR; // this should never happen
+		ec_log_crit("PrepareReadProps(): FetchRowLengths failed");
+		goto exit;
         }
 
         ulPropTag = PROP_TAG(atoi(lpDBRow[FIELD_NR_TYPE]),atoi(lpDBRow[FIELD_NR_TAG]));
@@ -2368,9 +2354,9 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
             if (resInsert.second) {
                 // New entry
                 if (lpDBLen[FIELD_NR_NAMEGUID] != sizeof(resInsert.first->second.guid)) {
-                    er = ZARAFA_E_DATABASE_ERROR;
-		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "PrepareReadProps(): record size mismatch");
-                    goto exit;
+			er = ZARAFA_E_DATABASE_ERROR;
+			ec_log_err("PrepareReadProps(): record size mismatch");
+			goto exit;
                 }
                 memcpy(&resInsert.first->second.guid, lpDBRow[FIELD_NR_NAMEGUID], sizeof(resInsert.first->second.guid));
                 
@@ -2473,9 +2459,9 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
         lpDBLen = lpDatabase->FetchRowLengths(lpDBResult);
 
         if(lpDBLen == NULL) {
-            er = ZARAFA_E_DATABASE_ERROR; // this should never happen
-		g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "PrepareReadProps(): FetchRowLengths failed(2)");
-            goto exit;
+			er = ZARAFA_E_DATABASE_ERROR; // this should never happen
+			ec_log_crit("PrepareReadProps(): FetchRowLengths failed(2)");
+			goto exit;
         }
         
         if (lpNamedPropDefs) {
@@ -2486,7 +2472,7 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
                     // New entry
                     if (lpDBLen[FIELD_NR_NAMEGUID] != sizeof(resInsert.first->second.guid)) {
                         er = ZARAFA_E_DATABASE_ERROR;
-			g_lpSessionManager->GetLogger()->Log(EC_LOGLEVEL_FATAL, "PrepareReadProps(): record size mismatch(2)");
+			ec_log_crit("PrepareReadProps(): record size mismatch(2)");
                         goto exit;
                     }
                     memcpy(&resInsert.first->second.guid, lpDBRow[FIELD_NR_NAMEGUID], sizeof(resInsert.first->second.guid));
@@ -2538,18 +2524,16 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
     }
 
 exit:
-    if(lpDBResult)
-        lpDatabase->FreeResult(lpDBResult);
-
+	if (lpDBResult != NULL)
+		lpDatabase->FreeResult(lpDBResult);
 	return er;
 }
 
 ECRESULT FreeChildProps(std::map<unsigned int, CHILDPROPS> *lpChildProps)
 {
-    std::map<unsigned int, CHILDPROPS>::iterator iterChild;
+    std::map<unsigned int, CHILDPROPS>::const_iterator iterChild;
     
-    for(iterChild = lpChildProps->begin(); iterChild != lpChildProps->end(); iterChild++)
-    {
+    for (iterChild = lpChildProps->begin(); iterChild != lpChildProps->end(); ++iterChild) {
         if(iterChild->second.lpPropVals)
             delete iterChild->second.lpPropVals;
         if(iterChild->second.lpPropTags)

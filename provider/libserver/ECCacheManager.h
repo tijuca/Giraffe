@@ -1,63 +1,38 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 #ifndef ECCACHEMANAGER
 #define ECCACHEMANAGER
 
+#include <zarafa/zcdefs.h>
 #include <map>
 #include <pthread.h>
 
 #include "ECDatabaseFactory.h"
 #include "ECDatabaseUtils.h"
 #include "ECGenericObjectTable.h"	// ECListInt
-#include "ECConfig.h"
-#include "ECLogger.h"
+#include <zarafa/ECConfig.h>
+#include <zarafa/ECLogger.h>
 #include "SOAPUtils.h"
 #include "ZarafaCmdUtil.h"
 #include <mapidefs.h>
 #include <ECCache.h>
 
-#include "../common/ECKeyTable.h"
+#include <zarafa/ECKeyTable.h>
 
 #ifdef HAVE_SPARSEHASH
 #include <google/sparse_hash_map>
@@ -111,7 +86,8 @@ typedef struct {
 	std::string			strExternId;
 } ECsUEIdKey;
 
-inline bool operator < (ECsUEIdKey a, ECsUEIdKey b) {
+inline bool operator <(const ECsUEIdKey &a, const ECsUEIdKey &b)
+{
 	if (a.ulClass < b.ulClass)
 		return true;
 	if ((a.ulClass == b.ulClass) && a.strExternId < b.strExternId)
@@ -120,24 +96,24 @@ inline bool operator < (ECsUEIdKey a, ECsUEIdKey b) {
 }
 
 /* Intern Id cache */
-class ECsUEIdObject : public ECsCacheEntry {
+class ECsUEIdObject _zcp_final : public ECsCacheEntry {
 public:
 	unsigned int		ulCompanyId;
 	unsigned int		ulUserId;
 	std::string			strSignature;
 };
 
-class ECsUserObjectDetails : public ECsCacheEntry {
+class ECsUserObjectDetails _zcp_final : public ECsCacheEntry {
 public:
 	objectdetails_t			sDetails;
 };
 
-class ECsServerDetails : public ECsCacheEntry {
+class ECsServerDetails _zcp_final : public ECsCacheEntry {
 public:
 	serverdetails_t			sDetails;
 };
 
-class ECsObjects : public ECsCacheEntry {
+class ECsObjects _zcp_final : public ECsCacheEntry {
 public:
 	unsigned int	ulParent;
 	unsigned int	ulOwner;
@@ -145,12 +121,12 @@ public:
 	unsigned int	ulType;
 };
 
-class ECsQuota : public ECsCacheEntry {
+class ECsQuota _zcp_final : public ECsCacheEntry {
 public:
 	quotadetails_t	quota;
 };
 
-class ECsIndexObject : public ECsCacheEntry {
+class ECsIndexObject _zcp_final : public ECsCacheEntry {
 public:
 	inline bool operator==(const ECsIndexObject &other) const
 	{
@@ -175,7 +151,7 @@ public:
 	unsigned int ulTag;
 };
 
-class ECsIndexProp : public ECsCacheEntry {
+class ECsIndexProp _zcp_final : public ECsCacheEntry {
 public:
     ECsIndexProp() : ECsCacheEntry() { 
 		lpData = NULL; 
@@ -184,9 +160,7 @@ public:
 	}
 
 	~ECsIndexProp() {
-		if(lpData) {
-			delete[] lpData;
-		}
+		delete[] lpData;
 	}
     
     ECsIndexProp(const ECsIndexProp &src) {
@@ -213,9 +187,10 @@ public:
 		if(cbData == other.cbData) {
 			if(lpData == NULL && other.lpData)
 				return true;
-			else if(lpData && other.lpData == NULL)
+			else if (lpData != NULL && other.lpData == NULL)
 				return false;
-
+			else if (lpData == NULL && other.lpData == NULL)
+				return false;
 			int c = memcmp(lpData, other.lpData, cbData);
 			if(c < 0)
 				return true;
@@ -260,9 +235,7 @@ public:
 	}
 protected:
 	void Free() {
-		if(lpData) {
-			delete[] lpData;
-		}
+		delete[] lpData;
 		ulTag = 0; 
 		cbData = 0;
 		lpData = NULL;
@@ -286,7 +259,7 @@ public:
 	unsigned int	cbData;
 };
 
-class ECsCells : public ECsCacheEntry {
+class ECsCells _zcp_final : public ECsCacheEntry {
 public:
     ECsCells() : ECsCacheEntry() { 
     	m_bComplete = false; 
@@ -296,15 +269,14 @@ public:
 	};
     ~ECsCells() {
 		std::map<unsigned int, struct propVal>::iterator i;
-        for(i=mapPropVals.begin(); i!=mapPropVals.end(); i++) {
-            FreePropVal(&i->second, false); 
-        }
+		for (i = mapPropVals.begin(); i != mapPropVals.end(); ++i)
+			FreePropVal(&i->second, false);
     };
     
     ECsCells(const ECsCells &src) {
         struct propVal val;
         std::map<unsigned int, struct propVal>::const_iterator i;
-        for(i=src.mapPropVals.begin(); i!=src.mapPropVals.end(); i++) {
+        for (i = src.mapPropVals.begin(); i != src.mapPropVals.end(); ++i) {
             CopyPropVal((struct propVal *)&i->second, &val);
             mapPropVals[i->first] = val;
         }
@@ -317,12 +289,12 @@ public:
     ECsCells& operator=(const ECsCells &src) {
         struct propVal val;
         std::map<unsigned int, struct propVal>::iterator i;
-        for(i=mapPropVals.begin(); i!=mapPropVals.end(); i++) {
-            FreePropVal(&i->second, false); 
-        }
+		for (i = mapPropVals.begin(); i != mapPropVals.end(); ++i)
+			FreePropVal(&i->second, false);
         mapPropVals.clear();
         
-        for(i=((ECsCells &)src).mapPropVals.begin(); i!=((ECsCells &)src).mapPropVals.end(); i++) {
+        for (i = ((ECsCells &)src).mapPropVals.begin();
+             i != ((ECsCells &)src).mapPropVals.end(); ++i) {
             CopyPropVal((struct propVal *)&i->second, &val);
             mapPropVals[i->first] = val;
         }
@@ -331,7 +303,7 @@ public:
     }
     
     // Add a property value for this object
-    void AddPropVal(unsigned int ulPropTag, struct propVal *lpPropVal) {
+    void AddPropVal(unsigned int ulPropTag, const struct propVal *lpPropVal) {
         struct propVal val;
         ulPropTag = NormalizeDBPropTag(ulPropTag); // Only cache PT_STRING8
 		std::pair<std::map<unsigned int, struct propVal>::iterator,bool> res;
@@ -346,7 +318,7 @@ public:
     
     // get a property value for this object
     bool GetPropVal(unsigned int ulPropTag, struct propVal *lpPropVal, struct soap *soap) {
-        std::map<unsigned int, struct propVal>::iterator i;
+        std::map<unsigned int, struct propVal>::const_iterator i;
         i = mapPropVals.find(NormalizeDBPropTag(ulPropTag));
         if(i == mapPropVals.end())
             return false;
@@ -392,7 +364,7 @@ public:
         size_t ulSize = 0;
         
         std::map<unsigned int, struct propVal>::const_iterator i;
-        for(i=mapPropVals.begin(); i!=mapPropVals.end(); i++) {
+        for (i = mapPropVals.begin(); i != mapPropVals.end(); ++i) {
             switch(i->second.__union) {
                 case SOAP_UNION_propValData_lpszA:
                     ulSize += i->second.Value.lpszA ? (unsigned int)strlen(i->second.Value.lpszA) : 0;
@@ -420,7 +392,7 @@ public:
     bool m_bComplete;
 };
 
-class ECsACLs : public ECsCacheEntry {
+class ECsACLs _zcp_final : public ECsCacheEntry {
 public:
 	ECsACLs() : ECsCacheEntry() { ulACLs = 0; aACL = NULL; }
     ECsACLs(const ECsACLs &src) {
@@ -430,14 +402,16 @@ public:
     };
     ECsACLs& operator=(const ECsACLs &src) {
 		if (this != &src) {
-			if(aACL) delete [] aACL;
+			delete[] aACL;
 			ulACLs = src.ulACLs;
 			aACL = new ACL[src.ulACLs];
 			memcpy(aACL, src.aACL, sizeof(ACL) * src.ulACLs);
 		}
 		return *this;
     };
-    ~ECsACLs() { if(aACL) delete [] aACL; }
+    ~ECsACLs() {
+		delete[] aACL;
+    }
     unsigned int 	ulACLs;
     struct ACL {
         unsigned int ulType;
@@ -471,10 +445,9 @@ inline unsigned int IPRSHash(const ECsIndexProp& _Keyval1)
 	unsigned int a    = 63689;
 	unsigned int hash = 0;
 
-	for(std::size_t i = 0; i < _Keyval1.cbData; i++)
-	{
+	for (std::size_t i = 0; i < _Keyval1.cbData; ++i) {
 		hash = hash * a + _Keyval1.lpData[i];
-			a    = a * b;
+		a *= b;
 	}
 
 	return hash;
@@ -483,7 +456,7 @@ inline unsigned int IPRSHash(const ECsIndexProp& _Keyval1)
 namespace HASH_NAMESPACE {
 	// hash function for type ECsIndexProp
 	template<>
-	class hash<ECsIndexProp> {
+	struct hash<ECsIndexProp> {
 		public:
 			hash() {};
 			~hash() {};
@@ -493,7 +466,7 @@ namespace HASH_NAMESPACE {
 
 	// hash function for type ECsIndexObject
 	template<>
-	class hash<ECsIndexObject> {
+	struct hash<ECsIndexObject> {
 		public:
 			hash() {};
 			~hash() {};
@@ -521,10 +494,9 @@ typedef hash_map<ECsIndexProp, ECsIndexObject>::Type ECMapPropToObject;
 
 #define CACHE_NO_PARENT 0xFFFFFFFF
 
-class ECCacheManager  
-{
+class ECCacheManager _zcp_final {
 public:
-	ECCacheManager(ECConfig *lpConfig, ECDatabaseFactory *lpDatabase, ECLogger *lpLogger);
+	ECCacheManager(ECConfig *lpConfig, ECDatabaseFactory *lpDatabase);
 	virtual ~ECCacheManager();
 
 	ECRESULT PurgeCache(unsigned int ulFlags);
@@ -537,12 +509,13 @@ public:
 	// Query cache only
 	ECRESULT QueryParent(unsigned int ulObjId, unsigned int *ulParent);
 	
-	ECRESULT GetObjects(std::list<sObjectTableKey> &lstObjects, std::map<sObjectTableKey,ECsObjects> &mapObjects);
+	ECRESULT GetObjects(const std::list<sObjectTableKey> &lstObjects, std::map<sObjectTableKey, ECsObjects> &mapObjects);
+	ECRESULT GetObjectsFromProp(unsigned int ulTag, const std::vector<unsigned int> &cbdata, const std::vector<unsigned char *> &lpdata, std::map<ECsIndexProp, unsigned int> &mapObjects);
 
 	ECRESULT GetStore(unsigned int ulObjId, unsigned int *ulStore, GUID *lpGuid, unsigned int maxdepth = 100);
 	ECRESULT GetStoreAndType(unsigned int ulObjId, unsigned int *ulStore, GUID *lpGuid, unsigned int *ulType, unsigned int maxdepth = 100);
 	ECRESULT GetObjectFlags(unsigned int ulObjId, unsigned int *ulFlags);
-	ECRESULT SetStore(unsigned int ulObjId, unsigned int ulStore, GUID *lpGuid, unsigned int ulType);
+	ECRESULT SetStore(unsigned int ulObjId, unsigned int ulStore, const GUID *, unsigned int ulType);
 
 	ECRESULT GetServerDetails(const std::string &strServerId, serverdetails_t *lpsDetails);
 	ECRESULT SetServerDetails(const std::string &strServerId, const serverdetails_t &sDetails);
@@ -555,27 +528,27 @@ public:
 
 	// Cache user information
 	ECRESULT GetUserDetails(unsigned int ulUserId, objectdetails_t *details);
-	ECRESULT SetUserDetails(unsigned int ulUserId, objectdetails_t *details);
+	ECRESULT SetUserDetails(unsigned int, const objectdetails_t *);
 
 	ECRESULT GetACLs(unsigned int ulObjId, struct rightsArray **lppRights);
-	ECRESULT SetACLs(unsigned int ulObjId, struct rightsArray *lpRights);
+	ECRESULT SetACLs(unsigned int ulObjId, const struct rightsArray *);
 
 	ECRESULT GetQuota(unsigned int ulUserId, bool bIsDefaultQuota, quotadetails_t *quota);
-	ECRESULT SetQuota(unsigned int ulUserId, bool bIsDefaultQuota, quotadetails_t quota);
+	ECRESULT SetQuota(unsigned int ulUserId, bool bIsDefaultQuota, const quotadetails_t &);
 
 	ECRESULT Update(unsigned int ulType, unsigned int ulObjId);
 	ECRESULT UpdateUser(unsigned int ulUserId);
 
 	ECRESULT GetEntryIdFromObject(unsigned int ulObjId, struct soap *soap, unsigned int ulFlags, entryId* lpEntrId);
 	ECRESULT GetEntryIdFromObject(unsigned int ulObjId, struct soap *soap, unsigned int ulFlags, entryId** lppEntryId);
-	ECRESULT GetObjectFromEntryId(entryId* lpEntrId, unsigned int* lpulObjId);
-	ECRESULT SetObjectEntryId(entryId *lpEntryId, unsigned int ulObjId);
+	ECRESULT GetObjectFromEntryId(const entryId *id, unsigned int *obj);
+	ECRESULT SetObjectEntryId(const entryId *, unsigned int ulObjId);
 	ECRESULT GetEntryListToObjectList(struct entryList *lpEntryList, ECListInt* lplObjectList);
 	ECRESULT GetEntryListFromObjectList(ECListInt* lplObjectList, struct soap *soap, struct entryList **lppEntryList);
 
 	// Table data functions (pure cache functions, they will never access the DB themselves. Data must be provided through Set functions)
-	ECRESULT GetCell(sObjectTableKey* lpsRowItem, unsigned int ulPropTag, struct propVal *lpDest, struct soap *soap, bool bComputed);
-	ECRESULT SetCell(sObjectTableKey* lpsRowItem, unsigned int ulPropTag, struct propVal *lpSrc);
+	ECRESULT GetCell(const sObjectTableKey *, unsigned int tag, struct propVal *, struct soap *, bool computed);
+	ECRESULT SetCell(const sObjectTableKey *, unsigned int tag, const struct propVal *);
 	ECRESULT UpdateCell(unsigned int ulObjId, unsigned int ulPropTag, int lDelta);
 	ECRESULT UpdateCell(unsigned int ulObjId, unsigned int ulPropTag, unsigned int ulMask, unsigned int ulValue);
 	ECRESULT SetComplete(unsigned int ulObjId);
@@ -600,7 +573,7 @@ public:
 	
 	// Cache list of properties indexed by zarafa-indexer
 	ECRESULT GetExcludedIndexProperties(std::set<unsigned int>& set);
-	ECRESULT SetExcludedIndexProperties(std::set<unsigned int>& set);
+	ECRESULT SetExcludedIndexProperties(const std::set<unsigned int> &);
 
 	// Test
 	void DisableCellCache();
@@ -617,19 +590,16 @@ private:
 	ECRESULT _GetStore(unsigned int ulObjId, unsigned int *ulStore, GUID *lpGuid, unsigned int *ulType);
 	ECRESULT _DelStore(unsigned int ulObjId);
 
-	ECRESULT _AddUserObject(unsigned int ulUserId, objectclass_t ulClass, unsigned int ulCompanyId,
-							std::string strExternId, std::string strSignature);
+	ECRESULT _AddUserObject(unsigned int ulUserId, const objectclass_t &ulClass, unsigned int ulCompanyId, const std::string &strExternId, const std::string &strSignature);
 	ECRESULT _GetUserObject(unsigned int ulUserId, objectclass_t* lpulClass, unsigned int *lpulCompanyId,
 							std::string* lpstrExternId, std::string* lpstrSignature);
 	ECRESULT _DelUserObject(unsigned int ulUserId);
 
-	ECRESULT _AddUEIdObject(std::string strExternId, objectclass_t ulClass, unsigned int ulCompanyId,
-							unsigned int ulUserId, std::string strSignature);
-	ECRESULT _GetUEIdObject(std::string strExternId, objectclass_t ulClass, unsigned int *lpulCompanyId,
-							unsigned int* lpulUserId, std::string* lpstrSignature);
-	ECRESULT _DelUEIdObject(std::string strExternId, objectclass_t ulClass);
+	ECRESULT _AddUEIdObject(const std::string &strExternId, const objectclass_t &ulClass, unsigned int ulCompanyId, unsigned int ulUserId, const std::string &strSignature);
+	ECRESULT _GetUEIdObject(const std::string &strExternId, objectclass_t ulClass, unsigned int *lpulCompanyId, unsigned int* lpulUserId, std::string* lpstrSignature);
+	ECRESULT _DelUEIdObject(const std::string &strExternId, objectclass_t ulClass);
 
-	ECRESULT _AddUserObjectDetails(unsigned int ulUserId, objectdetails_t *details);
+	ECRESULT _AddUserObjectDetails(unsigned int, const objectdetails_t *);
 	ECRESULT _GetUserObjectDetails(unsigned int ulUserId, objectdetails_t *details);
 	ECRESULT _DelUserObjectDetails(unsigned int ulUserId);
 
@@ -639,12 +609,10 @@ private:
 	ECRESULT _DelQuota(unsigned int ulUserId, bool bIsDefaultQuota);
 
 	// Cache Index properties
-	ECRESULT _AddIndexData(ECsIndexObject* lpObject, ECsIndexProp* lpProp);	
+	ECRESULT _AddIndexData(const ECsIndexObject *lpObject, const ECsIndexProp *lpProp);
 
 private:
 	ECDatabaseFactory*	m_lpDatabaseFactory;
-	ECLogger*			m_lpLogger;
-
 	pthread_mutex_t		m_hCacheMutex;			// Store, Object, User, ACL, server cache
 	pthread_mutex_t		m_hCacheCellsMutex;		// Cell cache
 	pthread_mutex_t		m_hCacheIndPropMutex;	// Indexed properties cache

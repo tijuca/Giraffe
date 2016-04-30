@@ -1,70 +1,44 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 // ECABLogon.cpp: implementation of the ECABLogon class.
 //
 //////////////////////////////////////////////////////////////////////
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <mapiutil.h>
 
 #include "Zarafa.h"
-#include "ECGuid.h"
-#include "edkguid.h"
+#include <zarafa/ECGuid.h>
+#include <edkguid.h>
 #include "ECABLogon.h"
 
 #include "ECABContainer.h"
 #include "ECMailUser.h"
 #include "ECDistList.h"
 
-#include "ECDebug.h"
+#include <zarafa/ECDebug.h>
 
 #include "WSTransport.h"
 
-#include "Util.h"
+#include <zarafa/Util.h>
 #include "Mem.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 #include "ZarafaUtil.h"
 
 #ifdef _DEBUG
@@ -153,11 +127,7 @@ HRESULT ECABLogon::QueryInterface(REFIID refiid, void **lppInterface)
 
 HRESULT ECABLogon::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_CALL_FAILED;
-
-	return hr;
+	return MAPI_E_CALL_FAILED;
 }
 
 HRESULT ECABLogon::Logoff(ULONG ulFlags)
@@ -338,9 +308,7 @@ HRESULT ECABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 		*lpulObjType = lpABeid->ulType;
 
 exit:
-	if(lpEntryIDServer)
-		MAPIFreeBuffer(lpEntryIDServer);
-
+	MAPIFreeBuffer(lpEntryIDServer);
 	if(lpABContainer)
 		lpABContainer->Release();
 
@@ -368,63 +336,40 @@ HRESULT ECABLogon::Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMas
 {
 	HRESULT hr = hrSuccess;
 
-	if(lpAdviseSink == NULL || lpulConnection == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if(lpEntryID == NULL) {
+	if (lpAdviseSink == NULL || lpulConnection == NULL)
+		return MAPI_E_INVALID_PARAMETER;
+	if (lpEntryID == NULL)
 		//NOTE: Normal you must give the entryid of the addressbook toplevel
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+		return MAPI_E_INVALID_PARAMETER;
 
 	ASSERT(m_lpNotifyClient != NULL && (lpEntryID != NULL || TRUE));
 
 	if(m_lpNotifyClient->Advise(cbEntryID, (LPBYTE)lpEntryID, ulEventMask, lpAdviseSink, lpulConnection) != S_OK)
 		hr = MAPI_E_NO_SUPPORT;
-
-exit:
 	return hr;
 }
 
 HRESULT ECABLogon::Unadvise(ULONG ulConnection)
 {
-	HRESULT hr = hrSuccess;
-
 	ASSERT(m_lpNotifyClient != NULL);
-
 	m_lpNotifyClient->Unadvise(ulConnection);
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECABLogon::OpenStatusEntry(LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPMAPISTATUS * lppMAPIStatus)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_NO_SUPPORT;
-
-	return hr;
+	return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT ECABLogon::OpenTemplateID(ULONG cbTemplateID, LPENTRYID lpTemplateID, ULONG ulTemplateFlags, LPMAPIPROP lpMAPIPropData, LPCIID lpInterface, LPMAPIPROP * lppMAPIPropNew, LPMAPIPROP lpMAPIPropSibling)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_NO_SUPPORT;
-
-	return hr;
+	return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT ECABLogon::GetOneOffTable(ULONG ulFlags, LPMAPITABLE * lppTable)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = MAPI_E_NO_SUPPORT;
-	//hr = m_lpMAPISup->GetOneOffTable(ulFlags, lppTable);
-
-	return hr;
+	//return m_lpMAPISup->GetOneOffTable(ulFlags, lppTable);
+	return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT ECABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, LPADRLIST lpRecipList)
@@ -445,8 +390,7 @@ HRESULT ECABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, 
 	if(lpPropTagArray == NULL || lpPropTagArray->cValues == 0) // There is no work to do.
 		goto exit;
 
-	for(unsigned int i=0; i < lpRecipList->cEntries; i++)
-	{
+	for (unsigned int i = 0; i < lpRecipList->cEntries; ++i) {
 		rgpropvalsRecip	= lpRecipList->aEntries[i].rgPropVals;
 		cPropsRecip		= lpRecipList->aEntries[i].cValues;
 
@@ -476,7 +420,7 @@ HRESULT ECABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, 
 		// merge the properties
 		ECAllocateBuffer((cValues+cPropsRecip)*sizeof(SPropValue), (void**)&lpNewPropArray);
 
-		for(j=0; j < cValues; j++) {
+		for (j = 0; j < cValues; ++j) {
 			lpPropVal = NULL;
 
 			if(PROP_TYPE(lpPropArray[j].ulPropTag) == PT_ERROR)
@@ -491,8 +435,7 @@ HRESULT ECABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, 
 				goto exit;
 		}
 
-		for(j=0; j < cPropsRecip; j++)
-		{
+		for (j = 0; j < cPropsRecip; ++j) {
 			if ( PpropFindProp(lpNewPropArray, cValues, rgpropvalsRecip[j].ulPropTag ) ||
 				PROP_TYPE( rgpropvalsRecip[j].ulPropTag ) == PT_ERROR )
 				continue;
@@ -500,9 +443,7 @@ HRESULT ECABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, 
 			hr = Util::HrCopyProperty(lpNewPropArray + cValues, &rgpropvalsRecip[j], lpNewPropArray);
 			if(hr != hrSuccess)
 				goto exit;			
-				
-				
-			cValues++;
+			++cValues;
 		}
 
 		lpRecipList->aEntries[i].rgPropVals	= lpNewPropArray;

@@ -1,52 +1,26 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "Http.h"
-#include "mapi_ptr.h"
-#include "stringutil.h"
+#include <zarafa/mapi_ptr.h>
+#include <zarafa/stringutil.h>
 
-#include "ECConfig.h"
+#include <zarafa/ECConfig.h>
 
 using namespace std;
 
@@ -78,7 +52,7 @@ HRESULT HrParseURL(const std::string &strUrl, ULONG *lpulFlag, std::string *lpst
 	std::string strFolder;
 	std::string strUrlUser;
 	vector<std::string> vcUrlTokens;
-	vector<std::string>::iterator iterToken;
+	vector<std::string>::const_iterator iterToken;
 	ULONG ulFlag = 0;
 
 	vcUrlTokens = tokenize(strUrl, L'/', true);
@@ -133,7 +107,7 @@ HRESULT HrParseURL(const std::string &strUrl, ULONG *lpulFlag, std::string *lpst
 		goto exit;
 
 	// @todo subfolder/folder/ is not allowed! only subfolder/item.ics
-	for ( ;iterToken != vcUrlTokens.end(); iterToken++) 
+	for (; iterToken != vcUrlTokens.end(); ++iterToken)
 		strFolder = strFolder + *iterToken + "/";
 
 	strFolder.erase(strFolder.length() - 1);
@@ -155,6 +129,7 @@ Http::Http(ECChannel *lpChannel, ECLogger *lpLogger, ECConfig *lpConfig)
 {
 	m_lpChannel = lpChannel;
 	m_lpLogger = lpLogger;
+	m_lpLogger->AddRef();
 	m_lpConfig = lpConfig;
 
 	m_ulKeepAlive = 0;
@@ -166,6 +141,7 @@ Http::Http(ECChannel *lpChannel, ECLogger *lpLogger, ECConfig *lpConfig)
  */
 Http::~Http()
 {
+	m_lpLogger->Release();
 }
 
 /**
@@ -176,7 +152,7 @@ Http::~Http()
  */
 HRESULT Http::HrReadHeaders()
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	std::string strBuffer;
 	ULONG n = 0;
 	std::map<std::string, std::string>::iterator iHeader = mapHeaders.end();
@@ -186,7 +162,7 @@ HRESULT Http::HrReadHeaders()
 	{
 		hr = m_lpChannel->HrReadLine(&strBuffer);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		if (strBuffer.empty())
 			break;
@@ -202,7 +178,8 @@ HRESULT Http::HrReadHeaders()
 				if (iHeader == mapHeaders.end())
 					continue;
 				// continue header
-				while (strBuffer[start] == ' ' || strBuffer[start] == '\t') start++;
+				while (strBuffer[start] == ' ' || strBuffer[start] == '\t')
+					++start;
 				iHeader->second += strBuffer.substr(start);
 			} else {
 				// new header
@@ -217,15 +194,13 @@ HRESULT Http::HrReadHeaders()
 			else
 				m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "< "+strBuffer);
 		}
-		n++;
+		++n;
 
 	} while(hr == hrSuccess);
 
 	hr = HrParseHeaders();
 	if (hr != hrSuccess)
 		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "parsing headers failed: 0x%08X", hr);
-
-exit:
 	return hr;
 }
 
@@ -237,13 +212,13 @@ exit:
 // @todo this does way too much.
 HRESULT Http::HrParseHeaders()
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	std::string strAuthdata;
 	std::string strLength;
 	std::string strUserAgent;
 
 	std::vector<std::string> items;
-	std::map<std::string, std::string>::iterator iHeader = mapHeaders.end();
+	std::map<std::string, std::string>::const_iterator iHeader = mapHeaders.end();
 
 	std::string user_pass;
 	size_t colon_pos;
@@ -251,8 +226,7 @@ HRESULT Http::HrParseHeaders()
 	items = tokenize(m_strAction, ' ', true);
 	if (items.size() != 3) {
 		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "HrParseHeaders invalid != 3 tokens");
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
+		return MAPI_E_INVALID_PARAMETER;
 	}
 	m_strMethod = items[0];
 	m_strURL = items[1];
@@ -286,31 +260,26 @@ HRESULT Http::HrParseHeaders()
 	hr = HrGetHeaderValue("Authorization", &strAuthdata);
 	if (hr != hrSuccess) {
 		hr = HrGetHeaderValue("WWW-Authenticate", &strAuthdata);
-		if (hr != hrSuccess) {
-			hr = S_OK;	// ignore empty Authorization
-			goto exit;
-		}
+		if (hr != hrSuccess)
+			return S_OK; /* ignore empty Authorization */
 	}
 
 	items = tokenize(strAuthdata, ' ', true);
 	// we only support basic authentication
 	if (items.size() != 2 || items[0].compare("Basic") != 0) {
 		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "HrParseHeaders login failed");
-		hr = MAPI_E_LOGON_FAILED;
-		goto exit;
+		return MAPI_E_LOGON_FAILED;
 	}
 
 	user_pass = base64_decode(items[1]);
 	if((colon_pos = user_pass.find(":")) == std::string::npos) {
-		hr = MAPI_E_LOGON_FAILED;
 		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "HrParseHeaders password missing");
-		goto exit;
+		return MAPI_E_LOGON_FAILED;
 	}
 
 	m_strUser = user_pass.substr(0, colon_pos);
 	m_strPass = user_pass.substr(colon_pos+1, std::string::npos);
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -321,13 +290,9 @@ exit:
  */
 HRESULT Http::HrGetUser(std::wstring *strUser)
 {
-	HRESULT hr = hrSuccess;
-	if (!m_strUser.empty())
-		hr = X2W(m_strUser, strUser);
-	else
-		hr = MAPI_E_NOT_FOUND;
-
-	return hr;
+	if (m_strUser.empty())
+		return MAPI_E_NOT_FOUND;
+	return X2W(m_strUser, strUser);
 }
 
 /**
@@ -338,14 +303,10 @@ HRESULT Http::HrGetUser(std::wstring *strUser)
  */
 HRESULT Http::HrGetMethod(std::string *strMethod)
 {
-	HRESULT hr = hrSuccess;
-
-	if (!m_strMethod.empty())
-		strMethod->assign(m_strMethod);
-	else
-		hr = MAPI_E_NOT_FOUND;
-
-	return hr;
+	if (m_strMethod.empty())
+		return MAPI_E_NOT_FOUND;
+	strMethod->assign(m_strMethod);
+	return hrSuccess;
 }
 
 /**
@@ -356,13 +317,9 @@ HRESULT Http::HrGetMethod(std::string *strMethod)
  */
 HRESULT Http::HrGetPass(std::wstring *strPass)
 {
-	HRESULT hr = hrSuccess;
-	if (!m_strPass.empty())
-		hr = X2W(m_strPass, strPass);
-	else
-		hr = MAPI_E_NOT_FOUND;
-
-	return hr;
+	if (m_strPass.empty())
+		return MAPI_E_NOT_FOUND;
+	return X2W(m_strPass, strPass);
 }
 
 /** 
@@ -387,14 +344,10 @@ HRESULT Http::HrGetRequestUrl(std::string *strURL)
  */
 HRESULT Http::HrGetUrl(std::string *strUrl)
 {
-	HRESULT hr = hrSuccess;
-
-	if (!m_strPath.empty())
-		strUrl->assign(urlDecode(m_strPath));
-	else
-		hr = MAPI_E_NOT_FOUND;
-
-	return hr;
+	if (m_strPath.empty())
+		return MAPI_E_NOT_FOUND;
+	strUrl->assign(urlDecode(m_strPath));
+	return hrSuccess;
 }
 
 /**
@@ -405,13 +358,10 @@ HRESULT Http::HrGetUrl(std::string *strUrl)
  */
 HRESULT Http::HrGetBody(std::string *strBody)
 {
-	HRESULT hr = hrSuccess;
-	if (!m_strReqBody.empty())
-		strBody->assign(m_strReqBody);
-	else
-		hr = MAPI_E_NOT_FOUND;
-
-	return hr;
+	if (m_strReqBody.empty())
+		return MAPI_E_NOT_FOUND;
+	strBody->assign(m_strReqBody);
+	return hrSuccess;
 }
 
 /**
@@ -486,7 +436,7 @@ bool Http::CheckIfMatch(LPMAPIPROP lpProp)
 
 	// check all etags for a match
 	vMatches = tokenize(strIf, ',', true);
-	for (i = vMatches.begin(); i != vMatches.end(); i++) {
+	for (i = vMatches.begin(); i != vMatches.end(); ++i) {
 		if (i->at(0) == '"' || i->at(0) == '\'')
 			i->assign(i->begin()+1, i->end()-1);
 		if (i->compare(strValue) == 0) {
@@ -510,14 +460,10 @@ bool Http::CheckIfMatch(LPMAPIPROP lpProp)
  */
 HRESULT Http::HrGetCharSet(std::string *strCharset)
 {
-	HRESULT hr = hrSuccess;
-
-	if(!m_strCharSet.empty())
-		strCharset->assign(m_strCharSet);
-	else
-		hr = MAPI_E_NOT_FOUND;
-
-	return hr;
+	if (m_strCharSet.empty())
+		return MAPI_E_NOT_FOUND;
+	strCharset->assign(m_strCharSet);
+	return hrSuccess;
 }
 
 /**
@@ -536,7 +482,7 @@ HRESULT Http::HrGetCharSet(std::string *strCharset)
  */
 HRESULT Http::HrGetDestination(std::string *strDestination)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	std::string strHost;
 	std::string strDest;
 	string::size_type pos;
@@ -545,29 +491,24 @@ HRESULT Http::HrGetDestination(std::string *strDestination)
 	hr = HrGetHeaderValue("Host", &strHost);
 	if(hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Http::HrGetDestination host header missing");
-		goto exit;
+		return hr;
 	}
 
 	// example:  Destination: http://server:port/caldav/username/folderid/entry.ics
 	hr = HrGetHeaderValue("Destination", &strDest);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Http::HrGetDestination destination header missing");
-		goto exit;
+		return hr;
 	}
 
 	pos = strDest.find(strHost);
 	if (pos == string::npos) {
 		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Refusing to move calendar item from %s to different host on url %s", strHost.c_str(), strDest.c_str());
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
-	} else {
-		strDest.erase(0, pos + strHost.length());
+		return MAPI_E_CALL_FAILED;
 	}
-
+	strDest.erase(0, pos + strHost.length());
 	*strDestination = strDest;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -607,27 +548,25 @@ HRESULT Http::HrReadBody()
  */
 HRESULT Http::HrValidateReq()
 {
-	HRESULT hr = hrSuccess;
 	static const char *const lpszMethods[] = {
 		"ACL", "GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS",
 		"PROPFIND", "REPORT", "MKCALENDAR", "PROPPATCH", "MOVE", NULL,
 	};
 	bool bFound = false;
-	int i = 0;
+	int i;
 
 	if (m_strMethod.empty()) {
-		hr = MAPI_E_INVALID_PARAMETER;
+		static const HRESULT hr = MAPI_E_INVALID_PARAMETER;
 		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "HTTP request method is empty: %08X", hr);
-		goto exit;
+		return hr;
 	}
 
 	if (!parseBool(m_lpConfig->GetSetting("enable_ical_get")) && m_strMethod == "GET") {
-		hr = MAPI_E_NO_ACCESS;
 		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Denying iCalendar GET since it is disabled");
-		goto exit;
+		return MAPI_E_NO_ACCESS;
 	}
 
-	for (i = 0; lpszMethods[i] != NULL; i++) {
+	for (i = 0; lpszMethods[i] != NULL; ++i) {
 		if (m_strMethod.compare(lpszMethods[i]) == 0) {
 			bFound = true;
 			break;
@@ -635,20 +574,17 @@ HRESULT Http::HrValidateReq()
 	}
 
 	if (bFound == false) {
-		hr = MAPI_E_INVALID_PARAMETER;
+		static const HRESULT hr = MAPI_E_INVALID_PARAMETER;
 		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "HTTP request '%s' not implemented: %08X", m_strMethod.c_str(), hr);
-		goto exit;
+		return hr;
 	}
 
 	// validate authentication data
 	if (m_strUser.empty() || m_strPass.empty())
-	{
 		// hr still success, since http request is valid
 		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Request missing authorization data");
-	}
 
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -746,7 +682,7 @@ HRESULT Http::HrFinalize()
 		// @todo we're in C LC_TIME locale to get the correct (month) format, but the timezone will be GMT, which is not wanted.
 		strftime(szTime, arraySize(szTime), "%d/%b/%Y:%H:%M:%S %z", &local);
 		HrGetHeaderValue("User-Agent", &strAgent);
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "%s - %s [%s] \"%s\" %d %d \"-\" \"%s\"", m_lpChannel->GetIPAddress().c_str(), m_strUser.empty() ? "-" : m_strUser.c_str(), szTime, m_strAction.c_str(), m_ulRetCode, (int)m_strRespBody.length(), strAgent.c_str());
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "%s - %s [%s] \"%s\" %d %d \"-\" \"%s\"", m_lpChannel->peer_addr(), m_strUser.empty() ? "-" : m_strUser.c_str(), szTime, m_strAction.c_str(), m_ulRetCode, (int)m_strRespBody.length(), strAgent.c_str());
 	}
 
 exit:
@@ -784,17 +720,12 @@ HRESULT Http::HrToHTTPCode(HRESULT hr)
  */
 HRESULT Http::HrResponseHeader(unsigned int ulCode, std::string strResponse)
 {
-	HRESULT hr = hrSuccess;
-
 	m_ulRetCode = ulCode;
-
 	// do not set headers if once set
-	if (m_strRespHeader.empty()) 
-		m_strRespHeader = "HTTP/1.1 " + stringify(ulCode) + " " + strResponse;
-	else
-		hr = MAPI_E_CALL_FAILED;
-
-	return hr;
+	if (!m_strRespHeader.empty())
+		return MAPI_E_CALL_FAILED;
+	m_strRespHeader = "HTTP/1.1 " + stringify(ulCode) + " " + strResponse;
+	return hrSuccess;
 }
 
 /**
@@ -805,13 +736,8 @@ HRESULT Http::HrResponseHeader(unsigned int ulCode, std::string strResponse)
  */
 HRESULT Http::HrResponseHeader(std::string strHeader, std::string strValue)
 {
-	HRESULT hr = hrSuccess;
-	std::string header;
-
-	header = strHeader + ": " + strValue;
-	m_lstHeaders.push_back(header);
-
-	return hr;
+	m_lstHeaders.push_back(strHeader + ": " + strValue);
+	return hrSuccess;
 }
 
 /**
@@ -821,12 +747,9 @@ HRESULT Http::HrResponseHeader(std::string strHeader, std::string strValue)
  */
 HRESULT Http::HrResponseBody(std::string strResponse)
 {
-	HRESULT hr = hrSuccess;
-
 	m_strRespBody += strResponse;
 	// data send in HrFinalize()
-
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -837,19 +760,16 @@ HRESULT Http::HrResponseBody(std::string strResponse)
  */
 HRESULT Http::HrRequestAuth(std::string strMsg)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = HrResponseHeader(401, "Unauthorized");
+	HRESULT hr = HrResponseHeader(401, "Unauthorized");
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	strMsg = "Basic realm=\"" + strMsg + "\"";
 	hr = HrResponseHeader("WWW-Authenticate", strMsg);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -860,7 +780,7 @@ exit:
 HRESULT Http::HrFlushHeaders()
 {
 	HRESULT hr = hrSuccess;
-	std::list<std::string>::iterator h;
+	std::list<std::string>::const_iterator h;
 	std::string strOutput;
 	char lpszChar[128];
 	time_t tmCurrenttime = time(NULL);
@@ -893,7 +813,7 @@ HRESULT Http::HrFlushHeaders()
 	strOutput += m_strRespHeader + "\r\n";
 	m_strRespHeader.clear();
 
-	for (h = m_lstHeaders.begin(); h != m_lstHeaders.end(); h++) {
+	for (h = m_lstHeaders.begin(); h != m_lstHeaders.end(); ++h) {
 		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "> " + *h);
 		strOutput += *h + "\r\n";
 	}
@@ -914,7 +834,7 @@ HRESULT Http::X2W(const std::string &strIn, std::wstring *lpstrOut)
 
 HRESULT Http::HrGetHeaderValue(const std::string &strHeader, std::string *strValue)
 {
-	std::map<std::string, std::string>::iterator iHeader = mapHeaders.find(strHeader);
+	std::map<std::string, std::string>::const_iterator iHeader = mapHeaders.find(strHeader);
 	if (iHeader == mapHeaders.end())
 		return MAPI_E_NOT_FOUND;
 	*strValue = iHeader->second;
@@ -923,24 +843,16 @@ HRESULT Http::HrGetHeaderValue(const std::string &strHeader, std::string *strVal
 
 HRESULT Http::HrGetUserAgent(std::string *strUserAgent)
 {
-	HRESULT hr = hrSuccess;
-
-	if (!m_strUserAgent.empty())
-		strUserAgent -> assign(m_strUserAgent);
-	else
-		hr = MAPI_E_NOT_FOUND;
-
-	return hr;
+	if (m_strUserAgent.empty())
+		return MAPI_E_NOT_FOUND;
+	strUserAgent -> assign(m_strUserAgent);
+	return hrSuccess;
 }
 
 HRESULT Http::HrGetUserAgentVersion(std::string *strUserAgentVersion)
 {
-	HRESULT hr = hrSuccess;
-
-	if (!m_strUserAgentVersion.empty())
-		strUserAgentVersion -> assign(m_strUserAgentVersion);
-	else
-		hr = MAPI_E_NOT_FOUND;
-
-	return hr;
+	if (m_strUserAgentVersion.empty())
+		return MAPI_E_NOT_FOUND;
+	strUserAgentVersion -> assign(m_strUserAgentVersion);
+	return hrSuccess;
 }

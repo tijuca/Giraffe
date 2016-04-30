@@ -7,7 +7,7 @@
 #              through all objects (including attachments)
 # processname: /usr/sbin/zarafa-search
 # config: /etc/zarafa/search.cfg
-# pidfile: /var/run/zarafa-search.pid
+# pidfile: /var/run/zarafad/search.pid
 
 ### BEGIN INIT INFO
 # Provides: zarafa-search
@@ -40,11 +40,12 @@ fi
 RETVAL=0
 search=`basename $SEARCHPROGRAM`
 lockfile=/var/lock/subsys/$search
-pidfile=/var/run/$search.pid
+pidfile=/var/run/zarafad/search.pid
 
 start() {
 	# Start in background, always succeeds
 	echo -n $"Starting $search: "
+	install -dm0775 -o zarafa -g zarafa /var/run/zarafad
 	export LC_ALL=$ZARAFA_LOCALE
 	export LANG=$ZARAFA_LOCALE
 	daemon $SEARCHPROGRAM $SEARCHCONFIG_OPT

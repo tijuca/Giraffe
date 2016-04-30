@@ -1,59 +1,33 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <mapidefs.h>
 #include <mapitags.h>
 #include <edkmdb.h>
-#include "ECGuid.h"
+#include <zarafa/ECGuid.h>
 #include <Zarafa.h>
 
 #include "SOAPUtils.h"
 #include "SOAPAlloc.h"
-#include "stringutil.h"
-#include "ustringutil.h"
-#include "base64.h"
+#include <zarafa/stringutil.h>
+#include <zarafa/ustringutil.h>
+#include <zarafa/base64.h>
 
 using namespace std;
 
@@ -92,17 +66,13 @@ public:
 
 	ECRESULT compare(unsigned int ulIndex, const struct propVal *lpProp, const ECLocale &locale, int *lpnCompareResult)
 	{
-		ECRESULT er = erSuccess;
 		int nCompareResult = 0;
 
 		if (m_lpMVProp == NULL || 
 			(PROP_TYPE(m_lpMVProp->ulPropTag) & MV_FLAG) == 0 || 
 			(PROP_TYPE(m_lpMVProp->ulPropTag) & ~MV_FLAG) != PROP_TYPE(lpProp->ulPropTag) ||
 			ulIndex >= size())
-		{
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+			return ZARAFA_E_INVALID_PARAMETER;
 
 		switch (PROP_TYPE(m_lpMVProp->ulPropTag)) {
 			case PT_MV_I2:		
@@ -152,14 +122,11 @@ public:
 				break;
 
 			default:
-				er = ZARAFA_E_INVALID_PARAMETER;
-				goto exit;
+				return ZARAFA_E_INVALID_PARAMETER;
 		}
 
 		*lpnCompareResult = nCompareResult;
-
-	exit:
-		return er;
+		return erSuccess;
 	}
 
 private:
@@ -193,7 +160,7 @@ int CompareSortOrderArray(const struct sortOrderArray *lpsSortOrder1,
 	if(lpsSortOrder1->__size != lpsSortOrder2->__size)
 		return lpsSortOrder1->__size - lpsSortOrder2->__size;
 
-	for(i=0;i<lpsSortOrder1->__size;i++) {
+	for (i = 0; i <lpsSortOrder1->__size; ++i) {
 		if(lpsSortOrder1->__ptr[i].ulPropTag != lpsSortOrder2->__ptr[i].ulPropTag)
 			return -1;
 		if(lpsSortOrder1->__ptr[i].ulOrder != lpsSortOrder2->__ptr[i].ulOrder)
@@ -207,13 +174,10 @@ int CompareSortOrderArray(const struct sortOrderArray *lpsSortOrder1,
 ECRESULT CopyPropTagArray(struct soap *soap,
     const struct propTagArray *lpPTsSrc, struct propTagArray **lppsPTsDst)
 {
-	ECRESULT er = erSuccess;
 	struct propTagArray* lpPTsDst = NULL;
 
-	if(lppsPTsDst == NULL || lpPTsSrc == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lppsPTsDst == NULL || lpPTsSrc == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	lpPTsDst = s_alloc<struct propTagArray>(soap);
 	lpPTsDst->__size = lpPTsSrc->__size;
@@ -226,9 +190,7 @@ ECRESULT CopyPropTagArray(struct soap *soap,
 	}
 
 	*lppsPTsDst = lpPTsDst;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 void FreePropTagArray(struct propTagArray *lpsPropTags, bool bFreeBase)
@@ -260,7 +222,7 @@ struct propVal *FindProp(const struct propValArray *lpPropValArray,
 	if (lpPropValArray == NULL)
 		return NULL;
 
-	for (i = 0; i < lpPropValArray->__size; i++) {
+	for (i = 0; i < lpPropValArray->__size; ++i) {
 		if (lpPropValArray->__ptr[i].ulPropTag == ulPropTag ||
 			(PROP_TYPE(ulPropTag) == PT_UNSPECIFIED && PROP_ID(lpPropValArray->__ptr[i].ulPropTag) == PROP_ID(ulPropTag)))
 			return &lpPropValArray->__ptr[i];
@@ -470,28 +432,22 @@ ECRESULT CompareProp(const struct propVal *lpProp1,
 		{PR_ADDRESS_BOOK_ENTRYID, &CompareABEID},
 	};
 
-	if(lpProp1 == NULL || lpProp2 == NULL || lpCompareResult == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpProp1 == NULL || lpProp2 == NULL || lpCompareResult == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	ulPropTag1 = NormalizePropTag(lpProp1->ulPropTag);
 	ulPropTag2 = NormalizePropTag(lpProp2->ulPropTag);
 
-	if(PROP_TYPE(ulPropTag1) != PROP_TYPE(ulPropTag2)) {
+	if (PROP_TYPE(ulPropTag1) != PROP_TYPE(ulPropTag2))
 		// Treat this as equal
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	// check soap union types and null pointers
-	if(PropCheck(lpProp1) != erSuccess || PropCheck(lpProp2) != erSuccess){
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (PropCheck(lpProp1) != erSuccess || PropCheck(lpProp2) != erSuccess)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	// First check if the any of the properties is in the sSpecials list
-	for (unsigned x = 0; x < sizeof(sSpecials) / sizeof *sSpecials; ++x) {
+	for (size_t x = 0; x < ARRAY_SIZE(sSpecials); ++x) {
 		if ((lpProp1->ulPropTag == sSpecials[x].ulPropTag && PROP_TYPE(lpProp2->ulPropTag) == PROP_TYPE(sSpecials[x].ulPropTag)) ||
 			(PROP_TYPE(lpProp1->ulPropTag) == PROP_TYPE(sSpecials[x].ulPropTag) && lpProp2->ulPropTag == sSpecials[x].ulPropTag))
 		{
@@ -576,7 +532,7 @@ ECRESULT CompareProp(const struct propVal *lpProp1,
 
 	case PT_MV_I2:
 		if (lpProp1->Value.mvi.__size == lpProp2->Value.mvi.__size) {
-			for(i=0; i < lpProp1->Value.mvi.__size; i++) {
+			for (i = 0; i < lpProp1->Value.mvi.__size; ++i) {
 				nCompareResult = lpProp1->Value.mvi.__ptr[i] - lpProp2->Value.mvi.__ptr[i];
 				if(nCompareResult != 0)
 					break;
@@ -586,7 +542,7 @@ ECRESULT CompareProp(const struct propVal *lpProp1,
 		break;
 	case PT_MV_LONG:
 		if (lpProp1->Value.mvl.__size == lpProp2->Value.mvl.__size) {
-			for(i=0; i < lpProp1->Value.mvl.__size; i++) {
+			for (i = 0; i < lpProp1->Value.mvl.__size; ++i) {
 				if(lpProp1->Value.mvl.__ptr[i] == lpProp2->Value.mvl.__ptr[i])
                     nCompareResult = 0;
 				else if(lpProp1->Value.mvl.__ptr[i] < lpProp2->Value.mvl.__ptr[i])
@@ -602,7 +558,7 @@ ECRESULT CompareProp(const struct propVal *lpProp1,
 		break;
 	case PT_MV_R4:
 		if (lpProp1->Value.mvflt.__size == lpProp2->Value.mvflt.__size) {
-			for(i=0; i < lpProp1->Value.mvflt.__size; i++) {
+			for (i = 0; i < lpProp1->Value.mvflt.__size; ++i) {
 				if(lpProp1->Value.mvflt.__ptr[i] == lpProp2->Value.mvflt.__ptr[i])
 					nCompareResult = 0;
 				else if(lpProp1->Value.mvflt.__ptr[i] < lpProp2->Value.mvflt.__ptr[i])
@@ -619,7 +575,7 @@ ECRESULT CompareProp(const struct propVal *lpProp1,
 	case PT_MV_DOUBLE:
 	case PT_MV_APPTIME:
 		if (lpProp1->Value.mvdbl.__size == lpProp2->Value.mvdbl.__size) {
-			for(i=0; i < lpProp1->Value.mvdbl.__size; i++) {
+			for (i = 0; i < lpProp1->Value.mvdbl.__size; ++i) {
 				if(lpProp1->Value.mvdbl.__ptr[i] == lpProp2->Value.mvdbl.__ptr[i])
 					nCompareResult = 0;
 				else if(lpProp1->Value.mvdbl.__ptr[i] < lpProp2->Value.mvdbl.__ptr[i])
@@ -635,7 +591,7 @@ ECRESULT CompareProp(const struct propVal *lpProp1,
 		break;
 	case PT_MV_I8:
 		if (lpProp1->Value.mvli.__size == lpProp2->Value.mvli.__size) {
-			for(i=0; i < lpProp1->Value.mvli.__size; i++) {
+			for (i = 0; i < lpProp1->Value.mvli.__size; ++i) {
 				if(lpProp1->Value.mvli.__ptr[i] == lpProp2->Value.mvli.__ptr[i])
 					nCompareResult = 0;
 				else if(lpProp1->Value.mvli.__ptr[i] < lpProp2->Value.mvli.__ptr[i])
@@ -651,7 +607,7 @@ ECRESULT CompareProp(const struct propVal *lpProp1,
 	case PT_MV_SYSTIME:
 	case PT_MV_CURRENCY:
 		if (lpProp1->Value.mvhilo.__size == lpProp2->Value.mvhilo.__size) {
-			for(i=0; i < lpProp1->Value.mvhilo.__size; i++) {
+			for (i = 0; i < lpProp1->Value.mvhilo.__size; ++i) {
 				if(lpProp1->Value.mvhilo.__ptr[i].hi == lpProp2->Value.mvhilo.__ptr[i].hi && lpProp1->Value.mvhilo.__ptr[i].lo < lpProp2->Value.mvhilo.__ptr[i].lo)
 					nCompareResult = -1;
 				else if(lpProp1->Value.mvhilo.__ptr[i].hi == lpProp2->Value.mvhilo.__ptr[i].hi && lpProp1->Value.mvhilo.__ptr[i].lo > lpProp2->Value.mvhilo.__ptr[i].lo)
@@ -668,7 +624,7 @@ ECRESULT CompareProp(const struct propVal *lpProp1,
 	case PT_MV_CLSID:
 	case PT_MV_BINARY:
 		if (lpProp1->Value.mvbin.__size == lpProp2->Value.mvbin.__size) {
-			for(i=0; i < lpProp1->Value.mvbin.__size; i++) {
+			for (i = 0; i < lpProp1->Value.mvbin.__size; ++i) {
 				if(lpProp1->Value.mvbin.__ptr[i].__ptr && lpProp2->Value.mvbin.__ptr[i].__ptr &&
 				   lpProp1->Value.mvbin.__ptr[i].__size && lpProp2->Value.mvbin.__ptr[i].__size &&
 				   lpProp1->Value.mvbin.__ptr[i].__size - lpProp2->Value.mvbin.__ptr[i].__size == 0)
@@ -685,7 +641,7 @@ ECRESULT CompareProp(const struct propVal *lpProp1,
 	case PT_MV_STRING8:
 	case PT_MV_UNICODE:
 		if (lpProp1->Value.mvszA.__size == lpProp2->Value.mvszA.__size) {
-			for(i=0; i < lpProp1->Value.mvszA.__size; i++) {
+			for (i = 0; i < lpProp1->Value.mvszA.__size; ++i) {
 				if (lpProp1->Value.mvszA.__ptr[i] && lpProp2->Value.mvszA.__ptr[i])
 					nCompareResult =u8_icompare(lpProp1->Value.mvszA.__ptr[i], lpProp2->Value.mvszA.__ptr[i], locale);
 				else
@@ -698,15 +654,11 @@ ECRESULT CompareProp(const struct propVal *lpProp1,
 			nCompareResult = lpProp1->Value.mvszA.__size - lpProp2->Value.mvszA.__size;
 		break;
 	default:
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-		break;
+		return ZARAFA_E_INVALID_PARAMETER;
 	}
 
 skip_check:
 	*lpCompareResult = nCompareResult;
-
-exit:
 	return er;
 }
 
@@ -719,32 +671,25 @@ ECRESULT CompareMVPropWithProp(struct propVal *lpMVProp1,
     const struct propVal *lpProp2, unsigned int ulType, const ECLocale &locale,
     bool *lpfMatch)
 {
-	ECRESULT	er = erSuccess;
+	ECRESULT er;
 	int			nCompareResult = -1; // Default, Don't change this to 0
 	bool		fMatch = false;
 	MVPropProxy pxyMVProp1(lpMVProp1);
 
-	if(lpMVProp1 == NULL || lpProp2 == NULL || lpfMatch == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if((PROP_TYPE(lpMVProp1->ulPropTag)&~MV_FLAG) != PROP_TYPE(lpProp2->ulPropTag)) {
+	if (lpMVProp1 == NULL || lpProp2 == NULL || lpfMatch == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
+	if ((PROP_TYPE(lpMVProp1->ulPropTag) & ~MV_FLAG) != PROP_TYPE(lpProp2->ulPropTag))
 		// Treat this as equal
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	// check soap union types and null pointers
-	if(PropCheck(lpMVProp1) != erSuccess || PropCheck(lpProp2) != erSuccess){
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (PropCheck(lpMVProp1) != erSuccess || PropCheck(lpProp2) != erSuccess)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	for (unsigned int i = 0; !fMatch && i < pxyMVProp1.size(); ++i) {
 		er = pxyMVProp1.compare(i, lpProp2, locale, &nCompareResult);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 
 		switch(ulType) {
 		case RELOP_GE:
@@ -772,9 +717,7 @@ ECRESULT CompareMVPropWithProp(struct propVal *lpMVProp1,
 	}
 
 	*lpfMatch = fMatch;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 unsigned int PropSize(struct propVal *lpProp)
@@ -819,10 +762,8 @@ unsigned int PropSize(struct propVal *lpProp)
 	case PT_MV_UNICODE:
 	case PT_MV_STRING8:
 		ulSize = 0;
-		for(i=0; i < lpProp->Value.mvszA.__size; i++)
-		{
+		for (i = 0; i < lpProp->Value.mvszA.__size; ++i)
 			ulSize+= (lpProp->Value.mvszA.__ptr[i])? (unsigned int)strlen(lpProp->Value.mvszA.__ptr[i]) : 0;
-		}
 		return ulSize;
 	case PT_MV_SYSTIME:
 	case PT_MV_CURRENCY:
@@ -830,10 +771,8 @@ unsigned int PropSize(struct propVal *lpProp)
 	case PT_MV_BINARY:
 	case PT_MV_CLSID:
 		ulSize = 0;
-		for(i=0; i < lpProp->Value.mvbin.__size; i++)
-		{
+		for (i = 0; i < lpProp->Value.mvbin.__size; ++i)
 			ulSize+= lpProp->Value.mvbin.__ptr[i].__size;
-		}
 		return ulSize;
 	default:
 		return 0;
@@ -859,55 +798,45 @@ ECRESULT FreePropVal(struct propVal *lpProp, bool bBasePointerDel)
 		break;
 	case PT_SYSTIME:
 	case PT_CURRENCY:
-		if(lpProp->Value.hilo)
-			delete lpProp->Value.hilo;
+		delete lpProp->Value.hilo;
 		break;
 	case PT_STRING8:
 	case PT_UNICODE:
-		if(lpProp->Value.lpszA)
-			delete [] lpProp->Value.lpszA;
+		delete[] lpProp->Value.lpszA;
 		break;
 	case PT_CLSID:
 	case PT_BINARY:
-		if(lpProp->Value.bin && lpProp->Value.bin->__ptr)
-			delete [] lpProp->Value.bin->__ptr;
-		if(lpProp->Value.bin)
+		if (lpProp->Value.bin) {
+			delete[] lpProp->Value.bin->__ptr;
 			delete lpProp->Value.bin;
+		}
 		break;
 	case PT_MV_I2:
-		if(lpProp->Value.mvi.__ptr)
-			delete []lpProp->Value.mvi.__ptr;
+		delete[] lpProp->Value.mvi.__ptr;
 		break;
 	case PT_MV_LONG:
-		if(lpProp->Value.mvl.__ptr)
-			delete []lpProp->Value.mvl.__ptr;
+		delete[] lpProp->Value.mvl.__ptr;
 		break;
 	case PT_MV_R4:
-		if(lpProp->Value.mvflt.__ptr)
-			delete []lpProp->Value.mvflt.__ptr;
+		delete[] lpProp->Value.mvflt.__ptr;
 		break;
 	case PT_MV_DOUBLE:
 	case PT_MV_APPTIME:
-		if(lpProp->Value.mvdbl.__ptr)
-			delete []lpProp->Value.mvdbl.__ptr;
+		delete[] lpProp->Value.mvdbl.__ptr;
 		break;
 	case PT_MV_I8:
-		if(lpProp->Value.mvli.__ptr)
-			delete []lpProp->Value.mvli.__ptr;
+		delete[] lpProp->Value.mvli.__ptr;
 		break;
 	case PT_MV_SYSTIME:
 	case PT_MV_CURRENCY:
-		if(lpProp->Value.mvhilo.__ptr)
-			delete[] lpProp->Value.mvhilo.__ptr;
+		delete[] lpProp->Value.mvhilo.__ptr;
 		break;
 	case PT_MV_CLSID:
 	case PT_MV_BINARY:
 		if(lpProp->Value.mvbin.__ptr)
 		{
-			for(int i=0; i < lpProp->Value.mvbin.__size; i++) {
-				if(lpProp->Value.mvbin.__ptr[i].__ptr)
-					delete[] lpProp->Value.mvbin.__ptr[i].__ptr;
-			}
+			for (int i = 0; i < lpProp->Value.mvbin.__size; ++i)
+				delete[] lpProp->Value.mvbin.__ptr[i].__ptr;
 			delete[] lpProp->Value.mvbin.__ptr;
 		}
 		break;
@@ -915,10 +844,8 @@ ECRESULT FreePropVal(struct propVal *lpProp, bool bBasePointerDel)
 	case PT_MV_UNICODE:
 		if(lpProp->Value.mvszA.__ptr)
 		{
-			for(int i=0; i < lpProp->Value.mvszA.__size; i++) {
-				if(lpProp->Value.mvszA.__ptr[i])
-					delete[] lpProp->Value.mvszA.__ptr[i];
-			}
+			for (int i = 0; i < lpProp->Value.mvszA.__size; ++i)
+				delete[] lpProp->Value.mvszA.__ptr[i];
 			delete [] lpProp->Value.mvszA.__ptr;
 		}
 		break;
@@ -930,7 +857,7 @@ ECRESULT FreePropVal(struct propVal *lpProp, bool bBasePointerDel)
 		if(lpProp->Value.actions) {
 			struct actions *lpActions = lpProp->Value.actions;
 
-			for(int i=0;i<lpActions->__size;i++) {
+			for (int i = 0; i < lpActions->__size; ++i) {
 				struct action *lpAction = &lpActions->__ptr[i];
 
 				switch(lpAction->acttype) {
@@ -959,9 +886,7 @@ ECRESULT FreePropVal(struct propVal *lpProp, bool bBasePointerDel)
 				}
 			}
 
-			if(lpActions->__ptr)
-				delete [] lpActions->__ptr;
-
+			delete[] lpActions->__ptr;
 			delete lpProp->Value.actions;
 		}
 		break;
@@ -979,13 +904,8 @@ void FreeRowSet(struct rowSet *lpRowSet, bool bBasePointerDel)
 {
 	if(lpRowSet == NULL)
 		return;
-
-	for(int i=0; i<lpRowSet->__size; i++) {
-
+	for (int i = 0; i < lpRowSet->__size; ++i)
 		FreePropValArray(&lpRowSet->__ptr[i]);
-
-	}
-
 	if(lpRowSet->__size > 0)
 		delete []lpRowSet->__ptr;
 
@@ -1003,84 +923,68 @@ void FreeRowSet(struct rowSet *lpRowSet, bool bBasePointerDel)
  */
 ECRESULT FreeRestrictTable(struct restrictTable *lpRestrict, bool base)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	unsigned int i = 0;
 
 	if(lpRestrict == NULL)
-		goto exit;
+		return erSuccess;
 
 	switch(lpRestrict->ulType) {
 	case RES_OR:
 		if(lpRestrict->lpOr && lpRestrict->lpOr->__ptr) {
-
-			for(i=0;i<lpRestrict->lpOr->__size;i++) {
+			for (i = 0; i < lpRestrict->lpOr->__size; ++i) {
 				er = FreeRestrictTable(lpRestrict->lpOr->__ptr[i]);
 
 				if(er != erSuccess)
-					goto exit;
+					return er;
 			}
 			delete [] lpRestrict->lpOr->__ptr;
 		}
-		if(lpRestrict->lpOr)
-			delete lpRestrict->lpOr;
+		delete lpRestrict->lpOr;
 		break;
 	case RES_AND:
 		if(lpRestrict->lpAnd && lpRestrict->lpAnd->__ptr) {
-			for(i=0;i<lpRestrict->lpAnd->__size;i++) {
+			for (i = 0; i < lpRestrict->lpAnd->__size; ++i) {
 				er = FreeRestrictTable(lpRestrict->lpAnd->__ptr[i]);
 
 				if(er != erSuccess)
-					goto exit;
+					return er;
 			}
 			delete [] lpRestrict->lpAnd->__ptr;
 		}
-		if(lpRestrict->lpAnd)
-			delete lpRestrict->lpAnd;
+		delete lpRestrict->lpAnd;
 		break;
 
 	case RES_NOT:
 		if(lpRestrict->lpNot && lpRestrict->lpNot->lpNot)
 			FreeRestrictTable(lpRestrict->lpNot->lpNot);
-
-		if(lpRestrict->lpNot)
-			delete lpRestrict->lpNot;
+		delete lpRestrict->lpNot;
 		break;
 	case RES_CONTENT:
 		if(lpRestrict->lpContent && lpRestrict->lpContent->lpProp)
 			FreePropVal(lpRestrict->lpContent->lpProp, true);
-
-		if(lpRestrict->lpContent)
-			delete lpRestrict->lpContent;
-
+		delete lpRestrict->lpContent;
 		break;
 	case RES_PROPERTY:
 		if(lpRestrict->lpProp && lpRestrict->lpProp->lpProp)
 			FreePropVal(lpRestrict->lpProp->lpProp, true);
-
-		if(lpRestrict->lpProp)
-			delete lpRestrict->lpProp;
-
+		delete lpRestrict->lpProp;
 		break;
 
 	case RES_COMPAREPROPS:
-		if(lpRestrict->lpCompare)
-			delete lpRestrict->lpCompare;
-
+		delete lpRestrict->lpCompare;
 		break;
 
 	case RES_BITMASK:
-		if(lpRestrict->lpBitmask)
-			delete lpRestrict->lpBitmask;
+		delete lpRestrict->lpBitmask;
 		break;
 
 	case RES_SIZE:
-		if(lpRestrict->lpSize)
-			delete lpRestrict->lpSize;
+		delete lpRestrict->lpSize;
 		break;
 
 	case RES_EXIST:
-		if(lpRestrict->lpExist)
-			delete lpRestrict->lpExist;
+		delete lpRestrict->lpExist;
 		break;
 
 	case RES_COMMENT:
@@ -1094,12 +998,10 @@ ECRESULT FreeRestrictTable(struct restrictTable *lpRestrict, bool base)
 		break;
 
 	case RES_SUBRESTRICTION:
-	    if(lpRestrict->lpSub && lpRestrict->lpSub->lpSubObject)
-	        FreeRestrictTable(lpRestrict->lpSub->lpSubObject);
-
-        if(lpRestrict->lpSub)
-            delete lpRestrict->lpSub;
-        break;
+		if(lpRestrict->lpSub && lpRestrict->lpSub->lpSubObject)
+			FreeRestrictTable(lpRestrict->lpSub->lpSubObject);
+		delete lpRestrict->lpSub;
+		break;
 
 	default:
 		er = ZARAFA_E_INVALID_TYPE;
@@ -1110,20 +1012,18 @@ ECRESULT FreeRestrictTable(struct restrictTable *lpRestrict, bool base)
 	// only when we're optimizing restrictions we must keep the base pointer, so we can replace it with new content
 	if (base)
 		delete lpRestrict;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal *lpDst,
     struct soap *soap, bool bTruncate)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	int i;
 
 	er = PropCheck(lpSrc);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	lpDst->ulPropTag = lpSrc->ulPropTag;
 	lpDst->__union = lpSrc->__union;
@@ -1152,10 +1052,8 @@ ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal *lpDst,
 		break;
 	case PT_CURRENCY:
 	case PT_SYSTIME:
-		if(lpSrc->Value.hilo == NULL) {
-			er = ZARAFA_E_INVALID_TYPE;
-			goto exit;
-		}
+		if (lpSrc->Value.hilo == NULL)
+			return ZARAFA_E_INVALID_TYPE;
 		lpDst->Value.hilo = s_alloc<hiloLong>(soap);
 		lpDst->Value.hilo->hi = lpSrc->Value.hilo->hi;
 		lpDst->Value.hilo->lo = lpSrc->Value.hilo->lo;
@@ -1164,11 +1062,8 @@ ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal *lpDst,
 	case PT_STRING8: {
 		size_t len;
 		
-		if(lpSrc->Value.lpszA == NULL) {
-			er = ZARAFA_E_INVALID_TYPE;
-			goto exit;
-		}
-
+		if (lpSrc->Value.lpszA == NULL)
+			return ZARAFA_E_INVALID_TYPE;
 		if (bTruncate)
 			len = u8_cappedbytes(lpSrc->Value.lpszA, TABLE_CAP_STRING);
 		else
@@ -1182,10 +1077,8 @@ ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal *lpDst,
 	}
 	case PT_BINARY:
 	case PT_CLSID:
-		if(lpSrc->Value.bin == NULL) {
-			er = ZARAFA_E_INVALID_TYPE;
-			goto exit;
-		}
+		if (lpSrc->Value.bin == NULL)
+			return ZARAFA_E_INVALID_TYPE;
 		lpDst->Value.bin = s_alloc<struct xsd__base64Binary>(soap);
 		lpDst->Value.bin->__size = lpSrc->Value.bin->__size;
 		
@@ -1198,71 +1091,56 @@ ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal *lpDst,
 		memcpy(lpDst->Value.bin->__ptr, lpSrc->Value.bin->__ptr, lpDst->Value.bin->__size);
 		break;
 	case PT_MV_I2:
-		if(lpSrc->Value.mvi.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_TYPE;
-			goto exit;
-		}
+		if (lpSrc->Value.mvi.__ptr == NULL)
+			return ZARAFA_E_INVALID_TYPE;
 		lpDst->Value.mvi.__size = lpSrc->Value.mvi.__size;
 		lpDst->Value.mvi.__ptr = s_alloc<short int>(soap, lpSrc->Value.mvi.__size);
 		memcpy(lpDst->Value.mvi.__ptr, lpSrc->Value.mvi.__ptr, sizeof(short int) * lpDst->Value.mvi.__size);
 		break;
 	case PT_MV_LONG:
-		if(lpSrc->Value.mvl.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_TYPE;
-			goto exit;
-		}
+		if (lpSrc->Value.mvl.__ptr == NULL)
+			return ZARAFA_E_INVALID_TYPE;
 		lpDst->Value.mvl.__size = lpSrc->Value.mvl.__size;
 		lpDst->Value.mvl.__ptr = s_alloc<unsigned int>(soap, lpSrc->Value.mvl.__size);
 		memcpy(lpDst->Value.mvl.__ptr, lpSrc->Value.mvl.__ptr, sizeof(unsigned int) * lpDst->Value.mvl.__size);
 		break;
 	case PT_MV_R4:
-		if(lpSrc->Value.mvflt.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_TYPE;
-			goto exit;
-		}
+		if (lpSrc->Value.mvflt.__ptr == NULL)
+			return ZARAFA_E_INVALID_TYPE;
 		lpDst->Value.mvflt.__size = lpSrc->Value.mvflt.__size;
 		lpDst->Value.mvflt.__ptr = s_alloc<float>(soap, lpSrc->Value.mvflt.__size);
 		memcpy(lpDst->Value.mvflt.__ptr, lpSrc->Value.mvflt.__ptr, sizeof(float) * lpDst->Value.mvflt.__size);
 		break;
 	case PT_MV_DOUBLE:
 	case PT_MV_APPTIME:
-		if(lpSrc->Value.mvdbl.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_TYPE;
-			goto exit;
-		}
+		if (lpSrc->Value.mvdbl.__ptr == NULL)
+			return ZARAFA_E_INVALID_TYPE;
 		lpDst->Value.mvdbl.__size = lpSrc->Value.mvdbl.__size;
 		lpDst->Value.mvdbl.__ptr = s_alloc<double>(soap, lpSrc->Value.mvdbl.__size);
 		memcpy(lpDst->Value.mvdbl.__ptr, lpSrc->Value.mvdbl.__ptr, sizeof(double) * lpDst->Value.mvdbl.__size);
 		break;
 	case PT_MV_I8:
-		if(lpSrc->Value.mvli.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_TYPE;
-			goto exit;
-		}
+		if (lpSrc->Value.mvli.__ptr == NULL)
+			return ZARAFA_E_INVALID_TYPE;
 		lpDst->Value.mvli.__size = lpSrc->Value.mvli.__size;
 		lpDst->Value.mvli.__ptr = s_alloc<LONG64>(soap, lpSrc->Value.mvli.__size);
 		memcpy(lpDst->Value.mvli.__ptr, lpSrc->Value.mvli.__ptr, sizeof(LONG64) * lpDst->Value.mvli.__size);
 		break;
 	case PT_MV_CURRENCY:
 	case PT_MV_SYSTIME:
-		if(lpSrc->Value.mvhilo.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_TYPE;
-			goto exit;
-		}
+		if (lpSrc->Value.mvhilo.__ptr == NULL)
+			return ZARAFA_E_INVALID_TYPE;
 		lpDst->Value.mvhilo.__size = lpSrc->Value.mvhilo.__size;
 		lpDst->Value.mvhilo.__ptr = s_alloc<hiloLong>(soap, lpSrc->Value.mvhilo.__size);
 		memcpy(lpDst->Value.mvhilo.__ptr, lpSrc->Value.mvhilo.__ptr, sizeof(hiloLong) * lpDst->Value.mvhilo.__size);
 		break;
 	case PT_MV_STRING8:
 	case PT_MV_UNICODE:
-		if(lpSrc->Value.mvszA.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_TYPE;
-			goto exit;
-		}
+		if (lpSrc->Value.mvszA.__ptr == NULL)
+			return ZARAFA_E_INVALID_TYPE;
 		lpDst->Value.mvszA.__size = lpSrc->Value.mvszA.__size;
 		lpDst->Value.mvszA.__ptr = s_alloc<char*>(soap, lpSrc->Value.mvszA.__size);
-		for(i=0; i < lpSrc->Value.mvszA.__size; i++)
-		{
+		for (i = 0; i < lpSrc->Value.mvszA.__size; ++i) {
 			lpDst->Value.mvszA.__ptr[i] = s_alloc<char>(soap, strlen(lpSrc->Value.mvszA.__ptr[i])+1);
 			if(lpSrc->Value.mvszA.__ptr[i] == NULL)
 			    strcpy(lpDst->Value.mvszA.__ptr[i], "");
@@ -1272,14 +1150,11 @@ ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal *lpDst,
 		break;
 	case PT_MV_BINARY:
 	case PT_MV_CLSID:
-		if(lpSrc->Value.mvbin.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_TYPE;
-			goto exit;
-		}
+		if (lpSrc->Value.mvbin.__ptr == NULL)
+			return ZARAFA_E_INVALID_TYPE;
 		lpDst->Value.mvbin.__size = lpSrc->Value.mvbin.__size;
 		lpDst->Value.mvbin.__ptr = s_alloc<struct xsd__base64Binary>(soap, lpSrc->Value.mvbin.__size);
-		for(i=0; i < lpSrc->Value.mvbin.__size; i++)
-		{
+		for (i = 0; i < lpSrc->Value.mvbin.__size; ++i) {
 			lpDst->Value.mvbin.__ptr[i].__ptr = s_alloc<unsigned char>(soap, lpSrc->Value.mvbin.__ptr[i].__size);
 			if(lpSrc->Value.mvbin.__ptr[i].__ptr == NULL) {
 				lpDst->Value.mvbin.__ptr[i].__size = 0;
@@ -1290,17 +1165,15 @@ ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal *lpDst,
 		}
 		break;
 	default:
-		er = ZARAFA_E_INVALID_TYPE;
+		return ZARAFA_E_INVALID_TYPE;
 	}
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal **lppDst,
     struct soap *soap, bool bTruncate)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	struct propVal *lpDst;
 
 	lpDst = s_alloc<struct propVal>(soap);
@@ -1310,59 +1183,51 @@ ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal **lppDst,
 		// there is no sub-alloc when there's an error, so we can remove lpDst
 		if (!soap)
 			delete lpDst;		// maybe create s_free() ?
-		goto exit;
+		return er;
 	}
 
 	*lppDst = lpDst;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT CopyPropValArray(const struct propValArray *lpSrc,
     struct propValArray **lppDst, struct soap *soap)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	struct propValArray *lpDst = NULL;
 
-	if(lpSrc == NULL || lppDst == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpSrc == NULL || lppDst == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	lpDst = s_alloc<struct propValArray>(soap);
 
 	if(lpSrc->__size > 0) {
 		er = CopyPropValArray(lpSrc, lpDst, soap);
 		if(er != erSuccess)
-			goto exit;
+			return er;
 	}else {
 		lpDst->__ptr = NULL;
 		lpDst->__size = 0;
 	}
 
 	*lppDst = lpDst;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT CopyPropValArray(const struct propValArray *lpSrc,
     struct propValArray *lpDst, struct soap *soap)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	int i;
 
-	if(lpSrc == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpSrc == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	lpDst->__ptr = s_alloc<struct propVal>(soap, lpSrc->__size);
 	lpDst->__size = lpSrc->__size;
 	memset(lpDst->__ptr, 0, sizeof(propVal)*lpDst->__size);
 
-	for (i=0; i<lpSrc->__size; i++) {
+	for (i = 0; i < lpSrc->__size; ++i) {
 		er = CopyPropVal(&lpSrc->__ptr[i], &lpDst->__ptr[i], soap);
 		if(er != erSuccess) {
 			if (!soap) {
@@ -1370,26 +1235,22 @@ ECRESULT CopyPropValArray(const struct propValArray *lpSrc,
 				lpDst->__ptr = NULL;
 			}
 			lpDst->__size = 0;
-			goto exit;
+			return er;
 		}
 	}
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 
 ECRESULT CopyRestrictTable(struct soap *soap,
     const struct restrictTable *lpSrc, struct restrictTable **lppDst)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	struct restrictTable *lpDst = NULL;
 	unsigned int i = 0;
 
-	if(lpSrc == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpSrc == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	lpDst = s_alloc<struct restrictTable>(soap);
 	memset(lpDst, 0, sizeof(restrictTable));
@@ -1398,10 +1259,8 @@ ECRESULT CopyRestrictTable(struct soap *soap,
 
 	switch(lpSrc->ulType) {
 	case RES_OR:
-		if(lpSrc->lpOr == NULL) {
-			er = ZARAFA_E_INVALID_TYPE;
-			goto exit;
-		}
+		if (lpSrc->lpOr == NULL)
+			return ZARAFA_E_INVALID_TYPE;
 
 		lpDst->lpOr = s_alloc<restrictOr>(soap);
 
@@ -1409,30 +1268,28 @@ ECRESULT CopyRestrictTable(struct soap *soap,
 		lpDst->lpOr->__size = lpSrc->lpOr->__size;
 		memset(lpDst->lpOr->__ptr, 0, sizeof(restrictTable *) * lpSrc->lpOr->__size);
 
-		for(i=0;i<lpSrc->lpOr->__size;i++) {
+		for (i = 0; i < lpSrc->lpOr->__size; ++i) {
 			er = CopyRestrictTable(soap, lpSrc->lpOr->__ptr[i], &lpDst->lpOr->__ptr[i]);
 
 			if(er != erSuccess)
-				goto exit;
+				return er;
 		}
 
 		break;
 	case RES_AND:
-		if(lpSrc->lpAnd == NULL) {
-			er = ZARAFA_E_INVALID_TYPE;
-			goto exit;
-		}
+		if(lpSrc->lpAnd == NULL)
+			return ZARAFA_E_INVALID_TYPE;
 		lpDst->lpAnd = s_alloc<restrictAnd>(soap);
 
 		lpDst->lpAnd->__ptr = s_alloc<restrictTable *>(soap, lpSrc->lpAnd->__size);
 		lpDst->lpAnd->__size = lpSrc->lpAnd->__size;
 		memset(lpDst->lpAnd->__ptr, 0, sizeof(restrictTable *) * lpSrc->lpAnd->__size);
 
-		for(i=0;i<lpSrc->lpAnd->__size;i++) {
+		for (i = 0; i < lpSrc->lpAnd->__size; ++i) {
 			er = CopyRestrictTable(soap, lpSrc->lpAnd->__ptr[i], &lpDst->lpAnd->__ptr[i]);
 
 			if(er != erSuccess)
-				goto exit;
+				return er;
 		}
 		break;
 
@@ -1443,8 +1300,7 @@ ECRESULT CopyRestrictTable(struct soap *soap,
 		er = CopyRestrictTable(soap, lpSrc->lpNot->lpNot, &lpDst->lpNot->lpNot);
 
 		if(er != erSuccess)
-			goto exit;
-
+			return er;
 		break;
 	case RES_CONTENT:
 		lpDst->lpContent = s_alloc<restrictContent>(soap);
@@ -1456,7 +1312,7 @@ ECRESULT CopyRestrictTable(struct soap *soap,
 		if(lpSrc->lpContent->lpProp) {
 			er = CopyPropVal(lpSrc->lpContent->lpProp, &lpDst->lpContent->lpProp, soap);
 			if(er != erSuccess)
-				goto exit;
+				return er;
 		}
 
 		break;
@@ -1470,8 +1326,7 @@ ECRESULT CopyRestrictTable(struct soap *soap,
 		er = CopyPropVal(lpSrc->lpProp->lpProp, &lpDst->lpProp->lpProp, soap);
 
 		if(er != erSuccess)
-			goto exit;
-
+			return er;
 		break;
 
 	case RES_COMPAREPROPS:
@@ -1514,11 +1369,10 @@ ECRESULT CopyRestrictTable(struct soap *soap,
 
 		er = CopyPropValArray(&lpSrc->lpComment->sProps, &lpDst->lpComment->sProps, soap);
 		if (er != erSuccess)
-			goto exit;
-
+			return er;
 		er = CopyRestrictTable(soap, lpSrc->lpComment->lpResTable, &lpDst->lpComment->lpResTable);
 		if(er != erSuccess)
-			goto exit;
+			return er;
 
 		break;
 
@@ -1531,18 +1385,15 @@ ECRESULT CopyRestrictTable(struct soap *soap,
 		er = CopyRestrictTable(soap, lpSrc->lpSub->lpSubObject, &lpDst->lpSub->lpSubObject);
 
 		if(er != erSuccess)
-			goto exit;
+			return er;
 
         break;
 	default:
-		er = ZARAFA_E_INVALID_TYPE;
-		goto exit;
+		return ZARAFA_E_INVALID_TYPE;
 	}
 
 	*lppDst = lpDst;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT FreePropValArray(struct propValArray *lpPropValArray, bool bFreeBase)
@@ -1550,10 +1401,8 @@ ECRESULT FreePropValArray(struct propValArray *lpPropValArray, bool bFreeBase)
 	int i = 0;
 
 	if(lpPropValArray) {
-		for(i=0; i<lpPropValArray->__size; i++) {
+		for (i = 0; i < lpPropValArray->__size; ++i)
 			FreePropVal(&(lpPropValArray->__ptr[i]), false);
-		}
-
 		delete [] lpPropValArray->__ptr;
 
 		if(bFreeBase)
@@ -1565,13 +1414,10 @@ ECRESULT FreePropValArray(struct propValArray *lpPropValArray, bool bFreeBase)
 
 ECRESULT CopyEntryId(struct soap *soap, entryId* lpSrc, entryId** lppDst)
 {
-	ECRESULT er = erSuccess;
 	entryId* lpDst = NULL;
 
-	if(lpSrc == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpSrc == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	lpDst = s_alloc<entryId>(soap);
 	lpDst->__size = lpSrc->__size;
@@ -1585,19 +1431,15 @@ ECRESULT CopyEntryId(struct soap *soap, entryId* lpSrc, entryId** lppDst)
 	}
 
 	*lppDst = lpDst;
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT CopyEntryList(struct soap *soap, struct entryList *lpSrc, struct entryList **lppDst)
 {
-	ECRESULT er = erSuccess;
 	struct entryList *lpDst = NULL;
 
-	if(lpSrc == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpSrc == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	lpDst = s_alloc<entryList>(soap);
 	lpDst->__size = lpSrc->__size;
@@ -1606,7 +1448,7 @@ ECRESULT CopyEntryList(struct soap *soap, struct entryList *lpSrc, struct entryL
 	else
 		lpDst->__ptr = NULL;
 
-	for(unsigned int i=0; i<lpSrc->__size; i++) {
+	for (unsigned int i = 0; i < lpSrc->__size; ++i) {
 		lpDst->__ptr[i].__size = lpSrc->__ptr[i].__size;
 		lpDst->__ptr[i].__ptr = s_alloc<unsigned char>(soap, lpSrc->__ptr[i].__size);
 		memcpy(lpDst->__ptr[i].__ptr, lpSrc->__ptr[i].__ptr, sizeof(unsigned char) * lpSrc->__ptr[i].__size);
@@ -1614,42 +1456,30 @@ ECRESULT CopyEntryList(struct soap *soap, struct entryList *lpSrc, struct entryL
 
 
 	*lppDst = lpDst;
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT FreeEntryList(struct entryList *lpEntryList, bool bFreeBase)
 {
-	ECRESULT er = erSuccess;
-
 	if(lpEntryList == NULL)
-		goto exit;
+		return erSuccess;
 
 	if(lpEntryList->__ptr) {
-
-		for(unsigned int i=0; i < lpEntryList->__size; i++) {
-			if(lpEntryList->__ptr[i].__ptr)
-				delete [] lpEntryList->__ptr[i].__ptr;
-		}
-
+		for (unsigned int i = 0; i < lpEntryList->__size; ++i)
+			delete[] lpEntryList->__ptr[i].__ptr;
 		delete [] lpEntryList->__ptr;
 	}
 
 	if(bFreeBase) {
 		delete lpEntryList;
 	}
-
-exit:
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT FreeNotificationStruct(notification *lpNotification, bool bFreeBase)
 {
-	ECRESULT er = erSuccess;
-
 	if(lpNotification == NULL)
-		return er;
+		return erSuccess;
 
 	if(lpNotification->obj != NULL){
 
@@ -1684,11 +1514,8 @@ ECRESULT FreeNotificationStruct(notification *lpNotification, bool bFreeBase)
 		delete lpNotification->tab;
 	}
 
-	if(lpNotification->newmail != NULL) {
-
-		if(lpNotification->newmail->lpszMessageClass != NULL)
-			delete []lpNotification->newmail->lpszMessageClass;
-
+	if (lpNotification->newmail != NULL) {
+		delete[] lpNotification->newmail->lpszMessageClass;
 		FreeEntryId(lpNotification->newmail->pEntryId, true);
 		FreeEntryId(lpNotification->newmail->pParentId, true);
 
@@ -1704,19 +1531,17 @@ ECRESULT FreeNotificationStruct(notification *lpNotification, bool bFreeBase)
 	if(bFreeBase)
 		delete lpNotification;
 
-	return er;
+	return erSuccess;
 }
 
 // Make a copy of the struct notification.
-ECRESULT CopyNotificationStruct(struct soap *soap, notification *lpNotification, notification &rNotifyTo)
+ECRESULT CopyNotificationStruct(struct soap *soap,
+    const notification *lpNotification, notification &rNotifyTo)
 {
-	ECRESULT er = erSuccess;
 	int nLen;
 
-	if(lpNotification == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpNotification == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	memset(&rNotifyTo, 0, sizeof(rNotifyTo));
 
@@ -1777,20 +1602,16 @@ ECRESULT CopyNotificationStruct(struct soap *soap, notification *lpNotification,
 		// We use CopyEntryId as it just copied binary data
 		CopyEntryId(soap, lpNotification->ics->pSyncState, &rNotifyTo.ics->pSyncState);
 	}
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT FreeNotificationArrayStruct(notificationArray *lpNotifyArray, bool bFreeBase)
 {
-	ECRESULT	er = erSuccess;
 	unsigned int i;
 
 	if(lpNotifyArray == NULL)
-		goto exit;
-
-	for(i = 0; i < lpNotifyArray->__size; i++)
+		return erSuccess;
+	for (i = 0; i < lpNotifyArray->__size; ++i)
 		FreeNotificationStruct(&lpNotifyArray->__ptr[i], false);
 
 	delete [] lpNotifyArray->__ptr;
@@ -1800,20 +1621,15 @@ ECRESULT FreeNotificationArrayStruct(notificationArray *lpNotifyArray, bool bFre
 	else {
 		lpNotifyArray->__size = 0;
 	}
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT CopyNotificationArrayStruct(notificationArray *lpNotifyArrayFrom, notificationArray *lpNotifyArrayTo)
 {
-	ECRESULT	er = erSuccess;
 	unsigned int i;
 
-	if(lpNotifyArrayFrom == NULL){
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpNotifyArrayFrom == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	if (lpNotifyArrayFrom->__size > 0)
 		lpNotifyArrayTo->__ptr = new notification[lpNotifyArrayFrom->__size];
@@ -1821,68 +1637,48 @@ ECRESULT CopyNotificationArrayStruct(notificationArray *lpNotifyArrayFrom, notif
 		lpNotifyArrayTo->__ptr = NULL;
 
 	lpNotifyArrayTo->__size = lpNotifyArrayFrom->__size;
-	for(i = 0; i < lpNotifyArrayFrom->__size; i++)
-	{
+	for (i = 0; i < lpNotifyArrayFrom->__size; ++i)
 		CopyNotificationStruct(NULL, &lpNotifyArrayFrom->__ptr[i], lpNotifyArrayTo->__ptr[i]);
-	}
-
-exit:
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT FreeUserObjectArray(struct userobjectArray *lpUserobjectArray, bool bFreeBase)
 {
-	ECRESULT	er = erSuccess;
 	unsigned int i;
 
 	if(lpUserobjectArray == NULL)
-		goto exit;
+		return erSuccess;
 
-	for(i = 0; i < lpUserobjectArray->__size; i++) {
+	for (i = 0; i < lpUserobjectArray->__size; ++i)
 		delete[] lpUserobjectArray->__ptr[i].lpszName;
-	}
-
 	delete [] lpUserobjectArray->__ptr;
 
 	if(bFreeBase)
 		delete lpUserobjectArray;
 	else
 		lpUserobjectArray->__size = 0;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT FreeEntryId(entryId* lpEntryId, bool bFreeBase)
 {
-	ECRESULT er = erSuccess;
-
 	if(lpEntryId == NULL)
-		goto exit;
+		return erSuccess;
 
-	if(lpEntryId->__ptr)
-		delete[] lpEntryId->__ptr;
-
+	delete[] lpEntryId->__ptr;
 	if(bFreeBase == true)
 		delete lpEntryId;
 	else
 		lpEntryId->__size = 0;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT CopyRightsArrayToSoap(struct soap *soap, struct rightsArray *lpRightsArraySrc, struct rightsArray **lppRightsArrayDst)
 {
-	ECRESULT			er = erSuccess;
 	struct rightsArray	*lpRightsArrayDst = NULL;
 
 	if (soap == NULL || lpRightsArraySrc == NULL || lppRightsArrayDst == NULL)
-	{
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+		return ZARAFA_E_INVALID_PARAMETER;
 
 	lpRightsArrayDst = s_alloc<struct rightsArray>(soap);
 	memset(lpRightsArrayDst, 0, sizeof *lpRightsArrayDst);
@@ -1899,55 +1695,40 @@ ECRESULT CopyRightsArrayToSoap(struct soap *soap, struct rightsArray *lpRightsAr
 	}
 	
 	*lppRightsArrayDst = lpRightsArrayDst;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT FreeRightsArray(struct rightsArray *lpRights)
 {
-	ECRESULT er = erSuccess;
 	if(lpRights == NULL)
-		goto exit;
+		return erSuccess;
 
 	if(lpRights->__ptr)
 	{
-		if (lpRights->__ptr->sUserId.__ptr)
-			delete [] lpRights->__ptr->sUserId.__ptr;
+		delete[] lpRights->__ptr->sUserId.__ptr;
 		delete [] lpRights->__ptr;
 	}
 
-    delete lpRights;
-
-exit:
-	return er;
-
+	delete lpRights;
+	return erSuccess;
 }
 
 static const struct propVal *
 SpropValFindPropVal(const struct propValArray *lpsPropValArray,
     unsigned int ulPropTag)
 {
-	const struct propVal *lpPropVal = NULL;
 	int i;
 
 	if(PROP_TYPE(ulPropTag) == PT_ERROR)
-		goto exit;
-
-	for(i=0; i < lpsPropValArray->__size; i++)
-	{
+		return NULL;
+	for (i = 0; i < lpsPropValArray->__size; ++i)
 		if(lpsPropValArray->__ptr[i].ulPropTag == ulPropTag ||
 			(PROP_ID(lpsPropValArray->__ptr[i].ulPropTag) == PROP_ID(ulPropTag) &&
 			 PROP_TYPE(ulPropTag) == PT_UNSPECIFIED &&
 			 PROP_TYPE(lpsPropValArray->__ptr[i].ulPropTag) != PT_ERROR) )
-		{
-			lpPropVal = &lpsPropValArray->__ptr[i];
-			break;
-		}
-	}
+			return &lpsPropValArray->__ptr[i];
 
-exit:
-	return lpPropVal;
+	return NULL;
 }
 
 // NOTE: PropValArray 2 overruled PropValArray 1, except if proptype is PT_ERROR
@@ -1956,42 +1737,36 @@ ECRESULT MergePropValArray(struct soap *soap,
     const struct propValArray *lpsPropValArray2,
     struct propValArray *lpPropValArrayNew)
 {
-	ECRESULT		er = erSuccess;
+	ECRESULT er;
 	int i;
 	const struct propVal *lpsPropVal;
 
 	lpPropValArrayNew->__ptr = s_alloc<struct propVal>(soap, lpsPropValArray1->__size + lpsPropValArray2->__size);
 	lpPropValArrayNew->__size = 0;
 
-	for(i=0; i < lpsPropValArray1->__size; i++)
-	{
+	for (i = 0; i < lpsPropValArray1->__size; ++i) {
 		lpsPropVal = SpropValFindPropVal(lpsPropValArray2, lpsPropValArray1->__ptr[i].ulPropTag);
 		if(lpsPropVal == NULL)
 			lpsPropVal = &lpsPropValArray1->__ptr[i];
 
 		er = CopyPropVal(lpsPropVal, &lpPropValArrayNew->__ptr[lpPropValArrayNew->__size], soap);
 		if(er != erSuccess)
-			goto exit;
-
-		lpPropValArrayNew->__size++;
+			return er;
+		++lpPropValArrayNew->__size;
 	}
 
 	//Merge items
-	for(i=0; i < lpsPropValArray2->__size; i++)
-	{
+	for (i = 0; i < lpsPropValArray2->__size; ++i) {
 		lpsPropVal = SpropValFindPropVal(lpPropValArrayNew, lpsPropValArray2->__ptr[i].ulPropTag);
 		if(lpsPropVal != NULL)
 			continue; // Already exist
 
 		er = CopyPropVal(&lpsPropValArray2->__ptr[i], &lpPropValArrayNew->__ptr[lpPropValArrayNew->__size], soap);
 		if(er != erSuccess)
-			goto exit;
-
-		lpPropValArrayNew->__size++;
+			return er;
+		++lpPropValArrayNew->__size;
 	}
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT CopySearchCriteria(struct soap *soap,
@@ -2000,24 +1775,22 @@ ECRESULT CopySearchCriteria(struct soap *soap,
 	ECRESULT er = erSuccess;
 	struct searchCriteria *lpDst = NULL;
 
-	if(lpSrc == NULL) {
-	    er = ZARAFA_E_NOT_FOUND;
-	    goto exit;
-    }
+	if (lpSrc == NULL)
+		return ZARAFA_E_NOT_FOUND;
 
 	lpDst = new searchCriteria;
 	if(lpSrc->lpRestrict) {
     	er = CopyRestrictTable(soap, lpSrc->lpRestrict, &lpDst->lpRestrict);
-    	if(er != erSuccess)
-		    goto exit;
+		if (er != erSuccess)
+			goto exit;
     } else {
         lpDst->lpRestrict = NULL;
     }
 
 	if(lpSrc->lpFolders) {
     	er = CopyEntryList(soap, lpSrc->lpFolders, &lpDst->lpFolders);
-    	if(er != erSuccess)
-		    goto exit;
+		if (er != erSuccess)
+			goto exit;
     } else {
         lpDst->lpFolders = NULL;
     }
@@ -2026,6 +1799,11 @@ ECRESULT CopySearchCriteria(struct soap *soap,
 
 	*lppDst = lpDst;
 exit:
+	if (er != erSuccess && lpDst != NULL) {
+		FreeRestrictTable(lpDst->lpRestrict, true);
+		FreeEntryList(lpDst->lpFolders, true);
+		delete lpDst;
+	}
 	return er;
 }
 
@@ -2078,7 +1856,9 @@ static ECRESULT CopyAnonymousDetailsToSoap(struct soap *soap,
 		lpsoapPropmap = s_alloc<struct propmapPairArray>(soap, 1);
 		lpsoapPropmap->__size = 0;
 		lpsoapPropmap->__ptr = s_alloc<struct propmapPair>(soap, propmap.size());
-		for (property_map::iterator iter = propmap.begin(); iter != propmap.end(); iter++) {
+		for (property_map::const_iterator iter = propmap.begin();
+		     iter != propmap.end(); ++iter)
+		{
 			if (PROP_TYPE(iter->first) == PT_BINARY && bCopyBinary) {
 				string strData = base64_encode((const unsigned char *)iter->second.data(), iter->second.size());
 				lpsoapPropmap->__ptr[lpsoapPropmap->__size].ulPropId = iter->first;
@@ -2097,19 +1877,22 @@ static ECRESULT CopyAnonymousDetailsToSoap(struct soap *soap,
 		lpsoapMVPropmap = s_alloc<struct propmapMVPairArray>(soap, 1);
 		lpsoapMVPropmap->__size = 0;
 		lpsoapMVPropmap->__ptr = s_alloc<struct propmapMVPair>(soap, propmvmap.size());
-		for (property_mv_map::iterator iter = propmvmap.begin(); iter != propmvmap.end(); iter++) {
+		for (property_mv_map::const_iterator iter = propmvmap.begin();
+		     iter != propmvmap.end(); ++iter)
+		{
 			if (PROP_TYPE(iter->first) == PT_MV_BINARY && bCopyBinary) {
 				j = 0;
 				lpsoapMVPropmap->__ptr[lpsoapMVPropmap->__size].ulPropId = iter->first;
 				lpsoapMVPropmap->__ptr[lpsoapMVPropmap->__size].sValues.__size = iter->second.size();
 				lpsoapMVPropmap->__ptr[lpsoapMVPropmap->__size].sValues.__ptr = s_alloc<char *>(soap, lpsoapMVPropmap->__ptr[lpsoapMVPropmap->__size].sValues.__size);
-				for (list<string>::iterator entry = iter->second.begin(); entry != iter->second.end(); entry++) {
+				for (std::list<std::string>::const_iterator entry = iter->second.begin();
+				     entry != iter->second.end(); ++entry)
+				{
 					string strData = base64_encode((const unsigned char *)entry->data(), entry->size());
 					lpsoapMVPropmap->__ptr[lpsoapMVPropmap->__size].sValues.__ptr[j] = s_strcpy(soap, strData.c_str());
-					j++;
+					++j;
 				}
-
-				lpsoapMVPropmap->__size++;
+				++lpsoapMVPropmap->__size;
 				continue;
 			}
 
@@ -2120,12 +1903,12 @@ static ECRESULT CopyAnonymousDetailsToSoap(struct soap *soap,
 			lpsoapMVPropmap->__ptr[lpsoapMVPropmap->__size].ulPropId = iter->first;
 			lpsoapMVPropmap->__ptr[lpsoapMVPropmap->__size].sValues.__size = iter->second.size();
 			lpsoapMVPropmap->__ptr[lpsoapMVPropmap->__size].sValues.__ptr = s_alloc<char *>(soap, lpsoapMVPropmap->__ptr[lpsoapMVPropmap->__size].sValues.__size);
-			for (list<string>::iterator entry = iter->second.begin(); entry != iter->second.end(); entry++) {
+			for (std::list<std::string>::const_iterator entry = iter->second.begin();
+			     entry != iter->second.end(); ++entry) {
 				lpsoapMVPropmap->__ptr[lpsoapMVPropmap->__size].sValues.__ptr[j] = s_strcpy(soap, entry->c_str());
-				j++;
+				++j;
 			}
-
-			lpsoapMVPropmap->__size++;
+			++lpsoapMVPropmap->__size;
 		}
 	}
 
@@ -2142,30 +1925,26 @@ static ECRESULT
 CopyAnonymousDetailsFromSoap(struct propmapPairArray *lpsoapPropmap,
     struct propmapMVPairArray *lpsoapMVPropmap, objectdetails_t *details)
 {
-	if (lpsoapPropmap) {
-		for (unsigned int i = 0; i < lpsoapPropmap->__size; i++) {
+	if (lpsoapPropmap)
+		for (unsigned int i = 0; i < lpsoapPropmap->__size; ++i)
 			if (PROP_TYPE(lpsoapPropmap->__ptr[i].ulPropId) == PT_BINARY) {
 				string strData = base64_decode(lpsoapPropmap->__ptr[i].lpszValue);
 				details->SetPropString((property_key_t)lpsoapPropmap->__ptr[i].ulPropId, strData);
 			} else if (PROP_TYPE(lpsoapPropmap->__ptr[i].ulPropId) == PT_STRING8) {
 				details->SetPropString((property_key_t)lpsoapPropmap->__ptr[i].ulPropId, lpsoapPropmap->__ptr[i].lpszValue);
 			}
-		}
-	}
 
-	if (lpsoapMVPropmap) {
-		for (unsigned int i = 0; i < lpsoapMVPropmap->__size; i++) {
+	if (lpsoapMVPropmap)
+		for (unsigned int i = 0; i < lpsoapMVPropmap->__size; ++i) {
 			details->SetPropListString((property_key_t)lpsoapMVPropmap->__ptr[i].ulPropId, list<string>());
-			for (int j = 0; j < lpsoapMVPropmap->__ptr[i].sValues.__size; j++) {
+			for (int j = 0; j < lpsoapMVPropmap->__ptr[i].sValues.__size; ++j)
 				if (PROP_TYPE(lpsoapMVPropmap->__ptr[i].ulPropId) == PT_MV_BINARY) {
 					string strData = base64_decode(lpsoapMVPropmap->__ptr[i].sValues.__ptr[j]);
 					details->AddPropString((property_key_t)lpsoapMVPropmap->__ptr[i].ulPropId, strData);
 				} else {
 					details->AddPropString((property_key_t)lpsoapMVPropmap->__ptr[i].ulPropId, lpsoapMVPropmap->__ptr[i].sValues.__ptr[j]);
 				}
-			}
 		}
-	}
 
 	return erSuccess;
 }
@@ -2349,33 +2128,30 @@ DynamicPropValArray::DynamicPropValArray(struct soap *soap, unsigned int ulHint)
 DynamicPropValArray::~DynamicPropValArray()
 {
 	if(m_lpPropVals && !m_soap) {
-		for(unsigned int i=0; i < m_ulPropCount; i++) {
+		for (unsigned int i = 0; i < m_ulPropCount; ++i)
 			FreePropVal(&m_lpPropVals[i], false);
-		}
 		delete [] m_lpPropVals;
 	}
 }
     
 ECRESULT DynamicPropValArray::AddPropVal(struct propVal &propVal)
 {
-    ECRESULT er = erSuccess;
+	ECRESULT er;
     
     if(m_ulCapacity == m_ulPropCount) {
         if(m_ulCapacity == 0)
-            m_ulCapacity++;
+			++m_ulCapacity;
         er = Resize(m_ulCapacity * 2);
         if(er != erSuccess)
-            goto exit;
+			return er;
     }
     
     er = CopyPropVal(&propVal, &m_lpPropVals[m_ulPropCount], m_soap);
     if(er != erSuccess)
-        goto exit;
+		return er;
         
-    m_ulPropCount++;
-
-exit:
-    return er;
+	++m_ulPropCount;
+    return erSuccess;
 }
 
 ECRESULT DynamicPropValArray::GetPropValArray(struct propValArray *lpPropValArray)
@@ -2394,38 +2170,31 @@ ECRESULT DynamicPropValArray::GetPropValArray(struct propValArray *lpPropValArra
 
 ECRESULT DynamicPropValArray::Resize(unsigned int ulSize)
 {
-    ECRESULT er = erSuccess;
+	ECRESULT er;
     struct propVal *lpNew = NULL;
     
-    if(ulSize < m_ulCapacity) {
-        er = ZARAFA_E_INVALID_PARAMETER;
-        goto exit;
-    }
+	if (ulSize < m_ulCapacity)
+		return ZARAFA_E_INVALID_PARAMETER;
     
     lpNew = s_alloc<struct propVal>(m_soap, ulSize);
-    if(lpNew == NULL) {
-        er = ZARAFA_E_INVALID_PARAMETER;
-        goto exit;
-    }
+	if (lpNew == NULL)
+		return ZARAFA_E_INVALID_PARAMETER;
     
-    for(unsigned int i=0;i<m_ulPropCount;i++) {
+	for (unsigned int i = 0; i < m_ulPropCount; ++i) {
         er = CopyPropVal(&m_lpPropVals[i], &lpNew[i], m_soap);
         if(er != erSuccess)
-            goto exit;
-    }
+			return er;
+	}
     
     if(!m_soap) {
-		for(unsigned int i=0; i < m_ulPropCount; i++) {
+		for (unsigned int i = 0; i < m_ulPropCount; ++i)
 			FreePropVal(&m_lpPropVals[i], false);
-		}
 		delete [] m_lpPropVals;
 	}
 	
     m_lpPropVals = lpNew;
     m_ulCapacity = ulSize;
-    
-exit:
-    return er;
+	return erSuccess;
 }		
 
 DynamicPropTagArray::DynamicPropTagArray(struct soap *soap)
@@ -2446,16 +2215,14 @@ BOOL DynamicPropTagArray::HasPropTag(unsigned int ulPropTag) const {
 }
 
 ECRESULT DynamicPropTagArray::GetPropTagArray(struct propTagArray *lpsPropTagArray) {
-    std::list<unsigned int>::iterator i;
+    std::list<unsigned int>::const_iterator i;
     int n = 0;
     
     lpsPropTagArray->__size = m_lstPropTags.size();
     lpsPropTagArray->__ptr = s_alloc<unsigned int>(m_soap, lpsPropTagArray->__size);
     
-    for(i=m_lstPropTags.begin(); i!=m_lstPropTags.end(); i++) {
-        lpsPropTagArray->__ptr[n] = *i;
-        n++;
-    }
+	for (i = m_lstPropTags.begin(); i != m_lstPropTags.end(); ++i)
+		lpsPropTagArray->__ptr[n++] = *i;
     
     return erSuccess;
 }
@@ -2469,19 +2236,14 @@ ECRESULT DynamicPropTagArray::GetPropTagArray(struct propTagArray *lpsPropTagArr
  */
 unsigned int PropValArraySize(struct propValArray *lpSrc)
 {
-	unsigned int ulSize = 0;
+	unsigned int ulSize;
 
-	if(lpSrc == NULL) {
-		goto exit;
-	}
+	if (lpSrc == NULL)
+		return 0;
 
 	ulSize = sizeof(struct propValArray) * lpSrc->__size;
-
-	for(int i = 0; i < lpSrc->__size; i++) {
+	for (int i = 0; i < lpSrc->__size; ++i)
 		ulSize += PropSize(&lpSrc->__ptr[i]);
-	}
-
-exit:
 	return ulSize;
 }
 
@@ -2496,22 +2258,19 @@ unsigned int RestrictTableSize(struct restrictTable *lpSrc)
 	unsigned int ulSize = 0;
 	unsigned int i = 0;
 
-	if(lpSrc == NULL) {
-		goto exit;
-	}
+	if (lpSrc == NULL)
+		return 0;
 
 	switch(lpSrc->ulType) {
 	case RES_OR:
 		ulSize += sizeof(restrictOr);
-		for(i=0; i<lpSrc->lpOr->__size; i++) {
+		for (i = 0; i < lpSrc->lpOr->__size; ++i)
 			ulSize += RestrictTableSize(lpSrc->lpOr->__ptr[i]);
-		}
 		break;
 	case RES_AND:
 		ulSize += sizeof(restrictAnd);
-		for(i=0;i<lpSrc->lpAnd->__size;i++) {
+		for (i = 0; i < lpSrc->lpAnd->__size; ++i)
 			ulSize += RestrictTableSize(lpSrc->lpAnd->__ptr[i]);
-		}
 		break;
 
 	case RES_NOT:
@@ -2564,8 +2323,6 @@ unsigned int RestrictTableSize(struct restrictTable *lpSrc)
 	default:
 		break;
 	}
-
-exit:
 	return ulSize;
 }
 
@@ -2577,20 +2334,15 @@ exit:
  */
 unsigned int EntryListSize(struct entryList *lpSrc)
 {
-	unsigned int ulSize = 0;
+	unsigned int ulSize;
 
-	if(lpSrc == NULL) {
-		goto exit;
-	}
+	if (lpSrc == NULL)
+		return 0;
 
-	ulSize += sizeof(entryList);
+	ulSize = sizeof(entryList);
 	ulSize += sizeof(entryId) * lpSrc->__size;
-
-	for(unsigned int i=0; i<lpSrc->__size; i++) {
+	for (unsigned int i = 0; i < lpSrc->__size; ++i)
 		ulSize += lpSrc->__ptr[i].__size * sizeof(unsigned char);
-	}
-
-exit:
 	return ulSize;
 }
 
@@ -2613,14 +2365,12 @@ unsigned int PropTagArraySize(struct propTagArray *pPropTagArray)
  */
 unsigned int SearchCriteriaSize(struct searchCriteria *lpSrc)
 {
-	unsigned int ulSize = 0;
+	unsigned int ulSize;
 
-	if(lpSrc == NULL) {
-	    goto exit;
-    }
+	if (lpSrc == NULL)
+		return 0;
 
-	ulSize += sizeof(struct searchCriteria);
-
+	ulSize = sizeof(struct searchCriteria);
 	if(lpSrc->lpRestrict) {
 		ulSize += RestrictTableSize(lpSrc->lpRestrict);
 	}
@@ -2628,8 +2378,6 @@ unsigned int SearchCriteriaSize(struct searchCriteria *lpSrc)
 	if(lpSrc->lpFolders) {
 		ulSize += EntryListSize(lpSrc->lpFolders);
 	}
-
-exit:
 	return ulSize;
 }
 
@@ -2655,14 +2403,12 @@ unsigned int EntryIdSize(entryId *lpEntryid)
  */
 unsigned int NotificationStructSize(notification *lpNotification)
 {
-	unsigned int ulSize = 0;
+	unsigned int ulSize;
 
-	if(lpNotification == NULL) {
-		goto exit;
-	}
+	if (lpNotification == NULL)
+		return 0;
 
-	ulSize += sizeof(notification);
-	
+	ulSize = sizeof(notification);
 	if(lpNotification->tab != NULL) {
 		ulSize += sizeof(notificationTable);
 
@@ -2691,8 +2437,6 @@ unsigned int NotificationStructSize(notification *lpNotification)
 		ulSize += sizeof(notificationICS);
 		ulSize += EntryIdSize(lpNotification->ics->pSyncState);
 	}
-
-exit:
 	return ulSize;
 }
 
@@ -2739,22 +2483,16 @@ ULONG NormalizePropTag(ULONG ulPropTag)
  */
 ECRESULT FreeNamedPropArray(struct namedPropArray *array, bool bFreeBase)
 {
-	for(unsigned int i = 0; i < array->__size; i++) {
-		if(array->__ptr[i].lpId)
-			delete array->__ptr[i].lpId;
-		if(array->__ptr[i].lpString)
-			delete array->__ptr[i].lpString;
+	for (unsigned int i = 0; i < array->__size; ++i) {
+		delete array->__ptr[i].lpId;
+		delete array->__ptr[i].lpString;
 		if(array->__ptr[i].lpguid) {
-			if(array->__ptr[i].lpguid->__ptr)
-				delete [] array->__ptr[i].lpguid->__ptr;
-				
+			delete[] array->__ptr[i].lpguid->__ptr;
 			delete array->__ptr[i].lpguid;
 		}
 	}
 	
-	if (array->__ptr)
-		delete [] array->__ptr;
-		
+	delete[] array->__ptr;
 	if(bFreeBase)
 		delete array;
 
@@ -2769,13 +2507,13 @@ ECRESULT FreeNamedPropArray(struct namedPropArray *array, bool bFreeBase)
  * the contents of that header
  *
  * @param[in] soap Soap object of the request
- * @result String representation of the requester's source address
+ * @result String representation of the requester's source address, valid for as long as the soap object exists.
  */
-std::string GetSourceAddr(struct soap *soap)
+const char *GetSourceAddr(struct soap *soap)
 {
 	if( ((SOAPINFO *)soap->user)->bProxy && soap->proxy_from)
 		return soap->proxy_from;
 	else
-		return PrettyIP(soap->ip);
+		return soap->host;
 }
 

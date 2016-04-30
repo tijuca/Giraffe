@@ -1,49 +1,23 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
-#include "ECGetText.h"
+#include <zarafa/ECGetText.h>
 
 #include <memory.h>
 #include <mapi.h>
@@ -54,26 +28,30 @@
 #include "ECMSProvider.h"
 #include "ECOfflineState.h"
 
-#include "ECGuid.h"
+#include <zarafa/ECGuid.h>
 
-#include "Trace.h"
-#include "ECDebug.h"
+#include <zarafa/Trace.h>
+#include <zarafa/ECDebug.h>
 
-#include "edkguid.h"
+#include <edkguid.h>
 #include "EntryPoint.h"
 #include "DLLGlobal.h"
 #include <edkmdb.h>
-#include "mapiext.h"
+#include <zarafa/mapiext.h>
 
 #include "ClientUtil.h"
 #include "ECMsgStore.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 
+#ifdef WIN32
+#include <Sensapi.h>
+#include "PasswordDlg.h"
+#endif
 #include <csignal>
 
 #include "ProviderUtil.h"
 
-#include <charset/convstring.h>
+#include <zarafa/charset/convstring.h>
 
 #ifdef swprintf
 	#undef swprintf
@@ -155,7 +133,23 @@ HRESULT ECMSProviderSwitch::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR l
 
 	convstring			tstrProfileName(lpszProfileName, ulFlags);
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	int				ulAction = 0;
+	BOOL			bFirstSync = FALSE;
 
+	LPMSLOGON		lpMSLogonOffline = NULL;
+	LPMDB			lpMDBOffline = NULL;
+	DWORD			dwNetworkFlag = 0;
+
+	IMSProvider *lpOffline = NULL;
+	bool bRetryLogon;
+	IUnknown *lpTmpStream = NULL;
+#endif
+
+#if defined(WIN32) && !defined(WINCE)
+	if (ulUIParam == 0)
+		ulUIParam = (ULONG)GetWindow(GetDesktopWindow(), GW_CHILD);
+#endif
 
 	// Get the username and password from the profile settings
 	hr = ClientUtil::GetGlobalProfileProperties(lpMAPISup, &sProfileProps);
@@ -207,7 +201,15 @@ HRESULT ECMSProviderSwitch::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR l
 	if (hr != hrSuccess)
 		goto exit;
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	hr = sProviderInfo.lpMSProviderOffline->QueryInterface(IID_IMSProvider, (void **)&lpOffline);
+	if (hr != hrSuccess)
+		goto exit;
+#endif
 
+#if defined(WIN32) && !defined(WINCE)
+relogin:
+#endif
 	// Default error
 	hr = MAPI_E_LOGON_FAILED; //or MAPI_E_FAILONEPROVIDER
 
@@ -218,16 +220,215 @@ HRESULT ECMSProviderSwitch::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR l
 
 	if ((ulFlags & MDB_ONLINE) == MDB_ONLINE || (sProviderInfo.ulProfileFlags&EC_PROFILE_FLAGS_OFFLINE) != EC_PROFILE_FLAGS_OFFLINE || bIsDefaultStore == false)
 	{
+#ifdef HAVE_OFFLINE_SUPPORT
+		ECOfflineState::OFFLINESTATE state;
+
+		if(sProviderInfo.ulProfileFlags & EC_PROFILE_FLAGS_OFFLINE) {
+			// If the profile is offline-capable, check offline state
+			if(ECOfflineState::GetOfflineState(tstrProfileName, &state) == hrSuccess && state == ECOfflineState::OFFLINESTATE_OFFLINE) {
+				// Deny logon to online store if 'working offline'
+				hr = MAPI_E_FAILONEPROVIDER;
+				goto exit;
+			}
+		}
+#endif
 		bool fDone = false;
 
 		while(!fDone) {
 			hr = lpOnline->Logon(lpMAPISup, ulUIParam, lpszProfileName, cbEntryID, lpEntryID, ulFlags, lpInterface, NULL, NULL, NULL, &lpMSLogon, &lpMDB);
 			ulConnectType = CT_ONLINE;
+#ifdef HAVE_OFFLINE_SUPPORT
+			if(hr == MAPI_E_NETWORK_ERROR && sProviderInfo.ulProfileFlags&EC_PROFILE_FLAGS_OFFLINE) {
+#ifdef WIN32
+				if(ulFlags & MDB_NO_DIALOG) {
+#endif
+					// If no dialog is allowed, do the same as when pressing 'continue', ie work offline
+					ECOfflineState::SetOfflineState(tstrProfileName, ECOfflineState::OFFLINESTATE_OFFLINE);
+					fDone = true;
+#ifdef WIN32
+				} else {
+					// An offline profile is in use, and we were unable to connect to an online store. Prompt the user for what to do
+					// The user can choose 'Retry', which will retry the connect, 'Cancel' which will cancel the current request, and 'Continue'
+					// in which case all subsequent online requests should fail (work offline).
+					switch(MessageBox((HWND)ulUIParam, _("Unable to connect to the online server. If you continue, no new connections will be attempted until you disable the 'Work offline' option in the 'File' menu."), g_strProductName.c_str(), MB_ICONQUESTION | MB_CANCELTRYCONTINUE)) {
+						case IDCANCEL:
+							fDone = true;
+							// break loop with error
+							break;
+						case IDTRYAGAIN:
+							// just loop around again
+							break;
+						case IDCONTINUE:
+							ECOfflineState::SetOfflineState(tstrProfileName, ECOfflineState::OFFLINESTATE_OFFLINE);
+							fDone = true;
+							// break loop with error
+							break;
+					}
+				}
+#endif
+			} else
+#endif //offline
 			{
 				fDone = true;
 			}
 		}
 	}
+#ifdef HAVE_OFFLINE_SUPPORT
+	// Offline provider
+	else {
+#ifdef WIN32
+		//Logon on the offline store
+		hr = lpOffline->Logon(lpMAPISup, ulUIParam, lpszProfileName, cbEntryID, lpEntryID, ulFlags, lpInterface, NULL, NULL, NULL, &lpMSLogonOffline, &lpMDBOffline);
+		if (hr == MAPI_E_BUSY) {
+			bool bTryOnline = (sProviderInfo.ulConnectType != CT_OFFLINE);
+
+			// The offline server is performing an upgrade that takes too long for a
+			// user to comfortably wait for.
+			// We'll just work online this session if the user wants to
+			if (sProviderInfo.ulConnectType == CT_UNSPECIFIED && (ulFlags & MDB_NO_DIALOG) == 0) {
+				MessageBox((HWND)ulUIParam, _("Your offline cache database is being upgraded. Outlook will start in online mode for this session."), g_strProductName.c_str(), MB_ICONEXCLAMATION | MB_OK);
+				bTryOnline = true;
+			}
+
+			if (bTryOnline)
+				hr = Logon(lpMAPISup, ulUIParam, lpszProfileName, cbEntryID, lpEntryID, ulFlags | MDB_ONLINE, lpInterface, lpcbSpoolSecurity, lppbSpoolSecurity, lppMAPIError, lppMSLogon, lppMDB);
+			else
+				hr = MAPI_E_LOGON_FAILED;
+
+			goto exit;	// In any case we're done
+		}
+		else if (hr != hrSuccess)
+			goto exit;
+
+		// Check if this is the first time to logon
+		hr = lpMDBOffline->OpenProperty(PR_EC_OFFLINE_SYNC_STATUS, &IID_IStream, 0, 0, (IUnknown**)&lpTmpStream);
+		if (hr == MAPI_E_NOT_FOUND)
+			bFirstSync = true;
+
+		if (lpTmpStream) { lpTmpStream->Release(); lpTmpStream = NULL; }
+
+		hr = hrSuccess; // Reset hr
+
+		
+		if (bFirstSync)
+		{
+			hr = FirstFolderSync((HWND)ulUIParam, lpOffline, lpOnline, cbEntryID, lpEntryID, lpMAPISup);
+			if (hr != hrSuccess)
+				goto exit;
+		}
+
+		// Login with offline cached mode
+		if ( (sProviderInfo.ulProfileFlags&(EC_PROFILE_FLAGS_OFFLINE|EC_PROFILE_FLAGS_CACHE_PRIVATE)) == (EC_PROFILE_FLAGS_OFFLINE|EC_PROFILE_FLAGS_CACHE_PRIVATE))
+		{
+
+			if (bFirstSync)
+			{
+				// Ok, reload the store, to get the last properties (a bug in the store)
+				lpMSLogonOffline->Release(); 
+				lpMDBOffline->Release(); 
+				lpMSLogonOffline = NULL;
+				lpMDBOffline = NULL;
+
+				hr = lpOffline->Logon(lpMAPISup, ulUIParam, lpszProfileName, cbEntryID, lpEntryID, ulFlags, lpInterface, NULL, NULL, NULL, &lpMSLogonOffline, &lpMDBOffline);
+				if (hr != hrSuccess)
+					goto exit;
+			}
+
+			lpMSLogon = lpMSLogonOffline;
+			lpMDB = lpMDBOffline;
+
+			lpMSLogonOffline = NULL;
+			lpMDBOffline = NULL;
+			ulConnectType = CT_OFFLINE;
+
+		} else if ( (sProviderInfo.ulProfileFlags&EC_PROFILE_FLAGS_OFFLINE) == EC_PROFILE_FLAGS_OFFLINE ) {
+
+			// login with online/offline mode
+			if (bFirstSync)
+			{
+				// Logoff offline store, not needed
+				lpMSLogonOffline->Release();
+				lpMDBOffline->Release();
+				lpMSLogonOffline = NULL;
+				lpMDBOffline = NULL;
+			}
+
+			if (ulFlags & MDB_NO_DIALOG && sProviderInfo.ulConnectType == CT_UNSPECIFIED) {
+				// This is a non-interactive logon with autodetect mode. Our behaviour is to follow
+				// whatever the user has last chosen in an interactive login session (pressing the button 'continue'
+				// for example, selecting offline mode. This causes MAPISP32.exe to follow whatever the user has chosen.
+
+				if(GetLastConnectionType(lpMAPISup, &ulConnectType) == erSuccess) {
+					sProviderInfo.ulConnectType = ulConnectType;
+				}
+			}
+
+			if (bFirstSync == FALSE && sProviderInfo.ulConnectType == CT_OFFLINE) {
+				// Autodetect mode with connection type == CT_OFFLINE
+				lpMSLogon = lpMSLogonOffline;
+				lpMDB = lpMDBOffline;
+
+				lpMSLogonOffline = NULL;
+				lpMDBOffline = NULL;
+				ulConnectType = CT_OFFLINE;
+			}else if (bFirstSync == FALSE && sProviderInfo.ulConnectType == CT_ONLINE) {
+				// Autodetect mode with connection type == CT_ONLINE
+				hr = lpOnline->Logon(lpMAPISup, ulUIParam, lpszProfileName, cbEntryID, lpEntryID, ulFlags, lpInterface, NULL, NULL, NULL, &lpMSLogon, &lpMDB);
+				ulConnectType = CT_ONLINE;
+			}else {
+				// Autodetect mode with connection type == CT_UNSPECIFIED
+				do {
+					bRetryLogon = false;
+					ulConnectType = CT_ONLINE;
+
+					if (IsNetworkAlive(&dwNetworkFlag) == TRUE) {
+						hr = lpOnline->Logon(lpMAPISup, ulUIParam, lpszProfileName, cbEntryID, lpEntryID, ulFlags, lpInterface, NULL, NULL, NULL, &lpMSLogon, &lpMDB);
+					}else {
+						hr = MAPI_E_NETWORK_ERROR;
+					}
+					
+					if(hr != hrSuccess && ulFlags & MDB_NO_DIALOG) {
+						goto exit;
+					}else if (hr == MAPI_E_NETWORK_ERROR) {
+						hr = hrSuccess;
+
+						// Question work online / offline
+						ulAction = MessageBox((HWND)ulUIParam, _("Unable to work online! Do you want to switch to offline mode?"), g_strProductName.c_str(), MB_CANCELTRYCONTINUE);
+						switch(ulAction)
+						{
+							case IDCONTINUE: // Use offline store
+								lpMSLogon = lpMSLogonOffline;
+								lpMDB = lpMDBOffline;
+
+								lpMSLogonOffline = NULL;
+								lpMDBOffline = NULL;
+
+								ulConnectType = CT_OFFLINE;
+								
+								// Set 'work offline' mode, since we know that the online server is not available now
+								ECOfflineState::SetOfflineState(tstrProfileName, ECOfflineState::OFFLINESTATE_OFFLINE);
+
+								break;
+							case IDTRYAGAIN:
+								bRetryLogon = true;
+								break;
+							case IDCANCEL:
+							default:
+								hr = MAPI_E_NETWORK_ERROR;
+								break;
+						}// switch(ulAction)
+					} // if (hr == MAPI_E_NETWORK_ERROR)
+					
+					// INFO: hr can be an error, check on a other place
+				}while (bRetryLogon);
+
+			} //if (bFirstSync == FALSE && sProviderInfo.bOnline == FALSE) {
+		}
+#else
+		// TODO: Linux support
+#endif
+	}
+#endif	// HAVE_OFFLINE_SUPPORT
 
 	// Set the provider in the right connection type
 	if (bIsDefaultStore) {
@@ -245,9 +446,27 @@ HRESULT ECMSProviderSwitch::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR l
 			hr = MAPI_E_FAILONEPROVIDER; //for disable public folders, so you can work offline
 			goto exit;
 		} else if (hr == MAPI_E_LOGON_FAILED) {
+#if defined(WIN32) && !defined(WINCE)
+			//MessageBox((HWND)ulUIParam, _("Incorrect username and/or password."), g_strProductName.c_str(), MB_OK | MB_ICONEXCLAMATION );
+
+			// Use this dll for resource stuff
+			AFX_MANAGE_STATE(AfxGetStaticModuleState());
+
+			CWnd *lpParentWnd = CWnd::FromHandle((HWND)ulUIParam); 
+			CPasswordDlg pwdDlg(lpParentWnd, lpMAPISup);
+
+			if (pwdDlg.DoModal() == IDOK && pwdDlg.Save() == hrSuccess) {
+				goto relogin;
+			}
+			else {
+				hr = MAPI_E_LOGON_FAILED;
+				goto exit;
+			}
+#else
 			hr = MAPI_E_UNCONFIGURED; // Linux error ??//
 			//hr = MAPI_E_LOGON_FAILED;
 			goto exit;
+#endif
 		}else{
 			hr = MAPI_E_LOGON_FAILED;
 			goto exit;
@@ -323,19 +542,19 @@ HRESULT ECMSProviderSwitch::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR l
 exit:
 	if (lppMAPIError)
 		*lppMAPIError = NULL;
-
-	if (lpsPropTagArray)
-		MAPIFreeBuffer(lpsPropTagArray);
-
-	if (lpsPropArray)
-		MAPIFreeBuffer(lpsPropArray);
-
-	if (lpProp)
-		MAPIFreeBuffer(lpProp);
-
+	MAPIFreeBuffer(lpsPropTagArray);
+	MAPIFreeBuffer(lpsPropArray);
+	MAPIFreeBuffer(lpProp);
 	if (lpProfSect)
 		lpProfSect->Release();
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	if (lpMSLogonOffline)
+		lpMSLogonOffline->Release();
+
+	if (lpMDBOffline)
+		lpMDBOffline->Release();
+#endif
 	
 	if (lpMSLogon)
 		lpMSLogon->Release();
@@ -349,13 +568,15 @@ exit:
 	if (lpOnline)
 		lpOnline->Release();
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	if (lpOffline)
+		lpOffline->Release();
 
-    if (lpIdentityProps)
-        MAPIFreeBuffer(lpIdentityProps);
-
-	if (lpStoreID)
-		MAPIFreeBuffer(lpStoreID);
-
+	if (lpTmpStream)
+		lpTmpStream->Release();
+#endif
+	MAPIFreeBuffer(lpIdentityProps);
+	MAPIFreeBuffer(lpStoreID);
 	return hr;
 }
 
@@ -382,6 +603,12 @@ HRESULT ECMSProviderSwitch::SpoolerLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, L
 	if (hr != hrSuccess)
 		goto exit;
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	ASSERT(sProviderInfo.ulConnectType != CT_UNSPECIFIED);
+	if (sProviderInfo.ulConnectType == CT_OFFLINE)
+		lpProvider = sProviderInfo.lpMSProviderOffline;
+	else // all other types
+#endif
 		lpProvider = sProviderInfo.lpMSProviderOnline;
 
 	hr = lpProvider->SpoolerLogon(lpMAPISup, ulUIParam, lpszProfileName, cbEntryID, lpEntryID, ulFlags, lpInterface, cbSpoolSecurity, lpbSpoolSecurity, NULL, &lpMSLogon, &lpMDB);

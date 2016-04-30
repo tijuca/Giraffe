@@ -1,6 +1,6 @@
 %{
-#include "ECTags.h"
-#include "IECUnknown.h"
+#include <zarafa/ECTags.h>
+#include <zarafa/IECUnknown.h>
 %}
 
 // Pull in the language-specific helpers
@@ -45,14 +45,12 @@ HRESULT UnwrapObject(IMAPIProp *lpWrapped, LPCIID USE_IID_FOR_OUTPUT, LPUNKNOWN*
 
 		hr = lpUnwrapped->QueryInterface(*USE_IID_FOR_OUTPUT, (void**)OUTPUT_USE_IID);
 	} else {
-		// Possible object already wrapped, gives the orignale object back
+		// Possible object already wrapped, gives the original object back
 		hr = lpWrapped->QueryInterface(*USE_IID_FOR_OUTPUT, (void**)OUTPUT_USE_IID);
 	}
 
 exit:
-	if (lpPropValue)
-		MAPIFreeBuffer(lpPropValue);
-
+	MAPIFreeBuffer(lpPropValue);
 	return hr;
 }
 %}

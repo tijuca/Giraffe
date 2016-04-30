@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <mapidefs.h>
 #include <mapicode.h>
@@ -50,8 +24,8 @@
 #include <mapiutil.h>
 #include "Zarafa.h"
 
-#include "ECGuid.h"
-#include "ECDefs.h"
+#include <zarafa/ECGuid.h>
+#include <zarafa/ECDefs.h>
 
 #include "ECMsgStore.h"
 #include "ECMAPIProp.h"
@@ -59,13 +33,13 @@
 #include "ECMemStream.h"
 
 #include "Mem.h"
-#include "Util.h"
+#include <zarafa/Util.h>
 
-#include "ECDebug.h"
-#include "mapiext.h"
+#include <zarafa/ECDebug.h>
+#include <zarafa/mapiext.h>
 
-#include "CommonUtil.h"
-#include "mapi_ptr.h"
+#include <zarafa/CommonUtil.h>
+#include <zarafa/mapi_ptr.h>
 #include "ZarafaUtil.h"
 
 #include <sstream>
@@ -153,8 +127,7 @@ ECMAPIProp::ECMAPIProp(void *lpProvider, ULONG ulObjType, BOOL fModify,
 ECMAPIProp::~ECMAPIProp()
 {
 	TRACE_MAPI(TRACE_ENTRY, "ECMAPIProp::~ECMAPIProp","");
-	if (m_lpParentID)
-		MAPIFreeBuffer(m_lpParentID);
+	MAPIFreeBuffer(m_lpParentID);
 }
 
 HRESULT ECMAPIProp::QueryInterface(REFIID refiid, void **lppInterface)
@@ -178,17 +151,7 @@ ECMsgStore* ECMAPIProp::GetMsgStore()
 // Loads the properties of the saved message for use
 HRESULT ECMAPIProp::HrLoadProps()
 {
-	HRESULT hr = hrSuccess;
-
-	hr = ECGenericProp::HrLoadProps();
-	if(hr != hrSuccess)
-		goto exit;
-
-exit:
-
-	dwLastError = hr;
-
-	return hr;
+	return dwLastError = ECGenericProp::HrLoadProps();
 }
 
 HRESULT ECMAPIProp::SetICSObject(BOOL bICSObject)
@@ -217,7 +180,23 @@ HRESULT	ECMAPIProp::DefaultMAPIGetProp(ULONG ulPropTag, void* lpProvider, ULONG 
 	case PROP_ID(PR_SOURCE_KEY):
 		hr = lpProp->HrGetRealProp(PR_SOURCE_KEY, ulFlags, lpBase, lpsPropValue);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
+#ifdef WIN32
+		if(lpMsgStore->m_ulProfileFlags & EC_PROFILE_FLAGS_TRUNCATE_SOURCEKEY && lpsPropValue->Value.bin.cb > 22) {
+			/*
+			 * Make our source key a little shorter; MSEMS has 22-byte sourcekeys, while we can have 24-byte
+			 * source keys. This can cause buffer overflows in applications that (wrongly) assume fixed 22-byte
+			 * source keys. We're not losing any data here actually, since the last two bytes are always 0000 since
+			 * the source key ends in a 128-bit little-endian counter which will definitely never increment the last two
+			 * bytes in the coming 1000000 years ;)
+			 *
+			 * Then, mark the sourcekey as being truncated by setting the highest bit in the ID part to 1, so we can 
+			 * untruncate it when needed.
+			 */
+			lpsPropValue->Value.bin.cb = 22;
+			lpsPropValue->Value.bin.lpb[lpsPropValue->Value.bin.cb-1] |= 0x80; // Set top bit
+		}
+#endif
 		break;
 		
 	case PROP_ID(0x664B0014):
@@ -321,7 +300,7 @@ HRESULT	ECMAPIProp::DefaultMAPIGetProp(ULONG ulPropTag, void* lpProvider, ULONG 
 		if (lpProp->m_sMapiObject == NULL) {
 			hr = lpProp->HrLoadProps();
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 		if (lpProp->m_sMapiObject->ulObjId > 0) {
 			lpsPropValue->ulPropTag = ulPropTag;
@@ -334,8 +313,6 @@ HRESULT	ECMAPIProp::DefaultMAPIGetProp(ULONG ulPropTag, void* lpProvider, ULONG 
 		hr = lpProp->HrGetRealProp(ulPropTag, ulFlags, lpBase, lpsPropValue);
 		break;
 	}
-	
-exit:
 	return hr;
 }
 
@@ -693,12 +670,18 @@ HRESULT ECMAPIProp::SetSerializedACLData(LPSPropValue lpsPropValue)
 		soap.is = &is;
 		soap_set_imode(&soap, SOAP_C_UTFSTRING);
 		soap_begin(&soap);
-		soap_begin_recv(&soap);
+		if (soap_begin_recv(&soap) != 0) {
+			hr = MAPI_E_NETWORK_FAILURE;
+			goto exit;
+		}
 		if (!soap_get_rightsArray(&soap, &rights, "rights", "rightsArray")) {
 			hr = MAPI_E_CORRUPT_DATA;
 			goto exit;
 		}
-		soap_end_recv(&soap); 
+		if (soap_end_recv(&soap) != 0) {
+			hr = MAPI_E_NETWORK_ERROR;
+			goto exit;
+		}
 	}
 
 	hr = MAPIAllocateBuffer(rights.__size * sizeof(ECPERMISSION), &ptrPerms);
@@ -715,30 +698,30 @@ exit:
 	return hr;
 }
 
-HRESULT	ECMAPIProp::UpdateACLs(ULONG cNewPerms, LPECPERMISSION lpNewPerms)
+HRESULT	ECMAPIProp::UpdateACLs(ULONG cNewPerms, ECPERMISSION *lpNewPerms)
 {
-	HRESULT					hr = hrSuccess;
+	HRESULT hr;
 	ECSecurityPtr			ptrSecurity;
 	ULONG					cPerms = 0;
 	ECPermissionArrayPtr	ptrPerms;
 	ULONG					cSparePerms = 0;
 	ECPermissionPtr			ptrTmpPerms;
-	LPECPERMISSION			lpPermissions = NULL;
+	ECPERMISSION *lpPermissions = NULL;
 
 	hr = QueryInterface(IID_IECSecurity, &ptrSecurity);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	hr = ptrSecurity->GetPermissionRules(ACCESS_TYPE_GRANT, &cPerms, &ptrPerms);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// Since we want to replace the current ACL with a new one, we need to mark
 	// each existing item as deleted, and add all new ones as new.
 	// But there can also be overlap, where some items are left unchanged, and
 	// other modified.
 	for (ULONG i = 0; i < cPerms; ++i) {
-		LPECPERMISSION lpMatch = std::find_if(lpNewPerms, lpNewPerms + cNewPerms, FindUser(ptrPerms[i].sUserId));
+		ECPERMISSION *lpMatch = std::find_if(lpNewPerms, lpNewPerms + cNewPerms, FindUser(ptrPerms[i].sUserId));
 		if (lpMatch == lpNewPerms + cNewPerms) {
 			// Not in new set, so delete
 			ptrPerms[i].ulState = RIGHT_DELETED;
@@ -750,9 +733,9 @@ HRESULT	ECMAPIProp::UpdateACLs(ULONG cNewPerms, LPECPERMISSION lpNewPerms)
 				// Nothing changes, remove from set.
 				if (i < (cPerms - 1))
 					std::swap(ptrPerms[i], ptrPerms[cPerms - 1]);
-				cPerms--;
-				i--;
-				cSparePerms++;
+				--cPerms;
+				--i;
+				++cSparePerms;
 			} else {
 				ptrPerms[i].ulRights = lpMatch->ulRights;
 				ptrPerms[i].ulType = lpMatch->ulType;
@@ -762,7 +745,7 @@ HRESULT	ECMAPIProp::UpdateACLs(ULONG cNewPerms, LPECPERMISSION lpNewPerms)
 			// Remove from list of new permissions
 			if (lpMatch != &lpNewPerms[cNewPerms - 1])
 				std::swap(*lpMatch, lpNewPerms[cNewPerms - 1]);
-			cNewPerms--;
+			--cNewPerms;
 		}
 	}
 
@@ -777,7 +760,7 @@ HRESULT	ECMAPIProp::UpdateACLs(ULONG cNewPerms, LPECPERMISSION lpNewPerms)
 		} else {
 			hr = MAPIAllocateBuffer((cPerms + cNewPerms) * sizeof(ECPERMISSION), &ptrTmpPerms);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			memcpy(ptrTmpPerms, ptrPerms, cPerms * sizeof(ECPERMISSION));
 			memcpy(ptrTmpPerms + cPerms, lpNewPerms, cNewPerms * sizeof(ECPERMISSION));
@@ -789,46 +772,29 @@ HRESULT	ECMAPIProp::UpdateACLs(ULONG cNewPerms, LPECPERMISSION lpNewPerms)
 	if (cPerms + cNewPerms > 0)
 		hr = ptrSecurity->SetPermissionRules(cPerms + cNewPerms, lpPermissions);
 
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 
 HRESULT ECMAPIProp::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
 {
-	HRESULT hr = hrSuccess;
-	
-	hr = Util::DoCopyTo(&IID_IMAPIProp, &this->m_xMAPIProp, ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-
-	return hr;
+	return Util::DoCopyTo(&IID_IMAPIProp, &this->m_xMAPIProp, ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
 
 HRESULT ECMAPIProp::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = Util::DoCopyProps(&IID_IMAPIProp, &this->m_xMAPIProp, lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-
-	return hr;
+	return Util::DoCopyProps(&IID_IMAPIProp, &this->m_xMAPIProp, lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
 
 // Pass call off to lpMsgStore
 HRESULT ECMAPIProp::GetNamesFromIDs(LPSPropTagArray FAR * lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG FAR * lpcPropNames, LPMAPINAMEID FAR * FAR * lpppPropNames)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = this->GetMsgStore()->lpNamedProp->GetNamesFromIDs(lppPropTags, lpPropSetGuid, ulFlags, lpcPropNames, lpppPropNames);
-
-	return hr;
+	return this->GetMsgStore()->lpNamedProp->GetNamesFromIDs(lppPropTags, lpPropSetGuid, ulFlags, lpcPropNames, lpppPropNames);
 }
 
 HRESULT ECMAPIProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID FAR * lppPropNames, ULONG ulFlags, LPSPropTagArray FAR * lppPropTags)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = this->GetMsgStore()->lpNamedProp->GetIDsFromNames(cPropNames, lppPropNames, ulFlags, lppPropTags);
-
-	return hr;
+	return this->GetMsgStore()->lpNamedProp->GetIDsFromNames(cPropNames, lppPropNames, ulFlags, lppPropTags);
 }
 
 /////////////////////////////////////////////
@@ -917,10 +883,7 @@ exit:
 HRESULT ECMAPIProp::HrStreamCleanup(void *lpData)
 {
 	STREAMDATA *lpStreamData = (STREAMDATA *)lpData;
-	
-	if (lpStreamData)					// just to be sure
-		delete lpStreamData;
-
+	delete lpStreamData;
 	return hrSuccess;
 }
 
@@ -945,106 +908,66 @@ exit:
 ////////////////////////////////////////////////////////////////
 // Security fucntions
 //
-HRESULT ECMAPIProp::GetPermissionRules(int ulType, ULONG* lpcPermissions, LPECPERMISSION* lppECPermissions) {
-	HRESULT hr = hrSuccess;
+HRESULT ECMAPIProp::GetPermissionRules(int ulType, ULONG *lpcPermissions,
+    ECPERMISSION **lppECPermissions)
+{
+	if (m_lpEntryId == NULL)
+		return MAPI_E_NO_ACCESS;
 
-	if(m_lpEntryId == NULL) {
-		hr = MAPI_E_NO_ACCESS;
-		goto exit;
-	}
-
-	hr = this->GetMsgStore()->lpTransport->HrGetPermissionRules(ulType, m_cbEntryId, m_lpEntryId, lpcPermissions, lppECPermissions);
-
-	if(hr != hrSuccess)
-		goto exit;
-
-exit:
-	return hr;
+	return this->GetMsgStore()->lpTransport->HrGetPermissionRules(ulType, m_cbEntryId, m_lpEntryId, lpcPermissions, lppECPermissions);
 }
 
-HRESULT ECMAPIProp::SetPermissionRules(ULONG cPermissions, LPECPERMISSION lpECPermissions) {
-	HRESULT hr = hrSuccess;
+HRESULT ECMAPIProp::SetPermissionRules(ULONG cPermissions,
+    ECPERMISSION *lpECPermissions)
+{
+	if (m_lpEntryId == NULL)
+		return MAPI_E_NO_ACCESS;
 
-	if(m_lpEntryId == NULL) {
-		hr = MAPI_E_NO_ACCESS;
-		goto exit;
-	}
-
-	hr = this->GetMsgStore()->lpTransport->HrSetPermissionRules(m_cbEntryId, m_lpEntryId, cPermissions, lpECPermissions);
-	if(hr != hrSuccess)
-		goto exit;
-
-exit:
-	return hr;
+	return this->GetMsgStore()->lpTransport->HrSetPermissionRules(m_cbEntryId, m_lpEntryId, cPermissions, lpECPermissions);
 }
 
 HRESULT ECMAPIProp::GetOwner(ULONG *lpcbOwner, LPENTRYID *lppOwner)
 {
-	HRESULT hr = hrSuccess;
-
 	if (lpcbOwner == NULL || lppOwner == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if(m_lpEntryId == NULL) {
-		hr = MAPI_E_NO_ACCESS;
-		goto exit;
-	}
-
-	hr = GetMsgStore()->lpTransport->HrGetOwner(m_cbEntryId, m_lpEntryId, lpcbOwner, lppOwner);
-
-exit:
-	return hr;
+		return MAPI_E_INVALID_PARAMETER;
+	if (m_lpEntryId == NULL)
+		return MAPI_E_NO_ACCESS;
+	return GetMsgStore()->lpTransport->HrGetOwner(m_cbEntryId, m_lpEntryId, lpcbOwner, lppOwner);
 }
 
-HRESULT ECMAPIProp::GetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, LPECUSER* lppsUsers)
+HRESULT ECMAPIProp::GetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId,
+    ULONG ulFlags, ULONG *lpcUsers, ECUSER **lppsUsers)
 {
-	HRESULT	hr = hrSuccess;
-	
-	hr = GetMsgStore()->lpTransport->HrGetUserList(cbCompanyId, lpCompanyId, ulFlags, lpcUsers, lppsUsers);
-	
-	return hr;
+	return GetMsgStore()->lpTransport->HrGetUserList(cbCompanyId, lpCompanyId, ulFlags, lpcUsers, lppsUsers);
 }
 
-HRESULT ECMAPIProp::GetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcGroups, LPECGROUP *lppsGroups)
+HRESULT ECMAPIProp::GetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId,
+    ULONG ulFlags, ULONG *lpcGroups, ECGROUP **lppsGroups)
 {
-	HRESULT	hr = hrSuccess;
-	
-	hr = GetMsgStore()->lpTransport->HrGetGroupList(cbCompanyId, lpCompanyId, ulFlags, lpcGroups, lppsGroups);
-	
-	return hr;
+	return GetMsgStore()->lpTransport->HrGetGroupList(cbCompanyId, lpCompanyId, ulFlags, lpcGroups, lppsGroups);
 }
 
-HRESULT ECMAPIProp::GetCompanyList(ULONG ulFlags, ULONG *lpcCompanies, LPECCOMPANY *lppsCompanies)
+HRESULT ECMAPIProp::GetCompanyList(ULONG ulFlags, ULONG *lpcCompanies,
+    ECCOMPANY **lppsCompanies)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = GetMsgStore()->lpTransport->HrGetCompanyList(ulFlags, lpcCompanies, lppsCompanies);
-
-	return hr;
+	return GetMsgStore()->lpTransport->HrGetCompanyList(ulFlags, lpcCompanies, lppsCompanies);
 }
 
 HRESULT ECMAPIProp::SetParentID(ULONG cbParentID, LPENTRYID lpParentID)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	ASSERT(m_lpParentID == NULL);
-	if (lpParentID == NULL || cbParentID == 0) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpParentID == NULL || cbParentID == 0)
+		return MAPI_E_INVALID_PARAMETER;
 
 	hr = MAPIAllocateBuffer(cbParentID, (void**)&m_lpParentID);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	m_cbParentID = cbParentID;
 	memcpy(m_lpParentID, lpParentID, cbParentID);
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 ////////////////////////////////////////////
@@ -1202,31 +1125,37 @@ HRESULT ECMAPIProp::xECSecurity::GetOwner(ULONG *lpcbOwner, LPENTRYID *lppOwner)
 	return pThis->GetOwner(lpcbOwner, lppOwner);
 }
 
-HRESULT ECMAPIProp::xECSecurity::GetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, LPECUSER* lpsUsers)
+HRESULT ECMAPIProp::xECSecurity::GetUserList(ULONG cbCompanyId,
+    LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lpsUsers)
 {
 	METHOD_PROLOGUE_(ECMAPIProp, ECSecurity);
 	return pThis->GetUserList(cbCompanyId, lpCompanyId, ulFlags, lpcUsers, lpsUsers);
 }
 
-HRESULT ECMAPIProp::xECSecurity::GetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcGroups, LPECGROUP *lppsGroups)
+HRESULT ECMAPIProp::xECSecurity::GetGroupList(ULONG cbCompanyId,
+    LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcGroups,
+    ECGROUP **lppsGroups)
 {
 	METHOD_PROLOGUE_(ECMAPIProp, ECSecurity);
 	return pThis->GetGroupList(cbCompanyId, lpCompanyId, ulFlags, lpcGroups, lppsGroups);
 }
 
-HRESULT ECMAPIProp::xECSecurity::GetCompanyList(ULONG ulFlags, ULONG *lpcCompanies, LPECCOMPANY *lppsCompanies)
+HRESULT ECMAPIProp::xECSecurity::GetCompanyList(ULONG ulFlags,
+    ULONG *lpcCompanies, ECCOMPANY **lppsCompanies)
 {
 	METHOD_PROLOGUE_(ECMAPIProp, ECSecurity);
 	return pThis->GetCompanyList(ulFlags, lpcCompanies, lppsCompanies);
 }
 
-HRESULT ECMAPIProp::xECSecurity::GetPermissionRules(int ulType, ULONG* lpcPermissions, LPECPERMISSION* lppECPermissions)
+HRESULT ECMAPIProp::xECSecurity::GetPermissionRules(int ulType,
+    ULONG *lpcPermissions, ECPERMISSION **lppECPermissions)
 {
 	METHOD_PROLOGUE_(ECMAPIProp, ECSecurity);
 	return pThis->GetPermissionRules(ulType, lpcPermissions, lppECPermissions);
 }
 
-HRESULT ECMAPIProp::xECSecurity::SetPermissionRules(ULONG cPermissions, LPECPERMISSION lpECPermissions)
+HRESULT ECMAPIProp::xECSecurity::SetPermissionRules(ULONG cPermissions,
+    ECPERMISSION *lpECPermissions)
 {
 	METHOD_PROLOGUE_(ECMAPIProp, ECSecurity);
 	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::IECSecurity::SetPermissionRules", "%s", PermissionRulesToString(cPermissions, lpECPermissions).c_str());

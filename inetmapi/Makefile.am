@@ -1,7 +1,9 @@
 # -*- Makefile -*-
 
+SUBDIRS = include/inetmapi
+
 AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
-	$(VMIME_CFLAGS) \
+	$(VMIME_CFLAGS) -I${srcdir}/include \
 	-I$(top_srcdir)/mapi4linux/include -I$(top_srcdir)/provider/common \
 	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
 	-I${top_srcdir}/libfreebusy -I${top_srcdir}/libicalmapi \
@@ -30,14 +32,13 @@ libinetmapi_la_LIBADD = \
 
 libinetmapidir = $(includedir)/inetmapi
 libinetmapi_HEADERS = ECMapiUtils.h ECVMIMEUtils.h	\
-		MAPIToVMIME.h VMIMEToMAPI.h inetmapi.h		\
+		MAPIToVMIME.h VMIMEToMAPI.h \
 		outputStreamMAPIAdapter.h					\
 		inputStreamMAPIAdapter.h					\
 		mapiAttachment.h tnef.h						\
 		mapiTextPart.h								\
 		MAPISMTPTransport.h							\
-		SMIMEMessage.h									\
-		options.h
+		SMIMEMessage.h
 
 libinetmapi_la_SOURCES = ECMapiUtils.cpp ECVMIMEUtils.cpp	\
 		MAPIToVMIME.cpp VMIMEToMAPI.cpp						\

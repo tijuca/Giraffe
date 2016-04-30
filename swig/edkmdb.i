@@ -69,7 +69,7 @@ public:
 #if SWIGPYTHON
 
 %{
-#include "swig_iunknown.h"
+#include <zarafa/swig_iunknown.h>
 typedef IUnknownImplementor<IExchangeImportContentsChanges> ExchangeImportContentsChanges;
 typedef IUnknownImplementor<IExchangeImportHierarchyChanges> ExchangeImportHierarchyChanges;
 typedef IUnknownImplementor<IExchangeExportChanges> ExchangeExportChanges;

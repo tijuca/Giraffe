@@ -1,48 +1,23 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "zcdefs.h"
-#include "platform.h"
+#include <zarafa/zcdefs.h>
+#include <zarafa/platform.h>
+#include <zarafa/ECLogger.h>
 
 #include <sys/select.h>
 #include <sys/time.h>
@@ -51,8 +26,10 @@
 #include <cstdio>
 #include <cctype>
 #include <ctime>
+#include <dirent.h>
 #include <mapicode.h>			// return codes
 #include <unistd.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <cstdlib>
@@ -61,7 +38,17 @@
 
 #include <string>
 #include <map>
+#include <vector>
 
+#ifndef HAVE_UUID_CREATE
+#	include <uuid/uuid.h>
+#else
+#	include <uuid.h>
+#endif
+#if defined(__linux__) && defined(__GLIBC__)
+#	include <cxxabi.h>
+#	include <execinfo.h>
+#endif
 #include "TmpPath.h"
 
 #ifdef __APPLE__
@@ -77,16 +64,14 @@
 
 static bool rand_init_done = false;
 
-bool operator!=(GUID a, GUID b) {
-	if (memcmp((void*)&a, (void*)&b, sizeof(GUID)) == 0)
-		return false;
-	return true;
+bool operator!=(const GUID &a, const GUID &b)
+{
+	return memcmp(&a, &b, sizeof(GUID)) != 0;
 }
 
-bool operator==(REFIID a, GUID b) {
-	if (memcmp((void*)&a, (void*)&b, sizeof(GUID)) == 0)
-		return true;
-	return false;
+bool operator==(REFIID a, const GUID &b)
+{
+	return memcmp(&a, &b, sizeof(GUID)) == 0;
 }
 
 HRESULT CoCreateGuid(LPGUID pNewGUID) {
@@ -249,19 +234,11 @@ time_t GetProcessTime()
 	return t;
 }
 
-void sleep_ms(unsigned int millis) 
-{
-	struct timeval tv;
-	tv.tv_sec = millis / 1000;
-	tv.tv_usec = millis * 1000;
-	select(0,NULL,NULL,NULL,&tv);
-}
-
 #if DEBUG_PTHREADS
 
-class Lock _final {
+class Lock _zcp_final {
 public:
-       Lock() { locks = 0; busy = 0; dblTime = 0; };
+	Lock() : locks(0), busy(0), dblTime(0) {}
        ~Lock() {};
 
        std::string strLocation;
@@ -289,12 +266,12 @@ int my_pthread_mutex_lock(const char *file, unsigned int line, pthread_mutex_t *
 
        pthread_mutex_lock(&my_mutex);
        my_pthread_map[s].strLocation = s;
-       my_pthread_map[s].locks++;
+       ++my_pthread_map[s].locks;
        pthread_mutex_unlock(&my_mutex);
 
        if(( err = pthread_mutex_trylock(__mutex)) == EBUSY) {
                pthread_mutex_lock(&my_mutex);
-               my_pthread_map[s].busy++;
+               ++my_pthread_map[s].busy;
                pthread_mutex_unlock(&my_mutex);
                dblTime = GetTimeOfDay();
                err = pthread_mutex_lock(__mutex);
@@ -321,12 +298,12 @@ int my_pthread_rwlock_rdlock(const char *file, unsigned int line, pthread_rwlock
 
        pthread_mutex_lock(&my_mutex);
        my_pthread_map[s].strLocation = s;
-       my_pthread_map[s].locks++;
+       ++my_pthread_map[s].locks;
        pthread_mutex_unlock(&my_mutex);
 
        if(( err = pthread_rwlock_tryrdlock(__mutex)) == EBUSY) {
                pthread_mutex_lock(&my_mutex);
-               my_pthread_map[s].busy++;
+               ++my_pthread_map[s].busy;
                pthread_mutex_unlock(&my_mutex);
                dblTime = GetTimeOfDay();
                err = pthread_rwlock_rdlock(__mutex);
@@ -353,12 +330,12 @@ int my_pthread_rwlock_wrlock(const char *file, unsigned int line, pthread_rwlock
 
        pthread_mutex_lock(&my_mutex);
        my_pthread_map[s].strLocation = s;
-       my_pthread_map[s].locks++;
+       ++my_pthread_map[s].locks;
        pthread_mutex_unlock(&my_mutex);
 
        if(( err = pthread_rwlock_trywrlock(__mutex)) == EBUSY) {
                pthread_mutex_lock(&my_mutex);
-               my_pthread_map[s].busy++;
+               ++my_pthread_map[s].busy;
                pthread_mutex_unlock(&my_mutex);
                dblTime = GetTimeOfDay();
                err = pthread_rwlock_wrlock(__mutex);
@@ -376,7 +353,7 @@ std::string dump_pthread_locks()
        std::string strLog;
        char s[2048];
 
-       for(i=my_pthread_map.begin(); i!= my_pthread_map.end(); i++) {
+       for (i = my_pthread_map.begin(); i!= my_pthread_map.end(); ++i) {
                snprintf(s,sizeof(s), "%s\t\t%d\t\t%d\t\t%f\n", i->second.strLocation.c_str(), i->second.locks, i->second.busy, (float)i->second.dblTime);
                strLog += s;
        }
@@ -385,3 +362,89 @@ std::string dump_pthread_locks()
 }
 #endif
 
+std::vector<std::string> get_backtrace(void)
+{
+#define BT_MAX 256
+	std::vector<std::string> result;
+	void *addrlist[BT_MAX];
+	int addrlen = backtrace(addrlist, BT_MAX);
+	if (addrlen == 0)
+		return result;
+	char **symbollist = backtrace_symbols(addrlist, addrlen);
+	for (int i = 0; i < addrlen; ++i)
+		result.push_back(symbollist[i]);
+	free(symbollist);
+	return result;
+#undef BT_MAX
+}
+
+static void dump_fdtable_summary(pid_t pid)
+{
+	char procdir[64];
+	snprintf(procdir, sizeof(procdir), "/proc/%ld/fd", static_cast<long>(pid));
+	DIR *dh = opendir(procdir);
+	if (dh == NULL)
+		return;
+	std::string msg;
+	struct dirent de_space, *de = NULL;
+	while (readdir_r(dh, &de_space, &de) == 0 && de != NULL) {
+		if (de->d_type != DT_LNK)
+			continue;
+		std::string de_name(std::string(procdir) + "/" + de->d_name);
+		struct stat sb;
+		if (stat(de_name.c_str(), &sb) < 0) {
+			msg += " ?";
+		} else switch (sb.st_mode & S_IFMT) {
+			case S_IFREG:  msg += " ."; break;
+			case S_IFSOCK: msg += " s"; break;
+			case S_IFDIR:  msg += " d"; break;
+			case S_IFIFO:  msg += " p"; break;
+			case S_IFCHR:  msg += " c"; break;
+			default:       msg += " O"; break;
+		}
+		msg += de->d_name;
+	}
+	closedir(dh);
+	ec_log_debug("FD map:%s", msg.c_str());
+}
+
+/* ALERT! Big hack!
+ *
+ * This function relocates an open file descriptor to a new file descriptor above 1024. The
+ * reason we do this is because, although we support many open FDs up to FD_SETSIZE, libraries
+ * that we use may not (most notably libldap). This means that if a new socket is allocated within
+ * libldap as socket 1025, libldap will fail because it was compiled with FD_SETSIZE=1024. To fix
+ * this problem, we make sure that most FDs under 1024 are free for use by external libraries, while
+ * we use the range 1024 -> \infty.
+ */
+int ec_relocate_fd(int fd)
+{
+	static const int typical_limit = 1024;
+
+	int relocated = fcntl(fd, F_DUPFD, typical_limit);
+	if (relocated >= 0) {
+		close(fd);
+		return relocated;
+	}
+	if (errno == EINVAL) {
+		/*
+		 * The range start (typical_limit) was already >=RLIMIT_NOFILE.
+		 * Just stay silent.
+		 */
+		static bool warned_once;
+		if (warned_once)
+			return fd;
+		warned_once = true;
+		ec_log_warn("F_DUPFD yielded EINVAL\n");
+		return fd;
+	}
+	static time_t warned_last;
+	time_t now = time(NULL);
+	if (warned_last + 60 > now)
+		return fd;
+	ec_log_notice(
+		"Relocation of FD %d into high range (%d+) could not be completed: "
+		"%s. Keeping old number.\n", fd, typical_limit, strerror(errno));
+	dump_fdtable_summary(getpid());
+	return fd;
+}

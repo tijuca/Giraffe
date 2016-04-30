@@ -1,68 +1,42 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include "ECExchangeImportHierarchyChanges.h"
 #include "ECExchangeImportContentsChanges.h"
 
-#include "Util.h"
-#include "ECGuid.h"
-#include "edkguid.h"
+#include <zarafa/Util.h>
+#include <zarafa/ECGuid.h>
+#include <edkguid.h>
 #include <mapiguid.h>
-#include "mapiext.h"
-#include "ECDebug.h"
-#include "stringutil.h"
+#include <zarafa/mapiext.h>
+#include <zarafa/ECDebug.h>
+#include <zarafa/stringutil.h>
 #include "ZarafaUtil.h"
 #include "ZarafaICS.h"
 #include <mapiutil.h>
 #include "Mem.h"
-#include "mapi_ptr.h"
+#include <zarafa/mapi_ptr.h>
 #include "EntryPoint.h"
 
-#include "charset/convert.h"
-#include "charset/utf8string.h"
-#include "charset/convstring.h"
+#include <zarafa/charset/convert.h>
+#include <zarafa/charset/utf8string.h>
+#include <zarafa/charset/convstring.h>
 
 #ifdef _DEBUG
 #undef THIS_FILE
@@ -81,18 +55,12 @@ ECExchangeImportHierarchyChanges::~ECExchangeImportHierarchyChanges(){
 }
 
 HRESULT ECExchangeImportHierarchyChanges::Create(ECMAPIFolder *lpFolder, LPEXCHANGEIMPORTHIERARCHYCHANGES* lppExchangeImportHierarchyChanges){
-	HRESULT hr = hrSuccess;
-	ECExchangeImportHierarchyChanges *lpEIHC = NULL;
 
 	if(!lpFolder)
 		return MAPI_E_INVALID_PARAMETER;
 
-	lpEIHC = new ECExchangeImportHierarchyChanges(lpFolder);
-
-	hr = lpEIHC->QueryInterface(IID_IExchangeImportHierarchyChanges, (void **)lppExchangeImportHierarchyChanges);
-
-	return hr;
-
+	ECExchangeImportHierarchyChanges *lpEIHC = new ECExchangeImportHierarchyChanges(lpFolder);
+	return lpEIHC->QueryInterface(IID_IExchangeImportHierarchyChanges, reinterpret_cast<void **>(lppExchangeImportHierarchyChanges));
 }
 
 HRESULT	ECExchangeImportHierarchyChanges::QueryInterface(REFIID refiid, void **lppInterface)
@@ -152,9 +120,7 @@ HRESULT ECExchangeImportHierarchyChanges::GetLastError(HRESULT hResult, ULONG ul
 	*lppMAPIError = lpMapiError;
 
 exit:
-	if (lpszErrorMsg)
-		MAPIFreeBuffer(lpszErrorMsg);
-
+	MAPIFreeBuffer(lpszErrorMsg);
 	if( hr != hrSuccess && lpMapiError)
 		ECFreeBuffer(lpMapiError);
 
@@ -213,46 +179,38 @@ HRESULT ECExchangeImportHierarchyChanges::Config(LPSTREAM lpStream, ULONG ulFlag
 		
 	m_ulFlags = ulFlags;
 exit:	
-	if(lpPropSourceKey)
-		MAPIFreeBuffer(lpPropSourceKey);
-		
+	MAPIFreeBuffer(lpPropSourceKey);
 	return hrSuccess;
 }
 
 //write into the stream 4 bytes syncid and 4 bytes changeid
 HRESULT ECExchangeImportHierarchyChanges::UpdateState(LPSTREAM lpStream){
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	LARGE_INTEGER zero = {{0,0}};
 	ULONG ulLen = 0;
 	
 	if(lpStream == NULL) {
-		if(m_lpStream == NULL){
-			goto exit;
-		}
+		if (m_lpStream == NULL)
+			return hrSuccess;
 		lpStream = m_lpStream;
 	}
 
 	if(m_ulSyncId == 0)
-		goto exit; // config() called with NULL stream, so we'll ignore the UpdateState()
+		return hrSuccess; // config() called with NULL stream, so we'll ignore the UpdateState()
 	
 	hr = lpStream->Seek(zero, STREAM_SEEK_SET, NULL);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 		
 	hr = lpStream->Write(&m_ulSyncId, 4, &ulLen);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 		
 	if(m_ulSyncId == 0){
 		m_ulChangeId = 0;
 	}
 
-	hr = lpStream->Write(&m_ulChangeId, 4, &ulLen);
-	if(hr != hrSuccess)
-		goto exit;
-	
-exit:
-	return hr;
+	return lpStream->Write(&m_ulChangeId, 4, &ulLen);
 }
 
 
@@ -324,10 +282,8 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 	if(hr == MAPI_E_NOT_FOUND){
 		// Folder is not yet available in our store
 		if(lpPropParentSourceKey->Value.bin.cb > 0){
-			if(lpEntryId){
-				MAPIFreeBuffer(lpEntryId);
-				lpEntryId = NULL;
-			}
+			MAPIFreeBuffer(lpEntryId);
+			lpEntryId = NULL;
 			
 			// Find the parent folder in which the new folder is to be created
 			hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId , lpPropParentSourceKey->Value.bin.cb, lpPropParentSourceKey->Value.bin.lpb, 0, NULL, &cbEntryId, &lpEntryId);
@@ -421,16 +377,12 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 				goto exit;
 		}
 		
-		if(lpPropVal){
-			MAPIFreeBuffer(lpPropVal);
-			lpPropVal = NULL;
-		}
+		MAPIFreeBuffer(lpPropVal);
+		lpPropVal = NULL;
 	}
 	
-	if(lpEntryId){
-		MAPIFreeBuffer(lpEntryId);
-		lpEntryId = NULL;
-	}
+	MAPIFreeBuffer(lpEntryId);
+	lpEntryId = NULL;
 	
 	//ignore change if remote changekey is in local changelist
 	if(lpPropChangeKey && HrGetOneProp(lpFolder, PR_PREDECESSOR_CHANGE_LIST, &lpPropVal) == hrSuccess){
@@ -447,10 +399,8 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 			}
 			ulPos += ulSize + 1;
 		}
-		if(lpPropVal){
-			MAPIFreeBuffer(lpPropVal);
-			lpPropVal = NULL;
-		}
+		MAPIFreeBuffer(lpPropVal);
+		lpPropVal = NULL;
 	}
 
 	//ignore change if local changekey in remote changelist
@@ -469,10 +419,8 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 			}
 			ulPos += ulSize + 1;
 		}
-		if(lpPropVal){
-			MAPIFreeBuffer(lpPropVal);
-			lpPropVal = NULL;
-		}
+		MAPIFreeBuffer(lpPropVal);
+		lpPropVal = NULL;
 	}
 
 	if(bConflict){
@@ -523,15 +471,9 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 
 
 exit:
-	if(lpPropVal)
-		MAPIFreeBuffer(lpPropVal);
-
-	if(lpEntryId)
-		MAPIFreeBuffer(lpEntryId);
-
-	if(lpDestEntryId)
-		MAPIFreeBuffer(lpDestEntryId);
-
+	MAPIFreeBuffer(lpPropVal);
+	MAPIFreeBuffer(lpEntryId);
+	MAPIFreeBuffer(lpDestEntryId);
 	if(lpFolder)
 		lpFolder->Release();
 
@@ -554,11 +496,9 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderDeletion(ULONG ulFlags, LP
 	ULONG cbEntryId;
 	LPENTRYID lpEntryId = NULL;
 
-	for(ulSKNr = 0; ulSKNr < lpSourceEntryList->cValues; ulSKNr++){
-		if(lpEntryId){
-			MAPIFreeBuffer(lpEntryId);
-			lpEntryId = NULL;
-		}
+	for (ulSKNr = 0; ulSKNr < lpSourceEntryList->cValues; ++ulSKNr) {
+		MAPIFreeBuffer(lpEntryId);
+		lpEntryId = NULL;
 		hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId, lpSourceEntryList->lpbin[ulSKNr].cb, lpSourceEntryList->lpbin[ulSKNr].lpb, 0, NULL, &cbEntryId, &lpEntryId);
 		if(hr == MAPI_E_NOT_FOUND){
 			hr = hrSuccess;
@@ -576,9 +516,7 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderDeletion(ULONG ulFlags, LP
 		goto exit;
 
 exit:
-	if(lpEntryId)
-		MAPIFreeBuffer(lpEntryId);
-
+	MAPIFreeBuffer(lpEntryId);
 	return hr;
 }
 

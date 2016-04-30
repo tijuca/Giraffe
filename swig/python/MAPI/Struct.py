@@ -265,10 +265,18 @@ class READSTATE(MAPIStruct):
         self.SourceKey = SourceKey
         self.ulFlags = ulFlags
 
+class MVPROPMAP(MAPIStruct):
+    def __init__(self, ulPropId, Values):
+        self.ulPropId = ulPropId
+        self.Values = Values
+
+    def __str__(self):
+        return 'MVPROPMAP(%s)' % (self.ulPropId)
+
 # @todo sUserId ECENTRYID?
 # @todo propmap?
 class ECUSER(MAPIStruct):
-    def __init__(self, Username, Password, Email, FullName, Servername = None, Class = 0x10001, IsAdmin = False, IsHidden = False, Capacity = 0, UserID = None):
+    def __init__(self, Username, Password, Email, FullName, Servername = None, Class = 0x10001, IsAdmin = False, IsHidden = False, Capacity = 0, UserID = None, MVPropMap = None):
         self.Username = Username
         self.Password = Password
         self.Email = Email
@@ -279,6 +287,7 @@ class ECUSER(MAPIStruct):
         self.IsHidden = IsHidden
         self.Capacity = Capacity
         self.UserID = UserID
+        self.MVPropMap = MVPropMap
     def __str__(self):
         return 'ECUSER(%s,%s,%s)' % (self.Username, self.Email, self.FullName)
 

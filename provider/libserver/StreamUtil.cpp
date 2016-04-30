@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include <platform.h>
+#include <zarafa/platform.h>
 
 #include "StreamUtil.h"
 #include "StorageUtil.h"
@@ -53,16 +27,16 @@
 #include "ECTPropsPurge.h"
 #include "ECICS.h"
 #include "ECMemStream.h"
-#include "MAPIErrors.h"
+#include <zarafa/MAPIErrors.h>
 
-#include "charset/convert.h"
-#include "charset/utf8string.h"
+#include <zarafa/charset/convert.h>
+#include <zarafa/charset/utf8string.h>
 
 #include <ECFifoBuffer.h>
 #include <ECSerializer.h>
-#include <stringutil.h>
+#include <zarafa/stringutil.h>
 #include <mapitags.h>
-#include <mapiext.h>
+#include <zarafa/mapiext.h>
 #include <mapidefs.h>
 #include <edkmdb.h>
 
@@ -115,7 +89,11 @@ const static struct StreamCaps {
 #define STREAM_VERSION			1	// encode strings in UTF-8.
 #define STREAM_CAPS_CURRENT		(&g_StreamCaps[STREAM_VERSION])
 
+#ifdef WIN32
+#define CHARSET_WIN1252	"WINDOWS-1252//IGNORE"
+#else
 #define CHARSET_WIN1252	"WINDOWS-1252//TRANSLIT"
+#endif
 
 // External objects
 extern ECSessionManager *g_lpSessionManager;	// ECServerEntrypoint.cpp
@@ -180,7 +158,7 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, unsigned int ulNameId, uns
 	if ((lpRow = m_lpDatabase->FetchRow(lpResult)) != NULL) {
 		if (lpRow[0] == NULL) {
 			er = ZARAFA_E_DATABASE_ERROR;
-			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "NamedPropertyMapper::GetId(): column null");
+			ec_log_err("NamedPropertyMapper::GetId(): column null");
 			goto exit;
 		}
 
@@ -238,7 +216,7 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, const std::string &strName
 	if ((lpRow = m_lpDatabase->FetchRow(lpResult)) != NULL) {
 		if (lpRow[0] == NULL) {
 			er = ZARAFA_E_DATABASE_ERROR;
-			m_lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "NamedPropertyMapper::GetId(): column null");
+			ec_log_err("NamedPropertyMapper::GetId(): column null");
 			goto exit;
 		}
 
@@ -409,8 +387,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		ulCount = atoi(lpRow[FIELD_NR_ID]);
 		er = lpSink->Write(&ulCount, sizeof(ulCount), 1);
 		ulLastPos = 0;
-		for (unsigned x = 0 ;er == erSuccess && x < ulCount; x++)
-		{
+		for (unsigned int x = 0; er == erSuccess && x < ulCount; ++x) {
 			ParseMVProp(lpRow[FIELD_NR_ULONG], lpLen[FIELD_NR_ULONG], &ulLastPos, &strData);
 			i = (short)atoi(strData.c_str());
 			er = lpSink->Write(&i, sizeof(i), 1);
@@ -425,8 +402,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		ulCount = atoi(lpRow[FIELD_NR_ID]);
 		er = lpSink->Write(&ulCount, sizeof(ulCount), 1);
 		ulLastPos = 0;
-		for (unsigned x = 0; er == erSuccess && x < ulCount; x++)
-		{
+		for (unsigned int x = 0; er == erSuccess && x < ulCount; ++x) {
 			ParseMVProp(lpRow[FIELD_NR_ULONG], lpLen[FIELD_NR_ULONG], &ulLastPos, &strData);
 			ul = atoui((char*)strData.c_str());
 			er = lpSink->Write(&ul, sizeof(ul), 1);
@@ -441,8 +417,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		ulCount = atoi(lpRow[FIELD_NR_ID]);
 		er = lpSink->Write(&ulCount, sizeof(ulCount), 1);
 		ulLastPos = 0;
-		for (unsigned x = 0; er == erSuccess && x < ulCount; x++)
-		{
+		for (unsigned int x = 0; er == erSuccess && x < ulCount; ++x) {
 			ParseMVProp(lpRow[FIELD_NR_DOUBLE], lpLen[FIELD_NR_DOUBLE], &ulLastPos, &strData);
 			flt = (float)strtod_l(strData.c_str(), NULL, loc);
 			er = lpSink->Write(&flt, sizeof(flt), 1);
@@ -458,8 +433,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		ulCount = atoi(lpRow[FIELD_NR_ID]);
 		er = lpSink->Write(&ulCount, sizeof(ulCount), 1);
 		ulLastPos = 0;
-		for (unsigned x = 0; er == erSuccess && x < ulCount; x++)
-		{
+		for (unsigned int x = 0; er == erSuccess && x < ulCount; ++x) {
 			ParseMVProp(lpRow[FIELD_NR_DOUBLE], lpLen[FIELD_NR_DOUBLE], &ulLastPos, &strData);
 			dbl = strtod_l(strData.c_str(), NULL, loc);
 			er = lpSink->Write(&dbl, sizeof(dbl), 1);
@@ -475,8 +449,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		er = lpSink->Write(&ulCount, sizeof(ulCount), 1);
 		ulLastPos = 0;
 		ulLastPos2 = 0;
-		for (unsigned x = 0; er == erSuccess && x < ulCount; x++)
-		{
+		for (unsigned int x = 0; er == erSuccess && x < ulCount; ++x) {
 			ParseMVProp(lpRow[FIELD_NR_LO], lpLen[FIELD_NR_LO], &ulLastPos, &strData);
 			hilo.lo = atoui((char*)strData.c_str());
 			ParseMVProp(lpRow[FIELD_NR_HI], lpLen[FIELD_NR_HI], &ulLastPos2, &strData);
@@ -495,8 +468,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		ulCount = atoi(lpRow[FIELD_NR_ID]);
 		er = lpSink->Write(&ulCount, sizeof(ulCount), 1);
 		ulLastPos = 0;
-		for (unsigned x = 0; er == erSuccess && x < ulCount; x++)
-		{
+		for (unsigned int x = 0; er == erSuccess && x < ulCount; ++x) {
 			ParseMVProp(lpRow[FIELD_NR_BINARY], lpLen[FIELD_NR_BINARY], &ulLastPos, &strData);
 			ulLen = (unsigned int)strData.size();
 			er = lpSink->Write(&ulLen, sizeof(ulLen), 1);
@@ -513,8 +485,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		ulCount = atoi(lpRow[FIELD_NR_ID]);
 		er = lpSink->Write(&ulCount, sizeof(ulCount), 1);
 		ulLastPos = 0;
-		for (unsigned x = 0; er == erSuccess && x < ulCount; x++)
-		{
+		for (unsigned int x = 0; er == erSuccess && x < ulCount; ++x) {
 			ParseMVProp(lpRow[FIELD_NR_STRING], lpLen[FIELD_NR_STRING], &ulLastPos, &strData);
 			if (lpStreamCaps->bSupportUnicode) {
 				ulLen = (unsigned int)strData.size();
@@ -539,8 +510,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		ulCount = atoi(lpRow[FIELD_NR_ID]);
 		er = lpSink->Write(&ulCount, sizeof(ulCount), 1);
 		ulLastPos = 0;
-		for (unsigned x = 0; er == erSuccess && x < ulCount; x++)
-		{
+		for (unsigned int x = 0; er == erSuccess && x < ulCount; ++x) {
 			ParseMVProp(lpRow[FIELD_NR_LONGINT], lpLen[FIELD_NR_LONGINT], &ulLastPos, &strData);
 			li = _atoi64(strData.c_str());
 			er = lpSink->Write(&li, sizeof(li), 1);
@@ -669,29 +639,29 @@ ECRESULT SerializePropVal(LPCSTREAMCAPS lpStreamCaps, const struct propVal &sPro
 		break;
 	case PT_MV_I2:
 		er = lpSink->Write(&sPropVal.Value.mvi.__size, sizeof(sPropVal.Value.mvi.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvi.__size; x++)
+		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvi.__size; ++x)
 			er = lpSink->Write(&sPropVal.Value.mvi.__ptr[x], sizeof(sPropVal.Value.mvi.__ptr[x]), 1);
 		break;
 	case PT_MV_LONG:
 		er = lpSink->Write(&sPropVal.Value.mvl.__size, sizeof(sPropVal.Value.mvl.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvl.__size; x++)
+		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvl.__size; ++x)
 			er = lpSink->Write(&sPropVal.Value.mvl.__ptr[x], sizeof(sPropVal.Value.mvl.__ptr[x]), 1);
 		break;
 	case PT_MV_R4:
 		er = lpSink->Write(&sPropVal.Value.mvflt.__size, sizeof(sPropVal.Value.mvflt.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvflt.__size; x++)
+		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvflt.__size; ++x)
 			er = lpSink->Write(&sPropVal.Value.mvflt.__ptr[x], sizeof(sPropVal.Value.mvflt.__ptr[x]), 1);
 		break;
 	case PT_MV_DOUBLE:
 	case PT_MV_APPTIME:
 		er = lpSink->Write(&sPropVal.Value.mvdbl.__size, sizeof(sPropVal.Value.mvdbl.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvdbl.__size; x++)
+		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvdbl.__size; ++x)
 			er = lpSink->Write(&sPropVal.Value.mvdbl.__ptr[x], sizeof(sPropVal.Value.mvdbl.__ptr[x]), 1);
 		break;
 	case PT_MV_CURRENCY:
 	case PT_MV_SYSTIME:
 		er = lpSink->Write(&sPropVal.Value.mvhilo.__size, sizeof(sPropVal.Value.mvhilo.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvhilo.__size; x++) {
+		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvhilo.__size; ++x) {
 			er = lpSink->Write(&sPropVal.Value.mvhilo.__ptr[x].hi, sizeof(sPropVal.Value.mvhilo.__ptr[x].hi), 1);
 			if (er == erSuccess)
 				er = lpSink->Write(&sPropVal.Value.mvhilo.__ptr[x].lo, sizeof(sPropVal.Value.mvhilo.__ptr[x].lo), 1);
@@ -700,7 +670,7 @@ ECRESULT SerializePropVal(LPCSTREAMCAPS lpStreamCaps, const struct propVal &sPro
 	case PT_MV_BINARY:
 	case PT_MV_CLSID:
 		er = lpSink->Write(&sPropVal.Value.mvbin.__size, sizeof(sPropVal.Value.mvbin.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvbin.__size; x++) {
+		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvbin.__size; ++x) {
 			er = lpSink->Write(&sPropVal.Value.mvbin.__ptr[x].__size, sizeof(sPropVal.Value.mvbin.__ptr[x].__size), 1);
 			if (er == erSuccess)
 				er = lpSink->Write(sPropVal.Value.mvbin.__ptr[x].__ptr, 1, sPropVal.Value.mvbin.__ptr[x].__size);
@@ -709,7 +679,7 @@ ECRESULT SerializePropVal(LPCSTREAMCAPS lpStreamCaps, const struct propVal &sPro
 	case PT_MV_STRING8:
 	case PT_MV_UNICODE:
 		er = lpSink->Write(&sPropVal.Value.mvszA.__size, sizeof(sPropVal.Value.mvszA.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvszA.__size; x++) {
+		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvszA.__size; ++x) {
 			if (lpStreamCaps->bSupportUnicode) {
 				ulLen = (unsigned)strlen(sPropVal.Value.mvszA.__ptr[x]);
 				er = lpSink->Write(&ulLen, sizeof(ulLen), 1);
@@ -726,7 +696,7 @@ ECRESULT SerializePropVal(LPCSTREAMCAPS lpStreamCaps, const struct propVal &sPro
 		break;
 	case PT_MV_I8:
 		er = lpSink->Write(&sPropVal.Value.mvli.__size, sizeof(sPropVal.Value.mvli.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvli.__size; x++)
+		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvli.__size; ++x)
 			er = lpSink->Write(&sPropVal.Value.mvli.__ptr[x], sizeof(sPropVal.Value.mvli.__ptr[x]), 1);
 		break;
 
@@ -775,7 +745,7 @@ static ECRESULT SerializeProps(struct propValArray *lpPropVals,
 	if (er != erSuccess)
     	goto exit;
     	
-	for(unsigned int i=0; i < ulCount; i++) {
+	for (unsigned int i = 0; i < ulCount; ++i) {
 		er = SerializePropVal(lpStreamCaps, lpPropVals->__ptr[i], lpSink, lpNamedPropDefs);
         if (er != erSuccess)
 	        goto exit;
@@ -890,23 +860,21 @@ static ECRESULT SerializeProps(ECSession *lpecSession, ECDatabase *lpDatabase,
 		lpDBLen = lpDatabase->FetchRowLengths(lpDBResult);
 		if (lpDBRow == NULL || lpDBLen == NULL) {
 			er = ZARAFA_E_DATABASE_ERROR;
-			lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "SerializeProps(): fetchrow/fetchrowlengths failed");
+			ec_log_err("SerializeProps(): fetchrow/fetchrowlengths failed");
 			goto exit;
 		}
 
 		er = SerializeDatabasePropVal(lpStreamCaps, lpDBRow, lpDBLen, lpTempSink);
 		if (er != erSuccess)
 			goto exit;
-			
-		ulCount++;
+		++ulCount;
 	}
 
 	for (std::list<struct propVal>::const_iterator it = sPropValList.begin(); it != sPropValList.end(); ++it) {
 		er = SerializePropVal(lpStreamCaps, *it, lpTempSink, NULL);		// No NamedPropDefMap needed for computed properties
 		if (er != erSuccess)
 			goto exit;
-			
-		ulCount++;
+		++ulCount;
 	}
 
 	er = lpSink->Write(&ulCount, sizeof(ulCount), 1);
@@ -924,9 +892,8 @@ exit:
 	if (lpIStream)
 		lpIStream->Release();
 
-	if (lpTempSink)
-		delete lpTempSink;
-		
+	delete lpTempSink;
+
 	if (lpDatabase) {
 		if (lpDBResult)
 			lpDatabase->FreeResult(lpDBResult);
@@ -970,7 +937,7 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECDatabase *lpStreamDatabase, 
 	unsigned int	ulSubObjType = 0;
 	unsigned int	ulCount = 0;
 	ChildPropsMap	mapChildProps;
-	ChildPropsMap::iterator iterChild;
+	ChildPropsMap::const_iterator iterChild;
 	NamedPropDefMap	mapNamedPropDefs;
 
 	DB_ROW 			lpDBRow = NULL;
@@ -1030,7 +997,7 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECDatabase *lpStreamDatabase, 
 
 		if (lpDBRow == NULL || lpDBLen == NULL) {
 			er = ZARAFA_E_DATABASE_ERROR;
-			lpStreamDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "SerializeMessage(): fetchrow/fetchrowlengths failed");
+			ec_log_err("SerializeMessage(): fetchrow/fetchrowlengths failed");
 			goto exit;
 		}
 
@@ -1110,20 +1077,19 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECDatabase *lpStreamDatabase, 
 			if(lpDBRow != NULL) {
 				if(lpDBRow[0] == NULL) {
 					er = ZARAFA_E_DATABASE_ERROR;
-					lpStreamDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "SerializeMessage(): column null");
+					ec_log_err("SerializeMessage(): column null");
 					goto exit;
 				}
 				
-	            ulSubObjType = atoi(lpDBRow[1]);
-                er = lpSink->Write(&ulSubObjType, sizeof(ulSubObjType), 1);
-                if (er != erSuccess)
-    	            goto exit;
-                                                    
-	            ulSubObjId = atoi(lpDBRow[0]);
-                er = lpSink->Write(&ulSubObjId, sizeof(ulSubObjId), 1);
-                if (er != erSuccess)
-    	            goto exit;
-				
+				ulSubObjType = atoi(lpDBRow[1]);
+				er = lpSink->Write(&ulSubObjType, sizeof(ulSubObjType), 1);
+				if (er != erSuccess)
+					goto exit;
+				ulSubObjId = atoi(lpDBRow[0]);
+				er = lpSink->Write(&ulSubObjId, sizeof(ulSubObjId), 1);
+				if (er != erSuccess)
+					goto exit;
+
 				// Recurse into subobject, depth is ignored when not using sql procedures
 				er = SerializeMessage(lpecSession, lpStreamDatabase, lpAttachmentStorage, lpStreamCaps, ulSubObjId, ulSubObjType, ulStoreId, lpsGuid, ulFlags, lpSink, false);
 				if (er != erSuccess)
@@ -1140,10 +1106,8 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECDatabase *lpStreamDatabase, 
 		lpStreamDatabase->FinalizeMulti();
 
 exit:
-	if (er != erSuccess) {
-		lpecSession->GetSessionManager()->GetLogger()->Log(EC_LOGLEVEL_ERROR, "SerializeObject failed with error code 0x%08x for object %d", er, ulObjId );
-	}
-
+	if (er != erSuccess)
+		ec_log_err("SerializeObject failed with error code 0x%08x for object %d", er, ulObjId );
 	if (lpDBResult)
 		lpStreamDatabase->FreeResult(lpDBResult);
 		
@@ -1287,7 +1251,7 @@ static ECRESULT DeserializePropVal(struct soap *soap,
 		if (er == erSuccess) {
 			lpsPropval->Value.mvhilo.__size = ulCount;
 			lpsPropval->Value.mvhilo.__ptr = s_alloc<hiloLong>(soap, ulCount);
-			for (unsigned x = 0; er == erSuccess &&  x < ulCount; x++) {
+			for (unsigned int x = 0; er == erSuccess && x < ulCount; ++x) {
 				er = lpSource->Read(&lpsPropval->Value.mvhilo.__ptr[x].hi, sizeof(lpsPropval->Value.mvhilo.__ptr[x].hi), ulCount);
 				if (er == erSuccess)
 					er = lpSource->Read(&lpsPropval->Value.mvhilo.__ptr[x].lo, sizeof(lpsPropval->Value.mvhilo.__ptr[x].lo), ulCount);
@@ -1301,7 +1265,7 @@ static ECRESULT DeserializePropVal(struct soap *soap,
 		if (er == erSuccess) {
 			lpsPropval->Value.mvbin.__size = ulCount;
 			lpsPropval->Value.mvbin.__ptr = s_alloc<xsd__base64Binary>(soap, ulCount);
-			for (unsigned x = 0; er == erSuccess && x < ulCount; x++) {
+			for (unsigned int x = 0; er == erSuccess && x < ulCount; ++x) {
 				er = lpSource->Read(&ulLen, sizeof(ulLen), 1);
 				if (er == erSuccess) {
 					lpsPropval->Value.mvbin.__ptr[x].__size = ulLen;
@@ -1318,7 +1282,7 @@ static ECRESULT DeserializePropVal(struct soap *soap,
 		if (er == erSuccess) {
 			lpsPropval->Value.mvszA.__size = ulCount;
 			lpsPropval->Value.mvszA.__ptr = s_alloc<char*>(soap, ulCount);
-			for (unsigned x = 0; er == erSuccess && x < ulCount; x++) {
+			for (unsigned int x = 0; er == erSuccess && x < ulCount; ++x) {
 				er = lpSource->Read(&ulLen, sizeof(ulLen), 1);
 				if (er == erSuccess) {
 					if (lpStreamCaps->bSupportUnicode) {
@@ -1407,7 +1371,7 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 	DB_ROW			lpDBRow = NULL;
 
 	std::set<unsigned int>				setInserted;
-	std::set<unsigned int>::iterator	iterInserted;
+	std::set<unsigned int>::const_iterator iterInserted;
 
 	if (!lpDatabase) {
 		er = ZARAFA_E_DATABASE_ERROR;
@@ -1523,7 +1487,7 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 					goto exit;
 				if (ulAffected != 1) {
 					er = ZARAFA_E_DATABASE_ERROR;
-					lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "DeserializeProps(): Unexpected affected row count");
+					ec_log_err("DeserializeProps(): Unexpected affected row count");
 					goto exit;
 				}
 			}
@@ -1842,7 +1806,7 @@ ECRESULT DeserializeObject(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtt
 exit:
 	if (er != erSuccess) {
 		lpSource->Flush(); // Flush the whole stream
-		lpecSession->GetSessionManager()->GetLogger()->Log(EC_LOGLEVEL_ERROR, "DeserializeObject failed with error code 0x%08x %s", er, GetMAPIErrorMessage(ZarafaErrorToMAPIError(er, ~0U /* anything that yields UNKNOWN */)));
+		ec_log_err("DeserializeObject failed with error code 0x%08x %s", er, GetMAPIErrorMessage(ZarafaErrorToMAPIError(er, ~0U /* anything that yields UNKNOWN */)));
 	}	
 
 	if (lpPropValArray)
@@ -1967,13 +1931,12 @@ ECRESULT GetValidatedPropCount(ECDatabase *lpDatabase, DB_RESULT lpDBResult, uns
 		unsigned int ulType;
 		er = GetValidatedPropType(lpRow, &ulType);	// Ignore ulType, we just need the validation
 		if (er == ZARAFA_E_DATABASE_ERROR) {
-			lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "GetValidatedPropCount(): GetValidatedPropType failed");
+			ec_log_err("GetValidatedPropCount(): GetValidatedPropType failed");
 			er = erSuccess;
 			continue;
 		} else if (er != erSuccess)
 			goto exit;
-
-		ulCount++;
+		++ulCount;
 	}
 
 	lpDatabase->ResetResult(lpDBResult);

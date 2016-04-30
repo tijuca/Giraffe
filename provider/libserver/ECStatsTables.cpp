@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ECStatsTables.h"
 
 #include "SOAPUtils.h"
@@ -53,10 +27,10 @@
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapitags.h>
-#include <mapiext.h>
+#include <zarafa/mapiext.h>
 #include <edkmdb.h>
-#include "ECTags.h"
-#include "stringutil.h"
+#include <zarafa/ECTags.h>
+#include <zarafa/stringutil.h>
 
 #include "ECStatsCollector.h"
 
@@ -162,11 +136,9 @@ ECRESULT ECSystemStatsTable::Load()
 #endif
 
 	// add all items to the keytable
-	for (i = 0; i < id; i++) {
+	for (i = 0; i < id; ++i)
 		// Use MAPI_STATUS as ulObjType for the key table .. this param may be removed in the future..?
 		UpdateRow(ECKeyTable::TABLE_ROW_ADD, i, 0);
-	}
-
 	return er;
 }
 
@@ -180,8 +152,7 @@ void ECSystemStatsTable::GetStatsCollectorData(const std::string &name, const st
 	ss.value = value;
 
 	lpThis->m_mapStatData[lpThis->id] = ss;
-
-	lpThis->id++;
+	++lpThis->id;
 }
 
 ECRESULT ECSystemStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis, struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList, struct propTagArray *lpsPropTagArray, void *lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
@@ -189,8 +160,8 @@ ECRESULT ECSystemStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis, s
 	ECRESULT er = erSuccess;
 	struct rowSet *lpsRowSet = NULL;
 	ECSystemStatsTable *lpThis = (ECSystemStatsTable *)lpGenericThis;
-	ECObjectTableList::iterator iterRowList;
-	map<unsigned int, statstrings>::iterator iterSD;
+	ECObjectTableList::const_iterator iterRowList;
+	std::map<unsigned int, statstrings>::const_iterator iterSD;
 
 	int i, k;
 
@@ -209,18 +180,17 @@ ECRESULT ECSystemStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis, s
 	memset(lpsRowSet->__ptr, 0, sizeof(propValArray) * lpsRowSet->__size);
 
 	// Allocate memory for all rows
-	for (i = 0; i < lpsRowSet->__size; i++) {
+	for (i = 0; i < lpsRowSet->__size; ++i) {
 		lpsRowSet->__ptr[i].__size = lpsPropTagArray->__size;
 		lpsRowSet->__ptr[i].__ptr = s_alloc<propVal>(soap, lpsPropTagArray->__size);
 		memset(lpsRowSet->__ptr[i].__ptr, 0, sizeof(propVal) * lpsPropTagArray->__size);
 	}
 
-	for (i = 0, iterRowList = lpRowList->begin(); iterRowList != lpRowList->end(); iterRowList++, i++) {
-
+	for (i = 0, iterRowList = lpRowList->begin();
+	     iterRowList != lpRowList->end(); ++iterRowList, ++i)
+	{
 		iterSD = lpThis->m_mapStatData.find(iterRowList->ulObjId);
-
-		for (k = 0; k < lpsPropTagArray->__size; k++) {
-
+		for (k = 0; k < lpsPropTagArray->__size; ++k) {
 			if (iterSD == lpThis->m_mapStatData.end())
 				continue;		// broken .. should never happen
 
@@ -309,11 +279,9 @@ ECRESULT ECSessionStatsTable::Load()
 	lpSessionManager->ForEachSession(this->GetSessionData, (void*)this);
 
 	// add all items to the keytable
-	for (i = 0; i < id; i++) {
+	for (i = 0; i < id; ++i)
 		// Use MAPI_STATUS as ulObjType for the key table .. this param may be removed in the future..?
 		UpdateRow(ECKeyTable::TABLE_ROW_ADD, i, 0);
-	}
-
 	return er;
 }
 
@@ -321,7 +289,7 @@ void ECSessionStatsTable::GetSessionData(ECSession *lpSession, void *obj)
 {
 	ECSessionStatsTable *lpThis = (ECSessionStatsTable*)obj;
 	sessiondata sd;
-	std::list<BUSYSTATE>::iterator iterBS;
+	std::list<BUSYSTATE>::const_iterator iterBS;
 
 	if (!lpSession) {
 		// dynamic_cast failed
@@ -347,9 +315,10 @@ void ECSessionStatsTable::GetSessionData(ECSession *lpSession, void *obj)
 	lpSession->GetClientApplicationMisc(&sd.client_application_misc);
 	sd.requests = lpSession->GetRequests();
 
+#ifndef WIN32
 	// To get up-to-date CPU stats, check each of the active threads on the session
 	// for their CPU usage, and add that to the already-logged time on the session
-	for (iterBS = sd.busystates.begin(); iterBS != sd.busystates.end(); iterBS++) {
+	for (iterBS = sd.busystates.begin(); iterBS != sd.busystates.end(); ++iterBS) {
 		clockid_t clock;
 		struct timespec now;
 		
@@ -361,21 +330,22 @@ void ECSessionStatsTable::GetSessionData(ECSession *lpSession, void *obj)
 		sd.dblUser += timespec2dbl(now) - timespec2dbl(iterBS->threadstart);
 		sd.dblReal += GetTimeOfDay() - iterBS->start;
 	}
+#endif
 
 	lpThis->m_mapSessionData[lpThis->id] = sd;
-	lpThis->id++;
+	++lpThis->id;
 }
 
 ECRESULT ECSessionStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis, struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList, struct propTagArray *lpsPropTagArray, void *lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
 {
 	ECRESULT er = erSuccess;
 	struct rowSet *lpsRowSet = NULL;
-	ECObjectTableList::iterator iterRowList;
+	ECObjectTableList::const_iterator iterRowList;
 	ECSessionStatsTable *lpThis = (ECSessionStatsTable *)lpGenericThis;
 	int i, j, k;
 	std::string strTemp;
-	std::map<unsigned int, sessiondata>::iterator iterSD;
-	std::list<BUSYSTATE>::iterator iterBS;
+	std::map<unsigned int, sessiondata>::const_iterator iterSD;
+	std::list<BUSYSTATE>::const_iterator iterBS;
 
 	lpsRowSet = s_alloc<rowSet>(soap);
 	lpsRowSet->__size = 0;
@@ -392,18 +362,17 @@ ECRESULT ECSessionStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis, 
 	memset(lpsRowSet->__ptr, 0, sizeof(propValArray) * lpsRowSet->__size);
 
 	// Allocate memory for all rows
-	for (i = 0; i < lpsRowSet->__size; i++) {
+	for (i = 0; i < lpsRowSet->__size; ++i) {
 		lpsRowSet->__ptr[i].__size = lpsPropTagArray->__size;
 		lpsRowSet->__ptr[i].__ptr = s_alloc<propVal>(soap, lpsPropTagArray->__size);
 		memset(lpsRowSet->__ptr[i].__ptr, 0, sizeof(propVal) * lpsPropTagArray->__size);
 	}
 
-	for (i = 0, iterRowList = lpRowList->begin(); iterRowList != lpRowList->end(); iterRowList++, i++) {
-
+	for (i = 0, iterRowList = lpRowList->begin();
+	     iterRowList != lpRowList->end(); ++iterRowList, ++i)
+	{
 		iterSD = lpThis->m_mapSessionData.find(iterRowList->ulObjId);
-
-		for (k = 0; k < lpsPropTagArray->__size; k++) {
-
+		for (k = 0; k < lpsPropTagArray->__size; ++k) {
 			// default is error prop
 			lpsRowSet->__ptr[i].__ptr[k].ulPropTag = PROP_TAG(PROP_TYPE(PT_ERROR), PROP_ID(lpsPropTagArray->__ptr[k]));
 			lpsRowSet->__ptr[i].__ptr[k].Value.ul = ZARAFA_E_NOT_FOUND;
@@ -420,7 +389,7 @@ ECRESULT ECSessionStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis, 
 				lpsRowSet->__ptr[i].__ptr[k].Value.bin = s_alloc<xsd__base64Binary>(soap);
 				lpsRowSet->__ptr[i].__ptr[k].Value.bin->__size = sizeof(sObjectTableKey);
 				lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr = s_alloc<unsigned char>(soap, sizeof(sObjectTableKey));
-				memcpy(lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr, (void*)&(*iterRowList), sizeof(sObjectTableKey));
+				memcpy(lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr, &(*iterRowList), sizeof(sObjectTableKey));
 				break;
 
 			case PROP_ID(PR_EC_USERNAME):
@@ -513,9 +482,9 @@ ECRESULT ECSessionStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis, 
 				lpsRowSet->__ptr[i].__ptr[k].Value.mvszA.__size = iterSD->second.busystates.size();
 				lpsRowSet->__ptr[i].__ptr[k].Value.mvszA.__ptr = s_alloc<char*>(soap, iterSD->second.busystates.size());
 
-				for (j = 0, iterBS = iterSD->second.busystates.begin(); iterBS != iterSD->second.busystates.end(); j++, iterBS++) {
+				for (j = 0, iterBS = iterSD->second.busystates.begin();
+				     iterBS != iterSD->second.busystates.end(); ++j, ++iterBS)
 					lpsRowSet->__ptr[i].__ptr[k].Value.mvszA.__ptr[j] = s_strcpy(soap, iterBS->fname);
-				}
 				break;
 			case PROP_ID(PR_EC_STATS_SESSION_PROCSTATES):
 				lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_mvszA;
@@ -524,7 +493,8 @@ ECRESULT ECSessionStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis, 
 				lpsRowSet->__ptr[i].__ptr[k].Value.mvszA.__size = iterSD->second.busystates.size();
 				lpsRowSet->__ptr[i].__ptr[k].Value.mvszA.__ptr = s_alloc<char*>(soap, iterSD->second.busystates.size());
 
-				for (j = 0, iterBS = iterSD->second.busystates.begin(); iterBS != iterSD->second.busystates.end(); j++, iterBS++) {
+				for (j = 0, iterBS = iterSD->second.busystates.begin();
+				     iterBS != iterSD->second.busystates.end(); ++j, ++iterBS) {
 					const char *szState;
 					if(iterBS->state == SESSION_STATE_PROCESSING)
 						szState = "P";
@@ -583,7 +553,7 @@ ECRESULT ECUserStatsTable::Load()
 {
 	ECRESULT er = erSuccess;
 	std::list<localobjectdetails_t> *lpCompanies = NULL;
-	std::list<localobjectdetails_t>::iterator iCompanies;
+	std::list<localobjectdetails_t>::const_iterator iCompanies;
 
 	// load all active and non-active users
 	// FIXME: group/company quota already possible?
@@ -598,7 +568,8 @@ ECRESULT ECUserStatsTable::Load()
 		if (er != erSuccess)
 			goto exit;
 	} else {
-		for (iCompanies = lpCompanies->begin(); iCompanies != lpCompanies->end(); iCompanies++) {
+		for (iCompanies = lpCompanies->begin();
+		     iCompanies != lpCompanies->end(); ++iCompanies) {
 			er = LoadCompanyUsers(iCompanies->ulId);
 			if (er != erSuccess)
 				goto exit;
@@ -606,9 +577,7 @@ ECRESULT ECUserStatsTable::Load()
 	}
 
 exit:
-	if (lpCompanies)
-		delete lpCompanies;
-
+	delete lpCompanies;
 	return er;
 }
 
@@ -618,7 +587,7 @@ ECRESULT ECUserStatsTable::LoadCompanyUsers(ULONG ulCompanyId)
 	std::list<localobjectdetails_t> *lpObjects = NULL;
 	sObjectTableKey sRowItem;
 	ECUserManagement *lpUserManagement = lpSession->GetUserManagement();
-	std::list<localobjectdetails_t>::iterator iObjects;
+	std::list<localobjectdetails_t>::const_iterator iObjects;
 	bool bDistrib = lpSession->GetSessionManager()->IsDistributedSupported();
 	const char* server = lpSession->GetSessionManager()->GetConfig()->GetSetting("server_name");
 	std::list<unsigned int> lstObjId;
@@ -628,7 +597,7 @@ ECRESULT ECUserStatsTable::LoadCompanyUsers(ULONG ulCompanyId)
 		goto exit;
 	er = erSuccess;
 
-	for (iObjects = lpObjects->begin(); iObjects != lpObjects->end(); iObjects++) {
+	for (iObjects = lpObjects->begin(); iObjects != lpObjects->end(); ++iObjects) {
 		// we only return users present on this server
 		if (bDistrib && iObjects->GetPropString(OB_PROP_S_SERVERNAME).compare(server) != 0)
 			continue;
@@ -639,9 +608,7 @@ ECRESULT ECUserStatsTable::LoadCompanyUsers(ULONG ulCompanyId)
 	UpdateRows(ECKeyTable::TABLE_ROW_ADD, &lstObjId, 0, false);
 
 exit:
-	if (lpObjects)
-		delete lpObjects;
-
+	delete lpObjects;
 	return er;
 }
 
@@ -651,7 +618,7 @@ ECRESULT ECUserStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 	ECRESULT er = erSuccess;
 	int i, k;
 	struct rowSet *lpsRowSet = NULL;
-	ECObjectTableList::iterator iterRowList;
+	ECObjectTableList::const_iterator iterRowList;
 	ECUserManagement *lpUserManagement = lpSession->GetUserManagement();
 	ECDatabase *lpDatabase = NULL;
 	long long llStoreSize = 0;
@@ -684,15 +651,15 @@ ECRESULT ECUserStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 	memset(lpsRowSet->__ptr, 0, sizeof(propValArray) * lpsRowSet->__size);
 
 	// Allocate memory for all rows
-	for (i = 0; i < lpsRowSet->__size; i++) {
+	for (i = 0; i < lpsRowSet->__size; ++i) {
 		lpsRowSet->__ptr[i].__size = lpsPropTagArray->__size;
 		lpsRowSet->__ptr[i].__ptr = s_alloc<propVal>(soap, lpsPropTagArray->__size);
 		memset(lpsRowSet->__ptr[i].__ptr, 0, sizeof(propVal) * lpsPropTagArray->__size);
 	}
 
-
-	for(i = 0, iterRowList = lpRowList->begin(); iterRowList != lpRowList->end(); iterRowList++, i++)	{
-
+	for (i = 0, iterRowList = lpRowList->begin();
+	     iterRowList != lpRowList->end(); ++iterRowList, ++i)
+	{
 		bNoObjectDetails = bNoQuotaDetails = false;
 
 		if (lpUserManagement->GetObjectDetails(iterRowList->ulObjId, &objectDetails) != erSuccess)
@@ -705,8 +672,7 @@ ECRESULT ECUserStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 		if (lpSession->GetSecurity()->GetUserSize(iterRowList->ulObjId, &llStoreSize) != erSuccess)
 			llStoreSize = 0;
 
-		for (k = 0; k < lpsPropTagArray->__size; k++) {
-
+		for (k = 0; k < lpsPropTagArray->__size; ++k) {
 			// default is error prop
 			lpsRowSet->__ptr[i].__ptr[k].ulPropTag = PROP_TAG(PROP_TYPE(PT_ERROR), PROP_ID(lpsPropTagArray->__ptr[k]));
 			lpsRowSet->__ptr[i].__ptr[k].Value.ul = ZARAFA_E_NOT_FOUND;
@@ -720,7 +686,7 @@ ECRESULT ECUserStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 				lpsRowSet->__ptr[i].__ptr[k].Value.bin = s_alloc<xsd__base64Binary>(soap);
 				lpsRowSet->__ptr[i].__ptr[k].Value.bin->__size = sizeof(sObjectTableKey);
 				lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr = s_alloc<unsigned char>(soap, sizeof(sObjectTableKey));
-				memcpy(lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr, (void*)&(*iterRowList), sizeof(sObjectTableKey));
+				memcpy(lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr, &(*iterRowList), sizeof(sObjectTableKey));
 				break;
 
 			case PROP_ID(PR_EC_COMPANY_NAME):
@@ -879,21 +845,18 @@ ECRESULT ECCompanyStatsTable::Load()
 {
 	ECRESULT er = erSuccess;
 	std::list<localobjectdetails_t> *lpCompanies = NULL;
-	std::list<localobjectdetails_t>::iterator iCompanies;
+	std::list<localobjectdetails_t>::const_iterator iCompanies;
 	sObjectTableKey sRowItem;
 
 	er = lpSession->GetSecurity()->GetViewableCompanyIds(0, &lpCompanies);
 	if (er != erSuccess)
 		goto exit;
 
-	for (iCompanies = lpCompanies->begin(); iCompanies != lpCompanies->end(); iCompanies++) {
+	for (iCompanies = lpCompanies->begin();
+	     iCompanies != lpCompanies->end(); ++iCompanies)
 		UpdateRow(ECKeyTable::TABLE_ROW_ADD, iCompanies->ulId, 0);
-	}	
-
 exit:
-	if (lpCompanies)
-		delete lpCompanies;
-
+	delete lpCompanies;
 	return er;
 }
 
@@ -903,7 +866,7 @@ ECRESULT ECCompanyStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct 
 	ECRESULT er = erSuccess;
 	int i, k;
 	struct rowSet *lpsRowSet = NULL;
-	ECObjectTableList::iterator iterRowList;
+	ECObjectTableList::const_iterator iterRowList;
 	ECUserManagement *lpUserManagement = lpSession->GetUserManagement();
 	ECDatabase *lpDatabase = NULL;
 	long long llStoreSize = 0;
@@ -935,15 +898,15 @@ ECRESULT ECCompanyStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct 
 	memset(lpsRowSet->__ptr, 0, sizeof(propValArray) * lpsRowSet->__size);
 
 	// Allocate memory for all rows
-	for (i = 0; i < lpsRowSet->__size; i++) {
+	for (i = 0; i < lpsRowSet->__size; ++i) {
 		lpsRowSet->__ptr[i].__size = lpsPropTagArray->__size;
 		lpsRowSet->__ptr[i].__ptr = s_alloc<propVal>(soap, lpsPropTagArray->__size);
 		memset(lpsRowSet->__ptr[i].__ptr, 0, sizeof(propVal) * lpsPropTagArray->__size);
 	}
 
-
-	for(i = 0, iterRowList = lpRowList->begin(); iterRowList != lpRowList->end(); iterRowList++, i++)	{
-
+	for (i = 0, iterRowList = lpRowList->begin();
+	     iterRowList != lpRowList->end(); ++iterRowList, ++i)
+	{
 		bNoCompanyDetails = bNoQuotaDetails = false;
 
 		if (lpUserManagement->GetObjectDetails(iterRowList->ulObjId, &companyDetails) != erSuccess)
@@ -956,8 +919,7 @@ ECRESULT ECCompanyStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct 
 		if (lpSession->GetSecurity()->GetUserSize(iterRowList->ulObjId, &llStoreSize) != erSuccess)
 			llStoreSize = 0;
 
-		for (k = 0; k < lpsPropTagArray->__size; k++) {
-
+		for (k = 0; k < lpsPropTagArray->__size; ++k) {
 			// default is error prop
 			lpsRowSet->__ptr[i].__ptr[k].ulPropTag = PROP_TAG(PROP_TYPE(PT_ERROR), PROP_ID(lpsPropTagArray->__ptr[k]));
 			lpsRowSet->__ptr[i].__ptr[k].Value.ul = ZARAFA_E_NOT_FOUND;
@@ -1068,12 +1030,12 @@ ECRESULT ECServerStatsTable::Load()
 		goto exit;
 		
 	// Assign an ID to each server which is usable from QueryRowData
-	for(serverlist_t::iterator iServer = servers.begin(); iServer != servers.end(); iServer++) {
+	for (serverlist_t::const_iterator iServer = servers.begin();
+	     iServer != servers.end(); ++iServer) {
 		m_mapServers.insert(std::make_pair(i, *iServer));
 		// For each server, add a row in the table
 		UpdateRow(ECKeyTable::TABLE_ROW_ADD, i, 0);
-		
-		i++;
+		++i;
 	}
 
 exit:
@@ -1087,7 +1049,7 @@ ECRESULT ECServerStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct s
 	ECRESULT er = erSuccess;
 	int i, k;
 	struct rowSet *lpsRowSet = NULL;
-	ECObjectTableList::iterator iterRowList;
+	ECObjectTableList::const_iterator iterRowList;
 	ECUserManagement *lpUserManagement = lpSession->GetUserManagement();
 	serverdetails_t details;
 	
@@ -1108,17 +1070,19 @@ ECRESULT ECServerStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct s
 	memset(lpsRowSet->__ptr, 0, sizeof(propValArray) * lpsRowSet->__size);
 
 	// Allocate memory for all rows
-	for (i = 0; i < lpsRowSet->__size; i++) {
+	for (i = 0; i < lpsRowSet->__size; ++i) {
 		lpsRowSet->__ptr[i].__size = lpsPropTagArray->__size;
 		lpsRowSet->__ptr[i].__ptr = s_alloc<propVal>(soap, lpsPropTagArray->__size);
 		memset(lpsRowSet->__ptr[i].__ptr, 0, sizeof(propVal) * lpsPropTagArray->__size);
 	}
 
-	for(i = 0, iterRowList = lpRowList->begin(); iterRowList != lpRowList->end(); iterRowList++, i++)	{
+	for (i = 0, iterRowList = lpRowList->begin();
+	     iterRowList != lpRowList->end(); ++iterRowList, ++i)
+	{
 		if(lpUserManagement->GetServerDetails(lpStats->m_mapServers[iterRowList->ulObjId], &details) != erSuccess)
 			details = serverdetails_t();
 		
-		for (k = 0; k < lpsPropTagArray->__size; k++) {
+		for (k = 0; k < lpsPropTagArray->__size; ++k) {
 			// default is error prop
 			lpsRowSet->__ptr[i].__ptr[k].ulPropTag = PROP_TAG(PROP_TYPE(PT_ERROR), PROP_ID(lpsPropTagArray->__ptr[k]));
 			lpsRowSet->__ptr[i].__ptr[k].Value.ul = ZARAFA_E_NOT_FOUND;

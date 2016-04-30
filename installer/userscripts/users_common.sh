@@ -22,4 +22,6 @@ if [ -z "${ZARAFA_USER}" -a -z "${ZARAFA_STOREGUID}" ] ; then
     exit 1
 fi
 
-find ${ZARAFA_USER_SCRIPTS} -maxdepth 1 -type f -perm -u=x -not -name \*~ -not -name \#\* -not -name \*.rpm\* -not -name \*.bak -not -name \*.old -exec {} \;
+# Find cannot cope with unreadable cwd
+cd "$ZARAFA_USER_SCRIPTS"
+find "${ZARAFA_USER_SCRIPTS}" -maxdepth 1 -type f -perm -u=x -not -name \*~ -not -name \#\* -not -name \*.rpm\* -not -name \*.bak -not -name \*.old -exec {} \;

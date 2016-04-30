@@ -1,50 +1,27 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
-#include "ECScheduler.h"
+#include <zarafa/platform.h>
+#include <zarafa/ECScheduler.h>
+#ifdef LINUX
 // ETIMEDOUT in linux is in errno, windows has this though pthread.h
 #include <cerrno>
+#endif
+#include <sys/time.h> /* gettimeofday */
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -52,6 +29,13 @@
 static const char THIS_FILE[] = __FILE__;
 #endif
 
+#ifdef WIN32
+inline struct tm* localtime_r (const time_t *clock, struct tm *result) {
+       if (!clock || !result) return NULL;
+       memcpy(result,localtime(clock),sizeof(*result));
+       return result;
+}
+#endif
 
 #define SCHEDULER_POLL_FREQUENCY	5
 
@@ -59,6 +43,7 @@ ECScheduler::ECScheduler(ECLogger *lpLogger)
 {
 	m_bExit = FALSE;
 	m_lpLogger = lpLogger;
+	m_lpLogger->AddRef();
 
 	// Create a mutex with no initial owner.
 	pthread_mutexattr_t mattr;
@@ -89,6 +74,7 @@ ECScheduler::~ECScheduler(void)
 	//pthread_mutex_lock(&m_hSchedulerMutex);
 	
 	//Clean up something
+	m_lpLogger->Release();
 
 	// Unlock whole Scheduler
 	//pthread_mutex_unlock(&m_hSchedulerMutex);
@@ -127,7 +113,7 @@ exit:
 	return hr;
 }
 
-bool ECScheduler::hasExpired(time_t ttime, LPECSCHEDULE lpSchedule)
+bool ECScheduler::hasExpired(time_t ttime, ECSCHEDULE *lpSchedule)
 {
 	struct tm tmLastRunTime;
 	struct tm tmtime;
@@ -212,7 +198,7 @@ void* ECScheduler::ScheduleThread(void* lpTmpScheduler)
 		}
 		pthread_mutex_unlock(&lpScheduler->m_hExitMutex);
 
-		for(iterScheduleList = lpScheduler->m_listScheduler.begin(); iterScheduleList != lpScheduler->m_listScheduler.end(); iterScheduleList++)
+		for (iterScheduleList = lpScheduler->m_listScheduler.begin(); iterScheduleList != lpScheduler->m_listScheduler.end(); ++iterScheduleList)
 		{
 			pthread_mutex_lock(&lpScheduler->m_hSchedulerMutex);
 
@@ -226,8 +212,8 @@ void* ECScheduler::ScheduleThread(void* lpTmpScheduler)
 				
 				if((err = pthread_create(&hThread, NULL, iterScheduleList->lpFunction, (void*)iterScheduleList->lpData)) != 0) {
 				    lpScheduler->m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to spawn new thread: %s", strerror(err));
-                    continue;
-                }
+					goto task_fail;
+				}
 
 				set_thread_name(hThread, "ECScheduler:worker");
 
@@ -235,12 +221,14 @@ void* ECScheduler::ScheduleThread(void* lpTmpScheduler)
 
 				if((err = pthread_join(hThread, (void**)&lperThread)) != 0) {
 				    lpScheduler->m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to join thread: %s", strerror(err));
-				    continue;
+					goto task_fail;
 				}
 
-				if(lperThread){delete lperThread; lperThread = NULL;}
+				delete lperThread;
+				lperThread = NULL;
 			}
 
+ task_fail:
 			pthread_mutex_unlock(&lpScheduler->m_hSchedulerMutex);
 
 			// check for a exit signal

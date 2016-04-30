@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <mapiguid.h>
 #include <mapicode.h>
@@ -49,9 +23,9 @@
 
 #include "ECAttach.h"
 
-#include "ECGuid.h"
-#include "ECDebug.h"
-#include "ECInterfaceDefs.h"
+#include <zarafa/ECGuid.h>
+#include <zarafa/ECDebug.h>
+#include <zarafa/ECInterfaceDefs.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -113,12 +87,10 @@ HRESULT ECAttach::QueryInterface(REFIID refiid, void **lppInterface)
 
 HRESULT ECAttach::SaveChanges(ULONG ulFlags)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
-	if (!fModify) {
-		hr = MAPI_E_NO_ACCESS;
-		goto exit;
-	}
+	if (!fModify)
+		return MAPI_E_NO_ACCESS;
 
 	if (!lstProps || lstProps->find(PROP_ID(PR_RECORD_KEY)) == lstProps->end()) {
 		GUID guid;
@@ -132,13 +104,9 @@ HRESULT ECAttach::SaveChanges(ULONG ulFlags)
 
 		hr = HrSetRealProp(&sPropVal);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-	hr = ECMAPIProp::SaveChanges(ulFlags);
-
-exit:
-	return hr;
+	return ECMAPIProp::SaveChanges(ulFlags);
 }
 
 HRESULT ECAttach::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
@@ -311,33 +279,21 @@ HRESULT	ECAttach::GetPropHandler(ULONG ulPropTag, void *lpProvider, ULONG ulFlag
 HRESULT	ECAttach::SetPropHandler(ULONG ulPropTag, void* lpProvider, LPSPropValue lpsPropValue, void *lpParam)
 {
 	ECAttach *lpAttach = (ECAttach *)lpParam;
-	HRESULT hr = hrSuccess;
-
 	switch (ulPropTag) {
 		case PR_ATTACH_DATA_BIN:
-			hr = lpAttach->HrSetRealProp(lpsPropValue);
-			break;
-
+			return lpAttach->HrSetRealProp(lpsPropValue);
 		case PR_ATTACH_DATA_OBJ:
-			hr = MAPI_E_COMPUTED;
-			break;
-
+			return MAPI_E_COMPUTED;
 		default:
-			hr = MAPI_E_NOT_FOUND;
-			break;
+			return MAPI_E_NOT_FOUND;
 	}
-
-	return hr;
+	return MAPI_E_NOT_FOUND;
 }
 
 // Use the support object to do the copying
 HRESULT ECAttach::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
 {
-	HRESULT hr = hrSuccess;
-	
-	hr = Util::DoCopyTo(&IID_IAttachment, &this->m_xAttach, ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-
-	return hr;
+	return Util::DoCopyTo(&IID_IAttachment, &this->m_xAttach, ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
 
 /**
@@ -373,7 +329,7 @@ exit:
 HRESULT ECAttach::HrSaveChild(ULONG ulFlags, MAPIOBJECT *lpsMapiObject)
 {
 	HRESULT hr = hrSuccess;
-	ECMapiObjects::iterator iterSObj;
+	ECMapiObjects::const_iterator iterSObj;
 
 	pthread_mutex_lock(&m_hMutexMAPIObject);
 

@@ -22,7 +22,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 m4_define([_BOOST_SERIAL], [m4_translit([
-# serial 24
+# serial 25
 ], [#
 ], [])])
 
@@ -110,7 +110,7 @@ AC_LANG_POP([C++])dnl
 # On # success, defines HAVE_BOOST.  On failure, calls the optional
 # ACTION-IF-NOT-FOUND action if one was supplied.
 # Otherwise aborts with an error message.
-AC_DEFUN([BOOST_REQUIRE],
+AC_DEFUN_ONCE([BOOST_REQUIRE],
 [AC_REQUIRE([AC_PROG_CXX])dnl
 AC_REQUIRE([AC_PROG_GREP])dnl
 echo "$as_me: this is boost.m4[]_BOOST_SERIAL" >&AS_MESSAGE_LOG_FD
@@ -439,14 +439,13 @@ for boost_rtopt_ in $boost_rtopt '' -d; do
     # right so instead we'll try to a location based on where the headers are.
     boost_tmp_lib=$with_boost
     test x"$with_boost" = x && boost_tmp_lib=${boost_cv_inc_path%/include}
-    for boost_ldpath in "$boost_tmp_lib/lib" '' \
-             /opt/local/lib* /usr/local/lib* /opt/lib* /usr/lib* \
-             "$with_boost" C:/Boost/lib /lib*
+    for boost_ldpath in "$boost_tmp_lib/lib" '';
     do
       # Don't waste time with directories that don't exist.
       if test x"$boost_ldpath" != x && test ! -e "$boost_ldpath"; then
         continue
       fi
+      echo "boost.m4: testing for -l$boost_lib in $boost_ldpath...";
       boost_save_LDFLAGS=$LDFLAGS
       # Are we looking for a static library?
       case $boost_ldpath:$boost_rtopt_ in #(
@@ -1067,15 +1066,24 @@ LDFLAGS="$LDFLAGS $BOOST_SYSTEM_LDFLAGS"
 CPPFLAGS="$CPPFLAGS $boost_cv_pthread_flag"
 
 # When compiling for the Windows platform, the threads library is named
-# differently.
-case $host_os in
-  (*mingw*) boost_thread_lib_ext=_win32;;
-esac
+# differently.  This suffix doesn't exist in new versions of Boost, or
+# possibly new versions of GCC on mingw I am assuming it's Boost's change for
+# now and I am setting version to 1.48, for lack of knowledge as to when this
+# change occurred.
+if test $boost_major_version -lt 148; then
+  case $host_os in
+    (*mingw*) boost_thread_lib_ext=_win32;;
+  esac
+fi
 BOOST_FIND_LIBS([thread], [thread$boost_thread_lib_ext],
                 [$1],
                 [boost/thread.hpp], [boost::thread t; boost::mutex m;])
 
-BOOST_THREAD_LIBS="$BOOST_THREAD_LIBS $BOOST_SYSTEM_LIBS $boost_cv_pthread_flag"
+case $host_os in
+  (*mingw*) boost_thread_w32_socket_link=-lws2_32;;
+esac
+
+BOOST_THREAD_LIBS="$BOOST_THREAD_LIBS $BOOST_SYSTEM_LIBS $boost_cv_pthread_flag $boost_thread_w32_socket_link"
 BOOST_THREAD_LDFLAGS="$BOOST_SYSTEM_LDFLAGS"
 BOOST_CPPFLAGS="$BOOST_CPPFLAGS $boost_cv_pthread_flag"
 LIBS=$boost_thread_save_LIBS
@@ -1296,6 +1304,10 @@ if test x$boost_cv_inc_path != xno; then
   # I'm not sure about my test for `il' (be careful: Intel's ICC pre-defines
   # the same defines as GCC's).
   for i in \
+    _BOOST_mingw_test(5, 2) \
+    _BOOST_gcc_test(5, 2) \
+    _BOOST_mingw_test(5, 1) \
+    _BOOST_gcc_test(5, 1) \
     _BOOST_mingw_test(5, 0) \
     _BOOST_gcc_test(5, 0) \
     _BOOST_mingw_test(4, 10) \
@@ -1343,6 +1355,7 @@ if test x$boost_cv_inc_path != xno; then
   do
     boost_tag_test=`expr "X$i" : 'X\([[^@]]*\) @ '`
     boost_tag=`expr "X$i" : 'X[[^@]]* @ \(.*\)'`
+    echo "boost.m4: compile testing $i... "
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #if $boost_tag_test
 /* OK */

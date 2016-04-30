@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <mapicode.h>
 #include <mapidefs.h>
@@ -51,12 +25,12 @@
 
 #include "Mem.h"
 #include "ECMAPITable.h"
-#include "edkguid.h"
-#include "ECGuid.h"
-#include "Util.h"
+#include <edkguid.h>
+#include <zarafa/ECGuid.h>
+#include <zarafa/Util.h>
 
-#include "ECDebug.h"
-#include "ECInterfaceDefs.h"
+#include <zarafa/ECDebug.h>
+#include <zarafa/ECInterfaceDefs.h>
 
 
 #ifdef _DEBUG
@@ -96,93 +70,71 @@ ECMAPITable::ECMAPITable(std::string strName, ECNotifyClient *lpNotifyClient, UL
 
 HRESULT ECMAPITable::FlushDeferred(LPSRowSet *lppRowSet)
 {
-    HRESULT hr = hrSuccess;
+	HRESULT hr;
     
 	hr = lpTableOps->HrOpenTable();
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
-    // No deferred calls -> nothing to do
-    if(!IsDeferred())
-        goto exit;
+	// No deferred calls -> nothing to do
+	if (!IsDeferred())
+		return hr;
         
-    hr = lpTableOps->HrMulti(m_ulDeferredFlags, m_lpSetColumns, m_lpRestrict, m_lpSortTable, m_ulRowCount, m_ulFlags, lppRowSet);
+	hr = lpTableOps->HrMulti(m_ulDeferredFlags, m_lpSetColumns, m_lpRestrict, m_lpSortTable, m_ulRowCount, m_ulFlags, lppRowSet);
 
-    // Reset deferred items
-    if(m_lpSetColumns)
-        MAPIFreeBuffer(m_lpSetColumns);
+	// Reset deferred items
+	MAPIFreeBuffer(m_lpSetColumns);
 	m_lpSetColumns = NULL;
-	if(m_lpRestrict)
-	    MAPIFreeBuffer(m_lpRestrict);
+	MAPIFreeBuffer(m_lpRestrict);
 	m_lpRestrict = NULL;
-	if(m_lpSortTable)
-	    MAPIFreeBuffer(m_lpSortTable);
+	MAPIFreeBuffer(m_lpSortTable);
 	m_lpSortTable = NULL;
 	m_ulRowCount = 0;
 	m_ulFlags = 0;
 	m_ulDeferredFlags = 0;
-
-exit: 
-    return hr;
+	return hr;
 }
 
 BOOL ECMAPITable::IsDeferred()
 {
-    if(m_lpSetColumns == NULL && m_lpRestrict == NULL && m_lpSortTable == NULL && m_ulRowCount == 0 && m_ulFlags == 0 && m_ulDeferredFlags == 0)
-        return false;
-    return true;
+	return m_lpSetColumns != NULL || m_lpRestrict != NULL ||
+	       m_lpSortTable != NULL || m_ulRowCount != 0 ||
+	       m_ulFlags != 0 || m_ulDeferredFlags != 0;
 }
 
 ECMAPITable::~ECMAPITable()
 {
 	TRACE_MAPI(TRACE_ENTRY, "ECMAPITable::~ECMAPITable","");
-	std::set<ULONG>::iterator iterMapInt;
-	std::set<ULONG>::iterator iterMapIntDel;
+	std::set<ULONG>::const_iterator iterMapInt;
+	std::set<ULONG>::const_iterator iterMapIntDel;
 
 	// Remove all advises	
 	iterMapInt = m_ulConnectionList.begin();
 	while( iterMapInt != m_ulConnectionList.end() )
 	{
 		iterMapIntDel = iterMapInt;
-		iterMapInt++;
+		++iterMapInt;
 		Unadvise(*iterMapIntDel);
 	}
 
-	if(lpsPropTags)
-		delete [] this->lpsPropTags;
-
-	if (m_lpRestrict)
-		MAPIFreeBuffer(m_lpRestrict);
-
-	if (m_lpSetColumns)
-		MAPIFreeBuffer(m_lpSetColumns);
-
-	if (m_lpSortTable)
-		MAPIFreeBuffer(m_lpSortTable);
-
+	delete[] this->lpsPropTags;
+	MAPIFreeBuffer(m_lpRestrict);
+	MAPIFreeBuffer(m_lpSetColumns);
+	MAPIFreeBuffer(m_lpSortTable);
 	if(lpNotifyClient)
 		lpNotifyClient->Release();
 
 	if(lpTableOps)
 		lpTableOps->Release();	// closes the table on the server too
-
-	if(lpsSortOrderSet)
-		delete [] lpsSortOrderSet;
-
+	delete[] lpsSortOrderSet;
 	pthread_mutex_destroy(&m_hMutexConnectionList);
 	pthread_mutex_destroy(&m_hLock);
 }
 
 HRESULT ECMAPITable::Create(std::string strName, ECNotifyClient *lpNotifyClient, ULONG ulFlags, ECMAPITable **lppECMAPITable)
 {
-	HRESULT hr = hrSuccess;
-	ECMAPITable *lpMAPITable = NULL;
-	
-	lpMAPITable = new ECMAPITable(strName, lpNotifyClient, ulFlags);
-
-	hr = lpMAPITable->QueryInterface(IID_ECMAPITable, (void **)lppECMAPITable);
-
-	return hr;
+	ECMAPITable *lpMAPITable = new ECMAPITable(strName, lpNotifyClient, ulFlags);
+	return lpMAPITable->QueryInterface(IID_ECMAPITable, reinterpret_cast<void **>(lppECMAPITable));
 }
 
 HRESULT ECMAPITable::QueryInterface(REFIID refiid, void **lppInterface)
@@ -253,7 +205,7 @@ exit:
 HRESULT ECMAPITable::Unadvise(ULONG ulConnection)
 {
 	HRESULT hr = hrSuccess;
-	std::set<ULONG>::iterator iterMapInt;
+	std::set<ULONG>::const_iterator iterMapInt;
 
 	pthread_mutex_lock(&m_hLock);
 
@@ -298,17 +250,12 @@ HRESULT ECMAPITable::SetColumns(LPSPropTagArray lpPropTagArray, ULONG ulFlags)
 		return MAPI_E_INVALID_PARAMETER;
 
 	pthread_mutex_lock(&m_hLock);
-
-	if(lpsPropTags)
-		delete [] this->lpsPropTags;
-
+	delete[] this->lpsPropTags;
 	lpsPropTags = (LPSPropTagArray) new BYTE[CbNewSPropTagArray(lpPropTagArray->cValues)];
 
 	lpsPropTags->cValues = lpPropTagArray->cValues;
 	memcpy(&lpsPropTags->aulPropTag, &lpPropTagArray->aulPropTag, lpPropTagArray->cValues * sizeof(ULONG));
-
-    if(m_lpSetColumns)
-        MAPIFreeBuffer(m_lpSetColumns);
+	MAPIFreeBuffer(m_lpSetColumns);
 	m_lpSetColumns = NULL;
 
     hr = MAPIAllocateBuffer(CbNewSPropTagArray(lpPropTagArray->cValues), (void **)&m_lpSetColumns);
@@ -472,9 +419,7 @@ HRESULT ECMAPITable::Restrict(LPSRestriction lpRestriction, ULONG ulFlags)
 	HRESULT hr = hrSuccess;
 
 	pthread_mutex_lock(&m_hLock);
-
-    if(m_lpRestrict)
-        MAPIFreeBuffer(m_lpRestrict);
+	MAPIFreeBuffer(m_lpRestrict);
     if(lpRestriction) {
         if ((hr = MAPIAllocateBuffer(sizeof(SRestriction), (void **)&m_lpRestrict)) != hrSuccess)
 		goto exit;
@@ -548,15 +493,11 @@ HRESULT ECMAPITable::SortTable(LPSSortOrderSet lpSortCriteria, ULONG ulFlags)
 		goto exit;
 	}
 
-	if(lpsSortOrderSet)
-		delete [] lpsSortOrderSet;
-
+	delete[] lpsSortOrderSet;
 	lpsSortOrderSet = (LPSSortOrderSet) new BYTE[CbSSortOrderSet(lpSortCriteria)];
 
 	memcpy(lpsSortOrderSet, lpSortCriteria, CbSSortOrderSet(lpSortCriteria));
-
-    if(m_lpSortTable)
-        MAPIFreeBuffer(m_lpSortTable);
+	MAPIFreeBuffer(m_lpSortTable);
     if ((hr = MAPIAllocateBuffer(CbSSortOrderSet(lpSortCriteria), (void **) &m_lpSortTable)) != hrSuccess)
 		goto exit;
     memcpy(m_lpSortTable, lpSortCriteria, CbSSortOrderSet(lpSortCriteria));
@@ -716,23 +657,20 @@ exit:
 
 HRESULT ECMAPITable::HrSetTableOps(WSTableView *lpTableOps, bool fLoad)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	this->lpTableOps = lpTableOps;
 	lpTableOps->AddRef();
 
 	// Open the table on the server, ready for reading ..
 	if(fLoad) {
-    	hr = lpTableOps->HrOpenTable();
-
-    	if(hr != hrSuccess)
-		    goto exit;
-    }
+		hr = lpTableOps->HrOpenTable();
+		if (hr != hrSuccess)
+			return hr;
+	}
 
 	lpTableOps->SetReloadCallback(Reload, this);
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMAPITable::QueryRows(LONG lRowCount, ULONG ulFlags, LPSRowSet *lppRows)
@@ -765,7 +703,7 @@ HRESULT ECMAPITable::Reload(void *lpParam)
 {
 	HRESULT hr = hrSuccess;
 	ECMAPITable *lpThis = (ECMAPITable *)lpParam;
-	std::set<ULONG>::iterator iter;
+	std::set<ULONG>::const_iterator iter;
 
 	// Locking m_hLock is not allowed here since when we are called, the SOAP transport in lpTableOps  
 	// will be locked. Since normally m_hLock is locked before SOAP, locking m_hLock *after* SOAP here  
@@ -775,7 +713,8 @@ HRESULT ECMAPITable::Reload(void *lpParam)
 
 	// The underlying data has been reloaded, therefore we must re-register the advises. This is called
 	// after the transport has re-established its state
-	for(iter = lpThis->m_ulConnectionList.begin(); iter != lpThis->m_ulConnectionList.end(); iter++) {
+	for (iter = lpThis->m_ulConnectionList.begin();
+	     iter != lpThis->m_ulConnectionList.end(); ++iter) {
 		hr = lpThis->lpNotifyClient->Reregister(*iter, 4, (BYTE *)&lpThis->lpTableOps->ulTableId);
 		if(hr != hrSuccess)
 			goto exit;

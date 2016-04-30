@@ -37,6 +37,7 @@ monitor=`basename $MONITORPROGRAM`
 case "$1" in
     start)
 		echo -n "Starting Zarafa monitor "
+		install -dm0775 -o zarafa -g zarafa /var/run/zarafad
 		export LC_ALL=$ZARAFA_LOCALE
 		export LANG=$ZARAFA_LOCALE
 		$MONITORPROGRAM $MONITORCONFIG_OPT

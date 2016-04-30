@@ -1,58 +1,32 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "PublishFreeBusy.h"
-#include "namedprops.h"
-#include "mapiguidext.h"
+#include <zarafa/namedprops.h>
+#include <zarafa/mapiguidext.h>
 #include <iostream>
 #include <vector>
 #include <algorithm>
-#include "ECLogger.h"
+#include <zarafa/ECLogger.h>
 #include "recurrence.h"
-#include "MAPIErrors.h"
+#include <zarafa/MAPIErrors.h>
 
-#include "restrictionutil.h"
+#include <zarafa/restrictionutil.h>
 #include "ECFreeBusyUpdate.h"
 #include "freebusyutil.h"
 #include "ECFreeBusySupport.h"
@@ -135,12 +109,8 @@ exit:
 	if(lpTable)
 		lpTable->Release();
 
-	if(lpFreeBusy)
-		delete lpFreeBusy;
-
-	if(lpFBblocks)
-		MAPIFreeBuffer(lpFBblocks);
-
+	delete lpFreeBusy;
+	MAPIFreeBuffer(lpFBblocks);
 	if(lpNullLogger)
 		lpNullLogger->Release();
 
@@ -162,6 +132,7 @@ PublishFreeBusy::PublishFreeBusy(IMAPISession *lpSession, IMsgStore *lpDefStore,
 	m_lpSession = lpSession;
 	m_lpDefStore = lpDefStore;
 	m_lpLogger = lpLogger;
+	m_lpLogger->AddRef();
 	m_tsStart = tsStart;
 	m_tsEnd = tsStart + (ulMonths * (30*24*60*60));
 
@@ -171,6 +142,7 @@ PublishFreeBusy::PublishFreeBusy(IMAPISession *lpSession, IMsgStore *lpDefStore,
 
 PublishFreeBusy::~PublishFreeBusy()
 {
+	m_lpLogger->Release();
 }
 
 /** 
@@ -353,8 +325,7 @@ HRESULT PublishFreeBusy::HrProcessTable(IMAPITable *lpTable, FBBlock_1 **lppfbBl
 		if(lpRowSet->cRows == 0)
 			break;
 		
-		for(ULONG i = 0; i < lpRowSet->cRows ; i++)
-		{	
+		for (ULONG i = 0; i < lpRowSet->cRows; ++i) {
 			TIMEZONE_STRUCT ttzInfo = {0};
 			
 			ulFbStatus = 0;
@@ -417,7 +388,7 @@ HRESULT PublishFreeBusy::HrProcessTable(IMAPITable *lpTable, FBBlock_1 **lppfbBl
 		if(hr != hrSuccess)
 			goto exit;
 
-		for (ULONG i = 0 ; i < *lpcValues; i++)
+		for (ULONG i = 0 ; i < *lpcValues; ++i)
 			lpfbBlocks[i]  = lpOccrInfo[i].fbBlock;
 
 		*lppfbBlocks = lpfbBlocks;
@@ -425,12 +396,8 @@ HRESULT PublishFreeBusy::HrProcessTable(IMAPITable *lpTable, FBBlock_1 **lppfbBl
 	}
 
 exit:
-	if (lpOccrInfo)
-		MAPIFreeBuffer(lpOccrInfo);
-
-	if (lpsPrpTagArr)
-		MAPIFreeBuffer(lpsPrpTagArr);
-
+	MAPIFreeBuffer(lpOccrInfo);
+	MAPIFreeBuffer(lpsPrpTagArr);
 	if (lpRowSet)
 		FreeProws(lpRowSet);
 
@@ -454,18 +421,17 @@ HRESULT PublishFreeBusy::HrMergeBlocks(FBBlock_1 **lppfbBlocks, ULONG *lpcValues
 	time_t tsLastTime = 0;
 	TSARRAY sTsitem = {0,0,0};
 	std::map<time_t , TSARRAY> mpTimestamps;
-	std::map<time_t , TSARRAY>::iterator iterTs;
+	std::map<time_t, TSARRAY>::const_iterator iterTs;
 	std::vector <ULONG> vctStatus;
 	std::vector <ULONG>::iterator iterStatus;
 	std::vector <FBBlock_1> vcFBblocks;
-	std::vector <FBBlock_1>::iterator iterVcBlocks;
+	std::vector<FBBlock_1>::const_iterator iterVcBlocks;
 	time_t tTemp = 0;
 
 	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Input blocks %ul", cValues);
 
 	lpFbBlocks = *lppfbBlocks;
-	for (ULONG i = 0; i< cValues; i++)
-	{
+	for (ULONG i = 0; i < cValues; ++i) {
 		sTsitem.ulType = START_TIME;
 		sTsitem.ulStatus = lpFbBlocks[i].m_fbstatus;
 		sTsitem.tsTime = lpFbBlocks[i].m_tmStart;
@@ -483,8 +449,7 @@ HRESULT PublishFreeBusy::HrMergeBlocks(FBBlock_1 **lppfbBlocks, ULONG *lpcValues
 		mpTimestamps[sTsitem.tsTime] = sTsitem;
 	}
 	
-	for (iterTs = mpTimestamps.begin(); iterTs != mpTimestamps.end(); iterTs++)
-	{
+	for (iterTs = mpTimestamps.begin(); iterTs != mpTimestamps.end(); ++iterTs) {
 		FBBlock_1 fbBlockTemp;
 
 		sTsitem = iterTs->second;
@@ -500,7 +465,7 @@ HRESULT PublishFreeBusy::HrMergeBlocks(FBBlock_1 **lppfbBlocks, ULONG *lpcValues
 				if(fbBlockTemp.m_fbstatus != 0)
 					vcFBblocks.push_back(fbBlockTemp);
 			}
-			ulLevel++;
+			++ulLevel;
 			vctStatus.push_back(sTsitem.ulStatus);
 			tsLastTime = sTsitem.tsTime;
 			break;
@@ -514,7 +479,7 @@ HRESULT PublishFreeBusy::HrMergeBlocks(FBBlock_1 **lppfbBlocks, ULONG *lpcValues
 				if(fbBlockTemp.m_fbstatus != 0)
 					vcFBblocks.push_back(fbBlockTemp);
 			}
-			ulLevel--;
+			--ulLevel;
 			if(!vctStatus.empty()){
 				iterStatus = std::find(vctStatus.begin(),vctStatus.end(),sTsitem.ulStatus);
 				if(iterStatus != vctStatus.end())
@@ -536,7 +501,7 @@ HRESULT PublishFreeBusy::HrMergeBlocks(FBBlock_1 **lppfbBlocks, ULONG *lpcValues
 		goto exit;
 	iterVcBlocks = vcFBblocks.begin();
 
-	for(ULONG i = 0; iterVcBlocks != vcFBblocks.end(); i++, iterVcBlocks++)
+	for (ULONG i = 0; iterVcBlocks != vcFBblocks.end(); ++i, ++iterVcBlocks)
 		lpFbBlocks[i] = *iterVcBlocks;		
 
 	*lppfbBlocks = lpFbBlocks;
@@ -599,9 +564,7 @@ HRESULT PublishFreeBusy::HrPublishFBblocks(FBBlock_1 *lpfbBlocks, ULONG cValues)
 		goto exit;
 
 exit:
-	if(lpsPrpUsrMEid)
-		MAPIFreeBuffer(lpsPrpUsrMEid);
-
+	MAPIFreeBuffer(lpsPrpUsrMEid);
 	if(lpFBUpdate)
 		lpFBUpdate->Release();
 

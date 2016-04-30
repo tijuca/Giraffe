@@ -1,44 +1,18 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 // -*- Mode: c++ -*-
@@ -50,7 +24,7 @@
 #include <string>
 
 #include "ECDatabase.h"
-#include "ECDefs.h"
+#include <zarafa/ECDefs.h>
 
 /**
  * @defgroup userplugin_dbbase Database common for user plugins
@@ -175,7 +149,7 @@ public:
 	 *
 	 * @throw runtime_error when the database could not be initialized
 	 */	
-	virtual void InitPlugin() throw(std::exception);
+	virtual void InitPlugin();
 
 public:
 
@@ -193,7 +167,7 @@ public:
 	 * @return The list of object signatures of all objects which were found
 	 * @throw std::exception
 	 */
-	virtual auto_ptr<signatures_t> getAllObjects(const objectid_t &company, objectclass_t objclass) throw(std::exception);
+	virtual auto_ptr<signatures_t> getAllObjects(const objectid_t &company, objectclass_t objclass);
 
 	/**
 	 * Obtain the object details for the given object
@@ -205,7 +179,7 @@ public:
 	 * @return The objectdetails for the given objectid
 	 * @throw objectnotfound when the object was not found
 	 */
-	virtual auto_ptr<objectdetails_t> getObjectDetails(const objectid_t &objectid) throw(std::exception);
+	virtual auto_ptr<objectdetails_t> getObjectDetails(const objectid_t &objectid);
 
     /**
 	 * Obtain the object details for the given objects
@@ -218,7 +192,7 @@ public:
 	 * @return A map of objectid with the matching objectdetails
 	 * @throw runtime_error when SQL problems occur.
 	 */
-	virtual auto_ptr<map<objectid_t, objectdetails_t> > getObjectDetails(const list<objectid_t> &objectids) throw (std::exception);
+	virtual auto_ptr<map<objectid_t, objectdetails_t> > getObjectDetails(const list<objectid_t> &objectids);
 
 	/**
 	 * Get all children for a parent for a given relation type.
@@ -233,7 +207,7 @@ public:
 	 * @return A list of object signatures of the children of the parent.
 	 * @throw std::exception
 	 */
-	virtual auto_ptr<signatures_t> getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentobject) throw(std::exception);
+	virtual auto_ptr<signatures_t> getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentobject);
 
     /**
 	 * Request all parents for a childobject for a given relation type.
@@ -248,7 +222,7 @@ public:
 	 * @return A list of object signatures of the parents of the child.
 	 * @throw std::exception
 	 */
-	virtual auto_ptr<signatures_t> getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childobject) throw(std::exception);
+	virtual auto_ptr<signatures_t> getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childobject);
 
 	/**
 	 * Update an object with new details
@@ -261,7 +235,7 @@ public:
 	 *					List of configuration names which should be removed from the object
 	 * @throw runtime_error when SQL problems occur.
 	 */
-	virtual void changeObject(const objectid_t &id, const objectdetails_t &details, const std::list<std::string> *lpRemove) throw(std::exception);
+	virtual void changeObject(const objectid_t &id, const objectdetails_t &details, const std::list<std::string> *lpRemove);
 
 	/**
 	 * Create object in plugin
@@ -272,7 +246,7 @@ public:
 	 * @throw runtime_error When SQL problems occur.
 	 * @throw collison_error When the object already exists.
 	 */
-	virtual objectsignature_t createObject(const objectdetails_t &details) throw(std::exception);
+	virtual objectsignature_t createObject(const objectdetails_t &details);
 
 	/**
 	 * Delete object from plugin
@@ -282,7 +256,7 @@ public:
 	 * @throw runtime_error When SQL problems occur.
 	 * @throw objectnotfound When the object did not exist.
 	 */
-	virtual void deleteObject(const objectid_t &id) throw(std::exception);
+	virtual void deleteObject(const objectid_t &id);
 
     /**
 	 * Add relation between child and parent. This can be used
@@ -300,7 +274,7 @@ public:
 	 * @throw collison_error When the relation already exists.
 	 */
 	virtual void addSubObjectRelation(userobject_relation_t relation,
-									  const objectid_t &parentobject, const objectid_t &childobject) throw(std::exception);
+									  const objectid_t &parentobject, const objectid_t &childobject);
 
 	/**
 	 * Delete relation between child and parent, this can be used
@@ -318,7 +292,7 @@ public:
 	 * @throw objectnotfound When the relation did not exist.
 	 */
 	virtual void deleteSubObjectRelation(userobject_relation_t relation,
-										 const objectid_t &parentobject, const objectid_t &childobject) throw(std::exception);
+										 const objectid_t &parentobject, const objectid_t &childobject);
 
 	/**
 	 * Request quota information from object
@@ -330,7 +304,7 @@ public:
 	 * @return The quota details
 	 * @throw runtime_error when SQL problems occur
 	 */
-	virtual auto_ptr<quotadetails_t> getQuota(const objectid_t &id, bool bGetUserDefault) throw(std::exception);
+	virtual auto_ptr<quotadetails_t> getQuota(const objectid_t &id, bool bGetUserDefault);
 
 	/**
 	 * Update object with quota information
@@ -341,7 +315,7 @@ public:
 	 *					The quota details which must be written to the Database
 	 * @throw runtime_error when SQL problems occur
 	 */
-	virtual void setQuota(const objectid_t &id, const quotadetails_t &quotadetails) throw(std::exception);
+	virtual void setQuota(const objectid_t &id, const quotadetails_t &quotadetails);
 
 	/**
 	 * Get extra properties which are set in the object details for the addressbook
@@ -351,9 +325,9 @@ public:
 	 * @return	a empty list of properties
 	 * @throw runtime_error when SQL problems occur
 	 */
-	virtual auto_ptr<abprops_t> getExtraAddressbookProperties() throw(std::exception);
+	virtual auto_ptr<abprops_t> getExtraAddressbookProperties();
 	
-	virtual void removeAllObjects(objectid_t except) throw(std::exception);
+	virtual void removeAllObjects(objectid_t except);
 
 
 private:
@@ -371,7 +345,7 @@ private:
 	 * @return The list of object signatures which were returned by the SQL query
 	 * @throw runtime_error when SQL problems occur
 	 */
-	virtual auto_ptr<signatures_t> CreateSignatureList(const std::string &query) throw(std::exception);
+	virtual auto_ptr<signatures_t> CreateSignatureList(const std::string &query);
 
 	/**
 	 * Convert a string to MD5Hash
@@ -423,7 +397,7 @@ protected:
 	 * @throw objectnotfound when no results have been found
 	 */
 	virtual auto_ptr<signatures_t> searchObjects(const string &match, const char *search_props[],
-												 const char *return_prop, unsigned int ulFlags) throw(std::exception);
+												 const char *return_prop, unsigned int ulFlags);
 
 	/**
 	 * Update objectdetails with sendas information.

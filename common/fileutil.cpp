@@ -1,60 +1,38 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
-#include "stringutil.h"
-#include "charset/convert.h"
+#include <zarafa/platform.h>
+#include <zarafa/stringutil.h>
+#include <zarafa/charset/convert.h>
 #include <string>
-#include "ECIConv.h"
-#include "ECLogger.h"
+#include <cerrno>
+#include <cstring>
+#include <zarafa/ECIConv.h>
+#include <zarafa/ECLogger.h>
 
 #include <mapicode.h> // only for MAPI error codes
 #include <mapidefs.h> // only for MAPI error codes
 
+#ifdef LINUX
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <arpa/inet.h>
+#endif
 #include "fileutil.h"
 
 #ifdef _DEBUG
@@ -79,46 +57,39 @@ static const char THIS_FILE[] = __FILE__;
  */
 HRESULT HrFileLFtoCRLF(FILE *fin, FILE** fout)
 {
-	HRESULT hr = hrSuccess;
 	char	bufferin[BLOCKSIZE / 2];
 	char	bufferout[BLOCKSIZE+1];
 	size_t	sizebufferout, readsize;
 	FILE*	fTmp = NULL;
 
 	if(fin == NULL || fout == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+		return MAPI_E_INVALID_PARAMETER;
 
 	fTmp = tmpfile();
 	if(fTmp == NULL) {
 		perror("Unable to create tmp file");
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
+		return MAPI_E_CALL_FAILED;
 	}
 
 	while (!feof(fin)) {
 		readsize = fread(bufferin, 1, BLOCKSIZE / 2, fin);
 		if (ferror(fin)) {
 			perror("Read error");//FIXME: What an error?, what now?
-			hr = MAPI_E_CORRUPT_DATA;
-			break;
+			fclose(fTmp);
+			return MAPI_E_CORRUPT_DATA;
 		}
 
 		BufferLFtoCRLF(readsize, bufferin, bufferout, &sizebufferout);
 
 		if (fwrite(bufferout, 1, sizebufferout, fTmp) != sizebufferout) {
 			perror("Write error");//FIXME: What an error?, what now?
-			hr = MAPI_E_CORRUPT_DATA;
-			break;
+			fclose(fTmp);
+			return MAPI_E_CORRUPT_DATA;
 		}
 	}
 
 	*fout = fTmp;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -146,7 +117,6 @@ static inline int mmapsize(unsigned int size)
  */
 HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize, bool *lpImmap)
 {
-	HRESULT hr = hrSuccess;
 	char *lpBuffer = NULL;
 	int offset = 0;
 	long ulBufferSize = BLOCKSIZE;
@@ -156,11 +126,11 @@ HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize, bool *lpImmap)
 
 	*lpImmap = false;
 
+#ifdef LINUX
 	/* Try mmap first */
 	if (fstat(fd, &stat) != 0) {
 		perror("Stat failed");
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
+		return MAPI_E_CALL_FAILED;
 	}
 
 	/* auto-zero-terminate because mmap zeroes bytes after the file */
@@ -169,8 +139,9 @@ HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize, bool *lpImmap)
 		*lpImmap = true;
 		*lppBuffer = lpBuffer;
 		*lpSize = stat.st_size;
-		goto exit;
+		return hrSuccess;
 	}
+#endif /* LINUX */
 
 	/* mmap failed (probably reading from STDIN as a stream), just read the file into memory, and return that */
 	lpBuffer = (char*)malloc(BLOCKSIZE); // will be deleted as soon as possible
@@ -185,8 +156,8 @@ HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize, bool *lpImmap)
 		if (offset + BLOCKSIZE > ulBufferSize) {    // Next read could cross buffer boundary, realloc
 			char *lpRealloc = (char*)realloc(lpBuffer, offset + BLOCKSIZE);
 			if (lpRealloc == NULL) {
-				hr = MAPI_E_NOT_ENOUGH_MEMORY;
-				goto exit;
+				free(lpBuffer);
+				return MAPI_E_NOT_ENOUGH_MEMORY;
 			}
 			lpBuffer = lpRealloc;
 			ulBufferSize += BLOCKSIZE;
@@ -195,6 +166,7 @@ HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize, bool *lpImmap)
 
 	/* Nothing was read */
     if (offset == 0) {
+		free(lpBuffer);
 		*lppBuffer = NULL;
 		*lpSize = 0;
 	} else {
@@ -204,9 +176,7 @@ HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize, bool *lpImmap)
 		*lppBuffer = lpBuffer;
 		*lpSize = offset;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -218,9 +188,11 @@ exit:
  */
 HRESULT HrUnmapFileBuffer(char *lpBuffer, int ulSize, bool bImmap)
 {
+#ifdef LINUX
 	if (bImmap)
 		munmap(lpBuffer, mmapsize(ulSize));
 	else
+#endif
 		free(lpBuffer);
 
 	return hrSuccess;
@@ -264,7 +236,6 @@ exit:
 /**
  * Duplicate a file, to a given location
  *
- * @param[in]	lpLogger Pointer to logger, if NULL the errors are sent to stderr
  * @param[in]	lpFile Pointer to the source file
  * @param[in]	strFileName	The new file name
  *
@@ -272,7 +243,7 @@ exit:
  *
  * @todo on error delete file?
  */
-bool DuplicateFile(ECLogger *lpLogger, FILE *lpFile, std::string &strFileName) 
+bool DuplicateFile(FILE *lpFile, std::string &strFileName)
 {
 	bool bResult = true;
 	size_t	ulReadsize = 0;
@@ -282,11 +253,7 @@ bool DuplicateFile(ECLogger *lpLogger, FILE *lpFile, std::string &strFileName)
 	// create new file
 	pfNew = fopen(strFileName.c_str(), "wb");
 	if(pfNew == NULL) {
-		if (lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to create file, error %d", errno);
-		else
-			perror("Unable to create file");
-
+		ec_log_err("Unable to create file %s: %s", strFileName.c_str(), strerror(errno));
 		bResult = false;
 		goto exit;
 	}
@@ -296,8 +263,7 @@ bool DuplicateFile(ECLogger *lpLogger, FILE *lpFile, std::string &strFileName)
 
 	lpBuffer = (char*)malloc(BLOCKSIZE); 
 	if (!lpBuffer) {
-		if (lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_FATAL, "Duplicate file is out of memory");
+		ec_log_crit("DuplicateFile is out of memory");
 
 		bResult = false;
 		goto exit;
@@ -307,31 +273,21 @@ bool DuplicateFile(ECLogger *lpLogger, FILE *lpFile, std::string &strFileName)
 	while (!feof(lpFile)) {
 		ulReadsize = fread(lpBuffer, 1, BLOCKSIZE, lpFile);
 		if (ferror(lpFile)) {
-			if (lpLogger)
-				lpLogger->Log(EC_LOGLEVEL_FATAL, "Read error, error %d", errno);
-			else
-				perror("Read error");
-
+			ec_log_crit("DuplicateFile: fread: %s", strerror(errno));
 			bResult = false;
 			goto exit;
 		}
 		
 
 		if (fwrite(lpBuffer, 1, ulReadsize , pfNew) != ulReadsize) {
-			if (lpLogger)
-				lpLogger->Log(EC_LOGLEVEL_FATAL, "Write error, error %d", errno);
-			else
-				perror("Write error");
-
+			ec_log_crit("Error during write to \"%s\": %s", strFileName.c_str(), strerror(errno));
 			bResult = false;
 			goto exit;
 		}
 	}
 
 exit:
-	if (lpBuffer)
-		free(lpBuffer);
-
+	free(lpBuffer);
 	if (pfNew)
 		fclose(pfNew);
 
@@ -341,11 +297,10 @@ exit:
 /**
  * Convert file from UCS2 to UTF8
  *
- * @param[in] lpLogger Pointer to a log object
  * @param[in] strSrcFileName Source filename
  * @param[in] strDstFileName Destination filename
  */
-bool ConvertFileFromUCS2ToUTF8(ECLogger *lpLogger, const std::string &strSrcFileName, const std::string &strDstFileName)
+bool ConvertFileFromUCS2ToUTF8(const std::string &strSrcFileName, const std::string &strDstFileName)
 {
 	bool bResult = false;
 	int ulBufferSize = 0;
@@ -357,22 +312,14 @@ bool ConvertFileFromUCS2ToUTF8(ECLogger *lpLogger, const std::string &strSrcFile
 
 	pfSrc = fopen(strSrcFileName.c_str(), "rb");
 	if(pfSrc == NULL) {
-		if (lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to open file '%s', error %d", strSrcFileName.c_str(), errno);
-		else
-			perror("Unable to open file");
-
+		ec_log_err("%s: Unable to open file \"%s\": %s", __PRETTY_FUNCTION__, strSrcFileName.c_str(), strerror(errno));
 		goto exit;
 	}
 
 	// create new file
 	pfDst = fopen(strDstFileName.c_str(), "wb");
 	if(pfDst == NULL) {
-		if (lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to create file '%s', error %d", strDstFileName.c_str(), errno);
-		else
-			perror("Unable to create file");
-
+		ec_log_err("%s: Unable to create file \"%s\": %s", __PRETTY_FUNCTION__, strDstFileName.c_str(), strerror(errno));
 		goto exit;
 	}
 
@@ -386,11 +333,7 @@ bool ConvertFileFromUCS2ToUTF8(ECLogger *lpLogger, const std::string &strSrcFile
 	}
 	
 	if (fwrite(strConverted.c_str(), 1, strConverted.size(), pfDst) != strConverted.size()) { 
-		if (lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to write to file '%s', error %d", strDstFileName.c_str(), errno);
-		else
-			perror("Write error");
-
+		ec_log_crit("%s: Unable to write to file \"%s\": %s", __PRETTY_FUNCTION__, strDstFileName.c_str(), strerror(errno));
 		goto exit;
 	}
 

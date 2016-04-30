@@ -148,8 +148,8 @@ if($optionBadEntries) {
   my $nbDup = 0;
   foreach (keys %dup) {
     my $sumOid = 0;
-    $sumOid += @{$dup{$_}{attr}} if(defined (@{$dup{$_}{attr}}));
-    $sumOid += @{$dup{$_}{objc}} if(defined (@{$dup{$_}{objc}}));
+    $sumOid += @{$dup{$_}{attr}};
+    $sumOid += @{$dup{$_}{objc}};
     if( $sumOid > 1 && $_ ne "") {
       $nbDup ++;
       print "#" x 80 ."\n";

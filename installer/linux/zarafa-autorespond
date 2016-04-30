@@ -16,6 +16,10 @@ SENDDBTMP=$BASE_PATH/zarafa-vacation-$USER-$$.tmp
 SENDMAILCMD=/usr/sbin/sendmail
 SENDMAILPARAMS="-t -f"
 
+if [ -r /etc/zarafa/autorespond ] ; then
+	. /etc/zarafa/autorespond
+fi
+
 if [ ! -d "$BASE_PATH" ] ; then
 	/usr/bin/logger -p mail.notice -t 'zarafa-autorespond' "Created directory $BASE_PATH"
 	mkdir -p "$BASE_PATH"
@@ -23,10 +27,6 @@ if [ ! -d "$BASE_PATH" ] ; then
 
 	/usr/bin/logger -p mail.notice -t 'zarafa-autorespond' "Moving existing vacation-files from /tmp to $BASE_PATH"
 	mv -fv /tmp/zarafa-vacation-* "$BASE_PATH/"
-fi
-
-if [ -r /etc/zarafa/autorespond ] ; then
-	. /etc/zarafa/autorespond
 fi
 
 # Check whether we want to respond to the message

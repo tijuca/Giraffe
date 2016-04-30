@@ -1,76 +1,50 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 #ifndef ECUSERMANAGEMENT_H
 #define ECUSERMANAGEMENT_H
 
+#include <zarafa/zcdefs.h>
 #include <list>
 #include <map>
+#include <ctime>
 #include <pthread.h>
 
-#include "ZarafaCode.h"
-#include "ZarafaUser.h"
-#include "ECConfig.h"
+#include <zarafa/ZarafaCode.h>
+#include <zarafa/ZarafaUser.h>
+#include <zarafa/ECConfig.h>
 #include "ECSession.h"
-#include "ECLogger.h"
-#include "ECDefs.h"
+#include <zarafa/ECLogger.h>
+#include <zarafa/ECDefs.h>
 #include "plugin.h"
 
-#include <boost/date_time/posix_time/posix_time_types.hpp>
-
-class localobjectdetails_t : public objectdetails_t {
+class localobjectdetails_t _zcp_final : public objectdetails_t {
 public:
     localobjectdetails_t() : objectdetails_t(), ulId(0) {};
 	localobjectdetails_t(unsigned int id, objectclass_t objclass) : objectdetails_t(objclass), ulId(id) {};
 	localobjectdetails_t(unsigned int id, const objectdetails_t &details) : objectdetails_t(details), ulId(id) {};
 
-	bool operator== (const localobjectdetails_t &obj) { return ulId == obj.ulId; };
-	bool operator< (const localobjectdetails_t &obj) const { return ulId < obj.ulId; } ;
+	bool operator==(const localobjectdetails_t &obj) const { return ulId == obj.ulId; };
+	bool operator<(const localobjectdetails_t &obj) const { return ulId < obj.ulId; } ;
 
 	unsigned int ulId;
 };
 
-class usercount_t {
+class usercount_t _zcp_final {
 public:
 	enum ucIndex {
 		ucActiveUser = 0,
@@ -164,7 +138,7 @@ private:
 
 class ECUserManagement {
 public:
-	ECUserManagement(BTSession *lpSession, ECPluginFactory *lpPluginFactory, ECConfig *lpConfig, ECLogger *lpLogger);
+	ECUserManagement(BTSession *lpSession, ECPluginFactory *lpPluginFactory, ECConfig *lpConfig);
 	virtual ~ECUserManagement();
 
 	// Authenticate a user
@@ -310,13 +284,12 @@ private:
 protected:
 	ECPluginFactory 	*m_lpPluginFactory;
 	BTSession			*m_lpSession;
-	ECLogger			*m_lpLogger;
 	ECConfig			*m_lpConfig;
 
 private:
 	pthread_mutex_t				m_hMutex;
 	usercount_t 				m_userCount;
-	boost::posix_time::ptime	m_ucTimeStamp;
+	time_t m_usercount_ts;
 };
 
 #define ZARAFA_UID_EVERYONE 1

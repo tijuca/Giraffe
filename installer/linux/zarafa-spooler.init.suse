@@ -38,6 +38,7 @@ spooler=`basename $SPOOLERPROGRAM`
 case "$1" in
     start)
 		echo -n "Starting Zarafa spooler "
+		install -dm0775 -o zarafa -g zarafa /var/run/zarafad
 		export LC_ALL=$ZARAFA_LOCALE
 		export LANG=$ZARAFA_LOCALE
 		$SPOOLERPROGRAM $SPOOLERCONFIG_OPT

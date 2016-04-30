@@ -1,44 +1,18 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 #ifndef ECWSUTIL_H
@@ -47,7 +21,7 @@
 #include <mapidefs.h>
 #include <mapicode.h>
 #include "Zarafa.h"
-#include "ZarafaCode.h"
+#include <zarafa/ZarafaCode.h>
 
 #include "soapZarafaCmdProxy.h"
 
@@ -74,7 +48,7 @@ HRESULT CopySOAPEntryIdToMAPIEntryId(const entryId *lpSrc, ULONG ulObjId, ULONG 
 HRESULT CopySOAPEntryIdToMAPIEntryId(const entryId *lpSrc, ULONG ulObjId, ULONG ulType, ULONG *lpcbDest, LPENTRYID *lppEntryIdDest, void *lpBase = NULL);
 HRESULT CopyMAPIEntryListToSOAPEntryList(const ENTRYLIST *lpMsgList, struct entryList *lpsEntryList);
 HRESULT CopySOAPEntryListToMAPIEntryList(const struct entryList *lpsEntryList, LPENTRYLIST *lppMsgList);
-HRESULT CopyUserClientUpdateStatusFromSOAP(struct userClientUpdateStatusResponse &sUCUS, ULONG ulFlags, LPECUSERCLIENTUPDATESTATUS *lppECUCUS);
+HRESULT CopyUserClientUpdateStatusFromSOAP(struct userClientUpdateStatusResponse &sUCUS, ULONG ulFlags, ECUSERCLIENTUPDATESTATUS **lppECUCUS);
 
 HRESULT CopySOAPPropTagArrayToMAPIPropTagArray(const struct propTagArray *lpsPropTagArray, LPSPropTagArray *lppPropTagArray, void *lpBase = NULL);
 
@@ -84,21 +58,28 @@ HRESULT CopyABPropsToSoap(const SPROPMAP *lpPropmap, const MVPROPMAP *lpMVPropma
 HRESULT CopyABPropsFromSoap(const struct propmapPairArray *lpsoapPropmap, const struct propmapMVPairArray *lpsoapMVPropmap,
 							SPROPMAP *lpPropmap, MVPROPMAP *lpMVPropmap, void *lpBase, ULONG ulFlags);
 
-HRESULT SoapUserArrayToUserArray(const struct userArray *lpUserArray, ULONG ulFLags, ULONG *lpcUsers, LPECUSER *lppsUsers);
-HRESULT SoapUserToUser(const struct user *lpUser, ULONG ulFLags, LPECUSER *lppsUser);
+HRESULT SoapUserArrayToUserArray(const struct userArray *lpUserArray, ULONG ulFLags, ULONG *lpcUsers, ECUSER **lppsUsers);
+HRESULT SoapUserToUser(const struct user *lpUser, ULONG ulFLags, ECUSER **lppsUser);
 
-HRESULT SoapGroupArrayToGroupArray(const struct groupArray *lpGroupArray, ULONG ulFLags, ULONG *lpcGroups, LPECGROUP *lppsGroups);
-HRESULT SoapGroupToGroup(const struct group *lpGroup, ULONG ulFLags, LPECGROUP *lppsGroup);
+HRESULT SoapGroupArrayToGroupArray(const struct groupArray *lpGroupArray, ULONG ulFLags, ULONG *lpcGroups, ECGROUP **lppsGroups);
+HRESULT SoapGroupToGroup(const struct group *lpGroup, ULONG ulFLags, ECGROUP **lppsGroup);
 
-HRESULT SoapCompanyArrayToCompanyArray(const struct companyArray *lpCompanyArray, ULONG ulFLags, ULONG *lpcCompanies, LPECCOMPANY *lppsCompanies);
-HRESULT SoapCompanyToCompany(const struct company *lpCompany, ULONG ulFLags, LPECCOMPANY *lppsCompany);
+HRESULT SoapCompanyArrayToCompanyArray(const struct companyArray *lpCompanyArray, ULONG ulFLags, ULONG *lpcCompanies, ECCOMPANY **lppsCompanies);
+HRESULT SoapCompanyToCompany(const struct company *lpCompany, ULONG ulFLags, ECCOMPANY **lppsCompany);
 
-HRESULT SvrNameListToSoapMvString8(LPECSVRNAMELIST lpSvrNameList, ULONG ulFLags, struct mv_string8 **lppsSvrNameList);
-HRESULT SoapServerListToServerList(const struct serverList *lpsServerList, ULONG ulFLags, LPECSERVERLIST *lppServerList);
+HRESULT SvrNameListToSoapMvString8(ECSVRNAMELIST *lpSvrNameList, ULONG ulFLags, struct mv_string8 **lppsSvrNameList);
+HRESULT SoapServerListToServerList(const struct serverList *lpsServerList, ULONG ulFLags, ECSERVERLIST **lppServerList);
 
+#ifdef LINUX
 int gsoap_connect_unixsocket(struct soap *soap, const char *endpoint, const char *host, int port);
+#else
+int gsoap_win_fsend(struct soap *soap, const char *s, size_t n);
+size_t gsoap_win_frecv(struct soap *soap, char *s, size_t n);
+int gsoap_win_fclose(struct soap *soap);
+int gsoap_connect_namedpipe(struct soap *soap, const char *endpoint, const char *host, int port);
+#endif
 
-HRESULT CreateSoapTransport(ULONG ulUIFlags, sGlobalProfileProps sProfileProps, ZarafaCmd **lppCmd);
+HRESULT CreateSoapTransport(ULONG ulUIFlags, const sGlobalProfileProps &sProfileProps, ZarafaCmd **const lppCmd);
 
 HRESULT WrapServerClientStoreEntry(const char* lpszServerName, entryId* lpsStoreId, ULONG* lpcbStoreID, LPENTRYID* lppStoreID);
 HRESULT UnWrapServerClientStoreEntry(ULONG cbWrapStoreID, LPENTRYID lpWrapStoreID, ULONG* lpcbUnWrapStoreID, LPENTRYID* lppUnWrapStoreID);

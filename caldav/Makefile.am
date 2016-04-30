@@ -1,6 +1,6 @@
 # -*- Makefile -*-
 
-AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
+AM_CPPFLAGS = ${ZCPPFLAGS} ${DEBUGFLAGS} ${BOOST_CPPFLAGS} ${SSL_CFLAGS} \
 	-I${top_srcdir}/mapi4linux/include \
 	-I${top_srcdir}/inetmapi -I${top_srcdir}/provider/common \
 	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
@@ -24,7 +24,8 @@ zarafa_ical_LDADD = ${top_builddir}/mapi4linux/src/libmapi.la \
 	${top_builddir}/libicalmapi/libicalmapi.la \
 	${top_builddir}/common/libzcp_common_ssl.la \
 	${top_builddir}/libfreebusy/libfreebusy.la \
-	$(PROG_LIBS) $(SSL_LIBS) $(ICONV_LIBS) $(XML2_LIBS) $(ICAL_LIBS)
+	$(PROG_LIBS) $(SSL_LIBS) $(ICONV_LIBS) $(XML2_LIBS) $(ICAL_LIBS) \
+	${icu_uc_LIBS}
 
 check-syntax:
 	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \

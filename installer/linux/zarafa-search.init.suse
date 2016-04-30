@@ -33,11 +33,12 @@ if [ -z "$ZARAFA_LOCALE" ]; then
 fi
 
 search=`basename $SEARCHPROGRAM`
-PIDFILE=/var/run/$search.pid
+PIDFILE=/var/run/zarafad/search.pid
 
 case "$1" in
     start)
 		echo -n "Starting Zarafa search "
+		install -dm0775 -o zarafa -g zarafa /var/run/zarafad
 		export LC_ALL=$ZARAFA_LOCALE
 		export LANG=$ZARAFA_LOCALE
 		$SEARCHPROGRAM $SEARCHCONFIG_OPT
@@ -47,7 +48,11 @@ case "$1" in
 
     stop)
 		echo -n "Stopping Zarafa search "
+		killproc -t15 -p "/var/run/$search.pid" python
+		RETVAL2="$?"
 		killproc -t15 -p $PIDFILE python
+		RETVAL="$?"
+		test "$RETVAL2" -eq 0 || "$RETVAL" -eq 0
 		rc_status -v
 		;;
 

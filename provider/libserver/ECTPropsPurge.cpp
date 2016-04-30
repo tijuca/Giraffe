@@ -1,70 +1,43 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
-#include <stringutil.h>
+#include <zarafa/stringutil.h>
 
-#include "threadutil.h"
-#include "ECLogger.h"
-#include "ECConfig.h"
+#include <zarafa/threadutil.h>
+#include <zarafa/ECLogger.h>
+#include <zarafa/ECConfig.h>
 #include "ECSession.h"
 #include "ECSessionManager.h"
 #include "ECDatabaseFactory.h"
 #include "ECStatsCollector.h"
-#include "ZarafaCode.h"
+#include <zarafa/ZarafaCode.h>
 
 #include "ECTPropsPurge.h"
 
 extern ECStatsCollector*     g_lpStatsCollector;
 
-ECTPropsPurge::ECTPropsPurge(ECConfig *lpConfig, ECLogger *lpLogger, ECDatabaseFactory *lpDatabaseFactory)
+ECTPropsPurge::ECTPropsPurge(ECConfig *lpConfig, ECDatabaseFactory *lpDatabaseFactory)
 {
     pthread_mutex_init(&m_hMutexExit, NULL);
     pthread_cond_init(&m_hCondExit, NULL);
     
     m_lpConfig = lpConfig;
-    m_lpLogger = lpLogger;
     m_lpDatabaseFactory = lpDatabaseFactory;
     m_bExit = false;
     
@@ -127,7 +100,7 @@ ECRESULT ECTPropsPurge::PurgeThread()
         if(!lpDatabase) {
             er = GetThreadLocalDatabase(this->m_lpDatabaseFactory, &lpDatabase);
             if(er != erSuccess) {
-                m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to get database connection for delayed purge!");
+                ec_log_crit("Unable to get database connection for delayed purge!");
                 Sleep(60000);
                 continue;
             }
@@ -224,7 +197,7 @@ ECRESULT ECTPropsPurge::GetDeferredCount(ECDatabase *lpDatabase, unsigned int *l
     lpRow = lpDatabase->FetchRow(lpResult);
     if(!lpRow || !lpRow[0]) {
         er = ZARAFA_E_DATABASE_ERROR;
-	lpDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "ECTPropsPurge::GetDeferredCount(): row or column null");
+	ec_log_err("ECTPropsPurge::GetDeferredCount(): row or column null");
         goto exit;
     }
     
@@ -266,9 +239,8 @@ ECRESULT ECTPropsPurge::GetLargestFolderId(ECDatabase *lpDatabase, unsigned int 
     
     *lpulFolderId = atoui(lpRow[0]);
 exit:
-    if(lpResult)
-        lpDatabase->FreeResult(lpResult);
-        
+	if (lpResult != NULL)
+		lpDatabase->FreeResult(lpResult);
 	return er;
 }
 

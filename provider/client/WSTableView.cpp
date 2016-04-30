@@ -1,59 +1,33 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 
 #include "WSTableView.h"
 
 #include "Mem.h"
-#include "ECGuid.h"
+#include <zarafa/ECGuid.h>
 
 // Utils
 #include "SOAPUtils.h"
 #include "WSUtil.h"
 
-#include <charset/convert.h>
+#include <zarafa/charset/convert.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -103,13 +77,8 @@ WSTableView::~WSTableView()
 
 	// if the table was still open it will now be closed in the server too
 	this->HrCloseTable();
-
-	if(m_lpsPropTagArray)
-		delete [] m_lpsPropTagArray;
-
-	if(m_lpsSortOrderSet)
-		delete [] m_lpsSortOrderSet;
-
+	delete[] m_lpsPropTagArray;
+	delete[] m_lpsSortOrderSet;
 	FreeEntryId(&m_sEntryId, false);
 }
 
@@ -204,9 +173,7 @@ HRESULT WSTableView::HrSetColumns(LPSPropTagArray lpsPropTagArray)
 	END_SOAP_CALL
 
 exit:
-	if(lpsOld)
-		delete [] lpsOld;
-
+	delete[] lpsOld;
 	UnLockSoap();
 
 	return hr;
@@ -240,9 +207,8 @@ HRESULT WSTableView::HrQueryColumns(ULONG ulFlags, LPSPropTagArray *lppsPropTags
 	if(hr != hrSuccess)
 		goto exit;
 
-	for(i=0;i<sResponse.sPropTagArray.__size;i++) {
+	for (i = 0; i < sResponse.sPropTagArray.__size; ++i)
 		lpsPropTags->aulPropTag[i] = sResponse.sPropTagArray.__ptr[i];
-	}
 
 	lpsPropTags->cValues = sResponse.sPropTagArray.__size;
 
@@ -304,7 +270,7 @@ HRESULT WSTableView::HrSortTable(LPSSortOrderSet lpsSortOrderSet)
 	sSort.__size = lpsSortOrderSet->cSorts;
 	sSort.__ptr = new sortOrder[lpsSortOrderSet->cSorts];
 
-	for(i=0;i<lpsSortOrderSet->cSorts;i++) {
+	for (i = 0; i < lpsSortOrderSet->cSorts; ++i) {
 		sSort.__ptr[i].ulOrder = lpsSortOrderSet->aSort[i].ulOrder;
 		sSort.__ptr[i].ulPropTag = lpsSortOrderSet->aSort[i].ulPropTag;
 	}
@@ -324,13 +290,8 @@ HRESULT WSTableView::HrSortTable(LPSSortOrderSet lpsSortOrderSet)
 
 exit:
 	UnLockSoap();
-
-	if(lpOld)
-		delete [] lpOld;
-
-	if(sSort.__ptr) 
-		delete [] sSort.__ptr;
-
+	delete[] lpOld;
+	delete[] sSort.__ptr;
 	return hr;
 }
 
@@ -694,8 +655,7 @@ HRESULT WSTableView::HrMulti(ULONG ulDeferredFlags, LPSPropTagArray lpsPropTagAr
 	
 	if(lpsPropTagArray) {
 		// Save the proptag set for if we need to reload
-		if(m_lpsPropTagArray)
-			delete [] m_lpsPropTagArray;
+		delete[] m_lpsPropTagArray;
 		m_lpsPropTagArray = (LPSPropTagArray) new char[CbNewSPropTagArray(lpsPropTagArray->cValues)];
 		memcpy(&m_lpsPropTagArray->aulPropTag, &lpsPropTagArray->aulPropTag, sizeof(ULONG) * lpsPropTagArray->cValues);
 		m_lpsPropTagArray->cValues = lpsPropTagArray->cValues;
@@ -717,8 +677,7 @@ HRESULT WSTableView::HrMulti(ULONG ulDeferredFlags, LPSPropTagArray lpsPropTagAr
 	
 	if(lpsSortOrderSet) {
 		// Remember sort order for reconnect
-		if(m_lpsSortOrderSet)
-			delete [] m_lpsSortOrderSet;
+		delete[] m_lpsSortOrderSet;
 		m_lpsSortOrderSet = (LPSSortOrderSet)new char [CbSSortOrderSet(lpsSortOrderSet)];
 		memcpy(m_lpsSortOrderSet, lpsSortOrderSet, CbSSortOrderSet(lpsSortOrderSet));
 
@@ -726,7 +685,7 @@ HRESULT WSTableView::HrMulti(ULONG ulDeferredFlags, LPSPropTagArray lpsPropTagAr
         sSort.sSortOrder.__size = lpsSortOrderSet->cSorts;
         sSort.sSortOrder.__ptr = new sortOrder[lpsSortOrderSet->cSorts];
 
-        for(i=0;i<lpsSortOrderSet->cSorts;i++) {
+        for (i = 0; i < lpsSortOrderSet->cSorts; ++i) {
             sSort.sSortOrder.__ptr[i].ulOrder = lpsSortOrderSet->aSort[i].ulOrder;
             sSort.sSortOrder.__ptr[i].ulPropTag = lpsSortOrderSet->aSort[i].ulPropTag;
         }
@@ -764,10 +723,8 @@ HRESULT WSTableView::HrMulti(ULONG ulDeferredFlags, LPSPropTagArray lpsPropTagAr
 
 exit:
 	UnLockSoap();
+	delete[] sSort.sSortOrder.__ptr;
 
-	if (sSort.sSortOrder.__ptr)
-		delete [] sSort.sSortOrder.__ptr;
-	
 	if(lpsRestrictTable)
 		FreeRestrictTable(lpsRestrictTable);
         

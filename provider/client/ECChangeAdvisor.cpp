@@ -1,52 +1,26 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include <platform.h>
+#include <zarafa/platform.h>
 
-#include <ECGuid.h>
+#include <zarafa/ECGuid.h>
 #include <ECSyncLog.h>
-#include <ECDebug.h>
-#include <ECLogger.h>
+#include <zarafa/ECDebug.h>
+#include <zarafa/ECLogger.h>
 
 #include "ECChangeAdvisor.h"
 #include "ECMsgStore.h"
@@ -105,7 +79,7 @@ ECChangeAdvisor::ECChangeAdvisor(ECMsgStore *lpMsgStore)
 
 ECChangeAdvisor::~ECChangeAdvisor()
 {
-	ConnectionMap::iterator	iterConnection;
+	ConnectionMap::const_iterator iterConnection;
 
 	if (m_ulReloadId)
 		m_lpMsgStore->lpTransport->RemoveSessionReloadCallback(m_ulReloadId);
@@ -194,13 +168,14 @@ HRESULT ECChangeAdvisor::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERRO
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ECChangeAdvisor::Config(LPSTREAM lpStream, LPGUID /*lpGUID*/, LPECCHANGEADVISESINK lpAdviseSink, ULONG ulFlags)
+HRESULT ECChangeAdvisor::Config(LPSTREAM lpStream, LPGUID /*lpGUID*/,
+    IECChangeAdviseSink *lpAdviseSink, ULONG ulFlags)
 {
 	HRESULT					hr = hrSuccess;
 	ULONG					ulVal = 0;
 	LPENTRYLIST				lpEntryList = NULL;
 	ULONG					ulRead = {0};
-	ConnectionMap::iterator	iterConnection;
+	ConnectionMap::const_iterator iterConnection;
 	LARGE_INTEGER			liSeekStart = {{0}};
 
 	if (lpAdviseSink == NULL && !(ulFlags & SYNC_CATCHUP)) {
@@ -279,9 +254,7 @@ HRESULT ECChangeAdvisor::Config(LPSTREAM lpStream, LPGUID /*lpGUID*/, LPECCHANGE
 	}
 
 exit:
-	if (lpEntryList)
-		MAPIFreeBuffer(lpEntryList);
-
+	MAPIFreeBuffer(lpEntryList);
 	return hr;
 }
 
@@ -292,19 +265,19 @@ exit:
  */
 HRESULT ECChangeAdvisor::PurgeStates()
 {
-	HRESULT				hr = hrSuccess;
+	HRESULT hr;
 	ECLISTSYNCID		lstSyncId;
 	ECLISTSYNCSTATE		lstSyncState;
 	SyncStateMap		mapChangeId;
 
 	std::list<ConnectionMap::value_type>			lstObsolete;
-	std::list<ConnectionMap::value_type>::iterator	iterObsolete;
+	std::list<ConnectionMap::value_type>::const_iterator iterObsolete;
 
 	// First get the most up to date change ids for all registered sync ids (we'll ignore the changeid's since we don't know if we actually got that far)
 	std::transform(m_mapConnections.begin(), m_mapConnections.end(), std::back_inserter(lstSyncId), &GetSyncId);
 	hr = m_lpMsgStore->m_lpNotifyClient->UpdateSyncStates(lstSyncId, &lstSyncState);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// Create a map based on the returned sync states
 	std::transform(lstSyncState.begin(), lstSyncState.end(), std::inserter(mapChangeId, mapChangeId.begin()), &ConvertSyncState);
@@ -318,15 +291,13 @@ HRESULT ECChangeAdvisor::PurgeStates()
 		m_mapConnections.erase(iterObsolete->first);
 		m_mapSyncStates.erase(iterObsolete->first);
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECChangeAdvisor::UpdateState(LPSTREAM lpStream)
 {
 	HRESULT					hr = hrSuccess;
-	ConnectionMap::iterator	iterConnection;
+	ConnectionMap::const_iterator iterConnection;
 	LARGE_INTEGER			liPos = {{0}};
 	ULARGE_INTEGER			uliSize = {{0}};
 	ULONG					ulVal = 0;
@@ -383,32 +354,27 @@ HRESULT ECChangeAdvisor::AddKeys(LPENTRYLIST lpEntryList)
 	HRESULT						hr = hrSuccess;
 	SSyncState					*lpsSyncState = NULL;
 	ECLISTCONNECTION			listConnections;
-	ECLISTCONNECTION::iterator	iterConnection;
+	ECLISTCONNECTION::const_iterator iterConnection;
 	ECLISTSYNCSTATE				listSyncStates;
 
-	if (m_lpChangeAdviseSink == NULL && !(m_ulFlags & SYNC_CATCHUP)) {
-		hr = MAPI_E_UNCONFIGURED;
-		goto exit;
-	}
-
-	if (lpEntryList == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (m_lpChangeAdviseSink == NULL && !(m_ulFlags & SYNC_CATCHUP))
+		return MAPI_E_UNCONFIGURED;
+	if (lpEntryList == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	pthread_mutex_lock(&m_hConnectionLock);
 
-	LOG_DEBUG(m_lpLogger, "Adding %u keys", lpEntryList->cValues);
+	ZLOG_DEBUG(m_lpLogger, "Adding %u keys", lpEntryList->cValues);
 	
 	for (ULONG i = 0; hr == hrSuccess && i < lpEntryList->cValues; ++i) {
 		if (lpEntryList->lpbin[i].cb >= sizeof(SSyncState)) {
 			lpsSyncState = (SSyncState*)lpEntryList->lpbin[i].lpb;
 
-			LOG_DEBUG(m_lpLogger, " - Key %u: syncid=%u, changeid=%u", i, lpsSyncState->ulSyncId, lpsSyncState->ulChangeId);
+			ZLOG_DEBUG(m_lpLogger, " - Key %u: syncid=%u, changeid=%u", i, lpsSyncState->ulSyncId, lpsSyncState->ulChangeId);
 
 			// Check if we don't have this sync state already
 			if (m_mapConnections.find(lpsSyncState->ulSyncId) != m_mapConnections.end()) {
-				LOG_DEBUG(m_lpLogger, " - Key %u: duplicate!", lpsSyncState->ulSyncId);
+				ZLOG_DEBUG(m_lpLogger, " - Key %u: duplicate!", lpsSyncState->ulSyncId);
 				continue;
 			}
 
@@ -431,8 +397,6 @@ HRESULT ECChangeAdvisor::AddKeys(LPENTRYLIST lpEntryList)
 	}
 
 	pthread_mutex_unlock(&m_hConnectionLock);
-
-exit:
 	return hr;
 }
 
@@ -443,15 +407,10 @@ HRESULT ECChangeAdvisor::RemoveKeys(LPENTRYLIST lpEntryList)
 	ConnectionMap::iterator	iterConnection;
 	ECLISTCONNECTION		listConnections;
 
-	if (m_lpChangeAdviseSink == NULL && !(m_ulFlags & SYNC_CATCHUP)) {
-		hr = MAPI_E_UNCONFIGURED;
-		goto exit;
-	}
-
-	if (lpEntryList == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (m_lpChangeAdviseSink == NULL && !(m_ulFlags & SYNC_CATCHUP))
+		return MAPI_E_UNCONFIGURED;
+	if (lpEntryList == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	pthread_mutex_lock(&m_hConnectionLock);
 	
@@ -478,19 +437,14 @@ HRESULT ECChangeAdvisor::RemoveKeys(LPENTRYLIST lpEntryList)
 
 	hr = m_lpMsgStore->m_lpNotifyClient->Unadvise(listConnections);
 	pthread_mutex_unlock(&m_hConnectionLock);
-
-exit:
 	return hr;
 }
 
 HRESULT ECChangeAdvisor::IsMonitoringSyncId(syncid_t ulSyncId)
 {
-	HRESULT	hr = hrSuccess;
-
 	if (m_mapConnections.find(ulSyncId) == m_mapConnections.end())
-		hr = MAPI_E_NOT_FOUND;
-
-	return hr;
+		return MAPI_E_NOT_FOUND;
+	return hrSuccess;
 }
 
 HRESULT ECChangeAdvisor::UpdateSyncState(syncid_t ulSyncId, changeid_t ulChangeId)
@@ -585,7 +539,9 @@ HRESULT ECChangeAdvisor::xECChangeAdvisor::GetLastError(HRESULT hResult, ULONG u
 	return hr;
 }
 
-HRESULT ECChangeAdvisor::xECChangeAdvisor::Config(LPSTREAM lpStream, LPGUID lpGUID, LPECCHANGEADVISESINK lpAdviseSink, ULONG ulFlags) {
+HRESULT ECChangeAdvisor::xECChangeAdvisor::Config(LPSTREAM lpStream,
+    LPGUID lpGUID, IECChangeAdviseSink *lpAdviseSink, ULONG ulFlags)
+{
 	TRACE_MAPI(TRACE_ENTRY, "IECChangeAdvisor::Config", "%s, %x", lpGUID ? DBGGUIDToString(*lpGUID).c_str() : "NULL", ulFlags);
 	METHOD_PROLOGUE_(ECChangeAdvisor, ECChangeAdvisor);
 	HRESULT hr = pThis->Config(lpStream, lpGUID, lpAdviseSink, ulFlags);

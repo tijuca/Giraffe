@@ -1,48 +1,23 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ConsoleTable.h"
+#include <algorithm>
 #include <iostream>
 using namespace std;
 
@@ -56,7 +31,8 @@ ConsoleTable::ConsoleTable(size_t rows, size_t columns) : m_iRows(rows), m_iColu
 {
 	m_nRow = 0;
 	m_vTable.resize(rows);
-	for (size_t i = 0; i < rows; i++) m_vTable[i].resize(columns);
+	for (size_t i = 0; i < rows; ++i)
+		m_vTable[i].resize(columns);
 	m_vMaxLengths.resize(m_iColumns);
 	m_vHeader.resize(m_iColumns);
 	bHaveHeader = false;
@@ -74,7 +50,8 @@ void ConsoleTable::Clear()
 	// remove all data by using resize to 0 and back to original size
 	m_vTable.resize(0);
 	m_vTable.resize(m_iRows);
-	for (size_t i = 0; i < m_iRows; i++) m_vTable[i].resize(m_iColumns);
+	for (size_t i = 0; i < m_iRows; ++i)
+		m_vTable[i].resize(m_iColumns);
 	m_vMaxLengths.clear();
 	m_vHeader.clear();
 	m_nRow = 0;
@@ -96,7 +73,8 @@ void ConsoleTable::Resize(size_t rows, size_t columns)
 	m_iColumns = columns;
 
 	m_vTable.resize(rows);
-	for (size_t i = 0; i < rows; i++) m_vTable[i].resize(columns);
+	for (size_t i = 0; i < rows; ++i)
+		m_vTable[i].resize(columns);
 	m_vMaxLengths.resize(m_iColumns);
 	m_vHeader.resize(m_iColumns);
 }
@@ -171,7 +149,7 @@ bool ConsoleTable::SetColumn(size_t row, size_t col, const string& entry)
 
 	m_nRow = row;
 	if (col+1 == m_iColumns)
-		m_nRow++;
+		++m_nRow;
 
 	return true;
 }
@@ -188,7 +166,7 @@ void ConsoleTable::PrintRow(const vector<wstring>& vRow)
 	size_t longest, ntabs;
 
 	cout << '\t';
-	for (nCol = 0, iCol = vRow.begin(); iCol != vRow.end(); iCol++, nCol++) {
+	for (nCol = 0, iCol = vRow.begin(); iCol != vRow.end(); ++iCol, ++nCol) {
 		// cout can't print wstring, and wcout is not allowed to mix with cout.
 		printf("%ls\t", iCol->c_str());
 		if (nCol+1 < m_iColumns) {
@@ -209,12 +187,13 @@ void ConsoleTable::DumpRow(const vector<wstring>& vRow)
 {
 	vector<wstring>::const_iterator iCol;
 	size_t nCol;
-	for (nCol = 0, iCol = vRow.begin(); iCol != vRow.end(); iCol++, nCol++) {
+	for (nCol = 0, iCol = vRow.begin(); iCol != vRow.end(); ++iCol, ++nCol) {
+		std::wstring temp = *iCol;
+		std::replace(temp.begin(), temp.end(), '\n', ' ');
 		// cout can't print wstring, and wcout is not allowed to mix with cout.
-		printf("%ls", iCol->c_str());
-		if (nCol+1 < m_iColumns) {
+		printf("%ls", temp.c_str());
+		if (nCol + 1 < m_iColumns)
 			printf(";");
-		}
 	}
 	printf("\n");
 }
@@ -230,15 +209,14 @@ void ConsoleTable::PrintTable()
 	if (bHaveHeader) {
 		PrintRow(m_vHeader);
 		total = 0;
-		for (nCol = 0; nCol < m_iColumns; nCol++)
+		for (nCol = 0; nCol < m_iColumns; ++nCol)
 			total += m_vMaxLengths[nCol];
 		total += (m_iColumns -1) * 8;
 		cout << "\t" << string(total, '-') << endl;
 	}
 
-	for (nRow = 0; nRow < m_nRow; nRow++) {
+	for (nRow = 0; nRow < m_nRow; ++nRow)
 		PrintRow(m_vTable[nRow]);
-	}
 }
 
 /**
@@ -249,8 +227,7 @@ void ConsoleTable::DumpTable()
 	if (bHaveHeader) {
 		DumpRow(m_vHeader);
 	}
-	for (size_t nRow = 0; nRow < m_nRow; nRow++) {
+	for (size_t nRow = 0; nRow < m_nRow; ++nRow)
 		DumpRow(m_vTable[nRow]);
-	}
 }
 

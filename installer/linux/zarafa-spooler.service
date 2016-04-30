@@ -1,0 +1,11 @@
+[Unit]
+Description=Zarafa Collaboration Platform Spooler
+Documentation=man:zarafa-spooler(8) man:zarafa-spooler.cfg(5)
+
+[Service]
+Type=simple
+Environment=LC_ALL=C LANG=C
+ExecStart=/usr/sbin/zarafa-spooler -F -c /etc/zarafa/spooler.cfg
+
+[Install]
+WantedBy=multi-user.target

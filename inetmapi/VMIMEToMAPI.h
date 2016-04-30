@@ -1,44 +1,18 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 #ifndef VMIMETOMAPI
@@ -48,9 +22,9 @@
 #include <list>
 #include <mapix.h>
 #include <mapidefs.h>
-#include "ECLogger.h"
-#include "options.h"
-#include "charset/convert.h"
+#include <zarafa/ECLogger.h>
+#include <inetmapi/options.h>
+#include <zarafa/charset/convert.h>
 
 #define MAPI_CHARSET vmime::charset(vmime::charsets::UTF_8)
 #define MAPI_CHARSET_STRING "UTF-8"
@@ -62,6 +36,7 @@ typedef struct sMailState {
 	BODYLEVEL bodyLevel;		//!< the current body state. plain upgrades none, html upgrades plain and none.
 	ULONG ulLastCP;
 	ATTACHLEVEL attachLevel;	//!< the current attachment state
+	unsigned int mime_vtag_nest;	//!< number of nested MIME-Version tags seen
 	bool bAttachSignature;		//!< add a signed signature at the end
 	ULONG ulMsgInMsg;			//!< counter for msg-in-msg level
 	std::string strHTMLBody;	//!< cache for the current complete untouched HTML body, used for finding CIDs or locations (inline images)
@@ -74,6 +49,7 @@ typedef struct sMailState {
 		bodyLevel = BODY_NONE;
 		ulLastCP = 0;
 		attachLevel = ATTACH_NONE;
+		mime_vtag_nest = 0;
 		bAttachSignature = false;
 		strHTMLBody.clear();
 	};
@@ -100,7 +76,10 @@ private:
 	convert_context m_converter;
 
 	HRESULT fillMAPIMail(vmime::ref<vmime::message> vmMessage, IMessage *lpMessage);
-	HRESULT disectBody(vmime::ref<vmime::header> vmHeader, vmime::ref<vmime::body> vmBody, IMessage* lpMessage, bool onlyBody = false, bool filterDouble = false, bool appendBody = false);
+	HRESULT dissect_body(vmime::ref<vmime::header> vmHeader, vmime::ref<vmime::body> vmBody, IMessage *lpMessage, bool filterDouble = false, bool appendBody = false);
+	void dissect_message(vmime::ref<vmime::body>, IMessage *);
+	HRESULT dissect_multipart(vmime::ref<vmime::header>, vmime::ref<vmime::body>, IMessage *, bool filterDouble = false, bool appendBody = false);
+	HRESULT dissect_ical(vmime::ref<vmime::header>, vmime::ref<vmime::body>, IMessage *, bool bIsAttachment);
 
 	HRESULT handleHeaders(vmime::ref<vmime::header> vmHeader, IMessage* lpMessage);
 	HRESULT handleRecipients(vmime::ref<vmime::header> vmHeader, IMessage* lpMessage);
@@ -117,8 +96,7 @@ private:
 	HRESULT handleAttachment(vmime::ref<vmime::header> vmHeader, vmime::ref<vmime::body> vmBody, IMessage* lpMessage, bool bAllowEmpty = true);
 	HRESULT handleMessageToMeProps(IMessage *lpMessage, LPADRLIST lpRecipients);
 
-	std::list<int> findBestAlternative(vmime::ref<vmime::body> vmBody);
-	HRESULT getCharsetFromHTML(const std::string &strHTML, vmime::charset *htmlCharset);
+	int getCharsetFromHTML(const std::string &strHTML, vmime::charset *htmlCharset);
 	vmime::charset getCompatibleCharset(const vmime::charset &vmCharset);
 	std::wstring getWideFromVmimeText(const vmime::text &vmText);
 	

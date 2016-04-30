@@ -1,0 +1,4 @@
+CXXFLAGS=-g -Wall -I. `pkg-config --cflags zarafa`
+LDFLAGS=`pkg-config --libs zarafa`
+
+zarafa-fsck: zarafa-fsck.o zarafa-fsck-main.o zarafa-fsck-calendar.o zarafa-fsck-task.o my_getopt.o

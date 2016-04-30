@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "HtmlToTextParser.h"
 #include "HtmlEntity.h"
 #include <cwctype>
@@ -122,14 +96,14 @@ bool CHtmlToTextParser::Parse(const WCHAR *lpwHTML)
 			else
 				fAddSpace = false;
 
-			lpwHTML++;
+			++lpwHTML;
 		} else if(*lpwHTML == '<' && *lpwHTML+1 != ' ') { // The next char can not be a space!
-			lpwHTML++;
+			++lpwHTML;
 			parseTag(lpwHTML);
 		} else if(*lpwHTML == ' ' && !fPreMode) {
 			fTextMode = true;
 			addSpace(false);
-			lpwHTML++;
+			++lpwHTML;
 		} else {
 			if (fTextMode && fAddSpace) {
 				addSpace(false);
@@ -144,7 +118,7 @@ bool CHtmlToTextParser::Parse(const WCHAR *lpwHTML)
 					continue;
 				addChar(*lpwHTML);
 			}
-			lpwHTML++;
+			++lpwHTML;
 		}
 	}
 
@@ -162,7 +136,7 @@ void CHtmlToTextParser::addNewLine(bool forceLine) {
 	if (forceLine || cNewlines == 0)
 		strText += L"\r\n";
 
-	cNewlines++;
+	++cNewlines;
 }
 
 void CHtmlToTextParser::addChar(WCHAR c) {
@@ -190,27 +164,27 @@ bool CHtmlToTextParser::parseEntity(const WCHAR* &lpwHTML)
 	if(*lpwHTML != '&')
 		return false;
 
-	lpwHTML++;
+	++lpwHTML;
 
 	if (*lpwHTML == '#') {
 		int base = 10;
 
-		lpwHTML++;
+		++lpwHTML;
 		if (*lpwHTML == 'x') {
-			lpwHTML++;
+			++lpwHTML;
 			base = 16;
 		}
 
-		for (int i =0; isxdigit(*lpwHTML) && *lpwHTML != ';' && i < 10; i++) {
+		for (int i = 0; isxdigit(*lpwHTML) && *lpwHTML != ';' && i < 10; ++i) {
 			entity += *lpwHTML;
-			lpwHTML++;
+			++lpwHTML;
 		}
 
 		strText.push_back(wcstoul(entity.c_str(), NULL, base));
 	} else {
-		for(int i =0; *lpwHTML != ';' && *lpwHTML != 0 && i < 10; i++) {
+		for (int i = 0; *lpwHTML != ';' && *lpwHTML != 0 && i < 10; ++i) {
 			entity += *lpwHTML;
-			lpwHTML++;
+			++lpwHTML;
 		}
 
 		WCHAR code = CHtmlEntity::toChar(entity.c_str());
@@ -219,7 +193,7 @@ bool CHtmlToTextParser::parseEntity(const WCHAR* &lpwHTML)
 	}
 
 	if(*lpwHTML == ';')
-		lpwHTML++;
+		++lpwHTML;
 
 	return true;
 }
@@ -239,7 +213,7 @@ void CHtmlToTextParser::parseTag(const WCHAR* &lpwHTML)
 			
 			// HTML comment or doctype detect, ignore all the text
 			bool fCommentMode = false;
-			lpwHTML++;
+			++lpwHTML;
 
 			if (*lpwHTML == '-' && *(lpwHTML+1) == '-') {
 				fCommentMode = true;
@@ -250,16 +224,16 @@ void CHtmlToTextParser::parseTag(const WCHAR* &lpwHTML)
 				if (*lpwHTML == '>') {
 					if(fCommentMode) {
 						if (*(lpwHTML-1) == '-' && *(lpwHTML-2) == '-' ) {
-							lpwHTML++; // comment ends with -->
+							++lpwHTML; // comment ends with -->
 							return;
 						}
 					} else {
-						lpwHTML++; // all others end on the first >
+						++lpwHTML; // all others end on the first >
 						return;
 					}
 				}
 
-				lpwHTML++;
+				++lpwHTML;
 			}
 		} else if (*lpwHTML == '>') {
 			if(!bTagEnd){
@@ -285,7 +259,7 @@ void CHtmlToTextParser::parseTag(const WCHAR* &lpwHTML)
 			}
 		}
 
-		lpwHTML++;
+		++lpwHTML;
 	}
 
 	// Parse tag
@@ -311,7 +285,7 @@ void CHtmlToTextParser::parseAttributes(const WCHAR* &lpwHTML)
 				bAttrValue = false;
 				bEndTag = true;
 		} else if(*lpwHTML == '>' && bAttrName) {
-			lpwHTML++;
+			++lpwHTML;
 			break; // No attributes or broken attribute detect
 		} else if(*lpwHTML == '=' && bAttrName) {
 			bAttrName = false;
@@ -351,12 +325,10 @@ void CHtmlToTextParser::parseAttributes(const WCHAR* &lpwHTML)
 			attrName.clear();
 		}
 
-		lpwHTML++;
+		++lpwHTML;
 	}
 
 	stackAttrs.push(mapAttrs);
-
-	return;
 }
 
 void CHtmlToTextParser::parseTagP()

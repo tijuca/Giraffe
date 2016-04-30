@@ -1,52 +1,26 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 #ifndef ECSEARCHFOLDERS_H
 #define ECSEARCHFOLDERS_H
 
-#include "ECLogger.h"
+#include <zarafa/zcdefs.h>
 #include "ECDatabaseFactory.h"
-#include "ECKeyTable.h"
+#include <zarafa/ECKeyTable.h>
 #include "ECStoreObjectTable.h"
 
 #include "soapH.h"
@@ -58,7 +32,7 @@
 
 class ECSessionManager;
 
-typedef struct SEARCHFOLDER {
+typedef struct SEARCHFOLDER _zcp_final {
 	SEARCHFOLDER(unsigned int ulStoreId, unsigned int ulFolderId) {
 		this->lpSearchCriteria = NULL;
 		/* sThreadId */
@@ -89,8 +63,8 @@ typedef struct EVENT {
     unsigned int			ulObjectId;
     ECKeyTable::UpdateType  ulType;
     
-    bool operator< (const struct EVENT &b) { return ulFolderId < b.ulFolderId ? true : (ulType < b.ulType ? true : ( ulObjectId < b.ulObjectId ? true : false ) ); }
-    bool operator== (const struct EVENT &b) { return ulFolderId == b.ulFolderId && ulType == b.ulType && ulObjectId ==  b.ulObjectId; }
+    bool operator<(const struct EVENT &b) const { return ulFolderId < b.ulFolderId ? true : (ulType < b.ulType ? true : ( ulObjectId < b.ulObjectId ? true : false ) ); }
+    bool operator==(const struct EVENT &b) const { return ulFolderId == b.ulFolderId && ulType == b.ulType && ulObjectId ==  b.ulObjectId; }
 } EVENT;
 
 typedef std::map<unsigned int, SEARCHFOLDER *> FOLDERIDSEARCH;
@@ -122,9 +96,9 @@ typedef struct tagsSearchFolderStats
  * except rebuilding searchfolders; when the server starts and finds a searchfolder that was only half-built, a complete
  * rebuild is started since we don't know how far the rebuild got last time.
  */
-class ECSearchFolders {
+class ECSearchFolders _zcp_final {
 public:
-    ECSearchFolders(ECSessionManager *lpSessionManager, ECDatabaseFactory *lpFactory, ECLogger *lpLogger);
+    ECSearchFolders(ECSessionManager *lpSessionManager, ECDatabaseFactory *lpFactory);
     virtual ~ECSearchFolders();
 
     /**
@@ -438,7 +412,7 @@ private:
      * @param[in] bNotify TRUE on a live system, FALSE if only the database must be updated.
      * @return result
      */
-    virtual ECRESULT ProcessCandidateRows(ECDatabase *lpDatabase, ECSession *lpSession, struct restrictTable *lpRestrict, bool *lpbCancel, unsigned int ulStoreId, unsigned int ulFolderId, ECODStore *ecODStore, ECObjectTableList ecRows, struct propTagArray *lpPropTags, ECLocale locale, bool bNotify);
+    virtual ECRESULT ProcessCandidateRows(ECDatabase *lpDatabase, ECSession *lpSession, struct restrictTable *lpRestrict, bool *lpbCancel, unsigned int ulStoreId, unsigned int ulFolderId, ECODStore *ecODStore, ECObjectTableList ecRows, struct propTagArray *lpPropTags, const ECLocale &locale, bool bNotify);
 
     // Map StoreID -> SearchFolderId -> SearchCriteria
     // Because searchfolders only work within a store, this allows us to skip 99% of all
@@ -451,7 +425,6 @@ private:
 
     ECDatabaseFactory *m_lpDatabaseFactory;
     ECSessionManager *m_lpSessionManager;
-    ECLogger *m_lpLogger;
 
     // List of change events
     std::list<EVENT> m_lstEvents;

@@ -3,8 +3,8 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
 	-I${top_srcdir}/provider/libserver \
 	-I${top_srcdir}/provider/common	-I${top_srcdir}/mapi4linux/include
 
-COMMON_PLUGIN_FILES = plugin.h ..//common/ZarafaUser.h
-COMMON_DBPLUGIN_FILES = DBBase.h DBBase.cpp ../libserver/ECDatabase.h 
+COMMON_PLUGIN_FILES = plugin.h
+COMMON_DBPLUGIN_FILES = DBBase.h DBBase.cpp
 
 
 pkglib_LTLIBRARIES = 
@@ -29,7 +29,8 @@ ldapplugin_la_SOURCES = LDAPUserPlugin.cpp LDAPUserPlugin.h LDAPCache.cpp LDAPCa
 ldapplugin_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
 ldapplugin_la_LIBADD = \
 	${top_builddir}/common/libzcp_common_util.la \
-	../libserver/libzarafa_server.la ${LDAP_LIBS}
+	../libserver/libzarafa_server.la ${CRYPTO_LIBS} ${LDAP_LIBS}
+dist_pkgdata_DATA = ${ldapplugin_la_SOURCES}
 
 
 endif

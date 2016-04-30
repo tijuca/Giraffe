@@ -1,64 +1,38 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <memory.h>
 #include <mapi.h>
 #include <mapiutil.h>
 #include <mapispi.h>
 
-#include "ECGetText.h"
+#include <zarafa/ECGetText.h>
 
 #include "Mem.h"
 
-#include "ECGuid.h"
+#include <zarafa/ECGuid.h>
 
 #include "ECMSProvider.h"
 #include "ECMsgStore.h"
 #include "ECABProvider.h"
 
-#include "ECDebug.h"
+#include <zarafa/ECDebug.h>
 
 
 #include "ClientUtil.h"
@@ -67,17 +41,17 @@
 #include "WSUtil.h"
 #include "ZarafaUtil.h"
 #include "ProviderUtil.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 
 using namespace std;
 
 #include <edkguid.h>
 
 #include <cwchar>
-#include "charset/convert.h"
-#include "charset/utf8string.h"
+#include <zarafa/charset/convert.h>
+#include <zarafa/charset/utf8string.h>
 
-#include <mapi_ptr/mapi_memory_ptr.h>
+#include <zarafa/mapi_ptr/mapi_memory_ptr.h>
 typedef mapi_memory_ptr<ECUSER>	ECUserPtr;
 
 #ifdef _DEBUG
@@ -118,9 +92,7 @@ HRESULT ECMSProvider::QueryInterface(REFIID refiid, void **lppInterface)
 
 HRESULT ECMSProvider::Shutdown(ULONG * lpulFlags) 
 {
-	HRESULT hr = hrSuccess;
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECMSProvider::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, LPCIID lpInterface, ULONG *lpcbSpoolSecurity, LPBYTE *lppbSpoolSecurity, LPMAPIERROR *lppMAPIError, LPMSLOGON *lppMSLogon, LPMDB *lppMDB)
@@ -141,7 +113,29 @@ HRESULT ECMSProvider::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszPro
 	
 	sGlobalProfileProps	sProfileProps;
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	ULONG		cbUnWrapStoreID = 0;
+	LPENTRYID	lpUnWrapStoreID = NULL;
+	ULONG		cbRootId = 0;
+	LPENTRYID	lpRootId = NULL;
+	GUID		guidStore;
+	BOOL		bFirstLogin = FALSE;
+	BOOL		bFirstUserLogin = FALSE;
+	ULONG		cbTmp = 0; // unused vars
+	LPENTRYID	lpTmpId = NULL; // unused vars
+	string strUniqueId;
+	string strDBDirectory;
+	string strDBConfigFile;
+	std::string strOfflineServerPath;
+	LPSTREAM lpTmpStream = NULL;
 
+	ECUserPtr		ptrUser;
+#endif
+
+#if defined(WIN32) && !defined(WINCE)
+	if(ulUIParam == 0)
+		ulUIParam = (ULONG)GetWindow(GetDesktopWindow(), GW_CHILD);
+#endif
 
 	// Always suppress UI when running in a service
 	if(m_ulFlags & MAPI_NT_SERVICE)
@@ -187,12 +181,38 @@ HRESULT ECMSProvider::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszPro
 	if (lpsPropArray[1].ulPropTag == PR_RESOURCE_FLAGS && (lpsPropArray[1].Value.ul & STATUS_DEFAULT_STORE) == STATUS_DEFAULT_STORE)
 		fIsDefaultStore = TRUE;
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	// The only possible offline provider is default store(ZARAFA_SERVICE_GUID / fIsDefaultStore == TRUE)
+	if ((m_ulFlags & EC_PROVIDER_OFFLINE) == EC_PROVIDER_OFFLINE && fIsDefaultStore == FALSE) {
+		hr = MAPI_E_CALL_FAILED;
+		ASSERT(FALSE);
+		goto exit;
+	}
+#endif
 
 	// Create a transport for this message store
 	hr = WSTransport::Create(ulFlags, &lpTransport);
 	if(hr != hrSuccess)
 		goto exit;
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	if ((m_ulFlags & EC_PROVIDER_OFFLINE) == EC_PROVIDER_OFFLINE && fIsDefaultStore == TRUE) { 
+		if (!sProfileProps.strOfflinePath.empty())
+			g_strUserLocalAppDataZarafa = sProfileProps.strOfflinePath;
+
+		hr = CheckStartServerAndGetServerURL(lpMAPISup, g_strUserLocalAppDataZarafa.c_str(), g_strZarafaDirectory.c_str(), &strOfflineServerPath);		
+		if (hr != hrSuccess)
+			goto exit;
+
+		// It's an offline store
+		bOfflineStore = TRUE;
+		sProfileProps.strServerPath = strOfflineServerPath;
+
+		// Log on the transport to the server
+		hr = lpTransport->HrLogon(sProfileProps);
+	}
+	else
+#endif
 	{
 		hr = LogonByEntryID(&lpTransport, &sProfileProps, cbEntryID, lpEntryID);
 	}
@@ -223,6 +243,120 @@ HRESULT ECMSProvider::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszPro
 	}
 	TRACE_MAPI(TRACE_ENTRY, "ECMSProvider::Logon::MDB", "PR_MDB_PROVIDER = %s", DBGGUIDToString(*(IID*)&guidMDBProvider).c_str());
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	if ( hr == hrSuccess && (m_ulFlags&EC_PROVIDER_OFFLINE) == EC_PROVIDER_OFFLINE && CompareMDBProvider(&guidMDBProvider, &ZARAFA_SERVICE_GUID))
+	{
+		// check if there is already a store
+		hr = lpTransport->HrGetStore(cbEntryID, lpEntryID, &cbTmp, &lpTmpId, 0 , NULL);
+		
+		if(lpTmpId) {
+			ECFreeBuffer(lpTmpId);
+			lpTmpId = NULL;
+		}
+
+	}else if(hr == MAPI_E_LOGON_FAILED){
+		bFirstUserLogin = TRUE;
+	}else if(hr == MAPI_E_SESSION_LIMIT) {
+		if(!(ulFlags & MDB_NO_DIALOG)) {
+			MessageBox((HWND)ulUIParam, _("Cannot use the profile because you are over the license limit. To continue, you must purchase additional client licenses."), g_strProductName.c_str(), MB_ICONEXCLAMATION | MB_OK);
+		}
+	}else if(hr == MAPI_E_NO_ACCESS) {
+		if(!(ulFlags & MDB_NO_DIALOG)) {
+			MessageBox((HWND)ulUIParam, _("Cannot use the profile because the server was unable to contact the license server. Please consult your system administrator."), g_strProductName.c_str(), MB_ICONEXCLAMATION | MB_OK);
+		}
+	}
+
+	// As this the first time you logon, you must be an administrator
+	if (hr != hrSuccess && (m_ulFlags&EC_PROVIDER_OFFLINE) == EC_PROVIDER_OFFLINE && CompareMDBProvider(&guidMDBProvider, &ZARAFA_SERVICE_GUID))
+	{
+		sGlobalProfileProps sLocalServerProfileProps;
+		sGlobalProfileProps sOnlineProfileProps;
+
+		hr = ClientUtil::GetGlobalProfileProperties(lpMAPISup, &sLocalServerProfileProps);
+		if(hr != hrSuccess)
+			goto exit;
+
+		sOnlineProfileProps = sLocalServerProfileProps;
+
+		sLocalServerProfileProps.strServerPath = strOfflineServerPath;
+		sLocalServerProfileProps.strUserName = ZARAFA_SYSTEM_USER_W;
+		sLocalServerProfileProps.strPassword = ZARAFA_SYSTEM_USER_W;
+
+		// Log off the user
+		lpTransport->HrLogOff();
+
+		// Login as admin
+		hr = lpTransport->HrLogon(sLocalServerProfileProps);
+		if(hr != hrSuccess)
+			goto exit; // Only when the offline server is killed on a bad moment
+
+		// Check if it's a new offline profile
+		hr = lpTransport->HrGetStore(cbEntryID, lpEntryID, &cbTmp, &lpTmpId, 0 , NULL);
+		if(hr == MAPI_E_NOT_FOUND)
+			bFirstLogin = TRUE;
+		else if(hr != hrSuccess)
+			goto exit;
+
+		if(bFirstLogin == TRUE)
+		{
+			lpTransport->HrLogOff();
+
+			hr = lpTransport->HrLogon(sOnlineProfileProps);
+			if(hr != hrSuccess)
+				goto exit;
+
+			hr = lpTransport->HrGetUser(0, NULL, MAPI_UNICODE, &ptrUser);
+			if(hr != hrSuccess)
+				goto exit;
+
+			lpTransport->HrLogOff();
+
+			hr = lpTransport->HrLogon(sLocalServerProfileProps);
+			if(hr != hrSuccess)
+				goto exit; // Only when the offline server is killed on a bad moment
+
+			if(bFirstUserLogin){
+				// Add user to offline store
+				ptrUser->lpszPassword = (LPTSTR)L"dummy";
+				hr = lpTransport->HrSetUser(ptrUser, MAPI_UNICODE);
+				if(hr != hrSuccess)
+					goto exit;
+			}
+
+			// Create new offline store
+			//
+
+			hr = UnWrapServerClientStoreEntry(cbEntryID, lpEntryID, &cbUnWrapStoreID,&lpUnWrapStoreID);
+			if(hr != hrSuccess)
+				goto exit;
+			
+			hr = HrGetStoreGuidFromEntryId(cbUnWrapStoreID, (LPBYTE)lpUnWrapStoreID, &guidStore);
+			if(hr != hrSuccess)
+				goto exit;
+
+			// create root entryid
+			hr = HrCreateEntryId(guidStore, MAPI_FOLDER, &cbRootId, &lpRootId);
+			if(hr != hrSuccess)
+				goto exit;
+			
+			hr = lpTransport->HrCreateStore(ECSTORE_TYPE_PRIVATE, ptrUser->sUserId.cb, (LPENTRYID)ptrUser->sUserId.lpb, cbUnWrapStoreID, lpUnWrapStoreID, cbRootId, lpRootId, 0);
+			if(hr != hrSuccess)
+				goto exit;
+
+			hr = lpTransport->HrSetReceiveFolder(cbUnWrapStoreID, lpUnWrapStoreID, utf8string::from_string("IPC"), cbRootId, lpRootId);
+			if(hr != hrSuccess)
+				goto exit;
+		} // if(bFirstLogin == TRUE)
+
+		// Log off the admin store
+		lpTransport->HrLogOff();
+
+		// Login with the user
+		hr = lpTransport->HrLogon(sProfileProps);
+
+	} // if (hr != hrSuccess .....)
+
+#endif
 
 	if(hr != hrSuccess)
 		goto exit;
@@ -234,6 +368,70 @@ HRESULT ECMSProvider::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszPro
 	if(hr != hrSuccess)
 		goto exit;
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	// We now have a store. We'll now check for EC_AB_SYNC_STATUS in order to set the correct
+	// user. If it is missing, we are dealing with an upgrade that forced a resync in order to upgrade
+	// the extern ids. We need to upgrade ourselve now to get the correct owner property on the store.
+	if (!bFirstUserLogin && bOfflineStore) {
+		sGlobalProfileProps sLocalServerProfileProps;
+		sGlobalProfileProps sOnlineProfileProps;
+
+		hr = ClientUtil::GetGlobalProfileProperties(lpMAPISup, &sLocalServerProfileProps);
+		if(hr != hrSuccess)
+			goto exit;
+
+		sOnlineProfileProps = sLocalServerProfileProps;
+
+		sLocalServerProfileProps.strServerPath = strOfflineServerPath;
+		sLocalServerProfileProps.strUserName = ZARAFA_SYSTEM_USER_W;
+		sLocalServerProfileProps.strPassword = ZARAFA_SYSTEM_USER_W;
+
+		hr = lpECMsgStore->OpenProperty(PR_EC_AB_SYNC_STATUS, &IID_IStream, 0, 0, (IUnknown**)&lpTmpStream);
+		if (lpTmpStream) { lpTmpStream->Release(); lpTmpStream = NULL; }
+
+		if (hr == MAPI_E_NOT_FOUND) {
+			// Destroy the just opened store.
+			lpECMsgStore->Release();
+			lpECMsgStore = NULL;
+
+			// Get the online user information.
+			hr = lpTransport->HrLogon(sOnlineProfileProps);
+			if(hr != hrSuccess)
+				goto exit;
+
+			hr = lpTransport->HrGetUser(0, NULL, MAPI_UNICODE, &ptrUser);
+			if(hr != hrSuccess)
+				goto exit;
+
+			lpTransport->HrLogOff();
+
+			// Store the information offline.
+			hr = lpTransport->HrLogon(sLocalServerProfileProps);
+			if(hr != hrSuccess)
+				goto exit; // Only when the offline server is killed on a bad moment
+
+			// Add user to offline store
+			ptrUser->lpszPassword = (LPTSTR)L"dummy";
+			hr = lpTransport->HrSetUser(ptrUser, MAPI_UNICODE);
+			if(hr != hrSuccess)
+				goto exit;
+
+			// Log off the admin store
+			lpTransport->HrLogOff();
+
+			// Recreate the store object with the user
+			hr = lpTransport->HrLogon(sProfileProps);
+			if (hr != hrSuccess)
+				goto exit;
+
+			hr = CreateMsgStoreObject((LPSTR)sProfileProps.strProfileName.c_str(), lpMAPISup, cbEntryID, lpEntryID, ulFlags, sProfileProps.ulProfileFlags, lpTransport,
+									&guidMDBProvider, false, fIsDefaultStore, bOfflineStore,
+									&lpECMsgStore);
+			if(hr != hrSuccess)
+				goto exit;
+		}
+	}
+#endif
 	
 	// Register ourselves with mapisupport
 	//hr = lpMAPISup->SetProviderUID((MAPIUID *)&lpMsgStore->GetStoreGuid(), 0); 
@@ -275,13 +473,15 @@ exit:
 
 	if(lpTransport)
 		lpTransport->Release();
+	MAPIFreeBuffer(lpsPropTagArray);
+	MAPIFreeBuffer(lpsPropArray);
+#ifdef HAVE_OFFLINE_SUPPORT
+	if(lpTmpId)
+		ECFreeBuffer(lpTmpId);
 
-	if(lpsPropTagArray)
-		MAPIFreeBuffer(lpsPropTagArray);
-	
-	if(lpsPropArray)
-		MAPIFreeBuffer(lpsPropArray);
-
+	if (lpTmpStream)
+		lpTmpStream->Release();
+#endif
 
 	return hr;
 }
@@ -357,9 +557,7 @@ HRESULT ECMSProvider::SpoolerLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR 
 		hr = MAPI_E_NO_ACCESS;
 		goto exit;
 	}
-
-	strSep++;
-
+	++strSep;
 	sProfileProps.strUserName = (wchar_t*)lpbSpoolSecurity;
 	sProfileProps.strPassword = strSep;
 
@@ -369,6 +567,20 @@ HRESULT ECMSProvider::SpoolerLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR 
 	if(hr != hrSuccess)
 		goto exit;
 
+#ifdef HAVE_OFFLINE_SUPPORT
+	if ( (m_ulFlags&EC_PROVIDER_OFFLINE) == EC_PROVIDER_OFFLINE) { 
+
+		hr = GetOfflineServerURL(lpMAPISup, &sProfileProps.strServerPath);
+		if(hr != hrSuccess) {
+			hr = MAPI_E_FAILONEPROVIDER;
+			goto exit;
+		}
+		bOfflineStore = true;
+
+		// Log on the transport to the server
+		hr = lpTransport->HrLogon(sProfileProps);
+	} else
+#endif
 	{
 		hr = LogonByEntryID(&lpTransport, &sProfileProps, cbEntryID, lpEntryID);
 	}
@@ -453,7 +665,7 @@ HRESULT ECMSProvider::CompareStoreIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, UL
  */
 HRESULT ECMSProvider::LogonByEntryID(WSTransport **lppTransport, sGlobalProfileProps *lpsProfileProps, ULONG cbEntryID, LPENTRYID lpEntryID)
 {
-	HRESULT		hr = hrSuccess;
+	HRESULT hr;
 	string		extractedServerPath;		// The extracted server path
 	bool		bIsPseudoUrl = false;
 	WSTransport	*lpTransport = NULL;
@@ -462,10 +674,8 @@ HRESULT ECMSProvider::LogonByEntryID(WSTransport **lppTransport, sGlobalProfileP
 	lpTransport = *lppTransport;
 
 	hr = HrGetServerURLFromStoreEntryId(cbEntryID, lpEntryID, extractedServerPath, &bIsPseudoUrl);
-	if (hr != hrSuccess) {
-		hr = MAPI_E_FAILONEPROVIDER;
-		goto exit;
-	}
+	if (hr != hrSuccess)
+		return MAPI_E_FAILONEPROVIDER;
 
 	// Log on the transport to the server
 	if (!bIsPseudoUrl) {
@@ -486,25 +696,23 @@ HRESULT ECMSProvider::LogonByEntryID(WSTransport **lppTransport, sGlobalProfileP
 
 		hr = lpTransport->HrLogon(*lpsProfileProps);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		hr = HrResolvePseudoUrl(lpTransport, extractedServerPath.c_str(), strServerPath, &bIsPeer);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		if (!bIsPeer) {
 			hr = lpTransport->CreateAndLogonAlternate(strServerPath.c_str(), &lpAltTransport);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			lpTransport->HrLogOff();
 			lpTransport->Release();
 			*lppTransport = lpAltTransport;
 		}
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 ULONG ECMSProvider::xMSProvider::AddRef() 

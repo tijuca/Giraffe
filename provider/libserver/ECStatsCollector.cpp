@@ -1,49 +1,23 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ECStatsCollector.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 
 using namespace std;
 
@@ -128,9 +102,8 @@ ECStatsCollector::ECStatsCollector() {
 ECStatsCollector::~ECStatsCollector() {
 	SCMap::iterator iSD;
 
-	for (iSD = m_StatData.begin(); iSD != m_StatData.end(); iSD++) {
+	for (iSD = m_StatData.begin(); iSD != m_StatData.end(); ++iSD)
 		pthread_mutex_destroy(&iSD->second.lock);
-	}
 	pthread_mutex_destroy(&m_StringsLock);
 }
 
@@ -148,7 +121,7 @@ void ECStatsCollector::AddStat(SCName index, SCType type, const char *name, cons
 }
 
 void ECStatsCollector::Increment(SCName name, float inc) {
-	map<SCName, ECStat>::iterator iSD = m_StatData.find(name);
+	SCMap::iterator iSD = m_StatData.find(name);
 	if (iSD == m_StatData.end())
 		return;
 
@@ -164,7 +137,7 @@ void ECStatsCollector::Increment(SCName name, int inc) {
 }
 
 void ECStatsCollector::Increment(SCName name, LONGLONG inc) {
-	map<SCName, ECStat>::iterator iSD = m_StatData.find(name);
+	SCMap::iterator iSD = m_StatData.find(name);
 	if (iSD == m_StatData.end())
 		return;
 
@@ -176,7 +149,7 @@ void ECStatsCollector::Increment(SCName name, LONGLONG inc) {
 }
 
 void ECStatsCollector::Set(SCName name, float set) {
-	map<SCName, ECStat>::iterator iSD = m_StatData.find(name);
+	SCMap::iterator iSD = m_StatData.find(name);
 	if (iSD == m_StatData.end())
 		return;
 
@@ -188,7 +161,7 @@ void ECStatsCollector::Set(SCName name, float set) {
 }
 
 void ECStatsCollector::Set(SCName name, LONGLONG set) {
-	map<SCName, ECStat>::iterator iSD = m_StatData.find(name);
+	SCMap::iterator iSD = m_StatData.find(name);
 	if (iSD == m_StatData.end())
 		return;
 
@@ -200,7 +173,7 @@ void ECStatsCollector::Set(SCName name, LONGLONG set) {
 }
 
 void ECStatsCollector::SetTime(SCName name, time_t set) {
-	map<SCName, ECStat>::iterator iSD = m_StatData.find(name);
+	SCMap::iterator iSD = m_StatData.find(name);
 	if (iSD == m_StatData.end())
 		return;
 
@@ -213,7 +186,7 @@ void ECStatsCollector::SetTime(SCName name, time_t set) {
 
 void ECStatsCollector::Min(SCName name, float min)
 {
-	map<SCName, ECStat>::iterator iSD = m_StatData.find(name);
+	SCMap::iterator iSD = m_StatData.find(name);
 	if (iSD == m_StatData.end())
 		return;
 
@@ -227,7 +200,7 @@ void ECStatsCollector::Min(SCName name, float min)
 
 void ECStatsCollector::Min(SCName name, LONGLONG min)
 {
-	map<SCName, ECStat>::iterator iSD = m_StatData.find(name);
+	SCMap::iterator iSD = m_StatData.find(name);
 	if (iSD == m_StatData.end())
 		return;
 
@@ -241,7 +214,7 @@ void ECStatsCollector::Min(SCName name, LONGLONG min)
 
 void ECStatsCollector::MinTime(SCName name, time_t min)
 {
-	map<SCName, ECStat>::iterator iSD = m_StatData.find(name);
+	SCMap::iterator iSD = m_StatData.find(name);
 	if (iSD == m_StatData.end())
 		return;
 
@@ -256,7 +229,7 @@ void ECStatsCollector::MinTime(SCName name, time_t min)
 
 void ECStatsCollector::Max(SCName name, float max)
 {
-	map<SCName, ECStat>::iterator iSD = m_StatData.find(name);
+	SCMap::iterator iSD = m_StatData.find(name);
 	if (iSD == m_StatData.end())
 		return;
 
@@ -270,7 +243,7 @@ void ECStatsCollector::Max(SCName name, float max)
 
 void ECStatsCollector::Max(SCName name, LONGLONG max)
 {
-	map<SCName, ECStat>::iterator iSD = m_StatData.find(name);
+	SCMap::iterator iSD = m_StatData.find(name);
 	if (iSD == m_StatData.end())
 		return;
 
@@ -284,7 +257,7 @@ void ECStatsCollector::Max(SCName name, LONGLONG max)
 
 void ECStatsCollector::MaxTime(SCName name, time_t max)
 {
-	map<SCName, ECStat>::iterator iSD = m_StatData.find(name);
+	SCMap::iterator iSD = m_StatData.find(name);
 	if (iSD == m_StatData.end())
 		return;
 
@@ -299,7 +272,7 @@ void ECStatsCollector::MaxTime(SCName name, time_t max)
 
 void ECStatsCollector::Avg(SCName name, float add)
 {
-	map<SCName, ECStat>::iterator iSD = m_StatData.find(name);
+	SCMap::iterator iSD = m_StatData.find(name);
 	if (iSD == m_StatData.end())
 		return;
 
@@ -307,7 +280,7 @@ void ECStatsCollector::Avg(SCName name, float add)
 
 	pthread_mutex_lock(&iSD->second.lock);
 	iSD->second.data.f = ((add - iSD->second.data.f) / iSD->second.avginc) + iSD->second.data.f;
-	iSD->second.avginc++;
+	++iSD->second.avginc;
 	if (iSD->second.avginc == 0)
 		iSD->second.avginc = 1;
 	pthread_mutex_unlock(&iSD->second.lock);	
@@ -315,7 +288,7 @@ void ECStatsCollector::Avg(SCName name, float add)
 
 void ECStatsCollector::Avg(SCName name, LONGLONG add)
 {
-	map<SCName, ECStat>::iterator iSD = m_StatData.find(name);
+	SCMap::iterator iSD = m_StatData.find(name);
 	if (iSD == m_StatData.end())
 		return;
 
@@ -323,7 +296,7 @@ void ECStatsCollector::Avg(SCName name, LONGLONG add)
 
 	pthread_mutex_lock(&iSD->second.lock);
 	iSD->second.data.ll = ((add - iSD->second.data.ll) / iSD->second.avginc) + iSD->second.data.ll;
-	iSD->second.avginc++;
+	++iSD->second.avginc;
 	if (iSD->second.avginc == 0)
 		iSD->second.avginc = 1;
 	pthread_mutex_unlock(&iSD->second.lock);	
@@ -331,7 +304,7 @@ void ECStatsCollector::Avg(SCName name, LONGLONG add)
 
 void ECStatsCollector::AvgTime(SCName name, time_t add)
 {
-	map<SCName, ECStat>::iterator iSD = m_StatData.find(name);
+	SCMap::iterator iSD = m_StatData.find(name);
 	if (iSD == m_StatData.end())
 		return;
 
@@ -339,7 +312,7 @@ void ECStatsCollector::AvgTime(SCName name, time_t add)
 
 	pthread_mutex_lock(&iSD->second.lock);
 	iSD->second.data.ts = ((add - iSD->second.data.ts) / iSD->second.avginc) + iSD->second.data.ts;
-	iSD->second.avginc++;
+	++iSD->second.avginc;
 	if (iSD->second.avginc == 0)
 		iSD->second.avginc = 1;
 	pthread_mutex_unlock(&iSD->second.lock);	
@@ -366,7 +339,7 @@ void ECStatsCollector::Remove(const std::string &name)
 	pthread_mutex_unlock(&m_StringsLock);
 }
 
-std::string ECStatsCollector::GetValue(SCMap::iterator iSD)
+std::string ECStatsCollector::GetValue(SCMap::const_iterator iSD)
 {
 	std::string rv;
 
@@ -392,7 +365,7 @@ std::string ECStatsCollector::GetValue(SCMap::iterator iSD)
 
 std::string ECStatsCollector::GetValue(SCName name) {
 	std::string rv;
-	SCMap::iterator iSD = m_StatData.find(name);
+	SCMap::const_iterator iSD = m_StatData.find(name);
 
 	if (iSD != m_StatData.end())
 		rv = GetValue(iSD);
@@ -404,7 +377,7 @@ void ECStatsCollector::ForEachStat(void(callback)(const std::string &, const std
 {
 	SCMap::iterator iSD;
 
-	for (iSD = m_StatData.begin(); iSD != m_StatData.end(); iSD++) {
+	for (iSD = m_StatData.begin(); iSD != m_StatData.end(); ++iSD) {
 		pthread_mutex_lock(&iSD->second.lock);
 		callback(iSD->second.name, iSD->second.description, GetValue(iSD), obj);
 		pthread_mutex_unlock(&iSD->second.lock);
@@ -413,22 +386,20 @@ void ECStatsCollector::ForEachStat(void(callback)(const std::string &, const std
 
 void ECStatsCollector::ForEachString(void(callback)(const std::string &, const std::string &, const std::string &, void*), void *obj)
 {
-	std::map<std::string, ECStrings>::iterator iSS;
+	std::map<std::string, ECStrings>::const_iterator iSS;
 
 	pthread_mutex_lock(&m_StringsLock);
-	for (iSS = m_StatStrings.begin(); iSS != m_StatStrings.end(); iSS++) {
+	for (iSS = m_StatStrings.begin(); iSS != m_StatStrings.end(); ++iSS)
 		callback(iSS->first, iSS->second.description, iSS->second.value, obj);
-	}
 	pthread_mutex_unlock(&m_StringsLock);
 }
 
 void ECStatsCollector::Reset() {
 	SCMap::iterator iSD;
 
-	for (iSD = m_StatData.begin(); iSD != m_StatData.end(); iSD++) {
+	for (iSD = m_StatData.begin(); iSD != m_StatData.end(); ++iSD)
 		// reset largest var in union
 		iSD->second.data.ll = 0;
-	}
 }
 
 void ECStatsCollector::Reset(SCName name) {

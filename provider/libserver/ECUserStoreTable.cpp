@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ECDatabase.h"
 
 #include <mapidefs.h>
@@ -52,7 +26,7 @@
 #include "ECUserStoreTable.h"
 #include "ECGenProps.h"
 #include "ECSession.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -86,7 +60,7 @@ ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 	ECRESULT er = erSuccess;
 	ECUserStoreTable *pThis = dynamic_cast<ECUserStoreTable*>(lpThis);
 	struct rowSet *lpsRowSet = NULL;
-	ECObjectTableList::iterator iterRowList;
+	ECObjectTableList::const_iterator iterRowList;
 	int i, k;
 	GUID sZeroGuid = {0};
 
@@ -110,15 +84,15 @@ ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 	memset(lpsRowSet->__ptr, 0, sizeof(propValArray) * lpsRowSet->__size);
 
 	// Allocate memory for all rows
-	for (i = 0; i < lpsRowSet->__size; i++) {
+	for (i = 0; i < lpsRowSet->__size; ++i) {
 		lpsRowSet->__ptr[i].__size = lpsPropTagArray->__size;
 		lpsRowSet->__ptr[i].__ptr = s_alloc<propVal>(soap, lpsPropTagArray->__size);
 		memset(lpsRowSet->__ptr[i].__ptr, 0, sizeof(propVal) * lpsPropTagArray->__size);
 	}
 
-	for (i = 0, iterRowList = lpRowList->begin(); iterRowList != lpRowList->end(); iterRowList++, i++) {
-		for (k = 0; k < lpsPropTagArray->__size; k++) {
-
+	for (i = 0, iterRowList = lpRowList->begin();
+	     iterRowList != lpRowList->end(); ++iterRowList, ++i) {
+		for (k = 0; k < lpsPropTagArray->__size; ++k) {
 			lpsRowSet->__ptr[i].__ptr[k].ulPropTag = PROP_TAG(PT_ERROR, lpsPropTagArray->__ptr[k]);
 			lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_ul;
 			lpsRowSet->__ptr[i].__ptr[k].Value.ul = ZARAFA_E_NOT_FOUND;
@@ -131,7 +105,7 @@ ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 				lpsRowSet->__ptr[i].__ptr[k].Value.bin = s_alloc<xsd__base64Binary>(soap);
 				lpsRowSet->__ptr[i].__ptr[k].Value.bin->__size = sizeof(sObjectTableKey);
 				lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr = s_alloc<unsigned char>(soap, sizeof(sObjectTableKey));
-				memcpy(lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr, (void*)&(*iterRowList), sizeof(sObjectTableKey));
+				memcpy(lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr, &(*iterRowList), sizeof(sObjectTableKey));
 				break;
 
 			case PROP_ID(PR_EC_USERNAME):
@@ -158,7 +132,7 @@ ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 					lpsRowSet->__ptr[i].__ptr[k].Value.bin = s_alloc<xsd__base64Binary>(soap);
 					lpsRowSet->__ptr[i].__ptr[k].Value.bin->__size = sizeof(GUID);
 					lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr = s_alloc<unsigned char>(soap, sizeof(GUID));
-					memcpy(lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr, (unsigned char*)&pThis->m_mapUserStoreData[iterRowList->ulObjId].sGuid, sizeof(GUID));
+					memcpy(lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr, &pThis->m_mapUserStoreData[iterRowList->ulObjId].sGuid, sizeof(GUID));
 				}
 				break;
 			case PROP_ID(PR_EC_STORETYPE):
@@ -236,7 +210,7 @@ ECRESULT ECUserStoreTable::Load() {
 	ECSecurity *lpSecurity = lpSession->GetSecurity();
 	objectdetails_t sUserDetails;
 	GUID sZeroGuid = {0};
-	objectclass_t objclass;
+	objectclass_t objclass = OBJECTCLASS_UNKNOWN;
 	objectdetails_t sDetails;
 
 	enum cols { USERID = 0, EXTERNID, OBJCLASS, UCOMPANY, STOREGUID, STORETYPE, USERNAME, SCOMPANY, HIERARCHYID, STORESIZE, MODTIME_HI, MODTIME_LO };
@@ -279,12 +253,8 @@ ECRESULT ECUserStoreTable::Load() {
 
 		lpDBLength = lpDatabase->FetchRowLengths(lpDBResult);
 
-		if (lpDBRow[OBJCLASS]) {
+		if (lpDBRow[OBJCLASS])
 			objclass = (objectclass_t)atoi(lpDBRow[OBJCLASS]);
-			if (objclass != ACTIVE_USER && objclass != NONACTIVE_USER &&
-				objclass != NONACTIVE_ROOM && objclass != NONACTIVE_EQUIPMENT)
-				continue;
-		}
 
 		if (lpDBRow[USERID]) {
 			sUserStore.ulUserId = atoi(lpDBRow[USERID]);

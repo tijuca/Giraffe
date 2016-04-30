@@ -1,57 +1,33 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
-#include "ECLogger.h"
+#include <zarafa/platform.h>
+#include <zarafa/ECLogger.h>
 #include <cassert>
+#include <climits>
 #include <clocale>
 #include <pthread.h>
 #include <cstdarg>
 #include <csignal>
 #include <zlib.h>
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 #include "charset/localeutil.h"
 
+#ifdef LINUX
 #include "config.h"
 #include <poll.h>
 #if HAVE_SYSLOG_H
@@ -65,7 +41,12 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
+#endif
 
+#include <zarafa/ECConfig.h>
+#if defined(_WIN32) && !defined(WINCE)
+#include "NTService.h"
+#endif
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -77,7 +58,7 @@ using namespace std;
 
 static const char *const ll_names[] = {
 	" notice",
-	"fatal  ",
+	"crit   ",
 	"error  ",
 	"warning",
 	"notice ",
@@ -85,8 +66,12 @@ static const char *const ll_names[] = {
 	"debug  "
 };
 
+static ECLogger_File ec_log_fallback_target(EC_LOGLEVEL_WARNING, false, "-", false);
+static ECLogger *ec_log_target = &ec_log_fallback_target;
+
 ECLogger::ECLogger(int max_ll) {
 	max_loglevel = max_ll;
+	pthread_mutex_init(&m_mutex, NULL);
 	// get system locale for time, NULL is returned if locale was not found.
 	timelocale = createlocale(LC_TIME, "C");
 	datalocale = createUTF8Locale();
@@ -95,11 +80,15 @@ ECLogger::ECLogger(int max_ll) {
 }
 
 ECLogger::~ECLogger() {
+	if (ec_log_target == this)
+		ec_log_set(NULL);
+
 	if (timelocale)
 		freelocale(timelocale);
 
 	if (datalocale)
 		freelocale(datalocale);
+	pthread_mutex_destroy(&m_mutex);
 }
 
 void ECLogger::SetLoglevel(unsigned int max_ll) {
@@ -110,7 +99,11 @@ std::string ECLogger::MakeTimestamp() {
 	time_t now = time(NULL);
 	tm local;
 
+#ifdef WIN32
+	local = *localtime(&now);
+#else
 	localtime_r(&now, &local);
+#endif
 
 	char buffer[_LOG_TSSIZE];
 
@@ -160,11 +153,19 @@ int ECLogger::GetFileDescriptor() {
 	return -1;
 }
 
-unsigned ECLogger::AddRef() { return ++m_ulRef;
+unsigned int ECLogger::AddRef(void)
+{
+	pthread_mutex_lock(&m_mutex);
+	assert(m_ulRef < UINT_MAX);
+	unsigned int ret = ++m_ulRef;
+	pthread_mutex_unlock(&m_mutex);
+	return ret;
 }
 
 unsigned ECLogger::Release() {
-	unsigned ulRef = --m_ulRef;
+	pthread_mutex_lock(&m_mutex);
+	unsigned int ulRef = --m_ulRef;
+	pthread_mutex_unlock(&m_mutex);
 	if (ulRef == 0)
 		delete this;
 	return ulRef;
@@ -195,12 +196,9 @@ void ECLogger_Null::LogVA(unsigned int loglevel, const char *format, va_list& va
  * @param[in]	add_timestamp	true if a timestamp before the logmessage is wanted
  * @param[in]	filename		filename of log in current locale
  */
-ECLogger_File::ECLogger_File(const unsigned int max_ll, const bool add_timestamp, const char *const filename, const bool compress, const size_t bs) : ECLogger(max_ll) {
+ECLogger_File::ECLogger_File(const unsigned int max_ll, const bool add_timestamp, const char *const filename, const bool compress) : ECLogger(max_ll) {
 	logname = strdup(filename);
 	timestamp = add_timestamp;
-
-	buffer = new char[bs];
-	buffer_size = bs;
 
 	if (strcmp(logname, "-") == 0) {
 		log = stderr;
@@ -227,8 +225,8 @@ ECLogger_File::ECLogger_File(const unsigned int max_ll, const bool add_timestamp
 		}
 
 		log = fnOpen(logname, szMode);
-		setbuffer((FILE *)log, buffer, buffer_size);
 	}
+	reinit_buffer(0);
 
 	// read/write is for the handle, not the f*-calls
 	// so read is because we're only reading the handle ('log')
@@ -259,8 +257,16 @@ ECLogger_File::~ECLogger_File() {
 	free(logname);
 
 	pthread_rwlock_destroy(&dupfilter_lock);
+}
 
-	delete [] buffer;
+void ECLogger_File::reinit_buffer(size_t size)
+{
+	if (size == 0)
+		setvbuf(static_cast<FILE *>(log), NULL, _IOLBF, size);
+	else
+		setvbuf(static_cast<FILE *>(log), NULL, _IOFBF, size);
+	/* Store value for Reset() to re-invoke this function after reload */
+	buffer_size = size;
 }
 
 void ECLogger_File::Reset() {
@@ -271,7 +277,7 @@ void ECLogger_File::Reset() {
 			fnClose(log);
 
 		log = fnOpen(logname, szMode);
-		setbuffer((FILE *)log, buffer, buffer_size);
+		reinit_buffer(buffer_size);
 	}
 
 	pthread_rwlock_unlock(&handle_lock);
@@ -342,7 +348,7 @@ bool ECLogger_File::DupFilter(const unsigned int loglevel, const std::string &me
 
 	pthread_rwlock_rdlock(&dupfilter_lock);
 	if (prevmsg == message) {
-		prevcount++;
+		++prevcount;
 
 		if (prevcount < 100)
 			exit_with_true = true;
@@ -376,8 +382,12 @@ void ECLogger_File::Log(unsigned int loglevel, const string &message) {
 
 		if (log) {
 			fnPrintf(log, "%s%s%s\n", DoPrefix().c_str(), EmitLevel(loglevel).c_str(), message.c_str());
-
-			if (loglevel <= EC_LOGLEVEL_WARNING || loglevel == EC_LOGLEVEL_ALWAYS)
+			/*
+			 * If IOLBF was set (buffer_size==0), the previous
+			 * print call already flushed it. Do not flush again
+			 * in that case.
+			 */
+			if (buffer_size > 0 && (loglevel <= EC_LOGLEVEL_WARNING || loglevel == EC_LOGLEVEL_ALWAYS))
 				fflush((FILE *)log);
 		}
 
@@ -402,6 +412,7 @@ void ECLogger_File::LogVA(unsigned int loglevel, const char *format, va_list& va
 	Log(loglevel, std::string(msgbuffer));
 }
 
+#ifdef LINUX
 ECLogger_Syslog::ECLogger_Syslog(unsigned int max_ll, const char *ident, int facility) : ECLogger(max_ll) {
 	/*
 	 * Because @ident can go away, and openlog(3) does not make a copy for
@@ -415,7 +426,7 @@ ECLogger_Syslog::ECLogger_Syslog(unsigned int max_ll, const char *ident, int fac
 		openlog(m_ident, LOG_PID, facility);
 	}
 	levelmap[EC_LOGLEVEL_NONE] = LOG_DEBUG;
-	levelmap[EC_LOGLEVEL_FATAL] = LOG_CRIT;
+	levelmap[EC_LOGLEVEL_CRIT] = LOG_CRIT;
 	levelmap[EC_LOGLEVEL_ERROR] = LOG_ERR;
 	levelmap[EC_LOGLEVEL_WARNING] = LOG_WARNING;
 	levelmap[EC_LOGLEVEL_NOTICE] = LOG_NOTICE;
@@ -460,7 +471,86 @@ void ECLogger_Syslog::LogVA(unsigned int loglevel, const char *format, va_list& 
 	syslog(levelmap[loglevel & EC_LOGLEVEL_MASK], "%s", msgbuffer);
 #endif
 }
+#endif
 
+#if defined(_WIN32) && !defined(WINCE)
+ECLogger_Eventlog::ECLogger_Eventlog(unsigned int max_ll, const char *lpszServiceName) : ECLogger(max_ll) {
+	m_hEventSource = NULL;
+
+	if(lpszServiceName)
+		strcpy(m_szServiceName, lpszServiceName);
+	else
+		m_szServiceName[0] = 0;
+
+	levelmap[EC_LOGLEVEL_NONE] = EVENTLOG_ERROR_TYPE;
+	levelmap[EC_LOGLEVEL_CRIT] = EVENTLOG_ERROR_TYPE;
+	levelmap[EC_LOGLEVEL_ERROR] = EVENTLOG_ERROR_TYPE;
+	levelmap[EC_LOGLEVEL_WARNING] = EVENTLOG_WARNING_TYPE;
+	levelmap[EC_LOGLEVEL_NOTICE] = EVENTLOG_INFORMATION_TYPE;
+	levelmap[EC_LOGLEVEL_INFO] = EVENTLOG_INFORMATION_TYPE;
+	levelmap[EC_LOGLEVEL_DEBUG] = EVENTLOG_INFORMATION_TYPE;
+	levelmap[EC_LOGLEVEL_ALWAYS] = EVENTLOG_INFORMATION_TYPE;
+	// EVENTLOG_SUCCESS
+	// EVENTLOG_AUDIT_SUCCESS
+	// EVENTLOG_AUDIT_FAILURE
+}
+
+ECLogger_Eventlog::~ECLogger_Eventlog() {
+	if (m_hEventSource)
+		::DeregisterEventSource(m_hEventSource);
+}
+
+void ECLogger_Eventlog::Reset() {
+}
+
+void ECLogger_Eventlog::Log(unsigned int loglevel, const char *format, ...) {
+	if (!ECLogger::Log(loglevel))
+		return;
+
+	va_list va;
+	va_start(va, format);
+	LogVA(loglevel, format, va);
+	va_end(va);
+}
+
+void ECLogger_Eventlog::LogVA(unsigned int loglevel, const char *format, va_list& va) {
+	char msgbuffer[_LOG_BUFSIZE];
+	_vsnprintf(msgbuffer, sizeof msgbuffer, format, va);
+	ReportEventLog(levelmap[loglevel & EC_LOGLEVEL_MASK], msgbuffer);
+}
+
+void ECLogger_Eventlog::Log(unsigned int loglevel, const string &message) {
+	if (!ECLogger::Log(loglevel))
+		return;
+
+	ReportEventLog(levelmap[loglevel & EC_LOGLEVEL_MASK], message.c_str());
+}
+
+void ECLogger_Eventlog::ReportEventLog(WORD wType, const char *szMsg) {
+	DWORD dwID = EVMSG_DEFAULT;
+	const char *ps[1];
+	ps[0] = szMsg;
+
+	// Check the event source has been registered and if
+	// not then register it now
+	if (!m_hEventSource) {
+		m_hEventSource = ::RegisterEventSourceA(NULL,  // local machine
+				m_szServiceName); // source name
+	}
+
+	if (m_hEventSource) {
+		::ReportEventA(m_hEventSource,
+				wType,
+				0,
+				dwID,
+				NULL, // sid
+				1, // size of array ps
+				0,
+				ps,
+				NULL);
+	}
+}
+#endif
 
 /**
  * Consructor
@@ -562,6 +652,7 @@ void ECLogger_Tee::AddLogger(ECLogger *lpLogger) {
 	}
 }
 
+#ifdef LINUX
 ECLogger_Pipe::ECLogger_Pipe(int fd, pid_t childpid, int loglevel) : ECLogger(loglevel) {
 	m_fd = fd;
 	m_childpid = childpid;
@@ -588,7 +679,11 @@ void ECLogger_Pipe::Log(unsigned int loglevel, const std::string &message) {
 	off += 1;
 
 	if (prefix == LP_TID)
+#ifdef WIN32
+		len = snprintf(msgbuffer + off, sizeof msgbuffer - off, "[%p] ", pthread_self());
+#else
 	len = snprintf(msgbuffer + off, sizeof msgbuffer - off, "[0x%08x] ", (unsigned int)pthread_self());
+#endif
 	else if (prefix == LP_PID)
 		len = snprintf(msgbuffer + off, sizeof msgbuffer - off, "[%5d] ", getpid());
 
@@ -606,7 +701,7 @@ void ECLogger_Pipe::Log(unsigned int loglevel, const std::string &message) {
 	}
 
 	msgbuffer[off] = '\0';
-	off++;
+	++off;
 
 	/*
 	 * Write as one block to get it to the real logger.
@@ -632,7 +727,11 @@ void ECLogger_Pipe::LogVA(unsigned int loglevel, const char *format, va_list& va
 	off += 1;
 
 	if (prefix == LP_TID)
+#ifdef WIN32
+		len = snprintf(msgbuffer + off, sizeof msgbuffer - off, "[%p] ", pthread_self());
+#else
 	len = snprintf(msgbuffer + off, sizeof msgbuffer - off, "[0x%08x] ", (unsigned int)pthread_self());
+#endif
 	else if (prefix == LP_PID)
 		len = snprintf(msgbuffer + off, sizeof msgbuffer - off, "[%5d] ", getpid());
 
@@ -651,7 +750,7 @@ void ECLogger_Pipe::LogVA(unsigned int loglevel, const char *format, va_list& va
 	off += len;
 
 	msgbuffer[off] = '\0';
-	off++;
+	++off;
 
 	/*
 	 * Write as one block to get it to the real logger.
@@ -721,6 +820,9 @@ namespace PrivatePipe {
 		int s;
 		int l;
 		bool bNPTL = true;
+#ifdef WIN32
+		fd_set readfds;
+#endif
 
 		confstr(_CS_GNU_LIBPTHREAD_VERSION, buffer, sizeof(buffer));
 		if (strncmp(buffer, "linuxthreads", strlen("linuxthreads")) == 0)
@@ -728,6 +830,7 @@ namespace PrivatePipe {
 
 		m_lpConfig = lpConfig;
 		m_lpFileLogger = lpFileLogger;
+		m_lpFileLogger->AddRef();
 
 		if (bNPTL) {
 			sigemptyset(&signal_mask);
@@ -751,6 +854,19 @@ namespace PrivatePipe {
 		// We want the prefix of each individual thread/fork, so don't add that of the Pipe version.
 		m_lpFileLogger->SetLogprefix(LP_NONE);
 
+#ifdef WIN32
+		while (true) {
+			FD_ZERO(&readfds);
+			FD_SET(readfd, &readfds);
+
+			// blocking wait, returns on error or data waiting to log
+			ret = select(readfd + 1, &readfds, NULL, NULL, NULL);
+			if (ret <= 0) {
+				if (errno == EINTR)
+					continue;	// logger received SIGHUP, which wakes the select
+				break;
+			}
+#else
 		struct pollfd fds[1] = { { readfd, POLLIN, 0 } };
 
 		while(true) {
@@ -765,6 +881,7 @@ namespace PrivatePipe {
 			}
 			if (ret == 0)
 				continue;
+#endif
 
 			complete.clear();
 
@@ -783,11 +900,11 @@ namespace PrivatePipe {
 			while (ret && p) {
 				// first char in buffer is loglevel
 				l = *p++;
-				ret--;
+				--ret;
 				s = strlen(p);	// find string in read buffer
 				if (s) {
 					lpFileLogger->Log(l, string(p, s));
-					s++;		// add \0
+					++s;		// add \0
 					p += s;		// skip string
 					ret -= s;
 				} else {
@@ -798,9 +915,14 @@ namespace PrivatePipe {
 		// we need to stop fetching signals
 		kill(getpid(), SIGPIPE);
 
-		if (bNPTL)
+		if (bNPTL) {
 			pthread_join(signal_thread, NULL);
+		} else {
+			signal(SIGHUP, SIG_DFL);
+			signal(SIGPIPE, SIG_DFL);
+		}
 		m_lpFileLogger->Log(EC_LOGLEVEL_INFO, "[%5d] Log process is done", getpid());
+		m_lpFileLogger->Release();
 		return ret;
 	}
 }
@@ -837,7 +959,7 @@ ECLogger* StartLoggerProcess(ECConfig* lpConfig, ECLogger* lpLogger) {
 	if (child == 0) {
 		// close all files except the read pipe and the logfile
 		t = getdtablesize();
-		for (i = 3; i<t; i++) {
+		for (i = 3; i < t; ++i) {
 			if (i == pipefds[0] || i == filefd) continue;
 			close(i);
 		}
@@ -850,7 +972,14 @@ ECLogger* StartLoggerProcess(ECConfig* lpConfig, ECLogger* lpLogger) {
 
 	// this is the main fork, which doesn't log anything anymore, except through the pipe version.
 	// we should release the lpFileLogger
-	delete lpFileLogger;
+	unsigned int refs = lpLogger->Release();
+	if (refs > 0)
+		/*
+		 * The object must have had a refcount of 1 (the caller);
+		 * if not, this means that some other class is carrying a
+		 * pointer. This is not critical but is ill-favored.
+		 */
+		lpLogger->Log(EC_LOGLEVEL_WARNING, "StartLoggerProcess called with large refcount %u", refs + 1);
 
 	close(pipefds[0]);
 	lpPipeLogger = new ECLogger_Pipe(pipefds[1], child, atoi(lpConfig->GetSetting("log_level"))); // let destructor wait on child
@@ -859,6 +988,7 @@ ECLogger* StartLoggerProcess(ECConfig* lpConfig, ECLogger* lpLogger) {
 
 	return lpPipeLogger;
 }
+#endif
 
 /**
  * Create ECLogger object from configuration.
@@ -877,25 +1007,40 @@ ECLogger* CreateLogger(ECConfig *lpConfig, const char *argv0,
 	string prepend;
 	int loglevel = 0;
 
+#ifdef LINUX
 	int syslog_facility = LOG_MAIL;
+#endif
 
 	if (bAudit) {
+#ifdef LINUX
 		if (!parseBool(lpConfig->GetSetting("audit_log_enabled")))
 			return NULL;
 		prepend = "audit_";
 		syslog_facility = LOG_AUTHPRIV;
+#else
+		return NULL;    // No auditing in Windows, apparently.
+#endif
 	}
 
 	loglevel = strtol(lpConfig->GetSetting((prepend+"log_level").c_str()), NULL, 0);
 
 	if (stricmp(lpConfig->GetSetting((prepend+"log_method").c_str()), "syslog") == 0) {
+#ifdef LINUX
 		char *argzero = strdup(argv0);
 		lpLogger = new ECLogger_Syslog(loglevel, basename(argzero), syslog_facility);
 		free(argzero);
+#else
+		fprintf(stderr, "syslog logging is only available on linux.\n");
+#endif
 	} else if (stricmp(lpConfig->GetSetting((prepend+"log_method").c_str()), "eventlog") == 0) {
+#if defined(_WIN32) && !defined(WINCE)
+		lpLogger = new ECLogger_Eventlog(loglevel, lpszServiceName);
+#else
 		fprintf(stderr, "eventlog logging is only available on windows.\n");
+#endif
 	} else if (stricmp(lpConfig->GetSetting((prepend+"log_method").c_str()), "file") == 0) {
 		int ret = 0;
+#ifdef LINUX
 		const struct passwd *pw = NULL;
 		const struct group *gr = NULL;
 		if (strcmp(lpConfig->GetSetting((prepend+"log_file").c_str()), "-")) {
@@ -936,18 +1081,18 @@ ECLogger* CreateLogger(ECConfig *lpConfig, const char *argv0,
 				}
 			}
 		}
+#endif
 		if (ret == 0) {
 			bool logtimestamp = parseBool(lpConfig->GetSetting((prepend + "log_timestamp").c_str()));
 
-			int log_buffer_size = 4096;
+			size_t log_buffer_size = 0;
 			const char *log_buffer_size_str = lpConfig->GetSetting("log_buffer_size");
 			if (log_buffer_size_str)
-				log_buffer_size = atoi(log_buffer_size_str);
-
-			if (log_buffer_size < 1)
-				log_buffer_size = 1;
-
-			lpLogger = new ECLogger_File(loglevel, logtimestamp, lpConfig->GetSetting((prepend+"log_file").c_str()), false, log_buffer_size);
+				log_buffer_size = strtoul(log_buffer_size_str, NULL, 0);
+			ECLogger_File *log = new ECLogger_File(loglevel, logtimestamp, lpConfig->GetSetting((prepend + "log_file").c_str()), false);
+			log->reinit_buffer(log_buffer_size);
+			lpLogger = log;
+#ifdef LINUX
 			// chown file
 			if (pw || gr) {
 				uid_t uid = -1;
@@ -958,17 +1103,18 @@ ECLogger* CreateLogger(ECConfig *lpConfig, const char *argv0,
 					gid = gr->gr_gid;
 				chown(lpConfig->GetSetting((prepend+"log_file").c_str()), uid, gid);
 			}
+#endif
 		} else {
 			fprintf(stderr, "Not enough permissions to append logfile '%s'. Reverting to stderr.\n", lpConfig->GetSetting((prepend+"log_file").c_str()));
 			bool logtimestamp = parseBool(lpConfig->GetSetting((prepend + "log_timestamp").c_str()));
-			lpLogger = new ECLogger_File(loglevel, logtimestamp, "-", false, 0);
+			lpLogger = new ECLogger_File(loglevel, logtimestamp, "-", false);
 		}
 	}
 
 	if (!lpLogger) {
 		fprintf(stderr, "Incorrect logging method selected. Reverting to stderr.\n");
 		bool logtimestamp = parseBool(lpConfig->GetSetting((prepend + "log_timestamp").c_str()));
-		lpLogger = new ECLogger_File(loglevel, logtimestamp, "-", false, 0);
+		lpLogger = new ECLogger_File(loglevel, logtimestamp, "-", false);
 	}
 
 	return lpLogger;
@@ -980,29 +1126,30 @@ int DeleteLogger(ECLogger *lpLogger) {
 	return 0;
 }
 
-void LogConfigErrors(ECConfig *lpConfig, ECLogger *lpLogger) {
+void LogConfigErrors(ECConfig *lpConfig) {
 	const list<string> *strings;
 	list<string>::const_iterator i;
 
-	if (!lpConfig || !lpLogger)
+	if (lpConfig == NULL)
 		return;
 
 	strings = lpConfig->GetWarnings();
-	for (i = strings->begin() ; i != strings->end(); i++)
-		lpLogger->Log(EC_LOGLEVEL_WARNING, "Config warning: " + *i);
+	for (i = strings->begin(); i != strings->end(); ++i)
+		ec_log_warn("Config warning: " + *i);
 
 	strings = lpConfig->GetErrors();
-	for (i = strings->begin() ; i != strings->end(); i++)
-		lpLogger->Log(EC_LOGLEVEL_FATAL, "Config error: " + *i);
+	for (i = strings->begin(); i != strings->end(); ++i)
+		ec_log_crit("Config error: " + *i);
 }
 
-void generic_sigsegv_handler(ECLogger *lpLogger, const char *const app_name, const char *const version_string, const int signr)
+void generic_sigsegv_handler(ECLogger *lpLogger, const char *app_name,
+    const char *version_string, int signr, const siginfo_t *si, const void *uc)
 {
-#define N_TRACEBACK 64
-	void *bt[N_TRACEBACK];
-	char **btsymbols = NULL;
-
+#ifdef _WIN32
+	ECLogger_Eventlog localLogger(EC_LOGLEVEL_DEBUG, app_name);
+#else
 	ECLogger_Syslog localLogger(EC_LOGLEVEL_DEBUG, app_name, LOG_MAIL);
+#endif
 
 	if (lpLogger == NULL)
 		lpLogger = &localLogger;
@@ -1011,11 +1158,13 @@ void generic_sigsegv_handler(ECLogger *lpLogger, const char *const app_name, con
 	lpLogger->Log(EC_LOGLEVEL_FATAL, "Fatal error detected. Please report all following information.");
 	lpLogger->Log(EC_LOGLEVEL_FATAL, "Application %s version: %s", app_name, version_string);
 
+#ifndef _WIN32
 	struct utsname buf;
 	if (uname(&buf) == -1)
 		lpLogger->Log(EC_LOGLEVEL_FATAL, "uname() failed: %s", strerror(errno));
 	else
 		lpLogger->Log(EC_LOGLEVEL_FATAL, "OS: %s, release: %s, version: %s, hardware: %s", buf.sysname, buf.release, buf.version, buf.machine);
+#endif
 
 #ifdef HAVE_PTHREAD_GETNAME_NP
         char name[32] = { 0 };
@@ -1026,39 +1175,99 @@ void generic_sigsegv_handler(ECLogger *lpLogger, const char *const app_name, con
 		lpLogger->Log(EC_LOGLEVEL_FATAL, "Thread name: %s", name);
 #endif
 
+#ifndef _WIN32
 	struct rusage rusage;
 	if (getrusage(RUSAGE_SELF, &rusage) == -1)
 		lpLogger->Log(EC_LOGLEVEL_FATAL, "getrusage() failed: %s", strerror(errno));
 	else
 		lpLogger->Log(EC_LOGLEVEL_FATAL, "Peak RSS: %ld", rusage.ru_maxrss);
+#endif
         
 	switch (signr) {
 		case SIGSEGV:
 			lpLogger->Log(EC_LOGLEVEL_FATAL, "Pid %d caught SIGSEGV (%d), traceback:", getpid(), signr);
 			break;
+#ifndef _WIN32
 		case SIGBUS:
 			lpLogger->Log(EC_LOGLEVEL_FATAL, "Pid %d caught SIGBUS (%d), possible invalid mapped memory access, traceback:", getpid(), signr);
 			break;
+#endif
 		case SIGABRT:
 			lpLogger->Log(EC_LOGLEVEL_FATAL, "Pid %d caught SIGABRT (%d), out of memory or unhandled exception, traceback:", getpid(), signr);
 			break;
 	}
 
-	int n = backtrace(bt, N_TRACEBACK);
-	lpLogger->Log(EC_LOGLEVEL_FATAL, "backtrace length: %d", n);
-
-	btsymbols = backtrace_symbols(bt, n);
-
-	for(int i = 0; i < n; i++) {
-		if (btsymbols)
-			lpLogger->Log(EC_LOGLEVEL_FATAL, "%i %p %s", i, bt[i], btsymbols[i]);
-		else
-			lpLogger->Log(EC_LOGLEVEL_FATAL, "%i %16p", i, bt[i]);
-	}
-
+#ifndef _WIN32
+	ec_log_bt(EC_LOGLEVEL_CRIT, "Backtrace:");
+#endif
+	ec_log_crit("Signal errno: %s, signal code: %d", strerror(si->si_errno), si->si_code);
+	ec_log_crit("Sender pid: %d, sender uid: %d, si_satus: %d", si->si_pid, si->si_uid, si->si_status);
+	ec_log_crit("User time: %ld, system time: %ld, signal value: %d", si->si_utime, si->si_stime, si->si_value.sival_int);
+	ec_log_crit("Faulting address: %p, affected fd: %d", si->si_addr, si->si_fd);
 	lpLogger->Log(EC_LOGLEVEL_FATAL, "When reporting this traceback, please include Linux distribution name (and version), system architecture and Zarafa version.");
-
+#ifndef _WIN32
 	kill(getpid(), signr);
+#endif
 
 	exit(1);
+}
+
+/**
+ * The expectation here is that ec_log_set is only called when the program is
+ * single-threaded, i.e. during startup or at shutdown. As a consequence, all
+ * of this is written without locks and without shared_ptr.
+ *
+ * This function gets called from destructors, so you must not invoke
+ * ec_log_target->anyfunction at this point any more.
+ */
+void ec_log_set(ECLogger *logger)
+{
+	if (logger == NULL)
+		logger = &ec_log_fallback_target;
+	ec_log_target = logger;
+}
+
+ECLogger *ec_log_get(void)
+{
+	return ec_log_target;
+}
+
+bool ec_log_has_target(void)
+{
+	return ec_log_target != &ec_log_fallback_target;
+}
+
+void ec_log(unsigned int level, const char *fmt, ...)
+{
+	if (!ec_log_target->Log(level))
+		return;
+	va_list argp;
+	va_start(argp, fmt);
+	ec_log_target->LogVA(level, fmt, argp);
+	va_end(argp);
+}
+
+void ec_log(unsigned int level, const std::string &msg)
+{
+	ec_log_target->Log(level, msg);
+}
+
+void ec_log_bt(unsigned int level, const char *fmt, ...)
+{
+	if (!ec_log_target->Log(level))
+		return;
+	va_list argp;
+	va_start(argp, fmt);
+	ec_log_target->LogVA(level, fmt, argp);
+	va_end(argp);
+
+	static bool notified = false;
+	std::vector<std::string> bt = get_backtrace();
+	if (!bt.empty()) {
+		for (size_t i = 0; i < bt.size(); ++i)
+			ec_log(level, "#%zu. %s", i, bt[i].c_str());
+	} else if (!notified) {
+		ec_log_info("Backtrace not available");
+		notified = true;
+	}
 }

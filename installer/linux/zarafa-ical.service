@@ -1,0 +1,11 @@
+[Unit]
+Description=Zarafa Collaboration Platoform iCal/CalDAV Gateway
+Documentation=man:zarafa-ical(8) man:zarafa-ical.cfg(5)
+
+[Service]
+Type=simple
+Environment=LC_ALL=C LANG=C
+ExecStart=/usr/sbin/zarafa-ical -F -c /etc/zarafa/ical.cfg
+
+[Install]
+WantedBy=multi-user.target

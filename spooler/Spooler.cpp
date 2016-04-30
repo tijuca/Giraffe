@@ -1,44 +1,18 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 /*
@@ -54,14 +28,18 @@
  * This advise sink unblocks the main (waiting) thread.
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
+#ifdef _WIN32
+	#include "ECNTService.h"
+#endif
 
 #include "mailer.h"
-
+#include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <csignal>
+#include <sys/time.h> /* gettimeofday */
 
 #define USES_IID_IMAPIFolder
 #define USES_IID_IMessage
@@ -74,33 +52,37 @@
 #include <mapiguid.h>
 #include <cctype>
 
-#include "IECUnknown.h"
+#include <zarafa/IECUnknown.h>
 #include "IECSpooler.h"
-#include "IECServiceAdmin.h"
-#include "IECSecurity.h"
-#include "ECGuid.h"
-#include "EMSAbTag.h"
-#include "ECTags.h"
-#include "ECABEntryID.h"
-#include "CommonUtil.h"
-#include "ECLogger.h"
-#include "ECConfig.h"
-#include "UnixUtil.h"
-#include "my_getopt.h"
-#include "ecversion.h"
-#include "Util.h"
-#include "stringutil.h"
+#include <zarafa/IECServiceAdmin.h>
+#include <zarafa/IECSecurity.h>
+#include <zarafa/MAPIErrors.h>
+#include <zarafa/ECGuid.h>
+#include <zarafa/EMSAbTag.h>
+#include <zarafa/ECTags.h>
+#include <zarafa/ECABEntryID.h>
+#include <zarafa/CommonUtil.h>
+#include <zarafa/ECLogger.h>
+#include <zarafa/ECConfig.h>
+#ifdef LINUX
+#include <zarafa/UnixUtil.h>
+#endif
+#include <zarafa/MAPIErrors.h>
+#include <zarafa/my_getopt.h>
+#include <zarafa/ecversion.h>
+#include <zarafa/Util.h>
+#include <zarafa/stringutil.h>
 
-#include "mapiext.h"
+#include <zarafa/mapiext.h>
 #include <edkmdb.h>
-#include "edkguid.h"
-#include "mapiguidext.h"
+#include <edkguid.h>
+#include <zarafa/mapiguidext.h>
 #include "mapicontact.h"
-#include "restrictionutil.h"
-#include "charset/convert.h"
-#include "charset/convstring.h"
-#include "charset/utf8string.h"
-#include "ECGetText.h"
+#include <zarafa/restrictionutil.h>
+#include <zarafa/charset/convert.h>
+#include <zarafa/charset/convstring.h>
+#include <zarafa/charset/utf8string.h>
+#include <zarafa/ECGetText.h>
 #include "StatsClient.h"
 #include "TmpPath.h"
 
@@ -124,13 +106,19 @@ static bool bQuit = false;
 static int nReload = 0;
 static int disconnects = 0;
 static const char *szCommand = NULL;
+#ifdef LINUX
 static const char *szConfig = ECConfig::GetDefaultPath("spooler.cfg");
+#else
+static const char *szConfig = "spooler.cfg";
+#endif
 ECConfig *g_lpConfig = NULL;
 ECLogger *g_lpLogger = NULL;
 
+#ifdef LINUX
 static pthread_t signal_thread;
 static sigset_t signal_mask;
 static bool bNPTL = true;
+#endif
 
 // notification
 static bool bMessagesWaiting = false;
@@ -152,6 +140,29 @@ static pthread_mutex_t hMutexFinished;	// mutex for mapFinished
 
 static HRESULT running_server(const char *szSMTP, int port, const char *szPath);
 
+#ifdef WIN32
+/**
+ * signal handler for termination requests
+ *
+ * @param[in]	sig	signal number triggered
+ */
+static void sighandle(int sig)
+{
+	// Win32 has unix semantics and therefore requires us to reset the signal handler.
+	signal(SIGTERM , sighandle);
+	signal(SIGINT  , sighandle);	// CTRL+C
+
+	if (!bQuit)						// do not log multimple shutdown messages
+		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Termination requested, shutting down.");
+
+	bQuit = true;
+
+	// Trigger condition as it may be waiting for messages
+	pthread_mutex_lock(&hMutexMessagesWaiting);
+	pthread_cond_signal(&hCondMessagesWaiting);
+	pthread_mutex_unlock(&hMutexMessagesWaiting);
+}
+#endif
 
 /**
  * Print command line options, only for daemon version, not for mailer fork process
@@ -163,10 +174,16 @@ static void print_help(const char *name)
 	cout << "Usage:\n" << endl;
 	cout << name << " [-F] [-h|--host <serverpath>] [-c|--config <configfile>] [smtp server]" << endl;
 	cout << "  -F\t\tDo not run in the background" << endl;
-	cout << "  -h path\tUse alternate connect path (e.g. file:///var/run/socket).\n\t\tDefault: file:///var/run/zarafa" << endl;
+	cout << "  -h path\tUse alternate connect path (e.g. file:///var/run/socket).\n\t\tDefault: file:///var/run/zarafad/server.sock" << endl;
 	cout << "  -V Print version info." << endl;
 	cout << "  -c filename\tUse alternate config file (e.g. /etc/zarafa-spooler.cfg)\n\t\tDefault: /etc/zarafa/spooler.cfg" << endl;
 	cout << "  smtp server: The name or IP-address of the SMTP server, overriding the configuration" << endl;
+#if defined(WIN32)
+	cout << endl;
+	cout << "  Windows service options" << endl;
+	cout << "  -i\t\tInstall as service." << endl;
+	cout << "  -u\t\tRemove the service." << endl;
+#endif
 	cout << endl;
 }
 
@@ -204,7 +221,7 @@ static LONG __stdcall AdviseCallback(void *lpContext, ULONG cNotif,
     LPNOTIFICATION lpNotif)
 {
 	pthread_mutex_lock(&hMutexMessagesWaiting);
-	for (ULONG i = 0; i < cNotif; i++) {
+	for (ULONG i = 0; i < cNotif; ++i) {
 		if (lpNotif[i].info.tab.ulTableEvent == TABLE_RELOAD) {
 			// Table needs a reload - trigger a reconnect with the server
 			nReload = true;
@@ -233,6 +250,7 @@ static LONG __stdcall AdviseCallback(void *lpContext, ULONG cNotif,
  * if (szSMTP)  smtp host
  * if (szSMTPPport) smtp port
  */
+#ifdef LINUX
 /**
  * Starts a forked process which sends the actual mail, and removes it
  * from the queue, in normal situations.  On error, the
@@ -328,6 +346,7 @@ static HRESULT StartSpoolerFork(const wchar_t *szUsername, const char *szSMTP,
 exit:
 	return hr;
 }
+#endif
 
 /**
  * Opens all required objects of the administrator to move an error
@@ -344,7 +363,7 @@ exit:
  */
 static HRESULT GetErrorObjects(const SendData &sSendData,
     IMAPISession *lpAdminSession, IAddrBook **lppAddrBook,
-    ECSender **lppMailer, LPECUSER *lppUserAdmin, IMsgStore **lppUserStore,
+    ECSender **lppMailer, ECUSER **lppUserAdmin, IMsgStore **lppUserStore,
     IMessage **lppMessage)
 {
 	HRESULT hr = hrSuccess;
@@ -393,7 +412,8 @@ static HRESULT GetErrorObjects(const SendData &sSendData,
 
 		hr = ((IECUnknown*)lpsProp->Value.lpszA)->QueryInterface(IID_IECServiceAdmin, (void **)&lpServiceAdmin);
 		if (hr != hrSuccess) {
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "ServiceAdmin interface not supported");
+			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "ServiceAdmin interface not supported: %s (%x)",
+				GetMAPIErrorMessage(hr), hr);
 			goto exit;
 		}
 
@@ -405,9 +425,7 @@ static HRESULT GetErrorObjects(const SendData &sSendData,
 	}
 
 exit:
-	if (lpsProp)
-		MAPIFreeBuffer(lpsProp);
-
+	MAPIFreeBuffer(lpsProp);
 	if (lpServiceAdmin)
 		lpServiceAdmin->Release();
 
@@ -426,8 +444,11 @@ exit:
 static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
     IECSpooler *lpSpooler)
 {
+#ifdef WIN32
+	return hrSuccess;
+#else
 	HRESULT hr = hrSuccess;
-	map<pid_t, int>::iterator i, iDel;
+	std::map<pid_t, int>::const_iterator i, iDel;
 	SendData sSendData;
 	bool bErrorMail;
 	map<pid_t, int> finished; // exit status of finished processes
@@ -435,7 +456,7 @@ static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
 	// error message creation
 	IAddrBook *lpAddrBook = NULL;
 	ECSender *lpMailer = NULL;
-	LPECUSER lpUserAdmin = NULL;
+	ECUSER *lpUserAdmin = NULL;
 	// user error message, release after using
 	IMsgStore *lpUserStore = NULL;
 	IMessage *lpMessage = NULL;
@@ -456,8 +477,7 @@ static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
 	g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Cleaning %d messages from queue", (int)finished.size());
 
 	// process finished entries
-	for (i = finished.begin(); i != finished.end(); i++)
-	{
+	for (i = finished.begin(); i != finished.end(); ++i) {
 		sSendData = mapSendData[i->first];
 
 		/* Find exit status, and decide to remove mail from queue or not */
@@ -517,7 +537,8 @@ static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
 				// TODO: if failed, and we have the lpUserStore, create message?
 			}
 			if (hr != hrSuccess)
-				g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Failed to create error message for user %ls", sSendData.strUsername.c_str());
+				g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Failed to create error message for user %ls: %s (%x)",
+					sSendData.strUsername.c_str(), GetMAPIErrorMessage(hr), hr);
 
 			// remove mail from queue
 			hr = lpSpooler->DeleteFromMasterOutgoingTable(sSendData.cbMessageEntryId, (LPENTRYID)sSendData.lpMessageEntryId, sSendData.ulFlags);
@@ -529,7 +550,8 @@ static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
 				hr = DoSentMail(lpAdminSession, lpUserStore, 0, lpMessage);
 				lpMessage = NULL;
 				if (hr != hrSuccess)
-					g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to move sent mail to sent-items folder");
+					g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to move sent mail to sent-items folder: %s (%x)",
+						GetMAPIErrorMessage(hr), hr);
 			}
 
 			if (lpUserStore) {
@@ -550,11 +572,8 @@ static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
 	if (lpAddrBook)
 		lpAddrBook->Release();
 
-		delete lpMailer;
-
-	if (lpUserAdmin)
-		MAPIFreeBuffer(lpUserAdmin);
-
+	delete lpMailer;
+	MAPIFreeBuffer(lpUserAdmin);
 	if (lpUserStore)
 		lpUserStore->Release();
 
@@ -562,6 +581,7 @@ static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
 		lpMessage->Release();
 
 	return hr;
+#endif
 }
 
 /**
@@ -594,7 +614,8 @@ static HRESULT ProcessAllEntries(IMAPISession *lpAdminSession,
 
 	hr = lpTable->GetRowCount(0, &ulRowCount);
 	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get outgoing queue count");
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get outgoing queue count: %s (%x)",
+			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
 
@@ -676,9 +697,14 @@ static HRESULT ProcessAllEntries(IMAPISession *lpAdminSession,
 
 		strUsername = lpsRowSet->aRow[0].lpProps[0].Value.lpszW;
 
+#ifdef WIN32
+		// call directly without forking, and remove from queue if hr != MAPI_E_WAIT || MAPI_W_NO_SERVICE
+		hr = ProcessMessageForked(strUsername.c_str(), szSMTP, ulPort, szPath, lpsRowSet->aRow[0].lpProps[2].Value.bin.cb, (LPENTRYID)lpsRowSet->aRow[0].lpProps[2].Value.bin.lpb, lpsRowSet->aRow[0].lpProps[3].Value.ul & EC_SUBMIT_DOSENTMAIL);
+#else
 		// Check if there is already an active process for this message
 		bool bMatch = false;
-		for (map<pid_t, SendData>::iterator i = mapSendData.begin(); i != mapSendData.end(); i++) {
+		for (std::map<pid_t, SendData>::const_iterator i = mapSendData.begin();
+		     i != mapSendData.end(); ++i) {
 			if (i->second.cbMessageEntryId == lpsRowSet->aRow[0].lpProps[2].Value.bin.cb &&
 				memcmp(i->second.lpMessageEntryId, lpsRowSet->aRow[0].lpProps[2].Value.bin.lpb, i->second.cbMessageEntryId) == 0) {
 				bMatch = true;
@@ -694,6 +720,7 @@ static HRESULT ProcessAllEntries(IMAPISession *lpAdminSession,
 			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "ProcessAllEntries(): Failed starting spooler: %x", hr);
 			goto exit;
 		}
+#endif
 	}
 
 exit:
@@ -726,13 +753,15 @@ static HRESULT GetAdminSpooler(IMAPISession *lpAdminSession,
 
 	hr = HrGetOneProp(lpMDB, PR_EC_OBJECT, &lpsProp);
 	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get Zarafa internal object");
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get Zarafa internal object: %s (%x)",
+			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
 
 	hr = ((IECUnknown *)lpsProp->Value.lpszA)->QueryInterface(IID_IECSpooler, (void **)&lpSpooler);
 	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Spooler interface not supported");
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Spooler interface not supported: %s (%x)",
+			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
 
@@ -741,10 +770,7 @@ static HRESULT GetAdminSpooler(IMAPISession *lpAdminSession,
 exit:
 	if (lpMDB)
 		lpMDB->Release();
-
-	if (lpsProp)
-		MAPIFreeBuffer(lpsProp);
-
+	MAPIFreeBuffer(lpsProp);
 	return hr;
 }
 
@@ -807,26 +833,30 @@ static HRESULT ProcessQueue(const char *szSMTP, int ulPort, const char *szPath)
 	// Request the master outgoing table
 	hr = lpSpooler->GetMasterOutgoingTable(0, &lpTable);
 	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Master outgoing queue not available");
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Master outgoing queue not available: %s (%x)",
+			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
 
 	hr = lpTable->SetColumns((LPSPropTagArray)&sOutgoingCols, 0);
 	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to setColumns() on OutgoingQueue");
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to setColumns() on OutgoingQueue: %s (%x)",
+			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
 	
 	// Sort by ascending hierarchyid: first in, first out queue
 	hr = lpTable->SortTable(&sSort, 0);
 	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to SortTable() on OutgoingQueue");
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to SortTable() on OutgoingQueue: %s (%x)",
+			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
 
 	hr = HrAllocAdviseSink(AdviseCallback, NULL, &lpAdviseSink);	
 	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to allocate memory for advise sink");
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to allocate memory for advise sink: %s (%x)",
+			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
 
@@ -896,7 +926,7 @@ exit:
 				break;
 
 			Sleep(1000);
-			ulCount++;
+			++ulCount;
 		}
 		if (ulCount == 60)
 			g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "%d threads did not yet exit, closing anyway.", (int)mapSendData.size());
@@ -923,14 +953,16 @@ exit:
 	return hr;
 }
 
+#ifdef LINUX
 /**
  * Segfault signal handler. Prints the backtrace of the crash in the log.
  *
  * @param[in]	signr	Any signal that can dump core. Mostly SIGSEGV.
  */
-static void sigsegv(int signr)
+static void sigsegv(int signr, siginfo_t *si, void *uc)
 {
-	generic_sigsegv_handler(g_lpLogger, "Spooler", PROJECT_VERSION_SPOOLER_STR, signr);
+	generic_sigsegv_handler(g_lpLogger, "Spooler",
+		PROJECT_VERSION_SPOOLER_STR, signr, si, uc);
 }
 
 /** 
@@ -955,9 +987,8 @@ static void process_signal(int sig)
 
 	case SIGCHLD:
 		pthread_mutex_lock(&hMutexFinished);
-		while ((pid = waitpid (-1, &stat, WNOHANG)) > 0) {
+		while ((pid = waitpid (-1, &stat, WNOHANG)) > 0)
 			mapFinished[pid] = stat;
-		}
 		pthread_mutex_unlock(&hMutexFinished);
 		// Trigger condition so the messages get cleaned from the queue
 		pthread_mutex_lock(&hMutexMessagesWaiting);
@@ -974,7 +1005,7 @@ static void process_signal(int sig)
 		if (g_lpLogger) {
 			if (g_lpConfig) {
 				const char *ll = g_lpConfig->GetSetting("log_level");
-				int new_ll = ll ? atoi(ll) : 2;
+				int new_ll = ll ? atoi(ll) : EC_LOGLEVEL_WARNING;
 				g_lpLogger->SetLoglevel(new_ll);
 			}
 
@@ -1026,6 +1057,7 @@ static void *signal_handler(void *)
 
 	return NULL;
 }
+#endif
 
 /**
  * Main program loop. Calls ProcessQueue, which logs in to MAPI. This
@@ -1055,8 +1087,7 @@ static HRESULT running_server(const char *szSMTP, int ulPort,
 
 		if (disconnects == 0)
 			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Server connection lost. Reconnecting in 3 seconds...");
-
-		disconnects++;
+		++disconnects;
 		Sleep(3000);			// wait 3s until retry to connect
 	}
 
@@ -1070,6 +1101,9 @@ static HRESULT running_server(const char *szSMTP, int ulPort,
 int main(int argc, char *argv[]) {
 
 	HRESULT hr = hrSuccess;
+#ifdef WIN32
+	ECNTService ecNTService;
+#endif
 	const char *szPath = NULL;
 	const char *szSMTP = NULL;
 	int ulPort = 0;
@@ -1084,7 +1118,7 @@ int main(int argc, char *argv[]) {
 
 	// options
 	enum {
-		OPT_HELP,
+		OPT_HELP = UCHAR_MAX + 1,
 		OPT_CONFIG,
 		OPT_HOST,
 		OPT_FOREGROUND,
@@ -1115,17 +1149,19 @@ int main(int argc, char *argv[]) {
 	static const configsetting_t lpDefaults[] = {
 		{ "smtp_server","localhost", CONFIGSETTING_RELOADABLE },
 		{ "smtp_port","25", CONFIGSETTING_RELOADABLE },
-		{ "server_socket", CLIENT_ADMIN_SOCKET },
-		{ "run_as_user", "" },
-		{ "run_as_group", "" },
-		{ "pid_file", "/var/run/zarafa-spooler.pid" },
-		{ "running_path", "/" },
+		{ "server_socket", "default:" },
+#ifdef LINUX
+		{ "run_as_user", "zarafa" },
+		{ "run_as_group", "zarafa" },
+		{ "pid_file", "/var/run/zarafad/spooler.pid" },
+		{ "running_path", "/var/lib/zarafa" },
 		{ "coredump_enabled", "no" },
+#endif
 		{ "log_method","file" },
 		{ "log_file","-" },
-		{ "log_level","2", CONFIGSETTING_RELOADABLE },
+		{ "log_level", "3", CONFIGSETTING_RELOADABLE },
 		{ "log_timestamp","1" },
-		{ "log_buffer_size",	"4096" },
+		{ "log_buffer_size", "0" },
 		{ "sslkey_file", "" },
 		{ "sslkey_pass", "", CONFIGSETTING_EXACT },
 		{ "max_threads", "5", CONFIGSETTING_RELOADABLE },
@@ -1145,18 +1181,20 @@ int main(int argc, char *argv[]) {
         { "plugin_enabled", "yes" },
         { "plugin_path", "/var/lib/zarafa/spooler/plugins" },
         { "plugin_manager_path", "/usr/share/zarafa-spooler/python" },
-		{ "z_statsd_stats", "/var/run/zarafa-zstatsd" },
+		{ "z_statsd_stats", "/var/run/zarafad/statsd.sock" },
 		{ "tmp_path", "/tmp" },
 		{ "tmp_path", "/tmp" },
 		{ "tmp_path", "/tmp" },
 		{ NULL, NULL },
 	};
+#ifdef LINUX
     // SIGSEGV backtrace support
     stack_t st;
     struct sigaction act;
 
     memset(&st, 0, sizeof(st));
     memset(&act, 0, sizeof(act));
+#endif
 
 	setlocale(LC_CTYPE, "");
 	setlocale(LC_MESSAGES, "");
@@ -1170,11 +1208,11 @@ int main(int argc, char *argv[]) {
 		switch(c) {
 		case OPT_CONFIG:
 		case 'c':
-			szConfig = my_optarg;
+			szConfig = optarg;
 			break;
 		case OPT_HOST:
 		case 'h':
-			szPath = my_optarg;
+			szPath = optarg;
 			break;
 		case 'i': // Install service
 		case 'u': // Uninstall service
@@ -1185,20 +1223,20 @@ int main(int argc, char *argv[]) {
 			break;
 		case OPT_SEND_MESSAGE_ENTRYID:
 			bForked = true;
-			strMsgEntryId = hex2bin(my_optarg);
+			strMsgEntryId = hex2bin(optarg);
 			break;
 		case OPT_SEND_USERNAME:
 			bForked = true;
-			strUsername = decodestring(my_optarg);
+			strUsername = decodestring(optarg);
 			break;
 		case OPT_LOGFD:
-			logfd = atoi(my_optarg);
+			logfd = atoi(optarg);
 			break;
 		case OPT_DO_SENTMAIL:
 			bDoSentMail = true;
 			break;
 		case OPT_PORT:
-			ulPort = atoi(my_optarg);
+			ulPort = atoi(optarg);
 			break;
 		case OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS:
 			bIgnoreUnknownConfigOptions = true;
@@ -1222,24 +1260,31 @@ int main(int argc, char *argv[]) {
 	if (szConfig) {
 		int argidx = 0;
 
-		if (!g_lpConfig->LoadSettings(szConfig) || !g_lpConfig->ParseParams(argc-my_optind, &argv[my_optind], &argidx) || (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
-			g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false, 0); // create info logger without a timestamp to stderr
-			LogConfigErrors(g_lpConfig, g_lpLogger);
+		if (!g_lpConfig->LoadSettings(szConfig) ||
+		    !g_lpConfig->ParseParams(argc - optind, &argv[optind], &argidx) ||
+		    (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
+#ifdef WIN32
+			g_lpLogger = new ECLogger_Eventlog(EC_LOGLEVEL_INFO, "ZarafaSpooler");
+#else
+			g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false); // create info logger without a timestamp to stderr
+#endif
+			ec_log_set(g_lpLogger);
+			LogConfigErrors(g_lpConfig);
 			hr = E_FAIL;
 			goto exit;
 		}
 		
 		// ECConfig::ParseParams returns the index in the passed array,
-		// after some shuffling, where it stopped parsing. my_optind is
+		// after some shuffling, where it stopped parsing. optind is
 		// the index where my_getopt_long_permissive stopped parsing. So
-		// adding argidx to my_optind will result in the index after all
+		// adding argidx to optind will result in the index after all
 		// options are parsed.
-		my_optind += argidx;
+		optind += argidx;
 	}
 
 	// commandline overwrites spooler.cfg
-	if (my_optind < argc)
-		szSMTP = argv[my_optind];
+	if (optind < argc)
+		szSMTP = argv[optind];
 	else
 		szSMTP = g_lpConfig->GetSetting("smtp_server");
 	
@@ -1249,17 +1294,21 @@ int main(int argc, char *argv[]) {
 	szCommand = argv[0];
 
 	// setup logging, use pipe to log if started in forked mode and using pipe (file) logger, create normal logger for syslog
+#ifdef LINUX
 	if (bForked && logfd != -1)
 		g_lpLogger = new ECLogger_Pipe(logfd, 0, atoi(g_lpConfig->GetSetting("log_level")));
 	else
+#endif
 		g_lpLogger = CreateLogger(g_lpConfig, argv[0], "ZarafaSpooler");
 
+	ec_log_set(g_lpLogger);
 	if ((bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) || g_lpConfig->HasWarnings())
-		LogConfigErrors(g_lpConfig, g_lpLogger);
+		LogConfigErrors(g_lpConfig);
 
 	if (!TmpPath::getInstance() -> OverridePath(g_lpConfig))
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Ignoring invalid path-setting!");
 
+#ifdef LINUX
 	// detect linuxthreads, which is too broken to correctly run the spooler
 	if (!bForked) {
 		char buffer[256] = { 0 };
@@ -1272,6 +1321,7 @@ int main(int argc, char *argv[]) {
 			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: the zarafa-spooler will only be able to send one message at a time.");
 		}
 	}
+#endif
 
 	// set socket filename
 	if (!szPath)
@@ -1281,9 +1331,11 @@ int main(int argc, char *argv[]) {
 		// keep sending mail when we're killed in forked mode
 		signal(SIGTERM, SIG_IGN);
 		signal(SIGINT, SIG_IGN);
+#ifdef LINUX
 		signal(SIGHUP, SIG_IGN);
 		signal(SIGUSR1, SIG_IGN);
 		signal(SIGUSR2, SIG_IGN);
+#endif
 	}
 	else {
 		pthread_mutex_init(&hMutexFinished, NULL);
@@ -1291,39 +1343,46 @@ int main(int argc, char *argv[]) {
 		pthread_mutex_init(&hMutexMessagesWaiting, NULL);
 		pthread_cond_init(&hCondMessagesWaiting, NULL);
 
+#ifdef WIN32
+		// use default generic method for these signals
+		signal(SIGTERM, sighandle);
+		signal(SIGINT, sighandle);
+#else
 		sigemptyset(&signal_mask);
 		sigaddset(&signal_mask, SIGTERM);
 		sigaddset(&signal_mask, SIGINT);
 		sigaddset(&signal_mask, SIGCHLD);
 		sigaddset(&signal_mask, SIGHUP);
 		sigaddset(&signal_mask, SIGUSR2);
+#endif
 	}
 
+#ifdef LINUX
     st.ss_sp = malloc(65536);
     st.ss_flags = 0;
     st.ss_size = 65536;
 
-    act.sa_handler = sigsegv;
-    act.sa_flags = SA_ONSTACK | SA_RESETHAND;
+	act.sa_sigaction = sigsegv;
+	act.sa_flags = SA_ONSTACK | SA_RESETHAND | SA_SIGINFO;
 
     sigaltstack(&st, NULL);
     sigaction(SIGSEGV, &act, NULL);
     sigaction(SIGBUS, &act, NULL);
     sigaction(SIGABRT, &act, NULL);
+#endif
 
 	bQuit = bMessagesWaiting = false;
 
-	hr = MAPIInitialize(NULL);
-	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to initialize");
-		goto exit;
-	}
-
+#ifdef LINUX
 	if (parseBool(g_lpConfig->GetSetting("coredump_enabled")))
 		unix_coredump_enable(g_lpLogger);
 
 	// fork if needed and drop privileges as requested.
 	// this must be done before we do anything with pthreads
+	if (unix_runas(g_lpConfig, g_lpLogger)) {
+		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "main(): run-as failed");
+		goto exit;
+	}
 	if (daemonize && unix_daemonize(g_lpConfig, g_lpLogger)) {
 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "main(): failed daemonizing");
 		goto exit;
@@ -1336,15 +1395,19 @@ int main(int argc, char *argv[]) {
 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "main(): Failed creating PID file");
 		goto exit;
 	}
+	g_lpLogger = StartLoggerProcess(g_lpConfig, g_lpLogger);
+	ec_log_set(g_lpLogger);
+#endif
+	g_lpLogger->SetLogprefix(LP_PID);
 
-	if (unix_runas(g_lpConfig, g_lpLogger)) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "main(): run-as failed");
+	hr = MAPIInitialize(NULL);
+	if (hr != hrSuccess) {
+		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to initialize MAPI: %s (%x)",
+			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
 
-	g_lpLogger = StartLoggerProcess(g_lpConfig, g_lpLogger);
-	g_lpLogger->SetLogprefix(LP_PID);
-
+#ifdef LINUX
 	if (!bForked) {
 		if (bNPTL) {
 			// valid for all threads afterwards
@@ -1362,9 +1425,20 @@ int main(int argc, char *argv[]) {
 			signal(SIGUSR2, process_signal);
 		}
 	}
+#endif
 
 	sc = new StatsClient(g_lpConfig->GetSetting("z_statsd_stats"), g_lpLogger);
 
+#ifdef WIN32
+	// Parse for standard arguments (install, uninstall, version etc.)
+	if (!ecNTService.ParseStandardArgs(argc, argv))
+		ecNTService.StartService(&bQuit, szSMTP, szPath);
+
+	hr = ecNTService.m_Status.dwWin32ExitCode;
+	if(hr == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
+		hr = running_server(szSMTP, ulPort, szPath);
+	else
+#endif
 	if (bForked)
 		hr = ProcessMessageForked(strUsername.c_str(), szSMTP, ulPort, szPath, strMsgEntryId.length(), (LPENTRYID)strMsgEntryId.data(), bDoSentMail);
 	else
@@ -1372,6 +1446,7 @@ int main(int argc, char *argv[]) {
 
 	delete sc;
 
+#ifdef LINUX
 	if (!bForked) {
 		if (bNPTL) {
 			g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Joining signal thread");
@@ -1383,17 +1458,17 @@ int main(int argc, char *argv[]) {
 			signal(SIGCHLD, SIG_IGN);
 		}
 	}
+#endif
 
 	MAPIUninitialize();
 
 exit:
-	if (g_lpConfig)
-		delete g_lpConfig;
-
+	delete g_lpConfig;
 	DeleteLogger(g_lpLogger);
 
-	if (st.ss_sp)
-		free(st.ss_sp);
+#ifdef LINUX
+	free(st.ss_sp);
+#endif
 
 	switch(hr) {
 	case hrSuccess:

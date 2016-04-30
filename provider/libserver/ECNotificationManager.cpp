@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include "ECNotificationManager.h"
 #include "ECSession.h"
 #include "ECSessionManager.h"
@@ -90,13 +64,12 @@ static int soapresponse(struct notifyResponse notifications, struct soap *soap)
     return soap_closesock(soap);
 }
 
-ECNotificationManager::ECNotificationManager(ECLogger *lpLogger, ECConfig *lpConfig) : m_lpLogger(lpLogger), m_lpConfig(lpConfig)
+ECNotificationManager::ECNotificationManager(void)
 {
     m_bExit = false;
     pthread_mutex_init(&m_mutexSessions, NULL);
     pthread_mutex_init(&m_mutexRequests, NULL);
     pthread_cond_init(&m_condSessions, NULL);
-    
     pthread_create(&m_thread, NULL, Thread, this);
     set_thread_name(m_thread, "NotificationManager");
 
@@ -110,19 +83,19 @@ ECNotificationManager::~ECNotificationManager()
     pthread_cond_broadcast(&m_condSessions);
     pthread_mutex_unlock(&m_mutexSessions);
 
-	m_lpLogger->Log(EC_LOGLEVEL_INFO, "Shutdown notification manager");
+	ec_log_info("Shutdown notification manager");
     pthread_join(m_thread, NULL);
 
     // Close and free any pending requests (clients will receive EOF)
-    std::map<ECSESSIONID, NOTIFREQUEST>::iterator iterRequest;
-    for(iterRequest = m_mapRequests.begin(); iterRequest != m_mapRequests.end(); iterRequest++) {
+    std::map<ECSESSIONID, NOTIFREQUEST>::const_iterator iterRequest;
+    for (iterRequest = m_mapRequests.begin();
+         iterRequest != m_mapRequests.end(); ++iterRequest) {
 		// we can't call zarafa_notify_done here, race condition on shutdown in ECSessionManager vs ECDispatcher
 		zarafa_end_soap_connection(iterRequest->second.soap);
 		soap_destroy(iterRequest->second.soap);
 		soap_end(iterRequest->second.soap);
 		soap_free(iterRequest->second.soap);
     }
-    
     pthread_mutex_destroy(&m_mutexSessions);
     pthread_mutex_destroy(&m_mutexRequests);
     pthread_cond_destroy(&m_condSessions);
@@ -131,7 +104,7 @@ ECNotificationManager::~ECNotificationManager()
 // Called by the SOAP handler
 HRESULT ECNotificationManager::AddRequest(ECSESSIONID ecSessionId, struct soap *soap)
 {
-    std::map<ECSESSIONID, NOTIFREQUEST>::iterator iterRequest;
+    std::map<ECSESSIONID, NOTIFREQUEST>::const_iterator iterRequest;
     struct soap *lpItem = NULL;
     
     pthread_mutex_lock(&m_mutexRequests);
@@ -141,7 +114,8 @@ HRESULT ECNotificationManager::AddRequest(ECSESSIONID ecSessionId, struct soap *
         // requested notifications. Since this should only happen if the client thinks it has lost its connection and has
         // restarted the request, we will replace the existing request with this one.
 
-		m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Replacing notification request for ID: %llu", ecSessionId);
+		ec_log_warn("Replacing notification request for ID %llu",
+			static_cast<unsigned long long>(ecSessionId));
         
         // Return the previous request as an error
         struct notifyResponse notifications;
@@ -203,7 +177,7 @@ void *ECNotificationManager::Work() {
     ECSession *lpecSession = NULL;
     struct notifyResponse notifications;
 
-    std::set<ECSESSIONID>::iterator iterSessions;
+    std::set<ECSESSIONID>::const_iterator iterSessions;
     std::set<ECSESSIONID> setActiveSessions;
     std::map<ECSESSIONID, NOTIFREQUEST>::iterator iterRequest;
     struct soap *lpItem;
@@ -233,7 +207,9 @@ void *ECNotificationManager::Work() {
         pthread_mutex_unlock(&m_mutexSessions);
         
         // Look at all the sessions that have signalled a change
-        for(iterSessions = setActiveSessions.begin(); iterSessions != setActiveSessions.end(); iterSessions++) {
+        for (iterSessions = setActiveSessions.begin();
+             iterSessions != setActiveSessions.end(); ++iterSessions)
+        {
             lpItem = NULL;
         
             pthread_mutex_lock(&m_mutexRequests);
@@ -320,7 +296,7 @@ void *ECNotificationManager::Work() {
                 // Mark the session as active so it will be processed in the next loop
                 NotifyChange(iterRequest->first);
             }
-            iterRequest++;
+            ++iterRequest;
         } 
         pthread_mutex_unlock(&m_mutexRequests);
         

@@ -1,55 +1,29 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include <mapix.h>
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapiutil.h>
 #include <edkmdb.h>
 #include <Python.h>
-#include "charset/convert.h"
-#include "conversion.h"
+#include <zarafa/charset/convert.h>
+#include <zarafa/conversion.h>
 #include "scl.h"
 
 // mapi4linux does defines this in edkmdb.h
@@ -73,6 +47,7 @@ static PyObject *PyTypeNEWMAIL_NOTIFICATION;
 static PyObject *PyTypeOBJECT_NOTIFICATION;
 static PyObject *PyTypeTABLE_NOTIFICATION;
 
+static PyObject *PyTypeMVPROPMAP;
 static PyObject *PyTypeECUser;
 static PyObject *PyTypeECGroup;
 static PyObject *PyTypeECCompany;
@@ -122,7 +97,11 @@ typedef int Py_ssize_t;
 #endif
 
 // Depending on native vs python unicode representation, set NATIVE_UNICODE
+#ifdef WIN32
+  #define WCHAR_T_SIZE 2
+#else
   #define WCHAR_T_SIZE __SIZEOF_WCHAR_T__
+#endif
 
 #if (Py_UNICODE_SIZE == WCHAR_T_SIZE)
   #define NATIVE_UNICODE 1
@@ -156,6 +135,7 @@ void Init()
 	PyTypeSTATSTG = PyObject_GetAttrString(lpMAPIStruct, "STATSTG");
 	PyTypeSYSTEMTIME = PyObject_GetAttrString(lpMAPIStruct, "SYSTEMTIME");
 
+        PyTypeMVPROPMAP = PyObject_GetAttrString(lpMAPIStruct, "MVPROPMAP");
 	PyTypeECUser = PyObject_GetAttrString(lpMAPIStruct, "ECUSER");
 	PyTypeECGroup = PyObject_GetAttrString(lpMAPIStruct, "ECGROUP");
 	PyTypeECCompany = PyObject_GetAttrString(lpMAPIStruct, "ECCOMPANY");
@@ -210,7 +190,11 @@ wchar_t * CopyPyUnicode(wchar_t **lpWide, PyObject *o, void *lpBase)
     size = PyUnicode_GetSize(unicode);
     
     if (MAPIAllocateMore((size + 1) * sizeof(wchar_t), lpBase, (void **)lpWide) == hrSuccess) {
-	    PyUnicode_AsWideChar((PyUnicodeObject *)unicode, *lpWide, size);
+	    #if PY_MAJOR_VERSION >= 3
+		PyUnicode_AsWideChar(unicode, *lpWide, size);
+	    #else
+		PyUnicode_AsWideChar((PyUnicodeObject *)unicode, *lpWide, size);
+	    #endif
 	    
 	    (*lpWide)[size] = '\0';
 	 
@@ -258,7 +242,11 @@ FILETIME Object_to_FILETIME(PyObject *object)
 		goto exit;
 	}
 
-	periods = PyInt_AsUnsignedLongLongMask(filetime);
+	#if PY_MAJOR_VERSION >= 3
+		periods = PyLong_AsUnsignedLongLongMask(filetime);
+	#else
+		periods = PyInt_AsUnsignedLongLongMask(filetime);
+	#endif
 	ft.dwHighDateTime = periods >> 32;
 	ft.dwLowDateTime = periods & 0xffffffff;
 
@@ -356,7 +344,7 @@ PyObject *Object_from_LPSPropValue(LPSPropValue lpProp)
 #define QUADPART(x) x.QuadPart
 #define PT_MV_CASE(MVname,MVelem,From,Sub) \
 			Value = PyList_New(0); \
-			for(unsigned int i=0; i<lpProp->Value.MV##MVname.cValues; i++) { \
+			for (unsigned int i = 0; i < lpProp->Value.MV##MVname.cValues; ++i) { \
 				PyObject *elem = From(Sub(lpProp->Value.MV##MVname.lp##MVelem[i])); \
 				PyList_Append(Value, elem); \
 				Py_DECREF(elem); \
@@ -379,7 +367,7 @@ PyObject *Object_from_LPSPropValue(LPSPropValue lpProp)
 			PT_MV_CASE(li,li,PyLong_FromLongLong,QUADPART)
 		case PT_MV_SYSTIME:
 			Value = PyList_New(0);
-			for(unsigned int i=0; i<lpProp->Value.MVft.cValues; i++) {
+			for (unsigned int i = 0; i < lpProp->Value.MVft.cValues; ++i) {
 				PyObject *elem = Object_from_FILETIME(lpProp->Value.MVft.lpft[i]);
 				PyList_Append(Value, elem);
 				Py_DECREF(elem);
@@ -389,7 +377,7 @@ PyObject *Object_from_LPSPropValue(LPSPropValue lpProp)
 			PT_MV_CASE(szA,pszA,PyString_FromString,BASE)
 		case PT_MV_BINARY:
 			Value = PyList_New(0);
-			for(unsigned int i=0; i<lpProp->Value.MVbin.cValues; i++) {
+			for (unsigned int i = 0; i < lpProp->Value.MVbin.cValues; ++i) {
 				PyObject *elem = PyString_FromStringAndSize((const char *)lpProp->Value.MVbin.lpbin[i].lpb, lpProp->Value.MVbin.lpbin[i].cb);
 				PyList_Append(Value, elem);
 				Py_DECREF(elem);
@@ -397,7 +385,7 @@ PyObject *Object_from_LPSPropValue(LPSPropValue lpProp)
 			break;
 		case PT_MV_UNICODE:
 			Value = PyList_New(0);
-			for(unsigned int i=0; i<lpProp->Value.MVszW.cValues; i++) {
+			for (unsigned int i = 0; i < lpProp->Value.MVszW.cValues; ++i) {
 				int len = wcslen(lpProp->Value.MVszW.lppszW[i]);
 				PyObject *elem = PyUnicode_FromWideChar(lpProp->Value.MVszW.lppszW[i], len);
 				PyList_Append(Value, elem);
@@ -406,7 +394,7 @@ PyObject *Object_from_LPSPropValue(LPSPropValue lpProp)
 			break;
 		case PT_MV_CLSID:
 			Value = PyList_New(0);
-			for(unsigned int i=0; i<lpProp->Value.MVguid.cValues; i++) {
+			for (unsigned int i = 0; i < lpProp->Value.MVguid.cValues; ++i) {
 				PyObject *elem = PyString_FromStringAndSize((const char *)&lpProp->Value.MVguid.lpguid[i], sizeof(GUID));
 				PyList_Append(Value, elem);
 				Py_DECREF(elem);
@@ -450,7 +438,7 @@ PyObject *		List_from_LPSPropValue(LPSPropValue lpProps, ULONG cValues)
 	PyObject *list = PyList_New(0);
 	PyObject *item = NULL;
 
-	for(unsigned int i=0; i<cValues; i++) {
+	for (unsigned int i = 0; i < cValues; ++i) {
 		item = Object_from_LPSPropValue(&lpProps[i]);
 		if(PyErr_Occurred())
 			goto exit;
@@ -480,7 +468,7 @@ PyObject *	  List_from_wchar_t(wchar_t **lpStrings, ULONG cElements)
 	PyObject *list = PyList_New(0);
 	PyObject *item = NULL;
 
-	for(unsigned int i=0; i<cElements; i++) {
+	for (unsigned int i = 0; i < cElements; ++i) {
 		item = PyUnicode_FromWideChar(lpStrings[i], wcslen(lpStrings[i]));
 		if(PyErr_Occurred())
 			goto exit;
@@ -629,7 +617,7 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 				while((elem = PyIter_Next(iter))) {						\
 					Sub(lpProp->Value.MV##MVname.lp##MVelem[n]) = As(elem); \
 					Py_DECREF(elem);									\
-					n++;												\
+					++n;												\
 				}														\
 			}															\
 			lpProp->Value.MV##MVname.cValues = n; \
@@ -663,7 +651,7 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 			while((elem = PyIter_Next(iter))) {
 				lpProp->Value.MVft.lpft[n] = Object_to_FILETIME(elem);
 				Py_DECREF(elem);
-				n++;
+				++n;
 			}
 
 			lpProp->Value.MVft.cValues = n;
@@ -691,7 +679,7 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 				}
 
 				Py_DECREF(elem);
-				n++;
+				++n;
 			}
 
 			lpProp->Value.MVszA.cValues = n;
@@ -720,7 +708,7 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 				lpProp->Value.MVbin.lpbin[n].cb = size;
 
 				Py_DECREF(elem);
-				n++;
+				++n;
 			}
 
 			lpProp->Value.MVbin.cValues = n;
@@ -746,7 +734,7 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 
 
 				Py_DECREF(elem);
-				n++;
+				++n;
 			}
 
 			lpProp->Value.MVszW.cValues = n;
@@ -773,7 +761,7 @@ void Object_to_LPSPropValue(PyObject *object, LPSPropValue lpProp, ULONG ulFlags
 				memcpy(&lpProp->Value.MVguid.lpguid[n], guid, size);
 
 				Py_DECREF(elem);
-				n++;
+				++n;
 			}
 
 			lpProp->Value.MVguid.cValues = n;
@@ -853,19 +841,15 @@ LPSPropValue	List_to_LPSPropValue(PyObject *object, ULONG *cValues, ULONG ulFlag
 
 		Py_DECREF(elem);
 		elem = NULL;
-
-		i++;
+		++i;
 	}
 
 	lpResult = lpProps;
 	*cValues = size;
 
 exit:
-	if(PyErr_Occurred()) {
-		if(lpProps && !lpBase)
-			MAPIFreeBuffer(lpProps);
-
-	}
+	if (PyErr_Occurred() && lpBase != NULL)
+		MAPIFreeBuffer(lpProps);
 	if(elem) {
 		Py_DECREF(elem);
 	}
@@ -911,15 +895,14 @@ LPSPropTagArray	List_to_LPSPropTagArray(PyObject *object, ULONG /*ulFlags*/)
 	while((elem = PyIter_Next(iter))) {
 		lpPropTagArray->aulPropTag[n] = (ULONG)PyLong_AsUnsignedLong(elem);
 		Py_DECREF(elem);
-		n++;
+		++n;
 	}
 
 	lpPropTagArray->cValues = n;
 
 exit:
 	if(PyErr_Occurred()) {
-		if(lpPropTagArray)
-			MAPIFreeBuffer(lpPropTagArray);
+		MAPIFreeBuffer(lpPropTagArray);
 		lpPropTagArray = NULL;
 	}
 	if(iter) {
@@ -941,7 +924,7 @@ PyObject *		List_from_LPSPropTagArray(LPSPropTagArray lpPropTagArray)
 
 	list = PyList_New(0);
 
-	for(unsigned int i=0; i < lpPropTagArray->cValues; i++) {
+	for (unsigned int i = 0; i < lpPropTagArray->cValues; ++i) {
 		elem = PyLong_FromUnsignedLong(lpPropTagArray->aulPropTag[i]);
 		PyList_Append(list, elem);
 		if(PyErr_Occurred())
@@ -1009,7 +992,7 @@ void Object_to_LPSRestriction(PyObject *object, LPSRestriction lpsRestriction, v
 
 			if(PyErr_Occurred())
 				goto exit;
-			n++;
+			++n;
 			Py_DECREF(elem);
 			elem = NULL;
 		}
@@ -1426,7 +1409,7 @@ PyObject *		Object_from_LPACTIONS(ACTIONS *lpsActions)
 	}
 
 	subs = PyList_New(0);
-	for (UINT i = 0; i < lpsActions->cActions; i++) {
+	for (UINT i = 0; i < lpsActions->cActions; ++i) {
 		sub = Object_from_LPACTION(&lpsActions->lpAction[i]);
 		if (!sub)
 			goto exit;
@@ -1672,8 +1655,7 @@ LPSSortOrderSet	Object_to_LPSSortOrderSet(PyObject *object)
 
 		lpsSortOrderSet->aSort[i].ulOrder = PyLong_AsUnsignedLong(ulOrder);
 		lpsSortOrderSet->aSort[i].ulPropTag = PyLong_AsUnsignedLong(ulPropTag);
-
-		i++;
+		++i;
 		Py_DECREF(elem);
 	}
 
@@ -1683,8 +1665,7 @@ LPSSortOrderSet	Object_to_LPSSortOrderSet(PyObject *object)
 
 exit:
 	if(PyErr_Occurred()) {
-		if(lpsSortOrderSet)
-			MAPIFreeBuffer(lpsSortOrderSet);
+		MAPIFreeBuffer(lpsSortOrderSet);
 		lpsSortOrderSet = NULL;
 	}
 
@@ -1712,7 +1693,7 @@ PyObject *		Object_from_LPSSortOrderSet(LPSSortOrderSet lpSortOrderSet)
 
 	sorts = PyList_New(0);
 
-	for(unsigned int i=0; i<lpSortOrderSet->cSorts; i++) {
+	for (unsigned int i = 0; i < lpSortOrderSet->cSorts; ++i) {
 		sort = PyObject_CallFunction(PyTypeSSort, "(ll)", lpSortOrderSet->aSort[i].ulPropTag, lpSortOrderSet->aSort[i].ulOrder);
 
 		if(PyErr_Occurred())
@@ -1750,7 +1731,7 @@ PyObject *		List_from_LPSRowSet(LPSRowSet lpRowSet)
 	PyObject *list = PyList_New(0);
 	PyObject *item = NULL;
 
-	for(unsigned int i=0; i<lpRowSet->cRows; i++) {
+	for (unsigned int i = 0; i < lpRowSet->cRows; ++i) {
 		item = List_from_LPSPropValue(lpRowSet->aRow[i].lpProps, lpRowSet->aRow[i].cValues);
 
 		if(PyErr_Occurred())
@@ -1808,7 +1789,7 @@ LPSRowSet		List_to_LPSRowSet(PyObject *list, ULONG ulFlags)
 
 		Py_DECREF(elem);
 		elem = NULL;
-		i++;
+		++i;
 	}
 
 	lpsRowSet->cRows = i;
@@ -1900,7 +1881,7 @@ PyObject *		List_from_LPSPropProblemArray(LPSPropProblemArray lpProblemArray)
 
 	list = PyList_New(0);
 
-	for(unsigned int i=0; i<lpProblemArray->cProblem; i++) {
+	for (unsigned int i = 0; i < lpProblemArray->cProblem; ++i) {
 		elem = Object_from_LPSPropProblem(&lpProblemArray->aProblem[i]);
 
 		if(PyErr_Occurred())
@@ -1955,7 +1936,7 @@ LPSPropProblemArray List_to_LPSPropProblemArray(PyObject *list, ULONG /*ulFlags*
 
 		Py_DECREF(elem);
 		elem = NULL;
-		i++;
+		++i;
 	}
 
 	lpsProblems->cProblem = i;
@@ -1969,8 +1950,7 @@ exit:
 	}
 
 	if(PyErr_Occurred()) {
-		if(lpsProblems)
-			MAPIFreeBuffer(lpsProblems);
+		MAPIFreeBuffer(lpsProblems);
 		lpsProblems = NULL;
 	}
 
@@ -2009,7 +1989,7 @@ PyObject * List_from_LPMAPINAMEID(LPMAPINAMEID *lppMAPINameId, ULONG cNames)
 
 	list = PyList_New(0);
 
-	for(unsigned int i = 0; i < cNames ; i++) {
+	for (unsigned int i = 0; i < cNames; ++i) {
 		elem = Object_from_LPMAPINAMEID(lppMAPINameId[i]);
 
 		if(PyErr_Occurred())
@@ -2132,8 +2112,7 @@ LPMAPINAMEID *	List_to_p_LPMAPINAMEID(PyObject *list, ULONG *lpcNames, ULONG /*u
 
 		if(PyErr_Occurred())
 			goto exit;
-
-		i++;
+		++i;
 		Py_DECREF(elem);
 		elem = NULL;
 	}
@@ -2142,8 +2121,7 @@ LPMAPINAMEID *	List_to_p_LPMAPINAMEID(PyObject *list, ULONG *lpcNames, ULONG /*u
 
 exit:
 	if(PyErr_Occurred()) {
-		if(lpNames)
-			MAPIFreeBuffer(lpNames);
+		MAPIFreeBuffer(lpNames);
 		lpNames = NULL;
 	}
 
@@ -2194,16 +2172,14 @@ LPENTRYLIST		List_to_LPENTRYLIST(PyObject *list)
 		if (MAPIAllocateMore(strlen, lpEntryList, (void**)&lpEntryList->lpbin[i].lpb) != hrSuccess)
 			goto exit;
 		memcpy(lpEntryList->lpbin[i].lpb, ptr, strlen);
-
-		i++;
+		++i;
 		Py_DECREF(elem);
 		elem = NULL;
 	}
 
 exit:
 	if(PyErr_Occurred()) {
-		if(lpEntryList)
-			MAPIFreeBuffer(lpEntryList);
+		MAPIFreeBuffer(lpEntryList);
 		lpEntryList = NULL;
 	}
 
@@ -2225,7 +2201,7 @@ PyObject *		List_from_LPENTRYLIST(LPENTRYLIST lpEntryList)
 	list = PyList_New(0);
 
 	if (lpEntryList) {
-		for(unsigned int i = 0; i < lpEntryList->cValues ; i++) {
+		for (unsigned int i = 0; i < lpEntryList->cValues; ++i) {
 			elem = PyString_FromStringAndSize((const char*)lpEntryList->lpbin[i].lpb, lpEntryList->lpbin[i].cb);
 			if(PyErr_Occurred())
 				goto exit;
@@ -2260,7 +2236,7 @@ PyObject *		List_from_LPNOTIFICATION(LPNOTIFICATION lpNotif, ULONG cNotifs)
 	PyObject *list = PyList_New(0);
 	PyObject *item = NULL;
 
-	for(unsigned int i=0; i<cNotifs; i++) {
+	for (unsigned int i = 0; i < cNotifs; ++i) {
 		item = Object_from_LPNOTIFICATION(&lpNotif[i]);
 		if(PyErr_Occurred())
 			goto exit;
@@ -2449,8 +2425,7 @@ NOTIFICATION *	Object_to_LPNOTIFICATION(PyObject *obj)
 
 exit:
 	if(PyErr_Occurred()) {
-		if(lpNotif)
-			MAPIFreeBuffer(lpNotif);
+		MAPIFreeBuffer(lpNotif);
 		lpNotif = NULL;
 	}
 
@@ -2482,8 +2457,7 @@ LPFlagList		List_to_LPFlagList(PyObject *list)
 
 		if(PyErr_Occurred())
 			goto exit;
-
-		i++;
+		++i;
 		Py_DECREF(elem);
 		elem = NULL;
 	}
@@ -2492,8 +2466,7 @@ LPFlagList		List_to_LPFlagList(PyObject *list)
 
 exit:
 	if(PyErr_Occurred()) {
-		if(lpList)
-			MAPIFreeBuffer(lpList);
+		MAPIFreeBuffer(lpList);
 		lpList = NULL;
 	}
 	if(elem) {
@@ -2511,7 +2484,7 @@ PyObject *		List_from_LPFlagList(LPFlagList lpFlags)
 	PyObject *list = PyList_New(0);
 	PyObject *elem = NULL;
 
-	for(unsigned int i=0; i<lpFlags->cFlags; i++) {
+	for (unsigned int i = 0; i < lpFlags->cFlags; ++i) {
 		elem = PyLong_FromUnsignedLong(lpFlags->ulFlag[i]);
 		PyList_Append(list, elem);
 
@@ -2583,9 +2556,7 @@ LPREADSTATE		List_to_LPREADSTATE(PyObject *list, ULONG *lpcElements)
 
 		memcpy(lpList[i].pbSourceKey, ptr, len);
 		lpList[i].cbSourceKey = len;
-
-		i++;
-
+		++i;
 		Py_DECREF(flags);
 		flags = NULL;
 
@@ -2600,8 +2571,7 @@ LPREADSTATE		List_to_LPREADSTATE(PyObject *list, ULONG *lpcElements)
 
 exit:
 	if(PyErr_Occurred()) {
-		if(lpList)
-			MAPIFreeBuffer(lpList);
+		MAPIFreeBuffer(lpList);
 		lpList = NULL;
 	}
 
@@ -2630,7 +2600,7 @@ PyObject *		List_from_LPREADSTATE(LPREADSTATE lpReadState, ULONG cElements)
 	PyObject *elem = NULL;
 	PyObject *sourcekey = NULL;
 
-	for (unsigned int i = 0; i < cElements; i++) {
+	for (unsigned int i = 0; i < cElements; ++i) {
 		sourcekey = PyString_FromStringAndSize((char*)lpReadState[i].pbSourceKey, lpReadState[i].cbSourceKey);
 		if (PyErr_Occurred())
 			goto exit;
@@ -2693,8 +2663,7 @@ LPCIID			List_to_LPCIID(PyObject *list, ULONG *cInterfaces)
 		}
 
 		memcpy(&lpList[i], ptr, sizeof(*lpList));
-
-		i++;
+		++i;
 		Py_DECREF(elem);
 		elem = NULL;
 	}
@@ -2703,8 +2672,7 @@ LPCIID			List_to_LPCIID(PyObject *list, ULONG *cInterfaces)
 
 exit:
 	if(PyErr_Occurred()) {
-		if(lpList)
-			MAPIFreeBuffer(lpList);
+		MAPIFreeBuffer(lpList);
 		lpList = NULL;
 	}
 	if(elem) {
@@ -2728,7 +2696,7 @@ PyObject *List_from_LPCIID(LPCIID iids, ULONG cElements)
 	PyObject *list = PyList_New(0);
 	PyObject *iid = NULL;
 
-	for (unsigned int i = 0; i < cElements; i++) {
+	for (unsigned int i = 0; i < cElements; ++i) {
 		iid = PyString_FromStringAndSize((char*)&iids[i], sizeof(IID));
 		if (PyErr_Occurred())
 			goto exit;
@@ -2748,7 +2716,146 @@ exit:
 	return list;
 }
 
-LPECUSER Object_to_LPECUSER(PyObject *elem, ULONG ulFlags) {
+void Object_to_MVPROPMAP(PyObject *elem, ECUSER *&lpUser, ULONG ulFlags)
+{
+	HRESULT hr = hrSuccess;
+	PyObject *MVPropMaps, *Item, *PropID, *ListItem, *Values;
+	int ValuesLength, MVPropMapsSize = 0;
+
+	/* Multi-Value PropMap support. */
+	MVPropMaps = PyObject_GetAttrString(elem, "MVPropMap");
+
+	if (MVPropMaps == NULL || MVPropMaps == Py_None || !PyList_Check(MVPropMaps)) {
+		if (MVPropMaps != NULL)
+			Py_DECREF(MVPropMaps);
+		return;
+	}
+
+	MVPropMapsSize = PyList_Size(MVPropMaps);
+	/* No PropMaps - bail out */
+	if (MVPropMapsSize != 2) {
+		PyErr_SetString(PyExc_TypeError, "MVPropMap should contain two entries");
+		if (MVPropMaps != NULL)
+			Py_DECREF(MVPropMaps);
+		return;
+	}
+
+	/* If we have more mv props than the feature lists, adjust this value! */
+	lpUser->sMVPropmap.cEntries = 2;
+	hr = MAPIAllocateMore(sizeof(MVPROPMAPENTRY) * lpUser->sMVPropmap.cEntries, lpUser, reinterpret_cast<void **>(&lpUser->sMVPropmap.lpEntries));
+
+	for (int i = 0; i < MVPropMapsSize; ++i) {
+		Item = PyList_GetItem(MVPropMaps, i);
+		PropID = PyObject_GetAttrString(Item, "ulPropId");
+		Values = PyObject_GetAttrString(Item, "Values");
+
+		if (PropID == NULL || Values == NULL || PropID == Py_None || !PyList_Check(Values)) {
+			PyErr_SetString(PyExc_TypeError, "ulPropId or Values is empty or values is not a list");
+
+			if (PropID != NULL)
+				Py_DECREF(PropID);
+			if (Values != NULL)
+				Py_DECREF(Values);
+			if (MVPropMaps != NULL)
+				Py_DECREF(MVPropMaps);
+			return;
+		}
+
+		/* Set default struct entry to empty stub values */
+		lpUser->sMVPropmap.lpEntries[i].ulPropId = PyLong_AsUnsignedLong(PropID);
+		lpUser->sMVPropmap.lpEntries[i].cValues = 0;
+		lpUser->sMVPropmap.lpEntries[i].lpszValues = NULL;
+
+		//if ((PropID != NULL && PropID != Py_None) && (Values != NULL && Values != Py_None && PyList_Check(Values)))
+		ValuesLength = PyList_Size(Values);
+		lpUser->sMVPropmap.lpEntries[i].cValues = ValuesLength;
+
+		if (ValuesLength > 0) {
+			hr = MAPIAllocateMore(sizeof(LPTSTR) * lpUser->sMVPropmap.lpEntries[i].cValues, lpUser, reinterpret_cast<void **>(&lpUser->sMVPropmap.lpEntries[i].lpszValues));
+			if (hr != hrSuccess) {
+				PyErr_SetString(PyExc_RuntimeError, "Out of memory");
+				if (PropID != NULL)
+					Py_DECREF(PropID);
+				if (Values != NULL)
+					Py_DECREF(Values);
+				if (MVPropMaps != NULL)
+					Py_DECREF(MVPropMaps);
+				return;
+			}
+		}
+
+		for (int j = 0; j < ValuesLength; ++j) {
+			ListItem = PyList_GetItem(Values, j);
+
+			if (ListItem != Py_None) {
+				if ((ulFlags & MAPI_UNICODE) == 0)
+					// XXX: meh, not sure what todo here. Maybe use process_conv_out??
+					lpUser->sMVPropmap.lpEntries[i].lpszValues[j] = reinterpret_cast<TCHAR *>(PyString_AsString(ListItem));
+				else
+					CopyPyUnicode(&lpUser->sMVPropmap.lpEntries[i].lpszValues[j], ListItem, lpUser);
+			}
+			Py_DECREF(ListItem);
+		}
+
+		Py_DECREF(PropID);
+		Py_DECREF(Values);
+	}
+
+	if (MVPropMaps != NULL)
+		Py_DECREF(MVPropMaps);
+}
+
+PyObject *Object_from_MVPROPMAP(MVPROPMAP propmap, ULONG ulFlags)
+{
+	/*
+	 * Multi-Value PropMap support.
+	 *
+	 * This holds the enabled/disabled features of a user. It is
+	 * represented as a list of PropMaps which contains multiple values. A
+	 * Normal Propmap only contains one value, so we use a list to display
+	 * these values.
+	 *
+	 * Note that the enabled/disabled MVPropMap is special since, for
+	 * example, setting both PR_EC_ENABLED_FEATUES and
+	 * PR_EC_DISALBED_FEATURES to an empty list will still set the features
+	 * to either disabled or enabled according to the default set in the
+	 * server configuration.
+	 */
+	PyObject *MVProps = PyList_New(0);
+	PyObject *MVPropValues, *MVPropMap, *MVPropValue = NULL;
+
+	MVPROPMAP *lpMVPropmap = &propmap;
+	for (unsigned int i = 0; i < lpMVPropmap->cEntries; ++i) {
+		PyObject *MVPropValues = PyList_New(0);
+
+		for (unsigned int j = 0; j < lpMVPropmap->lpEntries[i].cValues; ++j) {
+			LPTSTR strval = lpMVPropmap->lpEntries[i].lpszValues[j];
+			std::string str = reinterpret_cast<LPSTR>(strval);
+
+			if (str.empty())
+				continue;
+			if (ulFlags & MAPI_UNICODE)
+				MVPropValue = PyUnicode_FromWideChar(strval, wcslen(strval));
+			else
+				MVPropValue = PyString_FromStringAndSize(str.c_str(), str.length());
+
+			PyList_Append(MVPropValues, MVPropValue);
+			Py_DECREF(MVPropValue);
+			MVPropValue = NULL;
+		}
+
+		MVPropMap = PyObject_CallFunction(PyTypeMVPROPMAP, "(lO)", lpMVPropmap->lpEntries[i].ulPropId, MVPropValues);
+		PyList_Append(MVProps, MVPropMap);
+		Py_DECREF(MVPropMap);
+		MVPropMap = NULL;
+		MVPropValues = NULL;
+	}
+
+	return MVProps;
+}
+
+ECUSER *Object_to_LPECUSER(PyObject *elem, ULONG ulFlags)
+{
 	static conv_out_info<ECUSER> conv_info[] = {
 		{conv_out_default<ECUSER, LPTSTR, &ECUSER::lpszUsername>, "Username"},
 		{conv_out_default<ECUSER, LPTSTR, &ECUSER::lpszPassword>, "Password"},
@@ -2763,7 +2870,7 @@ LPECUSER Object_to_LPECUSER(PyObject *elem, ULONG ulFlags) {
 	};
 
 	HRESULT hr = hrSuccess;
-	LPECUSER lpUser = NULL;
+	ECUSER *lpUser = NULL;
 
 	if (elem == Py_None)
 		goto exit;
@@ -2774,11 +2881,10 @@ LPECUSER Object_to_LPECUSER(PyObject *elem, ULONG ulFlags) {
 		goto exit;
 	}
 	memset(lpUser, 0, sizeof *lpUser);
-
 	process_conv_out_array(lpUser, elem, conv_info, lpUser, ulFlags);
-
+	Object_to_MVPROPMAP(elem, lpUser, ulFlags);
 exit:
-	if (PyErr_Occurred() && lpUser) {
+	if (PyErr_Occurred()) {
 		MAPIFreeBuffer(lpUser);
 		lpUser = NULL;
 	}
@@ -2786,22 +2892,24 @@ exit:
 	return lpUser;
 }
 
-PyObject * Object_from_LPECUSER(LPECUSER lpUser, ULONG ulFlags)
+PyObject *Object_from_LPECUSER(ECUSER *lpUser, ULONG ulFlags)
 {
-    if(ulFlags & MAPI_UNICODE)
-        return PyObject_CallFunction(PyTypeECUser, "(uuuuulllls#)", lpUser->lpszUsername, lpUser->lpszPassword, lpUser->lpszMailAddress, lpUser->lpszFullName, lpUser->lpszServername, lpUser->ulObjClass, lpUser->ulIsAdmin, lpUser->ulIsABHidden, lpUser->ulCapacity, lpUser->sUserId.lpb, lpUser->sUserId.cb);
-    else
-        return PyObject_CallFunction(PyTypeECUser, "(ssssslllls#)", lpUser->lpszUsername, lpUser->lpszPassword, lpUser->lpszMailAddress, lpUser->lpszFullName, lpUser->lpszServername, lpUser->ulObjClass, lpUser->ulIsAdmin, lpUser->ulIsABHidden, lpUser->ulCapacity, lpUser->sUserId.lpb, lpUser->sUserId.cb);
+	PyObject *MVProps = Object_from_MVPROPMAP(lpUser->sMVPropmap, ulFlags);
 
+	// XXX: Caller should DECREF List?
+	if (ulFlags & MAPI_UNICODE)
+		return PyObject_CallFunction(PyTypeECUser, "(uuuuulllls#O)", lpUser->lpszUsername, lpUser->lpszPassword, lpUser->lpszMailAddress, lpUser->lpszFullName, lpUser->lpszServername, lpUser->ulObjClass, lpUser->ulIsAdmin, lpUser->ulIsABHidden, lpUser->ulCapacity, lpUser->sUserId.lpb, lpUser->sUserId.cb, MVProps);
+	else
+		return PyObject_CallFunction(PyTypeECUser, "(ssssslllls#O)", lpUser->lpszUsername, lpUser->lpszPassword, lpUser->lpszMailAddress, lpUser->lpszFullName, lpUser->lpszServername, lpUser->ulObjClass, lpUser->ulIsAdmin, lpUser->ulIsABHidden, lpUser->ulCapacity, lpUser->sUserId.lpb, lpUser->sUserId.cb, MVProps);
 }
 
 
-PyObject * List_from_LPECUSER(LPECUSER lpUser, ULONG cElements, ULONG ulFlags)
+PyObject *List_from_LPECUSER(ECUSER *lpUser, ULONG cElements, ULONG ulFlags)
 {
 	PyObject *list = PyList_New(0);
 	PyObject *item = NULL;
 
-	for(unsigned int i=0; i<cElements; i++) {
+	for (unsigned int i = 0; i < cElements; ++i) {
 		item = Object_from_LPECUSER(&lpUser[i], ulFlags);
 		if (PyErr_Occurred())
 			goto exit;
@@ -2827,7 +2935,7 @@ exit:
 	return list;
 }
 
-LPECGROUP Object_to_LPECGROUP(PyObject *elem, ULONG ulFlags)
+ECGROUP *Object_to_LPECGROUP(PyObject *elem, ULONG ulFlags)
 {
 	static conv_out_info<ECGROUP> conv_info[] = {
 		{conv_out_default<ECGROUP, LPTSTR, &ECGROUP::lpszGroupname>, "Groupname"},
@@ -2838,7 +2946,7 @@ LPECGROUP Object_to_LPECGROUP(PyObject *elem, ULONG ulFlags)
 	};
 
 	HRESULT hr = hrSuccess;
-	LPECGROUP lpGroup = NULL;
+	ECGROUP *lpGroup = NULL;
 
 	if (elem == Py_None)
 		goto exit;
@@ -2853,7 +2961,7 @@ LPECGROUP Object_to_LPECGROUP(PyObject *elem, ULONG ulFlags)
 	process_conv_out_array(lpGroup, elem, conv_info, lpGroup, ulFlags);
 
 exit:
-	if (PyErr_Occurred() && lpGroup) {
+	if (PyErr_Occurred()) {
 		MAPIFreeBuffer(lpGroup);
 		lpGroup = NULL;
 	}
@@ -2861,7 +2969,7 @@ exit:
 	return lpGroup;
 }
 
-PyObject * Object_from_LPECGROUP(LPECGROUP lpGroup, ULONG ulFlags)
+PyObject *Object_from_LPECGROUP(ECGROUP *lpGroup, ULONG ulFlags)
 {
 	if(ulFlags & MAPI_UNICODE)
 		return PyObject_CallFunction(PyTypeECGroup, "(uuuls#)", lpGroup->lpszGroupname, lpGroup->lpszFullname, lpGroup->lpszFullEmail, lpGroup->ulIsABHidden, lpGroup->sGroupId.lpb, lpGroup->sGroupId.cb);
@@ -2869,12 +2977,12 @@ PyObject * Object_from_LPECGROUP(LPECGROUP lpGroup, ULONG ulFlags)
 		return PyObject_CallFunction(PyTypeECGroup, "(sssls#)", lpGroup->lpszGroupname, lpGroup->lpszFullname, lpGroup->lpszFullEmail, lpGroup->ulIsABHidden, lpGroup->sGroupId.lpb, lpGroup->sGroupId.cb);
 }
 
-PyObject * List_from_LPECGROUP(LPECGROUP lpGroup, ULONG cElements, ULONG ulFlags)
+PyObject *List_from_LPECGROUP(ECGROUP *lpGroup, ULONG cElements, ULONG ulFlags)
 {
 	PyObject *list = PyList_New(0);
 	PyObject *item = NULL;
 
-	for(unsigned int i=0; i<cElements; i++) {
+	for (unsigned int i = 0; i < cElements; ++i) {
 		item = Object_from_LPECGROUP(&lpGroup[i], ulFlags);
 		if (PyErr_Occurred())
 			goto exit;
@@ -2900,7 +3008,7 @@ exit:
 	return list;
 }
 
-LPECCOMPANY Object_to_LPECCOMPANY(PyObject *elem, ULONG ulFlags)
+ECCOMPANY *Object_to_LPECCOMPANY(PyObject *elem, ULONG ulFlags)
 {
 	static conv_out_info<ECCOMPANY> conv_info[] = {
 		{conv_out_default<ECCOMPANY, LPTSTR, &ECCOMPANY::lpszCompanyname>, "Companyname"},
@@ -2910,7 +3018,7 @@ LPECCOMPANY Object_to_LPECCOMPANY(PyObject *elem, ULONG ulFlags)
 	};
 
 	HRESULT hr = hrSuccess;
-	LPECCOMPANY lpCompany = NULL;
+	ECCOMPANY *lpCompany = NULL;
 
 	if (elem == Py_None)
 		goto exit;
@@ -2925,7 +3033,7 @@ LPECCOMPANY Object_to_LPECCOMPANY(PyObject *elem, ULONG ulFlags)
 	process_conv_out_array(lpCompany, elem, conv_info, lpCompany, ulFlags);
 
 exit:
-	if (PyErr_Occurred() && lpCompany) {
+	if (PyErr_Occurred()) {
 		MAPIFreeBuffer(lpCompany);
 		lpCompany = NULL;
 	}
@@ -2933,7 +3041,7 @@ exit:
 	return lpCompany;
 }
 
-PyObject * Object_from_LPECCOMPANY(LPECCOMPANY lpCompany, ULONG ulFlags)
+PyObject *Object_from_LPECCOMPANY(ECCOMPANY *lpCompany, ULONG ulFlags)
 {
         if(ulFlags & MAPI_UNICODE)
 		return PyObject_CallFunction(PyTypeECCompany, "(uuls#)", lpCompany->lpszCompanyname, lpCompany->lpszServername, lpCompany->ulIsABHidden, lpCompany->sCompanyId.lpb, lpCompany->sCompanyId.cb);
@@ -2941,12 +3049,13 @@ PyObject * Object_from_LPECCOMPANY(LPECCOMPANY lpCompany, ULONG ulFlags)
 		return PyObject_CallFunction(PyTypeECCompany, "(ssls#)", lpCompany->lpszCompanyname, lpCompany->lpszServername, lpCompany->ulIsABHidden, lpCompany->sCompanyId.lpb, lpCompany->sCompanyId.cb);
 }
 
-PyObject * List_from_LPECCOMPANY(LPECCOMPANY lpCompany, ULONG cElements, ULONG ulFlags)
+PyObject *List_from_LPECCOMPANY(ECCOMPANY *lpCompany, ULONG cElements,
+    ULONG ulFlags)
 {
 	PyObject *list = PyList_New(0);
 	PyObject *item = NULL;
 
-	for(unsigned int i=0; i<cElements; i++) {
+	for (unsigned int i = 0; i < cElements; ++i) {
 		item = Object_from_LPECCOMPANY(&lpCompany[i], ulFlags);
 		if (PyErr_Occurred())
 			goto exit;
@@ -2972,7 +3081,7 @@ exit:
 	return list;
 }
 
-PyObject *Object_from_LPECUSERCLIENTUPDATESTATUS(LPECUSERCLIENTUPDATESTATUS lpECUCUS)
+PyObject *Object_from_LPECUSERCLIENTUPDATESTATUS(ECUSERCLIENTUPDATESTATUS *lpECUCUS)
 {
 	// @todo charset conversion ?
 	return PyObject_CallFunction(PyTypeECUserClientUpdateStatus, "(llsssl)", lpECUCUS->ulTrackId, lpECUCUS->tUpdatetime, lpECUCUS->lpszCurrentversion, lpECUCUS->lpszLatestversion, lpECUCUS->lpszComputername, lpECUCUS->ulStatus);
@@ -3025,16 +3134,14 @@ LPROWLIST List_to_LPROWLIST(PyObject *object, ULONG ulFlags)
 
 		Py_DECREF(elem);
 		elem = NULL;
-
-		n++;
+		++n;
 	}
 
 	lpRowList->cEntries = n;
 
 exit:
 	if (PyErr_Occurred()) {
-		if (lpRowList)
-			MAPIFreeBuffer(lpRowList);
+		MAPIFreeBuffer(lpRowList);
 		lpRowList = NULL;
 	}
 	if (props)
@@ -3059,7 +3166,11 @@ void DoException(HRESULT hr)
 	PyObject *hrObj = PyLong_FromUnsignedLong((unsigned int)hr);
 #endif
 
-	PyObject *attr_name = PyString_FromString("_errormap");
+	#if PY_MAJOR_VERSION >= 3
+		PyObject *attr_name = PyUnicode_FromString("_errormap");
+	#else
+		PyObject *attr_name = PyString_FromString("_errormap");
+	#endif
 	PyObject *errormap = PyObject_GetAttr(PyTypeMAPIError, attr_name);
 	PyObject *errortype = NULL;
 	PyObject *ex = NULL;
@@ -3116,7 +3227,7 @@ int GetExceptionError(PyObject *object, HRESULT *lphr)
 	return 1;
 }
 
-LPECQUOTA Object_to_LPECQUOTA(PyObject *elem)
+ECQUOTA *Object_to_LPECQUOTA(PyObject *elem)
 {
 	static conv_out_info<ECQUOTA> conv_info[] = {
 		{conv_out_default<ECQUOTA, bool, &ECQUOTA::bUseDefaultQuota>, "bUseDefaultQuota"},
@@ -3127,7 +3238,7 @@ LPECQUOTA Object_to_LPECQUOTA(PyObject *elem)
 	};
 
 	HRESULT hr = hrSuccess;
-	LPECQUOTA lpQuota = NULL;
+	ECQUOTA *lpQuota = NULL;
 
 	if (elem == Py_None)
 		goto exit;
@@ -3142,7 +3253,7 @@ LPECQUOTA Object_to_LPECQUOTA(PyObject *elem)
 	process_conv_out_array(lpQuota, elem, conv_info, lpQuota, 0);
 
 exit:
-	if (PyErr_Occurred() && lpQuota) {
+	if (PyErr_Occurred()) {
 		MAPIFreeBuffer(lpQuota);
 		lpQuota = NULL;
 	}
@@ -3150,23 +3261,23 @@ exit:
 	return lpQuota;
 }
 
-PyObject *Object_from_LPECQUOTA(LPECQUOTA lpQuota)
+PyObject *Object_from_LPECQUOTA(ECQUOTA *lpQuota)
 {
 	return PyObject_CallFunction(PyTypeECQuota, "(llLLL)", lpQuota->bUseDefaultQuota, lpQuota->bIsUserDefaultQuota, lpQuota->llWarnSize, lpQuota->llSoftSize, lpQuota->llHardSize);
 }
 
-PyObject *Object_from_LPECQUOTASTATUS(LPECQUOTASTATUS lpQuotaStatus)
+PyObject *Object_from_LPECQUOTASTATUS(ECQUOTASTATUS *lpQuotaStatus)
 {
 	return PyObject_CallFunction(PyTypeECQuotaStatus, "Ll", lpQuotaStatus->llStoreSize, lpQuotaStatus->quotaStatus);
 }
 
-LPECSVRNAMELIST List_to_LPECSVRNAMELIST(PyObject *object)
+ECSVRNAMELIST *List_to_LPECSVRNAMELIST(PyObject *object)
 {
 	HRESULT hr = hrSuccess;
 	Py_ssize_t len = 0;
 	PyObject *iter = NULL;
 	PyObject *elem = NULL;
-	LPECSVRNAMELIST lpSvrNameList = NULL;
+	ECSVRNAMELIST *lpSvrNameList = NULL;
 
 	if (object == Py_None)
 		goto exit;
@@ -3177,10 +3288,10 @@ LPECSVRNAMELIST List_to_LPECSVRNAMELIST(PyObject *object)
 		goto exit;
 	}
 
-	if (MAPIAllocateBuffer(sizeof(ECSVRNAMELIST)+(sizeof(LPECSERVER) * len), (void**)&lpSvrNameList) != hrSuccess)
+	if (MAPIAllocateBuffer(sizeof(ECSVRNAMELIST) + (sizeof(ECSERVER *) * len), reinterpret_cast<void **>(&lpSvrNameList)) != hrSuccess)
 		goto exit;
 
-	memset(lpSvrNameList, 0, sizeof(ECSVRNAMELIST)+(sizeof(LPECSERVER) * len) );
+	memset(lpSvrNameList, 0, sizeof(ECSVRNAMELIST) + (sizeof(ECSERVER *) * len) );
 
 	iter = PyObject_GetIter(object);
 	if (iter == NULL)
@@ -3204,14 +3315,13 @@ LPECSVRNAMELIST List_to_LPECSVRNAMELIST(PyObject *object)
 
 		Py_DECREF(elem);
 		elem = NULL;
-		lpSvrNameList->cServers++;
+		++lpSvrNameList->cServers;
 	}
 
 
 exit:
 	if(PyErr_Occurred()) {
-		if(lpSvrNameList)
-			MAPIFreeBuffer(lpSvrNameList);
+		MAPIFreeBuffer(lpSvrNameList);
 		lpSvrNameList = NULL;
 	}
 	if(elem) {
@@ -3225,17 +3335,17 @@ exit:
 	return lpSvrNameList;
 }
 
-PyObject *Object_from_LPECSERVER(LPECSERVER lpServer)
+PyObject *Object_from_LPECSERVER(ECSERVER *lpServer)
 {
 	return PyObject_CallFunction(PyTypeECServer, "(sssssl)", lpServer->lpszName, lpServer->lpszFilePath, lpServer->lpszHttpPath, lpServer->lpszSslPath, lpServer->lpszPreferedPath, lpServer->ulFlags);
 }
 
-PyObject *List_from_LPECSERVERLIST(LPECSERVERLIST lpServerList)
+PyObject *List_from_LPECSERVERLIST(ECSERVERLIST *lpServerList)
 {
 	PyObject *list = PyList_New(0);
 	PyObject *item = NULL;
 
-	for(unsigned int i=0; i<lpServerList->cServers; i++) {
+	for (unsigned int i = 0; i < lpServerList->cServers; ++i) {
 		item = Object_from_LPECSERVER(&lpServerList->lpsaServer[i]);
 		if (PyErr_Occurred())
 			goto exit;

@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <iostream>
 #include <string>
@@ -54,19 +28,19 @@
 #include <malloc.h>
 #endif
 
-#include "EMSAbTag.h"
-#include "ECConfig.h"
-#include "ECDefs.h"
-#include "ECLogger.h"
-#include "ECPluginSharedData.h"
+#include <zarafa/EMSAbTag.h>
+#include <zarafa/ECConfig.h>
+#include <zarafa/ECDefs.h>
+#include <zarafa/ECLogger.h>
+#include <zarafa/ECPluginSharedData.h>
 
-#include "stringutil.h"
-#include "md5.h"
+#include <zarafa/stringutil.h>
+#include <zarafa/md5.h>
 
 using namespace std;
 #include "ECDatabaseFactory.h"
 #include "DBUserPlugin.h"
-#include "ecversion.h"
+#include <zarafa/ecversion.h>
 
 extern "C" {
 	UserPlugin* getUserPluginInstance(pthread_mutex_t *pluginlock, ECPluginSharedData *shareddata) {
@@ -93,12 +67,12 @@ DBUserPlugin::~DBUserPlugin()
 {
 }
 
-void DBUserPlugin::InitPlugin() throw(exception)
+void DBUserPlugin::InitPlugin()
 {
 	DBPlugin::InitPlugin();
 }
 
-objectsignature_t DBUserPlugin::resolveName(objectclass_t objclass, const string &name, const objectid_t &company) throw(exception)
+objectsignature_t DBUserPlugin::resolveName(objectclass_t objclass, const string &name, const objectid_t &company)
 {
 	objectid_t	id;
 	ECRESULT	er;
@@ -200,7 +174,7 @@ objectsignature_t DBUserPlugin::resolveName(objectclass_t objclass, const string
 }
 
 
-objectsignature_t DBUserPlugin::authenticateUser(const string &username, const string &password, const objectid_t &company) throw(exception)
+objectsignature_t DBUserPlugin::authenticateUser(const string &username, const string &password, const objectid_t &company)
 {
 	objectid_t	objectid;
 	std::string signature;
@@ -211,8 +185,6 @@ objectsignature_t DBUserPlugin::authenticateUser(const string &username, const s
 	DB_LENGTHS	lpDBLen = NULL;
 
 	std::string salt;
-	MD5*		crypt;
-	char*		hex;
 	std::string strMD5;
 
 	/*
@@ -265,18 +237,14 @@ objectsignature_t DBUserPlugin::authenticateUser(const string &username, const s
 		if(strcmp(lpDBRow[0], OP_PASSWORD) == 0)
 		{
 			// Check Password
-			crypt = new MD5();
+			MD5_CTX crypt;
 			salt = lpDBRow[1];
 			salt.resize(8);
 
-			crypt->update((unsigned char*)salt.c_str(), (unsigned int)salt.length());
-			crypt->update((unsigned char*)password.c_str(), (unsigned int)password.size());
-			crypt->finalize();
-
-			hex = crypt->hex_digest();
-			strMD5 = salt+hex;
-			delete [] hex;
-			delete crypt;
+			MD5_Init(&crypt);
+			MD5_Update(&crypt, salt.c_str(), salt.length());
+			MD5_Update(&crypt, password.c_str(), password.size());
+			strMD5 = salt + zcp_md5_final_hex(&crypt);
 
 			if(strMD5.compare((string)lpDBRow[1]) == 0) {
 				objectid = objectid_t(string(lpDBRow[2], lpDBLen[2]), ACTIVE_USER);	// Password is oke
@@ -296,7 +264,7 @@ objectsignature_t DBUserPlugin::authenticateUser(const string &username, const s
 	throw login_error("Trying to authenticate failed: wrong username or password");
 }
 
-auto_ptr<signatures_t> DBUserPlugin::searchObject(const string &match, unsigned int ulFlags) throw(std::exception)
+auto_ptr<signatures_t> DBUserPlugin::searchObject(const string &match, unsigned int ulFlags)
 {
 	const char *search_props[] =
 	{
@@ -311,12 +279,29 @@ auto_ptr<signatures_t> DBUserPlugin::searchObject(const string &match, unsigned 
 	return searchObjects(match.c_str(), search_props, NULL, ulFlags);
 }
 
-void DBUserPlugin::modifyObjectId(const objectid_t &oldId, const objectid_t &newId) throw(std::exception)
+void DBUserPlugin::modifyObjectId(const objectid_t &oldId, const objectid_t &newId)
 {
+#ifdef HAVE_OFFLINE_SUPPORT
+	ECRESULT er = erSuccess;
+	string strQuery;
+	unsigned int ulAffRows = 0;
+
+	strQuery = "UPDATE object SET externid='" + m_lpDatabase->Escape(newId.id) + "', objectclass="+stringify(newId.objclass) +
+		" WHERE externid='" + m_lpDatabase->Escape(oldId.id) + "' AND objectclass="+stringify(oldId.objclass);
+	er = m_lpDatabase->DoUpdate(strQuery, &ulAffRows);
+
+	if (er != erSuccess)
+		throw runtime_error(string("db_query: ") + strerror(er));
+
+	if (ulAffRows > 1)
+		throw collision_error("modifyObjectId sql failed");
+
+#else
 	throw notimplemented("Modifying objects is not supported when using the DB user plugin.");
+#endif
 }
 
-void DBUserPlugin::setQuota(const objectid_t &objectid, const quotadetails_t &quotadetails) throw(std::exception)
+void DBUserPlugin::setQuota(const objectid_t &objectid, const quotadetails_t &quotadetails)
 {
 	string strQuery;
 	ECRESULT er = erSuccess;
@@ -344,22 +329,22 @@ void DBUserPlugin::setQuota(const objectid_t &objectid, const quotadetails_t &qu
 	DBPlugin::setQuota(objectid, quotadetails);
 }
 
-auto_ptr<objectdetails_t> DBUserPlugin::getPublicStoreDetails() throw(std::exception)
+auto_ptr<objectdetails_t> DBUserPlugin::getPublicStoreDetails()
 {
 	throw notsupported("public store details");
 }
 
-auto_ptr<serverdetails_t> DBUserPlugin::getServerDetails(const string &server) throw(std::exception)
+auto_ptr<serverdetails_t> DBUserPlugin::getServerDetails(const string &server)
 {
 	throw notsupported("server details");
 }
 
-auto_ptr<serverlist_t> DBUserPlugin::getServers() throw(std::exception)
+auto_ptr<serverlist_t> DBUserPlugin::getServers()
 {
 	throw notsupported("server list");
 }
 
-void DBUserPlugin::addSubObjectRelation(userobject_relation_t relation, const objectid_t &parentobject, const objectid_t &childobject) throw(std::exception)
+void DBUserPlugin::addSubObjectRelation(userobject_relation_t relation, const objectid_t &parentobject, const objectid_t &childobject)
 {
 	ECRESULT er = erSuccess;
 	string strQuery;

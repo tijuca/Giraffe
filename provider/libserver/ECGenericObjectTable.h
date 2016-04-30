@@ -1,44 +1,18 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 #ifndef ECGENERIC_OBJECTTABLE_H
@@ -46,16 +20,17 @@
 
 #define MAX_SORTKEY_LEN 4096
 
+#include <zarafa/zcdefs.h>
 #include "soapH.h"
 
 #include <list>
 #include <map>
 
 #include "ECSubRestriction.h"
-#include "ECKeyTable.h"
+#include <zarafa/ECKeyTable.h>
 #include "ECDatabase.h"
-#include "ustringutil.h"
-#include "ECUnknown.h"
+#include <zarafa/ustringutil.h>
+#include <zarafa/ECUnknown.h>
 
 /*
  * This object is an actual table, with a cursor in-memory. We also keep the complete
@@ -66,7 +41,7 @@
 
 
 typedef std::list<unsigned int>				ECListInt;
-typedef std::list<unsigned int>::iterator	ECListIntIterator;
+typedef std::list<unsigned int>::const_iterator ECListIntIterator;
 
 #define RESTRICT_MAX_DEPTH 16
 
@@ -77,7 +52,7 @@ class ECCacheManager;
 
 typedef std::map<ECTableRow, sObjectTableKey> ECSortedCategoryMap;
 
-class ECCategory {
+class ECCategory _zcp_final {
 public:
     ECCategory(unsigned int ulCategory, struct propVal *lpProps, unsigned int cProps, unsigned int nProps, ECCategory *lpParent, unsigned int ulDepth, bool fExpanded, const ECLocale &locale);
     virtual ~ECCategory();
@@ -96,7 +71,7 @@ public:
     ECRESULT UpdateMinMax(const sObjectTableKey &sKey, unsigned int i, struct propVal *lpPropVal, bool fMax, bool *lpfModified);
     ECRESULT UpdateMinMaxRemove(const sObjectTableKey &sKey, unsigned int i, bool fMax, bool *lpfModified);
 	
-	unsigned int GetObjectSize();
+	unsigned int GetObjectSize(void) const;
 
     struct propVal *m_lpProps;
     unsigned int m_cProps;
@@ -209,7 +184,7 @@ public:
 	virtual	ECRESULT	GetPropCategory(struct soap *soap, unsigned int ulPropTag, sObjectTableKey sKey, struct propVal *lpPropVal);
 	virtual unsigned int GetCategories();
 
-	virtual unsigned int GetObjectSize();
+	virtual unsigned int GetObjectSize(void);
 
 protected:
 	// Add an actual row to the table, and send a notification if required. If you add an existing row, the row is modified and the notification is send as a modification

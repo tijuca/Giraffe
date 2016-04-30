@@ -4,7 +4,7 @@
 %{
 #include "IECChangeAdvisor.h"
 #include "IECChangeAdviseSink.h"
-#include "IECSingleInstance.h"
+#include <zarafa/IECSingleInstance.h>
 #include "IECImportContentsChanges.h"
 #include "IECImportHierarchyChanges.h"
 %}
@@ -62,7 +62,7 @@ public:
 #if SWIGPYTHON
 
 %{
-#include "swig_iunknown.h"
+#include <zarafa/swig_iunknown.h>
 typedef IUnknownImplementor<IECChangeAdviseSink> ECChangeAdviseSink;
 typedef IUnknownImplementor<IECImportContentsChanges> ECImportContentsChanges;
 typedef IUnknownImplementor<IECImportHierarchyChanges> ECImportHierarchyChanges;

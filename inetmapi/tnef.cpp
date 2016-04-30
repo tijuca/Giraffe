@@ -1,44 +1,18 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 /**
@@ -65,15 +39,15 @@
  * -- Steve
  */
  
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <mapidefs.h> 
 #include <mapiutil.h>
 #include <mapiguid.h>
-#include <mapiext.h>
-#include "Util.h"
-#include "charset/convert.h"
-#include "charset/utf16string.h"
+#include <zarafa/mapiext.h>
+#include <zarafa/Util.h>
+#include <zarafa/charset/convert.h>
+#include <zarafa/charset/utf16string.h>
 #include <string>
 
 #include "tnef.h"
@@ -97,13 +71,10 @@ static const struct _sClassMap {
 
 static const char *FindMAPIClassByScheduleClass(const char *szSClass)
 {
-	unsigned int i = 0;
-
-	for(i=0;i<sizeof(sClassMap)/sizeof(sClassMap[0]);i++) {
+	for (size_t i = 0; i < ARRAY_SIZE(sClassMap); ++i)
 		if(stricmp(szSClass, sClassMap[i].szScheduleClass) == 0) {
 			return sClassMap[i].szMAPIClass;
 		}
-	}
 
 	return NULL;
 }
@@ -111,13 +82,10 @@ static const char *FindMAPIClassByScheduleClass(const char *szSClass)
 #if 0
 static const char *FindScheduleClassByMAPIClass(const char *szMAPIClass)
 {
-	unsigned int i = 0;
-
-	for(i=0;i<sizeof(sClassMap)/sizeof(sClassMap[0]);i++) {
+	for (size_t i = 0; i < ARRAY_SIZE(sClassMap); ++i)
 		if(stricmp(szMAPIClass, sClassMap[i].szMAPIClass) == 0) {
 			return sClassMap[i].szScheduleClass;
 		}
-	}
 
 	return NULL;
 }
@@ -136,11 +104,9 @@ static bool PropTagInPropList(ULONG ulPropTag, const SPropTagArray *lpPropList)
 	if (lpPropList == NULL)
 		return false;
 
-	for (ULONG i = 0; i < lpPropList->cValues; i++) {
+	for (ULONG i = 0; i < lpPropList->cValues; ++i)
 		if (PROP_ID(ulPropTag) == PROP_ID(lpPropList->aulPropTag[i]))
 			return true;
-	}
-
 	return false;
 }
 
@@ -168,15 +134,15 @@ ECTNEF::ECTNEF(ULONG ulFlags, IMessage *lpMessage, IStream *lpStream)
  */
 ECTNEF::~ECTNEF()
 {
-	std::list<SPropValue *>::iterator iterProps;
-	std::list<tnefattachment*>::iterator iterAttach;
+	std::list<SPropValue *>::const_iterator iterProps;
+	std::list<tnefattachment *>::const_iterator iterAttach;
 
-	for(iterProps = lstProps.begin(); iterProps != lstProps.end(); iterProps++) {
+	for (iterProps = lstProps.begin();
+	     iterProps != lstProps.end(); ++iterProps)
 		MAPIFreeBuffer(*iterProps);
-	}
-	for (iterAttach = lstAttachments.begin(); iterAttach != lstAttachments.end(); iterAttach++) {
+	for (iterAttach = lstAttachments.begin();
+	     iterAttach != lstAttachments.end(); ++iterAttach)
 		FreeAttachmentData(*iterAttach);
-	}
 }
 
 /** 
@@ -187,14 +153,12 @@ ECTNEF::~ECTNEF()
  */
 void ECTNEF::FreeAttachmentData(tnefattachment* lpTnefAtt)
 {
-	std::list<SPropValue *>::iterator iterProps;
+	std::list<SPropValue *>::const_iterator iterProps;
 
-	if (lpTnefAtt->data)
-		delete [] lpTnefAtt->data;
-
-	for (iterProps = lpTnefAtt->lstProps.begin(); iterProps != lpTnefAtt->lstProps.end(); iterProps++) {
+	delete[] lpTnefAtt->data;
+	for (iterProps = lpTnefAtt->lstProps.begin();
+	     iterProps != lpTnefAtt->lstProps.end(); ++iterProps)
 		MAPIFreeBuffer(*iterProps);
-	}
 
 	delete lpTnefAtt;
 }
@@ -274,7 +238,7 @@ static HRESULT StreamToPropValue(IStream *lpStream, ULONG ulPropTag,
 	*lppPropValue = lpPropValue;
 
 exit:
-	if (hr != hrSuccess && lpPropValue)
+	if (hr != hrSuccess)
 		MAPIFreeBuffer(lpPropValue);
 
 	return hr;
@@ -310,11 +274,15 @@ HRESULT ECTNEF::AddProps(ULONG ulFlags, LPSPropTagArray lpPropList)
 	if (hr != hrSuccess)
 		goto exit;
 
-	for (i = 0; i < lpPropListMessage->cValues; i++) {
-	    // do not send properties in 0x67XX range, since these seem to be blacklisted in recent exchange servers, which
-	    // causes exchange to drop the entire message
-	    if(PROP_ID(lpPropListMessage->aulPropTag[i]) >= 0x6700 && PROP_ID(lpPropListMessage->aulPropTag[i]) <= 0x67FF)
-	        continue;
+	for (i = 0; i < lpPropListMessage->cValues; ++i) {
+		/*
+		 * Do not send properties in 0x67XX range, since these seem to
+		 * be blacklisted in recent exchange servers, which causes
+		 * exchange to drop the entire message.
+		 */
+		if (PROP_ID(lpPropListMessage->aulPropTag[i]) >= 0x6700 &&
+		    PROP_ID(lpPropListMessage->aulPropTag[i]) <= 0x67FF)
+			continue;
 
 		// unable to save these properties
 		if(PROP_TYPE(lpPropListMessage->aulPropTag[i]) == PT_OBJECT || 
@@ -347,8 +315,7 @@ HRESULT ECTNEF::AddProps(ULONG ulFlags, LPSPropTagArray lpPropList)
 				}
 			}
 
-			if (lpPropValue)
-				MAPIFreeBuffer(lpPropValue);
+			MAPIFreeBuffer(lpPropValue);
 			lpPropValue = NULL;
 		
 			hr = hrSuccess; // silently ignore the property
@@ -356,9 +323,7 @@ HRESULT ECTNEF::AddProps(ULONG ulFlags, LPSPropTagArray lpPropList)
 	}
 
 exit:
-	if(lpPropListMessage)
-		MAPIFreeBuffer(lpPropListMessage);
-
+	MAPIFreeBuffer(lpPropListMessage);
 	return hr;
 }
 
@@ -576,12 +541,8 @@ exit:
 			FreeAttachmentData(lpTnefAtt);
 	}
 
-	if(szSClass)
-		delete [] szSClass;
-
-	if(lpBuffer)
-		MAPIFreeBuffer(lpBuffer);
-
+	delete[] szSClass;
+	MAPIFreeBuffer(lpBuffer);
 	return hr;
 }
 
@@ -594,20 +555,18 @@ exit:
  */
 HRESULT ECTNEF::HrWritePropStream(IStream *lpStream, std::list<SPropValue *> &proplist)
 {
-	HRESULT hr = hrSuccess;
-	std::list<SPropValue *>::iterator iterProps;
+	HRESULT hr;
+	std::list<SPropValue *>::const_iterator iterProps;
 
 	hr = HrWriteDWord(lpStream, proplist.size());
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
-	for (iterProps = proplist.begin(); iterProps != proplist.end(); iterProps++) {
+	for (iterProps = proplist.begin(); iterProps != proplist.end(); ++iterProps) {
 		hr = HrWriteSingleProp(lpStream, *iterProps);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-exit:
 	return hr;
 }
 
@@ -685,7 +644,7 @@ HRESULT ECTNEF::HrWriteSingleProp(IStream *lpStream, LPSPropValue lpProp)
 				hr = HrWriteByte(lpStream, 0);
 				if(hr != hrSuccess)
 					goto exit;
-				ulLen++;
+				++ulLen;
 			}
 		}
 	} else {
@@ -746,7 +705,7 @@ HRESULT ECTNEF::HrWriteSingleProp(IStream *lpStream, LPSPropValue lpProp)
 
 	ulMVProp = 0;
 
-	for(ulMVProp = 0; ulMVProp < ulCount; ulMVProp++) {
+	for (ulMVProp = 0; ulMVProp < ulCount; ++ulMVProp) {
 		switch(PROP_TYPE(lpProp->ulPropTag) &~ MV_FLAG) {
 		case PT_I2:
 			if(lpProp->ulPropTag & MV_FLAG)
@@ -870,7 +829,7 @@ HRESULT ECTNEF::HrWriteSingleProp(IStream *lpStream, LPSPropValue lpProp)
 				hr = HrWriteByte(lpStream, 0);
 				if (hr != hrSuccess)
 					goto exit;
-				ulLen++;
+				++ulLen;
 			}
 			break;
 
@@ -909,7 +868,7 @@ HRESULT ECTNEF::HrWriteSingleProp(IStream *lpStream, LPSPropValue lpProp)
 				hr = HrWriteByte(lpStream, 0);
 				if (hr != hrSuccess)
 					goto exit;
-				ulLen++;
+				++ulLen;
 			}
 			break;
 
@@ -949,7 +908,7 @@ HRESULT ECTNEF::HrWriteSingleProp(IStream *lpStream, LPSPropValue lpProp)
 				hr = HrWriteByte(lpStream, 0);
 				if (hr != hrSuccess)
 					goto exit;
-				ulLen++;
+				++ulLen;
 			}
 			break;
 		
@@ -971,9 +930,7 @@ HRESULT ECTNEF::HrWriteSingleProp(IStream *lpStream, LPSPropValue lpProp)
 	}
 
 exit:
-	if (lppNames)
-		MAPIFreeBuffer(lppNames);
-
+	MAPIFreeBuffer(lppNames);
 	return hr;
 }
 
@@ -1007,8 +964,7 @@ HRESULT ECTNEF::HrReadPropStream(char *lpBuffer, ULONG ulSize, std::list<SPropVa
 		lpBuffer += ulRead;
 
 		proplist.push_back(lpProp);
-
-		ulProps--;
+		--ulProps;
 
 		if(ulRead & 3) {
 			// Skip padding
@@ -1189,7 +1145,7 @@ HRESULT ECTNEF::HrReadSingleProp(char *lpBuffer, ULONG ulSize, ULONG *lpulRead, 
 
 	lpProp->ulPropTag = ulPropTag;
 
-	for(ulMVProp = 0; ulMVProp < ulCount; ulMVProp++) {
+	for (ulMVProp = 0; ulMVProp < ulCount; ++ulMVProp) {
 		switch(PROP_TYPE(ulPropTag) & ~MV_FLAG) {
 		case PT_I2:
 			if(ulPropTag & MV_FLAG)
@@ -1468,14 +1424,9 @@ HRESULT ECTNEF::HrReadSingleProp(char *lpBuffer, ULONG ulSize, ULONG *lpulRead, 
 	*lppProp = lpProp;
 
 exit:
-	if(hr != hrSuccess) {
-		if(lpProp)
-			MAPIFreeBuffer(lpProp);
-	}
-
-	if(lpPropTags)
-		MAPIFreeBuffer(lpPropTags);
-
+	if (hr != hrSuccess)
+		MAPIFreeBuffer(lpProp);
+	MAPIFreeBuffer(lpPropTags);
 	return hr;
 }
 
@@ -1492,10 +1443,8 @@ HRESULT ECTNEF::SetProps(ULONG cValues, LPSPropValue lpProps)
 {
 	unsigned int i = 0;
 
-	for(i=0; i<cValues; i++) {
+	for (i = 0; i < cValues; ++i)
 		lstProps.push_back(&lpProps[i]);
-	}
-
 	return hrSuccess;
 }
 
@@ -1522,7 +1471,6 @@ HRESULT ECTNEF::FinishComponent(ULONG ulFlags, ULONG ulComponentID, LPSPropTagAr
     ULONG cValues = 0;
     AttachRendData sData;
     SizedSPropTagArray(2, sptaTags) = {2, { PR_ATTACH_METHOD, PR_RENDERING_POSITION }};
-    char *lpData = NULL;
     LPSPropValue lpsNewProp = NULL;
     struct tnefattachment sTnefAttach;
     
@@ -1557,7 +1505,7 @@ HRESULT ECTNEF::FinishComponent(ULONG ulFlags, ULONG ulComponentID, LPSPropTagAr
     if(FAILED(hr))
         goto exit;
     
-    for(unsigned int i=0; i < cValues; i++) {
+    for (unsigned int i = 0; i < cValues; ++i) {
         // Other properties
         if(PROP_TYPE(lpProps[i].ulPropTag) == PT_ERROR)
             continue;
@@ -1591,25 +1539,16 @@ HRESULT ECTNEF::FinishComponent(ULONG ulFlags, ULONG ulComponentID, LPSPropTagAr
     sTnefAttach.rdata = sData;
     sTnefAttach.data = NULL;
     sTnefAttach.size = 0;
-    
-    lpData = NULL;
-    
     lstAttachments.push_back(new tnefattachment(sTnefAttach));
     
 exit:
     if(lpStream)
         lpStream->Release();
-    if(lpsNewProp)
-        MAPIFreeBuffer(lpsNewProp);
-    if(lpData)
-        delete [] lpData;
+    MAPIFreeBuffer(lpsNewProp);
     if(lpAttach)
         lpAttach->Release();
-    if(lpProps)
-        MAPIFreeBuffer(lpProps);
-    if(lpAttachProps)
-        MAPIFreeBuffer(lpAttachProps);
-        
+    MAPIFreeBuffer(lpProps);
+    MAPIFreeBuffer(lpAttachProps);
     return hr;
 }
 
@@ -1624,7 +1563,7 @@ exit:
 HRESULT ECTNEF::Finish()
 {
 	HRESULT hr = hrSuccess;
-	std::list<SPropValue *>::iterator iterProps;
+	std::list<SPropValue *>::const_iterator iterProps;
 	IStream *lpPropStream = NULL;
 	STATSTG sStat;
 	ULONG ulChecksum;
@@ -1636,12 +1575,12 @@ HRESULT ECTNEF::Finish()
 	LPSTREAM lpAttStream = NULL;
 	LPMESSAGE lpAttMessage = NULL;
 	IStream *lpSubStream = NULL;
-	std::list<tnefattachment*>::iterator iterAttach;
+	std::list<tnefattachment *>::const_iterator iterAttach;
 	SPropValue sProp;
 
 	if(ulFlags == TNEF_DECODE) {
 		// Write properties to message
-		for(iterProps = lstProps.begin(); iterProps != lstProps.end(); iterProps++) {
+		for (iterProps = lstProps.begin(); iterProps != lstProps.end(); ++iterProps) {
 
 			if(PROP_ID((*iterProps)->ulPropTag) == PROP_ID(PR_MESSAGE_CLASS) ||
 				!FPropExists(m_lpMessage, (*iterProps)->ulPropTag) ||
@@ -1654,7 +1593,9 @@ HRESULT ECTNEF::Finish()
 
 		}
 		// Add all found attachments to message
-		for (iterAttach = lstAttachments.begin(); iterAttach != lstAttachments.end(); iterAttach++) {
+		for (iterAttach = lstAttachments.begin();
+		     iterAttach != lstAttachments.end(); ++iterAttach)
+		{
 			bool has_obj = false;
 
 			hr = m_lpMessage->CreateAttach(NULL, 0, &ulAttachNum, &lpAttach);
@@ -1669,7 +1610,10 @@ HRESULT ECTNEF::Finish()
             sProp.Value.ul = (*iterAttach)->rdata.ulPosition;
             lpAttach->SetProps(1, &sProp, NULL);
             
-			for (iterProps = (*iterAttach)->lstProps.begin(); iterProps != (*iterAttach)->lstProps.end(); iterProps++) {
+			for (iterProps = (*iterAttach)->lstProps.begin();
+			     iterProps != (*iterAttach)->lstProps.end();
+			     ++iterProps)
+			{
 				// must not set PR_ATTACH_NUM by ourselves
 				if (PROP_ID((*iterProps)->ulPropTag) == PROP_ID(PR_ATTACH_NUM))
 					continue;
@@ -1810,7 +1754,9 @@ HRESULT ECTNEF::Finish()
 			goto exit;
 		
 		// Write attachments	
-        for(iterAttach = lstAttachments.begin(); iterAttach != lstAttachments.end(); iterAttach++) {
+        for (iterAttach = lstAttachments.begin();
+             iterAttach != lstAttachments.end(); ++iterAttach)
+        {
             // Write attachment start block
             hr = HrWriteBlock(m_lpStream, (char *)&(*iterAttach)->rdata, sizeof(AttachRendData), 0x00069002, 2);
             if(hr != hrSuccess)
@@ -1870,20 +1816,15 @@ exit:
  */
 HRESULT ECTNEF::HrReadDWord(IStream *lpStream, ULONG *ulData)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG ulRead = 0;
 
 	hr = lpStream->Read(ulData, sizeof(unsigned int), &ulRead);
 	if(hr != hrSuccess)
-		goto exit;
-
-	if(ulRead != sizeof(unsigned int)) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-exit:
-	return hr;
+		return hr;
+	if (ulRead != sizeof(unsigned int))
+		return MAPI_E_NOT_FOUND;
+	return hrSuccess;
 }
 
 /**
@@ -1896,20 +1837,15 @@ exit:
  */
 HRESULT ECTNEF::HrReadWord(IStream *lpStream, unsigned short *ulData)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG ulRead = 0;
 
 	hr = lpStream->Read(ulData, sizeof(unsigned short), &ulRead);
 	if(hr != hrSuccess)
-		goto exit;
-
-	if(ulRead != sizeof(unsigned short)) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-exit:
-	return hr;
+		return hr;
+	if (ulRead != sizeof(unsigned short))
+		return MAPI_E_NOT_FOUND;
+	return hrSuccess;
 }
 
 /**
@@ -1922,20 +1858,15 @@ exit:
  */
 HRESULT ECTNEF::HrReadByte(IStream *lpStream, unsigned char *ulData)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG ulRead = 0;
 
 	hr = lpStream->Read(ulData, 1, &ulRead);
 	if(hr != hrSuccess)
-		goto exit;
-
-	if(ulRead != 1) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-exit:
-	return hr;
+		return hr;
+	if (ulRead != 1)
+		return MAPI_E_NOT_FOUND;
+	return hrSuccess;
 }
 
 /**
@@ -1950,7 +1881,7 @@ exit:
  */
 HRESULT ECTNEF::HrReadData(IStream *lpStream, char *lpData, ULONG ulLen)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG ulRead = 0;
 	ULONG ulToRead = 0;
 
@@ -1959,19 +1890,13 @@ HRESULT ECTNEF::HrReadData(IStream *lpStream, char *lpData, ULONG ulLen)
 
 		hr = lpStream->Read(lpData, ulToRead, &ulRead);
 		if(hr != hrSuccess)
-			goto exit;
-
-		if(ulRead != ulToRead) {
-			hr = MAPI_E_NOT_FOUND;
-			goto exit;
-		}
-
+			return hr;
+		if (ulRead != ulToRead)
+			return MAPI_E_NOT_FOUND;
 		ulLen -= ulRead;
 		lpData += ulRead;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -1984,20 +1909,15 @@ exit:
  */
 HRESULT ECTNEF::HrWriteDWord(IStream *lpStream, ULONG ulData)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG ulWritten = 0;
 
 	hr = lpStream->Write(&ulData, sizeof(unsigned int), &ulWritten);
 	if(hr != hrSuccess)
-		goto exit;
-
-	if(ulWritten != sizeof(unsigned int)) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-exit:
-	return hr;
+		return hr;
+	if (ulWritten != sizeof(unsigned int))
+		return MAPI_E_NOT_FOUND;
+	return hrSuccess;
 }
 
 /**
@@ -2010,20 +1930,15 @@ exit:
  */
 HRESULT ECTNEF::HrWriteWord(IStream *lpStream, unsigned short ulData)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG ulWritten = 0;
 
 	hr = lpStream->Write(&ulData, sizeof(unsigned short), &ulWritten);
 	if(hr != hrSuccess)
-		goto exit;
-
-	if(ulWritten != sizeof(unsigned short)) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-exit:
-	return hr;
+		return hr;
+	if (ulWritten != sizeof(unsigned short))
+		return MAPI_E_NOT_FOUND;
+	return hrSuccess;
 }
 
 /**
@@ -2036,20 +1951,15 @@ exit:
  */
 HRESULT ECTNEF::HrWriteByte(IStream *lpStream, unsigned char ulData)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG ulWritten = 0;
 
 	hr = lpStream->Write(&ulData, sizeof(unsigned char), &ulWritten);
 	if(hr != hrSuccess)
-		goto exit;
-
-	if(ulWritten != sizeof(unsigned char)) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-exit:
-	return hr;
+		return hr;
+	if (ulWritten != sizeof(unsigned char))
+		return MAPI_E_NOT_FOUND;
+	return hrSuccess;
 }
 
 /**
@@ -2061,20 +1971,17 @@ exit:
  */
 HRESULT ECTNEF::HrWriteData(IStream *lpStream, char *data, ULONG ulLen)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG ulWritten = 0;
 
 	while(ulLen > 0) {
 		hr = lpStream->Write(data, ulLen > 4096 ? 4096 : ulLen, &ulWritten);
 		if(hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		ulLen -= ulWritten;
 		data += ulWritten;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -2111,9 +2018,8 @@ HRESULT ECTNEF::HrGetChecksum(IStream *lpStream, ULONG *lpulChecksum)
 		if(ulRead == 0)
 			break;
 
-		for(i=0;i<ulRead;i++) {
+		for (i = 0; i < ulRead; ++i)
 			ulChecksum += buffer[i];
-		}
 	}
 
 	*lpulChecksum = ulChecksum;
@@ -2135,10 +2041,8 @@ exit:
 ULONG ECTNEF::GetChecksum(char *lpData, unsigned int ulLen)
 {
     ULONG ulChecksum = 0;
-    for (unsigned int i=0; i < ulLen; i++) {
-        ulChecksum += lpData[i];
-    }
-    
+	for (unsigned int i = 0; i < ulLen; ++i)
+		ulChecksum += lpData[i];
     return ulChecksum;
 }
 
@@ -2154,46 +2058,36 @@ ULONG ECTNEF::GetChecksum(char *lpData, unsigned int ulLen)
  */
 HRESULT ECTNEF::HrWriteBlock(IStream *lpDestStream, IStream *lpSourceStream, ULONG ulBlockID, ULONG ulLevel)
 {
-    HRESULT hr = hrSuccess;
+    HRESULT hr;
     ULONG ulChecksum = 0;
     LARGE_INTEGER zero = {{0,0}};
     STATSTG         sStat;
 
     hr = HrWriteByte(lpDestStream, ulLevel);
     if(hr != hrSuccess)
-        goto exit;
-        
+		return hr;
     hr = HrGetChecksum(lpSourceStream, &ulChecksum);
     if(hr != hrSuccess)
-        goto exit;
-    
+		return hr;
     hr = lpSourceStream->Seek(zero, STREAM_SEEK_SET, NULL);
     if(hr != hrSuccess)
-        goto exit;
-        
+		return hr;
     hr = HrWriteDWord(lpDestStream, ulBlockID);
     if(hr != hrSuccess)
-        goto exit;
-        
+		return hr;
     hr = lpSourceStream->Stat(&sStat, STATFLAG_NONAME);
     if(hr != hrSuccess)
-        goto exit;
-        
+		return hr;
     hr = HrWriteDWord(lpDestStream, sStat.cbSize.QuadPart);
     if(hr != hrSuccess)
-        goto exit;
-        
+		return hr;
     hr = lpSourceStream->CopyTo(lpDestStream, sStat.cbSize, NULL, NULL);
     if(hr != hrSuccess)
-        goto exit;
-        
+		return hr;
     hr = HrWriteWord(lpDestStream, ulChecksum);
     if(hr != hrSuccess)
-        goto exit;
-        
-exit:
-
-    return hr;
+		return hr;
+    return hrSuccess;
 }
 
 /** 
@@ -2243,32 +2137,26 @@ exit:
  */
 HRESULT ECTNEF::HrReadStream(IStream *lpStream, void *lpBase, BYTE **lppData, ULONG *lpulSize)
 {
-    HRESULT hr = hrSuccess;
+    HRESULT hr;
     STATSTG sStat;
     BYTE *lpBuffer = NULL;
     BYTE *lpWrite = NULL;
     ULONG ulSize = 0;
     ULONG ulRead = 0;
 
-	if (lpStream == NULL || lpBase == NULL || lppData == NULL || lpulSize == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-    
+	if (lpStream == NULL || lpBase == NULL || lppData == NULL || lpulSize == NULL)
+		return MAPI_E_INVALID_PARAMETER;
     hr = lpStream->Stat(&sStat, STATFLAG_NONAME);
     if(hr != hrSuccess)
-        goto exit;
-    
+		return hr;
     hr = MAPIAllocateMore(sStat.cbSize.QuadPart, lpBase, (void **)&lpBuffer);    
     if(hr != hrSuccess)
-        goto exit;
-    
+		return hr;
     lpWrite = lpBuffer;
     while(sStat.cbSize.QuadPart > 0) {
         hr = lpStream->Read(lpWrite, sStat.cbSize.QuadPart, &ulRead);
         if(hr != hrSuccess)
-            goto exit;
-            
+			return hr;
         lpWrite += ulRead;
         ulSize += ulRead;
         sStat.cbSize.QuadPart -= ulRead;
@@ -2276,9 +2164,7 @@ HRESULT ECTNEF::HrReadStream(IStream *lpStream, void *lpBase, BYTE **lppData, UL
         
     *lppData = lpBuffer;
     *lpulSize = ulSize;
-    
-exit:    
-    return hr;
+    return hrSuccess;
 }
 
 /** @} */

@@ -1,51 +1,27 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
-#include "ECChannel.h"
-#include "stringutil.h"
+#include <zarafa/ECChannel.h>
+#include <zarafa/stringutil.h>
 #include <csignal>
+#ifdef LINUX
+#include <netdb.h>
 #include <sys/types.h>
 #include <sys/select.h>
 #include <sys/socket.h>
@@ -54,6 +30,8 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <linux/rtnetlink.h>
+#endif
 
 #include <cerrno>
 #include <mapicode.h>
@@ -91,6 +69,9 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig, ECLogger *lpLogger) {
 	const char *ssl_ciphers = lpConfig->GetSetting("ssl_ciphers");
  	char *ssl_name = NULL;
  	int ssl_op = 0, ssl_include = 0, ssl_exclude = 0;
+#if !defined(OPENSSL_NO_ECDH) && defined(NID_X9_62_prime256v1)
+	EC_KEY *ecdh;
+#endif
 
 	if (lpConfig == NULL) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "ECChannel::HrSetCtx(): invalid parameters");
@@ -117,7 +98,7 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig, ECLogger *lpLogger) {
 		bool ssl_neg = false;
 
 		if (*ssl_name == '!') {
-			ssl_name++;
+			++ssl_name;
 			ssl_neg = true;
 		}
 
@@ -173,6 +154,16 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig, ECLogger *lpLogger) {
 		SSL_CTX_set_options(lpCTX, ssl_op);
 	}
 
+#if !defined(OPENSSL_NO_ECDH) && defined(NID_X9_62_prime256v1)
+	ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+	if (ecdh != NULL) {
+		/* SINGLE_ECDH_USE = renegotiate exponent for each handshake */
+		SSL_CTX_set_options(lpCTX, SSL_OP_SINGLE_ECDH_USE);
+		SSL_CTX_set_tmp_ecdh(lpCTX, ecdh);
+		EC_KEY_free(ecdh);
+	}
+#endif
+
 	if (ssl_ciphers && SSL_CTX_set_cipher_list(lpCTX, ssl_ciphers) != 1) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "Can not set SSL cipher list to '%s': %s", ssl_ciphers, ERR_error_string(ERR_get_error(), 0));
 		hr = MAPI_E_CALL_FAILED;
@@ -209,10 +200,10 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig, ECLogger *lpLogger) {
 		SSL_CTX_set_verify(lpCTX, SSL_VERIFY_NONE, 0);
 	}
 
-	if (strlen(lpConfig->GetSetting("ssl_verify_file")) > 0)
+	if (lpConfig->GetSetting("ssl_verify_file")[0])
 		szFile = lpConfig->GetSetting("ssl_verify_file");
 
-	if (strlen(lpConfig->GetSetting("ssl_verify_path")) > 0)
+	if (lpConfig->GetSetting("ssl_verify_path")[0])
 		szPath = lpConfig->GetSetting("ssl_verify_path");
 
 	if (szFile || szPath) {
@@ -244,6 +235,9 @@ ECChannel::ECChannel(int fd) {
 	lpSSL = NULL;
 	
 	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char *>(&flag), sizeof(flag));
+	*peer_atxt = '\0';
+	memset(&peer_sockaddr, 0, sizeof(peer_sockaddr));
+	peer_salen = 0;
 }
 
 ECChannel::~ECChannel() {
@@ -510,9 +504,7 @@ HRESULT ECChannel::HrReadBytes(std::string * strBuffer, ULONG ulByteCount) {
 	strBuffer->assign(buffer, ulByteCount);
 
 exit:
-	if (buffer)
-		delete [] buffer;
-
+	delete[] buffer;
 	return hr;
 }
 
@@ -521,8 +513,10 @@ HRESULT ECChannel::HrSelect(int seconds) {
 	int res = 0;
 	struct timeval timeout = { seconds, 0 };
 
+#ifdef LINUX
 	if(fd >= FD_SETSIZE)
 	    return MAPI_E_NOT_ENOUGH_MEMORY;
+#endif
 	if(lpSSL && SSL_pending(lpSSL))
 		return hrSuccess;
 
@@ -611,10 +605,10 @@ char * ECChannel::fd_gets(char *buf, int *lpulLen) {
 
 	//remove the lf or crlf
 	if(newline){
-		bp--;
-		newline--;
+		--bp;
+		--newline;
 		if(newline >= buf && *newline == '\r')
-			bp--;
+			--bp;
 	}
 
 	*bp = '\0';
@@ -651,10 +645,10 @@ char * ECChannel::SSL_gets(char *buf, int *lpulLen) {
 	
 	//remove the lf or crlf
 	if(newline){
-		bp--;
-		newline--;
+		--bp;
+		--newline;
 		if(newline >= buf && *newline == '\r')
-			bp--;
+			--bp;
 	}
 
 	*bp = '\0';
@@ -662,32 +656,199 @@ char * ECChannel::SSL_gets(char *buf, int *lpulLen) {
 	return buf;
 }
 
-void ECChannel::SetIPAddress(char *szIPAddress)
+void ECChannel::SetIPAddress(const struct sockaddr *sa, size_t slen)
 {
-	strIP = szIPAddress;
+	char host[256], serv[16];
+	if (getnameinfo(sa, slen, host, sizeof(host), serv, sizeof(serv),
+	    NI_NUMERICHOST | NI_NUMERICSERV) != 0)
+		snprintf(peer_atxt, sizeof(peer_atxt), "<indeterminate>");
+	else if (sa->sa_family == AF_INET6)
+		snprintf(peer_atxt, sizeof(peer_atxt), "[%s]:%s", host, serv);
+	else if (sa->sa_family == AF_UNIX)
+		snprintf(peer_atxt, sizeof(peer_atxt), "unix:%s:%s", host, serv);
+	else
+		snprintf(peer_atxt, sizeof(peer_atxt), "%s:%s", host, serv);
+	memcpy(&peer_sockaddr, sa, slen);
+	peer_salen = slen;
 }
 
-const std::string& ECChannel::GetIPAddress() const
+const char *ECChannel::peer_addr(void) const
 {
-	return strIP;
+	return peer_atxt;
+}
+
+#ifdef LINUX
+static int peer_is_local2(int rsk, const struct nlmsghdr *nlh)
+{
+	if (send(rsk, nlh, nlh->nlmsg_len, 0) < 0)
+		return -errno;
+	char rspbuf[512];
+	ssize_t ret = recv(rsk, rspbuf, sizeof(rspbuf), 0);
+	if (ret < 0)
+		return -errno;
+	if (static_cast<size_t>(ret) < sizeof(struct nlmsghdr))
+		return -ENODATA;
+	nlh = reinterpret_cast<const struct nlmsghdr *>(rspbuf);
+	if (!NLMSG_OK(nlh, nlh->nlmsg_len))
+		return -EIO;
+	const struct rtmsg *rtm = reinterpret_cast<const struct rtmsg *>(NLMSG_DATA(nlh));
+	return rtm->rtm_type == RTN_LOCAL;
+}
+#endif
+
+/**
+ * Determine if a file descriptor refers to some kind of local connection,
+ * so as to decide on flags like compression.
+ *
+ * Returns negative errno code if indeterminate, otherwise false/true.
+ */
+int zcp_peeraddr_is_local(const struct sockaddr *peer_sockaddr,
+    socklen_t peer_socklen)
+{
+	if (peer_sockaddr->sa_family == AF_UNIX) {
+		return true;
+	} else if (peer_sockaddr->sa_family == AF_INET6) {
+		if (peer_socklen < sizeof(struct sockaddr_in6))
+			return -EIO;
+	} else if (peer_sockaddr->sa_family == AF_INET) {
+		if (peer_socklen < sizeof(struct sockaddr_in))
+			return -EIO;
+	} else {
+		return -EPROTONOSUPPORT;
+	}
+#ifdef LINUX
+	int rsk = socket(AF_NETLINK, SOCK_DGRAM, NETLINK_ROUTE);
+	if (rsk < 0) {
+		fprintf(stderr, "socket AF_NETLINK: %s\n", strerror(errno));
+		return -errno;
+	}
+	struct {
+		struct nlmsghdr nh;
+		struct rtmsg rth;
+		char attrbuf[512];
+	} req;
+	memset(&req, 0, sizeof(req));
+	req.nh.nlmsg_len     = NLMSG_LENGTH(sizeof(req.rth));
+	req.nh.nlmsg_flags   = NLM_F_REQUEST;
+	req.nh.nlmsg_type    = RTM_GETROUTE;
+	req.rth.rtm_family   = peer_sockaddr->sa_family;
+	req.rth.rtm_protocol = RTPROT_UNSPEC;
+	req.rth.rtm_type     = RTN_UNSPEC;
+	req.rth.rtm_scope    = RT_SCOPE_UNIVERSE;
+	req.rth.rtm_table    = RT_TABLE_UNSPEC;
+	struct rtattr *rta = reinterpret_cast<struct rtattr *>(reinterpret_cast<char *>(&req) + NLMSG_ALIGN(req.nh.nlmsg_len));
+	rta->rta_type        = RTA_DST;
+
+	int ret = -ENODATA;
+	if (peer_sockaddr->sa_family == AF_INET6) {
+		const struct in6_addr &ad = reinterpret_cast<const struct sockaddr_in6 *>(peer_sockaddr)->sin6_addr;
+		static const uint8_t mappedv4[] =
+			{0,0,0,0, 0,0,0,0, 0,0,0xff,0xff};
+		req.rth.rtm_dst_len = sizeof(ad);
+		if (memcmp(&ad, mappedv4, 12) == 0) {
+			/* RTM_GETROUTE won't report RTN_LOCAL for ::ffff:127.0.0.1 */
+			req.rth.rtm_family = AF_INET;
+			rta->rta_len = RTA_LENGTH(sizeof(struct in_addr));
+			req.nh.nlmsg_len = NLMSG_ALIGN(req.nh.nlmsg_len) + RTA_LENGTH(rta->rta_len);
+			memcpy(RTA_DATA(rta), &ad.s6_addr[12], 4);
+		} else {
+			rta->rta_len = RTA_LENGTH(sizeof(ad));
+			req.nh.nlmsg_len = NLMSG_ALIGN(req.nh.nlmsg_len) + RTA_LENGTH(rta->rta_len);
+			memcpy(RTA_DATA(rta), &ad, sizeof(ad));
+		}
+	} else if (peer_sockaddr->sa_family == AF_INET) {
+		const struct in_addr &ad = reinterpret_cast<const struct sockaddr_in *>(peer_sockaddr)->sin_addr;
+		req.rth.rtm_dst_len = sizeof(ad);
+		rta->rta_len = RTA_LENGTH(sizeof(ad));
+		req.nh.nlmsg_len = NLMSG_ALIGN(req.nh.nlmsg_len) + RTA_LENGTH(rta->rta_len);
+		memcpy(RTA_DATA(rta), &ad, sizeof(ad));
+	}
+	ret = peer_is_local2(rsk, &req.nh);
+	close(rsk);
+	return ret;
+#endif
+	return -EPROTONOSUPPORT;
+}
+
+int zcp_peerfd_is_local(int fd)
+{
+	struct sockaddr_storage peer_sockaddr;
+	socklen_t peer_socklen = sizeof(sockaddr);
+	struct sockaddr *sa = reinterpret_cast<struct sockaddr *>(&peer_sockaddr);
+	int ret = getsockname(fd, sa, &peer_socklen);
+	if (ret < 0)
+		return -errno;
+	return zcp_peeraddr_is_local(sa, peer_socklen);
+}
+
+int ECChannel::peer_is_local(void) const
+{
+	return zcp_peeraddr_is_local(reinterpret_cast<const struct sockaddr *>(&peer_sockaddr), peer_salen);
+}
+
+/**
+ * getaddrinfo() adheres to the preference weights given in /etc/gai.conf,
+ * but only for connect sockets. For AI_PASSIVE, sockets may be returned in
+ * any order. This function will reorder an addrinfo linked list and place
+ * IPv6 in the front.
+ */
+static struct addrinfo *reorder_addrinfo_ipv6(struct addrinfo *node)
+{
+	struct addrinfo v6head, othead;
+	v6head.ai_next = NULL;
+	othead.ai_next = node;
+	struct addrinfo *v6tail = &v6head, *prev = &othead;
+
+	while (node != NULL) {
+		if (node->ai_family != AF_INET6) {
+			prev = node;
+			node = node->ai_next;
+			continue;
+		}
+		/* disconnect current node (INET6) */
+		prev->ai_next = node->ai_next;
+		node->ai_next = NULL;
+		/* - reattach to v6 list */
+		v6tail->ai_next = node;
+		v6tail = node;
+		/* continue in ot list */
+		node = prev->ai_next;
+	}
+	/* join list */
+	v6tail->ai_next = othead.ai_next;
+	return v6head.ai_next;
 }
 
 HRESULT HrListen(ECLogger *lpLogger, const char *szPath, int *lpulListenSocket)
 {
+#ifdef WIN32
+	// TODO: named pipe?
+	return MAPI_E_NO_SUPPORT;
+#else
 	HRESULT hr = hrSuccess;
 	int fd = -1;
 	struct sockaddr_un sun_addr;
 	mode_t prevmask = 0;
 
-	if (szPath == NULL || lpulListenSocket == NULL) {
+	if (szPath == NULL || strlen(szPath) >= sizeof(sun_addr.sun_path) ||
+	    lpulListenSocket == NULL) {
 		hr = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	}
 
 	memset(&sun_addr, 0, sizeof(sun_addr));
 	sun_addr.sun_family = AF_UNIX;
-	strcpy(sun_addr.sun_path, szPath);
+	strncpy(sun_addr.sun_path, szPath, sizeof(sun_addr.sun_path));
 
+#ifdef WIN32
+	WSAData wsaData;
+	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+		if (lpLogger)
+			lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to initialize Winsock.");
+		hr = E_FAIL;
+		goto exit;
+	}
+#endif
 
 	if ((fd = socket(PF_UNIX, SOCK_STREAM, 0)) == -1) {
 		if (lpLogger)
@@ -704,14 +865,16 @@ HRESULT HrListen(ECLogger *lpLogger, const char *szPath, int *lpulListenSocket)
 	if (bind(fd, (struct sockaddr *)&sun_addr, sizeof(sun_addr)) == -1) {
                 if (lpLogger)
 			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to socket %s (%s). This is usually caused by another process (most likely another zarafa-server) already using this port. This program will terminate now.", szPath, strerror(errno));
+#ifdef LINUX
                 kill(0, SIGTERM);
+#endif
                 exit(1);
         }
 
 	// TODO: backlog of SOMAXCONN should be configurable
 	if (listen(fd, SOMAXCONN) == -1) {
 		if (lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to start listening on socket %s.", szPath);
+			lpLogger->Log(EC_LOGLEVEL_CRIT, "Unable to start listening on socket \"%s\".", szPath);
 		hr = MAPI_E_NETWORK_ERROR;
 		goto exit;
 	}
@@ -721,48 +884,128 @@ HRESULT HrListen(ECLogger *lpLogger, const char *szPath, int *lpulListenSocket)
 exit:
 	if (prevmask)
 		umask(prevmask);
-
+	if (hr != hrSuccess && fd != -1)
+		close(fd);
 	return hr;
+#endif
 }
 
-HRESULT HrListen(ECLogger *lpLogger, const char *szBind, int ulPort, int *lpulListenSocket)
+int zcp_bindtodevice(ECLogger *log, int fd, const char *i)
+{
+	if (i == NULL || strcmp(i, "any") == 0 || strcmp(i, "all") == 0 ||
+	    strcmp(i, "") == 0)
+		return 0;
+	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, i, strlen(i)) >= 0)
+		return 0;
+
+	log->Log(EC_LOGLEVEL_ERROR, "Unable to bind to interface %s: %s",
+	         i, strerror(errno));
+	return -errno;
+}
+
+HRESULT HrListen(ECLogger *lpLogger, const char *szBind, uint16_t ulPort,
+    int *lpulListenSocket)
 {
 	HRESULT hr = hrSuccess;
-	int fd = -1, opt = 1;
-	struct sockaddr_in sin_addr;
+	int fd = -1, opt = 1, ret;
+	struct addrinfo *sock_res = NULL, sock_hints;
+	const struct addrinfo *sock_addr, *sock_last = NULL;
+	char port_string[sizeof("65535")];
 
 	if (lpulListenSocket == NULL || ulPort == 0 || szBind == NULL) {
 		hr = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	}
 
-	sin_addr.sin_family = AF_INET;
-	sin_addr.sin_addr.s_addr = inet_addr(szBind);
-	sin_addr.sin_port = htons(ulPort);
-
-
-	if ((fd = socket(PF_INET, SOCK_STREAM, 0)) == -1) {
+#ifdef WIN32
+	WSAData wsaData;
+	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
 		if (lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to create TCP socket.");
-		hr = MAPI_E_NETWORK_ERROR;
+			lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to initialize Winsock.");
+		hr = E_FAIL;
 		goto exit;
 	}
+#endif
 
-		// TODO: should be configurable?
-		if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char *>(&opt), sizeof(opt)) == -1)
-			lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to set reuseaddr socket option: %s", strerror(errno));
-
-		if (bind(fd, (struct sockaddr *)&sin_addr, sizeof(sin_addr)) == -1) {
-			if (lpLogger)
-				lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to port %d (%s). This is usually caused by another process (most likely another zarafa-server) already using this port. This program will terminate now.", ulPort, strerror(errno));
-		kill(0, SIGTERM);
-		exit(1);
+	snprintf(port_string, sizeof(port_string), "%u", ulPort);
+	memset(&sock_hints, 0, sizeof(sock_hints));
+	/*
+	 * AI_NUMERICHOST is reflected in the zarafa documentation:
+	 * an address is required for the "server_bind" parameter.
+	 */
+	sock_hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV | AI_PASSIVE;
+	sock_hints.ai_socktype = SOCK_STREAM;
+	ret = getaddrinfo(*szBind == '\0' ? NULL : szBind,
+	      port_string, &sock_hints, &sock_res);
+	if (ret != 0) {
+		hr = MAPI_E_INVALID_PARAMETER;
+		lpLogger->Log(EC_LOGLEVEL_ERROR, "getaddrinfo(%s,%u): %s", szBind, ulPort, gai_strerror(ret));
+		goto exit;
 	}
+	sock_res = reorder_addrinfo_ipv6(sock_res);
 
-	// TODO: backlog of SOMAXCONN should be configurable
-	if (listen(fd, SOMAXCONN) == -1) {
-		if (lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to start listening on port %d.", ulPort);
+	errno = 0;
+	for (sock_addr = sock_res; sock_addr != NULL;
+	     sock_addr = sock_addr->ai_next)
+	{
+		sock_last = sock_addr;
+		fd = socket(sock_addr->ai_family, sock_addr->ai_socktype,
+		     sock_addr->ai_protocol);
+		if (fd < 0)
+			continue;
+
+		if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
+		    reinterpret_cast<const char *>(&opt), sizeof(opt)) < 0)
+			lpLogger->Log(EC_LOGLEVEL_WARNING,
+				"Unable to set reuseaddr socket option: %s",
+				strerror(errno));
+
+		ret = bind(fd, sock_addr->ai_addr, sock_addr->ai_addrlen);
+		if (ret < 0 && errno == EADDRINUSE) {
+			/*
+			 * If the port is used, drop out early. Do not let it
+			 * happen that we move to an AF where it happens to be
+			 * unused.
+			 */
+			int saved_errno = errno;
+			close(fd);
+			fd = -1;
+			errno = saved_errno;
+			break;
+		}
+		if (ret < 0) {
+			int saved_errno = errno;
+			close(fd);
+			fd = -1;
+			errno = saved_errno;
+			continue;
+		}
+
+		if (listen(fd, SOMAXCONN) < 0) {
+			lpLogger->Log(EC_LOGLEVEL_ERROR,
+				"Unable to start listening on port %d: %s",
+				ulPort, strerror(errno));
+			hr = MAPI_E_NETWORK_ERROR;
+			goto exit;
+		}
+
+		/*
+		 * Function signature currently only permits a single fd, so if
+		 * we have a good socket, try no more. The IPv6 socket is
+		 * generally returned first, and is also IPv4-capable
+		 * (through mapped addresses).
+		 */
+		break;
+	}
+	if (fd < 0 && sock_last != NULL) {
+		lpLogger->Log(EC_LOGLEVEL_CRIT,
+			"Unable to create socket(%u,%u,%u) port %s: %s",
+			sock_last->ai_family, sock_last->ai_socktype,
+			sock_last->ai_protocol, port_string, strerror(errno));
+		hr = MAPI_E_NETWORK_ERROR;
+		goto exit;
+	} else if (fd < 0) {
+		lpLogger->Log(EC_LOGLEVEL_ERROR, "no sockets proposed");
 		hr = MAPI_E_NETWORK_ERROR;
 		goto exit;
 	}
@@ -770,6 +1013,10 @@ HRESULT HrListen(ECLogger *lpLogger, const char *szBind, int ulPort, int *lpulLi
 	*lpulListenSocket = fd;
 
 exit:
+	if (sock_res != NULL)
+		freeaddrinfo(sock_res);
+	if (hr != hrSuccess && fd >= 0)
+		closesocket(fd);
 	return hr;
 }
 
@@ -777,14 +1024,9 @@ HRESULT HrAccept(ECLogger *lpLogger, int ulListenFD, ECChannel **lppChannel)
 {
 	HRESULT hr = hrSuccess;
 	int socket = 0;
-	struct sockaddr_in client;
+	struct sockaddr_storage client;
 	ECChannel *lpChannel = NULL;
 	socklen_t len = sizeof(client);
-
-#ifdef TCP_FASTOPEN
-	int qlen = SOMAXCONN;
-	setsockopt(ulListenFD, SOL_TCP, TCP_FASTOPEN, &qlen, sizeof(qlen));
-#endif
 
 	if (ulListenFD < 0 || lppChannel == NULL) {
 		hr = MAPI_E_INVALID_PARAMETER;
@@ -792,7 +1034,11 @@ HRESULT HrAccept(ECLogger *lpLogger, int ulListenFD, ECChannel **lppChannel)
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "HrAccept: invalid parameters");
 		goto exit;
 	}
-
+#ifdef TCP_FASTOPEN
+	static const int qlen = SOMAXCONN;
+	if (setsockopt(ulListenFD, SOL_TCP, TCP_FASTOPEN, &qlen, sizeof(qlen)) < 0)
+		/* ignore - no harm in not having fastopen */;
+#endif
 	memset(&client, 0, sizeof(client));
 
 	socket = accept(ulListenFD, (struct sockaddr *)&client, &len);
@@ -803,16 +1049,15 @@ HRESULT HrAccept(ECLogger *lpLogger, int ulListenFD, ECChannel **lppChannel)
 		hr = MAPI_E_NETWORK_ERROR;
 		goto exit;
 	}
-	if (lpLogger)
-		lpLogger->Log(EC_LOGLEVEL_INFO, "Accepted connection from %s", inet_ntoa(client.sin_addr));
-
 	lpChannel = new ECChannel(socket);
-	lpChannel->SetIPAddress(inet_ntoa(client.sin_addr));
+	lpChannel->SetIPAddress(reinterpret_cast<const struct sockaddr *>(&client), len);
+	if (lpLogger)
+		lpLogger->Log(EC_LOGLEVEL_INFO, "Accepted connection from %s", lpChannel->peer_addr());
 
 	*lppChannel = lpChannel;
 
 exit:
-	if (hr != hrSuccess && lpChannel)
+	if (hr != hrSuccess)
 		delete lpChannel;
 
 	return hr;

@@ -1,7 +1,7 @@
 SUBDIRS = linux userscripts quotamail searchscripts
 
 datadir = ${docdir}
-dist_data_DATA = ldap/zarafa.schema zarafa.ldif licenseagreement/eula.txt licenseagreement/AGPL-3
+dist_data_DATA = ldap/zarafa.schema zarafa.ldif
 BUILT_SOURCES = zarafa.ldif
 EXTRA_DIST = ldap/ol-schema-migrate.pl
 

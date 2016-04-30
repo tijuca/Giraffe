@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -53,16 +27,16 @@
 #include <mapidefs.h>
 #include <mapiutil.h>
 
-#include <CommonUtil.h>
-#include <Util.h>
-#include <ECTags.h>
-#include <inetmapi.h>
-#include <mapiext.h>
+#include <zarafa/CommonUtil.h>
+#include <zarafa/Util.h>
+#include <zarafa/ECTags.h>
+#include <inetmapi/inetmapi.h>
+#include <zarafa/mapiext.h>
 
-#include "stringutil.h"
-#include "charset/convert.h"
-#include "ecversion.h"
-#include "charset/utf8string.h"
+#include <zarafa/stringutil.h>
+#include <zarafa/charset/convert.h>
+#include <zarafa/ecversion.h>
+#include <zarafa/charset/utf8string.h>
 #include "ECFeatures.h"
 
 #include "POP3.h"
@@ -85,9 +59,9 @@ POP3::POP3(const char *szServerPath, ECChannel *lpChannel, ECLogger *lpLogger, E
 }
 
 POP3::~POP3() {
-	for (vector<MailListItem>::iterator i = lstMails.begin(); i != lstMails.end(); i++) {
+	for (std::vector<MailListItem>::const_iterator i = lstMails.begin();
+	     i != lstMails.end(); ++i)
 		delete [] i->sbEntryID.lpb;
-	}
 
 	if (lpInbox)
 		lpInbox->Release();
@@ -315,7 +289,7 @@ std::string POP3::GetCapabilityString()
 		if (!lpChannel->UsingSsl() && lpChannel->sslctx())
 			strCapabilities += "STLS\r\n";
 
-		if (!(!lpChannel->UsingSsl() && lpChannel->sslctx() && plain && strcmp(plain, "yes") == 0))
+		if (!(!lpChannel->UsingSsl() && lpChannel->sslctx() && plain && strcmp(plain, "yes") == 0 && lpChannel->peer_is_local() <= 0))
 			strCapabilities += "USER\r\n";
 	}
 
@@ -396,10 +370,10 @@ HRESULT POP3::HrCmdUser(const string &strUser) {
 	HRESULT hr = hrSuccess;
 	const char *plain = lpConfig->GetSetting("disable_plaintext_auth");
 
-	if (!lpChannel->UsingSsl() && lpChannel->sslctx() && plain && strcmp(plain, "yes") == 0) {
+	if (!lpChannel->UsingSsl() && lpChannel->sslctx() && plain && strcmp(plain, "yes") == 0 && lpChannel->peer_is_local() <= 0) {
 		hr = HrResponse(POP3_RESP_AUTH_ERROR, "Plaintext authentication disallowed on non-secure (SSL/TLS) connections");
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "Aborted login from %s with username \"%s\" (tried to use disallowed plaintext auth)",
-					  lpChannel->GetIPAddress().c_str(), strUser.c_str());
+					  lpChannel->peer_addr(), strUser.c_str());
 	} else if (lpStore != NULL) {
 		hr = HrResponse(POP3_RESP_AUTH_ERROR, "Can't login twice");
 	} else if (strUser.length() > POP3_MAX_RESPONSE_LENGTH) {
@@ -425,14 +399,14 @@ HRESULT POP3::HrCmdPass(const string &strPass) {
 	HRESULT hr = hrSuccess;
 	const char *plain = lpConfig->GetSetting("disable_plaintext_auth");
 
-	if (!lpChannel->UsingSsl() && lpChannel->sslctx() && plain && strcmp(plain, "yes") == 0) {
+	if (!lpChannel->UsingSsl() && lpChannel->sslctx() && plain && strcmp(plain, "yes") == 0 && lpChannel->peer_is_local() <= 0) {
 		hr = HrResponse(POP3_RESP_AUTH_ERROR, "Plaintext authentication disallowed on non-secure (SSL/TLS) connections");
 		if(szUser.empty())
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "Aborted login from %s without username (tried to use disallowed "
-							 "plaintext auth)", lpChannel->GetIPAddress().c_str());
+							 "plaintext auth)", lpChannel->peer_addr());
 		else
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "Aborted login from %s with username \"%s\" (tried to use disallowed "
-							 "plaintext auth)", lpChannel->GetIPAddress().c_str(), szUser.c_str());
+							 "plaintext auth)", lpChannel->peer_addr(), szUser.c_str());
 	} else if (lpStore != NULL) {
 		hr = HrResponse(POP3_RESP_AUTH_ERROR, "Can't login twice");
 	} else if (strPass.length() > POP3_MAX_RESPONSE_LENGTH) {
@@ -443,7 +417,10 @@ HRESULT POP3::HrCmdPass(const string &strPass) {
 	} else {
 		hr = this->HrLogin(szUser, strPass);
 		if (hr != hrSuccess) {
-			HrResponse(POP3_RESP_AUTH_ERROR, "Wrong username or password");
+			if (hr == MAPI_E_LOGON_FAILED)
+				HrResponse(POP3_RESP_AUTH_ERROR, "Wrong username or password");
+			else
+				HrResponse(POP3_RESP_TEMPFAIL, "Internal error: HrLogin failed");
 			goto exit;
 		}
 
@@ -468,18 +445,14 @@ exit:
  * @return MAPI Error code
  */
 HRESULT POP3::HrCmdStat() {
-	HRESULT hr = hrSuccess;
 	ULONG ulSize = 0;
 	char szResponse[POP3_MAX_RESPONSE_LENGTH];
 
-	for (size_t i = 0; i < lstMails.size(); i++) {
+	for (size_t i = 0; i < lstMails.size(); ++i)
 		ulSize += lstMails[i].ulSize;
-	}
 
 	snprintf(szResponse, POP3_MAX_RESPONSE_LENGTH, "%u %u", (ULONG)lstMails.size(), ulSize);
-	hr = HrResponse(POP3_RESP_OK, szResponse);
-
-	return hr;
+	return HrResponse(POP3_RESP_OK, szResponse);
 }
 
 /** 
@@ -500,7 +473,7 @@ HRESULT POP3::HrCmdList() {
 	if (hr != hrSuccess)
 		goto exit;
 
-	for (size_t i = 0; i < lstMails.size(); i++) {
+	for (size_t i = 0; i < lstMails.size(); ++i) {
 		snprintf(szResponse, POP3_MAX_RESPONSE_LENGTH, "%u %u", (ULONG)i + 1, lstMails[i].ulSize);
 		hr = lpChannel->HrWriteLine(szResponse);
 		if (hr != hrSuccess)
@@ -600,10 +573,7 @@ exit:
 
 	if (lpMessage)
 		lpMessage->Release();
-
-	if (szMessage)
-		delete [] szMessage;
-
+	delete[] szMessage;
 	return hr;
 }
 
@@ -651,9 +621,9 @@ HRESULT POP3::HrCmdNoop() {
  * @return MAPI Error code
  */
 HRESULT POP3::HrCmdRset() {
-	for (vector<MailListItem>::iterator i = lstMails.begin(); i != lstMails.end(); i++) {
+	for (std::vector<MailListItem>::iterator i = lstMails.begin();
+	     i != lstMails.end(); ++i)
 		i->bDeleted = false;
-	}
 
 	return HrResponse(POP3_RESP_OK, "Undeleted mails");
 }
@@ -669,23 +639,21 @@ HRESULT POP3::HrCmdQuit() {
 	HRESULT hr = hrSuccess;
 	unsigned int DeleteCount = 0;
 	SBinaryArray ba = {0, NULL};
-	vector<MailListItem>::iterator i;
+	vector<MailListItem>::const_iterator i;
 
-	for (i = lstMails.begin(); i != lstMails.end(); i++) {
-		if (i->bDeleted) {
-			DeleteCount++;
-		}
-	}
+	for (i = lstMails.begin(); i != lstMails.end(); ++i)
+		if (i->bDeleted)
+			++DeleteCount;
 
 	if (DeleteCount) {
 		ba.cValues = DeleteCount;
 		ba.lpbin = new SBinary[DeleteCount];
 		DeleteCount = 0;
 
-		for (i = lstMails.begin(); i != lstMails.end(); i++) {
+		for (i = lstMails.begin(); i != lstMails.end(); ++i) {
 			if (i->bDeleted) {
 				ba.lpbin[DeleteCount] = i->sbEntryID;
-				DeleteCount++;
+				++DeleteCount;
 			}
 		}
 
@@ -694,10 +662,7 @@ HRESULT POP3::HrCmdQuit() {
 	}
 
 	hr = HrResponse(POP3_RESP_OK, "Bye");
-
-	if (ba.lpbin)
-		delete [] ba.lpbin;
-
+	delete[] ba.lpbin;
 	return hr;
 }
 
@@ -718,7 +683,7 @@ HRESULT POP3::HrCmdUidl() {
 	if (hr != hrSuccess)
 		goto exit;
 
-	for (size_t i = 0; i < lstMails.size(); i++) {
+	for (size_t i = 0; i < lstMails.size(); ++i) {
 		snprintf(szResponse, POP3_MAX_RESPONSE_LENGTH, "%u ", (ULONG)i + 1);
 		strResponse = szResponse;
 		strResponse += bin2hex(lstMails[i].sbEntryID.cb, lstMails[i].sbEntryID.lpb);
@@ -818,7 +783,7 @@ HRESULT POP3::HrCmdTop(unsigned int ulMailNr, unsigned int ulLines) {
 
 	ulPos = strMessage.find("\r\n\r\n", 0);
 
-	ulLines++;
+	++ulLines;
 	while (ulPos != string::npos && ulLines--)
 		ulPos = strMessage.find("\r\n", ulPos + 1);
 
@@ -841,10 +806,7 @@ exit:
 
 	if (lpMessage)
 		lpMessage->Release();
-
-	if (szMessage)
-		delete [] szMessage;
-
+	delete[] szMessage;
 	return hr;
 }
 
@@ -878,8 +840,8 @@ HRESULT POP3::HrLogin(const std::string &strUsername, const std::string &strPass
 	hr = HrOpenECSession(lpLogger, &lpSession, "gateway/pop3", PROJECT_SVN_REV_STR, strwUsername.c_str(), strwPassword.c_str(), m_strPath.c_str(), EC_PROFILE_FLAGS_NO_NOTIFICATIONS, NULL, NULL);
 	if (hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to login from %s with invalid username \"%s\" or wrong password. Error: 0x%X",
-					  lpChannel->GetIPAddress().c_str(), strUsername.c_str(), hr);
-		m_ulFailedLogins++;
+					  lpChannel->peer_addr(), strUsername.c_str(), hr);
+		++m_ulFailedLogins;
 		if (m_ulFailedLogins >= LOGIN_RETRIES)
 			// disconnect client
 			hr = MAPI_E_END_OF_SESSION;
@@ -920,11 +882,10 @@ HRESULT POP3::HrLogin(const std::string &strUsername, const std::string &strPass
 		goto exit;
 	}
 
-	lpLogger->Log(EC_LOGLEVEL_ERROR, "POP3 Login from %s for user %s", lpChannel->GetIPAddress().c_str(), strUsername.c_str());
+	lpLogger->Log(EC_LOGLEVEL_NOTICE, "POP3 Login from %s for user %s", lpChannel->peer_addr(), strUsername.c_str());
 
 exit:
-	if (lpEntryID)
-		MAPIFreeBuffer(lpEntryID);
+	MAPIFreeBuffer(lpEntryID);
 
 	if (hr != hrSuccess) {
 		if (lpInbox) {
@@ -977,7 +938,7 @@ HRESULT POP3::HrMakeMailList() {
 		goto exit;
 
 	lstMails.clear();
-	for (ULONG i = 0; i < lpRows->cRows; i++) {
+	for (ULONG i = 0; i < lpRows->cRows; ++i) {
 		if (PROP_TYPE(lpRows->aRow[i].lpProps[EID].ulPropTag) == PT_ERROR) {
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "Missing EntryID in message table for message %d", i);
 			continue;

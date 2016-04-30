@@ -1,44 +1,18 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 #ifndef IMAP_H
@@ -51,8 +25,8 @@
 #include <list>
 #include <set>
 
-#include <ECIConv.h>
-#include "ECChannel.h"
+#include <zarafa/ECIConv.h>
+#include <zarafa/ECChannel.h>
 
 using namespace std;
 
@@ -80,19 +54,81 @@ LONG __stdcall IMAPIdleAdviseCallback(void *lpContext, ULONG cNotif, LPNOTIFICAT
 
 class BinaryArray {
 public:
-    BinaryArray() { lpb = NULL; cb = 0; bcheap = false; }
-    BinaryArray(BYTE *lpData, ULONG cbData, bool bcheap = false) {  this->bcheap = bcheap; if(cbData == 0) { cb = 0; lpb = NULL; } else { if(!bcheap){lpb = new BYTE[cbData]; memcpy(lpb, lpData, cbData);}else{lpb=lpData;} cb = cbData; } }
-    BinaryArray(const BinaryArray &old)     { bcheap = false; if(old.cb == 0) { cb = 0; lpb = NULL; } else { cb = old.cb; lpb = new BYTE[cb]; memcpy(lpb, old.lpb, cb); } }
-    BinaryArray(SBinary &bin) { bcheap = false; if(bin.cb == 0) { cb = 0; lpb = NULL; } else { lpb = new BYTE[bin.cb]; memcpy(lpb, bin.lpb, bin.cb); cb = bin.cb; } }
-    ~BinaryArray() { if(lpb && !bcheap) delete [] lpb; }
+	BinaryArray(void) : lpb(NULL), cb(0), bcheap(false) {}
+	BinaryArray(BYTE *lpData, ULONG cbData, bool bcheap = false)
+	{
+		this->bcheap = bcheap;
+		if (cbData == 0) {
+			cb = 0;
+			lpb = NULL;
+		} else {
+			if (!bcheap) {
+				lpb = new BYTE[cbData];
+				memcpy(lpb, lpData, cbData);
+			} else {
+				lpb = lpData;
+			}
+			cb = cbData;
+		}
+	}
+	BinaryArray(const BinaryArray &old) {
+		bcheap = false;
+		if (old.cb == 0) {
+			cb = 0;
+			lpb = NULL;
+		} else {
+			cb = old.cb;
+			lpb = new BYTE[cb];
+			memcpy(lpb, old.lpb, cb);
+		}
+	}
+	BinaryArray(const SBinary &bin) {
+		bcheap = false;
+		if (bin.cb == 0) {
+			cb = 0;
+			lpb = NULL;
+		} else {
+			lpb = new BYTE[bin.cb];
+			memcpy(lpb, bin.lpb, bin.cb);
+			cb = bin.cb;
+		}
+	}
+	~BinaryArray(void)
+	{
+		if (!bcheap)
+			delete[] lpb;
+	}
 
-    bool operator == (const BinaryArray &b) { if(b.cb == 0 && this->cb == 0) return true; if(b.cb != this->cb) return false; else return memcmp(lpb, b.lpb, cb) == 0; }
+	bool operator==(const BinaryArray &b) const
+	{
+		if (b.cb == 0 && this->cb == 0)
+			return true;
+		if (b.cb != this->cb)
+			return false;
+		else
+			return memcmp(lpb, b.lpb, cb) == 0;
+	}
 
-    BinaryArray& operator = (const BinaryArray &b) { BYTE *lpbPrev = lpb; if(b.cb == 0) {cb=0; lpb = NULL; } else { cb=b.cb; lpb = new BYTE[cb]; memcpy(lpb, b.lpb, cb); if(lpbPrev && !bcheap) delete [] lpbPrev; } bcheap = false; return *this; }
+	BinaryArray &operator=(const BinaryArray &b)
+	{
+		BYTE *lpbPrev = lpb;
+		if (b.cb == 0) {
+			cb = 0;
+			lpb = NULL;
+		} else {
+			cb = b.cb;
+			lpb = new BYTE[cb];
+			memcpy(lpb, b.lpb, cb);
+			if (!bcheap)
+				delete[] lpbPrev;
+		}
+		bcheap = false;
+		return *this;
+	}
     
-    BYTE *lpb;
-    ULONG cb;
-    bool bcheap;
+	BYTE *lpb;
+	ULONG cb;
+	bool bcheap;
 };
 
 struct lessBinaryArray {
@@ -176,7 +212,7 @@ private:
 		bool bMailFolder;		// E-mail type folder
 		bool bSpecialFolder;	// 'special' folder (eg inbox)
 		bool bHasSubfolders;	// Has child folders
-		list<SFolder>::iterator lpParentFolder;
+		list<SFolder>::const_iterator lpParentFolder;
 	};
 
 	// All data to be mapped per mail in the current folder
@@ -271,8 +307,8 @@ private:
 
 	HRESULT HrRefreshFolderMails(bool bInitialLoad, bool bResetRecent, bool bShowUID, unsigned int *lpulUnseen, ULONG *lpulUIDValidity = NULL);
 
-	HRESULT HrGetSubTree(list<SFolder> &lstFolders, SBinary &sEntryID, wstring strFolderName, list<SFolder>::iterator lpParentFolder, bool bSubfolders = true, bool bIsEmailFolder = true);
-	HRESULT HrGetFolderPath(list<SFolder>::iterator lpFolder, list<SFolder> &lstFolder, wstring &strPath);
+	HRESULT HrGetSubTree(list<SFolder> &lstFolders, SBinary &sEntryID, wstring strFolderName, list<SFolder>::const_iterator lpParentFolder, bool bSubfolders = true, bool bIsEmailFolder = true);
+	HRESULT HrGetFolderPath(list<SFolder>::const_iterator lpFolder, list<SFolder> &lstFolder, wstring &strPath);
 	HRESULT HrGetDataItems(string strMsgDataItemNames, vector<string> &lstDataItems);
 	HRESULT HrSemicolonToComma(string &strData);
 
@@ -330,11 +366,11 @@ private:
 	string PropsToFlags(LPSPropValue lpProps, unsigned int cValues, bool bRecent, bool bRead);
 	string PropsToEmailAddress(LPSPropValue lpProps, unsigned int cValues, ULONG ulEmailPropTag, ULONG ulNamePropTag);
 
-	void HrParseHeaders(string &strHeaders, list<pair<string, string> > &lstHeaders);
-	void HrGetSubString(string &strOutput, string &strInput, string strBegin, string strEnd);
-	void HrTokenize(set<string> &setTokens, string &strInput);
+	void HrParseHeaders(const std::string &, std::list<std::pair<std::string, std::string> > &);
+	void HrGetSubString(string &strOutput, const std::string &strInput, const std::string &strBegin, const std::string &strEnd);
+	void HrTokenize(std::set<std::string> &setTokens, const std::string &strInput);
 
-	HRESULT HrExpungeDeleted(const string &strTag, const string &strCommand, LPSRestriction lpUIDRestriction);
+	HRESULT HrExpungeDeleted(const string &strTag, const string &strCommand, const SRestriction *lpUIDRestriction);
 
 	friend LONG __stdcall IMAPIdleAdviseCallback(void *lpContext, ULONG cNotif, LPNOTIFICATION lpNotif);
 };

@@ -1,70 +1,44 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include "ECExchangeImportContentsChanges.h"
 #include "WSMessageStreamImporter.h"
 #include "ECMessageStreamImporterIStreamAdapter.h"
-#include "ECLogger.h"
+#include <zarafa/ECLogger.h>
 #include "ECSyncLog.h"
 
-#include "Util.h"
-#include "edkguid.h"
-#include "ECGuid.h"
+#include <zarafa/Util.h>
+#include <edkguid.h>
+#include <zarafa/ECGuid.h>
 #include <mapiguid.h>
 #include "ECMessage.h"
-#include "ECDebug.h"
+#include <zarafa/ECDebug.h>
 
 #include "ZarafaICS.h"
-#include "mapiext.h"
-#include "mapi_ptr.h"
-#include "ECRestriction.h"
+#include <zarafa/mapiext.h>
+#include <zarafa/mapi_ptr.h>
+#include <zarafa/ECRestriction.h>
 
 #include <mapiutil.h>
 
-#include "charset/convert.h"
-#include "ECGetText.h"
+#include <zarafa/charset/convert.h>
+#include <zarafa/ECGetText.h>
 #include "EntryPoint.h"
 
 #include <list>
@@ -140,13 +114,11 @@ ECExchangeImportContentsChanges::ECExchangeImportContentsChanges(ECMAPIFolder *l
 ECExchangeImportContentsChanges::~ECExchangeImportContentsChanges(){
 	m_lpFolder->Release();
 	m_lpLogger->Release();
-
-	if (m_lpSourceKey)
-		MAPIFreeBuffer(m_lpSourceKey);
+	MAPIFreeBuffer(m_lpSourceKey);
 }
 
 HRESULT ECExchangeImportContentsChanges::Create(ECMAPIFolder *lpFolder, LPEXCHANGEIMPORTCONTENTSCHANGES* lppExchangeImportContentsChanges){
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ECExchangeImportContentsChanges *lpEICC = NULL;
 
 	if(!lpFolder)
@@ -155,16 +127,16 @@ HRESULT ECExchangeImportContentsChanges::Create(ECMAPIFolder *lpFolder, LPEXCHAN
 	lpEICC = new ECExchangeImportContentsChanges(lpFolder);
 
 	hr = HrGetOneProp(&lpFolder->m_xMAPIProp, PR_SOURCE_KEY, &lpEICC->m_lpSourceKey);
-	if(hr != hrSuccess)
-		goto exit;
-
-	hr = lpEICC->QueryInterface(IID_IExchangeImportContentsChanges, (void **)lppExchangeImportContentsChanges);
-	if(hr != hrSuccess)
-		goto exit;
-
-exit:
+	if (hr == hrSuccess)
+		/*
+		 * This essentially returns lpEICC (in the second argument's
+		 * location), so whatever Coverity is saying about it not
+		 * being freed, don't believe it.
+		 */
+		hr = lpEICC->QueryInterface(IID_IExchangeImportContentsChanges, reinterpret_cast<void **>(lppExchangeImportContentsChanges));
+	else
+		delete lpEICC;
 	return hr;
-
 }
 
 HRESULT	ECExchangeImportContentsChanges::QueryInterface(REFIID refiid, void **lppInterface)
@@ -233,9 +205,7 @@ HRESULT ECExchangeImportContentsChanges::GetLastError(HRESULT hResult, ULONG ulF
 	*lppMAPIError = lpMapiError;
 
 exit:
-	if (lpszErrorMsg)
-		MAPIFreeBuffer(lpszErrorMsg);
-
+	MAPIFreeBuffer(lpszErrorMsg);
 	return hr;
 }
 
@@ -252,31 +222,25 @@ HRESULT ECExchangeImportContentsChanges::Config(LPSTREAM lpStream, ULONG ulFlags
 	} else {
 		hr = lpStream->Seek(zero, STREAM_SEEK_SET, NULL);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 		
 		hr = lpStream->Read(&m_ulSyncId, 4, &ulLen);
 		if(hr != hrSuccess)
-			goto exit;
-			
-		if(ulLen != 4) {
-			hr = MAPI_E_INVALID_PARAMETER;
-			goto exit;
-		}
+			return hr;
+		if (ulLen != 4)
+			return MAPI_E_INVALID_PARAMETER;
 		
 		hr = lpStream->Read(&m_ulChangeId, 4, &ulLen);
 		if(hr != hrSuccess)
-			goto exit;
-			
-		if(ulLen != 4) {
-			hr = MAPI_E_INVALID_PARAMETER;
-			goto exit;
-		}
+			return hr;
+		if (ulLen != 4)
+			return MAPI_E_INVALID_PARAMETER;
 		
 		// The user specified the special sync key '0000000000000000', get a sync key from the server.
 		if(m_ulSyncId == 0) {
 			hr = m_lpFolder->GetMsgStore()->lpTransport->HrSetSyncStatus(std::string((char *)m_lpSourceKey->Value.bin.lpb, m_lpSourceKey->Value.bin.cb), m_ulSyncId, m_ulChangeId, ICS_SYNC_CONTENTS, 0, &m_ulSyncId);
 			if(hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 		
 		// The sync key we got from the server can be used to retrieve all items in the database now when given to IEEC->Config(). At the same time, any
@@ -285,39 +249,36 @@ HRESULT ECExchangeImportContentsChanges::Config(LPSTREAM lpStream, ULONG ulFlags
 	}		
 		
 	m_ulFlags = ulFlags;
-exit:	
 	return hrSuccess;
 }
 
 HRESULT ECExchangeImportContentsChanges::UpdateState(LPSTREAM lpStream){
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	LARGE_INTEGER zero = {{0,0}};
 	ULONG ulLen = 0;
 
 	if(lpStream == NULL) {
-		if(m_lpStream == NULL){
-			goto exit;
-		}
+		if (m_lpStream == NULL)
+			return hrSuccess;
 		lpStream = m_lpStream;
 	}
 
 	if(m_ulSyncId == 0)
-		goto exit; // config() called with NULL stream, so we'll ignore the UpdateState()
+		return hrSuccess; // config() called with NULL stream, so we'll ignore the UpdateState()
 	
 	hr = lpStream->Seek(zero, STREAM_SEEK_SET, NULL);
 	if(hr != hrSuccess)
-		goto exit;
-		
+		return hr;
+
 	hr = lpStream->Write(&m_ulSyncId, 4, &ulLen);
 	if(hr != hrSuccess)
-		goto exit;
-		
+		return hr;
+
 	hr = lpStream->Write(&m_ulChangeId, 4, &ulLen);
 	if(hr != hrSuccess)
-		goto exit;
-	 
-exit: 
-	return hr;
+		return hr;
+
+	return hrSuccess;
 }
 
 
@@ -338,7 +299,6 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageChange(ULONG cValue, LPSPr
 	LPSPropValue lpRemoteCK = PpropFindProp(lpPropArray, cValue, PR_CHANGE_KEY);
 
 	ULONG ulObjType = 0;
-	ULONG ulCount = 0;
 	bool bAssociatedMessage = false;
 	IMessage *lpMessage = NULL;
 	ECMessage *lpECMessage = NULL;
@@ -356,7 +316,7 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageChange(ULONG cValue, LPSPr
 		hr = MAPI_E_NOT_FOUND;
 	}
 
-	if((hr == MAPI_E_NOT_FOUND) && ((ulFlags & SYNC_NEW_MESSAGE) == 0)) {
+	if (hr == MAPI_E_NOT_FOUND && (ulFlags & SYNC_NEW_MESSAGE) == 0) {
 		// This is a change, but we don't already have the item. This can only mean
 		// that the item has been deleted on our side. 
 		hr = SYNC_E_OBJECT_DELETED;
@@ -432,16 +392,9 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageChange(ULONG cValue, LPSPr
 exit:
 	if(lpECMessage)
 		lpECMessage->Release();
-		
-	if(lpPropPCL)
-		MAPIFreeBuffer(lpPropPCL);
-
-	if(lpPropCK)
-		MAPIFreeBuffer(lpPropCK);
-
-	if(lpEntryId)
-		MAPIFreeBuffer(lpEntryId);
-
+	MAPIFreeBuffer(lpPropPCL);
+	MAPIFreeBuffer(lpPropCK);
+	MAPIFreeBuffer(lpEntryId);
 	return hr;
 }
 
@@ -456,7 +409,7 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageDeletion(ULONG ulFlags, LP
 	if ((hr = MAPIAllocateBuffer(sizeof(SBinary)* lpSourceEntryList->cValues, (LPVOID*)&EntryList.lpbin)) != hrSuccess)
 		goto exit;
 
-	for(ulSKNr = 0; ulSKNr < lpSourceEntryList->cValues; ulSKNr++){
+	for (ulSKNr = 0; ulSKNr < lpSourceEntryList->cValues; ++ulSKNr) {
 		hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId, m_lpSourceKey->Value.bin.cb, m_lpSourceKey->Value.bin.lpb, lpSourceEntryList->lpbin[ulSKNr].cb, lpSourceEntryList->lpbin[ulSKNr].lpb, &EntryList.lpbin[EntryList.cValues].cb, (LPENTRYID*)&EntryList.lpbin[EntryList.cValues].lpb);
 		if(hr == MAPI_E_NOT_FOUND){
 			hr = hrSuccess;
@@ -464,7 +417,7 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageDeletion(ULONG ulFlags, LP
 		}
 		if(hr != hrSuccess)
 			goto exit;
-		EntryList.cValues++;
+		++EntryList.cValues;
 	}
 	
 	if(EntryList.cValues == 0)
@@ -476,9 +429,8 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageDeletion(ULONG ulFlags, LP
 
 exit:
 	if(EntryList.lpbin){
-		for(ulSKNr = 0; ulSKNr < EntryList.cValues; ulSKNr++){
+		for (ulSKNr = 0; ulSKNr < EntryList.cValues; ++ulSKNr)
 			MAPIFreeBuffer(EntryList.lpbin[ulSKNr].lpb);
-		}
 		MAPIFreeBuffer(EntryList.lpbin);
 	}
 	return hr;
@@ -489,7 +441,7 @@ HRESULT ECExchangeImportContentsChanges::ImportPerUserReadStateChange(ULONG cEle
 	ULONG ulSKNr, cbEntryId;
 	LPENTRYID lpEntryId = NULL;
 
-	for(ulSKNr = 0; ulSKNr < cElements; ulSKNr++){
+	for (ulSKNr = 0; ulSKNr < cElements; ++ulSKNr) {
 		hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId , m_lpSourceKey->Value.bin.cb, m_lpSourceKey->Value.bin.lpb, lpReadState[ulSKNr].cbSourceKey, lpReadState[ulSKNr].pbSourceKey, &cbEntryId, &lpEntryId);
 		if(hr == MAPI_E_NOT_FOUND){
 			hr = hrSuccess;
@@ -503,17 +455,12 @@ HRESULT ECExchangeImportContentsChanges::ImportPerUserReadStateChange(ULONG cEle
 		hr = m_lpFolder->GetMsgStore()->lpTransport->HrSetReadFlag(cbEntryId, lpEntryId, lpReadState[ulSKNr].ulFlags & MSGFLAG_READ ? 0 : CLEAR_READ_FLAG, m_ulSyncId);
 		if(hr != hrSuccess)
 			goto exit;
-
-		if(lpEntryId){
-			MAPIFreeBuffer(lpEntryId);
-			lpEntryId = NULL;
-		}
+		MAPIFreeBuffer(lpEntryId);
+		lpEntryId = NULL;
 	}
 
 exit:
-	if(lpEntryId)
-		MAPIFreeBuffer(lpEntryId);
-
+	MAPIFreeBuffer(lpEntryId);
 	return hr;
 }
 
@@ -641,9 +588,7 @@ HRESULT ECExchangeImportContentsChanges::CreateConflictMessage(LPMESSAGE lpMessa
 
 
 exit:
-	if(lpConflictItems)
-		MAPIFreeBuffer(lpConflictItems);
-
+	MAPIFreeBuffer(lpConflictItems);
 	return hr;
 }
 
@@ -708,16 +653,10 @@ HRESULT ECExchangeImportContentsChanges::CreateConflictMessageOnly(LPMESSAGE lpM
 	hr = lpConflictMessage->SaveChanges(KEEP_OPEN_READWRITE);
 	if(hr != hrSuccess)
 		goto exit;
-
-	if(lpEntryIdProp){
-		MAPIFreeBuffer(lpEntryIdProp);
-		lpEntryIdProp = NULL;
-	}
-
-	if(lpConflictItems){
-		MAPIFreeBuffer(lpConflictItems);
-		lpConflictItems = NULL;
-	}
+	MAPIFreeBuffer(lpEntryIdProp);
+	lpEntryIdProp = NULL;
+	MAPIFreeBuffer(lpConflictItems);
+	lpConflictItems = NULL;
 
 	//add the entryid from the conflict message to the PR_CONFLICT_ITEMS of the original message
 	hr = HrGetOneProp(lpConflictMessage, PR_ENTRYID, &lpEntryIdProp);
@@ -738,7 +677,7 @@ HRESULT ECExchangeImportContentsChanges::CreateConflictMessageOnly(LPMESSAGE lpM
 	if(hr != hrSuccess)
 		goto exit;
 
-	for(ulCount = 0; ulCount < lpConflictItems->Value.MVbin.cValues; ulCount++){
+	for (ulCount = 0; ulCount < lpConflictItems->Value.MVbin.cValues; ++ulCount) {
 		lpEntryIds[ulCount].cb = lpConflictItems->Value.MVbin.lpbin[ulCount].cb;
 		lpEntryIds[ulCount].lpb = lpConflictItems->Value.MVbin.lpbin[ulCount].lpb;
 	}
@@ -746,7 +685,7 @@ HRESULT ECExchangeImportContentsChanges::CreateConflictMessageOnly(LPMESSAGE lpM
 	lpEntryIds[ulCount].lpb = lpEntryIdProp->Value.bin.lpb;
 
 	lpConflictItems->Value.MVbin.lpbin = lpEntryIds;
-	lpConflictItems->Value.MVbin.cValues++;
+	++lpConflictItems->Value.MVbin.cValues;
 
 	if (lppConflictItems) {
 		*lppConflictItems = lpConflictItems;
@@ -762,16 +701,9 @@ exit:
 
 	if(lpConflictMessage)
 		lpConflictMessage->Release();
-
-	if(lpPropAdditionalREN)
-		MAPIFreeBuffer(lpPropAdditionalREN);
-
-	if(lpConflictItems)
-		MAPIFreeBuffer(lpConflictItems);
-
-	if(lpEntryIdProp)
-		MAPIFreeBuffer(lpEntryIdProp);
-
+	MAPIFreeBuffer(lpPropAdditionalREN);
+	MAPIFreeBuffer(lpConflictItems);
+	MAPIFreeBuffer(lpEntryIdProp);
 	return hr;
 }
 
@@ -792,31 +724,31 @@ HRESULT ECExchangeImportContentsChanges::CreateConflictFolders(){
 
 	hr = m_lpFolder->OpenEntry(0, NULL, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, (LPUNKNOWN*)&lpRootFolder);
 	if(hr != hrSuccess) {
-		LOG_DEBUG(m_lpLogger, "Failed to open root folder, hr = 0x%08x", hr);
+		ZLOG_DEBUG(m_lpLogger, "Failed to open root folder, hr = 0x%08x", hr);
 		goto exit;
 	}
 
 	hr = m_lpFolder->GetMsgStore()->GetReceiveFolder((TCHAR*)"IPM", 0, &cbEntryId, &lpEntryId, NULL);
 	if(hr != hrSuccess) {
-		LOG_DEBUG(m_lpLogger, "Failed to get 'IPM' receive folder id, hr = 0x%08x", hr);
+		ZLOG_DEBUG(m_lpLogger, "Failed to get 'IPM' receive folder id, hr = 0x%08x", hr);
 		goto exit;
 	}
 
 	hr = m_lpFolder->OpenEntry(cbEntryId, lpEntryId, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, (LPUNKNOWN*)&lpInbox);
 	if(hr != hrSuccess) {
-		LOG_DEBUG(m_lpLogger, "Failed to open 'IPM' receive folder, hr = 0x%08x", hr);
+		ZLOG_DEBUG(m_lpLogger, "Failed to open 'IPM' receive folder, hr = 0x%08x", hr);
 		goto exit;
 	}
 
 	hr = HrGetOneProp(&m_lpFolder->GetMsgStore()->m_xMsgStore, PR_IPM_SUBTREE_ENTRYID, &lpIPMSubTree);
 	if(hr != hrSuccess) {
-		LOG_DEBUG(m_lpLogger, "Failed to get ipm subtree id, hr = 0x%08x", hr);
+		ZLOG_DEBUG(m_lpLogger, "Failed to get ipm subtree id, hr = 0x%08x", hr);
 		goto exit;
 	}
 
 	hr = m_lpFolder->OpenEntry(lpIPMSubTree->Value.bin.cb, (LPENTRYID)lpIPMSubTree->Value.bin.lpb, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, (LPUNKNOWN*)&lpParentFolder);
 	if(hr != hrSuccess) {
-		LOG_DEBUG(m_lpLogger, "Failed to open ipm subtree folder, hr = 0x%08x", hr);
+		ZLOG_DEBUG(m_lpLogger, "Failed to open ipm subtree folder, hr = 0x%08x", hr);
 		goto exit;
 	}
 
@@ -834,33 +766,31 @@ HRESULT ECExchangeImportContentsChanges::CreateConflictFolders(){
 		goto exit;
 
 	//copy from original PR_ADDITIONAL_REN_ENTRYIDS
-	if(lpAdditionalREN){
-		for(ulCount = 0; ulCount < lpAdditionalREN->Value.MVbin.cValues; ulCount++){
+	if(lpAdditionalREN)
+		for (ulCount = 0; ulCount < lpAdditionalREN->Value.MVbin.cValues; ++ulCount)
 			lpNewAdditionalREN->Value.MVbin.lpbin[ulCount] = lpAdditionalREN->Value.MVbin.lpbin[ulCount];
-		}
-	}
 
 	hr = CreateConflictFolder(_("Sync Issues"), lpNewAdditionalREN, 1, lpParentFolder, &lpConflictFolder);
 	if(hr != hrSuccess) {
-		LOG_DEBUG(m_lpLogger, "Failed to create 'Sync Issues' folder, hr = 0x%08x", hr);
+		ZLOG_DEBUG(m_lpLogger, "Failed to create 'Sync Issues' folder, hr = 0x%08x", hr);
 		goto exit;
 	}
 	
 	hr = CreateConflictFolder(_("Conflicts"), lpNewAdditionalREN, 0, lpConflictFolder, NULL);
 	if(hr != hrSuccess) {
-		LOG_DEBUG(m_lpLogger, "Failed to create 'Conflicts' folder, hr = 0x%08x", hr);
+		ZLOG_DEBUG(m_lpLogger, "Failed to create 'Conflicts' folder, hr = 0x%08x", hr);
 		goto exit;
 	}
 	
 	hr = CreateConflictFolder(_("Local Failures"), lpNewAdditionalREN, 2, lpConflictFolder, NULL);
 	if(hr != hrSuccess) {
-		LOG_DEBUG(m_lpLogger, "Failed to create 'Local Failures' folder, hr = 0x%08x", hr);
+		ZLOG_DEBUG(m_lpLogger, "Failed to create 'Local Failures' folder, hr = 0x%08x", hr);
 		goto exit;
 	}
 	
 	hr = CreateConflictFolder(_("Server Failures"), lpNewAdditionalREN, 3, lpConflictFolder, NULL);
 	if(hr != hrSuccess) {
-		LOG_DEBUG(m_lpLogger, "Failed to create 'Server Failures' folder, hr = 0x%08x", hr);
+		ZLOG_DEBUG(m_lpLogger, "Failed to create 'Server Failures' folder, hr = 0x%08x", hr);
 		goto exit;
 	}
 
@@ -877,7 +807,7 @@ HRESULT ECExchangeImportContentsChanges::CreateConflictFolders(){
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "No reminder searchfolder found, nothing to update");
 		hr = hrSuccess;
 	} else if (hr != hrSuccess) {
-		LOG_DEBUG(m_lpLogger, "Failed to update search reminders, hr = 0x%08x", hr);
+		ZLOG_DEBUG(m_lpLogger, "Failed to update search reminders, hr = 0x%08x", hr);
 		goto exit;
 	}
 
@@ -891,15 +821,10 @@ exit:
 
 	if(lpConflictFolder)
 		lpConflictFolder->Release();
-	if(lpAdditionalREN)
-		MAPIFreeBuffer(lpAdditionalREN);
-	if(lpNewAdditionalREN)
-		MAPIFreeBuffer(lpNewAdditionalREN);
-	if(lpIPMSubTree)
-		MAPIFreeBuffer(lpIPMSubTree);
-	if(lpEntryId)
-		MAPIFreeBuffer(lpEntryId);
-
+	MAPIFreeBuffer(lpAdditionalREN);
+	MAPIFreeBuffer(lpNewAdditionalREN);
+	MAPIFreeBuffer(lpIPMSubTree);
+	MAPIFreeBuffer(lpEntryId);
 	return hr;
 }
 
@@ -944,16 +869,13 @@ HRESULT ECExchangeImportContentsChanges::CreateConflictFolder(LPTSTR lpszName, L
 exit:
 	if((hr != hrSuccess || lppConflictFolder == NULL) && lpConflictFolder)
 		lpConflictFolder->Release();
-	
-	if(lpEntryId)
-		MAPIFreeBuffer(lpEntryId);
-
+	MAPIFreeBuffer(lpEntryId);
 	return hr;
 }
 
 HRESULT ECExchangeImportContentsChanges::ConfigForConversionStream(LPSTREAM lpStream, ULONG ulFlags, ULONG /*cValuesConversion*/, LPSPropValue /*lpPropArrayConversion*/)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	BOOL	bCanStream = FALSE;
 
 	// Since we don't use the cValuesConversion and lpPropArrayConversion arguments, we'll just check
@@ -961,22 +883,15 @@ HRESULT ECExchangeImportContentsChanges::ConfigForConversionStream(LPSTREAM lpSt
 
 	hr = m_lpFolder->GetMsgStore()->lpTransport->HrCheckCapabilityFlags(ZARAFA_CAP_ENHANCED_ICS, &bCanStream);
 	if (hr != hrSuccess)
-		goto exit;
-
-	if (bCanStream == FALSE) {
-		hr = MAPI_E_NO_SUPPORT;
-		goto exit;
-	}
-
-	hr = Config(lpStream, ulFlags);
-
-exit:
-	return hr;
+		return hr;
+	if (bCanStream == FALSE)
+		return MAPI_E_NO_SUPPORT;
+	return Config(lpStream, ulFlags);
 }
 
 HRESULT ECExchangeImportContentsChanges::ImportMessageChangeAsAStream(ULONG cValue, LPSPropValue lpPropArray, ULONG ulFlags, LPSTREAM *lppStream)
 {
-	HRESULT hr = hrSuccess; 
+	HRESULT hr;
 	ULONG cbEntryId = 0;
 	EntryIdPtr ptrEntryId;
 	WSMessageStreamImporterPtr ptrMessageImporter;
@@ -987,8 +902,8 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageChangeAsAStream(ULONG cVal
 	if (lpMessageSourceKey != NULL) {
 		hr = m_lpFolder->GetMsgStore()->lpTransport->HrEntryIDFromSourceKey(m_lpFolder->GetMsgStore()->m_cbEntryId, m_lpFolder->GetMsgStore()->m_lpEntryId, m_lpSourceKey->Value.bin.cb, m_lpSourceKey->Value.bin.lpb, lpMessageSourceKey->Value.bin.cb, lpMessageSourceKey->Value.bin.lpb, &cbEntryId, &ptrEntryId);
 		if (hr != MAPI_E_NOT_FOUND && hr != hrSuccess) {
-			LOG_DEBUG(m_lpLogger, "ImportFast: Failed to get entryid from sourcekey, hr = 0x%08x", hr);
-			goto exit;
+			ZLOG_DEBUG(m_lpLogger, "ImportFast: Failed to get entryid from sourcekey, hr = 0x%08x", hr);
+			return hr;
 		}
 	} else {
 	    // Source key not specified, therefore the message must be new since this is the only thing
@@ -1001,9 +916,8 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageChangeAsAStream(ULONG cVal
 	if (hr == MAPI_E_NOT_FOUND && ((ulFlags & SYNC_NEW_MESSAGE) == 0)) {
 		// This is a change, but we don't already have the item. This can only mean
 		// that the item has been deleted on our side. 
-		LOG_DEBUG(m_lpLogger, "ImportFast: %s", "Destination message deleted");
-		hr = SYNC_E_OBJECT_DELETED;
-		goto exit;
+		ZLOG_DEBUG(m_lpLogger, "ImportFast: %s", "Destination message deleted");
+		return SYNC_E_OBJECT_DELETED;
 	}
 
 	if (hr == MAPI_E_NOT_FOUND)
@@ -1012,26 +926,24 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageChangeAsAStream(ULONG cVal
 		hr = ImportMessageUpdateAsStream(cbEntryId, ptrEntryId, cValue, lpPropArray, &ptrMessageImporter);
 	if (hr != hrSuccess) {
 		if (hr != SYNC_E_IGNORE && hr != SYNC_E_OBJECT_DELETED)
-			LOG_DEBUG(m_lpLogger, "ImportFast: Failed to get MessageImporter, hr = 0x%08x", hr);
-		goto exit;
+			ZLOG_DEBUG(m_lpLogger, "ImportFast: Failed to get MessageImporter, hr = 0x%08x", hr);
+		return hr;
 	}
 
-	LOG_DEBUG(m_lpLogger, "ImportFast: %s", "Wrapping MessageImporter in IStreamAdapter");
+	ZLOG_DEBUG(m_lpLogger, "ImportFast: %s", "Wrapping MessageImporter in IStreamAdapter");
 	hr = ECMessageStreamImporterIStreamAdapter::Create(ptrMessageImporter, &ptrStream);
 	if (hr != hrSuccess) {
-		LOG_DEBUG(m_lpLogger, "ImportFast: Failed to wrap message importer, hr = 0x%08x" ,hr);
-		goto exit;
+		ZLOG_DEBUG(m_lpLogger, "ImportFast: Failed to wrap message importer, hr = 0x%08x" ,hr);
+		return hr;
 	}
 
 	*lppStream = ptrStream.release();
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECExchangeImportContentsChanges::ImportMessageCreateAsStream(ULONG cValue, LPSPropValue lpPropArray, WSMessageStreamImporter **lppMessageImporter)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	LPSPropValue lpMessageFlags = NULL;
 	LPSPropValue lpMessageAssociated = NULL;
 	LPSPropValue lpPropEntryId = NULL;
@@ -1040,10 +952,8 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageCreateAsStream(ULONG cValu
 	LPENTRYID lpEntryId = NULL;
 	WSMessageStreamImporterPtr ptrMessageImporter;
 
-	if (lpPropArray == NULL || lppMessageImporter == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpPropArray == NULL || lppMessageImporter == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	lpMessageFlags = PpropFindProp(lpPropArray, cValue, PR_MESSAGE_FLAGS);
 	lpMessageAssociated = PpropFindProp(lpPropArray, cValue, PR_ASSOCIATED);
@@ -1056,29 +966,27 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageCreateAsStream(ULONG cValu
 		cbEntryId = lpPropEntryId->Value.bin.cb;
 		lpEntryId = (LPENTRYID)lpPropEntryId->Value.bin.lpb;
 	} else {
-		LOG_DEBUG(m_lpLogger, "CreateFast: %s", "Creating new entryid");
+		ZLOG_DEBUG(m_lpLogger, "CreateFast: %s", "Creating new entryid");
 		hr = HrCreateEntryId(m_lpFolder->GetMsgStore()->GetStoreGuid(), MAPI_MESSAGE, &cbEntryId, &lpEntryId);
 		if (hr != hrSuccess) {
-			LOG_DEBUG(m_lpLogger, "CreateFast: Failed to create entryid, hr = 0x%08x", hr);
-			goto exit;
+			ZLOG_DEBUG(m_lpLogger, "CreateFast: Failed to create entryid, hr = 0x%08x", hr);
+			return hr;
 		}
 	}
 
 	hr = m_lpFolder->CreateMessageFromStream(ulNewFlags, m_ulSyncId, cbEntryId, lpEntryId, &ptrMessageImporter);
 	if(hr != hrSuccess) {
-		LOG_DEBUG(m_lpLogger, "CreateFast: Failed to create message from stream, hr = 0x%08x", hr);
-		goto exit;
+		ZLOG_DEBUG(m_lpLogger, "CreateFast: Failed to create message from stream, hr = 0x%08x", hr);
+		return hr;
 	}
 
 	*lppMessageImporter = ptrMessageImporter.release();
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECExchangeImportContentsChanges::ImportMessageUpdateAsStream(ULONG cbEntryId, LPENTRYID lpEntryId, ULONG cValue, LPSPropValue lpPropArray, WSMessageStreamImporter **lppMessageImporter)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	SPropValuePtr ptrPropPCL;
 	SPropValuePtr ptrPropCK;
 	LPSPropValue lpRemoteCK = NULL;
@@ -1089,28 +997,25 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageUpdateAsStream(ULONG cbEnt
 	SPropValuePtr ptrConflictItems;
 	WSMessageStreamImporterPtr ptrMessageImporter;
 
-	if (lpEntryId == NULL || lpPropArray == NULL || lppMessageImporter == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpEntryId == NULL || lpPropArray == NULL || lppMessageImporter == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	hr = m_lpFolder->GetChangeInfo(cbEntryId, lpEntryId, &ptrPropPCL, &ptrPropCK);
 	if (hr != hrSuccess) {
 		if (hr == MAPI_E_NOT_FOUND) {
 			// The item was soft-deleted; sourcekey is known, but we cannot open the item. It has therefore been deleted.
-			LOG_DEBUG(m_lpLogger, "UpdateFast: %s", "The destination item was deleted");
+			ZLOG_DEBUG(m_lpLogger, "UpdateFast: %s", "The destination item was deleted");
 			hr = SYNC_E_OBJECT_DELETED;
 		} else
-			LOG_DEBUG(m_lpLogger, "UpdateFast: Failed to get change info, hr = 0x%08x", hr);
-		goto exit;
+			ZLOG_DEBUG(m_lpLogger, "UpdateFast: Failed to get change info, hr = 0x%08x", hr);
+		return hr;
 	}
 
 	lpRemoteCK = PpropFindProp(lpPropArray, cValue, PR_CHANGE_KEY);
 	if (IsProcessed(lpRemoteCK, ptrPropPCL)) {
 		//we already have this change
-		LOG_DEBUG(m_lpLogger, "UpdateFast: %s", "The item was previously synchronized");
-		hr = SYNC_E_IGNORE;
-		goto exit;
+		ZLOG_DEBUG(m_lpLogger, "UpdateFast: %s", "The item was previously synchronized");
+		return SYNC_E_IGNORE;
 	}
 
 	lpMessageFlags = PpropFindProp(lpPropArray, cValue, PR_MESSAGE_FLAGS);
@@ -1123,17 +1028,16 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageUpdateAsStream(ULONG cbEnt
 		MessagePtr ptrMessage;
 		ULONG ulType = 0;
 
-		LOG_DEBUG(m_lpLogger, "UpdateFast: %s", "The item seems to be in conflict");
+		ZLOG_DEBUG(m_lpLogger, "UpdateFast: %s", "The item seems to be in conflict");
 
 		hr = m_lpFolder->OpenEntry(cbEntryId, lpEntryId, &ptrMessage.iid, MAPI_MODIFY, &ulType, &ptrMessage);
 		if (hr == MAPI_E_NOT_FOUND) {
 			// This shouldn't happen as we just got a conflict.
-			LOG_DEBUG(m_lpLogger, "UpdateFast: %s", "The destination item seems to have disappeared");
-			hr = SYNC_E_OBJECT_DELETED;
-			goto exit;
+			ZLOG_DEBUG(m_lpLogger, "UpdateFast: %s", "The destination item seems to have disappeared");
+			return SYNC_E_OBJECT_DELETED;
 		} else if (hr != hrSuccess) {
-			LOG_DEBUG(m_lpLogger, "UpdateFast: Failed to open conflicting message, hr = 0x%08x", hr);
-			goto exit;
+			ZLOG_DEBUG(m_lpLogger, "UpdateFast: Failed to open conflicting message, hr = 0x%08x", hr);
+			return hr;
 		}
 
 		if (CreateConflictMessageOnly(ptrMessage, &ptrConflictItems) == MAPI_E_NOT_FOUND) {
@@ -1144,14 +1048,12 @@ HRESULT ECExchangeImportContentsChanges::ImportMessageUpdateAsStream(ULONG cbEnt
 
 	hr = m_lpFolder->UpdateMessageFromStream(m_ulSyncId, cbEntryId, lpEntryId, ptrConflictItems, &ptrMessageImporter);
 	if (hr != hrSuccess) {
-		LOG_DEBUG(m_lpLogger, "UpdateFast: Failed to update message from stream, hr = 0x%08x", hr);
-		goto exit;
+		ZLOG_DEBUG(m_lpLogger, "UpdateFast: Failed to update message from stream, hr = 0x%08x", hr);
+		return hr;
 	}
 
 	*lppMessageImporter = ptrMessageImporter.release();
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECExchangeImportContentsChanges::SetMessageInterface(REFIID refiid)
@@ -1248,7 +1150,7 @@ HrVerifyRemindersRestriction(const SRestriction *lpRestriction,
 
 HRESULT ECExchangeImportContentsChanges::HrUpdateSearchReminders(LPMAPIFOLDER lpRootFolder, LPSPropValue lpAdditionalREN)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG cREMProps;
 	SPropArrayPtr ptrREMProps;
 	LPSPropValue lpREMEntryID = NULL;
@@ -1267,35 +1169,30 @@ HRESULT ECExchangeImportContentsChanges::HrUpdateSearchReminders(LPMAPIFOLDER lp
 
 	hr = lpRootFolder->GetProps((LPSPropTagArray)&sptaREMProps, 0, &cREMProps, &ptrREMProps);
 	if (FAILED(hr))
-		goto exit;
+		return hr;
 
 	// Find the correct reminders folder.
 	if (PROP_TYPE(ptrREMProps[1].ulPropTag) != PT_ERROR)
 		lpREMEntryID = &ptrREMProps[1];
 	else if (PROP_TYPE(ptrREMProps[0].ulPropTag) != PT_ERROR)
 		lpREMEntryID = &ptrREMProps[0];
-	else {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
+	else
+		return MAPI_E_NOT_FOUND;
 
 	hr = lpRootFolder->OpenEntry(lpREMEntryID->Value.bin.cb, (LPENTRYID)lpREMEntryID->Value.bin.lpb, &ptrRemindersFolder.iid, MAPI_BEST_ACCESS, &ulType, &ptrRemindersFolder);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 
 	hr = ptrRemindersFolder->GetSearchCriteria(0, &ptrOrigRestriction, &ptrOrigContainerList, &ulOrigSearchState);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 
 	// First check if the SearchCriteria needs updating by seeing if we can find the restrictions that
 	// contain the entryids of the folders to exclude. We assume that when they're found they're used
 	// as expected: as excludes.
 	hr = HrVerifyRemindersRestriction(ptrOrigRestriction, lpAdditionalREN);
 	if (hr == hrSuccess)
-		goto exit;
-
+		return hr;
 
 	sPropValConflicts.Value.bin = lpAdditionalREN->Value.MVbin.lpbin[0];
 	sPropValLocalFailures.Value.bin = lpAdditionalREN->Value.MVbin.lpbin[2];
@@ -1310,14 +1207,9 @@ HRESULT ECExchangeImportContentsChanges::HrUpdateSearchReminders(LPMAPIFOLDER lp
 
 	hr = resPre.CreateMAPIRestriction(&ptrPreRestriction, ECRestriction::Cheap);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
-	hr = ptrRemindersFolder->SetSearchCriteria(ptrPreRestriction, ptrOrigContainerList, RESTART_SEARCH | (ulOrigSearchState & (SEARCH_FOREGROUND | SEARCH_RECURSIVE)));
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-	return hr;
+	return ptrRemindersFolder->SetSearchCriteria(ptrPreRestriction, ptrOrigContainerList, RESTART_SEARCH | (ulOrigSearchState & (SEARCH_FOREGROUND | SEARCH_RECURSIVE)));
 }
 
 ULONG ECExchangeImportContentsChanges::xECImportContentsChanges::AddRef(){
@@ -1399,9 +1291,7 @@ HRESULT ECExchangeImportContentsChanges::xECImportContentsChanges::ImportMessage
 
 HRESULT ECExchangeImportContentsChanges::xECImportContentsChanges::SetMessageInterface(REFIID refiid)
 {
-	HRESULT hr;
 	TRACE_MAPI(TRACE_ENTRY, "IExchangeImportContentsChanges::SetMessageInterface", "%s", DBGGUIDToString(refiid).c_str());
 	METHOD_PROLOGUE_(ECExchangeImportContentsChanges, ECImportContentsChanges);
-	hr = pThis->SetMessageInterface(refiid);
-	return hr;
+	return pThis->SetMessageInterface(refiid);
 }

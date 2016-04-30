@@ -1,47 +1,21 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
 #include <iostream>
 #include <string>
@@ -64,17 +38,17 @@
 #include <malloc.h>
 #endif
 
-#include "EMSAbTag.h"
-#include "ECConfig.h"
-#include "ECDefs.h"
-#include "ECLogger.h"
-#include "ECPluginSharedData.h"
-#include "stringutil.h"
+#include <zarafa/EMSAbTag.h>
+#include <zarafa/ECConfig.h>
+#include <zarafa/ECDefs.h>
+#include <zarafa/ECLogger.h>
+#include <zarafa/ECPluginSharedData.h>
+#include <zarafa/stringutil.h>
 
 using namespace std;
 
 #include "UnixUserPlugin.h"
-#include "ecversion.h"
+#include <zarafa/ecversion.h>
 
 /**
  * static buffer size for getpwnam_r() calls etc.
@@ -96,7 +70,7 @@ extern "C" {
 	}
 }
 
-UnixUserPlugin::UnixUserPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *shareddata) throw(exception)
+UnixUserPlugin::UnixUserPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *shareddata)
 	: DBPlugin(pluginlock, shareddata), m_iconv(NULL)
 {
 	const configsetting_t lpDefaults [] = {
@@ -124,11 +98,10 @@ UnixUserPlugin::UnixUserPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *
 
 UnixUserPlugin::~UnixUserPlugin()
 {
-	if (m_iconv)
-		delete m_iconv;
+	delete m_iconv;
 }
 
-void UnixUserPlugin::InitPlugin() throw(std::exception) {
+void UnixUserPlugin::InitPlugin() {
 	DBPlugin::InitPlugin();
 
 	// we only need unix_charset -> zarafa charset
@@ -138,7 +111,7 @@ void UnixUserPlugin::InitPlugin() throw(std::exception) {
 		throw runtime_error(string("Cannot setup charset converter, check \"fullname_charset\" in cfg"));
 }
 
-void UnixUserPlugin::findUserID(const string &id, struct passwd *pwd, char *buffer) throw(std::exception)
+void UnixUserPlugin::findUserID(const string &id, struct passwd *pwd, char *buffer)
 {
 	struct passwd *pw = NULL;
 	uid_t minuid = fromstring<const char *, uid_t>(m_config->GetSetting("min_user_uid"));
@@ -161,7 +134,7 @@ void UnixUserPlugin::findUserID(const string &id, struct passwd *pwd, char *buff
 			throw objectnotfound(id);
 }
 
-void UnixUserPlugin::findUser(const string &name, struct passwd *pwd, char *buffer) throw(std::exception)
+void UnixUserPlugin::findUser(const string &name, struct passwd *pwd, char *buffer)
 {
 	struct passwd *pw = NULL;
 	uid_t minuid = fromstring<const char *, uid_t>(m_config->GetSetting("min_user_uid"));
@@ -184,7 +157,7 @@ void UnixUserPlugin::findUser(const string &name, struct passwd *pwd, char *buff
 			throw objectnotfound(name);
 }
 
-void UnixUserPlugin::findGroupID(const string &id, struct group *grp, char *buffer) throw(std::exception)
+void UnixUserPlugin::findGroupID(const string &id, struct group *grp, char *buffer)
 {
 	struct group *gr = NULL;
 	gid_t mingid = fromstring<const char *, gid_t>(m_config->GetSetting("min_group_gid"));
@@ -207,7 +180,7 @@ void UnixUserPlugin::findGroupID(const string &id, struct group *grp, char *buff
 			throw objectnotfound(id);
 }
 
-void UnixUserPlugin::findGroup(const string &name, struct group *grp, char *buffer) throw(std::exception)
+void UnixUserPlugin::findGroup(const string &name, struct group *grp, char *buffer)
 {
 	struct group *gr = NULL;
 	gid_t mingid = fromstring<const char *, gid_t>(m_config->GetSetting("min_group_gid"));
@@ -230,7 +203,7 @@ void UnixUserPlugin::findGroup(const string &name, struct group *grp, char *buff
 			throw objectnotfound(name);
 }
 
-objectsignature_t UnixUserPlugin::resolveUserName(const string &name) throw(std::exception)
+objectsignature_t UnixUserPlugin::resolveUserName(const string &name)
 {
 	char buffer[PWBUFSIZE];
 	struct passwd pws;
@@ -247,7 +220,7 @@ objectsignature_t UnixUserPlugin::resolveUserName(const string &name) throw(std:
 	return objectsignature_t(objectid, getDBSignature(objectid) + pws.pw_gecos + pws.pw_name);
 }
 
-objectsignature_t UnixUserPlugin::resolveGroupName(const string &name) throw(std::exception)
+objectsignature_t UnixUserPlugin::resolveGroupName(const string &name)
 {
 	char buffer[PWBUFSIZE];
 	struct group grp;
@@ -259,7 +232,7 @@ objectsignature_t UnixUserPlugin::resolveGroupName(const string &name) throw(std
 	return objectsignature_t(objectid, grp.gr_name);
 }
 
-objectsignature_t UnixUserPlugin::resolveName(objectclass_t objclass, const string &name, const objectid_t &company) throw(std::exception)
+objectsignature_t UnixUserPlugin::resolveName(objectclass_t objclass, const string &name, const objectid_t &company)
 {
 	objectsignature_t user;
 	objectsignature_t group;
@@ -307,14 +280,14 @@ objectsignature_t UnixUserPlugin::resolveName(objectclass_t objclass, const stri
 	}
 }
 
-objectsignature_t UnixUserPlugin::authenticateUser(const string &username, const string &password, const objectid_t &companyname) throw(std::exception) {
+objectsignature_t UnixUserPlugin::authenticateUser(const string &username, const string &password, const objectid_t &companyname) {
 	struct passwd pws, *pw = NULL;
 	char buffer[PWBUFSIZE];
 	uid_t minuid = fromstring<const char *, uid_t>(m_config->GetSetting("min_user_uid"));
 	uid_t maxuid = fromstring<const char *, uid_t>(m_config->GetSetting("max_user_uid"));
 	vector<string> exceptuids = tokenize(m_config->GetSetting("except_user_uids"), " \t");
-	auto_ptr<struct crypt_data> cryptdata = auto_ptr<struct crypt_data>(NULL);
-	auto_ptr<objectdetails_t> ud = auto_ptr<objectdetails_t>(NULL);
+	auto_ptr<struct crypt_data> cryptdata;
+	auto_ptr<objectdetails_t> ud;
 	objectid_t objectid;
 	const char *crpw = NULL;
 
@@ -388,7 +361,7 @@ bool UnixUserPlugin::matchGroupObject(struct group *gr, const string &match, uns
 	return matched;
 }
 
-auto_ptr<signatures_t> UnixUserPlugin::getAllUserObjects(const string &match, unsigned int ulFlags) throw(std::exception)
+auto_ptr<signatures_t> UnixUserPlugin::getAllUserObjects(const string &match, unsigned int ulFlags)
 {
 	auto_ptr<signatures_t> objectlist = auto_ptr<signatures_t>(new signatures_t());;
 	char buffer[PWBUFSIZE];
@@ -430,7 +403,7 @@ auto_ptr<signatures_t> UnixUserPlugin::getAllUserObjects(const string &match, un
 	return objectlist;
 }
 
-auto_ptr<signatures_t> UnixUserPlugin::getAllGroupObjects(const string &match, unsigned int ulFlags) throw(std::exception)
+auto_ptr<signatures_t> UnixUserPlugin::getAllGroupObjects(const string &match, unsigned int ulFlags)
 {
 	auto_ptr<signatures_t> objectlist = auto_ptr<signatures_t>(new signatures_t());;
 	char buffer[PWBUFSIZE];
@@ -467,14 +440,14 @@ auto_ptr<signatures_t> UnixUserPlugin::getAllGroupObjects(const string &match, u
 	return objectlist;
 }
 
-auto_ptr<signatures_t> UnixUserPlugin::getAllObjects(const objectid_t &companyid, objectclass_t objclass) throw(exception)
+auto_ptr<signatures_t> UnixUserPlugin::getAllObjects(const objectid_t &companyid, objectclass_t objclass)
 {
 	ECRESULT er = erSuccess;
 	auto_ptr<signatures_t> objectlist = auto_ptr<signatures_t>(new signatures_t());
 	auto_ptr<signatures_t> objects;
-	signatures_t::iterator iterObjs;
+	signatures_t::const_iterator iterObjs;
 	map<objectclass_t, string> objectstrings;
-	map<objectclass_t, string>::iterator iterStrings;
+	std::map<objectclass_t, string>::const_iterator iterStrings;
 	DB_RESULT_AUTOFREE lpResult(m_lpDatabase);
 	DB_ROW lpDBRow = NULL;
 	string strQuery;
@@ -518,7 +491,7 @@ auto_ptr<signatures_t> UnixUserPlugin::getAllObjects(const objectid_t &companyid
 		return objectlist;
 
 	// Distribute all objects over the various types
-	for (iterObjs = objectlist->begin(); iterObjs != objectlist->end(); iterObjs++) {
+	for (iterObjs = objectlist->begin(); iterObjs != objectlist->end(); ++iterObjs) {
 		if (!objectstrings[iterObjs->id.objclass].empty())
 			objectstrings[iterObjs->id.objclass] += ", ";
 		objectstrings[iterObjs->id.objclass] += iterObjs->id.id;
@@ -526,7 +499,8 @@ auto_ptr<signatures_t> UnixUserPlugin::getAllObjects(const objectid_t &companyid
 
 	// make list of obsolete objects
 	strQuery = "SELECT id, objectclass FROM " + (string)DB_OBJECT_TABLE + " WHERE ";
-	for (iterStrings = objectstrings.begin(); iterStrings != objectstrings.end(); iterStrings++) {
+	for (iterStrings = objectstrings.begin();
+	     iterStrings != objectstrings.end(); ++iterStrings) {
 		if (iterStrings != objectstrings.begin())
 			strQuery += "AND ";
 		strQuery +=
@@ -536,7 +510,7 @@ auto_ptr<signatures_t> UnixUserPlugin::getAllObjects(const objectid_t &companyid
 
 	er = m_lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess) {
-		m_logger->Log(EC_LOGLEVEL_ERROR, "Unix plugin: Unable to cleanup old entries");
+		ec_log_err("Unix plugin: Unable to cleanup old entries");
 		goto exit;
 	}
 
@@ -556,7 +530,8 @@ auto_ptr<signatures_t> UnixUserPlugin::getAllObjects(const objectid_t &companyid
 
 	// remove obsolete objects
 	strQuery = "DELETE FROM " + (string)DB_OBJECT_TABLE + " WHERE ";
-	for (iterStrings = objectstrings.begin(); iterStrings != objectstrings.end(); iterStrings++) {
+	for (iterStrings = objectstrings.begin();
+	     iterStrings != objectstrings.end(); ++iterStrings) {
 		if (iterStrings != objectstrings.begin())
 			strQuery += "OR ";
 		strQuery += "(externid IN (" + iterStrings->second + ") AND objectclass = " + stringify(iterStrings->first) + ")";
@@ -564,10 +539,10 @@ auto_ptr<signatures_t> UnixUserPlugin::getAllObjects(const objectid_t &companyid
 
 	er = m_lpDatabase->DoDelete(strQuery, &ulRows);
 	if (er != erSuccess) {
-		m_logger->Log(EC_LOGLEVEL_ERROR, "Unix plugin: Unable to cleanup old entries in object table");
+		ec_log_err("Unix plugin: Unable to cleanup old entries in object table");
 		goto exit;
 	} else if (ulRows > 0) {
-		m_logger->Log(EC_LOGLEVEL_INFO, "Unix plugin: Cleaned-up %d old entries from object table", ulRows);
+		ec_log_info("Unix plugin: Cleaned up %d old entries from object table", ulRows);
 	}
 
 	// Create subquery to select all ids which will be deleted
@@ -575,7 +550,8 @@ auto_ptr<signatures_t> UnixUserPlugin::getAllObjects(const objectid_t &companyid
 		"SELECT o.id "
 		"FROM " + (string)DB_OBJECT_TABLE + " AS o "
 		"WHERE ";
-	for (iterStrings = objectstrings.begin(); iterStrings != objectstrings.end(); iterStrings++) {
+	for (iterStrings = objectstrings.begin();
+	     iterStrings != objectstrings.end(); ++iterStrings) {
 		if (iterStrings != objectstrings.begin())
 			strSubQuery += "OR ";
 		strSubQuery += "(o.externid IN (" + iterStrings->second + ") AND o.objectclass = " + stringify(iterStrings->first) + ")";
@@ -587,10 +563,10 @@ auto_ptr<signatures_t> UnixUserPlugin::getAllObjects(const objectid_t &companyid
 		"WHERE objectid IN (" + strSubQuery + ")";
 	er = m_lpDatabase->DoDelete(strQuery, &ulRows);
 	if (er != erSuccess) {
-		m_logger->Log(EC_LOGLEVEL_ERROR, "Unix plugin: Unable to cleanup old entries in objectproperty table");
+		ec_log_err("Unix plugin: Unable to cleanup old entries in objectproperty table");
 		goto exit;
 	} else if (ulRows > 0) {
-		m_logger->Log(EC_LOGLEVEL_INFO, "Unix plugin: Cleaned-up %d old entries from objectproperty table", ulRows);
+		ec_log_info("Unix plugin: Cleaned up %d old entries from objectproperty table", ulRows);
 	}
 
 	strQuery =
@@ -599,21 +575,21 @@ auto_ptr<signatures_t> UnixUserPlugin::getAllObjects(const objectid_t &companyid
 		"OR parentobjectid IN (" + strSubQuery + ")";
 	er = m_lpDatabase->DoDelete(strQuery, &ulRows);
 	if (er != erSuccess) {
-		m_logger->Log(EC_LOGLEVEL_ERROR, "Unix plugin: Unable to cleanup old entries in objectrelation table");
+		ec_log_err("Unix plugin: Unable to cleanup old entries in objectrelation table");
 		goto exit;
 	} else if (ulRows > 0) {
-		m_logger->Log(EC_LOGLEVEL_INFO, "Unix plugin: Cleaned-up %d old entries from objectrelation table", ulRows);
+		ec_log_info("Unix plugin: Cleaned-up %d old entries from objectrelation table", ulRows);
 	}
 
 exit:
 	return objectlist;
 }
 
-auto_ptr<objectdetails_t> UnixUserPlugin::getObjectDetails(const objectid_t &externid) throw(exception)
+auto_ptr<objectdetails_t> UnixUserPlugin::getObjectDetails(const objectid_t &externid)
 {
 	ECRESULT er = erSuccess;
 	char buffer[PWBUFSIZE];
-	auto_ptr<objectdetails_t> ud = auto_ptr<objectdetails_t>(NULL);
+	auto_ptr<objectdetails_t> ud;
 	struct passwd pws;
 	struct group grp;
 	DB_RESULT_AUTOFREE lpResult(m_lpDatabase);
@@ -665,7 +641,7 @@ auto_ptr<objectdetails_t> UnixUserPlugin::getObjectDetails(const objectid_t &ext
 	return ud;
 }
 
-void UnixUserPlugin::changeObject(const objectid_t &id, const objectdetails_t &details, const std::list<std::string> *lpRemove) throw(std::exception)
+void UnixUserPlugin::changeObject(const objectid_t &id, const objectdetails_t &details, const std::list<std::string> *lpRemove)
 {
 	objectdetails_t tmp(details);
 
@@ -684,20 +660,20 @@ void UnixUserPlugin::changeObject(const objectid_t &id, const objectdetails_t &d
 	DBPlugin::changeObject(id, tmp, lpRemove);
 }
 
-objectsignature_t UnixUserPlugin::createObject(const objectdetails_t &details) throw(std::exception) {
+objectsignature_t UnixUserPlugin::createObject(const objectdetails_t &details) {
 	throw notimplemented("Creating objects is not supported when using the Unix user plugin.");
 }
 
-void UnixUserPlugin::deleteObject(const objectid_t &id) throw(std::exception) {
+void UnixUserPlugin::deleteObject(const objectid_t &id) {
 	throw notimplemented("Deleting objects is not supported when using the Unix user plugin.");
 }
 
-void UnixUserPlugin::modifyObjectId(const objectid_t &oldId, const objectid_t &newId) throw(std::exception)
+void UnixUserPlugin::modifyObjectId(const objectid_t &oldId, const objectid_t &newId)
 {
 	throw notimplemented("Modifying objectid is not supported when using the Unix user plugin.");
 }
 
-auto_ptr<signatures_t> UnixUserPlugin::getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childid) throw(std::exception)
+auto_ptr<signatures_t> UnixUserPlugin::getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childid)
 {
 	auto_ptr<signatures_t> objectlist = auto_ptr<signatures_t>(new signatures_t());
 	char buffer[PWBUFSIZE];
@@ -742,12 +718,11 @@ auto_ptr<signatures_t> UnixUserPlugin::getParentObjectsForObject(userobject_rela
 		if (exceptgidset.find(gr->gr_gid) != exceptgidset.end())
 			continue;
 
-		for (int i = 0; gr->gr_mem[i] != NULL; i++) {
+		for (int i = 0; gr->gr_mem[i] != NULL; ++i)
 			if (strcmp(username.c_str(), gr->gr_mem[i]) == 0) {
 				objectlist->push_back(objectsignature_t(objectid_t(tostring(gr->gr_gid), DISTLIST_SECURITY), gr->gr_name));
 				break;
 			}
-		}
 	}
 	endgrent();
 	pthread_mutex_unlock(m_plugin_lock);
@@ -759,7 +734,7 @@ auto_ptr<signatures_t> UnixUserPlugin::getParentObjectsForObject(userobject_rela
 	return objectlist;
 }
 
-auto_ptr<signatures_t> UnixUserPlugin::getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentid) throw(std::exception)
+auto_ptr<signatures_t> UnixUserPlugin::getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentid)
 {
 	auto_ptr<signatures_t> objectlist = auto_ptr<signatures_t>(new signatures_t());
 	char buffer[PWBUFSIZE];
@@ -780,13 +755,12 @@ auto_ptr<signatures_t> UnixUserPlugin::getSubObjectsForObject(userobject_relatio
 	LOG_PLUGIN_DEBUG("%s Relation: Group member", __FUNCTION__);
 
 	findGroupID(parentid.id, &grp, buffer);
-	for (unsigned int i = 0; grp.gr_mem[i] != NULL; i++) {
+	for (unsigned int i = 0; grp.gr_mem[i] != NULL; ++i)
 		try {
 			objectlist->push_back(resolveUserName(grp.gr_mem[i]));
 		} catch (std::exception &e) {
 			// Ignore error
 		}
-	}
 
 	transform(exceptuids.begin(), exceptuids.end(), inserter(exceptuidset, exceptuidset.begin()), fromstring<const std::string,uid_t>);
 
@@ -825,21 +799,21 @@ auto_ptr<signatures_t> UnixUserPlugin::getSubObjectsForObject(userobject_relatio
 	return objectlist;
 }
 
-void UnixUserPlugin::addSubObjectRelation(userobject_relation_t relation, const objectid_t &id, const objectid_t &member) throw(std::exception)
+void UnixUserPlugin::addSubObjectRelation(userobject_relation_t relation, const objectid_t &id, const objectid_t &member)
 {
 	if (relation != OBJECTRELATION_QUOTA_USERRECIPIENT && relation != OBJECTRELATION_USER_SENDAS)
 		throw notimplemented("Adding object relations is not supported when using the Unix user plugin.");
 	DBPlugin::addSubObjectRelation(relation, id, member);
 }
 
-void UnixUserPlugin::deleteSubObjectRelation(userobject_relation_t relation, const objectid_t &id, const objectid_t &member) throw(std::exception)
+void UnixUserPlugin::deleteSubObjectRelation(userobject_relation_t relation, const objectid_t &id, const objectid_t &member)
 {
 	if (relation != OBJECTRELATION_QUOTA_USERRECIPIENT && relation != OBJECTRELATION_USER_SENDAS)
 		throw notimplemented("Deleting object relations is not supported when using the Unix user plugin.");
 	DBPlugin::deleteSubObjectRelation(relation, id, member);
 }
 
-auto_ptr<signatures_t> UnixUserPlugin::searchObject(const string &match, unsigned int ulFlags) throw(std::exception)
+auto_ptr<signatures_t> UnixUserPlugin::searchObject(const string &match, unsigned int ulFlags)
 {
 	char buffer[PWBUFSIZE];
 	struct passwd pws, *pw = NULL;
@@ -860,7 +834,9 @@ auto_ptr<signatures_t> UnixUserPlugin::searchObject(const string &match, unsigne
 		const char *search_props[] = { OP_EMAILADDRESS, NULL };
 		objects = DBPlugin::searchObjects(match, search_props, NULL, ulFlags);
 
-		for (signatures_t::iterator iter = objects->begin(); iter != objects->end(); iter++) {
+		for (signatures_t::const_iterator iter = objects->begin();
+		     iter != objects->end(); ++iter)
+		{
 			// the DBPlugin returned the DB signature, so we need to prepend this with the gecos signature
 			errno = 0;
 			getpwuid_r(atoi(iter->id.id.c_str()), &pws, buffer, PWBUFSIZE, &pw);
@@ -884,22 +860,22 @@ auto_ptr<signatures_t> UnixUserPlugin::searchObject(const string &match, unsigne
 	return objectlist;
 }
 
-auto_ptr<objectdetails_t> UnixUserPlugin::getPublicStoreDetails() throw(std::exception)
+auto_ptr<objectdetails_t> UnixUserPlugin::getPublicStoreDetails()
 {
 	throw notsupported("public store details");
 }
 
-auto_ptr<serverdetails_t> UnixUserPlugin::getServerDetails(const string &server) throw(std::exception)
+auto_ptr<serverdetails_t> UnixUserPlugin::getServerDetails(const string &server)
 {
 	throw notsupported("server details");
 }
 
-auto_ptr<serverlist_t> UnixUserPlugin::getServers() throw(std::exception)
+auto_ptr<serverlist_t> UnixUserPlugin::getServers()
 {
 	throw notsupported("server list");
 }
 
-auto_ptr<map<objectid_t, objectdetails_t> > UnixUserPlugin::getObjectDetails(const list<objectid_t> &objectids) throw (std::exception) {
+auto_ptr<map<objectid_t, objectdetails_t> > UnixUserPlugin::getObjectDetails(const list<objectid_t> &objectids) {
 	auto_ptr<map<objectid_t, objectdetails_t> > mapdetails = auto_ptr<map<objectid_t, objectdetails_t> >(new map<objectid_t,objectdetails_t>);
 	auto_ptr<objectdetails_t> uDetails;
 	list<objectid_t>::const_iterator iterID;
@@ -908,7 +884,7 @@ auto_ptr<map<objectid_t, objectdetails_t> > UnixUserPlugin::getObjectDetails(con
 	if (objectids.empty())
 		return mapdetails;
 
-	for (iterID = objectids.begin(); iterID != objectids.end(); iterID++) {
+	for (iterID = objectids.begin(); iterID != objectids.end(); ++iterID) {
 		try {
 			uDetails = this->getObjectDetails(*iterID);
 		}
@@ -959,7 +935,7 @@ auto_ptr<objectdetails_t> UnixUserPlugin::objectdetailsFromPwent(struct passwd *
 			// invalid entry, must have a shadow password set in this case
 			// throw objectnotfound(ud->id);
 			// too bad that the password couldn't be found, but it's not that critical
-			m_logger->Log(EC_LOGLEVEL_WARNING, "Warning: unable to find password for user '%s', errno: %s", pw->pw_name, strerror(errno));
+			ec_log_warn("Warning: unable to find password for user \"%s\": %s", pw->pw_name, strerror(errno));
 			ud->SetPropString(OB_PROP_S_PASSWORD, string("x"));	// set invalid password entry, cannot login without a password
 		} else {
 			ud->SetPropString(OB_PROP_S_PASSWORD, string(spw->sp_pwdp));

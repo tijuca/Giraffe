@@ -1,60 +1,35 @@
 /*
  * Copyright 2005 - 2015  Zarafa B.V. and its licensors
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation with the following
- * additional terms according to sec. 7:
- * 
- * "Zarafa" is a registered trademark of Zarafa B.V.
- * The licensing of the Program under the AGPL does not imply a trademark 
- * license. Therefore any rights, title and interest in our trademarks 
- * remain entirely with us.
- * 
- * Our trademark policy (see TRADEMARKS.txt) allows you to use our trademarks
- * in connection with Propagation and certain other acts regarding the Program.
- * In any case, if you propagate an unmodified version of the Program you are
- * allowed to use the term "Zarafa" to indicate that you distribute the Program.
- * Furthermore you may use our trademarks where it is necessary to indicate the
- * intended purpose of a product or service provided you use it in accordance
- * with honest business practices. For questions please contact Zarafa at
- * trademark@zarafa.com.
+ * as published by the Free Software Foundation.
  *
- * The interactive user interface of the software displays an attribution 
- * notice containing the term "Zarafa" and/or the logo of Zarafa. 
- * Interactive user interfaces of unmodified and modified versions must 
- * display Appropriate Legal Notices according to sec. 5 of the GNU Affero 
- * General Public License, version 3, when you propagate unmodified or 
- * modified versions of the Program. In accordance with sec. 7 b) of the GNU 
- * Affero General Public License, version 3, these Appropriate Legal Notices 
- * must retain the logo of Zarafa or display the words "Initial Development 
- * by Zarafa" if the display of the logo is not reasonably feasible for
- * technical reasons.
- * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
- *  
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
-#include "platform.h"
+#include <zarafa/platform.h>
 
-#include "CommonUtil.h"
+#include <zarafa/CommonUtil.h>
 #include "ECGenericObjectTable.h"
-#include "stringutil.h"
+#include <zarafa/stringutil.h>
 #include "ECSearchClient.h"
 #include "ECCacheManager.h"
 #include "SOAPDebug.h"
 #include "ZarafaCmdUtil.h"
-#include "Util.h"
+#include <zarafa/Util.h>
 #include "ECStatsCollector.h"
 #include "ECIndexer.h"
 
 #include <map>
+#include <new>
 #include <string>
 #include <list>
 #include <boost/algorithm/string/join.hpp>
@@ -79,7 +54,7 @@ static BOOL NormalizeRestrictionIsFalse(const struct restrictTable *lpRestrict)
     if(lpRestrict->ulType != RES_AND)
         goto exit;
         
-    for(unsigned int i = 0; i < lpRestrict->lpAnd->__size ; i++) {
+    for (unsigned int i = 0; i < lpRestrict->lpAnd->__size; ++i) {
         if (lpRestrict->lpAnd->__ptr[i]->ulType == RES_EXIST)
             setExist.insert(lpRestrict->lpAnd->__ptr[i]->lpExist->ulPropTag);
         else if (lpRestrict->lpAnd->__ptr[i]->ulType == RES_NOT) {
@@ -121,8 +96,7 @@ static ECRESULT NormalizeRestrictionNestedAnd(struct restrictTable *lpRestrict)
     if(lpRestrict->ulType != RES_AND)
         goto exit;
         
-    for(unsigned int i = 0; i < lpRestrict->lpAnd->__size; i++) {
-        
+    for (unsigned int i = 0; i < lpRestrict->lpAnd->__size; ++i) {
         if(lpRestrict->lpAnd->__ptr[i]->ulType == RES_AND) {
             // First, flatten our subchild
             er = NormalizeRestrictionNestedAnd(lpRestrict->lpAnd->__ptr[i]);
@@ -130,9 +104,8 @@ static ECRESULT NormalizeRestrictionNestedAnd(struct restrictTable *lpRestrict)
                 goto exit;
 
             // Now, get all the clauses from the child AND-clause and push them to this AND-clause
-            for(unsigned j = 0; j < lpRestrict->lpAnd->__ptr[i]->lpAnd->__size; j++) {
+            for (unsigned j = 0; j < lpRestrict->lpAnd->__ptr[i]->lpAnd->__size; ++j)
                 lstClauses.push_back(lpRestrict->lpAnd->__ptr[i]->lpAnd->__ptr[j]);
-            }
 
             delete [] lpRestrict->lpAnd->__ptr[i]->lpAnd->__ptr;
             delete lpRestrict->lpAnd->__ptr[i]->lpAnd;
@@ -151,9 +124,9 @@ static ECRESULT NormalizeRestrictionNestedAnd(struct restrictTable *lpRestrict)
         lpRestrict->lpAnd->__ptr = s_alloc<restrictTable *>(NULL, lstClauses.size());
         
         int n = 0;
-        for(std::list<struct restrictTable *>::iterator clause = lstClauses.begin(); clause != lstClauses.end(); clause++) {
-            lpRestrict->lpAnd->__ptr[n++] = *clause;
-        }
+        for (std::list<struct restrictTable *>::const_iterator clause = lstClauses.begin();
+             clause != lstClauses.end(); ++clause)
+		lpRestrict->lpAnd->__ptr[n++] = *clause;
         
         lpRestrict->lpAnd->__size = n;
     }
@@ -191,7 +164,7 @@ static ECRESULT NormalizeGetMultiSearch(struct restrictTable *lpRestrict,
     sMultiSearch.setFields.clear();
     
     if(lpRestrict->ulType == RES_OR) {
-        for(unsigned int i = 0; i < lpRestrict->lpOr->__size ; i++) {
+        for (unsigned int i = 0; i < lpRestrict->lpOr->__size; ++i) {
             SIndexedTerm terms;
             
             if(NormalizeRestrictionIsFalse(lpRestrict->lpOr->__ptr[i]))
@@ -289,9 +262,9 @@ static ECRESULT NormalizeRestrictionMultiFieldSearch(
                 // Remove it from the restriction since it is now handled as a multisearch
                 FreeRestrictTable(lpRestrict->lpAnd->__ptr[i]);
                 memmove(&lpRestrict->lpAnd->__ptr[i], &lpRestrict->lpAnd->__ptr[i+1], sizeof(struct restrictTable *) * (lpRestrict->lpAnd->__size - i - 1));
-                lpRestrict->lpAnd->__size--;
+                --lpRestrict->lpAnd->__size;
             } else {
-                i++;
+                ++i;
             }
         }
     } else {
@@ -369,7 +342,10 @@ exit:
  * 
  * @return Zarafa error code
  */
-ECRESULT GetIndexerResults(ECDatabase *lpDatabase, ECConfig *lpConfig, ECLogger *lpLogger, ECCacheManager *lpCacheManager, GUID *guidServer, GUID *guidStore, ECListInt &lstFolders, struct restrictTable *lpRestrict, struct restrictTable **lppNewRestrict, std::list<unsigned int> &lstMatches)
+ECRESULT GetIndexerResults(ECDatabase *lpDatabase, ECConfig *lpConfig,
+    ECCacheManager *lpCacheManager, GUID *guidServer, GUID *guidStore,
+    ECListInt &lstFolders, struct restrictTable *lpRestrict,
+    struct restrictTable **lppNewRestrict, std::list<unsigned int> &lstMatches)
 {
     ECRESULT er = erSuccess;
 	ECSearchClient *lpSearchClient = NULL;
@@ -382,27 +358,25 @@ ECRESULT GetIndexerResults(ECDatabase *lpDatabase, ECConfig *lpConfig, ECLogger 
 
 	if (!lpDatabase) {
 		er = ZARAFA_E_DATABASE_ERROR;
-                lpLogger->Log(EC_LOGLEVEL_ERROR, "GetIndexerResults(): no database");
+                ec_log_err("GetIndexerResults(): no database");
 		goto exit;
 	}
 	
 	lstMatches.clear();
 
-	if(parseBool(lpConfig->GetSetting("search_enabled")) == true &&
-		strlen(szSocket) > 0)
-	{
-		lpSearchClient = new ECSearchClient(szSocket, atoui(lpConfig->GetSetting("search_timeout")) );
+	if (parseBool(lpConfig->GetSetting("search_enabled")) == true && szSocket[0]) {
+		lpSearchClient = new(std::nothrow) ECSearchClient(szSocket, atoui(lpConfig->GetSetting("search_timeout")) );
 		if (!lpSearchClient) {
 			er = ZARAFA_E_NOT_ENOUGH_MEMORY;
 			goto exit;
 		}
 
 		if(lpCacheManager->GetExcludedIndexProperties(setExcludePropTags) != erSuccess) {
-            er = lpSearchClient->GetProperties(setExcludePropTags);
-            if (er == ZARAFA_E_NETWORK_ERROR)
-                lpLogger->Log(EC_LOGLEVEL_ERROR, "Error while connecting to search on %s", szSocket);
-            else if (er != erSuccess)
-                lpLogger->Log(EC_LOGLEVEL_ERROR, "Error while querying search on %s, 0x%08x", szSocket, er);
+			er = lpSearchClient->GetProperties(setExcludePropTags);
+			if (er == ZARAFA_E_NETWORK_ERROR)
+				ec_log_err("Error while connecting to search on \"%s\"", szSocket);
+			else if (er != erSuccess)
+				ec_log_err("Error while querying search on \"%s\", 0x%08x", szSocket, er);
 
             if (er != erSuccess)
                 goto exit;
@@ -428,8 +402,7 @@ ECRESULT GetIndexerResults(ECDatabase *lpDatabase, ECConfig *lpConfig, ECLogger 
             goto exit;
         }
 
-		lpLogger->Log(EC_LOGLEVEL_DEBUG, "Using index, %d index queries", (unsigned int)lstMultiSearches.size());
-        
+		ec_log_debug("Using index, %lu index queries", static_cast<unsigned long>(lstMultiSearches.size()));
 		gettimeofday(&tstart, NULL);
 
         er = lpSearchClient->Query(guidServer, guidStore, lstFolders, lstMultiSearches, lstMatches);
@@ -441,11 +414,10 @@ ECRESULT GetIndexerResults(ECDatabase *lpDatabase, ECConfig *lpConfig, ECLogger 
 
         if (er != erSuccess) {
 			g_lpStatsCollector->Increment(SCN_INDEXER_SEARCH_ERRORS);
-            lpLogger->Log(EC_LOGLEVEL_ERROR, "Error while querying search on %s, 0x%08x", szSocket, er);
+			ec_log_err("Error while querying search on \"%s\", 0x%08x", szSocket, er);
 		} else
-			lpLogger->Log(EC_LOGLEVEL_DEBUG, "Indexed query results found in %.4f ms", llelapsedtime/1000.0);
-			if(lpLogger->Log(EC_LOGLEVEL_DEBUG))
-    			lpLogger->Log(EC_LOGLEVEL_DEBUG, "%d indexed matches found", (unsigned int)lstMatches.size());
+			ec_log_debug("Indexed query results found in %.4f ms", llelapsedtime/1000.0);
+		ec_log_debug("%lu indexed matches found", static_cast<unsigned long>(lstMatches.size()));
 	} else {
 	    er = ZARAFA_E_NOT_FOUND;
 	    goto exit;
@@ -455,11 +427,9 @@ ECRESULT GetIndexerResults(ECDatabase *lpDatabase, ECConfig *lpConfig, ECLogger 
     lpOptimizedRestrict = NULL;
     
 exit:
-    if (lpOptimizedRestrict)
-        FreeRestrictTable(lpOptimizedRestrict);
-        
-	if (lpSearchClient)
-		delete lpSearchClient;
+	if (lpOptimizedRestrict != NULL)
+		FreeRestrictTable(lpOptimizedRestrict);
+	delete lpSearchClient;
 
 	if (er != erSuccess)
 		g_lpStatsCollector->Increment(SCN_DATABASE_SEARCHES);
