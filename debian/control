@@ -1,12 +1,11 @@
-Source: zarafa
+Source: kopano
 Section: mail
 Priority: optional
-Homepage: https://community.zarafa.com/
+Homepage: https://download.kopano.io/community/
 Maintainer: Giraffe Maintainers <pkg-giraffe-maintainers@lists.alioth.debian.org>
 Uploaders: Carsten Schoenert <c.schoenert@t-online.de>,
  Matthias Geerdsen <matthias@vorlons.info>,
  Mark Dufour <m.dufour@zarafa.com>,
- Folkert van Heusden <f.vanheusden@zarafa.com>,
  Guido Günther <agx@sigxcpu.org>
 Build-Depends: autoconf (>= 2.59),
  autoconf (>= 2.59),
@@ -14,8 +13,9 @@ Build-Depends: autoconf (>= 2.59),
  autotools-dev,
  binutils (>= 2.12.90.0.9),
  bison,
- debhelper (>= 4.0.0),
+ debhelper (>= 9.20160115),
  dh-autoreconf,
+ dh-exec,
  dh-systemd (>= 1.5),
  dpkg-dev (>= 1.16.1~),
  flex,
@@ -47,149 +47,149 @@ Build-Depends: autoconf (>= 2.59),
  uuid-dev,
  xmlto,
  zlib1g-dev,
-Standards-Version: 3.9.6
+Standards-Version: 3.9.8
 X-Python-Version: 2.7
 Testsuite: autopkgtest
 
-Package: zarafa-libs
+Package: kopano-libs
 Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends},
 Description: Complete and feature rich groupware solution - Free/Busy library
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  This package contains the shared libraries of server and client.
 
-Package: zarafa
+Package: kopano
 Architecture: all
-Depends: zarafa-server (>= ${source:Version}),
- zarafa-utils (>= ${source:Version}),
- zarafa-monitor (>= ${source:Version}),
- zarafa-spooler (>= ${source:Version}),
- zarafa-dagent (>= ${source:Version}),
- zarafa-ical (>= ${source:Version}),
- zarafa-gateway (>= ${source:Version}),
- zarafa-search-plus (>= ${source:Version}),
+Depends: kopano-server (>= ${source:Version}),
+ kopano-utils (>= ${source:Version}),
+ kopano-monitor (>= ${source:Version}),
+ kopano-spooler (>= ${source:Version}),
+ kopano-dagent (>= ${source:Version}),
+ kopano-ical (>= ${source:Version}),
+ kopano-gateway (>= ${source:Version}),
+ kopano-search-plus (>= ${source:Version}),
  ${misc:Depends},
-Suggests: zarafa-webapp
-Description: Metapackage for the Zarafa Collaboration Platform
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+Suggests: kopano-webapp
+Description: Metapackage for the Kopano Collaboration Platform
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  This metapackage contains the dependencies to pull in all important parts of
- Zarafa Communication Platform.
+ Kopano Communication Platform.
 
-Package: zarafa-common
+Package: kopano-common
 Architecture: any
 Depends: ${misc:Depends},
  adduser,
  lsb-base
 Description: Complete and feature rich groupware solution - common files
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  This package contains some files common to all packages.
 
-Package: zarafa-contacts
+Package: kopano-contacts
 Architecture: any
 Depends: ${shlibs:Depends},
  locales,
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - contact mapi provider
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  This package provides adding contact folders in the addressbook.
 
-Package: zarafa-dagent
+Package: kopano-dagent
 Architecture: any
 Depends: ${misc:Depends},
  ${shlibs:Depends},
- zarafa-common (= ${binary:Version}),
+ kopano-common (= ${binary:Version}),
  php5-mapi (= ${binary:Version}),
  php5-cli,
  python-mapi (= ${binary:Version}),
 Description: Complete and feature rich groupware solution - delivery agent
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  This package contains the email delivery agent that delivers incoming
- email from you SMTP server to the Zarafa server.
+ email from you SMTP server to the Kopano server.
 
-Package: zarafa-dbg
+Package: kopano-dbg
 Priority: extra
 Architecture: any
 Depends: ${misc:Depends},
-  zarafa-server | zarafa-libs | python-mapi | php5-mapi
+  kopano-server | kopano-libs | python-mapi | php5-mapi
 Section: debug
 Description: Complete and feature rich groupware solution - debug files
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  This package contains the debug symbols.
 
-Package: zarafa-gateway
+Package: kopano-gateway
 Architecture: any
 Suggests: python-mapi
 Depends: ${shlibs:Depends},
- zarafa-common (= ${binary:Version}),
+ kopano-common (= ${binary:Version}),
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - POP3 and IMAP gateway
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  This package contains the gateway to access the data stored in your
- Zarafa server via the POP3 and IMAP protocolls.
+ Kopano server via the POP3 and IMAP protocolls.
 
-Package: zarafa-ical
+Package: kopano-ical
 Architecture: any
 Depends: ${shlibs:Depends},
- zarafa-common (= ${binary:Version}),
+ kopano-common (= ${binary:Version}),
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - iCal and CalDAV gateway
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  This package contains the gateway to access the data stored in your
- Zarafa server via the iCal and CardDAV protocolls.
+ Kopano server via the iCal and CardDAV protocolls.
 
-Package: zarafa-lang
+Package: kopano-l10n
 Architecture: all
 Depends: locales,
  ${misc:Depends},
-Description: Complete and feature rich groupware solution - language files
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+Description: Complete and feature rich groupware solution - l10n files
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  This package contains the translations in several languages.
 
-Package: zarafa-monitor
+Package: kopano-monitor
 Architecture: any
 Depends: ${misc:Depends},
  ${shlibs:Depends},
- zarafa-common (= ${binary:Version}),
+ kopano-common (= ${binary:Version}),
  php5-mapi (= ${binary:Version}),
  php5-cli,
  python-mapi (= ${binary:Version}),
 Description: Complete and feature rich groupware solution - quota monitor
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  This package contains the quota monitor that checks stores for total usage
  and alerts users by email.
 
-Package: zarafa-search-plus
+Package: kopano-search-plus
 Architecture: all
 Depends: ${shlibs:Depends},
  ${misc:Depends},
@@ -203,55 +203,55 @@ Depends: ${shlibs:Depends},
  poppler-utils,
  python,
  python-xapian,
- python-zarafa (>= ${source:Version}),
+ python-kopano (>= ${source:Version}),
  unzip,
  w3m,
  xsltproc,
- zarafa-common (>= ${source:Version})
+ kopano-common (>= ${source:Version})
 Description: Complete and feature rich groupware solution - indexer
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  This package provides the search indexer using xapian.
 
-Package: zarafa-server
+Package: kopano-server
 Architecture: any
 Depends: ${shlibs:Depends},
  dbconfig-common,
- zarafa-common (= ${binary:Version}),
+ kopano-common (= ${binary:Version}),
  mariadb-client | mysql-client | virtual-mysql-client,
  ${misc:Depends},
 Recommends: mariadb-server | mysql-server
 Description: Complete and feature rich groupware solution - server component
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  This package provides the core server component that connects to gateways
  (like the imap gateway) or the web gui connect to.
 
-Package: zarafa-spooler
+Package: kopano-spooler
 Architecture: any
 Depends: ${misc:Depends},
  ${shlibs:Depends},
- zarafa-common (= ${binary:Version}),
+ kopano-common (= ${binary:Version}),
  python-mapi (= ${binary:Version}),
 Description: Complete and feature rich groupware solution - email spooler
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  This package contains the email spooler that forwards emails from the
- Zarafa server to an SMTP server.
+ Kopano server to an SMTP server.
 
-Package: zarafa-utils
+Package: kopano-utils
 Architecture: any
 Depends: ${shlibs:Depends},
  ${misc:Depends},
  python,
 Description: Complete and feature rich groupware solution - admin tools
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
@@ -265,14 +265,14 @@ Depends: ${misc:Depends},
  ${python:Depends},
 XB-Python-Version: ${python:Versions}
 Description: Complete and feature rich groupware solution - Python MAPI bindings
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  Using this module, you can create Python programs which use MAPI
- calls to interact with Zarafa.
+ calls to interact with Kopano.
 
-Package: python-zarafa
+Package: python-kopano
 Architecture: all
 Section: python
 Depends: ${misc:Depends},
@@ -281,12 +281,12 @@ Depends: ${misc:Depends},
  python-mapi,
 XB-Python-Version: ${python:Versions}
 Description: Complete and feature rich groupware solution - Python bindings
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  Using this module, you can create Python programs which access the
- Zarafa server using a higher level abstraction than python-mapi
+ Kopano server using a higher level abstraction than python-mapi
  provides.
 
 Package: php5-mapi
@@ -296,10 +296,10 @@ Depends: ${shlibs:Depends},
  ${php:Depends},
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - PHP MAPI bindings
- The Zarafa Collaboration Platform (ZCP) is a complete, stable and
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  Using this module, you can create PHP programs which use MAPI
- calls to interact with Zarafa.
+ calls to interact with Kopano.
 
