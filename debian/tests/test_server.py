@@ -3,7 +3,7 @@
 import os
 import unittest
 
-import zarafa
+import kopano
 
 auth_user = os.environ['AUTH_USER']
 auth_pass = os.environ['AUTH_PASS']
@@ -14,7 +14,7 @@ class TestServer(unittest.TestCase):
 
     def setUp(self):
 
-        self.server = zarafa.Server(auth_user=auth_user,
+        self.server = kopano.Server(auth_user=auth_user,
                                     auth_pass=auth_pass)
 
     def testFindItemBySubject(self):
