@@ -7,10 +7,10 @@ Subject: Add include for database configuration
  1 file changed, 2 insertions(+)
 
 diff --git a/installer/linux/server.cfg b/installer/linux/server.cfg
-index fe19c70..dd6f366 100644
+index 87943d5..a558477 100644
 --- a/installer/linux/server.cfg
 +++ b/installer/linux/server.cfg
-@@ -479,3 +479,5 @@ embedded_attachment_limit = 20
+@@ -472,3 +472,5 @@ embedded_attachment_limit = 20
  # is taken to be received via a proxy. An empty value disables proxy detection
  # and the value of '*' is used to indicate that all connections are proxied
  proxy_header = 

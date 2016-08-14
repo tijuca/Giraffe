@@ -1,0 +1,364 @@
+From: Carsten Schoenert <c.schoenert@t-online.de>
+Date: Sun, 1 May 2016 16:02:41 +0200
+Subject: fixup spelling errors in comments and log messages
+
+The Debian QS tool Lintian has found some spelling errors which are
+fixed by this patch.
+
+Signed-off-by: Carsten Schoenert <c.schoenert@t-online.de>
+---
+ ECtools/archiver/ArchiveControlImpl.cpp        |  2 +-
+ ECtools/archiver/ArchiveStateCollector.cpp     |  2 +-
+ caldav/Http.cpp                                |  2 +-
+ caldav/WebDav.cpp                              |  4 ++--
+ doc/manual.xml                                 | 10 +++++-----
+ gateway/IMAP.cpp                               |  4 ++--
+ php-ext/include/mapi/class.baseexception.php   |  6 +++---
+ php-ext/include/mapi/class.meetingrequest.php  |  6 +++---
+ php-ext/include/mapi/class.taskrecurrence.php  |  2 +-
+ php7-ext/include/mapi/class.meetingrequest.php |  2 +-
+ php7-ext/include/mapi/class.taskrecurrence.php |  2 +-
+ provider/contacts/ZCABContainer.cpp            |  2 +-
+ provider/libserver/ECUserManagement.cpp        |  2 +-
+ provider/libserver/cmd.cpp                     |  2 +-
+ provider/plugins/DBUserPlugin.h                |  8 ++++----
+ provider/plugins/LDAPUserPlugin.h              |  2 +-
+ provider/server/ECServer.cpp                   |  2 +-
+ 17 files changed, 30 insertions(+), 30 deletions(-)
+
+diff --git a/ECtools/archiver/ArchiveControlImpl.cpp b/ECtools/archiver/ArchiveControlImpl.cpp
+index 3029c43..4e469fb 100644
+--- a/ECtools/archiver/ArchiveControlImpl.cpp
++++ b/ECtools/archiver/ArchiveControlImpl.cpp
+@@ -341,7 +341,7 @@ HRESULT ArchiveControlImpl::ProcessAll(bool bLocalOnly, fnProcess_t fnProcess)
+ 			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to process user '" TSTRING_PRINTF "'. (hr=0x%08x)", iUser->c_str(), hrTmp);
+ 			bHaveErrors = true;
+ 		} else if (hrTmp == MAPI_W_PARTIAL_COMPLETION) {
+-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Errors occured while processing user '" TSTRING_PRINTF "'.", iUser->c_str());
++			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Errors occurred while processing user '" TSTRING_PRINTF "'.", iUser->c_str());
+ 			bHaveErrors = true;
+ 		}
+ 	}
+diff --git a/ECtools/archiver/ArchiveStateCollector.cpp b/ECtools/archiver/ArchiveStateCollector.cpp
+index 65bbf19..ffa5490 100644
+--- a/ECtools/archiver/ArchiveStateCollector.cpp
++++ b/ECtools/archiver/ArchiveStateCollector.cpp
+@@ -102,7 +102,7 @@ namespace details {
+ 
+ 				for (unsigned j = 0; bComplete && j < IDX_MAX; ++j) {
+ 					if (PROP_TYPE(ptrRows[i].lpProps[j].ulPropTag) == PT_ERROR) {
+-						m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Got uncomplete row, row %u, column %u contains error 0x%08x", i, j, ptrRows[i].lpProps[j].Value.err);
++						m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Got incomplete row, row %u, column %u contains error 0x%08x", i, j, ptrRows[i].lpProps[j].Value.err);
+ 						bComplete = false;
+ 					}
+ 				}
+diff --git a/caldav/Http.cpp b/caldav/Http.cpp
+index ee44884..ba522f6 100644
+--- a/caldav/Http.cpp
++++ b/caldav/Http.cpp
+@@ -391,7 +391,7 @@ HRESULT Http::HrGetDepth(ULONG *ulDepth)
+ }
+ 
+ /** 
+- * Checks the etag of a MAPI object agains If-(None)-Match headers
++ * Checks the etag of a MAPI object against If-(None)-Match headers
+  * 
+  * @param[in] lpProp Object to check etag (PR_LAST_MODIFICATION_TIME) to
+  * 
+diff --git a/caldav/WebDav.cpp b/caldav/WebDav.cpp
+index e6dd547..2809493 100644
+--- a/caldav/WebDav.cpp
++++ b/caldav/WebDav.cpp
+@@ -148,7 +148,7 @@ HRESULT WebDav::HrPropfind()
+ 	hr = RespStructToXml(&sDavMStatus, &strXml);
+ 	if (hr != hrSuccess)
+ 	{
+-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unable to convert reponse to xml: 0x%08X", hr);
++		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unable to convert response to xml: 0x%08X", hr);
+ 		goto exit;
+ 	}
+ 	
+@@ -1402,7 +1402,7 @@ HRESULT WebDav::HrPropPatch()
+ 	hr = RespStructToXml(&sDavMStatus, &strXml);
+ 	if (hr != hrSuccess)
+ 	{
+-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unable to convert reponse to xml: 0x%08X", hr);
++		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unable to convert response to xml: 0x%08X", hr);
+ 		goto exit;
+ 	}
+ 
+diff --git a/doc/manual.xml b/doc/manual.xml
+index 900a269..2291cb7 100644
+--- a/doc/manual.xml
++++ b/doc/manual.xml
+@@ -604,7 +604,7 @@
+ 		<title>Config</title>
+ 
+ 		<para>Normally, no configuration file is used or required. The
+-		following options can be set in the configuation file:</para>
++		following options can be set in the configuration file:</para>
+ 
+ 		<variablelist>
+ 		  <varlistentry>
+@@ -2788,7 +2788,7 @@
+ 		checking is performed. This way, you can use any config file
+ 		from a kopano program, eg. kopano-spooler or kopano-dagent, to
+ 		load SSL settings.</para><para>The following options can be set in the
+-		configuation file:</para>
++		configuration file:</para>
+ 
+ 		<variablelist>
+ 		  <varlistentry>
+@@ -4801,7 +4801,7 @@
+ 					<para>Retrieve the users and groups information
+ 					from the Linux password files. User information
+ 					will be read the /etc/passwd file. Passwords will
+-					be checked agains /etc/shadow. Group information
++					be checked against /etc/shadow. Group information
+ 					will read from /etc/group. Use the
+ 					<citerefentry><refentrytitle>kopano-admin</refentrytitle><manvolnum>8</manvolnum></citerefentry>
+ 					tool to set Kopano specific attributes on a
+@@ -5542,7 +5542,7 @@
+ 			  <para>An object is defined by this attribute what type
+ 			  it is, eg. user, group, etc. Every object type should
+ 			  have a unique value in this attribute in order to define
+-			  what which enrty is.</para>
++			  what which entry is.</para>
+ 			  <para>The value of this attribute must be specified in the
+ 			  ldap_*_type_attribute_value settings. Each of those settings
+ 			  may specify multiple values for the type attribute, separated
+@@ -6615,7 +6615,7 @@
+ 		<title>User attributes</title>
+ 
+ 		<para>Not all Kopano attributes can be used from the system
+-		files. The following attibutes are used from the system files:
++		files. The following attributes are used from the system files:
+ 		</para>
+ 
+ 		<variablelist>
+diff --git a/gateway/IMAP.cpp b/gateway/IMAP.cpp
+index fdf73d1..351d27f 100644
+--- a/gateway/IMAP.cpp
++++ b/gateway/IMAP.cpp
+@@ -3337,7 +3337,7 @@ HRESULT IMAP::HrGetFolderList(list<SFolder> &lstFolders) {
+ 
+ 	hr = HrGetOneProp(lpPublicStore, PR_IPM_PUBLIC_FOLDERS_ENTRYID, &lpPropVal);
+ 	if (hr != hrSuccess) {
+-		lpLogger->Log(EC_LOGLEVEL_WARNING, "Public store is enabled in configuation, but Public Folders inside public store could not be found.");
++		lpLogger->Log(EC_LOGLEVEL_WARNING, "Public store is enabled in configuration, but Public Folders inside public store could not be found.");
+ 		hr = hrSuccess;
+ 		goto exit;
+ 	}
+@@ -3345,7 +3345,7 @@ HRESULT IMAP::HrGetFolderList(list<SFolder> &lstFolders) {
+ 	// make public folder folders list
+ 	hr = HrGetSubTree(lstFolders, lpPropVal->Value.bin, PUBLIC_FOLDERS_NAME, --lstFolders.end());
+ 	if (hr != hrSuccess) {
+-		lpLogger->Log(EC_LOGLEVEL_WARNING, "Public store is enabled in configuation, but Public Folders inside public store could not be found.");
++		lpLogger->Log(EC_LOGLEVEL_WARNING, "Public store is enabled in configuration, but Public Folders inside public store could not be found.");
+ 		hr = hrSuccess;
+ 	}
+ 
+diff --git a/php-ext/include/mapi/class.baseexception.php b/php-ext/include/mapi/class.baseexception.php
+index 8183e71..480da2f 100644
+--- a/php-ext/include/mapi/class.baseexception.php
++++ b/php-ext/include/mapi/class.baseexception.php
+@@ -96,7 +96,7 @@ class BaseException extends Exception
+ 	}
+ 
+ 	/**
+-	 * @return string returns file name and line number combined where exception occured.
++	 * @return string returns file name and line number combined where exception occurred.
+ 	 */
+ 	public function getFileLine()
+ 	{
+@@ -136,7 +136,7 @@ class BaseException extends Exception
+ 	}
+ 
+ 	/**
+-	 * @return string returns base path of the file where exception occured.
++	 * @return string returns base path of the file where exception occurred.
+ 	 */
+ 	public function getBaseFile()
+ 	{
+@@ -192,4 +192,4 @@ class BaseException extends Exception
+ 
+ 	// @TODO getTrace and getTraceAsString
+ }
+-?>
+\ No newline at end of file
++?>
+diff --git a/php-ext/include/mapi/class.meetingrequest.php b/php-ext/include/mapi/class.meetingrequest.php
+index 10047a3..443f15d 100644
+--- a/php-ext/include/mapi/class.meetingrequest.php
++++ b/php-ext/include/mapi/class.meetingrequest.php
+@@ -842,7 +842,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
+ 
+ 					if ($move) {
+ 						// All we have to do is open the default calendar,
+-						// set the mesage class correctly to be an appointment item
++						// set the message class correctly to be an appointment item
+ 						// and move it to the calendar folder
+ 						$sourcefolder = $this->openParentFolder();
+ 
+@@ -2360,7 +2360,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
+ 				$this->includesResources = true;
+ 			}else{
+ 				/**
+-				 * If no other errors occured and you have no access to the 
++				 * If no other errors occurred and you have no access to the 
+ 				 * folder of the resource, throw an error=1.
+ 				 */
+ 				if(!$this->errorSetResource){
+@@ -2846,7 +2846,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
+ 							$result = true;
+ 						}
+ 					} else {
+-						// we are not able to find exception, could mean that a significant change has occured on series
++						// we are not able to find exception, could mean that a significant change has occurred on series
+ 						// and it deleted all exceptions, so compare with series
+ 						if ((isset($calendarItemProps[$this->proptags['updatecounter']]) && $props[$this->proptags['updatecounter']] < $calendarItemProps[$this->proptags['updatecounter']]) 
+ 							|| (isset($calendarItemProps[$this->proptags['owner_critical_change']]) && $props[$this->proptags['owner_critical_change']] < $calendarItemProps[$this->proptags['owner_critical_change']])) {
+diff --git a/php-ext/include/mapi/class.taskrecurrence.php b/php-ext/include/mapi/class.taskrecurrence.php
+index f5ff17d..9836d3d 100644
+--- a/php-ext/include/mapi/class.taskrecurrence.php
++++ b/php-ext/include/mapi/class.taskrecurrence.php
+@@ -175,7 +175,7 @@
+ 					$this->action['startdate'] = $props[$this->proptags['startdate']] = $nextOccurrence[$this->proptags['startdate']];
+ 					$this->action['commonstart'] = $props[$this->proptags['commonstart']] = $nextOccurrence[$this->proptags['startdate']];
+ 
+-					// If current task as been mark as 'Complete' then next occurrence should be uncomplete.
++					// If current task as been mark as 'Complete' then next occurrence should be incomplete.
+ 					if (isset($this->action['complete']) && $this->action['complete'] == 1) {
+ 						$this->action['status'] = $props[$this->proptags["status"]] = olTaskNotStarted;
+ 						$this->action['complete'] = $props[$this->proptags["complete"]] = false;
+diff --git a/php7-ext/include/mapi/class.meetingrequest.php b/php7-ext/include/mapi/class.meetingrequest.php
+index 10047a3..afd28d2 100644
+--- a/php7-ext/include/mapi/class.meetingrequest.php
++++ b/php7-ext/include/mapi/class.meetingrequest.php
+@@ -842,7 +842,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
+ 
+ 					if ($move) {
+ 						// All we have to do is open the default calendar,
+-						// set the mesage class correctly to be an appointment item
++						// set the message class correctly to be an appointment item
+ 						// and move it to the calendar folder
+ 						$sourcefolder = $this->openParentFolder();
+ 
+diff --git a/php7-ext/include/mapi/class.taskrecurrence.php b/php7-ext/include/mapi/class.taskrecurrence.php
+index f5ff17d..9836d3d 100644
+--- a/php7-ext/include/mapi/class.taskrecurrence.php
++++ b/php7-ext/include/mapi/class.taskrecurrence.php
+@@ -175,7 +175,7 @@
+ 					$this->action['startdate'] = $props[$this->proptags['startdate']] = $nextOccurrence[$this->proptags['startdate']];
+ 					$this->action['commonstart'] = $props[$this->proptags['commonstart']] = $nextOccurrence[$this->proptags['startdate']];
+ 
+-					// If current task as been mark as 'Complete' then next occurrence should be uncomplete.
++					// If current task as been mark as 'Complete' then next occurrence should be incomplete.
+ 					if (isset($this->action['complete']) && $this->action['complete'] == 1) {
+ 						$this->action['status'] = $props[$this->proptags["status"]] = olTaskNotStarted;
+ 						$this->action['complete'] = $props[$this->proptags["complete"]] = false;
+diff --git a/provider/contacts/ZCABContainer.cpp b/provider/contacts/ZCABContainer.cpp
+index af7ad64..303cb8b 100644
+--- a/provider/contacts/ZCABContainer.cpp
++++ b/provider/contacts/ZCABContainer.cpp
+@@ -558,7 +558,7 @@ HRESULT ZCABContainer::GetDistListContentsTable(ULONG ulFlags, LPMAPITABLE *lppT
+ 		// Wrapped entryid's:
+ 		// Flags: (ULONG) 0
+ 		// Provider: (GUID) 0xC091ADD3519DCF11A4A900AA0047FAA4
+-		// Type: (BYTE) <value>, describes wrapped enrtyid
++		// Type: (BYTE) <value>, describes wrapped entryid
+ 		//  lower 4 bits:
+ 		//   0x00 = OneOff (use addressbook)
+ 		//   0x03 = Contact (use folder / session?)
+diff --git a/provider/libserver/ECUserManagement.cpp b/provider/libserver/ECUserManagement.cpp
+index af774f6..0195e68 100644
+--- a/provider/libserver/ECUserManagement.cpp
++++ b/provider/libserver/ECUserManagement.cpp
+@@ -3263,7 +3263,7 @@ ECRESULT ECUserManagement::DeleteLocalObject(unsigned int ulObjectId, objectclas
+ 	if(er != erSuccess)
+ 		goto exit;
+ 
+-	// Object didn't exist locally, so no delete has occured
++	// Object didn't exist locally, so no delete has occurred
+ 	if (ulDeletedRows == 0) {
+ 		er = lpDatabase->Commit();
+ 		if (er != erSuccess)
+diff --git a/provider/libserver/cmd.cpp b/provider/libserver/cmd.cpp
+index e056981..53b6a57 100644
+--- a/provider/libserver/cmd.cpp
++++ b/provider/libserver/cmd.cpp
+@@ -8181,7 +8181,7 @@ static ECRESULT CopyObject(ECSession *lpecSession,
+ 	strQuery = "SELECT id FROM hierarchy WHERE parent="+stringify(ulObjId);
+ 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
+ 	if (er != erSuccess) {
+-		ec_log_err("CopyObject: failed retriving child items of mesage: %s (%x)", GetMAPIErrorMessage(er), er);
++		ec_log_err("CopyObject: failed retrieving child items of message: %s (%x)", GetMAPIErrorMessage(er), er);
+ 		goto exit;
+ 	}
+ 
+diff --git a/provider/plugins/DBUserPlugin.h b/provider/plugins/DBUserPlugin.h
+index 96ec042..11a4a25 100644
+--- a/provider/plugins/DBUserPlugin.h
++++ b/provider/plugins/DBUserPlugin.h
+@@ -70,7 +70,7 @@ public:
+ 	 *					The company beneath which the name should be searched
+ 	 *					This objectid can be empty.
+ 	 * @return The object signature of the resolved object
+-	 * @throw runtime_error When a Database error occured.
++	 * @throw runtime_error When a Database error occurred.
+ 	 * @throw objectnotfound When no object was found.
+ 	 * @throw toomanyobjects When more then one object was found.
+ 	 */
+@@ -87,7 +87,7 @@ public:
+ 	 *					The objectid of the company to which the user belongs.
+ 	 *					This objectid can be empty.
+ 	 * @return The objectsignature of the authenticated user
+-	 * @throw runtime_error When a Database error occured.
++	 * @throw runtime_error When a Database error occurred.
+ 	 * @throw login_error When no user was found or the password was incorrect.
+ 	 */
+ 	virtual objectsignature_t authenticateUser(const string &username, const string &password, const objectid_t &company);
+@@ -130,7 +130,7 @@ public:
+ 	 *                  The objectid which should be updated
+ 	 * @param[in]   quotadetails
+ 	 *                  The quota information which should be written to the object
+-	 * @throw runtime_error When a Database error occured.
++	 * @throw runtime_error When a Database error occurred.
+ 	 * @throw objectnotfound When the object was not found.
+ 	 */
+ 	virtual void setQuota(const objectid_t &id, const quotadetails_t &quotadetails);
+@@ -179,7 +179,7 @@ public:
+ 	 *					The parent object.
+ 	 * @param[in]	childobject
+ 	 *					The child object.
+-	 * @throw runtime_error When a Database error occured
++	 * @throw runtime_error When a Database error occurred
+ 	 * @throw objectnotfound When the parent does not exist.
+ 	 */
+ 	virtual void addSubObjectRelation(userobject_relation_t relation,
+diff --git a/provider/plugins/LDAPUserPlugin.h b/provider/plugins/LDAPUserPlugin.h
+index afe4c73..b2114b4 100644
+--- a/provider/plugins/LDAPUserPlugin.h
++++ b/provider/plugins/LDAPUserPlugin.h
+@@ -489,7 +489,7 @@ private:
+ 	 * @param[in]	uniqueid
+ 	 *					The unique id which should be converted
+ 	 * @return the DN for the object
+-	 * @throw runtime_error When an error occured during the LDAP query.
++	 * @throw runtime_error When an error occurred during the LDAP query.
+ 	 * @throw objectnotfound When no object was found with the given objectid.
+ 	 * @throw toomanyobjects When more then one object was returned with the objectid.
+ 	 */
+diff --git a/provider/server/ECServer.cpp b/provider/server/ECServer.cpp
+index e009770..c3bd264 100644
+--- a/provider/server/ECServer.cpp
++++ b/provider/server/ECServer.cpp
+@@ -1456,7 +1456,7 @@ exit:
+ 		std::string msg;
+ 
+ 		if (er != erSuccess)
+-			msg = format("An error occured (%x).", er);
++			msg = format("An error occurred (%x).", er);
+ 		else
+ 			msg = "An error occurred.";
+ 

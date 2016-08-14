@@ -1,0 +1,19 @@
+From: Carsten Schoenert <c.schoenert@t-online.de>
+Date: Sat, 13 Aug 2016 20:18:38 +0200
+Subject: bash-completion: remove shebang from file
+
+---
+ installer/linux/kopano-bash-completion.sh | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/installer/linux/kopano-bash-completion.sh b/installer/linux/kopano-bash-completion.sh
+index 0b5ce6c..ea2fd34 100755
+--- a/installer/linux/kopano-bash-completion.sh
++++ b/installer/linux/kopano-bash-completion.sh
+@@ -1,5 +1,4 @@
+-#!/bin/bash
+-# -*- Mode: sh -*-
++# kopano(1) completion                                        -*- shell-script -*-
+ # bash completion for Kopano admin command
+ 
+ shopt -q extglob

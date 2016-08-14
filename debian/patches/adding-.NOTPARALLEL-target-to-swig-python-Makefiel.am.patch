@@ -10,10 +10,10 @@ make process is allowed.
  1 file changed, 3 insertions(+)
 
 diff --git a/swig/python/Makefile.am b/swig/python/Makefile.am
-index d9d0624..a18795e 100644
+index 85ced95..6aa6250 100644
 --- a/swig/python/Makefile.am
 +++ b/swig/python/Makefile.am
-@@ -172,3 +172,6 @@ install-exec-local:
+@@ -183,3 +183,6 @@ install-exec-local:
  	rm -Rf build
  
  include ../../global.am

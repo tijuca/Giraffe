@@ -7,29 +7,21 @@ return with an error. This fixes lots of situations where the daemon
 claimed to start but didn't (e.g. when not being able to connect
 to the database or to write to the attachment folder).
 ---
- provider/server/ECServer.cpp | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ provider/server/ECServer.cpp | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/provider/server/ECServer.cpp b/provider/server/ECServer.cpp
-index 97b43a1..0107510 100644
+index 063202d..e009770 100644
 --- a/provider/server/ECServer.cpp
 +++ b/provider/server/ECServer.cpp
-@@ -903,7 +903,7 @@ static void InitBindTextDomain(void)
- 
- int running_server(char *szName, const char *szConfig, int argc, char *argv[])
- {
--	int retval = -1;
-+	int			retval = -1;
- 	ECRESULT		er = erSuccess;
- #ifdef WIN32
- 	HRESULT			hr = hrSuccess;
-@@ -1451,6 +1451,9 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
+@@ -1238,7 +1238,9 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
  		setsid();
  	unix_create_pidfile(szName, g_lpConfig, g_lpLogger);
  #endif
+-
 +	if (unix_runas(g_lpConfig, g_lpLogger)) {
 +		goto exit;
 +	}
- 
  	mainthread = pthread_self();
  
+ #ifdef LINUX
