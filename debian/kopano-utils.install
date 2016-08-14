@@ -1,0 +1,18 @@
+#!/usr/bin/dh-exec
+etc/bash_completion.d/kopano-bash-completion.sh => usr/share/bash-completion/completions/kopano
+usr/bin/kopano-fsck
+usr/bin/kopano-passwd
+usr/bin/kopano-set-oof
+usr/bin/kopano-stats
+usr/sbin/kopano-admin
+usr/sbin/kopano-archiver-aclset
+usr/sbin/kopano-archiver-aclsync
+usr/sbin/kopano-archiver-restore
+usr/sbin/kopano-mailbox-permissions
+usr/share/man/man1/kopano-fsck.1
+usr/share/man/man1/kopano-passwd.1
+usr/share/man/man1/kopano-set-oof.1
+usr/share/man/man1/kopano-stats.1
+usr/share/man/man8/kopano-admin.8
+usr/share/man/man8/kopano-archiver.8
+usr/share/man/man8/kopano-mailbox-permissions.8
