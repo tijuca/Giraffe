@@ -1,6 +1,6 @@
 # -*- Mode: sh -*-
 ###########################################
-# Zarafa autoresponder settings
+# Autoresponder settings
 ###########################################
 
 # Autorespond if we were only in the Cc of a message 
@@ -12,13 +12,13 @@ AUTORESPOND_NORECIP=0
 # Only send reply to same e-mail address once per 24 hours
 TIMELIMIT=$[24*60*60]
 
-BASE_PATH=/var/lib/zarafa/autorespond
+BASE_PATH=/var/lib/kopano/autorespond
 
 # File which contains where vacation message was sent
-SENDDB=$BASE_PATH/zarafa-vacation-$USER.db
+SENDDB=$BASE_PATH/vacation-$USER.db
 
 # Tempfile containing message that will be send
-SENDDBTMP=$BASE_PATH/zarafa-vacation-$USER-$$.tmp
+SENDDBTMP=$BASE_PATH/vacation-$USER-$$.tmp
 
 # Customize your actual mail command, normally sendmail
 # Input to this command is the message to send

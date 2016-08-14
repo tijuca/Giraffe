@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,16 +15,16 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include "Zarafa.h"
+#include <kopano/platform.h>
+#include "kcore.hpp"
 
-#include <zarafa/ZarafaCode.h>
+#include <kopano/kcodes.h>
 #include <mapi.h>
 #include <mapispi.h>
 #include "WSABTableView.h"
 
 #include "Mem.h"
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 
 // Utils
 #include "SOAPUtils.h"
@@ -32,23 +32,15 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
-WSABTableView::WSABTableView(ULONG ulType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport) : WSTableView(ulType, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpTransport, "WSABTableView")
+WSABTableView::WSABTableView(ULONG ulType, ULONG ulFlags, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport) : WSTableView(ulType, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpTransport, "WSABTableView")
 {
 	m_lpProvider = lpABLogon;
 	m_ulTableType = TABLETYPE_AB;
 }
 
-WSABTableView::~WSABTableView()
-{
-
-}
-
-
-HRESULT WSABTableView::Create(ULONG ulType, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport, WSTableView **lppTableView)
+HRESULT WSABTableView::Create(ULONG ulType, ULONG ulFlags, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport, WSTableView **lppTableView)
 {
 	HRESULT hr = hrSuccess;
 	WSABTableView *lpTableView = NULL; 

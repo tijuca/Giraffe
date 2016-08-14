@@ -11,7 +11,7 @@ class MoveToPublic(IMapiDAgentPlugin):
     
     prioPreDelivery = 50
 
-    configfile = '/etc/zarafa/movetopublic.cfg'
+    configfile = '/etc/kopano/movetopublic.cfg'
 
     def __init__(self, logger):
         self.rulelist = {}
@@ -20,7 +20,7 @@ class MoveToPublic(IMapiDAgentPlugin):
         self.Init()
 
     def Init(self):
-        config = zconfig.ZarafaConfigParser(self.configfile,
+        config = zconfig.ZConfigParser(self.configfile,
                                      defaultoptions={}
                                      )
 

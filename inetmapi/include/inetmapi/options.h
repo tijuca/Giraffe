@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,16 +18,7 @@
 #ifndef __INETMAPI_OPTIONS_H
 #define __INETMAPI_OPTIONS_H
 
-#ifdef _WIN32
-# ifdef INETMAPI_EXPORTS
-#  define INETMAPI_API __declspec(dllexport)
-# else
-#  define INETMAPI_API __declspec(dllimport)
-# endif
-#else
-/* we do not need this on linux */
 # define INETMAPI_API
-#endif
 
 typedef struct _do {
 	bool use_received_date;			// Use the 'received' date instead of the current date as delivery date

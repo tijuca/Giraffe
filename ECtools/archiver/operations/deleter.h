@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,7 +19,7 @@
 #define deleter_INCLUDED
 
 #include "operations.h"
-#include <zarafa/archiver-common.h>
+#include <kopano/archiver-common.h>
 #include <list>
 
 namespace za { namespace operations {
@@ -34,7 +34,7 @@ public:
 	~Deleter();
 
 private:
-	HRESULT EnterFolder(LPMAPIFOLDER);
+	HRESULT EnterFolder(LPMAPIFOLDER) { return hrSuccess; }
 	HRESULT LeaveFolder();
 	HRESULT DoProcessEntry(ULONG cProps, const LPSPropValue &lpProps);
 	HRESULT PurgeQueuedMessages();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 // Mapi includes
 #include <mapi.h>
@@ -25,24 +25,24 @@
 #include <edkguid.h>
 #include <edkmdb.h>
 
-//Zarafa includes
-#include <zarafa/ECDefs.h>
-#include <zarafa/ECABEntryID.h>
-#include <zarafa/IECUnknown.h>
-#include <zarafa/Util.h>
-#include <zarafa/ecversion.h>
-#include <zarafa/charset/convert.h>
-#include <zarafa/mapi_ptr.h>
-#include <zarafa/MAPIErrors.h>
+// Kopano includes
+#include <kopano/ECDefs.h>
+#include <kopano/ECABEntryID.h>
+#include <kopano/IECUnknown.h>
+#include <kopano/Util.h>
+#include <kopano/ecversion.h>
+#include <kopano/charset/convert.h>
+#include <kopano/mapi_ptr.h>
+#include <kopano/MAPIErrors.h>
 
-//#include <zarafa/IECSecurity.h>
-#include <zarafa/ECGuid.h>
-#include <zarafa/ECTags.h>
-#include <zarafa/IECServiceAdmin.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/stringutil.h>
-#include <zarafa/mapiext.h>
-#include <zarafa/restrictionutil.h>
+//#include <kopano/IECSecurity.h>
+#include <kopano/ECGuid.h>
+#include <kopano/ECTags.h>
+#include <kopano/IECServiceAdmin.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/stringutil.h>
+#include <kopano/mapiext.h>
+#include <kopano/restrictionutil.h>
 
 // Other
 #include "ECMonitorDefs.h"
@@ -54,7 +54,7 @@ using namespace std;
 
 #include <boost/algorithm/string.hpp>
 
-#define QUOTA_CONFIG_MSG "Zarafa.Quota"
+#define QUOTA_CONFIG_MSG "Kopano.Quota"
 
 /**
  * ECQuotaMonitor constructor
@@ -112,13 +112,13 @@ void* ECQuotaMonitor::Create(void* lpVoid)
 	lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_INFO, "Quota monitor starting");
 
 	//Open admin session
-	hr = HrOpenECAdminSession(lpThreadMonitor->lpLogger, &lpMAPIAdminSession, "zarafa-monitor:create", PROJECT_SVN_REV_STR, lpPath, 0, lpThreadMonitor->lpConfig->GetSetting("sslkey_file","",NULL), lpThreadMonitor->lpConfig->GetSetting("sslkey_pass","",NULL));
+	hr = HrOpenECAdminSession(lpThreadMonitor->lpLogger, &lpMAPIAdminSession, "kopano-monitor:create", PROJECT_SVN_REV_STR, lpPath, 0, lpThreadMonitor->lpConfig->GetSetting("sslkey_file","",NULL), lpThreadMonitor->lpConfig->GetSetting("sslkey_pass","",NULL));
 	if (hr != hrSuccess) {
 		lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to open an admin session. Error 0x%X", hr);
 		goto exit;
 	}
 
-	lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_INFO, "Connection to Zarafa server succeeded");
+	lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_INFO, "Connection to storage server succeeded");
 
 	// Open admin store
 	hr = HrOpenDefaultStore(lpMAPIAdminSession, &lpMDBAdmin);
@@ -277,7 +277,7 @@ exit:
 }
 
 /** Uses the ECServiceAdmin to get a list of all users within a
- * given company and groups those per zarafa-server instance. Per
+ * given company and groups those per kopano-server instance. Per
  * server it calls ECQuotaMonitor::CheckServerQuota().
  *
  * @param[in] company lpecCompany ECCompany struct
@@ -370,7 +370,7 @@ HRESULT ECQuotaMonitor::CheckCompanyQuota(ECCOMPANY *lpecCompany)
 					goto next;
 				}
 			} else {				
-				hr = HrOpenECAdminSession(m_lpThreadMonitor->lpLogger, &lpSession, "zarafa-monitor:check-company", PROJECT_SVN_REV_STR, lpszConnection, 0, m_lpThreadMonitor->lpConfig->GetSetting("sslkey_file","",NULL), m_lpThreadMonitor->lpConfig->GetSetting("sslkey_pass","",NULL));
+				hr = HrOpenECAdminSession(m_lpThreadMonitor->lpLogger, &lpSession, "kopano-monitor:check-company", PROJECT_SVN_REV_STR, lpszConnection, 0, m_lpThreadMonitor->lpConfig->GetSetting("sslkey_file","",NULL), m_lpThreadMonitor->lpConfig->GetSetting("sslkey_pass","",NULL));
 				if (hr != hrSuccess) {
 					m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to connect to server %s, error code 0x%08X", lpszConnection, hr);
 					++m_ulFailed;
@@ -419,7 +419,7 @@ exit:
  * information per connected server given in lpAdminStore.
  *
  * @param[in]	cUsers		number of users in lpsUserList
- * @param[in]	lpsUserList	array of ECUser struct, containing all Zarafa from all companies, on any server
+ * @param[in]	lpsUserList	array of ECUser struct, containing all Kopano from all companies, on any server
  * @param[in]	lpecCompany	same company struct as in ECQuotaMonitor::CheckCompanyQuota()
  * @param[in]	lpAdminStore IMsgStore of SYSTEM user on a specific server instance.
  * @return hrSuccess or any MAPI error code.
@@ -566,7 +566,6 @@ exit:
  */
 HRESULT ECQuotaMonitor::CreateMailFromTemplate(TemplateVariables *lpVars, string *lpstrSubject, string *lpstrBody)
 {
-	HRESULT hr = hrSuccess;
 	string strTemplateConfig;
 	const char *lpszTemplate = NULL;
 	FILE *fp = NULL;
@@ -577,24 +576,24 @@ HRESULT ECQuotaMonitor::CreateMailFromTemplate(TemplateVariables *lpVars, string
 	size_t pos;
 
 	string strVariables[7][2] = {
-		{ "${ZARAFA_QUOTA_NAME}", "unknown" },
-		{ "${ZARAFA_QUOTA_FULLNAME}" , "unknown" },
-		{ "${ZARAFA_QUOTA_COMPANY}", "unknown" },
-		{ "${ZARAFA_QUOTA_STORE_SIZE}", "unknown" },
-		{ "${ZARAFA_QUOTA_WARN_SIZE}", "unlimited" },
-		{ "${ZARAFA_QUOTA_SOFT_SIZE}", "unlimited" },
-		{ "${ZARAFA_QUOTA_HARD_SIZE}", "unlimited" },
+		{ "${KOPANO_QUOTA_NAME}", "unknown" },
+		{ "${KOPANO_QUOTA_FULLNAME}" , "unknown" },
+		{ "${KOPANO_QUOTA_COMPANY}", "unknown" },
+		{ "${KOPANO_QUOTA_STORE_SIZE}", "unknown" },
+		{ "${KOPANO_QUOTA_WARN_SIZE}", "unlimited" },
+		{ "${KOPANO_QUOTA_SOFT_SIZE}", "unlimited" },
+		{ "${KOPANO_QUOTA_HARD_SIZE}", "unlimited" },
 	};
 
 	enum enumVariables {
-		ZARAFA_QUOTA_NAME,
-		ZARAFA_QUOTA_FULLNAME,
-		ZARAFA_QUOTA_COMPANY,
-		ZARAFA_QUOTA_STORE_SIZE,
-		ZARAFA_QUOTA_WARN_SIZE,
-		ZARAFA_QUOTA_SOFT_SIZE,
-		ZARAFA_QUOTA_HARD_SIZE,
-		ZARAFA_QUOTA_LAST_ITEM /* KEEP LAST! */
+		KOPANO_QUOTA_NAME,
+		KOPANO_QUOTA_FULLNAME,
+		KOPANO_QUOTA_COMPANY,
+		KOPANO_QUOTA_STORE_SIZE,
+		KOPANO_QUOTA_WARN_SIZE,
+		KOPANO_QUOTA_SOFT_SIZE,
+		KOPANO_QUOTA_HARD_SIZE,
+		KOPANO_QUOTA_LAST_ITEM /* KEEP LAST! */
 	};
 
 	if (lpVars->ulClass == CONTAINER_COMPANY) {
@@ -613,7 +612,7 @@ HRESULT ECQuotaMonitor::CreateMailFromTemplate(TemplateVariables *lpVars, string
 			break;
 		case QUOTA_OK:
 		default:
-			goto exit;
+			return hrSuccess;
 		}
 	}
 
@@ -622,8 +621,7 @@ HRESULT ECQuotaMonitor::CreateMailFromTemplate(TemplateVariables *lpVars, string
 	/* Start reading the template mail */
 	if((fp = fopen(lpszTemplate, "rt")) == NULL) {
 		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to open template email: %s", lpszTemplate);
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
+		return MAPI_E_NOT_FOUND;
 	}
 
 	while(!feof(fp)) {
@@ -645,21 +643,21 @@ HRESULT ECQuotaMonitor::CreateMailFromTemplate(TemplateVariables *lpVars, string
 	fp = NULL;
 
 	if (!lpVars->strUserName.empty())
-		strVariables[ZARAFA_QUOTA_NAME][1] = lpVars->strUserName;
+		strVariables[KOPANO_QUOTA_NAME][1] = lpVars->strUserName;
 	if (!lpVars->strFullName.empty())
-		strVariables[ZARAFA_QUOTA_FULLNAME][1] = lpVars->strFullName;
+		strVariables[KOPANO_QUOTA_FULLNAME][1] = lpVars->strFullName;
 	if (!lpVars->strCompany.empty())
-		strVariables[ZARAFA_QUOTA_COMPANY][1] = lpVars->strCompany;
+		strVariables[KOPANO_QUOTA_COMPANY][1] = lpVars->strCompany;
 	if (!lpVars->strStoreSize.empty())
-		strVariables[ZARAFA_QUOTA_STORE_SIZE][1] = lpVars->strStoreSize;
+		strVariables[KOPANO_QUOTA_STORE_SIZE][1] = lpVars->strStoreSize;
 	if (!lpVars->strWarnSize.empty())
-		strVariables[ZARAFA_QUOTA_WARN_SIZE][1] = lpVars->strWarnSize;
+		strVariables[KOPANO_QUOTA_WARN_SIZE][1] = lpVars->strWarnSize;
 	if (!lpVars->strSoftSize.empty())
-		strVariables[ZARAFA_QUOTA_SOFT_SIZE][1] = lpVars->strSoftSize;
+		strVariables[KOPANO_QUOTA_SOFT_SIZE][1] = lpVars->strSoftSize;
 	if (!lpVars->strHardSize.empty())
-		strVariables[ZARAFA_QUOTA_HARD_SIZE][1] = lpVars->strHardSize;
+		strVariables[KOPANO_QUOTA_HARD_SIZE][1] = lpVars->strHardSize;
 
-	for (unsigned int i = 0; i < ZARAFA_QUOTA_LAST_ITEM; ++i) {
+	for (unsigned int i = 0; i < KOPANO_QUOTA_LAST_ITEM; ++i) {
 		pos = 0;
 		while ((pos = strSubject.find(strVariables[i][0], pos)) != string::npos) {
 			strSubject.replace(pos, strVariables[i][0].size(), strVariables[i][1]);
@@ -687,9 +685,7 @@ HRESULT ECQuotaMonitor::CreateMailFromTemplate(TemplateVariables *lpVars, string
 
 	*lpstrSubject = strSubject;
 	*lpstrBody = strBody;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -878,7 +874,7 @@ HRESULT ECQuotaMonitor::CreateMessageProperties(ECUSER *lpecToUser,
 		   lpFromEntryid, cbFromEntryid);
 
 	lpPropArray[ulPropArrayCur].ulPropTag = PR_SENDER_NAME_A;
-	lpPropArray[ulPropArrayCur++].Value.lpszA = (lpecFromUser->lpszFullName ? (LPSTR)lpecFromUser->lpszFullName : (LPSTR)"Zarafa-system");
+	lpPropArray[ulPropArrayCur++].Value.lpszA = (lpecFromUser->lpszFullName ? (LPSTR)lpecFromUser->lpszFullName : (LPSTR)"kopano-system");
 
 	hr = MAPIAllocateMore(cbFromSearchKey, lpPropArray,
 						  (void**)&lpPropArray[ulPropArrayCur].Value.bin.lpb);
@@ -908,7 +904,7 @@ HRESULT ECQuotaMonitor::CreateMessageProperties(ECUSER *lpecToUser,
 		   lpFromEntryid, cbFromEntryid);
 
 	lpPropArray[ulPropArrayCur].ulPropTag = PR_SENT_REPRESENTING_NAME_A;
-	lpPropArray[ulPropArrayCur++].Value.lpszA = (lpecFromUser->lpszFullName ? (LPSTR)lpecFromUser->lpszFullName : (LPSTR)"Zarafa-system");
+	lpPropArray[ulPropArrayCur++].Value.lpszA = (lpecFromUser->lpszFullName ? (LPSTR)lpecFromUser->lpszFullName : (LPSTR)"kopano-system");
 
 	hr = MAPIAllocateMore(cbFromSearchKey, lpPropArray,
 						  (void**)&lpPropArray[ulPropArrayCur].Value.bin.lpb);
@@ -950,7 +946,7 @@ exit:
  * Creates a recipient list to set in the IMessage as recipient table.
  *
  * @param[in]	cToUsers	Number of users in lpToUsers
- * @param[in]	lpToUsers	Structs of Zarafa user information to write in the addresslist
+ * @param[in]	lpToUsers	Structs of Kopano user information to write in the addresslist
  * @param[out]	lppAddrList	Addresslist for the recipient table
  * @retval	MAPI_E_NOT_ENOUGH_MEMORY	unable to allocate more memory
  */
@@ -1123,8 +1119,8 @@ exit:
  *
  * @param[in]	lpVars	Template variables values
  * @param[in]	lpMDB	The store of the user in lpecToUser to create the mail in
- * @param[in]	lpecToUser		Zarafa user information, will be placed in the To of the mail
- * @param[in]	lpecFromUser	Zarafa user information, will be placed in the From of the mail
+ * @param[in]	lpecToUser		Kopano user information, will be placed in the To of the mail
+ * @param[in]	lpecFromUser	Kopano user information, will be placed in the From of the mail
  * @param[in]	lpAddrList		Rows to set in the recipient table of the mail
  * @return MAPI error code
  */
@@ -1167,7 +1163,7 @@ exit:
  */
 HRESULT ECQuotaMonitor::OpenUserStore(LPTSTR szStoreName, objectclass_t objclass, LPMDB *lppStore)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ExchangeManageStorePtr ptrEMS;
 	ULONG cbUserStoreEntryID = 0;
 	EntryIdPtr ptrUserStoreEntryID;
@@ -1175,7 +1171,7 @@ HRESULT ECQuotaMonitor::OpenUserStore(LPTSTR szStoreName, objectclass_t objclass
 
 	hr = m_lpMDBAdmin->QueryInterface(IID_IExchangeManageStore, &ptrEMS);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	hr = ptrEMS->CreateStoreEntryID((LPTSTR)"", szStoreName, OPENSTORE_HOME_LOGON, &cbUserStoreEntryID, &ptrUserStoreEntryID);
 	if (hr != hrSuccess) {
@@ -1183,17 +1179,15 @@ HRESULT ECQuotaMonitor::OpenUserStore(LPTSTR szStoreName, objectclass_t objclass
 			m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_INFO, "Store of %s \"%s\" not found", (objclass == CONTAINER_COMPANY) ? "company" : "user", reinterpret_cast<const char *>(szStoreName));
 		else
 			m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to get store entry id for \"%s\": %s (0x%08X)", reinterpret_cast<const char *>(szStoreName), GetMAPIErrorMessage(hr), hr);
-		goto exit;
+		return hr;
 	}
 
 	hr = m_lpMAPIAdminSession->OpenMsgStore(0, cbUserStoreEntryID, ptrUserStoreEntryID, NULL, MDB_WRITE, lppStore);
 	if (hr != hrSuccess) {
 		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to open store for '%s', error code: 0x%08X", (LPSTR)szStoreName, hr);
-		goto exit;
+		return hr;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -1207,7 +1201,7 @@ exit:
  */
 HRESULT ECQuotaMonitor::CheckQuotaInterval(LPMDB lpStore, LPMESSAGE *lppMessage, bool *lpbTimeout)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	MessagePtr ptrMessage;
 	SPropValuePtr ptrProp;
 	const char *lpResendInterval = NULL;
@@ -1217,17 +1211,16 @@ HRESULT ECQuotaMonitor::CheckQuotaInterval(LPMDB lpStore, LPMESSAGE *lppMessage,
 
 	hr = GetConfigMessage(lpStore, QUOTA_CONFIG_MSG, &ptrMessage);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	hr = HrGetOneProp(ptrMessage, PR_EC_QUOTA_MAIL_TIME, &ptrProp);
 	if (hr == MAPI_E_NOT_FOUND) {
 		*lppMessage = ptrMessage.release();
 		*lpbTimeout = true;
-		hr = hrSuccess;
-		goto exit;
+		return hrSuccess;
 	}
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	/* Determine when the last warning mail was send, and if a new one should be send. */
 	lpResendInterval = m_lpThreadMonitor->lpConfig->GetSetting("mailquota_resend_interval");
@@ -1239,9 +1232,7 @@ HRESULT ECQuotaMonitor::CheckQuotaInterval(LPMDB lpStore, LPMESSAGE *lppMessage,
 
 	*lppMessage = ptrMessage.release();
 	*lpbTimeout = (ft > ftNextRun);
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -1255,7 +1246,7 @@ exit:
  */
 HRESULT ECQuotaMonitor::UpdateQuotaTimestamp(LPMESSAGE lpMessage)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	SPropValue sPropTime;
 	FILETIME ft;
 
@@ -1266,24 +1257,21 @@ HRESULT ECQuotaMonitor::UpdateQuotaTimestamp(LPMESSAGE lpMessage)
 
 	hr = HrSetOneProp(lpMessage, &sPropTime);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
 	if (hr != hrSuccess) {
 		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to save config message, error code: 0x%08X", hr);
-		goto exit;
+		return hr;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
  * Sends the quota mail to the user, and to any administrator listed
  * to receive quota information within the company space.
  *
- * @param[in]	lpecUser	The Zarafa user who is over quota, NULL if the company is over quota
- * @param[in]	lpecCompany	The Zarafa company of the lpecUser (default company if non-hosted), or the over quota company if lpecUser is NULL
+ * @param[in]	lpecUser	The Kopano user who is over quota, NULL if the company is over quota
+ * @param[in]	lpecCompany	The Kopano company of the lpecUser (default company if non-hosted), or the over quota company if lpecUser is NULL
  * @param[in]	lpecQuotaStatus	The quota status values of lpecUser or lpecCompany
  * @param[in]	lpStore The store that is over quota
  * @return MAPI error code

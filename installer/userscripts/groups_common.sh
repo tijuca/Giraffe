@@ -1,25 +1,25 @@
 # shell include script
 
-ZARAFA_LANG="${ZARAFA_USERSCRIPT_LOCALE:-${LC_MESSAGES:-en_US}}"
+KOPANO_LANG="${KOPANO_USERSCRIPT_LOCALE:-${LC_MESSAGES:-en_US}}"
 PATH=/bin:/usr/local/bin:/usr/bin
-export ZARAFA_LANG PATH
+export KOPANO_LANG PATH
 
-if [ -z "${ZARAFA_GROUP_SCRIPTS}" ] ; then
+if [ -z "${KOPANO_GROUP_SCRIPTS}" ] ; then
     exec >&2
     echo "Do not execute this script directly"
     exit 1
 fi
 
-if [ ! -d "${ZARAFA_GROUP_SCRIPTS}" ] ; then
+if [ ! -d "${KOPANO_GROUP_SCRIPTS}" ] ; then
     exec >&2
-    echo "${ZARAFA_GROUP_SCRIPTS} does not exist or is not a directory"
+    echo "${KOPANO_GROUP_SCRIPTS} does not exist or is not a directory"
     exit 1
 fi
 
-if [ -z "${ZARAFA_GROUP}" -a -z "${ZARAFA_GROUPID}" ] ; then
+if [ -z "${KOPANO_GROUP}" -a -z "${KOPANO_GROUPID}" ] ; then
     exec >&2
-    echo "ZARAFA_GROUP and ZARAFA_GROUPID is not set."
+    echo "KOPANO_GROUP and KOPANO_GROUPID is not set."
     exit 1
 fi
 
-find ${ZARAFA_GROUP_SCRIPTS} -maxdepth 1 -type f -perm -u=x -not -name \*~ -not -name \#\* -not -name \*.rpm\* -not -name \*.bak -not -name \*.old -exec {} \;
+find ${KOPANO_GROUP_SCRIPTS} -maxdepth 1 -type f -perm -u=x -not -name \*~ -not -name \#\* -not -name \*.rpm\* -not -name \*.bak -not -name \*.old -exec {} \;

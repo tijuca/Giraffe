@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -27,16 +27,16 @@
 #include <mapidefs.h>
 #include <mapiutil.h>
 
-#include <zarafa/CommonUtil.h>
-#include <zarafa/Util.h>
-#include <zarafa/ECTags.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/Util.h>
+#include <kopano/ECTags.h>
 #include <inetmapi/inetmapi.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 
-#include <zarafa/stringutil.h>
-#include <zarafa/charset/convert.h>
-#include <zarafa/ecversion.h>
-#include <zarafa/charset/utf8string.h>
+#include <kopano/stringutil.h>
+#include <kopano/charset/convert.h>
+#include <kopano/ecversion.h>
+#include <kopano/charset/utf8string.h>
 #include "ECFeatures.h"
 
 #include "POP3.h"
@@ -92,9 +92,9 @@ HRESULT POP3::HrSendGreeting(const std::string &strHostString) {
 	HRESULT hr = hrSuccess;
 
 	if (parseBool(lpConfig->GetSetting("server_hostname_greeting")))
-		hr = HrResponse(POP3_RESP_OK, "Zarafa POP3 gateway ready" + strHostString);
+		hr = HrResponse(POP3_RESP_OK, "POP3 gateway ready" + strHostString);
 	else
-		hr = HrResponse(POP3_RESP_OK, "Zarafa POP3 gateway ready");
+		hr = HrResponse(POP3_RESP_OK, "POP3 gateway ready");
 
 	return hr;
 }

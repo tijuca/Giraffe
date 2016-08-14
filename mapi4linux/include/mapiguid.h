@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -22,16 +22,7 @@
 #define MAPIGUID_H
 #endif
 
-/*
- * MAPI for linux
- *
- * mapiguid.h - All GUID's for MAPI
- *
- * (C) Zarafa 2005
- *
- */
-
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 /* Because they have nowhere else to go ... sad huh? */
 #if !defined(INITGUID) || defined(USES_IID_IUnknown)

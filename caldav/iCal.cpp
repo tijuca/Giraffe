@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,41 +15,32 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "iCal.h"
 #include "CalDavUtil.h"
 
 #include <vector>
 
-#include <zarafa/CommonUtil.h>
-#include <zarafa/restrictionutil.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/restrictionutil.h>
 #include "icaluid.h"
 
 #include <libxml/tree.h>
 #include <libxml/parser.h>
 #include "PublishFreeBusy.h"
 
-#include <zarafa/mapi_ptr.h>
+#include <kopano/mapi_ptr.h>
 
 using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 /**
  * Default constructor
  */
 iCal::iCal(Http *lpRequest, IMAPISession *lpSession, ECLogger *lpLogger, std::string strSrvTz, std::string strCharset) : ProtocolBase(lpRequest, lpSession, lpLogger, strSrvTz, strCharset)
-{
-}
-
-/**
- * Default destructor
- */
-iCal::~iCal()
 {
 }
 

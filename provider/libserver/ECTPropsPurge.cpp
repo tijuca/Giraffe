@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,18 +15,18 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
-#include <zarafa/threadutil.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECConfig.h>
+#include <kopano/threadutil.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECConfig.h>
 #include "ECSession.h"
 #include "ECSessionManager.h"
 #include "ECDatabaseFactory.h"
 #include "ECStatsCollector.h"
-#include <zarafa/ZarafaCode.h>
+#include <kopano/kcodes.h>
 
 #include "ECTPropsPurge.h"
 
@@ -135,7 +135,7 @@ ECRESULT ECTPropsPurge::PurgeThread()
  */
 ECRESULT ECTPropsPurge::PurgeOverflowDeferred(ECDatabase *lpDatabase)
 {
-    ECRESULT er = erSuccess;
+	ECRESULT er;
     unsigned int ulCount = 0;
     unsigned int ulFolderId = 0;
     unsigned int ulMaxDeferred = atoi(m_lpConfig->GetSetting("max_deferred_records"));
@@ -144,35 +144,33 @@ ECRESULT ECTPropsPurge::PurgeOverflowDeferred(ECDatabase *lpDatabase)
 		while(!m_bExit) {
 			er = GetDeferredCount(lpDatabase, &ulCount);
 			if(er != erSuccess)
-				goto exit;
+				return er;
 				
 			if(ulCount < ulMaxDeferred)
 				break;
 				
 			er = lpDatabase->Begin();
 			if(er != erSuccess)
-				goto exit;
+				return er;
 			
 			er = GetLargestFolderId(lpDatabase, &ulFolderId);
 			if(er != erSuccess) {
 				lpDatabase->Rollback();
-				goto exit;
+				return er;
 			}
 				
 			er = PurgeDeferredTableUpdates(lpDatabase, ulFolderId);
 			if(er != erSuccess) {
 				lpDatabase->Rollback();
-				goto exit;
+				return er;
 			}
 				
 			er = lpDatabase->Commit();
 			if(er != erSuccess)
-				goto exit;
+				return er;
 		}
 	}
-	    
-exit:
-    return er;
+	return erSuccess;
 }
 
 /**
@@ -196,7 +194,7 @@ ECRESULT ECTPropsPurge::GetDeferredCount(ECDatabase *lpDatabase, unsigned int *l
     
     lpRow = lpDatabase->FetchRow(lpResult);
     if(!lpRow || !lpRow[0]) {
-        er = ZARAFA_E_DATABASE_ERROR;
+        er = KCERR_DATABASE_ERROR;
 	ec_log_err("ECTPropsPurge::GetDeferredCount(): row or column null");
         goto exit;
     }
@@ -233,7 +231,7 @@ ECRESULT ECTPropsPurge::GetLargestFolderId(ECDatabase *lpDatabase, unsigned int 
     lpRow = lpDatabase->FetchRow(lpResult);
     if(!lpRow || !lpRow[0]) {
         // Could be that there are no deferred updates, so give an appropriate error
-        er = ZARAFA_E_NOT_FOUND;
+        er = KCERR_NOT_FOUND;
         goto exit;
     }
     
@@ -358,16 +356,12 @@ exit:
  */
 ECRESULT ECTPropsPurge::AddDeferredUpdate(ECSession *lpSession, ECDatabase *lpDatabase, unsigned int ulFolderId, unsigned int ulOldFolderId, unsigned int ulObjId)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 
 	er = AddDeferredUpdateNoPurge(lpDatabase, ulFolderId, ulOldFolderId, ulObjId);
 	if (er != erSuccess)
-		goto exit;
-
-	er = NormalizeDeferredUpdates(lpSession, lpDatabase, ulFolderId);
-
-exit:
-	return er;
+		return er;
+	return NormalizeDeferredUpdates(lpSession, lpDatabase, ulFolderId);
 }
 
 /**
@@ -383,7 +377,6 @@ exit:
  */
 ECRESULT ECTPropsPurge::AddDeferredUpdateNoPurge(ECDatabase *lpDatabase, unsigned int ulFolderId, unsigned int ulOldFolderId, unsigned int ulObjId)
 {
-	ECRESULT er = erSuccess;
 	std::string strQuery;
 
 	if (ulOldFolderId)
@@ -393,12 +386,7 @@ ECRESULT ECTPropsPurge::AddDeferredUpdateNoPurge(ECDatabase *lpDatabase, unsigne
 		// Message has modified. If there is already a record for this message, we don't need to do anything
 		strQuery = "INSERT IGNORE INTO deferredupdate(hierarchyid, srcfolderid, folderid) VALUES(" + stringify(ulObjId) + "," + stringify(ulFolderId) + "," + stringify(ulFolderId) + ")";
 		
-	er = lpDatabase->DoInsert(strQuery);
-	if(er != erSuccess)
-		goto exit;
-
-exit:
-	return er;
+	return lpDatabase->DoInsert(strQuery);
 }
 
 /**
@@ -413,7 +401,7 @@ exit:
  */
 ECRESULT ECTPropsPurge::NormalizeDeferredUpdates(ECSession *lpSession, ECDatabase *lpDatabase, unsigned int ulFolderId)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	unsigned int ulMaxDeferred = 0;
 	unsigned int ulCount = 0;
 		
@@ -422,15 +410,13 @@ ECRESULT ECTPropsPurge::NormalizeDeferredUpdates(ECSession *lpSession, ECDatabas
 	if (ulMaxDeferred) {
 		er = GetDeferredCount(lpDatabase, ulFolderId, &ulCount);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 			
 		if (ulCount >= ulMaxDeferred) {
 			er = PurgeDeferredTableUpdates(lpDatabase, ulFolderId);
 			if (er != erSuccess)
-				goto exit;
+				return er;
 		}
 	}
-
-exit:
-	return er;
+	return erSuccess;
 }

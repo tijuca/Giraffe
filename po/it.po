@@ -14,39 +14,39 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Pootle 2.1.5\n"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:922
-msgid "Zarafa Archive"
-msgstr "Archivio Zarafa"
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:922
+msgid "Kopano Archive"
+msgstr "Archivio Kopano"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:923
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:923
 msgid "This folder contains the special archive folders."
 msgstr "Questa cartella contiene le cartelle archivio speciali."
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:928
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:928
 msgid "History"
 msgstr "Cronologia"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:929
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:929
 msgid ""
 "This folder contains archives that have been replaced by a newer version."
 msgstr ""
 "Questa cartella contiene gli archivi che sono stati sostituiti con una nuova "
 "versione."
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:933
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:933
 msgid "Outgoing"
 msgstr "In uscita"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:934
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:934
 msgid "This folder contains archives of all outgoing messages."
 msgstr "Questa cartella contiene gli archivi di tutti i messaggi in uscita."
 
 # 85%
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:938
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:938
 msgid "Deleted"
 msgstr "Eliminato"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:939
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:939
 msgid "This folder contains archives of messages that have been deleted."
 msgstr "Questa cartella contiene gli archivi dei messaggi eliminati."
 
@@ -152,7 +152,7 @@ msgstr "Nessuna descrizione disponibile."
 msgid "MAPI error code:"
 msgstr "Codice errore MAPI:"
 
-#: zarafa-libsync/ECSync.cpp:1961
+#: libsync/ECSync.cpp:1961
 msgid ""
 "The synchronization of a folder failed. Press retry to continue or ignore to "
 "supress all errors.\r\n"
@@ -165,7 +165,7 @@ msgstr ""
 "Se il problema persiste, contattare l'amministratore di sistema."
 
 # 84%
-#: zarafa-libsync/ECSync.cpp:1963
+#: libsync/ECSync.cpp:1963
 #, fuzzy
 msgid "Error codes: "
 msgstr "Codice errore:"
@@ -768,7 +768,7 @@ msgid ""
 "The server is not available. Either there are network problems or server is "
 "down for maintenance."
 msgstr ""
-"Il server non è disponibile. Potrebbero esserci problemi di rete o Zarafa "
+"Il server non è disponibile. Potrebbero esserci problemi di rete o Kopano "
 "potrebbe essere in manutenzione."
 
 #: provider/ECProps/ECDelegatePropPage.cpp:202
@@ -1349,7 +1349,7 @@ msgid ""
 "Cannot use the profile because you are over the license limit. To continue, "
 "you must purchase additional client licenses."
 msgstr ""
-"Non è possibile inizializzare il client Zarafa in quanto è stato superato il "
+"Non è possibile inizializzare il client Kopano in quanto è stato superato il "
 "limite di licenza. Per continuare è necessario acquistare una licenza client "
 "addizionale."
 
@@ -1359,13 +1359,13 @@ msgid ""
 "Cannot use the profile because the server was unable to contact the license "
 "server. Please consult your system administrator."
 msgstr ""
-"Impossibile inizializzare il client Zarafa poichè non è possibile contattare "
+"Impossibile inizializzare il client Kopano poichè non è possibile contattare "
 "il server delle licenze. Contattare il proprio amministratore di sistema."
 
 #: provider/client/ECArchiveAwareMessage.cpp:471
 #: provider/client/ECArchiveAwareMessage.cpp:529
-msgid "Zarafa Archiver"
-msgstr "Zarafa Archiver"
+msgid "Kopano Archiver"
+msgstr "Kopano Archiver"
 
 #: provider/client/ECArchiveAwareMessage.cpp:473
 msgid "An error has occurred while fetching the message from the archive."
@@ -1546,8 +1546,8 @@ msgid "Unable to store SSL certificate in registry key."
 msgstr "Impossibile archiviare il certificato SSL nella chiave di registro."
 
 #: provider/contacts/ZCABContainer.cpp:761
-msgid "Zarafa Contacts Folders"
-msgstr "Cartella contatti Zarafa"
+msgid "Kopano Contacts Folders"
+msgstr "Cartella contatti Kopano"
 
 #: provider/libserver/ECGenProps.cpp:949
 msgid "Archive"
@@ -1559,11 +1559,11 @@ msgstr "Aggiorno: "
 
 #: spooler/Spooler.cpp:485
 msgid ""
-"A fatal error occurred while processing your message, and Zarafa is unable "
+"A fatal error occurred while processing your message, and Kopano is unable "
 "to send your email."
 msgstr ""
 "Si è verificato un errore irreversibile durante l'elaborazione del messaggio "
-"e Zarafa non è in grado di inviare l'email."
+"e Kopano non è in grado di inviare l'email."
 
 #: spooler/archive.cpp:241
 msgid "Unable to obtain list of attached archives."
@@ -1605,19 +1605,19 @@ msgstr ""
 msgid "Error found while trying to send your message. Error code: "
 msgstr "Errore durante l'invio del messaggio. Codice di errore: "
 
-#: installer/linux/zarafa-mr-accept:403
+#: installer/linux/kopano-mr-accept:403
 msgid "Recurring meetings are not allowed"
 msgstr "Gli appuntamenti ricorsivi non sono permessi"
 
-#: installer/linux/zarafa-mr-accept:453
+#: installer/linux/kopano-mr-accept:453
 msgid "The requested time slot is unavailable"
 msgstr "La fascia oraria richiesta non è disponibile"
 
-#: installer/linux/zarafa-mr-accept:455
+#: installer/linux/kopano-mr-accept:455
 msgid "The requested time slots are unavailble on the following dates:"
 msgstr "Le fasce orarie richieste non sono disponibili nelle seguenti date:"
 
-#: installer/linux/zarafa-mr-accept:458
+#: installer/linux/kopano-mr-accept:458
 #, php-format
 msgid "%x %X"
 msgstr "%x %X"
@@ -1766,8 +1766,8 @@ msgid "Logon Failed. Please check your name/password."
 msgstr "Accesso fallito. Nome utente e password non validi."
 
 #: php-ext/include/mapi/class.mapiexception.php:29
-msgid "Can not connect to Zarafa server."
-msgstr "Impossibile connettersi al server Zarafa."
+msgid "Can not connect to Kopano server."
+msgstr "Impossibile connettersi al server Kopano."
 
 #: php-ext/include/mapi/class.mapiexception.php:31
 msgid "Can not open object with provided id."

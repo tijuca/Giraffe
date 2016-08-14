@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -21,10 +21,11 @@
 #ifndef ARCHIVEMANAGE_H_INCLUDED
 #define ARCHIVEMANAGE_H_INCLUDED
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <list>
+#include <memory>
 #include <mapix.h>
-#include <zarafa/ArchiveControl.h>
+#include <kopano/ArchiveControl.h>
 
 class ECLogger;
 
@@ -50,7 +51,7 @@ public:
 		ReadOnly = 4
 	};
 
-	typedef std::auto_ptr<ArchiveManage>	auto_ptr_type;
+	typedef std::unique_ptr<ArchiveManage> auto_ptr_type;
 
 	virtual ~ArchiveManage() {};
 

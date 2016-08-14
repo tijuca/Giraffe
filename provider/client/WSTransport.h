@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,17 +18,18 @@
 #ifndef WSTRANSPORT_H
 #define WSTRANSPORT_H
 
+#include <kopano/zcdefs.h>
 #include <mapi.h>
 #include <mapispi.h>
 
 #include <map>
 #include <pthread.h>
 
-#include "Zarafa.h"
+#include "kcore.hpp"
 #include "ECMAPIProp.h"
-#include "soapZarafaCmdProxy.h"
+#include "soapKCmdProxy.h"
 
-#include <zarafa/ZarafaCode.h>
+#include <kopano/kcodes.h>
 
 #include "WSStoreTableView.h"
 //#include "WSTableOutGoingQueue.h"
@@ -65,7 +66,7 @@ enum
     NUM_RFT_PROPS
 };
 
-class WSTransport : public ECUnknown {
+class WSTransport _kc_final : public ECUnknown {
 protected:
 	WSTransport(ULONG ulUIFlags);
 	virtual ~WSTransport();
@@ -73,7 +74,7 @@ protected:
 public:
 	static HRESULT Create(ULONG ulUIFlags, WSTransport **lppTransport);
 
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 
 	static	HRESULT	HrOpenTransport(LPMAPISUP lpMAPISup, WSTransport **lppTransport, BOOL bOffline = FALSE);
 
@@ -83,6 +84,7 @@ public:
 	virtual HRESULT HrClone(WSTransport **lppTransport);
 
 	virtual HRESULT HrLogOff();
+	HRESULT logoff_nd(void);
 	virtual HRESULT HrSetRecvTimeout(unsigned int ulSeconds);
 
 	virtual HRESULT CreateAndLogonAlternate(LPCSTR szServer, WSTransport **lppTransport) const;
@@ -249,7 +251,7 @@ public:
 	/* multi store table functions */
 	virtual HRESULT HrOpenMultiStoreTable(LPENTRYLIST lpMsgList, ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID, ECMsgStore *lpMsgStore, WSTableView **lppTableOps);
 
-	/* statistics tables (system, threads, users), ulTableType is ZarafaProto.h TABLETYPE_STATS_... */
+	/* statistics tables (system, threads, users), ulTableType is proto.h TABLETYPE_STATS_... */
 	/* userstores table TABLETYPE_USERSTORE */
 	virtual HRESULT HrOpenMiscTable(ULONG ulTableType, ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID, ECMsgStore *lpMsgStore, WSTableView **lppTableView);
 
@@ -258,10 +260,8 @@ public:
 
 	// License information
 
-	/* Exchange encrypted auth info with zarafa-licensed */
 	virtual HRESULT HrLicenseAuth(unsigned char *lpData, unsigned int ulSize, unsigned char **lppResponseData, unsigned int *lpulSize);
 
-	/* Get license capabilities from zarafa-licensed */
 	virtual HRESULT HrLicenseCapa(unsigned int ulServiceType, char ***lppszCapas, unsigned int *lpulSize);
 	
 	virtual HRESULT HrLicenseUsers(unsigned int ulServiceType, unsigned int *lpulUsers);
@@ -306,13 +306,13 @@ private:
 	virtual HRESULT UnLockSoap();
 
 	//TODO: Move this function to the right file
-	static ECRESULT TrySSOLogon(ZarafaCmd* lpCmd, LPCSTR szServer, utf8string strUsername, utf8string strImpersonateUser, unsigned int ulCapabilities, ECSESSIONGROUPID ecSessionGroupId, char *szAppName, ECSESSIONID* lpSessionId, unsigned int* lpulServerCapabilities, unsigned long long *lpllFlags, LPGUID lpsServerGuid, const std::string strClientAppVersion, const std::string strClientAppMisc);
+	static ECRESULT TrySSOLogon(KCmd* lpCmd, LPCSTR szServer, utf8string strUsername, utf8string strImpersonateUser, unsigned int ulCapabilities, ECSESSIONGROUPID ecSessionGroupId, char *szAppName, ECSESSIONID* lpSessionId, unsigned int* lpulServerCapabilities, unsigned long long *lpllFlags, LPGUID lpsServerGuid, const std::string strClientAppVersion, const std::string strClientAppMisc);
 
 	// Returns name of calling application (eg 'program.exe' or 'httpd')
 	std::string GetAppName();
 
 protected:
-	ZarafaCmd*		m_lpCmd;
+	KCmd*		m_lpCmd;
 	pthread_mutex_t m_hDataLock;
 	ECSESSIONID		m_ecSessionId;
 	ECSESSIONGROUPID m_ecSessionGroupId;
@@ -329,6 +329,7 @@ protected:
 private:
 	pthread_mutex_t					m_ResolveResultCacheMutex;
 	ECCache<ECMapResolveResults>	m_ResolveResultCache;
+	bool m_has_session;
 
 friend class WSMessageStreamExporter;
 friend class WSMessageStreamImporter;

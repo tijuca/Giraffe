@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,21 +18,20 @@
 #ifndef RECURRENCE_H
 #define RECURRENCE_H
 
-#include <zarafa/RecurrenceState.h>
+#include <kopano/zcdefs.h>
+#include <kopano/RecurrenceState.h>
 #include <mapidefs.h>
 #include <mapix.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/Util.h>
+#include <kopano/ECLogger.h>
+#include <kopano/Util.h>
 #include <list>
 #include "TimeUtil.h"
 #include "freebusy.h"
 #include "freebusyutil.h"
 
-class recurrence {
+class recurrence _kc_final {
 public:
 	recurrence();
-	~recurrence();
-
 	HRESULT HrLoadRecurrenceState(char *lpData, unsigned int ulLen, ULONG ulFlags);
 	HRESULT HrGetRecurrenceState(char **lppData, unsigned int *lpulLen, void *base = NULL);
 
@@ -73,7 +72,7 @@ public:
 	ULONG getInterval();
 	HRESULT setInterval(ULONG);
 
-	ULONG getSlidingFlag();
+	ULONG getSlidingFlag(void) { return m_sRecState.ulSlidingFlag; }
 	HRESULT setSlidingFlag(ULONG);
 
 	ULONG getFirstDOW();

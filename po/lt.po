@@ -932,7 +932,7 @@ msgid "User already exists."
 msgstr ""
 
 #: provider/client/ECArchiveAwareMessage.cpp:446
-msgid "Zarafa Archiver"
+msgid "Kopano Archiver"
 msgstr ""
 
 #: provider/client/ECArchiveAwareMessage.cpp:448
@@ -1298,42 +1298,42 @@ msgstr ""
 msgid "Do you wish to continue?"
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:782
-msgid "Zarafa Archive"
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:782
+msgid "Kopano Archive"
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:783
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:783
 msgid "This folder contains the special archive folders."
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:787
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:787
 msgid "History"
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:788
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:788
 msgid ""
 "This folder contains archives that have been replaced by a newer version."
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:792
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:792
 msgid "Outgoing"
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:793
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:793
 msgid "This folder contains archives of all outgoing messages."
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:797
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:797
 msgid "Deleted"
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:798
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:798
 msgid "This folder contains archives of messages that have been deleted."
 msgstr ""
 
 #: spooler/Spooler.cpp:481
 msgid ""
-"A fatal error occurred while processing your message, and Zarafa is unable "
+"A fatal error occurred while processing your message, and Kopano is unable "
 "to send your email."
 msgstr ""
 

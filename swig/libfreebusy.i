@@ -3,7 +3,7 @@
 %{
 #include <mapix.h>
 #include <mapidefs.h>
-#include <zarafa/ECLogger.h>
+#include <kopano/ECLogger.h>
 #include "freebusy.h"
 #include "freebusyguid.h"
 #include "ECFreeBusySupport.h"
@@ -15,13 +15,11 @@
 
 %include "std_string.i"
 %include "cstring.i"
-%include <zarafa/typemap.i>
+%include <kopano/typemap.i>
 
 
 
-//////////////////////////////////////////////
 // ICLASS (Class instances of MAPI objects)
-//////////////////////////////////////////////
 
 // Output
 %typemap(in,numinputs=0)    ICLASS *($basetype *temp)
@@ -41,7 +39,7 @@ enum FBStatus
         fbTentative = fbFree + 1,               /**< Tentative */
         fbBusy  = fbTentative + 1,              /**< Busy */
         fbOutOfOffice   = fbBusy + 1,   /**< Out Of Office */
-        fbZarafaAllBusy = 1000                  /**< Internal used */
+        fbKopanoAllBusy = 1000                  /**< Internal used */
 };
 
 %apply (ULONG, MAPIARRAY) { (ULONG cMax, FBUser *rgfbuser), (ULONG cUsers, FBUser *lpUsers) };
@@ -116,7 +114,7 @@ public:
         virtual HRESULT Reload(void*) = 0;
         virtual HRESULT EnumBlocks(IEnumFBBlock **ppenumfb, FILETIME ftmStart, FILETIME ftmEnd) = 0;
         virtual HRESULT Merge(void *) = 0;
-        virtual HRESULT GetDeligateInfo(void *) = 0;
+        virtual HRESULT GetDelegateInfo(void *) = 0;
         virtual HRESULT FindFreeBlock(LONG, LONG, LONG, BOOL, LONG, LONG, LONG, FBBlock_1 *) = 0;
         virtual HRESULT InterSect(void *, LONG, void *) = 0;
         virtual HRESULT SetFBRange(LONG rtmStart, LONG rtmEnd) = 0;

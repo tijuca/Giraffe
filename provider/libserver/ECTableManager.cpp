@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <sstream>
 
@@ -38,20 +38,18 @@
 #include "ECDatabaseUtils.h"
 #include "ECSecurity.h"
 #include "ECSubRestriction.h"
-#include <zarafa/ECDefs.h>
+#include <kopano/ECDefs.h>
 #include "SOAPUtils.h"
-#include <zarafa/stringutil.h>
-#include <zarafa/Trace.h>
+#include <kopano/stringutil.h>
+#include <kopano/Trace.h>
 #include "ECServerEntrypoint.h"
 #include "ECMailBoxTable.h"
 
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <edkmdb.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 void FreeRowSet(struct rowSet *lpRowSet, bool bBasePointerDel);
@@ -329,12 +327,12 @@ ECRESULT ECTableManager::OpenGenericTable(unsigned int ulParent, unsigned int ul
 	locale = lpSession->GetSessionManager()->GetSortLocale(ulStoreId);
 	if(lpSession->GetSessionManager()->GetSearchFolders()->IsSearchFolder(ulStoreId, ulParent) == erSuccess) {
 	    if((ulFlags & MSGFLAG_DELETED) | (ulFlags & MAPI_ASSOCIATED)) {
-	        er = ZARAFA_E_NO_SUPPORT;
+	        er = KCERR_NO_SUPPORT;
 	        goto exit;
         }
 	    if(lpSession->GetSecurity()->IsStoreOwner(ulParent) != erSuccess && lpSession->GetSecurity()->IsAdminOverOwnerOfObject(ulParent) != erSuccess) {
 	        // Search folders are not visible at all to other users, therefore NOT_FOUND, not NO_ACCESS
-            er = ZARAFA_E_NOT_FOUND; 
+            er = KCERR_NOT_FOUND; 
             goto exit;
 	    } else {
 			er = ECSearchObjectTable::Create(lpSession, ulStoreId, &sGuid, ulParent, ulObjType, ulFlags, locale, (ECSearchObjectTable**)&lpTable);
@@ -407,7 +405,7 @@ ECRESULT ECTableManager::OpenStatsTable(unsigned int ulTableType, unsigned int u
 	case TABLETYPE_STATS_SYSTEM:
 		if ((hosted && adminlevel < ADMIN_LEVEL_SYSADMIN) || (!hosted && adminlevel < ADMIN_LEVEL_ADMIN)) {
 			AuditStatsAccess(lpSession, "denied", "system");
-			er = ZARAFA_E_NO_ACCESS;
+			er = KCERR_NO_ACCESS;
 			goto exit;
 		}
 		er = ECSystemStatsTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), (ECSystemStatsTable**)&lpTable);
@@ -420,7 +418,7 @@ ECRESULT ECTableManager::OpenStatsTable(unsigned int ulTableType, unsigned int u
 	case TABLETYPE_STATS_SESSIONS:
 		if ((hosted && adminlevel < ADMIN_LEVEL_SYSADMIN) || (!hosted && adminlevel < ADMIN_LEVEL_ADMIN)) {
 			AuditStatsAccess(lpSession, "denied", "session");
-			er = ZARAFA_E_NO_ACCESS;
+			er = KCERR_NO_ACCESS;
 			goto exit;
 		}
 		er = ECSessionStatsTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), (ECSessionStatsTable**)&lpTable);
@@ -433,7 +431,7 @@ ECRESULT ECTableManager::OpenStatsTable(unsigned int ulTableType, unsigned int u
 	case TABLETYPE_STATS_USERS:
 		if (adminlevel < ADMIN_LEVEL_ADMIN) {
 			AuditStatsAccess(lpSession, "denied", "user");
-			er = ZARAFA_E_NO_ACCESS;
+			er = KCERR_NO_ACCESS;
 			goto exit;
 		}
 		er = ECUserStatsTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), (ECUserStatsTable**)&lpTable);
@@ -445,12 +443,12 @@ ECRESULT ECTableManager::OpenStatsTable(unsigned int ulTableType, unsigned int u
 		break;
 	case TABLETYPE_STATS_COMPANY:
 		if (!hosted) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		if (adminlevel < ADMIN_LEVEL_SYSADMIN) {
 			AuditStatsAccess(lpSession, "denied", "company");
-			er = ZARAFA_E_NO_ACCESS;
+			er = KCERR_NO_ACCESS;
 			goto exit;
 		}
 		er = ECCompanyStatsTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), (ECCompanyStatsTable**)&lpTable);
@@ -463,7 +461,7 @@ ECRESULT ECTableManager::OpenStatsTable(unsigned int ulTableType, unsigned int u
 	case TABLETYPE_STATS_SERVERS:
 		if (adminlevel < ADMIN_LEVEL_SYSADMIN) {
 			AuditStatsAccess(lpSession, "denied", "company");
-			er = ZARAFA_E_NO_ACCESS;
+			er = KCERR_NO_ACCESS;
 			goto exit;
 		}
 		er = ECServerStatsTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), (ECServerStatsTable**)&lpTable);
@@ -474,7 +472,7 @@ ECRESULT ECTableManager::OpenStatsTable(unsigned int ulTableType, unsigned int u
 		er = lpTable->SetColumns(&sPropTagArrayServerStats, true);
 		break;
 	default:
-		er = ZARAFA_E_UNKNOWN;
+		er = KCERR_UNKNOWN;
 		break;
 	}
 	if (er != erSuccess)
@@ -583,14 +581,14 @@ ECRESULT ECTableManager::GetTable(unsigned int ulTableId, ECGenericObjectTable *
 
 	iterTables = mapTable.find(ulTableId);
 	if(iterTables == mapTable.end()) {
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 		goto exit;
 	}
 
 	lpTable = iterTables->second->lpTable;
 
 	if(lpTable == NULL) {
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 		goto exit;
 	}
 

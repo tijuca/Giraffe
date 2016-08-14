@@ -3,12 +3,12 @@
 #
 # This is an example script which creates a .forward file
 # in the home directory of a user, which is being created
-# in Zarafa. Place this file, with executable rights, in
-# /etc/zarafa/userscripts/createuser.d/
+# in Kopano. Place this file, with executable rights, in
+# /etc/kopano/userscripts/createuser.d/
 # if you want a .forward file for delivery for each user.
 #
 
-HOMEDIR=`getent passwd $ZARAFA_USER | cut -d: -f6`
+HOMEDIR=`getent passwd $KOPANO_USER | cut -d: -f6`
 
-echo "\"| /usr/sbin/zarafa-dagent $ZARAFA_USER\"" > $HOMEDIR/.forward
-chown $ZARAFA_USER.$ZARAFA_USER $HOMEDIR/.forward
+echo "\"| /usr/sbin/kopano-dagent $KOPANO_USER\"" > $HOMEDIR/.forward
+chown $KOPANO_USER.$KOPANO_USER $HOMEDIR/.forward

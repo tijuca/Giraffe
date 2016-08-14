@@ -13,16 +13,16 @@ AM_CPPFLAGS = ${ZCPPFLAGS} ${DEBUGFLAGS} ${BOOST_CPPFLAGS} \
 
 # We are not actually using any linked symbols from tcmalloc's header files,
 # so linking to tcmalloc is not done, not here at least. It is done in
-# provider/zarafa/Makefile.am. Probably such that other components including
-# libzarafa_server.la (provider/plugins/) _don't_ get tcmalloc.
+# provider/*/Makefile.am. Probably such that other components including
+# libkcserver.la (provider/plugins/) _don't_ get tcmalloc.
 
-pkginclude_HEADERS = include/zarafa/ECPluginSharedData.h
+pkginclude_HEADERS = include/kopano/ECPluginSharedData.h
 
-lib_LTLIBRARIES = libzarafa_server.la
-#noinst_DATA = libserver.ldd
+lib_LTLIBRARIES = libkcserver.la
+#noinst_DATA = libkcserver.ldd
 
-libzarafa_server_la_SOURCES = \
-	ZarafaCmd.cpp ZarafaCmd.h \
+libkcserver_la_SOURCES = \
+	cmd.cpp cmd.hpp \
 	ECABObjectTable.cpp ECABObjectTable.h \
 	ECCacheManager.cpp ECCacheManager.h \
 	ECDBDef.h ECDatabase.h \
@@ -71,16 +71,16 @@ libzarafa_server_la_SOURCES = \
 	ECTPropsPurge.cpp ECTPropsPurge.h \
 	ECMailBoxTable.cpp ECMailBoxTable.h \
 	ECTestProtocol.cpp ECTestProtocol.h \
-	ZarafaCmdUtil.cpp ZarafaCmdUtil.h \
+	cmdutil.cpp cmdutil.hpp logontime.cpp logontime.hpp \
 	ECLockManager.cpp ECLockManager.h
-libzarafa_server_la_LIBADD = \
-	../../common/libzcp_common_util.la ../common/libzarafacommon.la \
+libkcserver_la_LIBADD = \
+	../../common/libkcutil.la ../common/libkccommon.la \
 	-lpthread ${icu_i18n_LIBS} ${icu_uc_LIBS} \
 	${KRB5_LIBS} ${MYSQL_LIBS} ${PAM_LIBS} ${SSL_LIBS} \
 	${TCMALLOC_LIBS} ${s3_LIBS}
-libzarafa_server_la_LDFLAGS = ${AM_LDFLAGS} \
+libkcserver_la_LDFLAGS = ${AM_LDFLAGS} \
 	-Wl,--version-script=${top_builddir}/default.sym
-EXTRA_libzarafa_server_la_DEPENDENCIES = ${top_builddir}/default.sym
+EXTRA_libkcserver_la_DEPENDENCIES = ${top_builddir}/default.sym
 
 
 check-syntax:

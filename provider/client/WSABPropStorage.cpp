@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -12,32 +12,23 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-#include <zarafa/platform.h>
-
+#include <kopano/platform.h>
 #include "WSABPropStorage.h"
-
 #include "Mem.h"
-#include <zarafa/ECGuid.h>
-
-// Utils
+#include <kopano/ECGuid.h>
 #include "SOAPUtils.h"
 #include "WSUtil.h"
-
-#include <zarafa/charset/convert.h>
+#include <kopano/charset/convert.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 #define START_SOAP_CALL retry:
 #define END_SOAP_CALL   \
-	if(er == ZARAFA_E_END_OF_SESSION) { if(this->m_lpTransport->HrReLogon() == hrSuccess) goto retry; } \
-	hr = ZarafaErrorToMAPIError(er, MAPI_E_NOT_FOUND); \
+	if(er == KCERR_END_OF_SESSION) { if(this->m_lpTransport->HrReLogon() == hrSuccess) goto retry; } \
+	hr = kcerr_to_mapierr(er, MAPI_E_NOT_FOUND); \
     if(hr != hrSuccess) \
         goto exit;
                     
@@ -46,7 +37,7 @@ static const char THIS_FILE[] = __FILE__;
  * This is a PropStorage object for use with the WebServices storage platform
  */
 
-WSABPropStorage::WSABPropStorage(ULONG cbEntryId, LPENTRYID lpEntryId, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport) : ECUnknown("WSABPropStorage")
+WSABPropStorage::WSABPropStorage(ULONG cbEntryId, LPENTRYID lpEntryId, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport) : ECUnknown("WSABPropStorage")
 {
 	CopyMAPIEntryIdToSOAPEntryId(cbEntryId, lpEntryId, &m_sEntryId);
 
@@ -75,7 +66,7 @@ HRESULT WSABPropStorage::QueryInterface(REFIID refiid, void **lppInterface)
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
-HRESULT WSABPropStorage::Create(ULONG cbEntryId, LPENTRYID lpEntryId, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport, WSABPropStorage **lppPropStorage)
+HRESULT WSABPropStorage::Create(ULONG cbEntryId, LPENTRYID lpEntryId, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport, WSABPropStorage **lppPropStorage)
 {
 	HRESULT hr = hrSuccess;
 	WSABPropStorage *lpStorage = NULL;
@@ -94,7 +85,6 @@ HRESULT WSABPropStorage::HrReadProps(LPSPropTagArray *lppPropTags,ULONG *cValues
 {
 	HRESULT			hr = hrSuccess;
 	ECRESULT		er = hrSuccess;
-	int				i;
 	convert_context	converter;
 
 	struct readPropsResponse sResponse;
@@ -105,7 +95,7 @@ HRESULT WSABPropStorage::HrReadProps(LPSPropTagArray *lppPropTags,ULONG *cValues
 	{
         // Read the properties from the server
         if(SOAP_OK != lpCmd->ns__readABProps(ecSessionId, m_sEntryId, &sResponse))
-            er = ZARAFA_E_NETWORK_ERROR;
+            er = KCERR_NETWORK_ERROR;
         else
             er = sResponse.er;
     }
@@ -118,8 +108,7 @@ HRESULT WSABPropStorage::HrReadProps(LPSPropTagArray *lppPropTags,ULONG *cValues
 		goto exit;
 
 	(*lppPropTags)->cValues = sResponse.aPropTag.__size;
-
-	for (i = 0; i < sResponse.aPropTag.__size; ++i)
+	for (gsoap_size_t i = 0; i < sResponse.aPropTag.__size; ++i)
 		(*lppPropTags)->aulPropTag[i] = sResponse.aPropTag.__ptr[i];
 
 	// Convert the property values to a MAPI propvalarray
@@ -134,7 +123,7 @@ HRESULT WSABPropStorage::HrReadProps(LPSPropTagArray *lppPropTags,ULONG *cValues
 			goto exit;
 	}
 
-	for (i = 0; i < sResponse.aPropVal.__size; ++i) {
+	for (gsoap_size_t i = 0; i < sResponse.aPropVal.__size; ++i) {
 		hr = CopySOAPPropValToMAPIPropVal(&(*ppValues)[i],&sResponse.aPropVal.__ptr[i], *ppValues, &converter);
 
 		if(hr != hrSuccess)
@@ -168,7 +157,7 @@ HRESULT WSABPropStorage::HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropValue
 	START_SOAP_CALL
 	{
         if(SOAP_OK != lpCmd->ns__loadABProp(ecSessionId, m_sEntryId, ulPropTag, &sResponse))
-            er = ZARAFA_E_NETWORK_ERROR;
+            er = KCERR_NETWORK_ERROR;
         else
             er = sResponse.er;
     }
@@ -221,7 +210,7 @@ HRESULT WSABPropStorage::HrWriteProps(ULONG cValues, LPSPropValue pValues, ULONG
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != lpCmd->ns__writeABProps(ecSessionId, m_sEntryId, &sPropVals, &er))
-    		er = ZARAFA_E_NETWORK_ERROR;
+    		er = KCERR_NETWORK_ERROR;
     }
     END_SOAP_CALL
 
@@ -249,7 +238,7 @@ HRESULT WSABPropStorage::HrDeleteProps(LPSPropTagArray lpsPropTagArray)
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != lpCmd->ns__deleteABProps(ecSessionId, m_sEntryId, &sPropTags, &er))
-	    	er = ZARAFA_E_NETWORK_ERROR;
+	    	er = KCERR_NETWORK_ERROR;
     }
     END_SOAP_CALL
 
@@ -270,7 +259,6 @@ HRESULT WSABPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 {
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = hrSuccess;
-	int			i;
 	MAPIOBJECT  *mo = NULL;
 	LPSPropValue lpProp = NULL;
 	struct readPropsResponse sResponse;
@@ -282,7 +270,7 @@ HRESULT WSABPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 	{
     	// Read the properties from the server
     	if(SOAP_OK != lpCmd->ns__readABProps(ecSessionId, m_sEntryId, &sResponse))
-    		er = ZARAFA_E_NETWORK_ERROR;
+    		er = KCERR_NETWORK_ERROR;
     	else
     		er = sResponse.er;
     }
@@ -294,10 +282,10 @@ HRESULT WSABPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 	
 	ECAllocateBuffer(sizeof(SPropValue) * sResponse.aPropVal.__size, (void **)&lpProp);
 
-	for (i = 0; i < sResponse.aPropTag.__size; ++i)
+	for (gsoap_size_t i = 0; i < sResponse.aPropTag.__size; ++i)
 		mo->lstAvailable->push_back(sResponse.aPropTag.__ptr[i]);
 
-	for (i = 0; i < sResponse.aPropVal.__size; ++i) {
+	for (gsoap_size_t i = 0; i < sResponse.aPropVal.__size; ++i) {
 		hr = CopySOAPPropValToMAPIPropVal(lpProp, &sResponse.aPropVal.__ptr[i], lpProp, &converter);
 		if (hr != hrSuccess)
 			goto exit;
@@ -349,11 +337,7 @@ HRESULT WSABPropStorage::Reload(void *lpParam, ECSESSIONID sessionId) {
     return hrSuccess;
 }
             
-
-////////////////////////////////////////////////
 // Interface IECPropStorage
-//
-
 ULONG WSABPropStorage::xECPropStorage::AddRef()
 {
 	METHOD_PROLOGUE_(WSABPropStorage, ECPropStorage);

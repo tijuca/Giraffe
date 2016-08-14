@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,8 +15,8 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/ECScheduler.h>
+#include <kopano/platform.h>
+#include <kopano/ECScheduler.h>
 #ifdef LINUX
 // ETIMEDOUT in linux is in errno, windows has this though pthread.h
 #include <cerrno>
@@ -25,16 +25,6 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
-#endif
-
-#ifdef WIN32
-inline struct tm* localtime_r (const time_t *clock, struct tm *result) {
-       if (!clock || !result) return NULL;
-       memcpy(result,localtime(clock),sizeof(*result));
-       return result;
-}
 #endif
 
 #define SCHEDULER_POLL_FREQUENCY	5

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,32 +18,23 @@
 #ifndef ECCACHEMANAGER
 #define ECCACHEMANAGER
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <map>
 #include <pthread.h>
 
 #include "ECDatabaseFactory.h"
 #include "ECDatabaseUtils.h"
 #include "ECGenericObjectTable.h"	// ECListInt
-#include <zarafa/ECConfig.h>
-#include <zarafa/ECLogger.h>
+#include <kopano/ECConfig.h>
+#include <kopano/ECLogger.h>
 #include "SOAPUtils.h"
-#include "ZarafaCmdUtil.h"
+#include "cmdutil.hpp"
 #include <mapidefs.h>
 #include <ECCache.h>
 
-#include <zarafa/ECKeyTable.h>
+#include <kopano/ECKeyTable.h>
 
-#ifdef HAVE_SPARSEHASH
-#include <google/sparse_hash_map>
-#include <google/dense_hash_map>
-
-template <typename Key, typename T>
-struct hash_map {
-	typedef google::sparse_hash_map<Key,T> Type;
-};
-
-#elif __cplusplus >= 201100L
+#if __cplusplus >= 201100L
 #include <unordered_map>
 #define HASH_NAMESPACE std
 
@@ -263,9 +254,6 @@ class ECsCells _zcp_final : public ECsCacheEntry {
 public:
     ECsCells() : ECsCacheEntry() { 
     	m_bComplete = false; 
-#ifdef HAVE_SPARSEHASH    	
-    	mapPropVals.set_deleted_key(-1); 
-#endif    	
 	};
     ~ECsCells() {
 		std::map<unsigned int, struct propVal>::iterator i;
@@ -280,9 +268,6 @@ public:
             CopyPropVal((struct propVal *)&i->second, &val);
             mapPropVals[i->first] = val;
         }
-#ifdef HAVE_SPARSEHASH    	
-    	mapPropVals.set_deleted_key(-1); 
-#endif    	
         m_bComplete = src.m_bComplete;
     }
     
@@ -571,7 +556,7 @@ public:
 	void ForEachCacheItem(void(callback)(const std::string &, const std::string &, const std::string &, void*), void *obj);
 	ECRESULT DumpStats();
 	
-	// Cache list of properties indexed by zarafa-indexer
+	// Cache list of properties indexed by kopano-search
 	ECRESULT GetExcludedIndexProperties(std::set<unsigned int>& set);
 	ECRESULT SetExcludedIndexProperties(const std::set<unsigned int> &);
 
@@ -648,7 +633,7 @@ private:
 	ECCache<ECMapPropToObject>	m_PropToObjectCache;
 	ECCache<ECMapObjectToProp>	m_ObjectToPropCache;
 	
-	// Properties from zarafa-indexer
+	// Properties from kopano-search
 	std::set<unsigned int> 		m_setExcludedIndexProperties;
 	pthread_mutex_t				m_hExcludedIndexPropertiesMutex;
 	

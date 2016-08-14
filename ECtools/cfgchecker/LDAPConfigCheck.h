@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,13 +18,12 @@
 #ifndef LDAPCONFIGCHECK_H
 #define LDAPCONFIGCHECK_H
 
+#include <kopano/zcdefs.h>
 #include "ECConfigCheck.h"
 
-class LDAPConfigCheck : public ECConfigCheck {
+class LDAPConfigCheck _kc_final : public ECConfigCheck {
 public:
 	LDAPConfigCheck(const char *lpszConfigFile);
-	~LDAPConfigCheck();
-
 	void loadChecks();
 
 private:

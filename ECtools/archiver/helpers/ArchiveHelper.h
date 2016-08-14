@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,16 +18,17 @@
 #ifndef ARCHIVEHELPER_H_INCLUDED
 #define ARCHIVEHELPER_H_INCLUDED
 
-#include <boost/smart_ptr.hpp>
-#include <zarafa/archiver-common.h>
-#include <zarafa/mapi_ptr.h>
-#include <zarafa/CommonUtil.h>
+#include <memory>
+#include <kopano/zcdefs.h>
+#include <kopano/archiver-common.h>
+#include <kopano/mapi_ptr.h>
+#include <kopano/CommonUtil.h>
 #include "ArchiverSessionPtr.h"     // For ArchiverSessionPtr
 
 namespace za { namespace helpers {
 
 class ArchiveHelper;
-typedef boost::shared_ptr<ArchiveHelper> ArchiveHelperPtr;
+typedef std::shared_ptr<ArchiveHelper> ArchiveHelperPtr;
 
 enum ArchiveType {
 	UndefArchive = 0,
@@ -45,13 +46,11 @@ enum AttachType {
  * The ArchiveHelper class is a utility class that operates on a message store that's used as
  * an archive.
  */
-class ArchiveHelper
-{
+class ArchiveHelper _kc_final {
 public:
 	static HRESULT Create(LPMDB lpArchiveStore, const tstring &strFolder, const char *lpszServerPath, ArchiveHelperPtr *lpptrArchiveHelper);
 	static HRESULT Create(LPMDB lpArchiveStore, LPMAPIFOLDER lpArchiveFolder, const char *lpszServerPath, ArchiveHelperPtr *lpptrArchiveHelper);
 	static HRESULT Create(ArchiverSessionPtr ptrSession, const SObjectEntry &archiveEntry, ECLogger *lpLogger, ArchiveHelperPtr *lpptrArchiveHelper);
-	~ArchiveHelper();
 
 	HRESULT GetAttachedUser(abentryid_t *lpsUserEntryId);
 	HRESULT SetAttachedUser(const abentryid_t &sUserEntryId);

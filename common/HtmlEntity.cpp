@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,10 +15,10 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <string>
 #include "HtmlEntity.h"
-#include <zarafa/charset/convert.h>
+#include <kopano/charset/convert.h>
 
 static const struct HTMLEntity_t {
 	const WCHAR *s;
@@ -517,14 +517,6 @@ static const struct HTMLEntityToName_t {
 };
 static const size_t cHTMLEntityToName = ARRAY_SIZE(_HTMLEntityToName);
 
-CHtmlEntity::CHtmlEntity(void)
-{
-}
-
-CHtmlEntity::~CHtmlEntity(void)
-{
-}
-
 static int compareHTMLEntityToChar(const void *m1, const void *m2)
 {
 	const HTMLEntity_t *e1 = static_cast<const HTMLEntity_t *>(m1);
@@ -537,7 +529,7 @@ static int compareHTMLEntityToName(const void *m1, const void *m2)
 {
 	const HTMLEntityToName_t *e1 = static_cast<const HTMLEntityToName_t *>(m1);
 	const HTMLEntityToName_t *e2 = static_cast<const HTMLEntityToName_t *>(m2);
-	return (e1->c - e2->c);
+	return (e1->c < e2->c) ? -1 : (e1->c == e2->c) ? 0 : 1;
 }
 
 WCHAR CHtmlEntity::toChar( const WCHAR *name )

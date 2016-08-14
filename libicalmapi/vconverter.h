@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -20,8 +20,8 @@
 
 #include "vtimezone.h"
 #include "icalitem.h"
-#include <zarafa/RecurrenceState.h>
-#include <zarafa/charset/convert.h>
+#include <kopano/RecurrenceState.h>
+#include <kopano/charset/convert.h>
 
 #include <mapidefs.h>
 #include <libical/ical.h>
@@ -30,7 +30,7 @@ class VConverter {
 public:
 	/* lpNamedProps must be the GetIDsFromNames() of the array in nameids.h */
 	VConverter(LPADRBOOK lpAdrBook, timezone_map *mapTimeZones, LPSPropTagArray lpNamedProps, const std::string& strCharset, bool blCensor, bool bNoRecipients, IMailUser *lpImailUser);
-	virtual ~VConverter();
+	virtual ~VConverter(void) {}
 
 	virtual HRESULT HrICal2MAPI(icalcomponent *lpEventRoot /* in */, icalcomponent *lpEvent /* in */, icalitem *lpPrevItem /* in */, icalitem **lppRet /* out */);
 	virtual HRESULT HrMAPI2ICal(LPMESSAGE lpMessage /* in */, icalproperty_method *lpicMethod /* out */, std::list<icalcomponent*> *lpEventList /* out */);

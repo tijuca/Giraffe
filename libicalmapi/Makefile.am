@@ -1,7 +1,7 @@
 # -*- Makefile -*-
 
-lib_LTLIBRARIES = libicalmapi.la
-noinst_DATA = libicalmapi.ldd
+lib_LTLIBRARIES = libkcicalmapi.la
+noinst_DATA = libkcicalmapi.ldd
 
 AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
 	$(ICAL_CFLAGS) \
@@ -9,25 +9,25 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
 	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
 	-I$(top_srcdir)/libfreebusy
 
-libicalmapi_la_LDFLAGS = ${AM_LDFLAGS} \
-	-version-info ${ECCLIENT_LIBRARY_VERSION}
+libkcicalmapi_la_LDFLAGS = ${AM_LDFLAGS} \
+	-version-info 0:0:0 \
 	-Wl,--version-script=${top_builddir}/default.sym
-EXTRA_libicalmapi_la_DEPENDENCIES = ${top_builddir}/default.sym
+EXTRA_libkcicalmapi_la_DEPENDENCIES = ${top_builddir}/default.sym
 
-libicalmapi_la_LIBADD = \
-	${top_builddir}/libfreebusy/libfreebusy.la \
+libkcicalmapi_la_LIBADD = \
+	${top_builddir}/libfreebusy/libkcfreebusy.la \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_util.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcutil.la \
 	$(ICAL_LIBS)
 
-libicalmapidir = $(includedir)/icalmapi
-libicalmapi_HEADERS = icalitem.h nameids.h icaluid.h \
+libkcicalmapidir = $(includedir)/icalmapi
+libkcicalmapi_HEADERS = icalitem.h nameids.h icaluid.h \
 	MAPIToICal.h ICalToMAPI.h \
 	vtimezone.h valarm.h vconverter.h vevent.h vtodo.h \
 	icalrecurrence.h icalmapi.h vfreebusy.h
 
-libicalmapi_la_SOURCES = icalinit.cpp \
+libkcicalmapi_la_SOURCES = icalinit.cpp \
 	nameids.cpp \
 	icaluid.cpp \
 	MAPIToICal.cpp \

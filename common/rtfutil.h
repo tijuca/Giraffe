@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,7 +18,7 @@
 #ifndef __RTFUTIL_H
 #define __RTFUTIL_H
 
-#include <zarafa/CommonUtil.h>
+#include <kopano/CommonUtil.h>
 #include <string>
 
 bool isrtfhtml(const char *buf, unsigned int len);

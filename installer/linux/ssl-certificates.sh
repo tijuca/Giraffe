@@ -93,7 +93,7 @@ if [ ! -d "$CADIR" -o ! -f "$CADIR/serial" ]; then
 	echo "Press enter to create, or ctrl-c to exit."
 	read dummy
 	if [ -d "$CADIR" ]; then
-		mv $CADIR ${CADIR}-backup.zarafa
+		mv $CADIR ${CADIR}-backup.kopano
 	fi
 	$CASCRIPT -newca
 fi

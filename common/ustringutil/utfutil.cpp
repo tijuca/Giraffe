@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,11 +15,11 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "utfutil.h"
 
 #include <unicode/ustring.h>
-#include <zarafa/charset/convert.h>
+#include <kopano/charset/convert.h>
 
 #if U_ICU_VERSION_MAJOR_NUM < 4 || (U_ICU_VERSION_MAJOR_NUM == 4 && U_ICU_VERSION_MINOR_NUM < 2)
 #if U_ICU_VERSION_MAJOR_NUM > 3 || (U_ICU_VERSION_MAJOR_NUM == 3 && U_ICU_VERSION_MINOR_NUM >= 6)
@@ -115,11 +115,7 @@ UnicodeString UTF32ToUnicode(const UChar32 *utf32)
 
 UnicodeString WCHARToUnicode(const wchar_t *sz)
 {
-#ifdef WIN32
-	return UnicodeString(sz);
-#else
 	return UTF32ToUnicode((const UChar32 *)sz);
-#endif
 }
 
 UnicodeString StringToUnicode(const char *sz)

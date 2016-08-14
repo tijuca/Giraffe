@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <iostream>
 #include <string>
@@ -32,33 +32,24 @@
 #include <malloc.h>
 #endif
 
-#include <zarafa/EMSAbTag.h>
-#include <zarafa/ECConfig.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECPluginSharedData.h>
-#include <zarafa/stringutil.h>
+#include <kopano/EMSAbTag.h>
+#include <kopano/ECConfig.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECPluginSharedData.h>
+#include "ECStatsCollector.h"
+#include <kopano/stringutil.h>
 
-#include <zarafa/auto_free.h>
+#include <kopano/auto_free.h>
 
 using namespace std;
 
 #include "LDAPUserPlugin.h"
 #include "ldappasswords.h"
-#include <zarafa/ecversion.h>
+#include <kopano/ecversion.h>
 
 #ifndef PROP_ID
 // from mapidefs.h
 	#define PROP_ID(ulPropTag)		(((ULONG)(ulPropTag))>>16)
-#endif
-
-#ifdef WIN32
-	/* OpenLDAP TLS options */
-	#define LDAP_OPT_X_TLS_HARD		1
-	#define LDAP_OPT_X_TLS			0x6000
-
-	/* Error range check */
-	#define LDAP_RANGE(n,x,y)	(((x) <= (n)) && ((n) <= (y)))
-	#define LDAP_NAME_ERROR(n)	LDAP_RANGE((n),0x20,0x24) /* 32-34,36 */
 #endif
 
 extern "C" {
@@ -86,27 +77,15 @@ void ber_auto_free(BerElement *ber)
 	ber_free(ber, 0);
 }
 
-#ifdef WIN32
-typedef auto_free<char, auto_free_dealloc<char*, void, ldap_memfree> >auto_free_ldap_attribute;
-typedef auto_free<BerElement, auto_free_dealloc<BerElement*, void, ber_auto_free> >auto_free_ldap_berelement;
-typedef auto_free<LDAPMessage, auto_free_dealloc<LDAPMessage*, ULONG, ldap_msgfree> >auto_free_ldap_message;
-typedef auto_free<LDAPControl, auto_free_dealloc<LDAPControl*, ULONG, ldap_control_free> >auto_free_ldap_control;
-typedef auto_free<LDAPControl*, auto_free_dealloc<LDAPControl**, ULONG, ldap_controls_free> >auto_free_ldap_controls;
-typedef auto_free<struct berval*, auto_free_dealloc<struct berval**, ULONG, ldap_value_free_len> >auto_free_ldap_berval;
-#else
 typedef auto_free<char, auto_free_dealloc<void*, void, ldap_memfree> >auto_free_ldap_attribute;
 typedef auto_free<BerElement, auto_free_dealloc<BerElement*, void, ber_auto_free> >auto_free_ldap_berelement;
 typedef auto_free<LDAPMessage, auto_free_dealloc<LDAPMessage*, int, ldap_msgfree> >auto_free_ldap_message;
 typedef auto_free<LDAPControl, auto_free_dealloc<LDAPControl*, void, ldap_control_free> >auto_free_ldap_control;
 typedef auto_free<LDAPControl*, auto_free_dealloc<LDAPControl**, void, ldap_controls_free> >auto_free_ldap_controls;
 typedef auto_free<struct berval*, auto_free_dealloc<struct berval**, void, ldap_value_free_len> >auto_free_ldap_berval;
-#endif
-
 
 #define LDAP_DATA_TYPE_DN			"dn"	// data in attribute like cn=piet,cn=user,dc=localhost,dc=com
-#define LDAP_DATA_TYPE_ATTRIBUTE	"attribute"	// data in attribute like piet
 #define LDAP_DATA_TYPE_BINARY		"binary"
-#define LDAP_DATA_TYPE_TEXT			"text"
 
 #define FETCH_ATTR_VALS 0
 #define DONT_FETCH_ATTR_VALS 1
@@ -262,7 +241,7 @@ private:
 	if (__var)												\
 		(__attrs)->add(__var);
 
-auto_ptr<LDAPCache> LDAPUserPlugin::m_lpCache = auto_ptr<LDAPCache>(new LDAPCache());
+std::unique_ptr<LDAPCache> LDAPUserPlugin::m_lpCache(new LDAPCache());
 
 LDAPUserPlugin::LDAPUserPlugin(pthread_mutex_t *pluginlock,
     ECPluginSharedData *shareddata) :
@@ -286,11 +265,11 @@ LDAPUserPlugin::LDAPUserPlugin(pthread_mutex_t *pluginlock,
 		{ "ldap_user_type_attribute_value", "", CONFIGSETTING_NONEMPTY | CONFIGSETTING_RELOADABLE },
 		{ "ldap_group_type_attribute_value", "", CONFIGSETTING_NONEMPTY | CONFIGSETTING_RELOADABLE },
 		{ "ldap_contact_type_attribute_value", "", CONFIGSETTING_RELOADABLE },
-		{ "ldap_company_type_attribute_value", "", (m_bHosted ? CONFIGSETTING_NONEMPTY : 0) | CONFIGSETTING_RELOADABLE },
+		{ "ldap_company_type_attribute_value", "", static_cast<unsigned short>((m_bHosted ? CONFIGSETTING_NONEMPTY : 0) | CONFIGSETTING_RELOADABLE)},
 		{ "ldap_addresslist_type_attribute_value", "", CONFIGSETTING_RELOADABLE },
 		{ "ldap_dynamicgroup_type_attribute_value", "", CONFIGSETTING_RELOADABLE },
 #ifdef WITH_MULTISERVER
-		{ "ldap_server_type_attribute_value", "", (m_bDistributed ? CONFIGSETTING_NONEMPTY : 0) | CONFIGSETTING_RELOADABLE },
+		{ "ldap_server_type_attribute_value", "", static_cast<unsigned short>((m_bDistributed ? CONFIGSETTING_NONEMPTY : 0) | CONFIGSETTING_RELOADABLE)},
 #endif
 		{ "ldap_user_search_base","", CONFIGSETTING_UNUSED },
 		{ "ldap_user_search_filter","", CONFIGSETTING_RELOADABLE },
@@ -301,7 +280,7 @@ LDAPUserPlugin::LDAPUserPlugin(pthread_mutex_t *pluginlock,
 		{ "ldap_group_search_filter","", CONFIGSETTING_RELOADABLE },
 		{ "ldap_group_unique_attribute","cn", CONFIGSETTING_RELOADABLE },
 		{ "ldap_group_unique_attribute_type","text", CONFIGSETTING_RELOADABLE },
-		{ "ldap_group_security_attribute","zarafaSecurityGroup", CONFIGSETTING_RELOADABLE },
+		{ "ldap_group_security_attribute","kopanoSecurityGroup", CONFIGSETTING_RELOADABLE },
 		{ "ldap_group_security_attribute_type","boolean", CONFIGSETTING_RELOADABLE },
 		{ "ldap_company_search_base","", CONFIGSETTING_UNUSED },
 		{ "ldap_company_search_filter","", CONFIGSETTING_RELOADABLE },
@@ -310,18 +289,18 @@ LDAPUserPlugin::LDAPUserPlugin(pthread_mutex_t *pluginlock,
 		{ "ldap_fullname_attribute","cn", CONFIGSETTING_RELOADABLE },
 		{ "ldap_loginname_attribute","uid", CONFIGSETTING_RELOADABLE },
 		{ "ldap_password_attribute","userPassword", CONFIGSETTING_RELOADABLE },
-		{ "ldap_nonactive_attribute","zarafaSharedStoreOnly", CONFIGSETTING_RELOADABLE },
-		{ "ldap_resource_type_attribute","zarafaResourceType", CONFIGSETTING_RELOADABLE },
-		{ "ldap_resource_capacity_attribute","zarafaResourceCapacity", CONFIGSETTING_RELOADABLE },
+		{ "ldap_nonactive_attribute","kopanoSharedStoreOnly", CONFIGSETTING_RELOADABLE },
+		{ "ldap_resource_type_attribute","kopanoResourceType", CONFIGSETTING_RELOADABLE },
+		{ "ldap_resource_capacity_attribute","kopanoResourceCapacity", CONFIGSETTING_RELOADABLE },
 		{ "ldap_user_certificate_attribute", "userCertificate", CONFIGSETTING_RELOADABLE },
 		{ "ldap_emailaddress_attribute","mail", CONFIGSETTING_RELOADABLE },
-		{ "ldap_emailaliases_attribute","zarafaAliases", CONFIGSETTING_RELOADABLE },
+		{ "ldap_emailaliases_attribute","kopanoAliases", CONFIGSETTING_RELOADABLE },
 		{ "ldap_groupname_attribute","cn", CONFIGSETTING_RELOADABLE },
 		{ "ldap_groupmembers_attribute","member", CONFIGSETTING_RELOADABLE },
 		{ "ldap_groupmembers_attribute_type","text", CONFIGSETTING_RELOADABLE },
 		{ "ldap_companyname_attribute","ou", CONFIGSETTING_RELOADABLE },
-		{ "ldap_isadmin_attribute","zarafaAdmin", CONFIGSETTING_RELOADABLE },
-		{ "ldap_sendas_attribute","zarafaSendAsPrivilege", CONFIGSETTING_RELOADABLE },
+		{ "ldap_isadmin_attribute","kopanoAdmin", CONFIGSETTING_RELOADABLE },
+		{ "ldap_sendas_attribute","kopanoSendAsPrivilege", CONFIGSETTING_RELOADABLE },
 		{ "ldap_sendas_attribute_type","text", CONFIGSETTING_RELOADABLE },
 		{ "ldap_sendas_relation_attribute","", CONFIGSETTING_RELOADABLE },
 		{ "ldap_user_exchange_dn_attribute", "0x6788001E", CONFIGSETTING_ALIAS },
@@ -329,28 +308,28 @@ LDAPUserPlugin::LDAPUserPlugin(pthread_mutex_t *pluginlock,
 		{ "ldap_user_department_attribute", "0x3A23001E", CONFIGSETTING_ALIAS },
 		{ "ldap_user_location_attribute", "0x3A18001E", CONFIGSETTING_ALIAS},
 		{ "ldap_user_fax_attribute", "0x3A19001E", CONFIGSETTING_ALIAS },
-		{ "ldap_company_view_attribute","zarafaViewPrivilege", CONFIGSETTING_RELOADABLE },
+		{ "ldap_company_view_attribute","kopanoViewPrivilege", CONFIGSETTING_RELOADABLE },
 		{ "ldap_company_view_attribute_type","text", CONFIGSETTING_RELOADABLE },
 		{ "ldap_company_view_relation_attribute","", CONFIGSETTING_RELOADABLE },
-		{ "ldap_company_admin_attribute","zarafaAdminPrivilege", CONFIGSETTING_RELOADABLE },
+		{ "ldap_company_admin_attribute","kopanoAdminPrivilege", CONFIGSETTING_RELOADABLE },
 		{ "ldap_company_admin_attribute_type","text", CONFIGSETTING_RELOADABLE },
 		{ "ldap_company_admin_relation_attribute","", CONFIGSETTING_RELOADABLE },
-		{ "ldap_company_system_admin_attribute","zarafaSystemAdmin", CONFIGSETTING_RELOADABLE },
+		{ "ldap_company_system_admin_attribute","kopanoSystemAdmin", CONFIGSETTING_RELOADABLE },
 		{ "ldap_company_system_admin_attribute_type","text", CONFIGSETTING_RELOADABLE },
 		{ "ldap_company_system_admin_relation_attribute","", CONFIGSETTING_RELOADABLE },
 		{ "ldap_authentication_method","bind", CONFIGSETTING_RELOADABLE },
-		{ "ldap_quotaoverride_attribute","zarafaQuotaOverride", CONFIGSETTING_RELOADABLE },
-		{ "ldap_warnquota_attribute","zarafaQuotaWarn", CONFIGSETTING_RELOADABLE },
-		{ "ldap_softquota_attribute","zarafaQuotaSoft", CONFIGSETTING_RELOADABLE },
-		{ "ldap_hardquota_attribute","zarafaQuotaHard", CONFIGSETTING_RELOADABLE },
-		{ "ldap_userdefault_quotaoverride_attribute","zarafaUserDefaultQuotaOverride", CONFIGSETTING_RELOADABLE },
-		{ "ldap_userdefault_warnquota_attribute","zarafaUserDefaultQuotaWarn", CONFIGSETTING_RELOADABLE },
-		{ "ldap_userdefault_softquota_attribute","zarafaUserDefaultQuotaSoft", CONFIGSETTING_RELOADABLE },
-		{ "ldap_userdefault_hardquota_attribute","zarafaUserDefaultQuotaHard", CONFIGSETTING_RELOADABLE },
-		{ "ldap_quota_userwarning_recipients_attribute","zarafaQuotaUserWarningRecipients", CONFIGSETTING_RELOADABLE },
+		{ "ldap_quotaoverride_attribute","kopanoQuotaOverride", CONFIGSETTING_RELOADABLE },
+		{ "ldap_warnquota_attribute","kopanoQuotaWarn", CONFIGSETTING_RELOADABLE },
+		{ "ldap_softquota_attribute","kopanoQuotaSoft", CONFIGSETTING_RELOADABLE },
+		{ "ldap_hardquota_attribute","kopanoQuotaHard", CONFIGSETTING_RELOADABLE },
+		{ "ldap_userdefault_quotaoverride_attribute","kopanoUserDefaultQuotaOverride", CONFIGSETTING_RELOADABLE },
+		{ "ldap_userdefault_warnquota_attribute","kopanoUserDefaultQuotaWarn", CONFIGSETTING_RELOADABLE },
+		{ "ldap_userdefault_softquota_attribute","kopanoUserDefaultQuotaSoft", CONFIGSETTING_RELOADABLE },
+		{ "ldap_userdefault_hardquota_attribute","kopanoUserDefaultQuotaHard", CONFIGSETTING_RELOADABLE },
+		{ "ldap_quota_userwarning_recipients_attribute","kopanoQuotaUserWarningRecipients", CONFIGSETTING_RELOADABLE },
 		{ "ldap_quota_userwarning_recipients_attribute_type","text", CONFIGSETTING_RELOADABLE },
 		{ "ldap_quota_userwarning_recipients_relation_attribute","", CONFIGSETTING_RELOADABLE },
-		{ "ldap_quota_companywarning_recipients_attribute","zarafaQuotaCompanyWarningRecipients", CONFIGSETTING_RELOADABLE },
+		{ "ldap_quota_companywarning_recipients_attribute","kopanoQuotaCompanyWarningRecipients", CONFIGSETTING_RELOADABLE },
 		{ "ldap_quota_companywarning_recipients_attribute_type","text", CONFIGSETTING_RELOADABLE },
 		{ "ldap_quota_companywarning_recipients_relation_attribute","", CONFIGSETTING_RELOADABLE },
 		{ "ldap_quota_multiplier","1", CONFIGSETTING_RELOADABLE },
@@ -360,14 +339,14 @@ LDAPUserPlugin::LDAPUserPlugin(pthread_mutex_t *pluginlock,
 		{ "ldap_groupmembers_relation_attribute", "", CONFIGSETTING_RELOADABLE },
 		{ "ldap_last_modification_attribute", "modifyTimestamp", CONFIGSETTING_RELOADABLE },
 #ifdef WITH_MULTISERVER
-		{ "ldap_user_server_attribute", "zarafaUserServer", CONFIGSETTING_RELOADABLE },
-		{ "ldap_company_server_attribute", "zarafaCompanyServer", CONFIGSETTING_RELOADABLE },
+		{ "ldap_user_server_attribute", "kopanoUserServer", CONFIGSETTING_RELOADABLE },
+		{ "ldap_company_server_attribute", "kopanoCompanyServer", CONFIGSETTING_RELOADABLE },
 		{ "ldap_server_address_attribute", "", CONFIGSETTING_RELOADABLE },
-		{ "ldap_server_http_port_attribute", "zarafaHttpPort", CONFIGSETTING_RELOADABLE },
-		{ "ldap_server_ssl_port_attribute", "zarafaSslPort", CONFIGSETTING_RELOADABLE },
-		{ "ldap_server_file_path_attribute", "zarafaFilePath", CONFIGSETTING_RELOADABLE },
-		{ "ldap_server_proxy_path_attribute", "zarafaProxyURL", CONFIGSETTING_RELOADABLE },
-		{ "ldap_server_contains_public_attribute", "zarafaContainsPublic", CONFIGSETTING_RELOADABLE },
+		{ "ldap_server_http_port_attribute", "kopanoHttpPort", CONFIGSETTING_RELOADABLE },
+		{ "ldap_server_ssl_port_attribute", "kopanoSslPort", CONFIGSETTING_RELOADABLE },
+		{ "ldap_server_file_path_attribute", "kopanoFilePath", CONFIGSETTING_RELOADABLE },
+		{ "ldap_server_proxy_path_attribute", "kopanoProxyURL", CONFIGSETTING_RELOADABLE },
+		{ "ldap_server_contains_public_attribute", "kopanoContainsPublic", CONFIGSETTING_RELOADABLE },
 		{ "ldap_server_scope", "", CONFIGSETTING_UNUSED },
 		{ "ldap_server_search_base", "", CONFIGSETTING_UNUSED },
 		{ "ldap_server_search_filter", "", CONFIGSETTING_RELOADABLE },
@@ -378,16 +357,16 @@ LDAPUserPlugin::LDAPUserPlugin(pthread_mutex_t *pluginlock,
 		{ "ldap_addresslist_search_filter","", CONFIGSETTING_RELOADABLE },
 		{ "ldap_addresslist_unique_attribute","cn", CONFIGSETTING_RELOADABLE },
 		{ "ldap_addresslist_unique_attribute_type","text", CONFIGSETTING_RELOADABLE },
-		{ "ldap_addresslist_filter_attribute","zarafaFilter", CONFIGSETTING_RELOADABLE },
-		{ "ldap_addresslist_search_base_attribute","zarafaBase", CONFIGSETTING_RELOADABLE },
+		{ "ldap_addresslist_filter_attribute","kopanoFilter", CONFIGSETTING_RELOADABLE },
+		{ "ldap_addresslist_search_base_attribute","kopanoBase", CONFIGSETTING_RELOADABLE },
 		{ "ldap_addresslist_name_attribute","cn", CONFIGSETTING_RELOADABLE },
 		{ "ldap_dynamicgroup_search_filter","", CONFIGSETTING_RELOADABLE },
 		{ "ldap_dynamicgroup_unique_attribute","cn", CONFIGSETTING_RELOADABLE },
 		{ "ldap_dynamicgroup_unique_attribute_type","text", CONFIGSETTING_RELOADABLE },
-		{ "ldap_dynamicgroup_filter_attribute","zarafaFilter", CONFIGSETTING_RELOADABLE },
-		{ "ldap_dynamicgroup_search_base_attribute","zarafaBase", CONFIGSETTING_RELOADABLE },
+		{ "ldap_dynamicgroup_filter_attribute","kopanoFilter", CONFIGSETTING_RELOADABLE },
+		{ "ldap_dynamicgroup_search_base_attribute","kopanoBase", CONFIGSETTING_RELOADABLE },
 		{ "ldap_dynamicgroup_name_attribute","cn", CONFIGSETTING_RELOADABLE },
-		{ "ldap_addressbook_hide_attribute","zarafaHidden", CONFIGSETTING_RELOADABLE },
+		{ "ldap_addressbook_hide_attribute","kopanoHidden", CONFIGSETTING_RELOADABLE },
 		{ "ldap_network_timeout", "30", CONFIGSETTING_RELOADABLE },
 		{ "ldap_object_search_filter", "", CONFIGSETTING_RELOADABLE },
 		{ "ldap_filter_cutoff_elements", "1000", CONFIGSETTING_RELOADABLE },
@@ -435,6 +414,8 @@ LDAPUserPlugin::LDAPUserPlugin(pthread_mutex_t *pluginlock,
 
 	if (ldap_servers.empty())
 		throw ldap_error(string("No LDAP servers configured in ldap.cfg"));
+	m_timeout.tv_sec = atoui(m_config->GetSetting("ldap_network_timeout"));
+	m_timeout.tv_usec = 0;
 }
 
 void LDAPUserPlugin::InitPlugin()
@@ -487,7 +468,7 @@ LDAP *LDAPUserPlugin::ConnectLDAP(const char *bind_dn, const char *bind_pw) {
 			goto fail2;
 		}
 
-		ec_log_debug("Trying to connect to %s", currentServer.c_str());
+		LOG_PLUGIN_DEBUG("Trying to connect to %s", currentServer.c_str());
 
 		if ((rc = ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &version)) != LDAP_OPT_SUCCESS) {
 			ec_log_err("LDAP_OPT_PROTOCOL_VERSION failed: %s", ldap_err2string(rc));
@@ -508,14 +489,10 @@ LDAP *LDAPUserPlugin::ConnectLDAP(const char *bind_dn, const char *bind_pw) {
 		}
 
 		// Set network timeout (for connect)
-		m_timeout.tv_sec = atoui(m_config->GetSetting("ldap_network_timeout"));
-		m_timeout.tv_usec = 0;
-#ifndef WIN32
 		if ((rc = ldap_set_option(ld, LDAP_OPT_NETWORK_TIMEOUT, &m_timeout)) != LDAP_OPT_SUCCESS) {
 			ec_log_err("LDAP_OPT_NETWORK_TIMEOUT failed: %s", ldap_err2string(rc));
 			goto fail;
 		}
-#endif
 
 #if 0		// OpenLDAP stupidly closes the connection when TLS is not configured on the server.
 #ifdef LINUX // Only available in Windows XP, so we can't use this on windows platform.
@@ -534,6 +511,7 @@ LDAP *LDAPUserPlugin::ConnectLDAP(const char *bind_dn, const char *bind_pw) {
 		// Bind
 		// For these two values: if they are both NULL, anonymous bind
 		// will be used (ldap_binddn, ldap_bindpw)
+		LOG_PLUGIN_DEBUG("Issuing LDAP bind");
 		if ((rc = ldap_simple_bind_s(ld, (char *)bind_dn, (char *)bind_pw)) == LDAP_SUCCESS)
 			break;
 
@@ -571,7 +549,7 @@ LDAP *LDAPUserPlugin::ConnectLDAP(const char *bind_dn, const char *bind_pw) {
 LDAPUserPlugin::~LDAPUserPlugin() {
 	// Disconnect from the LDAP server
 	if (m_ldap) {
-		LOG_PLUGIN_DEBUG("%s", "Disconnect from LDAP while unloading plugin");
+		LOG_PLUGIN_DEBUG("%s", "Disconnecting from LDAP since unloading plugin instance");
 
 		if (ldap_unbind_s(m_ldap) == -1)
 			ec_log_err("LDAP unbind failed");
@@ -602,20 +580,25 @@ void LDAPUserPlugin::my_ldap_search_s(char *base, int scope, char *filter, char 
 		filter = NULL;
 	}
 
+	/*
+	 * When an m_ldap connection object already exists, use it to make
+	 * a query, and, if that fails for any reason, reconnect-and-retry
+	 * exactly once.
+	 * When no m_ldap connection object existed, this boils down to
+	 * one standard connect plus query.
+	 */
 	if (m_ldap != NULL)
 		result = ldap_search_ext_s(m_ldap, base, scope, filter, attrs, attrsonly, serverControls, NULL, &m_timeout, 0, &res);
 
 	if (m_ldap == NULL || LDAP_API_ERROR(result)) {
-		// try 1 reconnect and retry, and if that fails, just completely fail
-		// We need this because LDAP server connections can timeout
 		const char *ldap_binddn = m_config->GetSetting("ldap_bind_user");
 		const char *ldap_bindpw = m_config->GetSetting("ldap_bind_passwd");
 
 		if (m_ldap != NULL) {
+			ec_log_err("LDAP search error: %s. Will unbind, reconnect and retry.", ldap_err2string(result));
 			if (ldap_unbind_s(m_ldap) == -1)
 				ec_log_err("LDAP unbind failed");
 			m_ldap = NULL;
-			ec_log_err("Disconnect from LDAP because of search error %s", ldap_err2string(result));
 		}
 
 		/// @todo encode the user and password, now it's depended in which charset the config is saved
@@ -633,10 +616,10 @@ void LDAPUserPlugin::my_ldap_search_s(char *base, int scope, char *filter, char 
 		    // Some kind of API error occurred (error is not from the server). Unbind the connection so any next try will re-bind
 		    // which will possibly connect to a different (failed over) server.
 			if (m_ldap != NULL) {
+				ec_log_err("Unbinding from LDAP because of continued error (%s)", ldap_err2string(result));
 				if (ldap_unbind_s(m_ldap) == -1)
 					ec_log_err("LDAP unbind failed");
 				m_ldap = NULL;
-				ec_log_err("Disconnect from LDAP because reconnect search error %s", ldap_err2string(result));
 			}
 		}
 		goto exit;
@@ -789,16 +772,16 @@ objectid_t LDAPUserPlugin::GetObjectIdForEntry(LDAPMessage *entry)
 	// All object classes for a certain object
 	std::set<std::string> setObjectClasses;
 
-	// List of matching Zarafa object classes
+	// List of matching Kopano object classes
 	std::list<std::pair<unsigned int, objectclass_t> > lstMatches;
 	std::list<std::string> lstLDAPObjectClasses;
 	/*
-	 * Find the Zarafa object type by looking at the object classes.
+	 * Find the Kopano object type by looking at the object classes.
 	 *
 	 * We do this by checking the best-match of objectclasses; if an LDAP objectClass is
-	 * listed for multiple Zarafa object classes, we use the following rules:
+	 * listed for multiple Kopano object classes, we use the following rules:
 	 *
-	 * First, the Zarafa object class with the most matching LDAP objectClasses is selected.
+	 * First, the Kopano object class with the most matching LDAP objectClasses is selected.
 	 * If that does not resolve the ambiguity, then object classes with higher numerical values
 	 * override those with lower numerical values (most importantly, contacts override users)
 	 */
@@ -830,7 +813,7 @@ objectid_t LDAPUserPlugin::GetObjectIdForEntry(LDAPMessage *entry)
 	if(MatchClasses(setObjectClasses, lstLDAPObjectClasses))
 		lstMatches.push_back(std::pair<unsigned int, objectclass_t>(lstLDAPObjectClasses.size(), CONTAINER_ADDRESSLIST));
 
-	// lstMatches now contains all the zarafa object classes that the object COULD be, now sort by number of object classes
+	// lstMatches now contains all the kopano object classes that the object COULD be, now sort by number of object classes
 
 	if(lstMatches.empty())
 		throw data_error("Unable to detect object class for object: " + GetLDAPEntryDN(entry));
@@ -895,16 +878,19 @@ objectid_t LDAPUserPlugin::GetObjectIdForEntry(LDAPMessage *entry)
 	return objectid_t(object_uid, objclass);
 }
 
-auto_ptr<signatures_t> LDAPUserPlugin::getAllObjectsByFilter(const string &basedn, const int scope, const string &search_filter, const string &strCompanyDN, bool bCache)
+std::unique_ptr<signatures_t>
+LDAPUserPlugin::getAllObjectsByFilter(const std::string &basedn, int scope,
+    const std::string &search_filter, const std::string &strCompanyDN,
+    bool bCache)
 {
-	auto_ptr<signatures_t>	signatures = auto_ptr<signatures_t>(new signatures_t());
+	std::unique_ptr<signatures_t> signatures(new signatures_t());
 	objectid_t				objectid;
 	string					dn;
 	string					signature;
 
 	map<objectclass_t, dn_cache_t*> mapDNCache;
 	std::map<objectclass_t, dn_cache_t *>::const_iterator iterDNCache;
-	auto_ptr<dn_list_t>		dnFilter;
+	std::unique_ptr<dn_list_t> dnFilter;
 
 	auto_free_ldap_message res;
 
@@ -916,11 +902,11 @@ auto_ptr<signatures_t> LDAPUserPlugin::getAllObjectsByFilter(const string &based
 	 * and remove any returned objects which are member of these subcompanies.
 	 */
 	if (m_bHosted && !strCompanyDN.empty()) {
-		std::auto_ptr<dn_cache_t> lpCompanyCache = m_lpCache->getObjectDNCache(this, CONTAINER_COMPANY);
+		std::unique_ptr<dn_cache_t> lpCompanyCache = m_lpCache->getObjectDNCache(this, CONTAINER_COMPANY);
 		dnFilter = m_lpCache->getChildrenForDN(lpCompanyCache, strCompanyDN);
 	}
 
-	auto_ptr<attrArray>		request_attrs = auto_ptr<attrArray>(new attrArray(15));
+	std::unique_ptr<attrArray> request_attrs(new attrArray(15));
 
 	/* Needed for GetObjectIdForEntry() */
 	CONFIG_TO_ATTR(request_attrs, class_attr, "ldap_object_type_attribute");
@@ -984,7 +970,7 @@ auto_ptr<signatures_t> LDAPUserPlugin::getAllObjectsByFilter(const string &based
 
 	/* Update cache */
 	for (iterDNCache = mapDNCache.begin(); iterDNCache != mapDNCache.end(); ++iterDNCache)
-		m_lpCache->setObjectDNCache(iterDNCache->first, auto_ptr<dn_cache_t>(iterDNCache->second));
+		m_lpCache->setObjectDNCache(iterDNCache->first, std::unique_ptr<dn_cache_t>(iterDNCache->second));
 
 	return signatures;
 }
@@ -999,7 +985,7 @@ string LDAPUserPlugin::getSearchBase(const objectid_t &company)
 
 	if (m_bHosted && !company.id.empty()) {
 		// find company DN, and use as search_base
-		std::auto_ptr<dn_cache_t> lpCompanyCache = m_lpCache->getObjectDNCache(this, company.objclass);
+		std::unique_ptr<dn_cache_t> lpCompanyCache = m_lpCache->getObjectDNCache(this, company.objclass);
 		search_base = m_lpCache->getDNForObject(lpCompanyCache, company);
 		// CHECK: should not be possible to not already know the company
 		if (search_base.empty()) {
@@ -1333,7 +1319,7 @@ string LDAPUserPlugin::objectDNtoAttributeData(const string &dn, const char *lpA
 
 string LDAPUserPlugin::objectUniqueIDtoObjectDN(const objectid_t &uniqueid, bool cache)
 {
-	std::auto_ptr<dn_cache_t> lpCache = m_lpCache->getObjectDNCache(this, uniqueid.objclass);
+	std::unique_ptr<dn_cache_t> lpCache = m_lpCache->getObjectDNCache(this, uniqueid.objclass);
 	auto_free_ldap_message res;
 	string			dn;
 	LDAPMessage*	entry = NULL;
@@ -1357,7 +1343,7 @@ string LDAPUserPlugin::objectUniqueIDtoObjectDN(const objectid_t &uniqueid, bool
 	 */
 	string			ldap_basedn = getSearchBase();
 	string			ldap_filter = getObjectSearchFilter(uniqueid);
-	auto_ptr<attrArray> request_attrs = auto_ptr<attrArray>(new attrArray(1));
+	std::unique_ptr<attrArray> request_attrs(new attrArray(1));
 
 	request_attrs->add("dn");
 
@@ -1387,7 +1373,7 @@ string LDAPUserPlugin::objectUniqueIDtoObjectDN(const objectid_t &uniqueid, bool
 
 objectsignature_t LDAPUserPlugin::objectDNtoObjectSignature(objectclass_t objclass, const string &dn)
 {
-	auto_ptr<signatures_t> signatures;
+	std::unique_ptr<signatures_t> signatures;
 	string ldap_filter;
 
 	ldap_filter = getSearchFilter(objclass);
@@ -1401,9 +1387,11 @@ objectsignature_t LDAPUserPlugin::objectDNtoObjectSignature(objectclass_t objcla
 	return signatures->front();
 }
 
-auto_ptr<signatures_t> LDAPUserPlugin::objectDNtoObjectSignatures(objectclass_t objclass, const list<string> &dn)
+std::unique_ptr<signatures_t>
+LDAPUserPlugin::objectDNtoObjectSignatures(objectclass_t objclass,
+    const std::list<std::string> &dn)
 {
-	auto_ptr<signatures_t> signatures = auto_ptr<signatures_t>(new signatures_t());;
+	std::unique_ptr<signatures_t> signatures(new signatures_t());
 
 	for (std::list<std::string>::const_iterator i = dn.begin();
 	     i != dn.end(); ++i) {
@@ -1427,7 +1415,7 @@ auto_ptr<signatures_t> LDAPUserPlugin::objectDNtoObjectSignatures(objectclass_t 
 
 objectsignature_t LDAPUserPlugin::resolveObjectFromAttribute(objectclass_t objclass, const string &AttrData, const char* lpAttr, const objectid_t &company)
 {
-	auto_ptr<signatures_t> signatures;
+	std::unique_ptr<signatures_t> signatures;
 	list<string> objects;
 
 	objects.push_back(AttrData);
@@ -1442,7 +1430,10 @@ objectsignature_t LDAPUserPlugin::resolveObjectFromAttribute(objectclass_t objcl
 	return signatures->front();
 }
 
-auto_ptr<signatures_t> LDAPUserPlugin::resolveObjectsFromAttribute(objectclass_t objclass, const list<string> &objects, const char* lpAttr, const objectid_t &company)
+std::unique_ptr<signatures_t>
+LDAPUserPlugin::resolveObjectsFromAttribute(objectclass_t objclass,
+    const std::list<std::string> &objects, const char *lpAttr,
+    const objectid_t &company)
 {
 	const char *lpAttrs[2] = {
 		lpAttr,
@@ -1452,7 +1443,10 @@ auto_ptr<signatures_t> LDAPUserPlugin::resolveObjectsFromAttribute(objectclass_t
 	return resolveObjectsFromAttributes(objclass, objects, lpAttrs, company);
 }
 
-auto_ptr<signatures_t> LDAPUserPlugin::resolveObjectsFromAttributes(objectclass_t objclass, const list<string> &objects, const char** lppAttr, const objectid_t &company)
+std::unique_ptr<signatures_t>
+LDAPUserPlugin::resolveObjectsFromAttributes(objectclass_t objclass,
+    const std::list<std::string> &objects, const char **lppAttr,
+    const objectid_t &company)
 {
 	string ldap_basedn;
 	string ldap_filter;
@@ -1479,7 +1473,7 @@ auto_ptr<signatures_t> LDAPUserPlugin::resolveObjectsFromAttributes(objectclass_
 
 objectsignature_t LDAPUserPlugin::resolveObjectFromAttributeType(objectclass_t objclass, const string &object, const char* lpAttr, const char* lpAttrType, const objectid_t &company)
 {
-	auto_ptr<signatures_t> signatures;
+	std::unique_ptr<signatures_t> signatures;
 	list<string> objects;
 
 	objects.push_back(object);
@@ -1491,7 +1485,10 @@ objectsignature_t LDAPUserPlugin::resolveObjectFromAttributeType(objectclass_t o
 	return signatures->front();
 }
 
-auto_ptr<signatures_t> LDAPUserPlugin::resolveObjectsFromAttributeType(objectclass_t objclass, const list<string> &objects, const char* lpAttr, const char* lpAttrType, const objectid_t &company)
+std::unique_ptr<signatures_t>
+LDAPUserPlugin::resolveObjectsFromAttributeType(objectclass_t objclass,
+    const std::list<std::string> &objects, const char *lpAttr,
+    const char *lpAttrType, const objectid_t &company)
 {
 	const char *lpAttrs[2] = {
 		lpAttr,
@@ -1501,9 +1498,12 @@ auto_ptr<signatures_t> LDAPUserPlugin::resolveObjectsFromAttributeType(objectcla
 	return resolveObjectsFromAttributesType(objclass, objects, lpAttrs, lpAttrType, company);
 }
 
-auto_ptr<signatures_t> LDAPUserPlugin::resolveObjectsFromAttributesType(objectclass_t objclass, const list<string> &objects, const char** lppAttr, const char* lpAttrType, const objectid_t &company)
+std::unique_ptr<signatures_t>
+LDAPUserPlugin::resolveObjectsFromAttributesType(objectclass_t objclass,
+    const std::list<std::string> &objects, const char **lppAttr,
+    const char *lpAttrType, const objectid_t &company)
 {
-	auto_ptr<signatures_t> signatures;
+	std::unique_ptr<signatures_t> signatures;
 
 	/* When the relation attribute the is the DN, we cannot perform any optimizations
 	 * and we must incur the penalty of having to resolve each entry one by one.
@@ -1525,8 +1525,8 @@ auto_ptr<signatures_t> LDAPUserPlugin::resolveObjectsFromAttributesType(objectcl
 objectsignature_t LDAPUserPlugin::resolveName(objectclass_t objclass, const string &name, const objectid_t &company)
 {
 	list<string> objects;
-	auto_ptr<attrArray> attrs = auto_ptr<attrArray>(new attrArray(6));
-	auto_ptr<signatures_t> signatures;
+	std::unique_ptr<attrArray> attrs(new attrArray(6));
+	std::unique_ptr<signatures_t> signatures;
 
 	const char *loginname_attr = m_config->GetSetting("ldap_loginname_attribute", "", NULL);
 	const char *groupname_attr = m_config->GetSetting("ldap_groupname_attribute", "", NULL);
@@ -1688,7 +1688,7 @@ objectsignature_t LDAPUserPlugin::authenticateUserPassword(const string &usernam
 	string			strPasswordConverted;
 	objectsignature_t signature;
 
-	auto_ptr<attrArray>		request_attrs = auto_ptr<attrArray>(new attrArray(4));
+	std::unique_ptr<attrArray> request_attrs(new attrArray(4));
 	CONFIG_TO_ATTR(request_attrs, loginname_attr, "ldap_loginname_attribute" );
 	CONFIG_TO_ATTR(request_attrs, password_attr, "ldap_password_attribute");
 	CONFIG_TO_ATTR(request_attrs, unique_attr, "ldap_user_unique_attribute");
@@ -1774,7 +1774,8 @@ objectsignature_t LDAPUserPlugin::authenticateUserPassword(const string &usernam
 	return signature;
 }
 
-auto_ptr<signatures_t> LDAPUserPlugin::getAllObjects(const objectid_t &company, objectclass_t objclass)
+std::unique_ptr<signatures_t>
+LDAPUserPlugin::getAllObjects(const objectid_t &company, objectclass_t objclass)
 {
 	string companyDN;
 	if (!company.id.empty()) {
@@ -1836,9 +1837,10 @@ typedef struct {
 	std::string result_attr;	//!< optional: attribute to use from resulting object(s), if none then unique id
 } postaction;
 
-auto_ptr<map<objectid_t, objectdetails_t> > LDAPUserPlugin::getObjectDetails(const list<objectid_t> &objectids)
+std::unique_ptr<std::map<objectid_t, objectdetails_t> >
+LDAPUserPlugin::getObjectDetails(const std::list<objectid_t> &objectids)
 {
-	auto_ptr<map<objectid_t, objectdetails_t> > mapdetails = auto_ptr<map<objectid_t, objectdetails_t> >(new map<objectid_t, objectdetails_t>);
+	std::unique_ptr<std::map<objectid_t, objectdetails_t> > mapdetails(new std::map<objectid_t, objectdetails_t>);
 	auto_free_ldap_message res;
 
 	LOG_PLUGIN_DEBUG("%s N=%d", __FUNCTION__, (int)objectids.size() );
@@ -1850,7 +1852,7 @@ auto_ptr<map<objectid_t, objectdetails_t> > LDAPUserPlugin::getObjectDetails(con
 
 	bool			bCutOff = false;
 
-	std::auto_ptr<dn_cache_t>	lpCompanyCache;
+	std::unique_ptr<dn_cache_t> lpCompanyCache;
 	string						ldap_filter;
 	string						ldap_basedn;
 	string						ldap_attr;
@@ -1861,7 +1863,7 @@ auto_ptr<map<objectid_t, objectdetails_t> > LDAPUserPlugin::getObjectDetails(con
 
 	set<objectid_t>			setObjectIds;
 	list<configsetting_t>	lExtraAttrs = m_config->GetSettingGroup(CONFIGGROUP_PROPMAP);
-	auto_ptr<attrArray>		request_attrs = auto_ptr<attrArray>(new attrArray(33 + lExtraAttrs.size()));
+	std::unique_ptr<attrArray> request_attrs(new attrArray(33 + lExtraAttrs.size()));
 
 	CONFIG_TO_ATTR(request_attrs, object_attr, "ldap_object_type_attribute");
 	CONFIG_TO_ATTR(request_attrs, user_unique_attr, "ldap_user_unique_attribute");
@@ -2347,7 +2349,7 @@ auto_ptr<map<objectid_t, objectdetails_t> > LDAPUserPlugin::getObjectDetails(con
 			    // which is inefficient, and it is currently unused.
 			    ASSERT(p->result_attr.empty());
 			    
-				auto_ptr<signatures_t> lstSignatures;
+				std::unique_ptr<signatures_t> lstSignatures;
 				signatures_t::const_iterator iSignature;
 				lstSignatures = resolveObjectsFromAttributeType(p->objclass, p->ldap_attrs, p->relAttr, p->relAttrType);
 				if (lstSignatures->size() != p->ldap_attrs.size()) {
@@ -2398,8 +2400,10 @@ auto_ptr<map<objectid_t, objectdetails_t> > LDAPUserPlugin::getObjectDetails(con
 	return mapdetails;
 }
 
-auto_ptr<objectdetails_t> LDAPUserPlugin::getObjectDetails(const objectid_t &id) {
-	auto_ptr<map<objectid_t, objectdetails_t> > mapDetails;
+std::unique_ptr<objectdetails_t>
+LDAPUserPlugin::getObjectDetails(const objectid_t &id)
+{
+	std::unique_ptr<std::map<objectid_t, objectdetails_t> > mapDetails;
 	std::map<objectid_t, objectdetails_t>::const_iterator iterDetails;
     list<objectid_t> objectids;
 
@@ -2411,7 +2415,7 @@ auto_ptr<objectdetails_t> LDAPUserPlugin::getObjectDetails(const objectid_t &id)
     if(iterDetails == mapDetails->end())
         throw objectnotfound("No details for "+id.id);
 
-    return auto_ptr<objectdetails_t>(new objectdetails_t(iterDetails->second));
+    return std::unique_ptr<objectdetails_t>(new objectdetails_t(iterDetails->second));
 }
 
 static LDAPMod *newLDAPModification(char *attribute, const list<string> &values) {
@@ -2504,7 +2508,9 @@ void LDAPUserPlugin::modifyObjectId(const objectid_t &oldId, const objectid_t &n
  * @note Missing one group: with linux you have one group id on the user and other objectid on every possible group.
  *  this function checks all groups from searchfilter for an existing objectid.
  */
-auto_ptr<signatures_t> LDAPUserPlugin::getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childobject)
+std::unique_ptr<signatures_t>
+LDAPUserPlugin::getParentObjectsForObject(userobject_relation_t relation,
+    const objectid_t &childobject)
 {
 	string				ldap_filter;
 	string				member_data;
@@ -2613,11 +2619,13 @@ auto_ptr<signatures_t> LDAPUserPlugin::getParentObjectsForObject(userobject_rela
 	return getAllObjectsByFilter(ldap_basedn, LDAP_SCOPE_SUBTREE, ldap_filter, string(), false);
 }
 
-auto_ptr<signatures_t> LDAPUserPlugin::getSubObjectsForObject(userobject_relation_t relation, const objectid_t &sExternId)
+std::unique_ptr<signatures_t>
+LDAPUserPlugin::getSubObjectsForObject(userobject_relation_t relation,
+    const objectid_t &sExternId)
 {
 	enum LISTTYPE { MEMBERS, FILTER } ulType = MEMBERS;
 
-	auto_ptr<signatures_t>	members = auto_ptr<signatures_t>(new signatures_t());
+	std::unique_ptr<signatures_t> members(new signatures_t());
 	list<string>			memberlist;
 
 	auto_free_ldap_message res;
@@ -2636,8 +2644,8 @@ auto_ptr<signatures_t> LDAPUserPlugin::getSubObjectsForObject(userobject_relatio
 	const char *member_attr_type = NULL;
 	const char *base_attr = NULL;
 
-	auto_ptr<attrArray> member_attr_rel = auto_ptr<attrArray>(new attrArray(5));
-	auto_ptr<attrArray> child_unique_attr = auto_ptr<attrArray>(new attrArray(5));
+	std::unique_ptr<attrArray> member_attr_rel(new attrArray(5));
+	std::unique_ptr<attrArray> child_unique_attr(new attrArray(5));
 
 	CONFIG_TO_ATTR(child_unique_attr, user_unique_attr, "ldap_user_unique_attribute");
 	CONFIG_TO_ATTR(child_unique_attr, group_unique_attr, "ldap_group_unique_attribute");
@@ -2792,7 +2800,7 @@ auto_ptr<signatures_t> LDAPUserPlugin::getSubObjectsForObject(userobject_relatio
 
 		if(!ldap_member_filter.empty()) {
 			if(m_bHosted) {
-				std::auto_ptr<dn_cache_t> lpCompanyCache = m_lpCache->getObjectDNCache(this, CONTAINER_COMPANY);
+				std::unique_ptr<dn_cache_t> lpCompanyCache = m_lpCache->getObjectDNCache(this, CONTAINER_COMPANY);
 				companyid = m_lpCache->getParentForDN(lpCompanyCache, dn);
 				companyDN = m_lpCache->getDNForObject(lpCompanyCache, companyid);
 			}
@@ -2817,9 +2825,10 @@ void LDAPUserPlugin::deleteSubObjectRelation(userobject_relation_t relation, con
 	throw notimplemented("Delete object relations is not supported when using the LDAP user plugin.");
 }
 
-auto_ptr<signatures_t> LDAPUserPlugin::searchObject(const string &match, unsigned int ulFlags)
+std::unique_ptr<signatures_t>
+LDAPUserPlugin::searchObject(const std::string &match, unsigned int ulFlags)
 {
-	auto_ptr<signatures_t> signatures;
+	std::unique_ptr<signatures_t> signatures;
 	string escMatch;
 	string ldap_basedn;
 	string ldap_filter;
@@ -2872,7 +2881,7 @@ auto_ptr<signatures_t> LDAPUserPlugin::searchObject(const string &match, unsigne
 	return signatures;
 }
 
-auto_ptr<objectdetails_t> LDAPUserPlugin::getPublicStoreDetails()
+std::unique_ptr<objectdetails_t> LDAPUserPlugin::getPublicStoreDetails(void)
 {
 #ifndef WITH_MULTISERVER
 	throw notimplemented("distributed");
@@ -2882,7 +2891,7 @@ auto_ptr<objectdetails_t> LDAPUserPlugin::getPublicStoreDetails()
 	string ldap_basedn;
 	string search_filter;
 	string subfilter;
-	auto_ptr<objectdetails_t> details = auto_ptr<objectdetails_t>(new objectdetails_t(CONTAINER_COMPANY));
+	std::unique_ptr<objectdetails_t> details(new objectdetails_t(CONTAINER_COMPANY));
 
 	if (!m_bDistributed)
 		throw objectnotfound("public store");
@@ -2897,7 +2906,7 @@ auto_ptr<objectdetails_t> LDAPUserPlugin::getPublicStoreDetails()
 	if (publicstore_attr)
 		search_filter = "(&" + search_filter + "(" + publicstore_attr + "=1))";
 
-	auto_ptr<attrArray> request_attrs = auto_ptr<attrArray>(new attrArray(1));
+	std::unique_ptr<attrArray> request_attrs(new attrArray(1));
 	CONFIG_TO_ATTR(request_attrs, unique_attr, "ldap_server_unique_attribute");
 
 	// Do a search request to get all attributes for this user. The
@@ -2928,11 +2937,11 @@ auto_ptr<objectdetails_t> LDAPUserPlugin::getPublicStoreDetails()
 	}
 	END_FOREACH_ATTR
 
-	return auto_ptr<objectdetails_t>(details);
+	return details;
 #endif
 }
 
-auto_ptr<serverlist_t> LDAPUserPlugin::getServers()
+std::unique_ptr<serverlist_t> LDAPUserPlugin::getServers(void)
 {
 #ifndef WITH_MULTISERVER
 	throw notimplemented("distributed");
@@ -2940,7 +2949,7 @@ auto_ptr<serverlist_t> LDAPUserPlugin::getServers()
 	auto_free_ldap_message res;
 	string ldap_basedn;
 	string search_filter;
-	auto_ptr<serverlist_t> serverlist = auto_ptr<serverlist_t>(new serverlist_t());
+	std::unique_ptr<serverlist_t> serverlist(new serverlist_t());
 
 	if (!m_bDistributed)
 		throw objectnotfound("Distributed not enabled");
@@ -2956,7 +2965,7 @@ auto_ptr<serverlist_t> LDAPUserPlugin::getServers()
 		getServerSearchFilter() +
 		")";
 
-	auto_ptr<attrArray> request_attrs = auto_ptr<attrArray>(new attrArray(1));
+	std::unique_ptr<attrArray> request_attrs(new attrArray(1));
 	CONFIG_TO_ATTR(request_attrs, name_attr, "ldap_server_unique_attribute");
 
 	my_ldap_search_s(
@@ -2976,12 +2985,12 @@ auto_ptr<serverlist_t> LDAPUserPlugin::getServers()
     }
     END_FOREACH_ENTRY
 
-	return auto_ptr<serverlist_t>(serverlist);
-
+	return serverlist;
 #endif
 }
 
-auto_ptr<serverdetails_t> LDAPUserPlugin::getServerDetails(const string &server)
+std::unique_ptr<serverdetails_t>
+LDAPUserPlugin::getServerDetails(const std::string &server)
 {
 #ifndef WITH_MULTISERVER
 	throw notimplemented("distributed");
@@ -2996,7 +3005,7 @@ auto_ptr<serverdetails_t> LDAPUserPlugin::getServerDetails(const string &server)
 
 	LOG_PLUGIN_DEBUG("%s for server %s", __FUNCTION__, server.c_str());
 
-	auto_ptr<serverdetails_t> serverDetails = auto_ptr<serverdetails_t>(new serverdetails_t(server));
+	std::unique_ptr<serverdetails_t> serverDetails(new serverdetails_t(server));
 	string strAddress;
 	string strHttpPort;
 	string strSslPort;
@@ -3010,7 +3019,7 @@ auto_ptr<serverdetails_t> LDAPUserPlugin::getServerDetails(const string &server)
 		getSearchFilter(server, m_config->GetSetting("ldap_server_unique_attribute")) +
 		")";
 
-	auto_ptr<attrArray> request_attrs = auto_ptr<attrArray>(new attrArray(5));
+	std::unique_ptr<attrArray> request_attrs(new attrArray(5));
 	CONFIG_TO_ATTR(request_attrs, address_attr, "ldap_server_address_attribute");
 	CONFIG_TO_ATTR(request_attrs, http_port_attr, "ldap_server_http_port_attribute");
 	CONFIG_TO_ATTR(request_attrs, ssl_port_attr, "ldap_server_ssl_port_attribute");
@@ -3072,7 +3081,7 @@ auto_ptr<serverdetails_t> LDAPUserPlugin::getServerDetails(const string &server)
 	serverDetails->SetFilePath(strFilePath);
 	serverDetails->SetProxyPath(strProxyPath);
 
-	return auto_ptr<serverdetails_t>(serverDetails);
+	return serverDetails;
 #endif
 }
 
@@ -3116,11 +3125,12 @@ std::string LDAPUserPlugin::StringEscapeSequence(const char* lpdata, size_t size
 	return strEscaped;
 }
 
-auto_ptr<quotadetails_t> LDAPUserPlugin::getQuota(const objectid_t &id, bool bGetUserDefault)
+std::unique_ptr<quotadetails_t> LDAPUserPlugin::getQuota(const objectid_t &id,
+    bool bGetUserDefault)
 {
 	auto_free_ldap_message res;
 	string dn;
-	auto_ptr<quotadetails_t> quotaDetails = auto_ptr<quotadetails_t>(new quotadetails_t());
+	std::unique_ptr<quotadetails_t> quotaDetails(new quotadetails_t());
 
 	const char *multiplier_s = m_config->GetSetting("ldap_quota_multiplier");
 	long long multiplier = 1L;
@@ -3128,7 +3138,7 @@ auto_ptr<quotadetails_t> LDAPUserPlugin::getQuota(const objectid_t &id, bool bGe
 		multiplier = fromstring<const char *, long long>(multiplier_s);
 	}
 
-	auto_ptr<attrArray> request_attrs = auto_ptr<attrArray>(new attrArray(4));
+	std::unique_ptr<attrArray> request_attrs(new attrArray(4));
 	CONFIG_TO_ATTR(request_attrs, usedefaults_attr,
 		bGetUserDefault ?
 			"ldap_userdefault_quotaoverride_attribute" :
@@ -3185,7 +3195,7 @@ auto_ptr<quotadetails_t> LDAPUserPlugin::getQuota(const objectid_t &id, bool bGe
 	}
 	END_FOREACH_ENTRY
 
-	return auto_ptr<quotadetails_t>(quotaDetails);
+	return quotaDetails;
 }
 
 void LDAPUserPlugin::setQuota(const objectid_t &id, const quotadetails_t &quotadetails)
@@ -3193,9 +3203,9 @@ void LDAPUserPlugin::setQuota(const objectid_t &id, const quotadetails_t &quotad
 	throw notimplemented("set quota is not supported when using the LDAP user plugin.");
 }
 
-auto_ptr<abprops_t> LDAPUserPlugin::getExtraAddressbookProperties()
+std::unique_ptr<abprops_t> LDAPUserPlugin::getExtraAddressbookProperties(void)
 {
-	auto_ptr<abprops_t> lProps = auto_ptr<abprops_t>(new abprops_t());
+	std::unique_ptr<abprops_t> lProps(new abprops_t());
 	list<configsetting_t> lExtraAttrs = m_config->GetSettingGroup(CONFIGGROUP_PROPMAP);
 	std::list<configsetting_t>::const_iterator i;
 

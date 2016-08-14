@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -22,41 +22,31 @@
 #ifndef ECSESSION
 #define ECSESSION
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <list>
 #include <map>
 #include <set>
 
 #include "soapH.h"
-#include <zarafa/ZarafaCode.h>
+#include <kopano/kcodes.h>
 #include "ECNotification.h"
 #include "ECTableManager.h"
 
-#include <zarafa/ECConfig.h>
-#include <zarafa/ECLogger.h>
+#include <kopano/ECConfig.h>
+#include <kopano/ECLogger.h>
 #include "ECDatabaseFactory.h"
 #include "ECPluginFactory.h"
 #include "ECSessionGroup.h"
 #include "ECLockManager.h"
-#include "Zarafa.h"
+#include "kcore.hpp"
 
 #ifdef HAVE_GSSAPI
 #include <gssapi/gssapi.h>
 #endif
 
-#ifdef WIN32
-#define SECURITY_WIN32
-#include <Security.h>
-#endif
-
 class ECSecurity;
 class ECUserManagement;
 class SOURCEKEY;
-
-#ifdef WIN32
-// used for pthread_t, implementation in ECSoapServerConnection.cpp
-bool operator<(const pthread_t &pta, const pthread_t &ptb);
-#endif
 
 void CreateSessionID(unsigned int ulCapabilities, ECSESSIONID *lpSessionId);
 
@@ -153,8 +143,8 @@ class ECSession _zcp_final : public BTSession {
 public:
 	ECSession(const char *addr, ECSESSIONID sessionID, ECSESSIONGROUPID ecSessionGroupId, ECDatabaseFactory *lpDatabaseFactory, ECSessionManager *lpSessionManager, unsigned int ulCapabilities, bool bIsOffline, AUTHMETHOD ulAuthMethod, int pid, const std::string &cl_vers, const std::string &cl_app, const std::string &cl_app_ver, const std::string &cl_app_misc);
 
-	virtual ECSESSIONGROUPID GetSessionGroupId();
-	virtual int				 GetConnectingPid();
+	virtual ECSESSIONGROUPID GetSessionGroupId(void) const { return m_ecSessionGroupId; }
+	virtual int GetConnectingPid(void) const { return m_ulConnectingPid; }
 
 	virtual ~ECSession();
 
@@ -167,8 +157,8 @@ public:
 	ECRESULT AddNotificationTable(unsigned int ulType, unsigned int ulObjType, unsigned int ulTableId, sObjectTableKey *lpsChildRow, sObjectTableKey *lpsPrevRow, struct propValArray *lpRow);
 	ECRESULT GetNotifyItems(struct soap *soap, struct notifyResponse *notifications);
 
-	ECTableManager* GetTableManager();
-	ECSecurity* GetSecurity();
+	ECTableManager *GetTableManager(void) const { return m_lpTableManager; }
+	ECSecurity *GetSecurity(void) const { return m_lpEcSecurity; }
 	
 	ECRESULT GetObjectFromEntryId(const entryId *lpEntryId, unsigned int *lpulObjId, unsigned int *lpulEidFlags = NULL);
 	ECRESULT LockObject(unsigned int ulObjId);
@@ -189,7 +179,7 @@ public:
 
 	unsigned int ClientVersion() const { return m_ulClientVersion; }
 
-	AUTHMETHOD GetAuthMethod();
+	AUTHMETHOD GetAuthMethod(void) const { return m_ulAuthMethod; }
 
 private:
 	ECTableManager		*m_lpTableManager;
@@ -262,14 +252,6 @@ private:
 	gss_cred_id_t m_gssServerCreds;
 	gss_ctx_id_t m_gssContext;
 #endif
-
-#else  /* WIN32 */
-	CredHandle	m_hCredentials;
-	ULONG		m_cPackages;
-	ULONG		m_ulPid;
-	PSecPkgInfo	m_lpPackageInfo;
-	TimeStamp	m_tsExpiry;
-	CtxtHandle	m_hContext;
 #endif
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <cstring>
 #include <iostream>
@@ -23,9 +23,9 @@
 #include <climits>
 
 #include "ECPluginFactory.h"
-#include <zarafa/ECConfig.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/ecversion.h>
+#include <kopano/ECConfig.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ecversion.h>
 
 #ifdef EMBEDDED_USERPLUGIN
 	#include "DBUserPlugin.h"
@@ -33,11 +33,9 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
-ECPluginFactory::ECPluginFactory(ECConfig *config, IECStatsCollector *lpStatsCollector,
+ECPluginFactory::ECPluginFactory(ECConfig *config, ECStatsCollector *lpStatsCollector,
     bool bHosted, bool bDistributed)
 {
 	m_getUserPluginInstance = NULL;
@@ -76,7 +74,7 @@ ECRESULT ECPluginFactory::CreateUserPlugin(UserPlugin **lppPlugin) {
         if (!pluginname || !strcmp(pluginname, "")) {
 			ec_log_crit("User plugin is unavailable.");
 			ec_log_crit("Please correct your configuration file and set the \"plugin_path\" and \"user_plugin\" options.");
-			return ZARAFA_E_NOT_FOUND;
+			return KCERR_NOT_FOUND;
         }
 
         snprintf(filename, PATH_MAX + 1, "%s%c%splugin.%s", 
@@ -120,7 +118,7 @@ ECRESULT ECPluginFactory::CreateUserPlugin(UserPlugin **lppPlugin) {
 	}
 	catch (exception &e) {
 		ec_log_crit("Cannot instantiate user plugin: %s", e.what());
-		return ZARAFA_E_NOT_FOUND;
+		return KCERR_NOT_FOUND;
 	}
 	
 	*lppPlugin = lpPlugin;
@@ -131,7 +129,7 @@ ECRESULT ECPluginFactory::CreateUserPlugin(UserPlugin **lppPlugin) {
 	if (m_dl)
 		dlclose(m_dl);
 	m_dl = NULL;
-	return ZARAFA_E_NOT_FOUND;
+	return KCERR_NOT_FOUND;
 }
 
 void ECPluginFactory::SignalPlugins(int signal)
@@ -144,7 +142,7 @@ extern pthread_key_t plugin_key;
 ECRESULT GetThreadLocalPlugin(ECPluginFactory *lpPluginFactory,
     UserPlugin **lppPlugin)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	UserPlugin *lpPlugin = NULL;
 
 	lpPlugin = (UserPlugin *)pthread_getspecific(plugin_key);
@@ -155,14 +153,12 @@ ECRESULT GetThreadLocalPlugin(ECPluginFactory *lpPluginFactory,
 		if (er != erSuccess) {
 			lpPlugin = NULL;
 			ec_log_crit("Unable to instantiate user plugin");
-			goto exit;
+			return er;
 		}
 
 		pthread_setspecific(plugin_key, (void *)lpPlugin);
 	}
 
 	*lppPlugin = lpPlugin;
-
-exit:
-	return er;
+	return erSuccess;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,9 +18,9 @@
 #ifndef EC_EXCHANGE_MODIFY_TABLE_H
 #define EC_EXCHANGE_MODIFY_TABLE_H
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/ECUnknown.h>
-#include <zarafa/ECMemTable.h>
+#include <kopano/zcdefs.h>
+#include <kopano/ECUnknown.h>
+#include <kopano/ECMemTable.h>
 #include <mapidefs.h>
 #include <edkmdb.h>
 #include "IECExchangeModifyTable.h"
@@ -85,12 +85,8 @@ private:
 	bool	m_bPushToServer;
 };
 
-
-class ECExchangeRuleAction : public ECUnknown {
+class ECExchangeRuleAction _kc_final : public ECUnknown {
 public:
-	ECExchangeRuleAction();
-	virtual ~ECExchangeRuleAction();
-
 	HRESULT __stdcall ActionCount(ULONG *lpcActions);
 	HRESULT __stdcall GetAction(ULONG ulActionNumber, LARGE_INTEGER *lpruleid, LPACTION *lppAction);
 

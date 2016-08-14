@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,17 +15,18 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
+#include <memory>
 
 #include "DBBase.h"
-#include <zarafa/ECDefs.h>
-#include <zarafa/EMSAbTag.h>
-#include <zarafa/stringutil.h>
-#include <zarafa/md5.h>
+#include <kopano/ECDefs.h>
+#include <kopano/EMSAbTag.h>
+#include <kopano/stringutil.h>
+#include <kopano/md5.h>
 #include <mapidefs.h>
-#include <zarafa/base64.h>
+#include <kopano/base64.h>
 
-ZARAFA_API ECRESULT GetDatabaseObject(ECDatabase **lppDatabase);
+KDLLAPI ECRESULT GetDatabaseObject(ECDatabase **lppDatabase);
 
 DBPlugin::DBPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *shareddata) :
 	UserPlugin(pluginlock, shareddata), m_lpDatabase(NULL) {
@@ -41,7 +42,8 @@ void DBPlugin::InitPlugin() {
 	    throw runtime_error(string("db_init: cannot get handle to database"));
 }
 
-auto_ptr<signatures_t> DBPlugin::getAllObjects(const objectid_t &company, objectclass_t objclass)
+std::unique_ptr<signatures_t>
+DBPlugin::getAllObjects(const objectid_t &company, objectclass_t objclass)
 {
 	string strQuery =
 		"SELECT om.externid, om.objectclass, op.value "
@@ -64,9 +66,10 @@ auto_ptr<signatures_t> DBPlugin::getAllObjects(const objectid_t &company, object
 	return CreateSignatureList(strQuery);
 }
 
-auto_ptr<objectdetails_t> DBPlugin::getObjectDetails(const objectid_t &objectid)
+std::unique_ptr<objectdetails_t>
+DBPlugin::getObjectDetails(const objectid_t &objectid)
 {
-	auto_ptr<map<objectid_t, objectdetails_t> > objectdetails;
+	std::unique_ptr<std::map<objectid_t, objectdetails_t> > objectdetails;
 	list<objectid_t> objectids;
 
 	objectids.push_back(objectid);
@@ -75,10 +78,11 @@ auto_ptr<objectdetails_t> DBPlugin::getObjectDetails(const objectid_t &objectid)
 	if (objectdetails->size() != 1)
 		throw objectnotfound(objectid.id);
 
-	return auto_ptr<objectdetails_t>(new objectdetails_t(objectdetails->begin()->second));
+	return std::unique_ptr<objectdetails_t>(new objectdetails_t(objectdetails->begin()->second));
 }
 
-auto_ptr<map<objectid_t, objectdetails_t> > DBPlugin::getObjectDetails(const list<objectid_t> &objectids)
+std::unique_ptr<std::map<objectid_t, objectdetails_t> >
+DBPlugin::getObjectDetails(const std::list<objectid_t> &objectids)
 {
 	map<objectid_t,objectdetails_t> *mapdetails = new map<objectid_t,objectdetails_t>;
 	map<objectid_t,objectdetails_t>::iterator iterDetails;
@@ -96,7 +100,7 @@ auto_ptr<map<objectid_t, objectdetails_t> > DBPlugin::getObjectDetails(const lis
 	std::list<objectid_t>::const_iterator iterID;
 
 	if(objectids.empty())
-		return auto_ptr<map<objectid_t, objectdetails_t> >(mapdetails);
+		return std::unique_ptr<std::map<objectid_t, objectdetails_t> >(mapdetails);
 
 	LOG_PLUGIN_DEBUG("%s N=%d", __FUNCTION__, (int)objectids.size());
 
@@ -237,10 +241,12 @@ auto_ptr<map<objectid_t, objectdetails_t> > DBPlugin::getObjectDetails(const lis
 		}
 	}
 
-	return auto_ptr<map<objectid_t, objectdetails_t> >(mapdetails);
+	return std::unique_ptr<std::map<objectid_t, objectdetails_t> >(mapdetails);
 }
 
-auto_ptr<signatures_t> DBPlugin::getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentobject)
+std::unique_ptr<signatures_t>
+DBPlugin::getSubObjectsForObject(userobject_relation_t relation,
+    const objectid_t &parentobject)
 {
 	string strQuery =
 		"SELECT o.externid, o.objectclass, modtime.value "
@@ -261,7 +267,9 @@ auto_ptr<signatures_t> DBPlugin::getSubObjectsForObject(userobject_relation_t re
 	return CreateSignatureList(strQuery);
 }
 
-auto_ptr<signatures_t> DBPlugin::getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childobject)
+std::unique_ptr<signatures_t>
+DBPlugin::getParentObjectsForObject(userobject_relation_t relation,
+    const objectid_t &childobject)
 {
 	string strQuery =
 		"SELECT o.externid, o.objectclass, modtime.value "
@@ -349,6 +357,7 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 			if (!bFirstOne)
 				strDeleteQuery += ",";
 			strDeleteQuery += *iterProps;
+			bFirstOne = false;
 		}
 
 		strDeleteQuery += ")";
@@ -520,7 +529,7 @@ objectsignature_t DBPlugin::createObject(const objectdetails_t &details)
 		CreateObjectWithExternId(objectid, details);
 
 	} else {
-		// zarafa-admin online create object
+		// kopano-admin online create object
 		objectid = CreateObject(details);
 	}
 
@@ -707,10 +716,12 @@ void DBPlugin::deleteSubObjectRelation(userobject_relation_t relation, const obj
 		throw objectnotfound("db_user: relation " + parentobject.id);
 }
 
-auto_ptr<signatures_t> DBPlugin::searchObjects(const string &match, const char *search_props[], const char *return_prop, unsigned int ulFlags) {
+std::unique_ptr<signatures_t> DBPlugin::searchObjects(const std::string &match,
+    const char **search_props, const char *return_prop, unsigned int ulFlags)
+{
 	string signature;
 	objectid_t objectid;
-	auto_ptr<signatures_t> lpSignatures = auto_ptr<signatures_t>(new signatures_t());
+	std::unique_ptr<signatures_t> lpSignatures(new signatures_t());
 
 	string strQuery =
 		"SELECT DISTINCT ";
@@ -765,9 +776,10 @@ auto_ptr<signatures_t> DBPlugin::searchObjects(const string &match, const char *
 	return lpSignatures;
 }
 
-auto_ptr<quotadetails_t> DBPlugin::getQuota(const objectid_t &objectid, bool bGetUserDefault)
+std::unique_ptr<quotadetails_t> DBPlugin::getQuota(const objectid_t &objectid,
+    bool bGetUserDefault)
 {
-	auto_ptr<quotadetails_t> lpDetails;
+	std::unique_ptr<quotadetails_t> lpDetails;
 	ECRESULT er = erSuccess;
 	string strQuery;
 	DB_RESULT_AUTOFREE lpResult(m_lpDatabase);
@@ -787,7 +799,7 @@ auto_ptr<quotadetails_t> DBPlugin::getQuota(const objectid_t &objectid, bool bGe
 	if (er != erSuccess)
 		throw runtime_error(string("db_query: ") + strerror(er));
 
-	lpDetails = auto_ptr<quotadetails_t>(new quotadetails_t());
+	lpDetails = std::unique_ptr<quotadetails_t>(new quotadetails_t());
 	lpDetails->bIsUserDefaultQuota = bGetUserDefault;
 
 	while ((lpDBRow = m_lpDatabase->FetchRow(lpResult)) != NULL) {
@@ -860,10 +872,11 @@ void DBPlugin::setQuota(const objectid_t &objectid, const quotadetails_t &quotad
 		throw runtime_error(string("db_query: ") + strerror(er));
 }
 
-auto_ptr<signatures_t> DBPlugin::CreateSignatureList(const std::string &query)
+std::unique_ptr<signatures_t>
+DBPlugin::CreateSignatureList(const std::string &query)
 {
 	ECRESULT er = erSuccess;
-	auto_ptr<signatures_t> objectlist = auto_ptr<signatures_t>(new signatures_t());
+	std::unique_ptr<signatures_t> objectlist(new signatures_t());
 	DB_RESULT_AUTOFREE lpResult(m_lpDatabase);
 	DB_ROW lpDBRow = NULL;
 	DB_LENGTHS lpDBLen = NULL;
@@ -903,7 +916,7 @@ ECRESULT DBPlugin::CreateMD5Hash(const std::string &strData, std::string* lpstrR
 	std::ostringstream s;
 
 	if (strData.empty() || lpstrResult == NULL)
-		return ZARAFA_E_INVALID_PARAMETER;
+		return KCERR_INVALID_PARAMETER;
 
 	s.setf(ios::hex, ios::basefield);
 	s.fill('0');
@@ -920,7 +933,7 @@ ECRESULT DBPlugin::CreateMD5Hash(const std::string &strData, std::string* lpstrR
 
 void DBPlugin::addSendAsToDetails(const objectid_t &objectid, objectdetails_t *lpDetails)
 {
-	auto_ptr<signatures_t> sendas;
+	std::unique_ptr<signatures_t> sendas;
 	signatures_t::const_iterator iter;
 
 	sendas = getSubObjectsForObject(OBJECTRELATION_USER_SENDAS, objectid);
@@ -929,10 +942,10 @@ void DBPlugin::addSendAsToDetails(const objectid_t &objectid, objectdetails_t *l
 		lpDetails->AddPropObject(OB_PROP_LO_SENDAS, iter->id);
 }
 
-auto_ptr<abprops_t> DBPlugin::getExtraAddressbookProperties()
+std::unique_ptr<abprops_t> DBPlugin::getExtraAddressbookProperties(void)
 {
 	ECRESULT er = erSuccess;
-	auto_ptr<abprops_t> proplist = auto_ptr<abprops_t>(new abprops_t());
+	std::unique_ptr<abprops_t> proplist(new abprops_t());
 	DB_RESULT_AUTOFREE lpResult(m_lpDatabase);
 	DB_ROW lpDBRow = NULL;
 	std::string strQuery;

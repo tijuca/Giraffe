@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,14 +15,14 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/stringutil.h>
-#include <zarafa/charset/convert.h>
+#include <kopano/platform.h>
+#include <kopano/stringutil.h>
+#include <kopano/charset/convert.h>
 #include <string>
 #include <cerrno>
 #include <cstring>
-#include <zarafa/ECIConv.h>
-#include <zarafa/ECLogger.h>
+#include <kopano/ECIConv.h>
+#include <kopano/ECLogger.h>
 
 #include <mapicode.h> // only for MAPI error codes
 #include <mapidefs.h> // only for MAPI error codes
@@ -37,8 +37,6 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 #define BLOCKSIZE	65536

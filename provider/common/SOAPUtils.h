@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -20,9 +20,9 @@
 
 #include "soapH.h"
 #include "SOAPAlloc.h"
-#include <zarafa/ZarafaCode.h>
-#include <zarafa/ZarafaUser.h>
-#include <zarafa/ustringutil.h>
+#include <kopano/kcodes.h>
+#include <kopano/pcuser.hpp>
+#include <kopano/ustringutil.h>
 
 #include <list>
 #include <string>
@@ -58,7 +58,7 @@ extern ECRESULT MergePropValArray(struct soap *soap, const struct propValArray *
 extern ECRESULT CompareProp(const struct propVal *lpProp1, const struct propVal *lpProp2, const ECLocale &locale, int *lpCompareResult);
 extern ECRESULT CompareMVPropWithProp(struct propVal *lpMVProp1, const struct propVal *lpProp2, unsigned int ulType, const ECLocale &locale, bool* lpfMatch);
 
-unsigned int		PropSize(struct propVal *lpProp);
+size_t PropSize(const struct propVal *);
 ECRESULT			FreePropVal(struct propVal *lpProp, bool bBasePointerDel);
 ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal *lpDst, struct soap *soap = NULL, bool bTruncate = false);
 ECRESULT CopyPropVal(const struct propVal *lpSrc, struct propVal **lppDst, struct soap *soap = NULL, bool bTruncate = false); /* allocates new lpDst and calls other version */
@@ -104,14 +104,14 @@ ULONG 				NormalizePropTag(ULONG ulPropTag);
 
 const char *GetSourceAddr(struct soap *soap);
 
-unsigned int SearchCriteriaSize(struct searchCriteria *lpSrc);
-unsigned int RestrictTableSize(struct restrictTable *lpSrc);
-unsigned int PropValArraySize(struct propValArray *lpSrc);
-unsigned int EntryListSize(struct entryList *lpSrc);
-unsigned int EntryIdSize(entryId *lpEntryid);
-unsigned int NotificationStructSize(notification *lpNotification);
-unsigned int PropTagArraySize(struct propTagArray *pPropTagArray);
-unsigned int SortOrderArraySize(struct sortOrderArray *lpsSortOrder);
+size_t SearchCriteriaSize(const struct searchCriteria *);
+size_t RestrictTableSize(const struct restrictTable *);
+size_t PropValArraySize(const struct propValArray *);
+size_t EntryListSize(const struct entryList *);
+size_t EntryIdSize(const entryId *);
+size_t NotificationStructSize(const notification *);
+size_t PropTagArraySize(const struct propTagArray *);
+size_t SortOrderArraySize(const struct sortOrderArray *);
 
 class DynamicPropValArray {
 public:

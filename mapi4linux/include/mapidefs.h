@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,16 +19,7 @@
 #define __M4L_MAPIDEFS_H_
 #define MAPIDEFS_H
 
-/*
- * MAPI for linux
- *
- * mapidefs.h - All interface definitions
- *
- * (C) Zarafa 2005
- *
- */
-
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <cstring>		/* memcmp() */
 
 #define MAPI_DIM	1
@@ -1090,7 +1081,7 @@ typedef struct _flaglist
     ULONG ulFlag[MAPI_DIM];
 } FlagList, *LPFlagList;
 
-/* Zarafa added */
+/* Our parts. */
 #define CbNewFlagList(_cflags) \
     (offsetof(FlagList,ulFlag) + (_cflags)*sizeof(ULONG))
 

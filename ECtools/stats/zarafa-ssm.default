@@ -1,6 +1,0 @@
-# Default settings for Zarafa System Statistics Monitor
-# Change to 1 to enable this service
-ENABLED=0
-
-# Enter the right path if this file is in a different location
-ZARAFA_LICENSE_FILE=/etc/zarafa/license/base

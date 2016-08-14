@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #ifdef LINUX
 #include <arpa/inet.h>
@@ -25,8 +25,6 @@
 #include "ECSerializer.h"
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -55,7 +53,7 @@ ECRESULT ECStreamSerializer::Write(const void *ptr, size_t size, size_t nmemb)
 	} tmp;
 
 	if (ptr == NULL)
-		return ZARAFA_E_INVALID_PARAMETER;
+		return KCERR_INVALID_PARAMETER;
 
 	switch (size) {
 	case 1:
@@ -80,7 +78,7 @@ ECRESULT ECStreamSerializer::Write(const void *ptr, size_t size, size_t nmemb)
 		}
 		break;
 	default:
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		break;
 	}
 	
@@ -95,7 +93,7 @@ ECRESULT ECStreamSerializer::Read(void *ptr, size_t size, size_t nmemb)
 	ULONG cbRead = 0;
 
 	if (ptr == NULL)
-		return ZARAFA_E_INVALID_PARAMETER;
+		return KCERR_INVALID_PARAMETER;
 
 	er = m_lpBuffer->Read(ptr, size * nmemb, &cbRead);
 	if (er != erSuccess)
@@ -104,7 +102,7 @@ ECRESULT ECStreamSerializer::Read(void *ptr, size_t size, size_t nmemb)
 	m_ulRead += cbRead;
 
 	if (cbRead != size * nmemb)
-		return ZARAFA_E_CALL_FAILED;
+		return KCERR_CALL_FAILED;
 
 	switch (size) {
 	case 1: break;
@@ -121,7 +119,7 @@ ECRESULT ECStreamSerializer::Read(void *ptr, size_t size, size_t nmemb)
 			((long long *)ptr)[x] = ntohll(((long long *)ptr)[x]);
 		break;
 	default:
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		break;
 	}
 	return er;
@@ -205,10 +203,10 @@ ECRESULT ECFifoSerializer::Write(const void *ptr, size_t size, size_t nmemb)
 	} tmp;
 
 	if (m_mode != serialize)
-		return ZARAFA_E_NO_SUPPORT;
+		return KCERR_NO_SUPPORT;
 
 	if (ptr == NULL)
-		return ZARAFA_E_INVALID_PARAMETER;
+		return KCERR_INVALID_PARAMETER;
 
 	switch (size) {
 	case 1:
@@ -233,7 +231,7 @@ ECRESULT ECFifoSerializer::Write(const void *ptr, size_t size, size_t nmemb)
 		}
 		break;
 	default:
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		break;
 	}
 	
@@ -248,9 +246,9 @@ ECRESULT ECFifoSerializer::Read(void *ptr, size_t size, size_t nmemb)
 	ECFifoBuffer::size_type cbRead = 0;
 
 	if (m_mode != deserialize)
-		return ZARAFA_E_NO_SUPPORT;
+		return KCERR_NO_SUPPORT;
 	if (ptr == NULL)
-		return ZARAFA_E_INVALID_PARAMETER;
+		return KCERR_INVALID_PARAMETER;
 
 	er = m_lpBuffer->Read(ptr, size * nmemb, STR_DEF_TIMEOUT, &cbRead);
 	if (er != erSuccess)
@@ -259,7 +257,7 @@ ECRESULT ECFifoSerializer::Read(void *ptr, size_t size, size_t nmemb)
 	m_ulRead += cbRead;
 
 	if (cbRead != size * nmemb)
-		return ZARAFA_E_CALL_FAILED;
+		return KCERR_CALL_FAILED;
 	
 
 	switch (size) {
@@ -277,7 +275,7 @@ ECRESULT ECFifoSerializer::Read(void *ptr, size_t size, size_t nmemb)
 			((long long *)ptr)[x] = ntohll(((long long *)ptr)[x]);
 		break;
 	default:
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		break;
 	}
 	return er;
@@ -291,7 +289,7 @@ ECRESULT ECFifoSerializer::Skip(size_t size, size_t nmemb)
 	try {
 		buf = new char[size*nmemb];
 	} catch(...) {
-		er = ZARAFA_E_NOT_ENOUGH_MEMORY;
+		er = KCERR_NOT_ENOUGH_MEMORY;
 	}
 	if (er != erSuccess)
 		goto exit;

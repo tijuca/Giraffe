@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -12,42 +12,30 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-#include <zarafa/platform.h>
-
-
+#include <kopano/platform.h>
 #include "WSTableView.h"
-
 #include "Mem.h"
-#include <zarafa/ECGuid.h>
-
-// Utils
+#include <kopano/ECGuid.h>
 #include "SOAPUtils.h"
 #include "WSUtil.h"
-
-#include <zarafa/charset/convert.h>
+#include <kopano/charset/convert.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 /*
  * TableView operations for WS transport
- *
  */
-
 #define START_SOAP_CALL retry:
 #define END_SOAP_CALL 	\
-	if(er == ZARAFA_E_END_OF_SESSION) { if(m_lpTransport->HrReLogon() == hrSuccess) goto retry; } \
-	hr = ZarafaErrorToMAPIError(er, MAPI_E_NOT_FOUND); \
+	if(er == KCERR_END_OF_SESSION) { if(m_lpTransport->HrReLogon() == hrSuccess) goto retry; } \
+	hr = kcerr_to_mapierr(er, MAPI_E_NOT_FOUND); \
 	if(hr != hrSuccess) \
 		goto exit;
 
-WSTableView::WSTableView(ULONG ulType, ULONG ulFlags, ZarafaCmd *lpCmd,
+WSTableView::WSTableView(ULONG ulType, ULONG ulFlags, KCmd *lpCmd,
     pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
     LPENTRYID lpEntryId, WSTransport *lpTransport, const char *szClassName) :
 	ECUnknown(szClassName)
@@ -103,7 +91,7 @@ HRESULT WSTableView::HrQueryRows(ULONG ulRowCount, ULONG ulFlags, LPSRowSet *lpp
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableQueryRows(ecSessionId, ulTableId, ulRowCount, ulFlags, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -130,9 +118,9 @@ HRESULT WSTableView::HrCloseTable()
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableClose(ecSessionId, this->ulTableId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 
-		if(er == ZARAFA_E_END_OF_SESSION)
+		if(er == KCERR_END_OF_SESSION)
 			er = erSuccess; // Don't care about end of session 
 	}
 	END_SOAP_CALL
@@ -168,7 +156,7 @@ HRESULT WSTableView::HrSetColumns(LPSPropTagArray lpsPropTagArray)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableSetColumns(ecSessionId, ulTableId, &sColumns, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -185,7 +173,6 @@ HRESULT WSTableView::HrQueryColumns(ULONG ulFlags, LPSPropTagArray *lppsPropTags
 	HRESULT hr = hrSuccess;
 	struct tableQueryColumnsResponse sResponse;
 	LPSPropTagArray lpsPropTags = NULL;
-	int i = 0;
 	
 	LockSoap();
 
@@ -196,7 +183,7 @@ HRESULT WSTableView::HrQueryColumns(ULONG ulFlags, LPSPropTagArray *lppsPropTags
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableQueryColumns(ecSessionId, ulTableId, ulFlags, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -206,8 +193,7 @@ HRESULT WSTableView::HrQueryColumns(ULONG ulFlags, LPSPropTagArray *lppsPropTags
 
 	if(hr != hrSuccess)
 		goto exit;
-
-	for (i = 0; i < sResponse.sPropTagArray.__size; ++i)
+	for (gsoap_size_t i = 0; i < sResponse.sPropTagArray.__size; ++i)
 		lpsPropTags->aulPropTag[i] = sResponse.sPropTagArray.__ptr[i];
 
 	lpsPropTags->cValues = sResponse.sPropTagArray.__size;
@@ -242,7 +228,7 @@ HRESULT WSTableView::HrRestrict(LPSRestriction lpsRestriction)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableRestrict(ecSessionId, ulTableId, lpsRestrictTable, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -284,7 +270,7 @@ HRESULT WSTableView::HrSortTable(LPSSortOrderSet lpsSortOrderSet)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableSort(ecSessionId, ulTableId, &sSort, lpsSortOrderSet->cCategories, lpsSortOrderSet->cExpanded, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -309,7 +295,7 @@ HRESULT WSTableView::HrOpenTable()
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableOpen(ecSessionId, m_sEntryId, m_ulTableType, ulType, this->ulFlags, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -339,7 +325,7 @@ HRESULT WSTableView::HrGetRowCount(ULONG *lpulRowCount, ULONG *lpulCurrentRow)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableGetRowCount(ecSessionId, ulTableId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -378,7 +364,7 @@ HRESULT WSTableView::HrFindRow(LPSRestriction lpsRestriction, BOOKMARK bkOrigin,
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableFindRow(ecSessionId, ulTableId, (unsigned int)bkOrigin, ulFlags, lpRestrict, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -407,7 +393,7 @@ HRESULT WSTableView::HrSeekRow(BOOKMARK bkOrigin, LONG lRows, LONG *lplRowsSough
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableSeekRow(ecSessionId, ulTableId, (unsigned int)bkOrigin, lRows, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -442,7 +428,7 @@ HRESULT WSTableView::CreateBookmark(BOOKMARK* lpbkPosition)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableCreateBookmark(ecSessionId, ulTableId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -470,7 +456,7 @@ HRESULT WSTableView::FreeBookmark(BOOKMARK bkPosition)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableFreeBookmark(ecSessionId, ulTableId, bkPosition, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -499,7 +485,7 @@ HRESULT WSTableView::HrExpandRow(ULONG cbInstanceKey, LPBYTE pbInstanceKey, ULON
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableExpandRow(ecSessionId, this->ulTableId, sInstanceKey, ulRowCount, ulFlags, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -536,7 +522,7 @@ HRESULT WSTableView::HrCollapseRow(ULONG cbInstanceKey, LPBYTE pbInstanceKey, UL
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableCollapseRow(ecSessionId, this->ulTableId, sInstanceKey, ulFlags, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -569,7 +555,7 @@ HRESULT WSTableView::HrGetCollapseState(BYTE **lppCollapseState, ULONG *lpcbColl
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableGetCollapseState(ecSessionId, this->ulTableId, sBookmark, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -606,13 +592,13 @@ HRESULT WSTableView::HrSetCollapseState(BYTE *lpCollapseState, ULONG cbCollapseS
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableSetCollapseState(ecSessionId, this->ulTableId, sState, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
 	END_SOAP_CALL
 
-	hr = ZarafaErrorToMAPIError(er);
+	hr = kcerr_to_mapierr(er);
 	if(hr != hrSuccess)
 		goto exit;
 
@@ -630,13 +616,13 @@ HRESULT WSTableView::HrMulti(ULONG ulDeferredFlags, LPSPropTagArray lpsPropTagAr
     HRESULT hr = hrSuccess;
     ECRESULT er = erSuccess;
     
-	struct propTagArray sColumns = {0};
-	struct tableMultiRequest sRequest = {0};
-	struct tableMultiResponse sResponse = {0};
+	struct propTagArray sColumns{__gszeroinit};
+	struct tableMultiRequest sRequest{__gszeroinit};
+	struct tableMultiResponse sResponse{__gszeroinit};
 	struct restrictTable *lpsRestrictTable = NULL;
-	struct tableQueryRowsRequest sQueryRows = {0};
-	struct tableSortRequest sSort = {{0}};
-	struct tableOpenRequest sOpen = {{0}};
+	struct tableQueryRowsRequest sQueryRows{__gszeroinit};
+	struct tableSortRequest sSort{__gszeroinit};
+	struct tableOpenRequest sOpen{__gszeroinit};
 	unsigned int i;
 	
 	memset(&sRequest, 0, sizeof(sRequest));
@@ -708,7 +694,7 @@ HRESULT WSTableView::HrMulti(ULONG ulDeferredFlags, LPSPropTagArray lpsPropTagAr
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableMulti(ecSessionId, sRequest, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -785,15 +771,13 @@ HRESULT WSTableView::SetReloadCallback(RELOADCALLBACK callback, void *lpParam)
 
 	return hr;
 }
-//////////////////////////////////////////////
-// WSTableOutGoingQueue view
-//
-WSTableOutGoingQueue::WSTableOutGoingQueue(ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport) : WSStoreTableView(MAPI_MESSAGE, 0, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport)
-{
 
+// WSTableOutGoingQueue view
+WSTableOutGoingQueue::WSTableOutGoingQueue(KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport) : WSStoreTableView(MAPI_MESSAGE, 0, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport)
+{
 }
 
-HRESULT WSTableOutGoingQueue::Create(ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport, WSTableOutGoingQueue **lppTableOutGoingQueue)
+HRESULT WSTableOutGoingQueue::Create(KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport, WSTableOutGoingQueue **lppTableOutGoingQueue)
 {
 	HRESULT hr = hrSuccess;
 	WSTableOutGoingQueue *lpTableOutGoingQueue = NULL; 
@@ -830,7 +814,7 @@ HRESULT WSTableOutGoingQueue::HrOpenTable()
 	{
 		//m_sEntryId is the id of a store
 		if(SOAP_OK != lpCmd->ns__tableOpen(ecSessionId, m_sEntryId, TABLETYPE_SPOOLER, 0, this->ulFlags, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}

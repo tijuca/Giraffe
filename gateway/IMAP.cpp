@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -30,33 +30,33 @@
 #include <mapidefs.h>
 #include <mapiutil.h>
 #include <mapiguid.h>
-#include <zarafa/ECDefs.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/ECTags.h>
-#include <zarafa/ECIConv.h>
+#include <kopano/ECDefs.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/ECTags.h>
+#include <kopano/ECIConv.h>
 #include <inetmapi/inetmapi.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <vector>
 #include <list>
 #include <set>
 #include <map>
 #include <algorithm>
-#include <zarafa/base64.h>
+#include <kopano/base64.h>
 #include <inetmapi/options.h>
 
 #include <edkmdb.h>
-#include <zarafa/stringutil.h>
-#include <zarafa/codepage.h>
-#include <zarafa/charset/convert.h>
-#include <zarafa/restrictionutil.h>
-#include <zarafa/ecversion.h>
-#include <zarafa/ECGuid.h>
-#include <zarafa/namedprops.h>
+#include <kopano/stringutil.h>
+#include <kopano/codepage.h>
+#include <kopano/charset/convert.h>
+#include <kopano/restrictionutil.h>
+#include <kopano/ecversion.h>
+#include <kopano/ECGuid.h>
+#include <kopano/namedprops.h>
 #include "ECFeatures.h"
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/unordered_set.hpp>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/mapi_ptr.h>
 
 #include "IMAP.h"
 using namespace std;
@@ -306,9 +306,9 @@ HRESULT IMAP::HrSendGreeting(const std::string &strHostString)
 	HRESULT hr = hrSuccess;
 
 	if (parseBool(lpConfig->GetSetting("server_hostname_greeting")))
-		hr = HrResponse(RESP_UNTAGGED, "OK [" + GetCapabilityString(false) + "] Zarafa IMAP gateway ready" + strHostString);
+		hr = HrResponse(RESP_UNTAGGED, "OK [" + GetCapabilityString(false) + "] IMAP gateway ready" + strHostString);
 	else
-		hr = HrResponse(RESP_UNTAGGED, "OK [" + GetCapabilityString(false) + "] Zarafa IMAP gateway ready");
+		hr = HrResponse(RESP_UNTAGGED, "OK [" + GetCapabilityString(false) + "] IMAP gateway ready");
 
 	return hr;
 }
@@ -813,7 +813,7 @@ exit:
 HRESULT IMAP::HrCmdLogout(const string &strTag) {
 	HRESULT hr = hrSuccess;
 
-	hr = HrResponse(RESP_UNTAGGED, "BYE Zarafa server logging out");
+	hr = HrResponse(RESP_UNTAGGED, "BYE server logging out");
 	if (hr != hrSuccess)
 		goto exit;
 	
@@ -1001,7 +1001,7 @@ HRESULT IMAP::HrCmdLogin(const string &strTag, const string &strUser, const stri
 		goto exit;
 	}
 
-	// do not disable notifications for imap connections, may be idle and sessions on the zarafa server will disappear.
+	// do not disable notifications for imap connections, may be idle and sessions on the storage server will disappear.
 	hr = HrOpenECSession(lpLogger, &lpSession, "gateway/imap", PROJECT_SVN_REV_STR, strwUsername.c_str(), strwPassword.c_str(), m_strPath.c_str(), EC_PROFILE_FLAGS_NO_COMPRESSION, NULL, NULL);
 	if (hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_WARNING, "Failed to login from %s with invalid username \"%s\" or wrong password. Error: 0x%08X",
@@ -2260,7 +2260,7 @@ exit:
  * @brief Handles the EXPUNGE command
  * 
  * All \Deleted marked emails will actually be removed (softdeleted in
- * Zarafa). Optional is the sequence set (UIDPLUS extension), which
+ * Kopano). Optional is the sequence set (UIDPLUS extension), which
  * messages only must be expunged if \Deleted flag was marked AND are
  * present in this sequence.
  *
@@ -2822,7 +2822,7 @@ LONG __stdcall IMAPIdleAdviseCallback(void *lpContext, ULONG cNotif, LPNOTIFICAT
 			break;
 
 		case TABLE_RELOAD:
-			// TABLE_RELOAD is unused in Zarafa
+			// TABLE_RELOAD is unused in Kopano
 		case TABLE_CHANGED:
             lpIMAP->HrRefreshFolderMails(false, !lpIMAP->bCurrentFolderReadOnly, false, NULL);
 		    break;
@@ -3932,7 +3932,7 @@ HRESULT IMAP::HrGetSubTree(list<SFolder> &lstFolders, SBinary &sEntryID, wstring
 			continue;			// no entryid, no folder
 
 		if (PROP_TYPE(lpRows->aRow[i].lpProps[IMAPID].ulPropTag) != PT_LONG) {
-		    lpLogger->Log(EC_LOGLEVEL_FATAL, "Server does not support PR_EC_IMAP_ID. Please update zarafa server.");
+		    lpLogger->Log(EC_LOGLEVEL_FATAL, "Server does not support PR_EC_IMAP_ID. Please update the storage server.");
 		    break;
         }
 

@@ -10,23 +10,23 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
 	-DPKGLIBDIR='"${pkglibdir}"' \
 	$(MYSQL_INCLUDES) $(GSOAP_CFLAGS) $(SSL_CFLAGS) $(SSL_HAS_EVP_PKEY_CMP) $(EPOLL_CFLAGS) $(KRB5_CFLAGS)
 
-sbin_PROGRAMS = zarafa-server
-noinst_DATA = zarafa-server.ldx
+sbin_PROGRAMS = kopano-server
+noinst_DATA = kopano-server.ldx
 
-zarafa_server_LDFLAGS = ${AM_LDFLAGS} -Wl,-E $(BOOST_FILESYSTEM_LDFLAGS)
-zarafa_server_LDADD = \
-	${top_builddir}/provider/libserver/libzarafa_server.la \
+kopano_server_LDFLAGS = ${AM_LDFLAGS} -Wl,-E $(BOOST_FILESYSTEM_LDFLAGS)
+kopano_server_LDADD = \
+	${top_builddir}/provider/libserver/libkcserver.la \
     ${GSOAP_LIBS} \
-	${top_builddir}/provider/soap/libzarafa_soapserver.la \
-	${top_builddir}/provider/common/libzarafacommon.la						\
-	${top_builddir}/common/libzcp_common_util.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_ssl.la \
+	${top_builddir}/provider/soap/libkcsoapserver.la \
+	${top_builddir}/provider/common/libkccommon.la						\
+	${top_builddir}/common/libkcutil.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcssl.la \
 	$(PROG_LIBS) ${icu_uc_LIBS} \
 	$(BOOST_FILESYSTEM_LIBS) $(BOOST_SYSTEM_LIBS) $(ICU_LIBS) $(DL_LIBS)	\
 	$(MYSQL_LIBS) $(SSL_LIBS) $(PAM_LIBS) $(KRB5_LIBS) -lrt
 
-zarafa_server_SOURCES = ECServer.cpp  \
+kopano_server_SOURCES = ECServer.cpp  \
 						ECSoapServerConnection.h ECSoapServerConnection.cpp \
 						ECClientUpdate.h ECClientUpdate.cpp \
 						ECThreadManager.h ECThreadManager.cpp

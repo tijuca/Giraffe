@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -22,7 +22,7 @@
 #ifndef ECNOTIFICATION
 #define ECNOTIFICATION
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include "soapH.h"
 
 class ECNotification _zcp_final {
@@ -38,8 +38,7 @@ public:
 	void SetConnection(unsigned int ulConnection);
 
 	void GetCopy(struct soap *, notification &) const;
-
-	unsigned int GetObjectSize(void) const;
+	size_t GetObjectSize(void) const;
 
 protected:
 	void Init();

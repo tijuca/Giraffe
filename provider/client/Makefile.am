@@ -1,13 +1,13 @@
 # -*- Makefile -*-
 
-pkglib_LTLIBRARIES = libzarafaclient.la
-noinst_DATA = libzarafaclient.ldd
+pkglib_LTLIBRARIES = libkcclient.la
+noinst_DATA = libkcclient.ldd
 
 sysconf_configdir = ${MAPICONFIGDIR}
-dist_sysconf_config_DATA = zarafa.inf
+dist_sysconf_config_DATA = kopano.inf
 
 sampleconfdir = ${docdir}/example-config
-sampleconf_DATA = zarafa.inf
+sampleconf_DATA = kopano.inf
 
 AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS)	\
 	$(GSOAP_CFLAGS) $(SSL_CFLAGS)				\
@@ -18,22 +18,22 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS)	\
 	-I${top_srcdir}/mapi4linux/include			\
 	-I${top_srcdir}/libfreebusy					\
 	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
-	-I${top_srcdir}/zarafa-libsync
+	-I${top_srcdir}/libsync
 
-libzarafaclient_la_LDFLAGS = ${AM_LDFLAGS} -avoid-version -module
-libzarafaclient_la_LIBADD = $(SSL_LIBS)	\
+libkcclient_la_LDFLAGS = ${AM_LDFLAGS} -avoid-version -module
+libkcclient_la_LIBADD = $(SSL_LIBS)	\
     ${GSOAP_LIBS} \
-	${top_builddir}/provider/soap/libzarafa_soapclient.la \
-	${top_builddir}/provider/common/libzarafacommon.la	\
-	${top_builddir}/common/libzcp_common_util.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_ssl.la \
-	${top_builddir}/libfreebusy/libfreebusy.la			\
+	${top_builddir}/provider/soap/libkcsoapclient.la \
+	${top_builddir}/provider/common/libkccommon.la	\
+	${top_builddir}/common/libkcutil.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcssl.la \
+	${top_builddir}/libfreebusy/libkcfreebusy.la \
 	${top_builddir}/mapi4linux/src/libmapi.la			\
-	${top_builddir}/zarafa-libsync/libzarafasync.la		\
+	${top_builddir}/libsync/libkcsync.la \
 	-lstdc++ $(UUID_LIBS) $(ICU_LIBS)
 
-libzarafaclient_la_SOURCES = ECABLogon.cpp ECABProvider.cpp											\
+libkcclient_la_SOURCES = ECABLogon.cpp ECABProvider.cpp											\
 	ECAttach.cpp ECMAPIContainer.cpp ECMAPIFolder.cpp ECMAPIProp.cpp								\
 	ECMAPITable.cpp ECMessage.cpp ECMsgStore.cpp													\
 	ECMSProvider.cpp ECNamedProp.cpp ECNotifyClient.cpp ECNotifyMaster.cpp							\

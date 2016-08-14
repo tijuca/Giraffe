@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,16 +19,18 @@
 #ifndef ECPLUGINFACTORY_H
 #define ECPLUGINFACTORY_H
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/ZarafaCode.h>
-#include <zarafa/ECConfig.h>
-#include <zarafa/ECPluginSharedData.h>
+#include <kopano/zcdefs.h>
+#include <kopano/kcodes.h>
 #include "plugin.h"
 #include <pthread.h>
 
+class ECConfig;
+class ECPluginSharedData;
+class ECStatsCollector;
+
 class ECPluginFactory _zcp_final {
 public:
-	ECPluginFactory(ECConfig *config, IECStatsCollector *lpStatsCollector, bool bHosted, bool bDistributed);
+	ECPluginFactory(ECConfig *config, ECStatsCollector *lpStatsCollector, bool bHosted, bool bDistributed);
 	~ECPluginFactory();
 
 	ECRESULT	CreateUserPlugin(UserPlugin **lppPlugin);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -25,8 +25,8 @@
 #include <list>
 #include <set>
 
-#include <zarafa/ECIConv.h>
-#include <zarafa/ECChannel.h>
+#include <kopano/ECIConv.h>
+#include <kopano/ECChannel.h>
 
 using namespace std;
 

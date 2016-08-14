@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -37,7 +37,7 @@ public:
 	eResult GetManage(const TCHAR *lpszUser, ArchiveManagePtr *lpptrManage);
 	eResult AutoAttach(unsigned int ulFlags);
 
-	ECConfig* GetConfig() const;
+	ECConfig *GetConfig(void) const { return m_lpsConfig; }
 
 	ECLogger* GetLogger(eLogType which) const; // Inherits default (which = DefaultLog) from Archiver::GetLogger
 

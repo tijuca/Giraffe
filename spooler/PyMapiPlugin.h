@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,12 +19,12 @@
 #define _PYMAPIPLUGIN_H
 
 #include <Python.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECConfig.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECConfig.h>
 #include "PythonSWIGRuntime.h"
 #include <edkmdb.h>
 
-#include <zarafa/auto_free.h>
+#include <kopano/auto_free.h>
 
 inline void my_DECREF(PyObject *obj) {
 	Py_DECREF(obj);
@@ -71,8 +71,8 @@ private:
 
 private:
 	// Inhibit (accidental) copying
-	PyMapiPlugin(const PyMapiPlugin &);
-	PyMapiPlugin& operator=(const PyMapiPlugin &);
+	PyMapiPlugin(const PyMapiPlugin &) = delete;
+	PyMapiPlugin &operator=(const PyMapiPlugin &) = delete;
 };
 
 
@@ -94,8 +94,8 @@ private:
 
 private:
 	// Inhibit (accidental) copying
-	PyMapiPluginFactory(const PyMapiPluginFactory &);
-	PyMapiPluginFactory& operator=(const PyMapiPluginFactory &);
+	PyMapiPluginFactory(const PyMapiPluginFactory &) = delete;
+	PyMapiPluginFactory &operator=(const PyMapiPluginFactory &) = delete;
 };
 
 

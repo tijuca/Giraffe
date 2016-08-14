@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,16 +19,7 @@
 #define __M4L_MAPIX_H_
 #define MAPIX_H
 
-/*
- * MAPI for linux
- *
- * mapix.h - Extended MAPI
- *
- * (C) Zarafa 2005
- *
- */
-
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 /* Include common MAPI header files if they haven't been already. */
 #include <mapidefs.h>

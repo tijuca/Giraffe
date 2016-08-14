@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,19 +18,17 @@
 #ifndef _ICAL_H_
 #define _ICAL_H_
 
+#include <kopano/zcdefs.h>
 #include "Http.h"
 #include <mapi.h>
-#include <zarafa/CommonUtil.h>
+#include <kopano/CommonUtil.h>
 #include "MAPIToICal.h"
 #include "ICalToMAPI.h"
 #include "CalDavProto.h"
 
-class iCal: public ProtocolBase
-{
+class iCal _kc_final : public ProtocolBase {
 public:
 	iCal(Http *lpRequest, IMAPISession *lpSession, ECLogger *lpLogger, std::string strSrvTz, std::string strCharset);
-	~iCal();
-
 	HRESULT HrHandleCommand(const std::string &strMethod);
 	
 private:

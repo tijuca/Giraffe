@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -12,15 +12,8 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-// ECSecurity.cpp: implementation of the ECSecurity class.
-//
-//////////////////////////////////////////////////////////////////////
-
-#include <zarafa/platform.h>
-
+#include <kopano/platform.h>
 #ifdef LINUX
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -33,20 +26,20 @@
 #include "ECSessionManager.h"
 #include "ECSession.h"
 
-#include <zarafa/ECDefs.h>
+#include <kopano/ECDefs.h>
 #include "ECSecurity.h"
 
-#include <zarafa/stringutil.h>
-#include <zarafa/Trace.h>
-#include "Zarafa.h"
-#include <zarafa/md5.h>
+#include <kopano/stringutil.h>
+#include <kopano/Trace.h>
+#include "kcore.hpp"
+#include <kopano/md5.h>
 
-#include <zarafa/ECDefs.h>
+#include <kopano/ECDefs.h>
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapitags.h>
 
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 
 #include <cstdarg>
 
@@ -62,12 +55,10 @@
 #include "SOAPDebug.h"
 #include <edkmdb.h>
 #include "ECDBDef.h"
-#include "ZarafaCmdUtil.h"
+#include "cmdutil.hpp"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 #define MAX_PARENT_LIMIT 64
@@ -112,11 +103,11 @@ ECSecurity::~ECSecurity()
  * 
  * @param[in] ulUserId current logged in user
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSecurity::SetUserContext(unsigned int ulUserId, unsigned int ulImpersonatorID)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	ECUserManagement *lpUserManagement = m_lpSession->GetUserManagement();
 
 	m_ulUserID = ulUserId;
@@ -124,7 +115,7 @@ ECRESULT ECSecurity::SetUserContext(unsigned int ulUserId, unsigned int ulImpers
 
 	er = lpUserManagement->GetObjectDetails(m_ulUserID, &m_details);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	// Get the company we're assigned to
 	if(m_lpSession->GetSessionManager()->IsHostedSupported()) {
@@ -138,18 +129,15 @@ ECRESULT ECSecurity::SetUserContext(unsigned int ulUserId, unsigned int ulImpers
 
 		er = lpUserManagement->GetObjectDetails(m_ulImpersonatorID, &m_impersonatorDetails);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 
 		ulAdminLevel = m_impersonatorDetails.GetPropInt(OB_PROP_I_ADMINLEVEL);
 		if (ulAdminLevel == 0) {
-			er = ZARAFA_E_NO_ACCESS;
-			goto exit;
+			return KCERR_NO_ACCESS;
 		} else if (m_lpSession->GetSessionManager()->IsHostedSupported() == true && ulAdminLevel < ADMIN_LEVEL_SYSADMIN) {
 			unsigned int ulCompanyID = m_impersonatorDetails.GetPropInt(OB_PROP_I_COMPANYID);
-			if (ulCompanyID != m_ulCompanyID) {
-				er = ZARAFA_E_NO_ACCESS;
-				goto exit;
-			}
+			if (ulCompanyID != m_ulCompanyID)
+				return KCERR_NO_ACCESS;
 		}
 	}
 
@@ -159,9 +147,7 @@ ECRESULT ECSecurity::SetUserContext(unsigned int ulUserId, unsigned int ulImpers
 	 * this will save quite a lot of LDAP queries since often we don't
 	 * even need the list at all.
 	 */
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 // helper class to remember groups we've seen to break endless loops
@@ -182,11 +168,11 @@ public:
  * @param[in]  ulUserId A user or group to query the grouplist for.
  * @param[out] lppGroups The unique list of group ids
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSecurity::GetGroupsForUser(unsigned int ulUserId, std::list<localobjectdetails_t> **lppGroups)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	std::list<localobjectdetails_t> *lpGroups = NULL;
 	std::list<localobjectdetails_t>::iterator iterGroups;
 	cUniqueGroup cSeenGroups;
@@ -194,9 +180,9 @@ ECRESULT ECSecurity::GetGroupsForUser(unsigned int ulUserId, std::list<localobje
 	/* Gets the current user's membership information.
 	 * This means you will be in the same groups until you login again */
 	er = m_lpSession->GetUserManagement()->GetParentObjectsOfObjectAndSync(OBJECTRELATION_GROUP_MEMBER,
-																		   ulUserId, &lpGroups, USERMANAGEMENT_IDS_ONLY);
+		ulUserId, &lpGroups, USERMANAGEMENT_IDS_ONLY);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	/* A user is only member of a group when he can also view the group */
 	for (iterGroups = lpGroups->begin(); iterGroups != lpGroups->end(); ) {
@@ -221,15 +207,13 @@ ECRESULT ECSecurity::GetGroupsForUser(unsigned int ulUserId, std::list<localobje
 				remove_copy_if(lpGroupInGroups->begin(), lpGroupInGroups->end(), back_inserter(*lpGroups), cSeenGroups);
 				delete lpGroupInGroups;
 			}
-			er = erSuccess;		// Ignore error (eg. cannot use that function on group Everyone)
+			// Ignore error (eg. cannot use that function on group Everyone)
 			++iterGroups;
 		}
 	}
 
 	*lppGroups = lpGroups;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 /** 
@@ -243,7 +227,6 @@ exit:
 ECRESULT ECSecurity::GetObjectPermission(unsigned int ulObjId, unsigned int* lpulRights)
 {
 	ECRESULT		er = erSuccess;
-	unsigned int	i = 0;
 	std::list<localobjectdetails_t>::const_iterator iterGroups;
 	struct rightsArray *lpRights = NULL;
 	unsigned		ulCurObj = ulObjId;
@@ -261,14 +244,14 @@ ECRESULT ECSecurity::GetObjectPermission(unsigned int ulObjId, unsigned int* lpu
 		if(m_lpSession->GetSessionManager()->GetCacheManager()->GetACLs(ulCurObj, &lpRights) == erSuccess) {
 			// This object has ACL's, check if any of them are for this user
 
-			for (i = 0; i < lpRights->__size; ++i)
+			for (gsoap_size_t i = 0; i < lpRights->__size; ++i)
 				if(lpRights->__ptr[i].ulType == ACCESS_TYPE_GRANT && lpRights->__ptr[i].ulUserid == m_ulUserID) {
 					*lpulRights |= lpRights->__ptr[i].ulRights;
 					bFoundACL = true;
 				}
 
 			// Check for the company we are in and add the permissions
-			for (i = 0; i < lpRights->__size; ++i)
+			for (gsoap_size_t i = 0; i < lpRights->__size; ++i)
 				if (lpRights->__ptr[i].ulType == ACCESS_TYPE_GRANT && lpRights->__ptr[i].ulUserid == m_ulCompanyID) {
 					*lpulRights |= lpRights->__ptr[i].ulRights;
 					bFoundACL = true;
@@ -277,7 +260,7 @@ ECRESULT ECSecurity::GetObjectPermission(unsigned int ulObjId, unsigned int* lpu
 			// Also check for groups that we are in, and add those permissions
 			if(m_lpGroups || GetGroupsForUser(m_ulUserID, &m_lpGroups) == erSuccess)
 				for (iterGroups = m_lpGroups->begin(); iterGroups != m_lpGroups->end(); ++iterGroups)
-					for (i = 0; i < lpRights->__size; ++i)
+					for (gsoap_size_t i = 0; i < lpRights->__size; ++i)
 						if(lpRights->__ptr[i].ulType == ACCESS_TYPE_GRANT && lpRights->__ptr[i].ulUserid == iterGroups->ulId) {
 							*lpulRights |= lpRights->__ptr[i].ulRights;
 							bFoundACL = true;
@@ -328,16 +311,16 @@ exit:
  *
  * @param[in] ulObjId Object ID for which the permission should be checked
  * @param[in] ulACLMask Mask of permissions to be checked
- * @return Zarafa error code
+ * @return Kopano error code
  * @retval erSuccess if permission is granted
- * @retval ZARAFA_E_NO_ACCESS if permission is denied
+ * @retval KCERR_NO_ACCESS if permission is denied
  */
 ECRESULT ECSecurity::HaveObjectPermission(unsigned int ulObjId, unsigned int ulACLMask)
 {
 	unsigned int	ulRights = 0;
 
 	GetObjectPermission(ulObjId, &ulRights);
-	return (ulRights & ulACLMask) ? erSuccess : ZARAFA_E_NO_ACCESS;
+	return (ulRights & ulACLMask) ? erSuccess : KCERR_NO_ACCESS;
 }
 
 /** 
@@ -347,7 +330,7 @@ ECRESULT ECSecurity::HaveObjectPermission(unsigned int ulObjId, unsigned int ulA
  * 
  * @param[in] ulObjId hierarchy object to check ownership of
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSecurity::IsOwner(unsigned int ulObjId)
 {
@@ -355,7 +338,7 @@ ECRESULT ECSecurity::IsOwner(unsigned int ulObjId)
 	unsigned int	ulOwner = 0;
 
 	er = GetOwner(ulObjId, &ulOwner);
-	return er != erSuccess || ulOwner != m_ulUserID ? ZARAFA_E_NO_ACCESS : erSuccess;
+	return er != erSuccess || ulOwner != m_ulUserID ? KCERR_NO_ACCESS : erSuccess;
 }
 
 /** 
@@ -364,7 +347,7 @@ ECRESULT ECSecurity::IsOwner(unsigned int ulObjId)
  * @param[in] ulObjId hierarchy object to get ownership of
  * @param[out] lpulOwnerId owner userid (may not even exist anymore)
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSecurity::GetOwner(unsigned int ulObjId, unsigned int *lpulOwnerId)
 {
@@ -374,7 +357,7 @@ ECRESULT ECSecurity::GetOwner(unsigned int ulObjId, unsigned int *lpulOwnerId)
 	*lpulOwnerId = 0;
 
 	er = m_lpSession->GetSessionManager()->GetCacheManager()->GetOwner(ulObjId, lpulOwnerId);
-	return er != erSuccess ? ZARAFA_E_NOT_FOUND : er;
+	return er != erSuccess ? KCERR_NOT_FOUND : er;
 }
 
 /** 
@@ -383,7 +366,7 @@ ECRESULT ECSecurity::GetOwner(unsigned int ulObjId, unsigned int *lpulOwnerId)
  * 
  * @param[in] ulId object id to start checking from
  * 
- * @return ZARAFA_E_NOT_FOUND Error if a parent has the delete flag
+ * @return KCERR_NOT_FOUND Error if a parent has the delete flag
  */
 ECRESULT ECSecurity::CheckDeletedParent(unsigned int ulId)
 {
@@ -397,22 +380,16 @@ ECRESULT ECSecurity::CheckDeletedParent(unsigned int ulId)
 	do {
 		er = lpCache->GetObject(ulId, &ulParentObjId, NULL, &ulObjFlags, &ulObjType);
 		if (er != erSuccess)
-			goto exit;
-
-		if (ulObjFlags & MSGFLAG_DELETED) {
-			er = ZARAFA_E_NOT_FOUND;
-			goto exit;
-		}
-
+			return er;
+		if (ulObjFlags & MSGFLAG_DELETED)
+			return KCERR_NOT_FOUND;
 		ulId = ulParentObjId;
 		++ulDepth;
 	} while (ulObjType != MAPI_STORE && ulParentObjId != CACHE_NO_PARENT && ulDepth <= MAX_PARENT_LIMIT);
 
 	// return error when max depth is reached, so we don't create folders and messages deeper than the limit
 	if (ulDepth == MAX_PARENT_LIMIT)
-		er = ZARAFA_E_NOT_FOUND;
-
-exit:
+		er = KCERR_NOT_FOUND;
 	return er;
 }
 
@@ -422,13 +399,13 @@ exit:
  * @param[in] ulObjId hierarchy object to check permissions on
  * @param[in] ulecRights minimal permission required on object to succeed
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  * @retval erSuccess requested access on object allowed
- * @retval ZARAFA_E_NO_ACCESS requested access on object denied
+ * @retval KCERR_NO_ACCESS requested access on object denied
  */
 ECRESULT ECSecurity::CheckPermission(unsigned int ulObjId, unsigned int ulecRights)
 {
-	ECRESULT		er = ZARAFA_E_NO_ACCESS;
+	ECRESULT		er = KCERR_NO_ACCESS;
 	bool			bOwnerFound = false;
 	unsigned int	ulStoreOwnerId = 0;
 	unsigned int	ulStoreType = 0;
@@ -439,7 +416,7 @@ ECRESULT ECSecurity::CheckPermission(unsigned int ulObjId, unsigned int ulecRigh
 	unsigned int	ulParentId;
 	unsigned int	ulParentType;
 
-	if(m_ulUserID == ZARAFA_UID_SYSTEM) {
+	if(m_ulUserID == KOPANO_UID_SYSTEM) {
 		// SYSTEM is always allowed everything
 		er = erSuccess;
 		goto exit;
@@ -573,14 +550,14 @@ exit:
 	if(er != erSuccess)
 		TRACE_INTERNAL(TRACE_ENTRY,"Security","ECSecurity::CheckPermission","object=%d, rights=%d", ulObjId, ulecRights);
 
-	if (m_lpAudit && m_ulUserID != ZARAFA_UID_SYSTEM) {
+	if (m_lpAudit && m_ulUserID != KOPANO_UID_SYSTEM) {
 		unsigned int ulType = 0;
 		objectdetails_t sStoreDetails;
 		std::string strStoreOwner;
 		std::string strUsername;
 
 		m_lpSession->GetSessionManager()->GetCacheManager()->GetObject(ulObjId, NULL, NULL, NULL, &ulType);
-		if (er == ZARAFA_E_NO_ACCESS || ulStoreOwnerId != m_ulUserID) {
+		if (er == KCERR_NO_ACCESS || ulStoreOwnerId != m_ulUserID) {
 			GetUsername(&strUsername);
 			if (ulStoreOwnerId != m_ulUserID) {
 				if (m_lpSession->GetUserManagement()->GetObjectDetails(ulStoreOwnerId, &sStoreDetails) != erSuccess) {
@@ -594,7 +571,7 @@ exit:
 			}
 		}
 
-		if (er == ZARAFA_E_NO_ACCESS) {
+		if (er == KCERR_NO_ACCESS) {
 			m_lpAudit->Log(EC_LOGLEVEL_FATAL, "access denied objectid=%d type=%d ownername='%s' username='%s' rights='%s'",
 						   ulObjId, ulType, strStoreOwner.c_str(), strUsername.c_str(), RightsToString(ulecRights));
 		} else if (ulStoreOwnerId != m_ulUserID) {
@@ -616,11 +593,11 @@ exit:
  * @param[in] ulType rights access type, denied or grant
  * @param[out] lpsRightsArray structure with the current rights on objid
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSecurity::GetRights(unsigned int objid, int ulType, struct rightsArray *lpsRightsArray)
 {
-	ECRESULT			er = ZARAFA_E_NO_ACCESS;
+	ECRESULT			er = KCERR_NO_ACCESS;
 	DB_RESULT			lpDBResult = NULL;
 	DB_ROW				lpDBRow = NULL;
 	ECDatabase			*lpDatabase = NULL;
@@ -634,7 +611,7 @@ ECRESULT ECSecurity::GetRights(unsigned int objid, int ulType, struct rightsArra
 		goto exit;
 
 	if (lpsRightsArray == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
@@ -661,7 +638,7 @@ ECRESULT ECSecurity::GetRights(unsigned int objid, int ulType, struct rightsArra
 			lpDBRow = lpDatabase->FetchRow(lpDBResult);
 
 			if(lpDBRow == NULL) {
-				er = ZARAFA_E_DATABASE_ERROR;
+				er = KCERR_DATABASE_ERROR;
 				ec_log_err("ECSecurity::GetRights(): row is null");
 				goto exit;
 			}
@@ -672,9 +649,9 @@ ECRESULT ECSecurity::GetRights(unsigned int objid, int ulType, struct rightsArra
 			lpsRightsArray->__ptr[i].ulState  = RIGHT_NORMAL;
 
 			// do not use internal id's with the cache
-			if (lpsRightsArray->__ptr[i].ulUserid == ZARAFA_UID_SYSTEM) {
+			if (lpsRightsArray->__ptr[i].ulUserid == KOPANO_UID_SYSTEM) {
 				sExternId = objectid_t(ACTIVE_USER);
-			} else if (lpsRightsArray->__ptr[i].ulUserid == ZARAFA_UID_EVERYONE) {
+			} else if (lpsRightsArray->__ptr[i].ulUserid == KOPANO_UID_EVERYONE) {
 				sExternId = objectid_t(DISTLIST_GROUP);
 			} else {
 				er = m_lpSession->GetUserManagement()->GetExternalId(lpsRightsArray->__ptr[i].ulUserid, &sExternId);
@@ -706,12 +683,11 @@ exit:
  * @param[in] objid hierarchy object id to set rights on
  * @param[in] lpsRightsArray protocol struct containing new rights for this object
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSecurity::SetRights(unsigned int objid, struct rightsArray *lpsRightsArray)
 {
-	ECRESULT			er = erSuccess;
-	unsigned int		i;
+	ECRESULT er;
 	std::string			strQueryNew, strQueryDeniedNew;
 	std::string			strQueryModify, strQueryDeniedModify;
 	std::string			strQueryDelete, strQueryDeniedDelete;
@@ -720,21 +696,18 @@ ECRESULT ECSecurity::SetRights(unsigned int objid, struct rightsArray *lpsRights
 	unsigned int		ulUserId = 0;
 	objectid_t			sExternId;
 	objectdetails_t		sDetails;
-	unsigned int		ulErrors = 0;
+	size_t ulErrors = 0;
 
 	er = m_lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
-		goto exit;
-
-	if (lpsRightsArray == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+		return er;
+	if (lpsRightsArray == NULL)
+		return KCERR_INVALID_PARAMETER;
 
 	// Invalidate cache for this object
 	m_lpSession->GetSessionManager()->GetCacheManager()->Update(fnevObjectModified, objid);
 
-	for (i = 0; i< lpsRightsArray->__size; ++i) {
+	for (gsoap_size_t i = 0; i < lpsRightsArray->__size; ++i) {
 		// FIXME: check for each object if it belongs to the store we're logged into (except for admin)
 
 		// Get the correct local id
@@ -742,7 +715,7 @@ ECRESULT ECSecurity::SetRights(unsigned int objid, struct rightsArray *lpsRights
 		{
 			er = ABEntryIDToID(&lpsRightsArray->__ptr[i].sUserId, &ulUserId, &sExternId, NULL);
 			if (er != erSuccess)
-				goto exit;
+				return er;
 
 			// internal user/group doesn't have an externid
 			if (!sExternId.id.empty())
@@ -750,7 +723,7 @@ ECRESULT ECSecurity::SetRights(unsigned int objid, struct rightsArray *lpsRights
 				// Get real ulUserId on this server
 				er = m_lpSession->GetUserManagement()->GetLocalId(sExternId, &ulUserId, NULL);
 				if (er != erSuccess)
-					goto exit;
+					return er;
 			}
 		}
 		else
@@ -758,7 +731,7 @@ ECRESULT ECSecurity::SetRights(unsigned int objid, struct rightsArray *lpsRights
 
 		er = m_lpSession->GetUserManagement()->GetObjectDetails(ulUserId, &sDetails);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 
 		// You can only set (delete is ok) permissions on active users, and security groups
 		// Outlook 2007 blocks this client side, other clients get this error.
@@ -798,7 +771,7 @@ ECRESULT ECSecurity::SetRights(unsigned int objid, struct rightsArray *lpsRights
 
 			er = lpDatabase->DoInsert(strQueryNew);
 			if(er != erSuccess)
-				goto exit;
+				return er;
 
 			if(lpsRightsArray->__ptr[i].ulState & RIGHT_AUTOUPDATE_DENIED){
 				strQueryNew = "REPLACE INTO acl (id, hierarchy_id, type, rights) VALUES ";
@@ -806,10 +779,8 @@ ECRESULT ECSecurity::SetRights(unsigned int objid, struct rightsArray *lpsRights
 
 				er = lpDatabase->DoInsert(strQueryNew);
 				if(er != erSuccess)
-					goto exit;
-
+					return er;
 			}
-
 		}
 		else if(lpsRightsArray->__ptr[i].ulState & RIGHT_DELETED)
 		{
@@ -818,7 +789,7 @@ ECRESULT ECSecurity::SetRights(unsigned int objid, struct rightsArray *lpsRights
 
 			er = lpDatabase->DoDelete(strQueryDelete);
 			if(er != erSuccess)
-				goto exit;
+				return er;
 
 			if(lpsRightsArray->__ptr[i].ulState & RIGHT_AUTOUPDATE_DENIED) {
 				strQueryDelete = "DELETE FROM acl WHERE ";
@@ -826,7 +797,7 @@ ECRESULT ECSecurity::SetRights(unsigned int objid, struct rightsArray *lpsRights
 
 				er = lpDatabase->DoDelete(strQueryDelete);
 				if(er != erSuccess)
-					goto exit;
+					return er;
 			}
 
 		}else{
@@ -834,14 +805,12 @@ ECRESULT ECSecurity::SetRights(unsigned int objid, struct rightsArray *lpsRights
 		}
 	}
 
-	if (ulErrors == lpsRightsArray->__size)
-		er = ZARAFA_E_INVALID_PARAMETER;	// all acl's failed
-	else if (ulErrors)
-		er = ZARAFA_W_PARTIAL_COMPLETION;	// some acl's failed
+	if (lpsRightsArray->__size >= 0 && ulErrors == static_cast<size_t>(lpsRightsArray->__size))
+		er = KCERR_INVALID_PARAMETER;	// all acl's failed
+	else if (ulErrors != 0)
+		er = KCWARN_PARTIAL_COMPLETION;	// some acl's failed
 	else
 		er = erSuccess;
-
-exit:
 	return er;
 }
 
@@ -864,11 +833,11 @@ ECRESULT ECSecurity::GetUserCompany(unsigned int *lpulCompanyId)
  * @param[in] ulFlags Usermanagemnt flags
  * @param[out] lppObjects New allocated list of company details
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSecurity::GetViewableCompanyIds(unsigned int ulFlags, list<localobjectdetails_t> **lppObjects)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	std::list<localobjectdetails_t>::const_iterator iter;
 
 	/*
@@ -882,7 +851,7 @@ ECRESULT ECSecurity::GetViewableCompanyIds(unsigned int ulFlags, list<localobjec
 	if (!m_lpViewCompanies) {
 		er = GetViewableCompanies(0, &m_lpViewCompanies);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 	}
 
 	/*
@@ -902,9 +871,7 @@ ECRESULT ECSecurity::GetViewableCompanyIds(unsigned int ulFlags, list<localobjec
 		else
 			(*lppObjects)->push_back(localobjectdetails_t(iter->ulId, *iter));
 	}
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 /** 
@@ -912,13 +879,13 @@ exit:
  * 
  * @param[in] ulUserObjectId internal user id
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  * @retval erSuccess viewable
- * @retval ZARAFA_E_NOT_FOUND not viewable
+ * @retval KCERR_NOT_FOUND not viewable
  */
 ECRESULT ECSecurity::IsUserObjectVisible(unsigned int ulUserObjectId)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	std::list<localobjectdetails_t>::const_iterator iterCompany;
 	objectid_t sExternId;
 	unsigned int ulCompanyId;
@@ -926,16 +893,16 @@ ECRESULT ECSecurity::IsUserObjectVisible(unsigned int ulUserObjectId)
 	if (ulUserObjectId == 0 ||
 		ulUserObjectId == m_ulUserID ||
 		ulUserObjectId == m_ulCompanyID ||
-		ulUserObjectId == ZARAFA_UID_SYSTEM ||
-		ulUserObjectId == ZARAFA_UID_EVERYONE ||
+		ulUserObjectId == KOPANO_UID_SYSTEM ||
+		ulUserObjectId == KOPANO_UID_EVERYONE ||
 		m_details.GetPropInt(OB_PROP_I_ADMINLEVEL) == ADMIN_LEVEL_SYSADMIN ||
 		!m_lpSession->GetSessionManager()->IsHostedSupported()) {
-		goto exit;
+		return erSuccess;
 	}
 
 	er = m_lpSession->GetUserManagement()->GetExternalId(ulUserObjectId, &sExternId, &ulCompanyId);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	// still needed?
 	if (sExternId.objclass == CONTAINER_COMPANY)
@@ -944,20 +911,15 @@ ECRESULT ECSecurity::IsUserObjectVisible(unsigned int ulUserObjectId)
 	if (!m_lpViewCompanies) {
 		er = GetViewableCompanies(0, &m_lpViewCompanies);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 	}
 	for (iterCompany = m_lpViewCompanies->begin();
 	     iterCompany != m_lpViewCompanies->end(); ++iterCompany)
-		if (iterCompany->ulId == ulCompanyId) {
-			er = erSuccess;
-			goto exit;
-		}
+		if (iterCompany->ulId == ulCompanyId)
+			return erSuccess;
 
 	/* Item was not found */
-	er = ZARAFA_E_NOT_FOUND;
-
-exit:
-	return er;
+	return KCERR_NOT_FOUND;
 }
 
 /** 
@@ -1026,7 +988,7 @@ exit:
  * @param[in] ulFlags usermanagement flags
  * @param[out] lppObjects company list
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSecurity::GetAdminCompanies(unsigned int ulFlags, list<localobjectdetails_t> **lppObjects)
 {
@@ -1093,24 +1055,21 @@ unsigned int ECSecurity::GetUserId(unsigned int ulObjId)
  * 
  * @param[in] ulObjId hierarchy object id of object to check
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  * @retval erSuccess object is in current user's store
  */
 ECRESULT ECSecurity::IsStoreOwner(unsigned int ulObjId)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	unsigned int ulStoreId = 0;
 
 	er = m_lpSession->GetSessionManager()->GetCacheManager()->GetStore(ulObjId, &ulStoreId, NULL);
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	er = IsOwner(ulStoreId);
 	if(er != erSuccess)
-		goto exit;
-
-exit:
-	return er;
+		return er;
+	return erSuccess;
 }
 
 /** 
@@ -1129,7 +1088,7 @@ int ECSecurity::GetAdminLevel()
  * @param[in] ulObjId hierarchy object id to get store owner of
  * @param[in] lpulOwnerId user id of store in which ulObjId resides
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSecurity::GetStoreOwner(unsigned int ulObjId, unsigned int* lpulOwnerId)
 {
@@ -1143,27 +1102,25 @@ ECRESULT ECSecurity::GetStoreOwner(unsigned int ulObjId, unsigned int* lpulOwner
  * @param[out] lpulOwnerId user id of store in which ulObjId resides
  * @param[out] lpulStoreType type of store in which ulObjId resides
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSecurity::GetStoreOwnerAndType(unsigned int ulObjId, unsigned int* lpulOwnerId, unsigned int* lpulStoreType)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	unsigned int ulStoreId = 0;
 
 	if (lpulOwnerId || lpulStoreType) {
 		er = m_lpSession->GetSessionManager()->GetCacheManager()->GetStoreAndType(ulObjId, &ulStoreId, NULL, lpulStoreType);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 	}
 
 	if (lpulOwnerId) {
 		er = GetOwner(ulStoreId, lpulOwnerId);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 	}
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 /** 
@@ -1173,13 +1130,13 @@ exit:
  * 
  * @param[in] ulUserObjectId id of user
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  * @retval erSuccess Yes, admin
- * @retval ZARAFA_E_NO_ACCESS No, not admin
+ * @retval KCERR_NO_ACCESS No, not admin
  */
 ECRESULT ECSecurity::IsAdminOverUserObject(unsigned int ulUserObjectId)
 {
-	ECRESULT er = ZARAFA_E_NO_ACCESS;
+	ECRESULT er = KCERR_NO_ACCESS;
 	std::list<localobjectdetails_t>::const_iterator objectIter;
 	unsigned int ulCompanyId;
 	objectdetails_t objectdetails;
@@ -1191,13 +1148,12 @@ ECRESULT ECSecurity::IsAdminOverUserObject(unsigned int ulUserObjectId)
 	if (!m_lpSession->GetSessionManager()->IsHostedSupported()) {
 		if (m_details.GetPropInt(OB_PROP_I_ADMINLEVEL) != 0)
 			er = erSuccess;
-		goto exit;
+		return er;
 	}
 
 	/* If hosted is enabled, system administrators are administrator over all users. */
 	if (m_details.GetPropInt(OB_PROP_I_ADMINLEVEL) == ADMIN_LEVEL_SYSADMIN) {
-		er = erSuccess;
-		goto exit;
+		return erSuccess;
 	}
 
 	/*
@@ -1205,7 +1161,7 @@ ECRESULT ECSecurity::IsAdminOverUserObject(unsigned int ulUserObjectId)
 	 */
 	er = m_lpSession->GetUserManagement()->GetExternalId(ulUserObjectId, &sExternId, &ulCompanyId);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	// still needed?
 	if (sExternId.objclass == CONTAINER_COMPANY)
@@ -1219,27 +1175,22 @@ ECRESULT ECSecurity::IsAdminOverUserObject(unsigned int ulUserObjectId)
 		if (m_details.GetPropInt(OB_PROP_I_ADMINLEVEL) != 0)
 			er = erSuccess;
 		else
-			er = ZARAFA_E_NO_ACCESS;
-		goto exit;
+			er = KCERR_NO_ACCESS;
+		return er;
 	}
 
 	if (!m_lpAdminCompanies) {
 		er = GetAdminCompanies(USERMANAGEMENT_IDS_ONLY, &m_lpAdminCompanies);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 	}
 	for (objectIter = m_lpAdminCompanies->begin();
 	     objectIter != m_lpAdminCompanies->end(); ++objectIter)
-		if (objectIter->ulId == ulCompanyId) {
-			er = erSuccess;
-			goto exit;
-		}
+		if (objectIter->ulId == ulCompanyId)
+			return erSuccess;
 
 	/* Item was not found, so no access */
-	er = ZARAFA_E_NO_ACCESS;
-
-exit:
-	return er;
+	return KCERR_NO_ACCESS;
 }
 
 /** 
@@ -1247,13 +1198,13 @@ exit:
  * 
  * @param ulObjectId hierarchy object id
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  * @retval erSuccess Yes
- * @retval ZARAFA_E_NO_ACCESS No
+ * @retval KCERR_NO_ACCESS No
  */
 ECRESULT ECSecurity::IsAdminOverOwnerOfObject(unsigned int ulObjectId)
 {
-	ECRESULT er = ZARAFA_E_NO_ACCESS;
+	ECRESULT er;
 	unsigned int ulOwner;
 
 	/*
@@ -1261,12 +1212,8 @@ ECRESULT ECSecurity::IsAdminOverOwnerOfObject(unsigned int ulObjectId)
 	 */
 	er = GetStoreOwner(ulObjectId, &ulOwner);
 	if (er != erSuccess)
-		goto exit;
-
-	er = IsAdminOverUserObject(ulOwner);
-
-exit:
-	return er;
+		return er;
+	return IsAdminOverUserObject(ulOwner);
 }
 
 /** 
@@ -1275,7 +1222,7 @@ exit:
  * @param[in] ulObjId hierarchy object id
  * @param[out] lpllStoreSize size of store
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSecurity::GetStoreSize(unsigned int ulObjId, long long* lpllStoreSize)
 {
@@ -1308,7 +1255,7 @@ ECRESULT ECSecurity::GetStoreSize(unsigned int ulObjId, long long* lpllStoreSize
 
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if(lpDBRow == NULL || lpDBRow[0] == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		ec_log_err("ECSecurity::GetStoreSize(): row is null");
 		goto exit;
 	}
@@ -1328,7 +1275,7 @@ exit:
  * @param[in] ulUserId internal user id
  * @param[out] lpllUserSize store size of user
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSecurity::GetUserSize(unsigned int ulUserId, long long* lpllUserSize)
 {
@@ -1364,7 +1311,7 @@ ECRESULT ECSecurity::GetUserSize(unsigned int ulUserId, long long* lpllUserSize)
 
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if (lpDBRow == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		ec_log_err("ECSecurity::GetUserSize(): row is null");
 		goto exit;
 	}
@@ -1394,32 +1341,29 @@ exit:
  * @param[in] llStoreSize current store size of the store
  * @param[out] lpQuotaStatus quota status value
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSecurity::CheckQuota(unsigned int ulStoreId, long long llStoreSize, eQuotaStatus* lpQuotaStatus)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	unsigned int ulOwnerId = 0;
 	unsigned int ulStoreType = 0;
 
 	er = m_lpSession->GetSessionManager()->GetCacheManager()->GetStoreAndType(ulStoreId, NULL, NULL, &ulStoreType);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 		
 	if(ulStoreType != ECSTORE_TYPE_PRIVATE) {
 		*lpQuotaStatus = QUOTA_OK;
-		goto exit; // all is good, no quota on non-private stores.
+		return er; // all is good, no quota on non-private stores.
 	}
 
 	// Get the store owner
 	er = GetStoreOwner(ulStoreId, &ulOwnerId);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
-	er = CheckUserQuota(ulOwnerId, llStoreSize, lpQuotaStatus);
-
-exit:
-	return er;
+	return CheckUserQuota(ulOwnerId, llStoreSize, lpQuotaStatus);
 }
 
 /** 
@@ -1430,23 +1374,23 @@ exit:
  * @param[in] llStoreSize current store size of the store
  * @param[out] lpQuotaStatus quota status
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSecurity::CheckUserQuota(unsigned int ulUserId, long long llStoreSize, eQuotaStatus *lpQuotaStatus)
 {
-	ECRESULT		er = erSuccess;
+	ECRESULT er;
 	quotadetails_t	quotadetails;
 
-	if (ulUserId == ZARAFA_UID_EVERYONE) {
+	if (ulUserId == KOPANO_UID_EVERYONE) {
 		/* Publicly owned stores are never over quota.
 		 * But do publicly owned stores actually exist since the owner is either a user or company */
 		*lpQuotaStatus = QUOTA_OK;
-		goto exit;
+		return erSuccess;
 	}
 
 	er = GetUserQuota(ulUserId, false, &quotadetails);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	// check the options
 	if(quotadetails.llHardSize > 0 && llStoreSize >= quotadetails.llHardSize)
@@ -1457,9 +1401,7 @@ ECRESULT ECSecurity::CheckUserQuota(unsigned int ulUserId, long long llStoreSize
 		*lpQuotaStatus = QUOTA_WARN;
 	else
 		*lpQuotaStatus = QUOTA_OK;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 /** 
@@ -1468,7 +1410,7 @@ exit:
  * @param[in] ulUserId internal user id
  * @param[out] lpDetails quota details
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSecurity::GetUserQuota(unsigned int ulUserId, bool bGetUserDefault, quotadetails_t *lpDetails)
 {
@@ -1481,7 +1423,7 @@ ECRESULT ECSecurity::GetUserQuota(unsigned int ulUserId, bool bGetUserDefault, q
 	unsigned int ulCompanyId;
 
 	if (!lpDetails) {
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
@@ -1551,7 +1493,7 @@ ECRESULT ECSecurity::GetUsername(std::string *lpstrUsername)
 	if (m_ulUserID)
 		*lpstrUsername = m_details.GetPropString(OB_PROP_S_LOGIN);
 	else
-		*lpstrUsername = ZARAFA_SYSTEM_USER;
+		*lpstrUsername = KOPANO_SYSTEM_USER;
 	return erSuccess;
 }
 
@@ -1567,11 +1509,11 @@ ECRESULT ECSecurity::GetImpersonator(std::string *lpstrImpersonator)
 	ECRESULT er = erSuccess;
 
 	if (m_ulImpersonatorID == EC_NO_IMPERSONATOR)
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 	else if (m_ulImpersonatorID)
 		*lpstrImpersonator = m_impersonatorDetails.GetPropString(OB_PROP_S_LOGIN);
 	else
-		*lpstrImpersonator = ZARAFA_SYSTEM_USER;
+		*lpstrImpersonator = KOPANO_SYSTEM_USER;
 
 	return er;
 }
@@ -1581,9 +1523,9 @@ ECRESULT ECSecurity::GetImpersonator(std::string *lpstrImpersonator)
  *
  * @return Object size in bytes
  */
-unsigned int ECSecurity::GetObjectSize()
+size_t ECSecurity::GetObjectSize(void)
 {
-	unsigned int ulSize = sizeof(*this);
+	size_t ulSize = sizeof(*this);
 	unsigned int ulItems;
 
 	list<localobjectdetails_t>::iterator iter;

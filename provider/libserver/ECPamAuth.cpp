@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -20,7 +20,7 @@
 ECRESULT ECPAMAuthenticateUser(const char* szPamService, const std::string &strUsername, const std::string &strPassword, std::string *lpstrError)
 {
 	*lpstrError = "Server is not compiled with pam support.";
-	return ZARAFA_E_NO_SUPPORT;
+	return KCERR_NO_SUPPORT;
 }
 #else
 #include <security/pam_appl.h>
@@ -36,7 +36,6 @@ public:
 static int converse(int num_msg, const struct pam_message **msg,
     struct pam_response **resp, void *appdata_ptr)
 {
-	int ret = PAM_SUCCESS;
 	int i = 0;
 	struct pam_response *response = NULL;
 	char *password = (char *) appdata_ptr;
@@ -56,15 +55,12 @@ static int converse(int num_msg, const struct pam_message **msg,
 			response[i].resp = strdup(password);
 		} else {
 			free(response);
-			ret = PAM_CONV_ERR;
-			goto exit;
+			return PAM_CONV_ERR;
 		}
 	}
 
 	*resp = response;
-
-exit:
-	return ret;
+	return PAM_SUCCESS;
 }
 
 ECRESULT ECPAMAuthenticateUser(const char* szPamService, const std::string &strUsername, const std::string &strPassword, std::string *lpstrError)
@@ -80,7 +76,7 @@ ECRESULT ECPAMAuthenticateUser(const char* szPamService, const std::string &strU
 	if (res != PAM_SUCCESS) 
 	{
 		*lpstrError = pam_strerror(NULL, res);
-		er = ZARAFA_E_LOGON_FAILED;
+		er = KCERR_LOGON_FAILED;
 		goto exit;
 	}
 
@@ -90,7 +86,7 @@ ECRESULT ECPAMAuthenticateUser(const char* szPamService, const std::string &strU
 
 	if (res != PAM_SUCCESS) {
 		*lpstrError = pam_strerror(NULL, res);
-		er = ZARAFA_E_LOGON_FAILED;
+		er = KCERR_LOGON_FAILED;
 	}
 
 exit:

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,13 +18,13 @@
 #ifndef MAPINOTIFSINK_H
 #define MAPINOTIFSINK_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <list>
 #include <mapi.h>
 #include <mapix.h>
 #include <mapidefs.h>
 #include <pthread.h>
-#include <zarafa/ECUnknown.h>
+#include <kopano/ECUnknown.h>
 
 class MAPINotifSink _zcp_final : public IMAPIAdviseSink {
 public:

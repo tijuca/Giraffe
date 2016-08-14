@@ -17,36 +17,36 @@ msgstr ""
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 "X-Generator: Translate Toolkit 1.8.1\n"
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:905
-msgid "Zarafa Archive"
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:905
+msgid "Kopano Archive"
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:906
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:906
 msgid "This folder contains the special archive folders."
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:911
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:911
 msgid "History"
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:912
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:912
 msgid ""
 "This folder contains archives that have been replaced by a newer version."
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:916
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:916
 msgid "Outgoing"
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:917
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:917
 msgid "This folder contains archives of all outgoing messages."
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:921
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:921
 msgid "Deleted"
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:922
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:922
 msgid "This folder contains archives of messages that have been deleted."
 msgstr ""
 
@@ -132,7 +132,7 @@ msgstr ""
 msgid "MAPI error code:"
 msgstr ""
 
-#: zarafa-libsync/ECSync.cpp:1970
+#: libsync/ECSync.cpp:1970
 msgid ""
 "The synchronization of a folder failed. Press retry to continue or ignore to "
 "supress all errors.\r\n"
@@ -140,7 +140,7 @@ msgid ""
 "Please contact the system administrator if this problem persists."
 msgstr ""
 
-#: zarafa-libsync/ECSync.cpp:1972
+#: libsync/ECSync.cpp:1972
 msgid "Error codes: "
 msgstr ""
 
@@ -1292,7 +1292,7 @@ msgstr ""
 
 #: provider/client/ECArchiveAwareMessage.cpp:471
 #: provider/client/ECArchiveAwareMessage.cpp:529
-msgid "Zarafa Archiver"
+msgid "Kopano Archiver"
 msgstr ""
 
 #: provider/client/ECArchiveAwareMessage.cpp:473
@@ -1462,7 +1462,7 @@ msgid "Unable to store SSL certificate in registry key."
 msgstr ""
 
 #: provider/contacts/ZCABContainer.cpp:785
-msgid "Zarafa Contacts Folders"
+msgid "Kopano Contacts Folders"
 msgstr ""
 
 #: provider/libserver/ECGenProps.cpp:944
@@ -1475,7 +1475,7 @@ msgstr ""
 
 #: spooler/Spooler.cpp:484
 msgid ""
-"A fatal error occurred while processing your message, and Zarafa is unable "
+"A fatal error occurred while processing your message, and Kopano is unable "
 "to send your email."
 msgstr ""
 
@@ -1515,19 +1515,19 @@ msgstr ""
 msgid "Error found while trying to send your message. Error code: "
 msgstr ""
 
-#: installer/linux/zarafa-mr-accept:405
+#: installer/linux/kopano-mr-accept:405
 msgid "Recurring meetings are not allowed"
 msgstr ""
 
-#: installer/linux/zarafa-mr-accept:455
+#: installer/linux/kopano-mr-accept:455
 msgid "The requested time slot is unavailable"
 msgstr ""
 
-#: installer/linux/zarafa-mr-accept:457
+#: installer/linux/kopano-mr-accept:457
 msgid "The requested time slots are unavailble on the following dates:"
 msgstr ""
 
-#: installer/linux/zarafa-mr-accept:460
+#: installer/linux/kopano-mr-accept:460
 #, php-format
 msgid "%x %X"
 msgstr ""
@@ -1675,7 +1675,7 @@ msgid "Logon Failed. Please check your name/password."
 msgstr ""
 
 #: php-ext/include/mapi/class.mapiexception.php:29
-msgid "Can not connect to Zarafa server."
+msgid "Can not connect to Kopano server."
 msgstr ""
 
 #: php-ext/include/mapi/class.mapiexception.php:31

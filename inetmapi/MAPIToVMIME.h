@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -25,8 +25,8 @@
 #include <vmime/mailbox.hpp>
 #include <inetmapi/options.h>
 #include <mapidefs.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/charset/convert.h>
+#include <kopano/ECLogger.h>
+#include <kopano/charset/convert.h>
 #include "SMIMEMessage.h"
 
 class MAPIToVMIME
@@ -37,7 +37,7 @@ public:
 	~MAPIToVMIME();
 
 	HRESULT convertMAPIToVMIME(IMessage *lpMessage, vmime::ref<vmime::message> *lpvmMessage);
-	std::wstring getConversionError();
+	std::wstring getConversionError(void) const;
 
 private:
 	ECLogger *lpLogger;

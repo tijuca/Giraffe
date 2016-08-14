@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,24 +15,24 @@
  *
  */
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/platform.h>
+#include <kopano/zcdefs.h>
+#include <kopano/platform.h>
 
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapiutil.h>
 
-#include <zarafa/ECMemTable.h>
-#include <zarafa/ECKeyTable.h>
-#include <zarafa/ECGuid.h>
-#include <zarafa/Util.h>
-#include <zarafa/Trace.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/charset/convert.h>
+#include <kopano/ECMemTable.h>
+#include <kopano/ECKeyTable.h>
+#include <kopano/ECGuid.h>
+#include <kopano/Util.h>
+#include <kopano/Trace.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/charset/convert.h>
 
-#include <zarafa/ZarafaCode.h>
+#include <kopano/kcodes.h>
 
-#include <zarafa/ECDebug.h>
+#include <kopano/ECDebug.h>
 #include <algorithm>
 
 #ifdef LINUX
@@ -42,8 +42,6 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 using namespace std;
@@ -843,7 +841,7 @@ HRESULT ECMemTableView::GetRowCount(ULONG ulFlags, ULONG *lpulCount)
 	}
 
 	er = this->lpKeyTable->GetRowCount(&ulCount, &ulCurrentRow);
-	hr = ZarafaErrorToMAPIError(er);
+	hr = kcerr_to_mapierr(er);
 
 	if(hr != hrSuccess)
 		goto exit;
@@ -862,7 +860,7 @@ HRESULT ECMemTableView::SeekRow(BOOKMARK bkOrigin, LONG lRowCount, LONG *lplRows
 	int lRowsSought;
 
 	er = this->lpKeyTable->SeekRow((unsigned int)bkOrigin, lRowCount, &lRowsSought);
-	hr = ZarafaErrorToMAPIError(er);
+	hr = kcerr_to_mapierr(er);
 
 	if(hr != hrSuccess)
 		goto exit;
@@ -882,7 +880,7 @@ HRESULT ECMemTableView::SeekRowApprox(ULONG ulNumerator, ULONG ulDenominator)
 	unsigned int ulCurrentRow = 0;
 
 	er = lpKeyTable->GetRowCount(&ulRows, &ulCurrentRow);
-	hr = ZarafaErrorToMAPIError(er);
+	hr = kcerr_to_mapierr(er);
 
 	if(hr != hrSuccess)
 		goto exit;
@@ -907,7 +905,7 @@ HRESULT ECMemTableView::QueryPosition(ULONG *lpulRow, ULONG *lpulNumerator, ULON
 	}
 
 	er = lpKeyTable->GetRowCount(&ulRows, &ulCurrentRow);
-	hr = ZarafaErrorToMAPIError(er);
+	hr = kcerr_to_mapierr(er);
 
 	if(hr != hrSuccess)
 		goto exit;
@@ -941,7 +939,7 @@ HRESULT ECMemTableView::FindRow(LPSRestriction lpRestriction, BOOKMARK bkOrigin,
 		sRowItem.ulOrderId = 0; // FIXME:mvprops ?
 
 		er = this->lpKeyTable->SeekId(&sRowItem);
-		hr = ZarafaErrorToMAPIError(er);
+		hr = kcerr_to_mapierr(er);
 		goto exit;
 	}
 
@@ -951,14 +949,14 @@ HRESULT ECMemTableView::FindRow(LPSRestriction lpRestriction, BOOKMARK bkOrigin,
 	} else {
 		er = SeekRow(bkOrigin, 0, NULL);
 	}
-	hr = ZarafaErrorToMAPIError(er);
+	hr = kcerr_to_mapierr(er);
 	if(hr != hrSuccess)
 		goto exit;
 
 	// Loop through the rows until one matches.
 	while(1) {
 		er = this->lpKeyTable->QueryRows(1, &sRowList, ulFlags & DIR_BACKWARD, 0);
-		hr = ZarafaErrorToMAPIError(er);
+		hr = kcerr_to_mapierr(er);
 		if(hr != hrSuccess)
 			break;
 		if (sRowList.empty()) {
@@ -975,7 +973,7 @@ HRESULT ECMemTableView::FindRow(LPSRestriction lpRestriction, BOOKMARK bkOrigin,
 			} else {
 				er = SeekRow(BOOKMARK_CURRENT, -1, NULL);
 			}
-			hr = ZarafaErrorToMAPIError(er);
+			hr = kcerr_to_mapierr(er);
 			break;
 		}
 		sRowList.clear();
@@ -1022,7 +1020,7 @@ HRESULT ECMemTableView::CreateBookmark(BOOKMARK* lpbkPosition)
 
 	er = this->lpKeyTable->CreateBookmark(&bkPosition);
 
-	hr = ZarafaErrorToMAPIError(er);
+	hr = kcerr_to_mapierr(er);
 
 	if(hr != hrSuccess)
 		goto exit;
@@ -1040,7 +1038,7 @@ HRESULT ECMemTableView::FreeBookmark(BOOKMARK bkPosition)
 
 	er = this->lpKeyTable->FreeBookmark((unsigned int)bkPosition);
 
-	hr = ZarafaErrorToMAPIError(er);
+	hr = kcerr_to_mapierr(er);
 
 	if(hr != hrSuccess)
 		goto exit;
@@ -1310,7 +1308,7 @@ HRESULT ECMemTableView::QueryRows(LONG lRowCount, ULONG ulFlags, LPSRowSet *lppR
 	ECObjectTableList	sRowList;
 
 	er = lpKeyTable->QueryRows(lRowCount, &sRowList, false, ulFlags);
-	hr = ZarafaErrorToMAPIError(er);
+	hr = kcerr_to_mapierr(er);
 	if(hr != hrSuccess)
 		goto exit;
 
@@ -1467,7 +1465,7 @@ HRESULT ECMemTableView::UpdateRow(ULONG ulUpdateType, ULONG ulId)
 		ulUpdateType == ECKeyTable::TABLE_ROW_DELETE)
 	{
 		er = lpKeyTable->UpdateRow((ECKeyTable::UpdateType)ulUpdateType, &sRowItem, 0, NULL, NULL, NULL, &sPrevRow, false, (ECKeyTable::UpdateType*)&ulTableEvent);
-		hr = ZarafaErrorToMAPIError(er);
+		hr = kcerr_to_mapierr(er);
 	} else {
 		hr = ModifyRowKey(&sRowItem, &sPrevRow, &ulTableEvent);
 	}
@@ -1485,7 +1483,7 @@ HRESULT ECMemTableView::Clear()
 
 	er = lpKeyTable->Clear();
 
-	hr = ZarafaErrorToMAPIError(er);
+	hr = kcerr_to_mapierr(er);
 
 	// FIXME: Outlook gives a TABLE_ROW_DELETE or TABLE_CHANGE?
 	if (hr == hrSuccess)

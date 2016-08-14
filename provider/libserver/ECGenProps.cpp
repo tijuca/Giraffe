@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <mapitags.h>
 #include <mapidefs.h>
@@ -24,40 +24,28 @@
 #include <libintl.h>
 
 #include "ECMAPI.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 #include "SOAPUtils.h"
 #include "soapH.h"
 #include "ECStoreObjectTable.h"
 #include "ECGenProps.h"
-#include "Zarafa.h"
-#include <zarafa/ECDefs.h>
+#include "kcore.hpp"
+#include <kopano/ECDefs.h>
 #include "ECUserManagement.h"
 #include "ECSecurity.h"
 #include "ECSessionManager.h"
 #include "ECLockManager.h"
 
 #include <edkmdb.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
-#define _(string) dcgettext("zarafa", string, LC_MESSAGES)
+#define _(string) dcgettext("kopano", string, LC_MESSAGES)
 
 extern ECSessionManager*	g_lpSessionManager;
-
-ECGenProps::ECGenProps()
-{
-	// Nothing to do
-}
-
-ECGenProps::~ECGenProps()
-{
-	// Nothing to do
-}
 
 ECRESULT ECGenProps::GetMVPropSubquery(unsigned int ulPropTagRequested, std::string &subquery) 
 {
@@ -92,7 +80,7 @@ ECRESULT ECGenProps::GetMVPropSubquery(unsigned int ulPropTagRequested, std::str
 			subquery = "SELECT concat(count(*), ':', group_concat(length(val_longint),':',val_longint ORDER BY subquery.orderid SEPARATOR '')) FROM mvproperties AS subquery WHERE subquery.hierarchyid=hierarchy.id AND subquery.type="+stringify(PROP_TYPE(ulPropTagRequested))+" AND subquery.tag="+stringify(PROP_ID(ulPropTagRequested))+" GROUP BY subquery.hierarchyid";
 			break;
 		default:
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			break;
 	}
 	
@@ -125,7 +113,7 @@ ECRESULT ECGenProps::GetPropSubquery(unsigned int ulPropTagRequested, std::strin
         break;
         
 	default:
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 		break;
 	}
 
@@ -148,8 +136,6 @@ ECRESULT ECGenProps::GetPropSubquery(unsigned int ulPropTagRequested, std::strin
  */
 ECRESULT ECGenProps::GetPropSubstitute(unsigned int ulObjType, unsigned int ulPropTagRequested, unsigned int *lpulPropTagRequired)
 {
-	ECRESULT er = erSuccess;
-
 	unsigned int ulPropTagRequired = 0;
 
 	switch(PROP_ID(ulPropTagRequested)) {
@@ -159,20 +145,15 @@ ECRESULT ECGenProps::GetPropSubstitute(unsigned int ulObjType, unsigned int ulPr
 		case PROP_ID(PR_CONTENT_UNREAD):
 			if(ulObjType == MAPI_MESSAGE)
 				ulPropTagRequired = PR_MESSAGE_FLAGS;
-			else {
-				er = ZARAFA_E_NOT_FOUND;
-				goto exit;
-			}
+			else
+				return KCERR_NOT_FOUND;
 			break;
 		default:
-			er = ZARAFA_E_NOT_FOUND;
-			goto exit;
+			return KCERR_NOT_FOUND;
 	}
 
 	*lpulPropTagRequired = ulPropTagRequired;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 // This should be synchronized with GetPropComputed
@@ -192,16 +173,16 @@ ECRESULT ECGenProps::IsPropComputed(unsigned int ulPropTag, unsigned int ulObjTy
 			if(ulObjType == MAPI_MESSAGE)
 				er = erSuccess;
 			else
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 			break;
 		case PR_RECORD_KEY:
 			if (ulObjType == MAPI_ATTACH)
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 			else
 				er = erSuccess;
 			break;
 		default:
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			break;
 	}
 
@@ -239,7 +220,7 @@ ECRESULT ECGenProps::IsPropComputedUncached(unsigned int ulPropTag, unsigned int
 		    break;
 		case PROP_ID(PR_RECORD_KEY):
 			if (ulObjType == MAPI_ATTACH)
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 			else
 				er = erSuccess;
 			break;
@@ -248,16 +229,16 @@ ECRESULT ECGenProps::IsPropComputedUncached(unsigned int ulPropTag, unsigned int
 		    if(ulObjType == MAPI_STORE)
     			er = erSuccess;
             else
-                er = ZARAFA_E_NOT_FOUND;
+                er = KCERR_NOT_FOUND;
 			break;
 		case PROP_ID(PR_CONTENT_COUNT):
 			if (ulObjType == MAPI_MESSAGE)
 				er = erSuccess;
 			else
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 			break;
         default:
-            er = ZARAFA_E_NOT_FOUND;
+            er = KCERR_NOT_FOUND;
             break;
     }
     
@@ -299,12 +280,12 @@ ECRESULT ECGenProps::IsPropRedundant(unsigned int ulPropTag, unsigned int ulObjT
 		    break;
 		case PROP_ID(PR_RECORD_KEY):				// generated from hierarchy except for attachments
 			if (ulObjType == MAPI_ATTACH)
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 			else
 				er = erSuccess;
 			break;
 		default:
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			break;
     }
     
@@ -324,7 +305,7 @@ ECRESULT ECGenProps::GetPropComputed(struct soap *soap, unsigned int ulObjType, 
 
 			lpPropVal->Value.ul = 0;
 		} else {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 		}
 		break;
     case PROP_ID(PR_EC_IMAP_ID):
@@ -333,7 +314,7 @@ ECRESULT ECGenProps::GetPropComputed(struct soap *soap, unsigned int ulObjType, 
 			lpPropVal->__union = SOAP_UNION_propValData_ul;
 			lpPropVal->Value.ul = ulObjId;
 		} else {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 		}
 		break;
 	case PROP_ID(PR_CONTENT_UNREAD):
@@ -343,13 +324,13 @@ ECRESULT ECGenProps::GetPropComputed(struct soap *soap, unsigned int ulObjType, 
 			lpPropVal->__union = SOAP_UNION_propValData_ul;
 			lpPropVal->Value.ul = lpPropVal->Value.ul & MSGFLAG_READ ? 0 : 1;
 		} else {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 		}
 		break;
     case PROP_ID(PR_NORMALIZED_SUBJECT):
     	if(lpPropVal->ulPropTag != PR_SUBJECT) {
     		lpPropVal->ulPropTag = PROP_TAG(PT_ERROR, PROP_ID(PR_NORMALIZED_SUBJECT));
-    		lpPropVal->Value.ul = ZARAFA_E_NOT_FOUND;
+    		lpPropVal->Value.ul = KCERR_NOT_FOUND;
     		lpPropVal->__union = SOAP_UNION_propValData_ul;
     	} else {
 		lpPropVal->ulPropTag = ulPropTagRequested;
@@ -395,15 +376,11 @@ ECRESULT ECGenProps::GetPropComputed(struct soap *soap, unsigned int ulObjType, 
 			lpPropVal->Value.bin->__size = sizeof(ULONG);
 			memcpy(lpPropVal->Value.bin->__ptr, &ulObjId, sizeof(ULONG));
 		} else
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 		break;
 	default:
-		er = ZARAFA_E_NOT_FOUND;
-		goto exit;
+		return KCERR_NOT_FOUND;
 	}
-
-exit:
-
 	return er;
 }
 
@@ -417,10 +394,10 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 	unsigned int	ulFlags = 0;
 	unsigned int	ulUserId = 0;
 	char*			lpStoreName = NULL;
-	struct propVal	sPropVal = {0};
+	struct propVal sPropVal{__gszeroinit};
 
-	struct propValArray sPropValArray = {0, 0};
-	struct propTagArray sPropTagArray = {0, 0};
+	struct propValArray sPropValArray{__gszeroinit};
+	struct propTagArray sPropTagArray{__gszeroinit};
 
 	switch(PROP_ID(ulPropTag)) {
 		case PROP_ID(PR_LONGTERM_ENTRYID_FROM_TABLE):
@@ -457,7 +434,7 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 			if(er != erSuccess) {
 				// happens on recipients, attachments and msg-in-msg .. TODO: add strict type checking?
 				//ASSERT(FALSE);
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 				goto exit;
 			}
 			sPropVal.ulPropTag = ulPropTag;
@@ -479,7 +456,7 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 		    sPropVal.Value.bin->__size = sizeof(GUID);
 		    er = lpSession->GetSessionManager()->GetCacheManager()->GetStore(ulStoreId, 0, (GUID *)sPropVal.Value.bin->__ptr);
 		    if(er != erSuccess) {
-		        er = ZARAFA_E_NOT_FOUND;
+		        er = KCERR_NOT_FOUND;
 		        goto exit;
             }
 		    break;
@@ -497,7 +474,7 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 				sPropVal.ulPropTag = PR_USER_ENTRYID;
 				sPropVal.Value.bin = sPropValArray.__ptr[0].Value.bin; // memory is allocated in GetUserData(..)
 			}else{
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 				goto exit;
 			}
 			break;
@@ -514,7 +491,7 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 				sPropVal.ulPropTag = CHANGE_PROP_TYPE(PR_USER_NAME, (PROP_TYPE(ulPropTag)));
 				sPropVal.Value.lpszA = sPropValArray.__ptr[0].Value.lpszA;// memory is allocated in GetUserData(..)
 			}else{
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 				goto exit;
 			}
 			break;
@@ -523,7 +500,7 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 			unsigned int ulStoreType = 0;
 
 			if(ulObjType != MAPI_STORE) {
-			    er = ZARAFA_E_NOT_FOUND;
+			    er = KCERR_NOT_FOUND;
 			    goto exit;
 	        }
 
@@ -553,7 +530,7 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 				sPropVal.ulPropTag = CHANGE_PROP_TYPE(PR_MAILBOX_OWNER_NAME, (PROP_TYPE(ulPropTag)));
 				sPropVal.Value.lpszA = sPropValArray.__ptr[0].Value.lpszA; // memory is allocated in GetUserData(..)
 			}else{
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 				goto exit;
 			}
 		break;
@@ -570,7 +547,7 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 				sPropVal.ulPropTag = PR_MAILBOX_OWNER_ENTRYID;
 				sPropVal.Value.bin = sPropValArray.__ptr[0].Value.bin;// memory is allocated in GetUserData(..)
 			}else{
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 				goto exit;
 			}
 			break;
@@ -587,7 +564,7 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 				sPropVal.ulPropTag = CHANGE_PROP_TYPE(PR_EC_MAILBOX_OWNER_ACCOUNT, (PROP_TYPE(ulPropTag)));
 				sPropVal.Value.lpszA = sPropValArray.__ptr[0].Value.lpszA; // memory is allocated in GetUserData(..)
 			} else {
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 				goto exit;
 			}
 			break;
@@ -601,7 +578,7 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 			unsigned int ulStoreType = 0;
 
 			if(ulObjType != MAPI_STORE) {
-			    er = ZARAFA_E_NOT_FOUND;
+			    er = KCERR_NOT_FOUND;
 			    goto exit;
 	        }
 
@@ -664,14 +641,14 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 				sPropVal.__union = SOAP_UNION_propValData_ul;
 				sPropVal.Value.ul = 1;
 			} else {
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 				goto exit;
 			}
 			break;
 		case PROP_ID(PR_RIGHTS):
 			if(ulObjType != MAPI_FOLDER)
 			{
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 				goto exit;
 			}
 
@@ -689,7 +666,7 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 		case PROP_ID(PR_ACCESS):
 			if(ulObjType == MAPI_STORE || ulObjType == MAPI_ATTACH)
 			{
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 				goto exit;
 			}
 
@@ -717,7 +694,7 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 					case MAPI_ATTACH:
 					case MAPI_STORE:
 					default:
-						er = ZARAFA_E_NOT_FOUND;
+						er = KCERR_NOT_FOUND;
 						goto exit;
 				}
 
@@ -771,7 +748,7 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 				case MAPI_ATTACH:
 				case MAPI_STORE:
 				default:
-					er = ZARAFA_E_NOT_FOUND;
+					er = KCERR_NOT_FOUND;
 					goto exit;
 			}
 			break;
@@ -818,7 +795,7 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 
 			er = lpSession->GetServerGUID((GUID*)sPropVal.Value.bin->__ptr);
 			if(er != erSuccess){
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 				goto exit;
 			}
 			break;
@@ -828,12 +805,12 @@ ECRESULT ECGenProps::GetPropComputedUncached(struct soap *soap, ECODStore *lpODS
 
 			er = IsOrphanStore(lpSession, ulObjId, &sPropVal.Value.b);
 			if(er != erSuccess){
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 				goto exit;
 			}
 			break;
 		default:
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 	}
 
@@ -867,7 +844,7 @@ ECRESULT ECGenProps::IsOrphanStore(ECSession* lpSession, unsigned int ulObjId, b
 	bool		bIsOrphan = false;
 
 	if (!lpSession || !lpbIsOrphan) {
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
@@ -908,8 +885,8 @@ ECRESULT ECGenProps::GetStoreName(struct soap *soap, ECSession* lpSession, unsig
 	ECRESULT			er = erSuccess;
 	unsigned int		ulUserId = 0;
 	unsigned int	    ulCompanyId = 0;
-	struct propValArray sPropValArray = {0, 0};
-	struct propTagArray sPropTagArray = {0, 0};
+	struct propValArray sPropValArray{__gszeroinit};
+	struct propTagArray sPropTagArray{__gszeroinit};
 
 	string				strFormat;
 	char*				lpStoreName = NULL;
@@ -924,7 +901,7 @@ ECRESULT ECGenProps::GetStoreName(struct soap *soap, ECSession* lpSession, unsig
 		goto exit;
 
 	// When the userid belongs to a company or group everybody, the store is considered a public store.
-	if(ulUserId == ZARAFA_UID_EVERYONE || ulUserId == ulCompanyId) {
+	if(ulUserId == KOPANO_UID_EVERYONE || ulUserId == ulCompanyId) {
 	    strFormat = _("Public Folders");
 	} else {
         sPropTagArray.__ptr = new unsigned int[3];
@@ -935,13 +912,13 @@ ECRESULT ECGenProps::GetStoreName(struct soap *soap, ECSession* lpSession, unsig
 
         er = lpSession->GetUserManagement()->GetProps(soap, ulUserId, &sPropTagArray, &sPropValArray);
         if (er != erSuccess || !sPropValArray.__ptr) {
-            er = ZARAFA_E_NOT_FOUND;
+            er = KCERR_NOT_FOUND;
             goto exit;
         }
 
         strFormat = string(lpSession->GetSessionManager()->GetConfig()->GetSetting("storename_format"));
 
-        for (int i = 0; i < sPropValArray.__size; ++i) {
+        for (gsoap_size_t i = 0; i < sPropValArray.__size; ++i) {
             string sub;
             size_t pos = 0;
 

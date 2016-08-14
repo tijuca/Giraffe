@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECDatabase.h"
 
 #include <mapidefs.h>
@@ -26,12 +26,10 @@
 #include "ECUserStoreTable.h"
 #include "ECGenProps.h"
 #include "ECSession.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 // 1 == MAPI_STORE.. does it even matter?
@@ -40,10 +38,6 @@ ECUserStoreTable::ECUserStoreTable(ECSession *lpSession, unsigned int ulFlags, c
 {
 	// Set callback function for queryrowdata (again?)
 	m_lpfnQueryRowData = QueryRowData;
-}
-
-ECUserStoreTable::~ECUserStoreTable()
-{
 }
 
 ECRESULT ECUserStoreTable::Create(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale, ECUserStoreTable **lppTable)
@@ -57,17 +51,14 @@ ECRESULT ECUserStoreTable::Create(ECSession *lpSession, unsigned int ulFlags, co
 
 ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
 {
-	ECRESULT er = erSuccess;
 	ECUserStoreTable *pThis = dynamic_cast<ECUserStoreTable*>(lpThis);
 	struct rowSet *lpsRowSet = NULL;
 	ECObjectTableList::const_iterator iterRowList;
-	int i, k;
+	gsoap_size_t i;
 	GUID sZeroGuid = {0};
 
-	if (!lpThis) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpThis == NULL)
+		return KCERR_INVALID_PARAMETER;
 
 	lpsRowSet = s_alloc<rowSet>(soap);
 	lpsRowSet->__size = 0;
@@ -75,7 +66,7 @@ ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 
 	if(lpRowList->empty()) {
 		*lppRowSet = lpsRowSet;
-		goto exit; // success
+		return erSuccess;
 	}
 
 	// We return a square array with all the values
@@ -92,10 +83,10 @@ ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 
 	for (i = 0, iterRowList = lpRowList->begin();
 	     iterRowList != lpRowList->end(); ++iterRowList, ++i) {
-		for (k = 0; k < lpsPropTagArray->__size; ++k) {
+		for (gsoap_size_t k = 0; k < lpsPropTagArray->__size; ++k) {
 			lpsRowSet->__ptr[i].__ptr[k].ulPropTag = PROP_TAG(PT_ERROR, lpsPropTagArray->__ptr[k]);
 			lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_ul;
-			lpsRowSet->__ptr[i].__ptr[k].Value.ul = ZARAFA_E_NOT_FOUND;
+			lpsRowSet->__ptr[i].__ptr[k].Value.ul = KCERR_NOT_FOUND;
 
 			switch (PROP_ID(lpsPropTagArray->__ptr[k])) {
 			case PROP_ID(PR_INSTANCE_KEY):
@@ -183,16 +174,14 @@ ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 				lpsRowSet->__ptr[i].__ptr[k].ulPropTag = PROP_TAG(PT_ERROR, lpsPropTagArray->__ptr[k]);
 
 				lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_ul;
-				lpsRowSet->__ptr[i].__ptr[k].Value.ul = ZARAFA_E_NOT_FOUND;
+				lpsRowSet->__ptr[i].__ptr[k].Value.ul = KCERR_NOT_FOUND;
 				break;
 			};
 		}
 	}
 
 	*lppRowSet = lpsRowSet;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECUserStoreTable::Load() {
@@ -258,7 +247,7 @@ ECRESULT ECUserStoreTable::Load() {
 
 		if (lpDBRow[USERID]) {
 			sUserStore.ulUserId = atoi(lpDBRow[USERID]);
-			if (sUserStore.ulUserId == ZARAFA_UID_SYSTEM) // everyone already filtered by object type
+			if (sUserStore.ulUserId == KOPANO_UID_SYSTEM) // everyone already filtered by object type
 				continue;
 		} else {
 			sUserStore.ulUserId = -1;

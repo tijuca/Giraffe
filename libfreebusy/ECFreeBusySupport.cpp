@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,22 +15,20 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECFreeBusySupport.h"
 
 #include "ECFreeBusyUpdate.h"
 #include "ECFreeBusyData.h"
-#include <zarafa/CommonUtil.h>
-#include <zarafa/mapiext.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/mapiext.h>
 #include <mapiutil.h>
 
 #include "freebusyutil.h"
-#include <zarafa/mapi_ptr.h>
+#include <kopano/mapi_ptr.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECFreeBusySupport::ECFreeBusySupport(void)
@@ -285,86 +283,6 @@ exit:
 	return hr;
 }
 
-HRESULT ECFreeBusySupport::CommitChanges()
-{
-	return S_OK;
-}
-
-HRESULT ECFreeBusySupport::GetDelegateInfo(FBUser sFBUser, void *lpData)
-{
-	return E_NOTIMPL;
-}
-
-HRESULT ECFreeBusySupport::SetDelegateInfo(void * lpdata)
-{
-	return E_NOTIMPL;
-}
-
-HRESULT ECFreeBusySupport::AdviseFreeBusy(void *lpData)
-{
-	return E_NOTIMPL;
-}
-
-HRESULT ECFreeBusySupport::Reload(void *lpData)
-{
-	return E_NOTIMPL;
-}
-
-HRESULT ECFreeBusySupport::GetFBDetailSupport(void **lppdata, BOOL bData)
-{
-	return E_NOTIMPL;
-}
-
-HRESULT ECFreeBusySupport::HrHandleServerSched(void *lpdata)
-{
-	return E_NOTIMPL;
-}
-
-HRESULT ECFreeBusySupport::HrHandleServerSchedAccess()
-{
-	return S_OK;
-}
-
-BOOL ECFreeBusySupport::FShowServerSched(BOOL bData)
-{
-	return FALSE;
-}
-
-HRESULT ECFreeBusySupport::HrDeleteServerSched()
-{
-	return S_OK;
-}
-
-HRESULT ECFreeBusySupport::GetFReadOnly(void *lpData)
-{
-	return E_NOTIMPL;
-}
-
-HRESULT ECFreeBusySupport::SetLocalFB(void *lpData)
-{
-	return E_NOTIMPL;
-}
-
-HRESULT ECFreeBusySupport::PrepareForSync()
-{
-	return E_NOTIMPL;
-}
-
-HRESULT ECFreeBusySupport::GetFBPublishMonthRange(void *lpData)
-{
-	return E_NOTIMPL;
-}
-
-HRESULT ECFreeBusySupport::PublishRangeChanged()
-{
-	return E_NOTIMPL;
-}
-
-HRESULT ECFreeBusySupport::CleanTombstone()
-{
-	return E_NOTIMPL;
-}
-
 HRESULT ECFreeBusySupport::GetDelegateInfoEx(FBUser sFBUser, unsigned int *lpulStatus, unsigned int *lpulStart, unsigned int *lpulEnd)
 {
 	HRESULT hr = hrSuccess;
@@ -513,30 +431,10 @@ exit:
 	return hr;
 }
 
-HRESULT ECFreeBusySupport::PushDelegateInfoToWorkspace()
-{
-	return E_NOTIMPL;
-}
-
-HRESULT ECFreeBusySupport::Placeholder21(void *lpData, HWND hwnd, BOOL bData)
-{
-	return S_OK;
-}
-
-
-HRESULT ECFreeBusySupport::Placeholder22()
-{
-	return S_OK;
-}
-
-//////////////////////////////////////////////////////////////////
 // Interfaces
 //		IUnknown
 //		IFreeBusySupport
-//
-
 // IUnknown
-
 HRESULT __stdcall ECFreeBusySupport::xFreeBusySupport::QueryInterface(REFIID refiid, void** lppInterface)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IFreeBusySupport::QueryInterface", "");
@@ -777,14 +675,10 @@ HRESULT __stdcall ECFreeBusySupport::xFreeBusySupport::Placeholder22()
 	return hr;
 }
 
-//////////////////////////////////////////////////////////////////
 // Interfaces
 //		IUnknown
 //		IFreeBusySupportOutlook2000
-//
-
 // IUnknown
-
 HRESULT __stdcall ECFreeBusySupport::xFreeBusySupportOutlook2000::QueryInterface(REFIID refiid, void** lppInterface)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IFreeBusySupportOutlook2000::QueryInterface", "");

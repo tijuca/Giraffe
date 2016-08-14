@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,7 +18,7 @@
 #ifndef __MAPI_SVC_H
 #define __MAPI_SVC_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <map>
 #include <set>
 #include <vector>
@@ -46,8 +46,6 @@ typedef HRESULT(__cdecl *SVC_ABProviderInit)(HINSTANCE hInstance, LPMALLOC lpMal
 class INFLoader _zcp_final {
 public:
 	INFLoader();
-	~INFLoader();
-
 	HRESULT LoadINFs();
 	const inf_section* GetSection(const std::string& strSectionName) const;
 

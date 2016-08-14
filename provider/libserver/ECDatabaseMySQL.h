@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -22,7 +22,7 @@
 #ifndef ECDATABASEMYSQL_H
 #define ECDATABASEMYSQL_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <pthread.h>
 #include <mysql.h>
 #include <string>
@@ -79,7 +79,7 @@ public:
 	ECRESULT Commit(void) _zcp_override;
 	ECRESULT Rollback(void) _zcp_override;
 	
-	unsigned int GetMaxAllowedPacket(void) _zcp_override;
+	unsigned int GetMaxAllowedPacket(void) _zcp_override { return m_ulMaxAllowedPacket; }
 
 	void ThreadInit(void) _zcp_override;
 	void ThreadEnd(void) _zcp_override;

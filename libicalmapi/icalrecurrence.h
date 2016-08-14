@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,6 +18,7 @@
 #ifndef __ICAL_RECURRENCE_H
 #define __ICAL_RECURRENCE_H
 
+#include <kopano/zcdefs.h>
 #include "recurrence.h"
 #include "vtimezone.h"
 #include "icalitem.h"
@@ -27,11 +28,8 @@
 /**
  * Conversion class for recurrence & exceptions (mapi <-> ical)
  */
-class ICalRecurrence {
+class ICalRecurrence _kc_final {
 public:
-	ICalRecurrence();
-	~ICalRecurrence();
-	
 	/* ical -> mapi */
 	HRESULT HrParseICalRecurrenceRule(TIMEZONE_STRUCT sTimeZone, icalcomponent *lpicRootEvent, icalcomponent *lpicEvent,
 									  bool bIsAllday, LPSPropTagArray lpNamedProps, icalitem *lpIcalItem);

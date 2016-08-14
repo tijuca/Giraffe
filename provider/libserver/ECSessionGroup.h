@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -22,15 +22,15 @@
 #ifndef ECSESSIONGROUP
 #define ECSESSIONGROUP
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <list>
 #include <map>
 #include <set>
 
-#include <zarafa/ECKeyTable.h>
+#include <kopano/ECKeyTable.h>
 #include "ECNotification.h"
-#include <zarafa/ZarafaCode.h>
-#include <zarafa/CommonUtil.h>
+#include <kopano/kcodes.h>
+#include <kopano/CommonUtil.h>
 
 class ECSession;
 class ECSessionGroup;
@@ -71,12 +71,12 @@ public:
 	 */
 	virtual void Lock();
 	virtual void Unlock();
-	virtual bool IsLocked();
+	virtual bool IsLocked(void) const { return m_ulRefCount > 0; }
 
 	/*
 	 * Returns the SessionGroupId
 	 */
-	virtual ECSESSIONGROUPID GetSessionGroupId();
+	virtual ECSESSIONGROUPID GetSessionGroupId(void) const { return m_sessionGroupId; }
 
 	/*
 	 * Add/Remove Session from group
@@ -112,7 +112,7 @@ public:
 	virtual ECRESULT AddChangeNotification(ECSESSIONID ulSessionId, unsigned int ulConnection, unsigned int ulSyncId, unsigned long ulChangeId);
 	virtual ECRESULT GetNotifyItems(struct soap *soap, ECSESSIONID ulSessionId, struct notifyResponse *notifications);
 
-	unsigned int GetObjectSize();
+	size_t GetObjectSize(void);
 
 private:
 	ECRESULT releaseListeners();
@@ -156,8 +156,8 @@ private:
 	
 private:
 	// Make ECSessionGroup non-copyable
-	ECSessionGroup(const ECSessionGroup &);
-	ECSessionGroup& operator=(const ECSessionGroup &);
+	ECSessionGroup(const ECSessionGroup &) = delete;
+	ECSessionGroup &operator=(const ECSessionGroup &) = delete;
 };
 
 #endif // #ifndef ECSESSIONGROUP

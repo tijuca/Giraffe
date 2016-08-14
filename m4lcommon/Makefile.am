@@ -1,6 +1,6 @@
 # -*- Makefile -*-
 
-SUBDIRS = include/zarafa
+SUBDIRS = include/kopano
 
 AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
 	-DMAPICONFIGDIR=\"${MAPICONFIGDIR}\" \
@@ -44,7 +44,7 @@ libm4lcommon_la_SOURCES = \
 	MAPINotifSink.cpp Util.cpp \
 	favoritesutil.cpp
 libm4lcommon_la_LIBADD = \
-	../common/libzcp_common_util.la ../common/libzcp_common_mapi.la \
+	../common/libkcutil.la ../common/libkcmapi.la \
 	-lpthread
 
 

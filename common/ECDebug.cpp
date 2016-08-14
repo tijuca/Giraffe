@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,39 +15,37 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/ECDebug.h>
+#include <kopano/platform.h>
+#include <kopano/ECDebug.h>
 
 #include <mapidefs.h>
 #include <mapispi.h>
 #include <edkmdb.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include "freebusytags.h"
-#include <zarafa/stringutil.h>
-#include <zarafa/charset/convert.h>
-#include <zarafa/ECTags.h>
-#include <zarafa/EMSAbTag.h>
-#include <zarafa/ECABEntryID.h>
+#include <kopano/stringutil.h>
+#include <kopano/charset/convert.h>
+#include <kopano/ECTags.h>
+#include <kopano/EMSAbTag.h>
+#include <kopano/ECABEntryID.h>
 
 #include <mapiguid.h>
-#include <zarafa/mapiguidext.h>
+#include <kopano/mapiguidext.h>
 #include <edkguid.h>
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 
 #include "freebusyguid.h"
 
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
 #include <iostream>
 #include <sstream>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/mapi_ptr.h>
 
 using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 #define RETURN_ERROR_CASE(x) \
@@ -207,7 +205,7 @@ static const INFOGUID sGuidList[] = {
 	{1, (GUID*)&IID_IMAPISecureMessage, "IID_IMAPISecureMessage"},
 	{1, (GUID*)&IID_IMAPIGetSession, "IID_IMAPIGetSession"},
 
-	// Zarafa
+	// Kopano
 	{3, (GUID*)&IID_IECSpooler, "IID_IECSpooler"},
 	{3, (GUID*)&IID_IECServiceAdmin , "IID_IECServiceAdmin"},
 	{3, (GUID*)&IID_ECMSProvider , "IID_ECMSProvider"},
@@ -256,11 +254,11 @@ static const INFOGUID sGuidList[] = {
 	{3, (GUID*)&IID_ECFreeBusySupport , "IID_ECFreeBusySupport"},
 	{3, (GUID*)&IID_IECImportContentsChanges, "IID_IECImportContentsChanges"},
 
-	// zarafa ms/ab/xp/ guids
-	{3, (GUID*)&ZARAFA_SERVICE_GUID , "Zarafa Private store"},
-	{3, (GUID*)&ZARAFA_STORE_PUBLIC_GUID , "Zarafa Public Store"},
-	{3, (GUID*)&MUIDECSAB, "Zarafa Address Book"},
-	{3, (GUID*)&ZARAFA_STORE_DELEGATE_GUID, "Zarafa Delegate Store"},
+	// kopano ms/ab/xp/ guids
+	{3, (GUID*)&KOPANO_SERVICE_GUID , "Kopano Private store"},
+	{3, (GUID*)&KOPANO_STORE_PUBLIC_GUID , "Kopano Public Store"},
+	{3, (GUID*)&MUIDECSAB, "Kopano Address Book"},
+	{3, (GUID*)&KOPANO_STORE_DELEGATE_GUID, "Kopano Delegate Store"},
 	{3, (GUID*)&GUID_NULL , "GUID_NULL"},
 
 #ifndef LINUX
@@ -302,7 +300,7 @@ static const INFOGUID sGuidList[] = {
 	{5, (GUID*)&PSETID_CalendarAssistant, "PSETID_CalendarAssistant"},
 	{5, (GUID*)&PSETID_CONTACT_FOLDER_RECIPIENT, "PSETID_CONTACT_FOLDER_RECIPIENT"},
 		
-	{5, (GUID*)&PSETID_Zarafa_CalDav, "PSETID_Zarafa_CalDav"},
+	{5, (GUID*)&PSETID_Kopano_CalDav, "PSETID_Kopano_CalDav"},
 	{5, (GUID*)&PS_EC_IMAP, "PS_EC_IMAP"},
 
 //End of list

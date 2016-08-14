@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,13 +15,11 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECFifoBuffer.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECFifoBuffer::ECFifoBuffer(size_type ulMaxSize)
@@ -51,11 +49,11 @@ ECFifoBuffer::~ECFifoBuffer()
  * @param[in]	ulTimeoutMs		The maximum amount that this function may block.
  *
  * @retval	erSuccess					The data was successfully written.
- * @retval	ZARAFA_E_INVALID_PARAMETER	lpBuf is NULL.
- * @retval	ZARAFA_E_NOT_ENOUGH_MEMORY	There was not enough memory available to store the data.
- * @retval	ZARAFA_E_TIMEOUT			Not all data was writting within the specified time limit.
+ * @retval	KCERR_INVALID_PARAMETER	lpBuf is NULL.
+ * @retval	KCERR_NOT_ENOUGH_MEMORY	There was not enough memory available to store the data.
+ * @retval	KCERR_TIMEOUT			Not all data was writting within the specified time limit.
  *										The amount of data that was written is returned in lpcbWritten.
- * @retval	ZARAFA_E_NETWORK_ERROR		The buffer was closed prior to this call.
+ * @retval	KCERR_NETWORK_ERROR		The buffer was closed prior to this call.
  */
 ECRESULT ECFifoBuffer::Write(const void *lpBuf, size_type cbBuf, unsigned int ulTimeoutMs, size_type *lpcbWritten)
 {
@@ -65,10 +63,10 @@ ECRESULT ECFifoBuffer::Write(const void *lpBuf, size_type cbBuf, unsigned int ul
 	const unsigned char	*lpData = reinterpret_cast<const unsigned char*>(lpBuf);
 
 	if (lpBuf == NULL)
-		return ZARAFA_E_INVALID_PARAMETER;
+		return KCERR_INVALID_PARAMETER;
 
 	if (IsClosed(cfWrite))
-	    return ZARAFA_E_NETWORK_ERROR;
+	    return KCERR_NETWORK_ERROR;
 
 	if (cbBuf == 0) {
 		if (lpcbWritten)
@@ -84,13 +82,13 @@ ECRESULT ECFifoBuffer::Write(const void *lpBuf, size_type cbBuf, unsigned int ul
 	while (cbWritten < cbBuf) {
 		while (IsFull()) {
 		    if (IsClosed(cfRead)) {
-				er = ZARAFA_E_NETWORK_ERROR;
+				er = KCERR_NETWORK_ERROR;
 				goto exit;
 			}
 
 			if (ulTimeoutMs > 0) {
 				if (pthread_cond_timedwait(&m_hCondNotFull, &m_hMutex, &deadline) == ETIMEDOUT) {
-					er = ZARAFA_E_TIMEOUT;
+					er = KCERR_TIMEOUT;
 					goto exit;
 				}
 			} else
@@ -101,7 +99,7 @@ ECRESULT ECFifoBuffer::Write(const void *lpBuf, size_type cbBuf, unsigned int ul
 		try {
 			m_storage.insert(m_storage.end(), lpData + cbWritten, lpData + cbWritten + cbNow);
 		} catch (const std::bad_alloc &) {
-			er = ZARAFA_E_NOT_ENOUGH_MEMORY;
+			er = KCERR_NOT_ENOUGH_MEMORY;
 			goto exit;
 		}
 		pthread_cond_signal(&m_hCondNotEmpty);
@@ -111,7 +109,7 @@ ECRESULT ECFifoBuffer::Write(const void *lpBuf, size_type cbBuf, unsigned int ul
 exit:
 	pthread_mutex_unlock(&m_hMutex);
 
-	if (lpcbWritten && (er == erSuccess || er == ZARAFA_E_TIMEOUT))
+	if (lpcbWritten && (er == erSuccess || er == KCERR_TIMEOUT))
 		*lpcbWritten = cbWritten;
 
 	return er;
@@ -126,8 +124,8 @@ exit:
  * @param[in]		ulTimeoutMs		The maximum amount that this function may block.
  *
  * @retval	erSuccess					The data was successfully written.
- * @retval	ZARAFA_E_INVALID_PARAMETER	lpBuf is NULL.
- * @retval	ZARAFA_E_TIMEOUT			Not all data was writting within the specified time limit.
+ * @retval	KCERR_INVALID_PARAMETER	lpBuf is NULL.
+ * @retval	KCERR_TIMEOUT			Not all data was writting within the specified time limit.
  *										The amount of data that was written is returned in lpcbWritten.
  */
 ECRESULT ECFifoBuffer::Read(void *lpBuf, size_type cbBuf, unsigned int ulTimeoutMs, size_type *lpcbRead)
@@ -138,10 +136,10 @@ ECRESULT ECFifoBuffer::Read(void *lpBuf, size_type cbBuf, unsigned int ulTimeout
 	unsigned char	*lpData = reinterpret_cast<unsigned char*>(lpBuf);
 
 	if (lpBuf == NULL)
-		return ZARAFA_E_INVALID_PARAMETER;
+		return KCERR_INVALID_PARAMETER;
 
 	if (IsClosed(cfRead))
-		return ZARAFA_E_NETWORK_ERROR;
+		return KCERR_NETWORK_ERROR;
 
 	if (cbBuf == 0) {
 		if (lpcbRead)
@@ -161,7 +159,7 @@ ECRESULT ECFifoBuffer::Read(void *lpBuf, size_type cbBuf, unsigned int ulTimeout
 
 			if (ulTimeoutMs > 0) {
 				if (pthread_cond_timedwait(&m_hCondNotEmpty, &m_hMutex, &deadline) == ETIMEDOUT) {
-					er = ZARAFA_E_TIMEOUT;
+					er = KCERR_TIMEOUT;
 					goto exit;
 				}
 			} else
@@ -183,7 +181,7 @@ ECRESULT ECFifoBuffer::Read(void *lpBuf, size_type cbBuf, unsigned int ulTimeout
 exit:
 	pthread_mutex_unlock(&m_hMutex);
 
-	if (lpcbRead && (er == erSuccess || er == ZARAFA_E_TIMEOUT))
+	if (lpcbRead && (er == erSuccess || er == KCERR_TIMEOUT))
 		*lpcbRead = cbRead;
 
 	return er;
@@ -191,7 +189,7 @@ exit:
 
 /**
  * Close a buffer.
- * This causes new writes to the buffer to fail with ZARAFA_E_NETWORK_ERROR and all
+ * This causes new writes to the buffer to fail with KCERR_NETWORK_ERROR and all
  * (pending) reads on the buffer to return immediately.
  *
  * @retval	erSucces (never fails)
@@ -226,7 +224,7 @@ ECRESULT ECFifoBuffer::Close(close_flags flags)
 ECRESULT ECFifoBuffer::Flush()
 {
 	if (!IsClosed(cfWrite))
-		return ZARAFA_E_NETWORK_ERROR;
+		return KCERR_NETWORK_ERROR;
 
 	pthread_mutex_lock(&m_hMutex);
 	while (!(IsClosed(cfWrite) || IsEmpty()))

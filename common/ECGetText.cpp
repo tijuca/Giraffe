@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,10 +15,10 @@
  *
  */
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/platform.h>
-#include <zarafa/ECGetText.h>
-#include <zarafa/charset/convert.h>
+#include <kopano/zcdefs.h>
+#include <kopano/platform.h>
+#include <kopano/ECGetText.h>
+#include <kopano/charset/convert.h>
 
 #include <map>
 #include <string>
@@ -27,8 +27,6 @@
 #include <cassert>
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -129,7 +127,7 @@ namespace detail {
  *
  * @return	The converted, translated string.
  */
-LPWSTR zarafa_dcgettext_wide(const char *domainname, const char *msgid)
+LPWSTR kopano_dcgettext_wide(const char *domainname, const char *msgid)
 {
 	const char *lpsz = msgid;
 	detail::converter *lpConverter = detail::converter::getInstance();

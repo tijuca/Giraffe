@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include "ECExchangeExportChanges.h"
 #include "WSMessageStreamExporter.h"
@@ -23,39 +23,35 @@
 
 #include <set>
 
-#include <zarafa/Util.h>
-#include <zarafa/ECGuid.h>
+#include <kopano/Util.h>
+#include <kopano/ECGuid.h>
 #include <edkguid.h>
 #include <mapiguid.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 
 #include <mapiutil.h>
-#include "ZarafaICS.h"
-#include <zarafa/ECDebug.h>
+#include "ics.h"
+#include <kopano/ECDebug.h>
 
 #include "Mem.h"
 #include "ECMessage.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 #include "ECSyncLog.h"
 #include "ECSyncUtil.h"
 #include "ECSyncSettings.h"
 #include "EntryPoint.h"
-#include <zarafa/CommonUtil.h>
+#include <kopano/CommonUtil.h>
 
 #ifdef LINUX
 // We use ntohl/htonl for network-order conversion
 #include <arpa/inet.h>
 #endif
 
-#include <zarafa/charset/convert.h>
+#include <kopano/charset/convert.h>
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
-
-#define max(a,b) ((a) > (b) ? (a) : (b))
 
 ECExchangeExportChanges::ECExchangeExportChanges(ECMsgStore *lpStore, const std::string &sk, const wchar_t * szDisplay, unsigned int ulSyncType)
 : m_iidMessage(IID_IMessage)
@@ -248,7 +244,7 @@ HRESULT ECExchangeExportChanges::Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKN
 		if(m_ulSyncType == ICS_SYNC_CONTENTS){
 			hr = lpCollector->QueryInterface(IID_IExchangeImportContentsChanges, (LPVOID*) &m_lpImportContents);
 			if (hr == hrSuccess && lpSyncSettings->SyncStreamEnabled()) {
-				m_lpStore->lpTransport->HrCheckCapabilityFlags(ZARAFA_CAP_ENHANCED_ICS, &bCanStream);
+				m_lpStore->lpTransport->HrCheckCapabilityFlags(KOPANO_CAP_ENHANCED_ICS, &bCanStream);
 				if (bCanStream == TRUE) {
 					ZLOG_DEBUG(m_lpLogger, "Exporter supports enhanced ICS, checking importer...");
 					hr = lpCollector->QueryInterface(IID_IECImportContentsChanges, (LPVOID*) &m_lpImportStreamedContents);
@@ -641,7 +637,7 @@ HRESULT ECExchangeExportChanges::ConfigSelective(ULONG ulPropTag, LPENTRYLIST lp
 		return MAPI_E_INVALID_PARAMETER;
 	
 	if(ulPropTag == PR_ENTRYID) {
-		m_lpStore->lpTransport->HrCheckCapabilityFlags(ZARAFA_CAP_EXPORT_PROPTAG, &bSupportsPropTag);
+		m_lpStore->lpTransport->HrCheckCapabilityFlags(KOPANO_CAP_EXPORT_PROPTAG, &bSupportsPropTag);
 		if (!bSupportsPropTag)
 			return MAPI_E_NO_SUPPORT;
 	}
@@ -665,7 +661,7 @@ HRESULT ECExchangeExportChanges::ConfigSelective(ULONG ulPropTag, LPENTRYLIST lp
 	// Select an importer interface
 	hr = lpCollector->QueryInterface(IID_IExchangeImportContentsChanges, (LPVOID*) &m_lpImportContents);
 	if (hr == hrSuccess && lpSyncSettings->SyncStreamEnabled()) {
-		m_lpStore->lpTransport->HrCheckCapabilityFlags(ZARAFA_CAP_ENHANCED_ICS, &bCanStream);
+		m_lpStore->lpTransport->HrCheckCapabilityFlags(KOPANO_CAP_ENHANCED_ICS, &bCanStream);
 		if (bCanStream == TRUE) {
 			ZLOG_DEBUG(m_lpLogger, "Exporter supports enhanced ICS, checking importer...");
 			hr = lpCollector->QueryInterface(IID_IECImportContentsChanges, (LPVOID*) &m_lpImportStreamedContents);

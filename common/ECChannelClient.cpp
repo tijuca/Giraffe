@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <new>
 
 #include <mapidefs.h>
@@ -30,10 +30,10 @@
 #include <sys/socket.h>
 #endif
 
-#include <zarafa/base64.h>
-#include <zarafa/ECChannel.h>
-#include <zarafa/ECDefs.h>
-#include <zarafa/stringutil.h>
+#include <kopano/base64.h>
+#include <kopano/ECChannel.h>
+#include <kopano/ECDefs.h>
+#include <kopano/stringutil.h>
 
 #include "ECChannelClient.h"
 
@@ -87,7 +87,7 @@ ECRESULT ECChannelClient::DoCmd(const std::string &strCommand, std::vector<std::
 	if (!lstResponse.empty() && lstResponse.front() == "OK")
 		lstResponse.erase(lstResponse.begin());
 	else
-		return ZARAFA_E_CALL_FAILED;
+		return KCERR_CALL_FAILED;
 	return erSuccess;
 }
 
@@ -107,10 +107,6 @@ ECRESULT ECChannelClient::Connect()
 
 ECRESULT ECChannelClient::ConnectSocket()
 {
-#ifdef WIN32
-	// TODO: named pipe?
-	return MAPI_E_NO_SUPPORT;
-#else
 	ECRESULT er = erSuccess;
 	int fd = -1;
 	struct sockaddr_un saddr;
@@ -120,18 +116,18 @@ ECRESULT ECChannelClient::ConnectSocket()
 	strcpy(saddr.sun_path, m_strPath.c_str());
 
 	if ((fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0) {
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
 	if (connect(fd, (struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
-		er = ZARAFA_E_NETWORK_ERROR;
+		er = KCERR_NETWORK_ERROR;
 		goto exit;
 	}
 
 	m_lpChannel = new(std::nothrow) ECChannel(fd);
 	if (!m_lpChannel) {
-		er = ZARAFA_E_NOT_ENOUGH_MEMORY;
+		er = KCERR_NOT_ENOUGH_MEMORY;
 		goto exit;
 	}
 
@@ -140,7 +136,6 @@ exit:
 		closesocket(fd);
 
 	return er;
-#endif /* WIN32 */
 }
 
 ECRESULT ECChannelClient::ConnectHttp()
@@ -151,21 +146,13 @@ ECRESULT ECChannelClient::ConnectHttp()
 	const struct addrinfo *sock_addr;
 	char port_string[sizeof("65536")];
 
-#ifdef WIN32
-	WSAData wsaData;
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-		er = ZARAFA_E_CALL_FAILED;
-		goto exit;
-	}
-#endif
-
 	snprintf(port_string, sizeof(port_string), "%u", m_ulPort);
 	memset(&sock_hints, 0, sizeof(sock_hints));
 	sock_hints.ai_socktype = SOCK_STREAM;
 	ret = getaddrinfo(m_strPath.c_str(), port_string, &sock_hints,
 	      &sock_res);
 	if (ret != 0) {
-		er = ZARAFA_E_NETWORK_ERROR;
+		er = KCERR_NETWORK_ERROR;
 		goto exit;
 	}
 
@@ -187,13 +174,13 @@ ECRESULT ECChannelClient::ConnectHttp()
 		}
 	}
 	if (fd < 0) {
-		er = ZARAFA_E_NETWORK_ERROR;
+		er = KCERR_NETWORK_ERROR;
 		goto exit;
 	}
 
 	m_lpChannel = new(std::nothrow) ECChannel(fd);
 	if (!m_lpChannel) {
-		er = ZARAFA_E_NOT_ENOUGH_MEMORY;
+		er = KCERR_NOT_ENOUGH_MEMORY;
 		goto exit;
 	}
 

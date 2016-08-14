@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -42,7 +42,7 @@ class ECTPropsPurge;
 
 using namespace std;
 
-typedef hash_map<ECSESSIONGROUPID, ECSessionGroup*>::Type SESSIONGROUPMAP;
+typedef hash_map<ECSESSIONGROUPID, ECSessionGroup*>::Type EC_SESSIONGROUPMAP;
 typedef hash_map<ECSESSIONID, BTSession*>::Type SESSIONMAP;
 typedef hash_map<ECSESSIONID, unsigned int>::Type PERSISTENTBYSESSION;
 typedef hash_map<unsigned int, ECSESSIONID>::Type PERSISTENTBYCONNECTION;
@@ -89,7 +89,7 @@ class SOURCEKEY;
 class ECSessionManager
 {
 public:
-	ECSessionManager(ECConfig *lpConfig, ECLogger *audit, bool bHostedZarafa, bool bDistributedZarafa);
+	ECSessionManager(ECConfig *lpConfig, ECLogger *audit, bool bHostedKopano, bool bDistributedKopano);
 	virtual ~ECSessionManager();
 
 	virtual ECRESULT CreateAuthSession(struct soap *soap, unsigned int ulCapabilities, ECSESSIONID *sessionID, ECAuthSession **lppAuthSession, bool bRegisterSession, bool bLockSession);
@@ -97,7 +97,7 @@ public:
 	virtual ECRESULT CreateSession(struct soap *soap, char *szName, char *szPassword, char *szImpersonateUser, char *szClientVersion, char *szClientApp, const char *szClientAppVersion, const char *szClientAppMisc, unsigned int ulCapabilities, ECSESSIONGROUPID sessionGroupID, ECSESSIONID *lpSessionID, ECSession **lppSession, bool fLockSession, bool fAllowUidAuth);
 	// Creates a session without credential checking (caller must check credentials)
 	virtual ECRESULT RegisterSession(ECAuthSession *lpAuthSession, ECSESSIONGROUPID sessionGroupID, char *szClientVersion, char *szClientApp, const char *szClientApplicationVersion, const char *szClientApplicationMisc, ECSESSIONID *lpSessionID, ECSession **lppSession, bool fLockSession);
-	virtual ECRESULT CreateSessionInternal(ECSession **lppSession, unsigned int ulUserId = ZARAFA_UID_SYSTEM);
+	virtual ECRESULT CreateSessionInternal(ECSession **lppSession, unsigned int ulUserId = KOPANO_UID_SYSTEM);
 	virtual ECRESULT RemoveSession(ECSESSIONID sessionID);
 	virtual void RemoveSessionInternal(ECSession *lpSession);
 
@@ -145,8 +145,8 @@ public:
 	void GetStats(sSessionManagerStats &sStats);
 	ECRESULT DumpStats();
 
-	bool IsHostedSupported(void) { return m_bHostedZarafa; }
-	bool IsDistributedSupported(void) { return m_bDistributedZarafa; }
+	bool IsHostedSupported(void) { return m_bHostedKopano; }
+	bool IsDistributedSupported(void) { return m_bDistributedKopano; }
 	ECRESULT GetLicensedUsers(unsigned int ulServiceType, unsigned int* lpulLicensedUsers);
 	ECRESULT GetServerGUID(GUID* lpServerGuid);
 
@@ -187,7 +187,7 @@ protected:
 	ECRESULT			UpdateSubscribedTables(ECKeyTable::UpdateType ulType, TABLESUBSCRIPTION sSubscription, std::list<unsigned int> &lstChildId);
 	ECRESULT			SaveSourceKeyAutoIncrement(unsigned long long ullNewSourceKeyAutoIncrement);
 
-	SESSIONGROUPMAP		m_mapSessionGroups;		///< map of all the session groups
+	EC_SESSIONGROUPMAP m_mapSessionGroups; ///< map of all the session groups
 	SESSIONMAP			m_mapSessions;			///< map of all the sessions
 	
 	pthread_rwlock_t	m_hCacheRWLock;			///< locking of the sessionMap
@@ -203,8 +203,8 @@ protected:
 	ECDatabaseFactory*	m_lpDatabaseFactory;
 	ECPluginFactory*	m_lpPluginFactory;
 	ECSearchFolders*	m_lpSearchFolders;
-	bool				m_bHostedZarafa;
-	bool				m_bDistributedZarafa;
+	bool				m_bHostedKopano;
+	bool				m_bDistributedKopano;
 	GUID*				m_lpServerGuid;
 	unsigned long long	m_ullSourceKeyAutoIncrement;
 	unsigned int		m_ulSourceKeyQueue;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,8 +18,8 @@
 #ifndef __ECAUTHPAM_H_
 
 #include <string>
-#include <zarafa/platform.h>
-#include <zarafa/ZarafaCode.h>
+#include <kopano/platform.h>
+#include <kopano/kcodes.h>
 
 /**
  * Authenticate a user through a PAM service
@@ -27,7 +27,7 @@
  * @param strUsername Username
  * @param strPassword Password
  * @param *lpstrError On error, an error string will be returned
- * @return erSuccess, ZARAFA_E_LOGON_FAILURE or other error
+ * @return erSuccess, KCERR_LOGON_FAILURE or other error
  */
 ECRESULT ECPAMAuthenticateUser(const char* szPamService, const std::string &strUsername, const std::string &strPassword, std::string *lpstrError);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,11 +18,11 @@
 #ifndef ECCONFIGIMPL_H
 #define ECCONFIGIMPL_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 
 using namespace std;
 
-#include <zarafa/ECConfig.h>
+#include <kopano/ECConfig.h>
 
 #include <map>
 #include <set>
@@ -79,7 +79,7 @@ public:
 
 	bool LoadSettings(const char *szFilename) _zcp_override;
 	virtual bool ParseParams(int argc, char *argv[], int *lpargidx) _zcp_override;
-	const char *GetSettingsPath(void) _zcp_override;
+	const char *GetSettingsPath(void) _kc_override { return m_szConfigFile; }
 	bool ReloadSettings(void) _zcp_override;
 
 	bool AddSetting(const char *szName, const char *szValue, const unsigned int ulGroup = 0) _zcp_override;
@@ -95,9 +95,9 @@ public:
 	std::list<configsetting_t> GetAllSettings(void) _zcp_override;
 
 	bool HasWarnings(void) _zcp_override;
-	const std::list<std::string> *GetWarnings(void) _zcp_override;
+	const std::list<std::string> *GetWarnings(void) _kc_override { return &warnings; }
 	bool HasErrors(void) _zcp_override;
-	const std::list<std::string> *GetErrors(void) _zcp_override;
+	const std::list<std::string> *GetErrors(void) _kc_override { return &errors; }
 
 	bool WriteSettingToFile(const char *szName, const char *szValue, const char *szFileName) _zcp_override;
 	bool WriteSettingsToFile(const char *szFileName) _zcp_override;

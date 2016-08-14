@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECNotificationManager.h"
 #include "ECSession.h"
 #include "ECSessionManager.h"
@@ -90,8 +90,8 @@ ECNotificationManager::~ECNotificationManager()
     std::map<ECSESSIONID, NOTIFREQUEST>::const_iterator iterRequest;
     for (iterRequest = m_mapRequests.begin();
          iterRequest != m_mapRequests.end(); ++iterRequest) {
-		// we can't call zarafa_notify_done here, race condition on shutdown in ECSessionManager vs ECDispatcher
-		zarafa_end_soap_connection(iterRequest->second.soap);
+		// we can't call kopano_notify_done here, race condition on shutdown in ECSessionManager vs ECDispatcher
+		kopano_end_soap_connection(iterRequest->second.soap);
 		soap_destroy(iterRequest->second.soap);
 		soap_end(iterRequest->second.soap);
 		soap_free(iterRequest->second.soap);
@@ -124,7 +124,7 @@ HRESULT ECNotificationManager::AddRequest(ECSESSIONID ecSessionId, struct soap *
 #else
         soap_default_ns_notifyResponse(iterRequest->second.soap, &notifications);
 #endif
-        notifications.er = ZARAFA_E_NOT_FOUND; // Should be something like 'INTERRUPTED' or something
+        notifications.er = KCERR_NOT_FOUND; // Should be something like 'INTERRUPTED' or something
         if(soapresponse(notifications, iterRequest->second.soap)) {
             // Handle error on the response
             soap_send_fault(iterRequest->second.soap);
@@ -134,7 +134,7 @@ HRESULT ECNotificationManager::AddRequest(ECSESSIONID ecSessionId, struct soap *
         lpItem = iterRequest->second.soap;
     
         // Pass the socket back to the socket manager (which will probably close it since the client should not be holding two notification sockets)
-        zarafa_notify_done(lpItem);
+        kopano_notify_done(lpItem);
     }
     
     NOTIFREQUEST req;
@@ -228,7 +228,7 @@ void *ECNotificationManager::Work() {
                     // Get the notifications from the session
                     er = lpecSession->GetNotifyItems(iterRequest->second.soap, &notifications);
                     
-                    if(er == ZARAFA_E_NOT_FOUND) {
+                    if(er == KCERR_NOT_FOUND) {
                         if(time(NULL) - iterRequest->second.ulRequestTime < m_ulTimeout) {
                             // No notifications - this means we have to wait. This can happen if the session was marked active since
                             // the request was just made, and there may have been notifications still waiting for us
@@ -244,7 +244,7 @@ void *ECNotificationManager::Work() {
                     }
 
 					ULONG ulCapabilities = lpecSession->GetCapabilities();
-					if (er == erSuccess && (ulCapabilities & ZARAFA_CAP_UNICODE) == 0) {
+					if (er == erSuccess && (ulCapabilities & KOPANO_CAP_UNICODE) == 0) {
 						ECStringCompat stringCompat(false);
 						er = FixNotificationsEncoding(iterRequest->second.soap, stringCompat, notifications.pNotificationArray);
 					}
@@ -254,7 +254,7 @@ void *ECNotificationManager::Work() {
                     lpecSession->Unlock();
                 } else {
                     // The session is dead
-                    notifications.er = ZARAFA_E_END_OF_SESSION;
+                    notifications.er = KCERR_END_OF_SESSION;
                 }
 
                 // Send the SOAP data
@@ -279,7 +279,7 @@ void *ECNotificationManager::Work() {
             pthread_mutex_unlock(&m_mutexRequests);
             
             if(lpItem)
-                zarafa_notify_done(lpItem);
+                kopano_notify_done(lpItem);
             
         }
         

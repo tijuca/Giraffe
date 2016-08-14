@@ -1,12 +1,12 @@
-dist_sbin_SCRIPTS = zarafa-search zarafa-search-xapian-compact.py
+dist_sbin_SCRIPTS = kopano-search kopano-search-xapian-compact.py
 
 EXTRA_DIST = setup.py		\
-	zarafa_search/__init__.py \
-	zarafa_search/plaintext.py \
-	zarafa_search/magic.py \
-	zarafa_search/plugin_solr.py  \
-	zarafa_search/plugin_xapian.py  \
-	zarafa_search/xmltotext.xslt
+	kopano_search/__init__.py \
+	kopano_search/plaintext.py \
+	kopano_search/magic.py \
+	kopano_search/plugin_solr.py  \
+	kopano_search/plugin_xapian.py  \
+	kopano_search/xmltotext.xslt
 
 install-exec-local:
 	cd ${srcdir} && ${PYTHON} setup.py install -f \
@@ -15,4 +15,4 @@ install-exec-local:
 	rm -Rf build
 
 install-data-local:
-	mkdir -p "${DESTDIR}${localstatedir}/lib/zarafa/search"
+	mkdir -p "${DESTDIR}${localstatedir}/lib/kopano/search"

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,13 +18,13 @@
 #ifndef ECTHREADMANAGER_H
 #define ECTHREADMANAGER_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <queue>
 #include <set>
 
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECConfig.h>
-#include <zarafa/ZarafaCode.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECConfig.h>
+#include <kopano/kcodes.h>
 #include "SOAPUtils.h"
 #include "soapH.h"
 
@@ -232,8 +232,6 @@ private:
 
 public:
     ECDispatcherSelect(ECLogger *lpLogger, ECConfig *lpConfig, CREATEPIPESOCKETCALLBACK lpCallback, void *lpCallbackParam);
-    virtual ~ECDispatcherSelect();
-
     virtual ECRESULT MainLoop();
 
     virtual ECRESULT ShutDown();
@@ -258,40 +256,5 @@ public:
     virtual ECRESULT NotifyRestart(SOAP_SOCKET s);
 };
 #endif
-
-#ifdef WIN32
-class ECDispatcherWin32 _zcp_final : public ECDispatcher {
-private:
-	// Windows handler
-	HANDLE					m_hRescanEvent;
-public:
-    ECDispatcherWin32(ECLogger *lpLogger, ECConfig *lpConfig, CREATEPIPESOCKETCALLBACK lpCallback, void *lpCallbackParam);
-    virtual ~ECDispatcherWin32();
-
-    virtual ECRESULT MainLoop();
-
-    virtual ECRESULT ShutDown();
-
-    virtual ECRESULT NotifyRestart(SOAP_SOCKET s);
-
-	enum {
-		SOCKETTYPE_TCP = 1, 
-		SOCKETTYPE_PIPE,
-		SOCKETTYPE_RESCAN,
-		SOCKETTYPE_TCP_LISTEN,
-		SOCKETTYPE_PIPE_LISTEN
-	};
-	typedef struct 
-	{
-		int type;
-		char buffer[1];
-		DWORD dwRead;
-		OVERLAPPED sOverlapped;
-		bool bPending;
-		bool bEOF;
-	} ECSOCKETDATA;
-};
-#endif
-
 
 #endif

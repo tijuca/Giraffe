@@ -8,7 +8,7 @@
  *	 escape: The internal representation of local `hel_w` escapes into
  *	 `prop[x].Value.lpszW`, but is destroyed when it exits scope."
  */
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <string>
 #include <cstdlib>
 #include <mapidefs.h>

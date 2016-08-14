@@ -135,14 +135,14 @@ msgstr "Synchroniseren ..."
 msgid "Synchronize"
 msgstr "Synchronisatie"
 
-msgid "Start Zarafa offline synchronization"
-msgstr "Start de Zarafa offline synchronisatie"
+msgid "Start Kopano offline synchronization"
+msgstr "Start de Kopano offline synchronisatie"
 
 msgid "Configure"
 msgstr "Instellingen"
 
-msgid "Configure Zarafa offline synchronization"
-msgstr "Zarafa offline synchronisatie instellen"
+msgid "Configure Kopano offline synchronization"
+msgstr "Kopano offline synchronisatie instellen"
 
 msgid "Global Address Book"
 msgstr "Blobal Address Book"
@@ -159,7 +159,7 @@ msgstr "Machtigingen..."
 msgid "Delegates can send items on your behalf. To grant permission to others to access your folders without also giving them send-on-behalf-of privileges, go to properties for each folder and change the options on the Permissions tab."
 msgstr "Gemachtigten kunnen items versturen vanuit uw naam. Om rechten te geven aan anderen zonder de verstuur namens rechten in te stellen, open de map eigenschappen en wijzig de opties in de rechten tab."
 
-msgid "Zarafa is not availible. Either there are network problems or Zarafa is down for maintenance."
+msgid "Kopano is not availible. Either there are network problems or Kopano is down for maintenance."
 msgstr ""
 
 msgid "Could not initialize delegation window\nPlease contact your administrator."
@@ -210,11 +210,11 @@ msgstr "Foutmelding"
 msgid "Unable to get Folder information"
 msgstr "Map informatie verkrijgen is niet mogelijk"
 
-msgid "Zarafa Favorites"
-msgstr "Zarafa Favorieten"
+msgid "Kopano Favorites"
+msgstr "Kopano Favorieten"
 
-msgid "Zarafa Delegates"
-msgstr "Zarafa Gemachtigden"
+msgid "Kopano Delegates"
+msgstr "Kopano Gemachtigden"
 
 msgid "Adding local folders"
 msgstr "Toevoegen lokale folders"
@@ -360,17 +360,17 @@ msgstr "Verbindings soort"
 msgid "Online"
 msgstr "Online"
 
-msgid "Cached Zarafa Mode"
-msgstr "Cached Zarafa Modus"
+msgid "Cached Kopano Mode"
+msgstr "Cached Kopano Modus"
 
 msgid "Detect at startup"
 msgstr "Detecteren bij opstarten"
 
-msgid "Zarafa does not support offline or cached mode for Outlook XP and Outlook 2002. If you wish to use offline functionality of Zarafa, please use Outlook 2000, 2003, 2007 or later."
-msgstr "Zarafa heeft geen ondersteuning voor het gebruik van offline mappen voor Outlook XP en Outlook 2002. Als u offline mappen wilt gebruiken, gebruik dan Outlook 2000, 2003, 2007 of later."
+msgid "Kopano does not support offline or cached mode for Outlook XP and Outlook 2002. If you wish to use offline functionality of Kopano, please use Outlook 2000, 2003, 2007 or later."
+msgstr "Kopano heeft geen ondersteuning voor het gebruik van offline mappen voor Outlook XP en Outlook 2002. Als u offline mappen wilt gebruiken, gebruik dan Outlook 2000, 2003, 2007 of later."
 
-msgid "Zarafa Offline"
-msgstr "Zarafa zonder verbinding"
+msgid "Kopano Offline"
+msgstr "Kopano zonder verbinding"
 
 msgid "Favorites"
 msgstr "Favorieten"
@@ -396,14 +396,11 @@ msgstr "Verbinding maken met de server..."
 msgid "Unable to reach the server.\nDo you want to save the settings or cancel and re-enter the settings?"
 msgstr "Er kon geen verbinding worden gemaakt met de server. Wilt u de instellingen opslaan of deze annuleren en de instellingen nogmaals instellen?"
 
-msgid "Cannot start Zarafa client because you are over the license limit. To continue, you must purchase additional client licenses from Zarafa."
-msgstr "Kan Zarafa client niet starten omdat de licentie over het limiet is. Om door te gaan moet u een bijkomende client licentie aanschaffen."
+msgid "Cannot start Kopano client because you are over the license limit. To continue, you must purchase additional client licenses from Kopano."
+msgstr "Kan Kopano client niet starten omdat de licentie over het limiet is. Om door te gaan moet u een bijkomende client licentie aanschaffen."
 
-msgid "Zarafa license"
-msgstr "Zarafa licentie"
-
-msgid "Cannot start Zarafa client because the server was unable to contact the zarafa-licensed license server. Please consult your system administrator."
-msgstr "Kan de Zarafa client niet starten omdat de server geen verbinding kan maken met de Zarafa license server. Neem contact op met uw systeembeheerder."
+msgid "Kopano license"
+msgstr "Kopano licentie"
 
 msgid "Incorrect username and/or password."
 msgstr "Foute gebruikersnaam en/of wachtwoord."
@@ -411,8 +408,8 @@ msgstr "Foute gebruikersnaam en/of wachtwoord."
 msgid "Incorrect servername and/or port\nCheck if the server is running."
 msgstr "Foute servernaam en/of poort Controleer of de server draait."
 
-msgid "Incorrect Zarafa version."
-msgstr "Foute Zarafa versie"
+msgid "Incorrect Kopano version."
+msgstr "Foute Kopano versie"
 
 msgid "An unknown failure has occurred.\nPlease contact your administrator."
 msgstr "Er is een onbekende fout opgetreden. Neem contact op met uw systeem beheerder."
@@ -606,14 +603,14 @@ msgstr "Machtigingen"
 msgid "Unable to open MAPI session."
 msgstr "Kan geen MAPI sessie openen."
 
-msgid "You are currently offline. To use this command, connect to the Zarafa online server."
-msgstr "U bent nu offline. Maak verbinding met de online Zarafa server om dit commando te gebruiken."
+msgid "You are currently offline. To use this command, connect to the Kopano online server."
+msgstr "U bent nu offline. Maak verbinding met de online Kopano server om dit commando te gebruiken."
 
 msgid "Unable to open default store in MAPI session."
 msgstr "Kan de standaard store van de MAPI sessie niet openen."
 
-msgid "You can only use this function with Zarafa profiles."
-msgstr "U kunt deze functie alleen met Zarafa profielen gebruiken."
+msgid "You can only use this function with Kopano profiles."
+msgstr "U kunt deze functie alleen met Kopano profielen gebruiken."
 
 msgid "Unable to open this store."
 msgstr "Kan de store niet openen."
@@ -636,8 +633,8 @@ msgstr "Verwijderde Items Herstellen..."
 msgid "Out of Office Assistant..."
 msgstr "Wizard Afwezigheid..."
 
-msgid "Add to Zarafa Favorites Folder"
-msgstr "Voeg toe aan Zarafa Favorieten Folder"
+msgid "Add to Kopano Favorites Folder"
+msgstr "Voeg toe aan Kopano Favorieten Folder"
 
 msgid "Unable to get shortcut folder."
 msgstr "Kan de snelkoppeling van de map niet verkrijgen"

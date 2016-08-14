@@ -1,6 +1,6 @@
 from distutils.core import setup, Extension
 
-setup(name='zarafa-presence',
+setup(name='kopano-presence',
       version='0.1',
-      packages=['zarafa_presence'],
+      packages=['kopano_presence'],
 )

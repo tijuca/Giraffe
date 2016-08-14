@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,27 +15,25 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <mapidefs.h>
 #include "WSTransport.h"
 #include "ECGenericProp.h"
 
-#include "Zarafa.h"
-#include "ZarafaUtil.h"
+#include "kcore.hpp"
+#include "pcutil.hpp"
 #include "Mem.h"
-#include <zarafa/Util.h>
+#include <kopano/Util.h>
 
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 
-#include <zarafa/ECDebug.h>
+#include <kopano/ECDebug.h>
 
-#include <zarafa/charset/convert.h>
+#include <kopano/charset/convert.h>
 #include "EntryPoint.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECGenericProp::ECGenericProp(void *lpProvider, ULONG ulObjType, BOOL fModify,
@@ -222,7 +220,6 @@ exit:
 //    the property has not been force-loaded with OpenProperty
 // or
 // 2) A MaxSize was specified and the property is larger than that size (normally 8k or so)
-//
 
 HRESULT ECGenericProp::HrGetRealProp(ULONG ulPropTag, ULONG ulFlags, void *lpBase, LPSPropValue lpsPropValue, ULONG ulMaxSize)
 {
@@ -326,10 +323,7 @@ exit:
 	return hr;
 }
 
-////////////////////////////////////////////////////////////
 // Default property handles
-//
-
 HRESULT	ECGenericProp::DefaultGetProp(ULONG ulPropTag,  void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase)
 {
 	HRESULT			hr = hrSuccess;
@@ -1172,10 +1166,7 @@ HRESULT ECGenericProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID FAR * lppP
 	return MAPI_E_NO_SUPPORT;
 }
 
-////////////////////////////////////////////
 // Interface IECSingleInstance
-//
-
 HRESULT ECGenericProp::GetSingleInstanceId(ULONG *lpcbInstanceID, LPSIEID *lppInstanceID)
 {
 	HRESULT hr = hrSuccess;
@@ -1235,10 +1226,7 @@ exit:
 	return hr;
 }
 
-////////////////////////////////////////////
 // Interface IMAPIProp
-//
-
 HRESULT __stdcall ECGenericProp::xMAPIProp::QueryInterface(REFIID refiid, void ** lppInterface)
 {
 	METHOD_PROLOGUE_(ECGenericProp , MAPIProp);

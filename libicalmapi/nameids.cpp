@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "nameids.h"
 #include <mapix.h>
 
@@ -37,12 +37,12 @@ MAPINAMEID mnNamedProps[SIZE_NAMEDPROPS] = {
 	{(LPGUID)&PSETID_Meeting, MNID_ID, {dispidIsException}},
 	{(LPGUID)&PSETID_Meeting, MNID_ID, {dispidStartRecurrenceTime}},
 	{(LPGUID)&PSETID_Meeting, MNID_ID, {dispidEndRecurrenceTime}},
-	{(LPGUID)&PSETID_Zarafa_CalDav, MNID_ID, {dispidMozGen}}, //X-MOZ-GENERATION
-	{(LPGUID)&PSETID_Zarafa_CalDav, MNID_ID, {dispidMozLastAck}}, //X-MOZ-LAST-ACK
-	{(LPGUID)&PSETID_Zarafa_CalDav, MNID_ID, {dispidMozSnoozeSuffixTime}}, //X-MOZ-SNOOZE-TIME suffix
-	{(LPGUID)&PSETID_Zarafa_CalDav, MNID_ID, {dispidMozSendInvite}}, //X-MOZ-SEND-INVITATIONS 
-	{(LPGUID)&PSETID_Zarafa_CalDav, MNID_ID, {dispidApptTsRef}},
-	{(LPGUID)&PSETID_Zarafa_CalDav, MNID_ID, {dispidFldID}},
+	{(LPGUID)&PSETID_Kopano_CalDav, MNID_ID, {dispidMozGen}}, //X-MOZ-GENERATION
+	{(LPGUID)&PSETID_Kopano_CalDav, MNID_ID, {dispidMozLastAck}}, //X-MOZ-LAST-ACK
+	{(LPGUID)&PSETID_Kopano_CalDav, MNID_ID, {dispidMozSnoozeSuffixTime}}, //X-MOZ-SNOOZE-TIME suffix
+	{(LPGUID)&PSETID_Kopano_CalDav, MNID_ID, {dispidMozSendInvite}}, //X-MOZ-SEND-INVITATIONS 
+	{(LPGUID)&PSETID_Kopano_CalDav, MNID_ID, {dispidApptTsRef}},
+	{(LPGUID)&PSETID_Kopano_CalDav, MNID_ID, {dispidFldID}},
 	{(LPGUID)&PSETID_Appointment, MNID_ID, {dispidSendAsICAL}},
 	{(LPGUID)&PSETID_Appointment, MNID_ID, {dispidAppointmentSequenceNumber}},
 	{(LPGUID)&PSETID_Appointment, MNID_ID, {dispidApptSeqTime}},

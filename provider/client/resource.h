@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,14 +17,13 @@
 
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
-// Used by Zarafa.rc
 //
 #define IDD_SETTINGS_DLG                101
 #define IDD_PROPPAGE_ADVANCE            102
 #define IDD_AB_USERGENERAL_PAGE         103
 #define IDD_PASSWORD_DLG                104
 #define IDD_USERLISTDLG                 105
-#define IDB_LOGO_ZARAFA                 105
+#define IDB_LOGO_KOPANO                 105
 #define IDD_AB_DISTGENERAL_PAGE         106
 #define IDD_SETTINGS_TAB_CONNECTION     107
 #define IDD_AB_DISTMEMBEROF_PAGE        108
@@ -36,7 +35,7 @@
 #define IDD_AB_DISTEMAIL_PAGE           113
 #define IDD_CERTIFICATE_DLG             114
 #define IDC_USERLIST                    202
-#define IDI_ZARAFA                      230
+#define IDI_KOPANO                      230
 #define IDC_EDIT_SERVER                 1000
 #define IDC_EDIT_SERVER_PORT            1001
 #define IDC_EDIT_USERNAME               1002
@@ -173,7 +172,7 @@
 #define IDC_VAL_ERROR_DESCRIPTION       1130
 #define IDC_TXT_HOSTNAME                1131
 #define IDC_VAL_HOSTNAME                1132
-#define IDC_STATIC_LOGO_ZARAFA          1133
+#define IDC_STATIC_LOGO_KOPANO          1133
 
 // Next default values for new objects
 // 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -26,39 +26,37 @@
 #ifndef ECFREEBUSYDATA_H
 #define ECFREEBUSYDATA_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include "freebusy.h"
 #include "freebusyguid.h"
 
-#include <zarafa/ECUnknown.h>
-#include <zarafa/Trace.h>
-#include <zarafa/ECDebug.h>
-#include <zarafa/ECGuid.h>
+#include <kopano/ECUnknown.h>
+#include <kopano/Trace.h>
+#include <kopano/ECDebug.h>
+#include <kopano/ECGuid.h>
 
 #include "ECFBBlockList.h"
 
 /**
  * Implementatie of the IFreeBusyData interface
  */
-class ECFreeBusyData : public ECUnknown
-{
+class ECFreeBusyData _kc_final : public ECUnknown {
 private:
 	ECFreeBusyData();
-	~ECFreeBusyData(void);
 public:
 	static HRESULT Create(ECFreeBusyData **lppECFreeBusyData);
 
 	HRESULT Init(LONG rtmStart, LONG rtmEnd, ECFBBlockList* lpfbBlockList);
 	
 	virtual HRESULT QueryInterface(REFIID refiid, void** lppInterface);
-	virtual HRESULT Reload(void*);
+	virtual HRESULT Reload(void *) { return E_NOTIMPL; }
 	virtual HRESULT EnumBlocks(IEnumFBBlock **ppenumfb, FILETIME ftmStart, FILETIME ftmEnd);
-	virtual HRESULT Merge(void *);
-	virtual HRESULT GetDeligateInfo(void *);
+	virtual HRESULT Merge(void *) { return E_NOTIMPL; }
+	virtual HRESULT GetDelegateInfo(void *) { return E_NOTIMPL; }
 	virtual HRESULT FindFreeBlock(LONG, LONG, LONG, BOOL, LONG, LONG, LONG, FBBlock_1 *);
-	virtual HRESULT InterSect(void *, LONG, void *);
+	virtual HRESULT InterSect(void *, LONG, void *) { return E_NOTIMPL; }
 	virtual HRESULT SetFBRange(LONG rtmStart, LONG rtmEnd);
-	virtual HRESULT NextFBAppt(void *, ULONG, void *, ULONG, void *, void *);
+	virtual HRESULT NextFBAppt(void *, ULONG, void *, ULONG, void *, void *) { return E_NOTIMPL; }
 	virtual HRESULT GetFBPublishRange(LONG *prtmStart, LONG *prtmEnd);
 
 public:
@@ -74,7 +72,7 @@ public:
 			virtual HRESULT __stdcall Reload(void *) _zcp_override;
 			virtual HRESULT __stdcall EnumBlocks(IEnumFBBlock **ppenumfb, FILETIME ftmStart, FILETIME ftmEnd) _zcp_override;
 			virtual HRESULT __stdcall Merge(void *) _zcp_override;
-			virtual HRESULT __stdcall GetDeligateInfo(void *) _zcp_override;
+			virtual HRESULT __stdcall GetDelegateInfo(void *) _zcp_override;
 			virtual HRESULT __stdcall FindFreeBlock(LONG, LONG, LONG, BOOL, LONG, LONG, LONG, FBBlock_1 *) _zcp_override;
 			virtual HRESULT __stdcall InterSect(void *, LONG, void *) _zcp_override;
 			virtual HRESULT __stdcall SetFBRange(LONG rtmStart, LONG rtmEnd) _zcp_override;

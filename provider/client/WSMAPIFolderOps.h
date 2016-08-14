@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,10 +18,10 @@
 #ifndef WSMAPIFOLDEROPS_H
 #define WSMAPIFOLDEROPS_H
 
-#include <zarafa/ECUnknown.h>
-#include "Zarafa.h"
-#include <zarafa/ZarafaCode.h>
-#include "soapZarafaCmdProxy.h"
+#include <kopano/ECUnknown.h>
+#include "kcore.hpp"
+#include <kopano/kcodes.h>
+#include "soapKCmdProxy.h"
 #include "ECICS.h"
 
 #include <vector>
@@ -36,11 +36,11 @@ class utf8string;
 class WSMAPIFolderOps : public ECUnknown
 {
 protected:
-	WSMAPIFolderOps(ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport);
+	WSMAPIFolderOps(KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport);
 	virtual ~WSMAPIFolderOps();
 
 public:
-	static HRESULT Create(ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport, WSMAPIFolderOps **lppFolderOps);
+	static HRESULT Create(KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport, WSMAPIFolderOps **lppFolderOps);
 
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
 	
@@ -82,7 +82,7 @@ private:
 
 private:
 	entryId			m_sEntryId;		// Entryid of the folder
-	ZarafaCmd*		lpCmd;			// command object
+	KCmd*		lpCmd;			// command object
 	pthread_mutex_t *lpDataLock;		//
 	ECSESSIONID		ecSessionId;	// Id of the session
 	ULONG			m_ulSessionReloadCallback;

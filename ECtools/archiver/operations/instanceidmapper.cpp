@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,11 +15,12 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "instanceidmapper.h"
 #include "Archiver.h"
 #include "ECDatabase.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
+#include <boost/utility.hpp>
 
 namespace za { namespace operations {
 
@@ -71,7 +72,7 @@ HRESULT InstanceIdMapper::Init(ECConfig *lpConfig)
 	ECRESULT er = erSuccess;
 	
 	er = m_ptrDatabase->Connect(lpConfig);
-	if (er == ZARAFA_E_DATABASE_NOT_FOUND) {
+	if (er == KCERR_DATABASE_NOT_FOUND) {
 		m_ptrDatabase->GetLogger()->Log(EC_LOGLEVEL_INFO, "Database not found, creating database.");
 		er = m_ptrDatabase->CreateDatabase(lpConfig);
 	}
@@ -79,7 +80,7 @@ HRESULT InstanceIdMapper::Init(ECConfig *lpConfig)
 	if (er != erSuccess)
 		m_ptrDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "Database connection failed: %s", m_ptrDatabase->GetError());
 
-	return ZarafaErrorToMAPIError(er);
+	return kcerr_to_mapierr(er);
 }
 
 HRESULT InstanceIdMapper::GetMappedInstanceId(const SBinary &sourceServerUID, ULONG cbSourceInstanceID, LPENTRYID lpSourceInstanceID, const SBinary &destServerUID, ULONG *lpcbDestInstanceID, LPENTRYID *lppDestInstanceID)
@@ -104,7 +105,7 @@ HRESULT InstanceIdMapper::GetMappedInstanceId(const SBinary &sourceServerUID, UL
 
 	er = m_ptrDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess) {
-		hr = ZarafaErrorToMAPIError(er);
+		hr = kcerr_to_mapierr(er);
 		goto exit;
 	}
 
@@ -117,7 +118,7 @@ HRESULT InstanceIdMapper::GetMappedInstanceId(const SBinary &sourceServerUID, UL
 			break;
 
 		default:	// This should be impossible.
-			hr = MAPI_E_DISK_ERROR;	// MAPI version of ZARAFA_E_DATABASE_ERROR
+			hr = MAPI_E_DISK_ERROR;	// MAPI version of KCERR_DATABASE_ERROR
 			m_ptrDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "InstanceIdMapper::GetMappedInstanceId(): GetNumRows failed");
 			goto exit;
 	}
@@ -125,14 +126,14 @@ HRESULT InstanceIdMapper::GetMappedInstanceId(const SBinary &sourceServerUID, UL
 	lpDBRow = m_ptrDatabase->FetchRow(lpResult);
 	if (lpDBRow == NULL || lpDBRow[0] == NULL) {
 		m_ptrDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "InstanceIdMapper::GetMappedInstanceId(): FetchRow failed");
-		hr = MAPI_E_DISK_ERROR;	// MAPI version of ZARAFA_E_DATABASE_ERROR
+		hr = MAPI_E_DISK_ERROR;	// MAPI version of KCERR_DATABASE_ERROR
 		goto exit;
 	}
 
 	lpLengths = m_ptrDatabase->FetchRowLengths(lpResult);
 	if (lpLengths == NULL || lpLengths[0] == 0) {
 		m_ptrDatabase->GetLogger()->Log(EC_LOGLEVEL_FATAL, "InstanceIdMapper::GetMappedInstanceId(): FetchRowLengths failed");
-		hr = MAPI_E_DISK_ERROR;	// MAPI version of ZARAFA_E_DATABASE_ERROR
+		hr = MAPI_E_DISK_ERROR;	// MAPI version of KCERR_DATABASE_ERROR
 		goto exit;
 	}
 
@@ -158,7 +159,7 @@ HRESULT InstanceIdMapper::SetMappedInstances(ULONG ulPropTag, const SBinary &sou
 	DB_ROW lpDBRow = NULL;
 
 	if (cbSourceInstanceID == 0 || lpSourceInstanceID == NULL || cbDestInstanceID == 0 || lpDestInstanceID == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
@@ -211,7 +212,7 @@ exit:
 	if (er != erSuccess)
 		m_ptrDatabase->Rollback();
 
-	return ZarafaErrorToMAPIError(er);
+	return kcerr_to_mapierr(er);
 }
 
 }} // namespaces operations, za

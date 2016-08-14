@@ -1,6 +1,6 @@
 %{
-#include <zarafa/ECTags.h>
-#include <zarafa/IECUnknown.h>
+#include <kopano/ECTags.h>
+#include <kopano/IECUnknown.h>
 %}
 
 // Pull in the language-specific helpers

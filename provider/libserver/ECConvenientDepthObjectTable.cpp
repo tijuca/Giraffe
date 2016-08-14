@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECDatabase.h"
 
 #include <mapidefs.h>
@@ -25,14 +25,12 @@
 #include "ECConvenientDepthObjectTable.h"
 #include "ECSession.h"
 #include "ECMAPI.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
 #include <list>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECConvenientDepthObjectTable::ECConvenientDepthObjectTable(ECSession *lpSession, unsigned int ulStoreId, LPGUID lpGuid, unsigned int ulFolderId, unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale) : ECStoreObjectTable(lpSession, ulStoreId, lpGuid, 0, ulObjType, ulFlags, 0, locale) {
@@ -206,7 +204,7 @@ exit:
 }
 
 ECRESULT ECConvenientDepthObjectTable::GetComputedDepth(struct soap *soap, ECSession* lpSession, unsigned int ulObjId, struct propVal *lpPropVal){
-	ECRESULT		er = erSuccess;
+	ECRESULT er;
 	unsigned int ulObjType;
 
 	lpPropVal->ulPropTag = PR_DEPTH;
@@ -218,16 +216,11 @@ ECRESULT ECConvenientDepthObjectTable::GetComputedDepth(struct soap *soap, ECSes
 		if(er != erSuccess) {
 			// should never happen
 			ASSERT(FALSE);
-			er = ZARAFA_E_NOT_FOUND;
-			goto exit;
+			return KCERR_NOT_FOUND;
 		}
-		if(ulObjType != MAPI_FOLDER){
-			er = ZARAFA_E_NOT_FOUND;
-			goto exit;
-		}
+		if (ulObjType != MAPI_FOLDER)
+			return KCERR_NOT_FOUND;
 		++lpPropVal->Value.ul;
 	}
-	
-exit:
-	return er;
+	return erSuccess;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <mapi.h>
 #include <mapidefs.h>
@@ -23,16 +23,14 @@
 #include <mapiutil.h>
 
 #include "freebusyutil.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
 #include "freebusytags.h"
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <edkmdb.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 BOOL leapyear(short year)
@@ -234,9 +232,7 @@ HRESULT GetFreeBusyMessage(IMAPISession* lpSession, IMsgStore* lpPublicStore, IM
 		if(hr != hrSuccess)
 			goto exit;
 
-		///////////////////////////////////////////////////////////////////////
 		// Set the accountname in properties PR_DISPLAY_NAME and PR_SUBJECT
-		//
 		hr = lpSession->OpenAddressBook(0, NULL, AB_NO_DIALOG, &lpAdrBook);
  		if(hr != hrSuccess)
 			goto exit;
@@ -279,9 +275,7 @@ HRESULT GetFreeBusyMessage(IMAPISession* lpSession, IMsgStore* lpPublicStore, IM
 		if(hr != hrSuccess)
 			goto exit;
 
-		//////////////////////////////////////////////////////////
 		// Update the user freebusy entryid array
-		//
 
 		if (lpUserStore) {
 			// Get entryid
@@ -635,7 +629,7 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 	       iMonth < static_cast<LONG>(ulMonths))
 	{
 
-		if(fbBlk.m_fbstatus == fbStatus || fbStatus == fbZarafaAllBusy)
+		if(fbBlk.m_fbstatus == fbStatus || fbStatus == fbKopanoAllBusy)
 		{
 			RTimeToUnixTime(fbBlk.m_tmStart, &tmUnixStart);
 			RTimeToUnixTime(fbBlk.m_tmEnd, &tmUnixEnd);

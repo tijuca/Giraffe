@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include "ECStoreObjectTable.h"
 
 class ECSession;
@@ -25,7 +25,6 @@ class ECSession;
 class ECMailBoxTable _zcp_final : public ECStoreObjectTable {
 protected:
 	ECMailBoxTable(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale);
-	virtual ~ECMailBoxTable();
 
 public:
 	static ECRESULT Create(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale, ECMailBoxTable **lppTable);

@@ -133,7 +133,7 @@ sub parse_entry($) {
 setlocale(LC_CTYPE, "");
 
 my $servercfg = $ARGV[0];
-$servercfg = "/etc/zarafa/server.cfg" if (!defined($servercfg));
+$servercfg = "/etc/kopano/server.cfg" if (!defined($servercfg));
 my %serveropt = readconfig($servercfg);
 
 $dbh = DBI->connect("dbi:mysql:database=".$serveropt{mysql_database}.";host=".$serveropt{mysql_host}, $serveropt{mysql_user}, $serveropt{mysql_password})
@@ -154,16 +154,16 @@ $par = $dbh->prepare($query)
 
 while (<STDIN>) {
 # syslog
-# Feb 28 11:17:21 <hostname> zarafa-server[5307]: zarafa-server startup by user uid=1000
-# Feb 28 17:53:35 <hostname> zarafa-server[5311]: authenticate ok user='john' from='file:///var/run/zarafa' method='Pipe socket' program='zarafa-dagent'
-# Feb 28 13:07:04 <hostname> zarafa-server[5311]: access allowed objectid=991 type=3 ownername='constant' username='john' rights='view'
+# Feb 28 11:17:21 <hostname> kopano-server[5307]: server startup by user uid=1000
+# Feb 28 17:53:35 <hostname> kopano-server[5311]: authenticate ok user='jdoe' from='file:///var/run/kopano/server.sock' method='Pipe socket' program='kopano-dagent'
+# Feb 28 13:07:04 <hostname> kopano-server[5311]: access allowed objectid=991 type=3 ownername='constant' username='jdoe' rights='view'
 # ...
 
 # logfile
-# di 01 mrt 2011 09:48:29 CET: zarafa-server startup by user uid=1000
+# di 01 mrt 2011 09:48:29 CET: server startup by user uid=1000
 	my $fixup;
 
-	if ($_ =~ m/(.*) (zarafa-server\[\d+\]): (.*)/) { # syslog
+	if ($_ =~ m/(.*) (kopano-server\[\d+\]): (.*)/) { # syslog
 		$fixup = parse_entry($3);
 		print "$1 $2: $fixup\n";
 	} elsif ($_ =~ /(.*): (.*)/) { # too generic?

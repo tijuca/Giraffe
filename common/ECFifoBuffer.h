@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,11 +18,11 @@
 #ifndef ECFIFOBUFFER_H
 #define ECFIFOBUFFER_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <deque>
 #include <pthread.h>
 
-#include <zarafa/ZarafaCode.h>
+#include <kopano/kcodes.h>
 
 // Thread safe buffer for FIFO operations
 class ECFifoBuffer _zcp_final {
@@ -47,8 +47,8 @@ public:
 	
 private:
 	// prohibit copy
-	ECFifoBuffer(const ECFifoBuffer &);
-	ECFifoBuffer& operator=(const ECFifoBuffer &);
+	ECFifoBuffer(const ECFifoBuffer &) = delete;
+	ECFifoBuffer &operator=(const ECFifoBuffer &) = delete;
 	
 private:
 	storage_type	m_storage;

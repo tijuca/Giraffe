@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,14 +15,12 @@
  *
  */
 
-#include <zarafa/charset/traits.h>
-#include <zarafa/charset/utf16string.h>
+#include <kopano/charset/traits.h>
+#include <kopano/charset/utf16string.h>
 #include "utf32string.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 /** 
@@ -33,11 +31,7 @@ static const char THIS_FILE[] = __FILE__;
  */
 void setCharsetBestAttempt(std::string &strCharset)
 {
-#ifdef WIN32
-	strCharset += "//IGNORE";
-#else
 	strCharset += "//TRANSLIT";
-#endif
 }
 
 template <typename _T>

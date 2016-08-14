@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,23 +15,21 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECDatabase.h"
 
 #include <mapidefs.h>
 #include <mapitags.h>
-#include <zarafa/EMSAbTag.h>
+#include <kopano/EMSAbTag.h>
 
 #include "ECSessionManager.h"
 #include "ECConvenientDepthABObjectTable.h"
 #include "ECSession.h"
 #include "ECMAPI.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECConvenientDepthABObjectTable::ECConvenientDepthABObjectTable(ECSession *lpSession, unsigned int ulABId, unsigned int ulABType, unsigned int ulABParentId, unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale) : ECABObjectTable(lpSession, ulABId, ulABType, ulABParentId, ulABParentType, ulFlags, locale) {
@@ -56,7 +54,7 @@ ECRESULT ECConvenientDepthABObjectTable::Create(ECSession *lpSession, unsigned i
  */
 ECRESULT ECConvenientDepthABObjectTable::QueryRowData(ECGenericObjectTable *lpGenTable, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bTableData,bool bTableLimit)
 {
-    ECRESULT er = erSuccess;
+	ECRESULT er;
     ECObjectTableList::const_iterator iterRow;
     unsigned int n = 0;
     struct propVal *lpProp = NULL;
@@ -64,7 +62,7 @@ ECRESULT ECConvenientDepthABObjectTable::QueryRowData(ECGenericObjectTable *lpGe
     
     er = ECABObjectTable::QueryRowData(lpThis, soap, lpSession, lpRowList, lpsPropTagArray, lpObjectData, lppRowSet, bTableData, bTableLimit);
     if(er != erSuccess)
-        goto exit;
+		return er;
 
     // Insert the PR_DEPTH for all the rows since the row engine has no knowledge of depth
     for (iterRow = lpRowList->begin(); iterRow != lpRowList->end(); ++iterRow, ++n) {
@@ -84,9 +82,7 @@ ECRESULT ECConvenientDepthABObjectTable::QueryRowData(ECGenericObjectTable *lpGe
             lpProp->__union = SOAP_UNION_propValData_lpszA;
         }
     }
-        
-exit:
-    return er;
+	return erSuccess;
 }
 
 
@@ -106,7 +102,7 @@ ECRESULT ECConvenientDepthABObjectTable::Load()
 	CONTAINERINFO root;
 
 	if (lpODAB->ulABType != MAPI_ABCONT) {
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 

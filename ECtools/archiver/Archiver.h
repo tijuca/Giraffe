@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,6 +18,7 @@
 #ifndef ARCHIVER_H_INCLUDED
 #define ARCHIVER_H_INCLUDED
 
+#include <memory>
 #include "ArchiveManage.h" // for ArchiveManagePtr
 
 class ECConfig;
@@ -31,7 +32,7 @@ struct configsetting_t;
 
 class Archiver {
 public:
-	typedef std::auto_ptr<Archiver>		auto_ptr_type;
+	typedef std::unique_ptr<Archiver> auto_ptr_type;
 
 	enum {
 		RequireConfig		= 0x00000001,

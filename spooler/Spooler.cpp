@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -16,7 +16,7 @@
  */
 
 /*
- * This is the Zarafa spooler.
+ * This is the Kopano spooler.
  *
  *
  * The actual encoding is done by the inetmapi library.
@@ -28,11 +28,7 @@
  * This advise sink unblocks the main (waiting) thread.
  */
 
-#include <zarafa/platform.h>
-#ifdef _WIN32
-	#include "ECNTService.h"
-#endif
-
+#include <kopano/platform.h>
 #include "mailer.h"
 #include <climits>
 #include <cstdio>
@@ -52,37 +48,37 @@
 #include <mapiguid.h>
 #include <cctype>
 
-#include <zarafa/IECUnknown.h>
+#include <kopano/IECUnknown.h>
 #include "IECSpooler.h"
-#include <zarafa/IECServiceAdmin.h>
-#include <zarafa/IECSecurity.h>
-#include <zarafa/MAPIErrors.h>
-#include <zarafa/ECGuid.h>
-#include <zarafa/EMSAbTag.h>
-#include <zarafa/ECTags.h>
-#include <zarafa/ECABEntryID.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECConfig.h>
+#include <kopano/IECServiceAdmin.h>
+#include <kopano/IECSecurity.h>
+#include <kopano/MAPIErrors.h>
+#include <kopano/ECGuid.h>
+#include <kopano/EMSAbTag.h>
+#include <kopano/ECTags.h>
+#include <kopano/ECABEntryID.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECConfig.h>
 #ifdef LINUX
-#include <zarafa/UnixUtil.h>
+#include <kopano/UnixUtil.h>
 #endif
-#include <zarafa/MAPIErrors.h>
-#include <zarafa/my_getopt.h>
-#include <zarafa/ecversion.h>
-#include <zarafa/Util.h>
-#include <zarafa/stringutil.h>
+#include <kopano/MAPIErrors.h>
+#include <kopano/my_getopt.h>
+#include <kopano/ecversion.h>
+#include <kopano/Util.h>
+#include <kopano/stringutil.h>
 
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <edkmdb.h>
 #include <edkguid.h>
-#include <zarafa/mapiguidext.h>
+#include <kopano/mapiguidext.h>
 #include "mapicontact.h"
-#include <zarafa/restrictionutil.h>
-#include <zarafa/charset/convert.h>
-#include <zarafa/charset/convstring.h>
-#include <zarafa/charset/utf8string.h>
-#include <zarafa/ECGetText.h>
+#include <kopano/restrictionutil.h>
+#include <kopano/charset/convert.h>
+#include <kopano/charset/convstring.h>
+#include <kopano/charset/utf8string.h>
+#include <kopano/ECGetText.h>
 #include "StatsClient.h"
 #include "TmpPath.h"
 
@@ -92,9 +88,6 @@
 using namespace std;
 
 static StatsClient *sc = NULL;
-
-#define SMTP_HOST	"127.0.0.1"
-#define WHITESPACE	" \t\n\r"
 
 // spooler exit codes
 #define EXIT_OK 0
@@ -140,30 +133,6 @@ static pthread_mutex_t hMutexFinished;	// mutex for mapFinished
 
 static HRESULT running_server(const char *szSMTP, int port, const char *szPath);
 
-#ifdef WIN32
-/**
- * signal handler for termination requests
- *
- * @param[in]	sig	signal number triggered
- */
-static void sighandle(int sig)
-{
-	// Win32 has unix semantics and therefore requires us to reset the signal handler.
-	signal(SIGTERM , sighandle);
-	signal(SIGINT  , sighandle);	// CTRL+C
-
-	if (!bQuit)						// do not log multimple shutdown messages
-		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Termination requested, shutting down.");
-
-	bQuit = true;
-
-	// Trigger condition as it may be waiting for messages
-	pthread_mutex_lock(&hMutexMessagesWaiting);
-	pthread_cond_signal(&hCondMessagesWaiting);
-	pthread_mutex_unlock(&hMutexMessagesWaiting);
-}
-#endif
-
 /**
  * Print command line options, only for daemon version, not for mailer fork process
  *
@@ -174,16 +143,10 @@ static void print_help(const char *name)
 	cout << "Usage:\n" << endl;
 	cout << name << " [-F] [-h|--host <serverpath>] [-c|--config <configfile>] [smtp server]" << endl;
 	cout << "  -F\t\tDo not run in the background" << endl;
-	cout << "  -h path\tUse alternate connect path (e.g. file:///var/run/socket).\n\t\tDefault: file:///var/run/zarafad/server.sock" << endl;
+	cout << "  -h path\tUse alternate connect path (e.g. file:///var/run/socket).\n\t\tDefault: file:///var/run/kopano/server.sock" << endl;
 	cout << "  -V Print version info." << endl;
-	cout << "  -c filename\tUse alternate config file (e.g. /etc/zarafa-spooler.cfg)\n\t\tDefault: /etc/zarafa/spooler.cfg" << endl;
+	cout << "  -c filename\tUse alternate config file (e.g. /etc/kopano-spooler.cfg)\n\t\tDefault: /etc/kopano/spooler.cfg" << endl;
 	cout << "  smtp server: The name or IP-address of the SMTP server, overriding the configuration" << endl;
-#if defined(WIN32)
-	cout << endl;
-	cout << "  Windows service options" << endl;
-	cout << "  -i\t\tInstall as service." << endl;
-	cout << "  -u\t\tRemove the service." << endl;
-#endif
 	cout << endl;
 }
 
@@ -246,7 +209,7 @@ static LONG __stdcall AdviseCallback(void *lpContext, ULONG cNotif,
  * --log-fd x   execpt you should log here through a pipe
  * --entryids   the data to send
  * --username   the user to send the message as
- * if (szPath)  zarafa host
+ * if (szPath)  kopano host
  * if (szSMTP)  smtp host
  * if (szSMTPPport) smtp port
  */
@@ -261,7 +224,7 @@ static LONG __stdcall AdviseCallback(void *lpContext, ULONG cNotif,
  * @param[in]	szUsername	The username. This name is in unicode.
  * @param[in]	szSMTP		SMTP server to use
  * @param[in]	ulPort		SMTP port to use
- * @param[in]	szPath		URL to zarafa server
+ * @param[in]	szPath		URL to storage server
  * @param[in]	cbStoreEntryId	Length of lpStoreEntryId
  * @param[in]	lpStoreEntryId	Entry ID of store of user containing the message to be sent
  * @param[in]	cbStoreEntryId	Length of lpMsgEntryId
@@ -353,7 +316,7 @@ exit:
  * mail out of the queue.
  *
  * @param[in]	sSendData		Struct with information about the mail in the queue which caused a fatal error
- * @param[in]	lpAdminSession	MAPI session of Zarafa SYSTEM user
+ * @param[in]	lpAdminSession	MAPI session of Kopano SYSTEM user
  * @param[out]	lppAddrBook		MAPI Addressbook object
  * @param[out]	lppMailer		inetmapi ECSender object, which can generate an error text for the body for the mail
  * @param[out]	lppUserAdmin	The administrator user in an ECUSER struct
@@ -437,16 +400,13 @@ exit:
  * mailer completely failed (eg. segfault), this function will try to
  * remove the faulty mail from the queue.
  *
- * @param[in]	lpAdminSession	MAPI session of the Zarafa SYSTEM user
+ * @param[in]	lpAdminSession	MAPI session of the Kopano SYSTEM user
  * @param[in]	lpSpooler		IECSpooler object
  * @return		HRESULT
  */
 static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
     IECSpooler *lpSpooler)
 {
-#ifdef WIN32
-	return hrSuccess;
-#else
 	HRESULT hr = hrSuccess;
 	std::map<pid_t, int>::const_iterator i, iDel;
 	SendData sSendData;
@@ -532,7 +492,7 @@ static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
 		if (bErrorMail) {
 			hr = GetErrorObjects(sSendData, lpAdminSession, &lpAddrBook, &lpMailer, &lpUserAdmin, &lpUserStore, &lpMessage);
 			if (hr == hrSuccess) {
-				lpMailer->setError(_("A fatal error occurred while processing your message, and Zarafa is unable to send your email."));
+				lpMailer->setError(_("A fatal error occurred while processing your message, and Kopano is unable to send your email."));
 				hr = SendUndeliverable(lpAddrBook, lpMailer, lpUserStore, lpUserAdmin, lpMessage);
 				// TODO: if failed, and we have the lpUserStore, create message?
 			}
@@ -581,7 +541,6 @@ static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
 		lpMessage->Release();
 
 	return hr;
-#endif
 }
 
 /**
@@ -592,12 +551,12 @@ static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
  * fork/thread. When a fatal MAPI error has occurred, or the table is
  * empty, this function will return.
  *
- * @param[in]	lpAdminSession	MAPI Session of Zarafa SYSTEM user
+ * @param[in]	lpAdminSession	MAPI Session of Kopano SYSTEM user
  * @param[in]	lpSpooler		IECSpooler object
  * @param[in]	lpTable			Outgoing queue table view
  * @param[in]	szSMTP			SMTP server to use
  * @param[in]	ulPort			SMTP port
- * @param[in]	szPath			URI to Zarafa server
+ * @param[in]	szPath			URI to storage server
  * @return		HRESULT
  */
 static HRESULT ProcessAllEntries(IMAPISession *lpAdminSession,
@@ -696,11 +655,6 @@ static HRESULT ProcessAllEntries(IMAPISession *lpAdminSession,
 		}
 
 		strUsername = lpsRowSet->aRow[0].lpProps[0].Value.lpszW;
-
-#ifdef WIN32
-		// call directly without forking, and remove from queue if hr != MAPI_E_WAIT || MAPI_W_NO_SERVICE
-		hr = ProcessMessageForked(strUsername.c_str(), szSMTP, ulPort, szPath, lpsRowSet->aRow[0].lpProps[2].Value.bin.cb, (LPENTRYID)lpsRowSet->aRow[0].lpProps[2].Value.bin.lpb, lpsRowSet->aRow[0].lpProps[3].Value.ul & EC_SUBMIT_DOSENTMAIL);
-#else
 		// Check if there is already an active process for this message
 		bool bMatch = false;
 		for (std::map<pid_t, SendData>::const_iterator i = mapSendData.begin();
@@ -720,7 +674,6 @@ static HRESULT ProcessAllEntries(IMAPISession *lpAdminSession,
 			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "ProcessAllEntries(): Failed starting spooler: %x", hr);
 			goto exit;
 		}
-#endif
 	}
 
 exit:
@@ -733,8 +686,8 @@ exit:
 /**
  * Opens the IECSpooler object on an admin session.
  *
- * @param[in]	lpAdminSession	MAPI Session of the Zarafa SYSTEM user
- * @param[out]	lppSpooler		IECSpooler is a Zarafa interface to the outgoing queue functions.
+ * @param[in]	lpAdminSession	MAPI Session of the Kopano SYSTEM user
+ * @param[out]	lppSpooler		IECSpooler is a Kopano interface to the outgoing queue functions.
  * @return		HRESULT
  */
 static HRESULT GetAdminSpooler(IMAPISession *lpAdminSession,
@@ -753,7 +706,7 @@ static HRESULT GetAdminSpooler(IMAPISession *lpAdminSession,
 
 	hr = HrGetOneProp(lpMDB, PR_EC_OBJECT, &lpsProp);
 	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get Zarafa internal object: %s (%x)",
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get Kopano internal object: %s (%x)",
 			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
@@ -782,7 +735,7 @@ exit:
  *
  * @param[in]	szSMTP	The SMTP server to send to.
  * @param[in]	ulPort	The SMTP port to sent to.
- * @param[in]	szPath	URI of Zarafa server to connect to, must be file:// or https:// with valid ssl certificates.
+ * @param[in]	szPath	URI of storage server to connect to, must be file:// or https:// with valid ssl certificates.
  * @return		HRESULT
  */
 static HRESULT ProcessQueue(const char *szSMTP, int ulPort, const char *szPath)
@@ -806,7 +759,7 @@ static HRESULT ProcessQueue(const char *szSMTP, int ulPort, const char *szPath)
 	
 	SSortOrderSet sSort = { 1, 0, 0, { { PR_EC_HIERARCHYID, TABLE_SORT_ASCEND } } };
 
-	hr = HrOpenECAdminSession(g_lpLogger, &lpAdminSession, "zarafa-spooler:system", PROJECT_SVN_REV_STR, szPath, EC_PROFILE_FLAGS_NO_PUBLIC_STORE,
+	hr = HrOpenECAdminSession(g_lpLogger, &lpAdminSession, "kopano-spooler:system", PROJECT_SVN_REV_STR, szPath, EC_PROFILE_FLAGS_NO_PUBLIC_STORE,
 							  g_lpConfig->GetSetting("sslkey_file", "", NULL),
 							  g_lpConfig->GetSetting("sslkey_pass", "", NULL));
 	if (hr != hrSuccess) {
@@ -815,9 +768,9 @@ static HRESULT ProcessQueue(const char *szSMTP, int ulPort, const char *szPath)
 	}
 
 	if (disconnects == 0)
-		g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Connection to Zarafa server succeeded");
+		g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Connection to storage server succeeded");
 	else
-		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Connection to Zarafa server succeeded after %d retries", disconnects);
+		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Connection to storage server succeeded after %d retries", disconnects);
 
 	disconnects = 0;			// first call succeeded, assume all is well.
 
@@ -1066,7 +1019,7 @@ static void *signal_handler(void *)
  *
  * @param[in]	szSMTP	The SMTP server to send to.
  * @param[in]	ulPort	The SMTP port to send to.
- * @param[in]	szPath	URI of Zarafa server to connect to, must be file:// or https:// with valid ssl certificates.
+ * @param[in]	szPath	URI of storage server to connect to, must be file:// or https:// with valid ssl certificates.
  * @return		HRESULT
  */
 static HRESULT running_server(const char *szSMTP, int ulPort,
@@ -1074,7 +1027,7 @@ static HRESULT running_server(const char *szSMTP, int ulPort,
 {
 	HRESULT hr = hrSuccess;
 
-	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting zarafa-spooler version " PROJECT_VERSION_SPOOLER_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
+	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting kopano-spooler version " PROJECT_VERSION_SPOOLER_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
 	g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Using SMTP server: %s, port %d", szSMTP, ulPort);
 
 	disconnects = 0;
@@ -1101,9 +1054,6 @@ static HRESULT running_server(const char *szSMTP, int ulPort,
 int main(int argc, char *argv[]) {
 
 	HRESULT hr = hrSuccess;
-#ifdef WIN32
-	ECNTService ecNTService;
-#endif
 	const char *szPath = NULL;
 	const char *szSMTP = NULL;
 	int ulPort = 0;
@@ -1133,7 +1083,7 @@ int main(int argc, char *argv[]) {
 	static const struct option long_options[] = {
 		{ "help", 0, NULL, OPT_HELP },		// help text
 		{ "config", 1, NULL, OPT_CONFIG },	// config file
-		{ "host", 1, NULL, OPT_HOST },		// zarafa host location
+		{ "host", 1, NULL, OPT_HOST },		// kopano host location
 		{ "foreground", 0, NULL, OPT_FOREGROUND },		// do not daemonize
 		// only called by spooler itself
 		{ "send-message-entryid", 1, NULL, OPT_SEND_MESSAGE_ENTRYID },	// entryid of message to send
@@ -1151,10 +1101,10 @@ int main(int argc, char *argv[]) {
 		{ "smtp_port","25", CONFIGSETTING_RELOADABLE },
 		{ "server_socket", "default:" },
 #ifdef LINUX
-		{ "run_as_user", "zarafa" },
-		{ "run_as_group", "zarafa" },
-		{ "pid_file", "/var/run/zarafad/spooler.pid" },
-		{ "running_path", "/var/lib/zarafa" },
+		{ "run_as_user", "kopano" },
+		{ "run_as_group", "kopano" },
+		{ "pid_file", "/var/run/kopano/spooler.pid" },
+		{ "running_path", "/var/lib/kopano" },
 		{ "coredump_enabled", "no" },
 #endif
 		{ "log_method","file" },
@@ -1179,9 +1129,9 @@ int main(int argc, char *argv[]) {
 		{ "archive_on_send", "no", CONFIGSETTING_RELOADABLE },
 		{ "enable_dsn", "yes", CONFIGSETTING_RELOADABLE },
         { "plugin_enabled", "yes" },
-        { "plugin_path", "/var/lib/zarafa/spooler/plugins" },
-        { "plugin_manager_path", "/usr/share/zarafa-spooler/python" },
-		{ "z_statsd_stats", "/var/run/zarafad/statsd.sock" },
+        { "plugin_path", "/var/lib/kopano/spooler/plugins" },
+        { "plugin_manager_path", "/usr/share/kopano-spooler/python" },
+		{ "z_statsd_stats", "/var/run/kopano/statsd.sock" },
 		{ "tmp_path", "/tmp" },
 		{ "tmp_path", "/tmp" },
 		{ "tmp_path", "/tmp" },
@@ -1263,11 +1213,7 @@ int main(int argc, char *argv[]) {
 		if (!g_lpConfig->LoadSettings(szConfig) ||
 		    !g_lpConfig->ParseParams(argc - optind, &argv[optind], &argidx) ||
 		    (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
-#ifdef WIN32
-			g_lpLogger = new ECLogger_Eventlog(EC_LOGLEVEL_INFO, "ZarafaSpooler");
-#else
 			g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false); // create info logger without a timestamp to stderr
-#endif
 			ec_log_set(g_lpLogger);
 			LogConfigErrors(g_lpConfig);
 			hr = E_FAIL;
@@ -1299,7 +1245,7 @@ int main(int argc, char *argv[]) {
 		g_lpLogger = new ECLogger_Pipe(logfd, 0, atoi(g_lpConfig->GetSetting("log_level")));
 	else
 #endif
-		g_lpLogger = CreateLogger(g_lpConfig, argv[0], "ZarafaSpooler");
+		g_lpLogger = CreateLogger(g_lpConfig, argv[0], "KopanoSpooler");
 
 	ec_log_set(g_lpLogger);
 	if ((bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) || g_lpConfig->HasWarnings())
@@ -1318,7 +1264,7 @@ int main(int argc, char *argv[]) {
 			bNPTL = false;
 			g_lpConfig->AddSetting("max_threads","1");
 			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: your system is running with outdated linuxthreads.");
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: the zarafa-spooler will only be able to send one message at a time.");
+			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: the kopano-spooler will only be able to send one message at a time.");
 		}
 	}
 #endif
@@ -1342,19 +1288,12 @@ int main(int argc, char *argv[]) {
 		// notification condition
 		pthread_mutex_init(&hMutexMessagesWaiting, NULL);
 		pthread_cond_init(&hCondMessagesWaiting, NULL);
-
-#ifdef WIN32
-		// use default generic method for these signals
-		signal(SIGTERM, sighandle);
-		signal(SIGINT, sighandle);
-#else
 		sigemptyset(&signal_mask);
 		sigaddset(&signal_mask, SIGTERM);
 		sigaddset(&signal_mask, SIGINT);
 		sigaddset(&signal_mask, SIGCHLD);
 		sigaddset(&signal_mask, SIGHUP);
 		sigaddset(&signal_mask, SIGUSR2);
-#endif
 	}
 
 #ifdef LINUX
@@ -1427,18 +1366,8 @@ int main(int argc, char *argv[]) {
 	}
 #endif
 
-	sc = new StatsClient(g_lpConfig->GetSetting("z_statsd_stats"), g_lpLogger);
-
-#ifdef WIN32
-	// Parse for standard arguments (install, uninstall, version etc.)
-	if (!ecNTService.ParseStandardArgs(argc, argv))
-		ecNTService.StartService(&bQuit, szSMTP, szPath);
-
-	hr = ecNTService.m_Status.dwWin32ExitCode;
-	if(hr == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
-		hr = running_server(szSMTP, ulPort, szPath);
-	else
-#endif
+	sc = new StatsClient(g_lpLogger);
+	sc->startup(g_lpConfig->GetSetting("z_statsd_stats"));
 	if (bForked)
 		hr = ProcessMessageForked(strUsername.c_str(), szSMTP, ulPort, szPath, strMsgEntryId.length(), (LPENTRYID)strMsgEntryId.data(), bDoSentMail);
 	else

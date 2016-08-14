@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,21 +15,19 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
-#include "Zarafa.h"
+#include "kcore.hpp"
 #include "ECABProp.h"
 #include "Mem.h"
-#include <zarafa/ECGuid.h>
-#include <zarafa/ECDefs.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/ECDebug.h>
+#include <kopano/ECGuid.h>
+#include <kopano/ECDefs.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/ECDebug.h>
 
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECABProp::ECABProp(void *lpProvider, ULONG ulObjType, BOOL fModify,
@@ -39,11 +37,6 @@ ECABProp::ECABProp(void *lpProvider, ULONG ulObjType, BOOL fModify,
 
 	this->HrAddPropHandlers(PR_RECORD_KEY,		DefaultABGetProp,		DefaultSetPropComputed, (void*) this);
 	this->HrAddPropHandlers(PR_STORE_SUPPORT_MASK,	DefaultABGetProp,	DefaultSetPropComputed, (void*) this);
-}
-
-ECABProp::~ECABProp()
-{
-
 }
 
 HRESULT ECABProp::QueryInterface(REFIID refiid, void **lppInterface)
@@ -124,9 +117,7 @@ ECABLogon* ECABProp::GetABStore()
 	return (ECABLogon*)lpProvider;
 }
 
-////////////////////////////////////////////
 // Interface IMAPIProp
-
 HRESULT __stdcall ECABProp::xMAPIProp::QueryInterface(REFIID refiid, void ** lppInterface)
 {
 	TRACE_MAPI(TRACE_ENTRY, "AB::IMAPIProp::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,13 +19,13 @@
  * MAPIErrors.cpp
  * Definition of GetMAPIErrorMessage()
  */
-#include <zarafa/platform.h>
-#include <zarafa/MAPIErrors.h>
+#include <kopano/platform.h>
+#include <kopano/MAPIErrors.h>
 #include <mapidefs.h>
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
 #include <mapicode.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <string>
 
 typedef struct tagMAPIErrorTranslateRecord
@@ -53,7 +53,7 @@ static const MAPIErrorTranslateRecord MAPIErrorCodes[] = {
     { MAPI_E_NOT_ENOUGH_DISK,               "not enough disk" },
     { MAPI_E_NOT_ENOUGH_RESOURCES,          "not enough resources" },
     { MAPI_E_NOT_FOUND,                     "not found" },
-    { MAPI_E_VERSION,                       "version" },
+    { MAPI_E_VERSION,                       "version mismatch" },
     { MAPI_E_LOGON_FAILED,                  "logon failed" },
     { MAPI_E_SESSION_LIMIT,                 "session limit" },
     { MAPI_E_USER_CANCEL,                   "use cancel" },

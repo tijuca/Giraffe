@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -20,14 +20,14 @@
 
 #include <mapispi.h>
 #include <string>
-#include <zarafa/ECTags.h>
+#include <kopano/ECTags.h>
 #include <edkmdb.h>
-#include <zarafa/tstring.h>
+#include <kopano/tstring.h>
 
 class WSTransport;
 
-// Indexes of sptaZarafaProfile property array
-enum ePropZarafaProfileColumns
+// Indexes of sptaKopanoProfile property array
+enum ePropOurProfileColumns
 {
 	PZP_EC_PATH,
 	PZP_PR_PROFILE_NAME,
@@ -51,12 +51,12 @@ enum ePropZarafaProfileColumns
 	PZP_PR_SERVICE_NAME,
 	PZP_EC_STATS_SESSION_CLIENT_APPLICATION_VERSION,
 	PZP_EC_STATS_SESSION_CLIENT_APPLICATION_MISC,
-	NUM_ZARAFAPROFILE_PROPS		// Array size
+	NUM_KOPANOPROFILE_PROPS		// Array size
 };
 
-// Zarafa profile properties
-const static SizedSPropTagArray(NUM_ZARAFAPROFILE_PROPS, sptaZarafaProfile) = {
-	NUM_ZARAFAPROFILE_PROPS,
+// profile properties
+const static SizedSPropTagArray(NUM_KOPANOPROFILE_PROPS, sptaKopanoProfile) = {
+	NUM_KOPANOPROFILE_PROPS,
 	{
 		PR_EC_PATH,
 		PR_PROFILE_NAME_A,
@@ -112,12 +112,12 @@ public:
 
 	static HRESULT ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAGE* lppEmptyMessage);
 
-	// Get the global zarafa properties
+	// Get the global properties
 	static HRESULT GetGlobalProfileProperties(LPPROFSECT lpGlobalProfSect, struct sGlobalProfileProps* lpsProfileProps);
 	static HRESULT GetGlobalProfileProperties(LPMAPISUP lpMAPISup, struct sGlobalProfileProps* lpsProfileProps);
 
 	// Get the deligate stores from the global profile
-	static HRESULT GetGlobalProfileDeligateStoresProp(LPPROFSECT lpGlobalProfSect, ULONG* lpcDeligates, LPBYTE* lppDeligateStores);
+	static HRESULT GetGlobalProfileDelegateStoresProp(LPPROFSECT lpGlobalProfSect, ULONG *lpcDelegates, LPBYTE *lppDelegateStores);
 
 	// Get MSEMS emulator config
 	static HRESULT GetConfigPath(std::string *lpConfigPath);
@@ -135,7 +135,7 @@ enum enumPublicEntryID { ePE_None, ePE_IPMSubtree, ePE_Favorites, ePE_PublicFold
 
 HRESULT GetPublicEntryId(enumPublicEntryID ePublicEntryID, GUID guidStore, void *lpBase, ULONG *lpcbEntryID, LPENTRYID *lppEntryID);
 
-BOOL CompareMDBProvider(LPBYTE lpguid, const GUID *lpguidZarafa);
-BOOL CompareMDBProvider(MAPIUID* lpguid, const GUID *lpguidZarafa);
+BOOL CompareMDBProvider(LPBYTE lpguid, const GUID *lpguidKopano);
+BOOL CompareMDBProvider(MAPIUID* lpguid, const GUID *lpguidKopano);
 
 #endif

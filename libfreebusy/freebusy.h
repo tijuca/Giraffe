@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -137,7 +137,7 @@ enum FBStatus
 	fbTentative = fbFree + 1,		/**< Tentative */
 	fbBusy	= fbTentative + 1,		/**< Busy */
 	fbOutOfOffice	= fbBusy + 1,	/**< Out Of Office */
-	fbZarafaAllBusy = 1000			/**< Internal used */
+	fbKopanoAllBusy = 1000			/**< Internal used */
 };
 
 /**
@@ -376,7 +376,7 @@ public:
 	/**
 	 * This member not supported must return E_NOTIMPL.
 	 */
-	virtual HRESULT __stdcall GetDeligateInfo(void *) = 0;
+	virtual HRESULT __stdcall GetDelegateInfo(void *) = 0;
 
 	/**
 	 * This member not supported must return S_OK.

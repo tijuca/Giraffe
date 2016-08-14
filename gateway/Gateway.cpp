@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -16,27 +16,20 @@
  */
 
 #include "config.h"
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <climits>
 #include <csignal>
-
-#ifdef WIN32
-#include "ECNTService.h"
-#include <process.h>
-#else
-#endif
-
 #include <inetmapi/inetmapi.h>
 
 #include <mapi.h>
 #include <mapix.h>
 #include <mapidefs.h>
 #include <mapicode.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <mapiguid.h>
 
-#include <zarafa/CommonUtil.h>
-#include <zarafa/stringutil.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/stringutil.h>
 #include <iostream>
 #include <cstdio>
 #include <string>
@@ -45,23 +38,23 @@
 #include <cstdlib>
 #include <cerrno>
 
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECConfig.h>
-#include <zarafa/MAPIErrors.h>
-#include <zarafa/my_getopt.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECConfig.h>
+#include <kopano/MAPIErrors.h>
+#include <kopano/my_getopt.h>
 
-#include <zarafa/ECChannel.h>
+#include <kopano/ECChannel.h>
 #include "POP3.h"
 #include "IMAP.h"
-#include <zarafa/ecversion.h>
+#include <kopano/ecversion.h>
 
 #include "SSLUtil.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
 #include "TmpPath.h"
 
 #ifdef LINUX
-#include <zarafa/UnixUtil.h>
+#include <kopano/UnixUtil.h>
 #endif
 
 #ifdef ZCP_USES_ICU
@@ -136,15 +129,9 @@ static void print_help(const char *name)
 	cout << "Usage:\n" << endl;
 	cout << name << " [-F] [-h|--host <serverpath>] [-c|--config <configfile>]" << endl;
 	cout << "  -F\t\tDo not run in the background" << endl;
-	cout << "  -h path\tUse alternate connect path (e.g. file:///var/run/socket).\n\t\tDefault: file:///var/run/zarafad/server.sock" << endl;
+	cout << "  -h path\tUse alternate connect path (e.g. file:///var/run/socket).\n\t\tDefault: file:///var/run/kopano/server.sock" << endl;
 	cout << "  -V Print version info." << endl;
-	cout << "  -c filename\tUse alternate config file (e.g. /etc/zarafa-gateway.cfg)\n\t\tDefault: /etc/zarafa/gateway.cfg" << endl;
-#if defined(WIN32)
-	cout << endl;
-	cout << "  Windows service options" << endl;
-	cout << "  -i\t\tInstall as service." << endl;
-	cout << "  -u\t\tRemove the service." << endl;
-#endif
+	cout << "  -c filename\tUse alternate config file (e.g. /etc/kopano-gateway.cfg)\n\t\tDefault: /etc/kopano/gateway.cfg" << endl;
 	cout << endl;
 }
 
@@ -299,10 +286,10 @@ int main(int argc, char *argv[]) {
 	static const configsetting_t lpDefaults[] = {
 		{ "server_bind", "" },
 #ifdef LINUX
-		{ "run_as_user", "zarafa" },
-		{ "run_as_group", "zarafa" },
-		{ "pid_file", "/var/run/zarafad/gateway.pid" },
-		{ "running_path", "/var/lib/zarafa" },
+		{ "run_as_user", "kopano" },
+		{ "run_as_group", "kopano" },
+		{ "pid_file", "/var/run/kopano/gateway.pid" },
+		{ "running_path", "/var/lib/kopano" },
 		{ "process_model", "fork" },
 		{ "coredump_enabled", "no" },
 #endif
@@ -324,11 +311,11 @@ int main(int argc, char *argv[]) {
 		{ "imap_expunge_on_delete", "no", CONFIGSETTING_RELOADABLE },
 		{ "imap_store_rfc822", "yes", CONFIGSETTING_RELOADABLE },
 		{ "disable_plaintext_auth", "no", CONFIGSETTING_RELOADABLE },
-		{ "server_socket", "http://localhost:236/zarafa" },
+		{ "server_socket", "http://localhost:236/" },
 		{ "server_hostname", "" },
 		{ "server_hostname_greeting", "no", CONFIGSETTING_RELOADABLE },
-		{ "ssl_private_key_file", "/etc/zarafa/gateway/privkey.pem" },
-		{ "ssl_certificate_file", "/etc/zarafa/gateway/cert.pem" },
+		{ "ssl_private_key_file", "/etc/kopano/gateway/privkey.pem" },
+		{ "ssl_certificate_file", "/etc/kopano/gateway/cert.pem" },
 		{ "ssl_verify_client", "no" },
 		{ "ssl_verify_file", "" },
 		{ "ssl_verify_path", "" },
@@ -401,11 +388,7 @@ int main(int argc, char *argv[]) {
 	if (!g_lpConfig->LoadSettings(szConfig) ||
 	    !g_lpConfig->ParseParams(argc - optind, &argv[optind], NULL) ||
 	    (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
-#ifdef WIN32
-		g_lpLogger = new ECLogger_Eventlog(EC_LOGLEVEL_INFO, "ZarafaGateway");
-#else
 		g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false);	// create logger without a timestamp to stderr
-#endif
 		ec_log_set(g_lpLogger);
 		LogConfigErrors(g_lpConfig);
 		hr = E_FAIL;
@@ -413,7 +396,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Setup logging
-	g_lpLogger = CreateLogger(g_lpConfig, argv[0], "ZarafaGateway");
+	g_lpLogger = CreateLogger(g_lpConfig, argv[0], "KopanoGateway");
 	ec_log_set(g_lpLogger);
 
 	if ((bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) || g_lpConfig->HasWarnings())
@@ -432,17 +415,6 @@ int main(int argc, char *argv[]) {
 
 	if (!szPath)
 		szPath = g_lpConfig->GetSetting("server_socket");
-
-#ifdef _WIN32
-	// Parse for standard arguments (install, uninstall, version etc.)
-	if (!ecNTService.ParseStandardArgs(argc, argv)) {
-		ecNTService.StartService(szPath);
-	}
-
-	hr = ecNTService.m_Status.dwWin32ExitCode;
-	if (hr != ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
-		goto exit;
-#endif
 
 	g_strHostString = g_lpConfig->GetSetting("server_hostname", NULL, "");
 	if (g_strHostString.empty())
@@ -530,18 +502,6 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 		}
 #endif
 	}
-
-#ifdef WIN32
-	// Initialize Winsock
-	WSADATA wsaData;
-	int iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
-
-	if (iResult != NO_ERROR){
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't initialize Winsock");
-		hr = E_FAIL;
-		goto exit;
-	}
-#endif
 
 	bListenPOP3 = (strcmp(g_lpConfig->GetSetting("pop3_enable"), "yes") == 0);
 	bListenPOP3s = (strcmp(g_lpConfig->GetSetting("pop3s_enable"), "yes") == 0);
@@ -643,7 +603,7 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 		goto exit;
 	}
 
-	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting zarafa-gateway version " PROJECT_VERSION_GATEWAY_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
+	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting kopano-gateway version " PROJECT_VERSION_GATEWAY_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
 
 	// Mainloop
 	while (!quit) {
@@ -838,11 +798,6 @@ exit:
 #ifdef LINUX
 	free(st.ss_sp);
 #endif
-
-#ifdef WIN32
-	WSACleanup();
-#endif
-
 #ifdef ZCP_USES_ICU
 	// cleanup ICU data so valgrind is happy
 	u_cleanup();

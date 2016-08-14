@@ -200,7 +200,7 @@ public:
 #if SWIGPYTHON
 
 %{
-#include <zarafa/swig_iunknown.h>
+#include <kopano/swig_iunknown.h>
 typedef IUnknownImplementor<IMAPIAdviseSink> MAPIAdviseSink;
 typedef IUnknownImplementor<IMAPIProp> MAPIProp;
 typedef IUnknownImplementor<IMessage> Message;

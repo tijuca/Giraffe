@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include "WSUtil.h"
 #include "WSTransport.h"
@@ -26,26 +26,24 @@
 #include <mapidefs.h>
 #include <mapiutil.h>
 
-#include <zarafa/Util.h>
+#include <kopano/Util.h>
 #include "ECExchangeModifyTable.h"
 #include <mapicode.h>
 #include <edkguid.h>
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 #include <mapiguid.h>
 
-#include <zarafa/Trace.h>
-#include <zarafa/ECDebug.h>
+#include <kopano/Trace.h>
+#include <kopano/ECDebug.h>
 
-#include "ZarafaUtil.h"
-#include <zarafa/charset/convert.h>
+#include "pcutil.hpp"
+#include <kopano/charset/convert.h>
 #include "utf8.h"
 
-#include <zarafa/ECInterfaceDefs.h>
+#include <kopano/ECInterfaceDefs.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 static LPWSTR WTF1252_to_WCHAR(LPCSTR szWTF1252, LPVOID lpBase, convert_context *lpConverter)
@@ -681,12 +679,6 @@ DEF_HRMETHOD(TRACE_MAPI, ECExchangeModifyTable, ECExchangeModifyTable, ModifyTab
 DEF_HRMETHOD(TRACE_MAPI, ECExchangeModifyTable, ECExchangeModifyTable, DisablePushToServer, (void))
 
 // ExchangeRuleAction object
-
-ECExchangeRuleAction::ECExchangeRuleAction() {
-}
-
-ECExchangeRuleAction::~ECExchangeRuleAction() {
-}
 
 HRESULT __stdcall ECExchangeRuleAction::ActionCount(ULONG *lpcActions) {
 	*lpcActions = 0;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,18 +19,8 @@
 #define __M4L_MAPIUTIL_H_
 #define MAPIUTIL_H
 
-/*
- * MAPI for linux
- *
- * mapiutil.h - Utility functions
- *
- * (C) Zarafa 2005
- *
- */
-
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <mapix.h>
-
 
 /* IMAPITable in memory */
 
@@ -631,15 +621,6 @@ RTFSync (LPMESSAGE lpMessage, ULONG ulFlags, BOOL * lpfMessageUpdated);
 HRESULT
 WrapCompressedRTFStream (LPSTREAM lpCompressedRTFStream,
         ULONG ulFlags, LPSTREAM * lpUncompressedRTFStream);
-
-/* Storage on Stream */
-
-#if defined(_WIN32) || defined(WIN16)
-HRESULT
-HrIStorageFromStream (LPUNKNOWN lpUnkIn,
-    LPCIID lpInterface, ULONG ulFlags, LPSTORAGE * lppStorageOut);
-#endif
-
 
 /*
  * Setup and cleanup. 

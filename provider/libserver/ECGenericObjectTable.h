@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -20,17 +20,17 @@
 
 #define MAX_SORTKEY_LEN 4096
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include "soapH.h"
 
 #include <list>
 #include <map>
 
 #include "ECSubRestriction.h"
-#include <zarafa/ECKeyTable.h>
+#include <kopano/ECKeyTable.h>
 #include "ECDatabase.h"
-#include <zarafa/ustringutil.h>
-#include <zarafa/ECUnknown.h>
+#include <kopano/ustringutil.h>
+#include <kopano/ECUnknown.h>
 
 /*
  * This object is an actual table, with a cursor in-memory. We also keep the complete
@@ -62,7 +62,7 @@ public:
     void IncUnread();
     void DecUnread();
     
-    unsigned int GetCount();
+	unsigned int GetCount(void) const { return m_ulLeafs; }
     
     ECCategory* GetParent();
     
@@ -71,7 +71,7 @@ public:
     ECRESULT UpdateMinMax(const sObjectTableKey &sKey, unsigned int i, struct propVal *lpPropVal, bool fMax, bool *lpfModified);
     ECRESULT UpdateMinMaxRemove(const sObjectTableKey &sKey, unsigned int i, bool fMax, bool *lpfModified);
 	
-	unsigned int GetObjectSize(void) const;
+	size_t GetObjectSize(void) const;
 
     struct propVal *m_lpProps;
     unsigned int m_cProps;
@@ -184,7 +184,7 @@ public:
 	virtual	ECRESULT	GetPropCategory(struct soap *soap, unsigned int ulPropTag, sObjectTableKey sKey, struct propVal *lpPropVal);
 	virtual unsigned int GetCategories();
 
-	virtual unsigned int GetObjectSize(void);
+	virtual size_t GetObjectSize(void);
 
 protected:
 	// Add an actual row to the table, and send a notification if required. If you add an existing row, the row is modified and the notification is send as a modification
@@ -196,7 +196,7 @@ protected:
 	// Add data to key table
 	ECRESULT 	UpdateKeyTableRow(ECCategory *lpCategory, sObjectTableKey *lpsRowKey, struct propVal *lpProps, unsigned int cValues, bool fHidden, sObjectTableKey *sPrevRow, ECKeyTable::UpdateType *lpulAction);
 	// Update min/max field for category
-	ECRESULT 	UpdateCategoryMinMax(sObjectTableKey& lpKey, ECCategory *lpCategory, unsigned int i, struct propVal *lpProps, unsigned int cProps, bool *lpfModified);
+	ECRESULT 	UpdateCategoryMinMax(sObjectTableKey& lpKey, ECCategory *lpCategory, size_t i, struct propVal *lpProps, size_t cProps, bool *lpfModified);
 
 	virtual ECRESULT	ReloadKeyTable();
 	ECRESULT	GetBinarySortKey(struct propVal *lpsPropVal, unsigned int *lpSortLen, unsigned char **lppSortData);

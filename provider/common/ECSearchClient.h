@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,13 +18,13 @@
 #ifndef ECSEARCHCLIENT_H
 #define ECSEARCHCLIENT_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <map>
 #include <set>
 #include <string>
 
 #include <soapH.h>
-#include <zarafa/ZarafaCode.h>
+#include <kopano/kcodes.h>
 
 #include "ECChannelClient.h"
 
@@ -38,16 +38,15 @@ typedef std::set<unsigned int> setindexprops_t;
 class ECSearchClient _zcp_final : public ECChannelClient {
 public:
 	ECSearchClient(const char *szIndexerPath, unsigned int ulTimeOut);
-	~ECSearchClient();
-
 	ECRESULT GetProperties(setindexprops_t &mapProps);
-	ECRESULT Query(GUID *lpServerGuid, GUID *lpStoreGUID, std::list<unsigned int> &lstFolders, std::list<SIndexedTerm> &lstSearches, std::list<unsigned int> &lstMatches);
+	ECRESULT Query(GUID *lpServerGuid, GUID *lpStoreGUID, std::list<unsigned int> &lstFolders, std::list<SIndexedTerm> &lstSearches, std::list<unsigned int> &lstMatches, std::string &suggestion);
 	ECRESULT SyncRun();
 	
 private:
 	ECRESULT Scope(const std::string &strServer, const std::string &strStore, const std::list<unsigned int> &ulFolders);
 	ECRESULT Find(const std::set<unsigned int> &setFields, const std::string &strTerm);
 	ECRESULT Query(std::list<unsigned int> &lstMatches);
+	ECRESULT Suggest(std::string &suggestion);
 };
 
 #endif /* ECSEARCHCLIENT_H */

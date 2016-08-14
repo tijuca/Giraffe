@@ -30,14 +30,15 @@ stamp-h2
 
 /default.sym
 
-/ECtools/zarafa-admin
-/ECtools/zarafa-archiver
-/ECtools/zarafa-cfgchecker
-/ECtools/zarafa-fsck
-/ECtools/zarafa-monitor
-/ECtools/zarafa-passwd
-/ECtools/zarafa-stats
-/ECtools/backup-plus/build/
+/ECtools/kopano-admin
+/ECtools/kopano-archiver
+/ECtools/kopano-cfgchecker
+/ECtools/kopano-fsck
+/ECtools/kopano-monitor
+/ECtools/kopano-passwd
+/ECtools/kopano-stats
+/ECtools/mapitime
+/ECtools/backup/build/
 /ECtools/presence/build/
 /ECtools/search/build/
 
@@ -57,14 +58,14 @@ stamp-h2
 /autoconf/compile
 
 # /caldav/
-/caldav/zarafa-ical
+/caldav/kopano-ical
 
 # /common/
 /common/config.h*
 /common/ecversion.h
-/common/include/zarafa/ecversion.h
-/common/include/zarafa/zconfig.h
-/common/zarafa.pc
+/common/include/kopano/ecversion.h
+/common/include/kopano/zconfig.h
+/common/kopano.pc
 
 # /doc/
 /doc/*.[0-9]
@@ -73,10 +74,10 @@ stamp-h2
 #/doc/php-ext/*html
 #
 # /gateway/
-/gateway/zarafa-gateway
+/gateway/kopano-gateway
 
 # /installer/
-/installer/zarafa.ldif
+/installer/kopano.ldif
 
 # /installer/linux/
 /installer/linux/ldap.openldap.cfg
@@ -108,14 +109,14 @@ stamp-h2
 #/provider/plugins/plugintest
 #
 # /provider/server/
-/provider/server/zarafa-server
+/provider/server/kopano-server
 
 # /provider/soap/
 /provider/soap/*res.xml
 /provider/soap/*req.xml
 /provider/soap/ns.xsd
-/provider/soap/ZarafaCmd.wsdl
-/provider/soap/ZarafaCmd.nsmap
+/provider/soap/KCmd.wsdl
+/provider/soap/KCmd.nsmap
 /provider/soap/soapClient.cpp
 /provider/soap/soapServer.cpp
 /provider/soap/soapStub.h
@@ -123,12 +124,12 @@ stamp-h2
 /provider/soap/soapH.h
 /provider/soap/soapClientLib.cpp
 /provider/soap/soapServerLib.cpp
-/provider/soap/soapZarafaCmdProxy.h
-/provider/soap/soapZarafaCmdObject.h
+/provider/soap/soapKCmdProxy.h
+/provider/soap/soapKCmdObject.h
 
 # /spooler/
-/spooler/zarafa-spooler
-/spooler/zarafa-dagent
+/spooler/kopano-spooler
+/spooler/kopano-dagent
 /spooler/PythonSWIGRuntime.h
 
 # /swig/python/
@@ -150,7 +151,7 @@ stamp-h2
 /swig/python/libfreebusy_wrap.cxx
 /swig/python/RecurrenceState.py
 /swig/python/RecurrenceState_wrap.cxx
-/swig/python/zarafa/build/
+/swig/python/kopano/build/
 
 # Ignore Python compiled files
 *.pyc

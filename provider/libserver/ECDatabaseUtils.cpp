@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,18 +15,18 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <mapidefs.h>
 #include <mapitags.h>
 
-#include "Zarafa.h"
+#include "kcore.hpp"
 #include "soapH.h"
 #include "ECDatabase.h"
 #include "ECDatabaseFactory.h"
 #include "ECDatabaseUtils.h"
 #include "SOAPUtils.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 #include "ECSessionManager.h"
 
 #include <pthread.h>
@@ -34,8 +34,6 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECRESULT GetPropSize(DB_ROW lpRow, DB_LENGTHS lpLen, unsigned int *lpulSize)
@@ -69,7 +67,7 @@ ECRESULT GetPropSize(DB_ROW lpRow, DB_LENGTHS lpLen, unsigned int *lpulSize)
 		ulSize = lpLen[FIELD_NR_BINARY];
 		break;
 	default:
-		er = ZARAFA_E_INVALID_TYPE;
+		er = KCERR_INVALID_TYPE;
 	}
 
 	*lpulSize = ulSize;
@@ -90,47 +88,36 @@ ci_find_substr(const std::string &first, const std::string &second)
 
 ECRESULT CopySOAPPropValToDatabasePropVal(struct propVal *lpPropVal, unsigned int *lpulColNr, std::string &strColData, ECDatabase *lpDatabase, bool bTruncate)
 {
-	ECRESULT er = erSuccess;
 	ULONG type = PROP_TYPE(lpPropVal->ulPropTag);
 
 	switch(type) {
 	case PT_I2:
-		if(lpPropVal->__union != SOAP_UNION_propValData_i) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_i)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify(lpPropVal->Value.i);
 		*lpulColNr = VALUE_NR_ULONG;
 		break;
 	case PT_LONG:
-		if(lpPropVal->__union != SOAP_UNION_propValData_ul) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_ul)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify(lpPropVal->Value.ul);
 		*lpulColNr = VALUE_NR_ULONG;
 		break;
 	case PT_R4:
-		if(lpPropVal->__union != SOAP_UNION_propValData_flt) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_flt)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify_float(lpPropVal->Value.flt);
 		*lpulColNr = VALUE_NR_DOUBLE;
 		break;
 	case PT_BOOLEAN:
-		if(lpPropVal->__union != SOAP_UNION_propValData_b) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_b)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify(lpPropVal->Value.b);
 		*lpulColNr = VALUE_NR_ULONG;
 		break;
 	case PT_DOUBLE:
-		if(lpPropVal->__union != SOAP_UNION_propValData_dbl) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_dbl)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify_double(lpPropVal->Value.dbl);
 		*lpulColNr = VALUE_NR_DOUBLE;
 		if (ci_find_substr(strColData, std::string("nan")) != std::string::npos) {
@@ -139,44 +126,37 @@ ECRESULT CopySOAPPropValToDatabasePropVal(struct propVal *lpPropVal, unsigned in
 		}
 	break;
 	case PT_CURRENCY:
-		if(lpPropVal->__union != SOAP_UNION_propValData_hilo || lpPropVal->Value.hilo == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_hilo ||
+		    lpPropVal->Value.hilo == NULL)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify(lpPropVal->Value.hilo->hi,false,true) + "," + stringify(lpPropVal->Value.hilo->lo);
 		*lpulColNr = VALUE_NR_HILO;
 		break;
 	case PT_APPTIME:
-		if(lpPropVal->__union != SOAP_UNION_propValData_dbl) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_dbl)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify_double(lpPropVal->Value.dbl);
 		*lpulColNr = VALUE_NR_DOUBLE;
 		break;
 	case PT_SYSTIME:
-		if(lpPropVal->__union != SOAP_UNION_propValData_hilo || lpPropVal->Value.hilo == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_hilo ||
+		    lpPropVal->Value.hilo == NULL)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify(lpPropVal->Value.hilo->hi,false,true) + "," + stringify(lpPropVal->Value.hilo->lo);
 		*lpulColNr = VALUE_NR_HILO;
 		break;
 	case PT_I8:
-		if(lpPropVal->__union != SOAP_UNION_propValData_li) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_li)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify_int64(int64_t(lpPropVal->Value.li));
 		*lpulColNr = VALUE_NR_LONGINT;
 		break;
 	case PT_UNICODE:
 	case PT_STRING8: {
 		std::string strData;
-		if(lpPropVal->__union != SOAP_UNION_propValData_lpszA || lpPropVal->Value.lpszA == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_lpszA ||
+		    lpPropVal->Value.lpszA == NULL)
+			return KCERR_INVALID_PARAMETER;
 		if(bTruncate) {
 			u8_ncpy(lpPropVal->Value.lpszA, TABLE_CAP_STRING, &strData);
 		} else {
@@ -189,10 +169,10 @@ ECRESULT CopySOAPPropValToDatabasePropVal(struct propVal *lpPropVal, unsigned in
 	}
 	case PT_BINARY: {
 		unsigned int ulSize;
-		if(lpPropVal->__union != SOAP_UNION_propValData_bin || lpPropVal->Value.bin == NULL || lpPropVal->Value.bin->__ptr == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_bin ||
+		    lpPropVal->Value.bin == NULL ||
+		    lpPropVal->Value.bin->__ptr == NULL)
+			return KCERR_INVALID_PARAMETER;
 
 		if(bTruncate && lpPropVal->Value.bin->__size > TABLE_CAP_BINARY) {
 			ulSize = TABLE_CAP_BINARY;
@@ -205,25 +185,23 @@ ECRESULT CopySOAPPropValToDatabasePropVal(struct propVal *lpPropVal, unsigned in
 		break;
 	}
 	case PT_CLSID:
-		if(lpPropVal->__union != SOAP_UNION_propValData_bin || lpPropVal->Value.bin == NULL || lpPropVal->Value.bin->__ptr == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_bin ||
+		    lpPropVal->Value.bin == NULL ||
+		    lpPropVal->Value.bin->__ptr == NULL)
+			return KCERR_INVALID_PARAMETER;
 		strColData = lpDatabase->EscapeBinary(lpPropVal->Value.bin->__ptr, lpPropVal->Value.bin->__size);
 		*lpulColNr = VALUE_NR_BINARY;
 		break;
 	default:
-		er = ZARAFA_E_INVALID_TYPE;
+		return KCERR_INVALID_TYPE;
 	}
-
-exit:
-	return er;
+	return erSuccess;
 }
 
-ULONG GetMVItemCount(struct propVal *lpPropVal)
+gsoap_size_t GetMVItemCount(struct propVal *lpPropVal)
 {
 	ULONG type = PROP_TYPE(lpPropVal->ulPropTag);
-	ULONG ulSize = 0;
+	gsoap_size_t ulSize = 0;
 
 	switch(type) {
 		case PT_MV_I2:
@@ -303,105 +281,91 @@ ULONG GetMVItemCount(struct propVal *lpPropVal)
 
 ECRESULT CopySOAPPropValToDatabaseMVPropVal(struct propVal *lpPropVal, int nItem, std::string &strColName, std::string &strColData, ECDatabase *lpDatabase)
 {
-	ECRESULT er = erSuccess;
 	ULONG type = PROP_TYPE(lpPropVal->ulPropTag);
 
 	switch(type) {
 	case PT_MV_I2:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvi || lpPropVal->Value.mvi.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvi ||
+		    lpPropVal->Value.mvi.__ptr == NULL)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify(lpPropVal->Value.mvi.__ptr[nItem]);
 		strColName = PROPCOL_ULONG;
 		break;
 	case PT_MV_LONG:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvl || lpPropVal->Value.mvl.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvl ||
+		    lpPropVal->Value.mvl.__ptr == NULL)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify(lpPropVal->Value.mvl.__ptr[nItem]);
 		strColName = PROPCOL_ULONG;
 		break;
 	case PT_MV_R4:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvflt || lpPropVal->Value.mvflt.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvflt ||
+		    lpPropVal->Value.mvflt.__ptr == NULL)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify_float(lpPropVal->Value.mvflt.__ptr[nItem]);
 		strColName = PROPCOL_DOUBLE;
 		break;
 	case PT_MV_DOUBLE:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvdbl || lpPropVal->Value.mvdbl.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvdbl ||
+		    lpPropVal->Value.mvdbl.__ptr == NULL)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify_double(lpPropVal->Value.mvdbl.__ptr[nItem]);
 		strColName = PROPCOL_DOUBLE;
 		break;
 	case PT_MV_CURRENCY:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvhilo || lpPropVal->Value.mvhilo.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvhilo ||
+		    lpPropVal->Value.mvhilo.__ptr == NULL)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify(lpPropVal->Value.mvhilo.__ptr[nItem].hi,false,true) + "," + stringify(lpPropVal->Value.mvhilo.__ptr[nItem].lo);
 		strColName = PROPCOL_HILO;
 		break;
 	case PT_MV_APPTIME:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvdbl || lpPropVal->Value.mvdbl.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvdbl ||
+		    lpPropVal->Value.mvdbl.__ptr == NULL)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify_double(lpPropVal->Value.mvdbl.__ptr[nItem]);
 		strColName = PROPCOL_DOUBLE;
 		break;
 	case PT_MV_SYSTIME:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvhilo || lpPropVal->Value.mvhilo.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvhilo ||
+		    lpPropVal->Value.mvhilo.__ptr == NULL)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify(lpPropVal->Value.mvhilo.__ptr[nItem].hi,false,true) + "," + stringify(lpPropVal->Value.mvhilo.__ptr[nItem].lo);
 		strColName = PROPCOL_HILO;
 		break;
 	case PT_MV_BINARY:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvbin || lpPropVal->Value.mvbin.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvbin ||
+		    lpPropVal->Value.mvbin.__ptr == NULL)
+			return KCERR_INVALID_PARAMETER;
 		strColData = lpDatabase->EscapeBinary(lpPropVal->Value.mvbin.__ptr[nItem].__ptr, lpPropVal->Value.mvbin.__ptr[nItem].__size);
 		strColName = PROPCOL_BINARY;
 		break;
 	case PT_MV_STRING8:
 	case PT_MV_UNICODE:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvszA || lpPropVal->Value.mvszA.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvszA ||
+		    lpPropVal->Value.mvszA.__ptr == NULL)
+			return KCERR_INVALID_PARAMETER;
 		strColData = "'" + lpDatabase->Escape(lpDatabase->FilterBMP(lpPropVal->Value.mvszA.__ptr[nItem])) + "'";
 		strColName = PROPCOL_STRING;
 		break;
 	case PT_MV_CLSID:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvbin || lpPropVal->Value.mvbin.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvbin ||
+		    lpPropVal->Value.mvbin.__ptr == NULL)
+			return KCERR_INVALID_PARAMETER;
 		strColData = lpDatabase->EscapeBinary(lpPropVal->Value.mvbin.__ptr[nItem].__ptr, lpPropVal->Value.mvbin.__ptr[nItem].__size);
 		strColName = PROPCOL_BINARY;
 		break;
 	case PT_MV_I8:
-		if (lpPropVal->__union != SOAP_UNION_propValData_mvli || lpPropVal->Value.mvli.__ptr == NULL) {
-			er = ZARAFA_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvli ||
+		    lpPropVal->Value.mvli.__ptr == NULL)
+			return KCERR_INVALID_PARAMETER;
 		strColData = stringify_int64(lpPropVal->Value.mvli.__ptr[nItem]);
 		strColName = PROPCOL_LONGINT;
 		break;
 	default:
-		er = ZARAFA_E_INVALID_TYPE;
+		return KCERR_INVALID_TYPE;
 	}
-
-exit:
-	return er;
+	return erSuccess;
 }
 // by table 
 
@@ -428,8 +392,6 @@ ECRESULT ParseMVPropCount(const char *lpRowData, ULONG ulSize,
 ECRESULT ParseMVProp(const char *lpRowData, ULONG ulSize,
     unsigned int *lpulLastPos, std::string *lpstrData)
 {
-	ECRESULT er = erSuccess;
-
 	ULONG	ulPos = *lpulLastPos;
 	ULONG   ulLen = 0;
 	char	*lpEnd = NULL;
@@ -437,28 +399,18 @@ ECRESULT ParseMVProp(const char *lpRowData, ULONG ulSize,
 
 	ASSERT(ulPos < ulSize);
 
-	if (ulPos >= ulSize) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (ulPos >= ulSize)
+		return KCERR_INVALID_PARAMETER;
 	ulLen = strtoul(lpRowData + ulPos, &lpEnd, 10);
-	if (lpEnd == lpRowData + ulPos || lpEnd == NULL || *lpEnd != ':') {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if (lpRowData + ulSize < lpEnd + 1 + ulLen) {
+	if (lpEnd == lpRowData + ulPos || lpEnd == NULL || *lpEnd != ':')
+		return KCERR_INVALID_PARAMETER;
+	if (lpRowData + ulSize < lpEnd + 1 + ulLen)
 		// not enough data from mysql
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+		return KCERR_INVALID_PARAMETER;
 
 	lpstrData->assign(lpEnd + 1, ulLen);
 	*lpulLastPos = (lpEnd - lpRowData) + 1 + ulLen;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ULONG GetColOffset(unsigned int ulPropTag)
@@ -530,7 +482,6 @@ std::string GetPropColOrder(unsigned int ulPropTag,
 ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LENGTHS lpLen, propVal *lpPropVal)
 {
 	ECRESULT er = erSuccess;
-	int i;
 	unsigned int ulLastPos;
 	std::string	strData;
 	unsigned int type = atoi(lpRow[FIELD_NR_TYPE]);
@@ -547,7 +498,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 	switch(type) {
 	case PT_I2:
 		if(lpRow[FIELD_NR_ULONG] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_i;
@@ -555,7 +506,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		break;
 	case PT_LONG:
 		if(lpRow[FIELD_NR_ULONG] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_ul;
@@ -563,7 +514,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		break;
 	case PT_R4:
 		if(lpRow[FIELD_NR_DOUBLE] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_flt;
@@ -571,7 +522,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		break;
 	case PT_BOOLEAN:
 		if(lpRow[FIELD_NR_ULONG] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_b;
@@ -579,7 +530,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		break;
 	case PT_DOUBLE:
 		if(lpRow[FIELD_NR_DOUBLE] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_dbl;
@@ -587,7 +538,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		break;
 	case PT_CURRENCY:
 		if(lpRow[FIELD_NR_HI] == NULL || lpRow[FIELD_NR_LO] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_hilo;
@@ -597,7 +548,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		break;
 	case PT_APPTIME:
 		if(lpRow[FIELD_NR_DOUBLE] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_dbl;
@@ -605,7 +556,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		break;
 	case PT_SYSTIME:
 		if(lpRow[FIELD_NR_HI] == NULL || lpRow[FIELD_NR_LO] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_hilo;
@@ -615,7 +566,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		break;
 	case PT_I8:
 		if(lpRow[FIELD_NR_LONGINT] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_li;
@@ -624,7 +575,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 	case PT_STRING8:
 	case PT_UNICODE:
 		if(lpRow[FIELD_NR_STRING] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_lpszA;
@@ -635,7 +586,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		break;
 	case PT_CLSID:
 		if(lpRow[FIELD_NR_BINARY] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_bin;
@@ -646,7 +597,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		break;
 	case PT_BINARY:
 		if(lpRow[FIELD_NR_BINARY] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_bin;
@@ -657,7 +608,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		break;
 	case PT_MV_I2:
 		if(lpRow[FIELD_NR_ULONG] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 
@@ -665,14 +616,14 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		lpPropVal->Value.mvi.__size = atoi(lpRow[FIELD_NR_ID]);
 		lpPropVal->Value.mvi.__ptr = s_alloc<short int>(soap, lpPropVal->Value.mvi.__size);
 		ulLastPos = 0;
-		for (i = 0; i < lpPropVal->Value.mvi.__size; ++i) {
+		for (gsoap_size_t i = 0; i < lpPropVal->Value.mvi.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_ULONG], lpLen[FIELD_NR_ULONG], &ulLastPos, &strData);
 			lpPropVal->Value.mvi.__ptr[i] = (short)atoui((char *)strData.c_str());
 		}
 		break;
 	case PT_MV_LONG:
 		if(lpRow[FIELD_NR_ULONG] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 
@@ -680,14 +631,14 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		lpPropVal->Value.mvl.__size = atoi(lpRow[FIELD_NR_ID]);
 		lpPropVal->Value.mvl.__ptr = s_alloc<unsigned int>(soap, lpPropVal->Value.mvl.__size);
 		ulLastPos = 0;
-		for (i = 0; i < lpPropVal->Value.mvl.__size; ++i) {
+		for (gsoap_size_t i = 0; i < lpPropVal->Value.mvl.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_ULONG], lpLen[FIELD_NR_ULONG], &ulLastPos, &strData);
 			lpPropVal->Value.mvl.__ptr[i] = atoui((char*)strData.c_str());
 		}
 		break;
 	case PT_MV_R4:
 		if(lpRow[FIELD_NR_DOUBLE] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 
@@ -695,7 +646,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		lpPropVal->Value.mvflt.__size = atoi(lpRow[FIELD_NR_ID]);
 		lpPropVal->Value.mvflt.__ptr = s_alloc<float>(soap, lpPropVal->Value.mvflt.__size);
 		ulLastPos = 0;
-		for (i = 0; i < lpPropVal->Value.mvflt.__size; ++i) {
+		for (gsoap_size_t i = 0; i < lpPropVal->Value.mvflt.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_DOUBLE], lpLen[FIELD_NR_DOUBLE], &ulLastPos, &strData);
 			lpPropVal->Value.mvflt.__ptr[i] = (float)strtod_l(strData.c_str(), NULL, loc);
 		}
@@ -703,7 +654,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 	case PT_MV_DOUBLE:
 	case PT_MV_APPTIME:
 		if(lpRow[FIELD_NR_DOUBLE] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 
@@ -711,7 +662,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		lpPropVal->Value.mvdbl.__size = atoi(lpRow[FIELD_NR_ID]);
 		lpPropVal->Value.mvdbl.__ptr = s_alloc<double>(soap, lpPropVal->Value.mvdbl.__size);
 		ulLastPos = 0;
-		for (i = 0; i < lpPropVal->Value.mvdbl.__size; ++i) {
+		for (gsoap_size_t i = 0; i < lpPropVal->Value.mvdbl.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_DOUBLE], lpLen[FIELD_NR_DOUBLE], &ulLastPos, &strData);
 			lpPropVal->Value.mvdbl.__ptr[i] = strtod_l(strData.c_str(), NULL, loc);
 		}
@@ -719,7 +670,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 	case PT_MV_CURRENCY:
 	case PT_MV_SYSTIME:
 		if(lpRow[FIELD_NR_HI] == NULL || lpRow[FIELD_NR_LO] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_mvhilo;
@@ -727,13 +678,13 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		lpPropVal->Value.mvhilo.__ptr = s_alloc<hiloLong>(soap, lpPropVal->Value.mvhilo.__size);
 		//Scan low
 		ulLastPos = 0;
-		for (i = 0; i < lpPropVal->Value.mvhilo.__size; ++i) {
+		for (gsoap_size_t i = 0; i < lpPropVal->Value.mvhilo.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_LO], lpLen[FIELD_NR_LO], &ulLastPos, &strData);
 			lpPropVal->Value.mvhilo.__ptr[i].lo = atoui((char*)strData.c_str());
 		}
 		//Scan high
 		ulLastPos = 0;
-		for (i = 0; i < lpPropVal->Value.mvhilo.__size; ++i) {
+		for (gsoap_size_t i = 0; i < lpPropVal->Value.mvhilo.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_HI], lpLen[FIELD_NR_HI], &ulLastPos, &strData);
 			lpPropVal->Value.mvhilo.__ptr[i].hi = atoi((char*)strData.c_str());
 		}
@@ -741,14 +692,14 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 	case PT_MV_BINARY:
 	case PT_MV_CLSID:
 		if(lpRow[FIELD_NR_BINARY] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_mvbin;
 		lpPropVal->Value.mvbin.__size = atoi(lpRow[FIELD_NR_ID]);
 		lpPropVal->Value.mvbin.__ptr = s_alloc<struct xsd__base64Binary>(soap, lpPropVal->Value.mvbin.__size);
 		ulLastPos = 0;
-		for (i = 0; i < lpPropVal->Value.mvbin.__size; ++i) {
+		for (gsoap_size_t i = 0; i < lpPropVal->Value.mvbin.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_BINARY], lpLen[FIELD_NR_BINARY], &ulLastPos, &strData);
 			lpPropVal->Value.mvbin.__ptr[i].__size = strData.size();
 			lpPropVal->Value.mvbin.__ptr[i].__ptr = s_alloc<unsigned char>(soap, lpPropVal->Value.mvbin.__ptr[i].__size);
@@ -758,14 +709,14 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 	case PT_MV_STRING8:
 	case PT_MV_UNICODE:
 		if(lpRow[FIELD_NR_STRING] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_mvszA;
 		lpPropVal->Value.mvszA.__size = atoi(lpRow[FIELD_NR_ID]);
 		lpPropVal->Value.mvszA.__ptr = s_alloc<char *>(soap, lpPropVal->Value.mvszA.__size);
 		ulLastPos = 0;
-		for (i = 0; i < lpPropVal->Value.mvszA.__size; ++i) {
+		for (gsoap_size_t i = 0; i < lpPropVal->Value.mvszA.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_STRING], lpLen[FIELD_NR_STRING], &ulLastPos, &strData);
 			lpPropVal->Value.mvszA.__ptr[i] = s_alloc<char>(soap, strData.size() + 1);
 			memcpy(lpPropVal->Value.mvszA.__ptr[i], strData.c_str(), strData.size() + 1);
@@ -774,7 +725,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		break;
 	case PT_MV_I8:
 		if(lpRow[FIELD_NR_LONGINT] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 
@@ -782,13 +733,13 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		lpPropVal->Value.mvli.__size = atoi(lpRow[FIELD_NR_ID]);
 		lpPropVal->Value.mvli.__ptr = s_alloc<LONG64>(soap, lpPropVal->Value.mvli.__size);
 		ulLastPos = 0;
-		for (i = 0; i < lpPropVal->Value.mvli.__size; ++i) {
+		for (gsoap_size_t i = 0; i < lpPropVal->Value.mvli.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_LONGINT], lpLen[FIELD_NR_LONGINT], &ulLastPos, &strData);
 			lpPropVal->Value.mvli.__ptr[i] = _atoi64(strData.c_str());
 		}
 		break;
 	default:
-		er = ZARAFA_E_INVALID_TYPE;
+		er = KCERR_INVALID_TYPE;
 		goto exit;
 	}
 
@@ -832,7 +783,7 @@ ECRESULT GetDatabaseSettingAsInteger(ECDatabase *lpDatabase, const std::string &
 
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if(lpDBRow == NULL || lpDBRow[0] == NULL) {
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 		goto exit;
 	}
 

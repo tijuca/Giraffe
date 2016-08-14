@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,9 +15,9 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <ctime>
-#include <zarafa/ECLogger.h>
+#include <kopano/ECLogger.h>
 
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
@@ -33,7 +33,7 @@
 #	include <dirent.h>
 #	include <fcntl.h>
 #	include <unistd.h>
-#	include <zarafa/UnixUtil.h>
+#	include <kopano/UnixUtil.h>
 #endif
 
 extern ECLogger *g_lpLogger;
@@ -42,14 +42,6 @@ struct soap_connection_thread {
 	ECSoapServerConnection*	lpSoapConnClass;
 	struct soap*			lpSoap;
 };
-
-#ifdef WIN32
-// used for std::set<pthread_t>
-bool operator<(const pthread_t &pta, const pthread_t &ptb)
-{
-	return pta.p < ptb.p;
-}
-#endif
 
 #ifdef LINUX
 /** 
@@ -71,23 +63,22 @@ static int create_pipe_socket(const char *unix_socket, ECConfig *lpConfig,
 	struct sockaddr_un saddr;
 	memset(&saddr, 0, sizeof(struct sockaddr_un));
 
+	if (strlen(unix_socket) >= sizeof(saddr.sun_path)) {
+		ec_log_err("UNIX domain socket path \"%s\" is too long", unix_socket);
+		return -1;
+	}
 	s = socket(PF_UNIX, SOCK_STREAM, 0);
 	if(s < 0) {
 		lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to create AF_UNIX socket.");
 		return -1;
 	}
-	
 	memset(&saddr,0,sizeof(saddr));
 	saddr.sun_family = AF_UNIX;
-	if (strlen(unix_socket) >= sizeof(saddr.sun_path)) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "UNIX domain socket path \"%s\" is too long", unix_socket);
-		return -1;
-	}
 	strncpy(saddr.sun_path, unix_socket, sizeof(saddr.sun_path));
 	unlink(unix_socket);
 
 	if (bind(s, (struct sockaddr*)&saddr, 2 + strlen(unix_socket)) == -1) {
-		lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to socket %s (%s). This is usually caused by another process (most likely another zarafa-server) already using this port. This program will terminate now.", unix_socket, strerror(errno));
+		lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to socket %s (%s). This is usually caused by another process (most likely another server) already using this port. This program will terminate now.", unix_socket, strerror(errno));
 #ifdef LINUX
                 kill(0, SIGTERM);
 #endif
@@ -120,9 +111,7 @@ static int create_pipe_socket(const char *unix_socket, ECConfig *lpConfig,
 
 #else
 
-//////////////////////////////////////////////////////////////////////
 // Named pipe functions
-//
 
 // Create a namedpipe in windows 
 // the function must be called very time you have used the pipe
@@ -191,7 +180,7 @@ int gsoap_win_fclose(struct soap *soap)
 	if((HANDLE)soap->socket == INVALID_HANDLE_VALUE)
 		return SOAP_OK;
 
-	zarafa_disconnect_soap_connection(soap);
+	kopano_disconnect_soap_connection(soap);
 
 	// Flush the data so the client gets any left-over data, then disconnect and close the socket
 	FlushFileBuffers((HANDLE)soap->socket);
@@ -223,9 +212,7 @@ int gsoap_win_shutdownsocket(struct soap *soap, SOAP_SOCKET fd, int how)
 }
 
 
-//////////////////////////////////////////////////////////////////////
 // TCP/SSL socket functions
-//
 #endif // #ifdef LINUX
 
 /*
@@ -285,13 +272,13 @@ ECRESULT ECSoapServerConnection::ListenTCP(const char* lpServerName, int nServer
 	struct soap	*lpsSoap = NULL;
 
 	if(lpServerName == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
 	//init soap
 	lpsSoap = soap_new2(SOAP_IO_KEEPALIVE | SOAP_XML_TREE | SOAP_C_UTFSTRING, SOAP_IO_KEEPALIVE | SOAP_XML_TREE | SOAP_C_UTFSTRING);
-	zarafa_new_soap_listener(CONNECTION_TYPE_TCP, lpsSoap);
+	kopano_new_soap_listener(CONNECTION_TYPE_TCP, lpsSoap);
 
 	if (bEnableGET)
 		lpsSoap->fget = http_get;
@@ -302,7 +289,7 @@ ECRESULT ECSoapServerConnection::ListenTCP(const char* lpServerName, int nServer
 
 	lpsSoap->socket = socket = soap_bind(lpsSoap, *lpServerName == '\0' ? NULL : lpServerName, nServerPort, 100);
         if (socket == -1) {
-                m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to port %d: %s. This is usually caused by another process (most likely another zarafa-server) already using this port. This program will terminate now.", nServerPort, lpsSoap->fault->faultstring);
+                m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to port %d: %s. This is usually caused by another process (most likely another server) already using this port. This program will terminate now.", nServerPort, lpsSoap->fault->faultstring);
 #ifdef LINUX
                 kill(0, SIGTERM);
 #endif
@@ -337,12 +324,12 @@ ECRESULT ECSoapServerConnection::ListenSSL(const char* lpServerName, int nServer
 #endif
 
 	if(lpServerName == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
 	lpsSoap = soap_new2(SOAP_IO_KEEPALIVE | SOAP_XML_TREE | SOAP_C_UTFSTRING, SOAP_IO_KEEPALIVE | SOAP_XML_TREE | SOAP_C_UTFSTRING);
-	zarafa_new_soap_listener(CONNECTION_TYPE_SSL, lpsSoap);
+	kopano_new_soap_listener(CONNECTION_TYPE_SSL, lpsSoap);
 
 	if (bEnableGET)
 		lpsSoap->fget = http_get;
@@ -356,12 +343,12 @@ ECRESULT ECSoapServerConnection::ListenSSL(const char* lpServerName, int nServer
 			lpszCAPath,			// CA certificate path of thrusted sources
 			NULL,				// dh file, null == rsa
 			NULL,				// create random data on the fly (/dev/urandom is slow .. create file?)
-			"zarafa")			// unique name for ssl session cache
+			"EC")			// unique name for ssl session cache
 		)
 	{
 		soap_set_fault(lpsSoap);
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to setup ssl context: %s", *soap_faultdetail(lpsSoap));
-		er = ZARAFA_E_CALL_FAILED;
+		er = KCERR_CALL_FAILED;
 		goto exit;
 	}
 
@@ -400,7 +387,7 @@ ECRESULT ECSoapServerConnection::ListenSSL(const char* lpServerName, int nServer
 #endif
 		else {
 			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unknown protocol '%s' in server_ssl_protocols setting", ssl_name);
-			er = ZARAFA_E_CALL_FAILED;
+			er = KCERR_CALL_FAILED;
 			goto exit;
 		}
 
@@ -438,7 +425,7 @@ ECRESULT ECSoapServerConnection::ListenSSL(const char* lpServerName, int nServer
 
 	if (server_ssl_ciphers && SSL_CTX_set_cipher_list(lpsSoap->ctx, server_ssl_ciphers) != 1) {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Can not set SSL cipher list to '%s': %s", server_ssl_ciphers, ERR_error_string(ERR_get_error(), 0));
-		er = ZARAFA_E_CALL_FAILED;
+		er = KCERR_CALL_FAILED;
 		goto exit;
 	}
 
@@ -455,7 +442,7 @@ ECRESULT ECSoapServerConnection::ListenSSL(const char* lpServerName, int nServer
 
 	lpsSoap->socket = socket = soap_bind(lpsSoap, *lpServerName == '\0' ? NULL : lpServerName, nServerPort, 100);
         if (socket == -1) {
-                m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to port %d: %s (SSL). This is usually caused by another process (most likely another zarafa-server) already using this port. This program will terminate now.", nServerPort, lpsSoap->fault->faultstring);
+                m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to port %d: %s (SSL). This is usually caused by another process (most likely another server) already using this port. This program will terminate now.", nServerPort, lpsSoap->fault->faultstring);
 #ifdef LINUX
                 kill(0, SIGTERM);
 #endif
@@ -486,16 +473,16 @@ ECRESULT ECSoapServerConnection::ListenPipe(const char* lpPipeName, bool bPriori
 	struct soap	*lpsSoap = NULL;
 
 	if(lpPipeName == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
 	//init soap
 	lpsSoap = soap_new2(SOAP_IO_KEEPALIVE | SOAP_XML_TREE | SOAP_C_UTFSTRING, SOAP_IO_KEEPALIVE | SOAP_XML_TREE | SOAP_C_UTFSTRING);
 	if (bPriority)
-		zarafa_new_soap_listener(CONNECTION_TYPE_NAMED_PIPE_PRIORITY, lpsSoap);
+		kopano_new_soap_listener(CONNECTION_TYPE_NAMED_PIPE_PRIORITY, lpsSoap);
 	else
-		zarafa_new_soap_listener(CONNECTION_TYPE_NAMED_PIPE, lpsSoap);
+		kopano_new_soap_listener(CONNECTION_TYPE_NAMED_PIPE, lpsSoap);
 	
 	// Create a unix or windows pipe
 	m_strPipeName = lpPipeName;
@@ -505,26 +492,11 @@ ECRESULT ECSoapServerConnection::ListenPipe(const char* lpPipeName, bool bPriori
 	strcpy(lpsSoap->path,"pipe");
 
 	if (sPipe == -1) {
-		er = ZARAFA_E_CALL_FAILED;
+		er = KCERR_CALL_FAILED;
 		goto exit;
 	}
 
-#ifdef WIN32
-	// The windows pipe must overwrite some soap functions 
-	// because is doesn't work with sockets but with handles.
-	lpsSoap->fsend = gsoap_win_fsend;
-	lpsSoap->frecv = gsoap_win_frecv;
-	lpsSoap->fclose = gsoap_win_fclose;
-	lpsSoap->fclosesocket = gsoap_win_closesocket;
-	lpsSoap->fshutdownsocket = gsoap_win_shutdownsocket;
-
-	// Unused
-	lpsSoap->faccept = NULL;
-	lpsSoap->fopen = NULL;
-
-#endif
 	lpsSoap->master = sPipe;
-
 	lpsSoap->peerlen = 0;
 	memset(&lpsSoap->peer, 0, sizeof(lpsSoap->peer));
 	m_lpDispatcher->AddListenSocket(lpsSoap);

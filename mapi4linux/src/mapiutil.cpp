@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <new>
 #include <cstdlib>
 #include <cmath> // for pow() 
@@ -29,17 +29,17 @@
 #include <mapiutil.h>
 #include <mapidefs.h>
 
-#include <zarafa/ECDebug.h>
-#include <zarafa/ECTags.h>
-#include <zarafa/stringutil.h>
-#include <zarafa/Util.h>
+#include <kopano/ECDebug.h>
+#include <kopano/ECTags.h>
+#include <kopano/stringutil.h>
+#include <kopano/Util.h>
 
 #include "ECMemStream.h"
-#include <zarafa/mapiguidext.h>
+#include <kopano/mapiguidext.h>
 
 #include "rtf.h"
 
-#include <zarafa/charset/convstring.h>
+#include <kopano/charset/convstring.h>
 
 ULONG __stdcall UlRelease(LPVOID lpUnknown)
 {
@@ -510,7 +510,7 @@ HRESULT __stdcall ScCreateConversationIndex (ULONG cbParent,
 						ULONG FAR *	lpcbConvIndex,
 						LPBYTE FAR * lppbConvIndex)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	TRACE_MAPILIB1(TRACE_ENTRY, "ScCreateConversationIndex", "%s", lpbParent ? bin2hex(cbParent, lpbParent).c_str() : "<null>");
 	ULONG cbConvIndex = 0;
 	BYTE *pbConvIndex = NULL;
@@ -518,7 +518,7 @@ HRESULT __stdcall ScCreateConversationIndex (ULONG cbParent,
 	if(cbParent == 0) {
 		FILETIME ft;
 		if ((hr = MAPIAllocateBuffer(sizeof(CONVERSATION_INDEX), (void **)&pbConvIndex)) != hrSuccess)
-			goto exit;
+			return hr;
 		cbConvIndex = sizeof(CONVERSATION_INDEX);
 
 		CONVERSATION_INDEX *ci = (CONVERSATION_INDEX*)pbConvIndex;
@@ -532,7 +532,7 @@ HRESULT __stdcall ScCreateConversationIndex (ULONG cbParent,
 		FILETIME diff;
 
 		if ((hr = MAPIAllocateBuffer(cbParent + 5, (void **)&pbConvIndex)) != hrSuccess)
-			goto exit;
+			return hr;
 		cbConvIndex = cbParent+5;
 		memcpy(pbConvIndex, lpbParent, cbParent);
 
@@ -550,9 +550,7 @@ HRESULT __stdcall ScCreateConversationIndex (ULONG cbParent,
 	*lpcbConvIndex = cbConvIndex;
 
 	TRACE_MAPILIB1(TRACE_RETURN, "ScCreateConversationIndex", "%s", bin2hex(cbConvIndex, pbConvIndex).c_str());
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 SCODE __stdcall ScDupPropset( int cprop,  LPSPropValue rgprop,  LPALLOCATEBUFFER lpAllocateBuffer,  LPSPropValue FAR * prgprop )
@@ -849,12 +847,8 @@ LPTSTR __stdcall SzFindCh(LPCTSTR lpsz, USHORT ch)
 int __stdcall MNLS_CompareStringW(LCID Locale, DWORD dwCmpFlags, LPCWSTR lpString1, int cchCount1, LPCWSTR lpString2, int cchCount2)
 {
 	TRACE_MAPILIB4(TRACE_ENTRY, "MNLS_CompareStringW", "%d %S, %d %S", cchCount1, lpString1, cchCount2, lpString2);
-#ifdef WIN32
-	int ulCmp = CompareStringW(Locale, dwCmpFlags, lpString1, cchCount1, lpString2, cchCount2);
-#else
 	// FIXME: we're ignoring Locale, dwCmpFlags, cchCount1 and cchCount2
 	int ulCmp = wcscmp((LPWSTR)lpString1, (LPWSTR)lpString2);
-#endif
 	TRACE_MAPILIB1(TRACE_RETURN, "MNLS_CompareStringW", "%d", ulCmp);
 	return ulCmp;
 }
@@ -1133,9 +1127,9 @@ HRESULT GetConnectionProperties(LPSPropValue lpServer, LPSPropValue lpUsername, 
 		goto exit;
 
 	if (m4l_lpConfig->GetSetting("server_address")[0])
-		strServerPath = (std::string)"https://" + m4l_lpConfig->GetSetting("server_address") + ":" + m4l_lpConfig->GetSetting("ssl_port") + "/zarafa";
+		strServerPath = (std::string)"https://" + m4l_lpConfig->GetSetting("server_address") + ":" + m4l_lpConfig->GetSetting("ssl_port") + "/";
 	else
-		strServerPath = (std::string)"https://" + lpServer->Value.lpszA + ":" + m4l_lpConfig->GetSetting("ssl_port") + "/zarafa";
+		strServerPath = (std::string)"https://" + lpServer->Value.lpszA + ":" + m4l_lpConfig->GetSetting("ssl_port") + "/";
 	szUsername = lpUsername->Value.lpszA;
 
 	if(strrchr(szUsername, '='))

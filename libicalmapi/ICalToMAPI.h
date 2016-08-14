@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -33,7 +33,7 @@ class ICALMAPI_API ICalToMapi {
 public:
 	/*
 	    - lpPropObj to lookup named properties
-	    - Addressbook (Zarafa Global AddressBook for looking up users)
+	    - Addressbook (Global AddressBook for looking up users)
 	 */
 	ICalToMapi(IMAPIProp *lpPropObj, LPADRBOOK lpAdrBook, bool bNoRecipients) : m_lpPropObj(lpPropObj), m_lpAdrBook(lpAdrBook), m_bNoRecipients(bNoRecipients) {};
 	virtual ~ICalToMapi() {};

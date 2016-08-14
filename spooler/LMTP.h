@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -20,17 +20,15 @@
 
 #include <string>
 #include <vector>
-#include <zarafa/ECChannel.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECConfig.h>
+#include <kopano/ECChannel.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECConfig.h>
 
 enum LMTP_Command {LMTP_Command_LHLO, LMTP_Command_MAIL_FROM, LMTP_Command_RCPT_TO, LMTP_Command_DATA, LMTP_Command_RSET, LMTP_Command_QUIT };
 
 class LMTP {
 public:
 	LMTP(ECChannel *lpChan, const char *szServerPath, ECLogger *lpLog, ECConfig *lpConf);
-	~LMTP();
-
 	HRESULT HrGetCommand(const std::string &strCommand, LMTP_Command &eCommand);
 	HRESULT HrResponse(const std::string &strResponse);
 

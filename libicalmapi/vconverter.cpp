@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,23 +15,23 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "vconverter.h"
 #include "valarm.h"
 #include "icalrecurrence.h"
 #include <mapi.h>
 #include <mapiutil.h>
-#include <zarafa/mapiext.h>
-#include <zarafa/restrictionutil.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/Util.h>
+#include <kopano/mapiext.h>
+#include <kopano/restrictionutil.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/Util.h>
 #include "icaluid.h"
 #include "nameids.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 #include <ctime>
-#include <zarafa/mapi_ptr.h>
-#include <zarafa/namedprops.h>
-#include <zarafa/base64.h>
+#include <kopano/mapi_ptr.h>
+#include <kopano/namedprops.h>
+#include <kopano/base64.h>
 
 using namespace std;
 
@@ -101,13 +101,6 @@ VConverter::VConverter(LPADRBOOK lpAdrBook, timezone_map *mapTimeZones, LPSPropT
 	m_bCensorPrivate = blCensor;
 	m_bNoRecipients = bNoRecipients;
 	m_ulUserStatus = 0;
-}
-
-/**
- * Default destructor
- */
-VConverter::~VConverter()
-{
 }
 
 /**
@@ -1614,7 +1607,8 @@ HRESULT VConverter::HrAddRecurrence(icalcomponent *lpicEventRoot, icalcomponent 
 
 	lpicProp = icalcomponent_get_first_property(lpicEvent, ICAL_X_PROPERTY);
 	while (lpicProp) {
-		if (strcmp(icalproperty_get_x_name(lpicProp), "X-ZARAFA-REC-PATTERN") == 0){
+		if (strcmp(icalproperty_get_x_name(lpicProp), "X-ZARAFA-REC-PATTERN") == 0 ||
+		    strcmp(icalproperty_get_x_name(lpicProp), "X-KOPANO-REC-PATTERN") == 0) {
 			spSpropVal.ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_RECURRENCEPATTERN], PT_UNICODE);
 			HrCopyString(m_converter, m_strCharset, lpIcalItem->base, icalproperty_get_x(lpicProp), &spSpropVal.Value.lpszW);
 			lpIcalItem->lstMsgProps.push_back(spSpropVal);
@@ -2836,11 +2830,10 @@ HRESULT VConverter::HrSetRecurrence(LPMESSAGE lpMessage, icalcomponent *lpicEven
 	if ((PROP_TYPE(lpSpropArray[4].ulPropTag) != PT_ERROR) && lpSpropArray[4].Value.ul == 2)
 		goto exit;
 
-	// set X-ZARAFA-REC-PATTERN property
 	if (PROP_TYPE(lpSpropArray[1].ulPropTag) != PT_ERROR)
 	{		
 		lpicProp = icalproperty_new_x(m_converter.convert_to<string>(m_strCharset.c_str(), lpSpropArray[1].Value.lpszW, rawsize(lpSpropArray[1].Value.lpszW), CHARSET_WCHAR).c_str());
-		icalproperty_set_x_name(lpicProp, "X-ZARAFA-REC-PATTERN"); 
+		icalproperty_set_x_name(lpicProp, "X-KOPANO-REC-PATTERN");
 		icalcomponent_add_property(lpicEvent, lpicProp);
 	}
 

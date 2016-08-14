@@ -3,8 +3,8 @@
 
 #include "config.h"
 #ifdef HAVE_LIBS3_H
-#include <zarafa/zcdefs.h>
-#include <zarafa/platform.h>
+#include <kopano/zcdefs.h>
+#include <kopano/platform.h>
 #include <list>
 #include <set>
 #include <string>

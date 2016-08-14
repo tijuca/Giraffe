@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,11 +15,11 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/base64.h>
+#include <kopano/platform.h>
+#include <kopano/base64.h>
 
 #include <string>
-#include <zarafa/charset/convert.h>
+#include <kopano/charset/convert.h>
 #include <cassert>
 #include "SymmetricCrypt.h"
 
@@ -39,8 +39,6 @@
  * @retval	false 	The provided string was not encrypted.
  */
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 

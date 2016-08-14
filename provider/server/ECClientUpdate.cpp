@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,15 +15,15 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/ZarafaCode.h>
+#include <kopano/platform.h>
+#include <kopano/kcodes.h>
 #include "soapH.h"
 #include "ECClientUpdate.h"
 #include "ECLicenseClient.h"
-#include <zarafa/stringutil.h>
-#include <zarafa/base64.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECConfig.h>
+#include <kopano/stringutil.h>
+#include <kopano/base64.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECConfig.h>
 
 #include <boost/filesystem.hpp>
 namespace bfs = boost::filesystem;
@@ -37,7 +37,7 @@ namespace ba = boost::algorithm;
 #include "ECSessionManager.h"
 #include "ECDatabase.h"
 #include "ECStatsCollector.h"
-#include <zarafa/boost_compat.h>
+#include <kopano/boost_compat.h>
 
 /* class and add constructor params? */
 extern ECRESULT GetBestServerPath(struct soap *soap, ECSession *lpecSession, const std::string &strServerName, std::string *lpstrServerPath);
@@ -202,11 +202,7 @@ bool ConvertAndValidatePath(const char *lpszClientUpdatePath, const std::string 
 	bool bRet = false;
 	size_t nTempLen = 0;
 	std::string strFile;
-#ifdef WIN32
-	char cPathSeparator = '\\';
-#else
 	char cPathSeparator = '/';
-#endif
 
 	if (lpstrDownloadFile == NULL || lpszClientUpdatePath == NULL)
 		goto exit;
@@ -215,11 +211,7 @@ bool ConvertAndValidatePath(const char *lpszClientUpdatePath, const std::string 
 	nTempLen = strFile.length();
 
 	// not 100% correct, but good enough
-#ifdef WIN32
-	if (strstr(strFile.c_str(), "\\.."))
-#else
 	if (strstr(strFile.c_str(), "/.."))
-#endif
 	{
 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Client update: Update path contains invalid .. to previous path.");
 		goto exit;
@@ -434,7 +426,7 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 	if (!parseBool(g_lpConfig->GetSetting("client_update_enabled"))) {
 		// do not set on high loglevel, since by default the client updater is installed, and this will be quite often in your log
 		g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Client update: trackid: 0x%08X, Config option 'client_update_enabled' has disabled this feature.", sClientUpdateInfo.ulTrackId);
-		er = ZARAFA_E_NO_SUPPORT;
+		er = KCERR_NO_SUPPORT;
 		goto exit;
 	}
 
@@ -444,7 +436,7 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 
 	if (!lpszClientUpdatePath || lpszClientUpdatePath[0] == 0) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: trackid: 0x%08X, The configuration field 'client_update_path' is empty.", sClientUpdateInfo.ulTrackId);
-		er = ZARAFA_E_NO_ACCESS;
+		er = KCERR_NO_ACCESS;
 		goto exit;
 	}
 
@@ -473,20 +465,20 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 		sClientUpdateInfo.szComputerName = const_cast<char *>(""); //Client has no name?
 
 	if(!sClientUpdateInfo.szUsername) {
-		er = ZARAFA_E_NO_ACCESS;
+		er = KCERR_NO_ACCESS;
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: trackid: 0x%08X, Client did not send a username", sClientUpdateInfo.ulTrackId);
 	}
 
 	// validate user name
 	er = lpecSession->GetUserManagement()->SearchObjectAndSync(sClientUpdateInfo.szUsername, 0x01/*EMS_AB_ADDRESS_LOOKUP*/, &ulUserID);
 	if (er != erSuccess) {
-		er = ZARAFA_E_NO_ACCESS;
+		er = KCERR_NO_ACCESS;
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: trackid: 0x%08X, unknown username '%s'", sClientUpdateInfo.ulTrackId, sClientUpdateInfo.szUsername);
 	}
 
 
 	if(lpecSession->GetUserManagement()->IsInternalObject(ulUserID)) {
-		er = ZARAFA_E_NO_ACCESS;
+		er = KCERR_NO_ACCESS;
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: trackid: 0x%08X, Wrong user data. User name '%s' is a reserved user", sClientUpdateInfo.ulTrackId, sClientUpdateInfo.szUsername);
 		goto exit;
 	}
@@ -504,7 +496,7 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 		string strServerName = sUserDetails.GetPropString(OB_PROP_S_SERVERNAME);
 		if (strServerName.empty()) {
 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: trackid: 0x%08X, User '%s' has no default server", sClientUpdateInfo.ulTrackId, sClientUpdateInfo.szUsername);
-			er = ZARAFA_E_NO_ACCESS;
+			er = KCERR_NO_ACCESS;
 			goto exit;
 		}
 
@@ -518,7 +510,7 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 			lpsResponse->lpszServerPath = s_strcpy(soap, strServerPath.c_str());// Server Path must always utf8 (also in 6.40.x)
 			ec_log_info("Client update: trackid: 0x%08X, User \"%s\" is redirected to \"%s\"", sClientUpdateInfo.ulTrackId, sClientUpdateInfo.szUsername, lpsResponse->lpszServerPath);
 			g_lpStatsCollector->Increment(SCN_REDIRECT_COUNT, 1);
-			er = ZARAFA_E_UNABLE_TO_COMPLETE;
+			er = KCERR_UNABLE_TO_COMPLETE;
 			goto exit;
 		}
 	}
@@ -539,7 +531,7 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 
 	if (!GetLatestVersionAtServer(lpszClientUpdatePath, sClientUpdateInfo.ulTrackId, &sLatestVersion)) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: trackid: 0x%08X, No updates found on server.", sClientUpdateInfo.ulTrackId);
-		er = ZARAFA_E_NO_ACCESS;
+		er = KCERR_NO_ACCESS;
 		goto exit;
 	}
 
@@ -554,20 +546,20 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 
 	if (!GetClientMSINameFromVersion(sLatestVersion, &strClientMSIName)) {
 		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Client update: trackid: 0x%08X, No suitable version available.", sClientUpdateInfo.ulTrackId);
-		er = ZARAFA_E_NO_ACCESS;
+		er = KCERR_NO_ACCESS;
 		goto exit;
 	}
 
 	if (ConvertAndValidatePath(lpszClientUpdatePath, strClientMSIName, &strPath) != true) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: trackid: 0x%08X, Error in path conversion and validation.", sClientUpdateInfo.ulTrackId);
-		er = ZARAFA_E_NO_ACCESS;
+		er = KCERR_NO_ACCESS;
 		goto exit;
 	}
 
 	fd = fopen(strPath.c_str(), "rb");
 	if (!fd) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: trackid: 0x%08X, Path not found %s.", sClientUpdateInfo.ulTrackId, strPath.c_str());
-		er = ZARAFA_E_NO_ACCESS;
+		er = KCERR_NO_ACCESS;
 		goto exit;
 	}
 
@@ -634,19 +626,19 @@ int ns__setClientUpdateStatus(struct soap *soap, struct clientUpdateStatusReques
 	const char *lpszLogPath = g_lpConfig->GetSetting("client_update_log_path");
 
 	if (!parseBool(g_lpConfig->GetSetting("client_update_enabled"))) {
-		er = ZARAFA_E_NO_SUPPORT;
+		er = KCERR_NO_SUPPORT;
 		goto exit;
 	}
 
 	if (!lpszClientUpdatePath || lpszClientUpdatePath[0] == 0) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: trackid: 0x%08X, The configuration field 'client_update_path' is empty.", sClientUpdateStatus.ulTrackId);
-		er = ZARAFA_E_NO_ACCESS;
+		er = KCERR_NO_ACCESS;
 		goto exit;
 	}
 
 	if (!lpszLogPath || lpszLogPath[0] == 0) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: trackid: 0x%08X, The configuration field 'client_update_log_path' is empty.", sClientUpdateStatus.ulTrackId);
-		er = ZARAFA_E_NO_ACCESS;
+		er = KCERR_NO_ACCESS;
 		goto exit;
 	}
 
@@ -690,13 +682,13 @@ int ns__setClientUpdateStatus(struct soap *soap, struct clientUpdateStatusReques
 
 		if(CreatePath((char *)strFilePath.c_str()) != 0) {
 			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Client update: trackid: 0x%08X, Unable to create directory '%s'!", sClientUpdateStatus.ulTrackId, strFilePath.c_str());
-			er = ZARAFA_E_NO_ACCESS;
+			er = KCERR_NO_ACCESS;
 			goto exit;
 		}
 
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: trackid: 0x%08X, Log files saved in '%s'", sClientUpdateStatus.ulTrackId, strFilePath.c_str());
 
-		int ulFile = 0;
+		gsoap_size_t ulFile = 0;
 		while (true) {
 
 			if (ulFile >= sClientUpdateStatus.sFiles.__size)
@@ -716,7 +708,7 @@ int ns__setClientUpdateStatus(struct soap *soap, struct clientUpdateStatusReques
 		}
 
 		if (soap->error) {
-			er = ZARAFA_E_NO_ACCESS;
+			er = KCERR_NO_ACCESS;
 			goto exit;
 		}
 	}

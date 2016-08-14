@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,23 +15,23 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include "rules.h"
 #include <mapi.h>
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapiutil.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <edkmdb.h>
 #include <edkguid.h>
-#include <zarafa/stringutil.h>
-#include <zarafa/Util.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/MAPIErrors.h>
-#include <zarafa/mapi_ptr.h>
-#include <zarafa/mapiguidext.h>
+#include <kopano/stringutil.h>
+#include <kopano/Util.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/ECLogger.h>
+#include <kopano/MAPIErrors.h>
+#include <kopano/mapi_ptr.h>
+#include <kopano/mapiguidext.h>
 
 #include "IECExchangeModifyTable.h"
 #include "PyMapiPlugin.h"
@@ -400,10 +400,10 @@ static HRESULT CreateReplyCopy(LPMAPISESSION lpSession, LPMDB lpOrigStore,
 		SPropValue sPropVal;
 
 		PROPMAP_START
-		PROPMAP_NAMED_ID(ZarafaRuleAction, PT_UNICODE, PS_INTERNET_HEADERS, "x-zarafa-rule-action")
+		PROPMAP_NAMED_ID(KopanoRuleAction, PT_UNICODE, PS_INTERNET_HEADERS, "x-kopano-rule-action")
 		PROPMAP_INIT(lpReplyMessage);
 
-		sPropVal.ulPropTag = PROP_ZarafaRuleAction;
+		sPropVal.ulPropTag = PROP_KopanoRuleAction;
 		sPropVal.Value.lpszW = const_cast<wchar_t *>(L"reply");
 
 		hr = HrSetOneProp(lpReplyMessage, &sPropVal);
@@ -717,10 +717,10 @@ static HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
 
 	if (parseBool(g_lpConfig->GetSetting("set_rule_headers", NULL, "yes"))) {
 		PROPMAP_START
-		PROPMAP_NAMED_ID(ZarafaRuleAction, PT_UNICODE, PS_INTERNET_HEADERS, "x-zarafa-rule-action")
+		PROPMAP_NAMED_ID(KopanoRuleAction, PT_UNICODE, PS_INTERNET_HEADERS, "x-kopano-rule-action")
 		PROPMAP_INIT(lpFwdMsg);
 
-		sForwardProps[cfp].ulPropTag = PROP_ZarafaRuleAction;
+		sForwardProps[cfp].ulPropTag = PROP_KopanoRuleAction;
 		sForwardProps[cfp++].Value.lpszW = LPWSTR(bDoPreserveSender ? L"redirect" : L"forward");
 	}
 
@@ -989,14 +989,14 @@ HRESULT HrProcessRules(const std::string &recip, PyMapiPlugin *pyMapiPlugin,
 
 				hr = lpDestFolder->CreateMessage(NULL, 0, &lpNewMessage);
 				if(hr != hrSuccess) {
-					std::string msg = "Unable to create e-mail for rule: %s (%x)" + strRule;
+					std::string msg = "Unable to create e-mail for rule " + strRule + ": %s (%x)";
 					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					goto exit;
 				}
 					
 				hr = (*lppMessage)->CopyTo(0, NULL, NULL, 0, NULL, &IID_IMessage, lpNewMessage, 0, NULL);
 				if(hr != hrSuccess) {
-					std::string msg = "Unable to copy e-mail for rule: %s (%x)" + strRule;
+					std::string msg = "Unable to copy e-mail for rule " + strRule + ": %s (%x)";
 					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					goto exit;
 				}
@@ -1070,14 +1070,14 @@ HRESULT HrProcessRules(const std::string &recip, PyMapiPlugin *pyMapiPlugin,
 				}
 
 				if(parseBool(g_lpConfig->GetSetting("no_double_forward"))) {
-					// Loop protection, when header 'x-zarafa-rule-action' is added to the message it will stop to forward or redirect the message.
+					// Loop protection, when header 'x-kopano-rule-action' is added to the message it will stop to forward or redirect the message.
 					PROPMAP_START
-					PROPMAP_NAMED_ID(ZarafaRuleAction, PT_UNICODE, PS_INTERNET_HEADERS, "x-zarafa-rule-action")
+					PROPMAP_NAMED_ID(KopanoRuleAction, PT_UNICODE, PS_INTERNET_HEADERS, "x-kopano-rule-action")
 					PROPMAP_INIT( (*lppMessage) );
 
-					if (HrGetOneProp(*lppMessage, PROP_ZarafaRuleAction, &lpPropRule) == hrSuccess) {
+					if (HrGetOneProp(*lppMessage, PROP_KopanoRuleAction, &lpPropRule) == hrSuccess) {
 						MAPIFreeBuffer(lpPropRule);
-						lpLogger->Log(EC_LOGLEVEL_WARNING, (std::string)"Rule "+strRule+": FORWARD loop protection. Message will not be forwarded or redirected because it includes header 'x-zarafa-rule-action'");
+						lpLogger->Log(EC_LOGLEVEL_WARNING, (std::string)"Rule "+strRule+": FORWARD loop protection. Message will not be forwarded or redirected because it includes header 'x-kopano-rule-action'");
 						continue;
 					}
 				}

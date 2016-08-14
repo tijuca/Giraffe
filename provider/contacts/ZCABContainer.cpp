@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,33 +15,31 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ZCABContainer.h"
 #include "ZCMAPIProp.h"
-#include <zarafa/Trace.h>
+#include <kopano/Trace.h>
 
 #include <mapiutil.h>
 
-#include <zarafa/ECMemTable.h>
-#include <zarafa/ECGuid.h>
-#include <zarafa/ECDebug.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/mapiext.h>
-#include <zarafa/mapiguidext.h>
-#include <zarafa/namedprops.h>
-#include <zarafa/charset/convert.h>
-#include <zarafa/mapi_ptr.h>
-#include <zarafa/ECGetText.h>
-#include <zarafa/EMSAbTag.h>
-#include <zarafa/ECRestriction.h>
+#include <kopano/ECMemTable.h>
+#include <kopano/ECGuid.h>
+#include <kopano/ECDebug.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/mapiext.h>
+#include <kopano/mapiguidext.h>
+#include <kopano/namedprops.h>
+#include <kopano/charset/convert.h>
+#include <kopano/mapi_ptr.h>
+#include <kopano/ECGetText.h>
+#include <kopano/EMSAbTag.h>
+#include <kopano/ECRestriction.h>
 
 #include <iostream>
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 using namespace std;
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -98,7 +96,7 @@ HRESULT	ZCABContainer::QueryInterface(REFIID refiid, void **lppInterface)
  * Create a ZCABContainer as either the top level (lpFolders is set) or
  * as a subfolder (lpContacts is set).
  * 
- * @param[in] lpFolders Only the top container has the list to the wanted Zarafa Contacts Folders, NULL otherwise.
+ * @param[in] lpFolders Only the top container has the list to the wanted Kopano Contacts Folders, NULL otherwise.
  * @param[in] lpContacts Create this object as wrapper for the lpContacts folder, NULL if 
  * @param[in] lpMAPISup 
  * @param[in] lpProvider 
@@ -156,10 +154,7 @@ exit:
 	return hr;
 }
 
-/////////////////////////////////////////////////
 // IMAPIContainer
-//
-
 HRESULT ZCABContainer::MakeWrappedEntryID(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulObjType, ULONG ulOffset, ULONG *lpcbEntryID, LPENTRYID *lppEntryID)
 {
 	HRESULT hr = hrSuccess;
@@ -781,7 +776,7 @@ HRESULT ZCABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 		}
 	} else if (!m_lpContactFolder) {
 		// only if not using a contacts folder, which should make the contents table. so this would return an empty hierarchy table, which is true.
-		// create toplevel hierarchy. one entry: "Zarafa Contacts Folders"
+		// create toplevel hierarchy. one entry: "Kopano Contacts Folders"
 		BYTE sEntryID[4 + sizeof(GUID)]; // minimum sized entryid. no extra info needed
 
 		memset(sEntryID, 0, sizeof(sEntryID));
@@ -797,9 +792,9 @@ HRESULT ZCABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 		sProps[DISPLAY_NAME].ulPropTag = sptaCols.aulPropTag[DISPLAY_NAME];
 		if ((ulFlags & MAPI_UNICODE) == 0) {
 			sProps[DISPLAY_NAME].ulPropTag = PR_DISPLAY_NAME_A;
-			sProps[DISPLAY_NAME].Value.lpszA = _A("Zarafa Contacts Folders");
+			sProps[DISPLAY_NAME].Value.lpszA = _A("Kopano Contacts Folders");
 		} else {
-			sProps[DISPLAY_NAME].Value.lpszW = _W("Zarafa Contacts Folders");
+			sProps[DISPLAY_NAME].Value.lpszW = _W("Kopano Contacts Folders");
 		}
 
 		sProps[OBJECT_TYPE].ulPropTag = sptaCols.aulPropTag[OBJECT_TYPE];
@@ -1027,10 +1022,7 @@ HRESULT ZCABContainer::GetSearchCriteria(ULONG ulFlags, LPSRestriction *lppRestr
 	return MAPI_E_NO_SUPPORT;
 }
 
-/////////////////////////////////////////////////
 // IABContainer
-//
-
 HRESULT ZCABContainer::CreateEntry(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulCreateFlags, LPMAPIPROP* lppMAPIPropEntry)
 {
 	return MAPI_E_NO_SUPPORT;
@@ -1206,10 +1198,7 @@ HRESULT ZCABContainer::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropT
 	return hr;
 }
 
-
-//////////////////////////////////
 // Interface IUnknown
-//
 HRESULT ZCABContainer::xABContainer::QueryInterface(REFIID refiid , void** lppInterface)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IABContainer::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
@@ -1235,9 +1224,7 @@ ULONG ZCABContainer::xABContainer::Release()
 	return ulRef;
 }
 
-//////////////////////////////////
 // Interface IABContainer
-//
 HRESULT ZCABContainer::xABContainer::CreateEntry(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulCreateFlags, LPMAPIPROP* lppMAPIPropEntry)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IABContainer::CreateEntry", "");
@@ -1274,9 +1261,7 @@ HRESULT ZCABContainer::xABContainer::ResolveNames(LPSPropTagArray lpPropTagArray
 	return hr;
 }
 
-//////////////////////////////////
 // Interface IMAPIContainer
-//
 HRESULT ZCABContainer::xABContainer::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetContentsTable", "");
@@ -1322,9 +1307,7 @@ HRESULT ZCABContainer::xABContainer::GetSearchCriteria(ULONG ulFlags, LPSRestric
 	return hr;
 }
 
-////////////////////////////////
 // Interface IMAPIProp
-//
 HRESULT ZCABContainer::xABContainer::GetLastError(HRESULT hError, ULONG ulFlags, LPMAPIERROR * lppMapiError)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetLastError", "");

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECTestProtocol.h"
 #include "SOAPUtils.h"
 #include "ECSessionManager.h"
@@ -38,7 +38,7 @@ ECRESULT TestPerform(struct soap *soap, ECSession *lpSession, char *szCommand, u
 
 			er = lpSession->GetDatabase(&lpDatabase);
             if(er != erSuccess)
-				goto exit;
+				return er;
 			
             er = ECTPropsPurge::GetLargestFolderId(lpDatabase, &ulFolderId);
             if(er != erSuccess) {
@@ -48,7 +48,7 @@ ECRESULT TestPerform(struct soap *soap, ECSession *lpSession, char *szCommand, u
             
             er = ECTPropsPurge::PurgeDeferredTableUpdates(lpDatabase, ulFolderId);
             if(er != erSuccess)
-                goto exit;
+                return er;
         }
             
     } else if (stricmp(szCommand, "indexer_syncrun") == 0) {
@@ -69,8 +69,6 @@ ECRESULT TestPerform(struct soap *soap, ECSession *lpSession, char *szCommand, u
         if(ulArgs == 1 && args[0])
             Sleep(atoui(args[0]) * 1000);
     }
-    
-exit:
     return er;
 }
 
@@ -103,7 +101,7 @@ ECRESULT TestGet(struct soap *soap, ECSession *lpSession, char *szVarName, char 
     if(!stricmp(szVarName, "ping")) {
         *szValue = s_strcpy(soap, "pong");
     } else {
-        er = ZARAFA_E_NOT_FOUND;
+        er = KCERR_NOT_FOUND;
     }
     
     return er;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,10 +18,10 @@
 #ifndef ECNOTIFICATIONMANAGER_H
 #define ECNOTIFICATIONMANAGER_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include "ECSession.h"
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECConfig.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECConfig.h>
 
 #include <map>
 #include <set>
@@ -61,8 +61,6 @@ private:
     
     unsigned int m_ulTimeout;
 
-    ECLogger *m_lpLogger;
-
     // A map of all sessions that are waiting for a SOAP response to be sent (an item can be in here for up to 60 seconds)
     std::map<ECSESSIONID, NOTIFREQUEST> 	m_mapRequests;
     // A set of all sessions that have reported notification activity, but are yet to be processed.
@@ -75,6 +73,6 @@ private:
 };
 
 extern ECSessionManager *g_lpSessionManager;
-extern void zarafa_notify_done(struct soap *soap);
+extern void kopano_notify_done(struct soap *soap);
 
 #endif

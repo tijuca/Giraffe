@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,10 +15,10 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "vtodo.h"
 #include <mapiutil.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include "nameids.h"
 
 #include <iostream>
@@ -29,13 +29,6 @@ using namespace std;
  */
 VTodoConverter::VTodoConverter(LPADRBOOK lpAdrBook, timezone_map *mapTimeZones, LPSPropTagArray lpNamedProps, const std::string& strCharset, bool blCensor, bool bNoRecipients, IMailUser *lpMailUser)
 	: VConverter(lpAdrBook, mapTimeZones, lpNamedProps, strCharset, blCensor, bNoRecipients, lpMailUser)
-{
-}
-
-/** 
- * VEvent descructor
- */
-VTodoConverter::~VTodoConverter()
 {
 }
 

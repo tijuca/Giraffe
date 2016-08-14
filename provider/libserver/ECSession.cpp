@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,18 +15,8 @@
  *
  */
 
-//
-//////////////////////////////////////////////////////////////////////
-
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <new>
-
-#ifdef DEBUG
-#ifdef WIN32
-#pragma warning(disable: 4786)
-#endif
-#endif
-
 #ifdef LINUX
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -44,29 +34,27 @@
 #include "ECSecurity.h"
 #include "ECSecurityOffline.h"
 #include "ECPluginFactory.h"
-#include <zarafa/base64.h>
+#include <kopano/base64.h>
 #include "SSLUtil.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
 #include "ECDatabaseMySQL.h"
 #include "ECDatabaseUtils.h" // used for PR_INSTANCE_KEY
 #include "SOAPUtils.h"
-#include "ZarafaICS.h"
+#include "ics.h"
 #include "ECICS.h"
-#include <zarafa/ECIConv.h>
-#include "ZarafaVersions.h"
+#include <kopano/ECIConv.h>
+#include "versions.h"
 
 #include "pthreadutil.h"
-#include <zarafa/threadutil.h>
-#include <zarafa/boost_compat.h>
+#include <kopano/threadutil.h>
+#include <kopano/boost_compat.h>
 
 #include <boost/filesystem.hpp>
 namespace bfs = boost::filesystem;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 #if defined LINUX || !defined UNICODE
@@ -108,7 +96,7 @@ static int EVP_PKEY_cmp(EVP_PKEY *a, EVP_PKEY *b)
 
 void CreateSessionID(unsigned int ulCapabilities, ECSESSIONID *lpSessionId)
 {
-	ssl_random(!!(ulCapabilities & ZARAFA_CAP_LARGE_SESSIONID), lpSessionId);
+	ssl_random(!!(ulCapabilities & KOPANO_CAP_LARGE_SESSIONID), lpSessionId);
 }
 
 /*
@@ -177,7 +165,7 @@ ECRESULT BTSession::ValidateOriginator(struct soap *soap)
 		return erSuccess;
 	ec_log_err("Denying access to session from source \"%s\" due to unmatched establishing source \"%s\"",
 		s, m_strSourceAddr.c_str());
-	return ZARAFA_E_END_OF_SESSION;
+	return KCERR_END_OF_SESSION;
 }
 
 void BTSession::UpdateSessionTime()
@@ -270,10 +258,6 @@ size_t BTSession::GetInternalObjectSize()
 			MEMORY_USAGE_STRING(m_strProxyHost);
 }
 
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
-
 ECSession::ECSession(const char *src_addr, ECSESSIONID sessionID,
     ECSESSIONGROUPID ecSessionGroupId, ECDatabaseFactory *lpDatabaseFactory,
     ECSessionManager *lpSessionManager, unsigned int ulCapabilities,
@@ -292,12 +276,12 @@ ECSession::ECSession(const char *src_addr, ECSESSIONID sessionID,
 	m_ulConnectingPid		= pid;
 	m_ecSessionGroupId		= ecSessionGroupId;
 	m_strClientVersion		= cl_ver;
-	m_ulClientVersion		= ZARAFA_VERSION_UNKNOWN;
+	m_ulClientVersion		= KOPANO_VERSION_UNKNOWN;
 	m_strClientApp			= cl_app;
 	m_strClientApplicationVersion   = cl_app_ver;
 	m_strClientApplicationMisc	= cl_app_misc;
 
-	ParseZarafaVersion(cl_ver, &m_ulClientVersion);
+	ParseKopanoVersion(cl_ver, &m_ulClientVersion);
 	// Ignore result.
 
 	m_ulSessionTimeout = atoi(lpSessionManager->GetConfig()->GetSetting("session_timeout"));
@@ -352,11 +336,11 @@ ECSession::~ECSession()
  * - Signal sessiongroup that long-running requests should be cancelled
  * - Wait for all users of the session to exit
  *
- * If the wait takes longer than ulTimeout milliseconds, ZARAFA_E_TIMEOUT is
+ * If the wait takes longer than ulTimeout milliseconds, KCERR_TIMEOUT is
  * returned. If this is the case, it is *not* safe to delete the session
  *
  * @param ulTimeout Timeout in milliseconds
- * @result erSuccess or ZARAFA_E_TIMEOUT
+ * @result erSuccess or KCERR_TIMEOUT
  */
 ECRESULT ECSession::Shutdown(unsigned int ulTimeout)
 {
@@ -375,23 +359,10 @@ ECRESULT ECSession::Shutdown(unsigned int ulTimeout)
 	pthread_mutex_unlock(&m_hThreadReleasedMutex);
 
 	if(IsLocked()) {
-		er = ZARAFA_E_TIMEOUT;
+		er = KCERR_TIMEOUT;
 	}
 
 	return er;
-}
-
-ECSession::AUTHMETHOD ECSession::GetAuthMethod()
-{
-    return m_ulAuthMethod;
-}
-
-ECSESSIONGROUPID ECSession::GetSessionGroupId() {
-    return m_ecSessionGroupId;
-}
-
-int ECSession::GetConnectingPid() {
-    return m_ulConnectingPid;
 }
 
 ECRESULT ECSession::AddAdvise(unsigned int ulConnection, unsigned int ulKey, unsigned int ulEventMask)
@@ -403,7 +374,7 @@ ECRESULT ECSession::AddAdvise(unsigned int ulConnection, unsigned int ulKey, uns
 	if (m_lpSessionGroup)
 		hr = m_lpSessionGroup->AddAdvise(m_sessionID, ulConnection, ulKey, ulEventMask);
 	else
-		hr = ZARAFA_E_NOT_INITIALIZED;
+		hr = KCERR_NOT_INITIALIZED;
 
 	Unlock();
 
@@ -422,7 +393,7 @@ ECRESULT ECSession::AddChangeAdvise(unsigned int ulConnection, notifySyncState *
 	Lock();
 
 	if (!m_lpSessionGroup) {
-		er = ZARAFA_E_NOT_INITIALIZED;
+		er = KCERR_NOT_INITIALIZED;
 		goto exit;
 	}
 
@@ -453,7 +424,7 @@ ECRESULT ECSession::AddChangeAdvise(unsigned int ulConnection, notifySyncState *
 
     lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if (lpDBRow == NULL || lpDBRow[0] == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		ec_log_err("ECSession::AddChangeAdvise(): row or column null");
 		goto exit;
 	}
@@ -479,7 +450,7 @@ ECRESULT ECSession::DelAdvise(unsigned int ulConnection)
 	if (m_lpSessionGroup)
 		hr = m_lpSessionGroup->DelAdvise(m_sessionID, ulConnection);
 	else
-		hr = ZARAFA_E_NOT_INITIALIZED;
+		hr = KCERR_NOT_INITIALIZED;
 
 	Unlock();
 
@@ -495,7 +466,7 @@ ECRESULT ECSession::AddNotificationTable(unsigned int ulType, unsigned int ulObj
 	if (m_lpSessionGroup)
 		hr = m_lpSessionGroup->AddNotificationTable(m_sessionID, ulType, ulObjType, ulTableId, lpsChildRow, lpsPrevRow, lpRow);
 	else
-		hr = ZARAFA_E_NOT_INITIALIZED;
+		hr = KCERR_NOT_INITIALIZED;
 
 	Unlock();
 
@@ -511,21 +482,11 @@ ECRESULT ECSession::GetNotifyItems(struct soap *soap, struct notifyResponse *not
 	if (m_lpSessionGroup)
 		hr = m_lpSessionGroup->GetNotifyItems(soap, m_sessionID, notifications);
 	else
-		hr = ZARAFA_E_NOT_INITIALIZED;
+		hr = KCERR_NOT_INITIALIZED;
 
 	Unlock();
 
 	return hr;
-}
-
-ECTableManager* ECSession::GetTableManager()
-{
-	return m_lpTableManager;
-}
-
-ECSecurity* ECSession::GetSecurity()
-{
-	return m_lpEcSecurity;
 }
 
 void ECSession::AddBusyState(pthread_t threadId, const char* lpszState, struct timespec threadstart, double start)
@@ -569,7 +530,6 @@ void ECSession::RemoveBusyState(pthread_t threadId)
 	i = m_mapBusyStates.find(threadId);
 
 	if(i != m_mapBusyStates.end()) {
-#ifndef WIN32
 		clockid_t clock;
 		struct timespec end;
 
@@ -581,7 +541,6 @@ void ECSession::RemoveBusyState(pthread_t threadId)
 		} else {
 			ASSERT(FALSE);
 		}
-#endif
 		m_mapBusyStates.erase(threadId);
 	} else {
 		ASSERT(FALSE);
@@ -642,31 +601,35 @@ void ECSession::GetClientApp(std::string *lpstrClientApp)
  * @param[out]	lpbIsShortTerm	Optional pointer to a boolean that will be set to true when the entryid
  * 								is a short term entryid.
  *
- * @retval	ZARAFA_E_INVALID_PARAMETER	lpEntryId or lpulObjId is NULL.
- * @retval	ZARAFA_E_INVALID_ENTRYID	The provided entryid is invalid.
- * @retval	ZARAFA_E_NOT_FOUND			No object was found for the provided entryid.
+ * @retval	KCERR_INVALID_PARAMETER	lpEntryId or lpulObjId is NULL.
+ * @retval	KCERR_INVALID_ENTRYID	The provided entryid is invalid.
+ * @retval	KCERR_NOT_FOUND			No object was found for the provided entryid.
  */
 ECRESULT ECSession::GetObjectFromEntryId(const entryId *lpEntryId, unsigned int *lpulObjId, unsigned int *lpulEidFlags)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	unsigned int ulObjId = 0;
 
-	if (lpEntryId == NULL || lpulObjId == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (lpEntryId == NULL || lpulObjId == NULL)
+		return KCERR_INVALID_PARAMETER;
 	er = m_lpSessionManager->GetCacheManager()->GetObjectFromEntryId(lpEntryId, &ulObjId);
 	if (er != erSuccess)
-		goto exit;
-
+		return er;
 	*lpulObjId = ulObjId;
 
-	if(lpulEidFlags)
-		*lpulEidFlags = ((EID *)lpEntryId->__ptr)->usFlags;
-
-exit:
-	return er;
+	if (lpulEidFlags != NULL) {
+		static_assert(offsetof(EID, usFlags) == offsetof(EID_V0, usFlags),
+			"usFlags member not at same position");
+		auto d = reinterpret_cast<EID *>(lpEntryId->__ptr);
+		if (lpEntryId->__size < 0 ||
+		    static_cast<size_t>(lpEntryId->__size) < offsetof(EID, usFlags) + sizeof(d->usFlags)) {
+			ec_log_err("%s: entryid has size %d; not enough for EID_V1.usFlags",
+				__func__, lpEntryId->__size);
+			return MAPI_E_CORRUPT_DATA;
+		}
+		*lpulEidFlags = d->usFlags;
+	}
+	return erSuccess;
 }
 
 ECRESULT ECSession::LockObject(unsigned int ulObjId)
@@ -684,19 +647,16 @@ ECRESULT ECSession::LockObject(unsigned int ulObjId)
 
 ECRESULT ECSession::UnlockObject(unsigned int ulObjId)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	LockMap::iterator i;
 	scoped_lock lock(m_hLocksLock);
 
 	i = m_mapLocks.find(ulObjId);
 	if (i == m_mapLocks.end())
-		goto exit;
-
+		return erSuccess;
 	er = i->second.Unlock();
 	if (er == erSuccess)
 		m_mapLocks.erase(i);
-
-exit:
 	return er;
 }
 
@@ -718,14 +678,9 @@ size_t ECSession::GetObjectSize()
 
 	// The Table manager size is not callculated here
 //	ulSize += GetTableManager()->GetObjectSize();
-
 	return ulSize;
 }
 
-
-/*
-  ECAuthSession
-*/
 ECAuthSession::ECAuthSession(const char *src_addr, ECSESSIONID sessionID,
     ECDatabaseFactory *lpDatabaseFactory, ECSessionManager *lpSessionManager,
     unsigned int ulCapabilities) :
@@ -829,7 +784,7 @@ ECRESULT ECAuthSession::CreateECSession(ECSESSIONGROUPID ecSessionGroupId,
 	ECSESSIONID newSID;
 
 	if (!m_bValidated) {
-		er = ZARAFA_E_LOGON_FAILED;
+		er = KCERR_LOGON_FAILED;
 		goto exit;
 	}
 
@@ -842,7 +797,7 @@ ECRESULT ECAuthSession::CreateECSession(ECSESSIONGROUPID ecSessionGroupId,
 	            m_ulValidationMethod, m_ulConnectingPid,
 	            cl_ver, cl_app, cl_app_ver, cl_app_misc);
 	if (!lpSession) {
-		er = ZARAFA_E_NOT_ENOUGH_MEMORY;
+		er = KCERR_NOT_ENOUGH_MEMORY;
 		goto exit;
 	}
 
@@ -864,44 +819,36 @@ exit:
 // You always log in as the user you are authenticating with.
 ECRESULT ECAuthSession::ValidateUserLogon(const char* lpszName, const char* lpszPassword, const char* lpszImpersonateUser)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 
 	if (!lpszName)
 	{
 		ec_log_err("Invalid argument \"lpszName\" in call to ECAuthSession::ValidateUserLogon()");
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
+		return KCERR_INVALID_PARAMETER;
     }
 	if (!lpszPassword) {
 		ec_log_err("Invalid argument \"lpszPassword\" in call to ECAuthSession::ValidateUserLogon()");
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
+		return KCERR_INVALID_PARAMETER;
 	}
 
 	// SYSTEM can't login with user/pass
-	if(stricmp(lpszName, ZARAFA_ACCOUNT_SYSTEM) == 0) {
-		er = ZARAFA_E_NO_ACCESS;
-		goto exit;
-	}
-
+	if (stricmp(lpszName, KOPANO_ACCOUNT_SYSTEM) == 0)
+		return KCERR_NO_ACCESS;
 	er = m_lpUserManagement->AuthUserAndSync(lpszName, lpszPassword, &m_ulUserID);
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	er = ProcessImpersonation(lpszImpersonateUser);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	m_bValidated = true;
 	m_ulValidationMethod = METHOD_USERPASSWORD;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 // Validate a user through the socket they are connecting through. This has the special feature
 // that you can connect as a different user than you are specifying in the username. For example,
-// you could be connecting as 'root' and being granted access because the zarafa-server process
+// you could be connecting as 'root' and being granted access because the kopano-server process
 // is also running as 'root', but you are actually loggin in as user 'user1'.
 ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, const char* lpszImpersonateUser)
 {
@@ -909,26 +856,18 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 	const char *p = NULL;
 	bool			allowLocalUsers = false;
 	int				pid = 0;
-#ifdef WIN32
-	TCHAR			*pt = NULL;
-	TCHAR			*localAdminUsers = NULL;
-	TCHAR			szUsernameServer[256+1] = {0}; // max size is UNLEN +1 (defined in Lmcons.h)
-	TCHAR			szUsernameClient[256+1] = {0};
-	DWORD			dwSize = 0;
-#else
 	char			*ptr = NULL;
 	char			*localAdminUsers = NULL;
-#endif
 
     if (!lpszName)
     {
 		ec_log_err("Invalid argument \"lpszName\" in call to ECAuthSession::ValidateUserSocket()");
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
     }
 	if (!lpszImpersonateUser) {
 		ec_log_err("Invalid argument \"lpszImpersonateUser\" in call to ECAuthSession::ValidateUserSocket()");
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 	p = m_lpSessionManager->GetConfig()->GetSetting("allow_local_users");
@@ -950,7 +889,7 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 
 	cr_len = sizeof(struct ucred);
 	if(getsockopt(socket, SOL_SOCKET, SO_PEERCRED, &cr, &cr_len) != 0 || cr_len != sizeof(struct ucred)) {
-		er = ZARAFA_E_LOGON_FAILED;
+		er = KCERR_LOGON_FAILED;
 		goto exit;
 	}
 
@@ -961,7 +900,7 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 	gid_t gid;
 
 	if (getpeereid(socket, &uid, &gid)) {
-		er = ZARAFA_E_LOGON_FAILED;
+		er = KCERR_LOGON_FAILED;
 		goto exit;
 	}
 #else // HAVE_GETPEEREID
@@ -1016,7 +955,7 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 		!GetUserName(szUsernameServer, &dwSize))
 	{
 		//GetLastError();
-		er = ZARAFA_E_LOGON_FAILED;
+		er = KCERR_LOGON_FAILED;
 		goto exit;
 	}
 
@@ -1034,7 +973,7 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 
 #endif // LINUX
 
-	er = ZARAFA_E_LOGON_FAILED;
+	er = KCERR_LOGON_FAILED;
 	goto exit;
 
 userok:
@@ -1058,7 +997,7 @@ exit:
 
 ECRESULT ECAuthSession::ValidateUserCertificate(struct soap* soap, const char* lpszName, const char* lpszImpersonateUser)
 {
-	ECRESULT		er = ZARAFA_E_LOGON_FAILED;
+	ECRESULT		er = KCERR_LOGON_FAILED;
 	X509			*cert = NULL;			// client certificate
 	EVP_PKEY		*pubkey = NULL;			// client public key
 	EVP_PKEY		*storedkey = NULL;
@@ -1072,17 +1011,17 @@ ECRESULT ECAuthSession::ValidateUserCertificate(struct soap* soap, const char* l
 
 	if (!soap) {
 		ec_log_err("Invalid argument \"soap\" in call to ECAuthSession::ValidateUserCertificate()");
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 	if (!lpszName) {
 		ec_log_err("Invalid argument \"lpszName\" in call to ECAuthSession::ValidateUserCertificate()");
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 	if (!lpszImpersonateUser) {
 		ec_log_err("Invalid argument \"lpszImpersonateUser\" in call to ECAuthSession::ValidateUserCertificate()");
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
@@ -1108,7 +1047,7 @@ ECRESULT ECAuthSession::ValidateUserCertificate(struct soap* soap, const char* l
 		keysdir = sslkeys_path;
 		if (!bfs::exists(keysdir)) {
 			ec_log_info("Certificate path \"%s\" is not present.", sslkeys_path);
-			er = ZARAFA_E_LOGON_FAILED;
+			er = KCERR_LOGON_FAILED;
 			goto exit;
 		}
 
@@ -1180,37 +1119,37 @@ exit:
 #define NTLMBUFFER 8192
 ECRESULT ECAuthSession::ValidateSSOData(struct soap* soap, const char* lpszName, const char* lpszImpersonateUser, const char* szClientVersion, const char *szClientApp, const char *szClientAppVersion, const char *szClientAppMisc, const struct xsd__base64Binary* lpInput, struct xsd__base64Binary **lppOutput)
 {
-	ECRESULT er = ZARAFA_E_INVALID_PARAMETER;
+	ECRESULT er = KCERR_INVALID_PARAMETER;
 	if (!soap) {
 		ec_log_err("Invalid argument \"soap\" in call to ECAuthSession::ValidateSSOData()");
-		goto exit;
+		return er;
 	}
 	if (!lpszName) {
 		ec_log_err("Invalid argument \"lpszName\" in call to ECAuthSession::ValidateSSOData()");
-		goto exit;
+		return er;
 	}
 	if (!lpszImpersonateUser) {
 		ec_log_err("Invalid argument \"lpszImpersonateUser\" in call to ECAuthSession::ValidateSSOData()");
-		goto exit;
+		return er;
 	}
 	if (!szClientVersion) {
 		ec_log_err("Invalid argument \"szClientVersion\" in call to ECAuthSession::ValidateSSOData()");
-		goto exit;
+		return er;
 	}
 	if (!szClientApp) {
 		ec_log_err("Invalid argument \"szClientApp\" in call to ECAuthSession::ValidateSSOData()");
-		goto exit;
+		return er;
 	}
 	if (!lpInput) {
 		ec_log_err("Invalid argument \"lpInput\" in call to ECAuthSession::ValidateSSOData()");
-		goto exit;
+		return er;
 	}
 	if (!lppOutput) {
 		ec_log_err("Invalid argument \"lppOutput\" in call to ECAuthSession::ValidateSSOData()");
-		goto exit;
+		return er;
 	}
 
-	er = ZARAFA_E_LOGON_FAILED;
+	er = KCERR_LOGON_FAILED;
 
 	// first NTLM package starts with that signature, continues are detected by the filedescriptor
 	if (m_NTLM_pid != -1 || strncmp((const char*)lpInput->__ptr, "NTLM", 4) == 0)
@@ -1218,14 +1157,12 @@ ECRESULT ECAuthSession::ValidateSSOData(struct soap* soap, const char* lpszName,
 	else
 		er = ValidateSSOData_KRB5(soap, lpszName, szClientVersion, szClientApp, szClientAppVersion, szClientAppMisc, lpInput, lppOutput);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	er = ProcessImpersonation(lpszImpersonateUser);
 	if (er != erSuccess)
-		goto exit;
-
-exit:
-	return er;
+		return er;
+	return erSuccess;
 }
 
 #ifdef HAVE_GSSAPI
@@ -1239,9 +1176,9 @@ static ECRESULT LogKRB5Error_2(const char *msg, OM_uint32 code, OM_uint32 type)
 
 	if (msg == NULL) {
 		ec_log_err("Invalid argument \"msg\" in call to ECAuthSession::LogKRB5Error()");
-		return ZARAFA_E_INVALID_PARAMETER;
+		return KCERR_INVALID_PARAMETER;
 	}
-	ECRESULT retval = ZARAFA_E_CALL_FAILED;
+	ECRESULT retval = KCERR_CALL_FAILED;
 	do {
 		OM_uint32 result = gss_display_status(&status, code, type, GSS_C_NULL_OID, &context, &gssMessage);
 		switch (result) {
@@ -1251,11 +1188,11 @@ static ECRESULT LogKRB5Error_2(const char *msg, OM_uint32 code, OM_uint32 type)
 			break;
 		case GSS_S_BAD_MECH:
 			ec_log_warn("%s: %s", gss_display_status_fail_message, "unsupported mechanism type was requested.");
-			retval = ZARAFA_E_CALL_FAILED;
+			retval = KCERR_CALL_FAILED;
 			break;
 		case GSS_S_BAD_STATUS:
 			ec_log_warn("%s: %s", gss_display_status_fail_message, "status value was not recognized, or the status type was neither GSS_C_GSS_CODE nor GSS_C_MECH_CODE.");
-			retval = ZARAFA_E_CALL_FAILED;
+			retval = KCERR_CALL_FAILED;
 			break;
 		}
 		gss_release_buffer(&status, &gssMessage);
@@ -1267,7 +1204,7 @@ ECRESULT ECAuthSession::LogKRB5Error(const char* msg, OM_uint32 major, OM_uint32
 {
 	if (!msg) {
 		ec_log_err("Invalid argument \"msg\" in call to ECAuthSession::LogKRB5Error()");
-		return ZARAFA_E_INVALID_PARAMETER;
+		return KCERR_INVALID_PARAMETER;
 	}
 	LogKRB5Error_2(msg, major, GSS_C_GSS_CODE);
 	return LogKRB5Error_2(msg, minor, GSS_C_MECH_CODE);
@@ -1276,7 +1213,7 @@ ECRESULT ECAuthSession::LogKRB5Error(const char* msg, OM_uint32 major, OM_uint32
 
 ECRESULT ECAuthSession::ValidateSSOData_KRB5(struct soap* soap, const char* lpszName, const char* szClientVersion, const char* szClientApp, const char *szClientAppVersion, const char *szClientAppMisc, const struct xsd__base64Binary* lpInput, struct xsd__base64Binary** lppOutput)
 {
-	ECRESULT er = ZARAFA_E_INVALID_PARAMETER;
+	ECRESULT er = KCERR_INVALID_PARAMETER;
 #ifndef HAVE_GSSAPI
 	ec_log_err("Incoming Kerberos request, but this server was build without GSSAPI support.");
 #else
@@ -1319,7 +1256,7 @@ ECRESULT ECAuthSession::ValidateSSOData_KRB5(struct soap* soap, const char* lpsz
 		ec_log_err("Invalid argument \"lppOutput\" in call to ECAuthSession::ValidateSSOData_KRB5()");
 		goto exit;
 	}
-	er = ZARAFA_E_LOGON_FAILED;
+	er = KCERR_LOGON_FAILED;
 	if (m_gssServerCreds == GSS_C_NO_CREDENTIAL) {
 		m_gssContext = GSS_C_NO_CONTEXT;
 
@@ -1330,7 +1267,7 @@ ECRESULT ECAuthSession::ValidateSSOData_KRB5(struct soap* soap, const char* lpsz
 			ec_log_crit("Hostname not found, required for Kerberos");
 			goto exit;
 		}
-		principal = "zarafa@";
+		principal = "kopano@";
 		principal += szHostname;
 
 		ec_log_debug("Kerberos principal: %s", principal.c_str());
@@ -1367,7 +1304,7 @@ ECRESULT ECAuthSession::ValidateSSOData_KRB5(struct soap* soap, const char* lpsz
 	}
 
 	if (retval == GSS_S_CONTINUE_NEEDED) {
-		er = ZARAFA_E_SSO_CONTINUE;
+		er = KCERR_SSO_CONTINUE;
 		goto exit;
 	} else if (retval != GSS_S_COMPLETE) {
 		LogKRB5Error("Unable to accept security context", retval, status);
@@ -1427,7 +1364,7 @@ exit:
 
 ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpszName, const char* szClientVersion, const char* szClientApp, const char *szClientAppVersion, const char *szClientAppMisc, const struct xsd__base64Binary* lpInput, struct xsd__base64Binary **lppOutput)
 {
-	ECRESULT er = ZARAFA_E_INVALID_PARAMETER;
+	ECRESULT er = KCERR_INVALID_PARAMETER;
 	struct xsd__base64Binary *lpOutput = NULL;
 	char buffer[NTLMBUFFER];
 	std::string strEncoded, strDecoded, strAnswer;
@@ -1439,29 +1376,29 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 
 	if (!soap) {
 		ec_log_err("Invalid argument \"soap\" in call to ECAuthSession::ValidateSSOData_NTLM()");
-		goto exit;
+		return er;
 	}
 	if (!lpszName) {
 		ec_log_err("Invalid argument \"lpszName\" in call to ECAuthSession::ValidateSSOData_NTLM()");
-		goto exit;
+		return er;
 	}
 	if (!szClientVersion) {
 		ec_log_err("Invalid argument \"zClientVersionin\" in call to ECAuthSession::ValidateSSOData_NTLM()");
-		goto exit;
+		return er;
 	}
 	if (!szClientApp) {
 		ec_log_err("Invalid argument \"szClientApp\" in call to ECAuthSession::ValidateSSOData_NTLM()");
-		goto exit;
+		return er;
 	}
 	if (!lpInput) {
 		ec_log_err("Invalid argument \"lpInput\" in call to ECAuthSession::ValidateSSOData_NTLM()");
-		goto exit;
+		return er;
 	}
 	if (!lppOutput) {
 		ec_log_err("Invalid argument \"lppOutput\" in call to ECAuthSession::ValidateSSOData_NTLM()");
-		goto exit;
+		return er;
 	}
-	er = ZARAFA_E_LOGON_FAILED;
+	er = KCERR_LOGON_FAILED;
 	strEncoded = base64_encode(lpInput->__ptr, lpInput->__size);
 	errno = 0;
 
@@ -1471,7 +1408,7 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 
 		if (pipe(m_NTLM_stdin) == -1 || pipe(m_NTLM_stdout) == -1 || pipe(m_NTLM_stderr) == -1) {
 			ec_log_crit(string("Unable to create communication pipes for ntlm_auth: ") + strerror(errno));
-			goto exit;
+			return er;
 		}
 
 		/*
@@ -1492,7 +1429,7 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 		if (m_NTLM_pid == -1) {
 			// broken
 			ec_log_crit(string("Unable to start new process for ntlm_auth: ") + strerror(errno));
-			goto exit;
+			return er;
 		} else if (m_NTLM_pid == 0) {
 			// client
 			int j, k;
@@ -1505,7 +1442,7 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 			dup2(m_NTLM_stdout[1], 1);
 			dup2(m_NTLM_stderr[1], 2);
 
-			// close all other open file descriptors, so ntlm doesn't keep the zarafa-server sockets open
+			// close all other open file descriptors, so ntlm doesn't keep the kopano-server sockets open
 			j = getdtablesize();
 			for (k = 3; k < j; ++k)
 				close(k);
@@ -1553,13 +1490,13 @@ retry:
 			goto retry;
 
 		ec_log_err(string("Error while waiting for data from ntlm_auth: ") + strerror(errno));
-		goto exit;
+		return er;
 	}
 
 	if (ret == 0) {
 		// timeout
 		ec_log_err("Timeout while reading from ntlm_auth");
-		goto exit;
+		return er;
 	}
 
 	// stderr is optional, and always written first
@@ -1571,7 +1508,7 @@ retry:
 		// print in lower level. if ntlm_auth was not installed (kerberos only environment), you won't care that ntlm_auth doesn't work.
 		// login error is returned to the client, which was expected anyway.
 		ec_log_notice(string("Received error from ntlm_auth:\n") + buffer);
-		goto exit;
+		return er;
 	}
 
 	// stdout is mandatory, so always read from this pipe
@@ -1579,10 +1516,10 @@ retry:
 	bytes = read(m_stdout, buffer, NTLMBUFFER-1);
 	if (bytes < 0) {
 		ec_log_err(string("Unable to read data from ntlm_auth: ") + strerror(errno));
-		goto exit;
+		return er;
 	} else if (bytes == 0) {
 		ec_log_err("Nothing read from ntlm_auth");
-		goto exit;
+		return er;
 	}
 	if (buffer[bytes-1] == '\n')
 		/*
@@ -1593,7 +1530,7 @@ retry:
 	if (bytes < 2) {
 		/* Ensure buffer[0]==.. && buffer[1]==.. is valid to do */
 		ec_log_err("Short reply from ntlm_auth");
-		goto exit;
+		return er;
 	}
 
 	if (bytes >= 3)
@@ -1606,7 +1543,7 @@ retry:
 	if (buffer[0] == 'B' && buffer[1] == 'H') {
 		// Broken Helper
 		ec_log_err("Incorrect data fed to ntlm_auth");
-		goto exit;
+		return er;
 	} else if (buffer[0] == 'T' && buffer[1] == 'T') {
 		// Try This
 		strDecoded = base64_decode(strAnswer);
@@ -1616,16 +1553,16 @@ retry:
 		lpOutput->__ptr = s_alloc<unsigned char>(soap, strDecoded.length());
 		memcpy(lpOutput->__ptr, strDecoded.data(), strDecoded.length());
 
-		er = ZARAFA_E_SSO_CONTINUE;
+		er = KCERR_SSO_CONTINUE;
 
 	} else if (buffer[0] == 'A' && buffer[1] == 'F') {
 		// Authentication Fine
 		// Samba default runs in UTF-8 and setting 'unix charset' to windows-1252 in the samba config will break ntlm_auth
-		// convert the username before we use it in Zarafa
+		// convert the username before we use it in Kopano
 		ECIConv iconv("windows-1252", "utf-8");
 		if (!iconv.canConvert()) {
 			ec_log_crit("Problem setting up windows-1252 to utf-8 converter");
-			goto exit;
+			return er;
 		}
 
 		strAnswer = iconv.convert(strAnswer);
@@ -1643,7 +1580,7 @@ retry:
 		er = m_lpUserManagement->ResolveObjectAndSync(ACTIVE_USER, (char *)strAnswer.c_str(), &m_ulUserID);
 		// don't check NONACTIVE, since those shouldn't be able to login
 		if(er != erSuccess)
-			goto exit;
+			return er;
 
 		if (stricmp(lpszName, strAnswer.c_str()) != 0) {
 			// cannot open another user without password
@@ -1651,7 +1588,7 @@ retry:
 			ec_log_warn("Single Sign-On: User \"%s\" authenticated, but user \"%s\" requested.", strAnswer.c_str(), lpszName);
 			ZLOG_AUDIT(m_lpSessionManager->GetAudit(), "authenticate spoofed user='%s' requested='%s' from='%s' method='ntlm sso' program='%s'",
 				strAnswer.c_str(), lpszName, soap->host, szClientApp);
-			er = ZARAFA_E_LOGON_FAILED;
+			er = KCERR_LOGON_FAILED;
 		} else {
 			m_bValidated = true;
 			m_ulValidationMethod = METHOD_SSO;
@@ -1666,197 +1603,29 @@ retry:
 		ec_log_info("Requested user \"%s\" denied. Not authenticated: \"%s\"", lpszName, strAnswer.c_str());
 		ZLOG_AUDIT(m_lpSessionManager->GetAudit(), "authenticate failed user='%s' from='%s' method='ntlm sso' program='%s'",
 			lpszName, soap->host, szClientApp);
-		er = ZARAFA_E_LOGON_FAILED;
+		er = KCERR_LOGON_FAILED;
 	} else {
 		// unknown response?
 		ec_log_err("Unknown response from ntlm_auth: %.*s", static_cast<int>(bytes), buffer);
-		er = ZARAFA_E_CALL_FAILED;
-		goto exit;
+		return KCERR_CALL_FAILED;
 	}
 
 	*lppOutput = lpOutput;
-
-exit:
 	return er;
 }
 #undef NTLMBUFFER
 #endif
-#ifdef WIN32
-ECRESULT ECAuthSession::ValidateSSOData(struct soap* soap, const char* lpszName, const char* lpszImpersonateUser, const char* szClientVersion, const char* szClientApp, const char *szClientAppVersion, const char *szClientAppMisc, const struct xsd__base64Binary* lpInput, struct xsd__base64Binary** lppOutput)
-{
-	ECRESULT er = ZARAFA_E_INVALID_PARAMETER;
-	SECURITY_STATUS	SecStatus;
-	bool			bFirst = false;
-	SecBuffer		OutSecBuffer, InSecBuffer[2];
-	SecBufferDesc	OutSecBufferDesc, InSecBufferDesc;
-	ULONG			fContextAttr = 0;
-	struct xsd__base64Binary *lpOutput = NULL;
-
-	OutSecBuffer.pvBuffer = NULL;
-
-	if (!soap) {
-		ec_log_err("Invalid argument \"soap\" in call to ECAuthSession::ValidateSSOData()");
-		goto exit;
-	}
-	if (!lpszName) {
-		ec_log_err("Invalid argument \"lpszName\" in call to ECAuthSession::ValidateSSOData()");
-		goto exit;
-	}
-	if (!szClientVersion) {
-		ec_log_err("Invalid argument \"zClientVersionin\" in call to ECAuthSession::ValidateSSOData()");
-		goto exit;
-	}
-	if (!szClientApp) {
-		ec_log_err("Invalid argument \"szClientApp\" in call to ECAuthSession::ValidateSSOData()");
-		goto exit;
-	}
-	if (!lpInput) {
-		ec_log_err("Invalid argument \"lpInput\" in call to ECAuthSession::ValidateSSOData()");
-		goto exit;
-	}
-	if (!lppOutput) {
-		ec_log_err("Invalid argument \"lppOutput\" in call to ECAuthSession::ValidateSSOData()");
-		goto exit;
-	}
-	er = ZARAFA_E_LOGON_FAILED;
-	if (!SecIsValidHandle(&m_hCredentials)) {
-		// new connection
-
-		SecStatus = EnumerateSecurityPackages(&m_cPackages, &m_lpPackageInfo);
-		if (SecStatus != SEC_E_OK) {
-			ec_log_err("Unable to get security packages list");
-			goto exit;
-		}
-
-		for (m_ulPid = 0; m_ulPid < m_cPackages; ++m_ulPid) {
-			// find auto detect method, always (?) first item in the list
-			// TODO: config option to force a method?
-			if (_tcsicmp(_T("Negotiate"), m_lpPackageInfo[m_ulPid].Name) == 0)
-				break;
-		}
-		if (m_ulPid == m_cPackages) {
-			ec_log_err("Negotiate security package was not found");
-			goto exit;
-		}
-
-		SecStatus = AcquireCredentialsHandle(/* principal */NULL, /* package */m_lpPackageInfo[m_ulPid].Name,
-			/*fCredentialUse*/SECPKG_CRED_INBOUND, /*pvLogonID*/NULL, /*pAuthData*/NULL, NULL, NULL,
-			&m_hCredentials, &m_tsExpiry);
-		if (SecStatus != SEC_E_OK) {
-			ec_log_err("Unable to acquire credentials handle: 0x%08X", SecStatus);
-			goto exit;
-		}
-
-		bFirst = true;
-	} else {
-		// step 2
-	}
-
-	// prepare input buffer
-	InSecBufferDesc.ulVersion = SECBUFFER_VERSION;
-	InSecBufferDesc.cBuffers = 2;
-	InSecBufferDesc.pBuffers = InSecBuffer;
-	InSecBuffer[0].BufferType = SECBUFFER_TOKEN;
-	InSecBuffer[0].cbBuffer = lpInput->__size;
-	InSecBuffer[0].pvBuffer = (void*)lpInput->__ptr;
-	InSecBuffer[1].BufferType = SECBUFFER_EMPTY;
-	InSecBuffer[1].cbBuffer = 0;
-	InSecBuffer[1].pvBuffer = NULL;
-
-	OutSecBufferDesc.ulVersion = SECBUFFER_VERSION;
-	OutSecBufferDesc.cBuffers = 1;
-	OutSecBufferDesc.pBuffers = &OutSecBuffer;
-	OutSecBuffer.BufferType = SECBUFFER_TOKEN;
-	OutSecBuffer.cbBuffer = m_lpPackageInfo[m_ulPid].cbMaxToken;
-	OutSecBuffer.pvBuffer = NULL;
-
-	SecStatus = AcceptSecurityContext(&m_hCredentials, bFirst ? NULL : &m_hContext, &InSecBufferDesc,
-		ASC_REQ_ALLOCATE_MEMORY | ASC_REQ_CONFIDENTIALITY | ASC_REQ_CONNECTION, SECURITY_NATIVE_DREP,
-		&m_hContext, &OutSecBufferDesc, &fContextAttr, &m_tsExpiry);
-
-	if (FAILED(SecStatus)) {
-		ec_log_err("Error accepting security context: 0x%08X", SecStatus);
-		goto exit;
-	}
-
-	if (SecStatus) {
-		// continue data
-		lpOutput = s_alloc<struct xsd__base64Binary>(soap);
-		lpOutput->__size = OutSecBuffer.cbBuffer;
-		lpOutput->__ptr = s_alloc<unsigned char>(soap, OutSecBuffer.cbBuffer);
-		memcpy(lpOutput->__ptr, OutSecBuffer.pvBuffer, OutSecBuffer.cbBuffer);
-
-		er = ZARAFA_E_SSO_CONTINUE;
-	} else {
-		// logged on
-		TCHAR username[256];
-		ULONG size = 256;
-		string strUsername;
-
-		SecStatus = ImpersonateSecurityContext(&m_hContext);
-		if (SecStatus != SEC_E_OK)
-			goto exit;
-
-		GetUserName(username, &size);
-		strUsername = convert_to<std::string>("UTF-8", username, rawsize(username), CHARSET_TCHAR);
-
-		SecStatus = RevertSecurityContext(&m_hContext);
-		if (SecStatus != SEC_E_OK)
-			goto exit;
-
-		// Check whether user exists in the user database
-		er = m_lpUserManagement->ResolveObjectAndSync(ACTIVE_USER, (char *)strUsername.c_str(), &m_ulUserID);
-		// don't check NONACTIVE, since those shouldn't be able to login
-		if (er != erSuccess)
-			goto exit;
-
-		// stricmp ??
-		if (strUsername.compare(lpszName) != 0) {
-			// cannot open another user without password
-			// or should be check permissions ?
-			ec_log_warn("Single Sign-On: User \"%s\" authenticated, but user \"%s\" requested.", username, lpszName);
-			er = ZARAFA_E_LOGON_FAILED;
-		} else {
-			m_bValidated = true;
-			er = erSuccess;
-			ec_log_info("Single Sign-On: User \"%s\" authenticated", username);
-		}
-	}
-
-	*lppOutput = lpOutput;
-
-exit:
-	if (OutSecBuffer.pvBuffer)
-		FreeContextBuffer(OutSecBuffer.pvBuffer);
-
-	return er;
-}
-
-ECRESULT ECAuthSession::ValidateSSOData_KRB5(struct soap* soap, const char* lpszName, const char* szClientVersion, const char* szClientApp, const char *szClientAppVersion, const char *szClientAppMisc, const struct xsd__base64Binary* lpInput, struct xsd__base64Binary** lppOutput)
-{
-	return ZARAFA_E_LOGON_FAILED;
-}
-
-ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpszName, const char* szClientVersion, const char* szClientApp, const char *szClientAppVersion, const char *szClientAppMisc, const struct xsd__base64Binary* lpInput, struct xsd__base64Binary **lppOutput)
-{
-	return ZARAFA_E_LOGON_FAILED;
-}
-#endif
 
 ECRESULT ECAuthSession::ProcessImpersonation(const char* lpszImpersonateUser)
 {
-	ECRESULT er = erSuccess;
-
 	if (lpszImpersonateUser == NULL || *lpszImpersonateUser == '\0') {
 		m_ulImpersonatorID = EC_NO_IMPERSONATOR;
-		goto exit;
+		return erSuccess;
 	}
 
 	m_ulImpersonatorID = m_ulUserID;
-	er = m_lpUserManagement->ResolveObjectAndSync(OBJECTCLASS_USER, lpszImpersonateUser, &m_ulUserID);
-
-exit:
-	return er;
+	return m_lpUserManagement->ResolveObjectAndSync(OBJECTCLASS_USER,
+	       lpszImpersonateUser, &m_ulUserID);
 }
 
 size_t ECAuthSession::GetObjectSize()
@@ -1887,7 +1656,7 @@ ECAuthSessionOffline::CreateECSession(ECSESSIONGROUPID ecSessionGroupId,
 	ECSESSIONID newSID;
 
 	if (!m_bValidated) {
-		er = ZARAFA_E_LOGON_FAILED;
+		er = KCERR_LOGON_FAILED;
 		goto exit;
 	}
 
@@ -1899,7 +1668,7 @@ ECAuthSessionOffline::CreateECSession(ECSESSIONGROUPID ecSessionGroupId,
 	            m_ulClientCapabilities, true, m_ulValidationMethod,
 	            m_ulConnectingPid, cl_ver, cl_app, cl_app_ver, cl_app_misc);
 	if (!lpSession) {
-		er = ZARAFA_E_NOT_ENOUGH_MEMORY;
+		er = KCERR_NOT_ENOUGH_MEMORY;
 		goto exit;
 	}
 

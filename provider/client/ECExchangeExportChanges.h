@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,7 +18,7 @@
 #ifndef ECEXCHANGEEXPORTCHANGES_H
 #define ECEXCHANGEEXPORTCHANGES_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <mapidefs.h>
 #include <vector>
 #include <set>
@@ -27,8 +27,8 @@
 #include "ECICS.h"
 #include "ECMAPIProp.h"
 
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECUnknown.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECUnknown.h>
 #include <IECExportChanges.h>
 #include <IECImportContentsChanges.h>
 

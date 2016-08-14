@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,8 +15,8 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/archiver-common.h>
+#include <kopano/platform.h>
+#include <kopano/archiver-common.h>
 #include <boost/algorithm/string/predicate.hpp>
 namespace ba = boost::algorithm;
 
@@ -84,8 +84,10 @@ entryid_t entryid_t::getUnwrapped() const
 
 int abentryid_t::compare(const abentryid_t &other) const
 {
-	if (size() != other.size())
-		return int(size()) - int(other.size());
+	if (size() < other.size())
+		return -1;
+	if (size() > other.size())
+		return 1;
 
 	if (size() <= 32) {
 		// Too small, just compare the whole thing

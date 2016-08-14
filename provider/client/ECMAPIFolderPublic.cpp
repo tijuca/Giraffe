@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,38 +15,36 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include "ECMAPIFolderPublic.h"
 
 #include "Mem.h"
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 #include <edkguid.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/Util.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/Util.h>
 #include "ClientUtil.h"
-#include "ZarafaUtil.h"
+#include "pcutil.hpp"
 
-#include <zarafa/ECDebug.h>
+#include <kopano/ECDebug.h>
 
 #include <edkmdb.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 #include "ECMsgStorePublic.h"
 #include "ECMemTablePublic.h"
 
 #include "favoritesutil.h"
-#include <zarafa/restrictionutil.h>
+#include <kopano/restrictionutil.h>
 
-#include <zarafa/charset/convstring.h>
+#include <kopano/charset/convstring.h>
 
-#include <zarafa/ECGetText.h>
+#include <kopano/ECGetText.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 
@@ -74,11 +72,6 @@ ECMAPIFolderPublic::ECMAPIFolderPublic(ECMsgStore *lpMsgStore, BOOL fModify, WSM
 	
 
 	m_ePublicEntryID = ePublicEntryID;
-}
-
-ECMAPIFolderPublic::~ECMAPIFolderPublic(void)
-{
-
 }
 
 HRESULT	ECMAPIFolderPublic::QueryInterface(REFIID refiid, void **lppInterface)
@@ -169,7 +162,7 @@ HRESULT ECMAPIFolderPublic::GetPropHandler(ULONG ulPropTag, void* lpProvider, UL
 		} else {
 			hr = ECGenericProp::DefaultGetProp(PR_ENTRYID, lpProvider, ulFlags, lpsPropValue, lpParam, lpBase);
 			if(hr == hrSuccess && lpFolder->m_ePublicEntryID == ePE_FavoriteSubFolder)
-				((LPENTRYID)lpsPropValue->Value.bin.lpb)->abFlags[3] = ZARAFA_FAVORITE;
+				((LPENTRYID)lpsPropValue->Value.bin.lpb)->abFlags[3] = KOPANO_FAVORITE;
 		}
 		break;
 	case PROP_ID(PR_DISPLAY_NAME):
@@ -218,7 +211,7 @@ HRESULT ECMAPIFolderPublic::GetPropHandler(ULONG ulPropTag, void* lpProvider, UL
 		hr = ECMAPIFolderPublic::GetPropHandler(PR_ENTRYID, lpProvider, ulFlags, lpsPropValue, lpParam, lpBase);
 		if (hr == hrSuccess) {
 			if(lpFolder->m_ePublicEntryID == ePE_FavoriteSubFolder)
-				((LPENTRYID)lpsPropValue->Value.bin.lpb)->abFlags[3] = ZARAFA_FAVORITE;
+				((LPENTRYID)lpsPropValue->Value.bin.lpb)->abFlags[3] = KOPANO_FAVORITE;
 
 			lpsPropValue->ulPropTag = PR_RECORD_KEY;
 		}
@@ -475,7 +468,7 @@ HRESULT ECMAPIFolderPublic::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCI
 			return hr;
 
 		if (ulObjType == MAPI_FOLDER && m_ePublicEntryID == ePE_FavoriteSubFolder)
-			lpEntryID->abFlags[3] = ZARAFA_FAVORITE;
+			lpEntryID->abFlags[3] = KOPANO_FAVORITE;
 	}
 	return ECMAPIFolder::OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, lpulObjType, lppUnk);
 }
@@ -524,9 +517,9 @@ HRESULT ECMAPIFolderPublic::CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPC
 	if(hr != hrSuccess)
 		goto exit;
 
-	// Check if it's  the same store of zarafa so we can copy/move fast
-	if( IsZarafaEntryId(cbEntryID, (LPBYTE)lpEntryID) && 
-		IsZarafaEntryId(lpPropArray[0].Value.bin.cb, lpPropArray[0].Value.bin.lpb) &&
+	// Check if it's  the same store of kopano so we can copy/move fast
+	if( IsKopanoEntryId(cbEntryID, (LPBYTE)lpEntryID) && 
+		IsKopanoEntryId(lpPropArray[0].Value.bin.cb, lpPropArray[0].Value.bin.lpb) &&
 		HrGetStoreGuidFromEntryId(cbEntryID, (LPBYTE)lpEntryID, &guidFrom) == hrSuccess && 
 		HrGetStoreGuidFromEntryId(lpPropArray[0].Value.bin.cb, lpPropArray[0].Value.bin.lpb, &guidDest) == hrSuccess &&
 		memcmp(&guidFrom, &guidDest, sizeof(GUID)) == 0 &&
@@ -572,12 +565,12 @@ HRESULT ECMAPIFolderPublic::DeleteFolder(ULONG cbEntryID, LPENTRYID lpEntryID, U
 	LPMAPIFOLDER lpShortcutFolder = NULL;
 	LPSPropValue lpProp = NULL;
 
-	if(ValidateZarafaEntryId(cbEntryID, (LPBYTE)lpEntryID, MAPI_FOLDER) == false) {
+	if(ValidateZEntryId(cbEntryID, (LPBYTE)lpEntryID, MAPI_FOLDER) == false) {
 		hr = MAPI_E_INVALID_ENTRYID;
 		goto exit;
 	}
 
-	if (cbEntryID > 4 && (lpEntryID->abFlags[3] & ZARAFA_FAVORITE) )
+	if (cbEntryID > 4 && (lpEntryID->abFlags[3] & KOPANO_FAVORITE) )
 	{
 		// remove the shortcut from the shortcut folder
 		hr = OpenEntry(cbEntryID, lpEntryID, NULL, 0, &ulObjType, (LPUNKNOWN *)&lpFolder);

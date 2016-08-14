@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,29 +15,29 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ClientUtil.h"
 
-#include <zarafa/ECGetText.h>
+#include <kopano/ECGetText.h>
 
 #include <mapi.h>
 #include <mapidefs.h>
 #include <mapiutil.h>
 
-#include <zarafa/CommonUtil.h>
+#include <kopano/CommonUtil.h>
 #include "WSTransport.h"
-#include <zarafa/ECConfig.h>
+#include <kopano/ECConfig.h>
 
-#include "Zarafa.h"
-#include <zarafa/ECGuid.h>
+#include "kcore.hpp"
+#include <kopano/ECGuid.h>
 #include <edkguid.h>
-#include <zarafa/mapiguidext.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiguidext.h>
+#include <kopano/mapiext.h>
 
 #include "Mem.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
-#include <zarafa/charset/convstring.h>
+#include <kopano/charset/convstring.h>
 #include "EntryPoint.h"
 
 #include <boost/algorithm/string/case_conv.hpp>
@@ -45,8 +45,6 @@
 using namespace std;
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -87,7 +85,7 @@ HRESULT ClientUtil::HrInitializeStatusRow (const char * lpszProviderDisplay, ULO
 
 	// PR_PROVIDER_DLL_NAME
 	lpspvStatusRow[cCurVal].ulPropTag = PR_PROVIDER_DLL_NAME_A;
-	lpspvStatusRow[cCurVal++].Value.lpszA = (LPSTR)ZARAFA_DLL_NAME;
+	lpspvStatusRow[cCurVal++].Value.lpszA = (LPSTR)WCLIENT_DLL_NAME;
 
 	// Set the PR_STATUS_CODE property:
 	lpspvStatusRow[cCurVal].ulPropTag = PR_STATUS_CODE;
@@ -703,7 +701,7 @@ HRESULT ClientUtil::GetGlobalProfileProperties(LPPROFSECT lpGlobalProfSect, stru
 			goto exit;
 	} else {
 		// Get the properties we need directly from the global profile section
-		hr = lpGlobalProfSect->GetProps((LPSPropTagArray)&sptaZarafaProfile, 0, &cValues, &lpsPropArray);
+		hr = lpGlobalProfSect->GetProps((LPSPropTagArray)&sptaKopanoProfile, 0, &cValues, &lpsPropArray);
 		if(FAILED(hr))
 			goto exit;
 	}
@@ -786,15 +784,15 @@ exit:
 	return hr;
 }
 
-HRESULT ClientUtil::GetGlobalProfileDeligateStoresProp(LPPROFSECT lpGlobalProfSect, ULONG* lpcDeligates, LPBYTE* lppDeligateStores)
+HRESULT ClientUtil::GetGlobalProfileDelegateStoresProp(LPPROFSECT lpGlobalProfSect, ULONG *lpcDelegates, LPBYTE *lppDelegateStores)
 {
 	HRESULT			hr = hrSuccess;
 	LPSPropValue	lpsPropValue = NULL;
 	ULONG			cValues = 0;
 	SPropTagArray	sPropTagArray;
-	LPBYTE			lpDeligateStores = NULL;
+	LPBYTE			lpDelegateStores = NULL;
 
-	if(lpGlobalProfSect == NULL || lpcDeligates == NULL || lppDeligateStores == NULL)
+	if(lpGlobalProfSect == NULL || lpcDelegates == NULL || lppDelegateStores == NULL)
 	{
 		hr = MAPI_E_INVALID_OBJECT;
 		goto exit;
@@ -808,15 +806,15 @@ HRESULT ClientUtil::GetGlobalProfileDeligateStoresProp(LPPROFSECT lpGlobalProfSe
 		goto exit;
 
 	if(lpsPropValue[0].Value.bin.cb > 0){
-		hr = MAPIAllocateBuffer(lpsPropValue[0].Value.bin.cb, (void**)&lpDeligateStores);
+		hr = MAPIAllocateBuffer(lpsPropValue[0].Value.bin.cb, (void**)&lpDelegateStores);
 		if(hr != hrSuccess)
 			goto exit;
 
-		memcpy(lpDeligateStores, lpsPropValue[0].Value.bin.lpb, lpsPropValue[0].Value.bin.cb);
+		memcpy(lpDelegateStores, lpsPropValue[0].Value.bin.lpb, lpsPropValue[0].Value.bin.cb);
 	}
 
-	*lpcDeligates = lpsPropValue[0].Value.bin.cb;
-	*lppDeligateStores = lpDeligateStores;
+	*lpcDelegates = lpsPropValue[0].Value.bin.cb;
+	*lppDelegateStores = lpDelegateStores;
 
 	hr = hrSuccess;
 
@@ -833,32 +831,7 @@ exit:
  */
 HRESULT ClientUtil::GetConfigPath(std::string *lpConfigPath)
 {
-#ifdef WIN32
-	HRESULT hr = hrSuccess;
-	HKEY hKey = NULL;
-	char szDir[MAX_PATH];
-	ULONG cbDir = 0;
-
-	hr = RegOpenKeyExA(HKEY_LOCAL_MACHINE, "Software\\Zarafa\\ExchangeRedirector", 0, KEY_READ, &hKey);
-	if(hr != hrSuccess)
-		goto exit;
-
-	cbDir = MAX_PATH;
-
-	hr = RegQueryValueExA(hKey, "InstallDir", NULL, NULL, (BYTE*)szDir, &cbDir);
-	if(hr != hrSuccess)
-		goto exit;
-
-	lpConfigPath->assign(szDir);
-
-exit:
-	if(hKey)
-		RegCloseKey(hKey);
-
-	return hr;
-#else
 	return MAPI_E_NO_SUPPORT;
-#endif
 }
 
 /**
@@ -886,8 +859,8 @@ HRESULT ClientUtil::ConvertMSEMSProps(ULONG cValues, LPSPropValue pValues, ULONG
 	LPSPropValue lpProfileName = NULL;
 	static const configsetting_t settings[] = {
 		{ "ssl_port", "237" },
-		{ "ssl_key_file", "c:\\program files\\zarafa\\exchange-redirector.pem" },
-		{ "ssl_key_pass", "zarafa" },
+		{ "ssl_key_file", "c:\\program files\\kopano\\exchange-redirector.pem" },
+		{ "ssl_key_pass", "kopano" },
 		{ "server_address", "" },
 		{ "log_method","file" },
 		{ "log_file","-" },
@@ -942,13 +915,13 @@ HRESULT ClientUtil::ConvertMSEMSProps(ULONG cValues, LPSPropValue pValues, ULONG
 		goto exit;
 
 	if (lpConfig->GetSetting("server_address")[0]) {
-		strServerPath = (std::string)"https://" + lpConfig->GetSetting("server_address") + ":" + lpConfig->GetSetting("ssl_port") + "/zarafa";
+		strServerPath = (std::string)"https://" + lpConfig->GetSetting("server_address") + ":" + lpConfig->GetSetting("ssl_port") + "/";
 	} else {
 		if(!lpServer) {
 			hr = MAPI_E_UNCONFIGURED;
 			goto exit;
 		}
-		strServerPath = (std::string)"https://" + lpServer->Value.lpszA + ":" + lpConfig->GetSetting("ssl_port") + "/zarafa";
+		strServerPath = (std::string)"https://" + lpServer->Value.lpszA + ":" + lpConfig->GetSetting("ssl_port") + "/";
 	}
 
 	szUsername = lpUsername->Value.lpszA;
@@ -1006,7 +979,7 @@ exit:
 }
 
 /* 
-Zarafa entryid functions
+entryid functions
 
 */
 
@@ -1192,21 +1165,13 @@ HRESULT GetPublicEntryId(enumPublicEntryID ePublicEntryID, GUID guidStore, void 
 	return hrSuccess;
 }
 
-BOOL CompareMDBProvider(LPBYTE lpguid, const GUID *lpguidZarafa) {
-	return CompareMDBProvider((MAPIUID*)lpguid, lpguidZarafa);
+BOOL CompareMDBProvider(LPBYTE lpguid, const GUID *lpguidKopano) {
+	return CompareMDBProvider((MAPIUID*)lpguid, lpguidKopano);
 }
 
-BOOL CompareMDBProvider(MAPIUID* lpguid, const GUID *lpguidZarafa)
+BOOL CompareMDBProvider(MAPIUID* lpguid, const GUID *lpguidKopano)
 {
-	if (memcmp(lpguid, lpguidZarafa, sizeof(GUID)) == 0)
+	if (memcmp(lpguid, lpguidKopano, sizeof(GUID)) == 0)
 		return TRUE;
-#ifdef WIN32
-		if ((memcmp(lpguidZarafa, &ZARAFA_SERVICE_GUID, sizeof(GUID)) == 0 && memcmp(lpguid, &MSEMS_SERVICE_GUID, sizeof(GUID)) == 0) ||
-			(memcmp(lpguidZarafa, &ZARAFA_STORE_PUBLIC_GUID, sizeof(GUID)) == 0 && memcmp(lpguid, &MSEMS_PUBLIC_STORE_GUID, sizeof(GUID)) == 0) ||
-			(memcmp(lpguidZarafa, &ZARAFA_STORE_DELEGATE_GUID, sizeof(GUID)) == 0 && memcmp(lpguid, &MSEMS_DELEGATE_GUID, sizeof(GUID)) == 0) )
-		{
-			return TRUE;
-		}
-#endif
 	return FALSE;
 }

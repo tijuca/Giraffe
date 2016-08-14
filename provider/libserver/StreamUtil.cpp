@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,11 +15,11 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include "StreamUtil.h"
 #include "StorageUtil.h"
-#include "ZarafaCmdUtil.h"
+#include "cmdutil.hpp"
 #include "ECAttachmentStorage.h"
 #include "ECSecurity.h"
 #include "ECSessionManager.h"
@@ -27,16 +27,16 @@
 #include "ECTPropsPurge.h"
 #include "ECICS.h"
 #include "ECMemStream.h"
-#include <zarafa/MAPIErrors.h>
+#include <kopano/MAPIErrors.h>
 
-#include <zarafa/charset/convert.h>
-#include <zarafa/charset/utf8string.h>
+#include <kopano/charset/convert.h>
+#include <kopano/charset/utf8string.h>
 
 #include <ECFifoBuffer.h>
 #include <ECSerializer.h>
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 #include <mapitags.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <mapidefs.h>
 #include <edkmdb.h>
 
@@ -46,8 +46,6 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 /*
@@ -89,11 +87,7 @@ const static struct StreamCaps {
 #define STREAM_VERSION			1	// encode strings in UTF-8.
 #define STREAM_CAPS_CURRENT		(&g_StreamCaps[STREAM_VERSION])
 
-#ifdef WIN32
-#define CHARSET_WIN1252	"WINDOWS-1252//IGNORE"
-#else
 #define CHARSET_WIN1252	"WINDOWS-1252//TRANSLIT"
-#endif
 
 // External objects
 extern ECSessionManager *g_lpSessionManager;	// ECServerEntrypoint.cpp
@@ -157,7 +151,7 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, unsigned int ulNameId, uns
 
 	if ((lpRow = m_lpDatabase->FetchRow(lpResult)) != NULL) {
 		if (lpRow[0] == NULL) {
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 			ec_log_err("NamedPropertyMapper::GetId(): column null");
 			goto exit;
 		}
@@ -215,7 +209,7 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, const std::string &strName
 
 	if ((lpRow = m_lpDatabase->FetchRow(lpResult)) != NULL) {
 		if (lpRow[0] == NULL) {
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 			ec_log_err("NamedPropertyMapper::GetId(): column null");
 			goto exit;
 		}
@@ -273,7 +267,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 	long long li;
 
 	er = GetValidatedPropType(lpRow, &type);
-	if (er == ZARAFA_E_DATABASE_ERROR) {
+	if (er == KCERR_DATABASE_ERROR) {
 		er = erSuccess;
 		goto exit;
 	}
@@ -289,7 +283,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 	switch (type) {
 	case PT_I2:
 		if (lpRow[FIELD_NR_ULONG] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		i = (short)atoi(lpRow[FIELD_NR_ULONG]);
@@ -297,7 +291,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		break;
 	case PT_LONG:
 		if (lpRow[FIELD_NR_ULONG] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		ul = atoui(lpRow[FIELD_NR_ULONG]);
@@ -305,7 +299,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		break;
 	case PT_R4:
 		if (lpRow[FIELD_NR_DOUBLE] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		flt = (float)strtod_l(lpRow[FIELD_NR_DOUBLE], NULL, loc);
@@ -313,7 +307,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		break;
 	case PT_BOOLEAN:
 		if (lpRow[FIELD_NR_ULONG] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		b = (atoi(lpRow[FIELD_NR_ULONG]) ? 1 : 0);
@@ -322,7 +316,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 	case PT_DOUBLE:
 	case PT_APPTIME:
 		if (lpRow[FIELD_NR_DOUBLE] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		dbl = strtod_l(lpRow[FIELD_NR_DOUBLE], NULL, loc);
@@ -331,7 +325,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 	case PT_CURRENCY:
 	case PT_SYSTIME:
 		if (lpRow[FIELD_NR_HI] == NULL || lpRow[FIELD_NR_LO] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		hilo.hi = atoi(lpRow[FIELD_NR_HI]);
@@ -342,7 +336,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		break;
 	case PT_I8:
 		if (lpRow[FIELD_NR_LONGINT] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		li = _atoi64(lpRow[FIELD_NR_LONGINT]);
@@ -351,7 +345,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 	case PT_STRING8:
 	case PT_UNICODE:
 		if (lpRow[FIELD_NR_STRING] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		if (lpStreamCaps->bSupportUnicode) {
@@ -370,7 +364,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 	case PT_CLSID:
 	case PT_BINARY:
 		if (lpRow[FIELD_NR_BINARY] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		ulLen = lpLen[FIELD_NR_BINARY];
@@ -380,7 +374,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		break;
 	case PT_MV_I2:
 		if (lpRow[FIELD_NR_ULONG] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 
@@ -395,7 +389,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		break;
 	case PT_MV_LONG:
 		if (lpRow[FIELD_NR_ULONG] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 
@@ -410,7 +404,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		break;
 	case PT_MV_R4:
 		if (lpRow[FIELD_NR_DOUBLE] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 
@@ -426,7 +420,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 	case PT_MV_DOUBLE:
 	case PT_MV_APPTIME:
 		if (lpRow[FIELD_NR_DOUBLE] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 
@@ -442,7 +436,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 	case PT_MV_CURRENCY:
 	case PT_MV_SYSTIME:
 		if (lpRow[FIELD_NR_HI] == NULL || lpRow[FIELD_NR_LO] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		ulCount = atoi(lpRow[FIELD_NR_ID]);
@@ -462,7 +456,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 	case PT_MV_BINARY:
 	case PT_MV_CLSID:
 		if (lpRow[FIELD_NR_BINARY] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		ulCount = atoi(lpRow[FIELD_NR_ID]);
@@ -479,7 +473,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 	case PT_MV_STRING8:
 	case PT_MV_UNICODE:
 		if (lpRow[FIELD_NR_STRING] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		ulCount = atoi(lpRow[FIELD_NR_ID]);
@@ -503,7 +497,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		break;
 	case PT_MV_I8:
 		if (lpRow[FIELD_NR_LONGINT] == NULL) {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 
@@ -517,7 +511,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		}
 		break;
 	default:
-		er = ZARAFA_E_INVALID_TYPE;
+		er = KCERR_INVALID_TYPE;
 		goto exit;
 	}
 
@@ -545,7 +539,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 				er = lpSink->Write(lpRow[FIELD_NR_NAMESTR], 1, ulLen);
 
 		} else if (er == erSuccess)
-			er = ZARAFA_E_INVALID_TYPE;
+			er = KCERR_INVALID_TYPE;
 	}
 
 exit:
@@ -555,7 +549,7 @@ exit:
 
 ECRESULT SerializePropVal(LPCSTREAMCAPS lpStreamCaps, const struct propVal &sPropVal, ECSerializer *lpSink, const NamedPropDefMap *lpNamedPropDefs)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	unsigned int type = PROP_TYPE(sPropVal.ulPropTag);
 	unsigned int ulLen;
 	unsigned char b;
@@ -572,22 +566,17 @@ ECRESULT SerializePropVal(LPCSTREAMCAPS lpStreamCaps, const struct propVal &sPro
 
 	if (PROP_ID(ulPropTag) > 0x8500) {
 		ASSERT(lpNamedPropDefs);
-		if (!lpNamedPropDefs) {
-			er = ZARAFA_E_INVALID_TYPE;
-			goto exit;
-		}
-		
+		if (!lpNamedPropDefs)
+			return KCERR_INVALID_TYPE;
 		iNamedPropDef = lpNamedPropDefs->find(ulPropTag);
 		ASSERT(iNamedPropDef != lpNamedPropDefs->end());
-		if (iNamedPropDef == lpNamedPropDefs->end()) {
-			er = ZARAFA_E_NOT_FOUND;
-			goto exit;
-		}
+		if (iNamedPropDef == lpNamedPropDefs->end())
+			return KCERR_NOT_FOUND;
 	}
 	
 	er = lpSink->Write((unsigned char *)&ulPropTag, sizeof(ulPropTag), 1);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	switch (type) {
 	case PT_I2:
@@ -639,29 +628,29 @@ ECRESULT SerializePropVal(LPCSTREAMCAPS lpStreamCaps, const struct propVal &sPro
 		break;
 	case PT_MV_I2:
 		er = lpSink->Write(&sPropVal.Value.mvi.__size, sizeof(sPropVal.Value.mvi.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvi.__size; ++x)
+		for (gsoap_size_t x = 0; er == erSuccess && x < sPropVal.Value.mvi.__size; ++x)
 			er = lpSink->Write(&sPropVal.Value.mvi.__ptr[x], sizeof(sPropVal.Value.mvi.__ptr[x]), 1);
 		break;
 	case PT_MV_LONG:
 		er = lpSink->Write(&sPropVal.Value.mvl.__size, sizeof(sPropVal.Value.mvl.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvl.__size; ++x)
+		for (gsoap_size_t x = 0; er == erSuccess && x < sPropVal.Value.mvl.__size; ++x)
 			er = lpSink->Write(&sPropVal.Value.mvl.__ptr[x], sizeof(sPropVal.Value.mvl.__ptr[x]), 1);
 		break;
 	case PT_MV_R4:
 		er = lpSink->Write(&sPropVal.Value.mvflt.__size, sizeof(sPropVal.Value.mvflt.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvflt.__size; ++x)
+		for (gsoap_size_t x = 0; er == erSuccess && x < sPropVal.Value.mvflt.__size; ++x)
 			er = lpSink->Write(&sPropVal.Value.mvflt.__ptr[x], sizeof(sPropVal.Value.mvflt.__ptr[x]), 1);
 		break;
 	case PT_MV_DOUBLE:
 	case PT_MV_APPTIME:
 		er = lpSink->Write(&sPropVal.Value.mvdbl.__size, sizeof(sPropVal.Value.mvdbl.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvdbl.__size; ++x)
+		for (gsoap_size_t x = 0; er == erSuccess && x < sPropVal.Value.mvdbl.__size; ++x)
 			er = lpSink->Write(&sPropVal.Value.mvdbl.__ptr[x], sizeof(sPropVal.Value.mvdbl.__ptr[x]), 1);
 		break;
 	case PT_MV_CURRENCY:
 	case PT_MV_SYSTIME:
 		er = lpSink->Write(&sPropVal.Value.mvhilo.__size, sizeof(sPropVal.Value.mvhilo.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvhilo.__size; ++x) {
+		for (gsoap_size_t x = 0; er == erSuccess && x < sPropVal.Value.mvhilo.__size; ++x) {
 			er = lpSink->Write(&sPropVal.Value.mvhilo.__ptr[x].hi, sizeof(sPropVal.Value.mvhilo.__ptr[x].hi), 1);
 			if (er == erSuccess)
 				er = lpSink->Write(&sPropVal.Value.mvhilo.__ptr[x].lo, sizeof(sPropVal.Value.mvhilo.__ptr[x].lo), 1);
@@ -670,7 +659,7 @@ ECRESULT SerializePropVal(LPCSTREAMCAPS lpStreamCaps, const struct propVal &sPro
 	case PT_MV_BINARY:
 	case PT_MV_CLSID:
 		er = lpSink->Write(&sPropVal.Value.mvbin.__size, sizeof(sPropVal.Value.mvbin.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvbin.__size; ++x) {
+		for (gsoap_size_t x = 0; er == erSuccess && x < sPropVal.Value.mvbin.__size; ++x) {
 			er = lpSink->Write(&sPropVal.Value.mvbin.__ptr[x].__size, sizeof(sPropVal.Value.mvbin.__ptr[x].__size), 1);
 			if (er == erSuccess)
 				er = lpSink->Write(sPropVal.Value.mvbin.__ptr[x].__ptr, 1, sPropVal.Value.mvbin.__ptr[x].__size);
@@ -679,7 +668,7 @@ ECRESULT SerializePropVal(LPCSTREAMCAPS lpStreamCaps, const struct propVal &sPro
 	case PT_MV_STRING8:
 	case PT_MV_UNICODE:
 		er = lpSink->Write(&sPropVal.Value.mvszA.__size, sizeof(sPropVal.Value.mvszA.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvszA.__size; ++x) {
+		for (gsoap_size_t x = 0; er == erSuccess && x < sPropVal.Value.mvszA.__size; ++x) {
 			if (lpStreamCaps->bSupportUnicode) {
 				ulLen = (unsigned)strlen(sPropVal.Value.mvszA.__ptr[x]);
 				er = lpSink->Write(&ulLen, sizeof(ulLen), 1);
@@ -696,12 +685,12 @@ ECRESULT SerializePropVal(LPCSTREAMCAPS lpStreamCaps, const struct propVal &sPro
 		break;
 	case PT_MV_I8:
 		er = lpSink->Write(&sPropVal.Value.mvli.__size, sizeof(sPropVal.Value.mvli.__size), 1);
-		for (int x = 0; er == erSuccess && x < sPropVal.Value.mvli.__size; ++x)
+		for (gsoap_size_t x = 0; er == erSuccess && x < sPropVal.Value.mvli.__size; ++x)
 			er = lpSink->Write(&sPropVal.Value.mvli.__ptr[x], sizeof(sPropVal.Value.mvli.__ptr[x]), 1);
 		break;
 
 	default:
-		er = ZARAFA_E_INVALID_TYPE;
+		er = KCERR_INVALID_TYPE;
 	}
 	
 	// If property is named property in the dynamic range we need to add some extra info
@@ -724,11 +713,9 @@ ECRESULT SerializePropVal(LPCSTREAMCAPS lpStreamCaps, const struct propVal &sPro
 			}
 			
 			else
-				er = ZARAFA_E_INVALID_TYPE;
+				er = KCERR_INVALID_TYPE;
 		}
 	}
-
-exit:
 	return er;
 }
 
@@ -736,23 +723,21 @@ static ECRESULT SerializeProps(struct propValArray *lpPropVals,
     LPCSTREAMCAPS lpStreamCaps, ECSerializer *lpSink,
     const NamedPropDefMap *lpNamedPropDefs)
 {
-	ECRESULT		er = erSuccess;
+	ECRESULT er;
 	unsigned int	ulCount = 0;
 
 	ulCount = lpPropVals->__size;
 	
     er = lpSink->Write(&ulCount, sizeof(ulCount), 1);
 	if (er != erSuccess)
-    	goto exit;
+		return er;
     	
 	for (unsigned int i = 0; i < ulCount; ++i) {
 		er = SerializePropVal(lpStreamCaps, lpPropVals->__ptr[i], lpSink, lpNamedPropDefs);
-        if (er != erSuccess)
-	        goto exit;
+	        if (er != erSuccess)
+			return er;
 	}
-	
-exit:
-	return er;                
+	return erSuccess;
 }
 
 static ECRESULT GetBestBody(ECDatabase *lpDatabase, unsigned int ulObjId,
@@ -790,7 +775,7 @@ static ECRESULT SerializeProps(ECSession *lpecSession, ECDatabase *lpDatabase,
 	unsigned int	ulCount = 0;
 
 	struct soap		*soap = NULL;
-	struct propVal	sPropVal = {0};
+	struct propVal sPropVal{__gszeroinit};
 
 	DB_ROW 			lpDBRow = NULL;
 	DB_LENGTHS		lpDBLen = NULL;
@@ -817,7 +802,7 @@ static ECRESULT SerializeProps(ECSession *lpecSession, ECDatabase *lpDatabase,
 	lpTempSink = new ECStreamSerializer(lpIStream);
 
 	if (!lpAttachmentStorage) {
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
@@ -859,7 +844,7 @@ static ECRESULT SerializeProps(ECSession *lpecSession, ECDatabase *lpDatabase,
 	while ((lpDBRow = lpDatabase->FetchRow(lpDBResult)) != NULL) {
 		lpDBLen = lpDatabase->FetchRowLengths(lpDBResult);
 		if (lpDBRow == NULL || lpDBLen == NULL) {
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 			ec_log_err("SerializeProps(): fetchrow/fetchrowlengths failed");
 			goto exit;
 		}
@@ -948,14 +933,14 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECDatabase *lpStreamDatabase, 
 	bool			bUseSQLMulti = parseBool(g_lpSessionManager->GetConfig()->GetSetting("enable_sql_procedures"));
 
 	if (ulObjType != MAPI_MESSAGE) {
-		er = ZARAFA_E_NO_SUPPORT;
+		er = KCERR_NO_SUPPORT;
 		goto exit;
 	}
 	
 	if (lpStreamCaps == NULL) {
 		lpStreamCaps = STREAM_CAPS_CURRENT;	// Set to current stream capabilities.
 
-		if ((lpecSession->GetCapabilities() & ZARAFA_CAP_UNICODE) == 0) {
+		if ((lpecSession->GetCapabilities() & KOPANO_CAP_UNICODE) == 0) {
 			ulStreamVersion = 0;
 			lpStreamCaps = &g_StreamCaps[0];
 		}
@@ -996,7 +981,7 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECDatabase *lpStreamDatabase, 
 		lpDBLen = lpStreamDatabase->FetchRowLengths(lpDBResult);
 
 		if (lpDBRow == NULL || lpDBLen == NULL) {
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 			ec_log_err("SerializeMessage(): fetchrow/fetchrowlengths failed");
 			goto exit;
 		}
@@ -1076,7 +1061,7 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECDatabase *lpStreamDatabase, 
 			lpDBRow = lpStreamDatabase->FetchRow(lpDBResultAttachment);
 			if(lpDBRow != NULL) {
 				if(lpDBRow[0] == NULL) {
-					er = ZARAFA_E_DATABASE_ERROR;
+					er = KCERR_DATABASE_ERROR;
 					ec_log_err("SerializeMessage(): column null");
 					goto exit;
 				}
@@ -1123,8 +1108,8 @@ static ECRESULT DeserializePropVal(struct soap *soap,
     LPCSTREAMCAPS lpStreamCaps, NamedPropertyMapper &namedPropertyMapper,
     propVal **lppsPropval, ECSerializer *lpSource)
 {
-	ECRESULT		er = erSuccess;
-	unsigned int	ulCount;
+	ECRESULT er;
+	gsoap_size_t ulCount;
 	unsigned int	ulLen;
 	propVal			*lpsPropval = NULL;
 	unsigned char	b;
@@ -1140,7 +1125,7 @@ static ECRESULT DeserializePropVal(struct soap *soap,
 	lpsPropval = s_alloc<propVal>(soap);
 	er = lpSource->Read(&lpsPropval->ulPropTag, sizeof(lpsPropval->ulPropTag), 1);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	switch (PROP_TYPE(lpsPropval->ulPropTag)) {
 	case PT_I2:
@@ -1251,7 +1236,7 @@ static ECRESULT DeserializePropVal(struct soap *soap,
 		if (er == erSuccess) {
 			lpsPropval->Value.mvhilo.__size = ulCount;
 			lpsPropval->Value.mvhilo.__ptr = s_alloc<hiloLong>(soap, ulCount);
-			for (unsigned int x = 0; er == erSuccess && x < ulCount; ++x) {
+			for (gsoap_size_t x = 0; er == erSuccess && x < ulCount; ++x) {
 				er = lpSource->Read(&lpsPropval->Value.mvhilo.__ptr[x].hi, sizeof(lpsPropval->Value.mvhilo.__ptr[x].hi), ulCount);
 				if (er == erSuccess)
 					er = lpSource->Read(&lpsPropval->Value.mvhilo.__ptr[x].lo, sizeof(lpsPropval->Value.mvhilo.__ptr[x].lo), ulCount);
@@ -1265,7 +1250,7 @@ static ECRESULT DeserializePropVal(struct soap *soap,
 		if (er == erSuccess) {
 			lpsPropval->Value.mvbin.__size = ulCount;
 			lpsPropval->Value.mvbin.__ptr = s_alloc<xsd__base64Binary>(soap, ulCount);
-			for (unsigned int x = 0; er == erSuccess && x < ulCount; ++x) {
+			for (gsoap_size_t x = 0; er == erSuccess && x < ulCount; ++x) {
 				er = lpSource->Read(&ulLen, sizeof(ulLen), 1);
 				if (er == erSuccess) {
 					lpsPropval->Value.mvbin.__ptr[x].__size = ulLen;
@@ -1282,7 +1267,7 @@ static ECRESULT DeserializePropVal(struct soap *soap,
 		if (er == erSuccess) {
 			lpsPropval->Value.mvszA.__size = ulCount;
 			lpsPropval->Value.mvszA.__ptr = s_alloc<char*>(soap, ulCount);
-			for (unsigned int x = 0; er == erSuccess && x < ulCount; ++x) {
+			for (gsoap_size_t x = 0; er == erSuccess && x < ulCount; ++x) {
 				er = lpSource->Read(&ulLen, sizeof(ulLen), 1);
 				if (er == erSuccess) {
 					if (lpStreamCaps->bSupportUnicode) {
@@ -1311,8 +1296,7 @@ static ECRESULT DeserializePropVal(struct soap *soap,
 		}
 		break;
 	default:
-		er = ZARAFA_E_INVALID_TYPE;
-		goto exit;
+		return KCERR_INVALID_TYPE;
 	}
 
 	// If the proptag is in the dynamic named property range, we need to get the correct local proptag
@@ -1338,8 +1322,6 @@ static ECRESULT DeserializePropVal(struct soap *soap,
 	}
 
 	*lppsPropval = lpsPropval;
-
-exit:
 	return er;
 }
 
@@ -1351,7 +1333,7 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 	unsigned int	ulParentId = 0;
 	unsigned int	ulOwner = 0;
 	unsigned int	ulParentType = 0;
-	unsigned int	nMVItems = 0;
+	gsoap_size_t nMVItems = 0;
 	unsigned int	ulAffected = 0;
 	unsigned int	ulLen = 0;
 	propVal			*lpsPropval = NULL;
@@ -1374,12 +1356,12 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 	std::set<unsigned int>::const_iterator iterInserted;
 
 	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		goto exit;
 	}
 
 	if (!lpAttachmentStorage) {
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
@@ -1474,7 +1456,7 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 
 		if ((PROP_TYPE(lpsPropval->ulPropTag) & MV_FLAG) == MV_FLAG) {
 			nMVItems = GetMVItemCount(lpsPropval);
-			for (unsigned j = 0; j < nMVItems; ++j) {
+			for (gsoap_size_t j = 0; j < nMVItems; ++j) {
 				er = CopySOAPPropValToDatabaseMVPropVal(lpsPropval, j, strColName, strColData, lpDatabase);
 				if (er != erSuccess) {
 					er = erSuccess;
@@ -1486,7 +1468,7 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 				if (er != erSuccess)
 					goto exit;
 				if (ulAffected != 1) {
-					er = ZARAFA_E_DATABASE_ERROR;
+					er = KCERR_DATABASE_ERROR;
 					ec_log_err("DeserializeProps(): Unexpected affected row count");
 					goto exit;
 				}
@@ -1495,7 +1477,7 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 		} else {
 			// Write the property to the database
 			er = WriteSingleProp(lpDatabase, ulObjId, ulParentId, lpsPropval, false, lpDatabase->GetMaxAllowedPacket(), strInsertQuery);
-			if (er == ZARAFA_E_TOO_BIG) {
+			if (er == KCERR_TOO_BIG) {
 				er = lpDatabase->DoInsert(strInsertQuery);
 				if (er == erSuccess) {
 					strInsertQuery.clear();
@@ -1513,9 +1495,9 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 				
 				if (0) {
 					// FIXME do we need this code? Currently we get always a deferredupdate!
-					// Please also update zarafacmd.cpp:WriteProps
+					// Please also update cmd.cpp:WriteProps
 					er = WriteSingleProp(lpDatabase, ulObjId, ulParentId, lpsPropval, true, lpDatabase->GetMaxAllowedPacket(), strInsertTProp);
-					if (er == ZARAFA_E_TOO_BIG) {
+					if (er == KCERR_TOO_BIG) {
 						er = lpDatabase->DoInsert(strInsertTProp);
 						if (er == erSuccess) {
 							strInsertTProp.clear();
@@ -1630,7 +1612,7 @@ ECRESULT DeserializeObject(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtt
 	std::string		strQuery;
 
 	if (!lpDatabase) {
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		goto exit;
 	}
 
@@ -1646,7 +1628,7 @@ ECRESULT DeserializeObject(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtt
 	ulRealObjType = RealObjType(ulObjType, ulParentType);
 
 	if (ulRealObjType != MAPI_MESSAGE && ulRealObjType != MAPI_ATTACH && ulRealObjType != MAPI_MAILUSER && ulRealObjType != MAPI_DISTLIST) {
-		er = ZARAFA_E_NO_SUPPORT;
+		er = KCERR_NO_SUPPORT;
 		goto exit;
 	}
 
@@ -1656,7 +1638,7 @@ ECRESULT DeserializeObject(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtt
 			goto exit;
 
 		if (ulStreamVersion >= arraySize(g_StreamCaps)) {
-			er = ZARAFA_E_NO_SUPPORT;
+			er = KCERR_NO_SUPPORT;
 			goto exit;
 		}
 
@@ -1806,7 +1788,7 @@ ECRESULT DeserializeObject(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtt
 exit:
 	if (er != erSuccess) {
 		lpSource->Flush(); // Flush the whole stream
-		ec_log_err("DeserializeObject failed with error code 0x%08x %s", er, GetMAPIErrorMessage(ZarafaErrorToMAPIError(er, ~0U /* anything that yields UNKNOWN */)));
+		ec_log_err("DeserializeObject failed with error code 0x%08x %s", er, GetMAPIErrorMessage(kcerr_to_mapierr(er, ~0U /* anything that yields UNKNOWN */)));
 	}	
 
 	if (lpPropValArray)
@@ -1818,130 +1800,118 @@ exit:
 
 ECRESULT GetValidatedPropType(DB_ROW lpRow, unsigned int *lpulType)
 {
-	ECRESULT er = ZARAFA_E_DATABASE_ERROR;
+	ECRESULT er = KCERR_DATABASE_ERROR;
 	unsigned int ulType = 0;
 
-	if (lpRow == NULL || lpulType == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpRow == NULL || lpulType == NULL)
+		return KCERR_INVALID_PARAMETER;
 
 	ulType = atoi(lpRow[FIELD_NR_TYPE]);
 	switch (ulType) {
 	case PT_I2:
 		if (lpRow[FIELD_NR_ULONG] == NULL)
-			goto exit;
+			return er;
 		break;
 	case PT_LONG:
 		if (lpRow[FIELD_NR_ULONG] == NULL)
-			goto exit;
+			return er;
 		break;
 	case PT_R4:
 		if (lpRow[FIELD_NR_DOUBLE] == NULL)
-			goto exit;
+			return er;
 		break;
 	case PT_BOOLEAN:
 		if (lpRow[FIELD_NR_ULONG] == NULL)
-			goto exit;
+			return er;
 		break;
 	case PT_DOUBLE:
 	case PT_APPTIME:
 		if (lpRow[FIELD_NR_DOUBLE] == NULL)
-			goto exit;
+			return er;
 		break;
 	case PT_CURRENCY:
 	case PT_SYSTIME:
 		if (lpRow[FIELD_NR_HI] == NULL || lpRow[FIELD_NR_LO] == NULL) 
-			goto exit;
+			return er;
 		break;
 	case PT_I8:
 		if (lpRow[FIELD_NR_LONGINT] == NULL)
-			goto exit;
+			return er;
 		break;
 	case PT_STRING8:
 	case PT_UNICODE:
 		if (lpRow[FIELD_NR_STRING] == NULL) 
-			goto exit;
+			return er;
 		break;
 	case PT_CLSID:
 	case PT_BINARY:
 		if (lpRow[FIELD_NR_BINARY] == NULL) 
-			goto exit;
+			return er;
 		break;
 	case PT_MV_I2:
 		if (lpRow[FIELD_NR_ULONG] == NULL) 
-			goto exit;
+			return er;
 		break;
 	case PT_MV_LONG:
 		if (lpRow[FIELD_NR_ULONG] == NULL) 
-			goto exit;
+			return er;
 		break;
 	case PT_MV_R4:
 		if (lpRow[FIELD_NR_DOUBLE] == NULL) 
-			goto exit;
+			return er;
 		break;
 	case PT_MV_DOUBLE:
 	case PT_MV_APPTIME:
 		if (lpRow[FIELD_NR_DOUBLE] == NULL) 
-			goto exit;
+			return er;
 		break;
 	case PT_MV_CURRENCY:
 	case PT_MV_SYSTIME:
 		if (lpRow[FIELD_NR_HI] == NULL || lpRow[FIELD_NR_LO] == NULL) 
-			goto exit;
+			return er;
 		break;
 	case PT_MV_BINARY:
 	case PT_MV_CLSID:
 		if (lpRow[FIELD_NR_BINARY] == NULL) 
-			goto exit;
+			return er;
 		break;
 	case PT_MV_STRING8:
 	case PT_MV_UNICODE:
 		if (lpRow[FIELD_NR_STRING] == NULL) 
-			goto exit;
+			return er;
 		break;
 	case PT_MV_I8:
 		if (lpRow[FIELD_NR_LONGINT] == NULL) 
-			goto exit;
+			return er;
 		break;
 	default:
-		er = ZARAFA_E_INVALID_TYPE;
-		goto exit;
+		return KCERR_INVALID_TYPE;
 	}
-
-	er = erSuccess;
 	*lpulType = ulType;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT GetValidatedPropCount(ECDatabase *lpDatabase, DB_RESULT lpDBResult, unsigned int *lpulCount)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	unsigned int ulCount = 0;
 	DB_ROW lpRow;
 
-	if (lpDatabase == NULL || lpDBResult == NULL || lpulCount == 0) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpDatabase == NULL || lpDBResult == NULL || lpulCount == 0)
+		return KCERR_INVALID_PARAMETER;
 
 	while ((lpRow = lpDatabase->FetchRow(lpDBResult)) != NULL) {
 		unsigned int ulType;
 		er = GetValidatedPropType(lpRow, &ulType);	// Ignore ulType, we just need the validation
-		if (er == ZARAFA_E_DATABASE_ERROR) {
+		if (er == KCERR_DATABASE_ERROR) {
 			ec_log_err("GetValidatedPropCount(): GetValidatedPropType failed");
-			er = erSuccess;
 			continue;
 		} else if (er != erSuccess)
-			goto exit;
+			return er;
 		++ulCount;
 	}
 
 	lpDatabase->ResetResult(lpDBResult);
 	*lpulCount = ulCount;
-
-exit:
-	return er;
+	return erSuccess;
 }

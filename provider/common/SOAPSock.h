@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,20 +18,12 @@
 #ifndef SOAPSOCK_H
 #define SOAPSOCK_H
 
-#ifdef WIN32
-// For WSAIoctl
-#include <Winsock2.h>
-#include <Mstcpip.h>
-#include <Wincrypt.h>
-#include <Cryptuiapi.h>
-#endif
-
 #include <openssl/ssl.h>
-#include "soapZarafaCmdProxy.h"
+#include "soapKCmdProxy.h"
 
-int ssl_verify_callback_zarafa_silent(int ok, X509_STORE_CTX *store);
-int ssl_verify_callback_zarafa(int ok, X509_STORE_CTX *store);
-int ssl_verify_callback_zarafa_control(int ok, X509_STORE_CTX *store, BOOL bShowDlg);
+int ssl_verify_callback_kopano_silent(int ok, X509_STORE_CTX *store);
+int ssl_verify_callback_kopano(int ok, X509_STORE_CTX *store);
+int ssl_verify_callback_kopano_control(int ok, X509_STORE_CTX *store, BOOL bShowDlg);
 
 HRESULT LoadCertificatesFromRegistry();
 
@@ -47,8 +39,8 @@ HRESULT CreateSoapTransport(ULONG ulUIFlags,
 	ULONG ulProxyFlags,
 	int				iSoapiMode,
 	int				iSoapoMode,
-	ZarafaCmd **lppCmd);
+	KCmd **lppCmd);
 
 
-VOID DestroySoapTransport(ZarafaCmd *lpCmd);
+VOID DestroySoapTransport(KCmd *lpCmd);
 #endif

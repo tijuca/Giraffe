@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -28,15 +28,13 @@
 
 #include "freebusy.h"
 #include <map>
+#include <kopano/zcdefs.h>
 
 typedef std::map<LONG, FBBlock_1>mapFB;
 
-class ECFBBlockList
-{
+class ECFBBlockList _kc_final {
 public:
 	ECFBBlockList(void);
-	~ECFBBlockList(void);
-
 	void Copy(ECFBBlockList *lpfbBlkList);
 
 	HRESULT Add(FBBlock_1* lpFBBlock);

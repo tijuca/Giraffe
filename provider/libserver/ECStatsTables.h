@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,7 +18,7 @@
 #ifndef EC_STATS_TABLES_H
 #define EC_STATS_TABLES_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include "ECGenericObjectTable.h"
 #include "ECSession.h"
 
@@ -135,6 +135,6 @@ private:
 };
 
 // Link to provider/server
-void zarafa_get_server_stats(unsigned int *lpulQueueLen, double *lpDblQueueAge, unsigned int *lpulThreads, unsigned int *lpulIdleThreads);
+void kopano_get_server_stats(unsigned int *lpulQueueLen, double *lpDblQueueAge, unsigned int *lpulThreads, unsigned int *lpulIdleThreads);
 
 #endif

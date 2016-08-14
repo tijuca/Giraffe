@@ -1,8 +1,8 @@
 AC_PREREQ(2.60)
-m4_define([zarafa_version], esyscmd(tr -d '\n' <version.in))
-AC_INIT([Zarafa], [zarafa_version], [zarafa-dev@zarafa.com])
+m4_define([xm4_pkg_version], esyscmd([tr -d '\n' <version.in]))
+AC_INIT([kopano], [xm4_pkg_version], [development@kopano.io])
 AC_CONFIG_SRCDIR([provider/server/ECServer.cpp])
-AC_CONFIG_HEADERS([common/config.h common/include/zarafa/zconfig.h])
+AC_CONFIG_HEADERS([common/config.h common/include/kopano/zconfig.h])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_CONFIG_MACRO_DIR([autoconf])
 AM_INIT_AUTOMAKE([1.10 foreign subdir-objects])
@@ -18,19 +18,7 @@ AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_CXX
 AC_PROG_INSTALL
-AC_PATH_PROG(PROG_XMLTO, xmlto)	# not an error if not found, just no manual pages
-AC_PATH_PROG(PROG_ANT, ant)		# not an error if not found, no 'make dist' (waxt package)
 PKG_PROG_PKG_CONFIG
-
-AC_PATH_PROG([SWIG_EXEC], [swig])
-AS_IF([test "x$SWIG_EXEC" = "x"], [AC_MSG_ERROR([Cannot find swig binary])])
-
-
-AM_PATH_PYTHON([2.5])
-PYTHON_LIBS=$("$PYTHON" -c "import distutils.sysconfig as x; print('-lpython' + x.get_config_var('VERSION') + ' ' + x.get_config_var('LIBS') + ' ' + x.get_config_var('SYSLIBS'))")
-PYTHON_INCLUDES=$("$PYTHON" -c "import distutils.sysconfig as x; print('-I' + x.get_python_inc())")
-AC_SUBST([PYTHON_LIBS])
-AC_SUBST([PYTHON_INCLUDES])
 
 abs_top_srcdir=`cd $srcdir; pwd`
 abs_top_builddir=`pwd`
@@ -85,6 +73,17 @@ ZCXXFLAGS="-Wall -Wmissing-declarations -Wno-write-strings"
 LFS_CFLAGS=`getconf LFS_CFLAGS`
 ZCPPFLAGS="$ZCPPFLAGS $LFS_CFLAGS"
 
+AC_MSG_CHECKING([for C++2011 support])
+cxxmode=""
+for i in "c++11" "c++0x"; do
+	CXXFLAGS="$CXXFLAGS_system -std=$i"
+	AC_COMPILE_IFELSE([AC_LANG_SOURCE([])], [cxxmode="$i"])
+	AS_IF([test -n "$cxxmode"], [break])
+done
+CXXFLAGS="$CXXFLAGS_system"
+ZCXXFLAGS="$ZCXXFLAGS -std=$cxxmode"
+AC_MSG_RESULT([$cxxmode])
+
 # disable variadic-macros: too much warning: anonymous variadic macros were introduced in C99, only on new compilers
 AC_MSG_CHECKING([whether C++ compiler understands -Wno-variadic-macros option])
 if ( echo 'int main() {}' | $CXX -Wno-variadic-macros -E - >/dev/null 2>&1 ); then
@@ -124,9 +123,6 @@ AC_SUBST([SWIG_FLAGS])
 
 AC_ARG_ENABLE([tcmalloc], AS_HELP_STRING([--enable-tcmalloc], [enable use of tcmalloc minimal lib]),
   [want_tcmalloc=${enableval}],[want_tcmalloc=no])
-
-AC_ARG_ENABLE([sparsehash], AS_HELP_STRING([--enable-sparsehash], [enable use of sparsehash]),
-  [want_sparsehash=${enableval}],[want_sparsehash=no])
 
 AC_MSG_CHECKING([specified Linux distribution name])
 AC_ARG_WITH([distro], AS_HELP_STRING([--with-distro], [set distribution name, used for sysconfig and initscripts only. available: rhel, alt, suse or sles]),
@@ -169,12 +165,6 @@ AC_ARG_ENABLE(coverage,
 	  fi
     ])
 
-# test offline possibility
-  AC_ARG_ENABLE([offline], AS_HELP_STRING([--enable-offline], [Compile zarafa-server as the offline server]),
-  [
-  	ZCPPFLAGS="$ZCPPFLAGS -DHAVE_OFFLINE_SUPPORT"
-  ])
-
 # MAPI config files
 AC_ARG_WITH(mapi-configdir,
   AS_HELP_STRING([--with-mapi-configdir=PATH], [path to install the libmapi config (provider) files (default /etc/mapi)]),
@@ -183,22 +173,22 @@ AC_SUBST(MAPICONFIGDIR)
 
 # user create scripts location
 AC_ARG_WITH(userscript-prefix,
-  AS_HELP_STRING([--with-userscript-prefix=PATH], [path to install the userscripts in (default SYSCONFDIR/zarafa/userscripts)]),
-  [USERSCRIPTDIR=${withval}],[USERSCRIPTDIR='/etc/zarafa/userscripts'])
+  AS_HELP_STRING([--with-userscript-prefix=PATH], [path to install the userscripts in (default SYSCONFDIR/kopano/userscripts)]),
+  [USERSCRIPTDIR=${withval}],[USERSCRIPTDIR='/etc/kopano/userscripts'])
 AC_SUBST(USERSCRIPTDIR)
 AS_IF([echo "$USERSCRIPTDIR" | grep -q '\$'],
 	[AC_MSG_ERROR([Variable expansion unfortunately not supported for --with-userscript-prefix])])
 
 # quota warning templates location
 AC_ARG_WITH(quotatemplate-prefix,
-  AS_HELP_STRING([--with-quotatemplate-prefix=PATH], [path to install the quota warning templates in (default SYSCONFDIR/zarafa/quotamail)]),
-  [QUOTATEMPLATEDIR=${withval}],[QUOTATEMPLATEDIR='${sysconfdir}/zarafa/quotamail'])
+  AS_HELP_STRING([--with-quotatemplate-prefix=PATH], [path to install the quota warning templates in (default SYSCONFDIR/kopano/quotamail)]),
+  [QUOTATEMPLATEDIR=${withval}],[QUOTATEMPLATEDIR='${sysconfdir}/kopano/quotamail'])
 AC_SUBST(QUOTATEMPLATEDIR)
 
 # search scripts location
 AC_ARG_WITH(searchscripts-prefix,
-  AS_HELP_STRING([--with-searchscripts-prefix=PATH], [path to install the search scripts in (default SYSCONFDIR/zarafa/searchscripts)]),
-  [SEARCHSCRIPTSDIR=${withval}],[SEARCHSCRIPTSDIR='${sysconfdir}/zarafa/searchscripts'])
+  AS_HELP_STRING([--with-searchscripts-prefix=PATH], [path to install the search scripts in (default SYSCONFDIR/kopano/searchscripts)]),
+  [SEARCHSCRIPTSDIR=${withval}],[SEARCHSCRIPTSDIR='${sysconfdir}/kopano/searchscripts'])
 AC_SUBST(SEARCHSCRIPTSDIR)
 
 AC_ARG_WITH([systemunitdir],
@@ -226,7 +216,7 @@ AC_ARG_WITH([tmpfilesdir],
 	])
 AC_SUBST([tmpfilesdir])
 
-# zarafa-stats requires ncurses(w) for --top
+# stats client requires ncurses(w) for --top
 # check wide version before non-wide version
 AC_DEFUN([LIBNCURSES_WITH_CONFIG],[
 	AC_CHECK_PROGS([NCURSES_CONFIG], [ncursesw6-config ncursesw5-config ncurses6-config ncurses5-config ncursesw-config ncurses-config], [])
@@ -238,7 +228,7 @@ AC_DEFUN([LIBNCURSES_WITH_CONFIG],[
 		[
 			dnl just pick the lowest common denominator
 			NCURSES_FLAGS=""
-			NCURSES_LIBS="-lncurses"
+			NCURSES_LIBS="-lncurses -ltinfo"
 		]
 	)
 	dnl We should be using ncurses.h - or is portability to non-ncurses
@@ -261,13 +251,19 @@ AC_CHECK_FUNCS([timegm getpeereid getpwnam_r vsyslog vsnprintf_l])
 #
 
 AC_ARG_WITH([php], [AS_HELP_STRING([--without-php], [Disable building PHP components])])
-AM_CONDITIONAL([WITH_PHP], [test "$with_php" != "no"])
 AS_IF([test "$with_php" != "no"], [
 	# Checks for PHP through php-config and tests the truth of
 	# php-config results
 	PHP_WITH_PHP_CONFIG
 	PHP_CHECK_INCLUDES
+	echo "PHP version: $PHP_VERSION"
+	AS_CASE([$PHP_VERSION],
+		[5.*], [with_php=5],
+		[7.*], [with_php=7]
+	)
 ])
+AM_CONDITIONAL([WITH_PHP5], [test "$with_php" = 5])
+AM_CONDITIONAL([WITH_PHP7], [test "$with_php" = 7])
 
 # Checks for libxml2
 AC_DEFUN([LIBXML_WITH_XML2_CONFIG],[
@@ -311,7 +307,7 @@ AC_DEFUN([MYSQL_WITH_MYSQL_CONFIG],[
   AC_ARG_WITH([mysql-config], AS_HELP_STRING([--with-mysql-config=PATH], [path to the mysql-config script of mysql 4.1]),
     [MYSQL_CONFIG=${withval}],[MYSQL_CONFIG=mysql_config])
 
-  AC_ARG_ENABLE([embedded-mysql], AS_HELP_STRING([--enable-embedded-mysql], [Compile zarafa-server with the embedded MySQL server]),
+  AC_ARG_ENABLE([embedded-mysql], AS_HELP_STRING([--enable-embedded-mysql], [Compile server with the embedded MySQL server]),
   [
 	EMBEDDED=1
 	ZCPPFLAGS="$ZCPPFLAGS -DEMBEDDED_MYSQL"
@@ -429,27 +425,8 @@ dnl Stupid gsoap not abstracting properly! If our -Ds do not match with what
 dnl gsoap was compiled with, we are in trouble.
 GSOAP_CFLAGS="-DWITH_OPENSSL -DWITH_GZIP -DHAVE_OPENSSL_SSL_H -DHAVE_ZLIB_H"
 GSOAP_LIBS="-lgsoapssl++"
-AC_MSG_CHECKING([gsoap])
-AC_ARG_WITH(gsoap-prefix,
-  AS_HELP_STRING([--with-gsoap-prefix=PATH], [gsoap prefix, e.g. /usr/local, default /usr]),
-  [
-  GSOAP_PREFIX="$withval"
-  GSOAP_SOAPCPP2="$GSOAP_PREFIX/bin/soapcpp2"
-  GSOAP_CFLAGS="$GSOAP_CFLAGS -I$GSOAP_PREFIX/include"
-  # Hardcoding directories is bad… they may contain libraries of mismatching archictecture
-  GSOAP_LIBS="$GSOAP_LIBS -L$GSOAP_PREFIX/lib -L$GSOAP_PREFIX/lib64 -R$GSOAP_PREFIX/lib -R$GSOAP_PREFIX/lib64"
-  ],
-  [
-  GSOAP_PREFIX="/usr"
-  GSOAP_SOAPCPP2="soapcpp2"
-  ])
-# Gsoap 2.8.13 introduced the -z1 flag for depreacted old-style C++ service proxies and objects ( https://www.cs.fsu.edu/~engelen/changelog.html )
-GSOAP_SOAPCPP2=$(mkdir -p "conftest.$$" && cd "conftest.$$" && "$GSOAP_SOAPCPP2" -z1 </dev/null >/dev/null 2>/dev/null && echo "$GSOAP_SOAPCPP2 -z1 " || echo "$GSOAP_SOAPCPP2")
-rm -Rf "conftest.$$"
-AC_MSG_RESULT([$GSOAP_SOAPCPP2])
 AC_SUBST(GSOAP_CFLAGS)
 AC_SUBST(GSOAP_LIBS)
-AC_SUBST(GSOAP_SOAPCPP2)
 
 ICAL_CFLAGS=""
 ICAL_LIBS="-lical -licalss"
@@ -470,11 +447,6 @@ if test "$want_tcmalloc" = "yes"; then
 	AC_CHECK_HEADERS([gperftools/malloc_extension.h google/malloc_extension.h])
 	CPPFLAGS="$CPPFLAGS_system"
 	AC_DEFINE(HAVE_TCMALLOC, [1], [Google TCMalloc enabled])
-fi
-
-# Check for sparsehash availability
-if test "$want_sparsehash" = "yes"; then
-	AC_CHECK_HEADERS([google/sparse_hash_map], AC_DEFINE(HAVE_SPARSEHASH, [], [Google sparsehash available]), [])
 fi
 
 #
@@ -747,8 +719,21 @@ dnl Set default project flags. On overriding AM_CXXFLAGS, include ${ZCXXFLAGS}
 AM_CXXFLAGS="$ZCXXFLAGS"
 AM_LDFLAGS="$ZLDFLAGS"
 AC_SUBST([ZCPPFLAGS])
+AC_SUBST([ZCXXFLAGS])
 AC_SUBST([AM_CXXFLAGS])
 AC_SUBST([AM_LDFLAGS])
+
+
+AC_PATH_PROG(PROG_XMLTO, xmlto)	# not an error if not found, just no manual pages
+AC_PATH_PROG(PROG_ANT, ant)		# not an error if not found, no 'make dist' (waxt package)
+AC_PATH_PROG([SWIG_EXEC], [swig])
+AS_IF([test "x$SWIG_EXEC" = "x"], [AC_MSG_ERROR([Cannot find swig binary])])
+AM_PATH_PYTHON([2.5])
+PYTHON_LIBS=$("$PYTHON" -c "import sys; import distutils.sysconfig as x; print('-lpython' + x.get_config_var('VERSION') + getattr(sys, 'abiflags', '') + ' ' + x.get_config_var('LIBS') + ' ' + x.get_config_var('SYSLIBS'))")
+PYTHON_INCLUDES=$("$PYTHON" -c "import distutils.sysconfig as x; print('-I' + x.get_python_inc())")
+AC_SUBST([PYTHON_LIBS])
+AC_SUBST([PYTHON_INCLUDES])
+
 
 #
 # Output files
@@ -758,8 +743,8 @@ AC_CONFIG_FILES([Makefile
 		mapi4linux/include/Makefile
 		mapi4linux/src/Makefile
 		m4lcommon/Makefile
-		m4lcommon/include/zarafa/Makefile
-		php-ext/Makefile
+		m4lcommon/include/kopano/Makefile
+		php-ext/Makefile php7-ext/Makefile
 		provider/Makefile
 		provider/client/Makefile
 		provider/contacts/Makefile
@@ -775,10 +760,10 @@ AC_CONFIG_FILES([Makefile
 		spooler/python/Makefile
 		spooler/python/plugins/Makefile
 		common/Makefile
-		common/include/zarafa/Makefile
+		common/include/kopano/Makefile
 		ECtools/Makefile
-		ECtools/archiver/include/zarafa/Makefile
-		ECtools/backup-plus/Makefile
+		ECtools/archiver/include/kopano/Makefile
+		ECtools/backup/Makefile
 		ECtools/presence/Makefile
 		ECtools/search/Makefile
 		installer/Makefile
@@ -805,13 +790,14 @@ AC_CONFIG_FILES([Makefile
 		libicalmapi/Makefile
 		caldav/Makefile
 		swig/Makefile
-		swig/include/zarafa/Makefile
+		swig/include/kopano/Makefile
 		swig/python/Makefile
-		swig/python/include/zarafa/Makefile
+		swig/python/include/kopano/Makefile
+		swig/python/kopano/Makefile
 		swig/python/zarafa/Makefile
-		zarafa-libsync/Makefile
+		libsync/Makefile
 
-		common/zarafa.pc
+		common/kopano.pc
 		default.sym
 		mapi4linux/src/libmapi.sym
 		version

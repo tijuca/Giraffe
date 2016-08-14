@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,27 +15,27 @@
  *
  */
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/platform.h>
+#include <kopano/zcdefs.h>
+#include <kopano/platform.h>
 
 #include <mapi.h>
 #include <mapiutil.h>
-#include <zarafa/ECLogger.h>
+#include <kopano/ECLogger.h>
 
-#include <zarafa/userutil.h>
+#include <kopano/userutil.h>
 
-#include <zarafa/charset/utf8string.h>
-#include <zarafa/charset/convert.h>
-#include <zarafa/ECDefs.h>
-#include <zarafa/ECGuid.h>
-#include <zarafa/IECServiceAdmin.h>
+#include <kopano/charset/utf8string.h>
+#include <kopano/charset/convert.h>
+#include <kopano/ECDefs.h>
+#include <kopano/ECGuid.h>
+#include <kopano/IECServiceAdmin.h>
 #include <edkmdb.h>
 #include <edkguid.h>
-#include <zarafa/IECLicense.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/ECRestriction.h>
-#include <zarafa/mapi_ptr.h>
-#include <zarafa/mapiguidext.h>
+#include <kopano/IECLicense.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/ECRestriction.h>
+#include <kopano/mapi_ptr.h>
+#include <kopano/mapiguidext.h>
 
 using namespace std;
 

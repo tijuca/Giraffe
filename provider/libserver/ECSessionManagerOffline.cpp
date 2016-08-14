@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <new>
 
 #include "ECSecurity.h"
@@ -23,17 +23,11 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECSessionManagerOffline::ECSessionManagerOffline(ECConfig *lpConfig,
-    bool bHostedZarafa, bool bDistributedZarafa) :
-	ECSessionManager(lpConfig, NULL, bHostedZarafa, bDistributedZarafa)
-{
-}
-
-ECSessionManagerOffline::~ECSessionManagerOffline(void)
+    bool bHostedKopano, bool bDistributedKopano) :
+	ECSessionManager(lpConfig, NULL, bHostedKopano, bDistributedKopano)
 {
 }
 
@@ -46,7 +40,7 @@ ECRESULT ECSessionManagerOffline::CreateAuthSession(struct soap *soap, unsigned 
 
 	lpAuthSession = new(std::nothrow) ECAuthSessionOffline(GetSourceAddr(soap), newSessionID, m_lpDatabaseFactory, this, ulCapabilities);
 	if (lpAuthSession == NULL)
-		return ZARAFA_E_NOT_ENOUGH_MEMORY;
+		return KCERR_NOT_ENOUGH_MEMORY;
 	if (bLockSession)
 	        lpAuthSession->Lock();
 	if (bRegisterSession) {

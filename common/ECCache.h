@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,13 +18,13 @@
 #ifndef ECCACHE_INCLUDED
 #define ECCACHE_INCLUDED
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <list>
 #include <string>
 #include <vector>
 #include <cassert>
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 class ECLogger;
 
@@ -58,7 +58,7 @@ public:
 	typedef unsigned long		count_type;
 		typedef uint64_t	size_type;
 
-	virtual ~ECCacheBase();
+	virtual ~ECCacheBase(void) {}
 
 	virtual count_type ItemCount() const = 0;
 	virtual size_type Size() const = 0;
@@ -132,7 +132,7 @@ public:
 
 		iter = m_map.find(key);
 		if (iter == m_map.end())
-			return ZARAFA_E_NOT_FOUND;
+			return KCERR_NOT_FOUND;
 
 		m_ulSize -= GetCacheAdditionalSize(iter->second);
 		m_ulSize -= GetCacheAdditionalSize(key);
@@ -165,7 +165,7 @@ public:
 						dl.push_back(iter->first);
 				for (typename std::vector<key_type>::const_iterator i = dl.begin(); i != dl.end(); ++i)
 					m_map.erase(*i);
-				er = ZARAFA_E_NOT_FOUND;
+				er = KCERR_NOT_FOUND;
 			} else {
 				*lppValue = &iter->second;
 				// If we have an aging cache, we don't update the timestamp,
@@ -177,7 +177,7 @@ public:
 				er = erSuccess;
 			}
 		} else {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 		}
 
 		IncrementHitCount();
@@ -212,7 +212,8 @@ public:
 
 		if (result.second == false) {
 			// The key already exists but its value is unmodified. So update it now
-			m_ulSize += (int)(GetCacheAdditionalSize(value) - GetCacheAdditionalSize(result.first->second));
+			m_ulSize += GetCacheAdditionalSize(value);
+			m_ulSize -= GetCacheAdditionalSize(result.first->second);
 			result.first->second = value;
 			result.first->second.ulLastAccess = GetProcessTime();
 			// Since there is a very small chance that we need to purge the cache, we're skipping that here.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,16 +15,14 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/ZarafaCode.h>
+#include <kopano/platform.h>
+#include <kopano/kcodes.h>
 
 #include "ECCache.h"
-#include <zarafa/ECLogger.h>
-#include <zarafa/stringutil.h>
+#include <kopano/ECLogger.h>
+#include <kopano/stringutil.h>
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -36,8 +34,6 @@ ECCacheBase::ECCacheBase(const std::string &strCachename, size_type ulMaxSize, l
 	, m_ulCacheHit(0)
 	, m_ulCacheValid(0)
 { }
-
-ECCacheBase::~ECCacheBase() {}
 
 void ECCacheBase::RequestStats(void(callback)(const std::string &, const std::string &, const std::string &, void*), void *obj)
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,25 +15,21 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ServerConfigCheck.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
 ServerConfigCheck::ServerConfigCheck(const char *lpszConfigFile) : ECConfigCheck("Server Configuration file", lpszConfigFile)
 {
 	std::string setting;
 
-	setting = getSetting("enable_hosted_zarafa");
+	setting = getSetting("enable_hosted_kopano");
 	if (!setting.empty())
 		setHosted(parseBool(setting));
 
-	setting = getSetting("enable_distributed_zarafa");
+	setting = getSetting("enable_distributed_kopano");
 	if (!setting.empty())
 		setMulti(parseBool(setting));
-}
-
-ServerConfigCheck::~ServerConfigCheck()
-{
 }
 
 void ServerConfigCheck::loadChecks()
@@ -52,11 +48,11 @@ void ServerConfigCheck::loadChecks()
 	addCheck("createcompany_script", CONFIG_HOSTED_USED, &testFile);
 	addCheck("deletecompany_script", CONFIG_HOSTED_USED, &testFile);
 
-	addCheck("enable_hosted_zarafa", 0, &testBoolean);
+	addCheck("enable_hosted_kopano", 0, &testBoolean);
 	addCheck("storename_format", 0, &testStorename);
 	addCheck("user_plugin", "loginname_format", 0, &testLoginname);
 
-	addCheck("enable_distributed_zarafa", 0, &testBoolean);
+	addCheck("enable_distributed_kopano", 0, &testBoolean);
 	addCheck("server_name", CONFIG_MULTI_USED);
 // 	addCheck("thread_stacksize", 0, &testMinInt, 25);
 

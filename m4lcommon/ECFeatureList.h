@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,23 +18,23 @@
 #ifndef EC_FEATURELIST_H
 #define EC_FEATURELIST_H
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <string>
 #include <set>
 
-///< all zarafa features that are checked for access before allowing it
-static const char *const zarafa_features[] = {
-	"imap", "pop3", "mobile"
+///< all kopano features that are checked for access before allowing it
+static const char *const kopano_features[] = {
+	"imap", "pop3", "mobile", "outlook"
 };
 
 /** 
- * Return a set of all available zarafa features.
+ * Return a set of all available kopano features.
  * 
  * @return unique set of feature names
  */
 inline std::set<std::string> getFeatures() {
-	return std::set<std::string>(zarafa_features,
-	       zarafa_features + ARRAY_SIZE(zarafa_features));
+	return std::set<std::string>(kopano_features,
+	       kopano_features + ARRAY_SIZE(kopano_features));
 }
 
 #endif

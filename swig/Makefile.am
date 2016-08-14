@@ -1,6 +1,6 @@
 # make sure common swig lib builds first
 
-SUBDIRS = . include/zarafa python
+SUBDIRS = . include/kopano python
 
 AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) \
 	-I$(top_srcdir)/mapi4linux/include -I$(top_srcdir)/provider/common \
@@ -11,7 +11,7 @@ EXTRA_DIST = edkmdb.i mapi.i mapiutil.i mapidefs.i mapicode.i mapix.i	\
 	IECMultiStoreTable.i IECServiceAdmin.i IECSpooler.i					\
 	IECTestProtocol.i IECLicense.i inetmapi.i icalmapi.i				\
 	swig_iunknown.h ecdefs.i libcommon.i archiver.i licenseclient.i		\
-	libfreebusy.i zarafasync.i ECLogger.i RecurrenceState.i				\
+	libfreebusy.i kopanosync.i ECLogger.i RecurrenceState.i				\
 	RecurrenceState.swig.h
 
 check-syntax:

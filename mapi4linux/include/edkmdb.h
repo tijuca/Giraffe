@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -20,7 +20,7 @@
 
 /*
  * No, this is not the edkmdb.h file,
- * but it contains the exchange interfaces used in zarafa
+ * but it contains the exchange interfaces used in kopano
  */
 
 #define	OPENSTORE_USE_ADMIN_PRIVILEGE		((ULONG)1)
@@ -31,7 +31,7 @@
 #define OPENSTORE_TRANSPORT					((ULONG)32)
 #define OPENSTORE_REMOTE_TRANSPORT			((ULONG)64)
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 class IExchangeManageStore : public IUnknown {
 public:

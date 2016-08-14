@@ -17,36 +17,36 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 "X-Generator: Pootle 2.1.5\n"
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:905
-msgid "Zarafa Archive"
-msgstr "Zarafa Archive"
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:905
+msgid "Kopano Archive"
+msgstr "Kopano Archive"
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:906
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:906
 msgid "This folder contains the special archive folders."
 msgstr "此資料夾包含特別的封存資料夾"
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:911
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:911
 msgid "History"
 msgstr "歷史紀錄"
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:912
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:912
 msgid ""
 "This folder contains archives that have been replaced by a newer version."
 msgstr "此資料夾包含封存已被置換成新的版本"
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:916
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:916
 msgid "Outgoing"
 msgstr "離開"
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:917
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:917
 msgid "This folder contains archives of all outgoing messages."
 msgstr "此資料夾包含所有寄出的郵件封存"
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:921
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:921
 msgid "Deleted"
 msgstr "刪除"
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:922
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:922
 msgid "This folder contains archives of messages that have been deleted."
 msgstr "此資料夾包含被刪除郵件的封存"
 
@@ -138,7 +138,7 @@ msgstr "沒有描述"
 msgid "MAPI error code:"
 msgstr "MAPI錯誤碼:"
 
-#: zarafa-libsync/ECSync.cpp:1970
+#: libsync/ECSync.cpp:1970
 msgid ""
 "The synchronization of a folder failed. Press retry to continue or ignore to "
 "supress all errors.\r\n"
@@ -149,7 +149,7 @@ msgstr ""
 "如果持續發生，請聯絡系統管理員"
 
 # 84%
-#: zarafa-libsync/ECSync.cpp:1972
+#: libsync/ECSync.cpp:1972
 msgid "Error codes: "
 msgstr "錯誤碼:"
 
@@ -1308,8 +1308,8 @@ msgstr "不能使用的設定文件，因為伺服器無法連線授權伺服器
 
 #: provider/client/ECArchiveAwareMessage.cpp:471
 #: provider/client/ECArchiveAwareMessage.cpp:529
-msgid "Zarafa Archiver"
-msgstr "Zarafa Archiver"
+msgid "Kopano Archiver"
+msgstr "Kopano Archiver"
 
 #: provider/client/ECArchiveAwareMessage.cpp:473
 msgid "Failed to fetch this message from archive."
@@ -1480,8 +1480,8 @@ msgid "Unable to store SSL certificate in registry key."
 msgstr "無法儲存SSL憑證到註冊表"
 
 #: provider/contacts/ZCABContainer.cpp:785
-msgid "Zarafa Contacts Folders"
-msgstr "Zarafa聯絡人資料夾"
+msgid "Kopano Contacts Folders"
+msgstr "Kopano聯絡人資料夾"
 
 #: provider/libserver/ECGenProps.cpp:944
 msgid "Archive"
@@ -1493,7 +1493,7 @@ msgstr "升級:"
 
 #: spooler/Spooler.cpp:484
 msgid ""
-"A fatal error occurred while processing your message, and Zarafa is unable "
+"A fatal error occurred while processing your message, and Kopano is unable "
 "to send your email."
 msgstr "發生不明的錯誤，無法傳送你的郵件"
 
@@ -1533,19 +1533,19 @@ msgstr "找不到傳送的使用者或群組"
 msgid "Error found while trying to send your message. Error code: "
 msgstr "傳送郵件發生錯誤.錯誤碼:"
 
-#: installer/linux/zarafa-mr-accept:405
+#: installer/linux/kopano-mr-accept:405
 msgid "Recurring meetings are not allowed"
 msgstr "不允許定期會議"
 
-#: installer/linux/zarafa-mr-accept:455
+#: installer/linux/kopano-mr-accept:455
 msgid "The requested time slot is unavailable"
 msgstr "要求的時段不可用"
 
-#: installer/linux/zarafa-mr-accept:457
+#: installer/linux/kopano-mr-accept:457
 msgid "The requested time slots are unavailble on the following dates:"
 msgstr "要求的時間區段在此日期不可用:"
 
-#: installer/linux/zarafa-mr-accept:460
+#: installer/linux/kopano-mr-accept:460
 #, php-format
 msgid "%x %X"
 msgstr "%x %X"
@@ -1697,8 +1697,8 @@ msgid "Logon Failed. Please check your name/password."
 msgstr "登入錯誤。請檢查你的帳號與密碼"
 
 #: php-ext/include/mapi/class.mapiexception.php:29
-msgid "Can not connect to Zarafa server."
-msgstr "無法連線到Zarafa主機"
+msgid "Can not connect to Kopano server."
+msgstr "無法連線到Kopano主機"
 
 #: php-ext/include/mapi/class.mapiexception.php:31
 msgid "Can not open object with provided id."

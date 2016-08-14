@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,28 +15,25 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "SOAPDebug.h"
-#include <zarafa/ZarafaCode.h>
-#include <zarafa/ECDebug.h>
+#include <kopano/kcodes.h>
+#include <kopano/ECDebug.h>
 
 #include <edkmdb.h>
 #include <mapidefs.h>
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
 using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 std::string RestrictionToString(const restrictTable *lpRestriction,
     unsigned int indent)
 {
 	std::string strResult;
-	unsigned int i = 0;
 	unsigned int j = 0;
 
 	if(lpRestriction == NULL)
@@ -49,7 +46,7 @@ std::string RestrictionToString(const restrictTable *lpRestriction,
 	{
 		case RES_OR:
 			strResult = "RES_OR:\n";
-			for (i = 0; i < lpRestriction->lpOr->__size; ++i) {
+			for (gsoap_size_t i = 0; i < lpRestriction->lpOr->__size; ++i) {
 				for (j = 0; j < indent + 1; ++j)
 					strResult += "  ";
 				strResult += "Restriction: "+ RestrictionToString(lpRestriction->lpOr->__ptr[i], indent+1)+"\n";
@@ -60,7 +57,7 @@ std::string RestrictionToString(const restrictTable *lpRestriction,
 			break;
 		case RES_AND:
 			strResult = "RES_AND:\n";
-			for (i = 0; i < lpRestriction->lpAnd->__size; ++i) {
+			for (gsoap_size_t i = 0; i < lpRestriction->lpAnd->__size; ++i) {
 				for (j = 0; j < indent + 1; ++j)
 					strResult += "  ";
 				strResult += "Restriction: " + RestrictionToString(lpRestriction->lpAnd->__ptr[i], indent+1);
@@ -292,41 +289,41 @@ std::string PropValueToString(const propVal *lpPropValue)
 			strResult = "PT_MV_I2[" + stringify(lpPropValue->Value.mvi.__size) + "]";
 			break;
 		case PT_MV_LONG:
-			strResult = "PT_MV_LONG[" + stringify(lpPropValue->Value.mvi.__size) + "]";
+			strResult = "PT_MV_LONG[" + stringify(lpPropValue->Value.mvl.__size) + "]";
 			break;
 		case PT_MV_R4:
-			strResult = "PT_MV_R4[" + stringify(lpPropValue->Value.mvi.__size) + "]";
+			strResult = "PT_MV_R4[" + stringify(lpPropValue->Value.mvflt.__size) + "]";
 			break;
 		case PT_MV_DOUBLE:
-			strResult = "PT_MV_DOUBLE[" + stringify(lpPropValue->Value.mvi.__size) + "]";
+			strResult = "PT_MV_DOUBLE[" + stringify(lpPropValue->Value.mvdbl.__size) + "]";
 			break;
 		case PT_MV_APPTIME:
-			strResult = "PT_MV_APPTIME[" + stringify(lpPropValue->Value.mvi.__size) + "]";
+			strResult = "PT_MV_APPTIME[" + stringify(lpPropValue->Value.mvbin.__size) + "]";
 			break;
 		case PT_MV_CURRENCY:
-			strResult = "PT_MV_CURRENCY[" + stringify(lpPropValue->Value.mvi.__size) + "]";
+			strResult = "PT_MV_CURRENCY[" + stringify(lpPropValue->Value.mvbin.__size) + "]";
 			break;
 		case PT_MV_SYSTIME:
-			strResult = "PT_MV_SYSTIME[" + stringify(lpPropValue->Value.mvi.__size) + "]";
+			strResult = "PT_MV_SYSTIME[" + stringify(lpPropValue->Value.mvbin.__size) + "]";
 			break;
 		case PT_MV_I8:
-			strResult = "PT_MV_I8[" + stringify(lpPropValue->Value.mvi.__size) + "]";
+			strResult = "PT_MV_I8[" + stringify(lpPropValue->Value.mvli.__size) + "]";
 			break;
 		case PT_MV_UNICODE:
-			strResult = "PT_MV_UNICODE[" + stringify(lpPropValue->Value.mvi.__size) + "]" + "\n";
-			for (int i = 0; i < lpPropValue->Value.mvi.__size; ++i)
+			strResult = "PT_MV_UNICODE[" + stringify(lpPropValue->Value.mvszA.__size) + "]" + "\n";
+			for (gsoap_size_t i = 0; i < lpPropValue->Value.mvszA.__size; ++i)
 				strResult += std::string("\t") + lpPropValue->Value.mvszA.__ptr[i] + "\n";
 			break;
 		case PT_MV_STRING8:
-			strResult = "PT_MV_STRING8[" + stringify(lpPropValue->Value.mvi.__size) + "]" + "\n";
-			for (int i = 0; i < lpPropValue->Value.mvi.__size; ++i)
+			strResult = "PT_MV_STRING8[" + stringify(lpPropValue->Value.mvszA.__size) + "]" + "\n";
+			for (gsoap_size_t i = 0; i < lpPropValue->Value.mvszA.__size; ++i)
 				strResult += std::string("\t") + lpPropValue->Value.mvszA.__ptr[i] + "\n";
 			break;
 		case PT_MV_BINARY:
-			strResult = "PT_MV_BINARY[" + stringify(lpPropValue->Value.mvi.__size) + "]";
+			strResult = "PT_MV_BINARY[" + stringify(lpPropValue->Value.mvbin.__size) + "]";
 			break;
 		case PT_MV_CLSID:
-			strResult = "PT_MV_CLSID[" + stringify(lpPropValue->Value.mvi.__size) + "]";
+			strResult = "PT_MV_CLSID[" + stringify(lpPropValue->Value.mvbin.__size) + "]";
 			break;
 		default:
 			strResult = "<UNKNOWN>";

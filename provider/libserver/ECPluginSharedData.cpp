@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,16 +15,16 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECPluginSharedData.h>
+#include <kopano/platform.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECPluginSharedData.h>
 
 ECPluginSharedData *ECPluginSharedData::m_lpSingleton = NULL;
 pthread_mutex_t ECPluginSharedData::m_SingletonLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t ECPluginSharedData::m_CreateConfigLock = PTHREAD_MUTEX_INITIALIZER;
 
 ECPluginSharedData::ECPluginSharedData(ECConfig *lpParent,
-    IECStatsCollector *lpStatsCollector, bool bHosted, bool bDistributed)
+    ECStatsCollector *lpStatsCollector, bool bHosted, bool bDistributed)
 {
 	m_ulRefCount = 0;
 	m_lpConfig = NULL;
@@ -54,7 +54,7 @@ ECPluginSharedData::~ECPluginSharedData()
 }
 
 void ECPluginSharedData::GetSingleton(ECPluginSharedData **lppSingleton,
-    ECConfig *lpParent, IECStatsCollector *lpStatsCollector, bool bHosted,
+    ECConfig *lpParent, ECStatsCollector *lpStatsCollector, bool bHosted,
     bool bDistributed)
 {
 	pthread_mutex_lock(&m_SingletonLock);
@@ -134,21 +134,6 @@ ECConfig *ECPluginSharedData::CreateConfig(const configsetting_t *lpDefaults,
 	pthread_mutex_unlock(&m_CreateConfigLock);
 
 	return m_lpConfig;
-}
-
-IECStatsCollector* ECPluginSharedData::GetStatsCollector()
-{
-	return m_lpStatsCollector;
-}
-
-bool ECPluginSharedData::IsHosted()
-{
-	return m_bHosted;
-}
-
-bool ECPluginSharedData::IsDistributed()
-{
-	return m_bDistributed;
 }
 
 void ECPluginSharedData::Signal(int signal)

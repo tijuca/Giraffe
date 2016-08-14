@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -34,14 +34,14 @@
 #ifndef IECPROPSTORAGE_H
 #define IECPROPSTORAGE_H
 
-#include <zarafa/IECUnknown.h>
+#include <kopano/IECUnknown.h>
 #include <mapi.h>
 #include <mapispi.h>
 #include <list>
 #include <set>
 #include "ECPropertyEntry.h"
-#include "Zarafa.h"
-#include <zarafa/Util.h>
+#include "kcore.hpp"
+#include <kopano/Util.h>
 
 typedef struct MAPIOBJECT {
 	MAPIOBJECT() {

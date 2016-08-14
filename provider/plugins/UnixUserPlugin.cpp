@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <iostream>
 #include <string>
@@ -38,17 +38,17 @@
 #include <malloc.h>
 #endif
 
-#include <zarafa/EMSAbTag.h>
-#include <zarafa/ECConfig.h>
-#include <zarafa/ECDefs.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECPluginSharedData.h>
-#include <zarafa/stringutil.h>
+#include <kopano/EMSAbTag.h>
+#include <kopano/ECConfig.h>
+#include <kopano/ECDefs.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECPluginSharedData.h>
+#include <kopano/stringutil.h>
 
 using namespace std;
 
 #include "UnixUserPlugin.h"
-#include <zarafa/ecversion.h>
+#include <kopano/ecversion.h>
 
 /**
  * static buffer size for getpwnam_r() calls etc.
@@ -91,9 +91,9 @@ UnixUserPlugin::UnixUserPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *
 		throw runtime_error(string("Not a valid configuration file."));
 
 	if (m_bHosted)
-		throw notsupported("Hosted Zarafa not supported when using the Unix Plugin");
+		throw notsupported("Hosted Kopano not supported when using the Unix Plugin");
 	if (m_bDistributed)
-		throw notsupported("Distributed Zarafa not supported when using the Unix Plugin");
+		throw notsupported("Distributed Kopano not supported when using the Unix Plugin");
 }
 
 UnixUserPlugin::~UnixUserPlugin()
@@ -104,7 +104,7 @@ UnixUserPlugin::~UnixUserPlugin()
 void UnixUserPlugin::InitPlugin() {
 	DBPlugin::InitPlugin();
 
-	// we only need unix_charset -> zarafa charset
+	// we only need unix_charset -> kopano charset
 	m_iconv = new ECIConv("utf-8", m_config->GetSetting("fullname_charset"));
 
 	if (!m_iconv -> canConvert())
@@ -118,11 +118,9 @@ void UnixUserPlugin::findUserID(const string &id, struct passwd *pwd, char *buff
 	uid_t maxuid = fromstring<const char *, uid_t>(m_config->GetSetting("max_user_uid"));
 	vector<string> exceptuids = tokenize(m_config->GetSetting("except_user_uids"), " \t");
 	objectid_t objectid;
-
-	errno = 0;
-	getpwuid_r(atoi(id.c_str()), pwd, buffer, PWBUFSIZE, &pw);
-	errnoCheck(id);
-
+	int ret = getpwuid_r(atoi(id.c_str()), pwd, buffer, PWBUFSIZE, &pw);
+	if (ret != 0)
+		errnoCheck(id, ret);
 	if (pw == NULL)
 		throw objectnotfound(id);
 
@@ -141,11 +139,9 @@ void UnixUserPlugin::findUser(const string &name, struct passwd *pwd, char *buff
 	uid_t maxuid = fromstring<const char *, uid_t>(m_config->GetSetting("max_user_uid"));
 	vector<string> exceptuids = tokenize(m_config->GetSetting("except_user_uids"), " \t");
 	objectid_t objectid;
-
-	errno = 0;
-	getpwnam_r(name.c_str(), pwd, buffer, PWBUFSIZE, &pw);
-	errnoCheck(name);
-
+	int ret = getpwnam_r(name.c_str(), pwd, buffer, PWBUFSIZE, &pw);
+	if (ret != 0)
+		errnoCheck(name, ret);
 	if (pw == NULL)
 		throw objectnotfound(name);
 
@@ -164,11 +160,9 @@ void UnixUserPlugin::findGroupID(const string &id, struct group *grp, char *buff
 	gid_t maxgid = fromstring<const char *, gid_t>(m_config->GetSetting("max_group_gid"));
 	vector<string> exceptgids = tokenize(m_config->GetSetting("except_group_gids"), " \t");
 	objectid_t objectid;
-
-	errno = 0;
-	getgrgid_r(atoi(id.c_str()), grp, buffer, PWBUFSIZE, &gr);
-	errnoCheck(id);
-
+	int ret = getgrgid_r(atoi(id.c_str()), grp, buffer, PWBUFSIZE, &gr);
+	if (ret != 0)
+		errnoCheck(id, ret);
 	if (gr == NULL)
 		throw objectnotfound(id);
 
@@ -187,11 +181,9 @@ void UnixUserPlugin::findGroup(const string &name, struct group *grp, char *buff
 	gid_t maxgid = fromstring<const char *, gid_t>(m_config->GetSetting("max_group_gid"));
 	vector<string> exceptgids = tokenize(m_config->GetSetting("except_group_gids"), " \t");
 	objectid_t objectid;
-
-	errno = 0;
-	getgrnam_r(name.c_str(), grp, buffer, PWBUFSIZE, &gr);
-	errnoCheck(name);
-
+	int ret = getgrnam_r(name.c_str(), grp, buffer, PWBUFSIZE, &gr);
+	if (ret != 0)
+		errnoCheck(name, ret);
 	if (gr == NULL)
 		throw objectnotfound(name);
 
@@ -286,18 +278,17 @@ objectsignature_t UnixUserPlugin::authenticateUser(const string &username, const
 	uid_t minuid = fromstring<const char *, uid_t>(m_config->GetSetting("min_user_uid"));
 	uid_t maxuid = fromstring<const char *, uid_t>(m_config->GetSetting("max_user_uid"));
 	vector<string> exceptuids = tokenize(m_config->GetSetting("except_user_uids"), " \t");
-	auto_ptr<struct crypt_data> cryptdata;
-	auto_ptr<objectdetails_t> ud;
+	std::unique_ptr<struct crypt_data> cryptdata;
+	std::unique_ptr<objectdetails_t> ud;
 	objectid_t objectid;
 	const char *crpw = NULL;
 
 	cryptdata.reset(new struct crypt_data); // malloc because it is > 128K !
 	memset(cryptdata.get(), 0, sizeof(struct crypt_data));
 
-	errno = 0;
-	getpwnam_r(username.c_str(), &pws, buffer, PWBUFSIZE, &pw);
-	errnoCheck(username);
-
+	int ret = getpwnam_r(username.c_str(), &pws, buffer, PWBUFSIZE, &pw);
+	if (ret != 0)
+		errnoCheck(username, ret);
 	if (pw == NULL)
 		throw objectnotfound(username);
 
@@ -361,9 +352,11 @@ bool UnixUserPlugin::matchGroupObject(struct group *gr, const string &match, uns
 	return matched;
 }
 
-auto_ptr<signatures_t> UnixUserPlugin::getAllUserObjects(const string &match, unsigned int ulFlags)
+std::unique_ptr<signatures_t>
+UnixUserPlugin::getAllUserObjects(const std::string &match,
+    unsigned int ulFlags)
 {
-	auto_ptr<signatures_t> objectlist = auto_ptr<signatures_t>(new signatures_t());;
+	std::unique_ptr<signatures_t> objectlist(new signatures_t());
 	char buffer[PWBUFSIZE];
 	struct passwd pws, *pw = NULL;
 	uid_t minuid = fromstring<const char *, uid_t>(m_config->GetSetting("min_user_uid"));
@@ -377,11 +370,12 @@ auto_ptr<signatures_t> UnixUserPlugin::getAllUserObjects(const string &match, un
 
 	setpwent();
 	while (true) {
-		getpwent_r(&pws, buffer, PWBUFSIZE, &pw);
+		if (getpwent_r(&pws, buffer, PWBUFSIZE, &pw) != 0)
+			break;
 		if (pw == NULL)
 			break;
 
-		// system users don't have zarafa accounts
+		// system users don't have kopano accounts
 		if (pw->pw_uid < minuid || pw->pw_uid >= maxuid)
 			continue;
 
@@ -403,9 +397,11 @@ auto_ptr<signatures_t> UnixUserPlugin::getAllUserObjects(const string &match, un
 	return objectlist;
 }
 
-auto_ptr<signatures_t> UnixUserPlugin::getAllGroupObjects(const string &match, unsigned int ulFlags)
+std::unique_ptr<signatures_t>
+UnixUserPlugin::getAllGroupObjects(const std::string &match,
+    unsigned int ulFlags)
 {
-	auto_ptr<signatures_t> objectlist = auto_ptr<signatures_t>(new signatures_t());;
+	std::unique_ptr<signatures_t> objectlist(new signatures_t());
 	char buffer[PWBUFSIZE];
 	struct group grs, *gr = NULL;
 	gid_t mingid = fromstring<const char *, gid_t>(m_config->GetSetting("min_group_gid"));
@@ -418,11 +414,12 @@ auto_ptr<signatures_t> UnixUserPlugin::getAllGroupObjects(const string &match, u
 
 	setgrent();
 	while (true) {
-		getgrent_r(&grs, buffer, PWBUFSIZE, &gr);
+		if (getgrent_r(&grs, buffer, PWBUFSIZE, &gr) != 0)
+			break;
 		if (gr == NULL)
 			break;
 
-		// system groups don't have zarafa accounts
+		// system groups don't have kopano accounts
 		if (gr->gr_gid < mingid || gr->gr_gid >= maxgid)
 			continue;
 
@@ -440,11 +437,13 @@ auto_ptr<signatures_t> UnixUserPlugin::getAllGroupObjects(const string &match, u
 	return objectlist;
 }
 
-auto_ptr<signatures_t> UnixUserPlugin::getAllObjects(const objectid_t &companyid, objectclass_t objclass)
+std::unique_ptr<signatures_t>
+UnixUserPlugin::getAllObjects(const objectid_t &companyid,
+    objectclass_t objclass)
 {
 	ECRESULT er = erSuccess;
-	auto_ptr<signatures_t> objectlist = auto_ptr<signatures_t>(new signatures_t());
-	auto_ptr<signatures_t> objects;
+	std::unique_ptr<signatures_t> objectlist(new signatures_t());
+	std::unique_ptr<signatures_t> objects;
 	signatures_t::const_iterator iterObjs;
 	map<objectclass_t, string> objectstrings;
 	std::map<objectclass_t, string>::const_iterator iterStrings;
@@ -585,11 +584,12 @@ exit:
 	return objectlist;
 }
 
-auto_ptr<objectdetails_t> UnixUserPlugin::getObjectDetails(const objectid_t &externid)
+std::unique_ptr<objectdetails_t>
+UnixUserPlugin::getObjectDetails(const objectid_t &externid)
 {
 	ECRESULT er = erSuccess;
 	char buffer[PWBUFSIZE];
-	auto_ptr<objectdetails_t> ud;
+	std::unique_ptr<objectdetails_t> ud;
 	struct passwd pws;
 	struct group grp;
 	DB_RESULT_AUTOFREE lpResult(m_lpDatabase);
@@ -652,7 +652,7 @@ void UnixUserPlugin::changeObject(const objectid_t &id, const objectdetails_t &d
 		throw runtime_error("Updating the fullname is not allowed with the Unix plugin.");
 
 	// Although updating username is invalid in Unix plugin, we still receive the OB_PROP_S_LOGIN field.
-	// This is because zarafa-admin -u <username> sends it, and that requirement is because the
+	// This is because kopano-admin -u <username> sends it, and that requirement is because the
 	// UpdateUserDetailsFromClient call needs to convert the username/company to details.
 	// Remove the username detail to allow updating user information.
 	tmp.SetPropString(OB_PROP_S_LOGIN, string());
@@ -673,9 +673,11 @@ void UnixUserPlugin::modifyObjectId(const objectid_t &oldId, const objectid_t &n
 	throw notimplemented("Modifying objectid is not supported when using the Unix user plugin.");
 }
 
-auto_ptr<signatures_t> UnixUserPlugin::getParentObjectsForObject(userobject_relation_t relation, const objectid_t &childid)
+std::unique_ptr<signatures_t>
+UnixUserPlugin::getParentObjectsForObject(userobject_relation_t relation,
+    const objectid_t &childid)
 {
-	auto_ptr<signatures_t> objectlist = auto_ptr<signatures_t>(new signatures_t());
+	std::unique_ptr<signatures_t> objectlist(new signatures_t());
 	char buffer[PWBUFSIZE];
 	struct passwd pws;
 	struct group grs, *gr = NULL;
@@ -707,11 +709,12 @@ auto_ptr<signatures_t> UnixUserPlugin::getParentObjectsForObject(userobject_rela
 	pthread_mutex_lock(m_plugin_lock);
 	setgrent();
 	while (true) {
-		getgrent_r(&grs, buffer, PWBUFSIZE, &gr);
+		if (getgrent_r(&grs, buffer, PWBUFSIZE, &gr) != 0)
+			break;
 		if (gr == NULL)
 			break;
 
-		// system users don't have zarafa accounts
+		// system users don't have kopano accounts
 		if (gr->gr_gid < mingid || gr->gr_gid >= maxgid)
 			continue;
 
@@ -734,9 +737,11 @@ auto_ptr<signatures_t> UnixUserPlugin::getParentObjectsForObject(userobject_rela
 	return objectlist;
 }
 
-auto_ptr<signatures_t> UnixUserPlugin::getSubObjectsForObject(userobject_relation_t relation, const objectid_t &parentid)
+std::unique_ptr<signatures_t>
+UnixUserPlugin::getSubObjectsForObject(userobject_relation_t relation,
+    const objectid_t &parentid)
 {
-	auto_ptr<signatures_t> objectlist = auto_ptr<signatures_t>(new signatures_t());
+	std::unique_ptr<signatures_t> objectlist(new signatures_t());
 	char buffer[PWBUFSIZE];
 	struct passwd pws, *pw = NULL;
 	struct group grp;
@@ -768,11 +773,12 @@ auto_ptr<signatures_t> UnixUserPlugin::getSubObjectsForObject(userobject_relatio
 	pthread_mutex_lock(m_plugin_lock);
 	setpwent();
 	while (true) {
-		getpwent_r(&pws, buffer, PWBUFSIZE, &pw);
+		if (getpwent_r(&pws, buffer, PWBUFSIZE, &pw) != 0)
+			break;
 		if (pw == NULL)
 			break;
 
-		// system users don't have zarafa accounts
+		// system users don't have kopano accounts
 		if (pw->pw_uid < minuid || pw->pw_uid >= maxuid)
 			continue;
 
@@ -813,12 +819,13 @@ void UnixUserPlugin::deleteSubObjectRelation(userobject_relation_t relation, con
 	DBPlugin::deleteSubObjectRelation(relation, id, member);
 }
 
-auto_ptr<signatures_t> UnixUserPlugin::searchObject(const string &match, unsigned int ulFlags)
+std::unique_ptr<signatures_t>
+UnixUserPlugin::searchObject(const std::string &match, unsigned int ulFlags)
 {
 	char buffer[PWBUFSIZE];
 	struct passwd pws, *pw = NULL;
-	auto_ptr<signatures_t> objectlist = auto_ptr<signatures_t>(new signatures_t());
-	auto_ptr<signatures_t> objects;
+	std::unique_ptr<signatures_t> objectlist(new signatures_t());
+	std::unique_ptr<signatures_t> objects;
 
 	LOG_PLUGIN_DEBUG("%s %s flags:%x", __FUNCTION__, match.c_str(), ulFlags);
 
@@ -838,10 +845,9 @@ auto_ptr<signatures_t> UnixUserPlugin::searchObject(const string &match, unsigne
 		     iter != objects->end(); ++iter)
 		{
 			// the DBPlugin returned the DB signature, so we need to prepend this with the gecos signature
-			errno = 0;
-			getpwuid_r(atoi(iter->id.id.c_str()), &pws, buffer, PWBUFSIZE, &pw);
-			errnoCheck(iter->id.id);
-
+			int ret = getpwuid_r(atoi(iter->id.id.c_str()), &pws, buffer, PWBUFSIZE, &pw);
+			if (ret != 0)
+				errnoCheck(iter->id.id, ret);
 			if (pw == NULL)	// object not found anymore
 				continue;
 
@@ -860,24 +866,27 @@ auto_ptr<signatures_t> UnixUserPlugin::searchObject(const string &match, unsigne
 	return objectlist;
 }
 
-auto_ptr<objectdetails_t> UnixUserPlugin::getPublicStoreDetails()
+std::unique_ptr<objectdetails_t> UnixUserPlugin::getPublicStoreDetails(void)
 {
 	throw notsupported("public store details");
 }
 
-auto_ptr<serverdetails_t> UnixUserPlugin::getServerDetails(const string &server)
+std::unique_ptr<serverdetails_t>
+UnixUserPlugin::getServerDetails(const std::string &server)
 {
 	throw notsupported("server details");
 }
 
-auto_ptr<serverlist_t> UnixUserPlugin::getServers()
+std::unique_ptr<serverlist_t> UnixUserPlugin::getServers(void)
 {
 	throw notsupported("server list");
 }
 
-auto_ptr<map<objectid_t, objectdetails_t> > UnixUserPlugin::getObjectDetails(const list<objectid_t> &objectids) {
-	auto_ptr<map<objectid_t, objectdetails_t> > mapdetails = auto_ptr<map<objectid_t, objectdetails_t> >(new map<objectid_t,objectdetails_t>);
-	auto_ptr<objectdetails_t> uDetails;
+std::unique_ptr<std::map<objectid_t, objectdetails_t> >
+UnixUserPlugin::getObjectDetails(const std::list<objectid_t> &objectids)
+{
+	std::unique_ptr<std::map<objectid_t, objectdetails_t> > mapdetails(new map<objectid_t, objectdetails_t>());
+	std::unique_ptr<objectdetails_t> uDetails;
 	list<objectid_t>::const_iterator iterID;
 	objectdetails_t details;
 
@@ -904,8 +913,10 @@ auto_ptr<map<objectid_t, objectdetails_t> > UnixUserPlugin::getObjectDetails(con
 // private
 // -------------
 
-auto_ptr<objectdetails_t> UnixUserPlugin::objectdetailsFromPwent(struct passwd *pw) {
-	auto_ptr<objectdetails_t> ud = auto_ptr<objectdetails_t>(new objectdetails_t());
+std::unique_ptr<objectdetails_t>
+UnixUserPlugin::objectdetailsFromPwent(struct passwd *pw)
+{
+	std::unique_ptr<objectdetails_t> ud(new objectdetails_t());
 	string gecos;
 	size_t comma;
 
@@ -930,8 +941,11 @@ auto_ptr<objectdetails_t> UnixUserPlugin::objectdetailsFromPwent(struct passwd *
 		struct spwd spws, *spw = NULL;
 		char sbuffer[PWBUFSIZE];
 
-		getspnam_r(pw->pw_name, &spws, sbuffer, PWBUFSIZE, &spw);
-		if (spw == NULL) {
+		if (getspnam_r(pw->pw_name, &spws, sbuffer, PWBUFSIZE, &spw) != 0) {
+			ec_log_warn("getspname_r: %s", strerror(errno));
+			/* set invalid password entry, cannot login without a password */
+			ud->SetPropString(OB_PROP_S_PASSWORD, std::string("x"));
+		} else if (spw == NULL) {
 			// invalid entry, must have a shadow password set in this case
 			// throw objectnotfound(ud->id);
 			// too bad that the password couldn't be found, but it's not that critical
@@ -952,8 +966,10 @@ auto_ptr<objectdetails_t> UnixUserPlugin::objectdetailsFromPwent(struct passwd *
 	return ud;
 }
 
-auto_ptr<objectdetails_t> UnixUserPlugin::objectdetailsFromGrent(struct group *gr) {
-	auto_ptr<objectdetails_t> gd(new objectdetails_t(DISTLIST_SECURITY));
+std::unique_ptr<objectdetails_t>
+UnixUserPlugin::objectdetailsFromGrent(struct group *gr)
+{
+	std::unique_ptr<objectdetails_t> gd(new objectdetails_t(DISTLIST_SECURITY));
 
 	gd->SetPropString(OB_PROP_S_LOGIN, string(gr->gr_name));
 	gd->SetPropString(OB_PROP_S_FULLNAME, string(gr->gr_name));
@@ -988,18 +1004,19 @@ std::string UnixUserPlugin::getDBSignature(const objectid_t &id)
 	return lpDBRow[0];
 }
 
-void UnixUserPlugin::errnoCheck(const string &user) {
-	if (errno) {
+void UnixUserPlugin::errnoCheck(const std::string &user, int e) const
+{
+	if (e != 0) {
 		char buffer[256];
 		char *retbuf;
-		retbuf = strerror_r(errno, buffer, 256);
+		retbuf = strerror_r(e, buffer, 256);
 
 		// from the getpwnam() man page: (notice the last or...)
 		//  ERRORS
 		//    0 or ENOENT or ESRCH or EBADF or EPERM or ...
 		//    The given name or uid was not found.
 
-		switch (errno) {
+		switch (e) {
 			// 0 is handled in top if()
 		case ENOENT:
 		case ESRCH:

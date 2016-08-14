@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,12 +18,12 @@
 // From http://www.wischik.com/lu/programmer/mapi_utils.html
 // Parts rewritten by Zarafa
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <iostream>
-#include <zarafa/codepage.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/Util.h>
-#include <zarafa/charset/convert.h>
+#include <kopano/codepage.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/Util.h>
+#include <kopano/charset/convert.h>
 #include "HtmlEntity.h"
 
 #include "rtfutil.h"
@@ -35,8 +35,6 @@ using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 static const char szHex[] = "0123456789ABCDEF";
@@ -449,7 +447,7 @@ HRESULT HrExtractHTMLFromTextRTF(const std::string &lpStrRTFIn,
 		 "<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=";
 	tmp += szHTMLCharset;
 	tmp += 	"\">\r\n"												\
-		 "<META NAME=\"Generator\" CONTENT=\"Zarafa text/HTML builder 1.0\">\r\n" \
+		 "<META NAME=\"Generator\" CONTENT=\"Kopano text/HTML builder 1.0\">\r\n" \
 		 "<TITLE></TITLE>\r\n" \
 		 "</HEAD>\r\n" \
 		 "<BODY>\r\n" \
@@ -757,7 +755,7 @@ HRESULT HrExtractHTMLFromRealRTF(const std::string &lpStrRTFIn,
 		 "<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=";
 	tmp += szHTMLCharset;
 	tmp +=	"\">\r\n"															\
-		 "<META NAME=\"Generator\" CONTENT=\"Zarafa rtf/HTML builder 1.0\">\r\n" \
+		 "<META NAME=\"Generator\" CONTENT=\"Kopano rtf/HTML builder 1.0\">\r\n" \
 		 "<TITLE></TITLE>\r\n" \
 		 "</HEAD>\r\n" \
 		 "<BODY>\r\n" \

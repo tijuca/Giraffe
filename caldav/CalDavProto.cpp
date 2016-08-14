@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,18 +15,16 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "PublishFreeBusy.h"
 #include "CalDavProto.h"
-#include <zarafa/mapi_ptr.h>
-#include <zarafa/MAPIErrors.h>
+#include <kopano/mapi_ptr.h>
+#include <kopano/MAPIErrors.h>
 
 using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 
@@ -85,7 +83,7 @@ static ULONG GetPropIDForXMLProp(LPMAPIPROP lpObj,
 	if (hr != hrSuccess)
 		goto exit;
 
-	lpNameID->lpguid = (GUID*)&PSETID_Zarafa_CalDav;
+	lpNameID->lpguid = (GUID*)&PSETID_Kopano_CalDav;
 	lpNameID->ulKind = MNID_STRING;
 	lpNameID->Kind.lpwstrName = (WCHAR*)wstrName.c_str();
 
@@ -109,13 +107,6 @@ exit:
  * @param[in]	strCharset	String specifying the default charset of the http response
  */
 CalDAV::CalDAV(Http *lpRequest, IMAPISession *lpSession, ECLogger *lpLogger, std::string strSrvTz, std::string strCharset) : WebDav(lpRequest, lpSession, lpLogger , strSrvTz, strCharset)
-{
-}
-
-/**
- * Default Destructor
- */
-CalDAV::~CalDAV()
 {
 }
 
@@ -2387,7 +2378,7 @@ HRESULT CalDAV::HrMapValtoStruct(LPMAPIPROP lpObj, LPSPropValue lpProps, ULONG u
  * the calendar-order to 1 or else is set to 2
  *
  * The calendar-order property is set to show the default calendar first in 
- * the calendar list in ical.app(Mac). This makes the default zarafa calendar default
+ * the calendar list in ical.app(Mac). This makes the default kopano calendar default
  * in ical.app too.
  *
  * if the value is left empty ical.app tries to reset the order and sometimes sets

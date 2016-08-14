@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,26 +15,26 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <mapidefs.h>
 #include <mapiutil.h>
 #include <mapitags.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 
 #include "ECMessage.h"
 #include "ECAttach.h"
-#include <zarafa/ECMemTable.h>
+#include <kopano/ECMemTable.h>
 
-#include <zarafa/codepage.h>
+#include <kopano/codepage.h>
 #include "rtfutil.h"
-#include <zarafa/Util.h>
+#include <kopano/Util.h>
 #include "Mem.h"
-#include <zarafa/mapi_ptr.h>
+#include <kopano/mapi_ptr.h>
 
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 #include <edkguid.h>
-#include <zarafa/ECDebug.h>
+#include <kopano/ECDebug.h>
 #include "WSUtil.h"
 
 
@@ -42,14 +42,12 @@
 #include "ECMemStream.h"
 
 #include <charset/utf32string.h>
-#include <zarafa/charset/convert.h>
+#include <kopano/charset/convert.h>
 
 using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 #define MAX_TABLE_PROPSIZE 8192
@@ -1421,21 +1419,6 @@ HRESULT ECMessage::SubmitMessage(ULONG ulFlags)
 	if(HR_FAILED(hr))
 		goto exit;
 
-#ifdef WIN32
-	if(cValue == 1 && lpsPropArray != NULL && PROP_TYPE(lpsPropArray->ulPropTag) != PT_ERROR && (lpsPropArray->Value.ul & MSGFLAG_RESEND))
-	{
-		ULONG ulPreFlags = 0;
-
-		hr = this->GetMsgStore()->lpSupport->SpoolerNotify(NOTIFY_READYTOSEND, NULL);
-		if(hr != hrSuccess)
-			goto exit;
-
-		hr = this->GetMsgStore()->lpSupport->PrepareSubmit(&this->m_xMessage, &ulPreFlags);
-		if(hr != hrSuccess)
-			goto exit;
-	}
-#endif
-
 	if(lpsPropArray->ulPropTag == PR_MESSAGE_FLAGS) {
 		// Re-set 'unsent' as it is obviously not sent if we're submitting it ... This allows you to send a message
 		// multiple times, but only if the client calls SubmitMessage multiple times.
@@ -1637,10 +1620,7 @@ HRESULT ECMessage::SetReadFlag(ULONG ulFlags)
 	if(hr != hrSuccess)
 		goto exit;
 
-	///////////////////////////////////////////////////
 	// Check for Read receipts
-	//
-
 	lpsPropTagArray->cValues = 2;
 	lpsPropTagArray->aulPropTag[0] = PR_MESSAGE_FLAGS;
 	lpsPropTagArray->aulPropTag[1] = PR_READ_RECEIPT_REQUESTED;
@@ -2264,7 +2244,6 @@ HRESULT ECMessage::SyncSubject()
 		goto exit;
 	}
 
-	//////////////////////////////////////////
 	// Check if subject and prefix in sync
 
 	hr = ECMAPIProp::GetProps((LPSPropTagArray)&sPropSubjects, 0, &cValues, &lpPropArray);
@@ -2672,7 +2651,7 @@ HRESULT ECMessage::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArra
 	    goto exit;
     }
 
-	// Wrap mapi object to zarafa object
+	// Wrap mapi object to kopano object
 	if (HrGetOneProp((LPMAPIPROP)lpDestObj, PR_EC_OBJECT, &lpECObject) == hrSuccess) {
 		lpECUnknown = (IECUnknown*)lpECObject->Value.lpszA;
 		lpECUnknown->AddRef();

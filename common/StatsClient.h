@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,7 +18,7 @@
 #ifndef __STATSCLIENT_H__
 #define __STATSCLIENT_H__
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <map>
 #include <string>
 #include <ctime>
@@ -26,13 +26,14 @@
 #include <sys/types.h>
 #include <sys/un.h>
 
-#include <zarafa/ECLogger.h>
+#include <kopano/ECLogger.h>
 
 class StatsClient _zcp_final {
 private:
 	int fd;
 	struct sockaddr_un addr;
 	int addr_len;
+	bool thread_running;
 	ECLogger *const logger;
 
 	pthread_t countsSubmitThread;
@@ -43,9 +44,10 @@ public:
 	std::map<std::string, int64_t> countsMapInt64;
 
 public:
-	StatsClient(const std::string & collectorSocket, ECLogger *const logger);
+	StatsClient(ECLogger *);
 	~StatsClient();
 
+	int startup(const std::string &collector);
 	inline ECLogger *const getLogger() { return logger; }
 
 	void countInc(const std::string & key, const std::string & key_sub);

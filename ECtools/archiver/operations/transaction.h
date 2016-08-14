@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -20,10 +20,10 @@
 
 #include "transaction_fwd.h"
 #include "ArchiverSessionPtr.h"     // For ArchiverSessionPtr
-#include <zarafa/archiver-common.h>
+#include <kopano/archiver-common.h>
 #include "postsaveaction.h"
 
-#include <zarafa/mapi_ptr.h>
+#include <kopano/mapi_ptr.h>
 
 namespace za { namespace operations {
 

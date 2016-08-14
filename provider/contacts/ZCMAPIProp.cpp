@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ZCMAPIProp.h"
 #include "ZCABData.h"
 
@@ -24,16 +24,14 @@
 #include <mapicode.h>
 #include <mapiutil.h>
 
-#include <zarafa/Util.h>
-#include <zarafa/ECGuid.h>
-#include <zarafa/mapi_ptr.h>
-#include <zarafa/namedprops.h>
-#include <zarafa/mapiguidext.h>
+#include <kopano/Util.h>
+#include <kopano/ECGuid.h>
+#include <kopano/mapi_ptr.h>
+#include <kopano/namedprops.h>
+#include <kopano/mapiguidext.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ZCMAPIProp::ZCMAPIProp(ULONG ulObjType, const char *szClassName) :
@@ -526,11 +524,7 @@ HRESULT ZCMAPIProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID * lppPropName
 	return MAPI_E_NO_SUPPORT;
 }
 
-
-////////////////////////////////////////////
 // Interface IMAPIProp
-//
-
 HRESULT __stdcall ZCMAPIProp::xMAPIProp::QueryInterface(REFIID refiid, void ** lppInterface)
 {
 	METHOD_PROLOGUE_(ZCMAPIProp , MAPIProp);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,13 +17,13 @@
 
 #include "ECFeatures.h"
 #include "ECFeatureList.h"
-#include <zarafa/CommonUtil.h>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/mapi_ptr.h>
 
 using namespace std;
 
 /** 
- * Checks if given feature name is an actual zarafa feature.
+ * Checks if given feature name is an actual kopano feature.
  * 
  * @param[in] feature name of the feature to check
  * 
@@ -31,8 +31,8 @@ using namespace std;
  */
 bool isFeature(const char* feature)
 {
-	for (size_t i = 0; i < arraySize(zarafa_features); ++i)
-		if (stricmp(feature, zarafa_features[i]) == 0)
+	for (size_t i = 0; i < arraySize(kopano_features); ++i)
+		if (stricmp(feature, kopano_features[i]) == 0)
 			return true;
 	return false;
 }

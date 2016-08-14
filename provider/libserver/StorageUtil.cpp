@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,14 +15,14 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "StorageUtil.h"
 #include "ECDatabase.h"
 #include "ECAttachmentStorage.h"
 #include "ECSession.h"
 #include "ECSessionManager.h"
 #include "ECSecurity.h"
-#include "ZarafaCmdUtil.h"
+#include "cmdutil.hpp"
 #include <edkmdb.h>
 
 // External objects
@@ -52,7 +52,7 @@ ECRESULT CreateObject(ECSession *lpecSession, ECDatabase *lpDatabase, unsigned i
 		// you should check access rights on the top-level message, not on the underlying objects.
 		er = lpecSession->GetSecurity()->CheckPermission(ulParentObjId, ecSecurityCreate);
 		if(er != erSuccess)
-			goto exit;
+			return er;
 	}
 
 	ulOwner = lpecSession->GetSecurity()->GetUserId(ulParentObjId); // Owner of object is either the current user or the owner of the folder
@@ -61,13 +61,13 @@ ECRESULT CreateObject(ECSession *lpecSession, ECDatabase *lpDatabase, unsigned i
 	strQuery = "INSERT INTO hierarchy (parent, type, flags, owner) values("+stringify(ulParentObjId)+", "+stringify(ulObjType)+", "+stringify(ulFlags)+", "+stringify(ulOwner)+")";
 	er = lpDatabase->DoInsert(strQuery, &ulNewObjId, &ulAffected);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	if (ulObjType == MAPI_MESSAGE) {
 		strQuery = "INSERT INTO properties (hierarchyid, tag, type, val_ulong) VALUES ("+ stringify(ulNewObjId) + "," + stringify(PROP_ID(PR_MESSAGE_FLAGS)) + "," + stringify(PROP_TYPE(PR_MESSAGE_FLAGS)) + "," + stringify(ulFlags) + ")";
 		er = lpDatabase->DoInsert(strQuery);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 	}
 
 	// Save this item in the cache, as there is a very high probability that this data will be required very soon (almost 100% sure)
@@ -76,9 +76,7 @@ ECRESULT CreateObject(ECSession *lpecSession, ECDatabase *lpDatabase, unsigned i
 	// return new object id to saveObject
 	if (lpulObjId)
 		*lpulObjId = ulNewObjId;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 
@@ -97,13 +95,13 @@ ECRESULT GetObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned in
 		goto exit;
 
 	if(lpDatabase->GetNumRows(lpDBResult) != 1) {
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 		goto exit;
 	}
 
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if(lpDBRow == NULL || lpDBRow[0] == NULL) {
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 		goto exit;
 	}
 
@@ -208,7 +206,7 @@ exit:
 
 ECRESULT UpdateObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned int ulObjType, eSizeUpdateAction updateAction, long long llSize)
 {
-	ECRESULT		er = erSuccess;
+	ECRESULT er;
 	unsigned int	ulPropTag = 0;
 	unsigned int	ulAffRows = 0;
 	std::string		strQuery;
@@ -230,7 +228,7 @@ ECRESULT UpdateObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned
 		er = lpDatabase->DoInsert(strQuery);
 
 		if(er != erSuccess)
-			goto exit;
+			return er;
 
 		if(ulObjType == MAPI_MESSAGE) {
 			// Update cell cache for new size
@@ -245,7 +243,7 @@ ECRESULT UpdateObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned
 
 			er = g_lpSessionManager->GetCacheManager()->SetCell(&key, PR_MESSAGE_SIZE, &sPropVal);
 			if(er != erSuccess)
-				goto exit;
+				return er;
 		}
 	} else {
 		strQuery = "UPDATE properties SET "+strField+"=";
@@ -262,7 +260,7 @@ ECRESULT UpdateObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned
 		er = lpDatabase->DoUpdate(strQuery, &ulAffRows);
 		
 		if(er != erSuccess) 
-			goto exit;
+			return er;
 		
 		if(ulObjType == MAPI_MESSAGE) {
 			// Update cell cache
@@ -270,10 +268,8 @@ ECRESULT UpdateObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned
 			
 			er = g_lpSessionManager->GetCacheManager()->UpdateCell(ulObjId, PR_MESSAGE_SIZE, (updateAction == UPDATE_ADD ? llSize : -llSize));
 			if(er != erSuccess)
-				goto exit;
+				return er;
 		}
 	}
-	
-exit:
-	return er;
+	return erSuccess;
 }

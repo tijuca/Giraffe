@@ -1,4 +1,4 @@
-zarafa-search does 2 things, indexing and searching.
+kopano-search does 2 things, indexing and searching.
 
 INDEXING
 
@@ -6,9 +6,9 @@ INDEXING
 -attachments are not indexed by default ('index_attachments' in search.cfg) (note that attachments can really slow down indexing)
 -attachments are converted with external tools such as pdf2text, then handed to the configured search engine
 -it indexes _all_ stores on the _current_ server node (so that is including any public stores..)
--for xapian, each store has its own xapian 'index database' directory, usually in /var/lib/zarafa/index ('index_path' in search.cfg). format is 'serverguid-storeguid'.
+-for xapian, each store has its own xapian 'index database' directory, usually in /var/lib/kopano/index ('index_path' in search.cfg). format is 'serverguid-storeguid'.
 -xapian databases can be inspected with standard tool 'delve'. for example 'delve databasename' gives general info such as total item count.
--another standard tool 'xapian-compact' can be used to defragment/compress a xapian database. the script 'zarafa-search-xapian-compact.py' loops over all databases and compacts them (this should work even while search is running). customers will probably want to run this after initial indexing and then perhaps once every month or several months.
+-another standard tool 'xapian-compact' can be used to defragment/compress a xapian database. the script 'kopano-search-xapian-compact.py' loops over all databases and compacts them (this should work even while search is running). customers will probably want to run this after initial indexing and then perhaps once every month or several months.
 -there are two phases in indexing, initial and incremental. 
 -in the initial phase, the whole history for every store is read and indexed. initial indexing can be parallized so multiple folders are indexed at the same time (option 'index_processes' in search.cfg, default 1!).
 -currently, our own mail server with about 1.2M items is indexed in about 30 hours (including attachments, otherwise it's closer to 10 hours).
@@ -16,8 +16,8 @@ INDEXING
 -in the second phase, incremental indexing just tries to keep up in real-time with current/recent events. it uses ICS to track all changes on the server, and indexes encountered folders in the same way as initial indexing (also in parallel)
 -in the file 'serverguid_state', we keep track of which folders have been synced already, so initial syncing does not have to fully restart when something goes wrong.
 -the file 'serverguid_mapping' is needed to fix a problem in ICS, which does not know for a 'delete event' which store/folder the delete belongs to. for each 'new/update' event we store this info here. so if the item is deleted later we know the store.
--stores can be fully reindexed (after initial syncing), by running 'zarafa-search --reindex username/storeguid'. it will then contact the running zarafa-search process to queue reindexing (multiple stores can be queued at one time). zarafa-search only looks in this queue when it has nothing else to do during incremental syncing, so there may be a delay. for xapian, this means the database is completely deleted, then reindexed (in parallel, again according to 'index_processes' in search.cfg)).
--(typically) in /var/log/zarafa/search.log, the index process can be followed. each parallel worker process has its own prefix (index0, index1..). 
+-stores can be fully reindexed (after initial syncing), by running 'kopano-search --reindex username/storeguid'. it will then contact the running kopano-search process to queue reindexing (multiple stores can be queued at one time). kopano-search only looks in this queue when it has nothing else to do during incremental syncing, so there may be a delay. for xapian, this means the database is completely deleted, then reindexed (in parallel, again according to 'index_processes' in search.cfg)).
+-(typically) in /var/log/kopano/search.log, the index process can be followed. each parallel worker process has its own prefix (index0, index1..). 
 -there are also many timings logged, such as how many items where processed in total and per second for initial indexing, and xapian commit time.
 -there should be no manual messing in the index directory. either delete everything, or use reindexing.
 

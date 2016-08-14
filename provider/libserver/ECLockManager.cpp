@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,23 +15,19 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <memory>
+#include <kopano/platform.h>
 #include "ECLockManager.h"
-#include <zarafa/threadutil.h>
+#include <kopano/threadutil.h>
 
 #include <boost/utility.hpp>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 using namespace std;
 
-///////////////////
-// ECObjectLockImpl
-///////////////////
 class ECObjectLockImpl : private boost::noncopyable {
 public:
 	ECObjectLockImpl(ECLockManagerPtr ptrLockManager, unsigned int ulObjId, ECSESSIONID sessionId);
@@ -40,14 +36,11 @@ public:
 	ECRESULT Unlock();
 
 private:
-	boost::weak_ptr<ECLockManager> m_ptrLockManager;
+	std::weak_ptr<ECLockManager> m_ptrLockManager;
 	unsigned int m_ulObjId;
 	ECSESSIONID m_sessionId;
 };
 
-//////////////////////////////////
-// ECLockObjectImpl Implementation
-//////////////////////////////////
 ECObjectLockImpl::ECObjectLockImpl(ECLockManagerPtr ptrLockManager, unsigned int ulObjId, ECSESSIONID sessionId)
 : m_ptrLockManager(ptrLockManager)
 , m_ulObjId(ulObjId)
@@ -71,11 +64,6 @@ ECRESULT ECObjectLockImpl::Unlock() {
 	return er;
 }
 
-
-
-//////////////////////////////
-// ECLockObject Implementation
-//////////////////////////////
 ECObjectLock::ECObjectLock(ECLockManagerPtr ptrLockManager, unsigned int ulObjId, ECSESSIONID sessionId)
 : m_ptrImpl(new ECObjectLockImpl(ptrLockManager, ulObjId, sessionId))
 { }
@@ -90,11 +78,6 @@ ECRESULT ECObjectLock::Unlock() {
 	return er;
 }
 
-
-
-///////////////////////////////
-// ECLockManager Implementation
-///////////////////////////////
 ECLockManagerPtr ECLockManager::Create() {
 	return ECLockManagerPtr(new ECLockManager());
 }
@@ -115,7 +98,7 @@ ECRESULT ECLockManager::LockObject(unsigned int ulObjId, ECSESSIONID sessionId, 
 
 	res = m_mapLocks.insert(LockMap::value_type(ulObjId, sessionId));
 	if (res.second == false && res.first->second != sessionId)
-		er = ZARAFA_E_NO_ACCESS;
+		er = KCERR_NO_ACCESS;
 
 	if (lpObjectLock)
 		*lpObjectLock = ECObjectLock(shared_from_this(), ulObjId, sessionId);
@@ -131,9 +114,9 @@ ECRESULT ECLockManager::UnlockObject(unsigned int ulObjId, ECSESSIONID sessionId
 
 	i = m_mapLocks.find(ulObjId);
 	if (i == m_mapLocks.end())
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 	else if (i->second != sessionId)
-		er = ZARAFA_E_NO_ACCESS;
+		er = KCERR_NO_ACCESS;
 	else
 		m_mapLocks.erase(i);
 

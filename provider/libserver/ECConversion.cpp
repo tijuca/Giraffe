@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,13 +15,13 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include "soapH.h"
 
 #include "SOAPUtils.h"
 #include "ECDatabase.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 #include <sstream>
 
 #include "ECConversion.h"
@@ -30,15 +30,13 @@ using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
-// Convert search criteria of zarafa version 5.2x to 6
+// Convert search criteria from zarafa-5.2x to zarafa-6 format
 ECRESULT ConvertSearchCriteria52XTo6XX(ECDatabase *lpDatabase, char* lpData, struct searchCriteria **lppNewSearchCriteria)
 {
 	if (lpDatabase == NULL || lpData == NULL || lppNewSearchCriteria == NULL)
-		return ZARAFA_E_INVALID_PARAMETER;
+		return KCERR_INVALID_PARAMETER;
 
 	ECRESULT er = erSuccess;
 	
@@ -66,14 +64,14 @@ ECRESULT ConvertSearchCriteria52XTo6XX(ECDatabase *lpDatabase, char* lpData, str
 	xmlsoap.is = &xml;
 	soap_default_searchCriteria52X(&xmlsoap, lpSearchCriteria);
 	if (soap_begin_recv(&xmlsoap) != 0) {
-		er = ZARAFA_E_NETWORK_ERROR;
+		er = KCERR_NETWORK_ERROR;
 		goto exit;
 	}
 	soap_get_searchCriteria52X(&xmlsoap, lpSearchCriteria, "SearchCriteria", NULL);
 
 	// We now have the object, allocated by xmlsoap object,
 	if (soap_end_recv(&xmlsoap) != 0) {
-		er = ZARAFA_E_NETWORK_ERROR;
+		er = KCERR_NETWORK_ERROR;
 		goto exit;
 	}
 
@@ -150,10 +148,6 @@ exit:
 	return er;
 }
 
-//
-// Soap code from the zarafa 5.2x 
-//
-
 SOAP_FMAC3 void SOAP_FMAC4 soap_default_searchCriteria52X(struct soap *soap, struct searchCriteria52X *a)
 {
 	(void)soap; (void)a; /* appease -Wall -Werror */
@@ -216,7 +210,16 @@ SOAP_FMAC3 struct searchCriteria52X * SOAP_FMAC4 soap_in_searchCriteria52X(struc
 			return NULL;
 	}
 	else
-	{	a = (struct searchCriteria52X *)soap_id_forward(soap, soap->href, (void**)a, 0, SOAP_TYPE_searchCriteria, 0, sizeof(struct searchCriteria52X), 0, NULL);
+	{
+#if GSOAP_VERSION >= 20824
+		a = static_cast<struct searchCriteria52X *>(soap_id_forward(soap,
+		    soap->href, reinterpret_cast<void **>(a), 0,
+		    SOAP_TYPE_searchCriteria, 0, sizeof(*a), 0, NULL, NULL));
+#else
+		a = static_cast<struct searchCriteria52X *>(soap_id_forward(soap,
+		    soap->href, reinterpret_cast<void **>(a), 0,
+		    SOAP_TYPE_searchCriteria, 0, sizeof(*a), 0, NULL));
+#endif
 		if (soap->body && soap_element_end_in(soap, tag))
 			return NULL;
 	}
@@ -237,7 +240,16 @@ SOAP_FMAC3 struct entryList52X ** SOAP_FMAC4 soap_in_PointerToentryList52X(struc
 			return NULL;
 	}
 	else
-	{	a = (struct entryList52X **)soap_id_lookup(soap, soap->href, (void**)a, SOAP_TYPE_entryList, sizeof(struct entryList52X), 0);
+	{
+#if GSOAP_VERSION >= 20824
+		a = static_cast<struct entryList52X **>(soap_id_lookup(soap,
+		    soap->href, reinterpret_cast<void **>(a),
+		    SOAP_TYPE_entryList, sizeof(*a), 0, NULL));
+#else
+		a = static_cast<struct entryList52X **>(soap_id_lookup(soap,
+		    soap->href, reinterpret_cast<void **>(a),
+		    SOAP_TYPE_entryList, sizeof(*a), 0));
+#endif
 		if (soap->body && soap_element_end_in(soap, tag))
 			return NULL;
 	}
@@ -287,7 +299,16 @@ SOAP_FMAC3 struct entryList52X * SOAP_FMAC4 soap_in_entryList52X(struct soap *so
 			return NULL;
 	}
 	else
-	{	a = (struct entryList52X *)soap_id_forward(soap, soap->href, (void**)a, 0, SOAP_TYPE_entryList, 0, sizeof(struct entryList52X), 0, NULL);
+	{
+#if GSOAP_VERSION >= 20824
+		a = static_cast<struct entryList52X *>(soap_id_forward(soap,
+		    soap->href, reinterpret_cast<void **>(a), 0,
+		    SOAP_TYPE_entryList, 0, sizeof(*a), 0, NULL, NULL));
+#else
+		a = static_cast<struct entryList52X *>(soap_id_forward(soap,
+		    soap->href, reinterpret_cast<void **>(a), 0,
+		    SOAP_TYPE_entryList, 0, sizeof(*a), 0, NULL));
+#endif
 		if (soap->body && soap_element_end_in(soap, tag))
 			return NULL;
 	}

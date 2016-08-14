@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,23 +15,19 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECParentStorage.h"
 
 #include "Mem.h"
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 
 #include <mapiutil.h>
-
-// Utils
 #include "SOAPUtils.h"
 #include "WSUtil.h"
-#include <zarafa/Util.h>
+#include <kopano/Util.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 /*
@@ -157,10 +153,7 @@ IECPropStorage* ECParentStorage::GetServerStorage() {
 	return m_lpServerStorage;
 }
 
-////////////////////////////////////////////////
 // Interface IECPropStorage
-//
-
 ULONG ECParentStorage::xECPropStorage::AddRef()
 {
 	METHOD_PROLOGUE_(ECParentStorage, ECPropStorage);

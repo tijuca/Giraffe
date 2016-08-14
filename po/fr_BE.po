@@ -135,14 +135,14 @@ msgstr "Synchronisation en cours ..."
 msgid "Synchronize"
 msgstr "Synchroniser"
 
-msgid "Start Zarafa offline synchronization"
-msgstr "Démarrer la synchronisation Zarafa hors-connexion"
+msgid "Start Kopano offline synchronization"
+msgstr "Démarrer la synchronisation Kopano hors-connexion"
 
 msgid "Configure"
 msgstr "Configurer"
 
-msgid "Configure Zarafa offline synchronization"
-msgstr "Configurer la synchronisation Zarafa hors-connexion"
+msgid "Configure Kopano offline synchronization"
+msgstr "Configurer la synchronisation Kopano hors-connexion"
 
 msgid "Global Address Book"
 msgstr "Carnet d'adresses global"
@@ -159,7 +159,7 @@ msgstr "Permissions..."
 msgid "Delegates can send items on your behalf. To grant permission to others to access your folders without also giving them send-on-behalf-of privileges, go to properties for each folder and change the options on the Permissions tab."
 msgstr "Vous pouvez permettre à vos mandataires d'envoyer des éléments en votre nom. Afin de permettre à vos autres collègues d'accéder à vos dossiers sans toutefois leur donner également le privilège envoyer-au-nom-de, veuillez modifier les options de l'onglet Permissions dans les propriétés de chaque dossier."
 
-msgid "Zarafa is not availible. Either there are network problems or Zarafa is down for maintenance."
+msgid "Kopano is not availible. Either there are network problems or Kopano is down for maintenance."
 msgstr ""
 
 msgid "Could not initialize delegation window\nPlease contact your administrator."
@@ -210,11 +210,11 @@ msgstr "Erreur"
 msgid "Unable to get Folder information"
 msgstr "Impossible d'obtenir l'information du dossier"
 
-msgid "Zarafa Favorites"
-msgstr "Favoris Zarafa"
+msgid "Kopano Favorites"
+msgstr "Favoris Kopano"
 
-msgid "Zarafa Delegates"
-msgstr "Mandataires Zarafa"
+msgid "Kopano Delegates"
+msgstr "Mandataires Kopano"
 
 msgid "Adding local folders"
 msgstr "Ajout de dossiers locaux"
@@ -360,17 +360,17 @@ msgstr "Type de connexion"
 msgid "Online"
 msgstr "En ligne"
 
-msgid "Cached Zarafa Mode"
-msgstr "Mode de mise en cache Zarafa"
+msgid "Cached Kopano Mode"
+msgstr "Mode de mise en cache Kopano"
 
 msgid "Detect at startup"
 msgstr "Détectez au démarrage"
 
-msgid "Zarafa does not support offline or cached mode for Outlook XP and Outlook 2002. If you wish to use offline functionality of Zarafa, please use Outlook 2000, 2003, 2007 or later."
-msgstr "Zarafa ne supporte pas le mode cache et le mode hors-connexion pour Outlook XP et Outlook 2002.\nSi vous souhaitez utiliser les fonctionnalités hors-connexion de Zarafa, vous devez utiliser les versions Outlook 2000, 2003, 2007 ou supérieures"
+msgid "Kopano does not support offline or cached mode for Outlook XP and Outlook 2002. If you wish to use offline functionality of Kopano, please use Outlook 2000, 2003, 2007 or later."
+msgstr "Kopano ne supporte pas le mode cache et le mode hors-connexion pour Outlook XP et Outlook 2002.\nSi vous souhaitez utiliser les fonctionnalités hors-connexion de Kopano, vous devez utiliser les versions Outlook 2000, 2003, 2007 ou supérieures"
 
-msgid "Zarafa Offline"
-msgstr "Zarafa hors-ligne"
+msgid "Kopano Offline"
+msgstr "Kopano hors-ligne"
 
 msgid "Favorites"
 msgstr "Favoris"
@@ -396,14 +396,11 @@ msgstr "Connexion au serveur..."
 msgid "Unable to reach the server.\nDo you want to save the settings or cancel and re-enter the settings?"
 msgstr "Impossible de se connecter au serveur.\nDésirez-vous conserver les paramètre ou annuler et renouveler la saisie des paramètres?"
 
-msgid "Cannot start Zarafa client because you are over the license limit. To continue, you must purchase additional client licenses from Zarafa."
-msgstr "Impossible de démarrer le client Zarafa car vous avez dépassé la limite accordée à votre licence. Pour continuer, vous devez acquérir une licence pour client supplémentaire  auprès de Zarafa."
+msgid "Cannot start Kopano client because you are over the license limit. To continue, you must purchase additional client licenses from Kopano."
+msgstr "Impossible de démarrer le client Kopano car vous avez dépassé la limite accordée à votre licence. Pour continuer, vous devez acquérir une licence pour client supplémentaire  auprès de Kopano."
 
-msgid "Zarafa license"
-msgstr "Licence Zarafa"
-
-msgid "Cannot start Zarafa client because the server was unable to contact the zarafa-licensed license server. Please consult your system administrator."
-msgstr "Impossible de démarrer le client zarafa car le serveur ne parvient pas à se connecter à la base de stockage des licences Zarafa. Veuillez contacter votre administrateur système."
+msgid "Kopano license"
+msgstr "Licence Kopano"
 
 msgid "Incorrect username and/or password."
 msgstr "Nom d'utilisateur et/ou mot de passe incorrect."
@@ -411,8 +408,8 @@ msgstr "Nom d'utilisateur et/ou mot de passe incorrect."
 msgid "Incorrect servername and/or port\nCheck if the server is running."
 msgstr "Nom de serveur et/ou port incorrect. Vérifiez si le serveur fonctionne."
 
-msgid "Incorrect Zarafa version."
-msgstr "Version Zarafa incorrecte."
+msgid "Incorrect Kopano version."
+msgstr "Version Kopano incorrecte."
 
 msgid "An unknown failure has occurred.\nPlease contact your administrator."
 msgstr "Une erreur inconnue s'est produite. Contactez votre administrateur s'il vous plaît."
@@ -606,14 +603,14 @@ msgstr "Permissions"
 msgid "Unable to open MAPI session."
 msgstr "Impossible d'ouvrir une session MAPI"
 
-msgid "You are currently offline. To use this command, connect to the Zarafa online server."
-msgstr "Vous êtez hors-connexion en ce moment. Pour utiliser cette commande, connectez-vous au serveur Zarafa en ligne."
+msgid "You are currently offline. To use this command, connect to the Kopano online server."
+msgstr "Vous êtez hors-connexion en ce moment. Pour utiliser cette commande, connectez-vous au serveur Kopano en ligne."
 
 msgid "Unable to open default store in MAPI session."
 msgstr "Impossible d'ouvrir la base de stockage par défaut dans la session MAPI"
 
-msgid "You can only use this function with Zarafa profiles."
-msgstr "Vous pouvez utiliser uniquement cette fonction avec les profils Zarafa"
+msgid "You can only use this function with Kopano profiles."
+msgstr "Vous pouvez utiliser uniquement cette fonction avec les profils Kopano"
 
 msgid "Unable to open this store."
 msgstr "Impossible d'ouvrir cette base de stockage."
@@ -636,8 +633,8 @@ msgstr "Récupérer les éléments supprimés…"
 msgid "Out of Office Assistant..."
 msgstr "Assistant de mode 'Absent' ..."
 
-msgid "Add to Zarafa Favorites Folder"
-msgstr "Ajouter au dossier des favoris Zarafa"
+msgid "Add to Kopano Favorites Folder"
+msgstr "Ajouter au dossier des favoris Kopano"
 
 msgid "Unable to get shortcut folder."
 msgstr "Impossible d'obtenir le dossier de raccourci"

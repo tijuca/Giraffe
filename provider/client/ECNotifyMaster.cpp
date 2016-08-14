@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <algorithm>
 
@@ -24,7 +24,7 @@
 #include "ECNotifyClient.h"
 #include "ECNotifyMaster.h"
 #include "ECSessionGroupManager.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 #include "SOAPUtils.h"
 #include "WSTransport.h"
 
@@ -35,8 +35,6 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember)) 
@@ -370,7 +368,7 @@ void* ECNotifyMaster::NotifyWatch(void *pTmpNotifyMaster)
 		notificationArray *pNotifyArray = NULL;
 
 		hr = pNotifyMaster->m_lpTransport->HrGetNotify(&pNotifyArray);
-		if (hr == ZARAFA_W_CALL_KEEPALIVE) {
+		if (static_cast<unsigned int>(hr) == KCWARN_CALL_KEEPALIVE) {
 			if (bReconnect) {
 				TRACE_NOTIFY(TRACE_WARNING, "NotifyWatch::Reconnection", "OK connection: %d", pNotifyMaster->m_ulConnection);
 				bReconnect = false;
@@ -443,7 +441,7 @@ void* ECNotifyMaster::NotifyWatch(void *pTmpNotifyMaster)
 		 * Loop through all notifications and sort them by connection number
 		 * with these mappings we can later send all notifications per connection to the appropriate client.
 		 */
-		for (ULONG item = 0; item < pNotifyArray->__size; ++item) {
+		for (gsoap_size_t item = 0; item < pNotifyArray->__size; ++item) {
 			ULONG ulConnection = pNotifyArray->__ptr[item].ulConnection;
 
 			// No need to do a find before an insert with a default object.

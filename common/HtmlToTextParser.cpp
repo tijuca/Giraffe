@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "HtmlToTextParser.h"
 #include "HtmlEntity.h"
 #include <cwctype>
@@ -63,11 +63,6 @@ CHtmlToTextParser::CHtmlToTextParser(void)
 	tagMap[L"dl"] = tagParser(false, &CHtmlToTextParser::parseTagDL);
 	
 	// @todo check span
-}
-
-CHtmlToTextParser::~CHtmlToTextParser(void)
-{
-	
 }
 
 void CHtmlToTextParser::Init()

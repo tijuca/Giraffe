@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECDatabase.h"
 
 #include <mapidefs.h>
@@ -25,24 +25,18 @@
 #include "ECSessionManager.h"
 #include "ECGenProps.h"
 #include "ECSession.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
 #include "ECMailBoxTable.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECMailBoxTable::ECMailBoxTable(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale) : 
 	ECStoreObjectTable(lpSession, 0, NULL, 0, MAPI_STORE, ulFlags, TABLE_FLAG_OVERRIDE_HOME_MDB, locale)
 {
 	m_ulStoreTypes = 3; // 1. Show all users store 2. Public stores
-}
-
-ECMailBoxTable::~ECMailBoxTable(void)
-{
 }
 
 ECRESULT ECMailBoxTable::Create(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale, ECMailBoxTable **lppTable)

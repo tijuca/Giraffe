@@ -1,8 +1,1 @@
-For this example you will need the Zarafa SDK.
-You may download the Zarafa SDK from the following website:
-http://developer.zarafa.com/
-
 To build the package, simply type 'make'.
-
-This program comes without ANY WARRANTY and is distributed under the
-GNU GPL2 license.

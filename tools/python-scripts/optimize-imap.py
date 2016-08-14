@@ -136,7 +136,7 @@ for o, a in opts:
         verbose = True
 
 locale.setlocale(locale.LC_CTYPE, '')
-session = OpenECSession("SYSTEM", "", os.getenv("ZARAFA_SOCKET", "default:"))
+session = OpenECSession("SYSTEM", "", os.getenv("KOPANO_SOCKET", "default:"))
 admin = GetDefaultStore(session)
 abook = session.OpenAddressBook(0, None, MAPI_UNICODE)
 

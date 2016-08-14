@@ -9,5 +9,5 @@ install-data-local:
 		lang="$${po%.po}"; \
 		sub="$(DESTDIR)$(datadir)/$$lang/LC_MESSAGES"; \
 		mkdir -p $$sub; \
-		msgfmt -f -v -o $$sub/zarafa.mo ${top_srcdir}/po/$$po; \
+		msgfmt -f -v -o $$sub/kopano.mo ${top_srcdir}/po/$$po; \
 	done

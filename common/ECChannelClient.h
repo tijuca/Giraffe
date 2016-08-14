@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -21,8 +21,8 @@
 #include <string>
 #include <vector>
 
-#include <zarafa/platform.h>
-#include <zarafa/ZarafaCode.h>
+#include <kopano/platform.h>
+#include <kopano/kcodes.h>
 
 class ECChannel;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,15 +15,13 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECEnumFBBlock.h"
 #include "freebusyutil.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 /**
@@ -39,13 +37,6 @@ ECEnumFBBlock::ECEnumFBBlock(ECFBBlockList* lpFBBlock)
 
 	while(lpFBBlock->Next(&sBlock) == hrSuccess)
 		m_FBBlock.Add(&sBlock);
-}
-
-/**
- * Destructor
- */
-ECEnumFBBlock::~ECEnumFBBlock(void)
-{
 }
 
 /**
@@ -125,12 +116,6 @@ HRESULT ECEnumFBBlock::Reset()
 	return m_FBBlock.Reset();
 }
 
-/*! @copydoc IEnumFBBlock::Clone */
-HRESULT ECEnumFBBlock::Clone(IEnumFBBlock **ppclone)
-{
-	return E_NOTIMPL;
-}
-
 /*! @copydoc IEnumFBBlock::Restrict */
 HRESULT ECEnumFBBlock::Restrict(FILETIME ftmStart, FILETIME ftmEnd)
 {
@@ -143,12 +128,9 @@ HRESULT ECEnumFBBlock::Restrict(FILETIME ftmStart, FILETIME ftmEnd)
 	return m_FBBlock.Restrict(rtmStart, rtmEnd);
 }
 
-//////////////////////////////////////////////////////////////////
 // Interfaces
 //		IUnknown
 //		IEnumFBBlock
-//
-
 HRESULT __stdcall ECEnumFBBlock::xEnumFBBlock::QueryInterface(REFIID refiid , void** lppInterface)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IEnumFBBlock::QueryInterface", "");

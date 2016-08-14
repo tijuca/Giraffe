@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,23 +15,17 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include "ECUserManagementOffline.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECUserManagementOffline::ECUserManagementOffline(ECSession *lpSession,
     ECPluginFactory *lpPluginFactory, ECConfig *lpConfig) :
 	ECUserManagement(lpSession, lpPluginFactory, lpConfig)
-{
-}
-
-ECUserManagementOffline::~ECUserManagementOffline(void)
 {
 }
 
@@ -61,14 +55,14 @@ ECRESULT ECUserManagementOffline::GetGroupDetailsAndSync(unsigned int ulGroupId,
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
 
 ECRESULT ECUserManagementOffline::GetUserListAndSync(std::list<localuserdetails_t> **lppUsers, unsigned int ulFlags)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	userdetails_t details;
 
 	std::list<localuserdetails_t> *lpUsers = new std::list<localuserdetails_t>;
@@ -76,23 +70,21 @@ ECRESULT ECUserManagementOffline::GetUserListAndSync(std::list<localuserdetails_
 	if(! (ulFlags & USERMANAGEMENT_IDS_ONLY)) {
 		er = GetUserDetailsAndSync(m_ulUserId, &details);
 		if(er != erSuccess)
-			goto exit;
+			return er;
 	}
 	
 	lpUsers->push_back(localuserdetails_t(m_ulUserId, details));
 
 
 	*lppUsers = lpUsers;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECUserManagementOffline::GetGroupListAndSync(std::list<localgroupdetails> **lppGroups, unsigned int ulFlags)
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
@@ -101,7 +93,7 @@ ECRESULT ECUserManagementOffline::GetMembersOfGroupAndSync(unsigned int ulGroupI
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
@@ -110,7 +102,7 @@ ECRESULT ECUserManagementOffline::GetUserGroupListAndSync(std::list<localuserobj
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
@@ -119,7 +111,7 @@ ECRESULT ECUserManagementOffline::SetUserDetailsAndSync(unsigned int ulUserId, u
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
@@ -128,7 +120,7 @@ ECRESULT ECUserManagementOffline::GetGroupMembershipAndSync(unsigned int ulUserI
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
@@ -137,7 +129,7 @@ ECRESULT ECUserManagementOffline::SetGroupDetailsAndSync(unsigned int ulGroupId,
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
@@ -146,7 +138,7 @@ ECRESULT ECUserManagementOffline::AddMemberToGroupAndSync(unsigned int ulGroupId
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
@@ -155,7 +147,7 @@ ECRESULT ECUserManagementOffline::DeleteMemberFromGroupAndSync(unsigned int ulGr
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
@@ -164,7 +156,7 @@ ECRESULT ECUserManagementOffline::ResolveUserAndSync(char *szUsername, unsigned 
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	//if(lpbIsNonActive)
 	//	*lpbIsNonActive = false;
@@ -178,7 +170,7 @@ ECRESULT ECUserManagementOffline::ResolveGroupAndSync(char *szGroupname, unsigne
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
@@ -187,7 +179,7 @@ ECRESULT ECUserManagementOffline::SearchPartialUserAndSync(char *szSearchString,
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
@@ -196,7 +188,7 @@ ECRESULT ECUserManagementOffline::SearchPartialGroupAndSync(char *szSearchString
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
@@ -205,7 +197,7 @@ ECRESULT ECUserManagementOffline::CreateUserAndSync(userdetails_t details, unsig
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
@@ -214,7 +206,7 @@ ECRESULT ECUserManagementOffline::DeleteUserAndSync(unsigned int ulId)
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
@@ -223,7 +215,7 @@ ECRESULT ECUserManagementOffline::CreateGroupAndSync(groupdetails_t details, uns
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
@@ -232,7 +224,7 @@ ECRESULT ECUserManagementOffline::DeleteGroupAndSync(unsigned int ulId)
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }
@@ -241,7 +233,7 @@ ECRESULT ECUserManagementOffline::GetProps(struct soap *soap, unsigned int ulId,
 {
 	ECRESULT er = erSuccess;
 
-	er = ZARAFA_E_NO_SUPPORT;
+	er = KCERR_NO_SUPPORT;
 
 	return er;
 }

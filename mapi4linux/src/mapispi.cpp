@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,19 +15,19 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "m4l.mapispi.h"
 #include "m4l.mapiutil.h"
 #include "m4l.mapix.h"
 #include "m4l.debug.h"
 
 #include <mapi.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/Util.h>
-#include <zarafa/ECGuid.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/Util.h>
+#include <kopano/ECGuid.h>
 
 #include <algorithm>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/mapi_ptr.h>
 
 M4LMAPIGetSession::M4LMAPIGetSession(LPMAPISESSION new_session) {
 	ASSERT(new_session);

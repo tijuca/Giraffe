@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Generate Zarafa temporary file
+# Generate Kopano temporary file
 #
 # attachments_parser will have provided the ${TMPDIR}
 # which means that we will generate the following temporary

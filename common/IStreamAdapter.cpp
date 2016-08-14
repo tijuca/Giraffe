@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <algorithm>
 
@@ -28,10 +28,6 @@
 IStreamAdapter::IStreamAdapter(std::string& str) : m_pos(0), m_str(str) {
 }
 
-IStreamAdapter::~IStreamAdapter()
-{
-}
-
 HRESULT IStreamAdapter::QueryInterface(REFIID iid, void **pv){
 	if(iid == IID_IStream || iid == IID_ISequentialStream || iid == IID_IUnknown) {
 		*pv = this;
@@ -39,9 +35,6 @@ HRESULT IStreamAdapter::QueryInterface(REFIID iid, void **pv){
 	}
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
-
-ULONG IStreamAdapter::AddRef() { return 1; }
-ULONG IStreamAdapter::Release() { return 1; }
 
 HRESULT IStreamAdapter::Read(void *pv, ULONG cb, ULONG *pcbRead)
 {
@@ -134,40 +127,10 @@ HRESULT IStreamAdapter::CopyTo(IStream *pstm, ULARGE_INTEGER cb, ULARGE_INTEGER 
 	return hr;
 }
 
-HRESULT IStreamAdapter::Commit(DWORD grfCommitFlags)
-{
-	return hrSuccess;
-}
-
-HRESULT IStreamAdapter::Revert(void)
-{
-	return hrSuccess;
-}
-
-HRESULT IStreamAdapter::LockRegion(ULARGE_INTEGER libOffset, ULARGE_INTEGER cb, DWORD dwLockType)
-{
-	return MAPI_E_NO_SUPPORT;
-}
-
-HRESULT IStreamAdapter::UnlockRegion(ULARGE_INTEGER libOffset, ULARGE_INTEGER cb, DWORD dwLockType)
-{
-	return MAPI_E_NO_SUPPORT;
-}
-
 HRESULT IStreamAdapter::Stat(STATSTG *pstatstg, DWORD grfStatFlag)
 {
 	memset(pstatstg, 0, sizeof(STATSTG));
 	pstatstg->cbSize.QuadPart = m_str.size();
 	
 	return hrSuccess;
-}
-
-HRESULT IStreamAdapter::Clone(IStream **ppstm)
-{
-	return MAPI_E_NO_SUPPORT;
-}
-
-IStream *IStreamAdapter::get()
-{
-	return this;
 }

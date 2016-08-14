@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,38 +15,38 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "mailer.h"
 #include "archive.h"
 
 #include <mapitags.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <mapiutil.h>
 #include <mapidefs.h>
 #include <mapix.h>
 #include <mapi.h>
 
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECConfig.h>
-#include <zarafa/IECUnknown.h>
-#include <zarafa/ecversion.h>
-#include <zarafa/IECSecurity.h>
-#include <zarafa/IECServiceAdmin.h>
-#include <zarafa/MAPIErrors.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECConfig.h>
+#include <kopano/IECUnknown.h>
+#include <kopano/ecversion.h>
+#include <kopano/IECSecurity.h>
+#include <kopano/IECServiceAdmin.h>
+#include <kopano/MAPIErrors.h>
 #include "IECSpooler.h"
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 #include <edkguid.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/Util.h>
-#include <zarafa/stringutil.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/Util.h>
+#include <kopano/stringutil.h>
 #include "mapicontact.h"
-#include <zarafa/mapiguidext.h>
-#include <zarafa/EMSAbTag.h>
-#include <zarafa/ECABEntryID.h>
-#include <zarafa/ECGetText.h>
+#include <kopano/mapiguidext.h>
+#include <kopano/EMSAbTag.h>
+#include <kopano/ECABEntryID.h>
+#include <kopano/ECGetText.h>
 
-#include <zarafa/charset/convert.h>
-#include <zarafa/charset/convstring.h>
+#include <kopano/charset/convert.h>
+#include <kopano/charset/convstring.h>
 
 #include "PyMapiPlugin.h"
 
@@ -1419,13 +1419,13 @@ exit:
  * @param[in]	lpAddrBook	The Global Addressbook of the user.
  * @param[in]	cbEntryId	The number of bytes in lpEntryId
  * @param[in]	lpEntryId	The contact EntryID
- * @param[in]	lpulZarafaEID The number of bytes in lppZarafaEID
- * @param[in]	lppZarafaEID  The EntryID where the contact points to
+ * @param[in]	eid_size The number of bytes in eidp
+ * @param[in]	eidp  The EntryID where the contact points to
  * @return		HRESULT
  */
-static HRESULT ContactToZarafa(IMsgStore *lpUserStore, LPADRBOOK lpAddrBook,
-    ULONG cbEntryId, const ENTRYID *lpEntryId, ULONG *lpulZarafaEID,
-    LPENTRYID *lppZarafaEID)
+static HRESULT ContactToKopano(IMsgStore *lpUserStore, LPADRBOOK lpAddrBook,
+    ULONG cbEntryId, const ENTRYID *lpEntryId, ULONG *eid_size,
+    LPENTRYID *eidp)
 {
 	HRESULT hr = hrSuccess;
 	const CONTAB_ENTRYID *lpContabEntryID = (LPCONTAB_ENTRYID)lpEntryId;
@@ -1505,15 +1505,15 @@ static HRESULT ContactToZarafa(IMsgStore *lpUserStore, LPADRBOOK lpAddrBook,
 		goto exit;
 	}
 
-	hr = MAPIAllocateBuffer(lpEntryIds[lpContabEntryID->email_offset].Value.bin.cb, (void**)lppZarafaEID);
+	hr = MAPIAllocateBuffer(lpEntryIds[lpContabEntryID->email_offset].Value.bin.cb, (void**)eidp);
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "No memory for contact eid: %s (%x)",
 			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
 
-	memcpy(*lppZarafaEID, lpEntryIds[lpContabEntryID->email_offset].Value.bin.lpb, lpEntryIds[lpContabEntryID->email_offset].Value.bin.cb);
-	*lpulZarafaEID = lpEntryIds[lpContabEntryID->email_offset].Value.bin.cb;
+	memcpy(*eidp, lpEntryIds[lpContabEntryID->email_offset].Value.bin.lpb, lpEntryIds[lpContabEntryID->email_offset].Value.bin.cb);
+	*eid_size = lpEntryIds[lpContabEntryID->email_offset].Value.bin.cb;
 
 exit:
 	MAPIFreeBuffer(lpPropTags);
@@ -1532,13 +1532,13 @@ exit:
  * @param[in]	lpAddrBook	The Global Addressbook of the user sending the mail.
  * @param[in]	ulSMTPEID	The number of bytes in lpSMTPEID
  * @param[in]	lpSMTPEID	The One off EntryID.
- * @param[out]	lpulZarafaEID	The number of bytes in lppZarafaEID
- * @param[out]	lppZarafaEID	The ZARAFA entryid of the user defined in the One off.
+ * @param[out]	eid_size	The number of bytes in eidp
+ * @param[out]	eidp	The ZARAFA entryid of the user defined in the One off.
  * @return		HRESULT
- * @retval		MAPI_E_NOT_FOUND	User not a Zarafa user, or lpSMTPEID is not an One-off EntryID
+ * @retval		MAPI_E_NOT_FOUND	User not a Kopano user, or lpSMTPEID is not an One-off EntryID
  */
 static HRESULT SMTPToZarafa(LPADRBOOK lpAddrBook, ULONG ulSMTPEID,
-    const ENTRYID *lpSMTPEID, ULONG *lpulZarafaEID, LPENTRYID *lppZarafaEID)
+    const ENTRYID *lpSMTPEID, ULONG *eid_size, LPENTRYID *eidp)
 {
 	HRESULT hr = hrSuccess;
 	wstring wstrName, wstrType, wstrEmailAddress;
@@ -1581,8 +1581,8 @@ static HRESULT SMTPToZarafa(LPADRBOOK lpAddrBook, ULONG ulSMTPEID,
 		}
 
 		memcpy(lpSpoofBin, lpSpoofEID->Value.bin.lpb, lpSpoofEID->Value.bin.cb);
-		*lppZarafaEID = lpSpoofBin;
-		*lpulZarafaEID = lpSpoofEID->Value.bin.cb;
+		*eidp = lpSpoofBin;
+		*eid_size = lpSpoofEID->Value.bin.cb;
 	} else {
 		hr = MAPI_E_NOT_FOUND;
 	}
@@ -1841,7 +1841,7 @@ exit:
  *
  * @param[in]	lpAddrBook	The Global Addressbook of the user trying to send an email.
  * @param[in]	lpUserStore	The store of the user trying to send an email.
- * @param[in]	lpAdminSession MAPI session of the Zarafa SYSTEM user.
+ * @param[in]	lpAdminSession MAPI session of the Kopano SYSTEM user.
  * @param[in]	lpMailer	ECSender object (inetmapi), used to set an error for an error mail if not allowed.
  * @param[in]	ulOwnerCB	Number of bytes in lpOwnerEID
  * @param[in]	lpOwnerEID	EntryID of the user sending the mail.
@@ -1872,7 +1872,7 @@ static HRESULT CheckSendAs(IAddrBook *lpAddrBook, IMsgStore *lpUserStore,
 
 	hr = SMTPToZarafa(lpAddrBook, ulRepresentCB, lpRepresentEID, &sSpoofEID.Value.bin.cb, (LPENTRYID*)&sSpoofEID.Value.bin.lpb);
 	if (hr != hrSuccess)
-		hr = ContactToZarafa(lpUserStore, lpAddrBook, ulRepresentCB, lpRepresentEID, &sSpoofEID.Value.bin.cb, (LPENTRYID*)&sSpoofEID.Value.bin.lpb);
+		hr = ContactToKopano(lpUserStore, lpAddrBook, ulRepresentCB, lpRepresentEID, &sSpoofEID.Value.bin.cb, (LPENTRYID*)&sSpoofEID.Value.bin.lpb);
 	if (hr == hrSuccess) {
 		ulRepresentCB = sSpoofEID.Value.bin.cb;
 		lpRepresentEID = (LPENTRYID)sSpoofEID.Value.bin.lpb;
@@ -1885,7 +1885,7 @@ static HRESULT CheckSendAs(IAddrBook *lpAddrBook, IMsgStore *lpUserStore,
 		goto exit;
 	}
 
-	// representing entryid is now always a Zarafa Entry ID. Open the user so we can log the display name
+	// representing entryid is now always a Kopano Entry ID. Open the user so we can log the display name
 	hr = lpAddrBook->OpenEntry(ulRepresentCB, lpRepresentEID, NULL, 0, &ulObjType, (LPUNKNOWN*)&lpRepresenting);
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "CheckSendAs(): OpenEntry failed(1) %x", hr);
@@ -1975,7 +1975,7 @@ exit:
  *
  * @param[in]	lpAddrBook	The Global Addressbook of the user trying to send an email.
  * @param[in]	lpUserStore	The store of the user trying to send an email.
- * @param[in]	lpAdminSession MAPI session of the Zarafa SYSTEM user.
+ * @param[in]	lpAdminSession MAPI session of the Kopano SYSTEM user.
  * @param[in]	ulOwnerCB	Number of bytes in lpOwnerEID
  * @param[in]	lpOwnerEID	EntryID of the user sending the mail.
  * @param[in]	ulRepresentCB Number of bytes in lpRepresentEID.
@@ -2005,7 +2005,7 @@ static HRESULT CheckDelegate(IAddrBook *lpAddrBook, IMsgStore *lpUserStore,
 
 	hr = SMTPToZarafa(lpAddrBook, ulRepresentCB, lpRepresentEID, &sSpoofEID.Value.bin.cb, (LPENTRYID*)&sSpoofEID.Value.bin.lpb);
 	if (hr != hrSuccess)
-		hr = ContactToZarafa(lpUserStore, lpAddrBook, ulRepresentCB, lpRepresentEID, &sSpoofEID.Value.bin.cb, (LPENTRYID*)&sSpoofEID.Value.bin.lpb);
+		hr = ContactToKopano(lpUserStore, lpAddrBook, ulRepresentCB, lpRepresentEID, &sSpoofEID.Value.bin.cb, (LPENTRYID*)&sSpoofEID.Value.bin.lpb);
 	if (hr == hrSuccess) {
 		ulRepresentCB = sSpoofEID.Value.bin.cb;
 		lpRepresentEID = (LPENTRYID)sSpoofEID.Value.bin.lpb;
@@ -2203,7 +2203,7 @@ exit:
 /**
  * Using the given resources, sends the mail to the SMTP server.
  *
- * @param[in]	lpAdminSession	Zarafa SYSTEM user MAPI session.
+ * @param[in]	lpAdminSession	Kopano SYSTEM user MAPI session.
  * @param[in]	lpUserSession	MAPI Session of the user sending the mail.
  * @param[in]	lpServiceAdmin	IECServiceAdmin interface on the user's store.
  * @param[in]	lpSecurity		IECSecurity interface on the user's store.
@@ -2412,7 +2412,7 @@ static HRESULT ProcessMessage(IMAPISession *lpAdminSession,
 
 			hr = HrGetOneProp(lpUserStore, PR_MAILBOX_OWNER_ENTRYID, &lpPropOwner);
 			if (hr != hrSuccess) {
-				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get Zarafa mailbox owner id, error code: 0x%08X", hr);
+				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get Kopano mailbox owner id, error code: 0x%08X", hr);
 				goto exit;
 			}
 
@@ -2683,7 +2683,7 @@ exit:
  *
  * @param[in]	szUsername	The username to login as. This name is in unicode.
  * @param[in]	szSMTP		The SMTP server name or IP address to use.
- * @param[in]	szPath		The URI to the Zarafa server.
+ * @param[in]	szPath		The URI to the Kopano server.
  * @param[in]	cbMsgEntryId The number of bytes in lpMsgEntryId
  * @param[in]	lpMsgEntryId The EntryID of the message to send
  * @param[in]	bDoSentMail	true if the mail should be moved to the "Sent Items" folder of the user.
@@ -2756,7 +2756,7 @@ HRESULT ProcessMessageForked(const wchar_t *szUsername, const char *szSMTP,
 
 	hr = HrGetOneProp(lpUserStore, PR_EC_OBJECT, &lpsProp);
 	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get Zarafa internal object: %s (%x)",
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get Kopano internal object: %s (%x)",
 			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,18 +15,15 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "WSMessageStreamImporter.h"
 #include "WSUtil.h"
 #include "ECSyncSettings.h"
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
-/////////////////////////////////////
 // WSMessageStreamSink Implementation
 
 /**
@@ -63,7 +60,7 @@ HRESULT WSMessageStreamSink::Write(LPVOID lpData, ULONG cbData)
 	HRESULT hr = hrSuccess;
 	HRESULT hrAsync = hrSuccess;
 
-	hr = ZarafaErrorToMAPIError(m_lpFifoBuffer->Write(lpData, cbData, 0, NULL));
+	hr = kcerr_to_mapierr(m_lpFifoBuffer->Write(lpData, cbData, 0, NULL));
 	if(hr != hrSuccess) {
 		// Write failed, close the write-side of the FIFO
 		m_lpFifoBuffer->Close(ECFifoBuffer::cfWrite);
@@ -92,7 +89,6 @@ WSMessageStreamSink::WSMessageStreamSink(ECFifoBuffer *lpFifoBuffer, ULONG ulTim
 { }
 
 /**
- * Destructor
  * Closes the underlaying fifo buffer, causing the reader to stop reading.
  */
 WSMessageStreamSink::~WSMessageStreamSink()
@@ -100,15 +96,12 @@ WSMessageStreamSink::~WSMessageStreamSink()
 	m_lpFifoBuffer->Close(ECFifoBuffer::cfWrite);
 }
 
-
-/////////////////////////////////////////
-// WSMessageStreamImporter Implementation
 HRESULT WSMessageStreamImporter::Create(ULONG ulFlags, ULONG ulSyncId, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG cbFolderEntryID, LPENTRYID lpFolderEntryID, bool bNewMessage, LPSPropValue lpConflictItems, WSTransport *lpTransport, WSMessageStreamImporter **lppStreamImporter)
 {
 	HRESULT hr = hrSuccess;
 	entryId sEntryId = {0};
 	entryId sFolderEntryId = {0};
-	propVal sConflictItems = {0};
+	struct propVal sConflictItems{__gszeroinit};
 	WSMessageStreamImporterPtr ptrStreamImporter;
 	ECSyncSettings* lpSyncSettings = NULL;
 
@@ -217,7 +210,7 @@ WSMessageStreamImporter::~WSMessageStreamImporter()
 void WSMessageStreamImporter::run()
 {
 	unsigned int ulResult = 0;
-	xsd__Binary	sStreamData = {{0}};
+	struct xsd__Binary sStreamData{__gszeroinit};
 
 	struct soap *lpSoap = m_ptrTransport->m_lpCmd->soap;
 	propVal *lpsConflictItems = NULL;
@@ -241,7 +234,7 @@ void WSMessageStreamImporter::run()
 	if (m_ptrTransport->m_lpCmd->ns__importMessageFromStream(m_ptrTransport->m_ecSessionId, m_ulFlags, m_ulSyncId, m_sFolderEntryId, m_sEntryId, m_bNewMessage, lpsConflictItems, sStreamData, &ulResult) != SOAP_OK) {
 		m_hr = MAPI_E_NETWORK_ERROR;
 	} else if (m_hr == hrSuccess) {	// Could be set from callback
-		m_hr = ZarafaErrorToMAPIError(ulResult, MAPI_E_NOT_FOUND);
+		m_hr = kcerr_to_mapierr(ulResult, MAPI_E_NOT_FOUND);
 	}
 
 	m_ptrTransport->UnLockSoap();
@@ -277,7 +270,7 @@ size_t WSMessageStreamImporter::MTOMRead(struct soap* soap, void* /*handle*/, ch
 
 	er = m_fifoBuffer.Read(buf, len, 0, &cbRead);
 	if (er != erSuccess) {
-		m_hr = ZarafaErrorToMAPIError(er);
+		m_hr = kcerr_to_mapierr(er);
 		return 0;
 	}
 

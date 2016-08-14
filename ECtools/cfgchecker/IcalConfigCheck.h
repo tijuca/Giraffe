@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,13 +18,12 @@
 #ifndef ICALCONFIGCHECK_H
 #define ICALCONFIGCHECK_H
 
+#include <kopano/zcdefs.h>
 #include "ECConfigCheck.h"
 
-class IcalConfigCheck : public ECConfigCheck {
+class IcalConfigCheck _kc_final : public ECConfigCheck {
 public:
 	IcalConfigCheck(const char *lpszConfigFile);
-	~IcalConfigCheck();
-
 	void loadChecks();
 
 private:

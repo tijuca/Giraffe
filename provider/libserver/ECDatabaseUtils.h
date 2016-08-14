@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,13 +18,13 @@
 #ifndef ECDATABASEUTILS_H
 #define ECDATABASEUTILS_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include "ECMAPI.h"
-#include "Zarafa.h"
-#include <zarafa/ZarafaCode.h>
+#include "kcore.hpp"
+#include <kopano/kcodes.h>
 #include "ECDatabase.h"
 #include "ECDatabaseFactory.h"
-#include <zarafa/ECLogger.h>
+#include <kopano/ECLogger.h>
 
 #include <string>
 
@@ -76,7 +76,7 @@ ECRESULT	GetPropSize(DB_ROW lpRow, DB_LENGTHS lpLen, unsigned int *lpulSize);
 ECRESULT	CopySOAPPropValToDatabasePropVal(struct propVal *lpPropVal, unsigned int *ulColId, std::string &strColData, ECDatabase *lpMySQL, bool bTruncate);
 ECRESULT	CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LENGTHS lpLen, propVal *lpPropVal);
 
-ULONG GetMVItemCount(struct propVal *lpPropVal);
+gsoap_size_t GetMVItemCount(struct propVal *lpPropVal);
 ECRESULT CopySOAPPropValToDatabaseMVPropVal(struct propVal *lpPropVal, int nItem, std::string &strColName, std::string &strColData, ECDatabase *lpDatabase);
 
 ECRESULT ParseMVProp(const char *lpRowData, ULONG ulSize, unsigned int *lpulLastPos, std::string *lpstrData);
@@ -105,8 +105,8 @@ private:
 	bool m_bResetValue;
 
 private:
-	SuppressLockErrorLogging(const SuppressLockErrorLogging&);
-	SuppressLockErrorLogging& operator=(const SuppressLockErrorLogging&);
+	SuppressLockErrorLogging(const SuppressLockErrorLogging &) = delete;
+	SuppressLockErrorLogging &operator=(const SuppressLockErrorLogging &) = delete;
 };
 
 /**
