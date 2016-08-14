@@ -2,30 +2,30 @@
 
 set -e
 
-LOGDIR=/var/log/zarafa
+LOGDIR=/var/log/kopano
 
 logs() {
-    chown zarafa:adm ${LOGDIR}
+    chown kopano:adm ${LOGDIR}
     chmod 750 ${LOGDIR}
 }
 
 add_users_groups()
 {
-    if ! getent group zarafa >/dev/null; then
-        addgroup --system zarafa
+    if ! getent group kopano >/dev/null; then
+        addgroup --system kopano
     fi
 
-    if ! getent passwd zarafa >/dev/null; then
+    if ! getent passwd kopano >/dev/null; then
         adduser --quiet \
-            --system \
-            --ingroup zarafa \
-            --quiet \
-            --disabled-login \
-            --disabled-password \
-            --home /var/lib/zarafa \
-            --no-create-home \
-            --gecos "Zarafa" \
-            zarafa
+                --system \
+                --ingroup kopano \
+                --quiet \
+                --disabled-login \
+                --disabled-password \
+                --home /var/lib/kopano \
+                --no-create-home \
+                --gecos "Kopano" \
+                kopano
     fi
 }
 

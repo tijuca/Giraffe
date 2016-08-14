@@ -1,3 +1,0 @@
-etc/cron.daily/zarafa-client-update
-etc/logrotate.d/zarafa
-etc/default/zarafa
