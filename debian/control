@@ -106,6 +106,18 @@ Description: Complete and feature rich groupware solution - contact mapi provide
  .
  This package provides adding contact folders in the addressbook.
 
+Package: kopano-dev
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+Description: C++ Development files and libraries for Kopano Core
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package provides development files to create programs for use with Kopano
+ Core.
+
 Package: kopano-dagent
 Architecture: any
 Depends: ${misc:Depends},
