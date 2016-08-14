@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,15 +18,14 @@
 #ifndef __CONSOLE_TABLE_H
 #define __CONSOLE_TABLE_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <string>
 #include <vector>
-#include <zarafa/charset/convert.h>
+#include <kopano/charset/convert.h>
 
 class ConsoleTable _zcp_final {
 public:
 	ConsoleTable(size_t rows, size_t columns);
-	~ConsoleTable();
 
 	void Clear();
 	void Resize(size_t rows, size_t columns);

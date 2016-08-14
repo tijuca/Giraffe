@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,15 +15,12 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "transaction.h"
 #include "ArchiverSession.h"
 
 namespace za { namespace operations {
 
-/////////////////////////////
-// Transaction implementation
-/////////////////////////////
 Transaction::Transaction(const SObjectEntry &objectEntry): m_objectEntry(objectEntry) 
 { }
 
@@ -121,14 +118,9 @@ HRESULT Transaction::Delete(const SObjectEntry &objectEntry, bool bDeferredDelet
 	return hrSuccess;
 }
 
-
-
-//////////////////////////
-// Rollback implementation
-//////////////////////////
 HRESULT Rollback::Delete(ArchiverSessionPtr ptrSession, IMessage *lpMessage)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	SPropArrayPtr ptrMsgProps;
 	ULONG cMsgProps;
 	ULONG ulType;
@@ -137,24 +129,19 @@ HRESULT Rollback::Delete(ArchiverSessionPtr ptrSession, IMessage *lpMessage)
 	SizedSPropTagArray(2, sptaMsgProps) = {2, {PR_ENTRYID, PR_PARENT_ENTRYID}};
 	enum {IDX_ENTRYID, IDX_PARENT_ENTRYID};
 
-	if (lpMessage == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpMessage == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	hr = lpMessage->GetProps((LPSPropTagArray)&sptaMsgProps, 0, &cMsgProps, &ptrMsgProps);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = ptrSession->GetMAPISession()->OpenEntry(ptrMsgProps[IDX_PARENT_ENTRYID].Value.bin.cb, (LPENTRYID)ptrMsgProps[IDX_PARENT_ENTRYID].Value.bin.lpb, &entry.ptrFolder.iid, MAPI_MODIFY, &ulType, &entry.ptrFolder);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	entry.eidMessage.assign(ptrMsgProps[IDX_ENTRYID].Value.bin);
 	m_lstDelete.push_back(entry);
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT Rollback::Execute(ArchiverSessionPtr ptrSession)

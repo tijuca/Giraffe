@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,13 +18,13 @@
 #ifndef ECICS_H
 #define ECICS_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include "ECSession.h"
 
 #include <set>
 
 // This class is used to pass SOURCEKEYs internally between parts of the server backend. You can use it as a char* to get the data, use size() to get the size,
-// and have various ways of creating new SOURCEKEYs, including using a GUID and an ID, which is used for zarafa-generated source keys.
+// and have various ways of creating new SOURCEKEYs, including using a GUID and an ID, which is used for kopano-generated source keys.
 
 class SOURCEKEY _zcp_final {
 public:

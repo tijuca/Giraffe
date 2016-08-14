@@ -17,39 +17,39 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Pootle 2.1.5\n"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:922
-msgid "Zarafa Archive"
-msgstr "Zarafa Archívum"
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:922
+msgid "Kopano Archive"
+msgstr "Kopano Archívum"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:923
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:923
 msgid "This folder contains the special archive folders."
 msgstr "Ez a mappa tartalmazza a különleges archív mappákat."
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:928
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:928
 msgid "History"
 msgstr "Előzmények"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:929
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:929
 msgid ""
 "This folder contains archives that have been replaced by a newer version."
 msgstr ""
 "Ez a mappa tartalmazza azokat az archívumokat amik át lettek helyezve egy "
 "újabb verzióba."
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:933
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:933
 msgid "Outgoing"
 msgstr "kimenő"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:934
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:934
 msgid "This folder contains archives of all outgoing messages."
 msgstr "ez a mappa tartalmazza az összes kimenő üzenet archívumait."
 
 # 85%
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:938
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:938
 msgid "Deleted"
 msgstr "Törölt"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:939
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:939
 msgid "This folder contains archives of messages that have been deleted."
 msgstr "Ez a mappa tartalmazza az üzenet archívumait amik törölve lettek."
 
@@ -155,7 +155,7 @@ msgstr "Nincs elérhető leírás"
 msgid "MAPI error code:"
 msgstr "MAPI hiba kód:"
 
-#: zarafa-libsync/ECSync.cpp:1970
+#: libsync/ECSync.cpp:1970
 msgid ""
 "The synchronization of a folder failed. Press retry to continue or ignore to "
 "supress all errors.\r\n"
@@ -169,7 +169,7 @@ msgstr ""
 "Rendszergazdával."
 
 # 84%
-#: zarafa-libsync/ECSync.cpp:1972
+#: libsync/ECSync.cpp:1972
 msgid "Error codes: "
 msgstr "Hibakódok:"
 
@@ -1368,8 +1368,8 @@ msgstr ""
 # 93%
 #: provider/client/ECArchiveAwareMessage.cpp:471
 #: provider/client/ECArchiveAwareMessage.cpp:529
-msgid "Zarafa Archiver"
-msgstr "Zarafa Archiváló"
+msgid "Kopano Archiver"
+msgstr "Kopano Archiváló"
 
 #: provider/client/ECArchiveAwareMessage.cpp:473
 msgid "An error has occurred while fetching the message from the archive."
@@ -1550,7 +1550,7 @@ msgid "Unable to store SSL certificate in registry key."
 msgstr "Nem lehet tárolni az SSL bizonylatot a regisztrációs kulcsban."
 
 #: provider/contacts/ZCABContainer.cpp:761
-msgid "Zarafa Contacts Folders"
+msgid "Kopano Contacts Folders"
 msgstr ""
 
 #: provider/libserver/ECGenProps.cpp:949
@@ -1563,10 +1563,10 @@ msgstr "Frissítés:"
 
 #: spooler/Spooler.cpp:485
 msgid ""
-"A fatal error occurred while processing your message, and Zarafa is unable "
+"A fatal error occurred while processing your message, and Kopano is unable "
 "to send your email."
 msgstr ""
-"Végzetes hiba történt az üzenet feldolgozása közben, és Zarafa nem tudja "
+"Végzetes hiba történt az üzenet feldolgozása közben, és Kopano nem tudja "
 "elküldeni az e-mailt."
 
 #: spooler/archive.cpp:241
@@ -1605,19 +1605,19 @@ msgstr "A felhasználó vagy csoport aki álltal próbálta küldeni nem találh
 msgid "Error found while trying to send your message. Error code: "
 msgstr "Hibát talált mialatt próbálta küldeni az üzenetet. Hibakód:"
 
-#: installer/linux/zarafa-mr-accept:403
+#: installer/linux/kopano-mr-accept:403
 msgid "Recurring meetings are not allowed"
 msgstr ""
 
-#: installer/linux/zarafa-mr-accept:453
+#: installer/linux/kopano-mr-accept:453
 msgid "The requested time slot is unavailable"
 msgstr ""
 
-#: installer/linux/zarafa-mr-accept:455
+#: installer/linux/kopano-mr-accept:455
 msgid "The requested time slots are unavailble on the following dates:"
 msgstr ""
 
-#: installer/linux/zarafa-mr-accept:458
+#: installer/linux/kopano-mr-accept:458
 #, php-format
 msgid "%x %X"
 msgstr ""
@@ -1767,7 +1767,7 @@ msgid "Logon Failed. Please check your name/password."
 msgstr ""
 
 #: php-ext/include/mapi/class.mapiexception.php:29
-msgid "Can not connect to Zarafa server."
+msgid "Can not connect to Kopano server."
 msgstr ""
 
 #: php-ext/include/mapi/class.mapiexception.php:31

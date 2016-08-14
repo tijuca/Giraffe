@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -16,28 +16,20 @@
  */
 
 #include "config.h"
-#include <zarafa/platform.h>
-#include <zarafa/ecversion.h>
-#include <zarafa/stringutil.h>
+#include <kopano/platform.h>
+#include <kopano/ecversion.h>
+#include <kopano/stringutil.h>
 
 #include "soapH.h"
 
 #include "ECDatabase.h"
 #include "ECDatabaseFactory.h"
 #include "ECDatabaseUtils.h"
-#include <zarafa/ECLogger.h>
+#include <kopano/ECLogger.h>
 
-#include <zarafa/ECConfig.h>
+#include <kopano/ECConfig.h>
 #include "ECDatabase.h"
 #include "ECPluginFactory.h"
-
-#ifdef WIN32
-#include "ECNTService.h"
-#include <process.h>
-#include <direct.h>
-#include <ws2tcpip.h>
-#endif
-
 #include "ECNotificationManager.h"
 #include "ECSessionManager.h"
 #include "ECStatsCollector.h"
@@ -46,16 +38,15 @@
 #include <csignal>
 
 #ifdef LINUX
-#include <zarafa/UnixUtil.h>
-#include "ECLicenseClient.h"
+#include <kopano/UnixUtil.h>
 #include <pwd.h>
 #endif
 
 #include <sys/stat.h>
-#include <zarafa/ECScheduler.h>
-#include <zarafa/ZarafaCode.h>
-#include <zarafa/my_getopt.h>
-#include "ZarafaCmd.h"
+#include <kopano/ECScheduler.h>
+#include <kopano/kcodes.h>
+#include <kopano/my_getopt.h>
+#include "cmd.hpp"
 
 #include "ECServerEntrypoint.h"
 #include "SSLUtil.h"
@@ -63,13 +54,8 @@
 #include "ECSoapServerConnection.h"
 #include <libintl.h>
 #include <map>
-#include <zarafa/tstring.h>
-#include <zarafa/charset/convstring.h>
-
-#ifdef WIN32
-#include "ECProcessPriority.h"
-#endif
-
+#include <kopano/tstring.h>
+#include <kopano/charset/convstring.h>
 #ifdef ZCP_USES_ICU
 #include <unicode/uclean.h>
 #endif
@@ -78,8 +64,6 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 // The following value is based on:
@@ -92,7 +76,7 @@ static const char THIS_FILE[] = __FILE__;
 // have to go with the safe value which is for 64bit.
 #define MYSQL_MIN_THREAD_STACK (256*1024)
 
-const char upgrade_lock_file[] = "/tmp/zarafa-upgrade-lock";
+const char upgrade_lock_file[] = "/tmp/kopano-upgrade-lock";
 
 extern ECSessionManager*    g_lpSessionManager;
 
@@ -113,7 +97,7 @@ int					restart_searches = 0;
 int					searchfolder_restart_required = 0; //HACK for rebuild the searchfolders with an upgrade
 bool				m_bIgnoreDatabaseVersionConflict = false;
 bool				m_bIgnoreAttachmentStorageConflict = false;
-bool				m_bIgnoreDistributedZarafaConflict = false;
+bool				m_bIgnoreDistributedKopanoConflict = false;
 bool				m_bForceDatabaseUpdate = false;
 bool				m_bIgnoreUnknownConfigOptions = false;
 bool				m_bIgnoreDbThreadStackSize = false;
@@ -132,22 +116,15 @@ bool 		m_bNPTL = true;
 #endif
 bool m_bDatabaseUpdateIgnoreSignals = false;
 
-#ifdef WIN32
-	#define SIGHUP		1
-	#define SIGPIPE		13
-	#define SIGUSR1		16
-	#define SIGUSR2		17
-#endif
-
 // This is the callback function for libserver/* so that it can notify that a delayed soap
 // request has been handled.
-void zarafa_notify_done(struct soap *soap)
+void kopano_notify_done(struct soap *soap)
 {
     g_lpSoapServerConn->NotifyDone(soap);
 }
 
 // Called from ECStatsTables to get server stats
-void zarafa_get_server_stats(unsigned int *lpulQueueLength,
+void kopano_get_server_stats(unsigned int *lpulQueueLength,
     double *lpdblAge, unsigned int *lpulThreadCount,
     unsigned int *lpulIdleThreads)
 {
@@ -161,7 +138,7 @@ void zarafa_get_server_stats(unsigned int *lpulQueueLength,
  */
 static void process_signal(int sig)
 {
-	ZLOG_AUDIT(g_lpAudit, "zarafa-server signalled sig=%d", sig);
+	ZLOG_AUDIT(g_lpAudit, "server signalled sig=%d", sig);
 
 #ifdef LINUX
 	if (!m_bNPTL)
@@ -177,7 +154,7 @@ static void process_signal(int sig)
 
 	if (m_bDatabaseUpdateIgnoreSignals) {
 		g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "WARNING: Database upgrade is taking place.");
-		g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "  Please be patient, and don't try to kill the zarafa-server process.");
+		g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "  Please be patient, and do not try to kill the server process.");
 		g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "  It may leave your database in an inconsistent state.");
 		return;
 	}	
@@ -207,7 +184,7 @@ static void process_signal(int sig)
 		break;
 	case SIGHUP:
 		{
-			// g_lpSessionManager only present when zarafa_init is called (last init function), signals are initialized much earlier
+			// g_lpSessionManager only present when kopano_init is called (last init function), signals are initialized much earlier
 			if (g_lpSessionManager == NULL)
 				return;
 
@@ -290,7 +267,7 @@ static ECRESULT check_database_innodb(ECDatabase *lpDatabase)
 
 	while( (lpRow = lpDatabase->FetchRow(lpResult)) ) {
 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Database table '%s' not in InnoDB format: %s", lpRow[0] ? lpRow[0] : "unknown table", lpRow[1] ? lpRow[1] : "unknown engine");
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 	}
 
 	if (er != erSuccess) {
@@ -327,7 +304,7 @@ static ECRESULT check_database_attachments(ECDatabase *lpDatabase)
 		if (strcmp(lpRow[0], g_lpConfig->GetSetting("attachment_storage")) != 0) {
 			if (!m_bIgnoreAttachmentStorageConflict) {
 				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Attachments are stored with option '%s', but '%s' is selected.", lpRow[0], g_lpConfig->GetSetting("attachment_storage"));
-				er = ZARAFA_E_DATABASE_ERROR;
+				er = KCERR_DATABASE_ERROR;
 				goto exit;
 			} else {
 				g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Ignoring attachment storing conflict as requested. Attachments are now stored with option '%s'", g_lpConfig->GetSetting("attachment_storage"));
@@ -360,15 +337,15 @@ exit:
 	return er;
 }
 
-static ECRESULT check_distributed_zarafa(ECDatabase *lpDatabase)
+static ECRESULT check_distributed_kopano(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
 	string strQuery;
 	DB_RESULT lpResult = NULL;
 	DB_ROW lpRow = NULL;
-	bool bConfigEnabled = parseBool(g_lpConfig->GetSetting("enable_distributed_zarafa"));
+	bool bConfigEnabled = parseBool(g_lpConfig->GetSetting("enable_distributed_kopano"));
 
-	er = lpDatabase->DoSelect("SELECT value FROM settings WHERE name = 'lock_distributed_zarafa'", &lpResult);
+	er = lpDatabase->DoSelect("SELECT value FROM settings WHERE name = 'lock_distributed_kopano'", &lpResult);
 	if (er != erSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to read from database");
 		goto exit;
@@ -382,9 +359,9 @@ static ECRESULT check_distributed_zarafa(ECDatabase *lpDatabase)
 
 	// If any value is found, distributed is not allowed. The value specifies the reason.
 	if (bConfigEnabled) {
-		if (!m_bIgnoreDistributedZarafaConflict) {
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Multiserver mode is locked, reason: '%s'. Contact Zarafa for support.", lpRow[0]);
-			er = ZARAFA_E_DATABASE_ERROR;
+		if (!m_bIgnoreDistributedKopanoConflict) {
+			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Multiserver mode is locked, reason: '%s'. Contact Kopano for support.", lpRow[0]);
+			er = KCERR_DATABASE_ERROR;
 			goto exit;
 		} else {
 			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Ignoring multiserver mode lock as requested.");
@@ -413,7 +390,7 @@ static ECRESULT check_attachment_storage_permissions(void)
 		tmpfile = fopen(strtestpath.c_str(), "w");
 		if (!tmpfile) {
 			 g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to write attachments to the directory '%s' - %s. Please check the directory and sub directories.",  g_lpConfig->GetSetting("attachment_path"), strerror(errno));
-			 er = ZARAFA_E_NO_ACCESS;
+			 er = KCERR_NO_ACCESS;
 			 goto exit;
 		}
 	}
@@ -442,7 +419,7 @@ static ECRESULT check_database_tproperties_key(ECDatabase *lpDatabase)
 		goto exit;
 	}
 
-	er = ZARAFA_E_DATABASE_ERROR;
+	er = KCERR_DATABASE_ERROR;
 
 	lpRow = lpDatabase->FetchRow(lpResult);
 	if (!lpRow || !lpRow[1]) {
@@ -488,8 +465,6 @@ static ECRESULT check_database_tproperties_key(ECDatabase *lpDatabase)
 		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "**** WARNING: Installation is not optimal! ****");
 		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "  The primary key of the tproperties table is incorrect.");
 		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "  Since updating the primary key on a large table is slow, the server will not automatically update this for you.");
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "  Please read the following page on how to update your installation to get much better performance:");
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "  http://www.zarafa.com/wiki/index.php/Zarafa_Alerts");
 	}
 
 	er = erSuccess;
@@ -534,7 +509,7 @@ static ECRESULT check_database_thread_stack(ECDatabase *lpDatabase)
 		if (m_bIgnoreDbThreadStackSize)
 			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "MySQL thread_stack setting ignored. Please reconsider when 'Thread stack overrun' errors appear in the log.");
 		else
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 	}
 
 exit:
@@ -566,7 +541,7 @@ static ECRESULT check_server_fqdn(void)
 	
 	rc = gethostname(hostname, sizeof(hostname));
 	if (rc != 0) {
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 		goto exit;
 	}
 
@@ -574,7 +549,7 @@ static ECRESULT check_server_fqdn(void)
 
 	rc = getaddrinfo(hostname, NULL, &hints, &aiResult);
 	if (rc != 0) {
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 		goto exit;
 	}
 
@@ -584,7 +559,7 @@ static ECRESULT check_server_fqdn(void)
 	// Name lookup is required, so set that flag
 	rc = getnameinfo((const sockaddr*)&saddr, sizeof(saddr), hostname, sizeof(hostname), NULL, 0, NI_NAMEREQD);
 	if (rc != 0) {
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 		goto exit;
 	}
 
@@ -628,14 +603,14 @@ static ECRESULT check_server_configuration(void)
 
 
 	// all other checks are only required for multi-server environments
-	bCheck = parseBool(g_lpConfig->GetSetting("enable_distributed_zarafa"));
+	bCheck = parseBool(g_lpConfig->GetSetting("enable_distributed_kopano"));
 	if (!bCheck)
 		goto exit;
 	
 	strServerName = g_lpConfig->GetSetting("server_name");
 	if (strServerName.empty()) {
 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "ERROR: No 'server_name' specified while operating in multiserver mode.");
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		// unable to check any other server details if we have no name, skip other tests
 		goto exit;
 	}
@@ -716,6 +691,19 @@ exit:
 	return er;
 }
 
+/**
+ * NSPR initialization is not properly guarded for threaded operation;
+ * so call it now before we create threads if it is part of the process image.
+ */
+static void nspr_thread_workaround(void)
+{
+	auto f = reinterpret_cast<void (*)(int, int, int)>(dlsym(NULL, "PR_Init"));
+	if (f == NULL)
+		return;
+	ec_log_warn("Calling NSPR's PR_Init now to workaround KC-104.");
+	f(0, 0, 0);
+}
+
 int main(int argc, char* argv[])
 {
 	int nReturn = 0;
@@ -764,7 +752,7 @@ int main(int argc, char* argv[])
 			config = optarg;
 			break;
 		case OPT_HELP:
-			cout << "Zarafa " PROJECT_VERSION_SERVER_STR " ";
+			cout << "Kopano " PROJECT_VERSION_SERVER_STR " ";
 #ifdef EMBEDDED_MYSQL
 			cout << "with embedded SQL server";
 #endif
@@ -779,12 +767,6 @@ int main(int argc, char* argv[])
 			cout << "     --override-multiserver-lock             Start in multiserver mode even if multiserver mode is locked" << endl;
 			cout << "     --force-database-upgrade                Start upgrade from 6.x database and continue running if upgrade is complete" << endl;
 			cout << "     --ignore-db-thread-stack-size           Start even if the thread_stack setting for MySQL is too low" << endl;
-#if defined(WIN32)
-			cout << endl;
-			cout << "  Windows service options" << endl;
-			cout << "  -i                                         Install as service." << endl;
-			cout << "  -u                                         Remove the service." << endl;
-#endif
 			return 0;
 		case 'V':
 			cout << "Product version:\t" <<  PROJECT_VERSION_SERVER_STR << endl
@@ -814,103 +796,25 @@ int main(int argc, char* argv[])
 			break;
 		};
 	}
-
-#if defined(WIN32) && !defined(HAVE_OFFLINE_SUPPORT)
-	ECNTService ecNTService;
-	// Parse for standard arguments (install, uninstall, version etc.)
-	if (!ecNTService.ParseStandardArgs(argc, argv))
-	{
-		ecNTService.StartService(config, &g_Quit);
-	}
-
-	nReturn = ecNTService.m_Status.dwWin32ExitCode;
-	if(nReturn == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
-		nReturn = running_server(argv[0], config);
-
-#else
-	//windows and linux
+	nspr_thread_workaround();
 	nReturn = running_server(argv[0], config, argc - optind, &argv[optind]);
-#endif
-
 	return nReturn;
 }
 
-#ifdef WIN32
-#define ZARAFA_SERVER_PIPE "\\\\.\\pipe\\zarafa"
-#define ZARAFA_SERVER_PRIO "\\\\.\\pipe\\zarafa-prio"
-inline int getuid() { return 0; }
-#else
-#define ZARAFA_SERVER_PIPE "/var/run/zarafad/server.sock"
-#define ZARAFA_SERVER_PRIO "/var/run/zarafad/prio.sock"
-#endif
+#define KOPANO_SERVER_PIPE "/var/run/kopano/server.sock"
+#define KOPANO_SERVER_PRIO "/var/run/kopano/prio.sock"
 
-#ifdef WIN32
-void InitBindTextDomain()
-{
-	tstring strPath;
-	tstring strManufacturer = _T("Zarafa");
-	BYTE szDir[MAX_PATH];
-	TCHAR szShort[MAX_PATH];
-	ULONG cbDir = 0;
-	HKEY hKey = NULL;
-
-#ifndef NO_GETTEXT
-	if(RegOpenKeyEx(HKEY_LOCAL_MACHINE, _T("Software\\Zarafa\\Client"), 0, KEY_READ, &hKey) == ERROR_SUCCESS)
-	{
-		cbDir = MAX_PATH;
-		if(RegQueryValueEx(hKey, _T("Manufacturer"), NULL, NULL, szDir, &cbDir) == ERROR_SUCCESS) {
-			strManufacturer = (LPTSTR)szDir;
-		}
-
-		RegCloseKey(hKey);
-
-
-		if(SUCCEEDED(SHGetFolderPath(NULL, CSIDL_PROGRAM_FILES_COMMON, NULL, SHGFP_TYPE_CURRENT, (LPTSTR)szDir)))
-		{
-			strPath = (LPTSTR)szDir;
-			strPath += _T("\\");
-			strPath += strManufacturer.c_str();
-			strPath += _T("\\locale");
-
-#ifdef UNICODE
-			// bindtextdomain takes a non-unicode path argument, which we don't have if compiled with UNICODE. Our
-			// best bet is to get the short form of the required directory, which will contain only ANSI characters.
-			// However the 8.3 aliasses can be disabled. In that case we'll just convert the UNICODE path to ANSI
-			// and pray for the best.
-			if (GetShortPathName(strPath.c_str(), szShort, sizeof(szShort)) > 0)
-				bindtextdomain("zarafa", convert_to<std::string>(szShort).c_str());
-			else
-				bindtextdomain("zarafa", convert_to<std::string>(strPath).c_str());
-#else
-			bindtextdomain("zarafa", strPath.c_str());
-#endif
-		}
-	}// RegOpenKeyEx
-
-	// Set gettext codeset, used for generated folder name translations
-	bind_textdomain_codeset("zarafa", "UTF-8");
-#endif
-
-}
-
-#else
 static void InitBindTextDomain(void)
 {
 	// Set gettext codeset, used for generated folder name translations
-	bind_textdomain_codeset("zarafa", "UTF-8");
+	bind_textdomain_codeset("kopano", "UTF-8");
 }
-#endif
 
 int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 {
 	int retval = -1;
 	ECRESULT		er = erSuccess;
-#ifdef WIN32
-	HRESULT			hr = hrSuccess;
-#endif
-
 	ECDatabaseFactory*	lpDatabaseFactory = NULL;
-
 	ECDatabase*		lpDatabase = NULL;
 	std::string		dbError;
 
@@ -918,19 +822,6 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 	bool			bSSLEnabled = false;
 	bool			bPipeEnabled = false;
 	bool			bTCPEnabled = false;
-
-	// License
-#ifdef LINUX
-	ECLicenseClient *lpLicense = NULL;
-#endif
-	std::string		strSerial;
-	std::vector<std::string> lstCALs;
-	
-#ifdef HAVE_OFFLINE_SUPPORT
-	string			strPipeName;
-	string			strDBPath;
-	char			*lpTmp = NULL;
-#endif
 	bool			hosted = false;
 	bool			distributed = false;
 
@@ -948,8 +839,8 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		{ "server_port",				"server_tcp_port", CONFIGSETTING_ALIAS },
 		{ "unix_socket",				"server_pipe_name", CONFIGSETTING_ALIAS },
 		// Default settings
-		{ "enable_hosted_zarafa",		"false" },	// Will only be checked when license allows hosted
-		{ "enable_distributed_zarafa",	"false" },
+		{ "enable_hosted_kopano",		"false" },	// Will only be checked when license allows hosted
+		{ "enable_distributed_kopano",	"false" },
 		{ "server_name",				"" }, // used by multi-server
 		{ "server_hostname",			"" }, // used by kerberos, if empty, gethostbyname is used
 		// server connections
@@ -957,8 +848,8 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		{ "server_tcp_port",			"236" },
 		{ "server_tcp_enabled",			"yes" },
 		{ "server_pipe_enabled",		"yes" },
-		{ "server_pipe_name",			ZARAFA_SERVER_PIPE },
-		{ "server_pipe_priority",		ZARAFA_SERVER_PRIO },
+		{ "server_pipe_name",			KOPANO_SERVER_PIPE },
+		{ "server_pipe_priority",		KOPANO_SERVER_PRIO },
 		{ "server_recv_timeout",		"5", CONFIGSETTING_RELOADABLE },	// timeout before reading next XML request
 		{ "server_read_timeout",		"60", CONFIGSETTING_RELOADABLE }, // timeout during reading of XML request
 		{ "server_send_timeout",		"60", CONFIGSETTING_RELOADABLE },
@@ -967,14 +858,14 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		{ "thread_stacksize",			"512" },
 		{ "allow_local_users",			"yes", CONFIGSETTING_RELOADABLE },			// allow any user connect through the unix socket
 		{ "local_admin_users",			"root", CONFIGSETTING_RELOADABLE },			// this local user is admin
-		{ "run_as_user",			"zarafa" }, // drop root privileges, and run as this user/group
-		{ "run_as_group",			"zarafa" },
-		{ "pid_file",					"/var/run/zarafad/server.pid" },
-		{ "running_path",			"/var/lib/zarafa" },
+		{ "run_as_user",			"kopano" }, // drop root privileges, and run as this user/group
+		{ "run_as_group",			"kopano" },
+		{ "pid_file",					"/var/run/kopano/server.pid" },
+		{ "running_path",			"/var/lib/kopano" },
 		{ "coredump_enabled",			"yes" },
 
-		{ "license_path",			"/etc/zarafa/license", CONFIGSETTING_UNUSED },
-		{ "license_socket",			"/var/run/zarafad/licensed.sock" },
+		{ "license_path",			"/etc/kopano/license", CONFIGSETTING_UNUSED },
+		{ "license_socket",			"/var/run/kopano/licensed.sock" },
 		{ "license_timeout", 		"10", CONFIGSETTING_RELOADABLE},
 #else
 		{ "local_admin_users",		"SYSTEM" },			// this local user is admin
@@ -984,15 +875,15 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 
 		{ "server_ssl_enabled",			"no" },
 		{ "server_ssl_port",			"237" },
-		{ "server_ssl_key_file",		"/etc/zarafa/ssl/server.pem" },
+		{ "server_ssl_key_file",		"/etc/kopano/ssl/server.pem" },
 		{ "server_ssl_key_pass",		"server",	CONFIGSETTING_EXACT },
-		{ "server_ssl_ca_file",			"/etc/zarafa/ssl/cacert.pem" },
+		{ "server_ssl_ca_file",			"/etc/kopano/ssl/cacert.pem" },
 		{ "server_ssl_ca_path",			"" },
 		{ "server_ssl_protocols",		"!SSLv2" },
 		{ "server_ssl_ciphers",			"ALL:!LOW:!SSLv2:!EXP:!aNULL" },
 		{ "server_ssl_prefer_server_ciphers",	"no" },
 #ifdef LINUX
-		{ "sslkeys_path",				"/etc/zarafa/sslkeys" },	// login keys
+		{ "sslkeys_path",				"/etc/kopano/sslkeys" },	// login keys
 #else
 		{ "sslkeys_path",				"sslkeys" },
 #endif
@@ -1003,11 +894,11 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		{ "mysql_port",					"3306" },
 		{ "mysql_user",					"root" },
 		{ "mysql_password",				"",	CONFIGSETTING_EXACT },
-		{ "mysql_database",				"zarafa" },
+		{ "mysql_database",				"kopano" },
 		{ "mysql_socket",				"" },
-#if defined(EMBEDDED_MYSQL) || defined(HAVE_OFFLINE_SUPPORT)
-		{ "mysql_database_path",		"/var/zarafa/data" },
-		{ "mysql_config_file",			"/etc/zarafa/my.cnf" },
+#if defined(EMBEDDED_MYSQL)
+		{ "mysql_database_path",		"/var/kopano/data" },
+		{ "mysql_config_file",			"/etc/kopano/my.cnf" },
 #endif
 		{ "attachment_storage",			"database" },
 #ifdef HAVE_LIBS3_H
@@ -1018,11 +909,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		{"attachment_s3_secretaccesskey", ""},
 		{"attachment_s3_bucketname", ""},
 #endif
-#ifdef WIN32
-		{ "attachment_path",			"Zarafa Data" },
-#else
-		{ "attachment_path",			"/var/lib/zarafa/attachments" },
-#endif
+		{ "attachment_path",			"Kopano Data" },
 		{ "attachment_compression",		"6" },
 
 		// Log options
@@ -1042,13 +929,13 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 #ifdef LINUX
 		{ "plugin_path",				PKGLIBDIR },
 		{ "user_plugin",				"db" },
-		{ "user_plugin_config",			"/etc/zarafa/ldap.cfg" },
-		{ "createuser_script",			"/etc/zarafa/userscripts/createuser", CONFIGSETTING_RELOADABLE },
-		{ "deleteuser_script",			"/etc/zarafa/userscripts/deleteuser", CONFIGSETTING_RELOADABLE },
-		{ "creategroup_script",			"/etc/zarafa/userscripts/creategroup", CONFIGSETTING_RELOADABLE },
-		{ "deletegroup_script",			"/etc/zarafa/userscripts/deletegroup", CONFIGSETTING_RELOADABLE},
-		{ "createcompany_script",		"/etc/zarafa/userscripts/createcompany", CONFIGSETTING_RELOADABLE },
-		{ "deletecompany_script",		"/etc/zarafa/userscripts/deletecompany", CONFIGSETTING_RELOADABLE },
+		{ "user_plugin_config",			"/etc/kopano/ldap.cfg" },
+		{ "createuser_script",			"/etc/kopano/userscripts/createuser", CONFIGSETTING_RELOADABLE },
+		{ "deleteuser_script",			"/etc/kopano/userscripts/deleteuser", CONFIGSETTING_RELOADABLE },
+		{ "creategroup_script",			"/etc/kopano/userscripts/creategroup", CONFIGSETTING_RELOADABLE },
+		{ "deletegroup_script",			"/etc/kopano/userscripts/deletegroup", CONFIGSETTING_RELOADABLE},
+		{ "createcompany_script",		"/etc/kopano/userscripts/createcompany", CONFIGSETTING_RELOADABLE },
+		{ "deletecompany_script",		"/etc/kopano/userscripts/deletecompany", CONFIGSETTING_RELOADABLE },
 #else
 		{ "plugin_path",				"plugins" },
 		{ "user_plugin",				"ldap" },
@@ -1089,11 +976,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		{ "companyquota_hard",		"0", CONFIGSETTING_UNUSED },
 		{ "session_timeout",		"300", CONFIGSETTING_RELOADABLE },		// 5 minutes
 		{ "sync_lifetime",			"365", CONFIGSETTING_RELOADABLE },		// 1 year
-#ifndef HAVE_OFFLINE_SUPPORT
 		{ "sync_log_all_changes",	"yes", CONFIGSETTING_RELOADABLE },	// Log All ICS changes
-#else
-		{ "sync_log_all_changes",	"no", CONFIGSETTING_RELOADABLE },	// Log All ICS changes
-#endif
 		{ "auth_method",			"plugin", CONFIGSETTING_RELOADABLE },		// plugin (default), pam, kerberos
 		{ "pam_service",			"passwd", CONFIGSETTING_RELOADABLE },		// pam service, found in /etc/pam.d/
 		{ "enable_sso_ntlmauth",	"no", CONFIGSETTING_UNUSED },			// default disables ntlm_auth, so we don't log errors on useless things
@@ -1105,16 +988,16 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
         { "enable_enhanced_ics",    "yes", CONFIGSETTING_RELOADABLE },			// (dis)allow enhanced ICS operations (stream and notifications)
         { "enable_sql_procedures",  "no" },			// (dis)allow SQL procedures (requires mysql config stack adjustment), not reloadable because in the middle of the streaming flip
 		
-		{ "report_path",			"/etc/zarafa/report", CONFIGSETTING_RELOADABLE },
-		{ "report_ca_path",			"/etc/zarafa/report-ca", CONFIGSETTING_RELOADABLE },
+		{ "report_path",			"/etc/kopano/report", CONFIGSETTING_RELOADABLE },
+		{ "report_ca_path",			"/etc/kopano/report-ca", CONFIGSETTING_RELOADABLE },
 		
 		{ "cache_sortkey_size",		"0", CONFIGSETTING_UNUSED }, // Option not support, only for backward compatibility of all configurations under the 6.20
 
 		{ "client_update_enabled",	"no" },
 		{ "client_update_log_level", "1", CONFIGSETTING_RELOADABLE },
 #ifdef LINUX
-		{ "client_update_path",		"/var/lib/zarafa/client", CONFIGSETTING_RELOADABLE },
-		{ "client_update_log_path",	"/var/log/zarafa/autoupdate", CONFIGSETTING_RELOADABLE },
+		{ "client_update_path",		"/var/lib/kopano/client", CONFIGSETTING_RELOADABLE },
+		{ "client_update_log_path",	"/var/log/kopano/autoupdate", CONFIGSETTING_RELOADABLE },
 #else
 		{ "client_update_path",		"c:\\client_update_path", CONFIGSETTING_RELOADABLE },
 		{ "client_update_log_path", "C:\\TEMP", CONFIGSETTING_RELOADABLE },
@@ -1122,13 +1005,8 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		{ "index_services_enabled", "", CONFIGSETTING_UNUSED },
 		{ "index_services_path",    "", CONFIGSETTING_UNUSED },
 		{ "index_services_search_timeout", "", CONFIGSETTING_UNUSED },
-
-#ifdef HAVE_OFFLINE_SUPPORT
-		{ "search_enabled",			"no", CONFIGSETTING_RELOADABLE }, 
-#else
 		{ "search_enabled",			"yes", CONFIGSETTING_RELOADABLE }, 
-#endif
-		{ "search_socket",			"file:///var/run/zarafad/search.sock", CONFIGSETTING_RELOADABLE },
+		{ "search_socket",			"file:///var/run/kopano/search.sock", CONFIGSETTING_RELOADABLE },
 		{ "search_timeout",			"10", CONFIGSETTING_RELOADABLE },
 
 		{ "threads",				"8", CONFIGSETTING_RELOADABLE },
@@ -1172,21 +1050,15 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 	g_lpConfig = ECConfig::Create(lpDefaults);
 	
 	if (!g_lpConfig->LoadSettings(szConfig) || !g_lpConfig->ParseParams(argc, argv, NULL) || (!m_bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) ) {
-#ifndef HAVE_OFFLINE_SUPPORT
-#ifdef WIN32
-		g_lpLogger = new ECLogger_Eventlog(EC_LOGLEVEL_INFO, "ZarafaServer");
-#else
 		g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false); // create info logger without a timestamp to stderr
-#endif
 		ec_log_set(g_lpLogger);
 		LogConfigErrors(g_lpConfig);
 		er = MAPI_E_UNCONFIGURED;
 		goto exit;
-#endif
 	}
 
 	// setup logging
-	g_lpLogger = CreateLogger(g_lpConfig, szName, "ZarafaServer");
+	g_lpLogger = CreateLogger(g_lpConfig, szName, "KopanoServer");
 	if (!g_lpLogger) {
 		fprintf(stderr, "Error in log configuration, unable to resume.\n");
 		er = MAPI_E_UNCONFIGURED;
@@ -1199,20 +1071,13 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 	if (!TmpPath::getInstance() -> OverridePath(g_lpConfig))
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Ignoring invalid path-setting!");
 
-#ifdef WIN32
-	// now that we have a logger we'll attempt to correct our cpu, memory and IO priority
-	hr = SetPriority(NORMAL_PRIORITY_CLASS, DEFAULT_MEMORY_PRIORITY, DEFAULT_IO_PRIORITY);
-	if (FAILED(hr))
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Failed to set priority. Performance will be degraded! hr=0x%08x", hr);
-
-#endif
-	g_lpAudit = CreateLogger(g_lpConfig, szName, "ZarafaServer", true);
+	g_lpAudit = CreateLogger(g_lpConfig, szName, "KopanoServer", true);
 	if (g_lpAudit)
-		g_lpAudit->Log(EC_LOGLEVEL_NOTICE, "zarafa-server startup uid=%d", getuid());
+		g_lpAudit->Log(EC_LOGLEVEL_NOTICE, "server startup uid=%d", getuid());
 	else
 		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Audit logging not enabled.");
 
-	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting zarafa-server version " PROJECT_VERSION_SERVER_STR ", pid %d", getpid());
+	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting server version " PROJECT_VERSION_SERVER_STR ", pid %d", getpid());
 
 	if (g_lpConfig->HasWarnings())
 		LogConfigErrors(g_lpConfig);
@@ -1221,13 +1086,13 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		// directory will be created using startup (probably root) and then chowned to the new 'runas' username
 		if (CreatePath(g_lpConfig->GetSetting("attachment_path")) != 0) {
 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to create attachment directory '%s'", g_lpConfig->GetSetting("attachment_path"));
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 			goto exit;
 		}
 #ifdef LINUX
 		if (stat(g_lpConfig->GetSetting("attachment_path"), &dir) != 0) {
 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to stat attachment directory '%s', error: %s", g_lpConfig->GetSetting("attachment_path"), strerror(errno));
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 			goto exit;
 		}
 		runasUser = getpwnam(g_lpConfig->GetSetting("run_as_user","","root"));
@@ -1239,7 +1104,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		if (runasUser->pw_uid != dir.st_uid) {
 			if (unix_chown(g_lpConfig->GetSetting("attachment_path"), g_lpConfig->GetSetting("run_as_user"), g_lpConfig->GetSetting("run_as_group")) != 0) {
 				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to change ownership for attachment directory '%s'", g_lpConfig->GetSetting("attachment_path"));
-				er = ZARAFA_E_DATABASE_ERROR;
+				er = KCERR_DATABASE_ERROR;
 				goto exit;
 			}
 		}
@@ -1259,64 +1124,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		g_lpConfig->AddSetting("sync_gab_realtime", "yes");
 	}
 
-#ifdef HAVE_OFFLINE_SUPPORT
-
-#ifdef EMBEDDED_MYSQL
-	// override database path
-	lpTmp= getenv("ZARAFA_DB_PATH");
-	if (lpTmp == NULL) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to getenv value ZARAFA_DB_PATH");
-		retval = -1;
-		er = MAPI_E_UNCONFIGURED;
-		goto exit;
-	}
-
-	strDBPath = lpTmp;
-
-	// override database name and pipe name
-	lpTmp= getenv("ZARAFA_UNIQUEID");
-	if (lpTmp == NULL) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to getenv value ZARAFA_UNIQUEID");
-		retval = -1;
-		er = MAPI_E_UNCONFIGURED;
-		goto exit;
-	}
-
-	strPipeName = ZARAFA_SERVER_PIPE;
-	strPipeName += "-";
-	strPipeName += lpTmp;
-
-	g_lpConfig->AddSetting("server_pipe_name", strPipeName.c_str());
-
-	// Add unique id in the database path
-	strDBPath += "/";
-	strDBPath+=lpTmp;
-
-	// Create storage directory
-	if(CreatePath((char *)strDBPath.c_str()) != 0) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to create directory %s!", strDBPath.c_str());
-		// Things will probably fail now
-	}
-
-	g_lpConfig->AddSetting("mysql_database_path", strDBPath.c_str());
-
-	// override database config file
-	lpTmp= getenv("ZARAFA_DB_CONFIG_NAME");
-	if (lpTmp == NULL) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to getenv value ZARAFA_DB_CONFIG_NAME");
-		retval = -1;
-		er = MAPI_E_UNCONFIGURED;
-		goto exit;
-	}
-
-	g_lpConfig->AddSetting("mysql_config_file", (const char*)lpTmp);
-
-#endif //#ifdef EMBEDDED_MYSQL
-	g_lpConfig->AddSetting("server_tcp_enabled", "no");
-
-#endif //#ifdef HAVE_OFFLINE_SUPPORT
-
-	zarafa_initlibrary(g_lpConfig->GetSetting("mysql_database_path"), g_lpConfig->GetSetting("mysql_config_file"));
+	kopano_initlibrary(g_lpConfig->GetSetting("mysql_database_path"), g_lpConfig->GetSetting("mysql_config_file"));
 
 	if(!strcmp(g_lpConfig->GetSetting("server_pipe_enabled"), "yes"))
 		bPipeEnabled = true;
@@ -1385,7 +1193,6 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		goto exit;
 	}
 #endif
-#ifndef HAVE_OFFLINE_SUPPORT
 	// Priority queue is always enabled, create as first socket, so this socket is returned first too on activity
 	er = g_lpSoapServerConn->ListenPipe(g_lpConfig->GetSetting("server_pipe_priority"), true);
 	if (er != erSuccess) {
@@ -1398,14 +1205,12 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 			goto exit;
 		}
 	}
-#endif
-
 	// Test database settings
 	lpDatabaseFactory = new ECDatabaseFactory(g_lpConfig);
 
 	// open database
 	er = lpDatabaseFactory->CreateDatabaseObject(&lpDatabase, dbError);
-	if(er == ZARAFA_E_DATABASE_NOT_FOUND) {
+	if(er == KCERR_DATABASE_NOT_FOUND) {
 		er = lpDatabaseFactory->CreateDatabase();
 		if(er != erSuccess) {
 			goto exit;
@@ -1420,26 +1225,8 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 	}
 	g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Connection to database '%s' succeeded", g_lpConfig->GetSetting("mysql_database"));
 
-	hosted = parseBool(g_lpConfig->GetSetting("enable_hosted_zarafa"));
-	distributed = parseBool(g_lpConfig->GetSetting("enable_distributed_zarafa"));
-#ifdef HAVE_OFFLINE_SUPPORT
-	hosted = true;
-	distributed = false;
-#endif
-
-#ifdef LINUX
-	lpLicense = new ECLicenseClient(g_lpConfig->GetSetting("license_socket"), atoui(g_lpConfig->GetSetting("license_timeout")) );
-
-	if(lpLicense->GetSerial(0 /*SERVICE_TYPE_ZCP*/, strSerial, lstCALs) != erSuccess) {
-	    g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: zarafa-licensed not running, commercial features will not be available until it's started.");
-	} else {
-		if (!strSerial.empty())
-			g_lpLogger->Log(EC_LOGLEVEL_INFO, "Using commercial license serial '%s'", strSerial.c_str());
-		else
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "zarafa-licensed is running, but no license key was found. Not all commercial features will be available.");
-	}
-#endif
-
+	hosted = parseBool(g_lpConfig->GetSetting("enable_hosted_kopano"));
+	distributed = parseBool(g_lpConfig->GetSetting("enable_distributed_kopano"));
 #ifdef LINUX
 	// fork if needed and drop privileges as requested.
 	// this must be done before we do anything with pthreads
@@ -1504,33 +1291,6 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 #endif
 	}
 
-#ifdef LINUX
-	// Check if we're licensed to run distributed mode. The license daemon might
-	// not be running (yet), so try for a minute before giving up.
-	if (distributed) {
-		for (int i = 0; i < 30; ++i) {
-			bool bLicensed = false;
-			er = lpLicense->QueryCapability(0 /*SERVICE_TYPE_ZCP*/, "MULTISERVER", &bLicensed);
-			if (er != erSuccess) {
-				if (i < 29) {
-					g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: Unable to determine if distributed features are allowed, waiting 2s for retry. (attempt %u/30)", i + 1);
-					Sleep(2000);
-				} else {
-					g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Failed to determine if distributed features are allowed, assuming unavailable.");
-					goto exit;
-				}
-			} else {
-				if (!bLicensed) {
-					g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Your license key does not allow the usage of the distributed features.");
-					er = MAPI_E_UNCONFIGURED;
-					goto exit;
-				}
-				break;
-			}
-		}
-	}
-#endif
-
 	// ignore ignorable signals that might stop the server during database upgrade
 	// all these signals will be reset after the database upgrade part.
 	m_bDatabaseUpdateIgnoreSignals = true;
@@ -1574,7 +1334,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 	}
 #endif
 
-	if(er == ZARAFA_E_INVALID_VERSION) {
+	if(er == KCERR_INVALID_VERSION) {
 		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: %s", dbError.c_str());
 
 		if(m_bIgnoreDatabaseVersionConflict == false) {
@@ -1583,7 +1343,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 			goto exit;
 		}
 	}else if(er != erSuccess) {
-		if (er != ZARAFA_E_USER_CANCEL)
+		if (er != KCERR_USER_CANCEL)
 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't update the database: %s", dbError.c_str());
 		goto exit;
 	}
@@ -1595,36 +1355,6 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 	}
 	
 	m_bDatabaseUpdateIgnoreSignals = false;
-
-#ifdef HAVE_OFFLINE_SUPPORT
-	/**
-	 * The zarafa-client checks for the file <db-guid>.upgrading to determine
-	 * if a long upgrade (6 -> 7) is in progress. Before it attempts to make
-	 * a connection to the pipe.
-	 * However, this file is created during the upgrade process. This means
-	 * that in the regular setup order, the socket is created before the
-	 * DB upgrade is started, which could cause the client to see no .upgrading
-	 * file and happily connect to the pipe, which is not being serviced untill
-	 * the upgrade is ready. This will cause the client to block for quite a
-	 * while.
-	 *
-	 * We can't setup the pipe connection here in the regular setup order
-	 * because it must be done before the call to unix_daemonize or setid
-	 * because we might lose the privileges to even create the socket after
-	 * those calls.
-	 * In an offline server (and in Windows in general) this is not an issue.
-	 */
-
-	// Setup a pipe connection
-	if (bPipeEnabled) {
-		er = g_lpSoapServerConn->ListenPipe(g_lpConfig->GetSetting("server_pipe_name"));
-		if (er != erSuccess) {
-			retval = -1;
-			goto exit;
-		}
-	}
-#endif
-
 	if(searchfolder_restart_required) {
 		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Update requires searchresult folders to be rebuilt. This may take some time. You can restart this process with the --restart-searches option");
 		restart_searches = 1;
@@ -1652,7 +1382,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		goto exit;
 
 	// check distributed mode started with, and maybe reject startup
-	er = check_distributed_zarafa(lpDatabase);
+	er = check_distributed_kopano(lpDatabase);
 	if (er != erSuccess)
 		goto exit;
 
@@ -1663,13 +1393,13 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 
 	//Init the main system, now you can use the values like session manager
 	// This also starts several threads, like SessionCleaner, NotificationThread and TPropsPurge.
-	er = zarafa_init(g_lpConfig, g_lpAudit, hosted, distributed);
+	er = kopano_init(g_lpConfig, g_lpAudit, hosted, distributed);
 	if (er != erSuccess) { // create SessionManager
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to initialize zarafa session manager");
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to initialize kopano session manager");
 		goto exit;
 	}
 
-	// check for conflicting settings in local config and LDAP, after zarafa_init since this needs the sessionmanager.
+	// check for conflicting settings in local config and LDAP, after kopano_init since this needs the sessionmanager.
 	er = check_server_configuration();
 	if (er != erSuccess)
 		goto exit;
@@ -1702,7 +1432,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 	while(!g_Quit) {
 		// Select on the sockets
 		er = g_lpSoapServerConn->MainLoop();
-		if(er == ZARAFA_E_NETWORK_ERROR) {
+		if(er == KCERR_NETWORK_ERROR) {
 			retval = -1;
 			break; // Exit loop
 		} else if (er != erSuccess) {
@@ -1710,7 +1440,7 @@ int running_server(char *szName, const char *szConfig, int argc, char *argv[])
 		}
 	}
 	// Close All sessions
-	zarafa_removeallsessions();
+	kopano_removeallsessions();
 
 #ifdef LINUX
 	if (m_bNPTL) {
@@ -1737,26 +1467,25 @@ exit:
 	}
 
 	if (g_lpAudit)
-		g_lpAudit->Log(EC_LOGLEVEL_ALWAYS, "zarafa-server shutdown in progress");
+		g_lpAudit->Log(EC_LOGLEVEL_ALWAYS, "server shutdown in progress");
 
 	delete g_lpSoapServerConn;
 
 	delete g_lpScheduler;
 
 #ifdef LINUX
-	delete lpLicense;
 	free(st.ss_sp);
 #endif
 	delete lpDatabase;
 	delete lpDatabaseFactory;
 
 
-	zarafa_exit();
+	kopano_exit();
 
 	ssl_threading_cleanup();
 
 	SSL_library_cleanup(); //cleanup memory so valgrind is happy
-	zarafa_unloadlibrary();
+	kopano_unloadlibrary();
 	rand_free();
 
 	delete g_lpConfig;

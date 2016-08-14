@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,8 +15,8 @@
  *
  */
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/platform.h>
+#include <kopano/zcdefs.h>
+#include <kopano/platform.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -27,18 +27,16 @@
 #endif
 
 #include <algorithm>
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 #include "ECConfigImpl.h"
 
-#include <zarafa/charset/convert.h>
-#include <zarafa/boost_compat.h>
+#include <kopano/charset/convert.h>
+#include <kopano/boost_compat.h>
 
 using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 #include <boost/filesystem.hpp>
@@ -144,11 +142,6 @@ bool ECConfigImpl::ParseParams(int argc, char *argv[], int *lpargidx)
 		*lpargidx = argc;
 
 	return true;
-}
-
-const char *ECConfigImpl::GetSettingsPath()
-{
-	return m_szConfigFile;
 }
 
 bool ECConfigImpl::ReloadSettings()
@@ -682,11 +675,6 @@ bool ECConfigImpl::HasWarnings() {
 	return !warnings.empty();
 }
 
-const list<string> *ECConfigImpl::GetWarnings(void)
-{
-	return &warnings;
-}
-
 bool ECConfigImpl::HasErrors() {
 	settingmap_t::iterator iterSettings;
 
@@ -704,12 +692,6 @@ bool ECConfigImpl::HasErrors() {
 
 	return !errors.empty();
 }
-
-const list<string> *ECConfigImpl::GetErrors(void)
-{
-	return &errors;
-}
-
 
 bool ECConfigImpl::WriteSettingToFile(const char *szName, const char *szValue, const char* szFileName)
 {
@@ -799,14 +781,8 @@ bool ECConfigImpl::WriteSettingsToFile(const char* szFileName)
 	out.close();
 
 // the stdio functions does not work in win release mode in some cases
-#ifdef WIN32 
-	CopyFileA(szFileName, pathBakFile.string().c_str(), false); // Backup
-	CopyFileA(pathOutFile.string().c_str(), szFileName, false);
-#else
 	remove(szFileName);
 	rename(path_to_string(pathOutFile).c_str(),szFileName);
-#endif
-
 	return true;
 }
 

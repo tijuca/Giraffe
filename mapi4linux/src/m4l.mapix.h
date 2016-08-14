@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,7 +18,7 @@
 #ifndef __M4L_MAPIX_IMPL_H
 #define __M4L_MAPIX_IMPL_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <pthread.h>
 
 #include "m4l.common.h"
@@ -30,7 +30,7 @@
 #include <list>
 #include <map>
 
-#include <zarafa/ECConfig.h>
+#include <kopano/ECConfig.h>
 
 using namespace std;
 

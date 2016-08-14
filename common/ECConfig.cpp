@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,14 +15,12 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECConfigImpl.h"
-#include <zarafa/charset/convert.h>
+#include <kopano/charset/convert.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECConfig *ECConfig::Create(const configsetting_t *lpDefaults,
@@ -40,8 +38,8 @@ bool ECConfig::LoadSettings(const wchar_t *szFilename)
 
 /**
  * Get the default path for the configuration file specified with lpszBasename.
- * Usually this will return '/etc/zarafa/<lpszBasename>'. However, the path to
- * the configuration files can be altered by setting the 'ZARAFA_CONFIG_PATH'
+ * Usually this will return '/etc/kopano/<lpszBasename>'. However, the path to
+ * the configuration files can be altered by setting the 'KOPANO_CONFIG_PATH'
  * environment variable.
  *
  * @param[in]	lpszBasename
@@ -71,9 +69,9 @@ const char* ECConfig::GetDefaultPath(const char* lpszBasename)
 
 	insertresult_t result = s_mapPaths.insert(stringmap_t::value_type(lpszBasename, string()));
 	if (result.second == true) {		// New item added, so create the actual path
-		const char *lpszDirname = getenv("ZARAFA_CONFIG_PATH");
+		const char *lpszDirname = getenv("KOPANO_CONFIG_PATH");
 		if (!lpszDirname || lpszDirname[0] == '\0')
-			lpszDirname = "/etc/zarafa";
+			lpszDirname = "/etc/kopano";
 		result.first->second = string(lpszDirname) + "/" + lpszBasename;
 	}
 	return result.first->second.c_str();

@@ -19,37 +19,37 @@ msgstr ""
 "X-Generator: Pootle 2.1.5\n"
 
 # 93%
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:905
-msgid "Zarafa Archive"
-msgstr "Zarafa arhiv"
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:905
+msgid "Kopano Archive"
+msgstr "Kopano arhiv"
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:906
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:906
 msgid "This folder contains the special archive folders."
 msgstr "Ta mapa vsebuje posebne mape arhivov."
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:911
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:911
 msgid "History"
 msgstr "Zgodovina"
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:912
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:912
 msgid ""
 "This folder contains archives that have been replaced by a newer version."
 msgstr "Ta mapa vsebuje arhive, ki so bili zamenjani z novo verzijo."
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:916
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:916
 msgid "Outgoing"
 msgstr "Odhodna"
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:917
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:917
 msgid "This folder contains archives of all outgoing messages."
 msgstr "Ta mapa vsebuje arhive vseh poslanih sporočil."
 
 # 85%
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:921
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:921
 msgid "Deleted"
 msgstr "Izbrisano"
 
-#: ECtools/zarafa-archiver/helpers/ArchiveHelper.cpp:922
+#: ECtools/kopano-archiver/helpers/ArchiveHelper.cpp:922
 msgid "This folder contains archives of messages that have been deleted."
 msgstr "Ta mapa vsebuje arhive sporočil, ki so bila izbrisana."
 
@@ -154,7 +154,7 @@ msgstr "Na voljo ni nobenega opisa."
 msgid "MAPI error code:"
 msgstr "MAPI koda napake:"
 
-#: zarafa-libsync/ECSync.cpp:1970
+#: libsync/ECSync.cpp:1970
 msgid ""
 "The synchronization of a folder failed. Press retry to continue or ignore to "
 "supress all errors.\r\n"
@@ -167,7 +167,7 @@ msgstr ""
 "Prosimo kontaktirajte sistemskega administratorja, če se problem ponavlja."
 
 # 84%
-#: zarafa-libsync/ECSync.cpp:1972
+#: libsync/ECSync.cpp:1972
 msgid "Error codes: "
 msgstr "Kode napak:"
 
@@ -1352,8 +1352,8 @@ msgstr ""
 
 #: provider/client/ECArchiveAwareMessage.cpp:471
 #: provider/client/ECArchiveAwareMessage.cpp:529
-msgid "Zarafa Archiver"
-msgstr "Zarafa arhiviranje"
+msgid "Kopano Archiver"
+msgstr "Kopano arhiviranje"
 
 #: provider/client/ECArchiveAwareMessage.cpp:473
 msgid "Failed to fetch this message from archive."
@@ -1528,7 +1528,7 @@ msgid "Unable to store SSL certificate in registry key."
 msgstr "Ne morem shraniti SSL certifikata v registrarski ključ."
 
 #: provider/contacts/ZCABContainer.cpp:785
-msgid "Zarafa Contacts Folders"
+msgid "Kopano Contacts Folders"
 msgstr "Zarafine mape kontaktov"
 
 #: provider/libserver/ECGenProps.cpp:944
@@ -1541,10 +1541,10 @@ msgstr "Nadgradnja:"
 
 #: spooler/Spooler.cpp:484
 msgid ""
-"A fatal error occurred while processing your message, and Zarafa is unable "
+"A fatal error occurred while processing your message, and Kopano is unable "
 "to send your email."
 msgstr ""
-"Med obdelavo vašega sporočila se je pojavila usodna napaka, zato Zarafa ne "
+"Med obdelavo vašega sporočila se je pojavila usodna napaka, zato Kopano ne "
 "more poslati vašega sporočila."
 
 #: spooler/archive.cpp:242
@@ -1583,19 +1583,19 @@ msgstr "Uporabnik ali skupina s katero bi radi poslali, ni najdena."
 msgid "Error found while trying to send your message. Error code: "
 msgstr "Med pošiljanjem sporočila se je pojavila napaka. Koda napake:"
 
-#: installer/linux/zarafa-mr-accept:405
+#: installer/linux/kopano-mr-accept:405
 msgid "Recurring meetings are not allowed"
 msgstr "Ponavljajoči sestanki niso dovoljeni"
 
-#: installer/linux/zarafa-mr-accept:455
+#: installer/linux/kopano-mr-accept:455
 msgid "The requested time slot is unavailable"
 msgstr "Zahtevana časovna reža ni na voljo"
 
-#: installer/linux/zarafa-mr-accept:457
+#: installer/linux/kopano-mr-accept:457
 msgid "The requested time slots are unavailble on the following dates:"
 msgstr "Zahtevane časovne reže niso na voljo na te datume:"
 
-#: installer/linux/zarafa-mr-accept:460
+#: installer/linux/kopano-mr-accept:460
 #, php-format
 msgid "%x %X"
 msgstr "%x %X"
@@ -1752,8 +1752,8 @@ msgid "Logon Failed. Please check your name/password."
 msgstr "Prijava neuspešna. Prosim preverite vaše ime/geslo."
 
 #: php-ext/include/mapi/class.mapiexception.php:29
-msgid "Can not connect to Zarafa server."
-msgstr "Ne morem se povezati z Zarafa serverjem."
+msgid "Can not connect to Kopano server."
+msgstr "Ne morem se povezati z Kopano serverjem."
 
 #: php-ext/include/mapi/class.mapiexception.php:31
 msgid "Can not open object with provided id."

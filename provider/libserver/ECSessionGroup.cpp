@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <mapidefs.h>
 #include <mapitags.h>
@@ -29,8 +29,6 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 class FindChangeAdvise
@@ -112,16 +110,6 @@ void ECSessionGroup::Unlock()
 	if (!IsLocked())
 		pthread_cond_signal(&m_hThreadReleased);
 	pthread_mutex_unlock(&m_hThreadReleasedMutex);
-}
-
-bool ECSessionGroup::IsLocked()
-{
-	return m_ulRefCount > 0;
-}
-
-ECSESSIONGROUPID ECSessionGroup::GetSessionGroupId()
-{
-	return m_sessionGroupId;
 }
 
 void ECSessionGroup::AddSession(ECSession *lpSession)
@@ -215,13 +203,10 @@ ECRESULT ECSessionGroup::AddAdvise(ECSESSIONID ulSessionId, unsigned int ulConne
 
 ECRESULT ECSessionGroup::AddChangeAdvise(ECSESSIONID ulSessionId, unsigned int ulConnection, notifySyncState *lpSyncState)
 {
-	ECRESULT			er = erSuccess;
-	changeSubscribeItem sSubscribeItem = {ulSessionId, ulConnection, {0}};
+	changeSubscribeItem sSubscribeItem = {ulSessionId, ulConnection};
 
-	if (lpSyncState == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpSyncState == NULL)
+		return KCERR_INVALID_PARAMETER;
 
 	sSubscribeItem.sSyncState = *lpSyncState;
 
@@ -230,9 +215,7 @@ ECRESULT ECSessionGroup::AddChangeAdvise(ECSESSIONID ulSessionId, unsigned int u
 	m_mapChangeSubscribe.insert(CHANGESUBSCRIBEMAP::value_type(lpSyncState->ulSyncId, sSubscribeItem));
 
 	pthread_mutex_unlock(&m_hNotificationLock);
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECSessionGroup::DelAdvise(ECSESSIONID ulSessionId, unsigned int ulConnection)
@@ -385,8 +368,8 @@ ECRESULT ECSessionGroup::AddNotificationTable(ECSESSIONID ulSessionId, unsigned 
 ECRESULT ECSessionGroup::AddChangeNotification(const std::set<unsigned int> &syncIds, unsigned int ulChangeId, unsigned int ulChangeType)
 {
 	ECRESULT		er = erSuccess;
-	notification	notifyItem = {0};
-	notificationICS	ics = {0};
+	notification notifyItem{__gszeroinit};
+	notificationICS ics{__gszeroinit};
 	entryId			syncStateBin = {0};
 	notifySyncState	syncState = {0, ulChangeId};
 	SESSIONINFOMAP::const_iterator iterSessions;
@@ -397,7 +380,7 @@ ECRESULT ECSessionGroup::AddChangeNotification(const std::set<unsigned int> &syn
 	CHANGESUBSCRIBEMAP::const_iterator iterItem;
 	std::pair<CHANGESUBSCRIBEMAP::const_iterator, CHANGESUBSCRIBEMAP::const_iterator> iterRange;
 
-	notifyItem.ulEventType = fnevZarafaIcsChange;
+	notifyItem.ulEventType = fnevKopanoIcsChange;
 	notifyItem.ics = &ics;
 	notifyItem.ics->pSyncState = &syncStateBin;
 	notifyItem.ics->pSyncState->__size = sizeof(syncState);
@@ -444,14 +427,14 @@ ECRESULT ECSessionGroup::AddChangeNotification(const std::set<unsigned int> &syn
 ECRESULT ECSessionGroup::AddChangeNotification(ECSESSIONID ulSessionId, unsigned int ulConnection, unsigned int ulSyncId, unsigned long ulChangeId)
 {
 	ECRESULT		er = erSuccess;
-	notification	notifyItem = {0};
-	notificationICS	ics = {0};
+	notification notifyItem{__gszeroinit};
+	notificationICS ics{__gszeroinit};
 	entryId			syncStateBin = {0};
 
 	notifySyncState	syncState = { ulSyncId, static_cast<unsigned int>(ulChangeId) };
 	SESSIONINFOMAP::const_iterator iterSessions;
 
-	notifyItem.ulEventType = fnevZarafaIcsChange;
+	notifyItem.ulEventType = fnevKopanoIcsChange;
 	notifyItem.ics = &ics;
 	notifyItem.ics->pSyncState = &syncStateBin;
 	notifyItem.ics->pSyncState->__size = sizeof(syncState);
@@ -521,7 +504,7 @@ ECRESULT ECSessionGroup::GetNotifyItems(struct soap *soap, ECSESSIONID ulSession
 
 		m_listNotification.clear();
 	} else {
-	    er = ZARAFA_E_NOT_FOUND;
+	    er = KCERR_NOT_FOUND;
     }
 
 	pthread_mutex_unlock(&m_hNotificationLock);
@@ -551,10 +534,10 @@ ECRESULT ECSessionGroup::releaseListeners()
  *
  * @return Object size in bytes
  */
-unsigned int ECSessionGroup::GetObjectSize()
+size_t ECSessionGroup::GetObjectSize(void)
 {
 	NOTIFICATIONLIST::const_iterator iterlNotify;
-	unsigned int ulSize = 0;
+	size_t ulSize = 0;
 	unsigned int ulItems;
 
 	pthread_mutex_lock(&m_hNotificationLock);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECFreeBusyUpdate.h"
 #include "freebusytags.h"
 
@@ -23,8 +23,6 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECFreeBusyUpdate::ECFreeBusyUpdate(IMessage* lpMessage)
@@ -68,12 +66,6 @@ HRESULT ECFreeBusyUpdate::QueryInterface(REFIID refiid, void** lppInterface)
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
-
-HRESULT ECFreeBusyUpdate::Reload()
-{
-	return S_OK;
-}
-
 HRESULT ECFreeBusyUpdate::PublishFreeBusy(FBBlock_1 *lpBlocks, ULONG nBlocks)
 {
 	HRESULT hr = S_OK;
@@ -90,21 +82,10 @@ exit:
 	return hr;
 }
 
-HRESULT ECFreeBusyUpdate::RemoveAppt()
-{
-	
-	return S_OK;
-}
-
 HRESULT ECFreeBusyUpdate::ResetPublishedFreeBusy()
 {
 	m_fbBlockList.Clear();
 
-	return S_OK;
-}
-
-HRESULT ECFreeBusyUpdate::ChangeAppt()
-{
 	return S_OK;
 }
 
@@ -196,7 +177,7 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
   	if(hr != hrSuccess)
 		goto exit;
 
-	if (CreateFBProp(fbZarafaAllBusy, ulMonths, PR_FREEBUSY_ALL_MONTHS, PR_FREEBUSY_ALL_EVENTS, &m_fbBlockList, &lpPropFBDataArray) == hrSuccess) {
+	if (CreateFBProp(fbKopanoAllBusy, ulMonths, PR_FREEBUSY_ALL_MONTHS, PR_FREEBUSY_ALL_EVENTS, &m_fbBlockList, &lpPropFBDataArray) == hrSuccess) {
 		hr = m_lpMessage->SetProps(2, lpPropFBDataArray, NULL);
 		if(hr != hrSuccess)
 			goto exit;
@@ -242,23 +223,9 @@ exit:
 	return hr;
 }
 
-HRESULT ECFreeBusyUpdate::GetFBTimes()
-{
-	return S_OK;
-}
-
-HRESULT ECFreeBusyUpdate::Intersect()
-{
-	return S_OK;
-}
-
-
-//////////////////////////////////////////////////////////////////
 // Interfaces
 //		IUnknown
 //		IFreeBusyUpdate
-//
-
 HRESULT __stdcall ECFreeBusyUpdate::xFreeBusyUpdate::QueryInterface(REFIID refiid, void** lppInterface)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IFreeBusyUpdate::QueryInterface", "");

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,16 +18,16 @@
 #ifndef ARCHIVESTATECOLLECTOR_H_INCLUDED
 #define ARCHIVESTATECOLLECTOR_H_INCLUDED
 
-#include <boost/smart_ptr.hpp>
 #include <map>
+#include <memory>
 #include "archivestateupdater_fwd.h"
 #include "ArchiverSessionPtr.h"     // For ArchiverSessionPtr
-#include <zarafa/tstring.h>
-#include <zarafa/archiver-common.h>
+#include <kopano/tstring.h>
+#include <kopano/archiver-common.h>
 #include "ECArchiverLogger.h"
 
 class ArchiveStateCollector;
-typedef boost::shared_ptr<ArchiveStateCollector> ArchiveStateCollectorPtr;
+typedef std::shared_ptr<ArchiveStateCollector> ArchiveStateCollectorPtr;
 
 /**
  * The ArchiveStateCollector will construct the current archive state, which

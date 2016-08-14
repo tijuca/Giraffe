@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -21,7 +21,7 @@
 #include <mapispi.h>
 
 #include "ProviderUtil.h"
-#include <zarafa/tstring.h>
+#include <kopano/tstring.h>
 
 extern "C" {
 
@@ -30,19 +30,15 @@ HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst, LPMALLOC lpMalloc, LPMAPISUP 
 HRESULT __cdecl XPProviderInit(HINSTANCE hInstance, LPMALLOC lpMalloc, LPALLOCATEBUFFER lpAllocateBuffer, LPALLOCATEMORE lpAllocateMore, LPFREEBUFFER lpFreeBuffer, ULONG ulFlags, ULONG ulMAPIVer, ULONG * lpulProviderVer, LPXPPROVIDER * lppXPProvider);
 HRESULT  __cdecl ABProviderInit(HINSTANCE hInstance, LPMALLOC lpMalloc, LPALLOCATEBUFFER lpAllocateBuffer, LPALLOCATEMORE lpAllocateMore, LPFREEBUFFER lpFreeBuffer, ULONG ulFlags, ULONG ulMAPIVer, ULONG * lpulProviderVer, LPABPROVIDER * lppABProvider);
 
-#ifdef WIN32
-HRESULT __stdcall MergeWithMAPISVC();
-HRESULT __stdcall RemoveFromMAPISVC();
-#endif
-
 }
 
-HRESULT InitializeProvider(LPPROVIDERADMIN lpAdminProvider, IProfSect *lpProfSect, sGlobalProfileProps sProfileProps, ULONG *lpcStoreID, LPENTRYID *lppStoreID);
+class WSTransport;
+HRESULT InitializeProvider(LPPROVIDERADMIN lpAdminProvider, IProfSect *lpProfSect, const sGlobalProfileProps &, ULONG *lpcStoreID, LPENTRYID *lppStoreID, WSTransport * = NULL);
 
 // Global values
-extern tstring	g_strCommonFilesZarafa;
-extern tstring	g_strUserLocalAppDataZarafa;
-extern tstring	g_strZarafaDirectory;
+extern tstring	g_strCommonFilesKopano;
+extern tstring	g_strUserLocalAppDataKopano;
+extern tstring	g_strKopanoDirectory;
 extern ECMapProvider g_mapProviders;
 extern tstring		g_strManufacturer;
 extern tstring		g_strProductName;

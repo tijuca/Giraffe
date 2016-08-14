@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,17 +15,15 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "WSMessageStreamExporter.h"
 #include "WSSerializedMessage.h"
 #include "WSTransport.h"
-#include <zarafa/charset/convert.h>
+#include <kopano/charset/convert.h>
 #include "WSUtil.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 /**
@@ -54,9 +52,8 @@ HRESULT WSMessageStreamExporter::Create(ULONG ulOffset, ULONG ulCount, const mes
 		hr = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	}
-
 	
-	for (unsigned i = 0; i < streams.__size; ++i) {
+	for (gsoap_size_t i = 0; i < streams.__size; ++i) {
 		lpsi = new StreamInfo;
 
 		lpsi->id.assign(streams.__ptr[i].sStreamData.xop__Include.id);
@@ -64,7 +61,7 @@ HRESULT WSMessageStreamExporter::Create(ULONG ulOffset, ULONG ulCount, const mes
 		hr = MAPIAllocateBuffer(streams.__ptr[i].sPropVals.__size * sizeof(SPropValue), &lpsi->ptrPropVals);
 		if (hr != hrSuccess)
 			goto exit;
-		for (int j = 0; j < streams.__ptr[i].sPropVals.__size; ++j) {
+		for (gsoap_size_t j = 0; j < streams.__ptr[i].sPropVals.__size; ++j) {
 			hr = CopySOAPPropValToMAPIPropVal(&lpsi->ptrPropVals[j], &streams.__ptr[i].sPropVals.__ptr[j], lpsi->ptrPropVals, &converter);
 			if (hr != hrSuccess)
 				goto exit;
@@ -133,6 +130,7 @@ HRESULT WSMessageStreamExporter::GetSerializedMessage(ULONG ulIndex, WSSerialize
 
 WSMessageStreamExporter::WSMessageStreamExporter()
 { 
+	m_ulExpectedIndex = m_ulMaxIndex = 0;
 }
 
 WSMessageStreamExporter::~WSMessageStreamExporter()

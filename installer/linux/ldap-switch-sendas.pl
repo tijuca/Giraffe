@@ -27,7 +27,7 @@ sub readconfig($) {
 
 
 my $servercfg = $ARGV[0];
-$servercfg = "/etc/zarafa/server.cfg" if (!defined($servercfg));
+$servercfg = "/etc/kopano/server.cfg" if (!defined($servercfg));
 
 my %serveropt = readconfig($servercfg);
 

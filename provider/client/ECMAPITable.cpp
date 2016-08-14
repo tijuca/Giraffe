@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <mapicode.h>
 #include <mapidefs.h>
@@ -26,17 +26,15 @@
 #include "Mem.h"
 #include "ECMAPITable.h"
 #include <edkguid.h>
-#include <zarafa/ECGuid.h>
-#include <zarafa/Util.h>
+#include <kopano/ECGuid.h>
+#include <kopano/Util.h>
 
-#include <zarafa/ECDebug.h>
-#include <zarafa/ECInterfaceDefs.h>
+#include <kopano/ECDebug.h>
+#include <kopano/ECInterfaceDefs.h>
 
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECMAPITable::ECMAPITable(std::string strName, ECNotifyClient *lpNotifyClient, ULONG ulFlags) : ECUnknown("IMAPITable")

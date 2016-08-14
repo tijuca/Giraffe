@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,29 +15,27 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECMsgStorePublic.h"
 
 #include "ECMAPIFolder.h"
-#include <zarafa/CommonUtil.h>
-#include <zarafa/Util.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/Util.h>
 #include "ClientUtil.h"
-#include "ZarafaUtil.h"
-#include <zarafa/ECGetText.h>
+#include "pcutil.hpp"
+#include <kopano/ECGetText.h>
 
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <mapiutil.h>
 
 #include "ECMAPIFolderPublic.h"
 
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 
 using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECMsgStorePublic::ECMsgStorePublic(char *lpszProfname, LPMAPISUP lpSupport, WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags, BOOL fIsSpooler, BOOL bOfflineStore) :
@@ -212,7 +210,7 @@ HRESULT ECMsgStorePublic::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID
 		ePublicEntryID = ePE_Favorites;
 	else if(ComparePublicEntryId(ePE_PublicFolders, cbEntryID, lpEntryID, &ulResult) == hrSuccess && ulResult == TRUE)
 		ePublicEntryID = ePE_PublicFolders;
-	else if (lpEntryID && (lpEntryID->abFlags[3] & ZARAFA_FAVORITE)) {
+	else if (lpEntryID && (lpEntryID->abFlags[3] & KOPANO_FAVORITE)) {
 		ePublicEntryID = ePE_FavoriteSubFolder;
 
 		// Replace the original entryid because this one is only readable
@@ -221,7 +219,7 @@ HRESULT ECMsgStorePublic::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID
 		memcpy(lpEntryIDIntern, lpEntryID, cbEntryID);
 
 		// Remove Flags intern
-		lpEntryIDIntern->abFlags[3] &= ~ZARAFA_FAVORITE;
+		lpEntryIDIntern->abFlags[3] &= ~KOPANO_FAVORITE;
 
 		lpEntryID = lpEntryIDIntern;
 
@@ -284,7 +282,7 @@ HRESULT ECMsgStorePublic::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID
 				goto exit;
 
 			//if(ePublicEntryID == ePE_FavoriteSubFolder)
-				//lpEntryID->abFlags[3] = ZARAFA_FAVORITE;
+				//lpEntryID->abFlags[3] = KOPANO_FAVORITE;
 		} else {
 			lpMAPIFolder->HrLoadEmptyProps();
 		}
@@ -591,9 +589,7 @@ HRESULT ECMsgStorePublic::BuildIPMSubTree()
 	MAPIFreeBuffer(lpProps);
 	lpProps = NULL;
 
-	///////////////////////////////////////////////////
 	// the folder "Public Folders"
-	//
 	++ulRowId;
 	cProps = 0;
 	cMaxProps = 20;
@@ -733,7 +729,7 @@ HRESULT ECMsgStorePublic::GetDefaultShortcutFolder(IMAPIFolder** lppFolder)
  		if(hr != hrSuccess)
 			goto exit;
 
-		hr = WrapStoreEntryID(0, (LPTSTR)ZARAFA_DLL_NAME, cbStoreEntryID, lpStoreEntryID, &cbEntryId, &lpEntryId);
+		hr = WrapStoreEntryID(0, (LPTSTR)WCLIENT_DLL_NAME, cbStoreEntryID, lpStoreEntryID, &cbEntryId, &lpEntryId);
 		if(hr != hrSuccess)
 			goto exit;
 
@@ -793,14 +789,14 @@ HRESULT ECMsgStorePublic::Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulE
 	} else if(ComparePublicEntryId(ePE_PublicFolders, cbEntryID, lpEntryID, &ulResult) == hrSuccess && ulResult == TRUE) {
 		hr = MAPI_E_NO_SUPPORT; // FIXME
 		goto exit;
-	} else if (lpEntryID && (lpEntryID->abFlags[3] & ZARAFA_FAVORITE)) {
+	} else if (lpEntryID && (lpEntryID->abFlags[3] & KOPANO_FAVORITE)) {
 		// Replace the original entryid because this one is only readable
 		if ((hr = MAPIAllocateBuffer(cbEntryID, (void**)&lpEntryIDIntern)) != hrSuccess)
 			goto exit;
 		memcpy(lpEntryIDIntern, lpEntryID, cbEntryID);
 
 		// Remove Flags intern
-		lpEntryIDIntern->abFlags[3] &= ~ZARAFA_FAVORITE;
+		lpEntryIDIntern->abFlags[3] &= ~KOPANO_FAVORITE;
 
 		lpEntryID = lpEntryIDIntern;
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -41,7 +41,7 @@
 /*
  * PR_PROCESS_MEETING_REQUESTS, PR_DECLINE_CONFLICTING_MEETING_REQUESTS, and
  * PR_DECLINE_RECURRING_MEETING_REQUESTS are already defined by
- * Zarafa's <mapiext.h>
+ * our <mapiext.h>
  */
 
 #endif // FREEBUSYTAG_INCLUDED

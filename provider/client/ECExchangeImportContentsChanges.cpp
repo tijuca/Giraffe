@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,42 +15,41 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/zcdefs.h>
+#include <kopano/platform.h>
 
 #include "ECExchangeImportContentsChanges.h"
 #include "WSMessageStreamImporter.h"
 #include "ECMessageStreamImporterIStreamAdapter.h"
-#include <zarafa/ECLogger.h>
+#include <kopano/ECLogger.h>
 #include "ECSyncLog.h"
 
-#include <zarafa/Util.h>
+#include <kopano/Util.h>
 #include <edkguid.h>
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 #include <mapiguid.h>
 #include "ECMessage.h"
-#include <zarafa/ECDebug.h>
+#include <kopano/ECDebug.h>
 
-#include "ZarafaICS.h"
-#include <zarafa/mapiext.h>
-#include <zarafa/mapi_ptr.h>
-#include <zarafa/ECRestriction.h>
+#include "ics.h"
+#include <kopano/mapiext.h>
+#include <kopano/mapi_ptr.h>
+#include <kopano/ECRestriction.h>
 
 #include <mapiutil.h>
 
-#include <zarafa/charset/convert.h>
-#include <zarafa/ECGetText.h>
+#include <kopano/charset/convert.h>
+#include <kopano/ECGetText.h>
 #include "EntryPoint.h"
 
 #include <list>
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
 #ifdef _DEBUG
-class NullStream : public IStream
+class NullStream _kc_final : public IStream
 {
 public:
 	NullStream() : m_cRef(1) {}
@@ -147,7 +146,7 @@ HRESULT	ECExchangeImportContentsChanges::QueryInterface(REFIID refiid, void **lp
 	REGISTER_INTERFACE(IID_ECUnknown, this);
 
 	if (refiid == IID_IECImportContentsChanges) {
-		m_lpFolder->GetMsgStore()->lpTransport->HrCheckCapabilityFlags(ZARAFA_CAP_ENHANCED_ICS, &bCanStream);
+		m_lpFolder->GetMsgStore()->lpTransport->HrCheckCapabilityFlags(KOPANO_CAP_ENHANCED_ICS, &bCanStream);
 		if (bCanStream == FALSE)
 			return MAPI_E_INTERFACE_NOT_SUPPORTED;
 
@@ -881,7 +880,7 @@ HRESULT ECExchangeImportContentsChanges::ConfigForConversionStream(LPSTREAM lpSt
 	// Since we don't use the cValuesConversion and lpPropArrayConversion arguments, we'll just check
 	// if the server suppors streaming and if so call the 'normal' config.
 
-	hr = m_lpFolder->GetMsgStore()->lpTransport->HrCheckCapabilityFlags(ZARAFA_CAP_ENHANCED_ICS, &bCanStream);
+	hr = m_lpFolder->GetMsgStore()->lpTransport->HrCheckCapabilityFlags(KOPANO_CAP_ENHANCED_ICS, &bCanStream);
 	if (hr != hrSuccess)
 		return hr;
 	if (bCanStream == FALSE)

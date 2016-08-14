@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,22 +15,20 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <iostream>
 #include "ECDatabaseMySQL.h"
 #include "mysqld_error.h"
 
-#include <zarafa/stringutil.h>
-#include <zarafa/ECDefs.h>
-#include <zarafa/ecversion.h>
+#include <kopano/stringutil.h>
+#include <kopano/ECDefs.h>
+#include <kopano/ecversion.h>
 #include <mapidefs.h>
-#include <zarafa/CommonUtil.h>
+#include <kopano/CommonUtil.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 #ifdef DEBUG
 #define DEBUG_SQL 0
@@ -71,14 +69,14 @@ ECRESULT ECDatabaseMySQL::InitEngine()
 	//Init mysql and make a connection
 	if (!m_bMysqlInitialize && mysql_init(&m_lpMySQL) == NULL) {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::InitEngine() mysql_init failed");
-		return ZARAFA_E_DATABASE_ERROR;
+		return KCERR_DATABASE_ERROR;
 	}
 
 	m_bMysqlInitialize = true;
 
 	// Set auto reconnect
 	// mysql < 5.0.4 default on, mysql 5.0.4 > reconnection default off
-	// Zarafa always wants to reconnect
+	// Kopano always wants to reconnect
 	m_lpMySQL.reconnect = 1;
 	return erSuccess;
 }
@@ -111,9 +109,9 @@ ECRESULT ECDatabaseMySQL::Connect(ECConfig *lpConfig)
 			(lpMysqlPort)?atoi(lpMysqlPort):0, NULL, 0) == NULL)
 	{
 		if (mysql_errno(&m_lpMySQL) == ER_BAD_DB_ERROR) // Database does not exist
-			er = ZARAFA_E_DATABASE_NOT_FOUND;
+			er = KCERR_DATABASE_NOT_FOUND;
 		else
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::Connect(): database access error %d, mysql error: %s", er, mysql_error(&m_lpMySQL));
 
@@ -129,7 +127,7 @@ ECRESULT ECDatabaseMySQL::Connect(ECConfig *lpConfig)
 	}
 
 	if(GetNumRows(lpDBResult) == 0) {
-		er = ZARAFA_E_DATABASE_NOT_FOUND;
+		er = KCERR_DATABASE_NOT_FOUND;
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::Connect(): database missing %d", er);
 		goto exit;
 	}
@@ -159,13 +157,13 @@ ECRESULT ECDatabaseMySQL::Connect(ECConfig *lpConfig)
 
 	strQuery = "SET SESSION group_concat_max_len = " + stringify((unsigned int)MAX_GROUP_CONCAT_LEN);
 	if(Query(strQuery) != 0 ) {
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::Connect(): group_concat_max_len set fail %d", er);
 		goto exit;
 	}
 
 	if(Query("SET NAMES 'utf8'") != 0) {
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::Connect(): set names to utf8 failed %d", er);
 		goto exit;
 	}
@@ -254,7 +252,7 @@ ECRESULT ECDatabaseMySQL::DoSelect(const string &strQuery, DB_RESULT *lpResult, 
 		Lock();
 
 	if (Query(strQuery) != 0) {
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::DoSelect(): Failed invoking '%s'", strQuery.c_str());
 		goto exit;
 	}
@@ -265,7 +263,7 @@ ECRESULT ECDatabaseMySQL::DoSelect(const string &strQuery, DB_RESULT *lpResult, 
 		*lpResult = mysql_store_result(&m_lpMySQL);
 
 	if (*lpResult == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "%p: SQL result failed: %s, Query: \"%s\"", (void*)&m_lpMySQL, mysql_error(&m_lpMySQL), strQuery.c_str());
 	}
 
@@ -300,7 +298,7 @@ ECRESULT ECDatabaseMySQL::_Update(const string &strQuery, unsigned int *lpulAffe
 		// FIXME: Add the mysql error system ?
 		// er = nMysqlError;
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "ECDatabaseMySQL::_Update(): Failed invoking '%s'", strQuery.c_str());
-		return ZARAFA_E_DATABASE_ERROR;
+		return KCERR_DATABASE_ERROR;
 	}
 
 	if(lpulAffectedRows)
@@ -469,7 +467,7 @@ ECRESULT ECDatabaseMySQL::Begin() {
 	err = Query("BEGIN");
 
 	if(err)
-		return ZARAFA_E_DATABASE_ERROR;
+		return KCERR_DATABASE_ERROR;
 
 	return erSuccess;
 }
@@ -479,7 +477,7 @@ ECRESULT ECDatabaseMySQL::Commit() {
 	err = Query("COMMIT");
 
 	if(err)
-		return ZARAFA_E_DATABASE_ERROR;
+		return KCERR_DATABASE_ERROR;
 
 	return erSuccess;
 }
@@ -489,7 +487,7 @@ ECRESULT ECDatabaseMySQL::Rollback() {
 	err = Query("ROLLBACK");
 
 	if(err)
-		return ZARAFA_E_DATABASE_ERROR;
+		return KCERR_DATABASE_ERROR;
 
 	return erSuccess;
 }
@@ -517,19 +515,19 @@ ECRESULT ECDatabaseMySQL::IsInnoDBSupported()
 		if (stricmp(lpDBRow[1], "DISABLED") == 0) {
 			// mysql has run with innodb enabled once, but disabled this.. so check your log.
 			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "INNODB engine is disabled. Please re-enable the INNODB engine. Check your MySQL log for more information or comment out skip-innodb in the mysql configuration file.");
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 			goto exit;
 		} else if (stricmp(lpDBRow[1], "YES") != 0 && stricmp(lpDBRow[1], "DEFAULT") != 0) {
 			// mysql is incorrectly configured or compiled.
 			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "INNODB engine is not supported. Please enable the INNODB engine in the mysql configuration file.");
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 			goto exit;
 		}
 		break;
 	}
 	if (lpDBRow == NULL) {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to find 'InnoDB' engine from the mysql server. Probably INNODB is not supported.");
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		goto exit;
 	}
 
@@ -552,7 +550,7 @@ ECRESULT ECDatabaseMySQL::CreateDatabase(ECConfig *lpConfig)
 	if(*lpMysqlSocket == '\0')
 		lpMysqlSocket = NULL;
 
-	// Zarafa archiver database tables
+	// Kopano archiver database tables
 	const sSQLDatabase_t *sDatabaseTables = GetDatabaseDefs();
 
 	er = InitEngine();
@@ -573,12 +571,12 @@ ECRESULT ECDatabaseMySQL::CreateDatabase(ECConfig *lpConfig)
         ) == NULL)
 	{
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Failed to connect to database: Error: %s", mysql_error(&m_lpMySQL));
-		return ZARAFA_E_DATABASE_ERROR;
+		return KCERR_DATABASE_ERROR;
 	}
 
 	if(lpDatabase == NULL) {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Unable to create database: Unknown database");
-		return ZARAFA_E_DATABASE_ERROR;
+		return KCERR_DATABASE_ERROR;
 	}
 
 	m_lpLogger->Log(EC_LOGLEVEL_NOTICE,"Create database %s", lpDatabase);
@@ -590,7 +588,7 @@ ECRESULT ECDatabaseMySQL::CreateDatabase(ECConfig *lpConfig)
 	strQuery = "CREATE DATABASE IF NOT EXISTS `"+std::string(lpConfig->GetSetting("mysql_database"))+"`";
 	if(Query(strQuery) != erSuccess){
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL,"Unable to create database: %s", GetError());
-		return ZARAFA_E_DATABASE_ERROR;
+		return KCERR_DATABASE_ERROR;
 	}
 
 	strQuery = "USE `"+std::string(lpConfig->GetSetting("mysql_database"))+"`";

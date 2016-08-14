@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,10 +18,10 @@
 #ifndef ECSTRINGCOMPAT_H
 #define ECSTRINGCOMPAT_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <boost/noncopyable.hpp>
-#include <zarafa/ZarafaCode.h>
-#include "Zarafa.h"
+#include <kopano/kcodes.h>
+#include "kcore.hpp"
 #include "SOAPUtils.h"
 #include <mapidefs.h>
 
@@ -48,7 +48,7 @@ public:
 
 	/**
 	 * Convert the input data to true UTF8. If ulClientCaps contains
-	 * ZARAFA_CAP_UNICODE, the input data is expected to be in UTF8,
+	 * KOPANO_CAP_UNICODE, the input data is expected to be in UTF8,
 	 * so no conversion is needed. If convert is set to true, the input
 	 * data is expected to be in WTF1252, and the data is converted
 	 * accordingly.
@@ -61,7 +61,7 @@ public:
 
 	/**
 	 * Convert the data from UTF8 to either UTF8 ot WTF1252. If culClientCaps
-	 * contains ZARAFA_CAP_UNICODE, the output data will not be converted and
+	 * contains KOPANO_CAP_UNICODE, the output data will not be converted and
 	 * will be in UTF8. Otherwise the data will be encoded in WTF1252. 
 	 * 
 	 *
@@ -74,7 +74,7 @@ public:
 
 	/**
 	 * Convert and copy the data from UTF8 to either UTF8 or WTF1252. If
-	 * ulClientCaps contains ZARAFA_CAP_UNICODE, the output data will not be
+	 * ulClientCaps contains KOPANO_CAP_UNICODE, the output data will not be
 	 * converted and will be in UTF8. Otherwise the data will be encoded in
 	 * WTF1252.
 	 *

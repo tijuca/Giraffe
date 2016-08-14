@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,23 +15,17 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
-#include <zarafa/ECDefs.h>
+#include <kopano/ECDefs.h>
 #include "ECSecurityOffline.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECSecurityOffline::ECSecurityOffline(ECSession *lpSession, ECConfig *lpConfig) :
 	ECSecurity(lpSession, lpConfig, NULL)
-{
-}
-
-ECSecurityOffline::~ECSecurityOffline(void)
 {
 }
 
@@ -70,19 +64,12 @@ ECRESULT ECSecurityOffline::GetViewableCompanyIds(std::list<localobjectdetails_t
 
 ECRESULT ECSecurityOffline::GetUserQuota(unsigned int ulUserId, quotadetails_t *lpDetails)
 {
-	ECRESULT er = erSuccess;
-
-	if (!lpDetails) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (lpDetails == NULL)
+		return KCERR_INVALID_PARAMETER;
 	lpDetails->bIsUserDefaultQuota = false;
 	lpDetails->bUseDefaultQuota = false;
 	lpDetails->llHardSize = 0;
 	lpDetails->llSoftSize = 0;
 	lpDetails->llWarnSize = 0;
-
-exit:
-	return er;
+	return erSuccess;
 }

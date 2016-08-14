@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,22 +15,20 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/charset/convert.h>
+#include <kopano/platform.h>
+#include <kopano/charset/convert.h>
 
 #include <mapicode.h>
 
 #include <numeric>
 #include <vector>
 #include <string>
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 #include <cerrno>
 #define BUFSIZE 4096
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 convert_exception::convert_exception(enum exception_type type, const std::string &message)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,16 +19,16 @@
 #define ECDBDEF_H
 
 /**
- * @page zarafa_db Database
+ * @page kopano_db Database
  *
- * @section zarafa_db_layout Database layout
+ * @section kopano_db_layout Database layout
  *
- * Zarafa server tables:
+ * Server tables:
  * @code
  * abchanges         | All addressbook changes
  * acl               | User permission objects
  * changes           | Object changes
- * clientupdatestatus| Update status of the zarafa client, only used with auto updater
+ * clientupdatestatus| Update status of the kopano client, only used with auto updater
  * hierarchy         | The hiearchy between the mapi objects
  * indexedproperties | Mapi object entryid and sourcekey
  * lob               | Attachment data. Only when the setting attachment in database is enabled
@@ -43,7 +43,7 @@
  * stores            | A list with data stores related to one user and includes the deleted stores.
  * syncedmessages    | Messages which are synced with a specific restriction
  * syncs             | Sync state of a folder
- * users             | User relation between the userplugin and zarafa
+ * users             | User relation between the userplugin and kopano
  * versions          | Database update information
  * @endcode
  *
@@ -55,9 +55,9 @@
  * objectrelation    | User, group, company and sendas relations
  * @endcode
  *
- * @todo Add an image of the Zarafa database layout
+ * @todo Add an image of the database layout
  *
- * @section zarafa_db_update Database update system
+ * @section kopano_db_update Database update system
  *
  * @todo describe the update system
  *
@@ -254,7 +254,7 @@
 										`id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT, \
 										`sourcekey` VARBINARY(64) NOT NULL, \
 										`parentsourcekey` VARBINARY(64) NOT NULL, \
-										`change_type` INT(11) UNSIGNED NULL, \
+										`change_type` INT(11) UNSIGNED NOT NULL DEFAULT '0', \
 										`flags` INT(11) UNSIGNED DEFAULT NULL, \
 										`sourcesync` INT(11) UNSIGNED DEFAULT NULL, \
 										PRIMARY KEY (`parentsourcekey`,`sourcekey`,`change_type`), \
@@ -266,7 +266,7 @@
 										`id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT, \
 										`sourcekey` VARBINARY(255) NOT NULL, \
 										`parentsourcekey` VARBINARY(255) NOT NULL, \
-										`change_type` INT(11) UNSIGNED NULL, \
+										`change_type` INT(11) UNSIGNED NOT NULL DEFAULT '0', \
 										PRIMARY KEY (`parentsourcekey`,`change_type`,`sourcekey`), \
 										UNIQUE KEY `changeid` (`id`) \
 									) ENGINE=InnoDB CHARACTER SET utf8 COLLATE utf8_general_ci;"
@@ -334,8 +334,8 @@
 
 #define Z_TABLEDATA_STORES			"INSERT INTO `stores` VALUES (1, 1, 2, 0, 'SYSTEM', 0, 0x8962ffeffb7b4d639bc5967c4bb58234);"
 
-//1=ZARAFA_UID_EVERYONE, 0x30002=DISTLIST_SECURITY
-//2=ZARAFA_UID_SYSTEM, 0x10001=ACTIVE_USER
+//1=KOPANO_UID_EVERYONE, 0x30002=DISTLIST_SECURITY
+//2=KOPANO_UID_SYSTEM, 0x10001=ACTIVE_USER
 #define Z_TABLEDATA_USERS			"INSERT INTO `users` (`id`, `externid`, `objectclass`, `signature`, `company`) VALUES \
 										(1, NULL, 0x30002, '', 0), \
 										(2, NULL, 0x10001, '', 0);"
@@ -412,6 +412,8 @@
 #define Z_UPDATE_UPDATE_STORES					62
 #define Z_UPDATE_UPDATE_WLINK_RECKEY			63
 #define Z_UPDATE_VERSIONTBL_MICRO 64
+#define Z_UPDATE_CHANGES_PKEY 65
+#define Z_UPDATE_ABCHANGES_PKEY 66
 
 /*
  * The first population of the SQL tables can use both create-type and
@@ -419,9 +421,9 @@
  * version that can be reached with creates only.
  * (This is never less than %Z_UPDATE_LAST.)
  */
-#define Z_UPDATE_RELEASE_ID 64
+#define Z_UPDATE_RELEASE_ID 66
 
 // This is the last update ID always update this to the last ID
-#define Z_UPDATE_LAST 64
+#define Z_UPDATE_LAST 66
 
 #endif

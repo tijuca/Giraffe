@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,8 +15,8 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/stringutil.h>
+#include <kopano/platform.h>
+#include <kopano/stringutil.h>
 
 // Damn windows header defines max which break C++ header files
 #undef max
@@ -30,27 +30,23 @@
 #include "vmime/vmime.hpp"
 #include "vmime/textPartFactory.hpp"
 #include "mapiTextPart.h"
-#ifdef _WIN32
-#include "vmime/platforms/windows/windowsHandler.hpp"
-#else
 #include "vmime/platforms/posix/posixHandler.hpp"
-#endif
 
 // mapi
 #include <mapix.h>
 #include <mapiutil.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <edkmdb.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/charset/convert.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/charset/convert.h>
 // inetmapi
 #include <inetmapi/inetmapi.h>
 #include "VMIMEToMAPI.h"
 #include "MAPIToVMIME.h"
 #include "ECVMIMEUtils.h"
 #include "ECMapiUtils.h"
-#include <zarafa/ECLogger.h>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/ECLogger.h>
+#include <kopano/mapi_ptr.h>
 
 using namespace std;
 
@@ -101,16 +97,6 @@ bool ECSender::haveError() {
 	return ! error.empty();
 }
 
-const std::vector<sFailedRecip> &ECSender::getPermanentFailedRecipients(void) const
-{
-	return mPermanentFailedRecipients;
-}
-
-const std::vector<sFailedRecip> &ECSender::getTemporaryFailedRecipients() const
-{
-	return mTemporaryFailedRecipients;
-}
-
 pthread_mutex_t vmInitLock = PTHREAD_MUTEX_INITIALIZER;
 static void InitializeVMime()
 {
@@ -119,11 +105,7 @@ static void InitializeVMime()
 		vmime::platform::getHandler();
 	}
 	catch (vmime::exceptions::no_platform_handler &) {
-#ifdef _WIN32
-		vmime::platform::setHandler<vmime::platforms::windows::windowsHandler>();
-#else
 		vmime::platform::setHandler<vmime::platforms::posix::posixHandler>();
-#endif
 		// need to have a unique indentifier in the mediaType
 		vmime::textPartFactory::getInstance()->registerType<vmime::mapiTextPart>(vmime::mediaType(vmime::mediaTypes::TEXT, "mapi"));
 		// init our random engine for random message id generation
@@ -137,8 +119,10 @@ static string generateRandomMessageId()
 #define IDLEN 38
 	char id[IDLEN] = {0};
 	// the same format as the vmime generator, but with more randomness
-	snprintf(id, IDLEN, "zarafa.%08x.%04x.%08x%08x", (unsigned int)time(NULL), getpid(), rand_mt(), rand_mt());
-	return string(id, IDLEN -1); // do not include \0 in std::string
+	snprintf(id, IDLEN, "kcim.%lx.%x.%08x%08x",
+		static_cast<unsigned long>(time(NULL)), getpid(),
+		rand_mt(), rand_mt());
+	return string(id, strlen(id));
 #undef IDLEN
 }
 

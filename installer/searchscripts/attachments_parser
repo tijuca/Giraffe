@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Zarafa script which is executed to convert an attachment to plain text.
+# Kopano script which is executed to convert an attachment to plain text.
 
 # Description:
 # This script accepts attachment data through the standard input

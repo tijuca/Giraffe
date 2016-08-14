@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,8 +15,8 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/UnixUtil.h>
+#include <kopano/platform.h>
+#include <kopano/UnixUtil.h>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -59,6 +59,9 @@ int unix_runas(ECConfig *lpConfig, ECLogger *lpLogger) {
 	ret = unix_runpath(lpConfig);
 	if (ret != 0)
 		return ret;
+
+	if (getgroups(0, NULL) != 0 && setgroups(0, NULL) < 0)
+		ec_log_warn("setgroups(0): %s", strerror(errno));
 
 	if (group != NULL && *group != '\0') {
 		const struct group *gr = getgrnam(group);
@@ -125,7 +128,7 @@ void unix_coredump_enable(ECLogger *logger)
 int unix_create_pidfile(const char *argv0, ECConfig *lpConfig,
     ECLogger *lpLogger, bool bForce)
 {
-	string pidfilename = "/var/run/zarafad/" + string(argv0) + ".pid";
+	string pidfilename = "/var/run/kopano/" + string(argv0) + ".pid";
 	FILE *pidfile;
 	int oldpid;
 	char tmp[255];

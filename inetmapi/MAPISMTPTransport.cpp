@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -41,8 +41,8 @@
 // the GNU General Public License cover the whole combination.
 //
 
-#include <zarafa/platform.h>
-#include <zarafa/stringutil.h>
+#include <kopano/platform.h>
+#include <kopano/stringutil.h>
 #include "MAPISMTPTransport.h"
 #include "vmime/net/smtp/SMTPResponse.hpp"
 
@@ -54,9 +54,9 @@
 #include "vmime/utility/stringUtils.hpp"
 #include "vmime/net/defaultConnectionInfos.hpp"
 
-#include <zarafa/ECDebugPrint.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/charset/traits.h>
+#include <kopano/ECDebugPrint.h>
+#include <kopano/ECLogger.h>
+#include <kopano/charset/traits.h>
 
 #if VMIME_HAVE_SASL_SUPPORT
 	#include "vmime/security/sasl/SASLContext.hpp"
@@ -111,13 +111,6 @@ MAPISMTPTransport::~MAPISMTPTransport()
 		m_lpLogger->Release();
 }
 
-
-const string MAPISMTPTransport::getProtocolName() const
-{
-	return "mapismtp";
-}
-
-
 void MAPISMTPTransport::connect()
 {
 	if (isConnected())
@@ -131,7 +124,7 @@ void MAPISMTPTransport::connect()
 		m_timeoutHandler = getTimeoutHandlerFactory()->create();
 
 	// Create and connect the socket
-	// @note zarafa edit: we don't want a timeout during the connect() call
+	// @note we don't want a timeout during the connect() call
 	// because if we set this, the side-effect is when IPv6 is tried first, it will timeout
 	// the handler will break the loop by returning false from the handleTimeOut() function.
 	m_socket = getSocketFactory()->create();
@@ -513,19 +506,6 @@ bool MAPISMTPTransport::isConnected() const
 	return (m_socket && m_socket->isConnected() && m_authentified);
 }
 
-
-bool MAPISMTPTransport::isSecuredConnection() const
-{
-	return m_secured;
-}
-
-
-ref <connectionInfos> MAPISMTPTransport::getConnectionInfos() const
-{
-	return m_cntInfos;
-}
-
-
 void MAPISMTPTransport::disconnect()
 {
 	if (!isConnected())
@@ -701,18 +681,6 @@ void MAPISMTPTransport::send(const mailbox& expeditor, const mailboxList& recipi
 	}
 }
 
-const std::vector<sFailedRecip> &
-MAPISMTPTransport::getPermanentFailedRecipients(void) const
-{
-	return mPermanentFailedRecipients;
-}
-
-const std::vector<sFailedRecip> &
-MAPISMTPTransport::getTemporaryFailedRecipients(void) const
-{
-	return mTemporaryFailedRecipients;
-}
-
 void MAPISMTPTransport::setLogger(ECLogger *lpLogger)
 {                              
 	if (m_lpLogger != NULL)
@@ -752,19 +720,6 @@ ref <SMTPResponse> MAPISMTPTransport::readResponse()
 // Service infos
 
 SMTPServiceInfos MAPISMTPTransport::sm_infos(false);
-
-
-const serviceInfos& MAPISMTPTransport::getInfosInstance()
-{
-	return sm_infos;
-}
-
-
-const serviceInfos& MAPISMTPTransport::getInfos() const
-{
-	return sm_infos;
-}
-
 
 } // smtp
 } // net

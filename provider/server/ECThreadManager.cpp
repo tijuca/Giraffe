@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,19 +15,19 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECThreadManager.h"
 
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
 #ifdef HAVE_EPOLL_CREATE
 #include <sys/epoll.h>
 #endif
 
-#include <zarafa/CommonUtil.h>
+#include <kopano/CommonUtil.h>
 #include "ECSessionManager.h"
 #include "ECStatsCollector.h"
 #include "ECServerEntrypoint.h"
@@ -139,12 +139,7 @@ void *ECWorkerThread::Work(void *lpParam)
     bool fStop = false;
 	int err = 0;
 
-#ifdef WIN32
-	// Win32 pthread_t is a struct, which we can't cast to a ULONG.
-    lpThis->m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Started%sthread %p", lpPrio ? " priority " : " ", pthread_self().p);
-#else
     lpThis->m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Started%sthread %08x", lpPrio ? " priority " : " ", (ULONG)pthread_self());
-#endif
     
     while(1) {
 		set_thread_name(pthread_self(), "z-s: idle thread");
@@ -156,12 +151,7 @@ void *ECWorkerThread::Work(void *lpParam)
             
             // We were requested to exit due to idle state
             if(fStop) {
-#ifdef WIN32
-				// Win32 pthread_t is a struct, which we can't cast to a ULONG.
-				lpThis->m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Thread %p idle and requested to exit", pthread_self().p);
-#else
                 lpThis->m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Thread %08x idle and requested to exit", (ULONG)pthread_self());
-#endif
                 break;
             }
                 
@@ -378,7 +368,7 @@ ECRESULT ECThreadManager::NotifyIdle(ECWorkerThread *lpThread, bool *lpfStop)
         if(iterThreads == m_lstThreads.end()) {
             // HUH
             m_lpLogger->Log(EC_LOGLEVEL_FATAL, "A thread that we don't know is idle ...");
-            er = ZARAFA_E_NOT_FOUND;
+            er = KCERR_NOT_FOUND;
             goto exit;
         }
         // Remove the thread from our running thread list
@@ -590,7 +580,7 @@ ECRESULT ECDispatcher::QueueItem(struct soap *soap)
  * @param[in] bPrio handle priority or normal queue
  * 
  * @return error code
- * @retval ZARAFA_E_NOT_FOUND no soap call in the queue present
+ * @retval KCERR_NOT_FOUND no soap call in the queue present
  */
 ECRESULT ECDispatcher::GetNextWorkItem(WORKITEM **lppItem, bool bWait, bool bPrio)
 {
@@ -625,12 +615,12 @@ ECRESULT ECDispatcher::GetNextWorkItem(WORKITEM **lppItem, bool bWait, bool bPri
                 queue->pop();
             } else {
                 // Condition fired, but still nothing there. Probably exit requested or wrong queue signal
-                er = ZARAFA_E_NOT_FOUND;
+                er = KCERR_NOT_FOUND;
                 goto exit;
             }
         } else {
             // No wait requested, return not found
-            er = ZARAFA_E_NOT_FOUND;
+            er = KCERR_NOT_FOUND;
             goto exit;
         }
     }
@@ -647,7 +637,7 @@ ECRESULT ECDispatcher::NotifyDone(struct soap *soap)
 {
     // During exit, don't requeue active sockets, but close them
     if(m_bExit) {	
-		zarafa_end_soap_connection(soap);
+		kopano_end_soap_connection(soap);
         soap_free(soap);
     } else {
 		--soap->max_keep_alive;
@@ -669,7 +659,7 @@ ECRESULT ECDispatcher::NotifyDone(struct soap *soap)
 			NotifyRestart(socket);
         } else {
             // SOAP has closed the socket, no need to requeue
-			zarafa_end_soap_connection(soap);
+			kopano_end_soap_connection(soap);
             soap_free(soap);
         }
     }
@@ -726,10 +716,6 @@ ECDispatcherSelect::ECDispatcherSelect(ECLogger *lpLogger, ECConfig *lpConfig, C
 	// Create a pipe that we can use to trigger select() to return
     m_fdRescanRead = pipes[0];
     m_fdRescanWrite = pipes[1];
-}
-
-ECDispatcherSelect::~ECDispatcherSelect()
-{
 }
 
 ECRESULT ECDispatcherSelect::MainLoop()
@@ -814,7 +800,7 @@ ECRESULT ECDispatcherSelect::MainLoop()
                 // First, check for EOF
                 if(recv(iterSockets->second.soap->socket, &s, 1, MSG_PEEK) == 0) {
                     // EOF occurred, just close the socket and remove it from the socket list
-					zarafa_end_soap_connection(iterSockets->second.soap);
+					kopano_end_soap_connection(iterSockets->second.soap);
                     soap_free(iterSockets->second.soap);
                     m_setSockets.erase(iterSockets++);
                 } else {
@@ -846,7 +832,7 @@ ECRESULT ECDispatcherSelect::MainLoop()
                 ACTIVESOCKET sActive;
                 
                 newsoap = soap_copy(iterListenSockets->second);
-                zarafa_new_soap_connection(SOAP_CONNECTION_TYPE(iterListenSockets->second), newsoap);
+                kopano_new_soap_connection(SOAP_CONNECTION_TYPE(iterListenSockets->second), newsoap);
                 
                 if(newsoap == NULL) {
                     m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to accept new connection: out of memory");
@@ -873,7 +859,7 @@ ECRESULT ECDispatcherSelect::MainLoop()
 						else
 							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Error accepting incoming connection from network.");
 					}
-					zarafa_end_soap_connection(newsoap);
+					kopano_end_soap_connection(newsoap);
                     soap_free(newsoap);
                 } else {
 					if (m_lpLogger->Log(EC_LOGLEVEL_DEBUG)) {
@@ -918,15 +904,15 @@ ECRESULT ECDispatcherSelect::MainLoop()
     
     // Empty the queue
     pthread_mutex_lock(&m_mutexItems);
-    while(!m_queueItems.empty()) { zarafa_end_soap_connection(m_queueItems.front()->soap); soap_free(m_queueItems.front()->soap); m_queueItems.pop(); }
-    while(!m_queuePrioItems.empty()) { zarafa_end_soap_connection(m_queuePrioItems.front()->soap); soap_free(m_queuePrioItems.front()->soap); m_queuePrioItems.pop(); }
+    while(!m_queueItems.empty()) { kopano_end_soap_connection(m_queueItems.front()->soap); soap_free(m_queueItems.front()->soap); m_queueItems.pop(); }
+    while(!m_queuePrioItems.empty()) { kopano_end_soap_connection(m_queuePrioItems.front()->soap); soap_free(m_queuePrioItems.front()->soap); m_queuePrioItems.pop(); }
     pthread_mutex_unlock(&m_mutexItems);
 
 	// Close all listener sockets. 
 	for (iterListenSockets = m_setListenSockets.begin();
 	     iterListenSockets != m_setListenSockets.end();
 	     ++iterListenSockets) {
-		zarafa_end_soap_listener(iterListenSockets->second); 
+		kopano_end_soap_listener(iterListenSockets->second); 
 		soap_free(iterListenSockets->second);
 	}
 	// Close all sockets. This will cause all that we were listening on clients to get an EOF
@@ -934,7 +920,7 @@ ECRESULT ECDispatcherSelect::MainLoop()
 	for (iterSockets = m_setSockets.begin();
 	     iterSockets != m_setSockets.end();
 	     ++iterSockets) {
-		zarafa_end_soap_connection(iterSockets->second.soap); 
+		kopano_end_soap_connection(iterSockets->second.soap); 
 		soap_free(iterSockets->second.soap);
 	}
 	pthread_mutex_unlock(&m_mutexSockets);
@@ -1035,7 +1021,7 @@ ECRESULT ECDispatcherEPoll::MainLoop()
 				ACTIVESOCKET sActive;
 
 				newsoap = soap_copy(iterListenSockets->second);
-                zarafa_new_soap_connection(SOAP_CONNECTION_TYPE(iterListenSockets->second), newsoap);
+                kopano_new_soap_connection(SOAP_CONNECTION_TYPE(iterListenSockets->second), newsoap);
 
 				// Record last activity (now)
 				time(&sActive.ulLastActivity);
@@ -1056,7 +1042,7 @@ ECRESULT ECDispatcherEPoll::MainLoop()
 						else
 							m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Error accepting incoming connection from network.");
 					}
-					zarafa_end_soap_connection(newsoap);
+					kopano_end_soap_connection(newsoap);
 					soap_free(newsoap);
 				} else {
 					if (m_lpLogger->Log(EC_LOGLEVEL_DEBUG)) {
@@ -1090,7 +1076,7 @@ ECRESULT ECDispatcherEPoll::MainLoop()
 				epoll_ctl(m_epFD, EPOLL_CTL_DEL, iterSockets->second.soap->socket, &epevent);
 
 				if ((epevents[i].events & EPOLLHUP) == EPOLLHUP) {
-					zarafa_end_soap_connection(iterSockets->second.soap);
+					kopano_end_soap_connection(iterSockets->second.soap);
 					soap_free(iterSockets->second.soap);
 					m_setSockets.erase(iterSockets);
 				} else {
@@ -1122,21 +1108,21 @@ ECRESULT ECDispatcherEPoll::MainLoop()
 
     // Empty the queue
     pthread_mutex_lock(&m_mutexItems);
-    while(!m_queueItems.empty()) { zarafa_end_soap_connection(m_queueItems.front()->soap); soap_free(m_queueItems.front()->soap); m_queueItems.pop(); }
-    while(!m_queuePrioItems.empty()) { zarafa_end_soap_connection(m_queuePrioItems.front()->soap); soap_free(m_queuePrioItems.front()->soap); m_queuePrioItems.pop(); }
+    while(!m_queueItems.empty()) { kopano_end_soap_connection(m_queueItems.front()->soap); soap_free(m_queueItems.front()->soap); m_queueItems.pop(); }
+    while(!m_queuePrioItems.empty()) { kopano_end_soap_connection(m_queuePrioItems.front()->soap); soap_free(m_queuePrioItems.front()->soap); m_queuePrioItems.pop(); }
     pthread_mutex_unlock(&m_mutexItems);
 
 	// Close all listener sockets.
 	for (iterListenSockets = m_setListenSockets.begin();
 	     iterListenSockets != m_setListenSockets.end();
 	     ++iterListenSockets) {
-        zarafa_end_soap_listener(iterListenSockets->second);
+        kopano_end_soap_listener(iterListenSockets->second);
         soap_free(iterListenSockets->second);
     }
     // Close all sockets. This will cause all that we were listening on clients to get an EOF
 	pthread_mutex_lock(&m_mutexSockets);
     for (iterSockets = m_setSockets.begin(); iterSockets != m_setSockets.end(); ++iterSockets) {
-        zarafa_end_soap_connection(iterSockets->second.soap);
+        kopano_end_soap_connection(iterSockets->second.soap);
         soap_free(iterSockets->second.soap);
     }
 	pthread_mutex_unlock(&m_mutexSockets);
@@ -1159,381 +1145,4 @@ ECRESULT ECDispatcherEPoll::NotifyRestart(SOAP_SOCKET s)
 	return erSuccess;
 }
 #endif
-#endif
-
-#ifdef WIN32
-ECDispatcherWin32::ECDispatcherWin32(ECLogger *lpLogger, ECConfig *lpConfig, CREATEPIPESOCKETCALLBACK lpCallback, void *lpCallbackParam) : ECDispatcher(lpLogger, lpConfig, lpCallback, lpCallbackParam)
-{
-	m_hRescanEvent = CreateEvent(NULL, false, false, NULL);
-}
-
-ECDispatcherWin32::~ECDispatcherWin32()
-{
-}
-
-ECRESULT ECDispatcherWin32::MainLoop()
-{
-    ECRESULT er = erSuccess;
-    ECWatchDog *lpWatchDog = NULL;
-    std::map<int, ACTIVESOCKET>::const_iterator iterSockets;
-    std::map<int, ACTIVESOCKET>::const_iterator iterErase;
-    std::map<int, struct soap *>::const_iterator iterListenSockets;
-	std::map<HANDLE, ECSOCKETDATA *> mapPending;			// Map of all pending overlapped I/O requests
-	std::map<HANDLE, ECSOCKETDATA *>::const_iterator iterPending;
-	std::vector<HANDLE> lstWatch;						// Rebuilt for each WFMOE loop in same order as hEvent[]
-    time_t now;
-	unsigned int ulEvent;
-
-	ECSOCKETDATA *lpEventData;
-	HANDLE hEvent[64];
-	unsigned int cEvents;
-	CONNECTION_TYPE ulType;
-
-    // This will start the threads
-    m_lpThreadManager = new ECThreadManager(m_lpLogger, this, atoui(m_lpConfig->GetSetting("threads")));
-    
-    // Start the watchdog
-    lpWatchDog = new ECWatchDog(m_lpConfig, m_lpLogger, this, m_lpThreadManager);
-
-    // Main loop
-    while(!m_bExit) {
-        time(&now);
-		
-		lstWatch.clear();
-		cEvents = 0;
-
-        // Listen on rescan trigger
-		hEvent[cEvents] = m_hRescanEvent;
-		++cEvents;
-		lstWatch.push_back(m_hRescanEvent);
-
-		pthread_mutex_lock(&m_mutexSockets);
-
-        // Listen on active sockets
-        iterSockets = m_setSockets.begin();
-
-		while(iterSockets != m_setSockets.end()) {
-		    ulType = SOAP_CONNECTION_TYPE(iterSockets->second.soap);
-            if(ulType != CONNECTION_TYPE_NAMED_PIPE && (now - (time_t)iterSockets->second.ulLastActivity > atoi(m_lpConfig->GetSetting("server_recv_timeout")))) {
-                // Socket has been inactive for more than server_recv_timeout seconds, close the socket
-				SOCKET s = iterSockets->second.soap->socket;
-
-				// Close soap object
-				zarafa_end_soap_connection(iterSockets->second.soap);
-				soap_free(iterSockets->second.soap);
-                
-				// Discard pending I/O event
-				iterPending = mapPending.find((HANDLE)s);
-				if(iterPending != mapPending.end()) {
-					CancelIo((HANDLE)s);
-					CloseHandle(iterPending->second->sOverlapped.hEvent);
-					delete iterPending->second;
-					mapPending.erase(iterPending);
-				}
-				
-				// Remove from active socket set
-                iterErase = iterSockets;
-                ++iterSockets;
-                m_setSockets.erase(iterErase);
-
-                continue;
-            }
-            
-            int socket = iterSockets->second.soap->socket;
-            
-            if(socket > 0) {
-				if (cEvents >= ARRAY_SIZEf(hEvent))
-					continue;
-
-				// See if there is a pending overlapped I/O request for this socket
-				iterPending = mapPending.find((HANDLE)iterSockets->second.soap->socket);
-
-				if(iterPending == mapPending.end()) {
-					lpEventData = new ECSOCKETDATA;
-					memset(lpEventData, 0, sizeof(ECSOCKETDATA));
-
-					// No pending request, create one
-					if(ulType == CONNECTION_TYPE_NAMED_PIPE) {
-						// Win32 Named Pipe, use overlapped Read to create event we can wait on
-
-						lpEventData->sOverlapped.hEvent = CreateEvent(NULL, true, false, NULL);
-						lpEventData->type = SOCKETTYPE_PIPE;
-
-						/* This is a bit of a hack
-						* We want to be notified when there is ANYTHING to read from the named pipe. Unfortunately, there is
-						* no API call we can do to do this directly (PeekNamedPipe is not asynchronous ..). The only way to be notified
-						* of waiting data is to use ReadFile(). Unfortunately this means we may actually read data from the socket
-						* which we cannot discard. To make sure the data is not lost, we put the read data into the SOAP object for reading.
-						*/
-						if(ReadFile((HANDLE)iterSockets->second.soap->socket, lpEventData->buffer, sizeof(lpEventData->buffer), &lpEventData->dwRead, &lpEventData->sOverlapped)) {
-							// Success: data has already been read. Just mark it as active, which will be handled later
-							SetEvent(lpEventData->sOverlapped.hEvent);
-						} else {
-							switch(GetLastError()) {
-								case ERROR_IO_PENDING:
-									lpEventData->bPending = true;
-									break;
-								case ERROR_HANDLE_EOF:
-								default:
-									SetEvent(lpEventData->sOverlapped.hEvent);
-									lpEventData->bEOF = true;
-									break;
-							}
-						}
-					} else {
-						// TCP socket -> Create and link an event object to read or close activity on the socket
-						lpEventData->sOverlapped.hEvent = CreateEvent(NULL, false, false, NULL);
-						lpEventData->type = SOCKETTYPE_TCP;
-						WSAEventSelect(iterSockets->second.soap->socket, lpEventData->sOverlapped.hEvent, FD_READ | FD_CLOSE);
-
-					}
-
-					iterPending = mapPending.insert(std::pair<HANDLE, ECSOCKETDATA *>((HANDLE)iterSockets->second.soap->socket, lpEventData)).first;
-				}
-
-				if(iterPending != mapPending.end()) {
-					// Store the event that we're listening on
-					hEvent[cEvents] = iterPending->second->sOverlapped.hEvent;
-					++cEvents;
-					lstWatch.push_back((HANDLE)iterSockets->second.soap->socket);
-				}
-            }
-            ++iterSockets;
-        }
-
-        // Listen on listener sockets
-        for (iterListenSockets = m_setListenSockets.begin();
-             iterListenSockets != m_setListenSockets.end();
-             ++iterListenSockets) {
-			if (cEvents >= ARRAY_SIZE(hEvent))
-				continue;
-			iterPending = mapPending.find((HANDLE)iterListenSockets->second->socket);
-			if(iterPending == mapPending.end()) {
-				// No pending request, create a new one
-
-				lpEventData = new ECSOCKETDATA;
-				memset(lpEventData, 0, sizeof(ECSOCKETDATA));
-
-				if(strcmp(iterListenSockets->second->path, "pipe") == 0) {
-					// Create an overlapped connect request
-					lpEventData->type = SOCKETTYPE_PIPE_LISTEN;
-					lpEventData->sOverlapped.hEvent = CreateEvent(NULL, true, false, NULL);
-					if(ConnectNamedPipe((HANDLE)iterListenSockets->second->socket, &lpEventData->sOverlapped) == 0) {
-						switch(GetLastError()) {
-							case ERROR_IO_PENDING:
-								lpEventData->bPending = true;
-								break;
-							case ERROR_PIPE_CONNECTED:
-								SetEvent(lpEventData->sOverlapped.hEvent);
-								break;
-							default:
-								m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Error from ConnectNamedPipe: 0x%08X", GetLastError());
-								break;
-						}
-					}
-				} else {
-					lpEventData->type = SOCKETTYPE_TCP_LISTEN;
-					lpEventData->sOverlapped.hEvent = CreateEvent(NULL, false, false, NULL);
-					WSAEventSelect(iterListenSockets->second->socket, lpEventData->sOverlapped.hEvent, FD_ACCEPT);
-				}
-
-				iterPending = mapPending.insert(std::pair<HANDLE, ECSOCKETDATA *>((HANDLE)iterListenSockets->second->socket, lpEventData)).first;
-			}
-
-			if(iterPending != mapPending.end()) {
-				hEvent[cEvents] = iterPending->second->sOverlapped.hEvent;
-				++cEvents;
-				lstWatch.push_back((HANDLE)iterListenSockets->second->socket);
-			}
-        }
-        pthread_mutex_unlock(&m_mutexSockets);
-        		
-		// Wait for an event, with a max of 1 second
-		DWORD dwWait = WaitForMultipleObjectsEx(cEvents, hEvent, false, 1000, true);
-
-		if(dwWait == WAIT_TIMEOUT)
-			continue;
-
-		if(dwWait >= WAIT_OBJECT_0 && dwWait < WAIT_OBJECT_0+cEvents) {
-			ulEvent = dwWait - WAIT_OBJECT_0;
-
-			// Handle rescan event
-			if(lstWatch[ulEvent] == m_hRescanEvent) {
-				continue;
-			}
-
-	        pthread_mutex_lock(&m_mutexSockets);
-
-			// Get event data for this WAIT_OBJECT
-			lpEventData = mapPending[lstWatch[ulEvent]];
-
-			// Get any pending overlapped data (it may not be overlapped if the request returned with data earlier
-			// when issuing the overlapped I/O request)
-			if(lpEventData->bPending) {
-				if(!GetOverlappedResult((HANDLE)lstWatch[ulEvent], &lpEventData->sOverlapped, &lpEventData->dwRead, true)) {
-					// Any error here will be treated as an EOF
-					lpEventData->bEOF = true;
-				}
-			}
-
-			// Handle activity
-			if(lpEventData->type == SOCKETTYPE_TCP || lpEventData->type == SOCKETTYPE_PIPE) {
-				// Handle TCP / PIPE read activity
-
-				iterSockets = m_setSockets.find((SOCKET)lstWatch[ulEvent]);
-				if(iterSockets == m_setSockets.end()) {
-					// Activity on a socket that we're not handling ?
-					ASSERT(false);
-				}
-
-				if(lpEventData->bEOF) {
-					// EOF occurred, just close the socket and remove it from the socket list
-					zarafa_end_soap_connection(iterSockets->second.soap);
-					soap_free(iterSockets->second.soap);
-
-					iterErase = iterSockets;
-					++iterSockets;
-					m_setSockets.erase(iterErase);
-				} else {
-					// Actual data waiting
-					WORKITEM *item = new WORKITEM;
-	                
-					// Record activity time
-					time((time_t *)&iterSockets->second.ulLastActivity);
-
-					item->soap = iterSockets->second.soap;
-					item->dblReceiveStamp = GetTimeOfDay();
-	                
-					// Give gSOAP any data that we have already read (see HACK above)
-					item->soap->buflen = lpEventData->dwRead;
-					memcpy(item->soap->buf, lpEventData->buffer, lpEventData->dwRead);
-					item->soap->keep_alive = 1; // Needed so that soap doesn't read buffers
-
-					pthread_mutex_lock(&m_mutexItems);
-					m_queueItems.push(item);
-					pthread_cond_signal(&m_condItems);
-					pthread_mutex_unlock(&m_mutexItems);
-	                
-					// Remove socket from listen list for now, since we're already handling data there and don't
-					// want to interfere with the thread that is now handling that socket. It will be passed back
-					// to us when the request is done.
-					m_setSockets.erase(iterSockets);
-				}
-			} else if(lpEventData->type == SOCKETTYPE_TCP_LISTEN || lpEventData->type == SOCKETTYPE_PIPE_LISTEN) {
-				// Listensocket activity
-                struct soap *newsoap;
-				ACTIVESOCKET sActive;
-
-				iterListenSockets = m_setListenSockets.find((SOCKET)lstWatch[ulEvent]);
-				if(iterListenSockets == m_setListenSockets.end()) {
-					// Activity on a socket that we're not handling ?
-					ASSERT(false);
-					continue;
-				}
-
-				// Create a new soap struct to handle the request
-                newsoap = soap_copy(iterListenSockets->second);
-                zarafa_new_soap_connection(SOAP_CONNECTION_TYPE(iterListenSockets->second), newsoap);
-                
-                // Record last activity (now)
-                time(&sActive.ulLastActivity);
-
-                if(lpEventData->type == SOCKETTYPE_PIPE_LISTEN) {
-					// Nothing needs to be done to accept the socket since our listener socket now
-					// becomes the socket to read from. Since we have already copied that with soap_copy() no
-					// accept() or anything is needed. However, to accept the next socket, we need to
-					// re-create the named pipe which we do now.
-
-					int hOldSocket = iterListenSockets->second->socket;
-					iterListenSockets->second->socket = m_lpCreatePipeSocketCallback(m_lpCreatePipeSocketParam);
-					m_setListenSockets.insert(std::make_pair(iterListenSockets->second->socket, iterListenSockets->second));
-					// Remove the old listen socket
-					m_setListenSockets.erase(hOldSocket);
-                } else {
-                    soap_accept(newsoap);
-                }
-                    
-                if(newsoap->socket == SOAP_INVALID_SOCKET) {
-                    zarafa_end_soap_connection(newsoap);
-                    soap_free(newsoap);
-                } else {
-					g_lpStatsCollector->Increment(SCN_SERVER_CONNECTIONS);
-
-                    sActive.soap = newsoap;
-					m_setSockets.insert(std::make_pair(newsoap->socket, sActive));
-                }
-			}
-
-	        pthread_mutex_unlock(&m_mutexSockets);
-
-			// No longer pending since we just handled the event
-			CloseHandle(lpEventData->sOverlapped.hEvent);
-			delete lpEventData;
-			mapPending.erase(lstWatch[ulEvent]);
-		}
-    }
-
-    // Delete the watchdog. This makes sure no new threads will be started.
-    delete lpWatchDog;
-    
-    // Set the thread count to zero so that threads will exit
-    m_lpThreadManager->SetThreadCount(0);
-
-    // Notify threads that they should re-query their idle state (and exit)
-    pthread_mutex_lock(&m_mutexItems);
-    pthread_cond_broadcast(&m_condItems);
-    pthread_cond_broadcast(&m_condPrioItems);
-    pthread_mutex_unlock(&m_mutexItems);
-    
-
-    // Delete thread manager (waits for threads to become idle). During this time
-    // the threads may report back a workitem as being done. If this is the case, we directly close that socket too.
-    delete m_lpThreadManager;
-
-    // Empty the queue
-    pthread_mutex_lock(&m_mutexItems);
-    while(!m_queueItems.empty()) { zarafa_end_soap_connection(m_queueItems.front()->soap); soap_free(m_queueItems.front()->soap); m_queueItems.pop(); }
-    while(!m_queuePrioItems.empty()) { zarafa_end_soap_connection(m_queuePrioItems.front()->soap); soap_free(m_queuePrioItems.front()->soap); m_queuePrioItems.pop(); }
-    pthread_mutex_unlock(&m_mutexItems);
-
-	// Delete all pending requests
-	for (iterPending = mapPending.begin();
-	     iterPending != mapPending.end(); ++iterPending) {
-		CloseHandle(iterPending->second->sOverlapped.hEvent);
-		delete(iterPending->second);
-	}
-
-    // Close all listener sockets.  (bit of a hack since they were passed from outside this class!)
-	for (iterListenSockets = m_setListenSockets.begin();
-	     iterListenSockets != m_setListenSockets.end();
-	     ++iterListenSockets) {
-        zarafa_end_soap_listener(iterListenSockets->second);
-        soap_free(iterListenSockets->second);
-	}
-    // Close all sockets. This will cause all that we were listening on clients to get an EOF
-	pthread_mutex_lock(&m_mutexSockets);
-	for (iterSockets = m_setSockets.begin();
-	     iterSockets != m_setSockets.end(); ++iterSockets) {
-        zarafa_end_soap_connection(iterSockets->second.soap);
-        soap_free(iterSockets->second.soap);
-	}
-	pthread_mutex_unlock(&m_mutexSockets);
-    
-    return er;
-}
-
-ECRESULT ECDispatcherWin32::ShutDown()
-{
-	ECDispatcher::ShutDown();
-
-	SetEvent(m_hRescanEvent);
-
-	return erSuccess;
-}
-
-ECRESULT ECDispatcherWin32::NotifyRestart(SOAP_SOCKET s)
-{
-	SetEvent(m_hRescanEvent);
-	return erSuccess;
-}
 #endif

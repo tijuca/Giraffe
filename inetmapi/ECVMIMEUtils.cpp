@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 // Damn windows header defines max which break C++ header files
 #undef max
@@ -24,20 +24,20 @@
 
 #include "ECVMIMEUtils.h"
 #include "MAPISMTPTransport.h"
-#include <zarafa/CommonUtil.h>
-#include <zarafa/charset/convert.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/charset/convert.h>
 
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
 #include <mapi.h>
 #include <mapitags.h>
 #include <mapidefs.h>
 #include <mapiutil.h>
 #include <mapix.h>
-#include <zarafa/mapiext.h>
-#include <zarafa/EMSAbTag.h>
-#include <zarafa/ECABEntryID.h>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/mapiext.h>
+#include <kopano/EMSAbTag.h>
+#include <kopano/ECABEntryID.h>
+#include <kopano/mapi_ptr.h>
 
 using namespace std;
 
@@ -69,9 +69,6 @@ public:
 };
 
 ECVMIMESender::ECVMIMESender(ECLogger *newlpLogger, std::string strSMTPHost, int port) : ECSender(newlpLogger, strSMTPHost, port) {
-}
-
-ECVMIMESender::~ECVMIMESender() {
 }
 
 /**

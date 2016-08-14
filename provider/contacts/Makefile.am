@@ -1,7 +1,7 @@
 # -*- Makefile -*-
 
-pkglib_LTLIBRARIES = libzarafacontacts.la
-noinst_DATA = libzarafacontacts.ldd
+pkglib_LTLIBRARIES = libkccontacts.la
+noinst_DATA = libkccontacts.ldd
 
 sysconf_configdir = ${MAPICONFIGDIR}
 dist_sysconf_config_DATA = zcontacts.inf
@@ -16,14 +16,14 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS)	\
 	-I${top_srcdir}/mapi4linux/include	\
 	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon
 
-libzarafacontacts_la_LDFLAGS = ${AM_LDFLAGS} -avoid-version -module
-libzarafacontacts_la_LIBADD = \
-	${top_builddir}/common/libzcp_common_util.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
+libkccontacts_la_LDFLAGS = ${AM_LDFLAGS} -avoid-version -module
+libkccontacts_la_LIBADD = \
+	${top_builddir}/common/libkcutil.la \
+	${top_builddir}/common/libkcmapi.la \
 	${top_builddir}/mapi4linux/src/libmapi.la			\
 	-lstdc++ $(UUID_LIBS) $(ICU_LIBS)
 
-libzarafacontacts_la_SOURCES = epcontact.cpp ZCABData.h \
+libkccontacts_la_SOURCES = epcontact.cpp ZCABData.h \
 	ZCMAPIProp.h ZCMAPIProp.cpp \
 	ZCABProvider.h ZCABProvider.cpp \
 	ZCABLogon.h ZCABLogon.cpp \

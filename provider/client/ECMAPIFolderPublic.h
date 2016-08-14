@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,15 +18,14 @@
 #ifndef ECMAPIFOLDERPUBLIC_H
 #define ECMAPIFOLDERPUBLIC_H
 
+#include <kopano/zcdefs.h>
 #include "ECMAPIFolder.h"
-#include <zarafa/ECMemTable.h>
+#include <kopano/ECMemTable.h>
 #include "ClientUtil.h"
 
-class ECMAPIFolderPublic : public ECMAPIFolder
-{
+class ECMAPIFolderPublic _kc_final : public ECMAPIFolder {
 protected:
 	ECMAPIFolderPublic(ECMsgStore *lpMsgStore, BOOL fModify, WSMAPIFolderOps *lpFolderOps, enumPublicEntryID ePublicEntryID);
-	virtual ~ECMAPIFolderPublic(void);
 
 public:
 	static HRESULT Create(ECMsgStore *lpMsgStore, BOOL fModify, WSMAPIFolderOps *lpFolderOps, enumPublicEntryID ePublicEntryID, ECMAPIFolder **lppECMAPIFolder);

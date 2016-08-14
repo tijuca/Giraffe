@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -21,17 +21,17 @@
 #include <memory>
 
 #include <mapix.h>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/mapi_ptr.h>
 
-#include <zarafa/CommonUtil.h>
+#include <kopano/CommonUtil.h>
 
-#include <zarafa/archiver-common.h>
+#include <kopano/archiver-common.h>
 #include "ArchiverSessionPtr.h"     // For ArchiverSessionPtr
 
 namespace za { namespace helpers {
 
 class MAPIPropHelper;
-typedef std::auto_ptr<MAPIPropHelper> MAPIPropHelperPtr;
+typedef std::unique_ptr<MAPIPropHelper> MAPIPropHelperPtr;
 
 class MessageState;
 
@@ -43,7 +43,7 @@ class MAPIPropHelper
 {
 public:
 	static HRESULT Create(MAPIPropPtr ptrMapiProp, MAPIPropHelperPtr *lpptrMAPIPropHelper);
-	virtual ~MAPIPropHelper();
+	virtual ~MAPIPropHelper(void) {}
 
 	HRESULT GetMessageState(ArchiverSessionPtr ptrSession, MessageState *lpState);
 	HRESULT GetArchiveList(ObjectEntryList *lplstArchives, bool bIgnoreSourceKey = false);

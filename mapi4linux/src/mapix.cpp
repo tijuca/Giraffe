@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <new>
 #include "m4l.mapix.h"
 #include "m4l.mapispi.h"
@@ -28,27 +28,23 @@
 #include <pthread.h>
 #include <cstring>
 
-#include <zarafa/Util.h>
+#include <kopano/Util.h>
 
-#include <zarafa/ECConfig.h>
-#include <zarafa/ECDebug.h>
-#include <zarafa/ECGuid.h>
-#include <zarafa/ECMemTable.h>
-#include <zarafa/charset/utf16string.h>
+#include <kopano/ECConfig.h>
+#include <kopano/ECDebug.h>
+#include <kopano/ECGuid.h>
+#include <kopano/ECMemTable.h>
+#include <kopano/charset/utf16string.h>
 
-#include <zarafa/CommonUtil.h>
-#include <zarafa/stringutil.h>
-#include <zarafa/mapiguidext.h>
-#include <zarafa/ECRestriction.h>
-#include <zarafa/MAPIErrors.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/stringutil.h>
+#include <kopano/mapiguidext.h>
+#include <kopano/ECRestriction.h>
+#include <kopano/MAPIErrors.h>
 
 #include <string>
 #include <map>
-#include <zarafa/charset/convert.h>
-
-#ifdef WIN32
-HMODULE g_hLibMapi = 0;
-#endif
+#include <kopano/charset/convert.h>
 
 /* Some required globals */
 ECConfig *m4l_lpConfig = NULL;
@@ -60,13 +56,12 @@ MAPISVC *m4l_lpMAPISVC = NULL;
  */
 static HRESULT HrCreateM4LServices(void)
 {
-	HRESULT hr = hrSuccess;
 	std::basic_string<TCHAR> configfile;
 
 	static const configsetting_t settings[] = {
 		{ "ssl_port", "237" },
-		{ "ssl_key_file", "c:\\program files\\zarafa\\exchange-redirector.pem" },
-		{ "ssl_key_pass", "zarafa", CONFIGSETTING_EXACT },
+		{ "ssl_key_file", "c:\\program files\\kopano\\exchange-redirector.pem" },
+		{ "ssl_key_pass", "kopano", CONFIGSETTING_EXACT },
 		{ "server_address", "" },
 		{ "log_method","file" },
 		{ "log_file","-" },
@@ -76,46 +71,22 @@ static HRESULT HrCreateM4LServices(void)
 		{ NULL, NULL },
 	};
 
-#ifdef WIN32
-	configfile = _T("."); /* Not sure if this is going to work... */
-
-	/*
-	 * Read register key to discover the installation directory
-	 * where the configuration file can be found (Obviously this only works on Windows).
-	 */
-	HKEY hKey = NULL;
-	TCHAR szDir[MAX_PATH];
-	ULONG cbDir = 0;
-
-	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, _T("Software\\Zarafa\\ExchangeRedirector"), 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
-		cbDir = MAX_PATH * sizeof(TCHAR);
-		if (RegQueryValueEx(hKey, _T("InstallDir"), NULL, NULL, (BYTE*)szDir, &cbDir) == ERROR_SUCCESS)
-			configfile = szDir;
-		RegCloseKey(hKey);
-	}
-#else
-	/* Go for default location of zarafa configuration */
-	configfile = _T("/etc/zarafa/");
-#endif /* WIN32 */
-
+	/* Go for default location of kopano configuration */
+	configfile = _T("/etc/kopano/");
 	configfile += PATH_SEPARATOR;
 	configfile += _T("exchange-redirector.cfg");
 
 	if (!m4l_lpConfig) {
 		m4l_lpConfig = ECConfig::Create(settings);
-		if (!m4l_lpConfig) {
-			hr = MAPI_E_NOT_ENOUGH_MEMORY;
-			goto exit;
-		}
+		if (!m4l_lpConfig)
+			return MAPI_E_NOT_ENOUGH_MEMORY;
 		m4l_lpConfig->LoadSettings(configfile.c_str());
 	}
 
 	if (!ec_log_has_target()) {
 		m4l_lpLogger = CreateLogger(m4l_lpConfig, "exchange-redirector", "ExchangeRedirector");
-		if (!m4l_lpLogger) {
-			hr = MAPI_E_NOT_ENOUGH_MEMORY;
-			goto exit;
-		}
+		if (!m4l_lpLogger)
+			return MAPI_E_NOT_ENOUGH_MEMORY;
 		/*
 		 * You already knew that MAPIInitialize() could only be called
 		 * from single-threaded context.
@@ -125,9 +96,7 @@ static HRESULT HrCreateM4LServices(void)
 		m4l_lpLogger = ec_log_get();
 		m4l_lpLogger->AddRef();
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -651,7 +620,7 @@ exit:
 /**
  * Create new message service in this profile.
  *
- * @param[in]	lpszService		Name of the new service to add. In Linux, this is only the ZARAFA6 (zarafaclient.so) service.
+ * @param[in]	lpszService		Name of the new service to add. In Linux, this is only the ZARAFA6 (libkcclient.so) service.
  * @param[in]	lpszDisplayName	Unused in Linux.
  * @param[in]	ulUIParam		Unused in Linux.
  * @param[in]	ulFlags			Unused in Linux.
@@ -675,9 +644,6 @@ HRESULT M4LMsgServiceAdmin::CreateMsgService(LPTSTR lpszService, LPTSTR lpszDisp
 		goto exit;
 	}
 
-#ifdef WIN32
-	// @todo, this should be able to find MSEMS as Zarafa
-#endif
 	hr = m4l_lpMAPISVC->GetService(lpszService, ulFlags, &service);
 	if (hr == MAPI_E_NOT_FOUND) {
 		ec_log_err("M4LMsgServiceAdmin::CreateMsgService(): get service \"%s\" failed: %s (%x). "
@@ -690,7 +656,7 @@ HRESULT M4LMsgServiceAdmin::CreateMsgService(LPTSTR lpszService, LPTSTR lpszDisp
 		goto exit;
 	}
 
-	// Create a Zarafa message service
+	// Create a Kopano message service
 	entry = findServiceAdmin(lpszService);
 	if (entry) {
 		ec_log_err("M4LMsgServiceAdmin::CreateMsgService(): service already exists %x: %s", hr, GetMAPIErrorMessage(hr));
@@ -728,12 +694,6 @@ HRESULT M4LMsgServiceAdmin::CreateMsgService(LPTSTR lpszService, LPTSTR lpszDisp
 	hr = service->CreateProviders(entry->provideradmin);
 
 	entry->bInitialize = false;
-#ifdef WIN32
-//	The windows mapi32 calls always MSG_SERVICE_CREATE and shows a gui. This is how it should work. Do not remove example code.
-//	if(EC_MSGServiceEntry(0, NULL, NULL, ulUIParam, ulFlags, MSG_SERVICE_CREATE, 0, NULL, (LPPROVIDERADMIN)entry->provideradmin, NULL) == hrSuccess)
-//		entry->bInitialize = true;
-#endif
-
 exit:
 	pthread_mutex_unlock(&m_mutexserviceadmin);
 
@@ -824,11 +784,6 @@ HRESULT M4LMsgServiceAdmin::ConfigureMsgService(LPMAPIUID lpUID, ULONG ulUIParam
 	HRESULT hr = hrSuccess;
 	M4LProviderAdmin *lpProviderAdmin = NULL;
     serviceEntry* entry;
-#if WIN32
-	std::string strServerPath;
-	ULONG ulcTmpValues = 0;
-	LPSPropValue lpTmpProps = NULL;
-#endif
 
 	pthread_mutex_lock(&m_mutexserviceadmin);
 	
@@ -849,24 +804,7 @@ HRESULT M4LMsgServiceAdmin::ConfigureMsgService(LPMAPIUID lpUID, ULONG ulUIParam
 		goto exit;
 	}
 
-#if WIN32
-	if(entry->servicename == "MSEMS") {
-		LPSPropValue lpServer = PpropFindProp(lpProps, cValues, PR_PROFILE_UNRESOLVED_SERVER);
-		LPSPropValue lpUsername = PpropFindProp(lpProps, cValues, PR_PROFILE_UNRESOLVED_NAME);
-
-		hr = GetConnectionProperties(lpServer, lpUsername, &ulcTmpValues, &lpTmpProps); 
-		if (hr != hrSuccess) {
-			ec_log_err("M4LMsgServiceAdmin::ConfigureMsgService() GetConnectionProperties failed %x: %s", hr, GetMAPIErrorMessage(hr));
-			goto exit;
-		}
-
-		// @todo, merge with parameters, not override?
-		cValues = ulcTmpValues; 
-		lpProps = lpTmpProps; 
-	}
-#endif /* WIN32 */
-
-	// call zarafa client Message Service Entry (provider/client/EntryPoint.cpp)
+	// call kopano client Message Service Entry (provider/client/EntryPoint.cpp)
 	hr = entry->service->MSGServiceEntry()(0, NULL, NULL, ulUIParam, ulFlags, MSG_SERVICE_CONFIGURE, cValues, lpProps, (LPPROVIDERADMIN)entry->provideradmin, NULL);
 	if(hr != hrSuccess) {
 		ec_log_err("M4LMsgServiceAdmin::ConfigureMsgService() MSGServiceEntry failed %x: %s", hr, GetMAPIErrorMessage(hr));
@@ -877,9 +815,6 @@ HRESULT M4LMsgServiceAdmin::ConfigureMsgService(LPMAPIUID lpUID, ULONG ulUIParam
 
 exit:
 	pthread_mutex_unlock(&m_mutexserviceadmin);
-#if WIN32
-	MAPIFreeBuffer(lpTmpProps);
-#endif
 	if(lpProviderAdmin)
 		lpProviderAdmin->Release();
 
@@ -1182,7 +1117,7 @@ HRESULT M4LMAPISession::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR
 }
 
 /**
- * Get a list of all message stores in this session. With Zarafa in
+ * Get a list of all message stores in this session. With Kopano in
  * Linux, this is always atleast your own and the public where
  * available.
  *
@@ -1234,28 +1169,6 @@ HRESULT M4LMAPISession::GetMsgStoresTable(ULONG ulFlags, LPMAPITABLE* lppTable) 
 		lpType = PpropFindProp(lpsProps, cValues, PR_RESOURCE_TYPE);
 		if(lpType == NULL || lpType->Value.ul != MAPI_STORE_PROVIDER)
 			goto next;
-
-#ifdef WIN32
-		/*
-		 * BlackBerry: Swap GUIDS from Zarafa to Exchange when requesting Micrsoft Exchange services
-		 */
-		if ((*i)->servicename == "MSEMS" &&
-			lpsProps[0].ulPropTag == PR_MDB_PROVIDER &&
-			lpsProps[0].Value.bin.cb == sizeof(GUID)) {
-				if (memcmp(lpsProps[0].Value.bin.lpb, &ZARAFA_SERVICE_GUID, sizeof(GUID)) == 0) {
-					TRACE_MAPILIB(TRACE_ENTRY, "IMAPISession::GetMsgStoresTable", "Replacing Private Store GUID");
-					memcpy(lpsProps[0].Value.bin.lpb, pbExchangeProviderPrimaryUserGuid, sizeof(GUID));
-				} else if (memcmp(lpsProps[0].Value.bin.lpb, &ZARAFA_STORE_DELEGATE_GUID, sizeof(GUID)) == 0) {
-					TRACE_MAPILIB(TRACE_ENTRY, "IMAPISession::GetMsgStoresTable", "Replacing Delegate Store GUID");
-					memcpy(lpsProps[0].Value.bin.lpb, pbExchangeProviderDelegateGuid, sizeof(GUID));
-				} else if (memcmp(lpsProps[0].Value.bin.lpb, &ZARAFA_STORE_PUBLIC_GUID, sizeof(GUID)) == 0) {
-					TRACE_MAPILIB(TRACE_ENTRY, "IMAPISession::GetMsgStoresTable", "Replacing Public Store GUID");
-					memcpy(lpsProps[0].Value.bin.lpb, pbExchangeProviderPublicGuid, sizeof(GUID));
-				} else {
-					TRACE_MAPILIB(TRACE_ENTRY, "IMAPISession::GetMsgStoresTable", "Unknown GUID, not replaced");
-				}
-		}
-#endif
 
 		sPropID.ulPropTag = PR_ROWID;
 		sPropID.Value.ul = n++;
@@ -1312,7 +1225,7 @@ exit:
  * @param[in]	cbEntryID	Size of lpEntryID
  * @param[in]	lpEntryID	EntryID identifier of store.
  * @param[in]	lpInterface	Requested interface on lppMDB return value.
- * @param[in]	ulFlags		Passed to MSProviderInit function of provider of the store. In Linux always zarafaclient.so.
+ * @param[in]	ulFlags		Passed to MSProviderInit function of provider of the store. In Linux always libkcclient.so.
  * @param[out]	lppMDB		Pointer to IMsgStore object
  * @return		HRESULT
  */
@@ -1399,7 +1312,7 @@ HRESULT M4LMAPISession::OpenMsgStore(ULONG ulUIParam, ULONG cbEntryID, LPENTRYID
 		
 	lpISupport->AddRef();
 
-	// call zarafa client for the Message Store Provider (provider/client/EntryPoint.cpp)
+	// call kopano client for the Message Store Provider (provider/client/EntryPoint.cpp)
 	hr = service->MSProviderInit()(0, NULL, MAPIAllocateBuffer, MAPIAllocateMore, MAPIFreeBuffer, ulFlags, CURRENT_SPI_VERSION, &mdbver, &msp);
 	if (hr != hrSuccess) {
 		ec_log_err("M4LMAPISession::OpenMsgStore() MSProviderInit failed %x: %s", hr, GetMAPIErrorMessage(hr));
@@ -2223,7 +2136,7 @@ HRESULT M4LAddrBook::CompareEntryIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULO
     TRACE_MAPILIB(TRACE_ENTRY, "M4LAddrBook::CompareEntryIDs", "");
 	HRESULT hr = hrSuccess;
 
-	// m_lABProviders[0] probably always is Zarafa
+	// m_lABProviders[0] probably always is Kopano
 	for (std::list<abEntry>::const_iterator i = m_lABProviders.begin(); i != m_lABProviders.end(); ++i) {
 		hr = i->lpABLogon->CompareEntryIDs(cbEntryID1, lpEntryID1, cbEntryID2, lpEntryID2, ulFlags, lpulResult);
 		if (hr == hrSuccess || hr != MAPI_E_NO_SUPPORT)
@@ -2566,7 +2479,7 @@ HRESULT M4LAddrBook::GetDefaultDir(ULONG* lpcbEntryID, LPENTRYID* lppEntryID) {
 		goto exit;
 	}
 
-	// m_lABProviders[0] probably always is Zarafa
+	// m_lABProviders[0] probably always is Kopano
 	for (std::list<abEntry>::const_iterator i = m_lABProviders.begin();
 	     i != m_lABProviders.end(); ++i) {
 		// find a working open root container
@@ -2941,20 +2854,11 @@ pthread_mutex_t _memlist_lock;
  */
 static SCODE MAPIAllocate(ULONG cbSize, LPVOID *lppBuffer)
 {
-	char *buffer = NULL;
-
-	try {
-		buffer = new char[cbSize];
-	} catch (...) {
+	*lppBuffer = malloc(cbSize);
+	if (*lppBuffer != NULL)
+		return S_OK;
+	else
 		return MAKE_MAPI_E(1);
-	}
-
-	if (!buffer)
-		return MAKE_MAPI_E(1);
-
-	*lppBuffer = (void*)buffer;
-
-	return S_OK;
 }
 
 /**
@@ -3002,21 +2906,18 @@ exit:
  * @retval		MAPI_E_NOT_ENOUGH_MEMORY
  */
 SCODE __stdcall MAPIAllocateMore(ULONG cbSize, LPVOID lpObject, LPVOID* lppBuffer) {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	std::map<void *, list<void *> *>::const_iterator mlptr;
 
-	if (lppBuffer == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (lppBuffer == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 	if (!lpObject)
 		return MAPIAllocateBuffer(cbSize, lppBuffer);
 
 	hr = MAPIAllocate(cbSize, lppBuffer);
 	if (hr != hrSuccess) {
 		ec_log_crit("MAPIAllocateMore(): MAPIAllocate fail %x: %s", hr, GetMAPIErrorMessage(hr));
-		goto exit;
+		return hr;
 	}
 
 	pthread_mutex_lock(&_memlist_lock);
@@ -3056,9 +2957,7 @@ SCODE __stdcall MAPIAllocateMore(ULONG cbSize, LPVOID lpObject, LPVOID* lppBuffe
 #if _MAPI_MEM_DEBUG
 	fprintf(stderr, "Extra buffer: %p on %p\n", *lppBuffer, lpObject);
 #endif
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -3089,12 +2988,12 @@ ULONG __stdcall MAPIFreeBuffer(LPVOID lpBuffer) {
 #if _MAPI_MEM_DEBUG
 			fprintf(stderr, "  Freeing: %p\n", (*i));
 #endif
-			delete[] static_cast<char *>(*i);
+			free(*i);
 		}
 
 		// delete list
 		delete mlptr->second;
-		delete [] (char *)mlptr->first;
+		free(mlptr->first);
 
 		// remove map entry
 		_memlist.erase(mlptr);
@@ -3111,7 +3010,7 @@ ULONG __stdcall MAPIFreeBuffer(LPVOID lpBuffer) {
 // Entry
 // ---
 
-LPPROFADMIN localProfileAdmin = NULL;
+IProfAdmin *localProfileAdmin = NULL;
 
 /**
  * Returns a pointer to the IProfAdmin interface. MAPIInitialize must been called previously.
@@ -3122,7 +3021,8 @@ LPPROFADMIN localProfileAdmin = NULL;
  * @retval		MAPI_E_CALL_FAILED	MAPIInitialize not called previously.
  * @retval		MAPI_E_INVALID_PARAMETER	No lppProfAdmin return parameter given.
  */
-HRESULT __stdcall MAPIAdminProfiles(ULONG ulFlags, LPPROFADMIN *lppProfAdmin) {
+HRESULT __stdcall MAPIAdminProfiles(ULONG ulFlags, IProfAdmin **lppProfAdmin)
+{
 	TRACE_MAPILIB1(TRACE_ENTRY, "MAPIAdminProfiles", "flags=0x%08d", ulFlags);
 
 	HRESULT hr = hrSuccess;
@@ -3226,14 +3126,14 @@ pthread_mutex_t g_MAPILock = PTHREAD_MUTEX_INITIALIZER;
 /**
  * MAPIInitialize is the first function called.
  *
- * In Linux, this will already open the zarafaclient.so file, and will retrieve
+ * In Linux, this will already open the libkcclient.so file, and will retrieve
  * the entry point function pointers. If these are not present, the function will fail.
  *
  * @param[in] lpMapiInit
  *			Optional pointer to MAPIINIT struct. Unused in Linux.
  * @return	HRESULT
  * @retval	hrSuccess
- * @retval	MAPI_E_CALL_FAILED	Unable to use zarafaclient.so
+ * @retval	MAPI_E_CALL_FAILED	Unable to use libkcclient.so
  * @retval	MAPI_E_NOT_ENOUGH_MEMORY Memory allocation failed
  */
 HRESULT __stdcall MAPIInitialize(LPVOID lpMapiInit) {
@@ -3273,26 +3173,6 @@ HRESULT __stdcall MAPIInitialize(LPVOID lpMapiInit) {
 			goto exit;
 		}
 		localProfileAdmin->AddRef();
-
-#ifdef WIN32
-		typedef HRESULT (__stdcall MS_MAPIInitialize)(LPVOID lpMapiInit);
-		MS_MAPIInitialize*	lpMapiInitFn = NULL;
-
-		g_hLibMapi = LoadLibraryA("msmapi32.dll");
-		if(!g_hLibMapi) {
-			goto ignore;
-		}
-
-		lpMapiInitFn = (MS_MAPIInitialize *)GetProcAddress(g_hLibMapi, "MAPIInitialize@4");
-		if(!lpMapiInitFn) {
-			hr = MAPI_E_CALL_FAILED;
-			goto exit;
-		}
-
-		hr = lpMapiInitFn(lpMapiInit);
-ignore:
-	  ;
-#endif
 	}
 
 exit:
@@ -3305,7 +3185,7 @@ exit:
 /**
  * Last function of your MAPI program.  
  *
- * In Linux, this will unload the zarafaclient.so library. Any
+ * In Linux, this will unload the libkcclient.so library. Any
  * object from that library you still * have will be unusable,
  * and will make your program crash when used.
  */
@@ -3330,21 +3210,6 @@ void __stdcall MAPIUninitialize(void) {
 		HrFreeM4LServices();
 
 		pthread_mutex_destroy(&_memlist_lock);
-
-#ifdef WIN32
-		if(g_hLibMapi) {
-			typedef HRESULT (__stdcall MS_MAPIUninitialize)();
-			MS_MAPIUninitialize*	lpMapiUninit = NULL;
-
-			lpMapiUninit = (MS_MAPIUninitialize *)GetProcAddress(g_hLibMapi, "MAPIUninitialize@0");
-			if(lpMapiUninit)
-				lpMapiUninit();
-
-			FreeLibrary(g_hLibMapi);
-
-			g_hLibMapi = 0;
-		}
-#endif
 	}
 
 	pthread_mutex_unlock(&g_MAPILock);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -20,18 +20,18 @@
 
 #include <mapidefs.h>
 #include <mapicode.h>
-#include <zarafa/base64.h>
-#include <zarafa/stringutil.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/ECChannel.h>
-#include <zarafa/ECIConv.h>
+#include <kopano/base64.h>
+#include <kopano/stringutil.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/ECChannel.h>
+#include <kopano/ECIConv.h>
 #include <cstdio>
 #include <cstdarg>
 #include <cctype>
 #include <libxml/xmlmemory.h>
 #include <libxml/uri.h>
 #include <libxml/globals.h>
-#include <zarafa/charset/convert.h>
+#include <kopano/charset/convert.h>
 
 
 #define HTTP_CHUNK_SIZE 10000

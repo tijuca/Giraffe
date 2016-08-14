@@ -132,6 +132,6 @@ if (defined($delete) && $delete) {
 	print "Done.\n";
 }
 
-print "Remember to correct the ownership of the files for Zarafa to access, when Zarafa is not running as root\n";
+print "Remember to correct the ownership of the files for kopano to access, when Kopano is not running as root\n";
 
 $db->do("commit;");

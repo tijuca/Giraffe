@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <string>
 #include <vector>
@@ -25,23 +25,12 @@
 #include <sys/socket.h>
 #endif
 
-#include <zarafa/ECDefs.h>
-#include <zarafa/ECChannel.h>
-#include <zarafa/base64.h>
-#include <zarafa/stringutil.h>
+#include <kopano/ECDefs.h>
+#include <kopano/ECChannel.h>
+#include <kopano/base64.h>
+#include <kopano/stringutil.h>
 
 #include "ECLicenseClient.h"
-
-ECLicenseClient::ECLicenseClient(const char *szLicensePath,
-    unsigned int ulTimeOut) :
-	ECChannelClient(szLicensePath, " \t")
-{
-	m_ulTimeout = ulTimeOut;
-}
-
-ECLicenseClient::~ECLicenseClient()
-{
-}
 
 ECRESULT ECLicenseClient::ServiceTypeToServiceTypeString(unsigned int ulServiceType, std::string &strServiceType)
 {
@@ -55,7 +44,7 @@ ECRESULT ECLicenseClient::ServiceTypeToServiceTypeString(unsigned int ulServiceT
             strServiceType = "ARCHIVER";
             break;
         default:
-            er = ZARAFA_E_INVALID_TYPE;
+            er = KCERR_INVALID_TYPE;
             break;
     }
 
@@ -70,103 +59,85 @@ ECRESULT ECLicenseClient::GetCapabilities(unsigned int ulServiceType, std::vecto
 	er = ServiceTypeToServiceTypeString(ulServiceType, strServiceType);
 	if (er != erSuccess)
 		return er;
-	return DoCmd("CAPA " + strServiceType, lstCapabilities);
+
+	lstCapabilities.clear();
+	if (ulServiceType == 0) {
+		lstCapabilities.push_back("DEFAULT");
+		lstCapabilities.push_back("OUTLOOK");
+		lstCapabilities.push_back("OLENABLED");
+		lstCapabilities.push_back("BACKUP");
+		lstCapabilities.push_back("GATEWAY");
+		lstCapabilities.push_back("ICAL");
+		lstCapabilities.push_back("REPORT");
+		lstCapabilities.push_back("MIGRATION");
+		lstCapabilities.push_back("WA-ADVANCED-CALENDAR");
+		lstCapabilities.push_back("BES");
+		lstCapabilities.push_back("MULTISERVER");
+		lstCapabilities.push_back("UPDATER");
+		lstCapabilities.push_back("EWS");
+	}
+	return erSuccess;
 }
 
 ECRESULT ECLicenseClient::QueryCapability(unsigned int ulServiceType, const std::string &strCapability, bool *lpbResult)
 {
 	ECRESULT er;
 	std::string strServiceType;
-	std::vector<std::string> vResult;
 
 	er = ServiceTypeToServiceTypeString(ulServiceType, strServiceType);
 	if (er != erSuccess)
 		return er;
 
-	er = DoCmd("QUERY " + strServiceType + " " + strCapability, vResult);
-	if (er != erSuccess)
-		return er;
-
-	*lpbResult = (vResult.front().compare("ENABLED") == 0);
+	*lpbResult = true;
 	return erSuccess;
 }
 
 ECRESULT ECLicenseClient::GetSerial(unsigned int ulServiceType, std::string &strSerial, std::vector<std::string> &lstCALs)
 {
 	ECRESULT er;
-	std::vector<std::string> lstSerials;
 	std::string strServiceType;
 
 	er = ServiceTypeToServiceTypeString(ulServiceType, strServiceType);
 	if (er != erSuccess)
 		return er;
 
-	er = DoCmd("SERIAL " + strServiceType, lstSerials);
-	if (er != erSuccess)
-		return er;
+	strSerial = "";
+	lstCALs.clear();
 
-    if(lstSerials.empty()) {
-        strSerial = "";
-		return erSuccess;
-    } else {
-    	strSerial=lstSerials.front();
-    	lstSerials.erase(lstSerials.begin());
-    }
-    
-	lstCALs=lstSerials;
 	return erSuccess;
 }
 
 ECRESULT ECLicenseClient::GetInfo(unsigned int ulServiceType, unsigned int *lpulUserCount)
 {
 	ECRESULT er;
-    std::vector<std::string> lstInfo;
-    unsigned int ulUserCount = 0;
 	std::string strServiceType;
 
 	er = ServiceTypeToServiceTypeString(ulServiceType, strServiceType);
 	if (er != erSuccess)
 		return er;
 
-	er = DoCmd("INFO " + strServiceType, lstInfo);
-	if (er != erSuccess)
-		return er;
-
-	if (lstInfo.empty())
-		return ZARAFA_E_INVALID_PARAMETER;
-        
-    ulUserCount = atoi(lstInfo.front().c_str());
-    lstInfo.erase(lstInfo.begin());
-    
-	if (lpulUserCount != NULL)
-		*lpulUserCount = ulUserCount;
+	*lpulUserCount = 65535;
 	return erSuccess;
 }
+
+typedef struct {
+	unsigned int ulVersion;			// Current: LICENSERESPONSE_VERSION
+	unsigned int ulTrackingId;
+	unsigned long long llFlags;
+	unsigned int ulStatus;
+	char szPadding[4];				// Make sure the struct is padded to a multiple of 8 bytes
+} LICENSERESPONSE;
 
 ECRESULT ECLicenseClient::Auth(const unsigned char *lpData,
     unsigned int ulSize, unsigned char **lppResponse,
     unsigned int *lpulResponseSize)
 {
-	ECRESULT er;
-    std::vector<std::string> lstAuth;
-    std::string strDecoded;
-    unsigned char *lpResponse = NULL;
-    
-	er = DoCmd((std::string)"AUTH " + base64_encode(lpData, ulSize), lstAuth);
-	if (er != erSuccess)
-		return er;
-	if (lstAuth.empty())
-		return ZARAFA_E_INVALID_PARAMETER;
-    
-	strDecoded = base64_decode(lstAuth.front());
+	LICENSERESPONSE *lpResponse = new LICENSERESPONSE;
+	memset(lpResponse, 0, sizeof(LICENSERESPONSE));
 
-	if (lppResponse != NULL) {
-		lpResponse = new unsigned char [strDecoded.size()];
-		memcpy(lpResponse, strDecoded.c_str(), strDecoded.size());
-		*lppResponse = lpResponse;
-	}
-	if (lpulResponseSize != NULL)
-		*lpulResponseSize = strDecoded.size();
+	*lppResponse = (unsigned char *)lpResponse;
+	*lpulResponseSize = sizeof(LICENSERESPONSE);
+
 	return erSuccess;
 }
 
@@ -174,16 +145,10 @@ ECRESULT ECLicenseClient::SetSerial(unsigned int ulServiceType, const std::strin
 {
 	ECRESULT er;
 	std::string strServiceType;
-	std::string strCommand;
-	std::vector<std::string> lstRes;
 
 	er = ServiceTypeToServiceTypeString(ulServiceType, strServiceType);
 	if (er != erSuccess)
 		return er;
 
-	strCommand = "SETSERIAL " + strServiceType + " " + strSerial;
-	for (std::vector<std::string>::const_iterator iCAL = lstCALs.begin(); iCAL != lstCALs.end(); ++iCAL)
-		strCommand.append(" " + *iCAL);
-
-	return DoCmd(strCommand, lstRes);
+	return erSuccess;
 }

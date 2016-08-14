@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -32,7 +32,7 @@
 		PyLong_AsLong(id)
 #endif
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 // Get Py_ssize_t for older versions of python
 #if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)

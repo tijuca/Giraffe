@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,7 +18,7 @@
 #ifndef __M4L_MAPIDEFS_IMPL_H
 #define __M4L_MAPIDEFS_IMPL_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include "m4l.common.h"
 #include <mapidefs.h>
 #include <mapispi.h>
@@ -35,7 +35,6 @@ private:
     list<LPSPropValue> properties;
 
 public:
-    M4LMAPIProp();
     virtual ~M4LMAPIProp();
 
     virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError) _zcp_override;
@@ -62,7 +61,6 @@ private:
 	BOOL bGlobalProf;
 public:
     M4LProfSect(BOOL bGlobalProf = FALSE);
-    virtual ~M4LProfSect();
 
     virtual HRESULT __stdcall ValidateState(ULONG ulUIParam, ULONG ulFlags);
     virtual HRESULT __stdcall SettingsDialog(ULONG ulUIParam, ULONG ulFlags);
@@ -93,9 +91,6 @@ class M4LMAPITable _zcp_final : public M4LUnknown, public IMAPITable {
 private:
 
 public:
-    M4LMAPITable();
-    virtual ~M4LMAPITable();
-
     virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError) _zcp_override;
     virtual HRESULT __stdcall Advise(ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection) _zcp_override;
     virtual HRESULT __stdcall Unadvise(ULONG ulConnection) _zcp_override;
@@ -156,8 +151,6 @@ private:
 
 public:
     M4LMAPIAdviseSink(LPNOTIFCALLBACK lpFn, void *lpContext);
-    virtual ~M4LMAPIAdviseSink();
-
     virtual ULONG __stdcall OnNotify(ULONG cNotif, LPNOTIFICATION lpNotifications) _zcp_override;
 
     // iunknown passthru
@@ -170,9 +163,6 @@ public:
 /* for ABContainer */
 class M4LMAPIContainer : public IMAPIContainer, public M4LMAPIProp {
 public:
-	M4LMAPIContainer();
-    virtual ~M4LMAPIContainer();
-
     virtual HRESULT __stdcall GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable) _zcp_override;
     virtual HRESULT __stdcall GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable) _zcp_override;
     virtual HRESULT __stdcall OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk) _zcp_override;
@@ -213,7 +203,6 @@ private:
 
 public:
 	M4LABContainer(const std::list<abEntry> &lABEntries);
-	virtual ~M4LABContainer();
 
 	virtual HRESULT __stdcall CreateEntry(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulCreateFlags, LPMAPIPROP *lppMAPIPropEntry) _zcp_override;
 	virtual HRESULT __stdcall CopyEntries(LPENTRYLIST lpEntries, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags) _zcp_override;

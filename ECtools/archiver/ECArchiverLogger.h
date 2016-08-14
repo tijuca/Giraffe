@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,8 +18,8 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
-#include <zarafa/ECLogger.h>
-#include <zarafa/tstring.h>
+#include <kopano/ECLogger.h>
+#include <kopano/tstring.h>
 
 class ECArchiverLogger : public ECLogger
 {
@@ -43,8 +43,8 @@ private:
 	std::string EscapeFormatString(const std::string &strFormat);
 
 private:
-	ECArchiverLogger(const ECArchiverLogger&);
-	ECArchiverLogger& operator=(const ECArchiverLogger&);
+	ECArchiverLogger(const ECArchiverLogger &) = delete;
+	ECArchiverLogger &operator=(const ECArchiverLogger &) = delete;
 
 private:
 	ECLogger	*m_lpLogger;
@@ -60,8 +60,8 @@ public:
 	~ScopedUserLogging();
 
 private:
-	ScopedUserLogging(const ScopedUserLogging&);
-	ScopedUserLogging& operator=(const ScopedUserLogging&);
+	ScopedUserLogging(const ScopedUserLogging &) = delete;
+	ScopedUserLogging &operator=(const ScopedUserLogging &) = delete;
 
 private:
 	ECArchiverLogger *m_lpLogger;
@@ -76,8 +76,8 @@ public:
 	~ScopedFolderLogging();
 
 private:
-	ScopedFolderLogging(const ScopedFolderLogging&);
-	ScopedFolderLogging& operator=(const ScopedFolderLogging&);
+	ScopedFolderLogging(const ScopedFolderLogging &) = delete;
+	ScopedFolderLogging &operator=(const ScopedFolderLogging &) = delete;
 
 private:
 	ECArchiverLogger *m_lpLogger;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,26 +15,19 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECFreeBusyData.h"
 
 #include "ECEnumFBBlock.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECFreeBusyData::ECFreeBusyData(void)
 {
 	m_rtmStart = 0;
 	m_rtmEnd = 0;
-}
-
-ECFreeBusyData::~ECFreeBusyData(void)
-{
-
 }
 
 HRESULT ECFreeBusyData::Init(LONG rtmStart, LONG rtmEnd, ECFBBlockList* lpfbBlockList)
@@ -94,11 +87,6 @@ HRESULT ECFreeBusyData::QueryInterface(REFIID refiid, void** lppInterface)
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
-HRESULT ECFreeBusyData::Reload(void*) 
-{
-	return E_NOTIMPL;
-}
-
 HRESULT ECFreeBusyData::EnumBlocks(IEnumFBBlock **ppenumfb, FILETIME ftmStart, FILETIME ftmEnd)
 {
 	HRESULT			hr = S_OK;
@@ -132,16 +120,6 @@ exit:
 		lpECEnumFBBlock->Release();
 
 	return hr;
-}
-
-HRESULT ECFreeBusyData::Merge(void *)
-{
-	return E_NOTIMPL;
-}
-
-HRESULT ECFreeBusyData::GetDeligateInfo(void *)
-{
-	return E_NOTIMPL;
 }
 
 /**
@@ -209,21 +187,11 @@ exit:
 	return hr;
 }
 
-HRESULT ECFreeBusyData::InterSect(void *lpData1, LONG ulData, void *lpData2)
-{
-	return E_NOTIMPL;
-}
-
 HRESULT ECFreeBusyData::SetFBRange(LONG rtmStart, LONG rtmEnd)
 {
 	m_rtmStart = rtmStart;
 	m_rtmEnd = rtmEnd;
 	return S_OK;
-}
-
-HRESULT ECFreeBusyData::NextFBAppt(void *, ULONG, void *, ULONG, void *, void *)
-{
-	return E_NOTIMPL;
 }
 
 HRESULT ECFreeBusyData::GetFBPublishRange(LONG *prtmStart, LONG *prtmEnd)
@@ -243,12 +211,9 @@ exit:
 	return hr;
 }
 
-//////////////////////////////////////////////////////////////////
 // Interfaces
 //		IUnknown
 //		IFreeBusyData
-//
-
 HRESULT __stdcall ECFreeBusyData::xFreeBusyData::QueryInterface(REFIID refiid , void** lppInterface)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IFreeBusyData::QueryInterface", "");
@@ -299,12 +264,12 @@ HRESULT __stdcall ECFreeBusyData::xFreeBusyData::Merge(void* lpData)
 	return hr;
 }
 
-HRESULT __stdcall ECFreeBusyData::xFreeBusyData::GetDeligateInfo(void* lpData)
+HRESULT __stdcall ECFreeBusyData::xFreeBusyData::GetDelegateInfo(void* lpData)
 {
-	TRACE_MAPI(TRACE_ENTRY, "IFreeBusyData::GetDeligateInfo", "");
+	TRACE_MAPI(TRACE_ENTRY, "IFreeBusyData::GetDelegateInfo", "");
 	METHOD_PROLOGUE_(ECFreeBusyData , FreeBusyData);
-	HRESULT hr = pThis->GetDeligateInfo(lpData);
-	TRACE_MAPI(TRACE_RETURN, "IFreeBusyData::GetDeligateInfo", "%s", GetMAPIErrorDescription(hr).c_str());
+	HRESULT hr = pThis->GetDelegateInfo(lpData);
+	TRACE_MAPI(TRACE_RETURN, "IFreeBusyData::GetDelegateInfo", "%s", GetMAPIErrorDescription(hr).c_str());
 	return hr;
 }
 

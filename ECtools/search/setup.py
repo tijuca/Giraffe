@@ -1,7 +1,7 @@
 from distutils.core import setup, Extension
 
-setup(name='zarafa-search',
+setup(name='kopano-search',
       version='0.1',
-      packages=['zarafa_search'],
+      packages=['kopano_search'],
       package_data={'': ['xmltotext.xslt']},
 )

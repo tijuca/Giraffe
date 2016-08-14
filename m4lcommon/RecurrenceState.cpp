@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,18 +15,18 @@
  *
  */
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/platform.h>
+#include <kopano/zcdefs.h>
+#include <kopano/platform.h>
 
 #include <cstdio>
 #include <mapi.h>
 #include <mapix.h>
 #include <mapicode.h>
 
-#include <zarafa/stringutil.h>
-#include <zarafa/RecurrenceState.h>
-#include <zarafa/charset/convert.h>
-#include <zarafa/charset/utf16string.h>
+#include <kopano/stringutil.h>
+#include <kopano/RecurrenceState.h>
+#include <kopano/charset/convert.h>
+#include <kopano/charset/utf16string.h>
 
 #ifndef WIN32
 #define DEBUGREAD 0
@@ -37,6 +37,7 @@
 #define DEBUGPRINT(x, args...)
 #endif
 #else
+// Testing for both WIN32 && LINUX makes no f sense
 	#ifdef LINUX
 		#define DEBUGPRINT(...)
 	#else
@@ -45,8 +46,6 @@
 #endif
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -190,12 +189,7 @@ private:
                             
 #define READSHORT(x) READDATA(x, Short)
 #define READLONG(x) READDATA(x, Long)
-#define READBYTE(x) READDATA(x, Byte)
 
-#define WRITEBYTE(x) do { \
-		DEBUGPRINT("%02X %10u %08X %s\n", (x), (x), (x), #x); \
-		data.WriteByte(x); \
-	} while (false)
 #define WRITESHORT(x) do { \
 		DEBUGPRINT("%04X %10u %08X %s\n", htons(x), (x), (x), #x); \
 		data.WriteShort(x); \

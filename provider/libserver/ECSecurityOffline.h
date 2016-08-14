@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,14 +18,12 @@
 #ifndef ECSECURITYOFFLINE
 #define ECSECURITYOFFLINE
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include "ECSecurity.h"
 
 class ECSecurityOffline _zcp_final : public ECSecurity {
 public:
 	ECSecurityOffline(ECSession *lpSession, ECConfig *lpConfig);
-	virtual ~ECSecurityOffline(void);
-
 	virtual int GetAdminLevel();
 	virtual ECRESULT IsAdminOverUserObject(unsigned int ulUserObjectId);
 	virtual ECRESULT IsAdminOverOwnerOfObject(unsigned int ulObjectId);

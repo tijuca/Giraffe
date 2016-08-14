@@ -25,14 +25,18 @@ AC_DEFUN([PHP_WITH_PHP_CONFIG],[
 	# find path in existing paths
 	if test -d "/etc/php.d"; then
 		PHP_SYSCONF_DIR="/etc/php.d"
+	elif test -d "/etc/php7/conf.d"; then
+		PHP_SYSCONF_DIR="/etc/php7/conf.d"
+	elif test -d "/etc/php7/apache2/conf.d"; then
+		PHP_SYSCONF_DIR="/etc/php7/apache2/conf.d"
 	elif test -d "/etc/php5/conf.d"; then
 		PHP_SYSCONF_DIR="/etc/php5/conf.d"
 	elif test -d "/etc/php5/apache2/conf.d"; then
 		PHP_SYSCONF_DIR="/etc/php5/apache2/conf.d"
 	else
 		# this happens on old distributions
-	    AC_MSG_RESULT([Cannot find php sysconf path, forcing /usr/share/doc/zarafa])
-		PHP_SYSCONF_DIR="/usr/share/doc/zarafa"
+	    AC_MSG_RESULT([Cannot find php sysconf path, forcing /usr/share/doc/kopano])
+		PHP_SYSCONF_DIR="/usr/share/doc/kopano"
 	fi
   fi
   if test ! -d "${PHP_SYSCONF_DIR}"; then

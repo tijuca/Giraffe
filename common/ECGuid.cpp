@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <initguid.h>
 
 /*
@@ -109,7 +109,7 @@
 #define USES_PSETID_AirSync
 #define USES_PSETID_Note
 #define USES_PSETID_CONTACT_FOLDER_RECIPIENT
-#define USES_PSETID_Zarafa_CalDav	//used in caldav
+#define USES_PSETID_Kopano_CalDav	//used in caldav
 #define USES_PSETID_Archive
 #define USES_PSETID_CalendarAssistant
 #define USES_GUID_Dilkie
@@ -146,6 +146,6 @@
 
 #include <mapiguid.h>
 #include <edkguid.h>
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 #include "freebusyguid.h"
-#include <zarafa/mapiguidext.h>
+#include <kopano/mapiguidext.h>

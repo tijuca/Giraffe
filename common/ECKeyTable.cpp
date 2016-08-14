@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,14 +15,12 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <cassert>
-#include <zarafa/ECKeyTable.h> 
-#include <zarafa/ustringutil.h>
+#include <kopano/ECKeyTable.h> 
+#include <kopano/ustringutil.h>
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 bool operator!=(const sObjectTableKey& a, const sObjectTableKey& b)
@@ -500,7 +498,7 @@ ECRESULT ECKeyTable::UpdateRow(UpdateType ulType,
 			if(lpulAction)
 				*lpulAction = TABLE_ROW_DELETE;
 		} else {
-			er = ZARAFA_E_NOT_FOUND;
+			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
 		break;
@@ -723,7 +721,7 @@ ECRESULT ECKeyTable::SeekId(const sObjectTableKey *lpsRowItem)
 	iterMap = this->mapRow.find(*lpsRowItem);
 
 	if(iterMap == mapRow.end()) {
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 		goto exit;
 	}
 
@@ -745,7 +743,7 @@ ECRESULT ECKeyTable::GetBookmark(unsigned int ulbkPosition, int* lpbkPosition)
 
 	iPosition = m_mapBookmarks.find(ulbkPosition);
 	if (iPosition == m_mapBookmarks.end()) {
-		er = ZARAFA_E_INVALID_BOOKMARK;
+		er = KCERR_INVALID_BOOKMARK;
 		goto exit;
 	}
 
@@ -754,7 +752,7 @@ ECRESULT ECKeyTable::GetBookmark(unsigned int ulbkPosition, int* lpbkPosition)
 		goto exit;
 
 	if (iPosition->second.ulFirstRowPosition != ulCurrPosition)
-		er = ZARAFA_W_POSITION_CHANGED;
+		er = KCWARN_POSITION_CHANGED;
 
 	*lpbkPosition = ulCurrPosition;
 
@@ -775,7 +773,7 @@ ECRESULT ECKeyTable::CreateBookmark(unsigned int* lpulbkPosition)
 
 	// Limit of bookmarks
 	if (m_mapBookmarks.size() >= BOOKMARK_LIMIT) {
-		er = ZARAFA_E_UNABLE_TO_COMPLETE;
+		er = KCERR_UNABLE_TO_COMPLETE;
 		goto exit;
 	}
 
@@ -808,7 +806,7 @@ ECRESULT ECKeyTable::FreeBookmark(unsigned int ulbkPosition)
 
 	iPosition = m_mapBookmarks.find(ulbkPosition);
 	if (iPosition == m_mapBookmarks.end()) {
-		er = ZARAFA_E_INVALID_BOOKMARK;
+		er = KCERR_INVALID_BOOKMARK;
 		goto exit;
 	}
 
@@ -872,7 +870,7 @@ ECRESULT ECKeyTable::SeekRow(unsigned int lbkOrgin, int lSeekTo, int *lplRowsSou
 		break;
 	default:
 		er = GetBookmark(lbkOrgin, &lDestRow);
-		if (er != ZARAFA_W_POSITION_CHANGED && er != erSuccess)
+		if (er != KCWARN_POSITION_CHANGED && er != erSuccess)
 			goto exit;
 
 		lDestRow += lSeekTo;
@@ -974,7 +972,7 @@ ECRESULT ECKeyTable::CurrentRow(ECTableRow *lpRow, unsigned int *lpulCurrentRow)
 	unsigned int ulCurrentRow = 0;
 
 	if (lpulCurrentRow == NULL)
-		return ZARAFA_E_INVALID_PARAMETER;
+		return KCERR_INVALID_PARAMETER;
 
 	if(lpRow == NULL) {
 		*lpulCurrentRow = lpRoot->ulBranchCount;
@@ -1114,7 +1112,7 @@ ECRESULT ECKeyTable::GetPreviousRow(const sObjectTableKey *lpsRowItem, sObjectTa
     if(lpCurrent) {
         *lpsPrev = lpCurrent->sKey;
     } else {
-        er = ZARAFA_E_NOT_FOUND;
+        er = KCERR_NOT_FOUND;
     }
     
     // Go back to the previous cursor position
@@ -1208,12 +1206,6 @@ void ECKeyTable::RotateRL(ECTableRow *lpPivot)
 
 	RotateL(lpPivot);
 	RotateR(lpParent);
-}
-
-// Returns the height of a given tree
-unsigned int ECKeyTable::GetHeight(ECTableRow *lpRoot)
-{
-	return lpRoot->ulHeight;
 }
 
 int ECKeyTable::GetBalance(ECTableRow *lpPivot)
@@ -1392,7 +1384,7 @@ ECRESULT ECKeyTable::UnhideRows(sObjectTableKey *lpsRowItem, ECObjectTableList *
     
     if(lpCurrent->fHidden) {
         // You cannot expand a category whose header is hidden
-        er = ZARAFA_E_NOT_FOUND;
+        er = KCERR_NOT_FOUND;
         goto exit;
     }
     
@@ -1480,14 +1472,14 @@ ECRESULT ECKeyTable::Find(unsigned int ulSortCols, int *lpSortLen, unsigned char
      
     // No item is *lpCurrent >= *search, so not found   
     if(lpCurrent == NULL) {
-        er = ZARAFA_E_NOT_FOUND;
+        er = KCERR_NOT_FOUND;
         goto exit;
     }
         
     // Lower bound has put us either on the first matching row, or at the first item which is *lpCurrent > *search, aka *lpCurrent >= *search
     if(ECTableRow::rowcompare(ulSortCols, lpSortLen, lppSortData, lpFlags, lpCurrent->ulSortCols, lpCurrent->lpSortLen, lpCurrent->lppSortKeys, lpCurrent->lpFlags)) {
         // *lpCurrent >= *search && *lpCurrent > *search, so *lpCurrent != *search
-        er = ZARAFA_E_NOT_FOUND;
+        er = KCERR_NOT_FOUND;
     } else
 		*lpsKey = lpCurrent->sKey;
     
@@ -1556,7 +1548,7 @@ ECRESULT ECKeyTable::UpdatePartialSortKey(sObjectTableKey *lpsRowItem, unsigned 
         goto exit;
         
     if(ulColumn >= lpCursor->ulSortCols) {
-        er = ZARAFA_E_INVALID_PARAMETER;
+        er = KCERR_INVALID_PARAMETER;
         goto exit;
     }
     

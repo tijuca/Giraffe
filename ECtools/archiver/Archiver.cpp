@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,10 +15,11 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
+#include <memory>
 #include <string>
 #include "Archiver.h"
-#include <zarafa/ECConfig.h>
+#include <kopano/ECConfig.h>
 #include "ArchiverImpl.h"
 
 const char* Archiver::GetConfigPath()
@@ -26,7 +27,7 @@ const char* Archiver::GetConfigPath()
 	static std::string s_strConfigPath;
 
 	if (s_strConfigPath.empty()) {
-		const char *lpszConfigPath = getenv("ZARAFA_ARCHIVER_CONF");
+		const char *lpszConfigPath = getenv("KOPANO_ARCHIVER_CONF");
 		if (!lpszConfigPath || lpszConfigPath[0] == '\0')
 			s_strConfigPath = ECConfig::GetDefaultPath("archiver.cfg");
 		else
@@ -76,7 +77,7 @@ const configsetting_t* Archiver::GetConfigDefaults()
 		{ "mysql_port",		"3306" },
 		{ "mysql_user",		"root" },
 		{ "mysql_password",	"",	CONFIGSETTING_EXACT },
-		{ "mysql_database",	"zarafa-archiver" },
+		{ "mysql_database",	"kopano-archiver" },
 		{ "mysql_socket",	"" },
 		{ "purge-soft-deleted", "no" },
 
@@ -88,23 +89,17 @@ const configsetting_t* Archiver::GetConfigDefaults()
 
 eResult Archiver::Create(auto_ptr_type *lpptrArchiver)
 {
-	eResult r = Success;
 	auto_ptr_type ptrArchiver;
 
-	if (lpptrArchiver == NULL) {
-		r = InvalidParameter;
-		goto exit;
-	}
+	if (lpptrArchiver == NULL)
+		return InvalidParameter;
 
 	try {
 		ptrArchiver.reset(new ArchiverImpl());
 	} catch (std::bad_alloc &) {
-		r = OutOfMemory;
-		goto exit;
+		return OutOfMemory;
 	}
 
-	*lpptrArchiver = ptrArchiver;
-
-exit:
-	return r;
+	*lpptrArchiver = std::move(ptrArchiver);
+	return Success;
 }

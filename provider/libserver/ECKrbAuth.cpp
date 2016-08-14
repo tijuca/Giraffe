@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -20,7 +20,7 @@
 ECRESULT ECKrb5AuthenticateUser(const std::string &strUsername, const std::string &strPassword, std::string *lpstrError)
 {
 	*lpstrError = "Server is not compiled with kerberos support.";
-	return ZARAFA_E_NO_SUPPORT;
+	return KCERR_NO_SUPPORT;
 }
 #else
 // error_message() is wrongly typed in c++ context
@@ -46,21 +46,21 @@ ECRESULT ECKrb5AuthenticateUser(const std::string &strUsername, const std::strin
 
 	if (code) {
 		*lpstrError = std::string("Unable to initialize kerberos 5 library: code ") + error_message(code);
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
 	code = krb5_parse_name(ctx, strUsername.c_str(), &me);
 	if (code) {
 		*lpstrError = std::string("Error parsing kerberos 5 username: code ") + error_message(code);
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
 	code = krb5_unparse_name(ctx, me, &name);
 	if (code) {
 		*lpstrError = std::string("Error unparsing kerberos 5 username: code ") + error_message(code);
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
@@ -70,7 +70,7 @@ ECRESULT ECKrb5AuthenticateUser(const std::string &strUsername, const std::strin
 	code = krb5_get_init_creds_password(ctx, &my_creds, me, (char*)strPassword.c_str(), 0, 0, 0, NULL, &options);
 	if (code) {
 		*lpstrError = error_message(code);
-		er = ZARAFA_E_LOGON_FAILED;
+		er = KCERR_LOGON_FAILED;
 		goto exit;
 	} 
 

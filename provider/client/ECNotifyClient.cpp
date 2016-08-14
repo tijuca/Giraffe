@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -12,48 +12,30 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-// ECNotifyClient.cpp: implementation of the ECNotifyClient class.
-//
-//////////////////////////////////////////////////////////////////////
-
-#include <zarafa/platform.h>
-
+#include <kopano/platform.h>
 #include <mapispi.h>
 #include <mapix.h>
-
-#include <zarafa/ECDebug.h>
+#include <kopano/ECDebug.h>
 #include "ECMsgStore.h"
 #include "ECNotifyClient.h"
 #include "ECSessionGroupManager.h"
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 #include "SOAPUtils.h"
 #include "WSUtil.h"
-#include <zarafa/Util.h>
-#include <zarafa/stringutil.h>
-#include <zarafa/mapiext.h>
-
-#ifdef WIN32
-#define NOTIFY_THROUGH_SUPPORT_OBJECT
-#endif
+#include <kopano/Util.h>
+#include <kopano/stringutil.h>
+#include <kopano/mapiext.h>
 
 #define MAX_NOTIFS_PER_CALL 64
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 static inline std::pair<ULONG,ULONG> SyncAdviseToConnection(const SSyncAdvise &sSyncAdvise) {
 	return std::make_pair(sSyncAdvise.sSyncState.ulSyncId,sSyncAdvise.ulConnection);
 }
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 
 ECNotifyClient::ECNotifyClient(ULONG ulProviderType, void *lpProvider, ULONG ulFlags, LPMAPISUP lpSupport) : ECUnknown("ECNotifyClient")
 {
@@ -287,7 +269,7 @@ HRESULT ECNotifyClient::RegisterChangeAdvise(ULONG ulSyncId, ULONG ulChangeId,
 	pEcAdvise->ulSyncId = ulSyncId;
 	pEcAdvise->ulChangeId = ulChangeId;
 	pEcAdvise->lpAdviseSink = lpChangeAdviseSink;
-	pEcAdvise->ulEventMask = fnevZarafaIcsChange;
+	pEcAdvise->ulEventMask = fnevKopanoIcsChange;
 
 	/*
 	 * Request unique connection id from Master.
@@ -423,11 +405,11 @@ HRESULT ECNotifyClient::Advise(const ECLISTSYNCSTATE &lstSyncStates,
 		lstAdvises.push_back(sSyncAdvise);
 	}
 
-	hr = m_lpTransport->HrSubscribeMulti(lstAdvises, fnevZarafaIcsChange);
+	hr = m_lpTransport->HrSubscribeMulti(lstAdvises, fnevKopanoIcsChange);
 	if (hr != hrSuccess) {
 		// On failure we'll try the one-at-a-time approach.
 		for (iSyncAdvise = lstAdvises.begin(); iSyncAdvise != lstAdvises.end(); ++iSyncAdvise) {
-			hr = m_lpTransport->HrSubscribe(iSyncAdvise->sSyncState.ulSyncId, iSyncAdvise->sSyncState.ulChangeId, iSyncAdvise->ulConnection, fnevZarafaIcsChange);
+			hr = m_lpTransport->HrSubscribe(iSyncAdvise->sSyncState.ulSyncId, iSyncAdvise->sSyncState.ulChangeId, iSyncAdvise->ulConnection, fnevKopanoIcsChange);
 			if (hr != hrSuccess) {
 				// Unadvise all advised connections
 				// No point in attempting the multi version as SubscribeMulti also didn't work
@@ -508,7 +490,6 @@ HRESULT ECNotifyClient::Unadvise(const ECLISTCONNECTION &lstConnections)
 
 	return hr;
 }
-
 
 // Re-registers a notification on the server. Normally only called if the server
 // session has been reset.

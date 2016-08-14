@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,8 +18,8 @@
 #ifndef ECGENPROPS_H
 #define ECGENPROPS_H
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/ZarafaCode.h>
+#include <kopano/zcdefs.h>
+#include <kopano/kcodes.h>
 
 #include <string>
 #include <map>
@@ -41,9 +41,6 @@ typedef struct _ECODStore ECODStore;
 
 class ECGenProps _zcp_final {
 public:
-	ECGenProps();
-	~ECGenProps();
-
 	// Returns whether a different property should be retrieved instead of the
 	// requested property.
 	static ECRESULT	GetPropSubstitute(unsigned int ulObjType, unsigned int ulPropTagRequested, unsigned int *lpulPropTagRequired);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,17 +15,15 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/stringutil.h>
-#include <zarafa/charset/convert.h>
+#include <kopano/platform.h>
+#include <kopano/stringutil.h>
+#include <kopano/charset/convert.h>
 #include <sstream>
 
-#include <zarafa/ECIConv.h>
+#include <kopano/ECIConv.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 std::string stringify(unsigned int x, bool usehex, bool _signed) {
@@ -236,16 +234,6 @@ std::string GetServerNameFromPath(const char *szPath) {
 	return path;
 }
 
-std::string GetServerTypeFromPath(const char *szPath) {
-	std::string path = szPath;
-	size_t pos;
-
-	pos = path.find("://");
-	if (pos != std::string::npos)
-		return path.substr(0, pos);
-	return std::string();
-}
-
 std::string GetServerPortFromPath(const char *szPath) {
 	std::string path = szPath;
 	size_t pos = 0;
@@ -293,7 +281,7 @@ std::string ServerNamePortToURL(const char *lpszType, const char *lpszServerName
 	return strURL;
 }
 
-std::string shell_escape(std::string str)
+std::string shell_escape(const std::string &str)
 {
 	std::string::const_iterator start;
 	std::string::const_iterator ptr;
@@ -315,7 +303,7 @@ std::string shell_escape(std::string str)
 	return escaped;
 }
 
-std::string shell_escape(std::wstring wstr)
+std::string shell_escape(const std::wstring &wstr)
 {
 	std::string strLocale = convert_to<std::string>(wstr);
 	return shell_escape(strLocale);
@@ -358,20 +346,6 @@ std::vector<std::string> tokenize(const std::string &strInput, const char sep, b
 	}
 
 	return vct;
-}
-
-std::string concatenate(std::vector<std::string> &elements, const std::string &delimeters)
-{
-	std::vector<std::string>::const_iterator iter;
-	std::string concat;
-
-    if (!elements.empty()) {
-		for (iter = elements.begin(); iter != elements.end(); ++iter)
-			concat += *iter + delimeters;
-		concat.erase(concat.end() - delimeters.size());
-	}
-
-	return concat;
 }
 
 std::string trim(const std::string &strInput, const std::string &strTrim)
@@ -481,28 +455,6 @@ std::wstring bin2hexw(const std::string &input)
 {
     return bin2hexw((unsigned int)input.size(), (const unsigned char*)input.c_str());
 }
-
-std::string StringEscape(const char* input, const char *tokens, const char escape)
- {
-	std::string strEscaped;
-	int i = 0;
-	int t;
-
-	while (true) {
-		if(input[i] == 0)
-			break;
-		
-		for (t = 0; tokens[t] != 0; ++t)
-			if (input[i] == tokens[t])
-				strEscaped += escape;
-
-		strEscaped += input[i];
-		++i;
-	}
-
-	return strEscaped;
-}
-
 
 /** 
  * Encodes a string for inclusion into an url.

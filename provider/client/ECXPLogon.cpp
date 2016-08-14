@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -12,43 +12,35 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-// ECXPLogon.cpp: implementation of the ECXPLogon class.
-//
-//////////////////////////////////////////////////////////////////////
-
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <mapi.h>
 #include <mapispi.h>
 #include <mapiutil.h>
-#include <zarafa/mapiguidext.h>
-#include <zarafa/ECGuid.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiguidext.h>
+#include <kopano/ECGuid.h>
+#include <kopano/mapiext.h>
 #include <edkmdb.h>
 #include <edkguid.h>
 
-#include "Zarafa.h"
+#include "kcore.hpp"
 #include "ECXPLogon.h"
 #include "ECXPProvider.h"
 #include "WSTransport.h"
 #include "Mem.h"
 #include "ClientUtil.h"
-#include <zarafa/CommonUtil.h>
+#include <kopano/CommonUtil.h>
 #include "ECMsgStore.h"
 #include "ECMessage.h"
 
-#include <zarafa/ZarafaCode.h>
+#include <kopano/kcodes.h>
 
-#include <zarafa/ECDebug.h>
-#include <zarafa/ECRestriction.h>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/ECDebug.h>
+#include <kopano/ECRestriction.h>
+#include <kopano/mapi_ptr.h>
 
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -68,10 +60,6 @@ static HRESULT HrGetECMsgStore(IMAPIProp *lpProp, ECMsgStore **lppECMsgStore)
 	(*lppECMsgStore)->AddRef();
 	return hrSuccess;
 }
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 
 ECXPLogon::ECXPLogon(const std::string &strProfileName, BOOL bOffline, ECXPProvider *lpXPProvider, LPMAPISUP lpMAPISup) : ECUnknown("IXPLogon")
 {
@@ -155,7 +143,7 @@ HRESULT ECXPLogon::AddressTypes(ULONG * lpulFlags, ULONG * lpcAdrType, LPTSTR **
 
 	*lpulFlags = fMapiUnicode;
 	*lpcMAPIUID = 0;
-	*lpppUIDArray = NULL; // We could specify the Zarafa addressbook's UID here to stop the MAPI spooler doing expansions on them (IE EntryID -> Email address)
+	*lpppUIDArray = NULL; // We could specify the Kopano addressbook's UID here to stop the MAPI spooler doing expansions on them (IE EntryID -> Email address)
 	*lpcAdrType = 3;
 	*lpppszAdrTypeArray = m_lppszAdrTypeArray;
 	return hrSuccess;
@@ -450,17 +438,6 @@ HRESULT ECXPLogon::SubmitMessage(ULONG ulFlags, LPMESSAGE lpMessage, ULONG * lpu
 
 	gettimeofday(&sNow,NULL);
 	ulValue = 300; // Default wait for max 5 min
-#ifdef WIN32
-	{
-		HKEY hKey;
-		ULONG ulSize = sizeof(ULONG);
-
-		if(RegOpenKeyExA(HKEY_CURRENT_USER, "Software\\Zarafa\\Client", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
-			RegQueryValueExA(hKey, "SubmitTimeOut", NULL, NULL, (BYTE*)&ulValue, &ulSize);
-			RegCloseKey(hKey);
-		}
-	}
-#endif /* WIN32 */
 	sTimeOut.tv_sec = sNow.tv_sec + ulValue;
 	sTimeOut.tv_nsec = sNow.tv_usec * 1000;
 	if(ETIMEDOUT == pthread_cond_timedwait(&m_hExitSignal, &m_hExitMutex, &sTimeOut)){

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,11 +15,11 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
-#include <zarafa/ECGuid.h>
-#include "ZarafaICS.h"
-#include "ZarafaUtil.h"
+#include <kopano/ECGuid.h>
+#include "ics.h"
+#include "pcutil.hpp"
 
 #include "ECABContainer.h"
 #include "IECImportAddressbookChanges.h"
@@ -27,16 +27,14 @@
 
 #include "ECExportAddressbookChanges.h"
 
-#include <zarafa/ECLogger.h>
+#include <kopano/ECLogger.h>
 #include <ECSyncLog.h>
-#include <zarafa/stringutil.h>
-#include <zarafa/Util.h>
+#include <kopano/stringutil.h>
+#include <kopano/Util.h>
 
 #include <edkmdb.h>
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -236,7 +234,6 @@ HRESULT	ECExportAddressbookChanges::Config(LPSTREAM lpStream, ULONG ulFlags, IEC
 HRESULT ECExportAddressbookChanges::Synchronize(ULONG *lpulSteps, ULONG *lpulProgress)
 {	
     HRESULT hr = hrSuccess;
-	PABEID eid = NULL;
     
     // Check if we're already done
 	if (m_ulThisChange >= m_ulChanges)
@@ -245,7 +242,7 @@ HRESULT ECExportAddressbookChanges::Synchronize(ULONG *lpulSteps, ULONG *lpulPro
 	if (m_lpChanges[m_ulThisChange].sSourceKey.cb < sizeof(ABEID))
 		return MAPI_E_INVALID_PARAMETER;
 
-	eid = (PABEID)m_lpChanges[m_ulThisChange].sSourceKey.lpb;
+	auto eid = reinterpret_cast<const ABEID *>(m_lpChanges[m_ulThisChange].sSourceKey.lpb);
 	ZLOG_DEBUG(m_lpLogger, "abchange type=%04x, sourcekey=%s", m_lpChanges[m_ulThisChange].ulChangeType, bin2hex(m_lpChanges[m_ulThisChange].sSourceKey.cb, m_lpChanges[m_ulThisChange].sSourceKey.lpb).c_str());
 
 	switch(m_lpChanges[m_ulThisChange].ulChangeType) {

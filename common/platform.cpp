@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,15 +15,8 @@
  *
  */
 
-#include <zarafa/platform.h>
-
-#ifdef WIN32
-#include <direct.h>
-#include <io.h>
-#else
+#include <kopano/platform.h>
 #include <fcntl.h>
-#endif
-
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <climits>
@@ -36,8 +29,6 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 HRESULT UnixTimeToFileTime(time_t t, FILETIME *ft)
@@ -145,7 +136,7 @@ HRESULT UnixTimeToRTime(time_t unixtime, LONG *rtime)
 }
 
 // time only, not date!
-time_t SystemTimeToUnixTime(SYSTEMTIME stime)
+time_t SystemTimeToUnixTime(const SYSTEMTIME &stime)
 {
 	return stime.wSecond + (stime.wMinute*60) + ((stime.wHour)*60*60);
 }
@@ -161,7 +152,7 @@ SYSTEMTIME UnixTimeToSystemTime(time_t unixtime)
 	return stime;
 }
 
-SYSTEMTIME TMToSystemTime(struct tm t)
+SYSTEMTIME TMToSystemTime(const struct tm &t)
 {
 	SYSTEMTIME stime = {0};
 	stime.wYear = t.tm_year;
@@ -175,7 +166,7 @@ SYSTEMTIME TMToSystemTime(struct tm t)
 	return stime;	
 }
 
-struct tm SystemTimeToTM(SYSTEMTIME stime)
+struct tm SystemTimeToTM(const SYSTEMTIME &stime)
 {
 	// not quite, since we miss tm_yday
 	struct tm t = {0};
@@ -234,7 +225,7 @@ ULONG   CreateIntTime(ULONG seconds, ULONG minutes, ULONG hours)
  * @param[in] ft FileTime to convert
  * @return Converted DATE part of the file time.
  */
-ULONG FileTimeToIntDate(FILETIME &ft)
+ULONG FileTimeToIntDate(const FILETIME &ft)
 {
 	struct tm date;
 	time_t t;
@@ -350,16 +341,7 @@ time_t timegm(struct tm *t) {
 struct tm* gmtime_safe(const time_t* timer, struct tm *result)
 {
 	struct tm *tmp = NULL;
-#ifdef WIN32
-	tmp = gmtime(timer);
-	if(tmp) {
-		*result = *tmp; // copy data
-		tmp = result; // switch pointer
-	}
-#else
 	tmp = gmtime_r(timer, result);
-#endif
-
 	if(tmp == NULL)
 		memset(result, 0, sizeof(struct tm));
 
@@ -400,14 +382,6 @@ int CreatePath(const char *createpath)
 	size_t len = strlen(path);
 	while (len > 0 && (path[len-1] == '/' || path[len-1] == '\\'))
 		path[--len] = 0;
-
-#ifdef WIN32
-	if (path[len-1] == ':') {
-		// do not try to create driverletters
-		free(path);
-		return 0;
-	}
-#endif
 
 	if(stat(path, &s) == 0) {
 		if(s.st_mode & S_IFDIR) {
@@ -469,11 +443,7 @@ ssize_t read_retry(int fd, void *data, size_t len)
 	size_t tread = 0;
 
 	while (len > 0) {
-#ifdef _WIN32
-		ssize_t ret = _read(fd, buf, len);
-#else
 		ssize_t ret = read(fd, buf, len);
-#endif
 		if (ret < 0 && (errno == EINTR || errno == EAGAIN))
 			continue;
 		if (ret < 0)
@@ -493,11 +463,7 @@ ssize_t write_retry(int fd, const void *data, size_t len)
 	size_t twrote = 0;
 
 	while (len > 0) {
-#ifdef WIN32
-		ssize_t ret = _write(fd, buf, len);
-#else
 		ssize_t ret = write(fd, buf, len);
-#endif
 		if (ret < 0 && (errno == EINTR || errno == EAGAIN))
 			continue;
 		if (ret < 0)
@@ -513,33 +479,24 @@ ssize_t write_retry(int fd, const void *data, size_t len)
 
 bool force_buffers_to_disk(const int fd)
 {
-#ifdef WIN32
-	_commit(fd);
-#else
 	if (fsync(fd) == -1)
 	    return false;
-#endif
-
 	return true;
 }
 
 void my_readahead(const int fd)
 {
-#ifndef WIN32
 	struct stat st;
 
 	if (fstat(fd, &st) == 0)
 		(void)readahead(fd, 0, st.st_size);
-#endif
 }
 
 void give_filesize_hint(const int fd, const off_t len)
 {
-#ifndef WIN32
 	// this helps preventing filesystem fragmentation as the
 	// kernel can now look for the best disk allocation
 	// pattern as it knows how much date is going to be
 	// inserted
 	posix_fallocate(fd, 0, len);
-#endif
 }

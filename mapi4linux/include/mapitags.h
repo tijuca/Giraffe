@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,16 +19,7 @@
 #define __M4L_MAPITAGS_H_
 #define MAPITAGS_H
 
-/*
- * MAPI for linux
- *
- * mapitags.h - property tags
- *
- * (C) Zarafa 2005
- *
- */
-
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <mapidefs.h>		/* we include this here too for the PROP_ID definitions */
 
 /* Determine if a property is transmittable. */

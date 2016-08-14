@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -25,9 +25,9 @@
 #include "ECUserManagement.h"
 #include "plugin.h"
 
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECConfig.h>
-#include <zarafa/ECDefs.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECConfig.h>
+#include <kopano/ECDefs.h>
 
 class ECSession;
 
@@ -86,7 +86,7 @@ public:
 	virtual ECRESULT GetUsername(std::string *lpstrUsername);
     virtual ECRESULT GetImpersonator(std::string *lpstrUsername);
 
-	virtual unsigned int GetObjectSize();
+	virtual size_t GetObjectSize(void);
 
 private:
 	ECRESULT GetGroupsForUser(unsigned int ulUserId, std::list<localobjectdetails_t> **lppGroups);

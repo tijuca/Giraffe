@@ -1,19 +1,19 @@
 #! /bin/sh
 
-# Zarafa script that is executed whenever a new group is deleted from
+# Script that is executed whenever a new group is deleted from
 # the external user source, such as an Active Directory tree or
 # /etc/passwd.
 
 # This script executes all scripts in @USERSCRIPTDIR@/deletegroup.d
-# using find.  The environment variable ZARAFA_GROUP is set, but
+# using find.  The environment variable KOPANO_GROUP is set, but
 # beware that this string can contain any characters, so take heed to
 # correct quoting.
 
-if [ -f @sysconfdir@/sysconfig/zarafa ]; then
-  . @sysconfdir@/sysconfig/zarafa
-elif [ -f @sysconfdir@/default/zarafa ]; then
-  . @sysconfdir@/default/zarafa
+if [ -f @sysconfdir@/sysconfig/kopano ]; then
+  . @sysconfdir@/sysconfig/kopano
+elif [ -f @sysconfdir@/default/kopano ]; then
+  . @sysconfdir@/default/kopano
 fi
 
-ZARAFA_GROUP_SCRIPTS=@USERSCRIPTDIR@/deletegroup.d
+KOPANO_GROUP_SCRIPTS=@USERSCRIPTDIR@/deletegroup.d
 . @USERSCRIPTDIR@/groups_common.sh

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -53,7 +53,7 @@ struct config_check_t {
 class ECConfigCheck {
 public:
 	ECConfigCheck(const char *lpszName, const char *lpszConfigFile);
-	virtual ~ECConfigCheck();
+	virtual ~ECConfigCheck(void) {}
 
 	/* Must be overwritten by subclass */
 	virtual void loadChecks() = 0;

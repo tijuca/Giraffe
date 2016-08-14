@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,16 +15,16 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <iostream>
 #include <climits>
 #include <getopt.h>
-#include <zarafa/stringutil.h>
-#include <zarafa/archiver-common.h>
-#include <zarafa/charset/convert.h>
-#include <zarafa/ECConfig.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/ecversion.h>
+#include <kopano/stringutil.h>
+#include <kopano/archiver-common.h>
+#include <kopano/charset/convert.h>
+#include <kopano/ECConfig.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ecversion.h>
 #include "Archiver.h"
 
 #ifdef LINUX
@@ -116,7 +116,7 @@ static void print_help(ostream &ostr, const char *lpszName)
     ostr << "                                     archive store, the folder needs to be" << endl;
     ostr << "                                     specified with --archive-folder." << endl;
     ostr << "  -D|--detach <archive no>         : Detach the archive specified by archive no. This" << endl;
-    ostr << "                                     number can be found by running zarafa-archiver -l" << endl;
+    ostr << "                                     number can be found by running kopano-archiver -l" << endl;
     ostr << "     --auto-attach                 : When no user is specified with -u, all users" << endl;
     ostr << "                                     will have their archives attached or detached" << endl;
     ostr << "                                     based on the LDAP/ADS settings. If a user is" << endl;
@@ -246,7 +246,7 @@ int main(int argc, char *argv[])
 
     static const configsetting_t lpDefaults[] = {
 #ifdef LINUX
-        { "pid_file", "/var/run/zarafad/archiver.pid" },
+        { "pid_file", "/var/run/kopano/archiver.pid" },
 #endif
         { NULL, NULL }
     };
@@ -496,7 +496,7 @@ int main(int argc, char *argv[])
         ArchiveManagePtr ptr;
         r = ptrArchiver->GetManage(strUser.c_str(), &ptr);
         if (r != Success)
-            goto exit;
+            return 1;
 
         filelogger->Log(EC_LOGLEVEL_DEBUG, "Archiver action: Attach archive %s in server %s using folder %s", lpszArchive, lpszArchiveServer, lpszFolder);
         r = ptr->AttachTo(lpszArchiveServer, toLPTST(lpszArchive, converter), toLPTST(lpszFolder, converter), ulAttachFlags);
@@ -509,7 +509,7 @@ int main(int argc, char *argv[])
         ArchiveManagePtr ptr;
         r = ptrArchiver->GetManage(strUser.c_str(), &ptr);
         if (r != Success)
-            goto exit;
+            return 1;
 
         if (mode == MODE_DETACH_IDX) {
             filelogger->Log(EC_LOGLEVEL_DEBUG, "Archiver action: Detach archive %u", ulArchive);
@@ -527,7 +527,7 @@ int main(int argc, char *argv[])
             ArchiveManagePtr ptr;
             r = ptrArchiver->GetManage(strUser.c_str(), &ptr);
             if (r != Success)
-                goto exit;
+                return 1;
 
             filelogger->Log(EC_LOGLEVEL_DEBUG, "Archiver action: Autoattach for user %ls, flags: %u", strUser.c_str(), ulAttachFlags);
             r = ptr->AutoAttach(ulAttachFlags);
@@ -543,7 +543,7 @@ int main(int argc, char *argv[])
         ArchiveManagePtr ptr;
         r = ptrArchiver->GetManage(strUser.c_str(), &ptr);
         if (r != Success)
-            goto exit;
+            return 1;
 
         filelogger->Log(EC_LOGLEVEL_DEBUG, "Archiver action: List archives");
         r = ptr->ListArchives(cout);
@@ -555,7 +555,7 @@ int main(int argc, char *argv[])
         ArchiveManagePtr ptr;
         r = ptrArchiver->GetManage(_T("SYSTEM"), &ptr);
         if (r != Success)
-            goto exit;
+            return 1;
 
         filelogger->Log(EC_LOGLEVEL_DEBUG, "Archiver action: List archive users");
         r = ptr->ListAttachedUsers(cout);
@@ -567,7 +567,7 @@ int main(int argc, char *argv[])
         ArchiveControlPtr ptr;
         r = ptrArchiver->GetControl(&ptr);
         if (r != Success)
-            goto exit;
+            return 1;
 
         if (strUser.size()) {
             filelogger->Log(EC_LOGLEVEL_DEBUG, "Archiver action: archive user %ls (autoattach: %s, flags %u)", strUser.c_str(), yesno(bAutoAttach), ulAttachFlags);
@@ -584,7 +584,7 @@ int main(int argc, char *argv[])
         ArchiveControlPtr ptr;
         r = ptrArchiver->GetControl(&ptr, bForceCleanup);
         if (r != Success)
-            goto exit;
+            return 1;
 
         if (strUser.size()) {
             filelogger->Log(EC_LOGLEVEL_DEBUG, "Archiver action: Cleanup user %ls ", strUser.c_str());
@@ -601,8 +601,6 @@ int main(int argc, char *argv[])
         filelogger->Log(EC_LOGLEVEL_DEBUG, "Archiver action: invalid");
         break;
     }
-
-exit:
-    return (r == Success ? 0 : 1);
+    return 0;
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,26 +15,24 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECMemTablePublic.h"
 
 #include "Mem.h"
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 #include <edkguid.h>
-#include <zarafa/Util.h>
+#include <kopano/Util.h>
 #include "ClientUtil.h"
 
 #include <edkmdb.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 
 #include "ECMsgStorePublic.h"
-#include <zarafa/restrictionutil.h>
+#include <kopano/restrictionutil.h>
 #include "favoritesutil.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 
@@ -394,7 +392,7 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 		goto exit;
 
 	memcpy(lpRecordKeyID, lpEntryID, cbEntryID);
-	lpRecordKeyID->abFlags[3] = ZARAFA_FAVORITE;
+	lpRecordKeyID->abFlags[3] = KOPANO_FAVORITE;
 
 	lpProps[cProps].ulPropTag = PR_RECORD_KEY;
 	lpProps[cProps].Value.bin.cb = cbEntryID;
@@ -405,7 +403,7 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 	if (ECGenericProp::DefaultGetProp(PR_ENTRYID, m_lpECParentFolder->GetMsgStore(), 0, &lpProps[cProps], m_lpECParentFolder, lpProps) == hrSuccess) {
 		lpProps[cProps].ulPropTag = PR_PARENT_ENTRYID;
 
-		((LPENTRYID)lpProps[cProps].Value.bin.lpb)->abFlags[3] =  ZARAFA_FAVORITE;
+		((LPENTRYID)lpProps[cProps].Value.bin.lpb)->abFlags[3] =  KOPANO_FAVORITE;
 		++cProps;
 	}
 
@@ -417,9 +415,7 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 	lpProps[cProps].ulPropTag = PR_SUBFOLDERS;
 	lpProps[cProps++].Value.b = TRUE;
 
-	/////////////////////////////////////////////////////
 	// Properties from the real folder
-	//
 	if (ulUpdateType == ECKeyTable::TABLE_ROW_ADD) {
 		hr = m_lpECParentFolder->OpenEntry(cbEntryID, lpEntryID, &IID_IMAPIFolder, MAPI_BEST_ACCESS, &ulObjType, (LPUNKNOWN *)&lpFolderReal);
 		if(hr != hrSuccess)
@@ -503,16 +499,14 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 		}
 
 		if (lpPropsFolder[i].ulPropTag == PR_ENTRYID) {
-			((LPENTRYID)lpPropsFolder[i].Value.bin.lpb)->abFlags[3] = ZARAFA_FAVORITE;
+			((LPENTRYID)lpPropsFolder[i].Value.bin.lpb)->abFlags[3] = KOPANO_FAVORITE;
 		}
 
 		lpProps[cProps].ulPropTag = lpPropsFolder[i].ulPropTag;
 		lpProps[cProps++].Value = lpPropsFolder[i].Value;
 	}
 
-	/////////////////////////////////////////////////////
 	// Add the row in the list
-	//
 	sKeyProp.ulPropTag = PR_ROWID;
 	sKeyProp.Value.ul = ulRowId;
 

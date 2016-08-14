@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,15 +18,13 @@
 #ifndef ECABPROVIDER
 #define ECABPROVIDER
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/ECUnknown.h>
+#include <kopano/zcdefs.h>
+#include <kopano/ECUnknown.h>
 #include <mapispi.h>
 
-class ZCABProvider : public ECUnknown 
-{
+class ZCABProvider _kc_final : public ECUnknown  {
 protected:
 	ZCABProvider(ULONG ulFlags, const char *szClassName);
-	virtual ~ZCABProvider();
 
 public:
 	static  HRESULT Create(ZCABProvider **lppZCABProvider);

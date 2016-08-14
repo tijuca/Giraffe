@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,18 +15,16 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "CalDavUtil.h"
-#include <zarafa/EMSAbTag.h>
-#include <zarafa/charset/convert.h>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/EMSAbTag.h>
+#include <kopano/charset/convert.h>
+#include <kopano/mapi_ptr.h>
 
 using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 /**
@@ -34,7 +32,7 @@ static const char THIS_FILE[] = __FILE__;
  *
  * @param[in]	strUser		User's login name
  * @param[in]	strPass		User's password
- * @param[in]	strPath		Zarafa server's path
+ * @param[in]	strPath		Kopano server's path
  * @param[out]	lppSession	IMAPISession object if login is successful
  * @return		HRESULT
  * @retval		MAPI_E_LOGON_FAILED		Unable to login with the specified user-name and password
@@ -214,7 +212,7 @@ HRESULT HrFindFolder(IMsgStore *lpMsgStore, IMAPIFolder *lpRootFolder, LPSPropTa
 	}
 	else
 	{
-		// note: this is a custom zarafa named property, defined in libicalmapi/names.*
+		// note: this is a custom kopano named property, defined in libicalmapi/names.*
 		ulPropTagFldId = CHANGE_PROP_TYPE(lpNamedProps->aulPropTag[PROP_FLDID], PT_UNICODE);
 		sPropFolderID.Value.lpszW = (LPWSTR)wstrFldId.c_str();
 	}

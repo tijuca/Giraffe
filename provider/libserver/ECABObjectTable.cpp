@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,16 +15,16 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
-#include "Zarafa.h"
-#include <zarafa/ZarafaCode.h>
+#include "kcore.hpp"
+#include <kopano/kcodes.h>
 
 #include <mapidefs.h>
 #include <mapitags.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 
-#include <zarafa/EMSAbTag.h>
+#include <kopano/EMSAbTag.h>
 
 #include "SOAPUtils.h"
 #include "ECABObjectTable.h"
@@ -32,12 +32,10 @@
 
 #include "ECSession.h"
 #include "ECSessionManager.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ECABObjectTable::ECABObjectTable(ECSession *lpSession, unsigned int ulABId, unsigned int ulABType, unsigned int ulABParentId, unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale) : ECGenericObjectTable(lpSession, ulABType, ulFlags, locale)
@@ -193,15 +191,12 @@ ECRESULT ECABObjectTable::QueryRowData(ECGenericObjectTable *lpThis, struct soap
 	else if (lpODAB->ulABType == MAPI_MAILUSER || lpODAB->ulABType == MAPI_DISTLIST)
 		er = lpSession->GetUserManagement()->QueryContentsRowData(soap, lpRowList, lpsPropTagArray, &lpsRowSet);
 	else
-		er = ZARAFA_E_INVALID_TYPE;
+		er = KCERR_INVALID_TYPE;
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	*lppRowSet = lpsRowSet;
-
-exit:
-
-	return er;
+	return erSuccess;
 }
 
 struct filter_objects {
@@ -212,9 +207,9 @@ struct filter_objects {
 	{
 		return
 			((m_ulFlags & AB_FILTER_SYSTEM) &&
-			 (details.GetClass() == DISTLIST_SECURITY && details.ulId == ZARAFA_UID_EVERYONE)) ||
+			 (details.GetClass() == DISTLIST_SECURITY && details.ulId == KOPANO_UID_EVERYONE)) ||
 			((m_ulFlags & AB_FILTER_SYSTEM) &&
-			 (details.GetClass() == ACTIVE_USER && details.ulId == ZARAFA_UID_SYSTEM)) ||
+			 (details.GetClass() == ACTIVE_USER && details.ulId == KOPANO_UID_SYSTEM)) ||
 			((m_ulFlags & AB_FILTER_ADDRESSLIST) &&
 			 (details.GetClass() == CONTAINER_ADDRESSLIST)) ||
 			((m_ulFlags & AB_FILTER_CONTACTS) &&
@@ -228,8 +223,8 @@ ECRESULT ECABObjectTable::LoadHierarchyAddressList(unsigned int ulObjectId, unsi
 	ECRESULT er = erSuccess;
 	list<localobjectdetails_t> *lpObjects = NULL;
 
-	if (ulObjectId == ZARAFA_UID_GLOBAL_ADDRESS_BOOK ||
-		ulObjectId == ZARAFA_UID_GLOBAL_ADDRESS_LISTS)
+	if (ulObjectId == KOPANO_UID_GLOBAL_ADDRESS_BOOK ||
+		ulObjectId == KOPANO_UID_GLOBAL_ADDRESS_LISTS)
 	{
 		/* Global Address Book, load addresslist of the users own company */
 		er = lpSession->GetSecurity()->GetUserCompany(&ulObjectId);
@@ -299,23 +294,23 @@ ECRESULT ECABObjectTable::LoadHierarchyContainer(unsigned int ulObjectId, unsign
 	list<localobjectdetails_t> *lpObjects = NULL;
 	objectid_t objectid;
 
-	if (ulObjectId == ZARAFA_UID_ADDRESS_BOOK) {
+	if (ulObjectId == KOPANO_UID_ADDRESS_BOOK) {
 		/*
-		 * Zarafa Address Book
-		 * The Zarafa Address Book contains 2 containers,
+		 * Kopano Address Book
+		 * The Kopano Address Book contains 2 containers,
 		 * the first container is the Global Address Book,
 		 * the second is the Global Address Lists container.
 		 */
 		lpObjects = new std::list<localobjectdetails_t>();
-		lpObjects->push_back(localobjectdetails_t(ZARAFA_UID_GLOBAL_ADDRESS_BOOK, CONTAINER_COMPANY));
+		lpObjects->push_back(localobjectdetails_t(KOPANO_UID_GLOBAL_ADDRESS_BOOK, CONTAINER_COMPANY));
 		if (!(m_ulUserManagementFlags & USERMANAGEMENT_IDS_ONLY))
-			lpObjects->back().SetPropString(OB_PROP_S_LOGIN, ZARAFA_ACCOUNT_GLOBAL_ADDRESS_BOOK);
+			lpObjects->back().SetPropString(OB_PROP_S_LOGIN, KOPANO_ACCOUNT_GLOBAL_ADDRESS_BOOK);
 
-		lpObjects->push_back(localobjectdetails_t(ZARAFA_UID_GLOBAL_ADDRESS_LISTS, CONTAINER_ADDRESSLIST));
+		lpObjects->push_back(localobjectdetails_t(KOPANO_UID_GLOBAL_ADDRESS_LISTS, CONTAINER_ADDRESSLIST));
 		if (!(m_ulUserManagementFlags & USERMANAGEMENT_IDS_ONLY))
-			lpObjects->back().SetPropString(OB_PROP_S_LOGIN, ZARAFA_ACCOUNT_GLOBAL_ADDRESS_LISTS);
+			lpObjects->back().SetPropString(OB_PROP_S_LOGIN, KOPANO_ACCOUNT_GLOBAL_ADDRESS_LISTS);
 
-	} else if (ulObjectId == ZARAFA_UID_GLOBAL_ADDRESS_BOOK) {
+	} else if (ulObjectId == KOPANO_UID_GLOBAL_ADDRESS_BOOK) {
 		/*
 		 * Global Address Book
 		 * The hierarchy for the Global Address Book contains all visible
@@ -330,26 +325,18 @@ ECRESULT ECABObjectTable::LoadHierarchyContainer(unsigned int ulObjectId, unsign
 		 *    in the hierarchy view. The user will not be allowed to open it, so it isn't a real security risk,
 		 *    but since we still have issue (1) open, we might as well disable the hierarchy view
 		 *    containers completely. */
-#ifdef HAVE_OFFLINE_SUPPORT
-		lpObjects = new std::list<localobjectdetails_t>();
-#else
 		er = LoadHierarchyCompany(ulObjectId, ulFlags, &lpObjects);
 		if (er != erSuccess)
 			goto exit;
-#endif
-	} else if (ulObjectId == ZARAFA_UID_GLOBAL_ADDRESS_LISTS) {
-#ifdef HAVE_OFFLINE_SUPPORT
-		lpObjects = new std::list<localobjectdetails_t>();
-#else
-		if (lpSession->GetSecurity()->GetUserId() == ZARAFA_UID_SYSTEM) {
-			er = ZARAFA_E_INVALID_PARAMETER;
+	} else if (ulObjectId == KOPANO_UID_GLOBAL_ADDRESS_LISTS) {
+		if (lpSession->GetSecurity()->GetUserId() == KOPANO_UID_SYSTEM) {
+			er = KCERR_INVALID_PARAMETER;
 			goto exit;
 		}
 
 		er = LoadHierarchyAddressList(ulObjectId, ulFlags, &lpObjects);
 		if (er != erSuccess)
 			goto exit;
-#endif
 	} else {
 		/*
 		 * Normal container
@@ -472,14 +459,14 @@ ECRESULT ECABObjectTable::Load()
 		 * Load hierarchy containing companies and addresslists
 		 */
 		if (lpODAB->ulABParentType != MAPI_ABCONT) {
-			er = ZARAFA_E_INVALID_PARAMETER;
+			er = KCERR_INVALID_PARAMETER;
 			goto exit;
 		}
 
 		er = LoadHierarchyContainer(lpODAB->ulABParentId, 0, &lpObjects);
 		if (er != erSuccess)
 			goto exit;
-	} else if (lpODAB->ulABParentId == ZARAFA_UID_GLOBAL_ADDRESS_BOOK && lpODAB->ulABParentType == MAPI_ABCONT) {
+	} else if (lpODAB->ulABParentId == KOPANO_UID_GLOBAL_ADDRESS_BOOK && lpODAB->ulABParentType == MAPI_ABCONT) {
 		/*
 		 * Load contents of Global Address Book
 		 */
@@ -498,11 +485,11 @@ ECRESULT ECABObjectTable::Load()
 		 */
 		if (!ulObjectId)
 			lpObjects->push_front(localobjectdetails_t(ulObjectId, CONTAINER_COMPANY));
-	} else if (lpODAB->ulABParentId == ZARAFA_UID_GLOBAL_ADDRESS_LISTS && lpODAB->ulABParentType == MAPI_ABCONT) {
+	} else if (lpODAB->ulABParentId == KOPANO_UID_GLOBAL_ADDRESS_LISTS && lpODAB->ulABParentType == MAPI_ABCONT) {
 		/*
 		 * Load contents of Global Address Lists
 		 */
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	} else {
 		/*
@@ -519,9 +506,9 @@ ECRESULT ECABObjectTable::Load()
 			if (objectid.objclass == CONTAINER_COMPANY && lpODAB->ulABParentType == MAPI_DISTLIST)
 				ulObjectFilter |= AB_FILTER_CONTACTS;
 		} else {
-			if (lpODAB->ulABParentId == ZARAFA_UID_SYSTEM) {
+			if (lpODAB->ulABParentId == KOPANO_UID_SYSTEM) {
 				objectid.objclass = ACTIVE_USER;
-			} else if (lpODAB->ulABParentId == ZARAFA_UID_EVERYONE) {
+			} else if (lpODAB->ulABParentId == KOPANO_UID_EVERYONE) {
 				objectid.objclass = DISTLIST_SECURITY;
 				/* Security distribution lists should not contain contacts */
 				ulObjectFilter |= AB_FILTER_CONTACTS;
@@ -553,7 +540,7 @@ ECRESULT ECABObjectTable::Load()
 				goto exit;
 			break;
 		default:
-			er = ZARAFA_E_INVALID_PARAMETER;
+			er = KCERR_INVALID_PARAMETER;
 			goto exit;
 		}
 	}

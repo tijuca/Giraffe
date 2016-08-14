@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,7 +17,7 @@
 
 #include "phpconfig.h"
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <cmath>
 
@@ -49,7 +49,7 @@ extern "C" {
 #include <edkmdb.h>
 
 #include "typeconversion.h"
-#include <zarafa/charset/convert.h>
+#include <kopano/charset/convert.h>
 
 // Calls MAPIAllocateMore or MAPIAllocateBuffer according to whether an lpBase was passed or not
 #define MAPI_ALLOC(n, lpBase, lpp) (lpBase ? MAPIAllocateMore(n, lpBase, lpp) : MAPIAllocateBuffer(n, lpp))

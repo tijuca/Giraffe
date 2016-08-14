@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,10 +18,10 @@
 #ifndef EC_USERSTORE_TABLE_H
 #define EC_USERSTORE_TABLE_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 /* #include "ECStoreObjectTable.h" */
 #include "ECGenericObjectTable.h"
-#include <zarafa/ZarafaUser.h>
+#include <kopano/pcuser.hpp>
 #include <map>
 
 class ECSession;
@@ -43,7 +43,6 @@ typedef struct {
 class ECUserStoreTable _zcp_final : public ECGenericObjectTable {
 protected:
 	ECUserStoreTable(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale);
-	virtual ~ECUserStoreTable();
 
 public:
 	static ECRESULT Create(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale, ECUserStoreTable **lppTable);

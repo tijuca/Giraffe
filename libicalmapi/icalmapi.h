@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,14 +18,6 @@
 #ifndef ICALMAPI_LIBICALMAPI_H
 #define ICALMAPI_LIBICALMAPI_H
 
-#ifdef _WIN32
-	#ifdef LIBICALMAPI_EXPORTS
-		#define ICALMAPI_API __declspec(dllexport)
-	#else
-		#define ICALMAPI_API __declspec(dllimport)
-	#endif
-#else
-	#define ICALMAPI_API
-#endif
+#define ICALMAPI_API
 
 #endif //ICALMAPI_H

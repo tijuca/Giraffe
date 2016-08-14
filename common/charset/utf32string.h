@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,8 +18,8 @@
 #ifndef utf32string_INCLUDED
 #define utf32string_INCLUDED
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/charset/traits.h>
+#include <kopano/zcdefs.h>
+#include <kopano/charset/traits.h>
 
 #ifdef LINUX
 // The utf32string type

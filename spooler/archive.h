@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -21,8 +21,8 @@
 #include <mapidefs.h>
 #include <mapix.h>
 
-#include <zarafa/mapi_ptr.h>
-#include <zarafa/tstring.h>
+#include <kopano/mapi_ptr.h>
+#include <kopano/tstring.h>
 
 #include <list>
 #include <memory>
@@ -40,7 +40,7 @@ private:
 
 
 class Archive;
-typedef std::auto_ptr<Archive> ArchivePtr;
+typedef std::unique_ptr<Archive> ArchivePtr;
 
 class Archive {
 public:
@@ -58,8 +58,8 @@ private:
 	void SetErrorMessage(HRESULT hr, LPCTSTR lpszMessage);
 
 	// Inhibit copying
-	Archive(const Archive&);
-	Archive& operator=(const Archive&);
+	Archive(const Archive &) = delete;
+	Archive &operator=(const Archive &) = delete;
 
 private:
 	MAPISessionPtr	m_ptrSession;

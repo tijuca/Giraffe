@@ -4,15 +4,15 @@ import StringIO
 import os
 import zunit
 
-class ZarafaConfigParser:
+class ZConfigParser:
 
     def __init__(self, configfile, defaultoptions={}):
 
         self.config = ConfigParser.ConfigParser(defaults=defaultoptions)
 
-        self.readZarafaConfig(configfile)
+        self.readZConfig(configfile)
         
-    def readZarafaConfig(self, filename):
+    def readZConfig(self, filename):
         filename = os.path.abspath(filename)
         
         data = "[DEFAULT]\r\n"

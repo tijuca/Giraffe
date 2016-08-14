@@ -10,32 +10,32 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) $(PYTHON_INCLUDES) \
 	-I${top_srcdir}/libfreebusy \
 	-I${top_srcdir}/ECtools/archiver
 
-sbin_PROGRAMS = zarafa-dagent zarafa-spooler
-noinst_DATA = zarafa-dagent.ldx zarafa-spooler.ldx
+sbin_PROGRAMS = kopano-dagent kopano-spooler
+noinst_DATA = kopano-dagent.ldx kopano-spooler.ldx
 
-zarafa_dagent_LDADD = ${top_builddir}/inetmapi/libinetmapi.la \
+kopano_dagent_LDADD = ${top_builddir}/inetmapi/libkcinetmapi.la \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_util.la \
-	${top_builddir}/common/libzcp_common_ssl.la \
-	${top_builddir}/ECtools/libzarafa-archiver.la \
-	${top_builddir}/ECtools/libzarafa-archiver-core.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcutil.la \
+	${top_builddir}/common/libkcssl.la \
+	${top_builddir}/ECtools/libkcarchiver.la \
+	${top_builddir}/ECtools/libkcarchivercore.la \
 	$(PROG_LIBS) $(SSL_LIBS) $(PYTHON_LIBS) $(XML2_LIBS) ${icu_uc_LIBS}
 
-zarafa_spooler_LDADD = ${top_builddir}/inetmapi/libinetmapi.la \
+kopano_spooler_LDADD = ${top_builddir}/inetmapi/libkcinetmapi.la \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_util.la \
-	${top_builddir}/common/libzcp_common_ssl.la \
-	${top_builddir}/ECtools/libzarafa-archiver.la \
-	${top_builddir}/ECtools/libzarafa-archiver-core.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcutil.la \
+	${top_builddir}/common/libkcssl.la \
+	${top_builddir}/ECtools/libkcarchiver.la \
+	${top_builddir}/ECtools/libkcarchivercore.la \
 	$(PROG_LIBS) $(PYTHON_LIBS) $(XML2_LIBS)
 
-zarafa_dagent_SOURCES = \
+kopano_dagent_SOURCES = \
 	DAgent.cpp spmain.h rules.cpp rules.h LMTP.cpp LMTP.h \
 	archive.cpp archive.h PyMapiPlugin.cpp PyMapiPlugin.h \
 	PythonSWIGRuntime.h
-zarafa_spooler_SOURCES = \
+kopano_spooler_SOURCES = \
 	Spooler.cpp spmain.h mailer.cpp mailer.h archive.cpp archive.h \
 	PyMapiPlugin.cpp PyMapiPlugin.h PythonSWIGRuntime.h
 

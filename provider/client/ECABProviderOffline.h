@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,12 +18,11 @@
 #ifndef ECABPROVIDEROFFLINE_H
 #define ECABPROVIDEROFFLINE_H
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/ECUnknown.h>
+#include <kopano/zcdefs.h>
+#include <kopano/ECUnknown.h>
 #include "ECABProvider.h"
 
-class ECABProviderOffline : public ECABProvider
-{
+class ECABProviderOffline _kc_final : public ECABProvider {
 protected:
 	ECABProviderOffline(void);
 

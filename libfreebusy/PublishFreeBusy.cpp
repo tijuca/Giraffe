@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,18 +15,18 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "PublishFreeBusy.h"
-#include <zarafa/namedprops.h>
-#include <zarafa/mapiguidext.h>
+#include <kopano/namedprops.h>
+#include <kopano/mapiguidext.h>
 #include <iostream>
 #include <vector>
 #include <algorithm>
-#include <zarafa/ECLogger.h>
+#include <kopano/ECLogger.h>
 #include "recurrence.h"
-#include <zarafa/MAPIErrors.h>
+#include <kopano/MAPIErrors.h>
 
-#include <zarafa/restrictionutil.h>
+#include <kopano/restrictionutil.h>
 #include "ECFreeBusyUpdate.h"
 #include "freebusyutil.h"
 #include "ECFreeBusySupport.h"
@@ -38,8 +38,6 @@ using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 /** 

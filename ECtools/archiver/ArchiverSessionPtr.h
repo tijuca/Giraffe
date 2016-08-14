@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,9 +18,9 @@
 #ifndef ARCHIVERSESSIONPTR_INCLUDED
 #define ARCHIVERSESSIONPTR_INCLUDED
 
-#include <boost/smart_ptr.hpp>
+#include <memory>
 
 class ArchiverSession;
-typedef boost::shared_ptr<ArchiverSession>	ArchiverSessionPtr;
+typedef std::shared_ptr<ArchiverSession> ArchiverSessionPtr;
 
 #endif // !defined ARCHIVERSESSIONPTR_INCLUDED

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 /* Returns the rows for a contents- or hierarchytable
  *
@@ -40,16 +40,16 @@
  */
 
 #include "soapH.h"
-#include <zarafa/ZarafaCode.h>
+#include <kopano/kcodes.h>
 
 #include <mapidefs.h>
 #include <mapitags.h>
 #include <edkmdb.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 
-#include "Zarafa.h"
+#include "kcore.hpp"
 #include "ECDatabaseUtils.h"
-#include <zarafa/ECKeyTable.h>
+#include <kopano/ECKeyTable.h>
 #include "ECGenProps.h"
 #include "ECStoreObjectTable.h"
 #include "ECStatsCollector.h"
@@ -58,11 +58,11 @@
 #include "ECSearchClient.h"
 #include "ECTPropsPurge.h"
 #include "SOAPUtils.h"
-#include <zarafa/stringutil.h>
-#include <zarafa/charset/utf8string.h>
-#include <zarafa/charset/convert.h>
+#include <kopano/stringutil.h>
+#include <kopano/charset/utf8string.h>
+#include <kopano/charset/convert.h>
 
-#include <zarafa/Trace.h>
+#include <kopano/Trace.h>
 #include "ECSessionManager.h"
 
 #include "ECSession.h"
@@ -71,8 +71,6 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 extern ECStatsCollector*  g_lpStatsCollector;
@@ -310,8 +308,7 @@ ECRESULT ECStoreObjectTable::QueryRowData(ECGenericObjectTable *lpThis, struct s
 ECRESULT ECStoreObjectTable::QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit, bool bSubObjects)
 {
 	ECRESULT		er = erSuccess;
-	int	i = 0;
-	int	k = 0;
+	gsoap_size_t i = 0, k = 0;
 	unsigned int	ulFolderId;
 	unsigned int 	ulRowStoreId = 0;
 	GUID			sRowGuid;
@@ -406,7 +403,7 @@ ECRESULT ECStoreObjectTable::QueryRowData(ECGenericObjectTable *lpThis, struct s
             	if(lpThis->GetPropCategory(soap, lpsPropTagArray->__ptr[k], *iterRowList, &lpsRowSet->__ptr[i].__ptr[k]) != erSuccess) {
             		// Other properties are not found
             		lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_ul;
-            		lpsRowSet->__ptr[i].__ptr[k].Value.ul = ZARAFA_E_NOT_FOUND;
+            		lpsRowSet->__ptr[i].__ptr[k].Value.ul = KCERR_NOT_FOUND;
             		lpsRowSet->__ptr[i].__ptr[k].ulPropTag = PROP_TAG(PT_ERROR, PROP_ID(ulPropTag));
             	}
     	        setCellDone.insert(std::make_pair(i,k));
@@ -1040,7 +1037,7 @@ ECRESULT ECStoreObjectTable::CopyEmptyCellToSOAPPropVal(struct soap *soap, unsig
 
 	lpPropVal->ulPropTag = PROP_TAG(PT_ERROR, PROP_ID(ulPropTag));
 	lpPropVal->__union = SOAP_UNION_propValData_ul;
-	lpPropVal->Value.ul = ZARAFA_E_NOT_FOUND;
+	lpPropVal->Value.ul = KCERR_NOT_FOUND;
 
 	return er;
 }
@@ -1084,7 +1081,7 @@ ECRESULT ECStoreObjectTable::GetMVRowCount(unsigned int ulObjId, unsigned int *l
     lpRow = lpDatabase->FetchRow(lpDBResult);
     
     if(lpRow == NULL || lpRow[0] == NULL) {
-        er = ZARAFA_E_DATABASE_ERROR;
+        er = KCERR_DATABASE_ERROR;
 	ec_log_err("ECStoreObjectTable::GetMVRowCount(): row or column null");
         goto exit;
     }
@@ -1204,35 +1201,29 @@ ECRESULT ECStoreObjectTable::CheckPermissions(unsigned int ulObjId)
             // Get the parent id of the row we're inserting (this is very probably cached from Load())
             er = lpSession->GetSessionManager()->GetCacheManager()->GetParent(ulObjId, &ulParent);
             if(er != erSuccess)
-                goto exit;
+			return er;
             
             // This will be cached after the first row in the table is added
             er = lpSession->GetSecurity()->CheckPermission(ulParent, ecSecurityRead);
             if(er != erSuccess)
-                goto exit;
+			return er;
         }
     } else if(m_ulObjType == MAPI_FOLDER) {
 	    // Check the folder type for searchfolders
 		er = lpSession->GetSessionManager()->GetCacheManager()->GetObject(ulObjId, NULL, NULL, &ulFolderFlags, NULL);
 		if(er != erSuccess)
-		    goto exit;
+			return er;
 		
-		if(ulFolderFlags == FOLDER_SEARCH) {
+		if(ulFolderFlags == FOLDER_SEARCH)
 		    // Searchfolders are only visible in the home store
-		    if(lpSession->GetSecurity()->IsAdminOverOwnerOfObject(ulObjId) != erSuccess && lpSession->GetSecurity()->IsStoreOwner(ulObjId) != erSuccess) {
-				er = ZARAFA_E_NO_ACCESS;
-		        goto exit;
-            }
-		}
+		    if(lpSession->GetSecurity()->IsAdminOverOwnerOfObject(ulObjId) != erSuccess && lpSession->GetSecurity()->IsStoreOwner(ulObjId) != erSuccess)
+				return KCERR_NO_ACCESS;
 
         er = lpSession->GetSecurity()->CheckPermission(ulObjId, ecSecurityFolderVisible);
         if(er != erSuccess)
-            goto exit;
+			return er;
     }
-            
-exit:
     return er;
-
 }
 
 ECRESULT ECStoreObjectTable::AddRowKey(ECObjectTableList* lpRows, unsigned int *lpulLoaded, unsigned int ulFlags, bool bLoad, bool bOverride, struct restrictTable *lpOverride)
@@ -1249,6 +1240,7 @@ ECRESULT ECStoreObjectTable::AddRowKey(ECObjectTableList* lpRows, unsigned int *
     ECObjectTableList::const_iterator iterRows;
     ECDatabase *lpDatabase = NULL;
     struct restrictTable *lpNewRestrict = NULL;
+    std::string suggestion;
  
     ASSERT(!bOverride); // Default implementation never has override enabled, so we should never see this
     ASSERT(lpOverride == NULL);
@@ -1273,7 +1265,7 @@ ECRESULT ECStoreObjectTable::AddRowKey(ECObjectTableList* lpRows, unsigned int *
         if(er != erSuccess)
         	goto exit;
 
-	if (GetIndexerResults(lpDatabase, lpSession->GetSessionManager()->GetConfig(), lpSession->GetSessionManager()->GetCacheManager(), &guidServer, lpODStore->lpGuid, lstFolders, lpsRestrict, &lpNewRestrict, lstIndexerResults) != erSuccess) {
+	if (GetIndexerResults(lpDatabase, lpSession->GetSessionManager()->GetConfig(), lpSession->GetSessionManager()->GetCacheManager(), &guidServer, lpODStore->lpGuid, lstFolders, lpsRestrict, &lpNewRestrict, lstIndexerResults, suggestion) != erSuccess) {
     	    // Cannot handle this restriction with the indexer, use 'normal' restriction code
     	    // Reasons can be:
     	    //  - restriction too complex

@@ -1,11 +1,11 @@
 EXTRA_DIST = examplerules.py BMP2PNG.py disclaimer.py movetopublic.py movetopublic.cfg uudecode.py
 
-zarafa_dagentdir = ${datadir}/zarafa-dagent/python/plugins
-zarafa_dagent_DATA=examplerules.py BMP2PNG.py movetopublic.py
+kopano_dagentdir = ${datadir}/kopano-dagent/python/plugins
+kopano_dagent_DATA=examplerules.py BMP2PNG.py movetopublic.py
 
-zarafa_dagent_configdir = ${zarafa_dagentdir}
-zarafa_dagent_config_DATA=movetopublic.cfg
+kopano_dagent_configdir = ${kopano_dagentdir}
+kopano_dagent_config_DATA=movetopublic.cfg
 
-zarafa_spoolerdir = ${datadir}/zarafa-spooler/python/plugins
-zarafa_spooler_DATA=disclaimer.py
+kopano_spoolerdir = ${datadir}/kopano-spooler/python/plugins
+kopano_spooler_DATA=disclaimer.py
 

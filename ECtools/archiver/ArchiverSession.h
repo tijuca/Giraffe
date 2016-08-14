@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,9 +19,9 @@
 #define ARCHIVERSESSION_H_INCLUDED
 
 #include "ArchiverSessionPtr.h"
-#include <zarafa/mapi_ptr.h>
-#include <zarafa/tstring.h>
-#include <zarafa/archiver-common.h>
+#include <kopano/mapi_ptr.h>
+#include <kopano/tstring.h>
+#include <kopano/archiver-common.h>
 
 // Forward declarations
 class ECConfig;
@@ -57,11 +57,9 @@ public:
 	HRESULT OpenOrCreateArchiveStore(const tstring& strUserName, const tstring& strServerName, LPMDB *lppArchiveStore);
 	HRESULT GetArchiveStoreEntryId(const tstring& strUserName, const tstring& strServerName, entryid_t *lpArchiveId);
 
-	IMAPISession *GetMAPISession() const;
+	IMAPISession *GetMAPISession(void) const { return m_ptrSession; }
 	const char *GetSSLPath() const;
 	const char *GetSSLPass() const;
-
-	HRESULT ValidateArchiverLicense() const;
 
 private:
 	ArchiverSession(ECLogger *lpLogger);

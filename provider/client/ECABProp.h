@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,7 +18,7 @@
 #ifndef ECABPROP_H
 #define ECABPROP_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <mapidefs.h>
 
 #include "ECGenericProp.h"
@@ -29,7 +29,7 @@ class ECABProp : public ECGenericProp
 {
 protected:
 	ECABProp(void* lpProvider, ULONG ulObjType, BOOL fModify, const char *szClassName = NULL);
-	virtual ~ECABProp();
+	virtual ~ECABProp(void) {}
 
 public:
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);

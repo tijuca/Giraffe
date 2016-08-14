@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -28,16 +28,7 @@
 
 class ECLogger;
 
-#ifdef _WIN32
-# ifdef INETMAPI_EXPORTS
-#  define INETMAPI_API __declspec(dllexport)
-# else
-#  define INETMAPI_API __declspec(dllimport)
-# endif
-#else
-/* we do not need this on linux */
 # define INETMAPI_API
-#endif
 
 typedef struct _sFailedRecip {
 	std::string strRecipEmail;
@@ -70,8 +61,8 @@ public:
 	virtual void setError(const std::string &newError);
 	virtual bool haveError();
 
-	virtual const std::vector<sFailedRecip> &getPermanentFailedRecipients(void) const;
-	virtual const std::vector<sFailedRecip> &getTemporaryFailedRecipients(void) const;
+	virtual const std::vector<sFailedRecip> &getPermanentFailedRecipients(void) const { return mPermanentFailedRecipients; }
+	virtual const std::vector<sFailedRecip> &getTemporaryFailedRecipients(void) const { return mTemporaryFailedRecipients; }
 };
 
 bool ValidateCharset(const char *charset);

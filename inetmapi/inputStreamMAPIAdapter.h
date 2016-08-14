@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,10 +18,11 @@
 #ifndef INPUT_STREAM_MAPI_ADAPTER_H
 #define INPUT_STREAM_MAPI_ADAPTER_H
 
+#include <kopano/zcdefs.h>
 #include <mapidefs.h>
 #include <vmime/utility/stream.hpp>
 
-class inputStreamMAPIAdapter : public vmime::utility::inputStream {
+class inputStreamMAPIAdapter _kc_final : public vmime::utility::inputStream {
 public:
 	inputStreamMAPIAdapter(IStream *lpStream);
 	virtual ~inputStreamMAPIAdapter();
@@ -29,7 +30,7 @@ public:
 	virtual size_type read(value_type* const data, const size_type count);
 	virtual size_type skip(const size_type count);
 	virtual void reset();
-	virtual bool eof() const;
+	virtual bool eof(void) const { return this->ateof; }
 
 private:
 	bool	ateof;

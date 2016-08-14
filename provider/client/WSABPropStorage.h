@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,13 +18,13 @@
 #ifndef WSABPROPSTORAGE_H
 #define WSABPROPSTORAGE_H
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/ECUnknown.h>
+#include <kopano/zcdefs.h>
+#include <kopano/ECUnknown.h>
 #include "IECPropStorage.h"
 
-#include <zarafa/ZarafaCode.h>
+#include <kopano/kcodes.h>
 #include "WSTransport.h"
-#include "soapZarafaCmdProxy.h"
+#include "soapKCmdProxy.h"
 
 #include <mapi.h>
 #include <mapispi.h>
@@ -34,11 +34,11 @@ class WSABPropStorage : public ECUnknown
 {
 
 protected:
-	WSABPropStorage(ULONG cbEntryId, LPENTRYID lpEntryId, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport);
+	WSABPropStorage(ULONG cbEntryId, LPENTRYID lpEntryId, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport);
 	virtual ~WSABPropStorage();
 
 public:
-	static HRESULT Create(ULONG cbEntryId, LPENTRYID lpEntryId, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport, WSABPropStorage **lppPropStorage);
+	static HRESULT Create(ULONG cbEntryId, LPENTRYID lpEntryId, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport, WSABPropStorage **lppPropStorage);
 
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
 	
@@ -89,7 +89,7 @@ public:
 
 private:
 	entryId			m_sEntryId;
-	ZarafaCmd*		lpCmd;
+	KCmd*		lpCmd;
 	pthread_mutex_t *lpDataLock;
 	ECSESSIONID		ecSessionId;
 	WSTransport*	m_lpTransport;

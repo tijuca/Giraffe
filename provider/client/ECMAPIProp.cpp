@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,17 +15,17 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapitags.h>
 #include <mapiguid.h>
 #include <mapiutil.h>
-#include "Zarafa.h"
+#include "kcore.hpp"
 
-#include <zarafa/ECGuid.h>
-#include <zarafa/ECDefs.h>
+#include <kopano/ECGuid.h>
+#include <kopano/ECDefs.h>
 
 #include "ECMsgStore.h"
 #include "ECMAPIProp.h"
@@ -33,21 +33,19 @@
 #include "ECMemStream.h"
 
 #include "Mem.h"
-#include <zarafa/Util.h>
+#include <kopano/Util.h>
 
-#include <zarafa/ECDebug.h>
-#include <zarafa/mapiext.h>
+#include <kopano/ECDebug.h>
+#include <kopano/mapiext.h>
 
-#include <zarafa/CommonUtil.h>
-#include <zarafa/mapi_ptr.h>
-#include "ZarafaUtil.h"
+#include <kopano/CommonUtil.h>
+#include <kopano/mapi_ptr.h>
+#include "pcutil.hpp"
 
 #include <sstream>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 static struct rights ECPermToRightsCheap(const ECPERMISSION &p)
@@ -78,11 +76,6 @@ public:
 private:
 	const ECENTRYID &m_sEntryID;
 };
-
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 
 ECMAPIProp::ECMAPIProp(void *lpProvider, ULONG ulObjType, BOOL fModify,
     ECMAPIProp *lpRoot, const char *szClassName) :
@@ -166,10 +159,7 @@ BOOL ECMAPIProp::IsICSObject()
 	return m_bICSObject;
 }
 
-/////////////////////////////////////////////////
 // Property handles
-//
-
 HRESULT	ECMAPIProp::DefaultMAPIGetProp(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase)
 {
 	HRESULT		hr = hrSuccess;
@@ -181,22 +171,6 @@ HRESULT	ECMAPIProp::DefaultMAPIGetProp(ULONG ulPropTag, void* lpProvider, ULONG 
 		hr = lpProp->HrGetRealProp(PR_SOURCE_KEY, ulFlags, lpBase, lpsPropValue);
 		if(hr != hrSuccess)
 			return hr;
-#ifdef WIN32
-		if(lpMsgStore->m_ulProfileFlags & EC_PROFILE_FLAGS_TRUNCATE_SOURCEKEY && lpsPropValue->Value.bin.cb > 22) {
-			/*
-			 * Make our source key a little shorter; MSEMS has 22-byte sourcekeys, while we can have 24-byte
-			 * source keys. This can cause buffer overflows in applications that (wrongly) assume fixed 22-byte
-			 * source keys. We're not losing any data here actually, since the last two bytes are always 0000 since
-			 * the source key ends in a 128-bit little-endian counter which will definitely never increment the last two
-			 * bytes in the coming 1000000 years ;)
-			 *
-			 * Then, mark the sourcekey as being truncated by setting the highest bit in the ID part to 1, so we can 
-			 * untruncate it when needed.
-			 */
-			lpsPropValue->Value.bin.cb = 22;
-			lpsPropValue->Value.bin.lpb[lpsPropValue->Value.bin.cb-1] |= 0x80; // Set top bit
-		}
-#endif
 		break;
 		
 	case PROP_ID(0x664B0014):
@@ -221,11 +195,11 @@ HRESULT	ECMAPIProp::DefaultMAPIGetProp(ULONG ulPropTag, void* lpProvider, ULONG 
 
 	case PROP_ID(PR_STORE_SUPPORT_MASK):
 	case PROP_ID(PR_STORE_UNICODE_MASK):
-		if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &ZARAFA_STORE_PUBLIC_GUID))
+		if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_PUBLIC_GUID))
 			lpsPropValue->Value.l = EC_SUPPORTMASK_PUBLIC;
-		else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &ZARAFA_STORE_DELEGATE_GUID)){
+		else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_DELEGATE_GUID)){
 			lpsPropValue->Value.l = EC_SUPPORTMASK_DELEGATE;
-		}else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &ZARAFA_STORE_ARCHIVE_GUID)) {
+		}else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_ARCHIVE_GUID)) {
 			lpsPropValue->Value.l = EC_SUPPORTMASK_ARCHIVE;
 		}else {
 			lpsPropValue->Value.l = EC_SUPPORTMASK_PRIVATE;
@@ -371,11 +345,11 @@ HRESULT ECMAPIProp::TableRowGetProp(void* lpProvider, struct propVal *lpsPropVal
 		
 		case PROP_TAG(PT_ERROR,PROP_ID(PR_STORE_SUPPORT_MASK)):
 		case PROP_TAG(PT_ERROR,PROP_ID(PR_STORE_UNICODE_MASK)):
-			if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &ZARAFA_STORE_PUBLIC_GUID))
+			if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_PUBLIC_GUID))
 				lpsPropValDst->Value.l = EC_SUPPORTMASK_PUBLIC;
-			else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &ZARAFA_STORE_DELEGATE_GUID))
+			else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_DELEGATE_GUID))
 				lpsPropValDst->Value.l = EC_SUPPORTMASK_DELEGATE;
-			else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &ZARAFA_STORE_ARCHIVE_GUID))
+			else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_ARCHIVE_GUID))
 				lpsPropValDst->Value.l = EC_SUPPORTMASK_ARCHIVE;
 			else 
 				lpsPropValDst->Value.l = EC_SUPPORTMASK_PRIVATE;
@@ -797,10 +771,7 @@ HRESULT ECMAPIProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID FAR * lppProp
 	return this->GetMsgStore()->lpNamedProp->GetIDsFromNames(cPropNames, lppPropNames, ulFlags, lppPropTags);
 }
 
-/////////////////////////////////////////////
 // Stream functions
-//
-
 HRESULT ECMAPIProp::HrStreamCommit(IStream *lpStream, void *lpData)
 {
 	HRESULT hr = hrSuccess;
@@ -905,9 +876,7 @@ exit:
 	return hr;
 }
 
-////////////////////////////////////////////////////////////////
-// Security fucntions
-//
+// Security functions
 HRESULT ECMAPIProp::GetPermissionRules(int ulType, ULONG *lpcPermissions,
     ECPERMISSION **lppECPermissions)
 {
@@ -970,9 +939,7 @@ HRESULT ECMAPIProp::SetParentID(ULONG cbParentID, LPENTRYID lpParentID)
 	return hrSuccess;
 }
 
-////////////////////////////////////////////
 // Interface IMAPIProp
-
 HRESULT __stdcall ECMAPIProp::xMAPIProp::QueryInterface(REFIID refiid, void **lppInterface)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
@@ -1098,9 +1065,7 @@ HRESULT __stdcall ECMAPIProp::xMAPIProp::GetIDsFromNames(ULONG cNames, LPMAPINAM
 	return hr;
 }
 
-/////////////////////////////////////////////////////////////////////////////
 // Interface ECSecurity
-
 HRESULT ECMAPIProp::xECSecurity::QueryInterface(REFIID refiid, void ** lppInterface)
 {
 	METHOD_PROLOGUE_(ECMAPIProp , ECSecurity);

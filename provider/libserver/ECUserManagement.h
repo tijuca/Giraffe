@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,18 +18,18 @@
 #ifndef ECUSERMANAGEMENT_H
 #define ECUSERMANAGEMENT_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <list>
 #include <map>
 #include <ctime>
 #include <pthread.h>
 
-#include <zarafa/ZarafaCode.h>
-#include <zarafa/ZarafaUser.h>
-#include <zarafa/ECConfig.h>
+#include <kopano/kcodes.h>
+#include <kopano/pcuser.hpp>
+#include <kopano/ECConfig.h>
 #include "ECSession.h"
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECDefs.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECDefs.h>
 #include "plugin.h"
 
 class localobjectdetails_t _zcp_final : public objectdetails_t {
@@ -211,7 +211,7 @@ public:
 	virtual ECRESULT	UpdateUserDetailsFromClient(objectdetails_t *lpDetails);
 
 	/* Create an ABEID in version 1 or version 0 */
-	ECRESULT	CreateABEntryID(struct soap *soap, unsigned int ulVersion, unsigned int ulObjId, unsigned int ulType, objectid_t *sExternId, int *lpcbEID, PABEID *lppEid);
+	ECRESULT CreateABEntryID(struct soap *soap, unsigned int ulVersion, unsigned int ulObjId, unsigned int ulType, objectid_t *sExternId, gsoap_size_t *lpcbEID, ABEID **lppEid);
 
 	/* Completely remove all users, groups, etc except for the passed object */
 	ECRESULT	RemoveAllObjectsAndSync(unsigned int ulObjId);
@@ -292,36 +292,36 @@ private:
 	time_t m_usercount_ts;
 };
 
-#define ZARAFA_UID_EVERYONE 1
-#define ZARAFA_UID_SYSTEM 2
+#define KOPANO_UID_EVERYONE 1
+#define KOPANO_UID_SYSTEM 2
 
-#define ZARAFA_ACCOUNT_SYSTEM "SYSTEM"
-#define ZARAFA_FULLNAME_SYSTEM "SYSTEM"
-#define ZARAFA_ACCOUNT_EVERYONE "Everyone"
-#define ZARAFA_FULLNAME_EVERYONE "Everyone"
+#define KOPANO_ACCOUNT_SYSTEM "SYSTEM"
+#define KOPANO_FULLNAME_SYSTEM "SYSTEM"
+#define KOPANO_ACCOUNT_EVERYONE "Everyone"
+#define KOPANO_FULLNAME_EVERYONE "Everyone"
 
 /*
- * Fixed addressbook containers
- * Only ID's 0, 1 and 2 are available for hardcoding
- * IDs for the fixed addressbook containers. This is because
- * those ID's are the only ones which will not conflict with
- * entries in the users table.
- *
- * The account name of the containers are used for the path
- * name of the container and is used in determine the exact
- * order of the containers and the subcontainers in the Address
- * Book. The fullname of the containers are used as display
- * name to the user.
- */
-#define ZARAFA_UID_ADDRESS_BOOK					0
-#define ZARAFA_UID_GLOBAL_ADDRESS_BOOK			1
-#define ZARAFA_UID_GLOBAL_ADDRESS_LISTS			2
+* Fixed addressbook containers
+* Only ID's 0, 1 and 2 are available for hardcoding
+* IDs for the fixed addressbook containers. This is because
+* those ID's are the only ones which will not conflict with
+* entries in the users table.
+*
+* The account name of the containers are used for the path
+* name of the container and is used in determine the exact
+* order of the containers and the subcontainers in the Address
+* Book. The fullname of the containers are used as display
+* name to the user.
+*/
+#define KOPANO_UID_ADDRESS_BOOK			0
+#define KOPANO_UID_GLOBAL_ADDRESS_BOOK		1
+#define KOPANO_UID_GLOBAL_ADDRESS_LISTS		2
 
-#define ZARAFA_ACCOUNT_ADDRESS_BOOK				"Zarafa Address Book"
-#define ZARAFA_FULLNAME_ADDRESS_BOOK			"Zarafa Address Book"
-#define ZARAFA_ACCOUNT_GLOBAL_ADDRESS_BOOK		"Global Address Book"
-#define ZARAFA_FULLNAME_GLOBAL_ADDRESS_BOOK		"Global Address Book"
-#define ZARAFA_ACCOUNT_GLOBAL_ADDRESS_LISTS		"Global Address Lists"
-#define ZARAFA_FULLNAME_GLOBAL_ADDRESS_LISTS	"All Address Lists"
+#define KOPANO_ACCOUNT_ADDRESS_BOOK		"Kopano Address Book"
+#define KOPANO_FULLNAME_ADDRESS_BOOK		"Kopano Address Book"
+#define KOPANO_ACCOUNT_GLOBAL_ADDRESS_BOOK	"Global Address Book"
+#define KOPANO_FULLNAME_GLOBAL_ADDRESS_BOOK	"Global Address Book"
+#define KOPANO_ACCOUNT_GLOBAL_ADDRESS_LISTS	"Global Address Lists"
+#define KOPANO_FULLNAME_GLOBAL_ADDRESS_LISTS	"All Address Lists"
 
 #endif

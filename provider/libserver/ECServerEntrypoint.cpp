@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,9 +15,9 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
-#include <zarafa/ECLogger.h>
+#include <kopano/ECLogger.h>
 #include "ECSessionManager.h"
 #include "ECStatsCollector.h"
 
@@ -30,8 +30,6 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 pthread_key_t database_key;
@@ -74,14 +72,12 @@ static void plugin_destroy(void *lpParam)
 	delete lpPlugin;
 }
 
-ECRESULT zarafa_initlibrary(const char *lpDatabaseDir, const char *lpConfigFile)
+ECRESULT kopano_initlibrary(const char *lpDatabaseDir, const char *lpConfigFile)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 
-	if(g_bInitLib == true) {
-		er = ZARAFA_E_CALL_FAILED;
-		goto exit;
-	}
+	if (g_bInitLib == true)
+		return KCERR_CALL_FAILED;
 
 	// This is a global key that we can reference from each thread with a different value. The
 	// database_destroy routine is called when the thread terminates.
@@ -96,20 +92,15 @@ ECRESULT zarafa_initlibrary(const char *lpDatabaseDir, const char *lpConfigFile)
 	
 	//TODO: with an error remove all variables and g_bInitLib = false
 	g_bInitLib = true;
-
-exit:
 	return er;
 }
 
-ECRESULT zarafa_unloadlibrary(void)
+ECRESULT kopano_unloadlibrary(void)
 {
-	ECRESULT er = erSuccess;
 	std::set<ECDatabase *>::const_iterator iterDBObject, iNext;
 
-	if(!g_bInitLib) {
-		er = ZARAFA_E_NOT_INITIALIZED;
-		goto exit;
-	}
+	if (!g_bInitLib)
+		return KCERR_NOT_INITIALIZED;
 
 	// Delete the global key,  
 	//  on this position, there are zero or more threads exist. 
@@ -139,57 +130,43 @@ ECRESULT zarafa_unloadlibrary(void)
 	pthread_mutex_destroy(&g_hMutexDBObjectList);
 	ECDatabaseMySQL::UnloadLibrary();
 	g_bInitLib = false;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
-ECRESULT zarafa_init(ECConfig *lpConfig, ECLogger *lpAudit, bool bHostedZarafa, bool bDistributedZarafa)
+ECRESULT kopano_init(ECConfig *lpConfig, ECLogger *lpAudit, bool bHostedKopano, bool bDistributedKopano)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 
-	if(!g_bInitLib) {
-		er = ZARAFA_E_NOT_INITIALIZED;
-		goto exit;
-	}
+	if (!g_bInitLib)
+		return KCERR_NOT_INITIALIZED;
 
-#ifdef HAVE_OFFLINE_SUPPORT
-    g_lpSessionManager = new ECSessionManagerOffline(lpConfig, bHostedZarafa, bDistributedZarafa);
-#else
-    g_lpSessionManager = new ECSessionManager(lpConfig, lpAudit, bHostedZarafa, bDistributedZarafa);
-#endif
-	
+	g_lpSessionManager = new ECSessionManager(lpConfig, lpAudit, bHostedKopano, bDistributedKopano);
 	er = g_lpSessionManager->LoadSettings();
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	er = g_lpSessionManager->CheckUserLicense();
 	if (er != erSuccess)
-		goto exit;
+		return er;
 #ifdef HAVE_LIBS3_H
         if (strcmp(lpConfig->GetSetting("attachment_storage"), "s3") == 0)
                 ECS3Attachment::StaticInit(lpConfig);
 #endif
-exit:
-	return er;
+	return erSuccess;
 }
 
-void zarafa_removeallsessions()
+void kopano_removeallsessions()
 {
 	if(g_lpSessionManager) {
 		g_lpSessionManager->RemoveAllSessions();
 	}
 }
 
-ECRESULT zarafa_exit()
+ECRESULT kopano_exit()
 {
-	ECRESULT er = erSuccess;
 	std::set<ECDatabase *>::const_iterator iterDBObject;
 
-	if(!g_bInitLib) {
-		er = ZARAFA_E_NOT_INITIALIZED;
-		goto exit;
-	}
+	if (!g_bInitLib)
+		return KCERR_NOT_INITIALIZED;
 
 #ifdef HAVE_LIBS3_H
         if (g_lpSessionManager && strcmp(g_lpSessionManager->GetConfig()->GetSetting("attachment_storage"), "s3") == 0)
@@ -212,13 +189,11 @@ ECRESULT zarafa_exit()
 	     iterDBObject != g_lpDBObjectList.end(); ++iterDBObject)
 		(*iterDBObject)->Close();		
 	pthread_mutex_unlock(&g_hMutexDBObjectList);
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 #if 0
-static void zarafa_resetstats(void)
+static void kopano_resetstats(void)
 {
 	if (g_lpStatsCollector)
 		g_lpStatsCollector->Reset();
@@ -240,7 +215,7 @@ static void zarafa_resetstats(void)
  * @param[in] vak Value part of the header (right of the :)
  * @return SOAP_OK or soap error
  */
-static int zarafa_fparsehdr(struct soap *soap, const char *key,
+static int kopano_fparsehdr(struct soap *soap, const char *key,
     const char *val)
 {
 	const char *szProxy = g_lpSessionManager->GetConfig()->GetSetting("proxy_header");
@@ -252,7 +227,7 @@ static int zarafa_fparsehdr(struct soap *soap, const char *key,
 }
 
 // Called just after a new soap connection is established
-void zarafa_new_soap_connection(CONNECTION_TYPE ulType, struct soap *soap)
+void kopano_new_soap_connection(CONNECTION_TYPE ulType, struct soap *soap)
 {
 	const char *szProxy = g_lpSessionManager->GetConfig()->GetSetting("proxy_header");
 	SOAPINFO *lpInfo = new SOAPINFO;
@@ -267,17 +242,17 @@ void zarafa_new_soap_connection(CONNECTION_TYPE ulType, struct soap *soap)
 		} else {
 			// Parse headers to determine if the connection is proxied
 			lpInfo->fparsehdr = soap->fparsehdr; // daisy-chain the existing code
-			soap->fparsehdr = zarafa_fparsehdr;
+			soap->fparsehdr = kopano_fparsehdr;
 		}
 	}
 }
 
-void zarafa_end_soap_connection(struct soap *soap)
+void kopano_end_soap_connection(struct soap *soap)
 {
 	delete (SOAPINFO *)soap->user;
 }
 
-void zarafa_new_soap_listener(CONNECTION_TYPE ulType, struct soap *soap)
+void kopano_new_soap_listener(CONNECTION_TYPE ulType, struct soap *soap)
 {
 	SOAPINFO *lpInfo = new SOAPINFO;
 	lpInfo->ulConnectionType = ulType;
@@ -285,14 +260,14 @@ void zarafa_new_soap_listener(CONNECTION_TYPE ulType, struct soap *soap)
 	soap->user = (void *)lpInfo;
 }
 
-void zarafa_end_soap_listener(struct soap *soap)
+void kopano_end_soap_listener(struct soap *soap)
 {
 	delete (SOAPINFO *)soap->user;
 }
 
 // Called just before the socket is reset, with the server-side socket still
 // open
-void zarafa_disconnect_soap_connection(struct soap *soap)
+void kopano_disconnect_soap_connection(struct soap *soap)
 {
 	if(SOAP_CONNECTION_TYPE_NAMED_PIPE(soap)) {
 		// Mark the persistent session as exited
@@ -300,18 +275,15 @@ void zarafa_disconnect_soap_connection(struct soap *soap)
 	}
 }
 
-/////////////////////////////////////////////////////
 // Export functions
-//
-
 ECRESULT GetDatabaseObject(ECDatabase **lppDatabase)
 {
 	if(g_lpSessionManager == NULL) {
-		return ZARAFA_E_UNKNOWN;
+		return KCERR_UNKNOWN;
 	}
 
 	if(lppDatabase == NULL) {
-		return ZARAFA_E_INVALID_PARAMETER;
+		return KCERR_INVALID_PARAMETER;
 	}
 
 	ECDatabaseFactory db(g_lpSessionManager->GetConfig());

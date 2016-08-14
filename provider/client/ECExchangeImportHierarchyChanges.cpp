@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,32 +15,30 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include "ECExchangeImportHierarchyChanges.h"
 #include "ECExchangeImportContentsChanges.h"
 
-#include <zarafa/Util.h>
-#include <zarafa/ECGuid.h>
+#include <kopano/Util.h>
+#include <kopano/ECGuid.h>
 #include <edkguid.h>
 #include <mapiguid.h>
-#include <zarafa/mapiext.h>
-#include <zarafa/ECDebug.h>
-#include <zarafa/stringutil.h>
-#include "ZarafaUtil.h"
-#include "ZarafaICS.h"
+#include <kopano/mapiext.h>
+#include <kopano/ECDebug.h>
+#include <kopano/stringutil.h>
+#include "pcutil.hpp"
+#include "ics.h"
 #include <mapiutil.h>
 #include "Mem.h"
-#include <zarafa/mapi_ptr.h>
+#include <kopano/mapi_ptr.h>
 #include "EntryPoint.h"
 
-#include <zarafa/charset/convert.h>
-#include <zarafa/charset/utf8string.h>
-#include <zarafa/charset/convstring.h>
+#include <kopano/charset/convert.h>
+#include <kopano/charset/utf8string.h>
+#include <kopano/charset/convstring.h>
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -260,7 +258,7 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 	if (lpPropComment)
 		strFolderComment = convert_to<utf8string>(lpPropComment->Value.lpszW);
 
-	if (lpPropEntryId && IsZarafaEntryId(lpPropEntryId->Value.bin.cb, lpPropEntryId->Value.bin.lpb)) {
+	if (lpPropEntryId && IsKopanoEntryId(lpPropEntryId->Value.bin.cb, lpPropEntryId->Value.bin.lpb)) {
 		cbOrigEntryId = lpPropEntryId->Value.bin.cb;
 		lpOrigEntryId = lpPropEntryId->Value.bin.lpb;
 	}
@@ -448,7 +446,7 @@ HRESULT ECExchangeImportHierarchyChanges::ImportFolderChange(ULONG cValue, LPSPr
 	 * root container is only synced during the initial folder sync, but we'll perform the check here anyway.
 	 * If we have a PR_ADDITIONAL_REN_ENTRYIDS on the inbox, we'll set the same value on the root-container as
 	 * they're supposed to be in sync.
-	 * NOTE: This is a workaround for Zarafa not handling this property (and some others) as special properties.
+	 * NOTE: This is a workaround for Kopano not handling this property (and some others) as special properties.
 	 */
 	if (lpPropAdditionalREN != NULL && lpPropEntryId != NULL && lpPropEntryId->Value.bin.cb > 0) {
 		HRESULT hrTmp = hrSuccess;

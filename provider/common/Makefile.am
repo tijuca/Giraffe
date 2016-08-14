@@ -6,29 +6,28 @@ AM_CPPFLAGS = ${ZCPPFLAGS} ${DEBUGFLAGS} ${GSOAP_CFLAGS} \
 	-I${top_builddir}/provider/soap -I${top_srcdir}/provider/soap \
 	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon
 
-pkginclude_HEADERS = include/zarafa/ZarafaUser.h
+pkginclude_HEADERS = include/kopano/pcuser.hpp
 
-noinst_LTLIBRARIES = libzarafacommon.la
-#noinst_DATA = libzarafacommon.ldd
+noinst_LTLIBRARIES = libkccommon.la
+#noinst_DATA = libkccommon.ldd
 
-libzarafacommon_la_SOURCES = SOAPUtils.cpp SOAPUtils.h \
+libkccommon_la_SOURCES = SOAPUtils.cpp SOAPUtils.h \
 	SOAPAlloc.h \
 	SOAPHelpers.cpp SOAPHelpers.h \
 	SOAPDebug.cpp SOAPDebug.h \
 	SOAPSock.cpp SOAPSock.h \
-	ZarafaUtil.cpp ZarafaUtil.h \
-	ZarafaUser.h ZarafaUser.cpp \
+	pcutil.cpp pcutil.hpp \
+	pcuser.cpp \
 	ECLicenseClient.h ECLicenseClient.cpp \
 	ECSearchClient.h ECSearchClient.cpp \
-	ECOfflineState.h ECOfflineState.cpp \
-	StreamTypes.h ZarafaVersions.h
-libzarafacommon_la_LIBADD = \
-	../../common/libzcp_common_util.la ../../common/libzcp_common_mapi.la \
-	../soap/libzarafa_soapclient.la ../../common/libzcp_common_ssl.la \
+	soapctor.cpp
+libkccommon_la_LIBADD = \
+	../../common/libkcutil.la ../../common/libkcmapi.la \
+	../soap/libkcsoapclient.la ../../common/libkcssl.la \
 	${GSOAP_LIBS} ${SSL_LIBS}
-libzarafacommon_la_LDFLAGS = ${AM_LDFLAGS} \
+libkccommon_la_LDFLAGS = ${AM_LDFLAGS} \
 	-Wl,--version-script=${top_builddir}/default.sym
-EXTRA_libzarafacommon_la_DEPENDENCIES = ${top_builddir}/default.sym
+EXTRA_libkccommon_la_DEPENDENCIES = ${top_builddir}/default.sym
 
 check-syntax:
 	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \

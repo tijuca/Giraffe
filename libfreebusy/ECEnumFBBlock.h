@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -26,12 +26,12 @@
 #ifndef ECENUMFBBLOCK_H
 #define ECENUMFBBLOCK_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include "freebusy.h"
-#include <zarafa/ECUnknown.h>
-#include <zarafa/Trace.h>
-#include <zarafa/ECDebug.h>
-#include <zarafa/ECGuid.h>
+#include <kopano/ECUnknown.h>
+#include <kopano/Trace.h>
+#include <kopano/ECDebug.h>
+#include <kopano/ECGuid.h>
 #include "freebusyguid.h"
 
 #include "ECFBBlockList.h"
@@ -39,11 +39,9 @@
 /**
  * Implementatie of the IEnumFBBlock interface
  */
-class ECEnumFBBlock : public ECUnknown
-{
+class ECEnumFBBlock _kc_final : public ECUnknown {
 private:
 	ECEnumFBBlock(ECFBBlockList* lpFBBlock);
-	~ECEnumFBBlock(void);
 public:
 	static HRESULT Create(ECFBBlockList* lpFBBlock, ECEnumFBBlock **lppECEnumFBBlock);
 	
@@ -51,7 +49,7 @@ public:
 	virtual HRESULT Next(LONG celt, FBBlock_1 *pblk, LONG *pcfetch);
 	virtual HRESULT Skip(LONG celt);
 	virtual HRESULT Reset();
-	virtual HRESULT Clone(IEnumFBBlock **ppclone);
+	virtual HRESULT Clone(IEnumFBBlock **) { return E_NOTIMPL; }
 	virtual HRESULT Restrict(FILETIME ftmStart, FILETIME ftmEnd);
 
 public:

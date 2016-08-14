@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -28,15 +28,15 @@
 #include <mapidefs.h>
 #include <mapiutil.h>
 #include <inetmapi/inetmapi.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 
-#include <zarafa/CommonUtil.h>
-#include <zarafa/MAPIErrors.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/MAPIErrors.h>
 #include <fileutil.h>
-#include <zarafa/ECTags.h>
-#include <zarafa/ECChannel.h>
+#include <kopano/ECTags.h>
+#include <kopano/ECChannel.h>
 #include "LMTP.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 #include "fileutil.h"
 
 using namespace std;
@@ -49,12 +49,6 @@ LMTP::LMTP(ECChannel *lpChan, const char *szServerPath, ECLogger *lpLog, ECConfi
     m_lpConfig = lpConf;
     m_strPath = szServerPath;
 }
-
-LMTP::~LMTP() {
-}
-
-// MAIL FROM:<john@zarafa.com>
-// MAIL FROM:< iets@hier.nl>
 
 /** 
  * Tests the start of the input for the LMTP command. LMTP is case

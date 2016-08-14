@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,19 +15,17 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "Http.h"
-#include <zarafa/mapi_ptr.h>
-#include <zarafa/stringutil.h>
+#include <kopano/mapi_ptr.h>
+#include <kopano/stringutil.h>
 
-#include <zarafa/ECConfig.h>
+#include <kopano/ECConfig.h>
 
 using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 /** 
@@ -473,7 +471,7 @@ HRESULT Http::HrGetCharSet(std::string *strCharset)
  * to move mapi message from one folder to another
  * for eg.
  *
- * Destination: https://zarafa.com:8080/caldav/USER/FOLDER-ID/ENTRY-GUID.ics
+ * Destination: https://kopano.com:8080/caldav/USER/FOLDER-ID/ENTRY-GUID.ics
  *
  * @param[out]	strDestination	Return string destination of the request
  *
@@ -789,7 +787,7 @@ HRESULT Http::HrFlushHeaders()
 	HrGetHeaderValue("Connection", &strConnection);
 
 	// Add misc. headers
-	HrResponseHeader("Server","Zarafa");
+	HrResponseHeader("Server","Kopano");
 	struct tm dummy;
 	strftime(lpszChar, 127, "%a, %d %b %Y %H:%M:%S GMT", gmtime_safe(&tmCurrenttime, &dummy));
 

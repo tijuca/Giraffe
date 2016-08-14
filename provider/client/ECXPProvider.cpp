@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -12,46 +12,34 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-// ECXPProvider.cpp: implementation of the ECXPProvider class.
-//
-//////////////////////////////////////////////////////////////////////
-
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <mapi.h>
 #include <mapispi.h>
 #include <mapiutil.h>
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 
 
-#include "Zarafa.h"
+#include "kcore.hpp"
 #include "ECXPProvider.h"
 #include "ECXPLogon.h"
 
 #include "WSTransport.h"
 #include "Mem.h"
 
-#include <zarafa/Util.h>
+#include <kopano/Util.h>
 
-#include <zarafa/ECDebug.h>
+#include <kopano/ECDebug.h>
 
 #include "ClientUtil.h"
 #include "EntryPoint.h"
 
-#include <zarafa/charset/convstring.h>
-#include <zarafa/ECGetText.h>
+#include <kopano/charset/convstring.h>
+#include <kopano/ECGetText.h>
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 
 ECXPProvider::ECXPProvider() : ECUnknown("IXPProvider")
 {

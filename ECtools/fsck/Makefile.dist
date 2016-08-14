@@ -1,4 +1,4 @@
-CXXFLAGS=-g -Wall -I. `pkg-config --cflags zarafa`
-LDFLAGS=`pkg-config --libs zarafa`
+CXXFLAGS=-g -Wall -I. `pkg-config --cflags kopano`
+LDFLAGS=`pkg-config --libs kopano`
 
-zarafa-fsck: zarafa-fsck.o zarafa-fsck-main.o zarafa-fsck-calendar.o zarafa-fsck-task.o my_getopt.o
+kopano-fsck: kopano-fsck.o kopano-fsck-main.o kopano-fsck-calendar.o kopano-fsck-task.o my_getopt.o

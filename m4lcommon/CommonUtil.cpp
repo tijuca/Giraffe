@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,13 +15,13 @@
  *
  */
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/platform.h>
+#include <kopano/zcdefs.h>
+#include <kopano/platform.h>
 
 #include <string>
 #include <memory>
 #include <map>
-#include <zarafa/ustringutil.h>
+#include <kopano/ustringutil.h>
 
 #include <mapi.h>
 #include <mapidefs.h>
@@ -31,44 +31,38 @@
 #include <cerrno>
 #include <iconv.h>
 
-#include <zarafa/ECLogger.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/ECTags.h>
-#include <zarafa/ECGuid.h>
-#include <zarafa/Util.h>
-#include <zarafa/stringutil.h>
-#include <zarafa/base64.h>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/ECLogger.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/ECTags.h>
+#include <kopano/ECGuid.h>
+#include <kopano/Util.h>
+#include <kopano/stringutil.h>
+#include <kopano/base64.h>
+#include <kopano/mapi_ptr.h>
 
-#include <zarafa/charset/convert.h>
-#include <zarafa/charset/utf16string.h>
+#include <kopano/charset/convert.h>
+#include <kopano/charset/utf16string.h>
 
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include "freebusytags.h"
 
 #include <edkguid.h>
-#include <zarafa/mapiguidext.h>
+#include <kopano/mapiguidext.h>
 #include <edkmdb.h>
-#include <zarafa/IECUnknown.h>
-#include <zarafa/IECServiceAdmin.h>
-#include <zarafa/EMSAbTag.h>
-#include <zarafa/ECRestriction.h>
-#include <zarafa/MAPIErrors.h>
+#include <kopano/IECUnknown.h>
+#include <kopano/IECServiceAdmin.h>
+#include <kopano/EMSAbTag.h>
+#include <kopano/ECRestriction.h>
+#include <kopano/MAPIErrors.h>
 
 #include <sys/types.h>
-#ifdef WIN32
-#include <ws2tcpip.h>
-#else
 #include <sys/socket.h>
 #include <netdb.h>
-#endif
 
 using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 #define PROFILEPREFIX		"ec-adm-"
@@ -105,7 +99,7 @@ bool operator <(const SBinary &left, const SBinary &right)
 
 const char *GetServerUnixSocket(const char *szPreferred)
 {
-	const char *env = getenv("ZARAFA_SOCKET");
+	const char *env = getenv("KOPANO_SOCKET");
 	if (env && env[0] != '\0')
 		return env;
 	else if (szPreferred && szPreferred[0] != '\0')
@@ -162,14 +156,14 @@ exit:
 /**
  * Creates a new profile with given information.
  *
- * A new Zarafa profile will be created with the information given in
+ * A new Kopano profile will be created with the information given in
  * the paramters. See common/ECTags.h for possible profileflags. These
  * will be placed in PR_EC_FLAGS.
  * Any existing profile with the name in szProfName will first be removed.
  *
- * @param[in]	username	Username to logon to Zarafa
+ * @param[in]	username	Username to logon with
  * @param[in]	password	Password of the username
- * @param[in]	path		In URI form. Eg. file:///var/run/zarafad/server.sock
+ * @param[in]	path		In URI form. Eg. file:///var/run/kopano/server.sock
  * @param[in]	szProfName	Name of the profile to create
  * @param[in]	ulProfileFlags See EC_PROFILE_FLAGS_* in common/ECTags.h
  * @param[in]	sslkey_file	May be NULL. Logon with this sslkey instead of password.
@@ -179,7 +173,7 @@ exit:
  */
 HRESULT CreateProfileTemp(ECLogger *const lpLogger, const WCHAR *username, const WCHAR *password, const char *path, const char* szProfName, ULONG ulProfileFlags, const char *sslkey_file, const char *sslkey_password, const char *app_version, const char *app_misc) {
 	HRESULT hr = hrSuccess;
-	LPPROFADMIN	lpProfAdmin = NULL;
+	IProfAdmin *lpProfAdmin = NULL;
 	LPSERVICEADMIN lpServiceAdmin = NULL;
 	LPSPropValue lpServiceUID = NULL;
 	SPropValue sProps[9];	// server, username, password and profile -name and -flags, optional sslkey file with sslkey password
@@ -336,7 +330,7 @@ exit:
  */
 HRESULT DeleteProfileTemp(char *szProfName)
 {
-	LPPROFADMIN	lpProfAdmin = NULL;
+	IProfAdmin *lpProfAdmin = NULL;
 	HRESULT hr = hrSuccess;
 
 	// Get the MAPI Profile administration object
@@ -355,7 +349,7 @@ exit:
 
 HRESULT HrOpenECAdminSession(ECLogger *const lpLogger, IMAPISession **lppSession, const char *const app_version, const char *const app_misc, const char *szPath, ULONG ulProfileFlags, const char *sslkey_file, const char *sslkey_password)
 {
-	return HrOpenECSession(lpLogger, lppSession, app_version, app_misc, ZARAFA_SYSTEM_USER_W, ZARAFA_SYSTEM_USER_W, szPath, ulProfileFlags, sslkey_file, sslkey_password);
+	return HrOpenECSession(lpLogger, lppSession, app_version, app_misc, KOPANO_SYSTEM_USER_W, KOPANO_SYSTEM_USER_W, szPath, ulProfileFlags, sslkey_file, sslkey_password);
 }
 
 HRESULT HrOpenECSession(ECLogger *const lpLogger, IMAPISession **lppSession, const char *const app_version, const char *const app_misc, const WCHAR *szUsername, const WCHAR *szPassword, const char *szPath, ULONG ulProfileFlags, const char *sslkey_file, const char *sslkey_password, const char *profname)
@@ -420,7 +414,7 @@ HRESULT HrSearchECStoreEntryId(IMAPISession *lpMAPISession, BOOL bPublic, ULONG 
 	LPSPropValue	lpEntryIDProp = NULL;
 
 	// Get the default store by searching through the message store table and finding the
-	// store with PR_MDB_PROVIDER set to the zarafa public store GUID
+	// store with PR_MDB_PROVIDER set to the kopano public store GUID
 
 	hr = lpMAPISession->GetMsgStoresTable(0, &lpStoreTable);
 	if(hr != hrSuccess)
@@ -436,7 +430,7 @@ HRESULT HrSearchECStoreEntryId(IMAPISession *lpMAPISession, BOOL bPublic, ULONG 
 
 			if (bPublic) {
 				lpStoreProp = PpropFindProp(lpRows->aRow[0].lpProps,lpRows->aRow[0].cValues, PR_MDB_PROVIDER);
-				if (lpStoreProp != NULL && memcmp(lpStoreProp->Value.bin.lpb, &ZARAFA_STORE_PUBLIC_GUID, sizeof(MAPIUID)) == 0 )
+				if (lpStoreProp != NULL && memcmp(lpStoreProp->Value.bin.lpb, &KOPANO_STORE_PUBLIC_GUID, sizeof(MAPIUID)) == 0 )
 					break;
 			} else {
 				lpStoreProp = PpropFindProp(lpRows->aRow[0].lpProps,lpRows->aRow[0].cValues, PR_RESOURCE_FLAGS);
@@ -1359,9 +1353,15 @@ exit:
 	return hr;
 }
 
-///////////////////////////////////////////
+static void strupr(char *a)
+{
+	while (*a != '\0') {
+		*a = toupper(*a);
+		++a;
+	}
+}
+
 // Create Search key for recipients
-//
 HRESULT HrCreateEmailSearchKey(const char *lpszEmailType,
     const char *lpszEmail, ULONG *cb, LPBYTE *lppByte)
 {
@@ -2354,39 +2354,7 @@ exit:
 HRESULT GetClientVersion(unsigned int* ulVersion)
 {
 	HRESULT hr = hrSuccess;
-#ifdef WIN32
-	DWORD dwType = 0;
-	char	szData[255];
-	DWORD	cbData = 255;
-	char* lpFind = NULL;
-	HKEY	hKeyRoot = NULL;
-	
-	if(RegOpenKeyExA(HKEY_CLASSES_ROOT, "Outlook.Application\\CurVer", 0, KEY_READ, &hKeyRoot) != ERROR_SUCCESS) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-	if(RegQueryValueExA(hKeyRoot, NULL, NULL, &dwType, (LPBYTE)szData, &cbData) != ERROR_SUCCESS || dwType != REG_SZ) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-	// Outlook.Application.xx
-	lpFind = strrchr(szData, '.');
-	if(lpFind == NULL) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-	++lpFind;
-	*ulVersion = atoui(lpFind);	
-
-exit:
-	if(hKeyRoot)
-		RegCloseKey(hKeyRoot);
-#else
 	*ulVersion = CLIENT_VERSION_LATEST;
-#endif
-
 	return hr;
 }
 
@@ -2520,7 +2488,7 @@ HRESULT OpenSubFolder(LPMDB lpMDB, const WCHAR *folder, WCHAR psep, ECLogger *lp
 
 		hr = FindFolder(lpTable, subfld.c_str(), &lpPropFolder);
 		if (hr == MAPI_E_NOT_FOUND && bCreateFolder) {
-			hr = lpFoundFolder->CreateFolder(FOLDER_GENERIC, (LPTSTR)subfld.c_str(), (LPTSTR)L"Auto-created by Zarafa", &IID_IMAPIFolder, MAPI_UNICODE | OPEN_IF_EXISTS, &lpNewFolder);
+			hr = lpFoundFolder->CreateFolder(FOLDER_GENERIC, (LPTSTR)subfld.c_str(), (LPTSTR)L"Auto-created by Kopano", &IID_IMAPIFolder, MAPI_UNICODE | OPEN_IF_EXISTS, &lpNewFolder);
 			if (hr != hrSuccess) {
 				lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to create folder '%ls', error code: 0x%08X", subfld.c_str(), hr);
 				goto exit;

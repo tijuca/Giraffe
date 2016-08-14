@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,28 +15,26 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "WSMAPIFolderOps.h"
 
 #include "Mem.h"
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 
 // Utils
 #include "SOAPUtils.h"
 #include "WSUtil.h"
 
-#include <zarafa/charset/utf8string.h>
+#include <kopano/charset/utf8string.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 #define START_SOAP_CALL retry:
 #define END_SOAP_CALL 	\
-	if(er == ZARAFA_E_END_OF_SESSION) { if(m_lpTransport->HrReLogon() == hrSuccess) goto retry; } \
-	hr = ZarafaErrorToMAPIError(er, MAPI_E_NOT_FOUND); \
+	if(er == KCERR_END_OF_SESSION) { if(m_lpTransport->HrReLogon() == hrSuccess) goto retry; } \
+	hr = kcerr_to_mapierr(er, MAPI_E_NOT_FOUND); \
 	if(hr != hrSuccess) \
 		goto exit;
 
@@ -44,7 +42,7 @@ static const char THIS_FILE[] = __FILE__;
  * The WSMAPIFolderOps for use with the WebServices transport
  */
 
-WSMAPIFolderOps::WSMAPIFolderOps(ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport) : ECUnknown("WSMAPIFolderOps")
+WSMAPIFolderOps::WSMAPIFolderOps(KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport) : ECUnknown("WSMAPIFolderOps")
 {
 	this->lpCmd = lpCmd;
 	this->lpDataLock = lpDataLock;
@@ -63,7 +61,7 @@ WSMAPIFolderOps::~WSMAPIFolderOps()
 	FreeEntryId(&m_sEntryId, false);
 }
 
-HRESULT WSMAPIFolderOps::Create(ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport, WSMAPIFolderOps **lppFolderOps)
+HRESULT WSMAPIFolderOps::Create(KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport, WSMAPIFolderOps **lppFolderOps)
 {
 	HRESULT hr = hrSuccess;
 	WSMAPIFolderOps *lpFolderOps = NULL;
@@ -112,7 +110,7 @@ HRESULT WSMAPIFolderOps::HrCreateFolder(ULONG ulFolderType, const utf8string &st
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__createFolder(ecSessionId, m_sEntryId, lpsEntryId, ulFolderType, (char*)strFolderName.c_str(), (char*)strComment.c_str(), fOpenIfExists == 0 ? false : true, ulSyncId, sSourceKey, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -150,7 +148,7 @@ HRESULT WSMAPIFolderOps::HrDeleteFolder(ULONG cbEntryId, LPENTRYID lpEntryId, UL
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__deleteFolder(ecSessionId, sEntryId, ulFlags, ulSyncId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -171,7 +169,7 @@ HRESULT WSMAPIFolderOps::HrEmptyFolder(ULONG ulFlags, ULONG ulSyncId)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__emptyFolder(ecSessionId, m_sEntryId, ulFlags, ulSyncId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -203,7 +201,7 @@ HRESULT WSMAPIFolderOps::HrSetReadFlags(ENTRYLIST *lpMsgList, ULONG ulFlags, ULO
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__setReadFlags(ecSessionId, ulFlags, &m_sEntryId, lpMsgList ? &sEntryList : NULL, ulSyncId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -243,11 +241,11 @@ HRESULT WSMAPIFolderOps::HrSetSearchCriteria(ENTRYLIST *lpMsgList, SRestriction 
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableSetSearchCriteria(ecSessionId, m_sEntryId, lpsRestrict, lpsEntryList, ulFlags, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
-	hr = ZarafaErrorToMAPIError(er);
+	hr = kcerr_to_mapierr(er);
 	if(hr != hrSuccess)
 		goto exit;
 
@@ -278,7 +276,7 @@ HRESULT WSMAPIFolderOps::HrGetSearchCriteria(ENTRYLIST **lppMsgList, LPSRestrict
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__tableGetSearchCriteria(ecSessionId, m_sEntryId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -343,7 +341,7 @@ HRESULT WSMAPIFolderOps::HrCopyFolder(ULONG cbEntryFrom, LPENTRYID lpEntryFrom, 
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__copyFolder(ecSessionId, sEntryFrom, sEntryDest, (char*)strNewFolderName.c_str(), ulFlags, ulSyncId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -378,7 +376,7 @@ HRESULT WSMAPIFolderOps::HrCopyMessage(ENTRYLIST *lpMsgList, ULONG cbEntryDest, 
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__copyObjects(ecSessionId, &sEntryList, sEntryDest, ulFlags, ulSyncId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -411,7 +409,7 @@ HRESULT WSMAPIFolderOps::HrGetMessageStatus(ULONG cbEntryID, LPENTRYID lpEntryID
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__getMessageStatus(ecSessionId, sEntryId, ulFlags, &sMessageStatus) )
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sMessageStatus.er;
 	}
@@ -447,7 +445,7 @@ HRESULT WSMAPIFolderOps::HrSetMessageStatus(ULONG cbEntryID, LPENTRYID lpEntryID
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__setMessageStatus(ecSessionId, sEntryId, ulNewStatus, ulNewStatusMask, ulSyncId, &sMessageStatus) )
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sMessageStatus.er;
 	}
@@ -469,7 +467,7 @@ HRESULT WSMAPIFolderOps::HrGetChangeInfo(ULONG cbEntryID, LPENTRYID lpEntryID, L
 
 	LPSPropValue			lpSPropValPCL = NULL;
 	LPSPropValue			lpSPropValCK = NULL;
-	getChangeInfoResponse	sChangeInfo = {{0}};
+	getChangeInfoResponse sChangeInfo{__gszeroinit};
 
 	LockSoap();
 
@@ -483,11 +481,11 @@ HRESULT WSMAPIFolderOps::HrGetChangeInfo(ULONG cbEntryID, LPENTRYID lpEntryID, L
 		goto exit;
 
 	if (SOAP_OK != lpCmd->ns__getChangeInfo(ecSessionId, sEntryId, &sChangeInfo))
-		er = ZARAFA_E_NETWORK_ERROR;
+		er = KCERR_NETWORK_ERROR;
 	else
 		er = sChangeInfo.er;
 
-	hr = ZarafaErrorToMAPIError(er);
+	hr = kcerr_to_mapierr(er);
 	if (hr != hrSuccess)
 		goto exit;
 

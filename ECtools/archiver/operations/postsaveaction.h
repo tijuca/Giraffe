@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,7 +18,7 @@
 #ifndef postsaveaction_INCLUDED
 #define postsaveaction_INCLUDED
 
-#include <boost/smart_ptr.hpp>
+#include <memory>
 
 namespace za { namespace operations {
 
@@ -31,7 +31,7 @@ public:
 	virtual ~IPostSaveAction() {};
 	virtual HRESULT Execute() = 0;
 };
-typedef boost::shared_ptr<IPostSaveAction> PostSaveActionPtr;
+typedef std::shared_ptr<IPostSaveAction> PostSaveActionPtr;
 
 }} // namespace operations, za
 

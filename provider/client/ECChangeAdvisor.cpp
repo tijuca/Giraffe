@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,12 +15,12 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 #include <ECSyncLog.h>
-#include <zarafa/ECDebug.h>
-#include <zarafa/ECLogger.h>
+#include <kopano/ECDebug.h>
+#include <kopano/ECLogger.h>
 
 #include "ECChangeAdvisor.h"
 #include "ECMsgStore.h"
@@ -28,8 +28,6 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 ULONG ECChangeAdvisor::GetSyncId(const ConnectionMap::value_type &sConnection)
@@ -135,7 +133,7 @@ HRESULT ECChangeAdvisor::Create(ECMsgStore *lpMsgStore, ECChangeAdvisor **lppCha
 		goto exit;
 	}
 
-	hr = lpMsgStore->lpTransport->HrCheckCapabilityFlags(ZARAFA_CAP_ENHANCED_ICS, &fEnhancedICS);
+	hr = lpMsgStore->lpTransport->HrCheckCapabilityFlags(KOPANO_CAP_ENHANCED_ICS, &fEnhancedICS);
 	if (hr != hrSuccess)
 		goto exit;
 	if (!fEnhancedICS) {
@@ -508,11 +506,7 @@ exit:
 	return hr;
 }
 
-
-
-//////////////////////////////////
 // IECChangeAdvisor interface
-
 ULONG ECChangeAdvisor::xECChangeAdvisor::AddRef() {
 	TRACE_MAPI(TRACE_ENTRY, "IECChangeAdvisor::AddRef", "");
 	METHOD_PROLOGUE_(ECChangeAdvisor, ECChangeAdvisor);

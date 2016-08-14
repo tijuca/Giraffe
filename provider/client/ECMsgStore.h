@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,23 +18,23 @@
 #ifndef ECMSGSTORE_H
 #define ECMSGSTORE_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <mapidefs.h>
 #include <mapispi.h>
 
 //NOTE: windows in $TOP/common/windows, linux in $TOP/mapi4linux/include
 #include <edkmdb.h>
 
-#include <zarafa/ECUnknown.h>
+#include <kopano/ECUnknown.h>
 #include "ECMAPIProp.h"
 #include "WSTransport.h"
 #include "ECNotifyClient.h"
 #include "ECNamedProp.h"
 
-#include <zarafa/IECServiceAdmin.h>
+#include <kopano/IECServiceAdmin.h>
 #include "IECSpooler.h"
 #include "IECMultiStoreTable.h"
-#include <zarafa/IECLicense.h>
+#include <kopano/IECLicense.h>
 #include "IECTestProtocol.h"
 
 #include "IMAPIOffline.h"
@@ -500,11 +500,9 @@ private:
 	std::set<ULONG>		m_setAdviseConnections;
 };
 
-class ECMSLogon : public ECUnknown {
+class ECMSLogon _kc_final : public ECUnknown {
 private:
 	ECMSLogon(ECMsgStore *lpStore);
-	~ECMSLogon();
-
 	ECMsgStore *m_lpStore;
 	
 public:

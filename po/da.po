@@ -14,38 +14,38 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Pootle 2.1.5\n"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:922
-msgid "Zarafa Archive"
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:922
+msgid "Kopano Archive"
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:923
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:923
 msgid "This folder contains the special archive folders."
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:928
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:928
 msgid "History"
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:929
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:929
 msgid ""
 "This folder contains archives that have been replaced by a newer version."
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:933
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:933
 msgid "Outgoing"
 msgstr ""
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:934
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:934
 msgid "This folder contains archives of all outgoing messages."
 msgstr ""
 
 # 85%
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:938
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:938
 #, fuzzy
 msgid "Deleted"
 msgstr "Slet"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:939
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:939
 msgid "This folder contains archives of messages that have been deleted."
 msgstr ""
 
@@ -149,7 +149,7 @@ msgstr ""
 msgid "MAPI error code:"
 msgstr ""
 
-#: zarafa-libsync/ECSync.cpp:1961
+#: libsync/ECSync.cpp:1961
 msgid ""
 "The synchronization of a folder failed. Press retry to continue or ignore to "
 "supress all errors.\r\n"
@@ -157,7 +157,7 @@ msgid ""
 "Please contact the system administrator if this problem persists."
 msgstr ""
 
-#: zarafa-libsync/ECSync.cpp:1963
+#: libsync/ECSync.cpp:1963
 msgid "Error codes: "
 msgstr ""
 
@@ -236,12 +236,12 @@ msgstr "Offline"
 #: provider/ECProps/Addin.cpp:592 provider/ECProps/SyncBar.cpp:328
 #, fuzzy
 msgid "Configure offline synchronization"
-msgstr "Konfigurer Zarafa offline-synkronisering"
+msgstr "Konfigurer Kopano offline-synkronisering"
 
 #: provider/ECProps/Addin.cpp:594 provider/ECProps/SyncBar.cpp:320
 #, fuzzy
 msgid "Start offline synchronization"
-msgstr "Start Zarafa offline-synkronisering"
+msgstr "Start Kopano offline-synkronisering"
 
 #: provider/ECProps/Addin.cpp:596
 #: provider/ECProps/CommandBarButtonOpenSharedStore.cpp:29
@@ -638,7 +638,7 @@ msgid ""
 "You are currently offline. To use this command, connect to the online server."
 msgstr ""
 "Du er i øjeblikket offline. For at bruge denne kommando skal du oprette "
-"forbindelse til Zarafa-serveren."
+"forbindelse til Kopano-serveren."
 
 #: provider/ECProps/CommandBarButtonOutOfOffice.cpp:109
 msgid "Unable to open store, access denied."
@@ -1332,7 +1332,7 @@ msgid ""
 "Cannot use the profile because you are over the license limit. To continue, "
 "you must purchase additional client licenses."
 msgstr ""
-"Kan ikke starte Zarafa-klienten, fordi du har overskredet licensgrænsen. For "
+"Kan ikke starte Kopano-klienten, fordi du har overskredet licensgrænsen. For "
 "at fortsætte, skal du købe ekstra klientlicenser."
 
 #: provider/client/ECABProviderSwitch.cpp:284
@@ -1342,12 +1342,12 @@ msgid ""
 "Cannot use the profile because the server was unable to contact the license "
 "server. Please consult your system administrator."
 msgstr ""
-"Kan ikke starte Zarafa-klientne, fordi serveren var ude af stand til at "
+"Kan ikke starte Kopano-klientne, fordi serveren var ude af stand til at "
 "kontakte licensserveren. Kontakt venligst din systemadministrator."
 
 #: provider/client/ECArchiveAwareMessage.cpp:471
 #: provider/client/ECArchiveAwareMessage.cpp:529
-msgid "Zarafa Archiver"
+msgid "Kopano Archiver"
 msgstr ""
 
 #: provider/client/ECArchiveAwareMessage.cpp:473
@@ -1526,7 +1526,7 @@ msgid "Unable to store SSL certificate in registry key."
 msgstr ""
 
 #: provider/contacts/ZCABContainer.cpp:761
-msgid "Zarafa Contacts Folders"
+msgid "Kopano Contacts Folders"
 msgstr ""
 
 #: provider/libserver/ECGenProps.cpp:949
@@ -1539,7 +1539,7 @@ msgstr ""
 
 #: spooler/Spooler.cpp:485
 msgid ""
-"A fatal error occurred while processing your message, and Zarafa is unable "
+"A fatal error occurred while processing your message, and Kopano is unable "
 "to send your email."
 msgstr ""
 
@@ -1579,19 +1579,19 @@ msgstr ""
 msgid "Error found while trying to send your message. Error code: "
 msgstr ""
 
-#: installer/linux/zarafa-mr-accept:403
+#: installer/linux/kopano-mr-accept:403
 msgid "Recurring meetings are not allowed"
 msgstr ""
 
-#: installer/linux/zarafa-mr-accept:453
+#: installer/linux/kopano-mr-accept:453
 msgid "The requested time slot is unavailable"
 msgstr ""
 
-#: installer/linux/zarafa-mr-accept:455
+#: installer/linux/kopano-mr-accept:455
 msgid "The requested time slots are unavailble on the following dates:"
 msgstr ""
 
-#: installer/linux/zarafa-mr-accept:458
+#: installer/linux/kopano-mr-accept:458
 #, php-format
 msgid "%x %X"
 msgstr ""
@@ -1741,7 +1741,7 @@ msgid "Logon Failed. Please check your name/password."
 msgstr ""
 
 #: php-ext/include/mapi/class.mapiexception.php:29
-msgid "Can not connect to Zarafa server."
+msgid "Can not connect to Kopano server."
 msgstr ""
 
 #: php-ext/include/mapi/class.mapiexception.php:31

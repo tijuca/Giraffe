@@ -11,7 +11,7 @@ import codecs
 
 class Disclaimer(IMapiSpoolerPlugin):
 
-    disclaimerdir = '/etc/zarafa/disclaimers'
+    disclaimerdir = '/etc/kopano/disclaimers'
     
     def bestBody(self, message):
         tag = PR_NULL

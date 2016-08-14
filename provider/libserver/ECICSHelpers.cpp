@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,9 +15,11 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/stringutil.h>
-#include <ZarafaICS.h>
+#include <kopano/zcdefs.h>
+#include <kopano/platform.h>
+#include <memory>
+#include <kopano/stringutil.h>
+#include "ics.h"
 
 #include "ECStoreObjectTable.h"
 #include "ECICSHelpers.h"
@@ -30,13 +32,11 @@
 #include <string>
 #include <algorithm>
 
-#include <zarafa/ECLogger.h>
+#include <kopano/ECLogger.h>
 extern ECLogger* g_lpLogger;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 extern ECSessionManager*	g_lpSessionManager;
@@ -64,7 +64,7 @@ public:
 	CommonQueryCreator(unsigned int ulFlags);
 	
 	// IDbQueryCreator
-	std::string CreateQuery();
+	std::string CreateQuery(void) _kc_override;
 	
 private:
 	virtual std::string CreateBaseQuery() = 0;
@@ -102,13 +102,12 @@ std::string CommonQueryCreator::CreateQuery()
  *                          that are new or have changed since the last check will be
  *                          returned (deleted is a change is this context).
  **/
-class IncrementalQueryCreator : public CommonQueryCreator
-{
+class IncrementalQueryCreator _kc_final : public CommonQueryCreator {
 public:
 	IncrementalQueryCreator(ECDatabase *lpDatabase, unsigned int ulSyncId, unsigned int ulChangeId, const SOURCEKEY &sFolderSourceKey, unsigned int ulFlags);
 	
 private:
-	std::string CreateBaseQuery();
+	std::string CreateBaseQuery(void) _kc_override;
 	std::string CreateOrderQuery();
 	
 private:
@@ -169,13 +168,12 @@ std::string IncrementalQueryCreator::CreateOrderQuery()
  *                   messages need to be processed afterwards to see what needs to be
  *                   send to the client.
  **/
-class FullQueryCreator : public CommonQueryCreator
-{
+class FullQueryCreator _kc_final : public CommonQueryCreator {
 public:
 	FullQueryCreator(ECDatabase *lpDatabase, const SOURCEKEY &sFolderSourceKey, unsigned int ulFlags, unsigned int ulFilteredSourceSync = 0);
 	
 private:
-	std::string CreateBaseQuery();
+	std::string CreateBaseQuery(void) _kc_override;
 	std::string CreateOrderQuery();
 	
 private:
@@ -223,13 +221,12 @@ std::string FullQueryCreator::CreateOrderQuery()
  * do not have a restriction set. (When a restriction is set, we still need to generate the message set
  * so we cannot optimize anything out then).
  **/
-class NullQueryCreator : public CommonQueryCreator
-{
+class NullQueryCreator _kc_final : public CommonQueryCreator {
 public:
 	NullQueryCreator();
 	
 private:
-	std::string CreateBaseQuery();
+	std::string CreateBaseQuery(void) _kc_override;
 	std::string CreateOrderQuery();
 };
 
@@ -267,14 +264,17 @@ public:
  *                                which implies that all changes are genuin changes and no messages will be
  *                                rejected through a restriction.
  **/
-class NonLegacyIncrementalProcessor : public IMessageProcessor
-{
+class NonLegacyIncrementalProcessor _kc_final : public IMessageProcessor {
 public:
 	NonLegacyIncrementalProcessor(unsigned int ulMaxChangeId);
-	ECRESULT ProcessAccepted(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType, unsigned int *lpulFlags);
-	ECRESULT ProcessRejected(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType);
-	ECRESULT GetResidualMessages(LPMESSAGESET lpsetResiduals);
-	unsigned int GetMaxChangeId() const;
+	ECRESULT ProcessAccepted(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType, unsigned int *lpulFlags) _kc_override;
+	ECRESULT ProcessRejected(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType) _kc_override;
+	ECRESULT GetResidualMessages(LPMESSAGESET lpsetResiduals) _kc_override
+	{
+		/* No legacy, no residuals. */
+		return erSuccess;
+	}
+	unsigned int GetMaxChangeId(void) const { return m_ulMaxChangeId; }
 	
 private:
 	unsigned int m_ulMaxChangeId;
@@ -293,6 +293,8 @@ ECRESULT NonLegacyIncrementalProcessor::ProcessAccepted(DB_ROW lpDBRow, DB_LENGT
 	
 	*lpulChangeType = atoui(lpDBRow[icsChangeType]);
 	*lpulFlags = lpDBRow[icsFlags] ? atoui(lpDBRow[icsFlags]) : 0;
+
+	ec_log(EC_LOGLEVEL_ICS, "NonLegacyIncrementalAccepted: sourcekey=%s, changetype=%d", bin2hex(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey])).c_str(), *lpulChangeType);
 	return erSuccess;
 }
 
@@ -303,20 +305,9 @@ ECRESULT NonLegacyIncrementalProcessor::ProcessRejected(DB_ROW lpDBRow, DB_LENGT
 	ASSERT(FALSE);
 	
 	*lpulChangeType = 0;
+	ec_log(EC_LOGLEVEL_ICS, "NonLegacyIncrementalRejected: sourcekey=%s, changetype=0", bin2hex(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey])).c_str());
 	return erSuccess;
 }
-
-ECRESULT NonLegacyIncrementalProcessor::GetResidualMessages(LPMESSAGESET lpsetResiduals)
-{
-	// No legacy, so no residuals.
-	return erSuccess;
-}
-
-unsigned int NonLegacyIncrementalProcessor::GetMaxChangeId() const
-{
-	return m_ulMaxChangeId;
-}
-
 
 /**
  * NonLegacyFullProcessor: Processes accepted and rejected messages without the burden of tracking
@@ -324,14 +315,17 @@ unsigned int NonLegacyIncrementalProcessor::GetMaxChangeId() const
  *                         client previously. Since we don't have legacy, we assume all messages
  *                         up to the current changeId are on the client.
  **/
-class NonLegacyFullProcessor : public IMessageProcessor
-{
+class NonLegacyFullProcessor _kc_final : public IMessageProcessor {
 public:
 	NonLegacyFullProcessor(unsigned int ulChangeId, unsigned int ulSyncId);
-	ECRESULT ProcessAccepted(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType, unsigned int *lpulFlags);
-	ECRESULT ProcessRejected(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType);
-	ECRESULT GetResidualMessages(LPMESSAGESET lpsetResiduals);
-	unsigned int GetMaxChangeId() const;
+	ECRESULT ProcessAccepted(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType, unsigned int *lpulFlags) _kc_override;
+	ECRESULT ProcessRejected(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType) _kc_override;
+	ECRESULT GetResidualMessages(LPMESSAGESET lpsetResiduals) _kc_override
+	{
+		/* No legacy, no residuals. */
+		return erSuccess;
+	}
+	unsigned int GetMaxChangeId(void) const { return m_ulMaxChangeId; }
 	
 private:
 	unsigned int m_ulChangeId;
@@ -370,6 +364,7 @@ ECRESULT NonLegacyFullProcessor::ProcessAccepted(DB_ROW lpDBRow, DB_LENGTHS lpDB
 	if (ulChange > m_ulMaxChangeId)
 		m_ulMaxChangeId = ulChange;
 		
+	ec_log(EC_LOGLEVEL_ICS, "NonLegacyFullAccepted: sourcekey=%s, changetype=%d", bin2hex(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey])).c_str(), *lpulChangeType);
 	return erSuccess;
 }
 
@@ -385,32 +380,20 @@ ECRESULT NonLegacyFullProcessor::ProcessRejected(DB_ROW lpDBRow, DB_LENGTHS lpDB
 	if (ulChange > m_ulMaxChangeId)
 		m_ulMaxChangeId = ulChange;
 
+	ec_log(EC_LOGLEVEL_ICS, "NonLegacyFullRejected: sourcekey=%s, changetype=%d", bin2hex(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey])).c_str(), *lpulChangeType);
 	return erSuccess;
 }
-
-ECRESULT NonLegacyFullProcessor::GetResidualMessages(LPMESSAGESET lpsetResiduals)
-{
-	// No legacy, so no residuals.
-	return erSuccess;
-}
-
-unsigned int NonLegacyFullProcessor::GetMaxChangeId() const
-{
-	return m_ulMaxChangeId;
-}
-
 
 /**
  * LegacyProcessor: Processes accepted and rejected messages while keeping track of legacy messages.
  **/
-class LegacyProcessor : public IMessageProcessor
-{
+class LegacyProcessor _kc_final : public IMessageProcessor {
 public:
 	LegacyProcessor(unsigned int ulChangeId, unsigned int ulSyncId, const MESSAGESET &setMessages, unsigned int ulMaxFolderChange);
-	ECRESULT ProcessAccepted(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType, unsigned int *lpulFlags);
-	ECRESULT ProcessRejected(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType);
-	ECRESULT GetResidualMessages(LPMESSAGESET lpsetResiduals);
-	unsigned int GetMaxChangeId() const;
+	ECRESULT ProcessAccepted(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType, unsigned int *lpulFlags) _kc_override;
+	ECRESULT ProcessRejected(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType) _kc_override;
+	ECRESULT GetResidualMessages(LPMESSAGESET lpsetResiduals) _kc_override;
+	unsigned int GetMaxChangeId(void) const { return m_ulMaxChangeId; }
 	
 private:
 	unsigned int	m_ulSyncId;
@@ -457,6 +440,8 @@ ECRESULT LegacyProcessor::ProcessAccepted(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, un
 			*lpulChangeType = 0;	// Ignore
 		else
 			*lpulChangeType = ICS_MESSAGE_NEW;
+
+		ec_log(EC_LOGLEVEL_ICS, "LegacyAccepted: not synced, sourcekey=%s, changetype=%d", bin2hex(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey])).c_str(), *lpulChangeType);
 	} else {
 		// The message is synced!
 		if (ulMsgFlags & MSGFLAG_DELETED)		// Deleted
@@ -472,6 +457,7 @@ ECRESULT LegacyProcessor::ProcessAccepted(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, un
 		else
 			*lpulChangeType = 0;	// Ignore
 		
+		ec_log(EC_LOGLEVEL_ICS, "LegacyAccepted: synced, sourcekey=%s , changetype=%d", bin2hex(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey])).c_str(), *lpulChangeType);
 		m_setMessages.erase(iterMessage);
 	}
 	
@@ -496,12 +482,14 @@ ECRESULT LegacyProcessor::ProcessRejected(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, un
 	if (iterMessage == m_setMessages.end()) {
 		// The message is not synced yet!
 		*lpulChangeType = 0;	// Ignore
+		ec_log(EC_LOGLEVEL_ICS, "LegacyRejected: not synced, sourcekey=%s, changetype=%d", bin2hex(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey])).c_str(), *lpulChangeType);
 	} else {
 		// The message is synced!
 		*lpulChangeType = ICS_HARD_DELETE;
 		m_setMessages.erase(iterMessage);
+		ec_log(EC_LOGLEVEL_ICS, "LegacyRejected: synced, sourcekey=%s, changetype=%d", bin2hex(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey])).c_str(), *lpulChangeType);
 	}
-	
+
 	if (*lpulChangeType != 0)
 		m_ulMaxChangeId = m_ulMaxFolderChange;
 	
@@ -515,24 +503,21 @@ ECRESULT LegacyProcessor::GetResidualMessages(LPMESSAGESET lpsetResiduals)
 	return erSuccess;
 }
 
-unsigned int LegacyProcessor::GetMaxChangeId() const
-{
-	return m_ulMaxChangeId;
-}
-
-
 /**
  * FirstSyncProcessor: Processes accepted and rejected messages for initial syncs. And because
  *                     it is the first sync we assume there are no messages on the device yet.
  **/
-class FirstSyncProcessor : public IMessageProcessor
-{
+class FirstSyncProcessor _kc_final : public IMessageProcessor {
 public:
 	FirstSyncProcessor(unsigned int ulMaxFolderChange);
-	ECRESULT ProcessAccepted(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType, unsigned int *lpulFlags);
-	ECRESULT ProcessRejected(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType);
-	ECRESULT GetResidualMessages(LPMESSAGESET lpsetResiduals);
-	unsigned int GetMaxChangeId() const;
+	ECRESULT ProcessAccepted(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType, unsigned int *lpulFlags) _kc_override;
+	ECRESULT ProcessRejected(DB_ROW lpDBRow, DB_LENGTHS lpDBLen, unsigned int *lpulChangeType) _kc_override;
+	ECRESULT GetResidualMessages(LPMESSAGESET lpsetResiduals) _kc_override
+	{
+		/* No legacy, no residuals. */
+		return erSuccess;
+	}
+	unsigned int GetMaxChangeId(void) const { return m_ulMaxFolderChange; }
 	
 private:
 	unsigned int m_ulMaxFolderChange;
@@ -557,6 +542,7 @@ ECRESULT FirstSyncProcessor::ProcessAccepted(DB_ROW lpDBRow, DB_LENGTHS lpDBLen,
 	else
 		*lpulChangeType = ICS_MESSAGE_NEW;
 		
+	ec_log(EC_LOGLEVEL_ICS, "FirstSyncAccepted: sourcekey=%s, changetype=%d", bin2hex(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey])).c_str(), *lpulChangeType);
 	return erSuccess;
 }
 
@@ -565,20 +551,10 @@ ECRESULT FirstSyncProcessor::ProcessRejected(DB_ROW lpDBRow, DB_LENGTHS lpDBLen,
 	ASSERT(lpulChangeType);
 	
 	*lpulChangeType = 0;	// Ignore
+
+	ec_log(EC_LOGLEVEL_ICS, "FirstSyncRejected: sourcekey=%s, changetype=0", bin2hex(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey])).c_str());
 	return erSuccess;
 }
-
-ECRESULT FirstSyncProcessor::GetResidualMessages(LPMESSAGESET lpsetResiduals)
-{
-	// No legacy, so no residuals.
-	return erSuccess;
-}
-
-unsigned int FirstSyncProcessor::GetMaxChangeId() const
-{
-	return m_ulMaxFolderChange;
-}
-
 
 /**
  * ECGetContentChangesHelper definitions
@@ -628,7 +604,7 @@ ECRESULT ECGetContentChangesHelper::Init()
 
 	if (m_sFolderSourceKey.empty() && m_ulChangeId == 0 && (m_ulFlags & SYNC_CATCHUP) != SYNC_CATCHUP) {
 		// Disallow full initial exports on server level since they are insanely large
-		er = ZARAFA_E_NO_SUPPORT;
+		er = KCERR_NO_SUPPORT;
 		goto exit;
 	}
 
@@ -641,7 +617,7 @@ ECRESULT ECGetContentChangesHelper::Init()
 		goto exit;
 		
 	if ((lpDBRow = m_lpDatabase->FetchRow(lpDBResult)) == NULL || lpDBRow == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		ec_log_err("ECGetContentChangesHelper::Init(): fetchrow failed");
 		goto exit;
 	}
@@ -738,7 +714,7 @@ ECGetContentChangesHelper::~ECGetContentChangesHelper()
 	
 ECRESULT ECGetContentChangesHelper::QueryDatabase(DB_RESULT *lppDBResult)
 {
-	ECRESULT		er = erSuccess;
+	ECRESULT er;
 	DB_RESULT		lpDBResult = NULL;
 	std::string		strQuery;
 	unsigned int	ulChanges = 0;
@@ -750,7 +726,7 @@ ECRESULT ECGetContentChangesHelper::QueryDatabase(DB_RESULT *lppDBResult)
 		ASSERT(m_lpDatabase);
 		er = m_lpDatabase->DoSelect(strQuery, &lpDBResult);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 	} else {
 		lpDBResult = NULL;
 		ulChanges = 0;
@@ -767,9 +743,7 @@ ECRESULT ECGetContentChangesHelper::QueryDatabase(DB_RESULT *lppDBResult)
 	
 	ASSERT(lppDBResult);
 	*lppDBResult = lpDBResult;
-	
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECGetContentChangesHelper::ProcessRows(const std::vector<DB_ROW> &db_rows, const std::vector<DB_LENGTHS> &db_lengths)
@@ -779,7 +753,7 @@ ECRESULT ECGetContentChangesHelper::ProcessRows(const std::vector<DB_ROW> &db_ro
 	unsigned int	ulFlags = 0;
 	DB_ROW lpDBRow;
 	DB_LENGTHS lpDBLen;
-	std::set<SOURCEKEY> *matches = NULL;
+	std::set<SOURCEKEY> matches;
 
 	if (m_lpsRestrict) {
 		ASSERT(m_lpSession);
@@ -794,8 +768,11 @@ ECRESULT ECGetContentChangesHelper::ProcessRows(const std::vector<DB_ROW> &db_ro
 
 		lpDBRow = db_rows[i];
 		lpDBLen = db_lengths[i];
+
 		if (m_lpsRestrict != NULL)
-			fMatch = matches->find(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey])) != matches->end();
+			fMatch = matches.find(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey])) != matches.end();
+
+		ec_log(EC_LOGLEVEL_ICS, "Processing: %s, match=%d", bin2hex(SOURCEKEY(lpDBLen[icsSourceKey], lpDBRow[icsSourceKey])).c_str(), fMatch);
 		ulChangeType = 0;
 		ulFlags = 0;
 		if (fMatch) {
@@ -830,27 +807,26 @@ ECRESULT ECGetContentChangesHelper::ProcessRows(const std::vector<DB_ROW> &db_ro
 		++m_ulChangeCnt;
 	}
 exit:
-	free(matches);
 	return er;
 }
 
 ECRESULT ECGetContentChangesHelper::ProcessResidualMessages()
 {
-	ECRESULT				er = erSuccess;
+	ECRESULT er;
 	MESSAGESET				setResiduals;
 	MESSAGESET::const_iterator iterMessage;
 
 	ASSERT(m_lpMsgProcessor);
 	er = m_lpMsgProcessor->GetResidualMessages(&setResiduals);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 	
 	for (iterMessage = setResiduals.begin(); iterMessage != setResiduals.end(); ++iterMessage) {
 		if (iterMessage->first.size() == 1 && memcmp(iterMessage->first, "\0", 1) == 0)
 			continue;	// Skip empty restricted set marker,
 	
+		ec_log(EC_LOGLEVEL_ICS, "ProcessResidualMessages: sourcekey=%s", bin2hex(iterMessage->first).c_str());
 		m_lpChanges->__ptr[m_ulChangeCnt].ulChangeId = 0;
-		
 		m_lpChanges->__ptr[m_ulChangeCnt].sSourceKey.__ptr = (unsigned char *)soap_malloc(m_soap, iterMessage->first.size());
 		m_lpChanges->__ptr[m_ulChangeCnt].sSourceKey.__size = iterMessage->first.size();
 		memcpy(m_lpChanges->__ptr[m_ulChangeCnt].sSourceKey.__ptr, iterMessage->first, iterMessage->first.size());
@@ -864,9 +840,7 @@ ECRESULT ECGetContentChangesHelper::ProcessResidualMessages()
 		m_lpChanges->__ptr[m_ulChangeCnt].ulFlags = 0;
 		++m_ulChangeCnt;
 	}	
-	
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECGetContentChangesHelper::Finalize(unsigned int *lpulMaxChange, icsChangesArray **lppChanges)
@@ -950,7 +924,7 @@ ECRESULT ECGetContentChangesHelper::Finalize(unsigned int *lpulMaxChange, icsCha
 
 		while ((lpDBRow = m_lpDatabase->FetchRow(lpDBResult))) {
 			if (lpDBRow == NULL || lpDBRow[0] == NULL) {
-				er = ZARAFA_E_DATABASE_ERROR; // this should never happen
+				er = KCERR_DATABASE_ERROR; // this should never happen
 				ec_log_err("ECGetContentChangesHelper::Finalize(): row null or column null");
 				goto exit;
 			}
@@ -1035,7 +1009,7 @@ exit:
 
 ECRESULT ECGetContentChangesHelper::MatchRestrictions(const std::vector<DB_ROW> &db_rows,
     const std::vector<DB_LENGTHS> &db_lengths,
-    struct restrictTable *restrict, std::set<SOURCEKEY> **matches_p)
+    struct restrictTable *restrict, std::set<SOURCEKEY> *matches_p)
 {
 	ECRESULT er = erSuccess;
 	unsigned int ulObjId = 0;
@@ -1047,12 +1021,14 @@ ECRESULT ECGetContentChangesHelper::MatchRestrictions(const std::vector<DB_ROW> 
 	std::map<ECsIndexProp, unsigned int> index_objs;
 	struct propTagArray *lpPropTags = NULL;
 	struct rowSet *lpRowSet = NULL;
-	std::set<SOURCEKEY> *matches = new std::set<SOURCEKEY>;
+	std::set<SOURCEKEY> matches;
 	std::vector<unsigned int> cbdata;
 	std::vector<unsigned char *> lpdata;
 	std::vector<unsigned int> objectids;
 
 	memset(&sODStore, 0, sizeof(sODStore));
+
+	ec_log(EC_LOGLEVEL_ICS, "MatchRestrictions: matching %zu rows", db_rows.size());
 
 	for (size_t i = 0; i < db_rows.size(); ++i) {
 		lpdata.push_back(reinterpret_cast<unsigned char *>(db_rows[i][icsSourceKey]));
@@ -1095,23 +1071,23 @@ ECRESULT ECGetContentChangesHelper::MatchRestrictions(const std::vector<DB_ROW> 
 
 	if (lpRowSet->__size < 0 ||
 	    static_cast<size_t>(lpRowSet->__size) != lstRows.size()) {
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		ec_log_err("ECGetContentChangesHelper::MatchRestriction(): unexpected row count");
 		goto exit;
 	}
 
-	for (int j = 0; j < lpRowSet->__size; ++j) {
+	for (gsoap_size_t j = 0; j < lpRowSet->__size; ++j) {
 		// @todo: Get a proper locale for the case insensitive comparisons inside MatchRowRestrict
 		er = ECGenericObjectTable::MatchRowRestrict(g_lpSessionManager->GetCacheManager(), &lpRowSet->__ptr[j], restrict, NULL, createLocaleFromName(""), &fMatch);
 		if(er != erSuccess)
 			goto exit;
 		if (fMatch)
-			matches->insert(source_keys[j]);
+			matches.insert(source_keys[j]);
 	}
 
-	*matches_p = matches;
-	matches = NULL;
-
+	ec_log(EC_LOGLEVEL_ICS, "MatchRestrictions: %zu match(es) out of %d rows (%d properties)",
+		matches.size(), lpRowSet->__size, lpPropTags->__size);
+	*matches_p = std::move(matches);
 exit:
 	delete sODStore.lpGuid;
 
@@ -1119,8 +1095,6 @@ exit:
 		FreePropTagArray(lpPropTags);
 	if(lpRowSet)
 		FreeRowSet(lpRowSet, true);
-	if (matches != NULL)
-		delete matches;
 	return er;
 }
 
@@ -1151,7 +1125,7 @@ ECRESULT ECGetContentChangesHelper::GetSyncedMessages(unsigned int ulSyncId, uns
 
 		lpDBLen = m_lpDatabase->FetchRowLengths(lpDBResult);
 		if (lpDBRow == NULL || lpDBLen == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL) {
-			er = ZARAFA_E_DATABASE_ERROR; // this should never happen
+			er = KCERR_DATABASE_ERROR; // this should never happen
 			ec_log_err("ECGetContentChangesHelper::GetSyncedMessages(): row or columns null");
 			goto exit;
 		}

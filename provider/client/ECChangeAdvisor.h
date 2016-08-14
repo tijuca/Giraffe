@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,16 +18,16 @@
 #ifndef ECCHANGEADVISOR_H
 #define ECCHANGEADVISOR_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <mapidefs.h>
 #include <mapispi.h>
 
 #include <pthread.h>	
 
-#include <zarafa/ECUnknown.h>
+#include <kopano/ECUnknown.h>
 #include <IECChangeAdvisor.h>
 #include "ECICS.h"
-#include <zarafa/ZarafaCode.h>
+#include <kopano/kcodes.h>
 
 #include <map>
 

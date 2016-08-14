@@ -1368,7 +1368,7 @@ IID_IMessageRaw = DEFINE_OLEGUID( 0x0002038A, 0, 0)
 PS_ADDRESS = DEFINE_OLEGUID(0x00062004, 0, 0)
 PS_AIRSYNC = DEFINE_GUID(0x71035549, 0x0739, 0x4DCB, 0x91, 0x63, 0x00, 0xF0, 0x58, 0x0D, 0xBB, 0xDF)
 
-# Zarafa Tags
+# Our tags
 PR_EC_BASE 				= 0x6700
 
 PR_EC_SUGGESTION			= PROP_TAG(PT_UNICODE, 0x6707)
@@ -1694,7 +1694,7 @@ ecRightsDeleteAny       = 0x00000040
 ecRightsCreateSubfolder = 0x00000080
 ecRightsFolderAccess    = 0x00000100
 ecRightsFolderVisible   = 0x00000400
-ecRightsFullControl     = 0x00004FBL
+ecRightsFullControl     = 0x000004FB
 
 ecRightsTemplateNoRights    = ecRightsFolderVisible
 ecRightsTemplateReadOnly    = ecRightsTemplateNoRights | ecRightsReadAny

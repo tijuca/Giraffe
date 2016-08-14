@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,12 +18,12 @@
 #ifndef instanceidmapper_fwd_INCLUDED
 #define instanceidmapper_fwd_INCLUDED
 
-#include <boost/smart_ptr.hpp>
+#include <memory>
 
 namespace za { namespace operations {
 
 class InstanceIdMapper;
-typedef boost::shared_ptr<InstanceIdMapper> InstanceIdMapperPtr;
+typedef std::shared_ptr<InstanceIdMapper> InstanceIdMapperPtr;
 
 }} // namespace operations, za
 

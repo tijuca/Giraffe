@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -12,28 +12,19 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-#include <zarafa/platform.h>
-
+#include <kopano/platform.h>
 #include "WSMAPIPropStorage.h"
-
 #include "Mem.h"
-#include <zarafa/ECGuid.h>
-
-// Utils
+#include <kopano/ECGuid.h>
 #include "SOAPUtils.h"
 #include "WSUtil.h"
-#include <zarafa/Util.h>
-#include "ZarafaUtil.h"
-
-#include <zarafa/charset/convert.h>
+#include <kopano/Util.h>
+#include "pcutil.hpp"
+#include <kopano/charset/convert.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 /*
@@ -45,12 +36,12 @@ static const char THIS_FILE[] = __FILE__;
 #define START_SOAP_CALL retry:
 
 #define END_SOAP_CALL 	\
-	if(er == ZARAFA_E_END_OF_SESSION) { if(this->m_lpTransport->HrReLogon() == hrSuccess) goto retry; } \
-	hr = ZarafaErrorToMAPIError(er, MAPI_E_NOT_FOUND); \
+	if(er == KCERR_END_OF_SESSION) { if(this->m_lpTransport->HrReLogon() == hrSuccess) goto retry; } \
+	hr = kcerr_to_mapierr(er, MAPI_E_NOT_FOUND); \
 	if(hr != hrSuccess) \
 		goto exit;
 
-WSMAPIPropStorage::WSMAPIPropStorage(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, unsigned int ulServerCapabilities, WSTransport *lpTransport) : ECUnknown("WSMAPIPropStorage")
+WSMAPIPropStorage::WSMAPIPropStorage(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, unsigned int ulServerCapabilities, WSTransport *lpTransport) : ECUnknown("WSMAPIPropStorage")
 {
 	CopyMAPIEntryIdToSOAPEntryId(cbEntryId, lpEntryId, &m_sEntryId);
 	CopyMAPIEntryIdToSOAPEntryId(cbParentEntryId, lpParentEntryId, &m_sParentEntryId);
@@ -95,7 +86,7 @@ HRESULT WSMAPIPropStorage::QueryInterface(REFIID refiid, void **lppInterface)
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
-HRESULT WSMAPIPropStorage::Create(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, unsigned int ulServerCapabilities, WSTransport *lpTransport, WSMAPIPropStorage **lppPropStorage)
+HRESULT WSMAPIPropStorage::Create(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, unsigned int ulServerCapabilities, WSTransport *lpTransport, WSMAPIPropStorage **lppPropStorage)
 {
 	HRESULT hr = hrSuccess;
 	WSMAPIPropStorage *lpStorage = NULL;
@@ -126,7 +117,7 @@ HRESULT WSMAPIPropStorage::HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropVal
 	
 	LockSoap();
 	
-	if (ulObjId == 0 && ((this->ulServerCapabilities & ZARAFA_CAP_LOADPROP_ENTRYID) == 0)) { 
+	if (ulObjId == 0 && ((this->ulServerCapabilities & KOPANO_CAP_LOADPROP_ENTRYID) == 0)) {
 		hr = MAPI_E_NO_SUPPORT; 
 		goto exit; 
 	} 
@@ -134,7 +125,7 @@ HRESULT WSMAPIPropStorage::HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropVal
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != lpCmd->ns__loadProp(ecSessionId, m_sEntryId, ulObjId, ulPropTag, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -292,7 +283,6 @@ HRESULT WSMAPIPropStorage::HrUpdateSoapObject(MAPIOBJECT *lpsMapiObject, struct 
 	std::list<ECProperty>::const_iterator iterProps;
 	SPropValue sData;
 	ULONG ulPropId = 0;
-	int i;
 
 	if (lpConverter == NULL) {
 		convert_context converter;
@@ -320,7 +310,12 @@ HRESULT WSMAPIPropStorage::HrUpdateSoapObject(MAPIOBJECT *lpsMapiObject, struct 
 				continue;
 
 			// Extra check for protect the modProps array
-			if(lpsSaveObj->modProps.__size+1 > lpsMapiObject->lstModified->size() ) {
+			if (lpsSaveObj->modProps.__size >= 0 &&
+			    static_cast<size_t>(lpsSaveObj->modProps.__size) >= lpsMapiObject->lstModified->size()) {
+				/*
+				 * modProps.size+1 > lpsMapiObject->lstModified->size()
+				 * (a+1>b) transformed to (a>=b)
+				 */
 				ASSERT(FALSE);
 				return MAPI_E_NOT_ENOUGH_MEMORY;
 			}
@@ -336,7 +331,7 @@ HRESULT WSMAPIPropStorage::HrUpdateSoapObject(MAPIOBJECT *lpsMapiObject, struct 
 		ASSERT(!(iterProps == lpsMapiObject->lstModified->end()) );
 	}
 
-	for (i = 0; i < lpsSaveObj->__size; ++i) {
+	for (gsoap_size_t i = 0; i < lpsSaveObj->__size; ++i) {
 		MAPIOBJECT find(lpsSaveObj->__ptr[i].ulObjType, lpsSaveObj->__ptr[i].ulClientId);
 		iter = lpsMapiObject->lstChildren->find(&find);
 		
@@ -351,16 +346,14 @@ HRESULT WSMAPIPropStorage::HrUpdateSoapObject(MAPIOBJECT *lpsMapiObject, struct 
 
 void WSMAPIPropStorage::DeleteSoapObject(struct saveObject *lpSaveObj)
 {
-	int i;
-
 	if (lpSaveObj->__ptr) {
-		for (i = 0; i < lpSaveObj->__size; ++i)
+		for (gsoap_size_t i = 0; i < lpSaveObj->__size; ++i)
 			DeleteSoapObject(&lpSaveObj->__ptr[i]);
 		delete [] lpSaveObj->__ptr;
 	}
 
 	if (lpSaveObj->modProps.__ptr) {
-		for (i = 0; i < lpSaveObj->modProps.__size; ++i)
+		for (gsoap_size_t i = 0; i < lpSaveObj->modProps.__size; ++i)
 			FreePropVal(&lpSaveObj->modProps.__ptr[i], false);
 		delete [] lpSaveObj->modProps.__ptr;
 	}
@@ -372,7 +365,7 @@ void WSMAPIPropStorage::DeleteSoapObject(struct saveObject *lpSaveObj)
 
 ECRESULT WSMAPIPropStorage::EcFillPropTags(struct saveObject *lpsSaveObj, MAPIOBJECT *lpsMapiObj)
 {
-	for (int i = 0; i < lpsSaveObj->delProps.__size; ++i)
+	for (gsoap_size_t i = 0; i < lpsSaveObj->delProps.__size; ++i)
 		lpsMapiObj->lstAvailable->push_back(lpsSaveObj->delProps.__ptr[i]);
 	return erSuccess;
 }
@@ -383,7 +376,7 @@ ECRESULT WSMAPIPropStorage::EcFillPropValues(struct saveObject *lpsSaveObj, MAPI
 	LPSPropValue lpsProp = NULL;
 	convert_context	context;
 
-	for (int i = 0; i < lpsSaveObj->modProps.__size; ++i) {
+	for (gsoap_size_t i = 0; i < lpsSaveObj->modProps.__size; ++i) {
 		ECAllocateBuffer(sizeof(SPropValue), (void **)&lpsProp);
 
 		ec = CopySOAPPropValToMAPIPropVal(lpsProp, &lpsSaveObj->modProps.__ptr[i], lpsProp, &context);
@@ -404,7 +397,6 @@ ECRESULT WSMAPIPropStorage::EcFillPropValues(struct saveObject *lpsSaveObj, MAPI
 HRESULT WSMAPIPropStorage::HrUpdateMapiObject(MAPIOBJECT *lpClientObj, struct saveObject *lpsServerObj)
 {
 	ECMapiObjects::const_iterator iterObj, iterDel;
-	int i;
 
 	lpClientObj->ulObjId = lpsServerObj->ulServerId;
 
@@ -445,7 +437,7 @@ HRESULT WSMAPIPropStorage::HrUpdateMapiObject(MAPIOBJECT *lpClientObj, struct sa
 			lpClientObj->lstChildren->erase(iterDel);
 		} else if ((*iterObj)->bChanged) {
 			// find by client id, and set server id
-			i = 0;
+			gsoap_size_t i = 0;
 			while (i < lpsServerObj->__size) {
 				if ((*iterObj)->ulUniqueId == lpsServerObj->__ptr[i].ulClientId && (*iterObj)->ulObjType == lpsServerObj->__ptr[i].ulObjType)
 					break;
@@ -485,12 +477,12 @@ HRESULT WSMAPIPropStorage::HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject
 	START_SOAP_CALL
 	{
 		if (SOAP_OK != lpCmd->ns__saveObject(ecSessionId, m_sParentEntryId, m_sEntryId, &sSaveObj, ulFlags, m_ulSyncId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
 
-	if (er == ZARAFA_E_UNKNOWN_INSTANCE_ID) {
+	if (er == KCERR_UNKNOWN_INSTANCE_ID) {
 		/* Instance ID was unknown, we should resend entire message again, but this time include the instance body */
 		hr = HrUpdateSoapObject(lpsMapiObject, &sSaveObj, &converter);
 		if (hr != hrSuccess)
@@ -521,24 +513,22 @@ exit:
 }
 
 ECRESULT WSMAPIPropStorage::ECSoapObjectToMapiObject(struct saveObject *lpsSaveObj, MAPIOBJECT *lpsMapiObject) {
-	ECRESULT ec;
-	int i = 0;
 	MAPIOBJECT *mo = NULL;
 	ULONG ulAttachUniqueId = 0;
 	ULONG ulRecipUniqueId = 0;
 
 	// delProps contains all the available property tag
-	ec = EcFillPropTags(lpsSaveObj, lpsMapiObject);
+	EcFillPropTags(lpsSaveObj, lpsMapiObject);
 
 	// modProps contains all the props < 8K
-	ec = EcFillPropValues(lpsSaveObj, lpsMapiObject);
+	EcFillPropValues(lpsSaveObj, lpsMapiObject);
 
 	// delete stays false, unique id is set upon allocation
 	lpsMapiObject->ulObjId = lpsSaveObj->ulServerId;
 	lpsMapiObject->ulObjType = lpsSaveObj->ulObjType;
 
 	// children
-	for (i = 0; i < lpsSaveObj->__size; ++i) {
+	for (gsoap_size_t i = 0; i < lpsSaveObj->__size; ++i) {
 		switch (lpsSaveObj->__ptr[i].ulObjType) {
 		case MAPI_ATTACH:
 			AllocNewMapiObject(ulAttachUniqueId++, lpsSaveObj->__ptr[i].ulServerId, lpsSaveObj->__ptr[i].ulObjType, &mo);
@@ -565,7 +555,7 @@ ECRESULT WSMAPIPropStorage::ECSoapObjectToMapiObject(struct saveObject *lpsSaveO
 	/* FIXME: Support Multiple Single Instances */
 	if (lpsSaveObj->lpInstanceIds && lpsSaveObj->lpInstanceIds->__size &&
 	    CopySOAPEntryIdToMAPIEntryId(&lpsSaveObj->lpInstanceIds->__ptr[0], &lpsMapiObject->cbInstanceID, (LPENTRYID *)&lpsMapiObject->lpInstanceID) != hrSuccess)
-		return ZARAFA_E_INVALID_PARAMETER;
+		return KCERR_INVALID_PARAMETER;
 
 	return erSuccess;
 }
@@ -595,7 +585,7 @@ HRESULT WSMAPIPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 	HRESULT hr = hrSuccess;
 	struct loadObjectResponse sResponse;
 	MAPIOBJECT *lpsMapiObject = NULL;
-	struct notifySubscribe sNotSubscribe = {0};
+	struct notifySubscribe sNotSubscribe{__gszeroinit};
 
 	if (m_ulConnection) {
 		// Register notification
@@ -610,27 +600,27 @@ HRESULT WSMAPIPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 
 	if (!lppsMapiObject) {
 		ASSERT(FALSE);
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
 	if (*lppsMapiObject) {
 		// memleak detected
 		ASSERT(FALSE);
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
 	START_SOAP_CALL
 	{
 		if (SOAP_OK != lpCmd->ns__loadObject(ecSessionId, m_sEntryId, ((m_ulConnection == 0) || m_bSubscribed)?NULL:&sNotSubscribe, m_ulFlags | 0x80000000, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
 	//END_SOAP_CALL
-	if(er == ZARAFA_E_END_OF_SESSION) { if(m_lpTransport->HrReLogon() == hrSuccess) goto retry; }
-	hr = ZarafaErrorToMAPIError(er, MAPI_E_NOT_FOUND);
+	if(er == KCERR_END_OF_SESSION) { if(m_lpTransport->HrReLogon() == hrSuccess) goto retry; }
+	hr = kcerr_to_mapierr(er, MAPI_E_NOT_FOUND);
 	if (hr == MAPI_E_UNABLE_TO_COMPLETE)	// Store does not exist on this server
 		hr = MAPI_E_UNCONFIGURED;			// Force a reconfigure
 	if(hr != hrSuccess)
@@ -687,11 +677,7 @@ HRESULT WSMAPIPropStorage::Reload(void *lpParam, ECSESSIONID sessionId) {
 	return hrSuccess;
 }
 
-
-////////////////////////////////////////////////
 // Interface IECPropStorage
-//
-
 ULONG WSMAPIPropStorage::xECPropStorage::AddRef()
 {
 	METHOD_PROLOGUE_(WSMAPIPropStorage, ECPropStorage);

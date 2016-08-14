@@ -1,13 +1,13 @@
-## Path:        Network/Mail/Zarafa
-## Description: Zarafa service locale
+## Path:        Network/Mail/Kopano
+## Description: Kopano service locale
 ## Type:        string
 ## Default:     "C"
 #
-# Locale setting for all Zarafa services
+# Locale setting for all Kopano services
 #
-ZARAFA_LOCALE="C"
+KOPANO_LOCALE="C"
 
 #
-# Locale setting for Zarafa userscripts
+# Locale setting for Kopano userscripts
 #
-ZARAFA_USERSCRIPT_LOCALE="C"
+KOPANO_USERSCRIPT_LOCALE="C"

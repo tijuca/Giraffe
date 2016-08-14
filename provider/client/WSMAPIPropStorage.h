@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,12 +18,12 @@
 #ifndef WSMAPIPROPSTORAGE_H
 #define WSMAPIPROPSTORAGE_H
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/ECUnknown.h>
+#include <kopano/zcdefs.h>
+#include <kopano/ECUnknown.h>
 #include "IECPropStorage.h"
 
-#include <zarafa/ZarafaCode.h>
-#include "soapZarafaCmdProxy.h"
+#include <kopano/kcodes.h>
+#include "soapKCmdProxy.h"
 #include "WSTransport.h"
 
 #include <mapi.h>
@@ -36,11 +36,11 @@ class WSMAPIPropStorage : public ECUnknown
 {
 
 protected:
-	WSMAPIPropStorage(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, unsigned int ulServerCapabilities, WSTransport *lpTransport);
+	WSMAPIPropStorage(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, unsigned int ulServerCapabilities, WSTransport *lpTransport);
 	virtual ~WSMAPIPropStorage();
 
 public:
-	static HRESULT Create(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, ZarafaCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, unsigned int ulServerCapabilities, WSTransport *lpTransport, WSMAPIPropStorage **lppPropStorage);
+	static HRESULT Create(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, unsigned int ulServerCapabilities, WSTransport *lpTransport, WSMAPIPropStorage **lppPropStorage);
 
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
 
@@ -113,7 +113,7 @@ public:
 private:
 	entryId			m_sEntryId;
 	entryId			m_sParentEntryId;
-	ZarafaCmd*		lpCmd;
+	KCmd*		lpCmd;
 	pthread_mutex_t *lpDataLock;
 	ECSESSIONID		ecSessionId;
 	unsigned int	ulServerCapabilities;

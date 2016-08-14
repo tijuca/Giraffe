@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,18 +15,18 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <new>
 #include "m4l.mapidefs.h"
 #include "m4l.mapix.h"
 #include "m4l.debug.h"
 #include "m4l.mapiutil.h"
 
-#include <zarafa/ECDebug.h>
-#include <zarafa/Util.h>
-#include <zarafa/ECMemTable.h>
-#include <zarafa/charset/convert.h>
-#include <zarafa/ustringutil.h>
+#include <kopano/ECDebug.h>
+#include <kopano/Util.h>
+#include <kopano/ECMemTable.h>
+#include <kopano/charset/convert.h>
+#include <kopano/ustringutil.h>
 
 #include <mapi.h>
 #include <mapicode.h>
@@ -34,17 +34,14 @@
 #include <mapix.h>
 #include <mapiutil.h>
 
-#include <zarafa/ECConfig.h>
-#include <zarafa/CommonUtil.h>
+#include <kopano/ECConfig.h>
+#include <kopano/CommonUtil.h>
 
 #include <set>
 
 // ---
 // IMAPIProp
 // ---
-
-M4LMAPIProp::M4LMAPIProp() {
-}
 
 M4LMAPIProp::~M4LMAPIProp() {
 	std::list<LPSPropValue>::const_iterator i;
@@ -365,8 +362,6 @@ M4LProfSect::M4LProfSect(BOOL bGlobalProf) {
 	this->bGlobalProf = bGlobalProf;
 }
 
-M4LProfSect::~M4LProfSect() {
-}
 
 HRESULT M4LProfSect::ValidateState(ULONG ulUIParam, ULONG ulFlags) {
 	TRACE_MAPILIB(TRACE_ENTRY, "M4LProfSect::ValidateState", "");
@@ -414,42 +409,7 @@ HRESULT M4LProfSect::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfa
 }
 
 HRESULT M4LProfSect::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray* lppProblems) {
-	HRESULT hr = hrSuccess;
-
-#ifdef WIN32
-	ULONG ulcTmpValues = 0;
-	LPSPropValue lpTmpProps = NULL; 
-	LPSPropValue lpDisplayname = NULL;
-	LPSPropValue lpServer = NULL;
-	LPSPropValue lpUsername = NULL;
-
-	if (bGlobalProf) { 
-		lpServer = PpropFindProp(lpPropArray, cValues, PR_PROFILE_HOME_SERVER); 
-		lpUsername = PpropFindProp(lpPropArray, cValues, PR_PROFILE_USER);
-		lpDisplayname = PpropFindProp(lpPropArray, cValues, PR_DISPLAY_NAME);
-
-		if (lpServer && lpUsername) 
-		{
-			hr = GetConnectionProperties(lpServer, lpUsername, &ulcTmpValues, &lpTmpProps); 
-			if (hr != hrSuccess) 
-				goto exit;
-
-			cValues = ulcTmpValues; 
-			lpPropArray = lpTmpProps;
-		}
-
-		if (lpDisplayname)
-			M4LMAPIProp::SetProps(1, lpDisplayname, NULL); //ignore errors
-	}
-#endif
-	hr = M4LMAPIProp::SetProps(cValues, lpPropArray, lppProblems);
-
-#ifdef WIN32
-exit:
-	MAPIFreeBuffer(lpTmpProps);
-#endif
-
-	return hr;
+	return M4LMAPIProp::SetProps(cValues, lpPropArray, lppProblems);
 }
 
 HRESULT M4LProfSect::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray* lppProblems) {
@@ -502,12 +462,6 @@ HRESULT M4LProfSect::QueryInterface(REFIID refiid, void **lpvoid) {
 // ---
 // IMAPITable
 // ---
-M4LMAPITable::M4LMAPITable() {
-}
-
-M4LMAPITable::~M4LMAPITable() {
-}
-
 HRESULT M4LMAPITable::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError) {
 	*lppMAPIError = NULL;
 	return hrSuccess;
@@ -985,9 +939,6 @@ M4LMAPIAdviseSink::M4LMAPIAdviseSink(LPNOTIFCALLBACK lpFn, void *lpContext) {
 	this->lpFn = lpFn;
 }
 
-M4LMAPIAdviseSink::~M4LMAPIAdviseSink() {
-}
-
 ULONG M4LMAPIAdviseSink::OnNotify(ULONG cNotif, LPNOTIFICATION lpNotifications) {
 	return this->lpFn(this->lpContext, cNotif, lpNotifications);
 }
@@ -1017,13 +968,6 @@ HRESULT M4LMAPIAdviseSink::QueryInterface(REFIID refiid, void **lpvoid) {
 // 
 // IMAPIContainer
 // 
-
-M4LMAPIContainer::M4LMAPIContainer() {
-}
-
-M4LMAPIContainer::~M4LMAPIContainer() {
-}
-
 HRESULT M4LMAPIContainer::GetContentsTable(ULONG ulFlags, LPMAPITABLE* lppTable) {
 	return MAPI_E_NO_SUPPORT;
 }
@@ -1119,9 +1063,6 @@ HRESULT M4LMAPIContainer::QueryInterface(REFIID refiid, void **lpvoid) {
 // 
 
 M4LABContainer::M4LABContainer(const std::list<abEntry> &lABEntries) : m_lABEntries(lABEntries) {
-}
-
-M4LABContainer::~M4LABContainer() {
 }
 
 HRESULT M4LABContainer::CreateEntry(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulCreateFlags, LPMAPIPROP* lppMAPIPropEntry) {
@@ -1271,15 +1212,12 @@ exit:
 }
 
 HRESULT M4LABContainer::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG* lpulObjType, LPUNKNOWN* lppUnk) {
-	HRESULT hr = hrSuccess;
 	std::list<abEntry>::const_iterator iter;
 	LPABLOGON lpABLogon = NULL;
 	MAPIUID muidEntry;
 
-	if (cbEntryID < sizeof(MAPIUID) + 4 || !lpEntryID) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (cbEntryID < sizeof(MAPIUID) + 4 || lpEntryID == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	// get the provider muid
 	memcpy(&muidEntry, (LPBYTE)lpEntryID + 4, sizeof(MAPIUID));
@@ -1292,16 +1230,10 @@ HRESULT M4LABContainer::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID l
 			break;
 		}
 	}
-	if (!lpABLogon) {
-		hr = MAPI_E_UNKNOWN_ENTRYID;
-		goto exit;
-	}
-
+	if (lpABLogon == NULL)
+		return MAPI_E_UNKNOWN_ENTRYID;
 	// open root container of provider
-	hr = lpABLogon->OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, lpulObjType, lppUnk);
-
-exit:
-	return hr;
+	return lpABLogon->OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, lpulObjType, lppUnk);
 }
 
 HRESULT M4LABContainer::SetSearchCriteria(LPSRestriction lpRestriction, LPENTRYLIST lpContainerList, ULONG ulSearchFlags) {

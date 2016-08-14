@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,13 +15,13 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "archive.h"
 
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECGetText.h>
-#include <zarafa/charset/convert.h>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECGetText.h>
+#include <kopano/charset/convert.h>
+#include <kopano/mapi_ptr.h>
 
 #include "helpers/StoreHelper.h"
 #include "operations/copier.h"
@@ -32,14 +32,14 @@
 #include <list>
 #include <sstream>
 
-#include <zarafa/Util.h>
-#include <zarafa/ECDebug.h>
+#include <kopano/Util.h>
+#include <kopano/ECDebug.h>
 
 using namespace za::helpers;
 using namespace za::operations;
 using namespace std;
 
-typedef std::auto_ptr<Copier::Helper> HelperPtr;
+typedef std::unique_ptr<Copier::Helper> HelperPtr;
 
 #ifdef UNICODE
 typedef std::wostringstream tostringstream;

@@ -1,6 +1,6 @@
 #include "config.h"
 #ifdef HAVE_LIBS3_H
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <algorithm>
 #include <cerrno>
 #include <pthread.h>
@@ -8,7 +8,7 @@
 #include <zlib.h>
 #include <mapidefs.h>
 #include <mapitags.h>
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 #include "../../common/ECSerializer.h"
 #include "../common/SOAPUtils.h"
 #include "ECAttachmentStorage.h"
@@ -101,10 +101,10 @@ int ECS3Attachment::put_obj_cb(int bufferSize, char *buffer, void *cbdata)
 ECRESULT ECS3Attachment::StaticInit(ECConfig *cf)
 {
 	ec_log_info("Initializing S3 Attachment Storage");
-	S3Status status = S3_initialize("Zarafa Mail", S3_INIT_ALL, cf->GetSetting("attachment_s3_hostname"));
+	S3Status status = S3_initialize("Kopano Mail", S3_INIT_ALL, cf->GetSetting("attachment_s3_hostname"));
 	if (status != S3StatusOK) {
 		ec_log_err("Error while initializing S3 Attachment Storage, error type: %s", S3_get_status_name(status));
-		return ZARAFA_E_NETWORK_ERROR;
+		return KCERR_NETWORK_ERROR;
 	}
 	return erSuccess;
 }
@@ -142,18 +142,18 @@ ECRESULT ECS3Attachment::StaticDeinit(void)
 /**
  * The ECS3Attachment Storage engine is used to store attachments as separate
  * files in the S3 storage cluster. This is useful to ensure you have enough
- * storage capacity on your servers and can be used to cluster multiple Zarafa
+ * storage capacity on your servers and can be used to cluster multiple Kopano
  * servers together, allowing each of them to access the same storage for the
  * attachments.
  *
- * @param database The database connection of the Zarafa Server
+ * @param database The database connection of the Kopano Server
  * @param protocol sets the type of protocol that should be used to connect to the Amazon S3 cluster.
  *		   The options are http or https, of which https is the preferred option.
  * @param uriStyle The uri style of the bucket, allowed options are virtualhost or path,
  * @param accessKeyId The access key of your Amazon account for S3 storage.
  * @param secretAccessKey The secret access key of your Amazon account for S3 storage.
  * @param bucketName The name of the bucket in which you want to store all the attachments.
- * @param basepath In order to use the same bucket with different Zarafa clusters, you can select
+ * @param basepath In order to use the same bucket with different Kopano clusters, you can select
  *		   different basepaths for each cluster, this works like a separate directory where
  *		   all the files are stored in. NOTE: Use the same basepath for all the servers in
  *		   a single server cluster.
@@ -397,12 +397,12 @@ bool ECS3Attachment::ExistAttachmentInstance(ULONG ins_id)
  * @param[out] size_p size in data_p
  * @param[out] data_p data of instance
  *
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECS3Attachment::LoadAttachmentInstance(struct soap *soap,
     ULONG ins_id, size_t *size_p, unsigned char **data_p)
 {
-	ECRESULT ret = ZARAFA_E_NOT_FOUND;
+	ECRESULT ret = KCERR_NOT_FOUND;
 	struct s3_cd cdata = create_cd();
 	struct s3_cd *cdp = &cdata;
 	cdp->sink = NULL;
@@ -436,13 +436,13 @@ ECRESULT ECS3Attachment::LoadAttachmentInstance(struct soap *soap,
 
 	if (cdp->size != cdp->processed) {
 		ec_log_err("Short read while reading attachment data, key: %s", filename.c_str());
-		ret = ZARAFA_E_DATABASE_ERROR;
+		ret = KCERR_DATABASE_ERROR;
 		goto exit;
 	} else if (cdp->data == NULL) {
-		ret = ZARAFA_E_NOT_ENOUGH_MEMORY;
+		ret = KCERR_NOT_ENOUGH_MEMORY;
 		goto exit;
 	} else if (cdp->status != S3StatusOK) {
-		ret = ZARAFA_E_NETWORK_ERROR;
+		ret = KCERR_NETWORK_ERROR;
 		goto exit;
 	}
 	/*
@@ -476,7 +476,7 @@ ECRESULT ECS3Attachment::LoadAttachmentInstance(struct soap *soap,
  */
 ECRESULT ECS3Attachment::LoadAttachmentInstance(ULONG ins_id, size_t *size_p, ECSerializer *sink)
 {
-	ECRESULT ret = ZARAFA_E_NOT_FOUND;
+	ECRESULT ret = KCERR_NOT_FOUND;
 	struct s3_cd cdata = create_cd();
 	struct s3_cd *cdp = &cdata;
 	cdp->sink = sink;
@@ -506,13 +506,13 @@ ECRESULT ECS3Attachment::LoadAttachmentInstance(ULONG ins_id, size_t *size_p, EC
 	ec_log_debug("Result of the load instance: %s", S3_get_status_name(cdp->status));
 	if (cdp->size != cdp->processed) {
 		ec_log_err("Short read while reading attachment data from S3, key: %s", filename.c_str());
-		ret = ZARAFA_E_DATABASE_ERROR;
+		ret = KCERR_DATABASE_ERROR;
 		goto exit;
 	} else if (cdp->status == S3StatusOK) {
 		ret = erSuccess;
 		goto exit;
 	} else if (cdp->data == NULL) {
-		ret = ZARAFA_E_NOT_ENOUGH_MEMORY;
+		ret = KCERR_NOT_ENOUGH_MEMORY;
 		goto exit;
 	}
 	*size_p = cdp->size;
@@ -533,12 +533,12 @@ ECRESULT ECS3Attachment::LoadAttachmentInstance(ULONG ins_id, size_t *size_p, EC
  * @param[in] size size of data
  * @param[in] data Data of property
  *
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECS3Attachment::SaveAttachmentInstance(ULONG ins_id, ULONG propid,
     size_t size, unsigned char *data)
 {
-	ECRESULT ret = ZARAFA_E_NOT_FOUND;
+	ECRESULT ret = KCERR_NOT_FOUND;
 	bool comp = false;
 	struct s3_cd cdata = create_cd();
 	struct s3_cd *cdp = &cdata;
@@ -572,7 +572,7 @@ ECRESULT ECS3Attachment::SaveAttachmentInstance(ULONG ins_id, ULONG propid,
 
 	if (cdp->size != cdp->processed) {
 		ec_log_err("Unable to write attachment data to S3, key: %s", filename.c_str());
-		ret = ZARAFA_E_DATABASE_ERROR;
+		ret = KCERR_DATABASE_ERROR;
 		goto exit;
 	} else if (cdp->status == S3StatusOK) {
 		ret = erSuccess;
@@ -591,12 +591,12 @@ ECRESULT ECS3Attachment::SaveAttachmentInstance(ULONG ins_id, ULONG propid,
  * @param[in] size size in source
  * @param[in] source serializer to read data from
  *
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECS3Attachment::SaveAttachmentInstance(ULONG ins_id, ULONG propid,
     size_t size, ECSerializer *source)
 {
-	ECRESULT ret = ZARAFA_E_NOT_FOUND;
+	ECRESULT ret = KCERR_NOT_FOUND;
 	bool comp = false;
 	struct s3_cd cdata = create_cd();
 	struct s3_cd *cdp = &cdata;
@@ -632,7 +632,7 @@ ECRESULT ECS3Attachment::SaveAttachmentInstance(ULONG ins_id, ULONG propid,
 
 	if (cdp->size != cdp->processed) {
 		ec_log_err("Unable to write attachment data to S3, key: %s", filename.c_str());
-		ret = ZARAFA_E_DATABASE_ERROR;
+		ret = KCERR_DATABASE_ERROR;
 		goto exit;
 	} else if (cdp->status == S3StatusOK) {
 		ret = erSuccess;
@@ -649,7 +649,7 @@ ECRESULT ECS3Attachment::SaveAttachmentInstance(ULONG ins_id, ULONG propid,
  * @param[in] lstDeleteInstances List of instance ids to remove from the filesystem
  * @param[in] bReplace Transaction marker
  *
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECS3Attachment::DeleteAttachmentInstances(const std::list<ULONG> &lstDeleteInstances, bool bReplace)
 {
@@ -662,7 +662,7 @@ ECRESULT ECS3Attachment::DeleteAttachmentInstances(const std::list<ULONG> &lstDe
 		if (ret != erSuccess)
 			++errors;
 	}
-	return errors == 0 ? erSuccess : ZARAFA_E_DATABASE_ERROR;
+	return errors == 0 ? erSuccess : KCERR_DATABASE_ERROR;
 }
 
 /**
@@ -670,7 +670,7 @@ ECRESULT ECS3Attachment::DeleteAttachmentInstances(const std::list<ULONG> &lstDe
  *
  * @param[in] ins_id instance id to mark
  *
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECS3Attachment::mark_att_for_del(ULONG ins_id)
 {
@@ -684,7 +684,7 @@ ECRESULT ECS3Attachment::mark_att_for_del(ULONG ins_id)
  *
  * @param[in] ins_id instance id to restore
  *
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECS3Attachment::restore_marked_att(ULONG ins_id)
 {
@@ -698,7 +698,7 @@ ECRESULT ECS3Attachment::restore_marked_att(ULONG ins_id)
  *
  * @param[in] ins_id instance id to remove
  *
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECS3Attachment::del_marked_att(ULONG ins_id)
 {
@@ -726,7 +726,7 @@ ECRESULT ECS3Attachment::del_marked_att(ULONG ins_id)
 	ec_log_debug("Result of the delete marked attachment: %s", S3_get_status_name(cdp->status));
 	if (cdp->status == S3StatusOK)
 		return erSuccess;
-	return ZARAFA_E_NOT_FOUND;
+	return KCERR_NOT_FOUND;
 }
 
 /**
@@ -747,7 +747,7 @@ ECRESULT ECS3Attachment::DeleteAttachmentInstance(ULONG ins_id,
 		return del_marked_att(ins_id);
 
 	ret = mark_att_for_del(ins_id);
-	if (ret != erSuccess && ret != ZARAFA_E_NOT_FOUND) {
+	if (ret != erSuccess && ret != KCERR_NOT_FOUND) {
 		ASSERT(FALSE);
 		return ret;
 	}
@@ -760,7 +760,7 @@ ECRESULT ECS3Attachment::DeleteAttachmentInstance(ULONG ins_id,
  * @param[in] ins_id instance id to convert to a filename
  * @param[in] bCompressed add compression marker to filename
  *
- * @return Zarafa error code
+ * @return Kopano error code
  */
 std::string ECS3Attachment::make_att_filename(ULONG ins_id, bool comp)
 {
@@ -811,12 +811,12 @@ struct s3_cd ECS3Attachment::create_cd(void)
  * @param[out] size_p Size of the instance
  * @param[out] compr_p the instance was compressed
  *
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECS3Attachment::GetSizeInstance(ULONG ins_id, size_t *size_p,
     bool *compr_p)
 {
-	ECRESULT ret = ZARAFA_E_NOT_FOUND;
+	ECRESULT ret = KCERR_NOT_FOUND;
 	bool comp = false;
 	struct s3_cd cdata = create_cd();
 	struct s3_cd *cdp = &cdata;
@@ -891,7 +891,7 @@ ECRESULT ECS3Attachment::Commit(void)
 	m_new_att.clear();
 	m_deleted_att.clear();
 	m_marked_att.clear();
-	return error ? ZARAFA_E_DATABASE_ERROR : erSuccess;
+	return error ? KCERR_DATABASE_ERROR : erSuccess;
 }
 
 ECRESULT ECS3Attachment::Rollback(void)
@@ -920,7 +920,7 @@ ECRESULT ECS3Attachment::Rollback(void)
 
 	m_new_att.clear();
 	m_marked_att.clear();
-	return error ? ZARAFA_E_DATABASE_ERROR : erSuccess;
+	return error ? KCERR_DATABASE_ERROR : erSuccess;
 }
 
 #endif /* LIBS3_H */

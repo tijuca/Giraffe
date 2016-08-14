@@ -1,14 +1,14 @@
 # -*- Makefile -*-
 
-SUBDIRS = include/zarafa zarafa
+SUBDIRS = include/kopano kopano zarafa
 
 SWIG_CXXFLAGS = -Wall -python -c++ -threads \
 	-I${top_srcdir}/swig/include -I${srcdir}/include
 
-lib_LTLIBRARIES = libzcp_pyconv.la libzcp_pydirector.la
+lib_LTLIBRARIES = libkcpyconv.la libkcpydirector.la
 pyexec_LTLIBRARIES = _MAPICore.la _inetmapi.la _icalmapi.la _licenseclient.la
 noinst_LTLIBRARIES = _libcommon.la _archiver.la _libfreebusy.la _RecurrenceState.la
-noinst_DATA = libzcp_pyconv.ldd _MAPICore.ldd _inetmapi.ldd _icalmapi.ldd \
+noinst_DATA = libkcpyconv.ldd _MAPICore.ldd _inetmapi.ldd _icalmapi.ldd \
 	_libcommon.ldd _archiver.ldd _libfreebusy.ldd _RecurrenceState.ldd \
 	_licenseclient.ldd
 
@@ -19,81 +19,81 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) \
 	$(PYTHON_INCLUDES) -I${top_srcdir}/swig -w \
 	-DSWIG_PYTHON_OUTPUT_TUPLE -DSWIG_TYPE_TABLE=MAPI
 
-libzcp_pyconv_la_SOURCES = conversion.cpp conversion.h
-libzcp_pyconv_la_LDFLAGS = -Wl,--version-script=${top_builddir}/default.sym
-libzcp_pyconv_la_LIBADD  = ${PYTHON_LIBS} \
+libkcpyconv_la_SOURCES = conversion.cpp conversion.h
+libkcpyconv_la_LDFLAGS = -Wl,--version-script=${top_builddir}/default.sym
+libkcpyconv_la_LIBADD  = ${PYTHON_LIBS} \
 	${top_builddir}/mapi4linux/src/libmapi.la
-libzcp_pydirector_la_SOURCES = ../director_util.cpp ../director_util.h
-libzcp_pydirector_la_LDFLAGS = -Wl,--version-script=${top_builddir}/default.sym
-libzcp_pydirector_la_LIBADD  = -lpthread
+libkcpydirector_la_SOURCES = ../director_util.cpp ../director_util.h
+libkcpydirector_la_LDFLAGS = -Wl,--version-script=${top_builddir}/default.sym
+libkcpydirector_la_LIBADD  = -lpthread
 
-_MAPICore_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/zarafa-libsync
+_MAPICore_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/libsync
 _MAPICore_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
-_MAPICore_la_LIBADD = libzcp_pyconv.la libzcp_pydirector.la \
+_MAPICore_la_LIBADD = libkcpyconv.la libkcpydirector.la \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_util.la \
-	${top_builddir}/zarafa-libsync/libzarafasync.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcutil.la \
+	${top_builddir}/libsync/libkcsync.la \
 	$(XML2_LIBS) $(PROG_LIBS) $(PYTHON_LIBS)
 
 _inetmapi_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/inetmapi
 _inetmapi_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
-_inetmapi_la_LIBADD = libzcp_pyconv.la \
+_inetmapi_la_LIBADD = libkcpyconv.la \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_util.la \
-	${top_builddir}/inetmapi/libinetmapi.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcutil.la \
+	${top_builddir}/inetmapi/libkcinetmapi.la \
 	$(PROG_LIBS) $(PYTHON_LIBS)
 
 _icalmapi_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/libicalmapi -I${top_srcdir}/libfreebusy
 _icalmapi_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
-_icalmapi_la_LIBADD = libzcp_pyconv.la \
+_icalmapi_la_LIBADD = libkcpyconv.la \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/libicalmapi/libicalmapi.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_util.la \
-	${top_builddir}/libfreebusy/libfreebusy.la \
+	${top_builddir}/libicalmapi/libkcicalmapi.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcutil.la \
+	${top_builddir}/libfreebusy/libkcfreebusy.la \
 	$(ICAL_LIBS) $(PROG_LIBS) $(PYTHON_LIBS)
 
 _archiver_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/ECtools/archiver
 _archiver_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version -rpath '$(libdir)'
 _archiver_la_LIBADD = \
-	${top_builddir}/ECtools/libzarafa-archiver.la \
-	${top_builddir}/ECtools/libzarafa-archiver-core.la \
+	${top_builddir}/ECtools/libkcarchiver.la \
+	${top_builddir}/ECtools/libkcarchivercore.la \
 	$(PROG_LIBS) $(PYTHON_LIBS)
 
 _licenseclient_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/provider/common -I${top_builddir}/provider/soap -I${top_srcdir}/provider/soap ${GSOAP_CFLAGS}
 _licenseclient_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
-_licenseclient_la_LIBADD = ${top_builddir}/provider/common/libzarafacommon.la \
+_licenseclient_la_LIBADD = ${top_builddir}/provider/common/libkccommon.la \
 						${GSOAP_LIBS} \
-						${top_builddir}/provider/soap/libzarafa_soapclient.la \
-						${top_builddir}/common/libzcp_common_mapi.la \
-						${top_builddir}/common/libzcp_common_util.la \
-						${top_builddir}/common/libzcp_common_ssl.la \
+						${top_builddir}/provider/soap/libkcsoapclient.la \
+						${top_builddir}/common/libkcmapi.la \
+						${top_builddir}/common/libkcutil.la \
+						${top_builddir}/common/libkcssl.la \
 						${top_builddir}/mapi4linux/src/libmapi.la \
 						$(PROG_LIBS) $(SSL_LIBS) $(PYTHON_LIBS)
 
 
 # noinst_ and rpath will generate the _libcommon.so file
 _libcommon_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version -rpath '$(libdir)'
-_libcommon_la_LIBADD = libzcp_pyconv.la ${top_builddir}/mapi4linux/src/libmapi.la \
-					   ${top_builddir}/common/libzcp_common_mapi.la \
-					   ${top_builddir}/common/libzcp_common_util.la \
+_libcommon_la_LIBADD = libkcpyconv.la ${top_builddir}/mapi4linux/src/libmapi.la \
+					   ${top_builddir}/common/libkcmapi.la \
+					   ${top_builddir}/common/libkcutil.la \
 				  	   $(PROG_LIBS) $(PYTHON_LIBS)
 
 _RecurrenceState_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version -rpath '$(libdir)'
-_RecurrenceState_la_LIBADD = libzcp_pyconv.la \
+_RecurrenceState_la_LIBADD = libkcpyconv.la \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_util.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcutil.la \
 	$(PROG_LIBS) $(PYTHON_LIBS)
 
 _libfreebusy_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/libfreebusy
 _libfreebusy_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
-_libfreebusy_la_LIBADD = libzcp_pyconv.la ${top_builddir}/mapi4linux/src/libmapi.la \
-						 ${top_builddir}/libfreebusy/libfreebusy.la \
-						 ${top_builddir}/common/libzcp_common_mapi.la \
-                         ${top_builddir}/common/libzcp_common_util.la \
+_libfreebusy_la_LIBADD = libkcpyconv.la ${top_builddir}/mapi4linux/src/libmapi.la \
+	${top_builddir}/libfreebusy/libkcfreebusy.la \
+						 ${top_builddir}/common/libkcmapi.la \
+                         ${top_builddir}/common/libkcutil.la \
                          $(PROG_LIBS) $(PYTHON_LIBS)
 
 
@@ -146,14 +146,14 @@ noinst_datadir = libcommon.py RecurrenceState.py
 
 
 mapi_wrap.h: mapi_wrap.cxx
-mapi_wrap.cxx: ../mapi.i ../mapiutil.i ../mapidefs.i ../mapicode.i ../mapix.i ../mapinotifsink.i ../mapiutil.i ../include/zarafa/typemap.i ../helpers.i ../edkmdb.i ../IECServiceAdmin.i ../ecdefs.i include/zarafa/typemap_python.i helpers_python.i
+mapi_wrap.cxx: ../mapi.i ../mapiutil.i ../mapidefs.i ../mapicode.i ../mapix.i ../mapinotifsink.i ../mapiutil.i ../include/kopano/typemap.i ../helpers.i ../edkmdb.i ../IECServiceAdmin.i ../ecdefs.i include/kopano/typemap_python.i helpers_python.i
 	if test "x$(SWIG_EXEC)" = "x"; then echo "swig is required for 'make dist'"; exit 1; fi
-	${SWIG_EXEC} -I${top_srcdir}/swig -I${top_srcdir}/zarafa-libsync ${SWIG_FLAGS} ${SWIG_CXXFLAGS} -o $@ $<
+	${SWIG_EXEC} -I${top_srcdir}/swig -I${top_srcdir}/libsync ${SWIG_FLAGS} ${SWIG_CXXFLAGS} -o $@ $<
 
-inetmapi_wrap.cxx: ../inetmapi.i ../include/zarafa/typemap.i ../inetmapi.i include/zarafa/typemap_python.i helpers_python.i
+inetmapi_wrap.cxx: ../inetmapi.i ../include/kopano/typemap.i ../inetmapi.i include/kopano/typemap_python.i helpers_python.i
 	${SWIG_EXEC} -I${top_srcdir}/swig ${SWIG_CXXFLAGS} -o $@ $<
 
-icalmapi_wrap.cxx: ../icalmapi.i ../include/zarafa/typemap.i include/zarafa/typemap_python.i helpers_python.i ../../libicalmapi/icalmapi.h
+icalmapi_wrap.cxx: ../icalmapi.i ../include/kopano/typemap.i include/kopano/typemap_python.i helpers_python.i ../../libicalmapi/icalmapi.h
 	${SWIG_EXEC} -I${top_srcdir}/libicalmapi -I${top_srcdir}/libfreebusy -I${top_srcdir/swig} ${SWIG_CXXFLAGS} -o $@ $<
 
 archiver_wrap.cxx: ../archiver.i archiver_python.i

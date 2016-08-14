@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,17 +15,17 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #ifdef LINUX
 #include <sys/un.h>
 #include <sys/socket.h>
 #endif
 
-#include <zarafa/base64.h>
-#include <zarafa/ECChannel.h>
-#include <zarafa/ECDefs.h>
-#include <zarafa/stringutil.h>
+#include <kopano/base64.h>
+#include <kopano/ECChannel.h>
+#include <kopano/ECDefs.h>
+#include <kopano/stringutil.h>
 
 #include "ECSearchClient.h"
 
@@ -33,10 +33,6 @@ ECSearchClient::ECSearchClient(const char *szIndexerPath, unsigned int ulTimeOut
 	: ECChannelClient(szIndexerPath, ":;")
 {
 	m_ulTimeout = ulTimeOut;
-}
-
-ECSearchClient::~ECSearchClient()
-{
 }
 
 ECRESULT ECSearchClient::GetProperties(setindexprops_t &setProps)
@@ -91,7 +87,7 @@ ECRESULT ECSearchClient::Scope(const std::string &strServer,
 	if (er != erSuccess)
 		return er;
 	if (!lstResponse.empty())
-		return ZARAFA_E_BAD_VALUE;
+		return KCERR_BAD_VALUE;
 	return erSuccess;
 }
 
@@ -125,7 +121,7 @@ ECRESULT ECSearchClient::Find(const std::set<unsigned int> &setFields,
 	if (er != erSuccess)
 		return er;
 	if (!lstResponse.empty())
-		return ZARAFA_E_BAD_VALUE;
+		return KCERR_BAD_VALUE;
 	return erSuccess;
 }
 
@@ -174,7 +170,7 @@ ECRESULT ECSearchClient::Query(std::list<unsigned int> &lstMatches)
  * @return result
  */
  
-ECRESULT ECSearchClient::Query(GUID *lpServerGuid, GUID *lpStoreGuid, std::list<unsigned int>& lstFolders, std::list<SIndexedTerm> &lstSearches, std::list<unsigned int> &lstMatches)
+ECRESULT ECSearchClient::Query(GUID *lpServerGuid, GUID *lpStoreGuid, std::list<unsigned int>& lstFolders, std::list<SIndexedTerm> &lstSearches, std::list<unsigned int> &lstMatches, std::string &suggestion)
 {
 	ECRESULT er;
 	std::string strServer = bin2hex(sizeof(GUID), (unsigned char *)lpServerGuid);
@@ -188,7 +184,25 @@ ECRESULT ECSearchClient::Query(GUID *lpServerGuid, GUID *lpStoreGuid, std::list<
 	     i != lstSearches.end(); ++i)
 		Find(i->setFields, i->strTerm);
 
+	er = Suggest(suggestion);
+	if (er != erSuccess)
+		return er;
+
 	return Query(lstMatches);
+}
+
+ECRESULT ECSearchClient::Suggest(std::string &suggestion)
+{
+	std::vector<std::string> resp;
+	ECRESULT er = DoCmd("SUGGEST", resp);
+	if (er != erSuccess)
+		return er;
+	if (resp.size() < 1)
+		return KCERR_CALL_FAILED;
+	suggestion = std::move(resp[0]);
+	if (suggestion[0] == ' ')
+		suggestion.erase(0, 1);
+	return erSuccess;
 }
 
 ECRESULT ECSearchClient::SyncRun()

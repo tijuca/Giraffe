@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,13 +18,14 @@
 #ifndef instanceidmapper_INCLUDED
 #define instanceidmapper_INCLUDED
 
+#include <memory>
 #include "instanceidmapper_fwd.h"
 #include <mapidefs.h>
 
 class ECConfig;
 class ECLogger;
 class ECDatabaseMySQL;
-typedef boost::shared_ptr<ECDatabaseMySQL> DatabasePtr;
+typedef std::shared_ptr<ECDatabaseMySQL> DatabasePtr;
 
 namespace za { namespace operations {
 

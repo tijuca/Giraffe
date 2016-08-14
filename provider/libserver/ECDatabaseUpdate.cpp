@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,18 +15,18 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include "ECDatabase.h"
 #include "ECDatabaseUpdate.h"
 
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
-#include <zarafa/ECDefs.h>
+#include <kopano/ECDefs.h>
 #include "ECDBDef.h"
 #include "ECUserManagement.h"
 
-#include <zarafa/ecversion.h>
+#include <kopano/ecversion.h>
 
 #include <mapidefs.h>
 #include <mapitags.h>
@@ -34,56 +34,20 @@
 #include "SOAPUtils.h"
 #include "ECSearchFolders.h"
 
-#include "ZarafaICS.h"
+#include "ics.h"
 
-#include <zarafa/charset/convert.h>
+#include <kopano/charset/convert.h>
 #include "ECStringCompat.h"
 #include "ECMAPI.h"
 
 #include <zlib.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <edkmdb.h>
-
-#ifdef HAVE_OFFLINE_SUPPORT
-#include "ECDBUpdateProgress.h"
-
-#define PROGRESS_INIT(_curupdate)												\
-	ECDBUpdateProgress *__lpProgress = NULL;									\
-	const unsigned int __ulCurUpdate = (_curupdate);							\
-	er = ECDBUpdateProgress::GetInstance(Z_UPDATE_CONVERT_NAMES, lpDatabase, &__lpProgress);	\
-	if (er == erSuccess)														\
-		er = __lpProgress->Start(__ulCurUpdate);								\
-	if (er != erSuccess)														\
-		goto exit;
-
-#define PROGRESS_DONE															\
-	er = __lpProgress->Finish(__ulCurUpdate);									\
-	if (er != erSuccess)														\
-		goto exit;
-
-#define INTERMEDIATE_PROGRESS(_cur, _total)										\
-	er = __lpProgress->SetIntermediateProgress((_cur), (_total));				\
-	if (er != erSuccess)														\
-		goto exit;
-
-#define INTERMEDIATE_PROGRESS_(_progress)										\
-	er = __lpProgress->SetIntermediateProgress((_progress));					\
-	if (er != erSuccess)														\
-		goto exit;
-
-#else
-
-#define PROGRESS_INIT(...)
-#define PROGRESS_DONE
-#define INTERMEDIATE_PROGRESS(...)
-#define INTERMEDIATE_PROGRESS_(...)
-
-#endif
 
 extern int searchfolder_restart_required; // HACK
 
 /*
-	Zarafa database upgrade
+	database upgrade
 
 	Version 4.20 (not include)
 	* Add table object
@@ -282,22 +246,14 @@ ECRESULT UpdateDatabaseCreateSettingsTable(ECDatabase *lpDatabase)
 
 ECRESULT InsertServerGUID(ECDatabase *lpDatabase)
 {
-	ECRESULT		er = erSuccess;
-
 	GUID guid;
 
 	if (CoCreateGuid(&guid) != S_OK) {
-		er = ZARAFA_E_DATABASE_ERROR;
 		ec_log_err("InsertServerGUID(): CoCreateGuid failed");
-		goto exit;
+		return KCERR_DATABASE_ERROR;
 	}
 
-	er = lpDatabase->DoInsert("INSERT INTO `settings` VALUES ('server_guid', " + lpDatabase->EscapeBinary((unsigned char *)&guid, sizeof(GUID)) + ")");
-	if(er != erSuccess)
-		goto exit;
-
-exit:
-	return er;
+	return lpDatabase->DoInsert("INSERT INTO `settings` VALUES ('server_guid', " + lpDatabase->EscapeBinary(reinterpret_cast<unsigned char *>(&guid), sizeof(GUID)) + ")");
 }
 
 // 10
@@ -328,7 +284,7 @@ ECRESULT UpdateDatabaseCreateSourceKeys(ECDatabase *lpDatabase)
 	lpDBRow = lpDatabase->FetchRow(lpResult);
 	lpDBLenths = lpDatabase->FetchRowLengths(lpResult);
 	if(lpDBRow == NULL || lpDBRow[0] == NULL || lpDBLenths == NULL || lpDBLenths[0] != sizeof(GUID)) {
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		ec_log_err("UpdateDatabaseCreateSourceKeys(): row or columns NULL");
 		goto exit;
 	}
@@ -383,7 +339,7 @@ ECRESULT UpdateDatabaseConvertEntryIDs(ECDatabase *lpDatabase)
 		if(lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL || 
 			lpDBLenths == NULL || lpDBLenths[0] != sizeof(GUID) )
 		{
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 			ec_log_crit("  Failed to convert store \"%s\"", (lpDBRow && lpDBRow[1])?lpDBRow[1]:"Unknown");
 			
 			if(lpDBRow == NULL || lpDBRow[0] == NULL || lpDBLenths == NULL || lpDBLenths[0] != sizeof(GUID) )
@@ -413,7 +369,7 @@ exit:
 
 ECRESULT CreateRecursiveStoreEntryIds(ECDatabase *lpDatabase, unsigned int ulStoreHierarchyId, unsigned char* lpStoreGuid)
 {
-	ECRESULT		er = erSuccess;
+	ECRESULT er;
 	string			strQuery, strInsertQuery, strDefaultQuery;
 	string			strInValues;
 	DB_RESULT		lpDBResult = NULL;
@@ -455,15 +411,14 @@ ECRESULT CreateRecursiveStoreEntryIds(ECDatabase *lpDatabase, unsigned int ulSto
 		// Insert the entryids
 		er = lpDatabase->DoInsert(strDefaultQuery + "(" + strInValues + ")");
 		if(er != erSuccess)
-			goto exit;
-
+			return er;
 
 		// Get the new parents
 		strQuery= "SELECT id FROM hierarchy WHERE parent IN ( "+strInValues+")";
 
 		er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 
 		while(true) {
 			lpDBRow = lpDatabase->FetchRow(lpDBResult);
@@ -472,9 +427,8 @@ ECRESULT CreateRecursiveStoreEntryIds(ECDatabase *lpDatabase, unsigned int ulSto
 				break;
 			
 			if (lpDBRow[0] == NULL) {
-				er = ZARAFA_E_DATABASE_ERROR;
 				ec_log_err("CreateRecursiveStoreEntryIds(): column is NULL");
-				goto exit;
+				return KCERR_DATABASE_ERROR;
 			}
 
 			 lstFolders.push_back(atoui(lpDBRow[0]));
@@ -486,9 +440,7 @@ ECRESULT CreateRecursiveStoreEntryIds(ECDatabase *lpDatabase, unsigned int ulSto
 		}
 		iterFolders = lstFolders.begin();
 	} //while
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 // 13
@@ -558,8 +510,7 @@ exit:
 // 14
 ECRESULT UpdateDatabaseAddUserObjectType(ECDatabase *lpDatabase)
 {
-	ECRESULT er = erSuccess;
-
+	ECRESULT er;
 	/*
 	 * First we create the object_type column and initialize the values
 	 * based on the isgroup and nonactive columns. Once that is done we should
@@ -568,43 +519,31 @@ ECRESULT UpdateDatabaseAddUserObjectType(ECDatabase *lpDatabase)
 	 */
 	er = lpDatabase->DoUpdate("ALTER TABLE users ADD COLUMN object_type int(11) NOT NULL default '0'");
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	er = lpDatabase->DoUpdate("UPDATE users SET object_type=5 WHERE nonactive != 0"); /* USEROBJECT_TYPE_NONACTIVE */
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	er = lpDatabase->DoUpdate("UPDATE users SET object_type=2 WHERE isgroup != 0"); /* USEROBJECT_TYPE_GROUP */
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	/*
 	 * All other entries should be considered as users.
 	 * This is safe since there are at this time no other valid object types.
 	 */
 	er = lpDatabase->DoUpdate("UPDATE users SET object_type=1 WHERE object_type = 0"); /* USEROBJECT_TYPE_USER */
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	er = lpDatabase->DoUpdate("ALTER TABLE users DROP COLUMN nonactive");
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	er = lpDatabase->DoUpdate("ALTER TABLE users DROP INDEX externid, DROP COLUMN isgroup, ADD INDEX externid (`externid`, `object_type`)");
 	if(er != erSuccess)
-		goto exit;
+		return er;
 		
     /*
      * Another change is that for the DB plugin, the 'objects' table should now show type 5 for nonactive users (instead of 1)
      */
-     
-    er = lpDatabase->DoUpdate("UPDATE object SET objecttype=5 WHERE id IN (SELECT objectid FROM objectproperty WHERE propname='isnonactive' AND value != 0)");
-    if(er != erSuccess)
-        goto exit;
-
-exit:
-
-	return er;
+	return lpDatabase->DoUpdate("UPDATE object SET objecttype=5 WHERE id IN (SELECT objectid FROM objectproperty WHERE propname='isnonactive' AND value != 0)");
 }
 
 // 15
@@ -645,81 +584,60 @@ ECRESULT UpdateDatabaseRestrictExternId(ECDatabase *lpDatabase)
 // 18
 ECRESULT UpdateDatabaseAddUserCompany(ECDatabase *lpDatabase)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 
 	er = lpDatabase->DoUpdate("ALTER TABLE users ADD COLUMN company int(11) NOT NULL default '0'");
 	if(er != erSuccess)
-		goto exit;
-
-	er = lpDatabase->DoInsert("INSERT INTO `users` (`externid`, `object_type`, `signature`, `company`) VALUES (NULL, 4, '', 0)");
-	if(er != erSuccess)
-		goto exit;
-exit:
-	return er;
+		return er;
+	return lpDatabase->DoInsert("INSERT INTO `users` (`externid`, `object_type`, `signature`, `company`) VALUES (NULL, 4, '', 0)");
 }
 
 // 19
 ECRESULT UpdateDatabaseAddObjectRelationType(ECDatabase *lpDatabase)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 
 	er = lpDatabase->DoUpdate("ALTER TABLE objectrelation ADD COLUMN relationtype tinyint(11) unsigned NOT NULL");
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	er = lpDatabase->DoUpdate("ALTER TABLE objectrelation DROP PRIMARY KEY");
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	er = lpDatabase->DoUpdate("ALTER TABLE objectrelation ADD PRIMARY KEY (`objectid`, `parentobjectid`, `relationtype`)");
 	if (er != erSuccess)
-		goto exit;
-
-	er = lpDatabase->DoUpdate("UPDATE objectrelation SET relationtype = " + stringify(OBJECTRELATION_GROUP_MEMBER));
-	if (er != erSuccess)
-		goto exit;
-
-exit:
-
-	return er;
+		return er;
+	return lpDatabase->DoUpdate("UPDATE objectrelation SET relationtype = " + stringify(OBJECTRELATION_GROUP_MEMBER));
 }
 
 // 20
 ECRESULT UpdateDatabaseDelUserCompany(ECDatabase *lpDatabase)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 
 	er = lpDatabase->DoDelete(
 		"DELETE FROM `users` "
 		"WHERE externid IS NULL "
 			"AND object_type = 4");
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
-	er = lpDatabase->DoDelete(
+	return lpDatabase->DoDelete(
 		"DELETE FROM `objectproperty` "
 		"WHERE `propname` = 'companyid' "
 			"AND `value` = 'default'");
-	if (er != erSuccess)
-		goto exit;
-
-exit:
-	return er;
 }
 
 // 21
 ECRESULT UpdateDatabaseAddCompanyToStore(ECDatabase *lpDatabase)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 
 	er = lpDatabase->DoUpdate("ALTER TABLE stores ADD COLUMN user_name varbinary(255) NOT NULL default ''");
 	if (er != erSuccess)
-		goto exit;
-
+		return er;
 	er = lpDatabase->DoUpdate("ALTER TABLE stores ADD COLUMN company smallint(11) NOT NULL default 0");
 	if (er != erSuccess)
-		goto exit;
-
+		return er;
 	/*
 	 * The user_name column should contain the actual username, but resolving the username for each
 	 * entry will be quite tiresome without much to gain. Instead we just push the userid as
@@ -728,12 +646,7 @@ ECRESULT UpdateDatabaseAddCompanyToStore(ECDatabase *lpDatabase)
 	 * information from the 'users' table. Note that this will always be correct regardless of
 	 * hosted is enabled or disabled since the default value in the 'users' table is 0.
 	 */
-	er = lpDatabase->DoUpdate("UPDATE stores SET user_name = user_id, company = IFNULL( (SELECT company FROM users WHERE users.id = user_id), 0)");
-	if (er != erSuccess)
-		goto exit;
-
-exit:
-	return er;
+	return lpDatabase->DoUpdate("UPDATE stores SET user_name = user_id, company = IFNULL( (SELECT company FROM users WHERE users.id = user_id), 0)");
 }
 
 // 22
@@ -787,7 +700,7 @@ ECRESULT UpdateDatabaseKeysChanges(ECDatabase *lpDatabase)
 					break;
 				
 				if (lpDBRow[0] == NULL) {
-					er = ZARAFA_E_DATABASE_ERROR;
+					er = KCERR_DATABASE_ERROR;
 					ec_log_err("UpdateDatabaseKeysChanges(): column is NULL");
 					goto exit;
 				}
@@ -856,7 +769,7 @@ ECRESULT UpdateDatabaseMoveFoldersInPublicFolder(ECDatabase *lpDatabase)
 					"ff.tag = 0x6630 AND ff.type = 0x102 AND ff.storeid = s.hierarchy_id " //PR_IPM_FAVORITES_ENTRYID
 				"LEFT JOIN indexedproperties AS iff ON "
 					"iff.tag=0xFFF AND iff.val_binary = ff.val_binary "
-				"WHERE u.object_type=4 OR u.id = 1"; // object_type=USEROBJECT_TYPE_COMPANY or id=ZARAFA_UID_EVERYONE
+				"WHERE u.object_type=4 OR u.id = 1"; // object_type=USEROBJECT_TYPE_COMPANY or id=KOPANO_UID_EVERYONE
 
 	er = lpDatabase->DoSelect(strQuery, &lpResult);
 	if(er != erSuccess)
@@ -1033,7 +946,7 @@ ECRESULT UpdateDatabaseAddExternIdToObject(ECDatabase *lpDatabase)
 
 	while ((lpDBRow = lpDatabase->FetchRow(lpResult))) {
 		if (lpDBRow[0] == NULL || lpDBRow[1] == NULL) {
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 			ec_log_err("  object table contains invalid NULL records");
 			goto exit;
 		}
@@ -1067,13 +980,13 @@ ECRESULT UpdateDatabaseAddExternIdToObject(ECDatabase *lpDatabase)
 		while ((lpDBRow = lpDatabase->FetchRow(lpResult))) {
 			lpDBLen = lpDatabase->FetchRowLengths(lpResult);
 			if (lpDBLen == NULL) {
-				er = ZARAFA_E_DATABASE_ERROR;
+				er = KCERR_DATABASE_ERROR;
 				ec_log_err("UpdateDatabaseAddExternIdToObject(): FetchRowLengths failed");
 				goto exit;
 			}
 
 			if (lpDBRow[0] == NULL) {
-				er = ZARAFA_E_DATABASE_ERROR;
+				er = KCERR_DATABASE_ERROR;
 				ec_log_err("UpdateDatabaseAddExternIdToObject(): column NULL");
 				goto exit;
 			}
@@ -1119,7 +1032,7 @@ ECRESULT UpdateDatabaseAddExternIdToObject(ECDatabase *lpDatabase)
 
 	while ((lpDBRow = lpDatabase->FetchRow(lpResult))) {
 		if (lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL) {
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 			ec_log_crit("  objectrelation table contains invalid NULL records");
 			goto exit;
 		}
@@ -1222,41 +1135,9 @@ ECRESULT UpdateDatabaseCreateReferences(ECDatabase *lpDatabase)
 	ECRESULT	er = erSuccess;
 	string		strQuery;
 
-#ifdef HAVE_OFFLINE_SUPPORT
-	struct {
-			const uLong cbUncompressed;
-			const uLong cbCompressed;
-			const char *lpCompressed;
-	} data = {
-			8678,
-			271,
-			"\x78\x9c\xed\xd8\xbd\x4a\x03\x41\x14\x86\xe1\x77\x67\x7f\x32\x71"
-			"\x2d\x82\x24\x82\x36\x26\x60\x63\x15\xc1\xd2\x42\x2c\x2d\x84\x90"
-			"\xce\x26\xb2\x46\xd1\x45\xd9\x42\xa3\x60\x97\xc2\xab\xf0\x92\xbc"
-			"\x00\x2f\xc1\x5c\x84\xe0\x38\x1b\x83\x91\x54\x22\xc2\x2a\x7c\x4f"
-			"\x33\x67\xbf\x81\x39\xa7\xdd\xf3\x16\xd4\x97\x43\x68\x04\xb0\x0d"
-			"\x13\x5a\xf0\xf4\xb8\x4b\xc9\xec\x50\xf7\xc7\x73\x02\x1d\x66\x26"
-			"\x2c\xe8\x76\xa1\xbd\x18\x8a\x88\x88\x88\x88\x88\x88\xc8\x9f\x12"
-			"\xf8\x9f\xff\x25\x7f\x5a\xc2\xf2\x6b\x6c\x60\x9d\x88\x70\x6c\x61"
-			"\x05\x83\x19\x27\x1f\x85\xeb\xf5\x0f\x0e\xf7\xfb\x47\xae\xea\x89"
-			"\x7f\xe4\x7f\x4e\x2d\x22\x22\x22\x22\x22\x22\xf2\x4b\x5e\x02\x1a"
-			"\x55\xcf\x50\xa5\x80\x88\x01\x1b\xbe\x6a\xb1\xf9\x99\xf6\x58\xf5"
-			"\x37\xa5\x01\x71\x64\x9a\x5b\xed\x6f\xf2\xaf\xa5\x79\x71\x33\xca"
-			"\x8a\xe1\x59\x7e\x4a\x8c\x1d\x5e\xdc\x16\x97\xbe\x4c\x88\x46\xd9"
-			"\x39\x35\xd2\xbb\xec\xea\xf8\x24\x2f\xb2\xeb\x7b\xa2\x34\x4d\x99"
-			"\xae\x5c\xbc\xb0\x03\xb1\x4d\x12\xa6\x1b\x17\xcf\xf8\x20\x89\x7c"
-			"\x60\xbf\x04\xb5\xd4\xda\x72\x63\xb3\xf6\xd0\x84\xd7\x3d\x70\xf3"
-			"\x7e\x6e\xd6\xcc\xf9\x4e\x6e\xde\xc6\xf1\x0e\x4f\x19\x36\x95"
-	};
-	Bytef		*lpUncompressed = NULL;
-	uLong		cbUncompressed = data.cbUncompressed;
-	std::string	strLobPath;
-	FILE		*fdLob = NULL;
-#endif
-
 	er = lpDatabase->DoInsert(Z_TABLEDEF_REFERENCES);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	/* 
 	 * Create all attachment references from hierarchy table, let
@@ -1271,59 +1152,19 @@ ECRESULT UpdateDatabaseCreateReferences(ECDatabase *lpDatabase)
 
 	er = lpDatabase->DoInsert(strQuery);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	/* We need to rename the column in `lob` */
-#ifdef HAVE_OFFLINE_SUPPORT
-	lpUncompressed = new Bytef[cbUncompressed];
-
-	if (uncompress(lpUncompressed, &cbUncompressed, (const Bytef*)data.lpCompressed, data.cbCompressed) != Z_OK) {
-		er = ZARAFA_E_UNABLE_TO_COMPLETE;
-		goto exit;
-	}
-
-	strLobPath = lpDatabase->GetDatabaseDir() + "/zarafa/lob.frm";
-	fdLob = fopen(strLobPath.c_str(), "wb");
-	if (fdLob == NULL) {
-		er = ZARAFA_E_UNABLE_TO_COMPLETE;
-		goto exit;
-	}
-
-	fwrite(lpUncompressed, 1, cbUncompressed, fdLob);
-	fclose(fdLob);	
-
-	er = lpDatabase->DoUpdate("FLUSH TABLES");
-	if (er != erSuccess)
-		goto exit;
-#else
 	strQuery =
 		"ALTER TABLE `lob` "
 		"CHANGE COLUMN `hierarchyid` `instanceid` int(11) unsigned NOT NULL";
-
-	er = lpDatabase->DoUpdate(strQuery);
-	if (er != erSuccess)
-		goto exit;
-#endif
-
-exit:
-#ifdef HAVE_OFFLINE_SUPPORT
-	delete[] lpUncompressed;
-#endif
-
-	return er;
+	return lpDatabase->DoUpdate(strQuery);
 }
 
 // 27
 ECRESULT UpdateDatabaseLockDistributed(ECDatabase *lpDatabase)
 {
-	ECRESULT	er = erSuccess;
-
-	er = lpDatabase->DoInsert("INSERT INTO settings VALUES ('lock_distributed_zarafa', 'upgrade')");
-	if (er != erSuccess)
-		goto exit;
-
-exit:
-	return er;
+	return lpDatabase->DoInsert("INSERT INTO settings VALUES ('lock_distributed_kopano', 'upgrade')");
 }
 
 // 28
@@ -1357,7 +1198,7 @@ ECRESULT UpdateDatabaseCreateABChangesTable(ECDatabase *lpDatabase)
 		lpDBLen = lpDatabase->FetchRowLengths(lpResult);
 
 		if (lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBLen[1] == 0 || lpDBRow[2] == NULL || lpDBLen[2] == 0) {
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 			ec_log_crit("  changes table contains invalid NULL records");
 			goto exit;
 		}
@@ -1424,18 +1265,11 @@ exit:
 // 29
 ECRESULT UpdateDatabaseSetSingleinstanceTag(ECDatabase *lpDatabase)
 {
-	ECRESULT	er = erSuccess;
 	string		strQuery;
 
 	// Force all tag values to PR_ATTACH_DATA_BIN. Up to now, no other values can be present in the table.
 	strQuery = "UPDATE `singleinstances` SET `tag` = " + stringify(PROP_ID(PR_ATTACH_DATA_BIN));
-
-	er = lpDatabase->DoUpdate(strQuery);
-	if (er != erSuccess)
-		goto exit;
-
-exit:
-	return er;
+	return lpDatabase->DoUpdate(strQuery);
 }
 
 // 30
@@ -1451,24 +1285,13 @@ ECRESULT UpdateDatabaseCreateSyncedMessagesTable(ECDatabase *lpDatabase)
 // 31
 ECRESULT UpdateDatabaseForceAbResync(ECDatabase *lpDatabase)
 {
-#ifdef HAVE_OFFLINE_SUPPORT
-	ECRESULT	er = erSuccess;
-	std::string	strQuery;
-
-	// Remove the PR_EC_AB_SYNC_STATUS property.
-	strQuery = "DELETE p.* FROM properties AS p JOIN stores AS s ON p.storeid=s.hierarchy_id AND p.hierarchyid=s.hierarchy_id WHERE p.tag=0x67a2 AND p.type=0x102";
-	er = lpDatabase->DoDelete(strQuery);
-#else
-	ECRESULT	er = ZARAFA_E_IGNORE_ME;
-#endif
-	
-	return er;
+	return KCERR_IGNORE_ME;
 }
 
 // 32
 ECRESULT UpdateDatabaseRenameObjectTypeToObjectClass(ECDatabase *lpDatabase)
 {
-	ECRESULT	er = erSuccess;
+	ECRESULT er;
 	std::string strQuery;
 
 	// rename columns in users and object tables
@@ -1477,18 +1300,13 @@ ECRESULT UpdateDatabaseRenameObjectTypeToObjectClass(ECDatabase *lpDatabase)
 		"CHANGE COLUMN `object_type` `objectclass` int(11) unsigned NOT NULL";
 	er = lpDatabase->DoUpdate(strQuery);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	// Note: type also changes from int to tinyint here
 	strQuery =
 		"ALTER TABLE `object` "
 		"CHANGE COLUMN `objecttype` `objectclass` int(11) unsigned NOT NULL";
-	er = lpDatabase->DoUpdate(strQuery);
-	if (er != erSuccess)
-		goto exit;
-
-exit:
-	return er;
+	return lpDatabase->DoUpdate(strQuery);
 }
 
 // 33
@@ -1534,7 +1352,7 @@ ECRESULT UpdateDatabaseConvertObjectTypeToObjectClass(ECDatabase *lpDatabase)
 		while ((lpDBRow = lpDatabase->FetchRow(lpResult))) {
 			lpDBLen = lpDatabase->FetchRowLengths(lpResult);
 			if (lpDBRow[0] == NULL || lpDBLen == NULL || lpDBLen[0] == 0) {
-				er = ZARAFA_E_DATABASE_ERROR;
+				er = KCERR_DATABASE_ERROR;
 				ec_log_crit("  users table contains invalid NULL records for type %d", iTypes->first);
 				goto exit;
 			}
@@ -1636,33 +1454,19 @@ exit:
 // 36
 ECRESULT UpdateDatabaseOutgoingQueuePrimarykey(ECDatabase *lpDatabase)
 {
-	ECRESULT er = erSuccess;
-
-	er= lpDatabase->DoUpdate("ALTER TABLE outgoingqueue DROP PRIMARY KEY, ADD PRIMARY KEY (`hierarchy_id`,`flags`,`store_id`)");
-	if (er != erSuccess)
-		goto exit;
-
-exit:
-	return er;
+	return lpDatabase->DoUpdate("ALTER TABLE outgoingqueue DROP PRIMARY KEY, ADD PRIMARY KEY (`hierarchy_id`,`flags`,`store_id`)");
 }
 
 // 37
 ECRESULT UpdateDatabaseACLPrimarykey(ECDatabase *lpDatabase)
 {
-	ECRESULT er = erSuccess;
-
-	er= lpDatabase->DoUpdate("ALTER TABLE acl DROP PRIMARY KEY, ADD PRIMARY KEY (`hierarchy_id`,`id`,`type`)");
-	if (er != erSuccess)
-		goto exit;
-
-exit:
-	return er;
+	return lpDatabase->DoUpdate("ALTER TABLE acl DROP PRIMARY KEY, ADD PRIMARY KEY (`hierarchy_id`,`id`,`type`)");
 }
 
 // 38
 ECRESULT UpdateDatabaseBlobExternId(ECDatabase *lpDatabase)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	std::string strQuery;
 
 	strQuery = "ALTER TABLE `object` "
@@ -1672,33 +1476,20 @@ ECRESULT UpdateDatabaseBlobExternId(ECDatabase *lpDatabase)
 
 	er = lpDatabase->DoUpdate(strQuery);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	strQuery = "ALTER TABLE `users` "
 				"DROP KEY `externid`, "
 				"MODIFY `externid` blob, "
 				"ADD UNIQUE KEY `externid` (`externid`(255), `objectclass`)";
-
-	er = lpDatabase->DoUpdate(strQuery);
-	if (er != erSuccess)
-		goto exit;
-
-exit:
-	return er;
+	return lpDatabase->DoUpdate(strQuery);
 }
 
 // 39
 ECRESULT UpdateDatabaseKeysChanges2(ECDatabase *lpDatabase)
 {
-	ECRESULT er = erSuccess;
-
 	// Change index
-	er = lpDatabase->DoUpdate("ALTER TABLE changes DROP PRIMARY KEY, ADD PRIMARY KEY(`parentsourcekey`,`sourcekey`,`change_type`)");
-	if (er != erSuccess)
-		goto exit;
-
-exit:
-	return er;
+	return lpDatabase->DoUpdate("ALTER TABLE changes DROP PRIMARY KEY, ADD PRIMARY KEY(`parentsourcekey`,`sourcekey`,`change_type`)");
 }
 
 /**
@@ -1712,7 +1503,7 @@ exit:
  * @param[in]	lpDatabase	ECDatabase object pointer to update.
  * @retval		erSuccess 
  *					Update is done.
- * @retval		ZARAFA_E_DATABASE_ERROR
+ * @retval		KCERR_DATABASE_ERROR
  *					Update failed
  */
 // 40
@@ -1755,14 +1546,7 @@ exit:
 // 41
 ECRESULT UpdateDatabaseFixDBPluginGroups(ECDatabase *lpDatabase)
 {
-	ECRESULT er = erSuccess;
-
-	er = lpDatabase->DoUpdate("UPDATE object SET objectclass="+stringify(DISTLIST_SECURITY)+" WHERE objectclass="+stringify(DISTLIST_GROUP));
-	if (er != erSuccess)
-		goto exit;
-
-exit:
-	return er;
+	return lpDatabase->DoUpdate("UPDATE object SET objectclass="+stringify(DISTLIST_SECURITY)+" WHERE objectclass="+stringify(DISTLIST_GROUP));
 }
 
 // 42
@@ -1816,7 +1600,7 @@ exit:
  * present and easy to find on the server and client.
  *
  * @param[in]	lpDatabase	ECDatabase object pointer to update.
- * @return		ECRESULT	erSuccess or ZARAFA_E_DATABASE_ERROR
+ * @return		ECRESULT	erSuccess or KCERR_DATABASE_ERROR
  */
 // 43
 ECRESULT UpdateDatabaseMoveSubscribedList(ECDatabase *lpDatabase)
@@ -1879,18 +1663,12 @@ ECRESULT UpdateDatabaseSyncTimeIndex(ECDatabase *lpDatabase)
 ECRESULT UpdateDatabaseAddStateKey(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
-#ifndef HAVE_OFFLINE_SUPPORT
 	bool bHaveIndex;
 
 	// There are upgrade paths where the state key already exists.
 	er = lpDatabase->CheckExistIndex("changes", "state", &bHaveIndex);
 	if (er == erSuccess && !bHaveIndex)
 		er = lpDatabase->DoUpdate("ALTER TABLE changes ADD UNIQUE KEY `state` (`parentsourcekey`,`id`)");
-#else
-
-	er = ZARAFA_E_IGNORE_ME;
-#endif
-
 	return er;
 }
 
@@ -1900,11 +1678,7 @@ ECRESULT UpdateDatabaseConvertToUnicode(ECDatabase *lpDatabase)
 	ECRESULT er = erSuccess;
 	std::string strQuery;
 
-#ifndef HAVE_OFFLINE_SUPPORT
 	if (lpDatabase->m_bForceUpdate) {
-#endif
-		PROGRESS_INIT(Z_UPDATE_CONVERT_TO_UNICODE)
-
 		// Admin requested a forced upgrade, converting known tables
 		
 		/*
@@ -1921,14 +1695,14 @@ ECRESULT UpdateDatabaseConvertToUnicode(ECDatabase *lpDatabase)
 		strQuery = "UPDATE objectproperty SET value = hex(value) WHERE propname = 'companyid'";
 		er = lpDatabase->DoUpdate(strQuery);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 
 		// Convert tables to unicode
 
 		strQuery = "ALTER TABLE mvproperties MODIFY val_string longtext CHARSET utf8 COLLATE utf8_general_ci";
 		er = lpDatabase->DoUpdate(strQuery);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 
 		// No need to convert the properties table as that will be done on the fly in update 50 (Z_UPDATE_CONVERT_PROPERTIES)
 
@@ -1936,8 +1710,7 @@ ECRESULT UpdateDatabaseConvertToUnicode(ECDatabase *lpDatabase)
 		strQuery = "ALTER TABLE objectproperty MODIFY propname VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci, MODIFY value TEXT CHARSET utf8 COLLATE utf8_general_ci";
 		er = lpDatabase->DoUpdate(strQuery);
 		if (er != erSuccess)
-			goto exit;
-
+			return er;
 		/*
 		 * Another similar change is to the SYSADMIN property; it used
 		 * to be 12345:XXXXXXXX with XXXXX being a binary externid. That
@@ -1947,33 +1720,25 @@ ECRESULT UpdateDatabaseConvertToUnicode(ECDatabase *lpDatabase)
 		strQuery = "UPDATE objectproperty SET value = concat(substr(value,1,instr(value,';')-1),';',hex(substr(value,instr(value,';')+1))) WHERE propname = 'companyadmin'";
 		er = lpDatabase->DoUpdate(strQuery);
 		if (er != erSuccess)
-			goto exit; 
-
+			return er;
 		strQuery = "ALTER TABLE objectmvproperty MODIFY propname VARCHAR(255) CHARSET utf8 COLLATE utf8_general_ci, MODIFY value TEXT CHARSET utf8 COLLATE utf8_general_ci";
 		er = lpDatabase->DoUpdate(strQuery);
 		if (er != erSuccess)
-			goto exit;
-
+			return er;
 		/*
 		 * Other tables containing varchar's are not converted, all data in those fields are us-ascii anyway:
 		 * - receivefolder
 		 * - stores (specially handled in next update
 		 * - settings
 		 */
-		PROGRESS_DONE
-#ifndef HAVE_OFFLINE_SUPPORT
 	} else {
-		ec_log_crit("Will not upgrade your database from 6.40.x to 7.0.");
-		ec_log_crit("The recommended upgrade procedure is to use the zarafa7-upgrade commandline tool.");
-		ec_log_crit("Please consult the Zarafa administrator manual on how to correctly upgrade your database.");
+		ec_log_crit("Will not upgrade your database from Zarafa 6.40.x.");
+		ec_log_crit("The recommended upgrade procedure is to first upgrade by first upgrading to ZCP 7.2 and using the zarafa7-upgrade commandline tool.");
+		ec_log_crit("Please consult the Zarafa and Kopano administrator manual on how to correctly upgrade your database.");
 		ec_log_crit("Alternatively you may try to upgrade using --force-database-upgrade,");
 		ec_log_crit("but no progress and estimates within the updates will be available.");
-		er = ZARAFA_E_USER_CANCEL;
-		goto exit;
+		return KCERR_USER_CANCEL;
 	}
-#endif
-
-exit:
 	return er;
 }
 
@@ -1981,18 +1746,9 @@ exit:
 ECRESULT UpdateDatabaseConvertStoreUsername(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
-
-	PROGRESS_INIT(Z_UPDATE_CONVERT_STORE_USERNAME)
-
 	er = lpDatabase->DoUpdate("UPDATE stores SET user_name = CAST(CONVERT(user_name USING latin1) AS CHAR(255) CHARACTER SET utf8)");
 	if (er == erSuccess)
 		er = lpDatabase->DoUpdate("ALTER TABLE stores MODIFY user_name VARCHAR(255) CHARACTER SET utf8 NOT NULL DEFAULT ''");
-
-	PROGRESS_DONE
-
-#ifdef HAVE_OFFLINE_SUPPORT
-exit:
-#endif
 	return er;
 }
 
@@ -2007,23 +1763,13 @@ ECRESULT UpdateDatabaseConvertRules(ECDatabase *lpDatabase)
 	convert_context converter;
 	char *lpszConverted = NULL;
 
-#ifdef HAVE_OFFLINE_SUPPORT
-	unsigned int ulTotal = 0;
-	unsigned int ulCurrent = 0;
-#endif
-	PROGRESS_INIT(Z_UPDATE_CONVERT_RULES)
-
 	er = lpDatabase->DoSelect("SELECT p.hierarchyid, p.storeid, p.val_binary FROM properties AS p JOIN receivefolder AS r ON p.hierarchyid=r.objid AND p.storeid=r.storeid JOIN stores AS s ON r.storeid=s.hierarchy_id WHERE p.tag=0x3fe1 AND p.type=0x102 AND r.messageclass='IPM'", &lpResult);
 	if (er != erSuccess)
 		goto exit;
 
-#ifdef HAVE_OFFLINE_SUPPORT
-	ulTotal = lpDatabase->GetNumRows(lpResult);
-#endif
-
 	while ((lpDBRow = lpDatabase->FetchRow(lpResult))) {
 		if (lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL) {
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 			ec_log_err("UpdateDatabaseConvertRules(): column NULL");
 			goto exit;
 		}
@@ -2035,15 +1781,9 @@ ECRESULT UpdateDatabaseConvertRules(ECDatabase *lpDatabase)
 		er = lpDatabase->DoUpdate("UPDATE properties SET val_binary='" + lpDatabase->Escape(lpszConverted) + "' WHERE hierarchyid=" + lpDBRow[0] + " AND storeid=" + lpDBRow[1] + " AND tag=0x3fe1 AND type=0x102");
 		if (er != erSuccess)
 			goto exit;
-
-		INTERMEDIATE_PROGRESS(++ulCurrent, ulTotal)
-
 		delete[] lpszConverted;
 		lpszConverted = NULL;
 	}
-
-	PROGRESS_DONE
-
 exit:
 	delete[] lpszConverted;
 
@@ -2065,24 +1805,14 @@ ECRESULT UpdateDatabaseConvertSearchFolders(ECDatabase *lpDatabase)
 	convert_context converter;
 	char *lpszConverted = NULL;
 
-#ifdef HAVE_OFFLINE_SUPPORT
-	unsigned int ulTotal = 0;
-	unsigned int ulCurrent = 0;
-#endif
-	PROGRESS_INIT(Z_UPDATE_CONVERT_SEARCH_FOLDERS)
-
 	strQuery = "SELECT h.id, p.storeid, p.val_string FROM hierarchy AS h JOIN properties AS p ON p.hierarchyid=h.id AND p.tag=" + stringify(PROP_ID(PR_EC_SEARCHCRIT)) +" AND p.type=" + stringify(PROP_TYPE(PR_EC_SEARCHCRIT)) + " WHERE h.type=3 AND h.flags=2";
 	er = lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess)
 		goto exit;
 
-#ifdef HAVE_OFFLINE_SUPPORT
-	ulTotal = lpDatabase->GetNumRows(lpResult);
-#endif
-
 	while ((lpDBRow = lpDatabase->FetchRow(lpResult))) {
 		if (lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL) {
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 			ec_log_err("UpdateDatabaseConvertSearchFolders(): column NULL");
 			goto exit;
 		}
@@ -2094,15 +1824,9 @@ ECRESULT UpdateDatabaseConvertSearchFolders(ECDatabase *lpDatabase)
 		er = lpDatabase->DoUpdate("UPDATE properties SET val_string='" + lpDatabase->Escape(lpszConverted) + "' WHERE hierarchyid=" + lpDBRow[0] + " AND storeid=" + lpDBRow[1] + " AND tag=" + stringify(PROP_ID(PR_EC_SEARCHCRIT)) +" AND type=" + stringify(PROP_TYPE(PR_EC_SEARCHCRIT)));
 		if (er != erSuccess)
 			goto exit;
-
-		INTERMEDIATE_PROGRESS(++ulCurrent, ulTotal)
-
 		delete[] lpszConverted;
 		lpszConverted = NULL;
 	}
-
-	PROGRESS_DONE
-
 exit:
 	delete[] lpszConverted;
 
@@ -2120,12 +1844,6 @@ ECRESULT UpdateDatabaseConvertProperties(ECDatabase *lpDatabase)
 	DB_RESULT lpResult = NULL;
 	DB_ROW lpDBRow = NULL;
 
-#ifdef HAVE_OFFLINE_SUPPORT
-	unsigned int ulTotal = 0;
-	unsigned int ulCurrent = 0;
-#endif
-	PROGRESS_INIT(Z_UPDATE_CONVERT_PROPERTIES)
-
 	// Create the temporary properties table
 	strQuery = Z_TABLEDEF_PROPERTIES;
 	strQuery.replace(strQuery.find("CREATE TABLE"), strlen("CREATE TABLE"), "CREATE TABLE IF NOT EXISTS");
@@ -2133,24 +1851,6 @@ ECRESULT UpdateDatabaseConvertProperties(ECDatabase *lpDatabase)
 	er = lpDatabase->DoInsert(strQuery);
 	if (er != erSuccess)
 		goto exit;
-
-#ifdef HAVE_OFFLINE_SUPPORT
-	strQuery = "SELECT MAX(hierarchyid) FROM properties";
-	er = lpDatabase->DoSelect(strQuery, &lpResult);
-	if (er != erSuccess)
-		goto exit;
-
-	lpDBRow = lpDatabase->FetchRow(lpResult);
-	if (lpDBRow == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
-		ec_log_err("UpdateDatabaseConvertProperties(): row non existing");
-		goto exit;
-	}
-
-	ulTotal = lpDBRow[0] ? atoui(lpDBRow[0]) : 0;
-	lpDatabase->FreeResult(lpResult);
-	lpResult = NULL;
-#endif
 
 	while (true) {
 		strQuery = "INSERT IGNORE INTO properties_temp (hierarchyid,tag,type,val_ulong,val_string,val_binary,val_double,val_longint,val_hi,val_lo) SELECT hierarchyid,tag,type,val_ulong,val_string,val_binary,val_double,val_longint,val_hi,val_lo FROM properties ORDER BY hierarchyid ASC LIMIT 10000";
@@ -2179,9 +1879,6 @@ ECRESULT UpdateDatabaseConvertProperties(ECDatabase *lpDatabase)
 		lpDBRow = lpDatabase->FetchRow(lpResult);
 		if (lpDBRow == NULL || lpDBRow[0] == NULL)
 			break;
-
-		INTERMEDIATE_PROGRESS(atoui(lpDBRow[0]), ulTotal)
-
 		lpDatabase->FreeResult(lpResult);
 		lpResult = NULL;
 	}
@@ -2197,9 +1894,6 @@ ECRESULT UpdateDatabaseConvertProperties(ECDatabase *lpDatabase)
 		goto exit;
 
 	er = lpDatabase->DoDelete("DROP TABLE properties_old");
-
-	PROGRESS_DONE
-
 exit:
 	if (lpResult)
 		lpDatabase->FreeResult(lpResult);
@@ -2230,11 +1924,6 @@ ECRESULT UpdateDatabaseCreateCounters(ECDatabase *lpDatabase)
 	ECRESULT er = erSuccess;
 	std::string strQuery;
 
-#ifdef HAVE_OFFLINE_SUPPORT
-	unsigned int ulCurrent = 0;
-#endif
-	PROGRESS_INIT(Z_UPDATE_CREATE_COUNTERS)
-
 	for (unsigned i = 0; i < 8; ++i) {
 		strQuery =	"REPLACE INTO properties(hierarchyid,tag,type,val_ulong) "
 						"SELECT parent.id,"+stringify(PROP_ID(counter_info[i].ulPropTag))+","+stringify(PROP_TYPE(counter_info[i].ulPropTag))+",count(child.id) "
@@ -2245,23 +1934,14 @@ ECRESULT UpdateDatabaseCreateCounters(ECDatabase *lpDatabase)
 						"GROUP BY parent.id";
 		er = lpDatabase->DoInsert(strQuery);
 		if (er != erSuccess)
-			goto exit;
-
-		INTERMEDIATE_PROGRESS(++ulCurrent, 16)
-
+			return er;
 		strQuery =	"REPLACE INTO properties(hierarchyid,tag,type,val_ulong) "
 						"SELECT folderid,"+stringify(PROP_ID(counter_info[i].ulPropTag))+","+stringify(PROP_TYPE(counter_info[i].ulPropTag))+","+counter_info[i].lpszValue+" FROM searchresults GROUP BY folderid";
 		er = lpDatabase->DoInsert(strQuery);
 		if (er != erSuccess)
-			goto exit;
-
-		INTERMEDIATE_PROGRESS(++ulCurrent, 16)
+			return er;
 	}
-
-	PROGRESS_DONE
-
-exit:
-	return er;
+	return hrSuccess;
 }
 
 // 52
@@ -2270,48 +1950,32 @@ ECRESULT UpdateDatabaseCreateCommonProps(ECDatabase *lpDatabase)
 	ECRESULT er = erSuccess;
 	std::string strQuery;
 
-	PROGRESS_INIT(Z_UPDATE_CREATE_COMMON_PROPS)
-
 	strQuery =	"REPLACE INTO properties(hierarchyid,tag,type,val_hi,val_lo,val_ulong) "
 					"SELECT h.id,"+stringify(PROP_ID(PR_CREATION_TIME))+","+stringify(PROP_TYPE(PR_CREATION_TIME))+",(UNIX_TIMESTAMP(h.createtime) * 10000000 + 116444736000000000) >> 32,(UNIX_TIMESTAMP(h.createtime) * 10000000 + 116444736000000000) & 0xffffffff, NULL "
 					"FROM hierarchy AS h "
 						"WHERE h.type IN (3,5,7)";
 	er = lpDatabase->DoInsert(strQuery);
 	if (er != erSuccess)
-		goto exit;
-	INTERMEDIATE_PROGRESS_(.25)
-
+		return er;
 	strQuery =	"REPLACE INTO properties(hierarchyid,tag,type,val_hi,val_lo,val_ulong) "
 					"SELECT h.id,"+stringify(PROP_ID(PR_LAST_MODIFICATION_TIME))+","+stringify(PROP_TYPE(PR_LAST_MODIFICATION_TIME))+",(UNIX_TIMESTAMP(h.modtime) * 10000000 + 116444736000000000) >> 32,(UNIX_TIMESTAMP(h.modtime) * 10000000 + 116444736000000000) & 0xffffffff, NULL "
 					"FROM hierarchy AS h "
 						"WHERE h.type IN (3,5,7)";
 	er = lpDatabase->DoInsert(strQuery);
 	if (er != erSuccess)
-		goto exit;
-	INTERMEDIATE_PROGRESS_(.5)
-
+		return er;
 	strQuery =	"REPLACE INTO properties(hierarchyid,tag,type,val_hi,val_lo,val_ulong) "
 					"SELECT h.id,"+stringify(PROP_ID(PR_MESSAGE_FLAGS))+","+stringify(PROP_TYPE(PR_MESSAGE_FLAGS))+",NULL, NULL, h.flags "
 					"FROM hierarchy AS h "
 						"WHERE h.type IN (3,5,7)";
 	er = lpDatabase->DoInsert(strQuery);
 	if (er != erSuccess)
-		goto exit;
-	INTERMEDIATE_PROGRESS_(.75)
-
+		return er;
 	strQuery =	"REPLACE INTO properties(hierarchyid,tag,type,val_hi,val_lo,val_ulong) "
 					"SELECT h.id,"+stringify(PROP_ID(PR_FOLDER_TYPE))+","+stringify(PROP_TYPE(PR_FOLDER_TYPE))+",NULL, NULL, h.flags & 0x3 "
 					"FROM hierarchy AS h "
 						"WHERE h.type=3";
-	er = lpDatabase->DoInsert(strQuery);
-	if (er != erSuccess)
-		goto exit;
-	INTERMEDIATE_PROGRESS_(1)
-
-	PROGRESS_DONE
-
-exit:
-	return er;
+	return lpDatabase->DoInsert(strQuery);
 }
 
 // 53
@@ -2320,8 +1984,6 @@ ECRESULT UpdateDatabaseCheckAttachments(ECDatabase *lpDatabase)
 	ECRESULT er = erSuccess;
 	std::string strQuery;
 
-	PROGRESS_INIT(Z_UPDATE_CHECK_ATTACHMENTS)
-
 	strQuery =	"REPLACE INTO properties(hierarchyid,tag,type,val_ulong) "
 					"SELECT h.id,"+stringify(PROP_ID(PR_HASATTACH))+","+stringify(PROP_TYPE(PR_HASATTACH))+",IF(att.id,1,0) "
 						"FROM hierarchy AS h "
@@ -2329,23 +1991,13 @@ ECRESULT UpdateDatabaseCheckAttachments(ECDatabase *lpDatabase)
 					"GROUP BY h.id";
 	er = lpDatabase->DoInsert(strQuery);
 	if (er != erSuccess)
-		goto exit;
-	INTERMEDIATE_PROGRESS_(.5)
-
+		return er;
 	strQuery =	"UPDATE properties AS p "
 					"JOIN hierarchy AS h ON p.hierarchyid=h.id AND h.type=5 "
 					"LEFT JOIN hierarchy AS c ON c.type=7 AND c.parent=p.hierarchyid "
 				"SET p.val_ulong = IF(c.id,p.val_ulong|"+stringify(MSGFLAG_DELETED)+", p.val_ulong & ~"+stringify(MSGFLAG_DELETED)+") "
 				"WHERE p.tag="+stringify(PROP_ID(PR_MESSAGE_FLAGS))+" AND p.type="+stringify(PROP_TYPE(PR_MESSAGE_FLAGS));
-	er = lpDatabase->DoInsert(strQuery);
-	if (er != erSuccess)
-		goto exit;
-	INTERMEDIATE_PROGRESS_(1)
-
-	PROGRESS_DONE
-
-exit:
-	return er;
+	return lpDatabase->DoInsert(strQuery);
 }
 
 // 54
@@ -2354,78 +2006,17 @@ ECRESULT UpdateDatabaseCreateTProperties(ECDatabase *lpDatabase)
 	ECRESULT er = erSuccess;
 	std::string strQuery;
 
-#ifndef HAVE_OFFLINE_SUPPORT 
 	// Create the tproperties table
 	er = lpDatabase->DoInsert(Z_TABLEDEF_TPROPERTIES);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	strQuery = 	"INSERT IGNORE INTO tproperties (folderid,hierarchyid,tag,type,val_ulong,val_string,val_binary,val_double,val_longint,val_hi,val_lo) "
 					"SELECT h.id, p.hierarchyid, p.tag, p.type, p.val_ulong, LEFT(p.val_string,255), LEFT(p.val_binary,255), p.val_double, p.val_longint, p.val_hi, p.val_lo "
 					"FROM properties AS p "
 						"JOIN hierarchy AS tmp ON p.hierarchyid = tmp.id AND p.tag NOT IN (" + stringify(PROP_ID(PR_BODY_HTML)) + "," + stringify(PROP_ID(PR_RTF_COMPRESSED)) + ")"
 						"LEFT JOIN hierarchy AS h ON tmp.parent = h.id AND h.type = 3";
-	er = lpDatabase->DoInsert(strQuery);
-	if (er != erSuccess)
-		goto exit;
-#else
-	DB_RESULT lpResult = NULL;
-	DB_ROW lpDBRow = NULL;
-	unsigned int ulTotal = 0;
-	unsigned int ulCurrent = 0;
-
-	PROGRESS_INIT(Z_UPDATE_CREATE_TPROPERTIES)
-
-	// Create the tproperties table
-	strQuery = Z_TABLEDEF_TPROPERTIES;
-	strQuery.replace(strQuery.find("CREATE TABLE"), strlen("CREATE TABLE"), "CREATE TABLE IF NOT EXISTS");
-	er = lpDatabase->DoInsert(strQuery);
-	if (er != erSuccess)
-		goto exit;
-
-	strQuery = "SELECT MAX(hierarchyid) FROM properties";
-	er = lpDatabase->DoSelect(strQuery, &lpResult);
-	if (er != erSuccess)
-		goto exit;
-
-	lpDBRow = lpDatabase->FetchRow(lpResult);
-	if (lpDBRow == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
-		ec_log_err("UpdateDatabaseCreateTProperties(): row non existing");
-		goto exit;
-	}
-
-	ulTotal = lpDBRow[0] ? atoui(lpDBRow[0]) : 0;
-	lpDatabase->FreeResult(lpResult);
-	lpResult = NULL;
-
-	while (ulCurrent <= ulTotal) {
-		unsigned int ulInserted, ulAffected;
-
-		strQuery = 	"INSERT IGNORE INTO tproperties (folderid,hierarchyid,tag,type,val_ulong,val_string,val_binary,val_double,val_longint,val_hi,val_lo) "
-						"SELECT h.id, p.hierarchyid, p.tag, p.type, p.val_ulong, LEFT(p.val_string,255), LEFT(p.val_binary,255), p.val_double, p.val_longint, p.val_hi, p.val_lo "
-						"FROM properties AS p "
-							"JOIN hierarchy AS tmp ON p.hierarchyid = tmp.id AND p.tag NOT IN (" + stringify(PROP_ID(PR_BODY_HTML)) + "," + stringify(PROP_ID(PR_RTF_COMPRESSED)) + ") "
-												 " AND p.hierarchyid >= " + stringify(ulCurrent) + " AND p.hierarchyid < " + stringify(ulCurrent + 500) + " "
-							"LEFT JOIN hierarchy AS h ON tmp.parent = h.id AND h.type = 3";
-		er = lpDatabase->DoInsert(strQuery, &ulInserted, &ulAffected);
-		if (er != erSuccess)
-			goto exit;
-
-		ulCurrent += 500;
-		INTERMEDIATE_PROGRESS(ulCurrent, ulTotal)
-	}
-
-	PROGRESS_DONE
-#endif
-
-exit:
-#ifdef HAVE_OFFLINE_SUPPORT
-	if (lpResult)
-		lpDatabase->FreeResult(lpResult);
-#endif
-
-	return er;
+	return lpDatabase->DoInsert(strQuery);
 }
 
 // 55
@@ -2433,8 +2024,6 @@ ECRESULT UpdateDatabaseConvertHierarchy(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
 	std::string strQuery;
-
-	PROGRESS_INIT(Z_UPDATE_CONVERT_HIERARCHY)
 
 	// Create the temporary properties table
 	strQuery = Z_TABLEDEF_HIERARCHY;
@@ -2456,9 +2045,6 @@ ECRESULT UpdateDatabaseConvertHierarchy(ECDatabase *lpDatabase)
 		goto exit;
 
 	er = lpDatabase->DoDelete("DROP TABLE hierarchy_old");
-
-	PROGRESS_DONE
-
 exit:
 	lpDatabase->DoDelete("DROP TABLE IF EXISTS hierarchy_temp");
 	
@@ -2470,17 +2056,8 @@ ECRESULT UpdateDatabaseCreateDeferred(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
 	std::string strQuery;
-
-	PROGRESS_INIT(Z_UPDATE_CREATE_DEFERRED)
-
 	// Create the deferred table
 	er = lpDatabase->DoInsert(Z_TABLEDEF_DELAYEDUPDATE);
-
-	PROGRESS_DONE
-
-#ifdef HAVE_OFFLINE_SUPPORT
-exit:
-#endif
 	return er;
 }
 
@@ -2489,7 +2066,6 @@ ECRESULT UpdateDatabaseConvertChanges(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
 	std::string strQuery;
-#ifndef HAVE_OFFLINE_SUPPORT
 	bool bDropColumn;
 	
 	// In some upgrade paths the moved_from column doesn't exist. We'll
@@ -2499,85 +2075,6 @@ ECRESULT UpdateDatabaseConvertChanges(ECDatabase *lpDatabase)
 		strQuery = "ALTER TABLE changes DROP COLUMN moved_from, DROP key moved";
 		er = lpDatabase->DoDelete(strQuery);
 	}
-
-#else
-	DB_RESULT lpResult = NULL;
-	DB_ROW lpDBRow = NULL;
-	unsigned int ulTotal = 0;
-	unsigned int ulCurrent = 0;
-
-	PROGRESS_INIT(Z_UPDATE_CONVERT_CHANGES)
-
-	// Create the temporary properties table
-	strQuery = Z_TABLEDEF_CHANGES;
-	strQuery.replace(strQuery.find("CREATE TABLE"), strlen("CREATE TABLE"), "CREATE TABLE IF NOT EXISTS");
-	strQuery.replace(strQuery.find("changes"), strlen("changes"), "changes_temp");
-	er = lpDatabase->DoInsert(strQuery);
-	if (er != erSuccess)
-		goto exit;
-
-	strQuery = "SELECT MAX(id) FROM changes";
-	er = lpDatabase->DoSelect(strQuery, &lpResult);
-	if (er != erSuccess)
-		goto exit;
-
-	lpDBRow = lpDatabase->FetchRow(lpResult);
-	if (lpDBRow == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
-		ec_log_err("UpdateDatabaseConvertChanges(): row non existing");
-		goto exit;
-	}
-
-	ulTotal = lpDBRow[0] ? atoui(lpDBRow[0]) : 0;
-	lpDatabase->FreeResult(lpResult);
-	lpResult = NULL;
-
-	while (true) {
-		strQuery = "INSERT INTO changes_temp (id, sourcekey, parentsourcekey, change_type, flags, sourcesync) SELECT id, sourcekey, parentsourcekey, change_type, flags, sourcesync FROM changes ORDER BY id ASC LIMIT 10000";
-		er = lpDatabase->DoInsert(strQuery);
-		if (er != erSuccess)
-			goto exit;
-
-		strQuery = "DELETE FROM changes ORDER BY id ASC LIMIT 10000";
-		er = lpDatabase->DoDelete(strQuery);
-		if (er != erSuccess)
-			goto exit;
-
-		er = lpDatabase->Commit();
-		if (er != erSuccess)
-			goto exit;
-
-		er = lpDatabase->Begin();
-		if (er != erSuccess)
-			goto exit;
-
-		strQuery = "SELECT MIN(id) FROM changes";
-		er = lpDatabase->DoSelect(strQuery, &lpResult);
-		if (er != erSuccess)
-			goto exit;
-
-		lpDBRow = lpDatabase->FetchRow(lpResult);
-		if (lpDBRow == NULL || lpDBRow[0] == NULL)
-			break;
-
-		INTERMEDIATE_PROGRESS(atoui(lpDBRow[0]), ulTotal)
-		lpDatabase->FreeResult(lpResult);
-		lpResult = NULL;
-	}
-
-	er = lpDatabase->DoUpdate("RENAME TABLE changes TO changes_old, changes_temp TO changes");
-	if (er != erSuccess)
-		goto exit;
-
-	er = lpDatabase->DoDelete("DROP TABLE changes_old");
-
-	PROGRESS_DONE
-
-exit:
-	if (lpResult)
-		lpDatabase->FreeResult(lpResult);
-
-#endif
 	return er;
 }
 
@@ -2586,8 +2083,6 @@ ECRESULT UpdateDatabaseConvertNames(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
 	std::string strQuery;
-
-	PROGRESS_INIT(Z_UPDATE_CONVERT_NAMES)
 
 	// CharsetDetect(names)
 
@@ -2608,9 +2103,6 @@ ECRESULT UpdateDatabaseConvertNames(ECDatabase *lpDatabase)
 		goto exit;
 
 	er = lpDatabase->DoDelete("DROP TABLE names_old");
-
-	PROGRESS_DONE
-
 exit:
 	lpDatabase->DoDelete("DROP TABLE IF EXISTS names_temp");
 	
@@ -2686,7 +2178,7 @@ ECRESULT UpdateWLinkRecordKeys(ECDatabase *lpDatabase)
 				"join properties as p2 on p2.hierarchyid=h2.id and p2.tag=0x684d " // Get PR_WLINK_RECKEY for each child
 				"join properties as p3 on p3.hierarchyid=h2.id and p3.tag=0x684c " // Get PR_WLINK_ENTRYID for each child
 				"set p2.val_binary = p3.val_binary "								// Set PR_WLINK_RECKEY = PR_WLINK_ENTRYID
-				"where length(p3.val_binary) = 48";									// Where entryid length is 48 (zarafa)
+				"where length(p3.val_binary) = 48";									// Where entryid length is 48 (kopano)
 	er = lpDatabase->DoUpdate(strQuery);
 
 	return er;
@@ -2700,4 +2192,20 @@ ECRESULT UpdateVersionsTbl(ECDatabase *db)
 		"add column `micro` int(11) unsigned not null default 0 after `minor`, "
 		"drop primary key, "
 		"add primary key (`major`, `minor`, `micro`, `revision`, `databaserevision`)");
+}
+
+/* Edit no. 65 */
+ECRESULT UpdateChangesTbl(ECDatabase *db)
+{
+	return db->DoUpdate(
+		"alter table `changes` "
+		"modify change_type int(11) unsigned not null default 0");
+}
+
+/* Edit no. 66 */
+ECRESULT UpdateABChangesTbl(ECDatabase *db)
+{
+	return db->DoUpdate(
+		"alter table `abchanges` "
+		"modify change_type int(11) unsigned not null default 0");
 }

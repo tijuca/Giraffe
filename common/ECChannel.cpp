@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,10 +15,10 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
-#include <zarafa/ECChannel.h>
-#include <zarafa/stringutil.h>
+#include <kopano/ECChannel.h>
+#include <kopano/stringutil.h>
 #include <csignal>
 #ifdef LINUX
 #include <netdb.h>
@@ -37,8 +37,6 @@
 #include <mapicode.h>
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -541,14 +539,6 @@ HRESULT ECChannel::HrSelect(int seconds) {
 	return hrSuccess;
 }
 
-bool ECChannel::UsingSsl() {
-	return lpSSL != NULL;
-}
-
-bool ECChannel::sslctx() {
-	return lpCTX != NULL;
-}
-
 /** 
  * read from buffer until \n is found, or buffer length is reached
  * return buffer always contains \0 in the end, so max read from network is *lpulLen -1
@@ -672,11 +662,6 @@ void ECChannel::SetIPAddress(const struct sockaddr *sa, size_t slen)
 	peer_salen = slen;
 }
 
-const char *ECChannel::peer_addr(void) const
-{
-	return peer_atxt;
-}
-
 #ifdef LINUX
 static int peer_is_local2(int rsk, const struct nlmsghdr *nlh)
 {
@@ -749,18 +734,18 @@ int zcp_peeraddr_is_local(const struct sockaddr *peer_sockaddr,
 			/* RTM_GETROUTE won't report RTN_LOCAL for ::ffff:127.0.0.1 */
 			req.rth.rtm_family = AF_INET;
 			rta->rta_len = RTA_LENGTH(sizeof(struct in_addr));
-			req.nh.nlmsg_len = NLMSG_ALIGN(req.nh.nlmsg_len) + RTA_LENGTH(rta->rta_len);
+			req.nh.nlmsg_len = NLMSG_ALIGN(req.nh.nlmsg_len) + rta->rta_len;
 			memcpy(RTA_DATA(rta), &ad.s6_addr[12], 4);
 		} else {
 			rta->rta_len = RTA_LENGTH(sizeof(ad));
-			req.nh.nlmsg_len = NLMSG_ALIGN(req.nh.nlmsg_len) + RTA_LENGTH(rta->rta_len);
+			req.nh.nlmsg_len = NLMSG_ALIGN(req.nh.nlmsg_len) + rta->rta_len;
 			memcpy(RTA_DATA(rta), &ad, sizeof(ad));
 		}
 	} else if (peer_sockaddr->sa_family == AF_INET) {
 		const struct in_addr &ad = reinterpret_cast<const struct sockaddr_in *>(peer_sockaddr)->sin_addr;
 		req.rth.rtm_dst_len = sizeof(ad);
 		rta->rta_len = RTA_LENGTH(sizeof(ad));
-		req.nh.nlmsg_len = NLMSG_ALIGN(req.nh.nlmsg_len) + RTA_LENGTH(rta->rta_len);
+		req.nh.nlmsg_len = NLMSG_ALIGN(req.nh.nlmsg_len) + rta->rta_len;
 		memcpy(RTA_DATA(rta), &ad, sizeof(ad));
 	}
 	ret = peer_is_local2(rsk, &req.nh);
@@ -821,10 +806,6 @@ static struct addrinfo *reorder_addrinfo_ipv6(struct addrinfo *node)
 
 HRESULT HrListen(ECLogger *lpLogger, const char *szPath, int *lpulListenSocket)
 {
-#ifdef WIN32
-	// TODO: named pipe?
-	return MAPI_E_NO_SUPPORT;
-#else
 	HRESULT hr = hrSuccess;
 	int fd = -1;
 	struct sockaddr_un sun_addr;
@@ -840,16 +821,6 @@ HRESULT HrListen(ECLogger *lpLogger, const char *szPath, int *lpulListenSocket)
 	sun_addr.sun_family = AF_UNIX;
 	strncpy(sun_addr.sun_path, szPath, sizeof(sun_addr.sun_path));
 
-#ifdef WIN32
-	WSAData wsaData;
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-		if (lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to initialize Winsock.");
-		hr = E_FAIL;
-		goto exit;
-	}
-#endif
-
 	if ((fd = socket(PF_UNIX, SOCK_STREAM, 0)) == -1) {
 		if (lpLogger)
 			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to create AF_UNIX socket.");
@@ -864,7 +835,7 @@ HRESULT HrListen(ECLogger *lpLogger, const char *szPath, int *lpulListenSocket)
 
 	if (bind(fd, (struct sockaddr *)&sun_addr, sizeof(sun_addr)) == -1) {
                 if (lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to socket %s (%s). This is usually caused by another process (most likely another zarafa-server) already using this port. This program will terminate now.", szPath, strerror(errno));
+			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to socket %s (%s). This is usually caused by another process (most likely another kopano-server) already using this port. This program will terminate now.", szPath, strerror(errno));
 #ifdef LINUX
                 kill(0, SIGTERM);
 #endif
@@ -887,7 +858,6 @@ exit:
 	if (hr != hrSuccess && fd != -1)
 		close(fd);
 	return hr;
-#endif
 }
 
 int zcp_bindtodevice(ECLogger *log, int fd, const char *i)
@@ -917,20 +887,10 @@ HRESULT HrListen(ECLogger *lpLogger, const char *szBind, uint16_t ulPort,
 		goto exit;
 	}
 
-#ifdef WIN32
-	WSAData wsaData;
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-		if (lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to initialize Winsock.");
-		hr = E_FAIL;
-		goto exit;
-	}
-#endif
-
 	snprintf(port_string, sizeof(port_string), "%u", ulPort);
 	memset(&sock_hints, 0, sizeof(sock_hints));
 	/*
-	 * AI_NUMERICHOST is reflected in the zarafa documentation:
+	 * AI_NUMERICHOST is reflected in the kopano documentation:
 	 * an address is required for the "server_bind" parameter.
 	 */
 	sock_hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV | AI_PASSIVE;

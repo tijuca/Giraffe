@@ -1,52 +1,56 @@
 # -*- Makefile -*-
 
-SUBDIRS = . archiver/include/zarafa backup-plus presence search
+SUBDIRS = . archiver/include/kopano backup presence search
 
 AM_CPPFLAGS = ${ZCPPFLAGS} ${DEBUGFLAGS} ${BOOST_CPPFLAGS} ${SSL_CFLAGS} \
 	-I${top_srcdir}/mapi4linux/include \
 	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon
 
 
-bin_PROGRAMS = zarafa-fsck zarafa-passwd zarafa-stats
-dist_bin_SCRIPTS = utils/zarafa-set-oof
-sbin_PROGRAMS = zarafa-admin zarafa-archiver zarafa-monitor
-dist_sbin_SCRIPTS = utils/zarafa-mailbox-permissions
-noinst_PROGRAMS = zarafa-cfgchecker
-lib_LTLIBRARIES = libzarafa-archiver.la libzarafa-archiver-core.la
+bin_PROGRAMS = kopano-fsck kopano-passwd kopano-stats
+dist_bin_SCRIPTS = utils/kopano-set-oof
+sbin_PROGRAMS = kopano-admin kopano-archiver kopano-monitor
+dist_sbin_SCRIPTS = utils/kopano-mailbox-permissions \
+	archiver/scripts/kopano-archiver-aclset \
+	archiver/scripts/kopano-archiver-aclsync \
+	archiver/scripts/kopano-archiver-restore
+noinst_PROGRAMS = kopano-cfgchecker
+pkglibexec_PROGRAMS = mapitime
+lib_LTLIBRARIES = libkcarchiver.la libkcarchivercore.la
 noinst_DATA = \
-	libzarafa-archiver.ldd libzarafa-archiver-core.ldd \
-	zarafa-archiver.ldx zarafa-cfgchecker.ldx \
-	zarafa-monitor.ldx zarafa-passwd.ldx zarafa-stats.ldx
+	libkcarchiver.ldd libkcarchivercore.ldd \
+	kopano-archiver.ldx kopano-cfgchecker.ldx \
+	kopano-monitor.ldx kopano-passwd.ldx kopano-stats.ldx
 
 
-zarafa_admin_SOURCES = \
-	admin/zarafa-admin.cpp
-zarafa_admin_CPPFLAGS = \
+kopano_admin_SOURCES = \
+	admin/admin.cpp
+kopano_admin_CPPFLAGS = \
 	${AM_CPPFLAGS} -I${top_srcdir}/ECtools/archiver
-zarafa_admin_LDADD = \
+kopano_admin_LDADD = \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_util.la \
-	${top_builddir}/common/libzcp_common_ssl.la \
-	libzarafa-archiver.la ${PROG_LIBS} ${SSL_LIBS}
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcutil.la \
+	${top_builddir}/common/libkcssl.la \
+	libkcarchiver.la ${PROG_LIBS} ${SSL_LIBS}
 
-zarafa_archiver_SOURCES = \
+kopano_archiver_SOURCES = \
 	archiver/main.cpp
-zarafa_archiver_CPPFLAGS = \
+kopano_archiver_CPPFLAGS = \
 	${AM_CPPFLAGS} -I${top_srcdir}/provider/client \
 	-I${top_srcdir}/provider/include -I${top_srcdir}/provider/soap \
 	-I${top_builddir}/provider/soap -I${top_srcdir}/ECtools/archiver \
 	${GSOAP_CFLAGS} ${MYSQL_INCLUDES}
-zarafa_archiver_LDADD = \
+kopano_archiver_LDADD = \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_util.la \
-	libzarafa-archiver.la libzarafa-archiver-core.la \
-	${top_builddir}/common/libzcp_common_service.la ${PROG_LIBS}
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcutil.la \
+	libkcarchiver.la libkcarchivercore.la \
+	${top_builddir}/common/libkcservice.la ${PROG_LIBS}
 
 
-zarafa_cfgchecker_SOURCES = \
-	cfgchecker/zarafa-cfg.cpp \
+kopano_cfgchecker_SOURCES = \
+	cfgchecker/cfg.cpp \
 	cfgchecker/ECConfigCheck.cpp \
 	cfgchecker/ECConfigCheck.h \
 	cfgchecker/LDAPConfigCheck.cpp \
@@ -65,64 +69,64 @@ zarafa_cfgchecker_SOURCES = \
 	cfgchecker/DAgentConfigCheck.h \
 	cfgchecker/SpoolerConfigCheck.cpp \
 	cfgchecker/SpoolerConfigCheck.h 
-zarafa_cfgchecker_LDADD = \
-	${top_builddir}/common/libzcp_common_util.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
+kopano_cfgchecker_LDADD = \
+	${top_builddir}/common/libkcutil.la \
+	${top_builddir}/common/libkcmapi.la \
 	${top_builddir}/mapi4linux/src/libmapi.la ${PROG_LIBS}
 
 
-zarafa_fsck_SOURCES = \
-	fsck/zarafa-fsck.cpp \
-	fsck/zarafa-fsck-main.cpp \
-	fsck/zarafa-fsck-calendar.cpp \
-	fsck/zarafa-fsck-contact.cpp \
-	fsck/zarafa-fsck-task.cpp \
-	fsck/zarafa-fsck.h
-zarafa_fsck_CPPFLAGS = \
+kopano_fsck_SOURCES = \
+	fsck/fsck.cpp \
+	fsck/fsck-main.cpp \
+	fsck/fsck-calendar.cpp \
+	fsck/fsck-contact.cpp \
+	fsck/fsck-task.cpp \
+	fsck/fsck.h
+kopano_fsck_CPPFLAGS = \
 	${AM_CPPFLAGS} -I${top_srcdir}/libicalmapi
-zarafa_fsck_LDADD = \
+kopano_fsck_LDADD = \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_util.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcutil.la \
 	${PROG_LIBS}
 
 
-zarafa_monitor_SOURCES = \
-	monitor/zarafa-monitor.cpp \
+kopano_monitor_SOURCES = \
+	monitor/monitor.cpp \
 	monitor/ECMonitorDefs.h \
 	monitor/ECQuotaMonitor.h \
 	monitor/ECQuotaMonitor.cpp
-zarafa_monitor_LDADD = \
+kopano_monitor_LDADD = \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_util.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcutil.la \
 	${PROG_LIBS}
 
 
-zarafa_passwd_SOURCES = \
-	passwd/zarafa-passwd.cpp
-zarafa_passwd_LDADD = \
+kopano_passwd_SOURCES = \
+	passwd/passwd.cpp
+kopano_passwd_LDADD = \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_util.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcutil.la \
 	${PROG_LIBS}
 
 
-zarafa_stats_SOURCES = \
-	stats/zarafa-stats.cpp
-zarafa_stats_CPPFLAGS = \
+kopano_stats_SOURCES = \
+	stats/stats.cpp
+kopano_stats_CPPFLAGS = \
 	${AM_CPPFLAGS} ${NCURSES_FLAGS} -I${top_srcdir}/libfreebusy
 # ncurses needs to come first, because ICU_LIBS erroneously has -L/usr/lib64
 # which overrides the ncurses lib selection >:-(
-zarafa_stats_LDADD = \
+kopano_stats_LDADD = \
 	${NCURSES_LIBS} \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_util.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcutil.la \
 	${PROG_LIBS}
 
 
-libzarafa_archiver_la_SOURCES = \
+libkcarchiver_la_SOURCES = \
 	archiver/ArchiverSession.cpp \
 	archiver/ArchiverSession.h \
 	archiver/ArchiverSessionPtr.h \
@@ -143,16 +147,16 @@ libzarafa_archiver_la_SOURCES = \
 	archiver/helpers/MAPIPropHelper.h \
 	archiver/ECArchiverLogger.cpp \
 	archiver/ECArchiverLogger.h
-libzarafa_archiver_la_CPPFLAGS = ${zarafa_archiver_CPPFLAGS}
-libzarafa_archiver_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
+libkcarchiver_la_CPPFLAGS = ${kopano_archiver_CPPFLAGS}
+libkcarchiver_la_LDFLAGS = ${AM_LDFLAGS} -no-undefined \
 	-Wl,--version-script=${top_builddir}/default.sym
-libzarafa_archiver_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_util.la
-EXTRA_libzarafa_archiver_la_DEPENDENCIES = ${top_builddir}/default.sym
+libkcarchiver_la_LIBADD = ${top_builddir}/mapi4linux/src/libmapi.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcutil.la
+EXTRA_libkcarchiver_la_DEPENDENCIES = ${top_builddir}/default.sym
 
 
-libzarafa_archiver_core_la_SOURCES = \
+libkcarchivercore_la_SOURCES = \
 	archiver/Archiver.cpp \
 	archiver/Archiver.h \
 	archiver/AutoMAPI.h \
@@ -180,24 +184,22 @@ libzarafa_archiver_core_la_SOURCES = \
 	archiver/ArchiveControlImpl.h \
 	archiver/ECDatabase.h \
 	archiver/ECDatabase.cpp
-libzarafa_archiver_core_la_CPPFLAGS = ${zarafa_archiver_CPPFLAGS}
-libzarafa_archiver_core_la_LDFLAGS = \
+libkcarchivercore_la_CPPFLAGS = ${kopano_archiver_CPPFLAGS}
+libkcarchivercore_la_LDFLAGS = \
 	${AM_LDFLAGS} -no-undefined \
 	-Wl,--version-script=${top_builddir}/default.sym
-libzarafa_archiver_core_la_LIBADD = \
+libkcarchivercore_la_LIBADD = \
 	${top_builddir}/mapi4linux/src/libmapi.la \
-	${top_builddir}/common/libzcp_common_mapi.la \
-	${top_builddir}/common/libzcp_common_service.la \
-	libzarafa-archiver.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcservice.la \
+	libkcarchiver.la \
 	${PROG_LIBS} ${SSL_LIBS} ${MYSQL_LIBS}
-EXTRA_libzarafa_archiver_core_la_DEPENDENCIES = \
+EXTRA_libkcarchivercore_la_DEPENDENCIES = \
 	${top_builddir}/default.sym
 
-
-install-exec-hook:
-	${MKDIR_P} ${DESTDIR}${pkglibdir}
-	ln -fs ${libdir}/libzarafa-archiver.so ${DESTDIR}${pkglibdir}/libarchiver.so
-	ln -fs ${libdir}/libzarafa-archiver-core.so ${DESTDIR}${pkglibdir}/libarchiver-core.so
-
+mapitime_SOURCES = mapitime.cpp hx-time.c
+mapitime_LDADD = -lrt ${top_builddir}/mapi4linux/src/libmapi.la \
+	${top_builddir}/common/libkcmapi.la \
+	${top_builddir}/common/libkcutil.la
 
 include ../global.am

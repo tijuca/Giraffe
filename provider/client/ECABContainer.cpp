@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,35 +15,33 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include "Zarafa.h"
+#include <kopano/platform.h>
+#include "kcore.hpp"
 
 #include "ECMAPITable.h"
 #include "Mem.h"
 
-#include <zarafa/ECGuid.h>
-#include <zarafa/ECDebug.h>
+#include <kopano/ECGuid.h>
+#include <kopano/ECDebug.h>
 
 
 #include "ECMAPITable.h"
 
 #include "ECDisplayTable.h"
 
-#include <zarafa/CommonUtil.h>
-#include "ZarafaICS.h"
-#include <zarafa/mapiext.h>
+#include <kopano/CommonUtil.h>
+#include "ics.h"
+#include <kopano/mapiext.h>
 
 #include "ECABContainer.h"
 
 #include <edkmdb.h>
 #include <mapiutil.h>
 
-#include <zarafa/charset/convstring.h>
-#include <zarafa/ECGetText.h>
+#include <kopano/charset/convstring.h>
+#include <kopano/ECGetText.h>
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -97,48 +95,6 @@ HRESULT	ECABContainer::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInter
 		return MAPI_E_INVALID_PARAMETER;
 
 	switch (ulPropTag) {
-#if defined(_WIN32) && !defined(WINCE)
-	case PR_DETAILS_TABLE:
-		if (*lpiid != IID_IMAPITable)
-			return MAPI_E_INTERFACE_NOT_SUPPORTED;
-
-		hr = ECDisplayTable::CreateDisplayTable(arraySize(rgdtIDistListPage), rgdtIDistListPage, (LPMAPITABLE *) lppUnk);
-		if (hr != hrSuccess)
-			return hr;
-		break;
-	case PR_EMS_AB_MEMBER_O:
-		if (*lpiid != IID_IMAPITable)
-			return MAPI_E_INTERFACE_NOT_SUPPORTED;
-
-		hr = GetContentsTable(ulInterfaceOptions, (LPMAPITABLE*)lppUnk);
-		if (hr != hrSuccess)
-			return hr;
-		break;
-	case PR_EMS_AB_PROXY_ADDRESSES_O:
-		if (*lpiid != IID_IMAPITable)
-			return MAPI_E_INTERFACE_NOT_SUPPORTED;
-
-		hr = ECDisplayTable::CreateTableFromProperty(this, lpiid, ulInterfaceOptions, PR_SMTP_ADDRESS, PR_EMS_AB_PROXY_ADDRESSES, lppUnk);
-		if (hr != hrSuccess)
-			return hr;
-		break;
-	case PR_EMS_AB_IS_MEMBER_OF_DL_O:
-		if (*lpiid != IID_IMAPITable)
-			return MAPI_E_INTERFACE_NOT_SUPPORTED;
-
-		hr = ECDisplayTable::CreateTableFromResolved(this, lpiid, ulInterfaceOptions, PR_EMS_AB_IS_MEMBER_OF_DL_T, lppUnk);
-		if (hr != hrSuccess)
-			return hr;
-		break;
-	case PR_EMS_AB_OWNER_O:
-		if (*lpiid != IID_IMAPITable)
-			return MAPI_E_INTERFACE_NOT_SUPPORTED;
-
-		hr = ECDisplayTable::CreateTableFromResolved(this, lpiid, ulInterfaceOptions, PR_EMS_AB_OWNER, lppUnk);
-		if (hr != hrSuccess)
-			return hr;
-		break;
-#endif
 	case PR_CONTAINER_CONTENTS:
 		if(*lpiid == IID_IMAPITable)
 			hr = GetContentsTable(ulInterfaceOptions, (LPMAPITABLE*)lppUnk);
@@ -327,10 +283,8 @@ HRESULT ECABContainer::TableRowGetProp(void* lpProvider, struct propVal *lpsProp
 	}
 	return hr;
 }
-/////////////////////////////////////////////////
-// IMAPIContainer
-//
 
+// IMAPIContainer
 HRESULT ECABContainer::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 {
 	HRESULT			hr = hrSuccess;
@@ -424,10 +378,7 @@ HRESULT ECABContainer::GetSearchCriteria(ULONG ulFlags, LPSRestriction *lppRestr
 	return MAPI_E_NO_SUPPORT;
 }
 
-/////////////////////////////////////////////////
 // IABContainer
-//
-
 HRESULT ECABContainer::CreateEntry(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulCreateFlags, LPMAPIPROP* lppMAPIPropEntry)
 {
 	return MAPI_E_NO_SUPPORT;
@@ -460,9 +411,7 @@ HRESULT ECABContainer::ResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlag
 	return ((ECABLogon*)lpProvider)->m_lpTransport->HrResolveNames(lpPropTagArray, ulFlags, lpAdrList, lpFlagList);
 }
 
-//////////////////////////////////
 // Interface IUnknown
-//
 HRESULT ECABContainer::xABContainer::QueryInterface(REFIID refiid , void** lppInterface)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IABContainer::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
@@ -488,9 +437,7 @@ ULONG ECABContainer::xABContainer::Release()
 	return ulRef;
 }
 
-//////////////////////////////////
 // Interface IABContainer
-//
 HRESULT ECABContainer::xABContainer::CreateEntry(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulCreateFlags, LPMAPIPROP* lppMAPIPropEntry)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IABContainer::CreateEntry", "");
@@ -527,9 +474,7 @@ HRESULT ECABContainer::xABContainer::ResolveNames(LPSPropTagArray lpPropTagArray
 	return hr;
 }
 
-//////////////////////////////////
 // Interface IMAPIContainer
-//
 HRESULT ECABContainer::xABContainer::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetContentsTable", "");
@@ -575,9 +520,7 @@ HRESULT ECABContainer::xABContainer::GetSearchCriteria(ULONG ulFlags, LPSRestric
 	return hr;
 }
 
-////////////////////////////////
 // Interface IMAPIProp
-//
 HRESULT ECABContainer::xABContainer::GetLastError(HRESULT hError, ULONG ulFlags, LPMAPIERROR * lppMapiError)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetLastError", "");

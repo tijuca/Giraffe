@@ -1,9 +1,9 @@
 # -*- Makefile -*-
 
-dist_sbin_SCRIPTS = zarafa-presence
+dist_sbin_SCRIPTS = kopano-presence
 
-EXTRA_DIST = setup.py zarafa_presence/__init__.py \
-             zarafa_presence/plugin_xmpp.py zarafa_presence/plugin_spreed.py
+EXTRA_DIST = setup.py kopano_presence/__init__.py \
+             kopano_presence/plugin_xmpp.py kopano_presence/plugin_spreed.py
 
 install-exec-local:
 	cd ${srcdir} && ${PYTHON} setup.py install -f \

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,9 +15,9 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/ECThreadPool.h>
-#include <zarafa/threadutil.h>
+#include <kopano/platform.h>
+#include <kopano/ECThreadPool.h>
+#include <kopano/threadutil.h>
 
 #include <algorithm>
 #include <sys/time.h> /* gettimeofday */
@@ -47,12 +47,6 @@ static inline struct timeval operator-(const struct timeval &lhs, const struct t
 	
 	return result;
 }
-
-
-
-//////////////////////////////
-// ECThreadPool implementation
-//////////////////////////////
 
 /**
  * Construct an ECThreadPool instance.
@@ -308,13 +302,6 @@ void* ECThreadPool::threadFunc(void *lpVoid)
 	return NULL;
 }
 
-
-
-
-////////////////////////
-// ECTask implementation
-////////////////////////
-
 /**
  * Execute an ECTask instance, just calls the run() method of the derived class.
  */
@@ -322,12 +309,6 @@ void ECTask::execute()
 {
 	run();
 }
-
-
-
-////////////////////////////////
-// ECWaitableTask implementation
-////////////////////////////////
 
 /** 
  * Construct an ECWaitableTask object.

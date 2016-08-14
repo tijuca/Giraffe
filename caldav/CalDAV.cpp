@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -16,12 +16,12 @@
  */
 
 #include "config.h"
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <climits>
 #include "mapidefs.h"
-#include <zarafa/ECChannel.h>
+#include <kopano/ECChannel.h>
 #include <mapix.h>
-#include <zarafa/MAPIErrors.h>
+#include <kopano/MAPIErrors.h>
 #include "Http.h"
 #include "CalDavUtil.h"
 #include "iCal.h"
@@ -33,11 +33,11 @@
 #include <iostream>
 #include <string>
 
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECChannel.h>
-#include <zarafa/my_getopt.h>
-#include <zarafa/ecversion.h>
-#include <zarafa/CommonUtil.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECChannel.h>
+#include <kopano/my_getopt.h>
+#include <kopano/ecversion.h>
+#include <kopano/CommonUtil.h>
 #include "SSLUtil.h"
 
 #include "TmpPath.h"
@@ -46,7 +46,7 @@ using namespace std;
 
 #ifdef LINUX
 #include <execinfo.h>
-#include <zarafa/UnixUtil.h>
+#include <kopano/UnixUtil.h>
 #endif
 
 #ifdef ZCP_USES_ICU
@@ -56,8 +56,6 @@ using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 
@@ -136,7 +134,7 @@ static void PrintHelp(const char *name)
 	cout << "  -F\t\tDo not run in the background" << endl;
 	cout << "  -h\t\tShows this help." << endl;
 	cout << "  -V\t\tPrint version info." << endl;
-	cout << "  -c filename\tUse alternate config file (e.g. /etc/zarafa/ical.cfg)\n\t\tDefault: /etc/zarafa/ical.cfg" << endl;
+	cout << "  -c filename\tUse alternate config file (e.g. /etc/kopano/ical.cfg)\n\t\tDefault: /etc/kopano/ical.cfg" << endl;
 	cout << endl;
 }
 
@@ -159,17 +157,13 @@ int main(int argc, char **argv) {
 
 	// Configuration
 	int opt = 0;
-#ifdef WIN32
-	const char *lpszCfg = "ical.cfg";
-#else
 	const char *lpszCfg = ECConfig::GetDefaultPath("ical.cfg");
-#endif
 	static const configsetting_t lpDefaults[] = {
 #ifdef LINUX
-		{ "run_as_user", "zarafa" },
-		{ "run_as_group", "zarafa" },
-		{ "pid_file", "/var/run/zarafad/ical.pid" },
-		{ "running_path", "/var/lib/zarafa" },
+		{ "run_as_user", "kopano" },
+		{ "run_as_group", "kopano" },
+		{ "pid_file", "/var/run/kopano/ical.pid" },
+		{ "running_path", "/var/lib/kopano" },
 		{ "process_model", "fork" },
 #endif
 		{ "server_bind", "" },
@@ -178,12 +172,12 @@ int main(int argc, char **argv) {
 		{ "icals_port", "8443" },
 		{ "icals_enable", "no" },
 		{ "enable_ical_get", "yes", CONFIGSETTING_RELOADABLE },
-		{ "server_socket", "http://localhost:236/zarafa" },
+		{ "server_socket", "http://localhost:236/" },
 		{ "server_timezone","Europe/Amsterdam"},
 		{ "default_charset","utf-8"},
 		{ "log_method", "file" },
 #ifdef LINUX
-		{ "log_file", "/var/log/zarafa/ical.log" },
+		{ "log_file", "/var/log/kopano/ical.log" },
 #else
 		{ "log_file", "ical.log" },
 #endif
@@ -191,8 +185,8 @@ int main(int argc, char **argv) {
 		{ "log_timestamp", "1" },
 		{ "log_buffer_size", "0" },
 #ifdef LINUX
-        { "ssl_private_key_file", "/etc/zarafa/ical/privkey.pem" },
-        { "ssl_certificate_file", "/etc/zarafa/ical/cert.pem" },
+        { "ssl_private_key_file", "/etc/kopano/ical/privkey.pem" },
+        { "ssl_certificate_file", "/etc/kopano/ical/cert.pem" },
 #else
         { "ssl_private_key_file", "privkey.pem" },
         { "ssl_certificate_file", "cert.pem" },
@@ -254,17 +248,13 @@ int main(int argc, char **argv) {
 	if (!g_lpConfig->LoadSettings(lpszCfg) ||
 	    !g_lpConfig->ParseParams(argc - optind, &argv[optind], NULL) ||
 	    (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
-#ifdef WIN32
-		g_lpLogger = new ECLogger_Eventlog(1, "ZarafaICal");
-#else
 		g_lpLogger = new ECLogger_File(1, 0, "-", false);
-#endif
 		ec_log_set(g_lpLogger);
 		LogConfigErrors(g_lpConfig);
 		goto exit;
 	}
 
-	g_lpLogger = CreateLogger(g_lpConfig, argv[0], "ZarafaICal");
+	g_lpLogger = CreateLogger(g_lpConfig, argv[0], "KopanoICal");
 	if (!g_lpLogger) {
 		fprintf(stderr, "Error loading configuration or parsing commandline arguments.\n");
 		goto exit;
@@ -335,7 +325,7 @@ int main(int argc, char **argv) {
 	if (g_bThreads)
 		mainthread = pthread_self();
 
-	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting zarafa-ical version " PROJECT_VERSION_CALDAV_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
+	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting kopano-ical version " PROJECT_VERSION_CALDAV_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
 
 	hr = HrProcessConnections(ulListenCalDAV, ulListenCalDAVs);
 	if (hr != hrSuccess)
@@ -720,9 +710,9 @@ static HRESULT HrHandleRequest(ECChannel *lpChannel)
 	}
 	if (hr != hrSuccess) {
 		if(ulFlag & SERVICE_ICAL)
-			lpRequest->HrRequestAuth("Zarafa iCal Gateway");
+			lpRequest->HrRequestAuth("Kopano iCal Gateway");
 		else
-			lpRequest->HrRequestAuth("Zarafa CalDav Gateway");
+			lpRequest->HrRequestAuth("Kopano CalDav Gateway");
 		hr = hrSuccess; //keep connection open.
 		goto exit;
 	}

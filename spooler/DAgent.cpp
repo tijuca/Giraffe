@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -16,8 +16,6 @@
  */
 
 /*
- * This is the Zarafa delivery Agent.
- *
  * E-mail is delivered to the client through this program; it is invoked
  * by the MTA with the username and rfc822 e-mail message, and the delivery
  * agent parses the rfc822 message, setting properties on the MAPI object
@@ -45,7 +43,7 @@
  * Detail:
  * see rfc.
  */
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
@@ -54,8 +52,8 @@
 #include <algorithm>
 #include <map>
 
-#include <zarafa/MAPIErrors.h>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/MAPIErrors.h>
+#include <kopano/mapi_ptr.h>
 #include "fileutil.h"
 #include "PyMapiPlugin.h"
 
@@ -86,7 +84,7 @@
 #define USES_IID_IMAPIFolder
 #define USES_IID_IExchangeManageStore
 #define USES_IID_IMsgStore
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 
 #include <inetmapi/inetmapi.h>
 
@@ -94,49 +92,44 @@
 #include <mapix.h>
 #include <mapiutil.h>
 #include <mapidefs.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <mapiguid.h>
 #include <edkguid.h>
 #include <edkmdb.h>
-#include <zarafa/EMSAbTag.h>
+#include <kopano/EMSAbTag.h>
 
 #include <cctype>
 #include <ctime>
 
-#include <zarafa/stringutil.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/Util.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/MAPIErrors.h>
-#include <zarafa/my_getopt.h>
-#include <zarafa/restrictionutil.h>
+#include <kopano/stringutil.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/Util.h>
+#include <kopano/ECLogger.h>
+#include <kopano/MAPIErrors.h>
+#include <kopano/my_getopt.h>
+#include <kopano/restrictionutil.h>
 #include "rules.h"
 #include "archive.h"
 #include "helpers/MAPIPropHelper.h"
 #include <inetmapi/options.h>
-#include <zarafa/charset/convert.h>
-#include <zarafa/base64.h>
+#include <kopano/charset/convert.h>
+#include <kopano/base64.h>
 
-#include <zarafa/IECServiceAdmin.h>
-#include <zarafa/IECUnknown.h>
-#include <zarafa/ECTags.h>
+#include <kopano/IECServiceAdmin.h>
+#include <kopano/IECUnknown.h>
+#include <kopano/ECTags.h>
 #include "ECFeatures.h"
 
-#include <zarafa/ECChannel.h>
-#include <zarafa/UnixUtil.h>
+#include <kopano/ECChannel.h>
+#include <kopano/UnixUtil.h>
 #include "LMTP.h"
-#include <zarafa/ecversion.h>
-#include <zarafa/platform.h>
+#include <kopano/ecversion.h>
+#include <kopano/platform.h>
 #include <csignal>
 #include "SSLUtil.h"
 #include "StatsClient.h"
-
-#ifdef WIN32
-#include "ECNTService.h"
-#else
 #include <execinfo.h>
-#endif
-    
+
 using namespace std;
 
 static StatsClient *sc = NULL;
@@ -163,7 +156,7 @@ public:
 	/* Channel for communication from MTA */
 	ECChannel *lpChannel;
 
-	/* Connection path to Zarafa server */
+	/* Connection path to storage server */
 	std::string strPath;
 
 	/* Path to autorespond handler */
@@ -491,17 +484,11 @@ static HRESULT HrAutoAccept(ECLogger *lpLogger, IMAPISession *lpMAPISession,
 	// force utf-8 output on the username. This means that the autoaccept script must also interpret the username
 	// in utf-8, *not* in the current locale.
 	strCmdLine = (std::string)autoresponder + " \"" + convert_to<string>("UTF-8", lpRecip->wstrUsername, rawsize(lpRecip->wstrUsername), CHARSET_WCHAR) + "\" \"" + g_lpConfig->GetSettingsPath() + "\" \"" + strEntryID + "\"";
-	
-#ifdef WIN32
-	g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "No support for autoaccept with command line %s", strCmdLine.c_str());
-	hr = MAPI_E_NO_SUPPORT;
-#else
 	g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Starting autoaccept with command line %s", strCmdLine.c_str());
 	if (!unix_system(autoresponder, strCmdLine.c_str(), const_cast<const char **>(environ))) {
 		hr = MAPI_E_CALL_FAILED;
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "HrAutoAccept(): invoking autoaccept script failed %x", hr);
 	}
-#endif
 		
 	// Delete the copy, irrespective of the outcome of the script.
 	sEntryList.cValues = 1;
@@ -582,15 +569,9 @@ static HRESULT HrAutoProcess(ECLogger *lpLogger, IMAPISession *lpMAPISession,
 	// force utf-8 output on the username. This means that the autoaccept script must also interpret the username
 	// in utf-8, *not* in the current locale.
 	strCmdLine = (std::string)autoprocessor + " \"" + convert_to<string>("UTF-8", lpRecip->wstrUsername, rawsize(lpRecip->wstrUsername), CHARSET_WCHAR) + "\" \"" + g_lpConfig->GetSettingsPath() + "\" \"" + strEntryID + "\"";
-
-#ifdef WIN32
-	g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "No support for autoaccept with command line %s", strCmdLine.c_str());
-	hr = MAPI_E_NO_SUPPORT;
-#else
 	g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Starting autoaccept with command line %s", strCmdLine.c_str());
 	if (!unix_system(autoprocessor, strCmdLine.c_str(), const_cast<const char **>(environ)))
 		hr = MAPI_E_CALL_FAILED;
-#endif
 
 	// Delete the copy, irrespective of the outcome of the script.
 	sEntryList.cValues = 1;
@@ -725,11 +706,11 @@ exit:
 }
 
 /** 
- * Resolve usernames/email addresses to Zarafa users.
+ * Resolve usernames/email addresses to Kopano users.
  * 
  * @param[in] lpArgs delivery options
  * @param[in] lpAddrFolder resolve users from this addressbook container
- * @param[in,out] lRCPT the list of recipients to resolve in Zarafa
+ * @param[in,out] lRCPT the list of recipients to resolve in Kopano
  * 
  * @return MAPI Error code
  */
@@ -896,11 +877,11 @@ exit:
 }
 
 /** 
- * Resolve a single recipient as Zarafa user
+ * Resolve a single recipient as Kopano user
  * 
  * @param[in] lpArgs delivery options
  * @param[in] lpAddrFolder resolve users from this addressbook container
- * @param[in,out] lpRecip recipient to resolve in Zarafa
+ * @param[in,out] lpRecip recipient to resolve in Kopano
  * 
  * @return MAPI Error code
  */
@@ -1004,7 +985,7 @@ exit:
  * 
  * @param[in] lpSession MAPI admin session
  * @param[in] lpServerNameRecips recipients grouped by server name
- * @param[in] strDefaultPath default connection url to zarafa
+ * @param[in] strDefaultPath default connection url to kopano
  * @param[out] lpServerPathRecips recipients grouped by server url
  * 
  * @return MAPI Error code
@@ -1119,7 +1100,7 @@ exit:
  *
  * @param[in] lpSession MAPI Admin session
  * @param[in] lpAdminStore Store of the admin
- * @param[in] lpRecip Resolved Zarafa recipient to open folders for
+ * @param[in] lpRecip Resolved Kopano recipient to open folders for
  * @param[in] lpArgs Use these delivery options to open correct folders etc.
  * @param[out] lppStore Store of the recipient
  * @param[out] lppInbox Inbox of the recipient
@@ -1498,8 +1479,8 @@ static bool dagent_oof_enabled(const SPropValue *prop)
 static bool dagent_stop_autoreply_hdr(const char *s)
 {
 #define S(x) do { if (strcasecmp(s, (x)) == 0) return true; } while (false)
-	/* Zarafa - Vacation header already present, do not send vacation reply. */
-	S("X-Zarafa-Vacation");
+	/* Kopano - Vacation header already present, do not send vacation reply. */
+	S("X-Kopano-Vacation");
 	/* RFC 3834 - Precedence: list/bulk/junk, do not reply to these mails. */
 	S("Auto-Submitted");
 	S("Precedence");
@@ -1546,7 +1527,7 @@ static bool dagent_avoid_autoreply(const std::vector<std::string> &hl)
  * @param[in] lpMDB Store of the user that triggered the oof email
  * @param[in] lpMessage delivery message that triggered the oof email
  * @param[in] lpRecip delivery recipient sending the oof email from
- * @param[in] strBaseCommand Command to use to start the oof mailer (zarafa-autorespond)
+ * @param[in] strBaseCommand Command to use to start the oof mailer (kopano-autorespond)
  * 
  * @return MAPI Error code
  */
@@ -1681,8 +1662,8 @@ static HRESULT SendOutOfOffice(LPADRBOOK lpAdrBook, LPMDB lpMDB,
 		goto exit;
 	}
 
-	// add anti-loop header for Zarafa
-	snprintf(szHeader, PATH_MAX, "\nX-Zarafa-Vacation: autorespond");
+	// add anti-loop header for Kopano
+	snprintf(szHeader, PATH_MAX, "\nX-Kopano-Vacation: autorespond");
 	hr = WriteOrLogError(fd, szHeader, strlen(szHeader));
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "SendOutOfOffice(): WriteOrLogError failed(3) %x", hr);
@@ -2388,7 +2369,7 @@ static HRESULT HrGetSession(const DeliveryArgs *lpArgs,
 		// if connecting fails, the mailer should try to deliver again.
 		switch (hr) {
 		case MAPI_E_NETWORK_ERROR:
-			if (!bSuppress) g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to connect to zarafa server for user %ls, using socket: '%s'", szUsername, lpArgs->strPath.c_str());
+			if (!bSuppress) g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to connect to storage server for user %ls, using socket: '%s'", szUsername, lpArgs->strPath.c_str());
 			break;
 
 		// MAPI_E_NO_ACCESS or MAPI_E_LOGON_FAILED are fatal (user does not exist)
@@ -2831,7 +2812,7 @@ static void RespondMessageExpired(recipients_t::const_iterator start,
 }
 
 /** 
- * For a specific zarafa server, deliver the same message to a list of
+ * For a specific storage server, deliver the same message to a list of
  * recipients. This makes sure this message is correctly single
  * instanced on this server.
  *
@@ -2842,7 +2823,7 @@ static void RespondMessageExpired(recipients_t::const_iterator start,
  * @param[in] lpMessage an already delivered message
  * @param[in] bFallbackDelivery already delivered message is an fallback message
  * @param[in] strMail the rfc2822 received email
- * @param[in] strServer uri of the zarafa server to connect to
+ * @param[in] strServer uri of the storage server to connect to
  * @param[in] listRecipients list of recipients present on the server connecting to
  * @param[in] lpAdrBook Global addressbook
  * @param[in] lpArgs delivery options
@@ -2882,7 +2863,7 @@ static HRESULT ProcessDeliveryToServer(PyMapiPlugin *lppyMapiPlugin,
 		// notify LMTP client soft error to try again later
 		for (iter = listRecipients.begin(); iter != listRecipients.end(); ++iter)
 			// error will be shown in postqueue status in postfix, probably too in other serves and mail syslog service
-			(*iter)->wstrDeliveryStatus = L"450 4.5.0 %ls network or permissions error to zarafa server: " + wstringify(hr, true);
+			(*iter)->wstrDeliveryStatus = L"450 4.5.0 %ls network or permissions error to storage server: " + wstringify(hr, true);
 		goto exit;
 	}
 
@@ -3281,7 +3262,7 @@ static void *HandlerLMTP(void *lpArg)
 		goto exit;
 	}
 
-	hr = HrGetSession(lpArgs, ZARAFA_SYSTEM_USER_W, &lpSession);
+	hr = HrGetSession(lpArgs, KOPANO_SYSTEM_USER_W, &lpSession);
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "HandlerLMTP(): HrGetSession failed %x", hr);
 		lmtp.HrResponse("421 internal error: GetSession failed");
@@ -3461,7 +3442,7 @@ static void *HandlerLMTP(void *lpArg)
 				char timeStr[4096];
 				strftime(timeStr, sizeof timeStr, "%a, %d %b %Y %T %z (%Z)", tm);
 
-				fprintf(tmp, "Received: from %s (%s)\r\n\tby %s (Zarafa-spooler) with LMTP\r\n\tfor <%s>; %s\r\n",
+				fprintf(tmp, "Received: from %s (%s)\r\n\tby %s (kopano-spooler) with LMTP\r\n\tfor <%s>; %s\r\n",
 					heloName.c_str(), lpArgs->lpChannel->peer_addr(),
 					serverName.c_str(),
 					curFrom.c_str(),
@@ -3607,19 +3588,6 @@ static HRESULT running_service(const char *servicename, bool bDaemonize,
 	}
 
 	g_lpLogger->Log(EC_LOGLEVEL_INFO, "Maximum LMTP threads set to %d", nMaxThreads);
-
-#ifdef WIN32
-	// Initialize Winsock
-	WSADATA wsaData;
-	int iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
-
-	if (iResult != NO_ERROR) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not initialize Winsock (%d)", iResult);
-		hr = E_FAIL;
-		goto exit;
-	}
-#endif
-	
 	// Setup sockets
 	hr = HrListen(g_lpLogger, g_lpConfig->GetSetting("server_bind"),
 	              atoi(g_lpConfig->GetSetting("lmtp_port")), &ulListenLMTP);
@@ -3691,9 +3659,10 @@ static HRESULT running_service(const char *servicename, bool bDaemonize,
 			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
-	sc = new StatsClient(g_lpConfig->GetSetting("z_statsd_stats"), g_lpLogger);
+	sc = new StatsClient(g_lpLogger);
+	sc->startup(g_lpConfig->GetSetting("z_statsd_stats"));
 
-	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting zarafa-dagent LMTP mode version " PROJECT_VERSION_DAGENT_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
+	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting kopano-dagent LMTP mode version " PROJECT_VERSION_DAGENT_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
 
 	// Mainloop
 	while (!g_bQuit) {
@@ -3782,11 +3751,6 @@ static HRESULT running_service(const char *servicename, bool bDaemonize,
 
 exit:
 	ECChannel::HrFreeCtx();
-
-#ifdef WIN32
-	WSACleanup();
-#endif
-
 #ifdef LINUX
 	free(st.ss_sp);
 #endif
@@ -3841,7 +3805,7 @@ static HRESULT deliver_recipient(PyMapiPlugin *lppyMapiPlugin,
 	// Always try to resolve the user unless we just stripped an email address.
 	if (!bStringEmail) {
 		// only suppress error when it has no meaning (eg. delivery of unix user to itself)
-		hr = HrGetSession(lpArgs, ZARAFA_SYSTEM_USER_W, &lpSession, !lpArgs->bResolveAddress);
+		hr = HrGetSession(lpArgs, KOPANO_SYSTEM_USER_W, &lpSession, !lpArgs->bResolveAddress);
 		if (hr == hrSuccess) {
 			hr = OpenResolveAddrFolder(lpSession, &lpAdrBook, &lpAddrDir);
 			if (hr != hrSuccess) {
@@ -3946,7 +3910,7 @@ static void print_help(const char *name)
 	cout << "  <recipient> Username or e-mail address of recipient" << endl;
 	cout << "  -f file\t read e-mail from file" << endl;
 	cout << "  -h path\t path to connect to (e.g. file:///var/run/socket)" << endl;
-	cout << "  -c filename\t Use configuration file (e.g. /etc/zarafa/dagent.cfg)\n\t\t Default: no config file used." << endl;
+	cout << "  -c filename\t Use configuration file (e.g. /etc/kopano/dagent.cfg)\n\t\t Default: no config file used." << endl;
 	cout << "  -j\t\t deliver in Junkmail" << endl;
 	cout << "  -F foldername\t deliver in a subfolder of the store. Eg. 'Inbox\\sales'" << endl; 
 	cout << "  -P foldername\t deliver in a subfolder of the public store. Eg. 'sales\\incoming'" << endl;
@@ -3966,7 +3930,7 @@ static void print_help(const char *name)
 #ifdef LINUX
 	cout << endl;
 	cout << "  -a responder\t path to autoresponder (e.g. /usr/local/bin/autoresponder)" << endl;
-	cout << "\t\t The autoresponder is called with </path/to/autoresponder> <from> <to> <subject> <zarafa-username> <messagefile>" << endl;
+	cout << "\t\t The autoresponder is called with </path/to/autoresponder> <from> <to> <subject> <kopano-username> <messagefile>" << endl;
 	cout << "\t\t when the autoresponder is enabled for this user, and -j is not specified" << endl;
 #endif
 	cout << endl;
@@ -3989,7 +3953,7 @@ int main(int argc, char *argv[]) {
 
 	DeliveryArgs sDeliveryArgs;
 	sDeliveryArgs.strPath = "";
-	sDeliveryArgs.strAutorespond = "/usr/sbin/zarafa-autorespond";
+	sDeliveryArgs.strAutorespond = "/usr/sbin/kopano-autorespond";
 	sDeliveryArgs.bCreateFolder = false;
 	sDeliveryArgs.strDeliveryFolder.clear();
 	sDeliveryArgs.szPathSeperator = '\\';
@@ -4028,7 +3992,7 @@ int main(int argc, char *argv[]) {
 		{ "config", 1, NULL, OPT_CONFIG },	// config file
 		{ "junk", 0, NULL, OPT_JUNK },	// junk folder
 		{ "file", 1, NULL, OPT_FILE },	// file as input
-		{ "host", 1, NULL, OPT_HOST },	// zarafa host parameter
+		{ "host", 1, NULL, OPT_HOST },	// kopano host parameter
 		{ "daemonize",0 ,NULL,OPT_DAEMONIZE}, // daemonize and listen for LMTP
 		{ "listen", 0, NULL, OPT_LISTEN},   // listen for LMTP 
 		{ "folder", 1, NULL, OPT_FOLDER },	// subfolder of store to deliver in
@@ -4045,9 +4009,9 @@ int main(int argc, char *argv[]) {
 		{ "server_bind", "" },
 		{ "server_bind_intf", "" },
 #ifdef LINUX
-		{ "run_as_user", "zarafa" },
-		{ "run_as_group", "zarafa" },
-		{ "pid_file", "/var/run/zarafad/dagent.pid" },
+		{ "run_as_user", "kopano" },
+		{ "run_as_group", "kopano" },
+		{ "pid_file", "/var/run/kopano/dagent.pid" },
 		{ "coredump_enabled", "no" },
 #endif
 		{ "lmtp_port", "2003" },
@@ -4066,15 +4030,15 @@ int main(int argc, char *argv[]) {
 		{ "log_raw_message", "no", CONFIGSETTING_RELOADABLE },
 		{ "log_raw_message_path", "/tmp", CONFIGSETTING_RELOADABLE },
 		{ "archive_on_delivery", "no", CONFIGSETTING_RELOADABLE },
-		{ "mr_autoaccepter", "/usr/sbin/zarafa-mr-accept", CONFIGSETTING_RELOADABLE },
-		{ "mr_autoprocessor", "/usr/sbin/zarafa-mr-process", CONFIGSETTING_RELOADABLE },
+		{ "mr_autoaccepter", "/usr/sbin/kopano-mr-accept", CONFIGSETTING_RELOADABLE },
+		{ "mr_autoprocessor", "/usr/sbin/kopano-mr-process", CONFIGSETTING_RELOADABLE },
 		{ "plugin_enabled", "yes" },
-		{ "plugin_path", "/var/lib/zarafa/dagent/plugins" },
-		{ "plugin_manager_path", "/usr/share/zarafa-dagent/python" },
+		{ "plugin_path", "/var/lib/kopano/dagent/plugins" },
+		{ "plugin_manager_path", "/usr/share/kopano-dagent/python" },
 		{ "default_charset", "iso-8859-15" },
 		{ "set_rule_headers", "yes", CONFIGSETTING_RELOADABLE },
 		{ "no_double_forward", "no", CONFIGSETTING_RELOADABLE },
-		{ "z_statsd_stats", "/var/run/zarafad/statsd.sock" },
+		{ "z_statsd_stats", "/var/run/kopano/statsd.sock" },
 		{ "tmp_path", "/tmp" },
 		{ NULL, NULL },
 	};
@@ -4127,7 +4091,7 @@ int main(int argc, char *argv[]) {
 			break;
 		
 		case OPT_HOST:
-		case 'h':				// 'host' (file:///var/run/zarafad/server.sock)
+		case 'h':				// 'host' (file:///var/run/kopano/server.sock)
 			sDeliveryArgs.strPath = optarg;
 			break;
 		case 'a':				// external autoresponder program
@@ -4235,7 +4199,7 @@ int main(int argc, char *argv[]) {
 	if (!loglevel)
 		g_lpLogger = new ECLogger_Null();
 	else 
-		g_lpLogger = CreateLogger(g_lpConfig, argv[0], "ZarafaDAgent");
+		g_lpLogger = CreateLogger(g_lpConfig, argv[0], "KopanoDAgent");
 	ec_log_set(g_lpLogger);
 	if (!bExplicitConfig && loglevel)
 		g_lpLogger->SetLoglevel(loglevel);
@@ -4268,20 +4232,6 @@ int main(int argc, char *argv[]) {
 	sDeliveryArgs.sDeliveryOpts.default_charset = g_lpConfig->GetSetting("default_charset");
 
 	if (bListenLMTP) {
-#ifdef _WIN32
-#if 0
-		// FIXME
-		// Parse for standard arguments (install, uninstall, version etc.)
-		if (!ecNTService.ParseStandardArgs(argc, argv)) {
-			ecNTService.StartService(lpConfig, lpLogger, path);
-		}
-
-		hr = ecNTService.m_Status.dwWin32ExitCode;
-	
-		if (hr != ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
-			goto exit;
-#endif
-#endif
 		/* MAPIInitialize done inside running_service */
 		hr = running_service(argv[0], bDaemonize, &sDeliveryArgs);
 		if (hr != hrSuccess)
@@ -4301,7 +4251,8 @@ int main(int argc, char *argv[]) {
 			goto exit;
 		}
 
-		sc = new StatsClient(g_lpConfig->GetSetting("z_statsd_stats"), g_lpLogger);
+		sc = new StatsClient(g_lpLogger);
+		sc->startup(g_lpConfig->GetSetting("z_statsd_stats"));
 		hr = pyMapiPluginFactory.Init(g_lpConfig, g_lpLogger);
 		if (hr != hrSuccess) {
 			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to instantiate plugin factory, hr=0x%08x", hr);

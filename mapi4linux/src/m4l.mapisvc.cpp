@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,8 +15,8 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/stringutil.h>
+#include <kopano/platform.h>
+#include <kopano/stringutil.h>
 
 #include "m4l.mapisvc.h"
 #include <mapix.h>
@@ -24,14 +24,12 @@
 #include <mapicode.h>
 #include <mapitags.h>
 #include <mapiutil.h>
-#include <zarafa/boost_compat.h>
+#include <kopano/boost_compat.h>
 
-#include <zarafa/Util.h>
+#include <kopano/Util.h>
 
 #include <iostream>
-#ifndef WIN32
 #include <arpa/inet.h>
-#endif
 #include <climits>
 
 #include <boost/algorithm/string.hpp>
@@ -73,10 +71,6 @@ INFLoader::INFLoader()
 	m_mapDefs["STATUS_NO_DEFAULT_STORE"] = STATUS_NO_DEFAULT_STORE;
 }
 
-INFLoader::~INFLoader()
-{
-}
-
 /** 
  * Loads all *.inf files in the paths returned by GetINFPaths()
  * 
@@ -84,7 +78,7 @@ INFLoader::~INFLoader()
  */
 HRESULT INFLoader::LoadINFs()
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	vector<string> paths = GetINFPaths();
 
 	for (std::vector<std::string>::const_iterator i = paths.begin();
@@ -102,9 +96,6 @@ HRESULT INFLoader::LoadINFs()
 				continue;
 
  			string strFilename = path_to_string(inffile->path());
-#ifdef WIN32
-			transform(strFilename.begin(), strFilename.begin(), strFilename.end(), ::tolower);
-#endif
 			string::size_type pos = strFilename.rfind(".inf", strFilename.size(), strlen(".inf"));
 
 			if (pos == string::npos || strFilename.size() - pos != strlen(".inf"))
@@ -113,12 +104,10 @@ HRESULT INFLoader::LoadINFs()
 
 			hr = LoadINF(path_to_string(inffile->path()).c_str());
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -219,18 +208,12 @@ const inf_section* INFLoader::GetSection(const string& strSectionName) const
 vector<string> INFLoader::GetINFPaths()
 {
 	vector<string> ret;
-#ifdef WIN32
-	// @todo fix real path
-	ret.push_back("%CommonProgramFiles%\\System\\MSMAPI\\1033\\MAPISVC.INF");
-	ret.push_back("%CommonProgramFiles(86)%\\System\\MSMAPI\\1033\\MAPISVC.INF");
-#else
 	char *env = getenv("MAPI_CONFIG_PATH");
 	if (env)
 		ba::split(ret, env, ba::is_any_of(":"), ba::token_compress_on);
 	else
 	// @todo, load both, or just one?
 		ret.push_back(MAPICONFIGDIR);
-#endif
 	return ret;
 }
 
@@ -246,7 +229,7 @@ vector<string> INFLoader::GetINFPaths()
  */
 HRESULT INFLoader::MakeProperty(const std::string& strTag, const std::string& strData, void *base, LPSPropValue lpProp) const
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	SPropValue sProp;
 
 	sProp.ulPropTag = DefinitionFromString(strTag, true);
@@ -265,29 +248,22 @@ HRESULT INFLoader::MakeProperty(const std::string& strTag, const std::string& st
 	case PT_UNICODE:
 		sProp.ulPropTag = CHANGE_PROP_TYPE(sProp.ulPropTag, PT_STRING8);
 	case PT_STRING8:
-	{
 		hr = MAPIAllocateMore(strData.length() + 1, base, (void**)&sProp.Value.lpszA);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		strcpy(sProp.Value.lpszA, strData.c_str());
 		break;
-	}
 	case PT_BINARY:
-	{
 		hr = Util::hex2bin(strData.data(), strData.length(), &sProp.Value.bin.cb, &sProp.Value.bin.lpb, base);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		break;
-	}
 	default:
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
+		return MAPI_E_INVALID_PARAMETER;
 	}
 
 	*lpProp = sProp;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -340,21 +316,20 @@ void SVCProvider::GetProps(ULONG *lpcValues, LPSPropValue *lppPropValues)
 
 HRESULT SVCProvider::Init(const INFLoader& cINF, const inf_section* infProvider)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	inf_section::const_iterator iSection;
 	vector<string> prop;
 
 	hr = MAPIAllocateBuffer(sizeof(SPropValue) * infProvider->size(), (void**)&m_lpProps);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	for (m_cValues = 0, iSection = infProvider->begin();
 	     iSection != infProvider->end(); ++iSection)
 		// add properties to list
 		if (cINF.MakeProperty(iSection->first, iSection->second, m_lpProps, &m_lpProps[m_cValues]) == hrSuccess)
 			++m_cValues;
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 
@@ -394,7 +369,7 @@ SVCService::~SVCService()
  */
 HRESULT SVCService::Init(const INFLoader& cINF, const inf_section* infService)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	inf_section::const_iterator iSection;
 	const inf_section* infProvider = NULL;
 	vector<string> prop;
@@ -404,7 +379,7 @@ HRESULT SVCService::Init(const INFLoader& cINF, const inf_section* infService)
 
 	hr = MAPIAllocateBuffer(sizeof(SPropValue) * infService->size(), (void**)&m_lpProps);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	for (m_cValues = 0, iSection = infService->begin();
 	     iSection != infService->end(); ++iSection) {
@@ -436,23 +411,17 @@ HRESULT SVCService::Init(const INFLoader& cINF, const inf_section* infService)
 	lpSO = PpropFindProp(m_lpProps, m_cValues, PR_SERVICE_SO_NAME_A);
 	if (!lpSO)
 		lpSO = PpropFindProp(m_lpProps, m_cValues, PR_SERVICE_DLL_NAME_A);
-	if (!lpSO) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
+	if (lpSO == NULL)
+		return MAPI_E_NOT_FOUND;
 
 	m_dl = dlopen(lpSO->Value.lpszA, RTLD_NOW);
-#ifndef WIN32
 	if (!m_dl) {
 		snprintf(filename, PATH_MAX + 1, "%s%c%s", PKGLIBDIR, PATH_SEPARATOR, lpSO->Value.lpszA);
 		m_dl = dlopen(filename, RTLD_NOW);
 	}
-#endif
-
 	if (!m_dl) {
 		cerr << "Unable to load " << lpSO->Value.lpszA << ": " << dlerror() << endl;
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
+		return MAPI_E_NOT_FOUND;
 	}
 
 	// @todo use PR_SERVICE_ENTRY_NAME
@@ -461,8 +430,7 @@ HRESULT SVCService::Init(const INFLoader& cINF, const inf_section* infService)
 	if (!m_fnMSGServiceEntry) {
 		// compulsary function in provider
 		cerr << "Unable to find MSGServiceEntry in " << lpSO->Value.lpszA << ": " << dlerror() << endl;
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
+		return MAPI_E_NOT_FOUND;
 	}
 
 	cf = (void**)&m_fnMSProviderInit;
@@ -470,9 +438,7 @@ HRESULT SVCService::Init(const INFLoader& cINF, const inf_section* infService)
 
 	cf = (void**)&m_fnABProviderInit;
 	*cf = dlsym(m_dl, "ABProviderInit");
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -485,18 +451,16 @@ exit:
  */
 HRESULT SVCService::CreateProviders(IProviderAdmin *lpProviderAdmin)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	std::map<std::string, SVCProvider *>::const_iterator i;
 
 	for (i = m_sProviders.begin(); i != m_sProviders.end(); ++i)  {
 		// CreateProvider will find the provider properties itself. the property parameters can be used for other properties.
 		hr = lpProviderAdmin->CreateProvider((TCHAR*)i->first.c_str(), 0, NULL, 0, 0, NULL);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 LPSPropValue SVCService::GetProp(ULONG ulPropTag)
@@ -550,7 +514,7 @@ MAPISVC::~MAPISVC()
 
 HRESULT MAPISVC::Init()
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	INFLoader inf;
 	const inf_section* infServices = NULL;
 	inf_section::const_iterator iServices;
@@ -558,8 +522,7 @@ HRESULT MAPISVC::Init()
 
 	hr = inf.LoadINFs();
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 
 	infServices = inf.GetSection("Services");
 
@@ -579,8 +542,6 @@ HRESULT MAPISVC::Init()
 			hr = hrSuccess;
 		}
 	}
-
-exit:
 	return hr;
 }
 

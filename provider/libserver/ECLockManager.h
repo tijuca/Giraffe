@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,17 +18,17 @@
 #ifndef ECLockManager_INCLUDED
 #define ECLockManager_INCLUDED
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/ZarafaCode.h>
+#include <kopano/zcdefs.h>
+#include <kopano/kcodes.h>
 
 #include <map>
+#include <memory>
 #include <pthread.h>
-#include <boost/smart_ptr.hpp>
 
 class ECLockManager;
 class ECObjectLockImpl;
 
-typedef boost::shared_ptr<ECLockManager> ECLockManagerPtr;
+typedef std::shared_ptr<ECLockManager> ECLockManagerPtr;
 
 ///////////////
 // ECObjectLock
@@ -45,7 +45,7 @@ public:
 	ECRESULT Unlock();
 
 private:
-	typedef boost::shared_ptr<ECObjectLockImpl> ImplPtr;
+	typedef std::shared_ptr<ECObjectLockImpl> ImplPtr;
 	ImplPtr	m_ptrImpl;
 };
 
@@ -73,7 +73,7 @@ inline void ECObjectLock::swap(ECObjectLock &other) {
 ////////////////
 // ECLockManager
 ////////////////
-class ECLockManager _zcp_final : public boost::enable_shared_from_this<ECLockManager> {
+class ECLockManager _zcp_final : public std::enable_shared_from_this<ECLockManager> {
 public:
 	static ECLockManagerPtr Create();
 	~ECLockManager();

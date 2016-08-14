@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -12,22 +12,13 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-/// ECSessionManager.cpp: implementation of the ECSessionManager class.
-//
-//////////////////////////////////////////////////////////////////////
-#include <zarafa/platform.h>
- 
- 
+#include <kopano/platform.h>
 #include <algorithm>
 #include <new>
 #include <typeinfo>
-
 #include <mapidefs.h>
 #include <mapitags.h>
-
 #include "ECMAPI.h"
 #include "ECDatabase.h"
 #include "ECSessionGroup.h"
@@ -35,29 +26,21 @@
 #include "ECStatsCollector.h"
 #include "ECTPropsPurge.h"
 #include "ECLicenseClient.h"
-
 #include "ECDatabaseUtils.h"
 #include "ECSecurity.h"
 #include "SSLUtil.h"
-
-#include <zarafa/Trace.h>
-#include "Zarafa.h"
-
+#include <kopano/Trace.h>
+#include "kcore.hpp"
 #include "ECICS.h"
 #include <edkmdb.h>
+#include "logontime.hpp"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
-
 ECSessionManager::ECSessionManager(ECConfig *lpConfig, ECLogger *lpAudit,
-    bool bHostedZarafa, bool bDistributedZarafa)
+    bool bHostedKopano, bool bDistributedKopano)
 {
 	int err = 0;
 
@@ -66,8 +49,8 @@ ECSessionManager::ECSessionManager(ECConfig *lpConfig, ECLogger *lpAudit,
 	m_lpAudit				= lpAudit;
 	if (m_lpAudit)
 		m_lpAudit->AddRef();
-	m_bHostedZarafa			= bHostedZarafa;
-	m_bDistributedZarafa	= bDistributedZarafa;
+	m_bHostedKopano			= bHostedKopano;
+	m_bDistributedKopano	= bDistributedKopano;
 	m_lpDatabase			= NULL;
 
 	// Create a rwlock with no initial owner.
@@ -82,7 +65,7 @@ ECSessionManager::ECSessionManager(ECConfig *lpConfig, ECLogger *lpAudit,
 	pthread_cond_init(&m_hExitSignal, NULL);
 
 	m_lpDatabaseFactory = new ECDatabaseFactory(lpConfig);
-	m_lpPluginFactory = new ECPluginFactory(lpConfig, g_lpStatsCollector, bHostedZarafa, bDistributedZarafa);
+	m_lpPluginFactory = new ECPluginFactory(lpConfig, g_lpStatsCollector, bHostedKopano, bDistributedKopano);
 	m_lpECCacheManager = new ECCacheManager(lpConfig, m_lpDatabaseFactory);
 	m_lpSearchFolders = new ECSearchFolders(this, m_lpDatabaseFactory);
 	m_lpTPropsPurge = new ECTPropsPurge(lpConfig, m_lpDatabaseFactory);
@@ -185,7 +168,7 @@ ECRESULT ECSessionManager::LoadSettings(){
 	std::string		strQuery;
 
 	if(m_lpServerGuid != NULL){
-		er = ZARAFA_E_BAD_VALUE;
+		er = KCERR_BAD_VALUE;
 		goto exit;
 	}
 
@@ -201,7 +184,7 @@ ECRESULT ECSessionManager::LoadSettings(){
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	lpDBLenths = lpDatabase->FetchRowLengths(lpDBResult);
 	if(lpDBRow == NULL || lpDBRow[0] == NULL || lpDBLenths == NULL || lpDBLenths[0] != sizeof(GUID)) {
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 		goto exit;
 	}
 
@@ -221,7 +204,7 @@ ECRESULT ECSessionManager::LoadSettings(){
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	lpDBLenths = lpDatabase->FetchRowLengths(lpDBResult);
 	if(lpDBRow == NULL || lpDBRow[0] == NULL || lpDBLenths == NULL || lpDBLenths[0] != 8) {
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 		goto exit;
 	}
 
@@ -252,8 +235,7 @@ ECRESULT ECSessionManager::CheckUserLicense()
 
 	if (ulLicense & USERMANAGEMENT_USER_LICENSE_EXCEEDED) {
 		ec_log_err("Failed to start server: Your license does not permit this amount of users.");
-		ec_log_err("Stop your zarafa-license service, start the zarafa-server and remove users to resolve the problem.");
-		er = ZARAFA_E_NO_ACCESS;
+		er = KCERR_NO_ACCESS;
 		goto exit;
 	}
 
@@ -286,14 +268,14 @@ ECRESULT ECSessionManager::GetSessionGroup(ECSESSIONGROUPID sessionGroupID, ECSe
 		lpSessionGroup = new ECSessionGroup(sessionGroupID, this);
 		g_lpStatsCollector->Increment(SCN_SESSIONGROUPS_CREATED);
 	} else {
-		SESSIONGROUPMAP::const_iterator iter = m_mapSessionGroups.find(sessionGroupID);
+		EC_SESSIONGROUPMAP::const_iterator iter = m_mapSessionGroups.find(sessionGroupID);
 		/* Check if the SessionGroup already exists on the server */
 		if (iter == m_mapSessionGroups.end()) {
 			// "upgrade" lock to insert new session
 			pthread_rwlock_unlock(&m_hGroupLock);
 			pthread_rwlock_wrlock(&m_hGroupLock);
 			lpSessionGroup = new ECSessionGroup(sessionGroupID, this);
-			m_mapSessionGroups.insert(SESSIONGROUPMAP::value_type(sessionGroupID, lpSessionGroup));
+			m_mapSessionGroups.insert(EC_SESSIONGROUPMAP::value_type(sessionGroupID, lpSessionGroup));
 			g_lpStatsCollector->Increment(SCN_SESSIONGROUPS_CREATED);
 		} else
 			lpSessionGroup = iter->second;
@@ -310,7 +292,6 @@ ECRESULT ECSessionManager::GetSessionGroup(ECSESSIONGROUPID sessionGroupID, ECSe
 
 ECRESULT ECSessionManager::DeleteIfOrphaned(ECSessionGroup *lpGroup)
 {
-	ECRESULT er = erSuccess;
 	ECSessionGroup *lpSessionGroup = NULL;
 	ECSESSIONGROUPID id = lpGroup->GetSessionGroupId();
 
@@ -318,10 +299,10 @@ ECRESULT ECSessionManager::DeleteIfOrphaned(ECSessionGroup *lpGroup)
 		pthread_rwlock_wrlock(&m_hGroupLock);
 
     	/* Check if the SessionGroup actually exists, if it doesn't just return without error */
-	SESSIONGROUPMAP::const_iterator i = m_mapSessionGroups.find(id);
+	EC_SESSIONGROUPMAP::const_iterator i = m_mapSessionGroups.find(id);
     	if (i == m_mapSessionGroups.end()) {
-    	    pthread_rwlock_unlock(&m_hGroupLock);
-    	    goto exit;
+			pthread_rwlock_unlock(&m_hGroupLock);
+			return erSuccess;
     	}
 
     	/* If this was the last Session, delete the SessionGroup */
@@ -338,9 +319,7 @@ ECRESULT ECSessionManager::DeleteIfOrphaned(ECSessionGroup *lpGroup)
 		delete lpSessionGroup;
 		g_lpStatsCollector->Increment(SCN_SESSIONGROUPS_DELETED);
 	}
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 BTSession* ECSessionManager::GetSession(ECSESSIONID sessionID, bool fLockSession) {
@@ -466,7 +445,6 @@ ECRESULT ECSessionManager::ForEachSession(void(*callback)(ECSession*, void*), vo
 	return er;
 }
 
-
 // Locking of sessions works as follows:
 //
 // - A session is requested by the caller thread through ValidateSession. ValidateSession
@@ -490,40 +468,33 @@ ECRESULT ECSessionManager::ForEachSession(void(*callback)(ECSession*, void*), vo
 // having the session call a 'cancel' request to long-running calls, which makes the calls
 // exit prematurely.
 //
-
 ECRESULT ECSessionManager::ValidateSession(struct soap *soap, ECSESSIONID sessionID, ECAuthSession **lppSession, bool fLockSession)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	BTSession *lpSession = NULL;
 
 	er = this->ValidateBTSession(soap, sessionID, &lpSession, fLockSession);
 	if (er != erSuccess)
-		goto exit;
-
+		return er;
 	*lppSession = dynamic_cast<ECAuthSession*>(lpSession);
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECSessionManager::ValidateSession(struct soap *soap, ECSESSIONID sessionID, ECSession **lppSession, bool fLockSession)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	BTSession *lpSession = NULL;
 
 	er = this->ValidateBTSession(soap, sessionID, &lpSession, fLockSession);
 	if (er != erSuccess)
-		goto exit;
-
+		return er;
 	*lppSession = dynamic_cast<ECSession*>(lpSession);
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECSessionManager::ValidateBTSession(struct soap *soap, ECSESSIONID sessionID, BTSession **lppSession, bool fLockSession)
 {
-	ECRESULT		er			= erSuccess;
+	ECRESULT er;
 	BTSession*		lpSession	= NULL;
 	
 	// Read lock
@@ -533,11 +504,8 @@ ECRESULT ECSessionManager::ValidateBTSession(struct soap *soap, ECSESSIONID sess
 	
 	pthread_rwlock_unlock(&m_hCacheRWLock);
 
-	if(lpSession == NULL) {
-		er = ZARAFA_E_END_OF_SESSION;
-		goto exit;
-	}
-
+	if (lpSession == NULL)
+		return KCERR_END_OF_SESSION;
 	lpSession->RecordRequest(soap);
 	
 	er = lpSession->ValidateOriginator(soap);
@@ -545,26 +513,24 @@ ECRESULT ECSessionManager::ValidateBTSession(struct soap *soap, ECSESSIONID sess
 		if (fLockSession)
 			lpSession->Unlock();
 		lpSession = NULL;
-		goto exit;
+		return er;
 	}
 
 	/* Enable compression if client desired and granted */
-	if (lpSession->GetCapabilities() & ZARAFA_CAP_COMPRESSION) {
+	if (lpSession->GetCapabilities() & KOPANO_CAP_COMPRESSION) {
 		soap_set_imode(soap, SOAP_ENC_ZLIB);
 		soap_set_omode(soap, SOAP_ENC_ZLIB | SOAP_IO_CHUNK);
 	}
 
 	// Enable streaming support if client is capable
-	if (lpSession->GetCapabilities() & ZARAFA_CAP_ENHANCED_ICS) {
+	if (lpSession->GetCapabilities() & KOPANO_CAP_ENHANCED_ICS) {
 		soap_set_omode(soap, SOAP_ENC_MTOM | SOAP_IO_CHUNK);
 		soap_set_imode(soap, SOAP_ENC_MTOM);
 		soap_post_check_mime_attachments(soap);	
 	}
 
 	*lppSession = lpSession;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECSessionManager::CreateAuthSession(struct soap *soap, unsigned int ulCapabilities, ECSESSIONID *sessionID, ECAuthSession **lppAuthSession, bool bRegisterSession, bool bLockSession)
@@ -576,7 +542,7 @@ ECRESULT ECSessionManager::CreateAuthSession(struct soap *soap, unsigned int ulC
 
 	lpAuthSession = new(std::nothrow) ECAuthSession(GetSourceAddr(soap), newSessionID, m_lpDatabaseFactory, this, ulCapabilities);
 	if (lpAuthSession == NULL)
-		return ZARAFA_E_NOT_ENOUGH_MEMORY;
+		return KCERR_NOT_ENOUGH_MEMORY;
 	if (bLockSession)
 	        lpAuthSession->Lock();
 	if (bRegisterSession) {
@@ -643,14 +609,14 @@ ECRESULT ECSessionManager::CreateSession(struct soap *soap, char *szName, char *
 	ZLOG_AUDIT(m_lpAudit, "authenticate failed user='%s' from='%s' program='%s'",
 			  szName, from.c_str(), szClientApp ? szClientApp : "<unknown>");
 
-	er = ZARAFA_E_LOGON_FAILED;			
+	er = KCERR_LOGON_FAILED;			
 	g_lpStatsCollector->Increment(SCN_LOGIN_DENIED);
 	goto exit;
 
 
 authenticated:
 	ec_log_debug("User \"%s\" from \"%s\" authenticated through \"%s\" using program %s", szName, from.c_str(), method, szClientApp ? szClientApp : "<unknown>");
-	if (strcmp(ZARAFA_SYSTEM_USER, szName) != 0) {
+	if (strcmp(KOPANO_SYSTEM_USER, szName) != 0) {
 		/* Do not log successful SYSTEM logins */
 		ZLOG_AUDIT(m_lpAudit, "authenticate ok user='%s' from='%s' method='%s' program='%s'",
 				  szName, from.c_str(), method, szClientApp ? szClientApp : "<unknown>");
@@ -658,7 +624,7 @@ authenticated:
 
 	er = RegisterSession(lpAuthSession, sessionGroupID, szClientVersion, szClientApp, szClientAppVersion, szClientAppMisc, lpSessionID, &lpSession, fLockSession);
 	if (er != erSuccess) {
-		if (er == ZARAFA_E_NO_ACCESS && szImpersonateUser != NULL && *szImpersonateUser != '\0') {
+		if (er == KCERR_NO_ACCESS && szImpersonateUser != NULL && *szImpersonateUser != '\0') {
 			ec_log_err("Failed attempt to impersonate user \"%s\" by user \"%s\"", szImpersonateUser, szName);
 			ZLOG_AUDIT(m_lpAudit, "impersonate failed user='%s', from='%s' program='%s' impersonator='%s'",
 					  szImpersonateUser, from.c_str(), szClientApp ? szClientApp : "<unknown>", szName);
@@ -711,22 +677,19 @@ ECRESULT ECSessionManager::RegisterSession(ECAuthSession *lpAuthSession, ECSESSI
 
 ECRESULT ECSessionManager::CreateSessionInternal(ECSession **lppSession, unsigned int ulUserId)
 {
-	ECRESULT	er			= erSuccess;
+	ECRESULT er;
 	ECSession	*lpSession	= NULL;
 	ECSESSIONID	newSID;
 
-	CreateSessionID(ZARAFA_CAP_LARGE_SESSIONID, &newSID);
+	CreateSessionID(KOPANO_CAP_LARGE_SESSIONID, &newSID);
 
-	lpSession = new(std::nothrow) ECSession("<internal>", newSID, 0, m_lpDatabaseFactory, this, 0, false, ECSession::METHOD_NONE, 0, "internal", "zarafa-server", "", "");
-	if(lpSession == NULL) {
-		er = ZARAFA_E_LOGON_FAILED;
-		goto exit;
-	}
-
+	lpSession = new(std::nothrow) ECSession("<internal>", newSID, 0, m_lpDatabaseFactory, this, 0, false, ECSession::METHOD_NONE, 0, "internal", "kopano-server", "", "");
+	if (lpSession == NULL)
+		return KCERR_LOGON_FAILED;
 	er = lpSession->GetSecurity()->SetUserContext(ulUserId, EC_NO_IMPERSONATOR);
 	if (er != erSuccess) {
 		delete lpSession;
-		goto exit;
+		return er;
 	}
 
 	ec_log_debug("New internal session (%llu)",
@@ -735,9 +698,7 @@ ECRESULT ECSessionManager::CreateSessionInternal(ECSession **lppSession, unsigne
 	g_lpStatsCollector->Increment(SCN_SESSIONS_INTERNAL_CREATED);
 
 	*lppSession = lpSession;
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 void ECSessionManager::RemoveSessionInternal(ECSession *lpSession)
@@ -798,11 +759,11 @@ ECRESULT ECSessionManager::RemoveSession(ECSESSIONID sessionID){
  * @param[in] ulFolderId Parent folder object for ulKey. 0 for unknown or not required (default).
  * @param[in] ulFlags Hierarchy flags for ulKey. 0 for unknown (default).
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSessionManager::AddNotification(notification *notifyItem, unsigned int ulKey, unsigned int ulStore, unsigned int ulFolderId, unsigned int ulFlags) {
 	
-	SESSIONGROUPMAP::const_iterator	iIterator;
+	EC_SESSIONGROUPMAP::const_iterator iIterator;
 	std::multimap<unsigned int, ECSESSIONGROUPID>::const_iterator iterObjectSubscription;
 	std::set<ECSESSIONGROUPID> setGroups;
 	std::set<ECSESSIONGROUPID>::const_iterator iterGroups;
@@ -812,7 +773,7 @@ ECRESULT ECSessionManager::AddNotification(notification *notifyItem, unsigned in
 	if(ulStore == 0) {
 		hr = m_lpECCacheManager->GetStore(ulKey, &ulStore, NULL);
 		if(hr != erSuccess)
-			goto exit;
+			return hr;
 	}
 
 	pthread_mutex_lock(&m_mutexObjectSubscriptions);
@@ -841,13 +802,13 @@ ECRESULT ECSessionManager::AddNotification(notification *notifyItem, unsigned in
 		if (ulFolderId == 0 && ulFlags == 0 ) {
 			if(GetCacheManager()->GetObject(ulKey, &ulFolderId, NULL, &ulFlags, NULL) != erSuccess) {
 				ASSERT(FALSE);
-				goto exit;
+				return hr;
 			}
 		}
             
         // Skip changes on associated messages, and changes on deleted item. (but include DELETE of deleted items)
         if((ulFlags & MAPI_ASSOCIATED) || (notifyItem->ulEventType != fnevObjectDeleted && (ulFlags & MSGFLAG_DELETED)))
-            goto exit;
+			return hr;
 
 		switch(notifyItem->ulEventType) {
 		case fnevObjectMoved:
@@ -868,8 +829,6 @@ ECRESULT ECSessionManager::AddNotification(notification *notifyItem, unsigned in
 			break;
 		}
 	}
-
-exit:
 	return hr;
 }
 
@@ -887,6 +846,10 @@ void* ECSessionManager::SessionCleaner(void *lpTmpSessionManager)
 	if(lpSessionManager == NULL) {
 		return 0;
 	}
+
+	ECDatabase *db = NULL;
+	if (GetThreadLocalDatabase(lpSessionManager->m_lpDatabaseFactory, &db) != erSuccess)
+		ec_log_err("GTLD failed in SessionCleaner");
 
 	while(true){
 		pthread_rwlock_wrlock(&lpSessionManager->m_hCacheRWLock);
@@ -930,6 +893,7 @@ void* ECSessionManager::SessionCleaner(void *lpTmpSessionManager)
 		}
 
 		lstSessions.clear();
+		kcsrv::sync_logon_times(db);
 
 		// Wait for a terminate signal or return after a few minutes
 		pthread_mutex_lock(&lpSessionManager->m_hExitMutex);
@@ -956,7 +920,6 @@ void* ECSessionManager::SessionCleaner(void *lpTmpSessionManager)
 
 ECRESULT ECSessionManager::UpdateOutgoingTables(ECKeyTable::UpdateType ulType, unsigned int ulStoreId, unsigned int ulObjId, unsigned int ulFlags, unsigned int ulObjType)
 {
-    ECRESULT er = erSuccess;
 	TABLESUBSCRIPTION sSubscription;
 	std::list<unsigned int> lstObjId;
 	
@@ -966,13 +929,7 @@ ECRESULT ECSessionManager::UpdateOutgoingTables(ECKeyTable::UpdateType ulType, u
 	sSubscription.ulRootObjectId = ulFlags & EC_SUBMIT_MASTER ? 0 : ulStoreId; // in the master queue, use 0 as root object id
 	sSubscription.ulObjectType = ulObjType;
 	sSubscription.ulObjectFlags = ulFlags & EC_SUBMIT_MASTER; // Only use MASTER flag as differentiator
-
-	er = UpdateSubscribedTables(ulType, sSubscription, lstObjId);
-	if(er != erSuccess)
-	    goto exit;
-
-exit:
-    return er;
+	return UpdateSubscribedTables(ulType, sSubscription, lstObjId);
 }
 
 ECRESULT ECSessionManager::UpdateTables(ECKeyTable::UpdateType ulType, unsigned int ulFlags, unsigned ulObjId, unsigned ulChildId, unsigned int ulObjType)
@@ -986,21 +943,16 @@ ECRESULT ECSessionManager::UpdateTables(ECKeyTable::UpdateType ulType, unsigned 
 
 ECRESULT ECSessionManager::UpdateTables(ECKeyTable::UpdateType ulType, unsigned int ulFlags, unsigned ulObjId, std::list<unsigned int>& lstChildId, unsigned int ulObjType)
 {
-    ECRESULT er = erSuccess;
 	TABLESUBSCRIPTION sSubscription;
 	
 	if(ulObjType != MAPI_MESSAGE && ulObjType != MAPI_FOLDER)
-		goto exit;
+		return erSuccess;
 
 	sSubscription.ulType = TABLE_ENTRY::TABLE_TYPE_GENERIC;
 	sSubscription.ulRootObjectId = ulObjId;
 	sSubscription.ulObjectType = ulObjType;
 	sSubscription.ulObjectFlags = ulFlags;
-
-	er = UpdateSubscribedTables(ulType, sSubscription, lstChildId);
-
-exit:
-    return er;
+	return UpdateSubscribedTables(ulType, sSubscription, lstChildId);
 }
 
 ECRESULT ECSessionManager::UpdateSubscribedTables(ECKeyTable::UpdateType ulType, TABLESUBSCRIPTION sSubscription, std::list<unsigned int> &lstChildId)
@@ -1055,6 +1007,7 @@ ECRESULT ECSessionManager::UpdateSubscribedTables(ECKeyTable::UpdateType ulType,
 
 	return er;
 }
+
 // FIXME: ulFolderId should be an entryid, because the parent is already deleted!
 // You must specify which store the object was deleted from, 'cause we can't find out afterwards
 ECRESULT ECSessionManager::NotificationDeleted(unsigned int ulObjType, unsigned int ulObjId, unsigned int ulStoreId, entryId* lpEntryId, unsigned int ulFolderId, unsigned int ulFlags)
@@ -1248,7 +1201,7 @@ exit:
  * 
  * @param ulObjId object id of the search folder
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT ECSessionManager::NotificationSearchComplete(unsigned int ulObjId, unsigned int ulStoreId)
 {
@@ -1278,7 +1231,7 @@ exit:
 ECRESULT ECSessionManager::NotificationChange(const set<unsigned int> &syncIds, unsigned int ulChangeId, unsigned int ulChangeType)
 {
 	ECRESULT					er = erSuccess;
-	SESSIONGROUPMAP::const_iterator iIterator;
+	EC_SESSIONGROUPMAP::const_iterator iIterator;
 	
 	pthread_rwlock_rdlock(&m_hGroupLock);
 
@@ -1338,7 +1291,7 @@ void ECSessionManager::GetStats(void(callback)(const std::string &, const std::s
 void ECSessionManager::GetStats(sSessionManagerStats &sStats)
 {
 	SESSIONMAP::const_iterator iIterator;
-	SESSIONGROUPMAP::const_iterator itersg;
+	EC_SESSIONGROUPMAP::const_iterator itersg;
 	list<ECSession*> vSessions;
 
 	memset(&sStats, 0, sizeof(sSessionManagerStats));
@@ -1355,7 +1308,7 @@ void ECSessionManager::GetStats(sSessionManagerStats &sStats)
 	pthread_rwlock_rdlock(&m_hGroupLock);
 	
 	sStats.group.ulItems = m_mapSessionGroups.size();
-	sStats.group.ullSize = MEMORY_USAGE_HASHMAP(sStats.group.ulItems, SESSIONGROUPMAP);
+	sStats.group.ullSize = MEMORY_USAGE_HASHMAP(sStats.group.ulItems, EC_SESSIONGROUPMAP);
 
 	for (itersg = m_mapSessionGroups.begin();
 	     itersg != m_mapSessionGroups.end(); ++itersg)
@@ -1428,7 +1381,7 @@ ECRESULT ECSessionManager::GetLicensedUsers(unsigned int ulServiceType, unsigned
 
 #ifdef LINUX	
     ECLicenseClient *lpLicenseClient = NULL;
-	lpLicenseClient = new ECLicenseClient(GetConfig()->GetSetting("license_socket"), atoui(GetConfig()->GetSetting("license_timeout")) );
+	lpLicenseClient = new ECLicenseClient();
 	
 	er = lpLicenseClient->GetInfo(ulServiceType, &ulLicensedUsers);
 	
@@ -1448,26 +1401,17 @@ ECRESULT ECSessionManager::GetLicensedUsers(unsigned int ulServiceType, unsigned
 }
 
 ECRESULT ECSessionManager::GetServerGUID(GUID* lpServerGuid){
-	ECRESULT		er = erSuccess;
-	
-	if(lpServerGuid == NULL){
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (lpServerGuid == NULL)
+		return KCERR_INVALID_PARAMETER;
 	memcpy(lpServerGuid, m_lpServerGuid, sizeof(GUID));
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECSessionManager::GetNewSourceKey(SOURCEKEY* lpSourceKey){
-	ECRESULT		er = erSuccess;
+	ECRESULT er;
 	
-	if(lpSourceKey == NULL){
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpSourceKey == NULL)
+		return KCERR_INVALID_PARAMETER;
 	
 	pthread_mutex_lock(&m_hSourceKeyAutoIncrementMutex);
 	
@@ -1475,7 +1419,7 @@ ECRESULT ECSessionManager::GetNewSourceKey(SOURCEKEY* lpSourceKey){
 		er = SaveSourceKeyAutoIncrement(m_ullSourceKeyAutoIncrement + 50);
 		if(er != erSuccess) {
 			pthread_mutex_unlock(&m_hSourceKeyAutoIncrementMutex);
-			goto exit;
+			return er;
 		}
 		m_ulSourceKeyQueue = 50;
 	}
@@ -1484,24 +1428,20 @@ ECRESULT ECSessionManager::GetNewSourceKey(SOURCEKEY* lpSourceKey){
 	++m_ullSourceKeyAutoIncrement;
 	--m_ulSourceKeyQueue;
 	pthread_mutex_unlock(&m_hSourceKeyAutoIncrementMutex);
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECSessionManager::SaveSourceKeyAutoIncrement(unsigned long long ullNewSourceKeyAutoIncrement){
-	ECRESULT		er = erSuccess;
+	ECRESULT er;
 	std::string		strQuery;
 	
 	er = CreateDatabaseConnection();
 	if(er != erSuccess)
-	    goto exit;
+		return er;
 
 	strQuery = "UPDATE `settings` SET `value` = "+ m_lpDatabase->EscapeBinary((unsigned char*)&ullNewSourceKeyAutoIncrement, 8) + " WHERE `name` = 'source_key_auto_increment'";
-	er = m_lpDatabase->DoUpdate(strQuery);
+	return m_lpDatabase->DoUpdate(strQuery);
 	// @TODO if this failed we want to retry this
-exit:
-	return er;
 }
 
 ECRESULT ECSessionManager::SetSessionPersistentConnection(ECSESSIONID sessionID, unsigned int ulPersistentConnectionId)
@@ -1529,13 +1469,13 @@ ECRESULT ECSessionManager::RemoveSessionPersistentConnection(unsigned int ulPers
 
 	iterConnection = m_mapPersistentByConnection.find(ulPersistentConnectionId);
 	if(iterConnection == m_mapPersistentByConnection.end()) {
-		er = ZARAFA_E_NOT_FOUND; // shouldn't really happen
+		er = KCERR_NOT_FOUND; // shouldn't really happen
 		goto exit;
 	}
 
 	iterSession = m_mapPersistentBySession.find(iterConnection->second);
 	if(iterSession == m_mapPersistentBySession.end()) {
-		er = ZARAFA_E_NOT_FOUND; // really really shouldn't happen
+		er = KCERR_NOT_FOUND; // really really shouldn't happen
 		goto exit;
 	}
 
@@ -1566,19 +1506,17 @@ BOOL ECSessionManager::IsSessionPersistent(ECSESSIONID sessionID)
 // @todo make this function with a map of seq ids
 ECRESULT ECSessionManager::GetNewSequence(SEQUENCE seq, unsigned long long *lpllSeqId)
 {
-	ECRESULT er = erSuccess;
+	ECRESULT er;
 	std::string strSeqName;
 
 	er = CreateDatabaseConnection();
 	if(er != erSuccess)
-	    goto exit;
+		return er;
 
-	if(seq == SEQ_IMAP) {
+	if (seq == SEQ_IMAP)
 		strSeqName = "imapseq";
-	} else {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	else
+		return KCERR_INVALID_PARAMETER;
 
 	pthread_mutex_lock(&m_hSeqMutex);
 	if (m_ulSeqIMAPQueue == 0)
@@ -1586,7 +1524,7 @@ ECRESULT ECSessionManager::GetNewSequence(SEQUENCE seq, unsigned long long *lpll
 		er = m_lpDatabase->DoSequence(strSeqName, 50, &m_ulSeqIMAP);
 		if (er != erSuccess) {
 			pthread_mutex_unlock(&m_hSeqMutex);
-			goto exit;
+			return er;
 		}
 		m_ulSeqIMAPQueue = 50;
 	}
@@ -1594,25 +1532,22 @@ ECRESULT ECSessionManager::GetNewSequence(SEQUENCE seq, unsigned long long *lpll
 	*lpllSeqId = m_ulSeqIMAP++;
 
 	pthread_mutex_unlock(&m_hSeqMutex);
-	
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECSessionManager::CreateDatabaseConnection()
 {
-    ECRESULT er = erSuccess;
+	ECRESULT er;
 	std::string strError;
     
 	if(m_lpDatabase == NULL) {
 		er = m_lpDatabaseFactory->CreateDatabaseObject(&m_lpDatabase, strError);
 		if(er != erSuccess) {
 			ec_log_crit("Unable to open connection to database: %s", strError.c_str());
-			goto exit;
+			return er;
 		}
 	}
-exit:
-    return er;	
+	return erSuccess;
 }
 
 ECRESULT ECSessionManager::SubscribeTableEvents(TABLE_ENTRY::TABLE_TYPE ulType, unsigned int ulTableRootObjectId, unsigned int ulObjectType, unsigned int ulObjectFlags, ECSESSIONID sessionID)
@@ -1657,7 +1592,7 @@ ECRESULT ECSessionManager::UnsubscribeTableEvents(TABLE_ENTRY::TABLE_TYPE ulType
     if(iter != m_mapTableSubscriptions.end()) {
         m_mapTableSubscriptions.erase(iter);
     } else {
-        er = ZARAFA_E_NOT_FOUND;
+        er = KCERR_NOT_FOUND;
     }
     
     pthread_mutex_unlock(&m_mutexTableSubscriptions);
@@ -1721,7 +1656,7 @@ ECRESULT ECSessionManager::GetStoreSortLCID(ULONG ulStoreId, ULONG *lpLcid)
 	std::string		strQuery;
 
 	if (lpLcid == NULL) {
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
@@ -1737,7 +1672,7 @@ ECRESULT ECSessionManager::GetStoreSortLCID(ULONG ulStoreId, ULONG *lpLcid)
 
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if (lpDBRow == NULL || lpDBRow[0] == NULL) {
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 		goto exit;
 	}
 
@@ -1763,27 +1698,22 @@ ULONG ECSessionManager::GetSortLCID(ULONG ulStoreId)
 
 	er = GetStoreSortLCID(ulStoreId, &ulLcid);
 	if (er == erSuccess)
-		goto exit;
+		return ulLcid;
 
 	lpszLocaleId = GetDefaultSortLocaleID();
-	if (lpszLocaleId == NULL || *lpszLocaleId == '\0') {
-		ulLcid = 0;	// Select default LCID
-		goto exit;
-	}
+	if (lpszLocaleId == NULL || *lpszLocaleId == '\0')
+		return 0; // Select default LCID
 
 	er = LocaleIdToLCID(lpszLocaleId, &ulLcid);
-	if (er != erSuccess) {
-		ulLcid = 0;	// Select default LCID
-		goto exit;
-	}
+	if (er != erSuccess)
+		return 0; // Select default LCID
 
-exit:
 	return ulLcid;
 }
 
 ECLocale ECSessionManager::GetSortLocale(ULONG ulStoreId)
 {
-	ECRESULT		er = erSuccess;
+	ECRESULT er;
 	ULONG			ulLcid = 0;
 	LPCSTR			lpszLocaleId = NULL;
 
@@ -1791,16 +1721,11 @@ ECLocale ECSessionManager::GetSortLocale(ULONG ulStoreId)
 	if (er == erSuccess) {
 		er = LCIDToLocaleId(ulLcid, &lpszLocaleId);
 	}
-	if (er == erSuccess)
-		goto exit;
-
-	lpszLocaleId = GetDefaultSortLocaleID();
-	if (lpszLocaleId == NULL || *lpszLocaleId == '\0') {
-		lpszLocaleId = "";	// Select default localeid
-		goto exit;
+	if (er != erSuccess) {
+		lpszLocaleId = GetDefaultSortLocaleID();
+		if (lpszLocaleId == NULL || *lpszLocaleId == '\0')
+			lpszLocaleId = "";	// Select default localeid
 	}
-
-exit:
 	return createLocaleFromName(lpszLocaleId);
 }
 
@@ -1843,4 +1768,3 @@ exit:
 		
 	return er;
 }
-

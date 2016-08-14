@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,11 +15,11 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
-#include "Zarafa.h"
-#include "ZarafaICS.h"
-#include "ZarafaUtil.h"
+#include "kcore.hpp"
+#include "ics.h"
+#include "pcutil.hpp"
 #include "ECMessage.h"
 #include "ECMAPIFolder.h"
 #include "ECMAPITable.h"
@@ -32,27 +32,25 @@
 #include "WSMessageStreamImporter.h"
 
 #include "Mem.h"
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 #include <edkguid.h>
-#include <zarafa/Util.h>
+#include <kopano/Util.h>
 #include "ClientUtil.h"
 
-#include <zarafa/ECDebug.h>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/ECDebug.h>
+#include <kopano/mapi_ptr.h>
 
 #include <edkmdb.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <mapiutil.h>
 #include <cstdio>
 
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 
-#include <zarafa/charset/convstring.h>
+#include <kopano/charset/convstring.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 static LONG __stdcall AdviseECFolderCallback(void *lpContext, ULONG cNotif,
@@ -94,11 +92,7 @@ ECMAPIFolder::ECMAPIFolder(ECMsgStore *lpMsgStore, BOOL fModify,
 	HrAddPropHandlers(PR_FOLDER_TYPE,		DefaultMAPIGetProp,		DefaultSetPropComputed, (void*) this);
 
 	// ACLs are only offline
-#ifdef HAVE_OFFLINE_SUPPORT
-	HrAddPropHandlers(PR_ACL_DATA,			DefaultGetPropNotFound,	DefaultSetPropIgnore,	(void*)this);
-#else
 	HrAddPropHandlers(PR_ACL_DATA,			GetPropHandler,			SetPropHandler,			(void*)this);
-#endif
 
 	this->lpFolderOps = lpFolderOps;
 	if (lpFolderOps)
@@ -554,15 +548,15 @@ HRESULT ECMAPIFolder::CopyMessages(LPENTRYLIST lpMsgList, LPCIID lpInterface, LP
 	if (hr != hrSuccess)
 		goto exit;
 
-	// Check if the destination entryid is a zarafa entryid and if there is a folder transport
-	if( IsZarafaEntryId(lpDestPropArray[0].Value.bin.cb, lpDestPropArray[0].Value.bin.lpb) &&
+	// Check if the destination entryid is a kopano entryid and if there is a folder transport
+	if( IsKopanoEntryId(lpDestPropArray[0].Value.bin.cb, lpDestPropArray[0].Value.bin.lpb) &&
 		lpFolderOps != NULL) 
 	{
 		hr = HrGetStoreGuidFromEntryId(lpDestPropArray[0].Value.bin.cb, lpDestPropArray[0].Value.bin.lpb, &guidFolder);
 		if(hr != hrSuccess)
 			goto exit;
 
-		// Allocate memory for support list and zarafa list
+		// Allocate memory for support list and kopano list
 		hr = ECAllocateBuffer(sizeof(ENTRYLIST), (void**)&lpMsgListEC);
 		if(hr != hrSuccess)
 			goto exit;
@@ -593,7 +587,7 @@ HRESULT ECMAPIFolder::CopyMessages(LPENTRYLIST lpMsgList, LPCIID lpInterface, LP
 		for (i = 0; i < lpMsgList->cValues; ++i) {
 			hr = HrGetStoreGuidFromEntryId(lpMsgList->lpbin[i].cb, lpMsgList->lpbin[i].lpb, &guidMsg);
 			// check if the message in the store of the folder (serverside copy possible)
-			if(hr == hrSuccess && IsZarafaEntryId(lpMsgList->lpbin[i].cb, lpMsgList->lpbin[i].lpb) && memcmp(&guidMsg, &guidFolder, sizeof(MAPIUID)) == 0)
+			if(hr == hrSuccess && IsKopanoEntryId(lpMsgList->lpbin[i].cb, lpMsgList->lpbin[i].lpb) && memcmp(&guidMsg, &guidFolder, sizeof(MAPIUID)) == 0)
 				lpMsgListEC->lpbin[lpMsgListEC->cValues++] = lpMsgList->lpbin[i];// cheap copy
 			else
 				lpMsgListSupport->lpbin[lpMsgListSupport->cValues++] = lpMsgList->lpbin[i];// cheap copy
@@ -642,7 +636,7 @@ HRESULT ECMAPIFolder::DeleteMessages(LPENTRYLIST lpMsgList, ULONG ulUIParam, LPM
 {
 	if (lpMsgList == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-	if (!ValidateZarafaEntryList(lpMsgList, MAPI_MESSAGE))
+	if (!ValidateZEntryList(lpMsgList, MAPI_MESSAGE))
 		return MAPI_E_INVALID_ENTRYID;
 	// FIXME progress bar
 	return this->GetMsgStore()->lpTransport->HrDeleteObjects(ulFlags, lpMsgList, 0);
@@ -721,9 +715,9 @@ HRESULT ECMAPIFolder::CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lp
 	if(hr != hrSuccess)
 		goto exit;
 
-	// Check if it's  the same store of zarafa so we can copy/move fast
-	if( IsZarafaEntryId(cbEntryID, (LPBYTE)lpEntryID) && 
-		IsZarafaEntryId(lpPropArray[0].Value.bin.cb, lpPropArray[0].Value.bin.lpb) &&
+	// Check if it's  the same store of kopano so we can copy/move fast
+	if( IsKopanoEntryId(cbEntryID, (LPBYTE)lpEntryID) && 
+		IsKopanoEntryId(lpPropArray[0].Value.bin.cb, lpPropArray[0].Value.bin.lpb) &&
 		HrGetStoreGuidFromEntryId(cbEntryID, (LPBYTE)lpEntryID, &guidFrom) == hrSuccess && 
 		HrGetStoreGuidFromEntryId(lpPropArray[0].Value.bin.cb, lpPropArray[0].Value.bin.lpb, &guidDest) == hrSuccess &&
 		memcmp(&guidFrom, &guidDest, sizeof(GUID)) == 0 &&
@@ -749,7 +743,7 @@ exit:
 
 HRESULT ECMAPIFolder::DeleteFolder(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags)
 {
-	if (!ValidateZarafaEntryId(cbEntryID, reinterpret_cast<LPBYTE>(lpEntryID), MAPI_FOLDER))
+	if (!ValidateZEntryId(cbEntryID, reinterpret_cast<LPBYTE>(lpEntryID), MAPI_FOLDER))
 		return MAPI_E_INVALID_ENTRYID;
 	if (lpFolderOps == NULL)
 		return MAPI_E_NO_SUPPORT;
@@ -833,7 +827,7 @@ exit:
 
 HRESULT ECMAPIFolder::GetMessageStatus(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, ULONG *lpulMessageStatus)
 {
-	if (lpEntryID == NULL || !IsZarafaEntryId(cbEntryID, reinterpret_cast<LPBYTE>(lpEntryID)))
+	if (lpEntryID == NULL || !IsKopanoEntryId(cbEntryID, reinterpret_cast<LPBYTE>(lpEntryID)))
 		return MAPI_E_INVALID_ENTRYID;
 	if (lpulMessageStatus == NULL)
 		return MAPI_E_INVALID_OBJECT;
@@ -844,7 +838,7 @@ HRESULT ECMAPIFolder::GetMessageStatus(ULONG cbEntryID, LPENTRYID lpEntryID, ULO
 
 HRESULT ECMAPIFolder::SetMessageStatus(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulNewStatus, ULONG ulNewStatusMask, ULONG *lpulOldStatus)
 {
-	if (lpEntryID == NULL || !IsZarafaEntryId(cbEntryID, reinterpret_cast<LPBYTE>(lpEntryID)))
+	if (lpEntryID == NULL || !IsKopanoEntryId(cbEntryID, reinterpret_cast<LPBYTE>(lpEntryID)))
 		return MAPI_E_INVALID_ENTRYID;
 	if (lpFolderOps == NULL)
 		return MAPI_E_NO_SUPPORT;
@@ -919,7 +913,6 @@ HRESULT ECMAPIFolder::UpdateMessageFromStream(ULONG ulSyncId, ULONG cbEntryID, L
 	return hrSuccess;
 }
 
-// -----------
 HRESULT ECMAPIFolder::xMAPIFolder::QueryInterface(REFIID refiid , void** lppInterface)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
@@ -1189,10 +1182,7 @@ HRESULT ECMAPIFolder::xMAPIFolder::EmptyFolder(ULONG ulUIParam, LPMAPIPROGRESS l
 	return hr;
 }
 
-////////////////////////////
 // IFolderSupport
-//
-
 HRESULT ECMAPIFolder::xFolderSupport::QueryInterface(REFIID refiid , void** lppInterface)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IFolderSupport::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());

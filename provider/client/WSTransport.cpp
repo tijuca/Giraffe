@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,15 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
-
-#ifdef WIN32
-// For WSAIoctl
-#include <WinSock2.h>
-#include <WS2tcpip.h>
-#include <Wincrypt.h>
-#endif
-
+#include <kopano/platform.h>
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapitags.h>
@@ -31,46 +23,38 @@
 
 #include <fstream>
 
-#include <zarafa/ECIConv.h>
+#include <kopano/ECIConv.h>
 #include "WSTransport.h"
 #include "ProviderUtil.h"
 #include "SymmetricCrypt.h"
 #include "soapH.h"
-#include "ZarafaUtil.h"
-
-#ifdef WIN32
-// SSO security context
-// use WIN32 security model (?)
-#define SECURITY_WIN32
-#include <Security.h>
-#include "ECLicense.h"
-#endif
+#include "pcutil.hpp"
 
 // The header files we use for communication with the server
-#include <zarafa/ZarafaCode.h>
-#include "soapZarafaCmdProxy.h"
-#include "ZarafaCmd.nsmap"
+#include <kopano/kcodes.h>
+#include "soapKCmdProxy.h"
+#include "KCmd.nsmap"
 #include "Mem.h"
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 
 #include "SOAPUtils.h"
 #include "WSUtil.h"
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 
 #include "WSABTableView.h"
 #include "WSABPropStorage.h"
-#include <zarafa/ecversion.h>
+#include <kopano/ecversion.h>
 #include "ClientUtil.h"
 #include "ECSessionGroupManager.h"
-#include <zarafa/stringutil.h>
-#include "ZarafaVersions.h"
+#include <kopano/stringutil.h>
+#include "versions.h"
 
-#include <zarafa/charset/convert.h>
-#include <zarafa/charset/utf8string.h>
-#include <zarafa/charset/convstring.h>
+#include <kopano/charset/convert.h>
+#include <kopano/charset/utf8string.h>
+#include <kopano/charset/convstring.h>
 
 #include "SOAPSock.h"
-#include <zarafa/mapi_ptr.h>
+#include <kopano/mapi_ptr.h>
 #include "WSMessageStreamExporter.h"
 #include "WSMessageStreamImporter.h"
 
@@ -78,8 +62,6 @@ using namespace std;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 
@@ -100,14 +82,14 @@ static const char THIS_FILE[] = __FILE__;
         goto exit; \
     }
 #define END_SOAP_CALL 	\
-	if(er == ZARAFA_E_END_OF_SESSION) { if(HrReLogon() == hrSuccess) goto retry; } \
-	hr = ZarafaErrorToMAPIError(er, MAPI_E_NOT_FOUND); \
+	if(er == KCERR_END_OF_SESSION) { if(HrReLogon() == hrSuccess) goto retry; } \
+	hr = kcerr_to_mapierr(er, MAPI_E_NOT_FOUND); \
 	if(hr != hrSuccess) \
 		goto exit;
 
 WSTransport::WSTransport(ULONG ulUIFlags)  
 : ECUnknown("WSTransport")
-, m_ResolveResultCache("ResolveResult", 4096, 300)
+, m_ResolveResultCache("ResolveResult", 4096, 300), m_has_session(false)
 {
     pthread_mutexattr_t attr;
     
@@ -199,13 +181,6 @@ HRESULT WSTransport::HrOpenTransport(LPMAPISUP lpMAPISup, WSTransport **lppTrans
 	if(hr != hrSuccess)
 		goto exit;
 
-#ifdef HAVE_OFFLINE_SUPPORT
-	if(bOffline) {
-		GetOfflineServerURL(lpMAPISup, &sProfileProps.strServerPath);
-		// Use online path on error
-    }
-#endif
-
 	// Log on the transport to the server
 	hr = lpTransport->HrLogon(sProfileProps);
 	if(hr != hrSuccess) 
@@ -248,7 +223,7 @@ HRESULT WSTransport::HrLogon2(const struct sGlobalProfileProps &sProfileProps)
 	unsigned int	ulLogonFlags = 0;
 	unsigned int	ulServerCapabilities = 0;
 	ECSESSIONID	ecSessionId = 0;
-	ZarafaCmd*	lpCmd = NULL;
+	KCmd*	lpCmd = NULL;
 	bool		bPipeConnection = false;
 	unsigned int	ulServerVersion = 0;
 	struct logonResponse sResponse;
@@ -260,18 +235,6 @@ HRESULT WSTransport::HrLogon2(const struct sGlobalProfileProps &sProfileProps)
 	utf8string	strImpersonateUser = converter.convert_to<utf8string>(sProfileProps.strImpersonateUser);
 	
 	LockSoap();
-
-#ifdef WIN32
-	ULONG ulTrackingId = rand_mt();
-
-	// Request licensed access to the server, unless we're talking to the offline server
-	if(sProfileProps.strServerPath.substr(0,7) != "file://") {
-		if(CreateLicenseRequestEnc(ulTrackingId, SERVICE_TYPE_ZCP, ZARAFA_SERVICE_OUTLOOK, strUserName, &sLicenseRequest.__ptr, (unsigned int *)&sLicenseRequest.__size) != erSuccess) {
-			hr = MAPI_E_INVALID_PARAMETER;
-			goto exit;
-		}
-	}
-#endif
 
 	if (strncmp("file:", sProfileProps.strServerPath.c_str(), 5) == 0)
 		bPipeConnection = true;
@@ -294,10 +257,10 @@ HRESULT WSTransport::HrLogon2(const struct sGlobalProfileProps &sProfileProps)
 	// Attach session to sessiongroup
 	m_ecSessionGroupId = g_ecSessionManager.GetSessionGroupId(sProfileProps);
 
-	ulCapabilities |= ZARAFA_CAP_MAILBOX_OWNER | ZARAFA_CAP_MULTI_SERVER | ZARAFA_CAP_ENHANCED_ICS | ZARAFA_CAP_UNICODE | ZARAFA_CAP_MSGLOCK | ZARAFA_CAP_MAX_ABCHANGEID | ZARAFA_CAP_EXTENDED_ANON;
+	ulCapabilities |= KOPANO_CAP_MAILBOX_OWNER | KOPANO_CAP_MULTI_SERVER | KOPANO_CAP_ENHANCED_ICS | KOPANO_CAP_UNICODE | KOPANO_CAP_MSGLOCK | KOPANO_CAP_MAX_ABCHANGEID | KOPANO_CAP_EXTENDED_ANON;
 
 	if (sizeof(ECSESSIONID) == 8)
-		ulCapabilities |= ZARAFA_CAP_LARGE_SESSIONID;
+		ulCapabilities |= KOPANO_CAP_LARGE_SESSIONID;
 
 	if (bPipeConnection == false) {
 		/*
@@ -305,7 +268,7 @@ HRESULT WSTransport::HrLogon2(const struct sGlobalProfileProps &sProfileProps)
 		 * can still reject the request.
 		 */
 		if(! (sProfileProps.ulProfileFlags & EC_PROFILE_FLAGS_NO_COMPRESSION))
-			ulCapabilities |= ZARAFA_CAP_COMPRESSION; // only to remote server .. windows?
+			ulCapabilities |= KOPANO_CAP_COMPRESSION; // only to remote server .. windows?
 
 		// try single signon logon
 		er = TrySSOLogon(lpCmd, GetServerNameFromPath(sProfileProps.strServerPath.c_str()).c_str(), strUserName, strImpersonateUser, ulCapabilities, m_ecSessionGroupId, (char *)GetAppName().c_str(), &ecSessionId, &ulServerCapabilities, &m_llFlags, &m_sServerGuid, sProfileProps.strClientAppVersion, sProfileProps.strClientAppMisc);
@@ -313,7 +276,7 @@ HRESULT WSTransport::HrLogon2(const struct sGlobalProfileProps &sProfileProps)
 			goto auth;
 	} else {
 		if (sProfileProps.ulProfileFlags & EC_PROFILE_FLAGS_NO_UID_AUTH)
-			ulLogonFlags |= ZARAFA_LOGON_NO_UID_AUTH;
+			ulLogonFlags |= KOPANO_LOGON_NO_UID_AUTH;
 	}
 	
 	// Login with username and password
@@ -326,16 +289,16 @@ HRESULT WSTransport::HrLogon2(const struct sGlobalProfileProps &sProfileProps)
 	    const_cast<char *>(sProfileProps.strClientAppVersion.c_str()),
 	    const_cast<char *>(sProfileProps.strClientAppMisc.c_str()),
 	    &sResponse))
-		er = ZARAFA_E_SERVER_NOT_RESPONDING;
+		er = KCERR_SERVER_NOT_RESPONDING;
 	else
 		er = sResponse.er;
 
 	// If the user was denied, and the server did not support encryption, and the password was encrypted, decrypt it now
 	// so that we support older servers. If the password was not encrypted, then it was just wrong, and if the server supported encryption
 	// then the password was also simply wrong.
-	if (er == ZARAFA_E_LOGON_FAILED &&
+	if (er == KCERR_LOGON_FAILED &&
 	    SymmetricIsCrypted(sProfileProps.strPassword.c_str()) &&
-	    !(sResponse.ulCapabilities & ZARAFA_CAP_CRYPT)) {
+	    !(sResponse.ulCapabilities & KOPANO_CAP_CRYPT)) {
 		// Login with username and password
 		if (SOAP_OK != lpCmd->ns__logon(const_cast<char *>(strUserName.c_str()),
 		    const_cast<char *>(SymmetricDecrypt(sProfileProps.strPassword.c_str()).c_str()),
@@ -347,50 +310,24 @@ HRESULT WSTransport::HrLogon2(const struct sGlobalProfileProps &sProfileProps)
 		    const_cast<char *>(sProfileProps.strClientAppVersion.c_str()),
 		    const_cast<char *>(sProfileProps.strClientAppMisc.c_str()),
 		    &sResponse))
-			er = ZARAFA_E_SERVER_NOT_RESPONDING;
+			er = KCERR_SERVER_NOT_RESPONDING;
 		else
 			er = sResponse.er;
 	}
 
-	hr = ZarafaErrorToMAPIError(er, MAPI_E_LOGON_FAILED);
+	hr = kcerr_to_mapierr(er, MAPI_E_LOGON_FAILED);
 	if (hr != hrSuccess)
 		goto exit;
 
-	// Connecting to a server with a lower major version is unsupported. Since the server only
-	// checks if a client isn't too old, we'll prohibit connecting to an old server here.
-	//
-	// During development of 7.1, it is quite annoying that a development client won't connect to
-	// a 7.0 server. On top of that, there are currently (12-jul-2011) no protocol differences
-	// between the two version.
-	// So for now, we will just check the general version, not the major.
-	er = ParseZarafaVersion(sResponse.lpszVersion, &ulServerVersion);
-	if (er != erSuccess || ZARAFA_COMPARE_VERSION_TO_GENERAL(ulServerVersion, ZARAFA_CUR_GENERAL) < 0) {
+	/*
+	 * Version is retrieved but not analyzed because we want to be able to
+	 * connect to old servers for development.
+	 */
+	er = ParseKopanoVersion(sResponse.lpszVersion, &ulServerVersion);
+	if (er != erSuccess) {
 		hr = MAPI_E_VERSION;
 		goto exit;
 	}
-
-
-#if defined WIN32 && !defined _DEBUG
-	// Check license info
-
-	// For backward-compatibility: don't check license if server doesn't support licensing (pre 6.20), and don't check on the offline server
-	if(sProfileProps.strServerPath.substr(0,7) != "file://" && sResponse.ulCapabilities & ZARAFA_CAP_LICENSE_SERVER) {
-		hr = ProcessLicenseResponseEnc(ulTrackingId, sResponse.sLicenseResponse.__ptr, sResponse.sLicenseResponse.__size, &m_llFlags);
-
-		if(hr != erSuccess)
-			goto exit;
-	}
-#endif
-
-#ifdef WIN32
-	// For BES, we only support it if we have ZARAFA_SERVICE_BES. The only way to detect that we're Bes is by checking the calling program, BlackBerryAgent.exe
-	if (stricmp(GetAppName().c_str(), "BlackBerryAgent.exe") == 0 && (m_llFlags & (1 << ZARAFA_SERVICE_BES)) == 0) {
-		TRACE_RELEASE("You do not have the correct license to use BlackBerry Enterprise Server with Zarafa");
-		hr = MAPI_E_NO_SUPPORT;
-		goto exit;
-	}
-
-#endif
 
 	ecSessionId = sResponse.ulSessionId;
 	ulServerCapabilities = sResponse.ulCapabilities;
@@ -404,12 +341,12 @@ HRESULT WSTransport::HrLogon2(const struct sGlobalProfileProps &sProfileProps)
 auth: // User have a logon
 	// See if the server supports impersonation. If it doesn't but imporsonation was attempted,
 	// we should fail now because the client won't expect his own store to be returned.
-	if (!strImpersonateUser.empty() && (sResponse.ulCapabilities & ZARAFA_CAP_IMPERSONATION) == 0) {
+	if (!strImpersonateUser.empty() && (sResponse.ulCapabilities & KOPANO_CAP_IMPERSONATION) == 0) {
 		hr = MAPI_E_NO_SUPPORT;	// or just MAPI_E_LOGON_FAILED?
 		goto exit;
 	}
 
-	if (ulServerCapabilities & ZARAFA_CAP_COMPRESSION) {
+	if (ulServerCapabilities & KOPANO_CAP_COMPRESSION) {
 		/*
 		 * GSOAP autodetects incoming compression, so even if not
 		 * explicitly enabled, it will be accepted.
@@ -421,12 +358,12 @@ auth: // User have a logon
 	m_sProfileProps = sProfileProps;
 	m_ulServerCapabilities = ulServerCapabilities;
 	m_ecSessionId = ecSessionId;
+	m_has_session = true;
 	m_lpCmd = lpCmd;
 
 exit:
 
 	UnLockSoap();
-	delete[] sLicenseRequest.__ptr;
 
 	if(hr != hrSuccess) {
 	    // UGLY FIX: due to the ugly code above that does lpCmd = m_lpCmd
@@ -442,20 +379,13 @@ exit:
 
 HRESULT WSTransport::HrLogon(const struct sGlobalProfileProps &in_props)
 {
+	if (m_has_session)
+		logoff_nd();
 	if (in_props.strServerPath.compare("default:") != 0)
 		return HrLogon2(in_props);
 	struct sGlobalProfileProps p = in_props;
-#ifdef WIN32
-	p.strServerPath = "file://\\\\.\\pipe\\zarafa";
+	p.strServerPath = "file:///var/run/kopano/server.sock";
 	return HrLogon2(p);
-#else
-	p.strServerPath = "file:///var/run/zarafad/server.sock";
-	HRESULT ret = HrLogon2(p);
-	if (ret != MAPI_E_NETWORK_ERROR)
-		return ret;
-	p.strServerPath = "file:///var/run/zarafa";
-	return HrLogon2(p);
-#endif
 }
 
 HRESULT WSTransport::HrSetRecvTimeout(unsigned int ulSeconds)
@@ -554,154 +484,9 @@ HRESULT WSTransport::HrReLogon()
 	return hrSuccess;
 }
 
-ECRESULT WSTransport::TrySSOLogon(ZarafaCmd* lpCmd, LPCSTR szServer, utf8string strUsername, utf8string strImpersonateUser, unsigned int ulCapabilities, ECSESSIONGROUPID ecSessionGroupId, char *szAppName, ECSESSIONID* lpSessionId, unsigned int* lpulServerCapabilities, unsigned long long *lpllFlags, LPGUID lpsServerGuid, const std::string appVersion, const std::string appMisc)
+ECRESULT WSTransport::TrySSOLogon(KCmd* lpCmd, LPCSTR szServer, utf8string strUsername, utf8string strImpersonateUser, unsigned int ulCapabilities, ECSESSIONGROUPID ecSessionGroupId, char *szAppName, ECSESSIONID* lpSessionId, unsigned int* lpulServerCapabilities, unsigned long long *lpllFlags, LPGUID lpsServerGuid, const std::string appVersion, const std::string appMisc)
 {
-	ECRESULT		er = ZARAFA_E_LOGON_FAILED;
-#ifdef WIN32
-	std::string strPrincipal("zarafa/");
-	SECURITY_STATUS	SecStatus;
-	PSecPkgInfo		lpPackageInfo = NULL;
-	ULONG			cPackages = 0;
-	ULONG			ulPid = 0;
-	CredHandle		hCredential;
-	CtxtHandle		hNewContext;
-	SecBuffer		OutSecBuffer, InSecBuffer[2];
-	SecBufferDesc	OutSecBufferDesc, InSecBufferDesc;
-	ULONG			fContextAttr = 0;
-	unsigned int	ulServerVersion = 0;
-	struct xsd__base64Binary sSSOData;
-	struct ssoLogonResponse sResponse;
-	struct xsd__base64Binary sLicenseRequest;
-
-	OutSecBuffer.pvBuffer = NULL;	// auto allocated by InitializeSecurityContext(), but freed by us
-
-	SecInvalidateHandle(&hCredential);
-	SecInvalidateHandle(&hNewContext);
-
-	ULONG ulTrackingId = rand_mt();
-
-	if(CreateLicenseRequestEnc(ulTrackingId, SERVICE_TYPE_ZCP, ZARAFA_SERVICE_OUTLOOK, strUsername, &sLicenseRequest.__ptr, (unsigned int*)&sLicenseRequest.__size) != erSuccess) {
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	strPrincipal += szServer;
-
-	SecStatus = EnumerateSecurityPackages(&cPackages, &lpPackageInfo);
-	if (SecStatus != SEC_E_OK)
-		goto exit;
-
-	for (ulPid = 0; ulPid < cPackages; ++ulPid) {
-		// find auto detect method, always (?) first item in the list
-		// TODO: config option to force a method?
-		if (_tcsicmp(_T("Negotiate"), lpPackageInfo[ulPid].Name) == 0)
-			break;
-	}
-	if (ulPid == cPackages)
-		goto exit;
-
-	SecStatus = AcquireCredentialsHandle(/*service?? principal*/ NULL, /*package*/ lpPackageInfo[ulPid].Name,
-		/*fCredentialUse*/ SECPKG_CRED_OUTBOUND, /*pvLoginID*/ NULL,
-		/*pAuthData*/ NULL, /*pGetKeyFn*/ NULL, /*pvGetKeyArgument*/ NULL, &hCredential, NULL);
-
-	if (SecStatus != SEC_E_OK)
-		goto exit;
-
-	// setup security buffer descriptor
-	OutSecBufferDesc.ulVersion = SECBUFFER_VERSION;
-	OutSecBufferDesc.cBuffers = 1;
-	OutSecBufferDesc.pBuffers = &OutSecBuffer;
-	OutSecBuffer.BufferType = SECBUFFER_TOKEN;
-	OutSecBuffer.cbBuffer = lpPackageInfo[ulPid].cbMaxToken;
-	OutSecBuffer.pvBuffer = NULL;
-
-	// query identification packet
-	SecStatus = InitializeSecurityContextA(&hCredential, NULL /*1st time context*/, (SEC_CHAR*)strPrincipal.c_str(),
-		ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_CONFIDENTIALITY | ISC_REQ_CONNECTION,
-		0, SECURITY_NATIVE_DREP, NULL, 0, &hNewContext, &OutSecBufferDesc, &fContextAttr, NULL);
-	if (SecStatus != SEC_E_OK && SecStatus != SEC_I_CONTINUE_NEEDED && SecStatus != SEC_I_COMPLETE_AND_CONTINUE) {
-		er = ZARAFA_E_LOGON_FAILED;
-		goto exit;
-	}
-
-	// send to server
-	sSSOData.__ptr = (unsigned char*)OutSecBufferDesc.pBuffers->pvBuffer;
-	sSSOData.__size = OutSecBufferDesc.pBuffers->cbBuffer;
-
-	if (SOAP_OK != lpCmd->ns__ssoLogon(0, (char*)strUsername.c_str(), (char*)strImpersonateUser.c_str(), &sSSOData, PROJECT_VERSION_CLIENT_STR, ulCapabilities, sLicenseRequest, ecSessionGroupId, szAppName, (char *)appVersion.c_str(), (char *)appMisc.c_str(), &sResponse))
-		goto exit;
-
-	while (sResponse.er == ZARAFA_E_SSO_CONTINUE) {
-		// setup inbut buffer
-		InSecBufferDesc.ulVersion = SECBUFFER_VERSION;
-		InSecBufferDesc.cBuffers = 2;
-		InSecBufferDesc.pBuffers = InSecBuffer;
-		InSecBuffer[0].BufferType = SECBUFFER_TOKEN;
-		InSecBuffer[0].cbBuffer = sResponse.lpOutput->__size;
-		InSecBuffer[0].pvBuffer = (void*)sResponse.lpOutput->__ptr;
-		InSecBuffer[1].BufferType = SECBUFFER_EMPTY;
-		InSecBuffer[1].cbBuffer = 0;
-		InSecBuffer[1].pvBuffer = NULL;
-
-		// reset output buffer
-		FreeContextBuffer(OutSecBuffer.pvBuffer);
-		OutSecBufferDesc.ulVersion = SECBUFFER_VERSION;
-		OutSecBufferDesc.cBuffers = 1;
-		OutSecBufferDesc.pBuffers = &OutSecBuffer;
-		OutSecBuffer.BufferType = SECBUFFER_TOKEN;
-		OutSecBuffer.cbBuffer = lpPackageInfo[ulPid].cbMaxToken;
-		OutSecBuffer.pvBuffer = NULL;
-
-		// feed response to windows
-		SecStatus = InitializeSecurityContext(NULL, &hNewContext, NULL,	ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_CONFIDENTIALITY | ISC_REQ_CONNECTION,
-			0, SECURITY_NATIVE_DREP, &InSecBufferDesc, 0, &hNewContext, &OutSecBufferDesc, &fContextAttr, NULL);
-		if (FAILED(SecStatus))
-			goto exit;
-
-		// feed response to zarafa
-		sSSOData.__ptr = (unsigned char*)OutSecBufferDesc.pBuffers->pvBuffer;
-		sSSOData.__size = OutSecBufferDesc.pBuffers->cbBuffer;
-
-		if (SOAP_OK != lpCmd->ns__ssoLogon(sResponse.ulSessionId, (char*)strUsername.c_str(), (char*)strImpersonateUser.c_str(), &sSSOData, PROJECT_VERSION_CLIENT_STR, ulCapabilities, sLicenseRequest, ecSessionGroupId, szAppName, (char *)appVersion.c_str(), (char *)appMisc.c_str(), &sResponse))
-			goto exit;
-	}
-	er = sResponse.er;
-	if (er != erSuccess)
-		goto exit;
-
-	// Check license info
-	er = ProcessLicenseResponseEnc(ulTrackingId, sResponse.sLicenseResponse.__ptr, sResponse.sLicenseResponse.__size, lpllFlags);
-	if(er != erSuccess)
-		goto exit;
-
-	// Connecting to a server of with a lower major version is unsupported. Since the server only
-	// checks if a client isn't too old, we'll prohibit connecting to an old server here.
-	er = ParseZarafaVersion(sResponse.lpszVersion, &ulServerVersion);
-	if (er != erSuccess || ZARAFA_COMPARE_VERSION_TO_MAJOR(ulServerVersion, ZARAFA_CUR_MAJOR) < 0) {
-		er = ZARAFA_E_INVALID_VERSION;
-		goto exit;
-	}
-
-	*lpSessionId = sResponse.ulSessionId;
-	*lpulServerCapabilities = sResponse.ulCapabilities;
-
-	if (sResponse.sServerGuid.__ptr != NULL && sResponse.sServerGuid.__size == sizeof *lpsServerGuid)
-		memcpy(lpsServerGuid, sResponse.sServerGuid.__ptr, sizeof *lpsServerGuid);
-
-exit:
-	delete[] sLicenseRequest.__ptr;
-	if (OutSecBuffer.pvBuffer)
-		FreeContextBuffer(OutSecBuffer.pvBuffer);
-
-	if (lpPackageInfo)
-		FreeContextBuffer(lpPackageInfo);
-
-	if (SecIsValidHandle(&hCredential))
-		FreeCredentialHandle(&hCredential);
-
-	if (SecIsValidHandle(&hNewContext))
-		DeleteSecurityContext(&hNewContext);
-#endif
+	ECRESULT		er = KCERR_LOGON_FAILED;
 	return er;
 }
 
@@ -726,13 +511,13 @@ HRESULT WSTransport::HrGetPublicStore(ULONG ulFlags, ULONG* lpcbStoreID, LPENTRY
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getPublicStore(m_ecSessionId, ulFlags, &sResponse))
-			er = ZARAFA_E_SERVER_NOT_RESPONDING;
+			er = KCERR_SERVER_NOT_RESPONDING;
 		else
 			er = sResponse.er;
 	}
 	//END_SOAP_CALL
-	if(er == ZARAFA_E_END_OF_SESSION) { if(HrReLogon() == hrSuccess) goto retry; }
-	hr = ZarafaErrorToMAPIError(er, MAPI_E_NOT_FOUND);
+	if(er == KCERR_END_OF_SESSION) { if(HrReLogon() == hrSuccess) goto retry; }
+	hr = kcerr_to_mapierr(er, MAPI_E_NOT_FOUND);
 	if (hr == MAPI_E_UNABLE_TO_COMPLETE)
 	{
 		if (lpstrRedirServer)
@@ -779,13 +564,13 @@ HRESULT WSTransport::HrGetStore(ULONG cbMasterID, LPENTRYID lpMasterID, ULONG* l
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getStore(m_ecSessionId, (lpMasterID)?&sEntryId:NULL, &sResponse))
-			er = ZARAFA_E_SERVER_NOT_RESPONDING;
+			er = KCERR_SERVER_NOT_RESPONDING;
 		else
 			er = sResponse.er;
 	}
 	//END_SOAP_CALL
-	if(er == ZARAFA_E_END_OF_SESSION) { if(HrReLogon() == hrSuccess) goto retry; }
-	hr = ZarafaErrorToMAPIError(er, MAPI_E_NOT_FOUND);
+	if(er == KCERR_END_OF_SESSION) { if(HrReLogon() == hrSuccess) goto retry; }
+	hr = kcerr_to_mapierr(er, MAPI_E_NOT_FOUND);
 	if (hr == MAPI_E_UNABLE_TO_COMPLETE)
 	{
 		if (lpstrRedirServer)
@@ -845,7 +630,7 @@ HRESULT WSTransport::HrGetStoreName(ULONG cbStoreID, LPENTRYID lpStoreID, ULONG 
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getStoreName(m_ecSessionId, sEntryId, &sResponse))
-			er = ZARAFA_E_SERVER_NOT_RESPONDING;
+			er = KCERR_SERVER_NOT_RESPONDING;
 		else
 			er = sResponse.er;
 	}
@@ -889,7 +674,7 @@ HRESULT WSTransport::HrGetStoreType(ULONG cbStoreID, LPENTRYID lpStoreID, ULONG 
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getStoreType(m_ecSessionId, sEntryId, &sResponse))
-			er = ZARAFA_E_SERVER_NOT_RESPONDING;
+			er = KCERR_SERVER_NOT_RESPONDING;
 		else
 			er = sResponse.er;
 	}
@@ -916,10 +701,12 @@ HRESULT WSTransport::HrLogOff()
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__logoff(m_ecSessionId, &er) )
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
+		else
+			m_has_session = false;
 
-        DestroySoapTransport(m_lpCmd);
-        m_lpCmd = NULL;
+		DestroySoapTransport(m_lpCmd);
+		m_lpCmd = NULL;
 	}
 	END_SOAP_CALL
 
@@ -928,6 +715,25 @@ exit:
 	UnLockSoap();
 
 	return hrSuccess; // NOTE hrSuccess, never fails since we don't really mind that it failed.
+}
+
+HRESULT WSTransport::logoff_nd(void)
+{
+	HRESULT hr = hrSuccess;
+	ECRESULT er = erSuccess;
+
+	LockSoap();
+	START_SOAP_CALL
+	{
+		if (m_lpCmd->ns__logoff(m_ecSessionId, &er) != SOAP_OK)
+			er = KCERR_NETWORK_ERROR;
+		else
+			m_has_session = false;
+	}
+	END_SOAP_CALL
+ exit:
+	UnLockSoap();
+	return er;
 }
 
 HRESULT WSTransport::HrCheckExistObject(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags)
@@ -950,7 +756,7 @@ HRESULT WSTransport::HrCheckExistObject(ULONG cbEntryID, LPENTRYID lpEntryID, UL
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__checkExistObject(m_ecSessionId, sEntryId, ulFlags, &er))
-			er = ZARAFA_E_SERVER_NOT_RESPONDING;
+			er = KCERR_SERVER_NOT_RESPONDING;
 
 	}
 	END_SOAP_CALL
@@ -1060,7 +866,6 @@ HRESULT WSTransport::HrOpenFolderOps(ULONG cbEntryID, LPENTRYID lpEntryID, WSMAP
 //	if( hr != hrSuccess)
 		//goto exit;
 
-
 	hr = UnWrapServerClientStoreEntry(cbEntryID, lpEntryID, &cbUnWrapStoreID, &lpUnWrapStoreID);
 	if(hr != hrSuccess)
 		goto exit;
@@ -1154,7 +959,7 @@ HRESULT WSTransport::HrDeleteObjects(ULONG ulFlags, LPENTRYLIST lpMsgList, ULONG
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__deleteObjects(m_ecSessionId, ulFlags, &sEntryList, ulSyncId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -1210,7 +1015,7 @@ HRESULT WSTransport::HrNotify(LPNOTIFICATION lpNotification)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__notify(m_ecSessionId, sNotification, &er)) {
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		}
 	}
 	END_SOAP_CALL
@@ -1227,7 +1032,7 @@ HRESULT WSTransport::HrSubscribe(ULONG cbKey, LPBYTE lpKey, ULONG ulConnection, 
 {
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
-	notifySubscribe notSubscribe = {0};
+	notifySubscribe notSubscribe{__gszeroinit};
 
 	LockSoap();
 
@@ -1239,7 +1044,7 @@ HRESULT WSTransport::HrSubscribe(ULONG cbKey, LPBYTE lpKey, ULONG ulConnection, 
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__notifySubscribe(m_ecSessionId, &notSubscribe, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 
 	}
 	END_SOAP_CALL
@@ -1254,7 +1059,7 @@ HRESULT WSTransport::HrSubscribe(ULONG ulSyncId, ULONG ulChangeId, ULONG ulConne
 {
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
-	notifySubscribe notSubscribe = {0};
+	notifySubscribe notSubscribe{__gszeroinit};
 
 	LockSoap();
 
@@ -1266,7 +1071,7 @@ HRESULT WSTransport::HrSubscribe(ULONG ulSyncId, ULONG ulChangeId, ULONG ulConne
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__notifySubscribe(m_ecSessionId, &notSubscribe, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 
 	}
 	END_SOAP_CALL
@@ -1281,7 +1086,7 @@ HRESULT WSTransport::HrSubscribeMulti(const ECLISTSYNCADVISE &lstSyncAdvises, UL
 {
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
-	notifySubscribeArray notSubscribeArray = {0};
+	notifySubscribeArray notSubscribeArray{__gszeroinit};
 	ECLISTSYNCADVISE::const_iterator iSyncAdvise;
 	unsigned	i = 0;
 	
@@ -1303,7 +1108,7 @@ HRESULT WSTransport::HrSubscribeMulti(const ECLISTSYNCADVISE &lstSyncAdvises, UL
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__notifySubscribeMulti(m_ecSessionId, &notSubscribeArray, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 
 	}
 	END_SOAP_CALL
@@ -1326,7 +1131,7 @@ HRESULT WSTransport::HrUnSubscribe(ULONG ulConnection)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__notifyUnSubscribe(m_ecSessionId, ulConnection, &er) )
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 
 	}
 	END_SOAP_CALL
@@ -1356,7 +1161,7 @@ HRESULT WSTransport::HrUnSubscribeMulti(const ECLISTCONNECTION &lstConnections)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__notifyUnSubscribeMulti(m_ecSessionId, &ulConnArray, &er) )
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 
 	}
 	END_SOAP_CALL
@@ -1391,14 +1196,14 @@ HRESULT WSTransport::HrExportMessageChangesAsStream(ULONG ulFlags, ULONG ulPropT
 	sourceKeyPairArrayPtr ptrsSourceKeyPairs;
 	WSMessageStreamExporterPtr ptrStreamExporter;
 	propTagArray sPropTags = {0, 0};
-	exportMessageChangesAsStreamResponse sResponse = {{0}};
+	exportMessageChangesAsStreamResponse sResponse{__gszeroinit};
 
 	if (lpChanges == NULL || lpsProps == NULL) {
 		hr = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	}
 
-	if ((m_ulServerCapabilities & ZARAFA_CAP_ENHANCED_ICS) == 0) {
+	if ((m_ulServerCapabilities & KOPANO_CAP_ENHANCED_ICS) == 0) {
 		hr = MAPI_E_NO_SUPPORT;
 		goto exit;
 	}
@@ -1443,7 +1248,7 @@ HRESULT WSTransport::HrGetMessageStreamImporter(ULONG ulFlags, ULONG ulSyncId, U
 	HRESULT hr;
 	WSMessageStreamImporterPtr ptrStreamImporter;
 
-	if ((m_ulServerCapabilities & ZARAFA_CAP_ENHANCED_ICS) == 0)
+	if ((m_ulServerCapabilities & KOPANO_CAP_ENHANCED_ICS) == 0)
 		return MAPI_E_NO_SUPPORT;
 
 	hr = WSMessageStreamImporter::Create(ulFlags, ulSyncId, cbEntryID, lpEntryID, cbFolderEntryID, lpFolderEntryID, bNewMessage, lpConflictItems, this, &ptrStreamImporter);
@@ -1502,7 +1307,7 @@ HRESULT WSTransport::HrGetIDsFromNames(LPMAPINAMEID *lppPropNames, ULONG cNames,
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getIDsFromNames(m_ecSessionId, &sNamedProps, ulFlags, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 
@@ -1534,7 +1339,6 @@ HRESULT WSTransport::HrGetNamesFromIDs(LPSPropTagArray lpsPropTags, LPMAPINAMEID
 	ECRESULT er = erSuccess;
 	struct getNamesFromIDsResponse sResponse;
 	struct propTagArray sPropTags;
-	unsigned int i=0;
 	LPMAPINAMEID *lppNames = NULL;
 	convert_context convertContext;
 
@@ -1546,7 +1350,7 @@ HRESULT WSTransport::HrGetNamesFromIDs(LPSPropTagArray lpsPropTags, LPMAPINAMEID
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getNamesFromIDs(m_ecSessionId, &sPropTags, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 
@@ -1556,7 +1360,7 @@ HRESULT WSTransport::HrGetNamesFromIDs(LPSPropTagArray lpsPropTags, LPMAPINAMEID
 	ECAllocateBuffer(sizeof(LPMAPINAMEID) * sResponse.lpsNames.__size, (void **) &lppNames);
 
 	// Loop through all the returned names, and put it into the return value
-	for (i = 0; i < sResponse.lpsNames.__size; ++i) {
+	for (gsoap_size_t i = 0; i < sResponse.lpsNames.__size; ++i) {
 		// Each MAPINAMEID must be allocated
 		ECAllocateMore(sizeof(MAPINAMEID), lppNames, (void **) &lppNames[i]);
 
@@ -1595,7 +1399,6 @@ HRESULT WSTransport::HrGetReceiveFolderTable(ULONG ulFlags, ULONG cbStoreEntryID
 	HRESULT		hr = hrSuccess;
 	LPSRowSet	lpsRowSet = NULL;
 	ULONG		ulRowId = 0;
-	unsigned int i = 0;
 	int			nLen = 0;
 	entryId		sEntryId = {0}; // Do not free
 
@@ -1619,7 +1422,7 @@ HRESULT WSTransport::HrGetReceiveFolderTable(ULONG ulFlags, ULONG cbStoreEntryID
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getReceiveFolderTable(m_ecSessionId, sEntryId, &sReceiveFolders))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sReceiveFolders.er;
 
@@ -1630,7 +1433,7 @@ HRESULT WSTransport::HrGetReceiveFolderTable(ULONG ulFlags, ULONG cbStoreEntryID
 	memset(lpsRowSet, 0, CbNewSRowSet(sReceiveFolders.sFolderArray.__size));
 	lpsRowSet->cRows = sReceiveFolders.sFolderArray.__size;
 
-	for (i = 0; i < sReceiveFolders.sFolderArray.__size; ++i) {
+	for (gsoap_size_t i = 0; i < sReceiveFolders.sFolderArray.__size; ++i) {
 		ulRowId = i+1;
 
 		lpsRowSet->aRow[i].cValues = NUM_RFT_PROPS;
@@ -1711,13 +1514,13 @@ HRESULT WSTransport::HrGetReceiveFolder(ULONG cbStoreEntryID, LPENTRYID lpStoreE
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getReceiveFolder(m_ecSessionId, sEntryId, (char*)strMessageClass.c_str(), &sReceiveFolderTable))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sReceiveFolderTable.er;
 	}
 	END_SOAP_CALL
 
-	if(er == ZARAFA_E_NOT_FOUND && lpstrExplicitClass)
+	if(er == KCERR_NOT_FOUND && lpstrExplicitClass)
 	{
 		// This is only by an empty message store ??
 		*lpcbEntryID = 0;
@@ -1734,7 +1537,7 @@ HRESULT WSTransport::HrGetReceiveFolder(ULONG cbStoreEntryID, LPENTRYID lpStoreE
 	if(hr != hrSuccess)
 		goto exit;
 
-	if(er != ZARAFA_E_NOT_FOUND && lpstrExplicitClass != NULL)
+	if(er != KCERR_NOT_FOUND && lpstrExplicitClass != NULL)
 		*lpstrExplicitClass = utf8string::from_string(sReceiveFolderTable.sReceiveFolder.lpszAExplicitClass);
 
 	*lppEntryID = lpEntryID;
@@ -1781,7 +1584,7 @@ HRESULT WSTransport::HrSetReceiveFolder(ULONG cbStoreID, LPENTRYID lpStoreID, co
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__setReceiveFolder(m_ecSessionId, sStoreId, (lpEntryID)?&sEntryId : NULL, (char*)strMessageClass.c_str(), &result))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = result;
 	}
@@ -1815,7 +1618,7 @@ HRESULT WSTransport::HrSetReadFlag(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG u
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__setReadFlags(m_ecSessionId, ulFlags, NULL, &sEntryList, ulSyncId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 
 	}
 	END_SOAP_CALL
@@ -1842,7 +1645,7 @@ HRESULT WSTransport::HrSubmitMessage(ULONG cbMessageID, LPENTRYID lpMessageID, U
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__submitMessage(m_ecSessionId, sEntryId, ulFlags, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -1868,7 +1671,7 @@ HRESULT WSTransport::HrFinishedMessage(ULONG cbEntryID,
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__finishedMessage(m_ecSessionId, sEntryId, ulFlags, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -1893,7 +1696,7 @@ HRESULT WSTransport::HrAbortSubmit(ULONG cbEntryID, LPENTRYID lpEntryID)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__abortSubmit(m_ecSessionId, sEntryId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -1918,7 +1721,7 @@ HRESULT WSTransport::HrIsMessageInQueue(ULONG cbEntryID, LPENTRYID lpEntryID)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__isMessageInQueue(m_ecSessionId, sEntryId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -1948,7 +1751,7 @@ HRESULT WSTransport::HrResolveStore(LPGUID lpGuid, ULONG *lpulUserID, ULONG* lpc
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__resolveStore(m_ecSessionId, sStoreGuid, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 
@@ -1988,13 +1791,13 @@ HRESULT WSTransport::HrResolveUserStore(const utf8string &strUserName, ULONG ulF
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__resolveUserStore(m_ecSessionId, (char*)strUserName.c_str(), ECSTORE_TYPE_MASK_PRIVATE | ECSTORE_TYPE_MASK_PUBLIC, ulFlags, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
 	//END_SOAP_CALL
-	if(er == ZARAFA_E_END_OF_SESSION) { if(HrReLogon() == hrSuccess) goto retry; }
-	hr = ZarafaErrorToMAPIError(er, MAPI_E_NOT_FOUND);
+	if(er == KCERR_END_OF_SESSION) { if(HrReLogon() == hrSuccess) goto retry; }
+	hr = kcerr_to_mapierr(er, MAPI_E_NOT_FOUND);
 	if (hr == MAPI_E_UNABLE_TO_COMPLETE)
 	{
 		if (lpstrRedirServer)
@@ -2053,7 +1856,7 @@ HRESULT WSTransport::HrResolveTypedStore(const utf8string &strUserName, ULONG ul
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__resolveUserStore(m_ecSessionId, (char*)strUserName.c_str(), (1 << ulStoreType), 0, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -2087,7 +1890,7 @@ HRESULT WSTransport::HrCreateUser(ECUSER *lpECUser, ULONG ulFlags,
 {
 	HRESULT	hr = hrSuccess;
 	ECRESULT er = erSuccess;
-	struct user	sUser = {0};
+	struct user sUser{__gszeroinit};
 	struct setUserResponse sResponse;
 	convert_context converter;
 
@@ -2119,7 +1922,7 @@ HRESULT WSTransport::HrCreateUser(ECUSER *lpECUser, ULONG ulFlags,
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__createUser(m_ecSessionId, &sUser, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 
@@ -2172,7 +1975,7 @@ HRESULT WSTransport::HrGetUser(ULONG cbUserID, LPENTRYID lpUserID,
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getUser(m_ecSessionId, ulUserId, sUserId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -2207,7 +2010,7 @@ HRESULT WSTransport::HrSetUser(ECUSER *lpECUser, ULONG ulFlags)
 {
 	HRESULT	hr = hrSuccess;
 	ECRESULT er = erSuccess;
-	struct user	sUser = {0};
+	struct user sUser{__gszeroinit};
 	unsigned int result = 0;
 	convert_context	converter;
 
@@ -2241,7 +2044,7 @@ HRESULT WSTransport::HrSetUser(ECUSER *lpECUser, ULONG ulFlags)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__setUser(m_ecSessionId, &sUser, &result))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = result;
 
@@ -2308,7 +2111,7 @@ HRESULT WSTransport::HrCreateStore(ULONG ulStoreType, ULONG cbUserID, LPENTRYID 
 	START_SOAP_CALL
 	{
 	  if(SOAP_OK != m_lpCmd->ns__createStore(m_ecSessionId, ulStoreType, ABEID_ID(lpUserID), sUserId, sStoreId, sRootId, ulFlags, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 
 	}
 	END_SOAP_CALL
@@ -2343,7 +2146,7 @@ HRESULT WSTransport::HrHookStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID lp
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__hookStore(m_ecSessionId, ulStoreType, sUserId, sStoreGuid, ulSyncId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -2373,7 +2176,7 @@ HRESULT WSTransport::HrUnhookStore(ULONG ulStoreType, ULONG cbUserId, LPENTRYID 
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__unhookStore(m_ecSessionId, ulStoreType, sUserId, ulSyncId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -2402,7 +2205,7 @@ HRESULT WSTransport::HrRemoveStore(LPGUID lpGuid, ULONG ulSyncId)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__removeStore(m_ecSessionId, sStoreGuid, ulSyncId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -2432,7 +2235,7 @@ HRESULT WSTransport::HrDeleteUser(ULONG cbUserId, LPENTRYID lpUserId)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__deleteUser(m_ecSessionId, ABEID_ID(lpUserId), sUserId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	
 	}
 	END_SOAP_CALL
@@ -2482,7 +2285,7 @@ HRESULT WSTransport::HrGetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId,
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getUserList(m_ecSessionId, ABEID_ID(lpCompanyId), sCompanyId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -2499,7 +2302,6 @@ exit:
 	return hr;
 }
 
-/////////////////////////////////////////////////////////////////////
 // IECServiceAdmin group functions
 /**
  * Create a new group.
@@ -2515,7 +2317,7 @@ HRESULT WSTransport::HrCreateGroup(ECGROUP *lpECGroup, ULONG ulFlags,
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
-	struct group sGroup = {0};
+	struct group sGroup{__gszeroinit};
 	struct setGroupResponse sResponse;
 	convert_context converter;
 
@@ -2542,7 +2344,7 @@ HRESULT WSTransport::HrCreateGroup(ECGROUP *lpECGroup, ULONG ulFlags,
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__createGroup(m_ecSessionId, &sGroup, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 
@@ -2573,8 +2375,7 @@ HRESULT WSTransport::HrSetGroup(ECGROUP *lpECGroup, ULONG ulFlags)
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
 	convert_context converter;
-
-	struct group	sGroup = {0};
+	struct group sGroup{__gszeroinit};
 
 	LockSoap();
 
@@ -2601,7 +2402,7 @@ HRESULT WSTransport::HrSetGroup(ECGROUP *lpECGroup, ULONG ulFlags)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__setGroup(m_ecSessionId, &sGroup, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 
 	}
 	END_SOAP_CALL
@@ -2648,7 +2449,7 @@ HRESULT WSTransport::HrGetGroup(ULONG cbGroupID, LPENTRYID lpGroupID,
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getGroup(m_ecSessionId, ABEID_ID(lpGroupID), sGroupId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -2686,7 +2487,7 @@ HRESULT WSTransport::HrDeleteGroup(ULONG cbGroupId, LPENTRYID lpGroupId)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__groupDelete(m_ecSessionId, ABEID_ID(lpGroupId), sGroupId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -2728,7 +2529,7 @@ HRESULT WSTransport::HrGetSendAsList(ULONG cbUserId, LPENTRYID lpUserId,
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getSendAsList(m_ecSessionId, ABEID_ID(lpUserId), sUserId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -2770,7 +2571,7 @@ HRESULT WSTransport::HrAddSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG c
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__addSendAsUser(m_ecSessionId, ABEID_ID(lpUserId), sUserId, ABEID_ID(lpSenderId), sSenderId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	
 	}
 	END_SOAP_CALL
@@ -2807,7 +2608,7 @@ HRESULT WSTransport::HrDelSendAsUser(ULONG cbUserId, LPENTRYID lpUserId, ULONG c
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__delSendAsUser(m_ecSessionId, ABEID_ID(lpUserId), sUserId, ABEID_ID(lpSenderId), sSenderId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -2839,7 +2640,7 @@ HRESULT WSTransport::HrGetUserClientUpdateStatus(ULONG cbUserId,
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getUserClientUpdateStatus(m_ecSessionId, sUserId, &sResponse) )
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -2875,7 +2676,7 @@ HRESULT WSTransport::HrRemoveAllObjects(ULONG cbUserId, LPENTRYID lpUserId)
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__removeAllObjects(m_ecSessionId, sUserId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -2911,7 +2712,7 @@ HRESULT WSTransport::HrResolveUserName(LPCTSTR lpszUserName, ULONG ulFlags, ULON
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__resolveUsername(m_ecSessionId, (char*)convstring(lpszUserName, ulFlags).u8_str(), &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	
@@ -2952,7 +2753,7 @@ HRESULT WSTransport::HrResolveGroupName(LPCTSTR lpszGroupName, ULONG ulFlags, UL
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__resolveGroupname(m_ecSessionId, (char*)convstring(lpszGroupName, ulFlags).u8_str(), &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	
@@ -3002,7 +2803,7 @@ HRESULT WSTransport::HrGetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId,
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__getGroupList(m_ecSessionId, ABEID_ID(lpCompanyId), sCompanyId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -3044,7 +2845,7 @@ HRESULT WSTransport::HrDeleteGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULO
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__deleteGroupUser(m_ecSessionId, ABEID_ID(lpGroupId), sGroupId, ABEID_ID(lpUserId), sUserId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -3081,7 +2882,7 @@ HRESULT WSTransport::HrAddGroupUser(ULONG cbGroupId, LPENTRYID lpGroupId, ULONG 
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__addGroupUser(m_ecSessionId, ABEID_ID(lpGroupId), sGroupId, ABEID_ID(lpUserId), sUserId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -3124,7 +2925,7 @@ HRESULT WSTransport::HrGetUserListOfGroup(ULONG cbGroupId, LPENTRYID lpGroupId,
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__getUserListOfGroup(m_ecSessionId, ABEID_ID(lpGroupId), sGroupId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -3173,7 +2974,7 @@ HRESULT WSTransport::HrGetGroupListOfUser(ULONG cbUserId, LPENTRYID lpUserId,
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__getGroupListOfUser(m_ecSessionId, ABEID_ID(lpUserId), sUserId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -3203,7 +3004,7 @@ HRESULT WSTransport::HrCreateCompany(ECCOMPANY *lpECCompany, ULONG ulFlags,
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
-	struct company sCompany = {0};
+	struct company sCompany{__gszeroinit};
 	struct setCompanyResponse sResponse;
 	convert_context	converter;
 
@@ -3228,7 +3029,7 @@ HRESULT WSTransport::HrCreateCompany(ECCOMPANY *lpECCompany, ULONG ulFlags,
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__createCompany(m_ecSessionId, &sCompany, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 
@@ -3265,7 +3066,7 @@ HRESULT WSTransport::HrDeleteCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId)
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__deleteCompany(m_ecSessionId, ABEID_ID(lpCompanyId), sCompanyId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -3288,7 +3089,7 @@ HRESULT WSTransport::HrSetCompany(ECCOMPANY *lpECCompany, ULONG ulFlags)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
-	struct company sCompany = {0};
+	struct company sCompany{__gszeroinit};
 	convert_context converter;
 
 	LockSoap();
@@ -3321,7 +3122,7 @@ HRESULT WSTransport::HrSetCompany(ECCOMPANY *lpECCompany, ULONG ulFlags)
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__setCompany(m_ecSessionId, &sCompany, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -3366,7 +3167,7 @@ HRESULT WSTransport::HrGetCompany(ULONG cbCompanyId, LPENTRYID lpCompanyId,
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__getCompany(m_ecSessionId, ABEID_ID(lpCompanyId), sCompanyId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -3410,7 +3211,7 @@ HRESULT WSTransport::HrResolveCompanyName(LPCTSTR lpszCompanyName, ULONG ulFlags
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__resolveCompanyname(m_ecSessionId, (char*)convstring(lpszCompanyName, ulFlags).u8_str(), &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 
@@ -3452,7 +3253,7 @@ HRESULT WSTransport::HrGetCompanyList(ULONG ulFlags, ULONG *lpcCompanies,
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getCompanyList(m_ecSessionId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 
@@ -3496,7 +3297,7 @@ HRESULT WSTransport::HrAddCompanyToRemoteViewList(ULONG cbSetCompanyId, LPENTRYI
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__addCompanyToRemoteViewList(m_ecSessionId, ABEID_ID(lpSetCompanyId), sSetCompanyId, ABEID_ID(lpCompanyId), sCompanyId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -3532,7 +3333,7 @@ HRESULT WSTransport::HrDelCompanyFromRemoteViewList(ULONG cbSetCompanyId, LPENTR
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__delCompanyFromRemoteViewList(m_ecSessionId, ABEID_ID(lpSetCompanyId), sSetCompanyId, ABEID_ID(lpCompanyId), sCompanyId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -3577,7 +3378,7 @@ HRESULT WSTransport::HrGetRemoteViewList(ULONG cbCompanyId,
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__getRemoteViewList(m_ecSessionId, ABEID_ID(lpCompanyId), sCompanyId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -3619,7 +3420,7 @@ HRESULT WSTransport::HrAddUserToRemoteAdminList(ULONG cbUserId, LPENTRYID lpUser
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__addUserToRemoteAdminList(m_ecSessionId, ABEID_ID(lpUserId), sUserId, ABEID_ID(lpCompanyId), sCompanyId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -3655,7 +3456,7 @@ HRESULT WSTransport::HrDelUserFromRemoteAdminList(ULONG cbUserId, LPENTRYID lpUs
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__delUserFromRemoteAdminList(m_ecSessionId, ABEID_ID(lpUserId), sUserId, ABEID_ID(lpCompanyId), sCompanyId, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -3699,7 +3500,7 @@ HRESULT WSTransport::HrGetRemoteAdminList(ULONG cbCompanyId,
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__getRemoteAdminList(m_ecSessionId, ABEID_ID(lpCompanyId), sCompanyId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -3747,7 +3548,7 @@ HRESULT WSTransport::HrGetPermissionRules(int ulType, ULONG cbEntryID,
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getRights(m_ecSessionId, sEntryId, ulType, &sRightResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sRightResponse.er;
 
@@ -3755,7 +3556,7 @@ HRESULT WSTransport::HrGetPermissionRules(int ulType, ULONG cbEntryID,
 	END_SOAP_CALL
 
 	ECAllocateBuffer(sizeof(ECPERMISSION) * sRightResponse.pRightsArray->__size, (void**)&lpECPermissions);
-	for (unsigned int i = 0; i < sRightResponse.pRightsArray->__size; ++i) {
+	for (gsoap_size_t i = 0; i < sRightResponse.pRightsArray->__size; ++i) {
 		lpECPermissions[i].ulRights	= sRightResponse.pRightsArray->__ptr[i].ulRights;
 		lpECPermissions[i].ulState	= sRightResponse.pRightsArray->__ptr[i].ulState;
 		lpECPermissions[i].ulType	= sRightResponse.pRightsArray->__ptr[i].ulType;
@@ -3836,7 +3637,7 @@ HRESULT WSTransport::HrSetPermissionRules(ULONG cbEntryID, LPENTRYID lpEntryID,
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__setRights(m_ecSessionId, sEntryId, &rArray, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 
 	}
 	END_SOAP_CALL
@@ -3878,7 +3679,7 @@ HRESULT WSTransport::HrGetOwner(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG *lpc
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getOwner(m_ecSessionId, sEntryId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 
@@ -3917,7 +3718,6 @@ HRESULT WSTransport::HrResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlag
 	struct rowSet* lpsRowSet = NULL;
 	struct flagArray aFlags;
 	struct abResolveNamesResponse sResponse;
-	unsigned int i;
 	convert_context	converter;
 
 	LockSoap();
@@ -3935,7 +3735,7 @@ HRESULT WSTransport::HrResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlag
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__abResolveNames(m_ecSessionId, &aPropTag, lpsRowSet, &aFlags, ulFlags, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 
@@ -3945,7 +3745,7 @@ HRESULT WSTransport::HrResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlag
 	ASSERT(sResponse.aFlags.__size == lpFlagList->cFlags);
 	ASSERT((ULONG)sResponse.sRowSet.__size == lpAdrList->cEntries);
 
-	for (i = 0; i < sResponse.aFlags.__size; ++i) {
+	for (gsoap_size_t i = 0; i < sResponse.aFlags.__size; ++i) {
 		// Set the resolved items
 		if(lpFlagList->ulFlag[i] == MAPI_UNRESOLVED && sResponse.aFlags.__ptr[i] == MAPI_RESOLVED)
 		{
@@ -3995,7 +3795,7 @@ HRESULT WSTransport::HrSyncUsers(ULONG cbCompanyId, LPENTRYID lpCompanyId)
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__syncUsers(m_ecSessionId, ulCompanyId, sCompanyId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = (ECRESULT) sResponse;
 	}
@@ -4030,7 +3830,7 @@ HRESULT WSTransport::GetQuota(ULONG cbUserId, LPENTRYID lpUserId,
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__GetQuota(m_ecSessionId, ABEID_ID(lpUserId), sUserId, bGetUserDefault, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = (ECRESULT) sResponse.er;
 	}
@@ -4081,7 +3881,7 @@ HRESULT WSTransport::SetQuota(ULONG cbUserId, LPENTRYID lpUserId,
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__SetQuota(m_ecSessionId, ABEID_ID(lpUserId), sUserId, &sQuota, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = (ECRESULT) sResponse;
 	}
@@ -4119,7 +3919,7 @@ HRESULT WSTransport::AddQuotaRecipient(ULONG cbCompanyId, LPENTRYID lpCompanyId,
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__AddQuotaRecipient(m_ecSessionId, ABEID_ID(lpCompanyId), sCompanyId, ABEID_ID(lpRecipientId), sRecipientId, ulType, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -4154,7 +3954,7 @@ HRESULT WSTransport::DeleteQuotaRecipient(ULONG cbCompanyId, LPENTRYID lpCompany
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__DeleteQuotaRecipient(m_ecSessionId, ABEID_ID(lpCompanyId), sCompanyId, ABEID_ID(lpRecipientId), sRecipientId, ulType, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 	}
 	END_SOAP_CALL
 
@@ -4188,7 +3988,7 @@ HRESULT WSTransport::GetQuotaRecipients(ULONG cbUserId, LPENTRYID lpUserId,
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__GetQuotaRecipients(m_ecSessionId, ABEID_ID(lpUserId), sUserId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -4227,7 +4027,7 @@ HRESULT WSTransport::GetQuotaStatus(ULONG cbUserId, LPENTRYID lpUserId,
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__GetQuotaStatus(m_ecSessionId, ABEID_ID(lpUserId), sUserId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = (ECRESULT) sResponse.er;
 	}
@@ -4256,7 +4056,7 @@ HRESULT WSTransport::HrPurgeSoftDelete(ULONG ulDays)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__purgeSoftDelete(m_ecSessionId, ulDays, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
         
 	}
 	END_SOAP_CALL
@@ -4277,7 +4077,7 @@ HRESULT WSTransport::HrPurgeCache(ULONG ulFlags)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__purgeCache(m_ecSessionId, ulFlags, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
         
 	}
 	END_SOAP_CALL
@@ -4299,7 +4099,7 @@ HRESULT WSTransport::HrPurgeDeferredUpdates(ULONG *lpulRemaining)
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__purgeDeferredUpdates(m_ecSessionId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
         else
             er = sResponse.er;
             
@@ -4318,7 +4118,7 @@ HRESULT WSTransport::HrResolvePseudoUrl(const char *lpszPseudoUrl, char **lppszS
 {
 	ECRESULT						er = erSuccess;
 	HRESULT							hr = hrSuccess;
-	struct resolvePseudoUrlResponse	sResponse = {0};
+	struct resolvePseudoUrlResponse sResponse{__gszeroinit};
 	char							*lpszServerPath = NULL;
 	unsigned int					ulLen = 0;
 	ECsResolveResult				*lpCachedResult = NULL;
@@ -4354,7 +4154,7 @@ HRESULT WSTransport::HrResolvePseudoUrl(const char *lpszPseudoUrl, char **lppszS
 	START_SOAP_CALL
 	{
     	if(SOAP_OK != m_lpCmd->ns__resolvePseudoUrl(m_ecSessionId, (char*)lpszPseudoUrl, &sResponse))
-    		er = ZARAFA_E_NETWORK_ERROR;
+    		er = KCERR_NETWORK_ERROR;
     	else
     		er = (ECRESULT)sResponse.er;
     }
@@ -4390,7 +4190,7 @@ HRESULT WSTransport::HrGetServerDetails(ECSVRNAMELIST *lpServerNameList,
 {
 	ECRESULT						er = erSuccess;
 	HRESULT							hr = hrSuccess;
-	struct getServerDetailsResponse	sResponse = {{0}};
+	struct getServerDetailsResponse sResponse{__gszeroinit};
 	struct mv_string8				*lpsSvrNameList = NULL;
 
 	LockSoap();
@@ -4409,7 +4209,7 @@ HRESULT WSTransport::HrGetServerDetails(ECSVRNAMELIST *lpServerNameList,
 	START_SOAP_CALL
 	{
     	if( SOAP_OK != m_lpCmd->ns__getServerDetails(m_ecSessionId, *lpsSvrNameList, ulFlags & ~MAPI_UNICODE, &sResponse))
-    		er = ZARAFA_E_NETWORK_ERROR;
+    		er = KCERR_NETWORK_ERROR;
     	else
     		er = (ECRESULT)sResponse.er;
     }
@@ -4433,7 +4233,6 @@ HRESULT WSTransport::HrGetChanges(const std::string& sourcekey, ULONG ulSyncId, 
 	ECRESULT					er = erSuccess;
 	struct icsChangeResponse	sResponse;
 	ICSCHANGE *					lpChanges = NULL;
-	unsigned int 				i = 0;
 	struct xsd__base64Binary	sSourceKey;
 	struct restrictTable		*lpsSoapRestrict = NULL;
 	
@@ -4451,7 +4250,7 @@ HRESULT WSTransport::HrGetChanges(const std::string& sourcekey, ULONG ulSyncId, 
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getChanges(m_ecSessionId, sSourceKey, ulSyncId, ulChangeId, ulSyncType, ulFlags, lpsSoapRestrict, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = (ECRESULT) sResponse.er;
 
@@ -4460,7 +4259,7 @@ HRESULT WSTransport::HrGetChanges(const std::string& sourcekey, ULONG ulSyncId, 
 
 	ECAllocateBuffer(sResponse.sChangesArray.__size * sizeof(ICSCHANGE), (void**)&lpChanges);
 
-	for (i = 0; i < sResponse.sChangesArray.__size; ++i) {
+	for (gsoap_size_t i = 0; i < sResponse.sChangesArray.__size; ++i) {
 		lpChanges[i].ulChangeId = sResponse.sChangesArray.__ptr[i].ulChangeId;
 		lpChanges[i].ulChangeType = sResponse.sChangesArray.__ptr[i].ulChangeType;
 		lpChanges[i].ulFlags = sResponse.sChangesArray.__ptr[i].ulFlags;
@@ -4509,7 +4308,7 @@ HRESULT WSTransport::HrSetSyncStatus(const std::string& sourcekey, ULONG ulSyncI
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__setSyncStatus(m_ecSessionId, sSourceKey, ulSyncId, ulChangeId, ulSyncType, ulFlags, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = (ECRESULT) sResponse.er;
 
@@ -4561,7 +4360,7 @@ HRESULT WSTransport::HrEntryIDFromSourceKey(ULONG cbStoreID, LPENTRYID lpStoreID
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getEntryIDFromSourceKey(m_ecSessionId, sStoreId, folderSourceKey, messageSourceKey, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = (ECRESULT) sResponse.er;
 
@@ -4586,7 +4385,7 @@ HRESULT WSTransport::HrGetSyncStates(const ECLISTSYNCID &lstSyncId, ECLISTSYNCST
 	HRESULT							hr = hrSuccess;
 	ECRESULT						er = erSuccess;
 	mv_long							ulaSyncId = {0};
-	getSyncStatesReponse			sResponse = {{0}};
+	getSyncStatesReponse sResponse{__gszeroinit};
 	ECLISTSYNCID::const_iterator	iSyncId;
 	SSyncState						sSyncState = {0};
 
@@ -4604,13 +4403,13 @@ HRESULT WSTransport::HrGetSyncStates(const ECLISTSYNCID &lstSyncId, ECLISTSYNCST
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getSyncStates(m_ecSessionId, ulaSyncId, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = (ECRESULT) sResponse.er;
 	}
 	END_SOAP_CALL
 
-	for (unsigned int i = 0; i < sResponse.sSyncStates.__size; ++i) {
+	for (gsoap_size_t i = 0; i < sResponse.sSyncStates.__size; ++i) {
 		sSyncState.ulSyncId = sResponse.sSyncStates.__ptr[i].ulSyncId;
 		sSyncState.ulChangeId = sResponse.sSyncStates.__ptr[i].ulChangeId;
 		lplstSyncState->push_back(sSyncState);
@@ -4694,7 +4493,7 @@ HRESULT WSTransport::HrSetLockState(ULONG cbEntryID, LPENTRYID lpEntryID, bool b
     ECRESULT er = erSuccess;
 	entryId eidMessage;
 
-	if ((m_ulServerCapabilities & ZARAFA_CAP_MSGLOCK) == 0)
+	if ((m_ulServerCapabilities & KOPANO_CAP_MSGLOCK) == 0)
 		return hrSuccess;
 
 	LockSoap();
@@ -4706,7 +4505,7 @@ HRESULT WSTransport::HrSetLockState(ULONG cbEntryID, LPENTRYID lpEntryID, bool b
 	START_SOAP_CALL
 	{
 		if (SOAP_OK != m_lpCmd->ns__setLockState(m_ecSessionId, eidMessage, bLocked, &er))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		/* else: er is already set and good to use */
 	}
 	END_SOAP_CALL
@@ -4742,7 +4541,7 @@ HRESULT WSTransport::HrLicenseAuth(unsigned char *lpData, unsigned int ulSize, u
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getLicenseAuth(m_ecSessionId, sData, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
         
@@ -4775,7 +4574,7 @@ HRESULT WSTransport::HrLicenseCapa(unsigned int ulServiceType, char ***lppszCapa
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getLicenseCapa(m_ecSessionId, ulServiceType, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
         
@@ -4786,7 +4585,7 @@ HRESULT WSTransport::HrLicenseCapa(unsigned int ulServiceType, char ***lppszCapa
     if(hr != hrSuccess)
         goto exit;
 
-    for (unsigned int i = 0; i < sResponse.sCapabilities.__size; ++i) {
+    for (gsoap_size_t i = 0; i < sResponse.sCapabilities.__size; ++i) {
         if ((hr = MAPIAllocateMore(strlen(sResponse.sCapabilities.__ptr[i])+1, lpszCapas, (void **) &lpszCapas[i])) != hrSuccess)
 		goto exit;
         strcpy(lpszCapas[i], sResponse.sCapabilities.__ptr[i]);
@@ -4812,7 +4611,7 @@ HRESULT WSTransport::HrLicenseUsers(unsigned int ulServiceType, unsigned int *lp
 	START_SOAP_CALL
 	{
 		if(SOAP_OK != m_lpCmd->ns__getLicenseUsers(m_ecSessionId, ulServiceType, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}
@@ -4841,7 +4640,7 @@ HRESULT WSTransport::HrTestPerform(char *szCommand, unsigned int ulArgs, char **
     START_SOAP_CALL
     {
         if(SOAP_OK != m_lpCmd->ns__testPerform(m_ecSessionId, szCommand, sTestPerform, &er))
-            er = ZARAFA_E_NETWORK_ERROR;
+            er = KCERR_NETWORK_ERROR;
     }
     END_SOAP_CALL;
 
@@ -4862,7 +4661,7 @@ HRESULT WSTransport::HrTestSet(const char *szName, const char *szValue)
     {
         if (m_lpCmd->ns__testSet(m_ecSessionId, const_cast<char *>(szName),
             const_cast<char *>(szValue), &er) != SOAP_OK)
-                er = ZARAFA_E_NETWORK_ERROR;
+                er = KCERR_NETWORK_ERROR;
     }
     END_SOAP_CALL
     
@@ -4886,7 +4685,7 @@ HRESULT WSTransport::HrTestGet(const char *szName, char **lpszValue)
     {
         if (m_lpCmd->ns__testGet(m_ecSessionId,
             const_cast<char *>(szName), &sResponse) != SOAP_OK)
-                er = ZARAFA_E_NETWORK_ERROR;
+                er = KCERR_NETWORK_ERROR;
         else
                 er = sResponse.er;
     }
@@ -5034,11 +4833,11 @@ HRESULT WSTransport::HrGetNotify(struct notificationArray **lppsArrayNotificatio
 	LockSoap();
 
 	if(SOAP_OK != m_lpCmd->ns__notifyGetItems(m_ecSessionId, &sNotifications))
-		er = ZARAFA_E_NETWORK_ERROR;
+		er = KCERR_NETWORK_ERROR;
 	else
-		er = sNotifications.er;	// hrSuccess or ZARAFA_W_KEEP_ALIVE only
+		er = sNotifications.er;	// hrSuccess or KCWARN_KEEP_ALIVE only
 
-	hr = ZarafaErrorToMAPIError(er);
+	hr = kcerr_to_mapierr(er);
 	if(hr != erSuccess)
 		goto exit;
 
@@ -5110,7 +4909,7 @@ HRESULT WSTransport::HrResetFolderCount(ULONG cbEntryId, LPENTRYID lpEntryId, UL
 	HRESULT hr = hrSuccess;
     ECRESULT er = erSuccess;
 	entryId eidFolder;
-	resetFolderCountResponse sResponse = {0};
+	resetFolderCountResponse sResponse{__gszeroinit};
 
 	LockSoap();
 
@@ -5121,7 +4920,7 @@ HRESULT WSTransport::HrResetFolderCount(ULONG cbEntryId, LPENTRYID lpEntryId, UL
 	START_SOAP_CALL
 	{
 		if (SOAP_OK != m_lpCmd->ns__resetFolderCount(m_ecSessionId, eidFolder, &sResponse))
-			er = ZARAFA_E_NETWORK_ERROR;
+			er = KCERR_NETWORK_ERROR;
 		else
 			er = sResponse.er;
 	}

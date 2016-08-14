@@ -5,7 +5,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2013-02-12 00:03+0100\n"
 "PO-Revision-Date: 2012-08-11 14:15+0200\n"
-"Last-Translator: Pierrick <pierrick@zarafa.com>\n"
+"Last-Translator: Pierrick <pierrick@kopano.com>\n"
 "Language-Team: fr_FR <fr@li.org>\n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
@@ -14,39 +14,39 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 "X-Generator: Pootle 2.1.5\n"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:922
-msgid "Zarafa Archive"
-msgstr "Archive Zarafa"
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:922
+msgid "Kopano Archive"
+msgstr "Archive Kopano"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:923
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:923
 msgid "This folder contains the special archive folders."
 msgstr "Ce répertoire contient les dossiers d'archives spécifiques."
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:928
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:928
 msgid "History"
 msgstr "Historique"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:929
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:929
 msgid ""
 "This folder contains archives that have been replaced by a newer version."
 msgstr ""
 "Ce dossier contient les archives écrasées par des versions plus récentes."
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:933
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:933
 msgid "Outgoing"
 msgstr "Courrier sortant"
 
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:934
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:934
 msgid "This folder contains archives of all outgoing messages."
 msgstr "Ce dossier contient les archives de l'ensemble du courrier sortant."
 
 # 85%
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:938
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:938
 msgid "Deleted"
 msgstr "Supprimé"
 
 # 98%
-#: ECtools/zarafa-archiver/helpers/archivehelper.cpp:939
+#: ECtools/kopano-archiver/helpers/archivehelper.cpp:939
 msgid "This folder contains archives of messages that have been deleted."
 msgstr "Ce répertoire contient des messages archivés qui ont été supprimés."
 
@@ -156,7 +156,7 @@ msgstr "Aucune description disponible."
 msgid "MAPI error code:"
 msgstr "Code erreur MAPI :"
 
-#: zarafa-libsync/ECSync.cpp:1961
+#: libsync/ECSync.cpp:1961
 msgid ""
 "The synchronization of a folder failed. Press retry to continue or ignore to "
 "supress all errors.\r\n"
@@ -169,7 +169,7 @@ msgstr ""
 "Veuillez contacte l'administrateur du système si le problème persiste."
 
 # 84%
-#: zarafa-libsync/ECSync.cpp:1963
+#: libsync/ECSync.cpp:1963
 #, fuzzy
 msgid "Error codes: "
 msgstr "Code erreur :"
@@ -1384,8 +1384,8 @@ msgstr ""
 # 93%
 #: provider/client/ECArchiveAwareMessage.cpp:471
 #: provider/client/ECArchiveAwareMessage.cpp:529
-msgid "Zarafa Archiver"
-msgstr "Gestionnaire d'archive Zarafa"
+msgid "Kopano Archiver"
+msgstr "Gestionnaire d'archive Kopano"
 
 #: provider/client/ECArchiveAwareMessage.cpp:473
 msgid "An error has occurred while fetching the message from the archive."
@@ -1573,8 +1573,8 @@ msgid "Unable to store SSL certificate in registry key."
 msgstr "Impossible de stocker le certificat SSL dans la clé de registre."
 
 #: provider/contacts/ZCABContainer.cpp:761
-msgid "Zarafa Contacts Folders"
-msgstr "Répertoires de contacts Zarafa"
+msgid "Kopano Contacts Folders"
+msgstr "Répertoires de contacts Kopano"
 
 #: provider/libserver/ECGenProps.cpp:949
 msgid "Archive"
@@ -1586,11 +1586,11 @@ msgstr "Mise à jour : "
 
 #: spooler/Spooler.cpp:485
 msgid ""
-"A fatal error occurred while processing your message, and Zarafa is unable "
+"A fatal error occurred while processing your message, and Kopano is unable "
 "to send your email."
 msgstr ""
 "Une erreur fatale est survenue lors du traitement de votre message, et "
-"Zarafa ne peut pas envoyer votre courrier."
+"Kopano ne peut pas envoyer votre courrier."
 
 #: spooler/archive.cpp:241
 msgid "Unable to obtain list of attached archives."
@@ -1633,20 +1633,20 @@ msgid "Error found while trying to send your message. Error code: "
 msgstr ""
 "Erreur rencontrée à la tentative d'envoi de votre message. Code erreur : "
 
-#: installer/linux/zarafa-mr-accept:403
+#: installer/linux/kopano-mr-accept:403
 msgid "Recurring meetings are not allowed"
 msgstr "Les rendez-vous périodiques ne sont pas autorisés"
 
-#: installer/linux/zarafa-mr-accept:453
+#: installer/linux/kopano-mr-accept:453
 msgid "The requested time slot is unavailable"
 msgstr "La tranche horaire demandée n'est pas disponible"
 
-#: installer/linux/zarafa-mr-accept:455
+#: installer/linux/kopano-mr-accept:455
 msgid "The requested time slots are unavailble on the following dates:"
 msgstr ""
 "La tranche horaire demandée n'est pas disponible pour les dates suivantes :"
 
-#: installer/linux/zarafa-mr-accept:458
+#: installer/linux/kopano-mr-accept:458
 #, php-format
 msgid "%x %X"
 msgstr "%x %X"
@@ -1800,8 +1800,8 @@ msgstr ""
 "passe."
 
 #: php-ext/include/mapi/class.mapiexception.php:29
-msgid "Can not connect to Zarafa server."
-msgstr "Impossible de se connecter au serveur Zarafa."
+msgid "Can not connect to Kopano server."
+msgstr "Impossible de se connecter au serveur Kopano."
 
 #: php-ext/include/mapi/class.mapiexception.php:31
 msgid "Can not open object with provided id."

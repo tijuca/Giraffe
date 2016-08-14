@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,16 +15,16 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
-#include "Zarafa.h"
+#include "kcore.hpp"
 #include "ECDistList.h"
 
 #include "Mem.h"
 
-#include <zarafa/ECGuid.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/ECDebug.h>
+#include <kopano/ECGuid.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/ECDebug.h>
 
 
 #include "ECMAPITable.h"
@@ -32,8 +32,6 @@
 #include "ECDisplayTable.h"
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
@@ -41,10 +39,6 @@ ECDistList::ECDistList(void* lpProvider, BOOL fModify) : ECABContainer(lpProvide
 {
 	// since we have no OpenProperty / abLoadProp, remove the 8k prop limit
 	this->m_ulMaxPropSize = 0;
-}
-
-ECDistList::~ECDistList()
-{
 }
 
 HRESULT	ECDistList::QueryInterface(REFIID refiid, void **lppInterface) 
@@ -93,48 +87,6 @@ HRESULT ECDistList::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfac
 	// FIXME: check variables
 
 	switch(ulPropTag) {
-#if defined(_WIN32) && !defined(WINCE) 
-	case PR_DETAILS_TABLE:
-		if (*lpiid != IID_IMAPITable)
-			return MAPI_E_INTERFACE_NOT_SUPPORTED;
-
-		hr = ECDisplayTable::CreateDisplayTable(arraySize(rgdtIDistListPage), rgdtIDistListPage, (LPMAPITABLE *) lppUnk);
-		if (hr != hrSuccess)
-			return hr;
-		break;
-	case PR_EMS_AB_MEMBER_O:
-		if (*lpiid != IID_IMAPITable)
-			return MAPI_E_INTERFACE_NOT_SUPPORTED;
-
-		hr = GetContentsTable(ulInterfaceOptions, (LPMAPITABLE*)lppUnk);
-		if (hr != hrSuccess)
-			return hr;
-		break;
-	case PR_EMS_AB_PROXY_ADDRESSES_O:
-		if (*lpiid != IID_IMAPITable)
-			return MAPI_E_INTERFACE_NOT_SUPPORTED;
-
-		hr = ECDisplayTable::CreateTableFromProperty(this, lpiid, ulInterfaceOptions, PR_SMTP_ADDRESS, PR_EMS_AB_PROXY_ADDRESSES, lppUnk);
-		if (hr != hrSuccess)
-			return hr;
-		break;
-	case PR_EMS_AB_IS_MEMBER_OF_DL_O:
-		if (*lpiid != IID_IMAPITable)
-			return MAPI_E_INTERFACE_NOT_SUPPORTED;
-
-		hr = ECDisplayTable::CreateTableFromResolved(this, lpiid, ulInterfaceOptions, PR_EMS_AB_IS_MEMBER_OF_DL_T, lppUnk);
-		if (hr != hrSuccess)
-			return hr;
-		break;
-	case PR_EMS_AB_OWNER_O:
-		if (*lpiid != IID_IMAPITable)
-			return MAPI_E_INTERFACE_NOT_SUPPORTED;
-
-		hr = ECDisplayTable::CreateTableFromResolved(this, lpiid, ulInterfaceOptions, PR_EMS_AB_OWNER, lppUnk);
-		if (hr != hrSuccess)
-			return hr;
-		break;
-#endif
 		default:
 			hr = ECABProp::OpenProperty(ulPropTag, lpiid, ulInterfaceOptions, ulFlags, lppUnk);
 			break;
@@ -152,10 +104,7 @@ HRESULT ECDistList::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, L
 	return this->GetABStore()->m_lpMAPISup->DoCopyProps(&IID_IDistList, &this->m_xDistList, lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
 
-////////////////////////////////////////////
 // Interface IUnknown
-//
-
 HRESULT ECDistList::xDistList::QueryInterface(REFIID refiid , void** lppInterface)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IDistList::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
@@ -179,10 +128,7 @@ ULONG ECDistList::xDistList::Release()
 	return pThis->Release();
 }
 
-////////////////////////////////////////////
 // Interface IABContainer
-//
-
 HRESULT ECDistList::xDistList::CreateEntry(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulCreateFlags, LPMAPIPROP* lppMAPIPropEntry)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IDistList::CreateEntry", "");
@@ -219,9 +165,7 @@ HRESULT ECDistList::xDistList::ResolveNames(LPSPropTagArray lpPropTagArray, ULON
 	return hr;
 }
 
-////////////////////////////////////////////
 // Interface IMAPIContainer
-//
 HRESULT ECDistList::xDistList::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IDistList::GetContentsTable", "");
@@ -267,9 +211,7 @@ HRESULT ECDistList::xDistList::GetSearchCriteria(ULONG ulFlags, LPSRestriction *
 	return hr;
 }
 
-////////////////////////////////////////////
 // Interface IMAPIProp
-//
 HRESULT ECDistList::xDistList::GetLastError(HRESULT hError, ULONG ulFlags, LPMAPIERROR * lppMapiError)
 {
 	TRACE_MAPI(TRACE_ENTRY, "IDistList::GetLastError", "");

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,15 +15,12 @@
  *
  */
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include "ECUserManagement.h"
 
 class ECUserManagementOffline _zcp_final : public ECUserManagement {
 public:
 	ECUserManagementOffline(ECSession *lpSession, ECPluginFactory *lpPluginFactory, ECConfig *lpConfig);
-	virtual ~ECUserManagementOffline(void);
-
-
 	//virtual ECRESULT	AuthUserAndSync(char *szUsername, char *szPassword, unsigned int *lpulUserId);
 	//virtual ECRESULT	GetUserDetailsAndSync(unsigned int ulUserId, userdetails_t *lpDetails);
 	virtual ECRESULT	GetUserQuotaDetailsAndSync(unsigned int ulUserId, quotadetails_t *lpDetails);

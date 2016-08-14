@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,9 +18,9 @@
 #ifndef WSMessageStreamExporter_INCLUDED
 #define WSMessageStreamExporter_INCLUDED
 
-#include <zarafa/ECUnknown.h>
+#include <kopano/ECUnknown.h>
 #include "soapStub.h"
-#include <zarafa/mapi_ptr.h>
+#include <kopano/mapi_ptr.h>
 
 #include <string>
 #include <map>
@@ -45,8 +45,8 @@ private:
 	~WSMessageStreamExporter();
 
 	// Inhibit copying
-	WSMessageStreamExporter(const WSMessageStreamExporter&);
-	WSMessageStreamExporter& operator=(const WSMessageStreamExporter&);
+	WSMessageStreamExporter(const WSMessageStreamExporter &) = delete;
+	WSMessageStreamExporter &operator=(const WSMessageStreamExporter &) = delete;
 
 private:
 	typedef mapi_object_ptr<WSTransport> WSTransportPtr;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,12 +19,12 @@
 #define CALDAV_UTIL_H_
 
 #include "WebDav.h"
-#include <zarafa/mapiext.h>
-#include <zarafa/mapiguidext.h>
+#include <kopano/mapiext.h>
+#include <kopano/mapiguidext.h>
 #include <cstring>
 #include <algorithm>
-#include <zarafa/restrictionutil.h>
-#include <zarafa/namedprops.h>
+#include <kopano/restrictionutil.h>
+#include <kopano/namedprops.h>
 #include "nameids.h"
 #include "icaluid.h"
 #include <edkguid.h>
@@ -44,7 +44,7 @@
 #define CALENDAR_FOLDER 0x02
 #define TASKS_FOLDER	0x03
 
-//Performs login to the Zarafa server and returns Session.
+//Performs login to the Kopano server and returns Session.
 HRESULT HrAuthenticate(ECLogger *const lpLogger, const std::string & appVersion, const std::string & appMisc, const std::wstring &wstrUser, const std::wstring &wstrPass, std::string strPath, IMAPISession **lpSession);
 
 //Adds property FolderID to the folder if not present else returns it.

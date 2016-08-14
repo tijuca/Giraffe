@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ZCABProvider.h"
 #include "ZCABLogon.h"
 
@@ -23,16 +23,12 @@
 #include <mapicode.h>
 #include <mapiguid.h>
 
-#include <zarafa/ECGuid.h>
-#include <zarafa/ECDebug.h>
-#include <zarafa/Trace.h>
+#include <kopano/ECGuid.h>
+#include <kopano/ECDebug.h>
+#include <kopano/Trace.h>
 
 ZCABProvider::ZCABProvider(ULONG ulFlags, const char *szClassName) :
     ECUnknown(szClassName)
-{
-}
-
-ZCABProvider::~ZCABProvider()
 {
 }
 

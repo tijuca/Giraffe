@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,13 +15,13 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include "MAPIConsoleTable.h"
 #include "ConsoleTable.h"
-#include <zarafa/mapi_ptr.h>
-#include <zarafa/mapi_ptr/mapi_rowset_ptr.h>
-#include <zarafa/stringutil.h>
+#include <kopano/mapi_ptr.h>
+#include <kopano/mapi_ptr/mapi_rowset_ptr.h>
+#include <kopano/stringutil.h>
 
 static std::string ToString(const SPropValue *lpProp)
 {

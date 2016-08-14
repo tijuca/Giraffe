@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -22,20 +22,18 @@
 #include "CalDavUtil.h"
 #include <libxml/uri.h>
 
-#include <zarafa/restrictionutil.h>
-#include <zarafa/mapiext.h>
+#include <kopano/zcdefs.h>
+#include <kopano/restrictionutil.h>
+#include <kopano/mapiext.h>
 #include "MAPIToICal.h"
 #include "ICalToMAPI.h"
 #include "icaluid.h"
 
 #define FB_PUBLISH_DURATION 6
 
-class CalDAV : public WebDav
-{
+class CalDAV _kc_final : public WebDav {
 public:
 	CalDAV(Http *lpRequest, IMAPISession *lpSession, ECLogger *lpLogger, std::string strSrvTz, std::string strCharset);
-	virtual ~CalDAV();
-
 	HRESULT HrHandleCommand(const std::string &strMethod);
 
 protected:

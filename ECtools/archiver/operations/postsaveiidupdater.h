@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,10 +18,11 @@
 #ifndef postsaveiidupdater_INCLUDED
 #define postsaveiidupdater_INCLUDED
 
+#include <memory>
 #include "postsaveaction.h"
-#include <zarafa/mapi_ptr.h>
+#include <kopano/mapi_ptr.h>
 #include "instanceidmapper_fwd.h"
-#include <zarafa/archiver-common.h>
+#include <kopano/archiver-common.h>
 #include <list>
 
 namespace za { namespace operations {
@@ -41,7 +42,7 @@ private:
 	MessagePtr	m_ptrDestMsg;
 	ULONG 	m_ulDestAttachIdx;
 };
-typedef boost::shared_ptr<TaskBase> TaskPtr;
+typedef std::shared_ptr<TaskBase> TaskPtr;
 typedef std::list<TaskPtr> TaskList;
 
 

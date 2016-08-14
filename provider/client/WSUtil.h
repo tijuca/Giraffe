@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -20,10 +20,10 @@
 
 #include <mapidefs.h>
 #include <mapicode.h>
-#include "Zarafa.h"
-#include <zarafa/ZarafaCode.h>
+#include "kcore.hpp"
+#include <kopano/kcodes.h>
 
-#include "soapZarafaCmdProxy.h"
+#include "soapKCmdProxy.h"
 
 #include "ECMsgStore.h"
 
@@ -79,7 +79,7 @@ int gsoap_win_fclose(struct soap *soap);
 int gsoap_connect_namedpipe(struct soap *soap, const char *endpoint, const char *host, int port);
 #endif
 
-HRESULT CreateSoapTransport(ULONG ulUIFlags, const sGlobalProfileProps &sProfileProps, ZarafaCmd **const lppCmd);
+HRESULT CreateSoapTransport(ULONG ulUIFlags, const sGlobalProfileProps &sProfileProps, KCmd **const lppCmd);
 
 HRESULT WrapServerClientStoreEntry(const char* lpszServerName, entryId* lpsStoreId, ULONG* lpcbStoreID, LPENTRYID* lppStoreID);
 HRESULT UnWrapServerClientStoreEntry(ULONG cbWrapStoreID, LPENTRYID lpWrapStoreID, ULONG* lpcbUnWrapStoreID, LPENTRYID* lppUnWrapStoreID);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "MAPIToICal.h"
 #include <libical/ical.h>
 
@@ -28,7 +28,7 @@
 #include <mapiutil.h>
 #include <mapicode.h>
 #include <mapix.h>
-#include <zarafa/ecversion.h>
+#include <kopano/ecversion.h>
 
 class MapiToICalImpl : public MapiToICal {
 public:
@@ -111,7 +111,7 @@ HRESULT MapiToICalImpl::HrInitializeVCal()
 {
 	m_lpicCalender = icalcomponent_new(ICAL_VCALENDAR_COMPONENT);
 	icalcomponent_add_property(m_lpicCalender, icalproperty_new_version("2.0"));
-	icalcomponent_add_property(m_lpicCalender, icalproperty_new_prodid("-//Zarafa//" PROJECT_VERSION_DOT_STR "-" PROJECT_SVN_REV_STR "//EN"));
+	icalcomponent_add_property(m_lpicCalender, icalproperty_new_prodid("-//Kopano//" PROJECT_VERSION_DOT_STR "-" PROJECT_SVN_REV_STR "//EN"));
 	icalcomponent_add_property(m_lpicCalender, icalproperty_new_calscale("GREGORIAN"));
 
 	return hrSuccess;
@@ -213,7 +213,7 @@ HRESULT MapiToICalImpl::AddBlocks(FBBlock_1 *lpsFbblk, LONG ulBlocks, time_t tSt
 		m_lpicCalender = icalcomponent_new(ICAL_VCALENDAR_COMPONENT);
 
 		icalcomponent_add_property(m_lpicCalender, icalproperty_new_version("2.0"));
-		icalcomponent_add_property(m_lpicCalender, icalproperty_new_prodid("-//Zarafa//" PROJECT_VERSION_DOT_STR "-" PROJECT_SVN_REV_STR "//EN"));		
+		icalcomponent_add_property(m_lpicCalender, icalproperty_new_prodid("-//Kopano//" PROJECT_VERSION_DOT_STR "-" PROJECT_SVN_REV_STR "//EN"));		
 	}
 	
 	hr  = HrFbBlock2ICal(lpsFbblk, ulBlocks, tStart, tEnd, strOrganiser, strUser, strUID, &icFbComponent);

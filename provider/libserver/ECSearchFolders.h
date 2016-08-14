@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,9 +18,9 @@
 #ifndef ECSEARCHFOLDERS_H
 #define ECSEARCHFOLDERS_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include "ECDatabaseFactory.h"
-#include <zarafa/ECKeyTable.h>
+#include <kopano/ECKeyTable.h>
 #include "ECStoreObjectTable.h"
 
 #include "soapH.h"
@@ -92,7 +92,7 @@ typedef struct tagsSearchFolderStats
  * - Rebuilding searchfolder contents (when users rebuild searchfolders)
  * - Getting searchfolder results (when users open searchfolders)
  *
- * Storage of searchresults is on-disk in the MySQL database; restarts of zarafa-server do not affect searchfolders
+ * Storage of searchresults is on-disk in the MySQL database; restarts of the storage server do not affect searchfolders
  * except rebuilding searchfolders; when the server starts and finds a searchfolder that was only half-built, a complete
  * rebuild is started since we don't know how far the rebuild got last time.
  */
@@ -197,7 +197,7 @@ public:
     /** 
      * Restart all searches. 
      * This is a rather heavy operation, and runs synchronously. You have to wait until it has finished.
-     * This is only called with the --restart-searches option of zarafa-server and never used in a running
+     * This is only called with the --restart-searches option of kopano-server and never used in a running
      * system
      */
     virtual ECRESULT RestartSearches();
@@ -207,7 +207,7 @@ public:
 	 *
 	 * Purely writes the given search criteria to the database without any further processing. This is really
 	 * a private function but it is used hackishly from ECDatabaseUpdate() when upgrading from really old (4.1)
-	 * versions of zarafa which have a slightly different search criteria format. Do not use this function for
+	 * versions of kopano which have a slightly different search criteria format. Do not use this function for
 	 * anything else!
 	 *
 	 * @param[in] lpDatabase Database handle

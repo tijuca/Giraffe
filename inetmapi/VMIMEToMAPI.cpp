@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,13 +15,13 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 // Damn windows header defines max which break C++ header files
 #undef max
 
 #include "VMIMEToMAPI.h"
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 
 #include <algorithm>
 #include <string>
@@ -39,11 +39,7 @@
 
 // vmime
 #include <vmime/vmime.hpp>
-#ifdef _WIN32
-#include <vmime/platforms/windows/windowsHandler.hpp>
-#else
 #include <vmime/platforms/posix/posixHandler.hpp>
-#endif
 #include <vmime/contentTypeField.hpp>
 #include <vmime/contentDispositionField.hpp>
 
@@ -53,20 +49,20 @@
 #include <mapi.h>
 #include <mapix.h>
 #include <mapiutil.h>
-#include <zarafa/mapiext.h>
-#include <zarafa/mapiguidext.h>
+#include <kopano/mapiext.h>
+#include <kopano/mapiguidext.h>
 #include <edkmdb.h>
 
-#include <zarafa/EMSAbTag.h>
+#include <kopano/EMSAbTag.h>
 #include "tnef.h"
-#include <zarafa/codepage.h>
-#include <zarafa/Util.h>
-#include <zarafa/CommonUtil.h>
-#include <zarafa/MAPIErrors.h>
-#include <zarafa/namedprops.h>
-#include <zarafa/charset/convert.h>
-#include <zarafa/stringutil.h>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/codepage.h>
+#include <kopano/Util.h>
+#include <kopano/CommonUtil.h>
+#include <kopano/MAPIErrors.h>
+#include <kopano/namedprops.h>
+#include <kopano/charset/convert.h>
+#include <kopano/stringutil.h>
+#include <kopano/mapi_ptr.h>
 
 // inetmapi
 #include "ECMapiUtils.h"
@@ -632,32 +628,32 @@ HRESULT VMIMEToMAPI::handleHeaders(vmime::ref<vmime::header> vmHeader, IMessage*
 			msgProps[nProps++].Value.ft = vmimeDatetimeToFiletime(d);
 		}
 
-		vmime::datetime date;
 		// setting receive date (now)
-		// parse from Received header, if possible. Otherwise, use now()
-		if (m_dopt.use_received_date) {
+		// parse from Received header, if possible
+		vmime::datetime date = vmime::datetime::now();
+		bool found_date = false;
+		if (m_dopt.use_received_date || m_mailState.ulMsgInMsg) {
 			try {
 				vmime::ref<vmime::relay> recv = vmHeader->findField("Received")->getValue().dynamicCast<vmime::relay>();
-				if (recv)
-				    date = recv->getDate();
+				if (recv) {
+					date = recv->getDate();
+					found_date = true;
+				}
 			}
 			catch (...) {
-				if (m_mailState.ulMsgInMsg)
+				if (m_mailState.ulMsgInMsg) {
 					date = *vmHeader->Date()->getValue().dynamicCast<vmime::datetime>();
-				else
+					found_date = true;
+				} else {
 					date = vmime::datetime::now();
+				}
 			}
-		} else {
-			if (m_mailState.ulMsgInMsg)
-				date = *vmHeader->Date()->getValue().dynamicCast<vmime::datetime>();
-			else
-				date = vmime::datetime::now();
 		}
 
 		// When parse_smime_signed = True, we don't want to change the delivery date, since otherwise
 		// clients which decode an signed email using mapi_inetmapi_imtomapi() will have a different deliver time
 		// when opening an signed email in for example the WebApp
-		if(!m_dopt.parse_smime_signed && !m_mailState.ulMsgInMsg) {
+		if (!m_dopt.parse_smime_signed && (!m_mailState.ulMsgInMsg || found_date)) {
 			msgProps[nProps].ulPropTag = PR_MESSAGE_DELIVERY_TIME;
 			msgProps[nProps++].Value.ft = vmimeDatetimeToFiletime(date);
 
@@ -864,8 +860,8 @@ HRESULT VMIMEToMAPI::handleHeaders(vmime::ref<vmime::header> vmHeader, IMessage*
 				goto exit;
 		}
 
-		// X-Zarafa-Vacation header (TODO: other headers?)
-		if (vmHeader->hasField("X-Zarafa-Vacation")) {
+		// X-Kopano-Vacation header (TODO: other headers?)
+		if (vmHeader->hasField("X-Kopano-Vacation")) {
 			SPropValue sIcon[1];
 			sIcon[0].ulPropTag = PR_ICON_INDEX;
 			sIcon[0].Value.l = ICON_MAIL_OOF;
@@ -929,7 +925,7 @@ HRESULT VMIMEToMAPI::handleHeaders(vmime::ref<vmime::header> vmHeader, IMessage*
 				if (wstrRRName.empty())
 					wstrRRName = wstrRREmail;
 
-				//FIXME: For zarafa use a addressbook entry?
+				//FIXME: Use an addressbook entry for "ZARAFA"-type addresses?
 				hr = ECCreateOneOff((LPTSTR)wstrRRName.c_str(),	(LPTSTR)L"SMTP", (LPTSTR)wstrRREmail.c_str(), MAPI_UNICODE | MAPI_SEND_NO_RICH_INFO, &cbEntryID, &lpEntryID);
 				if (hr != hrSuccess)
 					goto exit;
@@ -3277,6 +3273,25 @@ exit:
 	MAPIFreeBuffer(lpMessageClass);
 	MAPIFreeBuffer(lpProps);
 	return hr;
+}
+
+static std::string StringEscape(const char *input, const char *tokens,
+    const char escape)
+{
+	std::string strEscaped;
+	int i = 0;
+	int t;
+
+	while (true) {
+		if (input[i] == 0)
+			break;
+		for (t = 0; tokens[t] != 0; ++t)
+			if (input[i] == tokens[t])
+				strEscaped += escape;
+		strEscaped += input[i];
+		++i;
+	}
+	return strEscaped;
 }
 
 /** 

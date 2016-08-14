@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -22,15 +22,15 @@
    It reads from the saved data in the parent
 */
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/ECUnknown.h>
+#include <kopano/zcdefs.h>
+#include <kopano/ECUnknown.h>
 #include "IECPropStorage.h"
 
 #include "ECGenericProp.h"
 #include "WSMAPIPropStorage.h"
 
-#include <zarafa/ZarafaCode.h>
-#include "soapZarafaCmdProxy.h"
+#include <kopano/kcodes.h>
+#include "soapKCmdProxy.h"
 
 #include <mapi.h>
 #include <mapispi.h>

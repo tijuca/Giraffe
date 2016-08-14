@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,9 +15,9 @@
  *
  */
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/platform.h>
-#include <zarafa/ECLogger.h>
+#include <kopano/zcdefs.h>
+#include <kopano/platform.h>
+#include <kopano/ECLogger.h>
 
 #include <sys/select.h>
 #include <sys/time.h>
@@ -102,13 +102,6 @@ HRESULT CoCreateGuid(LPGUID pNewGUID) {
 #endif
 
 	return S_OK;
-}
-
-void strupr(char* a) {
-	while (*a != '\0') {
-		*a = toupper (*a);
-		++a;
-	}
 }
 
 __int64_t Int32x32To64(ULONG a, ULONG b) {

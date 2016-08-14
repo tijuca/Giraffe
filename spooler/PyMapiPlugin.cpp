@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,17 +15,17 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <Python.h>
 #include <mapi.h>
 #include <mapix.h>
 #include <mapiutil.h>
 #include <mapidefs.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <mapiguid.h>
 #include "PyMapiPlugin.h"
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 #include "frameobject.h"
 
 /**
@@ -50,19 +50,6 @@ static void assertbreak(void)
 	    Py_INCREF(Py_None);\
 	}\
 }
-
-#define NEW_SWIG_POINTER_OBJ(pyswigobj, objpointer, typeobj) {\
-	if (objpointer) {\
-		pyswigobj = SWIG_NewPointerObj((void*)objpointer, typeobj, SWIG_POINTER_OWN | 0);\
-		PY_HANDLE_ERROR(m_lpLogger, pyswigobj) \
-		\
-	} else {\
-		pyswigobj = Py_None;\
-		Py_INCREF(Py_None);\
-	}\
-}
-
-#define DECREF_PYOBJ(pyswigobj) { if (pyswigobj) { Py_DECREF(pyswigobj); pyswigobj = NULL;} }
 
 #define BUILD_SWIG_TYPE(pyswigobj, type) {\
 	pyswigobj = SWIG_TypeQuery(type);\

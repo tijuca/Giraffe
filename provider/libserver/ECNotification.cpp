@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -14,25 +14,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
-// ECNotification.cpp: implementation of the ECNotification class.
-//
-//////////////////////////////////////////////////////////////////////
-#include <zarafa/platform.h>
-
+#include <kopano/platform.h>
 #include "ECNotification.h"
 #include "ECMAPI.h"
 #include "SOAPUtils.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 
 ECNotification::ECNotification()
 {
@@ -97,7 +86,7 @@ void ECNotification::GetCopy(struct soap *soap, notification &notification) cons
  *
  * @return Object size in bytes
  */
-unsigned int ECNotification::GetObjectSize(void) const
+size_t ECNotification::GetObjectSize(void) const
 {
 	return NotificationStructSize(m_lpsNotification);
 }

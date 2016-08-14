@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
 #include <iostream>
 #include <string>
@@ -28,19 +28,19 @@
 #include <malloc.h>
 #endif
 
-#include <zarafa/EMSAbTag.h>
-#include <zarafa/ECConfig.h>
-#include <zarafa/ECDefs.h>
-#include <zarafa/ECLogger.h>
-#include <zarafa/ECPluginSharedData.h>
+#include <kopano/EMSAbTag.h>
+#include <kopano/ECConfig.h>
+#include <kopano/ECDefs.h>
+#include <kopano/ECLogger.h>
+#include <kopano/ECPluginSharedData.h>
 
-#include <zarafa/stringutil.h>
-#include <zarafa/md5.h>
+#include <kopano/stringutil.h>
+#include <kopano/md5.h>
 
 using namespace std;
 #include "ECDatabaseFactory.h"
 #include "DBUserPlugin.h"
-#include <zarafa/ecversion.h>
+#include <kopano/ecversion.h>
 
 extern "C" {
 	UserPlugin* getUserPluginInstance(pthread_mutex_t *pluginlock, ECPluginSharedData *shareddata) {
@@ -60,11 +60,7 @@ DBUserPlugin::DBUserPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *shar
 	: DBPlugin(pluginlock, shareddata)
 {
 	if (m_bDistributed)
-		throw notsupported("Distributed Zarafa not supported when using the Database Plugin");
-}
-
-DBUserPlugin::~DBUserPlugin()
-{
+		throw notsupported("Distributed Kopano not supported when using the Database Plugin");
 }
 
 void DBUserPlugin::InitPlugin()
@@ -264,7 +260,8 @@ objectsignature_t DBUserPlugin::authenticateUser(const string &username, const s
 	throw login_error("Trying to authenticate failed: wrong username or password");
 }
 
-auto_ptr<signatures_t> DBUserPlugin::searchObject(const string &match, unsigned int ulFlags)
+std::unique_ptr<signatures_t>
+DBUserPlugin::searchObject(const std::string &match, unsigned int ulFlags)
 {
 	const char *search_props[] =
 	{
@@ -281,24 +278,7 @@ auto_ptr<signatures_t> DBUserPlugin::searchObject(const string &match, unsigned 
 
 void DBUserPlugin::modifyObjectId(const objectid_t &oldId, const objectid_t &newId)
 {
-#ifdef HAVE_OFFLINE_SUPPORT
-	ECRESULT er = erSuccess;
-	string strQuery;
-	unsigned int ulAffRows = 0;
-
-	strQuery = "UPDATE object SET externid='" + m_lpDatabase->Escape(newId.id) + "', objectclass="+stringify(newId.objclass) +
-		" WHERE externid='" + m_lpDatabase->Escape(oldId.id) + "' AND objectclass="+stringify(oldId.objclass);
-	er = m_lpDatabase->DoUpdate(strQuery, &ulAffRows);
-
-	if (er != erSuccess)
-		throw runtime_error(string("db_query: ") + strerror(er));
-
-	if (ulAffRows > 1)
-		throw collision_error("modifyObjectId sql failed");
-
-#else
 	throw notimplemented("Modifying objects is not supported when using the DB user plugin.");
-#endif
 }
 
 void DBUserPlugin::setQuota(const objectid_t &objectid, const quotadetails_t &quotadetails)
@@ -329,17 +309,18 @@ void DBUserPlugin::setQuota(const objectid_t &objectid, const quotadetails_t &qu
 	DBPlugin::setQuota(objectid, quotadetails);
 }
 
-auto_ptr<objectdetails_t> DBUserPlugin::getPublicStoreDetails()
+std::unique_ptr<objectdetails_t> DBUserPlugin::getPublicStoreDetails(void)
 {
 	throw notsupported("public store details");
 }
 
-auto_ptr<serverdetails_t> DBUserPlugin::getServerDetails(const string &server)
+std::unique_ptr<serverdetails_t>
+DBUserPlugin::getServerDetails(const std::string &server)
 {
 	throw notsupported("server details");
 }
 
-auto_ptr<serverlist_t> DBUserPlugin::getServers()
+std::unique_ptr<serverlist_t> DBUserPlugin::getServers(void)
 {
 	throw notsupported("server list");
 }

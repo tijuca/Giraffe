@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,7 +15,7 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ICalToMAPI.h"
 #include "vconverter.h"
 #include "vtimezone.h"
@@ -26,18 +26,18 @@
 #include "icalrecurrence.h"
 #include <mapix.h>
 #include <mapiutil.h>
-#include <zarafa/mapiext.h>
-#include <zarafa/restrictionutil.h>
+#include <kopano/mapiext.h>
+#include <kopano/restrictionutil.h>
 #include <libical/ical.h>
 #include <algorithm>
 #include <vector>
-#include <zarafa/charset/convert.h>
+#include <kopano/charset/convert.h>
 
 class ICalToMapiImpl : public ICalToMapi {
 public:
 	/*
 	    - lpPropObj to lookup named properties
-	    - Addressbook (Zarafa Global AddressBook for looking up users)
+	    - Addressbook (Global AddressBook for looking up users)
 	 */
 	ICalToMapiImpl(IMAPIProp *lpPropObj, LPADRBOOK lpAdrBook, bool bNoRecipients);
 	virtual ~ICalToMapiImpl();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,33 +15,26 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 #include "ECArchiveAwareMsgStore.h"
 #include "ECArchiveAwareAttach.h"
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 #include <edkguid.h>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/mapi_ptr.h>
 #include "IECPropStorage.h"
 #include "Mem.h"
 
-#include <zarafa/mapiext.h>
-#include <zarafa/mapiguidext.h>
+#include <kopano/mapiext.h>
+#include <kopano/mapiguidext.h>
 #include "ECArchiveAwareMessage.h"
-#include <zarafa/ECGetText.h>
-#include <zarafa/stringutil.h>
+#include <kopano/ECGetText.h>
+#include <kopano/stringutil.h>
 
 #include <sstream>
-#include <zarafa/ECDebug.h>
-#include <zarafa/charset/convert.h>
-
-#ifdef HAVE_OFFLINE_SUPPORT
-#include "ECOfflineState.h"
-#endif
-
+#include <kopano/ECDebug.h>
+#include <kopano/charset/convert.h>
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 #define dispidStoreEntryIds			"store-entryids"
@@ -106,21 +99,10 @@ HRESULT ECArchiveAwareMessage::HrLoadProps()
 	if (m_mode == MODE_STUBBED) {
 		const BOOL fModifyCopy = this->fModify;
 		ECMsgStore *lpMsgStore = GetMsgStore();
-#ifdef HAVE_OFFLINE_SUPPORT
-		ECOfflineState::OFFLINESTATE state;
-#endif
 
 		// @todo: Put in MergePropsFromStub
 		SizedSPropTagArray(4, sptaDeleteProps) = {4, {PR_RTF_COMPRESSED, PR_BODY, PR_HTML, PR_ICON_INDEX}};
 		SizedSPropTagArray(6, sptaRestoreProps) = {6, {PR_RTF_COMPRESSED, PR_BODY, PR_HTML, PR_ICON_INDEX, PR_MESSAGE_CLASS, PR_MESSAGE_SIZE}};
-
-#ifdef HAVE_OFFLINE_SUPPORT
-		// Check if we're allowing online logons
-		if (ECOfflineState::GetOfflineState(lpMsgStore->GetProfileName(), &state) == hrSuccess && state == ECOfflineState::OFFLINESTATE_OFFLINE) {
-			hr = CreateInfoMessage((LPSPropTagArray)&sptaDeleteProps, CreateOfflineWarnBodyUtf8());
-			goto exit;
-		}
-#endif
 
 		if (!m_ptrArchiveMsg) {
 			ECArchiveAwareMsgStore *lpStore = dynamic_cast<ECArchiveAwareMsgStore*>(lpMsgStore);
@@ -467,7 +449,7 @@ std::string ECArchiveAwareMessage::CreateErrorBodyUtf8(HRESULT hResult) {
 				   _T("SPAN#errmsg {display: inline;font-style: italic;}")
 				   _T("DIV.indented {margin-left: 4em;}")
 				   _T("</STYLE></HEAD><BODY><H1>")
-				<< _("Zarafa Archiver")
+				<< _("Kopano Archiver")
 				<< _T("</H1><P>")
 				<< _("An error has occurred while fetching the message from the archive.")
 				<< _T(" ")
@@ -525,7 +507,7 @@ std::string ECArchiveAwareMessage::CreateOfflineWarnBodyUtf8()
 				   _T("SPAN#errmsg {display: inline;font-style: italic;}")
 				   _T("DIV.indented {margin-left: 4em;}")
 				   _T("</STYLE></HEAD><BODY><H1>")
-				<< _("Zarafa Archiver")
+				<< _("Kopano Archiver")
 				<< _T("</H1><P>")
 				<< _("Archives can not be destubbed when working offline.")
 				<< _T("</P></BODY></HTML>");

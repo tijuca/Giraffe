@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,21 +15,21 @@
  *
  */
 
-#include <zarafa/platform.h>
+#include <kopano/platform.h>
 
-#include "Zarafa.h"
+#include "kcore.hpp"
 #include <mapidefs.h>
 #include <edkmdb.h>
 
-#include <zarafa/stringutil.h>
+#include <kopano/stringutil.h>
 #include "ECSessionManager.h"
 #include "ECSecurity.h"
 
-#include "ZarafaICS.h"
-#include "ZarafaCmdUtil.h"
+#include "ics.h"
+#include "cmdutil.hpp"
 #include "ECStoreObjectTable.h"
 
-#include <zarafa/ECGuid.h>
+#include <kopano/ECGuid.h>
 #include "ECICS.h"
 #include "ECICSHelpers.h"
 #include "ECMAPI.h"
@@ -38,8 +38,6 @@
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
-#undef THIS_FILE
-static const char THIS_FILE[] = __FILE__;
 #endif
 
 extern ECSessionManager*	g_lpSessionManager;
@@ -110,7 +108,7 @@ static ECRESULT FilterUserIdsByCompany(ECDatabase *lpDatabase, const std::set<un
 			lpDBRow = lpDatabase->FetchRow(lpDBResult);
 			if (lpDBRow == NULL || lpDBRow[0] == NULL) {
 				ec_log_crit("%s:%d unexpected null pointer", __FUNCTION__, __LINE__);
-				er = ZARAFA_E_DATABASE_ERROR;
+				er = KCERR_DATABASE_ERROR;
 				goto exit;
 			}
 
@@ -132,47 +130,41 @@ static ECRESULT ConvertABEntryIDToSoapSourceKey(struct soap *soap,
     ECSession *lpSession, bool bUseV1, unsigned int cbEntryId,
     char *lpEntryId, xsd__base64Binary *lpSourceKey)
 {
-	ECRESULT			er			= erSuccess;
+	ECRESULT er;
 	unsigned int		cbAbeid		= cbEntryId;
-	PABEID				lpAbeid		= (PABEID)lpEntryId;
+	auto lpAbeid = reinterpret_cast<ABEID *>(lpEntryId);
 	entryId				sEntryId	= {0};
 	SOURCEKEY			sSourceKey;
 	objectid_t			sExternId;
 
-	if (cbEntryId < CbNewABEID("") || lpEntryId == NULL || lpSourceKey == NULL)
-	{
-		er = ZARAFA_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (cbEntryId < CbNewABEID("") || lpEntryId == NULL ||
+	    lpSourceKey == NULL)
+		return KCERR_INVALID_PARAMETER;
 
 	if (lpAbeid->ulVersion == 1 && !bUseV1)
 	{
 		er = MAPITypeToType(lpAbeid->ulType, &sExternId.objclass);
 		if (er != erSuccess)
-			goto exit;
-
+			return er;
 		er = ABIDToEntryID(soap, lpAbeid->ulId, sExternId, &sEntryId);	// Creates a V0 EntryID, because sExternId.id is empty
 		if (er != erSuccess)
-			goto exit;
-
-		lpAbeid = (PABEID)sEntryId.__ptr;
+			return er;
+		lpAbeid = reinterpret_cast<ABEID *>(sEntryId.__ptr);
 		cbAbeid = sEntryId.__size;
 	} 
 	else if (lpAbeid->ulVersion == 0 && bUseV1) 
 	{
 		er = lpSession->GetUserManagement()->GetABSourceKeyV1(lpAbeid->ulId, &sSourceKey);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 
-		lpAbeid = (PABEID)(unsigned char*)sSourceKey;
+		lpAbeid = reinterpret_cast<ABEID *>(static_cast<unsigned char *>(sSourceKey));
 		cbAbeid = sSourceKey.size();
 	}
 
 	lpSourceKey->__size = cbAbeid;
 	lpSourceKey->__ptr = (unsigned char*)s_memcpy(soap, (char*)lpAbeid, cbAbeid);
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 static void AddChangeKeyToChangeList(std::string *strChangeList,
@@ -230,12 +222,12 @@ ECRESULT AddChange(BTSession *lpSession, unsigned int ulSyncId,
 	bool					bIgnored = false;
 
 	if(!isICSChange(ulChange)){
-		er = ZARAFA_E_INVALID_TYPE;
+		er = KCERR_INVALID_TYPE;
 		goto exit;
 	}
 
 	if(sSourceKey == sParentSourceKey || sSourceKey.empty() || sParentSourceKey.empty()) {
-		er = ZARAFA_E_INVALID_PARAMETER;
+		er = KCERR_INVALID_PARAMETER;
 		goto exit;
 	}
 
@@ -305,7 +297,7 @@ ECRESULT AddChange(BTSession *lpSession, unsigned int ulSyncId,
 
 	// Add change key and predecessor change list
 	er = g_lpSessionManager->GetCacheManager()->GetObjectFromProp(PROP_ID(PR_SOURCE_KEY), sSourceKey.size(), sSourceKey, &ulObjId);
-	if(er == ZARAFA_E_NOT_FOUND){
+	if(er == KCERR_NOT_FOUND){
 		er = erSuccess; //hard deleted items can't be updated
 		goto exit;
 	}
@@ -604,7 +596,6 @@ ECRESULT GetChanges(struct soap *soap, ECSession *lpSession, SOURCEKEY sFolderSo
 	bool			bAcceptABEID = false;
 	unsigned char	*lpSourceKeyData = NULL;
 	unsigned int	cbSourceKeyData = 0;
-	
 	list<unsigned int> lstFolderIds;
 	list<unsigned int>::const_iterator lpFolderId;
 
@@ -614,6 +605,8 @@ ECRESULT GetChanges(struct soap *soap, ECSession *lpSession, SOURCEKEY sFolderSo
 
 	ECGetContentChangesHelper *lpHelper = NULL;
 	
+	ec_log(EC_LOGLEVEL_ICS, "GetChanges(): sourcekey=%s, syncid=%d, changetype=%d, flags=%d", bin2hex(sFolderSourceKey).c_str(), ulSyncId, ulChangeType, ulFlags);
+
     // Get database object
     er = lpSession->GetDatabase(&lpDatabase);
     if (er != erSuccess)
@@ -624,14 +617,14 @@ ECRESULT GetChanges(struct soap *soap, ECSession *lpSession, SOURCEKEY sFolderSo
 		goto exit;
 
     // CHeck if the client understands the new ABEID.
-	if ((lpSession->GetCapabilities() & ZARAFA_CAP_MULTI_SERVER) == ZARAFA_CAP_MULTI_SERVER)
+	if ((lpSession->GetCapabilities() & KOPANO_CAP_MULTI_SERVER) == KOPANO_CAP_MULTI_SERVER)
 		bAcceptABEID = true;
 
 
 	if(ulChangeType != ICS_SYNC_AB) {
         // You must first register your sync via setSyncStatus()
         if(ulSyncId == 0) {
-            er = ZARAFA_E_INVALID_PARAMETER;
+            er = KCERR_INVALID_PARAMETER;
             goto exit;
         }
 
@@ -649,7 +642,7 @@ ECRESULT GetChanges(struct soap *soap, ECSession *lpSession, SOURCEKEY sFolderSo
                 goto exit;
 
             if(lpDatabase->GetNumRows(lpDBResult) == 0){
-                er = ZARAFA_E_NOT_FOUND;
+                er = KCERR_NOT_FOUND;
                 goto exit;
             }
 
@@ -657,13 +650,13 @@ ECRESULT GetChanges(struct soap *soap, ECSession *lpSession, SOURCEKEY sFolderSo
             lpDBLen = lpDatabase->FetchRowLengths(lpDBResult);
 
             if( lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL){
-                er = ZARAFA_E_DATABASE_ERROR; // this should never happen
+                er = KCERR_DATABASE_ERROR; // this should never happen
 			ec_log_crit("%s:%d unexpected null pointer", __FUNCTION__, __LINE__);
                 goto exit;
             }
 
             if((dummy = atoui(lpDBRow[2])) != ulChangeType){
-			er = ZARAFA_E_COLLISION;
+			er = KCERR_COLLISION;
 			ec_log_crit("GetChanges(): unexpected change type %u/%u", dummy, ulChangeType);
 			goto exit;
             }
@@ -685,7 +678,7 @@ ECRESULT GetChanges(struct soap *soap, ECSession *lpSession, SOURCEKEY sFolderSo
 				std::string username;
 
 				er = lpSession->GetSecurity()->GetUsername(&username);
-				er = ZARAFA_E_DATABASE_ERROR;
+				er = KCERR_DATABASE_ERROR;
 				ec_log_warn(
 					"%s:%d The sync ID %u does not exist. "
 					"(unexpected null pointer) "
@@ -713,14 +706,14 @@ ECRESULT GetChanges(struct soap *soap, ECSession *lpSession, SOURCEKEY sFolderSo
         
         if(ulFolderId == 0) {
             if(lpSession->GetSecurity()->GetAdminLevel() != ADMIN_LEVEL_SYSADMIN)
-                er = ZARAFA_E_NO_ACCESS;
+                er = KCERR_NO_ACCESS;
         } else {
             if(ulChangeType == ICS_SYNC_CONTENTS) {
                 er = lpSession->GetSecurity()->CheckPermission(ulFolderId, ecSecurityRead);
             }else if(ulChangeType == ICS_SYNC_HIERARCHY){
                 er = lpSession->GetSecurity()->CheckPermission(ulFolderId, ecSecurityFolderVisible);
             }else{
-                er = ZARAFA_E_INVALID_TYPE;
+                er = KCERR_INVALID_TYPE;
             }
         }
         
@@ -736,25 +729,36 @@ ECRESULT GetChanges(struct soap *soap, ECSession *lpSession, SOURCEKEY sFolderSo
 		er = lpHelper->QueryDatabase(&lpDBResult);
 		if (er != erSuccess)
 			goto exit;
-			
+
 		std::vector<DB_ROW> db_rows;
 		std::vector<DB_LENGTHS> db_lengths;
+
+		static constexpr unsigned int ncols = 7;
+		unsigned long col_lengths[1000*ncols];
+		unsigned int length_counter = 0;
+
 		while (lpDBResult && (lpDBRow = lpDatabase->FetchRow(lpDBResult))) {
 			lpDBLen = lpDatabase->FetchRowLengths(lpDBResult);
+			if (lpDBLen == NULL)
+				continue;
+			memcpy(&col_lengths[length_counter*ncols], lpDBLen, ncols * sizeof(*col_lengths));
+			lpDBLen = &col_lengths[length_counter*ncols];
+			++length_counter;
 
 			if (lpDBRow[icsSourceKey] == NULL || lpDBRow[icsParentSourceKey] == NULL) {
-				er = ZARAFA_E_DATABASE_ERROR;
+				er = KCERR_DATABASE_ERROR;
 				ec_log_crit("ECGetContentChangesHelper::ProcessRow(): row null");
 				goto exit;
 			}
 			db_rows.push_back(lpDBRow);
 			db_lengths.push_back(lpDBLen);
-			if (db_rows.size() >= 1000) {
+			if (db_rows.size() == 1000) {
 				er = lpHelper->ProcessRows(db_rows, db_lengths);
 				if (er != erSuccess)
 					goto exit;
 				db_rows.clear();
 				db_lengths.clear();
+				length_counter = 0;
 			}
 		}
 
@@ -786,7 +790,7 @@ ECRESULT GetChanges(struct soap *soap, ECSession *lpSession, SOURCEKEY sFolderSo
 		     lpFolderId != lstFolderIds.end(); ++lpFolderId) {
 			if(*lpFolderId == 0) {
 			    if(lpSession->GetSecurity()->GetAdminLevel() != ADMIN_LEVEL_SYSADMIN) {
-			        er = ZARAFA_E_NO_ACCESS;
+			        er = KCERR_NO_ACCESS;
 			        goto exit;
                 }
             } else if(lpSession->GetSecurity()->CheckPermission(*lpFolderId, ecSecurityFolderVisible) != erSuccess){
@@ -822,7 +826,7 @@ ECRESULT GetChanges(struct soap *soap, ECSession *lpSession, SOURCEKEY sFolderSo
 
 				while( (lpDBRow = lpDatabase->FetchRow(lpDBResult)) ){
 					if( lpDBRow == NULL || lpDBRow[0] == NULL){
-						er = ZARAFA_E_DATABASE_ERROR; // this should never happen
+						er = KCERR_DATABASE_ERROR; // this should never happen
 						ec_log_crit("%s:%d unexpected null pointer", __FUNCTION__, __LINE__);
 						goto exit;
 					}
@@ -854,7 +858,7 @@ nextFolder:
                 while( (lpDBRow = lpDatabase->FetchRow(lpDBResult)) ){
 
                     if( lpDBRow == NULL || lpDBRow[0] == NULL){
-                        er = ZARAFA_E_DATABASE_ERROR; // this should never happen
+                        er = KCERR_DATABASE_ERROR; // this should never happen
 			ec_log_crit("%s:%d unexpected null pointer", __FUNCTION__, __LINE__);
                         goto exit;
                     }
@@ -876,7 +880,7 @@ nextFolder:
 		if(ulChangeId == 0) {
 		    if(ulFolderId == 0 && (ulFlags & SYNC_CATCHUP) == 0) {
 		        // Do not allow initial sync of all server folders
-		        er = ZARAFA_E_NO_SUPPORT;
+		        er = KCERR_NO_SUPPORT;
 		        goto exit;
             }
             
@@ -892,7 +896,7 @@ nextFolder:
 
 			lpDBRow = lpDatabase->FetchRow(lpDBResult);
 			if( lpDBRow == NULL){
-				er = ZARAFA_E_DATABASE_ERROR; // this should never happen
+				er = KCERR_DATABASE_ERROR; // this should never happen
 				ec_log_crit("%s:%d unexpected null pointer", __FUNCTION__, __LINE__);
 				goto exit;
 			}
@@ -967,7 +971,7 @@ nextFolder:
 				lpDBLen = lpDatabase->FetchRowLengths(lpDBResult);
 
 				if(lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL || lpDBRow[3] == NULL) {
-					er = ZARAFA_E_DATABASE_ERROR;
+					er = KCERR_DATABASE_ERROR;
 					ec_log_crit("%s:%d unexpected null pointer", __FUNCTION__, __LINE__);
 					goto exit;
 				}
@@ -1007,7 +1011,7 @@ nextFolder:
 		// still don't have that company in the offline gab.
 		unsigned int ulCompanyId = 0;
 
-		// returns 0 for ZARAFA_UID_SYSTEM on hosted environments, and then the filter correctly doesn't filter anything.
+		// returns 0 for KOPANO_UID_SYSTEM on hosted environments, and then the filter correctly doesn't filter anything.
 		lpSession->GetSecurity()->GetUserCompany(&ulCompanyId);
 
 	    if(ulChangeId > 0) {
@@ -1028,22 +1032,22 @@ nextFolder:
                     break;
 
                 if (lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL || lpDBRow[3] == NULL) {
-                    er = ZARAFA_E_DATABASE_ERROR; // this should never happen
+                    er = KCERR_DATABASE_ERROR; // this should never happen
 			ec_log_crit("%s:%d unexpected null pointer", __FUNCTION__, __LINE__);
                     goto exit;
                 }
 
 				if (lpDBLen[1] < CbNewABEID("")) {
-                    er = ZARAFA_E_DATABASE_ERROR; // this should never happen
+                    er = KCERR_DATABASE_ERROR; // this should never happen
 					ec_log_crit("%s:%d invalid size for ab entryid %lu", __FUNCTION__, __LINE__, static_cast<unsigned long>(lpDBLen[1]));
                     goto exit;
 				}
 
 				lstChanges.push_back(ABChangeRecord(atoui(lpDBRow[0]), std::string(lpDBRow[1], lpDBLen[1]), std::string(lpDBRow[2], lpDBLen[2]), atoui(lpDBRow[3])));
-				sUserIds.insert(((PABEID)lpDBRow[1])->ulId);
+				sUserIds.insert(reinterpret_cast<ABEID *>(lpDBRow[1])->ulId);
 			}
 
-			if (!sUserIds.empty() && ulCompanyId != 0 && (lpSession->GetCapabilities() & ZARAFA_CAP_MAX_ABCHANGEID)) {
+			if (!sUserIds.empty() && ulCompanyId != 0 && (lpSession->GetCapabilities() & KOPANO_CAP_MAX_ABCHANGEID)) {
 				er = FilterUserIdsByCompany(lpDatabase, sUserIds, ulCompanyId, &sUserIds);
 				if (er != erSuccess)
 					goto exit;
@@ -1060,7 +1064,7 @@ nextFolder:
 
             i=0;
 			for (ABChangeRecordList::const_iterator iter = lstChanges.begin(); iter != lstChanges.end(); ++iter) {
-				const unsigned int ulUserId = ((PABEID)iter->strItem.data())->ulId;
+				unsigned int ulUserId = reinterpret_cast<const ABEID *>(iter->strItem.data())->ulId;
 
 				if (iter->change_type != ICS_AB_DELETE && sUserIds.find(ulUserId) == sUserIds.end())
 					continue;
@@ -1107,9 +1111,9 @@ nextFolder:
             lpDatabase->FreeResult(lpDBResult);
             lpDBResult = NULL;
 
-			// Skip 'everyone', 'system' and users outside our company space, except when we're system (zarafa-indexer loads full addressbook)
+			// Skip 'everyone', 'system' and users outside our company space, except when we're system
             strQuery = "SELECT id, objectclass, externid FROM users WHERE id not in (1,2)";
-			if (lpSession->GetSecurity()->GetUserId() != ZARAFA_UID_SYSTEM)
+			if (lpSession->GetSecurity()->GetUserId() != KOPANO_UID_SYSTEM)
 				strQuery += " AND company = " + stringify(ulCompanyId);
             
             er = lpDatabase->DoSelect(strQuery, &lpDBResult);
@@ -1136,7 +1140,7 @@ nextFolder:
                     break;
                     
                 if(lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL) {
-                    er = ZARAFA_E_DATABASE_ERROR;
+                    er = KCERR_DATABASE_ERROR;
 			ec_log_crit("%s:%d unexpected null pointer", __FUNCTION__, __LINE__);
                     goto exit;
                 }
@@ -1149,7 +1153,10 @@ nextFolder:
                     goto exit;
 
                 lpChanges->__ptr[i].ulChangeId = ulMaxChange;
-                er = lpSession->GetUserManagement()->CreateABEntryID(soap, bAcceptABEID ? 1 : 0, atoui(lpDBRow[0]), ulType, &id, &lpChanges->__ptr[i].sSourceKey.__size, (PABEID *)&lpChanges->__ptr[i].sSourceKey.__ptr);
+                er = lpSession->GetUserManagement()->CreateABEntryID(soap,
+                     bAcceptABEID ? 1 : 0, atoui(lpDBRow[0]), ulType, &id,
+                     &lpChanges->__ptr[i].sSourceKey.__size,
+                     reinterpret_cast<ABEID **>(&lpChanges->__ptr[i].sSourceKey.__ptr));
                 if (er != erSuccess)
                     goto exit;
                 lpChanges->__ptr[i].sParentSourceKey.__size = sizeof(eid);
@@ -1172,7 +1179,6 @@ nextFolder:
 
 exit:
 	delete lpHelper;
-
 	if(lpDBResult)
 		lpDatabase->FreeResult(lpDBResult);
 
@@ -1186,22 +1192,17 @@ exit:
 
 ECRESULT AddABChange(BTSession *lpSession, unsigned int ulChange, SOURCEKEY sSourceKey, SOURCEKEY sParentSourceKey)
 {
-	ECRESULT		er = erSuccess;
+	ECRESULT er;
 	std::string		strQuery;
 	ECDatabase*		lpDatabase = NULL;
 
 	er = lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	// Add/Replace new change
 	strQuery = "REPLACE INTO abchanges (sourcekey, parentsourcekey, change_type) VALUES(" + lpDatabase->EscapeBinary(sSourceKey, sSourceKey.size()) + "," + lpDatabase->EscapeBinary(sParentSourceKey, sParentSourceKey.size()) + "," + stringify(ulChange) + ")";
-	er = lpDatabase->DoInsert(strQuery);
-	if(er != erSuccess)
-	    goto exit;
-
-exit:
-    return er;
+	return lpDatabase->DoInsert(strQuery);
 }
 
 ECRESULT GetSyncStates(struct soap *soap, ECSession *lpSession, mv_long ulaSyncId, syncStateArray *lpsaSyncState)
@@ -1223,7 +1224,7 @@ ECRESULT GetSyncStates(struct soap *soap, ECSession *lpSession, mv_long ulaSyncI
 		goto exit;
 
 	strQuery = "SELECT id,change_id FROM syncs WHERE id IN (" + stringify(ulaSyncId.__ptr[0]);
-	for (int i = 1; i < ulaSyncId.__size; ++i)
+	for (gsoap_size_t i = 1; i < ulaSyncId.__size; ++i)
 		strQuery += "," + stringify(ulaSyncId.__ptr[i]);
 	strQuery += ")";
 
@@ -1242,7 +1243,7 @@ ECRESULT GetSyncStates(struct soap *soap, ECSession *lpSession, mv_long ulaSyncI
 
 	while ((lpDBRow = lpDatabase->FetchRow(lpDBResult)) != NULL) {
 		if (lpDBRow[0] == NULL || lpDBRow[1] == NULL) {
-			er = ZARAFA_E_DATABASE_ERROR;
+			er = KCERR_DATABASE_ERROR;
 			ec_log_crit("%s:%d unexpected null pointer", __FUNCTION__, __LINE__);
 			goto exit;
 		}
@@ -1272,7 +1273,7 @@ ECRESULT AddToLastSyncedMessagesSet(ECDatabase *lpDatabase, unsigned int ulSyncI
 		
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if (lpDBRow == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		ec_log_crit("%s:%d unexpected null pointer", __FUNCTION__, __LINE__);
 		goto exit;
 	}
@@ -1309,7 +1310,7 @@ exit:
  * @param ulSyncId sync id, must be != 0
  * @param sSourceKey sourcekey of the object
  * 
- * @return Zarafa error code
+ * @return Kopano error code
  */
 ECRESULT CheckWithinLastSyncedMessagesSet(ECDatabase *lpDatabase, unsigned int ulSyncId, const SOURCEKEY &sSourceKey)
 {
@@ -1325,7 +1326,7 @@ ECRESULT CheckWithinLastSyncedMessagesSet(ECDatabase *lpDatabase, unsigned int u
 		
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if (lpDBRow == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		ec_log_crit("%s:%d unexpected null pointer", __FUNCTION__, __LINE__);
 		goto exit;
 	}
@@ -1348,7 +1349,7 @@ ECRESULT CheckWithinLastSyncedMessagesSet(ECDatabase *lpDatabase, unsigned int u
 
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if (lpDBRow == NULL)
-		er = ZARAFA_E_NOT_FOUND;
+		er = KCERR_NOT_FOUND;
 
 exit:
 	if (lpDBResult)
@@ -1371,7 +1372,7 @@ ECRESULT RemoveFromLastSyncedMessagesSet(ECDatabase *lpDatabase, unsigned int ul
 		
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if (lpDBRow == NULL) {
-		er = ZARAFA_E_DATABASE_ERROR;
+		er = KCERR_DATABASE_ERROR;
 		ec_log_crit("RemoveFromLastSyncedMessagesSet(): fetchrow return null");
 		goto exit;
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,7 +18,7 @@
 #ifndef ECDATABASEUPDATE_H
 #define ECDATABASEUPDATE_H
 
-#include <zarafa/ECLogger.h>
+#include <kopano/ECLogger.h>
 
 ECRESULT UpdateDatabaseCreateVersionsTable(ECDatabase *lpDatabase);
 ECRESULT UpdateDatabaseCreateSearchFolders(ECDatabase *lpDatabase);
@@ -103,5 +103,7 @@ ECRESULT UpdateDatabaseUpdateStores(ECDatabase *lpDatabase);
 
 ECRESULT UpdateWLinkRecordKeys(ECDatabase *lpDatabase);
 ECRESULT UpdateVersionsTbl(ECDatabase *db);
+ECRESULT UpdateChangesTbl(ECDatabase *db);
+ECRESULT UpdateABChangesTbl(ECDatabase *db);
 
 #endif // #ifndef ECDATABASEUPDATE_H

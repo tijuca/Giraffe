@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,8 +18,8 @@
 #ifndef ECMEMSTREAM_H
 #define ECMEMSTREAM_H
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/ECUnknown.h>
+#include <kopano/zcdefs.h>
+#include <kopano/ECUnknown.h>
 
 /* The ECMemBlock class is basically a random-access block of data that can be
  * read from and written to, expanded and contracted, and has a Commit and Revert
@@ -47,7 +47,7 @@ public:
 	virtual HRESULT SetSize(ULONG ulSize);
 	virtual HRESULT GetSize(ULONG *ulSize);
 
-	virtual char* GetBuffer();
+	virtual char *GetBuffer(void) { return lpCurrent; }
 
 private:
 	char *	lpCurrent;

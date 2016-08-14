@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,27 +15,21 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/Trace.h>
+#include <kopano/platform.h>
+#include <kopano/Trace.h>
 #include "ZCABLogon.h"
 #include "ZCABContainer.h"
-#include <zarafa/ECTags.h>
-#include <zarafa/ECDebug.h>
-#include <zarafa/ECDebugPrint.h>
-#include <zarafa/ECGuid.h>
-#include "Zarafa.h"
+#include <kopano/ECTags.h>
+#include <kopano/ECDebug.h>
+#include <kopano/ECDebugPrint.h>
+#include <kopano/ECGuid.h>
+#include "kcore.hpp"
 #include <mapix.h>
 #include <edkmdb.h>
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 
 ZCABLogon::ZCABLogon(LPMAPISUP lpMAPISup, ULONG ulProfileFlags, GUID *lpGUID) : ECUnknown("IABLogon")
 {
@@ -167,7 +161,7 @@ HRESULT ZCABLogon::ClearFolderList()
  * 
  * Root container EntryID: 00000000727f0430e3924fdab86ae52a7fe46571 (version + guid)
  * Sub container EntryID : 00000000727f0430e3924fdab86ae52a7fe46571 + obj type + 0 + folder contact eid
- * Contact Item EntryID  : 00000000727f0430e3924fdab86ae52a7fe46571 + obj type + email offset + zarafa item eid
+ * Contact Item EntryID  : 00000000727f0430e3924fdab86ae52a7fe46571 + obj type + email offset + kopano item eid
  * 
  * @param[in] cbEntryID 0 or bytes in lpEntryID
  * @param[in] lpEntryID NULL or a valid entryid
@@ -195,7 +189,7 @@ HRESULT ZCABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 	}
 
 	if(cbEntryID == 0 && lpEntryID == NULL) {
-		// this is the "Zarafa Contacts Folders" container. Get the hierarchy of this folder. SetEntryID(0000 + guid + MAPI_ABCONT + ?) ofzo?
+		// this is the "Kopano Contacts Folders" container. Get the hierarchy of this folder. SetEntryID(0000 + guid + MAPI_ABCONT + ?) ofzo?
 		hr = ZCABContainer::Create(NULL, NULL, m_lpMAPISup, this, &lpRootContainer);
 		if (hr != hrSuccess)
 			goto exit;

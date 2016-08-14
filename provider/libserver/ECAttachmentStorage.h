@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,16 +18,13 @@
 #ifndef EC_ATTACHMENT_STORAGE
 #define EC_ATTACHMENT_STORAGE
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include "ECDatabase.h"
 #include <list>
 #include <set>
 #include <string>
-
-#ifndef WIN32
 #include <dirent.h>
 #include <sys/types.h>
-#endif
 
 class ECSerializer;
 class ECLogger;
@@ -68,7 +65,7 @@ public:
 	virtual ECRESULT Rollback() = 0;
 
 protected:
-	virtual ~ECAttachmentStorage();
+	virtual ~ECAttachmentStorage(void) {}
 	
 	/* Single Instance Attachment handlers (must be overridden by subclasses) */
 	virtual ECRESULT LoadAttachmentInstance(struct soap *soap, ULONG ulInstanceId, size_t *lpiSize, unsigned char **lppData) = 0;
@@ -142,11 +139,8 @@ private:
 	std::string CreateAttachmentFilename(ULONG ulInstanceId, bool bCompressed);
 
 	size_t attachment_size_safety_limit;
-
-#ifndef WIN32
 	int m_dirFd;
 	DIR *m_dirp;
-#endif
 	bool force_changes_to_disk;
 
 	/* helper functions for transacted deletion */

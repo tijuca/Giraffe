@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,17 +18,16 @@
 #ifndef ECLICENSECLIENT_H
 #define ECLICENSECLIENT_H
 
-#include <zarafa/zcdefs.h>
+#include <kopano/zcdefs.h>
 #include <vector>
 #include <string>
 
 #include "ECChannelClient.h"
-#include <zarafa/ZarafaCode.h>
+#include <kopano/kcodes.h>
 
-class ECLicenseClient _zcp_final : public ECChannelClient{
+class ECLicenseClient _zcp_final {
 public:
-    ECLicenseClient(const char *szLicensePath, unsigned int ulTimeOut);
-    ~ECLicenseClient();
+	ECLicenseClient(const char * = NULL, unsigned int = 0) {}
     
     ECRESULT GetCapabilities(unsigned int ulServiceType, std::vector<std::string > &lstCapabilities);
     ECRESULT QueryCapability(unsigned int ulServiceType, const std::string &strCapability, bool *lpbResult);

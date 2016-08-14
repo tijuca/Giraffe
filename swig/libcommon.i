@@ -1,7 +1,7 @@
 %module libcommon
 
 %{
-    #include <zarafa/platform.h>
+    #include <kopano/platform.h>
     #include <mapi.h>
     #include <mapidefs.h>
     #include <mapicode.h>
@@ -10,8 +10,8 @@
     #include "HtmlToTextParser.h"
     #include "rtfutil.h"
     #include "favoritesutil.h"
-    #include <zarafa/Util.h>
-	#include <zarafa/ECLogger.h>
+    #include <kopano/Util.h>
+	#include <kopano/ECLogger.h>
     #include "fileutil.h"
 	#include "IStreamAdapter.h"
     // FIXME: why cant we get this from typemap_python
@@ -26,7 +26,7 @@
 %include "cstring.i"
 %include "cwstring.i"
 %include "std_string.i"
-%include <zarafa/typemap.i>
+%include <kopano/typemap.i>
 
 class CHtmlToTextParser {
     public:
@@ -45,9 +45,7 @@ class CHtmlToTextParser {
 
 };
 
-/////////////////////////////////
 // std::string&
-/////////////////////////////////
 %typemap(in,numinputs=0) std::string &OUTPUT	(std::string s)
 {
 	$1 = &s;

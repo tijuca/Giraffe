@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -12,19 +12,11 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-// ECABLogon.cpp: implementation of the ECABLogon class.
-//
-//////////////////////////////////////////////////////////////////////
-
-#include <zarafa/platform.h>
-
+#include <kopano/platform.h>
 #include <mapiutil.h>
-
-#include "Zarafa.h"
-#include <zarafa/ECGuid.h>
+#include "kcore.hpp"
+#include <kopano/ECGuid.h>
 #include <edkguid.h>
 #include "ECABLogon.h"
 
@@ -32,24 +24,18 @@
 #include "ECMailUser.h"
 #include "ECDistList.h"
 
-#include <zarafa/ECDebug.h>
+#include <kopano/ECDebug.h>
 
 #include "WSTransport.h"
 
-#include <zarafa/Util.h>
+#include <kopano/Util.h>
 #include "Mem.h"
-#include <zarafa/stringutil.h>
-#include "ZarafaUtil.h"
+#include <kopano/stringutil.h>
+#include "pcutil.hpp"
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 
 ECABLogon::ECABLogon(LPMAPISUP lpMAPISup, WSTransport* lpTransport, ULONG ulProfileFlags, GUID *lpGUID) : ECUnknown("IABLogon")
 {
@@ -153,7 +139,7 @@ HRESULT ECABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 	ECABContainer*	lpABContainer = NULL;
 	BOOL			fModifyObject = FALSE;
 	ABEID			eidRoot =  ABEID(MAPI_ABCONT, MUIDECSAB, 0);
-	PABEID			lpABeid = NULL;
+	ABEID *lpABeid = NULL;
 	IECPropStorage*	lpPropStorage = NULL;
 	ECMailUser*		lpMailUser = NULL;
 	ECDistList*		lpDistList = NULL;
@@ -195,7 +181,7 @@ HRESULT ECABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 		memcpy(lpEntryIDServer, lpEntryID, cbEntryID);
 		lpEntryID = lpEntryIDServer;
 
-		lpABeid = (PABEID)lpEntryID;
+		lpABeid = reinterpret_cast<ABEID *>(lpEntryID);
 
 		// Check sane entryid
 		if (lpABeid->ulType != MAPI_ABCONT && lpABeid->ulType != MAPI_MAILUSER && lpABeid->ulType != MAPI_DISTLIST) 
@@ -378,7 +364,7 @@ HRESULT ECABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, 
 	ULONG			cPropsRecip;
 	LPSPropValue	rgpropvalsRecip;
 	LPSPropValue	lpPropVal = NULL;
-	PABEID			lpABeid   = NULL;
+	ABEID *lpABeid = NULL;
 	ULONG			cbABeid;
 	ULONG			cValues;
 	IMailUser*		lpIMailUser = NULL;
@@ -399,7 +385,7 @@ HRESULT ECABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, 
 		if(!lpPropVal)
 			continue; // no
 		
-		lpABeid = (PABEID) lpPropVal->Value.bin.lpb;
+		lpABeid = reinterpret_cast<ABEID *>(lpPropVal->Value.bin.lpb);
 		cbABeid = lpPropVal->Value.bin.cb;
 
 		/* Is it one of ours? */

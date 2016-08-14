@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -15,19 +15,17 @@
  *
  */
 
-#include <zarafa/platform.h>
-#include <zarafa/ECABEntryID.h>
-#include <zarafa/ECGuid.h>
+#include <kopano/platform.h>
+#include <kopano/ECABEntryID.h>
+#include <kopano/ECGuid.h>
 
 #include <mapicode.h>
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
-/* This is a copy from the definition in Zarafa.h. It's for internal use only as we
+/* This is a copy from the definition in kcore.hpp. It's for internal use only as we
  * don't want to expose the format of the entry id. */
 typedef struct ABEID {
 	BYTE	abFlags[4];
@@ -44,7 +42,7 @@ typedef struct ABEID {
 		this->guid = guid;
 		this->ulId = ulId;
 	}
-} ABEID, *PABEID;
+} ABEID;
 
 static ABEID		g_sDefaultEid(MAPI_MAILUSER, MUIDECSAB, 0);
 unsigned char		*g_lpDefaultEid = (unsigned char*)&g_sDefaultEid;
@@ -62,12 +60,11 @@ static HRESULT CheckEntryId(unsigned int cbEntryId, const ENTRYID *lpEntryId,
     unsigned int ulId, unsigned int ulType, bool *lpbResult)
 {
 	bool	bResult = true;
-	PABEID	lpEid = NULL;
 
 	if (cbEntryId < sizeof(ABEID) || lpEntryId == NULL || lpbResult == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 
-	lpEid = (PABEID)lpEntryId;
+	auto lpEid = reinterpret_cast<const ABEID *>(lpEntryId);
 	if (lpEid->ulId != ulId)
 		bResult = false;
 		
@@ -104,7 +101,7 @@ HRESULT GetNonPortableObjectId(unsigned int cbEntryId,
 {
 	if (cbEntryId < sizeof(ABEID) || lpEntryId == NULL || lpulObjectId == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-	*lpulObjectId = ((PABEID)lpEntryId)->ulId;
+	*lpulObjectId = reinterpret_cast<const ABEID *>(lpEntryId)->ulId;
 	return hrSuccess;
 }
 
@@ -113,19 +110,16 @@ HRESULT GetNonPortableObjectType(unsigned int cbEntryId,
 {
 	if (cbEntryId < sizeof(ABEID) || lpEntryId == NULL || lpulObjectType == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-	*lpulObjectType = ((PABEID)lpEntryId)->ulType;
+	*lpulObjectType = reinterpret_cast<const ABEID *>(lpEntryId)->ulType;
 	return hrSuccess;
 }
 
-HRESULT GeneralizeEntryIdInPlace(unsigned int cbEntryId,
-    const ENTRYID *lpEntryId)
+HRESULT GeneralizeEntryIdInPlace(unsigned int cbEntryId, ENTRYID *lpEntryId)
 {
-	PABEID	lpAbeid = NULL;
-
 	if (cbEntryId < sizeof(ABEID) || lpEntryId == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 
-	lpAbeid = (PABEID)lpEntryId;
+	auto lpAbeid = reinterpret_cast<ABEID *>(lpEntryId);
 	switch (lpAbeid->ulVersion) {
 		// A version 0 entry id is generalized by nature as it's not used to be shared
 		// between servers.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -12,45 +12,28 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
-
-// ECMAPIContainer.cpp: implementation of the ECMAPIContainer class.
-//
-//////////////////////////////////////////////////////////////////////
-#include <zarafa/platform.h>
-#include "Zarafa.h"
+#include <kopano/platform.h>
+#include "kcore.hpp"
 #include "ECMAPIContainer.h"
-
 #include "ECMAPITable.h"
 #include "Mem.h"
 
-#include <zarafa/ECGuid.h>
-#include <zarafa/ECDebug.h>
+#include <kopano/ECGuid.h>
+#include <kopano/ECDebug.h>
 
 
 //#include <edkmdb.h>
-#include <zarafa/mapiext.h>
+#include <kopano/mapiext.h>
 #include <mapiutil.h>
 
 #ifdef _DEBUG
-#undef THIS_FILE
-static const char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 
 ECMAPIContainer::ECMAPIContainer(ECMsgStore *lpMsgStore, ULONG ulObjType,
     BOOL fModify, const char *szClassName) :
 	ECMAPIProp(lpMsgStore, ulObjType, fModify, NULL, szClassName)
-{
-
-}
-
-ECMAPIContainer::~ECMAPIContainer()
 {
 
 }

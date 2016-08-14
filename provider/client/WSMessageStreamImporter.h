@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 - 2015  Zarafa B.V. and its licensors
+ * Copyright 2005 - 2016 Zarafa and its licensors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,12 +18,12 @@
 #ifndef WSMessageStreamImporter_INCLUDED
 #define WSMessageStreamImporter_INCLUDED
 
-#include <zarafa/zcdefs.h>
-#include <zarafa/ECUnknown.h>
-#include <zarafa/mapi_ptr.h>
+#include <kopano/zcdefs.h>
+#include <kopano/ECUnknown.h>
+#include <kopano/mapi_ptr.h>
 #include "soapStub.h"
 #include "ECFifoBuffer.h"
-#include <zarafa/ECThreadPool.h>
+#include <kopano/ECThreadPool.h>
 #include "WSTransport.h"
 
 class ECMAPIFolder;
