@@ -1,16 +1,16 @@
 [Unit]
-Description=Zarafa DAgent Server
+Description=Kopano DAgent Server
 After=network.target
 After=local-fs.target
 After=remote-fs.target
 After=mysql.service
-After=zarafa-server.service
-Documentation=man:zarafa-dagent(8)
-Documentation=man:zarafa-dagent.cfg(5)
+After=kopano-server.service
+Documentation=man:kopano-dagent(8)
+Documentation=man:kopano-dagent.cfg(5)
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/zarafa-dagent -l -F -c /etc/zarafa/dagent.cfg
+ExecStart=/usr/sbin/kopano-dagent -l -F -c /etc/kopano/dagent.cfg
 KillMode=process
 ExecReload=/bin/kill -HUP $MAINPID
 
