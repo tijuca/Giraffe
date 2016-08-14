@@ -1,0 +1,7 @@
+/var/log/kopano/server.log {
+  rotate 5
+  weekly
+  postrotate
+    /usr/bin/killall -HUP kopano-server
+  endscript
+}

@@ -1,15 +1,15 @@
 [Unit]
-Description=Zarafa Server
+Description=Kopano Server
 After=network.target
 After=local-fs.target
 After=remote-fs.target
 After=mysql.service
-Documentation=man:zarafa-server(8)
+Documentation=man:kopano-server(8)
 
 [Service]
 Type=simple
-ExecStartPre=/bin/chown zarafa /var/lib/zarafa
-ExecStart=/usr/sbin/zarafa-server -F -c /etc/zarafa/server.cfg
+ExecStartPre=/bin/chown kopano /var/lib/kopano
+ExecStart=/usr/sbin/kopano-server -F -c /etc/kopano/server.cfg
 KillMode=process
 ExecReload=/bin/kill -HUP $MAINPID
 

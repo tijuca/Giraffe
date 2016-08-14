@@ -2,15 +2,15 @@
 
 set -e
 
-LOGDIR=/var/log/zarafa
+LOGDIR=/var/log/kopano
 
 . /usr/share/debconf/confmodule
 . /usr/share/dbconfig-common/dpkg/postinst.mysql
-dbc_generate_include=template:/etc/zarafa/debian-db.cfg
-dbc_generate_include_args="-o template_infile=/usr/share/zarafa/debian/debian-db.cfg.template"
-dbc_dbuser=zarafa
-dbc_dbname=zarafa
-dbc_go zarafa-server $@
+dbc_generate_include=template:/etc/kopano/debian-db.cfg
+dbc_generate_include_args="-o template_infile=/usr/share/kopano/debian/debian-db.cfg.template"
+dbc_dbuser=kopano
+dbc_dbname=kopano
+dbc_go kopano-server $@
 
 case "$1" in
     abort-upgrade|abort-remove|abort-deconfigure|configure)
