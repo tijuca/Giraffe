@@ -1,5 +1,0 @@
-etc/zarafa/ical.cfg
-usr/sbin/zarafa-ical
-/usr/share/doc/zarafa-server/example-config/ical.cfg  usr/share/doc/zarafa-ical/example-config
-usr/share/man/man5/zarafa-ical.cfg.5
-usr/share/man/man8/zarafa-ical.8
