@@ -8,6 +8,12 @@ Documentation=man:kopano-server(8)
 
 [Service]
 Type=simple
+PermissionsStartOnly=true
+# The RuntimeDirectory things isn't working now, make the directory by hand.
+#User=kopano
+#RuntimeDirectory=kopano
+ExecStartPre=/bin/mkdir -p /var/run/kopano
+ExecStartPre=/bin/chown kopano /var/run/kopano
 ExecStartPre=/bin/chown kopano /var/lib/kopano
 ExecStart=/usr/sbin/kopano-server -F -c /etc/kopano/server.cfg
 KillMode=process
