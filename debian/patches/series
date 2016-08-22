@@ -4,3 +4,4 @@ Be-pessimistic-about-daemon-startup.patch
 adding-.NOTPARALLEL-target-to-swig-python-Makefiel.am.patch
 fixup-spelling-errors-in-comments-and-log-messages.patch
 bash-completion-remove-shebang-from-file.patch
+server.cfg-prepare-later-M-A-substition-while-built.patch

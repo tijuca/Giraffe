@@ -3,6 +3,8 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
+export DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/buildflags.mk
@@ -73,6 +75,9 @@ override_dh_install:
 
 	# add php:Depends
 	echo "php:Depends=phpapi-$(shell php-config5 --phpapi)" > debian/php5-mapi.substvars
+
+	# adjust server.cfg to multi-arch behavior
+	sed -i 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/' $(INSTDIR)/etc/kopano/server.cfg
 
 	DH_VERBOSE=1 dh_install
 
