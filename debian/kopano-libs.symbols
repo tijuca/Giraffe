@@ -1,0 +1,49 @@
+libkcarchiver.so.0 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+
+libkcarchivercore.so.0 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+
+libkcfreebusy.so.0 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+
+libkcicalmapi.so.0 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+
+libkcinetmapi.so.0 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+
+libkcmapi.so.0 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+
+libkcpyconv.so.0 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+
+libkcpydirector.so.0 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+
+libkcserver.so.0 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+
+libkcservice.so.0 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+
+libkcsoapclient.so.0 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+
+libkcsoapserver.so.0 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+
+libkcssl.so.0 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+
+libkcsync.so.0 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+
+libkcutil.so.0 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+
+libmapi.so.1 kopano-libs #MINVER#
+ (symver)EC_8.1.0 8.0.1
+ (symver)MAPI32_1 8.0.1
+ (symver)OLE32_1 8.0.1

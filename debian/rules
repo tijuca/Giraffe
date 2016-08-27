@@ -96,8 +96,10 @@ override_dh_compress:
 override_dh_strip:
 	dh_strip --dbg-package=kopano-dbg
 
-override_dh_shlibdeps:
-	dh_shlibdeps -a \
-		-l $(CURDIR)/debian/kopano-libs/usr/lib/ \
-		-l $(CURDIR)/debian/kopano-libs/usr/lib/kopano
-
+override_dh_makeshlibs:
+	dh_makeshlibs -O--builddirectory=$(DEB_BUILD_DIR) -O--parallel \
+		-Xdbplugin \
+		-Xldapplugin \
+		-Xlibkcclient \
+		-Xlibkccontacts \
+		-Xunixplugin
