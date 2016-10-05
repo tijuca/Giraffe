@@ -1,0 +1,4 @@
+etc/kopano/archiver.cfg
+usr/sbin/kopano-archiver
+usr/share/man/man5/kopano-archiver.cfg.5
+usr/share/man/man8/kopano-archiver.8

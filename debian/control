@@ -65,6 +65,7 @@ Description: Complete and feature rich groupware solution - Free/Busy library
 Package: kopano
 Architecture: all
 Depends: kopano-server (>= ${source:Version}),
+ kopano-archiver (>= ${source:Version}),
  kopano-backup (>= ${source:Version}),
  kopano-utils (>= ${source:Version}),
  kopano-monitor (>= ${source:Version}),
@@ -82,6 +83,18 @@ Description: Metapackage for the Kopano Collaboration Platform
  .
  This metapackage contains the dependencies to pull in all important parts of
  Kopano Communication Platform.
+
+Package: kopano-archiver
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ kopano-common (>= ${source:Version})
+Description: Complete and feature rich groupware solution - archiver.
+ The Kopano Collaboration Platform (KCP) is a complete, stable and
+ flexible groupware solution supporting open source as well as proprietary
+ clients including mobile ones. It also features a web interface.
+ .
+ This package provides the archiver.
 
 Package: kopano-backup
 Architecture: all
