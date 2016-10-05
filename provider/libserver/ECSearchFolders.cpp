@@ -36,10 +36,6 @@
 
 #include "ECSearchClient.h"
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 typedef struct {
     SEARCHFOLDER 	*lpFolder;
     ECSearchFolders *lpSearchFolders;
@@ -312,9 +308,7 @@ ECRESULT ECSearchFolders::AddSearchFolder(unsigned int ulStoreId, unsigned int u
         pthread_attr_t attr;
         pthread_attr_init(&attr);
         pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-#ifdef LINUX
         pthread_attr_setstacksize(&attr, 512*1024); // 512KB stack space for search threads
-#endif
         int err = 0;
         
         if((err = pthread_create(&lpSearchFolder->sThreadId, &attr, ECSearchFolders::SearchThread, (void *)ti)) != 0) {
@@ -1061,7 +1055,6 @@ exit:
     return er;
 }    
 
-
 // Does an actual search of a specific search Criteria in store ulStoreId, search folder ulFolderId. Will cancel if *lpbCancel
 // is TRUE. We check after each message row set to see if the cancel has been requested.
 ECRESULT ECSearchFolders::Search(unsigned int ulStoreId, unsigned int ulFolderId, struct searchCriteria *lpSearchCrit, bool *lpbCancel, bool bNotify)
@@ -1160,15 +1153,19 @@ ECRESULT ECSearchFolders::Search(unsigned int ulStoreId, unsigned int ulFolderId
 			strQuery = "SELECT hierarchy.id from hierarchy WHERE hierarchy.parent = " + stringify(*iterFolders) + " AND hierarchy.type=3 AND hierarchy.flags & " + stringify(MSGFLAG_DELETED|MSGFLAG_ASSOCIATED) + " = 0 ORDER by hierarchy.id DESC";
 
 			er = lpDatabase->DoSelect(strQuery, &lpDBResult);
-			if(er != erSuccess)
-				continue; // Try to continue if the query failed ..
+			if(er == erSuccess) {
+				while((lpDBRow = lpDatabase->FetchRow(lpDBResult)) != NULL) {
+					if(lpDBRow && lpDBRow[0])
+						lstFolders.push_back(atoi(lpDBRow[0]));
+				}
+			} else
+				ec_log_crit("ECSearchFolders::Search() could not expand target folders: 0x%x", er);
 
-			while((lpDBRow = lpDatabase->FetchRow(lpDBResult)) != NULL) {
-				if(lpDBRow && lpDBRow[0])
-					lstFolders.push_back(atoi(lpDBRow[0]));
+			if(lpDBResult) {
+				lpDatabase->FreeResult(lpDBResult);
+				lpDBResult = NULL;
 			}
 
-			if(lpDBResult){ lpDatabase->FreeResult(lpDBResult); lpDBResult = NULL; }
 			++iterFolders;
 		}
 	}
@@ -1584,7 +1581,6 @@ ECRESULT ECSearchFolders::AddResults(unsigned int ulStoreId, unsigned int ulFold
 	return erSuccess;
 }
 
-
 // Remove a single search result (so one message in a search folder). Returns NOT_FOUND if the item wasn't in the database in the first place
 ECRESULT ECSearchFolders::DeleteResults(unsigned int ulStoreId, unsigned int ulFolderId, unsigned int ulObjId, unsigned int *lpulOldFlags)
 {
@@ -1835,7 +1831,6 @@ ECRESULT ECSearchFolders::SaveSearchCriteria(ECDatabase *lpDatabase, unsigned in
 	struct soap				xmlsoap;
 	struct searchCriteria	sSearchCriteria;
 	std::ostringstream		xml;
-
 
 	// We use the soap serializer / deserializer to store the data
 	soap_set_mode(&xmlsoap, SOAP_XML_TREE | SOAP_C_UTFSTRING);

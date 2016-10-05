@@ -356,7 +356,6 @@ HRESULT __stdcall RTFSync(LPMESSAGE lpMessage, ULONG ulFlags, BOOL * lpfMessageU
 	return hr;
 }
 
-
 //--- php-ext used functions
 HRESULT __stdcall HrQueryAllRows(LPMAPITABLE lpTable, LPSPropTagArray lpPropTags, LPSRestriction lpRestriction, LPSSortOrderSet lpSortOrderSet, LONG crowsMax, LPSRowSet *lppRows) {
 	TRACE_MAPILIB1(TRACE_ENTRY, "HrQueryAllRows", "%s", PropNameFromPropTagArray(lpPropTags).c_str());
@@ -448,9 +447,7 @@ BOOL __stdcall FPropExists(LPMAPIPROP lpMapiProp, ULONG ulPropTag)
 	return (hr == hrSuccess);
 }
 
-
 /* Actually not part of MAPI */
-#ifdef LINUX
 HRESULT __stdcall CreateStreamOnHGlobal(void *hGlobal, BOOL fDeleteOnRelease, IStream **lppStream)
 {
 	HRESULT hr = hrSuccess;
@@ -474,7 +471,6 @@ exit:
 	
 	return hr;
 }
-#endif
 
 HRESULT __stdcall OpenStreamOnFile(LPALLOCATEBUFFER lpAllocateBuffer, LPFREEBUFFER lpFreeBuffer, ULONG ulFlags,
 													 LPTSTR lpszFileName, LPTSTR lpszPrefix, LPSTREAM FAR * lppStream)

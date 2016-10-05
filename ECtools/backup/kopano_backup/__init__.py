@@ -237,9 +237,9 @@ class Service(kopano.Service):
 
         # determine stored and specified folders
         path_folder = folder_struct(self.data_path, self.options)
-        paths = self.options.folders or sorted(path_folder.keys())
+        paths = [_decode(f) for f in self.options.folders] or sorted(path_folder.keys())
         if self.options.recursive:
-            paths = [path2 for path2 in path_folder for path in paths if path2.startswith(path+'/')]
+            paths = [path2 for path2 in path_folder for path in paths if (path2+'//').startswith(path+'/')]
 
         # restore specified folders
         for path in paths:
@@ -248,7 +248,7 @@ class Service(kopano.Service):
                 stats['errors'] += 1
             else:
                 # handle --restore-root, filter and start restore
-                restore_path = self.options.restore_root+'/'+path if self.options.restore_root else path
+                restore_path = _decode(self.options.restore_root)+'/'+path if self.options.restore_root else path
                 folder = store.subtree.folder(restore_path, create=True)
                 if (not store.public and \
                     ((self.options.skip_junk and folder == store.junk) or \
@@ -262,7 +262,7 @@ class Service(kopano.Service):
     def create_jobs(self):
         """ check command-line options and determine which stores should be backed up """
 
-        output_dir = self.options.output_dir or ''
+        output_dir = _decode(self.options.output_dir) if self.options.output_dir else ''
         jobs = []
 
         # specified companies/all users
@@ -379,7 +379,7 @@ def folder_struct(data_path, options, mapper=None):
     if mapper is None:
         mapper = {}
     if os.path.exists(data_path+'/path'):
-        path = file(data_path+'/path').read()
+        path = file(data_path+'/path').read().decode('utf8')
         mapper[path] = data_path
     if os.path.exists(data_path+'/folders'):
         for f in os.listdir(data_path+'/folders'):
@@ -404,7 +404,7 @@ def show_contents(data_path, options):
     # setup CSV writer, perform basic checks
     writer = csv.writer(sys.stdout)
     path_folder = folder_struct(data_path, options)
-    paths = options.folders or sorted(path_folder)
+    paths = [_decode(f) for f in options.folders] or sorted(path_folder)
     for path in paths:
         if path not in path_folder:
             print 'no such folder:', path
@@ -429,13 +429,13 @@ def show_contents(data_path, options):
 
         # --stats: one entry per folder
         if options.stats:
-            writer.writerow([path, len(items)])
+            writer.writerow([path.encode(sys.stdout.encoding or 'utf8'), len(items)])
 
         # --index: one entry per item
         elif options.index:
             items.sort(key=lambda (k, d): d['last_modified'])
             for key, d in items:
-                writer.writerow([key, path, d['last_modified'], d['subject'].encode(sys.stdout.encoding or 'utf8')])
+                writer.writerow([key, path.encode(sys.stdout.encoding or 'utf8'), d['last_modified'], d['subject'].encode(sys.stdout.encoding or 'utf8')])
 
 def dump_props(props):
     """ dump given MAPI properties """
@@ -474,7 +474,7 @@ def load_acl(folder, user, server, data, log):
                 entryid = server.group(value).groupid
             row[1].Value = entryid.decode('hex')
             rows.append(row)
-        except kopano.ZNotFoundException:
+        except kopano.NotFoundError:
             log.warning("skipping access control entry for unknown user/group '%s'" % row[1].Value)
     acltab = folder.mapiobj.OpenProperty(PR_ACL_TABLE, IID_IExchangeModifyTable, 0, MAPI_MODIFY)
     acltab.ModifyTable(0, [ROWENTRY(ROW_ADD, row) for row in rows])
@@ -502,7 +502,7 @@ def dump_rules(folder, user, server, log):
                     f = movecopy.findall('folder')[0]
                     path = store.folder(entryid=f.text.decode('base64').encode('hex')).path
                     f.text = path
-                except kopano.ZNotFoundException:
+                except kopano.NotFoundError:
                     log.warning("skipping rule for unknown store/folder")
         ruledata = ElementTree.tostring(etxml)
     return pickle.dumps(ruledata)
@@ -524,35 +524,51 @@ def load_rules(folder, user, server, data, log):
                     s.text = store.entryid.decode('hex').encode('base64').strip()
                     f = movecopy.findall('folder')[0]
                     f.text = store.folder(f.text).entryid.decode('hex').encode('base64').strip()
-                except kopano.ZNotFoundException:
+                except kopano.NotFoundError:
                     log.warning("skipping rule for unknown store/folder")
         etxml = ElementTree.tostring(etxml)
         folder.create_prop(PR_RULES_DATA, etxml)
 
+def _get_fbf(user, flags, log):
+    try:
+        fbeid = user.root.prop(PR_FREEBUSY_ENTRYIDS).value[1]
+        return user.store.mapiobj.OpenEntry(fbeid, None, flags)
+    except MAPIErrorNotFound:
+        log.warning("skipping delegation because of missing freebusy data")
+
 def dump_delegates(user, server, log):
     """ dump delegate users for given user """
 
-    # XXX more freebusy stuff?
-    fbeid = user.root.prop(PR_FREEBUSY_ENTRYIDS).value[1]
-    fbf = user.store.mapiobj.OpenEntry(fbeid, None, 0)
+    fbf = _get_fbf(user, 0, log)
+    delegate_uids = []
     try:
-        delegate_uids = HrGetOneProp(fbf, PR_SCHDINFO_DELEGATE_ENTRYIDS).Value
+        if fbf:
+            delegate_uids = HrGetOneProp(fbf, PR_SCHDINFO_DELEGATE_ENTRYIDS).Value
     except MAPIErrorNotFound:
-        delegate_uids = []
-    usernames = [server.sa.GetUser(uid, MAPI_UNICODE).Username for uid in delegate_uids]
+        pass
+
+    usernames = []
+    for uid in delegate_uids:
+        try:
+            usernames.append(server.sa.GetUser(uid, MAPI_UNICODE).Username)
+        except MAPIErrorNotFound:
+            log.warning("skipping delegate user for unknown userid")
     return pickle.dumps(usernames)
 
 def load_delegates(user, server, data, log):
     """ load delegate users for given user """
 
-    data = pickle.loads(data)
-    fbeid = user.root.prop(PR_FREEBUSY_ENTRYIDS).value[1]
-    fbf = user.store.mapiobj.OpenEntry(fbeid, None, MAPI_MODIFY)
-    try:
-        fbf.SetProps([SPropValue(PR_SCHDINFO_DELEGATE_ENTRYIDS, [server.user(name).userid.decode('hex') for name in data])])
+    userids = []
+    for name in pickle.loads(data):
+        try:
+            userids.append(server.user(name).userid.decode('hex'))
+        except kopano.NotFoundError:
+            log.warning("skipping delegation for unknown user '%s'" % name)
+
+    fbf = _get_fbf(user, MAPI_MODIFY, log)
+    if fbf:
+        fbf.SetProps([SPropValue(PR_SCHDINFO_DELEGATE_ENTRYIDS, userids)])
         fbf.SaveChanges(0)
-    except kopano.ZNotFoundException:
-        log.warning("skipping delegation for unknown user '%s'" % name)
 
 def main():
     # select common options
@@ -574,7 +590,7 @@ def main():
 
     # parse and check command-line options
     options, args = parser.parse_args()
-    options.foreground = True
+    options.service = False
     if options.restore or options.stats or options.index:
         assert len(args) == 1 and os.path.isdir(args[0]), 'please specify path to backup data'
     else:

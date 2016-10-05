@@ -216,6 +216,13 @@ AC_ARG_WITH([tmpfilesdir],
 	])
 AC_SUBST([tmpfilesdir])
 
+dnl Not all files will be installed to ${prefix}, so we need to cheat a bit
+dnl to make "distcheck" succeed.
+AC_ARG_WITH([dcprefix],
+	[AS_HELP_STRING([Extra path inserted for distcheck])],
+	[dcprefix="$withval"])
+AC_SUBST([dcprefix])
+
 # stats client requires ncurses(w) for --top
 # check wide version before non-wide version
 AC_DEFUN([LIBNCURSES_WITH_CONFIG],[
@@ -242,8 +249,8 @@ AC_DEFUN([LIBNCURSES_WITH_CONFIG],[
 ])
 LIBNCURSES_WITH_CONFIG
 
-AC_CHECK_HEADERS([syslog.h sys/un.h sys/stat.h])
-AC_CHECK_FUNCS([timegm getpeereid getpwnam_r vsyslog vsnprintf_l])
+AC_CHECK_HEADERS([syslog.h sys/un.h sys/stat.h malloc.h])
+AC_CHECK_FUNCS([mallinfo timegm getpeereid getpwnam_r vsyslog vsnprintf_l])
 
 
 #
@@ -746,14 +753,7 @@ AC_CONFIG_FILES([Makefile
 		m4lcommon/include/kopano/Makefile
 		php-ext/Makefile php7-ext/Makefile
 		provider/Makefile
-		provider/client/Makefile
-		provider/contacts/Makefile
-		provider/common/Makefile
 		provider/include/Makefile
-		provider/libserver/Makefile
-		provider/plugins/Makefile
-		provider/server/Makefile
-		provider/soap/Makefile
 		inetmapi/Makefile
 		inetmapi/include/inetmapi/Makefile
 		spooler/Makefile

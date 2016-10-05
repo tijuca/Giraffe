@@ -26,10 +26,6 @@
 #include <cstdlib>
 #include <mapidefs.h>
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 // for LOG_MAIL
 #include <syslog.h>
 
@@ -47,7 +43,7 @@ HRESULT ECSyncLog::GetLogger(ECLogger **lppLogger)
 		if (lpSettings->SyncLogEnabled()) {
 			char dummy[MAX_PATH + 1] = { 0 };
 
-			if (GetTempPathA(sizeof dummy, dummy) >= sizeof dummy)
+			if (GetTempPath(sizeof dummy, dummy) >= sizeof dummy)
 				dummy[0] = 0x00;
 
 			std::string strPath = dummy + std::string("/");
@@ -109,7 +105,6 @@ HRESULT ECSyncLog::SetLogger(ECLogger *lpLogger)
 
 pthread_mutex_t	ECSyncLog::s_hMutex;
 ECLogger		*ECSyncLog::s_lpLogger = NULL;
-
 
 ECSyncLog::__initializer::__initializer() {
 	pthread_mutex_init(&ECSyncLog::s_hMutex, NULL);

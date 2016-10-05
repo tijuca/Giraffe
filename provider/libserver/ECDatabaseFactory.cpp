@@ -22,10 +22,6 @@
 
 #include "ECServerEntrypoint.h"
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 // The ECDatabaseFactory creates database objects connected to the server database. Which
 // database is returned is chosen by the database_engine configuration setting.
 
@@ -38,7 +34,7 @@ ECRESULT ECDatabaseFactory::GetDatabaseFactory(ECDatabase **lppDatabase)
 {
 	const char *szEngine = m_lpConfig->GetSetting("database_engine");
 
-	if(stricmp(szEngine, "mysql") == 0) {
+	if(strcasecmp(szEngine, "mysql") == 0) {
 		*lppDatabase = new ECDatabaseMySQL(m_lpConfig);
 	} else {
 		ec_log_crit("ECDatabaseFactory::GetDatabaseFactory(): database not mysql");

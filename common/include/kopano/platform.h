@@ -82,16 +82,12 @@ void	FileTimeToRTime(const FILETIME *pft, LONG *prtime);
 HRESULT	UnixTimeToRTime(time_t unixtime, LONG *rtime);
 HRESULT	RTimeToUnixTime(LONG rtime, time_t *unixtime);
 extern time_t SystemTimeToUnixTime(const SYSTEMTIME &);
-SYSTEMTIME UnixTimeToSystemTime(time_t unixtime);
 extern SYSTEMTIME TMToSystemTime(const struct tm &);
-extern struct tm SystemTimeToTM(const SYSTEMTIME &);
 double GetTimeOfDay();
 ULONG	CreateIntDate(ULONG day, ULONG month, ULONG year);
 ULONG	CreateIntTime(ULONG seconds, ULONG minutes, ULONG hours);
 extern ULONG FileTimeToIntDate(const FILETIME &);
 ULONG	SecondsToIntTime(ULONG seconds);
-
-int strcmp_ci(const char *s1, const char *s2);
 
 inline double difftimeval(struct timeval *ptstart, struct timeval *ptend) {
 	return 1000000 * (ptend->tv_sec - ptstart->tv_sec) + (ptend->tv_usec - ptstart->tv_usec);
@@ -157,5 +153,6 @@ void give_filesize_hint(const int fd, const off_t len);
 
 bool force_buffers_to_disk(const int fd);
 extern int ec_relocate_fd(int);
+extern int kc_reexec_with_allocator(char **, const char *);
 
 #endif // PLATFORM_H

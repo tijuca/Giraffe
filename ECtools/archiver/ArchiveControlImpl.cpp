@@ -54,8 +54,6 @@ using namespace za::operations;
  * 								if the settings aren't safe.
  * @param[out]	lpptrArchiver
  *					Pointer to a ArchivePtr that will be assigned the address of the returned object.
- *
- * @return HRESULT
  */
 HRESULT ArchiveControlImpl::Create(ArchiverSessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, bool bForceCleanup, ArchiveControlPtr *lpptrArchiveControl)
 {
@@ -79,8 +77,6 @@ exit:
 }
 
 /**
- * Constructor
- *
  * @param[in]	lpSession
  *					Pointer to the Session.
  * @param[in]	lpConfig
@@ -89,8 +85,6 @@ exit:
  *					Pointer to an ECLogger object that's used for logging.
   * @param[in]	bForceCleanup	Force a cleanup operation to continue, even
  * 								if the settings aren't safe.
-*
- * @return HRESULT
  */
 ArchiveControlImpl::ArchiveControlImpl(ArchiverSessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, bool bForceCleanup)
 : m_ptrSession(ptrSession)
@@ -111,9 +105,6 @@ ArchiveControlImpl::ArchiveControlImpl(ArchiverSessionPtr ptrSession, ECConfig *
 , m_bForceCleanup(bForceCleanup)
 { }
 
-/**
- * Destructor
- */
 ArchiveControlImpl::~ArchiveControlImpl()
 {
 	m_lpLogger->Release();
@@ -144,11 +135,11 @@ HRESULT ArchiveControlImpl::Init()
 		return MAPI_E_INVALID_PARAMETER;
 	}
 
-	if (stricmp(lpszCleanupAction, "delete") == 0)
+	if (strcasecmp(lpszCleanupAction, "delete") == 0)
 		m_cleanupAction = caDelete;
-	else if (stricmp(lpszCleanupAction, "store") == 0)
+	else if (strcasecmp(lpszCleanupAction, "store") == 0)
 		m_cleanupAction = caStore;
-	else if (stricmp(lpszCleanupAction, "none") == 0)
+	else if (strcasecmp(lpszCleanupAction, "none") == 0)
 		m_cleanupAction = caNone;
 	else {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unknown cleanup_action specified in config: '%s'", lpszCleanupAction);
@@ -167,8 +158,6 @@ HRESULT ArchiveControlImpl::Init()
  * @param[in]	bLocalOnly
  *					If set to true only  messsages for users that have their store on the local server
  *					will be archived.
- *
- * @return HRESULT
  */
 eResult ArchiveControlImpl::ArchiveAll(bool bLocalOnly, bool bAutoAttach, unsigned int ulFlags)
 {
@@ -210,8 +199,6 @@ eResult ArchiveControlImpl::ArchiveAll(bool bLocalOnly, bool bAutoAttach, unsign
  *
  * @param[in]	strUser
  *					The username for which to archive the messages.
- *
- * @return HRESULT
  */
 eResult ArchiveControlImpl::Archive(const tstring &strUser, bool bAutoAttach, unsigned int ulFlags)
 {
@@ -267,8 +254,6 @@ exit:
  * @param[in]	bLocalOnly
  *					If set to true only  messsages for users that have their store on the local server
  *					will be archived.
- *
- * @return HRESULT
  */
 eResult ArchiveControlImpl::CleanupAll(bool bLocalOnly)
 {
@@ -290,8 +275,6 @@ eResult ArchiveControlImpl::CleanupAll(bool bLocalOnly)
  *
  * @param[in]	strUser
  *					The username for which to archive the messages.
- *
- * @return HRESULT
  */
 eResult ArchiveControlImpl::Cleanup(const tstring &strUser)
 {
@@ -305,7 +288,6 @@ eResult ArchiveControlImpl::Cleanup(const tstring &strUser)
 
 	return MAPIErrorToArchiveError(hr);
 }
-
 
 /**
  * Process all users.
@@ -341,7 +323,7 @@ HRESULT ArchiveControlImpl::ProcessAll(bool bLocalOnly, fnProcess_t fnProcess)
 			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to process user '" TSTRING_PRINTF "'. (hr=0x%08x)", iUser->c_str(), hrTmp);
 			bHaveErrors = true;
 		} else if (hrTmp == MAPI_W_PARTIAL_COMPLETION) {
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Errors occured while processing user '" TSTRING_PRINTF "'.", iUser->c_str());
+			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Errors occurred while processing user '" TSTRING_PRINTF "'.", iUser->c_str());
 			bHaveErrors = true;
 		}
 	}
@@ -560,7 +542,6 @@ HRESULT ArchiveControlImpl::DoArchive(const tstring& strUser)
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Done archiving messages");
 	}
 
-
 	if (ptrDeleteOp) {
 		// First delete all messages that are elegible for deletion, so we don't unneccesary stub them first
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Deleting old messages");
@@ -575,7 +556,6 @@ HRESULT ArchiveControlImpl::DoArchive(const tstring& strUser)
 		}
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Done deleting messages");
 	}
-
 
 	if (ptrStubOp) {
 		// Now stub the remaing messages (if they're old enough)
@@ -712,8 +692,6 @@ HRESULT ArchiveControlImpl::DoCleanup(const tstring &strUser)
  * @param[in]	bProcessUnread
  *					If set to true, unread messages will also be processed. Otherwise unread message
  *					will be left untouched.
- *
- * @return HRESULT
  */
 HRESULT ArchiveControlImpl::ProcessFolder(MAPIFolderPtr &ptrFolder, ArchiveOperationPtr ptrArchiveOperation)
 {

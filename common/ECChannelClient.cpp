@@ -21,15 +21,11 @@
 #include <mapidefs.h>
 #include <mapiutil.h>
 #include <mapix.h>
-
-#ifdef LINUX
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/un.h>
 #include <sys/socket.h>
-#endif
-
 #include <kopano/base64.h>
 #include <kopano/ECChannel.h>
 #include <kopano/ECDefs.h>
@@ -133,7 +129,7 @@ ECRESULT ECChannelClient::ConnectSocket()
 
 exit:
 	if (er != erSuccess && fd != -1)
-		closesocket(fd);
+		close(fd);
 
 	return er;
 }
@@ -162,16 +158,20 @@ ECRESULT ECChannelClient::ConnectHttp()
 		fd = socket(sock_addr->ai_family, sock_addr->ai_socktype,
 		     sock_addr->ai_protocol);
 		if (fd < 0)
+			/* Socket type could not be created */
 			continue;
 
 		if (connect(fd, sock_addr->ai_addr,
 		    sock_addr->ai_addrlen) < 0) {
+			/* No route */
 			int saved_errno = errno;
-			closesocket(fd);
+			close(fd);
 			fd = -1;
 			errno = saved_errno;
 			continue;
 		}
+		/* Good connected socket, use it */
+		break;
 	}
 	if (fd < 0) {
 		er = KCERR_NETWORK_ERROR;
@@ -188,7 +188,7 @@ exit:
 	if (sock_res != NULL)
 		freeaddrinfo(sock_res);
 	if (er != erSuccess && fd != -1)
-		closesocket(fd);
+		close(fd);
 
 	return er;
 }

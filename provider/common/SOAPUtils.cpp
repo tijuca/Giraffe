@@ -16,7 +16,7 @@
  */
 
 #include <kopano/platform.h>
-
+#include <cstring>
 #include <mapidefs.h>
 #include <mapitags.h>
 #include <edkmdb.h>
@@ -30,10 +30,6 @@
 #include <kopano/base64.h>
 
 using namespace std;
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
 
 /* See m4lcommon/Util.cpp for twcmp */
 template<typename T> static int twcmp(T a, T b)
@@ -661,7 +657,6 @@ skip_check:
 	return er;
 }
 
-
 /**
  * ulType is one of the RELOP_xx types. The result returned will indicate that at least one of the values in lpMVProp positively 
  * matched the RELOP_xx comparison with lpProp2.
@@ -1234,7 +1229,6 @@ ECRESULT CopyPropValArray(const struct propValArray *lpSrc,
 	return erSuccess;
 }
 
-
 ECRESULT CopyRestrictTable(struct soap *soap,
     const struct restrictTable *lpSrc, struct restrictTable **lppDst)
 {
@@ -1443,7 +1437,6 @@ ECRESULT CopyEntryList(struct soap *soap, struct entryList *lpSrc, struct entryL
 		lpDst->__ptr[i].__ptr = s_alloc<unsigned char>(soap, lpSrc->__ptr[i].__size);
 		memcpy(lpDst->__ptr[i].__ptr, lpSrc->__ptr[i].__ptr, sizeof(unsigned char) * lpSrc->__ptr[i].__size);
 	}
-
 
 	*lppDst = lpDst;
 	return erSuccess;
@@ -1759,6 +1752,7 @@ ECRESULT CopySearchCriteria(struct soap *soap,
 		return KCERR_NOT_FOUND;
 
 	lpDst = new searchCriteria;
+	memset(lpDst, '\0', sizeof(*lpDst));
 	if(lpSrc->lpRestrict) {
     	er = CopyRestrictTable(soap, lpSrc->lpRestrict, &lpDst->lpRestrict);
 		if (er != erSuccess)
@@ -1800,21 +1794,6 @@ ECRESULT FreeSearchCriteria(struct searchCriteria *lpSearchCriteria)
 
 	return er;
 }
-
-ECRESULT CopyUserObjectDetailsToSoap(unsigned int ulId, entryId *lpUserEid, const objectdetails_t &details, struct soap *soap, struct userobject *lpObject)
-{
-	ECRESULT er = erSuccess;
-
-	lpObject->ulId = ulId;
-	lpObject->lpszName = s_strcpy(soap, details.GetPropString(OB_PROP_S_FULLNAME).c_str());
-	lpObject->ulType = details.GetClass();
-	lpObject->sId.__size = lpUserEid->__size;
-	lpObject->sId.__ptr = s_alloc<unsigned char>(soap, lpUserEid->__size);
-	memcpy(lpObject->sId.__ptr, lpUserEid->__ptr, lpUserEid->__size);
-
-	return er;
-}
-
 
 /**
  * Copy extra user details into propmap, (only the string values)

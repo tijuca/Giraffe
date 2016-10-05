@@ -7,10 +7,11 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) $(BOOST_CPPFLAGS) \
 	-I$(top_srcdir)/mapi4linux/include -I$(top_srcdir)/provider/common \
 	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
 	-I${top_srcdir}/libfreebusy -I${top_srcdir}/libicalmapi \
-	-I/usr/include/libxml2
+	${XML2_CFLAGS}
 
 lib_LTLIBRARIES = libkcinetmapi.la
 noinst_DATA = libkcinetmapi.ldd
+CLEANFILES = ${noinst_DATA}
 
 # Add '-z now' -> -Wl,-z, -Wl,now to LD flags so that we do early binding of symbols. This fixes
 # a problem in which libvmime attempts to resolve a symbol in libinetmapi.so during the unload
@@ -31,7 +32,7 @@ libkcinetmapi_la_LIBADD = \
 #CXXLD=--tag=none gcc
 
 libinetmapidir = $(includedir)/inetmapi
-libinetmapi_HEADERS = ECMapiUtils.h ECVMIMEUtils.h	\
+noinst_HEADERS = ECMapiUtils.h ECVMIMEUtils.h	\
 		MAPIToVMIME.h VMIMEToMAPI.h \
 		outputStreamMAPIAdapter.h					\
 		inputStreamMAPIAdapter.h					\

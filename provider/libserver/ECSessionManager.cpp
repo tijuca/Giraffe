@@ -35,10 +35,6 @@
 #include <edkmdb.h>
 #include "logontime.hpp"
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 ECSessionManager::ECSessionManager(ECConfig *lpConfig, ECLogger *lpAudit,
     bool bHostedKopano, bool bDistributedKopano)
 {
@@ -613,7 +609,6 @@ ECRESULT ECSessionManager::CreateSession(struct soap *soap, char *szName, char *
 	g_lpStatsCollector->Increment(SCN_LOGIN_DENIED);
 	goto exit;
 
-
 authenticated:
 	ec_log_debug("User \"%s\" from \"%s\" authenticated through \"%s\" using program %s", szName, from.c_str(), method, szClientApp ? szClientApp : "<unknown>");
 	if (strcmp(KOPANO_SYSTEM_USER, szName) != 0) {
@@ -842,7 +837,6 @@ void* ECSessionManager::SessionCleaner(void *lpTmpSessionManager)
 	struct timespec			timeout;
 	list<BTSession*>		lstSessions;
 
-
 	if(lpSessionManager == NULL) {
 		return 0;
 	}
@@ -1042,7 +1036,6 @@ exit:
 
 	return er;
 }
-
 
 ECRESULT ECSessionManager::NotificationModified(unsigned int ulObjType, unsigned int ulObjId, unsigned int ulParentId)
 {
@@ -1378,8 +1371,6 @@ ECRESULT ECSessionManager::GetLicensedUsers(unsigned int ulServiceType, unsigned
 {
 	ECRESULT er = erSuccess;
 	unsigned int ulLicensedUsers = 0;
-
-#ifdef LINUX	
     ECLicenseClient *lpLicenseClient = NULL;
 	lpLicenseClient = new ECLicenseClient();
 	
@@ -1391,10 +1382,6 @@ ECRESULT ECSessionManager::GetLicensedUsers(unsigned int ulServiceType, unsigned
 	}
 	
 	delete lpLicenseClient;
-#else
-    ulLicensedUsers = 0;
-#endif
-
 	*lpulLicensedUsers = ulLicensedUsers;
 
 	return er;

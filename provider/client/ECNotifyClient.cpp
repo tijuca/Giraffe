@@ -14,6 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <kopano/platform.h>
+#include <stdexcept>
 #include <mapispi.h>
 #include <mapix.h>
 #include <kopano/ECDebug.h>
@@ -28,10 +29,6 @@
 #include <kopano/mapiext.h>
 
 #define MAX_NOTIFS_PER_CALL 64
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
 
 static inline std::pair<ULONG,ULONG> SyncAdviseToConnection(const SSyncAdvise &sSyncAdvise) {
 	return std::make_pair(sSyncAdvise.sSyncState.ulSyncId,sSyncAdvise.ulConnection);
@@ -57,18 +54,18 @@ ECNotifyClient::ECNotifyClient(ULONG ulProviderType, void *lpProvider, ULONG ulF
 	else if(m_ulProviderType == MAPI_ADDRBOOK)
 		m_lpTransport = ((ECABLogon*)m_lpProvider)->m_lpTransport;
 	else
-		ASSERT(FALSE);
+		throw std::runtime_error("Unknown m_ulProviderType");
 
     /* Get the sessiongroup ID of the provider that we will be handling notifications for */
 	if (m_lpTransport->HrGetSessionId(&ecSessionId, &m_ecSessionGroupId) != hrSuccess)
-		ASSERT(FALSE);
+		throw std::runtime_error("ECNotifyClient/HrGetSessionId failed");
 
     /* Get the session group that this session belongs to */
 	if (g_ecSessionManager.GetSessionGroupData(m_ecSessionGroupId, m_lpTransport->GetProfileProps(), &m_lpSessionGroup) != hrSuccess)
-		ASSERT(FALSE);
+		throw std::runtime_error("ECNotifyClient/GetSessionGroupData failed");
 
 	if (m_lpSessionGroup->GetOrCreateNotifyMaster(&m_lpNotifyMaster) != hrSuccess)
-		ASSERT(FALSE);
+		throw std::runtime_error("ECNotifyClient/GetOrCreateNotifyMaster failed");
 
 	m_lpNotifyMaster->AddSession(this);
 }
@@ -529,7 +526,6 @@ exit:
 	return hr;
 }
 
-
 HRESULT ECNotifyClient::ReleaseAll()
 {
 	HRESULT hr			= hrSuccess;
@@ -567,7 +563,6 @@ HRESULT ECNotifyClient::NotifyReload()
 	
 	notifications.push_back(&notif);
 
-
 	// The transport used for this notifyclient *may* have a broken session. Inform the
 	// transport that the session may be broken and it should verify that all is well.
 
@@ -583,7 +578,6 @@ HRESULT ECNotifyClient::NotifyReload()
 
 	return hr;
 }
-
 
 HRESULT ECNotifyClient::Notify(ULONG ulConnection, const NOTIFYLIST &lNotifications)
 {

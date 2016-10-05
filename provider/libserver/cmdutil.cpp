@@ -17,14 +17,12 @@
 
 #include <kopano/platform.h>
 
-// STL defines
 #include <exception>
 #include <set>
 #include <string>
 #include <list>
 #include <map>
 
-// mapi defines
 #include <mapidefs.h>
 #include <mapitags.h>
 #include <kopano/mapiext.h>
@@ -49,10 +47,6 @@
 #define FIELD_NR_NAMEID		(FIELD_NR_MAX + 1)
 #define FIELD_NR_NAMESTR	(FIELD_NR_MAX + 2)
 #define FIELD_NR_NAMEGUID	(FIELD_NR_MAX + 3)
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
 
 extern ECSessionManager*    g_lpSessionManager; // FIXME: remove this global and change the depended source code!
 extern ECStatsCollector* 	g_lpStatsCollector;
@@ -511,7 +505,6 @@ ECRESULT DeleteObjectSoft(ECSession *lpSession, ECDatabase *lpDatabase, unsigned
 	PARENTINFO pi;
 	
 	std::map<unsigned int, PARENTINFO> mapFolderCounts;
-	std::map<unsigned int, PARENTINFO>::const_iterator iterFolderCounts;
 
 	// Build where condition
 	for (iterDeleteItems=lstDeleteItems.begin();
@@ -1344,7 +1337,6 @@ ECRESULT UpdateFolderCount(ECDatabase *lpDatabase, unsigned int ulFolderId, unsi
 	return erSuccess;
 }
 
-
 ECRESULT CheckQuota(ECSession *lpecSession, ULONG ulStoreId)
 {
 	ECRESULT er;
@@ -1385,13 +1377,12 @@ ECRESULT MapEntryIdToObjectId(ECSession *lpecSession, ECDatabase *lpDatabase, UL
 ECRESULT UpdateFolderCounts(ECDatabase *lpDatabase, ULONG ulParentId, ULONG ulFlags, propValArray *lpModProps)
 {
 	ECRESULT er = erSuccess;
-	struct propVal *lpPropMessageFlags = NULL;	// non-free
 	
 	if (ulFlags & MAPI_ASSOCIATED)
 		er = UpdateFolderCount(lpDatabase, ulParentId, PR_ASSOC_CONTENT_COUNT, 1);
 	else {
 		er = UpdateFolderCount(lpDatabase, ulParentId, PR_CONTENT_COUNT, 1);
-	
+		struct propVal *lpPropMessageFlags = NULL;
 		lpPropMessageFlags = FindProp(lpModProps, PR_MESSAGE_FLAGS);
 		if (er == erSuccess && (!lpPropMessageFlags || (lpPropMessageFlags->Value.ul & MSGFLAG_READ) == 0))
 			er = UpdateFolderCount(lpDatabase, ulParentId, PR_CONTENT_UNREAD, 1);

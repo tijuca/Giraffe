@@ -1153,7 +1153,6 @@ HRESULT SendUndeliverable(LPADRBOOK lpAddrBook, ECSender *lpMailer,
 		lpPropValue[ulPropPos++].Value.bin.lpb	= lpPropArrayOriginal[OR_SEARCH_KEY].Value.bin.lpb;
 	}
 
-
 	// Add the original message into the errorMessage
 	hr = lpErrorMsg->CreateAttach(NULL, 0, &ulAttachNum, &lpAttach);
 	if (hr != hrSuccess) {
@@ -1869,7 +1868,6 @@ static HRESULT CheckSendAs(IAddrBook *lpAddrBook, IMsgStore *lpUserStore,
 	SizedSPropTagArray(3, sptaIDProps) = { 3, { PR_DISPLAY_NAME_W, PR_EC_SENDAS_USER_ENTRYIDS, PR_DISPLAY_TYPE } };
 	ULONG cValues = 0;
 
-
 	hr = SMTPToZarafa(lpAddrBook, ulRepresentCB, lpRepresentEID, &sSpoofEID.Value.bin.cb, (LPENTRYID*)&sSpoofEID.Value.bin.lpb);
 	if (hr != hrSuccess)
 		hr = ContactToKopano(lpUserStore, lpAddrBook, ulRepresentCB, lpRepresentEID, &sSpoofEID.Value.bin.cb, (LPENTRYID*)&sSpoofEID.Value.bin.lpb);
@@ -2001,7 +1999,6 @@ static HRESULT CheckDelegate(IAddrBook *lpAddrBook, IMsgStore *lpUserStore,
 	LPMESSAGE lpRepFBMessage = NULL;
 	LPSPropValue lpDelegates = NULL;
 	SPropValue sSpoofEID = {0};
-
 
 	hr = SMTPToZarafa(lpAddrBook, ulRepresentCB, lpRepresentEID, &sSpoofEID.Value.bin.cb, (LPENTRYID*)&sSpoofEID.Value.bin.lpb);
 	if (hr != hrSuccess)
@@ -2427,8 +2424,8 @@ static HRESULT ProcessMessage(IMAPISession *lpAdminSession,
 					// ignore error if unable to open, just the copy of the mail might possibily not be done.
 				} else 	if(strcmp(g_lpConfig->GetSetting("allow_delegate_meeting_request"), "yes") == 0 &&
 							HrGetOneProp(lpMessage, PR_MESSAGE_CLASS_A, &lpMsgClass) == hrSuccess &&
-							((stricmp(lpMsgClass->Value.lpszA, "IPM.Schedule.Meeting.Request" ) == 0) ||
-							 (stricmp(lpMsgClass->Value.lpszA, "IPM.Schedule.Meeting.Canceled" ) == 0))) {
+							((strcasecmp(lpMsgClass->Value.lpszA, "IPM.Schedule.Meeting.Request" ) == 0) ||
+							 (strcasecmp(lpMsgClass->Value.lpszA, "IPM.Schedule.Meeting.Canceled" ) == 0))) {
 					// Meeting request can always sent as 'on behalf of' (Zarafa and SMTP user).
 					// This is needed if a user forward a meeting request. If you have permissions on a calendar,
 					// you can always sent with 'on behalve of'. This behavior is like exchange.
@@ -2605,7 +2602,6 @@ static HRESULT ProcessMessage(IMAPISession *lpAdminSession,
 		}
 	}
 
-
 	// Now hand message to library which will send it, inetmapi will handle addressbook
 	hr = IMToINet(lpUserSession, lpAddrBook, lpMessage, lpMailer, sopt, g_lpLogger);
 
@@ -2645,7 +2641,6 @@ exit:
 	// We always return the processes message to the caller, whether it failed or not
 	if (lpMessage)
 		lpMessage->QueryInterface(IID_IMessage, (void**)lppMessage);
-
 
 	if (lpMessage)
 		lpMessage->Release();

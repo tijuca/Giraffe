@@ -81,7 +81,6 @@ exit:
 }
 
 /**
- * Default constructor
  * @param[in]	lpAdrBook		Mapi addresss book
  * @param[in]	mapTimeZones	std::map containing timezone names and corresponding timezone structures
  * @param[in]	lpNamedProps	Named property tag array
@@ -308,14 +307,13 @@ HRESULT VConverter::HrMakeBinaryUID(const std::string &strUid, void *base, SProp
 	// Caller sets .ulPropTag
 	sPropValue.Value.bin.cb = strBinUid.size();
 	if ((hr = MAPIAllocateMore(sPropValue.Value.bin.cb, base, (void**)&sPropValue.Value.bin.lpb)) != hrSuccess)
-		goto exit;
+		return hr;
 	memcpy(sPropValue.Value.bin.lpb, strBinUid.data(), sPropValue.Value.bin.cb);
 
 	// set return value
-	*lpPropValue = sPropValue;
-
-exit:
-	return hr;
+	lpPropValue->Value.bin.cb  = sPropValue.Value.bin.cb;
+	lpPropValue->Value.bin.lpb = sPropValue.Value.bin.lpb;
+	return hrSuccess;
 }
 
 /**
@@ -2439,7 +2437,6 @@ HRESULT VConverter::HrSetXHeaders(ULONG ulMsgProps, LPSPropValue lpMsgProps, LPM
 	icalcomponent_add_property(lpEvent, lpProp);
 	icalvalue_free(lpicValue);
 
-
 	lpPropVal = PpropFindProp(lpMsgProps, ulMsgProps, PR_RTF_COMPRESSED);
 	if (lpPropVal && Util::GetBestBody(lpMsgProps, ulMsgProps, fMapiUnicode) == PR_RTF_COMPRESSED) {
 		string rtf;
@@ -2461,7 +2458,6 @@ HRESULT VConverter::HrSetXHeaders(ULONG ulMsgProps, LPSPropValue lpMsgProps, LPM
 			lpStream ->Release();
 		}
 	}
-
 
 	return hrSuccess;
 }
@@ -2815,7 +2811,7 @@ HRESULT VConverter::HrSetRecurrence(LPMESSAGE lpMessage, icalcomponent *lpicEven
 		goto exit;
 	
 	if ((PROP_TYPE(lpSpropArray[0].ulPropTag) != PT_ERROR)
-		&& (stricmp(lpSpropArray[0].Value.lpszA, "IPM.Task") == 0)) {
+		&& (strcasecmp(lpSpropArray[0].Value.lpszA, "IPM.Task") == 0)) {
 		ulRecurrenceStateTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_RECURRSTATE], PT_BINARY);
 		lpSPropRecVal = &lpSpropArray[5];
 		ulFlag = RECURRENCE_STATE_TASKS;

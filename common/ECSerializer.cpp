@@ -16,18 +16,9 @@
  */
 
 #include <kopano/platform.h>
-
-#ifdef LINUX
 #include <arpa/inet.h>
-#endif
-
 #include "ECFifoBuffer.h"
 #include "ECSerializer.h"
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 
 ECStreamSerializer::ECStreamSerializer(IStream *lpBuffer)
 {

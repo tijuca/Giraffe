@@ -39,10 +39,6 @@
 #include <kopano/stringutil.h>
 using namespace std;
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 ZCABContainer::ZCABContainer(std::vector<zcabFolderEntry> *lpFolders,
     IMAPIFolder *lpContacts, LPMAPISUP lpMAPISup, void *lpProvider,
     const char *szClassName) :
@@ -270,7 +266,6 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 		{(LPGUID)&PSETID_Address, MNID_ID, {dispidABPArrayType}},
 	};
 
-
 	ulFlags = ulFlags & MAPI_UNICODE;
 
 	hr = Util::HrCopyUnicodePropTagArray(ulFlags, (LPSPropTagArray)&inputCols, &ptrInputCols);
@@ -382,7 +377,7 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 
 			if (
 				((ulFlags & MAPI_UNICODE) && wcscasecmp(ptrRows[i].lpProps[I_MESSAGE_CLASS].Value.lpszW, L"IPM.Contact") == 0) ||
-				((ulFlags & MAPI_UNICODE) == 0 && stricmp(ptrRows[i].lpProps[I_MESSAGE_CLASS].Value.lpszA, "IPM.Contact") == 0)
+				((ulFlags & MAPI_UNICODE) == 0 && strcasecmp(ptrRows[i].lpProps[I_MESSAGE_CLASS].Value.lpszA, "IPM.Contact") == 0)
 				)
 			{
 				lpColData[O_DISPLAY_TYPE].ulPropTag = PR_DISPLAY_TYPE;
@@ -395,7 +390,7 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 				lpColData[O_ADDRTYPE].Value = ptrRows[i].lpProps[I_NAMEDSTART + ulOffset + 1].Value;
 			} else if (
 					   ((ulFlags & MAPI_UNICODE) && wcscasecmp(ptrRows[i].lpProps[I_MESSAGE_CLASS].Value.lpszW, L"IPM.DistList") == 0) ||
-					   ((ulFlags & MAPI_UNICODE) == 0 && stricmp(ptrRows[i].lpProps[I_MESSAGE_CLASS].Value.lpszA, "IPM.DistList") == 0)
+					   ((ulFlags & MAPI_UNICODE) == 0 && strcasecmp(ptrRows[i].lpProps[I_MESSAGE_CLASS].Value.lpszA, "IPM.DistList") == 0)
 					   )
 			{
 				lpColData[O_DISPLAY_TYPE].ulPropTag = PR_DISPLAY_TYPE;
@@ -548,7 +543,6 @@ HRESULT ZCABContainer::GetDistListContentsTable(ULONG ulFlags, LPMAPITABLE *lppT
 	if (hr != hrSuccess)
 		goto exit;
 
-
 	sKey.ulPropTag = PR_ROWID;
 	sKey.Value.ul = 0;
 	for (ULONG i = 0; i < ptrEntries->Value.MVbin.cValues; ++i) {
@@ -558,7 +552,7 @@ HRESULT ZCABContainer::GetDistListContentsTable(ULONG ulFlags, LPMAPITABLE *lppT
 		// Wrapped entryid's:
 		// Flags: (ULONG) 0
 		// Provider: (GUID) 0xC091ADD3519DCF11A4A900AA0047FAA4
-		// Type: (BYTE) <value>, describes wrapped enrtyid
+		// Type: (BYTE) <value>, describes wrapped entryid
 		//  lower 4 bits:
 		//   0x00 = OneOff (use addressbook)
 		//   0x03 = Contact (use folder / session?)
@@ -648,7 +642,6 @@ exit:
 
 	return hr;
 }
-
 
 /** 
  * Returns an addressbook contents table of the IPM.Contacts folder in m_lpContactFolder.
@@ -1115,7 +1108,6 @@ HRESULT ZCABContainer::ResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlag
 			goto exit;
 		ptrColumns->cValues = stProps.size();
 		std::copy(stProps.begin(), stProps.end(), ptrColumns->aulPropTag);
-
 
 		hr = this->GetContentsTable(ulFlags & MAPI_UNICODE, &ptrContents);
 		if (hr != hrSuccess)

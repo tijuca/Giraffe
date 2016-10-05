@@ -27,9 +27,6 @@
 #include <mapidefs.h>
 #include <kopano/CommonUtil.h>
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
 #ifdef DEBUG
 #define DEBUG_SQL 0
 #define DEBUG_TRANSACTION 0
@@ -400,11 +397,6 @@ unsigned int ECDatabaseMySQL::GetNumRows(DB_RESULT sResult) {
 	return (unsigned int)mysql_num_rows((MYSQL_RES *)sResult);
 }
 
-unsigned int ECDatabaseMySQL::GetNumRowFields(DB_RESULT sResult) {
-
-	return mysql_num_fields((MYSQL_RES *)sResult);
-}
-
 DB_ROW ECDatabaseMySQL::FetchRow(DB_RESULT sResult) {
 
 	return mysql_fetch_row((MYSQL_RES *)sResult);
@@ -509,15 +501,15 @@ ECRESULT ECDatabaseMySQL::IsInnoDBSupported()
 	}
 
 	while ((lpDBRow = FetchRow(lpResult)) != NULL) {
-		if (stricmp(lpDBRow[0], "InnoDB") != 0)
+		if (strcasecmp(lpDBRow[0], "InnoDB") != 0)
 			continue;
 
-		if (stricmp(lpDBRow[1], "DISABLED") == 0) {
+		if (strcasecmp(lpDBRow[1], "DISABLED") == 0) {
 			// mysql has run with innodb enabled once, but disabled this.. so check your log.
 			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "INNODB engine is disabled. Please re-enable the INNODB engine. Check your MySQL log for more information or comment out skip-innodb in the mysql configuration file.");
 			er = KCERR_DATABASE_ERROR;
 			goto exit;
-		} else if (stricmp(lpDBRow[1], "YES") != 0 && stricmp(lpDBRow[1], "DEFAULT") != 0) {
+		} else if (strcasecmp(lpDBRow[1], "YES") != 0 && strcasecmp(lpDBRow[1], "DEFAULT") != 0) {
 			// mysql is incorrectly configured or compiled.
 			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "INNODB engine is not supported. Please enable the INNODB engine in the mysql configuration file.");
 			er = KCERR_DATABASE_ERROR;
@@ -545,7 +537,6 @@ ECRESULT ECDatabaseMySQL::CreateDatabase(ECConfig *lpConfig)
 	const char *lpDatabase = lpConfig->GetSetting("mysql_database");
 	const char *lpMysqlPort = lpConfig->GetSetting("mysql_port");
 	const char *lpMysqlSocket = lpConfig->GetSetting("mysql_socket");
-
 
 	if(*lpMysqlSocket == '\0')
 		lpMysqlSocket = NULL;

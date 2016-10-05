@@ -38,15 +38,7 @@
 #endif
 #else
 // Testing for both WIN32 && LINUX makes no f sense
-	#ifdef LINUX
 		#define DEBUGPRINT(...)
-	#else
-		#define DEBUGPRINT	__noop
-	#endif
-#endif
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
 #endif
 
 class BinReader _zcp_final {

@@ -27,10 +27,6 @@
 #include "ECSessionManager.h"
 #include "SOAPUtils.h"
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 class FindChangeAdvise
 {
 public:
@@ -310,7 +306,6 @@ ECRESULT ECSessionGroup::AddNotificationTable(ECSESSIONID ulSessionId, unsigned 
 	lpNotify->ulEventType			= fnevTableModified;
 	lpNotify->tab->ulTableEvent		= ulType;
 
-
 	if(lpsChildRow && (lpsChildRow->ulObjId > 0 || lpsChildRow->ulOrderId > 0)) {
 		lpNotify->tab->propIndex.ulPropTag = PR_INSTANCE_KEY;
 		lpNotify->tab->propIndex.__union = SOAP_UNION_propValData_bin;
@@ -375,7 +370,6 @@ ECRESULT ECSessionGroup::AddChangeNotification(const std::set<unsigned int> &syn
 	SESSIONINFOMAP::const_iterator iterSessions;
 
 	std::map<ECSESSIONID,unsigned int> mapInserted;
-	std::map<ECSESSIONID,unsigned int>::const_iterator iterInserted;
 	std::set<unsigned int>::const_iterator iterSyncId;
 	CHANGESUBSCRIBEMAP::const_iterator iterItem;
 	std::pair<CHANGESUBSCRIBEMAP::const_iterator, CHANGESUBSCRIBEMAP::const_iterator> iterRange;

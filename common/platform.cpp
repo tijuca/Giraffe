@@ -16,20 +16,19 @@
  */
 
 #include <kopano/platform.h>
+#include <cerrno>
+#include <cstdlib>
 #include <fcntl.h>
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <climits>
 #include <pthread.h>
+#include <unistd.h>
 
 #include <sys/stat.h>
 #include <sys/time.h> /* gettimeofday */
-
+#include <kopano/ECLogger.h>
 #include "TmpPath.h"
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
 
 HRESULT UnixTimeToFileTime(time_t t, FILETIME *ft)
 {
@@ -141,17 +140,6 @@ time_t SystemTimeToUnixTime(const SYSTEMTIME &stime)
 	return stime.wSecond + (stime.wMinute*60) + ((stime.wHour)*60*60);
 }
 
-SYSTEMTIME UnixTimeToSystemTime(time_t unixtime)
-{
-	SYSTEMTIME stime = {0};
-	stime.wSecond = unixtime%60;
-	unixtime /= 60;
-	stime.wMinute = unixtime%60;
-	unixtime /= 60;
-	stime.wHour = unixtime;
-	return stime;
-}
-
 SYSTEMTIME TMToSystemTime(const struct tm &t)
 {
 	SYSTEMTIME stime = {0};
@@ -164,21 +152,6 @@ SYSTEMTIME TMToSystemTime(const struct tm &t)
 	stime.wSecond = t.tm_sec;
 	stime.wMilliseconds = 0;
 	return stime;	
-}
-
-struct tm SystemTimeToTM(const SYSTEMTIME &stime)
-{
-	// not quite, since we miss tm_yday
-	struct tm t = {0};
-	t.tm_year = stime.wYear;
-	t.tm_mon = stime.wMonth;
-	t.tm_wday = stime.wDayOfWeek;
-	t.tm_mday = stime.wDay;
-	t.tm_hour = stime.wHour;
-	t.tm_min = stime.wMinute;
-	t.tm_sec = stime.wSecond;
-	t.tm_isdst = -1;
-	return t;	
 }
 
 /* The 'IntDate' and 'IntTime' date and time encoding are used for some CDO calculations. They
@@ -305,18 +278,9 @@ time_t timegm(struct tm *t) {
 
 	// SuSE 9.1 segfaults when putenv() is used in a detached thread on the next getenv() call.
 	// so use setenv() on linux, putenv() on others.
-
-#ifdef LINUX
 	setenv("TZ", "UTC0", 1);
 	tzset();
-#else
-	if(putenv("TZ=UTC0") != -1)
-		_tzset();
-#endif
-
 	convert = mktime(t);
-
-#ifdef LINUX
 	if (s_tz) {
 		setenv("TZ", s_tz, 1);
 		tzset();
@@ -324,15 +288,6 @@ time_t timegm(struct tm *t) {
 		unsetenv("TZ");
 		tzset();
 	}
-#else
-	if (s_tz) {
-		putenv(s_tz);
-		_tzset();
-	} else {
-		putenv("TZ=");
-		_tzset();
-	}
-#endif
 	free(s_tz);
 	return convert;
 }
@@ -412,7 +367,7 @@ int CreatePath(const char *createpath)
 		}
 
 		// Create the actual directory
-		int ret = CreateDir(createpath, 0700);
+		int ret = mkdir(createpath, 0700);
 		free(path);
 		return ret;
 	}
@@ -499,4 +454,70 @@ void give_filesize_hint(const int fd, const off_t len)
 	// pattern as it knows how much date is going to be
 	// inserted
 	posix_fallocate(fd, 0, len);
+}
+
+/**
+ * Restart the program with a new preloaded library.
+ * @argv:	full argv of current invocation
+ * @lib:	library to load via LD_PRELOAD
+ *
+ * As every program under Linux is linked to libc and symbol resolution is done
+ * breadth-first, having just libkcserver.so linked to the alternate allocator
+ * is not enough to ensure the allocator is being used in favor of libc malloc.
+ *
+ * A program built against glibc will have a record for e.g.
+ * "malloc@GLIBC_2.2.5". The use of LD_PRELOAD appears to relax the version
+ * requirement, though; the benefit would be that libtcmalloc's malloc will
+ * take over _all_ malloc calls.
+ */
+int kc_reexec_with_allocator(char **argv, const char *lib)
+{
+	if (lib == NULL || *lib == '\0')
+		return 0;
+	const char *s = getenv("KC_ALLOCATOR_DONE");
+	if (s != NULL)
+		/* avoid repeatedly reexecing ourselves */
+		return 0;
+	s = getenv("LD_PRELOAD");
+	if (s == NULL)
+		setenv("LD_PRELOAD", lib, true);
+	else if (strstr(s, "/valgrind/") != NULL)
+		/*
+		 * Within vg, everything is a bit different — since it catches
+		 * execve itself. Execing /proc/self/exe therefore won't work,
+		 * we would need to use argv[0]. But… don't bother.
+		 */
+		return 0;
+	else
+		setenv("LD_PRELOAD", (std::string(s) + ":" + lib).c_str(), true);
+	void *handle = dlopen(lib, RTLD_LAZY | RTLD_LOCAL);
+	if (handle == NULL)
+		/*
+		 * Ignore libraries that won't load anyway. This avoids
+		 * ld.so emitting a scary warning if we did re-exec.
+		 */
+		return 0;
+	dlclose(handle);
+	setenv("KC_ALLOCATOR_DONE", lib, true);
+
+	/* Resolve "exe" symlink before exec to please the sysadmin */
+	std::vector<char> linkbuf(16);
+	ssize_t linklen;
+	while (true) {
+		linklen = readlink("/proc/self/exe", &linkbuf[0], linkbuf.size());
+		if (linklen < 0 || static_cast<size_t>(linklen) < linkbuf.size())
+			break;
+		linkbuf.resize(linkbuf.size() * 2);
+	}
+	if (linklen < 0) {
+		int ret = -errno;
+		ec_log_warn("kc_reexec_with_allocator: readlink: %s", strerror(errno));
+		return ret;
+	}
+	linkbuf[linklen] = '\0';
+	ec_log_debug("Reexecing %s with %s", &linkbuf[0], lib);
+	execv(&linkbuf[0], argv);
+	int ret = -errno;
+	ec_log_info("Failed to reexec self: %s. Continuing with standard allocator.", strerror(errno));
+	return ret;
 }

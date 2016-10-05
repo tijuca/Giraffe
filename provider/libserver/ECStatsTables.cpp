@@ -35,9 +35,12 @@
 #include "ECStatsCollector.h"
 
 #if defined(HAVE_GPERFTOOLS_MALLOC_EXTENSION_H)
-#	include <gperftools/malloc_extension.h>
+#	include <gperftools/malloc_extension_c.h>
 #elif defined(HAVE_GOOGLE_MALLOC_EXTENSION_H)
-#	include <google/malloc_extension.h>
+#	include <google/malloc_extension_c.h>
+#endif
+#ifdef HAVE_MALLOC_H
+#	include <malloc.h>
 #endif
 
 /*
@@ -105,33 +108,44 @@ ECRESULT ECSystemStatsTable::Load()
 
 #ifdef HAVE_TCMALLOC
 	size_t value = 0;
-	MallocExtension::instance()->GetNumericProperty("generic.current_allocated_bytes", &value);
-	GetStatsCollectorData("tc_allocated", "Current allocated memory by TCMalloc", stringify_int64(value), this); // Bytes in use by application
+	auto gnp = reinterpret_cast<decltype(MallocExtension_GetNumericProperty) *>(dlsym(NULL, "MallocExtension_GetNumericProperty"));
+	if (gnp != NULL) {
+		gnp("generic.current_allocated_bytes", &value);
+		GetStatsCollectorData("tc_allocated", "Current allocated memory by TCMalloc", stringify_int64(value), this); // Bytes in use by application
 
-	value = 0;
-	MallocExtension::instance()->GetNumericProperty("generic.heap_size", &value);
-	GetStatsCollectorData("tc_reserved", "Bytes of system memory reserved by TCMalloc", stringify_int64(value), this);
+		value = 0;
+		gnp("generic.heap_size", &value);
+		GetStatsCollectorData("tc_reserved", "Bytes of system memory reserved by TCMalloc", stringify_int64(value), this);
 
-	value = 0;
-	MallocExtension::instance()->GetNumericProperty("tcmalloc.pageheap_free_bytes", &value);
-	GetStatsCollectorData("tc_page_map_free", "Number of bytes in free, mapped pages in page heap", stringify_int64(value), this); 
+		value = 0;
+		gnp("tcmalloc.pageheap_free_bytes", &value);
+		GetStatsCollectorData("tc_page_map_free", "Number of bytes in free, mapped pages in page heap", stringify_int64(value), this); 
 
-	value = 0;
-	MallocExtension::instance()->GetNumericProperty("tcmalloc.pageheap_unmapped_bytes", &value);
-	GetStatsCollectorData("tc_page_unmap_free", "Number of bytes in free, unmapped pages in page heap (released to OS)", stringify_int64(value), this);
+		value = 0;
+		gnp("tcmalloc.pageheap_unmapped_bytes", &value);
+		GetStatsCollectorData("tc_page_unmap_free", "Number of bytes in free, unmapped pages in page heap (released to OS)", stringify_int64(value), this);
 
-	value = 0;
-	MallocExtension::instance()->GetNumericProperty("tcmalloc.max_total_thread_cache_bytes", &value);
-	GetStatsCollectorData("tc_threadcache_max", "A limit to how much memory TCMalloc dedicates for small objects", stringify_int64(value), this);
+		value = 0;
+		gnp("tcmalloc.max_total_thread_cache_bytes", &value);
+		GetStatsCollectorData("tc_threadcache_max", "A limit to how much memory TCMalloc dedicates for small objects", stringify_int64(value), this);
 
-	value = 0;
-	MallocExtension::instance()->GetNumericProperty("tcmalloc.current_total_thread_cache_bytes", &value);
-	GetStatsCollectorData("tc_threadcache_cur", "Current allocated memory in bytes for thread cache", stringify_int64(value), this);
+		value = 0;
+		gnp("tcmalloc.current_total_thread_cache_bytes", &value);
+		GetStatsCollectorData("tc_threadcache_cur", "Current allocated memory in bytes for thread cache", stringify_int64(value), this);
+	}
+#ifdef HAVE_MALLINFO
+	/* parallel threaded allocator */
+	struct mallinfo malloc_info = mallinfo();
+	GetStatsCollectorData("pt_allocated", "Current allocated memory by libc ptmalloc, in bytes", stringify_int64(malloc_info.uordblks), this);
+#endif
 
 #ifdef DEBUG
 	char test[2048] = {0};
-	MallocExtension::instance()->GetStats(test, sizeof(test));
-	GetStatsCollectorData("tc_stats_string", "TCMalloc memory debug data", test, this);
+	auto getstat = reinterpret_cast<decltype(MallocExtension_GetStats) *>(dlsym(NULL, "MallocExtension_GetStats"));
+	if (getstat != NULL) {
+		getstat(test, sizeof(test));
+		GetStatsCollectorData("tc_stats_string", "TCMalloc memory debug data", test, this);
+	}
 #endif
 
 #endif
@@ -235,7 +249,6 @@ ECRESULT ECSystemStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis, s
 	*lppRowSet = lpsRowSet;
 	return erSuccess;
 }
-
 
 /*
   Session stats
@@ -490,7 +503,7 @@ ECRESULT ECSessionStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis, 
 
 				for (j = 0, iterBS = iterSD->second.busystates.begin();
 				     iterBS != iterSD->second.busystates.end(); ++j, ++iterBS) {
-					const char *szState;
+					const char *szState = "";
 					if(iterBS->state == SESSION_STATE_PROCESSING)
 						szState = "P";
 					else if(iterBS->state == SESSION_STATE_SENDING)
@@ -522,7 +535,6 @@ ECRESULT ECSessionStatsTable::QueryRowData(ECGenericObjectTable *lpGenericThis, 
 	*lppRowSet = lpsRowSet;
 	return erSuccess;
 }
-
 
 /*
   User stats
@@ -604,7 +616,6 @@ exit:
 	delete lpObjects;
 	return er;
 }
-
 
 ECRESULT ECUserStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList, struct propTagArray *lpsPropTagArray, void *lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
 {
@@ -816,7 +827,6 @@ ECRESULT ECUserStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 	return er;
 }
 
-
 ECCompanyStatsTable::ECCompanyStatsTable(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale) : ECGenericObjectTable(lpSession, MAPI_STATUS, ulFlags, locale)
 {
 	m_lpfnQueryRowData = QueryRowData;
@@ -850,7 +860,6 @@ exit:
 	delete lpCompanies;
 	return er;
 }
-
 
 ECRESULT ECCompanyStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
 {
@@ -905,7 +914,6 @@ ECRESULT ECCompanyStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct 
 		else if (lpUserManagement->GetQuotaDetailsAndSync(iterRowList->ulObjId, &quotaDetails) != erSuccess)
 			// company gone missing since last call, all quota props should be set to ignore
 			bNoQuotaDetails = true;
-
 
 		if (lpSession->GetSecurity()->GetUserSize(iterRowList->ulObjId, &llStoreSize) != erSuccess)
 			llStoreSize = 0;
@@ -1028,7 +1036,6 @@ ECRESULT ECServerStatsTable::Load()
 	}
 	return erSuccess;
 }
-
 
 ECRESULT ECServerStatsTable::QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
 {

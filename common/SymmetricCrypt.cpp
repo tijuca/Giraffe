@@ -38,9 +38,6 @@
  * @retval	true	The provided string was encrypted.
  * @retval	false 	The provided string was not encrypted.
  */
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
 
 bool SymmetricIsCrypted(const char *c)
 {
@@ -65,38 +62,6 @@ bool SymmetricIsCrypted(const char *c)
 bool SymmetricIsCrypted(const wchar_t *c)
 {
 	return wcsncmp(c, L"{1}:", 4) == 0 || wcsncmp(c, L"{2}:", 4) == 0;
-}
-
-/**
- * Crypt a pasword using algorithm 2.
- * 
- * @param[in]	strPlain
- * 					The string to encrypt.
- * 
- * @return	The encrypted string encoded in UTF-8.
- */
-std::string SymmetricCrypt(const std::wstring &strPlain)
-{
-	std::string u = convert_to<std::string>("UTF-8", strPlain, rawsize(strPlain), CHARSET_WCHAR);
-	size_t z = u.size();
-
-	for (size_t i = 0; i < z; ++i)
-		u[i] ^= 0xA5;
-	// Do the base64 encode
-	return "{2}:" + base64_encode(reinterpret_cast<const unsigned char *>(u.c_str()), z);
-}
-
-/**
- * Crypt a pasword using algorithm 2.
- * 
- * @param[in]	strPlain
- * 					The string to encrypt.
- * 
- * @return	The encrypted string encoded in UTF-16/32 (depending on type of wchar_t).
- */
-std::wstring SymmetricCryptW(const std::wstring &strPlain)
-{
-	return convert_to<std::wstring>(SymmetricCrypt(strPlain));
 }
 
 /**
@@ -165,20 +130,4 @@ std::string SymmetricDecrypt(const wchar_t *wstrCrypted)
 	// Length has been guaranteed to be >=4.
 	return SymmetricDecryptBlob(wstrCrypted[1] - '0',
 		base64_decode(convert_to<std::string>(wstrCrypted + 4)));
-}
-
-/**
- * Decrypt an encrypted password.
- * 
- * Depending on the N value, the password is decrypted using algorithm 1 or 2.
- * 
- * @param[in]	strCrypted
- * 					The encrypted password to decrypt.
- * 
- * @return	THe decrypted password encoded in in UTF-16/32 (depending on type of wchar_t).
- */
-std::wstring SymmetricDecryptW(const wchar_t *wstrCrypted)
-{
-	const std::string strDecrypted = SymmetricDecrypt(wstrCrypted);
-	return convert_to<std::wstring>(strDecrypted, rawsize(strDecrypted), "UTF-8");
 }

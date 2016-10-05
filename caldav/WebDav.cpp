@@ -23,12 +23,7 @@
 
 using namespace std;
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 /**
- * Default constructor
  * @param[in]	lpRequest	Pointer to http Request object
  * @param[in]	lpSession	Pointer to mapi session of the user
  * @param[in]	lpLogger	Pointer to logger object to log errors and information
@@ -38,9 +33,6 @@ WebDav::WebDav(Http *lpRequest, IMAPISession *lpSession, ECLogger *lpLogger, std
 	m_lpXmlDoc  = NULL;
 }
 
-/**
- * Default Destructor
- */
 WebDav::~WebDav()
 {
 	if (m_lpXmlDoc)
@@ -148,7 +140,7 @@ HRESULT WebDav::HrPropfind()
 	hr = RespStructToXml(&sDavMStatus, &strXml);
 	if (hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unable to convert reponse to xml: 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unable to convert response to xml: 0x%08X", hr);
 		goto exit;
 	}
 	
@@ -168,7 +160,6 @@ exit:
 
 	return hr;
 }
-
 
 /**
  * Converts WEBDAVMULTISTATUS response structure to xml data
@@ -968,7 +959,6 @@ HRESULT WebDav::HrWriteSResponse(xmlTextWriter *xmlWriter,
 {
 	HRESULT hr;
 	WEBDAVRESPONSE sWebResp;
-	std::string strNsPrefix;
 	std::list<WEBDAVPROPSTAT>::const_iterator iterPropStat;
 	std::list<WEBDAVPROPERTY>::const_iterator iterProperty;
 	int ulRet;
@@ -1402,7 +1392,7 @@ HRESULT WebDav::HrPropPatch()
 	hr = RespStructToXml(&sDavMStatus, &strXml);
 	if (hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unable to convert reponse to xml: 0x%08X", hr);
+		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unable to convert response to xml: 0x%08X", hr);
 		goto exit;
 	}
 

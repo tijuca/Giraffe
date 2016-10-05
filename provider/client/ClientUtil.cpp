@@ -44,10 +44,6 @@
 
 using namespace std;
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 HRESULT ClientUtil::HrInitializeStatusRow (const char * lpszProviderDisplay, ULONG ulResourceType, LPMAPISUP lpMAPISup, LPSPropValue lpspvIdentity, ULONG ulFlags)
 {
 	HRESULT			hResult = hrSuccess;
@@ -288,7 +284,6 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 												PR_INTERNET_MESSAGE_ID, PR_DELIVER_TIME, PR_SENT_REPRESENTING_ADDRTYPE, PR_SENT_REPRESENTING_EMAIL_ADDRESS,
 												PR_MDN_DISPOSITION_TYPE, PR_MDN_DISPOSITION_SENDINGMODE } };
 
-
 	// Check incoming parameters
 	if(lpReadMessage == NULL || lppEmptyMessage == NULL || *lppEmptyMessage == NULL) {
 		hr = MAPI_E_INVALID_OBJECT;
@@ -322,7 +317,6 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 		hr = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	}
-
 
 	strBodyText = _("Your message");
 	strBodyText+= _T("\r\n\r\n");
@@ -366,7 +360,6 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 		strBodyText+= _T("\r\n");
 	}
 
-
 	strBodyText+= _T("\r\n");
 	strBodyText+= lpReportText;
 	strBodyText+= _T(" ");
@@ -380,7 +373,6 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 
 	strBodyText+= convert_to<tstring>(szTime, strlen(szTime), CHARSET_CHAR);
 	strBodyText+= _T("\r\n");
-
 
 	ulMaxDestValues = cSrcValues + 4;//+ default properties
 	hr = MAPIAllocateBuffer(sizeof(SPropValue)*ulMaxDestValues, (void**)&lpDestPropValue);
@@ -706,7 +698,6 @@ HRESULT ClientUtil::GetGlobalProfileProperties(LPPROFSECT lpGlobalProfSect, stru
 			goto exit;
 	}
 
-
 	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_PATH)) != NULL)
 		lpsProfileProps->strServerPath = lpProp->Value.lpszA;
 
@@ -827,7 +818,6 @@ exit:
  * Read registry key to discover the installation directory for the exchange redirector
  *
  * @param[out] lpConfigPath String containing full config path
- * @return HRESULT Result
  */
 HRESULT ClientUtil::GetConfigPath(std::string *lpConfigPath)
 {
@@ -844,7 +834,6 @@ HRESULT ClientUtil::GetConfigPath(std::string *lpConfigPath)
  * @param pValues[in] Incoming exchange properties (must contain PR_PROFILE_UNRESOLVED_{USER,SERVER})
  * @param lpcValues[out] Number of properties in lppProps
  * @param lppProps[out] New ZARAFA properties
- * @return HRESULT Success result
  */
 HRESULT ClientUtil::ConvertMSEMSProps(ULONG cValues, LPSPropValue pValues, ULONG *lpcValues, LPSPropValue *lppProps)
 {
@@ -1054,11 +1043,11 @@ HRESULT HrGetServerURLFromStoreEntryId(ULONG cbEntryId, LPENTRYID lpEntryId, std
 
 	if (ulSize >= ulMaxSize)
 		return MAPI_E_NOT_FOUND;
-	if (strnicmp(lpTmpServerName, "pseudo://", 9) == 0)
+	if (strncasecmp(lpTmpServerName, "pseudo://", 9) == 0)
 		bIsPseudoUrl = true;
-	else if (strnicmp(lpTmpServerName, "http://", 7) && 
-			 strnicmp(lpTmpServerName, "https://", 8) && 
-			 strnicmp(lpTmpServerName, "file://", 7))
+	else if (strncasecmp(lpTmpServerName, "http://", 7) && 
+			 strncasecmp(lpTmpServerName, "https://", 8) && 
+			 strncasecmp(lpTmpServerName, "file://", 7))
 		return MAPI_E_NOT_FOUND;
 
 	rServerPath = lpTmpServerName;
@@ -1144,7 +1133,6 @@ HRESULT GetPublicEntryId(enumPublicEntryID ePublicEntryID, GUID guidStore, void 
 		default:
 			return MAPI_E_INVALID_PARAMETER;
 	}
-
 
 	if (lpcbEntryID == NULL || lppEntryID == NULL)
 		return MAPI_E_INVALID_PARAMETER;

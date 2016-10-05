@@ -79,8 +79,6 @@ static vmime::charset vtm_upgrade_charset(const vmime::charset &);
 static const char im_charset_unspec[] = "unspecified";
 
 /**
- * VMIMEToMAPI default constructor
- *
  * Default empty constructor for the inetmapi library. Sets all member
  * values to sane defaults.
  */
@@ -94,8 +92,6 @@ VMIMEToMAPI::VMIMEToMAPI()
 }
 
 /**
- * VMIMEToMAPI parameterized constructor.
- *
  * Adds user set addressbook (to minimize opens on this object) and delivery options.
  * 
  * @param[in]	lpAdrBook	Addressbook of a user.
@@ -115,9 +111,6 @@ VMIMEToMAPI::VMIMEToMAPI(LPADRBOOK lpAdrBook, ECLogger *newlogger, delivery_opti
 	m_lpDefaultDir = NULL;
 }
 
-/**
- * VMIMEToMAPI destructor.
- */
 VMIMEToMAPI::~VMIMEToMAPI()
 {
 	lpLogger->Release();
@@ -246,7 +239,6 @@ HRESULT VMIMEToMAPI::convertVMIMEToMAPI(const string &input, IMessage *lpMessage
 									 MAPI_CREATE|MAPI_MODIFY, (LPUNKNOWN *)&lpStream);
 			if (hr != hrSuccess)
 				goto exit;
-
 
 			outputStreamMAPIAdapter os(lpStream);
 			// get the content-type string from the headers
@@ -1175,7 +1167,6 @@ exit:
 	return hr;
 }
 
-
 /**
  * Adds recipients from a vmime list to rows for the recipient
  * table. Starts adding at offset in cEntries member of the lpRecipients
@@ -1381,7 +1372,6 @@ HRESULT VMIMEToMAPI::modifyFromAddressBook(LPSPropValue *lppPropVals, ULONG *lpu
 		goto exit;
 	}
 
-
 	if (!m_lpDefaultDir) {
 		hr = m_lpAdrBook->GetDefaultDir(&cbDDEntryID, &lpDDEntryID);
 		if (hr != hrSuccess)
@@ -1511,7 +1501,6 @@ HRESULT VMIMEToMAPI::modifyFromAddressBook(LPSPropValue *lppPropVals, ULONG *lpu
 		}
 		++cValues;
 	}
-
 
 	if (PROP_TYPE(lpPropsList->aulPropTag[6]) != PT_NULL) {
 		lpProp = PpropFindProp(lpAdrList->aEntries[0].rgPropVals, lpAdrList->aEntries[0].cValues, PR_SMTP_ADDRESS_W);
@@ -1772,7 +1761,7 @@ HRESULT VMIMEToMAPI::dissect_ical(vmime::ref<vmime::header> vmHeader,
 		sAttProps[2].ulPropTag = PR_ATTACH_FLAGS;
 		sAttProps[2].Value.ul = 0;
 
-		hr = ptrAttach->SetProps(3, (LPSPropValue)sAttProps, NULL);
+		hr = ptrAttach->SetProps(3, sAttProps, NULL);
 		if (hr != hrSuccess) {
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "dissect_ical-1811: Unable to create message attachment for ical data: %s (%x)", GetMAPIErrorMessage(hr), hr);
 			goto exit;
@@ -2561,7 +2550,6 @@ exit:
 	return hr;
 }
 
-
 /**
  * Handle Attachments.. Now works for inlines and attachments...
  *
@@ -2794,7 +2782,7 @@ namespace charsetHelper {
 static vmime::charset vtm_upgrade_charset(const vmime::charset &cset)
 {
 	for (size_t i = 0; i < ARRAY_SIZE(charsetHelper::fixes); ++i)
-		if (stricmp(charsetHelper::fixes[i].original, cset.getName().c_str()) == 0)
+		if (strcasecmp(charsetHelper::fixes[i].original, cset.getName().c_str()) == 0)
 			return charsetHelper::fixes[i].update;
 
 	return cset;
@@ -2843,7 +2831,7 @@ static std::string fix_content_type_charset(const char *in)
 			while (isspace(*in))	/* skip WS after ';' */
 				++in;
 		}
-		if (strnicmp(in, "charset=", 8) == 0) {
+		if (strncasecmp(in, "charset=", 8) == 0) {
 			in += 8;
 			cset = in;
 			while (!isspace(*in) && *in != ';' && *in != '\0')
@@ -3079,7 +3067,7 @@ HRESULT VMIMEToMAPI::postWriteFixups(IMessage *lpMessage)
 	if (hr != hrSuccess)
 		goto exit;
 
-	if (strnicmp(lpMessageClass->Value.lpszA, "IPM.Schedule.Meeting.", strlen( "IPM.Schedule.Meeting." )) == 0)
+	if (strncasecmp(lpMessageClass->Value.lpszA, "IPM.Schedule.Meeting.", strlen( "IPM.Schedule.Meeting." )) == 0)
 	{
 		// IPM.Schedule.Meeting.*
 
@@ -3480,7 +3468,6 @@ std::string VMIMEToMAPI::createIMAPEnvelope(vmime::ref<vmime::message> vmMessage
 
 	// ((cc),(cc))
 	try {
-		list<string> lAddr;
 		vmime::ref<vmime::addressList> aList = vmHeader->Cc()->getValue().dynamicCast<vmime::addressList>();
 		int aCount = aList->getAddressCount();
 		for (int i = 0; i < aCount; ++i)
@@ -3493,7 +3480,6 @@ std::string VMIMEToMAPI::createIMAPEnvelope(vmime::ref<vmime::message> vmMessage
 
 	// ((bcc),(bcc))
 	try {
-		list<string> lAddr;
 		vmime::ref<vmime::addressList> aList = vmHeader->Bcc()->getValue().dynamicCast<vmime::addressList>();
 		int aCount = aList->getAddressCount();
 		for (int i = 0; i < aCount; ++i)
@@ -3613,7 +3599,6 @@ HRESULT VMIMEToMAPI::messagePartToStructure(const string &input, vmime::ref<vmim
 
 			lBodyStructure.clear();
 			lBodyStructure.push_back(strBodyStructure);
-
 
 			// body:
 			//   (<SUB> "subtype")
@@ -3872,7 +3857,6 @@ std::string::size_type VMIMEToMAPI::countBodyLines(const std::string &input, std
 	return lines;
 }
 
-
 // options.h code
 /**
  * Set all members in the delivery_options struct to their defaults
@@ -3907,4 +3891,5 @@ void imopt_default_sending_options(sending_options *sopt) {
 	sopt->charset_upgrade = const_cast<char *>("windows-1252");
 	sopt->allow_send_to_everyone = true;
 	sopt->enable_dsn = true;
+	sopt->always_expand_distr_list = false;
 }

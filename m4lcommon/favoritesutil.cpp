@@ -30,13 +30,10 @@
 #include <string>
 using namespace std;
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
-
-SizedSPropTagArray(SHORTCUT_NUM, sPropsShortcuts) = {SHORTCUT_NUM, { PR_INSTANCE_KEY, PR_FAV_PUBLIC_SOURCE_KEY, PR_FAV_PARENT_SOURCE_KEY, PR_FAV_DISPLAY_NAME, PR_FAV_DISPLAY_ALIAS, PR_FAV_LEVEL_MASK, PR_FAV_CONTAINER_CLASS}};
-
+static SizedSPropTagArray(SHORTCUT_NUM, sPropsShortcuts) = {SHORTCUT_NUM, {
+	PR_INSTANCE_KEY, PR_FAV_PUBLIC_SOURCE_KEY, PR_FAV_PARENT_SOURCE_KEY,
+	PR_FAV_DISPLAY_NAME, PR_FAV_DISPLAY_ALIAS, PR_FAV_LEVEL_MASK,
+	PR_FAV_CONTAINER_CLASS}};
 
 LPSPropTagArray GetShortCutTagArray() {
 	return (LPSPropTagArray)&sPropsShortcuts;
@@ -226,7 +223,6 @@ HRESULT DelFavoriteFolder(IMAPIFolder *lpShortcutFolder, LPSPropValue lpPropSour
 
 	if (lpRows->cRows == 0)
 		goto exit; // Folder already removed
-
 
 	hr = MAPIAllocateBuffer(sizeof(ENTRYLIST), (void**)&lpsMsgList);
 	if (hr != hrSuccess)
@@ -527,83 +523,5 @@ exit:
 	if (lpRows)
 		FreeProws(lpRows);
 	MAPIFreeBuffer(lpsPropArray);
-	return hr;
-}
-
-/**
- * Check if the favorite is exist. If the favorite is exist, it will returns the favorite data
- * @param ulFlags unicode flag (unused, since SetColumns always sets the correct tags)
- */
-HRESULT GetFavorite(IMAPIFolder *lpShortcutFolder, ULONG ulFlags, IMAPIFolder *lpMapiFolder, ULONG *lpcValues, LPSPropValue *lppShortCutPropValues)
-{
-	HRESULT hr = hrSuccess;
-	LPSPropValue lpPropSourceKey = NULL;
-
-	LPMAPITABLE lpTable = NULL;
-
-	LPSPropValue lpShortCutPropValues = NULL;
-	ULONG cShortCutValues = 0;
-
-	LPSRestriction lpRestriction = NULL;
-
-	SRowSet *lpRows = NULL;
-
-	if (lpShortcutFolder == NULL || lpMapiFolder == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-	
-	hr = HrGetOneProp(lpMapiFolder, PR_SOURCE_KEY, &lpPropSourceKey);
-	if (hr != hrSuccess) {
-		hr = MAPI_E_CORRUPT_DATA;
-		goto exit;
-	}
-
-	// Check for duplicates
-	hr = lpShortcutFolder->GetContentsTable(ulFlags, &lpTable);
-	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpTable->SetColumns(GetShortCutTagArray(), 0);
-	if(hr != hrSuccess)
-		goto exit;
-
-	// build restriction
-	CREATE_RESTRICTION(lpRestriction);
-	CREATE_RES_AND(lpRestriction, lpRestriction, 1);
-	DATA_RES_PROPERTY(lpRestriction, lpRestriction->res.resAnd.lpRes[0], RELOP_EQ, PR_FAV_PUBLIC_SOURCE_KEY, lpPropSourceKey);
-
-	hr = lpTable->FindRow(lpRestriction, BOOKMARK_BEGINNING, 0);
-	if (hr != hrSuccess)
-		goto exit;
-
-	// Favorite is exist, get the information
-
-	hr = lpTable->QueryRows (1, 0, &lpRows);
-	if (hr != hrSuccess)
-		goto exit;
-
-	if (lpRows->cRows == 0) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit; // Folder gone?
-	}
-	
-	cShortCutValues = 0;
-	hr = Util::HrCopyPropertyArray(lpRows->aRow[0].lpProps, lpRows->aRow[0].cValues, &lpShortCutPropValues, &cShortCutValues, true);
-	if (hr != hrSuccess)
-		goto exit;
-	
-
-	*lppShortCutPropValues = lpShortCutPropValues;
-	*lpcValues = cShortCutValues;
-exit:
-	if (hr != hrSuccess)
-		MAPIFreeBuffer(lpShortCutPropValues);
-	MAPIFreeBuffer(lpPropSourceKey);
-	if (lpTable)
-		lpTable->Release();
-
-	FREE_RESTRICTION(lpRestriction);
-
 	return hr;
 }

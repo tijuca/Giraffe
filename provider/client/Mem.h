@@ -26,25 +26,6 @@ HRESULT ECAllocateBuffer(ULONG cbSize, void **lpvoid);
 HRESULT ECAllocateBufferDbg(ULONG cbSize, void **lpvoid, char *szFile, int line);
 HRESULT ECAllocateMore(ULONG cbSize, void *lpBase, void **lpvoid);
 
-LPALLOCATEBUFFER GetAllocateBuffer();
-LPALLOCATEMORE GetAllocateMore();
-LPFREEBUFFER GetFreeBuffer();
-
-HINSTANCE GetInstance();
-LPMALLOC GetMalloc();
-
-// Standard memory management
-/* DEPRECATED - do not use 
-HRESULT HrAlloc(ULONG cbSize, void **lpvoid);
-HRESULT HrRealloc(ULONG cbSize, void *lpBase, void **lpvoid);
-HRESULT HrFree(void *lpvoid); */
-
-// debug tracing
-#ifdef _DEBUG
-#define ECAllocateBuffer(cbSize, lpvoid)	ECAllocateBufferDbg(cbSize, lpvoid, __FILE__, __LINE__)
-#endif
-
-
 HRESULT AllocNewMapiObject(ULONG ulUniqueId, ULONG ulObjId, ULONG ulObjType, MAPIOBJECT **lppMapiObject);
 HRESULT FreeMapiObject(MAPIOBJECT *lpsObject);
 

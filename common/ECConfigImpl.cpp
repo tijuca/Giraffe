@@ -22,11 +22,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include <cassert>
-#ifdef LINUX
 #include <climits>
-#endif
-
-#include <algorithm>
 #include <kopano/stringutil.h>
 #include "ECConfigImpl.h"
 
@@ -34,10 +30,6 @@
 #include <kopano/boost_compat.h>
 
 using namespace std;
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
@@ -510,7 +502,6 @@ bool ECConfigImpl::HandleDirective(const string &strLine, unsigned int ulFlags)
 	return true;
 }
 
-
 bool ECConfigImpl::HandleInclude(const char *lpszArgs, unsigned int ulFlags)
 {
 	string strValue;
@@ -543,7 +534,7 @@ bool ECConfigImpl::CopyConfigSetting(const configsetting_t *lpsSetting, settingk
 		return false;
 
 	memset(lpsKey, 0, sizeof(*lpsKey));
-	strncpy(lpsKey->s, lpsSetting->szName, sizeof(lpsKey->s));
+	kc_strlcpy(lpsKey->s, lpsSetting->szName, sizeof(lpsKey->s));
 	lpsKey->ulFlags = lpsSetting->ulFlags;
 	lpsKey->ulGroup = lpsSetting->ulGroup;
 
@@ -579,7 +570,7 @@ bool ECConfigImpl::AddSetting(const configsetting_t *lpsConfig, unsigned int ulF
 	if (szAlias) {
 		if (!(ulFlags & LOADSETTING_INITIALIZING))
 			warnings.push_back("Option '" + string(lpsConfig->szName) + "' is deprecated! New name for option is '" + szAlias + "'.");
-		strncpy(s.s, szAlias, sizeof(s.s));
+		kc_strlcpy(s.s, szAlias, sizeof(s.s));
 	}
 
 	pthread_rwlock_wrlock(&m_settingsRWLock);
@@ -785,7 +776,6 @@ bool ECConfigImpl::WriteSettingsToFile(const char* szFileName)
 	rename(path_to_string(pathOutFile).c_str(),szFileName);
 	return true;
 }
-
 
 void ECConfigImpl::WriteLinesToFile(const char* szName, const char* szValue, ifstream& in, ofstream& out, bool bWriteAll)
 {

@@ -22,10 +22,6 @@
 
 #include <sstream>
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 template<int(*fnCmp)(const char*, const char*)>
 class StringComparer {
 public:
@@ -229,7 +225,7 @@ bool objectdetails_t::PropListStringContains(property_key_t propname,
 {
 	const std::list<std::string> list = GetPropListString(propname);
 	if (ignoreCase)
-		return std::find_if(list.begin(), list.end(), StringComparer<stricmp>(value)) != list.end();
+		return std::find_if(list.begin(), list.end(), StringComparer<strcasecmp>(value)) != list.end();
 	return std::find_if(list.begin(), list.end(), StringComparer<strcmp>(value)) != list.end();
 }
 

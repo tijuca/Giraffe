@@ -39,7 +39,6 @@ namespace Predicates {
 		const SObjectEntry &m_objEntry;
 	};
 
-
 	/**
 	 * Compare two SObjectEntry instances.
 	 * This method uses CompareEntryIDs to do the comparison.
@@ -62,7 +61,6 @@ namespace Predicates {
 		IMAPISession *m_lpSession;
 		const SObjectEntry &m_objEntry;
 	};
-
 
 	/**
 	 * Compare a store entryid with the store entryid from an SObjectEntry instance.
@@ -94,7 +92,6 @@ namespace Predicates {
 
 } // namespace Predicates
 
-
 /**
  * Create an ArchiveStateUpdater instance.
  * @param[in]	ptrSession		The archiver session.
@@ -119,7 +116,6 @@ HRESULT ArchiveStateUpdater::Create(const ArchiverSessionPtr &ptrSession, ECLogg
 }
 
 /**
- * Constructor
  * @param[in]	ptrSession		The archiver session.
  * @param[in]	lpLogger		The logger.
  * @param[in]	mapArchiveInfo	The map containing the users that have and/or

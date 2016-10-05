@@ -232,6 +232,7 @@ HRESULT INFLoader::MakeProperty(const std::string& strTag, const std::string& st
 	HRESULT hr;
 	SPropValue sProp;
 
+	memset(&sProp, 0, sizeof(sProp));
 	sProp.ulPropTag = DefinitionFromString(strTag, true);
 	switch (PROP_TYPE(sProp.ulPropTag)) {
 	case PT_LONG:
@@ -318,7 +319,6 @@ HRESULT SVCProvider::Init(const INFLoader& cINF, const inf_section* infProvider)
 {
 	HRESULT hr;
 	inf_section::const_iterator iSection;
-	vector<string> prop;
 
 	hr = MAPIAllocateBuffer(sizeof(SPropValue) * infProvider->size(), (void**)&m_lpProps);
 	if (hr != hrSuccess)
@@ -331,7 +331,6 @@ HRESULT SVCProvider::Init(const INFLoader& cINF, const inf_section* infProvider)
 			++m_cValues;
 	return hrSuccess;
 }
-
 
 SVCService::SVCService()
 {

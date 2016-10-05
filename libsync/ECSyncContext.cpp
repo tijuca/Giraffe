@@ -46,12 +46,7 @@ typedef mapi_object_ptr<IECChangeAdvisor, IID_IECChangeAdvisor> ECChangeAdvisorP
 typedef mapi_object_ptr<IECChangeAdviseSink, IID_IECChangeAdviseSink> ECChangeAdviseSinkPtr;
 //DEFINEMAPIPTR(ECChangeAdviseSink);
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 #define EC_SYNC_STATUS_VERSION			1
-
 
 #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
 class ECChangeAdviseSink _zcp_final : public ECUnknown
@@ -59,7 +54,6 @@ class ECChangeAdviseSink _zcp_final : public ECUnknown
 public:
 	typedef ULONG(ECSyncContext::*NOTIFYCALLBACK)(ULONG,LPENTRYLIST);
 
-	// Constructor
 	ECChangeAdviseSink(ECSyncContext *lpsSyncContext, NOTIFYCALLBACK fnCallback)
 		: m_lpsSyncContext(lpsSyncContext)
 		, m_fnCallback(fnCallback)
@@ -145,8 +139,6 @@ exit:
 	return hr;
 }
 
-
-
 ECSyncContext::ECSyncContext(LPMDB lpStore, ECLogger *lpLogger)
 	: m_lpStore(lpStore)
 	, m_lpLogger(lpLogger)
@@ -178,7 +170,6 @@ ECSyncContext::~ECSyncContext()
 	pthread_mutex_destroy(&m_hMutex);
 }
 
-
 HRESULT ECSyncContext::HrGetMsgStore(LPMDB *lppMsgStore)
 {
 	HRESULT hr = hrSuccess;
@@ -198,7 +189,6 @@ HRESULT ECSyncContext::HrGetMsgStore(LPMDB *lppMsgStore)
 exit:
 	return hr;
 }
-
 
 HRESULT ECSyncContext::HrGetReceiveFolder(LPMAPIFOLDER *lppInboxFolder)
 {
@@ -224,7 +214,6 @@ exit:
 	MAPIFreeBuffer(lpEntryID);
 	return hr;
 }
-
 
 HRESULT ECSyncContext::HrGetChangeAdvisor(IECChangeAdvisor **lppChangeAdvisor)
 {
@@ -307,13 +296,11 @@ exit:
 	return hr;
 }
 
-
 HRESULT ECSyncContext::HrGetChangeAdviseSink(IECChangeAdviseSink **lppChangeAdviseSink)
 {
 	ASSERT(m_lpChangeAdviseSink != NULL);
 	return m_lpChangeAdviseSink->QueryInterface(IID_IECChangeAdviseSink, (void**)lppChangeAdviseSink);
 }
-
 
 HRESULT ECSyncContext::HrQueryHierarchyTable(LPSPropTagArray lpsPropTags, LPSRowSet *lppRows)
 {
@@ -346,7 +333,6 @@ exit:
 	return hr;
 }
 
-
 HRESULT ECSyncContext::HrOpenRootFolder(LPMAPIFOLDER *lppRootFolder, LPMDB *lppMsgStore)
 {
 	HRESULT			hr = hrSuccess;
@@ -375,7 +361,6 @@ exit:
 	return hr;
 }
 
-
 HRESULT ECSyncContext::HrOpenFolder(SBinary *lpsEntryID, LPMAPIFOLDER *lppFolder)
 {
 	HRESULT			hr = hrSuccess;
@@ -399,12 +384,10 @@ exit:
 	return hr;
 }
 
-
 HRESULT ECSyncContext::HrNotifyNewMail(LPNOTIFICATION lpNotification)
 {
 	return m_lpStore->NotifyNewMail(lpNotification);
 }
-
 
 HRESULT ECSyncContext::HrGetSteps(SBinary *lpEntryID, SBinary *lpSourceKey, ULONG ulSyncFlags, ULONG *lpulSteps)
 {
@@ -527,7 +510,6 @@ exit:
 	return hr;
 }
 
-
 HRESULT ECSyncContext::HrUpdateChangeId(LPSTREAM lpStream)
 {
 	HRESULT		hr = hrSuccess;
@@ -540,7 +522,6 @@ HRESULT ECSyncContext::HrUpdateChangeId(LPSTREAM lpStream)
 	hr = HrDecodeSyncStateStream(lpStream, &ulSyncId, &ulChangeId);
 	if (hr != hrSuccess)
 		goto exit;
-
 
 	pthread_mutex_lock(&m_hMutex);
 
@@ -566,7 +547,6 @@ exit:
 	return hr;
 }
 
-
 HRESULT ECSyncContext::HrGetSyncStateFromSourceKey(SBinary *lpSourceKey, SSyncState *lpsSyncState)
 {
 	HRESULT							hr = hrSuccess;
@@ -582,7 +562,6 @@ HRESULT ECSyncContext::HrGetSyncStateFromSourceKey(SBinary *lpSourceKey, SSyncSt
 		*lpsSyncState = iterSyncState->second;
 		goto exit;
 	}
-
 
 	// Try to get the information from the status stream.
 	hr = HrGetSyncStatusStream(lpSourceKey, &lpStream);
@@ -614,13 +593,11 @@ bool ECSyncContext::SyncStatusLoaded() const
 	return !m_mapSyncStatus.empty();
 }
 
-
 HRESULT ECSyncContext::HrClearSyncStatus()
 {
 	m_mapSyncStatus.clear();
 	return hrSuccess;
 }
-
 
 HRESULT ECSyncContext::HrLoadSyncStatus(SBinary *lpsSyncState)
 {
@@ -688,7 +665,6 @@ HRESULT ECSyncContext::HrLoadSyncStatus(SBinary *lpsSyncState)
 exit:
 	return hr;
 }
-
 
 HRESULT ECSyncContext::HrSaveSyncStatus(LPSPropValue *lppSyncStatusProp)
 {
@@ -759,7 +735,6 @@ exit:
 	return hr;
 }
 
-
 HRESULT ECSyncContext::HrGetSyncStatusStream(LPMAPIFOLDER lpFolder, LPSTREAM *lppStream)
 {
 	HRESULT hr = hrSuccess;
@@ -777,7 +752,6 @@ exit:
 	MAPIFreeBuffer(lpPropVal);
 	return hr;
 }
-
 
 HRESULT ECSyncContext::HrGetSyncStatusStream(SBinary *lpsSourceKey, LPSTREAM *lppStream)
 {
@@ -809,7 +783,6 @@ exit:
 
 	return hr;
 }
-
 
 HRESULT ECSyncContext::GetResyncID(ULONG *lpulResyncID)
 {

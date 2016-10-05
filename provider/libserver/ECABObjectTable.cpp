@@ -34,10 +34,6 @@
 #include "ECSessionManager.h"
 #include <kopano/stringutil.h>
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 ECABObjectTable::ECABObjectTable(ECSession *lpSession, unsigned int ulABId, unsigned int ulABType, unsigned int ulABParentId, unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale) : ECGenericObjectTable(lpSession, ulABType, ulFlags, locale)
 {
 	ECODAB* lpODAB = new ECODAB;
@@ -139,16 +135,12 @@ ECRESULT ECABObjectTable::GetColumnsAll(ECListInt* lplstProps)
 
 	pthread_mutex_unlock(&m_hLock);
 
-
 	return er;
 }
 
 ECRESULT ECABObjectTable::ReloadTableMVData(ECObjectTableList* lplistRows, ECListInt* lplistMVPropTag)
 {
 	ECRESULT			er = erSuccess;
-	ECListIntIterator	iterListMVPropTag;
-
-	ECObjectTableList::const_iterator iterListRows;
 
 	ASSERT(lplistMVPropTag->size() <2); //FIXME: Limit of one 1 MV column
 
@@ -159,15 +151,9 @@ ECRESULT ECABObjectTable::ReloadTableMVData(ECObjectTableList* lplistRows, ECLis
 	return er;
 }
 
-
 ECRESULT ECABObjectTable::GetMVRowCount(unsigned int ulObjId, unsigned int *lpulCount)
 {
 	ECRESULT er = erSuccess;
-    ECObjectTableList			listRows;
-	ECObjectTableList::const_iterator iterListRows;
-	ECObjectTableMap::const_iterator iterIDs;
-
-	ECListInt::const_iterator iterListMVPropTag;
 
 	pthread_mutex_lock(&m_hLock);
 

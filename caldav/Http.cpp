@@ -24,10 +24,6 @@
 
 using namespace std;
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 /** 
  * Parse the incoming URL into known pieces:
  *
@@ -134,9 +130,6 @@ Http::Http(ECChannel *lpChannel, ECLogger *lpLogger, ECConfig *lpConfig)
 	m_ulRetCode = 0;
 }
 
-/**
- * Default destructor
- */
 Http::~Http()
 {
 	m_lpLogger->Release();
@@ -212,7 +205,6 @@ HRESULT Http::HrParseHeaders()
 {
 	HRESULT hr;
 	std::string strAuthdata;
-	std::string strLength;
 	std::string strUserAgent;
 
 	std::vector<std::string> items;
@@ -391,7 +383,7 @@ HRESULT Http::HrGetDepth(ULONG *ulDepth)
 }
 
 /** 
- * Checks the etag of a MAPI object agains If-(None)-Match headers
+ * Checks the etag of a MAPI object against If-(None)-Match headers
  * 
  * @param[in] lpProp Object to check etag (PR_LAST_MODIFICATION_TIME) to
  * 
@@ -792,7 +784,7 @@ HRESULT Http::HrFlushHeaders()
 	strftime(lpszChar, 127, "%a, %d %b %Y %H:%M:%S GMT", gmtime_safe(&tmCurrenttime, &dummy));
 
 	HrResponseHeader("Date", lpszChar);
-	if (m_ulKeepAlive != 0 && stricmp(strConnection.c_str(), "keep-alive") == 0) {
+	if (m_ulKeepAlive != 0 && strcasecmp(strConnection.c_str(), "keep-alive") == 0) {
 		HrResponseHeader("Connection", "Keep-Alive");
 		HrResponseHeader("Keep-Alive", stringify(m_ulKeepAlive, false));
 	}

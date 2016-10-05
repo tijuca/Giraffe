@@ -39,10 +39,6 @@
 #include <edkmdb.h>
 #include <kopano/mapiext.h>
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 #define _(string) dcgettext("kopano", string, LC_MESSAGES)
 
 extern ECSessionManager*	g_lpSessionManager;
@@ -295,7 +291,6 @@ ECRESULT ECGenProps::IsPropRedundant(unsigned int ulPropTag, unsigned int ulObjT
 ECRESULT ECGenProps::GetPropComputed(struct soap *soap, unsigned int ulObjType, unsigned int ulPropTagRequested, unsigned int ulObjId, struct propVal *lpPropVal)
 {
 	ECRESULT		er = erSuccess;
-	char*			lpszColon = NULL;
 
 	switch(PROP_ID(ulPropTagRequested)) {
 	case PROP_ID(PR_MSG_STATUS):
@@ -335,7 +330,7 @@ ECRESULT ECGenProps::GetPropComputed(struct soap *soap, unsigned int ulObjType, 
     	} else {
 		lpPropVal->ulPropTag = ulPropTagRequested;
 		// Check for RE, FWD and similar muck at the start of the subject line   		
-		lpszColon = strchr(lpPropVal->Value.lpszA, ':');
+		const char *lpszColon = strchr(lpPropVal->Value.lpszA, ':');
 		if (lpszColon != NULL && (lpszColon - lpPropVal->Value.lpszA) > 1 && (lpszColon - lpPropVal->Value.lpszA) < 4)
 		{
 			char* c = lpPropVal->Value.lpszA;
@@ -859,7 +854,6 @@ ECRESULT ECGenProps::IsOrphanStore(ECSession* lpSession, unsigned int ulObjId, b
 
 	if (lpDatabase->GetNumRows(lpDBResult) == 0)
 		bIsOrphan = true;
-
 
 	*lpbIsOrphan = bIsOrphan;
 

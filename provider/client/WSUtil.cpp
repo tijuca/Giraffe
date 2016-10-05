@@ -16,9 +16,7 @@
  */
 
 #include <kopano/platform.h>
-#ifdef LINUX
 #include <sys/un.h>
-#endif
 #include "WSUtil.h"
 #include <kopano/ECIConv.h>
 #include <kopano/ECGuid.h>
@@ -49,11 +47,6 @@
 #include "SOAPSock.h"
 
 using namespace std;
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 
 #define CONVERT_TO(_context, _charset, ...) ((_context) ? (_context)->convert_to<_charset>(__VA_ARGS__) : convert_to<_charset>(__VA_ARGS__))
 
@@ -1542,7 +1535,6 @@ HRESULT CopyABPropsToSoap(const SPROPMAP *lpPropmap,
 	convert_context	converter;
 	ULONG ulConvFlags;
 
-
 	if (lpPropmap && lpPropmap->cEntries) {
 		hr = ECAllocateBuffer(sizeof *soapPropmap, (void**)&soapPropmap);
 		if (hr != hrSuccess)
@@ -2224,7 +2216,6 @@ HRESULT CopySOAPNotificationToMAPINotification(void *lpProvider, struct notifica
 				CopySOAPEntryIdToMAPIEntryId(lpSrc->newmail->pParentId, &lpNotification->info.newmail.cbParentID, &lpNotification->info.newmail.lpParentID, (void **)lpNotification);
 			}
 
-
 			if(lpSrc->newmail->lpszMessageClass != NULL) {
 				nLen = strlen(lpSrc->newmail->lpszMessageClass)+1;
 				ECAllocateMore(nLen, lpNotification, (void**)&lpNotification->info.newmail.lpszMessageClass);
@@ -2282,7 +2273,6 @@ HRESULT CopySOAPNotificationToMAPINotification(void *lpProvider, struct notifica
 			if(lpSrc->tab->propPrior.Value.bin){
 				lpNotification->info.tab.propPrior.Value.bin.cb = lpSrc->tab->propPrior.Value.bin->__size;
 				ECAllocateMore(lpNotification->info.tab.propPrior.Value.bin.cb, lpNotification, (void**)&lpNotification->info.tab.propPrior.Value.bin.lpb);
-
 
 				memcpy(lpNotification->info.tab.propPrior.Value.bin.lpb, lpSrc->tab->propPrior.Value.bin->__ptr, lpSrc->tab->propPrior.Value.bin->__size);
 			}
@@ -2443,7 +2433,6 @@ HRESULT CopyUserClientUpdateStatusFromSOAP(struct userClientUpdateStatusResponse
 
 	if (hr != hrSuccess)
 		goto exit;
-
 
 	*lppECUCUS = lpECUCUS;
 	lpECUCUS = NULL;

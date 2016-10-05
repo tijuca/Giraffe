@@ -40,8 +40,6 @@ namespace za { namespace helpers {
  * @param[out]	lppptrMAPIPropHelper
  *					Pointer to a MAPIPropHelperPtr that will be assigned the returned
  *					MAPIPropHelper object.
- *
- * @return HRESULT
  */
 HRESULT MAPIPropHelper::Create(MAPIPropPtr ptrMapiProp, MAPIPropHelperPtr *lpptrMAPIPropHelper)
 {
@@ -62,9 +60,6 @@ HRESULT MAPIPropHelper::Create(MAPIPropPtr ptrMapiProp, MAPIPropHelperPtr *lpptr
 	return hrSuccess;
 }
 
-/**
- * Constructor
- */
 MAPIPropHelper::MAPIPropHelper(MAPIPropPtr ptrMapiProp)
 : m_ptrMapiProp(ptrMapiProp)
 { }
@@ -133,7 +128,6 @@ HRESULT MAPIPropHelper::GetMessageState(ArchiverSessionPtr ptrSession, MessageSt
 		return ptrMessageProps[IDX_HIERARCHYID].Value.err;
 	hr = hrSuccess;
 
-
 	// Determine stubbed / dirty state.
 	if (PROP_TYPE(ptrMessageProps[IDX_STUBBED].ulPropTag) != PT_ERROR && ptrMessageProps[IDX_STUBBED].Value.b == TRUE)
 		ulState |= MessageState::msStubbed;
@@ -145,7 +139,6 @@ HRESULT MAPIPropHelper::GetMessageState(ArchiverSessionPtr ptrSession, MessageSt
 		if ((ulState & MessageState::msStubbed) == 0)
 			ulState |= MessageState::msDirty;
 	}
-
 
 	// Determine copy / move state.
 	if (PROP_TYPE(ptrMessageProps[IDX_ORIGINAL_SOURCEKEY].ulPropTag) == PT_ERROR) {
@@ -256,8 +249,6 @@ HRESULT MAPIPropHelper::GetMessageState(ArchiverSessionPtr ptrSession, MessageSt
  *
  * @param[in]	bIgnoreSourceKey
  * 					Don't try to detect a copy/move and return an empty list in that case.
- *
- * @return HRESULT
  */
 HRESULT MAPIPropHelper::GetArchiveList(ObjectEntryList *lplstArchives, bool bIgnoreSourceKey)
 {
@@ -343,8 +334,6 @@ HRESULT MAPIPropHelper::GetArchiveList(ObjectEntryList *lplstArchives, bool bIgn
  *					The list of archive references that should be stored in the object.
  * @param[in]	bExplicitCommit
  *					If set to true, the changes are committed before this function returns.
- *
- * @return HRESULT
  */
 HRESULT MAPIPropHelper::SetArchiveList(const ObjectEntryList &lstArchives, bool bExplicitCommit)
 {
@@ -418,8 +407,6 @@ HRESULT MAPIPropHelper::SetArchiveList(const ObjectEntryList &lstArchives, bool 
  *					The id of the referenced object.
  * @param[in]	bExplicitCommit
  *					If set to true, the changes are committed before this function returns.
- *
- * @return HRESULT
  */
 HRESULT  MAPIPropHelper::SetReference(const SObjectEntry &sEntry, bool bExplicitCommit)
 {
@@ -444,7 +431,6 @@ HRESULT  MAPIPropHelper::SetReference(const SObjectEntry &sEntry, bool bExplicit
 	return hr;
 }
 
-
 HRESULT MAPIPropHelper::ClearReference(bool bExplicitCommit)
 {
 	HRESULT hr;
@@ -459,7 +445,6 @@ HRESULT MAPIPropHelper::ClearReference(bool bExplicitCommit)
 
 	return hr;
 }
-
 
 HRESULT MAPIPropHelper::GetReference(SObjectEntry *lpEntry)
 {
@@ -485,7 +470,6 @@ HRESULT MAPIPropHelper::GetReference(SObjectEntry *lpEntry)
 	lpEntry->sItemEntryId.assign(ptrMessageProps[IDX_REF_ITEM_ENTRYID].Value.bin);
 	return hr;
 }
-
 
 HRESULT MAPIPropHelper::ReferencePrevious(const SObjectEntry &sEntry)
 {
@@ -537,8 +521,6 @@ HRESULT MAPIPropHelper::OpenPrevious(ArchiverSessionPtr ptrSession, LPMESSAGE *l
  * return true if the message class is not updated properly. However, this is done in the caller
  * of this function, which has no notion of the set of named properies that are needed to remove this
  * property.
- *
- * @return HRESULT.
  */
 HRESULT MAPIPropHelper::RemoveStub()
 {
@@ -552,12 +534,9 @@ HRESULT MAPIPropHelper::SetClean()
 	return m_ptrMapiProp->DeleteProps((LPSPropTagArray)&sptaDirtyProps, NULL);
 }
 
-
 /**
  * Detach an object from its archived version.
  * This does not cause the reference in the archived version to be removed.
- *
- * @return HRESULT
  */
 HRESULT MAPIPropHelper::DetachFromArchives()
 {
@@ -573,8 +552,6 @@ HRESULT MAPIPropHelper::DetachFromArchives()
  * @param[in]	lppFolder
  *					Pointer to a IMAPIFolder pointer that will be assigned the address
  *					of the returned folder.
- *
- * @return HRESULT
  */
 HRESULT MAPIPropHelper::GetParentFolder(ArchiverSessionPtr ptrSession, LPMAPIFOLDER *lppFolder)
 {
@@ -606,96 +583,6 @@ HRESULT MAPIPropHelper::GetParentFolder(ArchiverSessionPtr ptrSession, LPMAPIFOL
 }
 
 /**
- * Get the list of properties needed to be able to determine if the message from which
- * the properties are obtained is stubbed and if so to get a list of archived versions.
- *
- * @param[in]	ptrMapiProp		An IMAPIProp that lives on the same server as the the
- * 								message from which the properties will be obtained. This
- * 								is needed to properly resolve the named properties.
- * @param[in]	lpExtra			Optional pointer to a PropTagArray containing additional
- * 								properties that will also be placed in the resulting
- * 								PropTagArray. This is for convenience when building a list
- * 								of properties where not only the archive properties are
- * 								required.
- * @param[out]	lppProps		The resulting PropTagArray.
- */
-HRESULT MAPIPropHelper::GetArchiverProps(MAPIPropPtr ptrMapiProp, LPSPropTagArray lpExtra, LPSPropTagArray *lppProps)
-{
-	HRESULT hr = hrSuccess;
-
-	SizedSPropTagArray(2, sptaFixedProps) = {2, {PR_MESSAGE_CLASS, PR_SOURCE_KEY}};
-	
-	PROPMAP_START
-		PROPMAP_NAMED_ID(STUBBED, PT_BOOLEAN, PSETID_Archive, dispidStubbed)
-		PROPMAP_NAMED_ID(ARCHIVE_STORE_ENTRYIDS, PT_MV_BINARY, PSETID_Archive, dispidStoreEntryIds)
-		PROPMAP_NAMED_ID(ARCHIVE_ITEM_ENTRYIDS, PT_MV_BINARY, PSETID_Archive, dispidItemEntryIds)
-		PROPMAP_NAMED_ID(ORIGINAL_SOURCEKEY, PT_BINARY, PSETID_Archive, dispidOrigSourceKey)
-	PROPMAP_INIT(ptrMapiProp)
-
-	 hr = MAPIAllocateBuffer(CbNewSPropTagArray(sptaFixedProps.cValues + 4 + (lpExtra ? lpExtra->cValues : 0)), (LPVOID*)lppProps);
-	 if (hr != hrSuccess)
-		goto exit;
-
-	for (ULONG i = 0; i < sptaFixedProps.cValues; ++i)
-		(*lppProps)->aulPropTag[i] = sptaFixedProps.aulPropTag[i];
-
-	(*lppProps)->cValues = sptaFixedProps.cValues;
-	(*lppProps)->aulPropTag[(*lppProps)->cValues++] = PROP_STUBBED;
-	(*lppProps)->aulPropTag[(*lppProps)->cValues++] = PROP_ARCHIVE_STORE_ENTRYIDS;
-	(*lppProps)->aulPropTag[(*lppProps)->cValues++] = PROP_ARCHIVE_ITEM_ENTRYIDS;
-	(*lppProps)->aulPropTag[(*lppProps)->cValues++] = PROP_ORIGINAL_SOURCEKEY;
-
-	for (ULONG i = 0; lpExtra && i < lpExtra->cValues; ++i)
-		(*lppProps)->aulPropTag[(*lppProps)->cValues++] = lpExtra->aulPropTag[i];
-
-exit:
-	return hr;
-}
-
-/**
- * Check if a message is stubbed.
- * This is accomplished by checking if the named property {72e98ebc-57d2-4ab5-b0aad50a7b531cb9}/stubbed is set to true or false.
- * If that property is absent the PR_MESSAGE_CLASS is compared to "IPM.Zarafa.Stub". If that matches the message is
- * considered stubbed as well.
- *
- * @param[in]	ptrMapiProp		An IMAPIProp that lives on the same server as the the
- * 								message from which the properties were obtained. This
- * 								is needed to properly resolve the named properties.
- * @param[in]	lpProps			The list of properties to use to determine if the message
- * 								from which they were obtained is stubbed.
- * @param[in]	cbProps			The amount of properties in lpProps.
- * @param[out]	lpbResult		Pointer to a boolean that will be set to true if the
- * 								message is stubbed, and false otherwise.
- *
- * @return HRESULT
- */
-HRESULT MAPIPropHelper::IsStubbed(MAPIPropPtr ptrMapiProp, LPSPropValue lpProps, ULONG cbProps, bool *lpbResult)
-{
-	HRESULT hr = hrSuccess;
-	LPSPropValue lpPropStubbed = NULL;
-	LPSPropValue lpPropMessageClass = NULL;
-
-	PROPMAP_START
-		PROPMAP_NAMED_ID(STUBBED, PT_BOOLEAN, PSETID_Archive, dispidStubbed)
-	PROPMAP_INIT(ptrMapiProp)
-
-	lpPropStubbed = PpropFindProp(lpProps, cbProps, PROP_STUBBED);
-
-	if (!lpPropStubbed) {
-		// PROP_STUBBED doesn't exist, check the message class to be sure
-		lpPropMessageClass = PpropFindProp(lpProps, cbProps, PR_MESSAGE_CLASS);
-		if (lpPropMessageClass)
-			*lpbResult = (_tcsicmp(lpPropMessageClass->Value.LPSZ, _T("IPM.Zarafa.Stub")) == 0);
-		else
-			*lpbResult = false;
-	} else
-		*lpbResult = (lpPropStubbed->Value.b != 0);
-		
-exit:
-	return hr;
-}
-
-/**
  * Get the list of archives for the object.
  * This has a different meaning for different objects:
  * Message store: A list of folders that are the root folders of the attached archives.
@@ -709,8 +596,6 @@ exit:
  * 								for the message from which they were obtained.
  * @param[in]	cbProps			The amount of properties in lpProps.
  * @param[out]	lplstArchives	Pointer to a list that will be populated with the archive references.
- *
- * @return HRESULT
  */
 HRESULT MAPIPropHelper::GetArchiveList(MAPIPropPtr ptrMapiProp, LPSPropValue lpProps, ULONG cbProps, ObjectEntryList *lplstArchives)
 {

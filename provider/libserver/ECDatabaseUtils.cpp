@@ -32,10 +32,6 @@
 #include <pthread.h>
 #include <string>
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 ECRESULT GetPropSize(DB_ROW lpRow, DB_LENGTHS lpLen, unsigned int *lpulSize)
 {
 	ECRESULT er = erSuccess;
@@ -73,7 +69,6 @@ ECRESULT GetPropSize(DB_ROW lpRow, DB_LENGTHS lpLen, unsigned int *lpulSize)
 	*lpulSize = ulSize;
 	return er;
 }
-
 
 // Case insensitive find
 static size_t
@@ -367,27 +362,6 @@ ECRESULT CopySOAPPropValToDatabaseMVPropVal(struct propVal *lpPropVal, int nItem
 	}
 	return erSuccess;
 }
-// by table 
-
-ECRESULT ParseMVPropCount(const char *lpRowData, ULONG ulSize,
-    unsigned int *lpulLastPos, int *lpnItemCount)
-{
-	ULONG	ulPos = *lpulLastPos;
-	ULONG	ulIter = ulPos;
-	std::string strSize;
-
-	ASSERT(ulPos < ulSize);
-
-	while(ulIter < ulSize && lpRowData[ulIter] != ':')
-		++ulIter;
-	
-	strSize.insert(0, lpRowData+ulPos, ulIter - ulPos);
-
-	*lpnItemCount = atoi(strSize.c_str());
-	*lpulLastPos = (ulIter+1);
-
-	return erSuccess;
-}
 
 ECRESULT ParseMVProp(const char *lpRowData, ULONG ulSize,
     unsigned int *lpulLastPos, std::string *lpstrData)
@@ -570,7 +544,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 			goto exit;
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_li;
-		lpPropVal->Value.li = _atoi64(lpRow[FIELD_NR_LONGINT]);
+		lpPropVal->Value.li = atoll(lpRow[FIELD_NR_LONGINT]);
 		break;
 	case PT_STRING8:
 	case PT_UNICODE:
@@ -735,7 +709,7 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 		ulLastPos = 0;
 		for (gsoap_size_t i = 0; i < lpPropVal->Value.mvli.__size; ++i) {
 			ParseMVProp(lpRow[FIELD_NR_LONGINT], lpLen[FIELD_NR_LONGINT], &ulLastPos, &strData);
-			lpPropVal->Value.mvli.__ptr[i] = _atoi64(strData.c_str());
+			lpPropVal->Value.mvli.__ptr[i] = atoll(strData.c_str());
 		}
 		break;
 	default:
@@ -749,7 +723,6 @@ exit:
 	freelocale(loc);
 	return er;
 }
-
 
 unsigned int NormalizeDBPropTag(unsigned int ulPropTag)
 {
