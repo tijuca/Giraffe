@@ -1,0 +1,6 @@
+etc/kopano/backup.cfg
+usr/lib/python*/*/kopano_backup/
+usr/sbin/kopano-backup
+usr/share/doc/kopano-server/example-config/backup.cfg  usr/share/doc/kopano-backup-plus/example-config
+usr/share/man/man5/kopano-backup.cfg.5
+usr/share/man/man8/kopano-backup.8
