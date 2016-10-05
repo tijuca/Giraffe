@@ -49,7 +49,6 @@ Build-Depends: autoconf (>= 2.59),
  zlib1g-dev,
 Standards-Version: 3.9.8
 X-Python-Version: 2.7
-Testsuite: autopkgtest
 
 Package: kopano-libs
 Architecture: any
