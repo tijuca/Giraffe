@@ -26,7 +26,7 @@ License: Expat
 Comment: Upstream licensed the work under the MIT license which is also
  known as Expat license (https://www.debian.org/legal/licenses/mit)
  Upstream source can be found on  https://github.com/ahupp/python-magic
- Note the upstream license informtion in
+ Note the upstream license information in
  https://github.com/ahupp/python-magic/blob/master/LICENSE
 
 Files: inetmapi/MAPISMTPTransport.cpp
