@@ -161,19 +161,6 @@ Description: Complete and feature rich groupware solution - delivery agent
  This package contains the email delivery agent that delivers incoming
  email from you SMTP server to the Kopano server.
 
-Package: kopano-dbg
-Priority: extra
-Architecture: any
-Depends: ${misc:Depends},
-  kopano-server | kopano-libs | python-mapi | php5-mapi
-Section: debug
-Description: Complete and feature rich groupware solution - debug files
- The Kopano Collaboration Platform (KCP) is a complete, stable and
- flexible groupware solution supporting open source as well as proprietary
- clients including mobile ones. It also features a web interface.
- .
- This package contains the debug symbols.
-
 Package: kopano-gateway
 Architecture: any
 Suggests: python-mapi
