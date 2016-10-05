@@ -10,11 +10,11 @@ make process is allowed.
  1 file changed, 3 insertions(+)
 
 diff --git a/swig/python/Makefile.am b/swig/python/Makefile.am
-index 85ced95..6aa6250 100644
+index 5c06297..6e9ded7 100644
 --- a/swig/python/Makefile.am
 +++ b/swig/python/Makefile.am
-@@ -183,3 +183,6 @@ install-exec-local:
- 	rm -Rf build
+@@ -189,3 +189,6 @@ uninstall-local:
+ 		${DESTDIR}${pythondir}/MAPI-1*.egg-info
  
  include ../../global.am
 +

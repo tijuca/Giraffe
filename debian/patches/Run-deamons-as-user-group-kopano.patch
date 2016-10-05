@@ -91,7 +91,7 @@ index 68d70e0..926f818 100644
  # create a pid file for stopping the service via the init.d scripts
  #pid_file = /var/run/kopano/monitor.pid
 diff --git a/installer/linux/server.cfg b/installer/linux/server.cfg
-index a558477..c7bd342 100644
+index 97d5519..4b3b2bd 100644
 --- a/installer/linux/server.cfg
 +++ b/installer/linux/server.cfg
 @@ -46,10 +46,10 @@ owner_auto_full_access = true

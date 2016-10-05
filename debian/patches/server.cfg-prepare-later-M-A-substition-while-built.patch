@@ -10,10 +10,10 @@ can be substituted while package creation.
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/installer/linux/server.cfg b/installer/linux/server.cfg
-index c7bd342..b40756d 100644
+index 4b3b2bd..dd07969 100644
 --- a/installer/linux/server.cfg
 +++ b/installer/linux/server.cfg
-@@ -334,8 +334,8 @@ user_plugin		= db
+@@ -338,8 +338,8 @@ user_plugin		= db
  user_plugin_config	= /etc/kopano/ldap.cfg
  
  # location of the kopano plugins
