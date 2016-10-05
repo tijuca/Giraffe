@@ -21,10 +21,6 @@
 #include <cstdarg>
 #include <kopano/Trace.h>
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 #ifdef WITH_TRACING
 // Turn these on/off
 #  define DO_TRACE_MAPI		1
@@ -88,18 +84,13 @@ static void TraceMsg(const char *lpMsg, int time, const char *func,
 		break;
 	}
 
-
-	pos = _snprintf(debug, sizeof(debug), "%lu %08X %s %s: %s(", GetTickCount(), GetCurrentThreadId(), lpMsg, lpTraceType, func);
+	pos = snprintf(debug, sizeof(debug), "%lu %08X %s %s: %s(", GetTickCount(), GetCurrentThreadId(), lpMsg, lpTraceType, func);
 
 	len = pos + 3;
 
 	if (format) {
 		va_copy(va_lentest, va);
-#ifdef LINUX
 		len += _vsnprintf(NULL, 0, format, va_lentest);
-#else
-		len += _vscprintf(format, va_lentest);
-#endif
 		va_end(va_lentest);
 	}
 
@@ -200,7 +191,6 @@ void TraceInternals(int time, const char *tracetype, const char *func,
 
 	va_end(va);
 }
-
 
 void TraceStream(int time, const char *func, const char *format, ...)
 {

@@ -28,19 +28,14 @@
 #include "ECSessionManagerOffline.h"
 #include "ECS3Attachment.h"
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 pthread_key_t database_key;
 pthread_key_t plugin_key;
 
-ULONG					g_ulServerInitFlags = 0;	// Libary init flags
 ECSessionManager*		g_lpSessionManager = NULL;
 ECStatsCollector*		g_lpStatsCollector = NULL;
-std::set<ECDatabase*>	g_lpDBObjectList;
-pthread_mutex_t			g_hMutexDBObjectList;
-bool					g_bInitLib = false;
+static std::set<ECDatabase *> g_lpDBObjectList;
+static pthread_mutex_t g_hMutexDBObjectList;
+static bool g_bInitLib = false;
 
 void AddDatabaseObject(ECDatabase* lpDatabase)
 {
@@ -192,14 +187,6 @@ ECRESULT kopano_exit()
 	return erSuccess;
 }
 
-#if 0
-static void kopano_resetstats(void)
-{
-	if (g_lpStatsCollector)
-		g_lpStatsCollector->Reset();
-}
-#endif
-
 /**
  * Called for each HTTP header in a request, handles the proxy header
  * and marks the connection as using the proxy if it is found. The value
@@ -219,7 +206,7 @@ static int kopano_fparsehdr(struct soap *soap, const char *key,
     const char *val)
 {
 	const char *szProxy = g_lpSessionManager->GetConfig()->GetSetting("proxy_header");
-	if(strlen(szProxy) > 0 && stricmp(key, szProxy) == 0) {
+	if(strlen(szProxy) > 0 && strcasecmp(key, szProxy) == 0) {
 		((SOAPINFO *)soap->user)->bProxy = true;
 	}
 	

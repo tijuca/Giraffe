@@ -25,11 +25,6 @@ struct thread_info {
 	bool bCalledFromPython;
 };
 
-
-static void free_tls_data(void *lpvoid) {
-	delete (thread_info *)lpvoid;
-}
-
 static void make_key() {
 	pthread_key_create(&g_key, NULL);	// We need cleanup here
 }

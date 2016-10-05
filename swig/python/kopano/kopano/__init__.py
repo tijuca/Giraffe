@@ -1,5 +1,5 @@
 """
-High-level python bindings
+High-level python bindings for Kopano
 
 Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file for details)
 Copyright 2016 Kopano and its licensors (see LICENSE file for details)
@@ -609,21 +609,23 @@ Wrapper around MAPI properties
         self.idname = REV_TAG.get(self.proptag) # XXX slow, often unused: make into properties?
         self.type_ = PROP_TYPE(self.proptag)
         self.typename = REV_TYPE.get(self.type_)
-        self.named = (self.id_ >= 0x8000)
+        self.named = False
         self.kind = None
         self.kindname = None
         self.guid = None
         self.name = None
         self.namespace = None
 
-        if self.named:
+        if self.id_ >= 0x8000: # possible named prop
             try:
                 lpname = self._parent_mapiobj.GetNamesFromIDs([self.proptag], None, 0)[0]
-                self.guid = bin2hex(lpname.guid)
-                self.namespace = GUID_NAMESPACE.get(lpname.guid)
-                self.name = lpname.id
-                self.kind = lpname.kind
-                self.kindname = 'MNID_STRING' if lpname.kind == MNID_STRING else 'MNID_ID'
+                if lpname:
+                    self.guid = bin2hex(lpname.guid)
+                    self.namespace = GUID_NAMESPACE.get(lpname.guid)
+                    self.name = lpname.id
+                    self.kind = lpname.kind
+                    self.kindname = 'MNID_STRING' if lpname.kind == MNID_STRING else 'MNID_ID'
+                    self.named = True
             except MAPIErrorNoSupport: # XXX user.props()?
                 pass
 
@@ -634,8 +636,10 @@ Wrapper around MAPI properties
                 # The datetime object is of "naive" type, has local time and
                 # no TZ info. :-(
                 #
-                self._value = datetime.datetime.fromtimestamp(self.mapiobj.Value.unixtime)
-                
+                try:
+                    self._value = datetime.datetime.fromtimestamp(self.mapiobj.Value.unixtime)
+                except ValueError: # Y10K: datetime is limited to 4-digit years
+                    self._value = datetime.datetime(9999, 1, 1)
             else:
                 self._value = self.mapiobj.Value
         return self._value
@@ -848,7 +852,6 @@ Looks at command-line to see if another server address or other related options 
         entryid = HrGetOneProp(self.mapistore, PR_STORE_ENTRYID).Value
         self.pseudo_url = entryid[entryid.find(b'pseudo:'):-1] # XXX ECSERVER
         self.name = self.pseudo_url[9:] # XXX get this kind of stuff from pr_ec_statstable_servers..?
-        self._archive_sessions = {}
 
     def nodes(self): # XXX delay mapi sessions until actually needed
         for row in self.table(PR_EC_STATSTABLE_SERVERS).dict_rows():
@@ -1263,10 +1266,6 @@ class Group(object):
     def hidden(self, value):
         self._update(hidden=value)
 
-    @property
-    def groupid(self):
-        return bin2hex(self._ecgroup.GroupID)
-
     # XXX: also does groups..
     def add_user(self, user):
         if isinstance(user, Group):
@@ -1498,6 +1497,15 @@ class Store(object):
             pass
 
     @property
+    def findroot(self):
+        """ :class:`Folder` designated as search-results root """
+
+        try:
+            return self.root.folder('FINDER_ROOT')
+        except NotFoundError:
+            pass
+
+    @property
     def inbox(self):
         """ :class:`Folder` designated as inbox """
 
@@ -1540,6 +1548,15 @@ class Store(object):
 
         try:
             return Folder(self, HrGetOneProp(self._root, PR_IPM_CONTACT_ENTRYID).Value)
+        except MAPIErrorNotFound:
+            pass
+
+    @property
+    def common_views(self):
+        """ :class:`Folder` contains folders for managing views for the message store """
+
+        try:
+            return Folder(self, self.prop(PR_COMMON_VIEWS_ENTRYID).value)
         except MAPIErrorNotFound:
             pass
 
@@ -1789,8 +1806,7 @@ class Store(object):
 
     def create_searchfolder(self, text=None): # XXX store.findroot.create_folder()?
         import uuid # XXX username+counter? permission problems to determine number?
-        finder_root = self.root.folder('FINDER_ROOT') # XXX store.findroot?
-        mapiobj = finder_root.mapiobj.CreateFolder(FOLDER_SEARCH, str(uuid.uuid4()), 'comment', None, 0)
+        mapiobj = self.findroot.mapiobj.CreateFolder(FOLDER_SEARCH, str(uuid.uuid4()), 'comment', None, 0)
         return Folder(self, mapiobj=mapiobj)
 
     def permissions(self):
@@ -1798,6 +1814,25 @@ class Store(object):
 
     def permission(self, member, create=False):
         return _permission(self, member, create)
+
+    def favorites(self):
+        """Returns a list of favorite folders """
+
+        table = self.common_views.mapiobj.GetContentsTable(MAPI_ASSOCIATED)
+        table.SetColumns([PR_MESSAGE_CLASS, PR_SUBJECT, PR_WLINK_ENTRYID, PR_WLINK_FLAGS, PR_WLINK_ORDINAL, PR_WLINK_STORE_ENTRYID, PR_WLINK_TYPE], 0)
+        table.Restrict(SPropertyRestriction(RELOP_EQ, PR_MESSAGE_CLASS, SPropValue(PR_MESSAGE_CLASS, "IPM.Microsoft.WunderBar.Link")), TBL_BATCH)
+        
+        for row in table.QueryRows(-1, 0):
+            entryid = bin2hex(row[2].Value)
+            store_entryid = bin2hex(row[5].Value)
+
+            if store_entryid != self.entryid: # XXX: Handle favorites from public stores
+                continue
+
+            try:
+                yield self.folder(entryid=bin2hex(row[2].Value))
+            except MAPIErrorNotFound:
+                pass
 
     def __eq__(self, s): # XXX check same server?
         if isinstance(s, Store):
@@ -2253,7 +2288,7 @@ class Folder(object):
         searchfolder.search_wait()
         for item in searchfolder:
             yield item
-        self.store.root.folder('FINDER_ROOT').mapiobj.DeleteFolder(searchfolder.entryid.decode('hex'), 0, None, 0) # XXX store.findroot
+        self.store.findroot.mapiobj.DeleteFolder(searchfolder.entryid.decode('hex'), 0, None, 0) # XXX store.findroot
 
     def search_start(self, folder, text): # XXX RECURSIVE_SEARCH
         # specific restriction format, needed to reach indexer
@@ -2309,6 +2344,13 @@ class Folder(object):
                 return self.primary_store.folder(entryid=entryid.encode('hex'))
             except MAPIErrorNotFound:
                 pass
+
+    @property
+    def created(self):
+        try:
+            return self.prop(PR_CREATION_TIME).value
+        except MAPIErrorNotFound:
+            pass
 
     def __eq__(self, f): # XXX check same store?
         if isinstance(f, Folder):
@@ -2481,6 +2523,13 @@ class Item(object):
     def body(self, x):
         self.mapiobj.SetProps([SPropValue(PR_BODY_W, unicode(x))])
         self.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
+
+    @property
+    def created(self):
+        try:
+            return self.prop(PR_CREATION_TIME).value
+        except MAPIErrorNotFound:
+            pass
 
     @property
     def received(self):
@@ -2864,7 +2913,7 @@ class Item(object):
         for prop in self.props():
             if (bestbody != PR_NULL and prop.proptag in (PR_BODY_W, PR_HTML, PR_RTF_COMPRESSED) and prop.proptag != bestbody):
                 continue
-            if prop.id_ >= 0x8000: # named prop: prop.id_ system dependant..
+            if prop.named: # named prop: prop.id_ system dependant..
                 data = [prop.proptag, prop.mapiobj.Value, self.mapiobj.GetNamesFromIDs([prop.proptag], None, 0)[0]]
                 if not archiver and data[2].guid == PSETID_Archive:
                     continue
@@ -3725,8 +3774,18 @@ class User(object):
         user_class = kwargs.get('user_class', self._ecuser.Class)
         admin = kwargs.get('admin', self._ecuser.IsAdmin)
 
-        usereid = self.server.sa.SetUser(ECUSER(Username=username, Password=password, Email=email, FullName=fullname,
-                 Class=user_class, UserID=self._ecuser.UserID, IsAdmin=admin, MVPropMap = self._ecuser.MVPropMap), MAPI_UNICODE)
+        # Thrown when a user tries to set his own features, handle gracefully otherwise you'll end up without a store
+        try:
+            # Pass the MVPropMAP otherwise the set values are reset
+            if hasattr(self._ecuser, 'MVPropMap'):
+                usereid = self.server.sa.SetUser(ECUSER(Username=username, Password=password, Email=email, FullName=fullname,
+                                             Class=user_class, UserID=self._ecuser.UserID, IsAdmin=admin, MVPropMap = self._ecuser.MVPropMap), MAPI_UNICODE)
+
+            else:
+                usereid = self.server.sa.SetUser(ECUSER(Username=username, Password=password, Email=email, FullName=fullname,
+                                             Class=user_class, UserID=self._ecuser.UserID, IsAdmin=admin), MAPI_UNICODE)
+        except MAPIErrorNoSupport:
+            pass
 
         self._ecuser = self.server.sa.GetUser(self.server.sa.ResolveUserName(username, MAPI_UNICODE), MAPI_UNICODE)
         if self.name != username:
@@ -3957,8 +4016,6 @@ def daemon_helper(func, service, log):
             log.info('stopping %s', service.name)
 
 def daemonize(func, options=None, foreground=False, log=None, config=None, service=None):
-    if log and service:
-        log.info('starting %s', service.logname or service.name)
     uid = gid = None
     working_directory = '/'
     pidfile = None
@@ -4458,6 +4515,8 @@ Encapsulates everything to create a simple service, such as:
             config2.update(config)
         if getattr(options, 'config_file', None):
             options.config_file = os.path.abspath(options.config_file) # XXX useful during testing. could be generalized with optparse callback?
+        if getattr(options, 'service', True) == False:
+            options.foreground = True
         self.config = Config(config2, service=name, options=options)
         self.config.data['server_socket'] = os.getenv("KOPANO_SOCKET") or self.config.data['server_socket']
         if getattr(options, 'worker_processes', None):
@@ -4470,17 +4529,25 @@ Encapsulates everything to create a simple service, such as:
                 self.log.error(msg)
             sys.exit(1)
         self.stats = collections.defaultdict(int, {'errors': 0})
+        self._server = None
 
     @property
     def server(self):
-        return Server(options=self.options, config=self.config.data, log=self.log, service=self)
+        if self._server is None:
+            self._server = Server(options=self.options, config=self.config.data, log=self.log, service=self)
+        return self._server
 
     def start(self):
         for sig in (signal.SIGTERM, signal.SIGINT):
             signal.signal(sig, lambda *args: sys.exit(-sig))
         signal.signal(signal.SIGHUP, signal.SIG_IGN) # XXX long term, reload config?
+
+        self.log.info('starting %s', self.logname or self.name)
         with log_exc(self.log):
-            daemonize(self.main, options=self.options, log=self.log, config=self.config, service=self)
+            if getattr(self.options, 'service', True): # do not run-as-service (eg backup)
+                daemonize(self.main, options=self.options, log=self.log, config=self.config, service=self)
+            else:
+                daemon_helper(self.main, self, self.log)
 
 class Worker(Process):
     def __init__(self, service, name, **kwargs):
@@ -4500,6 +4567,7 @@ class Worker(Process):
             self.log.setLevel(loglevel)
 
     def run(self):
+        self.service._server = None # do not re-use "forked" session
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         signal.signal(signal.SIGHUP, signal.SIG_IGN)
         signal.signal(signal.SIGTERM, lambda *args: sys.exit(0))

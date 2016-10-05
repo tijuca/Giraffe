@@ -44,10 +44,6 @@
 #include <map>
 #include <string>
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 /*
 	streams are as follows:
 	  <version>
@@ -59,13 +55,11 @@
 	  <# of sub objects>:32bit
 	    <subobject>
 
-
 	properties are as follows:
 	  <prop tag>:32bit
 	  [<length in bytes>:32bit]
 	  <data bytes>
 	  [<guid, kind, [id|bytes+string>]
-
 
 	subobjects are as follows:
 	  <type>:32bit
@@ -115,7 +109,6 @@ private:
 	nameidmap_t m_mapNameIds;
 	namestringmap_t m_mapNameStrings;
 };
-
 
 NamedPropertyMapper::NamedPropertyMapper(ECDatabase *lpDatabase)
 	: m_lpDatabase(lpDatabase) 
@@ -172,7 +165,6 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, unsigned int ulNameId, uns
 
 	// *lpulId now contains the local propid, update the cache
 	m_mapNameIds.insert(nameidmap_t::value_type(key, *lpulId));
-
 
 exit:
 	if (lpResult)
@@ -231,14 +223,12 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, const std::string &strName
 	// *lpulId now contains the local propid, update the cache
 	m_mapNameStrings.insert(namestringmap_t::value_type(key, *lpulId));
 
-
 exit:
 	if (lpResult)
 		m_lpDatabase->FreeResult(lpResult);
 
 	return er;
 }
-
 
 // Utility Functions
 ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_LENGTHS lpLen, ECSerializer *lpSink)
@@ -339,7 +329,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 			er = KCERR_NOT_FOUND;
 			goto exit;
 		}
-		li = _atoi64(lpRow[FIELD_NR_LONGINT]);
+		li = atoll(lpRow[FIELD_NR_LONGINT]);
 		er = lpSink->Write(&li, sizeof(li), 1);
 		break;
 	case PT_STRING8:
@@ -506,7 +496,7 @@ ECRESULT SerializeDatabasePropVal(LPCSTREAMCAPS lpStreamCaps, DB_ROW lpRow, DB_L
 		ulLastPos = 0;
 		for (unsigned int x = 0; er == erSuccess && x < ulCount; ++x) {
 			ParseMVProp(lpRow[FIELD_NR_LONGINT], lpLen[FIELD_NR_LONGINT], &ulLastPos, &strData);
-			li = _atoi64(strData.c_str());
+			li = atoll(strData.c_str());
 			er = lpSink->Write(&li, sizeof(li), 1);
 		}
 		break;
@@ -554,7 +544,6 @@ ECRESULT SerializePropVal(LPCSTREAMCAPS lpStreamCaps, const struct propVal &sPro
 	unsigned int ulLen;
 	unsigned char b;
 	unsigned int ulPropTag = sPropVal.ulPropTag;
-	std::string	strData;
 	convert_context converter;
 	NamedPropDefMap::const_iterator iNamedPropDef;
 
@@ -1420,7 +1409,6 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 				CopyPropVal(lpsPropval, lpPropValArray->__ptr + lpPropValArray->__size++);
 		}
 
-
 		// Make sure we dont have a colliding PR_SOURCE_KEY. This can happen if a user imports an exported message for example.
 		if (lpsPropval->ulPropTag == PR_SOURCE_KEY) {
 			// don't use the sourcekey if found.
@@ -1441,7 +1429,6 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 			// We can't use lpDBRow here except for checking if it was NULL.
 			if (lpDBRow != NULL)
 				continue;
-
 
 			strQuery = "REPLACE INTO indexedproperties(hierarchyid,tag,val_binary) VALUES (" + stringify(ulObjId) + "," + stringify(PROP_ID(PR_SOURCE_KEY)) + "," + lpDatabase->EscapeBinary(lpsPropval->Value.bin->__ptr, lpsPropval->Value.bin->__size) + ")";
 			er = lpDatabase->DoInsert(strQuery);
@@ -1649,8 +1636,6 @@ ECRESULT DeserializeObject(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtt
 	if (er != erSuccess)
 		goto exit;
 
-
-
 	if (ulParentType == MAPI_FOLDER) {
 		sObjectTableKey key(ulObjId, 0);
 		propVal sProp;
@@ -1677,8 +1662,6 @@ ECRESULT DeserializeObject(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtt
 		if (er != erSuccess)
 			goto exit;
 	}
-
-
 
 	if (ulRealObjType == MAPI_MESSAGE || ulRealObjType == MAPI_ATTACH) {
 		unsigned int	ulSubObjCount = 0;
@@ -1797,7 +1780,6 @@ exit:
 	return er;
 }
 
-
 ECRESULT GetValidatedPropType(DB_ROW lpRow, unsigned int *lpulType)
 {
 	ECRESULT er = KCERR_DATABASE_ERROR;
@@ -1888,30 +1870,5 @@ ECRESULT GetValidatedPropType(DB_ROW lpRow, unsigned int *lpulType)
 		return KCERR_INVALID_TYPE;
 	}
 	*lpulType = ulType;
-	return erSuccess;
-}
-
-ECRESULT GetValidatedPropCount(ECDatabase *lpDatabase, DB_RESULT lpDBResult, unsigned int *lpulCount)
-{
-	ECRESULT er;
-	unsigned int ulCount = 0;
-	DB_ROW lpRow;
-
-	if (lpDatabase == NULL || lpDBResult == NULL || lpulCount == 0)
-		return KCERR_INVALID_PARAMETER;
-
-	while ((lpRow = lpDatabase->FetchRow(lpDBResult)) != NULL) {
-		unsigned int ulType;
-		er = GetValidatedPropType(lpRow, &ulType);	// Ignore ulType, we just need the validation
-		if (er == KCERR_DATABASE_ERROR) {
-			ec_log_err("GetValidatedPropCount(): GetValidatedPropType failed");
-			continue;
-		} else if (er != erSuccess)
-			return er;
-		++ulCount;
-	}
-
-	lpDatabase->ResetResult(lpDBResult);
-	*lpulCount = ulCount;
 	return erSuccess;
 }

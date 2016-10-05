@@ -35,12 +35,7 @@
 #include "SymmetricCrypt.h"
 #include "ECPamAuth.h"
 #include "ECKrbAuth.h"
-#ifdef LINUX
 #include <kopano/UnixUtil.h>
-#else
-#include "WinUtil.h"
-#endif
-
 #include <kopano/base64.h>
 
 #include "ECICS.h"
@@ -58,9 +53,6 @@
 #include <boost/algorithm/string.hpp>
 namespace ba = boost::algorithm;
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
 #ifndef AB_UNICODE_OK
 #define AB_UNICODE_OK ((ULONG) 0x00000040)
 #endif
@@ -99,39 +91,8 @@ static bool execute_script(const char *scriptname, ...)
 	for (i = lstEnv.begin(); i != lstEnv.end(); ++i)
 		env[n++] = i->c_str();
 	env[n] = NULL;
-
-#ifdef LINUX
 	return unix_system(scriptname, scriptname, env);
-#else
-	return win_system(scriptname, scriptname, env);
-#endif
 }
-
-#if 0
-static std::string HostnameFromSoap(struct soap *soap)
-{
-	/*
-	 * Is the client connecting using an IP address or fully qualified hostname?
-	 * SOAP knows... SOAP is all-knowing.
-	 */
-	if (soap->host[0] == '\0') {
-		/* Use the endpoint which is something like: http://<ip>:<port>/<path>*/
-		std::string ip = soap->endpoint;
-		size_t pos;
-
-		pos = ip.find("://");
-		if (pos != std::string::npos)
-			ip.erase(0, ip.find_first_not_of(":/", pos));
-
-		pos = ip.find_first_of(":/");
-		if (pos != std::string::npos)
-			ip.erase(pos, std::string::npos);
-
-		return ip;
-	}
-	return std::string(soap->host);
-}
-#endif
 
 static const char *ObjectClassToName(objectclass_t objclass)
 {
@@ -1231,14 +1192,14 @@ ECRESULT ECUserManagement::ResolveObjectAndSync(objectclass_t objclass, const ch
 	if ((OBJECTCLASS_TYPE(objclass) == OBJECTTYPE_UNKNOWN ||
 		 objclass == OBJECTCLASS_USER ||
 		 objclass == ACTIVE_USER) &&
-		stricmp(szName, KOPANO_ACCOUNT_SYSTEM) == 0)
+		strcasecmp(szName, KOPANO_ACCOUNT_SYSTEM) == 0)
 	{
 		*lpulObjectId = KOPANO_UID_SYSTEM;
 		return er;
 	} else if ((OBJECTCLASS_TYPE(objclass) == OBJECTTYPE_UNKNOWN ||
 				objclass == OBJECTCLASS_DISTLIST ||
 				objclass == DISTLIST_SECURITY) &&
-			   stricmp(szName, KOPANO_FULLNAME_EVERYONE) == 0)
+			   strcasecmp(szName, KOPANO_FULLNAME_EVERYONE) == 0)
 	{
 		*lpulObjectId = KOPANO_UID_EVERYONE;
 		return er;
@@ -1732,7 +1693,7 @@ ECRESULT ECUserManagement::SearchObjectAndSync(const char* szSearchString, unsig
 		return er;
 
 	// Special case: SYSTEM
-	if (stricmp(szSearchString, KOPANO_ACCOUNT_SYSTEM) == 0) {
+	if (strcasecmp(szSearchString, KOPANO_ACCOUNT_SYSTEM) == 0) {
 		// Hide user SYSTEM when requested
 		if (lpSecurity->GetUserId() != KOPANO_UID_SYSTEM) {
 			szHideSystem = m_lpConfig->GetSetting("hide_system");
@@ -1742,7 +1703,7 @@ ECRESULT ECUserManagement::SearchObjectAndSync(const char* szSearchString, unsig
 
 		*lpulID = KOPANO_UID_SYSTEM;
 		return erSuccess;
-	} else if (stricmp(szSearchString, KOPANO_ACCOUNT_EVERYONE) == 0) {
+	} else if (strcasecmp(szSearchString, KOPANO_ACCOUNT_EVERYONE) == 0) {
 		// Hide group everyone when requested
 		if (lpSecurity->GetUserId() != KOPANO_UID_SYSTEM) {
 			szHideEveryone = m_lpConfig->GetSetting("hide_everyone");
@@ -2319,7 +2280,6 @@ ECRESULT ECUserManagement::ConvertExternIDsToLocalIDs(objectdetails_t *lpDetails
 	list<objectid_t> lstExternIDs;
 	map<objectid_t, unsigned int> mapLocalIDs;
 	std::map<objectid_t, unsigned int>::const_iterator iterLocalIDs;
-	string strQuery;
 	objectid_t sExternID;
 	unsigned int ulLocalID = 0;
 
@@ -2559,7 +2519,6 @@ ECRESULT ECUserManagement::UpdateUserDetailsFromClient(objectdetails_t *lpDetail
 ECRESULT ECUserManagement::CheckUserLicense(unsigned int *lpulLicenseStatus)
 {
 	ECRESULT er;
-	std::string strQuery;
 	unsigned int ulTotalUsers = 0;
 	unsigned int ulActive = 0;
 	unsigned int ulNonActive = 0;
@@ -2729,7 +2688,7 @@ ECRESULT ECUserManagement::CreateLocalObject(const objectsignature_t &signature,
 	case NONACTIVE_ROOM:
 	case NONACTIVE_EQUIPMENT:
 		strUserServer = details.GetPropString(OB_PROP_S_SERVERNAME);
-		if (!bDistributed || stricmp(strUserServer.c_str(), strThisServer.c_str()) == 0) {
+		if (!bDistributed || strcasecmp(strUserServer.c_str(), strThisServer.c_str()) == 0) {
 			execute_script(m_lpConfig->GetSetting("createuser_script"),
 						   "KOPANO_USER", details.GetPropString(OB_PROP_S_LOGIN).c_str(),
 						   NULL);
@@ -2743,7 +2702,7 @@ ECRESULT ECUserManagement::CreateLocalObject(const objectsignature_t &signature,
 		break;
 	case CONTAINER_COMPANY:
 		strUserServer = details.GetPropString(OB_PROP_S_SERVERNAME);
-		if (!bDistributed || stricmp(strUserServer.c_str(), strThisServer.c_str()) == 0) {
+		if (!bDistributed || strcasecmp(strUserServer.c_str(), strThisServer.c_str()) == 0) {
 			execute_script(m_lpConfig->GetSetting("createcompany_script"),
 						   "KOPANO_COMPANY", details.GetPropString(OB_PROP_S_FULLNAME).c_str(),
 						   NULL);
@@ -3263,7 +3222,7 @@ ECRESULT ECUserManagement::DeleteLocalObject(unsigned int ulObjectId, objectclas
 	if(er != erSuccess)
 		goto exit;
 
-	// Object didn't exist locally, so no delete has occured
+	// Object didn't exist locally, so no delete has occurred
 	if (ulDeletedRows == 0) {
 		er = lpDatabase->Commit();
 		if (er != erSuccess)
@@ -3517,7 +3476,6 @@ ECRESULT ECUserManagement::ConvertObjectDetailsToProps(struct soap *soap, unsign
 	struct propVal *lpPropVal;
 	unsigned int ulOrder = 0;
 	ECSecurity *lpSecurity = NULL;
-	std::string strEncExId;
 	struct propValArray sPropVals{__gszeroinit};
 	struct propValArray *lpPropVals = &sPropVals;
 	ULONG ulMapiType = 0;
@@ -4086,7 +4044,6 @@ ECRESULT ECUserManagement::ConvertContainerObjectDetailsToProps(struct soap *soa
 	struct propVal *lpPropVal;
 	unsigned int ulOrder = 0;
 	ECSecurity *lpSecurity = NULL;
-	std::string strEncExId;
 	ULONG ulMapiType = 0;
 
 	er = GetSecurity(&lpSecurity);
@@ -4412,7 +4369,7 @@ ECRESULT ECUserManagement::ConvertABContainerToProps(struct soap *soap, unsigned
 			if(lpSession)
 				lpSession->GetClientApp(&strApp);
 			
-			if(strnicmp(strApp.c_str(), "blackberry", 10) == 0) {
+			if(strncasecmp(strApp.c_str(), "blackberry", 10) == 0) {
 				// For blackberry, we pose as being the Exchange AddressList. We have to do this
 				// since it searches for the GAB by restricting by this GUID, otherwise the Lookup
 				// function will not function properly.
@@ -4685,7 +4642,6 @@ ECRESULT ECUserManagement::CheckObjectModified(unsigned int ulObjectId, const st
 ECRESULT ECUserManagement::ProcessModification(unsigned int ulId, const std::string &newsignature)
 {
 	ECRESULT er;
-	std::string strQuery;
 	ECDatabase *lpDatabase = NULL;
 	ABEID eid(MAPI_ABCONT, MUIDECSAB, 1);
 	SOURCEKEY sSourceKey;
@@ -4848,22 +4804,6 @@ ECRESULT ECUserManagement::GetSecurity(ECSecurity **lppSecurity)
 	if (lppSecurity)
 		*lppSecurity = lpecSession->GetSecurity();
 	return erSuccess;
-}
-
-ECRESULT ECUserManagement::RemoveAllObjectsAndSync(unsigned int ulObjId)
-{
-	ECRESULT er;
-	UserPlugin *lpPlugin = NULL;
-	objectid_t id;
-
-	er = GetThreadLocalPlugin(m_lpPluginFactory, &lpPlugin);
-	if(er != erSuccess)
-		return er;
-	er = GetExternalId(ulObjId, &id);
-	if(er != erSuccess)
-		return er;
-	lpPlugin->removeAllObjects(id);
-	return SyncAllObjects();
 }
 
 ECRESULT ECUserManagement::SyncAllObjects()

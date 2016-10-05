@@ -21,6 +21,7 @@ noinst_DATA = \
 	libkcarchiver.ldd libkcarchivercore.ldd \
 	kopano-archiver.ldx kopano-cfgchecker.ldx \
 	kopano-monitor.ldx kopano-passwd.ldx kopano-stats.ldx
+CLEANFILES = ${noinst_DATA}
 
 
 kopano_admin_SOURCES = \
@@ -38,7 +39,7 @@ kopano_archiver_SOURCES = \
 	archiver/main.cpp
 kopano_archiver_CPPFLAGS = \
 	${AM_CPPFLAGS} -I${top_srcdir}/provider/client \
-	-I${top_srcdir}/provider/include -I${top_srcdir}/provider/soap \
+	-I${top_srcdir}/provider/include \
 	-I${top_builddir}/provider/soap -I${top_srcdir}/ECtools/archiver \
 	${GSOAP_CFLAGS} ${MYSQL_INCLUDES}
 kopano_archiver_LDADD = \
@@ -197,7 +198,7 @@ libkcarchivercore_la_LIBADD = \
 EXTRA_libkcarchivercore_la_DEPENDENCIES = \
 	${top_builddir}/default.sym
 
-mapitime_SOURCES = mapitime.cpp hx-time.c
+mapitime_SOURCES = mapitime.cpp
 mapitime_LDADD = -lrt ${top_builddir}/mapi4linux/src/libmapi.la \
 	${top_builddir}/common/libkcmapi.la \
 	${top_builddir}/common/libkcutil.la

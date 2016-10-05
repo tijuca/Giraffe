@@ -20,13 +20,7 @@
 #include "freebusyutil.h"
 #include <kopano/stringutil.h>
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 /**
- * Constructor
- *
  * @param[in] lpFBBlock Pointer to a list of free/busy blocks
  */
 ECEnumFBBlock::ECEnumFBBlock(ECFBBlockList* lpFBBlock)
@@ -44,8 +38,6 @@ ECEnumFBBlock::ECEnumFBBlock(ECFBBlockList* lpFBBlock)
  * 
  * @param[in]	lpFBBlock		Pointer to a list of free/busy blocks
  * @param[out]	lppEnumFBBlock	Address of the pointer that receives the object ECEnumFBBlock pointer
- *
- * @return HRESULT
  */
 HRESULT ECEnumFBBlock::Create(ECFBBlockList* lpFBBlock, ECEnumFBBlock **lppEnumFBBlock)
 {

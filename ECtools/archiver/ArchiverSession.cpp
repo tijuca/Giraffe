@@ -39,7 +39,6 @@ typedef mapi_memory_ptr<ECSERVERLIST> ECServerListPtr;
  * @param[out]	lppSession
  *					Pointer to a Session pointer that will be assigned the address of the returned
  *					ArchiverSession object.
- * @return HRESULT
  */
 HRESULT ArchiverSession::Create(ECConfig *lpConfig, ECLogger *lpLogger, ArchiverSessionPtr *lpptrSession)
 {
@@ -71,8 +70,6 @@ HRESULT ArchiverSession::Create(ECConfig *lpConfig, ECLogger *lpLogger, Archiver
  * @param[out]	lppSession
  *					Pointer to a Session pointer that will be assigned the address of the returned
  *					Session object.
- *
- * @return HRESULT
  */
 HRESULT ArchiverSession::Create(const MAPISessionPtr &ptrSession, ECLogger *lpLogger, ArchiverSessionPtr *lpptrSession)
 {
@@ -92,8 +89,6 @@ HRESULT ArchiverSession::Create(const MAPISessionPtr &ptrSession, ECLogger *lpLo
  * @param[out]	lppSession
  *					Pointer to a ArchiverSession pointer that will be assigned the address of the returned
  *					ArchiverSession object.
- *
- * @return HRESULT
  */
 HRESULT ArchiverSession::Create(const MAPISessionPtr &ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, ArchiverSessionPtr *lpptrSession)
 {
@@ -127,17 +122,11 @@ exit:
 	return hr;
 }
 
-/**
- * Destructor
- */
 ArchiverSession::~ArchiverSession()
 {
 	m_lpLogger->Release();
 }
 
-/**
- * Constructor
- */
 ArchiverSession::ArchiverSession(ECLogger *lpLogger): m_lpLogger(lpLogger)
 {
 	m_lpLogger->AddRef();
@@ -149,8 +138,6 @@ ArchiverSession::ArchiverSession(ECLogger *lpLogger): m_lpLogger(lpLogger)
  * @param[in]	lpConfig
  *					The configuration used for creating the ArchiverSession. The values extracted from the
  *					configuration are server_path, sslkey_file and sslkey_path.
- *
- * @return HRESULT
  */
 HRESULT ArchiverSession::Init(ECConfig *lpConfig)
 {
@@ -169,8 +156,6 @@ HRESULT ArchiverSession::Init(ECConfig *lpConfig)
  * @param[in]
  * 				lpszSslPass
  * 					The password for the certificate.
-
- * @return HRESULT
  */
 HRESULT ArchiverSession::Init(const char *lpszServerPath, const char *lpszSslPath, const char *lpszSslPass)
 {
@@ -215,8 +200,6 @@ HRESULT ArchiverSession::Init(const char *lpszServerPath, const char *lpszSslPat
  * @param[in]	ptrSession
  *					MAPISessionPtr that points to the MAPISession to contruct this
  *					ArchiverSession object for.
- *
- * @return HRESULT
  */
 HRESULT ArchiverSession::Init(const MAPISessionPtr &ptrSession, const char *lpszSslPath, const char *lpszSslPass)
 {
@@ -245,8 +228,6 @@ HRESULT ArchiverSession::Init(const MAPISessionPtr &ptrSession, const char *lpsz
  * @param[out]	lppMsgStore
  *					Pointer to a IMsgStore pointer that will be assigned the
  *					address of the returned message store.
- *
- * @return HRESULT
  */ 
 HRESULT ArchiverSession::OpenStoreByName(const tstring &strUser, LPMDB *lppMsgStore)
 {
@@ -288,8 +269,6 @@ HRESULT ArchiverSession::OpenStoreByName(const tstring &strUser, LPMDB *lppMsgSt
  * @param[out]	lppMsgStore
  *					Pointer to a IMsgStore pointer that will be assigned the
  *					address of the returned message store.
- *
- * @return HRESULT
  */ 
 HRESULT ArchiverSession::OpenStore(const entryid_t &sEntryId, ULONG ulFlags, LPMDB *lppMsgStore)
 {
@@ -332,8 +311,6 @@ HRESULT ArchiverSession::OpenStore(const entryid_t &sEntryId, ULONG ulFlags, LPM
  * @param[out]	lppMsgStore
  *					Pointer to a IMsgStore pointer that will be assigned the
  *					address of the returned message store.
- *
- * @return HRESULT
  */ 
 HRESULT ArchiverSession::OpenStore(const entryid_t &sEntryId, LPMDB *lppMsgStore)
 {
@@ -348,8 +325,6 @@ HRESULT ArchiverSession::OpenStore(const entryid_t &sEntryId, LPMDB *lppMsgStore
  * @param[out]	lppMsgStore
  *					Pointer to a IMsgStore pointer that will be assigned the
  *					address of the returned message store.
- *
- * @return HRESULT
  */ 
 HRESULT ArchiverSession::OpenReadOnlyStore(const entryid_t &sEntryId, LPMDB *lppMsgStore)
 {
@@ -373,8 +348,6 @@ HRESULT ArchiverSession::OpenReadOnlyStore(const entryid_t &sEntryId, LPMDB *lpp
  * 					Pointer to a boolean that will be set to true if the user is ACL capable.
  * 					This argument can be set to NULL if the active/non-active
  * 					information is not required.
- *
- * @return HRESULT
  */
 HRESULT ArchiverSession::GetUserInfo(const tstring &strUser, abentryid_t *lpsEntryId, tstring *lpstrFullname, bool *lpbAclCapable)
 {
@@ -489,8 +462,6 @@ HRESULT ArchiverSession::GetUserInfo(const abentryid_t &sEntryId, tstring *lpstr
  * @param[out]	lppAbContainer
  *					Pointer to a IABContainer pointer that will be assigned the
  *					address of the returned addressbook container.
- *
- * @return HRESULT
  */
 HRESULT ArchiverSession::GetGAL(LPABCONT *lppAbContainer)
 {
@@ -557,8 +528,6 @@ HRESULT ArchiverSession::GetGAL(LPABCONT *lppAbContainer)
  * @param[out]	lpbResult
  *					Pointer to a boolean that will be set to true if the two stores
  *					reference the same store.
- *
- * @return HRESULT
  */					
 HRESULT ArchiverSession::CompareStoreIds(LPMDB lpUserStore, LPMDB lpArchiveStore, bool *lpbResult)
 {
@@ -594,8 +563,6 @@ HRESULT ArchiverSession::CompareStoreIds(LPMDB lpUserStore, LPMDB lpArchiveStore
  * @param[out]	lpbResult
  *					Pointer to a boolean that will be set to true if the two ids
  *					reference the same store.
- *
- * @return HRESULT
  */					
 HRESULT ArchiverSession::CompareStoreIds(const entryid_t &sEntryId1, const entryid_t &sEntryId2, bool *lpbResult)
 {
@@ -609,42 +576,6 @@ HRESULT ArchiverSession::CompareStoreIds(const entryid_t &sEntryId1, const entry
 		return hr;
 		
 	*lpbResult = (ulResult == TRUE);
-	return hrSuccess;
-}
-
-/**
- * Check if the server specified by strServername is the server we're currently connected with.
- *
- * @param[in]	strServername
- *					The name of the server to check.
- * @param[out]	lpbResult
- *					Pointer to a boolean that will be set to true if the server is the
- *					same server we're currently connected with.
- *
- * @return HRESULT
- */ 
-HRESULT ArchiverSession::ServerIsLocal(const std::string &strServername, bool *lpbResult)
-{
-	HRESULT hr;
-	char *lpszServername = NULL;
-	ECSVRNAMELIST sSvrNameList = {0};
-	ECServiceAdminPtr ptrServiceAdmin;
-	ECServerListPtr ptrServerList;
-
-	hr = m_ptrAdminStore->QueryInterface(ptrServiceAdmin.iid, &ptrServiceAdmin);
-	if (hr != hrSuccess)
-		return hr;
-
-	lpszServername = (char*)strServername.c_str();
-	
-	sSvrNameList.cServers = 1;
-	sSvrNameList.lpszaServer = (LPTSTR*)&lpszServername;
-
-	hr = ptrServiceAdmin->GetServerDetails(&sSvrNameList, EC_SERVERDETAIL_NO_NAME, &ptrServerList);	// No MAPI_UNICODE
-	if (hr != hrSuccess)
-		return hr;
-
-	*lpbResult = (ptrServerList->lpsaServer[0].ulFlags & EC_SDFLAG_IS_PEER) == EC_SDFLAG_IS_PEER;
 	return hrSuccess;
 }
 
@@ -669,7 +600,6 @@ HRESULT ArchiverSession::CreateRemote(const char *lpszServerPath, ECLogger *lpLo
 	lpptrSession->reset(lpSession);
 	return hr;
 }
-
 
 HRESULT ArchiverSession::OpenMAPIProp(ULONG cbEntryID, LPENTRYID lpEntryID, LPMAPIPROP *lppProp)
 {

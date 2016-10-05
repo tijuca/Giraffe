@@ -26,14 +26,6 @@
 #include "WSUtil.h"
 #include <kopano/Util.h>
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
-/*
- * ECParentStorage implementation
- */
-
 ECParentStorage::ECParentStorage(ECGenericProp *lpParentObject, ULONG ulUniqueId, ULONG ulObjId, IECPropStorage *lpServerStorage)
 {
 	m_lpParentObject = lpParentObject;
@@ -101,8 +93,6 @@ HRESULT ECParentStorage::HrDeleteProps(LPSPropTagArray lpsPropTagArray)
 
 HRESULT ECParentStorage::HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject)
 {
-	ECMapiObjects::const_iterator iterSObj;
-
 	if (m_lpParentObject == NULL)
 		return MAPI_E_INVALID_OBJECT;
 

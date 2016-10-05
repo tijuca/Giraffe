@@ -80,9 +80,6 @@ static bool Prefix(const std::string &strInput, const std::string &strPrefix)
     return (strInput.compare(0, strPrefix.size(), strPrefix) == 0);
 }
 
-/**
- * IMAP class constructor
- */
 IMAP::IMAP(const char *szServerPath, ECChannel *lpChannel, ECLogger *lpLogger,
     ECConfig *lpConfig) :
 	ClientProto(szServerPath, lpChannel, lpLogger, lpConfig)
@@ -116,9 +113,6 @@ IMAP::IMAP(const char *szServerPath, ECChannel *lpChannel, ECLogger *lpLogger,
 	pthread_mutex_init(&m_mIdleLock, NULL);
 }
 
-/**
- * IMAP class destructor
- */
 IMAP::~IMAP() {
 	if (m_lpTable)
 		m_lpTable->Release();
@@ -199,7 +193,7 @@ void IMAP::ToUpper(wstring &strString) {
  */
 bool IMAP::CaseCompare(const string& strA, const string& strB)
 {
-	return stricmp(strA.c_str(), strB.c_str()) == 0;
+	return strcasecmp(strA.c_str(), strB.c_str()) == 0;
 }
 
 /**
@@ -440,7 +434,6 @@ HRESULT IMAP::HrProcessCommand(const std::string &strInput)
 	}
 
 	// process {} and end of line
-
 
 	if (strCommand.compare("CAPABILITY") == 0) {
 		if (!strvResult.empty()) {
@@ -825,7 +818,6 @@ exit:
 	return hr;
 }
 
-
 /** 
  * @brief Handles the STARTTLS command
  * 
@@ -1054,7 +1046,6 @@ HRESULT IMAP::HrCmdLogin(const string &strTag, const string &strUser, const stri
 
 		m_lpsIMAPTags->aulPropTag[0] = PROP_ENVELOPE;
 	}
-
 
 	hr = HrGetSubscribedList();
 	// ignore error, empty list of subscribed folder
@@ -2149,7 +2140,6 @@ HRESULT IMAP::HrCmdAppend(const string &strTag, const string &strFolderParam, co
 		HrSetOneProp(lpMessage, lpPropVal);
 	}
 
-
 	hr = lpMessage->SaveChanges(KEEP_OPEN_READWRITE | FORCE_SAVE);
 	if (hr != hrSuccess) {
 		hr2 = HrResponse(RESP_TAGGED_NO, strTag, "APPEND error saving message");
@@ -2695,35 +2685,6 @@ std::string IMAP::PropsToFlags(LPSPropValue lpProps, unsigned int cValues, bool 
 }
 
 /** 
- * Convert MAPI properties to a RFC-822 email address string, with optional fullname
- * 
- * @param[in] lpProps Array of properties containing atleast the tags given in ulEmailPropTag and ulNamePropTag
- * @param[in] cValues The number of properties in lpProps
- * @param[in] ulEmailPropTag The PropTag to use for the email address
- * @param[in] ulNamePropTag The PropTag to use for the fullname
- * 
- * @return String with email address, or empty
- */
-std::string IMAP::PropsToEmailAddress(LPSPropValue lpProps, unsigned int cValues, ULONG ulEmailPropTag, ULONG ulNamePropTag)
-{
-	const SPropValue *lpPropEmail = PpropFindProp(lpProps, cValues, ulEmailPropTag);
-	const SPropValue *lpPropName = PpropFindProp(lpProps, cValues, ulNamePropTag);
-    std::string strAddress;
-    
-    if(lpPropEmail && lpPropName && strcmp(lpPropEmail->Value.lpszA, lpPropName->Value.lpszA) == 0) {
-        strAddress = (string)"<" + lpPropEmail->Value.lpszA + ">";
-    } else if(lpPropEmail && lpPropName) {
-        strAddress = (string)"\"" + lpPropName->Value.lpszA + "\" <" + lpPropEmail->Value.lpszA + ">";
-    } else if(lpPropEmail) {
-        strAddress = (string)"<" + lpPropEmail->Value.lpszA + ">";
-    } else {
-        // Only a name ??
-    }
-    
-    return strAddress;
-}
-
-/** 
  * The notify callback function. Sends changes to the client on the
  * current selected folder during the IDLE command.
  * 
@@ -2858,7 +2819,6 @@ HRESULT IMAP::HrCmdIdle(const string &strTag) {
 	enum { EID, IKEY, IMAPID, MESSAGE_FLAGS, FLAG_STATUS, MSG_STATUS, LAST_VERB, NUM_COLS };
 	SizedSPropTagArray(NUM_COLS, spt) = { NUM_COLS, {PR_ENTRYID, PR_INSTANCE_KEY, PR_EC_IMAP_ID, PR_MESSAGE_FLAGS, PR_FLAG_STATUS, PR_MSG_STATUS, PR_LAST_VERB_EXECUTED} };
 
-
 	// Outlook (express) IDLEs without selecting a folder.
 	// When sending an error from this command, Outlook loops on the IDLE command forever :(
 	// Therefore, we can never return an HrResultBad() or ...No() here, so we always "succeed"
@@ -2908,7 +2868,6 @@ HRESULT IMAP::HrCmdIdle(const string &strTag) {
 	hr = HrResponse(RESP_CONTINUE, "waiting for notifications");
 
 	pthread_mutex_unlock(&m_mIdleLock);
-
 
 exit:
 	if (hr != hrSuccess || hr2 != hrSuccess) {
@@ -3337,7 +3296,7 @@ HRESULT IMAP::HrGetFolderList(list<SFolder> &lstFolders) {
 
 	hr = HrGetOneProp(lpPublicStore, PR_IPM_PUBLIC_FOLDERS_ENTRYID, &lpPropVal);
 	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_WARNING, "Public store is enabled in configuation, but Public Folders inside public store could not be found.");
+		lpLogger->Log(EC_LOGLEVEL_WARNING, "Public store is enabled in configuration, but Public Folders inside public store could not be found.");
 		hr = hrSuccess;
 		goto exit;
 	}
@@ -3345,7 +3304,7 @@ HRESULT IMAP::HrGetFolderList(list<SFolder> &lstFolders) {
 	// make public folder folders list
 	hr = HrGetSubTree(lstFolders, lpPropVal->Value.bin, PUBLIC_FOLDERS_NAME, --lstFolders.end());
 	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_WARNING, "Public store is enabled in configuation, but Public Folders inside public store could not be found.");
+		lpLogger->Log(EC_LOGLEVEL_WARNING, "Public store is enabled in configuration, but Public Folders inside public store could not be found.");
 		hr = hrSuccess;
 	}
 
@@ -3353,13 +3312,6 @@ exit:
 	MAPIFreeBuffer(lpPropVal);
 	MAPIFreeBuffer(lpEntryID);
 	return hr;
-}
-
-bool IMAP::IsSubscribed(BinaryArray sEntryId) {
-	vector<BinaryArray>::const_iterator iFld;
-
-	iFld = find(m_vSubscriptions.begin(), m_vSubscriptions.end(), sEntryId);
-	return iFld != m_vSubscriptions.end();
 }
 
 /**
@@ -4921,39 +4873,6 @@ exit:
 	return hr;
 }
 
-/** 
- * Returns the INTERNALDATE for a given message.  The value comes
- * either from PR_MESSAGE_DELIVERY_TIME or PR_CLIENT_SUBMIT_TIME.
- *
- * @param[out] strResponse the INTERNALDATE reply for the given message
- * @param[in] lpMessage the MAPI message to get the date for
- * 
- * @return MAPI Error code
- */
-HRESULT IMAP::HrGetMessageInterDate(string &strResponse, LPMESSAGE lpMessage) {
-	HRESULT hr = hrSuccess;
-	LPSPropValue lpPropVal = NULL;
-
-	if (!lpMessage) {
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
-	}
-
-	strResponse += "INTERNALDATE ";
-	if (HrGetOneProp(lpMessage, PR_MESSAGE_DELIVERY_TIME, &lpPropVal) == hrSuccess
-		|| HrGetOneProp(lpMessage, PR_CLIENT_SUBMIT_TIME, &lpPropVal) == hrSuccess) {
-		strResponse += "\"";
-		strResponse += FileTimeToString(lpPropVal->Value.ft);
-		strResponse += "\"";
-	} else {
-		strResponse += "NIL";
-	}
-
-exit:
-	MAPIFreeBuffer(lpPropVal);
-	return hr;
-}
-
 /*
  * RFC 3501, section 6.4.5:
  *
@@ -6219,7 +6138,6 @@ HRESULT IMAP::HrSearch(vector<string> &lstSearchCriteria, ULONG &ulStartCriteria
 			lpExtraRestriction[1].res.resAnd.lpRes[1].res.resProperty.relop = RELOP_GT;
 			lpExtraRestriction[1].res.resAnd.lpRes[1].res.resProperty.ulPropTag = PR_MESSAGE_SIZE;
 			lpExtraRestriction[1].res.resAnd.lpRes[1].res.resProperty.lpProp = lpPropVal;
-
 
 			ulStartCriteria += 2;
 			// NEW done with ALL
@@ -7788,7 +7706,7 @@ bool IMAP::IsMailFolder(IMAPIFolder *lpFolder)
         goto exit;
 	}
         
-	result = stricmp(lpProp->Value.lpszA, "IPM") == 0 || stricmp(lpProp->Value.lpszA, "IPF.NOTE") == 0;
+	result = strcasecmp(lpProp->Value.lpszA, "IPM") == 0 || strcasecmp(lpProp->Value.lpszA, "IPF.NOTE") == 0;
     
 exit:
 	MAPIFreeBuffer(lpProp);

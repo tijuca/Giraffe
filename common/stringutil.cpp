@@ -22,10 +22,6 @@
 
 #include <kopano/ECIConv.h>
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 std::string stringify(unsigned int x, bool usehex, bool _signed) {
 	char szBuff[33];
 
@@ -256,29 +252,6 @@ std::string GetServerPortFromPath(const char *szPath) {
 		path.erase(pos, std::string::npos);
 
 	return path.c_str();
-}
-
-std::string ServerNamePortToURL(const char *lpszType, const char *lpszServerName, const char *lpszServerPort, const char *lpszExtra) {
-	std::string strURL;
-
-	if (lpszType && lpszType[0]) {
-		strURL.append(lpszType);
-		strURL.append("://");
-	}
-
-	strURL.append(lpszServerName);
-
-	if (lpszServerPort && lpszServerPort[0]) {
-		strURL.append(":");
-		strURL.append(lpszServerPort);
-	}
-
-	if (strnicmp(lpszType,"http", 4) == 0 && lpszExtra && lpszExtra[0]) {
-		strURL.append("/");
-		strURL.append(lpszExtra);
-	}
-
-	return strURL;
 }
 
 std::string shell_escape(const std::string &str)
@@ -560,7 +533,6 @@ std::string urlDecode(const std::string &input)
 	return output;
 }
 
-
 /** 
  * Convert a memory buffer with strings with Unix \n enters to DOS
  * \r\n enters.
@@ -662,31 +634,6 @@ void StringLFtoCRLF(std::string &strInOut)
 	swap(strInOut, strOutput);
 }
 
-
-/**
- * Force a string to contain alphanumerics only
- *
- * Replaces all other characters with _ unless they are in szAdditional
- *
- * @param[in] str Input string
- * @param[in] szAdditional Additional characters to accept
- * @return Modified string
- */
-std::string forcealnum(const std::string& str, const char *szAdditional)
-{
-    std::string out;
-
-    for (std::string::const_iterator i = str.begin(); i != str.end(); ++i)
-        if(isalnum(*i))
-            out += *i;
-        else if(szAdditional && strchr(szAdditional, *i) != NULL)
-            out += *i;
-        else
-            out += '_';
-
-    return out;
-}
-
 std::string format(const char *const fmt, ...) {
         char *buffer = NULL;
         va_list ap;
@@ -699,4 +646,11 @@ std::string format(const char *const fmt, ...) {
         free(buffer);
 
         return result;
+}
+
+char *kc_strlcpy(char *dest, const char *src, size_t n)
+{
+	strncpy(dest, src, n);
+	dest[n-1] = '\0';
+	return dest;
 }

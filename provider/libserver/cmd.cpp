@@ -73,7 +73,6 @@
 #include "ECTPropsPurge.h"
 #include "versions.h"
 #include "ECTestProtocol.h"
-#include "ECTPropsPurge.h"
 
 #include <kopano/ECDefs.h>
 #include <kopano/EMSAbTag.h>
@@ -89,9 +88,9 @@
 #include "logontime.hpp"
 
 #if defined(HAVE_GPERFTOOLS_MALLOC_EXTENSION_H)
-#	include <gperftools/malloc_extension.h>
+#	include <gperftools/malloc_extension_c.h>
 #elif defined(HAVE_GOOGLE_MALLOC_EXTENSION_H)
-#	include <google/malloc_extension.h>
+#	include <google/malloc_extension_c.h>
 #endif
 
 #define STRIN_FIX(s) (bSupportUnicode ? (s) : ECStringCompat::WTF1252_to_UTF8(soap, (s)))
@@ -100,10 +99,6 @@
 
 #define LOG_SOAP_DEBUG(_msg, ...) \
 	ec_log(EC_LOGLEVEL_DEBUG | EC_LOGLEVEL_SOAP, "soap: " _msg, ##__VA_ARGS__)
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
 
 extern ECSessionManager*	g_lpSessionManager;
 extern ECStatsCollector*	g_lpStatsCollector;
@@ -243,7 +238,7 @@ static ECRESULT CheckUserStore(ECSession *lpecSession, unsigned ulUserId,
 			if (ulUserId == 2)	// Everyone, public in single tennant
 				*lpbHasLocalStore = true;
 			else
-				*lpbHasLocalStore = (stricmp(sDetails.GetPropString(OB_PROP_S_SERVERNAME).c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) == 0);
+				*lpbHasLocalStore = (strcasecmp(sDetails.GetPropString(OB_PROP_S_SERVERNAME).c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) == 0);
 		} else	// Archive store
 			*lpbHasLocalStore = sDetails.PropListStringContains((property_key_t)PR_EC_ARCHIVE_SERVERS_A, g_lpSessionManager->GetConfig()->GetSetting("server_name"), true);
 	} else	// Single tennant
@@ -290,7 +285,7 @@ static ECRESULT PeerIsServer(struct soap *soap,
 
 	// First check if we're connecting through unix-socket/named-pipe and if the request url matches this server
 	if (SOAP_CONNECTION_TYPE_NAMED_PIPE(soap) &&
-			stricmp(strServerName.c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) == 0)
+			strcasecmp(strServerName.c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) == 0)
 		bResult = true;
 
 	else
@@ -588,7 +583,7 @@ int ns__ssoLogon(struct soap *soap, ULONG64 ulSessionId, char *szUsername, char 
 		goto exit;
 
 	lpszEnabled = g_lpSessionManager->GetConfig()->GetSetting("enable_sso");
-	if (!(lpszEnabled && stricmp(lpszEnabled, "yes") == 0))
+	if (!(lpszEnabled && strcasecmp(lpszEnabled, "yes") == 0))
 		goto nosso;
 
 	lpsResponse->lpszVersion = const_cast<char *>("0," PROJECT_VERSION_SERVER_STR);
@@ -785,7 +780,6 @@ __soapentry_exit: \
     } \
     return SOAP_OK;
 
-
 // This is the variadic macro we would like to use. Unfortunately, the win32 vc++ compiler
 // doesn't understand variadic macro's, so we have to split them into the cases below...
 #define SOAP_ENTRY_START(fname,resultvar,...) \
@@ -796,7 +790,6 @@ int ns__##fname(struct soap *soap, ULONG64 ulSessionId, ##__VA_ARGS__) \
 #define SOAP_ENTRY_END() \
     SOAP_ENTRY_FUNCTION_FOOTER \
 }
-
 
 #define ALLOC_DBRESULT() \
 	DB_ROW 			UNUSED_VAR		lpDBRow = NULL; \
@@ -824,7 +817,6 @@ int ns__##fname(struct soap *soap, ULONG64 ulSessionId, ##__VA_ARGS__) \
 #define ROLLBACK_ON_ERROR() \
 	if (lpDatabase && FAILED(er)) \
 		lpDatabase->Rollback(); \
-
 
 static ECRESULT PurgeSoftDelete(ECSession *lpecSession,
     unsigned int ulLifetime, unsigned int *lpulMessages,
@@ -1084,7 +1076,7 @@ SOAP_ENTRY_START(getPublicStore, lpsResponse->er, unsigned int ulFlags, struct g
 		}
 	
 		/* Do we own the store? */
-		if (stricmp(strThisServer.c_str(), strStoreServer.c_str()) != 0)
+		if (strcasecmp(strThisServer.c_str(), strStoreServer.c_str()) != 0)
 		{
 			if ((ulFlags & EC_OVERRIDE_HOMESERVER) == 0) {
 				er = GetBestServerPath(soap, lpecSession, strStoreServer, &strServerPath);
@@ -1178,7 +1170,7 @@ SOAP_ENTRY_START(getStore, lpsResponse->er, entryId* lpsEntryId, struct getStore
                 er = KCERR_NOT_FOUND;
                 goto exit;
             }
-            if (stricmp(strServerName.c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) != 0)  {
+            if (strcasecmp(strServerName.c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) != 0)  {
                 er = GetBestServerPath(soap, lpecSession, strServerName, &strServerPath);
                 if (er != erSuccess)
                     goto exit;
@@ -1520,7 +1512,6 @@ static ECRESULT ReadProps(struct soap *soap, ECSession *lpecSession,
 	if(er != erSuccess)
 	    goto exit;
 
-
 exit:
 	FREE_DBRESULT();
 
@@ -1650,7 +1641,7 @@ static ECRESULT GetFolderSize(ECDatabase *lpDatabase, unsigned int ulFolderId,
 	if(lpDBRow == NULL || lpDBRow[0] == NULL)
 		llSize = 0;
 	else
-		llSize = _atoi64(lpDBRow[0]);
+		llSize = atoll(lpDBRow[0]);
 
 	// Free results
 	if(lpDBResult) { lpDatabase->FreeResult(lpDBResult); lpDBResult = NULL; }
@@ -2027,7 +2018,6 @@ static ECRESULT WriteProps(struct soap *soap, ECSession *lpecSession,
 		if (lpfHaveChangeKey && lpPropValArray->__ptr[i].ulPropTag == PR_CHANGE_KEY)
 			*lpfHaveChangeKey = true;
 
-
 		if((PROP_TYPE(lpPropValArray->__ptr[i].ulPropTag) & MV_FLAG) == MV_FLAG) {
 			// Make sure string prop_types become PT_MV_STRING8
 			if (PROP_TYPE(lpPropValArray->__ptr[i].ulPropTag) == PT_MV_UNICODE)
@@ -2304,7 +2294,6 @@ static ECRESULT WriteProps(struct soap *soap, ECSession *lpecSession,
 
 			g_lpSessionManager->GetCacheManager()->SetObjectProp(PROP_ID(PR_SOURCE_KEY), sSourceKey.size(), sSourceKey, ulObjId);
 		}
-
 
 		if(ulParentType == MAPI_FOLDER) {
 			// Add a PR_EC_IMAP_ID to the newly created message
@@ -2706,7 +2695,6 @@ static unsigned int SaveObject(struct soap *soap, ECSession *lpecSession,
 			lpsReturnObj->modProps.__ptr[n].Value.hilo->lo = ftCreated.dwLowDateTime;
 			++n;
 		}
-
 
 		// set actual array size
 		lpsReturnObj->delProps.__size = n;
@@ -3194,7 +3182,7 @@ SOAP_ENTRY_START(loadObject, lpsLoadObjectResponse->er, entryId sEntryId, struct
 							goto exit;
 						}
 
-						if (stricmp(strServerName.c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) != 0) {
+						if (strcasecmp(strServerName.c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) != 0) {
 							er = KCERR_UNABLE_TO_COMPLETE;	// Reason 2
 							goto exit;
 						}
@@ -3232,7 +3220,6 @@ SOAP_ENTRY_START(loadObject, lpsLoadObjectResponse->er, entryId sEntryId, struct
 		
 		ulParentObjType = MAPI_FOLDER;
 	} else if(ulObjType == MAPI_FOLDER) {
-
 
 		// Disable searchfolder for delegate stores without admin permissions
 		if ( (ulObjFlags&FOLDER_SEARCH) && lpecSession->GetSecurity()->GetAdminLevel() == 0 && 
@@ -3335,7 +3322,6 @@ static ECRESULT CreateFolder(ECSession *lpecSession, ECDatabase *lpDatabase,
 	if(er != erSuccess)
 		goto exit;
 
-
 	while (!bExist && (lpDBRow = lpDatabase->FetchRow(lpDBResult)) != NULL) {
 		if (lpDBRow[0] == NULL || lpDBRow[1] == NULL) {
 			er = KCERR_DATABASE_ERROR;
@@ -3343,10 +3329,9 @@ static ECRESULT CreateFolder(ECSession *lpecSession, ECDatabase *lpDatabase,
 			goto exit;
 		}
 
-		if (stricmp(lpDBRow[1], name) == 0)
+		if (strcasecmp(lpDBRow[1], name) == 0)
 			bExist = true;
 	}
-
 
 	if(bExist && !ulSyncId) {
 		// Check folder read access
@@ -3500,7 +3485,6 @@ static ECRESULT CreateFolder(ECSession *lpecSession, ECDatabase *lpDatabase,
 
 		// Update all tables viewing this folder
 		g_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_ADD, 0, ulParentId, ulFolderId, MAPI_FOLDER);
-
 
 		// Update notification, grandparent of the mainfolder
 		g_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_MODIFY, 0, ulGrandParent, ulParentId, MAPI_FOLDER);
@@ -4162,7 +4146,6 @@ SOAP_ENTRY_START(tableSetMultiStoreEntryIDs, *result, unsigned int ulTableId, st
 	ECGenericObjectTable	*lpTable = NULL;
 	ECMultiStoreTable		*lpMultiStoreTable = NULL;
 	ECListInt	lObjectList;
-
 
 	if(lpEntryList == NULL) {
 		er = KCERR_INVALID_PARAMETER;
@@ -4827,7 +4810,6 @@ SOAP_ENTRY_START(getReceiveFolder, lpsReceiveFolder->er, entryId sStoreId, char*
 		er = KCERR_NOT_FOUND;
 	}
 
-
 exit:
     FREE_DBRESULT();
 }
@@ -4916,7 +4898,6 @@ SOAP_ENTRY_START(setReceiveFolder, *result, entryId sStoreId, entryId* lpsEntryI
 		FREE_DBRESULT();
 	}
 
-
 	strQuery = "SELECT objid, id FROM receivefolder WHERE storeid="+stringify(ulStoreid)+" AND messageclass='"+lpDatabase->Escape(lpszMessageClass)+"'";
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
@@ -4953,7 +4934,6 @@ SOAP_ENTRY_START(setReceiveFolder, *result, entryId sStoreId, entryId* lpsEntryI
 		er = lpecSession->GetSecurity()->CheckPermission(ulStoreid, ecSecurityCreate);
 	if(er != erSuccess)
 		goto exit;
-
 
 	if(bIsUpdate) {
 		strQuery = "UPDATE receivefolder SET objid="+stringify(ulId);
@@ -5151,7 +5131,6 @@ SOAP_ENTRY_START(setReadFlags, *result, unsigned int ulFlags, entryId* lpsEntryI
 		if(er != erSuccess)
 			goto exit;
 
-
 		while( (lpDBRow = lpDatabase->FetchRow(lpDBResult)) )
 		{
 			if(lpDBRow[0] == NULL || lpDBRow[1] == NULL){
@@ -5194,7 +5173,6 @@ SOAP_ENTRY_START(setReadFlags, *result, unsigned int ulFlags, entryId* lpsEntryI
    	er = lpDatabase->DoUpdate(strQuery);
    	if(er != erSuccess)
     	goto exit;
-
 
 	er = UpdateTProp(lpDatabase, PR_MESSAGE_FLAGS, ulParent, &lHierarchyIDs); // FIXME ulParent is not constant for all lHierarchyIDs
 	if(er != erSuccess)
@@ -5728,7 +5706,12 @@ SOAP_ENTRY_START(purgeCache, *result, unsigned int ulFlags, unsigned int *result
     er = g_lpSessionManager->GetCacheManager()->PurgeCache(ulFlags);
 
 #ifdef HAVE_TCMALLOC
-	MallocExtension::instance()->ReleaseFreeMemory();
+	{
+		auto rfm = reinterpret_cast<decltype(MallocExtension_ReleaseFreeMemory) *>
+			(dlsym(NULL, "MallocExtension_ReleaseFreeMemory"));
+		if (rfm != NULL)
+			rfm();
+	}
 #endif
 
 	g_lpStatsCollector->SetTime(SCN_SERVER_LAST_CACHECLEARED, time(NULL));
@@ -5916,7 +5899,6 @@ SOAP_ENTRY_START(createStore, *result, unsigned int ulStoreType, unsigned int ul
 	er = lpDatabase->DoInsert(strQuery);
 	if(er != erSuccess)
 		goto exit;
-
 
 	// Set ACL's on public store
 	if(ulStoreType == ECSTORE_TYPE_PUBLIC) {
@@ -7151,7 +7133,6 @@ table:
 	if(er != erSuccess)
 		goto exit;
 
-
 	// Remove messge from the outgoing queue
 	g_lpSessionManager->UpdateOutgoingTables(ECKeyTable::TABLE_ROW_DELETE, ulStoreId, ulObjId, ulFlags, MAPI_MESSAGE);
 
@@ -7266,7 +7247,6 @@ SOAP_ENTRY_START(abortSubmit, *result, entryId sEntryId, unsigned int *result)
 		g_lpSessionManager->NotificationModified(MAPI_MESSAGE, ulObjId, ulParentId);
         g_lpSessionManager->GetCacheManager()->Update(fnevObjectModified, ulParentId);
 		g_lpSessionManager->NotificationModified(MAPI_FOLDER, ulParentId);
-
 
 		g_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_MODIFY, 0, ulParentId, ulObjId, MAPI_MESSAGE);
 		if(g_lpSessionManager->GetCacheManager()->GetParent(ulParentId, &ulGrandParentId) == erSuccess) {
@@ -7429,7 +7409,7 @@ SOAP_ENTRY_START(resolveUserStore, lpsResponse->er, char *szUserName, unsigned i
 				goto exit;
 			}
 
-			if (stricmp(strServerName.c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) != 0) {
+			if (strcasecmp(strServerName.c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) != 0) {
 				if ((ulFlags & OPENSTORE_OVERRIDE_HOME_MDB) == 0) {
 					string	strServerPath;
 
@@ -7697,7 +7677,6 @@ static ECRESULT MoveObjects(ECSession *lpSession, ECDatabase *lpDatabase,
 		if(iterCopyItems->ulParent == ulDestFolderId && (iterCopyItems->ulFlags&MSGFLAG_DELETED) == 0)
 			continue;
 
-
 		er = g_lpSessionManager->GetCacheManager()->GetEntryIdFromObject(iterCopyItems->ulId, NULL, 0, &lpsOldEntryId);
 		if(er != erSuccess) {
 			// FIXME isn't this an error?
@@ -7903,7 +7882,6 @@ static ECRESULT MoveObjects(ECSession *lpSession, ECDatabase *lpDatabase,
             lstParent.push_back(iterCopyItems->ulParent);
         }		
 	}
-
 
 	lstParent.sort();
 	lstParent.unique();
@@ -8176,12 +8154,11 @@ static ECRESULT CopyObject(ECSession *lpecSession,
 		lpsNewEntryId = NULL;
 	}
 
-
 	// Get child items of the message like , attachment, recipient...
 	strQuery = "SELECT id FROM hierarchy WHERE parent="+stringify(ulObjId);
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess) {
-		ec_log_err("CopyObject: failed retriving child items of mesage: %s (%x)", GetMAPIErrorMessage(er), er);
+		ec_log_err("CopyObject: failed retrieving child items of message: %s (%x)", GetMAPIErrorMessage(er), er);
 		goto exit;
 	}
 
@@ -8320,7 +8297,6 @@ static ECRESULT CopyObject(ECSession *lpecSession,
 			}
 		}
 	}
-
 
 	g_lpSessionManager->GetCacheManager()->Update(fnevObjectModified, ulDestFolderId);
 
@@ -8499,7 +8475,6 @@ static ECRESULT CopyFolderObjects(struct soap *soap, ECSession *lpecSession,
 	GetSourceKey(ulNewDestFolderId, &sSourceKey);
 
 	AddChange(lpecSession, ulSyncId, sSourceKey, sParentSourceKey, ICS_FOLDER_CHANGE);
-
 
 	//Select all Messages of the home folder
 	// Skip deleted and associated items
@@ -9104,7 +9079,6 @@ SOAP_ENTRY_START(getReceiveFolderTable, lpsReceiveFolderTable->er, entryId sStor
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
 		goto exit;
-
 
 	ulRows = lpDatabase->GetNumRows(lpDBResult);
 
@@ -10466,9 +10440,8 @@ SOAP_ENTRY_END()
 
 SOAP_ENTRY_START(getLicenseAuth, lpsResponse->er, struct xsd__base64Binary sAuthData, struct getLicenseAuthResponse *lpsResponse)
 {
-#ifdef LINUX
 	ECLicenseClient *lpLicenseClient = new ECLicenseClient();
-	unsigned char *data = NULL;
+	void *data = NULL;
 
 	er = lpLicenseClient->Auth(sAuthData.__ptr, sAuthData.__size, &data, reinterpret_cast<unsigned int *>(&lpsResponse->sAuthResponse.__size));
 	if (er != erSuccess)
@@ -10478,17 +10451,13 @@ SOAP_ENTRY_START(getLicenseAuth, lpsResponse->er, struct xsd__base64Binary sAuth
 	memcpy(lpsResponse->sAuthResponse.__ptr, data, lpsResponse->sAuthResponse.__size);
 
 exit:
-	delete[] data;
+	free(data);
 	delete lpLicenseClient;
-#else
-	er = KCERR_NOT_IMPLEMENTED;
-#endif
 }
 SOAP_ENTRY_END()
 
 SOAP_ENTRY_START(getLicenseCapa, lpsResponse->er, unsigned int ulServiceType, struct getLicenseCapaResponse *lpsResponse)
 {
-#ifdef LINUX
     ECLicenseClient *lpLicenseClient = new ECLicenseClient();
     std::vector<std::string> lstCapabilities;
 
@@ -10504,15 +10473,11 @@ SOAP_ENTRY_START(getLicenseCapa, lpsResponse->er, unsigned int ulServiceType, st
 exit:
 
     delete lpLicenseClient;
-#else
-	er = KCERR_NOT_IMPLEMENTED;
-#endif
 }
 SOAP_ENTRY_END()
 
 SOAP_ENTRY_START(getLicenseUsers, lpsResponse->er, unsigned int ulServiceType, struct getLicenseUsersResponse *lpsResponse)
 {
-#ifdef LINUX
 	unsigned int ulUsers = 0;
 
 	ECLicenseClient *lpLicenseClient = new ECLicenseClient();
@@ -10527,9 +10492,6 @@ SOAP_ENTRY_START(getLicenseUsers, lpsResponse->er, unsigned int ulServiceType, s
 exit:
 
 	delete lpLicenseClient;
-#else
-	er = KCERR_NOT_IMPLEMENTED;
-#endif
 }
 SOAP_ENTRY_END()
 
@@ -10563,7 +10525,7 @@ SOAP_ENTRY_START(resolvePseudoUrl, lpsResponse->er, char *lpszPseudoUrl, struct 
 		goto exit;
 
 	lpsResponse->lpszServerPath = STROUT_FIX_CPY(strServerPath.c_str());
-	lpsResponse->bIsPeer = stricmp(g_lpSessionManager->GetConfig()->GetSetting("server_name"), lpszPseudoUrl + 9) == 0;
+	lpsResponse->bIsPeer = strcasecmp(g_lpSessionManager->GetConfig()->GetSetting("server_name"), lpszPseudoUrl + 9) == 0;
 
 exit:
 	;
@@ -10612,11 +10574,11 @@ SOAP_ENTRY_START(getServerDetails, lpsResponse->er, struct mv_string8 szaSvrName
 				goto exit;
 
 			
-			if (stricmp(sDetails.GetServerName().c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) == 0)
+			if (strcasecmp(sDetails.GetServerName().c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) == 0)
 				lpsResponse->sServerList.__ptr[i].ulFlags |= EC_SDFLAG_IS_PEER;
 
 			// note: "contains a public of a company" is also a possibility
-			if (!strPublicServer.empty() && stricmp(sDetails.GetServerName().c_str(), strPublicServer.c_str()) == 0)
+			if (!strPublicServer.empty() && strcasecmp(sDetails.GetServerName().c_str(), strPublicServer.c_str()) == 0)
 				lpsResponse->sServerList.__ptr[i].ulFlags |= EC_SDFLAG_HAS_PUBLIC;
 				
 			if ((ulFlags & EC_SERVERDETAIL_NO_NAME) != EC_SERVERDETAIL_NO_NAME)
@@ -10682,7 +10644,6 @@ typedef struct _MTOMStreamInfo {
 	struct propValArray *lpPropValArray;
 	MTOMSessionInfo *lpSessionInfo;
 } MTOMStreamInfo;
-
 
 typedef MTOMStreamInfo * LPMTOMStreamInfo;
 
@@ -10809,7 +10770,6 @@ static void MTOMSessionDone(struct soap *soap, void *param)
 	delete lpInfo->lpThreadPool;
 	delete lpInfo;
 }
-
 
 SOAP_ENTRY_START(exportMessageChangesAsStream, lpsResponse->er, unsigned int ulFlags, struct propTagArray sPropTags, struct sourceKeyPairArray sSourceKeyPairs, unsigned int ulPropTag, exportMessageChangesAsStreamResponse *lpsResponse)
 {
@@ -11109,7 +11069,6 @@ static void MTOMWriteClose(struct soap *soap, void *handle)
 		soap->error = SOAP_FATAL_ERROR;
 	}
 }
-
 
 SOAP_ENTRY_START(importMessageFromStream, *result, unsigned int ulFlags, unsigned int ulSyncId, entryId sFolderEntryId, entryId sEntryId, bool bIsNew, struct propVal *lpsConflictItems, struct xsd__Binary sStreamData, unsigned int *result)
 {
@@ -11419,7 +11378,6 @@ SOAP_ENTRY_START(getChangeInfo, lpsResponse->er, entryId sEntryId, struct getCha
 	if (er != erSuccess)
 		goto exit;
 
-
 	// Get the Change Key
 	strQuery = "SELECT val_binary FROM properties "
 				"WHERE tag = " + stringify(PROP_ID(PR_CHANGE_KEY)) +
@@ -11446,7 +11404,6 @@ SOAP_ENTRY_START(getChangeInfo, lpsResponse->er, entryId sEntryId, struct getCha
 	}
 
 	FREE_DBRESULT();
-
 
 	// Get the Predecessor Change List
 	strQuery = "SELECT val_binary FROM properties "

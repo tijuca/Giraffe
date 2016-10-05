@@ -57,8 +57,6 @@ StoreHelper::search_folder_info_t StoreHelper::s_infoSearchFolders[] = {
  * @param[out]	lpptrStoreHelper
  *					Pointer to a StoreHelperPtr that will be assigned the address
  *					of the new StoreHelper object.
- *
- * @return HRESULT
  */
 HRESULT StoreHelper::Create(MsgStorePtr &ptrMsgStore, StoreHelperPtr *lpptrStoreHelper)
 {
@@ -78,7 +76,6 @@ HRESULT StoreHelper::Create(MsgStorePtr &ptrMsgStore, StoreHelperPtr *lpptrStore
 	*lpptrStoreHelper = std::move(ptrStoreHelper);
 	return hrSuccess;
 }
-
 
 /**
  * Constructor.
@@ -123,8 +120,6 @@ exit:
  * @param[out]	lppFolder
  *					Pointer to a IMapiFolder pointer that will be assigned the address
  *					of the returned folderd.
- *
- * @return HRESULT
  */
 HRESULT StoreHelper::GetFolder(const tstring &strFolder, bool bCreate, LPMAPIFOLDER *lppFolder)
 {
@@ -146,8 +141,6 @@ HRESULT StoreHelper::GetFolder(const tstring &strFolder, bool bCreate, LPMAPIFOL
 /**
  * Create or reinitialize the searchfolders used by the archiver. The search folders
  * need to be updated whenever the set of attached archives for a store change.
- *
- * @return HRESULT
  */
 HRESULT StoreHelper::UpdateSearchFolders()
 {
@@ -207,8 +200,6 @@ HRESULT StoreHelper::UpdateSearchFolders()
  * @param[out]	lppFolder
  *					Pointer to an IMAPIFolder pointer that will be assigned the
  *					address of the returned folder.
- *
- * @return HRESULT
  */
 HRESULT StoreHelper::GetIpmSubtree(LPMAPIFOLDER *lppFolder)
 {
@@ -247,8 +238,6 @@ HRESULT StoreHelper::GetIpmSubtree(LPMAPIFOLDER *lppFolder)
  *					address of the searcholder containing the messages that are eligible
  * 					for stubbing. These are basically all non-stubbed, archived messages that
  * 					are not flagged to be never stubbed.
- *
- * @return HRESULT
  */
 HRESULT StoreHelper::GetSearchFolders(LPMAPIFOLDER *lppSearchArchiveFolder, LPMAPIFOLDER *lppSearchDeleteFolder, LPMAPIFOLDER *lppSearchStubFolder)
 {
@@ -366,8 +355,6 @@ HRESULT StoreHelper::GetSearchFolders(LPMAPIFOLDER *lppSearchArchiveFolder, LPMA
  * @param[out]	lppFolder
  *					Pointer to an IMAPIFolder pointer that will be assigned the
  *					address of the returned folder.
- *
- * @return HRESULT
  */
 HRESULT StoreHelper::GetSubFolder(MAPIFolderPtr &ptrFolder, const tstring &strFolder, bool bCreate, LPMAPIFOLDER *lppFolder)
 {
@@ -554,7 +541,6 @@ HRESULT StoreHelper::SetupSearchArchiveFolder(LPMAPIFOLDER lpSearchFolder, const
 	ptrEntryList->lpbin[0].cb = ptrPropEntryId->Value.bin.cb;
 	ptrEntryList->lpbin[0].lpb = ptrPropEntryId->Value.bin.lpb;
 
-
 	sPropStubbed.ulPropTag = PROP_STUBBED; sPropStubbed.Value.b = 1;
 
 	// Create/Update the search folder that tracks unarchived message that are not flagged to be never archived
@@ -638,7 +624,6 @@ HRESULT StoreHelper::SetupSearchDeleteFolder(LPMAPIFOLDER lpSearchFolder, const 
 	ptrEntryList->lpbin[0].cb = ptrPropEntryId->Value.bin.cb;
 	ptrEntryList->lpbin[0].lpb = ptrPropEntryId->Value.bin.lpb;
 
-
 	// Create/Update the search folder that tracks all archived message that are not flagged to be never deleted or never stubbed
 	resDeleteFolder.append(
 		*lpresClassCheck +
@@ -703,7 +688,6 @@ HRESULT StoreHelper::SetupSearchStubFolder(LPMAPIFOLDER lpSearchFolder, const EC
 		return hr;
 	ptrEntryList->lpbin[0].cb = ptrPropEntryId->Value.bin.cb;
 	ptrEntryList->lpbin[0].lpb = ptrPropEntryId->Value.bin.lpb;
-
 
 	sPropStubbed.ulPropTag = PROP_STUBBED; 
 	sPropStubbed.Value.b = 1;

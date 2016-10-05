@@ -14,13 +14,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <kopano/platform.h>
-#ifdef LINUX
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pwd.h>
 #include <dirent.h>
-#endif
-
 #include "ECDatabaseUtils.h"
 #include "ECDatabase.h"
 #include "ECSessionManager.h"
@@ -34,7 +31,6 @@
 #include "kcore.hpp"
 #include <kopano/md5.h>
 
-#include <kopano/ECDefs.h>
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapitags.h>
@@ -57,15 +53,9 @@
 #include "ECDBDef.h"
 #include "cmdutil.hpp"
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 #define MAX_PARENT_LIMIT 64
 
 /** 
- * ECSecurity constructor
- * 
  * @param[in] lpSession user session
  * @param[in] lpConfig config object
  * @param[in] lpLogger log object for normal logging
@@ -198,7 +188,6 @@ ECRESULT ECSecurity::GetGroupsForUser(unsigned int ulUserId, std::list<localobje
 			cSeenGroups.m_seen.insert(*iterGroups);
 
 			std::list<localobjectdetails_t> *lpGroupInGroups = NULL;
-			std::list<localobjectdetails_t>::const_iterator li;
 
 			er = m_lpSession->GetUserManagement()->GetParentObjectsOfObjectAndSync(OBJECTRELATION_GROUP_MEMBER,
 																				   iterGroups->ulId, &lpGroupInGroups, USERMANAGEMENT_IDS_ONLY);
@@ -688,9 +677,7 @@ exit:
 ECRESULT ECSecurity::SetRights(unsigned int objid, struct rightsArray *lpsRightsArray)
 {
 	ECRESULT er;
-	std::string			strQueryNew, strQueryDeniedNew;
-	std::string			strQueryModify, strQueryDeniedModify;
-	std::string			strQueryDelete, strQueryDeniedDelete;
+	std::string			strQueryNew, strQueryDelete;
 	unsigned int		ulDeniedRights=0;
 	ECDatabase			*lpDatabase = NULL;
 	unsigned int		ulUserId = 0;
@@ -1260,7 +1247,7 @@ ECRESULT ECSecurity::GetStoreSize(unsigned int ulObjId, long long* lpllStoreSize
 		goto exit;
 	}
 
-	*lpllStoreSize = _atoi64(lpDBRow[0]);
+	*lpllStoreSize = atoll(lpDBRow[0]);
 
 exit:
 	if(lpDBResult)
@@ -1319,7 +1306,7 @@ ECRESULT ECSecurity::GetUserSize(unsigned int ulUserId, long long* lpllUserSize)
 	if (lpDBRow[0] == NULL)
 		llUserSize = 0;
 	else
-		llUserSize = _atoi64(lpDBRow[0]);
+		llUserSize = atoll(lpDBRow[0]);
 
 	*lpllUserSize = llUserSize;
 
@@ -1468,11 +1455,11 @@ ECRESULT ECSecurity::GetUserQuota(unsigned int ulUserId, bool bGetUserDefault, q
 	quotadetails.bUseDefaultQuota = true;
 	quotadetails.bIsUserDefaultQuota = false;
 	if (lpszWarnQuota)
-		quotadetails.llWarnSize = _atoi64(lpszWarnQuota) * 1024 * 1024;
+		quotadetails.llWarnSize = atoll(lpszWarnQuota) * 1024 * 1024;
 	if (lpszSoftQuota)
-		quotadetails.llSoftSize = _atoi64(lpszSoftQuota) * 1024 * 1024;
+		quotadetails.llSoftSize = atoll(lpszSoftQuota) * 1024 * 1024;
 	if (lpszHardQuota)
-		quotadetails.llHardSize = _atoi64(lpszHardQuota) * 1024 * 1024;
+		quotadetails.llHardSize = atoll(lpszHardQuota) * 1024 * 1024;
 
 exit:
 	if (er == erSuccess)

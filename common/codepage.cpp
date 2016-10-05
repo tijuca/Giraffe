@@ -22,10 +22,6 @@
 
 #include <kopano/codepage.h>
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 // These charset should all be supported by iconv
 
 // @see http://msdn.microsoft.com/en-us/library/dd317756(VS.85).aspx
@@ -115,7 +111,7 @@ HRESULT HrGetCharsetByCP(ULONG codepage, const char **lppszCharset)
 HRESULT HrGetCPByCharset(const char *lpszCharset,ULONG *codepage)
 {
     for (size_t i = 0; i < ARRAY_SIZE(CPMAP); ++i) {
-        if(stricmp(CPMAP[i].charset, lpszCharset) == 0) {
+        if(strcasecmp(CPMAP[i].charset, lpszCharset) == 0) {
             *codepage = CPMAP[i].codepage;
             return hrSuccess;
         }

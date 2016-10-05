@@ -25,11 +25,6 @@
 #include "ECChangeAdvisor.h"
 #include "ECMsgStore.h"
 
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 ULONG ECChangeAdvisor::GetSyncId(const ConnectionMap::value_type &sConnection)
 {
 	return sConnection.first;
@@ -158,8 +153,6 @@ exit:
 
 	return hr;
 }
-
-
 
 HRESULT ECChangeAdvisor::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError)
 {
@@ -341,7 +334,6 @@ HRESULT ECChangeAdvisor::UpdateState(LPSTREAM lpStream)
 		lpStream->Write(&m_mapSyncStates[iterConnection->first], sizeof(SyncStateMap::key_type), NULL);
 	}
 
-
 exit:
 	pthread_mutex_unlock(&m_hConnectionLock);
 	return hr;
@@ -352,7 +344,6 @@ HRESULT ECChangeAdvisor::AddKeys(LPENTRYLIST lpEntryList)
 	HRESULT						hr = hrSuccess;
 	SSyncState					*lpsSyncState = NULL;
 	ECLISTCONNECTION			listConnections;
-	ECLISTCONNECTION::const_iterator iterConnection;
 	ECLISTSYNCSTATE				listSyncStates;
 
 	if (m_lpChangeAdviseSink == NULL && !(m_ulFlags & SYNC_CATCHUP))

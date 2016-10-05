@@ -67,10 +67,6 @@ public:
 	 * ldap_search_s.
 	 */
 	LDAPUserPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *shareddata);
-
-	/**
-	 * Destructor
-	 */
 	virtual ~LDAPUserPlugin();
 
     /**
@@ -489,7 +485,7 @@ private:
 	 * @param[in]	uniqueid
 	 *					The unique id which should be converted
 	 * @return the DN for the object
-	 * @throw runtime_error When an error occured during the LDAP query.
+	 * @throw runtime_error When an error occurred during the LDAP query.
 	 * @throw objectnotfound When no object was found with the given objectid.
 	 * @throw toomanyobjects When more then one object was returned with the objectid.
 	 */
@@ -530,7 +526,6 @@ private:
 	 *					The length of the binary data
 	 * @param[out]	lpEscaped
 	 *					Escaped string
-	 * @return HRESULT
 	 */
 	HRESULT BintoEscapeSequence(const char* lpdata, size_t size, string* lpEscaped);
 

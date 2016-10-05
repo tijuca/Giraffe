@@ -106,8 +106,6 @@ class Meetingrequest {
 	var $errorSetResource;
 	
 	/**
-	 * Constructor
-	 *
 	 * Takes a store and a message. The message is an appointment item
 	 * that should be converted into a meeting request or an incoming
 	 * e-mail message that is a meeting request.
@@ -842,7 +840,7 @@ If it is the first time this attendee has proposed a new date/time, increment th
 
 					if ($move) {
 						// All we have to do is open the default calendar,
-						// set the mesage class correctly to be an appointment item
+						// set the message class correctly to be an appointment item
 						// and move it to the calendar folder
 						$sourcefolder = $this->openParentFolder();
 

@@ -59,7 +59,7 @@ HRESULT HrGetFbInfo(icalcomponent *lpFbcomp, time_t *lptStart, time_t *lptEnd, s
 	lpicProp = icalcomponent_get_first_property(lpFbcomp, ICAL_ATTENDEE_PROPERTY);
 	while (lpicProp) {
 		strEmail = icalproperty_get_attendee(lpicProp);
-		if (strnicmp(strEmail.c_str(), "mailto:", 7) == 0) {
+		if (strncasecmp(strEmail.c_str(), "mailto:", 7) == 0) {
 			strEmail.erase(0, 7);
 		}
 		lstUsers->push_back(strEmail);
@@ -94,7 +94,6 @@ HRESULT HrFbBlock2ICal(FBBlock_1 *lpsFbblk, LONG ulBlocks, time_t tDtStart, time
 	time_t tStart = 0;
 	time_t tEnd = 0;
 	std::string strEmail;
-
 
 	lpFbComp = icalcomponent_new(ICAL_VFREEBUSY_COMPONENT);
 	if (!lpFbComp) {

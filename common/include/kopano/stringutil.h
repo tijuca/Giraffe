@@ -27,10 +27,10 @@
 /*
  * Comparison handler for case-insensitive keys in maps
  */
-struct stricmp_comparison {
+struct strcasecmp_comparison {
 	bool operator()(const std::string &left, const std::string &right) const
 	{
-		return left.size() < right.size() || (left.size() == right.size() && stricmp(left.c_str(), right.c_str()) < 0);
+		return left.size() < right.size() || (left.size() == right.size() && strcasecmp(left.c_str(), right.c_str()) < 0);
 	}
 };
 
@@ -89,7 +89,6 @@ std::string str_storage(uint64_t ulBytes, bool bUnlimited = true);
 
 std::string GetServerNameFromPath(const char *szPath);
 std::string GetServerPortFromPath(const char *szPath);
-std::string ServerNamePortToURL(const char *lpszType, const char *lpszServerName, const char *lpszServerPort, const char *lpszExtra = "zarafa");
 
 static inline bool parseBool(const std::string &s) {
 	return !(s == "0" || s == "false" || s == "no");
@@ -97,7 +96,6 @@ static inline bool parseBool(const std::string &s) {
 
 extern std::string shell_escape(const std::string &str);
 extern std::string shell_escape(const std::wstring &wstr);
-std::string forcealnum(const std::string& str, const char *additional = NULL);
 
 std::vector<std::wstring> tokenize(const std::wstring &strInput, const WCHAR sep, bool bFilterEmpty = false);
 std::vector<std::string> tokenize(const std::string &strInput, const char sep, bool bFilterEmpty = false);
@@ -181,5 +179,6 @@ _Tp join(_InputIterator __first, _InputIterator __last, _Tp __sep)
 }
 
 std::string format(const char *const fmt, ...) __LIKE_PRINTF(1, 2);
+extern "C" char *kc_strlcpy(char *, const char *, size_t);
 
 #endif

@@ -17,13 +17,10 @@
 
 #include <kopano/platform.h>
 #include <new>
-#ifdef LINUX
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pwd.h>
 #include <dirent.h>
-#endif
-
 #include <mapidefs.h>
 #include <mapitags.h>
 
@@ -52,10 +49,6 @@
 
 #include <boost/filesystem.hpp>
 namespace bfs = boost::filesystem;
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
 
 #if defined LINUX || !defined UNICODE
 #define WHITESPACE " \t\n\r"
@@ -184,7 +177,6 @@ ECRESULT BTSession::GetAdditionalDatabase(ECDatabase **lppDatabase)
 	return this->m_lpDatabaseFactory->CreateDatabaseObject(lppDatabase, str);
 }
 
-
 ECRESULT BTSession::GetServerGUID(GUID* lpServerGuid){
 	return 	m_lpSessionManager->GetServerGUID(lpServerGuid);
 }
@@ -306,7 +298,6 @@ ECSession::ECSession(const char *src_addr, ECSESSIONID sessionID,
 	pthread_mutex_init(&m_hStateLock, NULL);
 	pthread_mutex_init(&m_hLocksLock, NULL);
 }
-
 
 ECSession::~ECSession()
 {
@@ -675,7 +666,6 @@ size_t ECSession::GetObjectSize()
 	if (m_lpEcSecurity)
 		ulSize += m_lpEcSecurity->GetObjectSize();
 
-
 	// The Table manager size is not callculated here
 //	ulSize += GetTableManager()->GetObjectSize();
 	return ulSize;
@@ -695,18 +685,10 @@ ECAuthSession::ECAuthSession(const char *src_addr, ECSESSIONID sessionID,
 
 	m_ulConnectingPid = 0;
 
-#ifdef LINUX
 	m_NTLM_pid = -1;
 #ifdef HAVE_GSSAPI
 	m_gssServerCreds = GSS_C_NO_CREDENTIAL;
 	m_gssContext = GSS_C_NO_CONTEXT;
-#endif
-#else
-	SecInvalidateHandle(&m_hCredentials);
-	SecInvalidateHandle(&m_hContext);
-	m_cPackages = 0;
-	m_ulPid = 0;
-	m_lpPackageInfo = NULL;
 #endif
 }
 
@@ -728,7 +710,6 @@ ECAuthSession::~ECAuthSession()
 		pthread_cond_wait(&m_hThreadReleased, &m_hThreadReleasedMutex);
 	pthread_mutex_unlock(&m_hThreadReleasedMutex);
 
-#ifdef LINUX
 	if (m_NTLM_pid != -1) {
 		int status;
 
@@ -759,20 +740,8 @@ ECAuthSession::~ECAuthSession()
 #endif
 		}
 	}
-#else // LINUX
-	if (m_lpPackageInfo)
-		FreeContextBuffer(m_lpPackageInfo);
-
-	if (SecIsValidHandle(&m_hCredentials))
-		FreeCredentialHandle(&m_hCredentials);
-
-	if (SecIsValidHandle(&m_hContext))
-		DeleteSecurityContext(&m_hContext);
-#endif
-
 	delete m_lpUserManagement;
 }
-
 
 ECRESULT ECAuthSession::CreateECSession(ECSESSIONGROUPID ecSessionGroupId,
     const std::string &cl_ver, const std::string &cl_app,
@@ -832,7 +801,7 @@ ECRESULT ECAuthSession::ValidateUserLogon(const char* lpszName, const char* lpsz
 	}
 
 	// SYSTEM can't login with user/pass
-	if (stricmp(lpszName, KOPANO_ACCOUNT_SYSTEM) == 0)
+	if (strcasecmp(lpszName, KOPANO_ACCOUNT_SYSTEM) == 0)
 		return KCERR_NO_ACCESS;
 	er = m_lpUserManagement->AuthUserAndSync(lpszName, lpszPassword, &m_ulUserID);
 	if(er != erSuccess)
@@ -871,12 +840,11 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 		goto exit;
 	}
 	p = m_lpSessionManager->GetConfig()->GetSetting("allow_local_users");
-	if (p && !stricmp(p, "yes")) {
+	if (p && !strcasecmp(p, "yes")) {
 		allowLocalUsers = true;
 	}
 
 	// Authentication stage
-#ifdef LINUX
 	localAdminUsers = strdup(m_lpSessionManager->GetConfig()->GetSetting("local_admin_users"));
 
 	struct passwd pwbuf;
@@ -944,35 +912,6 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 		}
 		p = strtok_r(NULL, WHITESPACE, &ptr);
 	}
-
-#else // LINUX
-
-	localAdminUsers = _tcsdup(GetConfigSetting(m_lpSessionManager->GetConfig(), "local_admin_users"));
-
-	dwSize = arraySize(szUsernameServer);
-
-	if (!GetNamedPipeHandleState((HANDLE)socket, NULL, NULL, NULL, NULL, szUsernameClient, arraySize(szUsernameClient)) ||
-		!GetUserName(szUsernameServer, &dwSize))
-	{
-		//GetLastError();
-		er = KCERR_LOGON_FAILED;
-		goto exit;
-	}
-
-	if (_tcscmp(szUsernameServer, szUsernameClient) == 0)
-		goto userok;
-
-	pt = _tcstok(localAdminUsers, WHITESPACE);
-
-	while (pt) {
-		if (_tcscmp(szUsernameClient, pt) == 0)
-			goto userok;
-
-		pt = _tcstok(NULL, WHITESPACE);
-	}
-
-#endif // LINUX
-
 	er = KCERR_LOGON_FAILED;
 	goto exit;
 
@@ -1115,7 +1054,6 @@ exit:
 	return er;
 }
 
-#ifdef LINUX
 #define NTLMBUFFER 8192
 ECRESULT ECAuthSession::ValidateSSOData(struct soap* soap, const char* lpszName, const char* lpszImpersonateUser, const char* szClientVersion, const char *szClientApp, const char *szClientAppVersion, const char *szClientAppMisc, const struct xsd__base64Binary* lpInput, struct xsd__base64Binary **lppOutput)
 {
@@ -1326,7 +1264,7 @@ ECRESULT ECAuthSession::ValidateSSOData_KRB5(struct soap* soap, const char* lpsz
 	if (pos != string::npos)
 		strUsername.erase(pos);
 
-	if (stricmp(strUsername.c_str(), lpszName) == 0) {
+	if (strcasecmp(strUsername.c_str(), lpszName) == 0) {
 		er = m_lpUserManagement->ResolveObjectAndSync(ACTIVE_USER, lpszName, &m_ulUserID);
 		// don't check NONACTIVE, since those shouldn't be able to login
 		if(er != erSuccess)
@@ -1582,7 +1520,7 @@ retry:
 		if(er != erSuccess)
 			return er;
 
-		if (stricmp(lpszName, strAnswer.c_str()) != 0) {
+		if (strcasecmp(lpszName, strAnswer.c_str()) != 0) {
 			// cannot open another user without password
 			// or should we check permissions ?
 			ec_log_warn("Single Sign-On: User \"%s\" authenticated, but user \"%s\" requested.", strAnswer.c_str(), lpszName);
@@ -1614,7 +1552,6 @@ retry:
 	return er;
 }
 #undef NTLMBUFFER
-#endif
 
 ECRESULT ECAuthSession::ProcessImpersonation(const char* lpszImpersonateUser)
 {
@@ -1634,7 +1571,6 @@ size_t ECAuthSession::GetObjectSize()
 
 	return ulSize;
 }
-
 
 ECAuthSessionOffline::ECAuthSessionOffline(const char *src_addr,
     ECSESSIONID sessionID, ECDatabaseFactory *lpDatabaseFactory,

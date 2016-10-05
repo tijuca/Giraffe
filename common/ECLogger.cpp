@@ -26,8 +26,6 @@
 #include <zlib.h>
 #include <kopano/stringutil.h>
 #include "charset/localeutil.h"
-
-#ifdef LINUX
 #include "config.h"
 #include <poll.h>
 #if HAVE_SYSLOG_H
@@ -41,12 +39,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
-#endif
-
 #include <kopano/ECConfig.h>
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
 
 using namespace std;
 
@@ -174,8 +167,6 @@ void ECLogger_Null::Log(unsigned int loglevel, const char *format, ...) {}
 void ECLogger_Null::LogVA(unsigned int loglevel, const char *format, va_list& va) {}
 
 /**
- * ECLogger_File constructor
- *
  * @param[in]	max_ll			max loglevel passed to ECLogger
  * @param[in]	add_timestamp	true if a timestamp before the logmessage is wanted
  * @param[in]	filename		filename of log in current locale
@@ -396,7 +387,6 @@ void ECLogger_File::LogVA(unsigned int loglevel, const char *format, va_list& va
 	Log(loglevel, std::string(msgbuffer));
 }
 
-#ifdef LINUX
 ECLogger_Syslog::ECLogger_Syslog(unsigned int max_ll, const char *ident, int facility) : ECLogger(max_ll) {
 	/*
 	 * Because @ident can go away, and openlog(3) does not make a copy for
@@ -455,17 +445,11 @@ void ECLogger_Syslog::LogVA(unsigned int loglevel, const char *format, va_list& 
 	syslog(levelmap[loglevel & EC_LOGLEVEL_MASK], "%s", msgbuffer);
 #endif
 }
-#endif
 
-/**
- * Consructor
- */
 ECLogger_Tee::ECLogger_Tee(): ECLogger(EC_LOGLEVEL_DEBUG) {
 }
 
 /**
- * Destructor
- *
  * The destructor calls Release on each attached logger so
  * they'll be deleted if it was the last reference.
  */
@@ -557,7 +541,6 @@ void ECLogger_Tee::AddLogger(ECLogger *lpLogger) {
 	}
 }
 
-#ifdef LINUX
 ECLogger_Pipe::ECLogger_Pipe(int fd, pid_t childpid, int loglevel) : ECLogger(loglevel) {
 	m_fd = fd;
 	m_childpid = childpid;
@@ -705,7 +688,7 @@ namespace PrivatePipe {
 	static int PipePassLoop(int readfd, ECLogger_File *lpFileLogger,
 	    ECConfig *lpConfig)
 	{
-		int ret = 0;
+		ssize_t ret;
 		char buffer[_LOG_BUFSIZE] = {0};
 		std::string complete;
 		const char *p = NULL;
@@ -763,7 +746,8 @@ namespace PrivatePipe {
 			do {
 				// if we don't read anything from the fd, it was the end
 				ret = read(readfd, buffer, sizeof buffer);
-
+				if (ret <= 0)
+					break;
 				complete.append(buffer,ret);
 			} while (ret == sizeof buffer);
 
@@ -815,7 +799,6 @@ ECLogger* StartLoggerProcess(ECConfig* lpConfig, ECLogger* lpLogger) {
 	ECLogger_Pipe *lpPipeLogger = NULL;
 	int filefd;
 	int pipefds[2];
-	int t, i;
 	pid_t child = 0;
 
 	if (lpFileLogger == NULL)
@@ -833,8 +816,8 @@ ECLogger* StartLoggerProcess(ECConfig* lpConfig, ECLogger* lpLogger) {
 
 	if (child == 0) {
 		// close all files except the read pipe and the logfile
-		t = getdtablesize();
-		for (i = 3; i < t; ++i) {
+		int t = getdtablesize();
+		for (int i = 3; i < t; ++i) {
 			if (i == pipefds[0] || i == filefd) continue;
 			close(i);
 		}
@@ -863,7 +846,6 @@ ECLogger* StartLoggerProcess(ECConfig* lpConfig, ECLogger* lpLogger) {
 
 	return lpPipeLogger;
 }
-#endif
 
 /**
  * Create ECLogger object from configuration.
@@ -881,13 +863,10 @@ ECLogger* CreateLogger(ECConfig *lpConfig, const char *argv0,
 	ECLogger *lpLogger = NULL;
 	string prepend;
 	int loglevel = 0;
-
-#ifdef LINUX
 	int syslog_facility = LOG_MAIL;
-#endif
 
 	if (bAudit) {
-#ifdef LINUX
+#if 1 /* change to ifdef HAVE_LOG_AUTHPRIV */
 		if (!parseBool(lpConfig->GetSetting("audit_log_enabled")))
 			return NULL;
 		prepend = "audit_";
@@ -899,19 +878,14 @@ ECLogger* CreateLogger(ECConfig *lpConfig, const char *argv0,
 
 	loglevel = strtol(lpConfig->GetSetting((prepend+"log_level").c_str()), NULL, 0);
 
-	if (stricmp(lpConfig->GetSetting((prepend+"log_method").c_str()), "syslog") == 0) {
-#ifdef LINUX
+	if (strcasecmp(lpConfig->GetSetting((prepend+"log_method").c_str()), "syslog") == 0) {
 		char *argzero = strdup(argv0);
 		lpLogger = new ECLogger_Syslog(loglevel, basename(argzero), syslog_facility);
 		free(argzero);
-#else
-		fprintf(stderr, "syslog logging is only available on linux.\n");
-#endif
-	} else if (stricmp(lpConfig->GetSetting((prepend+"log_method").c_str()), "eventlog") == 0) {
+	} else if (strcasecmp(lpConfig->GetSetting((prepend+"log_method").c_str()), "eventlog") == 0) {
 		fprintf(stderr, "eventlog logging is only available on windows.\n");
-	} else if (stricmp(lpConfig->GetSetting((prepend+"log_method").c_str()), "file") == 0) {
+	} else if (strcasecmp(lpConfig->GetSetting((prepend+"log_method").c_str()), "file") == 0) {
 		int ret = 0;
-#ifdef LINUX
 		const struct passwd *pw = NULL;
 		const struct group *gr = NULL;
 		if (strcmp(lpConfig->GetSetting((prepend+"log_file").c_str()), "-")) {
@@ -953,7 +927,6 @@ ECLogger* CreateLogger(ECConfig *lpConfig, const char *argv0,
 				}
 			}
 		}
-#endif
 		if (ret == 0) {
 			bool logtimestamp = parseBool(lpConfig->GetSetting((prepend + "log_timestamp").c_str()));
 
@@ -964,7 +937,6 @@ ECLogger* CreateLogger(ECConfig *lpConfig, const char *argv0,
 			ECLogger_File *log = new ECLogger_File(loglevel, logtimestamp, lpConfig->GetSetting((prepend + "log_file").c_str()), false);
 			log->reinit_buffer(log_buffer_size);
 			lpLogger = log;
-#ifdef LINUX
 			// chown file
 			if (pw || gr) {
 				uid_t uid = -1;
@@ -975,7 +947,6 @@ ECLogger* CreateLogger(ECConfig *lpConfig, const char *argv0,
 					gid = gr->gr_gid;
 				chown(lpConfig->GetSetting((prepend+"log_file").c_str()), uid, gid);
 			}
-#endif
 		} else {
 			fprintf(stderr, "Not enough permissions to append logfile '%s'. Reverting to stderr.\n", lpConfig->GetSetting((prepend+"log_file").c_str()));
 			bool logtimestamp = parseBool(lpConfig->GetSetting((prepend + "log_timestamp").c_str()));

@@ -70,13 +70,12 @@ int HandleClientUpdate(struct soap *soap)
 
 	ECLicenseClient *lpLicenseClient = NULL;
 	unsigned int ulLicenseResponse = 0;
-	unsigned char *lpLicenseResponse = NULL;
+	void *lpLicenseResponse = NULL;
 	ECRESULT er = erSuccess;
 	ClientVersion currentVersion = {0};
 	ClientVersion latestVersion = {0};
 	std::string strClientMSIName;
 	FILE *fd = NULL;
-
 
 	// Get the server.cfg setting
 	szClientUpdatePath = g_lpConfig->GetSetting("client_update_path");
@@ -110,7 +109,7 @@ int HandleClientUpdate(struct soap *soap)
 			goto exit;
 		}
 
-		strLicenseResponse = base64_encode(lpLicenseResponse, ulLicenseResponse);
+		strLicenseResponse = base64_encode(static_cast<const unsigned char *>(lpLicenseResponse), ulLicenseResponse);
 
 		soap->http_content = "binary";
 		soap_response(soap, SOAP_FILE);
@@ -188,7 +187,7 @@ int HandleClientUpdate(struct soap *soap)
 	nRet = SOAP_OK;
 
 exit:
-	delete[] lpLicenseResponse;
+	free(lpLicenseResponse);
 	delete lpLicenseClient;
 
 	if (fd)
@@ -406,7 +405,7 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 	ClientVersion sCurrentVersion = {0};
 	ClientVersion sLatestVersion;
 	unsigned int ulLicenseResponse = 0;
-	unsigned char *lpLicenseResponse = NULL;
+	void *lpLicenseResponse = NULL;
 	ECLicenseClient *lpLicenseClient = NULL;
 	std::string strClientMSIName;
 	std::string strPath;
@@ -476,7 +475,6 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: trackid: 0x%08X, unknown username '%s'", sClientUpdateInfo.ulTrackId, sClientUpdateInfo.szUsername);
 	}
 
-
 	if(lpecSession->GetUserManagement()->IsInternalObject(ulUserID)) {
 		er = KCERR_NO_ACCESS;
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client update: trackid: 0x%08X, Wrong user data. User name '%s' is a reserved user", sClientUpdateInfo.ulTrackId, sClientUpdateInfo.szUsername);
@@ -500,7 +498,7 @@ int ns__getClientUpdate(struct soap *soap, struct clientUpdateInfoRequest sClien
 			goto exit;
 		}
 
-		if (stricmp(strServerName.c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) != 0) {
+		if (strcasecmp(strServerName.c_str(), g_lpSessionManager->GetConfig()->GetSetting("server_name")) != 0) {
 			string	strServerPath;
 
 			er = GetBestServerPath(soap, lpecSession, strServerName, &strServerPath);
@@ -602,8 +600,7 @@ exit:
 	}
 
 	lpsResponse->er = er;
-
-	delete[] lpLicenseResponse;
+	free(lpLicenseResponse);
 	delete lpLicenseClient;
 
 	if (er && fd)

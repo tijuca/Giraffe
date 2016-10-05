@@ -68,7 +68,6 @@ static HRESULT GetMailboxDataPerServer(ECLogger *lpLogger, const char *lpszPath,
 static HRESULT GetMailboxDataPerServer(ECLogger *lpLogger, IMAPISession *lpSession, const char *lpszPath, DataCollector *lpCollector);
 static HRESULT UpdateServerList(ECLogger *lpLogger, IABContainer *lpContainer, std::set<servername> &listServers);
 
-
 class UserCountCollector _zcp_final : public DataCollector
 {
 public:
@@ -97,7 +96,6 @@ private:
 	std::list<string_type> m_lstUsers;
 	MAPISessionPtr m_ptrSession;
 };
-
 
 HRESULT	DataCollector::GetRequiredPropTags(LPMAPIPROP /*lpProp*/, LPSPropTagArray *lppPropTagArray) const {
 	static SizedSPropTagArray(1, sptaDefaultProps) = {1, {PR_DISPLAY_NAME}};
@@ -132,8 +130,6 @@ exit:
 	return hr;
 }
 
-
-
 UserCountCollector::UserCountCollector(): m_ulUserCount(0) {}
 
 HRESULT UserCountCollector::CollectData(LPMAPITABLE lpStoreTable) {
@@ -153,7 +149,6 @@ exit:
 inline unsigned int UserCountCollector::result() const {
 	return m_ulUserCount;
 }
-
 
 template<typename string_type, ULONG prAccount>
 UserListCollector<string_type, prAccount>::UserListCollector(IMAPISession *lpSession): m_ptrSession(lpSession, true) {}
@@ -214,64 +209,6 @@ void UserListCollector<std::string, PR_ACCOUNT_A>::push_back(LPSPropValue lpProp
 template<>
 void UserListCollector<std::wstring, PR_ACCOUNT_W>::push_back(LPSPropValue lpPropAccount) {
 	m_lstUsers.push_back(lpPropAccount->Value.lpszW);
-}
-
-
-
-HRESULT ValidateArchivedUserCount(ECLogger *lpLogger, IMAPISession *lpMapiSession, const char *lpSSLKey, const char *lpSSLPass, unsigned int *lpulArchivedUsers, unsigned int *lpulMaxUsers)
-{
-	HRESULT hr = S_OK;
-	unsigned int ulArchivedUsers = 0;
-	unsigned int ulMaxUsers = 0;
-	MsgStorePtr		ptrStore;
-	ECLicensePtr	ptrLicense;
-
-	hr = GetArchivedUserCount(lpLogger, lpMapiSession, lpSSLKey, lpSSLPass, &ulArchivedUsers);
-	if (hr != hrSuccess)
-		goto exit;
-
-	//@todo use PR_EC_OBJECT property
-	hr = HrOpenDefaultStore(lpMapiSession, &ptrStore);
-	if(hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_CRIT, "Unable to open default store: 0x%08X", hr);
-		goto exit;
-	}
-
-	hr = ptrStore->QueryInterface(IID_IECLicense, &ptrLicense);
-	if(hr != hrSuccess)
-		goto exit;
-
-	// Do no check the return value, possible the license server isn't running!
-	ptrLicense->LicenseUsers(1/*SERVICE_TYPE_ARCHIVE*/, &ulMaxUsers);
-
-
-	*lpulArchivedUsers = ulArchivedUsers;
-	*lpulMaxUsers = ulMaxUsers;
-
-exit:
-	return hr;
-}
-
-/**
- * Get the archived users
- *
- * @param[out] lpulArchivedUsers	Get archived user count
- *
- * @return MAPI error codes
- */
-HRESULT GetArchivedUserCount(ECLogger *lpLogger, IMAPISession *lpMapiSession, const char *lpSSLKey, const char *lpSSLPass, unsigned int *lpulArchivedUsers)
-{
-	HRESULT hr = hrSuccess;
-	UserCountCollector collector;
-
-	hr = GetMailboxData(lpLogger, lpMapiSession, lpSSLKey, lpSSLPass, false, &collector);
-	if (hr != hrSuccess)
-		goto exit;
-
-	*lpulArchivedUsers = collector.result();
-
-exit:
-	return hr;
 }
 
 HRESULT GetArchivedUserList(ECLogger *lpLogger, IMAPISession *lpMapiSession, const char *lpSSLKey, const char *lpSSLPass, std::list<std::string> *lplstUsers, bool bLocalOnly)

@@ -55,11 +55,6 @@ typedef bfs::path path;
 
 using namespace std;
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
-
 HRESULT CompareStoreIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult)
 {
 	HRESULT hr = hrSuccess;
@@ -111,30 +106,6 @@ exit:
 	return hr;
 }
 
-// Get MAPI unique guid, guaranteed by MAPI to be unique for all profiles.
-HRESULT GetMAPIUniqueProfileId(LPMAPISUP lpMAPISup, tstring* lpstrUniqueId)
-{
-	HRESULT			hr = hrSuccess;
-	LPPROFSECT		lpProfSect = NULL;
-	LPSPropValue	lpsPropValue = NULL;
-
-	hr = lpMAPISup->OpenProfileSection((LPMAPIUID)&MUID_PROFILE_INSTANCE, 0, &lpProfSect);
-	if(hr != hrSuccess)
-		goto exit;
-
-	hr = HrGetOneProp(lpProfSect, PR_SEARCH_KEY, &lpsPropValue);
-	if(hr != hrSuccess)
-		goto exit;
-
-	*lpstrUniqueId = bin2hext(lpsPropValue->Value.bin.cb, lpsPropValue->Value.bin.lpb);
-exit:
-	MAPIFreeBuffer(lpsPropValue);
-	if(lpProfSect)
-		lpProfSect->Release();
-
-	return hr;
-}
-
 HRESULT RemoveAllProviders(ECMapProvider* lpmapProvider)
 {
 	ECMapProvider::const_iterator iterProvider;
@@ -155,11 +126,6 @@ HRESULT RemoveAllProviders(ECMapProvider* lpmapProvider)
 
 HRESULT SetProviderMode(IMAPISupport *lpMAPISup, ECMapProvider* lpmapProvider, LPCSTR lpszProfileName, ULONG ulConnectType)
 {
-	return hrSuccess;
-}
-
-HRESULT GetLastConnectionType(IMAPISupport *lpMAPISup, ULONG *lpulType) {
-	*lpulType = CT_ONLINE;
 	return hrSuccess;
 }
 

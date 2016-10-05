@@ -136,8 +136,6 @@ SizedSPropTagArray(54, sptaExclude) = {
 #define PR_EC_OUTLOOK_VERSION PROP_TAG(PT_STRING8, 0x81F4)
 
 /**
- * Default constructor
- *
  * Inits the class with empty/default values.
  */
 MAPIToVMIME::MAPIToVMIME()
@@ -149,8 +147,6 @@ MAPIToVMIME::MAPIToVMIME()
 }
 
 /**
- * Constructor with parameters
- *
  * @param[in]	lpSession	current mapi session, used to open contact entryid's
  * @param[in]	lpAddrBook	global addressbook
  * @param[in]	newlogger	logger object
@@ -176,9 +172,6 @@ MAPIToVMIME::MAPIToVMIME(IMAPISession *lpSession, IAddrBook *lpAddrBook, ECLogge
 	m_lpSession = lpSession;
 }
 
-/**
- * Destructor
- */
 MAPIToVMIME::~MAPIToVMIME()
 {
 	lpLogger->Release();
@@ -345,7 +338,6 @@ HRESULT MAPIToVMIME::handleSingleAttachment(IMessage* lpMessage, LPSRow lpRow, v
 	std::string		strBoundary;
 	bool			bSendBinary = true;
 	MapiToICal		*mapiical = NULL;
-
 
 	pPropAttachNum = PpropFindProp(lpRow->lpProps, lpRow->cValues, PR_ATTACH_NUM);
 	if (pPropAttachNum == NULL) {
@@ -650,7 +642,6 @@ HRESULT MAPIToVMIME::parseMimeTypeFromFilename(std::wstring strFilename, vmime::
 		strMedType = "video/x-msvideo";
 	}
 
-
 	else {
 		strMedType = "application/octet-stream";
 	}
@@ -824,12 +815,12 @@ HRESULT MAPIToVMIME::BuildNoteMessage(IMessage *lpMessage, bool bSkipContent, vm
 					std::string name = vmField->getName();
 
 					// Received checks start of string to accept Received-SPF
-					if (strnicmp(name.c_str(), vmime::fields::RECEIVED, strlen(vmime::fields::RECEIVED)) == 0 ||
-						stricmp(name.c_str(), vmime::fields::RETURN_PATH) == 0) {
+					if (strncasecmp(name.c_str(), vmime::fields::RECEIVED, strlen(vmime::fields::RECEIVED)) == 0 ||
+						strcasecmp(name.c_str(), vmime::fields::RETURN_PATH) == 0) {
 						// Insert in same order at start of headers
 						vmHeader->insertFieldBefore(j++, vmField);
-					} else if (strnicmp(name.c_str(), "list-", strlen("list-")) == 0 ||
-							   stricmp(name.c_str(), "precedence") == 0) {
+					} else if (strncasecmp(name.c_str(), "list-", strlen("list-")) == 0 ||
+							   strcasecmp(name.c_str(), "precedence") == 0) {
 						// Just append at the end of this list, order is not important
 						vmHeader->appendField(vmField->clone().dynamicCast<vmime::headerField>());
 					}
@@ -984,9 +975,9 @@ HRESULT MAPIToVMIME::BuildMDNMessage(IMessage *lpMessage, vmime::ref<vmime::mess
 			goto exit;
 		}
 
-		if(stricmp(lpMsgClass->Value.lpszA, "REPORT.IPM.Note.IPNNRN") == 0)
+		if(strcasecmp(lpMsgClass->Value.lpszA, "REPORT.IPM.Note.IPNNRN") == 0)
 			dispo.setType(vmime::dispositionTypes::DELETED);
-		else // if(stricmp(lpMsgClass->Value.lpszA, "REPORT.IPM.Note.IPNRN") == 0)
+		else // if(strcasecmp(lpMsgClass->Value.lpszA, "REPORT.IPM.Note.IPNRN") == 0)
 			dispo.setType(vmime::dispositionTypes::DISPLAYED);		
 	
 		strMDNText.clear();// Default Empty body
@@ -1125,7 +1116,7 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage, vmime::ref<vmime::m
 		m_vmCharset = MAPI_CHARSET_STRING;
 	}
 
-	if (strnicmp(lpMsgClass->Value.lpszA, "IPM.Note", 8) && strnicmp(lpMsgClass->Value.lpszA, "REPORT.IPM.Note", 15)) {
+	if (strncasecmp(lpMsgClass->Value.lpszA, "IPM.Note", 8) && strncasecmp(lpMsgClass->Value.lpszA, "REPORT.IPM.Note", 15)) {
 		// Outlook sets some other incorrect charset for meeting requests and such,
 		// so for non-email we upgrade this to utf-8
 		m_vmCharset = MAPI_CHARSET_STRING;
@@ -1139,16 +1130,16 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage, vmime::ref<vmime::m
 
 	// Add iconv tag to convert non-exising chars without a fuss
 	m_strCharset = m_vmCharset.getName() + "//TRANSLIT";
-	if ((stricmp(lpMsgClass->Value.lpszA, "REPORT.IPM.Note.IPNNRN") == 0 ||
-		stricmp(lpMsgClass->Value.lpszA, "REPORT.IPM.Note.IPNRN") == 0)
+	if ((strcasecmp(lpMsgClass->Value.lpszA, "REPORT.IPM.Note.IPNNRN") == 0 ||
+		strcasecmp(lpMsgClass->Value.lpszA, "REPORT.IPM.Note.IPNRN") == 0)
 		)
 	{
 		// Create a read receipt message
 		hr = BuildMDNMessage(lpMessage, &vmMessage);
 		if(hr != hrSuccess)
 			goto exit;		
-	} else if ((stricmp(lpMsgClass->Value.lpszA, "IPM.Note.SMIME.MultiPartSigned") == 0) ||
-			   (stricmp(lpMsgClass->Value.lpszA, "IPM.Note.SMIME") == 0))
+	} else if ((strcasecmp(lpMsgClass->Value.lpszA, "IPM.Note.SMIME.MultiPartSigned") == 0) ||
+			   (strcasecmp(lpMsgClass->Value.lpszA, "IPM.Note.SMIME") == 0))
 	{
 		// - find attachment, and convert to char, and place in lpszRawSMTP
 		// - normal convert the message, but only from/to headers and such .. nothing else
@@ -1219,7 +1210,7 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage, vmime::ref<vmime::m
 		vmMessage->getHeader()->removeField(vmMessage->getHeader()->findField(vmime::fields::CONTENT_TYPE));
 		vmMessage->getHeader()->removeField(vmMessage->getHeader()->findField(vmime::fields::CONTENT_TRANSFER_ENCODING));
 
-		if (stricmp(lpMsgClass->Value.lpszA, "IPM.Note.SMIME") != 0) {
+		if (strcasecmp(lpMsgClass->Value.lpszA, "IPM.Note.SMIME") != 0) {
 			std::string strRawSMTP = lpszRawSMTP;
 			vmime::ref<SMIMEMessage> vmSMIMEMessage = vmime::create<SMIMEMessage>();
 			
@@ -1679,7 +1670,7 @@ HRESULT MAPIToVMIME::handleXHeaders(IMessage *lpMessage, vmime::ref<vmime::heade
 
 				// keep the original x-mailer header under a different name
 				// we still want to know that this mail was generated by kopano in the x-mailer header from handleExtraHeaders
-				if (stricmp(str, "X-Mailer") == 0) {
+				if (strcasecmp(str, "X-Mailer") == 0) {
 					delete [] str;
 					str = new char[18];
 					strcpy(str, "X-Original-Mailer");
@@ -2078,13 +2069,11 @@ HRESULT MAPIToVMIME::handleReplyTo(IMessage *lpMessage, vmime::ref<vmime::header
 	LPSPropTagArray lpNameTagArray = NULL;
 	LPSPropValue lpAddressProps = NULL;
 
-
 	if (HrGetOneProp(lpMessage, PR_REPLY_RECIPIENT_ENTRIES, &lpReplyTo) != hrSuccess)
 		goto exit;
 
 	if (lpReplyTo->Value.bin.cb == 0)
 		goto exit;
-
 
 	lpEntryList = (FLATENTRYLIST *)lpReplyTo->Value.bin.lpb;
 
@@ -2269,7 +2258,7 @@ HRESULT MAPIToVMIME::handleTNEF(IMessage* lpMessage, vmime::messageBuilder* lpVM
 			strTnefReason = "Force TNEF on request";
 
 		// currently no task support for ical
-		if (iUseTnef <= 0 && lpMessageClass && strnicmp("IPM.Task", lpMessageClass->Value.lpszA, 8) == 0) {
+		if (iUseTnef <= 0 && lpMessageClass && strncasecmp("IPM.Task", lpMessageClass->Value.lpszA, 8) == 0) {
 			iUseTnef = 1;
 			strTnefReason = "Force TNEF because of task request";
 		}
@@ -2294,7 +2283,7 @@ HRESULT MAPIToVMIME::handleTNEF(IMessage* lpMessage, vmime::messageBuilder* lpVM
 		if (iUseTnef == 1 ||
 			(lpSendAsICal && lpSendAsICal->Value.b) || 
 			(lpSendAsICal && lpOutlookVersion && strcmp(lpOutlookVersion->Value.lpszA, "9.0") == 0) ||
-			(lpMessageClass && (strnicmp("IPM.Note", lpMessageClass->Value.lpszA, 8) != 0) ) || 
+			(lpMessageClass && (strncasecmp("IPM.Note", lpMessageClass->Value.lpszA, 8) != 0) ) || 
 			bestBody == realRTF)
 		{
 		    // Send either TNEF or iCal data
@@ -2306,7 +2295,7 @@ HRESULT MAPIToVMIME::handleTNEF(IMessage* lpMessage, vmime::messageBuilder* lpVM
 			 * Send TNEF information for this message if we really need to, or otherwise iCal
 			 */
 			
-			if (lstOLEAttach.size() == 0 && iUseTnef <= 0 && lpMessageClass && (strnicmp("IPM.Note", lpMessageClass->Value.lpszA, 8) != 0)) {
+			if (lstOLEAttach.size() == 0 && iUseTnef <= 0 && lpMessageClass && (strncasecmp("IPM.Note", lpMessageClass->Value.lpszA, 8) != 0)) {
 				// iCAL
 				string ical, method;
 				vmime::ref<mapiAttachment> vmAttach = NULL;

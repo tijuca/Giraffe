@@ -58,12 +58,7 @@
 #define ASSERT assert
 #define _ASSERT assert
 
-#ifdef _DEBUG
-  #error _DEBUG is defined in linux, which should not be used!
-#endif
-
 #define _vsnprintf vsnprintf
-#define _snprintf snprintf
 #ifdef HAVE_VSNPRINTF_L
 #define _vsnprintf_l vsnprintf_l
 #else
@@ -86,18 +81,7 @@ inline int _vsnprintf_l(char *str, size_t size, const char *format, locale_t loc
 
 #define STDAPI_(__type) __type __stdcall
 
-/* Defines for some windows function that have a different name in Linux */
-#define _snprintf snprintf
-#define strnicmp strncasecmp
-#define stricmp strcasecmp
-
-#define _atoi64 atoll
-
-#define CreateDir(dir, mode) mkdir(dir, mode)
-#define closesocket(fd) close(fd)
-
 /* base types */
-#include <sys/types.h>
 typedef void			VOID;
 typedef unsigned char	BYTE;
 typedef unsigned char	UCHAR;
@@ -584,13 +568,8 @@ bool operator!=(const GUID &, const GUID &);
 bool operator==(REFIID, const GUID &);
 HRESULT CoCreateGuid(LPGUID);
 
-__int64_t Int32x32To64(ULONG, ULONG);
-
 void GetSystemTimeAsFileTime(FILETIME *ft);
 DWORD GetTempPath(DWORD inLen, char *lpBuffer);
-#define GetTempPathA GetTempPath
-
-#define utf32len wcslen
 
 /* Some wrappers to map Windows unicode functions */
 static inline int lstrcmpW(LPCWSTR str1, LPCWSTR str2)
@@ -618,10 +597,8 @@ static inline LPWSTR lstrcpyW(LPWSTR dst, LPCWSTR src)
 #define _tcslen strlen
 #define _tcscpy strcpy
 #define _tcscmp strcmp
-#define _tcsicmp stricmp
+#define _tcsicmp strcasecmp
 #endif
-
-inline int strcmp_ci(const char *s1, const char *s2) { return strcasecmp(s1, s2); }
 
 void Sleep(unsigned int usec);
 
@@ -640,11 +617,6 @@ typedef void * DLIB;
 #endif
 #define PATH_SEPARATOR				'/'
 
-// timezone compatability
-#define _tzset tzset
-#define _timezone timezone
-#define _daylight daylight
-#define _tzname tzname
 // unavailable in linux
 #define _dstbias 0
 
@@ -697,9 +669,6 @@ time_t GetProcessTime();
  * NOTE: For non-static methods the this pointer has index 1.
  **/
 #define __LIKE_PRINTF(_fmt, _va) __attribute__((format(printf, _fmt, _va)))
-
-#define z_tms tms
-#define z_times times
 
 std::vector<std::string> get_backtrace();
 

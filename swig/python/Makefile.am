@@ -11,6 +11,7 @@ noinst_LTLIBRARIES = _libcommon.la _archiver.la _libfreebusy.la _RecurrenceState
 noinst_DATA = libkcpyconv.ldd _MAPICore.ldd _inetmapi.ldd _icalmapi.ldd \
 	_libcommon.ldd _archiver.ldd _libfreebusy.ldd _RecurrenceState.ldd \
 	_licenseclient.ldd
+CLEANFILES = ${noinst_DATA}
 
 # disable warnings since code is mostly generated
 AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) \
@@ -19,11 +20,11 @@ AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) \
 	$(PYTHON_INCLUDES) -I${top_srcdir}/swig -w \
 	-DSWIG_PYTHON_OUTPUT_TUPLE -DSWIG_TYPE_TABLE=MAPI
 
-libkcpyconv_la_SOURCES = conversion.cpp conversion.h
+libkcpyconv_la_SOURCES = conversion.cpp
 libkcpyconv_la_LDFLAGS = -Wl,--version-script=${top_builddir}/default.sym
 libkcpyconv_la_LIBADD  = ${PYTHON_LIBS} \
 	${top_builddir}/mapi4linux/src/libmapi.la
-libkcpydirector_la_SOURCES = ../director_util.cpp ../director_util.h
+libkcpydirector_la_SOURCES = ../director_util.cpp
 libkcpydirector_la_LDFLAGS = -Wl,--version-script=${top_builddir}/default.sym
 libkcpydirector_la_LIBADD  = -lpthread
 
@@ -62,11 +63,11 @@ _archiver_la_LIBADD = \
 	${top_builddir}/ECtools/libkcarchivercore.la \
 	$(PROG_LIBS) $(PYTHON_LIBS)
 
-_licenseclient_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/provider/common -I${top_builddir}/provider/soap -I${top_srcdir}/provider/soap ${GSOAP_CFLAGS}
+_licenseclient_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/provider/common -I${top_builddir}/provider/soap ${GSOAP_CFLAGS}
 _licenseclient_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
-_licenseclient_la_LIBADD = ${top_builddir}/provider/common/libkccommon.la \
+_licenseclient_la_LIBADD = ${top_builddir}/provider/libkccommon.la \
 						${GSOAP_LIBS} \
-						${top_builddir}/provider/soap/libkcsoapclient.la \
+						${top_builddir}/provider/libkcsoapclient.la \
 						${top_builddir}/common/libkcmapi.la \
 						${top_builddir}/common/libkcutil.la \
 						${top_builddir}/common/libkcssl.la \
@@ -108,7 +109,7 @@ BUILT_SOURCES = mapi_wrap.cxx \
 				RecurrenceState_wrap.cxx
 
 
-CLEANFILES = $(BUILT_SOURCES) \
+CLEANFILES += ${BUILT_SOURCES} \
 			 MAPICore.py \
 			 inetmapi.py \
 			 icalmapi.py \
@@ -148,28 +149,28 @@ noinst_datadir = libcommon.py RecurrenceState.py
 mapi_wrap.h: mapi_wrap.cxx
 mapi_wrap.cxx: ../mapi.i ../mapiutil.i ../mapidefs.i ../mapicode.i ../mapix.i ../mapinotifsink.i ../mapiutil.i ../include/kopano/typemap.i ../helpers.i ../edkmdb.i ../IECServiceAdmin.i ../ecdefs.i include/kopano/typemap_python.i helpers_python.i
 	if test "x$(SWIG_EXEC)" = "x"; then echo "swig is required for 'make dist'"; exit 1; fi
-	${SWIG_EXEC} -I${top_srcdir}/swig -I${top_srcdir}/libsync ${SWIG_FLAGS} ${SWIG_CXXFLAGS} -o $@ $<
+	${SWIG_EXEC} -I${top_srcdir}/libsync ${SWIG_FLAGS} ${SWIG_CXXFLAGS} -o $@ $<
 
 inetmapi_wrap.cxx: ../inetmapi.i ../include/kopano/typemap.i ../inetmapi.i include/kopano/typemap_python.i helpers_python.i
-	${SWIG_EXEC} -I${top_srcdir}/swig ${SWIG_CXXFLAGS} -o $@ $<
+	${SWIG_EXEC} ${SWIG_CXXFLAGS} -o $@ $<
 
 icalmapi_wrap.cxx: ../icalmapi.i ../include/kopano/typemap.i include/kopano/typemap_python.i helpers_python.i ../../libicalmapi/icalmapi.h
-	${SWIG_EXEC} -I${top_srcdir}/libicalmapi -I${top_srcdir}/libfreebusy -I${top_srcdir/swig} ${SWIG_CXXFLAGS} -o $@ $<
+	${SWIG_EXEC} -I${top_srcdir}/libicalmapi -I${top_srcdir}/libfreebusy ${SWIG_CXXFLAGS} -o $@ $<
 
 archiver_wrap.cxx: ../archiver.i archiver_python.i
 	${SWIG_EXEC} -I${top_srcdir}/ECtools/archiver ${SWIG_CXXFLAGS} -o $@ $<
 
 libcommon_wrap.cxx: ../libcommon.i
-	${SWIG_EXEC} -I${top_srcdir}/common -I${top_srcdir}/m4lcommon -I${top_srcdir/swig} ${SWIG_CXXFLAGS} -o $@ $<
+	${SWIG_EXEC} -I${top_srcdir}/common -I${top_srcdir}/m4lcommon ${SWIG_CXXFLAGS} -o $@ $<
 
 RecurrenceState_wrap.cxx: ../RecurrenceState.i
-	${SWIG_EXEC} -I${top_srcdir}/common -I${top_srcdir}/m4lcommon -I${top_srcdir/swig} ${SWIG_CXXFLAGS} -o $@ $<
+	${SWIG_EXEC} -I${top_srcdir}/common -I${top_srcdir}/m4lcommon ${SWIG_CXXFLAGS} -o $@ $<
 
 licenseclient_wrap.cxx: ../licenseclient.i
-	${SWIG_EXEC} -I${top_srcdir}/provider/common -I${top_srcdir}/common -I${top_srcdir}/m4lcommon -I${top_srcdir/swig} ${SWIG_CXXFLAGS} -o $@ $<
+	${SWIG_EXEC} -I${top_srcdir}/provider/common -I${top_srcdir}/common -I${top_srcdir}/m4lcommon ${SWIG_CXXFLAGS} -o $@ $<
 
 libfreebusy_wrap.cxx: ../libfreebusy.i
-	${SWIG_EXEC} -I${top_srcdir}/libfreebusy -I${top_srcdir/swig} ${SWIG_CXXFLAGS} -o $@ $<
+	${SWIG_EXEC} -I${top_srcdir}/libfreebusy ${SWIG_CXXFLAGS} -o $@ $<
 
 check-syntax:
 	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) \
@@ -177,9 +178,14 @@ check-syntax:
 
 install-exec-local:
 	test "$(DISTRO)" = "suse" -o "$(DISTRO)" = "sles" && pyrpm="--record-rpm=INSTALLED_FILES"; \
-	cd ${srcdir} && ${PYTHON} setup.py install -f \
-		$${DESTDIR+--root=${DESTDIR}} \
+	cd ${srcdir} && ${PYTHON} setup.py \
+		build --build-base="${abs_builddir}/build" \
+		install -f $${DESTDIR+--root=${DESTDIR}} \
 		--prefix="${prefix}" --install-purelib ${pythondir} $${pyrpm}
 	rm -Rf build
+
+uninstall-local:
+	rm -Rf ${DESTDIR}${pythondir}/MAPI \
+		${DESTDIR}${pythondir}/MAPI-1*.egg-info
 
 include ../../global.am

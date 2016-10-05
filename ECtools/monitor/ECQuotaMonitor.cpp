@@ -57,7 +57,6 @@ using namespace std;
 #define QUOTA_CONFIG_MSG "Kopano.Quota"
 
 /**
- * ECQuotaMonitor constructor
  * Takes an extra reference to the passed MAPI objects which have refcounting.
  */
 ECQuotaMonitor::ECQuotaMonitor(ECTHREADMONITOR *lpThreadMonitor,
@@ -78,7 +77,6 @@ ECQuotaMonitor::ECQuotaMonitor(ECTHREADMONITOR *lpThreadMonitor,
 }
 
 /**
- * ECQuotaMonitor destructor
  * Releases references to passed MAPI objects.
  */
 ECQuotaMonitor::~ECQuotaMonitor()
@@ -298,7 +296,7 @@ HRESULT ECQuotaMonitor::CheckCompanyQuota(ECCOMPANY *lpecCompany)
 
 	set<string> setServers;
 	const char *lpszServersConfig;
-	std::set<string, stricmp_comparison> setServersConfig;
+	std::set<string, strcasecmp_comparison> setServersConfig;
 	set<string>::const_iterator iServers;
 	char *lpszConnection = NULL;
 	bool bIsPeer = false;
@@ -701,8 +699,8 @@ HRESULT ECQuotaMonitor::CreateMailFromTemplate(TemplateVariables *lpVars, string
  * @retval	MAPI_E_NOT_ENOUGH_MEMORY	unable to allocate more memory
  */
 HRESULT ECQuotaMonitor::CreateMessageProperties(ECUSER *lpecToUser,
-    ECUSER *lpecFromUser, std::string strSubject, std::string strBody,
-    ULONG *lpcPropSize, LPSPropValue *lppPropArray)
+    ECUSER *lpecFromUser, const std::string &strSubject,
+    const std::string &strBody, ULONG *lpcPropSize, LPSPropValue *lppPropArray)
 {
 	HRESULT hr = hrSuccess;
 	LPSPropValue lpPropArray = NULL;
@@ -801,7 +799,6 @@ HRESULT ECQuotaMonitor::CreateMessageProperties(ECUSER *lpecToUser,
 
 	lpPropArray[ulPropArrayCur].ulPropTag = PR_RCVD_REPRESENTING_EMAIL_ADDRESS_A;
 	lpPropArray[ulPropArrayCur++].Value.lpszA = (lpecToUser->lpszMailAddress ? (LPSTR)lpecToUser->lpszMailAddress : (LPSTR)"");
-
 
 	hr = MAPIAllocateMore(cbToEntryid, lpPropArray,
 						  (void**)&lpPropArray[ulPropArrayCur].Value.bin.lpb);

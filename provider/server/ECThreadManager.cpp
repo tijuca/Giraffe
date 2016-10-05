@@ -287,7 +287,6 @@ ECThreadManager::ECThreadManager(ECLogger *lpLogger, ECDispatcher *lpDispatcher,
 ECThreadManager::~ECThreadManager()
 {
 	unsigned int ulThreads;
-	std::list<ECWorkerThread *>::const_iterator iterThreads;
 
     // Wait for the threads to exit
     while(1) {
@@ -707,7 +706,6 @@ ECRESULT ECDispatcher::ShutDown()
     return erSuccess;
 }
 
-#ifdef LINUX
 ECDispatcherSelect::ECDispatcherSelect(ECLogger *lpLogger, ECConfig *lpConfig, CREATEPIPESOCKETCALLBACK lpCallback, void *lpCallbackParam) : ECDispatcher(lpLogger, lpConfig, lpCallback, lpCallbackParam)
 {
     int pipes[2];
@@ -723,7 +721,6 @@ ECRESULT ECDispatcherSelect::MainLoop()
 	ECRESULT er = erSuccess;
 	ECWatchDog *lpWatchDog = NULL;
 	std::map<int, ACTIVESOCKET>::iterator iterSockets;
-	std::map<int, ACTIVESOCKET>::const_iterator iterErase;
 	std::map<int, struct soap *>::const_iterator iterListenSockets;
     int maxfds = 0;
     char s = 0;
@@ -731,7 +728,6 @@ ECRESULT ECDispatcherSelect::MainLoop()
     struct timeval tv;
 	CONNECTION_TYPE ulType;
 	int n = 0;
-
 
     // This will start the threads
     m_lpThreadManager = new ECThreadManager(m_lpLogger, this, atoui(m_lpConfig->GetSetting("threads")));
@@ -1144,5 +1140,4 @@ ECRESULT ECDispatcherEPoll::NotifyRestart(SOAP_SOCKET s)
 	epoll_ctl(m_epFD, EPOLL_CTL_ADD, epevent.data.fd, &epevent);
 	return erSuccess;
 }
-#endif
 #endif

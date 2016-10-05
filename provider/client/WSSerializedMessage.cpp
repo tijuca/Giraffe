@@ -18,12 +18,7 @@
 #include <kopano/platform.h>
 #include "WSSerializedMessage.h"
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 /**
- * Constructor
  * @param[in]	lpSoap		The gSoap object from which the MTOM attachments must be obtained.
  * @param[in]	strStreamId	The expected stream id. Used to validate the MTOM attachment obtained from gSoap.
  * @param[in]	cbProps		The amount of properties returned from the original soap call.
@@ -103,9 +98,6 @@ HRESULT WSSerializedMessage::DoCopyData(LPSTREAM lpDestStream)
 		return MAPI_E_NETWORK_ERROR;
 	return m_hr;
 }
-
-
-
 
 void* WSSerializedMessage::StaticMTOMWriteOpen(struct soap *soap, void *handle, const char *id, const char *type, const char *description, enum soap_mime_encoding encoding)
 {

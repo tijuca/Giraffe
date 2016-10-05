@@ -19,10 +19,6 @@
 #include <kopano/charset/utf16string.h>
 #include "utf32string.h"
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 /** 
  * Make charset string ignore invalid characters, possebly converting
  * them with '?' character in iconv.
@@ -42,7 +38,6 @@ static size_t ucslen(const _T* p) {
 	return len;
 }
 
-#ifdef LINUX
 size_t iconv_charset<unsigned short*>::rawsize(const unsigned short *from) {
 	return ucslen(from) * sizeof(unsigned short);
 }
@@ -50,14 +45,3 @@ size_t iconv_charset<unsigned short*>::rawsize(const unsigned short *from) {
 size_t iconv_charset<const unsigned short*>::rawsize(const unsigned short *from) {
 	return ucslen(from) * sizeof(unsigned short);
 }
-
-#else
-size_t iconv_charset<unsigned int*>::rawsize(const unsigned int *from) {
-	return ucslen(from) * sizeof(unsigned int);
-}
-
-size_t iconv_charset<const unsigned int*>::rawsize(const unsigned int *from) {
-	return ucslen(from) * sizeof(unsigned int);
-}
-
-#endif

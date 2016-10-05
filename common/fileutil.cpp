@@ -24,20 +24,13 @@
 #include <kopano/ECIConv.h>
 #include <kopano/ECLogger.h>
 
-#include <mapicode.h> // only for MAPI error codes
-#include <mapidefs.h> // only for MAPI error codes
-
-#ifdef LINUX
+#include <mapicode.h>
+#include <mapidefs.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <arpa/inet.h>
-#endif
 #include "fileutil.h"
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
 
 #define BLOCKSIZE	65536
 
@@ -124,7 +117,6 @@ HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize, bool *lpImmap)
 
 	*lpImmap = false;
 
-#ifdef LINUX
 	/* Try mmap first */
 	if (fstat(fd, &stat) != 0) {
 		perror("Stat failed");
@@ -139,7 +131,6 @@ HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize, bool *lpImmap)
 		*lpSize = stat.st_size;
 		return hrSuccess;
 	}
-#endif /* LINUX */
 
 	/* mmap failed (probably reading from STDIN as a stream), just read the file into memory, and return that */
 	lpBuffer = (char*)malloc(BLOCKSIZE); // will be deleted as soon as possible
@@ -186,13 +177,10 @@ HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize, bool *lpImmap)
  */
 HRESULT HrUnmapFileBuffer(char *lpBuffer, int ulSize, bool bImmap)
 {
-#ifdef LINUX
 	if (bImmap)
 		munmap(lpBuffer, mmapsize(ulSize));
 	else
-#endif
 		free(lpBuffer);
-
 	return hrSuccess;
 }
 
@@ -288,64 +276,6 @@ exit:
 	free(lpBuffer);
 	if (pfNew)
 		fclose(pfNew);
-
-	return bResult;
-}
-
-/**
- * Convert file from UCS2 to UTF8
- *
- * @param[in] strSrcFileName Source filename
- * @param[in] strDstFileName Destination filename
- */
-bool ConvertFileFromUCS2ToUTF8(const std::string &strSrcFileName, const std::string &strDstFileName)
-{
-	bool bResult = false;
-	int ulBufferSize = 0;
-	FILE *pfSrc = NULL;
-	FILE *pfDst = NULL;
-	char *lpBuffer = NULL;
-	bool bImmap = false;
-	std::string strConverted;
-
-	pfSrc = fopen(strSrcFileName.c_str(), "rb");
-	if(pfSrc == NULL) {
-		ec_log_err("%s: Unable to open file \"%s\": %s", __PRETTY_FUNCTION__, strSrcFileName.c_str(), strerror(errno));
-		goto exit;
-	}
-
-	// create new file
-	pfDst = fopen(strDstFileName.c_str(), "wb");
-	if(pfDst == NULL) {
-		ec_log_err("%s: Unable to create file \"%s\": %s", __PRETTY_FUNCTION__, strDstFileName.c_str(), strerror(errno));
-		goto exit;
-	}
-
-	if(HrMapFileToBuffer(pfSrc, &lpBuffer, &ulBufferSize, &bImmap))
-		goto exit;
-
-	try {
-		strConverted = convert_to<std::string>("UTF-8", lpBuffer, ulBufferSize, "UCS-2//IGNORE");
-	} catch (const std::runtime_error &) {
-		goto exit;
-	}
-	
-	if (fwrite(strConverted.c_str(), 1, strConverted.size(), pfDst) != strConverted.size()) { 
-		ec_log_crit("%s: Unable to write to file \"%s\": %s", __PRETTY_FUNCTION__, strDstFileName.c_str(), strerror(errno));
-		goto exit;
-	}
-
-	bResult = true;
-
-exit:
-	if (lpBuffer)
-		HrUnmapFileBuffer(lpBuffer, ulBufferSize, bImmap);
-	
-	if (pfSrc)
-		fclose(pfSrc);
-
-	if (pfDst)
-		fclose(pfDst);
 
 	return bResult;
 }

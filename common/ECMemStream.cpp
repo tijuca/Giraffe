@@ -22,16 +22,6 @@
 #include "ECMemStream.h"
 #include <kopano/Trace.h>
 #include <kopano/ECDebug.h>
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
-/*
- * ECMemBlock implementation 
- *
- */
-
 #define EC_MEMBLOCK_SIZE 8192
 
 ECMemBlock::ECMemBlock(char *buffer, ULONG ulDataLen, ULONG ulFlags) : ECUnknown("ECMemBlock")
@@ -114,7 +104,6 @@ HRESULT ECMemBlock::WriteAt(ULONG ulPos, ULONG ulLen, char *buffer, ULONG *ulByt
 		memset(lpCurrent+cbTotal, 0, newsize-cbTotal);	// clear new alloced mem
 		cbTotal = newsize;		// set new size
 	}
-
 
 	if (dsize > cbCurrent)			// if write part is bigger than actual data
 		cbCurrent = ulPos + ulLen;	// set _real_ buffer size
@@ -526,7 +515,7 @@ ULONG   ECMemStream::xStream::Release()
 HRESULT ECMemStream::xStream::QueryInterface(REFIID refiid, LPVOID *lppInterface)
 {
 	char szGuidId[1024+1];
-	_snprintf(szGuidId, 1024, "{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}", refiid.Data1, refiid.Data2, refiid.Data3, refiid.Data4[0], refiid.Data4[1], refiid.Data4[2], refiid.Data4[3], refiid.Data4[4], refiid.Data4[5], refiid.Data4[6], refiid.Data4[7]);
+	snprintf(szGuidId, 1024, "{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}", refiid.Data1, refiid.Data2, refiid.Data3, refiid.Data4[0], refiid.Data4[1], refiid.Data4[2], refiid.Data4[3], refiid.Data4[4], refiid.Data4[5], refiid.Data4[6], refiid.Data4[7]);
 	
 	TRACE_STREAM(TRACE_ENTRY, "IStream::QueryInterface", "%s", szGuidId);
 	METHOD_PROLOGUE_(ECMemStream, Stream);
@@ -534,7 +523,6 @@ HRESULT ECMemStream::xStream::QueryInterface(REFIID refiid, LPVOID *lppInterface
 	TRACE_STREAM(TRACE_RETURN, "IStream::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
 	return hr;
 }
-
 
 HRESULT ECMemStream::xStream::Read(void *pv, ULONG cb, ULONG *pcbRead)
 {

@@ -36,17 +36,11 @@
 
 #include "freebusyguid.h"
 
-#include <kopano/stringutil.h>
-
 #include <iostream>
 #include <sstream>
 #include <kopano/mapi_ptr.h>
 
 using namespace std;
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
 
 #define RETURN_ERROR_CASE(x) \
 	case x: \
@@ -55,7 +49,6 @@ using namespace std;
 #define RETURN_CASE(x) \
 	case x: \
 		return #x;
-
 
 #define RETURN_PROP_CASE(pt) case PROP_ID(pt): return((#pt))
 
@@ -261,16 +254,6 @@ static const INFOGUID sGuidList[] = {
 	{3, (GUID*)&KOPANO_STORE_DELEGATE_GUID, "Kopano Delegate Store"},
 	{3, (GUID*)&GUID_NULL , "GUID_NULL"},
 
-#ifndef LINUX
-	{4, (GUID*)&IID_IExternalConnection, "IID_IExternalConnection"},
-	{4, (GUID*)&IID_IMarshal, "IID_IMarshal"},
-//	{4, (GUID*)&IID_IMarshal2, "IID_IMarshal2"},
-	{4, (GUID*)&IID_IMalloc, "IID_IMalloc"},
-	{4, (GUID*)&IID_IStdMarshalInfo, "IID_IStdMarshalInfo"},
-	{4, (GUID*)&IID_IStorage, "IID_IStorage"},
-	{4, (GUID*)&IID_IClassFactory, "IID_IClassFactory"},
-	
-#endif
 	{4, (GUID*)&IID_IMSCapabilities, "IID_IMSCapabilities"},
 	{4, (GUID*)&IID_IFolderSupport, "IID_IFolderSupport"},
 	{4, (GUID*)&IID_IMessageRaw , "IID_IMessageRaw"},
@@ -306,7 +289,6 @@ static const INFOGUID sGuidList[] = {
 //End of list
 	{0, NULL}
 };
-
 
 std::string GetMAPIErrorDescription(HRESULT hResult)
 {
@@ -404,7 +386,7 @@ std::string GetMAPIErrorDescription(HRESULT hResult)
 
 	char szResult[DEBUGBUFSIZE+1];
 
-	_snprintf(szResult, DEBUGBUFSIZE, "0x%08X", hResult);
+	snprintf(szResult, DEBUGBUFSIZE, "0x%08X", hResult);
 
 	return szResult;
 }
@@ -1118,7 +1100,6 @@ std::string	PropNameFromPropTag(ULONG ulPropTag)
 
 		RETURN_PROP_CASE(PR_AUTO_ADD_NEW_SUBS);
 		RETURN_PROP_CASE(PR_NEW_SUBS_GET_AUTO_ADD);
-
 
 		RETURN_PROP_CASE(PR_OFFLINE_FLAGS);
 		RETURN_PROP_CASE(PR_SYNCHRONIZE_FLAGS);
@@ -1918,7 +1899,6 @@ default:
 	}
 }//PropNameFromPropTag
 
-
 const char *RelationalOperatorToString(ULONG relop)
 {
 	switch(relop) {
@@ -2143,11 +2123,6 @@ std::string RestrictionToString(const SRestriction *lpRestriction,
 	}
 
 	return strResult;
-}
-
-std::string unicodetostr(const wchar_t *lpszW)
-{
-	return convert_to<std::string>(lpszW);
 }
 
 std::string PropValueToString(const SPropValue *lpPropValue)
@@ -2738,11 +2713,10 @@ std::string DBGGUIDToString(REFIID iid)
 	}
 
 	if (guidIDD.empty()) {
-		_snprintf(szGuidId, DEBUGBUFSIZE, "{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}", iid.Data1, iid.Data2, iid.Data3, iid.Data4[0], iid.Data4[1], iid.Data4[2], iid.Data4[3], iid.Data4[4], iid.Data4[5], iid.Data4[6], iid.Data4[7]);
+		snprintf(szGuidId, DEBUGBUFSIZE, "{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}", iid.Data1, iid.Data2, iid.Data3, iid.Data4[0], iid.Data4[1], iid.Data4[2], iid.Data4[3], iid.Data4[4], iid.Data4[5], iid.Data4[6], iid.Data4[7]);
 		guidIDD = "Unknown ";
 		guidIDD+=szGuidId;
 	}
-
 
 	return guidIDD;
 }
@@ -2772,7 +2746,6 @@ std::string MapiNameIdListToString(ULONG cNames,
 {
 	std::string str;
 	ULONG i;
-
 
 	if(ppNames == NULL)
 		return "NULL";

@@ -47,7 +47,6 @@
 #include <kopano/mapiext.h>
 #include <kopano/Util.h>
 #include <kopano/ECRestriction.h>
-#include <kopano/ECABEntryID.h>
 #include <kopano/charset/convert.h>
 #include "ConsoleTable.h"
 #include <kopano/mapi_ptr.h>
@@ -329,8 +328,10 @@ static void print_help(const char *name)
 	cout << endl;
 	cout << "Global options: [-h|--host path]" << endl;
 	ct.Resize(4,2);
+	ct.AddColumn(0, "--config file"); ct.AddColumn(1, "Use a configuration file");
 	ct.AddColumn(0, "-h path"); ct.AddColumn(1, "Connect through <path>, e.g. file:///var/run/socket");
 	ct.AddColumn(0, "--node name"); ct.AddColumn(1, "Execute the command on cluster node <name>");
+	ct.AddColumn(0, "--utf8"); ct.AddColumn(1, "Force the current locale to UTF-8");
 	ct.AddColumn(0, "-v"); ct.AddColumn(1, "Increase verbosity. A maximum of 7 is possible where 1=fatal errors only, 6=debug and 7=everything.");
 	ct.AddColumn(0, "--verbosity x"); ct.AddColumn(1, "Set verbosity to value 'x': 0...7 (0 = disable)");
 	ct.AddColumn(0, "-V"); ct.AddColumn(1, "Print version info.");
@@ -846,12 +847,11 @@ static void print_user_settings(IMsgStore *lpStore, const ECUSER *lpECUser,
 	if (lpECUser->lpszServername != NULL && *reinterpret_cast<LPSTR>(lpECUser->lpszServername) != '\0')
 		cout << "Home server:\t\t" << (LPSTR)lpECUser->lpszServername << endl;
 
-	adm_oof_status(lpProps);
-
 	if (lpProps) {
 		time_t logon = 0, logoff = 0;
 		char d[64];
 
+		adm_oof_status(lpProps);
 		if(lpProps[0].ulPropTag == PR_LAST_LOGON_TIME)
 			FileTimeToUnixTime(lpProps[0].Value.ft, &logon);
 		if(lpProps[1].ulPropTag == PR_LAST_LOGOFF_TIME)
@@ -2291,7 +2291,7 @@ struct lstr
 {
 	bool operator()(const string &t1, const string &t2) const
 	{
-		return stricmp((char*)t1.c_str(), (char*)t2.c_str()) < 0;
+		return strcasecmp((char*)t1.c_str(), (char*)t2.c_str()) < 0;
 	}
 };
 
@@ -2434,9 +2434,6 @@ int main(int argc, char* argv[])
 	unsigned int loglevel = EC_LOGLEVEL_NONE;
 
 	ECLogger *lpLogger = NULL;
-
-	InputValidator validateInput;
-
 	const configsetting_t lpDefaults[] = {
 		{ "server_socket", "default:" },
 		{ "sslkey_file", "" },
@@ -2446,13 +2443,7 @@ int main(int argc, char* argv[])
 	ECConfig *lpsConfig = ECConfig::Create(lpDefaults);
 	bool bExplicitConfig = false;
 	ConsoleTable ct(0,0);
-
-#ifdef LINUX
 	const char *szConfig = ECConfig::GetDefaultPath("admin.cfg");
-#else
-	char *szConfig = "admin.cfg";
-#endif
-
 
 	// Set locale to system variables
 	setlocale(LC_MESSAGES, "");
@@ -2466,6 +2457,7 @@ int main(int argc, char* argv[])
 
 	int c;
 	while (1) {
+		InputValidator validateInput;
 		c = getopt_long(argc, argv, "VlLsc:u:d:U:Pp:f:e:a:h:g:G:b:B:i:I:n:v", long_options, NULL);
 		if (c == -1)
 			break;
@@ -2591,25 +2583,25 @@ int main(int argc, char* argv[])
 				break;
 				// Make values from Mb to bytes which the server wants
 			case OPT_USER_QUOTA_HARD:
-				quotahard = _atoi64(optarg) *1024*1024;
+				quotahard = atoll(optarg) *1024*1024;
 				break;
 			case OPT_USER_QUOTA_SOFT:
-				quotasoft = _atoi64(optarg) *1024*1024;
+				quotasoft = atoll(optarg) *1024*1024;
 				break;
 			case OPT_USER_QUOTA_WARN:
-				quotawarn = _atoi64(optarg) *1024*1024;
+				quotawarn = atoll(optarg) *1024*1024;
 				break;
 			case OPT_USER_QUOTA_OVERRIDE:
 				quota = parse_yesno(optarg);
 				break;
 			case OPT_USER_DEFAULT_QUOTA_HARD:
-				ud_quotahard = _atoi64(optarg) * 1024 * 1024;
+				ud_quotahard = atoll(optarg) * 1024 * 1024;
 				break;
 			case OPT_USER_DEFAULT_QUOTA_SOFT:
-				ud_quotasoft = _atoi64(optarg) * 1024 * 1024;
+				ud_quotasoft = atoll(optarg) * 1024 * 1024;
 				break;
 			case OPT_USER_DEFAULT_QUOTA_WARN:
-				ud_quotawarn = _atoi64(optarg) * 1024 * 1024;
+				ud_quotawarn = atoll(optarg) * 1024 * 1024;
 				break;
 			case OPT_USER_DEFAULT_QUOTA_OVERRIDE:
 				ud_quota = parse_yesno(optarg);
@@ -2780,7 +2772,7 @@ int main(int argc, char* argv[])
 		cerr << "Username (-u) cannot be empty" << endl;
 		return 1;
 	}
-	if (username && stricmp(username, "SYSTEM")==0) {
+	if (username && strcasecmp(username, "SYSTEM")==0) {
 		cerr << "Username (-u) cannot be SYSTEM" << endl;
 		return 1;
 	}
@@ -3064,9 +3056,9 @@ int main(int argc, char* argv[])
 		cout << "force a resync of all offline profiles for all users? [y/N]: ";
 
 		cin >> response;
-		if (response.empty() || stricmp(response.c_str(), "n") == 0 || stricmp(response.c_str(), "no") == 0)
+		if (response.empty() || strcasecmp(response.c_str(), "n") == 0 || strcasecmp(response.c_str(), "no") == 0)
 			return 0;
-		if (stricmp(response.c_str(), "y") != 0 && stricmp(response.c_str(), "yes") != 0) {
+		if (strcasecmp(response.c_str(), "y") != 0 && strcasecmp(response.c_str(), "yes") != 0) {
 			cout << "Invalid response." << endl;
 			return 1;
 		}
@@ -3222,19 +3214,19 @@ int main(int argc, char* argv[])
 			break;
 
 		case MODE_DETAILS:
-			if (detailstype == NULL || stricmp(detailstype, "user") == 0)
+			if (detailstype == NULL || strcasecmp(detailstype, "user") == 0)
 				ulClass = ACTIVE_USER;
-			else if (stricmp(detailstype, "group") == 0)
+			else if (strcasecmp(detailstype, "group") == 0)
 				ulClass = DISTLIST_GROUP;
-			else if (stricmp(detailstype, "company") == 0)
+			else if (strcasecmp(detailstype, "company") == 0)
 				ulClass = CONTAINER_COMPANY;
-			else if (stricmp(detailstype, "archive") != 0) {
+			else if (strcasecmp(detailstype, "archive") != 0) {
 				hr = MAPI_E_INVALID_TYPE;
 				cerr << "Unknown userobject type \"" << detailstype << "\"" << endl;
 				goto exit;
 			}
 
-			if (detailstype && stricmp(detailstype, "archive") == 0)
+			if (detailstype && strcasecmp(detailstype, "archive") == 0)
 				hr = print_archive_details(lpSession, lpECMsgStore, username);
 			else
 				hr = print_details(lpSession, lpECMsgStore, ulClass, username);
@@ -4296,10 +4288,10 @@ int main(int argc, char* argv[])
 					break;
 		case MODE_LIST_SENDAS:
 
-					if (detailstype == NULL || stricmp(detailstype, "user") == 0) {
+					if (detailstype == NULL || strcasecmp(detailstype, "user") == 0) {
 						hr = lpServiceAdmin->ResolveUserName((LPTSTR)username, 0, &cbUserId, &lpUserId);
 						detailstype = "user";
-					} else if (stricmp(detailstype, "group") == 0) {
+					} else if (strcasecmp(detailstype, "group") == 0) {
 						hr = lpServiceAdmin->ResolveGroupName((LPTSTR)username, 0, &cbUserId, &lpUserId);
 					} else {
 						hr = MAPI_E_INVALID_TYPE;

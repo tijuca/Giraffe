@@ -35,10 +35,7 @@
 #include "ECMSProviderSwitch.h"
 #include "ECXPProvider.h"
 #include "ECABProviderSwitch.h"
-#ifdef LINUX
 #include <iostream>
-#endif
-
 #include <kopano/ecversion.h>
 
 #include <kopano/ECDebug.h>
@@ -61,12 +58,6 @@
 #include <kopano/charset/convstring.h>
 
 using namespace std;
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-
-#define DEBUG_WITH_MEMORY_DUMP 0 // Sure to dump memleaks before the dll is exit
-#endif
 
 class EPCDeleter {
 	public:
@@ -175,7 +166,6 @@ exit:
  *
  * @param lpProviderAdmin[in] The ProviderAdmin object passed to MSGServiceEntry
  * @param lpServiceName[out] The name of the message service
- * @return HRESULT Result status
  */
 static HRESULT GetServiceName(IProviderAdmin *lpProviderAdmin,
     std::string *lpServiceName)
@@ -442,6 +432,7 @@ HRESULT InitializeProvider(LPPROVIDERADMIN lpAdminProvider,
 	d.provadm = lpAdminProvider;
 	d.profsect = lpProfSect;
 	d.count = d.eid_size = 0;
+	d.transport = NULL;
 
 	if (d.provadm != NULL) {
 		hr = GetServiceName(d.provadm, &strServiceName);
@@ -864,7 +855,6 @@ extern "C" HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst,
 		break;
 	} // switch(ulContext)
 
-
 exit:
 	if (lppMapiError) {
 		
@@ -926,7 +916,6 @@ exit:
 	return hr;
 }
 
-
 extern "C" HRESULT __cdecl XPProviderInit(HINSTANCE hInstance, LPMALLOC lpMalloc, LPALLOCATEBUFFER lpAllocateBuffer, LPALLOCATEMORE lpAllocateMore, LPFREEBUFFER lpFreeBuffer, ULONG ulFlags, ULONG ulMAPIVer, ULONG * lpulProviderVer, LPXPPROVIDER * lppXPProvider)
 {
 	TRACE_MAPI(TRACE_ENTRY, "XPProviderInit", "");
@@ -959,10 +948,8 @@ exit:
 	if(pXPProvider)
 		pXPProvider->Release();
 
-
 	return hr;
 }
-
 
 extern "C" HRESULT  __cdecl ABProviderInit(HINSTANCE hInstance, LPMALLOC lpMalloc, LPALLOCATEBUFFER lpAllocateBuffer, LPALLOCATEMORE lpAllocateMore, LPFREEBUFFER lpFreeBuffer, ULONG ulFlags, ULONG ulMAPIVer, ULONG * lpulProviderVer, LPABPROVIDER * lppABProvider)
 {
@@ -994,7 +981,6 @@ extern "C" HRESULT  __cdecl ABProviderInit(HINSTANCE hInstance, LPMALLOC lpMallo
 exit:
 	if(lpABProvider)
 		lpABProvider->Release();
-
 
 	return hr;
 }

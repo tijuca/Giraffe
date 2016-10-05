@@ -20,7 +20,6 @@
 #include <kopano/ECChannel.h>
 #include <kopano/stringutil.h>
 #include <csignal>
-#ifdef LINUX
 #include <netdb.h>
 #include <sys/types.h>
 #include <sys/select.h>
@@ -30,16 +29,12 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#ifdef LINUX
 #include <linux/rtnetlink.h>
 #endif
 
 #include <cerrno>
 #include <mapicode.h>
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 
 #ifndef hrSuccess
 #define hrSuccess 0
@@ -100,18 +95,18 @@ HRESULT ECChannel::HrSetCtx(ECConfig *lpConfig, ECLogger *lpLogger) {
 			ssl_neg = true;
 		}
 
-		if (strcmp_ci(ssl_name, SSL_TXT_SSLV2) == 0)
+		if (strcasecmp(ssl_name, SSL_TXT_SSLV2) == 0)
 			ssl_proto = 0x01;
-		else if (strcmp_ci(ssl_name, SSL_TXT_SSLV3) == 0)
+		else if (strcasecmp(ssl_name, SSL_TXT_SSLV3) == 0)
 			ssl_proto = 0x02;
-		else if (strcmp_ci(ssl_name, SSL_TXT_TLSV1) == 0)
+		else if (strcasecmp(ssl_name, SSL_TXT_TLSV1) == 0)
 			ssl_proto = 0x04;
 #ifdef SSL_TXT_TLSV1_1
-		else if (strcmp_ci(ssl_name, SSL_TXT_TLSV1_1) == 0)
+		else if (strcasecmp(ssl_name, SSL_TXT_TLSV1_1) == 0)
 			ssl_proto = 0x08;
 #endif
 #ifdef SSL_TXT_TLSV1_2
-		else if (strcmp_ci(ssl_name, SSL_TXT_TLSV1_2) == 0)
+		else if (strcasecmp(ssl_name, SSL_TXT_TLSV1_2) == 0)
 			ssl_proto = 0x10;
 #endif
 		else {
@@ -244,7 +239,7 @@ ECChannel::~ECChannel() {
 		SSL_free(lpSSL);
 		lpSSL = NULL;
 	}
-	closesocket(fd);
+	close(fd);
 }
 
 HRESULT ECChannel::HrEnableTLS(ECLogger *const lpLogger) {
@@ -511,10 +506,8 @@ HRESULT ECChannel::HrSelect(int seconds) {
 	int res = 0;
 	struct timeval timeout = { seconds, 0 };
 
-#ifdef LINUX
 	if(fd >= FD_SETSIZE)
 	    return MAPI_E_NOT_ENOUGH_MEMORY;
-#endif
 	if(lpSSL && SSL_pending(lpSSL))
 		return hrSuccess;
 
@@ -819,7 +812,7 @@ HRESULT HrListen(ECLogger *lpLogger, const char *szPath, int *lpulListenSocket)
 
 	memset(&sun_addr, 0, sizeof(sun_addr));
 	sun_addr.sun_family = AF_UNIX;
-	strncpy(sun_addr.sun_path, szPath, sizeof(sun_addr.sun_path));
+	kc_strlcpy(sun_addr.sun_path, szPath, sizeof(sun_addr.sun_path));
 
 	if ((fd = socket(PF_UNIX, SOCK_STREAM, 0)) == -1) {
 		if (lpLogger)
@@ -836,9 +829,7 @@ HRESULT HrListen(ECLogger *lpLogger, const char *szPath, int *lpulListenSocket)
 	if (bind(fd, (struct sockaddr *)&sun_addr, sizeof(sun_addr)) == -1) {
                 if (lpLogger)
 			lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to bind to socket %s (%s). This is usually caused by another process (most likely another kopano-server) already using this port. This program will terminate now.", szPath, strerror(errno));
-#ifdef LINUX
                 kill(0, SIGTERM);
-#endif
                 exit(1);
         }
 
@@ -976,7 +967,7 @@ exit:
 	if (sock_res != NULL)
 		freeaddrinfo(sock_res);
 	if (hr != hrSuccess && fd >= 0)
-		closesocket(fd);
+		close(fd);
 	return hr;
 }
 

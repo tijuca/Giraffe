@@ -118,15 +118,7 @@ extern "C" {
    	#include "php_globals.h"
    	#include "php_ini.h"
 
-#if PHP_MAJOR_VERSION >= 5
-#define SUPPORT_EXCEPTIONS 1
-#else
-#define SUPPORT_EXCEPTIONS 0
-#endif
-
-#if SUPPORT_EXCEPTIONS
    	#include "zend_exceptions.h"
-#endif
 	#include "ext/standard/info.h"
 	#include "ext/standard/php_string.h"
 }
@@ -145,7 +137,6 @@ ZEND_BEGIN_ARG_INFO(fourth_arg_force_ref, 0)
         ZEND_ARG_PASS_INFO(1)
 ZEND_END_ARG_INFO()
 #endif
-
 
 #define LOG_BEGIN() { \
     if (mapi_debug & 1) { \
@@ -205,7 +196,6 @@ ZEND_END_ARG_INFO()
 #include "util.h"
 #include "rtfutil.h"
 #include <kopano/CommonUtil.h>
-#include <kopano/ECLogger.h>
 
 #include "ECImportContentsChangesProxy.h"
 #include "ECImportHierarchyChangesProxy.h"
@@ -460,9 +450,7 @@ zend_function_entry mapi_functions[] =
 	ZEND_FE(mapi_inetmapi_imtoinet, NULL)
 	ZEND_FE(mapi_inetmapi_imtomapi, NULL)
 	
-#if SUPPORT_EXCEPTIONS
 	ZEND_FE(mapi_enable_exceptions, NULL)
-#endif
 
     ZEND_FE(mapi_feature, NULL)
 
@@ -531,12 +519,7 @@ PHP_MINFO_FUNCTION(mapi)
 
 static int LoadSettingsFile(void)
 {
-#ifdef LINUX 
 	const char *const cfg_file = ECConfig::GetDefaultPath("php-mapi.cfg"); 
-#else 
-	const char *const cfg_file = "php-mapi.cfg"; 
-#endif
-
 	struct stat st;
 	if (stat(cfg_file, &st) == 0) {
 		static const configsetting_t settings[] = {
@@ -576,7 +559,7 @@ static int LoadSettingsFile(void)
 	if (lpLogger == NULL)
 		return FAILURE;
 
-	lpLogger->Log(EC_LOGLEVEL_INFO, "PHP-Mapi instantiated " PROJECT_VERSION_EXT_STR);
+	lpLogger->Log(EC_LOGLEVEL_INFO, "PHP-MAPI instantiated " PROJECT_VERSION_EXT_STR);
 
 	ec_log_set(lpLogger);
 	if (mapi_debug)
@@ -632,7 +615,6 @@ PHP_MINIT_FUNCTION(mapi) {
 }
 
 // Used at the end of each MAPI call to throw exceptions if mapi_enable_exceptions() has been called
-#if SUPPORT_EXCEPTIONS
 #define THROW_ON_ERROR() \
 	if (FAILED(MAPI_G(hr))) { \
 		if (lpLogger) \
@@ -641,11 +623,6 @@ PHP_MINIT_FUNCTION(mapi) {
 		if (MAPI_G(exceptions_enabled)) \
 			zend_throw_exception(MAPI_G(exception_ce), "MAPI error ", MAPI_G(hr)  TSRMLS_CC); \
 	}
-#else
-#define THROW_ON_ERROR() \
-	if (FAILED(MAPI_G(hr)) && lpLogger) \
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "MAPI error: %s (%x) (method: %s, line: %d)", GetMAPIErrorMessage(MAPI_G(hr)), MAPI_G(hr), __FUNCTION__, __LINE__);
-#endif
 
 /**
 *
@@ -659,7 +636,7 @@ PHP_MSHUTDOWN_FUNCTION(mapi)
 	perf_measure_file = NULL;
     
 	if (lpLogger)
-		lpLogger->Log(EC_LOGLEVEL_INFO, "php-mapi shutdown");
+		lpLogger->Log(EC_LOGLEVEL_INFO, "PHP-MAPI shutdown");
 
 	MAPIUninitialize();
 	lpLogger->Release();
@@ -726,7 +703,6 @@ static void _php_free_fb_object(zend_resource *rsrc TSRMLS_DC)
 	LPUNKNOWN lpObj = (LPUNKNOWN)rsrc->ptr;
 	if (lpObj) lpObj->Release();
 }
-
 
 static HRESULT GetECObject(LPMAPIPROP lpMapiProp,
     IECUnknown **lppIECUnknown TSRMLS_DC)
@@ -1154,7 +1130,6 @@ ZEND_FUNCTION(mapi_openaddressbook)
 	LPADRBOOK lpAddrBook;
 	// local
 
-
 	RETVAL_FALSE;
 	MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
 
@@ -1301,7 +1276,6 @@ exit:
 	LOG_END();
 	THROW_ON_ERROR();
 }
-
 
 /**
 * mapi_getstores
@@ -1755,7 +1729,6 @@ exit:
 	THROW_ON_ERROR();
 }
 
-
 ZEND_FUNCTION(mapi_folder_emptyfolder)
 {
 	PMEASURE_FUNC;
@@ -1830,7 +1803,6 @@ exit:
 	THROW_ON_ERROR();
 }
 
-
 /**
 * mapi_msgstore_createentryid
 * Creates an EntryID to open a store with mapi_openmsgstore.
@@ -1881,7 +1853,6 @@ exit:
 	THROW_ON_ERROR();
 }
 
-
 /**
 * mapi_msgstore_getearchiveentryid
 * Creates an EntryID to open an archive store with mapi_openmsgstore.
@@ -1931,7 +1902,6 @@ exit:
 	LOG_END();
 	THROW_ON_ERROR();
 }
-
 
 /**
 * mapi_openentry
@@ -2268,7 +2238,6 @@ ZEND_FUNCTION(mapi_table_queryrows)
 			goto exit;
 		}
 	}
-
 
 	MAPI_G(hr) = lpTable->QueryRows(lRowCount, 0, &pRowSet);
 
@@ -2872,7 +2841,6 @@ exit:
 	THROW_ON_ERROR();
 }
 
-
 ZEND_FUNCTION(mapi_message_createattach)
 {
 	PMEASURE_FUNC;
@@ -3104,7 +3072,6 @@ ZEND_FUNCTION(mapi_stream_stat)
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &res) == FAILURE) return;
 
 	ZEND_FETCH_RESOURCE_C(pStream, LPSTREAM, &res, -1, name_istream, le_istream);
-
 
 	MAPI_G(hr) = pStream->Stat(&stg,STATFLAG_NONAME);
 	if(MAPI_G(hr) != hrSuccess)
@@ -3350,7 +3317,6 @@ ZEND_FUNCTION(mapi_getidsfromnames)
 	if(guidArray)
 		guidHash = Z_ARRVAL_P(guidArray);
 
-
 	// get the number of items in the array
 	hashTotal = zend_hash_num_elements(targetHash);
 
@@ -3566,7 +3532,6 @@ ZEND_FUNCTION(mapi_copyto)
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unknown resource type");
 		goto exit;
 	}
-
 
 	MAPI_G(hr) = lpSrcObj->CopyTo(cExcludeIIDs, lpExcludeIIDs, lpExcludeProps, 0, NULL, lpInterface, lpDstObj, flags, NULL);
 
@@ -4332,7 +4297,6 @@ exit:
 	THROW_ON_ERROR();
 }
 
-
 ZEND_FUNCTION(mapi_zarafa_setuser)
 {
 	PMEASURE_FUNC;
@@ -4431,7 +4395,6 @@ ZEND_FUNCTION(mapi_zarafa_deleteuser)
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rs", &res, &lpszUserName, &ulUserName) == FAILURE) return;
 
 	ZEND_FETCH_RESOURCE_C(lpMsgStore, LPMDB, &res, -1, name_mapi_msgstore, le_mapi_msgstore);
-
 
 	MAPI_G(hr) = GetECObject(lpMsgStore, &lpUnknown TSRMLS_CC);
 	if(MAPI_G(hr) != hrSuccess) {
@@ -4709,6 +4672,7 @@ ZEND_FUNCTION(mapi_zarafa_setquota)
 	if (MAPI_G(hr) != hrSuccess)
 		goto exit;
 
+	ZVAL_DEREF(array);
 	data = HASH_OF(array);
 	zend_hash_internal_pointer_reset(data);
 
@@ -4755,7 +4719,6 @@ exit:
 	LOG_END();
 	THROW_ON_ERROR();
 }
-
 
 /**
 * Retrieve user information from zarafa
@@ -5293,7 +5256,6 @@ ZEND_FUNCTION(mapi_zarafa_getgrouplist)
 	if(MAPI_G(hr) != hrSuccess)
 		goto exit;
 
-
 	array_init(return_value);
 	for (i = 0; i < ulGroups; ++i) {
 		array_init(&zval_data_value);
@@ -5386,7 +5348,7 @@ ZEND_FUNCTION(mapi_zarafa_getuserlistofgroup)
 	IECUnknown		*lpUnknown = NULL;
 	IECServiceAdmin *lpServiceAdmin = NULL;
 	ULONG			ulUsers;
-	ECUSER *lpsUsers;
+	ECUSER *lpsUsers = NULL;
 	unsigned int	i;
 
 	RETVAL_FALSE;
@@ -6381,6 +6343,7 @@ ZEND_FUNCTION(mapi_zarafa_setpermissionrules)
 		goto exit;
 	}
 
+	ZVAL_DEREF(perms);
 	target_hash = HASH_OF(perms);
 	if (!target_hash) {
 		MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
@@ -6399,6 +6362,7 @@ ZEND_FUNCTION(mapi_zarafa_setpermissionrules)
 	j = 0;
 	ZEND_HASH_FOREACH_VAL(target_hash, entry) {
 		// null pointer returned if perms was not array(array()).
+		ZVAL_DEREF(entry);
 		data = HASH_OF(entry);
 		zend_hash_internal_pointer_reset(data);
 
@@ -6553,6 +6517,7 @@ ZEND_FUNCTION(mapi_freebusysupport_loaddata)
 
 	ZEND_FETCH_RESOURCE_C(lpFBSupport, IFreeBusySupport*, &resFBSupport, -1, name_fb_support, le_freebusy_support);
 
+	ZVAL_DEREF(resUsers);
 	target_hash = HASH_OF(resUsers);
 	if (!target_hash) {
 		MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
@@ -6633,6 +6598,7 @@ ZEND_FUNCTION(mapi_freebusysupport_loadupdate)
 
 	ZEND_FETCH_RESOURCE_C(lpFBSupport, IFreeBusySupport*, &resFBSupport, -1, name_fb_support, le_freebusy_support);
 
+	ZVAL_DEREF(resUsers);
 	target_hash = HASH_OF(resUsers);
 	if (!target_hash) {
 		MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
@@ -6866,7 +6832,6 @@ exit:
 	THROW_ON_ERROR();
 }
 
-
 ZEND_FUNCTION(mapi_freebusyenumblock_skip)
 {
 	PMEASURE_FUNC;
@@ -6953,18 +6918,21 @@ ZEND_FUNCTION(mapi_freebusyupdate_publish)
 
 	ZEND_FETCH_RESOURCE_C(lpFBUpdate, IFreeBusyUpdate*, &resFBUpdate, -1, name_fb_update, le_freebusy_update);
 
+	ZVAL_DEREF(aBlocks);
 	target_hash = HASH_OF(aBlocks);
 	if (!target_hash) {
 		MAPI_G(hr) = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	}
 
+	cBlocks = zend_hash_num_elements(target_hash);
 	MAPI_G(hr) = MAPIAllocateBuffer(sizeof(FBBlock_1)*cBlocks, (void**)&lpBlocks);
 	if(MAPI_G(hr) != hrSuccess)
 		goto exit;
 
-        i = 0;
-        ZEND_HASH_FOREACH_VAL(target_hash, entry) {
+	i = 0;
+	ZEND_HASH_FOREACH_VAL(target_hash, entry) {
+		ZVAL_DEREF(entry);
 		data = HASH_OF(entry);
 		zend_hash_internal_pointer_reset(data);
 
@@ -6990,9 +6958,7 @@ ZEND_FUNCTION(mapi_freebusyupdate_publish)
 		}
 		++i;
 
-        } ZEND_HASH_FOREACH_END();
-
-	cBlocks = zend_hash_num_elements(target_hash);
+	} ZEND_HASH_FOREACH_END();
 	MAPI_G(hr) = lpFBUpdate->PublishFreeBusy(lpBlocks, cBlocks);
 	if(MAPI_G(hr) != hrSuccess)
 		goto exit;
@@ -7605,7 +7571,6 @@ exit:
 	THROW_ON_ERROR();
 }
 
-
 ZEND_FUNCTION(mapi_importhierarchychanges_importfolderdeletion)
 {
 	PMEASURE_FUNC;
@@ -7641,8 +7606,6 @@ exit:
 	LOG_END();
 	THROW_ON_ERROR();
 }
-
-
 
 /*
  * This function needs some explanation as it is not just a one-to-one MAPI function. This function
@@ -7811,7 +7774,6 @@ exit:
     return;
 }    
 
-#if SUPPORT_EXCEPTIONS
 ZEND_FUNCTION(mapi_enable_exceptions)
 {
 	PMEASURE_FUNC;
@@ -7832,7 +7794,6 @@ ZEND_FUNCTION(mapi_enable_exceptions)
 	LOG_END();
     return;
 }
-#endif
 
 // Can be queried by client applications to check whether certain API features are supported or not.
 ZEND_FUNCTION(mapi_feature)
@@ -7849,7 +7810,7 @@ ZEND_FUNCTION(mapi_feature)
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &szFeature, &cbFeature) == FAILURE) return;
     
 	for (unsigned int i = 0; i < arraySize(features); ++i)
-        if(stricmp(features[i], szFeature) == 0) {
+        if(strcasecmp(features[i], szFeature) == 0) {
             RETVAL_TRUE;
             break;
 	}

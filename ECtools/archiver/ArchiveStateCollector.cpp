@@ -102,7 +102,7 @@ namespace details {
 
 				for (unsigned j = 0; bComplete && j < IDX_MAX; ++j) {
 					if (PROP_TYPE(ptrRows[i].lpProps[j].ulPropTag) == PT_ERROR) {
-						m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Got uncomplete row, row %u, column %u contains error 0x%08x", i, j, ptrRows[i].lpProps[j].Value.err);
+						m_lpLogger->Log(EC_LOGLEVEL_WARNING, "Got incomplete row, row %u, column %u contains error 0x%08x", i, j, ptrRows[i].lpProps[j].Value.err);
 						bComplete = false;
 					}
 				}
@@ -140,7 +140,6 @@ namespace details {
 
 }
 
-
 /**
  * Create an ArchiveStateCollector instance.
  * @param[in]	ArchiverSessionPtr		The archive session
@@ -162,7 +161,6 @@ HRESULT ArchiveStateCollector::Create(const ArchiverSessionPtr &ptrSession, ECLo
 }
 
 /**
- * Constructor
  * @param[in]	ArchiverSessionPtr		The archive session
  * @param[in]	lpLogger		The logger.
  */
