@@ -173,20 +173,20 @@ Description: Complete and feature rich groupware solution - POP3 and IMAP gatewa
  clients including mobile ones. It also features a web interface.
  .
  This package contains the gateway to access the data stored in your
- Kopano server via the POP3 and IMAP protocolls.
+ Kopano server via the POP3 and IMAP protocols.
 
 Package: kopano-ical
 Architecture: any
 Depends: ${shlibs:Depends},
  kopano-common (= ${binary:Version}),
  ${misc:Depends},
-Description: Complete and feature rich groupware solution - iCal and CalDAV gateway
+Description: Complete and feature rich groupware solution - CalDAV and CalDAV gateway
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
  .
  This package contains the gateway to access the data stored in your
- Kopano server via the iCal and CardDAV protocolls.
+ Kopano server via the CalDAV and CardDAV protocols.
 
 Package: kopano-l10n
 Architecture: all
