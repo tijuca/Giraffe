@@ -20,4 +20,4 @@ class TestServer(unittest.TestCase):
     def testFindItemBySubject(self):
         user = self.server.user(self.user)
         inbox = user.store.folder("Inbox")
-        self.assertIn("the towers", [item.subject for item in inbox.items()])
+        self.assertIn("the towers", [item.subject for item in inbox])
