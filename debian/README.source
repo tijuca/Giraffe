@@ -22,8 +22,8 @@ For information on how to set up a pbuilder environment see the
 git-pbuilder(1) manpage. In short:
 
     DIST=sid git-pbuilder create
-    gbp clone <project-url>
-    cd <project>
+    gbp clone https://anonscm.debian.org/git/pkg-giraffe/kopanocore.git/
+    cd kopanocore
     gbp buildpackage --git-pbuilder
 
  -- Guido Günther <agx@sigxcpu.org>, Wed,  2 Dec 2015 18:51:15 +0100
