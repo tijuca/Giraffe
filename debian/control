@@ -1,7 +1,6 @@
 Source: kopanocore
 Section: mail
 Priority: optional
-Homepage: https://download.kopano.io/community/
 Maintainer: Giraffe Maintainers <pkg-giraffe-maintainers@lists.alioth.debian.org>
 Uploaders: Carsten Schoenert <c.schoenert@t-online.de>,
  Matthias Geerdsen <matthias@vorlons.info>,
@@ -50,7 +49,7 @@ Build-Depends: autoconf (>= 2.59),
 Standards-Version: 3.9.8
 Vcs-Git: https://anonscm.debian.org/git/pkg-giraffe/kopanocore.git/
 Vcs-Browser: https://anonscm.debian.org/cgit/pkg-giraffe/kopanocore.git/
-Homepage: https://stash.kopano.io/projects/KC
+Homepage: https://download.kopano.io/community/
 X-Python-Version: 2.7
 
 Package: kopano-libs
