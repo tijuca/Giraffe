@@ -90,7 +90,7 @@ Architecture: any
 Depends: ${shlibs:Depends},
  ${misc:Depends},
  kopano-common (>= ${source:Version})
-Description: Complete and feature rich groupware solution - archiver.
+Description: Complete and feature rich groupware solution - archiver
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
  clients including mobile ones. It also features a web interface.
