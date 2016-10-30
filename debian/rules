@@ -49,6 +49,16 @@ override_dh_auto_configure:
 	echo ${DEB_UVERSION} > $(CURDIR)/revision
 	[ -x ./bootstrap.sh ] && ./bootstrap.sh || true
 	dh_auto_configure -- $(DEB_CONFIGURE_EXTRA_ARGS)
+	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' \
+		debian/kopano-contacts.install.in > debian/kopano-contacts.install
+	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' \
+		debian/kopano-dev.install.in > debian/kopano-dev.install
+	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' \
+		debian/kopano-dev.links.in > debian/kopano-dev.links
+	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' \
+		debian/kopano-libs.install.in > debian/kopano-libs.install
+	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' \
+		debian/kopano-server.install.in > debian/kopano-contacts.install
 
 override_dh_auto_clean:
 	[ ! -f Makefile ] || dh_auto_clean
