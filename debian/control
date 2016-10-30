@@ -115,7 +115,7 @@ Package: kopano-common
 Architecture: any
 Depends: ${misc:Depends},
  adduser,
- lsb-base
+ lsb-base (>= 3.0-6),
 Description: Complete and feature rich groupware solution - common files
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
@@ -151,6 +151,7 @@ Package: kopano-dagent
 Architecture: any
 Depends: ${misc:Depends},
  ${shlibs:Depends},
+ lsb-base (>= 3.0-6),
  kopano-common (= ${binary:Version}),
  php5-mapi (= ${binary:Version}),
  php5-cli,
@@ -167,6 +168,7 @@ Package: kopano-gateway
 Architecture: any
 Suggests: python-mapi
 Depends: ${shlibs:Depends},
+ lsb-base (>= 3.0-6),
  kopano-common (= ${binary:Version}),
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - POP3 and IMAP gateway
@@ -180,6 +182,7 @@ Description: Complete and feature rich groupware solution - POP3 and IMAP gatewa
 Package: kopano-ical
 Architecture: any
 Depends: ${shlibs:Depends},
+ lsb-base (>= 3.0-6),
  kopano-common (= ${binary:Version}),
  ${misc:Depends},
 Description: Complete and feature rich groupware solution - CalDAV and CalDAV gateway
@@ -205,6 +208,7 @@ Package: kopano-monitor
 Architecture: any
 Depends: ${misc:Depends},
  ${shlibs:Depends},
+ lsb-base (>= 3.0-6),
  kopano-common (= ${binary:Version}),
  php5-mapi (= ${binary:Version}),
  php5-cli,
@@ -247,6 +251,7 @@ Package: kopano-server
 Architecture: any
 Depends: ${shlibs:Depends},
  dbconfig-common,
+ lsb-base (>= 3.0-6),
  kopano-common (= ${binary:Version}),
  mariadb-client | mysql-client | virtual-mysql-client,
  ${misc:Depends},
@@ -263,6 +268,7 @@ Package: kopano-spooler
 Architecture: any
 Depends: ${misc:Depends},
  ${shlibs:Depends},
+ lsb-base (>= 3.0-6),
  kopano-common (= ${binary:Version}),
  python-mapi (= ${binary:Version}),
 Description: Complete and feature rich groupware solution - email spooler
