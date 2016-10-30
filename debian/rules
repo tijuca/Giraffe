@@ -78,8 +78,7 @@ override_dh_install:
 
 	# adjust server.cfg to multi-arch behavior
 	sed -i 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/' $(INSTDIR)/etc/kopano/server.cfg
-
-	DH_VERBOSE=1 dh_install
+	dh_install
 
 override_dh_installinit:
 	dh_installinit --name kopano-server
