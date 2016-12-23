@@ -1,0 +1,29 @@
+From: Carsten Schoenert <c.schoenert@t-online.de>
+Date: Sun, 25 Dec 2016 15:42:33 +0100
+Subject: change shebang to /usr/bin/php7.0
+
+---
+ installer/linux/kopano-mr-accept  | 2 +-
+ installer/linux/kopano-mr-process | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/installer/linux/kopano-mr-accept b/installer/linux/kopano-mr-accept
+index 06ee6acf..e7cc6c5e 100755
+--- a/installer/linux/kopano-mr-accept
++++ b/installer/linux/kopano-mr-accept
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env php
++#!/usr/bin/php7.0
+ # -*- Mode: php -*-
+ 
+ <?php
+diff --git a/installer/linux/kopano-mr-process b/installer/linux/kopano-mr-process
+index 58c2655b..a6b121cd 100755
+--- a/installer/linux/kopano-mr-process
++++ b/installer/linux/kopano-mr-process
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env php
++#!/usr/bin/php7.0
+ # -*- Mode: php -*-
+ 
+ <?php
