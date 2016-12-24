@@ -39,6 +39,7 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
     --enable-unicode \
     --enable-python \
     --enable-swig \
+    --with-php-config=/usr/bin/php-config7.0 \
     $(CONFFLAG) \
     $(NULL)
 
