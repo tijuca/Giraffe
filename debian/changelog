@@ -1,3 +1,38 @@
+kopanocore (8.1.0-2) unstable; urgency=medium
+
+  [ Guido Günther ]
+  * [d8ac69c] Add README.source
+  * [43106e0] Add links to alioth and upstream
+  * [b673725] gbp.conf: Switch to upstream/latest
+  * [4793176] autopkgtests: install kopano-backup and be less verbose
+  * [4ca7a79] Unbreak backup test by using an existing user
+
+  [ Mark Dufour ]
+  * [51b8d14] add basic user backup/restore test for kopano-backup
+  * [9490f3d] kopanocore: enable configure switch for using PHP7.
+
+  [ Carsten Schoenert ]
+  * [bdac342] kopano-utils.install: Install kopano-cachestat
+    (Closes: #842357)
+  * [5d9e3a0] d/rules: be less verbose while dh_install.
+  * [6fabdfa] d/control: update mysql-client related Build-Depends.
+  * [45912cb] d/control: adding some versioned depends on lsb-base.
+  * [2263a17] d/control: update Recommends and Depends on mysql-{client,server}
+  * [decea40] kopano-*.{install,links}: moving dh sequencer more to M-A.
+  * [538c362,a8617f1] Update patches:
+       Replace use-changed-function-name-after-gsoap-2.8.35.patch
+       with build-support-gsoap-2.8.36.patch from upstream
+    New patches:
+       - fixup-spelling-issues-against-8.1.0.patch
+       - kopano-cachestat-update-docstring-remove-diff-function.patch
+       - adjust-search-path-for-php-config-script-on-php7.0.patch
+       - change-shebang-to-usr-bin-php7.0.patch
+       - OpenSSL-Make-SSLv2-conditional.patch
+  * [d43221d] Add lintian override for 'Nam' which is a Vietnamese word
+  * [a02a65f,82b7164,9940348] Swith to PHP7
+
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 25 Dec 2016 19:52:54 +0100
+
 kopanocore (8.1.0-1) unstable; urgency=medium
 
   [ Jelle van der Waa ]
