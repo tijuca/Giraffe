@@ -29,8 +29,8 @@ kopano-admin -c testadmin -p r00tme \
              -e admin@example.com -f "Your admin" -a 1 | grep -qs "User created."
 echo "done."
 
-echo "Check that we can deliver..."
 apt-get -y install kopano-dagent
+echo "Check that we can deliver..."
 cat <<EOF | kopano-dagent -n -v testadmin
 From: hwm@example.com
 To: testadmin@example.com
@@ -38,8 +38,8 @@ Subject: the towers
 EOF
 echo "done."
 
-echo "Checking that we can backup and retrieve email"
 apt-get -y install kopano-backup
+echo "Checking that we can backup and retrieve email"
 cd debian/tests
 export AUTH_USER='testadmin'
 export AUTH_PASS='r00tme'
