@@ -14,6 +14,7 @@ DEB_UVERSION=$(shell  dpkg-parsechangelog -SVersion)
 DEB_BUILD_DIR=debian/build
 
 INSTDIR=$(CURDIR)/debian/tmp
+PHPVERSION=7.0
 SMARTYVER=2.6.14
 
 ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
@@ -39,7 +40,7 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
     --enable-unicode \
     --enable-python \
     --enable-swig \
-    --with-php-config=/usr/bin/php-config7.0 \
+    --with-php-config=/usr/bin/php-config$(PHPVERSION) \
     $(CONFFLAG) \
     $(NULL)
 
@@ -85,7 +86,7 @@ override_dh_install:
 	find $(INSTDIR) -name \*.pyc -exec rm {} \;
 
 	# add php:Depends
-	echo "php:Depends=phpapi-$(shell php-config5 --phpapi)" > debian/php5-mapi.substvars
+	echo "php:Depends=phpapi-$(shell php-config$(PHPVERSION) --phpapi)" > debian/php$(PHPVERSION)-mapi.substvars
 
 	# adjust server.cfg to multi-arch behavior
 	sed -i 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/' $(INSTDIR)/etc/kopano/server.cfg
