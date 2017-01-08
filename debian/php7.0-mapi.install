@@ -1,3 +1,2 @@
-etc/php*/*
-usr/lib/php*/*/mapi.so*
+# installation of mapi.{ini,so} is handled by php7.0-mapi.php
 usr/share/php/mapi/
