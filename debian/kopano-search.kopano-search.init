@@ -9,7 +9,7 @@
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: The Search Indexer of the Kopano Collaboration Platform
-# Description:       The Kopano Search is the indexer daemon for full-text 
+# Description:       The Kopano Search is the indexer daemon for full-text
 #                    search through all objects (including attachments)
 ### END INIT INFO
 

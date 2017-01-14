@@ -75,7 +75,7 @@ Depends: kopano-server (>= ${source:Version}),
  kopano-dagent (>= ${source:Version}),
  kopano-ical (>= ${source:Version}),
  kopano-gateway (>= ${source:Version}),
- kopano-search-plus (>= ${source:Version}),
+ kopano-search (>= ${source:Version}),
  ${misc:Depends},
 Suggests: kopano-webapp
 Description: Metapackage for the Kopano Core
@@ -222,7 +222,7 @@ Description: Complete and feature rich groupware solution - quota monitor
  This package contains the quota monitor that checks stores for total usage
  and alerts users by email.
 
-Package: kopano-search-plus
+Package: kopano-search
 Architecture: all
 Depends: ${shlibs:Depends},
  ${misc:Depends},
