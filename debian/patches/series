@@ -10,3 +10,4 @@ kopano-cachestat-update-docstring-remove-diff-function.patch
 OpenSSL-Make-SSLv2-conditional.patch
 adjust-search-path-for-php-config-script-on-php7.0.patch
 change-shebang-to-usr-bin-php7.0.patch
+remove-undocummented-sk_SSL_COMP_free-call.patch

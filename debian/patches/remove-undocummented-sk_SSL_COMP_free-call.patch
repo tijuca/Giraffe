@@ -1,0 +1,21 @@
+From: Mark Dufour <m.dufour@zarafa.com>
+Date: Sun, 15 Jan 2017 09:36:27 +0100
+Subject: remove undocummented sk_SSL_COMP_free() call
+
+It causes a segfault in kopano-admin later otherwise.
+---
+ common/SSLUtil.cpp | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/common/SSLUtil.cpp b/common/SSLUtil.cpp
+index 5700cc7e..8c9a31f4 100644
+--- a/common/SSLUtil.cpp
++++ b/common/SSLUtil.cpp
+@@ -87,7 +87,6 @@ void SSL_library_cleanup()
+ 
+ 	CONF_modules_unload(0);
+ 
+-	sk_SSL_COMP_free(SSL_COMP_get_compression_methods());
+ }
+ 
+ void ssl_random_init()
