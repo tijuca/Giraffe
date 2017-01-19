@@ -1,3 +1,26 @@
+kopanocore (8.1.0-3) unstable; urgency=medium
+
+  [ Guido Günther ]
+  * [6480d2c] Add db_stop calls to avoid hangs in postinst
+  * [8dc1334] autopkgtests: Move test output past package installation so it's
+    simpler to grasp whats being tested.
+
+  [ Mark Dufour ]
+  * [e6170d3] debian/copyright: add some still missed files.
+    Copyright information for some subfolders in swig/ differs from the other
+    Kopano source files.
+    Some parts of swig/python/kopano/kopano/__init__.py are written by other
+    authors than Kopano.
+    Reorder the licenses in alphabetical order.
+  * [a9b88b0] rename package kopano-search-plus to kopano-search.
+
+  [ Carsten Schoenert ]
+  * php7.0-mapi: use dh-php.
+  * [85aec63] Fix segfault on cleanup. New patch:
+    remove-undocummented-sk_SSL_COMP_free-call.patch
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 19 Jan 2017 13:59:07 +0100
+
 kopanocore (8.1.0-2) unstable; urgency=medium
 
   [ Guido Günther ]
