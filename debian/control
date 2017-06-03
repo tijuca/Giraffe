@@ -55,6 +55,7 @@ X-Python-Version: 2.7
 
 Package: kopano-libs
 Architecture: any
+Multi-Arch: same
 Depends: ${shlibs:Depends},
          ${misc:Depends},
 Description: Complete and feature rich groupware solution - Free/Busy library
@@ -126,6 +127,7 @@ Description: Complete and feature rich groupware solution - common files
 
 Package: kopano-contacts
 Architecture: any
+Multi-Arch: same
 Depends: ${shlibs:Depends},
  locales,
  ${misc:Depends},
@@ -138,6 +140,7 @@ Description: Complete and feature rich groupware solution - contact mapi provide
 
 Package: kopano-dev
 Architecture: any
+Multi-Arch: same
 Depends: ${shlibs:Depends},
  ${misc:Depends},
 Description: C++ Development files and libraries for Kopano Core
