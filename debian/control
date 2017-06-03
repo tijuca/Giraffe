@@ -154,7 +154,7 @@ Depends: ${misc:Depends},
  ${shlibs:Depends},
  lsb-base (>= 3.0-6),
  kopano-common (= ${binary:Version}),
- php7.0-mapi (= ${binary:Version}),
+ php-mapi (= ${binary:Version}),
  php-cli,
  python-mapi (= ${binary:Version}),
 Description: Complete and feature rich groupware solution - delivery agent
@@ -211,7 +211,7 @@ Depends: ${misc:Depends},
  ${shlibs:Depends},
  lsb-base (>= 3.0-6),
  kopano-common (= ${binary:Version}),
- php7.0-mapi (= ${binary:Version}),
+ php-mapi (= ${binary:Version}),
  php-cli,
  python-mapi (= ${binary:Version}),
 Description: Complete and feature rich groupware solution - quota monitor
@@ -324,7 +324,7 @@ Description: Complete and feature rich groupware solution - Python bindings
  Kopano server using a higher level abstraction than python-mapi
  provides.
 
-Package: php7.0-mapi
+Package: php-mapi
 Architecture: any
 Section: php
 Depends: ${shlibs:Depends},
