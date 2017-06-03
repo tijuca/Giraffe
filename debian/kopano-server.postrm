@@ -1,5 +1,5 @@
 #!/bin/sh
-# postrm script for zarafa-server
+# postrm script for kopano-server
 #
 # see: dh_installdeb(1)
 
@@ -10,7 +10,7 @@ if [ -f /usr/share/debconf/confmodule ]; then
 fi
 if [ -f /usr/share/dbconfig-common/dpkg/postrm.mysql ]; then
     . /usr/share/dbconfig-common/dpkg/postrm.mysql
-    dbc_go zarafa-server $@
+    dbc_go kopano-server $@
 fi
 
 case "$1" in
@@ -19,9 +19,9 @@ case "$1" in
 
     purge)
         if which ucf >/dev/null 2>&1; then
-            ucf --purge /etc/zarafa/debian-db.cfg
+            ucf --purge /etc/kopano/debian-db.cfg
         else
-            rm -f /etc/zarafa/debian-db.cfg
+            rm -f /etc/kopano/debian-db.cfg
         fi
     ;;
 
