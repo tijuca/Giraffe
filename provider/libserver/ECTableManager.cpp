@@ -16,12 +16,10 @@
  */
 
 #include <kopano/platform.h>
-
-#include <sstream>
-
+#include <kopano/memory.hpp>
 #include <mapidefs.h>
 #include <mapitags.h>
-
+#include <kopano/lockhelper.hpp>
 #include "ECMAPI.h"
 #include "ECGenericObjectTable.h"
 #include "ECSearchObjectTable.h"
@@ -48,75 +46,122 @@
 #include <kopano/mapiext.h>
 #include <edkmdb.h>
 
+using namespace KCHL;
+
+namespace KC {
+
 void FreeRowSet(struct rowSet *lpRowSet, bool bBasePointerDel);
 
-unsigned int sContentsProps[] = { PR_ENTRYID, PR_DISPLAY_NAME, PR_MESSAGE_FLAGS, PR_SUBJECT, PR_STORE_ENTRYID, PR_STORE_RECORD_KEY, PR_STORE_SUPPORT_MASK, PR_INSTANCE_KEY, PR_RECORD_KEY, PR_ACCESS, PR_ACCESS_LEVEL };
-unsigned int sHierarchyProps[] = { PR_ENTRYID, PR_DISPLAY_NAME, PR_CONTENT_COUNT, PR_CONTENT_UNREAD, PR_STORE_ENTRYID, PR_STORE_RECORD_KEY, PR_STORE_SUPPORT_MASK, PR_INSTANCE_KEY, PR_RECORD_KEY, PR_ACCESS, PR_ACCESS_LEVEL };
-unsigned int sABContentsProps[] = { PR_ENTRYID, PR_DISPLAY_NAME, PR_INSTANCE_KEY, PR_ADDRTYPE, PR_DISPLAY_TYPE, PR_DISPLAY_TYPE_EX, PR_EMAIL_ADDRESS, PR_SMTP_ADDRESS, PR_OBJECT_TYPE, PR_RECORD_KEY, PR_SEARCH_KEY, PR_DEPARTMENT_NAME, PR_OFFICE_TELEPHONE_NUMBER, PR_OFFICE_LOCATION, PR_PRIMARY_FAX_NUMBER };
-unsigned int sABHierarchyProps[] = { PR_ENTRYID, PR_DISPLAY_NAME, PR_INSTANCE_KEY, PR_DISPLAY_TYPE, PR_OBJECT_TYPE, PR_RECORD_KEY, PR_SEARCH_KEY };
+static const unsigned int sContentsProps[] = {
+	PR_ENTRYID, PR_DISPLAY_NAME, PR_MESSAGE_FLAGS, PR_SUBJECT,
+	PR_STORE_ENTRYID, PR_STORE_RECORD_KEY, PR_STORE_SUPPORT_MASK,
+	PR_INSTANCE_KEY, PR_RECORD_KEY, PR_ACCESS, PR_ACCESS_LEVEL,
+};
+static const unsigned int sHierarchyProps[] = {
+	PR_ENTRYID, PR_DISPLAY_NAME, PR_CONTENT_COUNT, PR_CONTENT_UNREAD,
+	PR_STORE_ENTRYID, PR_STORE_RECORD_KEY, PR_STORE_SUPPORT_MASK,
+	PR_INSTANCE_KEY, PR_RECORD_KEY, PR_ACCESS, PR_ACCESS_LEVEL,
+};
+static const unsigned int sABContentsProps[] = {
+	PR_ENTRYID, PR_DISPLAY_NAME, PR_INSTANCE_KEY, PR_ADDRTYPE,
+	PR_DISPLAY_TYPE, PR_DISPLAY_TYPE_EX, PR_EMAIL_ADDRESS, PR_SMTP_ADDRESS,
+	PR_OBJECT_TYPE, PR_RECORD_KEY, PR_SEARCH_KEY, PR_DEPARTMENT_NAME,
+	PR_OFFICE_TELEPHONE_NUMBER, PR_OFFICE_LOCATION, PR_PRIMARY_FAX_NUMBER,
+};
+static const unsigned int sABHierarchyProps[] = {
+	PR_ENTRYID, PR_DISPLAY_NAME, PR_INSTANCE_KEY, PR_DISPLAY_TYPE,
+	PR_OBJECT_TYPE, PR_RECORD_KEY, PR_SEARCH_KEY,
+};
 
-unsigned int sUserStoresProps[] = { PR_EC_USERNAME, PR_EC_STOREGUID, PR_EC_STORETYPE, PR_DISPLAY_NAME, PR_EC_COMPANYID, PR_EC_COMPANY_NAME, PR_STORE_ENTRYID, PR_LAST_MODIFICATION_TIME, PR_MESSAGE_SIZE_EXTENDED};
+static const unsigned int sUserStoresProps[] = {
+	PR_EC_USERNAME, PR_EC_STOREGUID, PR_EC_STORETYPE, PR_DISPLAY_NAME,
+	PR_EC_COMPANYID, PR_EC_COMPANY_NAME, PR_STORE_ENTRYID,
+	PR_LAST_MODIFICATION_TIME, PR_MESSAGE_SIZE_EXTENDED,
+};
 
 // stats tables
-unsigned int sSystemStatsProps[] = { PR_DISPLAY_NAME, PR_EC_STATS_SYSTEM_DESCRIPTION, PR_EC_STATS_SYSTEM_VALUE };
-unsigned int sSessionStatsProps[] = { PR_EC_STATS_SESSION_ID, PR_EC_STATS_SESSION_GROUP_ID, PR_EC_STATS_SESSION_IPADDRESS, PR_EC_STATS_SESSION_IDLETIME, PR_EC_STATS_SESSION_CAPABILITY, PR_EC_STATS_SESSION_LOCKED, PR_EC_USERNAME, PR_EC_STATS_SESSION_BUSYSTATES, PR_EC_STATS_SESSION_PROCSTATES, PR_EC_STATS_SESSION_CPU_USER, PR_EC_STATS_SESSION_CPU_SYSTEM, PR_EC_STATS_SESSION_CPU_REAL, PR_EC_STATS_SESSION_PEER_PID, PR_EC_STATS_SESSION_CLIENT_VERSION, PR_EC_STATS_SESSION_CLIENT_APPLICATION, PR_EC_STATS_SESSION_REQUESTS, PR_EC_STATS_SESSION_PORT, PR_EC_STATS_SESSION_PROXY, PR_EC_STATS_SESSION_URL, PR_EC_STATS_SESSION_CLIENT_APPLICATION_VERSION, PR_EC_STATS_SESSION_CLIENT_APPLICATION_MISC };
-unsigned int sUserStatsProps[] = { PR_EC_COMPANY_NAME, PR_EC_USERNAME, PR_DISPLAY_NAME, PR_SMTP_ADDRESS, PR_EC_NONACTIVE, PR_EC_ADMINISTRATOR, PR_EC_HOMESERVER_NAME,
-								   PR_MESSAGE_SIZE_EXTENDED, PR_QUOTA_WARNING_THRESHOLD, PR_QUOTA_SEND_THRESHOLD, PR_QUOTA_RECEIVE_THRESHOLD, PR_EC_QUOTA_MAIL_TIME,
-								   PR_EC_OUTOFOFFICE, PR_LAST_LOGON_TIME, PR_LAST_LOGOFF_TIME };
-unsigned int sCompanyStatsProps[] = { PR_EC_COMPANY_NAME, PR_EC_COMPANY_ADMIN, PR_MESSAGE_SIZE_EXTENDED,
-									  PR_QUOTA_WARNING_THRESHOLD, PR_QUOTA_SEND_THRESHOLD, PR_QUOTA_RECEIVE_THRESHOLD, PR_EC_QUOTA_MAIL_TIME };
-unsigned int sServerStatsProps[] = { PR_EC_STATS_SERVER_NAME, PR_EC_STATS_SERVER_HOST, PR_EC_STATS_SERVER_HTTPPORT, PR_EC_STATS_SERVER_SSLPORT, PR_EC_STATS_SERVER_PROXYURL, PR_EC_STATS_SERVER_HTTPURL,
-									 PR_EC_STATS_SERVER_HTTPSURL, PR_EC_STATS_SERVER_FILEURL };
+static const unsigned int sSystemStatsProps[] = {
+	PR_DISPLAY_NAME, PR_EC_STATS_SYSTEM_DESCRIPTION,
+	PR_EC_STATS_SYSTEM_VALUE,
+};
+static const unsigned int sSessionStatsProps[] = {
+	PR_EC_STATS_SESSION_ID, PR_EC_STATS_SESSION_GROUP_ID,
+	PR_EC_STATS_SESSION_IPADDRESS, PR_EC_STATS_SESSION_IDLETIME,
+	PR_EC_STATS_SESSION_CAPABILITY, PR_EC_STATS_SESSION_LOCKED,
+	PR_EC_USERNAME, PR_EC_STATS_SESSION_BUSYSTATES,
+	PR_EC_STATS_SESSION_PROCSTATES, PR_EC_STATS_SESSION_CPU_USER,
+	PR_EC_STATS_SESSION_CPU_SYSTEM, PR_EC_STATS_SESSION_CPU_REAL,
+	PR_EC_STATS_SESSION_PEER_PID, PR_EC_STATS_SESSION_CLIENT_VERSION,
+	PR_EC_STATS_SESSION_CLIENT_APPLICATION, PR_EC_STATS_SESSION_REQUESTS,
+	PR_EC_STATS_SESSION_PORT, PR_EC_STATS_SESSION_PROXY,
+	PR_EC_STATS_SESSION_URL, PR_EC_STATS_SESSION_CLIENT_APPLICATION_VERSION,
+	PR_EC_STATS_SESSION_CLIENT_APPLICATION_MISC,
+};
+static const unsigned int sUserStatsProps[] = {
+	PR_EC_COMPANY_NAME, PR_EC_USERNAME, PR_DISPLAY_NAME, PR_SMTP_ADDRESS,
+	PR_EC_NONACTIVE, PR_EC_ADMINISTRATOR, PR_EC_HOMESERVER_NAME,
+	PR_MESSAGE_SIZE_EXTENDED, PR_QUOTA_WARNING_THRESHOLD,
+	PR_QUOTA_SEND_THRESHOLD, PR_QUOTA_RECEIVE_THRESHOLD,
+	PR_EC_QUOTA_MAIL_TIME, PR_EC_OUTOFOFFICE, PR_LAST_LOGON_TIME,
+	PR_LAST_LOGOFF_TIME,
+};
+static const unsigned int sCompanyStatsProps[] = {
+	PR_EC_COMPANY_NAME, PR_EC_COMPANY_ADMIN, PR_MESSAGE_SIZE_EXTENDED,
+	PR_QUOTA_WARNING_THRESHOLD, PR_QUOTA_SEND_THRESHOLD,
+	PR_QUOTA_RECEIVE_THRESHOLD, PR_EC_QUOTA_MAIL_TIME,
+};
+static const unsigned int sServerStatsProps[] = {
+	PR_EC_STATS_SERVER_NAME, PR_EC_STATS_SERVER_HOST,
+	PR_EC_STATS_SERVER_HTTPPORT, PR_EC_STATS_SERVER_SSLPORT,
+	PR_EC_STATS_SERVER_PROXYURL, PR_EC_STATS_SERVER_HTTPURL,
+	PR_EC_STATS_SERVER_HTTPSURL, PR_EC_STATS_SERVER_FILEURL,
+};
 
-struct propTagArray sPropTagArrayContents = { (unsigned int *)&sContentsProps, ARRAY_SIZE(sContentsProps)};
-struct propTagArray sPropTagArrayHierarchy = { (unsigned int *)&sHierarchyProps, ARRAY_SIZE(sHierarchyProps)};
-struct propTagArray sPropTagArrayABContents = { (unsigned int *)&sABContentsProps, ARRAY_SIZE(sABContentsProps)};
-struct propTagArray sPropTagArrayABHierarchy = { (unsigned int *)&sABHierarchyProps, ARRAY_SIZE(sABHierarchyProps)};
-struct propTagArray sPropTagArrayUserStores = { (unsigned int *)&sUserStoresProps, ARRAY_SIZE(sUserStoresProps)};
+static const struct propTagArray sPropTagArrayContents =
+	{const_cast<unsigned int *>(sContentsProps), ARRAY_SIZE(sContentsProps)};
+static const struct propTagArray sPropTagArrayHierarchy =
+	{const_cast<unsigned int *>(sHierarchyProps), ARRAY_SIZE(sHierarchyProps)};
+static const struct propTagArray sPropTagArrayABContents =
+	{const_cast<unsigned int *>(sABContentsProps), ARRAY_SIZE(sABContentsProps)};
+static const struct propTagArray sPropTagArrayABHierarchy =
+	{const_cast<unsigned int *>(sABHierarchyProps), ARRAY_SIZE(sABHierarchyProps)};
+static const struct propTagArray sPropTagArrayUserStores =
+	{const_cast<unsigned int *>(sUserStoresProps), ARRAY_SIZE(sUserStoresProps)};
 
-struct propTagArray sPropTagArraySystemStats = { (unsigned int *)&sSystemStatsProps, ARRAY_SIZE(sSystemStatsProps)};
-struct propTagArray sPropTagArraySessionStats = { (unsigned int *)&sSessionStatsProps, ARRAY_SIZE(sSessionStatsProps)};
-struct propTagArray sPropTagArrayUserStats = { (unsigned int *)&sUserStatsProps, ARRAY_SIZE(sUserStatsProps)};
-struct propTagArray sPropTagArrayCompanyStats = { (unsigned int *)&sCompanyStatsProps, ARRAY_SIZE(sCompanyStatsProps)};
-struct propTagArray sPropTagArrayServerStats = { (unsigned int *)&sServerStatsProps, ARRAY_SIZE(sServerStatsProps)};
+static const struct propTagArray sPropTagArraySystemStats =
+	{const_cast<unsigned int *>(sSystemStatsProps), ARRAY_SIZE(sSystemStatsProps)};
+static const struct propTagArray sPropTagArraySessionStats =
+	{const_cast<unsigned int *>(sSessionStatsProps), ARRAY_SIZE(sSessionStatsProps)};
+static const struct propTagArray sPropTagArrayUserStats =
+	{const_cast<unsigned int *>(sUserStatsProps), ARRAY_SIZE(sUserStatsProps)};
+static const struct propTagArray sPropTagArrayCompanyStats =
+	{const_cast<unsigned int *>(sCompanyStatsProps), ARRAY_SIZE(sCompanyStatsProps)};
+static const struct propTagArray sPropTagArrayServerStats =
+	{const_cast<unsigned int *>(sServerStatsProps), ARRAY_SIZE(sServerStatsProps)};
 
 ECTableManager::ECTableManager(ECSession *lpSession)
 {
 	this->lpSession = lpSession;
-	this->ulNextTableId = 1;
-	pthread_mutexattr_t mattr;
-	pthread_mutexattr_init(&mattr);
-	pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
-	// make recursive lock, since destructor uses this->CloseTable()
-	pthread_mutex_init(&this->hListMutex, &mattr);
 }
 
 ECTableManager::~ECTableManager()
 {
-	std::map<unsigned int, TABLE_ENTRY *>::const_iterator iterTables;
-	std::map<unsigned int, TABLE_ENTRY *>::const_iterator iterNext;
+	scoped_rlock lock(hListMutex);
 
-	pthread_mutex_lock(&hListMutex);
-
-	iterTables = mapTable.begin();
+	auto iterTables = mapTable.cbegin();
 	// Clean up tables, if CloseTable(..) isn't called 
-	while(iterTables != mapTable.end()) {
-		iterNext = iterTables;
+	while (iterTables != mapTable.cend()) {
+		auto iterNext = iterTables;
 		++iterNext;
 		CloseTable(iterTables->first);
 		iterTables = iterNext;
 	}
-
-	pthread_mutex_unlock(&hListMutex);
-	pthread_mutex_destroy(&hListMutex);
-
 	mapTable.clear();
-
 }
 
 void ECTableManager::AddTableEntry(TABLE_ENTRY *lpEntry, unsigned int *lpulTableId)
 {
-	pthread_mutex_lock(&hListMutex);
+	scoped_rlock lock(hListMutex);
 
 	mapTable[ulNextTableId] = lpEntry;
 
@@ -128,31 +173,29 @@ void ECTableManager::AddTableEntry(TABLE_ENTRY *lpEntry, unsigned int *lpulTable
 
 	// Subscribe to events for this table, if needed
 	switch(lpEntry->ulTableType) {
-	    case TABLE_ENTRY::TABLE_TYPE_GENERIC:
+	case TABLE_ENTRY::TABLE_TYPE_GENERIC:
         	lpSession->GetSessionManager()->SubscribeTableEvents(lpEntry->ulTableType,
-																 lpEntry->sTable.sGeneric.ulParentId, lpEntry->sTable.sGeneric.ulObjectType,
-																 lpEntry->sTable.sGeneric.ulObjectFlags, lpSession->GetSessionId());
+			lpEntry->sTable.sGeneric.ulParentId, lpEntry->sTable.sGeneric.ulObjectType,
+			lpEntry->sTable.sGeneric.ulObjectFlags, lpSession->GetSessionId());
         	break;
-	    case TABLE_ENTRY::TABLE_TYPE_OUTGOINGQUEUE:
+	case TABLE_ENTRY::TABLE_TYPE_OUTGOINGQUEUE:
 	        lpSession->GetSessionManager()->SubscribeTableEvents(lpEntry->ulTableType,
-																 lpEntry->sTable.sOutgoingQueue.ulFlags & EC_SUBMIT_MASTER ? 0 : lpEntry->sTable.sOutgoingQueue.ulStoreId,
-																 MAPI_MESSAGE, lpEntry->sTable.sOutgoingQueue.ulFlags, lpSession->GetSessionId());
+			lpEntry->sTable.sOutgoingQueue.ulFlags & EC_SUBMIT_MASTER ? 0 : lpEntry->sTable.sOutgoingQueue.ulStoreId,
+			MAPI_MESSAGE, lpEntry->sTable.sOutgoingQueue.ulFlags, lpSession->GetSessionId());
 	        break;
         default:
             // Other table types don't need updates from other sessions
             break;
     }
 	++ulNextTableId;
-	pthread_mutex_unlock(&hListMutex);
-	
 }
 
 ECRESULT ECTableManager::OpenOutgoingQueueTable(unsigned int ulStoreId, unsigned int *lpulTableId)
 {
 	ECRESULT er = erSuccess;
-	ECStoreObjectTable *lpTable = NULL;
-	TABLE_ENTRY	*lpEntry;
-	DB_RESULT	lpDBResult = NULL;
+	object_ptr<ECStoreObjectTable> lpTable;
+	std::unique_ptr<TABLE_ENTRY> lpEntry;
+	DB_RESULT lpDBResult;
 	DB_ROW		lpDBRow = NULL;
 	std::string strQuery;
 	struct propTagArray *lpsPropTags = NULL;
@@ -170,13 +213,11 @@ ECRESULT ECTableManager::OpenOutgoingQueueTable(unsigned int ulStoreId, unsigned
 
 		if(er != erSuccess)
 			goto exit;
-
-		er = ECStoreObjectTable::Create(lpSession, ulStoreId, &sGuid, 0, MAPI_MESSAGE, 0, 0, locale, &lpTable);
-
+		er = ECStoreObjectTable::Create(lpSession, ulStoreId, &sGuid, 0, MAPI_MESSAGE, 0, 0, locale, &~lpTable);
 	} else {
 		// FIXME check permissions for master outgoing table
 		// Master outgoing table has different STORE_ENTRYID and GUID per row
-		er = ECStoreObjectTable::Create(lpSession, 0, NULL, 0, MAPI_MESSAGE, 0, 0, locale, &lpTable);
+		er = ECStoreObjectTable::Create(lpSession, 0, NULL, 0, MAPI_MESSAGE, 0, 0, locale, &~lpTable);
 	}
 	if(er != erSuccess)
 		goto exit;
@@ -209,28 +250,18 @@ ECRESULT ECTableManager::OpenOutgoingQueueTable(unsigned int ulStoreId, unsigned
 		lpTable->UpdateRow(ECKeyTable::TABLE_ROW_ADD, atoi(lpDBRow[0]), 0);
 	}
 
-	lpEntry = new TABLE_ENTRY;
+	lpEntry.reset(new TABLE_ENTRY);
 	// Add the open table to the list of current tables
 	lpEntry->lpTable = lpTable;
 	lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_OUTGOINGQUEUE;
 	lpEntry->sTable.sOutgoingQueue.ulStoreId = ulStoreId;
 	lpEntry->sTable.sOutgoingQueue.ulFlags = ulStoreId ? EC_SUBMIT_LOCAL : EC_SUBMIT_MASTER;
-
-	AddTableEntry(lpEntry, lpulTableId);
-
-	if(lpTable->GetColumns(NULL, TBL_ALL_COLUMNS, &lpsPropTags) == erSuccess) {
+	AddTableEntry(lpEntry.release(), lpulTableId);
+	if (lpTable->GetColumns(NULL, TBL_ALL_COLUMNS, &lpsPropTags) == erSuccess)
 		lpTable->SetColumns(lpsPropTags, false);
-	}
-
 	lpTable->SeekRow(BOOKMARK_BEGINNING, 0, NULL);
 
 exit:
-	if(lpTable)
-		lpTable->Release();
-
-	if(lpDBResult)
-		lpDatabase->FreeResult(lpDBResult);
-
 	if(lpsPropTags)
 		FreePropTagArray(lpsPropTags);
 
@@ -240,16 +271,14 @@ exit:
 ECRESULT ECTableManager::OpenUserStoresTable(unsigned int ulFlags, unsigned int *lpulTableId)
 {
 	ECRESULT er = erSuccess;
-	ECUserStoreTable *lpTable = NULL;
-	TABLE_ENTRY	*lpEntry = NULL;
+	object_ptr<ECUserStoreTable> lpTable;
 	const char *lpszLocaleId = lpSession->GetSessionManager()->GetConfig()->GetSetting("default_sort_locale_id");
 
-	er = ECUserStoreTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), &lpTable);
+	er = ECUserStoreTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
-	lpEntry = new TABLE_ENTRY;
-
+	std::unique_ptr<TABLE_ENTRY> lpEntry(new TABLE_ENTRY);
 	// Add the open table to the list of current tables
 	lpEntry->lpTable = lpTable;
 	lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_USERSTORES;
@@ -257,45 +286,28 @@ ECRESULT ECTableManager::OpenUserStoresTable(unsigned int ulFlags, unsigned int 
 
 	er = lpTable->SetColumns(&sPropTagArrayUserStores, true);
 	if (er != erSuccess)
-		goto exit;
-
-	AddTableEntry(lpEntry, lpulTableId);
-
-exit:
-	if (lpTable)
-		lpTable->Release();
-
-	if (er != erSuccess)
-		delete lpEntry;
-
-	return er;
+		return er;
+	AddTableEntry(lpEntry.release(), lpulTableId);
+	return erSuccess;
 }
 
 ECRESULT ECTableManager::OpenMultiStoreTable(unsigned int ulObjType, unsigned int ulFlags, unsigned int *lpulTableId)
 {
 	ECRESULT er = erSuccess;
-	ECMultiStoreTable *lpTable = NULL;
-	TABLE_ENTRY	*lpEntry = NULL;
+	object_ptr<ECMultiStoreTable> lpTable;
 	const char *lpszLocaleId = lpSession->GetSessionManager()->GetConfig()->GetSetting("default_sort_locale_id");
 
 	// Open an empty table. Contents will be provided by client in a later call.
-	er = ECMultiStoreTable::Create(lpSession, ulObjType, ulFlags, createLocaleFromName(lpszLocaleId), &lpTable);
+	er = ECMultiStoreTable::Create(lpSession, ulObjType, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
-	lpEntry = new TABLE_ENTRY;
-
+	std::unique_ptr<TABLE_ENTRY> lpEntry(new TABLE_ENTRY);
 	// Add the open table to the list of current tables
 	lpEntry->lpTable = lpTable;
 	lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_MULTISTORE;
 	memset(&lpEntry->sTable, 0, sizeof(TABLE_ENTRY::__sTable));
-
-	AddTableEntry(lpEntry, lpulTableId);
-
-exit:
-	if (lpTable)
-		lpTable->Release();
-
+	AddTableEntry(lpEntry.release(), lpulTableId);
 	return er;
 }
 
@@ -303,9 +315,8 @@ ECRESULT ECTableManager::OpenGenericTable(unsigned int ulParent, unsigned int ul
 {
 	ECRESULT		er = erSuccess;
 	std::string		strQuery;
-	ECStoreObjectTable	*lpTable = NULL;
-	TABLE_ENTRY		*lpEntry = NULL;
-
+	object_ptr<ECStoreObjectTable> lpTable;
+	std::unique_ptr<TABLE_ENTRY> lpEntry;
 	unsigned int	ulStoreId = 0;
 	GUID			sGuid;
 	ECLocale			locale;
@@ -313,34 +324,30 @@ ECRESULT ECTableManager::OpenGenericTable(unsigned int ulParent, unsigned int ul
 
 	er = lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
-		goto exit;
-
+		return er;
 	er = lpSession->GetSessionManager()->GetCacheManager()->GetStore(ulParent, &ulStoreId, &sGuid);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	locale = lpSession->GetSessionManager()->GetSortLocale(ulStoreId);
 	if(lpSession->GetSessionManager()->GetSearchFolders()->IsSearchFolder(ulStoreId, ulParent) == erSuccess) {
-	    if((ulFlags & MSGFLAG_DELETED) | (ulFlags & MAPI_ASSOCIATED)) {
-	        er = KCERR_NO_SUPPORT;
-	        goto exit;
-        }
-	    if(lpSession->GetSecurity()->IsStoreOwner(ulParent) != erSuccess && lpSession->GetSecurity()->IsAdminOverOwnerOfObject(ulParent) != erSuccess) {
-	        // Search folders are not visible at all to other users, therefore NOT_FOUND, not NO_ACCESS
-            er = KCERR_NOT_FOUND; 
-            goto exit;
-	    } else {
-			er = ECSearchObjectTable::Create(lpSession, ulStoreId, &sGuid, ulParent, ulObjType, ulFlags, locale, (ECSearchObjectTable**)&lpTable);
-        }
+		if (ulFlags & (MSGFLAG_DELETED | MAPI_ASSOCIATED))
+			return KCERR_NO_SUPPORT;
+		er = lpSession->GetSecurity()->CheckPermission(ulParent, ecSecurityFolderVisible);
+		if(er != erSuccess)
+			return er;
+		else
+			er = ECSearchObjectTable::Create(lpSession, ulStoreId, &sGuid, ulParent, ulObjType, ulFlags, locale, &~lpTable);
+
 	} else if(ulObjType == MAPI_FOLDER && (ulFlags & CONVENIENT_DEPTH))
-		er = ECConvenientDepthObjectTable::Create(lpSession, ulStoreId, &sGuid, ulParent, ulObjType, ulFlags, locale, (ECConvenientDepthObjectTable**)&lpTable);
+		er = ECConvenientDepthObjectTable::Create(lpSession, ulStoreId, &sGuid, ulParent, ulObjType, ulFlags, locale, &~lpTable);
 	else
-		er = ECStoreObjectTable::Create(lpSession, ulStoreId, &sGuid, ulParent, ulObjType, ulFlags, 0, locale, &lpTable);
+		er = ECStoreObjectTable::Create(lpSession, ulStoreId, &sGuid, ulParent, ulObjType, ulFlags, 0, locale, &~lpTable);
 
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
-	lpEntry = new TABLE_ENTRY;
+	lpEntry.reset(new TABLE_ENTRY);
 	// Add the open table to the list of current tables
 	lpEntry->lpTable = lpTable;
 	lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_GENERIC;
@@ -350,42 +357,35 @@ ECRESULT ECTableManager::OpenGenericTable(unsigned int ulParent, unsigned int ul
 
 	// First, add table to internal list of tables. This means we can already start
 	// receiving notifications on this table
-	AddTableEntry(lpEntry, lpulTableId);
+	AddTableEntry(lpEntry.release(), lpulTableId);
 
 	// Load a default column set
-	if(ulObjType == MAPI_MESSAGE) {
+	if (ulObjType == MAPI_MESSAGE)
 		lpTable->SetColumns(&sPropTagArrayContents, true);
-	} else {
+	else
 		lpTable->SetColumns(&sPropTagArrayHierarchy, true);
-	}
-
-exit:
-	if (lpTable)
-		lpTable->Release();
-
-	return er;
+	return erSuccess;
 }
 
 static void AuditStatsAccess(ECSession *lpSession, const char *access, const char *table)
 {
-	if (lpSession->GetSessionManager()->GetAudit()) {
-		std::string strUsername;
-		std::string strImpersonator;
-		
-		lpSession->GetSecurity()->GetUsername(&strUsername);
-		if (lpSession->GetSecurity()->GetImpersonator(&strImpersonator) == erSuccess) {
-			ZLOG_AUDIT(lpSession->GetSessionManager()->GetAudit(), "access %s table='%s stats' username=%s impersonator=%s", access, table, strUsername.c_str(), strImpersonator.c_str());
-		} else {
-			ZLOG_AUDIT(lpSession->GetSessionManager()->GetAudit(), "access %s table='%s stats' username=%s", access, table, strUsername.c_str());
-		}
-	}
+	if (!lpSession->GetSessionManager()->GetAudit())
+		return;
+	std::string strUsername;
+	std::string strImpersonator;
+	
+	lpSession->GetSecurity()->GetUsername(&strUsername);
+	if (lpSession->GetSecurity()->GetImpersonator(&strImpersonator) == erSuccess)
+		ZLOG_AUDIT(lpSession->GetSessionManager()->GetAudit(), "access %s table='%s stats' username=%s impersonator=%s", access, table, strUsername.c_str(), strImpersonator.c_str());
+	else
+		ZLOG_AUDIT(lpSession->GetSessionManager()->GetAudit(), "access %s table='%s stats' username=%s", access, table, strUsername.c_str());
 }
 
 ECRESULT ECTableManager::OpenStatsTable(unsigned int ulTableType, unsigned int ulFlags, unsigned int *lpulTableId)
 {
 	ECRESULT er = erSuccess;
-	ECGenericObjectTable *lpTable = NULL;
-	TABLE_ENTRY	*lpEntry = NULL;
+	object_ptr<ECGenericObjectTable> lpTable;
+	std::unique_ptr<TABLE_ENTRY> lpEntry;
 	int adminlevel = lpSession->GetSecurity()->GetAdminLevel();
 	bool hosted = lpSession->GetSessionManager()->IsHostedSupported();
 	const char *lpszLocaleId = lpSession->GetSessionManager()->GetConfig()->GetSetting("default_sort_locale_id");
@@ -394,75 +394,62 @@ ECRESULT ECTableManager::OpenStatsTable(unsigned int ulTableType, unsigned int u
 	// TABLETYPE_STATS_SESSIONS: only for (sys)admins
 	// TABLETYPE_STATS_USERS: full list: only for (sys)admins, company list: only for admins
 
-	lpEntry = new TABLE_ENTRY;
-
+	lpEntry.reset(new TABLE_ENTRY);
 	switch (ulTableType) {
 	case TABLETYPE_STATS_SYSTEM:
 		if ((hosted && adminlevel < ADMIN_LEVEL_SYSADMIN) || (!hosted && adminlevel < ADMIN_LEVEL_ADMIN)) {
 			AuditStatsAccess(lpSession, "denied", "system");
-			er = KCERR_NO_ACCESS;
-			goto exit;
+			return KCERR_NO_ACCESS;
 		}
-		er = ECSystemStatsTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), (ECSystemStatsTable**)&lpTable);
+		er = ECSystemStatsTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
 		if (er != erSuccess)
-			goto exit;
-
+			return er;
 		lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_SYSTEMSTATS;
 		er = lpTable->SetColumns(&sPropTagArraySystemStats, true);
 		break;
 	case TABLETYPE_STATS_SESSIONS:
 		if ((hosted && adminlevel < ADMIN_LEVEL_SYSADMIN) || (!hosted && adminlevel < ADMIN_LEVEL_ADMIN)) {
 			AuditStatsAccess(lpSession, "denied", "session");
-			er = KCERR_NO_ACCESS;
-			goto exit;
+			return KCERR_NO_ACCESS;
 		}
-		er = ECSessionStatsTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), (ECSessionStatsTable**)&lpTable);
+		er = ECSessionStatsTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
 		if (er != erSuccess)
-			goto exit;
-
+			return er;
 		lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_SESSIONSTATS;
 		er = lpTable->SetColumns(&sPropTagArraySessionStats, true);
 		break;
 	case TABLETYPE_STATS_USERS:
 		if (adminlevel < ADMIN_LEVEL_ADMIN) {
 			AuditStatsAccess(lpSession, "denied", "user");
-			er = KCERR_NO_ACCESS;
-			goto exit;
+			return KCERR_NO_ACCESS;
 		}
-		er = ECUserStatsTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), (ECUserStatsTable**)&lpTable);
+		er = ECUserStatsTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
 		if (er != erSuccess)
-			goto exit;
-
+			return er;
 		lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_USERSTATS;
 		er = lpTable->SetColumns(&sPropTagArrayUserStats, true);
 		break;
 	case TABLETYPE_STATS_COMPANY:
-		if (!hosted) {
-			er = KCERR_NOT_FOUND;
-			goto exit;
-		}
+		if (!hosted)
+			return KCERR_NOT_FOUND;
 		if (adminlevel < ADMIN_LEVEL_SYSADMIN) {
 			AuditStatsAccess(lpSession, "denied", "company");
-			er = KCERR_NO_ACCESS;
-			goto exit;
+			return KCERR_NO_ACCESS;
 		}
-		er = ECCompanyStatsTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), (ECCompanyStatsTable**)&lpTable);
+		er = ECCompanyStatsTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
 		if (er != erSuccess)
-			goto exit;
-
+			return er;
 		lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_COMPANYSTATS;
 		er = lpTable->SetColumns(&sPropTagArrayCompanyStats, true);
 		break;
 	case TABLETYPE_STATS_SERVERS:
 		if (adminlevel < ADMIN_LEVEL_SYSADMIN) {
 			AuditStatsAccess(lpSession, "denied", "company");
-			er = KCERR_NO_ACCESS;
-			goto exit;
+			return KCERR_NO_ACCESS;
 		}
-		er = ECServerStatsTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), (ECServerStatsTable**)&lpTable);
+		er = ECServerStatsTable::Create(lpSession, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
 		if (er != erSuccess)
-			goto exit;
-
+			return er;
 		lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_SERVERSTATS;
 		er = lpTable->SetColumns(&sPropTagArrayServerStats, true);
 		break;
@@ -471,37 +458,26 @@ ECRESULT ECTableManager::OpenStatsTable(unsigned int ulTableType, unsigned int u
 		break;
 	}
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	// Add the open table to the list of current tables
 	lpEntry->lpTable = lpTable;
 	memset(&lpEntry->sTable, 0, sizeof(TABLE_ENTRY::__sTable));
-
-	AddTableEntry(lpEntry, lpulTableId);
-
-exit:
-	if (er != erSuccess)
-		delete lpEntry;
-
-	if (lpTable)
-		lpTable->Release();
-
-	return er;
+	AddTableEntry(lpEntry.release(), lpulTableId);
+	return erSuccess;
 }
 
 ECRESULT ECTableManager::OpenMailBoxTable(unsigned int ulflags, unsigned int *lpulTableId)
 {
 	ECRESULT er = erSuccess;
-	ECMailBoxTable *lpTable = NULL;
-	TABLE_ENTRY	*lpEntry = NULL;
+	object_ptr<ECMailBoxTable> lpTable;
 	const char *lpszLocaleId = lpSession->GetSessionManager()->GetConfig()->GetSetting("default_sort_locale_id");
 
-	er = ECMailBoxTable::Create(lpSession, ulflags, createLocaleFromName(lpszLocaleId), &lpTable);
+	er = ECMailBoxTable::Create(lpSession, ulflags, createLocaleFromName(lpszLocaleId), &~lpTable);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
-	lpEntry = new TABLE_ENTRY;
-
+	std::unique_ptr<TABLE_ENTRY> lpEntry(new TABLE_ENTRY);
 	// Add the open table to the list of current tables
 	lpEntry->lpTable = lpTable;
 	lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_MAILBOX;
@@ -510,18 +486,9 @@ ECRESULT ECTableManager::OpenMailBoxTable(unsigned int ulflags, unsigned int *lp
 	//@todo check this list!!!
 	er = lpTable->SetColumns(&sPropTagArrayUserStores, true);
 	if (er != erSuccess)
-		goto exit;
-
-	AddTableEntry(lpEntry, lpulTableId);
-
-exit:
-	if (lpTable)
-		lpTable->Release();
-
-	if (er != erSuccess)
-		delete lpEntry;
-
-	return er;
+		return er;
+	AddTableEntry(lpEntry.release(), lpulTableId);
+	return erSuccess;
 }
 
 /*
@@ -530,83 +497,56 @@ exit:
 ECRESULT ECTableManager::OpenABTable(unsigned int ulParent, unsigned int ulParentType, unsigned int ulObjType, unsigned int ulFlags, unsigned int *lpulTableId)
 {
 	ECRESULT er = erSuccess;
-	ECABObjectTable	*lpTable = NULL;
-	TABLE_ENTRY *lpEntry = NULL;
+	object_ptr<ECABObjectTable> lpTable;
+	std::unique_ptr<TABLE_ENTRY> lpEntry;
 	const char *lpszLocaleId = lpSession->GetSessionManager()->GetConfig()->GetSetting("default_sort_locale_id");
 
 	// Open first container
 	if (ulFlags & CONVENIENT_DEPTH)
-		er = ECConvenientDepthABObjectTable::Create(lpSession, 1, ulObjType, ulParent, ulParentType, ulFlags, createLocaleFromName(lpszLocaleId), (ECConvenientDepthABObjectTable**)&lpTable);
+		er = ECConvenientDepthABObjectTable::Create(lpSession, 1, ulObjType, ulParent, ulParentType, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
 	else
-		er = ECABObjectTable::Create(lpSession, 1, ulObjType, ulParent, ulParentType, ulFlags, createLocaleFromName(lpszLocaleId), &lpTable);
+		er = ECABObjectTable::Create(lpSession, 1, ulObjType, ulParent, ulParentType, ulFlags, createLocaleFromName(lpszLocaleId), &~lpTable);
 
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
-	lpEntry = new TABLE_ENTRY;
-
+	lpEntry.reset(new TABLE_ENTRY);
 	// Add the open table to the list of current tables
 	lpEntry->lpTable = lpTable;
 	lpEntry->ulTableType = TABLE_ENTRY::TABLE_TYPE_GENERIC;
 	lpEntry->sTable.sGeneric.ulObjectFlags = ulFlags & (MAPI_ASSOCIATED | MSGFLAG_DELETED); // MSGFLAG_DELETED because of conversion in ns__tableOpen
 	lpEntry->sTable.sGeneric.ulObjectType = ulObjType;
 	lpEntry->sTable.sGeneric.ulParentId = ulParent;
-
-	AddTableEntry(lpEntry, lpulTableId);
-
+	AddTableEntry(lpEntry.release(), lpulTableId);
 	if (ulObjType == MAPI_ABCONT || ulObjType == MAPI_DISTLIST)
 		lpTable->SetColumns(&sPropTagArrayABHierarchy, true);
 	else
 		lpTable->SetColumns(&sPropTagArrayABContents, true);
-
-exit:
-	if (lpTable)
-		lpTable->Release();
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECTableManager::GetTable(unsigned int ulTableId, ECGenericObjectTable **lppTable)
 {
-	ECRESULT		er = erSuccess;
-	ECGenericObjectTable	*lpTable = NULL;
-	std::map<unsigned int, TABLE_ENTRY *>::const_iterator iterTables;
+	scoped_rlock lock(hListMutex);
 
-	pthread_mutex_lock(&hListMutex);
-
-	iterTables = mapTable.find(ulTableId);
-	if(iterTables == mapTable.end()) {
-		er = KCERR_NOT_FOUND;
-		goto exit;
-	}
-
-	lpTable = iterTables->second->lpTable;
-
-	if(lpTable == NULL) {
-		er = KCERR_NOT_FOUND;
-		goto exit;
-	}
-
+	auto iterTables = mapTable.find(ulTableId);
+	if (iterTables == mapTable.cend())
+		return KCERR_NOT_FOUND;
+	ECGenericObjectTable *lpTable = iterTables->second->lpTable;
+	if (lpTable == NULL)
+		return KCERR_NOT_FOUND;
 	lpTable->AddRef();
 	*lppTable = lpTable;
-
-exit:
-	pthread_mutex_unlock(&hListMutex);
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECTableManager::CloseTable(unsigned int ulTableId)
 {
 	ECRESULT er = erSuccess;
-	std::map<unsigned int, TABLE_ENTRY *>::const_iterator iterTables;
 	TABLE_ENTRY *lpEntry = NULL;
-
-	pthread_mutex_lock(&hListMutex);
-	iterTables = mapTable.find(ulTableId);
-
-	if(iterTables != mapTable.end())
-	{
+	ulock_rec lk(hListMutex);
+	auto iterTables = mapTable.find(ulTableId);
+	if (iterTables != mapTable.cend()) {
 		// Remember the table entry struct
 		lpEntry = iterTables->second;
 		
@@ -630,72 +570,58 @@ ECRESULT ECTableManager::CloseTable(unsigned int ulTableId)
 		mapTable.erase(ulTableId);
     
 		// Unlock the table now as the search thread may not be able to exit without a hListMutex lock
-		pthread_mutex_unlock(&hListMutex);
+		lk.unlock();
 
 		// Free table data and threads running
 		lpEntry->lpTable->Release();
 		delete lpEntry;
 	} else {
-		pthread_mutex_unlock(&hListMutex);
+		lk.unlock();
 	}
-	
 	return er;
 }
 
 ECRESULT ECTableManager::UpdateOutgoingTables(ECKeyTable::UpdateType ulType, unsigned ulStoreId, std::list<unsigned int> &lstObjId, unsigned int ulFlags, unsigned int ulObjType)
 {
 	ECRESULT er = erSuccess;
-	std::map<unsigned int, TABLE_ENTRY *>::const_iterator iterTables;
-
 	sObjectTableKey	sRow;
+	scoped_rlock lock(hListMutex);
 
-	pthread_mutex_lock(&hListMutex);
-
-	for (iterTables = mapTable.begin(); iterTables != mapTable.end(); ++iterTables) {
-		if(	iterTables->second->ulTableType == TABLE_ENTRY::TABLE_TYPE_OUTGOINGQUEUE &&
-			(iterTables->second->sTable.sOutgoingQueue.ulStoreId == ulStoreId ||
-			 iterTables->second->sTable.sOutgoingQueue.ulStoreId == 0) &&
-			 iterTables->second->sTable.sOutgoingQueue.ulFlags == (ulFlags & EC_SUBMIT_MASTER)) {
-
-			er = iterTables->second->lpTable->UpdateRows(ulType, &lstObjId, OBJECTTABLE_NOTIFY, false);
-
-			// ignore errors from the update
-			er = erSuccess;
-
-		}
+	for (const auto &t : mapTable) {
+		bool k = t.second->ulTableType == TABLE_ENTRY::TABLE_TYPE_OUTGOINGQUEUE &&
+		         (t.second->sTable.sOutgoingQueue.ulStoreId == ulStoreId ||
+		         t.second->sTable.sOutgoingQueue.ulStoreId == 0) &&
+		         t.second->sTable.sOutgoingQueue.ulFlags == (ulFlags & EC_SUBMIT_MASTER);
+		if (!k)
+			continue;
+		er = t.second->lpTable->UpdateRows(ulType, &lstObjId, OBJECTTABLE_NOTIFY, false);
+		// ignore errors from the update
+		er = erSuccess;
 	}
-
-	pthread_mutex_unlock(&hListMutex);
 	return er;
 }
 
 ECRESULT ECTableManager::UpdateTables(ECKeyTable::UpdateType ulType, unsigned int ulFlags, unsigned int ulObjId, std::list<unsigned int> &lstChildId, unsigned int ulObjType)
 {
 	ECRESULT er = erSuccess;
-	std::map<unsigned int, TABLE_ENTRY *>::const_iterator iterTables;
 	sObjectTableKey	sRow;
-
-	pthread_mutex_lock(&hListMutex);
+	scoped_rlock lock(hListMutex);
 
 	// This is called when a table has changed, so we have to see if the table in question is actually loaded by this table
 	// manager, and then update the row if required.
 
 	// First, do all the actual contents tables and hierarchy tables
-	for (iterTables = mapTable.begin(); iterTables != mapTable.end(); ++iterTables) {
-		if(	iterTables->second->ulTableType == TABLE_ENTRY::TABLE_TYPE_GENERIC &&
-			iterTables->second->sTable.sGeneric.ulParentId == ulObjId && 
-			iterTables->second->sTable.sGeneric.ulObjectFlags == ulFlags &&
-			iterTables->second->sTable.sGeneric.ulObjectType == ulObjType) {
-
-			er = iterTables->second->lpTable->UpdateRows(ulType, &lstChildId, OBJECTTABLE_NOTIFY, false);
-
-			// ignore errors from the update
-			er = erSuccess;
-
-		}
+	for (const auto &t : mapTable) {
+		bool k = t.second->ulTableType == TABLE_ENTRY::TABLE_TYPE_GENERIC &&
+		         t.second->sTable.sGeneric.ulParentId == ulObjId &&
+		         t.second->sTable.sGeneric.ulObjectFlags == ulFlags &&
+		         t.second->sTable.sGeneric.ulObjectType == ulObjType;
+		if (!k)
+			continue;
+		er = t.second->lpTable->UpdateRows(ulType, &lstChildId, OBJECTTABLE_NOTIFY, false);
+		// ignore errors from the update
+		er = erSuccess;
 	}
-
-	pthread_mutex_unlock(&hListMutex);
 	return er;
 }
 
@@ -708,23 +634,21 @@ ECRESULT ECTableManager::UpdateTables(ECKeyTable::UpdateType ulType, unsigned in
  */
 ECRESULT ECTableManager::GetStats(unsigned int *lpulTables, unsigned int *lpulObjectSize)
 {
-	TABLEENTRYMAP::const_iterator iterEntry;
 	unsigned int ulSize = 0;
 	unsigned int ulTables = 0; 
-	
-	pthread_mutex_lock(&hListMutex);
+	scoped_rlock lock(hListMutex);
 
 	ulTables = mapTable.size();
 	ulSize = MEMORY_USAGE_MAP(ulTables, TABLEENTRYMAP);
 
-	for (iterEntry = mapTable.begin(); iterEntry !=  mapTable.end(); ++iterEntry)
-		if(iterEntry->second->ulTableType != TABLE_ENTRY::TABLE_TYPE_SYSTEMSTATS) // Skip system stats since it would recursively include itself
-			ulSize += iterEntry->second->lpTable->GetObjectSize();
-
-	pthread_mutex_unlock(&hListMutex);
+	for (const auto &e : mapTable)
+		if (e.second->ulTableType != TABLE_ENTRY::TABLE_TYPE_SYSTEMSTATS)
+			/* Skip system stats since it would recursively include itself */
+			ulSize += e.second->lpTable->GetObjectSize();
 
 	*lpulTables = ulTables;
 	*lpulObjectSize = ulSize;
-
 	return erSuccess;
 }
+
+} /* namespace */

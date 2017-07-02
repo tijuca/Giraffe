@@ -18,8 +18,6 @@
 #include <kopano/platform.h>
 
 #include <cstring>
-#include <iostream>
-#include <cerrno>
 #include <climits>
 
 #include "ECPluginFactory.h"
@@ -27,15 +25,13 @@
 #include <kopano/ECLogger.h>
 #include <kopano/ecversion.h>
 
+namespace KC {
+
 ECPluginFactory::ECPluginFactory(ECConfig *config, ECStatsCollector *lpStatsCollector,
-    bool bHosted, bool bDistributed)
+    bool bHosted, bool bDistributed) :
+	m_config(config)
 {
-	m_getUserPluginInstance = NULL;
-	m_deleteUserPluginInstance = NULL;
-	m_config = config;
-	pthread_mutex_init(&m_plugin_lock, NULL);
 	ECPluginSharedData::GetSingleton(&m_shareddata, m_config, lpStatsCollector, bHosted, bDistributed);
-	m_dl = NULL;
 }
 
 ECPluginFactory::~ECPluginFactory() {
@@ -43,8 +39,6 @@ ECPluginFactory::~ECPluginFactory() {
 	if(m_dl)
 		dlclose(m_dl);
 #endif
-	pthread_mutex_destroy(&m_plugin_lock);
-
 	if (m_shareddata)
 		m_shareddata->Release();
 }
@@ -57,9 +51,8 @@ ECRESULT ECPluginFactory::CreateUserPlugin(UserPlugin **lppPlugin) {
         const char *pluginname = m_config->GetSetting("user_plugin");
         char filename[PATH_MAX + 1];
 
-        if (!pluginpath || !strcmp(pluginpath, "")) {
+        if (pluginpath == nullptr || strcmp(pluginpath, "") == 0)
             pluginpath = "";
-        }
         if (!pluginname || !strcmp(pluginname, "")) {
 			ec_log_crit("User plugin is unavailable.");
 			ec_log_crit("Please correct your configuration file and set the \"plugin_path\" and \"user_plugin\" options.");
@@ -88,7 +81,7 @@ ECRESULT ECPluginFactory::CreateUserPlugin(UserPlugin **lppPlugin) {
 			goto out;
 	}
     
-        m_getUserPluginInstance = (UserPlugin* (*)(pthread_mutex_t *, ECPluginSharedData *)) dlsym(m_dl, "getUserPluginInstance");
+        m_getUserPluginInstance = (UserPlugin* (*)(std::mutex &, ECPluginSharedData *)) dlsym(m_dl, "getUserPluginInstance");
         if (m_getUserPluginInstance == NULL) {
 			ec_log_crit("Failed to load getUserPluginInstance from plugin: %s", dlerror());
 			goto out;
@@ -101,7 +94,7 @@ ECRESULT ECPluginFactory::CreateUserPlugin(UserPlugin **lppPlugin) {
         }
     }
 	try {
-		lpPlugin = m_getUserPluginInstance(&m_plugin_lock, m_shareddata);
+		lpPlugin = m_getUserPluginInstance(m_plugin_lock, m_shareddata);
 		lpPlugin->InitPlugin();
 	}
 	catch (exception &e) {
@@ -150,3 +143,5 @@ ECRESULT GetThreadLocalPlugin(ECPluginFactory *lpPluginFactory,
 	*lppPlugin = lpPlugin;
 	return erSuccess;
 }
+
+} /* namespace */

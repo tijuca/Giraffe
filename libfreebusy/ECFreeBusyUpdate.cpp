@@ -16,15 +16,20 @@
  */
 
 #include <kopano/platform.h>
+#include <kopano/memory.hpp>
+#include <kopano/ECInterfaceDefs.h>
 #include "ECFreeBusyUpdate.h"
 #include "freebusytags.h"
 
 #include "freebusyutil.h"
 
-ECFreeBusyUpdate::ECFreeBusyUpdate(IMessage* lpMessage)
-{
-	m_lpMessage = lpMessage;
+using namespace KCHL;
 
+namespace KC {
+
+ECFreeBusyUpdate::ECFreeBusyUpdate(IMessage *lpMessage) :
+	m_lpMessage(lpMessage)
+{
 	if(m_lpMessage)
 		m_lpMessage->AddRef();
 }
@@ -52,29 +57,20 @@ HRESULT ECFreeBusyUpdate::Create(IMessage* lpMessage, ECFreeBusyUpdate **lppECFr
 
 HRESULT ECFreeBusyUpdate::QueryInterface(REFIID refiid, void** lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECFreeBusyUpdate, this);
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
-	REGISTER_INTERFACE(IID_IFreeBusyUpdate, &this->m_xFreeBusyUpdate);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xFreeBusyUpdate);
-
+	REGISTER_INTERFACE2(ECFreeBusyUpdate, this);
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IFreeBusyUpdate, &this->m_xFreeBusyUpdate);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xFreeBusyUpdate);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
 HRESULT ECFreeBusyUpdate::PublishFreeBusy(FBBlock_1 *lpBlocks, ULONG nBlocks)
 {
-	HRESULT hr = S_OK;
-
 	if(nBlocks > 0 && lpBlocks == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+		return MAPI_E_INVALID_PARAMETER;
 	for (ULONG i = 0; i < nBlocks; ++i)
 		m_fbBlockList.Add(&lpBlocks[i]);
-exit:
-	return hr;
+	return S_OK;
 }
 
 HRESULT ECFreeBusyUpdate::ResetPublishedFreeBusy()
@@ -90,8 +86,7 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
 	ULONG			cValues = 0;
 	ULONG			cProps = 0;
 	ULONG			ulMonths;
-	LPSPropValue	lpPropArray = NULL;
-	LPSPropValue	lpPropFBDataArray = NULL;
+	memory_ptr<SPropValue> lpPropArray, lpPropFBDataArray;
 	LONG			rtmStart = 0;
 	LONG			rtmEnd = 0;
 	FILETIME		ft;	
@@ -100,7 +95,7 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
 	struct tm		tmStart;
 	struct tm		tmEnd;
 
-	SizedSPropTagArray(8, sPropsFBDelete) = {
+	static constexpr const SizedSPropTagArray(8, sPropsFBDelete) = {
 		8,
 		{
 			PR_FREEBUSY_ALL_EVENTS,
@@ -147,7 +142,8 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
 
 	cValues = 9;
 	cProps = 0;
-	if ((hr = MAPIAllocateBuffer(sizeof(SPropValue) * cValues, (void**)&lpPropArray)) != hrSuccess)
+	hr = MAPIAllocateBuffer(sizeof(SPropValue) * cValues, &~lpPropArray);
+	if (hr != hrSuccess)
 		goto exit;
 
 	lpPropArray[cProps].ulPropTag = PR_FREEBUSY_LAST_MODIFIED;
@@ -167,43 +163,32 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
 		goto exit;
 
 	// Delete all free/busy data properties	
-	hr = m_lpMessage->DeleteProps((LPSPropTagArray)&sPropsFBDelete, NULL);
+	hr = m_lpMessage->DeleteProps(sPropsFBDelete, NULL);
   	if(hr != hrSuccess)
 		goto exit;
-
-	if (CreateFBProp(fbKopanoAllBusy, ulMonths, PR_FREEBUSY_ALL_MONTHS, PR_FREEBUSY_ALL_EVENTS, &m_fbBlockList, &lpPropFBDataArray) == hrSuccess) {
+	if (CreateFBProp(fbKopanoAllBusy, ulMonths, PR_FREEBUSY_ALL_MONTHS,
+	    PR_FREEBUSY_ALL_EVENTS, &m_fbBlockList, &~lpPropFBDataArray) == hrSuccess) {
 		hr = m_lpMessage->SetProps(2, lpPropFBDataArray, NULL);
 		if(hr != hrSuccess)
 			goto exit;
-		MAPIFreeBuffer(lpPropFBDataArray);
-		lpPropFBDataArray = NULL;
 	}
-
-	if(CreateFBProp(fbBusy, ulMonths, PR_FREEBUSY_BUSY_MONTHS, PR_FREEBUSY_BUSY_EVENTS, &m_fbBlockList, &lpPropFBDataArray) == hrSuccess)
-	{
+	if (CreateFBProp(fbBusy, ulMonths, PR_FREEBUSY_BUSY_MONTHS,
+	    PR_FREEBUSY_BUSY_EVENTS, &m_fbBlockList, &~lpPropFBDataArray) == hrSuccess) {
 		hr = m_lpMessage->SetProps(2, lpPropFBDataArray, NULL);
 		if(hr != hrSuccess)
 			goto exit;
-		MAPIFreeBuffer(lpPropFBDataArray);
-		lpPropFBDataArray = NULL;
 	}
-	
-	if(CreateFBProp(fbTentative, ulMonths, PR_FREEBUSY_TENTATIVE_MONTHS,PR_FREEBUSY_TENTATIVE_EVENTS, &m_fbBlockList, &lpPropFBDataArray) == hrSuccess)
-	{
+	if (CreateFBProp(fbTentative, ulMonths, PR_FREEBUSY_TENTATIVE_MONTHS,
+	    PR_FREEBUSY_TENTATIVE_EVENTS, &m_fbBlockList, &~lpPropFBDataArray) == hrSuccess) {
 		hr = m_lpMessage->SetProps(2, lpPropFBDataArray, NULL);
 		if(hr != hrSuccess)
 			goto exit;
-		MAPIFreeBuffer(lpPropFBDataArray);
-		lpPropFBDataArray = NULL;
 	}
-
-	if(CreateFBProp(fbOutOfOffice, ulMonths, PR_FREEBUSY_OOF_MONTHS,PR_FREEBUSY_OOF_EVENTS, &m_fbBlockList, &lpPropFBDataArray) == hrSuccess)
-	{
+	if (CreateFBProp(fbOutOfOffice, ulMonths, PR_FREEBUSY_OOF_MONTHS,
+	    PR_FREEBUSY_OOF_EVENTS, &m_fbBlockList, &~lpPropFBDataArray) == hrSuccess) {
 		hr = m_lpMessage->SetProps(2, lpPropFBDataArray, NULL);
 		if(hr != hrSuccess)
 			goto exit;
-		MAPIFreeBuffer(lpPropFBDataArray);
-		lpPropFBDataArray = NULL;
 	}
 
 	hr = m_lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
@@ -212,105 +197,19 @@ HRESULT ECFreeBusyUpdate::SaveChanges(FILETIME ftStart, FILETIME ftEnd)
 
 exit:
 	m_fbBlockList.Reset();
-	MAPIFreeBuffer(lpPropArray);
-	MAPIFreeBuffer(lpPropFBDataArray);
 	return hr;
 }
 
-// Interfaces
-//		IUnknown
-//		IFreeBusyUpdate
-HRESULT __stdcall ECFreeBusyUpdate::xFreeBusyUpdate::QueryInterface(REFIID refiid, void** lppInterface)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFreeBusyUpdate::QueryInterface", "");
-	METHOD_PROLOGUE_(ECFreeBusyUpdate, FreeBusyUpdate);
-	HRESULT hr = pThis->QueryInterface(refiid, lppInterface);
-	TRACE_MAPI(TRACE_RETURN, "IFreeBusyUpdate::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
+DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, QueryInterface, (REFIID, refiid), (void**, lppInterface))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, Release, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, Reload, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, PublishFreeBusy, (FBBlock_1 *, lpBlocks), (ULONG, nBlocks))
+DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, RemoveAppt, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, ResetPublishedFreeBusy, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, ChangeAppt, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, SaveChanges, (FILETIME, ftBegin), (FILETIME, ftEnd))
+DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, GetFBTimes, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusyUpdate, FreeBusyUpdate, Intersect, (void))
 
-ULONG __stdcall ECFreeBusyUpdate::xFreeBusyUpdate::AddRef()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFreeBusyUpdate::AddRef", "");
-	METHOD_PROLOGUE_(ECFreeBusyUpdate , FreeBusyUpdate);
-	return pThis->AddRef();
-}
-
-ULONG __stdcall ECFreeBusyUpdate::xFreeBusyUpdate::Release()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFreeBusyUpdate::Release", "");
-	METHOD_PROLOGUE_(ECFreeBusyUpdate, FreeBusyUpdate);
-	return pThis->Release();
-}
-
-HRESULT __stdcall ECFreeBusyUpdate::xFreeBusyUpdate::Reload()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFreeBusyUpdate::Reload", "");
-	METHOD_PROLOGUE_(ECFreeBusyUpdate, FreeBusyUpdate);
-	HRESULT hr = pThis->Reload();
-	TRACE_MAPI(TRACE_RETURN, "IFreeBusyUpdate::Reload", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECFreeBusyUpdate::xFreeBusyUpdate::PublishFreeBusy(FBBlock_1 *lpBlocks, ULONG nBlocks)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFreeBusyUpdate::PublishFreeBusy", "%s", GetDebugFBBlock(nBlocks, lpBlocks).c_str());
-	METHOD_PROLOGUE_(ECFreeBusyUpdate, FreeBusyUpdate);
-	HRESULT hr = pThis->PublishFreeBusy(lpBlocks, nBlocks);
-	TRACE_MAPI(TRACE_RETURN, "IFreeBusyUpdate::PublishFreeBusy", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECFreeBusyUpdate::xFreeBusyUpdate::RemoveAppt()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFreeBusyUpdate::RemoveAppt", "");
-	METHOD_PROLOGUE_(ECFreeBusyUpdate, FreeBusyUpdate);
-	HRESULT hr = pThis->RemoveAppt();
-	TRACE_MAPI(TRACE_RETURN, "IFreeBusyUpdate::RemoveAppt", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECFreeBusyUpdate::xFreeBusyUpdate::ResetPublishedFreeBusy()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFreeBusyUpdate::ResetPublishedFreeBusy", "");
-	METHOD_PROLOGUE_(ECFreeBusyUpdate, FreeBusyUpdate);
-	HRESULT hr = pThis->ResetPublishedFreeBusy();
-	TRACE_MAPI(TRACE_RETURN, "IFreeBusyUpdate::ResetPublishedFreeBusy", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECFreeBusyUpdate::xFreeBusyUpdate::ChangeAppt()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFreeBusyUpdate::ChangeAppt", "");
-	METHOD_PROLOGUE_(ECFreeBusyUpdate, FreeBusyUpdate);
-	HRESULT hr = pThis->ChangeAppt();
-	TRACE_MAPI(TRACE_RETURN, "IFreeBusyUpdate::ChangeAppt", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECFreeBusyUpdate::xFreeBusyUpdate::SaveChanges(FILETIME ftBegin, FILETIME ftEnd)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFreeBusyUpdate::SaveChanges", "");
-	METHOD_PROLOGUE_(ECFreeBusyUpdate, FreeBusyUpdate);
-	HRESULT hr = pThis->SaveChanges(ftBegin, ftEnd);
-	TRACE_MAPI(TRACE_RETURN, "IFreeBusyUpdate::SaveChanges", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECFreeBusyUpdate::xFreeBusyUpdate::GetFBTimes()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFreeBusyUpdate::GetFBTimes", "");
-	METHOD_PROLOGUE_(ECFreeBusyUpdate, FreeBusyUpdate);
-	HRESULT hr = pThis->GetFBTimes();
-	TRACE_MAPI(TRACE_RETURN, "IFreeBusyUpdate::GetFBTimes", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECFreeBusyUpdate::xFreeBusyUpdate::Intersect()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFreeBusyUpdate::Intersect", "");
-	METHOD_PROLOGUE_(ECFreeBusyUpdate, FreeBusyUpdate);
-	HRESULT hr = pThis->Intersect();
-	TRACE_MAPI(TRACE_RETURN, "IFreeBusyUpdate::Intersect", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
+} /* namespace */

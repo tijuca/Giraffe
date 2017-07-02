@@ -29,11 +29,12 @@
 #include <iconv.h>
 #include <kopano/charset/traits.h>
 
+namespace KC {
+
 /**
  * @brief	Exception class
  */
-class convert_exception : public std::runtime_error
-{
+class convert_exception : public std::runtime_error {
 public:
 	enum exception_type {
 		eUnknownCharset,
@@ -52,16 +53,18 @@ private:
 /**
  * @brief	Unknown charset
  */
-class unknown_charset_exception _zcp_final : public convert_exception {
-public:
+class _kc_export_throw unknown_charset_exception _kc_final :
+    public convert_exception {
+	public:
 	unknown_charset_exception(const std::string &message);
 };
 
 /**
  * @brief	Illegal sequence
  */
-class illegal_sequence_exception _zcp_final : public convert_exception {
-public:
+class _kc_export_throw illegal_sequence_exception _kc_final :
+    public convert_exception {
+	public:
 	illegal_sequence_exception(const std::string &message);
 };
 
@@ -72,8 +75,7 @@ namespace details {
 	/** 
 	 * @brief	Performs the generic iconv processing.
 	 */
-	class iconv_context_base
-	{
+	class _kc_export iconv_context_base {
 	public:
 		/**
 		 * @brief Destructor.
@@ -106,14 +108,12 @@ namespace details {
 		 * @param[in] lpBuf		Pointer to the data to be appended.
 		 * @param[in] cbBuf		Size of the data to be appended in bytes.
 		 */
-		virtual void append(const char *lpBuf, size_t cbBuf) = 0;
+		_kc_hidden virtual void append(const char *buf, size_t bufsize) = 0;
 		
-	private:
 		iconv_t	m_cd;
 		bool m_bForce;
 		bool m_bHTML;
 		
-	private:	// Disallow copying
 		iconv_context_base(const iconv_context_base &) = delete;
 		iconv_context_base &operator=(const iconv_context_base &) = delete;
 	};
@@ -123,8 +123,8 @@ namespace details {
 	 * @brief	Default converter from one charset to another with string types.
 	 */
 	template <typename _To_Type, typename _From_Type>
-	class iconv_context _zcp_final : public iconv_context_base
-	{
+	class _kc_export_dycast iconv_context _kc_final :
+	    public iconv_context_base {
 	public:
 		/**
 		 * @brief Contructor.
@@ -182,11 +182,11 @@ namespace details {
 		}
 		
 	private:
-		void append(const char *lpBuf, size_t cbBuf) _zcp_override {
+		_kc_hidden void append(const char *lpBuf, size_t cbBuf) _kc_override
+		{
 			m_to.append(reinterpret_cast<typename _To_Type::const_pointer>(lpBuf), cbBuf / sizeof(typename _To_Type::value_type));
 		}
 
-	private:
 		_To_Type	m_to;
 	};
 
@@ -198,8 +198,7 @@ namespace details {
 	 * The converter_helper class detects when the to and from charsets are identical. In
 	 * that case the string is merely copied.
 	 */
-	template <typename _Type>
-	class convert_helper _zcp_final {
+	template<typename _Type> class convert_helper _kc_final {
 	public:
 		/**
 		 * @brief Converts a string to a string with the same charset.
@@ -303,12 +302,12 @@ inline _To_Type convert_to(const char *tocode, const _From_Type &_from, size_t c
  * same context. This basically means that the details::iconv_context classes can
  * be reused, removing the need to recreate them for each conversion.
  */
-class convert_context _zcp_final {
+class _kc_export convert_context _kc_final {
 public:
 	/**
 	 * @brief Constructor.
 	 */
-	convert_context();
+	convert_context(void) = default;
 	
 	/**
 	 * @brief Destructor.
@@ -325,7 +324,8 @@ public:
 	 * @return					The converted string.
 	 */
 	template <typename _To_Type, typename _From_Type>
-	_To_Type convert_to(const _From_Type &_from) {
+	_kc_hidden _To_Type convert_to(const _From_Type &_from)
+	{
 		return helper<_To_Type>(*this).convert(_from);		
 	}
 	
@@ -341,7 +341,9 @@ public:
 	 * @return					The converted string.
 	 */
 	template <typename _To_Type, typename _From_Type>
-	_To_Type convert_to(const _From_Type &_from, size_t cbBytes, const char *fromcode) {
+	_kc_hidden _To_Type convert_to(const _From_Type &_from, size_t cbBytes,
+	    const char *fromcode)
+	{
 		return helper<_To_Type>(*this).convert(_from, cbBytes, fromcode);
 	}
 	
@@ -357,7 +359,9 @@ public:
 	 * @return					The converted string.
 	 */
 	template <typename _To_Type, typename _From_Type>
-	_To_Type convert_to(const char *tocode, const _From_Type &_from, size_t cbBytes, const char *fromcode) {
+	_kc_hidden _To_Type convert_to(const char *tocode,
+	    const _From_Type &_from, size_t cbBytes, const char *fromcode)
+	{
 		return helper<_To_Type>(*this).convert(tocode, _from, cbBytes, fromcode);
 	}
 	
@@ -368,8 +372,7 @@ private:
 	 * The convert_context::helper class detects when the to and from charsets are
 	 * identical. In that case the string is merely copied.
 	 */
-	template <typename _Type>
-	class helper _zcp_final {
+	template<typename _Type> class _kc_hidden helper _kc_final {
 	public:
 		/**
 		 * @brief Constructor.
@@ -447,8 +450,7 @@ private:
 	 * result needs to be stores to guarantee storage of the data. Without this
 	 * the caller will end up with a pointer to non-existing data.
 	 */
-	template <typename _Type>
-	class helper<_Type *> _zcp_final {
+	template<typename _Type> class _kc_hidden helper<_Type *> _kc_final {
 	public:
 		typedef std::basic_string<_Type> string_type;
 	
@@ -518,12 +520,12 @@ private:
 	/**
 	 * @brief Key for the context_map;
 	 */
-	typedef struct _context_key {
+	struct context_key {
 		const char *totype;
 		const char *tocode;
 		const char *fromtype;
 		const char *fromcode;
-	} context_key;
+	};
 
 	/** Create a context_key based on the to- and from types and optionaly the to- and from codes.
 	 *
@@ -539,7 +541,9 @@ private:
 	 * @return	The new context_key
 	 */
 	template <typename _To_Type, typename _From_Type>
-	context_key create_key(const char *tocode, const char *fromcode) {
+	_kc_hidden context_key create_key(const char *tocode,
+	    const char *fromcode)
+	{
 		context_key key = {
 			typeid(_To_Type).name(), 
 			(tocode ? tocode : iconv_charset<_To_Type>::name()), 
@@ -552,7 +556,7 @@ private:
 	/**
 	 * @brief Sort predicate for the context_map;
 	 */
-	class context_predicate _zcp_final {
+	class _kc_hidden context_predicate _kc_final {
 	public:
 		bool operator()(const context_key &lhs, const context_key &rhs) const {
 			int r = strcmp(lhs.fromtype, rhs.fromtype);
@@ -581,7 +585,6 @@ private:
 	 */
 	typedef std::set<const char*> code_set;
 	
-private:
 	/**
 	 * @brief Obtains an iconv_context object.
 	 *
@@ -593,10 +596,11 @@ private:
 	 * @return				A pointer to a iconv_context.
 	 */
 	template <typename _To_Type, typename _From_Type>
-	details::iconv_context<_To_Type, _From_Type> *get_context() {
+	_kc_hidden details::iconv_context<_To_Type, _From_Type> *get_context(void)
+	{
 		context_key key(create_key<_To_Type, _From_Type>(NULL, NULL));
 		context_map::const_iterator iContext = m_contexts.find(key);
-		if (iContext == m_contexts.end()) {
+		if (iContext == m_contexts.cend()) {
 			details::iconv_context_base *lpContext = new details::iconv_context<_To_Type, _From_Type>();
 			iContext = m_contexts.insert(context_map::value_type(key, lpContext)).first;
 		}
@@ -614,10 +618,12 @@ private:
 	 * @return					A pointer to a iconv_context.
 	 */
 	template <typename _To_Type, typename _From_Type>
-	details::iconv_context<_To_Type, _From_Type> *get_context(const char *fromcode) {
+	_kc_hidden details::iconv_context<_To_Type, _From_Type> *
+	get_context(const char *fromcode)
+	{
 		context_key key(create_key<_To_Type, _From_Type>(NULL, fromcode));
 		context_map::const_iterator iContext = m_contexts.find(key);
-		if (iContext == m_contexts.end()) {
+		if (iContext == m_contexts.cend()) {
 			details::iconv_context_base *lpContext = new details::iconv_context<_To_Type, _From_Type>(fromcode);
 			
 			// Before we store it, we need to copy the fromcode as we don't know what the
@@ -640,10 +646,12 @@ private:
 	 * @return					A pointer to a iconv_context.
 	 */
 	template <typename _To_Type, typename _From_Type>
-	details::iconv_context<_To_Type, _From_Type> *get_context(const char *tocode, const char *fromcode) {
+	_kc_hidden details::iconv_context<_To_Type, _From_Type> *
+	get_context(const char *tocode, const char *fromcode)
+	{
 		context_key key(create_key<_To_Type, _From_Type>(tocode, fromcode));
 		context_map::const_iterator iContext = m_contexts.find(key);
-		if (iContext == m_contexts.end()) {
+		if (iContext == m_contexts.cend()) {
 			details::iconv_context_base *lpContext = new details::iconv_context<_To_Type, _From_Type>(tocode, fromcode);
 			
 			// Before we store it, we need to copy the fromcode as we don't know what the
@@ -669,7 +677,7 @@ private:
 	 *
 	 * @param[in,out]	key		The key for which the second field will be persisted.
 	 */
-	void persist_code(context_key &key, unsigned flags);
+	_kc_export void persist_code(context_key &key, unsigned flags);
 	
 	/**
 	 * Persist the string so a raw pointer to its content can be used.
@@ -680,7 +688,7 @@ private:
 	 * @param[in]	string		The string to persist.
 	 * @return		The raw pointer that can be used as long as the convert_context exists.
 	 */
-	char *persist_string(const std::string &strValue);
+	char *persist_string(const std::string &);
 	
 	/**
 	 * Persist the string so a raw pointer to its content can be used.
@@ -693,14 +701,12 @@ private:
 	 */
 	wchar_t *persist_string(const std::wstring &wstrValue);
 	
-private:
 	code_set	m_codes;
 	context_map	m_contexts;
 	std::list<std::string>	m_lstStrings;
 	std::list<std::wstring>	m_lstWstrings;
 	
 // a convert_context is not supposed to be copyable.
-private:
 	convert_context(const convert_context &) = delete;
 	convert_context &operator=(const convert_context &) = delete;
 };
@@ -741,7 +747,7 @@ private:
 
 namespace details {
 
-	HRESULT HrFromException(const convert_exception &ce);
+	extern _kc_export HRESULT HrFromException(const convert_exception &);
 
 } // namespace details
 
@@ -829,5 +835,7 @@ HRESULT TryConvert(convert_context &context, const _From_Type &_from, size_t cbB
 }
 
 #endif // MAPIDEFS_H
+
+} /* namespace */
 
 #endif // ndef convert_INCLUDED

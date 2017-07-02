@@ -18,9 +18,11 @@
 #ifndef __INETMAPI_OPTIONS_H
 #define __INETMAPI_OPTIONS_H
 
-# define INETMAPI_API
+#include <kopano/zcdefs.h>
 
-typedef struct _do {
+namespace KC {
+
+struct delivery_options {
 	bool use_received_date;			// Use the 'received' date instead of the current date as delivery date
 	bool mark_as_read;				// Deliver the message 'read' instead of unread
 	bool add_imap_data;				// Save IMAP optimizations to the server
@@ -35,10 +37,10 @@ typedef struct _do {
 	bool charset_strict_rfc;
 
 	LPSBinary user_entryid;			// If not NULL, specifies the entryid of the user for whom we are delivering. If set, allows generating PR_MESSAGE_*_ME properties.
-	const char *default_charset;		// Specifies the default charset to use when none is found in the source message, or when us-ascii is used in the source message. Note that this charset *must* be a superset of us-ascii
-} delivery_options;
+	const char *ascii_upgrade; // Upgrade ASCII parts to this new (ASCII-compatible) charset
+};
 
-typedef struct _so {
+struct sending_options {
 	char *alternate_boundary;		// Specifies a specific boundary prefix to use when creating MIME boundaries
 	bool no_recipients_workaround;	// Specified that we wish to accepts messages with no recipients (for example, when converting an attached email with no recipients)
 	bool msg_in_msg;
@@ -50,9 +52,11 @@ typedef struct _so {
 	bool allow_send_to_everyone;
 	bool enable_dsn;				/**< Enable SMTP Delivery Status Notifications */
 	bool always_expand_distr_list;
-} sending_options;
+};
 
-void INETMAPI_API imopt_default_delivery_options(delivery_options *dopt);
-void INETMAPI_API imopt_default_sending_options(sending_options *sopt);
+extern _kc_export void imopt_default_delivery_options(delivery_options *);
+extern _kc_export void imopt_default_sending_options(sending_options *);
+
+} /* namespace */
 
 #endif

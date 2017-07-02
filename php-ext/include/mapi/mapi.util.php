@@ -22,13 +22,12 @@
 /**
  * Function to make a MAPIGUID from a php string. 
  * The C++ definition for the GUID is: 
- *  typedef struct _GUID 
- *  { 
+ *  struct GUID {
  *   unsigned long        Data1; 
  *   unsigned short       Data2; 
  *   unsigned short       Data3; 
  *   unsigned char        Data4[8]; 
- *  } GUID;
+ *  };
  *
  * A GUID is normally represented in the following form: 
  * 	{00062008-0000-0000-C000-000000000046}
@@ -52,28 +51,26 @@ function get_mapi_error_name($errcode=null)
 		$errcode = mapi_last_hresult();
 	}
 	
-	if ($errcode !== 0){
-		// get_defined_constants(true) is preferred, but crashes PHP
-		// https://bugs.php.net/bug.php?id=61156
-		$allConstants = get_defined_constants();
-
-		foreach ($allConstants as $key => $value) {
-			/**
-			 * If PHP encounters a number beyond the bounds of the integer type,
-			 * it will be interpreted as a float instead, so when comparing these error codes
-			 * we have to manually typecast value to integer, so float will be converted in integer,
-			 * but still its out of bound for integer limit so it will be auto adjusted to minus value
-			 */
-			if ($errcode == (int) $value) {
-				// Check that we have an actual MAPI error or warning definition
-				$prefix = substr($key, 0, 7);
-				if ($prefix == "MAPI_E_" || $prefix == "MAPI_W_") {
-					return $key;
-				}
-			}
-		}
-	} else {
+	if ($errcode === 0)
 		return "NOERROR";
+
+	// get_defined_constants(true) is preferred, but crashes PHP
+	// https://bugs.php.net/bug.php?id=61156
+	$allConstants = get_defined_constants();
+
+	foreach ($allConstants as $key => $value) {
+		/**
+		 * If PHP encounters a number beyond the bounds of the integer type,
+		 * it will be interpreted as a float instead, so when comparing these error codes
+		 * we have to manually typecast value to integer, so float will be converted in integer,
+		 * but still its out of bound for integer limit so it will be auto adjusted to minus value
+		 */
+		if ($errcode != (int) $value)
+			continue;
+		// Check that we have an actual MAPI error or warning definition
+		$prefix = substr($key, 0, 7);
+		if ($prefix == "MAPI_E_" || $prefix == "MAPI_W_")
+			return $key;
 	}
 
 	// error code not found, return hex value (this is a fix for 64-bit systems, we can't use the dechex() function for this)
@@ -99,51 +96,46 @@ function getPropIdsFromStrings($store, $mapping)
 	$guids = array();
 
 	foreach($mapping as $name=>$val){
-		if(is_string($val)) {
-			$split = explode(":", $val);
-
-			if(count($split) != 3){ // invalid string, ignore
-				trigger_error(sprintf("Invalid property: %s \"%s\"",$name,$val), E_USER_NOTICE);
-				continue;
-			}
-
-			if(substr($split[2], 0, 2) == "0x") {
-				$id = hexdec(substr($split[2], 2));
-			} else {
-				$id = $split[2];
-			}
-
-			// have we used this guid before?
-			if (!defined($split[1])){
-				if (!array_key_exists($split[1], $guids)){
-					$guids[$split[1]] = makeguid($split[1]);
-				}
-				$guid = $guids[$split[1]];
-			}else{
-				$guid = constant($split[1]);
-			}
-
-			// temp store info about named prop, so we have to call mapi_getidsfromnames just one time
-			$ids["name"][$num] = $name;
-			$ids["id"][$num] = $id;
-			$ids["guid"][$num] = $guid;
-			$ids["type"][$num] = $split[0];
-			$num++;
-		}else{
+		if (!is_string($val)) {
 			// not a named property
 			$props[$name] = $val;
+			continue;
 		}
+		$split = explode(":", $val);
+		if (count($split) != 3) { // invalid string, ignore
+			trigger_error(sprintf("Invalid property: %s \"%s\"", $name, $val), E_USER_NOTICE);
+			continue;
+		}
+
+		if (substr($split[2], 0, 2) == "0x")
+			$id = hexdec(substr($split[2], 2));
+		else
+			$id = $split[2];
+
+		// have we used this guid before?
+		if (!defined($split[1])) {
+			if (!array_key_exists($split[1], $guids))
+				$guids[$split[1]] = makeguid($split[1]);
+			$guid = $guids[$split[1]];
+		} else {
+			$guid = constant($split[1]);
+		}
+
+		// temp store info about named prop, so we have to call mapi_getidsfromnames just one time
+		$ids["name"][$num] = $name;
+		$ids["id"][$num] = $id;
+		$ids["guid"][$num] = $guid;
+		$ids["type"][$num] = $split[0];
+		$num++;
 	}
 	
-	if (empty($ids["id"])){
+	if (empty($ids["id"]))
 		return $props;
-	}
 
 	// get the ids
 	$named = mapi_getidsfromnames($store, $ids["id"], $ids["guid"]);
-	foreach($named as $num=>$prop){
+	foreach($named as $num=>$prop)
 		$props[$ids["name"][$num]] = mapi_prop_tag(constant($ids["type"][$num]), mapi_prop_id($prop));
-	}
 
 	return $props;
 }
@@ -161,11 +153,9 @@ function getPropIdsFromStrings($store, $mapping)
  */
 function propIsError($property, $propArray)
 {
-	if (array_key_exists(mapi_prop_tag(PT_ERROR, mapi_prop_id($property)), $propArray)) {
+	if (array_key_exists(mapi_prop_tag(PT_ERROR, mapi_prop_id($property)), $propArray))
 		return $propArray[mapi_prop_tag(PT_ERROR, mapi_prop_id($property))];
-	} else {
-		return false;
-	}
+	return false;
 }
 
 /******** Macro Functions for PR_DISPLAY_TYPE_EX values *********/

@@ -66,9 +66,9 @@ extern "C" {
 static char *name_mapi_message;
 static int le_mapi_message;
 
-ECImportContentsChangesProxy::ECImportContentsChangesProxy(zval *lpObj TSRMLS_DC) {
-    this->m_cRef = 1; // Object is in use when created!
-    this->m_lpObj = lpObj;
+ECImportContentsChangesProxy::ECImportContentsChangesProxy(zval *lpObj TSRMLS_DC) :
+	m_cRef(1), m_lpObj(lpObj)
+{
 #if ZEND_MODULE_API_NO >= 20071006
     Z_ADDREF_P(m_lpObj);
 #else
@@ -122,11 +122,10 @@ HRESULT ECImportContentsChangesProxy::Config(LPSTREAM lpStream, ULONG ulFlags) {
     MAKE_STD_ZVAL(pvalArgs[0]);
     MAKE_STD_ZVAL(pvalArgs[1]);
 
-    if(lpStream) {
+    if (lpStream != nullptr)
         ZVAL_RESOURCE(pvalArgs[0], (long)lpStream);
-    } else {
+    else
         ZVAL_NULL(pvalArgs[0]);
-    }
     
     ZVAL_LONG(pvalArgs[1], ulFlags);
     
@@ -163,11 +162,10 @@ HRESULT ECImportContentsChangesProxy::UpdateState(LPSTREAM lpStream) {
     
     MAKE_STD_ZVAL(pvalArgs[0]);
 
-    if(lpStream) {
+    if (lpStream != nullptr)
         ZVAL_RESOURCE(pvalArgs[0], (long)lpStream);
-    } else {
+    else
         ZVAL_NULL(pvalArgs[0]);
-    }
     
     ZVAL_STRING(pvalFuncName, "UpdateState" , 1);
     
@@ -314,7 +312,7 @@ exit:
     return hr;
 }
 
-HRESULT ECImportContentsChangesProxy::ImportMessageMove(ULONG cbSourceKeySrcFolder, BYTE FAR * pbSourceKeySrcFolder, ULONG cbSourceKeySrcMessage, BYTE FAR * pbSourceKeySrcMessage, ULONG cbPCLMessage, BYTE FAR * pbPCLMessage, ULONG cbSourceKeyDestMessage, BYTE FAR * pbSourceKeyDestMessage, ULONG cbChangeNumDestMessage, BYTE FAR * pbChangeNumDestMessage) {
+HRESULT ECImportContentsChangesProxy::ImportMessageMove(ULONG cbSourceKeySrcFolder, BYTE *pbSourceKeySrcFolder, ULONG cbSourceKeySrcMessage, BYTE *pbSourceKeySrcMessage, ULONG cbPCLMessage, BYTE *pbPCLMessage, ULONG cbSourceKeyDestMessage, BYTE *pbSourceKeyDestMessage, ULONG cbChangeNumDestMessage, BYTE *pbChangeNumDestMessage) {
     return MAPI_E_NO_SUPPORT;
 }
 

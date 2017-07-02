@@ -21,32 +21,20 @@
 #include <kopano/zcdefs.h>
 #include <kopano/ECUnknown.h>
 
-
-class ECABProvider : public ECUnknown 
-{
+class ECABProvider _kc_final : public ECUnknown {
 protected:
 	ECABProvider(ULONG ulFlags, const char *szClassName);
-	virtual ~ECABProvider(void) {}
-
+	virtual ~ECABProvider(void) _kc_impdtor;
 public:
 	static  HRESULT Create(ECABProvider **lppECABProvider);
-
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
-
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
     virtual HRESULT Shutdown(ULONG * lpulFlags);
 	virtual HRESULT Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG ulFlags, ULONG * lpulcbSecurity, LPBYTE * lppbSecurity, LPMAPIERROR * lppMAPIError, LPABLOGON * lppABLogon);
 
-	class xABProvider _zcp_final : public IABProvider {
-		// IUnknown
-		virtual ULONG __stdcall AddRef(void) _zcp_override;
-		virtual ULONG __stdcall Release(void) _zcp_override;
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _zcp_override;
-
-		//IABProvider
-		virtual HRESULT __stdcall Shutdown(ULONG * lpulFlags);
-		virtual HRESULT __stdcall Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG ulFlags, ULONG * lpulcbSecurity, LPBYTE * lppbSecurity, LPMAPIERROR * lppMAPIError, LPABLOGON * lppABLogon);
-
-	}m_xABProvider;
+	class xABProvider _kc_final : public IABProvider {
+		#include <kopano/xclsfrag/IUnknown.hpp>
+		#include <kopano/xclsfrag/IABProvider.hpp>
+	} m_xABProvider;
 
 	ULONG m_ulFlags;
 };

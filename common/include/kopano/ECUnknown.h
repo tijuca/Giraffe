@@ -20,10 +20,12 @@
 
 #include <kopano/zcdefs.h>
 #include <kopano/IECUnknown.h>
-#include <pthread.h>
 
 #include <list>
+#include <mutex>
 #include <mapi.h>
+
+namespace KC {
 
 /**
  * Return interface pointer on a specific interface query.
@@ -36,6 +38,23 @@
 		if (refiid == (_guid)) { \
 			AddRef(); \
 			*lppInterface = reinterpret_cast<void *>(_interface); \
+			return hrSuccess; \
+		} \
+	} while (false)
+
+#define REGISTER_INTERFACE2(cls, interface)	\
+	do { \
+		if (refiid == (IID_ ## cls)) { \
+			AddRef(); \
+			*lppInterface = static_cast<cls *>(interface); \
+			return hrSuccess; \
+		} \
+	} while (false)
+#define REGISTER_INTERFACE3(guid, cls, interface)	\
+	do { \
+		if (refiid == (IID_ ## guid)) { \
+			AddRef(); \
+			*lppInterface = static_cast<cls *>(interface); \
 			return hrSuccess; \
 		} \
 	} while (false)
@@ -55,28 +74,22 @@
 		} \
 	} while (false)
 
-class ECUnknown : public IECUnknown {
+class _kc_export ECUnknown : public IECUnknown {
 public:
 	ECUnknown(const char *szClassName = NULL);
-	virtual ~ECUnknown();
-
-	virtual ULONG AddRef(void) _zcp_override;
-	virtual ULONG Release(void) _zcp_override;
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _zcp_override;
-
+	virtual ~ECUnknown(void);
+	virtual ULONG AddRef(void) _kc_override;
+	virtual ULONG Release(void) _kc_override;
+	virtual HRESULT QueryInterface(REFIID refiid, void **iface) _kc_override;
 	virtual HRESULT AddChild(ECUnknown *lpChild);
 	virtual HRESULT RemoveChild(ECUnknown *lpChild);
 
-	class xUnknown _zcp_final : public IUnknown {
-	public:
-		// From IUnknown
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _zcp_override;
-		virtual ULONG __stdcall AddRef(void) _zcp_override;
-		virtual ULONG __stdcall Release(void) _zcp_override;
+	class xUnknown _kc_final : public IUnknown {
+		#include <kopano/xclsfrag/IUnknown.hpp>
 	} m_xUnknown;
 
 	// lpParent is public because it is always thread-safe and valid
-	ECUnknown				*lpParent;
+	ECUnknown *lpParent = nullptr;
 	virtual BOOL IsParentOf(const ECUnknown *lpObject);
 	virtual BOOL IsChildOf(const ECUnknown *lpObject);
 
@@ -87,12 +100,12 @@ protected:
 	// Kills itself when lstChildren.empty() AND m_cREF == 0
 	virtual HRESULT			Suicide();
 
-	ULONG					m_cRef;
+	ULONG m_cRef = 0;
 	const char *szClassName;
 	std::list<ECUnknown *>	lstChildren; 
-	pthread_mutex_t mutex;
-
+	std::mutex mutex;
 };
 
+} /* namespace */
 
 #endif // ECUNKNOWN_H

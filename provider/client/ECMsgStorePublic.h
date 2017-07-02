@@ -18,6 +18,7 @@
 #ifndef ECMSGSTOREPUBLIC_H
 #define ECMSGSTOREPUBLIC_H
 
+#include <kopano/zcdefs.h>
 #include <mapidefs.h>
 #include <mapispi.h>
 
@@ -27,19 +28,17 @@
 #include "ClientUtil.h"
 #include <kopano/ECMemTable.h>
 
-class ECMsgStorePublic : public ECMsgStore
-{
+class ECMsgStorePublic _kc_final : public ECMsgStore {
 protected:
 	ECMsgStorePublic(char *lpszProfname, LPMAPISUP lpSupport, WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags, BOOL fIsSpooler, BOOL bOfflineStore);
 	~ECMsgStorePublic(void);
 
 public:
 	static HRESULT GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase);
-	static HRESULT SetPropHandler(ULONG ulPropTag, void* lpProvider, LPSPropValue lpsPropValue, void *lpParam);
+	static HRESULT SetPropHandler(ULONG ulPropTag, void *lpProvider, const SPropValue *lpsPropValue, void *lpParam);
 	static HRESULT	Create(char *lpszProfname, LPMAPISUP lpSupport, WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags, BOOL fIsSpooler, BOOL bOfflineStore, ECMsgStore **lppECMsgStore);
-	virtual HRESULT QueryInterface(REFIID refiid, void** lppInterface);
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 
-public:
 	virtual HRESULT OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk);
 	virtual HRESULT SetEntryId(ULONG cbEntryId, LPENTRYID lpEntryId);
 
@@ -55,20 +54,14 @@ public:
 	virtual HRESULT Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection);
 
 protected:	
-	LPENTRYID m_lpIPMSubTreeID;
-	LPENTRYID m_lpIPMFavoritesID;
-	LPENTRYID m_lpIPMPublicFoldersID;
-
-	ULONG m_cIPMSubTreeID;
-	ULONG m_cIPMFavoritesID;
-	ULONG m_cIPMPublicFoldersID;
-
+	ENTRYID *m_lpIPMSubTreeID = nullptr, *m_lpIPMFavoritesID = nullptr;
+	ENTRYID *m_lpIPMPublicFoldersID = nullptr;
+	ULONG m_cIPMSubTreeID = 0, m_cIPMFavoritesID = 0;
+	ULONG m_cIPMPublicFoldersID = 0;
+	ECMemTable *m_lpIPMSubTree = nullptr; // Build-in IPM subtree
+	IMsgStore *m_lpDefaultMsgStore = nullptr;
 
 	HRESULT BuildIPMSubTree();
-
-	ECMemTable *m_lpIPMSubTree; // Build-in IPM subtree
-
-	IMsgStore *m_lpDefaultMsgStore;
 	// entryid : level
 
 };

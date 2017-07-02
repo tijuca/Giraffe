@@ -16,35 +16,38 @@
  */
 
 #include <kopano/platform.h>
-
+#include <new>
 #include <mapix.h>
 #include <kopano/ECGuid.h>
+#include <kopano/ECInterfaceDefs.h>
+#include <kopano/memory.hpp>
 #include "ECMemStream.h"
 #include <kopano/Trace.h>
 #include <kopano/ECDebug.h>
 #define EC_MEMBLOCK_SIZE 8192
 
-ECMemBlock::ECMemBlock(char *buffer, ULONG ulDataLen, ULONG ulFlags) : ECUnknown("ECMemBlock")
+namespace KC {
+
+ECMemBlock::ECMemBlock(const char *buffer, ULONG ulDataLen, ULONG ulFlags) :
+    ECUnknown("ECMemBlock")
 {
-	this->cbTotal = 0;
-	this->cbCurrent = 0;
-	this->lpCurrent = NULL;
-	this->cbOriginal = 0;
-	this->lpOriginal = NULL;
 	this->ulFlags = ulFlags;
 
-	if(ulDataLen > 0) {
-		cbTotal = ulDataLen;
-		cbCurrent = ulDataLen;
-		lpCurrent = (char *)malloc(ulDataLen);
-		memcpy(lpCurrent, buffer, ulDataLen);
-
-		if(ulFlags & STGM_TRANSACTED) {
-			cbOriginal = ulDataLen;
-			lpOriginal = (char *)malloc(ulDataLen);
-			memcpy(lpOriginal, buffer, ulDataLen);
-		}
-	}
+	if (ulDataLen == 0)
+		return;
+	cbTotal = ulDataLen;
+	cbCurrent = ulDataLen;
+	lpCurrent = (char *)malloc(ulDataLen);
+	if (lpCurrent == nullptr)
+		throw std::bad_alloc();
+	memcpy(lpCurrent, buffer, ulDataLen);
+	if (!(ulFlags & STGM_TRANSACTED))
+		return;
+	cbOriginal = ulDataLen;
+	lpOriginal = (char *)malloc(ulDataLen);
+	if (lpOriginal == nullptr)
+		throw std::bad_alloc();
+	memcpy(lpOriginal, buffer, ulDataLen);
 }
 
 ECMemBlock::~ECMemBlock()
@@ -54,23 +57,18 @@ ECMemBlock::~ECMemBlock()
 		free(lpOriginal);
 }
 
-HRESULT	ECMemBlock::Create(char *buffer, ULONG ulDataLen, ULONG ulFlags, ECMemBlock **lppStream)
+HRESULT	ECMemBlock::Create(const char *buffer, ULONG ulDataLen, ULONG ulFlags,
+    ECMemBlock **lppStream)
 {
-	ECMemBlock *lpMemBlock = NULL;
-
-	try {
-		lpMemBlock = new ECMemBlock(buffer, ulDataLen, ulFlags);
-	} catch (std::exception &) {
+	auto lpMemBlock = new(std::nothrow) ECMemBlock(buffer, ulDataLen, ulFlags);
+	if (lpMemBlock == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-	}
-
 	return lpMemBlock->QueryInterface(IID_ECMemBlock, (void **)lppStream);
 }
 
 HRESULT ECMemBlock::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECMemBlock, this);
-
+	REGISTER_INTERFACE2(ECMemBlock, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -90,7 +88,8 @@ HRESULT	ECMemBlock::ReadAt(ULONG ulPos, ULONG ulLen, char *buffer, ULONG *ulByte
 	return hr;
 }
 
-HRESULT ECMemBlock::WriteAt(ULONG ulPos, ULONG ulLen, char *buffer, ULONG *ulBytesWritten)
+HRESULT ECMemBlock::WriteAt(ULONG ulPos, ULONG ulLen, const char *buffer,
+    ULONG *ulBytesWritten)
 {
 	ULONG dsize = ulPos + ulLen;
 	
@@ -116,49 +115,39 @@ HRESULT ECMemBlock::WriteAt(ULONG ulPos, ULONG ulLen, char *buffer, ULONG *ulByt
 
 HRESULT ECMemBlock::Commit()
 {
-	if(ulFlags & STGM_TRANSACTED) {
-		free(lpOriginal);
-		lpOriginal = NULL;
-
-		lpOriginal = (char *)malloc(cbCurrent);
-		if (lpOriginal == NULL)
-			return MAPI_E_NOT_ENOUGH_MEMORY;
-
-		cbOriginal = cbCurrent;
-		memcpy(lpOriginal, lpCurrent, cbCurrent);
-	}
-
+	if (!(ulFlags & STGM_TRANSACTED))
+		return hrSuccess;
+	free(lpOriginal);
+	lpOriginal = NULL;
+	lpOriginal = (char *)malloc(cbCurrent);
+	if (lpOriginal == NULL)
+		return MAPI_E_NOT_ENOUGH_MEMORY;
+	cbOriginal = cbCurrent;
+	memcpy(lpOriginal, lpCurrent, cbCurrent);
 	return hrSuccess;
 }
 
 HRESULT ECMemBlock::Revert()
 {
-	if(ulFlags & STGM_TRANSACTED) {
-		free(lpCurrent);
-		lpCurrent = NULL;
-
-		lpCurrent = (char *)malloc(cbOriginal);
-		if (lpCurrent == NULL)
-			return MAPI_E_NOT_ENOUGH_MEMORY;
-
-		cbCurrent = cbTotal = cbOriginal;
-		memcpy(lpCurrent, lpOriginal, cbOriginal);
-	}
-
+	if (!(ulFlags & STGM_TRANSACTED))
+		return hrSuccess;
+	free(lpCurrent);
+	lpCurrent = NULL;
+	lpCurrent = (char *)malloc(cbOriginal);
+	if (lpCurrent == NULL)
+		return MAPI_E_NOT_ENOUGH_MEMORY;
+	cbCurrent = cbTotal = cbOriginal;
+	memcpy(lpCurrent, lpOriginal, cbOriginal);
 	return hrSuccess;
 }
 
 HRESULT ECMemBlock::SetSize(ULONG ulSize)
 {
-	char *lpNew = (char *)malloc(ulSize);
-	if (lpNew == NULL)
+	auto lpNew = static_cast<char *>(realloc(lpCurrent, ulSize));
+	if (lpNew == NULL && ulSize != 0)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-
-	memcpy(lpNew, lpCurrent, ulSize < cbCurrent ? ulSize : cbCurrent);
-
 	if(ulSize > cbCurrent)
 		memset(lpNew+cbCurrent, 0, ulSize-cbCurrent);
-	free(lpCurrent);
 	lpCurrent = lpNew;
 	cbCurrent = ulSize;
 	cbTotal = ulSize;
@@ -166,7 +155,7 @@ HRESULT ECMemBlock::SetSize(ULONG ulSize)
 	return hrSuccess;
 }
 
-HRESULT ECMemBlock::GetSize(ULONG *ulSize)
+HRESULT ECMemBlock::GetSize(ULONG *ulSize) const
 {
 	*ulSize = cbCurrent;
 
@@ -185,7 +174,6 @@ ECMemStream::ECMemStream(char *buffer, ULONG ulDataLen, ULONG ulFlags, CommitFun
 	this->lpCommitFunc = lpCommitFunc;
 	this->lpDeleteFunc = lpDeleteFunc;
 	this->lpParam = lpParam;
-	this->fDirty = FALSE;
 	this->ulFlags = ulFlags;
 }
 
@@ -198,7 +186,6 @@ ECMemStream::ECMemStream(ECMemBlock *lpMemBlock, ULONG ulFlags, CommitFunc lpCom
 	this->lpCommitFunc = lpCommitFunc;
 	this->lpDeleteFunc = lpDeleteFunc;
 	this->lpParam = lpParam;
-	this->fDirty = FALSE;
 	this->ulFlags = ulFlags;
 }
 
@@ -215,54 +202,42 @@ ECMemStream::~ECMemStream()
 
 HRESULT ECMemStream::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_IStream, &this->m_xStream);
-	REGISTER_INTERFACE(IID_ISequentialStream, &this->m_xStream);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xStream);
-
-	REGISTER_INTERFACE(IID_ECMemStream, this);
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
+	REGISTER_INTERFACE2(IStream, &this->m_xStream);
+	REGISTER_INTERFACE2(ISequentialStream, &this->m_xStream);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xStream);
+	REGISTER_INTERFACE2(ECMemStream, this);
+	REGISTER_INTERFACE2(ECUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
 ULONG ECMemStream::Release()
 {
-	if(this->m_cRef == 1) {
-		// Releasing last reference
+	// Releasing last reference
 
-		// If you read the docs on STGM_SHARE_EXCLUSIVE it doesn't say you need
-		// to Commit() at the end, so if the client hasn't called Commit() yet, 
-		// we need to do it for them before throwing away the data.
-		if(this->ulFlags & STGM_SHARE_EXCLUSIVE && this->fDirty) {
-			this->Commit(0);
-		}
-	}
+	// If you read the docs on STGM_SHARE_EXCLUSIVE it doesn't say you need
+	// to Commit() at the end, so if the client hasn't called Commit() yet,
+	// we need to do it for them before throwing away the data.
+	if (this->m_cRef == 1 && this->ulFlags & STGM_SHARE_EXCLUSIVE &&
+	    this->fDirty)
+		this->Commit(0);
 	return ECUnknown::Release();
 }
 
 HRESULT	ECMemStream::Create(char *buffer, ULONG ulDataLen, ULONG ulFlags, CommitFunc lpCommitFunc, DeleteFunc lpDeleteFunc,
 							void *lpParam, ECMemStream **lppStream)
 {
-	ECMemStream *lpStream = NULL;
-
-	try {
-		lpStream = new ECMemStream(buffer, ulDataLen, ulFlags, lpCommitFunc, lpDeleteFunc, lpParam);
-	} catch (std::exception &) {
+	auto lpStream = new(std::nothrow) ECMemStream(buffer, ulDataLen, ulFlags, lpCommitFunc, lpDeleteFunc, lpParam);
+	if (lpStream == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-	}
 	return lpStream->QueryInterface(IID_ECMemStream, (void **)lppStream);
 }
 
 HRESULT	ECMemStream::Create(ECMemBlock *lpMemBlock, ULONG ulFlags, CommitFunc lpCommitFunc, DeleteFunc lpDeleteFunc,
 							void *lpParam, ECMemStream **lppStream)
 {
-	ECMemStream *lpStream = NULL;
-
-	try {
-		lpStream = new ECMemStream(lpMemBlock, ulFlags, lpCommitFunc, lpDeleteFunc, lpParam);
-	} catch (std::exception &) {
+	auto lpStream = new(std::nothrow) ECMemStream(lpMemBlock, ulFlags, lpCommitFunc, lpDeleteFunc, lpParam);
+	if (lpStream == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-	}
 	return lpStream->QueryInterface(IID_ECMemStream, (void **)lppStream);
 }
 
@@ -336,9 +311,6 @@ HRESULT ECMemStream::Seek(LARGE_INTEGER dlibmove, DWORD dwOrigin, ULARGE_INTEGER
 		liPos.QuadPart = ulSize + dlibmove.QuadPart;
 		break;
 	}
-
-	if(liPos.QuadPart < 0)
-		liPos.QuadPart = 0;
 	if(liPos.QuadPart > ulSize)
 		liPos.QuadPart = ulSize;
 
@@ -371,7 +343,7 @@ HRESULT ECMemStream::CopyTo(IStream *pstm, ULARGE_INTEGER cb, ULARGE_INTEGER *pc
 	if(hr != hrSuccess)
 		return hr;
 
-	ASSERT(liPos.u.HighPart == 0);
+	assert(liPos.u.HighPart == 0);
 	ulOffset = liPos.u.LowPart;
 
 	while(cb.QuadPart && ulSize > ulOffset) {
@@ -394,30 +366,22 @@ HRESULT ECMemStream::CopyTo(IStream *pstm, ULARGE_INTEGER cb, ULARGE_INTEGER *pc
 HRESULT ECMemStream::Commit(DWORD grfCommitFlags)
 {
 	HRESULT hr = hrSuccess;
-	IStream *lpClonedStream = NULL;
+	KCHL::object_ptr<IStream> lpClonedStream;
 
 	hr = this->lpMemBlock->Commit();
 
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// If there is no commit func, just ignore the commit
 	if(this->lpCommitFunc) {
-
-		hr = this->Clone(&lpClonedStream);
-
+		hr = this->Clone(&~lpClonedStream);
 		if(hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		hr = this->lpCommitFunc(lpClonedStream, lpParam);
 	}
 
 	this->fDirty = FALSE;
-
-exit:
-	if(lpClonedStream)
-		lpClonedStream->Release();
-
 	return hr;
 }
 
@@ -494,131 +458,19 @@ char* ECMemStream::GetBuffer()
 	return this->lpMemBlock->GetBuffer();
 }
 
-ULONG   ECMemStream::xStream::AddRef()
-{
-	TRACE_STREAM(TRACE_ENTRY, "IStream::AddRef", "");
-	METHOD_PROLOGUE_(ECMemStream, Stream);
-	ULONG ulRef =  pThis->AddRef();
-	TRACE_STREAM(TRACE_RETURN, "IStream::AddRef", "%d",  ulRef);
-	return ulRef;
-}
+DEF_ULONGMETHOD1(TRACE_MAPI, ECMemStream, Stream, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECMemStream, Stream, Release, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, QueryInterface, (REFIID, refiid), (LPVOID *, lppInterface))
+DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, Read, (void *, pv), (ULONG, cb), (ULONG *, pcbRead))
+DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, Write, (const void *, pv), (ULONG, cb), (ULONG *, pcbWritten))
+DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, Seek, (LARGE_INTEGER, dlibmove), (DWORD, dwOrigin), (ULARGE_INTEGER *, plibNewPosition))
+DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, SetSize, (ULARGE_INTEGER, libNewSize))
+DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, CopyTo, (IStream *, pstm), (ULARGE_INTEGER, cb), (ULARGE_INTEGER *, pcbRead), (ULARGE_INTEGER *, pcbWritten))
+DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, Commit, (DWORD, grfCommitFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, Revert, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, LockRegion, (ULARGE_INTEGER, libOffset), (ULARGE_INTEGER, cb), (DWORD, dwLockType))
+DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, UnlockRegion, (ULARGE_INTEGER, libOffset), (ULARGE_INTEGER, cb), (DWORD, dwLockType))
+DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, Stat, (STATSTG *, pstatstg), (DWORD, grfStatFlag))
+DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, Clone, (IStream **, ppstm))
 
-ULONG   ECMemStream::xStream::Release()
-{
-	TRACE_STREAM(TRACE_ENTRY, "IStream::Release", "");
-	METHOD_PROLOGUE_(ECMemStream, Stream);
-	ULONG ulRef = pThis->Release();
-	TRACE_STREAM(TRACE_RETURN, "IStream::Release", "%d",  ulRef);
-	return ulRef;
-}
-
-HRESULT ECMemStream::xStream::QueryInterface(REFIID refiid, LPVOID *lppInterface)
-{
-	char szGuidId[1024+1];
-	snprintf(szGuidId, 1024, "{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}", refiid.Data1, refiid.Data2, refiid.Data3, refiid.Data4[0], refiid.Data4[1], refiid.Data4[2], refiid.Data4[3], refiid.Data4[4], refiid.Data4[5], refiid.Data4[6], refiid.Data4[7]);
-	
-	TRACE_STREAM(TRACE_ENTRY, "IStream::QueryInterface", "%s", szGuidId);
-	METHOD_PROLOGUE_(ECMemStream, Stream);
-	HRESULT hr = pThis->QueryInterface(refiid, lppInterface);
-	TRACE_STREAM(TRACE_RETURN, "IStream::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMemStream::xStream::Read(void *pv, ULONG cb, ULONG *pcbRead)
-{
-	TRACE_STREAM(TRACE_ENTRY, "IStream::Read", "size=%d", cb);
-	METHOD_PROLOGUE_(ECMemStream, Stream);
-	HRESULT hr = pThis->Read(pv, cb, pcbRead);
-	TRACE_STREAM(TRACE_RETURN, "IStream::Read", "read=%d, Result=%s", (pcbRead)?(*pcbRead):0, GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMemStream::xStream::Write(const void *pv, ULONG cb, ULONG *pcbWritten)
-{
-	TRACE_STREAM(TRACE_ENTRY, "IStream::Write", "size=%d", cb);
-	METHOD_PROLOGUE_(ECMemStream, Stream);
-	HRESULT hr =  pThis->Write(pv, cb, pcbWritten);
-	TRACE_STREAM(TRACE_RETURN, "IStream::Write", "written=%d, Result=%s", (pcbWritten)?*pcbWritten:0, GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMemStream::xStream::Seek(LARGE_INTEGER dlibmove, DWORD dwOrigin, ULARGE_INTEGER *plibNewPosition)
-{
-	TRACE_STREAM(TRACE_ENTRY, "IStream::Seek", "dlibmove=%d, dwOrigin=%d", (int)dlibmove.QuadPart, dwOrigin);
-	METHOD_PROLOGUE_(ECMemStream, Stream);
-	HRESULT hr = pThis->Seek(dlibmove, dwOrigin, plibNewPosition);
-	TRACE_STREAM(TRACE_RETURN, "IStream::Seek", "newPos=%d, Result=%s", (plibNewPosition)?(int)plibNewPosition->QuadPart:0, GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMemStream::xStream::SetSize(ULARGE_INTEGER libNewSize)
-{
-	TRACE_STREAM(TRACE_ENTRY, "IStream::SetSize", "%d",  (int)libNewSize.QuadPart);
-	METHOD_PROLOGUE_(ECMemStream, Stream);
-	HRESULT hr = pThis->SetSize(libNewSize);
-	TRACE_STREAM(TRACE_RETURN, "IStream::SetSize", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMemStream::xStream::CopyTo(IStream *pstm, ULARGE_INTEGER cb, ULARGE_INTEGER *pcbRead, ULARGE_INTEGER *pcbWritten)
-{
-	TRACE_STREAM(TRACE_ENTRY, "IStream::CopyTo", "cb=%d", cb.QuadPart);
-	METHOD_PROLOGUE_(ECMemStream, Stream);
-	HRESULT hr = pThis->CopyTo(pstm, cb, pcbRead, pcbWritten);
-	TRACE_STREAM(TRACE_RETURN, "IStream::CopyTo", "%s cbRead=%d, cbWritten=%d", GetMAPIErrorDescription(hr).c_str(), (pcbRead)?pcbRead->QuadPart: 0, (pcbWritten)?pcbWritten->QuadPart: 0 );
-	return hr;
-}
-
-HRESULT ECMemStream::xStream::Commit(DWORD grfCommitFlags)
-{
-	TRACE_STREAM(TRACE_ENTRY, "IStream::Commit", "grfCommitFlags=0x%08X", grfCommitFlags);
-	METHOD_PROLOGUE_(ECMemStream, Stream);
-	HRESULT hr = pThis->Commit(grfCommitFlags);
-	TRACE_STREAM(TRACE_RETURN, "IStream::Commit", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMemStream::xStream::Revert()
-{
-	TRACE_STREAM(TRACE_ENTRY, "IStream::Revert", "");
-	METHOD_PROLOGUE_(ECMemStream, Stream);
-	HRESULT hr = pThis->Revert();
-	TRACE_STREAM(TRACE_RETURN, "IStream::Revert", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMemStream::xStream::LockRegion(ULARGE_INTEGER libOffset, ULARGE_INTEGER cb, DWORD dwLockType)
-{
-	TRACE_STREAM(TRACE_ENTRY, "IStream::LockRegion", "");
-	METHOD_PROLOGUE_(ECMemStream, Stream);
-	HRESULT hr = pThis->LockRegion(libOffset, cb, dwLockType);
-	TRACE_STREAM(TRACE_RETURN, "IStream::LockRegion", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMemStream::xStream::UnlockRegion(ULARGE_INTEGER libOffset, ULARGE_INTEGER cb, DWORD dwLockType)
-{
-	TRACE_STREAM(TRACE_ENTRY, "IStream::UnLockRegion", "");
-	METHOD_PROLOGUE_(ECMemStream, Stream);
-	HRESULT hr = pThis->UnlockRegion(libOffset, cb, dwLockType);
-	TRACE_STREAM(TRACE_RETURN, "IStream::UnLockRegion", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMemStream::xStream::Stat(STATSTG *pstatstg, DWORD grfStatFlag)
-{
-	TRACE_STREAM(TRACE_ENTRY, "IStream::Stat", "grfStatFlag=0x%08X", grfStatFlag);
-	METHOD_PROLOGUE_(ECMemStream, Stream);
-	HRESULT hr = pThis->Stat(pstatstg, grfStatFlag);
-	TRACE_STREAM(TRACE_RETURN, "IStream::Stat", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMemStream::xStream::Clone(IStream **ppstm)
-{
-	TRACE_STREAM(TRACE_ENTRY, "IStream::Clone", "");
-	METHOD_PROLOGUE_(ECMemStream, Stream);
-	HRESULT hr = pThis->Clone(ppstm);
-	TRACE_STREAM(TRACE_RETURN, "IStream::Clone", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
+} /* namespace */

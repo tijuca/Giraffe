@@ -16,6 +16,9 @@
  */
 
 #include <kopano/platform.h>
+#include <memory>
+#include <utility>
+#include <kopano/tie.hpp>
 #include "ECDatabase.h"
 
 #include <mapidefs.h>
@@ -28,6 +31,10 @@
 #include "ECMAPI.h"
 #include <kopano/stringutil.h>
 
+using namespace KCHL;
+
+namespace KC {
+
 ECConvenientDepthABObjectTable::ECConvenientDepthABObjectTable(ECSession *lpSession, unsigned int ulABId, unsigned int ulABType, unsigned int ulABParentId, unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale) : ECABObjectTable(lpSession, ulABId, ulABType, ulABParentId, ulABParentType, ulFlags, locale) {
     m_lpfnQueryRowData = ECConvenientDepthABObjectTable::QueryRowData;
 
@@ -35,7 +42,10 @@ ECConvenientDepthABObjectTable::ECConvenientDepthABObjectTable(ECSession *lpSess
 	m_ulUserManagementFlags &= ~USERMANAGEMENT_IDS_ONLY;
 }
 
-ECRESULT ECConvenientDepthABObjectTable::Create(ECSession *lpSession, unsigned int ulABId, unsigned int ulABType, unsigned int ulABParentId, unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale, ECConvenientDepthABObjectTable **lppTable)
+ECRESULT ECConvenientDepthABObjectTable::Create(ECSession *lpSession,
+    unsigned int ulABId, unsigned int ulABType, unsigned int ulABParentId,
+    unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale,
+    ECABObjectTable **lppTable)
 {
 	*lppTable = new ECConvenientDepthABObjectTable(lpSession, ulABId, ulABType, ulABParentId, ulABParentType, ulFlags, locale);
 
@@ -51,7 +61,6 @@ ECRESULT ECConvenientDepthABObjectTable::Create(ECSession *lpSession, unsigned i
 ECRESULT ECConvenientDepthABObjectTable::QueryRowData(ECGenericObjectTable *lpGenTable, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bTableData,bool bTableLimit)
 {
 	ECRESULT er;
-    ECObjectTableList::const_iterator iterRow;
     unsigned int n = 0;
     struct propVal *lpProp = NULL;
     ECConvenientDepthABObjectTable *lpThis = (ECConvenientDepthABObjectTable *)lpGenTable;
@@ -61,11 +70,11 @@ ECRESULT ECConvenientDepthABObjectTable::QueryRowData(ECGenericObjectTable *lpGe
 		return er;
 
     // Insert the PR_DEPTH for all the rows since the row engine has no knowledge of depth
-    for (iterRow = lpRowList->begin(); iterRow != lpRowList->end(); ++iterRow, ++n) {
+	for (const auto &row : *lpRowList) {
         lpProp = FindProp(&(*lppRowSet)->__ptr[n], PROP_TAG(PT_ERROR, PROP_ID(PR_DEPTH)));
         
         if(lpProp) {
-            lpProp->Value.ul = lpThis->m_mapDepth[iterRow->ulObjId];
+            lpProp->Value.ul = lpThis->m_mapDepth[row.ulObjId];
             lpProp->ulPropTag = PR_DEPTH;
             lpProp->__union = SOAP_UNION_propValData_ul;
         }
@@ -73,10 +82,11 @@ ECRESULT ECConvenientDepthABObjectTable::QueryRowData(ECGenericObjectTable *lpGe
         lpProp = FindProp(&(*lppRowSet)->__ptr[n], PROP_TAG(PT_ERROR, PROP_ID(PR_EMS_AB_HIERARCHY_PATH)));
         
         if(lpProp) {
-            lpProp->Value.lpszA = s_strcpy(soap, lpThis->m_mapPath[iterRow->ulObjId].c_str());
+            lpProp->Value.lpszA = s_strcpy(soap, lpThis->m_mapPath[row.ulObjId].c_str());
             lpProp->ulPropTag = PR_EMS_AB_HIERARCHY_PATH;
             lpProp->__union = SOAP_UNION_propValData_lpszA;
         }
+		++n;
     }
 	return erSuccess;
 }
@@ -86,54 +96,43 @@ ECRESULT ECConvenientDepthABObjectTable::QueryRowData(ECGenericObjectTable *lpGe
  */
 ECRESULT ECConvenientDepthABObjectTable::Load()
 {
-	ECRESULT er = erSuccess;
 	ECODAB *lpODAB = (ECODAB*)m_lpObjectData;
 	sObjectTableKey	sRowItem;
-	std::list<localobjectdetails_t> *lpSubObjects = NULL;
-	std::list<localobjectdetails_t>::const_iterator iterSubObjects;
-	
 	std::list<CONTAINERINFO> lstObjects;
-	std::list<CONTAINERINFO>::const_iterator objectIter;
 	CONTAINERINFO root;
 
-	if (lpODAB->ulABType != MAPI_ABCONT) {
-		er = KCERR_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpODAB->ulABType != MAPI_ABCONT)
+		return KCERR_INVALID_PARAMETER;
 
 	// Load this container
 	root.ulId = lpODAB->ulABParentId;
 	root.ulDepth = -1; // Our children are at depth 0, so the root object is depth -1. Note that this object is not actually added as a row in the end.
 	root.strPath = "";
-	
-	lstObjects.push_back(root);
+	lstObjects.push_back(std::move(root));
 
     // 'Recursively' loop through all our containers and add each of those children to our object list
-    for (objectIter = lstObjects.begin(); objectIter != lstObjects.end(); ++objectIter) {
-        if(LoadHierarchyContainer(objectIter->ulId, 0, &lpSubObjects) == erSuccess) {
-            for (iterSubObjects = lpSubObjects->begin(); iterSubObjects != lpSubObjects->end(); ++iterSubObjects) {
-                CONTAINERINFO folder;
-                folder.ulId = iterSubObjects->ulId;
-                folder.ulDepth = objectIter->ulDepth+1;
-                folder.strPath = objectIter->strPath + "/" + iterSubObjects->GetPropString(OB_PROP_S_LOGIN);
-                
-                lstObjects.push_back(folder);
-            }
-            delete lpSubObjects;
-            lpSubObjects = NULL;
-        }
+	for (const auto &obj : lstObjects) {
+		std::unique_ptr<std::list<localobjectdetails_t> > lpSubObjects;
+		if (LoadHierarchyContainer(obj.ulId, 0, &unique_tie(lpSubObjects)) != erSuccess)
+			continue;
+		for (const auto &subobj : *lpSubObjects) {
+			CONTAINERINFO folder;
+			folder.ulId = subobj.ulId;
+			folder.ulDepth = obj.ulDepth + 1;
+			folder.strPath = obj.strPath + "/" + subobj.GetPropString(OB_PROP_S_LOGIN);
+			lstObjects.push_back(std::move(folder));
+		}
     }
 
     // Add all the rows into the row engine, except the root object (the folder itself does not show in its own hierarchy table)
-	for (objectIter = lstObjects.begin(); objectIter != lstObjects.end(); ++objectIter) {
-	    if(objectIter->ulId != lpODAB->ulABParentId) {
-    	    m_mapDepth[objectIter->ulId] = objectIter->ulDepth;
-    	    m_mapPath[objectIter->ulId] = objectIter->strPath;
-	    	UpdateRow(ECKeyTable::TABLE_ROW_ADD, objectIter->ulId, 0);
-        }
+	for (const auto &obj : lstObjects) {
+		if (obj.ulId == lpODAB->ulABParentId)
+			continue;
+		m_mapDepth[obj.ulId] = obj.ulDepth;
+		m_mapPath[obj.ulId] = obj.strPath;
+		UpdateRow(ECKeyTable::TABLE_ROW_ADD, obj.ulId, 0);
 	}
-
-exit:
-	delete lpSubObjects;
-	return er;
+	return erSuccess;
 }
+
+} /* namespace */

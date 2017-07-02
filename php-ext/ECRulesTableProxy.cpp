@@ -16,6 +16,8 @@
  */
 
 #include <kopano/platform.h>
+#include <new>
+#include <kopano/memory.hpp>
 #include "ECRulesTableProxy.h"
 #include <kopano/ECGuid.h>
 #include <kopano/mapi_ptr.h>
@@ -42,33 +44,20 @@ ECRulesTableProxy::~ECRulesTableProxy()
 
 HRESULT ECRulesTableProxy::Create(LPMAPITABLE lpTable, ECRulesTableProxy **lppRulesTableProxy)
 {
-	HRESULT hr = hrSuccess;
-	mapi_object_ptr<ECRulesTableProxy> ptrRulesTableProxy;
-
-	if (lpTable == NULL || lppRulesTableProxy == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	try {
-		ptrRulesTableProxy.reset(new ECRulesTableProxy(lpTable));
-	} catch (const std::bad_alloc &) {
-		hr = MAPI_E_NOT_ENOUGH_MEMORY;
-		goto exit;
-	}
-
+	if (lpTable == NULL || lppRulesTableProxy == NULL)
+		return MAPI_E_INVALID_PARAMETER;
+	KCHL::object_ptr<ECRulesTableProxy> ptrRulesTableProxy(new(std::nothrow) ECRulesTableProxy(lpTable));
+	if (ptrRulesTableProxy == nullptr)
+		return MAPI_E_NOT_ENOUGH_MEMORY;
 	*lppRulesTableProxy = ptrRulesTableProxy.release();
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECRulesTableProxy::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-	REGISTER_INTERFACE(IID_IMAPITable, &this->m_xMAPITable);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xMAPITable);
-	
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IMAPITable, &this->m_xMAPITable);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xMAPITable);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 
 }
@@ -93,7 +82,8 @@ HRESULT ECRulesTableProxy::GetStatus(ULONG *lpulTableStatus, ULONG *lpulTableTyp
 	return m_lpTable->GetStatus(lpulTableStatus, lpulTableType);
 }
 
-HRESULT ECRulesTableProxy::SetColumns(LPSPropTagArray lpPropTagArray, ULONG ulFlags)
+HRESULT ECRulesTableProxy::SetColumns(const SPropTagArray *lpPropTagArray,
+    ULONG ulFlags)
 {
 	return m_lpTable->SetColumns(lpPropTagArray, ulFlags);
 }
@@ -143,7 +133,8 @@ HRESULT ECRulesTableProxy::FreeBookmark(BOOKMARK bkPosition)
 	return m_lpTable->FreeBookmark(bkPosition);
 }
 
-HRESULT ECRulesTableProxy::SortTable(LPSSortOrderSet lpSortCriteria, ULONG ulFlags)
+HRESULT ECRulesTableProxy::SortTable(const SSortOrderSet *lpSortCriteria,
+    ULONG ulFlags)
 {
 	return m_lpTable->SortTable(lpSortCriteria, ulFlags);
 }
@@ -155,36 +146,29 @@ HRESULT ECRulesTableProxy::QuerySortOrder(LPSSortOrderSet *lppSortCriteria)
 
 HRESULT ECRulesTableProxy::QueryRows(LONG lRowCount, ULONG ulFlags, LPSRowSet *lppRows)
 {
-	HRESULT hr = hrSuccess;
 	SRowSetPtr ptrRows;
 	convert_context converter;
-
-	hr = m_lpTable->QueryRows(lRowCount, ulFlags, &ptrRows);
+	HRESULT hr = m_lpTable->QueryRows(lRowCount, ulFlags, &ptrRows);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	
 	// table PR_RULE_ACTIONS and PR_RULE_CONDITION contain PT_UNICODE data, which we must convert to local charset PT_STRING8
 	// so we update the rows before we return them to the caller.
 	for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
-		LPSPropValue lpRuleProp = NULL;
-
-		lpRuleProp = PpropFindProp(ptrRows[i].lpProps, ptrRows[i].cValues, PR_RULE_CONDITION);
+		auto lpRuleProp = PCpropFindProp(ptrRows[i].lpProps, ptrRows[i].cValues, PR_RULE_CONDITION);
 		if (lpRuleProp)
 			hr = ConvertUnicodeToString8((LPSRestriction)lpRuleProp->Value.lpszA, ptrRows[i].lpProps, converter);
 		if (hr != hrSuccess)
-			goto exit;
-
-		lpRuleProp = PpropFindProp(ptrRows[i].lpProps, ptrRows[i].cValues, PR_RULE_ACTIONS);
+			return hr;
+		lpRuleProp = PCpropFindProp(ptrRows[i].lpProps, ptrRows[i].cValues, PR_RULE_ACTIONS);
 		if (lpRuleProp)
 			hr = ConvertUnicodeToString8((ACTIONS*)lpRuleProp->Value.lpszA, ptrRows[i].lpProps, converter);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 	
 	*lppRows = ptrRows.release();
-	
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECRulesTableProxy::Abort()
@@ -217,24 +201,14 @@ HRESULT ECRulesTableProxy::SetCollapseState(ULONG ulFlags, ULONG cbCollapseState
 	return m_lpTable->SetCollapseState(ulFlags, cbCollapseState, pbCollapseState, lpbkLocation);
 }
 
-ULONG ECRulesTableProxy::xMAPITable::AddRef()
-{
-	METHOD_PROLOGUE_(ECRulesTableProxy, MAPITable);
-	return pThis->AddRef();
-}
-			
-ULONG ECRulesTableProxy::xMAPITable::Release()
-{
-	METHOD_PROLOGUE_(ECRulesTableProxy, MAPITable);
-	return pThis->Release();
-}
-
+DEF_ULONGMETHOD0(ECRulesTableProxy, MAPITable, AddRef, (void))
+DEF_ULONGMETHOD0(ECRulesTableProxy, MAPITable, Release, (void))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, QueryInterface, (REFIID, refiid), (void **, lppInterface))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, GetLastError, (HRESULT, hResult), (ULONG, ulFlags), (LPMAPIERROR *, lppMAPIError))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, Advise, (ULONG, ulEventMask), (LPMAPIADVISESINK, lpAdviseSink), (ULONG *, lpulConnection))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, Unadvise, (ULONG, ulConnection))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, GetStatus, (ULONG *, lpulTableStatus), (ULONG *, lpulTableType))
-DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, SetColumns, (LPSPropTagArray, lpPropTagArray), (ULONG, ulFlags))
+DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, SetColumns, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, QueryColumns, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, GetRowCount, (ULONG, ulFlags), (ULONG *, lpulCount))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, SeekRow, (BOOKMARK, bkOrigin), (LONG, lRowCount), (LONG *, lplRowsSought))
@@ -244,37 +218,32 @@ DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, FindRow, (LPSRestriction,
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, Restrict, (LPSRestriction, lpRestriction), (ULONG, ulFlags))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, CreateBookmark, (BOOKMARK *, lpbkPosition))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, FreeBookmark, (BOOKMARK, bkPosition))
-DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, SortTable, (LPSSortOrderSet, lpSortCriteria), (ULONG, ulFlags))
+DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, SortTable, (const SSortOrderSet *, lpSortCriteria), (ULONG, ulFlags))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, QuerySortOrder, (LPSSortOrderSet *, lppSortCriteria))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, QueryRows, (LONG, lRowCount), (ULONG, ulFlags), (LPSRowSet *, lppRows))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, Abort, (void))
-DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, ExpandRow, (ULONG, cbInstanceKey, LPBYTE, pbInstanceKey), (ULONG, ulRowCount), (ULONG, ulFlags), (LPSRowSet *, lppRows), (ULONG *, lpulMoreRows))
-DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, CollapseRow, (ULONG, cbInstanceKey, LPBYTE, pbInstanceKey), (ULONG, ulFlags), (ULONG *, lpulRowCount))
+DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, ExpandRow, (ULONG, cbInstanceKey), (LPBYTE, pbInstanceKey), (ULONG, ulRowCount), (ULONG, ulFlags), (LPSRowSet *, lppRows), (ULONG *, lpulMoreRows))
+DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, CollapseRow, (ULONG, cbInstanceKey), (LPBYTE, pbInstanceKey), (ULONG, ulFlags), (ULONG *, lpulRowCount))
 DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, WaitForCompletion, (ULONG, ulFlags), (ULONG, ulTimeout), (ULONG *, lpulTableStatus))
-DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, GetCollapseState, (ULONG, ulFlags), (ULONG, cbInstanceKey, LPBYTE, lpbInstanceKey), (ULONG *, lpcbCollapseState, LPBYTE *, lppbCollapseState))
-DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, SetCollapseState, (ULONG, ulFlags), (ULONG, cbCollapseState, LPBYTE, pbCollapseState), (BOOKMARK *, lpbkLocation))
+DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, GetCollapseState, (ULONG, ulFlags), (ULONG, cbInstanceKey), (LPBYTE, lpbInstanceKey), (ULONG *, lpcbCollapseState), (LPBYTE *, lppbCollapseState))
+DEF_HRMETHOD(TRACE_MAPI, ECRulesTableProxy, MAPITable, SetCollapseState, (ULONG, ulFlags), (ULONG, cbCollapseState), (LPBYTE, pbCollapseState), (BOOKMARK *, lpbkLocation))
 
 static HRESULT ConvertUnicodeToString8(const WCHAR *lpszW, char **lppszA,
     void *base, convert_context &converter)
 {
-	HRESULT hr = hrSuccess;
 	std::string local;
 	char *lpszA = NULL;
 
-	if (lpszW == NULL || lppszA == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (lpszW == NULL || lppszA == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 	TryConvert(lpszW, local);
-	hr = MAPIAllocateMore((local.length() +1) * sizeof(std::string::value_type), base, (void**)&lpszA);
+	HRESULT hr = MAPIAllocateMore((local.length() + 1) * sizeof(std::string::value_type),
+		base, reinterpret_cast<void **>(&lpszA));
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	strcpy(lpszA, local.c_str());
 	*lppszA = lpszA;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 static HRESULT ConvertUnicodeToString8(LPSRestriction lpRestriction,
@@ -284,39 +253,39 @@ static HRESULT ConvertUnicodeToString8(LPSRestriction lpRestriction,
 	ULONG i;
 
 	if (lpRestriction == NULL)
-		goto exit;
+		return hr;
 
 	switch (lpRestriction->rt) {
 	case RES_OR:
 		for (i = 0; i < lpRestriction->res.resOr.cRes; ++i) {
 			hr = ConvertUnicodeToString8(&lpRestriction->res.resOr.lpRes[i], base, converter);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 		break;
 	case RES_AND:
 		for (i = 0; i < lpRestriction->res.resAnd.cRes; ++i) {
 			hr = ConvertUnicodeToString8(&lpRestriction->res.resAnd.lpRes[i], base, converter);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 		break;
 	case RES_NOT:
 		hr = ConvertUnicodeToString8(lpRestriction->res.resNot.lpRes, base, converter);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		break;
 	case RES_COMMENT:
 		if (lpRestriction->res.resComment.lpRes) {
 			hr = ConvertUnicodeToString8(lpRestriction->res.resComment.lpRes, base, converter);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 		for (i = 0; i < lpRestriction->res.resComment.cValues; ++i)
 			if (PROP_TYPE(lpRestriction->res.resComment.lpProp[i].ulPropTag) == PT_UNICODE) {
 				hr = ConvertUnicodeToString8(lpRestriction->res.resComment.lpProp[i].Value.lpszW, &lpRestriction->res.resComment.lpProp[i].Value.lpszA, base, converter);
 				if (hr != hrSuccess)
-					goto exit;
+					return hr;
 				lpRestriction->res.resComment.lpProp[i].ulPropTag = CHANGE_PROP_TYPE(lpRestriction->res.resComment.lpProp[i].ulPropTag, PT_STRING8);
 			}
 		break;
@@ -326,7 +295,7 @@ static HRESULT ConvertUnicodeToString8(LPSRestriction lpRestriction,
 		if (PROP_TYPE(lpRestriction->res.resContent.ulPropTag) == PT_UNICODE) {
 			hr = ConvertUnicodeToString8(lpRestriction->res.resContent.lpProp->Value.lpszW, &lpRestriction->res.resContent.lpProp->Value.lpszA, base, converter);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 			lpRestriction->res.resContent.lpProp->ulPropTag = CHANGE_PROP_TYPE(lpRestriction->res.resContent.lpProp->ulPropTag, PT_STRING8);
 			lpRestriction->res.resContent.ulPropTag = CHANGE_PROP_TYPE(lpRestriction->res.resContent.ulPropTag, PT_STRING8);
 		}
@@ -335,7 +304,7 @@ static HRESULT ConvertUnicodeToString8(LPSRestriction lpRestriction,
 		if (PROP_TYPE(lpRestriction->res.resProperty.ulPropTag) == PT_UNICODE) {
 			hr = ConvertUnicodeToString8(lpRestriction->res.resProperty.lpProp->Value.lpszW, &lpRestriction->res.resProperty.lpProp->Value.lpszA, base, converter);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 			lpRestriction->res.resProperty.lpProp->ulPropTag = CHANGE_PROP_TYPE(lpRestriction->res.resProperty.lpProp->ulPropTag, PT_STRING8);
 			lpRestriction->res.resProperty.ulPropTag = CHANGE_PROP_TYPE(lpRestriction->res.resProperty.ulPropTag, PT_STRING8);
 		}
@@ -343,69 +312,53 @@ static HRESULT ConvertUnicodeToString8(LPSRestriction lpRestriction,
 	case RES_SUBRESTRICTION:
 		hr = ConvertUnicodeToString8(lpRestriction->res.resSub.lpRes, base, converter);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		break;
-	};
-
-exit:
+	}
 	return hr;
 }
 
 static HRESULT ConvertUnicodeToString8(const SRow *lpRow, void *base,
     convert_context &converter)
 {
-	HRESULT hr = hrSuccess;
-
 	if (lpRow == NULL)
-		goto exit;
-
+		return hrSuccess;
 	for (ULONG c = 0; c < lpRow->cValues; ++c) {
 		if (PROP_TYPE(lpRow->lpProps[c].ulPropTag) == PT_UNICODE) {
-			hr = ConvertUnicodeToString8(lpRow->lpProps[c].Value.lpszW, &lpRow->lpProps[c].Value.lpszA, base, converter);
+			HRESULT hr = ConvertUnicodeToString8(lpRow->lpProps[c].Value.lpszW,
+				&lpRow->lpProps[c].Value.lpszA, base, converter);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 			lpRow->lpProps[c].ulPropTag = CHANGE_PROP_TYPE(lpRow->lpProps[c].ulPropTag, PT_STRING8);
 		}
-		if (hr != hrSuccess)
-			goto exit;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 static HRESULT ConvertUnicodeToString8(const ADRLIST *lpAdrList, void *base,
     convert_context &converter)
 {
-	HRESULT hr = hrSuccess;
-
 	if (lpAdrList == NULL)
-		goto exit;
-
+		return hrSuccess;
 	for (ULONG c = 0; c < lpAdrList->cEntries; ++c) {
 		// treat as row
-		hr = ConvertUnicodeToString8((LPSRow)&lpAdrList->aEntries[c], base, converter);
+		HRESULT hr = ConvertUnicodeToString8(reinterpret_cast<const SRow *>(&lpAdrList->aEntries[c]),
+			base, converter);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 static HRESULT ConvertUnicodeToString8(const ACTIONS *lpActions, void *base, convert_context &converter)
 {
-	HRESULT hr = hrSuccess;
-
 	if (lpActions == NULL)
-		goto exit;
-
+		return hrSuccess;
 	for (ULONG c = 0; c < lpActions->cActions; ++c)
 		if (lpActions->lpAction[c].acttype == OP_FORWARD || lpActions->lpAction[c].acttype == OP_DELEGATE) {
-			hr = ConvertUnicodeToString8(lpActions->lpAction[c].lpadrlist, base, converter);
+			HRESULT hr = ConvertUnicodeToString8(lpActions->lpAction[c].lpadrlist, base, converter);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
-exit:
-	return hr;
+	return hrSuccess;
 }

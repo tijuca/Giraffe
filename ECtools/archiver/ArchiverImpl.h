@@ -21,37 +21,37 @@
 #ifndef ARCHIVERIMPL_H_INCLUDED
 #define ARCHIVERIMPL_H_INCLUDED
 
+#include <kopano/zcdefs.h>
+#include <kopano/automapi.hpp>
 #include "Archiver.h"               // for declaration of class Archiver
-#include "AutoMAPI.h"               // for declaration of AutoMAPI
 #include "ArchiverSessionPtr.h"     // For ArchiverSessionPtr
 
-class ArchiverImpl : public Archiver
-{
+namespace KC {
+
+class ArchiverImpl _kc_final : public Archiver {
 public:
-	ArchiverImpl();
+	ArchiverImpl(void) = default;
+	ArchiverImpl(const ArchiverImpl &) = delete;
 	~ArchiverImpl();
-
-	eResult Init(const char *lpszAppName, const char *lpszConfig, const configsetting_t *lpExtraSettings, unsigned int ulFlags);
-
-	eResult GetControl(ArchiveControlPtr *lpptrControl, bool bForceCleanup);
-	eResult GetManage(const TCHAR *lpszUser, ArchiveManagePtr *lpptrManage);
-	eResult AutoAttach(unsigned int ulFlags);
-
-	ECConfig *GetConfig(void) const { return m_lpsConfig; }
-
-	ECLogger* GetLogger(eLogType which) const; // Inherits default (which = DefaultLog) from Archiver::GetLogger
+	eResult Init(const char *lpszAppName, const char *lpszConfig, const configsetting_t *lpExtraSettings, unsigned int ulFlags) _kc_override;
+	eResult GetControl(ArchiveControlPtr *lpptrControl, bool bForceCleanup) _kc_override;
+	eResult GetManage(const TCHAR *lpszUser, ArchiveManagePtr *lpptrManage) _kc_override;
+	eResult AutoAttach(unsigned int ulFlags) _kc_override;
+	ECConfig *GetConfig(void) const _kc_override { return m_lpsConfig; }
+	ECLogger *GetLogger(eLogType which) const _kc_override; // Inherits default (which = DefaultLog) from Archiver::GetLogger
 
 private:
 	configsetting_t* ConcatSettings(const configsetting_t *lpSettings1, const configsetting_t *lpSettings2);
 	unsigned CountSettings(const configsetting_t *lpSettings);
 
-private:
-	AutoMAPI		m_MAPI;
-	ECConfig		*m_lpsConfig;
-	ECLogger		*m_lpLogger;
-    ECLogger        *m_lpLogLogger; // Logs only to the log specified in the config
+	KCHL::AutoMAPI m_MAPI;
+	ECConfig *m_lpsConfig = nullptr;
+	ECLogger *m_lpLogger = nullptr;
+	ECLogger *m_lpLogLogger = nullptr; // Logs only to the log specified in the config
 	ArchiverSessionPtr 		m_ptrSession;
-	configsetting_t	*m_lpDefaults;
+	configsetting_t	*m_lpDefaults = nullptr;
 };
+
+} /* namespace */
 
 #endif // !defined ARCHIVERIMPL_H_INCLUDED

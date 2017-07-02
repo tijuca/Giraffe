@@ -19,6 +19,7 @@
 #define WSABPROPSTORAGE_H
 
 #include <kopano/zcdefs.h>
+#include <mutex>
 #include <kopano/ECUnknown.h>
 #include "IECPropStorage.h"
 
@@ -28,20 +29,15 @@
 
 #include <mapi.h>
 #include <mapispi.h>
-#include <pthread.h>
 
-class WSABPropStorage : public ECUnknown
-{
-
+class WSABPropStorage _kc_final : public ECUnknown {
 protected:
-	WSABPropStorage(ULONG cbEntryId, LPENTRYID lpEntryId, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport);
+	WSABPropStorage(ULONG cbEntryId, LPENTRYID, KCmd *, std::recursive_mutex &, ECSESSIONID, WSTransport *);
 	virtual ~WSABPropStorage();
 
 public:
-	static HRESULT Create(ULONG cbEntryId, LPENTRYID lpEntryId, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport, WSABPropStorage **lppPropStorage);
-
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
-	
+	static HRESULT Create(ULONG cbEntryId, LPENTRYID, KCmd *, std::recursive_mutex &, ECSESSIONID, WSTransport *, WSABPropStorage **);
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 	static HRESULT Reload(void *lpParam, ECSESSIONID sessionId);
 	
 private:
@@ -56,7 +52,7 @@ private:
 	virtual	HRESULT	HrWriteProps(ULONG cValues, LPSPropValue pValues, ULONG ulFlags = 0);
 
 	// Delete properties from file
-	virtual HRESULT HrDeleteProps(LPSPropTagArray lpsPropTagArray);
+	virtual HRESULT HrDeleteProps(const SPropTagArray *lpsPropTagArray);
 
 	// Save complete object to disk
 	virtual HRESULT HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject);
@@ -70,27 +66,15 @@ private:
 	virtual HRESULT UnLockSoap();
 
 public:
-	class xECPropStorage _zcp_final : public IECPropStorage {
-		public:
-			// IECUnknown
-			virtual ULONG AddRef(void) _zcp_override;
-			virtual ULONG Release(void) _zcp_override;
-			virtual HRESULT QueryInterface(REFIID refiid , void **lppInterface) _zcp_override;
-
-			// IECPropStorage
-			virtual HRESULT HrReadProps(LPSPropTagArray *lppPropTags,ULONG *cValues, LPSPropValue *lppValues);
-			virtual HRESULT HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropValue *lppsPropValue);
-			virtual	HRESULT	HrWriteProps(ULONG cValues, LPSPropValue lpValues, ULONG ulFlags = 0);
-			virtual HRESULT HrDeleteProps(LPSPropTagArray lpsPropTagArray);
-			virtual HRESULT HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsSavedObject);
-			virtual HRESULT HrLoadObject(MAPIOBJECT **lppsMapiObject);
-			virtual IECPropStorage* GetServerStorage();
-	}m_xECPropStorage;
+	class xECPropStorage _kc_final : public IECPropStorage {
+		#include <kopano/xclsfrag/IECUnknown.hpp>
+		#include <kopano/xclsfrag/IECPropStorage.hpp>
+	} m_xECPropStorage;
 
 private:
 	entryId			m_sEntryId;
 	KCmd*		lpCmd;
-	pthread_mutex_t *lpDataLock;
+	std::recursive_mutex &lpDataLock;
 	ECSESSIONID		ecSessionId;
 	WSTransport*	m_lpTransport;
 	ULONG			m_ulSessionReloadCallback;

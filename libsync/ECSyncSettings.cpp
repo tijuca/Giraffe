@@ -16,32 +16,24 @@
  */
 
 #include <kopano/platform.h>
+#include <mutex>
+#include <kopano/lockhelper.hpp>
 #include "ECSyncSettings.h"
-
-#include <pthread.h>
 #include <mapix.h>
 
 #include <kopano/ECLogger.h>
 
 ECSyncSettings* ECSyncSettings::GetInstance()
 {
-	pthread_mutex_lock(&s_hMutex);
+	scoped_lock lock(s_hMutex);
 
 	if (s_lpInstance == NULL)
 		s_lpInstance = new ECSyncSettings;
-
-	pthread_mutex_unlock(&s_hMutex);
-
 	return s_lpInstance;
 }
 
-ECSyncSettings::ECSyncSettings()
-: m_ulSyncLog(0)
-, m_ulSyncLogLevel(EC_LOGLEVEL_INFO)
-, m_ulSyncOpts(EC_SYNC_OPT_ALL)
-, m_ulStreamTimeout(30000)
-, m_ulStreamBufferSize(131072)
-, m_ulStreamBatchSize(256)
+ECSyncSettings::ECSyncSettings(void) :
+	m_ulSyncLogLevel(EC_LOGLEVEL_INFO)
 {
 	char *env = getenv("KOPANO_SYNC_LOGLEVEL");
 	if (env && env[0] != '\0') {
@@ -74,19 +66,19 @@ ULONG ECSyncSettings::SyncLogLevel() const {
 }
 
 bool ECSyncSettings::ContinuousLogging() const {
-	return (m_ulSyncOpts & EC_SYNC_OPT_CONTINUOUS) == EC_SYNC_OPT_CONTINUOUS;
+	return m_ulSyncOpts & EC_SYNC_OPT_CONTINUOUS;
 }
 
 bool ECSyncSettings::SyncStreamEnabled() const {
-	return (m_ulSyncOpts & EC_SYNC_OPT_STREAM) == EC_SYNC_OPT_STREAM;
+	return m_ulSyncOpts & EC_SYNC_OPT_STREAM;
 }
 
 bool ECSyncSettings::ChangeNotificationsEnabled() const {
-	return (m_ulSyncOpts & EC_SYNC_OPT_CHANGENOTIF) == EC_SYNC_OPT_CHANGENOTIF;
+	return m_ulSyncOpts & EC_SYNC_OPT_CHANGENOTIF;
 }
 
 bool ECSyncSettings::StateCollectorEnabled() const {
-	return (m_ulSyncOpts & EC_SYNC_OPT_STATECOLLECT) == EC_SYNC_OPT_STATECOLLECT;
+	return m_ulSyncOpts & EC_SYNC_OPT_STATECOLLECT;
 }
 
 ULONG ECSyncSettings::StreamTimeout() const {
@@ -184,16 +176,11 @@ ULONG ECSyncSettings::SetStreamBatchSize(ULONG ulBatchSize) {
 	return ulPrev;
 }
 
-pthread_mutex_t ECSyncSettings::s_hMutex;
+std::mutex ECSyncSettings::s_hMutex;
 ECSyncSettings* ECSyncSettings::s_lpInstance = NULL;
-
-ECSyncSettings::__initializer::__initializer() {
-	pthread_mutex_init(&ECSyncSettings::s_hMutex, NULL);
-}
 
 ECSyncSettings::__initializer::~__initializer() {
 	delete ECSyncSettings::s_lpInstance;
-	pthread_mutex_destroy(&ECSyncSettings::s_hMutex);
 }
 
 ECSyncSettings::__initializer ECSyncSettings::__i;

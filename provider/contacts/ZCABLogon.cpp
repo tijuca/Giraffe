@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <utility>
 #include <kopano/Trace.h>
 #include "ZCABLogon.h"
 #include "ZCABContainer.h"
@@ -23,20 +24,19 @@
 #include <kopano/ECDebug.h>
 #include <kopano/ECDebugPrint.h>
 #include <kopano/ECGuid.h>
+#include <kopano/ECInterfaceDefs.h>
+#include <kopano/memory.hpp>
 #include "kcore.hpp"
 #include <mapix.h>
 #include <edkmdb.h>
 
-ZCABLogon::ZCABLogon(LPMAPISUP lpMAPISup, ULONG ulProfileFlags, GUID *lpGUID) : ECUnknown("IABLogon")
+using namespace KCHL;
+
+ZCABLogon::ZCABLogon(LPMAPISUP lpMAPISup, ULONG ulProfileFlags, GUID *lpGUID) :
+	ECUnknown("IABLogon"), m_lpMAPISup(lpMAPISup)
 {
 	// The specific GUID for *this* addressbook provider, if available
-	if (lpGUID) {
-		m_ABPGuid = *lpGUID;
-	} else {
-		m_ABPGuid = GUID_NULL;
-	}
-
-	m_lpMAPISup = lpMAPISup;
+	m_ABPGuid = lpGUID != nullptr ? *lpGUID : GUID_NULL;
 	if(m_lpMAPISup)
 		m_lpMAPISup->AddRef();
 }
@@ -44,10 +44,8 @@ ZCABLogon::ZCABLogon(LPMAPISUP lpMAPISup, ULONG ulProfileFlags, GUID *lpGUID) : 
 ZCABLogon::~ZCABLogon()
 {
 	ClearFolderList();
-	if(m_lpMAPISup) {
+	if (m_lpMAPISup != nullptr)
 		m_lpMAPISup->Release();
-		m_lpMAPISup = NULL;
-	}
 }
 
 HRESULT ZCABLogon::Create(LPMAPISUP lpMAPISup, ULONG ulProfileFlags, GUID *lpGuid, ZCABLogon **lppZCABLogon)
@@ -66,12 +64,10 @@ HRESULT ZCABLogon::Create(LPMAPISUP lpMAPISup, ULONG ulProfileFlags, GUID *lpGui
 
 HRESULT ZCABLogon::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ZCABLogon, this);
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
-	REGISTER_INTERFACE(IID_IABLogon, &this->m_xABLogon);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xABLogon);
-
+	REGISTER_INTERFACE2(ZCABLogon, this);
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IABLogon, &this->m_xABLogon);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xABLogon);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -110,40 +106,34 @@ HRESULT ZCABLogon::Logoff(ULONG ulFlags)
  */
 HRESULT ZCABLogon::AddFolder(const WCHAR* lpwDisplayName, ULONG cbStore, LPBYTE lpStore, ULONG cbFolder, LPBYTE lpFolder)
 {
-	HRESULT hr = hrSuccess;
 	zcabFolderEntry entry;
 
-	if (cbStore == 0 || lpStore == NULL || cbFolder == 0 || lpFolder == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (cbStore == 0 || lpStore == NULL || cbFolder == 0 || lpFolder == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	entry.strwDisplayName = lpwDisplayName;
 
 	entry.cbStore = cbStore;
-	hr = MAPIAllocateBuffer(cbStore, (void**)&entry.lpStore);
+	HRESULT hr = MAPIAllocateBuffer(cbStore,
+	             reinterpret_cast<void **>(&entry.lpStore));
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	memcpy(entry.lpStore, lpStore, cbStore);
 
 	entry.cbFolder = cbFolder;
 	hr = MAPIAllocateBuffer(cbFolder, (void**)&entry.lpFolder);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	memcpy(entry.lpFolder, lpFolder, cbFolder);
-
-	m_lFolders.push_back(entry);
-
-exit:
-	return hr;
+	m_lFolders.push_back(std::move(entry));
+	return hrSuccess;
 }
 
 HRESULT ZCABLogon::ClearFolderList()
 {
-	for (std::vector<zcabFolderEntry>::const_iterator i = m_lFolders.begin();
-	     i != m_lFolders.end(); ++i) {
-		MAPIFreeBuffer(i->lpStore);
-		MAPIFreeBuffer(i->lpFolder);
+	for (const auto &i : m_lFolders) {
+		MAPIFreeBuffer(i.lpStore);
+		MAPIFreeBuffer(i.lpFolder);
 	}
 	m_lFolders.clear();
 	return hrSuccess;
@@ -171,45 +161,37 @@ HRESULT ZCABLogon::ClearFolderList()
 HRESULT ZCABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk)
 {
 	HRESULT			hr = hrSuccess;
-	ZCABContainer *lpRootContainer = NULL;
-	ZCMAPIProp *lpContact = NULL;
-	LPPROFSECT lpProfileSection = NULL;
-	LPSPropValue lpFolderProps = NULL;
+	object_ptr<ZCABContainer> lpRootContainer;
+	object_ptr<ZCMAPIProp> lpContact;
+	object_ptr<IProfSect> lpProfileSection;
+	memory_ptr<SPropValue> lpFolderProps;
 	ULONG cValues = 0;
-	SizedSPropTagArray(3, sptaFolderProps) = {3, {PR_ZC_CONTACT_STORE_ENTRYIDS, PR_ZC_CONTACT_FOLDER_ENTRYIDS, PR_ZC_CONTACT_FOLDER_NAMES_W}};
+	static constexpr const SizedSPropTagArray(3, sptaFolderProps) =
+		{3, {PR_ZC_CONTACT_STORE_ENTRYIDS,
+		PR_ZC_CONTACT_FOLDER_ENTRYIDS, PR_ZC_CONTACT_FOLDER_NAMES_W}};
 	
 	// Check input/output variables 
-	if(lpulObjType == NULL || lppUnk == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpulObjType == nullptr || lppUnk == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
 
 	if(cbEntryID == 0 && lpEntryID == NULL) {
 		// this is the "Kopano Contacts Folders" container. Get the hierarchy of this folder. SetEntryID(0000 + guid + MAPI_ABCONT + ?) ofzo?
-		hr = ZCABContainer::Create(NULL, NULL, m_lpMAPISup, this, &lpRootContainer);
+		hr = ZCABContainer::Create(nullptr, nullptr, m_lpMAPISup, this, &~lpRootContainer);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 	} else {
-		if (cbEntryID == 0 || lpEntryID == NULL) {
-			hr = MAPI_E_UNKNOWN_ENTRYID;
-			goto exit;
-		}
+		if (cbEntryID == 0 || lpEntryID == nullptr)
+			return MAPI_E_UNKNOWN_ENTRYID;
 
 		// you can only open the top level container
-		if (memcmp((LPBYTE)lpEntryID +4, &MUIDZCSAB, sizeof(GUID)) != 0) {
-			hr = MAPI_E_UNKNOWN_ENTRYID;
-			goto exit;
-		}
-
-		hr = m_lpMAPISup->OpenProfileSection((LPMAPIUID)pbGlobalProfileSectionGuid, 0, &lpProfileSection);
+		if (memcmp((LPBYTE)lpEntryID +4, &MUIDZCSAB, sizeof(GUID)) != 0)
+			return MAPI_E_UNKNOWN_ENTRYID;
+		hr = m_lpMAPISup->OpenProfileSection((LPMAPIUID)pbGlobalProfileSectionGuid, 0, &~lpProfileSection);
 		if (hr != hrSuccess)
-			goto exit;
-
-		hr = lpProfileSection->GetProps((LPSPropTagArray)&sptaFolderProps, 0, &cValues, &lpFolderProps);
+			return hr;
+		hr = lpProfileSection->GetProps(sptaFolderProps, 0, &cValues, &~lpFolderProps);
 		if (FAILED(hr))
-			goto exit;
-		hr = hrSuccess;
+			return hr;
 
 		// remove old list, if present
 		ClearFolderList();
@@ -225,15 +207,15 @@ HRESULT ZCABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 						  lpFolderProps[0].Value.MVbin.lpbin[c].cb, lpFolderProps[0].Value.MVbin.lpbin[c].lpb,
 						  lpFolderProps[1].Value.MVbin.lpbin[c].cb, lpFolderProps[1].Value.MVbin.lpbin[c].lpb);
 
-		hr = ZCABContainer::Create(&m_lFolders, NULL, m_lpMAPISup, this, &lpRootContainer);
+		hr = ZCABContainer::Create(&m_lFolders, nullptr, m_lpMAPISup, this, &~lpRootContainer);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		if (cbEntryID > 4+sizeof(GUID)) {
 			// we're actually opening a contact .. so pass-through to the just opened rootcontainer
-			hr = lpRootContainer->OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, lpulObjType, (LPUNKNOWN*)&lpContact);
+			hr = lpRootContainer->OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, lpulObjType, &~lpContact);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 	}
 
@@ -251,24 +233,11 @@ HRESULT ZCABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 			hr = lpRootContainer->QueryInterface(IID_IABContainer, (void **)lppUnk);
 	}
 	if(hr != hrSuccess)
-		goto exit;
-
-	if (!lpContact) {
+		return hr;
+	if (lpContact == nullptr)
 		// root container has pointer to my m_lFolders
 		AddChild(lpRootContainer);
-	}
-
-exit:
-	if (lpProfileSection)
-		lpProfileSection->Release();
-	MAPIFreeBuffer(lpFolderProps);
-	if (lpRootContainer)
-		lpRootContainer->Release();
-
-	if (lpContact)
-		lpContact->Release();
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ZCABLogon::CompareEntryIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult)
@@ -279,22 +248,11 @@ HRESULT ZCABLogon::CompareEntryIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG
 
 HRESULT ZCABLogon::Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection)
 {
-	HRESULT hr = hrSuccess;
-
-	if(lpAdviseSink == NULL || lpulConnection == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if(lpEntryID == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	hr = MAPI_E_NO_SUPPORT;
-
-exit:
-	return hr;
+	if (lpAdviseSink == NULL || lpulConnection == NULL)
+		return MAPI_E_INVALID_PARAMETER;
+	if (lpEntryID == NULL)
+		return MAPI_E_INVALID_PARAMETER;
+	return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT ZCABLogon::Unadvise(ULONG ulConnection)
@@ -317,130 +275,25 @@ HRESULT ZCABLogon::GetOneOffTable(ULONG ulFlags, LPMAPITABLE * lppTable)
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ZCABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, LPADRLIST lpRecipList)
+HRESULT ZCABLogon::PrepareRecips(ULONG ulFlags,
+    const SPropTagArray *lpPropTagArray, LPADRLIST lpRecipList)
 {
-	HRESULT			hr = hrSuccess;
-
-	if(lpPropTagArray == NULL || lpPropTagArray->cValues == 0) // There is no work to do.
-		goto exit;
-
-	hr = MAPI_E_NO_SUPPORT;
-
-exit:
-	return hr;
+	if(lpPropTagArray == NULL || lpPropTagArray->cValues == 0)
+		/* There is no work to do. */
+		return hrSuccess;
+	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ZCABLogon::xABLogon::QueryInterface(REFIID refiid, void ** lppInterface)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
-	METHOD_PROLOGUE_(ZCABLogon , ABLogon);
-	HRESULT hr = pThis->QueryInterface(refiid, lppInterface);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-ULONG ZCABLogon::xABLogon::AddRef()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::AddRef", "");
-	METHOD_PROLOGUE_(ZCABLogon , ABLogon);
-	return pThis->AddRef();
-}
-
-ULONG ZCABLogon::xABLogon::Release()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::Release", "");
-	METHOD_PROLOGUE_(ZCABLogon , ABLogon);
-	ULONG ulRef = pThis->Release();
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::Release", "%d", ulRef);
-	return ulRef;
-}
-
-HRESULT ZCABLogon::xABLogon::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::GetLastError", "");
-	METHOD_PROLOGUE_(ZCABLogon , ABLogon);
-	HRESULT hr = pThis->GetLastError(hResult, ulFlags, lppMAPIError);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::GetLastError", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABLogon::xABLogon::Logoff(ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::Logoff", "");
-	METHOD_PROLOGUE_(ZCABLogon, ABLogon);
-	HRESULT hr = pThis->Logoff(ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::Logoff", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABLogon::xABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk) 
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::OpenEntry", "cbEntryID=%d, type=%d, id=%d, interface=%s, flags=0x%08X", cbEntryID, ABEID_TYPE(lpEntryID), ABEID_ID(lpEntryID), (lpInterface)?DBGGUIDToString(*lpInterface).c_str():"", ulFlags);
-	METHOD_PROLOGUE_(ZCABLogon, ABLogon);
-	HRESULT hr = pThis->OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, lpulObjType, lppUnk);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::OpenEntry", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABLogon::xABLogon::CompareEntryIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult) 
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::CompareEntryIDs", "flags: %d\nentryid1: %s\nentryid2: %s", ulFlags, bin2hex(cbEntryID1, (BYTE*)lpEntryID1).c_str(), bin2hex(cbEntryID2, (BYTE*)lpEntryID2).c_str());
-	METHOD_PROLOGUE_(ZCABLogon, ABLogon);
-	HRESULT hr = pThis->CompareEntryIDs(cbEntryID1, lpEntryID1, cbEntryID2, lpEntryID2, ulFlags, lpulResult);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::CompareEntryIDs", "%s, result=%s", GetMAPIErrorDescription(hr).c_str(), (lpulResult)?((*lpulResult == TRUE)?"TRUE":"FALSE") : "NULL");
-	return hr;
-}
-
-HRESULT ZCABLogon::xABLogon::Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection) 
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::Advise", "");
-	METHOD_PROLOGUE_(ZCABLogon, ABLogon);
-	HRESULT hr = pThis->Advise(cbEntryID, lpEntryID, ulEventMask, lpAdviseSink, lpulConnection);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::Advise", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABLogon::xABLogon::Unadvise(ULONG ulConnection)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::Unadvise", "");
-	METHOD_PROLOGUE_(ZCABLogon, ABLogon);
-	HRESULT hr = pThis->Unadvise(ulConnection);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::Unadvise", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABLogon::xABLogon::OpenStatusEntry(LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPMAPISTATUS * lppMAPIStatus)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::OpenStatusEntry", "");
-	METHOD_PROLOGUE_(ZCABLogon, ABLogon);
-	HRESULT hr = pThis->OpenStatusEntry(lpInterface, ulFlags, lpulObjType, lppMAPIStatus);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::OpenStatusEntry", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABLogon::xABLogon::OpenTemplateID(ULONG cbTemplateID, LPENTRYID lpTemplateID, ULONG ulTemplateFlags, LPMAPIPROP lpMAPIPropData, LPCIID lpInterface, LPMAPIPROP * lppMAPIPropNew, LPMAPIPROP lpMAPIPropSibling)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::OpenTemplateID", "");
-	METHOD_PROLOGUE_(ZCABLogon, ABLogon);
-	HRESULT hr = pThis->OpenTemplateID(cbTemplateID, lpTemplateID, ulTemplateFlags, lpMAPIPropData, lpInterface, lppMAPIPropNew, lpMAPIPropSibling);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::OpenTemplateID", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABLogon::xABLogon::GetOneOffTable(ULONG ulFlags, LPMAPITABLE * lppTable)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::GetOneOffTable", "flags=0x%08X", ulFlags);
-	METHOD_PROLOGUE_(ZCABLogon, ABLogon);
-	HRESULT hr = pThis->GetOneOffTable(ulFlags, lppTable);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::GetOneOffTable", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABLogon::xABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, LPADRLIST lpRecipList)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::PrepareRecips", "flags=0x%08X, PropTagArray=%s\nin=%s", ulFlags, PropNameFromPropTagArray(lpPropTagArray).c_str(), RowSetToString((LPSRowSet)lpRecipList).c_str());
-	METHOD_PROLOGUE_(ZCABLogon, ABLogon);
-	HRESULT hr = pThis->PrepareRecips(ulFlags, lpPropTagArray, lpRecipList);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::PrepareRecips", "%s\nout=%s", GetMAPIErrorDescription(hr).c_str(), RowSetToString((LPSRowSet)lpRecipList).c_str() );
-	return hr;
-}
+DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_ULONGMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, Release, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, GetLastError, (HRESULT, hResult), (ULONG, ulFlags), (LPMAPIERROR *, lppMAPIError))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, Logoff, (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, OpenEntry, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (LPCIID, lpInterface), (ULONG, ulFlags), (ULONG *, lpulObjType), (LPUNKNOWN *, lppUnk))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, CompareEntryIDs, (ULONG, cbEntryID1), (LPENTRYID, lpEntryID1), (ULONG, cbEntryID2), (LPENTRYID, lpEntryID2), (ULONG, ulFlags), (ULONG *, lpulResult))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, Advise, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (ULONG, ulEventMask), (LPMAPIADVISESINK, lpAdviseSink), (ULONG *, lpulConnection))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, Unadvise, (ULONG, ulConnection))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, OpenStatusEntry, (LPCIID, lpInterface), (ULONG, ulFlags), (ULONG *, lpulObjType), (LPMAPISTATUS *, lppMAPIStatus))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, OpenTemplateID, (ULONG, cbTemplateID), (LPENTRYID, lpTemplateID), (ULONG, ulTemplateFlags), (LPMAPIPROP, lpMAPIPropData), (LPCIID, lpInterface), (LPMAPIPROP *, lppMAPIPropNew), (LPMAPIPROP, lpMAPIPropSibling))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, GetOneOffTable, (ULONG, ulFlags), (LPMAPITABLE *, lppTable))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABLogon, ABLogon, PrepareRecips, (ULONG, ulFlags), (const SPropTagArray *, lpPropTagArray), (LPADRLIST, lpRecipList))

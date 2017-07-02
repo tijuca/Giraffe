@@ -21,10 +21,11 @@
 #include <map>
 #include <climits>
 #include <getopt.h>
-
+#include <kopano/automapi.hpp>
 #include <kopano/CommonUtil.h>
 #include <kopano/mapiext.h>
 #include <kopano/mapiguidext.h>
+#include <kopano/memory.hpp>
 #include <mapiutil.h>
 #include <mapix.h>
 #include <kopano/namedprops.h>
@@ -39,6 +40,7 @@
 #include "fsck.h"
 
 using namespace std;
+using namespace KCHL;
 
 string auto_fix;
 string auto_del;
@@ -48,8 +50,6 @@ string auto_del;
  */
 typedef pair<string, Fsck* > CHECKMAP_P;
 typedef map<string, Fsck* > CHECKMAP;
-typedef map<string, Fsck* >::iterator CHECKMAP_I;
-typedef map<string, Fsck* >::const_iterator CHECKMAP_CI;
 
 enum {
 	OPT_HELP = UCHAR_MAX + 1,
@@ -141,53 +141,40 @@ static void disclaimer(bool acceptDisclaimer)
 HRESULT allocNamedIdList(ULONG ulSize, LPMAPINAMEID **lpppNameArray)
 {
 	HRESULT hr;
-	LPMAPINAMEID *lppArray = NULL;
+	memory_ptr<MAPINAMEID *> lppArray;
 	LPMAPINAMEID lpBuffer = NULL;
 
-	hr = MAPIAllocateBuffer(ulSize * sizeof(LPMAPINAMEID), (void**)&lppArray);
+	hr = MAPIAllocateBuffer(ulSize * sizeof(LPMAPINAMEID), &~lppArray);
 	if (hr != hrSuccess)
 		return hr;
 
 	hr = MAPIAllocateMore(ulSize * sizeof(MAPINAMEID), lppArray, (void**)&lpBuffer);
-	if (hr != hrSuccess) {
-		MAPIFreeBuffer(lppArray);
+	if (hr != hrSuccess)
 		return hr;
-	}
-
 	for (ULONG i = 0; i < ulSize; ++i)
 		lppArray[i] = &lpBuffer[i];
 
-	*lpppNameArray = lppArray;
+	*lpppNameArray = lppArray.release();
 	return hrSuccess;
 }
 
-void freeNamedIdList(LPMAPINAMEID *lppNameArray)
-{
-	MAPIFreeBuffer(lppNameArray);
-}
-
-HRESULT ReadProperties(LPMESSAGE lpMessage, ULONG ulCount, ULONG *lpTag, LPSPropValue *lppPropertyArray)
+HRESULT ReadProperties(LPMESSAGE lpMessage, ULONG ulCount, const ULONG *lpTag,
+    LPSPropValue *lppPropertyArray)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropTagArray lpPropertyTagArray = NULL;
+	memory_ptr<SPropTagArray> lpPropertyTagArray;
 	ULONG ulPropertyCount = 0;
 
-	hr = MAPIAllocateBuffer(sizeof(SPropTagArray) + (sizeof(ULONG) * ulCount), (void**)&lpPropertyTagArray);
+	hr = MAPIAllocateBuffer(sizeof(SPropTagArray) + (sizeof(ULONG) * ulCount), &~lpPropertyTagArray);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	lpPropertyTagArray->cValues = ulCount;
 	for (ULONG i = 0; i < ulCount; ++i)
 		lpPropertyTagArray->aulPropTag[i] = lpTag[i];
 
 	hr = lpMessage->GetProps(lpPropertyTagArray, 0, &ulPropertyCount, lppPropertyArray);
-	if (FAILED(hr)) {
+	if (FAILED(hr))
 		cout << "Failed to obtain all properties." << endl;
-		goto exit;
-	}
-
-exit:
-	MAPIFreeBuffer(lpPropertyTagArray);
 	return hr;
 }
 
@@ -220,25 +207,16 @@ static HRESULT DetectFolderDetails(LPMAPIFOLDER lpFolder, string *lpName,
     string *lpClass, ULONG *lpFolderType)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpPropertyArray = NULL;
+	memory_ptr<SPropValue> lpPropertyArray;
 	ULONG ulPropertyCount = 0;
+	static constexpr const SizedSPropTagArray(3, PropertyTagArray) =
+		{3, {PR_DISPLAY_NAME_A, PR_CONTAINER_CLASS_A, PR_FOLDER_TYPE}};
 
-	SizedSPropTagArray(3, PropertyTagArray) = {
-		3,
-		{
-			PR_DISPLAY_NAME_A,
-			PR_CONTAINER_CLASS_A,
-			PR_FOLDER_TYPE,
-		}
-	};
-
-	hr = lpFolder->GetProps((LPSPropTagArray)&PropertyTagArray,
-			      0,
-			      &ulPropertyCount,
-			      &lpPropertyArray);
+	hr = lpFolder->GetProps(PropertyTagArray, 0, &ulPropertyCount,
+	     &~lpPropertyArray);
 	if (FAILED(hr)) {
 		cout << "Failed to obtain all properties." << endl;
-		goto exit;
+		return hr;
 	}
 
 	*lpFolderType = 0;
@@ -259,9 +237,6 @@ static HRESULT DetectFolderDetails(LPMAPIFOLDER lpFolder, string *lpName,
 	 */
 	if (!lpName->empty() && !lpClass->empty())
 		hr = hrSuccess;
-
-exit:
-	MAPIFreeBuffer(lpPropertyArray);
 	return hr;
 }
 
@@ -270,29 +245,24 @@ RunFolderValidation(const std::set<std::string> &setFolderIgnore,
     LPMAPIFOLDER lpRootFolder, LPSRow lpRow, CHECKMAP checkmap)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpItemProperty = NULL;
-	LPMAPIFOLDER lpFolder = NULL;
+	object_ptr<IMAPIFolder> lpFolder;
 	Fsck *lpFsck = NULL;
 	ULONG ulObjectType = 0;
 	string strName;
 	string strClass;
 	ULONG ulFolderType = 0;
 
-	lpItemProperty = PpropFindProp(lpRow->lpProps, lpRow->cValues, PR_ENTRYID);
+	auto lpItemProperty = PCpropFindProp(lpRow->lpProps, lpRow->cValues, PR_ENTRYID);
 	if (!lpItemProperty) {
 		cout << "Row does not contain an EntryID." << endl;
-		goto exit;
+		return hr;
 	}
-
 	hr = lpRootFolder->OpenEntry(lpItemProperty->Value.bin.cb,
-				   (LPENTRYID)lpItemProperty->Value.bin.lpb,
-				   &IID_IMAPIFolder,
-				   0,
-				   &ulObjectType,
-				   (IUnknown**)&lpFolder);
+	     reinterpret_cast<ENTRYID *>(lpItemProperty->Value.bin.lpb),
+	     &IID_IMAPIFolder, 0, &ulObjectType, &~lpFolder);
 	if (hr != hrSuccess) {
 		cout << "Failed to open EntryID." << endl;
-		goto exit;
+		return hr;
 	}
 
 	/*
@@ -305,39 +275,34 @@ RunFolderValidation(const std::set<std::string> &setFolderIgnore,
 			cout << " \"" << strName << "\"" << endl;
 		} else
 			cout << "Failed to detect folder details." << endl;
-		goto exit;
+		return hr;
 	}
 
 	if (setFolderIgnore.find(string((const char*)lpItemProperty->Value.bin.lpb, lpItemProperty->Value.bin.cb)) != setFolderIgnore.end()) {
 		cout << "Ignoring folder: ";
 		cout << "\"" << strName << "\" (" << strClass << ")" << endl;
-		goto exit;
+		return hrSuccess;
 	}
 
 	if (ulFolderType != FOLDER_GENERIC) {
 		cout << "Ignoring search folder: ";
 		cout << "\"" << strName << "\" (" << strClass << ")" << endl;
-		goto exit;
+		return hrSuccess;
 	}
 
-	for (CHECKMAP_CI i = checkmap.begin(); i != checkmap.end(); ++i)
-		if (i->first == strClass) {
-			lpFsck = i->second;
+	for (const auto &i : checkmap)
+		if (i.first == strClass) {
+			lpFsck = i.second;
 			break;
 		}
 
-	if (lpFsck)
+	if (lpFsck != nullptr) {
 		lpFsck->ValidateFolder(lpFolder, strName);
-	else {
-		cout << "Ignoring folder: ";
-		cout << "\"" << strName << "\" (" << strClass << ")" << endl;
+		return hrSuccess;
 	}
-
-exit:
-	if(lpFolder)
-		lpFolder->Release();
-
-	return hr;
+	cout << "Ignoring folder: ";
+	cout << "\"" << strName << "\" (" << strClass << ")" << endl;
+	return hrSuccess;
 }
 
 static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
@@ -345,32 +310,29 @@ static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
     CHECKMAP checkmap)
 {
 	HRESULT hr = hrSuccess;
-	LPMAPISESSION lpSession = NULL;
-	LPMDB lpStore = NULL;
-	LPMDB lpAltStore = NULL;
+	AutoMAPI mapiinit;
+	object_ptr<IMAPISession> lpSession;
+	object_ptr<IMsgStore> lpStore, lpAltStore;
 	LPMDB lpReadStore = NULL;
-	LPMAPIFOLDER lpRootFolder = NULL;
-	LPMAPITABLE lpHierarchyTable = NULL;
-	LPSRowSet lpRows = NULL;
+	object_ptr<IMAPIFolder> lpRootFolder;
+	object_ptr<IMAPITable> lpHierarchyTable;
 	ULONG ulObjectType;
 	ULONG ulCount;
-    LPEXCHANGEMANAGESTORE lpIEMS = NULL;
+	object_ptr<IExchangeManageStore> lpIEMS;
     // user
     ULONG			cbUserStoreEntryID = 0;
-    LPENTRYID		lpUserStoreEntryID = NULL;
+	memory_ptr<ENTRYID> lpUserStoreEntryID, lpEntryIDSrc;
 	wstring strwUsername;
 	wstring strwAltUsername;
 	wstring strwPassword;
 	std::set<std::string> setFolderIgnore;
-	LPSPropValue lpAddRenProp = NULL;
+	memory_ptr<SPropValue> lpAddRenProp;
 	ULONG cbEntryIDSrc = 0;
-	LPENTRYID lpEntryIDSrc = NULL;
-	ECLogger *const lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false);
 
-	hr = MAPIInitialize(NULL);
+	hr = mapiinit.Initialize();
 	if (hr != hrSuccess) {
 		cout << "Unable to initialize session" << endl;
-		goto exit;
+		return hr;
 	}
 
 	// input from commandline is current locale
@@ -381,47 +343,46 @@ static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
 	if (strAltUser)
 		strwAltUsername = convert_to<wstring>(strAltUser);
 
-	hr = HrOpenECSession(lpLogger, &lpSession, "kopano-fsck", PROJECT_SVN_REV_STR, strwUsername.c_str(), strwPassword.c_str(), strHost, 0, NULL, NULL);
-	lpLogger->Release();
+	hr = HrOpenECSession(&~lpSession, "kopano-fsck", PROJECT_SVN_REV_STR,
+	     strwUsername.c_str(), strwPassword.c_str(), strHost, 0, NULL, NULL);
 	if(hr != hrSuccess) {
 		cout << "Wrong username or password." << endl;
-		goto exit;
+		return hr;
 	}
 	
 	if (bPublic) {
-		hr = HrOpenECPublicStore(lpSession, &lpStore);
+		hr = HrOpenECPublicStore(lpSession, &~lpStore);
 		if (hr != hrSuccess) {
 			cout << "Failed to open public store." << endl;
-			goto exit;
+			return hr;
 		}
 	} else {
-		hr = HrOpenDefaultStore(lpSession, &lpStore);
+		hr = HrOpenDefaultStore(lpSession, &~lpStore);
 		if (hr != hrSuccess) {
 			cout << "Failed to open default store." << endl;
-			goto exit;
+			return hr;
 		}
 	}
 
 	if (!strwAltUsername.empty()) {
-        hr = lpStore->QueryInterface(IID_IExchangeManageStore, (void **)&lpIEMS);
+		hr = lpStore->QueryInterface(IID_IExchangeManageStore, &~lpIEMS);
         if (hr != hrSuccess) {
             cout << "Cannot open ExchangeManageStore object" << endl;
-            goto exit;
+		return hr;
         }
 
         hr = lpIEMS->CreateStoreEntryID(const_cast<wchar_t *>(L""),
              (LPTSTR)strwAltUsername.c_str(),
              MAPI_UNICODE | OPENSTORE_HOME_LOGON, &cbUserStoreEntryID,
-             &lpUserStoreEntryID);
+	     &~lpUserStoreEntryID);
         if (hr != hrSuccess) {
             cout << "Cannot get user store id for user" << endl;
-            goto exit;
+		return hr;
         }
-
-        hr = lpSession->OpenMsgStore(0, cbUserStoreEntryID, lpUserStoreEntryID, NULL, MDB_WRITE | MDB_NO_DIALOG | MDB_NO_MAIL | MDB_TEMPORARY, &lpAltStore);
+        hr = lpSession->OpenMsgStore(0, cbUserStoreEntryID, lpUserStoreEntryID, nullptr, MDB_WRITE | MDB_NO_DIALOG | MDB_NO_MAIL | MDB_TEMPORARY, &~lpAltStore);
         if (hr != hrSuccess) {
             cout << "Cannot open user store of user" << endl;
-            goto exit;
+		return hr;
         }
         
         lpReadStore = lpAltStore;
@@ -429,21 +390,20 @@ static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
 	    lpReadStore = lpStore;
     }
 
-	hr = lpReadStore->OpenEntry(0, NULL, &IID_IMAPIFolder, 0, &ulObjectType, (IUnknown **)&lpRootFolder);
+	hr = lpReadStore->OpenEntry(0, nullptr, &IID_IMAPIFolder, 0, &ulObjectType, &~lpRootFolder);
 	if(hr != hrSuccess) {
 		cout << "Failed to open root folder." << endl;
-		goto exit;
+		return hr;
 	}
 
-	if (HrGetOneProp(lpRootFolder, PR_IPM_OL2007_ENTRYIDS /*PR_ADDITIONAL_REN_ENTRYIDS_EX*/, &lpAddRenProp) == hrSuccess &&
-		Util::ExtractSuggestedContactsEntryID(lpAddRenProp, &cbEntryIDSrc, &lpEntryIDSrc) == hrSuccess) {
-		setFolderIgnore.insert(string((const char*)lpEntryIDSrc, cbEntryIDSrc));
-	}
+	if (HrGetOneProp(lpRootFolder, PR_IPM_OL2007_ENTRYIDS /*PR_ADDITIONAL_REN_ENTRYIDS_EX*/, &~lpAddRenProp) == hrSuccess &&
+	    Util::ExtractSuggestedContactsEntryID(lpAddRenProp, &cbEntryIDSrc, &~lpEntryIDSrc) == hrSuccess)
+		setFolderIgnore.insert(string(reinterpret_cast<const char *>(lpEntryIDSrc.get()), cbEntryIDSrc));
 
-	hr = lpRootFolder->GetHierarchyTable(CONVENIENT_DEPTH, &lpHierarchyTable);
+	hr = lpRootFolder->GetHierarchyTable(CONVENIENT_DEPTH, &~lpHierarchyTable);
 	if (hr != hrSuccess) {
 		cout << "Failed to open hierarchy." << endl;
-		goto exit;
+		return hr;
 	}
 
 	/*
@@ -452,61 +412,27 @@ static HRESULT RunStoreValidation(const char *strHost, const char *strUser,
 	hr = lpHierarchyTable->GetRowCount(0, &ulCount);
 	if(hr != hrSuccess) {
 		cout << "Failed to count number of rows." << endl;
-		goto exit;
+		return hr;
 	} else if (!ulCount) {
 		cout << "No entries inside Calendar." << endl;
-		goto exit;
+		return hr;
 	}
 
 	/*
 	 * Loop through each row/entry and validate.
 	 */
 	while (true) {
-		hr = lpHierarchyTable->QueryRows(20, 0, &lpRows);
+		rowset_ptr lpRows;
+		hr = lpHierarchyTable->QueryRows(20, 0, &~lpRows);
 		if (hr != hrSuccess)
-			break;
-
+			return hr;
 		if (lpRows->cRows == 0)
 			break;
 
 		for (ULONG i = 0; i < lpRows->cRows; ++i)
 			RunFolderValidation(setFolderIgnore, lpRootFolder, &lpRows->aRow[i], checkmap);
-
-		if (lpRows) {
-			FreeProws(lpRows);
-			lpRows = NULL;
-		}
 	}
-
-exit:
-	MAPIFreeBuffer(lpUserStoreEntryID);
-
-	if (lpIEMS)
-		lpIEMS->Release();
-        
-	if (lpRows) {
-		FreeProws(lpRows);
-		lpRows = NULL;
-	}
-
-	MAPIFreeBuffer(lpEntryIDSrc);
-	MAPIFreeBuffer(lpAddRenProp);
-	if(lpHierarchyTable)
-		lpHierarchyTable->Release();
-
-	if (lpRootFolder)
-		lpRootFolder->Release();
-	if (lpAltStore != NULL)
-		lpAltStore->Release();
-	if (lpStore)
-		lpStore->Release();
-
-	if (lpSession)
-		lpSession->Release();
-
-	MAPIUninitialize();
-
-	return hr;
+	return hrSuccess;
 }
 
 int main(int argc, char *argv[])
@@ -642,9 +568,8 @@ int main(int argc, char *argv[])
 	if (hr == hrSuccess)
 		cout << endl << "Statistics:" << endl;
 
-	for (CHECKMAP_I i = checkmap.begin(); i != checkmap.end();
-	     i = checkmap.begin())
-	{
+	for (auto i = checkmap.begin(); i != checkmap.end();
+	     i = checkmap.begin()) {
 		Fsck *lpFsck = i->second;
 		
 		if (hr == hrSuccess)

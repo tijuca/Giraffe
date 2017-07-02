@@ -18,6 +18,8 @@
 #include <kopano/platform.h>
 #include <kopano/charset/convstring.h>
 
+namespace KC {
+
 /** Create a convstring instance from a SPropValue.
  *
  * Extarcts the lpszA or lpszW depending on the PROP_TYPE of the provided
@@ -25,31 +27,21 @@
  *
  * @param[in]	lpsPropVal
  *			Pointer to the SPropValue object to extract the data from.
- * @param[in]	bCheapCopy
- *			If set to true, the string data is only referenced from
- *			the SPropValue object. Otherwise a copy is made.
- *
  * @return	A new convstring object.
  */
-convstring convstring::from_SPropValue(const SPropValue *lpsPropVal, bool bCheapCopy)
+convstring convstring::from_SPropValue(const SPropValue *lpsPropVal)
 {
 	if (!lpsPropVal)
 		return convstring();
 	
 	switch (PROP_TYPE(lpsPropVal->ulPropTag)) {
 	case PT_STRING8:
-		return convstring(lpsPropVal->Value.lpszA, bCheapCopy);
-		break;
-	
+		return convstring(lpsPropVal->Value.lpszA);
 	case PT_UNICODE:
-		return convstring(lpsPropVal->Value.lpszW, bCheapCopy);
-		break;
-	
+		return convstring(lpsPropVal->Value.lpszW);
 	default:
-		break;
+		return convstring();
 	}
-		
-	return convstring();
 }
 
 /** Create a convstring instance from a SPropValue.
@@ -59,21 +51,12 @@ convstring convstring::from_SPropValue(const SPropValue *lpsPropVal, bool bCheap
  *
  * @param[in]	sPropVal
  *			Reference to the SPropValue object to extract the data from.
- * @param[in]	bCheapCopy
- *			If set to true, the string data is only referenced from
- *			the SPropValue object. Otherwise a copy is made.
- *
  * @return	A new convstring object.
  */
-convstring convstring::from_SPropValue(const SPropValue &sPropVal, bool bCheapCopy)
+convstring convstring::from_SPropValue(const SPropValue &sPropVal)
 {
-	return from_SPropValue(&sPropVal, bCheapCopy);
+	return from_SPropValue(&sPropVal);
 }
-
-convstring::convstring()
-: m_lpsz(NULL)
-, m_ulFlags(0)
-{}
 
 /**
  * Create a new convstring object based on another convstring object.
@@ -81,10 +64,8 @@ convstring::convstring()
  * @param[in]	other
  *			The convstring object to base the new object on.
  */
-convstring::convstring(const convstring &other)
-: m_lpsz(NULL)
-, m_ulFlags(other.m_ulFlags)
-, m_str(other.m_str)
+convstring::convstring(const convstring &other) :
+	m_ulFlags(other.m_ulFlags), m_str(other.m_str)
 {
 	// We create a new convert_context as the context of other contains
 	// nothing we really need. If we would copy its map with iconv_context's, we would
@@ -103,18 +84,10 @@ convstring::convstring(const convstring &other)
  * @param[in]	lpsz
  *			The string to base the new object on. This string
  *			is expected to be encoded in the current locale.
- * @param[in]	bCheapCopy
- *			If set to true, the provided string is only referenced.
- *			Otherwise it's copied.
  */
-convstring::convstring(const char *lpsz, bool bCheapCopy)
+convstring::convstring(const char *lpsz)
 : m_lpsz(reinterpret_cast<const TCHAR*>(lpsz))
-, m_ulFlags(0)
 {
-	if (!bCheapCopy && !m_lpsz) {
-		m_str.assign(m_lpsz);
-		m_lpsz = m_str.c_str();
-	}
 }
 
 /** Create a new convstring object based on a raw char pointer.
@@ -125,18 +98,11 @@ convstring::convstring(const char *lpsz, bool bCheapCopy)
  * @param[in]	lpsz
  *			The string to base the new object on. This string
  *			is expected to be encoded as a wide character string.
- * @param[in]	bCheapCopy
- *			If set to true, the provided string is only referenced.
- *			Otherwise it's copied.
  */
-convstring::convstring(const wchar_t *lpsz, bool bCheapCopy)
+convstring::convstring(const wchar_t *lpsz)
 : m_lpsz(reinterpret_cast<const TCHAR*>(lpsz))
 , m_ulFlags(MAPI_UNICODE)
 {
-	if (!bCheapCopy && !m_lpsz) {
-		m_str.assign(m_lpsz);
-		m_lpsz = m_str.c_str();
-	}
 }
 
 /** Create a new convstring object based on a raw pointer.
@@ -153,18 +119,11 @@ convstring::convstring(const wchar_t *lpsz, bool bCheapCopy)
  *			string is assumed to be encoded as a wide character
  *			string. Otherwise it is assumed to be encoded in the
  *			current locale.
- * @param[in]	bCheapCopy
- *			If set to true, the provided string is only referenced.
- *			Otherwise it's copied.
  */
-convstring::convstring(const TCHAR *lpsz, ULONG ulFlags, bool bCheapCopy)
+convstring::convstring(const TCHAR *lpsz, ULONG ulFlags)
 : m_lpsz(lpsz)
 , m_ulFlags(ulFlags)
 {
-	if (!bCheapCopy && !m_lpsz) {
-		m_str.assign(m_lpsz);
-		m_lpsz = m_str.c_str();
-	}
 }
 
 /** Perform a conversion from the internal string to the requested encoding.
@@ -178,8 +137,7 @@ template <typename T>
 T convstring::convert_to() const {
 	if (m_lpsz == NULL)
 		return T();
-	
-	if ((m_ulFlags & MAPI_UNICODE) == MAPI_UNICODE)
+	if (m_ulFlags & MAPI_UNICODE)
 		return m_converter.convert_to<T>(reinterpret_cast<const wchar_t*>(m_lpsz));
 	else
 		return m_converter.convert_to<T>(reinterpret_cast<const char*>(m_lpsz));
@@ -199,8 +157,7 @@ template<typename T>
 T convstring::convert_to(const char *tocode) const {
 	if (m_lpsz == NULL)
 		return T();
-	
-	if ((m_ulFlags & MAPI_UNICODE) == MAPI_UNICODE) {
+	if (m_ulFlags & MAPI_UNICODE) {
 		const wchar_t *lpszw = reinterpret_cast<const wchar_t*>(m_lpsz);
 		return m_converter.convert_to<T>(tocode, lpszw, rawsize(lpszw), CHARSET_WCHAR);
 	} else {
@@ -219,8 +176,7 @@ bool convstring::null_or_empty() const
 {
 	if (m_lpsz == NULL)
 		return true;
-	
-	if ((m_ulFlags & MAPI_UNICODE) == MAPI_UNICODE)
+	if (m_ulFlags & MAPI_UNICODE)
 		return *reinterpret_cast<const wchar_t*>(m_lpsz) == L'\0';
 	else
 		return *reinterpret_cast<const char*>(m_lpsz) == '\0';
@@ -267,19 +223,6 @@ const char* convstring::c_str() const
 }
 
 /**
- * Convert this convstring object to a raw wchar_t pointer.
- *
- * @return	A character pointer that represents the internal string encoded in a wide character string.
- *
- * @note	Don't call this too often as the results are stored internally since storage needs to be
- *		guaranteed for the caller to be able to use the data.
- */
-const wchar_t* convstring::wc_str() const
-{
-	return (m_lpsz ? convert_to<wchar_t*>() : NULL);
-}
-
-/**
  * Convert this convstring object to a raw char pointer encoded in UTF-8.
  *
  * @return	A character pointer that represents the internal string encoded in the current locale.
@@ -291,3 +234,5 @@ const char* convstring::u8_str() const
 {
 	return (m_lpsz ? convert_to<char*>("UTF-8") : NULL);
 }
+
+} /* namespace */

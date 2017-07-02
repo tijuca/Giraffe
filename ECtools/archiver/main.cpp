@@ -28,8 +28,9 @@
 #include "Archiver.h"
 #include "UnixUtil.cpp"
 
-enum modes
-{
+namespace KC {
+
+enum modes {
     MODE_INVALID = 0,
     MODE_ATTACH,
     MODE_DETACH,
@@ -214,6 +215,8 @@ static const struct option long_options[] = {
 
 static inline LPTSTR toLPTST(const char* lpszString, convert_context& converter) { return lpszString ? converter.convert_to<LPTSTR>(lpszString) : NULL; }
 static inline const char *yesno(bool bValue) { return bValue ? "yes" : "no"; }
+
+} /* namespace */
 
 /**
  * Program entry point
@@ -464,25 +467,24 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    ptrArchiver->GetLogger()->Log(EC_LOGLEVEL_FATAL, "Startup command: %s", strCmdLine.c_str());
+    ec_log_crit("Startup command: %s", strCmdLine.c_str());
     ptrArchiver->GetLogger(Archiver::LogOnly)->Log(EC_LOGLEVEL_FATAL, "Version: %s", PROJECT_VERSION_ARCHIVER_STR);
 
     lSettings = ptrArchiver->GetConfig()->GetAllSettings();
 
     ECLogger* filelogger = ptrArchiver->GetLogger(Archiver::LogOnly);
     ptrArchiver->GetLogger(Archiver::LogOnly)->Log(EC_LOGLEVEL_FATAL, "Config settings:");
-    for (std::list<configsetting_t>::const_iterator i = lSettings.begin(); i != lSettings.end(); ++i) {
-        if (strcmp(i->szName, "sslkey_pass") == 0 || strcmp(i->szName, "mysql_password") == 0)
-            filelogger->Log(EC_LOGLEVEL_FATAL, "*  %s = '********'", i->szName);
-        else
-            filelogger->Log(EC_LOGLEVEL_FATAL, "*  %s = '%s'", i->szName, i->szValue);
-    }
+	for (const auto &s : lSettings)
+		if (strcmp(s.szName, "sslkey_pass") == 0 || strcmp(s.szName, "mysql_password") == 0)
+			filelogger->Log(EC_LOGLEVEL_FATAL, "*  %s = '********'", s.szName);
+		else
+			filelogger->Log(EC_LOGLEVEL_FATAL, "*  %s = '%s'", s.szName, s.szValue);
 
     if (mode == MODE_ARCHIVE || mode == MODE_CLEANUP)
-        if (unix_create_pidfile(argv[0], ptrArchiver->GetConfig(), ptrArchiver->GetLogger(), false) != 0)
+        if (unix_create_pidfile(argv[0], ptrArchiver->GetConfig(), false) != 0)
             return 1;
 
-    ptrArchiver->GetLogger()->Log(EC_LOGLEVEL_DEBUG, "Archiver mode: %d: (%s)", mode, modename(mode));
+    ec_log_debug("Archiver mode: %d: (%s)", mode, modename(mode));
     switch (mode) {
     case MODE_ATTACH: {
         ArchiveManagePtr ptr;
@@ -595,4 +597,3 @@ int main(int argc, char *argv[])
     }
     return 0;
 }
-

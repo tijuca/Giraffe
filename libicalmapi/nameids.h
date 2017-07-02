@@ -18,16 +18,18 @@
 #ifndef NAMEIDS_H
 #define NAMEIDS_H
 
+#include <kopano/zcdefs.h>
 #include <mapidefs.h>
 #include <kopano/namedprops.h>
 #include <kopano/mapiguidext.h>
 #include <mapiguid.h>
-#include "icalmapi.h"
+
+namespace KC {
 
 /* MAPINAMEID strings are in UCS-2LE, so cannot be static initialized in linux
    We first define all strings, so we can use the nmStringNames[] lookup array
  */
-enum ICALMAPI_API eIDNamedProps {
+enum eIDNamedProps {
 	PROP_KEYWORDS = 0,
 // End of String names
 	PROP_MEETINGLOCATION, PROP_GOID, PROP_ISRECURRING, PROP_CLEANID, PROP_OWNERCRITICALCHANGE, PROP_ATTENDEECRITICALCHANGE, PROP_OLDSTART, PROP_ISEXCEPTION, PROP_RECURSTARTTIME,
@@ -47,7 +49,9 @@ enum ICALMAPI_API eIDNamedProps {
 	SIZE_NAMEDPROPS
 };
 
-/* call this function to get the id's from the listed namedprops above */
-HRESULT ICALMAPI_API HrLookupNames(IMAPIProp *lpPropObj, LPSPropTagArray *lppNamedProps);
+/* call this function to get the IDs from the listed namedprops above */
+extern _kc_export HRESULT HrLookupNames(IMAPIProp *propobj, LPSPropTagArray *namedprops);
+
+} /* namespace */
 
 #endif

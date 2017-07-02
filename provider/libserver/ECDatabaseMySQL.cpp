@@ -14,14 +14,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <kopano/zcdefs.h>
 #include <kopano/platform.h>
 
 #include <iostream>
 #include <errmsg.h>
-#include "ECDatabaseMySQL.h"
 #include "mysqld_error.h"
-
 #include <kopano/stringutil.h>
 
 #include <kopano/ECDefs.h>
@@ -36,6 +34,7 @@
 
 #include <mapidefs.h>
 #include "ECConversion.h"
+#include "ECDatabase.h"
 #include "SOAPUtils.h"
 #include "ECSearchFolders.h"
 
@@ -44,35 +43,21 @@
 
 using namespace std;
 
+namespace KC {
+
 #ifdef DEBUG
 #define DEBUG_SQL 0
 #define DEBUG_TRANSACTION 0
 #endif
 
-#define LOG_SQL_DEBUG(_msg, ...) \
-	ec_log(EC_LOGLEVEL_DEBUG | EC_LOGLEVEL_SQL, _msg, ##__VA_ARGS__)
-
-// The maximum packet size. This is automatically also the maximum
-// size of a single entry in the database. This means that PR_BODY, PR_COMPRESSED_RTF
-// etc. cannot grow larger than 16M. This shouldn't be such a problem in practice.
-
-// In debian lenny, setting your max_allowed_packet to 16M actually gives this value.... Unknown
-// why.
-#define MAX_ALLOWED_PACKET			16776192
-
-typedef struct _sUpdateList {
+struct sUpdateList_t {
 	unsigned int ulVersion;
 	unsigned int ulVersionMin; // Version to start the update
 	const char *lpszLogComment;
 	ECRESULT (*lpFunction)(ECDatabase* lpDatabase);
-} sUpdateList_t;
+};
 
-typedef struct _sNewDatabase {
-	const char *lpComment;
-	const char *lpSQL;
-} sSQLDatabase_t;
-
-class zcp_versiontuple _zcp_final {
+class zcp_versiontuple _kc_final {
 	public:
 	zcp_versiontuple(unsigned int maj = 0, unsigned int min = 0,
 	    unsigned int mic = 0, unsigned int rev = 0, unsigned int dbs = 0) :
@@ -198,10 +183,10 @@ static const char *const server_groups[] = {
   NULL,
 };
 
-typedef struct {
+struct STOREDPROCS {
 	const char *szName;
 	const char *szSQL;
-} STOREDPROCS;
+};
 
 /**
  * Mode 0 = All bodies
@@ -322,8 +307,6 @@ static const STOREDPROCS stored_procedures[] = {
 	{ "StreamObj", szStreamObj }
 };
 
-std::string	ECDatabaseMySQL::m_strDatabaseDir;
-
 std::string zcp_versiontuple::stringify(char sep) const
 {
 	return ::stringify(v_major) + sep + ::stringify(v_minor) + sep +
@@ -352,34 +335,17 @@ int zcp_versiontuple::compare(const zcp_versiontuple &rhs) const
 	return 0;
 }
 
-ECDatabaseMySQL::ECDatabaseMySQL(ECConfig *lpConfig)
+ECDatabase::ECDatabase(ECConfig *cfg) :
+    m_lpConfig(cfg)
 {
-	m_bMysqlInitialize	= false;
-	m_bConnected		= false;
-	m_bAutoLock			= true;
-	m_lpConfig			= lpConfig;
-	m_bSuppressLockErrorLogging = false;
-
-	// Create a mutex handle for mysql
-	pthread_mutexattr_t mattr;
-	pthread_mutexattr_init(&mattr);
-	pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
-	pthread_mutex_init(&m_hMutexMySql, &mattr);
-
-#ifdef DEBUG
-	m_ulTransactionState = 0;
-#endif	
-
 }
 
-ECDatabaseMySQL::~ECDatabaseMySQL()
+ECDatabase::~ECDatabase(void)
 {
 	Close();
-	// Close the mutex handle of mysql
-	pthread_mutex_destroy(&m_hMutexMySql);
 }
 
-ECRESULT ECDatabaseMySQL::InitLibrary(const char *lpDatabaseDir,
+ECRESULT ECDatabase::InitLibrary(const char *lpDatabaseDir,
     const char *lpConfigFile)
 {
 	string		strDatabaseDir;
@@ -389,8 +355,6 @@ ECRESULT ECDatabaseMySQL::InitLibrary(const char *lpDatabaseDir,
 	if(lpDatabaseDir) {
     	strDatabaseDir = "--datadir=";
     	strDatabaseDir+= lpDatabaseDir;
-
-		m_strDatabaseDir = lpDatabaseDir;
     }
 
     if(lpConfigFile) {
@@ -421,12 +385,12 @@ ECRESULT ECDatabaseMySQL::InitLibrary(const char *lpDatabaseDir,
  *
  * Currently this means we're updating all the stored procedure definitions
  */
-ECRESULT ECDatabaseMySQL::InitializeDBState(void)
+ECRESULT ECDatabase::InitializeDBState(void)
 {
 	return InitializeDBStateInner();
 }
 
-ECRESULT ECDatabaseMySQL::InitializeDBStateInner()
+ECRESULT ECDatabase::InitializeDBStateInner(void)
 {
 	ECRESULT er;
 
@@ -451,7 +415,7 @@ ECRESULT ECDatabaseMySQL::InitializeDBStateInner()
 	return erSuccess;
 }
 
-void ECDatabaseMySQL::UnloadLibrary(void)
+void ECDatabase::UnloadLibrary(void)
 {
 	/*
 	 * MySQL will timeout waiting for its own threads if the mysql
@@ -465,38 +429,12 @@ void ECDatabaseMySQL::UnloadLibrary(void)
 	mysql_library_end();
 }
 
-ECRESULT ECDatabaseMySQL::InitEngine()
-{
-	_ASSERT(m_bMysqlInitialize == false);
-
-	//Init mysql and make a connection
-	if(mysql_init(&m_lpMySQL) == NULL) {
-		ec_log_crit("ECDatabaseMySQL::InitEngine(): mysql_init failed");
-		return KCERR_DATABASE_ERROR;
-	}
-
-	m_bMysqlInitialize = true; 
-
-	// Set auto reconnect OFF
-	// mysql < 5.0.4 default on, mysql 5.0.4 > reconnection default off
-	// We always wants reconnect OFF, because we want to know when the connection
-	// is broken since this creates a new MySQL session, and we want to set some session
-	// variables
-	m_lpMySQL.reconnect = 0;
-	return erSuccess;
-}
-
-std::string ECDatabaseMySQL::GetDatabaseDir()
-{
-	ASSERT(!m_strDatabaseDir.empty());
-	return m_strDatabaseDir;
-}
-
-ECRESULT ECDatabaseMySQL::CheckExistColumn(const std::string &strTable, const std::string &strColumn, bool *lpbExist)
+ECRESULT ECDatabase::CheckExistColumn(const std::string &strTable,
+    const std::string &strColumn, bool *lpbExist)
 {
 	ECRESULT		er = erSuccess;
 	std::string		strQuery;
-	DB_RESULT		lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 
 	strQuery = "SELECT 1 FROM information_schema.COLUMNS "
 				"WHERE TABLE_SCHEMA = '" + string(m_lpConfig->GetSetting("mysql_database")) + "' "
@@ -505,23 +443,18 @@ ECRESULT ECDatabaseMySQL::CheckExistColumn(const std::string &strTable, const st
 				
 	er = DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 	
 	*lpbExist = (FetchRow(lpDBResult) != NULL);
-	
-exit:
-	if (lpDBResult)
-		FreeResult(lpDBResult);
-	
 	return er;
 }
 
-ECRESULT ECDatabaseMySQL::CheckExistIndex(const std::string &strTable,
+ECRESULT ECDatabase::CheckExistIndex(const std::string &strTable,
     const std::string &strKey, bool *lpbExist)
 {
 	ECRESULT		er = erSuccess;
 	std::string		strQuery;
-	DB_RESULT		lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 	DB_ROW			lpRow = NULL;
 
 	// WHERE not supported in MySQL < 5.0.3 
@@ -529,7 +462,7 @@ ECRESULT ECDatabaseMySQL::CheckExistIndex(const std::string &strTable,
 
 	er = DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	*lpbExist = false;
 	while ((lpRow = FetchRow(lpDBResult)) != NULL) {
@@ -539,178 +472,50 @@ ECRESULT ECDatabaseMySQL::CheckExistIndex(const std::string &strTable,
 			break;
 		}
 	}
-
-exit:
-	if (lpDBResult)
-		FreeResult(lpDBResult);
-	
 	return er;
 }
 
-ECRESULT ECDatabaseMySQL::Connect()
+ECRESULT ECDatabase::Connect(void)
 {
-	ECRESULT		er = erSuccess;
-	std::string		strQuery;
-	const char *lpMysqlPort = m_lpConfig->GetSetting("mysql_port");
-	const char *lpMysqlSocket = m_lpConfig->GetSetting("mysql_socket");
-	DB_RESULT		lpDBResult = NULL;
-	DB_ROW			lpDBRow = NULL;
-	unsigned int	gcm = 0;
-
-	if (*lpMysqlSocket == '\0')
-		lpMysqlSocket = NULL;
-	
-	er = InitEngine();
-	if(er != erSuccess)
-		goto exit;
-
-	if(mysql_real_connect(&m_lpMySQL, 
-			m_lpConfig->GetSetting("mysql_host"), 
-			m_lpConfig->GetSetting("mysql_user"), 
-			m_lpConfig->GetSetting("mysql_password"), 
-			m_lpConfig->GetSetting("mysql_database"), 
-			(lpMysqlPort)?atoi(lpMysqlPort):0, 
-			lpMysqlSocket, CLIENT_MULTI_STATEMENTS) == NULL)
-	{
-		if (mysql_errno(&m_lpMySQL) == ER_BAD_DB_ERROR) // Database does not exist
-			er = KCERR_DATABASE_NOT_FOUND;
-		else
-			er = KCERR_DATABASE_ERROR;
-
-		ec_log_err("ECDatabaseMySQL::Connect(): mysql connect fail: %s", GetError());
-		goto exit;
-	}
-	
-	// Check if the database is available, but empty
-	strQuery = "SHOW tables";
-	er = DoSelect(strQuery, &lpDBResult);
-	if(er != erSuccess)
-		goto exit;
-		
-	if(GetNumRows(lpDBResult) == 0) {
-		er = KCERR_DATABASE_NOT_FOUND;
-		goto exit;
-	}
-	
-	if(lpDBResult) {
-		FreeResult(lpDBResult);
-		lpDBResult = NULL;
-	}
-	
-	strQuery = "SHOW variables LIKE 'max_allowed_packet'";
-	er = DoSelect(strQuery, &lpDBResult);
-	if(er != erSuccess)
-	    goto exit;
-	
-	lpDBRow = FetchRow(lpDBResult);
-	/* lpDBRow[0] has the variable name, [1] the value */
-	if(lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL) {
-	    ec_log_warn("Unable to retrieve max_allowed_packet value. Assuming 16M");
-	    m_ulMaxAllowedPacket = (unsigned int)MAX_ALLOWED_PACKET;
-    } else {
-        m_ulMaxAllowedPacket = atoui(lpDBRow[1]);
-    }
-
-	m_bConnected = true;
-
-#if HAVE_MYSQL_SET_CHARACTER_SET
-	// function since mysql 5.0.7
-	if (mysql_set_character_set(&m_lpMySQL, "utf8")) {
-	    ec_log_err("Unable to set character set to \"utf8\"");
-		er = KCERR_DATABASE_ERROR;
-		goto exit;
-	}
-#else
-	if (Query("set character_set_client = 'utf8'") != 0) {
-		ec_log_warn("Unable to set character_set_client value");
-		goto exit;
-	}
-	if (Query("set character_set_connection = 'utf8'") != 0) {
-		ec_log_warn("Unable to set character_set_connection value");
-		goto exit;
-	}
-	if (Query("set character_set_results = 'utf8'") != 0) {
-		ec_log_warn("Unable to set character_set_results value");
-		goto exit;
-	}
-#endif
+	auto gcm = atoui(m_lpConfig->GetSetting("mysql_group_concat_max_len"));
+	if (gcm < 1024)
+		gcm = 1024;
+	/*
+	 * Set auto reconnect OFF. mysql < 5.0.4 default on, mysql 5.0.4 >
+	 * reconnection default off. We always want reconnect OFF, because we
+	 * want to know when the connection is broken since this creates a new
+	 * MySQL session, and we want to set some session variables.
+	 */
+	auto er = KDatabase::Connect(m_lpConfig, false,
+	          CLIENT_MULTI_STATEMENTS, gcm);
+	if (er != erSuccess)
+		return er;
 	if (Query("set max_sp_recursion_depth = 255") != 0) {
 		ec_log_err("Unable to set recursion depth");
 		er = KCERR_DATABASE_ERROR;
 		goto exit;
 	}
-
-	// Force to a sane value
-	gcm = atoui(m_lpConfig->GetSetting("mysql_group_concat_max_len"));
-	if(gcm < 1024)
-		gcm = 1024;
-		
-	strQuery = (string)"SET SESSION group_concat_max_len = " + stringify(gcm);
-	if(Query(strQuery) != erSuccess ) {
-	    ec_log_warn("Unable to set group_concat_max_len value");
-	}
-
-	// changing the SESSION max_allowed_packet is removed since mysql 5.1, and GLOBAL is for SUPER users only, so just give a warning
-	if (m_ulMaxAllowedPacket < MAX_ALLOWED_PACKET)
-		ec_log_warn("max_allowed_packet is smaller than 16M (%d). You are advised to increase this value by adding max_allowed_packet=16M in the [mysqld] section of my.cnf.", m_ulMaxAllowedPacket);
-
 	if (m_lpMySQL.server_version) {
 		// m_lpMySQL.server_version is a C type string (char*) containing something like "5.5.37-0+wheezy1" (MySQL),
 		// "5.5.37-MariaDB-1~wheezy-log" or "10.0.11-MariaDB=1~wheezy-log" (MariaDB)
 		// The following code may look funny, but it is correct, see http://www.cplusplus.com/reference/cstdlib/strtol/
 		long int majorversion = strtol(m_lpMySQL.server_version, NULL, 10);
 		// Check for over/underflow and version.
-		if (errno != ERANGE && majorversion >= 5) {
-			// this option was introduced in mysql 5.0, so let's not even try on 4.1 servers
-			strQuery = "SET SESSION sql_mode = 'STRICT_ALL_TABLES,NO_UNSIGNED_SUBTRACTION'";
-			Query(strQuery); // ignore error
-		}
+		if (errno != ERANGE && majorversion >= 5)
+			/*
+			 * This option was introduced in mysql 5.0, so let's
+			 * not even try on 4.1 servers. Ignore error, if any.
+			 */
+			Query("SET SESSION sql_mode = 'STRICT_ALL_TABLES,NO_UNSIGNED_SUBTRACTION'");
 	}
 
 exit:
-	if(lpDBResult)
-		FreeResult(lpDBResult);
-
 	if (er == erSuccess)
 		g_lpStatsCollector->Increment(SCN_DATABASE_CONNECTS);
 	else
 		g_lpStatsCollector->Increment(SCN_DATABASE_FAILED_CONNECTS);
 		
 	return er;
-}
-
-ECRESULT ECDatabaseMySQL::Close()
-{
-	ECRESULT er = erSuccess;
-
-	//INFO: No locking here
-
-	m_bConnected = false;
-
-	// Close mysql data connection and deallocate data
-	if(m_bMysqlInitialize)
-		mysql_close(&m_lpMySQL);
-
-	m_bMysqlInitialize = false;
-
-	return er;
-}
-
-// Get database ownership
-void ECDatabaseMySQL::Lock()
-{
-	pthread_mutex_lock(&m_hMutexMySql);
-}
-
-// Release the database ownership
-void ECDatabaseMySQL::UnLock()
-{
-	pthread_mutex_unlock(&m_hMutexMySql);
-}
-
-bool ECDatabaseMySQL::isConnected() {
-
-	return m_bConnected;
 }
 
 /**
@@ -725,15 +530,11 @@ bool ECDatabaseMySQL::isConnected() {
  * @param[in] strQuery SQL query to perform
  * @return result (erSuccess or KCERR_DATABASE_ERROR)
  */
-ECRESULT ECDatabaseMySQL::Query(const string &strQuery) {
+ECRESULT ECDatabase::Query(const std::string &strQuery)
+{
 	ECRESULT er = erSuccess;
-	int err;
+	int err = KDatabase::Query(strQuery);
 	
-	LOG_SQL_DEBUG("SQL [%08lu]: \"%s;\"", m_lpMySQL.thread_id, strQuery.c_str());
-
-	// use mysql_real_query to be binary safe ( http://dev.mysql.com/doc/mysql/en/mysql-real-query.html )
-	err = mysql_real_query( &m_lpMySQL, strQuery.c_str(), strQuery.length() );
-
 	if(err && (mysql_errno(&m_lpMySQL) == CR_SERVER_LOST || mysql_errno(&m_lpMySQL) == CR_SERVER_GONE_ERROR)) {
 		ec_log_warn("SQL [%08lu] info: Try to reconnect", m_lpMySQL.thread_id);
 			
@@ -754,88 +555,32 @@ ECRESULT ECDatabaseMySQL::Query(const string &strQuery) {
 		er = KCERR_DATABASE_ERROR;
 		// Don't assert on ER_NO_SUCH_TABLE because it's an anticipated error in the db upgrade code.
 		if (mysql_errno(&m_lpMySQL) != ER_NO_SUCH_TABLE)
-			ASSERT(false);
+			assert(false);
 	}
 	return er;
 }
 
-/**
- * Perform a SELECT operation on the database
- *
- * Sends the passed SELECT-like (any operation that outputs a result set) query to the MySQL server and retrieves
- * the result.
- *
- * Setting fStreamResult will delay retrieving data from the network until FetchRow() is called. The only
- * drawback is that GetRowCount() can therefore not be used unless all rows are fetched first. The main reason to
- * use this is to conserve memory and increase pipelining (the client can start processing data before the server
- * has completed the query)
- *
- * @param[in] strQuery SELECT query string
- * @param[out] Result output
- * @param[in] fStreamResult TRUE if data should be streamed instead of stored
- * @return result erSuccess or KCERR_DATABASE_ERROR
- */
-ECRESULT ECDatabaseMySQL::DoSelect(const string &strQuery, DB_RESULT *lppResult, bool fStreamResult) {
-
-	ECRESULT er = erSuccess;
-	DB_RESULT lpResult = NULL;
-
-	_ASSERT(strQuery.length()!= 0);
-
-	// Autolock, lock data
-	if(m_bAutoLock)
-		Lock();
-		
-	if( Query(strQuery) != erSuccess ) {
-		er = KCERR_DATABASE_ERROR;
-		ec_log_err("ECDatabaseMySQL::DoSelect(): query failed: %s", GetError());
-		goto exit;
-	}
-
-	if (fStreamResult)
-		lpResult = mysql_use_result(&m_lpMySQL);
-	else
-		lpResult = mysql_store_result(&m_lpMySQL);
-    
-	if( lpResult == NULL ) {
-		er = KCERR_DATABASE_ERROR;
-		if (!m_bSuppressLockErrorLogging || GetLastError() == DB_E_UNKNOWN)
-			ec_log_err("SQL [%08lu] result failed: %s, Query: \"%s\"", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL), strQuery.c_str());
-	}
-
+ECRESULT ECDatabase::DoSelect(const std::string &strQuery,
+    DB_RESULT *lppResult, bool fStreamResult)
+{
+	ECRESULT er = KDatabase::DoSelect(strQuery, lppResult, fStreamResult);
 	g_lpStatsCollector->Increment(SCN_DATABASE_SELECTS);
-	
-	if (lppResult)
-		*lppResult = lpResult;
-	else if(lpResult)
-			FreeResult(lpResult);
-
-exit:
 	if (er != erSuccess) {
 		g_lpStatsCollector->Increment(SCN_DATABASE_FAILED_SELECTS);
 		g_lpStatsCollector->SetTime(SCN_DATABASE_LAST_FAILED, time(NULL));
 	}
-
-	// Autolock, unlock data
-	if(m_bAutoLock)
-		UnLock();
-
 	return er;
 }
 
-ECRESULT ECDatabaseMySQL::DoSelectMulti(const string &strQuery) {
-
+ECRESULT ECDatabase::DoSelectMulti(const std::string &strQuery)
+{
 	ECRESULT er = erSuccess;
-
-	_ASSERT(strQuery.length()!= 0);
-
-	// Autolock, lock data
-	if(m_bAutoLock)
-		Lock();
+	assert(strQuery.length() != 0);
+	autolock alk(*this);
 		
 	if( Query(strQuery) != erSuccess ) {
 		er = KCERR_DATABASE_ERROR;
-		ec_log_err("ECDatabaseMySQL::DoSelectMulti(): select failed");
+		ec_log_err("ECDatabase::DoSelectMulti(): select failed");
 		goto exit;
 	}
 	
@@ -848,11 +593,6 @@ exit:
 		g_lpStatsCollector->Increment(SCN_DATABASE_FAILED_SELECTS);
 		g_lpStatsCollector->SetTime(SCN_DATABASE_LAST_FAILED, time(NULL));
 	}
-
-	// Autolock, unlock data
-	if(m_bAutoLock)
-		UnLock();
-
 	return er;
 }
 
@@ -862,16 +602,13 @@ exit:
  * @param[out] lppResult Resultset
  * @return result
  */
-ECRESULT ECDatabaseMySQL::GetNextResult(DB_RESULT *lppResult) {
-
+ECRESULT ECDatabase::GetNextResult(DB_RESULT *lppResult)
+{
 	ECRESULT er = erSuccess;
-	DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
 	int ret = 0;
+	autolock alk(*this);
 
-	// Autolock, lock data
-	if(m_bAutoLock)
-		Lock();
-		
 	if(!m_bFirstResult)
 		ret = mysql_next_result( &m_lpMySQL );
 		
@@ -889,8 +626,8 @@ ECRESULT ECDatabaseMySQL::GetNextResult(DB_RESULT *lppResult) {
 		goto exit;
 	}		
 
-   	lpResult = mysql_store_result( &m_lpMySQL );
-   	if(lpResult == NULL) {
+	lpResult = DB_RESULT(this, mysql_store_result(&m_lpMySQL));
+	if (lpResult == nullptr) {
    		// I think this can only happen on the first result set of a query since otherwise mysql_next_result() would already fail
 		er = KCERR_DATABASE_ERROR;
 		ec_log_err("SQL [%08lu] result failed: %s", m_lpMySQL.thread_id, mysql_error(&m_lpMySQL));
@@ -898,22 +635,12 @@ ECRESULT ECDatabaseMySQL::GetNextResult(DB_RESULT *lppResult) {
    	}
 
 	if (lppResult)
-		*lppResult = lpResult;
-	else {
-		if(lpResult)
-			FreeResult(lpResult);
-	}
-
+		*lppResult = std::move(lpResult);
 exit:
 	if (er != erSuccess) {
 		g_lpStatsCollector->Increment(SCN_DATABASE_FAILED_SELECTS);
 		g_lpStatsCollector->SetTime(SCN_DATABASE_LAST_FAILED, time(NULL));
 	}
-
-	// Autolock, unlock data
-	if(m_bAutoLock)
-		UnLock();
-
 	return er;
 }
 
@@ -924,254 +651,73 @@ exit:
  * that the results have ended. This must be consumed here, otherwise the database will be left in a bad
  * state.
  */
-ECRESULT ECDatabaseMySQL::FinalizeMulti() {
-
-	ECRESULT er = erSuccess;
-	DB_RESULT lpResult = NULL;
+ECRESULT ECDatabase::FinalizeMulti(void)
+{
+	DB_RESULT lpResult;
+	autolock alk(*this);
 
 	mysql_next_result(&m_lpMySQL);
-	
-	lpResult = mysql_store_result(&m_lpMySQL);
-	
-	if(lpResult != NULL) {
+	lpResult = DB_RESULT(this, mysql_store_result(&m_lpMySQL));
+	if (lpResult != nullptr) {
 		ec_log_err("SQL [%08lu] result failed: unexpected results received at end of batch", m_lpMySQL.thread_id);
-		er = KCERR_DATABASE_ERROR;
-		goto exit;
+		return KCERR_DATABASE_ERROR;
 	}
-exit:
-	if(lpResult)
-		FreeResult(lpResult);
-		
-	// Autolock, unlock data
-	if(m_bAutoLock)
-		UnLock();
-
-	return er;
+	return erSuccess;
 }
 
-/**
- * Perform a UPDATE operation on the database
- *
- * Sends the passed UPDATE query to the MySQL server, and optionally returns the number of affected rows. The
- * affected rows is the number of rows that have been MODIFIED, which is not necessarily the number of rows that
- * MATCHED the WHERE-clause.
- *
- * @param[in] strQuery UPDATE query string
- * @param[out] lpulAffectedRows (optional) Receives the number of affected rows 
- * @return result erSuccess or KCERR_DATABASE_ERROR
- */
-ECRESULT ECDatabaseMySQL::DoUpdate(const string &strQuery, unsigned int *lpulAffectedRows) {
-	
-	ECRESULT er = erSuccess;
-
-	// Autolock, lock data
-	if(m_bAutoLock)
-		Lock();
-	
-	er = _Update(strQuery, lpulAffectedRows);
-
+ECRESULT ECDatabase::DoUpdate(const std::string &strQuery,
+    unsigned int *lpulAffectedRows)
+{
+	auto er = KDatabase::DoUpdate(strQuery, lpulAffectedRows);
+	g_lpStatsCollector->Increment(SCN_DATABASE_UPDATES);
 	if (er != erSuccess) {
 		g_lpStatsCollector->Increment(SCN_DATABASE_FAILED_UPDATES);
 		g_lpStatsCollector->SetTime(SCN_DATABASE_LAST_FAILED, time(NULL));
 	}
-
-	g_lpStatsCollector->Increment(SCN_DATABASE_UPDATES);
-
-	// Autolock, unlock data
-	if(m_bAutoLock)
-		UnLock();
-
 	return er;
 }
 
-ECRESULT ECDatabaseMySQL::_Update(const string &strQuery, unsigned int *lpulAffectedRows)
+ECRESULT ECDatabase::DoInsert(const std::string &strQuery,
+    unsigned int *lpulInsertId, unsigned int *lpulAffectedRows)
 {
-	if( Query(strQuery) != erSuccess ) {
-		ec_log_err("ECDatabaseMySQL::_Update() query failed: %s", GetError());
-		return KCERR_DATABASE_ERROR;
-	}
-	
-	if(lpulAffectedRows)
-		*lpulAffectedRows = GetAffectedRows();
-	return erSuccess;
-}
-
-/**
- * Perform an INSERT operation on the database
- *
- * Sends the passed INSERT query to the MySQL server, and optionally returns the new insert ID and the number of inserted
- * rows.
- *
- * @param[in] strQuery INSERT query string
- * @param[out] lpulInsertId (optional) Receives the last insert id
- * @param[out] lpulAffectedRows (optional) Receives the number of inserted rows
- * @return result erSuccess or KCERR_DATABASE_ERROR
- */
-ECRESULT ECDatabaseMySQL::DoInsert(const string &strQuery, unsigned int *lpulInsertId, unsigned int *lpulAffectedRows)
-{
-	ECRESULT er = erSuccess;
-
-	// Autolock, lock data
-	if(m_bAutoLock)
-		Lock();
-	
-	er = _Update(strQuery, lpulAffectedRows);
-
-	if (er == erSuccess) {
-		if (lpulInsertId)
-			*lpulInsertId = GetInsertId();
-	} else {
+	auto er = KDatabase::DoInsert(strQuery, lpulInsertId, lpulAffectedRows);
+	g_lpStatsCollector->Increment(SCN_DATABASE_INSERTS);
+	if (er != erSuccess) {
 		g_lpStatsCollector->Increment(SCN_DATABASE_FAILED_INSERTS);
 		g_lpStatsCollector->SetTime(SCN_DATABASE_LAST_FAILED, time(NULL));
 	}
-
-	g_lpStatsCollector->Increment(SCN_DATABASE_INSERTS);
-
-	// Autolock, unlock data
-	if(m_bAutoLock)
-		UnLock();
-
 	return er;
 }
 
-/**
- * Perform a DELETE operation on the database
- *
- * Sends the passed DELETE query to the MySQL server, and optionally the number of deleted rows
- *
- * @param[in] strQuery INSERT query string
- * @param[out] lpulAffectedRows (optional) Receives the number of deleted rows
- * @return result erSuccess or KCERR_DATABASE_ERROR
- */
-ECRESULT ECDatabaseMySQL::DoDelete(const string &strQuery, unsigned int *lpulAffectedRows) {
-
-	ECRESULT er = erSuccess;
-
-	// Autolock, lock data
-	if(m_bAutoLock)
-		Lock();
-	
-	er = _Update(strQuery, lpulAffectedRows);
-
+ECRESULT ECDatabase::DoDelete(const std::string &strQuery,
+    unsigned int *lpulAffectedRows)
+{
+	auto er = KDatabase::DoDelete(strQuery, lpulAffectedRows);
+	g_lpStatsCollector->Increment(SCN_DATABASE_DELETES);
 	if (er != erSuccess) {
 		g_lpStatsCollector->Increment(SCN_DATABASE_FAILED_DELETES);
 		g_lpStatsCollector->SetTime(SCN_DATABASE_LAST_FAILED, time(NULL));
 	}
-
-	g_lpStatsCollector->Increment(SCN_DATABASE_DELETES);
-
-	// Autolock, unlock data
-	if(m_bAutoLock)
-		UnLock();
-
 	return er;
 }
 
 /*
- * This function updates a sequence in an atomic fashion - if called correctly;
- *
- * To make it work correctly, the state of the database connection should *NOT* be in a transaction; this would delay
- * committing of the data until a later time, causing other concurrent threads to possibly generate the same ID or lock
- * while waiting for this transaction to end. So, don't call Begin() before calling this function unless you really
- * know what you're doing.
- *
- * @todo measure sequence update calls, currently it is a update
  */
-ECRESULT ECDatabaseMySQL::DoSequence(const std::string &strSeqName, unsigned int ulCount, unsigned long long *lpllFirstId) {
-	ECRESULT er = erSuccess;
-	unsigned int ulAffected = 0;
-
-    // Autolock, lock data
-	if(m_bAutoLock)
-		Lock();
-
+ECRESULT ECDatabase::DoSequence(const std::string &strSeqName,
+    unsigned int ulCount, unsigned long long *lpllFirstId)
+{
 #ifdef DEBUG
 #if DEBUG_TRANSACTION
-	if(m_ulTransactionState != 0) {
-		ASSERT(FALSE);
-	}		
+	if (m_ulTransactionState != 0)
+		assert(false);
 #endif
 #endif
-
-	// Attempt to update the sequence in an atomic fashion
-	er = DoUpdate("UPDATE settings SET value=LAST_INSERT_ID(value+1)+" + stringify(ulCount-1) + " WHERE name = '" + strSeqName + "'", &ulAffected);
-	if(er != erSuccess)
-		goto exit;
-	
-	// If the setting was missing, insert it now, starting at sequence 1 (not 0 for safety - maybe there's some if(ulSequenceId) code somewhere)
-	if(ulAffected == 0) {
-		er = Query("INSERT INTO settings (name, value) VALUES('" + strSeqName + "',LAST_INSERT_ID(1)+" + stringify(ulCount-1) + ")");
-		if(er != erSuccess)
-			goto exit;
-	}
-			
-	*lpllFirstId = mysql_insert_id(&m_lpMySQL);
-	
-exit:
-	// Autolock, unlock data
-	if(m_bAutoLock)
-		UnLock();
-
-	return er;
-}
-
-unsigned int ECDatabaseMySQL::GetAffectedRows() {
-
-	return (unsigned int)mysql_affected_rows(&m_lpMySQL);
-}
-
-unsigned int ECDatabaseMySQL::GetInsertId() {
-
-	return (unsigned int)mysql_insert_id(&m_lpMySQL);
-}
-
-void ECDatabaseMySQL::FreeResult(DB_RESULT sResult) {
-
-	_ASSERT(sResult != NULL);
-
-	if(sResult)
-		mysql_free_result((MYSQL_RES *)sResult);
-}
-
-unsigned int ECDatabaseMySQL::GetNumRows(DB_RESULT sResult) {
-
-	return (unsigned int)mysql_num_rows((MYSQL_RES *)sResult);
-}
-
-unsigned int ECDatabaseMySQL::GetNumRowFields(DB_RESULT sResult) {
-
-	return mysql_num_fields((MYSQL_RES *)sResult);
-}
-
-unsigned int ECDatabaseMySQL::GetRowIndex(DB_RESULT sResult, const std::string &strFieldname) {
-
-	MYSQL_FIELD *lpFields;
-	unsigned int cbFields;
-	unsigned int ulIndex = (unsigned int)-1;
-
-	lpFields = mysql_fetch_fields((MYSQL_RES *)sResult);
-	cbFields = mysql_field_count(&m_lpMySQL);
-
-	for (unsigned int i = 0; i < cbFields && ulIndex == (unsigned int)-1; ++i)
-		if (strcasecmp(lpFields[i].name, strFieldname.c_str()) == 0)
-			ulIndex = i;
-	
-	return ulIndex;
-}
-
-DB_ROW ECDatabaseMySQL::FetchRow(DB_RESULT sResult) {
-
-	return mysql_fetch_row((MYSQL_RES *)sResult);
-}
-
-DB_LENGTHS ECDatabaseMySQL::FetchRowLengths(DB_RESULT sResult) {
-
-	return (DB_LENGTHS)mysql_fetch_lengths((MYSQL_RES *)sResult);
+	return KDatabase::DoSequence(strSeqName, ulCount, lpllFirstId);
 }
 
 /** 
- * For some reason, MySQL only supports up to 3 bytes of utf-8 data. This means
- * that data outside the BMP is not supported. This function filters the passed utf-8 string
+ * For some reason, MySQL only supports up to 3 bytes of UTF-8 data. This means
+ * that data outside the BMP is not supported. This function filters the passed UTF-8 string
  * and removes the non-BMP characters. Since it should be extremely uncommon to have useful
  * data outside the BMP, this should be acceptable.
  *
@@ -1181,14 +727,14 @@ DB_LENGTHS ECDatabaseMySQL::FetchRowLengths(DB_RESULT sResult) {
  * have to rethink this.
  *
  */
-std::string ECDatabaseMySQL::FilterBMP(const std::string &strToFilter)
+std::string ECDatabase::FilterBMP(const std::string &strToFilter)
 {
 	const char *c = strToFilter.c_str();
 	std::string::size_type pos = 0;
 	std::string strFiltered;
 
 	while(pos < strToFilter.size()) {
-		// Copy 1, 2, and 3-byte utf-8 sequences
+		// Copy 1, 2, and 3-byte UTF-8 sequences
 		int len;
 		
 		if((c[pos] & 0x80) == 0)
@@ -1203,111 +749,32 @@ std::string ECDatabaseMySQL::FilterBMP(const std::string &strToFilter)
 			len = 5;
 		else if((c[pos] & 0xFE) == 0xFC)
 			len = 6;
-		else {
-			// Invalid utf-8 ?
+		else
+			// Invalid UTF-8 ?
 			len = 1;
-		}
-		
-		if(len < 4) {
+		if (len < 4)
 			strFiltered.append(&c[pos], len);
-		}
-		
 		pos += len;
 	}
 	
 	return strFiltered;
 }
 
-std::string ECDatabaseMySQL::Escape(const std::string &strToEscape)
-{
-	ULONG size = strToEscape.length()*2+1;
-	char *szEscaped = new char[size];
-	std::string escaped;
-
-	memset(szEscaped, 0, size);
-
-	mysql_real_escape_string(&this->m_lpMySQL, szEscaped, strToEscape.c_str(), strToEscape.length());
-
-	escaped = szEscaped;
-
-	delete [] szEscaped;
-
-	return escaped;
-}
-
-std::string ECDatabaseMySQL::EscapeBinary(unsigned char *lpData, unsigned int ulLen)
-{
-	ULONG size = ulLen*2+1;
-	char *szEscaped = new char[size];
-	std::string escaped;
-	
-	memset(szEscaped, 0, size);
-
-	mysql_real_escape_string(&this->m_lpMySQL, szEscaped, (const char *)lpData, ulLen);
-
-	escaped = szEscaped;
-
-	delete [] szEscaped;
-
-	return "'" + escaped + "'";
-}
-
-std::string ECDatabaseMySQL::EscapeBinary(const std::string& strData)
-{
-	return EscapeBinary((unsigned char *)strData.c_str(), strData.size());
-}
-
-void ECDatabaseMySQL::ResetResult(DB_RESULT sResult) {
-
-	mysql_data_seek((MYSQL_RES *)sResult, 0);
-}
-
-const char *ECDatabaseMySQL::GetError(void)
-{
-	if(m_bMysqlInitialize == false)
-		return "MYSQL not initialized";
-
-	return mysql_error(&m_lpMySQL);
-}
-
-DB_ERROR ECDatabaseMySQL::GetLastError()
-{
-	DB_ERROR dberr;
-	
-	switch (mysql_errno(&m_lpMySQL)) {
-		case ER_LOCK_WAIT_TIMEOUT:
-			dberr = DB_E_LOCK_WAIT_TIMEOUT;
-			break;
-		
-		case ER_LOCK_DEADLOCK:
-			dberr = DB_E_LOCK_DEADLOCK;
-			break;
-			
-		default:
-			dberr = DB_E_UNKNOWN;
-			break;
-	}
-	
-	return dberr;
-}
-
-bool ECDatabaseMySQL::SuppressLockErrorLogging(bool bSuppress)
+bool ECDatabase::SuppressLockErrorLogging(bool bSuppress)
 {
 	std::swap(bSuppress, m_bSuppressLockErrorLogging);
 	return bSuppress;
 }
 
-ECRESULT ECDatabaseMySQL::Begin() {
-	ECRESULT er = erSuccess;
-	
-	er = Query("BEGIN");
-
+ECRESULT ECDatabase::Begin(void)
+{
+	auto er = KDatabase::Begin();
 #ifdef DEBUG
 #if DEBUG_TRANSACTION
 	ec_log_debug("%08X: BEGIN", &m_lpMySQL);
 	if(m_ulTransactionState != 0) {
 		ec_log_debug("BEGIN ALREADY ISSUED");
-		ASSERT(("BEGIN ALREADY ISSUED", FALSE));
+		assert(("BEGIN ALREADY ISSUED", false));
 	}
 	m_ulTransactionState = 1;
 #endif
@@ -1316,16 +783,15 @@ ECRESULT ECDatabaseMySQL::Begin() {
 	return er;
 }
 
-ECRESULT ECDatabaseMySQL::Commit() {
-	ECRESULT er = erSuccess;
-	er = Query("COMMIT");
-	
+ECRESULT ECDatabase::Commit(void)
+{
+	auto er = KDatabase::Commit();
 #ifdef DEBUG
 #if DEBUG_TRANSACTION
 	ec_log_debug("%08X: COMMIT", &m_lpMySQL);
 	if(m_ulTransactionState != 1) {
 		ec_log_debug("NO BEGIN ISSUED");
-		ASSERT(("NO BEGIN ISSUED", FALSE));
+		assert(("NO BEGIN ISSUED", false));
 	}
 	m_ulTransactionState = 0;
 #endif
@@ -1334,15 +800,15 @@ ECRESULT ECDatabaseMySQL::Commit() {
 	return er;
 }
 
-ECRESULT ECDatabaseMySQL::Rollback() {
-	ECRESULT er = Query("ROLLBACK");
-	
+ECRESULT ECDatabase::Rollback(void)
+{
+	auto er = KDatabase::Rollback();
 #ifdef DEBUG
 #if DEBUG_TRANSACTION
 	ec_log_debug("%08X: ROLLBACK", &m_lpMySQL);
 	if(m_ulTransactionState != 1) {
 		ec_log_debug("NO BEGIN ISSUED");
-		ASSERT(("NO BEGIN ISSUED", FALSE));
+		assert(("NO BEGIN ISSUED", false));
 	}
 	m_ulTransactionState = 0;
 #endif
@@ -1350,102 +816,24 @@ ECRESULT ECDatabaseMySQL::Rollback() {
 	return er;
 }
 
-void ECDatabaseMySQL::ThreadInit() {
+void ECDatabase::ThreadInit(void)
+{
 	mysql_thread_init();
 }
 
-void ECDatabaseMySQL::ThreadEnd() {
+void ECDatabase::ThreadEnd(void)
+{
 	mysql_thread_end();
 }
 
-ECRESULT ECDatabaseMySQL::IsInnoDBSupported()
+ECRESULT ECDatabase::CreateDatabase(void)
 {
-	ECRESULT	er = erSuccess;
-	DB_RESULT	lpResult = NULL;
-	DB_ROW		lpDBRow = NULL;
-
-	er = DoSelect("SHOW ENGINES", &lpResult);
-	if(er != erSuccess) {
-		ec_log_crit("Unable to query supported database engines. Error: %s", GetError());
-		goto exit;
-	}
-
-	while ((lpDBRow = FetchRow(lpResult)) != NULL) {
-		if (strcasecmp(lpDBRow[0], "InnoDB") != 0)
-			continue;
-
-		if (strcasecmp(lpDBRow[1], "DISABLED") == 0) {
-			// mysql has run with innodb enabled once, but disabled this.. so check your log.
-			ec_log_crit("INNODB engine is disabled. Please re-enable the INNODB engine. Check your MySQL log for more information or comment out skip-innodb in the mysql configuration file.");
-			er = KCERR_DATABASE_ERROR;
-			goto exit;
-		} else if (strcasecmp(lpDBRow[1], "YES") != 0 && strcasecmp(lpDBRow[1], "DEFAULT") != 0) {
-			// mysql is incorrectly configured or compiled.
-			ec_log_crit("INNODB engine is not supported. Please enable the INNODB engine in the mysql configuration file.");
-			er = KCERR_DATABASE_ERROR;
-			goto exit;
-		}
-		break;
-	}
-	if (lpDBRow == NULL) {
-		ec_log_crit("Unable to find the \"InnoDB\" engine from the mysql server. Probably INNODB is not supported.");
-		er = KCERR_DATABASE_ERROR;
-		goto exit;
-	}
-
-exit:
-	if(lpResult)
-		FreeResult(lpResult);
-
-	return er;
-}
-
-ECRESULT ECDatabaseMySQL::CreateDatabase()
-{
-	ECRESULT er;
-	string		strQuery;
-	const char *lpDatabase = m_lpConfig->GetSetting("mysql_database");
-	const char *lpMysqlPort = m_lpConfig->GetSetting("mysql_port");
-	const char *lpMysqlSocket = m_lpConfig->GetSetting("mysql_socket");
-
-	if(*lpMysqlSocket == '\0')
-		lpMysqlSocket = NULL;
-
-	// database tables
-	static const sSQLDatabase_t sDatabaseTables[] = {
-		{"acl", Z_TABLEDEF_ACL},
-		{"hierarchy", Z_TABLEDEF_HIERARCHY},
-		{"names", Z_TABLEDEF_NAMES},
-		{"mvproperties", Z_TABLEDEF_MVPROPERTIES},
-		{"tproperties", Z_TABLEDEF_TPROPERTIES},
-		{"properties", Z_TABLEDEF_PROPERTIES},
-		{"delayedupdate", Z_TABLEDEF_DELAYEDUPDATE},
-		{"receivefolder", Z_TABLEDEF_RECEIVEFOLDER},
-
-		{"stores", Z_TABLEDEF_STORES},
-		{"users", Z_TABLEDEF_USERS},
-		{"outgoingqueue", Z_TABLEDEF_OUTGOINGQUEUE},
-		{"lob", Z_TABLEDEF_LOB},
-		{"searchresults", Z_TABLEDEF_SEARCHRESULTS},
-		{"changes", Z_TABLEDEF_CHANGES},
-		{"syncs", Z_TABLEDEF_SYNCS},
-		{"versions", Z_TABLEDEF_VERSIONS},
-		{"indexedproperties", Z_TABLEDEF_INDEXED_PROPERTIES},
-		{"settings", Z_TABLEDEF_SETTINGS},
-
-		{"object", Z_TABLEDEF_OBJECT},
-		{"objectproperty", Z_TABLEDEF_OBJECT_PROPERTY},
-		{"objectmvproperty", Z_TABLEDEF_OBJECT_MVPROPERTY},
-		{"objectrelation", Z_TABLEDEF_OBJECT_RELATION},
-
-		{"singleinstances", Z_TABLEDEF_REFERENCES },
-		{"abchanges", Z_TABLEDEF_ABCHANGES },
-		{"syncedmessages", Z_TABLEDEFS_SYNCEDMESSAGES },
-		{"clientupdatestatus", Z_TABLEDEF_CLIENTUPDATESTATUS },
-	};
+	auto er = KDatabase::CreateDatabase(m_lpConfig, false);
+	if (er != erSuccess)
+		return er;
 
 	// database default data
-	static const sSQLDatabase_t sDatabaseData[] = {
+	static constexpr const sSQLDatabase_t sDatabaseData[] = {
 		{"users", Z_TABLEDATA_USERS},
 		{"stores", Z_TABLEDATA_STORES},
 		{"hierarchy", Z_TABLEDATA_HIERARCHY},
@@ -1454,53 +842,6 @@ ECRESULT ECDatabaseMySQL::CreateDatabase()
 		{"settings", Z_TABLEDATA_SETTINGS},
 		{"indexedproperties", Z_TABLEDATA_INDEXED_PROPERTIES},
 	};
-
-	er = InitEngine();
-	if(er != erSuccess)
-		return er;
-
-	// Connect
-	if(mysql_real_connect(&m_lpMySQL, 
-			m_lpConfig->GetSetting("mysql_host"), 
-			m_lpConfig->GetSetting("mysql_user"), 
-			m_lpConfig->GetSetting("mysql_password"), 
-			NULL, 
-			(lpMysqlPort)?atoi(lpMysqlPort):0, 
-			lpMysqlSocket, 0) == NULL)
-	{
-		ec_log_err("ECDatabaseMySQL::CreateDatabase(): mysql connect failed: %s", GetError());
-		return KCERR_DATABASE_ERROR;
-	}
-
-	if(lpDatabase == NULL) {
-		ec_log_crit("Unable to create database: Unknown database");
-		return KCERR_DATABASE_ERROR;
-	}
-
-	ec_log_notice("Creating database \"%s\"", lpDatabase);
-
-	er = IsInnoDBSupported();
-	if(er != erSuccess)
-		return er;
-
-	strQuery = "CREATE DATABASE IF NOT EXISTS `"+std::string(m_lpConfig->GetSetting("mysql_database"))+"`";
-	if(Query(strQuery) != erSuccess){
-		ec_log_crit("Unable to create database: %s", GetError());
-		return KCERR_DATABASE_ERROR;
-	}
-
-	strQuery = "USE `"+std::string(m_lpConfig->GetSetting("mysql_database"))+"`";
-	er = DoInsert(strQuery);
-	if(er != erSuccess)
-		return er;
-
-	// Database tables
-	for (size_t i = 0; i < ARRAY_SIZE(sDatabaseTables); ++i) {
-		ec_log_info("Creating table \"%s\"", sDatabaseTables[i].lpComment);
-		er = DoInsert(sDatabaseTables[i].lpSQL);
-		if(er != erSuccess)
-			return er;	
-	}
 
 	// Add the default table data
 	for (size_t i = 0; i < ARRAY_SIZE(sDatabaseData); ++i) {
@@ -1528,8 +869,7 @@ ECRESULT ECDatabaseMySQL::CreateDatabase()
 			return er;
 	}
 
-	
-	ec_log_notice("Database has been created");
+	ec_log_notice("Database has been created/updated and populated");
 	return erSuccess;
 }
 
@@ -1543,20 +883,19 @@ static inline bool row_has_null(DB_ROW row, size_t z)
 	return false;
 }
 
-ECRESULT ECDatabaseMySQL::GetDatabaseVersion(zcp_versiontuple *dbv)
+ECRESULT ECDatabase::GetDatabaseVersion(zcp_versiontuple *dbv)
 {
 	ECRESULT		er = erSuccess;
 	string			strQuery;
-	DB_RESULT		lpResult = NULL;
+	DB_RESULT lpResult;
 	DB_ROW			lpDBRow = NULL;
 	bool have_micro;
 
 	/* Check if the "micro" column already exists (it does since v64) */
 	er = DoSelect("SELECT databaserevision FROM versions WHERE databaserevision>=64 LIMIT 1", &lpResult);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 	have_micro = GetNumRows(lpResult) > 0;
-	FreeResult(lpResult);
 
 	strQuery = "SELECT major, minor";
 	strQuery += have_micro ? ", micro" : ", 0";
@@ -1567,7 +906,7 @@ ECRESULT ECDatabaseMySQL::GetDatabaseVersion(zcp_versiontuple *dbv)
 
 	er = DoSelect(strQuery, &lpResult);
 	if(er != erSuccess && mysql_errno(&m_lpMySQL) != ER_NO_SUCH_TABLE)
-		goto exit;
+		return er;
 
 	if(er != erSuccess || GetNumRows(lpResult) == 0) {
 		// Ok, maybe < than version 5.10
@@ -1576,11 +915,9 @@ ECRESULT ECDatabaseMySQL::GetDatabaseVersion(zcp_versiontuple *dbv)
 		strQuery = "SHOW COLUMNS FROM properties";
 		er = DoSelect(strQuery, &lpResult);
 		if(er != erSuccess)
-			goto exit;
+			return er;
 
 		lpDBRow = FetchRow(lpResult);
-		er = KCERR_UNKNOWN_DATABASE;
-
 		while (lpDBRow != NULL) {
 			if (lpDBRow[0] != NULL && strcasecmp(lpDBRow[0], "storeid") == 0) {
 				dbv->v_major  = 5;
@@ -1592,15 +929,13 @@ ECRESULT ECDatabaseMySQL::GetDatabaseVersion(zcp_versiontuple *dbv)
 			}
 			lpDBRow = FetchRow(lpResult);
 		}
-		
-		goto exit;
+		return KCERR_UNKNOWN_DATABASE;
 	}
 
 	lpDBRow = FetchRow(lpResult);
 	if (row_has_null(lpDBRow, 5)) {
-		er = KCERR_DATABASE_ERROR;
-		ec_log_err("ECDatabaseMySQL::GetDatabaseVersion(): NULL row or columns");
-		goto exit;
+		ec_log_err("ECDatabase::GetDatabaseVersion(): NULL row or columns");
+		return KCERR_DATABASE_ERROR;
 	}
 
 	dbv->v_major  = strtoul(lpDBRow[0], NULL, 0);
@@ -1608,19 +943,15 @@ ECRESULT ECDatabaseMySQL::GetDatabaseVersion(zcp_versiontuple *dbv)
 	dbv->v_micro  = strtoul(lpDBRow[2], NULL, 0);
 	dbv->v_rev    = strtoul(lpDBRow[3], NULL, 0);
 	dbv->v_schema = strtoul(lpDBRow[4], NULL, 0);
-
-exit:
-	if(lpResult)
-		FreeResult(lpResult);
-
-	return er;
+	return erSuccess;
 }
 
-ECRESULT ECDatabaseMySQL::IsUpdateDone(unsigned int ulDatabaseRevision, unsigned int ulRevision)
+ECRESULT ECDatabase::IsUpdateDone(unsigned int ulDatabaseRevision,
+    unsigned int ulRevision)
 {
 	ECRESULT		er = KCERR_NOT_FOUND;
 	string			strQuery;
-	DB_RESULT		lpResult = NULL;
+	DB_RESULT lpResult;
 
 	strQuery = "SELECT major,minor,revision,databaserevision FROM versions WHERE databaserevision = " + stringify(ulDatabaseRevision);
 	if (ulRevision > 0)
@@ -1630,40 +961,28 @@ ECRESULT ECDatabaseMySQL::IsUpdateDone(unsigned int ulDatabaseRevision, unsigned
 	
 	er = DoSelect(strQuery, &lpResult);
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	if(GetNumRows(lpResult) != 1)
-		er = KCERR_NOT_FOUND;
-
-exit:
-	if(lpResult != NULL)
-		FreeResult(lpResult);
-	return er;
+		return KCERR_NOT_FOUND;
+	return erSuccess;
 }
 
-ECRESULT ECDatabaseMySQL::GetFirstUpdate(unsigned int *lpulDatabaseRevision)
+ECRESULT ECDatabase::GetFirstUpdate(unsigned int *lpulDatabaseRevision)
 {
 	ECRESULT		er = erSuccess;
-	DB_RESULT		lpResult = NULL;
+	DB_RESULT lpResult;
 	DB_ROW			lpDBRow = NULL;
 
 	er = DoSelect("SELECT MIN(databaserevision) FROM versions", &lpResult);
 	if(er != erSuccess && mysql_errno(&m_lpMySQL) != ER_NO_SUCH_TABLE)
-		goto exit;
+		return er;
 	else if(er == erSuccess)
 		lpDBRow = FetchRow(lpResult);
-
-	er = erSuccess;
-
 	if (lpDBRow == NULL || lpDBRow[0] == NULL ) {
 		*lpulDatabaseRevision = 0;
 	}else
 		*lpulDatabaseRevision = atoui(lpDBRow[0]);
-
-exit:
-	if (lpResult != NULL)
-		FreeResult(lpResult);
-	return er;
+	return erSuccess;
 }
 
 /** 
@@ -1674,7 +993,7 @@ exit:
  * 
  * @return Kopano error code
  */
-ECRESULT ECDatabaseMySQL::UpdateDatabase(bool bForceUpdate, std::string &strReport)
+ECRESULT ECDatabase::UpdateDatabase(bool bForceUpdate, std::string &strReport)
 {
 	ECRESULT er;
 	bool			bUpdated = false;
@@ -1716,14 +1035,12 @@ ECRESULT ECDatabaseMySQL::UpdateDatabase(bool bForceUpdate, std::string &strRepo
 	for (size_t i = ulDatabaseRevisionMin;
 	     i < ARRAY_SIZE(sUpdateList); ++i)
 	{
-		if ( (ulDatabaseRevisionMin > 0 && IsUpdateDone(sUpdateList[i].ulVersion) == hrSuccess) ||
-			(sUpdateList[i].ulVersionMin != 0 && stored_ver.v_schema >= sUpdateList[i].ulVersion &&
-			stored_ver.v_schema >= sUpdateList[i].ulVersionMin) ||
-			(sUpdateList[i].ulVersionMin != 0 && IsUpdateDone(sUpdateList[i].ulVersionMin, PROJECT_VERSION_REVISION) == hrSuccess))
-		{
+		if ((ulDatabaseRevisionMin > 0 && IsUpdateDone(sUpdateList[i].ulVersion) == hrSuccess) ||
+		    (sUpdateList[i].ulVersionMin != 0 && stored_ver.v_schema >= sUpdateList[i].ulVersion &&
+		    stored_ver.v_schema >= sUpdateList[i].ulVersionMin) ||
+		    (sUpdateList[i].ulVersionMin != 0 && IsUpdateDone(sUpdateList[i].ulVersionMin, PROJECT_VERSION_REVISION) == hrSuccess))
 			// Update already done, next
 			continue;
-		}
 
 		ec_log_info("Start: %s", sUpdateList[i].lpszLogComment);
 
@@ -1764,7 +1081,7 @@ ECRESULT ECDatabaseMySQL::UpdateDatabase(bool bForceUpdate, std::string &strRepo
 	return erSuccess;
 }
 
-ECRESULT ECDatabaseMySQL::UpdateDatabaseVersion(unsigned int ulDatabaseRevision)
+ECRESULT ECDatabase::UpdateDatabaseVersion(unsigned int ulDatabaseRevision)
 {
 	ECRESULT er;
 	string		strQuery;
@@ -1776,7 +1093,6 @@ ECRESULT ECDatabaseMySQL::UpdateDatabaseVersion(unsigned int ulDatabaseRevision)
 	if (er != erSuccess)
 		return er;
 	have_micro = GetNumRows(result) > 0;
-	FreeResult(result);
 
 	// Insert version number
 	strQuery = "INSERT INTO versions (major, minor, ";
@@ -1792,78 +1108,103 @@ ECRESULT ECDatabaseMySQL::UpdateDatabaseVersion(unsigned int ulDatabaseRevision)
 /**
  * Validate all database tables
 */
-ECRESULT ECDatabaseMySQL::ValidateTables()
+ECRESULT ECDatabase::ValidateTables(void)
 {
 	ECRESULT	er = erSuccess;
 	string		strQuery;
 	list<std::string> listTables;
 	list<std::string> listErrorTables;
-	list<std::string>::const_iterator iterTables;
-	DB_RESULT	lpResult = NULL;
+	DB_RESULT lpResult;
 	DB_ROW		lpDBRow = NULL;
 
 	er = DoSelect("SHOW TABLES", &lpResult);
 	if(er != erSuccess) {
 		ec_log_err("Unable to get all tables from the mysql database. %s", GetError());
-		goto exit;
+		return er;
 	}
 
 	// Get all tables of the database
 	while( (lpDBRow = FetchRow(lpResult))) {
 		if (lpDBRow == NULL || lpDBRow[0] == NULL) {
 			ec_log_err("Wrong table information.");
-			er = KCERR_DATABASE_ERROR;
-			goto exit;
+			return KCERR_DATABASE_ERROR;
 		}
 
 		listTables.insert(listTables.end(), lpDBRow[0]);
 	}
-	if(lpResult) FreeResult(lpResult);
-	lpResult = NULL;
 
-	for (iterTables = listTables.begin(); iterTables != listTables.end(); ++iterTables) {
-		er = DoSelect("CHECK TABLE " + *iterTables, &lpResult);
+	for (const auto &table : listTables) {
+		er = DoSelect("CHECK TABLE " + table, &lpResult);
 		if(er != erSuccess) {
-			ec_log_err("Unable to check table \"%s\"", iterTables->c_str());
-			goto exit;
+			ec_log_err("Unable to check table \"%s\"", table.c_str());
+			return er;
 		}
 
 		lpDBRow = FetchRow(lpResult);
 		if (lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL) {
 			ec_log_err("Wrong check table information.");
-			er = KCERR_DATABASE_ERROR;
-			goto exit;
+			return KCERR_DATABASE_ERROR;
 		}
 
 		ec_log_info("%30s | %15s | %s", lpDBRow[0], lpDBRow[2], lpDBRow[3]);
 		if (strcmp(lpDBRow[2], "error") == 0)
 			listErrorTables.insert(listErrorTables.end(), lpDBRow[0]);
-
-		if(lpResult) FreeResult(lpResult);
-		lpResult = NULL;
 	}
 
 	if (!listErrorTables.empty())
 	{
 		ec_log_notice("Rebuilding tables.");
-		for (iterTables = listErrorTables.begin();
-		     iterTables != listErrorTables.end(); ++iterTables) {
-			er = DoUpdate("ALTER TABLE " + *iterTables + " FORCE");
+		for (const auto &table : listErrorTables) {
+			er = DoUpdate("ALTER TABLE " + table + " FORCE");
 			if(er != erSuccess) {
-				ec_log_crit("Unable to fix table \"%s\"", iterTables->c_str());
+				ec_log_crit("Unable to fix table \"%s\"", table.c_str());
 				break;
 			}
 		}
-		if(er != erSuccess) {
+		if (er != erSuccess)
 			ec_log_crit("Rebuild tables failed. Error code 0x%08x", er);
-		} else {
+		else
 			ec_log_notice("Rebuilding tables done.");
-		}
 	}//	if (!listErrorTables.empty())
-
-exit:
-	if(lpResult)
-		FreeResult(lpResult);
-
 	return er;
 }
+
+static constexpr const sSQLDatabase_t kcsrv_tables[] = {
+	{"acl", Z_TABLEDEF_ACL},
+	{"hierarchy", Z_TABLEDEF_HIERARCHY},
+	{"names", Z_TABLEDEF_NAMES},
+	{"mvproperties", Z_TABLEDEF_MVPROPERTIES},
+	{"tproperties", Z_TABLEDEF_TPROPERTIES},
+	{"properties", Z_TABLEDEF_PROPERTIES},
+	{"delayedupdate", Z_TABLEDEF_DELAYEDUPDATE},
+	{"receivefolder", Z_TABLEDEF_RECEIVEFOLDER},
+
+	{"stores", Z_TABLEDEF_STORES},
+	{"users", Z_TABLEDEF_USERS},
+	{"outgoingqueue", Z_TABLEDEF_OUTGOINGQUEUE},
+	{"lob", Z_TABLEDEF_LOB},
+	{"searchresults", Z_TABLEDEF_SEARCHRESULTS},
+	{"changes", Z_TABLEDEF_CHANGES},
+	{"syncs", Z_TABLEDEF_SYNCS},
+	{"versions", Z_TABLEDEF_VERSIONS},
+	{"indexedproperties", Z_TABLEDEF_INDEXED_PROPERTIES},
+	{"settings", Z_TABLEDEF_SETTINGS},
+
+	{"object", Z_TABLEDEF_OBJECT},
+	{"objectproperty", Z_TABLEDEF_OBJECT_PROPERTY},
+	{"objectmvproperty", Z_TABLEDEF_OBJECT_MVPROPERTY},
+	{"objectrelation", Z_TABLEDEF_OBJECT_RELATION},
+
+	{"singleinstances", Z_TABLEDEF_REFERENCES},
+	{"abchanges", Z_TABLEDEF_ABCHANGES},
+	{"syncedmessages", Z_TABLEDEFS_SYNCEDMESSAGES},
+	{"clientupdatestatus", Z_TABLEDEF_CLIENTUPDATESTATUS},
+	{nullptr, nullptr},
+};
+
+const struct sSQLDatabase_t *ECDatabase::GetDatabaseDefs(void)
+{
+	return kcsrv_tables;
+}
+
+} /* namespace */

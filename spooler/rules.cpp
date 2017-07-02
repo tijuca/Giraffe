@@ -23,8 +23,10 @@
 #include <mapicode.h>
 #include <mapiutil.h>
 #include <kopano/mapiext.h>
+#include <kopano/memory.hpp>
 #include <edkmdb.h>
 #include <edkguid.h>
+#include <kopano/ECGetText.h>
 #include <kopano/stringutil.h>
 #include <kopano/Util.h>
 #include <kopano/CommonUtil.h>
@@ -32,37 +34,38 @@
 #include <kopano/MAPIErrors.h>
 #include <kopano/mapi_ptr.h>
 #include <kopano/mapiguidext.h>
-
+#include <kopano/charset/convert.h>
+#include <kopano/hl.hpp>
 #include "IECExchangeModifyTable.h"
 #include "PyMapiPlugin.h"
 #include "spmain.h"
 
 using namespace std;
+using namespace KCHL;
 
 static HRESULT GetRecipStrings(LPMESSAGE lpMessage, std::wstring &wstrTo,
     std::wstring &wstrCc, std::wstring &wstrBcc)
 {
-	HRESULT hr = hrSuccess;
 	SRowSetPtr ptrRows;
 	MAPITablePtr ptrRecips;
-	SizedSPropTagArray(2, sptaDisplay)  = {2, { PR_DISPLAY_NAME_W, PR_RECIPIENT_TYPE } };
+	static constexpr const SizedSPropTagArray(2, sptaDisplay) =
+		{2, {PR_DISPLAY_NAME_W, PR_RECIPIENT_TYPE}};
 	
 	wstrTo.clear();
 	wstrCc.clear();
 	wstrBcc.clear();
 	
-	hr = lpMessage->GetRecipientTable(MAPI_UNICODE, &ptrRecips);
+	HRESULT hr = lpMessage->GetRecipientTable(MAPI_UNICODE, &~ptrRecips);
 	if(hr != hrSuccess)
-		goto exit;
-		
-	hr = ptrRecips->SetColumns((LPSPropTagArray)&sptaDisplay, TBL_BATCH);
+		return hr;
+	hr = ptrRecips->SetColumns(sptaDisplay, TBL_BATCH);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 		
 	while(1) {
 		hr = ptrRecips->QueryRows(1, 0, &ptrRows);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 			
 		if(ptrRows.size() == 0)
 			break;
@@ -71,42 +74,33 @@ static HRESULT GetRecipStrings(LPMESSAGE lpMessage, std::wstring &wstrTo,
 			continue;
 			
 		switch(ptrRows[0].lpProps[1].Value.ul) {
-			case MAPI_TO:
-				if (!wstrTo.empty()) wstrTo += L"; ";
-				wstrTo += ptrRows[0].lpProps[0].Value.lpszW;
-				break;
-			case MAPI_CC:
-				if (!wstrCc.empty()) wstrCc += L"; ";
-				wstrCc += ptrRows[0].lpProps[0].Value.lpszW;
-				break;
-			case MAPI_BCC:
-				if (!wstrBcc.empty()) wstrBcc += L"; ";
-				wstrBcc += ptrRows[0].lpProps[0].Value.lpszW;
-				break;
+		case MAPI_TO:
+			if (!wstrTo.empty()) wstrTo += L"; ";
+			wstrTo += ptrRows[0].lpProps[0].Value.lpszW;
+			break;
+		case MAPI_CC:
+			if (!wstrCc.empty()) wstrCc += L"; ";
+			wstrCc += ptrRows[0].lpProps[0].Value.lpszW;
+			break;
+		case MAPI_BCC:
+			if (!wstrBcc.empty()) wstrBcc += L"; ";
+			wstrBcc += ptrRows[0].lpProps[0].Value.lpszW;
+			break;
 		}
 	}
-
-exit:	
-	return hr;
+	return hrSuccess;
 }
 
 static HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 {
-	HRESULT hr = hrSuccess;
 	SPropArrayPtr ptrBodies;
-	SizedSPropTagArray (4, sBody) = { 4, {
-			PR_BODY_W,
-			PR_HTML,
-			PR_RTF_IN_SYNC,
-			PR_INTERNET_CPID
-		} };
+	static constexpr const SizedSPropTagArray(4, sBody) =
+		{4, {PR_BODY_W, PR_HTML, PR_RTF_IN_SYNC, PR_INTERNET_CPID}};
 	SPropArrayPtr ptrInfo;
-	SizedSPropTagArray (4, sInfo) = { 4, {
-			PR_SENT_REPRESENTING_NAME_W,
-			PR_SENT_REPRESENTING_EMAIL_ADDRESS_W,
-			PR_MESSAGE_DELIVERY_TIME,
-			PR_SUBJECT_W
-		} };
+	static constexpr const SizedSPropTagArray(4, sInfo) =
+		{4, {PR_SENT_REPRESENTING_NAME_W,
+		PR_SENT_REPRESENTING_EMAIL_ADDRESS_W, PR_MESSAGE_DELIVERY_TIME,
+		PR_SUBJECT_W}};
 	ULONG ulCharset;
 	ULONG cValues;
 	bool bPlain = false;
@@ -118,21 +112,20 @@ static HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 	wstring strForwardText;
 	wstring wstrTo, wstrCc, wstrBcc;
 
-	hr = lpOrigMessage->GetProps((LPSPropTagArray)&sBody, 0, &cValues, &ptrBodies);
+	HRESULT hr = lpOrigMessage->GetProps(sBody, 0, &cValues, &~ptrBodies);
 	if (FAILED(hr))
-		goto exit;
+		return hr;
 		
 	if (PROP_TYPE(ptrBodies[3].ulPropTag) != PT_ERROR)
 		ulCharset = ptrBodies[3].Value.ul;
 	else
-		ulCharset = 20127;		// us-ascii
+		ulCharset = 20127; // US-ASCII
 
-	if (PROP_TYPE(ptrBodies[0].ulPropTag) == PT_ERROR && PROP_TYPE(ptrBodies[1].ulPropTag) == PT_ERROR) {
+	if (PROP_TYPE(ptrBodies[0].ulPropTag) == PT_ERROR && PROP_TYPE(ptrBodies[1].ulPropTag) == PT_ERROR)
 		// plain and html not found, check sync flag
 		bPlain = (ptrBodies[2].Value.b == FALSE);
-	} else {
+	else
 		bPlain = PROP_TYPE(ptrBodies[1].ulPropTag) == PT_ERROR && ptrBodies[1].Value.err == MAPI_E_NOT_FOUND;
-	}
 	sNewBody.ulPropTag = bPlain ? PR_BODY_W : PR_HTML;
 
 	// From: <fullname>
@@ -144,11 +137,10 @@ static HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 	
 	hr = GetRecipStrings(lpOrigMessage, wstrTo, wstrCc, wstrBcc);
 	if (FAILED(hr))
-		goto exit;
-
-	hr = lpOrigMessage->GetProps((LPSPropTagArray)&sInfo, 0, &cValues, &ptrInfo);
+		return hr;
+	hr = lpOrigMessage->GetProps(sInfo, 0, &cValues, &~ptrInfo);
 	if (FAILED(hr))
-		goto exit;
+		return hr;
 
 	if (bPlain) {
 		// Plain text body
@@ -189,10 +181,9 @@ static HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 		strForwardText += L"\nAuto forwarded by a rule\n\n";
 
 		if (ptrBodies[0].ulPropTag == PT_ERROR) {
-			hr = lpOrigMessage->OpenProperty(PR_BODY_W, &IID_IStream, 0, 0, &ptrStream);
-			if (hr == hrSuccess) {
+			hr = lpOrigMessage->OpenProperty(PR_BODY_W, &IID_IStream, 0, 0, &~ptrStream);
+			if (hr == hrSuccess)
 				hr = Util::HrStreamToString(ptrStream, wstrBody);
-			}
 			// stream
 			strForwardText.append(wstrBody);
 		} else {
@@ -206,10 +197,9 @@ static HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 		string strFind("<body");
 		const char* pos;
 
-		hr = lpOrigMessage->OpenProperty(PR_HTML, &IID_IStream, 0, 0, &ptrStream);
-		if (hr == hrSuccess) {
+		hr = lpOrigMessage->OpenProperty(PR_HTML, &IID_IStream, 0, 0, &~ptrStream);
+		if (hr == hrSuccess)
 			hr = Util::HrStreamToString(ptrStream, strHTML);
-		}
 		// icase <body> tag 
 		pos = str_ifind(strHTML.c_str(), strFind.c_str());
 		pos = pos ? pos + strFind.length() : strHTML.c_str();
@@ -222,45 +212,39 @@ static HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 				++pos;
 		}
 
-		{
-			strHTMLForwardText = "<b>From:</b> ";
-			if (PROP_TYPE(ptrInfo[0].ulPropTag) != PT_ERROR)
-				Util::HrTextToHtml(ptrInfo[0].Value.lpszW, strHTMLForwardText, ulCharset);
-			else if (PROP_TYPE(ptrInfo[1].ulPropTag) != PT_ERROR)
-				Util::HrTextToHtml(ptrInfo[1].Value.lpszW, strHTMLForwardText, ulCharset);
+		strHTMLForwardText = "<b>From:</b> ";
+		if (PROP_TYPE(ptrInfo[0].ulPropTag) != PT_ERROR)
+			Util::HrTextToHtml(ptrInfo[0].Value.lpszW, strHTMLForwardText, ulCharset);
+		else if (PROP_TYPE(ptrInfo[1].ulPropTag) != PT_ERROR)
+			Util::HrTextToHtml(ptrInfo[1].Value.lpszW, strHTMLForwardText, ulCharset);
 
-			if (PROP_TYPE(ptrInfo[1].ulPropTag) != PT_ERROR) {
-				strHTMLForwardText += " &lt;<a href=\"mailto:";
-				Util::HrTextToHtml(ptrInfo[1].Value.lpszW, strHTMLForwardText, ulCharset);
-				strHTMLForwardText += "\">";
-				Util::HrTextToHtml(ptrInfo[1].Value.lpszW, strHTMLForwardText, ulCharset);
-				strHTMLForwardText += "</a>&gt;";
-			}
-
-			strHTMLForwardText += "<br><b>Sent:</b> ";
-			if (PROP_TYPE(ptrInfo[2].ulPropTag) != PT_ERROR) {
-				char buffer[32];
-				time_t t;
-				struct tm date;
-				FileTimeToUnixTime(ptrInfo[2].Value.ft, &t);
-				localtime_r(&t, &date);
-				strftime(buffer, 32, "%c", &date);
-				strHTMLForwardText += buffer;
-			}
-
-			strHTMLForwardText += "<br><b>To:</b> ";
-			Util::HrTextToHtml(wstrTo.c_str(), strHTMLForwardText, ulCharset);
-
-			strHTMLForwardText += "<br><b>Cc:</b> ";
-			Util::HrTextToHtml(wstrCc.c_str(), strHTMLForwardText, ulCharset);
-
-			strHTMLForwardText += "<br><b>Subject:</b> ";
-			if (PROP_TYPE(ptrInfo[3].ulPropTag) != PT_ERROR)
-				Util::HrTextToHtml(ptrInfo[3].Value.lpszW, strHTMLForwardText, ulCharset);
-
-			strHTMLForwardText += "<br><b>Auto forwarded by a rule</b><br><hr><br>";
+		if (PROP_TYPE(ptrInfo[1].ulPropTag) != PT_ERROR) {
+			strHTMLForwardText += " &lt;<a href=\"mailto:";
+			Util::HrTextToHtml(ptrInfo[1].Value.lpszW, strHTMLForwardText, ulCharset);
+			strHTMLForwardText += "\">";
+			Util::HrTextToHtml(ptrInfo[1].Value.lpszW, strHTMLForwardText, ulCharset);
+			strHTMLForwardText += "</a>&gt;";
 		}
 
+		strHTMLForwardText += "<br><b>Sent:</b> ";
+		if (PROP_TYPE(ptrInfo[2].ulPropTag) != PT_ERROR) {
+			char buffer[32];
+			time_t t;
+			struct tm date;
+			FileTimeToUnixTime(ptrInfo[2].Value.ft, &t);
+			localtime_r(&t, &date);
+			strftime(buffer, 32, "%c", &date);
+			strHTMLForwardText += buffer;
+		}
+		strHTMLForwardText += "<br><b>To:</b> ";
+		Util::HrTextToHtml(wstrTo.c_str(), strHTMLForwardText, ulCharset);
+		strHTMLForwardText += "<br><b>Cc:</b> ";
+		Util::HrTextToHtml(wstrCc.c_str(), strHTMLForwardText, ulCharset);
+		strHTMLForwardText += "<br><b>Subject:</b> ";
+		if (PROP_TYPE(ptrInfo[3].ulPropTag) != PT_ERROR)
+			Util::HrTextToHtml(ptrInfo[3].Value.lpszW, strHTMLForwardText, ulCharset);
+
+		strHTMLForwardText += "<br><b>Auto forwarded by a rule</b><br><hr><br>";
 		strHTML.insert((pos - strHTML.c_str()), strHTMLForwardText);
 
 		sNewBody.Value.bin.cb = strHTML.size();
@@ -268,122 +252,85 @@ static HRESULT MungeForwardBody(LPMESSAGE lpMessage, LPMESSAGE lpOrigMessage)
 	}
 
 	// set new body with forward markers
-	hr = lpMessage->SetProps(1, &sNewBody, NULL);
-
-exit:
-	return hr;
+	return lpMessage->SetProps(1, &sNewBody, NULL);
 }
 
 static HRESULT CreateOutboxMessage(LPMDB lpOrigStore, LPMESSAGE *lppMessage)
 {
 	HRESULT hr = hrSuccess;
-	LPMAPIFOLDER lpOutbox = NULL;
-	LPSPropValue lpOutboxEntryID = NULL;
+	object_ptr<IMAPIFolder> lpOutbox;
+	memory_ptr<SPropValue> lpOutboxEntryID;
 	ULONG ulObjType = 0;
 
-	hr = HrGetOneProp(lpOrigStore, PR_IPM_OUTBOX_ENTRYID, &lpOutboxEntryID);
+	hr = HrGetOneProp(lpOrigStore, PR_IPM_OUTBOX_ENTRYID, &~lpOutboxEntryID);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpOrigStore->OpenEntry(lpOutboxEntryID->Value.bin.cb, (LPENTRYID)lpOutboxEntryID->Value.bin.lpb, NULL, MAPI_MODIFY, &ulObjType, (LPUNKNOWN*)&lpOutbox);
+		return hr;
+	hr = lpOrigStore->OpenEntry(lpOutboxEntryID->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpOutboxEntryID->Value.bin.lpb), nullptr, MAPI_MODIFY, &ulObjType, &~lpOutbox);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpOutbox->CreateMessage(NULL, 0, lppMessage);
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-	MAPIFreeBuffer(lpOutboxEntryID);
-	if (lpOutbox)
-		lpOutbox->Release();
-
-	return hr;
+		return hr;
+	return lpOutbox->CreateMessage(nullptr, 0, lppMessage);
 }
 
 static HRESULT CreateReplyCopy(LPMAPISESSION lpSession, LPMDB lpOrigStore,
     IMAPIProp *lpOrigMessage, LPMESSAGE lpTemplate, LPMESSAGE *lppMessage)
 {
 	HRESULT hr = hrSuccess;
-	LPMESSAGE lpReplyMessage = NULL;
-	LPSPropValue lpProp = NULL;
+	object_ptr<IMessage> lpReplyMessage;
+	memory_ptr<SPropValue> lpProp, lpFrom, lpReplyRecipient;
+	memory_ptr<SPropValue> lpSentMailEntryID;
 	std::wstring strwSubject;
-	LPSPropValue lpSentMailEntryID = NULL;
 	ULONG cValues = 0;
-	LPSPropValue lpFrom = NULL;
-	LPSPropValue lpReplyRecipient = NULL;
-	ADRLIST sRecip = {0};
+	SizedADRLIST(1, sRecip) = {0, {}};
 	ULONG ulCmp = 0;
-	
-	SizedSPropTagArray (5, sFrom) = { 5, {
-		PR_RECEIVED_BY_ENTRYID,
-		PR_RECEIVED_BY_NAME,
-		PR_RECEIVED_BY_ADDRTYPE,
-		PR_RECEIVED_BY_EMAIL_ADDRESS,
-		PR_RECEIVED_BY_SEARCH_KEY,
-	} };
+	static constexpr const SizedSPropTagArray(5, sFrom) =
+		{5, {PR_RECEIVED_BY_ENTRYID, PR_RECEIVED_BY_NAME,
+		PR_RECEIVED_BY_ADDRTYPE, PR_RECEIVED_BY_EMAIL_ADDRESS,
+		PR_RECEIVED_BY_SEARCH_KEY}};
+	static constexpr const SizedSPropTagArray(6, sReplyRecipient) =
+		{6, {PR_SENDER_ENTRYID, PR_SENDER_NAME, PR_SENDER_ADDRTYPE,
+		PR_SENDER_EMAIL_ADDRESS, PR_SENDER_SEARCH_KEY, PR_NULL}};
 
-	SizedSPropTagArray (6, sReplyRecipient) = { 6, {
-		PR_SENDER_ENTRYID,
-		PR_SENDER_NAME,
-		PR_SENDER_ADDRTYPE,
-		PR_SENDER_EMAIL_ADDRESS,
-		PR_SENDER_SEARCH_KEY,
-		PR_NULL,
-	} };
-
-	hr = CreateOutboxMessage(lpOrigStore, &lpReplyMessage);
+	hr = CreateOutboxMessage(lpOrigStore, &~lpReplyMessage);
 	if (hr != hrSuccess)
-		goto exit;
-
+		goto exitpm;
 	hr = lpTemplate->CopyTo(0, NULL, NULL, 0, NULL, &IID_IMessage, lpReplyMessage, 0, NULL);
 	if (hr != hrSuccess)
-		goto exit;
-
+		goto exitpm;
 	// set "sent mail" folder entryid for spooler
-	hr = HrGetOneProp(lpOrigStore, PR_IPM_SENTMAIL_ENTRYID, &lpSentMailEntryID);
+	hr = HrGetOneProp(lpOrigStore, PR_IPM_SENTMAIL_ENTRYID, &~lpSentMailEntryID);
 	if (hr != hrSuccess)
-		goto exit;
+		goto exitpm;
 
 	lpSentMailEntryID->ulPropTag = PR_SENTMAIL_ENTRYID;
 
 	hr = HrSetOneProp(lpReplyMessage, lpSentMailEntryID);
 	if (hr != hrSuccess)
-		goto exit;
+		goto exitpm;
 
 	// set a sensible subject
-	hr = HrGetOneProp(lpReplyMessage, PR_SUBJECT_W, &lpProp);
+	hr = HrGetOneProp(lpReplyMessage, PR_SUBJECT_W, &~lpProp);
 	if (hr == hrSuccess && lpProp->Value.lpszW[0] == L'\0') {
-		MAPIFreeBuffer(lpProp);
 		// Exchange: uses "BT: orig subject" if empty, or only subject from template.
-		hr = HrGetOneProp(lpOrigMessage, PR_SUBJECT_W, &lpProp);
+		hr = HrGetOneProp(lpOrigMessage, PR_SUBJECT_W, &~lpProp);
 		if (hr == hrSuccess) {
 			strwSubject = wstring(L"BT: ") + lpProp->Value.lpszW;
 			lpProp->Value.lpszW = (WCHAR*)strwSubject.c_str();
 			hr = HrSetOneProp(lpReplyMessage, lpProp);
 			if (hr != hrSuccess)
-				goto exit;
+				goto exitpm;
 		}
 	}
-	MAPIFreeBuffer(lpProp);
-	lpProp = NULL;
-	hr = hrSuccess;
-
-	hr = HrGetOneProp(lpOrigMessage, PR_INTERNET_MESSAGE_ID, &lpProp);
+	hr = HrGetOneProp(lpOrigMessage, PR_INTERNET_MESSAGE_ID, &~lpProp);
 	if (hr == hrSuccess) {
 		lpProp->ulPropTag = PR_IN_REPLY_TO_ID;
 		hr = HrSetOneProp(lpReplyMessage, lpProp);
 		if (hr != hrSuccess)
-			goto exit;
+			goto exitpm;
 	}
-	MAPIFreeBuffer(lpProp);
-	lpProp = NULL;
-	hr = hrSuccess;
-
 	// set From to self
-	hr = lpOrigMessage->GetProps((LPSPropTagArray)&sFrom, 0, &cValues, &lpFrom);
+	hr = lpOrigMessage->GetProps(sFrom, 0, &cValues, &~lpFrom);
 	if (FAILED(hr))
-		goto exit;
+		goto exitpm;
 
 	lpFrom[0].ulPropTag = CHANGE_PROP_TYPE(PR_SENT_REPRESENTING_ENTRYID, PROP_TYPE(lpFrom[0].ulPropTag));
 	lpFrom[1].ulPropTag = CHANGE_PROP_TYPE(PR_SENT_REPRESENTING_NAME, PROP_TYPE(lpFrom[1].ulPropTag));
@@ -393,12 +340,12 @@ static HRESULT CreateReplyCopy(LPMAPISESSION lpSession, LPMDB lpOrigStore,
 
 	hr = lpReplyMessage->SetProps(5, lpFrom, NULL);
 	if (FAILED(hr))
-		goto exit;
+		goto exitpm;
 
 	if (parseBool(g_lpConfig->GetSetting("set_rule_headers", NULL, "yes"))) {
 		SPropValue sPropVal;
 
-		PROPMAP_START
+		PROPMAP_START(1)
 		PROPMAP_NAMED_ID(KopanoRuleAction, PT_UNICODE, PS_INTERNET_HEADERS, "x-kopano-rule-action")
 		PROPMAP_INIT(lpReplyMessage);
 
@@ -407,14 +354,14 @@ static HRESULT CreateReplyCopy(LPMAPISESSION lpSession, LPMDB lpOrigStore,
 
 		hr = HrSetOneProp(lpReplyMessage, &sPropVal);
 		if (hr != hrSuccess)
-			goto exit;
+			goto exitpm;
 	}
 
 	// append To with original sender
 	// @todo get Reply-To ?
-	hr = lpOrigMessage->GetProps((LPSPropTagArray)&sReplyRecipient, 0, &cValues, &lpReplyRecipient);
+	hr = lpOrigMessage->GetProps(sReplyRecipient, 0, &cValues, &~lpReplyRecipient);
 	if (FAILED(hr))
-		goto exit;
+		goto exitpm;
 
 	// obvious loop is being obvious
 	if (PROP_TYPE(lpReplyRecipient[0].ulPropTag) != PT_ERROR && PROP_TYPE(lpFrom[0].ulPropTag ) != PT_ERROR) {
@@ -422,7 +369,7 @@ static HRESULT CreateReplyCopy(LPMAPISESSION lpSession, LPMDB lpOrigStore,
 										lpFrom[0].Value.bin.cb, (LPENTRYID)lpFrom[0].Value.bin.lpb, 0, &ulCmp);
 		if (hr == hrSuccess && ulCmp == TRUE) {
 			hr = MAPI_E_UNABLE_TO_COMPLETE;
-			goto exit;
+			goto exitpm;
 		}
 	}
 
@@ -439,20 +386,128 @@ static HRESULT CreateReplyCopy(LPMAPISESSION lpSession, LPMDB lpOrigStore,
 	sRecip.aEntries[0].cValues = cValues;
 	sRecip.aEntries[0].rgPropVals = lpReplyRecipient;
 
-	hr = lpReplyMessage->ModifyRecipients(MODRECIP_ADD, &sRecip);
+	hr = lpReplyMessage->ModifyRecipients(MODRECIP_ADD, sRecip);
 	if (FAILED(hr))
-		goto exit;
+		goto exitpm;
 
 	// return message
 	hr = lpReplyMessage->QueryInterface(IID_IMessage, (void**)lppMessage);
+ exitpm:
+	return hr;
+}
 
-exit:
-	if (lpReplyMessage)
-		lpReplyMessage->Release();
-	MAPIFreeBuffer(lpProp);
-	MAPIFreeBuffer(lpSentMailEntryID);
-	MAPIFreeBuffer(lpFrom);
-	MAPIFreeBuffer(lpReplyRecipient);
+/**
+ * @pat:	pattern
+ * @subj:	subject string (domain part of an e-mail address)
+ *
+ * This _is_ different from kc_wildcard_cmp in that cmp2 allows
+ * the asterisk to match dots.
+ */
+static bool kc_wildcard_cmp2(const char *pat, const char *subj)
+{
+	while (*pat != '\0' && *subj != '\0') {
+		if (*pat == '*') {
+			++pat;
+			for (; *subj != '\0'; ++subj)
+				if (kc_wildcard_cmp2(pat, subj))
+					return true;
+			continue;
+		}
+		if (tolower(*pat) != tolower(*subj))
+			return false;
+		++pat;
+		++subj;
+	}
+	return *pat == '\0' && *subj == '\0';
+}
+
+static bool proc_fwd_allowed(const std::vector<std::string> &wdomlist,
+    const char *addr)
+{
+	const char *p = strchr(addr, '@');
+	if (p == nullptr) {
+		ec_log_err("K-1900: Address \"%s\" had no '@', aborting forward because we could not possibly match it to a domain whitelist.", addr);
+		return false;
+	}
+	addr = p + 1;
+	for (const auto &wdomstr : wdomlist) {
+		const char *wdom = wdomstr.c_str();
+		if (strcmp(wdom, "*") == 0 /* fastpath */ ||
+		    kc_wildcard_cmp2(wdom, addr)) {
+			ec_log_info("K-1901: proc_fwd_allowed: \"%s\" whitelist match on \"%s\"", addr, wdom);
+			return true;
+		}
+	}
+	ec_log_info("K-1902: proc_fwd_allowed: \"%s\" matched nothing on the whitelist", addr);
+	return false;
+}
+
+/**
+ * @inbox:	folder to dump warning mail into
+ * @addr:	target address which delivery was rejected to
+ *
+ * Drop an additional message into @inbox informing about the
+ * unwillingness to process a forwarding rule.
+ */
+static HRESULT kc_send_fwdabort_notice(KCHL::KStore &&store, const wchar_t *addr, const wchar_t *subject)
+{
+	using namespace KCHL;
+	KMessage msg;
+	try {
+		KFolder inbox = store.open_entry(store.get_receive_folder(), nullptr, MAPI_MODIFY);
+		msg = inbox.create_message(nullptr, 0);
+	} catch (KCHL::KMAPIError &err) {
+		ec_log_warn("K-2382: create_message: 0x%08x %s", err.code(), err.what());
+		return err.code();
+	}
+	SPropValue prop[7];
+	size_t nprop = 0;
+	prop[nprop].ulPropTag = PR_SENDER_NAME_W;
+	prop[nprop++].Value.lpszW = const_cast<wchar_t *>(L"Mail Delivery System");
+
+	auto newsubject = convert_to<std::wstring>(g_lpConfig->GetSetting("forward_whitelist_domain_subject"));
+	auto pos = newsubject.find(L"%subject");
+	if (pos != std::string::npos)
+		newsubject = newsubject.replace(pos, 8, subject);
+	prop[nprop].ulPropTag = PR_SUBJECT_W;
+	prop[nprop++].Value.lpszW = const_cast<wchar_t *>(newsubject.c_str());
+
+	prop[nprop].ulPropTag = PR_MESSAGE_FLAGS;
+	prop[nprop++].Value.ul = 0;
+	prop[nprop].ulPropTag = PR_MESSAGE_CLASS_W;
+	prop[nprop++].Value.lpszW = const_cast<wchar_t *>(L"REPORT.IPM.Note.NDR");
+	FILETIME ft;
+	GetSystemTimeAsFileTime(&ft);
+	prop[nprop].ulPropTag = PR_CLIENT_SUBMIT_TIME;
+	prop[nprop++].Value.ft = ft;
+	prop[nprop].ulPropTag = PR_MESSAGE_DELIVERY_TIME;
+	prop[nprop++].Value.ft = ft;
+
+	auto newbody = convert_to<std::wstring>(g_lpConfig->GetSetting("forward_whitelist_domain_message"));
+
+	pos = newbody.find(L"%subject");
+	if (pos != std::string::npos)
+		newbody = newbody.replace(pos, 8, subject);
+
+	pos = newbody.find(L"%sender");
+	if (pos != std::string::npos)
+		newbody = newbody.replace(pos, 7, addr);
+
+	prop[nprop].ulPropTag = PR_BODY_W;
+	prop[nprop++].Value.lpszW = const_cast<wchar_t *>(newbody.c_str());
+	auto hr = msg->SetProps(nprop, prop, nullptr);
+	if (hr != hrSuccess) {
+		ec_log_err("K-3283: SetProps: 0x%08x %s", hr, GetMAPIErrorMessage(hr));
+		return hr;
+	}
+	hr = msg->SaveChanges(KEEP_OPEN_READONLY);
+	if (hr != hrSuccess) {
+		ec_log_err("K-3284: commit: 0x%08x %s", hr, GetMAPIErrorMessage(hr));
+		return hr;
+	}
+	hr = HrNewMailNotification(store, msg);
+	if (hr != hrSuccess)
+		ec_log_warn("K-3285: NewMailNotification: 0x%08x %s", hr, GetMAPIErrorMessage(hr));
 	return hr;
 }
 
@@ -468,68 +523,78 @@ exit:
  * 
  * @return MAPI error code
  */
-static HRESULT CheckRecipients(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
-    IMAPIProp *lpMessage, LPADRLIST lpRuleRecipients, bool bOpDelegate,
-    bool bIncludeAsP1, LPADRLIST *lppNewRecipients)
+static HRESULT CheckRecipients(IAddrBook *lpAdrBook, IMsgStore *orig_store,
+    IMAPIProp *lpMessage, const ADRLIST *lpRuleRecipients, bool bOpDelegate,
+    bool bIncludeAsP1, ADRLIST **lppNewRecipients)
 {
 	HRESULT hr = hrSuccess;
-	LPADRLIST lpRecipients = NULL;
-	LPSPropValue lpMsgClass = NULL;
+	adrlist_ptr lpRecipients;
+	memory_ptr<SPropValue> lpMsgClass;
 	std::wstring strFromName, strFromType, strFromAddress;
 	std::wstring strRuleName, strRuleType, strRuleAddress;
 
 	hr = HrGetAddress(lpAdrBook, (IMessage*)lpMessage,
-					  PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_NAME_W,
-					  PR_SENT_REPRESENTING_ADDRTYPE_W, PR_SENT_REPRESENTING_EMAIL_ADDRESS_W,
-					  strFromName, strFromType, strFromAddress);
+	     PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_NAME_W,
+	     PR_SENT_REPRESENTING_ADDRTYPE_W, PR_SENT_REPRESENTING_EMAIL_ADDRESS_W,
+	     strFromName, strFromType, strFromAddress);
 	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get from address 0x%08X", hr);
-		goto exit;
+		ec_log_err("Unable to get from address 0x%08X", hr);
+		return hr;
+	}
+	hr = MAPIAllocateBuffer(CbNewADRLIST(lpRuleRecipients->cEntries), &~lpRecipients);
+	if (hr != hrSuccess) {
+		ec_log_err("CheckRecipients(): MAPIAllocateBuffer failed %x", hr);
+		return hr;
 	}
 
-	hr = MAPIAllocateBuffer(CbNewADRLIST(lpRuleRecipients->cEntries), (void**)&lpRecipients);
-	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "CheckRecipients(): MAPIAllocateBuffer failed %x", hr);
-		goto exit;
-	}
-
-	HrGetOneProp(lpMessage, PR_MESSAGE_CLASS_A, &lpMsgClass); //ignore errors
-
+	std::vector<std::string> fwd_whitelist =
+		tokenize(g_lpConfig->GetSetting("forward_whitelist_domains"), " ");
+	HrGetOneProp(lpMessage, PR_MESSAGE_CLASS_A, &~lpMsgClass); //ignore errors
 	lpRecipients->cEntries = 0;
 
 	for (ULONG i = 0; i < lpRuleRecipients->cEntries; ++i) {
 		hr = HrGetAddress(lpAdrBook, lpRuleRecipients->aEntries[i].rgPropVals, lpRuleRecipients->aEntries[i].cValues, PR_ENTRYID,
-						  CHANGE_PROP_TYPE(PR_DISPLAY_NAME, PT_UNSPECIFIED), CHANGE_PROP_TYPE(PR_ADDRTYPE, PT_UNSPECIFIED), CHANGE_PROP_TYPE(PR_SMTP_ADDRESS, PT_UNSPECIFIED), 
-						  strRuleName, strRuleType, strRuleAddress);
+		     CHANGE_PROP_TYPE(PR_DISPLAY_NAME, PT_UNSPECIFIED), CHANGE_PROP_TYPE(PR_ADDRTYPE, PT_UNSPECIFIED), CHANGE_PROP_TYPE(PR_SMTP_ADDRESS, PT_UNSPECIFIED),
+		     strRuleName, strRuleType, strRuleAddress);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get rule address 0x%08X", hr);
-			goto exit;
+			ec_log_err("Unable to get rule address 0x%08X", hr);
+			return hr;
 		}
+		auto rule_addr_std = convert_to<std::string>(strRuleAddress);
 
-		if (strFromAddress == strRuleAddress) {
-			// Hack for Meeting requests
-			if (!bOpDelegate || !lpMsgClass || strstr(lpMsgClass->Value.lpszA, "IPM.Schedule.Meeting.") == NULL) 
-			{
-				lpLogger->Log(EC_LOGLEVEL_INFO, "Same user found in From and rule, blocking for loop protection");
-				continue;
-			}
+		memory_ptr<SPropValue> subject;
+		std::wstring subject_wstd;
+		hr = HrGetOneProp(lpMessage, PR_SUBJECT_W, &~subject);
+		if (hr == hrSuccess)
+			subject_wstd = convert_to<std::wstring>(subject->Value.lpszW);
+		else if (hr != MAPI_E_NOT_FOUND)
+			return hr;
+
+		if (!proc_fwd_allowed(fwd_whitelist, rule_addr_std.c_str())) {
+			kc_send_fwdabort_notice(orig_store, strRuleAddress.c_str(), subject_wstd.c_str());
+			return MAPI_E_NO_ACCESS;
+		}
+		if (strFromAddress == strRuleAddress &&
+		    // Hack for Meeting requests
+		    (!bOpDelegate || lpMsgClass == nullptr ||
+		    strstr(lpMsgClass->Value.lpszA, "IPM.Schedule.Meeting.") == nullptr)) {
+			ec_log_info("Same user found in From and rule, blocking for loop protection");
+			continue;
 		}
 
 		// copy recipient
 		hr = Util::HrCopyPropertyArray(lpRuleRecipients->aEntries[i].rgPropVals, lpRuleRecipients->aEntries[i].cValues, &lpRecipients->aEntries[lpRecipients->cEntries].rgPropVals, &lpRecipients->aEntries[lpRecipients->cEntries].cValues, true);
 
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "CheckRecipients(): Util::HrCopyPropertyArray failed %x", hr);
-			goto exit;
+			ec_log_err("CheckRecipients(): Util::HrCopyPropertyArray failed %x", hr);
+			return hr;
 		}
 
         if(bIncludeAsP1) {
-            LPSPropValue lpRecipType = PpropFindProp(lpRecipients->aEntries[lpRecipients->cEntries].rgPropVals, lpRecipients->aEntries[lpRecipients->cEntries].cValues, PR_RECIPIENT_TYPE);
-            
+			auto lpRecipType = PpropFindProp(lpRecipients->aEntries[lpRecipients->cEntries].rgPropVals, lpRecipients->aEntries[lpRecipients->cEntries].cValues, PR_RECIPIENT_TYPE);
             if(!lpRecipType) {
-                lpLogger->Log(EC_LOGLEVEL_FATAL, "Attempt to add recipient with no PR_RECIPIENT_TYPE");
-                hr = MAPI_E_INVALID_PARAMETER;
-                goto exit;
+                ec_log_crit("Attempt to add recipient with no PR_RECIPIENT_TYPE");
+				return MAPI_E_INVALID_PARAMETER;
             }
             
             lpRecipType->Value.ul = MAPI_P1;
@@ -538,39 +603,30 @@ static HRESULT CheckRecipients(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
 	}
 
 	if (lpRecipients->cEntries == 0) {
-		lpLogger->Log(EC_LOGLEVEL_WARNING, "Loop protection blocked all recipients, skipping rule");
-		hr = MAPI_E_UNABLE_TO_COMPLETE;
-		goto exit;
+		ec_log_warn("Loop protection blocked all recipients, skipping rule");
+		return MAPI_E_UNABLE_TO_COMPLETE;
 	}
 
 	if (lpRecipients->cEntries != lpRuleRecipients->cEntries)
-		lpLogger->Log(EC_LOGLEVEL_INFO, "Loop protection blocked some recipients");
+		ec_log_info("Loop protection blocked some recipients");
 
-	*lppNewRecipients = lpRecipients;
+	*lppNewRecipients = lpRecipients.release();
 	lpRecipients = NULL;
-
-exit:
-	if (lpRecipients)
-		FreeProws((LPSRowSet)lpRecipients);
-	MAPIFreeBuffer(lpMsgClass);
-	return hr;
+	return hrSuccess;
 }
 
-static HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
-    LPMDB lpOrigStore, LPMESSAGE lpOrigMessage, LPADRLIST lpRuleRecipients,
+static HRESULT CreateForwardCopy(IAddrBook *lpAdrBook, IMsgStore *lpOrigStore,
+    IMessage *lpOrigMessage, const ADRLIST *lpRecipients,
     bool bOpDelegate, bool bDoPreserveSender, bool bDoNotMunge,
-    bool bForwardAsAttachment, LPMESSAGE *lppMessage)
+    bool bForwardAsAttachment, IMessage **lppMessage)
 {
 	HRESULT hr = hrSuccess;
 	LPMESSAGE lpFwdMsg = NULL;
-	LPSPropValue lpSentMailEntryID = NULL;
-	LPSPropTagArray lpExclude = NULL; // non-free
-	LPADRLIST lpRecipients = NULL;
+	memory_ptr<SPropValue> lpSentMailEntryID, lpOrigSubject;
+	memory_ptr<SPropTagArray> lpExclude;
+	adrlist_ptr filtered_recips;
 	ULONG ulANr = 0;
-	LPATTACH lpAttach = NULL;
-	LPMESSAGE lpAttachMsg = NULL;
-
-	SizedSPropTagArray (10, sExcludeFromCopyForward) = { 10, {
+	static constexpr const SizedSPropTagArray(10, sExcludeFromCopyForward) = {10, {
 		PR_TRANSPORT_MESSAGE_HEADERS,
 		PR_SENT_REPRESENTING_ENTRYID,
 		PR_SENT_REPRESENTING_NAME,
@@ -582,48 +638,45 @@ static HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
 		PR_MESSAGE_FLAGS,
 		PR_MESSAGE_RECIPIENTS, // This must be the last entry, see bDoNotMunge
 	} };
-
-	SizedSPropTagArray (3, sExcludeFromCopyRedirect) = { 3, {
+	static constexpr const SizedSPropTagArray (3, sExcludeFromCopyRedirect) = {3, {
 		PR_TRANSPORT_MESSAGE_HEADERS,
 		PR_MESSAGE_FLAGS,
 		PR_MESSAGE_RECIPIENTS, // This must be the last entry, see bDoNotMunge
 	} };
+	static constexpr const SizedSPropTagArray(1, sExcludeFromAttachedForward) =
+		{1, {PR_TRANSPORT_MESSAGE_HEADERS}};
 
-	SizedSPropTagArray(1, sExcludeFromAttachedForward) = { 1, {
-		PR_TRANSPORT_MESSAGE_HEADERS,
-	} };
-
-	LPSPropValue lpOrigSubject = NULL;
 	SPropValue sForwardProps[5];
 	ULONG cfp = 0;
 	wstring strSubject;
 
-	if (lpRuleRecipients == NULL || lpRuleRecipients->cEntries == 0) {
-	    lpLogger->Log(EC_LOGLEVEL_FATAL, "No rule recipient");
+	if (lpRecipients == NULL || lpRecipients->cEntries == 0) {
+		ec_log_crit("No rule recipient");
 		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
+		goto exitpm;
 	}
 
-	hr = CheckRecipients(lpLogger, lpAdrBook, lpOrigMessage, lpRuleRecipients, bOpDelegate, bDoNotMunge, &lpRecipients);
+	hr = CheckRecipients(lpAdrBook, lpOrigStore, lpOrigMessage, lpRecipients,
+	     bOpDelegate, bDoNotMunge, &~filtered_recips);
+	if (hr == MAPI_E_NO_ACCESS) {
+		ec_log_info("K-1904: Forwarding not permitted. Ending rule processing.");
+		goto exitpm;
+	}
 	if (hr == MAPI_E_UNABLE_TO_COMPLETE)
-		goto exit;
+		goto exitpm;
+	if (hr == hrSuccess)
+		lpRecipients = filtered_recips.get();
+	hr = HrGetOneProp(lpOrigStore, PR_IPM_SENTMAIL_ENTRYID, &~lpSentMailEntryID);
 	if (hr != hrSuccess)
-		// use rule recipients without filter
-		lpRecipients = lpRuleRecipients;
-
-	hr = HrGetOneProp(lpOrigStore, PR_IPM_SENTMAIL_ENTRYID, &lpSentMailEntryID);
-	if (hr != hrSuccess)
-		goto exit;
-
+		goto exitpm;
 	hr = CreateOutboxMessage(lpOrigStore, &lpFwdMsg);
 	if (hr != hrSuccess)
-		goto exit;
+		goto exitpm;
 
 	// If we're doing a redirect, copy over the original PR_SENT_REPRESENTING_*, otherwise don't
-	if(bDoPreserveSender)
-		lpExclude = (LPSPropTagArray)&sExcludeFromCopyRedirect;
-	else
-		lpExclude = (LPSPropTagArray)&sExcludeFromCopyForward;
+	hr = Util::HrCopyPropTagArray(bDoPreserveSender ? sExcludeFromCopyRedirect : sExcludeFromCopyForward, &~lpExclude);
+	if (hr != hrSuccess)
+		return hr;
 
     if(bDoNotMunge) {
         // The idea here is to enable 'resend' mode and to include the original recipient list. What will
@@ -639,13 +692,16 @@ static HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
 		--lpExclude->cValues; // strip PR_MESSAGE_RECIPIENTS, since original recipients should be used
         hr = HrSetOneProp(lpFwdMsg, &sPropResend);
         if(hr != hrSuccess)
-            goto exit;
+		goto exitpm;
     }
 
 	if (bForwardAsAttachment) {
-		hr = lpFwdMsg->CreateAttach(NULL, 0, &ulANr, &lpAttach);
+		object_ptr<IAttach> lpAttach;
+		object_ptr<IMessage> lpAttachMsg;
+
+		hr = lpFwdMsg->CreateAttach(nullptr, 0, &ulANr, &~lpAttach);
 		if (hr != hrSuccess)
-			goto exit;
+			goto exitpm;
 
 		SPropValue sAttachMethod;
 
@@ -654,43 +710,32 @@ static HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
 
 		hr = lpAttach->SetProps(1, &sAttachMethod, NULL);
 		if (hr != hrSuccess)
-			goto exit;
-
-		hr = lpAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, MAPI_CREATE | MAPI_MODIFY, (LPUNKNOWN *)&lpAttachMsg);
+			goto exitpm;
+		hr = lpAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, MAPI_CREATE | MAPI_MODIFY, &~lpAttachMsg);
 		if (hr != hrSuccess)
-			goto exit;
-
-		hr = lpOrigMessage->CopyTo(0, NULL,  (LPSPropTagArray)&sExcludeFromAttachedForward, 0, NULL, &IID_IMessage, lpAttachMsg, 0, NULL);
+			goto exitpm;
+		hr = lpOrigMessage->CopyTo(0, NULL, sExcludeFromAttachedForward,
+		     0, NULL, &IID_IMessage, lpAttachMsg, 0, NULL);
 		if (hr != hrSuccess)
-			goto exit;
-
+			goto exitpm;
 		hr = lpAttachMsg->SaveChanges(0);
 		if (hr != hrSuccess)
-			goto exit;
-
+			goto exitpm;
 		hr = lpAttach->SaveChanges(0);
 		if (hr != hrSuccess)
-			goto exit;
-
-		lpAttachMsg->Release();
-		lpAttachMsg = NULL;
-
-		lpAttach->Release();
-		lpAttach = NULL;
+			goto exitpm;
 	}
 	else {	
 		hr = lpOrigMessage->CopyTo(0, NULL, lpExclude, 0, NULL, &IID_IMessage, lpFwdMsg, 0, NULL);
 		if (hr != hrSuccess)
-			goto exit;
+			goto exitpm;
 	}
 
 	hr = lpFwdMsg->ModifyRecipients(MODRECIP_ADD, lpRecipients);
 	if (hr != hrSuccess)
-		goto exit;
-
+		goto exitpm;
 	// set from email ??
-
-	hr = HrGetOneProp(lpOrigMessage, PR_SUBJECT, &lpOrigSubject);
+	hr = HrGetOneProp(lpOrigMessage, PR_SUBJECT, &~lpOrigSubject);
 	if (hr == hrSuccess)
 		strSubject = lpOrigSubject->Value.lpszW;
 
@@ -714,7 +759,7 @@ static HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
 	}
 
 	if (parseBool(g_lpConfig->GetSetting("set_rule_headers", NULL, "yes"))) {
-		PROPMAP_START
+		PROPMAP_START(1)
 		PROPMAP_NAMED_ID(KopanoRuleAction, PT_UNICODE, PS_INTERNET_HEADERS, "x-kopano-rule-action")
 		PROPMAP_INIT(lpFwdMsg);
 
@@ -724,52 +769,42 @@ static HRESULT CreateForwardCopy(ECLogger *lpLogger, LPADRBOOK lpAdrBook,
 
 	hr = lpFwdMsg->SetProps(cfp, sForwardProps, NULL);
 	if (hr != hrSuccess)
-		goto exit;
+		goto exitpm;
 
 	if (!bDoNotMunge && !bForwardAsAttachment) {
 		// because we're forwarding this as a new message, clear the old received message id
-		SizedSPropTagArray(1, sptaDeleteProps) = { 1, { PR_INTERNET_MESSAGE_ID } };
+		static constexpr const SizedSPropTagArray(1, sptaDeleteProps) =
+			{1, {PR_INTERNET_MESSAGE_ID}};
 
-		hr = lpFwdMsg->DeleteProps((LPSPropTagArray)&sptaDeleteProps, NULL);
+		hr = lpFwdMsg->DeleteProps(sptaDeleteProps, NULL);
 		if(hr != hrSuccess)
-			goto exit;
-
+			goto exitpm;
 		MungeForwardBody(lpFwdMsg, lpOrigMessage);
 	}
 
 	*lppMessage = lpFwdMsg;
-
-exit:
-	MAPIFreeBuffer(lpSentMailEntryID);
-	MAPIFreeBuffer(lpOrigSubject);
-	if (lpRecipients && lpRecipients != lpRuleRecipients)
-		FreeProws((LPSRowSet)lpRecipients);
-
-	if (lpAttachMsg)
-		lpAttachMsg->Release();
-
-	if (lpAttach)
-		lpAttach->Release();
-
+ exitpm:
 	return hr;
 }
 
-// HRESULT HrDelegateMessage(LPMAPISESSION lpSession, LPEXCHANGEMANAGESTORE lpIEMS, IMAPIProp *lpMessage, LPADRENTRY lpAddress, ECLogger *lpLogger)
+// HRESULT HrDelegateMessage(LPMAPISESSION lpSession, LPEXCHANGEMANAGESTORE lpIEMS, IMAPIProp *lpMessage, LPADRENTRY lpAddress)
 static HRESULT HrDelegateMessage(IMAPIProp *lpMessage)
 {
 	HRESULT hr = hrSuccess;
 	SPropValue sNewProps[6] = {{0}};
-	LPSPropValue lpProps = NULL;
+	memory_ptr<SPropValue> lpProps;
 	ULONG cValues = 0;
-	SizedSPropTagArray(5, sptaRecipProps) = {5, 
-		{ PR_RECEIVED_BY_ENTRYID, PR_RECEIVED_BY_ADDRTYPE, PR_RECEIVED_BY_EMAIL_ADDRESS, PR_RECEIVED_BY_NAME, PR_RECEIVED_BY_SEARCH_KEY }
-	};
-	SizedSPropTagArray(1, sptaSentMail) = { 1, { PR_SENTMAIL_ENTRYID } };
+	static constexpr const SizedSPropTagArray(5, sptaRecipProps) =
+		{5, {PR_RECEIVED_BY_ENTRYID, PR_RECEIVED_BY_ADDRTYPE,
+		PR_RECEIVED_BY_EMAIL_ADDRESS, PR_RECEIVED_BY_NAME,
+		PR_RECEIVED_BY_SEARCH_KEY}};
+	static constexpr SizedSPropTagArray(1, sptaSentMail) =
+		{1, {PR_SENTMAIL_ENTRYID}};
 
 	// set PR_RCVD_REPRESENTING on original receiver
-	hr = lpMessage->GetProps((LPSPropTagArray)&sptaRecipProps, 0, &cValues, &lpProps);
+	hr = lpMessage->GetProps(sptaRecipProps, 0, &cValues, &~lpProps);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	lpProps[0].ulPropTag = PR_RCVD_REPRESENTING_ENTRYID;
 	lpProps[1].ulPropTag = PR_RCVD_REPRESENTING_ADDRTYPE;
@@ -779,7 +814,7 @@ static HRESULT HrDelegateMessage(IMAPIProp *lpMessage)
 
 	hr = lpMessage->SetProps(cValues, lpProps, NULL);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// TODO: delete PR_RECEIVED_BY_ values?
 
@@ -791,211 +826,248 @@ static HRESULT HrDelegateMessage(IMAPIProp *lpMessage)
 
 	hr = lpMessage->SetProps(2, sNewProps, NULL);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 		
 	// Don't want to move to sent mail
-	hr = lpMessage->DeleteProps((LPSPropTagArray)&sptaSentMail, NULL);
+	hr = lpMessage->DeleteProps(sptaSentMail, NULL);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
+	return lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
+}
 
-	hr = lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
+static int proc_op_fwd(IAddrBook *abook, IMsgStore *orig_store,
+    const ACTION &act, const std::string &rule, StatsClient *sc,
+    bool &bAddFwdFlag, IMessage **lppMessage)
+{
+	object_ptr<IMessage> lpFwdMsg;
+	HRESULT hr;
 
-exit:
-	MAPIFreeBuffer(lpProps);
-	return hr;
+	sc->countInc("rules", "forward");
+	// TODO: test act.lpAction[n].ulActionFlavor
+	// FWD_PRESERVE_SENDER			1
+	// FWD_DO_NOT_MUNGE_MSG			2
+	// FWD_AS_ATTACHMENT			4
+
+	// redirect == 3
+	if (act.lpadrlist->cEntries == 0) {
+		ec_log_debug("Forwarding rule doesn't have recipients");
+		return 0; // Nothing todo
+	}
+	if (parseBool(g_lpConfig->GetSetting("no_double_forward"))) {
+		/*
+		 * Loop protection. When header is added to the message, it
+		 * will stop to forward or redirect the message.
+		 */
+		PROPMAP_START(1)
+		PROPMAP_NAMED_ID(KopanoRuleAction, PT_UNICODE, PS_INTERNET_HEADERS, "x-kopano-rule-action")
+		PROPMAP_INIT((*lppMessage));
+
+		memory_ptr<SPropValue> lpPropRule;
+		if (HrGetOneProp(*lppMessage, PROP_KopanoRuleAction, &~lpPropRule) == hrSuccess) {
+			ec_log_warn((std::string)"Rule " + rule + ": FORWARD loop protection. Message will not be forwarded or redirected because it includes header \"x-kopano-rule-action\"");
+			return 0;
+		}
+	}
+	ec_log_debug("Rule action: %s e-mail", (act.ulActionFlavor & FWD_PRESERVE_SENDER) ? "redirecting" : "forwarding");
+	hr = CreateForwardCopy(abook, orig_store, *lppMessage,
+	     act.lpadrlist, false, act.ulActionFlavor & FWD_PRESERVE_SENDER,
+	     act.ulActionFlavor & FWD_DO_NOT_MUNGE_MSG,
+	     act.ulActionFlavor & FWD_AS_ATTACHMENT, &~lpFwdMsg);
+	if (hr != hrSuccess) {
+		std::string msg = std::string("Rule ") + rule + ": FORWARD Unable to create forward message: %s (%x)";
+		ec_log_err(msg.c_str(), GetMAPIErrorMessage(hr), hr);
+		return hr == MAPI_E_NO_ACCESS ? -1 : 1;
+	}
+	hr = lpFwdMsg->SubmitMessage(0);
+	if (hr != hrSuccess) {
+		std::string msg = std::string("Rule ") + rule + ": FORWARD Unable to send forward message: %s (%x)";
+		ec_log_err(msg.c_str(), GetMAPIErrorMessage(hr), hr);
+		return 1;
+	}
+	// update original message, set as forwarded
+	bAddFwdFlag = true;
+	return 2;
+ exitpm:
+	return -1;
 }
 
 // lpMessage: gets EntryID, maybe pass this and close message in DAgent.cpp
 HRESULT HrProcessRules(const std::string &recip, PyMapiPlugin *pyMapiPlugin,
-    LPMAPISESSION lpSession, LPADRBOOK lpAdrBook, LPMDB lpOrigStore,
-    LPMAPIFOLDER lpOrigInbox, IMessage **lppMessage, ECLogger *lpLogger,
-    StatsClient *const sc)
+    IMAPISession *lpSession, IAddrBook *lpAdrBook, IMsgStore *lpOrigStore,
+    IMAPIFolder *lpOrigInbox, IMessage **lppMessage, StatsClient *const sc)
 {
 	HRESULT hr = hrSuccess;
-    IExchangeModifyTable *lpTable = NULL;
-    IMAPITable *lpView = NULL;
-
-	LPMDB lpDestStore = NULL;
-	LPMAPIFOLDER lpDestFolder = NULL;
+	object_ptr<IExchangeModifyTable> lpTable;
+	object_ptr<IMAPITable> lpView;
 	LPMESSAGE lpTemplate = NULL;
-	LPMESSAGE lpReplyMsg = NULL;
-	LPMESSAGE lpFwdMsg = NULL;
 	ULONG ulObjType;
 	bool bAddFwdFlag = false;
 	bool bMoved = false;
-	IMessage *lpNewMessage = NULL;
-
-    LPSRowSet lpRowSet = NULL;
-    SizedSPropTagArray(11, sptaRules) = {11,
-										 { PR_RULE_ID, PR_RULE_IDS, PR_RULE_SEQUENCE, PR_RULE_STATE,
-										   PR_RULE_USER_FLAGS, PR_RULE_CONDITION, PR_RULE_ACTIONS,
-										   PR_RULE_PROVIDER, CHANGE_PROP_TYPE(PR_RULE_NAME, PT_STRING8), PR_RULE_LEVEL, PR_RULE_PROVIDER_DATA } };
-	SizedSSortOrderSet(1, sosRules) = {1, 0, 0, { {PR_RULE_SEQUENCE, TABLE_SORT_ASCEND} } };
-    LPSPropValue lpRuleName = NULL;
-    LPSPropValue lpRuleState = NULL;
-	LPSPropValue lpPropRule = NULL;
+	static constexpr const SizedSPropTagArray(11, sptaRules) =
+		{11, {PR_RULE_ID, PR_RULE_IDS, PR_RULE_SEQUENCE, PR_RULE_STATE,
+		PR_RULE_USER_FLAGS, PR_RULE_CONDITION, PR_RULE_ACTIONS,
+		PR_RULE_PROVIDER, CHANGE_PROP_TYPE(PR_RULE_NAME, PT_STRING8),
+		PR_RULE_LEVEL, PR_RULE_PROVIDER_DATA}};
+	static constexpr const SizedSSortOrderSet(1, sosRules) =
+		{1, 0, 0, {{PR_RULE_SEQUENCE, TABLE_SORT_ASCEND}}};
 	std::string strRule;
-    LPSPropValue lpProp = NULL;
-    LPSRestriction lpCondition = NULL;
-    ACTIONS* lpActions = NULL;
+	LPSRestriction lpCondition = NULL;
+	ACTIONS* lpActions = NULL;
 
 	SPropValue sForwardProps[4];
-	IECExchangeModifyTable *lpECModifyTable = NULL;
+	object_ptr<IECExchangeModifyTable> lpECModifyTable;
 	ULONG ulResult= 0;
 
 	sc -> countInc("rules", "invocations");
-
-    hr = lpOrigInbox->OpenProperty(PR_RULES_TABLE, &IID_IExchangeModifyTable, 0, 0, (LPUNKNOWN *)&lpTable);
+	hr = lpOrigInbox->OpenProperty(PR_RULES_TABLE, &IID_IExchangeModifyTable, 0, 0, &~lpTable);
 	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "HrProcessRules(): OpenProperty failed %x", hr);
-        goto exit;
+		ec_log_err("HrProcessRules(): OpenProperty failed %x", hr);
+		goto exit;
 	}
-
-	hr = lpTable->QueryInterface(IID_IECExchangeModifyTable, (void**)&lpECModifyTable);
+	hr = lpTable->QueryInterface(IID_IECExchangeModifyTable, &~lpECModifyTable);
 	if(hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "HrProcessRules(): QueryInterface failed %x", hr);
+		ec_log_err("HrProcessRules(): QueryInterface failed %x", hr);
 		goto exit;
 	}
 
 	hr = lpECModifyTable->DisablePushToServer();
 	if(hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "HrProcessRules(): DisablePushToServer failed %x", hr);
+		ec_log_err("HrProcessRules(): DisablePushToServer failed %x", hr);
 		goto exit;
 	}
 
 	hr = pyMapiPlugin->RulesProcessing("PreRuleProcess", lpSession, lpAdrBook, lpOrigStore, lpTable, &ulResult);
 	if(hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "HrProcessRules(): RulesProcessing failed %x", hr);
+		ec_log_err("HrProcessRules(): RulesProcessing failed %x", hr);
 		goto exit;
 	}
 
 	//TODO do something with ulResults
-    hr = lpTable->GetTable(0, &lpView);
+	hr = lpTable->GetTable(0, &~lpView);
 	if(hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "HrProcessRules(): GetTable failed %x", hr);
-        goto exit;
+		ec_log_err("HrProcessRules(): GetTable failed %x", hr);
+		goto exit;
 	}
-        
-    hr = lpView->SetColumns((LPSPropTagArray)&sptaRules, 0);
+	hr = lpView->SetColumns(sptaRules, 0);
 	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "HrProcessRules(): SetColumns failed %x", hr);
-        goto exit;
+		ec_log_err("HrProcessRules(): SetColumns failed %x", hr);
+		goto exit;
+	}
+	hr = lpView->SortTable(sosRules, 0);
+	if (hr != hrSuccess) {
+		ec_log_err("HrProcessRules(): SortTable failed %x", hr);
+		goto exit;
 	}
 
-	hr = lpView->SortTable((LPSSortOrderSet)&sosRules, 0);
-	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "HrProcessRules(): SortTable failed %x", hr);
-        goto exit;
-	}
-
-	while (TRUE) {
-        hr = lpView->QueryRows(1, 0, &lpRowSet);
-	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "HrProcessRules(): QueryRows failed %x", hr);
-			goto exit;
-	}
-
-        if (lpRowSet->cRows == 0)
-            break;
+	while (1) {
+		const SPropValue *lpProp = NULL;
+		rowset_ptr lpRowSet;
+	        hr = lpView->QueryRows(1, 0, &~lpRowSet);
+		if (hr != hrSuccess) {
+			ec_log_err("HrProcessRules(): QueryRows failed %x", hr);
+				goto exit;
+		}
+	        if (lpRowSet->cRows == 0)
+			break;
 
 		sc -> countAdd("rules", "n_rules", int64_t(lpRowSet->cRows));
-
-        lpRuleName = PpropFindProp(lpRowSet->aRow[0].lpProps, lpRowSet->aRow[0].cValues, CHANGE_PROP_TYPE(PR_RULE_NAME, PT_STRING8));
+		auto lpRuleName = PCpropFindProp(lpRowSet->aRow[0].lpProps, lpRowSet->aRow[0].cValues, CHANGE_PROP_TYPE(PR_RULE_NAME, PT_STRING8));
 		if (lpRuleName)
 			strRule = lpRuleName->Value.lpszA;
 		else
 			strRule = "(no name)";
 
-		lpLogger->Log(EC_LOGLEVEL_DEBUG, "Processing rule %s for %s", strRule.c_str(), recip.c_str());
-		lpRuleState = PpropFindProp(lpRowSet->aRow[0].lpProps, lpRowSet->aRow[0].cValues, PR_RULE_STATE);
-		if (lpRuleState) {
-			if (!(lpRuleState->Value.i & ST_ENABLED)) {
-				lpLogger->Log(EC_LOGLEVEL_DEBUG, "Rule '%s' is disabled, skipping...", strRule.c_str());
-				goto nextrule;		// rule is disabled
-			}
+		ec_log_debug("Processing rule %s for %s", strRule.c_str(), recip.c_str());
+		auto lpRuleState = PCpropFindProp(lpRowSet->aRow[0].lpProps, lpRowSet->aRow[0].cValues, PR_RULE_STATE);
+		if (lpRuleState != nullptr && !(lpRuleState->Value.i & ST_ENABLED)) {
+			ec_log_debug("Rule '%s' is disabled, skipping...", strRule.c_str());
+			continue;
 		}
 
 		lpCondition = NULL;
 		lpActions = NULL;
 
-		lpProp = PpropFindProp(lpRowSet->aRow[0].lpProps, lpRowSet->aRow[0].cValues, PR_RULE_CONDITION);
+		lpProp = PCpropFindProp(lpRowSet->aRow[0].lpProps, lpRowSet->aRow[0].cValues, PR_RULE_CONDITION);
 		if (lpProp)
 			// NOTE: object is placed in Value.lpszA, not Value.x
 			lpCondition = (LPSRestriction)lpProp->Value.lpszA;
 		if (!lpCondition) {
-			lpLogger->Log(EC_LOGLEVEL_DEBUG, "Rule '%s' has no contition, skipping...", strRule.c_str());
-			goto nextrule;
+			ec_log_debug("Rule '%s' has no contition, skipping...", strRule.c_str());
+			continue;
 		}
 
-		lpProp = PpropFindProp(lpRowSet->aRow[0].lpProps, lpRowSet->aRow[0].cValues, PR_RULE_ACTIONS);
+		lpProp = PCpropFindProp(lpRowSet->aRow[0].lpProps, lpRowSet->aRow[0].cValues, PR_RULE_ACTIONS);
 		if (lpProp)
 			// NOTE: object is placed in Value.lpszA, not Value.x
 			lpActions = (ACTIONS*)lpProp->Value.lpszA;
 		if (!lpActions) {
-			lpLogger->Log(EC_LOGLEVEL_DEBUG, "Rule '%s' has no action, skipping...", strRule.c_str());
-			goto nextrule;
+			ec_log_debug("Rule '%s' has no action, skipping...", strRule.c_str());
+			continue;
 		}
 		
 		// test if action should be done...
 		// @todo: Create the correct locale for the current store.
-		if (TestRestriction(lpCondition, *lppMessage, createLocaleFromName("")) != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_INFO, (std::string)"Rule " + strRule + " doesn't match");
-			goto nextrule;
+		hr = TestRestriction(lpCondition, *lppMessage, createLocaleFromName(""));
+		if (hr != hrSuccess) {
+			ec_log_info("Rule %s doesn't match: 0x%08x", strRule.c_str(), hr);
+			continue;
 		}	
 
-		lpLogger->Log(EC_LOGLEVEL_INFO, (std::string)"Rule " + strRule + " matches");
-
+		ec_log_info((std::string)"Rule " + strRule + " matches");
 		sc -> countAdd("rules", "n_actions", int64_t(lpActions->cActions));
 
 		for (ULONG n = 0; n < lpActions->cActions; ++n) {
+			object_ptr<IMsgStore> lpDestStore;
+			object_ptr<IMAPIFolder> lpDestFolder;
+			object_ptr<IMessage> lpReplyMsg, lpFwdMsg, lpNewMessage;
+
 			// do action
 			switch(lpActions->lpAction[n].acttype) {
 			case OP_MOVE:
 			case OP_COPY:
-					sc -> countInc("rules", "copy_move");
-
+				sc->countInc("rules", "copy_move");
 				if (lpActions->lpAction[n].acttype == OP_COPY)
-					lpLogger->Log(EC_LOGLEVEL_DEBUG, "Rule action: copying e-mail");
+					ec_log_debug("Rule action: copying e-mail");
 				else
-					lpLogger->Log(EC_LOGLEVEL_DEBUG, "Rule action: moving e-mail");
+					ec_log_debug("Rule action: moving e-mail");
 
 				// First try to open the folder on the session as that will just work if we have the store open
 				hr = lpSession->OpenEntry(lpActions->lpAction[n].actMoveCopy.cbFldEntryId,
-										  lpActions->lpAction[n].actMoveCopy.lpFldEntryId, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType,
-										  (IUnknown**)&lpDestFolder);
+				     lpActions->lpAction[n].actMoveCopy.lpFldEntryId, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType,
+				     &~lpDestFolder);
 				if (hr != hrSuccess) {
 					std::string msg = std::string("Rule ") + strRule + ": Unable to open folder through session, trying through store: %s (%x)";
-					lpLogger->Log(EC_LOGLEVEL_INFO, msg.c_str(), GetMAPIErrorMessage(hr), hr);
+					ec_log_info(msg.c_str(), GetMAPIErrorMessage(hr), hr);
 
 					hr = lpSession->OpenMsgStore(0, lpActions->lpAction[n].actMoveCopy.cbStoreEntryId,
-													lpActions->lpAction[n].actMoveCopy.lpStoreEntryId, NULL, MAPI_BEST_ACCESS, &lpDestStore);
+					     lpActions->lpAction[n].actMoveCopy.lpStoreEntryId, nullptr, MAPI_BEST_ACCESS, &~lpDestStore);
 					if (hr != hrSuccess) {
 						std::string msg = std::string("Rule ") + strRule + ": Unable to open destination store: %s (%x)";
-						lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
-						goto nextact;
+						ec_log_err(msg.c_str(), GetMAPIErrorMessage(hr), hr);
+						continue;
 					}
 
 					hr = lpDestStore->OpenEntry(lpActions->lpAction[n].actMoveCopy.cbFldEntryId,
-												lpActions->lpAction[n].actMoveCopy.lpFldEntryId, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType,
-												(IUnknown**)&lpDestFolder);
+					     lpActions->lpAction[n].actMoveCopy.lpFldEntryId, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType,
+					     &~lpDestFolder);
 					if (hr != hrSuccess || ulObjType != MAPI_FOLDER) {
 						std::string msg = std::string("Rule ") + strRule + ": Unable to open destination folder: %s (%x)";
-						lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
-						goto nextact;
+						ec_log_err(msg.c_str(), GetMAPIErrorMessage(hr), hr);
+						continue;
 					}
 				}
 
-				hr = lpDestFolder->CreateMessage(NULL, 0, &lpNewMessage);
+				hr = lpDestFolder->CreateMessage(nullptr, 0, &~lpNewMessage);
 				if(hr != hrSuccess) {
 					std::string msg = "Unable to create e-mail for rule " + strRule + ": %s (%x)";
-					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
+					ec_log_err(msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					goto exit;
 				}
 					
 				hr = (*lppMessage)->CopyTo(0, NULL, NULL, 0, NULL, &IID_IMessage, lpNewMessage, 0, NULL);
 				if(hr != hrSuccess) {
 					std::string msg = "Unable to copy e-mail for rule " + strRule + ": %s (%x)";
-					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
+					ec_log_err(msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					goto exit;
 				}
 
@@ -1003,7 +1075,7 @@ HRESULT HrProcessRules(const std::string &recip, PyMapiPlugin *pyMapiPlugin,
 				// the function only returns errors on get/setprops, not when the data is just missing
 				if (hr != hrSuccess) {
 					std::string msg = "Unable to copy IMAP data e-mail for rule " + strRule + ", continuing: %s (%x)";
-					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
+					ec_log_err(msg.c_str(), GetMAPIErrorMessage(hr), hr);
 					hr = hrSuccess;
 					goto exit;
 				}
@@ -1012,8 +1084,8 @@ HRESULT HrProcessRules(const std::string &recip, PyMapiPlugin *pyMapiPlugin,
 				hr = lpNewMessage->SaveChanges(0);
 				if (hr != hrSuccess) {
 					std::string msg = std::string("Rule ") + strRule + ": Unable to copy/move message: %s (%x)";
-					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
-					goto nextact;
+					ec_log_err(msg.c_str(), GetMAPIErrorMessage(hr), hr);
+					continue;
 				}
 				if (lpActions->lpAction[n].acttype == OP_MOVE)
 					bMoved = true;
@@ -1023,127 +1095,82 @@ HRESULT HrProcessRules(const std::string &recip, PyMapiPlugin *pyMapiPlugin,
 
 			case OP_REPLY:
 			case OP_OOF_REPLY:
-					sc -> countInc("rules", "reply_and_oof");
+				sc->countInc("rules", "reply_and_oof");
 				if (lpActions->lpAction[n].acttype == OP_REPLY)
-					lpLogger->Log(EC_LOGLEVEL_DEBUG, "Rule action: replying e-mail");
+					ec_log_debug("Rule action: replying e-mail");
 				else
-					lpLogger->Log(EC_LOGLEVEL_DEBUG, "Rule action: OOF replying e-mail");
+					ec_log_debug("Rule action: OOF replying e-mail");
 
 				hr = lpOrigInbox->OpenEntry(lpActions->lpAction[n].actReply.cbEntryId,
-											lpActions->lpAction[n].actReply.lpEntryId, &IID_IMessage, 0, &ulObjType,
-											(IUnknown**)&lpTemplate);
+				     lpActions->lpAction[n].actReply.lpEntryId, &IID_IMessage, 0, &ulObjType,
+				     (IUnknown**)&lpTemplate);
 				if (hr != hrSuccess) {
 					std::string msg = std::string("Rule ") + strRule + ": Unable to open reply message: %s (%x)";
-					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
-					goto nextact;
+					ec_log_err(msg.c_str(), GetMAPIErrorMessage(hr), hr);
+					continue;
 				}
-
-				hr = CreateReplyCopy(lpSession, lpOrigStore, *lppMessage, lpTemplate, &lpReplyMsg);
+				hr = CreateReplyCopy(lpSession, lpOrigStore, *lppMessage, lpTemplate, &~lpReplyMsg);
 				if (hr != hrSuccess) {
 					std::string msg = std::string("Rule ") + strRule + ": Unable to create reply message: %s (%x)";
-					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
-					goto nextact;
+					ec_log_err(msg.c_str(), GetMAPIErrorMessage(hr), hr);
+					continue;
 				}
 
 				hr = lpReplyMsg->SubmitMessage(0);
 				if (hr != hrSuccess) {
 					std::string msg = std::string("Rule ") + strRule + ": Unable to send reply message: %s (%x)";
-					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
-					goto nextact;
+					ec_log_err(msg.c_str(), GetMAPIErrorMessage(hr), hr);
+					continue;
 				}
 				break;
 
-			case OP_FORWARD:
-					sc -> countInc("rules", "forward");
-				// TODO: test lpActions->lpAction[n].ulActionFlavor
-				// FWD_PRESERVE_SENDER			1
-				// FWD_DO_NOT_MUNGE_MSG			2
-				// FWD_AS_ATTACHMENT			4
-
-				// redirect == 3
-
-				if (lpActions->lpAction[n].lpadrlist->cEntries == 0) {
-					lpLogger->Log(EC_LOGLEVEL_DEBUG, "Forwarding rule doesn't have recipients");
-					continue; // Nothing todo
-				}
-
-				if(parseBool(g_lpConfig->GetSetting("no_double_forward"))) {
-					// Loop protection, when header 'x-kopano-rule-action' is added to the message it will stop to forward or redirect the message.
-					PROPMAP_START
-					PROPMAP_NAMED_ID(KopanoRuleAction, PT_UNICODE, PS_INTERNET_HEADERS, "x-kopano-rule-action")
-					PROPMAP_INIT( (*lppMessage) );
-
-					if (HrGetOneProp(*lppMessage, PROP_KopanoRuleAction, &lpPropRule) == hrSuccess) {
-						MAPIFreeBuffer(lpPropRule);
-						lpLogger->Log(EC_LOGLEVEL_WARNING, (std::string)"Rule "+strRule+": FORWARD loop protection. Message will not be forwarded or redirected because it includes header 'x-kopano-rule-action'");
-						continue;
-					}
-				}
-
-				lpLogger->Log(EC_LOGLEVEL_DEBUG, "Rule action: %s e-mail", (lpActions->lpAction[n].ulActionFlavor & FWD_PRESERVE_SENDER) ? "redirecting" : "forwarding");
-
-				hr = CreateForwardCopy(lpLogger, lpAdrBook, lpOrigStore, *lppMessage, lpActions->lpAction[n].lpadrlist,
-									   false,
-									   lpActions->lpAction[n].ulActionFlavor & FWD_PRESERVE_SENDER,
-									   lpActions->lpAction[n].ulActionFlavor & FWD_DO_NOT_MUNGE_MSG, 
-									   lpActions->lpAction[n].ulActionFlavor & FWD_AS_ATTACHMENT,
-									   &lpFwdMsg);
-				if (hr != hrSuccess) {
-					std::string msg = std::string("Rule ") + strRule + ": FORWARD Unable to create forward message: %s (%x)";
-					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
-					goto nextact;
-				}
-
-				hr = lpFwdMsg->SubmitMessage(0);
-				if (hr != hrSuccess) {
-					std::string msg = std::string("Rule ") + strRule + ": FORWARD Unable to send forward message: %s (%x)";
-					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
-					goto nextact;
-				}
-
-				// update original message, set as forwarded
-				bAddFwdFlag = true;
+			case OP_FORWARD: {
+				auto ret = proc_op_fwd(lpAdrBook, lpOrigStore, lpActions->lpAction[n], strRule, sc, bAddFwdFlag, lppMessage);
+				if (ret == -1)
+					goto exit;
+				else if (ret == 0)
+					continue;
+				else if (ret == 1)
+					continue;
 				break;
-
+			}
 			case OP_BOUNCE:
-					sc -> countInc("rules", "bounce");
+				sc -> countInc("rules", "bounce");
 				// scBounceCode?
 				// TODO:
 				// 1. make copy of lpMessage, needs CopyTo() function
 				// 2. copy From: to To:
 				// 3. SubmitMessage()
-				lpLogger->Log(EC_LOGLEVEL_WARNING, (std::string)"Rule "+strRule+": BOUNCE actions are currently unsupported");
+				ec_log_warn((std::string)"Rule "+strRule+": BOUNCE actions are currently unsupported");
 				break;
 
 			case OP_DELEGATE:
-					sc -> countInc("rules", "delegate");
-				
+				sc -> countInc("rules", "delegate");
 				if (lpActions->lpAction[n].lpadrlist->cEntries == 0) {
-					lpLogger->Log(EC_LOGLEVEL_DEBUG, "Delegating rule doesn't have recipients");
+					ec_log_debug("Delegating rule doesn't have recipients");
 					continue; // Nothing todo
 				}
-				lpLogger->Log(EC_LOGLEVEL_DEBUG, "Rule action: delegating e-mail");
-
-				hr = CreateForwardCopy(lpLogger, lpAdrBook, lpOrigStore, *lppMessage, lpActions->lpAction[n].lpadrlist, true, true, true, false, &lpFwdMsg);
+				ec_log_debug("Rule action: delegating e-mail");
+				hr = CreateForwardCopy(lpAdrBook, lpOrigStore, *lppMessage, lpActions->lpAction[n].lpadrlist, true, true, true, false, &~lpFwdMsg);
 				if (hr != hrSuccess) {
 					std::string msg = std::string("Rule ") + strRule + ": DELEGATE Unable to create delegate message: %s (%x)";
-					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
-					goto nextact;
+					ec_log_err(msg.c_str(), GetMAPIErrorMessage(hr), hr);
+					continue;
 				}
 
 				// set delegate properties
 				hr = HrDelegateMessage(lpFwdMsg);
 				if (hr != hrSuccess) {
 					std::string msg = std::string("Rule ") + strRule + ": DELEGATE Unable to modify delegate message: %s (%x)";
-					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
-					goto nextact;
+					ec_log_err(msg.c_str(), GetMAPIErrorMessage(hr), hr);
+					continue;
 				}
 
 				hr = lpFwdMsg->SubmitMessage(0);
 				if (hr != hrSuccess) {
 					std::string msg = std::string("Rule ") + strRule + ": DELEGATE Unable to send delegate message: %s (%x)";
-					lpLogger->Log(EC_LOGLEVEL_ERROR, msg.c_str(), GetMAPIErrorMessage(hr), hr);
-					goto nextact;
+					ec_log_err(msg.c_str(), GetMAPIErrorMessage(hr), hr);
+					continue;
 				}
 
 				// don't set forwarded flag
@@ -1153,62 +1180,33 @@ HRESULT HrProcessRules(const std::string &recip, PyMapiPlugin *pyMapiPlugin,
 
 			case OP_DEFER_ACTION:
 				sc -> countInc("rules", "defer");
-					// DAM crud, but outlook doesn't check these messages... yet
-				lpLogger->Log(EC_LOGLEVEL_WARNING, (std::string)"Rule "+strRule+": DEFER client actions are currently unsupported");
+				// DAM crud, but outlook doesn't check these messages... yet
+				ec_log_warn((std::string)"Rule "+strRule+": DEFER client actions are currently unsupported");
 				break;
 			case OP_TAG:
 				sc -> countInc("rules", "tag");
 				// sure. WHEN YOU STOP WITH THE FRIGGIN' DEFER ACTION MESSAGES!!
-				lpLogger->Log(EC_LOGLEVEL_WARNING, (std::string)"Rule "+strRule+": TAG actions are currently unsupported");
+				ec_log_warn((std::string)"Rule "+strRule+": TAG actions are currently unsupported");
 				break;
 			case OP_DELETE:
-					sc -> countInc("rules", "delete");
+				sc -> countInc("rules", "delete");
 				// since *lppMessage wasn't yet saved in the server, we can just return a special MAPI Error code here,
 				// this will trigger the out-of-office mail (according to microsoft), but not save the message and drop it.
 				// The error code will become hrSuccess automatically after returning from the post processing function.
-				lpLogger->Log(EC_LOGLEVEL_DEBUG, "Rule action: deleting e-mail");
+				ec_log_debug("Rule action: deleting e-mail");
 				hr = MAPI_E_CANCEL;
 				goto exit;
 				break;
 			case OP_MARK_AS_READ:
-					sc -> countInc("rules", "mark_read");
+				sc -> countInc("rules", "mark_read");
 				// add prop read
-				lpLogger->Log(EC_LOGLEVEL_WARNING, (std::string)"Rule "+strRule+": MARK AS READ actions are currently unsupported");
+				ec_log_warn((std::string)"Rule "+strRule+": MARK AS READ actions are currently unsupported");
 				break;
 			};
-
-			// next action
-nextact:
-			if (lpDestStore) {
-				lpDestStore->Release();
-				lpDestStore = NULL;
-			}
-			if (lpDestFolder) {
-				lpDestFolder->Release();
-				lpDestFolder = NULL;
-			}
-			if (lpReplyMsg) {
-				lpReplyMsg->Release();
-				lpReplyMsg = NULL;
-			}
-			if (lpFwdMsg) {
-				lpFwdMsg->Release();
-				lpFwdMsg = NULL;
-			}
-			if (lpNewMessage) {
-				lpNewMessage->Release();
-				lpNewMessage = NULL;
-			}
 		} // end action loop
 
 		if (lpRuleState && (lpRuleState->Value.i & ST_EXIT_LEVEL))
 			break;
-
-nextrule:
-		if (lpRowSet) {
-			FreeProws(lpRowSet);
-			lpRowSet = NULL;
-		}
 	}
 
 	if (bAddFwdFlag) {
@@ -1224,30 +1222,13 @@ nextrule:
 		// set forward in msg flag
 		hr = (*lppMessage)->SetProps(3, sForwardProps, NULL);
 	}
-
-exit:
+ exit:
 	if (hr != hrSuccess && hr != MAPI_E_CANCEL)
-		lpLogger->Log(EC_LOGLEVEL_INFO, "Error while processing rules: 0x%08X", hr);
+		ec_log_info("Error while processing rules: 0x%08X", hr);
 
 	// The message was moved to another folder(s), do not save it in the inbox anymore, so cancel it.
 	if (hr == hrSuccess && bMoved)
 		hr = MAPI_E_CANCEL;
-	
-	if (lpECModifyTable)
-		lpECModifyTable->Release();
-
-	if (lpNewMessage)
-		lpNewMessage->Release();
-		
-	if (lpTable)
-		lpTable->Release();
-
-	if (lpView)
-		lpView->Release();
-
-	if (lpRowSet)
-		FreeProws(lpRowSet);
-
 	if (hr != hrSuccess)
 		sc -> countInc("rules", "invocations_fail");
 

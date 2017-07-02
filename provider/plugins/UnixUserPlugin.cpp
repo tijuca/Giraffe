@@ -16,8 +16,9 @@
  */
 
 #include <kopano/platform.h>
-
+#include <exception>
 #include <iostream>
+#include <mutex>
 #include <string>
 #include <stdexcept>
 #include <sys/types.h>
@@ -39,6 +40,7 @@
 #include <kopano/ECDefs.h>
 #include <kopano/ECLogger.h>
 #include <kopano/ECPluginSharedData.h>
+#include <kopano/lockhelper.hpp>
 #include <kopano/stringutil.h>
 
 using namespace std;
@@ -53,9 +55,12 @@ using namespace std;
 #define PWBUFSIZE 16384
 
 extern "C" {
-	UserPlugin* getUserPluginInstance(pthread_mutex_t *pluginlock, ECPluginSharedData *shareddata) {
-		return new UnixUserPlugin(pluginlock, shareddata);
-	}
+
+UserPlugin *getUserPluginInstance(std::mutex &pluginlock,
+    ECPluginSharedData *shareddata)
+{
+	return new UnixUserPlugin(pluginlock, shareddata);
+}
 
 	void deleteUserPluginInstance(UserPlugin *up) {
 		delete up;
@@ -66,11 +71,12 @@ extern "C" {
 	}
 }
 
-UnixUserPlugin::UnixUserPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *shareddata)
-	: DBPlugin(pluginlock, shareddata), m_iconv(NULL)
+UnixUserPlugin::UnixUserPlugin(std::mutex &pluginlock,
+    ECPluginSharedData *shareddata) :
+	DBPlugin(pluginlock, shareddata)
 {
 	const configsetting_t lpDefaults [] = {
-		{ "fullname_charset", "iso-8859-15" },		// us-ascii compatible with support for high characters
+		{ "fullname_charset", "iso-8859-15" }, // US-ASCII compatible with support for high characters
 		{ "default_domain", "localhost" },			// no sane default
 		{ "non_login_shell", "/bin/false", CONFIGSETTING_RELOADABLE },	// create a non-login box when a user has this shell
 		{ "min_user_uid", "1000", CONFIGSETTING_RELOADABLE },
@@ -440,9 +446,7 @@ UnixUserPlugin::getAllObjects(const objectid_t &companyid,
 	ECRESULT er = erSuccess;
 	std::unique_ptr<signatures_t> objectlist(new signatures_t());
 	std::unique_ptr<signatures_t> objects;
-	signatures_t::const_iterator iterObjs;
 	map<objectclass_t, string> objectstrings;
-	std::map<objectclass_t, string>::const_iterator iterStrings;
 	DB_RESULT_AUTOFREE lpResult(m_lpDatabase);
 	DB_ROW lpDBRow = NULL;
 	string strQuery;
@@ -456,7 +460,7 @@ UnixUserPlugin::getAllObjects(const objectid_t &companyid,
 	}
 
 	// use mutex to protect thread-unsafe setpwent()/setgrent() calls
-	pthread_mutex_lock(m_plugin_lock);
+	ulock_normal biglock(m_plugin_lock);
 	switch (OBJECTCLASS_TYPE(objclass)) {
 	case OBJECTTYPE_UNKNOWN:
 		objects = getAllUserObjects();
@@ -473,30 +477,28 @@ UnixUserPlugin::getAllObjects(const objectid_t &companyid,
 		objectlist->merge(*objects.get());
 		break;
 	case OBJECTTYPE_CONTAINER:
-		pthread_mutex_unlock(m_plugin_lock);
 		throw notsupported("objecttype not supported " + stringify(objclass));
 	default:
-		pthread_mutex_unlock(m_plugin_lock);
 		throw runtime_error("Unknown object type " + stringify(objclass));
 	}
-	pthread_mutex_unlock(m_plugin_lock);
+	biglock.unlock();
 
 	// Cleanup old entries from deleted users/groups
 	if (objectlist->empty())
 		return objectlist;
 
 	// Distribute all objects over the various types
-	for (iterObjs = objectlist->begin(); iterObjs != objectlist->end(); ++iterObjs) {
-		if (!objectstrings[iterObjs->id.objclass].empty())
-			objectstrings[iterObjs->id.objclass] += ", ";
-		objectstrings[iterObjs->id.objclass] += iterObjs->id.id;
+	for (const auto &obj : *objectlist) {
+		if (!objectstrings[obj.id.objclass].empty())
+			objectstrings[obj.id.objclass] += ", ";
+		objectstrings[obj.id.objclass] += obj.id.id;
 	}
 
 	// make list of obsolete objects
 	strQuery = "SELECT id, objectclass FROM " + (string)DB_OBJECT_TABLE + " WHERE ";
-	for (iterStrings = objectstrings.begin();
-	     iterStrings != objectstrings.end(); ++iterStrings) {
-		if (iterStrings != objectstrings.begin())
+	for (auto iterStrings = objectstrings.cbegin();
+	     iterStrings != objectstrings.cend(); ++iterStrings) {
+		if (iterStrings != objectstrings.cbegin())
 			strQuery += "AND ";
 		strQuery +=
 			"(externid NOT IN (" + iterStrings->second + ") "
@@ -506,13 +508,13 @@ UnixUserPlugin::getAllObjects(const objectid_t &companyid,
 	er = m_lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess) {
 		ec_log_err("Unix plugin: Unable to cleanup old entries");
-		goto exit;
+		return objectlist;
 	}
 
 	// check if we have obsolute objects
 	ulRows = m_lpDatabase->GetNumRows(lpResult);
 	if (!ulRows)
-		goto exit;
+		return objectlist;
 
 	// clear our stringlist containing the valid entries and fill it with the deleted item ids
 	objectstrings.clear();
@@ -525,9 +527,9 @@ UnixUserPlugin::getAllObjects(const objectid_t &companyid,
 
 	// remove obsolete objects
 	strQuery = "DELETE FROM " + (string)DB_OBJECT_TABLE + " WHERE ";
-	for (iterStrings = objectstrings.begin();
-	     iterStrings != objectstrings.end(); ++iterStrings) {
-		if (iterStrings != objectstrings.begin())
+	for (auto iterStrings = objectstrings.cbegin();
+	     iterStrings != objectstrings.cend(); ++iterStrings) {
+		if (iterStrings != objectstrings.cbegin())
 			strQuery += "OR ";
 		strQuery += "(externid IN (" + iterStrings->second + ") AND objectclass = " + stringify(iterStrings->first) + ")";
 	}
@@ -535,7 +537,7 @@ UnixUserPlugin::getAllObjects(const objectid_t &companyid,
 	er = m_lpDatabase->DoDelete(strQuery, &ulRows);
 	if (er != erSuccess) {
 		ec_log_err("Unix plugin: Unable to cleanup old entries in object table");
-		goto exit;
+		return objectlist;
 	} else if (ulRows > 0) {
 		ec_log_info("Unix plugin: Cleaned up %d old entries from object table", ulRows);
 	}
@@ -545,9 +547,9 @@ UnixUserPlugin::getAllObjects(const objectid_t &companyid,
 		"SELECT o.id "
 		"FROM " + (string)DB_OBJECT_TABLE + " AS o "
 		"WHERE ";
-	for (iterStrings = objectstrings.begin();
-	     iterStrings != objectstrings.end(); ++iterStrings) {
-		if (iterStrings != objectstrings.begin())
+	for (auto iterStrings = objectstrings.cbegin();
+	     iterStrings != objectstrings.cend(); ++iterStrings) {
+		if (iterStrings != objectstrings.cbegin())
 			strSubQuery += "OR ";
 		strSubQuery += "(o.externid IN (" + iterStrings->second + ") AND o.objectclass = " + stringify(iterStrings->first) + ")";
 	}
@@ -559,7 +561,7 @@ UnixUserPlugin::getAllObjects(const objectid_t &companyid,
 	er = m_lpDatabase->DoDelete(strQuery, &ulRows);
 	if (er != erSuccess) {
 		ec_log_err("Unix plugin: Unable to cleanup old entries in objectproperty table");
-		goto exit;
+		return objectlist;
 	} else if (ulRows > 0) {
 		ec_log_info("Unix plugin: Cleaned up %d old entries from objectproperty table", ulRows);
 	}
@@ -571,12 +573,10 @@ UnixUserPlugin::getAllObjects(const objectid_t &companyid,
 	er = m_lpDatabase->DoDelete(strQuery, &ulRows);
 	if (er != erSuccess) {
 		ec_log_err("Unix plugin: Unable to cleanup old entries in objectrelation table");
-		goto exit;
+		return objectlist;
 	} else if (ulRows > 0) {
 		ec_log_info("Unix plugin: Cleaned-up %d old entries from objectrelation table", ulRows);
 	}
-
-exit:
 	return objectlist;
 }
 
@@ -702,7 +702,7 @@ UnixUserPlugin::getParentObjectsForObject(userobject_relation_t relation,
 
 	// This is a rather expensive operation: loop through all the
 	// groups, and check each member for each group.
-	pthread_mutex_lock(m_plugin_lock);
+	ulock_normal biglock(m_plugin_lock);
 	setgrent();
 	while (true) {
 		if (getgrent_r(&grs, buffer, PWBUFSIZE, &gr) != 0)
@@ -724,7 +724,7 @@ UnixUserPlugin::getParentObjectsForObject(userobject_relation_t relation,
 			}
 	}
 	endgrent();
-	pthread_mutex_unlock(m_plugin_lock);
+	biglock.unlock();
 
 	// because users can be explicitly listed in their default group
 	objectlist->sort();
@@ -766,7 +766,7 @@ UnixUserPlugin::getSubObjectsForObject(userobject_relation_t relation,
 	transform(exceptuids.begin(), exceptuids.end(), inserter(exceptuidset, exceptuidset.begin()), fromstring<const std::string,uid_t>);
 
 	// iterate through /etc/passwd users to find default group (eg. users) and add it to the list
-	pthread_mutex_lock(m_plugin_lock);
+	ulock_normal biglock(m_plugin_lock);
 	setpwent();
 	while (true) {
 		if (getpwent_r(&pws, buffer, PWBUFSIZE, &pw) != 0)
@@ -792,7 +792,7 @@ UnixUserPlugin::getSubObjectsForObject(userobject_relation_t relation,
 		}
 	}
 	endpwent();
-	pthread_mutex_unlock(m_plugin_lock);
+	biglock.unlock();
 
 	// because users can be explicitly listed in their default group
 	objectlist->sort();
@@ -825,29 +825,27 @@ UnixUserPlugin::searchObject(const std::string &match, unsigned int ulFlags)
 
 	LOG_PLUGIN_DEBUG("%s %s flags:%x", __FUNCTION__, match.c_str(), ulFlags);
 
-	pthread_mutex_lock(m_plugin_lock);
+	ulock_normal biglock(m_plugin_lock);
 	objects = getAllUserObjects(match, ulFlags);
 	objectlist->merge(*objects.get());
 	objects = getAllGroupObjects(match, ulFlags);
 	objectlist->merge(*objects.get());
-	pthread_mutex_unlock(m_plugin_lock);
+	biglock.unlock();
 
 	// See if we get matches based on database details as well
 	try {
 		const char *search_props[] = { OP_EMAILADDRESS, NULL };
 		objects = DBPlugin::searchObjects(match, search_props, NULL, ulFlags);
 
-		for (signatures_t::const_iterator iter = objects->begin();
-		     iter != objects->end(); ++iter)
-		{
+		for (const auto &sig : *objects) {
 			// the DBPlugin returned the DB signature, so we need to prepend this with the gecos signature
-			int ret = getpwuid_r(atoi(iter->id.id.c_str()), &pws, buffer, PWBUFSIZE, &pw);
+			int ret = getpwuid_r(atoi(sig.id.id.c_str()), &pws, buffer, PWBUFSIZE, &pw);
 			if (ret != 0)
-				errnoCheck(iter->id.id, ret);
+				errnoCheck(sig.id.id, ret);
 			if (pw == NULL)	// object not found anymore
 				continue;
 
-			objectlist->push_back(objectsignature_t(iter->id, iter->signature + pw->pw_gecos + pw->pw_name));
+			objectlist->push_back(objectsignature_t(sig.id, sig.signature + pw->pw_gecos + pw->pw_name));
 		}
 	} catch (objectnotfound &e) {
 			// Ignore exception, we will check lObjects.empty() later.
@@ -883,22 +881,20 @@ UnixUserPlugin::getObjectDetails(const std::list<objectid_t> &objectids)
 {
 	std::unique_ptr<std::map<objectid_t, objectdetails_t> > mapdetails(new map<objectid_t, objectdetails_t>());
 	std::unique_ptr<objectdetails_t> uDetails;
-	list<objectid_t>::const_iterator iterID;
 	objectdetails_t details;
 
 	if (objectids.empty())
 		return mapdetails;
 
-	for (iterID = objectids.begin(); iterID != objectids.end(); ++iterID) {
+	for (const auto &id : objectids) {
 		try {
-			uDetails = this->getObjectDetails(*iterID);
+			uDetails = this->getObjectDetails(id);
 		}
 		catch (objectnotfound &e) {
 			// ignore not found error
 			continue;
 		}
-
-		(*mapdetails)[*iterID] = (*uDetails.get());
+		(*mapdetails)[id] = (*uDetails.get());
 	}
     
     return mapdetails;

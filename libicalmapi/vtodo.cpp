@@ -16,13 +16,17 @@
  */
 
 #include <kopano/platform.h>
+#include <memory>
 #include "vtodo.h"
 #include <mapiutil.h>
 #include <kopano/mapiext.h>
 #include "nameids.h"
-
 #include <iostream>
+#include "icalmem.hpp"
+
 using namespace std;
+
+namespace KC {
 
 /** 
  * VTodo constructor, implements VConverter
@@ -44,16 +48,12 @@ VTodoConverter::VTodoConverter(LPADRBOOK lpAdrBook, timezone_map *mapTimeZones, 
  */
 HRESULT VTodoConverter::HrICal2MAPI(icalcomponent *lpEventRoot, icalcomponent *lpEvent, icalitem *lpPrevItem, icalitem **lppRet)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = VConverter::HrICal2MAPI(lpEventRoot, lpEvent, lpPrevItem, lppRet);
+	HRESULT hr = VConverter::HrICal2MAPI(lpEventRoot, lpEvent,
+	             lpPrevItem, lppRet);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	(*lppRet)->eType = VTODO;
-	
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -75,17 +75,15 @@ exit:
  */
 HRESULT VTodoConverter::HrAddBaseProperties(icalproperty_method icMethod, icalcomponent *lpicEvent, void *base, bool bIsException, std::list<SPropValue> *lplstMsgProps)
 {
-	HRESULT hr = hrSuccess;
 	SPropValue sPropVal;
 	icalproperty *lpicProp = NULL;
 	bool bComplete = false;
 	ULONG ulStatus = 0;
 
 	// @todo fix exception message class
-
-	hr = HrCopyString(base, L"IPM.Task", &sPropVal.Value.lpszW);
+	HRESULT hr = HrCopyString(base, L"IPM.Task", &sPropVal.Value.lpszW);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	sPropVal.ulPropTag = PR_MESSAGE_CLASS_W;
 	lplstMsgProps->push_back(sPropVal);
 
@@ -154,9 +152,7 @@ HRESULT VTodoConverter::HrAddBaseProperties(icalproperty_method icMethod, icalco
 
 	// TODO: task delegation
 	//if (icalcomponent_get_first_property(lpicEvent, ICAL_ATTENDEE_PROPERTY) == NULL)
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -182,7 +178,7 @@ HRESULT VTodoConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent *
 		// Take the timezone from DTSTART and set that as the item timezone
 		hr = HrAddTimeZone(lpicProp, lpIcalItem);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		// localStartTime
 		timeDTStart = icaltime_as_timet(icalproperty_get_dtstart(lpicProp));
@@ -206,7 +202,7 @@ HRESULT VTodoConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent *
 		// Take the timezone from DUE and set that as the item timezone
 		hr = HrAddTimeZone(lpicProp, lpIcalItem);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		// localduetime
 		timeDue = icaltime_as_timet(icalproperty_get_due(lpicProp));
@@ -232,8 +228,7 @@ HRESULT VTodoConverter::HrAddTimes(icalproperty_method icMethod, icalcomponent *
 		UnixTimeToFileTime(timeDue, &sPropVal.Value.ft);
 		lpIcalItem->lstMsgProps.push_back(sPropVal);
 	}
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -250,24 +245,14 @@ exit:
  */
 HRESULT VTodoConverter::HrMAPI2ICal(LPMESSAGE lpMessage, icalproperty_method *lpicMethod, icaltimezone **lppicTZinfo, std::string *lpstrTZid, icalcomponent **lppEvent)
 {
-	HRESULT hr = hrSuccess;
-	icalcomponent *lpEvent = NULL;
-
-	lpEvent = icalcomponent_new(ICAL_VTODO_COMPONENT);
-
-	hr = VConverter::HrMAPI2ICal(lpMessage, lpicMethod, lppicTZinfo, lpstrTZid, lpEvent);
+	icalcomp_ptr lpEvent(icalcomponent_new(ICAL_VTODO_COMPONENT));
+	HRESULT hr = VConverter::HrMAPI2ICal(lpMessage, lpicMethod, lppicTZinfo,
+	             lpstrTZid, lpEvent.get());
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	if (lppEvent)
-		*lppEvent = lpEvent;
-	lpEvent = NULL;
-
-exit:
-	if (lpEvent)
-		icalcomponent_free(lpEvent);
-
-	return hr;
+		*lppEvent = lpEvent.release();
+	return hrSuccess;
 }
 
 /** 
@@ -284,49 +269,45 @@ exit:
  */
 HRESULT VTodoConverter::HrSetTimeProperties(LPSPropValue lpMsgProps, ULONG ulMsgProps, icaltimezone *lpicTZinfo, const std::string &strTZid, icalcomponent *lpEvent)
 {
-	HRESULT hr = hrSuccess;
-	LPSPropValue lpPropVal = NULL;
-
-	hr = VConverter::HrSetTimeProperties(lpMsgProps, ulMsgProps, lpicTZinfo, strTZid, lpEvent);
+	HRESULT hr = VConverter::HrSetTimeProperties(lpMsgProps, ulMsgProps,
+	             lpicTZinfo, strTZid, lpEvent);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// vtodo extra
 	// Uses CommonStart/CommonEnd as its stores UTC time
 
 	// Set start time / DTSTART	
-	lpPropVal = PpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_COMMONSTART], PT_SYSTIME));
+	auto lpPropVal = PCpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_COMMONSTART], PT_SYSTIME));
 	if (lpPropVal != NULL) {
 		time_t ttTime = FileTimeToUnixTime(lpPropVal->Value.ft.dwHighDateTime, lpPropVal->Value.ft.dwLowDateTime);
 
 		hr = HrSetTimeProperty(ttTime, false, lpicTZinfo, strTZid, ICAL_DTSTART_PROPERTY, lpEvent);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 
 	// Set end time / DUE
-	lpPropVal = PpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_COMMONEND], PT_SYSTIME));
+	lpPropVal = PCpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_COMMONEND], PT_SYSTIME));
 	if (lpPropVal) {
 		time_t ttTime = FileTimeToUnixTime(lpPropVal->Value.ft.dwHighDateTime, lpPropVal->Value.ft.dwLowDateTime);
 
 		hr = HrSetTimeProperty(ttTime, false, lpicTZinfo, strTZid, ICAL_DUE_PROPERTY, lpEvent);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 	// else duration ?
 
 	// Set Completion time
-	lpPropVal = PpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_COMPLETED_DATE], PT_SYSTIME));
+	lpPropVal = PCpropFindProp(lpMsgProps, ulMsgProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_COMPLETED_DATE], PT_SYSTIME));
 	if (lpPropVal) {
 		time_t ttTime = FileTimeToUnixTime(lpPropVal->Value.ft.dwHighDateTime, lpPropVal->Value.ft.dwLowDateTime);
 
 		hr = HrSetTimeProperty(ttTime, false, lpicTZinfo, strTZid, ICAL_COMPLETED_PROPERTY, lpEvent);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -344,16 +325,15 @@ exit:
 HRESULT VTodoConverter::HrSetItemSpecifics(ULONG ulProps, LPSPropValue lpProps, icalcomponent *lpicEvent)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpPropVal = NULL;
 	double pc = 0.0;
 	ULONG ulStatus = 0;
 
-	lpPropVal = PpropFindProp(lpProps, ulProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_PERCENTCOMPLETE], PT_DOUBLE));
+	auto lpPropVal = PCpropFindProp(lpProps, ulProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_PERCENTCOMPLETE], PT_DOUBLE));
 	if (lpPropVal)
 		pc = lpPropVal->Value.dbl;
 	icalcomponent_add_property(lpicEvent, icalproperty_new_percentcomplete(pc * 100));
 
-	lpPropVal = PpropFindProp(lpProps, ulProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_STATUS], PT_LONG));
+	lpPropVal = PCpropFindProp(lpProps, ulProps, CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TASK_STATUS], PT_LONG));
 	if (lpPropVal)
 		ulStatus = lpPropVal->Value.ul;
 
@@ -374,3 +354,5 @@ HRESULT VTodoConverter::HrSetItemSpecifics(ULONG ulProps, LPSPropValue lpProps, 
 
 	return hr;
 }
+
+} /* namespace */

@@ -17,13 +17,15 @@
 #include "WSABPropStorage.h"
 #include "Mem.h"
 #include <kopano/ECGuid.h>
+#include <kopano/ECInterfaceDefs.h>
 #include "SOAPUtils.h"
 #include "WSUtil.h"
 #include <kopano/charset/convert.h>
 
 #define START_SOAP_CALL retry:
 #define END_SOAP_CALL   \
-	if(er == KCERR_END_OF_SESSION) { if(this->m_lpTransport->HrReLogon() == hrSuccess) goto retry; } \
+	if (er == KCERR_END_OF_SESSION && this->m_lpTransport->HrReLogon() == hrSuccess) \
+		goto retry; \
 	hr = kcerr_to_mapierr(er, MAPI_E_NOT_FOUND); \
     if(hr != hrSuccess) \
         goto exit;
@@ -33,15 +35,16 @@
  * This is a PropStorage object for use with the WebServices storage platform
  */
 
-WSABPropStorage::WSABPropStorage(ULONG cbEntryId, LPENTRYID lpEntryId, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport) : ECUnknown("WSABPropStorage")
+WSABPropStorage::WSABPropStorage(ULONG cbEntryId, LPENTRYID lpEntryId,
+    KCmd *lpCmd, std::recursive_mutex &data_lock, ECSESSIONID ecSessionId,
+    WSTransport *lpTransport) :
+	ECUnknown("WSABPropStorage"), lpDataLock(data_lock),
+	m_lpTransport(lpTransport)
 {
 	CopyMAPIEntryIdToSOAPEntryId(cbEntryId, lpEntryId, &m_sEntryId);
 
 	this->lpCmd = lpCmd;
-	this->lpDataLock = lpDataLock;
 	this->ecSessionId = ecSessionId;
-	this->m_lpTransport = lpTransport;
-	
     lpTransport->AddSessionReloadCallback(this, Reload, &m_ulSessionReloadCallback);
 	    
 }
@@ -55,14 +58,14 @@ WSABPropStorage::~WSABPropStorage()
 
 HRESULT WSABPropStorage::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_WSABPropStorage, this);
-
-	REGISTER_INTERFACE(IID_IECPropStorage, &this->m_xECPropStorage);
-
+	REGISTER_INTERFACE2(WSABPropStorage, this);
+	REGISTER_INTERFACE2(IECPropStorage, &this->m_xECPropStorage);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
-HRESULT WSABPropStorage::Create(ULONG cbEntryId, LPENTRYID lpEntryId, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, WSTransport *lpTransport, WSABPropStorage **lppPropStorage)
+HRESULT WSABPropStorage::Create(ULONG cbEntryId, LPENTRYID lpEntryId,
+    KCmd *lpCmd, std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId,
+    WSTransport *lpTransport, WSABPropStorage **lppPropStorage)
 {
 	HRESULT hr = hrSuccess;
 	WSABPropStorage *lpStorage = NULL;
@@ -189,8 +192,7 @@ HRESULT WSABPropStorage::HrWriteProps(ULONG cValues, LPSPropValue pValues, ULONG
 
 	struct propValArray sPropVals;
 
-	sPropVals.__ptr = new propVal[cValues];
-
+	sPropVals.__ptr = s_alloc<propVal>(nullptr, cValues);
 	for (i = 0; i < cValues; ++i) {
 		hr = CopyMAPIPropValToSOAPPropVal(&sPropVals.__ptr[j], &pValues[i], &converter);
 		if(hr == hrSuccess)
@@ -219,7 +221,7 @@ exit:
 	return hr;
 }
 
-HRESULT WSABPropStorage::HrDeleteProps(LPSPropTagArray lpsPropTagArray)
+HRESULT WSABPropStorage::HrDeleteProps(const SPropTagArray *lpsPropTagArray)
 {
 	ECRESULT	er = erSuccess;
 	HRESULT		hr = hrSuccess;
@@ -279,13 +281,13 @@ HRESULT WSABPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 	ECAllocateBuffer(sizeof(SPropValue) * sResponse.aPropVal.__size, (void **)&lpProp);
 
 	for (gsoap_size_t i = 0; i < sResponse.aPropTag.__size; ++i)
-		mo->lstAvailable->push_back(sResponse.aPropTag.__ptr[i]);
+		mo->lstAvailable.push_back(sResponse.aPropTag.__ptr[i]);
 
 	for (gsoap_size_t i = 0; i < sResponse.aPropVal.__size; ++i) {
 		hr = CopySOAPPropValToMAPIPropVal(lpProp, &sResponse.aPropVal.__ptr[i], lpProp, &converter);
 		if (hr != hrSuccess)
 			goto exit;
-		mo->lstProperties->push_back(lpProp);
+		mo->lstProperties.push_back(lpProp);
 	}
 
 	*lppsMapiObject = mo;
@@ -309,7 +311,7 @@ IECPropStorage* WSABPropStorage::GetServerStorage()
 
 HRESULT WSABPropStorage::LockSoap()
 {
-	pthread_mutex_lock(lpDataLock);
+	lpDataLock.lock();
 	return erSuccess;
 }
 
@@ -320,8 +322,7 @@ HRESULT WSABPropStorage::UnLockSoap()
 		soap_destroy(lpCmd->soap);
 		soap_end(lpCmd->soap);
 	}
-
-	pthread_mutex_unlock(lpDataLock);
+	lpDataLock.unlock();
 	return erSuccess;
 }
 
@@ -334,59 +335,15 @@ HRESULT WSABPropStorage::Reload(void *lpParam, ECSESSIONID sessionId) {
 }
             
 // Interface IECPropStorage
-ULONG WSABPropStorage::xECPropStorage::AddRef()
-{
-	METHOD_PROLOGUE_(WSABPropStorage, ECPropStorage);
-	return pThis->AddRef();
-}
-
-ULONG WSABPropStorage::xECPropStorage::Release()
-{
-	METHOD_PROLOGUE_(WSABPropStorage, ECPropStorage);
-	return pThis->Release();
-}
-
-HRESULT WSABPropStorage::xECPropStorage::QueryInterface(REFIID refiid , void** lppInterface)
-{
-	METHOD_PROLOGUE_(WSABPropStorage, ECPropStorage);
-	return pThis->QueryInterface(refiid, lppInterface);
-}
-
-HRESULT WSABPropStorage::xECPropStorage::HrReadProps(LPSPropTagArray *lppPropTags,ULONG *cValues, LPSPropValue *lppValues)
-{
-	METHOD_PROLOGUE_(WSABPropStorage, ECPropStorage);
-	return pThis->HrReadProps(lppPropTags,cValues, lppValues);
-}
-			
-HRESULT WSABPropStorage::xECPropStorage::HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropValue *lppsPropValue)
-{
-	METHOD_PROLOGUE_(WSABPropStorage, ECPropStorage);
-	return pThis->HrLoadProp(ulObjId, ulPropTag, lppsPropValue);
-}
-
-HRESULT WSABPropStorage::xECPropStorage::HrWriteProps(ULONG cValues, LPSPropValue lpValues, ULONG ulFlags)
-{
-	METHOD_PROLOGUE_(WSABPropStorage, ECPropStorage);
-	return pThis->HrWriteProps(cValues, lpValues, ulFlags);
-}	
-
-HRESULT WSABPropStorage::xECPropStorage::HrDeleteProps(LPSPropTagArray lpsPropTagArray)
-{
-	METHOD_PROLOGUE_(WSABPropStorage, ECPropStorage);
-	return pThis->HrDeleteProps(lpsPropTagArray);
-}
-
-HRESULT WSABPropStorage::xECPropStorage::HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject)
-{
-	METHOD_PROLOGUE_(WSABPropStorage, ECPropStorage);
-	return pThis->HrSaveObject(ulFlags, lpsMapiObject);
-}
-
-HRESULT WSABPropStorage::xECPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
-{
-	METHOD_PROLOGUE_(WSABPropStorage, ECPropStorage);
-	return pThis->HrLoadObject(lppsMapiObject);
-}
+DEF_ULONGMETHOD0(WSABPropStorage, ECPropStorage, AddRef, (void))
+DEF_ULONGMETHOD0(WSABPropStorage, ECPropStorage, Release, (void))
+DEF_HRMETHOD0(WSABPropStorage, ECPropStorage, QueryInterface, (REFIID, refiid), (void**, lppInterface))
+DEF_HRMETHOD0(WSABPropStorage, ECPropStorage, HrReadProps, (LPSPropTagArray *, lppPropTags), (ULONG *, cValues), (LPSPropValue *, lppValues))
+DEF_HRMETHOD0(WSABPropStorage, ECPropStorage, HrLoadProp, (ULONG, ulObjId), (ULONG, ulPropTag), (LPSPropValue *, lppsPropValue))
+DEF_HRMETHOD0(WSABPropStorage, ECPropStorage, HrWriteProps, (ULONG, cValues), (LPSPropValue, lpValues), (ULONG, ulFlags))
+DEF_HRMETHOD0(WSABPropStorage, ECPropStorage, HrDeleteProps, (const SPropTagArray *, lpsPropTagArray))
+DEF_HRMETHOD0(WSABPropStorage, ECPropStorage, HrSaveObject, (ULONG, ulFlags), (MAPIOBJECT *, lpsMapiObject))
+DEF_HRMETHOD0(WSABPropStorage, ECPropStorage, HrLoadObject, (MAPIOBJECT **, lppsMapiObject))
 
 IECPropStorage* WSABPropStorage::xECPropStorage::GetServerStorage()
 {

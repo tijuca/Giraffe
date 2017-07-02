@@ -19,6 +19,7 @@
 #define POP3_H
 
 #include <vector>
+#include <kopano/zcdefs.h>
 #include "ClientProto.h"
 
 /**
@@ -38,7 +39,7 @@
 /* enum POP3_Command { POP3_CMD_USER, POP3_CMD_PASS, POP3_CMD_STAT, POP3_CMD_LIST, POP3_CMD_RETR, POP3_CMD_DELE, POP3_CMD_NOOP, */
 /* 		POP3_CMD_RSET, POP3_CMD_QUIT, POP3_CMD_TOP, POP3_CMD_UIDL }; */
 
-class POP3 : public ClientProto {
+class POP3 _kc_final : public ClientProto {
 public:
 	POP3(const char *szServerPath, ECChannel *lpChannel, ECLogger *lpLogger, ECConfig *lpConfig);
 	~POP3();
@@ -71,7 +72,6 @@ private:
 
 	HRESULT HrResponse(const std::string &strResult, const std::string &strResponse);
 
-private:
 	struct MailListItem {
 		SBinary sbEntryID;
 		ULONG ulSize;
@@ -83,10 +83,10 @@ private:
 	std::string DotFilter(const char *input);
 	BOOL IsAuthorized() { return !!lpStore; }
 
-	IMAPISession	*lpSession;
-	IMsgStore		*lpStore;
-	IMAPIFolder		*lpInbox;
-	IAddrBook		*lpAddrBook;
+	IMAPISession *lpSession = nullptr;
+	IMsgStore *lpStore = nullptr;
+	IMAPIFolder *lpInbox = nullptr;
+	IAddrBook *lpAddrBook = nullptr;
 	sending_options sopt;
 
 	std::string szUser;

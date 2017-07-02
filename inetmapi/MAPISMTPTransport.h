@@ -45,14 +45,12 @@
 #define MAPI_NET_SMTP_SMTPTRANSPORT_HPP_INCLUDED
 
 #include <kopano/zcdefs.h>
-#include "vmime/config.hpp"
-
-#include "vmime/net/transport.hpp"
-#include "vmime/net/socket.hpp"
-#include "vmime/net/timeoutHandler.hpp"
-
-#include "vmime/net/smtp/SMTPServiceInfos.hpp"
-
+#include <vmime/config.hpp>
+#include <vmime/net/transport.hpp>
+#include <vmime/net/socket.hpp>
+#include <vmime/net/timeoutHandler.hpp>
+#include <vmime/net/smtp/SMTPResponse.hpp>
+#include <vmime/net/smtp/SMTPServiceInfos.hpp>
 #include <inetmapi/inetmapi.h>
 
 namespace vmime {
@@ -69,7 +67,7 @@ class SMTPResponse;
 class MAPISMTPTransport _kc_final : public transport {
 public:
 
-	MAPISMTPTransport(ref <session> sess, ref <security::authenticator> auth, const bool secured = false);
+	MAPISMTPTransport(vmime::shared_ptr<session> sess, vmime::shared_ptr<security::authenticator> auth, const bool secured = false);
 	~MAPISMTPTransport();
 
 	const std::string getProtocolName(void) const { return "mapismtp"; }
@@ -83,21 +81,20 @@ public:
 
 	void noop();
 
-	void send(const mailbox& expeditor, const mailboxList& recipients, utility::inputStream& is, const utility::stream::size_type size, utility::progressListener* progress = NULL);
+	void send(const mailbox &expeditor, const mailboxList &recipients, utility::inputStream &, size_t, utility::progressListener * = NULL, const mailbox &sender = mailbox());
 
 	bool isSecuredConnection(void) const { return m_secured; }
-	ref<connectionInfos> getConnectionInfos(void) const { return m_cntInfos; }
+	vmime::shared_ptr<connectionInfos> getConnectionInfos(void) const { return m_cntInfos; }
 
 	// additional functions
 	const std::vector<sFailedRecip> &getPermanentFailedRecipients(void) const { return mPermanentFailedRecipients; }
 	const std::vector<sFailedRecip> &getTemporaryFailedRecipients(void) const { return mTemporaryFailedRecipients; }
-	void setLogger(ECLogger *lpLogger);
 	void requestDSN(BOOL bRequest, const std::string &strTrackid);
 
 private:
 
 	void sendRequest(const string& buffer, const bool end = true);
-	ref <SMTPResponse> readResponse();
+	vmime::shared_ptr<SMTPResponse> readResponse(void);
 
 	void internalDisconnect();
 
@@ -111,18 +108,15 @@ private:
 	void startTLS();
 #endif // VMIME_HAVE_TLS_SUPPORT
 
-	ref <socket> m_socket;
-	bool m_authentified;
-
-	bool m_extendedSMTP;
+	vmime::shared_ptr<socket> m_socket;
+	bool m_authentified = false;
+	bool m_extendedSMTP = false;
 	std::map <string, std::vector <string> > m_extensions;
-
-	ref <timeoutHandler> m_timeoutHandler;
+	vmime::shared_ptr<timeoutHandler> m_timeoutHandler;
 
 	const bool m_isSMTPS;
-
-	bool m_secured;
-	ref <connectionInfos> m_cntInfos;
+	bool m_secured = false;
+	vmime::shared_ptr<connectionInfos> m_cntInfos;
 
 
 	// Service infos
@@ -131,10 +125,9 @@ private:
 	// additional data
 	std::vector<sFailedRecip> mTemporaryFailedRecipients;
 	std::vector<sFailedRecip> mPermanentFailedRecipients;
-
-	ECLogger *m_lpLogger;
-	bool m_bDSNRequest;
+	bool m_bDSNRequest = false;
 	std::string m_strDSNTrackid;
+	SMTPResponse::state m_response_state;
 };
 
 

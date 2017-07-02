@@ -18,6 +18,7 @@
 #include <kopano/platform.h>
 
 #include <kopano/ECGuid.h>
+#include <kopano/ECInterfaceDefs.h>
 #include "ics.h"
 #include "pcutil.hpp"
 
@@ -34,15 +35,10 @@
 
 #include <edkmdb.h>
 
-ECExportAddressbookChanges::ECExportAddressbookChanges(ECMsgStore *lpStore) {
+ECExportAddressbookChanges::ECExportAddressbookChanges(ECMsgStore *lpStore) :
+	m_lpMsgStore(lpStore)
+{
 	ECSyncLog::GetLogger(&m_lpLogger);
-
-    m_lpMsgStore = lpStore;
-	m_lpChanges = NULL;
-	m_lpRawChanges = NULL;
-	m_ulChangeId = 0;
-	m_ulThisChange = 0;
-	m_lpImporter = NULL;
 }
 
 ECExportAddressbookChanges::~ECExportAddressbookChanges() {
@@ -55,11 +51,9 @@ ECExportAddressbookChanges::~ECExportAddressbookChanges() {
 }
 
 HRESULT ECExportAddressbookChanges::QueryInterface(REFIID refiid, void **lppInterface) {
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
-	REGISTER_INTERFACE(IID_IECExportAddressbookChanges, &this->m_xECExportAddressbookChanges);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xECExportAddressbookChanges);
-
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IECExportAddressbookChanges, &this->m_xECExportAddressbookChanges);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xECExportAddressbookChanges);
     return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -172,43 +166,41 @@ HRESULT	ECExportAddressbookChanges::Config(LPSTREAM lpStream, ULONG ulFlags, IEC
 
 			else {
 				switch (m_lpRawChanges[i].ulChangeType) {
-					case ICS_AB_NEW:
-						// This shouldn't happen since apparently we have another change for the same object.
-						if (lpLastChange->ulChangeType == ICS_AB_DELETE) {
-							// user was deleted and re-created (probably as different object class), so keep both events
-							ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_NEW change for an object that was deleted, modifying into CHANGE. sourcekey=%s", bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
-							lpLastChange->ulChangeType = ICS_AB_CHANGE;
-						} else
-							ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_NEW change for an object we've seen before. sourcekey=%s", bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
-						break;
+				case ICS_AB_NEW:
+					// This shouldn't happen since apparently we have another change for the same object.
+					if (lpLastChange->ulChangeType == ICS_AB_DELETE) {
+						// user was deleted and re-created (probably as different object class), so keep both events
+						ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_NEW change for an object that was deleted, modifying into CHANGE. sourcekey=%s", bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
+						lpLastChange->ulChangeType = ICS_AB_CHANGE;
+					} else
+						ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_NEW change for an object we've seen before. sourcekey=%s", bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
+					break;
 
-					case ICS_AB_CHANGE:
-						// The only valid previous change could have been an add, since the server doesn't track
-						// multiple changes and we can't change an object that was just deleted.
-						// We'll ignore this in any case.
-						if (lpLastChange->ulChangeType != ICS_AB_NEW)
-							ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_CHANGE with something else than a ICS_AB_NEW as the previous changes. prev_change=%04x, sourcekey=%s", lpLastChange->ulChangeType, bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
-						ZLOG_DEBUG(m_lpLogger, "Ignoring ICS_AB_CHANGE due to previous ICS_AB_NEW. sourcekey=%s", bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
-						break;
+				case ICS_AB_CHANGE:
+					// The only valid previous change could have been an add, since the server doesn't track
+					// multiple changes and we can't change an object that was just deleted.
+					// We'll ignore this in any case.
+					if (lpLastChange->ulChangeType != ICS_AB_NEW)
+						ZLOG_DEBUG(m_lpLogger, "Got an ICS_AB_CHANGE with something else than a ICS_AB_NEW as the previous changes. prev_change=%04x, sourcekey=%s", lpLastChange->ulChangeType, bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
+					ZLOG_DEBUG(m_lpLogger, "Ignoring ICS_AB_CHANGE due to previous ICS_AB_NEW. sourcekey=%s", bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
+					break;
 
-					case ICS_AB_DELETE:
-						if (lpLastChange->ulChangeType == ICS_AB_NEW) {
-							ZLOG_DEBUG(m_lpLogger, "Ignoring previous ICS_AB_NEW due to current ICS_AB_DELETE. sourcekey=%s", bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
-							lpLastChange = NULL;	// An add and a delete results in nothing.
-						}
-
-						else if (lpLastChange->ulChangeType == ICS_AB_CHANGE) {
-							// We'll ignore the previous change and write the delete now. This way we allow another object
-							// with the same ID to be added after this object.
-							ZLOG_DEBUG(m_lpLogger, "Replacing previous ICS_AB_CHANGE with current ICS_AB_DELETE. sourcekey=%s", bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
-							m_lpChanges[n++] = m_lpRawChanges[i];
-							lpLastChange = NULL;
-						}
-						break;
-
-					default:
-						ZLOG_DEBUG(m_lpLogger, "Got an unknown change. change=%04x, sourcekey=%s", m_lpRawChanges[i].ulChangeType, bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
-						break;
+				case ICS_AB_DELETE:
+					if (lpLastChange->ulChangeType == ICS_AB_NEW) {
+						ZLOG_DEBUG(m_lpLogger, "Ignoring previous ICS_AB_NEW due to current ICS_AB_DELETE. sourcekey=%s", bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
+						lpLastChange = NULL;	// An add and a delete results in nothing.
+					}
+					else if (lpLastChange->ulChangeType == ICS_AB_CHANGE) {
+						// We'll ignore the previous change and write the delete now. This way we allow another object
+						// with the same ID to be added after this object.
+						ZLOG_DEBUG(m_lpLogger, "Replacing previous ICS_AB_CHANGE with current ICS_AB_DELETE. sourcekey=%s", bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
+						m_lpChanges[n++] = m_lpRawChanges[i];
+						lpLastChange = NULL;
+					}
+					break;
+				default:
+					ZLOG_DEBUG(m_lpLogger, "Got an unknown change. change=%04x, sourcekey=%s", m_lpRawChanges[i].ulChangeType, bin2hex(m_lpRawChanges[i].sSourceKey.cb, m_lpRawChanges[i].sSourceKey.lpb).c_str());
+					break;
 				}
 			}
 		}	
@@ -294,7 +286,6 @@ HRESULT ECExportAddressbookChanges::UpdateState(LPSTREAM lpStream)
 	ULONG ulCount = 0;
 	ULONG ulWritten = 0;
 	ULONG ulProcessed = 0;
-	std::set<ULONG>::const_iterator iterProcessed;
 
 	if(m_ulThisChange == m_ulChanges) {
 		// All changes have been processed, we can discard processed changes and go to the next server change ID
@@ -326,10 +317,8 @@ HRESULT ECExportAddressbookChanges::UpdateState(LPSTREAM lpStream)
 		return hr;
 
 	// Write the processed IDs
-	for (iterProcessed = m_setProcessed.begin();
-	     iterProcessed != m_setProcessed.end(); ++iterProcessed) {
-		ulProcessed = *iterProcessed;
-
+	for (const auto &pc : m_setProcessed) {
+		ulProcessed = pc;
 		hr = lpStream->Write(&ulProcessed, sizeof(ULONG), &ulWritten);
 		if(hr != hrSuccess)
 			return hr;
@@ -377,10 +366,10 @@ HRESULT ECExportAddressbookChanges::UpdateState(LPSTREAM lpStream)
 bool ECExportAddressbookChanges::LeftPrecedesRight(const ICSCHANGE &left, const ICSCHANGE &right)
 {
 	ULONG ulTypeLeft = ((ABEID*)left.sSourceKey.lpb)->ulType;
-	ASSERT(ulTypeLeft == MAPI_MAILUSER || ulTypeLeft == MAPI_DISTLIST || ulTypeLeft == MAPI_ABCONT);
+	assert(ulTypeLeft == MAPI_MAILUSER || ulTypeLeft == MAPI_DISTLIST || ulTypeLeft == MAPI_ABCONT);
 
 	ULONG ulTypeRight = ((ABEID*)right.sSourceKey.lpb)->ulType;
-	ASSERT(ulTypeRight == MAPI_MAILUSER || ulTypeRight == MAPI_DISTLIST || ulTypeRight == MAPI_ABCONT);
+	assert(ulTypeRight == MAPI_MAILUSER || ulTypeRight == MAPI_DISTLIST || ulTypeRight == MAPI_ABCONT);
 
 	if (ulTypeLeft == ulTypeRight)
 		return SortCompareABEID(left.sSourceKey.cb, (LPENTRYID)left.sSourceKey.lpb, right.sSourceKey.cb, (LPENTRYID)right.sSourceKey.lpb) < 0;
@@ -394,45 +383,9 @@ bool ECExportAddressbookChanges::LeftPrecedesRight(const ICSCHANGE &left, const 
 	return false;
 }
 
-ULONG ECExportAddressbookChanges::xECExportAddressbookChanges::AddRef()
-{
-    METHOD_PROLOGUE_(ECExportAddressbookChanges, ECExportAddressbookChanges);
-    TRACE_MAPI(TRACE_ENTRY, "IECExportAddressbookChanges::AddRef", "");
-    return pThis->AddRef();
-}
-
-ULONG ECExportAddressbookChanges::xECExportAddressbookChanges::Release()
-{
-    METHOD_PROLOGUE_(ECExportAddressbookChanges, ECExportAddressbookChanges);
-    TRACE_MAPI(TRACE_ENTRY, "IECExportAddressbookChanges::Release", "");
-    return pThis->Release();
-}
-
-HRESULT ECExportAddressbookChanges::xECExportAddressbookChanges::QueryInterface(REFIID refiid, void **lppInterface)
-{
-    METHOD_PROLOGUE_(ECExportAddressbookChanges, ECExportAddressbookChanges);
-    TRACE_MAPI(TRACE_ENTRY, "IECExportAddressbookChanges::QueryInterface", "");
-    return pThis->QueryInterface(refiid, lppInterface);
-}
-
-HRESULT ECExportAddressbookChanges::xECExportAddressbookChanges::Config(LPSTREAM lpStream, ULONG ulFlags, IECImportAddressbookChanges *lpCollector)
-{
-    METHOD_PROLOGUE_(ECExportAddressbookChanges, ECExportAddressbookChanges);
-    TRACE_MAPI(TRACE_ENTRY, "IECExportAddressbookChanges::Config", "");
-    return pThis->Config(lpStream, ulFlags, lpCollector);
-}
-
-HRESULT ECExportAddressbookChanges::xECExportAddressbookChanges::Synchronize(ULONG *lpulSteps, ULONG *lpulProgress)
-{
-    METHOD_PROLOGUE_(ECExportAddressbookChanges, ECExportAddressbookChanges);
-    TRACE_MAPI(TRACE_ENTRY, "IECExportAddressbookChanges::Synchronize", "");
-    return pThis->Synchronize(lpulSteps, lpulProgress);
-}
-
-HRESULT ECExportAddressbookChanges::xECExportAddressbookChanges::UpdateState(LPSTREAM lpStream)
-{
-    METHOD_PROLOGUE_(ECExportAddressbookChanges, ECExportAddressbookChanges);
-    TRACE_MAPI(TRACE_ENTRY, "IECExportAddressbookChanges::UpdateState", "");
-    return pThis->UpdateState(lpStream);
-}
-
+DEF_ULONGMETHOD1(TRACE_MAPI, ECExportAddressbookChanges, ECExportAddressbookChanges, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECExportAddressbookChanges, ECExportAddressbookChanges, Release, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECExportAddressbookChanges, ECExportAddressbookChanges, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_HRMETHOD1(TRACE_MAPI, ECExportAddressbookChanges, ECExportAddressbookChanges, Config, (LPSTREAM, lpStream), (ULONG, ulFlags), (IECImportAddressbookChanges *, lpCollector))
+DEF_HRMETHOD1(TRACE_MAPI, ECExportAddressbookChanges, ECExportAddressbookChanges, Synchronize, (ULONG *, lpulSteps), (ULONG *, lpulProgress))
+DEF_HRMETHOD1(TRACE_MAPI, ECExportAddressbookChanges, ECExportAddressbookChanges, UpdateState, (LPSTREAM, lpStream))

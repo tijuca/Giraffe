@@ -23,9 +23,11 @@
 #include <mapidefs.h>
 #include "recurrence.h"
 
+namespace KC {
+
 enum eIcalType { VEVENT, VTODO, VJOURNAL };
 
-typedef struct icalrecip {
+struct icalrecip {
 	/* recipient type (From==organizer, To==attendee, CC==opt attendee ?)) */
 	ULONG ulRecipientType;
 	/* tentative, canceled */
@@ -34,9 +36,9 @@ typedef struct icalrecip {
 	std::wstring strName;
 	ULONG cbEntryID;
 	LPENTRYID lpEntryID;		/* realloced to icalitem.base !! */
-} icalrecip;
+};
 
-typedef struct icalitem {
+struct icalitem {
 	void *base;					/* pointer on which we use MAPIAllocateMore, to only need to free this pointer */
 	eIcalType eType;
 	time_t tLastModified;
@@ -55,6 +57,8 @@ typedef struct icalitem {
 		std::list<icalrecip> lstRecips;
 	};
 	std::list<exception> lstExceptionAttachments;
-} icalitem;
+};
+
+} /* namespace */
 
 #endif

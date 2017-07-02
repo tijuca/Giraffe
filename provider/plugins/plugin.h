@@ -22,6 +22,7 @@
 // define to see which exception is thrown from a plugin
 //#define EXCEPTION_DEBUG
 
+#include <kopano/zcdefs.h>
 #include <kopano/ECDefs.h>
 #include <kopano/pcuser.hpp>
 
@@ -32,18 +33,19 @@
 #include <stdexcept>
 #include <iostream>
 #include <sstream>
-#include <pthread.h>
+#include <kopano/ECLogger.h>
 #include <kopano/ECPluginSharedData.h>
 
+using namespace std;
+
+namespace KC {
 /**
  * @defgroup userplugin Server user plugin
  * @{
  */
 
-using namespace std;
 class ECStatsCollector;
 
-#include <kopano/ECLogger.h>
 #define LOG_PLUGIN_DEBUG(_msg, ...) \
 	ec_log(EC_LOGLEVEL_DEBUG | EC_LOGLEVEL_PLUGIN, "plugin: " _msg, ##__VA_ARGS__)
 
@@ -54,7 +56,7 @@ class ECStatsCollector;
  * sync. This way ECUserManagement can cache things like the
  * object details without constantly accessing the plugin.
  */
-class objectsignature_t {
+class objectsignature_t _kc_final {
 public:
 	/**
 	 * Constructor for combining objectid and signature
@@ -69,7 +71,7 @@ public:
 	/**
 	 * Default constructor, creates empty objectid with empty signature
 	 */
-    objectsignature_t() : id(), signature("") {};
+	objectsignature_t(void) = default;
 
 	/**
 	 * Object signature equality comparison
@@ -128,14 +130,14 @@ public:
 	 *					The singleton shared plugin data.
 	 * @throw std::exception
 	 */
-	UserPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *shareddata) :
+	UserPlugin(std::mutex &pluginlock, ECPluginSharedData *shareddata) :
 		m_plugin_lock(pluginlock), m_config(NULL),
 		m_lpStatsCollector(shareddata->GetStatsCollector()),
 		m_bHosted(shareddata->IsHosted()),
 		m_bDistributed(shareddata->IsDistributed())
 	{}
 
-	virtual ~UserPlugin(void) {}
+	virtual ~UserPlugin(void) _kc_impdtor;
 
 	/**
 	 * Initialize plugin
@@ -417,10 +419,7 @@ public:
 	
 
 protected:
-	/**
-	 * Pointer to pthread mutex
-	 */
-	pthread_mutex_t *m_plugin_lock;
+	std::mutex &m_plugin_lock;
 
 	/**
 	 * Pointer to local configuration manager.
@@ -446,7 +445,7 @@ protected:
 /**
  * Exception which is thrown when no object was found during a search
  */
-class objectnotfound: public runtime_error {
+class _kc_export_throw objectnotfound _kc_final : public std::runtime_error {
 public:
 	/**
 	 * @param[in]	arg
@@ -463,7 +462,7 @@ public:
  * Exception which is thrown when too many objects where returned in
  * a search.
  */
-class toomanyobjects: public runtime_error {
+class _kc_export_throw toomanyobjects _kc_final : public std::runtime_error {
 public:
 	/**
 	 * @param[in]	arg
@@ -480,7 +479,7 @@ public:
  * Exception which is thrown when an object is being created
  * while it already existed.
  */
-class collision_error: public runtime_error {
+class _kc_export_throw collision_error _kc_final : public std::runtime_error {
 public:
 	/**
 	 * @param[in]	arg
@@ -497,7 +496,7 @@ public:
  * Exception which is thrown when a problem has been found with
  * the data read from the plugin backend.
  */
-class data_error: public runtime_error {
+class _kc_export_throw data_error _kc_final : public std::runtime_error {
 public:
 	/**
 	 * @param[in]	arg
@@ -514,7 +513,7 @@ public:
  * Exception which is thrown when the function was not
  * implemented by the plugin.
  */
-class notimplemented: public runtime_error {
+class _kc_export_throw notimplemented _kc_final : public std::runtime_error {
 public:
 	/**
 	 * @param[in]	arg
@@ -533,7 +532,7 @@ public:
  * or multi-server function is called while this feature is
  * disabled.
  */
-class notsupported : public runtime_error {
+class _kc_export_throw notsupported _kc_final : public std::runtime_error {
 public:
 	/**
 	 * @param[in]	arg
@@ -549,7 +548,7 @@ public:
 /**
  * Exception which is thrown when a user could not be logged in
  */
-class login_error: public runtime_error {
+class _kc_export_throw login_error _kc_final : public std::runtime_error {
 public:
 	/**
 	 * @param[in]	arg
@@ -565,7 +564,7 @@ public:
 /**
  * Exception which is thrown when LDAP returns errors
  */
-class ldap_error: public runtime_error {
+class _kc_export_throw ldap_error _kc_final : public std::runtime_error {
 	int m_ldaperror;
 public:
 	/**
@@ -616,4 +615,7 @@ static inline string tostring(const Tin i) {
 }
 
 /** @} */
+
+} /* namespace */
+
 #endif

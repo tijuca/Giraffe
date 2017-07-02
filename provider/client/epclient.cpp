@@ -23,7 +23,7 @@
 #include <mapiutil.h>
 
 #include <kopano/ECGetText.h>
-
+#include <kopano/memory.hpp>
 #include <memory>
 #include <string>
 #include <cassert>
@@ -58,11 +58,7 @@
 #include <kopano/charset/convstring.h>
 
 using namespace std;
-
-class EPCDeleter {
-	public:
-	void operator()(ABEID *p) { MAPIFreeBuffer(p); }
-};
+using namespace KCHL;
 
 struct initprov {
 	IProviderAdmin *provadm;
@@ -75,7 +71,7 @@ struct initprov {
 	/* referenced from prop[n] */
 	WStringPtr store_name;
 	EntryIdPtr wrap_eid;
-	std::unique_ptr<ABEID, EPCDeleter> abe_id;
+	memory_ptr<ABEID> abe_id;
 };
 
 static const uint32_t MAPI_S_SPECIAL_OK = MAKE_MAPI_S(0x900);
@@ -94,6 +90,7 @@ ULONG		g_ulLoadsim;
 // Map of msprovider with Profilename as key
 ECMapProvider	g_mapProviders;
 
+static HRESULT RemoveAllProviders(ECMapProvider *);
 class CKopanoApp {
 public:
     CKopanoApp() {
@@ -117,15 +114,31 @@ public:
 
 CKopanoApp theApp;
 
+static HRESULT RemoveAllProviders(ECMapProvider *mp)
+{
+	if (mp == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+	for (const auto &p : *mp) {
+		if (p.second.lpMSProviderOnline)
+			p.second.lpMSProviderOnline->Release();
+		if (p.second.lpABProviderOnline)
+			p.second.lpABProviderOnline->Release();
+	}
+	return hrSuccess;
+}
+
 // entrypoints
 
 // Called by MAPI to return a MSProvider object when a user opens a store based on our service
-extern "C" HRESULT __cdecl MSProviderInit(HINSTANCE hInstance, LPMALLOC pmalloc, LPALLOCATEBUFFER pfnAllocBuf, LPALLOCATEMORE pfnAllocMore, LPFREEBUFFER pfnFreeBuf, ULONG ulFlags, ULONG ulMAPIver, ULONG * lpulProviderVer, LPMSPROVIDER * ppmsp)
+HRESULT __cdecl MSProviderInit(HINSTANCE hInstance, LPMALLOC pmalloc,
+    LPALLOCATEBUFFER pfnAllocBuf, LPALLOCATEMORE pfnAllocMore,
+    LPFREEBUFFER pfnFreeBuf, ULONG ulFlags, ULONG ulMAPIver,
+    ULONG *lpulProviderVer, LPMSPROVIDER *ppmsp)
 {
 	TRACE_MAPI(TRACE_ENTRY, "MSProviderInit", "flags=%08X", ulFlags);
 
 	HRESULT hr = hrSuccess;
-	ECMSProviderSwitch *lpMSProvider = NULL;
+	object_ptr<ECMSProviderSwitch> lpMSProvider;
 
 	// Check the interface version is ok
 	if(ulMAPIver != CURRENT_SPI_VERSION) {
@@ -144,17 +157,13 @@ extern "C" HRESULT __cdecl MSProviderInit(HINSTANCE hInstance, LPMALLOC pmalloc,
 
 	// This object is created for the lifetime of the DLL and destroyed when the
 	// DLL is closed (same on linux, but then for the shared library);
-	hr = ECMSProviderSwitch::Create(ulFlags, &lpMSProvider);
-
+	hr = ECMSProviderSwitch::Create(ulFlags, &~lpMSProvider);
 	if(hr != hrSuccess)
 		goto exit;
 
 	hr = lpMSProvider->QueryInterface(IID_IMSProvider, (void **)ppmsp); 
 
 exit:
-	if (lpMSProvider)
-		lpMSProvider->Release();
-
 	TRACE_MAPI(TRACE_RETURN, "MSProviderInit", "%s", GetMAPIErrorDescription(hr).c_str());
 	return hr;
 }
@@ -185,7 +194,7 @@ initprov_storepub(struct initprov &d, const sGlobalProfileProps &profprop)
 		/* skip over to the DeleteProvider part */
 		ret = MAPI_E_INVALID_PARAMETER;
 	else
-		ret = d.transport->HrGetPublicStore(0, &d.eid_size, &d.eid, &redir_srv);
+		ret = d.transport->HrGetPublicStore(0, &d.eid_size, &~d.eid, &redir_srv);
 
 	if (ret == MAPI_E_UNABLE_TO_COMPLETE) {
 		d.transport->HrLogOff();
@@ -193,7 +202,7 @@ initprov_storepub(struct initprov &d, const sGlobalProfileProps &profprop)
 		new_props.strServerPath = redir_srv;
 		ret = d.transport->HrLogon(new_props);
 		if (ret == hrSuccess)
-			ret = d.transport->HrGetPublicStore(0, &d.eid_size, &d.eid);
+			ret = d.transport->HrGetPublicStore(0, &d.eid_size, &~d.eid);
 	}
 	if (ret == hrSuccess)
 		return hrSuccess;
@@ -208,7 +217,7 @@ initprov_service(struct initprov &d, const sGlobalProfileProps &profprop)
 {
 	/* Get the default store for this user */
 	std::string redir_srv;
-	HRESULT ret = d.transport->HrGetStore(0, NULL, &d.eid_size, &d.eid,
+	HRESULT ret = d.transport->HrGetStore(0, NULL, &d.eid_size, &~d.eid,
 	              0, NULL, &redir_srv);
 	if (ret == MAPI_E_NOT_FOUND) {
 		ec_log_err("HrGetStore failed: No store present.");
@@ -224,7 +233,7 @@ initprov_service(struct initprov &d, const sGlobalProfileProps &profprop)
 	ret = d.transport->HrLogon(new_props);
 	if (ret != hrSuccess)
 		return ret;
-	ret = d.transport->HrGetStore(0, NULL, &d.eid_size, &d.eid, 0, NULL);
+	ret = d.transport->HrGetStore(0, NULL, &d.eid_size, &~d.eid, 0, NULL);
 	if (ret != hrSuccess)
 		return ret;
 
@@ -237,7 +246,7 @@ initprov_service(struct initprov &d, const sGlobalProfileProps &profprop)
 	/* Set/update the default store home server. */
 	auto guid = reinterpret_cast<MAPIUID *>(const_cast<char *>(pbGlobalProfileSectionGuid));
 	ProfSectPtr globprofsect;
-	ret = d.provadm->OpenProfileSection(guid, NULL, MAPI_MODIFY, &globprofsect);
+	ret = d.provadm->OpenProfileSection(guid, nullptr, MAPI_MODIFY, &~globprofsect);
 	if (ret != hrSuccess)
 		return ret;
 
@@ -252,9 +261,9 @@ initprov_storedl(struct initprov &d, const sGlobalProfileProps &profprop)
 {
 	/* PR_EC_USERNAME is the user we want to add ... */
 	SPropValuePtr name;
-	HRESULT ret = HrGetOneProp(d.profsect, PR_EC_USERNAME_W, &name);
+	HRESULT ret = HrGetOneProp(d.profsect, PR_EC_USERNAME_W, &~name);
 	if (ret != hrSuccess)
-		ret = HrGetOneProp(d.profsect, PR_EC_USERNAME_A, &name);
+		ret = HrGetOneProp(d.profsect, PR_EC_USERNAME_A, &~name);
 	if (ret != hrSuccess) {
 		/*
 		 * This should probably be done in UpdateProviders. But
@@ -270,7 +279,7 @@ initprov_storedl(struct initprov &d, const sGlobalProfileProps &profprop)
 
 	std::string redir_srv;
 	ret = d.transport->HrResolveUserStore(convstring::from_SPropValue(name),
-	      0, NULL, &d.eid_size, &d.eid, &redir_srv);
+	      0, NULL, &d.eid_size, &~d.eid, &redir_srv);
 	if (ret != MAPI_E_UNABLE_TO_COMPLETE)
 		return ret;
 
@@ -281,7 +290,7 @@ initprov_storedl(struct initprov &d, const sGlobalProfileProps &profprop)
 	if (ret != hrSuccess)
 		return ret;
 	return d.transport->HrResolveUserStore(convstring::from_SPropValue(name),
-	       0, NULL, &d.eid_size, &d.eid);
+	       0, NULL, &d.eid_size, &~d.eid);
 }
 
 static HRESULT initprov_storearc(struct initprov &d)
@@ -290,13 +299,13 @@ static HRESULT initprov_storearc(struct initprov &d)
 	// That's enough information to get the entryid from the correct server. There's no redirect
 	// available when resolving archive stores.
 	SPropValuePtr name, server;
-	HRESULT ret = HrGetOneProp(d.profsect, PR_EC_USERNAME_W, &name);
+	HRESULT ret = HrGetOneProp(d.profsect, PR_EC_USERNAME_W, &~name);
 	if (ret != hrSuccess)
-		ret = HrGetOneProp(d.profsect, PR_EC_USERNAME_A, &name);
+		ret = HrGetOneProp(d.profsect, PR_EC_USERNAME_A, &~name);
 	if (ret == hrSuccess) {
-		ret = HrGetOneProp(d.profsect, PR_EC_SERVERNAME_W, &server);
+		ret = HrGetOneProp(d.profsect, PR_EC_SERVERNAME_W, &~server);
 		if (ret != hrSuccess)
-			ret = HrGetOneProp(d.profsect, PR_EC_SERVERNAME_A, &server);
+			ret = HrGetOneProp(d.profsect, PR_EC_SERVERNAME_A, &~server);
 		if (ret != hrSuccess)
 			return MAPI_E_UNCONFIGURED;
 	}
@@ -324,14 +333,14 @@ static HRESULT initprov_storearc(struct initprov &d)
 	alt_transport->Release();
 	alt_transport = NULL;
 	return d.transport->HrResolveTypedStore(convstring::from_SPropValue(name),
-	       ECSTORE_TYPE_ARCHIVE, &d.eid_size, &d.eid);
+	       ECSTORE_TYPE_ARCHIVE, &d.eid_size, &~d.eid);
 }
 
 static HRESULT
 initprov_mapi_store(struct initprov &d, const sGlobalProfileProps &profprop)
 {
 	SPropValuePtr mdb;
-	HRESULT ret = HrGetOneProp(d.profsect, PR_MDB_PROVIDER, &mdb);
+	HRESULT ret = HrGetOneProp(d.profsect, PR_MDB_PROVIDER, &~mdb);
 	if (ret != hrSuccess)
 		return ret;
 
@@ -352,16 +361,16 @@ initprov_mapi_store(struct initprov &d, const sGlobalProfileProps &profprop)
 		if (ret != hrSuccess)
 			return ret;
 	} else {
-		ASSERT(FALSE); // unknown GUID?
+		assert(false); // unknown GUID?
 		return hrSuccess;
 	}
 
 	ret = d.transport->HrGetStoreName(d.eid_size, d.eid, MAPI_UNICODE,
-	      static_cast<LPTSTR *>(&d.store_name));
+	      static_cast<LPTSTR *>(&~d.store_name));
 	if (ret != hrSuccess)
 		return ret;
 	ret = WrapStoreEntryID(0, reinterpret_cast<LPTSTR>(const_cast<char *>(WCLIENT_DLL_NAME)),
-	      d.eid_size, d.eid, &d.wrap_eid_size, &d.wrap_eid);
+	      d.eid_size, d.eid, &d.wrap_eid_size, &~d.wrap_eid);
 	if (ret != hrSuccess)
 		return ret;
 
@@ -440,21 +449,18 @@ HRESULT InitializeProvider(LPPROVIDERADMIN lpAdminProvider,
 			goto exit;
 	} else {
 		SPropValuePtr psn;
-		hr = HrGetOneProp(d.profsect, PR_SERVICE_NAME_A, &psn);
+		hr = HrGetOneProp(d.profsect, PR_SERVICE_NAME_A, &~psn);
 		if(hr == hrSuccess)
 			strServiceName = psn->Value.lpszA;
 		hr = hrSuccess;
 	}
-	
-	hr = HrGetOneProp(d.profsect, PR_RESOURCE_TYPE, &ptrPropValueResourceType);
+	hr = HrGetOneProp(d.profsect, PR_RESOURCE_TYPE, &~ptrPropValueResourceType);
 	if(hr != hrSuccess) {
 		// Ignore this provider; apparently it has no resource type, so just skip it
 		hr = hrSuccess;
 		goto exit;
 	}
-	
-	HrGetOneProp(d.profsect, PR_PROVIDER_UID, &ptrPropValueProviderUid);
-
+	HrGetOneProp(d.profsect, PR_PROVIDER_UID, &~ptrPropValueProviderUid);
 	ulResourceType = ptrPropValueResourceType->Value.l;
 
 	TRACE_MAPI(TRACE_INFO, "InitializeProvider", "Resource type=%s", ResourceTypeToString(ulResourceType) );
@@ -486,9 +492,8 @@ HRESULT InitializeProvider(LPPROVIDERADMIN lpAdminProvider,
 		if (hr != hrSuccess)
 			goto exit;
 	} else {
-		if(ulResourceType != MAPI_TRANSPORT_PROVIDER) {
-			ASSERT(FALSE);
-		}
+		if (ulResourceType != MAPI_TRANSPORT_PROVIDER)
+			assert(false);
 		goto exit;
 	}
 
@@ -512,7 +517,7 @@ exit:
 	//Free allocated memory
 	if (d.transport != NULL && d.transport != transport)
 		d.transport->Release(); /* implies logoff */
-	else
+	else if (d.transport != NULL)
 		d.transport->logoff_nd();
 	if (hr == MAPI_S_SPECIAL_OK)
 		return hrSuccess;
@@ -527,10 +532,9 @@ static HRESULT UpdateProviders(LPPROVIDERADMIN lpAdminProviders,
 	ProfSectPtr		ptrProfSect;
 	MAPITablePtr	ptrTable;
 	SRowSetPtr		ptrRows;
-	LPSPropValue	lpsProviderUID;
 
 	// Get the provider table
-	hr = lpAdminProviders->GetProviderTable(0, &ptrTable);
+	hr = lpAdminProviders->GetProviderTable(0, &~ptrTable);
 	if(hr != hrSuccess)
 		return hr;
 
@@ -546,14 +550,13 @@ static HRESULT UpdateProviders(LPPROVIDERADMIN lpAdminProviders,
 	// Scan the rows for message stores
 	for (ULONG curRow = 0; curRow < ptrRows.size(); ++curRow) {
 		//Get de UID of the provider to open the profile section
-		lpsProviderUID = PpropFindProp(ptrRows[curRow].lpProps, ptrRows[curRow].cValues, PR_PROVIDER_UID);
+		auto lpsProviderUID = PCpropFindProp(ptrRows[curRow].lpProps, ptrRows[curRow].cValues, PR_PROVIDER_UID);
 		if(lpsProviderUID == NULL || lpsProviderUID->Value.bin.cb == 0) {
 			// Provider without a provider uid,  just move to the next
-			ASSERT(FALSE);
+			assert(false);
 			continue;
 		}
-
-		hr = lpAdminProviders->OpenProfileSection((MAPIUID *)lpsProviderUID->Value.bin.lpb, NULL, MAPI_MODIFY, &ptrProfSect);
+		hr = lpAdminProviders->OpenProfileSection((MAPIUID *)lpsProviderUID->Value.bin.lpb, nullptr, MAPI_MODIFY, &~ptrProfSect);
 		if(hr != hrSuccess)
 			return hr;
 
@@ -600,16 +603,14 @@ extern "C" HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst,
 	ProfSectPtr		ptrGlobalProfSect;
 	ProfSectPtr		ptrProfSect;
 	MAPISessionPtr	ptrSession;
-
-	WSTransport		*lpTransport = NULL;
-	LPSPropValue	lpsPropValue = NULL;
+	object_ptr<WSTransport> lpTransport;
+	memory_ptr<SPropValue> lpsPropValue;
 	ULONG			cValues = 0;
 	bool			bShowDialog = false;
 
 	MAPIERROR		*lpMapiError = NULL;
-	LPBYTE			lpDelegateStores = NULL;
+	memory_ptr<BYTE> lpDelegateStores;
 	ULONG			cDelegateStores = 0;
-	LPSPropValue	lpsPropValueFind = NULL;
 	ULONG 			cValueIndex = 0;
 	convert_context	converter;
 
@@ -621,9 +622,8 @@ extern "C" HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst,
 
 	if (psup) {
 		hr = psup->GetMemAllocRoutines(&_pfnAllocBuf, &_pfnAllocMore, &_pfnFreeBuf);
-		if(hr != hrSuccess) {
-			ASSERT(FALSE);
-		}
+		if (hr != hrSuccess)
+			assert(false);
 	} else {
 		// Support object not available on linux at this time... TODO: fix mapi4linux?
 		_pfnAllocBuf = MAPIAllocateBuffer;
@@ -646,57 +646,50 @@ extern "C" HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst,
 	case MSG_SERVICE_DELETE:
 		hr = hrSuccess;
 		break;
-	case MSG_SERVICE_PROVIDER_CREATE:
-		if(cvals && pvals) {
-
-			LPSPropValue lpsPropName = NULL;
-			
-			lpsPropValueFind = PpropFindProp(pvals, cvals, PR_PROVIDER_UID);
-			if(lpsPropValueFind == NULL || lpsPropValueFind->Value.bin.cb == 0)
-			{
-				//FIXME: give the right error?
-				hr = MAPI_E_UNCONFIGURED;
-				goto exit;
-			}
-
-			// PR_EC_USERNAME is the user we're adding ...
-			lpsPropName = PpropFindProp(pvals, cvals, CHANGE_PROP_TYPE(PR_EC_USERNAME_A, PT_UNSPECIFIED));
-			if(lpsPropName == NULL || lpsPropName->Value.bin.cb == 0)
-			{
-				hr = MAPI_E_UNCONFIGURED;
-				goto exit;
-			}
-
-			//Open profile section
-			hr = lpAdminProviders->OpenProfileSection((MAPIUID *)lpsPropValueFind->Value.bin.lpb, NULL, MAPI_MODIFY, &ptrProfSect);
-			if(hr != hrSuccess)
-				goto exit;
-
-			hr = HrSetOneProp(ptrProfSect, lpsPropName);
-			if(hr != hrSuccess)
-				goto exit;
-		
-			hr = lpAdminProviders->OpenProfileSection((LPMAPIUID)pbGlobalProfileSectionGuid, NULL, MAPI_MODIFY , &ptrGlobalProfSect);
-			if(hr != hrSuccess)
-				goto exit;
-
-			// Get username/pass settings
-			hr = ClientUtil::GetGlobalProfileProperties(ptrGlobalProfSect, &sProfileProps);
-			if(hr != hrSuccess)
-				goto exit;
-
-			if(sProfileProps.strUserName.empty() || sProfileProps.strServerPath.empty()) {
-				hr = MAPI_E_UNCONFIGURED; // @todo: check if this is the right error
-				goto exit;
-			}
-
-			hr = InitializeProvider(lpAdminProviders, ptrProfSect, sProfileProps, NULL, NULL, NULL);
-			if (hr != hrSuccess)
-				goto exit;
-		
+	case MSG_SERVICE_PROVIDER_CREATE: {
+		if (cvals == 0 || pvals == nullptr)
+			break;
+		const SPropValue *lpsPropName = NULL;
+		auto lpsPropValueFind = PCpropFindProp(pvals, cvals, PR_PROVIDER_UID);
+		if (lpsPropValueFind == NULL || lpsPropValueFind->Value.bin.cb == 0)
+		{
+			//FIXME: give the right error?
+			hr = MAPI_E_UNCONFIGURED;
+			goto exit;
 		}
 
+		// PR_EC_USERNAME is the user we're adding ...
+		lpsPropName = PCpropFindProp(pvals, cvals, CHANGE_PROP_TYPE(PR_EC_USERNAME_A, PT_UNSPECIFIED));
+		if (lpsPropName == NULL || lpsPropName->Value.bin.cb == 0)
+		{
+			hr = MAPI_E_UNCONFIGURED;
+			goto exit;
+		}
+
+		//Open profile section
+		hr = lpAdminProviders->OpenProfileSection((MAPIUID *)lpsPropValueFind->Value.bin.lpb, nullptr, MAPI_MODIFY, &~ptrProfSect);
+		if (hr != hrSuccess)
+			goto exit;
+		hr = HrSetOneProp(ptrProfSect, lpsPropName);
+		if (hr != hrSuccess)
+			goto exit;
+		hr = lpAdminProviders->OpenProfileSection((LPMAPIUID)pbGlobalProfileSectionGuid, nullptr, MAPI_MODIFY, &~ptrGlobalProfSect);
+		if (hr != hrSuccess)
+			goto exit;
+
+		// Get username/pass settings
+		hr = ClientUtil::GetGlobalProfileProperties(ptrGlobalProfSect, &sProfileProps);
+		if (hr != hrSuccess)
+			goto exit;
+		if (sProfileProps.strUserName.empty() || sProfileProps.strServerPath.empty()) {
+			hr = MAPI_E_UNCONFIGURED; // @todo: check if this is the right error
+			goto exit;
+		}
+		hr = InitializeProvider(lpAdminProviders, ptrProfSect, sProfileProps, NULL, NULL, NULL);
+		if (hr != hrSuccess)
+			goto exit;
 		break;
+	}
 	case MSG_SERVICE_PROVIDER_DELETE:
 		hr = hrSuccess;
 
@@ -709,7 +702,7 @@ extern "C" HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst,
 	case MSG_SERVICE_CREATE:
 		
 		//Open global profile, add the store.(for show list, delete etc)
-		hr = lpAdminProviders->OpenProfileSection((LPMAPIUID)pbGlobalProfileSectionGuid, NULL, MAPI_MODIFY , &ptrGlobalProfSect);
+		hr = lpAdminProviders->OpenProfileSection((LPMAPIUID)pbGlobalProfileSectionGuid, nullptr, MAPI_MODIFY , &~ptrGlobalProfSect);
 		if(hr != hrSuccess)
 			goto exit;
 
@@ -721,10 +714,11 @@ extern "C" HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst,
 		}
 
 		hr = ClientUtil::GetGlobalProfileProperties(ptrGlobalProfSect, &sProfileProps);
-
-		if(sProfileProps.strServerPath.empty() || sProfileProps.strUserName.empty() || (sProfileProps.strPassword.empty() && sProfileProps.strSSLKeyFile.empty())) {
+		if (sProfileProps.strServerPath.empty() ||
+		    sProfileProps.strUserName.empty() ||
+		    (sProfileProps.strPassword.empty() &&
+		    sProfileProps.strSSLKeyFile.empty()))
 			bShowDialog = true;
-		}
 		//FIXME: check here offline path with the flags
 		if(!sProfileProps.strServerPath.empty()) {
 			strServerName = GetServerNameFromPath(sProfileProps.strServerPath.c_str());
@@ -733,10 +727,10 @@ extern "C" HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst,
 		}
 
 		// Get deligate stores, Ignore error
-		ClientUtil::GetGlobalProfileDelegateStoresProp(ptrGlobalProfSect, &cDelegateStores, &lpDelegateStores);
+		ClientUtil::GetGlobalProfileDelegateStoresProp(ptrGlobalProfSect, &cDelegateStores, &~lpDelegateStores);
 
 		// init defaults
-		hr = WSTransport::Create(ulFlags & SERVICE_UI_ALLOWED ? 0 : MDB_NO_DIALOG, &lpTransport);
+		hr = WSTransport::Create(ulFlags & SERVICE_UI_ALLOWED ? 0 : MDB_NO_DIALOG, &~lpTransport);
 		if(hr != hrSuccess)
 			goto exit;
 
@@ -746,11 +740,8 @@ extern "C" HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst,
 			bGlobalProfileUpdate = false;
 			bUpdatedPageConnection = false;
 
-			if((bShowDialog && ulFlags & SERVICE_UI_ALLOWED) || ulFlags & SERVICE_UI_ALWAYS )
-			{
+			if ((bShowDialog && ulFlags & SERVICE_UI_ALLOWED) || ulFlags & SERVICE_UI_ALWAYS)
 				hr = MAPI_E_USER_CANCEL;
-			}// if(bShowDialog...)
-
 						
 			if(!(ulFlags & SERVICE_UI_ALLOWED || ulFlags & SERVICE_UI_ALWAYS) && (strServerName.empty() || sProfileProps.strUserName.empty())){
 				hr = MAPI_E_UNCONFIGURED;
@@ -766,14 +757,14 @@ extern "C" HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst,
 				bShowDialog = true;
 			} else if(hr != erSuccess){ // Big error?
 				bShowDialog = true;
-				ASSERT(FALSE);
+				assert(false);
 			}else {
 				//Update global profile
 				if( bGlobalProfileUpdate == true) {
 
 					cValues = 12;
 					cValueIndex = 0;
-					hr = MAPIAllocateBuffer(sizeof(SPropValue) * cValues, (void**)&lpsPropValue);
+					hr = MAPIAllocateBuffer(sizeof(SPropValue) * cValues, &~lpsPropValue);
 					if(hr != hrSuccess)
 						goto exit;
 
@@ -820,11 +811,6 @@ extern "C" HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst,
 					hr = ptrGlobalProfSect->SetProps(cValueIndex, lpsPropValue, NULL);
 					if(hr != hrSuccess)
 						goto exit;
-					
-					//Free allocated memory
-					MAPIFreeBuffer(lpsPropValue);
-					lpsPropValue = NULL;
-
 				}
 				break; // Everything is oke
 			}
@@ -861,20 +847,18 @@ exit:
 		*lppMapiError = NULL;
 
 		if(hr != hrSuccess) {
-			LPTSTR lpszErrorMsg;
+			memory_ptr<TCHAR> lpszErrorMsg;
 
-			if (Util::HrMAPIErrorToText(hr, &lpszErrorMsg) == hrSuccess) {
+			if (Util::HrMAPIErrorToText(hr, &~lpszErrorMsg) == hrSuccess) {
 				// Set Error
 				strError = _T("EntryPoint: ");
 				strError += lpszErrorMsg;
-				MAPIFreeBuffer(lpszErrorMsg);
 
 				// Some outlook 2007 clients can't allocate memory so check it
 				if(MAPIAllocateBuffer(sizeof(MAPIERROR), (void**)&lpMapiError) == hrSuccess) { 
 
 					memset(lpMapiError, 0, sizeof(MAPIERROR));				
-
-					if ((ulFlags & MAPI_UNICODE) == MAPI_UNICODE) {
+					if (ulFlags & MAPI_UNICODE) {
 						std::wstring wstrErrorMsg = convert_to<std::wstring>(strError);
 						std::wstring wstrCompName = convert_to<std::wstring>(g_strProductName.c_str());
 							
@@ -907,28 +891,22 @@ exit:
 			}
 		}
 	}
-
-	MAPIFreeBuffer(lpDelegateStores);
-	if(lpTransport)
-		lpTransport->Release();
-	MAPIFreeBuffer(lpsPropValue);
 	TRACE_MAPI(TRACE_RETURN, "MSGServiceEntry", "%s", GetMAPIErrorDescription(hr).c_str());
 	return hr;
 }
 
-extern "C" HRESULT __cdecl XPProviderInit(HINSTANCE hInstance, LPMALLOC lpMalloc, LPALLOCATEBUFFER lpAllocateBuffer, LPALLOCATEMORE lpAllocateMore, LPFREEBUFFER lpFreeBuffer, ULONG ulFlags, ULONG ulMAPIVer, ULONG * lpulProviderVer, LPXPPROVIDER * lppXPProvider)
+HRESULT __cdecl XPProviderInit(HINSTANCE hInstance, LPMALLOC lpMalloc,
+    LPALLOCATEBUFFER lpAllocateBuffer, LPALLOCATEMORE lpAllocateMore,
+    LPFREEBUFFER lpFreeBuffer, ULONG ulFlags, ULONG ulMAPIVer,
+    ULONG *lpulProviderVer, LPXPPROVIDER *lppXPProvider)
 {
 	TRACE_MAPI(TRACE_ENTRY, "XPProviderInit", "");
 
 	HRESULT hr = hrSuccess;
-	ECXPProvider	*pXPProvider = NULL;
+	object_ptr<ECXPProvider> pXPProvider;
 
     if (ulMAPIVer < CURRENT_SPI_VERSION)
-    {
-        hr = MAPI_E_VERSION;
-		goto exit;
-    }
-
+		return MAPI_E_VERSION;
 	*lpulProviderVer = CURRENT_SPI_VERSION;
 
 	// Save the pointer to the allocation routines in global variables
@@ -938,32 +916,22 @@ extern "C" HRESULT __cdecl XPProviderInit(HINSTANCE hInstance, LPMALLOC lpMalloc
 	_pfnFreeBuf = lpFreeBuffer;
 	_hInstance = hInstance;
 
-	hr = ECXPProvider::Create(&pXPProvider);
+	hr = ECXPProvider::Create(&~pXPProvider);
 	if(hr != hrSuccess)
-		goto exit;
-
-	hr = pXPProvider->QueryInterface(IID_IXPProvider, (void **)lppXPProvider);
-
-exit:
-	if(pXPProvider)
-		pXPProvider->Release();
-
-	return hr;
+		return hr;
+	return pXPProvider->QueryInterface(IID_IXPProvider,
+	       reinterpret_cast<void **>(lppXPProvider));
 }
 
-extern "C" HRESULT  __cdecl ABProviderInit(HINSTANCE hInstance, LPMALLOC lpMalloc, LPALLOCATEBUFFER lpAllocateBuffer, LPALLOCATEMORE lpAllocateMore, LPFREEBUFFER lpFreeBuffer, ULONG ulFlags, ULONG ulMAPIVer, ULONG * lpulProviderVer, LPABPROVIDER * lppABProvider)
+HRESULT  __cdecl ABProviderInit(HINSTANCE hInstance, LPMALLOC lpMalloc,
+    LPALLOCATEBUFFER lpAllocateBuffer, LPALLOCATEMORE lpAllocateMore,
+    LPFREEBUFFER lpFreeBuffer, ULONG ulFlags, ULONG ulMAPIVer,
+    ULONG *lpulProviderVer, LPABPROVIDER *lppABProvider)
 {
 	TRACE_MAPI(TRACE_ENTRY, "ABProviderInit", "");
 
-	HRESULT hr = hrSuccess;
-	ECABProviderSwitch	*lpABProvider = NULL;
-
 	if (ulMAPIVer < CURRENT_SPI_VERSION)
-	{
-		hr = MAPI_E_VERSION;
-		goto exit;
-	}
-
+		return MAPI_E_VERSION;
 	*lpulProviderVer = CURRENT_SPI_VERSION;
 	// Save the pointer to the allocation routines in global variables
 	_pmalloc = lpMalloc;
@@ -972,15 +940,10 @@ extern "C" HRESULT  __cdecl ABProviderInit(HINSTANCE hInstance, LPMALLOC lpMallo
 	_pfnFreeBuf = lpFreeBuffer;
 	_hInstance = hInstance;
 
-	hr = ECABProviderSwitch::Create(&lpABProvider);
-	if(hr != hrSuccess)
-		goto exit;
-
-	hr = lpABProvider->QueryInterface(IID_IABProvider, (void **)lppABProvider);
-
-exit:
-	if(lpABProvider)
-		lpABProvider->Release();
-
+	object_ptr<ECABProviderSwitch> lpABProvider;
+	HRESULT hr = ECABProviderSwitch::Create(&~lpABProvider);
+	if (hr == hrSuccess)
+		hr = lpABProvider->QueryInterface(IID_IABProvider,
+		     reinterpret_cast<void **>(lppABProvider));
 	return hr;
 }

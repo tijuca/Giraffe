@@ -14,6 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <kopano/platform.h>
+#include <kopano/ECInterfaceDefs.h>
 #include "resource.h"
 #include <mapiutil.h>
 #include "kcore.hpp"
@@ -23,8 +24,6 @@
 #include "Mem.h"
 #include <kopano/ECGuid.h>
 #include <kopano/ECDebug.h>
-
-#include "ECDisplayTable.h"
 
 ECMailUser::ECMailUser(void* lpProvider, BOOL fModify) : ECABProp(lpProvider, MAPI_MAILUSER, fModify, "IMailUser")
 {
@@ -50,14 +49,12 @@ HRESULT ECMailUser::Create(void* lpProvider, BOOL fModify, ECMailUser** lppMailU
 
 HRESULT	ECMailUser::QueryInterface(REFIID refiid, void **lppInterface) 
 {
-	REGISTER_INTERFACE(IID_ECMailUser, this);
-	REGISTER_INTERFACE(IID_ECABProp, this);
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
-	REGISTER_INTERFACE(IID_IMailUser, &this->m_xMailUser);
-	REGISTER_INTERFACE(IID_IMAPIProp, &this->m_xMailUser);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xMailUser);
-
+	REGISTER_INTERFACE2(ECMailUser, this);
+	REGISTER_INTERFACE2(ECABProp, this);
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IMailUser, &this->m_xMailUser);
+	REGISTER_INTERFACE2(IMAPIProp, &this->m_xMailUser);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xMailUser);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -66,154 +63,44 @@ HRESULT ECMailUser::TableRowGetProp(void* lpProvider, struct propVal *lpsPropVal
 	return MAPI_E_NOT_FOUND;
 }
 
-HRESULT ECMailUser::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
+HRESULT ECMailUser::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN *lppUnk)
 {
-	HRESULT			hr = MAPI_E_NOT_FOUND;
-
 	if (lpiid == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 
 	if (ulFlags & MAPI_CREATE)
 		// Don't support creating any sub-objects
 		return MAPI_E_NO_ACCESS;
-
-	switch(ulPropTag) {
-	default:
-		hr = ECABProp::OpenProperty(ulPropTag, lpiid, ulInterfaceOptions, ulFlags, lppUnk);
-		break;
-	}
-	return hr;
+	return ECABProp::OpenProperty(ulPropTag, lpiid, ulInterfaceOptions, ulFlags, lppUnk);
 }
 
-HRESULT ECMailUser::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
+HRESULT ECMailUser::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude,
+    const SPropTagArray *lpExcludeProps, ULONG ulUIParam,
+    LPMAPIPROGRESS lpProgress, LPCIID lpInterface, void *lpDestObj,
+    ULONG ulFlags, SPropProblemArray **lppProblems)
 {
 	return this->GetABStore()->m_lpMAPISup->DoCopyTo(&IID_IMailUser, &this->m_xMailUser, ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
 
-HRESULT ECMailUser::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
+HRESULT ECMailUser::CopyProps(const SPropTagArray *lpIncludeProps,
+    ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface,
+    void *lpDestObj, ULONG ulFlags, SPropProblemArray **lppProblems)
 {
 	return this->GetABStore()->m_lpMAPISup->DoCopyProps(&IID_IMailUser, &this->m_xMailUser, lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
 
 // IMailUser
-HRESULT ECMailUser::xMailUser::QueryInterface(REFIID refiid , void** lppInterface)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMailUser::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
-	METHOD_PROLOGUE_(ECMailUser, MailUser);
-	HRESULT hr = pThis->QueryInterface(refiid, lppInterface);
-	TRACE_MAPI(TRACE_RETURN, "IMailUser::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-ULONG ECMailUser::xMailUser::AddRef()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMailUser::AddRef", "");
-	METHOD_PROLOGUE_(ECMailUser, MailUser);
-	return pThis->AddRef();
-}
-
-ULONG ECMailUser::xMailUser::Release()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMailUser::Release", "");
-	METHOD_PROLOGUE_(ECMailUser, MailUser);
-	return pThis->Release();
-}
-
-HRESULT ECMailUser::xMailUser::GetLastError(HRESULT hError, ULONG ulFlags, LPMAPIERROR * lppMapiError)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMailUser::GetLastError", "herror=0x%08x", hError);
-	METHOD_PROLOGUE_(ECMailUser, MailUser);
-	HRESULT hr = pThis->GetLastError(hError, ulFlags, lppMapiError);
-	TRACE_MAPI(TRACE_RETURN, "IMailUser::GetLastError", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMailUser::xMailUser::SaveChanges(ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMailUser::SaveChanges", "");
-	METHOD_PROLOGUE_(ECMailUser, MailUser);
-	HRESULT hr = pThis->SaveChanges(ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IMailUser::SaveChanges", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMailUser::xMailUser::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG FAR * lpcValues, LPSPropValue FAR * lppPropArray)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMailUser::GetProps", "%s, flags=%08X", PropNameFromPropTagArray(lpPropTagArray).c_str(), ulFlags);
-	METHOD_PROLOGUE_(ECMailUser, MailUser);
-	HRESULT hr = pThis->GetProps(lpPropTagArray, ulFlags, lpcValues, lppPropArray);
-	TRACE_MAPI(TRACE_RETURN, "IMailUser::GetProps", "%s, %s", GetMAPIErrorDescription(hr).c_str(), (lpcValues && lppPropArray)?PropNameFromPropArray(*lpcValues, *lppPropArray).c_str():"NULL");
-	return hr;
-}
-
-HRESULT ECMailUser::xMailUser::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropTagArray)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMailUser::GetPropList", "");
-	METHOD_PROLOGUE_(ECMailUser, MailUser);
-	HRESULT hr = pThis->GetPropList(ulFlags, lppPropTagArray);
-	TRACE_MAPI(TRACE_RETURN, "IMailUser::GetPropList", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMailUser::xMailUser::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMailUser::OpenProperty", "PropTag=%s, lpiid=%s", PropNameFromPropTag(ulPropTag).c_str(), DBGGUIDToString(*lpiid).c_str());
-	METHOD_PROLOGUE_(ECMailUser, MailUser);
-	HRESULT hr = pThis->OpenProperty(ulPropTag, lpiid, ulInterfaceOptions, ulFlags, lppUnk);
-	TRACE_MAPI(TRACE_RETURN, "IMailUser::OpenProperty", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMailUser::xMailUser::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMailUser::SetProps", "");
-	METHOD_PROLOGUE_(ECMailUser, MailUser);
-	HRESULT hr = pThis->SetProps(cValues, lpPropArray, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "IMailUser::SetProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMailUser::xMailUser::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMailUser::DeleteProps", "%s", PropNameFromPropTagArray(lpPropTagArray).c_str());
-	METHOD_PROLOGUE_(ECMailUser, MailUser);
-	HRESULT hr = pThis->DeleteProps(lpPropTagArray, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "IMailUser::DeleteProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMailUser::xMailUser::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMailUser::CopyTo", "");
-	METHOD_PROLOGUE_(ECMailUser, MailUser);
-	HRESULT hr = pThis->CopyTo(ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);;
-	TRACE_MAPI(TRACE_RETURN, "IMailUser::CopyTo", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMailUser::xMailUser::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMailUser::CopyProps", "");
-	METHOD_PROLOGUE_(ECMailUser, MailUser);
-	HRESULT hr = pThis->CopyProps(lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "IMailUser::CopyProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMailUser::xMailUser::GetNamesFromIDs(LPSPropTagArray * pptaga, LPGUID lpguid, ULONG ulFlags, ULONG * pcNames, LPMAPINAMEID ** pppNames)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMailUser::GetNamesFromIDs", "");
-	METHOD_PROLOGUE_(ECMailUser, MailUser);
-	HRESULT hr = pThis->GetNamesFromIDs(pptaga, lpguid, ulFlags, pcNames, pppNames);
-	TRACE_MAPI(TRACE_RETURN, "IMailUser::GetIDsFromNames", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMailUser::xMailUser::GetIDsFromNames(ULONG cNames, LPMAPINAMEID * ppNames, ULONG ulFlags, LPSPropTagArray * pptaga)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMailUser::GetIDsFromNames", "");
-	METHOD_PROLOGUE_(ECMailUser, MailUser);
-	HRESULT hr = pThis->GetIDsFromNames(cNames, ppNames, ulFlags, pptaga);
-	TRACE_MAPI(TRACE_RETURN, "IMailUser::GetIDsFromNames", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
+DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECMailUser, MailUser, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECMailUser, MailUser, Release, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
+DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, SaveChanges, (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, GetProps, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags), (ULONG *, lpcValues), (SPropValue **, lppPropArray))
+DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, GetPropList, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
+DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, OpenProperty, (ULONG, ulPropTag), (LPCIID, lpiid), (ULONG, ulInterfaceOptions), (ULONG, ulFlags), (LPUNKNOWN *, lppUnk))
+DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, SetProps, (ULONG, cValues), (const SPropValue *, lpPropArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, DeleteProps, (const SPropTagArray *, lpPropTagArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, CopyTo, (ULONG, ciidExclude), (LPCIID, rgiidExclude), (const SPropTagArray *, lpExcludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, CopyProps, (const SPropTagArray *, lpIncludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, GetNamesFromIDs, (LPSPropTagArray *, pptaga), (LPGUID, lpguid), (ULONG, ulFlags), (ULONG *, pcNames), (LPMAPINAMEID **, pppNames))
+DEF_HRMETHOD1(TRACE_MAPI, ECMailUser, MailUser, GetIDsFromNames, (ULONG, cNames), (LPMAPINAMEID *, ppNames), (ULONG, ulFlags), (LPSPropTagArray *, pptaga))

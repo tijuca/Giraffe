@@ -17,8 +17,9 @@
 
 #include <kopano/platform.h>
 #include <kopano/archiver-common.h>
-#include <boost/algorithm/string/predicate.hpp>
-namespace ba = boost::algorithm;
+#include <kopano/stringutil.h>
+
+namespace KC {
 
 bool entryid_t::operator==(const entryid_t &other) const
 {
@@ -37,9 +38,9 @@ bool entryid_t::operator>(const entryid_t &other) const
 
 bool entryid_t::wrap(const std::string &strPath)
 {
-	if (!ba::istarts_with(strPath, "file://") &&
-		!ba::istarts_with(strPath, "http://") &&
-		!ba::istarts_with(strPath, "https://"))
+	if (!kc_istarts_with(strPath, "file://") &&
+	    !kc_istarts_with(strPath, "http://") &&
+	    !kc_istarts_with(strPath, "https://"))
 		return false;
 	
 	m_vEntryId.insert(m_vEntryId.begin(), (LPBYTE)strPath.c_str(), (LPBYTE)strPath.c_str() + strPath.size() + 1);	// Include NULL terminator
@@ -51,12 +52,12 @@ bool entryid_t::unwrap(std::string *lpstrPath)
 	if (!isWrapped())
 		return false;
 	
-	std::vector<BYTE>::iterator iter = std::find(m_vEntryId.begin(), m_vEntryId.end(), 0);
+	auto iter = std::find(m_vEntryId.begin(), m_vEntryId.end(), 0);
 	if (iter == m_vEntryId.end())
 		return false;
 		
 	if (lpstrPath)
-		lpstrPath->assign((char*)&m_vEntryId.front(), iter - m_vEntryId.begin());
+		lpstrPath->assign((char*)&m_vEntryId.front(), iter - m_vEntryId.cbegin());
 	
 	m_vEntryId.erase(m_vEntryId.begin(), ++iter);
 	return true;
@@ -67,9 +68,9 @@ bool entryid_t::isWrapped() const
 	// ba::istarts_with doesn't work well on unsigned char. So we use a temporary instead.
 	const std::string strEntryId((char*)&m_vEntryId.front(), m_vEntryId.size());
 
-	return (ba::istarts_with(strEntryId, "file://") ||
-			ba::istarts_with(strEntryId, "http://") ||
-			ba::istarts_with(strEntryId, "https://"));
+	return kc_istarts_with(strEntryId, "file://") ||
+	       kc_istarts_with(strEntryId, "http://") ||
+	       kc_istarts_with(strEntryId, "https://");
 }
 
 entryid_t entryid_t::getUnwrapped() const
@@ -106,11 +107,11 @@ int abentryid_t::compare(const abentryid_t &other) const
 eResult MAPIErrorToArchiveError(HRESULT hr)
 {
 	switch (hr) {
-		case hrSuccess:					return Success;
-		case MAPI_E_NOT_ENOUGH_MEMORY:	return OutOfMemory;
-		case MAPI_E_INVALID_PARAMETER:	return InvalidParameter;
-		case MAPI_W_PARTIAL_COMPLETION:	return PartialCompletion;
-		default: 						return Failure;
+	case hrSuccess:			return Success;
+	case MAPI_E_NOT_ENOUGH_MEMORY:	return OutOfMemory;
+	case MAPI_E_INVALID_PARAMETER:	return InvalidParameter;
+	case MAPI_W_PARTIAL_COMPLETION:	return PartialCompletion;
+	default:			return Failure;
 	}
 }
 
@@ -139,3 +140,5 @@ const char* ArchiveResultString(eResult result)
     }
     return retval;
 }
+
+} /* namespace */

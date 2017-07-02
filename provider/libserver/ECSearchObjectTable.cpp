@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <kopano/lockhelper.hpp>
 #include "ECDatabase.h"
 
 #include <mapidefs.h>
@@ -23,6 +24,8 @@
 #include "ECSessionManager.h"
 #include "ECSearchObjectTable.h"
 #include "ECSession.h"
+
+namespace KC {
 
 ECSearchObjectTable::ECSearchObjectTable(ECSession *lpSession, unsigned int ulStoreId, LPGUID lpGuid, unsigned int ulFolderId, unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale) : ECStoreObjectTable(lpSession, ulStoreId, lpGuid, 0, ulObjType, ulFlags, 0, locale) {
 	// We don't pass ulFolderId to ECStoreObjectTable (see constructor above passing '0'), because 
@@ -33,7 +36,10 @@ ECSearchObjectTable::ECSearchObjectTable(ECSession *lpSession, unsigned int ulSt
 	m_ulStoreId = ulStoreId;
 }
 
-ECRESULT ECSearchObjectTable::Create(ECSession *lpSession, unsigned int ulStoreId, GUID *lpGuid, unsigned int ulFolderId, unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale, ECSearchObjectTable **lppTable)
+ECRESULT ECSearchObjectTable::Create(ECSession *lpSession,
+    unsigned int ulStoreId, GUID *lpGuid, unsigned int ulFolderId,
+    unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale,
+    ECStoreObjectTable **lppTable)
 {
 	ECRESULT er = erSuccess;
 
@@ -48,22 +54,18 @@ ECRESULT ECSearchObjectTable::Load() {
     ECRESULT er = erSuccess;
     sObjectTableKey		sRowItem;
     std::list<unsigned int> lstObjId;
-
-	pthread_mutex_lock(&m_hLock);
+	scoped_rlock biglock(m_hLock);
 
     if(m_ulFolderId) {
         // Get the search results
         er = lpSession->GetSessionManager()->GetSearchFolders()->GetSearchResults(m_ulStoreId, m_ulFolderId, &lstObjId);
         if(er != erSuccess)
-            goto exit;
-
+			return er;
         er = UpdateRows(ECKeyTable::TABLE_ROW_ADD, &lstObjId, 0, true);
         if(er != hrSuccess)
-            goto exit;
+			return er;
     }
-    
-exit:
-	pthread_mutex_unlock(&m_hLock);
-
     return er;
 }
+
+} /* namespace */

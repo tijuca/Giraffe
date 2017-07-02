@@ -16,22 +16,28 @@
  */
 
 #include <kopano/platform.h>
+#include <utility>
+#include <kopano/ECRestriction.h>
 #include "PublishFreeBusy.h"
 #include <kopano/namedprops.h>
 #include <kopano/mapiguidext.h>
 #include <iostream>
+#include <memory>
 #include <vector>
 #include <algorithm>
+#include <kopano/memory.hpp>
 #include <kopano/ECLogger.h>
 #include "recurrence.h"
 #include <kopano/MAPIErrors.h>
-
-#include <kopano/restrictionutil.h>
 #include "ECFreeBusyUpdate.h"
 #include "freebusyutil.h"
 #include "ECFreeBusySupport.h"
+#include <mapiutil.h>
 
 using namespace std;
+using namespace KCHL;
+
+namespace KC {
 
 #define START_TIME 0
 #define END_TIME 1
@@ -43,71 +49,47 @@ using namespace std;
  * @param[in] lpDefStore Store of user
  * @param[in] tsStart Start time to publish data of
  * @param[in] ulMonths Number of months to publish
- * @param[in] lpLogger Log object to send log messages to
  * 
  * @return MAPI Error code
  */
-HRESULT HrPublishDefaultCalendar(IMAPISession *lpSession, IMsgStore *lpDefStore, time_t tsStart, ULONG ulMonths, ECLogger *lpLogger)
+HRESULT HrPublishDefaultCalendar(IMAPISession *lpSession, IMsgStore *lpDefStore,
+    time_t tsStart, ULONG ulMonths)
 {
 	HRESULT hr = hrSuccess;
-	PublishFreeBusy *lpFreeBusy = NULL;
-	IMAPITable *lpTable = NULL;
-	FBBlock_1 *lpFBblocks = NULL;
+	std::unique_ptr<PublishFreeBusy> lpFreeBusy;
+	object_ptr<IMAPITable> lpTable;
+	memory_ptr<FBBlock_1> lpFBblocks;
 	ULONG cValues = 0;
-	ECLogger *lpNullLogger = NULL;
 
-	if (!lpLogger) {
-		lpNullLogger = new ECLogger_Null();
-		lpLogger = lpNullLogger;
-	}
-
-	lpLogger->Log(EC_LOGLEVEL_DEBUG, "current time %d", (int)tsStart);
-
-	lpFreeBusy = new PublishFreeBusy(lpSession, lpDefStore, tsStart, ulMonths, lpLogger);
-	
+	ec_log_debug("current time %d", (int)tsStart);
+	lpFreeBusy.reset(new PublishFreeBusy(lpSession, lpDefStore, tsStart, ulMonths));
 	hr = lpFreeBusy->HrInit();
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpFreeBusy->HrGetResctItems(&lpTable);
+		return hr;
+	hr = lpFreeBusy->HrGetResctItems(&~lpTable);
 	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_INFO, "Error while finding messages for free/busy publish, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
-		goto exit;
+		ec_log_info("Error while finding messages for free/busy publish, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
+		return hr;
 	}
-
-	hr = lpFreeBusy->HrProcessTable(lpTable, &lpFBblocks, &cValues);
+	hr = lpFreeBusy->HrProcessTable(lpTable, &~lpFBblocks, &cValues);
 	if(hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_INFO, "Error while finding free/busy blocks, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
-		goto exit;
+		ec_log_info("Error while finding free/busy blocks, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
+		return hr;
 	}
 
 	if (cValues == 0) {
-		lpLogger->Log(EC_LOGLEVEL_DEBUG, "No messages for free/busy publish");
-		goto exit;
+		ec_log_info("No messages for free/busy publish");
+		return hr;
 	}
-
-	hr = lpFreeBusy->HrMergeBlocks(&lpFBblocks, &cValues);
+	hr = lpFreeBusy->HrMergeBlocks(&+lpFBblocks, &cValues);
 	if(hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_INFO, "Error while merging free/busy blocks, entries: %d, error code: 0x%x %s", cValues, hr, GetMAPIErrorMessage(hr));
-		goto exit;
+		ec_log_info("Error while merging free/busy blocks, entries: %d, error code: 0x%x %s", cValues, hr, GetMAPIErrorMessage(hr));
+		return hr;
 	}
-	lpLogger->Log(EC_LOGLEVEL_DEBUG, "Publishing %d free/busy blocks", cValues);
-
+	ec_log_debug("Publishing %d free/busy blocks", cValues);
 	hr = lpFreeBusy->HrPublishFBblocks(lpFBblocks, cValues);
-	if(hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_INFO, "Error while publishing free/busy blocks, entries: %d, error code: 0x%x %s", cValues, hr, GetMAPIErrorMessage(hr));
-		goto exit;
-	}
-	
-exit:
-	if(lpTable)
-		lpTable->Release();
-
-	delete lpFreeBusy;
-	MAPIFreeBuffer(lpFBblocks);
-	if(lpNullLogger)
-		lpNullLogger->Release();
-
+	if (hr != hrSuccess)
+		ec_log_info("Error while publishing free/busy blocks, entries: %d, error code: 0x%x %s", cValues, hr, GetMAPIErrorMessage(hr));
 	return hr;
 }
 
@@ -119,24 +101,18 @@ exit:
  * @param[in] lpDefStore 
  * @param[in] tsStart 
  * @param[in] ulMonths 
- * @param[in] lpLogger 
  */
-PublishFreeBusy::PublishFreeBusy(IMAPISession *lpSession, IMsgStore *lpDefStore, time_t tsStart, ULONG ulMonths, ECLogger *lpLogger)
+PublishFreeBusy::PublishFreeBusy(IMAPISession *lpSession, IMsgStore *lpDefStore,
+    time_t tsStart, ULONG ulMonths) :
+	__propmap(7)
 {
 	m_lpSession = lpSession;
 	m_lpDefStore = lpDefStore;
-	m_lpLogger = lpLogger;
-	m_lpLogger->AddRef();
 	m_tsStart = tsStart;
 	m_tsEnd = tsStart + (ulMonths * (30*24*60*60));
 
 	UnixTimeToFileTime(m_tsStart, &m_ftStart);
 	UnixTimeToFileTime(m_tsEnd , &m_ftEnd);
-}
-
-PublishFreeBusy::~PublishFreeBusy()
-{
-	m_lpLogger->Release();
 }
 
 /** 
@@ -158,8 +134,7 @@ HRESULT PublishFreeBusy::HrInit()
 	PROPMAP_INIT_NAMED_ID (APPT_TIMEZONESTRUCT,	PT_BINARY, PSETID_Appointment,	dispidTimeZoneData)
 	PROPMAP_INIT (m_lpDefStore)
 	;
-
-exit:
+ exitpm:
 	return hr;
 }
 
@@ -177,29 +152,19 @@ exit:
 HRESULT PublishFreeBusy::HrGetResctItems(IMAPITable **lppTable)
 {
 	HRESULT hr = hrSuccess;
-	IMAPIFolder *lpDefCalendar = NULL;
-	IMAPITable *lpTable = NULL;
-	SRestriction *lpsRestrict = NULL;
-	SRestriction *lpsRestrictOR = NULL;
-	SRestriction *lpsRestrictAND = NULL;
-	SRestriction *lpsRestrictSubOR = NULL;
-	SRestriction *lpsRestrictNot = NULL;
+	object_ptr<IMAPIFolder> lpDefCalendar;
+	object_ptr<IMAPITable> lpTable;
 	SPropValue lpsPropStart;
 	SPropValue lpsPropEnd;
 	SPropValue lpsPropIsRecc;
 	SPropValue lpsPropReccEnd;
 		
-	hr = HrOpenDefaultCalendar(m_lpDefStore, m_lpLogger, &lpDefCalendar);
+	hr = HrOpenDefaultCalendar(m_lpDefStore, &~lpDefCalendar);
 	if(hr != hrSuccess)
-		goto exit;
-
-	hr = lpDefCalendar->GetContentsTable(0, &lpTable);
+		return hr;
+	hr = lpDefCalendar->GetContentsTable(0, &~lpTable);
 	if(hr != hrSuccess)
-		goto exit;
-	
-	CREATE_RESTRICTION(lpsRestrict);
-	CREATE_RES_OR(lpsRestrict, lpsRestrict, 4);
-	lpsRestrictOR = lpsRestrict->res.resOr.lpRes;
+		return hr;
 	
 	lpsPropStart.ulPropTag = PROP_APPT_STARTWHOLE;
 	lpsPropStart.Value.ft = m_ftStart;
@@ -213,63 +178,37 @@ HRESULT PublishFreeBusy::HrGetResctItems(IMAPITable **lppTable)
 	lpsPropReccEnd.ulPropTag = PROP_APPT_CLIPEND;
 	lpsPropReccEnd.Value.ft = m_ftStart;
 
-	CREATE_RES_AND(lpsRestrict, (&lpsRestrictOR[0]), 2);
-	lpsRestrictAND = lpsRestrictOR[0].res.resAnd.lpRes;	
-	//ITEM[START] >= START && ITEM[START] <= END;
-	DATA_RES_PROPERTY(lpsRestrict, lpsRestrictAND[0], RELOP_GE, PROP_APPT_STARTWHOLE, &lpsPropStart);//item[start]
-	DATA_RES_PROPERTY(lpsRestrict, lpsRestrictAND[1], RELOP_LE, PROP_APPT_STARTWHOLE, &lpsPropEnd);//item[start]
-
-	CREATE_RES_AND(lpsRestrict, (&lpsRestrictOR[1]), 2);
-	lpsRestrictAND = lpsRestrictOR[1].res.resAnd.lpRes;
-	//ITEM[END] >= START && ITEM[END] <= END;
-	DATA_RES_PROPERTY(lpsRestrict, lpsRestrictAND[0], RELOP_GE, PROP_APPT_ENDWHOLE, &lpsPropStart);//item[end]
-	DATA_RES_PROPERTY(lpsRestrict, lpsRestrictAND[1], RELOP_LE, PROP_APPT_ENDWHOLE, &lpsPropEnd);//item[end]
-
-	CREATE_RES_AND(lpsRestrict, (&lpsRestrictOR[2]), 2);
-	lpsRestrictAND = lpsRestrictOR[2].res.resAnd.lpRes;
-	//ITEM[START] < START && ITEM[END] > END;
-	DATA_RES_PROPERTY(lpsRestrict, lpsRestrictAND[0], RELOP_LT, PROP_APPT_STARTWHOLE, &lpsPropStart);//item[start]
-	DATA_RES_PROPERTY(lpsRestrict, lpsRestrictAND[1], RELOP_GT, PROP_APPT_ENDWHOLE, &lpsPropEnd);//item[end]
-
-	CREATE_RES_OR(lpsRestrict,(&lpsRestrictOR[3]),2);
-	lpsRestrictSubOR = lpsRestrictOR[3].res.resOr.lpRes;
-	
-	CREATE_RES_AND(lpsRestrict,(&lpsRestrictSubOR[0]),3);
-	lpsRestrictAND = lpsRestrictSubOR[0].res.resAnd.lpRes;
-	
-	DATA_RES_EXIST(lpsRestrict, lpsRestrictAND[0], PROP_APPT_CLIPEND);
-	DATA_RES_PROPERTY(lpsRestrict, lpsRestrictAND[1], RELOP_EQ, PROP_APPT_ISRECURRING, &lpsPropIsRecc);
-	DATA_RES_PROPERTY(lpsRestrict, lpsRestrictAND[2], RELOP_GE, PROP_APPT_CLIPEND, &lpsPropReccEnd);
-
-	CREATE_RES_AND(lpsRestrict,(&lpsRestrictSubOR[1]),3);
-	lpsRestrictAND = lpsRestrictSubOR[1].res.resAnd.lpRes;
-
-	CREATE_RES_NOT(lpsRestrict,(&lpsRestrictAND[0]));
-	lpsRestrictNot = lpsRestrictAND[0].res.resNot.lpRes;
-
-	DATA_RES_EXIST(lpsRestrict, lpsRestrictNot[0], PROP_APPT_CLIPEND);
-	DATA_RES_PROPERTY(lpsRestrict, lpsRestrictAND[1], RELOP_LE, PROP_APPT_STARTWHOLE, &lpsPropEnd);
-	DATA_RES_PROPERTY(lpsRestrict, lpsRestrictAND[2], RELOP_EQ, PROP_APPT_ISRECURRING, &lpsPropIsRecc);
-
-	
-	hr = lpTable->Restrict(lpsRestrict, TBL_BATCH);
-	if(hr != hrSuccess)
-		goto exit;
-	
-	*lppTable = lpTable;
-	lpTable = NULL;
-
-exit:
-	if(lpsRestrict)
-		FREE_RESTRICTION(lpsRestrict);
-
-	if(lpTable)
-		lpTable->Release();
-
-	if(lpDefCalendar)
-		lpDefCalendar->Release();
-
-	return hr;
+	hr = ECOrRestriction(
+		//ITEM[START] >= START && ITEM[START] <= END;
+		ECAndRestriction(
+			ECPropertyRestriction(RELOP_GE, PROP_APPT_STARTWHOLE, &lpsPropStart, ECRestriction::Cheap) + // item[start]
+			ECPropertyRestriction(RELOP_LE, PROP_APPT_STARTWHOLE, &lpsPropEnd, ECRestriction::Cheap) // item[start]
+		) +
+		//ITEM[END] >= START && ITEM[END] <= END;
+		ECAndRestriction(
+			ECPropertyRestriction(RELOP_GE, PROP_APPT_ENDWHOLE, &lpsPropStart, ECRestriction::Cheap) + // item[end]
+			ECPropertyRestriction(RELOP_LE, PROP_APPT_ENDWHOLE, &lpsPropEnd, ECRestriction::Cheap) // item[end]
+		) +
+		//ITEM[START] < START && ITEM[END] > END;
+		ECAndRestriction(
+			ECPropertyRestriction(RELOP_LT, PROP_APPT_STARTWHOLE, &lpsPropStart, ECRestriction::Cheap) + // item[start]
+			ECPropertyRestriction(RELOP_GT, PROP_APPT_ENDWHOLE, &lpsPropEnd, ECRestriction::Cheap) // item[end]
+		) +
+		ECAndRestriction(
+			ECExistRestriction(PROP_APPT_CLIPEND) +
+			ECPropertyRestriction(RELOP_EQ, PROP_APPT_ISRECURRING, &lpsPropIsRecc, ECRestriction::Cheap) +
+			ECPropertyRestriction(RELOP_GE, PROP_APPT_CLIPEND, &lpsPropReccEnd, ECRestriction::Cheap)
+		) +
+		ECAndRestriction(
+			ECNotRestriction(ECExistRestriction(PROP_APPT_CLIPEND)) +
+			ECPropertyRestriction(RELOP_LE, PROP_APPT_STARTWHOLE, &lpsPropEnd, ECRestriction::Cheap) +
+			ECPropertyRestriction(RELOP_EQ, PROP_APPT_ISRECURRING, &lpsPropIsRecc, ECRestriction::Cheap)
+		)
+	).RestrictTable(lpTable);
+	if (hr != hrSuccess)
+		return hr;
+	*lppTable = lpTable.release();
+	return hrSuccess;
 }
 
 /**
@@ -285,36 +224,25 @@ exit:
 HRESULT PublishFreeBusy::HrProcessTable(IMAPITable *lpTable, FBBlock_1 **lppfbBlocks, ULONG *lpcValues)
 {
 	HRESULT hr = hrSuccess;
-	SRowSet *lpRowSet = NULL;
-	SPropTagArray *lpsPrpTagArr = NULL;
-	OccrInfo *lpOccrInfo = NULL;
+	memory_ptr<OccrInfo> lpOccrInfo;
 	FBBlock_1 *lpfbBlocks = NULL;
 	recurrence lpRecurrence;
 	ULONG ulFbStatus = 0;
-
-	// @todo make static block and move this when to the table is created
-	hr = MAPIAllocateBuffer(CbNewSPropTagArray(7), (void **)&lpsPrpTagArr);
+	SizedSPropTagArray(7, proptags) =
+		{7, {PROP_APPT_STARTWHOLE, PROP_APPT_ENDWHOLE,
+		PROP_APPT_FBSTATUS, PROP_APPT_ISRECURRING,
+		PROP_APPT_RECURRINGSTATE, PROP_APPT_CLIPEND,
+		PROP_APPT_TIMEZONESTRUCT}};
+	hr = lpTable->SetColumns(proptags, 0);
 	if(hr != hrSuccess)
-		goto exit;
-
-	lpsPrpTagArr->cValues = 7;
-	lpsPrpTagArr->aulPropTag[0] = PROP_APPT_STARTWHOLE;
-	lpsPrpTagArr->aulPropTag[1] = PROP_APPT_ENDWHOLE;
-	lpsPrpTagArr->aulPropTag[2] = PROP_APPT_FBSTATUS;
-	lpsPrpTagArr->aulPropTag[3] = PROP_APPT_ISRECURRING;
-	lpsPrpTagArr->aulPropTag[4] = PROP_APPT_RECURRINGSTATE;
-	lpsPrpTagArr->aulPropTag[5] = PROP_APPT_CLIPEND;
-	lpsPrpTagArr->aulPropTag[6] = PROP_APPT_TIMEZONESTRUCT;
-
-	hr = lpTable->SetColumns((LPSPropTagArray)lpsPrpTagArr, 0);
-	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	while (true)
 	{
-		hr = lpTable->QueryRows(50, 0, &lpRowSet);
+		rowset_ptr lpRowSet;
+		hr = lpTable->QueryRows(50, 0, &~lpRowSet);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		if(lpRowSet->cRows == 0)
 			break;
@@ -331,7 +259,7 @@ HRESULT PublishFreeBusy::HrProcessTable(IMAPITable *lpTable, FBBlock_1 **lppfbBl
 				{
 					hr = lpRecurrence.HrLoadRecurrenceState((char *)(lpRowSet->aRow[i].lpProps[4].Value.bin.lpb),lpRowSet->aRow[i].lpProps[4].Value.bin.cb, 0);
 					if(FAILED(hr)) {
-						m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error loading recurrence state, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
+						ec_log_err("Error loading recurrence state, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 						continue;
 					}
 
@@ -340,10 +268,9 @@ HRESULT PublishFreeBusy::HrProcessTable(IMAPITable *lpTable, FBBlock_1 **lppfbBl
 
 					if (lpRowSet->aRow[i].lpProps[2].ulPropTag == PROP_APPT_FBSTATUS)
 						ulFbStatus = lpRowSet->aRow[i].lpProps[2].Value.ul;
-
-					hr = lpRecurrence.HrGetItems( m_tsStart, m_tsEnd, m_lpLogger, ttzInfo, ulFbStatus, &lpOccrInfo, lpcValues);
+					hr = lpRecurrence.HrGetItems(m_tsStart, m_tsEnd, ttzInfo, ulFbStatus, &+lpOccrInfo, lpcValues);
 					if (hr != hrSuccess || !lpOccrInfo) {
-						m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error expanding items for recurring item, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
+						ec_log_err("Error expanding items for recurring item, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 						continue;
 					}
 				}
@@ -362,40 +289,27 @@ HRESULT PublishFreeBusy::HrProcessTable(IMAPITable *lpTable, FBBlock_1 **lppfbBl
 				}
 				if (lpRowSet->aRow[i].lpProps[2].ulPropTag == PROP_APPT_FBSTATUS) 
 					sOccrBlock.fbBlock.m_fbstatus = (FBStatus)lpRowSet->aRow[i].lpProps[2].Value.ul;
-				
-				hr = HrAddFBBlock(sOccrBlock, &lpOccrInfo, lpcValues);
+				hr = HrAddFBBlock(sOccrBlock, &+lpOccrInfo, lpcValues);
 				if (hr != hrSuccess) {
-					m_lpLogger->Log( EC_LOGLEVEL_DEBUG, "Error adding occurrence block to list, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
-					goto exit;
+					ec_log_debug("Error adding occurrence block to list, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
+					return hr;
 				}
 			}
 	
 		}
-
-		if(lpRowSet)
-			FreeProws(lpRowSet);
-		lpRowSet = NULL;
 	}
 	
-	if (lpcValues != 0) {
+	if (lpcValues != 0 && lpOccrInfo != NULL) {
 		hr = MAPIAllocateBuffer(sizeof(FBBlock_1)* (*lpcValues), (void**)&lpfbBlocks);
 		if(hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		for (ULONG i = 0 ; i < *lpcValues; ++i)
 			lpfbBlocks[i]  = lpOccrInfo[i].fbBlock;
 
 		*lppfbBlocks = lpfbBlocks;
 		lpfbBlocks = NULL;
 	}
-
-exit:
-	MAPIFreeBuffer(lpOccrInfo);
-	MAPIFreeBuffer(lpsPrpTagArr);
-	if (lpRowSet)
-		FreeProws(lpRowSet);
-
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -408,21 +322,17 @@ exit:
  */
 HRESULT PublishFreeBusy::HrMergeBlocks(FBBlock_1 **lppfbBlocks, ULONG *lpcValues)
 {
-	HRESULT hr = hrSuccess;
 	FBBlock_1 *lpFbBlocks = NULL;
 	ULONG cValues = *lpcValues;
 	ULONG ulLevel = 0;
 	time_t tsLastTime = 0;
 	TSARRAY sTsitem = {0,0,0};
 	std::map<time_t , TSARRAY> mpTimestamps;
-	std::map<time_t, TSARRAY>::const_iterator iterTs;
 	std::vector <ULONG> vctStatus;
-	std::vector <ULONG>::iterator iterStatus;
 	std::vector <FBBlock_1> vcFBblocks;
-	std::vector<FBBlock_1>::const_iterator iterVcBlocks;
 	time_t tTemp = 0;
 
-	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Input blocks %ul", cValues);
+	ec_log_debug("Input blocks %ul", cValues);
 
 	lpFbBlocks = *lppfbBlocks;
 	for (ULONG i = 0; i < cValues; ++i) {
@@ -432,7 +342,7 @@ HRESULT PublishFreeBusy::HrMergeBlocks(FBBlock_1 **lppfbBlocks, ULONG *lpcValues
 		RTimeToUnixTime(sTsitem.tsTime, &tTemp);
 
 		// @note ctime adds \n character
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Blocks start %s", ctime(&tTemp));
+		ec_log_debug("Blocks start %s", ctime(&tTemp));
 
 		mpTimestamps[sTsitem.tsTime] = sTsitem;
 		
@@ -443,10 +353,10 @@ HRESULT PublishFreeBusy::HrMergeBlocks(FBBlock_1 **lppfbBlocks, ULONG *lpcValues
 		mpTimestamps[sTsitem.tsTime] = sTsitem;
 	}
 	
-	for (iterTs = mpTimestamps.begin(); iterTs != mpTimestamps.end(); ++iterTs) {
+	for (const auto &pts : mpTimestamps) {
 		FBBlock_1 fbBlockTemp;
 
-		sTsitem = iterTs->second;
+		sTsitem = pts.second;
 		switch(sTsitem.ulType)
 		{
 		case START_TIME:
@@ -457,7 +367,7 @@ HRESULT PublishFreeBusy::HrMergeBlocks(FBBlock_1 **lppfbBlocks, ULONG *lpcValues
 				fbBlockTemp.m_tmEnd = sTsitem.tsTime;
 				fbBlockTemp.m_fbstatus = (enum FBStatus)(vctStatus.size()> 0 ? vctStatus.back(): 0);// sort it to get max of status
 				if(fbBlockTemp.m_fbstatus != 0)
-					vcFBblocks.push_back(fbBlockTemp);
+					vcFBblocks.push_back(std::move(fbBlockTemp));
 			}
 			++ulLevel;
 			vctStatus.push_back(sTsitem.ulStatus);
@@ -471,12 +381,12 @@ HRESULT PublishFreeBusy::HrMergeBlocks(FBBlock_1 **lppfbBlocks, ULONG *lpcValues
 				fbBlockTemp.m_tmEnd = sTsitem.tsTime;
 				fbBlockTemp.m_fbstatus = (enum FBStatus)(vctStatus.size()> 0 ? vctStatus.back(): 0);
 				if(fbBlockTemp.m_fbstatus != 0)
-					vcFBblocks.push_back(fbBlockTemp);
+					vcFBblocks.push_back(std::move(fbBlockTemp));
 			}
 			--ulLevel;
 			if(!vctStatus.empty()){
-				iterStatus = std::find(vctStatus.begin(),vctStatus.end(),sTsitem.ulStatus);
-				if(iterStatus != vctStatus.end())
+				auto iterStatus = std::find(vctStatus.begin(), vctStatus.end(), sTsitem.ulStatus);
+				if (iterStatus != vctStatus.end())
 					vctStatus.erase(iterStatus);
 			}
 			tsLastTime = sTsitem.tsTime;
@@ -485,26 +395,24 @@ HRESULT PublishFreeBusy::HrMergeBlocks(FBBlock_1 **lppfbBlocks, ULONG *lpcValues
 	}
 
 	// Free previously allocated memory
-	if(lppfbBlocks && *lppfbBlocks) {
+	if (*lppfbBlocks != NULL) {
 		MAPIFreeBuffer(*lppfbBlocks);
 		*lppfbBlocks = NULL;
 	}
 
-	hr = MAPIAllocateBuffer(sizeof(FBBlock_1) * vcFBblocks.size(), (void **)&lpFbBlocks);
+	HRESULT hr = MAPIAllocateBuffer(sizeof(FBBlock_1) * vcFBblocks.size(),
+	             reinterpret_cast<void **>(&lpFbBlocks));
 	if (hr != hrSuccess)
-		goto exit;
-	iterVcBlocks = vcFBblocks.begin();
+		return hr;
 
-	for (ULONG i = 0; iterVcBlocks != vcFBblocks.end(); ++i, ++iterVcBlocks)
-		lpFbBlocks[i] = *iterVcBlocks;		
-
+	ULONG i = 0;
+	for (const auto &vcblock : vcFBblocks)
+		lpFbBlocks[i++] = vcblock;
 	*lppfbBlocks = lpFbBlocks;
 	*lpcValues = vcFBblocks.size();
 
-	m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Output blocks %d", *lpcValues);
-
-exit:
-	return hr;
+	ec_log_debug("Output blocks %d", *lpcValues);
+	return hrSuccess;
 }
 
 /** 
@@ -518,56 +426,36 @@ exit:
 HRESULT PublishFreeBusy::HrPublishFBblocks(FBBlock_1 *lpfbBlocks, ULONG cValues)
 {
 	HRESULT hr = hrSuccess;
-	ECFreeBusyUpdate *lpFBUpdate = NULL;
-	IMessage *lpMessage = NULL;
-	IMsgStore *lpPubStore = NULL;
-	LPSPropValue lpsPrpUsrMEid = NULL;
+	object_ptr<ECFreeBusyUpdate> lpFBUpdate;
+	object_ptr<IMessage> lpMessage;
+	object_ptr<IMsgStore> lpPubStore;
+	memory_ptr<SPropValue> lpsPrpUsrMEid;
 	time_t tsStart = 0;
-	
-	hr = HrOpenECPublicStore(m_lpSession, &lpPubStore);
-	if(hr != hrSuccess)
-		goto exit;
 
-	hr = HrGetOneProp(m_lpDefStore, PR_MAILBOX_OWNER_ENTRYID, &lpsPrpUsrMEid);
+	hr = HrOpenECPublicStore(m_lpSession, &~lpPubStore);
 	if(hr != hrSuccess)
-		goto exit;
-
-	hr = GetFreeBusyMessage(m_lpSession, lpPubStore, m_lpDefStore, lpsPrpUsrMEid[0].Value.bin.cb, (LPENTRYID)lpsPrpUsrMEid[0].Value.bin.lpb, true, &lpMessage);
+		return hr;
+	hr = HrGetOneProp(m_lpDefStore, PR_MAILBOX_OWNER_ENTRYID, &~lpsPrpUsrMEid);
 	if(hr != hrSuccess)
-		goto exit;
-
-	hr = ECFreeBusyUpdate::Create(lpMessage,&lpFBUpdate);
+		return hr;
+	hr = GetFreeBusyMessage(m_lpSession, lpPubStore, m_lpDefStore, lpsPrpUsrMEid[0].Value.bin.cb, reinterpret_cast<ENTRYID *>(lpsPrpUsrMEid[0].Value.bin.lpb), true, &~lpMessage);
 	if(hr != hrSuccess)
-		goto exit;
-	
+		return hr;
+	hr = ECFreeBusyUpdate::Create(lpMessage, &~lpFBUpdate);
+	if(hr != hrSuccess)
+		return hr;
 	hr = lpFBUpdate->ResetPublishedFreeBusy();
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpFBUpdate->PublishFreeBusy(lpfbBlocks, cValues);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	FileTimeToUnixTime(m_ftStart, &tsStart);
 	// @todo use a "start of day" function?
 	tsStart = tsStart - 86400; // 24*60*60 = 86400 include current day.
 	UnixTimeToFileTime(tsStart, &m_ftStart);
-
-	hr = lpFBUpdate->SaveChanges(m_ftStart, m_ftEnd);
-	if( hr != hrSuccess)
-		goto exit;
-
-exit:
-	MAPIFreeBuffer(lpsPrpUsrMEid);
-	if(lpFBUpdate)
-		lpFBUpdate->Release();
-
-	if(lpMessage)
-		lpMessage->Release();
-
-	if(lpPubStore)
-		lpPubStore->Release();
-
-	return hr;
-
+	return lpFBUpdate->SaveChanges(m_ftStart, m_ftEnd);
 }
+
+} /* namespace */

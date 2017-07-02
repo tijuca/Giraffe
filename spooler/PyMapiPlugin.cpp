@@ -16,7 +16,8 @@
  */
 
 #include <kopano/platform.h>
-
+#include <memory>
+#include <new>
 #include <Python.h>
 #include <mapi.h>
 #include <mapix.h>
@@ -28,35 +29,23 @@
 #include <kopano/stringutil.h>
 #include "frameobject.h"
 
-/**
- * workaround compile issue with ASSERT macro in vs 2008
- *
- * It's not possible to compile in visual studio 2008 with 
- * ASSERT in macro using this function will fix it
- */
-static void assertbreak(void)
-{
-	ASSERT(FALSE);
-}
-
 #define NEW_SWIG_INTERFACE_POINTER_OBJ(pyswigobj, objpointer, typeobj) {\
 	if (objpointer) {\
-		pyswigobj = SWIG_NewPointerObj((void*)objpointer, typeobj, SWIG_POINTER_OWN | 0);\
+		pyswigobj.reset(SWIG_NewPointerObj((void *)objpointer, typeobj, SWIG_POINTER_OWN | 0)); \
 		PY_HANDLE_ERROR(m_lpLogger, pyswigobj) \
 		\
 		objpointer->AddRef();\
 	} else {\
-		pyswigobj = Py_None;\
+		pyswigobj.reset(Py_None); \
 	    Py_INCREF(Py_None);\
 	}\
 }
 
 #define BUILD_SWIG_TYPE(pyswigobj, type) {\
-	pyswigobj = SWIG_TypeQuery(type);\
+	pyswigobj = SWIG_TypeQuery(type); \
 	if (!pyswigobj) {\
-		assertbreak();\
-		hr = S_FALSE;\
-		goto exit;\
+		assert(false);\
+		return S_FALSE;\
 	}\
 }
 
@@ -74,16 +63,16 @@ static HRESULT PyHandleError(ECLogger *lpLogger, PyObject *pyobj)
 		PyObject *lpErr = PyErr_Occurred();
 		if(lpErr) {
 			PyObjectAPtr ptype, pvalue, ptraceback;
-			PyErr_Fetch(&ptype, &pvalue, &ptraceback);
-			
-			PyTracebackObject* traceback = (PyTracebackObject*)(*ptraceback);
-			
+			PyErr_Fetch(&~ptype, &~pvalue, &~ptraceback);
+			auto traceback = reinterpret_cast<PyTracebackObject *>(ptraceback.get());
 			const char *pStrErrorMessage = "Unknown";
 			const char *pStrType = "Unknown";
 
-			if (*pvalue) pStrErrorMessage = PyString_AsString(pvalue);
-			if (*ptype) pStrType = PyString_AsString(ptype);
-			
+			if (pvalue != nullptr)
+				pStrErrorMessage = PyString_AsString(pvalue.get());
+			if (ptype != nullptr)
+				pStrType = PyString_AsString(ptype.get());
+
 			if (lpLogger)
 			{
 				lpLogger->Log(EC_LOGLEVEL_ERROR, "  Python type: %s", pStrType);
@@ -107,7 +96,7 @@ static HRESULT PyHandleError(ECLogger *lpLogger, PyObject *pyobj)
 
 			PyErr_Clear();
 		} 
-		assertbreak(); 
+		assert(false); 
 		hr = S_FALSE; 
 	}
 
@@ -117,13 +106,13 @@ static HRESULT PyHandleError(ECLogger *lpLogger, PyObject *pyobj)
 #define PY_HANDLE_ERROR(logger, pyobj) { \
 	hr = PyHandleError(logger, pyobj);\
 	if (hr != hrSuccess) \
-		goto exit; \
+		return hr; \
 }
 
 #define PY_CALL_METHOD(pluginmanager, functionname, returnmacro, format, ...) {\
 	PyObjectAPtr ptrResult;\
 	{\
-		ptrResult = PyObject_CallMethod(pluginmanager, const_cast<char *>(functionname), const_cast<char *>(format), __VA_ARGS__);\
+		ptrResult.reset(PyObject_CallMethod(pluginmanager, const_cast<char *>(functionname), const_cast<char *>(format), __VA_ARGS__)); \
 		PY_HANDLE_ERROR(m_lpLogger, ptrResult)\
 		\
 		returnmacro\
@@ -142,25 +131,10 @@ static HRESULT PyHandleError(ECLogger *lpLogger, PyObject *pyobj)
 	} \
 }
 
-PyMapiPlugin::PyMapiPlugin(void)
-{
-	m_lpLogger = NULL;
-
-	type_p_ECLogger = NULL;
-	type_p_IAddrBook = NULL;
-	type_p_IMAPIFolder = NULL;
-	type_p_IMAPISession = NULL;
-	type_p_IMsgStore = NULL;
-	type_p_IMessage = NULL;
-	type_p_IExchangeModifyTable = NULL;
-}
-
 PyMapiPlugin::~PyMapiPlugin(void)
 { 
-	if (m_lpLogger) {
+	if (m_lpLogger != nullptr)
 		m_lpLogger->Release();
-		m_lpLogger = NULL;
-	}
 }
 
 /**
@@ -181,8 +155,7 @@ HRESULT PyMapiPlugin::Init(ECLogger *lpLogger, PyObject *lpModMapiPlugin, const 
 	std::string		strEnvPython;
 
 	if (!lpModMapiPlugin)
-		goto exit;
-		
+		return S_OK;
 	m_lpLogger = lpLogger;
 	if (m_lpLogger)
 		m_lpLogger->AddRef();
@@ -200,16 +173,12 @@ HRESULT PyMapiPlugin::Init(ECLogger *lpLogger, PyObject *lpModMapiPlugin, const 
 	NEW_SWIG_INTERFACE_POINTER_OBJ(ptrPyLogger, m_lpLogger, type_p_ECLogger);
 
 	// Init plugin class	
-	ptrClass = PyObject_GetAttrString(lpModMapiPlugin, (char*)lpPluginManagerClassName);
+	ptrClass.reset(PyObject_GetAttrString(lpModMapiPlugin, /*char* */lpPluginManagerClassName));
 	PY_HANDLE_ERROR(m_lpLogger, ptrClass);
-
-	ptrArgs  = Py_BuildValue("(sO)", lpPluginPath, *ptrPyLogger);
+	ptrArgs.reset(Py_BuildValue("(sO)", lpPluginPath, ptrPyLogger.get()));
 	PY_HANDLE_ERROR(m_lpLogger, ptrArgs);
-
-	m_ptrMapiPluginManager = PyObject_CallObject(ptrClass, ptrArgs);
+	m_ptrMapiPluginManager.reset(PyObject_CallObject(ptrClass, ptrArgs));
 	PY_HANDLE_ERROR(m_lpLogger, m_ptrMapiPluginManager);
-
-exit:
 	return hr;
 }
 
@@ -234,17 +203,11 @@ HRESULT PyMapiPlugin::MessageProcessing(const char *lpFunctionName, IMAPISession
 	PyObjectAPtr ptrPySession, ptrPyAddrBook, ptrPyStore, ptrPyMessage, ptrPyFolderInbox;
 
 	if (!m_ptrMapiPluginManager)
-		goto exit;
-
-	if (!lpFunctionName || !lpMapiSession || !lpAdrBook) {
-		hr = MAPI_E_INVALID_PARAMETER; 
-		goto exit;
-	}
-
-	if (!m_ptrMapiPluginManager) {
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
-	}
+		return hrSuccess;
+	if (!lpFunctionName || !lpMapiSession || !lpAdrBook)
+		return MAPI_E_INVALID_PARAMETER; 
+	if (!m_ptrMapiPluginManager)
+		return MAPI_E_CALL_FAILED;
 
 	NEW_SWIG_INTERFACE_POINTER_OBJ(ptrPySession, lpMapiSession, type_p_IMAPISession)
 	NEW_SWIG_INTERFACE_POINTER_OBJ(ptrPyAddrBook, lpAdrBook, type_p_IAddrBook)
@@ -253,9 +216,10 @@ HRESULT PyMapiPlugin::MessageProcessing(const char *lpFunctionName, IMAPISession
 	NEW_SWIG_INTERFACE_POINTER_OBJ(ptrPyMessage, lpMessage, type_p_IMessage)
 
 	// Call the python function and get the (hr) return code back
-	PY_CALL_METHOD(m_ptrMapiPluginManager, (char*)lpFunctionName, PY_PARSE_TUPLE_HELPER("I", lpulResult), "OOOOO", *ptrPySession, *ptrPyAddrBook, *ptrPyStore, *ptrPyFolderInbox, *ptrPyMessage);
-
-exit:
+	PY_CALL_METHOD(m_ptrMapiPluginManager, const_cast<char *>(lpFunctionName),
+		PY_PARSE_TUPLE_HELPER("I", lpulResult), "OOOOO",
+		ptrPySession.get(), ptrPyAddrBook.get(), ptrPyStore.get(),
+		ptrPyFolderInbox.get(), ptrPyMessage.get());
 	return hr;
 }
 
@@ -272,26 +236,21 @@ HRESULT PyMapiPlugin::RulesProcessing(const char *lpFunctionName, IMAPISession *
     PyObjectAPtr  ptrPySession, ptrPyAddrBook, ptrPyStore, ptrEMTIn;
 
 	if (!m_ptrMapiPluginManager)
-		goto exit;
-
-	if (!lpFunctionName || !lpMapiSession || !lpAdrBook || !lpEMTRules) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if (!m_ptrMapiPluginManager) {
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
-	}
+		return hrSuccess;
+	if (!lpFunctionName || !lpMapiSession || !lpAdrBook || !lpEMTRules)
+		return MAPI_E_INVALID_PARAMETER;
+	if (!m_ptrMapiPluginManager)
+		return MAPI_E_CALL_FAILED;
 	
 	NEW_SWIG_INTERFACE_POINTER_OBJ(ptrPySession, lpMapiSession, type_p_IMAPISession)
 	NEW_SWIG_INTERFACE_POINTER_OBJ(ptrPyAddrBook, lpAdrBook, type_p_IAddrBook)
 	NEW_SWIG_INTERFACE_POINTER_OBJ(ptrPyStore, lpMsgStore, type_p_IMsgStore)
 	NEW_SWIG_INTERFACE_POINTER_OBJ(ptrEMTIn, lpEMTRules, type_p_IExchangeModifyTable)
 
-	PY_CALL_METHOD(m_ptrMapiPluginManager, ((char*)lpFunctionName), PY_PARSE_TUPLE_HELPER("I", lpulResult), "OOOO", *ptrPySession, *ptrPyAddrBook, *ptrPyStore, *ptrEMTIn);
-
-exit:
+	PY_CALL_METHOD(m_ptrMapiPluginManager, const_cast<char *>(lpFunctionName),
+		PY_PARSE_TUPLE_HELPER("I", lpulResult), "OOOO",
+		ptrPySession.get(), ptrPyAddrBook.get(), ptrPyStore.get(),
+		ptrEMTIn.get());
 	return hr;
 }
 
@@ -301,17 +260,11 @@ HRESULT PyMapiPlugin::RequestCallExecution(const char *lpFunctionName, IMAPISess
 	PyObjectAPtr  ptrPySession, ptrPyAddrBook, ptrPyStore, ptrFolder, ptrMessage;
 
 	if (!m_ptrMapiPluginManager)
-		goto exit;
-
-	if (!lpFunctionName || !lpMapiSession || !lpAdrBook || !lpulDoCallexe) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if (!m_ptrMapiPluginManager) {
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
-	}
+		return hrSuccess;
+	if (!lpFunctionName || !lpMapiSession || !lpAdrBook || !lpulDoCallexe)
+		return MAPI_E_INVALID_PARAMETER;
+	if (!m_ptrMapiPluginManager)
+		return MAPI_E_CALL_FAILED;
 
 	NEW_SWIG_INTERFACE_POINTER_OBJ(ptrPySession, lpMapiSession, type_p_IMAPISession)
 	NEW_SWIG_INTERFACE_POINTER_OBJ(ptrPyAddrBook, lpAdrBook, type_p_IAddrBook)
@@ -319,17 +272,12 @@ HRESULT PyMapiPlugin::RequestCallExecution(const char *lpFunctionName, IMAPISess
 	NEW_SWIG_INTERFACE_POINTER_OBJ(ptrFolder, lpFolder, type_p_IMAPIFolder)
 	NEW_SWIG_INTERFACE_POINTER_OBJ(ptrMessage, lpMessage, type_p_IMessage)
 
-	PY_CALL_METHOD(m_ptrMapiPluginManager, ((char*)lpFunctionName), PY_PARSE_TUPLE_HELPER("I|I", lpulResult, lpulDoCallexe), "OOOOO", *ptrPySession, *ptrPyAddrBook, *ptrPyStore, *ptrFolder, *ptrMessage);
-
-exit:
+	PY_CALL_METHOD(m_ptrMapiPluginManager, const_cast<char *>(lpFunctionName),
+		PY_PARSE_TUPLE_HELPER("I|I", lpulResult, lpulDoCallexe), "OOOOO",
+		ptrPySession.get(), ptrPyAddrBook.get(), ptrPyStore.get(),
+		ptrFolder.get(), ptrMessage.get());
 	return hr;
 }
-
-PyMapiPluginFactory::PyMapiPluginFactory()
-	: m_ptrModMapiPlugin(NULL)
-	, m_bEnablePlugin(false)
-	, m_lpLogger(NULL)
-{ }
 
 PyMapiPluginFactory::~PyMapiPluginFactory()
 {
@@ -337,11 +285,8 @@ PyMapiPluginFactory::~PyMapiPluginFactory()
 		m_ptrModMapiPlugin = NULL;
 		Py_Finalize();
 	}
-	
-	if (m_lpLogger) {
+	if (m_lpLogger != nullptr)
 		m_lpLogger->Release();
-		m_lpLogger = NULL;
-	}
 }
 
 HRESULT PyMapiPluginFactory::Init(ECConfig* lpConfig, ECLogger *lpLogger)
@@ -358,7 +303,7 @@ HRESULT PyMapiPluginFactory::Init(ECConfig* lpConfig, ECLogger *lpLogger)
 
 	m_bEnablePlugin = parseBool(lpConfig->GetSetting("plugin_enabled", NULL, "no"));
 	if (!m_bEnablePlugin)
-		goto exit;
+		return S_OK;
 
 	m_strPluginPath = lpConfig->GetSetting("plugin_path");
 
@@ -373,42 +318,26 @@ HRESULT PyMapiPluginFactory::Init(ECConfig* lpConfig, ECLogger *lpLogger)
 	lpLogger->Log(EC_LOGLEVEL_DEBUG, "PYTHONPATH = %s", strEnvPython.c_str());
 
 	Py_Initialize();
-
-	ptrModule = PyImport_ImportModule("MAPI");
+	ptrModule.reset(PyImport_ImportModule("MAPI"));
 	PY_HANDLE_ERROR(m_lpLogger, ptrModule);
 
 	// Import python plugin framework
 	// @todo error unable to find file xxx
-	ptrName = PyString_FromString("mapiplugin");
-
-	m_ptrModMapiPlugin = PyImport_Import(ptrName);
+	ptrName.reset(PyString_FromString("mapiplugin"));
+	m_ptrModMapiPlugin.reset(PyImport_Import(ptrName));
 	PY_HANDLE_ERROR(m_lpLogger, m_ptrModMapiPlugin);
-
-exit:
 	return hr;
 }
 
 HRESULT PyMapiPluginFactory::CreatePlugin(const char* lpPluginManagerClassName, PyMapiPlugin **lppPlugin)
 {
 	HRESULT hr = S_OK;
-	PyMapiPlugin *lpPlugin = NULL;
-	
-	try {
-		lpPlugin = new PyMapiPlugin();
-	} catch (const std::bad_alloc &) {
-		hr = MAPI_E_NOT_ENOUGH_MEMORY;
-		goto exit;
-	}
-	
+	std::unique_ptr<PyMapiPlugin> lpPlugin(new(std::nothrow) PyMapiPlugin);
+	if (lpPlugin == nullptr)
+		return MAPI_E_NOT_ENOUGH_MEMORY;
 	hr = lpPlugin->Init(m_lpLogger, m_ptrModMapiPlugin, lpPluginManagerClassName, m_strPluginPath.c_str());
 	if (hr != S_OK)
-		goto exit;
-		
-	*lppPlugin = lpPlugin;
-	lpPlugin = NULL;
-	
-exit:
-	delete lpPlugin;
-
-	return hr;
+		return hr;
+	*lppPlugin = lpPlugin.release();
+	return S_OK;
 }

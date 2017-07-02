@@ -18,9 +18,10 @@
 #ifndef ECSYNCSETTINGS_INCLUDED
 #define ECSYNCSETTINGS_INCLUDED
 
-#include "ECLibSync.h"
-#include <pthread.h>
+#include <mutex>
+#include <kopano/zcdefs.h>
 
+namespace KC {
 
 #define EC_SYNC_OPT_STREAM			1
 #define EC_SYNC_OPT_CHANGENOTIF		2
@@ -29,8 +30,7 @@
 #define EC_SYNC_OPT_ALL				(EC_SYNC_OPT_STREAM | EC_SYNC_OPT_CHANGENOTIF | EC_SYNC_OPT_STATECOLLECT)
 
 
-class ECLIBSYNC_API ECSyncSettings
-{
+class _kc_export ECSyncSettings _kc_final {
 public:
 	static ECSyncSettings* GetInstance();
 
@@ -58,24 +58,21 @@ public:
 	ULONG	SetStreamBatchSize(ULONG ulBatchSize);
 
 private:
-	ECSyncSettings();
+	_kc_hidden ECSyncSettings(void);
 
-private:
-	ULONG	m_ulSyncLog;
-	ULONG	m_ulSyncLogLevel;
-	ULONG	m_ulSyncOpts;
-	ULONG	m_ulStreamTimeout;
-	ULONG	m_ulStreamBufferSize;
-	ULONG	m_ulStreamBatchSize;
+	ULONG m_ulSyncLog = 0, m_ulSyncLogLevel;
+	ULONG m_ulSyncOpts = EC_SYNC_OPT_ALL, m_ulStreamTimeout = 30000;
+	ULONG m_ulStreamBufferSize = 131072, m_ulStreamBatchSize = 256;
 
-	static pthread_mutex_t s_hMutex;
+	static std::mutex s_hMutex;
 	static ECSyncSettings *s_lpInstance;
 
-	struct __initializer {
-		__initializer();
+	struct _kc_hidden __initializer {
 		~__initializer();
 	};
 	static __initializer __i;
 };
+
+} /* namespace */
 
 #endif // ndef ECSYNCSETTINGS_INCLUDED

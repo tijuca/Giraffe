@@ -18,11 +18,7 @@
 #ifndef mapi_ptr_INCLUDED
 #define mapi_ptr_INCLUDED
 
-#include <kopano/mapi_ptr/mapi_object_ptr.h>
-#include <kopano/mapi_ptr/mapi_memory_ptr.h>
-#include <kopano/mapi_ptr/mapi_array_ptr.h>
-#include <kopano/mapi_ptr/mapi_rowset_ptr.h>
-
+#include <kopano/memory.hpp>
 #include <mapix.h>
 #include <mapispi.h>
 #include <edkmdb.h>
@@ -34,55 +30,67 @@
 #include <kopano/ECGuid.h>
 #include <kopano/mapiguidext.h>
 
-typedef mapi_object_ptr<IABContainer, IID_IABContainer> ABContainerPtr;
-typedef mapi_object_ptr<IAddrBook, IID_IAddrBook> AddrBookPtr;
-typedef mapi_object_ptr<IDistList, IID_IDistList> DistListPtr;
-typedef mapi_object_ptr<IECSecurity, IID_IECSecurity> ECSecurityPtr;
-typedef mapi_object_ptr<IECServiceAdmin, IID_IECServiceAdmin> ECServiceAdminPtr;
-typedef mapi_object_ptr<IECSingleInstance, IID_IECSingleInstance> ECSingleInstancePtr;
-typedef mapi_object_ptr<IExchangeManageStore, IID_IExchangeManageStore> ExchangeManageStorePtr;
-typedef mapi_object_ptr<IExchangeModifyTable, IID_IExchangeModifyTable> ExchangeModifyTablePtr;
-typedef mapi_object_ptr<IExchangeExportChanges, IID_IExchangeExportChanges> ExchangeExportChangesPtr;
-typedef mapi_object_ptr<IMAPIAdviseSink, IID_IMAPIAdviseSink> MAPIAdviseSinkPtr;
-typedef mapi_object_ptr<IMAPIContainer, IID_IMAPIContainer> MAPIContainerPtr;
-typedef mapi_object_ptr<IMAPIFolder, IID_IMAPIFolder> MAPIFolderPtr;
-typedef mapi_object_ptr<IMAPIProp, IID_IMAPIProp> MAPIPropPtr;
-typedef mapi_object_ptr<IMAPISession, IID_IMAPISession> MAPISessionPtr;
-typedef mapi_object_ptr<IMAPITable, IID_IMAPITable> MAPITablePtr;
-typedef mapi_object_ptr<IMailUser, IID_IMailUser> MailUserPtr;
-typedef mapi_object_ptr<IMessage, IID_IMessage> MessagePtr;
-typedef mapi_object_ptr<IMsgServiceAdmin, IID_IMsgServiceAdmin> MsgServiceAdminPtr;
-typedef mapi_object_ptr<IMsgStore, IID_IMsgStore> MsgStorePtr;
-typedef mapi_object_ptr<IProfAdmin, IID_IProfAdmin> ProfAdminPtr;
-typedef mapi_object_ptr<IProfSect, IID_IProfSect> ProfSectPtr;
-typedef mapi_object_ptr<IProviderAdmin, IID_IProviderAdmin> ProviderAdminPtr;
-typedef mapi_object_ptr<IUnknown, IID_IUnknown> UnknownPtr;
-typedef mapi_object_ptr<IStream, IID_IStream> StreamPtr;
-typedef mapi_object_ptr<IAttach, IID_IAttachment> AttachPtr;
-typedef mapi_object_ptr<IMAPIGetSession, IID_IMAPIGetSession> MAPIGetSessionPtr;
+namespace KC {
 
-typedef mapi_memory_ptr<ECPERMISSION> ECPermissionPtr;
-typedef mapi_memory_ptr<ENTRYID> EntryIdPtr;
-typedef mapi_memory_ptr<ENTRYLIST> EntryListPtr;
-typedef mapi_memory_ptr<MAPIERROR> MAPIErrorPtr;
-typedef mapi_memory_ptr<ROWLIST> RowListPtr;
-typedef mapi_memory_ptr<SPropProblemArray> SPropProblemArrayPtr;
-typedef mapi_memory_ptr<SPropValue> SPropValuePtr;
-typedef mapi_memory_ptr<SPropTagArray> SPropTagArrayPtr;
-typedef mapi_memory_ptr<SRestriction> SRestrictionPtr;
-typedef mapi_memory_ptr<SRow> SRowPtr;
-typedef mapi_memory_ptr<SSortOrderSet> SSortOrderSetPtr;
-typedef mapi_memory_ptr<char> StringPtr;
-typedef mapi_memory_ptr<WCHAR> WStringPtr;
-typedef mapi_memory_ptr<FlagList> FlagListPtr;
-typedef mapi_memory_ptr<SBinary> SBinaryPtr;
-typedef mapi_memory_ptr<BYTE> BytePtr;
-typedef mapi_memory_ptr<MAPINAMEID> MAPINameIdPtr;
+typedef KCHL::object_ptr<IABContainer, IID_IABContainer> ABContainerPtr;
+typedef KCHL::object_ptr<IAddrBook, IID_IAddrBook> AddrBookPtr;
+typedef KCHL::object_ptr<IDistList, IID_IDistList> DistListPtr;
+typedef KCHL::object_ptr<IECSecurity, IID_IECSecurity> ECSecurityPtr;
+typedef KCHL::object_ptr<IECServiceAdmin, IID_IECServiceAdmin> ECServiceAdminPtr;
+typedef KCHL::object_ptr<IECSingleInstance, IID_IECSingleInstance> ECSingleInstancePtr;
+typedef KCHL::object_ptr<IExchangeManageStore, IID_IExchangeManageStore> ExchangeManageStorePtr;
+typedef KCHL::object_ptr<IExchangeModifyTable, IID_IExchangeModifyTable> ExchangeModifyTablePtr;
+typedef KCHL::object_ptr<IExchangeExportChanges, IID_IExchangeExportChanges> ExchangeExportChangesPtr;
+typedef KCHL::object_ptr<IMAPIAdviseSink, IID_IMAPIAdviseSink> MAPIAdviseSinkPtr;
+typedef KCHL::object_ptr<IMAPIContainer, IID_IMAPIContainer> MAPIContainerPtr;
+typedef KCHL::object_ptr<IMAPIFolder, IID_IMAPIFolder> MAPIFolderPtr;
+typedef KCHL::object_ptr<IMAPIProp, IID_IMAPIProp> MAPIPropPtr;
+typedef KCHL::object_ptr<IMAPISession, IID_IMAPISession> MAPISessionPtr;
+typedef KCHL::object_ptr<IMAPITable, IID_IMAPITable> MAPITablePtr;
+typedef KCHL::object_ptr<IMailUser, IID_IMailUser> MailUserPtr;
+typedef KCHL::object_ptr<IMessage, IID_IMessage> MessagePtr;
+typedef KCHL::object_ptr<IMsgServiceAdmin, IID_IMsgServiceAdmin> MsgServiceAdminPtr;
+typedef KCHL::object_ptr<IMsgStore, IID_IMsgStore> MsgStorePtr;
+typedef KCHL::object_ptr<IProfAdmin, IID_IProfAdmin> ProfAdminPtr;
+typedef KCHL::object_ptr<IProfSect, IID_IProfSect> ProfSectPtr;
+typedef KCHL::object_ptr<IProviderAdmin, IID_IProviderAdmin> ProviderAdminPtr;
+typedef KCHL::object_ptr<IUnknown, IID_IUnknown> UnknownPtr;
+typedef KCHL::object_ptr<IStream, IID_IStream> StreamPtr;
+typedef KCHL::object_ptr<IAttach, IID_IAttachment> AttachPtr;
+typedef KCHL::object_ptr<IMAPIGetSession, IID_IMAPIGetSession> MAPIGetSessionPtr;
 
-typedef mapi_array_ptr<ECPERMISSION> ECPermissionArrayPtr;
-typedef mapi_array_ptr<SPropValue> SPropArrayPtr;
+typedef KCHL::memory_ptr<ECPERMISSION> ECPermissionPtr;
+typedef KCHL::memory_ptr<ENTRYID> EntryIdPtr;
+typedef KCHL::memory_ptr<ENTRYLIST> EntryListPtr;
+typedef KCHL::memory_ptr<MAPIERROR> MAPIErrorPtr;
+typedef KCHL::memory_ptr<ROWLIST> RowListPtr;
+typedef KCHL::memory_ptr<SPropProblemArray> SPropProblemArrayPtr;
+typedef KCHL::memory_ptr<SPropValue> SPropValuePtr;
+typedef KCHL::memory_ptr<SPropTagArray> SPropTagArrayPtr;
+typedef KCHL::memory_ptr<SRestriction> SRestrictionPtr;
+typedef KCHL::memory_ptr<SRow> SRowPtr;
+typedef KCHL::memory_ptr<SSortOrderSet> SSortOrderSetPtr;
+typedef KCHL::memory_ptr<char> StringPtr;
+typedef KCHL::memory_ptr<WCHAR> WStringPtr;
+typedef KCHL::memory_ptr<FlagList> FlagListPtr;
+typedef KCHL::memory_ptr<SBinary> SBinaryPtr;
+typedef KCHL::memory_ptr<BYTE> BytePtr;
+typedef KCHL::memory_ptr<MAPINAMEID> MAPINameIdPtr;
 
-typedef mapi_rowset_ptr<SRow> SRowSetPtr;
-typedef mapi_rowset_ptr<ADRENTRY> AdrListPtr;
+typedef KCHL::memory_ptr<ECPERMISSION> ECPermissionArrayPtr;
+typedef KCHL::memory_ptr<SPropValue> SPropArrayPtr;
+
+class SRowSetPtr : public KCHL::memory_ptr<SRowSet, KCHL::rowset_delete> {
+	public:
+	typedef unsigned int size_type;
+	SRowSetPtr(void) = default;
+	SRowSetPtr(SRowSet *p) : KCHL::rowset_ptr(p) {}
+	SRowSet **operator&(void) { return &~*this; }
+	size_type size(void) const { return (*this)->cRows; }
+	const SRow &operator[](size_t i) const { return (*this)->aRow[i]; }
+	bool empty(void) const { return (*this)->cRows == 0; }
+};
+
+} /* namespace */
 
 #endif // ndef mapi_ptr_INCLUDED

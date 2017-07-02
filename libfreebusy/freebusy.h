@@ -102,6 +102,8 @@ information and delegate access to accounts.
 #include <mapix.h>
 #include <mapidefs.h>
 
+namespace KC {
+
 /**
  * Defines a free/busy event block. This is one block of a array of FBEvent blocks
  * 
@@ -109,8 +111,7 @@ information and delegate access to accounts.
  *
  * @todo rename sfbEvent to FBEvent
  */
-typedef struct tagFBEvent
-{
+struct sfbEvent {
 	short rtmStart;		/**< The start time is the number of minutes 
 							between 12 AM Coordinated Universal Time (UTC) of the 
 							first day of the month and the start time of the event
@@ -118,7 +119,7 @@ typedef struct tagFBEvent
 	short rtmEnd;		/**< The end time is the number of minutes between 12 AM UTC of 
 							 the first day of the month and the end time of the event 
 							 in UTC */
-} sfbEvent;
+};
 
 #define FB_DATE(yearmonth,daytime)	((((ULONG)(unsigned short)(yearmonth))<<16)|((ULONG)(unsigned short)(daytime)))
 
@@ -131,8 +132,7 @@ typedef struct tagFBEvent
  * The free/busy status of a block of time determines how it is displayed on a 
  * calendar: Free, Busy, Tentative, or Out of Office.
  */
-enum FBStatus
-{
+enum FBStatus {
 	fbFree	= 0,					/**< Free */
 	fbTentative = fbFree + 1,		/**< Tentative */
 	fbBusy	= fbTentative + 1,		/**< Busy */
@@ -144,35 +144,34 @@ enum FBStatus
  * Defines a free/busy block of data. This is an item on a calendar represented by
  * an appointment or meeting request.
  */
-typedef struct tagFBBlock_1
-{
+struct FBBlock_1 {
 	LONG m_tmStart;			/**< Start time for the block, expressed in relative time. */
 	LONG m_tmEnd;			/**< End time for the block, expressed in relative time. */
 	FBStatus m_fbstatus;	/**< Free/busy status for this block, indicating whether the user is 
 								out-of-office, busy, tentative, or free, during the time period 
 								between m_tmStart and m_tmEnd. */
-} FBBlock_1, *LPFBBlock_1;
+};
+typedef struct FBBlock_1 *LPFBBlock_1;
 
 /**
  * Extends the free/busy block of data. It also stores the basedate of occurrence
  * for exceptions. For normal occurrences base date is same as start date
  */
-typedef struct tagOccrInfo
-{
+struct OccrInfo {
 	FBBlock_1 fbBlock;
 	time_t tBaseDate;
-} OccrInfo;
+};
 
 /** 
  * Identifies a user that may or may not have free/busy data available.
  */
-typedef struct tagFBUser
-{
+struct FBUser {
 	ULONG m_cbEid;			/**< The length of the entry ID of the mail user as represented by the IMailUser interface. */
 	LPENTRYID m_lpEid;		/**< The entry ID of the mail user as represented by the IMailUser interface. */
 	ULONG m_ulReserved;		/**< This parameter is reserved for Outlook internal use and is not supported. */
 	LPWSTR m_pwszReserved;	/**< This parameter is reserved for Outlook internal use and is not supported.*/
-} FBUser, *LPFBUser;
+};
+typedef struct FBUser *LPFBUser;
 
 /**
  * @interface IFreeBusyUpdate
@@ -182,8 +181,7 @@ typedef struct tagFBUser
  * Provided by: Free/busy provider 
  * Interface identifier: IID_IFreeBusyUpdate
  */
-class IFreeBusyUpdate : public IUnknown
-{
+class IFreeBusyUpdate : public IUnknown {
 public:
 	/**
 	 * Unknown function, Possible reload the freebusydata ?
@@ -627,16 +625,6 @@ public:
 	 * This member not supported must return E_NOTIMPL.
 	 */
 	virtual HRESULT __stdcall PushDelegateInfoToWorkspace() = 0;
-
-	/**
-	 * This member not supported must return S_OK.
-	 */
-	virtual HRESULT __stdcall Placeholder21(void *, HWND, BOOL ) = 0;
-
-	/**
-	 * This member not supported must return S_OK.
-	 */
-	virtual HRESULT __stdcall Placeholder22() = 0;
 };
 
 /**
@@ -732,13 +720,9 @@ public:
 
 	/*! @copydoc IFreeBusySupport::PushDelegateInfoToWorkspace */
 	virtual HRESULT __stdcall PushDelegateInfoToWorkspace() = 0;
-
-	/*! @copydoc IFreeBusySupport::Placeholder21 */
-	virtual HRESULT __stdcall Placeholder21(void *, HWND, BOOL ) = 0;
-
-	/*! @copydoc IFreeBusySupport::Placeholder22 */
-	virtual HRESULT __stdcall Placeholder22() = 0;
 };
+
+} /* namespace */
 
 #endif // FREEBUSY_INCLUDED
 

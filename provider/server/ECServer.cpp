@@ -16,6 +16,7 @@
  */
 
 #include "config.h"
+#include <kopano/zcdefs.h>
 #include <kopano/platform.h>
 #include <kopano/ecversion.h>
 #include <kopano/stringutil.h>
@@ -24,6 +25,7 @@
 
 #include "ECDatabase.h"
 #include "ECDatabaseFactory.h"
+#include "ECDatabaseUpdate.h"
 #include "ECDatabaseUtils.h"
 #include <kopano/ECLogger.h>
 
@@ -49,33 +51,27 @@
 #include "ECSoapServerConnection.h"
 #include <libintl.h>
 #include <map>
-#include <kopano/tstring.h>
 #include <kopano/charset/convstring.h>
-#ifdef ZCP_USES_ICU
+#ifdef KC_USES_ICU
 #include <unicode/uclean.h>
 #endif
 
 #include "TmpPath.h"
+#include "ECICS.h"
+#include <openssl/ssl.h>
 
 // The following value is based on:
 // http://dev.mysql.com/doc/refman/5.0/en/server-system-variables.html#sysvar_thread_stack
 // Since the remote MySQL server can be 32 or 64 bit we'll just go with the value specified
-// for 64bit architectures.
-// We could use the 'version_compile_machine' variable, but I'm not sure if 32bit versions
-// will ever be build on 64bit machines and what that variable does. Plus we would need a
-// list of all possible 32bit architectures because if the architecture is unknown we'll
-// have to go with the safe value which is for 64bit.
+// for 64-bit architectures.
+// We could use the 'version_compile_machine' variable, but I'm not sure if 32-bit versions
+// will ever be build on 64-bit machines and what that variable does. Plus we would need a
+// list of all possible 32-bit architectures because if the architecture is unknown we'll
+// have to go with the safe value which is for 64-bit.
 #define MYSQL_MIN_THREAD_STACK (256*1024)
 
 const char upgrade_lock_file[] = "/tmp/kopano-upgrade-lock";
 
-extern ECSessionManager*    g_lpSessionManager;
-
-// scheduled functions
-void* SoftDeleteRemover(void* lpTmpMain);
-void* CleanupSyncsTable(void* lpTmpMain);
-void* CleanupChangesTable(void* lpTmpMain);
-void *CleanupSyncedMessagesTable(void *lpTmpMain);
 // Reports information on the current state of the license
 void* ReportLicense(void *);
 
@@ -84,7 +80,6 @@ static int running_server(char *, const char *, int, char **, int, char **);
 int					g_Quit = 0;
 int					daemonize = 1;
 int					restart_searches = 0;
-int					searchfolder_restart_required = 0; //HACK for rebuild the searchfolders with an upgrade
 bool				m_bIgnoreDatabaseVersionConflict = false;
 bool				m_bIgnoreAttachmentStorageConflict = false;
 bool				m_bIgnoreDistributedKopanoConflict = false;
@@ -99,49 +94,37 @@ ECLogger*			g_lpAudit = NULL;
 ECScheduler*		g_lpScheduler = NULL;
 ECSoapServerConnection*	g_lpSoapServerConn = NULL;
 
-pthread_t	signal_thread;
-sigset_t	signal_mask;
-bool 		m_bNPTL = true;
 bool m_bDatabaseUpdateIgnoreSignals = false;
 
 // This is the callback function for libserver/* so that it can notify that a delayed soap
 // request has been handled.
-void kopano_notify_done(struct soap *soap)
+static void kcsrv_notify_done(struct soap *soap)
 {
     g_lpSoapServerConn->NotifyDone(soap);
 }
 
 // Called from ECStatsTables to get server stats
-void kopano_get_server_stats(unsigned int *lpulQueueLength,
+static void kcsrv_get_server_stats(unsigned int *lpulQueueLength,
     double *lpdblAge, unsigned int *lpulThreadCount,
     unsigned int *lpulIdleThreads)
 {
     g_lpSoapServerConn->GetStats(lpulQueueLength, lpdblAge, lpulThreadCount, lpulIdleThreads);
 }
 
-/** 
- * actual signal handler, direct entry point if only linuxthreads is available.
- * 
- * @param[in] sig signal received
- */
 static void process_signal(int sig)
 {
+	ec_log_debug("Received signal %d", sig);
 	ZLOG_AUDIT(g_lpAudit, "server signalled sig=%d", sig);
 
-	if (!m_bNPTL)
-	{
-		// Win32 has unix semantics and therefore requires us to reset the signal handler.
-		signal(sig, process_signal);
-		if(pthread_equal(pthread_self(), mainthread)==0)
-			return;					// soap threads do not handle this signal
-	}
-
 	if (m_bDatabaseUpdateIgnoreSignals) {
-		g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "WARNING: Database upgrade is taking place.");
-		g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "  Please be patient, and do not try to kill the server process.");
-		g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "  It may leave your database in an inconsistent state.");
+		ec_log_notice("WARNING: Database upgrade is taking place.");
+		ec_log_notice("  Please be patient, and do not try to kill the server process.");
+		ec_log_notice("  It may leave your database in an inconsistent state.");
 		return;
 	}	
+
+	const char *ll;
+	int new_ll;
 
 	if(g_Quit == 1)
 		return; // already in exit state!
@@ -149,78 +132,44 @@ static void process_signal(int sig)
 	switch (sig) {
 	case SIGINT:
 	case SIGTERM:
-		if(g_lpLogger)
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Shutting down");
-	
+		ec_log_warn("Shutting down");
 		if (g_lpSoapServerConn)
 			g_lpSoapServerConn->ShutDown();
-
-		// unblock the signals so the server can exit
-		sigprocmask(SIG_UNBLOCK, &signal_mask, NULL);
-		signal(SIGPIPE, SIG_IGN);
-		signal(SIGTERM, SIG_IGN);
-		signal(SIGINT, SIG_IGN);
-
 		g_Quit = 1;
 
 		break;
 	case SIGHUP:
-		{
-			// g_lpSessionManager only present when kopano_init is called (last init function), signals are initialized much earlier
-			if (g_lpSessionManager == NULL)
-				return;
+		// g_lpSessionManager only present when kopano_init is called (last init function), signals are initialized much earlier
+		if (g_lpSessionManager == NULL)
+			return;
 
-			if (!g_lpConfig->ReloadSettings())
-				g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to reload configuration file, continuing with current settings.");
-			if (g_lpConfig->HasErrors())
-				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to reload configuration file");
+		if (!g_lpConfig->ReloadSettings())
+			ec_log_warn("Unable to reload configuration file, continuing with current settings.");
+		if (g_lpConfig->HasErrors())
+			ec_log_err("Failed to reload configuration file");
 
-			g_lpSessionManager->GetPluginFactory()->SignalPlugins(sig);
+		g_lpSessionManager->GetPluginFactory()->SignalPlugins(sig);
 
-			const char *ll = g_lpConfig->GetSetting("log_level");
-			int new_ll = ll ? strtol(ll, NULL, 0) : EC_LOGLEVEL_WARNING;
-			g_lpLogger->SetLoglevel(new_ll);
-			g_lpLogger->Reset();
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Log connection was reset");
+		ll = g_lpConfig->GetSetting("log_level");
+		new_ll = ll ? strtol(ll, NULL, 0) : EC_LOGLEVEL_WARNING;
+		g_lpLogger->SetLoglevel(new_ll);
+		g_lpLogger->Reset();
+		ec_log_warn("Log connection was reset");
 
-			if (g_lpAudit) {
-				ll = g_lpConfig->GetSetting("audit_log_level");
-				new_ll = ll ? strtol(ll, NULL, 0) : 1;
-				g_lpAudit->SetLoglevel(new_ll);
-				g_lpAudit->Reset();
-			}
-
-			g_lpStatsCollector->SetTime(SCN_SERVER_LAST_CONFIGRELOAD, time(NULL));
-			g_lpSoapServerConn->DoHUP();
+		if (g_lpAudit) {
+			ll = g_lpConfig->GetSetting("audit_log_level");
+			new_ll = ll ? strtol(ll, NULL, 0) : 1;
+			g_lpAudit->SetLoglevel(new_ll);
+			g_lpAudit->Reset();
 		}
+
+		g_lpStatsCollector->SetTime(SCN_SERVER_LAST_CONFIGRELOAD, time(NULL));
+		g_lpSoapServerConn->DoHUP();
 		break;
 	default:
-		g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unknown signal %d received", sig);
+		ec_log_debug("Unknown signal %d received", sig);
 		break;
 	}
-}
-
-/** 
- * Signal handler thread.
- *
- * @return NULL 
- */
-static void *signal_handler(void *)
-{
-	int sig;
-
-	g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Signal thread started");
-
-	// already blocking signals
-
-	while (!g_Quit && sigwait(&signal_mask, &sig) == 0)
-	{
-		g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Received signal %d", sig);
-		process_signal(sig);
-	}
-	
-	g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Signal thread done");
-	return NULL;
 }
 
 // SIGSEGV catcher
@@ -237,7 +186,7 @@ static ECRESULT check_database_innodb(ECDatabase *lpDatabase)
 	ECRESULT er = erSuccess;
 #ifndef EMBEDDED_MYSQL
 	string strQuery;
-	DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
 	DB_ROW lpRow = NULL;
 
 	// Only supported from mysql 5.0
@@ -246,19 +195,17 @@ static ECRESULT check_database_innodb(ECDatabase *lpDatabase)
 		goto exit;
 
 	while( (lpRow = lpDatabase->FetchRow(lpResult)) ) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Database table '%s' not in InnoDB format: %s", lpRow[0] ? lpRow[0] : "unknown table", lpRow[1] ? lpRow[1] : "unknown engine");
+		ec_log_crit("Database table '%s' not in InnoDB format: %s", lpRow[0] ? lpRow[0] : "unknown table", lpRow[1] ? lpRow[1] : "unknown engine");
 		er = KCERR_DATABASE_ERROR;
 	}
 
 	if (er != erSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Your database was incorrectly created. Please upgrade all tables to the InnoDB format using this query:");
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "  ALTER TABLE <table name> ENGINE='InnoDB';");
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "This process may take a very long time, depending on the size of your database.");
+		ec_log_crit("Your database was incorrectly created. Please upgrade all tables to the InnoDB format using this query:");
+		ec_log_crit("  ALTER TABLE <table name> ENGINE='InnoDB';");
+		ec_log_crit("This process may take a very long time, depending on the size of your database.");
 	}
 	
 exit:
-	if (lpResult)
-		lpDatabase->FreeResult(lpResult);
 #endif
 	return er;
 }
@@ -267,27 +214,25 @@ static ECRESULT check_database_attachments(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
 	string strQuery;
-	DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
 	DB_ROW lpRow = NULL;
 
 	er = lpDatabase->DoSelect("SELECT value FROM settings WHERE name = 'attachment_storage'", &lpResult);
 	if (er != erSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to read from database");
+		ec_log_crit("Unable to read from database");
 		goto exit;
 	}
 
 	lpRow = lpDatabase->FetchRow(lpResult);
-
-	if (lpRow && lpRow[0]) {
-		// check if the mode is the same as last time
-		if (strcmp(lpRow[0], g_lpConfig->GetSetting("attachment_storage")) != 0) {
-			if (!m_bIgnoreAttachmentStorageConflict) {
-				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Attachments are stored with option '%s', but '%s' is selected.", lpRow[0], g_lpConfig->GetSetting("attachment_storage"));
-				er = KCERR_DATABASE_ERROR;
-				goto exit;
-			} else {
-				g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Ignoring attachment storing conflict as requested. Attachments are now stored with option '%s'", g_lpConfig->GetSetting("attachment_storage"));
-			}
+	if (lpRow != nullptr && lpRow[0] != nullptr &&
+	    // check if the mode is the same as last time
+	    strcmp(lpRow[0], g_lpConfig->GetSetting("attachment_storage")) != 0) {
+		if (!m_bIgnoreAttachmentStorageConflict) {
+			ec_log_err("Attachments are stored with option '%s', but '%s' is selected.", lpRow[0], g_lpConfig->GetSetting("attachment_storage"));
+			er = KCERR_DATABASE_ERROR;
+			goto exit;
+		} else {
+			ec_log_warn("Ignoring attachment storing conflict as requested. Attachments are now stored with option '%s'", g_lpConfig->GetSetting("attachment_storage"));
 		}
 	}
 
@@ -296,7 +241,7 @@ static ECRESULT check_database_attachments(ECDatabase *lpDatabase)
 
 	er = lpDatabase->DoInsert(strQuery);
 	if (er != erSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to update database settings");
+		ec_log_err("Unable to update database settings");
 		goto exit;
 	}
 
@@ -310,9 +255,6 @@ static ECRESULT check_database_attachments(ECDatabase *lpDatabase)
 			}
 
 exit:
-	if (lpResult)
-		lpDatabase->FreeResult(lpResult);
-
 	return er;
 }
 
@@ -320,13 +262,13 @@ static ECRESULT check_distributed_kopano(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
 	string strQuery;
-	DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
 	DB_ROW lpRow = NULL;
 	bool bConfigEnabled = parseBool(g_lpConfig->GetSetting("enable_distributed_kopano"));
 
 	er = lpDatabase->DoSelect("SELECT value FROM settings WHERE name = 'lock_distributed_kopano'", &lpResult);
 	if (er != erSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to read from database");
+		ec_log_err("Unable to read from database");
 		goto exit;
 	}
 
@@ -339,18 +281,15 @@ static ECRESULT check_distributed_kopano(ECDatabase *lpDatabase)
 	// If any value is found, distributed is not allowed. The value specifies the reason.
 	if (bConfigEnabled) {
 		if (!m_bIgnoreDistributedKopanoConflict) {
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Multiserver mode is locked, reason: '%s'. Contact Kopano for support.", lpRow[0]);
+			ec_log_crit("Multiserver mode is locked, reason: '%s'. Contact Kopano for support.", lpRow[0]);
 			er = KCERR_DATABASE_ERROR;
 			goto exit;
 		} else {
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Ignoring multiserver mode lock as requested.");
+			ec_log_warn("Ignoring multiserver mode lock as requested.");
 		}
 	}
 
 exit:
-	if (lpResult)
-		lpDatabase->FreeResult(lpResult);
-
 	return er;
 }
 
@@ -367,7 +306,7 @@ static ECRESULT check_attachment_storage_permissions(void)
 
 		tmpfile = fopen(strtestpath.c_str(), "w");
 		if (!tmpfile) {
-			 g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to write attachments to the directory '%s' - %s. Please check the directory and sub directories.",  g_lpConfig->GetSetting("attachment_path"), strerror(errno));
+			 ec_log_err("Unable to write attachments to the directory '%s' - %s. Please check the directory and sub directories.",  g_lpConfig->GetSetting("attachment_path"), strerror(errno));
 			 er = KCERR_NO_ACCESS;
 			 goto exit;
 		}
@@ -385,13 +324,13 @@ static ECRESULT check_database_tproperties_key(ECDatabase *lpDatabase)
 	ECRESULT er = erSuccess;
 	string strQuery, strTable;
 	string::size_type start, end;
-	DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
 	DB_ROW lpRow = NULL;
 
 	strQuery = "SHOW CREATE TABLE `tproperties`";
 	er = lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to read from database");
+		ec_log_err("Unable to read from database");
 		goto exit;
 	}
 
@@ -399,7 +338,7 @@ static ECRESULT check_database_tproperties_key(ECDatabase *lpDatabase)
 
 	lpRow = lpDatabase->FetchRow(lpResult);
 	if (!lpRow || !lpRow[1]) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "No tproperties table definition found");
+		ec_log_crit("No tproperties table definition found");
 		goto exit;
 	}
 
@@ -407,13 +346,13 @@ static ECRESULT check_database_tproperties_key(ECDatabase *lpDatabase)
 
 	start = strTable.find("PRIMARY KEY");
 	if (start == string::npos) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "No primary key found in tproperties table");
+		ec_log_crit("No primary key found in tproperties table");
 		goto exit;
 	}
 
 	end = strTable.find(")", start);
 	if (end == string::npos) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "No end of primary key found in tproperties table");
+		ec_log_crit("No end of primary key found in tproperties table");
 		goto exit;
 	}
 
@@ -429,7 +368,7 @@ static ECRESULT check_database_tproperties_key(ECDatabase *lpDatabase)
 	if (start != string::npos)
 		start = strTable.find_first_of(',', start+1);
 	if (start == string::npos) {
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Primary key of tproperties table incorrect, trying: %s", strTable.c_str());
+		ec_log_warn("Primary key of tproperties table incorrect, trying: %s", strTable.c_str());
 		goto exit;
 	}
 
@@ -438,18 +377,14 @@ static ECRESULT check_database_tproperties_key(ECDatabase *lpDatabase)
 
 	// if not correct...
 	if (strTable.compare("`hierarchyid`,`type`") != 0) {
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "**** WARNING: Installation is not optimal! ****");
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "  The primary key of the tproperties table is incorrect.");
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "  Since updating the primary key on a large table is slow, the server will not automatically update this for you.");
+		ec_log_warn("**** WARNING: Installation is not optimal! ****");
+		ec_log_warn("  The primary key of the tproperties table is incorrect.");
+		ec_log_warn("  Since updating the primary key on a large table is slow, the server will not automatically update this for you.");
 	}
 
 	er = erSuccess;
 
 exit:
-
-	if (lpResult)
-		lpDatabase->FreeResult(lpResult);
-
 	return er;
 }
 
@@ -457,7 +392,7 @@ static ECRESULT check_database_thread_stack(ECDatabase *lpDatabase)
 {
 	ECRESULT er = erSuccess;
 	string strQuery;
-	DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
 	DB_ROW lpRow = NULL;
 	unsigned ulThreadStack = 0;
 
@@ -468,30 +403,27 @@ static ECRESULT check_database_thread_stack(ECDatabase *lpDatabase)
 	strQuery = "SHOW VARIABLES LIKE 'thread_stack'";
 	er = lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to read from database");
+		ec_log_err("Unable to read from database");
 		goto exit;
 	}
 
 	lpRow = lpDatabase->FetchRow(lpResult);
 	if (!lpRow || !lpRow[1]) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "No thread_stack variable returned");
+		ec_log_err("No thread_stack variable returned");
 		goto exit;
 	}
 
 	ulThreadStack = atoui(lpRow[1]);
 	if (ulThreadStack < MYSQL_MIN_THREAD_STACK) {
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "MySQL thread_stack is set to %u, which is too small", ulThreadStack);
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Please set thread_stack to %uK or higher in your MySQL configuration", MYSQL_MIN_THREAD_STACK / 1024);
+		ec_log_warn("MySQL thread_stack is set to %u, which is too small", ulThreadStack);
+		ec_log_warn("Please set thread_stack to %uK or higher in your MySQL configuration", MYSQL_MIN_THREAD_STACK / 1024);
 		if (m_bIgnoreDbThreadStackSize)
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "MySQL thread_stack setting ignored. Please reconsider when 'Thread stack overrun' errors appear in the log.");
+			ec_log_warn("MySQL thread_stack setting ignored. Please reconsider when 'Thread stack overrun' errors appear in the log.");
 		else
 			er = KCERR_DATABASE_ERROR;
 	}
 
 exit:
-	if (lpResult)
-		lpDatabase->FreeResult(lpResult);
-
 	return er;
 }
 
@@ -573,7 +505,7 @@ static ECRESULT check_server_configuration(void)
 	// Find FQDN if Kerberos is enabled (remove check if we're using 'server_hostname' for other purposes)
 	bCheck = parseBool(g_lpConfig->GetSetting("enable_sso"));
 	if (bCheck && check_server_fqdn() != erSuccess)
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "WARNING: Unable to find FQDN, please specify in 'server_hostname'. Now using '%s'.", g_lpConfig->GetSetting("server_hostname"));
+		ec_log_err("WARNING: Unable to find FQDN, please specify in 'server_hostname'. Now using '%s'.", g_lpConfig->GetSetting("server_hostname"));
 
 	// all other checks are only required for multi-server environments
 	bCheck = parseBool(g_lpConfig->GetSetting("enable_distributed_kopano"));
@@ -582,7 +514,7 @@ static ECRESULT check_server_configuration(void)
 	
 	strServerName = g_lpConfig->GetSetting("server_name");
 	if (strServerName.empty()) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "ERROR: No 'server_name' specified while operating in multiserver mode.");
+		ec_log_crit("ERROR: No 'server_name' specified while operating in multiserver mode.");
 		er = KCERR_INVALID_PARAMETER;
 		// unable to check any other server details if we have no name, skip other tests
 		goto exit;
@@ -590,7 +522,7 @@ static ECRESULT check_server_configuration(void)
 
 	er = g_lpSessionManager->CreateSessionInternal(&lpecSession);
 	if (er != erSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Internal error 0x%08x while checking distributed configuration", er);
+		ec_log_crit("Internal error 0x%08x while checking distributed configuration", er);
 		goto exit;
 	}
 
@@ -598,7 +530,7 @@ static ECRESULT check_server_configuration(void)
 	
 	er = lpecSession->GetUserManagement()->GetServerDetails(strServerName, &sServerDetails);
 	if (er != erSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "ERROR: Unable to find server information on LDAP for '%s', error 0x%08X. Check your server name.", strServerName.c_str(), er);
+		ec_log_crit("ERROR: Unable to find server information on LDAP for '%s', error 0x%08X. Check your server name.", strServerName.c_str(), er);
 		// unable to check anything else if we have no details, skip other tests
 		goto exit;
 	}
@@ -606,47 +538,47 @@ static ECRESULT check_server_configuration(void)
 	// Check the various connection parameters for consistency
 	if (parseBool(g_lpConfig->GetSetting("server_pipe_enabled")) == true) {
 		if (sServerDetails.GetFilePath().empty()) {
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: 'server_pipe_enabled' is set, but LDAP returns nothing");
+			ec_log_warn("WARNING: 'server_pipe_enabled' is set, but LDAP returns nothing");
 			bHaveErrors = true;
 		}
 		if (sServerDetails.GetFilePath().compare((std::string)"file://" + g_lpConfig->GetSetting("server_pipe_name")) != 0) {
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: 'server_pipe_name' is set to '%s', but LDAP returns '%s'", g_lpConfig->GetSetting("server_pipe_name"), sServerDetails.GetFilePath().c_str());
+			ec_log_warn("WARNING: 'server_pipe_name' is set to '%s', but LDAP returns '%s'", g_lpConfig->GetSetting("server_pipe_name"), sServerDetails.GetFilePath().c_str());
 			bHaveErrors = true;
 		}
 	} else if (!sServerDetails.GetFilePath().empty()) {
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: 'server_pipe_enabled' is unset, but LDAP returns '%s'", sServerDetails.GetFilePath().c_str());
+		ec_log_warn("WARNING: 'server_pipe_enabled' is unset, but LDAP returns '%s'", sServerDetails.GetFilePath().c_str());
 		bHaveErrors = true;
 	}
 	
 	if (parseBool(g_lpConfig->GetSetting("server_tcp_enabled")) == true) {
 		if (sServerDetails.GetHttpPath().empty()) {
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: 'server_tcp_enabled' is set, but LDAP returns nothing");
+			ec_log_warn("WARNING: 'server_tcp_enabled' is set, but LDAP returns nothing");
 			bHaveErrors = true;
 		}
 		
 		ulPort = atoui(g_lpConfig->GetSetting("server_tcp_port"));
 		if (sServerDetails.GetHttpPort() != ulPort) {
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: 'server_tcp_port' is set to '%u', but LDAP returns '%u'", ulPort, sServerDetails.GetHttpPort());
+			ec_log_warn("WARNING: 'server_tcp_port' is set to '%u', but LDAP returns '%u'", ulPort, sServerDetails.GetHttpPort());
 			bHaveErrors = true;
 		}
 	} else if (!sServerDetails.GetHttpPath().empty()) {
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: 'server_tcp_enabled' is unset, but LDAP returns '%s'", sServerDetails.GetHttpPath().c_str());
+		ec_log_warn("WARNING: 'server_tcp_enabled' is unset, but LDAP returns '%s'", sServerDetails.GetHttpPath().c_str());
 		bHaveErrors = true;
 	}
 	
 	if (parseBool(g_lpConfig->GetSetting("server_ssl_enabled")) == true) {
 		if (sServerDetails.GetSslPath().empty()) {
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: 'server_ssl_enabled' is set, but LDAP returns nothing");
+			ec_log_warn("WARNING: 'server_ssl_enabled' is set, but LDAP returns nothing");
 			bHaveErrors = true;
 		}
 		
 		ulPort = atoui(g_lpConfig->GetSetting("server_ssl_port"));
 		if (sServerDetails.GetSslPort() != ulPort) {
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: 'server_ssl_port' is set to '%u', but LDAP returns '%u'", ulPort, sServerDetails.GetSslPort());
+			ec_log_warn("WARNING: 'server_ssl_port' is set to '%u', but LDAP returns '%u'", ulPort, sServerDetails.GetSslPort());
 			bHaveErrors = true;
 		}
 	} else if (!sServerDetails.GetSslPath().empty()) {
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: 'server_ssl_enabled' is unset, but LDAP returns '%s'", sServerDetails.GetSslPath().c_str());
+		ec_log_warn("WARNING: 'server_ssl_enabled' is unset, but LDAP returns '%s'", sServerDetails.GetSslPath().c_str());
 		bHaveErrors = true;
 	}	
 	
@@ -658,10 +590,76 @@ exit:
 
 	// we could return an error when bHaveErrors is set, but we currently find this not fatal as a sysadmin might be smarter than us.
 	if (bHaveErrors)
- 		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: Inconsistencies detected between local and LDAP based configuration.");
+ 		ec_log_warn("WARNING: Inconsistencies detected between local and LDAP based configuration.");
 
 	// we do return er, since if that is set GetServerDetails() does not work and that is quite vital to work in distributed systems.
 	return er;
+}
+
+/**
+ * Restart the program with a new preloaded library.
+ * @argv:	full argv of current invocation
+ * @lib:	library to load via LD_PRELOAD
+ *
+ * As every program under Linux is linked to libc and symbol resolution is done
+ * breadth-first, having just libkcserver.so linked to the alternate allocator
+ * is not enough to ensure the allocator is being used in favor of libc malloc.
+ *
+ * A program built against glibc will have a record for e.g.
+ * "malloc@GLIBC_2.2.5". The use of LD_PRELOAD appears to relax the version
+ * requirement, though; the benefit would be that libtcmalloc's malloc will
+ * take over _all_ malloc calls.
+ */
+static int kc_reexec_with_allocator(char **argv, const char *lib)
+{
+	if (lib == NULL || *lib == '\0')
+		return 0;
+	const char *s = getenv("KC_ALLOCATOR_DONE");
+	if (s != NULL)
+		/* avoid repeatedly reexecing ourselves */
+		return 0;
+	s = getenv("LD_PRELOAD");
+	if (s == NULL)
+		setenv("LD_PRELOAD", lib, true);
+	else if (strstr(s, "/valgrind/") != NULL)
+		/*
+		 * Within vg, everything is a bit different — since it catches
+		 * execve itself. Execing /proc/self/exe therefore won't work,
+		 * we would need to use argv[0]. But… don't bother.
+		 */
+		return 0;
+	else
+		setenv("LD_PRELOAD", (std::string(s) + ":" + lib).c_str(), true);
+	void *handle = dlopen(lib, RTLD_LAZY | RTLD_LOCAL);
+	if (handle == NULL)
+		/*
+		 * Ignore libraries that won't load anyway. This avoids
+		 * ld.so emitting a scary warning if we did re-exec.
+		 */
+		return 0;
+	dlclose(handle);
+	setenv("KC_ALLOCATOR_DONE", lib, true);
+
+	/* Resolve "exe" symlink before exec to please the sysadmin */
+	std::vector<char> linkbuf(16);
+	ssize_t linklen;
+	while (true) {
+		linklen = readlink("/proc/self/exe", &linkbuf[0], linkbuf.size());
+		if (linklen < 0 || static_cast<size_t>(linklen) < linkbuf.size())
+			break;
+		linkbuf.resize(linkbuf.size() * 2);
+	}
+	if (linklen < 0) {
+		int ret = -errno;
+		ec_log_warn("kc_reexec_with_allocator: readlink: %s", strerror(errno));
+		return ret;
+	}
+	linkbuf[linklen] = '\0';
+	ec_log_debug("Reexecing %s with %s", &linkbuf[0], lib);
+	execv(&linkbuf[0], argv);
+	int ret = -errno;
+	ec_log_info("Failed to reexec self: %s. Continuing with standard allocator.", strerror(errno));
+	return ret;
 }
 
 int main(int argc, char* argv[])
@@ -784,7 +782,7 @@ static int running_server(char *szName, const char *szConfig,
 
 	// SIGSEGV backtrace support
 	stack_t st = {0};
-	struct sigaction act = {{0}};
+	struct sigaction act;
 	int tmplock = -1;
 	struct stat dir = {0};
 	struct passwd *runasUser = NULL;
@@ -810,7 +808,7 @@ static int running_server(char *szName, const char *szConfig,
 		{ "server_send_timeout",		"60", CONFIGSETTING_RELOADABLE },
 		{ "server_max_keep_alive_requests",	"100" },
 		{ "thread_stacksize",			"512" },
-		{ "allow_local_users",			"yes", CONFIGSETTING_RELOADABLE },			// allow any user connect through the unix socket
+		{ "allow_local_users",			"yes", CONFIGSETTING_RELOADABLE },			// allow any user connect through the Unix socket
 		{ "local_admin_users",			"root", CONFIGSETTING_RELOADABLE },			// this local user is admin
 		{ "run_as_user",			"kopano" }, // drop root privileges, and run as this user/group
 		{ "run_as_group",			"kopano" },
@@ -826,13 +824,17 @@ static int running_server(char *szName, const char *szConfig,
 
 		{ "server_ssl_enabled",			"no" },
 		{ "server_ssl_port",			"237" },
-		{ "server_ssl_key_file",		"/etc/kopano/ssl/server.pem" },
-		{ "server_ssl_key_pass",		"server",	CONFIGSETTING_EXACT },
-		{ "server_ssl_ca_file",			"/etc/kopano/ssl/cacert.pem" },
-		{ "server_ssl_ca_path",			"" },
-		{ "server_ssl_protocols",		"!SSLv2" },
-		{ "server_ssl_ciphers",			"ALL:!LOW:!SSLv2:!EXP:!aNULL" },
-		{ "server_ssl_prefer_server_ciphers",	"no" },
+		{"server_ssl_key_file", "/etc/kopano/ssl/server.pem", CONFIGSETTING_RELOADABLE},
+		{"server_ssl_key_pass", "server", CONFIGSETTING_EXACT | CONFIGSETTING_RELOADABLE},
+		{"server_ssl_ca_file", "/etc/kopano/ssl/cacert.pem", CONFIGSETTING_RELOADABLE},
+		{"server_ssl_ca_path", "", CONFIGSETTING_RELOADABLE},
+#ifdef SSL_TXT_SSLV2
+		{"server_ssl_protocols", "!SSLv2", CONFIGSETTING_RELOADABLE},
+#else
+		{"server_ssl_protocols", "", CONFIGSETTING_RELOADABLE},
+#endif
+		{"server_ssl_ciphers", "ALL:!LOW:!SSLv2:!EXP:!aNULL", CONFIGSETTING_RELOADABLE},
+		{"server_ssl_prefer_server_ciphers", "no", CONFIGSETTING_RELOADABLE},
 		{ "sslkeys_path",				"/etc/kopano/sslkeys" },	// login keys
 		// Database options
 		{ "database_engine",			"mysql" },
@@ -855,6 +857,7 @@ static int running_server(char *szName, const char *szConfig,
 		{"attachment_s3_accesskeyid", ""},
 		{"attachment_s3_secretaccesskey", ""},
 		{"attachment_s3_bucketname", ""},
+		{"attachment_s3_region", ""},
 #endif
 		{ "attachment_path",			"Kopano Data" },
 		{ "attachment_compression",		"6" },
@@ -889,7 +892,7 @@ static int running_server(char *szName, const char *szConfig,
 		{ "loginname_format",			"%u" },
 
 		// internal server contols
-		{ "softdelete_lifetime",		"0" },							// time expressed in days, 0 == never delete anything
+		{ "softdelete_lifetime",		"0", CONFIGSETTING_RELOADABLE },	// time expressed in days, 0 == never delete anything
 		{ "cache_cell_size",			"16M", CONFIGSETTING_SIZE },	// default 16 Mb, default in config 256M
 		{ "cache_object_size",		"16M", CONFIGSETTING_SIZE },
 		{ "cache_indexedobject_size",	"32M", CONFIGSETTING_SIZE },
@@ -961,24 +964,26 @@ static int running_server(char *szName, const char *szConfig,
 		{ NULL, NULL },
 	};
 
-	char buffer[256];
-	confstr(_CS_GNU_LIBPTHREAD_VERSION, buffer, sizeof(buffer));
-	if (strncmp(buffer, "linuxthreads", strlen("linuxthreads")) == 0)
-		m_bNPTL = false;
-
 	// Init random generator
 	rand_init();
-
-	// init translations according to environment variables
+#if GSOAP_VERSION >= 20839
+	/*
+	 * Init translations according to environment variables.
+	 * It also changes things like decimal separator, which gsoap < 2.8.39
+	 * fails to cope with properly.
+	 */
 	setlocale(LC_ALL, "");
-
+#endif
+#if GSOAP_VERSION == 20841
+#	error This gsoap version suffers from sf.net/p/gsoap2/bugs/1095
+#endif
 	InitBindTextDomain();
 
 	// Load settings
 	g_lpConfig = ECConfig::Create(lpDefaults);
 	
 	if (!g_lpConfig->LoadSettings(szConfig) ||
-	    !g_lpConfig->ParseParams(trim_argc, trim_argv, NULL) ||
+	    g_lpConfig->ParseParams(trim_argc, trim_argv) < 0 ||
 	    (!m_bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors()) ) {
 		g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false); // create info logger without a timestamp to stderr
 		ec_log_set(g_lpLogger);
@@ -1001,40 +1006,39 @@ static int running_server(char *szName, const char *szConfig,
 		LogConfigErrors(g_lpConfig);
 
 	if (!TmpPath::getInstance() -> OverridePath(g_lpConfig))
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Ignoring invalid path-setting!");
+		ec_log_err("Ignoring invalid path-setting!");
 
 	g_lpAudit = CreateLogger(g_lpConfig, szName, "KopanoServer", true);
 	if (g_lpAudit)
 		g_lpAudit->Log(EC_LOGLEVEL_NOTICE, "server startup uid=%d", getuid());
 	else
-		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Audit logging not enabled.");
+		ec_log_info("Audit logging not enabled.");
 
-	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting server version " PROJECT_VERSION_SERVER_STR ", pid %d", getpid());
-
+	ec_log_always("Starting server version " PROJECT_VERSION_SERVER_STR ", pid %d", getpid());
 	if (g_lpConfig->HasWarnings())
 		LogConfigErrors(g_lpConfig);
 
 	if (strcmp(g_lpConfig->GetSetting("attachment_storage"), "files") == 0) {
 		// directory will be created using startup (probably root) and then chowned to the new 'runas' username
 		if (CreatePath(g_lpConfig->GetSetting("attachment_path")) != 0) {
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to create attachment directory '%s'", g_lpConfig->GetSetting("attachment_path"));
+			ec_log_err("Unable to create attachment directory '%s'", g_lpConfig->GetSetting("attachment_path"));
 			er = KCERR_DATABASE_ERROR;
 			goto exit;
 		}
 		if (stat(g_lpConfig->GetSetting("attachment_path"), &dir) != 0) {
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to stat attachment directory '%s', error: %s", g_lpConfig->GetSetting("attachment_path"), strerror(errno));
+			ec_log_err("Unable to stat attachment directory '%s', error: %s", g_lpConfig->GetSetting("attachment_path"), strerror(errno));
 			er = KCERR_DATABASE_ERROR;
 			goto exit;
 		}
 		runasUser = getpwnam(g_lpConfig->GetSetting("run_as_user","","root"));
 		if (runasUser == NULL) {
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Fatal: run_as_user '%s' is unknown", g_lpConfig->GetSetting("run_as_user","","root"));
+			ec_log_err("Fatal: run_as_user '%s' is unknown", g_lpConfig->GetSetting("run_as_user","","root"));
 			er = MAPI_E_UNCONFIGURED;
 			goto exit;
 		}
 		if (runasUser->pw_uid != dir.st_uid) {
 			if (unix_chown(g_lpConfig->GetSetting("attachment_path"), g_lpConfig->GetSetting("run_as_user"), g_lpConfig->GetSetting("run_as_group")) != 0) {
-				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to change ownership for attachment directory '%s'", g_lpConfig->GetSetting("attachment_path"));
+				ec_log_err("Unable to change ownership for attachment directory '%s'", g_lpConfig->GetSetting("attachment_path"));
 				er = KCERR_DATABASE_ERROR;
 				goto exit;
 			}
@@ -1042,18 +1046,20 @@ static int running_server(char *szName, const char *szConfig,
 #ifdef HAVE_LIBS3_H
 	} else if (strcmp(g_lpConfig->GetSetting("attachment_storage"), "s3") == 0) {
 		// @todo check S3 settings and connectivity
-		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Attachment storage set to S3 Storage");
+		ec_log_info("Attachment storage set to S3 Storage");
 #endif
 	} else if (strcmp(g_lpConfig->GetSetting("attachment_storage"), "database") != 0) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unknown attachment_storage option '%s', reverting to default 'database' method.", g_lpConfig->GetSetting("attachment_storage"));
+		ec_log_err("Unknown attachment_storage option '%s', reverting to default 'database' method.", g_lpConfig->GetSetting("attachment_storage"));
 		g_lpConfig->AddSetting("attachment_storage", "database");
 	}
 
 	if (strcasecmp(g_lpConfig->GetSetting("user_plugin"), "db") == 0 && parseBool(g_lpConfig->GetSetting("sync_gab_realtime")) == false) {
-		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Unsupported sync_gab_realtime = no when using DB plugin. Enabling sync_gab_realtime.");
+		ec_log_info("Unsupported sync_gab_realtime = no when using DB plugin. Enabling sync_gab_realtime.");
 		g_lpConfig->AddSetting("sync_gab_realtime", "yes");
 	}
 
+	kopano_notify_done = kcsrv_notify_done;
+	kopano_get_server_stats = kcsrv_get_server_stats;
 	kopano_initlibrary(g_lpConfig->GetSetting("mysql_database_path"), g_lpConfig->GetSetting("mysql_config_file"));
 
 	if(!strcmp(g_lpConfig->GetSetting("server_pipe_enabled"), "yes"))
@@ -1076,19 +1082,18 @@ static int running_server(char *szName, const char *szConfig,
     ssl_threading_setup();
 
 	// setup connection handler
-	g_lpSoapServerConn = new ECSoapServerConnection(g_lpConfig, g_lpLogger);
+	g_lpSoapServerConn = new ECSoapServerConnection(g_lpConfig);
 
-	// Setup a tcp connection
+	// Setup a TCP connection
 	if (bTCPEnabled)
 	{
 		er = g_lpSoapServerConn->ListenTCP(g_lpConfig->GetSetting("server_bind"), atoi(g_lpConfig->GetSetting("server_tcp_port")),
 										   parseBool(g_lpConfig->GetSetting("client_update_enabled")));
-		if(er != erSuccess) {
+		if (er != erSuccess)
 			goto exit;
-		}
 	}
 
-	// Setup ssl connection
+	// Setup SSL connection
 	if (bSSLEnabled) {
 		er = g_lpSoapServerConn->ListenSSL(g_lpConfig->GetSetting("server_bind"),		// servername
 							atoi(g_lpConfig->GetSetting("server_ssl_port")),		// sslPort
@@ -1098,9 +1103,8 @@ static int running_server(char *szName, const char *szConfig,
 							g_lpConfig->GetSetting("server_ssl_ca_file","",NULL),	// CA certificate file which signed clients
 							g_lpConfig->GetSetting("server_ssl_ca_path","",NULL)	// CA certificate path of thrusted sources
 							);
-		if(er != erSuccess) {
+		if (er != erSuccess)
 			goto exit;
-		}
 	}
 
 	// Set max open file descriptors to FD_SETSIZE .. higher than this number
@@ -1110,28 +1114,26 @@ static int running_server(char *szName, const char *szConfig,
 	limit.rlim_cur = FD_SETSIZE;
 	limit.rlim_max = FD_SETSIZE;
 	if(setrlimit(RLIMIT_NOFILE, &limit) < 0) {
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: setrlimit(RLIMIT_NOFILE, %d) failed, you will only be able to connect up to %d sockets.", FD_SETSIZE, getdtablesize());
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: Either start the process as root, or increase user limits for open file descriptors.");
+		ec_log_warn("WARNING: setrlimit(RLIMIT_NOFILE, %d) failed, you will only be able to connect up to %d sockets.", FD_SETSIZE, getdtablesize());
+		ec_log_warn("WARNING: Either start the process as root, or increase user limits for open file descriptors.");
 	}
 
 	if (parseBool(g_lpConfig->GetSetting("coredump_enabled")))
-		unix_coredump_enable(g_lpLogger);
-	if (unix_runas(g_lpConfig, g_lpLogger)) {
+		unix_coredump_enable();
+	if (unix_runas(g_lpConfig)) {
 		er = MAPI_E_CALL_FAILED;
 		goto exit;
 	}
 
 	// Priority queue is always enabled, create as first socket, so this socket is returned first too on activity
 	er = g_lpSoapServerConn->ListenPipe(g_lpConfig->GetSetting("server_pipe_priority"), true);
-	if (er != erSuccess) {
+	if (er != erSuccess)
 		goto exit;
-	}
 	// Setup a pipe connection
 	if (bPipeEnabled) {
 		er = g_lpSoapServerConn->ListenPipe(g_lpConfig->GetSetting("server_pipe_name"));
-		if (er != erSuccess) {
+		if (er != erSuccess)
 			goto exit;
-		}
 	}
 	// Test database settings
 	lpDatabaseFactory = new ECDatabaseFactory(g_lpConfig);
@@ -1140,31 +1142,28 @@ static int running_server(char *szName, const char *szConfig,
 	er = lpDatabaseFactory->CreateDatabaseObject(&lpDatabase, dbError);
 	if(er == KCERR_DATABASE_NOT_FOUND) {
 		er = lpDatabaseFactory->CreateDatabase();
-		if(er != erSuccess) {
+		if (er != erSuccess)
 			goto exit;
-		}
-
 		er = lpDatabaseFactory->CreateDatabaseObject(&lpDatabase, dbError);
 	}
 
 	if(er != erSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to connect to database: %s", dbError.c_str());
+		ec_log_crit("Unable to connect to database: %s", dbError.c_str());
 		goto exit;
 	}
-	g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Connection to database '%s' succeeded", g_lpConfig->GetSetting("mysql_database"));
+	ec_log_notice("Connection to database '%s' succeeded", g_lpConfig->GetSetting("mysql_database"));
 
 	hosted = parseBool(g_lpConfig->GetSetting("enable_hosted_kopano"));
 	distributed = parseBool(g_lpConfig->GetSetting("enable_distributed_kopano"));
 	// fork if needed and drop privileges as requested.
 	// this must be done before we do anything with pthreads
-	if (daemonize && unix_daemonize(g_lpConfig, g_lpLogger)) {
+	if (daemonize && unix_daemonize(g_lpConfig)) {
 		er = MAPI_E_CALL_FAILED;
 		goto exit;
 	}
 	if (!daemonize)
 		setsid();
-	unix_create_pidfile(szName, g_lpConfig, g_lpLogger);
-
+	unix_create_pidfile(szName, g_lpConfig);
 	mainthread = pthread_self();
 
 	// SIGSEGV backtrace support
@@ -1177,40 +1176,24 @@ static int running_server(char *szName, const char *szConfig,
 
 	act.sa_sigaction = sigsegv;
 	act.sa_flags = SA_ONSTACK | SA_RESETHAND | SA_SIGINFO;
+	sigemptyset(&act.sa_mask);
 
 	sigaltstack(&st, NULL);
 	sigaction(SIGSEGV, &act, NULL);
 	sigaction(SIGBUS , &act, NULL);
 	sigaction(SIGABRT, &act, NULL);
 
-	if (m_bNPTL) {
-		// normally ignore these signals
-		signal(SIGUSR1, SIG_IGN);
-		signal(SIGUSR2, SIG_IGN);
-		signal(SIGPIPE, SIG_IGN);
+	// normally ignore these signals
+	signal(SIGUSR1, SIG_IGN);
+	signal(SIGUSR2, SIG_IGN);
+	signal(SIGPIPE, SIG_IGN);
 
-		// block these signals to handle only in the thread by sigwait()
-		sigemptyset(&signal_mask);
-		sigaddset(&signal_mask, SIGINT);
-		sigaddset(&signal_mask, SIGTERM);
-		sigaddset(&signal_mask, SIGHUP);
-
-		// valid for all threads afterwards
-		pthread_sigmask(SIG_BLOCK, &signal_mask, NULL);
-		// create signal handler thread, will handle all blocked signals
-		// must be done after the daemonize
-		pthread_create(&signal_thread, NULL, signal_handler, NULL);
-	        set_thread_name(signal_thread, "SignalHThread");
-	} else
-	{
-		// reset signals to normal server usage
-		signal(SIGTERM , process_signal);
-		signal(SIGINT  , process_signal);	//CTRL+C
-		signal(SIGHUP , process_signal);	// logrotate
-		signal(SIGUSR1, process_signal);
-		signal(SIGUSR2, process_signal);
-		signal(SIGPIPE, process_signal);
-	}
+	act.sa_handler = process_signal;
+	act.sa_flags = SA_ONSTACK | SA_RESTART;
+	sigemptyset(&act.sa_mask);
+	sigaction(SIGINT, &act, nullptr);
+	sigaction(SIGHUP, &act, nullptr);
+	sigaction(SIGTERM, &act, nullptr);
 
 	// ignore ignorable signals that might stop the server during database upgrade
 	// all these signals will be reset after the database upgrade part.
@@ -1220,7 +1203,7 @@ static int running_server(char *szName, const char *szConfig,
 	tmplock = open(upgrade_lock_file, O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
 
 	if (tmplock == -1)
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: Unable to place upgrade lockfile: %s", strerror(errno));
+		ec_log_warn("WARNING: Unable to place upgrade lockfile: %s", strerror(errno));
 
 #ifdef EMBEDDED_MYSQL
 {
@@ -1231,7 +1214,7 @@ static int running_server(char *szName, const char *szConfig,
 
 		er = lpDatabase->ValidateTables();
 		if (er != erSuccess) {
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to validate the database.");
+			ec_log_err("Unable to validate the database.");
 			goto exit;
 		}
 
@@ -1245,34 +1228,34 @@ static int running_server(char *szName, const char *szConfig,
 	// remove lock file
 	if (tmplock != -1) {
 		if (unlink(upgrade_lock_file) == -1)
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: Unable to delete upgrade lockfile (%s): %s", upgrade_lock_file, strerror(errno));
+			ec_log_warn("WARNING: Unable to delete upgrade lockfile (%s): %s", upgrade_lock_file, strerror(errno));
 
 		close(tmplock);
 	}
 
 	if(er == KCERR_INVALID_VERSION) {
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: %s", dbError.c_str());
+		ec_log_warn("WARNING: %s", dbError.c_str());
 
 		if(m_bIgnoreDatabaseVersionConflict == false) {
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "   You can force the server to start with --ignore-database-version-conflict");
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "   Warning, you can lose data! If you don't know what you're doing, you shouldn't be using this option!");
+			ec_log_warn("   You can force the server to start with --ignore-database-version-conflict");
+			ec_log_warn("   Warning, you can lose data! If you don't know what you're doing, you shouldn't be using this option!");
 			goto exit;
 		}
 	}else if(er != erSuccess) {
 		if (er != KCERR_USER_CANCEL)
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't update the database: %s", dbError.c_str());
+			ec_log_err("Can't update the database: %s", dbError.c_str());
 		goto exit;
 	}
 	
 	er = lpDatabase->InitializeDBState();
 	if(er != erSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't initialize database settings");
+		ec_log_err("Can't initialize database settings");
 		goto exit;
 	}
 	
 	m_bDatabaseUpdateIgnoreSignals = false;
 	if(searchfolder_restart_required) {
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Update requires searchresult folders to be rebuilt. This may take some time. You can restart this process with the --restart-searches option");
+		ec_log_warn("Update requires searchresult folders to be rebuilt. This may take some time. You can restart this process with the --restart-searches option");
 		restart_searches = 1;
 	}
 
@@ -1310,7 +1293,7 @@ static int running_server(char *szName, const char *szConfig,
 	// This also starts several threads, like SessionCleaner, NotificationThread and TPropsPurge.
 	er = kopano_init(g_lpConfig, g_lpAudit, hosted, distributed);
 	if (er != erSuccess) { // create SessionManager
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to initialize kopano session manager");
+		ec_log_err("Unable to initialize kopano session manager");
 		goto exit;
 	}
 
@@ -1320,10 +1303,10 @@ static int running_server(char *szName, const char *szConfig,
 		goto exit;
 
 	// Load search folders from disk
-	g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Loading searchfolders");
+	ec_log_notice("Loading searchfolders");
 	er = g_lpSessionManager->GetSearchFolders()->LoadSearchFolders();
 	if (er != erSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to load searchfolders");
+		ec_log_err("Unable to load searchfolders");
 		goto exit;
 	}
 	
@@ -1339,7 +1322,7 @@ static int running_server(char *szName, const char *szConfig,
 	g_lpScheduler->AddSchedule(SCHEDULE_HOUR, 16, &CleanupSyncedMessagesTable);
 
 	// high loglevel to always see when server is started.
-	g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Startup succeeded on pid %d", getpid() );
+	ec_log_notice("Startup succeeded on pid %d", getpid() );
 	g_lpStatsCollector->SetTime(SCN_SERVER_STARTTIME, time(NULL));
 
 	// Enter main accept loop
@@ -1356,10 +1339,6 @@ static int running_server(char *szName, const char *szConfig,
 	}
 	// Close All sessions
 	kopano_removeallsessions();
-	if (m_bNPTL) {
-		g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Joining signal thread");
-		pthread_join(signal_thread, NULL);
-	}
 exit:
 	if (er != erSuccess) {
 		auto msg = format("An error occurred (%x).", er);
@@ -1392,13 +1371,13 @@ exit:
 	delete g_lpConfig;
 
 	if (g_lpLogger) {
-		g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Server shutdown complete.");
+		ec_log_always("Server shutdown complete.");
 		g_lpLogger->Release();
 	}
 	if (g_lpAudit)
 		g_lpAudit->Release();
 
-#ifdef ZCP_USES_ICU
+#ifdef KC_USES_ICU
 	// cleanup ICU data so valgrind is happy
 	u_cleanup();
 #endif

@@ -17,10 +17,13 @@
 
 #include <kopano/platform.h>
 #include <memory>
+#include <new>
 #include <string>
 #include "Archiver.h"
 #include <kopano/ECConfig.h>
 #include "ArchiverImpl.h"
+
+namespace KC {
 
 const char* Archiver::GetConfigPath()
 {
@@ -89,17 +92,13 @@ const configsetting_t* Archiver::GetConfigDefaults()
 
 eResult Archiver::Create(auto_ptr_type *lpptrArchiver)
 {
-	auto_ptr_type ptrArchiver;
-
 	if (lpptrArchiver == NULL)
 		return InvalidParameter;
-
-	try {
-		ptrArchiver.reset(new ArchiverImpl());
-	} catch (std::bad_alloc &) {
+	auto_ptr_type ptrArchiver(new(std::nothrow) ArchiverImpl);
+	if (ptrArchiver == nullptr)
 		return OutOfMemory;
-	}
-
 	*lpptrArchiver = std::move(ptrArchiver);
 	return Success;
 }
+
+} /* namespace */

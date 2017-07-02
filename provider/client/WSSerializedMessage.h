@@ -18,16 +18,17 @@
 #ifndef WSSerializedMessage_INCLUDED
 #define WSSerializedMessage_INCLUDED
 
+#include <kopano/zcdefs.h>
 #include <kopano/ECUnknown.h>
-#include "soapStub.h"
 #include <kopano/mapi_ptr.h>
+#include <kopano/memory.hpp>
+#include "soapStub.h"
 #include <string>
 
 /**
  * This object represents one exported message stream. It is responsible for requesting the MTOM attachments from soap.
  */
-class WSSerializedMessage : public ECUnknown
-{
+class WSSerializedMessage _kc_final : public ECUnknown {
 public:
 	WSSerializedMessage(soap *lpSoap, const std::string strStreamId, ULONG cbProps, LPSPropValue lpProps);
 
@@ -46,17 +47,16 @@ private:
 	int		MTOMWrite(struct soap *soap, void *handle, const char *buf, size_t len);
 	void	MTOMWriteClose(struct soap *soap, void *handle);
 
-private:
 	soap				*m_lpSoap;
 	const std::string	m_strStreamId;
 	ULONG				m_cbProps;
 	LPSPropValue		m_lpProps;	//	Points to data from parent object.
 
-	bool				m_bUsed;
+	bool m_bUsed = false;
 	StreamPtr			m_ptrDestStream;
-	HRESULT				m_hr;
+	HRESULT m_hr = hrSuccess;
 };
 
-typedef mapi_object_ptr<WSSerializedMessage> WSSerializedMessagePtr;
+typedef KCHL::object_ptr<WSSerializedMessage> WSSerializedMessagePtr;
 
 #endif // ndef WSSerializedMessage_INCLUDED

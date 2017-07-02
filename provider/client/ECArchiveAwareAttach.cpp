@@ -28,7 +28,7 @@ ECArchiveAwareAttach::ECArchiveAwareAttach(ECMsgStore *lpMsgStore, ULONG ulObjTy
 : ECAttach(lpMsgStore, ulObjType, fModify, ulAttachNum, lpRoot)
 , m_lpRoot(dynamic_cast<ECArchiveAwareMessage*>(lpRoot))
 {
-	ASSERT(m_lpRoot != NULL);	// We don't expect an ECArchiveAwareAttach to be ever created by any other object than a ECArchiveAwareMessage.
+	assert(m_lpRoot != NULL);	// We don't expect an ECArchiveAwareAttach to be ever created by any other object than a ECArchiveAwareMessage.
 
 	// Override the handler defined in ECAttach
 	this->HrAddPropHandlers(PR_ATTACH_SIZE, ECAttach::GetPropHandler, SetPropHandler, (void*)this, FALSE, FALSE);
@@ -40,7 +40,8 @@ HRESULT	ECArchiveAwareAttach::Create(ECMsgStore *lpMsgStore, ULONG ulObjType, BO
 	return lpAttach->QueryInterface(IID_ECAttach, reinterpret_cast<void **>(lppAttach));
 }
 
-HRESULT	ECArchiveAwareAttach::SetPropHandler(ULONG ulPropTag, void* /*lpProvider*/, LPSPropValue lpsPropValue, void *lpParam)
+HRESULT	ECArchiveAwareAttach::SetPropHandler(ULONG ulPropTag,
+    void */*lpProvider*/, const SPropValue *lpsPropValue, void *lpParam)
 {
 	ECArchiveAwareAttach *lpAttach = (ECArchiveAwareAttach *)lpParam;
 	HRESULT hr = hrSuccess;

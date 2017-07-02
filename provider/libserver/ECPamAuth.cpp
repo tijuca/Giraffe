@@ -14,24 +14,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
 #include "ECPamAuth.h"
 #ifndef HAVE_PAM
+namespace KC {
 ECRESULT ECPAMAuthenticateUser(const char* szPamService, const std::string &strUsername, const std::string &strPassword, std::string *lpstrError)
 {
 	*lpstrError = "Server is not compiled with pam support.";
 	return KCERR_NO_SUPPORT;
 }
+}
 #else
 #include <security/pam_appl.h>
 
-class PAMLock {
-public:
-	PAMLock() { pthread_mutex_init(&m_mPAMAuthLock, NULL); }
-	~PAMLock() { pthread_mutex_destroy(&m_mPAMAuthLock); }
-
-	pthread_mutex_t m_mPAMAuthLock;
-} static cPAMLock;
+namespace KC {
 
 static int converse(int num_msg, const struct pam_message **msg,
     struct pam_response **resp, void *appdata_ptr)
@@ -65,19 +60,15 @@ static int converse(int num_msg, const struct pam_message **msg,
 
 ECRESULT ECPAMAuthenticateUser(const char* szPamService, const std::string &strUsername, const std::string &strPassword, std::string *lpstrError)
 {
-	ECRESULT er = erSuccess;
 	int res = 0;
 	pam_handle_t *pamh = NULL;
 	struct pam_conv conv_info = { &converse, (void*)strPassword.c_str() };
-
-	pthread_mutex_lock(&cPAMLock.m_mPAMAuthLock);
 
 	res = pam_start(szPamService, strUsername.c_str(), &conv_info, &pamh);
 	if (res != PAM_SUCCESS) 
 	{
 		*lpstrError = pam_strerror(NULL, res);
-		er = KCERR_LOGON_FAILED;
-		goto exit;
+		return KCERR_LOGON_FAILED;
 	}
 
 	res = pam_authenticate(pamh, PAM_SILENT);
@@ -86,12 +77,10 @@ ECRESULT ECPAMAuthenticateUser(const char* szPamService, const std::string &strU
 
 	if (res != PAM_SUCCESS) {
 		*lpstrError = pam_strerror(NULL, res);
-		er = KCERR_LOGON_FAILED;
+		return KCERR_LOGON_FAILED;
 	}
-
-exit:
-	pthread_mutex_unlock(&cPAMLock.m_mPAMAuthLock);
-
-	return er;
+	return erSuccess;
 }
+
+} /* namespace */
 #endif

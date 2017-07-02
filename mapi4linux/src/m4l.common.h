@@ -18,20 +18,20 @@
 #ifndef __M4L_COMMON_IMPL_H
 #define __M4L_COMMON_IMPL_H
 
-#include <pthread.h>
+#include <kopano/zcdefs.h>
+#include <mutex>
 
-class M4LUnknown : public IUnknown {
+class M4LUnknown : public virtual IUnknown {
 private:
     ULONG ref;
-    pthread_mutex_t mutex;
+	std::mutex mutex;
     
 public:
     M4LUnknown();
-    virtual ~M4LUnknown();
-
-    virtual ULONG __stdcall AddRef();
-    virtual ULONG __stdcall Release();
-    virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid);
+	virtual ~M4LUnknown(void) _kc_impdtor;
+	virtual ULONG __stdcall AddRef(void) _kc_override;
+	virtual ULONG __stdcall Release(void) _kc_override;
+	virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid) _kc_override;
 };
 
 #endif

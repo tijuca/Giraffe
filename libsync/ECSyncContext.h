@@ -18,11 +18,10 @@
 #ifndef ECSYNCCONTEXT_H
 #define ECSYNCCONTEXT_H
 
+#include <mutex>
+#include <kopano/zcdefs.h>
 #include <mapidefs.h>
-
-#include <pthread.h>
-#include "../provider/client/ECICS.h"
-
+#include "../provider/client/ics_client.hpp"
 #include <map>
 #include <set>
 #include <string>
@@ -30,7 +29,9 @@
 #include <IECChangeAdvisor.h>
 #include <IECChangeAdviseSink.h>
 
-typedef	std::map<std::string,LPSTREAM>		StatusStreamMap;
+namespace KC {
+
+typedef	std::map<std::string, IStream *> StatusStreamMap;
 typedef std::map<std::string,SSyncState>	SyncStateMap;
 typedef	std::map<ULONG,ULONG>				NotifiedSyncIdMap;
 
@@ -41,8 +42,7 @@ class ECSyncSettings;
  * ECSyncContext:	This class encapsulates all synchronization related information that is
  *					only related to one side of the sync process (online or offline).
  */
-class ECSyncContext
-{
+class ECSyncContext _kc_final {
 public:
 	/**
 	 * Construct a sync context.
@@ -316,19 +316,17 @@ private:	// methods
 	 */
 	HRESULT HrReleaseChangeAdvisor();
 
-private:	// members
 	LPMDB					m_lpStore;
 	ECLogger				*m_lpLogger;
 	ECSyncSettings			*m_lpSettings;
-
-	IECChangeAdvisor *m_lpChangeAdvisor;
-	IECChangeAdviseSink *m_lpChangeAdviseSink;
-
+	IECChangeAdvisor *m_lpChangeAdvisor = nullptr;
+	IECChangeAdviseSink *m_lpChangeAdviseSink = nullptr;
 	StatusStreamMap			m_mapSyncStatus;
 	SyncStateMap			m_mapStates;
 	NotifiedSyncIdMap		m_mapNotifiedSyncIds;
-
-	pthread_mutex_t			m_hMutex;
+	std::mutex m_hMutex;
 };
+
+} /* namespace */
 
 #endif // ndef ECSYNCCONTEXT_H

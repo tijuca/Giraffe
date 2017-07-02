@@ -19,8 +19,9 @@
 #define MAPIPROPHELPER_INCLUDED
 
 #include <memory>
-
+#include <kopano/zcdefs.h>
 #include <mapix.h>
+
 #include <kopano/mapi_ptr.h>
 
 #include <kopano/CommonUtil.h>
@@ -28,7 +29,7 @@
 #include <kopano/archiver-common.h>
 #include "ArchiverSessionPtr.h"     // For ArchiverSessionPtr
 
-namespace za { namespace helpers {
+namespace KC { namespace helpers {
 
 class MAPIPropHelper;
 typedef std::unique_ptr<MAPIPropHelper> MAPIPropHelperPtr;
@@ -39,34 +40,32 @@ class MessageState;
  * The MAPIPropHelper class provides some common utility functions that relate to IMAPIProp
  * objects in the archiver context.
  */
-class MAPIPropHelper
-{
+class _kc_export MAPIPropHelper {
 public:
 	static HRESULT Create(MAPIPropPtr ptrMapiProp, MAPIPropHelperPtr *lpptrMAPIPropHelper);
-	virtual ~MAPIPropHelper(void) {}
-
+	_kc_hidden virtual ~MAPIPropHelper(void) _kc_impdtor;
 	HRESULT GetMessageState(ArchiverSessionPtr ptrSession, MessageState *lpState);
 	HRESULT GetArchiveList(ObjectEntryList *lplstArchives, bool bIgnoreSourceKey = false);
 	HRESULT SetArchiveList(const ObjectEntryList &lstArchives, bool bExplicitCommit = false);
 	HRESULT SetReference(const SObjectEntry &sEntry, bool bExplicitCommit = false);
-	HRESULT GetReference(SObjectEntry *lpEntry);
+	_kc_hidden HRESULT GetReference(SObjectEntry *entry);
 	HRESULT ClearReference(bool bExplicitCommit = false);
 	HRESULT ReferencePrevious(const SObjectEntry &sEntry);
 	HRESULT OpenPrevious(ArchiverSessionPtr ptrSession, LPMESSAGE *lppMessage);
-	HRESULT RemoveStub();
+	_kc_hidden HRESULT RemoveStub(void);
 	HRESULT SetClean();
 	HRESULT DetachFromArchives();
 	virtual HRESULT GetParentFolder(ArchiverSessionPtr ptrSession, LPMAPIFOLDER *lppFolder);
-	static HRESULT GetArchiveList(MAPIPropPtr ptrMapiProp, LPSPropValue lpProps, ULONG cbProps, ObjectEntryList *lplstArchives);
+	_kc_hidden static HRESULT GetArchiveList(MAPIPropPtr, LPSPropValue props, ULONG nprop, ObjectEntryList *archives);
 
 protected:
-	MAPIPropHelper(MAPIPropPtr ptrMapiProp);
-	HRESULT Init();
+	_kc_hidden MAPIPropHelper(MAPIPropPtr);
+	_kc_hidden HRESULT Init(void);
 
 private:
 	MAPIPropPtr m_ptrMapiProp;
 
-	PROPMAP_START
+	PROPMAP_DECL()
 	PROPMAP_DEF_NAMED_ID(ARCHIVE_STORE_ENTRYIDS)
 	PROPMAP_DEF_NAMED_ID(ARCHIVE_ITEM_ENTRYIDS)
 	PROPMAP_DEF_NAMED_ID(ORIGINAL_SOURCEKEY)
@@ -77,16 +76,12 @@ private:
 	PROPMAP_DEF_NAMED_ID(REF_PREV_ENTRYID)
 };
 
-
-class MessageState
-{
+class MessageState _kc_final {
 public:
-	MessageState(): m_ulState(0) {}
-
-	bool isStubbed() const { return (m_ulState & msStubbed) != 0; }
-	bool isDirty() const { return (m_ulState & msDirty) != 0; }
-	bool isCopy() const { return (m_ulState & msCopy) != 0; }
-	bool isMove() const { return (m_ulState & msMove) != 0; }
+	bool isStubbed() const { return m_ulState & msStubbed; }
+	bool isDirty() const { return m_ulState & msDirty; }
+	bool isCopy() const { return m_ulState & msCopy; }
+	bool isMove() const { return m_ulState & msMove; }
 
 private:
 	enum msFlags {
@@ -96,11 +91,10 @@ private:
 		msMove		= 0x08	//< The message is moved, mutual exclusive with msCopy
 	};
 
-	ULONG m_ulState;
-
+	ULONG m_ulState = 0;
 friend class MAPIPropHelper;
 };
 
-}} // namespaces
+}} /* namespace */
 
 #endif // !defined MAPIPROPHELPER_INCLUDED

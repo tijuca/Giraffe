@@ -19,13 +19,15 @@
 #define ARCHIVECONTROLIMPL_H_INCLUDED
 
 #include <set>
+#include <kopano/zcdefs.h>
 #include "operations/operations_fwd.h"
 #include "helpers/ArchiveHelper.h"
+
+namespace KC {
 
 class ECConfig;
 class ECLogger;
 class ECArchiverLogger;
-
 
 /**
  * This class is the entry point to the archiving system. It's responsible for executing the actual archive
@@ -105,22 +107,18 @@ class ECArchiverLogger;
  * This way necessary steps will be executed on a message, regardless of searchfolder
  * timing.
  */
-class ArchiveControlImpl : public ArchiveControl
-{
+class ArchiveControlImpl _kc_final : public ArchiveControl {
 public:
 	static HRESULT Create(ArchiverSessionPtr ptrSession, ECConfig *lpConfig, ECLogger *lpLogger, bool bForceCleanup, ArchiveControlPtr *lpptrArchiveControl);
-
-	eResult ArchiveAll(bool bLocalOnly, bool bAutoAttach, unsigned int ulFlags);
-	eResult Archive(const tstring& strUser, bool bAutoAttach, unsigned int ulFlags);
-
-	eResult CleanupAll(bool bLocalOnly);
-	eResult Cleanup(const tstring& strUser);
+	eResult ArchiveAll(bool bLocalOnly, bool bAutoAttach, unsigned int ulFlags) _kc_override;
+	eResult Archive(const tstring &strUser, bool bAutoAttach, unsigned int ulFlags) _kc_override;
+	eResult CleanupAll(bool bLocalOnly) _kc_override;
+	eResult Cleanup(const tstring &strUser) _kc_override;
 
 	~ArchiveControlImpl();
 
 private:
-	class ReferenceLessCompare 
-    {
+	class ReferenceLessCompare {
 	public:
 		typedef std::pair<entryid_t, entryid_t> value_type;
 		bool operator()(const value_type &lhs, const value_type &rhs) const
@@ -129,7 +127,6 @@ private:
 		}
 	};
 	
-private:
 	typedef HRESULT(ArchiveControlImpl::*fnProcess_t)(const tstring&);
 	typedef std::set<entryid_t> EntryIDSet;
 	typedef std::set<std::pair<entryid_t, entryid_t>, ReferenceLessCompare> ReferenceSet;
@@ -140,7 +137,7 @@ private:
 	HRESULT DoArchive(const tstring& strUser);
 	HRESULT DoCleanup(const tstring& strUser);
 	
-	HRESULT ProcessFolder(MAPIFolderPtr &ptrFolder, za::operations::ArchiveOperationPtr ptrArchiveOperation);
+	HRESULT ProcessFolder(MAPIFolderPtr &ptrFolder, operations::ArchiveOperationPtr ptrArchiveOperation);
 
 	HRESULT ProcessAll(bool bLocalOnly, fnProcess_t fnProcess);
 
@@ -150,12 +147,12 @@ private:
 	HRESULT CleanupArchive(const SObjectEntry &archiveEntry, IMsgStore* lpUserStore, LPSRestriction lpRestriction);
 	HRESULT GetAllReferences(LPMDB lpUserStore, LPGUID lpArchiveGuid, EntryIDSet *lpMsgReferences);
 	HRESULT AppendAllReferences(LPMAPIFOLDER lpRoot, LPGUID lpArchiveGuid, EntryIDSet *lpMsgReferences);
-	HRESULT GetAllEntries(za::helpers::ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchive, LPSRestriction lpRestriction, EntryIDSet *lpEntries);
+	HRESULT GetAllEntries(helpers::ArchiveHelperPtr, LPMAPIFOLDER arc, LPSRestriction, EntryIDSet *entries);
 	HRESULT AppendAllEntries(LPMAPIFOLDER lpArchive, LPSRestriction lpRestriction, EntryIDSet *lpMsgEntries);
-	HRESULT CleanupHierarchy(za::helpers::ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchiveRoot, LPMDB lpUserStore);
+	HRESULT CleanupHierarchy(helpers::ArchiveHelperPtr, LPMAPIFOLDER arc_root, LPMDB user_store);
 
-	HRESULT MoveAndDetachMessages(za::helpers::ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchiveFolder, const EntryIDSet &setEIDs);
-	HRESULT MoveAndDetachFolder(za::helpers::ArchiveHelperPtr ptrArchiveHelper, LPMAPIFOLDER lpArchiveFolder);
+	HRESULT MoveAndDetachMessages(helpers::ArchiveHelperPtr, LPMAPIFOLDER arc_folder, const EntryIDSet &);
+	HRESULT MoveAndDetachFolder(helpers::ArchiveHelperPtr, LPMAPIFOLDER arc_folder);
 
 	HRESULT DeleteMessages(LPMAPIFOLDER lpArchiveFolder, const EntryIDSet &setEIDs);
 	HRESULT DeleteFolder(LPMAPIFOLDER lpArchiveFolder);
@@ -167,35 +164,27 @@ private:
     tstring getfoldername(LPMAPIFOLDER folder);
     HRESULT purgesoftdeleteditems(LPMAPIFOLDER folder, const tstring& strUser);
 	
-private:
 	enum eCleanupAction { caDelete, caStore, caNone };
 
 	ArchiverSessionPtr m_ptrSession;
-	ECConfig *m_lpConfig;
-	ECArchiverLogger *m_lpLogger;
-
-	FILETIME m_ftCurrent;
-	bool m_bArchiveEnable;
-	int m_ulArchiveAfter;
-
-	bool m_bDeleteEnable;
-	bool m_bDeleteUnread;
-	int m_ulDeleteAfter;
-
-	bool m_bStubEnable;
-	bool m_bStubUnread;
-	int m_ulStubAfter;
-
-	bool m_bPurgeEnable;
-	int m_ulPurgeAfter;
-
+	ECConfig *m_lpConfig = nullptr;
+	ECArchiverLogger *m_lpLogger = nullptr;
+	FILETIME m_ftCurrent = {0, 0};
+	bool m_bArchiveEnable = true;
+	int m_ulArchiveAfter = 30;
+	bool m_bDeleteEnable = false;
+	bool m_bDeleteUnread = false;
+	int m_ulDeleteAfter = 0;
+	bool m_bStubEnable = false;
+	bool m_bStubUnread = false;
+	int m_ulStubAfter = 0;
+	bool m_bPurgeEnable = false;
+	int m_ulPurgeAfter = 2555;
 	eCleanupAction m_cleanupAction;
-	bool m_bCleanupFollowPurgeAfter;
+	bool m_bCleanupFollowPurgeAfter = false;
 	bool m_bForceCleanup;
-
-    bool PurgeSoftdeleted;
 	
-	PROPMAP_START
+	PROPMAP_DECL()
 	PROPMAP_DEF_NAMED_ID(ARCHIVE_STORE_ENTRYIDS)
 	PROPMAP_DEF_NAMED_ID(ARCHIVE_ITEM_ENTRYIDS)
 	PROPMAP_DEF_NAMED_ID(ORIGINAL_SOURCEKEY)
@@ -203,5 +192,7 @@ private:
 	PROPMAP_DEF_NAMED_ID(DIRTY)
 
 };
+
+} /* namespace */
 
 #endif // !defined ARCHIVECONTROLIMPL_H_INCLUDED

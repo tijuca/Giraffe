@@ -29,13 +29,17 @@
  */
 
 #include <kopano/platform.h>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <utility>
 #include "mailer.h"
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <csignal>
-#include <sys/time.h> /* gettimeofday */
+#include <time.h>
 
 #define USES_IID_IMAPIFolder
 #define USES_IID_IMessage
@@ -46,7 +50,6 @@
 #include <mapiutil.h>
 #include <mapidefs.h>
 #include <mapiguid.h>
-#include <cctype>
 
 #include <kopano/IECUnknown.h>
 #include "IECSpooler.h"
@@ -61,6 +64,7 @@
 #include <kopano/ECLogger.h>
 #include <kopano/ECConfig.h>
 #include <kopano/UnixUtil.h>
+#include <kopano/memory.hpp>
 #include <kopano/my_getopt.h>
 #include <kopano/ecversion.h>
 #include <kopano/Util.h>
@@ -71,7 +75,6 @@
 #include <edkguid.h>
 #include <kopano/mapiguidext.h>
 #include "mapicontact.h"
-#include <kopano/restrictionutil.h>
 #include <kopano/charset/convert.h>
 #include <kopano/charset/convstring.h>
 #include <kopano/charset/utf8string.h>
@@ -83,6 +86,7 @@
 #include "spmain.h"
 
 using namespace std;
+using namespace KCHL;
 
 static StatsClient *sc = NULL;
 
@@ -100,27 +104,23 @@ static const char *szConfig = ECConfig::GetDefaultPath("spooler.cfg");
 ECConfig *g_lpConfig = NULL;
 ECLogger *g_lpLogger = NULL;
 
-static pthread_t signal_thread;
-static sigset_t signal_mask;
-static bool bNPTL = true;
-
 // notification
 static bool bMessagesWaiting = false;
-static pthread_mutex_t hMutexMessagesWaiting;
-static pthread_cond_t hCondMessagesWaiting;
+static std::mutex hMutexMessagesWaiting;
+static std::condition_variable hCondMessagesWaiting;
 
 // messages being processed
-typedef struct _SendData {
+struct SendData {
 	ULONG cbStoreEntryId;
 	BYTE* lpStoreEntryId;
 	ULONG cbMessageEntryId;
 	BYTE* lpMessageEntryId;
 	ULONG ulFlags;
 	wstring strUsername;
-} SendData;
+};
 static map<pid_t, SendData> mapSendData;
 static map<pid_t, int> mapFinished;	// exit status of finished processes
-static pthread_mutex_t hMutexFinished;	// mutex for mapFinished
+static std::mutex hMutexFinished; /* mutex for mapFinished */
 
 static HRESULT running_server(const char *szSMTP, int port, const char *szPath);
 
@@ -174,22 +174,20 @@ static wstring decodestring(const char *lpszA) {
 static LONG __stdcall AdviseCallback(void *lpContext, ULONG cNotif,
     LPNOTIFICATION lpNotif)
 {
-	pthread_mutex_lock(&hMutexMessagesWaiting);
+	std::unique_lock<std::mutex> lk(hMutexMessagesWaiting);
 	for (ULONG i = 0; i < cNotif; ++i) {
 		if (lpNotif[i].info.tab.ulTableEvent == TABLE_RELOAD) {
 			// Table needs a reload - trigger a reconnect with the server
 			nReload = true;
 			bMessagesWaiting = true;
-			pthread_cond_signal(&hCondMessagesWaiting);
+			hCondMessagesWaiting.notify_one();
 		} 
 		else if (lpNotif[i].info.tab.ulTableEvent != TABLE_ROW_DELETED) {
 			bMessagesWaiting = true;
-			pthread_cond_signal(&hCondMessagesWaiting);
+			hCondMessagesWaiting.notify_one();
 			break;
 		}
 	}
-	pthread_mutex_unlock(&hMutexMessagesWaiting);
-
 	return 0;
 }
 
@@ -226,7 +224,6 @@ static HRESULT StartSpoolerFork(const wchar_t *szUsername, const char *szSMTP,
     BYTE *lpStoreEntryId, ULONG cbMsgEntryId, BYTE *lpMsgEntryId,
     ULONG ulFlags)
 {
-	HRESULT hr = hrSuccess;
 	SendData sSendData;
 	pid_t pid;
 	bool bDoSentMail = ulFlags & EC_SUBMIT_DOSENTMAIL;
@@ -234,10 +231,11 @@ static HRESULT StartSpoolerFork(const wchar_t *szUsername, const char *szSMTP,
 
 	// place pid with entryid copy in map
 	sSendData.cbStoreEntryId = cbStoreEntryId;
-	hr = MAPIAllocateBuffer(cbStoreEntryId, (void**)&sSendData.lpStoreEntryId);
+	HRESULT hr = MAPIAllocateBuffer(cbStoreEntryId,
+	             reinterpret_cast<void **>(&sSendData.lpStoreEntryId));
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "StartSpoolerFork(): MAPIAllocateBuffer failed(1) %x", hr);
-		goto exit;
+		return hr;
 	}
 
 	memcpy(sSendData.lpStoreEntryId, lpStoreEntryId, cbStoreEntryId);
@@ -245,7 +243,7 @@ static HRESULT StartSpoolerFork(const wchar_t *szUsername, const char *szSMTP,
 	hr = MAPIAllocateBuffer(cbMsgEntryId, (void**)&sSendData.lpMessageEntryId);
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "StartSpoolerFork(): MAPIAllocateBuffer failed(2) %x", hr);
-		goto exit;
+		return hr;
 	}
 	memcpy(sSendData.lpMessageEntryId, lpMsgEntryId, cbMsgEntryId);
 	sSendData.ulFlags = ulFlags;
@@ -255,8 +253,7 @@ static HRESULT StartSpoolerFork(const wchar_t *szUsername, const char *szSMTP,
 	pid = vfork();
 	if (pid < 0) {
 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, string("Unable to start new spooler process: ") + strerror(errno));
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
+		return MAPI_E_CALL_FAILED;
 	}
 
 	if (pid == 0) {
@@ -294,9 +291,7 @@ static HRESULT StartSpoolerFork(const wchar_t *szUsername, const char *szSMTP,
 
 	// process is started, place in map
 	mapSendData[pid] = sSendData;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -307,34 +302,34 @@ exit:
  * @param[in]	lpAdminSession	MAPI session of Kopano SYSTEM user
  * @param[out]	lppAddrBook		MAPI Addressbook object
  * @param[out]	lppMailer		inetmapi ECSender object, which can generate an error text for the body for the mail
- * @param[out]	lppUserAdmin	The administrator user in an ECUSER struct
  * @param[out]	lppUserStore	The store of the user with the error mail, open with admin rights
  * @param[out]	lppMessage		The message of the user which caused the error, open with admin rights
  * @return		HRESULT
  */
 static HRESULT GetErrorObjects(const SendData &sSendData,
     IMAPISession *lpAdminSession, IAddrBook **lppAddrBook,
-    ECSender **lppMailer, ECUSER **lppUserAdmin, IMsgStore **lppUserStore,
-    IMessage **lppMessage)
+    ECSender **lppMailer, IMsgStore **lppUserStore, IMessage **lppMessage)
 {
 	HRESULT hr = hrSuccess;
 	ULONG ulObjType = 0;
-	IECServiceAdmin	*lpServiceAdmin = NULL;
-	LPSPropValue lpsProp = NULL;
 
 	if (*lppAddrBook == NULL) {
 		hr = lpAdminSession->OpenAddressBook(0, NULL, AB_NO_DIALOG, lppAddrBook);
 		if (hr != hrSuccess) {
 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open addressbook for error mail, skipping. Error 0x%08X", hr);
-			goto exit;
+			return hr;
 		}
 	}
 
 	if (*lppMailer == NULL) {
-		*lppMailer = CreateSender(g_lpLogger, "localhost", 25); // SMTP server does not matter here, we just use the object for the error body
+		/*
+		 * SMTP server does not matter here, we just use the
+		 * object for the error body.
+		 */
+		*lppMailer = CreateSender("localhost", 25);
 		if (! (*lppMailer)) {
 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to create error object for error mail, skipping.");
-			goto exit;
+			return hr;
 		}
 	}
 
@@ -342,7 +337,7 @@ static HRESULT GetErrorObjects(const SendData &sSendData,
 		hr = lpAdminSession->OpenMsgStore(0, sSendData.cbStoreEntryId, (LPENTRYID)sSendData.lpStoreEntryId, NULL, MDB_WRITE | MDB_NO_DIALOG | MDB_NO_MAIL | MDB_TEMPORARY, lppUserStore);
 		if (hr != hrSuccess) {
 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open store of user for error mail, skipping. Error 0x%08X", hr);
-			goto exit;
+			return hr;
 		}
 	}
 
@@ -350,36 +345,9 @@ static HRESULT GetErrorObjects(const SendData &sSendData,
 		hr = (*lppUserStore)->OpenEntry(sSendData.cbMessageEntryId, (LPENTRYID)sSendData.lpMessageEntryId, &IID_IMessage, MAPI_BEST_ACCESS, &ulObjType, (IUnknown**)lppMessage);
 		if (hr != hrSuccess) {
 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open message of user for error mail, skipping. Error 0x%08X", hr);
-			goto exit;
+			return hr;
 		}
 	}
-
-	if (*lppUserAdmin == NULL) {
-		hr = HrGetOneProp(*lppUserStore, PR_EC_OBJECT, &lpsProp);
-		if (hr != hrSuccess) {
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open ECObject of user for error mail, skipping. Error 0x%08X", hr);
-			goto exit;
-		}
-
-		hr = ((IECUnknown*)lpsProp->Value.lpszA)->QueryInterface(IID_IECServiceAdmin, (void **)&lpServiceAdmin);
-		if (hr != hrSuccess) {
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "ServiceAdmin interface not supported: %s (%x)",
-				GetMAPIErrorMessage(hr), hr);
-			goto exit;
-		}
-
-		hr = lpServiceAdmin->GetUser(g_cbDefaultEid, (LPENTRYID)g_lpDefaultEid, MAPI_UNICODE, lppUserAdmin);
-		if (hr != hrSuccess) {
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get user admin information from store for user error mail, skipping. Error 0x%08X", hr);
-			goto exit;
-		}
-	}
-
-exit:
-	MAPIFreeBuffer(lpsProp);
-	if (lpServiceAdmin)
-		lpServiceAdmin->Release();
-
 	return hr;
 }
 
@@ -396,40 +364,30 @@ static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
     IECSpooler *lpSpooler)
 {
 	HRESULT hr = hrSuccess;
-	std::map<pid_t, int>::const_iterator i;
 	SendData sSendData;
 	bool bErrorMail;
 	map<pid_t, int> finished; // exit status of finished processes
 	int status;
 	// error message creation
-	IAddrBook *lpAddrBook = NULL;
+	object_ptr<IAddrBook> lpAddrBook;
 	ECSender *lpMailer = NULL;
-	ECUSER *lpUserAdmin = NULL;
-	// user error message, release after using
-	IMsgStore *lpUserStore = NULL;
-	IMessage *lpMessage = NULL;
+	std::unique_lock<std::mutex> lock(hMutexFinished);
 
-	pthread_mutex_lock(&hMutexFinished);
-
-	if (mapFinished.empty()) {
-		pthread_mutex_unlock(&hMutexFinished);
+	if (mapFinished.empty())
 		return hr;
-	}
 
 	// copy map contents and clear it, so hMutexFinished can be unlocked again asap
 	finished = mapFinished;
 	mapFinished.clear();
-
-	pthread_mutex_unlock(&hMutexFinished);
-
+	lock.unlock();
 	g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Cleaning %d messages from queue", (int)finished.size());
 
 	// process finished entries
-	for (i = finished.begin(); i != finished.end(); ++i) {
-		sSendData = mapSendData[i->first];
+	for (const auto &i : finished) {
+		sSendData = mapSendData[i.first];
 
 		/* Find exit status, and decide to remove mail from queue or not */
-		status = i->second;
+		status = i.second;
 
 		bErrorMail = false;
 
@@ -455,20 +413,20 @@ static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
 		}
 		else if(WIFSIGNALED(status)) {        /* Child was killed by a signal */
 			bErrorMail = true;
-			g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Spooler process %d was killed by signal %d", i->first, WTERMSIG(status));
+			g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Spooler process %d was killed by signal %d", i.first, WTERMSIG(status));
 			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Message for user %ls will be removed from queue", sSendData.strUsername.c_str());
 			sc -> countInc("Spooler", "sig_killed");
 		}
 		else {								/* Something strange happened */
 			bErrorMail = true;
-			g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Spooler process %d terminated abnormally", i->first);
+			g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Spooler process %d terminated abnormally", i.first);
 			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Message for user %ls will be removed from queue", sSendData.strUsername.c_str());
 			sc -> countInc("Spooler", "abnormal_terminate");
 		}
 #else
 		if (status) {
 			bErrorMail = true;
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Spooler process %d exited with status %d", i->first, status);
+			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Spooler process %d exited with status %d", i.first, status);
 		}
 #endif
 
@@ -478,10 +436,13 @@ static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
 			sc -> countInc("Spooler", "send_failed");
 
 		if (bErrorMail) {
-			hr = GetErrorObjects(sSendData, lpAdminSession, &lpAddrBook, &lpMailer, &lpUserAdmin, &lpUserStore, &lpMessage);
+			object_ptr<IMsgStore> lpUserStore;
+			object_ptr<IMessage> lpMessage;
+
+			hr = GetErrorObjects(sSendData, lpAdminSession, &~lpAddrBook, &lpMailer, &~lpUserStore, &~lpMessage);
 			if (hr == hrSuccess) {
 				lpMailer->setError(_("A fatal error occurred while processing your message, and Kopano is unable to send your email."));
-				hr = SendUndeliverable(lpAddrBook, lpMailer, lpUserStore, lpUserAdmin, lpMessage);
+				hr = SendUndeliverable(lpMailer, lpUserStore, lpMessage);
 				// TODO: if failed, and we have the lpUserStore, create message?
 			}
 			if (hr != hrSuccess)
@@ -495,39 +456,18 @@ static HRESULT CleanFinishedMessages(IMAPISession *lpAdminSession,
 
 			// move mail to sent items folder
 			if (sSendData.ulFlags & EC_SUBMIT_DOSENTMAIL && lpMessage) {
-				hr = DoSentMail(lpAdminSession, lpUserStore, 0, lpMessage);
-				lpMessage = NULL;
+				hr = DoSentMail(lpAdminSession, lpUserStore, 0, std::move(lpMessage));
 				if (hr != hrSuccess)
 					g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to move sent mail to sent-items folder: %s (%x)",
 						GetMAPIErrorMessage(hr), hr);
-			}
-
-			if (lpUserStore) {
-				lpUserStore->Release();
-				lpUserStore = NULL;
-			}
-			if (lpMessage) {
-				lpMessage->Release();
-				lpMessage = NULL;
 			}
 		}
 
 		MAPIFreeBuffer(sSendData.lpStoreEntryId);
 		MAPIFreeBuffer(sSendData.lpMessageEntryId);
-		mapSendData.erase(i->first);
+		mapSendData.erase(i.first);
 	}
-
-	if (lpAddrBook)
-		lpAddrBook->Release();
-
 	delete lpMailer;
-	MAPIFreeBuffer(lpUserAdmin);
-	if (lpUserStore)
-		lpUserStore->Release();
-
-	if (lpMessage)
-		lpMessage->Release();
-
 	return hr;
 }
 
@@ -555,7 +495,6 @@ static HRESULT ProcessAllEntries(IMAPISession *lpAdminSession,
 	unsigned int ulMaxThreads	= 0;
 	unsigned int ulFreeThreads	= 0;
 	ULONG		ulRowCount		= 0;
-	LPSRowSet	lpsRowSet		= NULL;
 	std::wstring strUsername;
 	bool bForceReconnect = false;
 
@@ -578,11 +517,6 @@ static HRESULT ProcessAllEntries(IMAPISession *lpAdminSession,
 		ulMaxThreads = 1;
 
 	while(!bQuit) {
-		if (lpsRowSet) {
-			FreeProws(lpsRowSet);
-			lpsRowSet = NULL;
-		}
-
 		ulFreeThreads = ulMaxThreads - mapSendData.size();
 
 		if (ulFreeThreads == 0) {
@@ -591,8 +525,9 @@ static HRESULT ProcessAllEntries(IMAPISession *lpAdminSession,
 			CleanFinishedMessages(lpAdminSession, lpSpooler);
 			continue;	/* Continue looping until threads become available */
 		}
-		
-		hr = lpTable->QueryRows(1, 0, &lpsRowSet);
+
+		rowset_ptr lpsRowSet;
+		hr = lpTable->QueryRows(1, 0, &~lpsRowSet);
 		if (hr != hrSuccess) {
 			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to fetch data from table, error code: 0x%08X", hr);
 			goto exit;
@@ -607,10 +542,9 @@ static HRESULT ProcessAllEntries(IMAPISession *lpAdminSession,
 			time_t sendat;
 			
 			FileTimeToUnixTime(lpsRowSet->aRow[0].lpProps[4].Value.ft, &sendat);
-			if (now < sendat) {
+			if (now < sendat)
 				// if we ever add logging here, it should trigger just once for this mail
 				continue;
-			}
 		}
 
 		// Check whether the row contains the entryid and store id
@@ -645,14 +579,12 @@ static HRESULT ProcessAllEntries(IMAPISession *lpAdminSession,
 		strUsername = lpsRowSet->aRow[0].lpProps[0].Value.lpszW;
 		// Check if there is already an active process for this message
 		bool bMatch = false;
-		for (std::map<pid_t, SendData>::const_iterator i = mapSendData.begin();
-		     i != mapSendData.end(); ++i) {
-			if (i->second.cbMessageEntryId == lpsRowSet->aRow[0].lpProps[2].Value.bin.cb &&
-				memcmp(i->second.lpMessageEntryId, lpsRowSet->aRow[0].lpProps[2].Value.bin.lpb, i->second.cbMessageEntryId) == 0) {
+		for (const auto &i : mapSendData)
+			if (i.second.cbMessageEntryId == lpsRowSet->aRow[0].lpProps[2].Value.bin.cb &&
+			    memcmp(i.second.lpMessageEntryId, lpsRowSet->aRow[0].lpProps[2].Value.bin.lpb, i.second.cbMessageEntryId) == 0) {
 				bMatch = true;
 				break;
 			}
-		}
 		if (bMatch)
 			continue;
 
@@ -665,9 +597,6 @@ static HRESULT ProcessAllEntries(IMAPISession *lpAdminSession,
 	}
 
 exit:
-	if (lpsRowSet)
-		FreeProws(lpsRowSet);
-
 	return bForceReconnect ? MAPI_E_NETWORK_ERROR : hr;
 }
 
@@ -682,36 +611,29 @@ static HRESULT GetAdminSpooler(IMAPISession *lpAdminSession,
     IECSpooler **lppSpooler)
 {
 	HRESULT		hr = hrSuccess;
-	IECSpooler	*lpSpooler = NULL;
-	IMsgStore	*lpMDB = NULL;
-	SPropValue	*lpsProp = NULL;
+	object_ptr<IECSpooler> lpSpooler;
+	object_ptr<IMsgStore> lpMDB;
+	memory_ptr<SPropValue> lpsProp;
 
-	hr = HrOpenDefaultStore(lpAdminSession, &lpMDB);
+	hr = HrOpenDefaultStore(lpAdminSession, &~lpMDB);
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open default store for system account. Error 0x%08X", hr);
-		goto exit;
+		return hr;
 	}
-
-	hr = HrGetOneProp(lpMDB, PR_EC_OBJECT, &lpsProp);
+	hr = HrGetOneProp(lpMDB, PR_EC_OBJECT, &~lpsProp);
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get Kopano internal object: %s (%x)",
 			GetMAPIErrorMessage(hr), hr);
-		goto exit;
+		return hr;
 	}
 
-	hr = ((IECUnknown *)lpsProp->Value.lpszA)->QueryInterface(IID_IECSpooler, (void **)&lpSpooler);
+	hr = ((IECUnknown *)lpsProp->Value.lpszA)->QueryInterface(IID_IECSpooler, &~lpSpooler);
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Spooler interface not supported: %s (%x)",
 			GetMAPIErrorMessage(hr), hr);
-		goto exit;
+		return hr;
 	}
-
-	*lppSpooler = lpSpooler;
-
-exit:
-	if (lpMDB)
-		lpMDB->Release();
-	MAPIFreeBuffer(lpsProp);
+	*lppSpooler = lpSpooler.release();
 	return hr;
 }
 
@@ -723,33 +645,27 @@ exit:
  *
  * @param[in]	szSMTP	The SMTP server to send to.
  * @param[in]	ulPort	The SMTP port to sent to.
- * @param[in]	szPath	URI of storage server to connect to, must be file:// or https:// with valid ssl certificates.
+ * @param[in]	szPath	URI of storage server to connect to, must be file:// or https:// with valid SSL certificates.
  * @return		HRESULT
  */
 static HRESULT ProcessQueue(const char *szSMTP, int ulPort, const char *szPath)
 {
 	HRESULT				hr				= hrSuccess;
-	IMAPISession		*lpAdminSession = NULL;
-	IECSpooler			*lpSpooler		= NULL;
-	IMAPITable			*lpTable		= NULL;
-	IMAPIAdviseSink		*lpAdviseSink	= NULL;
+	object_ptr<IMAPISession> lpAdminSession;
+	object_ptr<IECSpooler> lpSpooler;
+	object_ptr<IMAPITable> lpTable;
+	object_ptr<IMAPIAdviseSink> lpAdviseSink;
 	ULONG				ulConnection	= 0;
+	static constexpr const SizedSPropTagArray(5, sOutgoingCols) =
+		{5, {PR_EC_MAILBOX_OWNER_ACCOUNT_W, PR_STORE_ENTRYID,
+		PR_ENTRYID, PR_EC_OUTGOING_FLAGS, PR_DEFERRED_SEND_TIME}};
+	static constexpr const SizedSSortOrderSet(1, sSort) =
+		{1, 0, 0, {{PR_EC_HIERARCHYID, TABLE_SORT_ASCEND}}};
 
-	SizedSPropTagArray(5, sOutgoingCols) = {
-		5, {
-			PR_EC_MAILBOX_OWNER_ACCOUNT_W,
-			PR_STORE_ENTRYID,
-			PR_ENTRYID,
-			PR_EC_OUTGOING_FLAGS,
-			PR_DEFERRED_SEND_TIME,
-		}
-	};
-	
-	SSortOrderSet sSort = { 1, 0, 0, { { PR_EC_HIERARCHYID, TABLE_SORT_ASCEND } } };
-
-	hr = HrOpenECAdminSession(g_lpLogger, &lpAdminSession, "kopano-spooler:system", PROJECT_SVN_REV_STR, szPath, EC_PROFILE_FLAGS_NO_PUBLIC_STORE,
-							  g_lpConfig->GetSetting("sslkey_file", "", NULL),
-							  g_lpConfig->GetSetting("sslkey_pass", "", NULL));
+	hr = HrOpenECAdminSession(&~lpAdminSession, "kopano-spooler:system",
+	     PROJECT_SVN_REV_STR, szPath, EC_PROFILE_FLAGS_NO_PUBLIC_STORE,
+	     g_lpConfig->GetSetting("sslkey_file", "", NULL),
+	     g_lpConfig->GetSetting("sslkey_pass", "", NULL));
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open admin session. Error 0x%08X", hr);
 		goto exit;
@@ -762,7 +678,7 @@ static HRESULT ProcessQueue(const char *szSMTP, int ulPort, const char *szPath)
 
 	disconnects = 0;			// first call succeeded, assume all is well.
 
-	hr = GetAdminSpooler(lpAdminSession, &lpSpooler);
+	hr = GetAdminSpooler(lpAdminSession, &~lpSpooler);
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "ProcessQueue: GetAdminSpooler failed %x", hr);
 		goto exit;
@@ -772,14 +688,13 @@ static HRESULT ProcessQueue(const char *szSMTP, int ulPort, const char *szPath)
 	nReload = false;
 	
 	// Request the master outgoing table
-	hr = lpSpooler->GetMasterOutgoingTable(0, &lpTable);
+	hr = lpSpooler->GetMasterOutgoingTable(0, &~lpTable);
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Master outgoing queue not available: %s (%x)",
 			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
-
-	hr = lpTable->SetColumns((LPSPropTagArray)&sOutgoingCols, 0);
+	hr = lpTable->SetColumns(sOutgoingCols, 0);
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to setColumns() on OutgoingQueue: %s (%x)",
 			GetMAPIErrorMessage(hr), hr);
@@ -787,14 +702,13 @@ static HRESULT ProcessQueue(const char *szSMTP, int ulPort, const char *szPath)
 	}
 	
 	// Sort by ascending hierarchyid: first in, first out queue
-	hr = lpTable->SortTable(&sSort, 0);
+	hr = lpTable->SortTable(sSort, 0);
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to SortTable() on OutgoingQueue: %s (%x)",
 			GetMAPIErrorMessage(hr), hr);
 		goto exit;
 	}
-
-	hr = HrAllocAdviseSink(AdviseCallback, NULL, &lpAdviseSink);	
+	hr = HrAllocAdviseSink(AdviseCallback, nullptr, &~lpAdviseSink);	
 	if (hr != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to allocate memory for advise sink: %s (%x)",
 			GetMAPIErrorMessage(hr), hr);
@@ -823,27 +737,22 @@ static HRESULT ProcessQueue(const char *szSMTP, int ulPort, const char *szPath)
 		if(nReload)
 			break;
 
-		pthread_mutex_lock(&hMutexMessagesWaiting);
+		std::unique_lock<std::mutex> lk(hMutexMessagesWaiting);
 		if(!bMessagesWaiting) {
-			struct timespec timeout;
-			struct timeval now;
-
-			// Wait for max 60 sec, then run queue anyway
-			gettimeofday(&now,NULL);
-			timeout.tv_sec = now.tv_sec + 60;
-			timeout.tv_nsec = now.tv_usec * 1000;
-
+			auto target = std::chrono::steady_clock::now() + std::chrono::seconds(60);
 			while (!bMessagesWaiting) {
-				if (pthread_cond_timedwait(&hCondMessagesWaiting, &hMutexMessagesWaiting, &timeout) == ETIMEDOUT || bMessagesWaiting || bQuit || nReload)
+				auto s = hCondMessagesWaiting.wait_until(lk, target);
+				if (s == std::cv_status::timeout || bMessagesWaiting || bQuit || nReload)
 					break;
 
 				// not timed out, no messages waiting, not quit requested, no table reload required:
 				// we were triggered for a cleanup call.
+				lk.unlock();
 				CleanFinishedMessages(lpAdminSession, lpSpooler);
+				lk.lock();
 			}
 		}
-
-		pthread_mutex_unlock(&hMutexMessagesWaiting);
+		lk.unlock();
 
 		// remove any entries that were done during the wait
 		CleanFinishedMessages(lpAdminSession, lpSpooler);
@@ -860,9 +769,8 @@ exit:
 				ulThreads = mapSendData.size();
 				g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Still waiting for %d thread%c to exit.", ulThreads, ulThreads!=1?'s':' ');
 			}
-
-			CleanFinishedMessages(lpAdminSession, lpSpooler);
-
+			if (lpSpooler != nullptr)
+				CleanFinishedMessages(lpAdminSession, lpSpooler);
 			if (mapSendData.size() == 0)
 				break;
 
@@ -878,19 +786,6 @@ exit:
 
 	if (lpTable && ulConnection)
 		lpTable->Unadvise(ulConnection);
-
-	if (lpAdviseSink)
-		lpAdviseSink->Release();
-
-	if (lpTable)
-		lpTable->Release();
-
-	if (lpSpooler)
-		lpSpooler->Release();
-
-	if (lpAdminSession)
-		lpAdminSession->Release();
-
 	return hr;
 }
 
@@ -912,36 +807,35 @@ static void sigsegv(int signr, siginfo_t *si, void *uc)
  */
 static void process_signal(int sig)
 {
+	ec_log_debug("Received signal %d", sig);
 	int stat;
 	pid_t pid;
 
 	switch (sig) {
 	case SIGTERM:
-	case SIGINT:
+	case SIGINT: {
 		bQuit = true;
 		// Trigger condition so we force wakeup the queue thread
-		pthread_mutex_lock(&hMutexMessagesWaiting);
-		pthread_cond_signal(&hCondMessagesWaiting);
-		pthread_mutex_unlock(&hMutexMessagesWaiting);
+		std::lock_guard<std::mutex> lk(hMutexMessagesWaiting);
+		hCondMessagesWaiting.notify_one();
 		break;
+	}
 
-	case SIGCHLD:
-		pthread_mutex_lock(&hMutexFinished);
+	case SIGCHLD: {
+		std::unique_lock<std::mutex> finlock(hMutexFinished);
 		while ((pid = waitpid (-1, &stat, WNOHANG)) > 0)
 			mapFinished[pid] = stat;
-		pthread_mutex_unlock(&hMutexFinished);
+		finlock.unlock();
 		// Trigger condition so the messages get cleaned from the queue
-		pthread_mutex_lock(&hMutexMessagesWaiting);
-		pthread_cond_signal(&hCondMessagesWaiting);
-		pthread_mutex_unlock(&hMutexMessagesWaiting);
+		std::lock_guard<std::mutex> mwlock(hMutexMessagesWaiting);
+		hCondMessagesWaiting.notify_one();
 		break;
+	}
 
 	case SIGHUP:
-		if (g_lpConfig) {
-			if (!g_lpConfig->ReloadSettings() && g_lpLogger)
-				g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to reload configuration file, continuing with current settings.");
-		}
-
+		if (g_lpConfig != nullptr && !g_lpConfig->ReloadSettings() &&
+		    g_lpLogger != nullptr)
+			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to reload configuration file, continuing with current settings.");
 		if (g_lpLogger) {
 			if (g_lpConfig) {
 				const char *ll = g_lpConfig->GetSetting("log_level");
@@ -954,48 +848,18 @@ static void process_signal(int sig)
 		}
 		break;
 
-	case SIGUSR2:
+	case SIGUSR2: {
 		g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Spooler stats:");
-		g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Running threads: %lu", mapSendData.size());
-		pthread_mutex_lock(&hMutexFinished);
-		g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Finished threads: %lu", mapFinished.size());
-		pthread_mutex_unlock(&hMutexFinished);
+		g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Running threads: %zu", mapSendData.size());
+		std::lock_guard<std::mutex> l(hMutexFinished);
+		g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Finished threads: %zu", mapFinished.size());
 		g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Disconnects: %d", disconnects);
 		break;
-
+	}
 	default:
 		g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unknown signal %d received", sig);
 		break;
 	}
-}
-
-/** 
- * Signal handler thread. Currently handles SIGTERM, SIGINT, SIGCHLD, SIGHUP and SIGUSR2.
- *
- * SIGCHLD waits for the mailer child, and stores the exit status for cleanup from the queue.
- * SIGHUP reloads the config file
- * SIGUSR2 prints some simple stats in the log 
- * 
- * @return 
- */
-static void *signal_handler(void *)
-{
-	int sig;
-
-	g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Signal thread started");
-
-	// already blocking signals
-
-	while (!bQuit && sigwait(&signal_mask, &sig) == 0)
-	{
-		g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Received signal %d", sig);
-
-		process_signal(sig);
-	}
-	
-	g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Signal thread done");
-
-	return NULL;
 }
 
 /**
@@ -1005,7 +869,7 @@ static void *signal_handler(void *)
  *
  * @param[in]	szSMTP	The SMTP server to send to.
  * @param[in]	ulPort	The SMTP port to send to.
- * @param[in]	szPath	URI of storage server to connect to, must be file:// or https:// with valid ssl certificates.
+ * @param[in]	szPath	URI of storage server to connect to, must be file:// or https:// with valid SSL certificates.
  * @return		HRESULT
  */
 static HRESULT running_server(const char *szSMTP, int ulPort,
@@ -1031,9 +895,6 @@ static HRESULT running_server(const char *szSMTP, int ulPort,
 	}
 
 	bQuit = true;				// make sure the sigchld does not use the lock anymore
-	pthread_mutex_destroy(&hMutexMessagesWaiting);
-	pthread_cond_destroy(&hCondMessagesWaiting);
-
 	return hr;
 }
 
@@ -1193,7 +1054,7 @@ int main(int argc, char *argv[]) {
 		int argidx = 0;
 
 		if (!g_lpConfig->LoadSettings(szConfig) ||
-		    !g_lpConfig->ParseParams(argc - optind, &argv[optind], &argidx) ||
+		    (argidx = g_lpConfig->ParseParams(argc - optind, &argv[optind])) < 0 ||
 		    (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
 			g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false); // create info logger without a timestamp to stderr
 			ec_log_set(g_lpLogger);
@@ -1234,19 +1095,6 @@ int main(int argc, char *argv[]) {
 	if (!TmpPath::getInstance() -> OverridePath(g_lpConfig))
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Ignoring invalid path-setting!");
 
-	// detect linuxthreads, which is too broken to correctly run the spooler
-	if (!bForked) {
-		char buffer[256] = { 0 };
-		confstr(_CS_GNU_LIBPTHREAD_VERSION, buffer, sizeof(buffer));
-
-		if (strncmp(buffer, "linuxthreads", strlen("linuxthreads")) == 0) {
-			bNPTL = false;
-			g_lpConfig->AddSetting("max_threads","1");
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: your system is running with outdated linuxthreads.");
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "WARNING: the kopano-spooler will only be able to send one message at a time.");
-		}
-	}
-
 	// set socket filename
 	if (!szPath)
 		szPath = g_lpConfig->GetSetting("server_socket");
@@ -1260,16 +1108,16 @@ int main(int argc, char *argv[]) {
 		signal(SIGUSR2, SIG_IGN);
 	}
 	else {
-		pthread_mutex_init(&hMutexFinished, NULL);
 		// notification condition
-		pthread_mutex_init(&hMutexMessagesWaiting, NULL);
-		pthread_cond_init(&hCondMessagesWaiting, NULL);
-		sigemptyset(&signal_mask);
-		sigaddset(&signal_mask, SIGTERM);
-		sigaddset(&signal_mask, SIGINT);
-		sigaddset(&signal_mask, SIGCHLD);
-		sigaddset(&signal_mask, SIGHUP);
-		sigaddset(&signal_mask, SIGUSR2);
+		act.sa_handler = process_signal;
+		act.sa_flags = SA_ONSTACK | SA_RESTART;
+		sigemptyset(&act.sa_mask);
+		sigaction(SIGHUP, &act, nullptr);
+		sigaction(SIGINT, &act, nullptr);
+		sigaction(SIGTERM, &act, nullptr);
+		sigaction(SIGCHLD, &act, nullptr);
+		sigaction(SIGUSR2, &act, nullptr);
+
 	}
 
     st.ss_sp = malloc(65536);
@@ -1278,7 +1126,7 @@ int main(int argc, char *argv[]) {
 
 	act.sa_sigaction = sigsegv;
 	act.sa_flags = SA_ONSTACK | SA_RESETHAND | SA_SIGINFO;
-
+	sigemptyset(&act.sa_mask);
     sigaltstack(&st, NULL);
     sigaction(SIGSEGV, &act, NULL);
     sigaction(SIGBUS, &act, NULL);
@@ -1286,15 +1134,15 @@ int main(int argc, char *argv[]) {
 
 	bQuit = bMessagesWaiting = false;
 	if (parseBool(g_lpConfig->GetSetting("coredump_enabled")))
-		unix_coredump_enable(g_lpLogger);
+		unix_coredump_enable();
 
 	// fork if needed and drop privileges as requested.
 	// this must be done before we do anything with pthreads
-	if (unix_runas(g_lpConfig, g_lpLogger)) {
+	if (unix_runas(g_lpConfig)) {
 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "main(): run-as failed");
 		goto exit;
 	}
-	if (daemonize && unix_daemonize(g_lpConfig, g_lpLogger)) {
+	if (daemonize && unix_daemonize(g_lpConfig)) {
 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "main(): failed daemonizing");
 		goto exit;
 	}
@@ -1302,7 +1150,7 @@ int main(int argc, char *argv[]) {
 	if (!daemonize)
 		setsid();
 
-	if (bForked == false && unix_create_pidfile(argv[0], g_lpConfig, g_lpLogger, false) < 0) {
+	if (bForked == false && unix_create_pidfile(argv[0], g_lpConfig, false) < 0) {
 		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "main(): Failed creating PID file");
 		goto exit;
 	}
@@ -1317,24 +1165,6 @@ int main(int argc, char *argv[]) {
 		goto exit;
 	}
 
-	if (!bForked) {
-		if (bNPTL) {
-			// valid for all threads afterwards
-			pthread_sigmask(SIG_BLOCK, &signal_mask, NULL);
-			// create signal handler thread, will handle all blocked signals
-			// must be done after the daemonize
-			pthread_create(&signal_thread, NULL, signal_handler, NULL);
-			set_thread_name(signal_thread, "SignalHandler");
-		} else {
-			// signal thread not possible, so register all signals separately
-			signal(SIGTERM, process_signal);
-			signal(SIGINT, process_signal);
-			signal(SIGCHLD, process_signal);
-			signal(SIGHUP, process_signal);
-			signal(SIGUSR2, process_signal);
-		}
-	}
-
 	sc = new StatsClient(g_lpLogger);
 	sc->startup(g_lpConfig->GetSetting("z_statsd_stats"));
 	if (bForked)
@@ -1344,17 +1174,8 @@ int main(int argc, char *argv[]) {
 
 	delete sc;
 
-	if (!bForked) {
-		if (bNPTL) {
-			g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Joining signal thread");
-			pthread_join(signal_thread, NULL);
-			g_lpLogger->Log(EC_LOGLEVEL_INFO, "Spooler shutdown complete");
-		}
-		else {
-			// ignore the death of the pipe logger
-			signal(SIGCHLD, SIG_IGN);
-		}
-	}
+	if (!bForked)
+		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Spooler shutdown complete");
 	MAPIUninitialize();
 
 exit:

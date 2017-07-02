@@ -16,11 +16,12 @@
  */
 
 #include <kopano/platform.h>
+#include <memory>
 #include "SOAPSock.h"
 #include <sys/un.h>
 #include "SOAPUtils.h"
+#include <kopano/ECLogger.h>
 #include <kopano/stringutil.h>
-#include <kopano/threadutil.h>
 #include <kopano/CommonUtil.h>
 #include <string>
 #include <map>
@@ -29,8 +30,6 @@
 #include <kopano/charset/utf8string.h>
 
 using namespace std;
-
-static int ssl_zvcb_index = -1;	// the index to get our custom data
 
 // we cannot patch http_post now (see external/gsoap/*.diff), so we redefine it
 static int
@@ -56,7 +55,7 @@ http_post(struct soap *soap, const char *endpoint, const char *host, int port, c
   return soap->fposthdr(soap, NULL, NULL);
 }
 
-// This function wraps the GSOAP fopen call to support "file:///var/run/socket" unix-socket URI's
+// This function wraps the GSOAP fopen call to support "file:///var/run/socket" Unix socket URIs
 static int gsoap_connect_pipe(struct soap *soap, const char *endpoint,
     const char *host, int port)
 {
@@ -73,19 +72,21 @@ static int gsoap_connect_pipe(struct soap *soap, const char *endpoint,
 	if (strncmp(endpoint, "file://", 7) != 0)
 		return SOAP_EOF;
 	const char *socket_name = strchr(endpoint + 7, '/');
+	// >= because there also needs to be room for the 0x00
 	if (socket_name == NULL ||
 	    strlen(socket_name) >= sizeof(saddr.sun_path))
 		return SOAP_EOF;
 
 	fd = socket(PF_UNIX, SOCK_STREAM, 0);
+	if (fd < 0)
+		return SOAP_EOF;
 
 	saddr.sun_family = AF_UNIX;
-
-	// >= because there also needs to be room for the 0x00
-	if (strlen(socket_name) >= sizeof(saddr.sun_path))
-		return SOAP_EOF;
 	kc_strlcpy(saddr.sun_path, socket_name, sizeof(saddr.sun_path));
-	connect(fd, (struct sockaddr *)&saddr, sizeof(struct sockaddr_un));
+	if (connect(fd, (struct sockaddr *)&saddr, sizeof(struct sockaddr_un)) < 0) {
+		close(fd);
+		return SOAP_EOF;
+	}
 
  	soap->sendfd = soap->recvfd = SOAP_INVALID_SOCKET;
 	soap->socket = fd;
@@ -115,13 +116,10 @@ HRESULT CreateSoapTransport(ULONG ulUIFlags,
 	int				iSoapoMode,
 	KCmd **lppCmd)
 {
-	HRESULT		hr = hrSuccess;
 	KCmd*	lpCmd = NULL;
 
-	if (strServerPath == NULL || *strServerPath == '\0' || lppCmd == NULL) {
-		hr = E_INVALIDARG;
-		goto exit;
-	}
+	if (strServerPath == NULL || *strServerPath == '\0' || lppCmd == NULL)
+		return E_INVALIDARG;
 
 	lpCmd = new KCmd();
 
@@ -129,6 +127,7 @@ HRESULT CreateSoapTransport(ULONG ulUIFlags,
 	soap_set_omode(lpCmd->soap, iSoapoMode);
 
 	lpCmd->endpoint = strdup(strServerPath);
+	lpCmd->soap->sndbuf = lpCmd->soap->rcvbuf = 0;
 
 	// default allow SSLv3, TLSv1, TLSv1.1 and TLSv1.2
 	lpCmd->soap->ctx = SSL_CTX_new(SSLv23_method());
@@ -136,22 +135,15 @@ HRESULT CreateSoapTransport(ULONG ulUIFlags,
 #ifdef WITH_OPENSSL
 	if (strncmp("https:", lpCmd->endpoint, 6) == 0) {
 		// no need to add certificates to call, since soap also calls SSL_CTX_set_default_verify_paths()
-		if(soap_ssl_client_context(lpCmd->soap,
-								SOAP_SSL_DEFAULT | SOAP_SSL_SKIP_HOST_CHECK,
+		if (soap_ssl_client_context(lpCmd->soap, SOAP_SSL_DEFAULT,
 								strSSLKeyFile != NULL && *strSSLKeyFile != '\0' ? strSSLKeyFile : NULL,
 								strSSLKeyPass != NULL && *strSSLKeyPass != '\0' ? strSSLKeyPass : NULL,
 								NULL, NULL,
 								NULL)) {
-			hr = E_INVALIDARG;
-			goto exit;
+			free(const_cast<char *>(lpCmd->endpoint));
+			delete lpCmd;
+			return E_INVALIDARG;
 		}
-
-		// set connection string as callback information
-		if (ssl_zvcb_index == -1) {
-			ssl_zvcb_index = SSL_get_ex_new_index(0, NULL, NULL, NULL, NULL);
-		}
-		// callback data will be set right before tcp_connect()
-
 		// set our own certificate check function
 		lpCmd->soap->fsslverify = ssl_verify_callback_kopano_silent;
 		SSL_CTX_set_verify(lpCmd->soap->ctx, SSL_VERIFY_PEER, lpCmd->soap->fsslverify);
@@ -174,16 +166,8 @@ HRESULT CreateSoapTransport(ULONG ulUIFlags,
 
 		lpCmd->soap->connect_timeout = ulConnectionTimeOut;
 	}
-
 	*lppCmd = lpCmd;
-exit:
-	if (hr != hrSuccess && lpCmd) {
-		/* strdup'd them earlier */
-		free(const_cast<char *>(lpCmd->endpoint));
-		delete lpCmd;
-	}
-
-	return hr;
+	return hrSuccess;
 }
 
 VOID DestroySoapTransport(KCmd *lpCmd)
@@ -205,20 +189,20 @@ int ssl_verify_callback_kopano_silent(int ok, X509_STORE_CTX *store)
 
 	if (ok == 0)
 	{
-		// Get the last ssl error
+		// Get the last SSL error
 		sslerr = X509_STORE_CTX_get_error(store);
 		switch (sslerr)
 		{
-			case X509_V_ERR_CERT_HAS_EXPIRED:
-			case X509_V_ERR_CERT_NOT_YET_VALID:
-			case X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN:
-			case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
-				// always ignore these errors
-				X509_STORE_CTX_set_error(store, X509_V_OK);
-				ok = 1;
-				break;
-			default:
-				break;
+		case X509_V_ERR_CERT_HAS_EXPIRED:
+		case X509_V_ERR_CERT_NOT_YET_VALID:
+		case X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN:
+		case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
+			// always ignore these errors
+			X509_STORE_CTX_set_error(store, X509_V_OK);
+			ok = 1;
+			break;
+		default:
+			break;
 		}
 	}
 	return ok;

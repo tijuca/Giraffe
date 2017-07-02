@@ -18,6 +18,7 @@
 #ifndef ECQUOTAMONITOR
 #define ECQUOTAMONITOR
 
+#include <kopano/zcdefs.h>
 #include <kopano/ECDefs.h>
 
 #define TEMPLATE_LINE_LENGTH		1024
@@ -34,13 +35,12 @@ struct TemplateVariables {
 	std::string strHardSize;
 };
 
-class ECQuotaMonitor
-{
+class ECQuotaMonitor _kc_final {
 private:
 	ECQuotaMonitor(ECTHREADMONITOR *lpThreadMonitor, LPMAPISESSION lpMAPIAdminSession, LPMDB lpMDBAdmin);
-	virtual ~ECQuotaMonitor();
 
 public:
+	virtual ~ECQuotaMonitor(void);
 	static void* Create(void* lpVoid);
 
 	HRESULT	CheckQuota();
@@ -62,12 +62,10 @@ private:
 
 	HRESULT Notify(ECUSER *lpecUser, ECCOMPANY *lpecCompany, ECQUOTASTATUS *lpecQuotaStatus, LPMDB lpStore);
 
-private:
 	ECTHREADMONITOR *m_lpThreadMonitor;
 	LPMAPISESSION		m_lpMAPIAdminSession;
 	LPMDB				m_lpMDBAdmin;
-	ULONG				m_ulProcessed;
-	ULONG				m_ulFailed;
+	ULONG m_ulProcessed = 0, m_ulFailed = 0;
 };
 
 

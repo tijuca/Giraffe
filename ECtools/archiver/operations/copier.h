@@ -19,6 +19,7 @@
 #define copier_INCLUDED
 
 #include <memory>
+#include <kopano/zcdefs.h>
 #include "operations.h"
 #include "postsaveaction.h"
 #include "transaction_fwd.h"
@@ -26,44 +27,42 @@
 #include "ArchiverSessionPtr.h"     // For ArchiverSessionPtr
 #include <kopano/archiver-common.h>
 #include <map>
-#include <boost/smart_ptr.hpp>
+
+namespace KC {
 
 class ECConfig;
 
-namespace za { namespace operations {
+namespace operations {
 
 /**
  * Performs the copy part of the archive operation.
  */
-class Copier : public ArchiveOperationBaseEx
-{
+class _kc_export Copier _kc_final : public ArchiveOperationBaseEx {
 public:
-	Copier(ArchiverSessionPtr ptrSession, ECConfig *lpConfig, ECArchiverLogger *lpLogger, const ObjectEntryList &lstArchives, LPSPropTagArray lpExcludeProps, int ulAge, bool bProcessUnread);
-	~Copier();
+	_kc_hidden Copier(ArchiverSessionPtr, ECConfig *, ECArchiverLogger *, const ObjectEntryList &archives, const SPropTagArray *exclprop, int age, bool process_unread);
+	_kc_hidden ~Copier(void);
 
 	/**
 	 * Override ArchiveOperationBaseEx's GetRestriction to add some more
 	 * magic.
 	 */
-	HRESULT GetRestriction(LPMAPIPROP lpMapiProp, LPSRestriction *lppRestriction);
+	_kc_hidden HRESULT GetRestriction(LPMAPIPROP p, LPSRestriction *ret);
 
 	/**
 	 * Set the operation that will perform the deletion if required.
 	 * @param[in]	ptrDeleteOp		The delete operation.
 	 */
-	void SetDeleteOperation(DeleterPtr ptrDeleteOp);
+	_kc_hidden void SetDeleteOperation(DeleterPtr);
 
 	/**
 	 * Set the operation that will perform the stubbing if required.
 	 * @param[in]	ptrStubOp		The stub operation.
 	 */
-	void SetStubOperation(StubberPtr ptrStubOp);
+	_kc_hidden void SetStubOperation(StubberPtr);
 
-public:
-	class Helper // For lack of a better name
-	{
+	class _kc_export Helper { // For lack of a better name
 	public:
-		Helper(ArchiverSessionPtr ptrSession, ECLogger *lpLogger, const InstanceIdMapperPtr &ptrMapper, LPSPropTagArray lpExcludeProps, LPMAPIFOLDER lpFolder);
+		Helper(ArchiverSessionPtr, ECLogger *, const InstanceIdMapperPtr &, const SPropTagArray *exclprop, LPMAPIFOLDER folder);
 		~Helper(void);
 
 		/**
@@ -80,7 +79,7 @@ public:
 		 * @param[in]	archiveEntry		SObjectEntry specifying the archive to archive.
 		 * @param[out]	lppArchiveFolder	The archive root folder.
 		 */
-		HRESULT GetArchiveFolder(const SObjectEntry &archiveEntry, LPMAPIFOLDER *lppArchiveFolder);
+		_kc_hidden HRESULT GetArchiveFolder(const SObjectEntry &arc_entry, LPMAPIFOLDER *ret);
 
 		/**
 		 * Copy the message to the archive and setup the special properties.
@@ -96,12 +95,12 @@ public:
 		 * @param[in]	lpSource		The reference message.
 		 * @param[in]	lpDest			The message to update.
 		 */
-		HRESULT UpdateIIDs(LPMESSAGE lpSource, LPMESSAGE lpDest, PostSaveActionPtr *lpptrPSAction);
+		_kc_hidden HRESULT UpdateIIDs(LPMESSAGE src, LPMESSAGE dst, PostSaveActionPtr *);
 
 		/**
 		 * Get the Session instance associated with this instance.
 		 */
-		ArchiverSessionPtr& GetSession() { return m_ptrSession; }
+		_kc_hidden ArchiverSessionPtr &GetSession(void) { return m_ptrSession; }
 
 	private:
 		typedef std::map<entryid_t,MAPIFolderPtr> ArchiveFolderMap;
@@ -109,17 +108,16 @@ public:
 
 		ArchiverSessionPtr m_ptrSession;
 		ECLogger *m_lpLogger;
-		LPSPropTagArray m_lpExcludeProps;
+		const SPropTagArray *m_lpExcludeProps;
 		MAPIFolderPtr m_ptrFolder;
 		InstanceIdMapperPtr m_ptrMapper;
 	};
 
 private:
-	HRESULT EnterFolder(LPMAPIFOLDER lpFolder);
-	HRESULT LeaveFolder();
-	HRESULT DoProcessEntry(ULONG cProps, const LPSPropValue &lpProps);
+	_kc_hidden HRESULT EnterFolder(LPMAPIFOLDER) _kc_override;
+	_kc_hidden HRESULT LeaveFolder(void) _kc_override;
+	_kc_hidden HRESULT DoProcessEntry(ULONG n, const LPSPropValue &prop) _kc_override;
 
-private:
 	/**
 	 * Perform an initial archive of a message. This will be used to archive
 	 * a message that has not been archived before.
@@ -129,7 +127,7 @@ private:
 	 * @param[in]	refMsgEntry			The SObjectEntry describing the message to be archived
 	 * @param[out]	lpptrTransaction	A Transaction object used to save and delete the proper messages when everything is setup
 	 */
-	HRESULT DoInitialArchive(LPMESSAGE lpMessage, const SObjectEntry &archiveRootEntry, const SObjectEntry &refMsgEntry, TransactionPtr *lpptrTransaction);
+	_kc_hidden HRESULT DoInitialArchive(LPMESSAGE, const SObjectEntry &arc_root_entry, const SObjectEntry &ref_msg_entry, TransactionPtr *);
 
 	/**
 	 * Track an existing archive and create a new archive of a message. This is used for the
@@ -143,7 +141,7 @@ private:
 	 * @param[in]	bUpdateHistory		If true, update the history references
 	 * @param[out]	lpptrTransaction	A Transaction object used to save and delete the proper messages when everything is setup
 	 */
-	HRESULT DoTrackAndRearchive(LPMESSAGE lpMessage, const SObjectEntry &archiveRootEntry, const SObjectEntry &archiveMsgEntry, const SObjectEntry &refMsgEntry, bool bUpdateHistory, TransactionPtr *lpptrTransaction);
+	_kc_hidden HRESULT DoTrackAndRearchive(LPMESSAGE, const SObjectEntry &arc_root_entry, const SObjectEntry &arc_msg_entry, const SObjectEntry &ref_msg_entry, bool update_history, TransactionPtr *);
 
 	/**
 	 * Update an existing archive of a message. This is used for dirty messages when the track_history
@@ -154,7 +152,7 @@ private:
 	 * @param[in]	refMsgEntry			The SObjectEntry describing the message to be archived
 	 * @param[out]	lpptrTransaction	A Transaction object used to save and delete the proper messages when everything is setup
 	 */
-	HRESULT DoUpdateArchive(LPMESSAGE lpMessage, const SObjectEntry &archiveMsgEntry, const SObjectEntry &refMsgEntry, TransactionPtr *lpptrTransaction);
+	_kc_hidden HRESULT DoUpdateArchive(LPMESSAGE, const SObjectEntry &arc_msg_entry, const SObjectEntry &ref_msg_entry, TransactionPtr *);
 
 	/**
 	 * Move an archived message from one archive folder to another. This is only needed when the
@@ -169,7 +167,7 @@ private:
 	 * @param[in]	refMsgEntry			The SObjectEntry describing the message to be archived
 	 * @param[out]	lpptrTransaction	A Transaction object used to save and delete the proper messages when everything is setup
 	 */
-	HRESULT DoMoveArchive(const SObjectEntry &archiveRootEntry, const SObjectEntry &archiveMsgEntry, const SObjectEntry &refMsgEntry, TransactionPtr *lpptrTransaction);
+	_kc_hidden HRESULT DoMoveArchive(const SObjectEntry &arc_root_entry, const SObjectEntry &arc_msg_entry, const SObjectEntry &ref_msg_entry, TransactionPtr *);
 
 	/**
 	 * Execute the delete or stub operation if available. If both are set the delete operation
@@ -181,7 +179,7 @@ private:
 	 * @param[in]	cProps			The amount of props found in lpProps
 	 * @param[in]	lpProps			A list of properties containing the information to open the correct message.
 	 */
-	HRESULT ExecuteSubOperations(LPMESSAGE lpMessage, LPMAPIFOLDER lpFolder, ULONG cProps, const LPSPropValue lpProps);
+	_kc_hidden HRESULT ExecuteSubOperations(LPMESSAGE, LPMAPIFOLDER, ULONG n, const LPSPropValue props);
 
 	/**
 	 * Move an archive message to the special history folder.
@@ -192,7 +190,7 @@ private:
 	 * @param[out]	lpNewEntry			The SObjectEntry describing the moved message.
 	 * @param[out]	lppNewMessage		The newly created message. This argument is allowed to be NULL
 	 */
-	HRESULT MoveToHistory(const SObjectEntry &sourceArchiveRoot, const SObjectEntry &sourceMsgEntry, TransactionPtr ptrTransaction, SObjectEntry *lpNewEntry, LPMESSAGE *lppNewMessage);
+	_kc_hidden HRESULT MoveToHistory(const SObjectEntry &src_arc_root, const SObjectEntry &src_msg_entry, TransactionPtr, SObjectEntry *new_entry, LPMESSAGE *new_msg);
 
 	/**
 	 * Open the history message referenced by lpArchivedMsg and update its reference. Continue doing that for all
@@ -202,9 +200,8 @@ private:
 	 * @param[in]	refMsgEntry			The SObjectEntry describing to reference
 	 * @param[in]	ptrTransaction		A Transaction object used to save and delete the proper messages when everything is setup
 	 */
-	HRESULT UpdateHistoryRefs(LPMESSAGE lpArchivedMsg, const SObjectEntry &refMsgEntry, TransactionPtr ptrTransaction);
+	_kc_hidden HRESULT UpdateHistoryRefs(LPMESSAGE arc_msg, const SObjectEntry &ref_msg_entry, TransactionPtr);
 
-private:
 	ArchiverSessionPtr m_ptrSession;
 	ECConfig *m_lpConfig;
 	ObjectEntryList m_lstArchives;
@@ -220,6 +217,6 @@ private:
 	InstanceIdMapperPtr m_ptrMapper;
 };
 
-}} // namespaces
+}} /* namespace */
 
 #endif // ndef copier_INCLUDED

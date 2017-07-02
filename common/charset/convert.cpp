@@ -22,10 +22,13 @@
 
 #include <numeric>
 #include <vector>
+#include <stdexcept>
 #include <string>
 #include <kopano/stringutil.h>
 #include <cerrno>
 #define BUFSIZE 4096
+
+namespace KC {
 
 convert_exception::convert_exception(enum exception_type type, const std::string &message)
 	: std::runtime_error(message)
@@ -45,17 +48,16 @@ namespace details {
 	HRESULT HrFromException(const convert_exception &ce)
 	{
 		switch (ce.type()) {
-			case convert_exception::eUnknownCharset:	return MAPI_E_NOT_FOUND;
-			case convert_exception::eIllegalSequence:	return MAPI_E_INVALID_PARAMETER;
-			default:									return MAPI_E_CALL_FAILED;
+		case convert_exception::eUnknownCharset:	return MAPI_E_NOT_FOUND;
+		case convert_exception::eIllegalSequence:	return MAPI_E_INVALID_PARAMETER;
+		default:					return MAPI_E_CALL_FAILED;
 		}
 	}
 
 	// HACK: prototypes may differ depending on the compiler and/or system (the
 	// second parameter may or may not be 'const'). This redeclaration is a hack
 	// to have a common prototype "iconv_cast".
-	class ICONV_HACK
-	{
+	class ICONV_HACK {
 	public:
 		ICONV_HACK(const char** ptr) : m_ptr(ptr) { }
 
@@ -101,16 +103,8 @@ namespace details {
 	 */
 	iconv_context_base::iconv_context_base(const char* tocode, const char* fromcode)
 	{
-#ifdef FORCE_CHARSET_CONVERSION		
-		// We now default to ignoring illegal sequences during conversion; this makes sure that we don't SIGABORT
-		// when some bad input from a user fails to convert. This means that the 'IGNORE'
-		// flag is on by default; specifying it is not useful.
+		/* Ignore illegal sequences by default. */
 		m_bForce = true;
-#else
-		// In debug builds, SIGABRT will be triggered in most cases due to the throw() 
-		// in doconvert()
-		m_bForce = false;
-#endif
 		m_bHTML = false;
 		
         std::string strto = tocode;
@@ -125,13 +119,14 @@ namespace details {
 
             i = vOptions.begin();
             while(i != vOptions.end()) {
-                if (*i == "IGNORE" || *i == "FORCE") {
-                    m_bForce = true;
-                } else if (*i == "NOIGNORE" || *i == "NOFORCE") {
-                    m_bForce = false;
-                } else if(*i == "HTMLENTITIES" && strcasecmp(fromcode, CHARSET_WCHAR) == 0) {
-                	m_bHTML = true;
-                } else vOptionsFiltered.push_back(*i);
+				if (*i == "IGNORE" || *i == "FORCE")
+					m_bForce = true;
+				else if (*i == "NOIGNORE" || *i == "NOFORCE")
+					m_bForce = false;
+				else if (*i == "HTMLENTITIES" && strcasecmp(fromcode, CHARSET_WCHAR) == 0)
+					m_bHTML = true;
+				else
+					vOptionsFiltered.push_back(*i);
 				++i;
             }
 
@@ -169,47 +164,46 @@ namespace details {
 			cbDst = sizeof(buf);
 			err = iconv(m_cd, ICONV_HACK(&lpSrc), &cbSrc, &lpDst, &cbDst);
 			
-			if (err == (size_t)(-1) && cbDst == sizeof(buf)) {
-				if(m_bHTML) {
-					if(cbSrc < sizeof(wchar_t)) {
-						// Do what //IGNORE would have done
-						++lpSrc;
-						--cbSrc;
-					} else {
-						// Convert the codepoint to '&#12345;'
-						std::wstring wstrEntity = L"&#";
-						size_t cbEntity;
-						wchar_t code;
-						const char *lpEntity;
-						
-						memcpy(&code, lpSrc, sizeof(code));
-						wstrEntity += wstringify(code);
-						wstrEntity += L";";
-						cbEntity = wstrEntity.size() * sizeof(wchar_t);
-						lpEntity = (const char *)wstrEntity.c_str();
-						
-						// Since we don't know in what charset we are outputting, we have to send
-						// the entity through iconv so that it can convert it to the target charset.
-						
-						err = iconv(m_cd, ICONV_HACK(&lpEntity), &cbEntity, &lpDst, &cbDst);
-						
-						if(err == (size_t)(-1)) {
-							ASSERT(false); // This will should never fail
-						}
-						
-						lpSrc += sizeof(wchar_t);
-						cbSrc -= sizeof(wchar_t);
-					}
-				} else if(m_bForce) {
-					// Force conversion by skipping this character
-					if(cbSrc) {
-						++lpSrc;
-						--cbSrc;
-					}
-				} else {
-					throw illegal_sequence_exception(strerror(errno));
+			if (err != static_cast<size_t>(-1) || cbDst != sizeof(buf)) {
+				// buf now contains converted chars, append them to output
+				append(buf, sizeof(buf) - cbDst);
+				continue;
+			}
+			if (m_bHTML) {
+				if(cbSrc < sizeof(wchar_t)) {
+					// Do what //IGNORE would have done
+					++lpSrc;
+					--cbSrc;
+					continue;
 				}
-			}			
+				// Convert the codepoint to '&#12345;'
+				std::wstring wstrEntity = L"&#";
+				size_t cbEntity;
+				wchar_t code;
+				const char *lpEntity;
+
+				memcpy(&code, lpSrc, sizeof(code));
+				wstrEntity += std::to_wstring(code);
+				wstrEntity += L";";
+				cbEntity = wstrEntity.size() * sizeof(wchar_t);
+				lpEntity = (const char *)wstrEntity.c_str();
+
+				// Since we don't know in what charset we are outputting, we have to send
+				// the entity through iconv so that it can convert it to the target charset.
+				err = iconv(m_cd, ICONV_HACK(&lpEntity), &cbEntity, &lpDst, &cbDst);
+				if (err == static_cast<size_t>(-1))
+					assert(false); // This will should never fail
+				lpSrc += sizeof(wchar_t);
+				cbSrc -= sizeof(wchar_t);
+			} else if (m_bForce) {
+				// Force conversion by skipping this character
+				if (cbSrc) {
+					++lpSrc;
+					--cbSrc;
+				}
+			} else {
+				throw illegal_sequence_exception(strerror(errno));
+			}
 			// buf now contains converted chars, append them to output
 			append(buf, sizeof(buf) - cbDst);
 		}
@@ -223,25 +217,19 @@ namespace details {
 	
 } // namespace details
 
-convert_context::convert_context()
-{}
-
 convert_context::~convert_context()
 {
-	context_map::iterator iContext;
-	for (iContext = m_contexts.begin(); iContext != m_contexts.end(); ++iContext)
-		delete iContext->second;
-		
-	code_set::iterator iCode;
-	for (iCode = m_codes.begin(); iCode != m_codes.end(); ++iCode)
-		delete[] *iCode;
+	for (auto &ictx : m_contexts)
+		delete ictx.second;
+	for (auto &icode : m_codes)
+		delete[] icode;
 }
 
 void convert_context::persist_code(context_key &key, unsigned flags)
 {
 	if (flags & pfToCode) {
 		code_set::const_iterator iCode = m_codes.find(key.tocode);
-		if (iCode == m_codes.end()) {
+		if (iCode == m_codes.cend()) {
 			char *tocode = new char[strlen(key.tocode) + 1];
 			memcpy(tocode, key.tocode, strlen(key.tocode) + 1);
 			iCode = m_codes.insert(tocode).first;
@@ -250,7 +238,7 @@ void convert_context::persist_code(context_key &key, unsigned flags)
 	}
 	if (flags & pfFromCode) {
 		code_set::const_iterator iCode = m_codes.find(key.fromcode);
-		if (iCode == m_codes.end()) {
+		if (iCode == m_codes.cend()) {
 			char *fromcode = new char[strlen(key.fromcode) + 1];
 			memcpy(fromcode, key.fromcode, strlen(key.fromcode) + 1);
 			iCode = m_codes.insert(fromcode).first;
@@ -270,3 +258,5 @@ wchar_t* convert_context::persist_string(const std::wstring &wstrValue)
 	m_lstWstrings.push_back(wstrValue);
 	return const_cast<wchar_t*>(m_lstWstrings.back().c_str());
 }
+
+} /* namespace */

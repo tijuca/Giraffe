@@ -18,31 +18,30 @@
 #ifndef deleter_INCLUDED
 #define deleter_INCLUDED
 
+#include <kopano/zcdefs.h>
 #include "operations.h"
 #include <kopano/archiver-common.h>
 #include <list>
 
-namespace za { namespace operations {
+namespace KC { namespace operations {
 
 /**
  * Performs the delete part of the archive operation.
  */
-class Deleter : public ArchiveOperationBaseEx
-{
+class Deleter _kc_final : public ArchiveOperationBaseEx {
 public:
 	Deleter(ECArchiverLogger *lpLogger, int ulAge, bool bProcessUnread);
 	~Deleter();
 
 private:
-	HRESULT EnterFolder(LPMAPIFOLDER) { return hrSuccess; }
-	HRESULT LeaveFolder();
-	HRESULT DoProcessEntry(ULONG cProps, const LPSPropValue &lpProps);
+	HRESULT EnterFolder(LPMAPIFOLDER)_kc_override { return hrSuccess; }
+	HRESULT LeaveFolder(void) _kc_override;
+	HRESULT DoProcessEntry(ULONG cProps, const LPSPropValue &lpProps) _kc_override;
 	HRESULT PurgeQueuedMessages();
 	
-private:
 	std::list<entryid_t> m_lstEntryIds;
 };
 
-}} // namespaces
+}} /* namespace */
 
 #endif // ndef deleter_INCLUDED

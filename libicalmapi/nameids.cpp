@@ -16,8 +16,11 @@
  */
 
 #include <kopano/platform.h>
+#include <kopano/memory.hpp>
 #include "nameids.h"
 #include <mapix.h>
+
+namespace KC {
 
 const WCHAR* nmStringNames[SIZE_NAMEDPROPS] = {
 	L"Keywords", NULL
@@ -120,18 +123,17 @@ MAPINAMEID mnNamedProps[SIZE_NAMEDPROPS] = {
 HRESULT HrLookupNames(IMAPIProp *lpPropObj, LPSPropTagArray *lppNamedProps)
 {
 	HRESULT hr = hrSuccess;
-	LPMAPINAMEID *lppNameIds = NULL;
+	KCHL::memory_ptr<MAPINAMEID *> lppNameIds;
 	LPSPropTagArray lpNamedProps = NULL;
 
-	hr = MAPIAllocateBuffer(sizeof(LPMAPINAMEID) * SIZE_NAMEDPROPS, (void**)&lppNameIds);
+	hr = MAPIAllocateBuffer(sizeof(LPMAPINAMEID) * SIZE_NAMEDPROPS, &~lppNameIds);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	for (int i = 0; i < SIZE_NAMEDPROPS; ++i) {
 		hr = MAPIAllocateMore(sizeof(MAPINAMEID), lppNameIds, (void**)&lppNameIds[i] );
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		memcpy(lppNameIds[i], &mnNamedProps[i], sizeof(MAPINAMEID) );
 		if (mnNamedProps[i].ulKind == MNID_STRING && nmStringNames[i])
 			lppNameIds[i]->Kind.lpwstrName = (WCHAR*)nmStringNames[i];
@@ -139,12 +141,9 @@ HRESULT HrLookupNames(IMAPIProp *lpPropObj, LPSPropTagArray *lppNamedProps)
 
 	hr = lpPropObj->GetIDsFromNames(SIZE_NAMEDPROPS, lppNameIds, MAPI_CREATE, &lpNamedProps);
 	if (FAILED(hr))
-		goto exit;
-
+		return hr;
 	*lppNamedProps = lpNamedProps;
-	hr = hrSuccess;
-
-exit:
-	MAPIFreeBuffer(lppNameIds);
-	return hr;
+	return hrSuccess;
 }
+
+} /* namespace */

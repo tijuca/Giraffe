@@ -28,14 +28,16 @@
 
 #include "ECChannelClient.h"
 
-typedef struct {
+namespace KC {
+
+struct SIndexedTerm {
     std::string strTerm;
     std::set<unsigned int> setFields;
-} SIndexedTerm;
+};
 
 typedef std::set<unsigned int> setindexprops_t;
 
-class ECSearchClient _zcp_final : public ECChannelClient {
+class ECSearchClient _kc_final : public ECChannelClient {
 public:
 	ECSearchClient(const char *szIndexerPath, unsigned int ulTimeOut);
 	ECRESULT GetProperties(setindexprops_t &mapProps);
@@ -48,5 +50,7 @@ private:
 	ECRESULT Query(std::list<unsigned int> &lstMatches);
 	ECRESULT Suggest(std::string &suggestion);
 };
+
+} /* namespace */
 
 #endif /* ECSEARCHCLIENT_H */

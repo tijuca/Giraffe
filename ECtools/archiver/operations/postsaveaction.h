@@ -18,9 +18,10 @@
 #ifndef postsaveaction_INCLUDED
 #define postsaveaction_INCLUDED
 
+#include <kopano/zcdefs.h>
 #include <memory>
 
-namespace za { namespace operations {
+namespace KC { namespace operations {
 
 /**
  * This interface defines an object that performs arbitrary operations
@@ -28,11 +29,11 @@ namespace za { namespace operations {
  */
 class IPostSaveAction {
 public:
-	virtual ~IPostSaveAction() {};
+	virtual ~IPostSaveAction(void) _kc_impdtor;
 	virtual HRESULT Execute() = 0;
 };
 typedef std::shared_ptr<IPostSaveAction> PostSaveActionPtr;
 
-}} // namespace operations, za
+}} /* namespace */
 
 #endif // ndef postsaveaction_INCLUDED

@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <kopano/memory.hpp>
 #include "WSMAPIFolderOps.h"
 
 #include "Mem.h"
@@ -29,7 +30,8 @@
 
 #define START_SOAP_CALL retry:
 #define END_SOAP_CALL 	\
-	if(er == KCERR_END_OF_SESSION) { if(m_lpTransport->HrReLogon() == hrSuccess) goto retry; } \
+	if (er == KCERR_END_OF_SESSION && m_lpTransport->HrReLogon() == hrSuccess) \
+		goto retry; \
 	hr = kcerr_to_mapierr(er, MAPI_E_NOT_FOUND); \
 	if(hr != hrSuccess) \
 		goto exit;
@@ -38,13 +40,14 @@
  * The WSMAPIFolderOps for use with the WebServices transport
  */
 
-WSMAPIFolderOps::WSMAPIFolderOps(KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport) : ECUnknown("WSMAPIFolderOps")
+WSMAPIFolderOps::WSMAPIFolderOps(KCmd *lpCmd, std::recursive_mutex &data_lock,
+    ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId,
+    WSTransport *lpTransport) :
+	ECUnknown("WSMAPIFolderOps"), lpDataLock(data_lock),
+	m_lpTransport(lpTransport)
 {
 	this->lpCmd = lpCmd;
-	this->lpDataLock = lpDataLock;
 	this->ecSessionId = ecSessionId;
-	this->m_lpTransport = lpTransport;
-
 	lpTransport->AddSessionReloadCallback(this, Reload, &m_ulSessionReloadCallback);
 
 	CopyMAPIEntryIdToSOAPEntryId(cbEntryId, lpEntryId, &m_sEntryId);
@@ -57,7 +60,9 @@ WSMAPIFolderOps::~WSMAPIFolderOps()
 	FreeEntryId(&m_sEntryId, false);
 }
 
-HRESULT WSMAPIFolderOps::Create(KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport, WSMAPIFolderOps **lppFolderOps)
+HRESULT WSMAPIFolderOps::Create(KCmd *lpCmd, std::recursive_mutex &lpDataLock,
+    ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId,
+    WSTransport *lpTransport, WSMAPIFolderOps **lppFolderOps)
 {
 	HRESULT hr = hrSuccess;
 	WSMAPIFolderOps *lpFolderOps = NULL;
@@ -74,12 +79,15 @@ HRESULT WSMAPIFolderOps::Create(KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESS
 
 HRESULT WSMAPIFolderOps::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECMAPIFolderOps, this);
-
+	REGISTER_INTERFACE3(ECMAPIFolderOps, WSMAPIFolderOps, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 	
-HRESULT WSMAPIFolderOps::HrCreateFolder(ULONG ulFolderType, const utf8string &strFolderName, const utf8string &strComment, BOOL fOpenIfExists, ULONG ulSyncId, LPSBinary lpsSourceKey, ULONG cbNewEntryId, LPENTRYID lpNewEntryId, ULONG* lpcbEntryId, LPENTRYID* lppEntryId)
+HRESULT WSMAPIFolderOps::HrCreateFolder(ULONG ulFolderType,
+    const utf8string &strFolderName, const utf8string &strComment,
+    BOOL fOpenIfExists, ULONG ulSyncId, const SBinary *lpsSourceKey,
+    ULONG cbNewEntryId, LPENTRYID lpNewEntryId, ULONG* lpcbEntryId,
+    LPENTRYID *lppEntryId)
 {
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
@@ -219,8 +227,7 @@ HRESULT WSMAPIFolderOps::HrSetSearchCriteria(ENTRYLIST *lpMsgList, SRestriction 
 	LockSoap();
 
 	if(lpMsgList) {
-		lpsEntryList = new struct entryList;
-		
+		lpsEntryList = s_alloc<entryList>(nullptr);
 		hr = CopyMAPIEntryListToSOAPEntryList(lpMsgList, lpsEntryList);
 		if(hr != hrSuccess)
 			goto exit;
@@ -458,9 +465,7 @@ HRESULT WSMAPIFolderOps::HrGetChangeInfo(ULONG cbEntryID, LPENTRYID lpEntryID, L
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
 	entryId		sEntryId = {0};
-
-	LPSPropValue			lpSPropValPCL = NULL;
-	LPSPropValue			lpSPropValCK = NULL;
+	KCHL::memory_ptr<SPropValue> lpSPropValPCL, lpSPropValCK;
 	getChangeInfoResponse sChangeInfo{__gszeroinit};
 
 	LockSoap();
@@ -484,7 +489,7 @@ HRESULT WSMAPIFolderOps::HrGetChangeInfo(ULONG cbEntryID, LPENTRYID lpEntryID, L
 		goto exit;
 
 	if (lppPropPCL) {
-		hr = MAPIAllocateBuffer(sizeof *lpSPropValPCL, (void**)&lpSPropValPCL);
+		hr = MAPIAllocateBuffer(sizeof *lpSPropValPCL, &~lpSPropValPCL);
 		if (hr != hrSuccess)
 			goto exit;
 
@@ -494,7 +499,7 @@ HRESULT WSMAPIFolderOps::HrGetChangeInfo(ULONG cbEntryID, LPENTRYID lpEntryID, L
 	}
 
 	if (lppPropCK) {
-		hr = MAPIAllocateBuffer(sizeof *lpSPropValCK, (void**)&lpSPropValCK);
+		hr = MAPIAllocateBuffer(sizeof *lpSPropValCK, &~lpSPropValCK);
 		if (hr != hrSuccess)
 			goto exit;
 
@@ -504,27 +509,19 @@ HRESULT WSMAPIFolderOps::HrGetChangeInfo(ULONG cbEntryID, LPENTRYID lpEntryID, L
 	}
 
 	// All went well, modify output parameters
-	if (lppPropPCL) {
-		*lppPropPCL = lpSPropValPCL;
-		lpSPropValPCL = NULL;
-	}
-
-	if (lppPropCK) {
-		*lppPropCK = lpSPropValCK;
-		lpSPropValCK = NULL;
-	}
-
+	if (lppPropPCL != nullptr)
+		*lppPropPCL = lpSPropValPCL.release();
+	if (lppPropCK != nullptr)
+		*lppPropCK = lpSPropValCK.release();
 exit:
 	UnLockSoap();
-	MAPIFreeBuffer(lpSPropValPCL);
-	MAPIFreeBuffer(lpSPropValCK);
 	return hr;
 }
 
 //FIXME: one lock/unlock function
 HRESULT WSMAPIFolderOps::LockSoap()
 {
-	pthread_mutex_lock(lpDataLock);
+	lpDataLock.lock();
 	return erSuccess;
 }
 
@@ -535,8 +532,7 @@ HRESULT WSMAPIFolderOps::UnLockSoap()
 		soap_destroy(lpCmd->soap);
 		soap_end(lpCmd->soap);
 	}
-
-	pthread_mutex_unlock(lpDataLock);
+	lpDataLock.unlock();
 	return erSuccess;
 }
 

@@ -16,7 +16,8 @@
  */
 
 #include <kopano/platform.h>
-
+#include <kopano/lockhelper.hpp>
+#include <kopano/memory.hpp>
 #include <mapiguid.h>
 #include <mapicode.h>
 #include <mapiutil.h>
@@ -26,6 +27,8 @@
 #include <kopano/ECGuid.h>
 #include <kopano/ECDebug.h>
 #include <kopano/ECInterfaceDefs.h>
+
+using namespace KCHL;
 
 HRESULT ECAttachFactory::Create(ECMsgStore *lpMsgStore, ULONG ulObjType, BOOL fModify, ULONG ulAttachNum, ECMAPIProp *lpRoot, ECAttach **lppAttach) const
 {
@@ -58,17 +61,14 @@ HRESULT ECAttach::Create(ECMsgStore *lpMsgStore, ULONG ulObjType, BOOL fModify, 
 
 HRESULT ECAttach::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECAttach, this);
-	REGISTER_INTERFACE(IID_ECMAPIProp, this);
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
-	REGISTER_INTERFACE(IID_IAttachment, &this->m_xAttach);
-	REGISTER_INTERFACE(IID_IMAPIProp, &this->m_xAttach);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xAttach);
+	REGISTER_INTERFACE2(ECAttach, this);
+	REGISTER_INTERFACE2(ECMAPIProp, this);
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE3(IAttachment, IAttach, &this->m_xAttach);
+	REGISTER_INTERFACE2(IMAPIProp, &this->m_xAttach);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xAttach);
 	// @todo add IID_ISelectUnicode ?
-
-	REGISTER_INTERFACE(IID_IECSingleInstance, &this->m_xECSingleInstance);
-
+	REGISTER_INTERFACE2(IECSingleInstance, &this->m_xECSingleInstance);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -96,20 +96,18 @@ HRESULT ECAttach::SaveChanges(ULONG ulFlags)
 	return ECMAPIProp::SaveChanges(ulFlags);
 }
 
-HRESULT ECAttach::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
+HRESULT ECAttach::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN *lppUnk)
 {
 	HRESULT			hr = hrSuccess;
-	ECMessage*		lpMessage = NULL;
-	IECPropStorage*	lpParentStorage = NULL;
-
+	object_ptr<ECMessage> lpMessage;
+	object_ptr<IECPropStorage> lpParentStorage;
 	SPropValue		sPropValue[3];
 	LPSPropValue	lpPropAttachType = NULL;
 	LPMAPIUID		lpMapiUID = NULL;
 	ULONG			ulAttachType = 0;
 	BOOL			fNew = FALSE;
 	ULONG			ulObjId = 0;
-
-	pthread_mutex_lock(&m_hMutexMAPIObject);
+	scoped_rlock lock(m_hMutexMAPIObject);
 
 	if (lpiid == NULL) {
 		hr = MAPI_E_INVALID_PARAMETER;
@@ -122,18 +120,18 @@ HRESULT ECAttach::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceO
 		ulAttachType = lpPropAttachType->Value.ul;
 
 		ECFreeBuffer(lpPropAttachType); lpPropAttachType = NULL;
-	} else {
-		// The client is creating a new attachment, which may be embedded. Fix for the next if check
-		if ((ulFlags & MAPI_CREATE) && PROP_ID(ulPropTag) == PROP_ID(PR_ATTACH_DATA_OBJ) && *lpiid == IID_IMessage)
-			ulAttachType = ATTACH_EMBEDDED_MSG;
+	}
+	// The client is creating a new attachment, which may be embedded. Fix for the next if check
+	else if ((ulFlags & MAPI_CREATE) && PROP_ID(ulPropTag) == PROP_ID(PR_ATTACH_DATA_OBJ) && *lpiid == IID_IMessage) {
+		ulAttachType = ATTACH_EMBEDDED_MSG;
 	}
 
 	if(ulAttachType == ATTACH_EMBEDDED_MSG && (PROP_ID(ulPropTag) == PROP_ID(PR_ATTACH_DATA_OBJ) && *lpiid == IID_IMessage)) {
 		// Client is opening an IMessage submessage
 
-		if (!m_sMapiObject->lstChildren->empty()) {
+		if (!m_sMapiObject->lstChildren.empty()) {
 			fNew = FALSE;			// Create the submessage object from my sSavedObject data
-			ulObjId = (*m_sMapiObject->lstChildren->begin())->ulObjId;
+			ulObjId = (*m_sMapiObject->lstChildren.begin())->ulObjId;
 		} else {
 			if(!fModify || !(ulFlags & MAPI_CREATE)) {
 				hr = MAPI_E_NO_ACCESS;
@@ -144,12 +142,12 @@ HRESULT ECAttach::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceO
 			ulObjId = 0;
 		}
 
-		hr = ECMessage::Create(this->GetMsgStore(), fNew, ulFlags & MAPI_MODIFY, 0, TRUE, m_lpRoot, &lpMessage);
+		hr = ECMessage::Create(this->GetMsgStore(), fNew, ulFlags & MAPI_MODIFY, 0, TRUE, m_lpRoot, &~lpMessage);
 		if(hr != hrSuccess)
 			goto exit;
 
 		// Client side unique ID is 0. Attachment can only have 1 submessage
-		hr = this->GetMsgStore()->lpTransport->HrOpenParentStorage(this, 0, ulObjId, this->lpStorage->GetServerStorage(), &lpParentStorage);
+		hr = this->GetMsgStore()->lpTransport->HrOpenParentStorage(this, 0, ulObjId, this->lpStorage->GetServerStorage(), &~lpParentStorage);
 		if(hr != hrSuccess)
 			goto exit;
 
@@ -202,17 +200,8 @@ HRESULT ECAttach::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceO
 	}
 
 exit:
-	if(lpParentStorage)
-		lpParentStorage->Release();
-
-	if(lpMessage)
-		lpMessage->Release();
-
 	if(lpMapiUID)
 		ECFreeBuffer(lpMapiUID);
-
-	pthread_mutex_unlock(&m_hMutexMAPIObject);
-
 	return hr;
 }
 
@@ -221,7 +210,7 @@ HRESULT	ECAttach::GetPropHandler(ULONG ulPropTag, void *lpProvider, ULONG ulFlag
 	HRESULT hr = hrSuccess;
 	ECAttach *lpAttach = (ECAttach*)lpParam;
 
-	SPropTagArray sPropArray;
+	SizedSPropTagArray(1, sPropArray);
 	ULONG cValues = 0;
 	LPSPropValue lpProps = NULL;
 
@@ -229,7 +218,7 @@ HRESULT	ECAttach::GetPropHandler(ULONG ulPropTag, void *lpProvider, ULONG ulFlag
 	case PR_ATTACH_DATA_OBJ:
 		sPropArray.cValues = 1;
 		sPropArray.aulPropTag[0] = PR_ATTACH_METHOD;
-		hr = lpAttach->GetProps(&sPropArray, 0, &cValues, &lpProps);
+		hr = lpAttach->GetProps(sPropArray, 0, &cValues, &lpProps);
 		if(hr == hrSuccess && cValues == 1 && lpProps[0].ulPropTag == PR_ATTACH_METHOD && (lpProps[0].Value.ul == ATTACH_EMBEDDED_MSG || lpProps[0].Value.ul == ATTACH_OLE) )
 		{
 			lpsPropValue->ulPropTag = PR_ATTACH_DATA_OBJ;
@@ -241,13 +230,12 @@ HRESULT	ECAttach::GetPropHandler(ULONG ulPropTag, void *lpProvider, ULONG ulFlag
 	case PR_ATTACH_DATA_BIN:
 		sPropArray.cValues = 1;
 		sPropArray.aulPropTag[0] = PR_ATTACH_METHOD;
-		hr = lpAttach->GetProps(&sPropArray, 0, &cValues, &lpProps);
-		if(lpProps[0].Value.ul == ATTACH_OLE) {
+		hr = lpAttach->GetProps(sPropArray, 0, &cValues, &lpProps);
+		if (lpProps[0].Value.ul == ATTACH_OLE)
 			hr = MAPI_E_NOT_FOUND;
-		}else {
+		else
 			// 8k limit
 			hr = lpAttach->HrGetRealProp(PR_ATTACH_DATA_BIN, ulFlags, lpBase, lpsPropValue, 8192);
-		}
 		break;
 	case PR_ATTACH_NUM:
 		lpsPropValue->ulPropTag = PR_ATTACH_NUM;
@@ -263,22 +251,26 @@ HRESULT	ECAttach::GetPropHandler(ULONG ulPropTag, void *lpProvider, ULONG ulFlag
 	return hr;
 }
 
-HRESULT	ECAttach::SetPropHandler(ULONG ulPropTag, void* lpProvider, LPSPropValue lpsPropValue, void *lpParam)
+HRESULT	ECAttach::SetPropHandler(ULONG ulPropTag, void *lpProvider,
+    const SPropValue *lpsPropValue, void *lpParam)
 {
 	ECAttach *lpAttach = (ECAttach *)lpParam;
 	switch (ulPropTag) {
-		case PR_ATTACH_DATA_BIN:
-			return lpAttach->HrSetRealProp(lpsPropValue);
-		case PR_ATTACH_DATA_OBJ:
-			return MAPI_E_COMPUTED;
-		default:
-			return MAPI_E_NOT_FOUND;
+	case PR_ATTACH_DATA_BIN:
+		return lpAttach->HrSetRealProp(lpsPropValue);
+	case PR_ATTACH_DATA_OBJ:
+		return MAPI_E_COMPUTED;
+	default:
+		return MAPI_E_NOT_FOUND;
 	}
 	return MAPI_E_NOT_FOUND;
 }
 
 // Use the support object to do the copying
-HRESULT ECAttach::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
+HRESULT ECAttach::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude,
+    const SPropTagArray *lpExcludeProps, ULONG ulUIParam,
+    LPMAPIPROGRESS lpProgress, LPCIID lpInterface, void *lpDestObj,
+    ULONG ulFlags, SPropProblemArray **lppProblems)
 {
 	return Util::DoCopyTo(&IID_IAttachment, &this->m_xAttach, ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
@@ -289,88 +281,53 @@ HRESULT ECAttach::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray
  * Overrides to detect changes to the single-instance property. If a change is detected,
  * the single-instance ID is reset since the data has now changed.
  */
-HRESULT ECAttach::HrSetRealProp(LPSPropValue lpProp)
+HRESULT ECAttach::HrSetRealProp(const SPropValue *lpProp)
 {
-	HRESULT hr = hrSuccess;
+	scoped_rlock lock(m_hMutexMAPIObject);
 
-	pthread_mutex_lock(&m_hMutexMAPIObject);
-
-	if (lpStorage == NULL) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-	if (!fModify) {
-		hr = MAPI_E_NO_ACCESS;
-		goto exit;
-	}
-
-	hr = ECMAPIProp::HrSetRealProp(lpProp);
-	
-exit:
-	pthread_mutex_unlock(&m_hMutexMAPIObject);
-
-	return hr;
+	if (lpStorage == NULL)
+		return MAPI_E_NOT_FOUND;
+	if (!fModify)
+		return MAPI_E_NO_ACCESS;
+	return ECMAPIProp::HrSetRealProp(lpProp);
 }
 
 HRESULT ECAttach::HrSaveChild(ULONG ulFlags, MAPIOBJECT *lpsMapiObject)
 {
-	HRESULT hr = hrSuccess;
 	ECMapiObjects::const_iterator iterSObj;
-
-	pthread_mutex_lock(&m_hMutexMAPIObject);
+	scoped_rlock lock(m_hMutexMAPIObject);
 
 	if (!m_sMapiObject) {
-		ASSERT(m_sMapiObject != NULL);
+		assert(m_sMapiObject != NULL);
 		AllocNewMapiObject(0, 0, MAPI_MESSAGE, &m_sMapiObject);
 	}
 
-	if (lpsMapiObject->ulObjType != MAPI_MESSAGE) {
+	if (lpsMapiObject->ulObjType != MAPI_MESSAGE)
 		// can only save messages in an attachment
-		hr = MAPI_E_INVALID_OBJECT;
-		goto exit;
-	}
+		return MAPI_E_INVALID_OBJECT;
 
 	// attachments can only have 1 sub-message
-	iterSObj = m_sMapiObject->lstChildren->begin();
-	if (iterSObj != m_sMapiObject->lstChildren->end()) {
+	iterSObj = m_sMapiObject->lstChildren.cbegin();
+	if (iterSObj != m_sMapiObject->lstChildren.cend()) {
 		FreeMapiObject(*iterSObj);
-		m_sMapiObject->lstChildren->erase(iterSObj);
+		m_sMapiObject->lstChildren.erase(iterSObj);
 	}
-
-	m_sMapiObject->lstChildren->insert(new MAPIOBJECT(lpsMapiObject));
-
-exit:
-
-	pthread_mutex_unlock(&m_hMutexMAPIObject);
-
-	return hr;
+	m_sMapiObject->lstChildren.insert(new MAPIOBJECT(lpsMapiObject));
+	return hrSuccess;
 }
 
 // Proxy routines for IAttach
-ULONG __stdcall ECAttach::xAttach::AddRef()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IAttach::AddRef", "");
-	METHOD_PROLOGUE_(ECAttach , Attach);
-	return pThis->AddRef();
-}
-
-ULONG __stdcall ECAttach::xAttach::Release()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IAttach::Release", "");
-	METHOD_PROLOGUE_(ECAttach , Attach);
-	return pThis->Release();
-}
-
 DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECAttach, Attach, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECAttach, Attach, Release, (void))
 DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
 DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, SaveChanges, (ULONG, ulFlags))
-DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, GetProps, (LPSPropTagArray, lpPropTagArray), (ULONG, ulFlags), (ULONG FAR *, lpcValues, LPSPropValue FAR *, lppPropArray))
-DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, GetPropList, (ULONG, ulFlags), (LPSPropTagArray FAR *, lppPropTagArray))
-DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, OpenProperty, (ULONG, ulPropTag), (LPCIID, lpiid), (ULONG, ulInterfaceOptions), (ULONG, ulFlags), (LPUNKNOWN FAR *, lppUnk))
-DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, SetProps, (ULONG, cValues, LPSPropValue, lpPropArray), (LPSPropProblemArray FAR *, lppProblems))
-DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, DeleteProps, (LPSPropTagArray, lpPropTagArray), (LPSPropProblemArray FAR *, lppProblems))
-DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, CopyTo, (ULONG, ciidExclude, LPCIID, rgiidExclude), (LPSPropTagArray, lpExcludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (LPVOID, lpDestObj), (ULONG, ulFlags), (LPSPropProblemArray FAR *, lppProblems))
-DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, CopyProps, (LPSPropTagArray, lpIncludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (LPVOID, lpDestObj), (ULONG, ulFlags), (LPSPropProblemArray FAR *, lppProblems))
-DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, GetNamesFromIDs, (LPSPropTagArray *, pptaga), (LPGUID, lpguid), (ULONG, ulFlags), (ULONG *, pcNames, LPMAPINAMEID **, pppNames))
-DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, GetIDsFromNames, (ULONG, cNames, LPMAPINAMEID *, ppNames), (ULONG, ulFlags), (LPSPropTagArray *, pptaga))
+DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, GetProps, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags), (ULONG *, lpcValues), (SPropValue **, lppPropArray))
+DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, GetPropList, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
+DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, OpenProperty, (ULONG, ulPropTag), (LPCIID, lpiid), (ULONG, ulInterfaceOptions), (ULONG, ulFlags), (LPUNKNOWN *, lppUnk))
+DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, SetProps, (ULONG, cValues), (const SPropValue *, lpPropArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, DeleteProps, (const SPropTagArray *, lpPropTagArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, CopyTo, (ULONG, ciidExclude), (LPCIID, rgiidExclude), (const SPropTagArray *, lpExcludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, CopyProps, (const SPropTagArray *, lpIncludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, GetNamesFromIDs, (LPSPropTagArray *, pptaga), (LPGUID, lpguid), (ULONG, ulFlags), (ULONG *, pcNames), (LPMAPINAMEID **, pppNames))
+DEF_HRMETHOD(TRACE_MAPI, ECAttach, Attach, GetIDsFromNames, (ULONG, cNames), (LPMAPINAMEID *, ppNames), (ULONG, ulFlags), (LPSPropTagArray *, pptaga))

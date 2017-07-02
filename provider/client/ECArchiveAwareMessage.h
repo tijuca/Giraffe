@@ -19,17 +19,14 @@
 #define ECARCHIVEAWAREMESSAGE_H
 
 #include <kopano/zcdefs.h>
+#include <kopano/memory.hpp>
 #include "ECMessage.h"
 #include <kopano/CommonUtil.h>
-
-#include <kopano/mapi_ptr/mapi_memory_ptr.h>
-#include <kopano/mapi_ptr/mapi_object_ptr.h>
-
 #include <string>
 
 class ECArchiveAwareMsgStore;
 
-class ECArchiveAwareMessage _kc_final : public ECMessage {
+class _kc_export_dycast ECArchiveAwareMessage _kc_final : public ECMessage {
 protected:
 	/**
 	 * \param lpMsgStore	The store owning this message.
@@ -37,8 +34,8 @@ protected:
 	 * \param fModify		Specifies whether the message is writable.
 	 * \param ulFlags		Flags.
 	 */
-	ECArchiveAwareMessage(ECArchiveAwareMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFlags);
-	virtual ~ECArchiveAwareMessage();
+	_kc_hidden ECArchiveAwareMessage(ECArchiveAwareMsgStore *, BOOL fNew, BOOL modify, ULONG flags);
+	_kc_hidden virtual ~ECArchiveAwareMessage(void) _kc_impdtor;
 
 public:
 	/**
@@ -54,46 +51,38 @@ public:
 	 *
 	 * \return hrSuccess on success.
 	 */
-	static HRESULT	Create(ECArchiveAwareMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFlags, ECMessage **lppMessage);
-
-	virtual HRESULT HrLoadProps();
-	virtual HRESULT	HrSetRealProp(SPropValue *lpsPropValue);
-
-	virtual HRESULT OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk);
-
-	virtual HRESULT OpenAttach(ULONG ulAttachmentNum, LPCIID lpInterface, ULONG ulFlags, LPATTACH *lppAttach);
-	virtual HRESULT CreateAttach(LPCIID lpInterface, ULONG ulFlags, ULONG *lpulAttachmentNum, LPATTACH *lppAttach);
-	virtual HRESULT DeleteAttach(ULONG ulAttachmentNum, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags);
-
-	virtual HRESULT ModifyRecipients(ULONG ulFlags, LPADRLIST lpMods);
-
-	virtual HRESULT SaveChanges(ULONG ulFlags);
-
-	static HRESULT	SetPropHandler(ULONG ulPropTag, void* lpProvider, LPSPropValue lpsPropValue, void *lpParam);
-
-	bool IsLoading() const { return m_bLoading; }
+	_kc_hidden static HRESULT Create(ECArchiveAwareMsgStore *store, BOOL fNew, BOOL modify, ULONG flags, ECMessage **);
+	_kc_hidden virtual HRESULT HrLoadProps(void);
+	_kc_hidden virtual HRESULT HrSetRealProp(const SPropValue *);
+	_kc_hidden virtual HRESULT OpenProperty(ULONG proptag, LPCIID lpiid, ULONG iface_opts, ULONG flags, LPUNKNOWN *);
+	_kc_hidden virtual HRESULT OpenAttach(ULONG atnum, LPCIID iface, ULONG flags, LPATTACH *ret);
+	_kc_hidden virtual HRESULT CreateAttach(LPCIID iface, ULONG flags, ULONG *atnum, LPATTACH *ret);
+	_kc_hidden virtual HRESULT DeleteAttach(ULONG atnum, ULONG ui_param, LPMAPIPROGRESS, ULONG flags);
+	_kc_hidden virtual HRESULT ModifyRecipients(ULONG flags, const ADRLIST *mods);
+	_kc_hidden virtual HRESULT SaveChanges(ULONG flags);
+	_kc_hidden static HRESULT SetPropHandler(ULONG proptag, void *prov, const SPropValue *, void *param);
+	_kc_hidden bool IsLoading(void) const { return m_bLoading; }
 
 protected:
-	virtual HRESULT	HrDeleteRealProp(ULONG ulPropTag, BOOL fOverwriteRO);
+	_kc_hidden virtual HRESULT HrDeleteRealProp(ULONG proptag, BOOL overwrite_ro);
 
 private:
-	HRESULT MapNamedProps();
-	HRESULT CreateInfoMessage(LPSPropTagArray lpptaDeleteProps, const std::string &strBodyHtml);
-	std::string CreateErrorBodyUtf8(HRESULT hResult);
-	std::string CreateOfflineWarnBodyUtf8();
+	_kc_hidden HRESULT MapNamedProps(void);
+	_kc_hidden HRESULT CreateInfoMessage(const SPropTagArray *deleteprop, const std::string &bodyhtml);
+	_kc_hidden std::string CreateErrorBodyUtf8(HRESULT);
+	_kc_hidden std::string CreateOfflineWarnBodyUtf8(void);
 
-private:
 	bool	m_bLoading;
 
 	bool	m_bNamedPropsMapped;
-	PROPMAP_START
+	PROPMAP_DECL()
 	PROPMAP_DEF_NAMED_ID(ARCHIVE_STORE_ENTRYIDS)
 	PROPMAP_DEF_NAMED_ID(ARCHIVE_ITEM_ENTRYIDS)
 	PROPMAP_DEF_NAMED_ID(STUBBED)
 	PROPMAP_DEF_NAMED_ID(DIRTY)
 	PROPMAP_DEF_NAMED_ID(ORIGINAL_SOURCE_KEY)
 
-	typedef mapi_memory_ptr<SPropValue> SPropValuePtr;
+	typedef KCHL::memory_ptr<SPropValue> SPropValuePtr;
 	SPropValuePtr	m_ptrStoreEntryIDs;
 	SPropValuePtr	m_ptrItemEntryIDs;
 
@@ -106,11 +95,11 @@ private:
 	eMode	m_mode;
 	bool	m_bChanged;
 
-	typedef mapi_object_ptr<ECMessage, IID_ECMessage>	ECMessagePtr;
+	typedef KCHL::object_ptr<ECMessage, IID_ECMessage> ECMessagePtr;
 	ECMessagePtr	m_ptrArchiveMsg;
 };
 
-class ECArchiveAwareMessageFactory : public IMessageFactory {
+class ECArchiveAwareMessageFactory _kc_final : public IMessageFactory {
 public:
 	HRESULT Create(ECMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFlags, BOOL bEmbedded, ECMAPIProp *lpRoot, ECMessage **lppMessage) const;
 };

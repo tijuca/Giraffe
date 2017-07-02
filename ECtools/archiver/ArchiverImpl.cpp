@@ -19,6 +19,8 @@
  * Definition of class ArchiverImpl
  */
 #include <kopano/platform.h>
+#include <kopano/automapi.hpp>
+#include <kopano/memory.hpp>
 #include "ArchiverImpl.h"
 #include "ArchiveControlImpl.h"
 #include "ArchiveManageImpl.h"
@@ -27,13 +29,7 @@
 #include "ArchiverSession.h"
 #include <kopano/ECConfig.h>
 
-ArchiverImpl::ArchiverImpl()
-: m_lpsConfig(NULL)
-, m_lpLogger(NULL)
-, m_lpLogLogger(NULL)
-, m_lpDefaults(NULL)
-{
-}
+namespace KC {
 
 ArchiverImpl::~ArchiverImpl()
 {
@@ -66,10 +62,9 @@ eResult ArchiverImpl::Init(const char *lpszAppName, const char *lpszConfig, cons
 			return FileNotFound;
 	} else if (m_lpsConfig->HasErrors()) {
 		if (!(ulFlags & InhibitErrorLogging)) {
-			ECLogger *lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false);
+			KCHL::object_ptr<ECLogger> lpLogger(new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false));
 			ec_log_set(lpLogger);
 			LogConfigErrors(m_lpsConfig);
-			lpLogger->Release();
 		}
 
 		return InvalidConfig;
@@ -96,10 +91,8 @@ eResult ArchiverImpl::Init(const char *lpszAppName, const char *lpszConfig, cons
 			ECLogger_Tee *lpTeeLogger = new ECLogger_Tee();
 			lpTeeLogger->AddLogger(m_lpLogLogger);
 
-			ECLogger_File *lpConsoleLogger = new ECLogger_File(EC_LOGLEVEL_ERROR, 0, "-", false);
+			KCHL::object_ptr<ECLogger_File> lpConsoleLogger(new ECLogger_File(EC_LOGLEVEL_ERROR, 0, "-", false));
 			lpTeeLogger->AddLogger(lpConsoleLogger);
-			lpConsoleLogger->Release();
-
 			m_lpLogger = lpTeeLogger;
 		} else {
 			m_lpLogger = m_lpLogLogger;
@@ -175,7 +168,7 @@ ECLogger* ArchiverImpl::GetLogger(eLogType which) const
     ECLogger* retval = NULL;
 	switch (which) {
 		case DefaultLog:
-            retval = m_lpLogger;
+            retval = ec_log_get();
             break;
 		case LogOnly:
             retval = m_lpLogLogger;
@@ -210,3 +203,5 @@ unsigned ArchiverImpl::CountSettings(const configsetting_t *lpSettings)
 
 	return ulSettings;
 }
+
+} /* namespace */

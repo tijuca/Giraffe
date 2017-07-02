@@ -22,13 +22,14 @@
  * Functions and (type)definitions that are needed for the Linux platform
  *
  */
+#include <kopano/zcdefs.h>
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
 
 #include <pthread.h>
 #include <cstring>		/* memset, etc.. */
-#include <cctype>		/* 64bit int definition */
+#include <cctype>		/* 64-bit int definition */
 #include <dlfcn.h>
 #include <cstddef>
 #include <libgen.h>
@@ -54,10 +55,6 @@
 #endif
 
 #include <cassert>
-/* windows compatible asserts ? */
-#define ASSERT assert
-#define _ASSERT assert
-
 #define _vsnprintf vsnprintf
 #ifdef HAVE_VSNPRINTF_L
 #define _vsnprintf_l vsnprintf_l
@@ -77,8 +74,6 @@ inline int _vsnprintf_l(char *str, size_t size, const char *format, locale_t loc
 /* compiler definitions */
 #define __stdcall
 #define __cdecl
-#define FAR
-
 #define STDAPI_(__type) __type __stdcall
 
 /* base types */
@@ -122,20 +117,22 @@ typedef __int64_t __int64;
 #endif
 
 /* This is a workaround for warnings in offsetof from stddef.h */
-#define offsetof1(TYPE, MEMBER) ((size_t) (&((TYPE *)1)->MEMBER)-1)
+#define offsetof_static(TYPE, MEMBER) ((size_t) (&((TYPE *)1)->MEMBER)-1)
+
+#define container_of(ptr, type, member) \
+	reinterpret_cast<type *>(reinterpret_cast<char *>(ptr) - offsetof_static(type, member))
 
 /* find parent class */
 #define METHOD_PROLOGUE_(theClass, localClass) \
-	UNUSED_VAR theClass* pThis = \
-		((theClass*)((BYTE*)this - offsetof1(theClass, m_x##localClass)));
+	UNUSED_VAR auto pThis = container_of(this, theClass, m_x##localClass)
 
 /* GUID defines */
-typedef struct __attribute__((__packed__)) _s_GUID {
+struct __attribute__((__packed__)) GUID {
     DWORD	Data1;
     WORD	Data2;
     WORD	Data3;
     BYTE	Data4[8];
-} GUID;
+};
 typedef GUID*  LPGUID;
 typedef const GUID *LPCGUID;
 
@@ -164,7 +161,7 @@ typedef GUID  UUID;		// needed? existing?
 /* #   define EXTERN_C extern */
 /* # endif */
   #define GUID_EXT extern "C"
-  #define DEFINE_GUID(n,l,w1,w2,b1,b2,b3,b4,b5,b6,b7,b8) GUID_EXT const GUID n
+  #define DEFINE_GUID(n,l,w1,w2,b1,b2,b3,b4,b5,b6,b7,b8) GUID_EXT _kc_export const GUID n
 #endif
 
 #define DEFINE_OLEGUID(n,l,w1,w2) DEFINE_GUID(n,l,w1,w2,0xC0,0,0,0,0,0,0,0x46)
@@ -313,6 +310,9 @@ typedef wchar_t 	WCHAR;
   typedef char		TCHAR;
 #define _T(x) x
 #endif
+namespace KC {
+typedef std::basic_string<TCHAR> tstring;
+}
 typedef unsigned char	TBYTE;
 
 typedef WCHAR*			LPWSTR;
@@ -321,19 +321,16 @@ typedef TCHAR*			LPTSTR;
 typedef const TCHAR*	LPCTSTR;
 typedef WCHAR			OLECHAR;
 
-typedef struct _s_FILETIME {
+struct FILETIME {
     DWORD dwLowDateTime;
     DWORD dwHighDateTime;
-} FILETIME, *LPFILETIME;
+};
+typedef struct FILETIME *LPFILETIME;
 #define NANOSECS_BETWEEN_EPOCHS 116444736000000000LL
 
 /* made up .. seems correct */
-typedef union _LARGE_INTEGER {
-#ifdef __GNUC__
+union LARGE_INTEGER {
   __extension__ struct {
-#else
-  struct {
-#endif
     DWORD LowPart;
     LONG HighPart;
   };
@@ -342,14 +339,11 @@ typedef union _LARGE_INTEGER {
     LONG HighPart;
   } u;
   LONGLONG QuadPart;
-} LARGE_INTEGER, *PLARGE_INTEGER;
+};
+typedef union LARGE_INTEGER *PLARGE_INTEGER;
 
-typedef union _ULARGE_INTEGER {
-#ifdef __GNUC__
+union ULARGE_INTEGER {
   __extension__ struct {
-#else
-  struct {
-#endif
     DWORD LowPart;
     DWORD HighPart;
   };
@@ -358,7 +352,8 @@ typedef union _ULARGE_INTEGER {
     DWORD HighPart;
   } u;
   ULONGLONG QuadPart;
-} ULARGE_INTEGER, *PULARGE_INTEGER;
+};
+typedef union ULARGE_INTEGER *PULARGE_INTEGER;
 
 /* #define lpszA	char* */
 /* #define lppszA	char** */
@@ -369,7 +364,7 @@ typedef union _ULARGE_INTEGER {
 /* #define MVszW	WCHAR** */
 
 // [MS-DTYP].pdf
-typedef struct SYSTEMTIME {
+struct SYSTEMTIME {
 	WORD wYear;
 	WORD wMonth;
 	WORD wDayOfWeek;
@@ -378,21 +373,22 @@ typedef struct SYSTEMTIME {
 	WORD wMinute;
 	WORD wSecond;
 	WORD wMilliseconds;
-} SYSTEMTIME, *PSYSTEMTIME;
+};
+typedef struct SYSTEMTIME *PSYSTEMTIME;
 
-typedef struct TZREG {
+struct TZREG {
 	LONG bias;
 	LONG stdbias;
 	LONG dstbias;
 	SYSTEMTIME stStandardDate;
 	SYSTEMTIME stDaylightDate;
-} TZREG, *PTZREG;
+};
+typedef struct TZREG *PTZREG;
 
 /* IUnknown Interface */
 class IUnknown {
 public:
-    virtual ~IUnknown() {};
-
+	virtual ~IUnknown(void) _kc_impdtor;
     virtual ULONG AddRef() = 0;
     virtual ULONG Release() = 0;
     virtual HRESULT QueryInterface(REFIID refiid, void **lpvoid) = 0;
@@ -406,7 +402,7 @@ public:
     virtual HRESULT Write(const void *pv, ULONG cb, ULONG *pcbWritten) = 0;
 };
 
-typedef struct tagSTATSTG {
+struct STATSTG {
     LPSTR pwcsName;		// was LPOLESTR .. wtf is that?
     DWORD type;
     ULARGE_INTEGER cbSize;
@@ -418,32 +414,32 @@ typedef struct tagSTATSTG {
     CLSID clsid;
     DWORD grfStateBits;
     DWORD reserved;
-} STATSTG;
+};
 
-typedef enum tagSTGTY {
+enum STGTY {
     STGTY_STORAGE	= 1,
     STGTY_STREAM	= 2,
     STGTY_LOCKBYTES	= 3,
     STGTY_PROPERTY	= 4
-} STGTY;
+};
 
-typedef enum tagSTREAM_SEEK {
+enum STREAM_SEEK {
     STREAM_SEEK_SET	= 0,
     STREAM_SEEK_CUR	= 1,
     STREAM_SEEK_END	= 2
-} STREAM_SEEK;
+};
 
-typedef enum tagLOCKTYPE {
+enum LOCKTYPE {
     LOCK_WRITE		= 1,
     LOCK_EXCLUSIVE	= 2,
     LOCK_ONLYONCE	= 4
-} LOCKTYPE;
+};
 
-typedef enum tagSTATFLAG {
+enum STATFLAG {
     STATFLAG_DEFAULT	= 0,
     STATFLAG_NONAME	= 1,
     STATFLAG_NOOPEN	= 2
-} STATFLAG;
+};
 
 class IEnumSTATSTG : public IUnknown {
 public:
@@ -484,7 +480,7 @@ public:
 };
 typedef IMalloc* LPMALLOC;
 
-// typedef struct tagRemSNB {
+// struct RemSNB {
 // unsigned long ulCntStr;
 //     unsigned long ulCntChar;
 //     //OLECHAR rgString[ 1 ];
@@ -521,55 +517,16 @@ typedef IStorage* LPSTORAGE;
   since these are not used, we can define them as void, instead of the large struct it is in WIN32
 */
 typedef DWORD LCID;
-typedef long DISPID;
-typedef void VARIANT;
-typedef void DISPPARAMS;
-typedef OLECHAR* BSTR;
-class ITypeInfo : public IUnknown {
-};
-typedef void EXCEPINFO;
-typedef void SENS_QOCINFO;
-typedef SENS_QOCINFO* LPSENS_QOCINFO;
-
-/* IDispatch Interface */
-class IDispatch : public IUnknown {
-public:
-	virtual HRESULT GetTypeInfoCount(unsigned int FAR* pctinfo) = 0;
-	virtual HRESULT GetTypeInfo(unsigned int iTInfo, LCID lcid, ITypeInfo FAR* FAR* ppTInfo) = 0;
-	virtual HRESULT GetIDsOfNames(REFIID riid, OLECHAR FAR* FAR* rgszNames, unsigned int cNames, LCID lcid, DISPID FAR* rgDispId) = 0;
-	virtual HRESULT Invoke(DISPID dispIdMember, REFIID riid, LCID lcid, WORD wFlags, DISPPARAMS FAR* pDispParams, VARIANT FAR* parResult, EXCEPINFO FAR* pExcepInfo, unsigned int FAR* puArgErr) = 0;
-};
-
-/* ISensNetwork Interface */
-class ISensNetwork : public IDispatch {
-public:
-	virtual HRESULT ConnectionMade(BSTR bstrConnection,ULONG ulType, LPSENS_QOCINFO lpQOCInfo) = 0;
-	virtual HRESULT ConnectionMadeNoQOCInfo(BSTR bstrConnection,ULONG ulType) = 0;
-	virtual HRESULT ConnectionLost(BSTR bstrConnection, ULONG ulType) = 0;
-	virtual HRESULT DestinationReachable(BSTR bstrDestination, BSTR bstrConnection, ULONG ulType, LPSENS_QOCINFO lpQOCInfo) = 0;
-	virtual HRESULT DestinationReachableNoQOCInfo(BSTR bstrDestination, BSTR bstrConnection, ULONG ulType) = 0;
-};
-
-class IEventSystem : public IDispatch {
-public:
-	virtual HRESULT Query(BSTR progID, BSTR queryCriteria, int *errorIndex, IUnknown **ppInterface) = 0;
-	virtual HRESULT Store(BSTR ProgID, IUnknown *pInterface) = 0;
-	virtual HRESULT Remove(BSTR progID, BSTR queryCriteria, int *errorIndex) = 0;
-	virtual HRESULT get_EventObjectChangeEventClassID(BSTR *pbstrEventClassID) = 0;
-	virtual HRESULT QueryS(BSTR progID, BSTR queryCriteria, IUnknown **ppInterface) = 0;
-	virtual HRESULT RemoveS(BSTR progID, BSTR queryCriteria) = 0;
-};
-
-class IEventSubscription : public IDispatch {
-};
 
 /* functions */
-bool operator!=(const GUID &, const GUID &);
-bool operator==(REFIID, const GUID &);
-HRESULT CoCreateGuid(LPGUID);
+extern _kc_export bool operator!=(const GUID &, const GUID &);
+extern _kc_export bool operator==(REFIID, const GUID &);
 
-void GetSystemTimeAsFileTime(FILETIME *ft);
-DWORD GetTempPath(DWORD inLen, char *lpBuffer);
+extern "C" {
+
+extern _kc_export HRESULT CoCreateGuid(LPGUID);
+extern _kc_export void GetSystemTimeAsFileTime(FILETIME *);
+extern _kc_export DWORD GetTempPath(DWORD len, char *buf);
 
 /* Some wrappers to map Windows unicode functions */
 static inline int lstrcmpW(LPCWSTR str1, LPCWSTR str2)
@@ -600,12 +557,13 @@ static inline LPWSTR lstrcpyW(LPWSTR dst, LPCWSTR src)
 #define _tcsicmp strcasecmp
 #endif
 
-void Sleep(unsigned int usec);
+extern _kc_export void Sleep(unsigned int usec);
 
 /* because the flags are not used linux, they do not match the windows flags! */
 #define GPTR 0
-HGLOBAL GlobalAlloc(UINT uFlags, ULONG ulSize);
+extern _kc_export HGLOBAL GlobalAlloc(UINT flags, ULONG size);
 
+} /* extern "C" */
 
 typedef void * DLIB;
 #ifdef __APPLE__
@@ -617,10 +575,12 @@ typedef void * DLIB;
 #endif
 #define PATH_SEPARATOR				'/'
 
+namespace KC {
+
 // unavailable in linux
 #define _dstbias 0
 
-time_t GetProcessTime();
+extern _kc_export time_t GetProcessTime(void);
 
 #ifndef ntohll
 	#if __BYTE_ORDER == __LITTLE_ENDIAN
@@ -639,25 +599,10 @@ time_t GetProcessTime();
 #endif
 
 #define OutputDebugStringA(dstr) fprintf(stderr,"%s",dstr)
-#define GetCurrentThreadId() (int)pthread_self()
+#define kc_threadid() static_cast<unsigned long>(pthread_self())
 #define GetTickCount() 0L
 
 #define TICKS_PER_SEC (sysconf(_SC_CLK_TCK))
-
-#if DEBUG_PTHREADS
-	#define pthread_mutex_lock(x) my_pthread_mutex_lock(__FILE__, __LINE__, x)
-	int my_pthread_mutex_lock(const char *file, unsigned int line, pthread_mutex_t *m);
-	
-	#define pthread_rwlock_rdlock(x) my_pthread_rwlock_rdlock(__FILE__, __LINE__, x)
-	int my_pthread_rwlock_rdlock(const char *file, unsigned int line, pthread_rwlock_t *m);
-	
-	#define pthread_rwlock_wrlock(x) my_pthread_rwlock_wrlock(__FILE__, __LINE__, x)
-	int my_pthread_rwlock_wrlock(const char *file, unsigned int line, pthread_rwlock_t *m);
-
-	std::string dump_pthread_locks();
-#endif
-
-
 #define localemask(_cat) (_cat ## _MASK)
 #define createlocale(_cat, _loc) newlocale(_cat ## _MASK, _loc, NULL)
 #define createlocale_real(_cat, _loc) newlocale(_cat, _loc, NULL)
@@ -667,9 +612,12 @@ time_t GetProcessTime();
  * _fmt is the 1-indexed index to the format argument
  * _va is the 1-indexed index to the first va argument.
  * NOTE: For non-static methods the this pointer has index 1.
- **/
+ * There is no wprintf attribute :-(
+ */
 #define __LIKE_PRINTF(_fmt, _va) __attribute__((format(printf, _fmt, _va)))
 
 std::vector<std::string> get_backtrace();
+
+} /* namespace */
 
 #endif // PLATFORM_LINUX_H

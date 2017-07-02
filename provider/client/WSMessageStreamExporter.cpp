@@ -16,6 +16,9 @@
  */
 
 #include <kopano/platform.h>
+#include <memory>
+#include <new>
+#include <kopano/mapi_ptr.h>
 #include "WSMessageStreamExporter.h"
 #include "WSSerializedMessage.h"
 #include "WSTransport.h"
@@ -38,34 +41,26 @@
 HRESULT WSMessageStreamExporter::Create(ULONG ulOffset, ULONG ulCount, const messageStreamArray &streams, WSTransport *lpTransport, WSMessageStreamExporter **lppStreamExporter)
 {
 	HRESULT hr = hrSuccess;
-	StreamInfo* lpsi = NULL;
-	WSMessageStreamExporterPtr ptrStreamExporter;
 	convert_context converter;
-
-	try {
-		ptrStreamExporter.reset(new WSMessageStreamExporter());
-	} catch (const std::bad_alloc&) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	WSMessageStreamExporterPtr ptrStreamExporter(new(std::nothrow) WSMessageStreamExporter);
+	if (ptrStreamExporter == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
 	
 	for (gsoap_size_t i = 0; i < streams.__size; ++i) {
-		lpsi = new StreamInfo;
+		std::unique_ptr<StreamInfo> lpsi(new StreamInfo);
 
 		lpsi->id.assign(streams.__ptr[i].sStreamData.xop__Include.id);
-		
-		hr = MAPIAllocateBuffer(streams.__ptr[i].sPropVals.__size * sizeof(SPropValue), &lpsi->ptrPropVals);
+		hr = MAPIAllocateBuffer(streams.__ptr[i].sPropVals.__size * sizeof(SPropValue), &~lpsi->ptrPropVals);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		for (gsoap_size_t j = 0; j < streams.__ptr[i].sPropVals.__size; ++j) {
 			hr = CopySOAPPropValToMAPIPropVal(&lpsi->ptrPropVals[j], &streams.__ptr[i].sPropVals.__ptr[j], lpsi->ptrPropVals, &converter);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 		lpsi->cbPropVals = streams.__ptr[i].sPropVals.__size;
 
-		ptrStreamExporter->m_mapStreamInfo[streams.__ptr[i].ulStep + ulOffset] = lpsi;
-		lpsi = NULL;
+		ptrStreamExporter->m_mapStreamInfo[streams.__ptr[i].ulStep + ulOffset] = lpsi.release();
 	}
 
 	ptrStreamExporter->m_ulExpectedIndex = ulOffset;
@@ -73,10 +68,7 @@ HRESULT WSMessageStreamExporter::Create(ULONG ulOffset, ULONG ulCount, const mes
 	ptrStreamExporter->m_ptrTransport.reset(lpTransport);
 
 	*lppStreamExporter = ptrStreamExporter.release();
-
-exit:
-	delete lpsi;
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -100,23 +92,19 @@ bool WSMessageStreamExporter::IsDone() const
 HRESULT WSMessageStreamExporter::GetSerializedMessage(ULONG ulIndex, WSSerializedMessage **lppSerializedMessage)
 {
 	StreamInfoMap::const_iterator iStreamInfo;
-	WSSerializedMessagePtr ptrMessage;
 
 	if (ulIndex != m_ulExpectedIndex || lppSerializedMessage == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 
 	iStreamInfo = m_mapStreamInfo.find(ulIndex);
-	if (iStreamInfo == m_mapStreamInfo.end()) {
+	if (iStreamInfo == m_mapStreamInfo.cend()) {
 		++m_ulExpectedIndex;
 		return SYNC_E_OBJECT_DELETED;
 	}
 
-	try {
-		ptrMessage.reset(new WSSerializedMessage(m_ptrTransport->m_lpCmd->soap, iStreamInfo->second->id, iStreamInfo->second->cbPropVals, iStreamInfo->second->ptrPropVals.get()));
-	} catch(const std::bad_alloc &) {
+	WSSerializedMessagePtr ptrMessage(new(std::nothrow) WSSerializedMessage(m_ptrTransport->m_lpCmd->soap, iStreamInfo->second->id, iStreamInfo->second->cbPropVals, iStreamInfo->second->ptrPropVals.get()));
+	if (ptrMessage == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-	}
-
 	AddChild(ptrMessage);
 
 	++m_ulExpectedIndex;
@@ -124,21 +112,16 @@ HRESULT WSMessageStreamExporter::GetSerializedMessage(ULONG ulIndex, WSSerialize
 	return hrSuccess;
 }
 
-WSMessageStreamExporter::WSMessageStreamExporter()
-{ 
-	m_ulExpectedIndex = m_ulMaxIndex = 0;
-}
-
 WSMessageStreamExporter::~WSMessageStreamExporter()
 {
-	if(m_ulMaxIndex != m_ulExpectedIndex && m_ptrTransport->m_lpCmd) {
+	if (m_ulMaxIndex != m_ulExpectedIndex &&
+	    m_ptrTransport->m_lpCmd != nullptr)
 		// We are halfway through a sync batch, so there is data waiting for us. Since we have our
 		// own transport, we just drop the connection now, instead of letting the server output up to 254
 		// messages that we'd just discard. Probably we will need to reconnect very soon after this call, to LogOff()
 		// the transport's session, but that's better than receiving unwanted data.
 		m_ptrTransport->m_lpCmd->soap->fshutdownsocket(m_ptrTransport->m_lpCmd->soap, m_ptrTransport->m_lpCmd->soap->socket, 0);
-	}
 
-	for (StreamInfoMap::const_iterator i = m_mapStreamInfo.begin(); i != m_mapStreamInfo.end(); ++i)
-		delete i->second;
+	for (const auto &i : m_mapStreamInfo)
+		delete i.second;
 }

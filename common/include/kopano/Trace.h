@@ -18,10 +18,14 @@
 #ifndef TRACE_H
 #define TRACE_H
 
+#include <kopano/zcdefs.h>
+
 #define TRACE_ENTRY 1
 #define TRACE_RETURN 2
 #define TRACE_WARNING 3
 #define TRACE_INFO 4
+
+namespace KC {
 
 void TraceMapi(int time, const char *func, const char *format, ...);
 void TraceMapiLib(int time, const char *func, const char *format, ...);
@@ -31,7 +35,9 @@ void TraceInternals(int time, const char *action, const char *func, const char *
 void TraceStream(int time, const char *func, const char *format, ...);
 void TraceECMapi(int time, const char *func, const char *format, ...);
 void TraceExt(int time, const char *func, const char *format, ...);
-void TraceRelease(const char *format, ...);
+extern _kc_export void TraceRelease(const char *fmt, ...);
+
+} /* namespace */
 
 #define TRACE_RELEASE	TraceRelease
 

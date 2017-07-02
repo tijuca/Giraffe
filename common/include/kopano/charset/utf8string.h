@@ -24,13 +24,15 @@
 
 #include <kopano/charset/traits.h>
 
+namespace KC {
+
 /**
  * @brief	This class represents an UTF-8 string.
  *
  * This class does not expose the same methods as STL's std::string as most of those don't make
  * much sense.
  */
-class utf8string _zcp_final {
+class utf8string _kc_final {
 public:
 	typedef std::string::value_type		value_type;
 	typedef std::string::const_pointer	const_pointer;
@@ -48,7 +50,7 @@ public:
 		return s;
 	}
 
-	utf8string(): m_bNull(false) {}
+	utf8string(void) = default;
 	utf8string(const utf8string &other): m_bNull(other.m_bNull), m_str(other.m_str) {}
 	utf8string(size_t n, char c): m_bNull(false), m_str(n, c) {}
 	
@@ -105,12 +107,11 @@ public:
 	}
 	
 private:
-	bool m_bNull;
+	bool m_bNull = false;
 	std::string	m_str;
 };
 
-template <>
-class iconv_charset<utf8string> _zcp_final {
+template<> class iconv_charset<utf8string> _kc_final {
 public:
 	static const char *name() {
 		return "UTF-8";
@@ -123,5 +124,6 @@ public:
 	}
 };
 
+} /* namespace */
 
 #endif //ndef utf8string_INCLUDED

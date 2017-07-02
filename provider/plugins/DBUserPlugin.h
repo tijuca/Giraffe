@@ -20,7 +20,7 @@
 #define DBUSERPLUGIN_H
 
 #include <memory>
-#include <stdexcept>
+#include <mutex>
 #include <string>
 #include <kopano/zcdefs.h>
 
@@ -32,6 +32,8 @@
  * @ingroup userplugin
  * @{
  */
+
+namespace KC {
 
 /**
  * Build-in database user plugin.
@@ -47,7 +49,7 @@ public:
 	 *					The singleton shared plugin data.
 	 * @throw notsupported When multi-server support is enabled
 	 */
-	DBUserPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *shareddata);
+	DBUserPlugin(std::mutex &, ECPluginSharedData *shareddata);
     /**
 	 * Initialize plugin
 	 *
@@ -55,7 +57,6 @@ public:
 	 */
 	virtual void InitPlugin();
 
-public:
 	/**
 	 * Resolve name and company to objectsignature
 	 *
@@ -184,10 +185,13 @@ public:
 									  const objectid_t &parentobject, const objectid_t &childobject);
 };
 
+} /* namespace */
+
 extern "C" {
-	extern UserPlugin* getUserPluginInstance(pthread_mutex_t*, ECPluginSharedData*);
-	extern void deleteUserPluginInstance(UserPlugin*);
-	extern int getUserPluginVersion();
+	extern _kc_export UserPlugin *getUserPluginInstance(std::mutex &, ECPluginSharedData *);
+	extern _kc_export void deleteUserPluginInstance(UserPlugin *);
+	extern _kc_export int getUserPluginVersion(void);
 }
 /** @} */
+
 #endif

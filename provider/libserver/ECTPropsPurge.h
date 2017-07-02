@@ -19,13 +19,17 @@
 #define ECTPROPSPURGE_H
 
 #include <kopano/zcdefs.h>
+#include <mutex>
+#include <pthread.h>
+
+namespace KC {
 
 class ECDatabase;
 class ECConfig;
 class ECDatabaseFactory;
 class ECSession;
 
-class ECTPropsPurge _zcp_final {
+class ECTPropsPurge _kc_final {
 public:
     ECTPropsPurge(ECConfig *lpConfig, ECDatabaseFactory *lpDatabaseFactory);
     ~ECTPropsPurge();
@@ -44,13 +48,14 @@ private:
     
     static void *Thread(void *param);
 
-    pthread_mutex_t		m_hMutexExit;
-    pthread_cond_t		m_hCondExit;
+	std::mutex m_hMutexExit;
+	std::condition_variable m_hCondExit;
     pthread_t			m_hThread;
-    bool				m_bExit;
-
+	bool m_bExit = false;
     ECConfig *m_lpConfig;    
     ECDatabaseFactory *m_lpDatabaseFactory;
 };
+
+} /* namespace */
 
 #endif

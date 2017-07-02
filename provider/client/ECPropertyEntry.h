@@ -18,19 +18,20 @@
 #ifndef ECPROPERTYENTRY_H
 #define ECPROPERTYENTRY_H
 
+#include <kopano/zcdefs.h>
 #include <mapidefs.h>
 #include <mapicode.h>
 
 #include "ECInvariantChecker.h"
 
 // C++ class to represent a property in the property list.
-class ECProperty {
+class ECProperty _kc_final {
 public:
 	ECProperty(const ECProperty &Property);
-	ECProperty(LPSPropValue lpsProp);
+	ECProperty(const SPropValue *);
 	~ECProperty();
 
-	HRESULT CopyFrom(LPSPropValue lpsProp);
+	HRESULT CopyFrom(const SPropValue *);
 	HRESULT CopyTo(LPSPropValue lpsProp, void *lpBase, ULONG ulPropTag);
 	HRESULT CopyToByRef(LPSPropValue lpsProp) const;
 	
@@ -45,26 +46,24 @@ public:
 
 private:
 	DECL_INVARIANT_GUARD(ECProperty)
-	HRESULT CopyFromInternal(LPSPropValue lpsProp);
+	HRESULT CopyFromInternal(const SPropValue *);
 
-private:
 	ULONG ulSize;
 	ULONG ulPropTag;
-	union _PV Value;
-
+	union __UPV Value;
 	DWORD dwLastError;
 };
 
 // A class representing a property we have in-memory, a list of which is held by ECMAPIProp
 // Deleting a property just sets the property as deleted
-class ECPropertyEntry {
+class ECPropertyEntry _kc_final {
 public:
 	ECPropertyEntry(ULONG ulPropTag);
 	ECPropertyEntry(ECProperty *property);
 	~ECPropertyEntry();
 
 	HRESULT			HrSetProp(ECProperty *property);
-	HRESULT			HrSetProp(LPSPropValue lpsPropValue);
+	HRESULT HrSetProp(const SPropValue *);
 	HRESULT			HrSetClean();
 
 	ECProperty *	GetProperty() { return lpProperty; }
@@ -80,7 +79,7 @@ private:
 
 	ECProperty		*lpProperty;
 	ULONG			ulPropTag;
-	BOOL			fDirty;
+	BOOL fDirty = true;
 };
 
 #endif

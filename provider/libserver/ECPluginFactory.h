@@ -20,32 +20,34 @@
 #define ECPLUGINFACTORY_H
 
 #include <kopano/zcdefs.h>
+#include <mutex>
 #include <kopano/kcodes.h>
 #include "plugin.h"
-#include <pthread.h>
+
+namespace KC {
 
 class ECConfig;
 class ECPluginSharedData;
 class ECStatsCollector;
 
-class ECPluginFactory _zcp_final {
+class _kc_export ECPluginFactory _kc_final {
 public:
-	ECPluginFactory(ECConfig *config, ECStatsCollector *lpStatsCollector, bool bHosted, bool bDistributed);
-	~ECPluginFactory();
-
-	ECRESULT	CreateUserPlugin(UserPlugin **lppPlugin);
+	_kc_hidden ECPluginFactory(ECConfig *, ECStatsCollector *, bool hosted, bool distributed);
+	_kc_hidden ~ECPluginFactory(void);
+	_kc_hidden ECRESULT CreateUserPlugin(UserPlugin **ret);
 	void		SignalPlugins(int signal);
 
 private:
-	UserPlugin* (*m_getUserPluginInstance)(pthread_mutex_t*, ECPluginSharedData*);
-	void (*m_deleteUserPluginInstance)(UserPlugin*);
-
+	UserPlugin *(*m_getUserPluginInstance)(std::mutex &, ECPluginSharedData *) = nullptr;
+	void (*m_deleteUserPluginInstance)(UserPlugin *) = nullptr;
 	ECPluginSharedData *m_shareddata;
 	ECConfig *m_config;
-	pthread_mutex_t m_plugin_lock;
-
-	DLIB m_dl;
+	std::mutex m_plugin_lock;
+	DLIB m_dl = nullptr;
 };
 
 extern ECRESULT GetThreadLocalPlugin(ECPluginFactory *lpPluginFactory, UserPlugin **lppPlugin);
+
+} /* namespace */
+
 #endif

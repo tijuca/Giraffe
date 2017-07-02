@@ -16,24 +16,28 @@
  */
 
 #include <kopano/platform.h>
+#include <algorithm>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <cctype>
 #include <kopano/stringutil.h>
 #include <kopano/charset/convert.h>
-#include <sstream>
-
 #include <kopano/ECIConv.h>
+#include <kopano/ECLogger.h>
+#include <openssl/md5.h>
+
+namespace KC {
 
 std::string stringify(unsigned int x, bool usehex, bool _signed) {
 	char szBuff[33];
 
 	if(usehex)
 		sprintf(szBuff, "0x%08X", x);
-	else {
-		if(_signed)
-			sprintf(szBuff, "%d", x);
-		else
-			sprintf(szBuff, "%u", x);
-	}
-	
+	else if (_signed)
+		sprintf(szBuff, "%d", x);
+	else
+		sprintf(szBuff, "%u", x);
 	return szBuff;
 }
 
@@ -77,29 +81,6 @@ std::string stringify_double(double x, int prec, bool bLocale) {
 	return s.str();
 }
 
-/* Convert time_t to string representation
- *
- * String is in format YYYY-MM-DD mm:hh in the local timezone
- *
- * @param time_t x Timestamp to convert
- * @return string String representation
- */
-std::string stringify_datetime(time_t x) {
-	char date[128];
-	struct tm *tm;
-	
-	tm = localtime(&x);
-	if(!tm){
-		x = 0;
-		tm = localtime(&x);
-	}
-	
-	//strftime(date, 128, "%Y-%m-%d %H:%M:%S", tm);
-	snprintf(date,128,"%d-%02d-%02d %.2d:%.2d:%.2d",tm->tm_year+1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
-	
-	return date;
-}
-
 // FIXME support only unsigned int!!!
 std::wstring wstringify(unsigned int x, bool usehex, bool _signed)
 {
@@ -110,53 +91,6 @@ std::wstring wstringify(unsigned int x, bool usehex, bool _signed)
 		s.setf(std::ios::hex, std::ios::basefield); // showbase && basefield: add 0x prefix
 		s.setf(std::ios::uppercase);
 	}
-	s << x;
-
-	return s.str();
-}
-
-std::wstring wstringify_int64(int64_t x, bool usehex)
-{
-	std::wostringstream s;
-
-	if (usehex) {
-		s.flags(std::ios::showbase);
-		s.setf(std::ios::hex, std::ios::basefield);	// showbase && basefield: add 0x prefix
-		s.setf(std::ios::uppercase);
-	}
-	s << x;
-
-	return s.str();
-}
-
-std::wstring wstringify_uint64(uint64_t x, bool usehex)
-{
-	std::wostringstream s;
-
-	if (usehex) {
-		s.flags(std::ios::showbase);
-		s.setf(std::ios::hex, std::ios::basefield);	// showbase && basefield: add 0x prefix
-		s.setf(std::ios::uppercase);
-	}
-	s << x;
-
-	return s.str();
-}
-
-std::wstring wstringify_float(float x)
-{
-	std::wostringstream s;
-
-	s << x;
-
-	return s.str();
-}
-
-std::wstring wstringify_double(double x, int prec)
-{
-	std::wostringstream s;
-
-	s.precision(prec);
 	s << x;
 
 	return s.str();
@@ -250,18 +184,15 @@ std::string GetServerPortFromPath(const char *szPath) {
 	pos = path.rfind('/');
 	if (pos != std::string::npos)
 		path.erase(pos, std::string::npos);
-
-	return path.c_str();
+	return path;
 }
 
 std::string shell_escape(const std::string &str)
 {
-	std::string::const_iterator start;
-	std::string::const_iterator ptr;
 	std::string escaped;
-
-	start = ptr = str.begin();
-	while (ptr != str.end()) {
+	auto start = str.cbegin();
+	auto ptr   = start;
+	while (ptr != str.cend()) {
 		while (ptr != str.end() && *ptr != '\'')
 			++ptr;
 
@@ -392,7 +323,10 @@ std::string bin2hex(unsigned int inLength, const unsigned char *input)
 
 	if (!input)
 		return buffer;
-
+	if (inLength > 2048)
+		ec_log_warn("Unexpectedly large bin2hex call, %u bytes\n", inLength);
+	else if (inLength > 64)
+		ec_log_debug("Unexpectedly large bin2hex call, %u bytes\n", inLength);
 	buffer.reserve(inLength * 2);
 	for (unsigned int i = 0; i < inLength; ++i) {
 		buffer += digits[input[i]>>4];
@@ -414,7 +348,10 @@ std::wstring bin2hexw(unsigned int inLength, const unsigned char *input)
 
 	if (!input)
 		return buffer;
-
+	if (inLength > 2048)
+		ec_log_warn("Unexpectedly large bin2hex call, %u bytes\n", inLength);
+	else if (inLength > 64)
+		ec_log_debug("Unexpectedly large bin2hex call, %u bytes\n", inLength);
 	buffer.reserve(inLength * 2);
 	for (unsigned int i = 0; i < inLength; ++i) {
 		buffer += digits[input[i]>>4];
@@ -446,37 +383,38 @@ std::string urlEncode(const std::string &input)
 
 	output.reserve(input.length());
 	for (size_t i = 0; i < input.length(); ++i) {
-		if (input[i] <= 127) {
-			switch (input[i]) {
-			case ':':
-			case '/':
-			case '?':
-			case '#':
-			case '[':
-			case ']':
-			case '@':
-			case '!':
-			case '$':
-			case '&':
-			case '\'':
-			case '(':
-			case ')':
-			case '*':
-			case '+':
-			case ',':
-			case ';':
-			case '=':
-				output += '%';
-				output += digits[input[i]>>4];
-				output += digits[input[i]&0x0F];
-				break;
-			default:
-				output += input[i];
-			}
-		} else {
+		if (static_cast<unsigned char>(input[i]) <= 33 ||
+		    static_cast<unsigned char>(input[i]) >= 128) {
 			output += '%';
-			output += digits[input[i]>>4];
-			output += digits[input[i]&0x0F];
+			output += digits[input[i] >> 4];
+			output += digits[input[i] & 0x0F];
+			continue;
+		}
+		switch (input[i]) {
+		case ':':
+		case '/':
+		case '?':
+		case '#':
+		case '[':
+		case ']':
+		case '@':
+		case '!':
+		case '$':
+		case '&':
+		case '\'':
+		case '(':
+		case ')':
+		case '*':
+		case '+':
+		case ',':
+		case ';':
+		case '=':
+			output += '%';
+			output += digits[input[i] >> 4];
+			output += digits[input[i] & 0x0F];
+			break;
+		default:
+			output += input[i];
 		}
 	}
 
@@ -573,18 +511,15 @@ void BufferLFtoCRLF(size_t size, const char *input, char *output, size_t *outsiz
  */
 void StringTabtoSpaces(const std::wstring &strInput, std::wstring *lpstrOutput) {
 
-	std::wstring::const_iterator iInput(strInput.begin());
 	std::wstring strOutput;
 
 	strOutput.reserve(strInput.length());
 
-	for (; iInput != strInput.end(); ++iInput) {
-		if (*iInput == '\t') {
+	for (auto c : strInput)
+		if (c == '\t')
 			strOutput.append(4, ' ');
-		} else {
-			strOutput.append(1, *iInput);
-		}
-	}
+		else
+			strOutput.append(1, c);
 
 	lpstrOutput->swap(strOutput);
 }
@@ -654,3 +589,129 @@ char *kc_strlcpy(char *dest, const char *src, size_t n)
 	dest[n-1] = '\0';
 	return dest;
 }
+
+bool kc_starts_with(const std::string &full, const std::string &prefix)
+{
+	return full.compare(0, prefix.size(), prefix) == 0;
+}
+
+bool kc_istarts_with(const std::string &full, const std::string &needle)
+{
+	return kc_starts_with(strToLower(full), strToLower(needle));
+}
+
+bool kc_ends_with(const std::string &full, const std::string &prefix)
+{
+	size_t fz = full.size(), pz = prefix.size();
+	if (fz < pz)
+		 return false;
+	return full.compare(fz - pz, pz, prefix) == 0;
+}
+
+static const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static inline bool is_base64(unsigned char c)
+{
+	return isalnum(c) || c == '+' || c == '/';
+}
+
+std::string base64_encode(const unsigned char *bytes_to_encode, unsigned int in_len)
+{
+	unsigned char char_array_3[3], char_array_4[4];
+	int i = 0, j = 0;
+	std::string ret;
+	
+	while (in_len--) {
+		char_array_3[i++] = *(bytes_to_encode++);
+		if (i != 3)
+			continue;
+		char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+		char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+		char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+		char_array_4[3] = char_array_3[2] & 0x3f;
+		for (i = 0; i < 4; ++i)
+			ret += base64_chars[char_array_4[i]];
+		i = 0;
+	}
+
+	if (i == 0)
+		return ret;
+	for (j = i; j < 3; ++j)
+		char_array_3[j] = '\0';
+	char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+	char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+	char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+	char_array_4[3] = char_array_3[2] & 0x3f;
+	for (j = 0; j < i + 1; ++j)
+		ret += base64_chars[char_array_4[j]];
+	while ((i++ < 3))
+		ret += '=';
+	return ret;
+}
+
+std::string base64_decode(const std::string &encoded_string)
+{
+	int in_len = encoded_string.size(), i = 0, j = 0, in_ = 0;
+	unsigned char char_array_4[4], char_array_3[3];
+	std::string ret;
+
+	while (in_len-- && encoded_string[in_] != '=' && is_base64(encoded_string[in_])) {
+		char_array_4[i++] = encoded_string[in_++];
+		if (i != 4)
+			continue;
+		for (i = 0; i < 4; ++i)
+			char_array_4[i] = base64_chars.find(char_array_4[i]);
+		char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+		char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+		char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+		for (i = 0; i < 3; ++i)
+			ret += char_array_3[i];
+		i = 0;
+	}
+
+	if (i == 0)
+		return ret;
+	for (j = i; j < 4; ++j)
+		char_array_4[j] = 0;
+	for (j = 0; j < 4; ++j)
+		char_array_4[j] = base64_chars.find(char_array_4[j]);
+	char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+	char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+	char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+	for (j = 0; j < i - 1; ++j)
+		ret += char_array_3[j];
+	return ret;
+}
+
+std::string zcp_md5_final_hex(MD5_CTX *ctx)
+{
+	static const char hex[] = "0123456789abcdef";
+	unsigned char md[MD5_DIGEST_LENGTH];
+	std::string s;
+	s.reserve(2 * sizeof(md));
+
+	MD5_Final(md, ctx);
+	for (size_t z = 0; z < sizeof(md); ++z) {
+		s.push_back(hex[(md[z] & 0xF0) >> 4]);
+		s.push_back(hex[md[z] & 0xF]);
+	}
+	return s;
+}
+
+std::string string_strip_nuls(const std::string &i)
+{
+	std::string o;
+	std::copy_if(i.cbegin(), i.cend(), std::back_inserter(o),
+		[](char c) { return c != '\0'; });
+	return o;
+}
+
+std::wstring string_strip_nuls(const std::wstring &i)
+{
+	std::wstring o;
+	std::copy_if(i.cbegin(), i.cend(), std::back_inserter(o),
+		[](wchar_t c) { return c != L'\0'; });
+	return o;
+}
+
+} /* namespace */

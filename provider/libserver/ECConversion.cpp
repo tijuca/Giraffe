@@ -28,6 +28,8 @@
 
 using namespace std;
 
+namespace KC {
+
 // Convert search criteria from zarafa-5.2x to zarafa-6 format
 ECRESULT ConvertSearchCriteria52XTo6XX(ECDatabase *lpDatabase, char* lpData, struct searchCriteria **lppNewSearchCriteria)
 {
@@ -37,14 +39,14 @@ ECRESULT ConvertSearchCriteria52XTo6XX(ECDatabase *lpDatabase, char* lpData, str
 	ECRESULT er = erSuccess;
 	
 	DB_ROW lpDBRow = NULL;
-	DB_RESULT lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 	DB_LENGTHS lpDBLenths = NULL;
 	std::string strQuery;
 	unsigned int i;
 
 	struct soap xmlsoap;
 	struct searchCriteria *lpNewSearchCriteria = NULL;
-	struct searchCriteria52X *lpSearchCriteria = NULL;
+	struct searchCriteria52X crit;
 
 	std::string xmldata(lpData);
 	std::istringstream xml(xmldata);
@@ -52,18 +54,16 @@ ECRESULT ConvertSearchCriteria52XTo6XX(ECDatabase *lpDatabase, char* lpData, str
 	// We use the soap serializer / deserializer to store the data
 	soap_set_mode(&xmlsoap, SOAP_XML_TREE | SOAP_C_UTFSTRING);
 
-	lpSearchCriteria = new struct searchCriteria52X;
-
 	// Workaround for gsoap bug in which it does a set_mode on FD 0 (stdin) which causes soap_begin_recv to hang
 	// until input is received
 	xmlsoap.recvfd = -1;
 	xmlsoap.is = &xml;
-	soap_default_searchCriteria52X(&xmlsoap, lpSearchCriteria);
+	soap_default_searchCriteria52X(&xmlsoap, &crit);
 	if (soap_begin_recv(&xmlsoap) != 0) {
 		er = KCERR_NETWORK_ERROR;
 		goto exit;
 	}
-	soap_get_searchCriteria52X(&xmlsoap, lpSearchCriteria, "SearchCriteria", NULL);
+	soap_get_searchCriteria52X(&xmlsoap, &crit, "SearchCriteria", NULL);
 
 	// We now have the object, allocated by xmlsoap object,
 	if (soap_end_recv(&xmlsoap) != 0) {
@@ -71,36 +71,31 @@ ECRESULT ConvertSearchCriteria52XTo6XX(ECDatabase *lpDatabase, char* lpData, str
 		goto exit;
 	}
 
-	lpNewSearchCriteria = new struct searchCriteria;
+	lpNewSearchCriteria = s_alloc<searchCriteria>(nullptr);
 	memset(lpNewSearchCriteria, 0, sizeof(struct searchCriteria));
 
 	// Do backward-compatibility fixup
-	if(lpSearchCriteria->lpRestrict)
-	{
+	if (crit.lpRestrict) {
 		// Copy the restriction
-		er = CopyRestrictTable(NULL, lpSearchCriteria->lpRestrict, &lpNewSearchCriteria->lpRestrict);
+		er = CopyRestrictTable(NULL, crit.lpRestrict, &lpNewSearchCriteria->lpRestrict);
 		if (er != erSuccess)
 			goto exit;
 	}
-
-	// Flags
-	lpNewSearchCriteria->ulFlags = lpSearchCriteria->ulFlags;
+	lpNewSearchCriteria->ulFlags = crit.ulFlags;
 
 	// EntryidList
-	if (lpSearchCriteria->lpFolders && lpSearchCriteria->lpFolders->__size > 0 && lpSearchCriteria->lpFolders->__ptr != NULL)
-	{
-
+	if (crit.lpFolders != nullptr && crit.lpFolders->__size > 0 &&
+	    crit.lpFolders->__ptr != nullptr) {
 		lpNewSearchCriteria->lpFolders = s_alloc<struct entryList>(NULL);
-		lpNewSearchCriteria->lpFolders->__ptr = s_alloc<entryId>(NULL, lpSearchCriteria->lpFolders->__size);
+		lpNewSearchCriteria->lpFolders->__ptr = s_alloc<entryId>(NULL, crit.lpFolders->__size);
 		lpNewSearchCriteria->lpFolders->__size = 0;
-
-		memset(lpNewSearchCriteria->lpFolders->__ptr, 0, sizeof(entryId) * lpSearchCriteria->lpFolders->__size);
+		memset(lpNewSearchCriteria->lpFolders->__ptr, 0, sizeof(entryId) * crit.lpFolders->__size);
 
 		// Get them from the database
 		strQuery = "SELECT val_binary FROM indexedproperties WHERE tag=0x0FFF AND hierarchyid IN ("; //PR_ENTRYID
-		for (i = 0; i < lpSearchCriteria->lpFolders->__size; ++i) {
+		for (i = 0; i < crit.lpFolders->__size; ++i) {
 			if (i != 0)strQuery+= ",";
-			strQuery+= stringify(lpSearchCriteria->lpFolders->__ptr[i]);
+			strQuery+= stringify(crit.lpFolders->__ptr[i]);
 		}
 		strQuery+= ")";
 
@@ -134,14 +129,10 @@ ECRESULT ConvertSearchCriteria52XTo6XX(ECDatabase *lpDatabase, char* lpData, str
 exit:
 	if (er != erSuccess && lpNewSearchCriteria)
 		FreeSearchCriteria(lpNewSearchCriteria);
-
-	delete lpSearchCriteria;
-
-	if (lpDBResult)
-		lpDatabase->FreeResult(lpDBResult);
-
 	return er;
 }
+
+} /* namespace */
 
 SOAP_FMAC3 void SOAP_FMAC4 soap_default_searchCriteria52X(struct soap *soap, struct searchCriteria52X *a)
 {
@@ -206,15 +197,9 @@ SOAP_FMAC3 struct searchCriteria52X * SOAP_FMAC4 soap_in_searchCriteria52X(struc
 	}
 	else
 	{
-#if GSOAP_VERSION >= 20824
 		a = static_cast<struct searchCriteria52X *>(soap_id_forward(soap,
 		    soap->href, reinterpret_cast<void **>(a), 0,
 		    SOAP_TYPE_searchCriteria, 0, sizeof(*a), 0, NULL, NULL));
-#else
-		a = static_cast<struct searchCriteria52X *>(soap_id_forward(soap,
-		    soap->href, reinterpret_cast<void **>(a), 0,
-		    SOAP_TYPE_searchCriteria, 0, sizeof(*a), 0, NULL));
-#endif
 		if (soap->body && soap_element_end_in(soap, tag))
 			return NULL;
 	}
@@ -236,15 +221,9 @@ SOAP_FMAC3 struct entryList52X ** SOAP_FMAC4 soap_in_PointerToentryList52X(struc
 	}
 	else
 	{
-#if GSOAP_VERSION >= 20824
 		a = static_cast<struct entryList52X **>(soap_id_lookup(soap,
 		    soap->href, reinterpret_cast<void **>(a),
 		    SOAP_TYPE_entryList, sizeof(*a), 0, NULL));
-#else
-		a = static_cast<struct entryList52X **>(soap_id_lookup(soap,
-		    soap->href, reinterpret_cast<void **>(a),
-		    SOAP_TYPE_entryList, sizeof(*a), 0));
-#endif
 		if (soap->body && soap_element_end_in(soap, tag))
 			return NULL;
 	}
@@ -270,7 +249,7 @@ SOAP_FMAC3 struct entryList52X * SOAP_FMAC4 soap_in_entryList52X(struct soap *so
 		{	soap->error = SOAP_TAG_MISMATCH;
 			if (soap_flag___ptr && soap->error == SOAP_TAG_MISMATCH)
 			{	unsigned int *p;
-				soap_new_block(soap);
+				soap_alloc_block(soap);
 				for (a->__size = 0; !soap_element_begin_in(soap, "item", 1, type); ++a->__size) {
 					p = (unsigned int *)soap_push_block(soap, NULL, sizeof(unsigned int));
 					soap_default_unsignedInt(soap, p);
@@ -295,15 +274,9 @@ SOAP_FMAC3 struct entryList52X * SOAP_FMAC4 soap_in_entryList52X(struct soap *so
 	}
 	else
 	{
-#if GSOAP_VERSION >= 20824
 		a = static_cast<struct entryList52X *>(soap_id_forward(soap,
 		    soap->href, reinterpret_cast<void **>(a), 0,
 		    SOAP_TYPE_entryList, 0, sizeof(*a), 0, NULL, NULL));
-#else
-		a = static_cast<struct entryList52X *>(soap_id_forward(soap,
-		    soap->href, reinterpret_cast<void **>(a), 0,
-		    SOAP_TYPE_entryList, 0, sizeof(*a), 0, NULL));
-#endif
 		if (soap->body && soap_element_end_in(soap, tag))
 			return NULL;
 	}

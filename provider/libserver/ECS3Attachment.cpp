@@ -5,7 +5,6 @@
 #include <mutex>
 #include <stdexcept>
 #include <cerrno>
-#include <pthread.h>
 #include <unistd.h>
 #include <zlib.h>
 #include <mapidefs.h>
@@ -16,6 +15,8 @@
 #include "ECAttachmentStorage.h"
 #include "ECS3Attachment.h"
 #include "StreamUtil.h"
+
+namespace KC {
 
 /* Number of times the server should retry to send the command to the S3 servers, this is required to process redirects. */
 #define S3_RETRIES 5
@@ -117,14 +118,14 @@ ECRESULT ECS3Attachment::StaticInit(ECConfig *cf)
 	ec_log_info("Initializing S3 Attachment Storage");
 
 	/*
-	 * Do a dlopen of libs3.so.2 so that the implicit pull-in of
+	 * Do a dlopen of libs3.so.3 so that the implicit pull-in of
 	 * libldap-2.4.so.2 symbols does not pollute our namespace of
 	 * libldap_r-2.4.so.2 symbols.
 	 */
-	void *h = ec_libs3_handle = dlopen("libs3.so.2", RTLD_LAZY | RTLD_LOCAL);
+	void *h = ec_libs3_handle = dlopen("libs3.so.3", RTLD_LAZY | RTLD_LOCAL);
 	const char *err;
 	if (ec_libs3_handle == NULL) {
-		ec_log_warn("dlopen libs3.so.2: %s", (err = dlerror()) ? err : "<none>");
+		ec_log_warn("dlopen libs3.so.3: %s", (err = dlerror()) ? err : "<none>");
 		return KCERR_DATABASE_ERROR;
 	}
 #define W(n) do { \
@@ -210,9 +211,9 @@ ECRESULT ECS3Attachment::StaticDeinit(void)
  */
 ECS3Attachment::ECS3Attachment(ECDatabase *database, const char *protocol,
     const char *uri_style, const char *access_key_id,
-    const char *secret_access_key, const char *bucket_name,
+    const char *secret_access_key, const char *bucket_name, const char *region,
     const char *basepath, unsigned int complvl) :
-	ECAttachmentStorage(database, complvl)
+	ECAttachmentStorage(database, complvl), m_basepath(basepath)
 {
 	memset(&m_bucket_ctx, 0, sizeof(m_bucket_ctx));
 	m_bucket_ctx.bucketName = bucket_name;
@@ -220,9 +221,7 @@ ECS3Attachment::ECS3Attachment(ECDatabase *database, const char *protocol,
 	m_bucket_ctx.uriStyle = strncmp(uri_style, "path", 4) == 0 ? S3UriStylePath : S3UriStyleVirtualHost;
 	m_bucket_ctx.accessKeyId = access_key_id;
 	m_bucket_ctx.secretAccessKey = secret_access_key;
-
-	m_basepath = basepath;
-	m_transact = false;
+	m_bucket_ctx.authRegion = region;
 
 	/* Set the handlers */
 	m_response_handler.propertiesCallback = &ECS3Attachment::response_prop_cb;
@@ -239,7 +238,7 @@ ECS3Attachment::ECS3Attachment(ECDatabase *database, const char *protocol,
 
 ECS3Attachment::~ECS3Attachment(void)
 {
-	ASSERT(!m_transact);
+	assert(!m_transact);
 }
 
 /**
@@ -257,14 +256,18 @@ S3Status ECS3Attachment::response_prop(const S3ResponseProperties *properties, v
 {
 	struct s3_cd *data = reinterpret_cast<struct s3_cd *>(cbdata);
 
-	data->size = properties->contentLength;
-	ec_log_debug("Received the response properties, content length: %d.", data->size);
+	if (properties->contentLength != 0) {
+		data->size = properties->contentLength;
+		ec_log_debug("Received the response properties, content length: %d", data->size);
+	} else {
+		ec_log_debug("Received the response properties");
+	}
 	/*
 	 * Only allocate memory if we are not able to use a serializer sink, we
 	 * are instructed to alloc data->data and have not allocated it yet.
 	 */
 	if (data->sink == NULL && data->alloc_data && data->data == NULL) {
-		data->data = s_alloc<unsigned char>(data->soap, data->size);
+		data->data = s_alloc_nothrow<unsigned char>(data->soap, data->size);
 		if (data->data == NULL) {
 			ec_log_err("Unable to claim memory of size: %d bytes.", data->size);
 			return S3StatusAbortedByCallback;
@@ -709,10 +712,8 @@ ECRESULT ECS3Attachment::DeleteAttachmentInstances(const std::list<ULONG> &lstDe
 {
 	ECRESULT ret = erSuccess;
 	int errors = 0;
-	std::list<ULONG>::const_iterator iterDel;
-
-	for (iterDel = lstDeleteInstances.begin(); iterDel != lstDeleteInstances.end(); ++iterDel) {
-		ret = this->DeleteAttachmentInstance(*iterDel, bReplace);
+	for (auto del_id : lstDeleteInstances) {
+		ret = this->DeleteAttachmentInstance(del_id, bReplace);
 		if (ret != erSuccess)
 			++errors;
 	}
@@ -803,7 +804,7 @@ ECRESULT ECS3Attachment::DeleteAttachmentInstance(ULONG ins_id,
 
 	ret = mark_att_for_del(ins_id);
 	if (ret != erSuccess && ret != KCERR_NOT_FOUND) {
-		ASSERT(FALSE);
+		assert(false);
 		return ret;
 	}
 	return erSuccess;
@@ -911,7 +912,7 @@ ECRESULT ECS3Attachment::Begin(void)
 	ec_log_debug("Begin transaction");
 	if (m_transact) {
 		/* Possible a duplicate begin call, don't destroy the data in production */
-		ASSERT(FALSE);
+		assert(false);
 		return erSuccess;
 	}
 	m_new_att.clear();
@@ -923,24 +924,23 @@ ECRESULT ECS3Attachment::Begin(void)
 
 ECRESULT ECS3Attachment::Commit(void)
 {
-	std::set<ULONG>::const_iterator i;
 	bool error = false;
 
 	ec_log_debug("Commit transaction");
 	if (!m_transact) {
-		ASSERT(FALSE);
+		assert(false);
 		return erSuccess;
 	}
 
 	/* Disable the transaction */
 	m_transact = false;
 	/* Delete the attachments */
-	for (i = m_deleted_att.begin(); i != m_deleted_att.end(); ++i)
-		if (DeleteAttachmentInstance(*i, false) != erSuccess)
+	for (auto att_id : m_deleted_att)
+		if (DeleteAttachmentInstance(att_id, false) != erSuccess)
 			error = true;
 	/* Delete marked attachments */
-	for (i = m_marked_att.begin(); i != m_marked_att.end(); ++i)
-		if (del_marked_att(*i) != erSuccess)
+	for (auto att_id : m_marked_att)
+		if (del_marked_att(att_id) != erSuccess)
 			error = true;
 
 	m_new_att.clear();
@@ -951,12 +951,11 @@ ECRESULT ECS3Attachment::Commit(void)
 
 ECRESULT ECS3Attachment::Rollback(void)
 {
-	std::set<ULONG>::const_iterator i;
 	bool error = false;
 
 	ec_log_debug("Rollback transaction");
 	if (!m_transact) {
-		ASSERT(FALSE);
+		assert(false);
 		return erSuccess;
 	}
 
@@ -965,17 +964,19 @@ ECRESULT ECS3Attachment::Rollback(void)
 	/* Do not delete the attachments */
 	m_deleted_att.clear();
 	/* Remove the created attachments */
-	for (i = m_new_att.begin(); i != m_new_att.end(); ++i)
-		if (DeleteAttachmentInstance(*i, false) != erSuccess)
+	for (auto att_id : m_new_att)
+		if (DeleteAttachmentInstance(att_id, false) != erSuccess)
 			error = true;
 	/* Restore marked attachment */
-	for (i = m_marked_att.begin(); i != m_marked_att.end(); ++i)
-		if (restore_marked_att(*i) != erSuccess)
+	for (auto att_id : m_marked_att)
+		if (restore_marked_att(att_id) != erSuccess)
 			error = true;
 
 	m_new_att.clear();
 	m_marked_att.clear();
 	return error ? KCERR_DATABASE_ERROR : erSuccess;
 }
+
+} /* namespace */
 
 #endif /* LIBS3_H */

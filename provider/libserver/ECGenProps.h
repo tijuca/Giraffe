@@ -22,9 +22,13 @@
 #include <kopano/kcodes.h>
 
 #include <string>
-#include <map>
 
 #include "ECSession.h"
+
+struct soap;
+
+namespace KC {
+
 /*
  * This class is a general serverside class for generated properties. A Generated
  * property is any property that cannot be directly stored or read from the database.
@@ -37,9 +41,9 @@
  * never sorted on in tables. (due to the server actually doing the sorting)
  */
 
-typedef struct _ECODStore ECODStore;
+struct ECODStore;
 
-class ECGenProps _zcp_final {
+class ECGenProps _kc_final {
 public:
 	// Returns whether a different property should be retrieved instead of the
 	// requested property.
@@ -67,6 +71,8 @@ public:
 private:
 
 };
+
+} /* namespace */
 
 #endif // ECGENPROPS_H
 

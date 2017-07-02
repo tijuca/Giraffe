@@ -18,25 +18,27 @@
 #ifndef operations_INCLUDED
 #define operations_INCLUDED
 
+#include <kopano/zcdefs.h>
 #include "operations_fwd.h"
 
 #include <mapix.h>
 #include <kopano/mapi_ptr.h>
 
+namespace KC {
+
 class ECArchiverLogger;
 
-namespace za { namespace operations {
+namespace operations {
 
 /**
  * IArchiveOperation specifies the interface to all archiver operations.
  */
-class IArchiveOperation
-{
+class IArchiveOperation {
 public:
 	/**
 	 * virtual destructor.
 	 */
-	virtual ~IArchiveOperation() {}
+	virtual ~IArchiveOperation(void) _kc_impdtor;
 	
 	/**
 	 * Entrypoint for all archive operations.
@@ -78,12 +80,11 @@ public:
  * It generates the restriction.
  * It contains the logger.
  */
-class ArchiveOperationBase : public IArchiveOperation
-{
+class ArchiveOperationBase : public IArchiveOperation {
 public:
 	ArchiveOperationBase(ECArchiverLogger *lpLogger, int ulAge, bool bProcessUnread, ULONG ulInhibitMask);
-	HRESULT GetRestriction(LPMAPIPROP LPMAPIPROP, LPSRestriction *lppRestriction);
-	HRESULT VerifyRestriction(LPMESSAGE lpMessage);
+	HRESULT GetRestriction(LPMAPIPROP LPMAPIPROP, LPSRestriction *lppRestriction) _kc_override;
+	HRESULT VerifyRestriction(LPMESSAGE lpMessage) _kc_override;
 
 protected:
 	/**
@@ -105,11 +106,10 @@ private:
  * ArchiveOperationBaseEx is the base implementation of the IArchiveOperation interface. It's main functionality
  * is iterating through all the items in the folder passed to ProcessEntry.
  */
-class ArchiveOperationBaseEx : public ArchiveOperationBase
-{
+class ArchiveOperationBaseEx : public ArchiveOperationBase {
 public:
 	ArchiveOperationBaseEx(ECArchiverLogger *lpLogger, int ulAge, bool bProcessUnread, ULONG ulInhibitMask);
-	HRESULT ProcessEntry(LPMAPIFOLDER lpFolder, ULONG cProps, const LPSPropValue lpProps);
+	HRESULT ProcessEntry(LPMAPIFOLDER lpFolder, ULONG cProps, const LPSPropValue lpProps) _kc_override;
 	
 protected:
 	/**
@@ -145,11 +145,10 @@ private:
 	 */
 	virtual HRESULT DoProcessEntry(ULONG cProps, const LPSPropValue &lpProps) = 0;
 	
-private:
 	SPropValuePtr m_ptrCurFolderEntryId;
 	MAPIFolderPtr m_ptrCurFolder;
 };
 
-}} // namespaces
+}} /* namespace */
 
 #endif // ndef operations_INCLUDED

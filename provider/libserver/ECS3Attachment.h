@@ -11,15 +11,19 @@
 #include <libs3.h>
 #include "ECAttachmentStorage.h"
 
+struct soap;
+
+namespace KC {
+
 class ECSerializer;
 class ECLogger;
 struct s3_cd;
 
-class ECS3Attachment _zcp_final : public ECAttachmentStorage {
+class ECS3Attachment _kc_final : public ECAttachmentStorage {
 	public:
 	static ECRESULT StaticInit(ECConfig *);
 	static ECRESULT StaticDeinit(void);
-	ECS3Attachment(ECDatabase *, const char *, const char *, const char *, const char *, const char *, const char *, unsigned int);
+	ECS3Attachment(ECDatabase *, const char *, const char *, const char *, const char *, const char *, const char *, const char *, unsigned int);
 
 	protected:
 	virtual ~ECS3Attachment(void);
@@ -64,7 +68,7 @@ class ECS3Attachment _zcp_final : public ECAttachmentStorage {
 	std::set<ULONG> m_new_att;
 	std::set<ULONG> m_deleted_att;
 	std::set<ULONG> m_marked_att;
-	bool m_transact;
+	bool m_transact = false;
 
 	/*
 	 * The Request Context and Response Handler variables are responsible
@@ -75,6 +79,8 @@ class ECS3Attachment _zcp_final : public ECAttachmentStorage {
 	S3GetObjectHandler m_get_obj_handler;
 	S3GetConditions m_get_conditions;
 };
+
+} /* namespace */
 
 #endif /* LIBS3_H */
 #endif

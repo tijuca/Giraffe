@@ -57,20 +57,20 @@
 
 #include <list>
 #include <map>
-
-#include <pthread.h>
+#include <mutex>
 
 #define BOOKMARK_LIMIT		100
 
+namespace KC {
+
 struct sObjectTableKey {
-    sObjectTableKey(unsigned int ulObjId, unsigned int ulOrderId) { this->ulObjId = ulObjId; this->ulOrderId = ulOrderId; };
-    sObjectTableKey() { ulObjId = 0; ulOrderId = 0; }
-	unsigned int ulObjId;
-	unsigned int ulOrderId;
+    sObjectTableKey(unsigned int obj_id, unsigned int order_id) : ulObjId(obj_id), ulOrderId(order_id) {}
+	sObjectTableKey(void) = default;
+	unsigned int ulObjId = 0;
+	unsigned int ulOrderId = 0;
 };
 
-struct ObjectTableKeyCompare
-{
+struct ObjectTableKeyCompare {
 	bool operator()(const sObjectTableKey& a, const sObjectTableKey& b) const
 	{
 		return a.ulObjId < b.ulObjId || (a.ulObjId == b.ulObjId && a.ulOrderId < b.ulOrderId);
@@ -78,8 +78,8 @@ struct ObjectTableKeyCompare
 };
 
 bool operator!=(const sObjectTableKey& a, const sObjectTableKey& b);
-bool operator==(const sObjectTableKey& a, const sObjectTableKey& b);
-bool operator<(const sObjectTableKey& a, const sObjectTableKey& b);
+extern _kc_export bool operator==(const sObjectTableKey &, const sObjectTableKey &);
+extern _kc_export bool operator<(const sObjectTableKey &, const sObjectTableKey &);
 bool operator>(const sObjectTableKey& a, const sObjectTableKey& b);
 
 typedef std::map<sObjectTableKey, unsigned int, ObjectTableKeyCompare>  ECObjectTableMap;
@@ -89,25 +89,22 @@ typedef std::list<sObjectTableKey> ECObjectTableList;
 #define TABLEROW_FLAG_FLOAT		0x00000002
 #define TABLEROW_FLAG_STRING	0x00000004
 
-class ECTableRow _zcp_final {
+class _kc_export ECTableRow _kc_final {
 public:
 	ECTableRow(sObjectTableKey sKey, unsigned int ulSortCols, const unsigned int *lpSortLen, const unsigned char *lpFlags, unsigned char **lppSortData, bool fHidden);
 	ECTableRow(const ECTableRow &other);
 	~ECTableRow();
-
-	unsigned int GetObjectSize(void) const;
-
-	static bool rowcompare(const ECTableRow *a, const ECTableRow *b);
-	static bool rowcompare(unsigned int ulSortColsA, const int *lpSortLenA, unsigned char **lppSortKeysA, const unsigned char *lpSortFlagsA, unsigned int ulSortColsB, const int *lpSortLenB, unsigned char **lppSortKeysB, const unsigned char *lpSortFlagsB, bool fIgnoreOrder = false);
-	static bool rowcompareprefix(unsigned int ulSortColPrefix, unsigned int ulSortColsA, const int *lpSortLenA, unsigned char **lppSortKeysA, const unsigned char *lpSortFlagsA, unsigned int ulSortColsB, const int *lpSortLenB, unsigned char **lppSortKeysB, const unsigned char *lpSortFlagsB);
-
+	_kc_hidden unsigned int GetObjectSize(void) const;
+	_kc_hidden static bool rowcompare(const ECTableRow *, const ECTableRow *);
+	_kc_hidden static bool rowcompare(unsigned int sortcols_a, const int *sortlen_a, unsigned char **sortkeys_a, const unsigned char *sortflags_a, unsigned int sortcols_b, const int *sortlen_b, unsigned char **sortkeys_b, const unsigned char *sortflags_b, bool ignore_order = false);
+	_kc_hidden static bool rowcompareprefix(unsigned int sortcolprefix, unsigned int sortcols_a, const int *sortlen_a, unsigned char **sortkeys_a, const unsigned char *sortflags_a, unsigned int sortcols_b, const int *sortlen_b, unsigned char **sortkeys_b, const unsigned char *sortflags_b);
 	bool operator < (const ECTableRow &other) const;
 	
 
 private:
-	void initSortCols(unsigned int ulSortCols, const int *lpSortLen, const unsigned char *lpFlags, unsigned char ** lppSortData);
-	void freeSortCols();
-	ECTableRow& operator = (const ECTableRow &other);
+	_kc_hidden void initSortCols(unsigned int sortcols, const int *sortlen, const unsigned char *flags, unsigned char **sortdata);
+	_kc_hidden void freeSortCols(void);
+	_kc_hidden ECTableRow &operator=(const ECTableRow &);
 public:
 	sObjectTableKey	sKey;
 
@@ -117,33 +114,35 @@ public:
 	unsigned char *lpFlags;
 
 	// b-tree data
-	ECTableRow *lpParent;
-	ECTableRow *lpLeft;			// All nodes in left are such that *left < *this
-	ECTableRow *lpRight;		// All nodes in right are such that *this <= *right
-	unsigned int ulBranchCount;	// Count of all nodes in this branch (including this node)
-	unsigned int ulHeight;		// For AVL
-	unsigned int fLeft;			// 1 if this is a left node
-	bool		fRoot;			// Only the root node has TRUE here
+	ECTableRow *lpParent = nullptr;
+	ECTableRow *lpLeft = nullptr; // All nodes in left are such that *left < *this
+	ECTableRow *lpRight = nullptr; // All nodes in right are such that *this <= *right
+	unsigned int ulBranchCount = 0; // Count of all nodes in this branch (including this node)
+	unsigned int ulHeight = 0; // For AVL
+	unsigned int fLeft = 0; // 1 if this is a left node
+	bool fRoot = false; // Only the root node has TRUE here
 	bool		fHidden;		// The row is hidden (is it non-existent for all purposes)
 };
 
 typedef std::map<sObjectTableKey, ECTableRow*, ObjectTableKeyCompare>  ECTableRowMap;
 
-typedef struct {
+struct sBookmarkPosition {
 	unsigned int	ulFirstRowPosition;
 	ECTableRow*		lpPosition;
-}sBookmarkPosition;
+};
 
 typedef std::map<unsigned int, sBookmarkPosition> ECBookmarkMap;
 
-class ECKeyTable _zcp_final {
+class _kc_export ECKeyTable _kc_final {
 public:
 	/* this MUST be the same definitions as TABLE_NOTIFICATION event types passed in ulTableEvent */
 
 	// FIXME this is rather ugly, the names must differ from those in mapi.h, as they clash !
-	typedef enum { TABLE_CHANGE=1, TABLE_ERR, TABLE_ROW_ADD, 
+	enum UpdateType {
+		TABLE_CHANGE=1, TABLE_ERR, TABLE_ROW_ADD,
 					TABLE_ROW_DELETE, TABLE_ROW_MODIFY,TABLE_SORT, 
-					TABLE_RESTRICT, TABLE_SETCOL, TABLE_DO_RELOAD } UpdateType;
+					TABLE_RESTRICT, TABLE_SETCOL, TABLE_DO_RELOAD,
+	};
 
 	enum { EC_SEEK_SET=0, EC_SEEK_CUR, EC_SEEK_END };
 	
@@ -158,7 +157,7 @@ public:
 	ECRESULT	QueryRows(unsigned int ulRows, ECObjectTableList* lpRowList, bool bDirBackward, unsigned int ulFlags, bool bShowHidden = false);
 	ECRESULT	Clear();
 
-	ECRESULT	GetBookmark(unsigned int ulbkPosition, int* lpbkPosition);
+	_kc_hidden ECRESULT GetBookmark(unsigned int p1, int *p2);
 	ECRESULT	CreateBookmark(unsigned int* lpulbkPosition);
 	ECRESULT	FreeBookmark(unsigned int ulbkPosition);
 
@@ -178,26 +177,25 @@ public:
 	unsigned int GetObjectSize();
 
 private:
-	ECRESULT	UpdateCounts(ECTableRow *lpRow);
-	ECRESULT	CurrentRow(ECTableRow *lpRow, unsigned int *lpulCurrentRow);
-	ECRESULT	InvalidateBookmark(ECTableRow *lpRow);
+	_kc_hidden ECRESULT UpdateCounts(ECTableRow *);
+	_kc_hidden ECRESULT CurrentRow(ECTableRow *, unsigned int *current_row);
+	_kc_hidden ECRESULT InvalidateBookmark(ECTableRow *);
 
 	// Functions for implemention AVL balancing
-	void		RotateL(ECTableRow *lpPivot);
-	void		RotateR(ECTableRow *lpPivot);
-	void		RotateLR(ECTableRow *lpPivot);
-	void		RotateRL(ECTableRow *lpPivot);
-	unsigned int GetHeight(ECTableRow *root) { return root->ulHeight; }
-	int 		GetBalance(ECTableRow *lpRoot);
-	void		Restructure(ECTableRow *lpPivot);
-	void		RestructureRecursive(ECTableRow *lpRow);
-	
+	_kc_hidden void RotateL(ECTableRow *pivot);
+	_kc_hidden void RotateR(ECTableRow *pivot);
+	_kc_hidden void RotateLR(ECTableRow *pivot);
+	_kc_hidden void RotateRL(ECTableRow *pivot);
+	_kc_hidden unsigned int GetHeight(ECTableRow *root) { return root->ulHeight; }
+	_kc_hidden int GetBalance(ECTableRow *root);
+	_kc_hidden void Restructure(ECTableRow *pivot);
+	_kc_hidden void RestructureRecursive(ECTableRow *);
 
 	// Advance / reverse cursor by one position
-	void		Next();
-	void		Prev();
+	_kc_hidden void Next(void);
+	_kc_hidden void Prev(void);
 
-	pthread_mutex_t			mLock;			// Locks the entire b-tree
+	std::recursive_mutex mLock; /* Locks the entire b-tree */
 	ECTableRow				*lpRoot;		// The root node, which is infinitely 'low', ie all nodes are such that *node > *root
 	ECTableRow				*lpCurrent;		// The current node
 	ECTableRowMap			mapRow;
@@ -206,5 +204,7 @@ private:
 };
 
 #define EC_TABLE_NOADVANCE 1
+
+} /* namespace */
 
 #endif // TABLE_H

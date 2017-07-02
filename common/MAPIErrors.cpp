@@ -28,11 +28,12 @@
 #include <kopano/mapiext.h>
 #include <string>
 
-typedef struct tagMAPIErrorTranslateRecord
-{
+namespace KC {
+
+struct MAPIErrorTranslateRecord {
 	HRESULT errorCode;
     const char* errorMessage;
-} MAPIErrorTranslateRecord;
+};
 
 static const MAPIErrorTranslateRecord MAPIErrorCodes[] = {
     { hrSuccess,                            "success" },
@@ -133,7 +134,7 @@ const char* GetMAPIErrorMessage(HRESULT errorCode)
 }
 
 /**
- * Prints a user friendly string for an given HRESULT value.
+ * Prints a user friendly string for a given HRESULT value.
  *
  * We should try to be as informative as possible to the user, try to
  * get a nice descriptive message for the error and in the last case
@@ -147,26 +148,21 @@ std::string getMapiCodeString(HRESULT hr, const char* object /* = "object" */)
 {
 	std::string retval = GetMAPIErrorMessage(hr);
 	std::string space(" ");
-	std::string objectstring(object);
+	std::string objectstring(object != nullptr ? object : "");
 	switch (hr) {
 	case MAPI_E_NOT_FOUND:
-		retval = objectstring + space + retval;
-		break;
+		return objectstring + space + retval;
 	case MAPI_E_COLLISION:
-		retval = objectstring + " already exists";
-		break;
+		return objectstring + " already exists";
 	case MAPI_E_NO_ACCESS:
-		retval = retval + space + objectstring;
-		break;
+		return retval + space + objectstring;
 	case MAPI_E_UNABLE_TO_COMPLETE:
-		retval = "please check your license";
-		break;
+		return "please check your license";
 	case MAPI_E_INVALID_TYPE:
-		retval = "invalid type combination";
-		break;
+		return "invalid type combination";
 	default:
-		retval = retval + std::string(" (") + stringify(hr, true) + std::string(")");
+		return retval + std::string(" (") + stringify(hr, true) + std::string(")");
 	};
-
-	return retval;
 }
+
+} /* namespace */

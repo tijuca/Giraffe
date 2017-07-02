@@ -16,7 +16,8 @@
  */
 
 #include <kopano/platform.h>
-
+#include <kopano/ECInterfaceDefs.h>
+#include <kopano/memory.hpp>
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapitags.h>
@@ -43,6 +44,13 @@
 #include "pcutil.hpp"
 
 #include <sstream>
+
+using namespace KCHL;
+
+struct STREAMDATA {
+	ULONG ulPropTag;
+	ECMAPIProp *lpProp;
+};
 
 static struct rights ECPermToRightsCheap(const ECPERMISSION &p)
 {
@@ -100,11 +108,6 @@ ECMAPIProp::ECMAPIProp(void *lpProvider, ULONG ulObjType, BOOL fModify,
 	// Used for loadsim
 	this->HrAddPropHandlers(0x664B0014/*PR_REPLICA_VERSION*/,		DefaultMAPIGetProp	,DefaultSetPropIgnore,		(void*) this, FALSE, FALSE);
 
-	m_bICSObject = FALSE;
-	m_ulSyncId = 0;
-	m_cbParentID = 0;
-	m_lpParentID = NULL;
-
 	// Track 'root object'. This is the object that was opened via OpenEntry or OpenMsgStore, so normally
 	// lpRoot == this, but in the case of attachments and submessages it points to the top-level message
 	if(lpRoot)
@@ -121,14 +124,11 @@ ECMAPIProp::~ECMAPIProp()
 
 HRESULT ECMAPIProp::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECMAPIProp, this);
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
-	REGISTER_INTERFACE(IID_IMAPIProp, &this->m_xMAPIProp);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xMAPIProp);
-
-	REGISTER_INTERFACE(IID_IECSecurity, &this->m_xECSecurity);
-
+	REGISTER_INTERFACE2(ECMAPIProp, this);
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IMAPIProp, &this->m_xMAPIProp);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xMAPIProp);
+	REGISTER_INTERFACE2(IECSecurity, &this->m_xECSecurity);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -177,9 +177,8 @@ HRESULT	ECMAPIProp::DefaultMAPIGetProp(ULONG ulPropTag, void* lpProvider, ULONG 
 		
 	case PROP_ID(PR_MAPPING_SIGNATURE):
 		// get the mapping signature from the store
-		if(lpMsgStore == NULL || lpMsgStore->HrGetRealProp(PR_MAPPING_SIGNATURE, ulFlags, lpBase, lpsPropValue) != hrSuccess) {
+		if (lpMsgStore == NULL || lpMsgStore->HrGetRealProp(PR_MAPPING_SIGNATURE, ulFlags, lpBase, lpsPropValue) != hrSuccess)
 			hr = MAPI_E_NOT_FOUND;
-		}
 		break;
 
 	case PROP_ID(PR_STORE_RECORD_KEY):
@@ -191,15 +190,14 @@ HRESULT	ECMAPIProp::DefaultMAPIGetProp(ULONG ulPropTag, void* lpProvider, ULONG 
 
 	case PROP_ID(PR_STORE_SUPPORT_MASK):
 	case PROP_ID(PR_STORE_UNICODE_MASK):
-		if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_PUBLIC_GUID))
+		if (CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_PUBLIC_GUID))
 			lpsPropValue->Value.l = EC_SUPPORTMASK_PUBLIC;
-		else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_DELEGATE_GUID)){
+		else if (CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_DELEGATE_GUID))
 			lpsPropValue->Value.l = EC_SUPPORTMASK_DELEGATE;
-		}else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_ARCHIVE_GUID)) {
+		else if (CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_ARCHIVE_GUID))
 			lpsPropValue->Value.l = EC_SUPPORTMASK_ARCHIVE;
-		}else {
+		else
 			lpsPropValue->Value.l = EC_SUPPORTMASK_PRIVATE;
-		}
 
 		if(lpMsgStore->m_ulClientVersion == CLIENT_VERSION_OLK2000)
 			lpsPropValue->Value.l &=~STORE_HTML_OK; // Remove the flag, other way outlook 2000 crashed
@@ -215,15 +213,13 @@ HRESULT	ECMAPIProp::DefaultMAPIGetProp(ULONG ulPropTag, void* lpProvider, ULONG 
 		lpsPropValue->ulPropTag = PR_STORE_ENTRYID;
 
 		ULONG cbWrapped = 0;
-		LPENTRYID lpWrapped = NULL;
+		memory_ptr<ENTRYID> lpWrapped;
 
-		hr = lpProp->GetMsgStore()->GetWrappedStoreEntryID(&cbWrapped, &lpWrapped);
-
+		hr = lpProp->GetMsgStore()->GetWrappedStoreEntryID(&cbWrapped, &~lpWrapped);
 		if(hr == hrSuccess) {
 			ECAllocateMore(cbWrapped, lpBase, (LPVOID *)&lpsPropValue->Value.bin.lpb);
 			memcpy(lpsPropValue->Value.bin.lpb, lpWrapped, cbWrapped);
 			lpsPropValue->Value.bin.cb = cbWrapped;
-			MAPIFreeBuffer(lpWrapped);
 		}
 		break;
 	}
@@ -286,7 +282,8 @@ HRESULT	ECMAPIProp::DefaultMAPIGetProp(ULONG ulPropTag, void* lpProvider, ULONG 
 	return hr;
 }
 
-HRESULT ECMAPIProp::SetPropHandler(ULONG ulPropTag, void* lpProvider, LPSPropValue lpsPropValue, void *lpParam)
+HRESULT ECMAPIProp::SetPropHandler(ULONG ulPropTag, void *lpProvider,
+    const SPropValue *lpsPropValue, void *lpParam)
 {
 	HRESULT hr = hrSuccess;
 	ECMAPIProp*	lpProp = (ECMAPIProp *)lpParam;
@@ -313,79 +310,70 @@ HRESULT ECMAPIProp::TableRowGetProp(void* lpProvider, struct propVal *lpsPropVal
 	ECMsgStore* lpMsgStore = (ECMsgStore*)lpProvider;
 
 	switch(lpsPropValSrc->ulPropTag) {
+	case PR_STORE_ENTRYID:
+	{
+		ULONG cbWrapped = 0;
+		memory_ptr<ENTRYID> lpWrapped;
 
-		case PR_STORE_ENTRYID:
-		{				
-			ULONG cbWrapped = 0;
-			LPENTRYID lpWrapped = NULL;
+		// if we know, we are a spooler or a store than we can switch the function for 'speed-up'
+		// hr = lpMsgStore->GetWrappedStoreEntryID(&cbWrapped, &lpWrapped);
+		hr = lpMsgStore->GetWrappedServerStoreEntryID(lpsPropValSrc->Value.bin->__size, lpsPropValSrc->Value.bin->__ptr, &cbWrapped, &~lpWrapped);
+		if (hr != hrSuccess)
+			return hr;
+		ECAllocateMore(cbWrapped, lpBase, (void **)&lpsPropValDst->Value.bin.lpb);
+		memcpy(lpsPropValDst->Value.bin.lpb, lpWrapped, cbWrapped);
+		lpsPropValDst->Value.bin.cb = cbWrapped;
+		lpsPropValDst->ulPropTag = PROP_TAG(PT_BINARY,PROP_ID(lpsPropValSrc->ulPropTag));
+		break;
+	}
+	case PROP_TAG(PT_ERROR,PROP_ID(PR_DISPLAY_TYPE)):
+		lpsPropValDst->Value.l = DT_FOLDER;				// FIXME, may be a search folder
+		lpsPropValDst->ulPropTag = PR_DISPLAY_TYPE;
+		break;
+	case PROP_TAG(PT_ERROR,PROP_ID(PR_STORE_SUPPORT_MASK)):
+	case PROP_TAG(PT_ERROR,PROP_ID(PR_STORE_UNICODE_MASK)):
+		if (CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_PUBLIC_GUID))
+			lpsPropValDst->Value.l = EC_SUPPORTMASK_PUBLIC;
+		else if (CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_DELEGATE_GUID))
+			lpsPropValDst->Value.l = EC_SUPPORTMASK_DELEGATE;
+		else if (CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_ARCHIVE_GUID))
+			lpsPropValDst->Value.l = EC_SUPPORTMASK_ARCHIVE;
+		else
+			lpsPropValDst->Value.l = EC_SUPPORTMASK_PRIVATE;
 
-			// if we know, we are a spooler or a store than we can switch the function for 'speed-up'
-			// hr = lpMsgStore->GetWrappedStoreEntryID(&cbWrapped, &lpWrapped);
-			hr = lpMsgStore->GetWrappedServerStoreEntryID(lpsPropValSrc->Value.bin->__size, lpsPropValSrc->Value.bin->__ptr, &cbWrapped, &lpWrapped);
+		if (lpMsgStore->m_ulClientVersion == CLIENT_VERSION_OLK2000)
+			lpsPropValDst->Value.l &=~STORE_HTML_OK; // Remove the flag, other way outlook 2000 crashed
 
-			if(hr == hrSuccess) {
-				ECAllocateMore(cbWrapped, lpBase, (void **)&lpsPropValDst->Value.bin.lpb);
-				memcpy(lpsPropValDst->Value.bin.lpb, lpWrapped, cbWrapped);
-				lpsPropValDst->Value.bin.cb = cbWrapped;
-				lpsPropValDst->ulPropTag = PROP_TAG(PT_BINARY,PROP_ID(lpsPropValSrc->ulPropTag));
-				MAPIFreeBuffer(lpWrapped);
-			}
+		// No real unicode support in outlook 2000 and xp
+		if (lpMsgStore->m_ulClientVersion <= CLIENT_VERSION_OLK2002)
+			lpsPropValDst->Value.l &=~ STORE_UNICODE_OK;
 
-			break;
-		}	
+		lpsPropValDst->ulPropTag = CHANGE_PROP_TYPE(lpsPropValSrc->ulPropTag, PT_LONG);
+		break;
 
-		case PROP_TAG(PT_ERROR,PROP_ID(PR_DISPLAY_TYPE)): 
-			lpsPropValDst->Value.l = DT_FOLDER;				// FIXME, may be a search folder
-			lpsPropValDst->ulPropTag = PR_DISPLAY_TYPE;
-			break;
-		
-		case PROP_TAG(PT_ERROR,PROP_ID(PR_STORE_SUPPORT_MASK)):
-		case PROP_TAG(PT_ERROR,PROP_ID(PR_STORE_UNICODE_MASK)):
-			if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_PUBLIC_GUID))
-				lpsPropValDst->Value.l = EC_SUPPORTMASK_PUBLIC;
-			else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_DELEGATE_GUID))
-				lpsPropValDst->Value.l = EC_SUPPORTMASK_DELEGATE;
-			else if(CompareMDBProvider(&lpMsgStore->m_guidMDB_Provider, &KOPANO_STORE_ARCHIVE_GUID))
-				lpsPropValDst->Value.l = EC_SUPPORTMASK_ARCHIVE;
-			else 
-				lpsPropValDst->Value.l = EC_SUPPORTMASK_PRIVATE;
+	case PROP_TAG(PT_ERROR,PROP_ID(PR_STORE_RECORD_KEY)):
+		// Reset type to binary
+		lpsPropValDst->ulPropTag = PROP_TAG(PT_BINARY,PROP_ID(lpsPropValSrc->ulPropTag));
+		ECAllocateMore(sizeof(MAPIUID), lpBase, (void **)&lpsPropValDst->Value.bin.lpb);
+		memcpy(lpsPropValDst->Value.bin.lpb, &lpMsgStore->GetStoreGuid(), sizeof(MAPIUID));
+		lpsPropValDst->Value.bin.cb = sizeof(MAPIUID);
+		break;
 
-			if(lpMsgStore->m_ulClientVersion == CLIENT_VERSION_OLK2000)
-				lpsPropValDst->Value.l &=~STORE_HTML_OK; // Remove the flag, other way outlook 2000 crashed
-		
-			// No real unicode support in outlook 2000 and xp
-			if (lpMsgStore->m_ulClientVersion <= CLIENT_VERSION_OLK2002)
-				lpsPropValDst->Value.l &=~ STORE_UNICODE_OK;
-
-			lpsPropValDst->ulPropTag = CHANGE_PROP_TYPE(lpsPropValSrc->ulPropTag, PT_LONG);
-			break;
-		
-		case PROP_TAG(PT_ERROR,PROP_ID(PR_STORE_RECORD_KEY)): 
-			// Reset type to binary
-			lpsPropValDst->ulPropTag = PROP_TAG(PT_BINARY,PROP_ID(lpsPropValSrc->ulPropTag));
-
-			ECAllocateMore(sizeof(MAPIUID), lpBase, (void **)&lpsPropValDst->Value.bin.lpb);
-			memcpy(lpsPropValDst->Value.bin.lpb, &lpMsgStore->GetStoreGuid(), sizeof(MAPIUID));
-			lpsPropValDst->Value.bin.cb = sizeof(MAPIUID);
-			break;
-
-		case PROP_TAG(PT_ERROR,PROP_ID(PR_MDB_PROVIDER)):
-			lpsPropValDst->ulPropTag = PROP_TAG(PT_BINARY,PROP_ID(lpsPropValSrc->ulPropTag));
-
-			ECAllocateMore(sizeof(MAPIUID), lpBase, (void **)&lpsPropValDst->Value.bin.lpb);
-			memcpy(lpsPropValDst->Value.bin.lpb, &lpMsgStore->m_guidMDB_Provider, sizeof(MAPIUID));
-			lpsPropValDst->Value.bin.cb = sizeof(MAPIUID);
-			break;
-		default:
-			hr = MAPI_E_NOT_FOUND;
-			break;
+	case PROP_TAG(PT_ERROR,PROP_ID(PR_MDB_PROVIDER)):
+		lpsPropValDst->ulPropTag = PROP_TAG(PT_BINARY,PROP_ID(lpsPropValSrc->ulPropTag));
+		ECAllocateMore(sizeof(MAPIUID), lpBase, (void **)&lpsPropValDst->Value.bin.lpb);
+		memcpy(lpsPropValDst->Value.bin.lpb, &lpMsgStore->m_guidMDB_Provider, sizeof(MAPIUID));
+		lpsPropValDst->Value.bin.cb = sizeof(MAPIUID);
+		break;
+	default:
+		return MAPI_E_NOT_FOUND;
 	}
 
 	return hr;
 }
 
 // FIXME openproperty on computed value is illegal
-HRESULT ECMAPIProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
+HRESULT ECMAPIProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN *lppUnk)
 {
     HRESULT hr = hrSuccess;
 	ECMemStream *lpStream = NULL;
@@ -393,143 +381,118 @@ HRESULT ECMAPIProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfac
 	STREAMDATA *lpStreamData = NULL;
 
 	if((ulFlags&MAPI_CREATE && !(ulFlags&MAPI_MODIFY)) || lpiid == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+		return MAPI_E_INVALID_PARAMETER;
 	
 	// Only support certain property types
-	if(PROP_TYPE(ulPropTag) != PT_BINARY && PROP_TYPE(ulPropTag) != PT_UNICODE && PROP_TYPE(ulPropTag) != PT_STRING8) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (PROP_TYPE(ulPropTag) != PT_BINARY &&
+	    PROP_TYPE(ulPropTag) != PT_UNICODE &&
+	    PROP_TYPE(ulPropTag) != PT_STRING8)
+		return MAPI_E_INVALID_PARAMETER;
+	if (*lpiid != IID_IStream && *lpiid != IID_IStorage)
+		return MAPI_E_INTERFACE_NOT_SUPPORTED;
+	if (PROP_TYPE(ulPropTag) != PT_STRING8 &&
+	    PROP_TYPE(ulPropTag) != PT_BINARY &&
+	    PROP_TYPE(ulPropTag) != PT_UNICODE)
+		return MAPI_E_NOT_FOUND;
 
-	if(*lpiid == IID_IStream || *lpiid == IID_IStorage) {
-		if(PROP_TYPE(ulPropTag) != PT_STRING8 && PROP_TYPE(ulPropTag) != PT_BINARY && PROP_TYPE(ulPropTag) != PT_UNICODE) {
-			hr = MAPI_E_NOT_FOUND;
-			goto exit;
-		}
-
-		if(*lpiid == IID_IStream && this->lstProps == NULL && PROP_TYPE(ulPropTag) == PT_BINARY && !(ulFlags & MAPI_MODIFY)) {
-		    // Shortcut: don't load entire object if only one property is being requested for read-only. HrLoadProp() will return
-			// without querying the server if the server does not support this capability (introduced in 6.20.8). Main reason is
-			// calendar loading time with large recursive entries in outlook XP.
-			if(this->lpStorage->HrLoadProp(0, ulPropTag, &lpsPropValue) == erSuccess) {
-				lpStreamData = new STREAMDATA; // is freed by HrStreamCleanup, called by ECMemStream on refcount == 0
-				lpStreamData->ulPropTag = ulPropTag;
-				lpStreamData->lpProp = this;
-
-				hr = ECMemStream::Create((char*)lpsPropValue->Value.bin.lpb, lpsPropValue->Value.bin.cb, ulInterfaceOptions,
-												NULL, ECMAPIProp::HrStreamCleanup, (void *)lpStreamData, &lpStream);
-				if (hr != hrSuccess)
-					goto exit;
-
-				lpStream->QueryInterface(IID_IStream, (void **)lppUnk);
-				AddChild(lpStream);
-				
-				lpStream->Release();
-				
-				goto exit;
-			}
-			// If this fails, just fallback to the 'normal' way of loading properties.
-		}
-		
-		if (ulFlags & MAPI_MODIFY)
-			ulInterfaceOptions |= STGM_WRITE;
-
-		// IStream requested for a property
-
-		ECAllocateBuffer(sizeof(SPropValue), (void **) &lpsPropValue);
-
-		// Yank the property in from disk if it wasn't loaded yet
-		HrLoadProp(ulPropTag);
-
-		// For MAPI_CREATE, reset (or create) the property now
-		if(ulFlags & MAPI_CREATE) {
-			if(!this->fModify) {
-				hr = MAPI_E_NO_ACCESS;
-				goto exit;
-			}
-			
-			SPropValue sProp;
-			sProp.ulPropTag = ulPropTag;
-			
-			if(PROP_TYPE(ulPropTag) == PT_BINARY) {
-				sProp.Value.bin.cb = 0;
-				sProp.Value.bin.lpb = NULL;
-			} else {
-				// Handles lpszA and lpszW since they are the same field in the union
-				sProp.Value.lpszW = const_cast<wchar_t *>(L"");
-			}
-				
-			hr = HrSetRealProp(&sProp);
-			if(hr != hrSuccess)
-				goto exit;
-		}
-			
-		hr = HrGetRealProp(ulPropTag, ulFlags, lpsPropValue, lpsPropValue);
-
-		if(hr != hrSuccess) {
-			// Promote warnings from GetProps to error
-			hr = MAPI_E_NOT_FOUND;
-			goto exit;
-		}
-		
+	if (*lpiid == IID_IStream && this->lstProps == NULL &&
+	    PROP_TYPE(ulPropTag) == PT_BINARY && !(ulFlags & MAPI_MODIFY) &&
+	    // Shortcut: don't load entire object if only one property is being requested for read-only. HrLoadProp() will return
+		// without querying the server if the server does not support this capability (introduced in 6.20.8). Main reason is
+		// calendar loading time with large recursive entries in outlook XP.
+	    // If HrLoadProp failed, just fallback to the 'normal' way of loading properties.
+	    this->lpStorage->HrLoadProp(0, ulPropTag, &lpsPropValue) == erSuccess) {
 		lpStreamData = new STREAMDATA; // is freed by HrStreamCleanup, called by ECMemStream on refcount == 0
 		lpStreamData->ulPropTag = ulPropTag;
 		lpStreamData->lpProp = this;
-
-		if((ulFlags & MAPI_CREATE) == MAPI_CREATE)
-		{
-			hr = ECMemStream::Create(NULL, 0, ulInterfaceOptions,
-									 ECMAPIProp::HrStreamCommit, ECMAPIProp::HrStreamCleanup, (void *)lpStreamData, &lpStream);
-		}else {
-
-			switch(PROP_TYPE(lpsPropValue->ulPropTag)) {
-			case PT_STRING8:
-				hr = ECMemStream::Create(lpsPropValue->Value.lpszA, strlen(lpsPropValue->Value.lpszA), ulInterfaceOptions,
-										ECMAPIProp::HrStreamCommit, ECMAPIProp::HrStreamCleanup, (void *)lpStreamData, &lpStream);
-				break;
-			case PT_UNICODE:
-				hr = ECMemStream::Create((char*)lpsPropValue->Value.lpszW, wcslen(lpsPropValue->Value.lpszW)*sizeof(WCHAR), ulInterfaceOptions,
-										ECMAPIProp::HrStreamCommit, ECMAPIProp::HrStreamCleanup, (void *)lpStreamData, &lpStream);
-				break;
-			case PT_BINARY:
-				hr = ECMemStream::Create((char *)lpsPropValue->Value.bin.lpb, lpsPropValue->Value.bin.cb, ulInterfaceOptions,
-										ECMAPIProp::HrStreamCommit, ECMAPIProp::HrStreamCleanup, (void *)lpStreamData, &lpStream);
-				break;
-			default:
-				ASSERT(false);
-				hr = MAPI_E_NOT_FOUND;
-				delete lpStreamData;
-				break;
-			}
-		}
-
-		if(hr != hrSuccess)
+		hr = ECMemStream::Create((char*)lpsPropValue->Value.bin.lpb, lpsPropValue->Value.bin.cb, ulInterfaceOptions,
+		     NULL, ECMAPIProp::HrStreamCleanup, (void *)lpStreamData, &lpStream);
+		if (hr != hrSuccess)
 			goto exit;
-
-		if(*lpiid == IID_IStorage ) {//*lpiid == IID_IStreamDocfile  || 
-			//FIXME: Unknown what to do with flag STGSTRM_CURRENT
-		
-			hr = GetMsgStore()->lpSupport->IStorageFromStream((LPUNKNOWN)&lpStream->m_xStream, NULL, ((ulFlags &MAPI_MODIFY)?STGSTRM_MODIFY : 0) | ((ulFlags & MAPI_CREATE)?STGSTRM_CREATE:0), (LPSTORAGE*)lppUnk);
-			if(hr != hrSuccess)
-				goto exit;
-		}else
-			hr = lpStream->QueryInterface(*lpiid, (void **)lppUnk);
-
-		// Release our copy
-		lpStream->Release();
-
-		if(hr != hrSuccess)
-			goto exit;
-
+		lpStream->QueryInterface(IID_IStream, (void **)lppUnk);
 		AddChild(lpStream);
+		lpStream->Release();
+		goto exit;
+	}
+	if (ulFlags & MAPI_MODIFY)
+		ulInterfaceOptions |= STGM_WRITE;
 
-	} else {
-		hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
+	// IStream requested for a property
+	ECAllocateBuffer(sizeof(SPropValue), (void **) &lpsPropValue);
+
+	// Yank the property in from disk if it wasn't loaded yet
+	HrLoadProp(ulPropTag);
+
+	// For MAPI_CREATE, reset (or create) the property now
+	if (ulFlags & MAPI_CREATE) {
+		if (!this->fModify) {
+			hr = MAPI_E_NO_ACCESS;
+			goto exit;
+		}
+		SPropValue sProp;
+		sProp.ulPropTag = ulPropTag;
+		if (PROP_TYPE(ulPropTag) == PT_BINARY) {
+			sProp.Value.bin.cb = 0;
+			sProp.Value.bin.lpb = NULL;
+		} else {
+			// Handles lpszA and lpszW since they are the same field in the union
+			sProp.Value.lpszW = const_cast<wchar_t *>(L"");
+		}
+		hr = HrSetRealProp(&sProp);
+		if (hr != hrSuccess)
+			goto exit;
 	}
 
+	hr = HrGetRealProp(ulPropTag, ulFlags, lpsPropValue, lpsPropValue);
+	if (hr != hrSuccess) {
+		// Promote warnings from GetProps to error
+		hr = MAPI_E_NOT_FOUND;
+		goto exit;
+	}
+
+	lpStreamData = new STREAMDATA; // is freed by HrStreamCleanup, called by ECMemStream on refcount == 0
+	lpStreamData->ulPropTag = ulPropTag;
+	lpStreamData->lpProp = this;
+
+	if (ulFlags & MAPI_CREATE) {
+		hr = ECMemStream::Create(NULL, 0, ulInterfaceOptions,
+		     ECMAPIProp::HrStreamCommit, ECMAPIProp::HrStreamCleanup, (void *)lpStreamData, &lpStream);
+	} else {
+		switch (PROP_TYPE(lpsPropValue->ulPropTag)) {
+		case PT_STRING8:
+			hr = ECMemStream::Create(lpsPropValue->Value.lpszA, strlen(lpsPropValue->Value.lpszA), ulInterfaceOptions,
+			     ECMAPIProp::HrStreamCommit, ECMAPIProp::HrStreamCleanup, (void *)lpStreamData, &lpStream);
+			break;
+		case PT_UNICODE:
+			hr = ECMemStream::Create((char*)lpsPropValue->Value.lpszW, wcslen(lpsPropValue->Value.lpszW)*sizeof(WCHAR), ulInterfaceOptions,
+			     ECMAPIProp::HrStreamCommit, ECMAPIProp::HrStreamCleanup, (void *)lpStreamData, &lpStream);
+			break;
+		case PT_BINARY:
+			hr = ECMemStream::Create((char *)lpsPropValue->Value.bin.lpb, lpsPropValue->Value.bin.cb, ulInterfaceOptions,
+			     ECMAPIProp::HrStreamCommit, ECMAPIProp::HrStreamCleanup, (void *)lpStreamData, &lpStream);
+			break;
+		default:
+			assert(false);
+			hr = MAPI_E_NOT_FOUND;
+			delete lpStreamData;
+			break;
+		}
+	}
+	if (hr != hrSuccess)
+		goto exit;
+	if (*lpiid == IID_IStorage) { //*lpiid == IID_IStreamDocfile ||
+		//FIXME: Unknown what to do with flag STGSTRM_CURRENT
+		hr = GetMsgStore()->lpSupport->IStorageFromStream((LPUNKNOWN)&lpStream->m_xStream, NULL, ((ulFlags &MAPI_MODIFY)?STGSTRM_MODIFY : 0) | ((ulFlags & MAPI_CREATE)?STGSTRM_CREATE:0), (LPSTORAGE*)lppUnk);
+		if (hr != hrSuccess)
+			goto exit;
+	} else
+		hr = lpStream->QueryInterface(*lpiid, (void **)lppUnk);
+
+	// Release our copy
+	lpStream->Release();
+	if(hr != hrSuccess)
+		goto exit;
+	AddChild(lpStream);
 exit:	
 	if(lpsPropValue)
 		ECFreeBuffer(lpsPropValue);
@@ -540,32 +503,20 @@ exit:
 HRESULT ECMAPIProp::SaveChanges(ULONG ulFlags)
 {
 	HRESULT hr = hrSuccess;
-	WSMAPIPropStorage *lpMAPIPropStorage = NULL;
+	object_ptr<WSMAPIPropStorage> lpMAPIPropStorage;
 	
-	if (lpStorage == NULL) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-	if (!fModify) {
-		hr = MAPI_E_NO_ACCESS;
-		goto exit;
-	}
+	if (lpStorage == nullptr)
+		return MAPI_E_NOT_FOUND;
+	if (!fModify)
+		return MAPI_E_NO_ACCESS;
 
 	// only folders and main messages have a syncid, attachments and msg-in-msg don't
-	if (lpStorage->QueryInterface(IID_WSMAPIPropStorage, (void **)&lpMAPIPropStorage) == hrSuccess) {
+	if (lpStorage->QueryInterface(IID_WSMAPIPropStorage, &~lpMAPIPropStorage) == hrSuccess) {
 		hr = lpMAPIPropStorage->HrSetSyncId(m_ulSyncId);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-	hr = ECGenericProp::SaveChanges(ulFlags);
-
-exit:
-	if(lpMAPIPropStorage)
-		lpMAPIPropStorage->Release();
-
-	return hr;
+	return ECGenericProp::SaveChanges(ulFlags);
 }
 
 HRESULT ECMAPIProp::HrSaveChild(ULONG ulFlags, MAPIOBJECT *lpsMapiObject) {
@@ -585,11 +536,10 @@ HRESULT ECMAPIProp::GetSerializedACLData(LPVOID lpBase, LPSPropValue lpsPropValu
 	struct rightsArray	rights;
 	std::string			strAclData;
 
-	hr = QueryInterface(IID_IECSecurity, &ptrSecurity);
+	hr = QueryInterface(IID_IECSecurity, &~ptrSecurity);
 	if (hr != hrSuccess)
 		goto exit;
-
-	hr = ptrSecurity->GetPermissionRules(ACCESS_TYPE_GRANT, &cPerms, &ptrPerms);
+	hr = ptrSecurity->GetPermissionRules(ACCESS_TYPE_GRANT, &cPerms, &~ptrPerms);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -619,7 +569,7 @@ exit:
 	return hr;
 }
 
-HRESULT ECMAPIProp::SetSerializedACLData(LPSPropValue lpsPropValue)
+HRESULT ECMAPIProp::SetSerializedACLData(const SPropValue *lpsPropValue)
 {
 	HRESULT				hr = hrSuccess;
 	ECPermissionPtr		ptrPerms;
@@ -651,8 +601,7 @@ HRESULT ECMAPIProp::SetSerializedACLData(LPSPropValue lpsPropValue)
 			goto exit;
 		}
 	}
-
-	hr = MAPIAllocateBuffer(rights.__size * sizeof(ECPERMISSION), &ptrPerms);
+	hr = MAPIAllocateBuffer(rights.__size * sizeof(ECPERMISSION), &~ptrPerms);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -676,11 +625,10 @@ HRESULT	ECMAPIProp::UpdateACLs(ULONG cNewPerms, ECPERMISSION *lpNewPerms)
 	ECPermissionPtr			ptrTmpPerms;
 	ECPERMISSION *lpPermissions = NULL;
 
-	hr = QueryInterface(IID_IECSecurity, &ptrSecurity);
+	hr = QueryInterface(IID_IECSecurity, &~ptrSecurity);
 	if (hr != hrSuccess)
 		return hr;
-
-	hr = ptrSecurity->GetPermissionRules(ACCESS_TYPE_GRANT, &cPerms, &ptrPerms);
+	hr = ptrSecurity->GetPermissionRules(ACCESS_TYPE_GRANT, &cPerms, &~ptrPerms);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -693,28 +641,28 @@ HRESULT	ECMAPIProp::UpdateACLs(ULONG cNewPerms, ECPERMISSION *lpNewPerms)
 		if (lpMatch == lpNewPerms + cNewPerms) {
 			// Not in new set, so delete
 			ptrPerms[i].ulState = RIGHT_DELETED;
-		} else {
-			// Found an entry in the new set, check if it's different
-			if (ptrPerms[i].ulRights == lpMatch->ulRights &&
-				ptrPerms[i].ulType == lpMatch->ulType)
-			{
-				// Nothing changes, remove from set.
-				if (i < (cPerms - 1))
-					std::swap(ptrPerms[i], ptrPerms[cPerms - 1]);
-				--cPerms;
-				--i;
-				++cSparePerms;
-			} else {
-				ptrPerms[i].ulRights = lpMatch->ulRights;
-				ptrPerms[i].ulType = lpMatch->ulType;
-				ptrPerms[i].ulState = RIGHT_MODIFY;
-			}
-
-			// Remove from list of new permissions
-			if (lpMatch != &lpNewPerms[cNewPerms - 1])
-				std::swap(*lpMatch, lpNewPerms[cNewPerms - 1]);
-			--cNewPerms;
+			continue;
 		}
+		// Found an entry in the new set, check if it's different
+		if (ptrPerms[i].ulRights == lpMatch->ulRights &&
+			ptrPerms[i].ulType == lpMatch->ulType)
+		{
+			// Nothing changes, remove from set.
+			if (i < (cPerms - 1))
+				std::swap(ptrPerms[i], ptrPerms[cPerms - 1]);
+			--cPerms;
+			--i;
+			++cSparePerms;
+		} else {
+			ptrPerms[i].ulRights = lpMatch->ulRights;
+			ptrPerms[i].ulType = lpMatch->ulType;
+			ptrPerms[i].ulState = RIGHT_MODIFY;
+		}
+
+		// Remove from list of new permissions
+		if (lpMatch != &lpNewPerms[cNewPerms - 1])
+			std::swap(*lpMatch, lpNewPerms[cNewPerms - 1]);
+		--cNewPerms;
 	}
 
 	// Now see if there are still some new ACL's left. If enough spare space is available
@@ -726,7 +674,7 @@ HRESULT	ECMAPIProp::UpdateACLs(ULONG cNewPerms, ECPERMISSION *lpNewPerms)
 		} else if (cPerms == 0) {
 			lpPermissions = lpNewPerms;
 		} else {
-			hr = MAPIAllocateBuffer((cPerms + cNewPerms) * sizeof(ECPERMISSION), &ptrTmpPerms);
+			hr = MAPIAllocateBuffer((cPerms + cNewPerms) * sizeof(ECPERMISSION), &~ptrTmpPerms);
 			if (hr != hrSuccess)
 				return hr;
 
@@ -743,23 +691,28 @@ HRESULT	ECMAPIProp::UpdateACLs(ULONG cNewPerms, ECPERMISSION *lpNewPerms)
 	return hrSuccess;
 }
 
-HRESULT ECMAPIProp::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
+HRESULT ECMAPIProp::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude,
+    const SPropTagArray *lpExcludeProps, ULONG ulUIParam,
+    LPMAPIPROGRESS lpProgress, LPCIID lpInterface, void *lpDestObj,
+    ULONG ulFlags, SPropProblemArray **lppProblems)
 {
 	return Util::DoCopyTo(&IID_IMAPIProp, &this->m_xMAPIProp, ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
 
-HRESULT ECMAPIProp::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
+HRESULT ECMAPIProp::CopyProps(const SPropTagArray *lpIncludeProps,
+    ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface,
+    void *lpDestObj, ULONG ulFlags, SPropProblemArray **lppProblems)
 {
 	return Util::DoCopyProps(&IID_IMAPIProp, &this->m_xMAPIProp, lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
 
 // Pass call off to lpMsgStore
-HRESULT ECMAPIProp::GetNamesFromIDs(LPSPropTagArray FAR * lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG FAR * lpcPropNames, LPMAPINAMEID FAR * FAR * lpppPropNames)
+HRESULT ECMAPIProp::GetNamesFromIDs(LPSPropTagArray *lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames, LPMAPINAMEID **lpppPropNames)
 {
 	return this->GetMsgStore()->lpNamedProp->GetNamesFromIDs(lppPropTags, lpPropSetGuid, ulFlags, lpcPropNames, lpppPropNames);
 }
 
-HRESULT ECMAPIProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID FAR * lppPropNames, ULONG ulFlags, LPSPropTagArray FAR * lppPropTags)
+HRESULT ECMAPIProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropNames, ULONG ulFlags, LPSPropTagArray *lppPropTags)
 {
 	return this->GetMsgStore()->lpNamedProp->GetIDsFromNames(cPropNames, lppPropNames, ulFlags, lppPropTags);
 }
@@ -773,7 +726,7 @@ HRESULT ECMAPIProp::HrStreamCommit(IStream *lpStream, void *lpData)
 	LPSPropValue lpPropValue = NULL;
 	STATSTG sStat;
 	ULONG ulSize = 0;
-	ECMemStream* lpECStream = NULL;
+	object_ptr<ECMemStream> lpECStream;
 
 	hr = ECAllocateBuffer(sizeof(SPropValue), (void **)&lpPropValue);
 
@@ -802,7 +755,7 @@ HRESULT ECMAPIProp::HrStreamCommit(IStream *lpStream, void *lpData)
 		// read the data into the buffer
 		hr = lpStream->Read(buffer, (ULONG)sStat.cbSize.QuadPart, &ulSize);
 	} else{
-		hr = lpStream->QueryInterface(IID_ECMemStream, (void**)&lpECStream);
+		hr = lpStream->QueryInterface(IID_ECMemStream, &~lpECStream);
 		if(hr != hrSuccess)
 			goto exit;
 
@@ -837,10 +790,6 @@ HRESULT ECMAPIProp::HrStreamCommit(IStream *lpStream, void *lpData)
 exit:
 	if(lpPropValue)
 		ECFreeBuffer(lpPropValue);
-
-	if(lpECStream)
-		lpECStream->Release();
-
 	return hr;
 }
 
@@ -854,19 +803,15 @@ HRESULT ECMAPIProp::HrStreamCleanup(void *lpData)
 HRESULT ECMAPIProp::HrSetSyncId(ULONG ulSyncId)
 {
 	HRESULT hr = hrSuccess;
-
-	WSMAPIPropStorage *lpMAPIPropStorage = NULL;
+	object_ptr<WSMAPIPropStorage> lpMAPIPropStorage;
 	
-	if(lpStorage && lpStorage->QueryInterface(IID_WSMAPIPropStorage, (void **)&lpMAPIPropStorage) ==  hrSuccess){
+	if (lpStorage != nullptr && lpStorage->QueryInterface(IID_WSMAPIPropStorage, &~lpMAPIPropStorage) == hrSuccess) {
 		hr = lpMAPIPropStorage->HrSetSyncId(ulSyncId);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 	m_ulSyncId = ulSyncId;
-exit:
-	if(lpMAPIPropStorage)
-		lpMAPIPropStorage->Release();
-	return hr;
+	return hrSuccess;
 }
 
 // Security functions
@@ -919,7 +864,7 @@ HRESULT ECMAPIProp::SetParentID(ULONG cbParentID, LPENTRYID lpParentID)
 {
 	HRESULT hr;
 
-	ASSERT(m_lpParentID == NULL);
+	assert(m_lpParentID == NULL);
 	if (lpParentID == NULL || cbParentID == 0)
 		return MAPI_E_INVALID_PARAMETER;
 
@@ -933,191 +878,28 @@ HRESULT ECMAPIProp::SetParentID(ULONG cbParentID, LPENTRYID lpParentID)
 }
 
 // Interface IMAPIProp
-HRESULT __stdcall ECMAPIProp::xMAPIProp::QueryInterface(REFIID refiid, void **lppInterface)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
-	METHOD_PROLOGUE_(ECMAPIProp , MAPIProp);
-	HRESULT hr = pThis->QueryInterface(refiid, lppInterface);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIProp::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-ULONG __stdcall ECMAPIProp::xMAPIProp::AddRef()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::AddRef", "");
-	METHOD_PROLOGUE_(ECMAPIProp , MAPIProp);
-	return pThis->AddRef();
-}
-
-ULONG __stdcall ECMAPIProp::xMAPIProp::Release()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::Release", "");
-	METHOD_PROLOGUE_(ECMAPIProp , MAPIProp);
-	ULONG ulRef = pThis->Release();
-	TRACE_MAPI(TRACE_RETURN, "IMAPIProp::Release", "%d", ulRef);
-	return ulRef;
-}
-
-HRESULT __stdcall ECMAPIProp::xMAPIProp::GetLastError(HRESULT hError, ULONG ulFlags,
-    LPMAPIERROR * lppMapiError)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::GetLastError", "");
-	METHOD_PROLOGUE_(ECMAPIProp , MAPIProp);
-	HRESULT hr = pThis->GetLastError(hError, ulFlags, lppMapiError);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIProp::GetLastError", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECMAPIProp::xMAPIProp::SaveChanges(ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::SaveChanges", "");
-	METHOD_PROLOGUE_(ECMAPIProp , MAPIProp);
-	HRESULT hr = pThis->SaveChanges(ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIProp::SaveChanges", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECMAPIProp::xMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG FAR * lpcValues, LPSPropValue FAR * lppPropArray)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::GetProps", "%s, flags=%08X", PropNameFromPropTagArray(lpPropTagArray).c_str(), ulFlags);
-	METHOD_PROLOGUE_(ECMAPIProp , MAPIProp);
-	HRESULT hr = pThis->GetProps(lpPropTagArray, ulFlags, lpcValues, lppPropArray);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIProp::GetProps", "%s\n %s", GetMAPIErrorDescription(hr).c_str(), PropNameFromPropArray(*lpcValues, *lppPropArray).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECMAPIProp::xMAPIProp::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropTagArray)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::GetPropList", "");
-	METHOD_PROLOGUE_(ECMAPIProp , MAPIProp);
-	HRESULT hr = pThis->GetPropList(ulFlags, lppPropTagArray);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIProp::GetPropList", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECMAPIProp::xMAPIProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::OpenProperty", "proptag=%s, flags=%d, lpiid=%s, InterfaceOptions=%d", PropNameFromPropTag(ulPropTag).c_str(), ulFlags, (lpiid)?DBGGUIDToString(*lpiid).c_str():"NULL", ulInterfaceOptions);
-	METHOD_PROLOGUE_(ECMAPIProp , MAPIProp);
-	HRESULT hr = pThis->OpenProperty(ulPropTag, lpiid, ulInterfaceOptions, ulFlags, lppUnk);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIProp::OpenProperty", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECMAPIProp::xMAPIProp::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::SetProps", "%s", PropNameFromPropArray(cValues, lpPropArray).c_str());
-	METHOD_PROLOGUE_(ECMAPIProp , MAPIProp);
-	HRESULT hr = pThis->SetProps(cValues, lpPropArray, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIProp::SetProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECMAPIProp::xMAPIProp::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::DeleteProps", "%s", PropNameFromPropTagArray(lpPropTagArray).c_str());
-	METHOD_PROLOGUE_(ECMAPIProp , MAPIProp);
-	HRESULT hr = pThis->DeleteProps(lpPropTagArray, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIProp::DeleteProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECMAPIProp::xMAPIProp::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::CopyTo", "");
-	METHOD_PROLOGUE_(ECMAPIProp , MAPIProp);
-	HRESULT hr = pThis->CopyTo(ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIProp::CopyTo", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECMAPIProp::xMAPIProp::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::CopyProps", "");
-	METHOD_PROLOGUE_(ECMAPIProp , MAPIProp);
-	HRESULT hr = pThis->CopyProps(lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIProp::CopyProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECMAPIProp::xMAPIProp::GetNamesFromIDs(LPSPropTagArray * pptaga, LPGUID lpguid, ULONG ulFlags, ULONG * pcNames, LPMAPINAMEID ** pppNames)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::GetNamesFromIDs", "");
-	METHOD_PROLOGUE_(ECMAPIProp , MAPIProp);
-	HRESULT hr = pThis->GetNamesFromIDs(pptaga, lpguid, ulFlags, pcNames, pppNames);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIProp::GetNamesFromIDs", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECMAPIProp::xMAPIProp::GetIDsFromNames(ULONG cNames, LPMAPINAMEID * ppNames, ULONG ulFlags, LPSPropTagArray * pptaga)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::GetIDsFromNames", "");
-	METHOD_PROLOGUE_(ECMAPIProp , MAPIProp);
-	HRESULT hr = pThis->GetIDsFromNames(cNames, ppNames, ulFlags, pptaga);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIProp::GetIDsFromNames", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIProp, MAPIProp, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECMAPIProp, MAPIProp, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECMAPIProp, MAPIProp, Release, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIProp, MAPIProp, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIProp, MAPIProp, SaveChanges, (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIProp, MAPIProp, GetProps, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags), (ULONG *, lpcValues), (SPropValue **, lppPropArray))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIProp, MAPIProp, GetPropList, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIProp, MAPIProp, OpenProperty, (ULONG, ulPropTag), (LPCIID, lpiid), (ULONG, ulInterfaceOptions), (ULONG, ulFlags), (LPUNKNOWN *, lppUnk))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIProp, MAPIProp, SetProps, (ULONG, cValues), (const SPropValue *, lpPropArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIProp, MAPIProp, DeleteProps, (const SPropTagArray *, lpPropTagArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIProp, MAPIProp, CopyTo, (ULONG, ciidExclude), (LPCIID, rgiidExclude), (const SPropTagArray *, lpExcludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIProp, MAPIProp, CopyProps, (const SPropTagArray *, lpIncludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIProp, MAPIProp, GetNamesFromIDs, (LPSPropTagArray *, pptaga), (LPGUID, lpguid), (ULONG, ulFlags), (ULONG *, pcNames), (LPMAPINAMEID **, pppNames))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIProp, MAPIProp, GetIDsFromNames, (ULONG, cNames), (LPMAPINAMEID *, ppNames), (ULONG, ulFlags), (LPSPropTagArray *, pptaga))
 
 // Interface ECSecurity
-HRESULT ECMAPIProp::xECSecurity::QueryInterface(REFIID refiid, void ** lppInterface)
-{
-	METHOD_PROLOGUE_(ECMAPIProp , ECSecurity);
-	return pThis->QueryInterface(refiid, lppInterface);
-}
-
-ULONG ECMAPIProp::xECSecurity::AddRef()
-{
-	METHOD_PROLOGUE_(ECMAPIProp , ECSecurity);
-	return pThis->AddRef();
-}
-
-ULONG ECMAPIProp::xECSecurity::Release()
-{
-	METHOD_PROLOGUE_(ECMAPIProp , ECSecurity);
-	return pThis->Release();
-}
-
-HRESULT ECMAPIProp::xECSecurity::GetOwner(ULONG *lpcbOwner, LPENTRYID *lppOwner)
-{
-	METHOD_PROLOGUE_(ECMAPIProp , ECSecurity);
-	return pThis->GetOwner(lpcbOwner, lppOwner);
-}
-
-HRESULT ECMAPIProp::xECSecurity::GetUserList(ULONG cbCompanyId,
-    LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcUsers, ECUSER **lpsUsers)
-{
-	METHOD_PROLOGUE_(ECMAPIProp, ECSecurity);
-	return pThis->GetUserList(cbCompanyId, lpCompanyId, ulFlags, lpcUsers, lpsUsers);
-}
-
-HRESULT ECMAPIProp::xECSecurity::GetGroupList(ULONG cbCompanyId,
-    LPENTRYID lpCompanyId, ULONG ulFlags, ULONG *lpcGroups,
-    ECGROUP **lppsGroups)
-{
-	METHOD_PROLOGUE_(ECMAPIProp, ECSecurity);
-	return pThis->GetGroupList(cbCompanyId, lpCompanyId, ulFlags, lpcGroups, lppsGroups);
-}
-
-HRESULT ECMAPIProp::xECSecurity::GetCompanyList(ULONG ulFlags,
-    ULONG *lpcCompanies, ECCOMPANY **lppsCompanies)
-{
-	METHOD_PROLOGUE_(ECMAPIProp, ECSecurity);
-	return pThis->GetCompanyList(ulFlags, lpcCompanies, lppsCompanies);
-}
-
-HRESULT ECMAPIProp::xECSecurity::GetPermissionRules(int ulType,
-    ULONG *lpcPermissions, ECPERMISSION **lppECPermissions)
-{
-	METHOD_PROLOGUE_(ECMAPIProp, ECSecurity);
-	return pThis->GetPermissionRules(ulType, lpcPermissions, lppECPermissions);
-}
-
-HRESULT ECMAPIProp::xECSecurity::SetPermissionRules(ULONG cPermissions,
-    ECPERMISSION *lpECPermissions)
-{
-	METHOD_PROLOGUE_(ECMAPIProp, ECSecurity);
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIProp::IECSecurity::SetPermissionRules", "%s", PermissionRulesToString(cPermissions, lpECPermissions).c_str());
-	HRESULT hr = pThis->SetPermissionRules(cPermissions, lpECPermissions);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIProp::IECSecurity::SetPermissionRules", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
+DEF_HRMETHOD0(ECMAPIProp, ECSecurity, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_ULONGMETHOD0(ECMAPIProp, ECSecurity, AddRef, (void))
+DEF_ULONGMETHOD0(ECMAPIProp, ECSecurity, Release, (void))
+DEF_HRMETHOD0(ECMAPIProp, ECSecurity, GetOwner, (ULONG *, lpcbOwner), (LPENTRYID *, lppOwner))
+DEF_HRMETHOD0(ECMAPIProp, ECSecurity, GetUserList, (ULONG, cbCompanyId), (LPENTRYID, lpCompanyId), (ULONG, ulFlags), (ULONG *, lpcUsers), (ECUSER **, lpsUsers))
+DEF_HRMETHOD0(ECMAPIProp, ECSecurity, GetGroupList, (ULONG, cbCompanyId), (LPENTRYID, lpCompanyId), (ULONG, ulFlags), (ULONG *, lpcGroups), (ECGROUP **, lppsGroups))
+DEF_HRMETHOD0(ECMAPIProp, ECSecurity, GetCompanyList, (ULONG, ulFlags), (ULONG *, lpcCompanies), (ECCOMPANY **, lppsCompanies))
+DEF_HRMETHOD0(ECMAPIProp, ECSecurity, GetPermissionRules, (int, ulType), (ULONG *, lpcPermissions), (ECPERMISSION **, lppECPermissions))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIProp, ECSecurity, SetPermissionRules, (ULONG, cPermissions), (ECPERMISSION *, lpECPermissions))

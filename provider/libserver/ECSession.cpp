@@ -16,47 +16,43 @@
  */
 
 #include <kopano/platform.h>
+#include <chrono>
+#include <memory>
+#include <mutex>
 #include <new>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <pwd.h>
+#include <utility>
+#include <cerrno>
+#include <cstring>
 #include <dirent.h>
+#include <pwd.h>
+#include <sys/stat.h>
 #include <mapidefs.h>
 #include <mapitags.h>
-
+#include <kopano/lockhelper.hpp>
+#include <kopano/UnixUtil.h>
 #include "ECSession.h"
 #include "ECSessionManager.h"
 #include "ECUserManagement.h"
-#include "ECUserManagementOffline.h"
 #include "ECSecurity.h"
-#include "ECSecurityOffline.h"
 #include "ECPluginFactory.h"
-#include <kopano/base64.h>
 #include "SSLUtil.h"
 #include <kopano/stringutil.h>
-
-#include "ECDatabaseMySQL.h"
+#include "ECDatabase.h"
 #include "ECDatabaseUtils.h" // used for PR_INSTANCE_KEY
 #include "SOAPUtils.h"
 #include "ics.h"
 #include "ECICS.h"
 #include <kopano/ECIConv.h>
 #include "versions.h"
-
-#include "pthreadutil.h"
-#include <kopano/threadutil.h>
-#include <kopano/boost_compat.h>
-
-#include <boost/filesystem.hpp>
-namespace bfs = boost::filesystem;
-
 #if defined LINUX || !defined UNICODE
 #define WHITESPACE " \t\n\r"
 #else
 #define WHITESPACE L" \t\n\r"
 #endif
 
-// possible missing ssl function
+namespace KC {
+
+// possible missing SSL function
 #ifndef HAVE_EVP_PKEY_CMP
 static int EVP_PKEY_cmp(EVP_PKEY *a, EVP_PKEY *b)
     {
@@ -113,19 +109,6 @@ BTSession::BTSession(const char *src_addr, ECSESSIONID sessionID,
 	m_ulRequests = 0;
 
 	m_ulLastRequestPort = 0;
-
-	// Protects the object from deleting while a thread is running on a method in this object
-	pthread_cond_init(&m_hThreadReleased, NULL);
-	pthread_mutex_init(&m_hThreadReleasedMutex, NULL);
-
-	pthread_mutex_init(&m_hRequestStats, NULL);
-}
-
-BTSession::~BTSession() {
-	// derived destructor still uses these vars
-	pthread_cond_destroy(&m_hThreadReleased);
-	pthread_mutex_destroy(&m_hThreadReleasedMutex);
-	pthread_mutex_destroy(&m_hRequestStats);
 }
 
 void BTSession::SetClientMeta(const char *const lpstrClientVersion, const char *const lpstrClientMisc)
@@ -188,19 +171,17 @@ ECRESULT BTSession::GetNewSourceKey(SOURCEKEY* lpSourceKey){
 void BTSession::Lock()
 {
 	// Increase our refcount by one
-	pthread_mutex_lock(&m_hThreadReleasedMutex);
+	scoped_lock lock(m_hThreadReleasedMutex);
 	++this->m_ulRefCount;
-	pthread_mutex_unlock(&m_hThreadReleasedMutex);
 }
 
 void BTSession::Unlock()
 {
 	// Decrease our refcount by one, signal ThreadReleased if RefCount == 0
-	pthread_mutex_lock(&m_hThreadReleasedMutex);
+	scoped_lock lock(m_hThreadReleasedMutex);
 	--this->m_ulRefCount;
 	if(!IsLocked())
-		pthread_cond_signal(&m_hThreadReleased);
-	pthread_mutex_unlock(&m_hThreadReleasedMutex);
+		m_hThreadReleased.notify_one();
 }
 
 time_t BTSession::GetIdleTime()
@@ -253,23 +234,16 @@ size_t BTSession::GetInternalObjectSize()
 ECSession::ECSession(const char *src_addr, ECSESSIONID sessionID,
     ECSESSIONGROUPID ecSessionGroupId, ECDatabaseFactory *lpDatabaseFactory,
     ECSessionManager *lpSessionManager, unsigned int ulCapabilities,
-    bool bIsOffline, AUTHMETHOD ulAuthMethod, int pid,
+    AUTHMETHOD ulAuthMethod, int pid,
     const std::string &cl_ver, const std::string &cl_app,
     const std::string &cl_app_ver, const std::string &cl_app_misc) :
 	BTSession(src_addr, sessionID, lpDatabaseFactory, lpSessionManager,
-	    ulCapabilities)
+	    ulCapabilities),
+	m_ulAuthMethod(ulAuthMethod), m_ulConnectingPid(pid),
+	m_ecSessionGroupId(ecSessionGroupId), m_strClientVersion(cl_ver),
+	m_ulClientVersion(KOPANO_VERSION_UNKNOWN), m_strClientApp(cl_app)
 {
 	m_lpTableManager		= new ECTableManager(this);
-	m_lpEcSecurity			= NULL;
-	m_dblUser				= 0;
-	m_dblSystem				= 0;
-	m_dblReal				= 0;
-	m_ulAuthMethod			= ulAuthMethod;
-	m_ulConnectingPid		= pid;
-	m_ecSessionGroupId		= ecSessionGroupId;
-	m_strClientVersion		= cl_ver;
-	m_ulClientVersion		= KOPANO_VERSION_UNKNOWN;
-	m_strClientApp			= cl_app;
 	m_strClientApplicationVersion   = cl_app_ver;
 	m_strClientApplicationMisc	= cl_app_misc;
 
@@ -283,20 +257,11 @@ ECSession::ECSession(const char *src_addr, ECSESSIONID sessionID,
 	m_bCheckIP = strcmp(lpSessionManager->GetConfig()->GetSetting("session_ip_check"), "no") != 0;
 
 	// Offline implements its own versions of these objects
-	if (bIsOffline == false) {
-		m_lpUserManagement = new ECUserManagement(this, m_lpSessionManager->GetPluginFactory(), m_lpSessionManager->GetConfig());
-		m_lpEcSecurity = new ECSecurity(this, m_lpSessionManager->GetConfig(), m_lpSessionManager->GetAudit());
-	} else {
-		m_lpUserManagement = new ECUserManagementOffline(this, m_lpSessionManager->GetPluginFactory(), m_lpSessionManager->GetConfig());
-
-		m_lpEcSecurity = new ECSecurityOffline(this, m_lpSessionManager->GetConfig());
-	}
+	m_lpUserManagement = new ECUserManagement(this, m_lpSessionManager->GetPluginFactory(), m_lpSessionManager->GetConfig());
+	m_lpEcSecurity = new ECSecurity(this, m_lpSessionManager->GetConfig(), m_lpSessionManager->GetAudit());
 
 	// Atomically get and AddSession() on the sessiongroup. Needs a ReleaseSession() on the session group to clean up.
 	m_lpSessionManager->GetSessionGroup(ecSessionGroupId, this, &m_lpSessionGroup);
-
-	pthread_mutex_init(&m_hStateLock, NULL);
-	pthread_mutex_init(&m_hLocksLock, NULL);
 }
 
 ECSession::~ECSession()
@@ -312,10 +277,6 @@ ECSession::~ECSession()
 		m_lpSessionGroup->ReleaseSession(this);
     	m_lpSessionManager->DeleteIfOrphaned(m_lpSessionGroup);
 	}
-
-	pthread_mutex_destroy(&m_hLocksLock);
-	pthread_mutex_destroy(&m_hStateLock);
-
 	delete m_lpTableManager;
 	delete m_lpUserManagement;
 	delete m_lpEcSecurity;
@@ -338,21 +299,17 @@ ECRESULT ECSession::Shutdown(unsigned int ulTimeout)
 	ECRESULT er = erSuccess;
 
 	/* Shutdown blocking calls for this session on our session group */
-	if (m_lpSessionGroup) {
+	if (m_lpSessionGroup != nullptr)
 		m_lpSessionGroup->ShutdownSession(this);
-	}
 
 	/* Wait until there are no more running threads using this session */
-	pthread_mutex_lock(&m_hThreadReleasedMutex);
+	std::unique_lock<std::mutex> lk(m_hThreadReleasedMutex);
 	while(IsLocked())
-		if(pthread_cond_timedwait(&m_hThreadReleased, &m_hThreadReleasedMutex, ulTimeout) == ETIMEDOUT)
+		if (m_hThreadReleased.wait_for(lk, std::chrono::milliseconds(ulTimeout)) == std::cv_status::timeout)
 			break;
-	pthread_mutex_unlock(&m_hThreadReleasedMutex);
-
-	if(IsLocked()) {
+	lk.unlock();
+	if (IsLocked())
 		er = KCERR_TIMEOUT;
-	}
-
 	return er;
 }
 
@@ -377,7 +334,7 @@ ECRESULT ECSession::AddChangeAdvise(unsigned int ulConnection, notifySyncState *
 	ECRESULT		er = erSuccess;
 	string			strQuery;
 	ECDatabase*		lpDatabase = NULL;
-	DB_RESULT		lpDBResult	= NULL;
+	DB_RESULT lpDBResult;
 	DB_ROW			lpDBRow;
 	ULONG			ulChangeId = 0;
 
@@ -424,9 +381,6 @@ ECRESULT ECSession::AddChangeAdvise(unsigned int ulConnection, notifySyncState *
 	er = m_lpSessionGroup->AddChangeNotification(m_sessionID, ulConnection, lpSyncState->ulSyncId, ulChangeId);
 
 exit:
-	 if (lpDBResult)
-		 lpDatabase->FreeResult(lpDBResult);
-
 	Unlock();
 
 	return er;
@@ -480,77 +434,61 @@ ECRESULT ECSession::GetNotifyItems(struct soap *soap, struct notifyResponse *not
 	return hr;
 }
 
-void ECSession::AddBusyState(pthread_t threadId, const char* lpszState, struct timespec threadstart, double start)
+void ECSession::AddBusyState(pthread_t threadId, const char *lpszState,
+    const struct timespec &threadstart, double start)
 {
 	if (!lpszState) {		
 		ec_log_err("Invalid argument \"lpszState\" in call to ECSession::AddBusyState()");
-	} else {
-		pthread_mutex_lock(&m_hStateLock);
-		m_mapBusyStates[threadId].fname = lpszState;
-		m_mapBusyStates[threadId].threadstart = threadstart;
-		m_mapBusyStates[threadId].start = start;
-		m_mapBusyStates[threadId].threadid = threadId;
-		m_mapBusyStates[threadId].state = SESSION_STATE_PROCESSING;
-		pthread_mutex_unlock(&m_hStateLock);
+		return;
 	}
+	scoped_lock lock(m_hStateLock);
+	m_mapBusyStates[threadId].fname = lpszState;
+	m_mapBusyStates[threadId].threadstart = threadstart;
+	m_mapBusyStates[threadId].start = start;
+	m_mapBusyStates[threadId].threadid = threadId;
+	m_mapBusyStates[threadId].state = SESSION_STATE_PROCESSING;
 }
 
 void ECSession::UpdateBusyState(pthread_t threadId, int state)
 {
-	std::map<pthread_t, BUSYSTATE>::iterator i;
-
-	pthread_mutex_lock(&m_hStateLock);
-
-	i = m_mapBusyStates.find(threadId);
-
-	if(i != m_mapBusyStates.end()) {
+	scoped_lock lock(m_hStateLock);
+	auto i = m_mapBusyStates.find(threadId);
+	if (i != m_mapBusyStates.cend())
 		i->second.state = state;
-	} else {
-		ASSERT(FALSE);
-	}
-
-	pthread_mutex_unlock(&m_hStateLock);
+	else
+		assert(false);
 }
 
 void ECSession::RemoveBusyState(pthread_t threadId)
 {
-	std::map<pthread_t, BUSYSTATE>::const_iterator i;
+	scoped_lock lock(m_hStateLock);
 
-	pthread_mutex_lock(&m_hStateLock);
-
-	i = m_mapBusyStates.find(threadId);
-
-	if(i != m_mapBusyStates.end()) {
-		clockid_t clock;
-		struct timespec end;
-
-		// Since the specified thread is done now, record how much work it has done for us
-		if(pthread_getcpuclockid(threadId, &clock) == 0) {
-			clock_gettime(clock, &end);
-
-			AddClocks(timespec2dbl(end) - timespec2dbl(i->second.threadstart), 0, GetTimeOfDay() - i->second.start);
-		} else {
-			ASSERT(FALSE);
-		}
-		m_mapBusyStates.erase(threadId);
-	} else {
-		ASSERT(FALSE);
+	auto i = m_mapBusyStates.find(threadId);
+	if (i == m_mapBusyStates.cend()) {
+		assert(false);
+		return;
 	}
+	clockid_t clock;
+	struct timespec end;
 
-	pthread_mutex_unlock(&m_hStateLock);
+	// Since the specified thread is done now, record how much work it has done for us
+	if(pthread_getcpuclockid(threadId, &clock) == 0) {
+		clock_gettime(clock, &end);
+		AddClocks(timespec2dbl(end) - timespec2dbl(i->second.threadstart), 0, GetTimeOfDay() - i->second.start);
+	} else {
+		assert(false);
+	}
+	m_mapBusyStates.erase(threadId);
 }
 
 void ECSession::GetBusyStates(std::list<BUSYSTATE> *lpStates)
 {
-	map<pthread_t, BUSYSTATE>::const_iterator iMap;
-
 	// this map is very small, since a session only performs one or two functions at a time
 	// so the lock time is short, which will block _all_ incoming functions
 	lpStates->clear();
-	pthread_mutex_lock(&m_hStateLock);
-	for (iMap = m_mapBusyStates.begin(); iMap != m_mapBusyStates.end(); ++iMap)
-		lpStates->push_back(iMap->second);
-	pthread_mutex_unlock(&m_hStateLock);
+	scoped_lock lock(m_hStateLock);
+	for (const auto &p : m_mapBusyStates)
+		lpStates->push_back(p.second);
 }
 
 void ECSession::AddClocks(double dblUser, double dblSystem, double dblReal)
@@ -607,29 +545,27 @@ ECRESULT ECSession::GetObjectFromEntryId(const entryId *lpEntryId, unsigned int 
 	if (er != erSuccess)
 		return er;
 	*lpulObjId = ulObjId;
-
-	if (lpulEidFlags != NULL) {
-		static_assert(offsetof(EID, usFlags) == offsetof(EID_V0, usFlags),
-			"usFlags member not at same position");
-		auto d = reinterpret_cast<EID *>(lpEntryId->__ptr);
-		if (lpEntryId->__size < 0 ||
-		    static_cast<size_t>(lpEntryId->__size) < offsetof(EID, usFlags) + sizeof(d->usFlags)) {
-			ec_log_err("%s: entryid has size %d; not enough for EID_V1.usFlags",
-				__func__, lpEntryId->__size);
-			return MAPI_E_CORRUPT_DATA;
-		}
-		*lpulEidFlags = d->usFlags;
+	if (lpulEidFlags == NULL)
+		return erSuccess;
+	static_assert(offsetof(EID, usFlags) == offsetof(EID_V0, usFlags),
+		"usFlags member not at same position");
+	auto d = reinterpret_cast<EID *>(lpEntryId->__ptr);
+	if (lpEntryId->__size < 0 ||
+	    static_cast<size_t>(lpEntryId->__size) < offsetof(EID, usFlags) + sizeof(d->usFlags)) {
+		ec_log_err("%s: entryid has size %d; not enough for EID_V1.usFlags",
+			__func__, lpEntryId->__size);
+		return MAPI_E_CORRUPT_DATA;
 	}
+	*lpulEidFlags = d->usFlags;
 	return erSuccess;
 }
 
 ECRESULT ECSession::LockObject(unsigned int ulObjId)
 {
 	ECRESULT er = erSuccess;
-	std::pair<LockMap::iterator, bool> res;
 	scoped_lock lock(m_hLocksLock);
 
-	res = m_mapLocks.insert(LockMap::value_type(ulObjId, ECObjectLock()));
+	auto res = m_mapLocks.insert(LockMap::value_type(ulObjId, ECObjectLock()));
 	if (res.second == true)
 		er = m_lpSessionManager->GetLockManager()->LockObject(ulObjId, m_sessionID, &res.first->second);
 
@@ -639,11 +575,10 @@ ECRESULT ECSession::LockObject(unsigned int ulObjId)
 ECRESULT ECSession::UnlockObject(unsigned int ulObjId)
 {
 	ECRESULT er;
-	LockMap::iterator i;
 	scoped_lock lock(m_hLocksLock);
 
-	i = m_mapLocks.find(ulObjId);
-	if (i == m_mapLocks.end())
+	auto i = m_mapLocks.find(ulObjId);
+	if (i == m_mapLocks.cend())
 		return erSuccess;
 	er = i->second.Unlock();
 	if (er == erSuccess)
@@ -677,15 +612,8 @@ ECAuthSession::ECAuthSession(const char *src_addr, ECSESSIONID sessionID,
 	BTSession(src_addr, sessionID, lpDatabaseFactory, lpSessionManager,
 	    ulCapabilities)
 {
-	m_ulUserID = 0;
-	m_bValidated = false;
 	m_ulSessionTimeout = 30;	// authenticate within 30 seconds, or else!
-
 	m_lpUserManagement = new ECUserManagement(this, m_lpSessionManager->GetPluginFactory(), m_lpSessionManager->GetConfig());
-
-	m_ulConnectingPid = 0;
-
-	m_NTLM_pid = -1;
 #ifdef HAVE_GSSAPI
 	m_gssServerCreds = GSS_C_NO_CREDENTIAL;
 	m_gssContext = GSS_C_NO_CONTEXT;
@@ -705,10 +633,9 @@ ECAuthSession::~ECAuthSession()
 #endif
 
 	/* Wait until all locks have been closed */
-	pthread_mutex_lock(&m_hThreadReleasedMutex);
-	while (IsLocked())
-		pthread_cond_wait(&m_hThreadReleased, &m_hThreadReleasedMutex);
-	pthread_mutex_unlock(&m_hThreadReleasedMutex);
+	std::unique_lock<std::mutex> l_thread(m_hThreadReleasedMutex);
+	m_hThreadReleased.wait(l_thread, [this](void) { return !IsLocked(); });
+	l_thread.unlock();
 
 	if (m_NTLM_pid != -1) {
 		int status;
@@ -749,39 +676,28 @@ ECRESULT ECAuthSession::CreateECSession(ECSESSIONGROUPID ecSessionGroupId,
     ECSESSIONID *sessionID, ECSession **lppNewSession)
 {
 	ECRESULT er = erSuccess;
-	ECSession *lpSession = NULL;
+	std::unique_ptr<ECSession> lpSession;
 	ECSESSIONID newSID;
 
-	if (!m_bValidated) {
-		er = KCERR_LOGON_FAILED;
-		goto exit;
-	}
-
+	if (!m_bValidated)
+		return KCERR_LOGON_FAILED;
 	CreateSessionID(m_ulClientCapabilities, &newSID);
 
 	// ECAuthSessionOffline creates offline version .. no bOverrideClass construction
-	lpSession = new(std::nothrow) ECSession(m_strSourceAddr.c_str(),
+	lpSession.reset(new(std::nothrow) ECSession(m_strSourceAddr.c_str(),
 	            newSID, ecSessionGroupId, m_lpDatabaseFactory,
-	            m_lpSessionManager, m_ulClientCapabilities, false,
+	            m_lpSessionManager, m_ulClientCapabilities,
 	            m_ulValidationMethod, m_ulConnectingPid,
-	            cl_ver, cl_app, cl_app_ver, cl_app_misc);
-	if (!lpSession) {
-		er = KCERR_NOT_ENOUGH_MEMORY;
-		goto exit;
-	}
-
+	            cl_ver, cl_app, cl_app_ver, cl_app_misc));
+	if (lpSession == nullptr)
+		return KCERR_NOT_ENOUGH_MEMORY;
 	er = lpSession->GetSecurity()->SetUserContext(m_ulUserID, m_ulImpersonatorID);
 	if (er != erSuccess)
-		goto exit;				// user not found anymore, or error in getting groups
-
-	*sessionID = newSID;
-	*lppNewSession = lpSession;
-
-exit:
-	if (er != erSuccess)
-		delete lpSession;
-
-	return er;
+		/* User not found anymore, or error in getting groups. */
+		return er;
+	*sessionID = std::move(newSID);
+	*lppNewSession = lpSession.release();
+	return erSuccess;
 }
 
 // This is a standard user/pass login.
@@ -840,9 +756,8 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 		goto exit;
 	}
 	p = m_lpSessionManager->GetConfig()->GetSetting("allow_local_users");
-	if (p && !strcasecmp(p, "yes")) {
+	if (p != nullptr && strcasecmp(p, "yes") == 0)
 		allowLocalUsers = true;
-	}
 
 	// Authentication stage
 	localAdminUsers = strdup(m_lpSessionManager->GetConfig()->GetSetting("local_admin_users"));
@@ -876,10 +791,9 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 #endif // HAVE_GETPEEREID
 #endif // SO_PEERCRED
 
-	if (geteuid() == uid) {
+	if (geteuid() == uid)
 		// User connecting is connecting under same UID as the server is running under, allow this
 		goto userok;
-	}
 
 	// Lookup user name
 	pw = NULL;
@@ -903,13 +817,9 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 #else
 		pw = getpwnam(p);
 #endif
-
-		if (pw) {
-			if (pw->pw_uid == uid) {
-				// A local admin user connected - ok
-				goto userok;
-			}
-		}
+		if (pw != nullptr && pw->pw_uid == uid)
+			// A local admin user connected - ok
+			goto userok;
 		p = strtok_r(NULL, WHITESPACE, &ptr);
 	}
 	er = KCERR_LOGON_FAILED;
@@ -943,11 +853,7 @@ ECRESULT ECAuthSession::ValidateUserCertificate(struct soap* soap, const char* l
 	int				res = -1;
 
 	const char *sslkeys_path = m_lpSessionManager->GetConfig()->GetSetting("sslkeys_path", "", NULL);
-	BIO 			*biofile = NULL;
-
-	bfs::path		keysdir;
-	bfs::directory_iterator key_last;
-
+	std::unique_ptr<DIR, fs_deleter> dh;
 	if (!soap) {
 		ec_log_err("Invalid argument \"soap\" in call to ECAuthSession::ValidateUserCertificate()");
 		er = KCERR_INVALID_PARAMETER;
@@ -971,7 +877,7 @@ ECRESULT ECAuthSession::ValidateUserCertificate(struct soap* soap, const char* l
 
 	cert = SSL_get_peer_certificate(soap->ssl);
 	if (!cert) {
-		// windows client without ssl certificate
+		// Windows client without SSL certificate
 		ec_log_info("No certificate in SSL connection.");
 		goto exit;
 	}
@@ -981,53 +887,46 @@ ECRESULT ECAuthSession::ValidateUserCertificate(struct soap* soap, const char* l
 		ec_log_info("No public key in certificate.");
 		goto exit;
 	}
+	dh.reset(opendir(sslkeys_path));
+	if (dh == nullptr) {
+		ec_log_info("Cannot read directory \"%s\": %s", sslkeys_path, strerror(errno));
+		er = KCERR_LOGON_FAILED;
+		goto exit;
+	}
 
-	try {
-		keysdir = sslkeys_path;
-		if (!bfs::exists(keysdir)) {
-			ec_log_info("Certificate path \"%s\" is not present.", sslkeys_path);
-			er = KCERR_LOGON_FAILED;
-			goto exit;
+	for (const struct dirent *dentry = readdir(dh.get());
+	     dentry != nullptr; dentry = readdir(dh.get())) {
+		const char *bname = dentry->d_name;
+		auto fullpath = std::string(sslkeys_path) + "/" + bname;
+		struct stat sb;
+
+		if (stat(fullpath.c_str(), &sb) < 0 || !S_ISREG(sb.st_mode))
+			continue;
+		auto biofile = BIO_new_file(fullpath.c_str(), "r");
+		if (!biofile) {
+			ec_log_info("Unable to create BIO for \"%s\": %s", bname, ERR_error_string(ERR_get_error(), NULL));
+			continue;
 		}
 
-		for (bfs::directory_iterator key(keysdir); key != key_last; ++key) {
-			if (is_directory(key->status()))
-				continue;
-
-			std::string filename = path_to_string(key->path());
-			const char *lpFileName = filename.c_str();
-
-			biofile = BIO_new_file(lpFileName, "r");
-			if (!biofile) {
-				ec_log_info("Unable to create BIO for \"%s\": %s", lpFileName, ERR_error_string(ERR_get_error(), NULL));
-				continue;
-			}
-
-			storedkey = PEM_read_bio_PUBKEY(biofile, NULL, NULL, NULL);
-			if (!storedkey) {
-				ec_log_info("Unable to read PUBKEY from \"%s\": %s", lpFileName, ERR_error_string(ERR_get_error(), NULL));
-				BIO_free(biofile);
-				continue;
-			}
-
-			res = EVP_PKEY_cmp(pubkey, storedkey);
-
+		storedkey = PEM_read_bio_PUBKEY(biofile, NULL, NULL, NULL);
+		if (!storedkey) {
+			ec_log_info("Unable to read PUBKEY from \"%s\": %s", bname, ERR_error_string(ERR_get_error(), NULL));
 			BIO_free(biofile);
-			EVP_PKEY_free(storedkey);
-
-			if (res <= 0) {
-				ec_log_info("Certificate \"%s\" does not match.", lpFileName);
-			} else {
-				er = erSuccess;
-				ec_log_info("Accepted certificate \"%s\" from client.", lpFileName);
-				break;
-			}
+			continue;
 		}
-	} catch (const bfs::filesystem_error&) {
-		// @todo: use get_error_info ?
-		ec_log_info("Boost exception during certificate validation.");
-	} catch (const std::exception& e) {
-		ec_log_info("STD exception during certificate validation: %s", e.what());
+
+		res = EVP_PKEY_cmp(pubkey, storedkey);
+
+		BIO_free(biofile);
+		EVP_PKEY_free(storedkey);
+
+		if (res <= 0) {
+			ec_log_info("Certificate \"%s\" does not match.", bname);
+		} else {
+			er = erSuccess;
+			ec_log_info("Accepted certificate \"%s\" from client.", bname);
+			break;
+		}
 	}
 	if (er != erSuccess)
 		goto exit;
@@ -1293,8 +1192,8 @@ exit:
 
 	if (gssServername != GSS_C_NO_NAME)
 		gss_release_name(&status, &gssServername);
-
-	*lppOutput = lpOutput;
+	if (lppOutput != nullptr)
+		*lppOutput = lpOutput;
 #endif
 
 	return er;
@@ -1572,52 +1471,4 @@ size_t ECAuthSession::GetObjectSize()
 	return ulSize;
 }
 
-ECAuthSessionOffline::ECAuthSessionOffline(const char *src_addr,
-    ECSESSIONID sessionID, ECDatabaseFactory *lpDatabaseFactory,
-    ECSessionManager *lpSessionManager, unsigned int ulCapabilities) :
-	ECAuthSession(src_addr, sessionID, lpDatabaseFactory, lpSessionManager,
-	    ulCapabilities)
-{
-	// nothing todo
-}
-
-ECRESULT
-ECAuthSessionOffline::CreateECSession(ECSESSIONGROUPID ecSessionGroupId,
-    const std::string &cl_ver, const std::string &cl_app,
-    const std::string &cl_app_ver, const std::string &cl_app_misc,
-    ECSESSIONID *sessionID, ECSession **lppNewSession)
-{
-	ECRESULT er = erSuccess;
-	ECSession *lpSession = NULL;
-	ECSESSIONID newSID;
-
-	if (!m_bValidated) {
-		er = KCERR_LOGON_FAILED;
-		goto exit;
-	}
-
-	CreateSessionID(m_ulClientCapabilities, &newSID);
-
-	// Offline version
-	lpSession = new(std::nothrow) ECSession(m_strSourceAddr.c_str(), newSID,
-	            ecSessionGroupId, m_lpDatabaseFactory, m_lpSessionManager,
-	            m_ulClientCapabilities, true, m_ulValidationMethod,
-	            m_ulConnectingPid, cl_ver, cl_app, cl_app_ver, cl_app_misc);
-	if (!lpSession) {
-		er = KCERR_NOT_ENOUGH_MEMORY;
-		goto exit;
-	}
-
-	er = lpSession->GetSecurity()->SetUserContext(m_ulUserID, m_ulImpersonatorID);
-	if (er != erSuccess)
-		goto exit;				// user not found anymore, or error in getting groups
-
-	*sessionID = newSID;
-	*lppNewSession = lpSession;
-
-exit:
-	if (er != erSuccess)
-		delete lpSession;
-
-	return er;
-}
+} /* namespace */

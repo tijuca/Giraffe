@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <kopano/memory.hpp>
 #include "ProtocolBase.h"
 #include <kopano/stringutil.h>
 #include <kopano/CommonUtil.h>
@@ -23,31 +24,17 @@
 #include <kopano/mapi_ptr.h>
 
 using namespace std;
+using namespace KCHL;
 
-ProtocolBase::ProtocolBase(Http *lpRequest, IMAPISession *lpSession, ECLogger *lpLogger, std::string strSrvTz, std::string strCharset) {
-	m_lpRequest = lpRequest;
-	m_lpSession = lpSession;
-	m_lpLogger  = lpLogger;
-	m_lpLogger->AddRef();
-
-	m_lpUsrFld = NULL;
-	m_lpIPMSubtree = NULL;
-	m_lpDefStore = NULL;
-	m_lpAddrBook = NULL;
-	m_lpActiveStore = NULL;
-	m_lpLoginUser = NULL;
-	m_lpActiveUser = NULL;
-	m_lpNamedProps = NULL;
-	m_blFolderAccess = true;
-	m_ulFolderFlag = 0;
-	m_strSrvTz = strSrvTz;
-	m_strCharset = strCharset;
+ProtocolBase::ProtocolBase(Http *lpRequest, IMAPISession *lpSession,
+    const std::string &strSrvTz, const std::string &strCharset) :
+	m_lpRequest(lpRequest), m_lpSession(lpSession), m_strSrvTz(strSrvTz),
+	m_strCharset(strCharset)
+{
 }
 
 ProtocolBase::~ProtocolBase()
 {
-	MAPIFreeBuffer(m_lpNamedProps);
-
 	if (m_lpLoginUser)
 		m_lpLoginUser->Release();
 
@@ -68,7 +55,6 @@ ProtocolBase::~ProtocolBase()
 
 	if (m_lpActiveStore)
 		m_lpActiveStore->Release();
-	m_lpLogger->Release();
 }
 
 /**
@@ -86,8 +72,7 @@ HRESULT ProtocolBase::HrInitializeClass()
 	std::string strMethod;
 	string strFldOwner;
 	string strFldName;
-	LPSPropValue lpDefaultProp = NULL;
-	LPSPropValue lpFldProp = NULL;
+	memory_ptr<SPropValue> lpDefaultProp, lpFldProp;
 	SPropValuePtr lpEntryID;
 	ULONG ulRes = 0;
 	bool bIsPublic = false;
@@ -121,21 +106,21 @@ HRESULT ProtocolBase::HrInitializeClass()
 	hr = m_lpSession->OpenAddressBook(0, NULL, 0, &m_lpAddrBook);
 	if(hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error opening addressbook, error code : 0x%08X", hr);
-		goto exit;
+		ec_log_err("Error opening addressbook, error code: 0x%08X", hr);
+		return hr;
 	}
 
 	// default store required for various actions (delete, freebusy, ...)
 	hr = HrOpenDefaultStore(m_lpSession, &m_lpDefStore);
 	if(hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error opening default store of user %ls, error code : 0x%08X", m_wstrUser.c_str(), hr);
-		goto exit;
+		ec_log_err("Error opening default store of user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
+		return hr;
 	}
 
 	hr = HrGetOwner(m_lpSession, m_lpDefStore, &m_lpLoginUser);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	/*
 	 * Set m_lpActiveStore
@@ -145,61 +130,62 @@ HRESULT ProtocolBase::HrInitializeClass()
 		// open public
 		hr = HrOpenECPublicStore(m_lpSession, &m_lpActiveStore);
 		if (hr != hrSuccess) {
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open public store with user %ls, error code : 0x%08X", m_wstrUser.c_str(), hr);
-			goto exit;
+			ec_log_err("Unable to open public store with user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
+			return hr;
 		}
 	} else if (wcscasecmp(m_wstrUser.c_str(), m_wstrFldOwner.c_str())) {
 		// open shared store
 		hr = HrOpenUserMsgStore(m_lpSession, (WCHAR*)m_wstrFldOwner.c_str(), &m_lpActiveStore);
 		if (hr != hrSuccess) {
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open store of user %ls with user %ls, error code : 0x%08X", m_wstrFldOwner.c_str(), m_wstrUser.c_str(), hr);
-			goto exit;
+			ec_log_err("Unable to open store of user %ls with user %ls, error code: 0x%08X", m_wstrFldOwner.c_str(), m_wstrUser.c_str(), hr);
+			return hr;
 		}
 		m_ulFolderFlag |= SHARED_FOLDER;
 	} else {
 		// @todo, make auto pointers
 		hr = m_lpDefStore->QueryInterface(IID_IMsgStore, (void**)&m_lpActiveStore);
+		if (hr != hrSuccess)
+			return hr;
 	}
 
 	// Retrieve named properties
-	hr = HrLookupNames(m_lpActiveStore, &m_lpNamedProps);
+	hr = HrLookupNames(m_lpActiveStore, &~m_lpNamedProps);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// get active user info
-	if (bIsPublic) {
+	if (bIsPublic)
 		hr = m_lpLoginUser->QueryInterface(IID_IMailUser, (void**)&m_lpActiveUser);
-	} else {
+	else
 		hr = HrGetOwner(m_lpSession, m_lpActiveStore, &m_lpActiveUser);
-	}
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	/*
 	 * Set m_lpIPMSubtree, used for CopyFolder, CreateFolder, DeleteFolder
 	 */
-	hr = OpenSubFolder(m_lpActiveStore, NULL, '/', m_lpLogger, bIsPublic, false, &m_lpIPMSubtree);
+	hr = OpenSubFolder(m_lpActiveStore, NULL, '/', bIsPublic, false, &m_lpIPMSubtree);
 	if(hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error opening IPM SUBTREE, using user %ls, error code : 0x%08X", m_wstrUser.c_str(), hr);
-		goto exit;
+		ec_log_err("Error opening IPM SUBTREE, using user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
+		return hr;
 	}
 
 	// Get active store default calendar to prevent delete action on this folder
-	hr = m_lpActiveStore->OpenEntry(0, NULL, NULL, 0, &ulType, &lpRoot);
+	hr = m_lpActiveStore->OpenEntry(0, nullptr, nullptr, 0, &ulType, &~lpRoot);
 	if(hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error opening root container, using user %ls, error code : 0x%08X", m_wstrUser.c_str(), hr);
-		goto exit;
+		ec_log_err("Error opening root container, using user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
+		return hr;
 	}
 
 	if (!bIsPublic) {
 		// get default calendar entryid for non-public stores
-		hr = HrGetOneProp(lpRoot, PR_IPM_APPOINTMENT_ENTRYID, &lpDefaultProp);
+		hr = HrGetOneProp(lpRoot, PR_IPM_APPOINTMENT_ENTRYID, &~lpDefaultProp);
 		if(hr != hrSuccess)
 		{
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error retrieving Entry id of Default calendar for user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
-			goto exit;
+			ec_log_err("Error retrieving Entry id of Default calendar for user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
+			return hr;
 		}
 	}
 
@@ -209,27 +195,28 @@ HRESULT ProtocolBase::HrInitializeClass()
 	if (strMethod.compare("MKCALENDAR") == 0 && (m_ulUrlFlag & SERVICE_CALDAV))
 	{
 		// created in the IPM_SUBTREE
-		hr = OpenSubFolder(m_lpActiveStore, NULL, '/', m_lpLogger, bIsPublic, false, &m_lpUsrFld);
+		hr = OpenSubFolder(m_lpActiveStore, NULL, '/', bIsPublic,
+		     false, &m_lpUsrFld);
 		if(hr != hrSuccess)
 		{
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error opening IPM_SUBTREE folder of user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
-			goto exit;
+			ec_log_err("Error opening IPM_SUBTREE folder of user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
+			return hr;
 		}
 	}
 	else if(!m_wstrFldName.empty())
 	{
-		// @note, caldav allows creation of calendars for non-existing urls, but since this can also use id's, I'm not sure we want to.
-		hr = HrFindFolder(m_lpActiveStore, m_lpIPMSubtree, m_lpNamedProps, m_lpLogger, m_wstrFldName, &m_lpUsrFld);
+		// @note, caldav allows creation of calendars for non-existing urls, but since this can also use IDs, I am not sure we want to.
+		hr = HrFindFolder(m_lpActiveStore, m_lpIPMSubtree, m_lpNamedProps, m_wstrFldName, &m_lpUsrFld);
 		if(hr != hrSuccess)
 		{
-			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error opening named folder of user %ls, folder %ls, error code: 0x%08X", m_wstrUser.c_str(), m_wstrFldName.c_str(), hr);
-			goto exit;
+			ec_log_err("Error opening named folder of user %ls, folder %ls, error code: 0x%08X", m_wstrUser.c_str(), m_wstrFldName.c_str(), hr);
+			return hr;
 		}
 		m_ulFolderFlag |= SINGLE_FOLDER;
 
 		// check if this is the default calendar folder to enable freebusy publishing
 		if (lpDefaultProp &&
-			HrGetOneProp(m_lpUsrFld, PR_ENTRYID, &lpEntryID) == hrSuccess &&
+		    HrGetOneProp(m_lpUsrFld, PR_ENTRYID, &~lpEntryID) == hrSuccess &&
 			m_lpActiveStore->CompareEntryIDs(lpEntryID->Value.bin.cb, (LPENTRYID)lpEntryID->Value.bin.lpb,
 											 lpDefaultProp->Value.bin.cb, (LPENTRYID)lpDefaultProp->Value.bin.lpb, 0, &ulRes) == hrSuccess &&
 			ulRes == TRUE)
@@ -238,25 +225,23 @@ HRESULT ProtocolBase::HrInitializeClass()
 			m_blFolderAccess = false;
 			m_ulFolderFlag |= DEFAULT_FOLDER;
 		}
+	}
+	// default calendar
+	else if (bIsPublic) {
+		hr = m_lpIPMSubtree->QueryInterface(IID_IMAPIFolder, (void**)&m_lpUsrFld);
+		if (hr != hrSuccess)
+			return hr;
 	} else {
-		// default calendar
-		if (bIsPublic) {
-			hr = m_lpIPMSubtree->QueryInterface(IID_IMAPIFolder, (void**)&m_lpUsrFld);
-			if (hr != hrSuccess)
-				goto exit;
-		} else {
-			// open default calendar
-			hr = m_lpActiveStore->OpenEntry(lpDefaultProp->Value.bin.cb, (LPENTRYID)lpDefaultProp->Value.bin.lpb, NULL, MAPI_BEST_ACCESS, &ulType, (LPUNKNOWN*)&m_lpUsrFld);
-			if (hr != hrSuccess)
-			{
-				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open default calendar for user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
-				goto exit;
-			}
-
-			// we already know we don't want to delete this folder
-			m_blFolderAccess = false;
-			m_ulFolderFlag |= DEFAULT_FOLDER;
+		// open default calendar
+		hr = m_lpActiveStore->OpenEntry(lpDefaultProp->Value.bin.cb, (LPENTRYID)lpDefaultProp->Value.bin.lpb, NULL, MAPI_BEST_ACCESS, &ulType, (LPUNKNOWN*)&m_lpUsrFld);
+		if (hr != hrSuccess)
+		{
+			ec_log_err("Unable to open default calendar for user %ls, error code: 0x%08X", m_wstrUser.c_str(), hr);
+			return hr;
 		}
+		// we already know we don't want to delete this folder
+		m_blFolderAccess = false;
+		m_ulFolderFlag |= DEFAULT_FOLDER;
 	}
 
 	/*
@@ -276,7 +261,7 @@ HRESULT ProtocolBase::HrInitializeClass()
 			SPropValuePtr ptrDisplayName;
 			string strLocation = "/caldav/" + urlEncode(m_wstrFldOwner, "utf-8");
 
-			if (HrGetOneProp(m_lpUsrFld, PR_DISPLAY_NAME_W, &ptrDisplayName) == hrSuccess) {
+			if (HrGetOneProp(m_lpUsrFld, PR_DISPLAY_NAME_W, &~ptrDisplayName) == hrSuccess) {
 				std::string part = urlEncode(ptrDisplayName->Value.lpszW, "UTF-8"); 
 				strLocation += "/" + part + "/";
 			} else {
@@ -286,44 +271,33 @@ HRESULT ProtocolBase::HrInitializeClass()
 
 			m_lpRequest->HrResponseHeader(301, "Moved Permanently");
 			m_lpRequest->HrResponseHeader("Location", m_converter.convert_to<string>(strLocation));
-			hr = MAPI_E_NOT_ME;
-			goto exit;
+			return MAPI_E_NOT_ME;
 		}
 	}
 
 	/*
 	 * Check delete / rename access on folder, if not already blocked.
 	 */
-	if (m_blFolderAccess) {
-		// lpDefaultProp already should contain PR_IPM_APPOINTMENT_ENTRYID
-		if (lpDefaultProp) {
-			ULONG ulCmp;
+	if (m_blFolderAccess &&
+	    // lpDefaultProp already should contain PR_IPM_APPOINTMENT_ENTRYID
+	    lpDefaultProp != nullptr) {
+		ULONG ulCmp;
 
-			hr = HrGetOneProp(m_lpUsrFld, PR_ENTRYID, &lpFldProp);
-			if (hr != hrSuccess)
-				goto exit;
-
-			hr = m_lpSession->CompareEntryIDs(lpDefaultProp->Value.bin.cb, (LPENTRYID)lpDefaultProp->Value.bin.lpb,
-											  lpFldProp->Value.bin.cb, (LPENTRYID)lpFldProp->Value.bin.lpb, 0, &ulCmp);
-			if (hr != hrSuccess || ulCmp == TRUE)
-				m_blFolderAccess = false;
-
-			MAPIFreeBuffer(lpFldProp);
-			lpFldProp = NULL;
-		}
+		hr = HrGetOneProp(m_lpUsrFld, PR_ENTRYID, &~lpFldProp);
+		if (hr != hrSuccess)
+			return hr;
+		hr = m_lpSession->CompareEntryIDs(lpDefaultProp->Value.bin.cb, (LPENTRYID)lpDefaultProp->Value.bin.lpb,
+		     lpFldProp->Value.bin.cb, (LPENTRYID)lpFldProp->Value.bin.lpb, 0, &ulCmp);
+		if (hr != hrSuccess || ulCmp == TRUE)
+			m_blFolderAccess = false;
 	}
 	if (m_blFolderAccess) {
-		hr = HrGetOneProp(m_lpUsrFld, PR_SUBFOLDERS, &lpFldProp);
+		hr = HrGetOneProp(m_lpUsrFld, PR_SUBFOLDERS, &~lpFldProp);
 		if(hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		if(lpFldProp->Value.b == (unsigned short)true && !strMethod.compare("DELETE"))
 			m_blFolderAccess = false;
 	}
-
-exit:
-	MAPIFreeBuffer(lpFldProp);
-	MAPIFreeBuffer(lpDefaultProp);
 	return hr;
 }
 
@@ -363,14 +337,13 @@ std::wstring ProtocolBase::U2W(const std::string &strUtfChar)
  * @param[in]	lpSprop		SPropValue to be converted
  * @return		string
  */
-std::string ProtocolBase::SPropValToString(SPropValue * lpSprop)
+std::string ProtocolBase::SPropValToString(const SPropValue *lpSprop)
 {
 	time_t tmUnixTime;
 	std::string strRetVal;
 	
-	if (lpSprop == NULL) {
+	if (lpSprop == NULL)
 		return std::string();
-	}
 
 	if (PROP_TYPE(lpSprop->ulPropTag) == PT_SYSTIME)
 	{

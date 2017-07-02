@@ -23,13 +23,17 @@
 #include "ECGenericObjectTable.h"
 #include "ECUserManagement.h"
 
+struct soap;
+
+namespace KC {
+
 // Objectdata for abprovider
-typedef struct{
+struct ECODAB {
 	unsigned int	ulABId;
 	unsigned int	ulABType; // MAPI_ABCONT, MAPI_DISTLIST, MAPI_MAILUSER
 	unsigned int 	ulABParentId;
 	unsigned int	ulABParentType; // MAPI_ABCONT, MAPI_DISTLIST, MAPI_MAILUSER
-}ECODAB;
+};
 
 #define AB_FILTER_SYSTEM		0x00000001
 #define AB_FILTER_ADDRESSLIST	0x00000002
@@ -72,5 +76,7 @@ private:
 protected:
 	unsigned int m_ulUserManagementFlags;
 };
+
+} /* namespace */
 
 #endif

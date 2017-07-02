@@ -43,18 +43,6 @@ HRESULT ECFreeBuffer(void *lpvoid) {
 	else return _pfnFreeBuf(lpvoid);
 }
 
-// Memory tracing
-HRESULT ECAllocateBufferDbg(ULONG cbSize, void **lpvoid, char *szFromWhere, int linenr) {
-	HRESULT hr = hrSuccess;
-	if(_pfnAllocBuf == NULL)
-		hr = MAPI_E_CALL_FAILED;
-	else hr = _pfnAllocBuf(cbSize, lpvoid);
-
-	TRACE_INTERNAL(TRACE_ENTRY, "MEM", "ECAllocateBuffer", "%s(%d): ALLOC 0x%08x", szFromWhere, linenr, *(unsigned int *)lpvoid);
-
-	return hr;
-}
-
 HRESULT ECAllocateBuffer(ULONG cbSize, void **lpvoid) {
 	if(_pfnAllocBuf == NULL)
 		return MAPI_E_CALL_FAILED;
@@ -69,19 +57,7 @@ HRESULT ECAllocateMore(ULONG cbSize, void *lpBase, void **lpvoid) {
 
 HRESULT AllocNewMapiObject(ULONG ulUniqueId, ULONG ulObjId, ULONG ulObjType, MAPIOBJECT **lppMapiObject)
 {
-	MAPIOBJECT *sMapiObject;
-
-	sMapiObject = new MAPIOBJECT;
-	sMapiObject->lstChildren = new ECMapiObjects;
-	sMapiObject->lstDeleted = new std::list<ULONG>;
-	sMapiObject->lstAvailable = new std::list<ULONG>;
-	sMapiObject->lstModified = new std::list<ECProperty>;
-	sMapiObject->lstProperties = new std::list<ECProperty>;
-	sMapiObject->lpInstanceID = NULL;
-	sMapiObject->cbInstanceID = 0;
-	sMapiObject->bChangedInstance = false;
-	sMapiObject->bChanged = false;
-	sMapiObject->bDelete = false;
+	auto sMapiObject = new MAPIOBJECT;
 	sMapiObject->ulUniqueId = ulUniqueId;
 	sMapiObject->ulObjId = ulObjId;
 	sMapiObject->ulObjType = ulObjType;
@@ -92,19 +68,8 @@ HRESULT AllocNewMapiObject(ULONG ulUniqueId, ULONG ulObjId, ULONG ulObjType, MAP
 
 HRESULT FreeMapiObject(MAPIOBJECT *lpsObject)
 {
-	ECMapiObjects::const_iterator iterSObj;
-
-	delete lpsObject->lstAvailable;
-	delete lpsObject->lstDeleted;
-	delete lpsObject->lstModified;
-	delete lpsObject->lstProperties;
-
-	for (iterSObj = lpsObject->lstChildren->begin();
-	     iterSObj != lpsObject->lstChildren->end(); ++iterSObj)
-		FreeMapiObject(*iterSObj);
-
-	delete lpsObject->lstChildren;
-
+	for (const auto &obj : lpsObject->lstChildren)
+		FreeMapiObject(obj);
 	if (lpsObject->lpInstanceID)
 		ECFreeBuffer(lpsObject->lpInstanceID);
 

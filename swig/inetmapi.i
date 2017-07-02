@@ -22,7 +22,7 @@
 	%append_output(SWIG_FromCharPtrAndSize($1->c_str(), $1->length()));
 }
 
-typedef struct _so {
+struct sending_options {
         char *alternate_boundary;               // Specifies a specific boundary prefix to use when creating MIME boundaries
         bool no_recipients_workaround;  // Specified that we wish to accepts messages with no recipients (for example, when converting an attached email with no recipients)
         bool msg_in_msg;
@@ -37,41 +37,39 @@ typedef struct _so {
 			sending_options() {
 				sending_options *sopt = new sending_options;
 				imopt_default_sending_options(sopt);
-				sopt->charset_upgrade = strdup(sopt->charset_upgrade); /* avoid free problems */
+				char *temp = sopt->charset_upgrade;
+				sopt->charset_upgrade = new char[strlen(temp)+1]; /* avoid free problems */
+				strcpy(sopt->charset_upgrade, temp);
 				return sopt;
 			}
 			~sending_options() {
-				free(self->alternate_boundary);
-				free(self->charset_upgrade);
+				delete[] self->alternate_boundary;
+				delete[] self->charset_upgrade;
 				delete(self);
 			}
 		}
+};
 
-} sending_options;
-
-typedef struct _do {
+struct delivery_options {
         bool use_received_date;         // Use the 'received' date instead of the current date as delivery date
         bool mark_as_read;              // Deliver the message 'read' instead of unread
         bool add_imap_data;				// Save IMAP optimized data to the server
 	bool parse_smime_signed;        // Parse actual S/MIME content instead of just writing out the S/MIME data to a single attachment
         /* LPSBinary user_entryid;         // If not NULL, specifies the entryid of the user for whom we are delivering. If set, allows generating PR_MESSAGE_*_ME properties. */
-	char *default_charset;
+	char *ascii_upgrade;
 
         %extend {
-            delivery_options() { 
-				delivery_options *dopt = new delivery_options; 
+            delivery_options() {
+				delivery_options *dopt = new delivery_options;
 				imopt_default_delivery_options(dopt);
-				dopt->default_charset = strdup(dopt->default_charset); /* avoid free problems */
-				/* elaborate on free problems? */
 				return dopt;
 			}
 			~delivery_options() {
-				free(const_cast<char *>(self->default_charset));
+				delete[] self->ascii_upgrade;
 				delete(self);
 			}
         }
-
-} delivery_options;
+};
 
 HRESULT IMToMAPI(IMAPISession *lpSession, IMsgStore *lpMsgStore, IAddrBook *lpAddrBook, IMessage *lpMessage, const std::string &input, delivery_options dopt);
 HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook, IMessage *lpMessage, char** lppchardelete, sending_options sopt);

@@ -19,6 +19,7 @@
 #define WSMAPIPROPSTORAGE_H
 
 #include <kopano/zcdefs.h>
+#include <mutex>
 #include <kopano/ECUnknown.h>
 #include "IECPropStorage.h"
 
@@ -28,21 +29,19 @@
 
 #include <mapi.h>
 #include <mapispi.h>
-#include <pthread.h>
 
+namespace KC {
 class convert_context;
+}
 
-class WSMAPIPropStorage : public ECUnknown
-{
-
+class WSMAPIPropStorage _kc_final : public ECUnknown {
 protected:
-	WSMAPIPropStorage(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, unsigned int ulServerCapabilities, WSTransport *lpTransport);
+	WSMAPIPropStorage(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID, ULONG ulFlags, KCmd *, std::recursive_mutex &, ECSESSIONID, unsigned int ulServerCapabilities, WSTransport *);
 	virtual ~WSMAPIPropStorage();
 
 public:
-	static HRESULT Create(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, unsigned int ulServerCapabilities, WSTransport *lpTransport, WSMAPIPropStorage **lppPropStorage);
-
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
+	static HRESULT Create(ULONG cbParentEntryId, LPENTRYID lpParentEntryId, ULONG cbEntryId, LPENTRYID, ULONG ulFlags, KCmd * , std::recursive_mutex &, ECSESSIONID, unsigned int ulServerCapabilities, WSTransport *, WSMAPIPropStorage **);
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 
 	// For ICS
 	virtual HRESULT HrSetSyncId(ULONG ulSyncId);
@@ -64,7 +63,7 @@ private:
 	virtual	HRESULT	HrWriteProps(ULONG cValues, LPSPropValue pValues, ULONG ulFlags = 0);
 
 	// Delete properties from file
-	virtual HRESULT HrDeleteProps(LPSPropTagArray lpsPropTagArray);
+	virtual HRESULT HrDeleteProps(const SPropTagArray *lpsPropTagArray);
 
 	// Save complete object to server
 	virtual HRESULT HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject);
@@ -93,37 +92,23 @@ private:
 	friend class ECParentStorage;
 
 public:
-	class xECPropStorage _zcp_final : public IECPropStorage {
-		public:
-			// IECUnknown
-			virtual ULONG AddRef(void) _zcp_override;
-			virtual ULONG Release(void) _zcp_override;
-			virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _zcp_override;
-
-			// IECPropStorage
-			virtual HRESULT HrReadProps(LPSPropTagArray *lppPropTags,ULONG *cValues, LPSPropValue *lppValues);
-			virtual HRESULT HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropValue *lppsPropValue);
-			virtual	HRESULT	HrWriteProps(ULONG cValues, LPSPropValue lpValues, ULONG ulFlags = 0);
-			virtual HRESULT HrDeleteProps(LPSPropTagArray lpsPropTagArray);
-			virtual HRESULT HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject);
-			virtual HRESULT HrLoadObject(MAPIOBJECT **lppsMapiObject);
-			virtual IECPropStorage* GetServerStorage();
-	}m_xECPropStorage;
+	class xECPropStorage _kc_final : public IECPropStorage {
+		#include <kopano/xclsfrag/IECUnknown.hpp>
+		#include <kopano/xclsfrag/IECPropStorage.hpp>
+	} m_xECPropStorage;
 
 private:
 	entryId			m_sEntryId;
 	entryId			m_sParentEntryId;
 	KCmd*		lpCmd;
-	pthread_mutex_t *lpDataLock;
+	std::recursive_mutex &lpDataLock;
 	ECSESSIONID		ecSessionId;
 	unsigned int	ulServerCapabilities;
-	ULONG			m_ulSyncId;
-	ULONG			m_ulConnection;
-	ULONG			m_ulEventMask;
+	ULONG m_ulSyncId = 0, m_ulConnection = 0, m_ulEventMask = 0;
 	ULONG			m_ulFlags;
 	ULONG			m_ulSessionReloadCallback;
 	WSTransport		*m_lpTransport;
-	bool			m_bSubscribed;
+	bool m_bSubscribed = false;
 };
 
 

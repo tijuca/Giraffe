@@ -18,12 +18,13 @@
 #include <kopano/platform.h>
 #include <sys/un.h>
 #include <sys/socket.h>
-#include <kopano/base64.h>
 #include <kopano/ECChannel.h>
 #include <kopano/ECDefs.h>
 #include <kopano/stringutil.h>
 
 #include "ECSearchClient.h"
+
+namespace KC {
 
 ECSearchClient::ECSearchClient(const char *szIndexerPath, unsigned int ulTimeOut)
 	: ECChannelClient(szIndexerPath, ":;")
@@ -36,7 +37,6 @@ ECRESULT ECSearchClient::GetProperties(setindexprops_t &setProps)
 	ECRESULT er;
 	std::vector<std::string> lstResponse;
 	std::vector<std::string> lstProps;
-	std::vector<std::string>::const_iterator iter;
 
 	er = DoCmd("PROPS", lstResponse);
 	if (er != erSuccess)
@@ -48,8 +48,8 @@ ECRESULT ECSearchClient::GetProperties(setindexprops_t &setProps)
 
 	lstProps = tokenize(lstResponse[0], " ");
 
-	for (iter = lstProps.begin(); iter != lstProps.end(); ++iter)
-		setProps.insert(atoui(iter->c_str()));
+	for (const auto &s : lstProps)
+		setProps.insert(atoui(s.c_str()));
 	return erSuccess;
 }
 
@@ -75,9 +75,8 @@ ECRESULT ECSearchClient::Scope(const std::string &strServer,
 		return er;
 
 	strScope = "SCOPE " + strServer + " " + strStore;
-	for (std::list<unsigned int>::const_iterator i = lstFolders.begin();
-	     i != lstFolders.end(); ++i)
-		strScope += " " + stringify(*i);
+	for (const auto i : lstFolders)
+		strScope += " " + stringify(i);
 
 	er = DoCmd(strScope, lstResponse);
 	if (er != erSuccess)
@@ -105,9 +104,8 @@ ECRESULT ECSearchClient::Find(const std::set<unsigned int> &setFields,
 	std::string strFind;
 
 	strFind = "FIND";
-	for (std::set<unsigned int>::const_iterator i = setFields.begin();
-	     i != setFields.end(); ++i)
-		strFind += " " + stringify(*i);
+	for (const auto i : setFields)
+		strFind += " " + stringify(i);
 		
 	strFind += ":";
 	
@@ -176,9 +174,8 @@ ECRESULT ECSearchClient::Query(GUID *lpServerGuid, GUID *lpStoreGuid, std::list<
 	if (er != erSuccess)
 		return er;
 
-	for (std::list<SIndexedTerm>::const_iterator i = lstSearches.begin();
-	     i != lstSearches.end(); ++i)
-		Find(i->setFields, i->strTerm);
+	for (const auto &i : lstSearches)
+		Find(i.setFields, i.strTerm);
 
 	er = Suggest(suggestion);
 	if (er != erSuccess)
@@ -207,3 +204,4 @@ ECRESULT ECSearchClient::SyncRun()
 	return DoCmd("SYNCRUN", lstVoid);
 }
 
+} /* namespace */

@@ -14,9 +14,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <kopano/platform.h>
+#include <kopano/ECInterfaceDefs.h>
 #include <mapiutil.h>
 #include "kcore.hpp"
 #include <kopano/ECGuid.h>
+#include <kopano/memory.hpp>
 #include <edkguid.h>
 #include "ECABLogon.h"
 
@@ -33,25 +35,20 @@
 #include <kopano/stringutil.h>
 #include "pcutil.hpp"
 
-ECABLogon::ECABLogon(LPMAPISUP lpMAPISup, WSTransport* lpTransport, ULONG ulProfileFlags, GUID *lpGUID) : ECUnknown("IABLogon")
+using namespace KCHL;
+
+ECABLogon::ECABLogon(LPMAPISUP lpMAPISup, WSTransport *lpTransport,
+    ULONG ulProfileFlags, GUID *lpGUID) :
+	ECUnknown("IABLogon"), m_lpMAPISup(lpMAPISup),
+	m_lpTransport(lpTransport)
 {
 	// The 'legacy' guid used normally (all AB entryIDs have this GUID)
 	m_guid = MUIDECSAB;
 
 	// The specific GUID for *this* addressbook provider, if available
-	if (lpGUID) {
-		m_ABPGuid = *lpGUID;
-	} else {
-		m_ABPGuid = GUID_NULL;
-	}
-
-	m_lpNotifyClient = NULL;
-
-	m_lpTransport = lpTransport;
+	m_ABPGuid = (lpGUID != nullptr) ? *lpGUID : GUID_NULL;
 	if(m_lpTransport)
 		m_lpTransport->AddRef();
-
-	m_lpMAPISup = lpMAPISup;
 	if(m_lpMAPISup)
 		m_lpMAPISup->AddRef();
 
@@ -70,12 +67,8 @@ ECABLogon::~ECABLogon()
 
 	if(m_lpNotifyClient)
 		m_lpNotifyClient->Release();
-
-	if(m_lpMAPISup) {
+	if (m_lpMAPISup != nullptr)
 		m_lpMAPISup->Release();
-		m_lpMAPISup = NULL;
-	}
-
 	if(m_lpTransport)
 		m_lpTransport->Release();
 }
@@ -96,14 +89,11 @@ HRESULT ECABLogon::Create(LPMAPISUP lpMAPISup, WSTransport* lpTransport, ULONG u
 
 HRESULT ECABLogon::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECABLogon, this);
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
-	REGISTER_INTERFACE(IID_IABLogon, &this->m_xABLogon);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xABLogon);
-
-	REGISTER_INTERFACE(IID_ISelectUnicode, &this->m_xUnknown);
-
+	REGISTER_INTERFACE2(ECABLogon, this);
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IABLogon, &this->m_xABLogon);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xABLogon);
+	REGISTER_INTERFACE3(ISelectUnicode, IUnknown, &this->m_xUnknown);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -132,26 +122,23 @@ HRESULT ECABLogon::Logoff(ULONG ulFlags)
 HRESULT ECABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk)
 {
 	HRESULT			hr = hrSuccess;
-	ECABContainer*	lpABContainer = NULL;
+	object_ptr<ECABContainer> lpABContainer;
 	BOOL			fModifyObject = FALSE;
 	ABEID			eidRoot =  ABEID(MAPI_ABCONT, MUIDECSAB, 0);
 	ABEID *lpABeid = NULL;
-	IECPropStorage*	lpPropStorage = NULL;
-	ECMailUser*		lpMailUser = NULL;
-	ECDistList*		lpDistList = NULL;
-	LPENTRYID		lpEntryIDServer = NULL;
+	object_ptr<IECPropStorage> lpPropStorage;
+	object_ptr<ECMailUser> lpMailUser;
+	object_ptr<ECDistList> 	lpDistList;
+	memory_ptr<ENTRYID> lpEntryIDServer;
 
 	// Check input/output variables 
-	if(lpulObjType == NULL || lppUnk == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpulObjType == nullptr || lppUnk == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
 
 	/*if(ulFlags & MAPI_MODIFY) {
-		if(!fModify) {
-			hr = MAPI_E_NO_ACCESS;
-			goto exit;
-		} else
+		if (!fModify)
+			return MAPI_E_NO_ACCESS;
+		else
 			fModifyObject = TRUE;
 	}
 
@@ -165,14 +152,11 @@ HRESULT ECABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 		cbEntryID = CbABEID(lpABeid);
 		lpEntryID = (LPENTRYID)lpABeid;
 	} else {
-		if (cbEntryID == 0 || lpEntryID == NULL) {
-			hr = MAPI_E_UNKNOWN_ENTRYID;
-			goto exit;
-		}
-
-		hr = MAPIAllocateBuffer(cbEntryID, (void **)&lpEntryIDServer);
+		if (cbEntryID == 0 || lpEntryID == nullptr)
+			return MAPI_E_UNKNOWN_ENTRYID;
+		hr = MAPIAllocateBuffer(cbEntryID, &~lpEntryIDServer);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		memcpy(lpEntryIDServer, lpEntryID, cbEntryID);
 		lpEntryID = lpEntryIDServer;
@@ -181,16 +165,12 @@ HRESULT ECABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 
 		// Check sane entryid
 		if (lpABeid->ulType != MAPI_ABCONT && lpABeid->ulType != MAPI_MAILUSER && lpABeid->ulType != MAPI_DISTLIST) 
-		{
-			hr = MAPI_E_UNKNOWN_ENTRYID;
-			goto exit;
-		}
+			return MAPI_E_UNKNOWN_ENTRYID;
 
 		// Check entryid GUID, must be either MUIDECSAB or m_ABPGuid
-		if(memcmp(&lpABeid->guid, &MUIDECSAB, sizeof(MAPIUID)) != 0 && memcmp(&lpABeid->guid, &m_ABPGuid, sizeof(MAPIUID)) != 0) {
-			hr = MAPI_E_UNKNOWN_ENTRYID;
-			goto exit;
-		}
+		if (memcmp(&lpABeid->guid, &MUIDECSAB, sizeof(MAPIUID)) != 0 &&
+		    memcmp(&lpABeid->guid, &m_ABPGuid, sizeof(MAPIUID)) != 0)
+			return MAPI_E_UNKNOWN_ENTRYID;
 
 		memcpy(&lpABeid->guid, &MUIDECSAB, sizeof(MAPIUID));
 	}
@@ -198,112 +178,76 @@ HRESULT ECABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInte
 	//TODO: check entryid serverside?
 
 	switch(lpABeid->ulType) {
-		case MAPI_ABCONT:
-			hr = ECABContainer::Create(this, MAPI_ABCONT, fModifyObject, &lpABContainer);
-			if(hr != hrSuccess)
-				goto exit;
-
-			hr = lpABContainer->SetEntryId(cbEntryID, lpEntryID);
-			if(hr != hrSuccess)
-				goto exit;
-
-			AddChild(lpABContainer);
-
-			hr = m_lpTransport->HrOpenABPropStorage(cbEntryID, lpEntryID, &lpPropStorage);
-			if(hr != hrSuccess)
-				goto exit;
-
-			hr = lpABContainer->HrSetPropStorage(lpPropStorage, TRUE);
-			if(hr != hrSuccess)
-				goto exit;
-
-			if(lpInterface)
-				hr = lpABContainer->QueryInterface(*lpInterface,(void **)lppUnk);
-			else
-				hr = lpABContainer->QueryInterface(IID_IABContainer, (void **)lppUnk);
-			if(hr != hrSuccess)
-				goto exit;
-			break;
-		case MAPI_MAILUSER:
-			hr = ECMailUser::Create(this, fModifyObject, &lpMailUser);
-			if(hr != hrSuccess)
-				goto exit;
-			
-			hr = lpMailUser->SetEntryId(cbEntryID, lpEntryID);
-			if(hr != hrSuccess)
-				goto exit;
-
-			AddChild(lpMailUser);
-
-			hr = m_lpTransport->HrOpenABPropStorage(cbEntryID, lpEntryID, &lpPropStorage);
-			if(hr != hrSuccess)
-				goto exit;
-
-			hr = lpMailUser->HrSetPropStorage(lpPropStorage, TRUE);
-			if(hr != hrSuccess)
-				goto exit;
-
-			if(lpInterface)
-				hr = lpMailUser->QueryInterface(*lpInterface,(void **)lppUnk);
-			else
-				hr = lpMailUser->QueryInterface(IID_IMailUser, (void **)lppUnk);
-
-			if(hr != hrSuccess)
-				goto exit;
-
-			break;
-		case MAPI_DISTLIST:
-			hr = ECDistList::Create(this, fModifyObject, &lpDistList);
-			if(hr != hrSuccess)
-				goto exit;
-			
-			hr = lpDistList->SetEntryId(cbEntryID, lpEntryID);
-			if(hr != hrSuccess)
-				goto exit;
-
-			AddChild(lpDistList);
-
-			hr = m_lpTransport->HrOpenABPropStorage(cbEntryID, lpEntryID, &lpPropStorage);
-			if(hr != hrSuccess)
-				goto exit;
-
-			hr = lpDistList->HrSetPropStorage(lpPropStorage, TRUE);
-			if(hr != hrSuccess)
-				goto exit;
-
-			if(lpInterface)
-				hr = lpDistList->QueryInterface(*lpInterface,(void **)lppUnk);
-			else
-				hr = lpDistList->QueryInterface(IID_IDistList, (void **)lppUnk);
-
-			if(hr != hrSuccess)
-				goto exit;
-
-			break;
-		default:
-			hr = MAPI_E_NOT_FOUND;
-			goto exit;
-			break;
+	case MAPI_ABCONT:
+		hr = ECABContainer::Create(this, MAPI_ABCONT, fModifyObject, &~lpABContainer);
+		if (hr != hrSuccess)
+			return hr;
+		hr = lpABContainer->SetEntryId(cbEntryID, lpEntryID);
+		if (hr != hrSuccess)
+			return hr;
+		AddChild(lpABContainer);
+		hr = m_lpTransport->HrOpenABPropStorage(cbEntryID, lpEntryID, &~lpPropStorage);
+		if (hr != hrSuccess)
+			return hr;
+		hr = lpABContainer->HrSetPropStorage(lpPropStorage, TRUE);
+		if (hr != hrSuccess)
+			return hr;
+		if (lpInterface)
+			hr = lpABContainer->QueryInterface(*lpInterface,(void **)lppUnk);
+		else
+			hr = lpABContainer->QueryInterface(IID_IABContainer, (void **)lppUnk);
+		if (hr != hrSuccess)
+			return hr;
+		break;
+	case MAPI_MAILUSER:
+		hr = ECMailUser::Create(this, fModifyObject, &~lpMailUser);
+		if (hr != hrSuccess)
+			return hr;
+		hr = lpMailUser->SetEntryId(cbEntryID, lpEntryID);
+		if (hr != hrSuccess)
+			return hr;
+		AddChild(lpMailUser);
+		hr = m_lpTransport->HrOpenABPropStorage(cbEntryID, lpEntryID, &~lpPropStorage);
+		if (hr != hrSuccess)
+			return hr;
+		hr = lpMailUser->HrSetPropStorage(lpPropStorage, TRUE);
+		if (hr != hrSuccess)
+			return hr;
+		if (lpInterface)
+			hr = lpMailUser->QueryInterface(*lpInterface,(void **)lppUnk);
+		else
+			hr = lpMailUser->QueryInterface(IID_IMailUser, (void **)lppUnk);
+		if (hr != hrSuccess)
+			return hr;
+		break;
+	case MAPI_DISTLIST:
+		hr = ECDistList::Create(this, fModifyObject, &~lpDistList);
+		if (hr != hrSuccess)
+			return hr;
+		hr = lpDistList->SetEntryId(cbEntryID, lpEntryID);
+		if (hr != hrSuccess)
+			return hr;
+		AddChild(lpDistList);
+		hr = m_lpTransport->HrOpenABPropStorage(cbEntryID, lpEntryID, &~lpPropStorage);
+		if (hr != hrSuccess)
+			return hr;
+		hr = lpDistList->HrSetPropStorage(lpPropStorage, TRUE);
+		if (hr != hrSuccess)
+			return hr;
+		if (lpInterface)
+			hr = lpDistList->QueryInterface(*lpInterface, (void **)lppUnk);
+		else
+			hr = lpDistList->QueryInterface(IID_IDistList, (void **)lppUnk);
+		if (hr != hrSuccess)
+			return hr;
+		break;
+	default:
+		return MAPI_E_NOT_FOUND;
 	}
 
 	if(lpulObjType)
 		*lpulObjType = lpABeid->ulType;
-
-exit:
-	MAPIFreeBuffer(lpEntryIDServer);
-	if(lpABContainer)
-		lpABContainer->Release();
-
-	if(lpPropStorage)
-		lpPropStorage->Release();
-
-	if(lpMailUser)
-		lpMailUser->Release();
-
-	if(lpDistList)
-		lpDistList->Release();
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECABLogon::CompareEntryIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult)
@@ -324,8 +268,7 @@ HRESULT ECABLogon::Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMas
 		//NOTE: Normal you must give the entryid of the addressbook toplevel
 		return MAPI_E_INVALID_PARAMETER;
 
-	ASSERT(m_lpNotifyClient != NULL && (lpEntryID != NULL || TRUE));
-
+	assert(m_lpNotifyClient != NULL && (lpEntryID != NULL || true));
 	if(m_lpNotifyClient->Advise(cbEntryID, (LPBYTE)lpEntryID, ulEventMask, lpAdviseSink, lpulConnection) != S_OK)
 		hr = MAPI_E_NO_SUPPORT;
 	return hr;
@@ -333,7 +276,7 @@ HRESULT ECABLogon::Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMas
 
 HRESULT ECABLogon::Unadvise(ULONG ulConnection)
 {
-	ASSERT(m_lpNotifyClient != NULL);
+	assert(m_lpNotifyClient != NULL);
 	m_lpNotifyClient->Unadvise(ulConnection);
 	return hrSuccess;
 }
@@ -354,16 +297,15 @@ HRESULT ECABLogon::GetOneOffTable(ULONG ulFlags, LPMAPITABLE * lppTable)
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ECABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, LPADRLIST lpRecipList)
+HRESULT ECABLogon::PrepareRecips(ULONG ulFlags,
+    const SPropTagArray *lpPropTagArray, LPADRLIST lpRecipList)
 {
 	HRESULT			hr = hrSuccess;
 	ULONG			cPropsRecip;
 	LPSPropValue	rgpropvalsRecip;
-	LPSPropValue	lpPropVal = NULL;
 	ABEID *lpABeid = NULL;
 	ULONG			cbABeid;
 	ULONG			cValues;
-	IMailUser*		lpIMailUser = NULL;
 	LPSPropValue	lpPropArray = NULL;
 	LPSPropValue	lpNewPropArray = NULL;
 	unsigned int	j;
@@ -377,7 +319,7 @@ HRESULT ECABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, 
 		cPropsRecip		= lpRecipList->aEntries[i].cValues;
 
 		// For each recipient, find its entryid
-		lpPropVal = PpropFindProp( rgpropvalsRecip, cPropsRecip, PR_ENTRYID );
+		auto lpPropVal = PCpropFindProp(rgpropvalsRecip, cPropsRecip, PR_ENTRYID);
 		if(!lpPropVal)
 			continue; // no
 		
@@ -391,7 +333,8 @@ HRESULT ECABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, 
 		if ( memcmp( &(lpABeid->guid), &this->m_guid, sizeof(MAPIUID) ) != 0)
 			continue;	// no
 
-		hr = OpenEntry(cbABeid, (LPENTRYID)lpABeid, NULL, 0, &ulObjType, (LPUNKNOWN*)&lpIMailUser);
+		object_ptr<IMailUser> lpIMailUser;
+		hr = OpenEntry(cbABeid, reinterpret_cast<ENTRYID *>(lpABeid), nullptr, 0, &ulObjType, &~lpIMailUser);
 		if(hr != hrSuccess)
 			continue;	// no
 		
@@ -406,7 +349,7 @@ HRESULT ECABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, 
 			lpPropVal = NULL;
 
 			if(PROP_TYPE(lpPropArray[j].ulPropTag) == PT_ERROR)
-				lpPropVal = PpropFindProp( rgpropvalsRecip, cPropsRecip, lpPropTagArray->aulPropTag[j]);
+				lpPropVal = PCpropFindProp(rgpropvalsRecip, cPropsRecip, lpPropTagArray->aulPropTag[j]);
 
 			if(lpPropVal == NULL)
 				lpPropVal = &lpPropArray[j];
@@ -417,7 +360,7 @@ HRESULT ECABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, 
 		}
 
 		for (j = 0; j < cPropsRecip; ++j) {
-			if ( PpropFindProp(lpNewPropArray, cValues, rgpropvalsRecip[j].ulPropTag ) ||
+			if (PCpropFindProp(lpNewPropArray, cValues, rgpropvalsRecip[j].ulPropTag) ||
 				PROP_TYPE( rgpropvalsRecip[j].ulPropTag ) == PT_ERROR )
 				continue;
 			
@@ -439,7 +382,6 @@ HRESULT ECABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, 
 
 	skip:
 		if(lpPropArray){ ECFreeBuffer(lpPropArray); lpPropArray = NULL; }
-		if(lpIMailUser){ lpIMailUser->Release(); lpIMailUser = NULL; }
 	}
 
 	// Always succeeded on this point
@@ -451,124 +393,19 @@ exit:
 
 	if(lpNewPropArray)
 		ECFreeBuffer(lpNewPropArray);
-	
-	if(lpIMailUser)
-		lpIMailUser->Release();
-
 	return hr;
 }
 
-HRESULT ECABLogon::xABLogon::QueryInterface(REFIID refiid, void ** lppInterface)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
-	METHOD_PROLOGUE_(ECABLogon , ABLogon);
-	HRESULT hr = pThis->QueryInterface(refiid, lppInterface);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-ULONG ECABLogon::xABLogon::AddRef()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::AddRef", "");
-	METHOD_PROLOGUE_(ECABLogon , ABLogon);
-	return pThis->AddRef();
-}
-
-ULONG ECABLogon::xABLogon::Release()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::Release", "");
-	METHOD_PROLOGUE_(ECABLogon , ABLogon);
-	ULONG ulRef = pThis->Release();
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::Release", "%d", ulRef);
-	return ulRef;
-}
-
-HRESULT ECABLogon::xABLogon::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::GetLastError", "");
-	METHOD_PROLOGUE_(ECABLogon , ABLogon);
-	HRESULT hr = pThis->GetLastError(hResult, ulFlags, lppMAPIError);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::GetLastError", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABLogon::xABLogon::Logoff(ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::Logoff", "");
-	METHOD_PROLOGUE_(ECABLogon, ABLogon);
-	HRESULT hr = pThis->Logoff(ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::Logoff", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABLogon::xABLogon::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk) 
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::OpenEntry", "cbEntryID=%d, lpEntryID=%s, type=%d, id=%d, interface=%s, flags=0x%08X", cbEntryID, bin2hex(cbEntryID, (BYTE*)lpEntryID).c_str(), ABEID_TYPE(lpEntryID), ABEID_ID(lpEntryID), (lpInterface)?DBGGUIDToString(*lpInterface).c_str():"", ulFlags);
-	METHOD_PROLOGUE_(ECABLogon, ABLogon);
-	HRESULT hr = pThis->OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, lpulObjType, lppUnk);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::OpenEntry", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABLogon::xABLogon::CompareEntryIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult) 
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::CompareEntryIDs", "flags: %d\nentryid1: %s\nentryid2: %s", ulFlags, bin2hex(cbEntryID1, (BYTE*)lpEntryID1).c_str(), bin2hex(cbEntryID2, (BYTE*)lpEntryID2).c_str());
-	METHOD_PROLOGUE_(ECABLogon, ABLogon);
-	HRESULT hr = pThis->CompareEntryIDs(cbEntryID1, lpEntryID1, cbEntryID2, lpEntryID2, ulFlags, lpulResult);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::CompareEntryIDs", "%s, result=%s", GetMAPIErrorDescription(hr).c_str(), (lpulResult)?((*lpulResult == TRUE)?"TRUE":"FALSE") : "NULL");
-	return hr;
-}
-
-HRESULT ECABLogon::xABLogon::Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection) 
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::Advise", "");
-	METHOD_PROLOGUE_(ECABLogon, ABLogon);
-	HRESULT hr = pThis->Advise(cbEntryID, lpEntryID, ulEventMask, lpAdviseSink, lpulConnection);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::Advise", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABLogon::xABLogon::Unadvise(ULONG ulConnection)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::Unadvise", "");
-	METHOD_PROLOGUE_(ECABLogon, ABLogon);
-	HRESULT hr = pThis->Unadvise(ulConnection);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::Unadvise", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABLogon::xABLogon::OpenStatusEntry(LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPMAPISTATUS * lppMAPIStatus)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::OpenStatusEntry", "");
-	METHOD_PROLOGUE_(ECABLogon, ABLogon);
-	HRESULT hr = pThis->OpenStatusEntry(lpInterface, ulFlags, lpulObjType, lppMAPIStatus);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::OpenStatusEntry", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABLogon::xABLogon::OpenTemplateID(ULONG cbTemplateID, LPENTRYID lpTemplateID, ULONG ulTemplateFlags, LPMAPIPROP lpMAPIPropData, LPCIID lpInterface, LPMAPIPROP * lppMAPIPropNew, LPMAPIPROP lpMAPIPropSibling)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::OpenTemplateID", "");
-	METHOD_PROLOGUE_(ECABLogon, ABLogon);
-	HRESULT hr = pThis->OpenTemplateID(cbTemplateID, lpTemplateID, ulTemplateFlags, lpMAPIPropData, lpInterface, lppMAPIPropNew, lpMAPIPropSibling);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::OpenTemplateID", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABLogon::xABLogon::GetOneOffTable(ULONG ulFlags, LPMAPITABLE * lppTable)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::GetOneOffTable", "flags=0x%08X", ulFlags);
-	METHOD_PROLOGUE_(ECABLogon, ABLogon);
-	HRESULT hr = pThis->GetOneOffTable(ulFlags, lppTable);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::GetOneOffTable", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABLogon::xABLogon::PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, LPADRLIST lpRecipList)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABLogon::PrepareRecips", "flags=0x%08X, PropTagArray=%s\nin=%s", ulFlags, PropNameFromPropTagArray(lpPropTagArray).c_str(), RowSetToString((LPSRowSet)lpRecipList).c_str());
-	METHOD_PROLOGUE_(ECABLogon, ABLogon);
-	HRESULT hr = pThis->PrepareRecips(ulFlags, lpPropTagArray, lpRecipList);
-	TRACE_MAPI(TRACE_RETURN, "IABLogon::PrepareRecips", "%s\nout=%s", GetMAPIErrorDescription(hr).c_str(), RowSetToString((LPSRowSet)lpRecipList).c_str() );
-	return hr;
-}
+DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, Release, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, GetLastError, (HRESULT, hResult), (ULONG, ulFlags), (LPMAPIERROR *, lppMAPIError))
+DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, Logoff, (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, OpenEntry, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (LPCIID, lpInterface), (ULONG, ulFlags), (ULONG *, lpulObjType), (LPUNKNOWN *, lppUnk))
+DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, CompareEntryIDs, (ULONG, cbEntryID1), (LPENTRYID, lpEntryID1), (ULONG, cbEntryID2), (LPENTRYID, lpEntryID2), (ULONG, ulFlags), (ULONG *, lpulResult))
+DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, Advise, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (ULONG, ulEventMask), (LPMAPIADVISESINK, lpAdviseSink), (ULONG *, lpulConnection))
+DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, Unadvise, (ULONG, ulConnection))
+DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, OpenStatusEntry, (LPCIID, lpInterface), (ULONG, ulFlags), (ULONG *, lpulObjType), (LPMAPISTATUS *, lppMAPIStatus))
+DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, OpenTemplateID, (ULONG, cbTemplateID), (LPENTRYID, lpTemplateID), (ULONG, ulTemplateFlags), (LPMAPIPROP, lpMAPIPropData), (LPCIID, lpInterface), (LPMAPIPROP *, lppMAPIPropNew), (LPMAPIPROP, lpMAPIPropSibling))
+DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, GetOneOffTable, (ULONG, ulFlags), (LPMAPITABLE *, lppTable))
+DEF_HRMETHOD1(TRACE_MAPI, ECABLogon, ABLogon, PrepareRecips, (ULONG, ulFlags), (const SPropTagArray *, lpPropTagArray), (LPADRLIST, lpRecipList))

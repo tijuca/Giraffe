@@ -42,12 +42,11 @@ typedef IMAPISession* LPMAPISESSION;
 
 /* Structure passed to MAPIInitialize(), and its ulFlags values */
 
-typedef struct
-{
+struct MAPIINIT_0 {
     ULONG           ulVersion;
     ULONG           ulFlags;
-} MAPIINIT_0, *LPMAPIINIT_0;
-
+};
+typedef struct MAPIINIT_0 *LPMAPIINIT_0;
 typedef MAPIINIT_0 MAPIINIT;
 typedef MAPIINIT *LPMAPIINIT;
 
@@ -56,15 +55,6 @@ typedef MAPIINIT *LPMAPIINIT;
 #define MAPI_MULTITHREAD_NOTIFICATIONS  0x00000001
 /* Reserved for MAPI                    0x40000000 */
 /* #define MAPI_NT_SERVICE              0x00010000  Use from NT service */
-
-/* MAPI base functions */
-
-
-HRESULT MAPIInitialize(MAPIINIT *lpMapiInit);
-
-void MAPIUninitialize(void);
-
-
 
 /*  Extended MAPI Logon function */
 
@@ -168,7 +158,7 @@ public:
     virtual HRESULT SetDefaultDir(ULONG cbEntryID, LPENTRYID lpEntryID) = 0;
     virtual HRESULT GetSearchPath(ULONG ulFlags, LPSRowSet* OUTPUT /*lppSearchPath*/) = 0;
     virtual HRESULT SetSearchPath(ULONG ulFlags, LPSRowSet INPUT /*lpSearchPath*/) = 0;
-    virtual HRESULT PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, LPADRLIST INOUT /*lpRecipList*/) = 0;
+	virtual HRESULT PrepareRecips(ULONG ulFlags, const SPropTagArray *lpPropTagArray, LPADRLIST INOUT /*lpRecipList*/) = 0;
 	%extend {
 		~IAddrBook() { self->Release(); }
 	}

@@ -16,9 +16,14 @@
  */
 
 #include <kopano/platform.h>
+#include <algorithm>
+#include <cwctype>
+#include <utility>
 #include "HtmlToTextParser.h"
 #include "HtmlEntity.h"
 #include <cwctype>
+
+namespace KC {
 
 CHtmlToTextParser::CHtmlToTextParser(void)
 {
@@ -91,35 +96,49 @@ bool CHtmlToTextParser::Parse(const WCHAR *lpwHTML)
 				fAddSpace = false;
 
 			++lpwHTML;
+			continue;
 		} else if(*lpwHTML == '<' && *lpwHTML+1 != ' ') { // The next char can not be a space!
 			++lpwHTML;
 			parseTag(lpwHTML);
+			continue;
 		} else if(*lpwHTML == ' ' && !fPreMode) {
 			fTextMode = true;
 			addSpace(false);
 			++lpwHTML;
-		} else {
-			if (fTextMode && fAddSpace) {
-				addSpace(false);
-			}
-
-			fAddSpace = false;
-			fTextMode = true;
-
-			// if (skippable and not parsed)
-			if (!(fScriptMode || fHeadMode || fStyleMode)) {
-				if (parseEntity(lpwHTML))
-					continue;
-				addChar(*lpwHTML);
-			}
-			++lpwHTML;
+			continue;
 		}
+		if (fTextMode && fAddSpace)
+			addSpace(false);
+		fAddSpace = false;
+		fTextMode = true;
+
+		// if (skippable and not parsed)
+		if (!(fScriptMode || fHeadMode || fStyleMode)) {
+			if (parseEntity(lpwHTML))
+				continue;
+			addChar(*lpwHTML);
+		}
+		++lpwHTML;
 	}
 
 	return true;
 }
 
 std::wstring& CHtmlToTextParser::GetText() {
+	/*
+	 * Remove all trailing whitespace, but remember if there was the usual
+	 * final newline (since it too counts as whitespace) and retain/restore
+	 * it afterwards.
+	 */
+	bool lf = false;
+	auto r = strText.rbegin();
+	for (; r != strText.rend() && iswspace(*r); ++r)
+		if (*r == L'\n')
+			/* \n is sufficient — no need to test for \r too */
+			lf = true;
+	strText.erase(r.base(), strText.end());
+	if (lf)
+		strText += L"\r\n";
 	return strText;
 }
 
@@ -169,7 +188,7 @@ bool CHtmlToTextParser::parseEntity(const WCHAR* &lpwHTML)
 			base = 16;
 		}
 
-		for (int i = 0; isxdigit(*lpwHTML) && *lpwHTML != ';' && i < 10; ++i) {
+		for (int i = 0; iswxdigit(*lpwHTML) && *lpwHTML != ';' && i < 10; ++i) {
 			entity += *lpwHTML;
 			++lpwHTML;
 		}
@@ -215,18 +234,19 @@ void CHtmlToTextParser::parseTag(const WCHAR* &lpwHTML)
 			}
 
 			while (*lpwHTML != 0) {
-				if (*lpwHTML == '>') {
-					if(fCommentMode) {
-						if (*(lpwHTML-1) == '-' && *(lpwHTML-2) == '-' ) {
-							++lpwHTML; // comment ends with -->
-							return;
-						}
-					} else {
-						++lpwHTML; // all others end on the first >
+				if (*lpwHTML != '>') {
+					++lpwHTML;
+					continue;
+				}
+				if (fCommentMode) {
+					if (*(lpwHTML-1) == '-' && *(lpwHTML-2) == '-' ) {
+						++lpwHTML; // comment ends with -->
 						return;
 					}
+				} else {
+					++lpwHTML; // all others end on the first >
+					return;
 				}
-
 				++lpwHTML;
 			}
 		} else if (*lpwHTML == '>') {
@@ -237,27 +257,25 @@ void CHtmlToTextParser::parseTag(const WCHAR* &lpwHTML)
 			}
 		} else if (*lpwHTML == '<') {
 			return; // Possible broken HTML, ignore data before
-		} else {
-			if (bTagName) {
-				if (*lpwHTML == ' ') {
-					bTagName = false;
-					iterTag = tagMap.find(tagName);
-					if(iterTag != tagMap.end())
-						bParseAttrs = iterTag->second.bParseAttrs;
-				}else {
-					tagName.push_back(towlower(*lpwHTML));
-				}
-			} else if(bParseAttrs) {
-				parseAttributes(lpwHTML);
-				break;
+		} else if (bTagName) {
+			if (*lpwHTML == ' ') {
+				bTagName = false;
+				iterTag = tagMap.find(tagName);
+				if (iterTag != tagMap.cend())
+					bParseAttrs = iterTag->second.bParseAttrs;
+			} else {
+				tagName.push_back(towlower(*lpwHTML));
 			}
+		} else if (bParseAttrs) {
+			parseAttributes(lpwHTML);
+			break;
 		}
 
 		++lpwHTML;
 	}
 
 	// Parse tag
-	if (!bTagName && iterTag != tagMap.end()) {
+	if (!bTagName && iterTag != tagMap.cend()) {
 		(this->*iterTag->second.parserMethod)();
 		fTextMode = false;
 	}
@@ -294,24 +312,19 @@ void CHtmlToTextParser::parseAttributes(const WCHAR* &lpwHTML)
 				if (firstQuote == 0) {
 					firstQuote = *lpwHTML++;
 					continue; // Don't add the quote!
-				} else {
-					if(firstQuote == *lpwHTML) {
-						bAttrValue = false;
-					}
+				} else if (firstQuote == *lpwHTML) {
+					bAttrValue = false;
 				}
 			}
 
 			if(bAttrValue)
 				attrValue.push_back(*lpwHTML);
-		} else {
-			if (bAttrName) {
-				attrName.push_back(towlower(*lpwHTML));
-			}
+		} else if (bAttrName) {
+			attrName.push_back(towlower(*lpwHTML));
 		}
 
 		if(!bAttrName && !bAttrValue) {
-			mapAttrs[attrName] = attrValue;
-
+			mapAttrs[std::move(attrName)] = std::move(attrValue);
 			firstQuote = 0;
 			bAttrName = true;
 			bAttrValue = false;
@@ -322,7 +335,7 @@ void CHtmlToTextParser::parseAttributes(const WCHAR* &lpwHTML)
 		++lpwHTML;
 	}
 
-	stackAttrs.push(mapAttrs);
+	stackAttrs.push(std::move(mapAttrs));
 }
 
 void CHtmlToTextParser::parseTagP()
@@ -538,3 +551,4 @@ void CHtmlToTextParser::parseTagBPRE() {
 	addNewLine( true );
 }
 
+} /* namespace */

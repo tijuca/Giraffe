@@ -18,10 +18,10 @@
 #ifndef WSMessageStreamExporter_INCLUDED
 #define WSMessageStreamExporter_INCLUDED
 
+#include <kopano/zcdefs.h>
+#include <kopano/memory.hpp>
 #include <kopano/ECUnknown.h>
 #include "soapStub.h"
-#include <kopano/mapi_ptr.h>
-
 #include <string>
 #include <map>
 
@@ -29,11 +29,10 @@ class WSTransport;
 class WSSerializedMessage;
 
 /**
- * This object encapsulates an set of exported streams. It allows the user to request each individual stream. The
+ * This object encapsulates a set of exported streams. It allows the user to request each individual stream. The
  * streams must be requested in the correct sequence.
  */
-class WSMessageStreamExporter : public ECUnknown
-{
+class WSMessageStreamExporter _kc_final : public ECUnknown {
 public:
 	static HRESULT Create(ULONG ulOffset, ULONG ulCount, const messageStreamArray &streams, WSTransport *lpTransport, WSMessageStreamExporter **lppStreamExporter);
 
@@ -41,15 +40,14 @@ public:
 	HRESULT GetSerializedMessage(ULONG ulIndex, WSSerializedMessage **lppSerializedMessage);
 
 private:
-	WSMessageStreamExporter();
+	WSMessageStreamExporter(void) = default;
 	~WSMessageStreamExporter();
 
 	// Inhibit copying
 	WSMessageStreamExporter(const WSMessageStreamExporter &) = delete;
 	WSMessageStreamExporter &operator=(const WSMessageStreamExporter &) = delete;
 
-private:
-	typedef mapi_object_ptr<WSTransport> WSTransportPtr;
+	typedef KCHL::object_ptr<WSTransport> WSTransportPtr;
 
 	struct StreamInfo {
 		std::string	id;
@@ -58,13 +56,11 @@ private:
 	};
 	typedef std::map<ULONG, StreamInfo*>	StreamInfoMap;
 
-
-	ULONG			m_ulExpectedIndex;
-	ULONG			m_ulMaxIndex;
+	ULONG m_ulExpectedIndex = 0, m_ulMaxIndex = 0;
 	WSTransportPtr	m_ptrTransport;
 	StreamInfoMap	m_mapStreamInfo;
 };
 
-typedef mapi_object_ptr<WSMessageStreamExporter> WSMessageStreamExporterPtr;
+typedef KCHL::object_ptr<WSMessageStreamExporter> WSMessageStreamExporterPtr;
 
 #endif // ndef ECMessageStreamExporter_INCLUDED

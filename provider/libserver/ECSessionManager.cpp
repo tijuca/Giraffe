@@ -14,11 +14,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <kopano/platform.h>
-#include <algorithm>
+#include <chrono>
+#include <memory>
+#include <mutex>
 #include <new>
-#include <typeinfo>
+#include <utility>
+#include <pthread.h>
 #include <mapidefs.h>
 #include <mapitags.h>
+#include <kopano/lockhelper.hpp>
+#include <kopano/tie.hpp>
 #include "ECMAPI.h"
 #include "ECDatabase.h"
 #include "ECSessionGroup.h"
@@ -35,30 +40,19 @@
 #include <edkmdb.h>
 #include "logontime.hpp"
 
+using namespace KCHL;
+
+namespace KC {
+
 ECSessionManager::ECSessionManager(ECConfig *lpConfig, ECLogger *lpAudit,
-    bool bHostedKopano, bool bDistributedKopano)
+    bool bHostedKopano, bool bDistributedKopano) :
+	m_lpConfig(lpConfig), m_lpAudit(lpAudit),
+	m_bHostedKopano(bHostedKopano),
+	m_bDistributedKopano(bDistributedKopano)
 {
 	int err = 0;
-
-	bExit					= FALSE;
-	m_lpConfig				= lpConfig;
-	m_lpAudit				= lpAudit;
 	if (m_lpAudit)
 		m_lpAudit->AddRef();
-	m_bHostedKopano			= bHostedKopano;
-	m_bDistributedKopano	= bDistributedKopano;
-	m_lpDatabase			= NULL;
-
-	// Create a rwlock with no initial owner.
-	pthread_rwlock_init(&m_hCacheRWLock, NULL);
-	pthread_rwlock_init(&m_hGroupLock, NULL);
-	pthread_mutex_init(&m_hExitMutex, NULL);
-	pthread_mutex_init(&m_mutexPersistent, NULL);
-	pthread_mutex_init(&m_mutexTableSubscriptions, NULL);
-	pthread_mutex_init(&m_mutexObjectSubscriptions, NULL);
-
-	//Terminate Event
-	pthread_cond_init(&m_hExitSignal, NULL);
 
 	m_lpDatabaseFactory = new ECDatabaseFactory(lpConfig);
 	m_lpPluginFactory = new ECPluginFactory(lpConfig, g_lpStatsCollector, bHostedKopano, bDistributedKopano);
@@ -67,17 +61,7 @@ ECSessionManager::ECSessionManager(ECConfig *lpConfig, ECLogger *lpAudit,
 	m_lpTPropsPurge = new ECTPropsPurge(lpConfig, m_lpDatabaseFactory);
 	m_ptrLockManager = ECLockManager::Create();
 	
-	m_lpServerGuid = NULL;
-	m_ullSourceKeyAutoIncrement = 0;
-	m_ulSourceKeyQueue = 0;
-
-	m_ulSeqIMAP = 0;
-	m_ulSeqIMAPQueue = 0;
-
-	pthread_mutex_init(&m_hSourceKeyAutoIncrementMutex, NULL);
-	pthread_mutex_init(&m_hSeqMutex, NULL);
-
-	// init ssl randomness for session id's
+	// init SSL randomness for session IDs
 	ssl_random_init();
 
 	//Create session clean up thread
@@ -92,30 +76,24 @@ ECSessionManager::ECSessionManager(ECConfig *lpConfig, ECLogger *lpAudit,
 
 ECSessionManager::~ECSessionManager()
 {
-	int err = 0;
-	SESSIONMAP::const_iterator iSession, iSessionNext;
-
-	pthread_mutex_lock(&m_hExitMutex);
+	ulock_normal l_exit(m_hExitMutex);
 	bExit = TRUE;
-	pthread_cond_signal(&m_hExitSignal);
-
-	pthread_mutex_unlock(&m_hExitMutex);
+	m_hExitSignal.notify_one();
+	l_exit.unlock();
 	delete m_lpTPropsPurge;
 	delete m_lpDatabase;
 	delete m_lpDatabaseFactory;
 		
-	err = pthread_join(m_hSessionCleanerThread, NULL);
-	
+	int err = pthread_join(m_hSessionCleanerThread, NULL);
 	if (err != 0)
 		ec_log_crit("Unable to join session cleaner thread: %s", strerror(err));
 
-	pthread_rwlock_wrlock(&m_hCacheRWLock);
-			
 	/* Clean up all sessions */
-	iSession = m_mapSessions.begin();
-	while(iSession != m_mapSessions.end()) {
+	std::lock_guard<KC::shared_mutex> l_cache(m_hCacheRWLock);
+	auto iSession = m_mapSessions.begin();
+	while (iSession != m_mapSessions.cend()) {
 		delete iSession->second;
-		iSessionNext = iSession;
+		auto iSessionNext = iSession;
 		++iSessionNext;
 		ec_log_info("End of session (shutdown) %llu",
 			static_cast<unsigned long long>(iSession->first));
@@ -135,82 +113,50 @@ ECSessionManager::~ECSessionManager()
 	delete m_lpServerGuid;
 	if (m_lpAudit != NULL)
 		m_lpAudit->Release();
-
-	// Release ownership of the rwlock object.
-	pthread_rwlock_unlock(&m_hCacheRWLock);
-
-	pthread_rwlock_destroy(&m_hCacheRWLock);
-	pthread_rwlock_destroy(&m_hGroupLock);
-
-	pthread_mutex_destroy(&m_hSourceKeyAutoIncrementMutex);
-	pthread_mutex_destroy(&m_hSeqMutex);
-
-	pthread_mutex_destroy(&m_hExitMutex);
-	pthread_mutex_destroy(&m_mutexPersistent);
-	
-	pthread_mutex_destroy(&m_mutexTableSubscriptions);
-	pthread_mutex_destroy(&m_mutexObjectSubscriptions);	
-
-	pthread_cond_destroy(&m_hExitSignal);
 }
 
 ECRESULT ECSessionManager::LoadSettings(){
 	ECRESULT		er = erSuccess;
 		
 	ECDatabase *	lpDatabase = NULL;
-	DB_RESULT		lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 	DB_ROW			lpDBRow = NULL;
 	DB_LENGTHS		lpDBLenths = NULL;
 	std::string		strQuery;
 
-	if(m_lpServerGuid != NULL){
-		er = KCERR_BAD_VALUE;
-		goto exit;
-	}
-
+	if (m_lpServerGuid != nullptr)
+		return KCERR_BAD_VALUE;
 	er = GetThreadLocalDatabase(m_lpDatabaseFactory, &lpDatabase);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 	
 	strQuery = "SELECT `value` FROM settings WHERE `name` = 'server_guid'";
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	lpDBLenths = lpDatabase->FetchRowLengths(lpDBResult);
-	if(lpDBRow == NULL || lpDBRow[0] == NULL || lpDBLenths == NULL || lpDBLenths[0] != sizeof(GUID)) {
-		er = KCERR_NOT_FOUND;
-		goto exit;
-	}
+	if (lpDBRow == nullptr || lpDBRow[0] == nullptr ||
+	    lpDBLenths == nullptr || lpDBLenths[0] != sizeof(GUID))
+		return KCERR_NOT_FOUND;
 
 	m_lpServerGuid = new GUID;
 
 	memcpy(m_lpServerGuid, lpDBRow[0], sizeof(GUID));
-
-	if (lpDBResult)
-		lpDatabase->FreeResult(lpDBResult);
-	lpDBResult = NULL;
-
 	strQuery = "SELECT `value` FROM settings WHERE `name` = 'source_key_auto_increment'";
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	lpDBLenths = lpDatabase->FetchRowLengths(lpDBResult);
-	if(lpDBRow == NULL || lpDBRow[0] == NULL || lpDBLenths == NULL || lpDBLenths[0] != 8) {
-		er = KCERR_NOT_FOUND;
-		goto exit;
-	}
+	if (lpDBRow == nullptr || lpDBRow[0] == nullptr ||
+	    lpDBLenths == nullptr || lpDBLenths[0] != 8)
+		return KCERR_NOT_FOUND;
 
 	memcpy(&m_ullSourceKeyAutoIncrement, lpDBRow[0], sizeof(m_ullSourceKeyAutoIncrement));
-
-exit:
-	if (lpDBResult)
-		lpDatabase->FreeResult(lpDBResult);
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECSessionManager::CheckUserLicense()
@@ -256,20 +202,20 @@ ECRESULT ECSessionManager::GetSessionGroup(ECSESSIONGROUPID sessionGroupID, ECSe
 {
 	ECRESULT er = erSuccess;
 	ECSessionGroup *lpSessionGroup = NULL;
-
-	pthread_rwlock_rdlock(&m_hGroupLock);
+	KC::shared_lock<KC::shared_mutex> lr_group(m_hGroupLock);
+	std::unique_lock<KC::shared_mutex> lw_group(m_hGroupLock, std::defer_lock_t());
 
 	/* Workaround for old clients, when sessionGroupID is 0 each session is its own group */
 	if (sessionGroupID == 0) {
 		lpSessionGroup = new ECSessionGroup(sessionGroupID, this);
 		g_lpStatsCollector->Increment(SCN_SESSIONGROUPS_CREATED);
 	} else {
-		EC_SESSIONGROUPMAP::const_iterator iter = m_mapSessionGroups.find(sessionGroupID);
+		auto iter = m_mapSessionGroups.find(sessionGroupID);
 		/* Check if the SessionGroup already exists on the server */
-		if (iter == m_mapSessionGroups.end()) {
+		if (iter == m_mapSessionGroups.cend()) {
 			// "upgrade" lock to insert new session
-			pthread_rwlock_unlock(&m_hGroupLock);
-			pthread_rwlock_wrlock(&m_hGroupLock);
+			lr_group.unlock();
+			lw_group.lock();
 			lpSessionGroup = new ECSessionGroup(sessionGroupID, this);
 			m_mapSessionGroups.insert(EC_SESSIONGROUPMAP::value_type(sessionGroupID, lpSessionGroup));
 			g_lpStatsCollector->Increment(SCN_SESSIONGROUPS_CREATED);
@@ -278,9 +224,6 @@ ECRESULT ECSessionManager::GetSessionGroup(ECSESSIONGROUPID sessionGroupID, ECSe
 	}
 	
 	lpSessionGroup->AddSession(lpSession);
-
-	pthread_rwlock_unlock(&m_hGroupLock);
-
 	*lppSessionGroup = lpSessionGroup;
 
 	return er;
@@ -292,22 +235,18 @@ ECRESULT ECSessionManager::DeleteIfOrphaned(ECSessionGroup *lpGroup)
 	ECSESSIONGROUPID id = lpGroup->GetSessionGroupId();
 
 	if (id != 0) {
-		pthread_rwlock_wrlock(&m_hGroupLock);
+		std::lock_guard<KC::shared_mutex> l_group(m_hGroupLock);
 
     	/* Check if the SessionGroup actually exists, if it doesn't just return without error */
-	EC_SESSIONGROUPMAP::const_iterator i = m_mapSessionGroups.find(id);
-    	if (i == m_mapSessionGroups.end()) {
-			pthread_rwlock_unlock(&m_hGroupLock);
+	auto i = m_mapSessionGroups.find(id);
+		if (i == m_mapSessionGroups.cend())
 			return erSuccess;
-    	}
 
     	/* If this was the last Session, delete the SessionGroup */
     	if (i->second->isOrphan()) {
     	    lpSessionGroup = i->second;
     	    m_mapSessionGroups.erase(i);
     	}
-
-		pthread_rwlock_unlock(&m_hGroupLock);
 	} else
 		lpSessionGroup = lpGroup;
 
@@ -320,14 +259,10 @@ ECRESULT ECSessionManager::DeleteIfOrphaned(ECSessionGroup *lpGroup)
 
 BTSession* ECSessionManager::GetSession(ECSESSIONID sessionID, bool fLockSession) {
 
-	SESSIONMAP::const_iterator iIterator;
 	BTSession *lpSession = NULL;
 		
-	//TRACE_INTERNAL(TRACE_ENTRY, "ECSessionManager", "GetSession", "%lu", sessionID);
-
-	iIterator = m_mapSessions.find(sessionID);
-
-	if(iIterator != m_mapSessions.end()){
+	auto iIterator = m_mapSessions.find(sessionID);
+	if (iIterator != m_mapSessions.cend()) {
 		lpSession = iIterator->second;
 		lpSession->UpdateSessionTime();
 		
@@ -336,8 +271,6 @@ BTSession* ECSessionManager::GetSession(ECSESSIONID sessionID, bool fLockSession
 	}else{
 		//EC_SESSION_LOST
 	}
-	
-	//TRACE_INTERNAL(TRACE_RETURN, "ECSessionManager", "GetSession", "%lu", sessionID);
 	return lpSession;
 }
 
@@ -346,20 +279,16 @@ ECRESULT ECSessionManager::RemoveAllSessions()
 {
 	ECRESULT		er = erSuccess;
 	BTSession		*lpSession = NULL;
-	SESSIONMAP::const_iterator iIterSession, iSessionNext;
 	std::list<BTSession *> lstSessions;
-	std::list<BTSession *>::const_iterator iterSessionList;
 	
 	// Lock the session map since we're going to remove all the sessions.
-	pthread_rwlock_wrlock(&m_hCacheRWLock);
-
+	std::unique_lock<KC::shared_mutex> l_cache(m_hCacheRWLock);
 	ec_log_info("Shutdown all current sessions");
 
-	iIterSession = m_mapSessions.begin();
-	while(iIterSession != m_mapSessions.end())
-	{
+	auto iIterSession = m_mapSessions.begin();
+	while (iIterSession != m_mapSessions.cend()) {
 		lpSession = iIterSession->second;
-		iSessionNext = iIterSession;
+		auto iSessionNext = iIterSession;
 		++iSessionNext;
 		m_mapSessions.erase(iIterSession);
 
@@ -368,14 +297,10 @@ ECRESULT ECSessionManager::RemoveAllSessions()
 		lstSessions.push_back(lpSession);
 	}
 
-	// Release ownership of the mutex object.
-	pthread_rwlock_unlock(&m_hCacheRWLock);
-	
+	l_cache.unlock();
 	// Do the actual session deletes, while the session map is not locked (!)
-	for (iterSessionList = lstSessions.begin();
-	     iterSessionList != lstSessions.end(); ++iterSessionList)
-	    delete *iterSessionList;
-	
+	for (auto sesp : lstSessions)
+		delete sesp;
 	return er;
 }
 
@@ -383,43 +308,32 @@ ECRESULT ECSessionManager::CancelAllSessions(ECSESSIONID sessionIDException)
 {
 	ECRESULT		er = erSuccess;
 	BTSession		*lpSession = NULL;
-	SESSIONMAP::const_iterator iIterSession, iSessionNext;
 	std::list<BTSession *> lstSessions;
-	std::list<BTSession *>::const_iterator iterSessionList;
 	
 	// Lock the session map since we're going to remove all the sessions.
-	pthread_rwlock_wrlock(&m_hCacheRWLock);
-
+	std::unique_lock<KC::shared_mutex> l_cache(m_hCacheRWLock);
 	ec_log_info("Shutdown all current sessions");
 
-	iIterSession = m_mapSessions.begin();
-	while(iIterSession != m_mapSessions.end())
-	{
-		if(iIterSession->first != sessionIDException) {
-			lpSession = iIterSession->second;
-			iSessionNext = iIterSession;
-			++iSessionNext;
-			// Tell the notification manager to wake up anyone waiting for this session
-			m_lpNotificationManager->NotifyChange(iIterSession->first);
-			
-			m_mapSessions.erase(iIterSession);
-
-			iIterSession = iSessionNext;
-
-			lstSessions.push_back(lpSession);
-		} else {
+	auto iIterSession = m_mapSessions.begin();
+	while (iIterSession != m_mapSessions.cend()) {
+		if (iIterSession->first == sessionIDException) {
 			++iIterSession;
+			continue;
 		}
+		lpSession = iIterSession->second;
+		auto iSessionNext = iIterSession;
+		++iSessionNext;
+		// Tell the notification manager to wake up anyone waiting for this session
+		m_lpNotificationManager->NotifyChange(iIterSession->first);
+		m_mapSessions.erase(iIterSession);
+		iIterSession = iSessionNext;
+		lstSessions.push_back(lpSession);
 	}
 
-	// Release ownership of the mutex object.
-	pthread_rwlock_unlock(&m_hCacheRWLock);
-	
+	l_cache.unlock();
 	// Do the actual session deletes, while the session map is not locked (!)
-	for (iterSessionList = lstSessions.begin();
-	     iterSessionList != lstSessions.end(); ++iterSessionList)
-	    delete *iterSessionList;
-	
+	for (auto sesp : lstSessions)
+		delete sesp;
 	return er;
 }
 
@@ -427,18 +341,10 @@ ECRESULT ECSessionManager::CancelAllSessions(ECSESSIONID sessionIDException)
 // used by ECStatsTable
 ECRESULT ECSessionManager::ForEachSession(void(*callback)(ECSession*, void*), void *obj)
 {
-	ECRESULT er = erSuccess;
-	SESSIONMAP::const_iterator iIterSession;
-
-	pthread_rwlock_rdlock(&m_hCacheRWLock);
-
-	for (iIterSession = m_mapSessions.begin();
-	     iIterSession != m_mapSessions.end(); ++iIterSession)
-		callback(dynamic_cast<ECSession*>(iIterSession->second), obj);
-
-	pthread_rwlock_unlock(&m_hCacheRWLock);
-
-	return er;
+	KC::shared_lock<KC::shared_mutex> l_cache(m_hCacheRWLock);
+	for (const auto &p : m_mapSessions)
+		callback(dynamic_cast<ECSession *>(p.second), obj);
+	return erSuccess;
 }
 
 // Locking of sessions works as follows:
@@ -494,11 +400,9 @@ ECRESULT ECSessionManager::ValidateBTSession(struct soap *soap, ECSESSIONID sess
 	BTSession*		lpSession	= NULL;
 	
 	// Read lock
-	pthread_rwlock_rdlock(&m_hCacheRWLock);
-	
+	KC::shared_lock<KC::shared_mutex> l_cache(m_hCacheRWLock);
 	lpSession = GetSession(sessionID, fLockSession);
-	
-	pthread_rwlock_unlock(&m_hCacheRWLock);
+	l_cache.unlock();
 
 	if (lpSession == NULL)
 		return KCERR_END_OF_SESSION;
@@ -542,9 +446,9 @@ ECRESULT ECSessionManager::CreateAuthSession(struct soap *soap, unsigned int ulC
 	if (bLockSession)
 	        lpAuthSession->Lock();
 	if (bRegisterSession) {
-		pthread_rwlock_wrlock(&m_hCacheRWLock);
+		std::unique_lock<KC::shared_mutex> l_cache(m_hCacheRWLock);
 		m_mapSessions.insert( SESSIONMAP::value_type(newSessionID, lpAuthSession) );
-		pthread_rwlock_unlock(&m_hCacheRWLock);
+		l_cache.unlock();
 		g_lpStatsCollector->Increment(SCN_SESSIONS_CREATED);
 	}
 
@@ -553,27 +457,31 @@ ECRESULT ECSessionManager::CreateAuthSession(struct soap *soap, unsigned int ulC
 	return erSuccess;
 }
 
-ECRESULT ECSessionManager::CreateSession(struct soap *soap, char *szName, char *szPassword, char *szImpersonateUser, char *szClientVersion, char *szClientApp, const char *szClientAppVersion, const char *szClientAppMisc, unsigned int ulCapabilities, ECSESSIONGROUPID sessionGroupID, ECSESSIONID *lpSessionID, ECSession **lppSession, bool fLockSession, bool fAllowUidAuth)
+ECRESULT ECSessionManager::CreateSession(struct soap *soap, const char *szName,
+    const char *szPassword, const char *szImpersonateUser,
+    const char *szClientVersion, const char *szClientApp,
+    const char *szClientAppVersion, const char *szClientAppMisc,
+    unsigned int ulCapabilities, ECSESSIONGROUPID sessionGroupID,
+    ECSESSIONID *lpSessionID, ECSession **lppSession, bool fLockSession,
+    bool fAllowUidAuth)
 {
 	ECRESULT		er			= erSuccess;
-	ECAuthSession	*lpAuthSession	= NULL;
+	std::unique_ptr<ECAuthSession> lpAuthSession;
 	ECSession		*lpSession	= NULL;
 	const char		*method = "error";
 	std::string		from;
-	CONNECTION_TYPE ulType;
+	CONNECTION_TYPE ulType = SOAP_CONNECTION_TYPE(soap);
 
-	ulType = SOAP_CONNECTION_TYPE(soap);
-	if (ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY) {
+	if (ulType == CONNECTION_TYPE_NAMED_PIPE_PRIORITY)
 		from = string("file://") + m_lpConfig->GetSetting("server_pipe_priority");
-	} else if (ulType == CONNECTION_TYPE_NAMED_PIPE) {
-		// connected through unix socket
+	else if (ulType == CONNECTION_TYPE_NAMED_PIPE)
+		// connected through Unix socket
 		from = string("file://") + m_lpConfig->GetSetting("server_pipe_name");
-	} else {
+	else
 		// connected over network
 		from = soap->host;
-	}
 
-	er = this->CreateAuthSession(soap, ulCapabilities, lpSessionID, &lpAuthSession, false, false);
+	er = this->CreateAuthSession(soap, ulCapabilities, lpSessionID, &unique_tie(lpAuthSession), false, false);
 	if (er != erSuccess)
 		goto exit;
 
@@ -611,13 +519,14 @@ ECRESULT ECSessionManager::CreateSession(struct soap *soap, char *szName, char *
 
 authenticated:
 	ec_log_debug("User \"%s\" from \"%s\" authenticated through \"%s\" using program %s", szName, from.c_str(), method, szClientApp ? szClientApp : "<unknown>");
-	if (strcmp(KOPANO_SYSTEM_USER, szName) != 0) {
+	if (strcmp(KOPANO_SYSTEM_USER, szName) != 0)
 		/* Do not log successful SYSTEM logins */
 		ZLOG_AUDIT(m_lpAudit, "authenticate ok user='%s' from='%s' method='%s' program='%s'",
 				  szName, from.c_str(), method, szClientApp ? szClientApp : "<unknown>");
-	}
 
-	er = RegisterSession(lpAuthSession, sessionGroupID, szClientVersion, szClientApp, szClientAppVersion, szClientAppMisc, lpSessionID, &lpSession, fLockSession);
+	er = RegisterSession(lpAuthSession.get(), sessionGroupID,
+	     szClientVersion, szClientApp, szClientAppVersion, szClientAppMisc,
+	     lpSessionID, &lpSession, fLockSession);
 	if (er != erSuccess) {
 		if (er == KCERR_NO_ACCESS && szImpersonateUser != NULL && *szImpersonateUser != '\0') {
 			ec_log_err("Failed attempt to impersonate user \"%s\" by user \"%s\"", szImpersonateUser, szName);
@@ -639,13 +548,16 @@ authenticated:
 	}
 
 exit:
-	delete lpAuthSession;
 	*lppSession = lpSession;
 
 	return er;
 }
 
-ECRESULT ECSessionManager::RegisterSession(ECAuthSession *lpAuthSession, ECSESSIONGROUPID sessionGroupID, char *szClientVersion, char *szClientApp, const char *szClientApplicationVersion, const char *szClientApplicationMisc, ECSESSIONID *lpSessionID, ECSession **lppSession, bool fLockSession)
+ECRESULT ECSessionManager::RegisterSession(ECAuthSession *lpAuthSession,
+    ECSESSIONGROUPID sessionGroupID, const char *szClientVersion,
+    const char *szClientApp, const char *szClientApplicationVersion,
+    const char *szClientApplicationMisc, ECSESSIONID *lpSessionID,
+    ECSession **lppSession, bool fLockSession)
 {
 	ECRESULT	er = erSuccess;
 	ECSession	*lpSession = NULL;
@@ -658,11 +570,10 @@ ECRESULT ECSessionManager::RegisterSession(ECAuthSession *lpAuthSession, ECSESSI
 	if (fLockSession)
 		lpSession->Lock();
 
-	pthread_rwlock_wrlock(&m_hCacheRWLock);
+	std::unique_lock<KC::shared_mutex> l_cache(m_hCacheRWLock);
 	m_mapSessions.insert( SESSIONMAP::value_type(newSID, lpSession) );
-	pthread_rwlock_unlock(&m_hCacheRWLock);
-
-	*lpSessionID = newSID;
+	l_cache.unlock();
+	*lpSessionID = std::move(newSID);
 	*lppSession = lpSession;
 
 	g_lpStatsCollector->Increment(SCN_SESSIONS_CREATED);
@@ -678,7 +589,9 @@ ECRESULT ECSessionManager::CreateSessionInternal(ECSession **lppSession, unsigne
 
 	CreateSessionID(KOPANO_CAP_LARGE_SESSIONID, &newSID);
 
-	lpSession = new(std::nothrow) ECSession("<internal>", newSID, 0, m_lpDatabaseFactory, this, 0, false, ECSession::METHOD_NONE, 0, "internal", "kopano-server", "", "");
+	lpSession = new(std::nothrow) ECSession("<internal>", newSID, 0,
+	            m_lpDatabaseFactory, this, 0, ECSession::METHOD_NONE, 0,
+	            "internal", "kopano-server", "", "");
 	if (lpSession == NULL)
 		return KCERR_LOGON_FAILED;
 	er = lpSession->GetSecurity()->SetUserContext(ulUserId, EC_NO_IMPERSONATOR);
@@ -714,7 +627,7 @@ ECRESULT ECSessionManager::RemoveSession(ECSESSIONID sessionID){
 	g_lpStatsCollector->Increment(SCN_SESSIONS_DELETED);
 
 	// Make sure no other thread can read or write the sessions list
-	pthread_rwlock_wrlock(&m_hCacheRWLock);
+	std::unique_lock<KC::shared_mutex> l_cache(m_hCacheRWLock);
 
 	// Get a session, don't lock it ourselves
 	lpSession = GetSession(sessionID, false);
@@ -722,9 +635,7 @@ ECRESULT ECSessionManager::RemoveSession(ECSESSIONID sessionID){
 	// Remove the session from the list. No other threads can start new
 	// requests on the session after this point
 	m_mapSessions.erase(sessionID);
-
-	// Release the mutex, other threads can now access the (updated) sessions list
-	pthread_rwlock_unlock(&m_hCacheRWLock);
+	l_cache.unlock();
 
 	// We know for sure that no other thread is attempting to remove the session
 	// at this time because it would not have been in the m_mapSessions map
@@ -758,10 +669,7 @@ ECRESULT ECSessionManager::RemoveSession(ECSESSIONID sessionID){
  */
 ECRESULT ECSessionManager::AddNotification(notification *notifyItem, unsigned int ulKey, unsigned int ulStore, unsigned int ulFolderId, unsigned int ulFlags) {
 	
-	EC_SESSIONGROUPMAP::const_iterator iIterator;
-	std::multimap<unsigned int, ECSESSIONGROUPID>::const_iterator iterObjectSubscription;
 	std::set<ECSESSIONGROUPID> setGroups;
-	std::set<ECSESSIONGROUPID>::const_iterator iterGroups;
 	
 	ECRESULT				hr = erSuccess;
 	
@@ -771,144 +679,124 @@ ECRESULT ECSessionManager::AddNotification(notification *notifyItem, unsigned in
 			return hr;
 	}
 
-	pthread_mutex_lock(&m_mutexObjectSubscriptions);
-
 	// Send notification to subscribed sessions
-	iterObjectSubscription = m_mapObjectSubscriptions.lower_bound(ulStore);
-	while(iterObjectSubscription != m_mapObjectSubscriptions.end() && iterObjectSubscription->first == ulStore) {
+	ulock_normal l_sub(m_mutexObjectSubscriptions);
+	auto iterObjectSubscription = m_mapObjectSubscriptions.lower_bound(ulStore);
+	while (iterObjectSubscription != m_mapObjectSubscriptions.cend() &&
+	       iterObjectSubscription->first == ulStore) {
 		// Send a notification only once to a session group, even if it has subscribed multiple times
 		setGroups.insert(iterObjectSubscription->second);
 		++iterObjectSubscription;
 	}
-	
-	pthread_mutex_unlock(&m_mutexObjectSubscriptions);
+	l_sub.unlock();
 
 	// Send each subscribed session group one notification
-	for (iterGroups = setGroups.begin(); iterGroups != setGroups.end(); ++iterGroups) {
-		pthread_rwlock_rdlock(&m_hGroupLock);
-		iIterator = m_mapSessionGroups.find(*iterGroups);
-		if(iIterator != m_mapSessionGroups.end())
+	for (const auto &grp : setGroups) {
+		KC::shared_lock<KC::shared_mutex> grplk(m_hGroupLock);
+		auto iIterator = m_mapSessionGroups.find(grp);
+		if (iIterator != m_mapSessionGroups.cend())
 			iIterator->second->AddNotification(notifyItem, ulKey, ulStore);
-		pthread_rwlock_unlock(&m_hGroupLock);
 	}
 	
 	// Next, do an internal notification to update searchfolder views for message updates.
-	if(notifyItem->obj && notifyItem->obj->ulObjType == MAPI_MESSAGE) {
-		if (ulFolderId == 0 && ulFlags == 0 ) {
-			if(GetCacheManager()->GetObject(ulKey, &ulFolderId, NULL, &ulFlags, NULL) != erSuccess) {
-				ASSERT(FALSE);
-				return hr;
-			}
-		}
-            
-        // Skip changes on associated messages, and changes on deleted item. (but include DELETE of deleted items)
-        if((ulFlags & MAPI_ASSOCIATED) || (notifyItem->ulEventType != fnevObjectDeleted && (ulFlags & MSGFLAG_DELETED)))
-			return hr;
+	if (notifyItem->obj == nullptr || notifyItem->obj->ulObjType != MAPI_MESSAGE)
+		return hr;
 
-		switch(notifyItem->ulEventType) {
-		case fnevObjectMoved:
-		    // Only update the item in the new folder. The system will automatically delete the item from folders that were not in the search path
-			m_lpSearchFolders->UpdateSearchFolders(ulStore, ulFolderId, ulKey, ECKeyTable::TABLE_ROW_MODIFY);
-			break;
-		case fnevObjectDeleted:
-			m_lpSearchFolders->UpdateSearchFolders(ulStore, ulFolderId, ulKey, ECKeyTable::TABLE_ROW_DELETE);
-			break;
-		case fnevObjectCreated:
-			m_lpSearchFolders->UpdateSearchFolders(ulStore, ulFolderId, ulKey, ECKeyTable::TABLE_ROW_ADD);
-			break;
-		case fnevObjectCopied:
-			m_lpSearchFolders->UpdateSearchFolders(ulStore, ulFolderId, ulKey, ECKeyTable::TABLE_ROW_ADD);
-			break;
-		case fnevObjectModified:
-			m_lpSearchFolders->UpdateSearchFolders(ulStore, ulFolderId, ulKey, ECKeyTable::TABLE_ROW_MODIFY);
-			break;
-		}
+	if (ulFolderId == 0 && ulFlags == 0 &&
+	    GetCacheManager()->GetObject(ulKey, &ulFolderId, NULL, &ulFlags, NULL) != erSuccess) {
+		assert(false);
+		return hr;
+	}
+
+	// Skip changes on associated messages, and changes on deleted item. (but include DELETE of deleted items)
+	if ((ulFlags & MAPI_ASSOCIATED) || (notifyItem->ulEventType != fnevObjectDeleted && (ulFlags & MSGFLAG_DELETED)))
+		return hr;
+
+	switch (notifyItem->ulEventType) {
+	case fnevObjectMoved:
+		// Only update the item in the new folder. The system will automatically delete the item from folders that were not in the search path
+		m_lpSearchFolders->UpdateSearchFolders(ulStore, ulFolderId, ulKey, ECKeyTable::TABLE_ROW_MODIFY);
+		break;
+	case fnevObjectDeleted:
+		m_lpSearchFolders->UpdateSearchFolders(ulStore, ulFolderId, ulKey, ECKeyTable::TABLE_ROW_DELETE);
+		break;
+	case fnevObjectCreated:
+		m_lpSearchFolders->UpdateSearchFolders(ulStore, ulFolderId, ulKey, ECKeyTable::TABLE_ROW_ADD);
+		break;
+	case fnevObjectCopied:
+		m_lpSearchFolders->UpdateSearchFolders(ulStore, ulFolderId, ulKey, ECKeyTable::TABLE_ROW_ADD);
+		break;
+	case fnevObjectModified:
+		m_lpSearchFolders->UpdateSearchFolders(ulStore, ulFolderId, ulKey, ECKeyTable::TABLE_ROW_MODIFY);
+		break;
 	}
 	return hr;
 }
 
 void* ECSessionManager::SessionCleaner(void *lpTmpSessionManager)
 {
-	SESSIONMAP::const_iterator iIterator, iRemove;
 	time_t					lCurTime;
 	ECSessionManager*		lpSessionManager = (ECSessionManager *)lpTmpSessionManager;
-	int						lResult;
-	struct timeval			now;
-	struct timespec			timeout;
 	list<BTSession*>		lstSessions;
 
-	if(lpSessionManager == NULL) {
+	if (lpSessionManager == NULL)
 		return 0;
-	}
 
 	ECDatabase *db = NULL;
 	if (GetThreadLocalDatabase(lpSessionManager->m_lpDatabaseFactory, &db) != erSuccess)
 		ec_log_err("GTLD failed in SessionCleaner");
 
 	while(true){
-		pthread_rwlock_wrlock(&lpSessionManager->m_hCacheRWLock);
-
+		std::unique_lock<KC::shared_mutex> l_cache(lpSessionManager->m_hCacheRWLock);
 		lCurTime = GetProcessTime();
 		
 		// Find a session that has timed out
-		iIterator = lpSessionManager->m_mapSessions.begin();
-		while( iIterator != lpSessionManager->m_mapSessions.end() ) {
-			if((iIterator->second->GetSessionTime()) < lCurTime && !lpSessionManager->IsSessionPersistent(iIterator->first)){
-				// Remember all the session to be deleted
-				lstSessions.push_back(iIterator->second);
-
-				iRemove = iIterator++;
-				// Remove the session from the list, no new threads can start on this session after this point.
-				g_lpStatsCollector->Increment(SCN_SESSIONS_TIMEOUT);
-				ec_log_info("End of session (timeout) %llu",
-					static_cast<unsigned long long>(iRemove->first));
-				lpSessionManager->m_mapSessions.erase(iRemove);
-			} else {
+		auto iIterator = lpSessionManager->m_mapSessions.begin();
+		while (iIterator != lpSessionManager->m_mapSessions.cend()) {
+			bool del = iIterator->second->GetSessionTime() < lCurTime &&
+			           !lpSessionManager->IsSessionPersistent(iIterator->first);
+			if (!del) {
 				++iIterator;
+				continue;
 			}
+			// Remember all the session to be deleted
+			lstSessions.push_back(iIterator->second);
+			auto iRemove = iIterator++;
+			// Remove the session from the list, no new threads can start on this session after this point.
+			g_lpStatsCollector->Increment(SCN_SESSIONS_TIMEOUT);
+			ec_log_info("End of session (timeout) %llu",
+				static_cast<unsigned long long>(iRemove->first));
+			lpSessionManager->m_mapSessions.erase(iRemove);
 		}
 
 		// Release ownership of the rwlock object. This makes sure all threads are free to run (and exit).
-		pthread_rwlock_unlock(&lpSessionManager->m_hCacheRWLock);
+		l_cache.unlock();
 
 		// Now, remove all the session. It will wait until all running threads for that session have exited.
-		for (std::list<BTSession *>::const_iterator iSessions = lstSessions.begin();
-		     iSessions != lstSessions.end(); ++iSessions)
-		{
-			if((*iSessions)->Shutdown(5 * 60 * 1000) == erSuccess) 
-				delete *iSessions;
-			else {
+		for (const auto ses : lstSessions) {
+			if (ses->Shutdown(5 * 60 * 1000) == erSuccess)
+				delete ses;
+			else
 				// The session failed to shut down within our timeout period. This means we probably hit a bug; this
 				// should only happen if some bit of code has locked the session and failed to unlock it. There are now
 				// two options: delete the session anyway and hope we don't segfault, or leak the session. We choose
 				// the latter.
 				ec_log_err("Session failed to shut down: skipping clean");
-			}
 		}
 
 		lstSessions.clear();
-		kcsrv::sync_logon_times(db);
+		KC::sync_logon_times(db);
 
 		// Wait for a terminate signal or return after a few minutes
-		pthread_mutex_lock(&lpSessionManager->m_hExitMutex);
+		ulock_normal l_exit(lpSessionManager->m_hExitMutex);
 		if(lpSessionManager->bExit) {
-			pthread_mutex_unlock(&lpSessionManager->m_hExitMutex);
+			l_exit.unlock();
 			break;
 		}
-
-		gettimeofday(&now,NULL); // null==timezone
-		timeout.tv_sec = now.tv_sec + 5;
-		timeout.tv_nsec = now.tv_usec * 1000;
-
-		lResult = pthread_cond_timedwait(&lpSessionManager->m_hExitSignal, &lpSessionManager->m_hExitMutex, &timeout);
-
-		if (lResult != ETIMEDOUT) {
-			pthread_mutex_unlock(&lpSessionManager->m_hExitMutex);
+		if (lpSessionManager->m_hExitSignal.wait_for(l_exit,
+		    std::chrono::seconds(5)) != std::cv_status::timeout)
 			break;
-		}
-		pthread_mutex_unlock(&lpSessionManager->m_hExitMutex);
 	}
-
 	return NULL;
 }
 
@@ -951,36 +839,30 @@ ECRESULT ECSessionManager::UpdateTables(ECKeyTable::UpdateType ulType, unsigned 
 
 ECRESULT ECSessionManager::UpdateSubscribedTables(ECKeyTable::UpdateType ulType, TABLESUBSCRIPTION sSubscription, std::list<unsigned int> &lstChildId)
 {
-	SESSIONMAP::const_iterator iterSession;
 	ECRESULT		er = erSuccess;
 	std::set<ECSESSIONID> setSessions;
-	std::set<ECSESSIONID>::const_iterator iterSubscribedSession;
-	std::multimap<TABLESUBSCRIPTION, ECSESSIONID>::const_iterator iterSubscriptions;
-
 	BTSession	*lpBTSession = NULL;
 		
     // Find out which sessions our interested in this event by looking at our subscriptions
-    pthread_mutex_lock(&m_mutexTableSubscriptions);
+	ulock_normal l_sub(m_mutexTableSubscriptions);
     
-    iterSubscriptions = m_mapTableSubscriptions.find(sSubscription);
-    while(iterSubscriptions != m_mapTableSubscriptions.end() && iterSubscriptions->first == sSubscription) {
+	auto iterSubscriptions = m_mapTableSubscriptions.find(sSubscription);
+	while (iterSubscriptions != m_mapTableSubscriptions.cend() &&
+	       iterSubscriptions->first == sSubscription) {
         setSessions.insert(iterSubscriptions->second);
         ++iterSubscriptions;
     }
-    
-    pthread_mutex_unlock(&m_mutexTableSubscriptions);
+	l_sub.unlock();
 
     // We now have a set of sessions that are interested in the notification. This list is normally quite small since not that many
     // sessions have the same table opened at one time.
 
     // For each of the sessions that are interested, send the table change
-	for (iterSubscribedSession = setSessions.begin();
-	     iterSubscribedSession != setSessions.end();
-	     ++iterSubscribedSession) {
+	for (const auto &ses : setSessions) {
 		// Get session
-		pthread_rwlock_rdlock(&m_hCacheRWLock);
-		lpBTSession = GetSession(*iterSubscribedSession, true);
-		pthread_rwlock_unlock(&m_hCacheRWLock);
+		KC::shared_lock<KC::shared_mutex> l_cache(m_hCacheRWLock);
+		lpBTSession = GetSession(ses, true);
+		l_cache.unlock();
 	    
 	    // Send the change notification
 	    if(lpBTSession != NULL) {
@@ -1014,7 +896,7 @@ ECRESULT ECSessionManager::NotificationDeleted(unsigned int ulObjType, unsigned 
 	if(ulObjType != MAPI_MESSAGE && ulObjType != MAPI_FOLDER && ulObjType != MAPI_STORE)
 		goto exit;
 
-	notify.obj = new notificationObject;
+	notify.obj = s_alloc<notificationObject>(nullptr);
 	memset(notify.obj, 0, sizeof(notificationObject));	
 	
 	notify.ulEventType			= fnevObjectDeleted;
@@ -1046,8 +928,7 @@ ECRESULT ECSessionManager::NotificationModified(unsigned int ulObjType, unsigned
 
 	if(ulObjType != MAPI_MESSAGE && ulObjType != MAPI_FOLDER && ulObjType != MAPI_STORE)
 		goto exit;
-
-	notify.obj = new notificationObject;
+	notify.obj = s_alloc<notificationObject>(nullptr);
 	memset(notify.obj, 0, sizeof(notificationObject));
 	
 	notify.ulEventType			= fnevObjectModified;
@@ -1080,8 +961,7 @@ ECRESULT ECSessionManager::NotificationCreated(unsigned int ulObjType, unsigned 
 
 	if(ulObjType != MAPI_MESSAGE && ulObjType != MAPI_FOLDER && ulObjType != MAPI_STORE)
 		goto exit;
-
-	notify.obj = new notificationObject;
+	notify.obj = s_alloc<notificationObject>(nullptr);
 	memset(notify.obj, 0, sizeof(notificationObject));
 
 	notify.ulEventType			= fnevObjectCreated;
@@ -1113,8 +993,7 @@ ECRESULT ECSessionManager::NotificationMoved(unsigned int ulObjType, unsigned in
 
 	if(ulObjType != MAPI_MESSAGE && ulObjType != MAPI_FOLDER && ulObjType != MAPI_STORE)
 		goto exit;
-
-	notify.obj = new notificationObject;
+	notify.obj = s_alloc<notificationObject>(nullptr);
 	memset(notify.obj, 0, sizeof(notificationObject));
 
 	notify.ulEventType				= fnevObjectMoved;	
@@ -1153,8 +1032,7 @@ ECRESULT ECSessionManager::NotificationCopied(unsigned int ulObjType, unsigned i
 
 	if(ulObjType != MAPI_MESSAGE && ulObjType != MAPI_FOLDER && ulObjType != MAPI_STORE)
 		goto exit;
-
-	notify.obj = new notificationObject;
+	notify.obj = s_alloc<notificationObject>(nullptr);
 	memset(notify.obj, 0, sizeof(notificationObject));
 
 	notify.ulEventType				= fnevObjectCopied;
@@ -1202,8 +1080,7 @@ ECRESULT ECSessionManager::NotificationSearchComplete(unsigned int ulObjId, unsi
 	struct notification notify;
 
 	memset(&notify, 0, sizeof(notification));
-
-	notify.obj = new notificationObject;
+	notify.obj = s_alloc<notificationObject>(nullptr);
 	memset(notify.obj, 0, sizeof(notificationObject));
 
 	notify.ulEventType				= fnevSearchComplete;
@@ -1223,20 +1100,13 @@ exit:
 
 ECRESULT ECSessionManager::NotificationChange(const set<unsigned int> &syncIds, unsigned int ulChangeId, unsigned int ulChangeType)
 {
-	ECRESULT					er = erSuccess;
-	EC_SESSIONGROUPMAP::const_iterator iIterator;
-	
-	pthread_rwlock_rdlock(&m_hGroupLock);
+	KC::shared_lock<KC::shared_mutex> grplk(m_hGroupLock);
 
 	// Send the notification to all sessionsgroups so that any client listening for these
 	// notifications can receive them
-	for (iIterator = m_mapSessionGroups.begin();
-	     iIterator != m_mapSessionGroups.end(); ++iIterator)
-		iIterator->second->AddChangeNotification(syncIds, ulChangeId, ulChangeType);
-	
-	pthread_rwlock_unlock(&m_hGroupLock);
-
-	return er;
+	for (const auto &p : m_mapSessionGroups)
+		p.second->AddChangeNotification(syncIds, ulChangeId, ulChangeType);
+	return erSuccess;
 }
 
 /**
@@ -1283,59 +1153,44 @@ void ECSessionManager::GetStats(void(callback)(const std::string &, const std::s
  */
 void ECSessionManager::GetStats(sSessionManagerStats &sStats)
 {
-	SESSIONMAP::const_iterator iIterator;
-	EC_SESSIONGROUPMAP::const_iterator itersg;
 	list<ECSession*> vSessions;
 
 	memset(&sStats, 0, sizeof(sSessionManagerStats));
 
 	// Get session data
-	pthread_rwlock_rdlock(&m_hCacheRWLock);
-
+	KC::shared_lock<KC::shared_mutex> l_cache(m_hCacheRWLock);
 	sStats.session.ulItems = m_mapSessions.size();
 	sStats.session.ullSize = MEMORY_USAGE_MAP(sStats.session.ulItems, SESSIONMAP);
-
-	pthread_rwlock_unlock(&m_hCacheRWLock);
+	l_cache.unlock();
 
 	// Get group data
-	pthread_rwlock_rdlock(&m_hGroupLock);
-	
+	KC::shared_lock<KC::shared_mutex> l_group(m_hGroupLock);
 	sStats.group.ulItems = m_mapSessionGroups.size();
 	sStats.group.ullSize = MEMORY_USAGE_HASHMAP(sStats.group.ulItems, EC_SESSIONGROUPMAP);
 
-	for (itersg = m_mapSessionGroups.begin();
-	     itersg != m_mapSessionGroups.end(); ++itersg)
-		sStats.group.ullSize += itersg->second->GetObjectSize();
-
-	pthread_rwlock_unlock(&m_hGroupLock);
+	for (const auto &psg : m_mapSessionGroups)
+		sStats.group.ullSize += psg.second->GetObjectSize();
+	l_group.unlock();
 
 	// persistent connections/sessions
-	pthread_mutex_lock(&m_mutexPersistent);
-
+	ulock_normal l_per(m_mutexPersistent);
 	sStats.ulPersistentByConnection = m_mapPersistentByConnection.size();
 	sStats.ulPersistentByConnectionSize = MEMORY_USAGE_HASHMAP(sStats.ulPersistentByConnection, PERSISTENTBYCONNECTION);
-
 	sStats.ulPersistentBySession = m_mapPersistentBySession.size();
 	sStats.ulPersistentBySessionSize = MEMORY_USAGE_HASHMAP(sStats.ulPersistentBySession, PERSISTENTBYSESSION);
-
-	pthread_mutex_unlock(&m_mutexPersistent);
+	l_per.unlock();
 
 	// Table subscriptions
-	pthread_mutex_lock(&m_mutexTableSubscriptions);
-	
+	ulock_normal l_tblsub(m_mutexTableSubscriptions);
 	sStats.ulTableSubscriptions = m_mapTableSubscriptions.size();
 	sStats.ulTableSubscriptionSize = MEMORY_USAGE_MULTIMAP(sStats.ulTableSubscriptions, TABLESUBSCRIPTIONMULTIMAP);
-
-	pthread_mutex_unlock(&m_mutexTableSubscriptions);
+	l_tblsub.unlock();
 
 	// Object subscriptions
-	pthread_mutex_lock(&m_mutexObjectSubscriptions);
-
+	ulock_normal l_objsub(m_mutexObjectSubscriptions);
 	sStats.ulObjectSubscriptions = m_mapObjectSubscriptions.size();
 	sStats.ulObjectSubscriptionSize = MEMORY_USAGE_MULTIMAP(sStats.ulObjectSubscriptions, OBJECTSUBSCRIPTIONSMULTIMAP);
-
-	pthread_mutex_unlock(&m_mutexObjectSubscriptions);
-
+	l_objsub.unlock();
 }
 
 /**
@@ -1400,21 +1255,17 @@ ECRESULT ECSessionManager::GetNewSourceKey(SOURCEKEY* lpSourceKey){
 	if (lpSourceKey == NULL)
 		return KCERR_INVALID_PARAMETER;
 	
-	pthread_mutex_lock(&m_hSourceKeyAutoIncrementMutex);
-	
+	scoped_lock l_inc(m_hSourceKeyAutoIncrementMutex);
 	if (m_ulSourceKeyQueue == 0) {
 		er = SaveSourceKeyAutoIncrement(m_ullSourceKeyAutoIncrement + 50);
-		if(er != erSuccess) {
-			pthread_mutex_unlock(&m_hSourceKeyAutoIncrementMutex);
+		if (er != erSuccess)
 			return er;
-		}
 		m_ulSourceKeyQueue = 50;
 	}
 
 	*lpSourceKey = SOURCEKEY(*m_lpServerGuid, m_ullSourceKeyAutoIncrement + 1);
 	++m_ullSourceKeyAutoIncrement;
 	--m_ulSourceKeyQueue;
-	pthread_mutex_unlock(&m_hSourceKeyAutoIncrementMutex);
 	return erSuccess;
 }
 
@@ -1433,61 +1284,39 @@ ECRESULT ECSessionManager::SaveSourceKeyAutoIncrement(unsigned long long ullNewS
 
 ECRESULT ECSessionManager::SetSessionPersistentConnection(ECSESSIONID sessionID, unsigned int ulPersistentConnectionId)
 {
-	ECRESULT er = erSuccess;
-
-	pthread_mutex_lock(&m_mutexPersistent);
-
+	scoped_lock lock(m_mutexPersistent);
 	// maintain a bi-map of connection <-> session here
 	m_mapPersistentByConnection[ulPersistentConnectionId] = sessionID;
 	m_mapPersistentBySession[sessionID] = ulPersistentConnectionId;
-
-	pthread_mutex_unlock(&m_mutexPersistent);
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECSessionManager::RemoveSessionPersistentConnection(unsigned int ulPersistentConnectionId)
 {
 	ECRESULT er = erSuccess;
-	PERSISTENTBYCONNECTION::const_iterator iterConnection;
 	PERSISTENTBYSESSION::const_iterator iterSession;
+	scoped_lock lock(m_mutexPersistent);
 
-	pthread_mutex_lock(&m_mutexPersistent);
-
-	iterConnection = m_mapPersistentByConnection.find(ulPersistentConnectionId);
-	if(iterConnection == m_mapPersistentByConnection.end()) {
-		er = KCERR_NOT_FOUND; // shouldn't really happen
-		goto exit;
-	}
+	auto iterConnection = m_mapPersistentByConnection.find(ulPersistentConnectionId);
+	if (iterConnection == m_mapPersistentByConnection.cend())
+		// shouldn't really happen
+		return KCERR_NOT_FOUND;
 
 	iterSession = m_mapPersistentBySession.find(iterConnection->second);
-	if(iterSession == m_mapPersistentBySession.end()) {
-		er = KCERR_NOT_FOUND; // really really shouldn't happen
-		goto exit;
-	}
+	if (iterSession == m_mapPersistentBySession.cend())
+		// really really shouldn't happen
+		return KCERR_NOT_FOUND;
 
 	m_mapPersistentBySession.erase(iterSession);
 	m_mapPersistentByConnection.erase(iterConnection);
-
-exit:
-	pthread_mutex_unlock(&m_mutexPersistent);
-
 	return er;
 }
 
 BOOL ECSessionManager::IsSessionPersistent(ECSESSIONID sessionID)
 {
-	PERSISTENTBYSESSION::const_iterator iterSession;
-
-	pthread_mutex_lock(&m_mutexPersistent);
-	iterSession = m_mapPersistentBySession.find(sessionID);
-	pthread_mutex_unlock(&m_mutexPersistent);
-
-	if(iterSession == m_mapPersistentBySession.end()) {
-		return FALSE;
-	} else {
-		return TRUE;
-	}
+	scoped_lock lock(m_mutexPersistent);
+	auto iterSession = m_mapPersistentBySession.find(sessionID);
+	return iterSession != m_mapPersistentBySession.cend();
 }
 
 // @todo make this function with a map of seq ids
@@ -1505,20 +1334,16 @@ ECRESULT ECSessionManager::GetNewSequence(SEQUENCE seq, unsigned long long *lpll
 	else
 		return KCERR_INVALID_PARAMETER;
 
-	pthread_mutex_lock(&m_hSeqMutex);
+	scoped_lock lock(m_hSeqMutex);
 	if (m_ulSeqIMAPQueue == 0)
 	{
 		er = m_lpDatabase->DoSequence(strSeqName, 50, &m_ulSeqIMAP);
-		if (er != erSuccess) {
-			pthread_mutex_unlock(&m_hSeqMutex);
+		if (er != erSuccess)
 			return er;
-		}
 		m_ulSeqIMAPQueue = 50;
 	}
 	--m_ulSeqIMAPQueue;
 	*lpllSeqId = m_ulSeqIMAP++;
-
-	pthread_mutex_unlock(&m_hSeqMutex);
 	return erSuccess;
 }
 
@@ -1541,8 +1366,7 @@ ECRESULT ECSessionManager::SubscribeTableEvents(TABLE_ENTRY::TABLE_TYPE ulType, 
 {
     ECRESULT er = erSuccess;
     TABLESUBSCRIPTION sSubscription;
-    
-    pthread_mutex_lock(&m_mutexTableSubscriptions);
+	scoped_lock lock(m_mutexTableSubscriptions);
     
     sSubscription.ulType = ulType;
     sSubscription.ulRootObjectId = ulTableRootObjectId;
@@ -1550,9 +1374,6 @@ ECRESULT ECSessionManager::SubscribeTableEvents(TABLE_ENTRY::TABLE_TYPE ulType, 
     sSubscription.ulObjectFlags = ulObjectFlags;
     
     m_mapTableSubscriptions.insert(std::pair<TABLESUBSCRIPTION, ECSESSIONID>(sSubscription, sessionID));
-    
-    pthread_mutex_unlock(&m_mutexTableSubscriptions);
-    
     return er;
 }
 
@@ -1560,63 +1381,47 @@ ECRESULT ECSessionManager::UnsubscribeTableEvents(TABLE_ENTRY::TABLE_TYPE ulType
 {
     ECRESULT er = erSuccess;
     TABLESUBSCRIPTION sSubscription;
-    std::multimap<TABLESUBSCRIPTION, ECSESSIONID>::iterator iter;
-    
-    pthread_mutex_lock(&m_mutexTableSubscriptions);
+	scoped_lock lock(m_mutexTableSubscriptions);
     
     sSubscription.ulType = ulType;
     sSubscription.ulRootObjectId = ulTableRootObjectId;
     sSubscription.ulObjectType = ulObjectType;
     sSubscription.ulObjectFlags = ulObjectFlags;
     
-    iter = m_mapTableSubscriptions.find(sSubscription);
-    while(iter != m_mapTableSubscriptions.end() && iter->first == sSubscription) {
+    auto iter = m_mapTableSubscriptions.find(sSubscription);
+    while (iter != m_mapTableSubscriptions.cend() &&
+           iter->first == sSubscription) {
         if(iter->second == sessionID)
             break;
         ++iter;
     }
     
-    if(iter != m_mapTableSubscriptions.end()) {
+    if (iter != m_mapTableSubscriptions.cend())
         m_mapTableSubscriptions.erase(iter);
-    } else {
+    else
         er = KCERR_NOT_FOUND;
-    }
-    
-    pthread_mutex_unlock(&m_mutexTableSubscriptions);
-    
     return er;
 }
 
 // Subscribes for all object notifications in store ulStoreID for session group sessionID
 ECRESULT ECSessionManager::SubscribeObjectEvents(unsigned int ulStoreId, ECSESSIONGROUPID sessionID)
 {
-    ECRESULT er = erSuccess;
-    
-    pthread_mutex_lock(&m_mutexObjectSubscriptions);
+	scoped_lock lock(m_mutexObjectSubscriptions);
     m_mapObjectSubscriptions.insert(std::pair<unsigned int, ECSESSIONGROUPID>(ulStoreId, sessionID));
-    pthread_mutex_unlock(&m_mutexObjectSubscriptions);
-    
-    return er;
+    return erSuccess;
 }
 
 ECRESULT ECSessionManager::UnsubscribeObjectEvents(unsigned int ulStoreId, ECSESSIONGROUPID sessionID)
 {
     ECRESULT er = erSuccess;
-    std::multimap<unsigned int, ECSESSIONGROUPID>::iterator i;
-    
-    pthread_mutex_lock(&m_mutexObjectSubscriptions);
-    i = m_mapObjectSubscriptions.find(ulStoreId);
-    
-	while (i != m_mapObjectSubscriptions.end() && i->first == ulStoreId &&
-	    i->second != sessionID)
+	scoped_lock lock(m_mutexObjectSubscriptions);
+	auto i = m_mapObjectSubscriptions.find(ulStoreId);
+	while (i != m_mapObjectSubscriptions.cend() && i->first == ulStoreId &&
+	       i->second != sessionID)
 		++i;
     
-    if(i != m_mapObjectSubscriptions.end()) {
-        m_mapObjectSubscriptions.erase(i);
-    }
-
-    pthread_mutex_unlock(&m_mutexObjectSubscriptions);
-    
+	if (i != m_mapObjectSubscriptions.cend())
+		m_mapObjectSubscriptions.erase(i);
     return er;
 }
 
@@ -1638,38 +1443,26 @@ ECRESULT ECSessionManager::GetStoreSortLCID(ULONG ulStoreId, ULONG *lpLcid)
 {
 	ECRESULT		er = erSuccess;
 	ECDatabase		*lpDatabase = NULL;
-	DB_RESULT		lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 	DB_ROW			lpDBRow = NULL;
 	std::string		strQuery;
 
-	if (lpLcid == NULL) {
-		er = KCERR_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (lpLcid == nullptr)
+		return KCERR_INVALID_PARAMETER;
 	er = GetThreadLocalDatabase(m_lpDatabaseFactory, &lpDatabase);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	strQuery = "SELECT val_ulong FROM properties WHERE hierarchyid=" + stringify(ulStoreId) +
 				" AND tag=" + stringify(PROP_ID(PR_SORT_LOCALE_ID)) + " AND type=" + stringify(PROP_TYPE(PR_SORT_LOCALE_ID));
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
-	if (lpDBRow == NULL || lpDBRow[0] == NULL) {
-		er = KCERR_NOT_FOUND;
-		goto exit;
-	}
-
+	if (lpDBRow == nullptr || lpDBRow[0] == nullptr)
+		return KCERR_NOT_FOUND;
 	*lpLcid = strtoul(lpDBRow[0], NULL, 10);
-
-exit:
-	if (lpDBResult)
-		lpDatabase->FreeResult(lpDBResult);
-
-	return er;
+	return erSuccess;
 }
 
 LPCSTR ECSessionManager::GetDefaultSortLocaleID()
@@ -1705,9 +1498,8 @@ ECLocale ECSessionManager::GetSortLocale(ULONG ulStoreId)
 	LPCSTR			lpszLocaleId = NULL;
 
 	er = GetStoreSortLCID(ulStoreId, &ulLcid);
-	if (er == erSuccess) {
+	if (er == erSuccess)
 		er = LCIDToLocaleId(ulLcid, &lpszLocaleId);
-	}
 	if (er != erSuccess) {
 		lpszLocaleId = GetDefaultSortLocaleID();
 		if (lpszLocaleId == NULL || *lpszLocaleId == '\0')
@@ -1731,19 +1523,16 @@ ECRESULT ECSessionManager::RemoveBusyState(ECSESSIONID ecSessionId, pthread_t th
 	BTSession *lpSession = NULL;
 	ECSession *lpECSession = NULL;
 	
-	pthread_rwlock_rdlock(&m_hCacheRWLock);
-	
+	KC::shared_lock<KC::shared_mutex> l_cache(m_hCacheRWLock);
 	lpSession = GetSession(ecSessionId, true);
-
-	pthread_rwlock_unlock(&m_hCacheRWLock);
-
+	l_cache.unlock();
 	if(!lpSession)
 		goto exit;
 		
 	lpECSession = dynamic_cast<ECSession *>(lpSession);
 	
 	if(!lpECSession) {
-		ASSERT(lpECSession != NULL);
+		assert(lpECSession != NULL);
 		goto exit;
 	}
 	
@@ -1755,3 +1544,5 @@ exit:
 		
 	return er;
 }
+
+} /* namespace */

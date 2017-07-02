@@ -18,10 +18,14 @@
 #ifndef ECThreadPool_INCLUDED
 #define ECThreadPool_INCLUDED
 
+#include <condition_variable>
+#include <mutex>
 #include <pthread.h>
 #include <set>
 #include <list>
 #include <kopano/zcdefs.h>
+
+namespace KC {
 
 class ECTask;
 
@@ -30,7 +34,7 @@ class ECTask;
  * The amount of workers can be modified at run time, but is not automatically
  * adjusted based on the task queue length or age.
  */
-class ECThreadPool _zcp_final {
+class _kc_export ECThreadPool _kc_final {
 private:	// types
 	struct STaskInfo {
 		ECTask			*lpTask;
@@ -46,36 +50,28 @@ public:
 	virtual ~ECThreadPool(void);
 	
 	virtual bool dispatch(ECTask *lpTask, bool bTakeOwnership = false);
-	unsigned threadCount() const;
-	void setThreadCount(unsigned ulThreadCount, bool bWait = false);
-	
-	struct timeval queueAge() const;
-
-	bool waitForAllTasks(time_t timeout) const;
+	_kc_hidden unsigned int threadCount(void) const;
+	_kc_hidden void setThreadCount(unsigned int cuont, bool wait = false);
 	
 private:	// methods
-	virtual bool getNextTask(STaskInfo *lpsTaskInfo);
-	void joinTerminated();
+	_kc_hidden virtual bool getNextTask(STaskInfo *, std::unique_lock<std::mutex> &);
+	_kc_hidden void joinTerminated(std::unique_lock<std::mutex> &);
+	_kc_hidden static void *threadFunc(void *);
+	_kc_hidden static bool isCurrentThread(const pthread_t &);
 	
-private:	// static methods
-	static void *threadFunc(void *lpVoid);
-	static bool isCurrentThread(const pthread_t &hThread);
-	
-private:	// members
 	ThreadSet	m_setThreads;
 	ThreadSet	m_setTerminated;
 	TaskList	m_listTasks;
 	
-	mutable pthread_mutex_t	m_hMutex;
-	pthread_cond_t			m_hCondition;
-	pthread_cond_t			m_hCondTerminated;
-	mutable pthread_cond_t	m_hCondTaskDone;
+	mutable std::mutex m_hMutex;
+	std::condition_variable m_hCondition;
+	std::condition_variable m_hCondTerminated;
+	mutable std::condition_variable m_hCondTaskDone;
 
-private:
 	ECThreadPool(const ECThreadPool &) = delete;
 	ECThreadPool &operator=(const ECThreadPool &) = delete;
 	
-	unsigned	m_ulTermReq;
+	unsigned int m_ulTermReq = 0;
 };
 
 /**
@@ -93,17 +89,15 @@ inline unsigned ECThreadPool::threadCount() const {
  * has a free worker and all previously queued tasks have been processed. There's
  * no way of knowing when the task is done.
  */
-class ECTask
-{
+class _kc_export ECTask {
 public:
-	virtual ~ECTask(void) {};
-	virtual void execute();
-	
-	bool dispatchOn(ECThreadPool *lpThreadPool, bool bTransferOwnership = false);
+	_kc_hidden virtual ~ECTask(void) _kc_impdtor;
+	_kc_hidden virtual void execute(void);
+	_kc_hidden bool dispatchOn(ECThreadPool *, bool transfer_ownership = false);
 	
 protected:
-	virtual void run() = 0;
-	ECTask(void) {};
+	_kc_hidden virtual void run(void) = 0;
+	_kc_hidden ECTask(void) {};
 	
 private:
 	// Make the object non-copyable
@@ -131,8 +125,7 @@ inline bool ECTask::dispatchOn(ECThreadPool *lpThreadPool, bool bTransferOwnersh
  * derived object. It's similar to an ECTask, but one can wait for the task
  * to be finished.
  */
-class ECWaitableTask : public ECTask
-{
+class _kc_export ECWaitableTask : public ECTask {
 public:
 	static const unsigned WAIT_INFINITE = (unsigned)-1;
 	
@@ -142,19 +135,17 @@ public:
 		Done = 4
 	};
 	
-public:
 	virtual ~ECWaitableTask();
-	virtual void execute(void) _zcp_override;
-	
-	bool done() const;
+	virtual void execute(void) _kc_override;
+	_kc_hidden bool done(void) const;
 	bool wait(unsigned timeout = WAIT_INFINITE, unsigned waitMask = Done) const;
 	
 protected:
 	ECWaitableTask();
 
 private:
-	mutable pthread_mutex_t	m_hMutex;
-	mutable pthread_cond_t	m_hCondition;
+	mutable std::mutex m_hMutex;
+	mutable std::condition_variable m_hCondition;
 	State					m_state;
 };
 
@@ -173,8 +164,7 @@ inline bool ECWaitableTask::done() const {
  * To call a function with more than one argument boost::bind can be used.
  */
 template<typename _Rt, typename _Fn, typename _At>
-class ECDeferredFunc _zcp_final : public ECWaitableTask
-{
+class ECDeferredFunc _kc_final : public ECWaitableTask {
 public:
 	/**
 	 * Construct an ECDeferredFunc instance.
@@ -184,7 +174,7 @@ public:
 	ECDeferredFunc(_Fn fn, const _At &arg) : m_fn(fn), m_arg(arg)
 	{ }
 	
-	virtual void run(void) _zcp_override
+	virtual void run(void) _kc_override
 	{
 		m_result = m_fn(m_arg);
 	}
@@ -199,9 +189,11 @@ public:
 	}
 	
 private:
-	_Rt	m_result;
+	_Rt m_result = 0;
 	_Fn m_fn;
 	_At m_arg;
 };
+
+} /* namespace */
 
 #endif // ndef ECThreadPool_INCLUDED

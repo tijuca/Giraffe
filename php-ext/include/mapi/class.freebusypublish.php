@@ -38,7 +38,7 @@ class FreeBusyPublish {
 	 */
 	 
 	 
-	function FreeBusyPublish($session, $store, $calendar, $entryid)
+	function __construct($session, $store, $calendar, $entryid)
 	{
   		$properties["entryid"] = PR_ENTRYID;
   		$properties["parent_entryid"] = PR_PARENT_ENTRYID;
@@ -241,19 +241,16 @@ class FreeBusyPublish {
 		// $freebusy now contains the start, end and status of all items, merged.
 
 		// Get the FB interface
+		$fbsupport = false;
 		try {
 			$fbsupport = mapi_freebusysupport_open($this->session, $this->store);
 		} catch (MAPIException $e) {
-			if($e->getCode() == MAPI_E_NOT_FOUND) {
+			if ($e->getCode() == MAPI_E_NOT_FOUND)
 				$e->setHandled();
-				if(function_exists("dump")) {
-					dump("Error in opening freebusysupport object.");
-				}
-			}
 		}
 
 		// Open updater for this user
-		if(isset($fbsupport)) {
+		if ($fbsupport !== false) {
 			$updaters = mapi_freebusysupport_loadupdate($fbsupport, Array($this->entryid));
 
 			$updater = $updaters[0];
@@ -317,42 +314,36 @@ class FreeBusyPublish {
 		{
     		switch ($ts["type"])
 			{
-				case 0: // Start
-    				if ($level != 0 && $laststart != $ts["time"])
-    				{
-    					$newitem["start"] = $laststart;
-    					$newitem["end"] = $ts["time"];
-    					$newitem["subject"] = join(",", $csubj);
-    					$newitem["status"] = !empty($cbusy) ? max($cbusy) : 0;
-						if($newitem["status"] > 0)
-	    					$merged[] = $newitem;
-    				} 
-
-    				$level++;
-    				
-    				$csubj[] = $ts["subject"];
-    				$cbusy[] = $ts["status"];
-    				
-    				$laststart = $ts["time"];
-    				break;
-    			case 1: // End
-    				if ($laststart != $ts["time"])
-    				{
-    					$newitem["start"] = $laststart;
-    					$newitem["end"] = $ts["time"];
-    					$newitem["subject"] = join(",", $csubj);
-    					$newitem["status"] = !empty($cbusy) ? max($cbusy) : 0;
-						if($newitem["status"] > 0)
-	    					$merged[] = $newitem;
-    				} 
-    				
-    				$level--;
-
-    				array_splice($csubj, array_search($ts["subject"], $csubj, 1), 1);
-    				array_splice($cbusy, array_search($ts["status"], $cbusy, 1), 1);
-
-    				$laststart = $ts["time"];
-    				break;
+		case 0: // Start
+    			if ($level != 0 && $laststart != $ts["time"])
+    			{
+    				$newitem["start"] = $laststart;
+    				$newitem["end"] = $ts["time"];
+    				$newitem["subject"] = join(",", $csubj);
+    				$newitem["status"] = !empty($cbusy) ? max($cbusy) : 0;
+				if ($newitem["status"] > 0)
+	    				$merged[] = $newitem;
+    			}
+			$level++;
+			$csubj[] = $ts["subject"];
+			$cbusy[] = $ts["status"];
+			$laststart = $ts["time"];
+			break;
+		case 1: // End
+			if ($laststart != $ts["time"])
+			{
+				$newitem["start"] = $laststart;
+				$newitem["end"] = $ts["time"];
+				$newitem["subject"] = join(",", $csubj);
+				$newitem["status"] = !empty($cbusy) ? max($cbusy) : 0;
+				if ($newitem["status"] > 0)
+					$merged[] = $newitem;
+			}
+			$level--;
+			array_splice($csubj, array_search($ts["subject"], $csubj, 1), 1);
+			array_splice($cbusy, array_search($ts["status"], $cbusy, 1), 1);
+			$laststart = $ts["time"];
+			break;
     		} 
     	} 
 

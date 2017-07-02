@@ -19,7 +19,9 @@
 #define __STATSCLIENT_H__
 
 #include <kopano/zcdefs.h>
+#include <atomic>
 #include <map>
+#include <mutex>
 #include <string>
 #include <ctime>
 #include <sys/socket.h>
@@ -28,34 +30,35 @@
 
 #include <kopano/ECLogger.h>
 
-class StatsClient _zcp_final {
+namespace KC {
+
+class _kc_export StatsClient _kc_final {
 private:
-	int fd;
+	int fd = -1;
 	struct sockaddr_un addr;
-	int addr_len;
-	bool thread_running;
+	int addr_len = 0;
+	bool thread_running = false;
 	ECLogger *const logger;
 
 	pthread_t countsSubmitThread;
 public:
-	volatile bool terminate; // older compilers don't do atomic_bool
-	pthread_mutex_t mapsLock;
+	std::atomic<bool> terminate{false};
+	std::mutex mapsLock;
 	std::map<std::string, double> countsMapDouble;
 	std::map<std::string, int64_t> countsMapInt64;
 
-public:
 	StatsClient(ECLogger *);
 	~StatsClient();
 
 	int startup(const std::string &collector);
-	inline ECLogger *const getLogger() { return logger; }
-
+	_kc_hidden inline ECLogger *getLogger(void) { return logger; }
 	void countInc(const std::string & key, const std::string & key_sub);
-	void countAdd(const std::string & key, const std::string & key_sub, const double n);
+	_kc_hidden void countAdd(const std::string &key, const std::string &key_sub, double n);
 	void countAdd(const std::string & key, const std::string & key_sub, const int64_t n);
-
-	void submit(const std::string & key, const time_t ts, const double value);
-	void submit(const std::string & key, const time_t ts, const int64_t value);
+	_kc_hidden void submit(const std::string &key, time_t ts, double value);
+	_kc_hidden void submit(const std::string &key, time_t ts, int64_t value);
 };
+
+} /* namespace */
 
 #endif

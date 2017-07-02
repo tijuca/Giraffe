@@ -25,7 +25,11 @@
 #include <kopano/zcdefs.h>
 #include "soapH.h"
 
-class ECNotification _zcp_final {
+struct soap;
+
+namespace KC {
+
+class ECNotification _kc_final {
 public:
 	ECNotification();
 	virtual ~ECNotification();
@@ -47,5 +51,7 @@ private:
 	notification	*m_lpsNotification;
 
 };
+
+} /* namespace */
 
 #endif // #ifndef ECNOTIFICATION

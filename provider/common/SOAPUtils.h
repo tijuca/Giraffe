@@ -20,13 +20,15 @@
 
 #include "soapH.h"
 #include "SOAPAlloc.h"
+#include <kopano/zcdefs.h>
 #include <kopano/kcodes.h>
 #include <kopano/pcuser.hpp>
 #include <kopano/ustringutil.h>
 
 #include <list>
 #include <string>
-#include <pthread.h>
+
+namespace KC {
 
 // SortOrderSets
 extern void FreeSortOrderArray(struct sortOrderArray *lpsSortOrder);
@@ -78,8 +80,6 @@ ECRESULT			CopyNotificationStruct(struct soap *, const notification *from, notif
 ECRESULT			FreeNotificationArrayStruct(notificationArray *lpNotifyArray, bool bFreeBase);
 ECRESULT			CopyNotificationArrayStruct(notificationArray *lpNotifyArrayFrom, notificationArray *lpNotifyArrayTo);
 
-ECRESULT			FreeUserObjectArray(struct userobjectArray *lpUserobjectArray, bool bFreeBase);
-
 // Rights
 ECRESULT			FreeRightsArray(struct rightsArray *lpRights);
 ECRESULT			CopyRightsArrayToSoap(struct soap *soap, struct rightsArray *lpRightsArraySrc, struct rightsArray **lppRightsArrayDst);
@@ -96,8 +96,6 @@ ECRESULT			CopyCompanyDetailsToSoap(unsigned int ulId, entryId *lpCompanyEid, un
 ECRESULT			CopyCompanyDetailsFromSoap(struct company *lpCompany, std::string *lpstrExternId, unsigned int ulAdmin,
 											   objectdetails_t *details, struct soap *soap);
 
-ECRESULT			FreeNamedPropArray(struct namedPropArray *array, bool bFreeBase);
-
 ULONG 				NormalizePropTag(ULONG ulPropTag);
 
 const char *GetSourceAddr(struct soap *soap);
@@ -111,7 +109,7 @@ size_t NotificationStructSize(const notification *);
 size_t PropTagArraySize(const struct propTagArray *);
 size_t SortOrderArraySize(const struct sortOrderArray *);
 
-class DynamicPropValArray {
+class DynamicPropValArray _kc_final {
 public:
     DynamicPropValArray(struct soap *soap, unsigned int ulHint = 10);
     ~DynamicPropValArray();
@@ -128,14 +126,12 @@ private:
     struct soap *m_soap;
     struct propVal *m_lpPropVals;
     unsigned int m_ulCapacity;
-    unsigned int m_ulPropCount;
+	unsigned int m_ulPropCount = 0;
 };
 
-class DynamicPropTagArray {
+class DynamicPropTagArray _kc_final {
 public:
     DynamicPropTagArray(struct soap *soap);
-    ~DynamicPropTagArray();
-    
     ECRESULT AddPropTag(unsigned int ulPropTag);
     BOOL HasPropTag(unsigned int ulPropTag) const;
     
@@ -158,5 +154,7 @@ struct SOAPINFO {
 	double start;			// Start timestamp of when we started processing the request
 	const char *szFname;
 };
+
+} /* namespace */
 
 #endif

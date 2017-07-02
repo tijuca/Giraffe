@@ -23,8 +23,7 @@
 #include <vector>
 #include <set>
 #include <string>
-
-#include "ECICS.h"
+#include "ics_client.hpp"
 #include "ECMAPIProp.h"
 
 #include <kopano/ECLogger.h>
@@ -34,20 +33,18 @@
 
 #include "WSMessageStreamExporter.h"
 
-class ECExchangeExportChanges _zcp_final : public ECUnknown {
+class ECExchangeExportChanges _kc_final : public ECUnknown {
 protected:
 	ECExchangeExportChanges(ECMsgStore *lpStore, const std::string& strSK, const wchar_t *szDisplay, unsigned int ulSyncType);
 	virtual ~ECExchangeExportChanges();
 
 public:
 	static	HRESULT Create(ECMsgStore *lpStore, REFIID iid, const std::string& strSK, const wchar_t *szDisplay, unsigned int ulSyncType, LPEXCHANGEEXPORTCHANGES* lppExchangeExportChanges);
-
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
-
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 	virtual HRESULT GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
 	virtual HRESULT Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKNOWN lpCollector, LPSRestriction lpRestriction, LPSPropTagArray lpIncludeProps, LPSPropTagArray lpExcludeProps, ULONG ulBufferSize);
 	virtual HRESULT ConfigSelective(ULONG ulPropTag, LPENTRYLIST lpEntries, LPENTRYLIST lpParents, ULONG ulFlags, LPUNKNOWN lpCollector, LPSPropTagArray lpIncludeProps, LPSPropTagArray lpExcludeProps, ULONG ulBufferSize);
-	virtual HRESULT Synchronize(ULONG FAR * pulSteps, ULONG FAR * pulProgress);
+	virtual HRESULT Synchronize(ULONG *pulSteps, ULONG *pulProgress);
 	virtual HRESULT UpdateState(LPSTREAM lpStream);
 	
 	virtual HRESULT GetChangeCount(ULONG *lpcChanges);
@@ -57,23 +54,18 @@ public:
 private:
 	void LogMessageProps(int loglevel, ULONG cValues, LPSPropValue lpPropArray);
 
-private:
-	class xECExportChanges _zcp_final : public IECExportChanges {
-		// IUnknown
-		virtual ULONG __stdcall AddRef(void) _zcp_override;
-		virtual ULONG __stdcall Release(void) _zcp_override;
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _zcp_override;
+	class xECExportChanges _kc_final : public IECExportChanges {
+		#include <kopano/xclsfrag/IUnknown.hpp>
 
-		// IExchangeExportChanges
-		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
-		virtual HRESULT __stdcall Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKNOWN lpCollector, LPSRestriction lpRestriction, LPSPropTagArray lpIncludeProps, LPSPropTagArray lpExcludeProps, ULONG ulBufferSize);
-		virtual HRESULT __stdcall Synchronize(ULONG FAR * pulSteps, ULONG FAR * pulProgress);
-		virtual HRESULT __stdcall UpdateState(LPSTREAM lpStream);
-
-		virtual HRESULT __stdcall ConfigSelective(ULONG ulPropTag, LPENTRYLIST lpEntries, LPENTRYLIST lpParents, ULONG ulFlags, LPUNKNOWN lpCollector, LPSPropTagArray lpIncludeProps, LPSPropTagArray lpExcludeProps, ULONG ulBufferSize) _zcp_override;
-		virtual HRESULT __stdcall GetChangeCount(ULONG *lpcChanges) _zcp_override;
-		virtual HRESULT __stdcall SetMessageInterface(REFIID refiid) _zcp_override;
-		virtual HRESULT __stdcall SetLogger(ECLogger *lpLogger) _zcp_override;
+		// <kopano/xclsfrag/IExchangeExportChanges.hpp>
+		virtual HRESULT __stdcall GetLastError(HRESULT, ULONG flags, LPMAPIERROR *err) _kc_override;
+		virtual HRESULT __stdcall Config(LPSTREAM, ULONG flags, LPUNKNOWN collector, LPSRestriction, LPSPropTagArray inclprop, LPSPropTagArray exclprop, ULONG bufsize) _kc_override;
+		virtual HRESULT __stdcall Synchronize(ULONG *steps, ULONG *progress) _kc_override;
+		virtual HRESULT __stdcall UpdateState(LPSTREAM) _kc_override;
+		virtual HRESULT __stdcall ConfigSelective(ULONG proptag, LPENTRYLIST entries, LPENTRYLIST parents, ULONG flags, LPUNKNOWN collector, LPSPropTagArray inclprop, LPSPropTagArray exclprop, ULONG bufsize) _kc_override;
+		virtual HRESULT __stdcall GetChangeCount(ULONG *changes) _kc_override;
+		virtual HRESULT __stdcall SetMessageInterface(REFIID refiid) _kc_override;
+		virtual HRESULT __stdcall SetLogger(ECLogger *) _kc_override;
 	} m_xECExportChanges;
 	
 	HRESULT ExportMessageChanges();
@@ -87,25 +79,21 @@ private:
 	HRESULT ChangesToEntrylist(std::list<ICSCHANGE> * lpLstChanges, LPENTRYLIST * lppEntryList);
 
 	unsigned long	m_ulSyncType;
-	bool			m_bConfiged;
+	bool m_bConfiged = false;
 	ECMsgStore*		m_lpStore;
 	std::string		m_sourcekey;
 	std::wstring	m_strDisplay;
-	LPSTREAM		m_lpStream;
-	ULONG			m_ulFlags;
-	ULONG			m_ulSyncId;
-	ULONG			m_ulChangeId;
-	ULONG			m_ulStep;
-	ULONG			m_ulBatchSize;
-	ULONG			m_ulBufferSize;
-	ULONG			m_ulEntryPropTag;
+	IStream *m_lpStream = nullptr;
+	ULONG m_ulFlags = 0;
+	ULONG m_ulSyncId = 0, m_ulChangeId = 0;
+	ULONG m_ulStep = 0, m_ulBatchSize;
+	ULONG m_ulBufferSize = 0;
+	ULONG m_ulEntryPropTag = PR_SOURCE_KEY; // This is normally the tag that is sent to exportMessageChangeAsStream()
 
 	IID				m_iidMessage;
-
-	LPEXCHANGEIMPORTCONTENTSCHANGES		m_lpImportContents;
-	IECImportContentsChanges *m_lpImportStreamedContents;
-	LPEXCHANGEIMPORTHIERARCHYCHANGES	m_lpImportHierarchy;
-	
+	IExchangeImportContentsChanges *m_lpImportContents = nullptr;
+	IECImportContentsChanges *m_lpImportStreamedContents = nullptr;
+	IExchangeImportHierarchyChanges *m_lpImportHierarchy = nullptr;
 	WSMessageStreamExporterPtr			m_ptrStreamExporter;
 	
 	std::vector<ICSCHANGE> m_lstChange;
@@ -119,14 +107,11 @@ private:
 	typedef std::set<std::pair<unsigned int, std::string> > PROCESSEDCHANGESSET;
 	
 	PROCESSEDCHANGESSET m_setProcessedChanges;
-
-	ICSCHANGE *			m_lpChanges;
-	ULONG				m_ulChanges;
-	ULONG				m_ulMaxChangeId;
-	LPSRestriction		m_lpRestrict;
-
+	ICSCHANGE *m_lpChanges = nullptr;
+	ULONG m_ulChanges = 0, m_ulMaxChangeId = 0;
+	SRestriction *m_lpRestrict = nullptr;
 	ECLogger			*m_lpLogger;
-	clock_t				m_clkStart;
+	clock_t m_clkStart = 0;
 	struct tms			m_tmsStart;
 	
 	HRESULT AddProcessedChanges(ChangeList &lstChanges);

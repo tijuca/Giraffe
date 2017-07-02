@@ -21,33 +21,26 @@
 #include <kopano/zcdefs.h>
 #include <kopano/ECUnknown.h>
 
-class ECXPProvider : public ECUnknown
-{
+class ECXPProvider _kc_final : public ECUnknown {
 protected:
 	ECXPProvider();
 	virtual ~ECXPProvider();
 
 public:
 	static  HRESULT Create(ECXPProvider **lppECXPProvider);
-
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
-
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
     virtual HRESULT Shutdown(ULONG * lpulFlags);
-	virtual HRESULT TransportLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG FAR * lpulFlags, LPMAPIERROR FAR * lppMAPIError, LPXPLOGON FAR * lppXPLogon);
+	virtual HRESULT TransportLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG *lpulFlags, LPMAPIERROR *lppMAPIError, LPXPLOGON *lppXPLogon);
 
-	class xXPProvider _zcp_final : public IXPProvider {
-		// IUnknown
-		virtual ULONG __stdcall AddRef(void) _zcp_override;
-		virtual ULONG __stdcall Release(void) _zcp_override;
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _zcp_override;
+	class xXPProvider _kc_final : public IXPProvider {
+		#include <kopano/xclsfrag/IUnknown.hpp>
 
-		//IXPProvider
-		virtual HRESULT __stdcall Shutdown(ULONG * lpulFlags);
-		virtual HRESULT __stdcall TransportLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG FAR * lpulFlags, LPMAPIERROR FAR * lppMAPIError, LPXPLOGON FAR * lppXPLogon);
-	}m_xXPProvider;
+		// <kopano/xclsfrag/IXPProvider.hpp>
+		virtual HRESULT __stdcall Shutdown(ULONG *flags) _kc_override;
+		virtual HRESULT __stdcall TransportLogon(LPMAPISUP, ULONG ui_param, LPTSTR profname, ULONG *flags, LPMAPIERROR *err, LPXPLOGON *) _kc_override;
+	} m_xXPProvider;
 	
-	LPSPropValue	m_lpIdentityProps;
-
+	SPropValue *m_lpIdentityProps = nullptr;
 };
 
 #endif // #ifndef ECXPPROVIDER_H

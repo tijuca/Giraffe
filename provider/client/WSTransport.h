@@ -23,8 +23,7 @@
 #include <mapispi.h>
 
 #include <map>
-#include <pthread.h>
-
+#include <mutex>
 #include "kcore.hpp"
 #include "ECMAPIProp.h"
 #include "soapKCmdProxy.h"
@@ -37,17 +36,20 @@
 #include "WSMAPIPropStorage.h"
 #include "ECParentStorage.h"
 #include "ECABLogon.h"
-#include "ECICS.h"
+#include "ics_client.hpp"
 #include <ECCache.h>
 
+namespace KC {
 class utf8string;
+}
+
 class WSMessageStreamExporter;
 class WSMessageStreamImporter;
 
 typedef HRESULT (*SESSIONRELOADCALLBACK)(void *lpParam, ECSESSIONID newSessionId);
 typedef std::map<ULONG, std::pair<void *, SESSIONRELOADCALLBACK> > SESSIONRELOADLIST;
 
-class ECsResolveResult : public ECsCacheEntry {
+class ECsResolveResult _kc_final : public ECsCacheEntry {
 public:
 	HRESULT	hr;
 	std::string serverPath;
@@ -105,7 +107,7 @@ public:
 
 	// Interface for folder operations (create/delete)
 	virtual HRESULT HrOpenFolderOps(ULONG cbEntryID, LPENTRYID lpEntryID, WSMAPIFolderOps **lppFolderOps);
-	virtual HRESULT HrExportMessageChangesAsStream(ULONG ulFlags, ULONG ulPropTag, ICSCHANGE *lpChanges, ULONG ulStart, ULONG ulChanges, LPSPropTagArray lpsProps, WSMessageStreamExporter **lppsStreamExporter);
+	virtual HRESULT HrExportMessageChangesAsStream(ULONG ulFlags, ULONG ulPropTag, const ICSCHANGE *lpChanges, ULONG ulStart, ULONG ulChanges, const SPropTagArray *lpsProps, WSMessageStreamExporter **lppsStreamExporter);
 	virtual HRESULT HrGetMessageStreamImporter(ULONG ulFlags, ULONG ulSyncId, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG cbFolderEntryID, LPENTRYID lpFolderEntryID, bool bNewMessage, LPSPropValue lpConflictItems, WSMessageStreamImporter **lppStreamImporter);
 
 	// Interface for table operations
@@ -233,8 +235,7 @@ public:
 	virtual HRESULT HrGetOwner(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG *lpcbOwnerId, LPENTRYID *lppOwnerId);
 
 	//Addressbook function
-	virtual HRESULT HrResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlags, LPADRLIST lpAdrList, LPFlagList lpFlagList);
-
+	virtual HRESULT HrResolveNames(const SPropTagArray *lpPropTagArray, ULONG ulFlags, LPADRLIST lpAdrList, LPFlagList lpFlagList);
 	virtual HRESULT HrSyncUsers(ULONG cbCompanyId, LPENTRYID lpCompanyId);
 
 
@@ -273,7 +274,7 @@ public:
 	virtual HRESULT GetLicenseFlags(unsigned long long *lpllFlags);
 
 	/* Test protocol */
-	virtual HRESULT HrTestPerform(char *szCommand, unsigned int ulArgs, char *lpszArgs[]);
+	virtual HRESULT HrTestPerform(const char *cmd, unsigned int argc, char **args);
 	virtual HRESULT HrTestSet(const char *szName, const char *szValue);
 	virtual HRESULT HrTestGet(const char *szName, char **szValue);
 
@@ -312,22 +313,22 @@ private:
 	std::string GetAppName();
 
 protected:
-	KCmd*		m_lpCmd;
-	pthread_mutex_t m_hDataLock;
-	ECSESSIONID		m_ecSessionId;
-	ECSESSIONGROUPID m_ecSessionGroupId;
+	KCmd *m_lpCmd = nullptr;
+	std::recursive_mutex m_hDataLock;
+	ECSESSIONID m_ecSessionId = 0;
+	ECSESSIONGROUPID m_ecSessionGroupId = 0;
 	SESSIONRELOADLIST m_mapSessionReload;
-	pthread_mutex_t m_mutexSessionReload;
-	unsigned int	m_ulReloadId;
-	unsigned int	m_ulServerCapabilities;
-	unsigned long long m_llFlags;	// license flags
+	std::recursive_mutex m_mutexSessionReload;
+	unsigned int m_ulReloadId = 1;
+	unsigned int m_ulServerCapabilities = 0;
+	unsigned long long m_llFlags = 0; // license flags
 	ULONG			m_ulUIFlags;	// UI flags for logon
 	sGlobalProfileProps m_sProfileProps;
 	std::string		m_strAppName;
 	GUID			m_sServerGuid;
 
 private:
-	pthread_mutex_t					m_ResolveResultCacheMutex;
+	std::recursive_mutex m_ResolveResultCacheMutex;
 	ECCache<ECMapResolveResults>	m_ResolveResultCache;
 	bool m_has_session;
 

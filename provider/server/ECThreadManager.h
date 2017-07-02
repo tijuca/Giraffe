@@ -19,10 +19,11 @@
 #define ECTHREADMANAGER_H
 
 #include <kopano/zcdefs.h>
+#include <condition_variable>
+#include <mutex>
 #include <queue>
 #include <set>
-
-#include <kopano/ECLogger.h>
+#include <pthread.h>
 #include <kopano/ECConfig.h>
 #include <kopano/kcodes.h>
 #include "SOAPUtils.h"
@@ -32,19 +33,19 @@
  * A single work item - it doesn't contain much since we defer all processing, including XML
  * parsing until a worker thread starts processing
  */
-typedef struct {
+struct WORKITEM {
     struct soap *soap;			// socket and state associated with the connection
     double dblReceiveStamp;		// time at which activity was detected on the socket
-} WORKITEM;
+};
 
-typedef struct ACTIVESOCKET _zcp_final {
+struct ACTIVESOCKET _kc_final {
     struct soap *soap;
     time_t ulLastActivity;
     
     bool operator < (const ACTIVESOCKET &a) const { return a.soap->socket < this->soap->socket; };
-} ACTIVESOCKET;
+};
 
-class FindSocket _zcp_final {
+class FindSocket _kc_final {
 public:
 	FindSocket(SOAP_SOCKET s) { this->s = s; };
 
@@ -53,7 +54,7 @@ private:
 	SOAP_SOCKET s;
 };
 
-class FindListenSocket _zcp_final {
+class FindListenSocket _kc_final {
 public:
 	FindListenSocket(SOAP_SOCKET s) { this->s = s; };
 
@@ -73,35 +74,34 @@ class ECDispatcher;
  */
 class ECWorkerThread {
 public:
-    ECWorkerThread(ECLogger *lpLogger, ECThreadManager *lpManager, ECDispatcher *lpDispatcher, bool bDoNotStart = false);
+	ECWorkerThread(ECThreadManager *, ECDispatcher *, bool nostart = false);
 
 protected:
     // The destructor is protected since we self-cleanup; you cannot delete this object externally.
-    virtual ~ECWorkerThread();
-
+	virtual ~ECWorkerThread(void) _kc_impdtor;
     static void *Work(void *param);
 
     pthread_t m_thread;
-    ECLogger *m_lpLogger;
     ECThreadManager *m_lpManager;
     ECDispatcher *m_lpDispatcher;
 };
 
-class ECPriorityWorkerThread _zcp_final : public ECWorkerThread {
-public:
-	ECPriorityWorkerThread(ECLogger *lpLogger, ECThreadManager *lpManager, ECDispatcher *lpDispatcher);
+class _kc_export_dycast ECPriorityWorkerThread _kc_final :
+    public ECWorkerThread {
+	public:
+	_kc_hidden ECPriorityWorkerThread(ECThreadManager *, ECDispatcher *);
 	// The destructor is public since this thread isn't detached, we wait for the thread and clean it
-	~ECPriorityWorkerThread();
+	_kc_hidden ~ECPriorityWorkerThread(void);
 };
 
 /*
  * It is the thread manager's job to keep track of processing threads, and adding or removing threads
  * when requested. 
  */
-class ECThreadManager _zcp_final {
+class ECThreadManager _kc_final {
 public:
     // ulThreads is the normal number of threads that are started; These threads are pre-started and will be in an idle state.
-    ECThreadManager(ECLogger *lpLogger, ECDispatcher *lpDispatcher, unsigned int ulThreads);
+	ECThreadManager(ECDispatcher *, unsigned int threads);
     ~ECThreadManager();
     
     // Adds n threads above the standard thread count. Threads are removed back to the normal thread count whenever the message
@@ -118,10 +118,9 @@ public:
     ECRESULT NotifyIdle(ECWorkerThread *, bool *lpfStop);
     
 private:
-    pthread_mutex_t 			m_mutexThreads;
+	std::mutex m_mutexThreads;
     std::list<ECWorkerThread *> m_lstThreads;
 	ECPriorityWorkerThread *	m_lpPrioWorker;
-    ECLogger *					m_lpLogger;
     ECDispatcher *				m_lpDispatcher;
     unsigned int				m_ulThreads;
 };
@@ -134,22 +133,21 @@ private:
  *
  * Thread deletion is done by the Thread Manager.
  */
-class ECWatchDog _zcp_final {
+class ECWatchDog _kc_final {
 public:
-    ECWatchDog(ECConfig *lpConfig, ECLogger *lpLogger, ECDispatcher *lpDispatcher, ECThreadManager *lpThreadManager);
+	ECWatchDog(ECConfig *, ECDispatcher *, ECThreadManager *);
     ~ECWatchDog();
 private:
     // Main watch thread
     static void *Watch(void *);
     
-    ECLogger *			m_lpLogger;
     ECConfig *			m_lpConfig;
     ECDispatcher *		m_lpDispatcher;
     ECThreadManager*	m_lpThreadManager;
     pthread_t			m_thread;
-    bool				m_bExit;
-    pthread_mutex_t		m_mutexExit;
-    pthread_cond_t		m_condExit;
+	bool m_bExit = false;
+	std::mutex m_mutexExit;
+	std::condition_variable m_condExit;
 };
 
 /*
@@ -161,9 +159,8 @@ typedef SOAP_SOCKET (*CREATEPIPESOCKETCALLBACK)(void *lpParam);
 
 class ECDispatcher {
 public:
-
-    ECDispatcher(ECLogger *lpLogger, ECConfig *lpConfig, CREATEPIPESOCKETCALLBACK lpCallback, void *lpCallbackParam);
-    virtual ~ECDispatcher();
+	ECDispatcher(ECConfig *, CREATEPIPESOCKETCALLBACK, void *cbparam);
+	virtual ~ECDispatcher(void) _kc_impdtor;
     
     // Statistics
     ECRESULT GetIdle(unsigned int *lpulIdle); 				// Idle threads
@@ -199,22 +196,21 @@ public:
     virtual ECRESULT MainLoop() = 0;
     
 protected:
-    ECLogger *				m_lpLogger;
     ECConfig *				m_lpConfig;
-    ECThreadManager *		m_lpThreadManager;
+	ECThreadManager *m_lpThreadManager = nullptr;
 
-    pthread_mutex_t 		m_mutexItems;
-    std::queue<WORKITEM *> 	m_queueItems;
-    pthread_cond_t			m_condItems;
-    std::queue<WORKITEM *> 	m_queuePrioItems;
-    pthread_cond_t			m_condPrioItems;
+	std::mutex m_mutexItems;
+	std::queue<WORKITEM *> m_queueItems;
+	std::condition_variable m_condItems;
+	std::queue<WORKITEM *> m_queuePrioItems;
+	std::condition_variable m_condPrioItems;
 
-    std::map<int, ACTIVESOCKET>	m_setSockets;
-    std::map<int, struct soap *>	m_setListenSockets;
-    pthread_mutex_t			m_mutexSockets;
-    bool					m_bExit;
-    pthread_mutex_t			m_mutexIdle;
-    unsigned int			m_ulIdle;
+	std::map<int, ACTIVESOCKET> m_setSockets;
+	std::map<int, struct soap *> m_setListenSockets;
+	std::mutex m_mutexSockets;
+	bool m_bExit = false;
+	std::mutex m_mutexIdle;
+	unsigned int m_ulIdle = 0;
 	CREATEPIPESOCKETCALLBACK m_lpCreatePipeSocketCallback;
 	void *					m_lpCreatePipeSocketParam;
 
@@ -225,13 +221,13 @@ protected:
 	int			m_nSendTimeout;
 };
 
-class ECDispatcherSelect _zcp_final : public ECDispatcher {
+class ECDispatcherSelect _kc_final : public ECDispatcher {
 private:
     int			m_fdRescanRead;
     int			m_fdRescanWrite;
 
 public:
-    ECDispatcherSelect(ECLogger *lpLogger, ECConfig *lpConfig, CREATEPIPESOCKETCALLBACK lpCallback, void *lpCallbackParam);
+	ECDispatcherSelect(ECConfig *, CREATEPIPESOCKETCALLBACK, void *cbparam);
     virtual ECRESULT MainLoop();
 
     virtual ECRESULT ShutDown();
@@ -240,13 +236,13 @@ public:
 };
 
 #ifdef HAVE_EPOLL_CREATE
-class ECDispatcherEPoll _zcp_final : public ECDispatcher {
+class ECDispatcherEPoll _kc_final : public ECDispatcher {
 private:
 	int m_fdMax;
 	int m_epFD;
 
 public:
-    ECDispatcherEPoll(ECLogger *lpLogger, ECConfig *lpConfig, CREATEPIPESOCKETCALLBACK lpCallback, void *lpCallbackParam);
+	ECDispatcherEPoll(ECConfig *, CREATEPIPESOCKETCALLBACK, void *cbparam);
     virtual ~ECDispatcherEPoll();
 
     virtual ECRESULT MainLoop();

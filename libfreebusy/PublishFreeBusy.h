@@ -18,6 +18,7 @@
 #ifndef _PublishFreeBusy_H_
 #define _PublishFreeBusy_H_
 
+#include <kopano/zcdefs.h>
 #include <mapix.h>
 #include <mapidefs.h>
 #include <ctime>
@@ -25,20 +26,21 @@
 #include "freebusy.h"
 #include <kopano/CommonUtil.h>
 
-typedef struct{
+namespace KC {
+
+class ECLogger;
+
+struct TSARRAY {
 	ULONG ulType;
 	time_t tsTime;
 	ULONG ulStatus;
-}TSARRAY;
+};
 
-HRESULT HrPublishDefaultCalendar(IMAPISession *lpSession, IMsgStore *lpDefStore, time_t tsStart, ULONG ulMonths, ECLogger *lpLogger);
+extern _kc_export HRESULT HrPublishDefaultCalendar(IMAPISession *, IMsgStore *, time_t start, ULONG months);
 
-class PublishFreeBusy
-{
+class PublishFreeBusy _kc_final {
 public:
-	PublishFreeBusy(IMAPISession *lpSession, IMsgStore *lpDefStore, time_t tsStart, ULONG ulMonths, ECLogger *lpLogger);
-	~PublishFreeBusy();
-	
+	PublishFreeBusy(IMAPISession *, IMsgStore *defstore, time_t start, ULONG months);
 	HRESULT HrInit();
 	HRESULT HrGetResctItems(IMAPITable **lppTable);
 	HRESULT HrProcessTable(IMAPITable *lpTable , FBBlock_1 **lppfbBlocks, ULONG *lpcValues);
@@ -49,13 +51,12 @@ private:
 
 	IMAPISession *m_lpSession;
 	IMsgStore *m_lpDefStore;
-	ECLogger *m_lpLogger;
 	FILETIME m_ftStart;
 	FILETIME m_ftEnd;
 	time_t m_tsStart;
 	time_t m_tsEnd;
 
-	PROPMAP_START
+	PROPMAP_DECL()
 	PROPMAP_DEF_NAMED_ID (APPT_STARTWHOLE)
 	PROPMAP_DEF_NAMED_ID (APPT_ENDWHOLE)
 	PROPMAP_DEF_NAMED_ID (APPT_CLIPEND)
@@ -65,5 +66,7 @@ private:
 	PROPMAP_DEF_NAMED_ID (APPT_TIMEZONESTRUCT)
 
 };
+
+} /* namespace */
 
 #endif //_PublishFreeBusy_H_

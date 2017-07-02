@@ -20,8 +20,9 @@
 #define UNIXUSERPLUGIN_H
 
 #include <memory>
-#include <stdexcept>
+#include <mutex>
 #include <string>
+#include <kopano/zcdefs.h>
 #include <kopano/ECIConv.h>
 
 #include "plugin.h"
@@ -32,6 +33,7 @@
  * @ingroup userplugin
  * @{
  */
+namespace KC {
 
 /**
  * UNIX user plugin
@@ -55,7 +57,7 @@ public:
 	 * @throw runtime_error When configuration file could not be loaded
 	 * @throw notsupported When multi-server or multi-company support is enabled.
 	 */
-	UnixUserPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *lpSharedData);
+	UnixUserPlugin(std::mutex &, ECPluginSharedData *lpSharedData);
 	virtual ~UnixUserPlugin();
 
     /**
@@ -309,7 +311,7 @@ public:
 										 const objectid_t &parentobject, const objectid_t &childobject);
 
 private:
-	ECIConv *m_iconv;
+	ECIConv *m_iconv = nullptr;
 
 	/**
 	 * Find a user with specific name
@@ -476,10 +478,12 @@ private:
 	void errnoCheck(const std::string &, int) const;
 };
 
+} /* namespace */
+
 extern "C" {
-	extern UserPlugin* getUserPluginInstance(pthread_mutex_t*, ECPluginSharedData*);
-	extern void deleteUserPluginInstance(UserPlugin*);
-	extern int getUserPluginVersion();
+	extern _kc_export UserPlugin *getUserPluginInstance(std::mutex &, ECPluginSharedData *);
+	extern _kc_export void deleteUserPluginInstance(UserPlugin *);
+	extern _kc_export int getUserPluginVersion(void);
 }
 /** @} */
 #endif

@@ -18,21 +18,25 @@
 #ifndef EC_MULTISTORE_TABLE_H
 #define EC_MULTISTORE_TABLE_H
 
+#include <kopano/zcdefs.h>
 #include "ECStoreObjectTable.h"
 
-class ECMultiStoreTable : public ECStoreObjectTable {
-protected:
-	ECMultiStoreTable(ECSession *lpSession, unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale);
+namespace KC {
+
+class _kc_export_dycast ECMultiStoreTable _kc_final :
+    public ECStoreObjectTable {
+	protected:
+	_kc_hidden ECMultiStoreTable(ECSession *, unsigned int obj_type, unsigned int flags, const ECLocale &);
 
 public:
-	static ECRESULT Create(ECSession *lpSession, unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale, ECMultiStoreTable **lppTable);
-
-	virtual ECRESULT SetEntryIDs(ECListInt *lplObjectList);
-
-    virtual ECRESULT Load();
+	_kc_hidden static ECRESULT Create(ECSession *, unsigned int obj_type, unsigned int flags, const ECLocale &, ECMultiStoreTable **ret);
+	_kc_hidden virtual ECRESULT SetEntryIDs(ECListInt *obj_list);
+	_kc_hidden virtual ECRESULT Load(void);
 private:
     std::list<unsigned int> m_lstObjects;
     
 };
+
+} /* namespace */
 
 #endif

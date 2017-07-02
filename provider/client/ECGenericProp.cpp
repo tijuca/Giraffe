@@ -16,6 +16,9 @@
  */
 
 #include <kopano/platform.h>
+#include <kopano/lockhelper.hpp>
+#include <kopano/memory.hpp>
+#include <kopano/ECInterfaceDefs.h>
 #include <mapidefs.h>
 #include "WSTransport.h"
 #include "ECGenericProp.h"
@@ -36,29 +39,9 @@ ECGenericProp::ECGenericProp(void *lpProvider, ULONG ulObjType, BOOL fModify,
     const char *szClassName) :
 	ECUnknown(szClassName)
 {
-	this->lstProps		= NULL;
-	this->lpStorage		= NULL;
-	this->fSaved		= false; // not saved until we either read or write from/to disk
 	this->ulObjType		= ulObjType;
 	this->fModify		= fModify;
-	this->dwLastError	= hrSuccess;
 	this->lpProvider	= lpProvider;
-	this->isTransactedObject = TRUE; // only ECMsgStore and ECMAPIFolder are not transacted
-	this->ulObjFlags	= 0;
-	this->m_sMapiObject = NULL;
-	this->m_ulMaxPropSize = 8192;
-
-	pthread_mutexattr_t mattr;
-	pthread_mutexattr_init(&mattr);
-	pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
-
-	pthread_mutex_init(&m_hMutexMAPIObject, &mattr);
-
-	m_lpEntryId = NULL;
-	m_cbEntryId = 0;
-	m_bReload = FALSE;
-	m_bLoading = FALSE;
-
 	this->HrAddPropHandlers(PR_EC_OBJECT,				DefaultGetProp,			DefaultSetPropComputed, (void*) this, FALSE, TRUE);
 	this->HrAddPropHandlers(PR_NULL,					DefaultGetProp,			DefaultSetPropIgnore,	(void*) this, FALSE, TRUE);
 	this->HrAddPropHandlers(PR_OBJECT_TYPE,				DefaultGetProp,			DefaultSetPropComputed, (void*) this);
@@ -67,37 +50,30 @@ ECGenericProp::ECGenericProp(void *lpProvider, ULONG ulObjType, BOOL fModify,
 
 ECGenericProp::~ECGenericProp()
 {
-	ECPropertyEntryIterator iterProps;
-
 	if (m_sMapiObject)
 		FreeMapiObject(m_sMapiObject);
 
 	if(lstProps) {
-		for (iterProps = lstProps->begin(); iterProps != lstProps->end(); ++iterProps)
-			iterProps->second.DeleteProperty();
-
+		for (auto &i : *lstProps)
+			i.second.DeleteProperty();
 		delete lstProps;
 	}
 
 	if(lpStorage)
 		lpStorage->Release();
 	MAPIFreeBuffer(m_lpEntryId);
-	pthread_mutex_destroy(&m_hMutexMAPIObject);
 }
 
 HRESULT ECGenericProp::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
+	REGISTER_INTERFACE2(ECUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
 HRESULT ECGenericProp::SetProvider(void* lpProvider)
 {
 	HRESULT hr = hrSuccess;
-	
-	ASSERT(this->lpProvider == NULL);
-
+	assert(this->lpProvider == NULL);
 	this->lpProvider = lpProvider;
 	
 	return hr;
@@ -105,7 +81,7 @@ HRESULT ECGenericProp::SetProvider(void* lpProvider)
 
 HRESULT ECGenericProp::SetEntryId(ULONG cbEntryId, LPENTRYID lpEntryId)
 {
-	ASSERT(m_lpEntryId == NULL);
+	assert(m_lpEntryId == NULL);
 	return Util::HrCopyEntryId(cbEntryId, lpEntryId, &m_cbEntryId, &m_lpEntryId);
 }
 
@@ -117,7 +93,9 @@ HRESULT ECGenericProp::HrAddPropHandlers(ULONG ulPropTag, GetPropCallBack lpfnGe
 	PROPCALLBACK			sCallBack;
 
 	// Check if the handler defines the right type, If Unicode you should never define a PT_STRING8 as handler!
-	ASSERT( (PROP_TYPE(ulPropTag) == PT_STRING8 || PROP_TYPE(ulPropTag) == PT_UNICODE)?PROP_TYPE(ulPropTag) == PT_TSTRING: TRUE);
+	assert(PROP_TYPE(ulPropTag) == PT_STRING8 ||
+	       PROP_TYPE(ulPropTag) == PT_UNICODE ?
+	       PROP_TYPE(ulPropTag) == PT_TSTRING : true);
 
 	// Only Support properties on ID, different types are not supported.
 	iterCallBack = lstCallBack.find(PROP_ID(ulPropTag));
@@ -138,7 +116,7 @@ HRESULT ECGenericProp::HrAddPropHandlers(ULONG ulPropTag, GetPropCallBack lpfnGe
 }
 
 // sets an actual value in memory
-HRESULT ECGenericProp::HrSetRealProp(SPropValue *lpsPropValue)
+HRESULT ECGenericProp::HrSetRealProp(const SPropValue *lpsPropValue)
 {
 	HRESULT					hr = hrSuccess;
 	ECProperty*				lpProperty = NULL;
@@ -151,10 +129,8 @@ HRESULT ECGenericProp::HrSetRealProp(SPropValue *lpsPropValue)
 	if (m_bLoading == FALSE && m_sMapiObject) {
 		// Only reset instance id when we're being modified, not being reloaded
 		HrSIEntryIDToID(m_sMapiObject->cbInstanceID, (LPBYTE)m_sMapiObject->lpInstanceID, NULL, NULL, (unsigned int *)&ulPropId);
-
-		if (ulPropId == PROP_ID(lpsPropValue->ulPropTag)) {
+		if (ulPropId == PROP_ID(lpsPropValue->ulPropTag))
 			SetSingleInstanceId(0, NULL);
-		}
 	}
 
 	if(lstProps == NULL) {
@@ -252,21 +228,19 @@ HRESULT ECGenericProp::HrGetRealProp(ULONG ulPropTag, ULONG ulFlags, void *lpBas
 	}
 
 	// Check if a max. size was requested, if so, dont return unless smaller than max. size
-	if(ulMaxSize) {
-		if(iterProps->second.GetProperty()->GetSize() > ulMaxSize) {
-			lpsPropValue->ulPropTag = PROP_TAG(PT_ERROR, PROP_ID(ulPropTag));
-			lpsPropValue->Value.err = MAPI_E_NOT_ENOUGH_MEMORY;
-			hr = MAPI_W_ERRORS_RETURNED;
-			goto exit;
-		}
+	if (ulMaxSize != 0 && iterProps->second.GetProperty()->GetSize() > ulMaxSize) {
+		lpsPropValue->ulPropTag = PROP_TAG(PT_ERROR, PROP_ID(ulPropTag));
+		lpsPropValue->Value.err = MAPI_E_NOT_ENOUGH_MEMORY;
+		hr = MAPI_W_ERRORS_RETURNED;
+		goto exit;
 	}
 
 	if (PROP_TYPE(ulPropTag) == PT_UNSPECIFIED) {
-		if (PROP_TYPE(iterProps->second.GetPropTag()) == PT_UNICODE) {
+		if (PROP_TYPE(iterProps->second.GetPropTag()) == PT_UNICODE)
 			ulPropTag = CHANGE_PROP_TYPE(ulPropTag, ((ulFlags & MAPI_UNICODE) ? PT_UNICODE : PT_STRING8));
-		} else if (PROP_TYPE(iterProps->second.GetPropTag()) == PT_MV_UNICODE) {
+		else if (PROP_TYPE(iterProps->second.GetPropTag()) == PT_MV_UNICODE)
 			ulPropTag = CHANGE_PROP_TYPE(ulPropTag, ((ulFlags & MAPI_UNICODE) ? PT_MV_UNICODE : PT_MV_STRING8));
-		} else
+		else
 			ulPropTag = iterProps->second.GetPropTag();
 	}
 
@@ -327,46 +301,40 @@ HRESULT	ECGenericProp::DefaultGetProp(ULONG ulPropTag,  void* lpProvider, ULONG 
 
 	switch(PROP_ID(ulPropTag))
 	{
-		case PROP_ID(PR_ENTRYID):
-			if(lpProp->m_cbEntryId) {
-				lpsPropValue->ulPropTag = PR_ENTRYID;
-				lpsPropValue->Value.bin.cb = lpProp->m_cbEntryId;
-				if(lpBase == NULL)
-					ASSERT(FALSE);
-
-				ECAllocateMore(lpProp->m_cbEntryId, lpBase, (void **)&lpsPropValue->Value.bin.lpb);
-				memcpy(lpsPropValue->Value.bin.lpb, lpProp->m_lpEntryId, lpProp->m_cbEntryId);
-			} else {
-				hr = MAPI_E_NOT_FOUND;
-			}
-			break;
-
-		// Gives access to the actual ECUnknown underlying object
-		case PROP_ID(PR_EC_OBJECT):
-			// NOTE: we place the object pointer in lpszA to make sure it's on the same offset as Value.x on 32bit as 64bit machines
-			lpsPropValue->ulPropTag = PR_EC_OBJECT;
-			lpsPropValue->Value.lpszA = (LPSTR)lpProp;
-			break;
-
-		case PROP_ID(PR_NULL):
-			// outlook with export contacts to csv (IMessage)(0x00000000) <- skip this one
-			// Palm used PR_NULL (IMAPIFolder)(0x00000001)
-			if(ulPropTag == PR_NULL) {
-				lpsPropValue->ulPropTag = PR_NULL;
-				memset(&lpsPropValue->Value, 0, sizeof(lpsPropValue->Value)); // make sure all bits, 32 or 64, are 0
-			} else {
-				hr = MAPI_E_NOT_FOUND;
-			}
-			break;
-
-		case PROP_ID(PR_OBJECT_TYPE): 
-			lpsPropValue->Value.l = lpProp->ulObjType;
-			lpsPropValue->ulPropTag = PR_OBJECT_TYPE;
-			break;
-
-		default:
-			hr = lpProp->HrGetRealProp(ulPropTag, ulFlags, lpBase, lpsPropValue);
-			break;
+	case PROP_ID(PR_ENTRYID):
+		if (lpProp->m_cbEntryId == 0)
+			return MAPI_E_NOT_FOUND;
+		lpsPropValue->ulPropTag = PR_ENTRYID;
+		lpsPropValue->Value.bin.cb = lpProp->m_cbEntryId;
+		if (lpBase == NULL)
+			assert(false);
+		ECAllocateMore(lpProp->m_cbEntryId, lpBase, (void **)&lpsPropValue->Value.bin.lpb);
+		memcpy(lpsPropValue->Value.bin.lpb, lpProp->m_lpEntryId, lpProp->m_cbEntryId);
+		break;
+	// Gives access to the actual ECUnknown underlying object
+	case PROP_ID(PR_EC_OBJECT):
+		/*
+		 * NOTE: we place the object pointer in lpszA to make sure it
+		 * is on the same offset as Value.x on 32-bit as 64-bit
+		 * machines.
+		 */
+		lpsPropValue->ulPropTag = PR_EC_OBJECT;
+		lpsPropValue->Value.lpszA = reinterpret_cast<char *>(static_cast<IECUnknown *>(lpProp));
+		break;
+	case PROP_ID(PR_NULL):
+		// outlook with export contacts to csv (IMessage)(0x00000000) <- skip this one
+		// Palm used PR_NULL (IMAPIFolder)(0x00000001)
+		if (ulPropTag != PR_NULL)
+			return MAPI_E_NOT_FOUND;
+		lpsPropValue->ulPropTag = PR_NULL;
+		memset(&lpsPropValue->Value, 0, sizeof(lpsPropValue->Value)); // make sure all bits, 32 or 64, are 0
+		break;
+	case PROP_ID(PR_OBJECT_TYPE): 
+		lpsPropValue->Value.l = lpProp->ulObjType;
+		lpsPropValue->ulPropTag = PR_OBJECT_TYPE;
+		break;
+	default:
+		return lpProp->HrGetRealProp(ulPropTag, ulFlags, lpBase, lpsPropValue);
 	}
 
 	return hr;
@@ -384,19 +352,22 @@ HRESULT	ECGenericProp::DefaultGetPropNotFound(ULONG ulPropTag, void* lpProvider,
 	return MAPI_E_NOT_FOUND;
 }
 
-HRESULT ECGenericProp::DefaultSetPropSetReal(ULONG ulPropTag, void* lpProvider, LPSPropValue lpsPropValue, void *lpParam)
+HRESULT ECGenericProp::DefaultSetPropSetReal(ULONG ulPropTag, void *lpProvider,
+    const SPropValue *lpsPropValue, void *lpParam)
 {
 	ECGenericProp *lpProp = (ECGenericProp *)lpParam;
 
 	return lpProp->HrSetRealProp(lpsPropValue);
 }
 
-HRESULT	ECGenericProp::DefaultSetPropComputed(ULONG ulPropTag, void* lpProvider, LPSPropValue lpsPropValue, void *lpParam)
+HRESULT	ECGenericProp::DefaultSetPropComputed(ULONG tag, void *provider,
+    const SPropValue *, void *)
 {
 	return MAPI_E_COMPUTED;
 }
 
-HRESULT	ECGenericProp::DefaultSetPropIgnore(ULONG ulPropTag, void* lpProvider, LPSPropValue lpsPropValue, void *lpParam)
+HRESULT	ECGenericProp::DefaultSetPropIgnore(ULONG tag, void *provider,
+    const SPropValue *, void *)
 {
 	return hrSuccess;
 }
@@ -406,13 +377,12 @@ HRESULT ECGenericProp::TableRowGetProp(void* lpProvider, struct propVal *lpsProp
 	HRESULT hr = hrSuccess;
 
 	switch(lpsPropValSrc->ulPropTag) {
-		case PROP_TAG(PT_ERROR,PROP_ID(PR_NULL)): 
-			lpsPropValDst->Value.l = 0;
-			lpsPropValDst->ulPropTag = PR_NULL;
-			break;
-		default:
-			hr = MAPI_E_NOT_FOUND;
-			break;
+	case PROP_TAG(PT_ERROR, PROP_ID(PR_NULL)):
+		lpsPropValDst->Value.l = 0;
+		lpsPropValDst->ulPropTag = PR_NULL;
+		break;
+	default:
+		return MAPI_E_NOT_FOUND;
 	}
 
 	return hr;
@@ -443,26 +413,24 @@ HRESULT ECGenericProp::HrSaveChild(ULONG ulFlags, MAPIOBJECT *lpsMapiObject)
 HRESULT ECGenericProp::HrRemoveModifications(MAPIOBJECT *lpsMapiObject, ULONG ulPropTag)
 {
 	HRESULT hr = hrSuccess;
-	std::list<ECProperty>::iterator iterProps;
 
-	lpsMapiObject->lstDeleted->remove(ulPropTag);
-
-	for (iterProps = lpsMapiObject->lstModified->begin();
-	     iterProps != lpsMapiObject->lstModified->end(); ++iterProps)
+	lpsMapiObject->lstDeleted.remove(ulPropTag);
+	for (auto iterProps = lpsMapiObject->lstModified.begin();
+	     iterProps != lpsMapiObject->lstModified.end(); ++iterProps)
 		if(iterProps->GetPropTag() == ulPropTag) {
-			lpsMapiObject->lstModified->erase(iterProps);
+			lpsMapiObject->lstModified.erase(iterProps);
 			break;
 		}
 	return hr;
 }
 
-HRESULT ECGenericProp::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR FAR * lppMAPIError)
+HRESULT ECGenericProp::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError)
 {
 	HRESULT		hr = hrSuccess;
 	LPMAPIERROR	lpMapiError = NULL;
-	LPTSTR		lpszErrorMsg = NULL;
+	KCHL::memory_ptr<TCHAR> lpszErrorMsg;
 	
-	hr = Util::HrMAPIErrorToText((hResult == hrSuccess)?MAPI_E_NO_ACCESS : hResult, &lpszErrorMsg);
+	hr = Util::HrMAPIErrorToText((hResult == hrSuccess)?MAPI_E_NO_ACCESS : hResult, &~lpszErrorMsg);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -470,8 +438,8 @@ HRESULT ECGenericProp::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR 
 	if(hr != hrSuccess)
 		goto exit;
 		
-	if ((ulFlags & MAPI_UNICODE) == MAPI_UNICODE) {
-		std::wstring wstrErrorMsg = convert_to<std::wstring>(lpszErrorMsg);
+	if (ulFlags & MAPI_UNICODE) {
+		std::wstring wstrErrorMsg = convert_to<std::wstring>(lpszErrorMsg.get());
 		std::wstring wstrCompName = convert_to<std::wstring>(g_strProductName.c_str());
 
 		if ((hr = MAPIAllocateMore(sizeof(std::wstring::value_type) * (wstrErrorMsg.size() + 1), lpMapiError, (void**)&lpMapiError->lpszError)) != hrSuccess)
@@ -483,7 +451,7 @@ HRESULT ECGenericProp::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR 
 		wcscpy((wchar_t*)lpMapiError->lpszComponent, wstrCompName.c_str()); 
 
 	} else {
-		std::string strErrorMsg = convert_to<std::string>(lpszErrorMsg);
+		std::string strErrorMsg = convert_to<std::string>(lpszErrorMsg.get());
 		std::string strCompName = convert_to<std::string>(g_strProductName.c_str());
 
 		if ((hr = MAPIAllocateMore(strErrorMsg.size() + 1, lpMapiError, (void**)&lpMapiError->lpszError)) != hrSuccess)
@@ -502,7 +470,6 @@ HRESULT ECGenericProp::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR 
 	*lppMAPIError = lpMapiError;
 
 exit:
-	MAPIFreeBuffer(lpszErrorMsg);
 	if( hr != hrSuccess && lpMapiError)
 		ECFreeBuffer(lpMapiError);
 
@@ -513,12 +480,7 @@ exit:
 HRESULT ECGenericProp::SaveChanges(ULONG ulFlags)
 {
 	HRESULT			hr = hrSuccess;
-	ECPropertyEntryIterator iterProps;
-	std::list<ULONG>::const_iterator iterPropTags;
-	std::list<ECProperty>::const_iterator iterPropVals;
-	std::set<ULONG>::const_iterator iterDelProps;
-
-	pthread_mutex_lock(&m_hMutexMAPIObject);
+	scoped_rlock l_obj(m_hMutexMAPIObject);
 
 	if (!fModify) {
 		hr = MAPI_E_NO_ACCESS;
@@ -545,35 +507,31 @@ HRESULT ECGenericProp::SaveChanges(ULONG ulFlags)
 
 	// save into m_sMapiObject
 	
-	for (iterDelProps = m_setDeletedProps.begin();
-	     iterDelProps != m_setDeletedProps.end(); ++iterDelProps) {
+	for (auto l : m_setDeletedProps) {
 		// Make sure the property is not present in deleted/modified list
-		HrRemoveModifications(m_sMapiObject, *iterDelProps);
-
-		m_sMapiObject->lstDeleted->push_back(*iterDelProps);
+		HrRemoveModifications(m_sMapiObject, l);
+		m_sMapiObject->lstDeleted.push_back(l);
 	}
 
-	for (iterProps = lstProps->begin(); iterProps != lstProps->end(); ++iterProps) {
+	for (auto &p : *lstProps) {
 		// Property is dirty, so we have to save it
-		if (iterProps->second.FIsDirty()) {
+		if (p.second.FIsDirty()) {
 			// Save in the 'modified' list
 
 			// Make sure the property is not present in deleted/modified list
-			HrRemoveModifications(m_sMapiObject, iterProps->second.GetPropTag());
-
+			HrRemoveModifications(m_sMapiObject, p.second.GetPropTag());
 			// Save modified property
-			m_sMapiObject->lstModified->push_back(*iterProps->second.GetProperty());
-			
+			m_sMapiObject->lstModified.push_back(*p.second.GetProperty());
 			// Save in the normal properties list
-			m_sMapiObject->lstProperties->push_back(*iterProps->second.GetProperty());
+			m_sMapiObject->lstProperties.push_back(*p.second.GetProperty());
 			continue;
 		}
 
 		// Normal property: either non-loaded or loaded
-		if (!iterProps->second.FIsLoaded())	// skip pt_error anyway
-			m_sMapiObject->lstAvailable->push_back(iterProps->second.GetPropTag());
+		if (!p.second.FIsLoaded())	// skip pt_error anyway
+			m_sMapiObject->lstAvailable.push_back(p.second.GetPropTag());
 		else
-			m_sMapiObject->lstProperties->push_back(*iterProps->second.GetProperty());
+			m_sMapiObject->lstProperties.push_back(*p.second.GetProperty());
 	}
 
 	m_sMapiObject->bChanged = true;
@@ -591,31 +549,29 @@ HRESULT ECGenericProp::SaveChanges(ULONG ulFlags)
 	// that save to ECParentStorage, the object will be untouched. The code below will do nothing.
 
 	// Large properties received
-	for (iterPropTags = m_sMapiObject->lstAvailable->begin();
-	     iterPropTags != m_sMapiObject->lstAvailable->end(); ++iterPropTags) {
+	for (auto tag : m_sMapiObject->lstAvailable) {
 		// ONLY if not present
-		iterProps = lstProps->find(PROP_ID(*iterPropTags));
-		if (iterProps == lstProps->end() || iterProps->second.GetPropTag() != *iterPropTags) {
-			ECPropertyEntry entry(*iterPropTags);
-			lstProps->insert(std::make_pair(PROP_ID(*iterPropTags), entry));
+		auto ip = lstProps->find(PROP_ID(tag));
+		if (ip == lstProps->cend() || ip->second.GetPropTag() != tag) {
+			ECPropertyEntry entry(tag);
+			lstProps->insert(std::make_pair(PROP_ID(tag), entry));
 		}
 	}
-	m_sMapiObject->lstAvailable->clear();
+	m_sMapiObject->lstAvailable.clear();
 
 	// Normal properties with value
-	for (iterPropVals = m_sMapiObject->lstProperties->begin();
-	     iterPropVals != m_sMapiObject->lstProperties->end(); ++iterPropVals)
+	for (const auto &pv : m_sMapiObject->lstProperties)
 		// don't add any 'error' types ... (the storage object shouldn't really give us these anyway ..)
-		if (PROP_TYPE((*iterPropVals).GetPropTag()) != PT_ERROR) {
-			SPropValue tmp = iterPropVals->GetMAPIPropValRef();
+		if (PROP_TYPE(pv.GetPropTag()) != PT_ERROR) {
+			SPropValue tmp = pv.GetMAPIPropValRef();
 			HrSetRealProp(&tmp);
 		}
 
 	// Note that we currently don't support the server removing properties after the SaveObject call
 
 	// We have loaded all properties, so clear the properties in the m_sMapiObject
-	m_sMapiObject->lstProperties->clear();
-	m_sMapiObject->lstAvailable->clear();
+	m_sMapiObject->lstProperties.clear();
+	m_sMapiObject->lstAvailable.clear();
 
 	// We are now in sync with the server again, so set everything as clean
 	HrSetClean();
@@ -624,16 +580,11 @@ HRESULT ECGenericProp::SaveChanges(ULONG ulFlags)
 
 exit:
 	if (hr == hrSuccess)
-	{
 		// Unless the user requests to continue with modify access, switch
 		// down to read-only access. This means that specifying neither of
 		// the KEEP_OPEN flags means the same thing as KEEP_OPEN_READONLY.
 		if (!(ulFlags & (KEEP_OPEN_READWRITE|FORCE_SAVE)))
 			fModify = FALSE;
-	}
-
-	pthread_mutex_unlock(&m_hMutexMAPIObject);
-
 	return hr;
 }
 
@@ -717,30 +668,24 @@ HRESULT ECGenericProp::HrSetPropStorage(IECPropStorage *lpStorage, BOOL fLoadPro
 		hr = HrLoadProps();
 		if(hr != hrSuccess)
 			return hr;
-			
-		if(HrGetRealProp(PR_OBJECT_TYPE, 0, NULL, &sPropValue, m_ulMaxPropSize) == hrSuccess) {
-			// The server sent a PR_OBJECT_TYPE, check if it is correct
-			if (this->ulObjType != sPropValue.Value.ul)
-				// Return NOT FOUND because the entryid given was the incorrect type. This means
-				// that the object was basically not found.
-				return MAPI_E_NOT_FOUND;
-		}
+		if (HrGetRealProp(PR_OBJECT_TYPE, 0, NULL, &sPropValue, m_ulMaxPropSize) == hrSuccess &&
+		    // The server sent a PR_OBJECT_TYPE, check if it is correct
+		    this->ulObjType != sPropValue.Value.ul)
+			// Return NOT FOUND because the entryid given was the incorrect type. This means
+			// that the object was basically not found.
+			return MAPI_E_NOT_FOUND;
 	}
 	return hrSuccess;
 }
 
 HRESULT ECGenericProp::HrLoadEmptyProps()
 {
-	pthread_mutex_lock(&m_hMutexMAPIObject);
+	scoped_rlock lock(m_hMutexMAPIObject);
 
-	ASSERT(lstProps == NULL);
-	ASSERT(m_sMapiObject == NULL);
-
+	assert(lstProps == NULL);
+	assert(m_sMapiObject == NULL);
 	lstProps = new ECPropertyEntryMap;
 	AllocNewMapiObject(0, 0, ulObjType, &m_sMapiObject);
-
-	pthread_mutex_unlock(&m_hMutexMAPIObject);
-
 	return hrSuccess;
 }
 
@@ -748,18 +693,14 @@ HRESULT ECGenericProp::HrLoadEmptyProps()
 HRESULT ECGenericProp::HrLoadProps()
 {
 	HRESULT			hr = hrSuccess;
-	ECPropertyEntryIterator iterProps;
-	std::list<ULONG>::const_iterator iterPropTags;
-	std::list<ECProperty>::const_iterator iterPropVals;
 
 	if(lpStorage == NULL)
 		return MAPI_E_CALL_FAILED;
 
-	pthread_mutex_lock(&m_hMutexMAPIObject);
+	scoped_rlock lock(m_hMutexMAPIObject);
 
-	if(lstProps != NULL && m_bReload == FALSE) {
+	if (lstProps != NULL && m_bReload == FALSE)
 		goto exit; // already loaded
-	}
 
 	m_bLoading = TRUE;
 
@@ -769,10 +710,11 @@ HRESULT ECGenericProp::HrLoadProps()
 		m_sMapiObject = NULL;
 
 		// only remove my own properties: keep recipients and attachment tables
-		for (iterProps = lstProps->begin(); iterProps != lstProps->end(); ++iterProps)
-			iterProps->second.DeleteProperty();
-
-		lstProps->clear();
+		if (lstProps != NULL) {
+			for (auto &p : *lstProps)
+				p.second.DeleteProperty();
+			lstProps->clear();
+		}
 		m_setDeletedProps.clear();
 	}
 
@@ -785,26 +727,22 @@ HRESULT ECGenericProp::HrLoadProps()
 
 	// Add *all* the entries as with empty values; values for these properties will be
 	// retrieved on-demand
-	for (iterPropTags = m_sMapiObject->lstAvailable->begin();
-	     iterPropTags != m_sMapiObject->lstAvailable->end(); ++iterPropTags) {
-		ECPropertyEntry entry(*iterPropTags);
-
-		lstProps->insert(std::make_pair(PROP_ID(*iterPropTags), entry));
+	for (auto tag : m_sMapiObject->lstAvailable) {
+		ECPropertyEntry entry(tag);
+		lstProps->insert(std::make_pair(PROP_ID(tag), entry));
 	}
 
 	// Load properties
-	for (iterPropVals = m_sMapiObject->lstProperties->begin();
-	     iterPropVals != m_sMapiObject->lstProperties->end(); ++iterPropVals) {
+	for (const auto &pv : m_sMapiObject->lstProperties)
 		// don't add any 'error' types ... (the storage object shouldn't really give us these anyway ..)
-		if (PROP_TYPE((*iterPropVals).GetPropTag()) != PT_ERROR) {
-			SPropValue tmp = iterPropVals->GetMAPIPropValRef();
+		if (PROP_TYPE(pv.GetPropTag()) != PT_ERROR) {
+			SPropValue tmp = pv.GetMAPIPropValRef();
 			HrSetRealProp(&tmp);
 		}
-	}
 
 	// remove copied proptags, subobjects are still present
-	m_sMapiObject->lstAvailable->clear();
-	m_sMapiObject->lstProperties->clear(); // pointers are now only present in lstProps (this removes memory usage!)
+	m_sMapiObject->lstAvailable.clear();
+	m_sMapiObject->lstProperties.clear(); // pointers are now only present in lstProps (this removes memory usage!)
 
 	// at this point: children still known, ulObjId and ulObjType too
 
@@ -821,9 +759,6 @@ exit:
 	dwLastError = hr;
 	m_bReload = FALSE;
 	m_bLoading = FALSE;
-
-	pthread_mutex_unlock(&m_hMutexMAPIObject);
-
 	return hr;
 }
 
@@ -840,7 +775,7 @@ HRESULT ECGenericProp::HrLoadProp(ULONG ulPropTag)
 
 	ulPropTag = NormalizePropTag(ulPropTag);
 
-	pthread_mutex_lock(&m_hMutexMAPIObject);
+	scoped_rlock lock(m_hMutexMAPIObject);
 
 	if(lstProps == NULL || m_bReload == TRUE) {
 		hr = HrLoadProps();
@@ -873,20 +808,17 @@ HRESULT ECGenericProp::HrLoadProp(ULONG ulPropTag)
 	iterProps->second.HrSetClean();
 
 exit:
-
 	if(lpsPropVal)
 		ECFreeBuffer(lpsPropVal);
-
-	pthread_mutex_unlock(&m_hMutexMAPIObject);
-
 	return hr;
 }
 
-HRESULT ECGenericProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG FAR * lpcValues, LPSPropValue FAR * lppPropArray)
+HRESULT ECGenericProp::GetProps(const SPropTagArray *lpPropTagArray,
+    ULONG ulFlags, ULONG *lpcValues, SPropValue **lppPropArray)
 {
 	HRESULT			hr = hrSuccess;
 	HRESULT			hrT = hrSuccess;
-	LPSPropTagArray	lpGetPropTagArray = lpPropTagArray;
+	SPropTagArray *lpGetPropTagArray = NULL;
 	GetPropCallBack	lpfnGetProp = NULL;
 	void*			lpParam = NULL;
 	LPSPropValue	lpsPropValue = NULL;
@@ -896,22 +828,23 @@ HRESULT ECGenericProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, U
 	if((lpPropTagArray != NULL && lpPropTagArray->cValues == 0) || Util::ValidatePropTagArray(lpPropTagArray) == false)
 		return MAPI_E_INVALID_PARAMETER;
 
-	if(lpGetPropTagArray == NULL) {
+	if (lpPropTagArray == NULL) {
 		hr = GetPropList(ulFlags, &lpGetPropTagArray);
 
 		if(hr != hrSuccess)
 			goto exit;
+		lpPropTagArray = lpGetPropTagArray;
 	}
 
-	ECAllocateBuffer(sizeof(SPropValue) * lpGetPropTagArray->cValues, (LPVOID *)&lpsPropValue);
+	ECAllocateBuffer(sizeof(SPropValue) * lpPropTagArray->cValues,
+		reinterpret_cast<void **>(&lpsPropValue));
 
-	for (i = 0; i < lpGetPropTagArray->cValues; ++i) {
-		if(HrGetHandler(lpGetPropTagArray->aulPropTag[i], NULL, &lpfnGetProp, &lpParam) == hrSuccess) {
-			lpsPropValue[i].ulPropTag = lpGetPropTagArray->aulPropTag[i];
-
-			hrT = lpfnGetProp(lpGetPropTagArray->aulPropTag[i], this->lpProvider, ulFlags, &lpsPropValue[i], lpParam, lpsPropValue);
+	for (i = 0; i < lpPropTagArray->cValues; ++i) {
+		if (HrGetHandler(lpPropTagArray->aulPropTag[i], NULL, &lpfnGetProp, &lpParam) == hrSuccess) {
+			lpsPropValue[i].ulPropTag = lpPropTagArray->aulPropTag[i];
+			hrT = lpfnGetProp(lpPropTagArray->aulPropTag[i], this->lpProvider, ulFlags, &lpsPropValue[i], lpParam, lpsPropValue);
 		} else {
-			hrT = HrGetRealProp(lpGetPropTagArray->aulPropTag[i], ulFlags, lpsPropValue, &lpsPropValue[i], m_ulMaxPropSize);
+			hrT = HrGetRealProp(lpPropTagArray->aulPropTag[i], ulFlags, lpsPropValue, &lpsPropValue[i], m_ulMaxPropSize);
 			if(hrT != hrSuccess && hrT != MAPI_E_NOT_FOUND && hrT != MAPI_E_NOT_ENOUGH_MEMORY && hrT != MAPI_W_ERRORS_RETURNED) {
 				hr = hrT;
 				goto exit;
@@ -919,7 +852,7 @@ HRESULT ECGenericProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, U
 		}
 
 		if(HR_FAILED(hrT)) {
-			lpsPropValue[i].ulPropTag = PROP_TAG(PT_ERROR,PROP_ID(lpGetPropTagArray->aulPropTag[i]));
+			lpsPropValue[i].ulPropTag = PROP_TAG(PT_ERROR, PROP_ID(lpPropTagArray->aulPropTag[i]));
 			lpsPropValue[i].Value.err = hrT;
 			hr = MAPI_W_ERRORS_RETURNED;
 		} else if(hrT != hrSuccess) {
@@ -928,17 +861,16 @@ HRESULT ECGenericProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, U
 	}
 
 	*lppPropArray = lpsPropValue;
-	*lpcValues = lpGetPropTagArray->cValues;
+	*lpcValues = lpPropTagArray->cValues;
 exit:
-
-	if(lpPropTagArray == NULL)
+	if (lpGetPropTagArray != NULL)
 		ECFreeBuffer(lpGetPropTagArray);
 
 	return hr;
 
 }
 
-HRESULT ECGenericProp::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropTagArray)
+HRESULT ECGenericProp::GetPropList(ULONG ulFlags, LPSPropTagArray *lppPropTagArray)
 {
 	HRESULT hr;
 	LPSPropTagArray		lpPropTagArray = NULL;
@@ -978,9 +910,9 @@ HRESULT ECGenericProp::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropT
 		if((!HR_FAILED(hrT) || hrT == MAPI_E_NOT_ENOUGH_MEMORY) && (PROP_TYPE(lpsPropValue->ulPropTag) != PT_ERROR || lpsPropValue->Value.err == MAPI_E_NOT_ENOUGH_MEMORY)) {
 			ULONG ulPropTag = iterCallBack->second.ulPropTag;
 			
-			if(PROP_TYPE(ulPropTag) == PT_UNICODE || PROP_TYPE(ulPropTag) == PT_STRING8) {
+			if (PROP_TYPE(ulPropTag) == PT_UNICODE ||
+			    PROP_TYPE(ulPropTag) == PT_STRING8)
 				ulPropTag = CHANGE_PROP_TYPE(ulPropTag, ((ulFlags & MAPI_UNICODE) ? PT_UNICODE : PT_STRING8));
-			}
 			
 			lpPropTagArray->aulPropTag[n++] = ulPropTag;
 		}
@@ -1013,12 +945,13 @@ HRESULT ECGenericProp::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropT
 	return hrSuccess;
 }
 
-HRESULT ECGenericProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
+HRESULT ECGenericProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN *lppUnk)
 {
 	return  MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ECGenericProp::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray FAR * lppProblems)
+HRESULT ECGenericProp::SetProps(ULONG cValues, const SPropValue *lpPropArray,
+    SPropProblemArray **lppProblems)
 {
 	HRESULT				hr = hrSuccess;
 	HRESULT				hrT = hrSuccess;
@@ -1043,11 +976,10 @@ HRESULT ECGenericProp::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSProp
 			PROP_TYPE(lpPropArray[i].ulPropTag) == PT_ERROR)
 			continue;
 
-		if(HrGetHandler(lpPropArray[i].ulPropTag, &lpfnSetProp, NULL, &lpParam) == hrSuccess) {
+		if (HrGetHandler(lpPropArray[i].ulPropTag, &lpfnSetProp, NULL, &lpParam) == hrSuccess)
 			hrT = lpfnSetProp(lpPropArray[i].ulPropTag, this->lpProvider, &lpPropArray[i], lpParam);
-		} else {
+		else
 			hrT = HrSetRealProp(&lpPropArray[i]); // SC: TODO: this does a ref copy ?!
-		}
 
 		if(hrT != hrSuccess) {
 			lpProblems->aProblem[nProblem].scode = hrT;
@@ -1086,7 +1018,8 @@ exit:
  * @retval MAPI_E_NO_ACCESS the object is read-only
  * @retval MAPI_E_NOT_ENOUGH_MEMORY unable to allocate memory to remove the problem array
  */
-HRESULT ECGenericProp::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray FAR * lppProblems)
+HRESULT ECGenericProp::DeleteProps(const SPropTagArray *lpPropTagArray,
+    SPropProblemArray **lppProblems)
 {
 	ECRESULT				er = erSuccess;
 	HRESULT					hr = hrSuccess;
@@ -1141,22 +1074,27 @@ HRESULT ECGenericProp::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProble
 	return hr;
 }
 
-HRESULT ECGenericProp::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
+HRESULT ECGenericProp::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude,
+    const SPropTagArray *lpExcludeProps, ULONG ulUIParam,
+    LPMAPIPROGRESS lpProgress, LPCIID lpInterface, void *lpDestObj,
+    ULONG ulFlags, SPropProblemArray **lppProblems)
 {
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ECGenericProp::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
+HRESULT ECGenericProp::CopyProps(const SPropTagArray *, ULONG ui_param,
+    LPMAPIPROGRESS, LPCIID intf, void *dest_obj, ULONG flags,
+    SPropProblemArray **)
 {
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ECGenericProp::GetNamesFromIDs(LPSPropTagArray FAR * lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG FAR * lpcPropNames, LPMAPINAMEID FAR * FAR * lpppPropNames)
+HRESULT ECGenericProp::GetNamesFromIDs(LPSPropTagArray *lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames, LPMAPINAMEID **lpppPropNames)
 {
 	return MAPI_E_NO_SUPPORT;
 }
  
-HRESULT ECGenericProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID FAR * lppPropNames, ULONG ulFlags, LPSPropTagArray FAR * lppPropTags)
+HRESULT ECGenericProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropNames, ULONG ulFlags, LPSPropTagArray *lppPropTags)
 {
 	return MAPI_E_NO_SUPPORT;
 }
@@ -1164,43 +1102,23 @@ HRESULT ECGenericProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID FAR * lppP
 // Interface IECSingleInstance
 HRESULT ECGenericProp::GetSingleInstanceId(ULONG *lpcbInstanceID, LPSIEID *lppInstanceID)
 {
-	HRESULT hr = hrSuccess;
+	scoped_rlock lock(m_hMutexMAPIObject);
 
-	pthread_mutex_lock(&m_hMutexMAPIObject);
-
-	if (!m_sMapiObject) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-	if (!lpcbInstanceID || !lppInstanceID) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	hr = Util::HrCopyEntryId(m_sMapiObject->cbInstanceID, (LPENTRYID)m_sMapiObject->lpInstanceID,
-							 lpcbInstanceID, (LPENTRYID *)lppInstanceID);
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-
-	pthread_mutex_unlock(&m_hMutexMAPIObject);
-
-	return hr;
+	if (m_sMapiObject == NULL)
+		return MAPI_E_NOT_FOUND;
+	if (lpcbInstanceID == NULL || lppInstanceID == NULL)
+		return MAPI_E_INVALID_PARAMETER;
+	return Util::HrCopyEntryId(m_sMapiObject->cbInstanceID,
+	       reinterpret_cast<ENTRYID *>(m_sMapiObject->lpInstanceID),
+	       lpcbInstanceID, reinterpret_cast<ENTRYID **>(lppInstanceID));
 }
 
 HRESULT ECGenericProp::SetSingleInstanceId(ULONG cbInstanceID, LPSIEID lpInstanceID)
 {
-	HRESULT hr = hrSuccess;
+	scoped_rlock lock(m_hMutexMAPIObject);
 
-	pthread_mutex_lock(&m_hMutexMAPIObject);
-
-	if (!m_sMapiObject) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
+	if (m_sMapiObject == NULL)
+		return MAPI_E_NOT_FOUND;
 	if (m_sMapiObject->lpInstanceID)
 		ECFreeBuffer(m_sMapiObject->lpInstanceID);
 
@@ -1208,128 +1126,36 @@ HRESULT ECGenericProp::SetSingleInstanceId(ULONG cbInstanceID, LPSIEID lpInstanc
 	m_sMapiObject->cbInstanceID = 0;
 	m_sMapiObject->bChangedInstance = false;
 
-	hr = Util::HrCopyEntryId(cbInstanceID, (LPENTRYID)lpInstanceID,
-							 &m_sMapiObject->cbInstanceID, (LPENTRYID *)&m_sMapiObject->lpInstanceID);
+	HRESULT hr = Util::HrCopyEntryId(cbInstanceID,
+		reinterpret_cast<ENTRYID *>(lpInstanceID),
+		&m_sMapiObject->cbInstanceID,
+		reinterpret_cast<ENTRYID **>(&m_sMapiObject->lpInstanceID));
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	m_sMapiObject->bChangedInstance = true;
-
-exit:
-	pthread_mutex_unlock(&m_hMutexMAPIObject);
-
 	return hr;
 }
 
 // Interface IMAPIProp
-HRESULT __stdcall ECGenericProp::xMAPIProp::QueryInterface(REFIID refiid, void ** lppInterface)
-{
-	METHOD_PROLOGUE_(ECGenericProp , MAPIProp);
-	return pThis->QueryInterface(refiid, lppInterface);
-}
-
-ULONG __stdcall ECGenericProp::xMAPIProp::AddRef()
-{
-	METHOD_PROLOGUE_(ECGenericProp , MAPIProp);
-	return pThis->AddRef();
-}
-
-ULONG __stdcall ECGenericProp::xMAPIProp::Release()
-{
-	METHOD_PROLOGUE_(ECGenericProp , MAPIProp);
-	return pThis->Release();
-}
-
-HRESULT __stdcall ECGenericProp::xMAPIProp::GetLastError(HRESULT hError, ULONG ulFlags,
-    LPMAPIERROR * lppMapiError)
-{
-	METHOD_PROLOGUE_(ECGenericProp , MAPIProp);
-	return pThis->GetLastError(hError, ulFlags, lppMapiError);
-}
-
-HRESULT __stdcall ECGenericProp::xMAPIProp::SaveChanges(ULONG ulFlags)
-{
-	METHOD_PROLOGUE_(ECGenericProp , MAPIProp);
-	return pThis->SaveChanges(ulFlags);
-}
-
-HRESULT __stdcall ECGenericProp::xMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG FAR * lpcValues, LPSPropValue FAR * lppPropArray)
-{
-	METHOD_PROLOGUE_(ECGenericProp , MAPIProp);
-	return pThis->GetProps(lpPropTagArray, ulFlags, lpcValues, lppPropArray);
-}
-
-HRESULT __stdcall ECGenericProp::xMAPIProp::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropTagArray)
-{
-	METHOD_PROLOGUE_(ECGenericProp , MAPIProp);
-	return pThis->GetPropList(ulFlags, lppPropTagArray);
-}
-
-HRESULT __stdcall ECGenericProp::xMAPIProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
-{
-	METHOD_PROLOGUE_(ECGenericProp , MAPIProp);
-	return pThis->OpenProperty(ulPropTag, lpiid, ulInterfaceOptions, ulFlags, lppUnk);
-}
-
-HRESULT __stdcall ECGenericProp::xMAPIProp::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray FAR * lppProblems)
-{
-	METHOD_PROLOGUE_(ECGenericProp , MAPIProp);
-	return pThis->SetProps(cValues, lpPropArray, lppProblems);
-}
-
-HRESULT __stdcall ECGenericProp::xMAPIProp::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray FAR * lppProblems)
-{
-	METHOD_PROLOGUE_(ECGenericProp , MAPIProp);
-	return pThis->DeleteProps(lpPropTagArray, lppProblems);
-}
-
-HRESULT __stdcall ECGenericProp::xMAPIProp::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
-{
-	METHOD_PROLOGUE_(ECGenericProp , MAPIProp);
-	return pThis->CopyTo(ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-}
-
-HRESULT __stdcall ECGenericProp::xMAPIProp::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
-{
-	METHOD_PROLOGUE_(ECGenericProp , MAPIProp);
-	return pThis->CopyProps(lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-}
-
-HRESULT __stdcall ECGenericProp::xMAPIProp::GetNamesFromIDs(LPSPropTagArray * pptaga, LPGUID lpguid, ULONG ulFlags, ULONG * pcNames, LPMAPINAMEID ** pppNames)
-{
-	METHOD_PROLOGUE_(ECGenericProp , MAPIProp);
-	return pThis->GetNamesFromIDs(pptaga, lpguid, ulFlags, pcNames, pppNames);
-}
-
-HRESULT __stdcall ECGenericProp::xMAPIProp::GetIDsFromNames(ULONG cNames, LPMAPINAMEID * ppNames, ULONG ulFlags, LPSPropTagArray * pptaga)
-{
-	METHOD_PROLOGUE_(ECGenericProp , MAPIProp);
-	return pThis->GetIDsFromNames(cNames, ppNames, ulFlags, pptaga);
-}
+DEF_HRMETHOD0(ECGenericProp, MAPIProp, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_ULONGMETHOD0(ECGenericProp, MAPIProp, AddRef, (void))
+DEF_ULONGMETHOD0(ECGenericProp, MAPIProp, Release, (void))
+DEF_HRMETHOD0(ECGenericProp, MAPIProp, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
+DEF_HRMETHOD0(ECGenericProp, MAPIProp, SaveChanges, (ULONG, ulFlags))
+DEF_HRMETHOD0(ECGenericProp, MAPIProp, GetProps, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags), (ULONG *, lpcValues), (SPropValue **, lppPropArray))
+DEF_HRMETHOD0(ECGenericProp, MAPIProp, GetPropList, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
+DEF_HRMETHOD0(ECGenericProp, MAPIProp, OpenProperty, (ULONG, ulPropTag), (LPCIID, lpiid), (ULONG, ulInterfaceOptions), (ULONG, ulFlags), (LPUNKNOWN *, lppUnk))
+DEF_HRMETHOD0(ECGenericProp, MAPIProp, SetProps, (ULONG, cValues), (const SPropValue *, lpPropArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD0(ECGenericProp, MAPIProp, DeleteProps, (const SPropTagArray *, lpPropTagArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD0(ECGenericProp, MAPIProp, CopyTo, (ULONG, ciidExclude), (LPCIID, rgiidExclude), (const SPropTagArray *, lpExcludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD0(ECGenericProp, MAPIProp, CopyProps, (const SPropTagArray *, lpIncludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD0(ECGenericProp, MAPIProp, GetNamesFromIDs, (LPSPropTagArray *, pptaga), (LPGUID, lpguid), (ULONG, ulFlags), (ULONG *, pcNames), (LPMAPINAMEID **, pppNames))
+DEF_HRMETHOD0(ECGenericProp, MAPIProp, GetIDsFromNames, (ULONG, cNames), (LPMAPINAMEID *, ppNames), (ULONG, ulFlags), (LPSPropTagArray *, pptaga))
 
 // Proxy routines for IECSingleInstance
-HRESULT __stdcall ECGenericProp::xECSingleInstance::QueryInterface(REFIID refiid, void ** lppInterface)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IECSingleInstance::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
-	METHOD_PROLOGUE_(ECGenericProp , ECSingleInstance);
-	HRESULT hr = pThis->QueryInterface(refiid, lppInterface);
-	TRACE_MAPI(TRACE_RETURN, "IECSingleInstance::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-ULONG __stdcall ECGenericProp::xECSingleInstance::AddRef()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IECSingleInstance::AddRef", "");
-	METHOD_PROLOGUE_(ECGenericProp , ECSingleInstance);
-	return pThis->AddRef();
-}
-
-ULONG __stdcall ECGenericProp::xECSingleInstance::Release()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IECSingleInstance::Release", "");
-	METHOD_PROLOGUE_(ECGenericProp , ECSingleInstance);
-	return pThis->Release();
-}
+DEF_HRMETHOD1(TRACE_MAPI, ECGenericProp, ECSingleInstance, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECGenericProp, ECSingleInstance, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECGenericProp, ECSingleInstance, Release, (void))
 
 HRESULT __stdcall ECGenericProp::xECSingleInstance::GetSingleInstanceId(ULONG *lpcbInstanceID, LPENTRYID *lppInstanceID)
 {

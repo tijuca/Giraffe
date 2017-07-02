@@ -16,10 +16,15 @@
  */
 
 #include <kopano/platform.h>
+#include <memory>
 #include "ECSyncUtil.h"
 #include <kopano/mapi_ptr.h>
-
+#include <kopano/memory.hpp>
 #include <mapix.h>
+
+using namespace KCHL;
+
+namespace KC {
 
 HRESULT HrDecodeSyncStateStream(LPSTREAM lpStream, ULONG *lpulSyncId, ULONG *lpulChangeId, PROCESSEDCHANGESSET *lpSetProcessChanged)
 {
@@ -30,35 +35,28 @@ HRESULT HrDecodeSyncStateStream(LPSTREAM lpStream, ULONG *lpulSyncId, ULONG *lpu
 	ULONG		ulChangeCount = 0;
 	ULONG		ulProcessedChangeId = 0;
 	ULONG		ulSourceKeySize = 0;
-	char		*lpData = NULL;
-
 	LARGE_INTEGER		liPos = {{0, 0}};
 	PROCESSEDCHANGESSET setProcessedChanged;
 
 	hr = lpStream->Stat(&stat, STATFLAG_NONAME);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 	
 	if (stat.cbSize.HighPart == 0 && stat.cbSize.LowPart == 0) {
 		ulSyncId = 0;
 		ulChangeId = 0;
 	} else {
-		if (stat.cbSize.HighPart != 0 || stat.cbSize.LowPart < 8){
-			hr = MAPI_E_INVALID_PARAMETER;
-			goto exit;
-		}
-		
+		if (stat.cbSize.HighPart != 0 || stat.cbSize.LowPart < 8)
+			return MAPI_E_INVALID_PARAMETER;
 		hr = lpStream->Seek(liPos, STREAM_SEEK_SET, NULL);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		hr = lpStream->Read(&ulSyncId, 4, NULL);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		hr = lpStream->Read(&ulChangeId, 4, NULL);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 			
 		// Following the sync ID and the change ID is the list of changes that were already processed for
 		// this sync ID / change ID combination. This allows us partial processing of items retrieved from 
@@ -67,30 +65,23 @@ HRESULT HrDecodeSyncStateStream(LPSTREAM lpStream, ULONG *lpulSyncId, ULONG *lpu
 			// The stream contains a list of already processed items, read them
 			
 			for (ULONG i = 0; i < ulChangeCount; ++i) {
+				std::unique_ptr<char[]> lpData;
+
 				hr = lpStream->Read(&ulProcessedChangeId, 4, NULL);
 				if (hr != hrSuccess)
-					goto exit; // Not the amount of expected bytes are there
-				
+					/* Not the amount of expected bytes are there */
+					return hr;
 				hr = lpStream->Read(&ulSourceKeySize, 4, NULL);
 				if (hr != hrSuccess)
-					goto exit;
-					
-				if (ulSourceKeySize > 1024) {
+					return hr;
+				if (ulSourceKeySize > 1024)
 					// Stupidly large source key, the stream must be bad.
-					hr = MAPI_E_INVALID_PARAMETER;
-					goto exit;
-				}
-					
-				lpData = new char[ulSourceKeySize];
-					
-				hr = lpStream->Read(lpData, ulSourceKeySize, NULL);
+					return MAPI_E_INVALID_PARAMETER;
+				lpData.reset(new char[ulSourceKeySize]);
+				hr = lpStream->Read(lpData.get(), ulSourceKeySize, NULL);
 				if(hr != hrSuccess)
-					goto exit;
-					
-				setProcessedChanged.insert(std::pair<unsigned int, std::string>(ulProcessedChangeId, std::string(lpData, ulSourceKeySize)));
-				
-				delete []lpData;
-				lpData =  NULL;
+					return hr;
+				setProcessedChanged.insert(std::pair<unsigned int, std::string>(ulProcessedChangeId, std::string(lpData.get(), ulSourceKeySize)));
 			}
 		}
 	}
@@ -103,94 +94,68 @@ HRESULT HrDecodeSyncStateStream(LPSTREAM lpStream, ULONG *lpulSyncId, ULONG *lpu
 
 	if (lpSetProcessChanged)
 		lpSetProcessChanged->insert(setProcessedChanged.begin(), setProcessedChanged.end());
-
-exit:
-	delete[] lpData;
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ResetStream(LPSTREAM lpStream)
 {
-	HRESULT hr = hrSuccess;
 	LARGE_INTEGER liPos = {{0, 0}};
 	ULARGE_INTEGER uliSize = {{8, 0}};
-	hr = lpStream->Seek(liPos, STREAM_SEEK_SET, NULL);
+	HRESULT hr = lpStream->Seek(liPos, STREAM_SEEK_SET, NULL);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	hr = lpStream->SetSize(uliSize);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	hr = lpStream->Write("\0\0\0\0\0\0\0\0", 8, NULL);
 	if (hr != hrSuccess)
-		goto exit;
-	hr = lpStream->Seek(liPos, STREAM_SEEK_SET, NULL);
-
-exit:
-	return hr;
+		return hr;
+	return lpStream->Seek(liPos, STREAM_SEEK_SET, NULL);
 }
 
 HRESULT CreateNullStatusStream(LPSTREAM *lppStream)
 {
-	HRESULT hr = hrSuccess;
 	StreamPtr ptrStream;
 
-	hr = CreateStreamOnHGlobal(GlobalAlloc(GPTR, 8), true, &ptrStream);
+	HRESULT hr = CreateStreamOnHGlobal(GlobalAlloc(GPTR, 8), true, &~ptrStream);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = ResetStream(ptrStream);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = ptrStream->QueryInterface(IID_IStream, (LPVOID*)lppStream);
-
-exit:
-	return hr;
+		return hr;
+	return ptrStream->QueryInterface(IID_IStream,
+	       reinterpret_cast<LPVOID *>(lppStream));
 }
 
 HRESULT HrGetOneBinProp(IMAPIProp *lpProp, ULONG ulPropTag, LPSPropValue *lppPropValue)
 {
 	HRESULT hr = hrSuccess;
-	IStream *lpStream = NULL;
-	LPSPropValue lpPropValue = NULL;
+	object_ptr<IStream> lpStream;
+	memory_ptr<SPropValue> lpPropValue;
 	STATSTG sStat;
 	ULONG ulRead = 0;
 
-	if(!lpProp){
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	hr = lpProp->OpenProperty(ulPropTag, &IID_IStream, 0, 0, (IUnknown **)&lpStream);
+	if (lpProp == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+	hr = lpProp->OpenProperty(ulPropTag, &IID_IStream, 0, 0, &~lpStream);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpStream->Stat(&sStat, 0);
 	if(hr != hrSuccess)
-		goto exit;
-
-	hr = MAPIAllocateBuffer(sizeof(SPropValue), (void **)&lpPropValue);
+		return hr;
+	hr = MAPIAllocateBuffer(sizeof(SPropValue), &~lpPropValue);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = MAPIAllocateMore(sStat.cbSize.LowPart, lpPropValue, (void **) &lpPropValue->Value.bin.lpb);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpStream->Read(lpPropValue->Value.bin.lpb, sStat.cbSize.LowPart, &ulRead);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	lpPropValue->Value.bin.cb = ulRead;
 
-	*lppPropValue = lpPropValue;
-
-exit:
-	if (hr != hrSuccess)
-		MAPIFreeBuffer(lpPropValue);
-
-	if(lpStream)
-		lpStream->Release();
-
-	return hr;
+	*lppPropValue = lpPropValue.release();
+	return hrSuccess;
 }
+
+} /* namespace */

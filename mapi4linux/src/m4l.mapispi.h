@@ -18,17 +18,17 @@
 #ifndef __M4L_MAPISPI_IMPL_H
 #define __M4L_MAPISPI_IMPL_H
 
+#include <kopano/zcdefs.h>
 #include <map>
-#include <pthread.h>
-
+#include <mutex>
 #include "m4l.common.h"
 #include "m4l.mapisvc.h"
 #include <mapispi.h>
 #include <mapix.h>
 #include <edkmdb.h>
 
-typedef struct m4lsupportadvise {
-	m4lsupportadvise(LPNOTIFKEY lpKey, ULONG ulEventMask, ULONG ulFlags, LPMAPIADVISESINK lpAdviseSink)
+struct M4LSUPPORTADVISE {
+	M4LSUPPORTADVISE(LPNOTIFKEY lpKey, ULONG ulEventMask, ULONG ulFlags, LPMAPIADVISESINK lpAdviseSink)
 	{
 		this->lpKey = lpKey;
 		this->ulEventMask = ulEventMask;
@@ -40,7 +40,7 @@ typedef struct m4lsupportadvise {
 	ULONG ulEventMask;
 	ULONG ulFlags;
 	LPMAPIADVISESINK lpAdviseSink;
-} M4LSUPPORTADVISE;
+};
 
 typedef std::map<ULONG, M4LSUPPORTADVISE> M4LSUPPORTADVISES;
 
@@ -68,12 +68,12 @@ public:
 	virtual ~M4LMAPIGetSession();
 
 	// IMAPIGetSession
-	virtual HRESULT __stdcall GetMAPISession(LPUNKNOWN *lppSession);
+	virtual HRESULT __stdcall GetMAPISession(LPUNKNOWN *lppSession) _kc_override;
 
     // iunknown passthru
-    virtual ULONG __stdcall AddRef();
-    virtual ULONG __stdcall Release();
-    virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid);
+	virtual ULONG __stdcall AddRef(void) _kc_override;
+	virtual ULONG __stdcall Release(void) _kc_override;
+	virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid) _kc_override;
 };
 
 class M4LMAPISupport : public M4LUnknown, public IMAPISupport {
@@ -81,10 +81,9 @@ private:
 	LPMAPISESSION		session;
 	LPMAPIUID			lpsProviderUID;
 	SVCService*			service;
-
-	pthread_mutex_t		m_advises_mutex;
+	std::mutex m_advises_mutex;
 	M4LSUPPORTADVISES	m_advises;
-	ULONG				m_connections;
+	ULONG m_connections = 0;
 
 public:
 	M4LMAPISupport(LPMAPISESSION new_session, LPMAPIUID sProviderUID, SVCService* lpService);
@@ -129,13 +128,8 @@ public:
 	virtual HRESULT __stdcall CopyFolder(LPCIID lpSrcInterface, LPVOID lpSrcFolder, ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpDestInterface,
 							   LPVOID lpDestFolder, LPTSTR lszNewFolderName, ULONG ulUIParam, LPMAPIPROGRESS lpProgress,
 							   ULONG ulFlags);
-
-	virtual HRESULT __stdcall DoCopyTo(LPCIID lpSrcInterface, LPVOID lpSrcObj, ULONG ciidExclude, LPCIID rgiidExclude,
-							 LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpDestInterface,
-							 LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray * lppProblems); 
-	virtual HRESULT __stdcall DoCopyProps(LPCIID lpSrcInterface, LPVOID lpSrcObj, LPSPropTagArray lpIncludeProps, ULONG ulUIParam,
-								LPMAPIPROGRESS lpProgress, LPCIID lpDestInterface, LPVOID lpDestObj, ULONG ulFlags,
-								LPSPropProblemArray * lppProblems); 
+	virtual HRESULT __stdcall DoCopyTo(LPCIID lpSrcInterface, LPVOID lpSrcObj, ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpDestInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
+	virtual HRESULT __stdcall DoCopyProps(LPCIID lpSrcInterface, LPVOID lpSrcObj, const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpDestInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
 	virtual HRESULT __stdcall DoProgressDialog(ULONG ulUIParam, ULONG ulFlags, LPMAPIPROGRESS * lppProgress); 
 	virtual HRESULT __stdcall ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAGE * lppEmptyMessage); 
 	virtual HRESULT __stdcall PrepareSubmit(LPMESSAGE lpMessage, ULONG * lpulFlags); 
@@ -155,9 +149,9 @@ public:
 	virtual HRESULT __stdcall GetSvcConfigSupportObj(ULONG ulFlags, LPMAPISUP * lppSvcSupport);
 
     // iunknown passthru
-    virtual ULONG __stdcall AddRef();
-    virtual ULONG __stdcall Release();
-    virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid);
+	virtual ULONG __stdcall AddRef(void) _kc_override;
+	virtual ULONG __stdcall Release(void) _kc_override;
+	virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid) _kc_override;
 };
 
 

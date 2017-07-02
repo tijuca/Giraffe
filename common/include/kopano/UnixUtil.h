@@ -18,10 +18,23 @@
 #ifndef __UNIXUTIL_H
 #define __UNIXUTIL_H
 
+#include <string>
+#include <vector>
+#include <kopano/zcdefs.h>
+#include <dirent.h>
 #include <sys/resource.h>
-
-#include <kopano/ECLogger.h>
 #include <kopano/ECConfig.h>
+
+namespace KC {
+
+class fs_deleter {
+	public:
+	void operator()(DIR *d)
+	{
+		if (d != nullptr)
+			closedir(d);
+	}
+};
 
 struct popen_rlimit {
 	int resource;
@@ -34,18 +47,19 @@ struct popen_rlimit_array {
 };
 
 #define sized_popen_rlimit_array(_climit, _name) \
-struct _popen_rlimit_array_ ## _name \
-{ \
+struct _popen_rlimit_array_ ## _name { \
 	unsigned int cValues; \
 	struct popen_rlimit sLimit[_climit]; \
 } _name
 
-int unix_runas(ECConfig *lpConfig, ECLogger *lpLogger);
-int unix_chown(const char *filename, const char *username, const char *groupname);
-extern void unix_coredump_enable(ECLogger *);
-int unix_create_pidfile(const char *argv0, ECConfig *lpConfig, ECLogger *lpLogger, bool bForce = true);
-int unix_daemonize(ECConfig *lpConfig, ECLogger *lpLogger);
-int unix_fork_function(void*(func)(void*), void *param, int nCloseFDs, int *pCloseFDs);
-extern bool unix_system(const char *szLogName, const char *command, const char **env);
+extern _kc_export int unix_runas(ECConfig *);
+extern _kc_export int unix_chown(const char *filename, const char *user, const char *group);
+extern _kc_export void unix_coredump_enable(void);
+extern _kc_export int unix_create_pidfile(const char *argv0, ECConfig *, bool force = true);
+extern _kc_export int unix_daemonize(ECConfig *);
+extern _kc_export int unix_fork_function(void *(*)(void *), void *param, int nfds, int *closefds);
+extern _kc_export bool unix_system(const char *logname, const std::vector<std::string> &cmd, const char **env);
+
+} /* namespace */
 
 #endif

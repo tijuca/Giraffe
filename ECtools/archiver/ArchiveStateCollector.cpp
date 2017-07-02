@@ -16,6 +16,8 @@
  */
 
 #include <kopano/zcdefs.h>
+#include <new>
+#include <utility>
 #include <kopano/platform.h>
 #include <kopano/userutil.h>
 #include "ArchiveStateCollector.h"
@@ -26,19 +28,20 @@
 #include "HrException.h"
 #include <kopano/ECRestriction.h>
 
+namespace KC {
+
 namespace details {
 
 	/**
 	 * Subclass of DataCollector that is used to get the current state
 	 * through the MailboxTable.
 	 */
-	class MailboxDataCollector _zcp_final : public DataCollector {
+	class MailboxDataCollector _kc_final : public DataCollector {
 	public:
 		MailboxDataCollector(ArchiveStateCollector::ArchiveInfoMap &mapArchiveInfo, ECLogger *lpLogger);
 		~MailboxDataCollector();
-
-		HRESULT GetRequiredPropTags(LPMAPIPROP lpProp, LPSPropTagArray *lppPropTagArray) const _zcp_override;
-		HRESULT CollectData(LPMAPITABLE lpStoreTable) _zcp_override;
+		HRESULT GetRequiredPropTags(LPMAPIPROP lpProp, LPSPropTagArray *lppPropTagArray) const _kc_override;
+		HRESULT CollectData(LPMAPITABLE lpStoreTable) _kc_override;
 
 	private:
 		ArchiveStateCollector::ArchiveInfoMap &m_mapArchiveInfo;
@@ -60,14 +63,14 @@ namespace details {
 		HRESULT hr = hrSuccess;
 		SPropTagArrayPtr ptrPropTagArray;
 
-		PROPMAP_START
+		PROPMAP_START(2)
 			PROPMAP_NAMED_ID(STORE_ENTRYIDS, PT_MV_BINARY, PSETID_Archive, "store-entryids")
 			PROPMAP_NAMED_ID(ITEM_ENTRYIDS, PT_MV_BINARY, PSETID_Archive, "item-entryids")
 		PROPMAP_INIT(lpProp);
 
-		hr = MAPIAllocateBuffer(CbNewSPropTagArray(4), &ptrPropTagArray);
+		hr = MAPIAllocateBuffer(CbNewSPropTagArray(4), &~ptrPropTagArray);
 		if (hr != hrSuccess)
-			goto exit;
+			goto exitpm;
 
 		ptrPropTagArray->cValues = 4;
 		ptrPropTagArray->aulPropTag[0] = PR_ENTRYID;
@@ -76,7 +79,7 @@ namespace details {
 		ptrPropTagArray->aulPropTag[3] = PROP_ITEM_ENTRYIDS;
 
 		*lppPropTagArray = ptrPropTagArray.release();
-	exit:
+	exitpm:
 		return hr;
 	}
 
@@ -96,7 +99,6 @@ namespace details {
 				break;
 
 			for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
-				std::pair<ArchiveStateCollector::ArchiveInfoMap::iterator, bool> res;
 				bool bComplete = true;
 				abentryid_t userId;
 
@@ -116,7 +118,7 @@ namespace details {
 				}
 
 				userId.assign(ptrRows[i].lpProps[IDX_MAILBOX_OWNER_ENTRYID].Value.bin);
-				res = m_mapArchiveInfo.insert(std::make_pair(userId, ArchiveStateCollector::ArchiveInfo()));
+				auto res = m_mapArchiveInfo.insert(std::make_pair(userId, ArchiveStateCollector::ArchiveInfo()));
 				if (res.second == true)
 					m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Inserting row for user id %s", userId.tostring().c_str());
 				else
@@ -131,7 +133,7 @@ namespace details {
 					SObjectEntry objEntry;
 					objEntry.sStoreEntryId.assign(entryid_t(ptrRows[i].lpProps[IDX_STORE_ENTRYIDS].Value.MVbin.lpbin[j]));
 					objEntry.sItemEntryId.assign(entryid_t(ptrRows[i].lpProps[IDX_ITEM_ENTRYIDS].Value.MVbin.lpbin[j]));
-					res.first->second.lstArchives.push_back(objEntry);
+					res.first->second.lstArchives.push_back(std::move(objEntry));
 				}
 			}
 		}
@@ -148,15 +150,11 @@ namespace details {
  */
 HRESULT ArchiveStateCollector::Create(const ArchiverSessionPtr &ptrSession, ECLogger *lpLogger, ArchiveStateCollectorPtr *lpptrCollector)
 {
-	ArchiveStateCollectorPtr ptrCollector;
-	
-	try {
-		ptrCollector = ArchiveStateCollectorPtr(new ArchiveStateCollector(ptrSession, lpLogger));
-	} catch (const std::bad_alloc &) {
+	ArchiveStateCollectorPtr ptrCollector(
+		new(std::nothrow) ArchiveStateCollector(ptrSession, lpLogger));
+	if (ptrCollector == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-	}
-
-	*lpptrCollector = ptrCollector;
+	*lpptrCollector = std::move(ptrCollector);
 	return hrSuccess;
 }
 
@@ -188,7 +186,9 @@ HRESULT ArchiveStateCollector::GetArchiveStateUpdater(ArchiveStateUpdaterPtr *lp
 	if (hr != hrSuccess)
 		return hr;
 
-	hr = GetMailboxData(m_lpLogger, m_ptrSession->GetMAPISession(), m_ptrSession->GetSSLPath(), m_ptrSession->GetSSLPass(), false, &mdc);
+	hr = GetMailboxData(m_ptrSession->GetMAPISession(),
+	     m_ptrSession->GetSSLPath(), m_ptrSession->GetSSLPass(),
+	     false, &mdc);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Failed to get mailbox data. hr=0x%08x", hr);
 		return hr;
@@ -212,7 +212,7 @@ HRESULT ArchiveStateCollector::PopulateUserList()
 	HRESULT hr;
 	ABContainerPtr ptrABContainer;
 
-	hr = m_ptrSession->GetGAL(&ptrABContainer);
+	hr = m_ptrSession->GetGAL(&~ptrABContainer);
 	if (hr != hrSuccess)
 		return hr;
 	hr = PopulateFromContainer(ptrABContainer);
@@ -245,37 +245,33 @@ HRESULT ArchiveStateCollector::PopulateFromContainer(LPABCONT lpContainer)
 	HRESULT hr;
 	SPropValue sPropObjType;
 	SPropValue sPropDispType;
-	SRestrictionPtr ptrRestriction;
 	MAPITablePtr ptrTable;
 	SRowSetPtr ptrRows;
-
-	SizedSPropTagArray(4, sptaUserProps) = {4, {PR_ENTRYID, PR_ACCOUNT, PR_EC_ARCHIVE_SERVERS, PR_EC_ARCHIVE_COUPLINGS}};
+	static constexpr const SizedSPropTagArray(4, sptaUserProps) =
+		{4, {PR_ENTRYID, PR_ACCOUNT, PR_EC_ARCHIVE_SERVERS,
+		PR_EC_ARCHIVE_COUPLINGS}};
 	enum {IDX_ENTRYID, IDX_ACCOUNT, IDX_EC_ARCHIVE_SERVERS, IDX_EC_ARCHIVE_COUPLINGS};
 
-	ECAndRestriction resFilter(
-		ECPropertyRestriction(RELOP_EQ, PR_OBJECT_TYPE, &sPropObjType, ECRestriction::Cheap) +
-		ECPropertyRestriction(RELOP_EQ, PR_DISPLAY_TYPE, &sPropDispType, ECRestriction::Cheap) +
-		ECOrRestriction(
-			ECExistRestriction(PR_EC_ARCHIVE_SERVERS) +
-			ECExistRestriction(PR_EC_ARCHIVE_COUPLINGS)
-		)
-	);
 
 	sPropObjType.ulPropTag = PR_OBJECT_TYPE;
 	sPropObjType.Value.ul = MAPI_MAILUSER;
 	sPropDispType.ulPropTag = PR_DISPLAY_TYPE;
 	sPropDispType.Value.ul = DT_MAILUSER;;
 
-	hr = resFilter.CreateMAPIRestriction(&ptrRestriction, ECRestriction::Cheap);
+	hr = lpContainer->GetContentsTable(0, &~ptrTable);
 	if (hr != hrSuccess)
 		return hr;
-	hr = lpContainer->GetContentsTable(0, &ptrTable);
+	hr = ptrTable->SetColumns(sptaUserProps, TBL_BATCH);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrTable->SetColumns((LPSPropTagArray)&sptaUserProps, TBL_BATCH);
-	if (hr != hrSuccess)
-		return hr;
-	hr = ptrTable->Restrict(ptrRestriction, TBL_BATCH);
+	hr = ECAndRestriction(
+		ECPropertyRestriction(RELOP_EQ, PR_OBJECT_TYPE, &sPropObjType, ECRestriction::Cheap) +
+		ECPropertyRestriction(RELOP_EQ, PR_DISPLAY_TYPE, &sPropDispType, ECRestriction::Cheap) +
+		ECOrRestriction(
+			ECExistRestriction(PR_EC_ARCHIVE_SERVERS) +
+			ECExistRestriction(PR_EC_ARCHIVE_COUPLINGS)
+		)
+	).RestrictTable(ptrTable, TBL_BATCH);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -288,8 +284,6 @@ HRESULT ArchiveStateCollector::PopulateFromContainer(LPABCONT lpContainer)
 			break;
 
 		for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
-			ArchiveInfoMap::iterator iterator;
-			
 			if (ptrRows[i].lpProps[IDX_ENTRYID].ulPropTag != PR_ENTRYID) {
 				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get entryid from address list. hr=0x%08x", ptrRows[i].lpProps[IDX_ACCOUNT].Value.err);
 				continue;
@@ -301,8 +295,7 @@ HRESULT ArchiveStateCollector::PopulateFromContainer(LPABCONT lpContainer)
 			}
 
 			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Inserting row for user '" TSTRING_PRINTF "'", ptrRows[i].lpProps[IDX_ACCOUNT].Value.LPSZ);
-			iterator = m_mapArchiveInfo.insert(std::make_pair(abentryid_t(ptrRows[i].lpProps[IDX_ENTRYID].Value.bin), ArchiveInfo())).first;
-
+			auto iterator = m_mapArchiveInfo.insert(std::make_pair(abentryid_t(ptrRows[i].lpProps[IDX_ENTRYID].Value.bin), ArchiveInfo())).first;
 			iterator->second.userName.assign(ptrRows[i].lpProps[IDX_ACCOUNT].Value.LPSZ);
 
 			if (ptrRows[i].lpProps[IDX_EC_ARCHIVE_SERVERS].ulPropTag == PR_EC_ARCHIVE_SERVERS) {
@@ -320,3 +313,5 @@ HRESULT ArchiveStateCollector::PopulateFromContainer(LPABCONT lpContainer)
 	}
 	return hrSuccess;
 }
+
+} /* namespace */

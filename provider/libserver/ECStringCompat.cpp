@@ -22,9 +22,11 @@
 
 #include <kopano/charset/convert.h>
 #include <kopano/charset/utf8string.h>
-#include "utf8.h"
+#include "utf8/unchecked.h"
 
 using namespace std;
+
+namespace KC {
 
 char *ECStringCompat::WTF1252_to_WINDOWS1252(soap *lpsoap, const char *szWTF1252, convert_context *lpConverter)
 {
@@ -83,11 +85,10 @@ char *ECStringCompat::UTF8_to_WTF1252(soap *lpsoap, const char *szUTF8, convert_
 		str1252 = convert_to<string>("WINDOWS-1252//TRANSLIT", szUTF8, rawsize(szUTF8), "UTF-8");
 	
 	string strWTF1252;
-	back_insert_iterator<string> iWTF1252 = back_inserter(strWTF1252);
-
+	auto iWTF1252 = back_inserter(strWTF1252);
 	strWTF1252.reserve(string::size_type(str1252.size() * 1.3));	// It will probably grow a bit, 1.3 is just a guess.
-	for (string::const_iterator i1252 = str1252.begin(); i1252 != str1252.end(); ++i1252)
-		utf8::unchecked::append((unsigned char)*i1252, iWTF1252);
+	for (const auto c : str1252)
+		utf8::unchecked::append(static_cast<unsigned char>(c), iWTF1252);
 
 	return s_strcpy(lpsoap, strWTF1252.c_str());
 }
@@ -136,9 +137,8 @@ ECRESULT FixRestrictionEncoding(struct soap *soap, const ECStringCompat &stringC
 {
 	ECRESULT er = erSuccess;
 
-	ASSERT(soap != NULL);
-	ASSERT(lpRestrict != NULL);
-
+	assert(soap != NULL);
+	assert(lpRestrict != NULL);
 	switch (lpRestrict->ulType) {
 	case RES_AND:
 		for (gsoap_size_t i = 0; er == erSuccess && i < lpRestrict->lpAnd->__size; ++i)
@@ -304,20 +304,20 @@ ECRESULT FixNotificationsEncoding(struct soap *soap, const ECStringCompat &strin
 
 	for (gsoap_size_t i = 0; i < notifications->__size; ++i) {
 		switch (notifications->__ptr[i].ulEventType) {
-			case fnevNewMail:
-				notifications->__ptr[i].newmail->lpszMessageClass = stringCompat.from_UTF8(soap, notifications->__ptr[i].newmail->lpszMessageClass);
-				break;
-
-			case fnevTableModified:
-				if (notifications->__ptr[i].tab->pRow)
-					for (gsoap_size_t j = 0; er == erSuccess && j < notifications->__ptr[i].tab->pRow->__size; ++j)
-						er = FixPropEncoding(soap, stringCompat, Out, notifications->__ptr[i].tab->pRow->__ptr + j, true);
-				break;
-
-			default:
-				break;			
+		case fnevNewMail:
+			notifications->__ptr[i].newmail->lpszMessageClass = stringCompat.from_UTF8(soap, notifications->__ptr[i].newmail->lpszMessageClass);
+			break;
+		case fnevTableModified:
+			if (notifications->__ptr[i].tab->pRow)
+				for (gsoap_size_t j = 0; er == erSuccess && j < notifications->__ptr[i].tab->pRow->__size; ++j)
+					er = FixPropEncoding(soap, stringCompat, Out, notifications->__ptr[i].tab->pRow->__ptr + j, true);
+			break;
+		default:
+			break;
 		}
 	}
 
 	return er;
 }
+
+} /* namespace */

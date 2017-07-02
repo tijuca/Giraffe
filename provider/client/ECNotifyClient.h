@@ -18,52 +18,31 @@
 #ifndef ECNOTIFYCLIENT_H
 #define ECNOTIFYCLIENT_H
 
+#include <mutex>
+#include <kopano/zcdefs.h>
 #include <kopano/ECUnknown.h>
 #include <IECChangeAdviseSink.h>
-
-#include "ECICS.h"
+#include "ics_client.hpp"
 #include "ECNotifyMaster.h"
-
-#include <pthread.h>
 #include <map>
 #include <list>
 #include <mapispi.h>
 
-typedef struct {
-	ULONG				cbKey;
-	LPBYTE				lpKey;
-	ULONG				ulEventMask;
-	LPMAPIADVISESINK	lpAdviseSink;
-	ULONG				ulConnection;
-	GUID				guid;
-	ULONG				ulSupportConnection;
-} ECADVISE;
-
-typedef struct {
-	ULONG					ulSyncId;
-	ULONG					ulChangeId;
-	ULONG					ulEventMask;
-	IECChangeAdviseSink *lpAdviseSink;
-	ULONG					ulConnection;
-	GUID					guid;
-} ECCHANGEADVISE;
-
+struct ECADVISE;
+struct ECCHANGEADVISE;
 typedef std::map<int, ECADVISE*> ECMAPADVISE;
 typedef std::map<int, ECCHANGEADVISE*> ECMAPCHANGEADVISE;
 typedef std::list<std::pair<syncid_t,connection_t> > ECLISTCONNECTION;
 
 class SessionGroupData;
 
-class ECNotifyClient : public ECUnknown
-{
+class ECNotifyClient _kc_final : public ECUnknown {
 protected:
 	ECNotifyClient(ULONG ulProviderType, void *lpProvider, ULONG ulFlags, LPMAPISUP lpSupport);
 	virtual ~ECNotifyClient();
 public:
 	static HRESULT Create(ULONG ulProviderType, void *lpProvider, ULONG ulFlags, LPMAPISUP lpSupport, ECNotifyClient**lppNotifyClient);
-
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
-
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 	virtual HRESULT Advise(ULONG cbKey, LPBYTE lpKey, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection);
 	virtual HRESULT Advise(const ECLISTSYNCSTATE &lstSyncStates, IECChangeAdviseSink *lpChangeAdviseSink, ECLISTCONNECTION *lplstConnections);
 	virtual HRESULT Unadvise(ULONG ulConnection);
@@ -96,9 +75,7 @@ private:
 
 	void*					m_lpProvider;
 	ULONG					m_ulProviderType;
-
-	pthread_mutex_t			m_hMutex;
-	pthread_mutexattr_t		m_hMutexAttrib;
+	std::recursive_mutex m_hMutex;
 	ECSESSIONGROUPID		m_ecSessionGroupId;
 };
 

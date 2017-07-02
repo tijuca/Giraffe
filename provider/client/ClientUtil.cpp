@@ -16,6 +16,9 @@
  */
 
 #include <kopano/platform.h>
+#include <algorithm>
+#include <memory>
+#include <cctype>
 #include "ClientUtil.h"
 
 #include <kopano/ECGetText.h>
@@ -33,28 +36,39 @@
 #include <edkguid.h>
 #include <kopano/mapiguidext.h>
 #include <kopano/mapiext.h>
-
+#include <kopano/memory.hpp>
 #include "Mem.h"
 #include <kopano/stringutil.h>
 
 #include <kopano/charset/convstring.h>
 #include "EntryPoint.h"
 
-#include <boost/algorithm/string/case_conv.hpp>
-
 using namespace std;
+using namespace KCHL;
+
+// profile properties
+static constexpr const SizedSPropTagArray(22, sptaKopanoProfile) =
+	{22, {PR_EC_PATH, PR_PROFILE_NAME_A, PR_EC_USERNAME_A,
+	PR_EC_USERNAME_W, PR_EC_USERPASSWORD_A, PR_EC_USERPASSWORD_W,
+	PR_EC_IMPERSONATEUSER_A, PR_EC_IMPERSONATEUSER_W, PR_EC_FLAGS,
+	PR_EC_SSLKEY_FILE, PR_EC_SSLKEY_PASS, PR_EC_PROXY_HOST,
+	PR_EC_PROXY_PORT, PR_EC_PROXY_USERNAME, PR_EC_PROXY_PASSWORD,
+	PR_EC_PROXY_FLAGS, PR_EC_CONNECTION_TIMEOUT, PR_EC_OFFLINE_PATH_A,
+	PR_EC_OFFLINE_PATH_W, PR_SERVICE_NAME,
+	PR_EC_STATS_SESSION_CLIENT_APPLICATION_VERSION,
+	PR_EC_STATS_SESSION_CLIENT_APPLICATION_MISC}};
 
 HRESULT ClientUtil::HrInitializeStatusRow (const char * lpszProviderDisplay, ULONG ulResourceType, LPMAPISUP lpMAPISup, LPSPropValue lpspvIdentity, ULONG ulFlags)
 {
 	HRESULT			hResult = hrSuccess;
-	LPSPropValue	lpspvStatusRow = NULL;
+	memory_ptr<SPropValue> lpspvStatusRow;
 	ULONG			cCurVal = 0;
 	unsigned int	size = 0;
 	std::wstring	wstrSearchKey;
 
-	hResult = MAPIAllocateBuffer(sizeof(SPropValue) * 13, (void**)&lpspvStatusRow);
+	hResult = MAPIAllocateBuffer(sizeof(SPropValue) * 13, &~lpspvStatusRow);
 	if(hResult != hrSuccess)
-		goto exit;
+		return hResult;
 
 	memset(lpspvStatusRow, 0, sizeof(SPropValue) * 13);
 
@@ -66,7 +80,7 @@ HRESULT ClientUtil::HrInitializeStatusRow (const char * lpszProviderDisplay, ULO
 		lpspvStatusRow[cCurVal].ulPropTag = PR_PROVIDER_DISPLAY_A;
 		hResult = MAPIAllocateMore(size, lpspvStatusRow, (void**)&lpspvStatusRow[cCurVal].Value.lpszA);
 		if(hResult != hrSuccess)
-			goto exit;
+			return hResult;
 		memcpy(lpspvStatusRow[cCurVal].Value.lpszA, lpszProviderDisplay, size);
 		++cCurVal;
 
@@ -74,7 +88,7 @@ HRESULT ClientUtil::HrInitializeStatusRow (const char * lpszProviderDisplay, ULO
 		lpspvStatusRow[cCurVal].ulPropTag = PR_DISPLAY_NAME_A;
 		hResult = MAPIAllocateMore(size, lpspvStatusRow, (void**)&lpspvStatusRow[cCurVal].Value.lpszA);
 		if(hResult != hrSuccess)
-			goto exit;
+			return hResult;
 		memcpy(lpspvStatusRow[cCurVal].Value.lpszA, lpszProviderDisplay, size);
 		++cCurVal;
 	}
@@ -113,47 +127,37 @@ HRESULT ClientUtil::HrInitializeStatusRow (const char * lpszProviderDisplay, ULO
 	lpspvStatusRow[cCurVal].ulPropTag = PR_RESOURCE_TYPE;
 	lpspvStatusRow[cCurVal++].Value.l = ulResourceType; //like MAPI_STORE_PROVIDER or MAPI_TRANSPORT_PROVIDER
 
-	hResult = lpMAPISup->ModifyStatusRow(cCurVal, lpspvStatusRow, ulFlags);
-
-exit:
-	MAPIFreeBuffer(lpspvStatusRow);
-	return hResult;
+	return lpMAPISup->ModifyStatusRow(cCurVal, lpspvStatusRow, ulFlags);
 }
 
 HRESULT ClientUtil::HrSetIdentity(WSTransport *lpTransport, LPMAPISUP lpMAPISup, LPSPropValue* lppIdentityProps)
 {
 	HRESULT			hr = hrSuccess;
 	ULONG			cbEntryStore = 0;
-	LPENTRYID		lpEntryStore = NULL;
-	LPENTRYID		lpEID = NULL;
+	memory_ptr<ENTRYID> lpEntryStore, lpEID;
 	ULONG			cbEID = 0;
 	ULONG			cValues = 0;
 	ULONG			ulSize = 0;
-	ECUSER *lpUser = NULL;
+	memory_ptr<ECUSER> lpUser;
 	tstring			strProfileSenderSearchKey;
-	LPSPropValue	lpIdentityProps = NULL;
+	memory_ptr<SPropValue> lpIdentityProps;
 
 	// Get the username and email adress
-	hr = lpTransport->HrGetUser(0, NULL, fMapiUnicode, &lpUser);
+	hr = lpTransport->HrGetUser(0, NULL, fMapiUnicode, &~lpUser);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	cValues = NUM_IDENTITY_PROPS;
-	hr = MAPIAllocateBuffer(sizeof(SPropValue) * cValues, (void**)&lpIdentityProps);
+	hr = MAPIAllocateBuffer(sizeof(SPropValue) * cValues, &~lpIdentityProps);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	memset(lpIdentityProps, 0, sizeof(SPropValue) * cValues);
 
-	strProfileSenderSearchKey.reserve(_tcslen(TRANSPORT_ADDRESS_TYPE_ZARAFA) + 1 + _tcslen(lpUser->lpszMailAddress));
-	strProfileSenderSearchKey = TRANSPORT_ADDRESS_TYPE_ZARAFA;
-	strProfileSenderSearchKey += ':';
-	boost::algorithm::to_upper_copy(std::back_inserter(strProfileSenderSearchKey), lpUser->lpszMailAddress);
-
+	strProfileSenderSearchKey = strToUpper(tstring(TRANSPORT_ADDRESS_TYPE_ZARAFA) + _T(":") + lpUser->lpszMailAddress);
 	lpIdentityProps[XPID_EID].ulPropTag = PR_SENDER_ENTRYID;
 	lpIdentityProps[XPID_EID].Value.bin.cb = lpUser->sUserId.cb;
 	hr = MAPIAllocateMore(lpUser->sUserId.cb, (LPVOID)lpIdentityProps, (void**)&lpIdentityProps[XPID_EID].Value.bin.lpb);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	memcpy(lpIdentityProps[XPID_EID].Value.bin.lpb, lpUser->sUserId.lpb, lpUser->sUserId.cb);
 
 	// Create the PR_SENDER_NAME property value.
@@ -161,7 +165,7 @@ HRESULT ClientUtil::HrSetIdentity(WSTransport *lpTransport, LPMAPISUP lpMAPISup,
 	ulSize = sizeof(TCHAR) * (_tcslen(lpUser->lpszFullName) + 1);
 	hr = MAPIAllocateMore(ulSize, (LPVOID)lpIdentityProps , (void**)&lpIdentityProps[XPID_NAME].Value.LPSZ);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	memcpy(lpIdentityProps[XPID_NAME].Value.LPSZ, lpUser->lpszFullName, ulSize);
 
 	// Create the PR_SENDER_SEARCH_KEY value. 
@@ -169,7 +173,7 @@ HRESULT ClientUtil::HrSetIdentity(WSTransport *lpTransport, LPMAPISUP lpMAPISup,
 	lpIdentityProps[XPID_SEARCH_KEY].Value.bin.cb = strProfileSenderSearchKey.size()+1;
 	hr = MAPIAllocateMore(lpIdentityProps[XPID_SEARCH_KEY].Value.bin.cb, (LPVOID)lpIdentityProps , (void**)&lpIdentityProps[XPID_SEARCH_KEY].Value.bin.lpb);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	memcpy(lpIdentityProps[XPID_SEARCH_KEY].Value.bin.lpb, strProfileSenderSearchKey.c_str(), lpIdentityProps[XPID_SEARCH_KEY].Value.bin.cb);
 
 	// PR_SENDER_EMAIL_ADDRESS
@@ -177,7 +181,7 @@ HRESULT ClientUtil::HrSetIdentity(WSTransport *lpTransport, LPMAPISUP lpMAPISup,
 	ulSize = sizeof(TCHAR) * (_tcslen(lpUser->lpszMailAddress) + 1);
 	hr = MAPIAllocateMore(ulSize, (LPVOID)lpIdentityProps , (void**)&lpIdentityProps[XPID_ADDRESS].Value.LPSZ);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	memcpy(lpIdentityProps[XPID_ADDRESS].Value.LPSZ, lpUser->lpszMailAddress, ulSize);
 
 	// PR_SENDER_ADDRTYPE
@@ -185,37 +189,26 @@ HRESULT ClientUtil::HrSetIdentity(WSTransport *lpTransport, LPMAPISUP lpMAPISup,
 	ulSize = sizeof(TCHAR) * (_tcslen(TRANSPORT_ADDRESS_TYPE_ZARAFA) + 1);
 	hr = MAPIAllocateMore(ulSize, (LPVOID)lpIdentityProps , (void**)&lpIdentityProps[XPID_ADDRTYPE].Value.LPSZ);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	memcpy(lpIdentityProps[XPID_ADDRTYPE].Value.LPSZ, TRANSPORT_ADDRESS_TYPE_ZARAFA, ulSize);
 
 	//PR_OWN_STORE_ENTRYID
 	// Get the default store for this user, not an issue if it fails when not on home server
-	if(lpTransport->HrGetStore(0, NULL, &cbEntryStore, &lpEntryStore, 0, NULL) == hrSuccess) 
-	{
-		hr = lpMAPISup->WrapStoreEntryID(cbEntryStore, lpEntryStore, &cbEID, (LPENTRYID*)&lpEID);
+	if (lpTransport->HrGetStore(0, nullptr, &cbEntryStore, &~lpEntryStore, 0, nullptr) == hrSuccess) {
+		hr = lpMAPISup->WrapStoreEntryID(cbEntryStore, lpEntryStore, &cbEID, (&~lpEID).as<ENTRYID>());
 		if(hr != hrSuccess) 
-			goto exit;
-
+			return hr;
 		lpIdentityProps[XPID_STORE_EID].ulPropTag = PR_OWN_STORE_ENTRYID;
 		lpIdentityProps[XPID_STORE_EID].Value.bin.cb = cbEID;
 		hr = MAPIAllocateMore(cbEID, (LPVOID)lpIdentityProps , (void**)&lpIdentityProps[XPID_STORE_EID].Value.bin.lpb);
 		if (hr != hrSuccess)
-			goto exit;
-		memcpy(lpIdentityProps[XPID_STORE_EID].Value.bin.lpb, (LPBYTE) lpEID, cbEID);
+			return hr;
+		memcpy(lpIdentityProps[XPID_STORE_EID].Value.bin.lpb, lpEID.get(), cbEID);
 	}
 	
 	// Set the identity in the global provider identity
-	*lppIdentityProps = lpIdentityProps;
-
-exit:
-	if(hr != hrSuccess && lpIdentityProps != NULL) {
-		MAPIFreeBuffer(lpIdentityProps);
-		*lppIdentityProps = NULL;	// just to be sure...
-	}
-	MAPIFreeBuffer(lpEntryStore);
-	MAPIFreeBuffer(lpEID);
-	MAPIFreeBuffer(lpUser);
-	return hr;
+	*lppIdentityProps = lpIdentityProps.release();
+	return hrSuccess;
 }
 
 /** 
@@ -234,18 +227,17 @@ exit:
 HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAGE* lppEmptyMessage)
 {
 	HRESULT			hr = hrSuccess;
-	LPSPropValue	lpSrcPropValue = NULL;
-	LPSPropValue	lpDestPropValue = NULL;
+	memory_ptr<SPropValue> lpSrcPropValue, lpDestPropValue;
 	ULONG			ulMaxDestValues = 0;
 	ULONG			ulCurDestValues = 0;
 	ULONG			cSrcValues = 0;
 	ULONG			cbTmp = 0;
-	LPBYTE			lpByteTmp = NULL;
+	memory_ptr<BYTE> lpByteTmp;
 	const TCHAR *lpMsgClass = NULL;
 	LPTSTR			lpReportText = NULL;
 	LPTSTR			lpReadText = NULL;
 	FILETIME		ft;	
-	LPADRLIST		lpMods = NULL;
+	adrlist_ptr lpMods;
 	std::wstring	strName;
 	std::wstring	strType;
 	std::wstring	strAddress;
@@ -254,7 +246,7 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 	time_t			tt;
 	struct tm*		tm;
 	char			szTime[255];
-	IStream*		lpBodyStream = NULL;
+	object_ptr<IStream> lpBodyStream;
 	tstring			tSubject;
 
 	// The same properties as under windows
@@ -271,33 +263,34 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 							RR_INTERNET_MESSAGE_ID, RR_DELIVER_TIME, RR_SENT_REPRESENTING_ADDRTYPE, RR_SENT_REPRESENTING_EMAIL_ADDRESS,
 							RR_MDN_DISPOSITION_TYPE, RR_MDN_DISPOSITION_SENDINGMODE};
 
-	SizedSPropTagArray(39, sPropReadReceipt) = {39, { PR_REPORT_TAG, PR_CONVERSATION_TOPIC, PR_CONVERSATION_INDEX, 
-												PR_SEARCH_KEY, PR_MESSAGE_CLASS, PR_SENDER_SEARCH_KEY,
-												PR_SUBJECT, PR_SUBJECT_PREFIX, PR_NORMALIZED_SUBJECT, 
-												PR_SENDER_NAME, PR_SENDER_ENTRYID, PR_SENDER_ADDRTYPE,												
-												PR_SENDER_EMAIL_ADDRESS, PR_REPORT_NAME, PR_REPORT_ENTRYID, 
-												PR_READ_RECEIPT_ENTRYID, PR_RECEIVED_BY_NAME, PR_RECEIVED_BY_ENTRYID, PR_RECEIVED_BY_ADDRTYPE, PR_RECEIVED_BY_EMAIL_ADDRESS,
-												PR_PRIORITY, PR_IMPORTANCE, PR_SENT_REPRESENTING_NAME, 
-												PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_SEARCH_KEY, PR_RCVD_REPRESENTING_NAME, PR_RCVD_REPRESENTING_ENTRYID, 
-												PR_MESSAGE_DELIVERY_TIME, PR_CLIENT_SUBMIT_TIME, PR_DISPLAY_TO,
-												PR_DISPLAY_CC, PR_DISPLAY_BCC, PR_SENSITIVITY, 
-												PR_INTERNET_MESSAGE_ID, PR_DELIVER_TIME, PR_SENT_REPRESENTING_ADDRTYPE, PR_SENT_REPRESENTING_EMAIL_ADDRESS,
-												PR_MDN_DISPOSITION_TYPE, PR_MDN_DISPOSITION_SENDINGMODE } };
+	static constexpr const SizedSPropTagArray(39, sPropReadReceipt) =
+		{39, { PR_REPORT_TAG, PR_CONVERSATION_TOPIC,
+		PR_CONVERSATION_INDEX, PR_SEARCH_KEY, PR_MESSAGE_CLASS,
+		PR_SENDER_SEARCH_KEY, PR_SUBJECT, PR_SUBJECT_PREFIX,
+		PR_NORMALIZED_SUBJECT, PR_SENDER_NAME, PR_SENDER_ENTRYID,
+		PR_SENDER_ADDRTYPE, PR_SENDER_EMAIL_ADDRESS, PR_REPORT_NAME,
+		PR_REPORT_ENTRYID, PR_READ_RECEIPT_ENTRYID, PR_RECEIVED_BY_NAME,
+		PR_RECEIVED_BY_ENTRYID, PR_RECEIVED_BY_ADDRTYPE,
+		PR_RECEIVED_BY_EMAIL_ADDRESS, PR_PRIORITY, PR_IMPORTANCE,
+		PR_SENT_REPRESENTING_NAME, PR_SENT_REPRESENTING_ENTRYID,
+		PR_SENT_REPRESENTING_SEARCH_KEY, PR_RCVD_REPRESENTING_NAME,
+		PR_RCVD_REPRESENTING_ENTRYID, PR_MESSAGE_DELIVERY_TIME,
+		PR_CLIENT_SUBMIT_TIME, PR_DISPLAY_TO, PR_DISPLAY_CC,
+		PR_DISPLAY_BCC, PR_SENSITIVITY, PR_INTERNET_MESSAGE_ID,
+		PR_DELIVER_TIME, PR_SENT_REPRESENTING_ADDRTYPE,
+		PR_SENT_REPRESENTING_EMAIL_ADDRESS, PR_MDN_DISPOSITION_TYPE,
+		PR_MDN_DISPOSITION_SENDINGMODE}};
 
 	// Check incoming parameters
-	if(lpReadMessage == NULL || lppEmptyMessage == NULL || *lppEmptyMessage == NULL) {
-		hr = MAPI_E_INVALID_OBJECT;
-		goto exit;
-	}
-
-	if((ulFlags &~ MAPI_NON_READ) != 0) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpReadMessage == nullptr || lppEmptyMessage == nullptr ||
+	    *lppEmptyMessage == nullptr)
+		return MAPI_E_INVALID_OBJECT;
+	if ((ulFlags &~ MAPI_NON_READ) != 0)
+		return MAPI_E_INVALID_PARAMETER;
 
 	GetSystemTimeAsFileTime(&ft);
 
-	if((ulFlags&MAPI_NON_READ) == MAPI_NON_READ) {
+	if (ulFlags & MAPI_NON_READ) {
 		lpMsgClass = _T("REPORT.IPM.Note.IPNNRN");
 		lpReadText = _("Not read:");
 		lpReportText = _("was not read because it expired before reading at time");
@@ -307,16 +300,13 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 		lpReportText = _("was read on");
 	}
 
-	hr = lpReadMessage->GetProps((LPSPropTagArray)&sPropReadReceipt, fMapiUnicode, &cSrcValues, &lpSrcPropValue);
+	hr = lpReadMessage->GetProps(sPropReadReceipt, fMapiUnicode, &cSrcValues, &~lpSrcPropValue);
 	if(FAILED(hr) != hrSuccess)
-		goto exit;
+		return hr;
 
 	// important properties
 	if(lpSrcPropValue[RR_REPORT_ENTRYID].ulPropTag != PR_REPORT_ENTRYID)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+		return MAPI_E_INVALID_PARAMETER;
 
 	strBodyText = _("Your message");
 	strBodyText+= _T("\r\n\r\n");
@@ -351,9 +341,8 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 
 		FileTimeToUnixTime(lpSrcPropValue[RR_CLIENT_SUBMIT_TIME].Value.ft, &tt);
 		tm = localtime(&tt);
-		if(tm == NULL) {
+		if (tm == NULL)
 			tm = localtime(&zero);
-		}
 		strftime(szTime, 255, "%c", tm);
 
 		strBodyText+= convert_to<tstring>(szTime, strlen(szTime), CHARSET_CHAR);
@@ -366,18 +355,17 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 	
 	FileTimeToUnixTime(ft, &tt);
 	tm = localtime(&tt);
-	if(tm == NULL) {
+	if (tm == NULL)
 		tm = localtime(&zero);
-	}
 	strftime(szTime, 255, "%c", tm);
 
 	strBodyText+= convert_to<tstring>(szTime, strlen(szTime), CHARSET_CHAR);
 	strBodyText+= _T("\r\n");
 
 	ulMaxDestValues = cSrcValues + 4;//+ default properties
-	hr = MAPIAllocateBuffer(sizeof(SPropValue)*ulMaxDestValues, (void**)&lpDestPropValue);
+	hr = MAPIAllocateBuffer(sizeof(SPropValue)*ulMaxDestValues, &~lpDestPropValue);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	memset(lpDestPropValue, 0, sizeof(SPropValue)*ulMaxDestValues);
 
@@ -453,19 +441,15 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 	}
 
 	if(lpSrcPropValue[RR_CONVERSATION_INDEX].ulPropTag == PR_CONVERSATION_INDEX &&
-		ScCreateConversationIndex(lpSrcPropValue[RR_CONVERSATION_INDEX].Value.bin.cb, lpSrcPropValue[RR_CONVERSATION_INDEX].Value.bin.lpb, &cbTmp, &lpByteTmp) == hrSuccess )
+	    ScCreateConversationIndex(lpSrcPropValue[RR_CONVERSATION_INDEX].Value.bin.cb, lpSrcPropValue[RR_CONVERSATION_INDEX].Value.bin.lpb, &cbTmp, &~lpByteTmp) == hrSuccess)
 	{
 		hr = MAPIAllocateMore(cbTmp, lpDestPropValue, (void**)&lpDestPropValue[ulCurDestValues].Value.bin.lpb);
 		if(hr != hrSuccess)
-			goto exit;
-		
+			return hr;
 		lpDestPropValue[ulCurDestValues].Value.bin.cb = cbTmp;
 		memcpy(lpDestPropValue[ulCurDestValues].Value.bin.lpb, lpByteTmp, cbTmp);
 
 		lpDestPropValue[ulCurDestValues++].ulPropTag = PR_CONVERSATION_INDEX;
-
-		MAPIFreeBuffer(lpByteTmp);
-		lpByteTmp = NULL;
 	}
 
 	if(lpSrcPropValue[RR_IMPORTANCE].ulPropTag == PR_IMPORTANCE)
@@ -566,32 +550,26 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 		lpDestPropValue[ulCurDestValues].ulPropTag = PR_INTERNET_MESSAGE_ID;
 		lpDestPropValue[ulCurDestValues++].Value.LPSZ = lpSrcPropValue[RR_INTERNET_MESSAGE_ID].Value.LPSZ;
 	}
-
-	hr = (*lppEmptyMessage)->OpenProperty(PR_BODY, &IID_IStream, 0, MAPI_CREATE | MAPI_MODIFY, (IUnknown**)&lpBodyStream);
+	hr = (*lppEmptyMessage)->OpenProperty(PR_BODY, &IID_IStream, 0, MAPI_CREATE | MAPI_MODIFY, &~lpBodyStream);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpBodyStream->Write(strBodyText.c_str(), strBodyText.size() * sizeof(TCHAR), NULL);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpBodyStream->Commit( 0 );//0 = STGC_DEFAULT
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = MAPIAllocateBuffer(CbNewADRLIST(1), (void**)&lpMods);
+		return hr;
+	hr = MAPIAllocateBuffer(CbNewADRLIST(1), &~lpMods);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	lpMods->cEntries = 1;
 
 	hr = MAPIAllocateBuffer(sizeof(SPropValue) * 8, (void**)&lpMods->aEntries->rgPropVals);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = ECParseOneOff((LPENTRYID)lpSrcPropValue[RR_REPORT_ENTRYID].Value.bin.lpb, lpSrcPropValue[RR_REPORT_ENTRYID].Value.bin.cb, strName, strType, strAddress);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	lpMods->aEntries->rgPropVals[0].ulPropTag = PR_ENTRYID;
 	lpMods->aEntries->rgPropVals[0].Value.bin = lpSrcPropValue[RR_REPORT_ENTRYID].Value.bin;
@@ -606,9 +584,9 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 	lpMods->aEntries->rgPropVals[5].ulPropTag = PR_EMAIL_ADDRESS_W;
 	lpMods->aEntries->rgPropVals[5].Value.lpszW = (WCHAR*)strAddress.c_str();
 	
-	hr = HrCreateEmailSearchKey((LPSTR)strType.c_str(), (LPSTR)strAddress.c_str(), &cbTmp, &lpByteTmp);
+	hr = HrCreateEmailSearchKey((LPSTR)strType.c_str(), (LPSTR)strAddress.c_str(), &cbTmp, &~lpByteTmp);
 	if (hr != hrSuccess)
-		goto exit;	
+		return hr;
 
 	lpMods->aEntries->rgPropVals[6].ulPropTag = PR_SEARCH_KEY;
 	lpMods->aEntries->rgPropVals[6].Value.bin.cb = cbTmp;
@@ -621,197 +599,137 @@ HRESULT ClientUtil::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAG
 
 	hr = (*lppEmptyMessage)->ModifyRecipients(MODRECIP_ADD, lpMods);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = (*lppEmptyMessage)->SetProps(ulCurDestValues, lpDestPropValue, NULL);
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-	if(lpBodyStream)
-		lpBodyStream->Release();
-	MAPIFreeBuffer(lpDestPropValue);
-	MAPIFreeBuffer(lpSrcPropValue);
-	MAPIFreeBuffer(lpByteTmp);
-	if(lpMods)
-		FreePadrlist(lpMods);	
-
-    return hr;
+		return hr;
+	return (*lppEmptyMessage)->SetProps(ulCurDestValues, lpDestPropValue, nullptr);
 }
 
 HRESULT ClientUtil::GetGlobalProfileProperties(LPMAPISUP lpMAPISup, struct sGlobalProfileProps* lpsProfileProps)
 {
 	HRESULT			hr = hrSuccess;
-	LPPROFSECT		lpGlobalProfSect = NULL;
+	object_ptr<IProfSect> lpGlobalProfSect;
 
-	hr = lpMAPISup->OpenProfileSection((LPMAPIUID)pbGlobalProfileSectionGuid, MAPI_MODIFY, &lpGlobalProfSect);
+	hr = lpMAPISup->OpenProfileSection((LPMAPIUID)pbGlobalProfileSectionGuid, MAPI_MODIFY, &~lpGlobalProfSect);
 	if(hr != hrSuccess)
-		goto exit;
-
-	hr = ClientUtil::GetGlobalProfileProperties(lpGlobalProfSect, lpsProfileProps);
-	if(hr != hrSuccess)
-		goto exit;
-
-exit:
-	if(lpGlobalProfSect)
-		lpGlobalProfSect->Release();
-
-	return hr;
+		return hr;
+	return ClientUtil::GetGlobalProfileProperties(lpGlobalProfSect, lpsProfileProps);
 }
 
 HRESULT ClientUtil::GetGlobalProfileProperties(LPPROFSECT lpGlobalProfSect, struct sGlobalProfileProps* lpsProfileProps)
 {
 	HRESULT			hr = hrSuccess;
-	LPSPropValue	lpsPropArray = NULL;
+	memory_ptr<SPropValue> lpsPropArray, lpsEMSPropArray, lpPropEMS;
 	ULONG			cValues = 0;
-	LPSPropValue	lpsEMSPropArray = NULL;
-	LPSPropValue	lpPropEMS = NULL;
 	ULONG			cEMSValues = 0;
-	LPSPropValue	lpProp = NULL;
+	const SPropValue *lpProp = NULL;
 	bool			bIsEMS = false;
 
-	if(lpGlobalProfSect == NULL || lpsProfileProps == NULL)
-	{
-		hr = MAPI_E_INVALID_OBJECT;
-		goto exit;
-	}
-
-	if(HrGetOneProp(lpGlobalProfSect, PR_PROFILE_UNRESOLVED_NAME, &lpPropEMS) == hrSuccess || g_ulLoadsim) {
+	if (lpGlobalProfSect == nullptr || lpsProfileProps == nullptr)
+		return MAPI_E_INVALID_OBJECT;
+	if (HrGetOneProp(lpGlobalProfSect, PR_PROFILE_UNRESOLVED_NAME, &~lpPropEMS) == hrSuccess || g_ulLoadsim)
 		bIsEMS = true;
-	}
 
 	if(bIsEMS) {
-		SizedSPropTagArray(4, sptaEMSProfile) = {4,{PR_PROFILE_NAME_A, PR_PROFILE_UNRESOLVED_SERVER, PR_PROFILE_UNRESOLVED_NAME, PR_PROFILE_USER}};
+		static constexpr const SizedSPropTagArray(4, sptaEMSProfile) =
+			{4, {PR_PROFILE_NAME_A, PR_PROFILE_UNRESOLVED_SERVER,
+			PR_PROFILE_UNRESOLVED_NAME, PR_PROFILE_USER}};
 
 		// This is an emulated MSEMS store. Get the properties we need and convert them to ZARAFA-style properties
-		hr = lpGlobalProfSect->GetProps((LPSPropTagArray)&sptaEMSProfile, 0, &cEMSValues, &lpsEMSPropArray);
+		hr = lpGlobalProfSect->GetProps(sptaEMSProfile, 0, &cEMSValues, &~lpsEMSPropArray);
 		if(FAILED(hr))
-			goto exit;
-
-		hr = ConvertMSEMSProps(cEMSValues, lpsEMSPropArray, &cValues, &lpsPropArray);
+			return hr;
+		hr = ConvertMSEMSProps(cEMSValues, lpsEMSPropArray, &cValues, &~lpsPropArray);
 		if(FAILED(hr))
-			goto exit;
+			return hr;
 	} else {
 		// Get the properties we need directly from the global profile section
-		hr = lpGlobalProfSect->GetProps((LPSPropTagArray)&sptaKopanoProfile, 0, &cValues, &lpsPropArray);
+		hr = lpGlobalProfSect->GetProps(sptaKopanoProfile, 0, &cValues, &~lpsPropArray);
 		if(FAILED(hr))
-			goto exit;
+			return hr;
 	}
 
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_PATH)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_PATH)) != NULL)
 		lpsProfileProps->strServerPath = lpProp->Value.lpszA;
-
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_PROFILE_NAME_A)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_PROFILE_NAME_A)) != NULL)
 		lpsProfileProps->strProfileName = lpProp->Value.lpszA;
-
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_USERNAME_W)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_USERNAME_W)) != NULL)
 		lpsProfileProps->strUserName = convstring::from_SPropValue(lpProp);
-	else if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_USERNAME_A)) != NULL)
+	else if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_USERNAME_A)) != NULL)
 		lpsProfileProps->strUserName = convstring::from_SPropValue(lpProp);
-
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_USERPASSWORD_W)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_USERPASSWORD_W)) != NULL)
 		lpsProfileProps->strPassword = convstring::from_SPropValue(lpProp);
-	else if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_USERPASSWORD_A)) != NULL)
+	else if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_USERPASSWORD_A)) != NULL)
 		lpsProfileProps->strPassword = convstring::from_SPropValue(lpProp);
-
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_IMPERSONATEUSER_W)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_IMPERSONATEUSER_W)) != NULL)
 		lpsProfileProps->strImpersonateUser = convstring::from_SPropValue(lpProp);
-	else if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_IMPERSONATEUSER_A)) != NULL)
+	else if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_IMPERSONATEUSER_A)) != NULL)
 		lpsProfileProps->strImpersonateUser = convstring::from_SPropValue(lpProp);
-
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_FLAGS)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_FLAGS)) != NULL)
 		lpsProfileProps->ulProfileFlags = lpProp->Value.ul;
 	else
 		lpsProfileProps->ulProfileFlags = 0;
-
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_SSLKEY_FILE)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_SSLKEY_FILE)) != NULL)
 		lpsProfileProps->strSSLKeyFile = lpProp->Value.lpszA;
-
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_SSLKEY_PASS)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_SSLKEY_PASS)) != NULL)
 		lpsProfileProps->strSSLKeyPass = lpProp->Value.lpszA;
-
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_PROXY_HOST)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_PROXY_HOST)) != NULL)
 		lpsProfileProps->strProxyHost = lpProp->Value.lpszA;
-	
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_PROXY_PORT)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_PROXY_PORT)) != NULL)
 		lpsProfileProps->ulProxyPort = lpProp->Value.ul;
 	else
 		lpsProfileProps->ulProxyPort = 0;
-
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_PROXY_FLAGS)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_PROXY_FLAGS)) != NULL)
 		lpsProfileProps->ulProxyFlags = lpProp->Value.ul;
 	else
 		lpsProfileProps->ulProxyFlags = 0;
-
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_PROXY_USERNAME)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_PROXY_USERNAME)) != NULL)
 		lpsProfileProps->strProxyUserName = lpProp->Value.lpszA;
-	
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_PROXY_PASSWORD)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_PROXY_PASSWORD)) != NULL)
 		lpsProfileProps->strProxyPassword = lpProp->Value.lpszA;
-
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_CONNECTION_TIMEOUT)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_CONNECTION_TIMEOUT)) != NULL)
 		lpsProfileProps->ulConnectionTimeOut = lpProp->Value.ul;
 	else
 		lpsProfileProps->ulConnectionTimeOut = 10;
-
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_OFFLINE_PATH_W)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_OFFLINE_PATH_W)) != NULL)
 		lpsProfileProps->strOfflinePath = convstring::from_SPropValue(lpProp);
-	else if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_OFFLINE_PATH_A)) != NULL)
+	else if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_OFFLINE_PATH_A)) != NULL)
 		lpsProfileProps->strOfflinePath = convstring::from_SPropValue(lpProp);
-
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_STATS_SESSION_CLIENT_APPLICATION_VERSION)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_STATS_SESSION_CLIENT_APPLICATION_VERSION)) != NULL)
 		lpsProfileProps->strClientAppVersion = lpProp->Value.lpszA;
-	if((lpProp = PpropFindProp(lpsPropArray, cValues, PR_EC_STATS_SESSION_CLIENT_APPLICATION_MISC)) != NULL)
+	if ((lpProp = PCpropFindProp(lpsPropArray, cValues, PR_EC_STATS_SESSION_CLIENT_APPLICATION_MISC)) != NULL)
 		lpsProfileProps->strClientAppMisc = lpProp->Value.lpszA;
 
 	lpsProfileProps->bIsEMS = bIsEMS;
-
-	hr = hrSuccess;
-
-exit:
-	MAPIFreeBuffer(lpPropEMS);
-	MAPIFreeBuffer(lpsPropArray);
-	MAPIFreeBuffer(lpsEMSPropArray);
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ClientUtil::GetGlobalProfileDelegateStoresProp(LPPROFSECT lpGlobalProfSect, ULONG *lpcDelegates, LPBYTE *lppDelegateStores)
 {
 	HRESULT			hr = hrSuccess;
-	LPSPropValue	lpsPropValue = NULL;
+	memory_ptr<SPropValue> lpsPropValue;
 	ULONG			cValues = 0;
-	SPropTagArray	sPropTagArray;
-	LPBYTE			lpDelegateStores = NULL;
+	SizedSPropTagArray(1, sPropTagArray);
+	memory_ptr<BYTE> lpDelegateStores;
 
-	if(lpGlobalProfSect == NULL || lpcDelegates == NULL || lppDelegateStores == NULL)
-	{
-		hr = MAPI_E_INVALID_OBJECT;
-		goto exit;
-	}
+	if (lpGlobalProfSect == nullptr || lpcDelegates == nullptr ||
+	    lppDelegateStores == nullptr)
+		return MAPI_E_INVALID_OBJECT;
 	
 	sPropTagArray.cValues = 1;
 	sPropTagArray.aulPropTag[0] =  PR_STORE_PROVIDERS;
-
-	hr = lpGlobalProfSect->GetProps(&sPropTagArray, 0, &cValues, &lpsPropValue);
+	hr = lpGlobalProfSect->GetProps(sPropTagArray, 0, &cValues, &~lpsPropValue);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	if(lpsPropValue[0].Value.bin.cb > 0){
-		hr = MAPIAllocateBuffer(lpsPropValue[0].Value.bin.cb, (void**)&lpDelegateStores);
+		hr = MAPIAllocateBuffer(lpsPropValue[0].Value.bin.cb, &~lpDelegateStores);
 		if(hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		memcpy(lpDelegateStores, lpsPropValue[0].Value.bin.lpb, lpsPropValue[0].Value.bin.cb);
 	}
 
 	*lpcDelegates = lpsPropValue[0].Value.bin.cb;
-	*lppDelegateStores = lpDelegateStores;
-
-	hr = hrSuccess;
-
-exit:
-	MAPIFreeBuffer(lpsPropValue);
-	return hr;
+	*lppDelegateStores = lpDelegateStores.release();
+	return hrSuccess;
 }
 
 /*
@@ -838,14 +756,14 @@ HRESULT ClientUtil::GetConfigPath(std::string *lpConfigPath)
 HRESULT ClientUtil::ConvertMSEMSProps(ULONG cValues, LPSPropValue pValues, ULONG *lpcValues, LPSPropValue *lppProps)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpProps = NULL;
+	memory_ptr<SPropValue> lpProps;
 	char *szUsername;
 	std::string strServerPath;
 	std::wstring strUsername;
 	ULONG cProps = 0;
-	LPSPropValue lpServer = NULL;
-	LPSPropValue lpUsername = NULL;
-	LPSPropValue lpProfileName = NULL;
+	const SPropValue *lpServer = NULL;
+	const SPropValue *lpUsername = NULL;
+	const SPropValue *lpProfileName = NULL;
 	static const configsetting_t settings[] = {
 		{ "ssl_port", "237" },
 		{ "ssl_key_file", "c:\\program files\\kopano\\exchange-redirector.pem" },
@@ -858,13 +776,13 @@ HRESULT ClientUtil::ConvertMSEMSProps(ULONG cValues, LPSPropValue pValues, ULONG
 		{ "log_buffer_size", "0" },
 		{ NULL, NULL },
 	};
-	ECConfig *lpConfig = ECConfig::Create(settings);
+	std::unique_ptr<ECConfig> lpConfig(ECConfig::Create(settings));
 	std::string strConfigPath;
 
 	hr = GetConfigPath(&strConfigPath);
 	if(hr != hrSuccess) {
 		TRACE_RELEASE("Unable to find config file (registry key missing)", (char *)strConfigPath.c_str());
-		goto exit;
+		return hr;
 	}
 
 	// Remove trailing slash
@@ -876,40 +794,34 @@ HRESULT ClientUtil::ConvertMSEMSProps(ULONG cValues, LPSPropValue pValues, ULONG
 	TRACE_RELEASE("Using config file '%s'", (char *)strConfigPath.c_str());
 
 	if(!lpConfig->LoadSettings((char *)strConfigPath.c_str())) {
-		hr = MAPI_E_NOT_FOUND;
 		TRACE_RELEASE("Unable to load config file '%s'", (char *)strConfigPath.c_str());
-		goto exit;
+		return MAPI_E_NOT_FOUND;
 	}
 
 	if(g_ulLoadsim) {
-		lpUsername = PpropFindProp(pValues, cValues, PR_PROFILE_USER);
+		lpUsername = PCpropFindProp(pValues, cValues, PR_PROFILE_USER);
 		if(!lpUsername) {
 			TRACE_RELEASE("PR_PROFILE_USER not set");
-			hr = MAPI_E_UNCONFIGURED;
-			goto exit;
+			return MAPI_E_UNCONFIGURED;
 		}
 	} else {
-		lpUsername = PpropFindProp(pValues, cValues, PR_PROFILE_UNRESOLVED_NAME);
-		lpServer = PpropFindProp(pValues, cValues, PR_PROFILE_UNRESOLVED_SERVER);
+		lpUsername = PCpropFindProp(pValues, cValues, PR_PROFILE_UNRESOLVED_NAME);
+		lpServer = PCpropFindProp(pValues, cValues, PR_PROFILE_UNRESOLVED_SERVER);
 
 		if(!lpServer || !lpUsername) {
 			TRACE_RELEASE("PR_PROFILE_UNRESOLVED_NAME or PR_PROFILE_UNRESOLVED_SERVER not set");
-			hr = MAPI_E_UNCONFIGURED;
-			goto exit;
+			return MAPI_E_UNCONFIGURED;
 		}
 	}
 
-	hr = MAPIAllocateBuffer(sizeof(SPropValue) * 7, (LPVOID *)&lpProps);
+	hr = MAPIAllocateBuffer(sizeof(SPropValue) * 7, &~lpProps);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	if (lpConfig->GetSetting("server_address")[0]) {
 		strServerPath = (std::string)"https://" + lpConfig->GetSetting("server_address") + ":" + lpConfig->GetSetting("ssl_port") + "/";
 	} else {
-		if(!lpServer) {
-			hr = MAPI_E_UNCONFIGURED;
-			goto exit;
-		}
+		if (lpServer == nullptr)
+			return MAPI_E_UNCONFIGURED;
 		strServerPath = (std::string)"https://" + lpServer->Value.lpszA + ":" + lpConfig->GetSetting("ssl_port") + "/";
 	}
 
@@ -920,38 +832,38 @@ HRESULT ClientUtil::ConvertMSEMSProps(ULONG cValues, LPSPropValue pValues, ULONG
 
 	lpProps[cProps].ulPropTag = PR_EC_PATH;
 	if ((hr = MAPIAllocateMore(strServerPath.size() + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
-		goto exit;
+		return hr;
 	strcpy(lpProps[cProps++].Value.lpszA, strServerPath.c_str());
 
 	strUsername = convert_to<std::wstring>(szUsername);
 	lpProps[cProps].ulPropTag = PR_EC_USERNAME;
 	if ((hr = MAPIAllocateMore((strUsername.size() + 1) * sizeof(TCHAR), lpProps, (void**)&lpProps[cProps].Value.lpszW)) != hrSuccess)
-		goto exit;
+		return hr;
 	wcscpy(lpProps[cProps++].Value.lpszW, strUsername.c_str());
 
 	lpProps[cProps].ulPropTag = PR_EC_USERPASSWORD;
 	if ((hr = MAPIAllocateMore(sizeof(TCHAR), lpProps, (void**)&lpProps[cProps].Value.LPSZ)) != hrSuccess)
-		goto exit;
+		return hr;
 	_tcscpy(lpProps[cProps++].Value.LPSZ, L"");
 
 	lpProps[cProps].ulPropTag = PR_EC_SSLKEY_FILE;
 	if ((hr = MAPIAllocateMore(strlen(lpConfig->GetSetting("ssl_key_file")) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
-		goto exit;
+		return hr;
 	strcpy(lpProps[cProps++].Value.lpszA, lpConfig->GetSetting("ssl_key_file"));
 
 	lpProps[cProps].ulPropTag = PR_EC_SSLKEY_PASS;
 	if ((hr = MAPIAllocateMore(strlen(lpConfig->GetSetting("ssl_key_pass")) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
-		goto exit;
+		return hr;
 	strcpy(lpProps[cProps++].Value.lpszA, lpConfig->GetSetting("ssl_key_pass"));
 
 	lpProps[cProps].ulPropTag = PR_EC_FLAGS; // Since we're emulating exchange, use 22-byte exchange-style sourcekeys
 	lpProps[cProps++].Value.ul = EC_PROFILE_FLAGS_TRUNCATE_SOURCEKEY;
 
-	lpProfileName = PpropFindProp(pValues, cValues, PR_PROFILE_NAME_A);
+	lpProfileName = PCpropFindProp(pValues, cValues, PR_PROFILE_NAME_A);
 	if(lpProfileName) {
 		lpProps[cProps].ulPropTag = PR_PROFILE_NAME_A;
 		if ((hr = MAPIAllocateMore(strlen(lpProfileName->Value.lpszA) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
-			goto exit;
+			return hr;
 		strcpy(lpProps[cProps++].Value.lpszA, lpProfileName->Value.lpszA);
 	}
 	
@@ -959,12 +871,7 @@ HRESULT ClientUtil::ConvertMSEMSProps(ULONG cValues, LPSPropValue pValues, ULONG
 
 	*lpcValues = cProps;
 	*lppProps = lpProps;
-
-exit:
-	if (hr != hrSuccess)
-		MAPIFreeBuffer(lpProps);
-	delete lpConfig;
-	return hr;
+	return hrSuccess;
 }
 
 /* 
@@ -1047,7 +954,8 @@ HRESULT HrGetServerURLFromStoreEntryId(ULONG cbEntryId, LPENTRYID lpEntryId, std
 		bIsPseudoUrl = true;
 	else if (strncasecmp(lpTmpServerName, "http://", 7) && 
 			 strncasecmp(lpTmpServerName, "https://", 8) && 
-			 strncasecmp(lpTmpServerName, "file://", 7))
+			 strncasecmp(lpTmpServerName, "file://", 7) &&
+			 strncasecmp(lpTmpServerName, "default:", 8))
 		return MAPI_E_NOT_FOUND;
 
 	rServerPath = lpTmpServerName;
@@ -1121,17 +1029,17 @@ HRESULT GetPublicEntryId(enumPublicEntryID ePublicEntryID, GUID guidStore, void 
 	EID eid = EID(MAPI_FOLDER, guidStore, guidEmpty);
 
 	switch (ePublicEntryID) {
-		case ePE_IPMSubtree:
-			eid.uniqueId.Data4[7] = 1;
-			break;
-		case ePE_Favorites:
-			eid.uniqueId.Data4[7] = 2;
-			break;
-		case ePE_PublicFolders:
-			eid.uniqueId.Data4[7] = 3;
-			break;
-		default:
-			return MAPI_E_INVALID_PARAMETER;
+	case ePE_IPMSubtree:
+		eid.uniqueId.Data4[7] = 1;
+		break;
+	case ePE_Favorites:
+		eid.uniqueId.Data4[7] = 2;
+		break;
+	case ePE_PublicFolders:
+		eid.uniqueId.Data4[7] = 3;
+		break;
+	default:
+		return MAPI_E_INVALID_PARAMETER;
 	}
 
 	if (lpcbEntryID == NULL || lppEntryID == NULL)

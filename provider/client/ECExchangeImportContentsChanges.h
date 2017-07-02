@@ -25,7 +25,11 @@
 #include <kopano/ECUnknown.h>
 #include <IECImportContentsChanges.h>
 
-class ECExchangeImportContentsChanges : public ECUnknown {
+namespace KC {
+class ECLogger;
+}
+
+class ECExchangeImportContentsChanges _kc_final : public ECUnknown {
 protected:
 	ECExchangeImportContentsChanges(ECMAPIFolder *lpFolder);
 	virtual ~ECExchangeImportContentsChanges();
@@ -34,7 +38,7 @@ public:
 	static	HRESULT Create(ECMAPIFolder *lpFolder, LPEXCHANGEIMPORTCONTENTSCHANGES* lppExchangeImportContentsChanges);
 
 	// IUnknown
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 
 	// IExchangeImportContentsChanges
 	virtual HRESULT GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
@@ -43,37 +47,35 @@ public:
 	virtual HRESULT ImportMessageChange(ULONG cValue, LPSPropValue lpPropArray, ULONG ulFlags, LPMESSAGE * lppMessage);
 	virtual HRESULT ImportMessageDeletion(ULONG ulFlags, LPENTRYLIST lpSourceEntryList);
 	virtual HRESULT ImportPerUserReadStateChange(ULONG cElements, LPREADSTATE lpReadState);
-	virtual HRESULT ImportMessageMove(ULONG cbSourceKeySrcFolder, BYTE FAR * pbSourceKeySrcFolder, ULONG cbSourceKeySrcMessage, BYTE FAR * pbSourceKeySrcMessage, ULONG cbPCLMessage, BYTE FAR * pbPCLMessage, ULONG cbSourceKeyDestMessage, BYTE FAR * pbSourceKeyDestMessage, ULONG cbChangeNumDestMessage, BYTE FAR * pbChangeNumDestMessage);
+	virtual HRESULT ImportMessageMove(ULONG cbSourceKeySrcFolder, BYTE *pbSourceKeySrcFolder, ULONG cbSourceKeySrcMessage, BYTE *pbSourceKeySrcMessage, ULONG cbPCLMessage, BYTE *pbPCLMessage, ULONG cbSourceKeyDestMessage, BYTE *pbSourceKeyDestMessage, ULONG cbChangeNumDestMessage, BYTE *pbChangeNumDestMessage);
 
 	// IECImportContentsChanges
 	virtual HRESULT ConfigForConversionStream(LPSTREAM lpStream, ULONG ulFlags, ULONG cValuesConversion, LPSPropValue lpPropArrayConversion);
 	virtual HRESULT ImportMessageChangeAsAStream(ULONG cValue, LPSPropValue lpPropArray, ULONG ulFlags, LPSTREAM *lppstream);
 	virtual HRESULT SetMessageInterface(REFIID refiid);
 
-	class xECImportContentsChanges _zcp_final : public IECImportContentsChanges {
-		// IUnknown
-		virtual ULONG __stdcall AddRef(void) _zcp_override;
-		virtual ULONG __stdcall Release(void) _zcp_override;
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _zcp_override;
+	class xECImportContentsChanges _kc_final :
+	    public IECImportContentsChanges {
+		#include <kopano/xclsfrag/IUnknown.hpp>
 
-		// IExchangeImportContentsChanges
-		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
-		virtual HRESULT __stdcall Config(LPSTREAM lpStream, ULONG ulFlags);
-		virtual HRESULT __stdcall UpdateState(LPSTREAM lpStream);
-		virtual HRESULT __stdcall ImportMessageChange(ULONG cValue, LPSPropValue lpPropArray, ULONG ulFlags, LPMESSAGE * lppMessage);
-		virtual HRESULT __stdcall ImportMessageDeletion(ULONG ulFlags, LPENTRYLIST lpSourceEntryList);
-		virtual HRESULT __stdcall ImportPerUserReadStateChange(ULONG cElements, LPREADSTATE lpReadState);
-		virtual HRESULT __stdcall ImportMessageMove(ULONG cbSourceKeySrcFolder, BYTE FAR * pbSourceKeySrcFolder, ULONG cbSourceKeySrcMessage, BYTE FAR * pbSourceKeySrcMessage, ULONG cbPCLMessage, BYTE FAR * pbPCLMessage, ULONG cbSourceKeyDestMessage, BYTE FAR * pbSourceKeyDestMessage, ULONG cbChangeNumDestMessage, BYTE FAR * pbChangeNumDestMessage);
+		// <kopano/xclsfrag/IExchangeImportContentsChanges.hpp>
+		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG flags, LPMAPIERROR *lppMAPIError) _kc_override;
+		virtual HRESULT __stdcall Config(LPSTREAM lpStream, ULONG flags) _kc_override;
+		virtual HRESULT __stdcall UpdateState(LPSTREAM lpStream) _kc_override;
+		virtual HRESULT __stdcall ImportMessageChange(ULONG cValue, LPSPropValue lpPropArray, ULONG flags, LPMESSAGE *lppMessage) _kc_override;
+		virtual HRESULT __stdcall ImportMessageDeletion(ULONG flags, LPENTRYLIST lpSourceEntryList) _kc_override;
+		virtual HRESULT __stdcall ImportPerUserReadStateChange(ULONG cElements, LPREADSTATE lpReadState) _kc_override;
+		virtual HRESULT __stdcall ImportMessageMove(ULONG cbSourceKeySrcFolder, BYTE *pbSourceKeySrcFolder, ULONG cbSourceKeySrcMessage, BYTE *pbSourceKeySrcMessage, ULONG cbPCLMessage, BYTE *pbPCLMessage, ULONG cbSourceKeyDestMessage, BYTE *pbSourceKeyDestMessage, ULONG cbChangeNumDestMessage, BYTE *pbChangeNumDestMessage) _kc_override;
 
-		// IECImportContentsChanges
-		virtual HRESULT __stdcall ConfigForConversionStream(LPSTREAM lpStream, ULONG ulFlags, ULONG cValuesConversion, LPSPropValue lpPropArrayConversion) _zcp_override;
-		virtual HRESULT __stdcall ImportMessageChangeAsAStream(ULONG cValue, LPSPropValue lpPropArray, ULONG ulFlags, LPSTREAM *lppstream) _zcp_override;
-		virtual HRESULT __stdcall SetMessageInterface(REFIID refiid) _zcp_override;
+		// <kopano/xclsfrag/IECImportContentsChanges.hpp>
+		virtual HRESULT __stdcall ConfigForConversionStream(LPSTREAM lpStream, ULONG flags, ULONG cValuesConversion, LPSPropValue lpPropArrayConversion) _kc_override;
+		virtual HRESULT __stdcall ImportMessageChangeAsAStream(ULONG cValue, LPSPropValue lpPropArray, ULONG flags, LPSTREAM *lppstream) _kc_override;
+		virtual HRESULT __stdcall SetMessageInterface(REFIID refiid) _kc_override;
 	} m_xECImportContentsChanges;
 
 private:
-	bool	IsProcessed(LPSPropValue lpRemoteCK, LPSPropValue lpLocalPCL);
-	bool	IsConflict(LPSPropValue lpLocalCK, LPSPropValue lpRemotePCL);
+	bool IsProcessed(const SPropValue *remote_ck, const SPropValue *local_pcl);
+	bool IsConflict(const SPropValue *local_ck, const SPropValue *remote_pcl);
 
 	HRESULT CreateConflictMessage(LPMESSAGE lpMessage);
 	HRESULT CreateConflictMessageOnly(LPMESSAGE lpMessage, LPSPropValue *lppConflictItems);
@@ -83,18 +85,17 @@ private:
 	HRESULT ImportMessageCreateAsStream(ULONG cValue, LPSPropValue lpPropArray, WSMessageStreamImporter **lppMessageImporter);
 	HRESULT ImportMessageUpdateAsStream(ULONG cbEntryId, LPENTRYID lpEntryId, ULONG cValue, LPSPropValue lpPropArray, WSMessageStreamImporter **lppMessageImporter);
 
-	static HRESULT HrUpdateSearchReminders(LPMAPIFOLDER lpRootFolder, LPSPropValue lpAdditionalREN);
+	static HRESULT HrUpdateSearchReminders(LPMAPIFOLDER lpRootFolder, const SPropValue *);
 	friend class ECExchangeImportHierarchyChanges;
 
-private:
-	ECLogger*		m_lpLogger;
-	ECMAPIFolder*	m_lpFolder;
-	LPSPropValue	m_lpSourceKey;
-	LPSTREAM		m_lpStream;
-	ULONG			m_ulFlags;
-	ULONG			m_ulSyncId;
-	ULONG			m_ulChangeId;
-	IID				m_iidMessage;
+	ECLogger *m_lpLogger = nullptr;
+	ECMAPIFolder *m_lpFolder = nullptr;
+	SPropValue *m_lpSourceKey = nullptr;
+	IStream *m_lpStream = nullptr;
+	ULONG m_ulFlags = 0;
+	ULONG m_ulSyncId = 0;
+	ULONG m_ulChangeId = 0;
+	IID m_iidMessage;
 };
 
 #endif // ECEXCHANGEIMPORTCONTENTSCHANGES_H

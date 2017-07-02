@@ -14,48 +14,43 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <kopano/zcdefs.h>
 #include <kopano/platform.h>
-
+#include <mutex>
+#include <pthread.h>
 #include <kopano/ECLogger.h>
+#include <kopano/lockhelper.hpp>
+#include "ECDatabase.h"
 #include "ECSessionManager.h"
 #include "ECStatsCollector.h"
-
 #include "ECDatabaseFactory.h"
-#include "ECDatabaseMySQL.h"
 #include "ECServerEntrypoint.h"
-
-#include "ECSessionManagerOffline.h"
 #include "ECS3Attachment.h"
+
+namespace KC {
 
 pthread_key_t database_key;
 pthread_key_t plugin_key;
 
-ECSessionManager*		g_lpSessionManager = NULL;
-ECStatsCollector*		g_lpStatsCollector = NULL;
+_kc_export ECSessionManager *g_lpSessionManager;
+_kc_export ECStatsCollector *g_lpStatsCollector;
 static std::set<ECDatabase *> g_lpDBObjectList;
-static pthread_mutex_t g_hMutexDBObjectList;
+static std::mutex g_hMutexDBObjectList;
 static bool g_bInitLib = false;
 
 void AddDatabaseObject(ECDatabase* lpDatabase)
 {
-	pthread_mutex_lock(&g_hMutexDBObjectList);
-
+	scoped_lock lk(g_hMutexDBObjectList);
 	g_lpDBObjectList.insert(std::set<ECDatabase*>::value_type(lpDatabase));
-
-	pthread_mutex_unlock(&g_hMutexDBObjectList);
 }
 
 static void database_destroy(void *lpParam)
 {
 	ECDatabase *lpDatabase = (ECDatabase *)lpParam;
-
-	pthread_mutex_lock(&g_hMutexDBObjectList);
+	ulock_normal l_obj(g_hMutexDBObjectList);
 
 	g_lpDBObjectList.erase(std::set<ECDatabase*>::key_type(lpDatabase));
-
-	pthread_mutex_unlock(&g_hMutexDBObjectList);
-
+	l_obj.unlock();
 	lpDatabase->ThreadEnd();
 	delete lpDatabase;
 }
@@ -81,8 +76,7 @@ ECRESULT kopano_initlibrary(const char *lpDatabaseDir, const char *lpConfigFile)
 	pthread_key_create(&plugin_key, plugin_destroy); // same goes for the userDB-plugin
 
 	// Init mutex for database object list
-	pthread_mutex_init(&g_hMutexDBObjectList, NULL);
-	er = ECDatabaseMySQL::InitLibrary(lpDatabaseDir, lpConfigFile);
+	er = ECDatabase::InitLibrary(lpDatabaseDir, lpConfigFile);
 	g_lpStatsCollector = new ECStatsCollector();
 	
 	//TODO: with an error remove all variables and g_bInitLib = false
@@ -92,8 +86,6 @@ ECRESULT kopano_initlibrary(const char *lpDatabaseDir, const char *lpConfigFile)
 
 ECRESULT kopano_unloadlibrary(void)
 {
-	std::set<ECDatabase *>::const_iterator iterDBObject, iNext;
-
 	if (!g_bInitLib)
 		return KCERR_NOT_INITIALIZED;
 
@@ -105,12 +97,11 @@ ECRESULT kopano_unloadlibrary(void)
 	pthread_key_delete(plugin_key);
 
 	// Remove all exist database objects
-	pthread_mutex_lock(&g_hMutexDBObjectList);
-
-	iterDBObject = g_lpDBObjectList.begin();
-	while( iterDBObject != g_lpDBObjectList.end())
+	ulock_normal l_obj(g_hMutexDBObjectList);
+	auto iterDBObject = g_lpDBObjectList.cbegin();
+	while (iterDBObject != g_lpDBObjectList.cend())
 	{
-		iNext = iterDBObject;
+		auto iNext = iterDBObject;
 		++iNext;
 		delete (*iterDBObject);
 
@@ -118,12 +109,10 @@ ECRESULT kopano_unloadlibrary(void)
 
 		iterDBObject = iNext;
 	}
-
-	pthread_mutex_unlock(&g_hMutexDBObjectList);
+	l_obj.unlock();
 
 	// remove mutex for database object list
-	pthread_mutex_destroy(&g_hMutexDBObjectList);
-	ECDatabaseMySQL::UnloadLibrary();
+	ECDatabase::UnloadLibrary();
 	g_bInitLib = false;
 	return erSuccess;
 }
@@ -151,15 +140,12 @@ ECRESULT kopano_init(ECConfig *lpConfig, ECLogger *lpAudit, bool bHostedKopano, 
 
 void kopano_removeallsessions()
 {
-	if(g_lpSessionManager) {
+	if (g_lpSessionManager != nullptr)
 		g_lpSessionManager->RemoveAllSessions();
-	}
 }
 
 ECRESULT kopano_exit()
 {
-	std::set<ECDatabase *>::const_iterator iterDBObject;
-
 	if (!g_bInitLib)
 		return KCERR_NOT_INITIALIZED;
 
@@ -178,12 +164,9 @@ ECRESULT kopano_exit()
 	g_lpStatsCollector = NULL;
 
 	// Close all database connections
-	pthread_mutex_lock(&g_hMutexDBObjectList);
-
-	for (iterDBObject = g_lpDBObjectList.begin();
-	     iterDBObject != g_lpDBObjectList.end(); ++iterDBObject)
-		(*iterDBObject)->Close();		
-	pthread_mutex_unlock(&g_hMutexDBObjectList);
+	scoped_lock l_obj(g_hMutexDBObjectList);
+	for (auto dbobjp : g_lpDBObjectList)
+		dbobjp->Close();
 	return erSuccess;
 }
 
@@ -206,10 +189,8 @@ static int kopano_fparsehdr(struct soap *soap, const char *key,
     const char *val)
 {
 	const char *szProxy = g_lpSessionManager->GetConfig()->GetSetting("proxy_header");
-	if(strlen(szProxy) > 0 && strcasecmp(key, szProxy) == 0) {
+	if (strlen(szProxy) > 0 && strcasecmp(key, szProxy) == 0)
 		((SOAPINFO *)soap->user)->bProxy = true;
-	}
-	
 	return ((SOAPINFO *)soap->user)->fparsehdr(soap, key, val);
 }
 
@@ -222,16 +203,16 @@ void kopano_new_soap_connection(CONNECTION_TYPE ulType, struct soap *soap)
 	lpInfo->bProxy = false;
 	soap->user = (void *)lpInfo;
 	
-	if (szProxy[0]) {
-		if(strcmp(szProxy, "*") == 0) {
-			// Assume everything is proxied
-			lpInfo->bProxy = true; 
-		} else {
-			// Parse headers to determine if the connection is proxied
-			lpInfo->fparsehdr = soap->fparsehdr; // daisy-chain the existing code
-			soap->fparsehdr = kopano_fparsehdr;
-		}
+	if (szProxy[0] == '\0')
+		return;
+	if (strcmp(szProxy, "*") == 0) {
+		// Assume everything is proxied
+		lpInfo->bProxy = true;
+		return;
 	}
+	// Parse headers to determine if the connection is proxied
+	lpInfo->fparsehdr = soap->fparsehdr; // daisy-chain the existing code
+	soap->fparsehdr = kopano_fparsehdr;
 }
 
 void kopano_end_soap_connection(struct soap *soap)
@@ -256,23 +237,21 @@ void kopano_end_soap_listener(struct soap *soap)
 // open
 void kopano_disconnect_soap_connection(struct soap *soap)
 {
-	if(SOAP_CONNECTION_TYPE_NAMED_PIPE(soap)) {
+	if (SOAP_CONNECTION_TYPE_NAMED_PIPE(soap))
 		// Mark the persistent session as exited
 		g_lpSessionManager->RemoveSessionPersistentConnection((unsigned int)soap->socket);
-	}
 }
 
 // Export functions
 ECRESULT GetDatabaseObject(ECDatabase **lppDatabase)
 {
-	if(g_lpSessionManager == NULL) {
+	if (g_lpSessionManager == NULL)
 		return KCERR_UNKNOWN;
-	}
-
-	if(lppDatabase == NULL) {
+	if (lppDatabase == NULL)
 		return KCERR_INVALID_PARAMETER;
-	}
 
 	ECDatabaseFactory db(g_lpSessionManager->GetConfig());
 	return GetThreadLocalDatabase(&db, lppDatabase);
 }
+
+} /* namespace */

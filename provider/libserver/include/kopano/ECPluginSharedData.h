@@ -19,8 +19,10 @@
 #define ECPLUGINSHAREDDATA_H
 
 #include <kopano/zcdefs.h>
+#include <mutex>
 #include <kopano/ECConfig.h>
-#include <pthread.h>
+
+namespace KC {
 
 class ECStatsCollector;
 
@@ -31,27 +33,27 @@ class ECStatsCollector;
  * Each instance of the UserPlugin share the contents
  * of ECPluginSharedData.
  */
-class ECPluginSharedData _zcp_final {
+class _kc_export ECPluginSharedData _kc_final {
 private:
 	/**
 	 * Singleton instance of ECPluginSharedData
 	 */
-	static ECPluginSharedData *m_lpSingleton;
+	_kc_hidden static ECPluginSharedData *m_lpSingleton;
 
 	/**
 	 * Lock for m_lpSingleton access
 	 */
-	static pthread_mutex_t m_SingletonLock;
+	_kc_hidden static std::mutex m_SingletonLock;
 
 	/**
 	 * Lock for CreateConfig
 	 */
-	static pthread_mutex_t m_CreateConfigLock;
+	_kc_hidden static std::mutex m_CreateConfigLock;
 
 	/**
 	 * Reference count, used to destroy object when no users are left.
 	 */
-	unsigned int m_ulRefCount;
+	unsigned int m_ulRefCount = 0;
 
 	/**
 	 * @param[in]	lpParent
@@ -68,8 +70,8 @@ private:
 	 * 					Plugins are allowed to throw an exception when bDistributed is true
 	 *					while the plugin doesn't support multi-server.
 	 */
-	ECPluginSharedData(ECConfig *lpParent, ECStatsCollector *, bool bHosted, bool bDistributed);
-	virtual ~ECPluginSharedData(void);
+	_kc_hidden ECPluginSharedData(ECConfig *parent, ECStatsCollector *, bool hosted, bool distributed);
+	_kc_hidden virtual ~ECPluginSharedData(void);
 
 public:
 	/**
@@ -90,17 +92,17 @@ public:
 	 * 					Plugins are allowed to throw an exception when bDistributed is true
 	 *					while the plugin doesn't support multi-server.
 	 */
-	static void GetSingleton(ECPluginSharedData **lppSingleton, ECConfig *lpParent, ECStatsCollector *, bool bHosted, bool bDistributed);
+	_kc_hidden static void GetSingleton(ECPluginSharedData **singleton, ECConfig *parent, ECStatsCollector *, bool hosted, bool distributed);
 
 	/**
 	 * Increase reference count
 	 */
-	virtual void AddRef();
+	_kc_hidden virtual void AddRef(void);
 
 	/**
 	 * Decrease reference count, object might be destroyed before this function returns.
 	 */
-	virtual void Release();
+	_kc_hidden virtual void Release(void);
 
 	/**
 	 * Load plugin configuration file
@@ -111,28 +113,28 @@ public:
 	 *					Supported configuration file directives.
 	 * @return The ECConfig pointer. NULL if configuration file could not be loaded.
 	 */
-	virtual ECConfig *CreateConfig(const configsetting_t *lpDefaults, const char *const *lpszDirectives = lpszDEFAULTDIRECTIVES);
+	_kc_export virtual ECConfig *CreateConfig(const configsetting_t *dfl, const char *const *directives = lpszDEFAULTDIRECTIVES);
 
 	/**
 	 * Obtain the Stats collector
 	 *
 	 * @return the ECStatsCollector pointer
 	 */
-	virtual ECStatsCollector *GetStatsCollector(void) const { return m_lpStatsCollector; }
+	_kc_hidden virtual ECStatsCollector *GetStatsCollector(void) const { return m_lpStatsCollector; }
 
 	/**
 	 * Check for multi-company support
 	 *
 	 * @return True if multi-company support is enabled.
 	 */
-	virtual bool IsHosted(void) const { return m_bHosted; }
+	_kc_hidden virtual bool IsHosted(void) const { return m_bHosted; }
 
 	/**
 	 * Check for multi-server support
 	 * 
 	 * @return True if multi-server support is enabled.
 	 */
-	virtual bool IsDistributed(void) const { return m_bDistributed; }
+	_kc_hidden virtual bool IsDistributed(void) const { return m_bDistributed; }
 
 	/**
 	 * Signal handler for userspace signals like SIGHUP
@@ -140,13 +142,13 @@ public:
 	 * @param[in]	signal
 	 *					The signal ID to be handled
 	 */
-	virtual void Signal(int signal);
+	_kc_hidden virtual void Signal(int s);
 
 private:
 	/**
 	 * Plugin configuration file
 	 */
-	ECConfig *m_lpConfig;
+	ECConfig *m_lpConfig = nullptr;
 
 	/**
 	 * Server configuration file
@@ -171,12 +173,14 @@ private:
 	/**
 	 * Copy of plugin defaults, stored in the singleton
 	 */
-	configsetting_t *m_lpDefaults;
+	configsetting_t *m_lpDefaults = nullptr;
 
 	/**
 	 * Copy of plugin directives, stored in the singleton
 	 */
-	char **m_lpszDirectives;
+	char **m_lpszDirectives = nullptr;
 };
+
+} /* namespace */
 
 #endif

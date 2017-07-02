@@ -20,9 +20,11 @@
 #include <kopano/zcdefs.h>
 #include "ECStoreObjectTable.h"
 
+namespace KC {
+
 class ECSession;
 
-class ECMailBoxTable _zcp_final : public ECStoreObjectTable {
+class ECMailBoxTable _kc_final : public ECStoreObjectTable {
 protected:
 	ECMailBoxTable(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale);
 
@@ -34,3 +36,5 @@ private:
 	unsigned int m_ulStoreTypes;
 
 };
+
+} /* namespace */

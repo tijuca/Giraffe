@@ -16,7 +16,7 @@
  */
 
 /*
- *	Definitions used throughout the ZCP code
+ *	Definitions used throughout the code
  *
  *	platform.h seems to be never included from header files, which is
  *	reasonable for definitions that would otherwise influence third-party
@@ -26,18 +26,56 @@
 #ifndef ZCOMMON_DEFS_H
 #define ZCOMMON_DEFS_H 1
 
-/* Minimum requirement for KC is g++ 4.6, g++0x mode. */
-#if __cplusplus >= 201100L
-	/* Only in g++ 4.7 onwards */
-#	define _kc_final final
-#	define _kc_override override
-#	define _zcp_final _kc_final
-#	define _zcp_override _kc_override
+#ifdef SWIG
+	/* why does this not surprise me */
+#	define _kc_hidden
+#	define _kc_export
 #else
+#	define _kc_hidden __attribute__((visibility("hidden")))
+#	define _kc_export __attribute__((visibility("default")))
+#endif
+
+/* Exported because something was using dynamic_cast<C> */
+#define _kc_export_dycast _kc_export
+/* Exported because something was using throw C; */
+#define _kc_export_throw _kc_export
+
+/* Minimum requirement for KC is g++ 4.7, g++0x mode. */
+/* Swig is not bright enough to grok all C++11. */
+#if defined(SWIG) || defined(__GNUG__) && __GNUG__ == 4 && \
+    defined(__GNUC_MINOR__) && __GNUC_MINOR__ < 7
 #	define _kc_final
 #	define _kc_override
-#	define _zcp_final
-#	define _zcp_override
+#else
+	/* From g++ 4.7 onwards */
+#	define _kc_final final
+#	define _kc_override override
+#endif
+
+/* Mark classes which explicitly must not be final in the C++ side… for SWIG */
+#define _no_final
+
+#if defined(__GNUG__) && __GNUG__ == 4 && \
+    defined(__GNUC_MINOR__) && __GNUC_MINOR__ < 8
+#	define _kc_lvqual
+#	define _kc_max_align __attribute__((aligned(16)))
+#else
+	/* From g++ 4.8 onwards */
+#	define _kc_lvqual &
+#	define _kc_max_align alignas(::max_align_t)
+#	define HAVE_MF_QUAL 1
+#endif
+
+#if (defined(__GNUG__) && __GNUG__ == 4 && \
+    defined(__GNUC_MINOR__) && __GNUC_MINOR__ < 8) || defined(IMPDTOR)
+	/* gcc 4.7.x chokes on
+	 * 	struct I { virtual ~I(void) = default; };
+	 * 	struct K : I { ~K(void) = default; };
+	 * so use {} instead of =default.
+	 */
+#	define _kc_impdtor {}
+#else
+#	define _kc_impdtor = default
 #endif
 
 /*
@@ -45,5 +83,9 @@
  * actually zero it.
  */
 #define __gszeroinit
+
+/* Don't like touching all cpp files just yet... */
+namespace KC {}
+using namespace KC;
 
 #endif /* ZCOMMON_DEFS_H */

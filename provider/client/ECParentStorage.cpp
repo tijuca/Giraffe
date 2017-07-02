@@ -16,26 +16,24 @@
  */
 
 #include <kopano/platform.h>
+#include <kopano/lockhelper.hpp>
 #include "ECParentStorage.h"
 
 #include "Mem.h"
 #include <kopano/ECGuid.h>
-
+#include <kopano/ECInterfaceDefs.h>
 #include <mapiutil.h>
 #include "SOAPUtils.h"
 #include "WSUtil.h"
 #include <kopano/Util.h>
 
-ECParentStorage::ECParentStorage(ECGenericProp *lpParentObject, ULONG ulUniqueId, ULONG ulObjId, IECPropStorage *lpServerStorage)
+ECParentStorage::ECParentStorage(ECGenericProp *lpParentObject,
+    ULONG ulUniqueId, ULONG ulObjId, IECPropStorage *lpServerStorage) :
+	m_lpParentObject(lpParentObject), m_ulObjId(ulObjId),
+	m_ulUniqueId(ulUniqueId), m_lpServerStorage(lpServerStorage)
 {
-	m_lpParentObject = lpParentObject;
 	if (m_lpParentObject)
 		m_lpParentObject->AddRef();
-
-	m_ulObjId = ulObjId;
-	m_ulUniqueId = ulUniqueId;
-
-	m_lpServerStorage = lpServerStorage;
 	if (m_lpServerStorage)
 		m_lpServerStorage->AddRef();
 }
@@ -51,10 +49,8 @@ ECParentStorage::~ECParentStorage()
 
 HRESULT ECParentStorage::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECParentStorage, this);
-
-	REGISTER_INTERFACE(IID_IECPropStorage, &this->m_xECPropStorage);
-
+	REGISTER_INTERFACE2(ECParentStorage, this);
+	REGISTER_INTERFACE2(IECPropStorage, &this->m_xECPropStorage);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -85,7 +81,7 @@ HRESULT	ECParentStorage::HrWriteProps(ULONG cValues, LPSPropValue pValues, ULONG
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ECParentStorage::HrDeleteProps(LPSPropTagArray lpsPropTagArray)
+HRESULT ECParentStorage::HrDeleteProps(const SPropTagArray *lpsPropTagArray)
 {
 	// this call should disappear
 	return MAPI_E_NO_SUPPORT;
@@ -108,34 +104,23 @@ HRESULT ECParentStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 
 	if (!m_lpParentObject)
 		return MAPI_E_INVALID_OBJECT;
-		
-	pthread_mutex_lock(&m_lpParentObject->m_hMutexMAPIObject);
-		
-	if (!m_lpParentObject->m_sMapiObject) {
-		hr = MAPI_E_INVALID_OBJECT;
-		goto exit;
-	}
+
+	scoped_rlock lock(m_lpParentObject->m_hMutexMAPIObject);
+	if (m_lpParentObject->m_sMapiObject == NULL)
+		return MAPI_E_INVALID_OBJECT;
 
 	// type is either attachment or message-in-message
 	{
 		MAPIOBJECT find(MAPI_MESSAGE, m_ulUniqueId);
 		MAPIOBJECT findAtt(MAPI_ATTACH, m_ulUniqueId);
-	    iterSObj = m_lpParentObject->m_sMapiObject->lstChildren->find(&find);
-	    if(iterSObj == m_lpParentObject->m_sMapiObject->lstChildren->end())
-    		iterSObj = m_lpParentObject->m_sMapiObject->lstChildren->find(&findAtt);
+		iterSObj = m_lpParentObject->m_sMapiObject->lstChildren.find(&find);
+		if (iterSObj == m_lpParentObject->m_sMapiObject->lstChildren.cend())
+			iterSObj = m_lpParentObject->m_sMapiObject->lstChildren.find(&findAtt);
 	}
-    	
-	if (iterSObj == m_lpParentObject->m_sMapiObject->lstChildren->end()) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
+	if (iterSObj == m_lpParentObject->m_sMapiObject->lstChildren.cend())
+		return MAPI_E_NOT_FOUND;
 	// make a complete copy of the object, because of close / re-open
 	*lppsMapiObject = new MAPIOBJECT(*iterSObj);
-
-exit:
-	pthread_mutex_unlock(&m_lpParentObject->m_hMutexMAPIObject);
-
 	return hr;
 }
 
@@ -144,59 +129,15 @@ IECPropStorage* ECParentStorage::GetServerStorage() {
 }
 
 // Interface IECPropStorage
-ULONG ECParentStorage::xECPropStorage::AddRef()
-{
-	METHOD_PROLOGUE_(ECParentStorage, ECPropStorage);
-	return pThis->AddRef();
-}
-
-ULONG ECParentStorage::xECPropStorage::Release()
-{
-	METHOD_PROLOGUE_(ECParentStorage, ECPropStorage);
-	return pThis->Release();
-}
-
-HRESULT ECParentStorage::xECPropStorage::QueryInterface(REFIID refiid , void** lppInterface)
-{
-	METHOD_PROLOGUE_(ECParentStorage, ECPropStorage);
-	return pThis->QueryInterface(refiid, lppInterface);
-}
-
-HRESULT ECParentStorage::xECPropStorage::HrReadProps(LPSPropTagArray *lppPropTags,ULONG *cValues, LPSPropValue *lppValues)
-{
-	METHOD_PROLOGUE_(ECParentStorage, ECPropStorage);
-	return pThis->HrReadProps(lppPropTags,cValues, lppValues);
-}
-			
-HRESULT ECParentStorage::xECPropStorage::HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropValue *lppsPropValue)
-{
-	METHOD_PROLOGUE_(ECParentStorage, ECPropStorage);
-	return pThis->HrLoadProp(ulObjId, ulPropTag, lppsPropValue);
-}
-
-HRESULT ECParentStorage::xECPropStorage::HrWriteProps(ULONG cValues, LPSPropValue lpValues, ULONG ulFlags)
-{
-	METHOD_PROLOGUE_(ECParentStorage, ECPropStorage);
-	return pThis->HrWriteProps(cValues, lpValues, ulFlags);
-}	
-
-HRESULT ECParentStorage::xECPropStorage::HrDeleteProps(LPSPropTagArray lpsPropTagArray)
-{
-	METHOD_PROLOGUE_(ECParentStorage, ECPropStorage);
-	return pThis->HrDeleteProps(lpsPropTagArray);
-}
-
-HRESULT ECParentStorage::xECPropStorage::HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject)
-{
-	METHOD_PROLOGUE_(ECParentStorage, ECPropStorage);
-	return pThis->HrSaveObject(ulFlags, lpsMapiObject);
-}
-
-HRESULT ECParentStorage::xECPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
-{
-	METHOD_PROLOGUE_(ECParentStorage, ECPropStorage);
-	return pThis->HrLoadObject(lppsMapiObject);
-}
+DEF_ULONGMETHOD0(ECParentStorage, ECPropStorage, AddRef, (void))
+DEF_ULONGMETHOD0(ECParentStorage, ECPropStorage, Release, (void))
+DEF_HRMETHOD0(ECParentStorage, ECPropStorage, QueryInterface, (REFIID, refiid), (void**, lppInterface))
+DEF_HRMETHOD0(ECParentStorage, ECPropStorage, HrReadProps, (LPSPropTagArray *, lppPropTags), (ULONG *, cValues), (LPSPropValue *, lppValues))
+DEF_HRMETHOD0(ECParentStorage, ECPropStorage, HrLoadProp, (ULONG, ulObjId), (ULONG, ulPropTag), (LPSPropValue *, lppsPropValue))
+DEF_HRMETHOD0(ECParentStorage, ECPropStorage, HrWriteProps, (ULONG, cValues), (LPSPropValue, lpValues), (ULONG, ulFlags))
+DEF_HRMETHOD0(ECParentStorage, ECPropStorage, HrDeleteProps, (const SPropTagArray *, lpsPropTagArray))
+DEF_HRMETHOD0(ECParentStorage, ECPropStorage, HrSaveObject, (ULONG, ulFlags), (MAPIOBJECT *, lpsMapiObject))
+DEF_HRMETHOD0(ECParentStorage, ECPropStorage, HrLoadObject, (MAPIOBJECT **, lppsMapiObject))
 
 IECPropStorage* ECParentStorage::xECPropStorage::GetServerStorage() {
 	METHOD_PROLOGUE_(ECParentStorage, ECPropStorage);

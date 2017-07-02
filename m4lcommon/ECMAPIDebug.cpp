@@ -22,34 +22,31 @@
 
 using namespace std;
 
+namespace KC {
+
 HRESULT Dump(std::ostream &os, LPMAPIPROP lpProp, const std::string &strPrefix)
 {
-	HRESULT hr = hrSuccess;
 	ULONG cValues;
 	SPropArrayPtr ptrProps;
 	std::string strObjType = "MAPIProp";
-	LPSPropValue lpObjType = NULL;
 	
-	if (lpProp == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	hr = lpProp->GetProps(NULL, 0, &cValues, &ptrProps);
+	if (lpProp == NULL)
+		return MAPI_E_INVALID_PARAMETER;
+	HRESULT hr = lpProp->GetProps(NULL, 0, &cValues, &~ptrProps);
 	if (FAILED(hr))
-		goto exit;
+		return hr;
 
-	lpObjType = PpropFindProp(ptrProps.get(), cValues, PR_OBJECT_TYPE);
+	auto lpObjType = PCpropFindProp(ptrProps.get(), cValues, PR_OBJECT_TYPE);
 	if (lpObjType) {
 		switch (lpObjType->Value.l) {
-			case MAPI_MESSAGE:
-				strObjType = "Message";
-				break;
-			case MAPI_ATTACH:
-				strObjType = "Attach";
-				break;
-			default:
-				break;
+		case MAPI_MESSAGE:
+			strObjType = "Message";
+			break;
+		case MAPI_ATTACH:
+			strObjType = "Attach";
+			break;
+		default:
+			break;
 		}
 	}
 
@@ -64,18 +61,16 @@ HRESULT Dump(std::ostream &os, LPMAPIPROP lpProp, const std::string &strPrefix)
 		MAPITablePtr ptrTable;
 		ULONG ulCount = 0;
 
-		hr = lpProp->QueryInterface(ptrMessage.iid, &ptrMessage);
+		hr = lpProp->QueryInterface(ptrMessage.iid(), &~ptrMessage);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		// List recipients
-		hr = ptrMessage->GetRecipientTable(0, &ptrTable);
+		hr = ptrMessage->GetRecipientTable(0, &~ptrTable);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		hr = ptrTable->GetRowCount(0, &ulCount);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		os << strPrefix << "Recipients (count=" << ulCount << "):" << endl;
 		if (ulCount > 0) {
@@ -84,13 +79,13 @@ HRESULT Dump(std::ostream &os, LPMAPIPROP lpProp, const std::string &strPrefix)
 			while (true) {
 				hr = ptrTable->QueryRows(64, 0, &ptrRows);
 				if (hr != hrSuccess)
-					goto exit;
+					return hr;
 
 				if (ptrRows.empty())
 					break;
 
 				for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
-					LPSPropValue lpRowId = PpropFindProp(ptrRows[i].lpProps, ptrRows[i].cValues, PR_ROWID);
+					auto lpRowId = PCpropFindProp(ptrRows[i].lpProps, ptrRows[i].cValues, PR_ROWID);
 
 					os << strPrefix << "  Recipient: ";
 					if (lpRowId)
@@ -106,28 +101,28 @@ HRESULT Dump(std::ostream &os, LPMAPIPROP lpProp, const std::string &strPrefix)
 		}
 
 		// List attachments
-		hr = ptrMessage->GetAttachmentTable(0, &ptrTable);
+		hr = ptrMessage->GetAttachmentTable(0, &~ptrTable);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		hr = ptrTable->GetRowCount(0, &ulCount);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		os << strPrefix << "Attachments (count=" << ulCount << "):" << endl;
 		if (ulCount > 0) {
-			SizedSPropTagArray(1, sptaAttachProps) = {1, {PR_ATTACH_NUM}};
+			static constexpr const SizedSPropTagArray(1, sptaAttachProps) = {1, {PR_ATTACH_NUM}};
 
-			hr = ptrTable->SetColumns((LPSPropTagArray)&sptaAttachProps, TBL_BATCH);
+			hr = ptrTable->SetColumns(sptaAttachProps, TBL_BATCH);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			while (true) {
 				SRowSetPtr ptrRows;
 
 				hr = ptrTable->QueryRows(64, 0, &ptrRows);
 				if (hr != hrSuccess)
-					goto exit;
+					return hr;
 
 				if (ptrRows.empty())
 					break;
@@ -136,16 +131,15 @@ HRESULT Dump(std::ostream &os, LPMAPIPROP lpProp, const std::string &strPrefix)
 					AttachPtr ptrAttach;
 
 					if (ptrRows[i].lpProps[0].ulPropTag != PR_ATTACH_NUM)
-						goto exit;
-
-					hr = ptrMessage->OpenAttach(ptrRows[i].lpProps[0].Value.l, &ptrAttach.iid, 0, &ptrAttach);
+						return hr;
+					hr = ptrMessage->OpenAttach(ptrRows[i].lpProps[0].Value.l, &ptrAttach.iid(), 0, &~ptrAttach);
 					if (hr != hrSuccess)
-						goto exit;
+						return hr;
 
 					os << strPrefix << "  Attachment: " << ptrRows[i].lpProps[0].Value.l << endl;
 					hr = Dump(os, ptrAttach, strPrefix + "  ");
 					if (hr != hrSuccess)
-						goto exit;
+						return hr;
 				}
 			}
 		}
@@ -155,29 +149,28 @@ HRESULT Dump(std::ostream &os, LPMAPIPROP lpProp, const std::string &strPrefix)
 		AttachPtr ptrAttach;
 		SPropValuePtr ptrAttachMethod;
 
-		hr = lpProp->QueryInterface(ptrAttach.iid, &ptrAttach);
+		hr = lpProp->QueryInterface(ptrAttach.iid(), &~ptrAttach);
 		if (hr != hrSuccess)
-			goto exit;
-
-		hr = HrGetOneProp(ptrAttach, PR_ATTACH_METHOD, &ptrAttachMethod);
+			return hr;
+		hr = HrGetOneProp(ptrAttach, PR_ATTACH_METHOD, &~ptrAttachMethod);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		// TODO: Handle more attachment types.
 		if (ptrAttachMethod->Value.l == ATTACH_EMBEDDED_MSG) {
 			MessagePtr ptrMessage;
 
-			hr = ptrAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &ptrMessage.iid, 0, 0, &ptrMessage);
+			hr = ptrAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &ptrMessage.iid(), 0, 0, &~ptrMessage);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			os << strPrefix << "Embedded message:" << endl;
 			hr = Dump(os, ptrMessage, strPrefix + "  ");
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
+
+} /* namespace */

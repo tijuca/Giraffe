@@ -21,6 +21,7 @@
 #include <kopano/ECGuid.h>
 #include <edkguid.h>
 #include <kopano/mapi_ptr.h>
+#include <kopano/memory.hpp>
 #include "IECPropStorage.h"
 #include "Mem.h"
 
@@ -63,16 +64,12 @@ HRESULT ECArchiveAwareMessageFactory::Create(ECMsgStore *lpMsgStore, BOOL fNew, 
 ECArchiveAwareMessage::ECArchiveAwareMessage(ECArchiveAwareMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFlags)
 : ECMessage(lpMsgStore, fNew, fModify, ulFlags, FALSE, NULL)
 , m_bLoading(false)
-, m_bNamedPropsMapped(false)
+, m_bNamedPropsMapped(false), __propmap(5)
 , m_mode(MODE_UNARCHIVED)
 , m_bChanged(false)
 {
 	// Override the handler defined in ECMessage
 	this->HrAddPropHandlers(PR_MESSAGE_SIZE, ECMessage::GetPropHandler, SetPropHandler, (void*)this, FALSE, FALSE);
-}
-
-ECArchiveAwareMessage::~ECArchiveAwareMessage()
-{
 }
 
 HRESULT	ECArchiveAwareMessage::Create(ECArchiveAwareMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFlags, ECMessage **lppMessage)
@@ -84,6 +81,8 @@ HRESULT	ECArchiveAwareMessage::Create(ECArchiveAwareMsgStore *lpMsgStore, BOOL f
 HRESULT ECArchiveAwareMessage::HrLoadProps()
 {
 	HRESULT hr = hrSuccess;
+	BOOL fModifyCopy;
+	ECMsgStore *lpMsgStore;
 
 	m_bLoading = true;
 	hr = ECMessage::HrLoadProps();
@@ -91,144 +90,144 @@ HRESULT ECArchiveAwareMessage::HrLoadProps()
 		goto exit;
 
 	// If we noticed we are stubbed, we need to perform a merge here.
-	if (m_mode == MODE_STUBBED) {
-		const BOOL fModifyCopy = this->fModify;
-		ECMsgStore *lpMsgStore = GetMsgStore();
-
-		// @todo: Put in MergePropsFromStub
-		SizedSPropTagArray(4, sptaDeleteProps) = {4, {PR_RTF_COMPRESSED, PR_BODY, PR_HTML, PR_ICON_INDEX}};
-		SizedSPropTagArray(6, sptaRestoreProps) = {6, {PR_RTF_COMPRESSED, PR_BODY, PR_HTML, PR_ICON_INDEX, PR_MESSAGE_CLASS, PR_MESSAGE_SIZE}};
-
-		if (!m_ptrArchiveMsg) {
-			ECArchiveAwareMsgStore *lpStore = dynamic_cast<ECArchiveAwareMsgStore*>(lpMsgStore);
-			if (lpStore == NULL) {
-				// This is quite a serious error since an ECArchiveAwareMessage can only be created by an
-				// ECArchiveAwareMsgStore. We won't just die here though...
-				hr = MAPI_E_NOT_FOUND;
-				goto exit;
-			}
-
-			hr = lpStore->OpenItemFromArchive(m_ptrStoreEntryIDs, m_ptrItemEntryIDs, &m_ptrArchiveMsg);
-			if (hr != hrSuccess) {
-				hr = CreateInfoMessage((LPSPropTagArray)&sptaDeleteProps, CreateErrorBodyUtf8(hr));
-				goto exit;
-			}
-		}
-
-		// Now merge the properties and reconstruct the attachment table.
-		// We'll copy the PR_RTF_COMPRESSED property from the archive to the stub as PR_RTF_COMPRESSED is
-		// obtained anyway to determine the type of the body.
-		// Also if the stub's PR_MESSAGE_CLASS equals IPM.Zarafa.Stub (old migrator behaviour), we'll overwrite
-		// that with the archive's PR_MESSAGE_CLASS and overwrite the PR_ICON_INDEX.
-
-		// We need to temporary enable write access on the underlying objects in order for the following
-		// 5 calls to succeed.
-		this->fModify = TRUE;
-
-		hr = DeleteProps((LPSPropTagArray)&sptaDeleteProps, NULL);
-		if (hr != hrSuccess) {
-			this->fModify = fModifyCopy;
-			goto exit;
-		}
-
-		hr = Util::DoCopyProps(&IID_IMAPIProp, &m_ptrArchiveMsg->m_xMAPIProp, (LPSPropTagArray)&sptaRestoreProps, 0, NULL, &IID_IMAPIProp, &this->m_xMAPIProp, 0, NULL);
-		if (hr != hrSuccess) {
-			this->fModify = fModifyCopy;
-			goto exit;
-		}
-
-		// Now remove any dummy attachment(s) and copy the attachments from the archive (except the properties
-		// that are too big in the firt place).
-		hr = Util::HrDeleteAttachments(&m_xMessage);
-		if (hr != hrSuccess) {
-			this->fModify = fModifyCopy;
-			goto exit;
-		}
-
-		hr = Util::CopyAttachments(&m_ptrArchiveMsg->m_xMessage, &m_xMessage, NULL);
-		this->fModify = fModifyCopy;
-		if (hr != hrSuccess)
-			goto exit;
+	if (m_mode != MODE_STUBBED) {
+		m_bLoading = false;
+		return hr;
 	}
 
+	fModifyCopy = this->fModify;
+	lpMsgStore = GetMsgStore();
+	// @todo: Put in MergePropsFromStub
+	static constexpr const SizedSPropTagArray(4, sptaDeleteProps) =
+		{4, {PR_RTF_COMPRESSED, PR_BODY, PR_HTML, PR_ICON_INDEX}};
+	static constexpr const SizedSPropTagArray(6, sptaRestoreProps) =
+		{6, {PR_RTF_COMPRESSED, PR_BODY, PR_HTML, PR_ICON_INDEX,
+		PR_MESSAGE_CLASS, PR_MESSAGE_SIZE}};
+
+	if (!m_ptrArchiveMsg) {
+		ECArchiveAwareMsgStore *lpStore = dynamic_cast<ECArchiveAwareMsgStore *>(lpMsgStore);
+		if (lpStore == NULL) {
+			// This is quite a serious error since an ECArchiveAwareMessage can only be created by an
+			// ECArchiveAwareMsgStore. We won't just die here though...
+			hr = MAPI_E_NOT_FOUND;
+			goto exit;
+		}
+		hr = lpStore->OpenItemFromArchive(m_ptrStoreEntryIDs, m_ptrItemEntryIDs, &~m_ptrArchiveMsg);
+		if (hr != hrSuccess) {
+			hr = CreateInfoMessage(sptaDeleteProps, CreateErrorBodyUtf8(hr));
+			goto exit;
+		}
+	}
+
+	// Now merge the properties and reconstruct the attachment table.
+	// We'll copy the PR_RTF_COMPRESSED property from the archive to the stub as PR_RTF_COMPRESSED is
+	// obtained anyway to determine the type of the body.
+	// Also if the stub's PR_MESSAGE_CLASS equals IPM.Zarafa.Stub (old migrator behaviour), we'll overwrite
+	// that with the archive's PR_MESSAGE_CLASS and overwrite the PR_ICON_INDEX.
+
+	// We need to temporary enable write access on the underlying objects in order for the following
+	// 5 calls to succeed.
+	this->fModify = TRUE;
+	hr = DeleteProps(sptaDeleteProps, NULL);
+	if (hr != hrSuccess) {
+		this->fModify = fModifyCopy;
+		goto exit;
+	}
+	hr = Util::DoCopyProps(&IID_IMAPIProp, &m_ptrArchiveMsg->m_xMAPIProp,
+	     sptaRestoreProps, 0, NULL, &IID_IMAPIProp,
+	     &this->m_xMAPIProp, 0, NULL);
+	if (hr != hrSuccess) {
+		this->fModify = fModifyCopy;
+		goto exit;
+	}
+
+	// Now remove any dummy attachment(s) and copy the attachments from the archive (except the properties
+	// that are too big in the firt place).
+	hr = Util::HrDeleteAttachments(&m_xMessage);
+	if (hr != hrSuccess) {
+		this->fModify = fModifyCopy;
+		goto exit;
+	}
+
+	hr = Util::CopyAttachments(&m_ptrArchiveMsg->m_xMessage, &m_xMessage, NULL);
+	this->fModify = fModifyCopy;
 exit:
 	m_bLoading = false;
 
 	return hr;
 }
 
-HRESULT	ECArchiveAwareMessage::HrSetRealProp(SPropValue *lpsPropValue)
+HRESULT	ECArchiveAwareMessage::HrSetRealProp(const SPropValue *lpsPropValue)
 {
 	HRESULT hr;
+	SPropValue copy;
 
-	if (m_bLoading) {
-		/*
-		 * This is where we end up if we're called through HrLoadProps. So this
-		 * is where we check if the loaded message is unarchived, archived or stubbed.
-		 */
-		if (lpsPropValue &&
-			PROP_TYPE(lpsPropValue->ulPropTag) != PT_ERROR &&
-			PROP_ID(lpsPropValue->ulPropTag) >= 0x8500)
-		{
-			// We have a named property that's in the not-hardcoded range (where
-			// the archive named properties are). We now need to check if that's
-			// one of the properties we're interested in.
-			// That might mean we need to first map the named properties now.
-			if (!m_bNamedPropsMapped) {
-				hr = MapNamedProps();
-				if (hr != hrSuccess)
-					return hr;
-			}
+	if (lpsPropValue != nullptr)
+		copy = *lpsPropValue;
+	/*
+	 * m_bLoading: This is where we end up if we're called through HrLoadProps. So this
+	 * is where we check if the loaded message is unarchived, archived or stubbed.
+	 */
+	if (m_bLoading && lpsPropValue != nullptr &&
+	    PROP_TYPE(lpsPropValue->ulPropTag) != PT_ERROR &&
+	    PROP_ID(lpsPropValue->ulPropTag) >= 0x8500) {
+		// We have a named property that's in the not-hardcoded range (where
+		// the archive named properties are). We now need to check if that's
+		// one of the properties we're interested in.
+		// That might mean we need to first map the named properties now.
+		if (!m_bNamedPropsMapped) {
+			hr = MapNamedProps();
+			if (hr != hrSuccess)
+				return hr;
+		}
 
-			// Check the various props.
-			if (lpsPropValue->ulPropTag == PROP_ARCHIVE_STORE_ENTRYIDS) {
-				if (m_mode == MODE_UNARCHIVED)
-					m_mode = MODE_ARCHIVED;
+		// Check the various props.
+		if (lpsPropValue->ulPropTag == PROP_ARCHIVE_STORE_ENTRYIDS) {
+			if (m_mode == MODE_UNARCHIVED)
+				m_mode = MODE_ARCHIVED;
 
-				// Store list
-				hr = MAPIAllocateBuffer(sizeof(SPropValue), (LPVOID*)&m_ptrStoreEntryIDs);
-				if (hr == hrSuccess)
-					hr = Util::HrCopyProperty(m_ptrStoreEntryIDs, lpsPropValue, m_ptrStoreEntryIDs);
-				if (hr != hrSuccess)
-					return hr;
-			}
+			// Store list
+			hr = MAPIAllocateBuffer(sizeof(SPropValue), &~m_ptrStoreEntryIDs);
+			if (hr == hrSuccess)
+				hr = Util::HrCopyProperty(m_ptrStoreEntryIDs, lpsPropValue, m_ptrStoreEntryIDs);
+			if (hr != hrSuccess)
+				return hr;
+		}
 
-			else if (lpsPropValue->ulPropTag == PROP_ARCHIVE_ITEM_ENTRYIDS) {
-				if (m_mode == MODE_UNARCHIVED)
-					m_mode = MODE_ARCHIVED;
+		else if (lpsPropValue->ulPropTag == PROP_ARCHIVE_ITEM_ENTRYIDS) {
+			if (m_mode == MODE_UNARCHIVED)
+				m_mode = MODE_ARCHIVED;
 
-				// Store list
-				hr = MAPIAllocateBuffer(sizeof(SPropValue), (LPVOID*)&m_ptrItemEntryIDs);
-				if (hr == hrSuccess)
-					hr = Util::HrCopyProperty(m_ptrItemEntryIDs, lpsPropValue, m_ptrItemEntryIDs);
-				if (hr != hrSuccess)
-					return hr;
-			}
+			// Store list
+			hr = MAPIAllocateBuffer(sizeof(SPropValue), &~m_ptrItemEntryIDs);
+			if (hr == hrSuccess)
+				hr = Util::HrCopyProperty(m_ptrItemEntryIDs, lpsPropValue, m_ptrItemEntryIDs);
+			if (hr != hrSuccess)
+				return hr;
+		}
 
-			else if (lpsPropValue->ulPropTag == PROP_STUBBED) {
-				if (lpsPropValue->Value.b != FALSE)
-					m_mode = MODE_STUBBED;
+		else if (lpsPropValue->ulPropTag == PROP_STUBBED) {
+			if (lpsPropValue->Value.b == TRUE)
+				m_mode = MODE_STUBBED;
 
-				// The message is not stubbed once destubbed.
-				// This fixes all kind of weird copy issues where the stubbed property does not
-				// represent the actual state of the message.
-				lpsPropValue->Value.b = FALSE;
-			}
+			// The message is not stubbed once destubbed.
+			// This fixes all kind of weird copy issues where the stubbed property does not
+			// represent the actual state of the message.
+			copy.Value.b = FALSE;
+		}
 
-			else if (lpsPropValue->ulPropTag == PROP_DIRTY) {
-				if (lpsPropValue->Value.b != FALSE)
-					m_mode = MODE_DIRTY;
-			}
+		else if (lpsPropValue->ulPropTag == PROP_DIRTY) {
+			if (lpsPropValue->Value.b != FALSE)
+				m_mode = MODE_DIRTY;
 		}
 	}
 
-	hr = ECMessage::HrSetRealProp(lpsPropValue);
-	if (hr == hrSuccess && !m_bLoading) {
+	hr = ECMessage::HrSetRealProp(lpsPropValue != nullptr ? &copy : nullptr);
+	if (hr == hrSuccess && !m_bLoading)
 		/*
 		 * This is where we end up if a property is actually altered through SetProps.
 		 */
 		m_bChanged = true;
-	}
 	return hr;
 }
 
@@ -243,19 +242,16 @@ HRESULT	ECArchiveAwareMessage::HrDeleteRealProp(ULONG ulPropTag, BOOL fOverwrite
 	return hr;
 }
 
-HRESULT ECArchiveAwareMessage::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
+HRESULT ECArchiveAwareMessage::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN *lppUnk)
 {
 	HRESULT hr = hrSuccess;
 
 	hr = ECMessage::OpenProperty(ulPropTag, lpiid, ulInterfaceOptions, ulFlags, lppUnk);
 	if (!m_bLoading && hr == hrSuccess && ((ulFlags & MAPI_MODIFY) || (fModify && (ulFlags & MAPI_BEST_ACCESS))))
-	{
 		// We have no way of knowing if the property will modified since it operates directly
 		// on the MAPIOBJECT data, which bypasses this subclass.
 		// @todo wrap the property to track if it was altered.
 		m_bChanged = true;
-	}
-
 	return hr;
 }
 
@@ -269,13 +265,10 @@ HRESULT ECArchiveAwareMessage::OpenAttach(ULONG ulAttachmentNum, LPCIID lpInterf
 	// if the parent object was openend with write access, we'll assume the object is changed the moment
 	// the attachment is openend.
 	if (hr == hrSuccess && ((ulFlags & MAPI_MODIFY) || fModify))
-	{
 		// We have no way of knowing if the attachment will modified since it operates directly
 		// on the MAPIOBJECT data, which bypasses this subclass.
 		// @todo wrap the attachment to track if it was altered.
 		m_bChanged = true;
-	}
-
 	return hr;
 }
 
@@ -311,7 +304,8 @@ HRESULT ECArchiveAwareMessage::DeleteAttach(ULONG ulAttachmentNum, ULONG ulUIPar
 	return hr;
 }
 
-HRESULT ECArchiveAwareMessage::ModifyRecipients(ULONG ulFlags, LPADRLIST lpMods)
+HRESULT ECArchiveAwareMessage::ModifyRecipients(ULONG ulFlags,
+    const ADRLIST *lpMods)
 {
 	HRESULT hr = hrSuccess;
 
@@ -337,7 +331,7 @@ HRESULT ECArchiveAwareMessage::SaveChanges(ULONG ulFlags)
 
 	// From here on we're no longer stubbed.
 	if (m_bNamedPropsMapped) {
-		hr = DeleteProps((LPSPropTagArray)&sptaStubbedProp, NULL);
+		hr = DeleteProps(sptaStubbedProp, NULL);
 		if (hr != hrSuccess)
 			return hr;
 	}
@@ -357,7 +351,8 @@ HRESULT ECArchiveAwareMessage::SaveChanges(ULONG ulFlags)
 	return ECMessage::SaveChanges(ulFlags);
 }
 
-HRESULT ECArchiveAwareMessage::SetPropHandler(ULONG ulPropTag, void* /*lpProvider*/, LPSPropValue lpsPropValue, void *lpParam)
+HRESULT ECArchiveAwareMessage::SetPropHandler(ULONG ulPropTag,
+    void */*lpProvider*/, const SPropValue *lpsPropValue, void *lpParam)
 {
 	ECArchiveAwareMessage *lpMessage = (ECArchiveAwareMessage *)lpParam;
 	HRESULT hr = hrSuccess;
@@ -388,12 +383,12 @@ HRESULT ECArchiveAwareMessage::MapNamedProps()
 	PROPMAP_INIT(&this->m_xMAPIProp);
 
 	m_bNamedPropsMapped = true;
-
-exit:
+ exitpm:
 	return hr;
 }
 
-HRESULT ECArchiveAwareMessage::CreateInfoMessage(LPSPropTagArray lpptaDeleteProps, const std::string &strBodyHtml)
+HRESULT ECArchiveAwareMessage::CreateInfoMessage(const SPropTagArray *lpptaDeleteProps,
+    const std::string &strBodyHtml)
 {
 	HRESULT hr = hrSuccess;
 	SPropValue sPropVal;
@@ -411,8 +406,7 @@ HRESULT ECArchiveAwareMessage::CreateInfoMessage(LPSPropTagArray lpptaDeleteProp
 	hr = HrSetOneProp(&this->m_xMAPIProp, &sPropVal);
 	if (hr != hrSuccess)
 		goto exit;
-
-	hr = OpenProperty(PR_HTML, &ptrHtmlStream.iid, 0, MAPI_CREATE|MAPI_MODIFY, &ptrHtmlStream);
+	hr = OpenProperty(PR_HTML, &ptrHtmlStream.iid(), 0, MAPI_CREATE | MAPI_MODIFY, &~ptrHtmlStream);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -471,16 +465,14 @@ std::string ECArchiveAwareMessage::CreateErrorBodyUtf8(HRESULT hResult) {
 				    << _("You don't have sufficient access to the archive.")
 					<< _T("</P>");
 	} else {
-		LPTSTR	lpszDescription = NULL;
-		HRESULT hr = Util::HrMAPIErrorToText(hResult, &lpszDescription);
-		if (hr == hrSuccess) {
+		KCHL::memory_ptr<TCHAR> lpszDescription;
+		HRESULT hr = Util::HrMAPIErrorToText(hResult, &~lpszDescription);
+		if (hr == hrSuccess)
 			ossHtmlBody << _T("<P>")
 						<< _("Error description:")
 						<< _T("<DIV class=\"indented\">")
 						<< lpszDescription
 						<< _T("</DIV></P>");
-			MAPIFreeBuffer(lpszDescription);
-		}
 	}
 
 	ossHtmlBody << _T("</BODY></HTML>");

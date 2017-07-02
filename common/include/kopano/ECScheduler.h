@@ -19,10 +19,14 @@
 #define ECSCHEDULER_H
 
 #include <kopano/zcdefs.h>
+#include <condition_variable>
+#include <mutex>
 #include <kopano/ECLogger.h>
 
 #include <pthread.h>
 #include <list>
+
+namespace KC {
 
 enum eSchedulerType{
 	SCHEDULE_NONE,
@@ -33,18 +37,17 @@ enum eSchedulerType{
 	SCHEDULE_MONTH
 };
 
-typedef struct tagSchedule
-{
+struct ECSCHEDULE {
 	eSchedulerType	eType;
 	unsigned int	ulBeginCycle;
 	time_t			tLastRunTime;
 	void*			(*lpFunction)(void*);
 	void*			lpData;
-} ECSCHEDULE;
+};
 
 typedef std::list<ECSCHEDULE> ECScheduleList;
 
-class ECScheduler _zcp_final {
+class _kc_export ECScheduler _kc_final {
 public:
 	ECScheduler(ECLogger *lpLogger);
 	~ECScheduler(void);
@@ -52,18 +55,19 @@ public:
 	HRESULT AddSchedule(eSchedulerType eType, unsigned int ulBeginCycle, void* (*lpFunction)(void*), void* lpData = NULL);
 
 private:
-	static bool hasExpired(time_t ttime, ECSCHEDULE *lpSchedule);
-	static void* ScheduleThread(void* lpTmpScheduler);
+	_kc_hidden static bool hasExpired(time_t ttime, ECSCHEDULE *);
+	_kc_hidden static void *ScheduleThread(void *tmp_scheduler);
 
-private:
 	ECScheduleList		m_listScheduler;
 	ECLogger *			m_lpLogger;
 
-	bool				m_bExit;
-	pthread_mutex_t     m_hExitMutex;			// Mutex needed for the release signal
-	pthread_cond_t		m_hExitSignal;			// Signal that should be send to the Scheduler when to exit 
-	pthread_mutex_t		m_hSchedulerMutex;		// Mutex for the locking of the Scheduler
+	bool m_bExit = false;
+	std::mutex m_hExitMutex; /* Mutex needed for the release signal */
+	std::condition_variable m_hExitSignal; /* Signal that should be send to the Scheduler when to exit */
+	std::recursive_mutex m_hSchedulerMutex; /* Mutex for the locking of the scheduler */
 	pthread_t			m_hMainThread;			// Thread that is used for the Scheduler
 };
+
+} /* namespace */
 
 #endif

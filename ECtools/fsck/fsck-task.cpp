@@ -22,32 +22,35 @@
 #include <kopano/CommonUtil.h>
 #include <kopano/mapiext.h>
 #include <kopano/mapiguidext.h>
+#include <kopano/memory.hpp>
 #include <mapiutil.h>
 #include <mapix.h>
 #include <kopano/namedprops.h>
 #include "fsck.h"
 
+using namespace KCHL;
+
 HRESULT FsckTask::ValidateMinimalNamedFields(LPMESSAGE lpMessage)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpPropertyArray = NULL;
-	LPSPropTagArray lpPropertyTagArray = NULL;
+	memory_ptr<SPropValue> lpPropertyArray;
+	memory_ptr<SPropTagArray> lpPropertyTagArray;
 
 	enum {
 		E_REMINDER,
 		TAG_COUNT
 	};
 
-	LPMAPINAMEID *lppTagArray = NULL;
+	memory_ptr<MAPINAMEID *> lppTagArray;
 	std::string strTagName[TAG_COUNT];
 
 	/*
 	 * Allocate the NamedID list and initialize it to all
 	 * properties which could give us some information about the name.
 	 */
-	hr = allocNamedIdList(TAG_COUNT, &lppTagArray);
+	hr = allocNamedIdList(TAG_COUNT, &~lppTagArray);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	lppTagArray[E_REMINDER]->lpguid = (LPGUID)&PSETID_Common;
 	lppTagArray[E_REMINDER]->ulKind = MNID_ID;
@@ -55,9 +58,10 @@ HRESULT FsckTask::ValidateMinimalNamedFields(LPMESSAGE lpMessage)
 
 	strTagName[E_REMINDER] = "dispidReminderSet";
 
-	hr = ReadNamedProperties(lpMessage, TAG_COUNT, lppTagArray, &lpPropertyTagArray, &lpPropertyArray);
+	hr = ReadNamedProperties(lpMessage, TAG_COUNT, lppTagArray,
+	     &~lpPropertyTagArray, &~lpPropertyArray);
 	if (FAILED(hr))
-		goto exit;
+		return hr;
 
 	for (ULONG i = 0; i < TAG_COUNT; ++i) {
 		if (PROP_TYPE(lpPropertyArray[i].ulPropTag) == PT_ERROR) {
@@ -68,26 +72,18 @@ HRESULT FsckTask::ValidateMinimalNamedFields(LPMESSAGE lpMessage)
 						CHANGE_PROP_TYPE(lpPropertyTagArray->aulPropTag[i], PT_BOOLEAN),
 						Value);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 	}
-
-	/* If we are here, we were succcessful. */
-	hr = hrSuccess;
-
-exit:
-	if (lppTagArray)
-		freeNamedIdList(lppTagArray);
-	MAPIFreeBuffer(lpPropertyArray);
-	MAPIFreeBuffer(lpPropertyTagArray);
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT FsckTask::ValidateTimestamps(LPMESSAGE lpMessage)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpPropertyArray = NULL;
-	LPSPropTagArray lpPropertyTagArray = NULL;
+	memory_ptr<SPropValue> lpPropertyArray;
+	memory_ptr<SPropTagArray> lpPropertyTagArray;
+	memory_ptr<MAPINAMEID *> lppTagArray;
 
 	enum {
 		E_START_DATE,
@@ -95,15 +91,13 @@ HRESULT FsckTask::ValidateTimestamps(LPMESSAGE lpMessage)
 		TAG_COUNT
 	};
 
-	LPMAPINAMEID *lppTagArray = NULL;
-
 	/*
 	 * Allocate the NameID list and initialize it to all
 	 * properties which could give us some information about the timestamps.
 	 */
-	hr = allocNamedIdList(TAG_COUNT, &lppTagArray);
+	hr = allocNamedIdList(TAG_COUNT, &~lppTagArray);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	lppTagArray[E_START_DATE]->lpguid = (LPGUID)&PSETID_Task;
 	lppTagArray[E_START_DATE]->ulKind = MNID_ID;
@@ -113,9 +107,10 @@ HRESULT FsckTask::ValidateTimestamps(LPMESSAGE lpMessage)
 	lppTagArray[E_DUE_DATE]->ulKind = MNID_ID;
 	lppTagArray[E_DUE_DATE]->Kind.lID = dispidTaskDueDate;
 
-	hr = ReadNamedProperties(lpMessage, TAG_COUNT, lppTagArray, &lpPropertyTagArray, &lpPropertyArray);
+	hr = ReadNamedProperties(lpMessage, TAG_COUNT, lppTagArray,
+	     &~lpPropertyTagArray, &~lpPropertyArray);
 	if (FAILED(hr))
-		goto exit;
+		return hr;
 
 	/*
 	 * Validate parameters
@@ -140,24 +135,19 @@ HRESULT FsckTask::ValidateTimestamps(LPMESSAGE lpMessage)
 					     "Start date cannot be after due date",
 					     Value);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 	} else
 		hr = hrSuccess;
-
-exit:
-	if (lppTagArray)
-		freeNamedIdList(lppTagArray);
-	MAPIFreeBuffer(lpPropertyArray);
-	MAPIFreeBuffer(lpPropertyTagArray);
 	return hr;
 }
 
 HRESULT FsckTask::ValidateCompletion(LPMESSAGE lpMessage)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpPropertyArray = NULL;
-	LPSPropTagArray lpPropertyTagArray = NULL;
+	memory_ptr<SPropValue> lpPropertyArray;
+	memory_ptr<SPropTagArray> lpPropertyTagArray;
+	memory_ptr<MAPINAMEID *> lppTagArray;
 	bool bCompleted;
 
 	enum {
@@ -167,15 +157,13 @@ HRESULT FsckTask::ValidateCompletion(LPMESSAGE lpMessage)
 		TAG_COUNT
 	};
 
-	LPMAPINAMEID *lppTagArray = NULL;
-
 	/*
 	 * Allocate the NamedID list and initialize it to all
 	 * properties which could give us some information about the completion.
 	 */
-	hr = allocNamedIdList(TAG_COUNT, &lppTagArray);
+	hr = allocNamedIdList(TAG_COUNT, &~lppTagArray);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	lppTagArray[E_COMPLETE]->lpguid = (LPGUID)&PSETID_Task;
 	lppTagArray[E_COMPLETE]->ulKind = MNID_ID;
@@ -189,9 +177,10 @@ HRESULT FsckTask::ValidateCompletion(LPMESSAGE lpMessage)
 	lppTagArray[E_COMPLETION_DATE]->ulKind = MNID_ID;
 	lppTagArray[E_COMPLETION_DATE]->Kind.lID = dispidTaskDateCompleted;
 
-	hr = ReadNamedProperties(lpMessage, TAG_COUNT, lppTagArray, &lpPropertyTagArray, &lpPropertyArray);
+	hr = ReadNamedProperties(lpMessage, TAG_COUNT, lppTagArray,
+	     &~lpPropertyTagArray, &~lpPropertyArray);
 	if (FAILED(hr))
-		goto exit;
+		return hr;
 
 	/*
 	 * Validate parameters
@@ -213,8 +202,7 @@ HRESULT FsckTask::ValidateCompletion(LPMESSAGE lpMessage)
 					CHANGE_PROP_TYPE(lpPropertyTagArray->aulPropTag[E_COMPLETE], PT_BOOLEAN),
 					Value);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		bCompleted = Value.b;
 	} else
 		bCompleted = lpPropertyArray[E_COMPLETE].Value.b;
@@ -227,7 +215,7 @@ HRESULT FsckTask::ValidateCompletion(LPMESSAGE lpMessage)
 		 			 CHANGE_PROP_TYPE(lpPropertyTagArray->aulPropTag[E_PERCENT_COMPLETE], PT_DOUBLE),
 					 Value);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 
 	if (PROP_TYPE(lpPropertyArray[E_COMPLETION_DATE].ulPropTag) == PT_ERROR && bCompleted) {
@@ -239,18 +227,9 @@ HRESULT FsckTask::ValidateCompletion(LPMESSAGE lpMessage)
 					CHANGE_PROP_TYPE(lpPropertyTagArray->aulPropTag[E_COMPLETION_DATE], PT_SYSTIME),
 					Value);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-	/* If we are here, we were succcessful. */
-	hr = hrSuccess;
-
-exit:
-	if (lppTagArray)
-		freeNamedIdList(lppTagArray);
-	MAPIFreeBuffer(lpPropertyArray);
-	MAPIFreeBuffer(lpPropertyTagArray);
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT FsckTask::ValidateItem(LPMESSAGE lpMessage,

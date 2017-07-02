@@ -21,6 +21,7 @@
 #define MAX_SORTKEY_LEN 4096
 
 #include <kopano/zcdefs.h>
+#include <mutex>
 #include "soapH.h"
 
 #include <list>
@@ -31,6 +32,10 @@
 #include "ECDatabase.h"
 #include <kopano/ustringutil.h>
 #include <kopano/ECUnknown.h>
+
+struct soap;
+
+namespace KC {
 
 /*
  * This object is an actual table, with a cursor in-memory. We also keep the complete
@@ -52,7 +57,7 @@ class ECCacheManager;
 
 typedef std::map<ECTableRow, sObjectTableKey> ECSortedCategoryMap;
 
-class ECCategory _zcp_final {
+class ECCategory _kc_final {
 public:
     ECCategory(unsigned int ulCategory, struct propVal *lpProps, unsigned int cProps, unsigned int nProps, ECCategory *lpParent, unsigned int ulDepth, bool fExpanded, const ECLocale &locale);
     virtual ~ECCategory();
@@ -79,10 +84,7 @@ public:
     unsigned int m_ulDepth;
     unsigned int m_ulCategory;
     bool m_fExpanded;
-    
-    unsigned int m_ulUnread;
-    unsigned int m_ulLeafs;
-
+	unsigned int m_ulUnread = 0, m_ulLeafs = 0;
 	const ECLocale& m_locale;
 
 	std::map<sObjectTableKey, struct propVal *> m_mapMinMax;
@@ -90,10 +92,10 @@ public:
 	sObjectTableKey m_sCurMinMax;
 };
 
-typedef struct {
+struct LEAFINFO {
     bool fUnread;
     ECCategory *lpCategory;
-} LEAFINFO;
+};
 
 typedef std::map<sObjectTableKey, ECCategory *, ObjectTableKeyCompare> ECCategoryMap;
 typedef std::map<sObjectTableKey, LEAFINFO, ObjectTableKeyCompare> ECLeafMap;
@@ -145,9 +147,9 @@ public:
 	ECRESULT	SeekRow(unsigned int ulBookmark, int lSeekTo, int *lplRowsSought);
 	ECRESULT	FindRow(struct restrictTable *lpsRestrict, unsigned int ulBookmark, unsigned int ulFlags);
 	ECRESULT	GetRowCount(unsigned int *lpulRowCount, unsigned int *lpulCurrentRow);
-	ECRESULT	SetColumns(struct propTagArray *lpsPropTags, bool bDefaultSet);
+	ECRESULT	SetColumns(const struct propTagArray *lpsPropTags, bool bDefaultSet);
 	ECRESULT	GetColumns(struct soap *soap, ULONG ulFlags, struct propTagArray **lpsPropTags);
-	ECRESULT	SetSortOrder(struct sortOrderArray *lpsSortOrder, unsigned int ulCategories, unsigned int ulExpanded);
+	ECRESULT SetSortOrder(struct sortOrderArray *, unsigned int categ, unsigned int expanded) __attribute__((nonnull));
 	ECRESULT	Restrict(struct restrictTable *lpsRestrict);
 	ECRESULT	QueryRows(struct soap *soap, unsigned int ulRowCount, unsigned int ulFlags, struct rowSet **lppRowSet);
 	ECRESULT	CreateBookmark(unsigned int* lpulbkPosition);
@@ -213,24 +215,23 @@ protected:
 	// Constants
 	ECSession*					lpSession;
 	ECKeyTable*					lpKeyTable;
-	unsigned int				m_ulTableId;	// Id of the table from ECTableManager
-	void*						m_lpObjectData;
+	unsigned int m_ulTableId = -1; /* id of the table from ECTableManager */
+	void *m_lpObjectData = nullptr;
 
-	pthread_mutex_t				m_hLock;		// Lock for locked internals
+	std::recursive_mutex m_hLock; /* Lock for locked internals */
 
 	// Locked internals
-	struct sortOrderArray*		lpsSortOrderArray;	// Stored sort order
-	struct propTagArray*		lpsPropTagArray;	// Stored column set
-	struct restrictTable*		lpsRestrict;		// Stored restriction
+	struct sortOrderArray *lpsSortOrderArray = nullptr; /* Stored sort order */
+	struct propTagArray *lpsPropTagArray = nullptr; /* Stored column set */
+	struct restrictTable *lpsRestrict = nullptr; /* Stored restriction */
 	ECObjectTableMap			mapObjects;			// Map of all objects in this table
 	ECListInt					m_listMVSortCols;	// List of MV sort columns
-	bool						m_bMVCols;			// Are there MV props in the column list
-	bool						m_bMVSort;			// Are there MV props in the sort order
+	bool m_bMVCols = false; /* Are there MV props in the column list */
+	bool m_bMVSort = false; /* Are there MV props in the sort order */
 	unsigned int				m_ulObjType;
 	unsigned int				m_ulFlags;			//< flags from client
-	QueryRowDataCallBack		m_lpfnQueryRowData;
+	QueryRowDataCallBack m_lpfnQueryRowData = nullptr;
 	
-protected:
 	virtual ECRESULT			AddRowKey(ECObjectTableList* lpRows, unsigned int *lpulLoaded, unsigned int ulFlags, bool bInitialLoad, bool bOverride, struct restrictTable *lpOverrideRestrict);
     virtual ECRESULT			AddCategoryBeforeAddRow(sObjectTableKey sObjKey, struct propVal *lpProps, unsigned int cProps, unsigned int ulFlags, bool fUnread, bool *lpfHidden, ECCategory **lppCategory);
     virtual ECRESULT			RemoveCategoryAfterRemoveRow(sObjectTableKey sObjKey, unsigned int ulFlags);
@@ -238,12 +239,12 @@ protected:
 	ECCategoryMap				m_mapCategories;	// Map between instance key of category and category struct
 	ECSortedCategoryMap			m_mapSortedCategories; // Map between category sort keys and instance key. This is where we track which categories we have
 	ECLeafMap					m_mapLeafs;			// Map between object instance key and LEAFINFO (contains unread flag and category pointer)
-	unsigned int				m_ulCategory;
-	unsigned int				m_ulCategories;
-	unsigned int				m_ulExpanded;
-	bool						m_bPopulated;
-	
+	unsigned int m_ulCategory = 1, m_ulCategories = 0;
+	unsigned int m_ulExpanded = 0;
+	bool m_bPopulated = false;
 	ECLocale					m_locale;
 };
+
+} /* namespace */
 
 #endif // ECGENERIC_OBJECTTABLE_H

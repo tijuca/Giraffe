@@ -19,33 +19,34 @@
 #define WSMAPIFOLDEROPS_H
 
 #include <kopano/ECUnknown.h>
+#include <kopano/zcdefs.h>
+#include <mutex>
 #include "kcore.hpp"
 #include <kopano/kcodes.h>
 #include "soapKCmdProxy.h"
-#include "ECICS.h"
-
+#include "ics_client.hpp"
 #include <vector>
 
 #include <mapi.h>
 #include <mapispi.h>
-#include <pthread.h>
+
+namespace KC {
+class utf8string;
+}
 
 class WSTransport;
-class utf8string;
 
-class WSMAPIFolderOps : public ECUnknown
-{
+class WSMAPIFolderOps _kc_final : public ECUnknown {
 protected:
-	WSMAPIFolderOps(KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport);
+	WSMAPIFolderOps(KCmd *, std::recursive_mutex &, ECSESSIONID, ULONG cbEntryId, LPENTRYID, WSTransport *);
 	virtual ~WSMAPIFolderOps();
 
 public:
-	static HRESULT Create(KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport, WSMAPIFolderOps **lppFolderOps);
-
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
+	static HRESULT Create(KCmd *, std::recursive_mutex &, ECSESSIONID, ULONG cbEntryId, LPENTRYID, WSTransport *, WSMAPIFolderOps **);
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 	
 	// Creates a folder object with only a PR_DISPLAY_NAME and type
-	virtual HRESULT HrCreateFolder(ULONG ulFolderType, const utf8string &strFolderName, const utf8string &strComment, BOOL fOpenIfExists, ULONG ulSyncId, LPSBinary lpsSourceKey, ULONG cbNewEntryId, LPENTRYID lpNewEntryId, ULONG* lpcbEntryId, LPENTRYID* lppEntryId);
+	virtual HRESULT HrCreateFolder(ULONG fl_type, const utf8string &name, const utf8string &comment, BOOL fOpenIfExists, ULONG sync_id, const SBinary *srckey, ULONG neweid_size, ENTRYID *neweid, ULONG *eid_size, ENTRYID **eid);
 
 	// Completely remove a folder, the messages in it, the folders in it or any combination
 	virtual HRESULT HrDeleteFolder(ULONG cbEntryId, LPENTRYID lpEntryId, ULONG ulFlags, ULONG ulSyncId);
@@ -80,10 +81,9 @@ private:
 	virtual HRESULT LockSoap();
 	virtual HRESULT UnLockSoap();
 
-private:
 	entryId			m_sEntryId;		// Entryid of the folder
 	KCmd*		lpCmd;			// command object
-	pthread_mutex_t *lpDataLock;		//
+	std::recursive_mutex &lpDataLock;
 	ECSESSIONID		ecSessionId;	// Id of the session
 	ULONG			m_ulSessionReloadCallback;
 	WSTransport *	m_lpTransport;

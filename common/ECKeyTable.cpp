@@ -16,9 +16,13 @@
  */
 
 #include <kopano/platform.h>
+#include <memory>
 #include <cassert>
-#include <kopano/ECKeyTable.h> 
+#include <kopano/ECKeyTable.h>
+#include <kopano/lockhelper.hpp>
 #include <kopano/ustringutil.h>
+
+namespace KC {
 
 bool operator!=(const sObjectTableKey& a, const sObjectTableKey& b)
 {
@@ -83,13 +87,6 @@ ECTableRow::ECTableRow(sObjectTableKey sKey, unsigned int ulSortCols,
     unsigned char **lppSortData, bool fHidden)
 {
 	this->sKey = sKey;
-	this->lpParent = NULL;
-	this->lpLeft = NULL;
-	this->lpRight = NULL;
-	this->fLeft = 0;
-	this->ulBranchCount = 0;
-	this->fRoot = false;
-	this->ulHeight = 0;
 	this->fHidden = fHidden;
 
 	initSortCols(ulSortCols, reinterpret_cast<const int *>(lpSortLen),
@@ -247,21 +244,17 @@ bool ECTableRow::rowcompare(unsigned int ulSortColsA, const int *lpSortLenA,
 	}
  
 	if(i == ulSortCols) {
-	    if(ulSortColsA == ulSortColsB) {
-    		// equal, always return false independent of asc/desc
-	    	return false;
-        }
-        else {
-            // unequal number of sort columns, the item with the least sort columns comes first, independent of asc/desc
-            return ulSortColsA < ulSortColsB;
-        }
-	} else {
-	    // Unequal, flip order if desc
-		if(!fIgnoreOrder && lpSortFlagsA && (lpSortFlagsA[i] & TABLEROW_FLAG_DESC))
-			return !ret;
-		else
-			return ret;
+		if (ulSortColsA == ulSortColsB)
+			// equal, always return false independent of asc/desc
+			return false;
+		// unequal number of sort columns, the item with the least sort columns comes first, independent of asc/desc
+		return ulSortColsA < ulSortColsB;
 	}
+	// Unequal, flip order if desc
+	if (!fIgnoreOrder && lpSortFlagsA && (lpSortFlagsA[i] & TABLEROW_FLAG_DESC))
+		return !ret;
+	else
+		return ret;
 }
 
 // Compares a row by looking only at a certain prefix of sort columns
@@ -311,25 +304,17 @@ ECKeyTable::ECKeyTable()
 
 	// The start of bookmark, the first 3 (0,1,2) are default
 	m_ulBookmarkPosition = 3;
-
-	// g++ doesn't like static initializers on existing variables
-	pthread_mutexattr_t mattr;
-	pthread_mutexattr_init(&mattr);
-	pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
-	pthread_mutex_init(&mLock, &mattr);
 }
 
 ECKeyTable::~ECKeyTable()
 {
 	Clear();
 	delete lpRoot;
-	pthread_mutex_destroy(&mLock);
 }
 
 // Propagate this node's counts up to the root
 ECRESULT ECKeyTable::UpdateCounts(ECTableRow *lpRow)
 {
-	ECRESULT er = erSuccess;
 	unsigned int ulHeight = 0;
 
 	while(lpRow != NULL) {
@@ -363,8 +348,7 @@ ECRESULT ECKeyTable::UpdateCounts(ECTableRow *lpRow)
 		lpRow = lpRow->lpParent;
 
 	}
-
-	return er;	
+	return erSuccess;
 }
 
 ECRESULT ECKeyTable::UpdateRow(UpdateType ulType,
@@ -379,123 +363,107 @@ ECRESULT ECKeyTable::UpdateRow(UpdateType ulType,
 	ECTableRow *lpNewRow = NULL;
 	unsigned int fLeft = 0;
 	bool fRelocateCursor = false;
-
-	pthread_mutex_lock(&mLock);
+	scoped_rlock biglock(mLock);
 
 	switch(ulType) {
 	case TABLE_ROW_DELETE:
 		// Find the row by ID
 		iterMap = mapRow.find(*lpsRowItem);
+		if (iterMap == mapRow.cend())
+			return KCERR_NOT_FOUND;
+		// The row exists
+		lpRow = iterMap->second;
 
-		if(iterMap != mapRow.end()) {
-			// The row exists
-			lpRow = iterMap->second;
-
-			// Do the delete
-			if(lpRow->lpLeft == NULL && lpRow->lpRight == NULL) {
-				// This is a leaf node, just delete the leaf
-				if(lpRow->fLeft)
-					lpRow->lpParent->lpLeft = NULL;
-				else
-					lpRow->lpParent->lpRight = NULL;
-
-				UpdateCounts(lpRow->lpParent);
-				RestructureRecursive(lpRow->lpParent);
-
-			} else if(lpRow->lpLeft != NULL && lpRow->lpRight == NULL) {
-				// We have a left branch, put that branch in place of this node
-				if(lpRow->fLeft)
-					lpRow->lpParent->lpLeft = lpRow->lpLeft;
-				else
-					lpRow->lpParent->lpRight = lpRow->lpLeft;
-
-				lpRow->lpLeft->lpParent = lpRow->lpParent;
-				lpRow->lpLeft->fLeft = lpRow->fLeft;
-
-				UpdateCounts(lpRow->lpParent);
-				RestructureRecursive(lpRow->lpParent);
-
-			} else if(lpRow->lpRight != NULL && lpRow->lpLeft == NULL) {
-				// We have a right branch, put that branch in place of this node
-				if(lpRow->fLeft)
-					lpRow->lpParent->lpLeft = lpRow->lpRight;
-				else
-					lpRow->lpParent->lpRight = lpRow->lpRight;
-
-				lpRow->lpRight->lpParent = lpRow->lpParent;
-				lpRow->lpRight->fLeft = lpRow->fLeft;
-
-				UpdateCounts(lpRow->lpParent);
-				RestructureRecursive(lpRow->lpParent);
-			} else {
-				// We have two child nodes ..
-
-				ECTableRow *lpPredecessor = lpRow->lpLeft;
-				ECTableRow *lpPredecessorParent = NULL;
-
-				while(lpPredecessor->lpRight)
-					lpPredecessor = lpPredecessor->lpRight;
-
-				// Remove the predecessor from the tree, optionally moving the left tree into place
-				if(lpPredecessor->fLeft)
-					lpPredecessor->lpParent->lpLeft = lpPredecessor->lpLeft;
-				else
-					lpPredecessor->lpParent->lpRight = lpPredecessor->lpLeft;
-
-				if(lpPredecessor->lpLeft) {
-					lpPredecessor->lpLeft->lpParent = lpPredecessor->lpParent;
-					lpPredecessor->lpLeft->fLeft = lpPredecessor->fLeft;
-				}
-
-				// Remember the predecessor parent for later use
-				lpPredecessorParent = lpPredecessor->lpParent;
-
-				// Replace the row to be deleted with the predecessor
-				if(lpRow->fLeft)
-					lpRow->lpParent->lpLeft = lpPredecessor;
-				else
-					lpRow->lpParent->lpRight = lpPredecessor;
-
-				lpPredecessor->lpParent = lpRow->lpParent;
-				lpPredecessor->fLeft = lpRow->fLeft;
-				lpPredecessor->lpLeft = lpRow->lpLeft;
-				lpPredecessor->lpRight = lpRow->lpRight;
-
-				if(lpPredecessor->lpLeft)
-					lpPredecessor->lpLeft->lpParent = lpPredecessor;
-				if(lpPredecessor->lpRight)
-					lpPredecessor->lpRight->lpParent = lpPredecessor;
-
-				// Do a recursive update of the counts in the branch of the predecessorparent, (where we removed the predecessor)
-				UpdateCounts(lpPredecessorParent);
-				// Do a recursive update of the counts in the branch we moved to predecessor to
-				UpdateCounts(lpPredecessor);
-
-				// Restructure 
-				RestructureRecursive(lpPredecessor);
-				if(lpPredecessorParent->sKey != *lpsRowItem)
-					RestructureRecursive(lpPredecessorParent);
-			}
-
-			// Move cursor to next node (or previous if this was the last row)
-			if(lpCurrent == lpRow) {
-				this->SeekRow(EC_SEEK_CUR, -1, NULL);
-				this->SeekRow(EC_SEEK_CUR, 1, NULL);
-			}
-
-			// Delete this uncoupled node
-			InvalidateBookmark(lpRow); //ignore errors
-			delete lpRow;
-
-			// Remove the row from the id map
-			mapRow.erase(*lpsRowItem);
-
-			if(lpulAction)
-				*lpulAction = TABLE_ROW_DELETE;
+		// Do the delete
+		if (lpRow->lpLeft == NULL && lpRow->lpRight == NULL) {
+			// This is a leaf node, just delete the leaf
+			if (lpRow->fLeft)
+				lpRow->lpParent->lpLeft = NULL;
+			else
+				lpRow->lpParent->lpRight = NULL;
+			UpdateCounts(lpRow->lpParent);
+			RestructureRecursive(lpRow->lpParent);
+		} else if (lpRow->lpLeft != NULL && lpRow->lpRight == NULL) {
+			// We have a left branch, put that branch in place of this node
+			if (lpRow->fLeft)
+				lpRow->lpParent->lpLeft = lpRow->lpLeft;
+			else
+				lpRow->lpParent->lpRight = lpRow->lpLeft;
+			lpRow->lpLeft->lpParent = lpRow->lpParent;
+			lpRow->lpLeft->fLeft = lpRow->fLeft;
+			UpdateCounts(lpRow->lpParent);
+			RestructureRecursive(lpRow->lpParent);
+		} else if (lpRow->lpRight != NULL && lpRow->lpLeft == NULL) {
+			// We have a right branch, put that branch in place of this node
+			if (lpRow->fLeft)
+				lpRow->lpParent->lpLeft = lpRow->lpRight;
+			else
+				lpRow->lpParent->lpRight = lpRow->lpRight;
+			lpRow->lpRight->lpParent = lpRow->lpParent;
+			lpRow->lpRight->fLeft = lpRow->fLeft;
+			UpdateCounts(lpRow->lpParent);
+			RestructureRecursive(lpRow->lpParent);
 		} else {
-			er = KCERR_NOT_FOUND;
-			goto exit;
+			// We have two child nodes ..
+			ECTableRow *lpPredecessor = lpRow->lpLeft;
+			ECTableRow *lpPredecessorParent = NULL;
+
+			while (lpPredecessor->lpRight)
+				lpPredecessor = lpPredecessor->lpRight;
+
+			// Remove the predecessor from the tree, optionally moving the left tree into place
+			if (lpPredecessor->fLeft)
+				lpPredecessor->lpParent->lpLeft = lpPredecessor->lpLeft;
+			else
+				lpPredecessor->lpParent->lpRight = lpPredecessor->lpLeft;
+
+			if (lpPredecessor->lpLeft) {
+				lpPredecessor->lpLeft->lpParent = lpPredecessor->lpParent;
+				lpPredecessor->lpLeft->fLeft = lpPredecessor->fLeft;
+			}
+
+			// Remember the predecessor parent for later use
+			lpPredecessorParent = lpPredecessor->lpParent;
+
+			// Replace the row to be deleted with the predecessor
+			if (lpRow->fLeft)
+				lpRow->lpParent->lpLeft = lpPredecessor;
+			else
+				lpRow->lpParent->lpRight = lpPredecessor;
+
+			lpPredecessor->lpParent = lpRow->lpParent;
+			lpPredecessor->fLeft = lpRow->fLeft;
+			lpPredecessor->lpLeft = lpRow->lpLeft;
+			lpPredecessor->lpRight = lpRow->lpRight;
+			if (lpPredecessor->lpLeft)
+				lpPredecessor->lpLeft->lpParent = lpPredecessor;
+			if (lpPredecessor->lpRight)
+				lpPredecessor->lpRight->lpParent = lpPredecessor;
+
+			// Do a recursive update of the counts in the branch of the predecessorparent, (where we removed the predecessor)
+			UpdateCounts(lpPredecessorParent);
+			// Do a recursive update of the counts in the branch we moved to predecessor to
+			UpdateCounts(lpPredecessor);
+			// Restructure
+			RestructureRecursive(lpPredecessor);
+			if (lpPredecessorParent->sKey != *lpsRowItem)
+				RestructureRecursive(lpPredecessorParent);
 		}
+
+		// Move cursor to next node (or previous if this was the last row)
+		if (lpCurrent == lpRow) {
+			this->SeekRow(EC_SEEK_CUR, -1, NULL);
+			this->SeekRow(EC_SEEK_CUR, 1, NULL);
+		}
+
+		// Delete this uncoupled node
+		InvalidateBookmark(lpRow); //ignore errors
+		delete lpRow;
+
+		// Remove the row from the id map
+		mapRow.erase(*lpsRowItem);
+		if (lpulAction)
+			*lpulAction = TABLE_ROW_DELETE;
 		break;
 
 	case TABLE_ROW_MODIFY:
@@ -504,8 +472,7 @@ ECRESULT ECKeyTable::UpdateRow(UpdateType ulType,
 
 		// Find the row by id (see if we already have the row)
 		iterMap = mapRow.find(*lpsRowItem);
-	
-		if(iterMap != mapRow.end()) {
+		if (iterMap != mapRow.cend()) {
 			// Found the row
 
 			// Indiciate that we are modifying an existing row
@@ -515,9 +482,8 @@ ECRESULT ECKeyTable::UpdateRow(UpdateType ulType,
 			// Create a new node
 			lpNewRow = new ECTableRow(*lpsRowItem, ulSortCols, lpSortLen, lpFlags, lppSortData, fHidden);
 
-			if(iterMap->second == lpCurrent) {
+			if (iterMap->second == lpCurrent)
 			    fRelocateCursor = true;
-			}
 
 			// If the exact same row is already in here, just look up the predecessor
 			if( !ECTableRow::rowcompare(iterMap->second, lpNewRow) &&
@@ -555,23 +521,18 @@ ECRESULT ECKeyTable::UpdateRow(UpdateType ulType,
 				
 				// Delete the unused new node
 				delete lpNewRow;
-				goto exit;
-			} else {
-				// new row data is different, so delete the old row now
-				er = UpdateRow(TABLE_ROW_DELETE, lpsRowItem, 0, NULL, NULL, NULL, NULL);
-
-				if(er != erSuccess){
-					// Delete the unused new node
-					if(lpNewRow) delete lpNewRow;
-
-					goto exit;
-				}
+				return er;
 			}
-
-		} else {
+			// new row data is different, so delete the old row now
+			er = UpdateRow(TABLE_ROW_DELETE, lpsRowItem, 0, NULL, NULL, NULL, NULL);
+			if (er != erSuccess) {
+				// Delete the unused new node
+				delete lpNewRow;
+				return er;
+			}
 			// Indicate that we are adding a new row
-			if(lpulAction)
-				*lpulAction = TABLE_ROW_ADD;
+		} else if (lpulAction != nullptr) {
+			*lpulAction = TABLE_ROW_ADD;
 		}
 
 		// Create the row that we will be inserting
@@ -585,16 +546,14 @@ ECRESULT ECKeyTable::UpdateRow(UpdateType ulType,
 					fLeft = 1;
 					break;
 				}
-				else
-					lpRow = lpRow->lpLeft;
-			} else {
-				if(lpRow->lpRight == NULL) {
-					fLeft = 0;
-					break;
-				}
-				else
-					lpRow = lpRow->lpRight;
+				lpRow = lpRow->lpLeft;
+				continue;
 			}
+			if (lpRow->lpRight == NULL) {
+				fLeft = 0;
+				break;
+			}
+			lpRow = lpRow->lpRight;
 		}
 			
 		// lpRow now points to our parent, fLeft is whether we're the new left or right node of this parent
@@ -645,10 +604,6 @@ ECRESULT ECKeyTable::UpdateRow(UpdateType ulType,
 	default:
 		break;
 	}
-
-exit:
-	pthread_mutex_unlock(&mLock);
-
 	return er;
 }
 
@@ -660,8 +615,7 @@ ECRESULT ECKeyTable::Clear()
 {
 	ECTableRow *lpRow = NULL;
 	ECTableRow *lpParent = NULL;
-
-	pthread_mutex_lock(&mLock);
+	scoped_rlock biglock(mLock);
 
 	lpRow = lpRoot;
 
@@ -691,92 +645,57 @@ ECRESULT ECKeyTable::Clear()
 			
 		}
 	}
-
 	lpCurrent = lpRoot;
-	
 	lpRoot->ulBranchCount = 0;
-
 	mapRow.clear();
-
 	// Remove all bookmarks
 	m_mapBookmarks.clear();
-
-	pthread_mutex_unlock(&mLock);
-
 	return erSuccess;
 }
 
 ECRESULT ECKeyTable::SeekId(const sObjectTableKey *lpsRowItem)
 {
-	ECRESULT er = erSuccess;
-	ECTableRowMap::iterator iterMap;
+	scoped_rlock biglock(mLock);
 
-	pthread_mutex_lock(&mLock);
-
-	iterMap = this->mapRow.find(*lpsRowItem);
-
-	if(iterMap == mapRow.end()) {
-		er = KCERR_NOT_FOUND;
-		goto exit;
-	}
-
+	auto iterMap = this->mapRow.find(*lpsRowItem);
+	if (iterMap == mapRow.cend())
+		return KCERR_NOT_FOUND;
 	lpCurrent = iterMap->second;
-
-exit:
-	pthread_mutex_unlock(&mLock);
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECKeyTable::GetBookmark(unsigned int ulbkPosition, int* lpbkPosition)
 {
-	ECRESULT er = erSuccess;
-	ECBookmarkMap::iterator	iPosition;
 	unsigned int ulCurrPosition = 0;
-	
-	pthread_mutex_lock(&mLock);
+	scoped_rlock biglock(mLock);
 
-	iPosition = m_mapBookmarks.find(ulbkPosition);
-	if (iPosition == m_mapBookmarks.end()) {
-		er = KCERR_INVALID_BOOKMARK;
-		goto exit;
-	}
-
-	er = CurrentRow(iPosition->second.lpPosition, &ulCurrPosition);
+	auto iPosition = m_mapBookmarks.find(ulbkPosition);
+	if (iPosition == m_mapBookmarks.cend())
+		return KCERR_INVALID_BOOKMARK;
+	ECRESULT er = CurrentRow(iPosition->second.lpPosition, &ulCurrPosition);
 	if (er != erSuccess)
-		goto exit;
-
+		return er;
 	if (iPosition->second.ulFirstRowPosition != ulCurrPosition)
 		er = KCWARN_POSITION_CHANGED;
 
 	*lpbkPosition = ulCurrPosition;
-
-exit:
-	pthread_mutex_unlock(&mLock);
-
 	return er;
 }
 
 ECRESULT ECKeyTable::CreateBookmark(unsigned int* lpulbkPosition)
 {
-	ECRESULT		er = erSuccess;
 	sBookmarkPosition	sbkPosition;
 	unsigned int	ulbkPosition = 0;
 	unsigned int	ulRowCount = 0;
-	
-	pthread_mutex_lock(&mLock);
+	scoped_rlock biglock(mLock);
 
 	// Limit of bookmarks
-	if (m_mapBookmarks.size() >= BOOKMARK_LIMIT) {
-		er = KCERR_UNABLE_TO_COMPLETE;
-		goto exit;
-	}
-
+	if (m_mapBookmarks.size() >= BOOKMARK_LIMIT)
+		return KCERR_UNABLE_TO_COMPLETE;
 	sbkPosition.lpPosition = lpCurrent;
-
-	er = GetRowCount(&ulRowCount, &sbkPosition.ulFirstRowPosition);
+	ECRESULT er = GetRowCount(&ulRowCount, &sbkPosition.ulFirstRowPosition);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	// set unique bookmark id higher
 	ulbkPosition = m_ulBookmarkPosition++;
@@ -785,32 +704,17 @@ ECRESULT ECKeyTable::CreateBookmark(unsigned int* lpulbkPosition)
 	m_mapBookmarks.insert( ECBookmarkMap::value_type(ulbkPosition, sbkPosition) );
 
 	*lpulbkPosition = ulbkPosition;
-
-exit:
-	pthread_mutex_unlock(&mLock);
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECKeyTable::FreeBookmark(unsigned int ulbkPosition)
 {
-	ECRESULT er = erSuccess;
-	ECBookmarkMap::iterator	iPosition;
-
-	pthread_mutex_lock(&mLock);
-
-	iPosition = m_mapBookmarks.find(ulbkPosition);
-	if (iPosition == m_mapBookmarks.end()) {
-		er = KCERR_INVALID_BOOKMARK;
-		goto exit;
-	}
-
+	scoped_rlock biglock(mLock);
+	auto iPosition = m_mapBookmarks.find(ulbkPosition);
+	if (iPosition == m_mapBookmarks.cend())
+		return KCERR_INVALID_BOOKMARK;
 	m_mapBookmarks.erase(iPosition);
-	
-exit:
-	pthread_mutex_unlock(&mLock);
-
-	return er;
+	return erSuccess;
 }
 
 // Intern function, no locking
@@ -824,12 +728,12 @@ ECRESULT ECKeyTable::InvalidateBookmark(ECTableRow *lpRow)
 
 	for(iPosition = m_mapBookmarks.begin(); iPosition != m_mapBookmarks.end(); )
 	{
-		if (lpRow == iPosition->second.lpPosition) {
-			iRemove = iPosition++;
-			m_mapBookmarks.erase(iRemove);
-		} else {
+		if (lpRow != iPosition->second.lpPosition) {
 			++iPosition;
+			continue;
 		}
+		iRemove = iPosition++;
+		m_mapBookmarks.erase(iRemove);
 	}
 	return erSuccess;
 }
@@ -841,13 +745,12 @@ ECRESULT ECKeyTable::SeekRow(unsigned int lbkOrgin, int lSeekTo, int *lplRowsSou
 	unsigned int ulCurrentRow = 0;
 	unsigned int ulRowCount = 0;
 	ECTableRow *lpRow = NULL;
-
-	pthread_mutex_lock(&mLock);
+	scoped_rlock biglock(mLock);
 
 	er = this->GetRowCount(&ulRowCount, &ulCurrentRow);
 
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	// Go to the correct position in the table
 	switch(lbkOrgin) {
@@ -864,8 +767,7 @@ ECRESULT ECKeyTable::SeekRow(unsigned int lbkOrgin, int lSeekTo, int *lplRowsSou
 	default:
 		er = GetBookmark(lbkOrgin, &lDestRow);
 		if (er != KCWARN_POSITION_CHANGED && er != erSuccess)
-			goto exit;
-
+			return er;
 		lDestRow += lSeekTo;
 		break;
 	}
@@ -897,7 +799,7 @@ ECRESULT ECKeyTable::SeekRow(unsigned int lbkOrgin, int lSeekTo, int *lplRowsSou
 
 	if(ulRowCount == 0) {
 		lpCurrent = lpRoot; // before front in empty table
-		goto exit;
+		return er;
 	}
 
 	lpRow = lpRoot->lpRight;
@@ -914,49 +816,37 @@ ECRESULT ECKeyTable::SeekRow(unsigned int lbkOrgin, int lSeekTo, int *lplRowsSou
 		else if(lpRow->lpLeft && lpRow->lpRight == NULL) {
 			// Follow the left branche
 			lpRow = lpRow->lpLeft;
+			continue;
 		}
 		else if(lpRow->lpLeft == NULL && lpRow->lpRight) {
 			// Follow the right branche
 			lDestRow -= lpRow->fHidden ? 0 : 1;
 			lpRow = lpRow->lpRight;
+			continue;
 		}
-		else {
-			// There is both a left and a right branch ...
-			if(lpRow->lpLeft->ulBranchCount < (ULONG)lDestRow) {
-				// ... in which our row doesn't exist, so go to the right branch
-				lDestRow -= lpRow->lpLeft->ulBranchCount+ (lpRow->fHidden ? 0 : 1);
-				lpRow = lpRow->lpRight;
-			} else {
-				// ... in which we should be looking
-				lpRow = lpRow->lpLeft;
-			}
+		// There is both a left and a right branch ...
+		if (lpRow->lpLeft->ulBranchCount < (ULONG)lDestRow) {
+			// ... in which our row doesn't exist, so go to the right branch
+			lDestRow -= lpRow->lpLeft->ulBranchCount + (lpRow->fHidden ? 0 : 1);
+			lpRow = lpRow->lpRight;
+		} else {
+			// ... in which we should be looking
+			lpRow = lpRow->lpLeft;
 		}
 	}
 
 	lpCurrent = lpRow; // may be NULL (after end of table)
-
-exit:
-	pthread_mutex_unlock(&mLock);
-
 	return er;
 }
 
 ECRESULT ECKeyTable::GetRowCount(unsigned int *lpulRowCount, unsigned int *lpulCurrentRow)
 {
-	ECRESULT er = erSuccess;
-
-	pthread_mutex_lock(&mLock);
-
-	er = CurrentRow(lpCurrent, lpulCurrentRow);
-	if(er != erSuccess)
-		goto exit;
-
-    *lpulRowCount = lpRoot->ulBranchCount;
-
-exit:	
-	pthread_mutex_unlock(&mLock);
-
-	return er;
+	scoped_rlock biglock(mLock);
+	ECRESULT er = CurrentRow(lpCurrent, lpulCurrentRow);
+	if (er != erSuccess)
+		return er;
+	*lpulRowCount = lpRoot->ulBranchCount;
+	return erSuccess;
 }
 
 // Intern function, no locking
@@ -1000,10 +890,8 @@ ECRESULT ECKeyTable::CurrentRow(ECTableRow *lpRow, unsigned int *lpulCurrentRow)
  */
 ECRESULT ECKeyTable::QueryRows(unsigned int ulRows, ECObjectTableList* lpRowList, bool bDirBackward, unsigned int ulFlags, bool bShowHidden)
 {
-	ECRESULT er = erSuccess;
 	ECTableRow *lpOrig = NULL;
-
-	pthread_mutex_lock(&mLock);
+	scoped_rlock biglock(mLock);
 
 	lpOrig = lpCurrent;
 	
@@ -1036,10 +924,7 @@ ECRESULT ECKeyTable::QueryRows(unsigned int ulRows, ECObjectTableList* lpRowList
 
 	if(ulFlags & EC_TABLE_NOADVANCE)
 		lpCurrent = lpOrig;
-
-	pthread_mutex_unlock(&mLock);
-
-	return er;
+	return erSuccess;
 }
 
 void ECKeyTable::Next()
@@ -1052,15 +937,13 @@ void ECKeyTable::Next()
         // go to leftmost node in right tree
         while(lpCurrent->lpLeft)
             lpCurrent = lpCurrent->lpLeft;
-    } else {
-        // Find node to top right from here
-        while(lpCurrent && !lpCurrent->fLeft)
-            lpCurrent = lpCurrent->lpParent;
-
-        if(lpCurrent)
-            lpCurrent = lpCurrent->lpParent;
-
+        return;
     }
+        // Find node to top right from here
+	while (lpCurrent && !lpCurrent->fLeft)
+		lpCurrent = lpCurrent->lpParent;
+	if (lpCurrent)
+		lpCurrent = lpCurrent->lpParent;
 }
 
 void ECKeyTable::Prev()
@@ -1068,52 +951,42 @@ void ECKeyTable::Prev()
     if(lpCurrent == NULL) {
         // Past end, seek back one row
         SeekRow(EC_SEEK_END, -1, NULL);
-    } else {
-        if(lpCurrent->lpLeft) {
+		return;
+    } else if(lpCurrent->lpLeft) {
             lpCurrent = lpCurrent->lpLeft;
             // Go to rightmost node in left tree
             while(lpCurrent->lpRight)
-                lpCurrent = lpCurrent->lpRight;
-        } else {
-            // Find node to top left from here
-            while(lpCurrent && lpCurrent->fLeft)
-                lpCurrent = lpCurrent->lpParent;
-
-            if(lpCurrent)
-                lpCurrent = lpCurrent->lpParent;
-        }
-    }
+			lpCurrent = lpCurrent->lpRight;
+		return;
+	}
+	// Find node to top left from here
+	while (lpCurrent && lpCurrent->fLeft)
+		lpCurrent = lpCurrent->lpParent;
+	if (lpCurrent)
+		lpCurrent = lpCurrent->lpParent;
 }
 
 ECRESULT ECKeyTable::GetPreviousRow(const sObjectTableKey *lpsRowItem, sObjectTableKey *lpsPrev)
 {
-    ECRESULT er = erSuccess;
     ECTableRow *lpPos = NULL;
-
-	pthread_mutex_lock(&mLock);
+	scoped_rlock biglock(mLock);
 
 	lpPos = lpCurrent;
-    
-    er = SeekId((sObjectTableKey *)lpsRowItem);
+	ECRESULT er = SeekId((sObjectTableKey *)lpsRowItem);
     if(er != erSuccess)
-        goto exit;
+		return er;
     
     Prev();
     while (lpCurrent && lpCurrent->fHidden)
         Prev();
     
-    if(lpCurrent) {
+    if (lpCurrent != nullptr)
         *lpsPrev = lpCurrent->sKey;
-    } else {
+    else
         er = KCERR_NOT_FOUND;
-    }
     
     // Go back to the previous cursor position
     lpCurrent = lpPos;
-    
-exit:
-	pthread_mutex_unlock(&mLock);
-
     return er;
 }
 
@@ -1224,23 +1097,21 @@ void ECKeyTable::Restructure(ECTableRow *lpPivot)
 	if(balance > 1) {
 		// Unbalanced (too much on the left)
 		balance = GetBalance(lpPivot->lpLeft);
-		if(balance >= 0) {
+		if (balance >= 0)
 			// Subtree unbalanced in same direction
 			RotateL(lpPivot);
-		} else {
+		else
 			// Subtree unbalanced in the other direction
 			RotateLR(lpPivot->lpLeft);
-		}
 	} else if(balance < -1) {
 		// Unbalanced (too much on the right)
 		balance = GetBalance(lpPivot->lpRight);
-		if(balance <= 0) {
+		if (balance <= 0)
 			// Subtree unbalanced in the same direction
 			RotateR(lpPivot);
-		} else {
+		else
 			// Subtree unbalanced in the other direction
 			RotateRL(lpPivot->lpRight);
-		}
 	}
 }
 
@@ -1260,20 +1131,18 @@ void ECKeyTable::RestructureRecursive(ECTableRow *lpRow)
  */
 ECRESULT ECKeyTable::GetRowsBySortPrefix(sObjectTableKey *lpsRowItem, ECObjectTableList *lpRowList)
 {
-    ECRESULT er = erSuccess;
     ECTableRow *lpCursor = NULL;
     unsigned int ulSortColPrefixLen = 0;
     unsigned char **lppSortData = 0;
     int *lpSortLen = NULL;
     unsigned char *lpFlags = NULL;
-    
-	pthread_mutex_lock(&mLock);
+	scoped_rlock biglock(mLock);
 	
 	lpCursor = lpCurrent;
 
-	er = SeekId(lpsRowItem);
+	ECRESULT er = SeekId(lpsRowItem);
 	if(er != erSuccess)
-	    goto exit;
+		return er;
 	    
     ulSortColPrefixLen = lpCurrent->ulSortCols;
     lppSortData = lpCurrent->lppSortKeys;
@@ -1291,30 +1160,23 @@ ECRESULT ECKeyTable::GetRowsBySortPrefix(sObjectTableKey *lpsRowItem, ECObjectTa
     }
     
     lpCurrent = lpCursor;
-    
-exit:
-	pthread_mutex_unlock(&mLock);
-
-    return er;
+	return erSuccess;
 }
 
 ECRESULT ECKeyTable::HideRows(sObjectTableKey *lpsRowItem, ECObjectTableList *lpHiddenList)
 {
-    ECRESULT er = erSuccess;
     BOOL fCursorHidden = false;
     ECTableRow *lpCursor = NULL;
     unsigned int ulSortColPrefixLen = 0;
     unsigned char **lppSortData = 0;
     int *lpSortLen = NULL;
     unsigned char *lpFlags = NULL;
-    
-	pthread_mutex_lock(&mLock);
+	scoped_rlock biglock(mLock);
 
 	lpCursor = lpCurrent;
-
-	er = SeekId(lpsRowItem);
+	ECRESULT er = SeekId(lpsRowItem);
 	if(er != erSuccess)
-	    goto exit;
+		return er;
 	    
     ulSortColPrefixLen = lpCurrent->ulSortCols;
     lppSortData = lpCurrent->lppSortKeys;
@@ -1347,45 +1209,37 @@ ECRESULT ECKeyTable::HideRows(sObjectTableKey *lpsRowItem, ECObjectTableList *lp
         while(lpCurrent && lpCurrent->fHidden)
             Next();
     }
-    
-exit:
-	pthread_mutex_unlock(&mLock);
-
-    return er;
+	return erSuccess;
 }
 
 // @todo lpCurrent should stay pointing at the same row we started at?
 ECRESULT ECKeyTable::UnhideRows(sObjectTableKey *lpsRowItem, ECObjectTableList *lpUnhiddenList)
 {
-    ECRESULT er = erSuccess;
     unsigned int ulSortColPrefixLen = 0;
     unsigned int ulFirstCols = 0;
     unsigned char **lppSortData = 0;
     int *lpSortLen = NULL;
     unsigned char *lpFlags = NULL;
+	scoped_rlock biglock(mLock);
 
-	pthread_mutex_lock(&mLock);
-
-	er = SeekId(lpsRowItem);
+	ECRESULT er = SeekId(lpsRowItem);
 	if(er != erSuccess)
-	    goto exit;
+		return er;
 	    
     ulSortColPrefixLen = lpCurrent->ulSortCols;
     lppSortData = lpCurrent->lppSortKeys;
     lpSortLen = lpCurrent->lpSortLen;
     lpFlags = lpCurrent->lpFlags;
     
-    if(lpCurrent->fHidden) {
-        // You cannot expand a category whose header is hidden
-        er = KCERR_NOT_FOUND;
-        goto exit;
-    }
+	if (lpCurrent->fHidden)
+		/* You cannot expand a category whose header is hidden */
+		return KCERR_NOT_FOUND;
     
     // Go to next row; we don't unhide the first row, as it is the header, 
     Next();
 
     if(lpCurrent == NULL)
-        goto exit; // No more rows
+		return erSuccess; /* No more rows */
             
     ulFirstCols = lpCurrent->ulSortCols;
 
@@ -1405,18 +1259,12 @@ ECRESULT ECKeyTable::UnhideRows(sObjectTableKey *lpsRowItem, ECObjectTableList *
                 
         Next();
     }
-    
-exit:
-	pthread_mutex_unlock(&mLock);
-
-    return er;
+	return erSuccess;
 }
         
 ECRESULT ECKeyTable::LowerBound(unsigned int ulSortCols, int *lpSortLen, unsigned char **lppSortData, unsigned char *lpFlags)
 {
-    ECRESULT er = erSuccess;
-    
-	pthread_mutex_lock(&mLock);
+	scoped_rlock biglock(mLock);
 
 	// With B being the passed sort key, find the first item A, for which !(A < B), AKA B >= A
 	
@@ -1433,20 +1281,15 @@ ECRESULT ECKeyTable::LowerBound(unsigned int ulSortCols, int *lpSortLen, unsigne
             } else {
                 lpCurrent = lpCurrent->lpRight;
             }
-	    } else {
-	        // Value we're looking for is left
-	        if(lpCurrent->lpLeft == NULL) {
-	            // Found it, if the value is left, then we're just 'right' of that value now.
-	            break;
-	        } else {
-	            lpCurrent = lpCurrent->lpLeft;
-            }
-        }
+		} else if (lpCurrent->lpLeft == nullptr) {
+			// Value we're looking for is left
+			// Found it, if the value is left, then we're just 'right' of that value now.
+			break;
+		} else {
+			lpCurrent = lpCurrent->lpLeft;
+		}
 	}
-
-	pthread_mutex_unlock(&mLock);
-
-	return er;
+	return erSuccess;
 }
 
 // Find an exact match for a sort key
@@ -1454,8 +1297,7 @@ ECRESULT ECKeyTable::Find(unsigned int ulSortCols, int *lpSortLen, unsigned char
 {
     ECRESULT er = erSuccess;
 	ECTableRow *lpCurPos = NULL;
-    
-	pthread_mutex_lock(&mLock);
+	scoped_rlock biglock(mLock);
 
 	lpCurPos = lpCurrent;
 
@@ -1480,9 +1322,6 @@ ECRESULT ECKeyTable::Find(unsigned int ulSortCols, int *lpSortLen, unsigned char
     
 exit:
 	lpCurrent = lpCurPos;
-
-	pthread_mutex_unlock(&mLock);
-
     return er;
 }
 
@@ -1494,19 +1333,14 @@ exit:
 unsigned int ECKeyTable::GetObjectSize()
 {
 	unsigned int ulSize = sizeof(*this);
-	ECTableRowMap::iterator iterRow;
-
-	pthread_mutex_lock(&mLock);
+	scoped_rlock biglock(mLock);
 	
 	ulSize += MEMORY_USAGE_MAP(mapRow.size(), ECTableRowMap);
 
-	for (iterRow = mapRow.begin(); iterRow != mapRow.end(); ++iterRow)
-		ulSize += iterRow->second->GetObjectSize();
+	for (const auto &r : mapRow)
+		ulSize += r.second->GetObjectSize();
 
 	ulSize += MEMORY_USAGE_MAP(m_mapBookmarks.size(), ECBookmarkMap);
-
-	pthread_mutex_unlock(&mLock);
-
 	return ulSize;
 }
 
@@ -1530,31 +1364,27 @@ ECRESULT ECKeyTable::UpdatePartialSortKey(sObjectTableKey *lpsRowItem, unsigned 
 {
     ECRESULT er = erSuccess;
     ECTableRow *lpCursor = NULL;
-    unsigned char **lppSortKeys = NULL;
-    unsigned int *lpSortLen = NULL;
-    unsigned char *lpFlags = NULL;
-    
-	pthread_mutex_lock(&mLock);
+	std::unique_ptr<unsigned char *[]> lppSortKeys;
+	std::unique_ptr<unsigned int[]> lpSortLen;
+	std::unique_ptr<unsigned char[]> lpFlags;
+	ulock_rec biglock(mLock);
 
     er = GetRow(lpsRowItem, &lpCursor);
     if(er != erSuccess)
-        goto exit;
-        
-    if(ulColumn >= lpCursor->ulSortCols) {
-        er = KCERR_INVALID_PARAMETER;
-        goto exit;
-    }
+		return er;
+	if (ulColumn >= lpCursor->ulSortCols)
+		return KCERR_INVALID_PARAMETER;
     
     // Copy the sortkeys that we used to have
-    lppSortKeys = new unsigned char *[lpCursor->ulSortCols];
-    lpSortLen = new unsigned int[lpCursor->ulSortCols];
-    lpFlags = new unsigned char[lpCursor->ulSortCols];
+	lppSortKeys.reset(new unsigned char *[lpCursor->ulSortCols]);
+	lpSortLen.reset(new unsigned int[lpCursor->ulSortCols]);
+	lpFlags.reset(new unsigned char[lpCursor->ulSortCols]);
 
     // Note: we can just copy the pointers of the sort data here, since they are still valid, and are also valid
     // to pass into UpdateRow()        
-    memcpy(lppSortKeys, lpCursor->lppSortKeys, sizeof(unsigned char *) * lpCursor->ulSortCols);
-    memcpy(lpSortLen, lpCursor->lpSortLen, sizeof(unsigned int) * lpCursor->ulSortCols);
-    memcpy(lpFlags, lpCursor->lpFlags, sizeof(unsigned char) * lpCursor->ulSortCols);
+	memcpy(lppSortKeys.get(), lpCursor->lppSortKeys, sizeof(unsigned char *) * lpCursor->ulSortCols);
+	memcpy(lpSortLen.get(), lpCursor->lpSortLen, sizeof(unsigned int) * lpCursor->ulSortCols);
+	memcpy(lpFlags.get(), lpCursor->lpFlags, sizeof(unsigned char) * lpCursor->ulSortCols);
     
     // Modify the updated colum
     lppSortKeys[ulColumn] = lpSortData;
@@ -1562,19 +1392,10 @@ ECRESULT ECKeyTable::UpdatePartialSortKey(sObjectTableKey *lpsRowItem, unsigned 
     lpFlags[ulColumn] = ulFlags;
     
     if(lpfHidden)
-        *lpfHidden = lpCursor->fHidden;
-
-    // Update the row
-    er = UpdateRow(TABLE_ROW_MODIFY, lpsRowItem, lpCursor->ulSortCols, lpSortLen, lpFlags, lppSortKeys, lpsPrevRow, lpCursor->fHidden, lpulAction);
-    if(er != erSuccess)
-        goto exit;
-    
-exit:
-	pthread_mutex_unlock(&mLock);
-	delete[] lppSortKeys;
-	delete[] lpSortLen;
-	delete[] lpFlags;
-	return er;
+		*lpfHidden = lpCursor->fHidden;
+	return UpdateRow(TABLE_ROW_MODIFY, lpsRowItem, lpCursor->ulSortCols,
+	       lpSortLen.get(), lpFlags.get(), lppSortKeys.get(), lpsPrevRow,
+	       lpCursor->fHidden, lpulAction);
 }
 
 /**
@@ -1589,14 +1410,9 @@ exit:
  */
 ECRESULT ECKeyTable::GetRow(sObjectTableKey *lpsRowItem, ECTableRow **lpRow)
 {
-    ECTableRow *lpCursor = NULL;
-    ECRESULT er = erSuccess;
-
-	pthread_mutex_lock(&mLock);
-
-	lpCursor = lpCurrent;
-    
-    er = SeekId(lpsRowItem);
+	ulock_rec biglock(mLock);
+	ECTableRow *lpCursor = lpCurrent;
+	ECRESULT er = SeekId(lpsRowItem);
     if(er != erSuccess)
         goto exit;
     
@@ -1604,8 +1420,7 @@ ECRESULT ECKeyTable::GetRow(sObjectTableKey *lpsRowItem, ECTableRow **lpRow)
     
 exit:
     lpCurrent = lpCursor;
-
-	pthread_mutex_unlock(&mLock);
-    
     return er;
 }
+
+} /* namespace */

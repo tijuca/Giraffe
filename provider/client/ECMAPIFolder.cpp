@@ -16,7 +16,9 @@
  */
 
 #include <kopano/platform.h>
-
+#include <kopano/ECInterfaceDefs.h>
+#include <kopano/mapi_ptr.h>
+#include <kopano/memory.hpp>
 #include "kcore.hpp"
 #include "ics.h"
 #include "pcutil.hpp"
@@ -49,12 +51,13 @@
 
 #include <kopano/charset/convstring.h>
 
+using namespace KCHL;
+
 static LONG __stdcall AdviseECFolderCallback(void *lpContext, ULONG cNotif,
     LPNOTIFICATION lpNotif)
 {
-	if (lpContext == NULL) {
+	if (lpContext == NULL)
 		return S_OK;
-	}
 
 	ECMAPIFolder *lpFolder = (ECMAPIFolder*)lpContext;
 
@@ -95,9 +98,6 @@ ECMAPIFolder::ECMAPIFolder(ECMsgStore *lpMsgStore, BOOL fModify,
 		lpFolderOps->AddRef();
 
 	this->isTransactedObject = FALSE;
-
-	m_lpFolderAdviseSink = NULL;
-	m_ulConnection = 0;
 }
 
 ECMAPIFolder::~ECMAPIFolder()
@@ -186,21 +186,14 @@ HRESULT ECMAPIFolder::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ul
 	return hr;
 }
 
-HRESULT	ECMAPIFolder::SetPropHandler(ULONG ulPropTag, void* lpProvider, LPSPropValue lpsPropValue, void *lpParam)
+HRESULT	ECMAPIFolder::SetPropHandler(ULONG ulPropTag, void *lpProvider,
+    const SPropValue *lpsPropValue, void *lpParam)
 {
-	HRESULT hr = hrSuccess;
 	ECMAPIFolder *lpFolder = (ECMAPIFolder *)lpParam;
 
-	switch(ulPropTag) {
-	case PR_ACL_DATA:
-		hr = lpFolder->SetSerializedACLData(lpsPropValue);
-		break;
-	default:
-		hr = MAPI_E_NOT_FOUND;
-		break;
-	}
-
-	return hr;
+	if (ulPropTag == PR_ACL_DATA)
+		return lpFolder->SetSerializedACLData(lpsPropValue);
+	return MAPI_E_NOT_FOUND;
 }
 
 // This is similar to GetPropHandler, but works is a static function, and therefore cannot access
@@ -224,22 +217,17 @@ HRESULT ECMAPIFolder::TableRowGetProp(void* lpProvider, struct propVal *lpsPropV
 
 HRESULT	ECMAPIFolder::QueryInterface(REFIID refiid, void **lppInterface) 
 {
-	REGISTER_INTERFACE(IID_ECMAPIFolder, this);
-	REGISTER_INTERFACE(IID_ECMAPIContainer, this);
-	REGISTER_INTERFACE(IID_ECMAPIProp, this);
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
-	REGISTER_INTERFACE(IID_IMAPIFolder, &this->m_xMAPIFolder);
-	REGISTER_INTERFACE(IID_IMAPIContainer, &this->m_xMAPIFolder);
-	REGISTER_INTERFACE(IID_IMAPIProp, &this->m_xMAPIFolder);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xMAPIFolder);
-
-	REGISTER_INTERFACE(IID_IFolderSupport, &this->m_xFolderSupport);
-
-	REGISTER_INTERFACE(IID_IECSecurity, &this->m_xECSecurity);
-
-	REGISTER_INTERFACE(IID_ISelectUnicode, &this->m_xUnknown);
-
+	REGISTER_INTERFACE2(ECMAPIFolder, this);
+	REGISTER_INTERFACE2(ECMAPIContainer, this);
+	REGISTER_INTERFACE2(ECMAPIProp, this);
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IMAPIFolder, &this->m_xMAPIFolder);
+	REGISTER_INTERFACE2(IMAPIContainer, &this->m_xMAPIFolder);
+	REGISTER_INTERFACE2(IMAPIProp, &this->m_xMAPIFolder);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xMAPIFolder);
+	REGISTER_INTERFACE2(IFolderSupport, &this->m_xFolderSupport);
+	REGISTER_INTERFACE2(IECSecurity, &this->m_xECSecurity);
+	REGISTER_INTERFACE3(ISelectUnicode, IUnknown, &this->m_xUnknown);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -247,40 +235,28 @@ HRESULT ECMAPIFolder::HrSetPropStorage(IECPropStorage *lpStorage, BOOL fLoadProp
 {
 	HRESULT hr = hrSuccess;
 	ULONG ulEventMask = fnevObjectModified  | fnevObjectDeleted | fnevObjectMoved | fnevObjectCreated;
-	WSMAPIPropStorage *lpMAPIPropStorage = NULL;
+	object_ptr<WSMAPIPropStorage> lpMAPIPropStorage;
 	ULONG cbEntryId;
 	LPENTRYID lpEntryId = NULL;
 
 	hr = HrAllocAdviseSink(AdviseECFolderCallback, this, &m_lpFolderAdviseSink);	
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpStorage->QueryInterface(IID_WSMAPIPropStorage, (void**)&lpMAPIPropStorage);
+		return hr;
+	hr = lpStorage->QueryInterface(IID_WSMAPIPropStorage, &~lpMAPIPropStorage);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpMAPIPropStorage->GetEntryIDByRef(&cbEntryId, &lpEntryId);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = GetMsgStore()->InternalAdvise(cbEntryId, lpEntryId, ulEventMask, m_lpFolderAdviseSink, &m_ulConnection);
-	if (hr == MAPI_E_NO_SUPPORT){
+	if (hr == MAPI_E_NO_SUPPORT)
 		hr = hrSuccess;			// there is no spoon
-	} else if (hr != hrSuccess) {
-		goto exit;
-	} else {
-
-		
+	else if (hr != hrSuccess)
+		return hr;
+	else
 		lpMAPIPropStorage->RegisterAdvise(ulEventMask, m_ulConnection);
-	}
 	
-	hr = ECGenericProp::HrSetPropStorage(lpStorage, fLoadProps);
-
-exit:
-	if(lpMAPIPropStorage)
-		lpMAPIPropStorage->Release();
-
-	return hr;
+	return ECGenericProp::HrSetPropStorage(lpStorage, fLoadProps);
 }
 
 HRESULT ECMAPIFolder::SetEntryId(ULONG cbEntryId, LPENTRYID lpEntryId)
@@ -288,7 +264,7 @@ HRESULT ECMAPIFolder::SetEntryId(ULONG cbEntryId, LPENTRYID lpEntryId)
 	return ECGenericProp::SetEntryId(cbEntryId, lpEntryId);
 }
 
-HRESULT ECMAPIFolder::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
+HRESULT ECMAPIFolder::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN *lppUnk)
 {
 	HRESULT hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
 	SPropValuePtr ptrSK, ptrDisplay;
@@ -317,20 +293,16 @@ HRESULT ECMAPIFolder::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterf
 		else if(*lpiid == IID_IExchangeImportContentsChanges)
 			hr = ECExchangeImportContentsChanges::Create(this, (LPEXCHANGEIMPORTCONTENTSCHANGES*)lppUnk);
 	} else if(ulPropTag == PR_HIERARCHY_SYNCHRONIZER) {
-		hr = HrGetOneProp(&m_xMAPIProp, PR_SOURCE_KEY, &ptrSK);
+		hr = HrGetOneProp(&m_xMAPIProp, PR_SOURCE_KEY, &~ptrSK);
 		if(hr != hrSuccess)
 			return hr;
-			
-		HrGetOneProp(&m_xMAPIProp, PR_DISPLAY_NAME_W, &ptrDisplay); // ignore error
-			
+		HrGetOneProp(&m_xMAPIProp, PR_DISPLAY_NAME_W, &~ptrDisplay); // ignore error
 		hr = ECExchangeExportChanges::Create(this->GetMsgStore(), *lpiid, std::string((const char*)ptrSK->Value.bin.lpb, ptrSK->Value.bin.cb), !ptrDisplay ? L"" : ptrDisplay->Value.lpszW, ICS_SYNC_HIERARCHY, (LPEXCHANGEEXPORTCHANGES*) lppUnk);
 	} else if(ulPropTag == PR_CONTENTS_SYNCHRONIZER) {
-		hr = HrGetOneProp(&m_xMAPIProp, PR_SOURCE_KEY, &ptrSK);
+		hr = HrGetOneProp(&m_xMAPIProp, PR_SOURCE_KEY, &~ptrSK);
 		if(hr != hrSuccess)
 			return hr;
-			
-		HrGetOneProp(&m_xMAPIProp, PR_DISPLAY_NAME, &ptrDisplay); // ignore error
-			
+		HrGetOneProp(&m_xMAPIProp, PR_DISPLAY_NAME, &~ptrDisplay); // ignore error
 		hr = ECExchangeExportChanges::Create(this->GetMsgStore(), *lpiid, std::string((const char*)ptrSK->Value.bin.lpb, ptrSK->Value.bin.cb), !ptrDisplay ? L"" : ptrDisplay->Value.lpszW, ICS_SYNC_CONTENTS, (LPEXCHANGEEXPORTCHANGES*) lppUnk);
 	} else {
 		hr = ECMAPIProp::OpenProperty(ulPropTag, lpiid, ulInterfaceOptions, ulFlags, lppUnk);
@@ -338,17 +310,23 @@ HRESULT ECMAPIFolder::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterf
 	return hr;
 }
 
-HRESULT ECMAPIFolder::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
+HRESULT ECMAPIFolder::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude,
+    const SPropTagArray *lpExcludeProps, ULONG ulUIParam,
+    LPMAPIPROGRESS lpProgress, LPCIID lpInterface, void *lpDestObj,
+    ULONG ulFlags, SPropProblemArray **lppProblems)
 {
 	return Util::DoCopyTo(&IID_IMAPIFolder, &this->m_xMAPIFolder, ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
 
-HRESULT ECMAPIFolder::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
+HRESULT ECMAPIFolder::CopyProps(const SPropTagArray *lpIncludeProps,
+    ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface,
+    void *lpDestObj, ULONG ulFlags, SPropProblemArray **lppProblems)
 {
 	return Util::DoCopyProps(&IID_IMAPIFolder, &this->m_xMAPIFolder, lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
 
-HRESULT ECMAPIFolder::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray *lppProblems)
+HRESULT ECMAPIFolder::SetProps(ULONG cValues, const SPropValue *lpPropArray,
+    SPropProblemArray **lppProblems)
 {
 	HRESULT hr;
 
@@ -359,7 +337,8 @@ HRESULT ECMAPIFolder::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropP
 	return ECMAPIContainer::SaveChanges(KEEP_OPEN_READWRITE);
 }
 
-HRESULT ECMAPIFolder::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray FAR * lppProblems)
+HRESULT ECMAPIFolder::DeleteProps(const SPropTagArray *lpPropTagArray,
+    SPropProblemArray **lppProblems)
 {
 	HRESULT hr;
 
@@ -398,19 +377,18 @@ HRESULT ECMAPIFolder::CreateMessage(LPCIID lpInterface, ULONG ulFlags, LPMESSAGE
 HRESULT ECMAPIFolder::CreateMessageWithEntryID(LPCIID lpInterface, ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID, LPMESSAGE *lppMessage)
 {
 	HRESULT		hr = hrSuccess;
-	ECMessage	*lpMessage = NULL;	
+	object_ptr<ECMessage> lpMessage;
 	LPMAPIUID	lpMapiUID = NULL;
 	ULONG		cbNewEntryId = 0;
 	LPENTRYID	lpNewEntryId = NULL;
 	SPropValue	sPropValue[3];
-	IECPropStorage*	lpStorage = NULL;
+	object_ptr<IECPropStorage> lpStorage;
 
 	if(!fModify) {
 		hr = MAPI_E_NO_ACCESS;
 		goto exit;
 	}
-
-	hr = ECMessage::Create(this->GetMsgStore(), TRUE, TRUE, ulFlags & MAPI_ASSOCIATED, FALSE, NULL, &lpMessage);
+	hr = ECMessage::Create(this->GetMsgStore(), TRUE, TRUE, ulFlags & MAPI_ASSOCIATED, FALSE, nullptr, &~lpMessage);
 	if(hr != hrSuccess)
 		goto exit;
 
@@ -423,8 +401,7 @@ HRESULT ECMAPIFolder::CreateMessageWithEntryID(LPCIID lpInterface, ULONG ulFlags
 		hr = lpMessage->SetEntryId(cbNewEntryId, lpNewEntryId);
 		if (hr != hrSuccess)
 			goto exit;
-
-		hr = this->GetMsgStore()->lpTransport->HrOpenPropStorage(m_cbEntryId, m_lpEntryId, cbNewEntryId, lpNewEntryId, ulFlags & MAPI_ASSOCIATED, &lpStorage);
+		hr = this->GetMsgStore()->lpTransport->HrOpenPropStorage(m_cbEntryId, m_lpEntryId, cbNewEntryId, lpNewEntryId, ulFlags & MAPI_ASSOCIATED, &~lpStorage);
 		if(hr != hrSuccess)
 			goto exit;
 
@@ -433,8 +410,7 @@ HRESULT ECMAPIFolder::CreateMessageWithEntryID(LPCIID lpInterface, ULONG ulFlags
         hr = lpMessage->SetEntryId(cbEntryID, lpEntryID);
         if(hr != hrSuccess)
             goto exit;
-
-		hr = this->GetMsgStore()->lpTransport->HrOpenPropStorage(m_cbEntryId, m_lpEntryId, cbEntryID, lpEntryID, ulFlags & MAPI_ASSOCIATED, &lpStorage);
+		hr = this->GetMsgStore()->lpTransport->HrOpenPropStorage(m_cbEntryId, m_lpEntryId, cbEntryID, lpEntryID, ulFlags & MAPI_ASSOCIATED, &~lpStorage);
 		if(hr != hrSuccess)
 			goto exit;
     }
@@ -450,8 +426,9 @@ HRESULT ECMAPIFolder::CreateMessageWithEntryID(LPCIID lpInterface, ULONG ulFlags
 
 	//Set defaults
 	// Same as ECAttach::OpenProperty
-	ECAllocateBuffer(sizeof(MAPIUID), (void **) &lpMapiUID);
-
+	hr = ECAllocateBuffer(sizeof(MAPIUID), reinterpret_cast<void **>(&lpMapiUID));
+	if (hr != hrSuccess)
+		goto exit;
 	hr = this->GetMsgStore()->lpSupport->NewUID(lpMapiUID);
 	if(hr != hrSuccess)
 		goto exit;
@@ -482,18 +459,11 @@ HRESULT ECMAPIFolder::CreateMessageWithEntryID(LPCIID lpInterface, ULONG ulFlags
 	AddChild(lpMessage);
 
 exit:
-	if (lpStorage)
-		lpStorage->Release();
-
 	if (lpNewEntryId)
 		ECFreeBuffer(lpNewEntryId);
 
 	if(lpMapiUID)
 		ECFreeBuffer(lpMapiUID);
-
-	if(lpMessage)
-		lpMessage->Release();
-
 	return hr;
 }
 
@@ -501,7 +471,7 @@ HRESULT ECMAPIFolder::CopyMessages(LPENTRYLIST lpMsgList, LPCIID lpInterface, LP
 {
 	HRESULT hr = hrSuccess;
 	HRESULT hrEC = hrSuccess;
-	IMAPIFolder	*lpMapiFolder = NULL;
+	object_ptr<IMAPIFolder> lpMapiFolder;
 	LPSPropValue lpDestPropArray = NULL;
 
 	LPENTRYLIST lpMsgListEC = NULL;
@@ -522,13 +492,13 @@ HRESULT ECMAPIFolder::CopyMessages(LPENTRYLIST lpMsgList, LPCIID lpInterface, LP
 	
 	//Get the interface of destinationfolder
 	if(lpInterface == NULL || *lpInterface == IID_IMAPIFolder)
-		hr = ((IMAPIFolder*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, (void**)&lpMapiFolder);
+		hr = ((IMAPIFolder *)lpDestFolder)->QueryInterface(IID_IMAPIFolder, &~lpMapiFolder);
 	else if(*lpInterface == IID_IMAPIContainer)
-		hr = ((IMAPIContainer*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, (void**)&lpMapiFolder);
+		hr = ((IMAPIContainer *)lpDestFolder)->QueryInterface(IID_IMAPIFolder, &~lpMapiFolder);
 	else if(*lpInterface == IID_IUnknown)
-		hr = ((IUnknown*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, (void**)&lpMapiFolder);
+		hr = ((IUnknown *)lpDestFolder)->QueryInterface(IID_IMAPIFolder, &~lpMapiFolder);
 	else if(*lpInterface == IID_IMAPIProp)
-		hr = ((IMAPIProp*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, (void**)&lpMapiFolder);
+		hr = ((IMAPIProp *)lpDestFolder)->QueryInterface(IID_IMAPIFolder, &~lpMapiFolder);
 	else
 		hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
 	
@@ -619,10 +589,6 @@ exit:
 
 	if(lpMsgListSupport)
 		ECFreeBuffer(lpMsgListSupport);
-
-	if(lpMapiFolder)
-		lpMapiFolder->Release();
-
 	return (hr == hrSuccess)?hrEC:hr;
 }
 
@@ -641,7 +607,7 @@ HRESULT ECMAPIFolder::CreateFolder(ULONG ulFolderType, LPTSTR lpszFolderName, LP
 	HRESULT			hr = hrSuccess;
 	ULONG			cbEntryId = 0;
 	LPENTRYID		lpEntryId = NULL;
-	IMAPIFolder*	lpFolder = NULL;
+	object_ptr<IMAPIFolder> lpFolder;
 	ULONG			ulObjType = 0;
 
 	// SC TODO: new code:
@@ -663,17 +629,11 @@ HRESULT ECMAPIFolder::CreateFolder(ULONG ulFolderType, LPTSTR lpszFolderName, LP
 		goto exit;
 
 	// Open the folder we just created
-	hr = this->GetMsgStore()->OpenEntry(cbEntryId, lpEntryId, lpInterface, MAPI_MODIFY | MAPI_DEFERRED_ERRORS, &ulObjType, (IUnknown **)&lpFolder);
-	
+	hr = this->GetMsgStore()->OpenEntry(cbEntryId, lpEntryId, lpInterface, MAPI_MODIFY | MAPI_DEFERRED_ERRORS, &ulObjType, &~lpFolder);
 	if(hr != hrSuccess)
 		goto exit;
-
-	*lppFolder = lpFolder;
-
+	*lppFolder = lpFolder.release();
 exit:
-	if(hr != hrSuccess && lpFolder)
-		lpFolder->Release();
-
 	if(lpEntryId)
 		ECFreeBuffer(lpEntryId);
 
@@ -684,20 +644,20 @@ exit:
 HRESULT ECMAPIFolder::CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, LPVOID lpDestFolder, LPTSTR lpszNewFolderName, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags)
 {
 	HRESULT hr = hrSuccess;
-	IMAPIFolder	*lpMapiFolder = NULL;
+	object_ptr<IMAPIFolder> lpMapiFolder;
 	LPSPropValue lpPropArray = NULL;
 	GUID guidDest;
 	GUID guidFrom;
 
 	//Get the interface of destinationfolder
 	if(lpInterface == NULL || *lpInterface == IID_IMAPIFolder)
-		hr = ((IMAPIFolder*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, (void**)&lpMapiFolder);
+		hr = ((IMAPIFolder*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, &~lpMapiFolder);
 	else if(*lpInterface == IID_IMAPIContainer)
-		hr = ((IMAPIContainer*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, (void**)&lpMapiFolder);
+		hr = ((IMAPIContainer*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, &~lpMapiFolder);
 	else if(*lpInterface == IID_IUnknown)
-		hr = ((IUnknown*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, (void**)&lpMapiFolder);
+		hr = ((IUnknown*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, &~lpMapiFolder);
 	else if(*lpInterface == IID_IMAPIProp)
-		hr = ((IMAPIProp*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, (void**)&lpMapiFolder);
+		hr = ((IMAPIProp*)lpDestFolder)->QueryInterface(IID_IMAPIFolder, &~lpMapiFolder);
 	else
 		hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
 	
@@ -727,8 +687,6 @@ HRESULT ECMAPIFolder::CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lp
 	}
 
 exit:
-	if(lpMapiFolder)
-		lpMapiFolder->Release();
 	if (lpPropArray != NULL)
 		ECFreeBuffer(lpPropArray);
 	return hr;
@@ -746,7 +704,6 @@ HRESULT ECMAPIFolder::DeleteFolder(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG u
 HRESULT ECMAPIFolder::SetReadFlags(LPENTRYLIST lpMsgList, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags)
 {
 	HRESULT		hr = hrSuccess;
-	LPMESSAGE	lpMessage = NULL;
 	BOOL		bError = FALSE;
 	ULONG		ulObjType = 0;
 
@@ -780,22 +737,19 @@ HRESULT ECMAPIFolder::SetReadFlags(LPENTRYLIST lpMsgList, ULONG ulUIParam, LPMAP
 		}
 
 		for (ULONG i = 0; i < lpMsgList->cValues; ++i) {
-			if(OpenEntry(lpMsgList->lpbin[i].cb, (LPENTRYID)lpMsgList->lpbin[i].lpb, &IID_IMessage, MAPI_MODIFY, &ulObjType, (LPUNKNOWN*)&lpMessage) == hrSuccess)
-			{
+			object_ptr<IMessage> lpMessage;
+			if (OpenEntry(lpMsgList->lpbin[i].cb, reinterpret_cast<ENTRYID *>(lpMsgList->lpbin[i].lpb), &IID_IMessage, MAPI_MODIFY, &ulObjType, &~lpMessage) == hrSuccess) {
 				if(lpMessage->SetReadFlag(ulFlags&~MESSAGE_DIALOG) != hrSuccess)
 					bError = TRUE;
-
-				lpMessage->Release(); lpMessage = NULL;
 			}else
 				bError = TRUE;
 			
 			// Progress bar
 			if((ulFlags&MESSAGE_DIALOG ) && lpProgress) {
-				if(ulPGFlags & MAPI_TOP_LEVEL) {
+				if (ulPGFlags & MAPI_TOP_LEVEL)
 					hr = lpProgress->Progress((int)((float)i * ulPGDelta / lpMsgList->cValues + ulPGMin), i, lpMsgList->cValues);
-				} else {
+				else
 					hr = lpProgress->Progress((int)((float)i * ulPGDelta / lpMsgList->cValues + ulPGMin), 0, 0);
-				}
 
 				if(hr == MAPI_E_USER_CANCEL) {// MAPI_E_USER_CANCEL is user click on the Cancel button.
 					hr = hrSuccess;
@@ -838,7 +792,7 @@ HRESULT ECMAPIFolder::SetMessageStatus(ULONG cbEntryID, LPENTRYID lpEntryID, ULO
 	return lpFolderOps->HrSetMessageStatus(cbEntryID, lpEntryID, ulNewStatus, ulNewStatusMask, 0, lpulOldStatus);
 }
 
-HRESULT ECMAPIFolder::SaveContentsSort(LPSSortOrderSet lpSortCriteria, ULONG ulFlags)
+HRESULT ECMAPIFolder::SaveContentsSort(const SSortOrderSet *lpSortCriteria, ULONG ulFlags)
 {
 	return MAPI_E_NO_ACCESS;
 }
@@ -852,7 +806,8 @@ HRESULT ECMAPIFolder::EmptyFolder(ULONG ulUIParam, LPMAPIPROGRESS lpProgress, UL
 	return lpFolderOps->HrEmptyFolder(ulFlags, 0);
 }
 
-HRESULT ECMAPIFolder::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG FAR * lpcValues, LPSPropValue FAR * lppPropArray)
+HRESULT ECMAPIFolder::GetProps(const SPropTagArray *lpPropTagArray,
+    ULONG ulFlags, ULONG *lpcValues, SPropValue **lppPropArray)
 {
 	HRESULT hr;
 	
@@ -880,7 +835,7 @@ HRESULT ECMAPIFolder::CreateMessageFromStream(ULONG ulFlags, ULONG ulSyncId, ULO
 	HRESULT hr;
 	WSMessageStreamImporterPtr	ptrStreamImporter;
 
-	hr = GetMsgStore()->lpTransport->HrGetMessageStreamImporter(ulFlags, ulSyncId, cbEntryID, lpEntryID, m_cbEntryId, m_lpEntryId, true, NULL, &ptrStreamImporter);
+	hr = GetMsgStore()->lpTransport->HrGetMessageStreamImporter(ulFlags, ulSyncId, cbEntryID, lpEntryID, m_cbEntryId, m_lpEntryId, true, nullptr, &~ptrStreamImporter);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -898,7 +853,7 @@ HRESULT ECMAPIFolder::UpdateMessageFromStream(ULONG ulSyncId, ULONG cbEntryID, L
 	HRESULT hr;
 	WSMessageStreamImporterPtr	ptrStreamImporter;
 
-	hr = GetMsgStore()->lpTransport->HrGetMessageStreamImporter(0, ulSyncId, cbEntryID, lpEntryID, m_cbEntryId, m_lpEntryId, false, lpConflictItems, &ptrStreamImporter);
+	hr = GetMsgStore()->lpTransport->HrGetMessageStreamImporter(0, ulSyncId, cbEntryID, lpEntryID, m_cbEntryId, m_lpEntryId, false, lpConflictItems, &~ptrStreamImporter);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -906,305 +861,39 @@ HRESULT ECMAPIFolder::UpdateMessageFromStream(ULONG ulSyncId, ULONG cbEntryID, L
 	return hrSuccess;
 }
 
-HRESULT ECMAPIFolder::xMAPIFolder::QueryInterface(REFIID refiid , void** lppInterface)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->QueryInterface(refiid, lppInterface);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-ULONG ECMAPIFolder::xMAPIFolder::AddRef()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::AddRef", "");
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	return pThis->AddRef();
-}
-
-ULONG ECMAPIFolder::xMAPIFolder::Release()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::Release", "");
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	ULONG ulRef = pThis->Release();
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::Release", "%d", ulRef);
-	return ulRef;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::GetLastError(HRESULT hError, ULONG ulFlags, LPMAPIERROR * lppMapiError)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::GetLastError", "");
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->GetLastError(hError, ulFlags, lppMapiError);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::GetLastError", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::SaveChanges(ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::SaveChanges", "");
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->SaveChanges(ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::SaveChanges", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG FAR * lpcValues, LPSPropValue FAR * lppPropArray)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::GetProps", "PropTagArray=%s\nfFlags=0x%08X", PropNameFromPropTagArray(lpPropTagArray).c_str(), ulFlags);
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->GetProps(lpPropTagArray, ulFlags, lpcValues, lppPropArray);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::GetProps", "%s\n%s", GetMAPIErrorDescription(hr).c_str(), PropNameFromPropArray(*lpcValues, *lppPropArray).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropTagArray)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::GetPropList", "flags=0x%08X", ulFlags);
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->GetPropList(ulFlags, lppPropTagArray);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::GetPropList", "%s tags=%s", GetMAPIErrorDescription(hr).c_str(),(lppPropTagArray)?PropNameFromPropTagArray(*lppPropTagArray).c_str() : "NULL");
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::OpenProperty", "PropTag=%s, lpiid=%s", PropNameFromPropTag(ulPropTag).c_str(), (lpiid)?DBGGUIDToString(*lpiid).c_str():"NULL");
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->OpenProperty(ulPropTag, lpiid, ulInterfaceOptions, ulFlags, lppUnk);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::OpenProperty", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::SetProps", "%s", PropNameFromPropArray(cValues, lpPropArray).c_str());
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->SetProps(cValues, lpPropArray, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::SetProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::DeleteProps", "%s", PropNameFromPropTagArray(lpPropTagArray).c_str());
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->DeleteProps(lpPropTagArray, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::DeleteProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::CopyTo", "");
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->CopyTo(ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);;
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::CopyTo", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::CopyProps", "");
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->CopyProps(lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::CopyProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::GetNamesFromIDs(LPSPropTagArray * pptaga, LPGUID lpguid, ULONG ulFlags, ULONG * pcNames, LPMAPINAMEID ** pppNames)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::GetNamesFromIDs", "");
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->GetNamesFromIDs(pptaga, lpguid, ulFlags, pcNames, pppNames);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::GetIDsFromNames", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::GetIDsFromNames(ULONG cNames, LPMAPINAMEID * ppNames, ULONG ulFlags, LPSPropTagArray * pptaga)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::GetIDsFromNames", "");
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->GetIDsFromNames(cNames, ppNames, ulFlags, pptaga);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::GetIDsFromNames", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::GetContentsTable", "Flags=0x%08X", ulFlags);
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->GetContentsTable(ulFlags, lppTable);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::GetContentsTable", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::GetHierarchyTable", ""); 
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->GetHierarchyTable(ulFlags, lppTable);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::GetHierarchyTable", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::OpenEntry", "interface=%s",(lpInterface)?DBGGUIDToString(*lpInterface).c_str():"NULL");
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, lpulObjType, lppUnk);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::OpenEntry", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::SetSearchCriteria(LPSRestriction lpRestriction, LPENTRYLIST lpContainerList, ULONG ulSearchFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::SetSearchCriteria", "%s \nulSearchFlags=0x%08X", (lpRestriction)?RestrictionToString(lpRestriction).c_str():"NULL", ulSearchFlags);
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->SetSearchCriteria(lpRestriction, lpContainerList, ulSearchFlags);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::SetSearchCriteria", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::GetSearchCriteria(ULONG ulFlags, LPSRestriction *lppRestriction, LPENTRYLIST *lppContainerList, ULONG *lpulSearchState)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::GetSearchCriteria", "");
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr =pThis->GetSearchCriteria(ulFlags, lppRestriction, lppContainerList, lpulSearchState);;
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::GetSearchCriteria", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::CreateMessage(LPCIID lpInterface, ULONG ulFlags, LPMESSAGE *lppMessage)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::CreateMessage", "flags=%d", ulFlags);
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->CreateMessage(lpInterface, ulFlags, lppMessage);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::CreateMessage", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::CopyMessages(LPENTRYLIST lpMsgList, LPCIID lpInterface, LPVOID lpDestFolder, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::CopyMessages", "flags=%d", ulFlags);
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->CopyMessages(lpMsgList, lpInterface, lpDestFolder, ulUIParam, lpProgress, ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::CopyMessages", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::DeleteMessages(LPENTRYLIST lpMsgList, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::DeleteMessages", "flags=0x%08X", ulFlags);
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->DeleteMessages(lpMsgList, ulUIParam, lpProgress, ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::DeleteMessages", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::CreateFolder(ULONG ulFolderType, LPTSTR lpszFolderName, LPTSTR lpszFolderComment, LPCIID lpInterface, ULONG ulFlags, LPMAPIFOLDER *lppFolder)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::CreateFolder", "type=%d name=%s flags=0x%08X", ulFolderType, (lpszFolderName)?convstring(lpszFolderName, ulFlags).c_str() : "", ulFlags);
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->CreateFolder(ulFolderType, lpszFolderName, lpszFolderComment, lpInterface, ulFlags, lppFolder);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::CreateFolder", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, LPVOID lpDestFolder, LPTSTR lpszNewFolderName, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::CopyFolder", "NewFolderName=%s, interface=%s, flags=%d", (lpszNewFolderName)?(char*)lpszNewFolderName:"NULL", (lpInterface)?DBGGUIDToString(*lpInterface).c_str():"NULL", ulFlags);
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->CopyFolder(cbEntryID, lpEntryID, lpInterface, lpDestFolder, lpszNewFolderName, ulUIParam, lpProgress, ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::CopyFolder", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::DeleteFolder(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::DeleteFolder", "flags=%d", ulFlags);
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->DeleteFolder(cbEntryID, lpEntryID, ulUIParam, lpProgress, ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::DeleteFolder", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::SetReadFlags(LPENTRYLIST lpMsgList, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::SetReadFlags", "lpMsgList=%s lpProgress=%s\n flags=0x%08X", EntryListToString(lpMsgList).c_str(), (lpProgress)?"Yes":"No", ulFlags);
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->SetReadFlags(lpMsgList, ulUIParam, lpProgress, ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::SetReadFlags", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::GetMessageStatus(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, ULONG *lpulMessageStatus)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::GetMessageStatus", "");
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->GetMessageStatus(cbEntryID, lpEntryID, ulFlags, lpulMessageStatus);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::GetMessageStatus", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::SetMessageStatus(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulNewStatus, ULONG ulNewStatusMask, ULONG *lpulOldStatus)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::SetMessageStatus", "");
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->SetMessageStatus(cbEntryID, lpEntryID, ulNewStatus, ulNewStatusMask, lpulOldStatus);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::SetMessageStatus", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::SaveContentsSort(LPSSortOrderSet lpSortCriteria, ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::SaveContentsSort", "");
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->SaveContentsSort(lpSortCriteria, ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::SaveContentsSort", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECMAPIFolder::xMAPIFolder::EmptyFolder(ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IMAPIFolder::EmptyFolder", "flags=%d", ulFlags);
-	METHOD_PROLOGUE_(ECMAPIFolder, MAPIFolder);
-	HRESULT hr = pThis->EmptyFolder(ulUIParam, lpProgress, ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IMAPIFolder::EmptyFolder", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, Release, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, SaveChanges, (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, GetProps, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags), (ULONG *, lpcValues), (SPropValue **, lppPropArray))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, GetPropList, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, OpenProperty, (ULONG, ulPropTag), (LPCIID, lpiid), (ULONG, ulInterfaceOptions), (ULONG, ulFlags), (LPUNKNOWN *, lppUnk))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, SetProps, (ULONG, cValues), (const SPropValue *, lpPropArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, DeleteProps, (const SPropTagArray *, lpPropTagArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, CopyTo, (ULONG, ciidExclude), (LPCIID, rgiidExclude), (const SPropTagArray *, lpExcludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, CopyProps, (const SPropTagArray *, lpIncludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, GetNamesFromIDs, (LPSPropTagArray *, pptaga), (LPGUID, lpguid), (ULONG, ulFlags), (ULONG *, pcNames), (LPMAPINAMEID **, pppNames))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, GetIDsFromNames, (ULONG, cNames), (LPMAPINAMEID *, ppNames), (ULONG, ulFlags), (LPSPropTagArray *, pptaga))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, GetContentsTable, (ULONG, ulFlags), (LPMAPITABLE *, lppTable))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, GetHierarchyTable, (ULONG, ulFlags), (LPMAPITABLE *, lppTable))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, OpenEntry, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (LPCIID, lpInterface), (ULONG, ulFlags), (ULONG *, lpulObjType), (LPUNKNOWN *, lppUnk))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, SetSearchCriteria, (LPSRestriction, lpRestriction), (LPENTRYLIST, lpContainerList), (ULONG, ulSearchFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, GetSearchCriteria, (ULONG, ulFlags), (LPSRestriction *, lppRestriction), (LPENTRYLIST *, lppContainerList), (ULONG *, lpulSearchState))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, CreateMessage, (LPCIID, lpInterface), (ULONG, ulFlags), (LPMESSAGE *, lppMessage))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, CopyMessages, (LPENTRYLIST, lpMsgList), (LPCIID, lpInterface), (LPVOID, lpDestFolder), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, DeleteMessages, (LPENTRYLIST, lpMsgList), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, CreateFolder, (ULONG, ulFolderType), (LPTSTR, lpszFolderName), (LPTSTR, lpszFolderComment), (LPCIID, lpInterface), (ULONG, ulFlags), (LPMAPIFOLDER *, lppFolder))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, CopyFolder, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (LPCIID, lpInterface), (LPVOID, lpDestFolder), (LPTSTR, lpszNewFolderName), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, DeleteFolder, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, SetReadFlags, (LPENTRYLIST, lpMsgList), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, GetMessageStatus, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (ULONG, ulFlags), (ULONG *, lpulMessageStatus))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, SetMessageStatus, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (ULONG, ulNewStatus), (ULONG, ulNewStatusMask), (ULONG *, lpulOldStatus))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, SaveContentsSort, (const SSortOrderSet *, lpSortCriteria), (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, MAPIFolder, EmptyFolder, (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (ULONG, ulFlags))
 
 // IFolderSupport
-HRESULT ECMAPIFolder::xFolderSupport::QueryInterface(REFIID refiid , void** lppInterface)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFolderSupport::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
-	METHOD_PROLOGUE_(ECMAPIFolder, FolderSupport);
-	HRESULT hr = pThis->QueryInterface(refiid, lppInterface);
-	TRACE_MAPI(TRACE_RETURN, "IFolderSupport::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-ULONG ECMAPIFolder::xFolderSupport::AddRef()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFolderSupport::AddRef", "");
-	METHOD_PROLOGUE_(ECMAPIFolder, FolderSupport);
-	return pThis->AddRef();
-}
-
-ULONG ECMAPIFolder::xFolderSupport::Release()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFolderSupport::Release", "");
-	METHOD_PROLOGUE_(ECMAPIFolder, FolderSupport);
-	ULONG ulRef = pThis->Release();
-	TRACE_MAPI(TRACE_RETURN, "IFolderSupport::Release", "%d", ulRef);
-	return ulRef;
-}
-
-HRESULT ECMAPIFolder::xFolderSupport::GetSupportMask(DWORD * pdwSupportMask)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFolderSupport::GetSupportMask", "");
-	METHOD_PROLOGUE_(ECMAPIFolder, FolderSupport);
-	HRESULT hr = pThis->GetSupportMask(pdwSupportMask);
-	TRACE_MAPI(TRACE_RETURN, "IFolderSupport::GetSupportMask", "%s SupportMask=%s", GetMAPIErrorDescription(hr).c_str(), (pdwSupportMask)?stringify(*pdwSupportMask, true).c_str():"");
-	return hr;
-}
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, FolderSupport, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECMAPIFolder, FolderSupport, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECMAPIFolder, FolderSupport, Release, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECMAPIFolder, FolderSupport, GetSupportMask, (DWORD *, pdwSupportMask))

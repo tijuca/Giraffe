@@ -14,11 +14,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <kopano/platform.h>
+#include <kopano/memory.hpp>
 #include <mapi.h>
 #include <mapispi.h>
 #include <mapiutil.h>
 #include <kopano/ECGuid.h>
-
+#include <kopano/ECInterfaceDefs.h>
 #include "kcore.hpp"
 #include "ECXPProvider.h"
 #include "ECXPLogon.h"
@@ -36,9 +37,10 @@
 #include <kopano/charset/convstring.h>
 #include <kopano/ECGetText.h>
 
+using namespace KCHL;
+
 ECXPProvider::ECXPProvider() : ECUnknown("IXPProvider")
 {
-	m_lpIdentityProps = NULL;
 }
 
 ECXPProvider::~ECXPProvider()
@@ -55,10 +57,8 @@ HRESULT ECXPProvider::Create(ECXPProvider **lppECXPProvider) {
 
 HRESULT ECXPProvider::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECXPProvider, this);
-
-	REGISTER_INTERFACE(IID_IXPProvider, &this->m_xXPProvider);
-
+	REGISTER_INTERFACE2(ECXPProvider, this);
+	REGISTER_INTERFACE2(IXPProvider, &this->m_xXPProvider);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -70,8 +70,8 @@ HRESULT ECXPProvider::Shutdown(ULONG * lpulFlags)
 HRESULT ECXPProvider::TransportLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG * lpulFlags, LPMAPIERROR * lppMAPIError, LPXPLOGON * lppXPLogon)
 {
 	HRESULT			hr = hrSuccess;
-	ECXPLogon		*lpXPLogon = NULL;
-	WSTransport		*lpTransport = NULL;
+	object_ptr<ECXPLogon> lpXPLogon;
+	object_ptr<WSTransport> lpTransport;
 	ECMapProvider::const_iterator iterMap;
 	std::string		strServerURL;
 	std::string		strUniqueId;
@@ -84,89 +84,44 @@ HRESULT ECXPProvider::TransportLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTST
 	iterMap = g_mapProviders.find(tstrProfileName);
 
 	// Online if: no entry in map, OR map specifies online mode
-	if(iterMap == g_mapProviders.end() || iterMap->second.ulConnectType == CT_ONLINE) {
+	if (iterMap == g_mapProviders.cend() ||
+	    iterMap->second.ulConnectType == CT_ONLINE) {
 		// Online
-		hr = WSTransport::HrOpenTransport(lpMAPISup, &lpTransport, FALSE);
+		hr = WSTransport::HrOpenTransport(lpMAPISup, &~lpTransport, FALSE);
 		bOffline = FALSE;
 	} else {
 		// Offline
-		hr = WSTransport::HrOpenTransport(lpMAPISup, &lpTransport, TRUE);
+		hr = WSTransport::HrOpenTransport(lpMAPISup, &~lpTransport, TRUE);
 		bOffline = TRUE;
 	}
-
-	if(hr != hrSuccess) {
-		hr = MAPI_E_FAILONEPROVIDER;
-		goto exit;
-	}
-
-	hr = ECXPLogon::Create(tstrProfileName, bOffline, this, lpMAPISup, &lpXPLogon);
+	if (hr != hrSuccess)
+		return MAPI_E_FAILONEPROVIDER;
+	hr = ECXPLogon::Create(tstrProfileName, bOffline, this, lpMAPISup, &~lpXPLogon);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpXPLogon->QueryInterface(IID_IXPLogon, (void **)lppXPLogon);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	AddChild(lpXPLogon);
 
 	// Set profile identity
 	hr = ClientUtil::HrSetIdentity(lpTransport, lpMAPISup, &m_lpIdentityProps);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// Initialize statusrow
 	strDisplayName = convert_to<std::string>(g_strManufacturer.c_str()) + _A(" Transport");
 
 	hr = ClientUtil::HrInitializeStatusRow(strDisplayName.c_str(), MAPI_TRANSPORT_PROVIDER, lpMAPISup, m_lpIdentityProps, 0);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	*lpulFlags = 0;
 	*lppMAPIError = NULL;
-	
-exit:
-	if(lpTransport)
-		lpTransport->Release();
-
-	if(lpXPLogon)
-		lpXPLogon->Release();
-
-	return hr;
+	return hrSuccess;
 }
 
-HRESULT __stdcall ECXPProvider::xXPProvider::QueryInterface(REFIID refiid, void ** lppInterface)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IXPProvider::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
-	METHOD_PROLOGUE_(ECXPProvider , XPProvider);
-	HRESULT hr = pThis->QueryInterface(refiid, lppInterface);
-	TRACE_MAPI(TRACE_RETURN, "IXPProvider::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-ULONG __stdcall ECXPProvider::xXPProvider::AddRef()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IXPProvider::AddRef", "");
-	METHOD_PROLOGUE_(ECXPProvider , XPProvider);
-	return pThis->AddRef();
-}
-
-ULONG __stdcall ECXPProvider::xXPProvider::Release()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IXPProvider::Release", "");
-	METHOD_PROLOGUE_(ECXPProvider , XPProvider);
-	return pThis->Release();
-}
-
-HRESULT ECXPProvider::xXPProvider::Shutdown(ULONG *lpulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IXPProvider::Shutdown", "");
-	METHOD_PROLOGUE_(ECXPProvider , XPProvider);
-	return pThis->Shutdown(lpulFlags);
-}
-
-HRESULT ECXPProvider::xXPProvider::TransportLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG FAR * lpulFlags, LPMAPIERROR FAR * lppMAPIError, LPXPLOGON FAR * lppXPLogon)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IXPProvider::TransportLogon", "");
-	METHOD_PROLOGUE_(ECXPProvider , XPProvider);
-	return pThis->TransportLogon(lpMAPISup, ulUIParam, lpszProfileName, lpulFlags, lppMAPIError, lppXPLogon);
-}
+DEF_HRMETHOD1(TRACE_MAPI, ECXPProvider, XPProvider, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECXPProvider, XPProvider, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECXPProvider, XPProvider, Release, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECXPProvider, XPProvider, Shutdown, (ULONG *, lpulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECXPProvider, XPProvider, TransportLogon, (LPMAPISUP, lpMAPISup), (ULONG, ulUIParam), (LPTSTR, lpszProfileName), (ULONG *, lpulFlags), (LPMAPIERROR *, lppMAPIError), (LPXPLOGON *, lppXPLogon))

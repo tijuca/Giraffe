@@ -24,6 +24,7 @@
 #include <set>
 using namespace std;
 
+#include <kopano/zcdefs.h>
 #include <mapidefs.h>
 
 /*
@@ -34,18 +35,12 @@ extern string auto_del;
 
 class Fsck {
 private:
-	ULONG ulFolders;
-	ULONG ulEntries;
-	ULONG ulProblems;
-	ULONG ulFixed;
-	ULONG ulDeleted;
-
+	ULONG ulFolders = 0, ulEntries = 0, ulProblems = 0;
+	ULONG ulFixed = 0, ulDeleted = 0;
 	virtual HRESULT ValidateItem(LPMESSAGE lpMessage, const std::string &strClass) = 0;
 
 public:
-	Fsck();
-	virtual ~Fsck() { }
-
+	virtual ~Fsck(void) _kc_impdtor;
 	HRESULT ValidateMessage(LPMESSAGE lpMessage, const std::string &strName, const std::string &strClass);
 	HRESULT ValidateFolder(LPMAPIFOLDER lpFolder, const std::string &strName);
 
@@ -53,33 +48,30 @@ public:
 	HRESULT ReplaceProperty(LPMESSAGE lpMessage, const std::string &strName, ULONG ulTag, const std::string &strError, __UPV Value);
 
 	HRESULT DeleteRecipientList(LPMESSAGE lpMessage, std::list<unsigned int> &mapiReciptDel, bool &bChanged);
-
-	HRESULT DeleteMessage(LPMAPIFOLDER lpFolder,
-			      LPSPropValue lpItemProperty);
-
+	HRESULT DeleteMessage(LPMAPIFOLDER folder, const SPropValue *prop);
 	HRESULT ValidateRecursiveDuplicateRecipients(LPMESSAGE lpMessage, bool &bChanged);
 	HRESULT ValidateDuplicateRecipients(LPMESSAGE lpMessage, bool &bChanged);
 
 	void PrintStatistics(const std::string &title);
 };
 
-class FsckCalendar : public Fsck {
+class FsckCalendar _kc_final : public Fsck {
 private:
-	HRESULT ValidateItem(LPMESSAGE lpMessage, const std::string &strClass);
+	HRESULT ValidateItem(LPMESSAGE lpMessage, const std::string &strClass) _kc_override;
 	HRESULT ValidateMinimalNamedFields(LPMESSAGE lpMessage);
 	HRESULT ValidateTimestamps(LPMESSAGE lpMessage);
 	HRESULT ValidateRecurrence(LPMESSAGE lpMessage);
 };
 
-class FsckContact : public Fsck {
+class FsckContact _kc_final : public Fsck {
 private:
-	HRESULT ValidateItem(LPMESSAGE lpMessage, const std::string &strClass);
+	HRESULT ValidateItem(LPMESSAGE lpMessage, const std::string &strClass) _kc_override;
 	HRESULT ValidateContactNames(LPMESSAGE lpMessage);
 };
 
-class FsckTask : public Fsck {
+class FsckTask _kc_final : public Fsck {
 private:
-	HRESULT ValidateItem(LPMESSAGE lpMessage, const std::string &strClass);
+	HRESULT ValidateItem(LPMESSAGE lpMessage, const std::string &strClass) _kc_override;
 	HRESULT ValidateMinimalNamedFields(LPMESSAGE lpMessage);
 	HRESULT ValidateTimestamps(LPMESSAGE lpMessage);
 	HRESULT ValidateCompletion(LPMESSAGE lpMessage);
@@ -89,10 +81,7 @@ private:
  * Helper functions.
  */
 HRESULT allocNamedIdList(ULONG ulSize, LPMAPINAMEID **lpppNameArray);
-void freeNamedIdList(LPMAPINAMEID *lppNameArray);
-
-HRESULT ReadProperties(LPMESSAGE lpMessage, ULONG ulCount,
-		       ULONG *lpTag, LPSPropValue *lppPropertyArray);
+HRESULT ReadProperties(IMessage *, ULONG count, const ULONG *tags, SPropValue **out);
 HRESULT ReadNamedProperties(LPMESSAGE lpMessage, ULONG ulCount,
 			    LPMAPINAMEID *lppTag,
 			    LPSPropTagArray *lppPropertyTagArray,

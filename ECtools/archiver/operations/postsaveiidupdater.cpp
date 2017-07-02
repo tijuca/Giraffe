@@ -16,10 +16,11 @@
  */
 
 #include <kopano/platform.h>
+#include <kopano/Util.h>
 #include "postsaveiidupdater.h"
 #include "instanceidmapper.h"
 
-namespace za { namespace operations {
+namespace KC { namespace operations {
 
 TaskBase::TaskBase(const AttachPtr &ptrSourceAttach, const MessagePtr &ptrDestMsg, ULONG ulDestAttachIdx)
 : m_ptrSourceAttach(ptrSourceAttach)
@@ -38,16 +39,15 @@ HRESULT TaskBase::Execute(ULONG ulPropTag, const InstanceIdMapperPtr &ptrMapper)
 	SPropValuePtr ptrDestServerUID;
 	ULONG cbDestInstanceID = 0;
 	EntryIdPtr ptrDestInstanceID;
-
-	SizedSPropTagArray(1, sptaTableProps) = {1, {PR_ATTACH_NUM}};
+	static constexpr const SizedSPropTagArray(1, sptaTableProps) = {1, {PR_ATTACH_NUM}};
 	
-	hr = GetUniqueIDs(m_ptrSourceAttach, &ptrSourceServerUID, &cbSourceInstanceID, &ptrSourceInstanceID);
+	hr = GetUniqueIDs(m_ptrSourceAttach, &~ptrSourceServerUID, &cbSourceInstanceID, &~ptrSourceInstanceID);
 	if (hr != hrSuccess)
 		return hr;
-	hr = m_ptrDestMsg->GetAttachmentTable(MAPI_DEFERRED_ERRORS, &ptrTable);
+	hr = m_ptrDestMsg->GetAttachmentTable(MAPI_DEFERRED_ERRORS, &~ptrTable);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrTable->SetColumns((LPSPropTagArray)&sptaTableProps, TBL_BATCH);
+	hr = ptrTable->SetColumns(sptaTableProps, TBL_BATCH);
 	if (hr != hrSuccess)
 		return hr;
 	hr = ptrTable->SeekRow(BOOKMARK_BEGINNING, m_ulDestAttachIdx, NULL);
@@ -58,10 +58,10 @@ HRESULT TaskBase::Execute(ULONG ulPropTag, const InstanceIdMapperPtr &ptrMapper)
 		return hr;
 	if (ptrRows.empty())
 		return MAPI_E_NOT_FOUND;
-	hr = m_ptrDestMsg->OpenAttach(ptrRows[0].lpProps[0].Value.ul, &ptrAttach.iid, 0, &ptrAttach);
+	hr = m_ptrDestMsg->OpenAttach(ptrRows[0].lpProps[0].Value.ul, &ptrAttach.iid(), 0, &~ptrAttach);
 	if (hr != hrSuccess)
 		return hr;
-	hr = GetUniqueIDs(ptrAttach, &ptrDestServerUID, &cbDestInstanceID, &ptrDestInstanceID);
+	hr = GetUniqueIDs(ptrAttach, &~ptrDestServerUID, &cbDestInstanceID, &~ptrDestInstanceID);
 	if (hr != hrSuccess)
 		return hr;
 	return DoExecute(ulPropTag, ptrMapper, ptrSourceServerUID->Value.bin,
@@ -78,13 +78,13 @@ HRESULT TaskBase::GetUniqueIDs(IAttach *lpAttach, LPSPropValue *lppServerUID, UL
 	ULONG cbInstanceID = 0;
 	EntryIdPtr ptrInstanceID;
 
-	hr = HrGetOneProp(lpAttach, PR_EC_SERVER_UID, &ptrServerUID);
+	hr = HrGetOneProp(lpAttach, PR_EC_SERVER_UID, &~ptrServerUID);
 	if (hr != hrSuccess)
 		return hr;
-	hr = lpAttach->QueryInterface(ptrInstance.iid, &ptrInstance);
+	hr = lpAttach->QueryInterface(ptrInstance.iid(), &~ptrInstance);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrInstance->GetSingleInstanceId(&cbInstanceID, &ptrInstanceID);
+	hr = ptrInstance->GetSingleInstanceId(&cbInstanceID, &~ptrInstanceID);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -129,13 +129,11 @@ PostSaveInstanceIdUpdater::PostSaveInstanceIdUpdater(ULONG ulPropTag, const Inst
 
 HRESULT PostSaveInstanceIdUpdater::Execute()
 {
-	typedef TaskList::const_iterator iterator;
-
 	HRESULT hr = hrSuccess;
 	bool bFailure = false;
 
-	for (iterator i = m_lstDeferred.begin(); i != m_lstDeferred.end(); ++i) {
-		hr = (*i)->Execute(m_ulPropTag, m_ptrMapper);
+	for (const auto &i : m_lstDeferred) {
+		hr = i->Execute(m_ulPropTag, m_ptrMapper);
 		if (hr != hrSuccess)
 			bFailure = true;
 	}
@@ -143,4 +141,4 @@ HRESULT PostSaveInstanceIdUpdater::Execute()
 	return bFailure ? MAPI_W_ERRORS_RETURNED : hrSuccess;
 }
 
-}} // namespace operations, za
+}} /* namespace */

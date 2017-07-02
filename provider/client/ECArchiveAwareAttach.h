@@ -18,24 +18,24 @@
 #ifndef ECARCHIVEAWAREATTACH_INCLUDED
 #define ECARCHIVEAWAREATTACH_INCLUDED
 
+#include <kopano/zcdefs.h>
 #include "ECAttach.h"
 
 class ECArchiveAwareMessage;
 
-class ECArchiveAwareAttach : public ECAttach {
+class ECArchiveAwareAttach _kc_final : public ECAttach {
 protected:
 	ECArchiveAwareAttach(ECMsgStore *lpMsgStore, ULONG ulObjType, BOOL fModify, ULONG ulAttachNum, ECMAPIProp *lpRoot);
 
 public:
 	static	HRESULT Create(ECMsgStore *lpMsgStore, ULONG ulObjType, BOOL fModify, ULONG ulAttachNum, ECMAPIProp *lpRoot, ECAttach **lppAttach);
-	static  HRESULT	SetPropHandler(ULONG ulPropTag, void* lpProvider, LPSPropValue lpsPropValue, void *lpParam);
+	static HRESULT SetPropHandler(ULONG ulPropTag, void *lpProvider, const SPropValue *lpsPropValue, void *lpParam);
 
 private:
 	ECArchiveAwareMessage	*m_lpRoot;
 };
 
-
-class ECArchiveAwareAttachFactory : public IAttachFactory{
+class ECArchiveAwareAttachFactory _kc_final : public IAttachFactory {
 public:
 	HRESULT Create(ECMsgStore *lpMsgStore, ULONG ulObjType, BOOL fModify, ULONG ulAttachNum, ECMAPIProp *lpRoot, ECAttach **lppAttach) const;
 };

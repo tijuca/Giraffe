@@ -21,7 +21,8 @@
 #include <mapidefs.h>
 #include <mapix.h>
 #include <mapiutil.h>
-
+#include <kopano/ECRestriction.h>
+#include <kopano/memory.hpp>
 #include "freebusyutil.h"
 #include <kopano/stringutil.h>
 
@@ -29,21 +30,21 @@
 #include <kopano/mapiext.h>
 #include <edkmdb.h>
 
-BOOL leapyear(short year)
+using namespace KCHL;
+
+namespace KC {
+
+static bool leapyear(short year)
 {
 	return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0); 
 }
 
-HRESULT getMaxMonthMinutes(short year, short month, short* minutes)
+static HRESULT getMaxMonthMinutes(short year, short month, short *minutes)
 {
-	HRESULT hr = hrSuccess;
 	short days = 0;
 
 	if(month < 0 || month >11 || year < 1601)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+		return MAPI_E_INVALID_PARAMETER;
 
 	switch(month+1)
 	{
@@ -70,232 +71,171 @@ HRESULT getMaxMonthMinutes(short year, short month, short* minutes)
 	}
 
 	*minutes = days * (24*60);
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
-HRESULT GetFreeBusyFolder(IMsgStore* lpPublicStore, IMAPIFolder** lppFreeBusyFolder)
+static HRESULT GetFreeBusyFolder(IMsgStore *lpPublicStore,
+    IMAPIFolder **lppFreeBusyFolder)
 {
 	HRESULT			hr = S_OK;
 	ULONG			cValuesFreeBusy = 0;
-	LPSPropValue	lpPropArrayFreeBusy = NULL;
-	IMAPIFolder*	lpMapiFolder = NULL;
+	memory_ptr<SPropValue> lpPropArrayFreeBusy;
+	object_ptr<IMAPIFolder> lpMapiFolder;
 	ULONG			ulObjType = 0;
-
-	SizedSPropTagArray(1, sPropsFreeBusy) = {
-		1,
-		{
-			PR_FREE_BUSY_FOR_LOCAL_SITE_ENTRYID
-		}
-	};
-
+	static constexpr const SizedSPropTagArray(1, sPropsFreeBusy) =
+		{1, {PR_FREE_BUSY_FOR_LOCAL_SITE_ENTRYID}};
 	enum eFreeBusyPos{ FBPOS_FREE_BUSY_FOR_LOCAL_SITE_ENTRYID};
 
 	// Get freebusy properies
-	hr = lpPublicStore->GetProps((LPSPropTagArray)&sPropsFreeBusy, 0, &cValuesFreeBusy, &lpPropArrayFreeBusy);
+	hr = lpPublicStore->GetProps(sPropsFreeBusy, 0, &cValuesFreeBusy, &~lpPropArrayFreeBusy);
 	if (FAILED(hr))
-		goto exit;
-
+		return hr;
 	if(lpPropArrayFreeBusy[FBPOS_FREE_BUSY_FOR_LOCAL_SITE_ENTRYID].ulPropTag != PR_FREE_BUSY_FOR_LOCAL_SITE_ENTRYID)
-	{
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
+		return MAPI_E_NOT_FOUND;
 
 	hr = lpPublicStore->OpenEntry(
-			lpPropArrayFreeBusy[FBPOS_FREE_BUSY_FOR_LOCAL_SITE_ENTRYID].Value.bin.cb,
-			(LPENTRYID)lpPropArrayFreeBusy[FBPOS_FREE_BUSY_FOR_LOCAL_SITE_ENTRYID].Value.bin.lpb,
-			&IID_IMAPIFolder,
-			MAPI_MODIFY,
-			&ulObjType,
-			(LPUNKNOWN*)&lpMapiFolder);
+	     lpPropArrayFreeBusy[FBPOS_FREE_BUSY_FOR_LOCAL_SITE_ENTRYID].Value.bin.cb,
+	     reinterpret_cast<ENTRYID *>(lpPropArrayFreeBusy[FBPOS_FREE_BUSY_FOR_LOCAL_SITE_ENTRYID].Value.bin.lpb),
+	     &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, &~lpMapiFolder);
 	if(hr != hrSuccess)
-		goto exit;
-
-	hr = lpMapiFolder->QueryInterface(IID_IMAPIFolder, (void**)lppFreeBusyFolder);
-	if(hr != hrSuccess)
-		goto exit;
-
-exit:
-	MAPIFreeBuffer(lpPropArrayFreeBusy);
-	if(lpMapiFolder)
-		lpMapiFolder->Release();
-
-	return hr;
+		return hr;
+	return lpMapiFolder->QueryInterface(IID_IMAPIFolder, (void**)lppFreeBusyFolder);
 }
 
 HRESULT GetFreeBusyMessage(IMAPISession* lpSession, IMsgStore* lpPublicStore, IMsgStore* lpUserStore, ULONG cbUserEntryID, LPENTRYID lpUserEntryID, BOOL bCreateIfNotExist, IMessage** lppMessage)
 {
 	HRESULT			hr = S_OK;
-	IMAPIFolder*	lpFreeBusyFolder = NULL;
-	IMAPITable*		lpMapiTable = NULL;
-	SRestriction	sRestriction;
+	object_ptr<IMAPIFolder> lpFreeBusyFolder;
+	object_ptr<IMAPITable> lpMapiTable;
 	SPropValue		sPropUser;
-	LPSRowSet		lpRows = NULL;
+	rowset_ptr lpRows;
 	ULONG			ulObjType = 0;
-	IMessage*		lpMessage = NULL;
-
-	IMAPIFolder*	lpFolder = NULL;
+	object_ptr<IMessage> lpMessage;
 	ULONG			ulMvItems = 0;
 	ULONG			i;
-	LPSPropValue	lpPropfbEntryids = NULL;
-	LPSPropValue	lpPropfbEntryidsNew = NULL;
-	LPSPropValue	lpPropFBMessage = NULL;
-	LPSPropValue	lpPropName = NULL;
-	LPSPropValue	lpPropEmail = NULL;
-
+	memory_ptr<SPropValue> lpPropfbEntryids;
+	memory_ptr<SPropValue> lpPropfbEntryidsNew, lpPropFBMessage;
+	memory_ptr<SPropValue> lpPropName, lpPropEmail;
 	ULONG			cbInBoxEntry = 0;
-	LPENTRYID		lpInboxEntry = NULL;
-	LPADRBOOK		lpAdrBook = NULL;
-	LPMAILUSER		lpMailUser = NULL;
-
-	SizedSPropTagArray(1, sPropsFreebusyTable) = {
-		1,
-		{
-			PR_ENTRYID
-		}
-	};
-
+	memory_ptr<ENTRYID> lpInboxEntry;
+	static constexpr const SizedSPropTagArray(1, sPropsFreebusyTable) = {1, {PR_ENTRYID}};
 	enum eFreeBusyTablePos{ FBPOS_ENTRYID};
 
 	if(lpSession == NULL || lpPublicStore == NULL || lppMessage == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if(cbUserEntryID == 0 || lpUserEntryID == NULL){
-		hr = MAPI_E_INVALID_ENTRYID;
-		goto exit;
-	}
+		return MAPI_E_INVALID_PARAMETER;
+	if(cbUserEntryID == 0 || lpUserEntryID == nullptr)
+		return MAPI_E_INVALID_ENTRYID;
 
 	// GetFreeBusyFolder  
-	hr = GetFreeBusyFolder(lpPublicStore, &lpFreeBusyFolder);
+	hr = GetFreeBusyFolder(lpPublicStore, &~lpFreeBusyFolder);
  	if(hr != hrSuccess)
-		goto exit;
-
-	hr = lpFreeBusyFolder->GetContentsTable(0, &lpMapiTable);
+		return hr;
+	hr = lpFreeBusyFolder->GetContentsTable(0, &~lpMapiTable);
  	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	sPropUser.ulPropTag = PR_ADDRESS_BOOK_ENTRYID;
 	sPropUser.Value.bin.cb = cbUserEntryID;
 	sPropUser.Value.bin.lpb = (LPBYTE)lpUserEntryID;
-
-	sRestriction.rt = RES_PROPERTY;
-	sRestriction.res.resProperty.ulPropTag = PR_ADDRESS_BOOK_ENTRYID;
-	sRestriction.res.resProperty.relop = RELOP_EQ;
-	sRestriction.res.resProperty.lpProp = &sPropUser;
-
-	hr = lpMapiTable->Restrict(&sRestriction, TBL_BATCH);
+	hr = ECPropertyRestriction(RELOP_EQ, PR_ADDRESS_BOOK_ENTRYID, &sPropUser, ECRestriction::Cheap)
+	     .RestrictTable(lpMapiTable, TBL_BATCH);
 	if(hr != hrSuccess)
-		goto exit;
-
-	hr = lpMapiTable->SetColumns((LPSPropTagArray)&sPropsFreebusyTable, TBL_BATCH);
+		return hr;
+	hr = lpMapiTable->SetColumns(sPropsFreebusyTable, TBL_BATCH);
 	if(hr != hrSuccess)
-		goto exit;
-
-	hr = lpMapiTable->QueryRows(1, 0, &lpRows);
+		return hr;
+	hr = lpMapiTable->QueryRows(1, 0, &~lpRows);
  	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	if(lpRows->cRows == 1 && lpRows->aRow[0].lpProps[FBPOS_ENTRYID].ulPropTag == PR_ENTRYID)
 	{
 		// Open freebusy data
 		hr = lpPublicStore->OpenEntry(lpRows->aRow[0].lpProps[FBPOS_ENTRYID].Value.bin.cb,
-					(LPENTRYID)lpRows->aRow[0].lpProps[FBPOS_ENTRYID].Value.bin.lpb,
-					&IID_IMessage,
-					MAPI_MODIFY,
-					&ulObjType,
-					(LPUNKNOWN*)&lpMessage);
-
+		     reinterpret_cast<ENTRYID *>(lpRows->aRow[0].lpProps[FBPOS_ENTRYID].Value.bin.lpb),
+		     &IID_IMessage, MAPI_MODIFY, &ulObjType, &~lpMessage);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 	else if (bCreateIfNotExist == TRUE)
 	{
 		//Create new freebusymessage
-		hr = lpFreeBusyFolder->CreateMessage(NULL, 0, &lpMessage);
+		hr = lpFreeBusyFolder->CreateMessage(nullptr, 0, &~lpMessage);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		//Set the user entry id 
 		hr = lpMessage->SetProps(1, &sPropUser, NULL);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		// Set the accountname in properties PR_DISPLAY_NAME and PR_SUBJECT
-		hr = lpSession->OpenAddressBook(0, NULL, AB_NO_DIALOG, &lpAdrBook);
+		object_ptr<IAddrBook> lpAdrBook;
+		hr = lpSession->OpenAddressBook(0, NULL, AB_NO_DIALOG, &~lpAdrBook);
  		if(hr != hrSuccess)
-			goto exit;
-
-		hr = lpAdrBook->OpenEntry(cbUserEntryID, lpUserEntryID, &IID_IMailUser, MAPI_BEST_ACCESS , &ulObjType, (LPUNKNOWN*)&lpMailUser);
+			return hr;
+		object_ptr<IMailUser> lpMailUser;
+		hr = lpAdrBook->OpenEntry(cbUserEntryID, lpUserEntryID, &IID_IMailUser, MAPI_BEST_ACCESS, &ulObjType, &~lpMailUser);
  		if(hr != hrSuccess)
-			goto exit;
-
-		hr = HrGetOneProp(lpMailUser, PR_ACCOUNT, &lpPropName);
+			return hr;
+		hr = HrGetOneProp(lpMailUser, PR_ACCOUNT, &~lpPropName);
 		if(hr != hrSuccess)
-			goto exit;
-
-		hr = HrGetOneProp(lpMailUser, PR_EMAIL_ADDRESS, &lpPropEmail);
+			return hr;
+		hr = HrGetOneProp(lpMailUser, PR_EMAIL_ADDRESS, &~lpPropEmail);
 		if(hr != hrSuccess)
-			goto exit;
-
-		if(lpMailUser){ lpMailUser->Release(); lpMailUser = NULL; }
-		if(lpAdrBook){ lpAdrBook->Release(); lpAdrBook = NULL; }
+			return hr;
 
 		//Set the displayname with accountname 
 		lpPropName->ulPropTag = PR_DISPLAY_NAME;
 		hr = lpMessage->SetProps(1, lpPropName, NULL);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		//Set the subject with accountname 
 		lpPropName->ulPropTag = PR_SUBJECT;
 		hr = lpMessage->SetProps(1, lpPropName, NULL);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		//Set the PR_FREEBUSY_EMA with the email address
 		lpPropEmail->ulPropTag = PR_FREEBUSY_EMAIL_ADDRESS;
 		hr = lpMessage->SetProps(1, lpPropEmail, NULL);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		//Save message
 		hr = lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		// Update the user freebusy entryid array
 
 		if (lpUserStore) {
 			// Get entryid
-			hr = HrGetOneProp(lpMessage, PR_ENTRYID, &lpPropFBMessage);
+			hr = HrGetOneProp(lpMessage, PR_ENTRYID, &~lpPropFBMessage);
 			if(hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			//Open root folder
-			hr = lpUserStore->OpenEntry(0, NULL, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, (LPUNKNOWN*)&lpFolder);
+			object_ptr<IMAPIFolder> lpFolder;
+			hr = lpUserStore->OpenEntry(0, NULL, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, &~lpFolder);
 			if(hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			ulMvItems = 4;
 			// Get current freebusy entryid array
-			if(HrGetOneProp(lpFolder, PR_FREEBUSY_ENTRYIDS, &lpPropfbEntryids) == hrSuccess) {
+			if (HrGetOneProp(lpFolder, PR_FREEBUSY_ENTRYIDS, &~lpPropfbEntryids) == hrSuccess)
 				ulMvItems = (lpPropfbEntryids->Value.MVbin.cValues>ulMvItems)?lpPropfbEntryids->Value.MVbin.cValues:ulMvItems;
-			}
 
-			hr = MAPIAllocateBuffer(sizeof(SPropValue), (void**)&lpPropfbEntryidsNew);
+			hr = MAPIAllocateBuffer(sizeof(SPropValue), &~lpPropfbEntryidsNew);
 			if(hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			lpPropfbEntryidsNew->Value.MVbin.cValues = ulMvItems;
 
 			hr = MAPIAllocateMore(sizeof(SBinary)*lpPropfbEntryidsNew->Value.MVbin.cValues, lpPropfbEntryidsNew, (void**)&lpPropfbEntryidsNew->Value.MVbin.lpbin);
 			if(hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			memset(lpPropfbEntryidsNew->Value.MVbin.lpbin, 0, sizeof(SBinary)*lpPropfbEntryidsNew->Value.MVbin.cValues);
 
@@ -314,82 +254,42 @@ HRESULT GetFreeBusyMessage(IMAPISession* lpSession, IMsgStore* lpPublicStore, IM
 
 			hr = lpFolder->SetProps(1, lpPropfbEntryidsNew, NULL);
 			if(hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			hr = lpFolder->SaveChanges(KEEP_OPEN_READONLY);
 			if(hr != hrSuccess)
-				goto exit;
-
-			lpFolder->Release();
-			lpFolder = NULL;
+				return hr;
 
 			// Get the inbox
-			hr = lpUserStore->GetReceiveFolder(NULL, 0, &cbInBoxEntry, &lpInboxEntry, NULL);
+			hr = lpUserStore->GetReceiveFolder(nullptr, 0, &cbInBoxEntry, &~lpInboxEntry, nullptr);
 			if(hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			// Open the inbox
-			hr = lpUserStore->OpenEntry(cbInBoxEntry, lpInboxEntry, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, (LPUNKNOWN*)&lpFolder);
+			hr = lpUserStore->OpenEntry(cbInBoxEntry, lpInboxEntry, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, &~lpFolder);
 			if(hr != hrSuccess)
-				goto exit;
-
+				return hr;
 			hr = lpFolder->SetProps(1, lpPropfbEntryidsNew, NULL);
 			if(hr != hrSuccess)
-				goto exit;
-
+				return hr;
 			hr = lpFolder->SaveChanges(KEEP_OPEN_READONLY);
 			if(hr != hrSuccess)
-				goto exit;
-
-			lpFolder->Release();
-			lpFolder = NULL;
+				return hr;
 		}
 
 	}
 	else
 	{
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
+		return MAPI_E_NOT_FOUND;
 	}
 
-	hr = lpMessage->QueryInterface(IID_IMessage, (void**)lppMessage);
-	if(hr != hrSuccess)
-		goto exit;
-
-exit:
-	MAPIFreeBuffer(lpPropEmail);
-	MAPIFreeBuffer(lpPropName);
-	if(lpMailUser)
-		lpMailUser->Release();
-
-	if(lpAdrBook)
-		lpAdrBook->Release();
-	MAPIFreeBuffer(lpInboxEntry);
-	MAPIFreeBuffer(lpPropfbEntryidsNew);
-	MAPIFreeBuffer(lpPropFBMessage);
-	MAPIFreeBuffer(lpPropfbEntryids);
-	if(lpFolder)
-		lpFolder->Release();
-
-	if(lpMapiTable)
-		lpMapiTable->Release();
-
-	if(lpFreeBusyFolder)
-		lpFreeBusyFolder->Release();
-
-	if(lpMessage)
-		lpMessage->Release();
-
-	if(lpRows)
-		FreeProws(lpRows);
-
-	return hr;
+	return lpMessage->QueryInterface(IID_IMessage,
+	       reinterpret_cast<void **>(lppMessage));
 }
 
-HRESULT ParseFBEvents(FBStatus fbSts, LPSPropValue lpMonth, LPSPropValue lpEvent, ECFBBlockList* lpfbBlockList)
+static HRESULT ParseFBEvents(FBStatus fbSts, LPSPropValue lpMonth,
+    LPSPropValue lpEvent, ECFBBlockList *lpfbBlockList)
 {
-	HRESULT hr = S_OK;
-
 	ULONG		cEvents;
 	sfbEvent*	lpfbEvents = NULL;
 	struct tm	tmTmp;
@@ -402,10 +302,7 @@ HRESULT ParseFBEvents(FBStatus fbSts, LPSPropValue lpMonth, LPSPropValue lpEvent
 	// Check varibales
 	if(lpEvent == NULL || lpMonth == NULL || lpfbBlockList == NULL ||
 		lpEvent->Value.MVbin.cValues != lpMonth->Value.MVl.cValues)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+		return MAPI_E_INVALID_PARAMETER;
 
 	memset(&fbBlock, 0, sizeof(fbBlock));
 
@@ -438,27 +335,18 @@ HRESULT ParseFBEvents(FBStatus fbSts, LPSPropValue lpMonth, LPSPropValue lpEvent
 			UnixTimeToRTime(tmUnix, &rtmEnd);
 			
 			// Don't reset fbBlock.m_tmEnd
-			if(fbBlock.m_tmEnd == rtmStart) {
-				bMerge = true;
-			}else
-				bMerge = false;
-
+			bMerge = fbBlock.m_tmEnd == rtmStart;
 			fbBlock.m_fbstatus = fbSts;
 			fbBlock.m_tmStart = rtmStart;
 			fbBlock.m_tmEnd = rtmEnd;
 
-			if(bMerge == true) {
+			if (bMerge)
 				lpfbBlockList->Merge(&fbBlock);
-			} else { 
+			else
 				lpfbBlockList->Add(&fbBlock);
-			}
-
 		}
-
 	}
-
-exit:
-	return hr;
+	return S_OK;
 }
 
 HRESULT GetFreeBusyMessageData(IMessage* lpMessage, LONG* lprtmStart, LONG* lprtmEnd, ECFBBlockList	*lpfbBlockList)
@@ -466,9 +354,8 @@ HRESULT GetFreeBusyMessageData(IMessage* lpMessage, LONG* lprtmStart, LONG* lprt
 	HRESULT hr = S_OK;
 
 	ULONG			cValuesFBData = 0;
-	LPSPropValue	lpPropArrayFBData = NULL;
-
-	SizedSPropTagArray(9, sPropsFreeBusyData) = {
+	memory_ptr<SPropValue> lpPropArrayFBData;
+	static constexpr const SizedSPropTagArray(9, sPropsFreeBusyData) = {
 		9,
 		{
 			//PR_FREEBUSY_ALL_EVENTS,
@@ -494,14 +381,10 @@ HRESULT GetFreeBusyMessageData(IMessage* lpMessage, LONG* lprtmStart, LONG* lprt
 					   };
 
 	if(lpMessage == NULL || lprtmStart == NULL || lprtmEnd == NULL || lpfbBlockList == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	hr = lpMessage->GetProps((LPSPropTagArray)&sPropsFreeBusyData, 0, &cValuesFBData, &lpPropArrayFBData);
+		return MAPI_E_INVALID_PARAMETER;
+	hr = lpMessage->GetProps(sPropsFreeBusyData, 0, &cValuesFBData, &~lpPropArrayFBData);
 	if(FAILED(hr))
-		goto exit;
+		return hr;
 
 	// Get busy data
 	if(lpPropArrayFBData[FBDATA_BUSY_EVENTS].ulPropTag == PR_FREEBUSY_BUSY_EVENTS &&
@@ -509,8 +392,7 @@ HRESULT GetFreeBusyMessageData(IMessage* lpMessage, LONG* lprtmStart, LONG* lprt
 	{
 		hr = ParseFBEvents(fbBusy, &lpPropArrayFBData[FBDATA_BUSY_MONTHS], &lpPropArrayFBData[FBDATA_BUSY_EVENTS], lpfbBlockList);
 		if(hr != hrSuccess)
-			goto exit;
-
+			return hr;
 	}
 
 	// Get Tentative data
@@ -519,7 +401,7 @@ HRESULT GetFreeBusyMessageData(IMessage* lpMessage, LONG* lprtmStart, LONG* lprt
 	{
 		hr = ParseFBEvents(fbTentative, &lpPropArrayFBData[FBDATA_TENTATIVE_MONTHS], &lpPropArrayFBData[FBDATA_TENTATIVE_EVENTS], lpfbBlockList);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 
 		// Get OutOfOffice data
@@ -528,7 +410,7 @@ HRESULT GetFreeBusyMessageData(IMessage* lpMessage, LONG* lprtmStart, LONG* lprt
 	{
 		hr = ParseFBEvents(fbOutOfOffice, &lpPropArrayFBData[FBDATA_OOF_MONTHS], &lpPropArrayFBData[FBDATA_OOF_EVENTS], lpfbBlockList);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 
 	if (lpPropArrayFBData[FBDATA_START_RANGE].ulPropTag == PR_FREEBUSY_START_RANGE)
@@ -540,9 +422,6 @@ HRESULT GetFreeBusyMessageData(IMessage* lpMessage, LONG* lprtmStart, LONG* lprt
 		*lprtmEnd = lpPropArrayFBData[FBDATA_END_RANGE].Value.ul;
 	else 
 		*lprtmEnd = 0;
-
-exit:
-	MAPIFreeBuffer(lpPropArrayFBData);
 	return hr;
 }
 
@@ -577,16 +456,13 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 	sfbEvent		fbEvent;
 	FBBlock_1		fbBlk;
 	bool			bFound;
-	LPSPropValue	lpPropFBDataArray = NULL;
+	memory_ptr<SPropValue> lpPropFBDataArray;
 	time_t			tmUnixStart = 0;
 	time_t			tmUnixEnd = 0;
 
 	//Check of propertys are mv
 	if(lpfbBlockList == NULL || lppPropFBDataArray == NULL)
-	{
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+		return MAPI_E_INVALID_PARAMETER;
 
 	// Set the list on the begin
 	lpfbBlockList->Reset();
@@ -596,16 +472,17 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 		First item is Months
 		Second item is the Freebusy data
 	*/
-	if ((hr = MAPIAllocateBuffer(2 * sizeof(SPropValue), (void**)&lpPropFBDataArray)) != hrSuccess)
-		goto exit;
+	hr = MAPIAllocateBuffer(2 * sizeof(SPropValue), &~lpPropFBDataArray);
+	if (hr != hrSuccess)
+		return hr;
 	
 	lpPropFBDataArray[0].Value.MVl.cValues = 0;
 	lpPropFBDataArray[1].Value.MVbin.cValues = 0;
 
 	if ((hr = MAPIAllocateMore((ulMonths+1) * sizeof(ULONG), lpPropFBDataArray, (void**)&lpPropFBDataArray[0].Value.MVl.lpl)) != hrSuccess)	 // +1 for free/busy in two months
-		goto exit;
+		return hr;
 	if ((hr = MAPIAllocateMore((ulMonths+1) * sizeof(SBinary), lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin)) != hrSuccess) // +1 for free/busy in two months
-		goto exit;
+		return hr;
 
 	//memset(&lpPropFBDataArray[1].Value.MVbin.lpbin, 0, ulArrayItems);
 
@@ -635,7 +512,7 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 				++lpPropFBDataArray[0].Value.MVl.cValues;
 				++lpPropFBDataArray[1].Value.MVbin.cValues;
 				if ((hr = MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb)) != hrSuccess)
-					goto exit;
+					return hr;
 				lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb = 0;
 				
 			}
@@ -649,7 +526,7 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 				// Add item to struct
 				memcpy(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb+lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb, &fbEvent, sizeof(sfbEvent));
 				lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb += sizeof(sfbEvent);
-				ASSERT(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb <= ulMaxItemDataSize);
+				assert(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb <= ulMaxItemDataSize);
 
 				ulDiffMonths = DiffYearMonthToMonth(&tmStart, &tmEnd);
 
@@ -670,7 +547,7 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 					++lpPropFBDataArray[1].Value.MVbin.cValues;
 
 					if ((hr = MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb)) != hrSuccess)
-						goto exit;
+						return hr;
 					lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb = 0;
 				
 					fbEvent.rtmStart = 0;					
@@ -679,7 +556,7 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 					// Add item to struct
 					memcpy(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb+lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb, &fbEvent, sizeof(sfbEvent));
 					lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb += sizeof(sfbEvent);
-					ASSERT(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb <= ulMaxItemDataSize);
+					assert(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb <= ulMaxItemDataSize);
 				}
 
 				++iMonth;
@@ -692,7 +569,7 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 				++lpPropFBDataArray[1].Value.MVbin.cValues;
 
 				if ((hr = MAPIAllocateMore(ulMaxItemDataSize, lpPropFBDataArray, (void**)&lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].lpb)) != hrSuccess)
-					goto exit;
+					return hr;
 				lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb = 0;
 
 				fbEvent.rtmStart = 0;
@@ -710,69 +587,17 @@ HRESULT CreateFBProp(FBStatus fbStatus, ULONG ulMonths, ULONG ulPropMonths, ULON
 			ulLastMonth = tmEnd.tm_mon;
 
 			bFound = true;
-			ASSERT(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb <= ulMaxItemDataSize);
+			assert(lpPropFBDataArray[1].Value.MVbin.lpbin[iMonth].cb <= ulMaxItemDataSize);
 		}
-		ASSERT(iMonth == -1 || (iMonth >= 0 && static_cast<ULONG>(iMonth) < (ulMonths+1)));
-		ASSERT(lpPropFBDataArray[1].Value.MVbin.cValues <= (ulMonths+1));
-		ASSERT(lpPropFBDataArray[0].Value.MVl.cValues <= (ulMonths+1));
+		assert(iMonth == -1 || (iMonth >= 0 && static_cast<ULONG>(iMonth) < ulMonths + 1));
+		assert(lpPropFBDataArray[1].Value.MVbin.cValues <= ulMonths + 1);
+		assert(lpPropFBDataArray[0].Value.MVl.cValues <= ulMonths + 1);
 	}
 
 	if(bFound == false)
-	{
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-	*lppPropFBDataArray = lpPropFBDataArray;
-
-exit:
-	if (hr != hrSuccess)
-		MAPIFreeBuffer(lpPropFBDataArray);
-
+		return MAPI_E_NOT_FOUND;
+	*lppPropFBDataArray = lpPropFBDataArray.release();
 	return hr;
-}
-
-std::string GetFbStatus(FBStatus &fbstatus)
-{
-	std::string str;
-
-	switch(fbstatus) {
-		case fbFree:
-			str = "Free";
-			break;
-		case fbTentative:
-			str = "Tentative";
-			break;
-		case fbBusy:
-			str = "Busy";
-			break;
-		case fbOutOfOffice:
-			str = "OutOfOffice";
-			break;
-		default:
-			str = "<unknown: "+stringify(fbstatus)+">";
-			break;
-	}
-
-	return str;
-}
-
-std::string GetDebugFBBlock(LONG celt, FBBlock_1* pblk)
-{
-	std::string str;
-
-	str= "celt: "+stringify(celt);
-	str+= "\n";
-
-	for (int i = 0; i < celt; ++i) {
-		str+= "block: "+stringify(i);
-		str+= "\n\tstart: "+stringify(pblk[i].m_tmStart);
-		str+= "\n\tend: "+stringify(pblk[i].m_tmEnd);
-		str+= "\n\tstatus: "+GetFbStatus(pblk[i].m_fbstatus);
-		str+= "\n";
-	}
-
-	return str;
 }
 
 /**
@@ -783,7 +608,8 @@ std::string GetDebugFBBlock(LONG celt, FBBlock_1* pblk)
  *
  * @return		HRESULT
  */
-HRESULT HrCopyFBBlockSet(OccrInfo *lpDest, OccrInfo *lpSrc, ULONG ulcValues)
+static HRESULT HrCopyFBBlockSet(OccrInfo *lpDest, const OccrInfo *lpSrc,
+    ULONG ulcValues)
 {
 	HRESULT hr = hrSuccess;	
 	ULONG i = 0;
@@ -800,33 +626,26 @@ HRESULT HrCopyFBBlockSet(OccrInfo *lpDest, OccrInfo *lpSrc, ULONG ulcValues)
  * @param[out]		lpcValues		number of occurrences in array
  * @return			HRESULT
  */
-HRESULT HrAddFBBlock(OccrInfo sOccrInfo, OccrInfo **lppsOccrInfo, ULONG *lpcValues)
+HRESULT HrAddFBBlock(const OccrInfo &sOccrInfo, OccrInfo **lppsOccrInfo,
+    ULONG *lpcValues)
 {
-	HRESULT hr = hrSuccess;
-	OccrInfo *lpsNewOccrInfo = NULL;
+	memory_ptr<OccrInfo> lpsNewOccrInfo;
 	OccrInfo *lpsInputOccrInfo = *lppsOccrInfo;
-	ULONG ulModVal = 0;
-
-	if(lpcValues)
-		ulModVal = (*lpcValues) + 1;
-	else
-		ulModVal = 1;
-
-	if ((hr = MAPIAllocateBuffer(sizeof(sOccrInfo) * ulModVal, (void **)&lpsNewOccrInfo)) != hrSuccess)
-		goto exit;
+	ULONG ulModVal = lpcValues != NULL ? *lpcValues + 1 : 1;
+	HRESULT hr = MAPIAllocateBuffer(sizeof(sOccrInfo) * ulModVal, &~lpsNewOccrInfo);
+	if (hr != hrSuccess)
+		return hr;
 	
 	if(lpsInputOccrInfo)
-		hr = HrCopyFBBlockSet(lpsNewOccrInfo, lpsInputOccrInfo, (*lpcValues));
-	
-	if(hr != hrSuccess)
-		goto exit;
-
-	(*lpcValues) = ulModVal;
+		hr = HrCopyFBBlockSet(lpsNewOccrInfo, lpsInputOccrInfo, ulModVal);
+	if (hr != hrSuccess)
+		return hr;
+	if (lpcValues != NULL)
+		*lpcValues = ulModVal;
 	lpsNewOccrInfo[ulModVal -1] = sOccrInfo;
-	*lppsOccrInfo = lpsNewOccrInfo;
-
-exit:
+	*lppsOccrInfo = lpsNewOccrInfo.release();
 	MAPIFreeBuffer(lpsInputOccrInfo);
-	return hr;
+	return hrSuccess;
 }
 
+} /* namespace */

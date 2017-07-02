@@ -28,6 +28,8 @@
 #include "ECSession.h"
 #include <kopano/stringutil.h>
 
+namespace KC {
+
 // 1 == MAPI_STORE.. does it even matter?
 ECUserStoreTable::ECUserStoreTable(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale) : 
 	ECGenericObjectTable(lpSession, 1, ulFlags, locale)
@@ -48,13 +50,11 @@ ECRESULT ECUserStoreTable::Create(ECSession *lpSession, unsigned int ulFlags, co
 ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit)
 {
 	ECUserStoreTable *pThis = dynamic_cast<ECUserStoreTable*>(lpThis);
+	if (pThis == nullptr)
+		return KCERR_INVALID_PARAMETER;
 	struct rowSet *lpsRowSet = NULL;
-	ECObjectTableList::const_iterator iterRowList;
 	gsoap_size_t i;
 	GUID sZeroGuid = {0};
-
-	if (lpThis == NULL)
-		return KCERR_INVALID_PARAMETER;
 
 	lpsRowSet = s_alloc<rowSet>(soap);
 	lpsRowSet->__size = 0;
@@ -77,8 +77,8 @@ ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 		memset(lpsRowSet->__ptr[i].__ptr, 0, sizeof(propVal) * lpsPropTagArray->__size);
 	}
 
-	for (i = 0, iterRowList = lpRowList->begin();
-	     iterRowList != lpRowList->end(); ++iterRowList, ++i) {
+	i = 0;
+	for (const auto &row : *lpRowList) {
 		for (gsoap_size_t k = 0; k < lpsPropTagArray->__size; ++k) {
 			lpsRowSet->__ptr[i].__ptr[k].ulPropTag = PROP_TAG(PT_ERROR, lpsPropTagArray->__ptr[k]);
 			lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_ul;
@@ -92,67 +92,70 @@ ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 				lpsRowSet->__ptr[i].__ptr[k].Value.bin = s_alloc<xsd__base64Binary>(soap);
 				lpsRowSet->__ptr[i].__ptr[k].Value.bin->__size = sizeof(sObjectTableKey);
 				lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr = s_alloc<unsigned char>(soap, sizeof(sObjectTableKey));
-				memcpy(lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr, &(*iterRowList), sizeof(sObjectTableKey));
+				memcpy(lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr, &row, sizeof(sObjectTableKey));
 				break;
 
 			case PROP_ID(PR_EC_USERNAME):
-				if (!pThis->m_mapUserStoreData[iterRowList->ulObjId].strUsername.empty()) {
+				if (!pThis->m_mapUserStoreData[row.ulObjId].strUsername.empty()) {
 					lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
 
 					lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_lpszA;
-					lpsRowSet->__ptr[i].__ptr[k].Value.lpszA = s_strcpy(soap, (char*)pThis->m_mapUserStoreData[iterRowList->ulObjId].strUsername.c_str());
+					lpsRowSet->__ptr[i].__ptr[k].Value.lpszA = s_strcpy(soap, const_cast<char *>(pThis->m_mapUserStoreData[row.ulObjId].strUsername.c_str()));
 				}
 				break;
 			case PROP_ID(PR_DISPLAY_NAME):
-				if (!pThis->m_mapUserStoreData[iterRowList->ulObjId].strGuessname.empty()) {
+				if (!pThis->m_mapUserStoreData[row.ulObjId].strGuessname.empty()) {
 					lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
 
 					lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_lpszA;
-					lpsRowSet->__ptr[i].__ptr[k].Value.lpszA = s_strcpy(soap, (char*)pThis->m_mapUserStoreData[iterRowList->ulObjId].strGuessname.c_str());
+					lpsRowSet->__ptr[i].__ptr[k].Value.lpszA = s_strcpy(soap, const_cast<char *>(pThis->m_mapUserStoreData[row.ulObjId].strGuessname.c_str()));
 				}
 				break;
 			case PROP_ID(PR_EC_STOREGUID):
-				if (pThis->m_mapUserStoreData[iterRowList->ulObjId].sGuid != sZeroGuid) {
+				if (pThis->m_mapUserStoreData[row.ulObjId].sGuid != sZeroGuid) {
 					lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
 
 					lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_bin;
 					lpsRowSet->__ptr[i].__ptr[k].Value.bin = s_alloc<xsd__base64Binary>(soap);
 					lpsRowSet->__ptr[i].__ptr[k].Value.bin->__size = sizeof(GUID);
 					lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr = s_alloc<unsigned char>(soap, sizeof(GUID));
-					memcpy(lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr, &pThis->m_mapUserStoreData[iterRowList->ulObjId].sGuid, sizeof(GUID));
+					memcpy(lpsRowSet->__ptr[i].__ptr[k].Value.bin->__ptr, &pThis->m_mapUserStoreData[row.ulObjId].sGuid, sizeof(GUID));
 				}
 				break;
 			case PROP_ID(PR_EC_STORETYPE):
 				lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
 
 				lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_ul;
-				lpsRowSet->__ptr[i].__ptr[k].Value.ul = pThis->m_mapUserStoreData[iterRowList->ulObjId].ulStoreType;
+				lpsRowSet->__ptr[i].__ptr[k].Value.ul = pThis->m_mapUserStoreData[row.ulObjId].ulStoreType;
 				break;
 			case PROP_ID(PR_EC_COMPANYID):
-				if (pThis->m_mapUserStoreData[iterRowList->ulObjId].ulCompanyId != 0) {
+				if (pThis->m_mapUserStoreData[row.ulObjId].ulCompanyId != 0) {
 					lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
 
 					lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_ul;
-					lpsRowSet->__ptr[i].__ptr[k].Value.ul = pThis->m_mapUserStoreData[iterRowList->ulObjId].ulCompanyId;
+					lpsRowSet->__ptr[i].__ptr[k].Value.ul = pThis->m_mapUserStoreData[row.ulObjId].ulCompanyId;
 				}
 				break;
 			case PROP_ID(PR_EC_COMPANY_NAME):
-				if (!pThis->m_mapUserStoreData[iterRowList->ulObjId].strCompanyName.empty()) {
+				if (!pThis->m_mapUserStoreData[row.ulObjId].strCompanyName.empty()) {
 					lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
 
 					lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_lpszA;
-					lpsRowSet->__ptr[i].__ptr[k].Value.lpszA = s_strcpy(soap, (char*)pThis->m_mapUserStoreData[iterRowList->ulObjId].strCompanyName.c_str());
+					lpsRowSet->__ptr[i].__ptr[k].Value.lpszA = s_strcpy(soap, const_cast<char *>(pThis->m_mapUserStoreData[row.ulObjId].strCompanyName.c_str()));
 				}
 				break;
 			case PROP_ID(PR_STORE_ENTRYID):
 				// ignore errors
-				ECGenProps::GetPropComputedUncached(soap, NULL ,lpSession, PR_STORE_ENTRYID, pThis->m_mapUserStoreData[iterRowList->ulObjId].ulObjId, 0,
-							   				pThis->m_mapUserStoreData[iterRowList->ulObjId].ulObjId, 0, MAPI_STORE, &lpsRowSet->__ptr[i].__ptr[k]);
+				ECGenProps::GetPropComputedUncached(soap, NULL,
+					lpSession, PR_STORE_ENTRYID,
+					pThis->m_mapUserStoreData[row.ulObjId].ulObjId,
+					0, pThis->m_mapUserStoreData[row.ulObjId].ulObjId,
+					0, MAPI_STORE, &lpsRowSet->__ptr[i].__ptr[k]);
 				break;
 			case PROP_ID(PR_LAST_MODIFICATION_TIME):
-				if (pThis->m_mapUserStoreData[iterRowList->ulObjId].tModTime != 0) {
+				if (pThis->m_mapUserStoreData[row.ulObjId].tModTime != 0) {
 					FILETIME ftTmp;
-					UnixTimeToFileTime(pThis->m_mapUserStoreData[iterRowList->ulObjId].tModTime, &ftTmp);
+					UnixTimeToFileTime(pThis->m_mapUserStoreData[row.ulObjId].tModTime, &ftTmp);
 
 					lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
 					lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_hilo;
@@ -164,7 +167,7 @@ ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 			case PROP_ID(PR_MESSAGE_SIZE_EXTENDED):
 				lpsRowSet->__ptr[i].__ptr[k].ulPropTag = lpsPropTagArray->__ptr[k];
 				lpsRowSet->__ptr[i].__ptr[k].__union = SOAP_UNION_propValData_li;
-				lpsRowSet->__ptr[i].__ptr[k].Value.li = pThis->m_mapUserStoreData[iterRowList->ulObjId].ullStoreSize;
+				lpsRowSet->__ptr[i].__ptr[k].Value.li = pThis->m_mapUserStoreData[row.ulObjId].ullStoreSize;
 				break;
 			default:
 				lpsRowSet->__ptr[i].__ptr[k].ulPropTag = PROP_TAG(PT_ERROR, lpsPropTagArray->__ptr[k]);
@@ -174,6 +177,7 @@ ECRESULT ECUserStoreTable::QueryRowData(ECGenericObjectTable *lpThis, struct soa
 				break;
 			};
 		}
+		++i;
 	}
 
 	*lppRowSet = lpsRowSet;
@@ -184,7 +188,7 @@ ECRESULT ECUserStoreTable::Load() {
 	ECRESULT er = erSuccess;
 	ECListIntIterator i;
     ECDatabase *lpDatabase = NULL;
-    DB_RESULT 	lpDBResult = NULL;
+	DB_RESULT lpDBResult;
     DB_ROW		lpDBRow = NULL;
     DB_LENGTHS	lpDBLength = NULL;
 	std::string strQuery;
@@ -202,7 +206,7 @@ ECRESULT ECUserStoreTable::Load() {
 
 	er = lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
     Clear();
 
@@ -227,7 +231,7 @@ ECRESULT ECUserStoreTable::Load() {
 
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	iRowId = 0;
 	while(1) {
@@ -269,11 +273,9 @@ ECRESULT ECUserStoreTable::Load() {
 		sUserStore.strUsername.clear();
 		// find and override real username if possible
 		if (sUserStore.ulUserId != -1 && lpUserManagement->GetObjectDetails(sUserStore.ulUserId, &sUserDetails) == erSuccess) {
-			if (lpSession->GetSessionManager()->IsDistributedSupported()) {
-				if (sUserDetails.GetPropString(OB_PROP_S_SERVERNAME).compare(lpSession->GetSessionManager()->GetConfig()->GetSetting("server_name")) != 0)
-					continue;		// user not on this server
-			}
-
+			if (lpSession->GetSessionManager()->IsDistributedSupported() &&
+			    sUserDetails.GetPropString(OB_PROP_S_SERVERNAME).compare(lpSession->GetSessionManager()->GetConfig()->GetSetting("server_name")) != 0)
+				continue; // user not on this server
 			sUserStore.strUsername = sUserDetails.GetPropString(OB_PROP_S_LOGIN);
 		}
 
@@ -291,9 +293,8 @@ ECRESULT ECUserStoreTable::Load() {
 		else
 			sUserStore.strGuessname.clear();
 
-		if (sUserStore.ulCompanyId > 0 && lpUserManagement->GetObjectDetails(sUserStore.ulCompanyId, &sDetails) == erSuccess) {
+		if (sUserStore.ulCompanyId > 0 && lpUserManagement->GetObjectDetails(sUserStore.ulCompanyId, &sDetails) == erSuccess)
 			sUserStore.strCompanyName = sDetails.GetPropString(OB_PROP_S_LOGIN);
-		}
 
 		if(lpDBRow[HIERARCHYID])
 			sUserStore.ulObjId = atoui(lpDBRow[HIERARCHYID]);
@@ -321,12 +322,7 @@ ECRESULT ECUserStoreTable::Load() {
 	}
 
 	LoadRows(&lstObjIds, 0);
-
-exit:	
-	if (lpDBResult) {
-		lpDatabase->FreeResult(lpDBResult);
-		lpDBResult = NULL;
-	}
-
-	return er;
+	return erSuccess;
 }
+
+} /* namespace KC */

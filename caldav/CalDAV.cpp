@@ -17,6 +17,8 @@
 
 #include "config.h"
 #include <kopano/platform.h>
+#include <memory>
+#include <type_traits>
 #include <climits>
 #include "mapidefs.h"
 #include <mapix.h>
@@ -34,6 +36,7 @@
 
 #include <kopano/ECLogger.h>
 #include <kopano/ECChannel.h>
+#include <kopano/memory.hpp>
 #include <kopano/my_getopt.h>
 #include <kopano/ecversion.h>
 #include <kopano/CommonUtil.h>
@@ -45,9 +48,10 @@ using namespace std;
 
 #include <execinfo.h>
 #include <kopano/UnixUtil.h>
-#ifdef ZCP_USES_ICU
+#ifdef KC_USES_ICU
 #include <unicode/uclean.h>
 #endif
+#include <openssl/ssl.h>
 
 struct HandlerArgs {
     ECChannel *lpChannel;
@@ -80,11 +84,9 @@ static void sighup(int)
 {
 	if (g_bThreads && pthread_equal(pthread_self(), mainthread)==0)
 		return;
-	if (g_lpConfig) {
-		if (!g_lpConfig->ReloadSettings() && g_lpLogger)
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to reload configuration file, continuing with current settings.");
-	}
-
+	if (g_lpConfig != nullptr && !g_lpConfig->ReloadSettings() &&
+	    g_lpLogger != nullptr)
+		ec_log_crit("Unable to reload configuration file, continuing with current settings.");
 	if (g_lpLogger) {
 		if (g_lpConfig) {
 			const char *ll = g_lpConfig->GetSetting("log_level");
@@ -93,7 +95,7 @@ static void sighup(int)
 		}
 
 		g_lpLogger->Reset();
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Log connection was reset");
+		ec_log_warn("Log connection was reset");
 	}
 }
 
@@ -132,7 +134,7 @@ int main(int argc, char **argv) {
 	int ulListenCalDAVs = 0;
 	bool bIgnoreUnknownConfigOptions = false;
     stack_t st = {0};
-    struct sigaction act = {{0}};
+	struct sigaction act;
 
 	// Configuration
 	int opt = 0;
@@ -159,7 +161,11 @@ int main(int argc, char **argv) {
 		{ "log_buffer_size", "0" },
         { "ssl_private_key_file", "/etc/kopano/ical/privkey.pem" },
         { "ssl_certificate_file", "/etc/kopano/ical/cert.pem" },
+#ifdef SSL_TXT_SSLV2
 		{ "ssl_protocols", "!SSLv2" },
+#else
+		{"ssl_protocols", ""},
+#endif
 		{ "ssl_ciphers", "ALL:!LOW:!SSLv2:!EXP:!aNULL" },
 		{ "ssl_prefer_server_ciphers", "no" },
         { "ssl_verify_client", "no" },
@@ -190,22 +196,22 @@ int main(int argc, char **argv) {
 			break;
 
 		switch (opt) {
-			case 'c': 
-				lpszCfg = optarg;
-				break;
-			case 'F': 
-				g_bDaemonize = false;
-				break;
-			case OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS:
-				bIgnoreUnknownConfigOptions = true;
-				break;
-			case 'V': 
-				PrintVersion(); 
-				goto exit;
-			case 'h':
-			default:
-				PrintHelp(argv[0]);
-				goto exit;
+		case 'c':
+			lpszCfg = optarg;
+			break;
+		case 'F':
+			g_bDaemonize = false;
+			break;
+		case OPT_IGNORE_UNKNOWN_CONFIG_OPTIONS:
+			bIgnoreUnknownConfigOptions = true;
+			break;
+		case 'V':
+			PrintVersion();
+			goto exit;
+		case 'h':
+		default:
+			PrintHelp(argv[0]);
+			goto exit;
 		}
 	}
 	
@@ -214,7 +220,7 @@ int main(int argc, char **argv) {
 
 	g_lpConfig = ECConfig::Create(lpDefaults);
 	if (!g_lpConfig->LoadSettings(lpszCfg) ||
-	    !g_lpConfig->ParseParams(argc - optind, &argv[optind], NULL) ||
+	    g_lpConfig->ParseParams(argc - optind, &argv[optind]) < 0 ||
 	    (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
 		g_lpLogger = new ECLogger_File(1, 0, "-", false);
 		ec_log_set(g_lpLogger);
@@ -232,7 +238,7 @@ int main(int argc, char **argv) {
 		LogConfigErrors(g_lpConfig);
 
 	if (!TmpPath::getInstance() -> OverridePath(g_lpConfig))
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Ignoring invalid path-setting!");
+		ec_log_err("Ignoring invalid path-setting!");
 
 	if (strncmp(g_lpConfig->GetSetting("process_model"), "thread", strlen("thread")) == 0)
 		g_bThreads = true;
@@ -260,7 +266,7 @@ int main(int argc, char **argv) {
 
 	act.sa_sigaction = sigsegv;
 	act.sa_flags = SA_ONSTACK | SA_RESETHAND | SA_SIGINFO;
-
+	sigemptyset(&act.sa_mask);
 	sigaltstack(&st, NULL);
 	sigaction(SIGSEGV, &act, NULL);
 	sigaction(SIGBUS, &act, NULL);
@@ -268,13 +274,13 @@ int main(int argc, char **argv) {
 
 	// fork if needed and drop privileges as requested.
 	// this must be done before we do anything with pthreads
-	if (unix_runas(g_lpConfig, g_lpLogger))
+	if (unix_runas(g_lpConfig))
 		goto exit;
-	if (g_bDaemonize && unix_daemonize(g_lpConfig, g_lpLogger))
+	if (g_bDaemonize && unix_daemonize(g_lpConfig))
 		goto exit;
 	if (!g_bDaemonize)
 		setsid();
-	unix_create_pidfile(argv[0], g_lpConfig, g_lpLogger);
+	unix_create_pidfile(argv[0], g_lpConfig);
 	if (g_bThreads == false)
 		g_lpLogger = StartLoggerProcess(g_lpConfig, g_lpLogger);
 	else
@@ -291,13 +297,13 @@ int main(int argc, char **argv) {
 	if (g_bThreads)
 		mainthread = pthread_self();
 
-	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting kopano-ical version " PROJECT_VERSION_CALDAV_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
+	ec_log_info("Starting kopano-ical version " PROJECT_VERSION_CALDAV_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
 
 	hr = HrProcessConnections(ulListenCalDAV, ulListenCalDAVs);
 	if (hr != hrSuccess)
 		goto exit2;
 
-	g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "CalDAV Gateway will now exit");
+	ec_log_info("CalDAV Gateway will now exit");
 
 	// in forked mode, send all children the exit signal
 	if (g_bThreads == false) {
@@ -308,15 +314,15 @@ int main(int argc, char **argv) {
 		i = 30;						// wait max 30 seconds
 		while (nChildren && i) {
 			if (i % 5 == 0)
-				g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Waiting for %d processes to exit", nChildren);
+				ec_log_notice("Waiting for %d processes to exit", nChildren);
 			sleep(1);
 			--i;
 		}
 
 		if (nChildren)
-			g_lpLogger->Log(EC_LOGLEVEL_NOTICE, "Forced shutdown with %d processes left", nChildren);
+			ec_log_notice("Forced shutdown with %d processes left", nChildren);
 		else
-			g_lpLogger->Log(EC_LOGLEVEL_ALWAYS, "CalDAV Gateway shutdown complete");
+			ec_log_info("CalDAV Gateway shutdown complete");
 	}
 exit2:
 	MAPIUninitialize();
@@ -326,15 +332,14 @@ exit:
 	delete g_lpConfig;
 	DeleteLogger(g_lpLogger);
 
-	SSL_library_cleanup(); // Remove ssl data for the main application and other related libraries
-
-	// Cleanup ssl parts
+	SSL_library_cleanup(); // Remove SSL data for the main application and other related libraries
+	// Cleanup SSL parts
 	ssl_threading_cleanup();
 
 	// Cleanup libxml2 library
 	xmlCleanupParser();
 
-#ifdef ZCP_USES_ICU
+#ifdef KC_USES_ICU
 	// cleanup ICU data so valgrind is happy
 	u_cleanup();
 #endif
@@ -358,7 +363,7 @@ static HRESULT HrSetupListeners(int *lpulNormal, int *lpulSecure)
 	bListen = (strcasecmp(g_lpConfig->GetSetting("ical_enable"), "yes") == 0);
 
 	if (!bListen && !bListenSecure) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "No ports to open for listening.");
+		ec_log_crit("No ports to open for listening.");
 		return MAPI_E_INVALID_PARAMETER;
 	}
 
@@ -367,33 +372,33 @@ static HRESULT HrSetupListeners(int *lpulNormal, int *lpulSecure)
 
 	// start listening on normal port
 	if (bListen) {
-		hr = HrListen(g_lpLogger, g_lpConfig->GetSetting("server_bind"), ulPortICal, &ulNormalSocket);
+		hr = HrListen(g_lpConfig->GetSetting("server_bind"), ulPortICal, &ulNormalSocket);
 		if (hr != hrSuccess) {
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Could not listen on port %d. (0x%08X %s)", ulPortICal, hr, GetMAPIErrorMessage(hr));
+			ec_log_crit("Could not listen on port %d. (0x%08X %s)", ulPortICal, hr, GetMAPIErrorMessage(hr));
 			bListen = false;
 		} else {
-			g_lpLogger->Log(EC_LOGLEVEL_INFO, "Listening on port %d.", ulPortICal);
+			ec_log_info("Listening on port %d.", ulPortICal);
 		}
 	}
 
 	// start listening on secure port
 	if (bListenSecure) {
-		hr = ECChannel::HrSetCtx(g_lpConfig, g_lpLogger);
+		hr = ECChannel::HrSetCtx(g_lpConfig);
 		if (hr == hrSuccess) {
-			hr = HrListen(g_lpLogger, g_lpConfig->GetSetting("server_bind"), ulPortICalS, &ulSecureSocket);
+			hr = HrListen(g_lpConfig->GetSetting("server_bind"), ulPortICalS, &ulSecureSocket);
 			if (hr != hrSuccess) {
-				g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Could not listen on secure port %d. (0x%08X %s)", ulPortICalS, hr, GetMAPIErrorMessage(hr));
+				ec_log_crit("Could not listen on secure port %d. (0x%08X %s)", ulPortICalS, hr, GetMAPIErrorMessage(hr));
 				bListenSecure = false;
 			}
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Listening on secure port %d.", ulPortICalS);
+			ec_log_err("Listening on secure port %d.", ulPortICalS);
 		} else {
-			g_lpLogger->Log(EC_LOGLEVEL_FATAL, "Could not listen on secure port %d. (0x%08X %s)", ulPortICalS, hr, GetMAPIErrorMessage(hr));
+			ec_log_crit("Could not listen on secure port %d. (0x%08X %s)", ulPortICalS, hr, GetMAPIErrorMessage(hr));
 			bListenSecure = false;
 		}
 	}
 
 	if (!bListen && !bListenSecure) {
-		g_lpLogger->Log(EC_LOGLEVEL_FATAL, "No ports have been opened for listening, exiting.");
+		ec_log_crit("No ports have been opened for listening, exiting.");
 		return MAPI_E_INVALID_PARAMETER;
 	}
 
@@ -441,7 +446,7 @@ static HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
 		err = select(max(ulNormalSocket, ulSecureSocket) + 1, &readfds, NULL, NULL, &timeout);
 		if (err < 0) {
 			if (errno != EINTR) {
-				g_lpLogger->Log(EC_LOGLEVEL_FATAL, "An unknown socket error has occurred.");
+				ec_log_crit("An unknown socket error has occurred.");
 				g_bQuit = true;
 				hr = MAPI_E_NETWORK_ERROR;
 			}
@@ -457,20 +462,20 @@ static HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
 
 		// Check if a normal connection is waiting.
 		if (ulNormalSocket && FD_ISSET(ulNormalSocket, &readfds)) {
-			g_lpLogger->Log(EC_LOGLEVEL_INFO, "Connection waiting on port %d.", atoi(g_lpConfig->GetSetting("ical_port")));
+			ec_log_info("Connection waiting on port %d.", atoi(g_lpConfig->GetSetting("ical_port")));
 			bUseSSL = false;
-			hr = HrAccept(g_lpLogger, ulNormalSocket, &lpChannel);
+			hr = HrAccept(ulNormalSocket, &lpChannel);
 			if (hr != hrSuccess) {
-				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not accept incoming connection on port %d. (0x%08X)", atoi(g_lpConfig->GetSetting("ical_port")), hr);
+				ec_log_err("Could not accept incoming connection on port %d. (0x%08X)", atoi(g_lpConfig->GetSetting("ical_port")), hr);
 				continue;
 			}
 		// Check if a secure connection is waiting.
 		} else if (ulSecureSocket && FD_ISSET(ulSecureSocket, &readfds)) {
-			g_lpLogger->Log(EC_LOGLEVEL_INFO, "Connection waiting on secure port %d.", atoi(g_lpConfig->GetSetting("icals_port")));
+			ec_log_info("Connection waiting on secure port %d.", atoi(g_lpConfig->GetSetting("icals_port")));
 			bUseSSL = true;
-			hr = HrAccept(g_lpLogger, ulSecureSocket, &lpChannel);
+			hr = HrAccept(ulSecureSocket, &lpChannel);
 			if (hr != hrSuccess) {
-				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not accept incoming secure connection on port %d. (0x%08X %s)", atoi(g_lpConfig->GetSetting("ical_port")), hr, GetMAPIErrorMessage(hr));
+				ec_log_err("Could not accept incoming secure connection on port %d. (0x%08X %s)", atoi(g_lpConfig->GetSetting("ical_port")), hr, GetMAPIErrorMessage(hr));
 				continue;
 			}
 		} else {
@@ -480,7 +485,7 @@ static HRESULT HrProcessConnections(int ulNormalSocket, int ulSecureSocket)
 		hr = HrStartHandlerClient(lpChannel, bUseSSL, nCloseFDs, pCloseFDs);
 		if (hr != hrSuccess) {
 			delete lpChannel;	// destructor closes sockets
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Handling client connection failed. (0x%08X %s)", hr, GetMAPIErrorMessage(hr));
+			ec_log_err("Handling client connection failed. (0x%08X %s)", hr, GetMAPIErrorMessage(hr));
 			continue;
 		}
 		if (g_bThreads == false)
@@ -514,12 +519,10 @@ static HRESULT HrStartHandlerClient(ECChannel *lpChannel, bool bUseSSL,
 	if (g_bThreads) {
 		pthread_attr_init(&pThreadAttr);
 
-		if (pthread_attr_setdetachstate(&pThreadAttr, PTHREAD_CREATE_DETACHED) != 0) {
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Could not set thread attribute to detached.");
-		}
-
+		if (pthread_attr_setdetachstate(&pThreadAttr, PTHREAD_CREATE_DETACHED) != 0)
+			ec_log_warn("Could not set thread attribute to detached.");
 		if (pthread_create(&pThread, &pThreadAttr, HandlerClient, lpHandlerArgs) != 0) {
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not create thread.");
+			ec_log_err("Could not create thread.");
 			hr = E_FAIL;
 			goto exit;
 		}
@@ -528,7 +531,7 @@ static HRESULT HrStartHandlerClient(ECChannel *lpChannel, bool bUseSSL,
 	}
 	else {
 		if (unix_fork_function(HandlerClient, lpHandlerArgs, nCloseFDs, pCloseFDs) < 0) {
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not create process.");
+			ec_log_err("Could not create process.");
 			hr = E_FAIL;
 			goto exit;
 		}
@@ -551,8 +554,8 @@ static void *HandlerClient(void *lpArg)
 
 	delete lpHandlerArgs;
 
-	if (bUseSSL && lpChannel->HrEnableTLS(g_lpLogger) != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to negotiate SSL connection");
+	if (bUseSSL && lpChannel->HrEnableTLS() != hrSuccess) {
+		ec_log_err("Unable to negotiate SSL connection");
 		goto exit;
     }
 
@@ -562,7 +565,7 @@ static void *HandlerClient(void *lpArg)
 			/* signalled - reevaluate g_bQuit */
 			continue;
 		if (hr != hrSuccess) {
-			g_lpLogger->Log(EC_LOGLEVEL_INFO, "Request timeout, closing connection");
+			ec_log_info("Request timeout, closing connection");
 			break;
 		}
 
@@ -573,7 +576,7 @@ static void *HandlerClient(void *lpArg)
 	}
 
 exit:
-	g_lpLogger->Log(EC_LOGLEVEL_INFO, "Connection closed");
+	ec_log_info("Connection closed");
 	delete lpChannel;
 	return NULL;
 }
@@ -588,114 +591,114 @@ static HRESULT HrHandleRequest(ECChannel *lpChannel)
 	std::string strServerTZ = g_lpConfig->GetSetting("server_timezone");
 	std::string strCharset;
 	std::string strUserAgent, strUserAgentVersion;
-	Http *lpRequest = new Http(lpChannel, g_lpLogger, g_lpConfig);
-	ProtocolBase *lpBase = NULL;
-	IMAPISession *lpSession = NULL;
+	std::unique_ptr<ProtocolBase> lpBase;
+	KCHL::object_ptr<IMAPISession> lpSession;
+	Http lpRequest(lpChannel, g_lpConfig);
 	ULONG ulFlag = 0;
 
-	g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "New Request");
-
-	hr = lpRequest->HrReadHeaders();
+	ec_log_debug("New Request");
+	hr = lpRequest.HrReadHeaders();
 	if(hr != hrSuccess) {
 		hr = MAPI_E_USER_CANCEL; // connection is closed by client no data to be read
 		goto exit;
 	}
 
-	hr = lpRequest->HrValidateReq();
+	hr = lpRequest.HrValidateReq();
 	if(hr != hrSuccess) {
-		lpRequest->HrResponseHeader(501, "Not Implemented");
-		lpRequest->HrResponseBody("\nRequest not implemented");
+		lpRequest.HrResponseHeader(501, "Not Implemented");
+		lpRequest.HrResponseBody("\nRequest not implemented");
 		goto exit;
 	}
 
 	// ignore Empty Body
-	lpRequest->HrReadBody();
+	lpRequest.HrReadBody();
 
-	// no error, defaults to utf-8
-	lpRequest->HrGetCharSet(&strCharset);
+	// no error, defaults to UTF-8
+	lpRequest.HrGetCharSet(&strCharset);
 	// ignore Empty User field.
-	lpRequest->HrGetUser(&wstrUser);
+	lpRequest.HrGetUser(&wstrUser);
 	// ignore Empty Password field
-	lpRequest->HrGetPass(&wstrPass);
+	lpRequest.HrGetPass(&wstrPass);
 	// no checks required as HrValidateReq() checks Method
-	lpRequest->HrGetMethod(&strMethod);
+	lpRequest.HrGetMethod(&strMethod);
 	// 
-	lpRequest->HrSetKeepAlive(KEEP_ALIVE_TIME);
+	lpRequest.HrSetKeepAlive(KEEP_ALIVE_TIME);
 
-	lpRequest->HrGetUserAgent(&strUserAgent);
-	lpRequest->HrGetUserAgentVersion(&strUserAgentVersion);
+	lpRequest.HrGetUserAgent(&strUserAgent);
+	lpRequest.HrGetUserAgentVersion(&strUserAgentVersion);
 
-	hr = lpRequest->HrGetUrl(&strUrl);
+	hr = lpRequest.HrGetUrl(&strUrl);
 	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Url is empty for method : %s",strMethod.c_str());
-		lpRequest->HrResponseHeader(400,"Bad Request");
-		lpRequest->HrResponseBody("Bad Request");
+		ec_log_debug("URl is empty for method %s", strMethod.c_str());
+		lpRequest.HrResponseHeader(400,"Bad Request");
+		lpRequest.HrResponseBody("Bad Request");
 		goto exit;
 	}
 
 	hr = HrParseURL(strUrl, &ulFlag);
 	if (hr != hrSuccess) {
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Client request is invalid: 0x%08X %s", hr, GetMAPIErrorMessage(hr));
-		lpRequest->HrResponseHeader(400, "Bad Request: " + stringify(hr,true));
+		ec_log_err("Client request is invalid: 0x%08X %s", hr, GetMAPIErrorMessage(hr));
+		lpRequest.HrResponseHeader(400, "Bad Request: " + stringify(hr,true));
 		goto exit;
 	}
 
 	if (ulFlag & SERVICE_CALDAV)
 		// this header is always present in a caldav response, but not in ical.
-		lpRequest->HrResponseHeader("DAV", "1, access-control, calendar-access, calendar-schedule, calendarserver-principal-property-search");
+		lpRequest.HrResponseHeader("DAV", "1, access-control, calendar-access, calendar-schedule, calendarserver-principal-property-search");
 
 	if(!strMethod.compare("OPTIONS"))
 	{
-		lpRequest->HrResponseHeader(200, "OK");
+		lpRequest.HrResponseHeader(200, "OK");
 		// @todo, if ical get is disabled, do not add GET as allowed option
 		// @todo, should check write access on url and only return read actions if not available
-		lpRequest->HrResponseHeader("Allow", "OPTIONS, GET, POST, PUT, DELETE, MOVE");
-		lpRequest->HrResponseHeader("Allow", "PROPFIND, PROPPATCH, REPORT, MKCALENDAR");
+		lpRequest.HrResponseHeader("Allow", "OPTIONS, GET, POST, PUT, DELETE, MOVE");
+		lpRequest.HrResponseHeader("Allow", "PROPFIND, PROPPATCH, REPORT, MKCALENDAR");
 		// most clients do not login with this action, no need to complain.
 		hr = hrSuccess;
 		goto exit;
 	}
 	
 	if (wstrUser.empty() || wstrPass.empty()) {
-		g_lpLogger->Log(EC_LOGLEVEL_INFO, "Sending authentication request");
+		ec_log_info("Sending authentication request");
 		hr = MAPI_E_CALL_FAILED;
 	} else {
-		lpRequest->HrGetMethod(&strMethod);
-		hr = HrAuthenticate(g_lpLogger, strUserAgent, strUserAgentVersion, wstrUser, wstrPass, g_lpConfig->GetSetting("server_socket"), &lpSession);
+		lpRequest.HrGetMethod(&strMethod);
+		hr = HrAuthenticate(strUserAgent, strUserAgentVersion, wstrUser, wstrPass, g_lpConfig->GetSetting("server_socket"), &~lpSession);
 		if (hr != hrSuccess)
-			g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Login failed (0x%08X %s), resending authentication request", hr, GetMAPIErrorMessage(hr));
+			ec_log_warn("Login failed (0x%08X %s), resending authentication request", hr, GetMAPIErrorMessage(hr));
 	}
 	if (hr != hrSuccess) {
 		if(ulFlag & SERVICE_ICAL)
-			lpRequest->HrRequestAuth("Kopano iCal Gateway");
+			lpRequest.HrRequestAuth("Kopano iCal Gateway");
 		else
-			lpRequest->HrRequestAuth("Kopano CalDav Gateway");
+			lpRequest.HrRequestAuth("Kopano CalDav Gateway");
 		hr = hrSuccess; //keep connection open.
 		goto exit;
 	}
 
 	//GET & ical Requests
 	// @todo fix caldav GET request
+	static_assert(std::is_polymorphic<ProtocolBase>::value, "ProtocolBase needs to be polymorphic for unique_ptr to work");
 	if( !strMethod.compare("GET") || !strMethod.compare("HEAD") || ((ulFlag & SERVICE_ICAL) && strMethod.compare("PROPFIND")) )
 	{
-		lpBase = new iCal(lpRequest, lpSession, g_lpLogger, strServerTZ, strCharset);
+		lpBase.reset(new iCal(&lpRequest, lpSession, strServerTZ, strCharset));
 	}
 	//CALDAV Requests
 	else if((ulFlag & SERVICE_CALDAV) || ( !strMethod.compare("PROPFIND") && !(ulFlag & SERVICE_ICAL)))
 	{
-		lpBase = new CalDAV(lpRequest, lpSession, g_lpLogger, strServerTZ, strCharset);		
+		lpBase.reset(new CalDAV(&lpRequest, lpSession, strServerTZ, strCharset));
 	} 
 	else
 	{
 		hr = MAPI_E_CALL_FAILED;
-		lpRequest->HrResponseHeader(404, "Request not valid for ical or caldav services");
+		lpRequest.HrResponseHeader(404, "Request not valid for ical or caldav services");
 		goto exit;
 	}
 
 	hr = lpBase->HrInitializeClass();
 	if (hr != hrSuccess) {
 		if (hr != MAPI_E_NOT_ME)
-			hr = lpRequest->HrToHTTPCode(hr);
+			hr = lpRequest.HrToHTTPCode(hr);
 		goto exit;
 	}
 
@@ -703,22 +706,9 @@ static HRESULT HrHandleRequest(ECChannel *lpChannel)
 
 exit:
 	if(hr != hrSuccess && !strMethod.empty() && hr != MAPI_E_NOT_ME)
-		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error processing %s request, error code 0x%08x %s", strMethod.c_str(), hr, GetMAPIErrorMessage(hr));
-
-	if ( lpRequest && hr != MAPI_E_USER_CANCEL ) // do not send response to client if connection closed by client.
-		hr = lpRequest->HrFinalize();
-
-	g_lpLogger->Log(EC_LOGLEVEL_DEBUG, "End Of Request");
-
-	if(lpRequest)
-		delete lpRequest;
-	
-	if(lpSession)
-		// do not keep the session alive, can receive different (or missing) Auth headers in keep-open requests!
-		lpSession->Release();
-
-	if(lpBase)
-		delete lpBase;
-
+		ec_log_err("Error processing %s request, error code 0x%08x %s", strMethod.c_str(), hr, GetMAPIErrorMessage(hr));
+	if (hr != MAPI_E_USER_CANCEL) // do not send response to client if connection closed by client.
+		hr = lpRequest.HrFinalize();
+	ec_log_debug("End Of Request");
 	return hr;
 }

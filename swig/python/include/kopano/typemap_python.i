@@ -60,23 +60,55 @@ SWIG_FromBytePtrAndSize(const unsigned char* carray, size_t size)
 	if(PyErr_Occurred()) goto fail;
 }
 
-%typemap(in)				MAPILIST *INPUT ($*type tmp)
+%typemap(in) 			(MAPIARRAY, ULONG) ($2_type cArray = 0, $1_type lpArray = NULL)
 {
-	tmp = List_to$*mangle($input);
-	if(PyErr_Occurred()) goto fail;
-	$1 = &tmp;
-}
-
-%typemap(in)				MAPILIST
-{
-	$1 = List_to$mangle($input);
+	ULONG len;
+	$1 = List_to$1_mangle($input, &len);
+	$2 = len;
 	if(PyErr_Occurred()) goto fail;
 }
 
-%typemap(in)				MAPISTRUCT
+%typemap(in)				MAPILIST *INPUT (KCHL::memory_ptr< std::remove_pointer<$*type>::type > tmp)
 {
-	$1 = Object_to$mangle($input);
+	tmp.reset(List_to$*mangle($input));
 	if(PyErr_Occurred()) goto fail;
+	$1 = &+tmp;
+}
+
+%typemap(in)				MAPILIST (KCHL::memory_ptr< std::remove_const< std::remove_pointer<$1_type>::type >::type > tmp)
+{
+	tmp.reset(List_to$mangle($input));
+	if(PyErr_Occurred()) goto fail;
+        $1 = tmp;
+}
+
+// use adrlist_ptr for adrlists
+
+%typemap(in) ADRLIST *INPUT (KCHL::adrlist_ptr tmp), LPADRLIST INOUT (KCHL::adrlist_ptr tmp)
+{
+        tmp.reset(List_to$mangle($input));
+        if(PyErr_Occurred()) goto fail;
+        $1 = tmp;
+}
+
+%typemap(in)				LPROWLIST
+{
+	$1 = List_to_LPROWLIST($input);
+	if(PyErr_Occurred()) goto fail;
+}
+
+%typemap(arginit) LPROWLIST
+	"$1 = NULL;"
+%typemap(freearg)	LPROWLIST
+{
+        FreeProws((LPSRowSet)$1);
+}
+
+%typemap(in)				MAPISTRUCT (KCHL::memory_ptr<std::remove_const<std::remove_pointer<$type>::type>::type> tmp)
+{
+        tmp.reset(Object_to$mangle($input));
+	if(PyErr_Occurred()) goto fail;
+        $1 = tmp;
 }
 
 %typemap(in)				SYSTEMTIME
@@ -85,17 +117,20 @@ SWIG_FromBytePtrAndSize(const unsigned char* carray, size_t size)
 	if(PyErr_Occurred()) goto fail;
 }
 
-%typemap(in)				MAPISTRUCT_W_FLAGS
+// we cannot use ulFlags during conversion, as it may not have been converted yet (use arginit for ulFlags?)
+
+%typemap(in)				MAPISTRUCT_W_FLAGS (PyObject *tmpobj)
 {
-	$1 = ($1_type)$input;
+       tmpobj = $input;
 }
 
-%typemap(check)				MAPISTRUCT_W_FLAGS
+%typemap(check)                                MAPISTRUCT_W_FLAGS (KCHL::memory_ptr<std::remove_const<std::remove_pointer<$type>::type>::type> tmp)
 {
-	$1 = Object_to$mangle((PyObject*)$1, ulFlags);
-	if(PyErr_Occurred()) {
-		%argument_fail(SWIG_ERROR,"$type",$symname, $argnum);
-	}
+       tmp.reset(Object_to$mangle(tmpobj$argnum, ulFlags));
+       if(PyErr_Occurred()) {
+               %argument_fail(SWIG_ERROR,"$type",$symname, $argnum);
+       }
+       $1 = tmp;
 }
 
 // Output
@@ -129,6 +164,12 @@ SWIG_FromBytePtrAndSize(const unsigned char* carray, size_t size)
 	if(PyErr_Occurred()) goto fail;
 }
 
+%typemap(argout)	(MAPIARRAY, LONG)
+{
+    %append_output(List_from_$1_basetype($1,$2));
+	if(PyErr_Occurred()) goto fail;
+}
+
 // Unicode
 
 // LPTSTR
@@ -148,7 +189,7 @@ SWIG_FromBytePtrAndSize(const unsigned char* carray, size_t size)
     $1 = NULL;
   else {
     if(ulFlags & MAPI_UNICODE) {
-	  if(PyUnicode_Check(o)) {
+      if(PyUnicode_Check(o)) {
 		size_t size = 0;
 		SWIG_AsWCharPtrAndSize(o, &buf, &size, &alloc);
 		$1 = buf;
@@ -157,15 +198,18 @@ SWIG_FromBytePtrAndSize(const unsigned char* carray, size_t size)
       }
     } else {
       if(PyUnicode_Check(o)) {
-        PyErr_SetString(PyExc_RuntimeError, "MAPI_UNICODE flag not passed but passed parameter is a Unicode string");
+        PyErr_SetString(PyExc_RuntimeError, "MAPI_UNICODE flag not passed but passed parameter is a unicode string");
       }
+
       char *input;
       Py_ssize_t size;
 
-      PyString_AsStringAndSize(o, &input, &size);
-      strInput.assign(input, size);
-
-      $1 = (LPTSTR)strInput.c_str();
+      if(PyString_AsStringAndSize(o, &input, &size) != -1) {
+        strInput.assign(input, size);
+        $1 = (LPTSTR)strInput.c_str();
+      }
+      else
+        %argument_fail(SWIG_ERROR,"$type",$symname, $argnum);
     }
   }
 
@@ -403,7 +447,7 @@ SWIG_FromBytePtrAndSize(const unsigned char* carray, size_t size)
 
 %apply (ULONG, MAPIARRAY) {(ULONG cElements, LPREADSTATE lpReadState), (ULONG cNotif, LPNOTIFICATION lpNotifications)};
 %apply (ULONG *OUTPUTC, MAPIARRAY *OUTPUTP) {(ULONG *OUTPUTC, LPSPropValue *OUTPUTP), (ULONG *OUTPUTC, LPMAPINAMEID **OUTPUTP)};
-%apply (MAPILIST *OUTPUT) {LPSPropTagArray *OUTPUT, LPSPropProblemArray *OUTPUT, LPSRowSet *OUTPUT};
+%apply (MAPILIST *OUTPUT) {SPropTagArray **OUTPUT, LPSPropTagArray *OUTPUT, LPSPropProblemArray *OUTPUT, LPSRowSet *OUTPUT};
 %apply MAPICLASS {IMAPISession *, IProfAdmin *, IMsgServiceAdmin *, IMAPITable *, IMsgStore *, IMAPIFolder *, IMAPITable *, IStream *, IMessage *, IAttach *, IAddrBook *}
 %apply (ULONG cbEntryID, LPENTRYID lpEntryID) {(ULONG cFolderKeySize, BYTE *lpFolderSourceKey), (ULONG cMessageKeySize, BYTE *lpMessageSourceKey), (ULONG cbInstanceKey, BYTE *pbInstanceKey), (ULONG cbCollapseState, BYTE *pbCollapseState)};
 

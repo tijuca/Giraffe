@@ -20,15 +20,7 @@
 
 #include <unicode/unistr.h>
 
-class UTF8Iterator;
-class UTF32Iterator;
-
-#if U_ICU_VERSION_MAJOR_NUM < 4 || (U_ICU_VERSION_MAJOR_NUM == 4 && U_ICU_VERSION_MINOR_NUM < 2)
-
-UnicodeString UTF8ToUnicode(const char *utf8);
-UnicodeString UTF32ToUnicode(const UChar32 *utf32);
-
-#else
+namespace KC {
 
 static inline UnicodeString UTF8ToUnicode(const char *utf8) {
 	return UnicodeString::fromUTF8(utf8);
@@ -38,9 +30,9 @@ static inline UnicodeString UTF32ToUnicode(const UChar32 *utf32) {
 	return UnicodeString::fromUTF32(utf32, -1);
 }
 
-#endif
-
 UnicodeString WCHARToUnicode(const wchar_t *str);
 UnicodeString StringToUnicode(const char *str);
+
+} /* namespace */
 
 #endif // ndef utfutil_INCLUDED

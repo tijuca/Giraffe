@@ -16,6 +16,8 @@
  */
 
 #include <kopano/platform.h>
+#include <kopano/ECRestriction.h>
+#include <kopano/memory.hpp>
 #include "ECMemTablePublic.h"
 
 #include "Mem.h"
@@ -28,37 +30,32 @@
 #include <kopano/mapiext.h>
 
 #include "ECMsgStorePublic.h"
-#include <kopano/restrictionutil.h>
 #include "favoritesutil.h"
+#include <mapiutil.h>
+
+using namespace KCHL;
 
 //FIXME: add the classname "ECMemTablePublic"
-ECMemTablePublic::ECMemTablePublic(ECMAPIFolderPublic *lpECParentFolder, SPropTagArray *lpsPropTags, ULONG ulRowPropTag) : ECMemTable(lpsPropTags, ulRowPropTag)
+ECMemTablePublic::ECMemTablePublic(ECMAPIFolderPublic *lpECParentFolder,
+    const SPropTagArray *lpsPropTags, ULONG ulRowPropTag) :
+	ECMemTable(lpsPropTags, ulRowPropTag),
+	m_lpECParentFolder(lpECParentFolder)
 {
-	m_lpECParentFolder = lpECParentFolder;
 	if (m_lpECParentFolder)
 		m_lpECParentFolder->AddRef();
-
-	m_lpShortCutAdviseSink = NULL;
-	m_lpShortcutTable = NULL;
-	m_ulFlags = 0;
-	m_ulRowId = 1;
 }
 
 ECMemTablePublic::~ECMemTablePublic(void)
 {
-	ECMAPFolderRelation::iterator	iterFolder;
-
 	if (m_lpShortcutTable)
 		m_lpShortcutTable->Release();
 
 	if (m_lpShortCutAdviseSink)
 		m_lpShortCutAdviseSink->Release();
-
-	for (iterFolder = m_mapRelation.begin(); iterFolder != m_mapRelation.end(); ++iterFolder) {
-		if (iterFolder->second.ulAdviseConnectionId > 0)
-			m_lpECParentFolder->GetMsgStore()->Unadvise(iterFolder->second.ulAdviseConnectionId);
-
-		FreeRelation(&iterFolder->second);
+	for (auto &p : m_mapRelation) {
+		if (p.second.ulAdviseConnectionId > 0)
+			m_lpECParentFolder->GetMsgStore()->Unadvise(p.second.ulAdviseConnectionId);
+		FreeRelation(&p.second);
 	}
 
 	if (m_lpECParentFolder)
@@ -68,16 +65,20 @@ ECMemTablePublic::~ECMemTablePublic(void)
 
 HRESULT ECMemTablePublic::Create(ECMAPIFolderPublic *lpECParentFolder, ECMemTablePublic **lppECMemTable)
 {
-	SizedSPropTagArray(12, sPropsHierarchyColumns) = {12, { PR_ENTRYID, PR_DISPLAY_NAME, PR_CONTENT_COUNT, PR_CONTENT_UNREAD, PR_STORE_ENTRYID, PR_STORE_RECORD_KEY, PR_STORE_SUPPORT_MASK, PR_INSTANCE_KEY, PR_RECORD_KEY, PR_ACCESS, PR_ACCESS_LEVEL, PR_CONTAINER_CLASS} };
-	ECMemTablePublic *lpMemTable = new ECMemTablePublic(lpECParentFolder, (LPSPropTagArray)&sPropsHierarchyColumns, PR_ROWID);
+	static constexpr const SizedSPropTagArray(12, sPropsHierarchyColumns) =
+		{12, {PR_ENTRYID, PR_DISPLAY_NAME, PR_CONTENT_COUNT,
+		PR_CONTENT_UNREAD, PR_STORE_ENTRYID, PR_STORE_RECORD_KEY,
+		PR_STORE_SUPPORT_MASK, PR_INSTANCE_KEY, PR_RECORD_KEY,
+		PR_ACCESS, PR_ACCESS_LEVEL, PR_CONTAINER_CLASS}};
+	ECMemTablePublic *lpMemTable = new ECMemTablePublic(lpECParentFolder,
+		sPropsHierarchyColumns, PR_ROWID);
 	return lpMemTable->QueryInterface(IID_ECMemTablePublic, reinterpret_cast<void **>(lppECMemTable));
 }
 
 HRESULT ECMemTablePublic::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECMemTable, this);
-	REGISTER_INTERFACE(IID_ECMemTablePublic, this);
-
+	REGISTER_INTERFACE2(ECMemTable, this);
+	REGISTER_INTERFACE2(ECMemTablePublic, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -95,7 +96,6 @@ static LONG __stdcall AdviseShortCutCallback(void *lpContext, ULONG cNotif,
 	}
 
 	HRESULT hr = hrSuccess;
-	LPSRowSet lpRows = NULL;
 	ECMemTablePublic *lpMemTablePublic = (ECMemTablePublic*)lpContext;
 
 	lpMemTablePublic->AddRef(); // Besure we have the object
@@ -103,51 +103,41 @@ static LONG __stdcall AdviseShortCutCallback(void *lpContext, ULONG cNotif,
 	for (ULONG i = 0; i < cNotif; ++i) {
 		if(lpNotif[i].ulEventType != fnevTableModified)
 		{
-			ASSERT(FALSE);
+			assert(false);
 			continue;
 		}
 
 		// NOTE: ignore errors at all.
 		switch (lpNotif[i].info.tab.ulTableEvent)
 		{
-			case TABLE_ROW_ADDED:
-			case TABLE_ROW_MODIFIED:
-				lpMemTablePublic->ModifyRow(&lpNotif[i].info.tab.propIndex.Value.bin, &lpNotif[i].info.tab.row);
-				break;
-			case TABLE_ROW_DELETED:
-				lpMemTablePublic->DelRow(&lpNotif[i].info.tab.propIndex.Value.bin);
-				break;
-			case TABLE_CHANGED:
-
-				lpMemTablePublic->HrClear();
-
-				hr = lpMemTablePublic->m_lpShortcutTable->SeekRow(BOOKMARK_BEGINNING, 0, NULL);
+		case TABLE_ROW_ADDED:
+		case TABLE_ROW_MODIFIED:
+			lpMemTablePublic->ModifyRow(&lpNotif[i].info.tab.propIndex.Value.bin, &lpNotif[i].info.tab.row);
+			break;
+		case TABLE_ROW_DELETED:
+			lpMemTablePublic->DelRow(&lpNotif[i].info.tab.propIndex.Value.bin);
+			break;
+		case TABLE_CHANGED:
+			lpMemTablePublic->HrClear();
+			hr = lpMemTablePublic->m_lpShortcutTable->SeekRow(BOOKMARK_BEGINNING, 0, NULL);
+			if (hr != hrSuccess)
+				continue; // Next notification
+			while(true)
+			{
+				rowset_ptr lpRows;
+				hr = lpMemTablePublic->m_lpShortcutTable->QueryRows(1, 0, &~lpRows);
 				if (hr != hrSuccess)
-					continue; // Next notification
-
-				while(true)
-				{
-					hr = lpMemTablePublic->m_lpShortcutTable->QueryRows (1, 0, &lpRows);
-					if (hr != hrSuccess)
-						break; // Next notification
-
-					if (lpRows->cRows == 0)
-						break;
-
-					lpMemTablePublic->ModifyRow(&lpRows->aRow[0].lpProps[SC_INSTANCE_KEY].Value.bin, &lpRows->aRow[0]);
-					FreeProws(lpRows);
-					lpRows = NULL;
-				}
-				break;
-
-			default:
-				break;
+					break; // Next notification
+				if (lpRows->cRows == 0)
+					break;
+				lpMemTablePublic->ModifyRow(&lpRows->aRow[0].lpProps[SC_INSTANCE_KEY].Value.bin, &lpRows->aRow[0]);
+			}
+			break;
+		default:
+			break;
 		}
 
 	}
-
-	if (lpRows)
-		FreeProws(lpRows);
 
 	lpMemTablePublic->Release();
 
@@ -157,11 +147,9 @@ static LONG __stdcall AdviseShortCutCallback(void *lpContext, ULONG cNotif,
 static LONG __stdcall AdviseFolderCallback(void *lpContext, ULONG cNotif,
     LPNOTIFICATION lpNotif)
 {
-	if (lpContext == NULL) {
+	if (lpContext == NULL)
 		return S_OK;
-	}
 
-	ECMemTablePublic::ECMAPFolderRelation::const_iterator iterFolder;
 	ECMemTablePublic *lpMemTablePublic = (ECMemTablePublic*)lpContext;
 	ULONG ulResult;
 	SBinary sInstanceKey;
@@ -171,35 +159,29 @@ static LONG __stdcall AdviseFolderCallback(void *lpContext, ULONG cNotif,
 	for (ULONG i = 0; i < cNotif; ++i) {
 		switch (lpNotif[i].ulEventType)
 		{
-			case fnevObjectModified:
-			case fnevObjectDeleted:
-				for (iterFolder = lpMemTablePublic->m_mapRelation.begin();
-				     iterFolder != lpMemTablePublic->m_mapRelation.end();
-				     ++iterFolder)
+		case fnevObjectModified:
+		case fnevObjectDeleted:
+			for (const auto &p : lpMemTablePublic->m_mapRelation)
+				if (lpMemTablePublic->m_lpECParentFolder->GetMsgStore()->CompareEntryIDs(p.second.cbEntryID, p.second.lpEntryID, lpNotif[i].info.obj.cbEntryID, lpNotif[i].info.obj.lpEntryID, 0, &ulResult) == hrSuccess && ulResult == TRUE)
 				{
-					if (lpMemTablePublic->m_lpECParentFolder->GetMsgStore()->CompareEntryIDs(iterFolder->second.cbEntryID, iterFolder->second.lpEntryID,lpNotif[i].info.obj.cbEntryID, lpNotif[i].info.obj.lpEntryID, 0, &ulResult) == hrSuccess && ulResult == TRUE)
+					sInstanceKey.cb = p.first.size();
+					sInstanceKey.lpb = reinterpret_cast<BYTE *>(const_cast<char *>(p.first.c_str()));
+
+					switch (lpNotif[i].ulEventType)
 					{
-
-						sInstanceKey.cb = iterFolder->first.size();
-						sInstanceKey.lpb = (LPBYTE)iterFolder->first.c_str();
-
-						switch (lpNotif[i].ulEventType)
-						{
-							case fnevObjectModified:
-								lpMemTablePublic->ModifyRow(&sInstanceKey, NULL);
-								TRACE_MAPI(TRACE_ENTRY, "AdviseFolderCallback", "fnevObjectModified    fnevObjectModified");
-								break;
-							case fnevObjectDeleted:
-								TRACE_MAPI(TRACE_ENTRY, "AdviseFolderCallback", "fnevObjectDeleted    fnevObjectDeleted");
-								lpMemTablePublic->DelRow(&sInstanceKey);
-								break;
-						}
-						
+					case fnevObjectModified:
+						lpMemTablePublic->ModifyRow(&sInstanceKey, NULL);
+						TRACE_MAPI(TRACE_ENTRY, "AdviseFolderCallback", "fnevObjectModified    fnevObjectModified");
+						break;
+					case fnevObjectDeleted:
+						TRACE_MAPI(TRACE_ENTRY, "AdviseFolderCallback", "fnevObjectDeleted    fnevObjectDeleted");
+						lpMemTablePublic->DelRow(&sInstanceKey);
 						break;
 					}
+					break;
 				}
-				break;
-			//TODO: Move (Unknown what to update)
+			break;
+		//TODO: Move (Unknown what to update)
 		}
 	}
 	
@@ -210,44 +192,34 @@ static LONG __stdcall AdviseFolderCallback(void *lpContext, ULONG cNotif,
 
 HRESULT ECMemTablePublic::Init(ULONG ulFlags)
 {
-	HRESULT hr = hrSuccess;
-	IMAPIFolder *lpShortcutFolder = NULL;
-	LPMAPITABLE lpShortcutTable = NULL;
-	LPSRestriction lpRestriction = NULL;
-	LPSRowSet lpRows = NULL;
-	LPSPropValue lpPropTmp = NULL;
+	object_ptr<IMAPIFolder> lpShortcutFolder;
+	object_ptr<IMAPITable> lpShortcutTable;
+	memory_ptr<SPropValue> lpPropTmp;
 	ULONG ulConnection;
 
 	m_ulFlags = ulFlags;
 
 	// Get the messages to build a folder list
-	if ( ((ECMsgStorePublic*)m_lpECParentFolder->GetMsgStore())->GetDefaultShortcutFolder(&lpShortcutFolder) == hrSuccess)
-	{
-		hr = lpShortcutFolder->GetContentsTable(ulFlags | MAPI_DEFERRED_ERRORS, &lpShortcutTable);
+	if (((ECMsgStorePublic *)m_lpECParentFolder->GetMsgStore())->GetDefaultShortcutFolder(&~lpShortcutFolder) == hrSuccess) {
+		HRESULT hr = lpShortcutFolder->GetContentsTable(ulFlags | MAPI_DEFERRED_ERRORS, &~lpShortcutTable);
 		if(hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		hr = lpShortcutTable->SetColumns(GetShortCutTagArray(), MAPI_DEFERRED_ERRORS);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		// build restriction
-		CREATE_RESTRICTION(lpRestriction);
-		CREATE_RES_AND(lpRestriction, lpRestriction, 1);
-
-		if (HrGetOneProp(&m_lpECParentFolder->m_xMAPIFolder, PR_SOURCE_KEY, &lpPropTmp) != hrSuccess)
+		if (HrGetOneProp(&m_lpECParentFolder->m_xMAPIFolder, PR_SOURCE_KEY, &~lpPropTmp) != hrSuccess)
 		{
-			CREATE_RES_NOT(lpRestriction, (&lpRestriction->res.resAnd.lpRes[0]));
-			DATA_RES_EXIST(lpRestriction, lpRestriction->res.resAnd.lpRes[0].res.resNot.lpRes[0], PR_FAV_PARENT_SOURCE_KEY);
+			hr = ECNotRestriction(ECExistRestriction(PR_FAV_PARENT_SOURCE_KEY)).RestrictTable(lpShortcutTable, MAPI_DEFERRED_ERRORS);
 		}else {
-			DATA_FP_RES_PROPERTY(lpRestriction, lpRestriction->res.resAnd.lpRes[0], RELOP_EQ, PR_FAV_PARENT_SOURCE_KEY, &m_lpECParentFolder->m_xMAPIFolder, PR_SOURCE_KEY);
+			hr = HrGetOneProp(&m_lpECParentFolder->m_xMAPIFolder, PR_SOURCE_KEY, &~lpPropTmp);
+			if (hr != hrSuccess)
+				return hr;
+			hr = ECPropertyRestriction(RELOP_EQ, PR_FAV_PARENT_SOURCE_KEY, lpPropTmp, ECRestriction::Cheap).RestrictTable(lpShortcutTable, MAPI_DEFERRED_ERRORS);
 		}
-
-		MAPIFreeBuffer(lpPropTmp);
-		lpPropTmp = NULL;
-		hr  = lpShortcutTable->Restrict(lpRestriction, MAPI_DEFERRED_ERRORS);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	
 		// No advise needed because the client disable notifications
 		// If you remove this check the webaccess favorites doesn't work.
@@ -256,84 +228,69 @@ HRESULT ECMemTablePublic::Init(ULONG ulFlags)
 
 			hr = HrAllocAdviseSink(AdviseShortCutCallback, this, &m_lpShortCutAdviseSink);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			// NOTE: the advise will destruct at release time
 			hr = lpShortcutTable->Advise(fnevTableModified, m_lpShortCutAdviseSink, &ulConnection);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 
 		while(true)
 		{
-			hr = lpShortcutTable->QueryRows (1, 0, &lpRows);
+			rowset_ptr lpRows;
+			hr = lpShortcutTable->QueryRows(1, 0, &~lpRows);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			if (lpRows->cRows == 0)
 				break;
 
 			ModifyRow(&lpRows->aRow[0].lpProps[SC_INSTANCE_KEY].Value.bin, &lpRows->aRow[0]);
-			FreeProws(lpRows);
-			lpRows = NULL;
 		}
 
 		hr = lpShortcutTable->QueryInterface(IID_IMAPITable, (void **)&m_lpShortcutTable);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-exit:
-	MAPIFreeBuffer(lpPropTmp);
-	if (lpShortcutTable)
-		lpShortcutTable->Release();
-
-	if (lpShortcutFolder)
-		lpShortcutFolder->Release();
-	MAPIFreeBuffer(lpRestriction);
-	MAPIFreeBuffer(lpPropTmp);
-	if (lpRows)
-		FreeProws(lpRows);
-
-	return hr;
+	return hrSuccess;
 }
 
 /*
 	lpInstanceKey	Instance key of the item
-	lpsRow			is a propertie array from the shortcuts
+	lpsRow		is a property array from the shortcuts
 */
 HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpProps = NULL;
+	memory_ptr<SPropValue> lpProps, lpPropsFolder;
 	ULONG cProps = 0;
 	SPropValue sKeyProp;
-	IMAPIFolder *lpFolderReal = NULL;
+	object_ptr<IMAPIFolder> lpFolderReal;
 	ULONG ulPropsFolder;
-	LPSPropValue lpPropsFolder = NULL;
 	ULONG ulObjType;
 	ULONG cbEntryID = 0;
 	ULONG cbFolderID = 0;
 	LPENTRYID lpEntryID = NULL; //Do not free this
-	LPENTRYID lpFolderID = NULL;
-	LPENTRYID lpRecordKeyID = NULL;
+	memory_ptr<ENTRYID> lpFolderID, lpRecordKeyID;
 	std::string strInstanceKey;
 	ECMAPFolderRelation::const_iterator iterRel;
 	ECKeyTable::UpdateType	ulUpdateType; 
 	ULONG ulRowId;
 	ULONG ulConnection = 0;
-	LPMAPIADVISESINK lpFolderAdviseSink = NULL;
-
-	SRestriction *lpRestriction = NULL;
-	LPSRowSet lpsRowsInternal = NULL;
+	object_ptr<IMAPIAdviseSink> lpFolderAdviseSink;
+	rowset_ptr lpsRowsInternal;
 	SPropValue sPropTmp;
 
 	t_sRelation sRelFolder = {0};
-
-	SizedSPropTagArray(11, sPropsFolderReal) = {11, { PR_ACCESS, PR_ACCESS_LEVEL, PR_STORE_ENTRYID, PR_STORE_RECORD_KEY, PR_STORE_SUPPORT_MASK, PR_ACCESS_LEVEL, PR_CONTENT_COUNT, PR_CONTENT_UNREAD, PR_CONTAINER_CLASS, PR_ENTRYID } };
+	static constexpr const SizedSPropTagArray(11, sPropsFolderReal) =
+		{11, { PR_ACCESS, PR_ACCESS_LEVEL, PR_STORE_ENTRYID,
+		PR_STORE_RECORD_KEY, PR_STORE_SUPPORT_MASK, PR_ACCESS_LEVEL,
+		PR_CONTENT_COUNT, PR_CONTENT_UNREAD, PR_CONTAINER_CLASS,
+		PR_ENTRYID}};
 
 	if (lpInstanceKey == NULL) {
-		ASSERT(FALSE);
+		assert(false);
 		hr = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	}
@@ -342,8 +299,7 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 
 	iterRel = m_mapRelation.find(strInstanceKey);
 
-	if (iterRel != m_mapRelation.end() ) {
-
+	if (iterRel != m_mapRelation.cend()) {
 		sRelFolder = iterRel->second;
 		ulRowId = sRelFolder.ulRowID;
 
@@ -356,12 +312,11 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 		ulUpdateType = ECKeyTable::TABLE_ROW_ADD;
 
 		if (lpsRow == NULL || lpsRow->lpProps[SC_FAV_PUBLIC_SOURCE_KEY].ulPropTag != PR_FAV_PUBLIC_SOURCE_KEY) {
-			ASSERT(FALSE);
+			assert(false);
 			hr = MAPI_E_INVALID_PARAMETER;
 			goto exit;
 		}
-
-		hr = ((ECMsgStorePublic*)m_lpECParentFolder->GetMsgStore())->EntryIDFromSourceKey(lpsRow->lpProps[SC_FAV_PUBLIC_SOURCE_KEY].Value.bin.cb, lpsRow->lpProps[SC_FAV_PUBLIC_SOURCE_KEY].Value.bin.lpb, 0, NULL, &cbFolderID, &lpFolderID);
+		hr = ((ECMsgStorePublic*)m_lpECParentFolder->GetMsgStore())->EntryIDFromSourceKey(lpsRow->lpProps[SC_FAV_PUBLIC_SOURCE_KEY].Value.bin.cb, lpsRow->lpProps[SC_FAV_PUBLIC_SOURCE_KEY].Value.bin.lpb, 0, NULL, &cbFolderID, &~lpFolderID);
 		if (hr != hrSuccess)
 			goto exit;
 
@@ -370,16 +325,14 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 	}
 
 	cProps = 0;
-
-	hr = MAPIAllocateBuffer(sizeof(SPropValue) * 20, (void**)&lpProps);
+	hr = MAPIAllocateBuffer(sizeof(SPropValue) * 20, &~lpProps);
 	if(hr != hrSuccess)
 		goto exit;
 
 	// Default table rows
 	lpProps[cProps].ulPropTag = PR_ROWID;
 	lpProps[cProps++].Value.ul = ulRowId;
-
-	hr = MAPIAllocateBuffer(cbEntryID, (void**)&lpRecordKeyID);
+	hr = MAPIAllocateBuffer(cbEntryID, &~lpRecordKeyID);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -388,7 +341,7 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 
 	lpProps[cProps].ulPropTag = PR_RECORD_KEY;
 	lpProps[cProps].Value.bin.cb = cbEntryID;
-	lpProps[cProps].Value.bin.lpb = (LPBYTE)lpRecordKeyID;
+	lpProps[cProps].Value.bin.lpb = reinterpret_cast<BYTE *>(lpRecordKeyID.get());
 	++cProps;
 
 	// Set this folder as parent
@@ -409,7 +362,7 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 
 	// Properties from the real folder
 	if (ulUpdateType == ECKeyTable::TABLE_ROW_ADD) {
-		hr = m_lpECParentFolder->OpenEntry(cbEntryID, lpEntryID, &IID_IMAPIFolder, MAPI_BEST_ACCESS, &ulObjType, (LPUNKNOWN *)&lpFolderReal);
+		hr = m_lpECParentFolder->OpenEntry(cbEntryID, lpEntryID, &IID_IMAPIFolder, MAPI_BEST_ACCESS, &ulObjType, &~lpFolderReal);
 		if(hr != hrSuccess)
 			goto exit;
 		
@@ -417,7 +370,7 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 		// If you remove this check the webaccess favorites doesn't work.
 		if(! (m_lpECParentFolder->GetMsgStore()->m_ulProfileFlags & EC_PROFILE_FLAGS_NO_NOTIFICATIONS) )
 		{
-			hr = HrAllocAdviseSink(AdviseFolderCallback, this, &lpFolderAdviseSink);	
+			hr = HrAllocAdviseSink(AdviseFolderCallback, this, &~lpFolderAdviseSink);	
 			if (hr != hrSuccess)
 				goto exit;
 
@@ -428,7 +381,7 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 
 	}else {
 		if (sRelFolder.lpFolder)
-			hr = sRelFolder.lpFolder->QueryInterface(IID_IMAPIFolder, (void **)&lpFolderReal);
+			hr = sRelFolder.lpFolder->QueryInterface(IID_IMAPIFolder, &~lpFolderReal);
 		else
 			hr = MAPI_E_CALL_FAILED;
 
@@ -440,17 +393,12 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 		{
 			sPropTmp.ulPropTag = PR_INSTANCE_KEY;
 			sPropTmp.Value.bin = *lpInstanceKey;
-			
-			CREATE_RESTRICTION(lpRestriction);
-			CREATE_RES_AND(lpRestriction, lpRestriction, 1);
-			
-			DATA_RES_PROPERTY(lpRestriction, lpRestriction->res.resAnd.lpRes[0], RELOP_EQ, PR_INSTANCE_KEY, &sPropTmp);
 
-			hr = m_lpShortcutTable->FindRow(lpRestriction, BOOKMARK_BEGINNING, 0);
+			hr = ECPropertyRestriction(RELOP_EQ, PR_INSTANCE_KEY, &sPropTmp, ECRestriction::Cheap)
+			     .FindRowIn(m_lpShortcutTable, BOOKMARK_BEGINNING, 0);
 			if (hr != hrSuccess)
 				goto exit;
-
-			hr = m_lpShortcutTable->QueryRows (1, 0, &lpsRowsInternal);
+			hr = m_lpShortcutTable->QueryRows(1, 0, &~lpsRowsInternal);
 			if (hr != hrSuccess)
 				goto exit;
 
@@ -470,12 +418,12 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 	}else if (lpsRow != NULL && lpsRow->cValues == SHORTCUT_NUM && lpsRow->lpProps[SC_FAV_DISPLAY_NAME].ulPropTag == PR_FAV_DISPLAY_NAME) {
 		lpProps[cProps++].Value.lpszA = lpsRow->lpProps[SC_FAV_DISPLAY_NAME].Value.lpszA;
 	} else {
-		ASSERT(FALSE);
+		assert(false);
 		hr = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	}
 
-	hr = lpFolderReal->GetProps((LPSPropTagArray)&sPropsFolderReal, m_ulFlags, &ulPropsFolder, &lpPropsFolder);
+	hr = lpFolderReal->GetProps(sPropsFolderReal, m_ulFlags, &ulPropsFolder, &~lpPropsFolder);
 	if (FAILED(hr))
 		goto exit;
 	else
@@ -489,10 +437,8 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 			lpPropsFolder[i].Value.ul &=~(MAPI_ACCESS_CREATE_HIERARCHY | MAPI_ACCESS_CREATE_ASSOCIATED);
 			lpPropsFolder[i].Value.ul |=MAPI_ACCESS_DELETE;
 		}
-
-		if (lpPropsFolder[i].ulPropTag == PR_ENTRYID) {
+		if (lpPropsFolder[i].ulPropTag == PR_ENTRYID)
 			((LPENTRYID)lpPropsFolder[i].Value.bin.lpb)->abFlags[3] = KOPANO_FAVORITE;
-		}
 
 		lpProps[cProps].ulPropTag = lpPropsFolder[i].ulPropTag;
 		lpProps[cProps++].Value = lpPropsFolder[i].Value;
@@ -537,23 +483,8 @@ HRESULT ECMemTablePublic::ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow)
 	}
 
 exit:
-	MAPIFreeBuffer(lpRecordKeyID);
-	if (lpFolderReal)
-		lpFolderReal->Release(); 
-	MAPIFreeBuffer(lpPropsFolder);
-	MAPIFreeBuffer(lpProps);
-	MAPIFreeBuffer(lpFolderID);
 	if (hr != hrSuccess && ulConnection > 0)
 		m_lpECParentFolder->GetMsgStore()->Unadvise(ulConnection);
-
-	if (lpFolderAdviseSink)
-		lpFolderAdviseSink->Release();
-
-	if (lpsRowsInternal)
-		FreeProws(lpsRowsInternal);
-
-	FREE_RESTRICTION(lpRestriction);
-
 	return hr;
 }
 
@@ -569,8 +500,7 @@ HRESULT ECMemTablePublic::DelRow(SBinary* lpInstanceKey)
 	strInstanceKey.assign((char*)lpInstanceKey->lpb, lpInstanceKey->cb);
 
 	iterRel = m_mapRelation.find(strInstanceKey);
-
-	if (iterRel == m_mapRelation.end() )
+	if (iterRel == m_mapRelation.cend())
 		return hrSuccess;
 
 	sKeyProp.ulPropTag = PR_ROWID;

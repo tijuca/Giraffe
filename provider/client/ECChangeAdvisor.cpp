@@ -16,14 +16,18 @@
  */
 
 #include <kopano/platform.h>
-
+#include <kopano/lockhelper.hpp>
+#include <kopano/memory.hpp>
 #include <kopano/ECGuid.h>
+#include <kopano/ECInterfaceDefs.h>
 #include <ECSyncLog.h>
 #include <kopano/ECDebug.h>
 #include <kopano/ECLogger.h>
 
 #include "ECChangeAdvisor.h"
 #include "ECMsgStore.h"
+
+using namespace KCHL;
 
 ULONG ECChangeAdvisor::GetSyncId(const ConnectionMap::value_type &sConnection)
 {
@@ -48,12 +52,7 @@ bool ECChangeAdvisor::CompareSyncId(const ConnectionMap::value_type &sConnection
 
 ECChangeAdvisor::ECChangeAdvisor(ECMsgStore *lpMsgStore)
 	: m_lpMsgStore(lpMsgStore)
-	, m_lpChangeAdviseSink(NULL)
-	, m_ulFlags(0)
-	, m_ulReloadId(0)
 { 
-	pthread_mutexattr_t attr;
-
 	ECSyncLog::GetLogger(&m_lpLogger);
 
 	m_lpMsgStore->AddRef();
@@ -64,16 +63,10 @@ ECChangeAdvisor::ECChangeAdvisor(ECMsgStore *lpMsgStore)
  	// WSTransport::HrGetSyncStates(....)
  	// ECChangeAdvisor::PurgeStates()
  	// ECChangeAdvisor::UpdateState(IStream * lpStream)
-
-	pthread_mutexattr_init(&attr);
-	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE_NP);
-	pthread_mutex_init(&m_hConnectionLock, &attr);
 }
 
 ECChangeAdvisor::~ECChangeAdvisor()
 {
-	ConnectionMap::const_iterator iterConnection;
-
 	if (m_ulReloadId)
 		m_lpMsgStore->lpTransport->RemoveSessionReloadCallback(m_ulReloadId);
 
@@ -86,19 +79,15 @@ ECChangeAdvisor::~ECChangeAdvisor()
 		
 	if (m_lpLogger)
 		m_lpLogger->Release();
-
-	pthread_mutex_destroy(&m_hConnectionLock);
 	m_lpMsgStore->Release();
 }
 
 HRESULT ECChangeAdvisor::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECChangeAdvisor, this);
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
-	REGISTER_INTERFACE(IID_IECChangeAdvisor, &this->m_xECChangeAdvisor);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xECChangeAdvisor);
-
+	REGISTER_INTERFACE2(ECChangeAdvisor, this);
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IECChangeAdvisor, &this->m_xECChangeAdvisor);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xECChangeAdvisor);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -115,43 +104,28 @@ HRESULT ECChangeAdvisor::QueryInterface(REFIID refiid, void **lppInterface)
 HRESULT ECChangeAdvisor::Create(ECMsgStore *lpMsgStore, ECChangeAdvisor **lppChangeAdvisor)
 {
 	HRESULT			hr = hrSuccess;
-	ECChangeAdvisor	*lpChangeAdvisor = NULL;
+	object_ptr<ECChangeAdvisor> lpChangeAdvisor;
 	BOOL			fEnhancedICS = false;
 
-	if (lpMsgStore == NULL || lppChangeAdvisor == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if (lpMsgStore->m_lpNotifyClient == NULL) {
-		hr = MAPI_E_NO_SUPPORT;
-		goto exit;
-	}
+	if (lpMsgStore == nullptr || lppChangeAdvisor == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+	if (lpMsgStore->m_lpNotifyClient == nullptr)
+		return MAPI_E_NO_SUPPORT;
 
 	hr = lpMsgStore->lpTransport->HrCheckCapabilityFlags(KOPANO_CAP_ENHANCED_ICS, &fEnhancedICS);
 	if (hr != hrSuccess)
-		goto exit;
-	if (!fEnhancedICS) {
-		hr = MAPI_E_NO_SUPPORT;
-		goto exit;
-	}
-
-	lpChangeAdvisor = new ECChangeAdvisor(lpMsgStore);
+		return hr;
+	if (!fEnhancedICS)
+		return MAPI_E_NO_SUPPORT;
+	lpChangeAdvisor.reset(new ECChangeAdvisor(lpMsgStore), false);
 	hr = lpChangeAdvisor->QueryInterface(IID_ECChangeAdvisor, (void**)lppChangeAdvisor);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpMsgStore->lpTransport->AddSessionReloadCallback(lpChangeAdvisor, &Reload, &lpChangeAdvisor->m_ulReloadId);
 	if (hr != hrSuccess)
-		goto exit;
-
-	lpChangeAdvisor = NULL;
-
-exit:
-	if (lpChangeAdvisor)
-		lpChangeAdvisor->Release();
-
-	return hr;
+		return hr;
+	lpChangeAdvisor.release();
+	return hrSuccess;
 }
 
 HRESULT ECChangeAdvisor::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError)
@@ -164,15 +138,12 @@ HRESULT ECChangeAdvisor::Config(LPSTREAM lpStream, LPGUID /*lpGUID*/,
 {
 	HRESULT					hr = hrSuccess;
 	ULONG					ulVal = 0;
-	LPENTRYLIST				lpEntryList = NULL;
+	memory_ptr<ENTRYLIST> lpEntryList;
 	ULONG					ulRead = {0};
-	ConnectionMap::const_iterator iterConnection;
 	LARGE_INTEGER			liSeekStart = {{0}};
 
-	if (lpAdviseSink == NULL && !(ulFlags & SYNC_CATCHUP)) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpAdviseSink == nullptr && !(ulFlags & SYNC_CATCHUP))
+		return MAPI_E_INVALID_PARAMETER;
 
 	// Unregister notifications
 	if (!(m_ulFlags & SYNC_CATCHUP))
@@ -192,61 +163,47 @@ HRESULT ECChangeAdvisor::Config(LPSTREAM lpStream, LPGUID /*lpGUID*/,
 	}
 
 	if (lpStream == NULL)
-		goto exit;
-
+		return hr;
 	hr = lpStream->Seek(liSeekStart, SEEK_SET, NULL);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpStream->Read(&ulVal, sizeof(ulVal), &ulRead);
 	if (hr != hrSuccess)
-		goto exit;
-	if (ulRead != sizeof(ulVal)) {
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
-	}
+		return hr;
+	if (ulRead != sizeof(ulVal))
+		return MAPI_E_CALL_FAILED;
 
 	if (ulVal > 0) {
-		hr = MAPIAllocateBuffer(sizeof *lpEntryList, (void**)&lpEntryList);
+		hr = MAPIAllocateBuffer(sizeof *lpEntryList, &~lpEntryList);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		hr = MAPIAllocateMore(ulVal * sizeof *lpEntryList->lpbin, lpEntryList, (void**)&lpEntryList->lpbin);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		lpEntryList->cValues = ulVal;
 		for (ULONG i = 0; i < lpEntryList->cValues; ++i) {
 			hr = lpStream->Read(&ulVal, sizeof(ulVal), &ulRead);
 			if (hr != hrSuccess)
-				goto exit;
-			if (ulRead != sizeof(ulVal)) {
-				hr = MAPI_E_CALL_FAILED;
-				goto exit;
-			}	
-
+				return hr;
+			if (ulRead != sizeof(ulVal))
+				return MAPI_E_CALL_FAILED;
 			hr = MAPIAllocateMore(ulVal, lpEntryList, (void**)&lpEntryList->lpbin[i].lpb);
 			if (hr != hrSuccess)
-				goto exit;
-
+				return hr;
 			lpEntryList->lpbin[i].cb = ulVal;
 			hr = lpStream->Read(lpEntryList->lpbin[i].lpb, ulVal, &ulRead);
 			if (hr != hrSuccess)
-				goto exit;
-			if (ulRead != ulVal) {
-				hr = MAPI_E_CALL_FAILED;
-				goto exit;
-			}
+				return hr;
+			if (ulRead != ulVal)
+				return MAPI_E_CALL_FAILED;
 		}
 
 		hr = AddKeys(lpEntryList);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-exit:
-	MAPIFreeBuffer(lpEntryList);
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -264,7 +221,7 @@ HRESULT ECChangeAdvisor::PurgeStates()
 	std::list<ConnectionMap::value_type>			lstObsolete;
 	std::list<ConnectionMap::value_type>::const_iterator iterObsolete;
 
-	// First get the most up to date change ids for all registered sync ids (we'll ignore the changeid's since we don't know if we actually got that far)
+	// First get the most up to date change ids for all registered sync ids (we will ignore the changeids since we don't know if we actually got that far)
 	std::transform(m_mapConnections.begin(), m_mapConnections.end(), std::back_inserter(lstSyncId), &GetSyncId);
 	hr = m_lpMsgStore->m_lpNotifyClient->UpdateSyncStates(lstSyncId, &lstSyncState);
 	if (hr != hrSuccess)
@@ -288,31 +245,23 @@ HRESULT ECChangeAdvisor::PurgeStates()
 HRESULT ECChangeAdvisor::UpdateState(LPSTREAM lpStream)
 {
 	HRESULT					hr = hrSuccess;
-	ConnectionMap::const_iterator iterConnection;
 	LARGE_INTEGER			liPos = {{0}};
 	ULARGE_INTEGER			uliSize = {{0}};
 	ULONG					ulVal = 0;
 	SyncStateMap			mapChangeId;
+	scoped_rlock lock(m_hConnectionLock);
 
-	pthread_mutex_lock(&m_hConnectionLock);
-
-	if (m_lpChangeAdviseSink == NULL && !(m_ulFlags & SYNC_CATCHUP)) {
-		hr = MAPI_E_UNCONFIGURED;
-		goto exit;
-	}
-
-	if (lpStream == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (m_lpChangeAdviseSink == NULL && !(m_ulFlags & SYNC_CATCHUP))
+		return MAPI_E_UNCONFIGURED;
+	if (lpStream == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 	hr = PurgeStates();
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// Since m_mapSyncStates are related m_mapConnection the maps should
 	// be equal in size.
-	ASSERT(m_mapConnections.size() == m_mapSyncStates.size());
+	assert(m_mapConnections.size() == m_mapSyncStates.size());
 
 	// Create the status stream
 	lpStream->Seek(liPos, STREAM_SEEK_SET, NULL);
@@ -322,21 +271,17 @@ HRESULT ECChangeAdvisor::UpdateState(LPSTREAM lpStream)
 	ulVal = (ULONG)m_mapConnections.size();
 	lpStream->Write(&ulVal, sizeof(ulVal), NULL);
 
-	for (iterConnection = m_mapConnections.begin(); iterConnection != m_mapConnections.end(); ++iterConnection) {
+	for (const auto &p : m_mapConnections) {
 		// The size of the sync state
 		ulVal = 2 * sizeof(ULONG);		// syncid, changeid
 		lpStream->Write(&ulVal, sizeof(ulVal), NULL);
 
 		// syncid
-		lpStream->Write(&iterConnection->first, sizeof(iterConnection->first), NULL);
-
+		lpStream->Write(&p.first, sizeof(p.first), NULL);
 		// changeid
-		lpStream->Write(&m_mapSyncStates[iterConnection->first], sizeof(SyncStateMap::key_type), NULL);
+		lpStream->Write(&m_mapSyncStates[p.first], sizeof(SyncStateMap::key_type), NULL);
 	}
-
-exit:
-	pthread_mutex_unlock(&m_hConnectionLock);
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECChangeAdvisor::AddKeys(LPENTRYLIST lpEntryList)
@@ -351,8 +296,7 @@ HRESULT ECChangeAdvisor::AddKeys(LPENTRYLIST lpEntryList)
 	if (lpEntryList == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 
-	pthread_mutex_lock(&m_hConnectionLock);
-
+	scoped_rlock lock(m_hConnectionLock);
 	ZLOG_DEBUG(m_lpLogger, "Adding %u keys", lpEntryList->cValues);
 	
 	for (ULONG i = 0; hr == hrSuccess && i < lpEntryList->cValues; ++i) {
@@ -384,8 +328,6 @@ HRESULT ECChangeAdvisor::AddKeys(LPENTRYLIST lpEntryList)
 		m_mapConnections.insert(listConnections.begin(), listConnections.end());
 		std::transform(listSyncStates.begin(), listSyncStates.end(), std::inserter(m_mapSyncStates, m_mapSyncStates.begin()), &ConvertSyncState);
 	}
-
-	pthread_mutex_unlock(&m_hConnectionLock);
 	return hr;
 }
 
@@ -393,7 +335,6 @@ HRESULT ECChangeAdvisor::RemoveKeys(LPENTRYLIST lpEntryList)
 {
 	HRESULT					hr = hrSuccess;
 	SSyncState				*lpsSyncState = NULL;
-	ConnectionMap::iterator	iterConnection;
 	ECLISTCONNECTION		listConnections;
 
 	if (m_lpChangeAdviseSink == NULL && !(m_ulFlags & SYNC_CATCHUP))
@@ -401,7 +342,7 @@ HRESULT ECChangeAdvisor::RemoveKeys(LPENTRYLIST lpEntryList)
 	if (lpEntryList == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 
-	pthread_mutex_lock(&m_hConnectionLock);
+	scoped_rlock lock(m_hConnectionLock);
 	
 	for (ULONG i = 0; hr == hrSuccess && i < lpEntryList->cValues; ++i) {
 		if (lpEntryList->lpbin[i].cb >= sizeof(SSyncState)) {
@@ -411,8 +352,8 @@ HRESULT ECChangeAdvisor::RemoveKeys(LPENTRYLIST lpEntryList)
 			m_mapSyncStates.erase(lpsSyncState->ulSyncId);
 
 			// Check if we even have the sync state
-			iterConnection = m_mapConnections.find(lpsSyncState->ulSyncId);
-			if (iterConnection == m_mapConnections.end())
+			auto iterConnection = m_mapConnections.find(lpsSyncState->ulSyncId);
+			if (iterConnection == m_mapConnections.cend())
 				continue;
 
 			// Unregister the sync state.
@@ -423,10 +364,7 @@ HRESULT ECChangeAdvisor::RemoveKeys(LPENTRYLIST lpEntryList)
 			m_mapConnections.erase(iterConnection);
 		}
 	}
-
-	hr = m_lpMsgStore->m_lpNotifyClient->Unadvise(listConnections);
-	pthread_mutex_unlock(&m_hConnectionLock);
-	return hr;
+	return m_lpMsgStore->m_lpNotifyClient->Unadvise(listConnections);
 }
 
 HRESULT ECChangeAdvisor::IsMonitoringSyncId(syncid_t ulSyncId)
@@ -438,23 +376,12 @@ HRESULT ECChangeAdvisor::IsMonitoringSyncId(syncid_t ulSyncId)
 
 HRESULT ECChangeAdvisor::UpdateSyncState(syncid_t ulSyncId, changeid_t ulChangeId)
 {
-	HRESULT hr = hrSuccess;
-	SyncStateMap::iterator iSyncState;
-
-	pthread_mutex_lock(&m_hConnectionLock);
-
-	iSyncState = m_mapSyncStates.find(ulSyncId);
-	if (iSyncState == m_mapSyncStates.end()) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	scoped_rlock lock(m_hConnectionLock);
+	auto iSyncState = m_mapSyncStates.find(ulSyncId);
+	if (iSyncState == m_mapSyncStates.cend())
+		return MAPI_E_INVALID_PARAMETER;
 	iSyncState->second = ulChangeId;
-
-exit:
-	pthread_mutex_unlock(&m_hConnectionLock);
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ECChangeAdvisor::Reload(void *lpParam, ECSESSIONID /*newSessionId*/)
@@ -464,16 +391,12 @@ HRESULT ECChangeAdvisor::Reload(void *lpParam, ECSESSIONID /*newSessionId*/)
 	ECLISTSYNCSTATE		listSyncStates;
 	ECLISTCONNECTION	listConnections;
 
-	if (lpParam == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpParam == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
-	pthread_mutex_lock(&lpChangeAdvisor->m_hConnectionLock);
-
+	scoped_rlock lock(lpChangeAdvisor->m_hConnectionLock);
 	if ((lpChangeAdvisor->m_ulFlags & SYNC_CATCHUP))
-		goto exit;
-
+		return hrSuccess;
 	/**
 	 * Here we will reregister all change notifications.
 	 **/
@@ -488,84 +411,17 @@ HRESULT ECChangeAdvisor::Reload(void *lpParam, ECSESSIONID /*newSessionId*/)
 	hr = lpChangeAdvisor->m_lpMsgStore->m_lpNotifyClient->Advise(listSyncStates, lpChangeAdvisor->m_lpChangeAdviseSink, &listConnections);
 	if (hr == hrSuccess)
 		lpChangeAdvisor->m_mapConnections.insert(listConnections.begin(), listConnections.end());
-
-	
-exit:
-	if (lpChangeAdvisor)
-		pthread_mutex_unlock(&lpChangeAdvisor->m_hConnectionLock);
-
 	return hr;
 }
 
 // IECChangeAdvisor interface
-ULONG ECChangeAdvisor::xECChangeAdvisor::AddRef() {
-	TRACE_MAPI(TRACE_ENTRY, "IECChangeAdvisor::AddRef", "");
-	METHOD_PROLOGUE_(ECChangeAdvisor, ECChangeAdvisor);
-	return pThis->AddRef();
-}
-
-ULONG ECChangeAdvisor::xECChangeAdvisor::Release() {
-	TRACE_MAPI(TRACE_ENTRY, "IECChangeAdvisor::Release", "");
-	METHOD_PROLOGUE_(ECChangeAdvisor, ECChangeAdvisor);
-	return pThis->Release();
-}
-
-HRESULT ECChangeAdvisor::xECChangeAdvisor::QueryInterface(REFIID refiid, void **lppInterface) {
-	TRACE_MAPI(TRACE_ENTRY, "IECChangeAdvisor::QueryInterface", "");
-	METHOD_PROLOGUE_(ECChangeAdvisor, ECChangeAdvisor);
-	return pThis->QueryInterface(refiid, lppInterface);
-}
-
-HRESULT ECChangeAdvisor::xECChangeAdvisor::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError) {
-	TRACE_MAPI(TRACE_ENTRY, "IECChangeAdvisor::GetLastError", "%s, %x", GetMAPIErrorDescription(hResult).c_str(), ulFlags);
-	METHOD_PROLOGUE_(ECChangeAdvisor, ECChangeAdvisor);
-	HRESULT hr = pThis->GetLastError(hResult, ulFlags, lppMAPIError);
-	TRACE_MAPI(TRACE_RETURN, "IECChangeAdvisor::GetLastError", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECChangeAdvisor::xECChangeAdvisor::Config(LPSTREAM lpStream,
-    LPGUID lpGUID, IECChangeAdviseSink *lpAdviseSink, ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IECChangeAdvisor::Config", "%s, %x", lpGUID ? DBGGUIDToString(*lpGUID).c_str() : "NULL", ulFlags);
-	METHOD_PROLOGUE_(ECChangeAdvisor, ECChangeAdvisor);
-	HRESULT hr = pThis->Config(lpStream, lpGUID, lpAdviseSink, ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IECChangeAdvisor::Config", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECChangeAdvisor::xECChangeAdvisor::UpdateState(LPSTREAM lpStream) {
-	TRACE_MAPI(TRACE_ENTRY, "IECChangeAdvisor::UpdateState", "");
-	METHOD_PROLOGUE_(ECChangeAdvisor, ECChangeAdvisor);
-	HRESULT hr = pThis->UpdateState(lpStream);
-	TRACE_MAPI(TRACE_RETURN, "IECChangeAdvisor::UpdateState", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECChangeAdvisor::xECChangeAdvisor::AddKeys(LPENTRYLIST lpEntryList) {
-	TRACE_MAPI(TRACE_ENTRY, "IECChangeAdvisor::AddKeys", "");
-	METHOD_PROLOGUE_(ECChangeAdvisor, ECChangeAdvisor);
-	HRESULT hr = pThis->AddKeys(lpEntryList);
-	TRACE_MAPI(TRACE_RETURN, "IECChangeAdvisor::AddKeys", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECChangeAdvisor::xECChangeAdvisor::RemoveKeys(LPENTRYLIST lpEntryList) {
-	TRACE_MAPI(TRACE_ENTRY, "IECChangeAdvisor::RemoveKeys", "");
-	METHOD_PROLOGUE_(ECChangeAdvisor, ECChangeAdvisor);
-	HRESULT hr = pThis->RemoveKeys(lpEntryList);
-	TRACE_MAPI(TRACE_RETURN, "IECChangeAdvisor::RemoveKeys", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECChangeAdvisor::xECChangeAdvisor::IsMonitoringSyncId(syncid_t ulSyncId) {
-	TRACE_MAPI(TRACE_ENTRY, "IECChangeAdvisor::IsMonitoringSyncId", "%u", ulSyncId);
-	METHOD_PROLOGUE_(ECChangeAdvisor, ECChangeAdvisor);
-	return pThis->IsMonitoringSyncId(ulSyncId);
-}
-
-HRESULT ECChangeAdvisor::xECChangeAdvisor::UpdateSyncState(syncid_t ulSyncId, changeid_t ulChangeId) {
-	TRACE_MAPI(TRACE_ENTRY, "IECChangeAdvisor::UpdateSyncState", "%u, %u", ulSyncId, ulChangeId);
-	METHOD_PROLOGUE_(ECChangeAdvisor, ECChangeAdvisor);
-	return pThis->UpdateSyncState(ulSyncId, ulChangeId);
-}
+DEF_ULONGMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, Release, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, GetLastError, (HRESULT, hResult), (ULONG, ulFlags), (LPMAPIERROR *, lppMAPIError))
+DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, Config, (LPSTREAM, lpStream), (LPGUID, lpGUID), (IECChangeAdviseSink *, lpAdviseSink), (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, UpdateState, (LPSTREAM, lpStream))
+DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, AddKeys, (LPENTRYLIST, lpEntryList))
+DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, RemoveKeys, (LPENTRYLIST, lpEntryList))
+DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, IsMonitoringSyncId, (syncid_t, ulSyncId))
+DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, UpdateSyncState, (syncid_t, ulSyncId), (changeid_t, ulChangeId))

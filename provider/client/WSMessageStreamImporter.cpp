@@ -16,6 +16,8 @@
  */
 
 #include <kopano/platform.h>
+#include <new>
+#include "SOAPUtils.h"
 #include "WSMessageStreamImporter.h"
 #include "WSUtil.h"
 #include "ECSyncSettings.h"
@@ -29,17 +31,12 @@
  */
 HRESULT WSMessageStreamSink::Create(ECFifoBuffer *lpFifoBuffer, ULONG ulTimeout, WSMessageStreamImporter *lpImporter, WSMessageStreamSink **lppSink)
 {
-	WSMessageStreamSinkPtr ptrSink;
-
 	if (lpFifoBuffer == NULL || lppSink == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 
-	try {
-		ptrSink.reset(new WSMessageStreamSink(lpFifoBuffer, ulTimeout, lpImporter));
-	} catch (const std::bad_alloc &) {
+	WSMessageStreamSinkPtr ptrSink(new(std::nothrow) WSMessageStreamSink(lpFifoBuffer, ulTimeout, lpImporter));
+	if (ptrSink == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-	}
-
 	*lppSink = ptrSink.release();
 	return hrSuccess;
 }
@@ -124,27 +121,23 @@ HRESULT WSMessageStreamImporter::Create(ULONG ulFlags, ULONG ulSyncId, ULONG cbE
 
 	lpSyncSettings = ECSyncSettings::GetInstance();
 
-	try {
-		ptrStreamImporter.reset(new WSMessageStreamImporter(ulFlags, ulSyncId, sEntryId, sFolderEntryId, bNewMessage, sConflictItems, lpTransport, lpSyncSettings->StreamBufferSize(), lpSyncSettings->StreamTimeout()));
-
-		// The following are now owned by the stream importer
-		sEntryId.__ptr = NULL;
-		sFolderEntryId.__ptr = NULL;
-		sConflictItems.Value.bin = NULL;
-	} catch (const std::bad_alloc &) {
+	ptrStreamImporter.reset(new(std::nothrow) WSMessageStreamImporter(ulFlags, ulSyncId, sEntryId, sFolderEntryId, bNewMessage, sConflictItems, lpTransport, lpSyncSettings->StreamBufferSize(), lpSyncSettings->StreamTimeout()));
+	if (ptrStreamImporter == nullptr) {
 		hr = MAPI_E_NOT_ENOUGH_MEMORY;
 		goto exit;
 	}
-
+	// The following are now owned by the stream importer
+	sEntryId.__ptr = NULL;
+	sFolderEntryId.__ptr = NULL;
+	sConflictItems.Value.bin = NULL;
 	*lppStreamImporter = ptrStreamImporter.release();
 
 exit:
-	delete[] sEntryId.__ptr;
-	delete[] sFolderEntryId.__ptr;
+	s_free(nullptr, sEntryId.__ptr);
+	s_free(nullptr, sFolderEntryId.__ptr);
 	if (sConflictItems.Value.bin)
-		delete[] sConflictItems.Value.bin->__ptr;
-	delete[] sConflictItems.Value.bin;
-
+		s_free(nullptr, sConflictItems.Value.bin->__ptr);
+	s_free(nullptr, sConflictItems.Value.bin);
 	return hr;
 }
 
@@ -156,7 +149,7 @@ HRESULT WSMessageStreamImporter::StartTransfer(WSMessageStreamSink **lppSink)
 	if (!m_threadPool.dispatch(this))
 		return MAPI_E_CALL_FAILED;
 
-	hr = WSMessageStreamSink::Create(&m_fifoBuffer, m_ulTimeout, this, &ptrSink);
+	hr = WSMessageStreamSink::Create(&m_fifoBuffer, m_ulTimeout, this, &~ptrSink);
 	if (hr != hrSuccess) {
 		m_fifoBuffer.Close(ECFifoBuffer::cfWrite);
 		return hr;
@@ -193,11 +186,11 @@ WSMessageStreamImporter::WSMessageStreamImporter(ULONG ulFlags, ULONG ulSyncId, 
 
 WSMessageStreamImporter::~WSMessageStreamImporter()
 { 
-	delete[] m_sEntryId.__ptr;
-	delete[] m_sFolderEntryId.__ptr;
+	s_free(nullptr, m_sEntryId.__ptr);
+	s_free(nullptr, m_sFolderEntryId.__ptr);
 	if (m_sConflictItems.Value.bin)
-		delete[] m_sConflictItems.Value.bin->__ptr;
-	delete[] m_sConflictItems.Value.bin;
+		s_free(nullptr, m_sConflictItems.Value.bin->__ptr);
+	s_free(nullptr, m_sConflictItems.Value.bin);
 }
 
 void WSMessageStreamImporter::run()
@@ -224,11 +217,10 @@ void WSMessageStreamImporter::run()
 	lpSoap->fmimereadclose = &StaticMTOMReadClose;
 
 	m_hr = hrSuccess;
-	if (m_ptrTransport->m_lpCmd->ns__importMessageFromStream(m_ptrTransport->m_ecSessionId, m_ulFlags, m_ulSyncId, m_sFolderEntryId, m_sEntryId, m_bNewMessage, lpsConflictItems, sStreamData, &ulResult) != SOAP_OK) {
+	if (m_ptrTransport->m_lpCmd->ns__importMessageFromStream(m_ptrTransport->m_ecSessionId, m_ulFlags, m_ulSyncId, m_sFolderEntryId, m_sEntryId, m_bNewMessage, lpsConflictItems, sStreamData, &ulResult) != SOAP_OK)
 		m_hr = MAPI_E_NETWORK_ERROR;
-	} else if (m_hr == hrSuccess) {	// Could be set from callback
+	else if (m_hr == hrSuccess) // Could be set from callback
 		m_hr = kcerr_to_mapierr(ulResult, MAPI_E_NOT_FOUND);
-	}
 
 	m_ptrTransport->UnLockSoap();
 }

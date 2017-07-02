@@ -18,8 +18,12 @@ AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_CXX
 AC_PROG_INSTALL
+AC_PROG_SED
 PKG_PROG_PKG_CONFIG
 
+PACKAGE_ABI=$($SED 's/\([[0-9]][[0-9]]*\.[[0-9]][[0-9]]*\).*/\1/' <"$srcdir/version.in")
+AC_SUBST([PACKAGE_ABI])
+AS_IF([test -z "$PACKAGE_ABI"], [AC_MSG_ERROR([Something was not right with a sed call of ours])])
 abs_top_srcdir=`cd $srcdir; pwd`
 abs_top_builddir=`pwd`
 
@@ -37,13 +41,17 @@ LIBS_system=$LIBS
 
 # check build OS
 AC_CANONICAL_HOST
-BUILDOS=""
+ZCPPFLAGS=""
 case "$host_os" in
 	openbsd*)
-		BUILDOS="-DOPENBSD"
+		BUILDOS="openbsd"
+		ZCPPFLAGS="$ZCPPFLAGS -DOPENBSD"
+		LN_TFSV="ln -fs"
 		;;
 	linux*)
-		BUILDOS="-DLINUX"
+		BUILDOS="linux"
+		ZCPPFLAGS="$ZCPPFLAGS -DLINUX"
+		LN_TFSV="ln -Tfsv"
 		;;
 esac
 
@@ -57,7 +65,7 @@ AC_SUBST([ZPHPCXXFLAGS])
 
 # default to debug mode
 # disable write-strings: too much complains about "" being 'cast' to char* (since const char* is not in the declarations) on g++-4.2 and higher
-ZCPPFLAGS="$BUILDOS -DHAVE_CONFIG_H \
+ZCPPFLAGS="$ZCPPFLAGS \
 	-I\${top_builddir}/common/include \
 	-I\${top_srcdir}/common/include \
 	-I\${top_srcdir}/m4lcommon/include \
@@ -67,9 +75,9 @@ ZCPPFLAGS="$BUILDOS -DHAVE_CONFIG_H \
 	-I\${top_srcdir}/inetmapi/include \
 	-I\${top_srcdir}/swig/include \
 	-I\${top_srcdir}/swig/python/include"
-ZCXXFLAGS="-Wall -Wmissing-declarations -Wno-write-strings"
+ZCXXFLAGS="-Wall -Wmissing-declarations"
 
-# programs that use files >2gb need 64bit file support
+# programs that use files >2GB need 64-bit file support
 LFS_CFLAGS=`getconf LFS_CFLAGS`
 ZCPPFLAGS="$ZCPPFLAGS $LFS_CFLAGS"
 
@@ -81,8 +89,10 @@ for i in "c++11" "c++0x"; do
 	AS_IF([test -n "$cxxmode"], [break])
 done
 CXXFLAGS="$CXXFLAGS_system"
-ZCXXFLAGS="$ZCXXFLAGS -std=$cxxmode"
-AC_MSG_RESULT([$cxxmode])
+AS_IF([test -n "$cxxmode"], [
+	ZCXXFLAGS="$ZCXXFLAGS -std=$cxxmode"
+	AC_MSG_RESULT([$cxxmode])
+])
 
 # disable variadic-macros: too much warning: anonymous variadic macros were introduced in C99, only on new compilers
 AC_MSG_CHECKING([whether C++ compiler understands -Wno-variadic-macros option])
@@ -93,10 +103,6 @@ else
    AC_MSG_RESULT([no])
 fi
 
-# Everything uses pthread
-# check lib, but do not set in link list, but use -pthread instead (gnu c/c++ only?)
-AC_CHECK_LIB([pthread], [pthread_create], [ZCXXFLAGS="$ZCXXFLAGS -pthread"], AC_MSG_ERROR([required library libpthread missing or unusable]))
-
 #
 # enable/disable options
 #
@@ -104,7 +110,7 @@ AC_CHECK_LIB([pthread], [pthread_create], [ZCXXFLAGS="$ZCXXFLAGS -pthread"], AC_
 AC_ARG_ENABLE([release], AS_HELP_STRING([--enable-release], [enable release mode (compile flags -O2 and no DEBUG defines)]),
   [want_release=${enableval}],[want_release=no])
 if test "$want_release" = "yes"; then
-    ZCPPFLAGS="$ZCPPFLAGS -DNDEBUG -DFORCE_CHARSET_CONVERSION"
+    ZCPPFLAGS="$ZCPPFLAGS -DNDEBUG"
     ZCXXFLAGS="$ZCXXFLAGS -O2 -fno-strict-aliasing"
 else
 # -fPIC must be present on x86_64 when -O2 isn't used
@@ -121,21 +127,28 @@ if test "$want_unicode" = "yes"; then
 fi
 AC_SUBST([SWIG_FLAGS])
 
-AC_ARG_ENABLE([tcmalloc], AS_HELP_STRING([--enable-tcmalloc], [enable use of tcmalloc minimal lib]),
-  [want_tcmalloc=${enableval}],[want_tcmalloc=no])
-
+AS_IF([test "$BUILDOS" = "linux"], [
 AC_MSG_CHECKING([specified Linux distribution name])
-AC_ARG_WITH([distro], AS_HELP_STRING([--with-distro], [set distribution name, used for sysconfig and initscripts only. available: rhel, alt, suse or sles]),
+AC_ARG_WITH([distro], AS_HELP_STRING([--with-distro], [set distribution name, used for sysconfig and initscripts only. available: rhel, suse or sles]),
   [with_distro=${withval}],[with_distro=rhel])
 if test "$with_distro" != "rhel" -a "$with_distro" != "suse" -a \
-   "$with_distro" != "sles" -a "$with_distro" != "alt" -a \
-   "$with_distro" != "cbs4" -a "$with_distro" != "debian"; then
+   "$with_distro" != "sles" -a "$with_distro" != "cbs4" -a \
+   "$with_distro" != "debian"; then
 	AC_MSG_ERROR([unknown distro])
 else
 	AC_MSG_RESULT([using $with_distro])
 fi
 DISTRO=$with_distro
+],
+[test "$BUILDOS" = "openbsd"], [DISTRO="openbsd"]
+)
 AC_SUBST(DISTRO)
+
+dnl These are the only two I will allow to edit LIBS
+AC_ARG_WITH([asan], AS_HELP_STRING([--with-asan], [Activate Address Sanitizer]),
+	[ZCXXFLAGS="$ZCXXFLAGS -fsanitize=address"])
+AC_ARG_WITH([ubsan], AS_HELP_STRING([--with-ubsan], [Activate Undefined Behavior Sanitizer]),
+	[ZCXXFLAGS="$ZCXXFLAGS -fsanitize=undefined"])
 
 AC_ARG_ENABLE([debug], AS_HELP_STRING([--enable-debug], [enable debug mode (Adds debug code)]),
   [want_debug=${enableval}],[want_debug=no])
@@ -311,8 +324,9 @@ AM_CONDITIONAL([WITH_XML2], [test "$XML2_CONFIG" != "" -a -x "`which $XML2_CONFI
 
 # Checks for MySQL 4.1 or better
 AC_DEFUN([MYSQL_WITH_MYSQL_CONFIG],[
+  AC_PATH_PROGS([MYSQL_CONFIG], [mysql_config mariadb_config])
   AC_ARG_WITH([mysql-config], AS_HELP_STRING([--with-mysql-config=PATH], [path to the mysql-config script of mysql 4.1]),
-    [MYSQL_CONFIG=${withval}],[MYSQL_CONFIG=mysql_config])
+    [MYSQL_CONFIG="$withval"])
 
   AC_ARG_ENABLE([embedded-mysql], AS_HELP_STRING([--enable-embedded-mysql], [Compile server with the embedded MySQL server]),
   [
@@ -415,19 +429,6 @@ CXXFLAGS="$CXXFLAGS_system $ZCXXFLAGS"
 LDFLAGS="$LDFLAGS_system $ZLDFLAGS"
 AC_CHECK_FUNCS([pthread_getname_np])
 
-VMIME_CFLAGS=""
-VMIME_LIBS="-lvmime"
-
-AC_ARG_WITH(vmime-prefix,
-  AS_HELP_STRING([--with-vmime-prefix=PATH], [libvmime prefix, e.g. /usr/local, default /usr]),
-  [
-  VMIME_PREFIX="$withval"
-  VMIME_CFLAGS="$VMIME_CFLAGS -I$VMIME_PREFIX/include"
-  VMIME_LIBS="$VMIME_LIBS -L$VMIME_PREFIX/lib -L$VMIME_PREFIX/lib64 -R$VMIME_PREFIX/lib -R$VMIME_PREFIX/lib64"
-  ])
-AC_SUBST(VMIME_CFLAGS)
-AC_SUBST(VMIME_LIBS)
-
 dnl Stupid gsoap not abstracting properly! If our -Ds do not match with what
 dnl gsoap was compiled with, we are in trouble.
 GSOAP_CFLAGS="-DWITH_OPENSSL -DWITH_GZIP -DHAVE_OPENSSL_SSL_H -DHAVE_ZLIB_H"
@@ -436,7 +437,7 @@ AC_SUBST(GSOAP_CFLAGS)
 AC_SUBST(GSOAP_LIBS)
 
 ICAL_CFLAGS=""
-ICAL_LIBS="-lical -licalss"
+ICAL_LIBS="-lical -licalss -licalvcal"
 AC_ARG_WITH(ical-prefix,
   AS_HELP_STRING([--with-ical-prefix=PATH], [libical prefix, e.g. /usr/local, default /usr]),
   [
@@ -448,13 +449,16 @@ AC_ARG_WITH(ical-prefix,
 AC_SUBST(ICAL_CFLAGS)
 AC_SUBST(ICAL_LIBS)
 
-if test "$want_tcmalloc" = "yes"; then
-	PKG_CHECK_MODULES([TCMALLOC], [libtcmalloc_minimal])
-	CPPFLAGS="$CPPFLAGS $TCMALLOC_CFLAGS"
-	AC_CHECK_HEADERS([gperftools/malloc_extension.h google/malloc_extension.h])
-	CPPFLAGS="$CPPFLAGS_system"
-	AC_DEFINE(HAVE_TCMALLOC, [1], [Google TCMalloc enabled])
-fi
+PKG_CHECK_MODULES([curl], [libcurl], [], [:])
+CPPFLAGS="$CPPFLAGS $curl_CFLAGS"
+AC_CHECK_HEADERS([curl/curl.h])
+CPPFLAGS="$CPPFLAGS_system"
+PKG_CHECK_MODULES([TCMALLOC], [libtcmalloc_minimal], [], [:])
+CPPFLAGS="$CPPFLAGS $TCMALLOC_CFLAGS"
+AC_CHECK_HEADERS([gperftools/malloc_extension.h google/malloc_extension.h])
+CPPFLAGS="$CPPFLAGS_system"
+PKG_CHECK_MODULES([VMIME], [vmime >= 0.9.2])
+
 
 #
 # Check for user plugin required libraries
@@ -663,12 +667,6 @@ EPOLL_CFLAGS=
 fi
 AC_SUBST(EPOLL_CFLAGS)
 
-# Boost
-BOOST_REQUIRE([1.35])
-BOOST_SMART_PTR
-BOOST_FILESYSTEM([mt])
-BOOST_DATE_TIME([mt])
-
 dnl The "Locale" class is in icu-uc.
 dnl The "CollationKey" class is in icu-i18n.
 req_icu_uc="icu-uc"
@@ -711,7 +709,7 @@ AS_IF([test "$want_icu" = "yes" && test "$have_icu" = 0], [
 	AC_MSG_ERROR([ICU was requested but not found])
 ])
 AS_IF([test "$have_icu" != 0], [
-	AC_DEFINE([ZCP_USES_ICU], [1], [Defined if ZCP was built with ICU])
+	AC_DEFINE([KC_USES_ICU], [1], [Defined if KC was built with ICU])
 ])
 AM_CONDITIONAL([HAVE_ICU], [test "$have_icu" -ne 0])
 ZCPPFLAGS="$ZCPPFLAGS $icu_uc_CFLAGS $icu_i18n_CFLAGS"
@@ -731,7 +729,6 @@ AC_SUBST([AM_CXXFLAGS])
 AC_SUBST([AM_LDFLAGS])
 
 
-AC_PATH_PROG(PROG_XMLTO, xmlto)	# not an error if not found, just no manual pages
 AC_PATH_PROG(PROG_ANT, ant)		# not an error if not found, no 'make dist' (waxt package)
 AC_PATH_PROG([SWIG_EXEC], [swig])
 AS_IF([test "x$SWIG_EXEC" = "x"], [AC_MSG_ERROR([Cannot find swig binary])])
@@ -746,26 +743,18 @@ AC_SUBST([PYTHON_INCLUDES])
 # Output files
 #
 AC_CONFIG_FILES([Makefile
-		mapi4linux/Makefile
 		mapi4linux/include/Makefile
-		mapi4linux/src/Makefile
-		m4lcommon/Makefile
 		m4lcommon/include/kopano/Makefile
-		php-ext/Makefile php7-ext/Makefile
-		provider/Makefile
 		provider/include/Makefile
-		inetmapi/Makefile
 		inetmapi/include/inetmapi/Makefile
-		spooler/Makefile
 		spooler/python/Makefile
 		spooler/python/plugins/Makefile
-		common/Makefile
 		common/include/kopano/Makefile
-		ECtools/Makefile
 		ECtools/archiver/include/kopano/Makefile
 		ECtools/backup/Makefile
 		ECtools/presence/Makefile
 		ECtools/search/Makefile
+		ECtools/migration-pst/Makefile
 		installer/Makefile
 		installer/linux/Makefile
 		installer/userscripts/Makefile
@@ -784,29 +773,30 @@ AC_CONFIG_FILES([Makefile
 		installer/quotamail/Makefile
 		installer/searchscripts/Makefile
 		po/Makefile
-		doc/Makefile
-		gateway/Makefile
-		libfreebusy/Makefile
-		libicalmapi/Makefile
-		caldav/Makefile
 		swig/Makefile
 		swig/include/kopano/Makefile
-		swig/python/Makefile
+		swig/python/Makefile swig/python/python.sym
 		swig/python/include/kopano/Makefile
 		swig/python/kopano/Makefile
 		swig/python/zarafa/Makefile
-		libsync/Makefile
-
-		common/kopano.pc
+		common/kopano.pc common/libkcmapi.sym common/libkcutil.sym
 		default.sym
 		mapi4linux/src/libmapi.sym
+		mapi4linux/src/libkchl.sym
+		provider/plugin.sym provider/provider.sym
+		provider/libkcserver.sym provider/libkcsoap.sym
 		version
-		specialbuild
 ])
-dnl non-oss files
+
+# Python tools
+
+AC_CONFIG_FILES([ECtools/search/kopano-search], [chmod +x ECtools/search/kopano-search])
+AC_CONFIG_FILES([ECtools/backup/kopano-backup], [chmod +x ECtools/backup/kopano-backup])
+AC_CONFIG_FILES([ECtools/presence/kopano-presence], [chmod +x ECtools/presence/kopano-presence])
+AC_CONFIG_FILES([ECtools/migration-pst/kopano-migration-pst], [chmod +x ECtools/migration-pst/kopano-migration-pst])
 
 AC_OUTPUT
-ln -Tfsv "${abs_top_srcdir}" "@"
+$LN_TFSV "$abs_top_srcdir" "@"
 
 AC_MSG_RESULT([
 Install prefix	:	$prefix
@@ -837,7 +827,6 @@ ICal flags	:	$ICAL_CFLAGS
 ICal libs	:	$ICAL_LIBS
 ncurses libs	:	$NCURSES_LIBS
 Clients libs	:	$PROG_LIBS
-xmlto	 	:	$PROG_XMLTO
 LDAP support	:	$want_ldap
 LDAP flags	:	$LDAP_FLAGS
 LDAP libs	:	$LDAP_LIBS
@@ -846,10 +835,6 @@ Pam libs	:	$PAM_LIBS
 Krb5 libs	:	$KRB5_LIBS
 TCMalloc lib	:	$TCMALLOC_LIBS
 S3 lib		:	$s3_LIBS
-Boost		:
- Flags		:	$BOOST_CPPFLAGS
- FS ldflags	:	$BOOST_FILESYSTEM_LDFLAGS
- FS libs	:	$BOOST_FILESYSTEM_LIBS
 ICU libs	:	$icu_uc_LIBS $icu_i18n_LIBS
 Python flags	:	$PYTHON_INCLUDES
 Python libs	:	$PYTHON_LIBS

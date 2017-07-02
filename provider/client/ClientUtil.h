@@ -22,69 +22,11 @@
 #include <string>
 #include <kopano/ECTags.h>
 #include <edkmdb.h>
-#include <kopano/tstring.h>
+#include <kopano/zcdefs.h>
 
 class WSTransport;
 
-// Indexes of sptaKopanoProfile property array
-enum ePropOurProfileColumns
-{
-	PZP_EC_PATH,
-	PZP_PR_PROFILE_NAME,
-	PZP_EC_USERNAME_A,
-	PZP_EC_USERNAME_W,
-	PZP_EC_USERPASSWORD_A,
-	PZP_EC_USERPASSWORD_W,
-	PZP_EC_IMPERSONATEUSER_A,
-	PZP_EC_IMPERSONATEUSER_W,
-	PZP_EC_FLAGS,
-	PZP_EC_SSLKEY_FILE,
-	PZP_EC_SSLKEY_PASS,
-	PZP_EC_PROXY_HOST,
-	PZP_EC_PROXY_PORT,
-	PZP_EC_PROXY_USERNAME,
-	PZP_EC_PROXY_PASSWORD,
-	PZP_EC_PROXY_FLAGS,
-	PZP_EC_CONNECTION_TIMEOUT,
-	PZP_EC_OFFLINE_PATH_A,
-	PZP_EC_OFFLINE_PATH_W,
-	PZP_PR_SERVICE_NAME,
-	PZP_EC_STATS_SESSION_CLIENT_APPLICATION_VERSION,
-	PZP_EC_STATS_SESSION_CLIENT_APPLICATION_MISC,
-	NUM_KOPANOPROFILE_PROPS		// Array size
-};
-
-// profile properties
-const static SizedSPropTagArray(NUM_KOPANOPROFILE_PROPS, sptaKopanoProfile) = {
-	NUM_KOPANOPROFILE_PROPS,
-	{
-		PR_EC_PATH,
-		PR_PROFILE_NAME_A,
-		PR_EC_USERNAME_A,
-		PR_EC_USERNAME_W,
-		PR_EC_USERPASSWORD_A,
-		PR_EC_USERPASSWORD_W,
-		PR_EC_IMPERSONATEUSER_A,
-		PR_EC_IMPERSONATEUSER_W,
-		PR_EC_FLAGS,
-		PR_EC_SSLKEY_FILE,
-		PR_EC_SSLKEY_PASS,
-		PR_EC_PROXY_HOST,
-		PR_EC_PROXY_PORT,
-		PR_EC_PROXY_USERNAME,
-		PR_EC_PROXY_PASSWORD,
-		PR_EC_PROXY_FLAGS,
-		PR_EC_CONNECTION_TIMEOUT,
-		PR_EC_OFFLINE_PATH_A,
-		PR_EC_OFFLINE_PATH_W,
-		PR_SERVICE_NAME,
-		PR_EC_STATS_SESSION_CLIENT_APPLICATION_VERSION,
-		PR_EC_STATS_SESSION_CLIENT_APPLICATION_MISC
-	}
-};
-
-struct sGlobalProfileProps
-{
+struct sGlobalProfileProps {
 	std::string		strServerPath;
 	std::string		strProfileName;
 	std::wstring		strUserName;
@@ -105,7 +47,7 @@ struct sGlobalProfileProps
 	std::string		strClientAppMisc;
 };
 
-class ClientUtil {
+class ClientUtil _kc_final {
 public:
 	static HRESULT	HrInitializeStatusRow (const char * lpszProviderDisplay, ULONG ulResourceType, LPMAPISUP lpMAPISup, LPSPropValue lpspvIdentity, ULONG ulFlags);
 	static HRESULT	HrSetIdentity(WSTransport *lpTransport, LPMAPISUP lpMAPISup, LPSPropValue* lppIdentityProps);

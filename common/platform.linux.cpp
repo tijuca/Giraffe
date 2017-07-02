@@ -140,6 +140,8 @@ void Sleep(unsigned int msec) {
 	nanosleep(&ts, NULL);
 }
 
+namespace KC {
+
 static void rand_fail(void)
 {
 	fprintf(stderr, "Cannot access/use /dev/urandom, this is fatal (%s)\n", strerror(errno));
@@ -208,11 +210,15 @@ char * get_password(const char *prompt) {
 	return getpass(prompt);
 }
 
+} /* namespace */
+
 HGLOBAL GlobalAlloc(UINT uFlags, ULONG ulSize)
 {
 	// always returns NULL, as required by CreateStreamOnHGlobal implementation in mapi4linux/src/mapiutil.cpp
 	return NULL;
 }
+
+namespace KC {
 
 time_t GetProcessTime()
 {
@@ -222,134 +228,6 @@ time_t GetProcessTime()
 
 	return t;
 }
-
-#if DEBUG_PTHREADS
-
-class Lock _zcp_final {
-public:
-	Lock() : locks(0), busy(0), dblTime(0) {}
-       ~Lock() {};
-
-       std::string strLocation;
-       unsigned int locks;
-       unsigned int busy;
-       double dblTime;
-};
-
-static std::map<std::string, Lock> my_pthread_map;
-static pthread_mutex_t my_mutex;
-static int init = 0;
-
-#undef pthread_mutex_lock
-int my_pthread_mutex_lock(const char *file, unsigned int line, pthread_mutex_t *__mutex)
-{
-       char s[1024];
-       snprintf(s, sizeof(s), "%s:%d", file, line);
-       double dblTime;
-       int err = 0;
-
-       if(!init) {
-               init = 1;
-               pthread_mutex_init(&my_mutex, NULL);
-       }
-
-       pthread_mutex_lock(&my_mutex);
-       my_pthread_map[s].strLocation = s;
-       ++my_pthread_map[s].locks;
-       pthread_mutex_unlock(&my_mutex);
-
-       if(( err = pthread_mutex_trylock(__mutex)) == EBUSY) {
-               pthread_mutex_lock(&my_mutex);
-               ++my_pthread_map[s].busy;
-               pthread_mutex_unlock(&my_mutex);
-               dblTime = GetTimeOfDay();
-               err = pthread_mutex_lock(__mutex);
-               pthread_mutex_lock(&my_mutex);
-               my_pthread_map[s].dblTime += GetTimeOfDay() - dblTime;
-               pthread_mutex_unlock(&my_mutex);
-       }
-
-       return err;
-}
-
-#undef pthread_rwlock_rdlock
-int my_pthread_rwlock_rdlock(const char *file, unsigned int line, pthread_rwlock_t *__mutex)
-{
-       char s[1024];
-       snprintf(s, sizeof(s), "%s:%d", file, line);
-       double dblTime;
-       int err = 0;
-
-       if(!init) {
-               init = 1;
-               pthread_mutex_init(&my_mutex, NULL);
-       }
-
-       pthread_mutex_lock(&my_mutex);
-       my_pthread_map[s].strLocation = s;
-       ++my_pthread_map[s].locks;
-       pthread_mutex_unlock(&my_mutex);
-
-       if(( err = pthread_rwlock_tryrdlock(__mutex)) == EBUSY) {
-               pthread_mutex_lock(&my_mutex);
-               ++my_pthread_map[s].busy;
-               pthread_mutex_unlock(&my_mutex);
-               dblTime = GetTimeOfDay();
-               err = pthread_rwlock_rdlock(__mutex);
-               pthread_mutex_lock(&my_mutex);
-               my_pthread_map[s].dblTime += GetTimeOfDay() - dblTime;
-               pthread_mutex_unlock(&my_mutex);
-       }
-
-       return err;
-}
-
-#undef pthread_rwlock_wrlock
-int my_pthread_rwlock_wrlock(const char *file, unsigned int line, pthread_rwlock_t *__mutex)
-{
-       char s[1024];
-       snprintf(s, sizeof(s), "%s:%d", file, line);
-       double dblTime;
-       int err = 0;
-
-       if(!init) {
-               init = 1;
-               pthread_mutex_init(&my_mutex, NULL);
-       }
-
-       pthread_mutex_lock(&my_mutex);
-       my_pthread_map[s].strLocation = s;
-       ++my_pthread_map[s].locks;
-       pthread_mutex_unlock(&my_mutex);
-
-       if(( err = pthread_rwlock_trywrlock(__mutex)) == EBUSY) {
-               pthread_mutex_lock(&my_mutex);
-               ++my_pthread_map[s].busy;
-               pthread_mutex_unlock(&my_mutex);
-               dblTime = GetTimeOfDay();
-               err = pthread_rwlock_wrlock(__mutex);
-               pthread_mutex_lock(&my_mutex);
-               my_pthread_map[s].dblTime += GetTimeOfDay() - dblTime;
-               pthread_mutex_unlock(&my_mutex);
-       }
-
-       return err;
-}
-
-std::string dump_pthread_locks()
-{
-	std::map<std::string, Lock>::const_iterator i;
-       std::string strLog;
-       char s[2048];
-
-       for (i = my_pthread_map.begin(); i!= my_pthread_map.end(); ++i) {
-               snprintf(s,sizeof(s), "%s\t\t%d\t\t%d\t\t%f\n", i->second.strLocation.c_str(), i->second.locks, i->second.busy, (float)i->second.dblTime);
-               strLog += s;
-       }
-
-       return strLog;
-}
-#endif
 
 std::vector<std::string> get_backtrace(void)
 {
@@ -375,8 +253,8 @@ static void dump_fdtable_summary(pid_t pid)
 	if (dh == NULL)
 		return;
 	std::string msg;
-	struct dirent de_space, *de = NULL;
-	while (readdir_r(dh, &de_space, &de) == 0 && de != NULL) {
+	struct dirent *de;
+	while ((de = readdir(dh)) != nullptr) {
 		if (de->d_type != DT_LNK)
 			continue;
 		std::string de_name(std::string(procdir) + "/" + de->d_name);
@@ -408,8 +286,11 @@ static void dump_fdtable_summary(pid_t pid)
  */
 int ec_relocate_fd(int fd)
 {
-	static const int typical_limit = 1024;
+	static constexpr const int typical_limit = 1024;
 
+	if (fd >= typical_limit)
+		/* No action needed */
+		return fd;
 	int relocated = fcntl(fd, F_DUPFD, typical_limit);
 	if (relocated >= 0) {
 		close(fd);
@@ -437,3 +318,5 @@ int ec_relocate_fd(int fd)
 	dump_fdtable_summary(getpid());
 	return fd;
 }
+
+} /* namespace */

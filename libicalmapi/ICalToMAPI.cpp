@@ -14,8 +14,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <kopano/zcdefs.h>
+#include <memory>
+#include <new>
 #include <kopano/platform.h>
+#include <kopano/ECRestriction.h>
+#include <kopano/memory.hpp>
 #include "ICalToMAPI.h"
 #include "vconverter.h"
 #include "vtimezone.h"
@@ -27,13 +31,19 @@
 #include <mapix.h>
 #include <mapiutil.h>
 #include <kopano/mapiext.h>
-#include <kopano/restrictionutil.h>
 #include <libical/ical.h>
 #include <algorithm>
 #include <vector>
+#include <kopano/stringutil.h>
 #include <kopano/charset/convert.h>
+#include <mapi.h>
+#include "icalmem.hpp"
 
-class ICalToMapiImpl : public ICalToMapi {
+using namespace KCHL;
+
+namespace KC {
+
+class ICalToMapiImpl _kc_final : public ICalToMapi {
 public:
 	/*
 	    - lpPropObj to lookup named properties
@@ -42,21 +52,20 @@ public:
 	ICalToMapiImpl(IMAPIProp *lpPropObj, LPADRBOOK lpAdrBook, bool bNoRecipients);
 	virtual ~ICalToMapiImpl();
 
-	HRESULT ParseICal(const std::string& strIcal, const std::string& strCharset, const std::string& strServerTZ, IMailUser *lpMailUser, ULONG ulFlags);
-	ULONG GetItemCount();
-	HRESULT GetItemInfo(ULONG ulPosition, eIcalType *lpType, time_t *lptLastModified, SBinary *lpUid);
-	HRESULT GetItem(ULONG ulPosition, ULONG ulFlags, LPMESSAGE lpMessage);
-	HRESULT GetFreeBusyInfo(time_t *lptstart, time_t *lptend, std::string *lpstrUId, std::list<std::string> **lplstUsers);
+	HRESULT ParseICal(const std::string& strIcal, const std::string& strCharset, const std::string& strServerTZ, IMailUser *lpMailUser, ULONG ulFlags) _kc_override;
+	ULONG GetItemCount(void) _kc_override;
+	HRESULT GetItemInfo(ULONG ulPosition, eIcalType *lpType, time_t *lptLastModified, SBinary *lpUid) _kc_override;
+	HRESULT GetItem(ULONG ulPosition, ULONG ulFlags, LPMESSAGE lpMessage) _kc_override;
+	HRESULT GetFreeBusyInfo(time_t *lptstart, time_t *lptend, std::string *lpstrUId, std::list<std::string> **lplstUsers) _kc_override;
 
 private:
 	void Clean();
 
 	HRESULT SaveAttendeesString(const std::list<icalrecip> *lplstRecip, LPMESSAGE lpMessage);
-	HRESULT SaveProps(const std::list<SPropValue> *lpPropList, LPMAPIPROP lpMapiProp);
+	HRESULT SaveProps(const std::list<SPropValue> *lpPropList, IMAPIProp *, unsigned int flags = 0);
 	HRESULT SaveRecipList(const std::list<icalrecip> *lplstRecip, ULONG ulFlag, LPMESSAGE lpMessage);
-	LPSPropTagArray m_lpNamedProps;
-	ULONG m_ulErrorCount;
-
+	SPropTagArray *m_lpNamedProps = nullptr;
+	ULONG m_ulErrorCount = 0;
 	TIMEZONE_STRUCT ttServerTZ;
 	std::string strServerTimeZone;
 
@@ -66,9 +75,9 @@ private:
 	std::vector<icalitem*> m_vMessages;
 
 	// freebusy information
-	bool m_bHaveFreeBusy;
-	time_t m_tFbStart;
-	time_t m_tFbEnd;
+	bool m_bHaveFreeBusy = false;
+	time_t m_tFbStart = 0;
+	time_t m_tFbEnd = 0;
 	std::string m_strUID;
 	std::list<std::string> m_lstUsers;
 };
@@ -83,13 +92,11 @@ private:
  */
 HRESULT CreateICalToMapi(IMAPIProp *lpPropObj, LPADRBOOK lpAdrBook, bool bNoRecipients, ICalToMapi **lppICalToMapi)
 {
-	if (!lpPropObj || !lpAdrBook || !lppICalToMapi)
+	if (lpPropObj == nullptr || lppICalToMapi == nullptr)
 		return MAPI_E_INVALID_PARAMETER;
-	try {
-		*lppICalToMapi = new ICalToMapiImpl(lpPropObj, lpAdrBook, bNoRecipients);
-	} catch (...) {
+	*lppICalToMapi = new(std::nothrow) ICalToMapiImpl(lpPropObj, lpAdrBook, bNoRecipients);
+	if (*lppICalToMapi == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-	}
 	return hrSuccess;
 }
 
@@ -102,7 +109,6 @@ HRESULT CreateICalToMapi(IMAPIProp *lpPropObj, LPADRBOOK lpAdrBook, bool bNoReci
  */
 ICalToMapiImpl::ICalToMapiImpl(IMAPIProp *lpPropObj, LPADRBOOK lpAdrBook, bool bNoRecipients) : ICalToMapi(lpPropObj, lpAdrBook, bNoRecipients)
 {
-	m_lpNamedProps = NULL;
 	memset(&ttServerTZ, 0, sizeof(TIMEZONE_STRUCT));
 }
 
@@ -123,11 +129,11 @@ ICalToMapiImpl::~ICalToMapiImpl()
 void ICalToMapiImpl::Clean()
 {
 	m_ulErrorCount = 0;
-	for (std::vector<icalitem *>::const_iterator i = m_vMessages.begin(); i != m_vMessages.end(); ++i) {
-		if ((*i)->lpRecurrence)
-			delete (*i)->lpRecurrence;
-		MAPIFreeBuffer((*i)->base);
-		delete (*i);
+	for (const auto i : m_vMessages) {
+		if (i->lpRecurrence != NULL)
+			delete i->lpRecurrence;
+		MAPIFreeBuffer(i->base);
+		delete i;
 	}
 	m_vMessages.clear();
 
@@ -154,8 +160,7 @@ void ICalToMapiImpl::Clean()
 HRESULT ICalToMapiImpl::ParseICal(const std::string& strIcal, const std::string& strCharset, const std::string& strServerTZparam, IMailUser *lpMailUser, ULONG ulFlags)
 {
 	HRESULT hr = hrSuccess;
-	VConverter *lpVEC = NULL;
-	icalcomponent *lpicCalendar = NULL;
+	icalcomp_ptr lpicCalendar;
 	icalcomponent *lpicComponent = NULL;
 	TIMEZONE_STRUCT ttTimeZone = {0};
 	timezone_map tzMap;
@@ -167,83 +172,74 @@ HRESULT ICalToMapiImpl::ParseICal(const std::string& strIcal, const std::string&
 	if (m_lpNamedProps == NULL) {
 		hr = HrLookupNames(m_lpPropObj, &m_lpNamedProps);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 
 	icalerror_clear_errno();
-
-	lpicCalendar = icalparser_parse_string(strIcal.c_str());
+	lpicCalendar.reset(icalparser_parse_string(strIcal.c_str()));
 
 	if (lpicCalendar == NULL || icalerrno != ICAL_NO_ERROR) {
 		switch (icalerrno) {
 		case ICAL_BADARG_ERROR:
 		case ICAL_USAGE_ERROR:
-			hr = MAPI_E_INVALID_PARAMETER;
-			break;
+			return MAPI_E_INVALID_PARAMETER;
 		case ICAL_NEWFAILED_ERROR:
 		case ICAL_ALLOCATION_ERROR:
-			hr = MAPI_E_NOT_ENOUGH_MEMORY;
-			break;
+			return MAPI_E_NOT_ENOUGH_MEMORY;
 		case ICAL_MALFORMEDDATA_ERROR:
-			hr = MAPI_E_CORRUPT_DATA;
-			break;
+			return MAPI_E_CORRUPT_DATA;
 		case ICAL_FILE_ERROR:
-			hr = MAPI_E_DISK_ERROR;
-			break;
+			return MAPI_E_DISK_ERROR;
 		case ICAL_UNIMPLEMENTED_ERROR:
-			hr = E_NOTIMPL;
-			break;
+			return E_NOTIMPL;
 		case ICAL_UNKNOWN_ERROR:
 		case ICAL_PARSE_ERROR:
 		case ICAL_INTERNAL_ERROR:
 		case ICAL_NO_ERROR:
-			hr = MAPI_E_CALL_FAILED;
-			break;
-		};
-		goto exit;
+			return MAPI_E_CALL_FAILED;
+		}
+		return hrSuccess;
 	}
 
-	if (icalcomponent_isa(lpicCalendar) != ICAL_VCALENDAR_COMPONENT && icalcomponent_isa(lpicCalendar) != ICAL_XROOT_COMPONENT) {
-		hr = MAPI_E_INVALID_OBJECT;
-		goto exit;
-	}
+	if (icalcomponent_isa(lpicCalendar.get()) != ICAL_VCALENDAR_COMPONENT &&
+	    icalcomponent_isa(lpicCalendar.get()) != ICAL_XROOT_COMPONENT)
+		return MAPI_E_INVALID_OBJECT;
 
-	m_ulErrorCount = icalcomponent_count_errors(lpicCalendar);
+	m_ulErrorCount = icalcomponent_count_errors(lpicCalendar.get());
 
 	// * find all timezone's, place in map
-	lpicComponent = icalcomponent_get_first_component(lpicCalendar, ICAL_VTIMEZONE_COMPONENT);
+	lpicComponent = icalcomponent_get_first_component(lpicCalendar.get(), ICAL_VTIMEZONE_COMPONENT);
 	while (lpicComponent) {
 		hr = HrParseVTimeZone(lpicComponent, &strTZID, &ttTimeZone);
-		if (hr != hrSuccess) {
-			// log warning?
-		} else {
+		if (hr != hrSuccess)
+			/* log warning? */ ;
+		else
 			tzMap[strTZID] = ttTimeZone;
-		}
-
-		lpicComponent = icalcomponent_get_next_component(lpicCalendar, ICAL_VTIMEZONE_COMPONENT);
+		lpicComponent = icalcomponent_get_next_component(lpicCalendar.get(), ICAL_VTIMEZONE_COMPONENT);
 	}
 
 	// ICal file did not send any timezone information
-	if (tzMap.empty() && strServerTimeZone.empty())
-	{
-		// find timezone from given server timezone
-		if (HrGetTzStruct(strServerTZparam, &ttServerTZ) == hrSuccess)
-		{
-			strServerTimeZone = strServerTZparam;
-			tzMap[strServerTZparam] = ttServerTZ;
-		}
+	if (tzMap.empty() && strServerTimeZone.empty() &&
+	    // find timezone from given server timezone
+	    HrGetTzStruct(strServerTZparam, &ttServerTZ) == hrSuccess) {
+		strServerTimeZone = strServerTZparam;
+		tzMap[strServerTZparam] = ttServerTZ;
 	}
 
 	// find all "messages" vevent, vtodo, vjournal, ...?
-	lpicComponent = icalcomponent_get_first_component(lpicCalendar, ICAL_ANY_COMPONENT);
+	lpicComponent = icalcomponent_get_first_component(lpicCalendar.get(), ICAL_ANY_COMPONENT);
 	while (lpicComponent) {
-		switch (icalcomponent_isa(lpicComponent)) {
+		std::unique_ptr<VConverter> lpVEC;
+		auto type = icalcomponent_isa(lpicComponent);
+		switch (type) {
 		case ICAL_VEVENT_COMPONENT:
-			lpVEC = new VEventConverter(m_lpAdrBook, &tzMap, m_lpNamedProps, strCharset, false, m_bNoRecipients, lpMailUser);
+			static_assert(std::is_polymorphic<VEventConverter>::value, "VEventConverter needs to be polymorphic for unique_ptr to work");
+			lpVEC.reset(new VEventConverter(m_lpAdrBook, &tzMap, m_lpNamedProps, strCharset, false, m_bNoRecipients, lpMailUser));
 			hr = hrSuccess;
 			break;
 		case ICAL_VTODO_COMPONENT:
-			lpVEC = new VTodoConverter(m_lpAdrBook, &tzMap, m_lpNamedProps, strCharset, false, m_bNoRecipients, lpMailUser);
+			static_assert(std::is_polymorphic<VTodoConverter>::value, "VTodoConverter needs to be polymorphic for unique_ptr to work");
+			lpVEC.reset(new VTodoConverter(m_lpAdrBook, &tzMap, m_lpNamedProps, strCharset, false, m_bNoRecipients, lpMailUser));
 			hr = hrSuccess;
 			break;
 		case ICAL_VFREEBUSY_COMPONENT:
@@ -258,7 +254,7 @@ HRESULT ICalToMapiImpl::ParseICal(const std::string& strIcal, const std::string&
 		if (hr != hrSuccess)
 			goto next;
 
-		switch(icalcomponent_isa(lpicComponent)) {			
+		switch (type) {
 		case ICAL_VFREEBUSY_COMPONENT:
 			hr = HrGetFbInfo(lpicComponent, &m_tFbStart, &m_tFbEnd, &m_strUID, &m_lstUsers);
 			if (hr == hrSuccess)
@@ -266,23 +262,19 @@ HRESULT ICalToMapiImpl::ParseICal(const std::string& strIcal, const std::string&
 			break;
 		case ICAL_VEVENT_COMPONENT:
 		case ICAL_VTODO_COMPONENT:
-			hr = lpVEC->HrICal2MAPI(lpicCalendar, lpicComponent, previtem, &item);			
+			hr = lpVEC->HrICal2MAPI(lpicCalendar.get(), lpicComponent, previtem, &item);
 			break;
 		default:
 			break;
 		};
 
-		if (hr == hrSuccess && item) {
+		if (hr == hrSuccess && item != nullptr && previtem != item) {
 			// previtem is equal to item when item was only updated (eg. vevent exception)
-			if (previtem != item) {
-				m_vMessages.push_back(item);
-				previtem = item;
-			}
+			m_vMessages.push_back(item);
+			previtem = item;
 		}
 next:
-		delete lpVEC;
-		lpVEC = NULL;
-		lpicComponent = icalcomponent_get_next_component(lpicCalendar, ICAL_ANY_COMPONENT);
+		lpicComponent = icalcomponent_get_next_component(lpicCalendar.get(), ICAL_ANY_COMPONENT);
 	}
 	hr = hrSuccess;
 
@@ -291,12 +283,6 @@ next:
 	// seems this happens quite fast .. don't know what's wrong with exchange's ical
 // 	if (m_ulErrorCount != 0)
 // 		hr = MAPI_W_ERRORS_RETURNED;
-
-exit:
-	delete lpVEC;
-	if (lpicCalendar)
-		icalcomponent_free(lpicCalendar);
-
 	return hr;
 }
 
@@ -323,17 +309,10 @@ ULONG ICalToMapiImpl::GetItemCount()
  */
 HRESULT ICalToMapiImpl::GetItemInfo(ULONG ulPosition, eIcalType *lpType, time_t *lptLastModified, SBinary *lpUid)
 {
-	HRESULT hr = hrSuccess;
-
-	if (ulPosition >= m_vMessages.size()) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-	if (lpType == NULL && lptLastModified == NULL && lpUid == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (ulPosition >= m_vMessages.size())
+		return MAPI_E_INVALID_PARAMETER;
+	if (lpType == NULL && lptLastModified == NULL && lpUid == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 	if (lpType)
 		*lpType = m_vMessages[ulPosition]->eType;
 
@@ -342,9 +321,7 @@ HRESULT ICalToMapiImpl::GetItemInfo(ULONG ulPosition, eIcalType *lpType, time_t 
 
 	if (lpUid)
 		*lpUid = m_vMessages[ulPosition]->sBinGuid.Value.bin;
-	
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -392,32 +369,23 @@ HRESULT ICalToMapiImpl::GetItem(ULONG ulPosition, ULONG ulFlags, LPMESSAGE lpMes
 	ICalRecurrence cRec;
 	icalitem *lpItem = NULL;
 	std::vector<icalitem *>::const_iterator iItem;
-	std::list<icalitem::exception>::const_iterator iEx;
 	ULONG ulANr = 0;
-	LPATTACH lpAttach = NULL;
-	LPMESSAGE lpExMsg = NULL;
-	LPSPropTagArray lpsPTA = NULL;
-	LPMAPITABLE lpAttachTable = NULL;
-	LPSRestriction lpAttachRestrict = NULL;
-	LPSRestriction lpPRestrictAnd = NULL;
-	LPSRestriction lpPRestrictOr = NULL;
-	LPSRowSet lpRows = NULL;
-	LPSPropValue lpPropVal = NULL;
+	memory_ptr<SPropTagArray> lpsPTA;
+	object_ptr<IMAPITable> lpAttachTable;
+	rowset_ptr lpRows;
 	SPropValue sStart = {0};
 	SPropValue sMethod = {0};
 
-	if (ulPosition >= m_vMessages.size() || lpMessage == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (ulPosition >= m_vMessages.size() || lpMessage == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
 
 	iItem = m_vMessages.begin() + ulPosition;
 	lpItem = *iItem;
 
 	if ((ulFlags & IC2M_APPEND_ONLY) == 0 && !lpItem->lstDelPropTags.empty()) {
-		hr = MAPIAllocateBuffer(CbNewSPropTagArray(lpItem->lstDelPropTags.size()), (LPVOID *)&lpsPTA);
+		hr = MAPIAllocateBuffer(CbNewSPropTagArray(lpItem->lstDelPropTags.size()), &~lpsPTA);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		std::copy(lpItem->lstDelPropTags.begin(), lpItem->lstDelPropTags.end(), lpsPTA->aulPropTag);
 
@@ -425,25 +393,23 @@ HRESULT ICalToMapiImpl::GetItem(ULONG ulPosition, ULONG ulFlags, LPMESSAGE lpMes
 
 		hr = lpMessage->DeleteProps(lpsPTA, NULL);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 
-	hr = SaveProps(&(lpItem->lstMsgProps), lpMessage);
+	hr = SaveProps(&lpItem->lstMsgProps, lpMessage, ulFlags);
 	if (hr != hrSuccess)
-		goto exit;
-	
+		return hr;
 	if (!(ulFlags & IC2M_NO_RECIPIENTS))
 		hr = SaveRecipList(&(lpItem->lstRecips), ulFlags, lpMessage);
 
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = SaveAttendeesString(&(lpItem->lstRecips), lpMessage);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// remove all exception attachments from message, if any
-	hr = lpMessage->GetAttachmentTable(0, &lpAttachTable);
+	hr = lpMessage->GetAttachmentTable(0, &~lpAttachTable);
 	if (hr != hrSuccess)
 		goto next;
 
@@ -457,41 +423,28 @@ HRESULT ICalToMapiImpl::GetItem(ULONG ulPosition, ULONG ulFlags, LPMESSAGE lpMes
 	// restrict to only exception attachments
 	// (((!pr_exception_starttime) or (pr_exception_starttime != 1-1-4501)) and (have method) and (method == 5))
 	// (AND( OR( NOT(pr_exception_start) (pr_exception_start!=time)) (have method)(method==5)))
-	CREATE_RESTRICTION(lpAttachRestrict);
-
-	CREATE_RES_AND(lpAttachRestrict, lpAttachRestrict, 3);
-	lpPRestrictAnd = lpAttachRestrict->res.resAnd.lpRes;
-	{
-		CREATE_RES_OR(lpAttachRestrict, (&lpPRestrictAnd[0]), 2);
-		lpPRestrictOr = lpPRestrictAnd[0].res.resOr.lpRes;
-
-		// or
-		CREATE_RES_NOT(lpAttachRestrict, (&lpPRestrictOr[0]));
-		DATA_RES_EXIST(lpAttachRestrict, lpPRestrictOr[0].res.resNot.lpRes[0], sStart.ulPropTag);
-	
-		DATA_RES_PROPERTY(lpAttachRestrict, lpPRestrictOr[1], RELOP_NE, sStart.ulPropTag, &sStart);
-	}
-
-	// and
-	DATA_RES_EXIST(lpAttachRestrict, lpPRestrictAnd[1], sMethod.ulPropTag);
-	DATA_RES_PROPERTY(lpAttachRestrict, lpPRestrictAnd[2], RELOP_EQ, sMethod.ulPropTag, &sMethod);
-
-	hr = lpAttachTable->Restrict(lpAttachRestrict, 0);
+	hr = ECAndRestriction(
+		ECOrRestriction(
+			ECNotRestriction(ECExistRestriction(sStart.ulPropTag)) +
+			ECPropertyRestriction(RELOP_NE, sStart.ulPropTag, &sStart, ECRestriction::Cheap)
+		) +
+		ECExistRestriction(sMethod.ulPropTag) +
+		ECPropertyRestriction(RELOP_EQ, sMethod.ulPropTag, &sMethod, ECRestriction::Cheap)
+	).RestrictTable(lpAttachTable, 0);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpAttachTable->QueryRows(-1, 0, &lpRows);
+		return hr;
+	hr = lpAttachTable->QueryRows(-1, 0, &~lpRows);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	for (ULONG i = 0; i < lpRows->cRows; ++i) {
-		lpPropVal = PpropFindProp(lpRows->aRow[i].lpProps, lpRows->aRow[i].cValues, PR_ATTACH_NUM);
+		auto lpPropVal = PCpropFindProp(lpRows->aRow[i].lpProps, lpRows->aRow[i].cValues, PR_ATTACH_NUM);
 		if (lpPropVal == NULL)
 			continue;
 
 		hr = lpMessage->DeleteAttach(lpPropVal->Value.ul, 0, NULL, 0);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 
 next:
@@ -501,74 +454,40 @@ next:
 		// TODO: log error if any?
 		
 		// check if all exceptions are valid
-		for (iEx = lpItem->lstExceptionAttachments.begin();
-		     iEx != lpItem->lstExceptionAttachments.end(); ++iEx) {
-			if (cRec.HrValidateOccurrence(lpItem, *iEx) == false) {
-				hr = MAPI_E_INVALID_OBJECT;
-				goto exit;
-			}
-		}
+		for (const auto &ex : lpItem->lstExceptionAttachments)
+			if (!cRec.HrValidateOccurrence(lpItem, ex))
+				return MAPI_E_INVALID_OBJECT;
+		for (const auto &ex : lpItem->lstExceptionAttachments) {
+			object_ptr<IAttach> lpAttach;
+			object_ptr<IMessage> lpExMsg;
 
-		for (iEx = lpItem->lstExceptionAttachments.begin();
-		     iEx != lpItem->lstExceptionAttachments.end(); ++iEx) {
-			hr = lpMessage->CreateAttach(NULL, 0, &ulANr, &lpAttach);
+			hr = lpMessage->CreateAttach(nullptr, 0, &ulANr, &~lpAttach);
 			if (hr != hrSuccess)
-				goto exit;
-
-			hr = lpAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, MAPI_CREATE | MAPI_MODIFY, (LPUNKNOWN *)&lpExMsg);
+				return hr;
+			hr = lpAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, MAPI_CREATE | MAPI_MODIFY, &~lpExMsg);
 			if (hr != hrSuccess)
-				goto exit;
-			
+				return hr;
 			if (!(ulFlags & IC2M_NO_RECIPIENTS))
-				hr = SaveRecipList(&(iEx->lstRecips), ulFlags, lpExMsg);
-
+				hr = SaveRecipList(&ex.lstRecips, ulFlags, lpExMsg);
 			if (hr != hrSuccess)
-				goto exit;
-			
-			hr = SaveAttendeesString(&(iEx->lstRecips), lpExMsg);
+				return hr;
+			hr = SaveAttendeesString(&ex.lstRecips, lpExMsg);
 			if (hr != hrSuccess)
-				goto exit;
-
-			hr = SaveProps(&(iEx->lstMsgProps), lpExMsg);
+				return hr;
+			hr = SaveProps(&ex.lstMsgProps, lpExMsg);
 			if (hr != hrSuccess)
-				goto exit;
-
-			hr = SaveProps(&(iEx->lstAttachProps), lpAttach);
+				return hr;
+			hr = SaveProps(&ex.lstAttachProps, lpAttach);
 			if (hr != hrSuccess)
-				goto exit;
-
+				return hr;
 			hr = lpExMsg->SaveChanges(0);
 			if (hr != hrSuccess)
-				goto exit;
-
+				return hr;
 			hr = lpAttach->SaveChanges(0);
 			if (hr != hrSuccess)
-				goto exit;
-
-			lpExMsg->Release();
-			lpExMsg = NULL;
-
-			lpAttach->Release();
-			lpAttach = NULL;
+				return hr;
 		}
 	}
-
-exit:
-	if (lpAttachRestrict)
-		FREE_RESTRICTION(lpAttachRestrict);
-
-	if (lpAttachTable)
-		lpAttachTable->Release();
-
-	if (lpRows)
-		FreeProws(lpRows);
-	MAPIFreeBuffer(lpsPTA);
-	if (lpAttach)
-		lpAttach->Release();
-
-	if (lpExMsg)
-		lpExMsg->Release();
-
 	return hr;
 }
 
@@ -582,30 +501,26 @@ exit:
  * @return MAPI error code
  */
 HRESULT ICalToMapiImpl::SaveProps(const std::list<SPropValue> *lpPropList,
-    LPMAPIPROP lpMapiProp)
+    LPMAPIPROP lpMapiProp, unsigned int flags)
 {
 	HRESULT hr = hrSuccess;
-	std::list<SPropValue>::const_iterator iProps;
-	LPSPropValue lpsPropVals = NULL;
+	memory_ptr<SPropValue> lpsPropVals;
 	int i;
 
 	// all props to message
-	hr = MAPIAllocateBuffer(lpPropList->size() * sizeof(SPropValue), (void**)&lpsPropVals);
+	hr = MAPIAllocateBuffer(lpPropList->size() * sizeof(SPropValue), &~lpsPropVals);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// @todo: add exclude list or something? might set props the caller doesn't want (see vevent::HrAddTimes())
-	for (i = 0, iProps = lpPropList->begin();
-	     iProps != lpPropList->end(); ++iProps, ++i)
-		lpsPropVals[i] = *iProps;
-
-	hr = lpMapiProp->SetProps(i, lpsPropVals, NULL);
-	if (FAILED(hr))
-		goto exit;
-
-exit:
-	MAPIFreeBuffer(lpsPropVals);
-	return hr;
+	i = 0;
+	for (const auto &prop : *lpPropList) {
+		if (flags & IC2M_NO_BODY &&
+		    PROP_ID(prop.ulPropTag) == PROP_ID(PR_BODY))
+			continue;
+		lpsPropVals[i++] = prop;
+	}
+	return lpMapiProp->SetProps(i, lpsPropVals, NULL);
 }
 
 /**
@@ -622,84 +537,68 @@ HRESULT ICalToMapiImpl::SaveRecipList(const std::list<icalrecip> *lplstRecip,
     ULONG ulFlag, LPMESSAGE lpMessage)
 {
 	HRESULT hr = hrSuccess;
-	LPADRLIST lpRecipients = NULL;
-	std::list<icalrecip>::const_iterator iRecip;
+	adrlist_ptr lpRecipients;
 	std::string strSearch;
 	ULONG i = 0;
 	convert_context converter;
 
-	hr = MAPIAllocateBuffer(CbNewADRLIST(lplstRecip->size()), (void**)&lpRecipients);
+	hr = MAPIAllocateBuffer(CbNewADRLIST(lplstRecip->size()), &~lpRecipients);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	lpRecipients->cEntries = 0;
-
-	for (iRecip = lplstRecip->begin(); iRecip != lplstRecip->end(); ++iRecip) {
+	for (const auto &recip : *lplstRecip) {
 		// iRecip->ulRecipientType
 		// strEmail
 		// strName
 		// cbEntryID, lpEntryID
-
-		if ((ulFlag & IC2M_NO_ORGANIZER) && iRecip->ulRecipientType == MAPI_ORIG)
+		if ((ulFlag & IC2M_NO_ORGANIZER) && recip.ulRecipientType == MAPI_ORIG)
 			continue;
 			
 		if ((hr = MAPIAllocateBuffer(sizeof(SPropValue)*10, (void**)&lpRecipients->aEntries[i].rgPropVals)) != hrSuccess)
-			goto exit;
+			return hr;
 		lpRecipients->aEntries[i].cValues = 10;
 
 		lpRecipients->aEntries[i].rgPropVals[0].ulPropTag = PR_RECIPIENT_TYPE;
-		lpRecipients->aEntries[i].rgPropVals[0].Value.ul = iRecip->ulRecipientType;
-
+		lpRecipients->aEntries[i].rgPropVals[0].Value.ul = recip.ulRecipientType;
 		lpRecipients->aEntries[i].rgPropVals[1].ulPropTag = PR_DISPLAY_NAME_W;
-		lpRecipients->aEntries[i].rgPropVals[1].Value.lpszW = (WCHAR*)iRecip->strName.c_str();
-
+		lpRecipients->aEntries[i].rgPropVals[1].Value.lpszW = const_cast<wchar_t *>(recip.strName.c_str());
 		lpRecipients->aEntries[i].rgPropVals[2].ulPropTag = PR_SMTP_ADDRESS_W;
-		lpRecipients->aEntries[i].rgPropVals[2].Value.lpszW = (WCHAR*)iRecip->strEmail.c_str();
-		
+		lpRecipients->aEntries[i].rgPropVals[2].Value.lpszW = const_cast<wchar_t *>(recip.strEmail.c_str());
 		lpRecipients->aEntries[i].rgPropVals[3].ulPropTag = PR_ENTRYID;
-		lpRecipients->aEntries[i].rgPropVals[3].Value.bin.cb = iRecip->cbEntryID;
-		if ((hr = MAPIAllocateMore(iRecip->cbEntryID, lpRecipients->aEntries[i].rgPropVals, (void**)&lpRecipients->aEntries[i].rgPropVals[3].Value.bin.lpb)) != hrSuccess)
-			goto exit;
-		memcpy(lpRecipients->aEntries[i].rgPropVals[3].Value.bin.lpb, iRecip->lpEntryID, iRecip->cbEntryID);
+		lpRecipients->aEntries[i].rgPropVals[3].Value.bin.cb = recip.cbEntryID;
+		hr = MAPIAllocateMore(recip.cbEntryID,
+		     lpRecipients->aEntries[i].rgPropVals,
+		     reinterpret_cast<void **>(&lpRecipients->aEntries[i].rgPropVals[3].Value.bin.lpb));
+		if (hr != hrSuccess)
+			return hr;
+		memcpy(lpRecipients->aEntries[i].rgPropVals[3].Value.bin.lpb, recip.lpEntryID, recip.cbEntryID);
 		
 		lpRecipients->aEntries[i].rgPropVals[4].ulPropTag = PR_ADDRTYPE_W;
 		lpRecipients->aEntries[i].rgPropVals[4].Value.lpszW = const_cast<wchar_t *>(L"SMTP");
 
-		strSearch = "SMTP:" + converter.convert_to<std::string>(iRecip->strEmail);
-		transform(strSearch.begin(), strSearch.end(), strSearch.begin(), ::toupper);
+		strSearch = strToUpper("SMTP:" + converter.convert_to<std::string>(recip.strEmail));
 		lpRecipients->aEntries[i].rgPropVals[5].ulPropTag = PR_SEARCH_KEY;
 		lpRecipients->aEntries[i].rgPropVals[5].Value.bin.cb = strSearch.size() + 1;
 		if ((hr = MAPIAllocateMore(strSearch.size()+1, lpRecipients->aEntries[i].rgPropVals, (void **)&lpRecipients->aEntries[i].rgPropVals[5].Value.bin.lpb)) != hrSuccess)
-			goto exit;
+			return hr;
 		memcpy(lpRecipients->aEntries[i].rgPropVals[5].Value.bin.lpb, strSearch.c_str(), strSearch.size()+1);
 
 		lpRecipients->aEntries[i].rgPropVals[6].ulPropTag = PR_EMAIL_ADDRESS_W;
-		lpRecipients->aEntries[i].rgPropVals[6].Value.lpszW = (WCHAR*)iRecip->strEmail.c_str();
-
+		lpRecipients->aEntries[i].rgPropVals[6].Value.lpszW = const_cast<wchar_t *>(recip.strEmail.c_str());
 		lpRecipients->aEntries[i].rgPropVals[7].ulPropTag = PR_DISPLAY_TYPE;
 		lpRecipients->aEntries[i].rgPropVals[7].Value.ul = DT_MAILUSER;
 
 		lpRecipients->aEntries[i].rgPropVals[8].ulPropTag = PR_RECIPIENT_FLAGS;
-		lpRecipients->aEntries[i].rgPropVals[8].Value.ul = iRecip->ulRecipientType == MAPI_ORIG? 3 : 1;
-
+		lpRecipients->aEntries[i].rgPropVals[8].Value.ul = recip.ulRecipientType == MAPI_ORIG? 3 : 1;
 		lpRecipients->aEntries[i].rgPropVals[9].ulPropTag = PR_RECIPIENT_TRACKSTATUS;
-		lpRecipients->aEntries[i].rgPropVals[9].Value.ul = iRecip->ulTrackStatus;
-
+		lpRecipients->aEntries[i].rgPropVals[9].Value.ul = recip.ulTrackStatus;
 		++lpRecipients->cEntries;
 		++i;
 	}
 
 	// flag 0: remove old recipient table, and add the new list
-	hr = lpMessage->ModifyRecipients(0, lpRecipients);	
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-	
-	if (lpRecipients)
-		FreePadrlist(lpRecipients);
-
-	return hr;
+	return lpMessage->ModifyRecipients(0, lpRecipients);	
 }
 
 /**
@@ -716,37 +615,31 @@ exit:
 HRESULT ICalToMapiImpl::SaveAttendeesString(const std::list<icalrecip> *lplstRecip, LPMESSAGE lpMessage)
 {
 	HRESULT hr = hrSuccess;
-
-	std::list<icalrecip>::const_iterator iRecip;
 	std::wstring strAllAttendees;
 	std::wstring strToAttendees;
 	std::wstring strCCAttendees;
-	LPSPropValue lpsPropValue = NULL;
+	memory_ptr<SPropValue> lpsPropValue;
 
-	hr = MAPIAllocateBuffer(sizeof(SPropValue) * 3, (LPVOID*)&lpsPropValue);
+	hr = MAPIAllocateBuffer(sizeof(SPropValue) * 3, &~lpsPropValue);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// Create attendees string
-	for (iRecip = lplstRecip->begin(); iRecip != lplstRecip->end(); ++iRecip) {
-		if (iRecip->ulRecipientType == MAPI_ORIG)
+	for (const auto &recip : *lplstRecip) {
+		if (recip.ulRecipientType == MAPI_ORIG)
 			continue;
-
-		if (iRecip->ulRecipientType == MAPI_TO) {
+		if (recip.ulRecipientType == MAPI_TO) {
 			if (!strToAttendees.empty())
 				strToAttendees += L"; ";
-
-			strToAttendees += iRecip->strName;
-		} else if(iRecip->ulRecipientType == MAPI_CC) {
+			strToAttendees += recip.strName;
+		} else if (recip.ulRecipientType == MAPI_CC) {
 			if (!strCCAttendees.empty())
 				strCCAttendees += L"; ";
-
-			strCCAttendees += iRecip->strName;
+			strCCAttendees += recip.strName;
 		}
 		if (!strAllAttendees.empty())
 			strAllAttendees += L"; ";
-
-		strAllAttendees += iRecip->strName;
+		strAllAttendees += recip.strName;
 	}
 
 	lpsPropValue[0].ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_TOATTENDEESSTRING], PT_UNICODE);
@@ -755,12 +648,7 @@ HRESULT ICalToMapiImpl::SaveAttendeesString(const std::list<icalrecip> *lplstRec
 	lpsPropValue[1].Value.lpszW = (WCHAR*)strCCAttendees.c_str();
 	lpsPropValue[2].ulPropTag = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_ALLATTENDEESSTRING], PT_UNICODE);
 	lpsPropValue[2].Value.lpszW = (WCHAR*)strAllAttendees.c_str();
-
-	hr = lpMessage->SetProps(3, lpsPropValue, NULL);
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-	MAPIFreeBuffer(lpsPropValue);
-	return hr;
+	return lpMessage->SetProps(3, lpsPropValue, nullptr);
 }
+
+} /* namespace */
