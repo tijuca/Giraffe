@@ -1,4 +1,17 @@
-version=3
+# watch file for kopanocore from Kopano
+#
+# Kopano is mirroring there git tree on GitHub
+# That's makes it a lot easier to use uscan for tracking new upstream versions.
+#
+# Release Tags are signed by OpenPGP key 0x6A3933DA297DFB7D from Jan Engelhard
+#               Fingerprint  2F8B FE96 D14F 8B56 0FBC 1F1D A28B DFEE B5A2 B2FF
+# But there aren't any armored detached signing files (*.asc), thus we can use
+# any cryptographic signature verification and don't use 'pgpsigurlmangle'.
 
-opts="uversionmangle=s/\.-RC/~rc/;s/.[0-9]+$//;s/$/+dfsg1/" \
-  http://download.zarafa.com/community/final/7.2/\d\.\d\.(?:\d|(?:\d{2}))-(.+)/sourcecode/zarafa-(\d\.\d\.\d)-(.+)\.tar\.gz
+# opts= ...
+# pgpsigurlmangle=s/archive\/(\d\S+)\.tar\.gz/releases\/download\/$1\/$1\.tar\.gz\.asc/ \
+# ...
+
+version=3
+opts=filenamemangle=s/.+\/v?(\d\S*)\.tar\.gz/<project>-$1\.tar\.gz/ \
+  http://github.com/Kopano-mirror/kopano-core/tags .*/kopanocore-(\d\S+)\.tar\.gz
