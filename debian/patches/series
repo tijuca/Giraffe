@@ -5,9 +5,5 @@ adding-.NOTPARALLEL-target-to-swig-python-Makefiel.am.patch
 bash-completion-remove-shebang-from-file.patch
 server.cfg-prepare-later-M-A-substition-while-built.patch
 build-support-gsoap-2.8.36.patch
-fixup-spelling-issues-against-8.1.0.patch
-kopano-cachestat-update-docstring-remove-diff-function.patch
-OpenSSL-Make-SSLv2-conditional.patch
 adjust-search-path-for-php-config-script-on-php7.0.patch
-change-shebang-to-usr-bin-php7.0.patch
-remove-undocummented-sk_SSL_COMP_free-call.patch
+typofix-small-fix-up-for-missspelled-another.patch

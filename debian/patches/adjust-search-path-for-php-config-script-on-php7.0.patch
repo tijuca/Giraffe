@@ -9,7 +9,7 @@ for php-config in PHP7.
  1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/autoconf/php.m4 b/autoconf/php.m4
-index 3c2f3a75..bf454082 100644
+index 3c2f3a7..bf45408 100644
 --- a/autoconf/php.m4
 +++ b/autoconf/php.m4
 @@ -25,10 +25,10 @@ AC_DEFUN([PHP_WITH_PHP_CONFIG],[

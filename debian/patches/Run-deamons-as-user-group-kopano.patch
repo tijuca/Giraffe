@@ -12,10 +12,10 @@ Subject: Run deamons as user/group kopano
  6 files changed, 14 insertions(+), 14 deletions(-)
 
 diff --git a/installer/linux/dagent.cfg b/installer/linux/dagent.cfg
-index a1bcd0b..25dee81 100644
+index e1b69c2..bdc1901 100644
 --- a/installer/linux/dagent.cfg
 +++ b/installer/linux/dagent.cfg
-@@ -68,10 +68,10 @@ lmtp_max_threads = 20
+@@ -69,10 +69,10 @@ lmtp_max_threads = 20
  # run as specific user in LMTP mode.
  #   make sure this user is listed in local_admin_users in your storage server config
  #   or use SSL connections with certificates to login
@@ -29,7 +29,7 @@ index a1bcd0b..25dee81 100644
  # control pid file
  #pid_file = /var/run/kopano/dagent.pid
 diff --git a/installer/linux/gateway.cfg b/installer/linux/gateway.cfg
-index 5985298..ed4faf2 100644
+index 0f51825..7d4d937 100644
 --- a/installer/linux/gateway.cfg
 +++ b/installer/linux/gateway.cfg
 @@ -14,10 +14,10 @@ server_hostname =
@@ -46,7 +46,7 @@ index 5985298..ed4faf2 100644
  # create a pid file for stopping the service via the init.d scripts
  #pid_file = /var/run/kopano/gateway.pid
 diff --git a/installer/linux/ical.cfg b/installer/linux/ical.cfg
-index 8f15fb1..a769929 100644
+index 659bd49..458e6a3 100644
 --- a/installer/linux/ical.cfg
 +++ b/installer/linux/ical.cfg
 @@ -2,10 +2,10 @@
@@ -74,7 +74,7 @@ index 8f15fb1..a769929 100644
  # wether normal connections can be made to the ical server
  ical_enable = yes
 diff --git a/installer/linux/monitor.cfg b/installer/linux/monitor.cfg
-index 68d70e0..926f818 100644
+index 3eca556..2335e93 100644
 --- a/installer/linux/monitor.cfg
 +++ b/installer/linux/monitor.cfg
 @@ -8,10 +8,10 @@
@@ -91,7 +91,7 @@ index 68d70e0..926f818 100644
  # create a pid file for stopping the service via the init.d scripts
  #pid_file = /var/run/kopano/monitor.pid
 diff --git a/installer/linux/server.cfg b/installer/linux/server.cfg
-index 97d5519..4b3b2bd 100644
+index 64b118b..b0eff91 100644
 --- a/installer/linux/server.cfg
 +++ b/installer/linux/server.cfg
 @@ -46,10 +46,10 @@ owner_auto_full_access = true
@@ -108,7 +108,7 @@ index 97d5519..4b3b2bd 100644
  # create a pid file for stopping the service via the init.d scripts
  #pid_file		= /var/run/kopano/server.pid
 diff --git a/installer/linux/spooler.cfg b/installer/linux/spooler.cfg
-index a5282fc..c7111a3 100644
+index 7d2dfcb..545ff76 100644
 --- a/installer/linux/spooler.cfg
 +++ b/installer/linux/spooler.cfg
 @@ -11,10 +11,10 @@ smtp_port = 25

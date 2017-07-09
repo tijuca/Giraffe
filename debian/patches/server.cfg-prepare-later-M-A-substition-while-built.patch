@@ -10,14 +10,14 @@ can be substituted while package creation.
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/installer/linux/server.cfg b/installer/linux/server.cfg
-index 4b3b2bd..dd07969 100644
+index b0eff91..9a094bb 100644
 --- a/installer/linux/server.cfg
 +++ b/installer/linux/server.cfg
-@@ -338,8 +338,8 @@ user_plugin		= db
+@@ -344,8 +344,8 @@ user_plugin		= db
  user_plugin_config	= /etc/kopano/ldap.cfg
  
  # location of the kopano plugins
--# if you have a 64bit distribution, this probably should be changed to /usr/lib64/kopano
+-# if you have a 64-bit distribution, this probably should be changed to /usr/lib64/kopano
 -plugin_path		= /usr/lib/kopano
 +# In Debian we have Multi-Arch architecture, we look for the plugins in the desired platform folder.
 +plugin_path		= /usr/lib/@DEB_HOST_MULTIARCH@/kopano

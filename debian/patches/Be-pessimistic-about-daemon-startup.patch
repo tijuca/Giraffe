@@ -7,19 +7,19 @@ return with an error. This fixes lots of situations where the daemon
 claimed to start but didn't (e.g. when not being able to connect
 to the database or to write to the attachment folder).
 ---
- provider/server/ECServer.cpp | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ provider/server/ECServer.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/provider/server/ECServer.cpp b/provider/server/ECServer.cpp
-index 8ab4920..40e3044 100644
+index 86adcec..3c01ce8 100644
 --- a/provider/server/ECServer.cpp
 +++ b/provider/server/ECServer.cpp
-@@ -1164,7 +1164,9 @@ static int running_server(char *szName, const char *szConfig,
+@@ -1164,6 +1164,10 @@ static int running_server(char *szName, const char *szConfig,
  	if (!daemonize)
  		setsid();
- 	unix_create_pidfile(szName, g_lpConfig, g_lpLogger);
--
-+	if (unix_runas(g_lpConfig, g_lpLogger)) {
+ 	unix_create_pidfile(szName, g_lpConfig);
++
++	if (unix_runas(g_lpConfig)) {
 +		goto exit;
 +	}
  	mainthread = pthread_self();

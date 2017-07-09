@@ -1,0 +1,49 @@
+From: Carsten Schoenert <c.schoenert@t-online.de>
+Date: Mon, 17 Jul 2017 15:30:28 +0200
+Subject: typofix: small fix up for missspelled "another"
+
+---
+ doc/kopano-server.cfg.5    | 2 +-
+ gateway/IMAP.h             | 2 +-
+ installer/linux/server.cfg | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/doc/kopano-server.cfg.5 b/doc/kopano-server.cfg.5
+index f9b5dcd..86a78a4 100644
+--- a/doc/kopano-server.cfg.5
++++ b/doc/kopano-server.cfg.5
+@@ -987,7 +987,7 @@ Default:
+ .RS 4
+ The hostname of the entry point to the S3 cloud where the bucket is located\&.
+ .sp
+-If you are using miniio or an other S3 compatible implementation that is using another port, you can specify the port with hostname:port\&.
++If you are using miniio or another S3 compatible implementation that is using another port, you can specify the port with hostname:port\&.
+ .RE
+ .PP
+ \fBattachment_s3_region\fR
+diff --git a/gateway/IMAP.h b/gateway/IMAP.h
+index 03d53ed..9f9c33a 100644
+--- a/gateway/IMAP.h
++++ b/gateway/IMAP.h
+@@ -330,7 +330,7 @@ private:
+ 	HRESULT HrGetDataItems(string strMsgDataItemNames, vector<string> &lstDataItems);
+ 	HRESULT HrSemicolonToComma(string &strData);
+ 
+-	// fetch calls an other fetch depending on the data items requested
++	// fetch calls another fetch depending on the data items requested
+ 	HRESULT HrPropertyFetch(list<ULONG> &lstMails, vector<string> &lstDataItems);
+ 	HRESULT HrPropertyFetchRow(LPSPropValue lpProps, ULONG cValues, string &strResponse, ULONG ulMailnr, bool bForceFlags, const vector<string> &lstDataItems);
+ 
+diff --git a/installer/linux/server.cfg b/installer/linux/server.cfg
+index 9a094bb..be3fbb0 100644
+--- a/installer/linux/server.cfg
++++ b/installer/linux/server.cfg
+@@ -155,7 +155,7 @@ attachment_compression	= 6
+ # S3 STORAGE SETTINGS (for attachment_storage = s3)
+ 
+ # The hostname of the entry point to the S3 cloud where the bucket is located
+-# If you are using miniio or an other S3 compatible implementation that
++# If you are using miniio or another S3 compatible implementation that
+ # is using another port, you can specify the port with hostname:port.
+ #attachment_s3_hostname = s3-eu-west-1.amazonaws.com
+ 
