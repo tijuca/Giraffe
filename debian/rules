@@ -35,11 +35,8 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
     --with-userscript-prefix=/etc/kopano/userscripts \
     --with-quotatemplate-prefix=/etc/kopano/quotamail \
     --disable-static \
-    --disable-tcmalloc \
     --enable-epoll \
     --enable-unicode \
-    --enable-python \
-    --enable-swig \
     --with-php-config=/usr/bin/php-config$(PHPVERSION) \
     $(CONFFLAG) \
     $(NULL)
