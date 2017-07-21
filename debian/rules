@@ -68,6 +68,7 @@ override_dh_install:
 	$(MAKE) DESTDIR=$(INSTDIR) install-man1 -C $(DEB_BUILD_DIR)/doc
 	# Don't ship any .la files
 	rm -f $(INSTDIR)/usr/lib/*/*.la
+	rm -f $(INSTDIR)/usr/lib/*/kopano/*.la
 	# Make sure docs end up in kopano-server
 	mv $(INSTDIR)/usr/share/doc/kopano $(INSTDIR)/usr/share/doc/kopano-server
 
