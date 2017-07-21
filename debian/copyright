@@ -4,16 +4,13 @@ Source: https://stash.kopano.io/projects/KC
 
 Files: *
 Copyright: 2005-2016, Zarafa B.V. and its licensors
+  2016-2017 Kopano B.V. <development@kopano.io>
 License: AGPL-3
 
 Files: debian/*
 Copyright: 2005-2016, Zarafa B.V. and its licensors
-  2015-2016, Carsten Schoenert <c.schoenert@t-online.de>
+  2015-2017, Carsten Schoenert <c.schoenert@t-online.de>
 License: AGPL-3
-
-Files: autoconf/boost.m4
-Copyright: 2007-2011, 2014 Benoit Sigoure <tsuna@lrde.epita.fr>
-License: GPL-3
 
 Files: autoconf/php.m4
   autoconf/swig.m4
@@ -28,6 +25,10 @@ Comment: Upstream licensed the work under the MIT license which is also
  Upstream source can be found on  https://github.com/ahupp/python-magic
  Note the upstream license information in
  https://github.com/ahupp/python-magic/blob/master/LICENSE
+
+Files: ECtools/migration-pst/kopano_migration_pst/pst.py
+Copyright: 2016, Dionach Ltd.
+License: BSD-3-clause
 
 Files: inetmapi/MAPISMTPTransport.cpp
   inetmapi/MAPISMTPTransport.h
@@ -54,13 +55,22 @@ Comment: The function _human_to_bytes() is written by Giampaolo Rodola
  and picked from the logutils (https://bitbucket.org/vinay.sajip/logutils)
  granted by BSD-3 license.
 
+Files: swig/python/kopano/kopano/delegation.py
+Copyright: 2017, Kopano and its licensors
+License: AGPL-3
+
 Files: swig/python/kopano/kopano/lockfile.py
 Copyright: 2007, Skip Montanaro
 License: Expat
 
-Files: common/utf8/checked.h
-Copyright: 2006, Nemanja Trifunovic
+Files: swig/python/kopano/kopano/lru_cache.py
+Copyright: 2012, Raymond Hettinger
 License: Expat
+Comment: The base of whole file is taken from http://code.activestate.com/recipes/578078/.
+
+Files: swig/python/kopano/kopano/restriction.py
+Copyright: 2016, Kopano and its licensors
+License: AGPL-3
 
 Files: swig/python/kopano/scripts/z-fuse.py
 Copyright: 2013, Murat Knecht
