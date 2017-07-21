@@ -15,7 +15,6 @@ DEB_BUILD_DIR=debian/build
 
 INSTDIR=$(CURDIR)/debian/tmp
 PHPVERSION=7.0
-SMARTYVER=2.6.14
 
 ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
 	CONFFLAG = ""
