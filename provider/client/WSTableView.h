@@ -14,45 +14,38 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
-/*
-	class WSTableView
-*/
-
 #ifndef WSTABLEVIEW_H
 #define WSTABLEVIEW_H
 
+#include <kopano/zcdefs.h>
 #include <kopano/ECUnknown.h>
+#include <mutex>
 #include "kcore.hpp"
 
 #include <kopano/kcodes.h>
 #include <mapi.h>
 #include <mapispi.h>
-
-#include <pthread.h>
 #include "soapKCmdProxy.h"
 class WSTransport;
 
 typedef HRESULT (*RELOADCALLBACK)(void *lpParam);
 
-class WSTableView : public ECUnknown
-{
+class WSTableView : public ECUnknown {
 protected:
-	WSTableView(ULONG ulType, ULONG ulFlags, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, WSTransport *lpTransport, const char *szClassName = NULL);
+	WSTableView(ULONG ulType, ULONG ulFlags, KCmd *, std::recursive_mutex &, ECSESSIONID, ULONG cbEntryId, LPENTRYID, WSTransport *, const char *szClassName = NULL);
 	virtual ~WSTableView();
 
 public:
-	virtual	HRESULT	QueryInterface(REFIID refiid, void **lppInstanceID);
-
+	virtual	HRESULT	QueryInterface(REFIID refiid, void **lppInstanceID) _kc_override;
 	virtual HRESULT HrOpenTable();
 	virtual HRESULT HrCloseTable();
 
 	// You must call HrOpenTable before calling the following methods
-	virtual HRESULT HrSetColumns(LPSPropTagArray lpsPropTagArray);
-	virtual HRESULT HrFindRow(LPSRestriction lpsRestriction, BOOKMARK bkOrigin, ULONG ulFlags);
+	virtual HRESULT HrSetColumns(const SPropTagArray *lpsPropTagArray);
+	virtual HRESULT HrFindRow(const SRestriction *lpsRestriction, BOOKMARK bkOrigin, ULONG ulFlags);
 	virtual HRESULT HrQueryColumns(ULONG ulFlags, LPSPropTagArray *lppsPropTags);
-	virtual HRESULT HrSortTable(LPSSortOrderSet lpsSortOrderSet);
-	virtual HRESULT HrRestrict(LPSRestriction lpsRestriction);
+	virtual HRESULT HrSortTable(const SSortOrderSet *lpsSortOrderSet);
+	virtual HRESULT HrRestrict(const SRestriction *lpsRestriction);
 	virtual HRESULT HrQueryRows(ULONG ulRowCount, ULONG ulFlags, LPSRowSet *lppRowSet);
 	virtual HRESULT HrGetRowCount(ULONG *lpulRowCount, ULONG *lpulCurrentRow);
 	virtual HRESULT HrSeekRow(BOOKMARK bkOrigin, LONG ulRows, LONG *lplRowsSought);
@@ -69,32 +62,28 @@ public:
 	static HRESULT Reload(void *lpParam, ECSESSIONID sessionID);
 	virtual HRESULT SetReloadCallback(RELOADCALLBACK callback, void *lpParam);
 
-public:
-	ULONG		ulTableId;
+	ULONG ulTableId = 0;
 
 protected:
 	virtual HRESULT LockSoap();
 	virtual HRESULT UnLockSoap();
 
-protected:
 	KCmd*		lpCmd;
-	pthread_mutex_t *lpDataLock;
+	std::recursive_mutex &lpDataLock;
 	ECSESSIONID		ecSessionId;
 	entryId			m_sEntryId;
 	void *			m_lpProvider;
 	ULONG			m_ulTableType;
 	ULONG			m_ulSessionReloadCallback;
 	WSTransport*	m_lpTransport;
-
-	LPSPropTagArray m_lpsPropTagArray;
-	LPSSortOrderSet m_lpsSortOrderSet;
-	LPSRestriction	m_lpsRestriction;
-
+	SPropTagArray *m_lpsPropTagArray = nullptr;
+	SSortOrderSet *m_lpsSortOrderSet = nullptr;
+	SRestriction *m_lpsRestriction = nullptr;
 	ULONG		ulFlags;
 	ULONG		ulType;
 
-	void *			m_lpParam;
-	RELOADCALLBACK  m_lpCallback;
+	void *m_lpParam = nullptr;
+	RELOADCALLBACK m_lpCallback = nullptr;
 };
 
 #endif

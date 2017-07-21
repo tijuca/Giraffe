@@ -24,10 +24,11 @@
 #include <sys/socket.h>
 #include <kopano/ECDefs.h>
 #include <kopano/ECChannel.h>
-#include <kopano/base64.h>
 #include <kopano/stringutil.h>
 
 #include "ECLicenseClient.h"
+
+namespace KC {
 
 ECRESULT ECLicenseClient::ServiceTypeToServiceTypeString(unsigned int ulServiceType, std::string &strServiceType)
 {
@@ -76,19 +77,6 @@ ECRESULT ECLicenseClient::GetCapabilities(unsigned int ulServiceType, std::vecto
 	return erSuccess;
 }
 
-ECRESULT ECLicenseClient::QueryCapability(unsigned int ulServiceType, const std::string &strCapability, bool *lpbResult)
-{
-	ECRESULT er;
-	std::string strServiceType;
-
-	er = ServiceTypeToServiceTypeString(ulServiceType, strServiceType);
-	if (er != erSuccess)
-		return er;
-
-	*lpbResult = true;
-	return erSuccess;
-}
-
 ECRESULT ECLicenseClient::GetSerial(unsigned int ulServiceType, std::string &strSerial, std::vector<std::string> &lstCALs)
 {
 	ECRESULT er;
@@ -117,13 +105,13 @@ ECRESULT ECLicenseClient::GetInfo(unsigned int ulServiceType, unsigned int *lpul
 	return erSuccess;
 }
 
-typedef struct {
+struct LICENSERESPONSE {
 	unsigned int ulVersion;			// Current: LICENSERESPONSE_VERSION
 	unsigned int ulTrackingId;
 	unsigned long long llFlags;
 	unsigned int ulStatus;
 	char szPadding[4];				// Make sure the struct is padded to a multiple of 8 bytes
-} LICENSERESPONSE;
+};
 
 ECRESULT ECLicenseClient::Auth(const unsigned char *lpData,
     unsigned int ulSize, void **lppResponse, unsigned int *lpulResponseSize)
@@ -144,3 +132,5 @@ ECRESULT ECLicenseClient::SetSerial(unsigned int ulServiceType, const std::strin
 
 	return erSuccess;
 }
+
+} /* namespace */

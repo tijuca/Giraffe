@@ -22,6 +22,7 @@
 #include <climits>
 #include <cmath>
 #include <getopt.h>
+#include <kopano/memory.hpp>
 #include <mapidefs.h>
 #include <mapispi.h>
 #include <mapix.h>
@@ -39,6 +40,7 @@
 #include <kopano/ECLogger.h>
 
 using namespace std;
+using namespace KCHL;
 
 static bool verbose = false;
 
@@ -79,17 +81,14 @@ static HRESULT UpdatePassword(const char *lpPath, const char *lpUsername,
     const char *lpPassword, const char *lpNewPassword)
 {
 	HRESULT hr = hrSuccess;
-	LPMAPISESSION lpSession = NULL;
-	
-	IECUnknown *lpECMsgStore = NULL;
-	IMsgStore *lpMsgStore = NULL;
-
-	IECServiceAdmin *lpServiceAdmin = NULL;
+	object_ptr<IMAPISession> lpSession;
+	object_ptr<IECUnknown> lpECMsgStore;
+	object_ptr<IMsgStore> lpMsgStore;
+	object_ptr<IECServiceAdmin> lpServiceAdmin;
 	ULONG cbUserId = 0;
-	LPENTRYID lpUserId = NULL;
-	LPSPropValue lpPropValue = NULL;
-	
-	ECUSER *lpECUser = NULL;
+	memory_ptr<ENTRYID> lpUserId;
+	memory_ptr<SPropValue> lpPropValue;
+	memory_ptr<ECUSER> lpECUser;
 	convert_context converter;
 
 	std::wstring strwUsername, strwPassword;
@@ -102,46 +101,42 @@ static HRESULT UpdatePassword(const char *lpPath, const char *lpUsername,
 		lpLogger = new ECLogger_File(EC_LOGLEVEL_FATAL, 0, "-", false);
 	else
 		lpLogger = new ECLogger_Null();
-	hr = HrOpenECSession(lpLogger, &lpSession, "kopano-passwd", PROJECT_SVN_REV_STR, strwUsername.c_str(), strwPassword.c_str(), lpPath, EC_PROFILE_FLAGS_NO_NOTIFICATIONS | EC_PROFILE_FLAGS_NO_PUBLIC_STORE, NULL, NULL);
+	ec_log_set(lpLogger);
+	hr = HrOpenECSession(&~lpSession, "kopano-passwd", PROJECT_SVN_REV_STR,
+	     strwUsername.c_str(), strwPassword.c_str(), lpPath,
+	     EC_PROFILE_FLAGS_NO_NOTIFICATIONS | EC_PROFILE_FLAGS_NO_PUBLIC_STORE,
+	     NULL, NULL);
 	lpLogger->Release();
 	if(hr != hrSuccess) {
 		cerr << "Wrong username or password." << endl;
-		goto exit;
+		return hr;
 	}
-
-	hr = HrOpenDefaultStore(lpSession, &lpMsgStore);
+	hr = HrOpenDefaultStore(lpSession, &~lpMsgStore);
 	if(hr != hrSuccess) {
 		cerr << "Unable to open store." << endl;
-		goto exit;
+		return hr;
 	}
-
-	hr = HrGetOneProp(lpMsgStore, PR_EC_OBJECT, &lpPropValue);
+	hr = HrGetOneProp(lpMsgStore, PR_EC_OBJECT, &~lpPropValue);
 	if(hr != hrSuccess || !lpPropValue)
-		goto exit;
-
-	lpECMsgStore = reinterpret_cast<IECUnknown *>(lpPropValue->Value.lpszA);
+		return hr;
+	lpECMsgStore.reset(reinterpret_cast<IECUnknown *>(lpPropValue->Value.lpszA), false);
 	if(!lpECMsgStore)
-		goto exit;
-
+		return hr;
 	lpECMsgStore->AddRef();
-
-	MAPIFreeBuffer(lpPropValue); lpPropValue = NULL;
-
-	hr = lpECMsgStore->QueryInterface(IID_IECServiceAdmin, reinterpret_cast<void **>(&lpServiceAdmin));
+	hr = lpECMsgStore->QueryInterface(IID_IECServiceAdmin, &~lpServiceAdmin);
 	if(hr != hrSuccess)
-		goto exit;
-
-	hr = lpServiceAdmin->ResolveUserName((LPTSTR)lpUsername, 0, &cbUserId, &lpUserId);
+		return hr;
+	hr = lpServiceAdmin->ResolveUserName((LPTSTR)lpUsername, 0, &cbUserId, &~lpUserId);
 	if (hr != hrSuccess) {
 		cerr << "Unable to update password, user not found." << endl;
-		goto exit;
+		return hr;
 	}
 
 	// get old features. we need these, because not setting them would mean: remove them
-	hr = lpServiceAdmin->GetUser(cbUserId, lpUserId, 0, &lpECUser);
+	hr = lpServiceAdmin->GetUser(cbUserId, lpUserId, 0, &~lpECUser);
 	if (hr != hrSuccess) {
 		cerr << "Unable to get user details, " << getMapiCodeString(hr, lpUsername) << endl;
-		goto exit;
+		return hr;
 	}
 
 	lpECUser->lpszPassword = (LPTSTR)lpNewPassword;
@@ -149,26 +144,9 @@ static HRESULT UpdatePassword(const char *lpPath, const char *lpUsername,
 	hr = lpServiceAdmin->SetUser(lpECUser, 0);
 	if(hr != hrSuccess) {
 		cerr << "Unable to update user password." << endl;
-		goto exit;
+		return hr;
 	}
-
-exit:
-	MAPIFreeBuffer(lpECUser);	// It's ok to pass a NULL pointer to MAPIFreeBuffer(). See http://msdn.microsoft.com/en-us/library/office/cc842298.aspx
-	MAPIFreeBuffer(lpUserId);
-	MAPIFreeBuffer(lpPropValue);
-	if (lpMsgStore)
-		lpMsgStore->Release();
-
-	if(lpECMsgStore)
-		lpECMsgStore->Release();
-
-	if (lpServiceAdmin)
-		lpServiceAdmin->Release();
-
-	if (lpSession)
-		lpSession->Release();
-
-	return hr;
+	return hrSuccess;
 }
 
 int main(int argc, char* argv[])
@@ -315,7 +293,6 @@ int main(int argc, char* argv[])
 	};
 
 exit:
-
 	MAPIUninitialize();
 	if (hr == hrSuccess)
 		return 0;

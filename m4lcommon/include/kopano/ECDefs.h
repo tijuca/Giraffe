@@ -20,6 +20,8 @@
 #ifndef ECDEFS_H
 #define ECDEFS_H
 
+namespace KC {
+
 // Get permission type
 #define ACCESS_TYPE_DENIED		1
 #define ACCESS_TYPE_GRANT		2
@@ -75,7 +77,7 @@
 	( OBJECTCLASS_FIELD_COMPARE(OBJECTCLASS_TYPE(__left), OBJECTCLASS_TYPE(__right)) && \
 	  OBJECTCLASS_FIELD_COMPARE((__left) & 0xffff, (__right) & 0xffff) )
 #define OBJECTCLASS_COMPARE_SQL(__column, __objclass) \
-	string((!(__objclass)) ? \
+	string(((__objclass) == 0) ? \
 			"TRUE" : \
 			((__objclass) & 0xffff) ? \
 				__column " = " + stringify(__objclass) : \
@@ -129,40 +131,42 @@ enum userobject_admin_level_t {
 	ADMIN_LEVEL_SYSADMIN = 2		/* System administrator (same rights as SYSTEM). */
 };
 
-typedef struct _sECEntryId
-{
+struct ECENTRYID {
 	unsigned int	cb;
 	unsigned char*	lpb;
-} ECENTRYID;
+};
 
-typedef struct _sECServerNameList
-{
+struct ECSVRNAMELIST {
 	unsigned int	cServers;
 	LPTSTR*			lpszaServer;
-} ECSVRNAMELIST;
+};
 
-typedef struct _sPropmapEntry {
+struct SPROPMAPENTRY {
 	unsigned int	ulPropId;
 	LPTSTR			lpszValue;
-} SPROPMAPENTRY, *LPSPROPMAPENTRY;
+};
+typedef struct SPROPMAPENTRY *LPSPROPMAPENTRY;
 
-typedef struct _sPropmap {
+struct SPROPMAP {
 	unsigned int		cEntries;
 	LPSPROPMAPENTRY		lpEntries;
-} SPROPMAP, *LPSPROPMAP;
+};
+typedef struct SPROPMAP *LPSPROPMAP;
 
-typedef struct _sMVPropmapEntry {
+struct MVPROPMAPENTRY {
 	unsigned int	ulPropId;
 	int				cValues;
 	LPTSTR*			lpszValues;
-} MVPROPMAPENTRY, *LPMVPROPMAPENTRY;
+};
+typedef struct MVPROPMAPENTRY *LPMVPROPMAPENTRY;
 
-typedef struct _sMVPropmap {
+struct MVPROPMAP {
 	unsigned int		cEntries;
 	LPMVPROPMAPENTRY	lpEntries;
-} MVPROPMAP, *LPMVPROPMAP;
+};
+typedef struct MVPROPMAP *LPMVPROPMAP;
 
-typedef struct _sECUser {
+struct ECUSER {
 	LPTSTR			lpszUsername;	// username@companyname
 	LPTSTR			lpszPassword;
 	LPTSTR			lpszMailAddress;
@@ -175,9 +179,9 @@ typedef struct _sECUser {
 	SPROPMAP		sPropmap;		// Extra anonymous properties for addressbook
 	MVPROPMAP		sMVPropmap;		// Extra anonymous MV properties for addressbook
 	ECENTRYID		sUserId;
-} ECUSER;
+};
 
-typedef struct _sECGroup {
+struct ECGROUP {
 	LPTSTR			lpszGroupname; // groupname@companyname
 	LPTSTR			lpszFullname;
 	LPTSTR			lpszFullEmail;
@@ -185,9 +189,9 @@ typedef struct _sECGroup {
 	unsigned int	ulIsABHidden;	// Is group hidden from address book
 	SPROPMAP		sPropmap;		// Extra anonymous properties for addressbook
 	MVPROPMAP		sMVPropmap;		// Extra anonymous MV properties for addressbook
-} ECGROUP;
+};
 
-typedef struct _sECCompany {
+struct ECCOMPANY {
 	ECENTRYID		sAdministrator; // userid of the administrator
 	LPTSTR			lpszCompanyname;
 	LPTSTR			lpszServername;
@@ -195,56 +199,55 @@ typedef struct _sECCompany {
 	unsigned int	ulIsABHidden;	// Is company hidden from address book
 	SPROPMAP		sPropmap;		// Extra anonymous properties for addressbook
 	MVPROPMAP		sMVPropmap;		// Extra anonymous MV properties for addressbook
-} ECCOMPANY;
+};
 
-
-typedef struct _sUserClientUpdateStatus {
+struct ECUSERCLIENTUPDATESTATUS {
 	unsigned int	ulTrackId;
 	time_t			tUpdatetime;
 	LPTSTR			lpszCurrentversion;
 	LPTSTR			lpszLatestversion;
 	LPTSTR			lpszComputername;
 	unsigned int 	ulStatus;
-} ECUSERCLIENTUPDATESTATUS;
+};
 
 #define UPDATE_STATUS_UNKNOWN	0
 #define UPDATE_STATUS_SUCCESS   1
 #define UPDATE_STATUS_PENDING   2
 #define UPDATE_STATUS_FAILED    3
 
-typedef struct _sECPermission {
+struct ECPERMISSION {
 	unsigned int	ulType;
 	unsigned int	ulRights;
 	unsigned int	ulState;
 	ECENTRYID		sUserId;
-} ECPERMISSION;
+};
 
-typedef struct _sECQuota {
+struct ECQUOTA {
 	bool			bUseDefaultQuota;
 	bool			bIsUserDefaultQuota; // Default quota for users within company
 	int64_t		llWarnSize;
 	int64_t		llSoftSize;
 	int64_t		llHardSize;
-} ECQUOTA;
+};
 
-typedef struct _sECQuotaStatus {
+struct ECQUOTASTATUS {
 	int64_t		llStoreSize;
 	eQuotaStatus	quotaStatus;
-} ECQUOTASTATUS;
+};
 
-typedef struct _sECServer {
+struct ECSERVER {
 	LPTSTR	lpszName;
 	LPTSTR	lpszFilePath;
 	LPTSTR	lpszHttpPath;
 	LPTSTR	lpszSslPath;
 	LPTSTR	lpszPreferedPath;
 	ULONG	ulFlags;
-} ECSERVER;
+};
 
-typedef struct _sECServerList {
+struct ECSERVERLIST {
 	unsigned int	cServers;
 	ECSERVER *lpsaServer;
-} ECSERVERLIST;
+};
 
 // Flags for ns__submitMessage
 #define EC_SUBMIT_LOCAL			0x00000000
@@ -264,5 +267,7 @@ typedef struct _sECServerList {
 
 // CreateStore flag(s)
 #define EC_OVERRIDE_HOMESERVER			0x00000001
+
+} /* namespace */
 
 #endif

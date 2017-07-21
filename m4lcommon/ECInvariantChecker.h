@@ -20,8 +20,9 @@
 
 #include <kopano/zcdefs.h>
 
-template <typename Type>
-class ECInvariantChecker _zcp_final {
+namespace KC {
+
+template<typename Type> class ECInvariantChecker _kc_final {
 public:
 	ECInvariantChecker(const Type *p): m_p(p) { m_p->CheckInvariant(); }
 	~ECInvariantChecker() { m_p->CheckInvariant(); }
@@ -40,5 +41,7 @@ private:
 #define DECL_INVARIANT_GUARD(__class)	typedef ECInvariantChecker<__class> guard;
 #define DECL_INVARIANT_CHECK			void CheckInvariant() const;
 #define DEF_INVARIANT_CHECK(__class)	void __class::CheckInvariant() const
+
+} /* namespace */
 
 #endif // ndef ECInvariantChecker_INCLUDED

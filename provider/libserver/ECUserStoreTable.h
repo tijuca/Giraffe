@@ -24,9 +24,13 @@
 #include <kopano/pcuser.hpp>
 #include <map>
 
+struct soap;
+
+namespace KC {
+
 class ECSession;
 
-typedef struct {
+struct ECUserStore {
 	long long		ulUserId;		// id of user (-1 if there is no user)
 	objectid_t		sExternId;		// externid of user
 	std::string		strUsername;	// actual username from ECUserManagement
@@ -38,21 +42,22 @@ typedef struct {
 	std::string		strCompanyName;	// Company name of the store. (can be empty)
 	time_t			tModTime;		// Modification time of the store
 	unsigned long long ullStoreSize;// Size of the store
-} ECUserStore;
+};
 
-class ECUserStoreTable _zcp_final : public ECGenericObjectTable {
-protected:
-	ECUserStoreTable(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale);
+class _kc_export_dycast ECUserStoreTable _kc_final :
+    public ECGenericObjectTable {
+	protected:
+	_kc_hidden ECUserStoreTable(ECSession *, unsigned int flags, const ECLocale &);
 
 public:
-	static ECRESULT Create(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale, ECUserStoreTable **lppTable);
-
-	static ECRESULT QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit);
-
-    virtual ECRESULT Load();
+	_kc_hidden static ECRESULT Create(ECSession *, unsigned int flags, const ECLocale &, ECUserStoreTable **ret);
+	_kc_hidden static ECRESULT QueryRowData(ECGenericObjectTable *, struct soap *, ECSession *, ECObjectTableList *rowlist, struct propTagArray *, void *obj_data, struct rowSet **rowset, bool cache_table_data, bool table_limit);
+	_kc_hidden virtual ECRESULT Load(void);
 
 private:
 	std::map<unsigned int, ECUserStore> m_mapUserStoreData;
 };
+
+} /* namespace */
 
 #endif

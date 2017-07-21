@@ -18,17 +18,22 @@
 #ifndef IMAP_H
 #define IMAP_H
 
-#include "ClientProto.h"
-
+#include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 #include <list>
 #include <set>
-
+#include <kopano/zcdefs.h>
 #include <kopano/ECIConv.h>
 #include <kopano/ECChannel.h>
+#include <kopano/memory.hpp>
+#include "ClientProto.h"
 
 using namespace std;
+namespace KC {
+class ECRestriction;
+}
 
 /**
  * @defgroup gateway_imap IMAP 
@@ -49,10 +54,7 @@ using namespace std;
 #define RESP_TAGGED_NO " NO "
 #define RESP_TAGGED_BAD " BAD "
 
-
-LONG __stdcall IMAPIdleAdviseCallback(void *lpContext, ULONG cNotif, LPNOTIFICATION lpNotif);
-
-class BinaryArray {
+class BinaryArray _kc_final {
 public:
 	BinaryArray(void) : lpb(NULL), cb(0), bcheap(false) {}
 	BinaryArray(BYTE *lpData, ULONG cbData, bool bcheap = false)
@@ -61,37 +63,50 @@ public:
 		if (cbData == 0) {
 			cb = 0;
 			lpb = NULL;
-		} else {
-			if (!bcheap) {
-				lpb = new BYTE[cbData];
-				memcpy(lpb, lpData, cbData);
-			} else {
-				lpb = lpData;
-			}
-			cb = cbData;
+			return;
 		}
+		if (!bcheap) {
+			lpb = new BYTE[cbData];
+			memcpy(lpb, lpData, cbData);
+		} else {
+			lpb = lpData;
+		}
+		cb = cbData;
 	}
 	BinaryArray(const BinaryArray &old) {
 		bcheap = false;
 		if (old.cb == 0) {
 			cb = 0;
 			lpb = NULL;
-		} else {
-			cb = old.cb;
-			lpb = new BYTE[cb];
-			memcpy(lpb, old.lpb, cb);
+			return;
 		}
+		cb = old.cb;
+		lpb = new BYTE[cb];
+		memcpy(lpb, old.lpb, cb);
+	}
+	BinaryArray(BinaryArray &&o) :
+	    lpb(o.lpb), cb(o.cb), bcheap(o.bcheap)
+	{
+		o.lpb = nullptr;
+		o.cb = 0;
+		o.bcheap = false;
 	}
 	BinaryArray(const SBinary &bin) {
 		bcheap = false;
 		if (bin.cb == 0) {
 			cb = 0;
 			lpb = NULL;
-		} else {
-			lpb = new BYTE[bin.cb];
-			memcpy(lpb, bin.lpb, bin.cb);
-			cb = bin.cb;
+			return;
 		}
+		lpb = new BYTE[bin.cb];
+		memcpy(lpb, bin.lpb, bin.cb);
+		cb = bin.cb;
+	}
+	BinaryArray(SBinary &&o) :
+	    lpb(o.lpb), cb(o.cb), bcheap(false)
+	{
+		o.lpb = nullptr;
+		o.cb = 0;
 	}
 	~BinaryArray(void)
 	{
@@ -141,7 +156,7 @@ struct lessBinaryArray {
 };
 
 // FLAGS: \Seen \Answered \Flagged \Deleted \Draft \Recent
-class IMAP : public ClientProto {
+class IMAP _kc_final : public ClientProto {
 public:
 	IMAP(const char *szServerPath, ECChannel *lpChannel, ECLogger *lpLogger, ECConfig *lpConfig);
 	~IMAP();
@@ -179,6 +194,7 @@ private:
 	HRESULT HrCmdRename(const string &strTag, const string &strExistingFolder, const string &strNewFolder);
 	HRESULT HrCmdSubscribe(const string &strTag, const string &strFolder, bool bSubscribe);
 	HRESULT HrCmdList(const string &strTag, string strReferenceFolder, const string &strFolder, bool bSubscribedOnly);
+	HRESULT get_uid_next(IMAPIFolder *status_folder, const std::string &tag, ULONG &uid_next);
 	HRESULT HrCmdStatus(const string &strTag, const string &strFolder, string strStatusData);
 	HRESULT HrCmdAppend(const string &strTag, const string &strFolder, const string &strData, string strFlags=string(), const string &strTime=string());
 	HRESULT HrCmdCheck(const string &strTag);
@@ -199,8 +215,8 @@ private:
 	HRESULT HrResponse(const string &strUntag, const string& strResponse);
 	/* Tagged response with result OK, NO or BAD */
 	HRESULT HrResponse(const string &strResult, const string &strTag, const string& strResponse);
+	static LONG __stdcall IdleAdviseCallback(void *ctx, ULONG numnotif, LPNOTIFICATION);
 
-private:
 	bool bOnlyMailFolders;
 	bool bShowPublicFolder;
 
@@ -239,44 +255,47 @@ private:
 		}
 	};
 
-	IMAPISession *lpSession;
-	IAddrBook *lpAddrBook;
-	LPSPropTagArray m_lpsIMAPTags;
+	IMAPISession *lpSession = nullptr;
+	IAddrBook *lpAddrBook = nullptr;
+	KCHL::memory_ptr<SPropTagArray> m_lpsIMAPTags;
 
 	// current folder name
 	wstring strCurrentFolder;
-	IMAPITable* m_lpTable;		/* current contents table */
+	IMAPITable *m_lpTable = nullptr; /* current contents table */
 	vector<string> m_vTableDataColumns; /* current dataitems that caused the setcolumns on the table */
 
 	// true if folder is opened with examine
-	bool bCurrentFolderReadOnly;
+	bool bCurrentFolderReadOnly = false;
 
 	// vector of mails in the current folder. The index is used for mail number.
 	vector<SMail> lstFolderMailEIDs;
-	IMsgStore *lpStore;
-	IMsgStore *lpPublicStore;
+	IMsgStore *lpStore = nullptr, *lpPublicStore = nullptr;
 
 	// special folder entryids (not able to move/delete inbox and such ...)
 	set<BinaryArray, lessBinaryArray> lstSpecialEntryIDs;
 
 	// Message cache
 	string m_strCache;
-	ULONG m_ulCacheUID;
+	ULONG m_ulCacheUID = 0;
+
+	// Folder cache
+	unsigned int cache_folders_time_limit = 0;
+	time_t cache_folders_last_used = 0;
+
+	std::list<SFolder> cached_folders;
 
 	// HrResponseContinuation state, used for HrCmdAuthenticate
-	bool m_bContinue;
+	bool m_bContinue = false;
 	string m_strContinueTag;
 	
 	// Idle mode variables
-	bool m_bIdleMode;
-	IMAPIAdviseSink *m_lpIdleAdviseSink;
-	ULONG m_ulIdleAdviseConnection;
+	bool m_bIdleMode = false;
+	IMAPIAdviseSink *m_lpIdleAdviseSink = nullptr;
+	ULONG m_ulIdleAdviseConnection = 0;
 	string m_strIdleTag;
-	IMAPITable *m_lpIdleTable;
-	pthread_mutex_t m_mIdleLock;
-	ULONG m_ulLastUid;
-	ULONG m_ulErrors;
-
+	IMAPITable *m_lpIdleTable = nullptr;
+	std::mutex m_mIdleLock;
+	ULONG m_ulLastUid = 0, m_ulErrors = 0;
 	wstring m_strwUsername;
 
 	delivery_options dopt;
@@ -306,8 +325,8 @@ private:
 
 	HRESULT HrRefreshFolderMails(bool bInitialLoad, bool bResetRecent, bool bShowUID, unsigned int *lpulUnseen, ULONG *lpulUIDValidity = NULL);
 
-	HRESULT HrGetSubTree(list<SFolder> &lstFolders, SBinary &sEntryID, wstring strFolderName, list<SFolder>::const_iterator lpParentFolder, bool bSubfolders = true, bool bIsEmailFolder = true);
-	HRESULT HrGetFolderPath(list<SFolder>::const_iterator lpFolder, list<SFolder> &lstFolder, wstring &strPath);
+	HRESULT HrGetSubTree(list<SFolder> &folders, const SBinary &in_entry_id, const wstring &in_folder_name, list<SFolder>::const_iterator parent_folder);
+	HRESULT HrGetFolderPath(list<SFolder>::const_iterator lpFolder, const list<SFolder> &lstFolder, wstring &strPath);
 	HRESULT HrGetDataItems(string strMsgDataItemNames, vector<string> &lstDataItems);
 	HRESULT HrSemicolonToComma(string &strData);
 
@@ -325,12 +344,12 @@ private:
 	ULONG LastOrNumber(const char *szNr, bool bUID);
 	HRESULT HrParseSeqSet(const string &strSeqSet, list<ULONG> &lstMails);
 	HRESULT HrParseSeqUidSet(const string &strSeqSet, list<ULONG> &lstMails);
-	HRESULT HrSeqUidSetToRestriction(const string &strSeqSet, LPSRestriction *lppRestriction);
+	HRESULT HrSeqUidSetToRestriction(const string &strSeqSet, std::unique_ptr<ECRestriction> &);
 
 	HRESULT HrStore(const list<ULONG> &lstMails, string strMsgDataItemName, string strMsgDataItemValue, bool *lpbDoDelete);
 	HRESULT HrCopy(const list<ULONG> &lstMails, const string &strFolder, bool bMove);
-	HRESULT HrSearch(vector<string> &lstSearchCriteria, ULONG &ulStartCriteria, list<ULONG> &lstMailnr, ECIConv *iconv);
-
+	HRESULT HrSearchNU(const std::vector<std::string> &cond, ULONG startcond, std::list<ULONG> &mailnr);
+	HRESULT HrSearch(std::vector<std::string> &&cond, ULONG startcond, std::list<ULONG> &mailnr);
 	string GetHeaderValue(const string &strMessage, const string &strHeader, const string &strDefault);
 	HRESULT HrGetBodyStructure(bool bExtended, string &strBodyStructure, const string& strMessage);
 
@@ -367,9 +386,7 @@ private:
 	void HrGetSubString(string &strOutput, const std::string &strInput, const std::string &strBegin, const std::string &strEnd);
 	void HrTokenize(std::set<std::string> &setTokens, const std::string &strInput);
 
-	HRESULT HrExpungeDeleted(const string &strTag, const string &strCommand, const SRestriction *lpUIDRestriction);
-
-	friend LONG __stdcall IMAPIdleAdviseCallback(void *lpContext, ULONG cNotif, LPNOTIFICATION lpNotif);
+	HRESULT HrExpungeDeleted(const string &strTag, const string &strCommand, std::unique_ptr<ECRestriction> &&);
 };
 
 /** @} */

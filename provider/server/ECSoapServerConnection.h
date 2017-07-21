@@ -19,16 +19,16 @@
 #define ECSOAPSERVERCONNECTION_H
 
 #include <kopano/zcdefs.h>
-#include <set>
 #include <kopano/kcodes.h>
 #include "ECThreadManager.h"
 #include "soapH.h"
-#include <kopano/ECLogger.h>
 #include <kopano/ECConfig.h>
 
-class ECSoapServerConnection _zcp_final {
+extern int kc_ssl_options(struct soap *, char *protos, const char *ciphers, const char *prefciphers);
+
+class ECSoapServerConnection _kc_final {
 public:
-	ECSoapServerConnection(ECConfig* lpConfig, ECLogger* lpLogger);
+	ECSoapServerConnection(ECConfig *);
 	~ECSoapServerConnection();
 
 	ECRESULT ListenTCP(const char* lpServerName, int nServerPort, bool bEnableGET);
@@ -51,7 +51,6 @@ private:
     ECDispatcher *m_lpDispatcher;
 
 	ECConfig*	m_lpConfig;
-	ECLogger*	m_lpLogger;
 	std::string	m_strPipeName;
 };
 

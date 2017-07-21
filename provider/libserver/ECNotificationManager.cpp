@@ -16,6 +16,9 @@
  */
 
 #include <kopano/platform.h>
+#include <chrono>
+#include <kopano/lockhelper.hpp>
+#include <pthread.h>
 #include "ECNotificationManager.h"
 #include "ECSession.h"
 #include "ECSessionManager.h"
@@ -23,26 +26,20 @@
 
 #include "soapH.h"
 
+namespace KC {
+
 // Copied from generated soapServer.cpp
 static int soapresponse(struct notifyResponse notifications, struct soap *soap)
 {
     soap_serializeheader(soap);
-#if GSOAP_VERSION > 20816
     soap_serialize_notifyResponse(soap, &notifications);
-#else
-    soap_serialize_ns_notifyResponse(soap, &notifications);
-#endif
     if (soap_begin_count(soap))
         return soap->error;
     if (soap->mode & SOAP_IO_LENGTH)
     {	if (soap_envelope_begin_out(soap)
          || soap_putheader(soap)
          || soap_body_begin_out(soap)
-#if GSOAP_VERSION > 20816
          || soap_put_notifyResponse(soap, &notifications, "ns:notifyResponse", NULL)
-#else
-         || soap_put_ns_notifyResponse(soap, &notifications, "ns:notifyResponse", NULL)
-#endif
          || soap_body_end_out(soap)
          || soap_envelope_end_out(soap))
             return soap->error;
@@ -52,11 +49,7 @@ static int soapresponse(struct notifyResponse notifications, struct soap *soap)
      || soap_envelope_begin_out(soap)
      || soap_putheader(soap)
      || soap_body_begin_out(soap)
-#if GSOAP_VERSION > 20816
      || soap_put_notifyResponse(soap, &notifications, "ns:notifyResponse", NULL)
-#else
-     || soap_put_ns_notifyResponse(soap, &notifications, "ns:notifyResponse", NULL)
-#endif
      || soap_body_end_out(soap)
      || soap_envelope_end_out(soap)
      || soap_end_send(soap))
@@ -64,52 +57,41 @@ static int soapresponse(struct notifyResponse notifications, struct soap *soap)
     return soap_closesock(soap);
 }
 
+void (*kopano_notify_done)(struct soap *) = [](struct soap *) {};
+
 ECNotificationManager::ECNotificationManager(void)
 {
-    m_bExit = false;
-    pthread_mutex_init(&m_mutexSessions, NULL);
-    pthread_mutex_init(&m_mutexRequests, NULL);
-    pthread_cond_init(&m_condSessions, NULL);
     pthread_create(&m_thread, NULL, Thread, this);
     set_thread_name(m_thread, "NotificationManager");
-
-    m_ulTimeout = 60; // Currently hardcoded at 60s, see comment in Work()    
 }
 
 ECNotificationManager::~ECNotificationManager()
 {
-    pthread_mutex_lock(&m_mutexSessions);
-    m_bExit = true;
-    pthread_cond_broadcast(&m_condSessions);
-    pthread_mutex_unlock(&m_mutexSessions);
+	ulock_normal l_ses(m_mutexSessions);
+	m_bExit = true;
+	m_condSessions.notify_all();
+	l_ses.unlock();
 
 	ec_log_info("Shutdown notification manager");
     pthread_join(m_thread, NULL);
 
     // Close and free any pending requests (clients will receive EOF)
-    std::map<ECSESSIONID, NOTIFREQUEST>::const_iterator iterRequest;
-    for (iterRequest = m_mapRequests.begin();
-         iterRequest != m_mapRequests.end(); ++iterRequest) {
+	for (const auto &p : m_mapRequests) {
 		// we can't call kopano_notify_done here, race condition on shutdown in ECSessionManager vs ECDispatcher
-		kopano_end_soap_connection(iterRequest->second.soap);
-		soap_destroy(iterRequest->second.soap);
-		soap_end(iterRequest->second.soap);
-		soap_free(iterRequest->second.soap);
+		kopano_end_soap_connection(p.second.soap);
+		soap_destroy(p.second.soap);
+		soap_end(p.second.soap);
+		soap_free(p.second.soap);
     }
-    pthread_mutex_destroy(&m_mutexSessions);
-    pthread_mutex_destroy(&m_mutexRequests);
-    pthread_cond_destroy(&m_condSessions);
 }
 
 // Called by the SOAP handler
 HRESULT ECNotificationManager::AddRequest(ECSESSIONID ecSessionId, struct soap *soap)
 {
-    std::map<ECSESSIONID, NOTIFREQUEST>::const_iterator iterRequest;
     struct soap *lpItem = NULL;
-    
-    pthread_mutex_lock(&m_mutexRequests);
-    iterRequest = m_mapRequests.find(ecSessionId);
-    if(iterRequest != m_mapRequests.end()) {
+	ulock_normal l_req(m_mutexRequests);
+	auto iterRequest = m_mapRequests.find(ecSessionId);
+	if (iterRequest != m_mapRequests.cend()) {
         // Hm. There is already a SOAP request waiting for this session id. Apparently a second SOAP connection has now
         // requested notifications. Since this should only happen if the client thinks it has lost its connection and has
         // restarted the request, we will replace the existing request with this one.
@@ -119,16 +101,11 @@ HRESULT ECNotificationManager::AddRequest(ECSESSIONID ecSessionId, struct soap *
         
         // Return the previous request as an error
         struct notifyResponse notifications;
-#if GSOAP_VERSION > 20816
         soap_default_notifyResponse(iterRequest->second.soap, &notifications);
-#else
-        soap_default_ns_notifyResponse(iterRequest->second.soap, &notifications);
-#endif
         notifications.er = KCERR_NOT_FOUND; // Should be something like 'INTERRUPTED' or something
-        if(soapresponse(notifications, iterRequest->second.soap)) {
-            // Handle error on the response
-            soap_send_fault(iterRequest->second.soap);
-        }
+		if (soapresponse(notifications, iterRequest->second.soap))
+			// Handle error on the response
+			soap_send_fault(iterRequest->second.soap);
 		soap_destroy(iterRequest->second.soap);
 		soap_end(iterRequest->second.soap);
         lpItem = iterRequest->second.soap;
@@ -142,8 +119,7 @@ HRESULT ECNotificationManager::AddRequest(ECSESSIONID ecSessionId, struct soap *
     time(&req.ulRequestTime);
     
     m_mapRequests[ecSessionId] = req;
-    
-    pthread_mutex_unlock(&m_mutexRequests);
+	l_req.unlock();
     
     // There may already be notifications waiting for this session, so post a change on this session so that the
     // thread will attempt to get notifications on this session
@@ -156,12 +132,10 @@ HRESULT ECNotificationManager::AddRequest(ECSESSIONID ecSessionId, struct soap *
 HRESULT ECNotificationManager::NotifyChange(ECSESSIONID ecSessionId)
 {
     // Simply mark the session in our set of active sessions
-    pthread_mutex_lock(&m_mutexSessions);
-    m_setActiveSessions.insert(ecSessionId);
-    pthread_cond_signal(&m_condSessions);		// Wake up thread due to activity
-    pthread_mutex_unlock(&m_mutexSessions);    
-    
-    return hrSuccess;
+	scoped_lock l_ses(m_mutexSessions);
+	m_setActiveSessions.insert(ecSessionId);
+	m_condSessions.notify_all(); /* Wake up thread due to activity */
+	return hrSuccess;
 }
 
 void * ECNotificationManager::Thread(void *lpParam)
@@ -176,54 +150,35 @@ void *ECNotificationManager::Work() {
     ECSession *lpecSession = NULL;
     struct notifyResponse notifications;
 
-    std::set<ECSESSIONID>::const_iterator iterSessions;
     std::set<ECSESSIONID> setActiveSessions;
-    std::map<ECSESSIONID, NOTIFREQUEST>::iterator iterRequest;
     struct soap *lpItem;
     time_t ulNow = 0;
     
     // Keep looping until we should exit
     while(1) {
-        pthread_mutex_lock(&m_mutexSessions);
-        
-        if(m_bExit) {
-            pthread_mutex_unlock(&m_mutexSessions);
-            break;
-        }
-            
-        if(m_setActiveSessions.size() == 0) {
-            // Wait for events for maximum of 1 sec
-            struct timespec ts;
-            clock_gettime(CLOCK_REALTIME, &ts);
-            ts.tv_sec += 1;
-            pthread_cond_timedwait(&m_condSessions, &m_mutexSessions, &ts);
-        }
+		ulock_normal l_ses(m_mutexSessions);
+		if (m_bExit)
+			break;
+		if (m_setActiveSessions.size() == 0)
+			/* Wait for events for maximum of 1 sec */
+			m_condSessions.wait_for(l_ses, std::chrono::seconds(1));
         
         // Make a copy of the session list so we can release the lock ASAP
         setActiveSessions = m_setActiveSessions;
         m_setActiveSessions.clear();
-        
-        pthread_mutex_unlock(&m_mutexSessions);
+		l_ses.unlock();
         
         // Look at all the sessions that have signalled a change
-        for (iterSessions = setActiveSessions.begin();
-             iterSessions != setActiveSessions.end(); ++iterSessions)
-        {
+        for (const auto &ses : setActiveSessions) {
             lpItem = NULL;
-        
-            pthread_mutex_lock(&m_mutexRequests);
+			ulock_normal l_req(m_mutexRequests);
             
             // Find the request for the session that had something to say
-            iterRequest = m_mapRequests.find(*iterSessions);
-            
-            if(iterRequest != m_mapRequests.end()) {
+            auto iterRequest = m_mapRequests.find(ses);
+            if (iterRequest != m_mapRequests.cend()) {
                 // Reset notification response to default values
-#if GSOAP_VERSION > 20816
                 soap_default_notifyResponse(iterRequest->second.soap, &notifications);
-#else
-                soap_default_ns_notifyResponse(iterRequest->second.soap, &notifications);
-#endif
-                if(g_lpSessionManager->ValidateSession(iterRequest->second.soap, *iterSessions, &lpecSession, true) == erSuccess) {
+                if(g_lpSessionManager->ValidateSession(iterRequest->second.soap, ses, &lpecSession, true) == erSuccess) {
                     // Get the notifications from the session
                     er = lpecSession->GetNotifyItems(iterRequest->second.soap, &notifications);
                     
@@ -231,7 +186,7 @@ void *ECNotificationManager::Work() {
                         if(time(NULL) - iterRequest->second.ulRequestTime < m_ulTimeout) {
                             // No notifications - this means we have to wait. This can happen if the session was marked active since
                             // the request was just made, and there may have been notifications still waiting for us
-                            pthread_mutex_unlock(&m_mutexRequests);
+							l_req.unlock();
                             lpecSession->Unlock();
                             continue; // Totally ignore this item == wait
                         } else {
@@ -257,10 +212,9 @@ void *ECNotificationManager::Work() {
                 }
 
                 // Send the SOAP data
-				if(soapresponse(notifications, iterRequest->second.soap)) {
+				if (soapresponse(notifications, iterRequest->second.soap))
 					// Handle error on the response
 					soap_send_fault(iterRequest->second.soap);
-				}
 				// Free allocated SOAP data (in GetNotifyItems())
 				soap_destroy(iterRequest->second.soap);
 				soap_end(iterRequest->second.soap);
@@ -274,9 +228,7 @@ void *ECNotificationManager::Work() {
             } else {
                 // Nobody was listening to this session, just ignore it
             }
-
-            pthread_mutex_unlock(&m_mutexRequests);
-            
+			l_req.unlock();
             if(lpItem)
                 kopano_notify_done(lpItem);
             
@@ -287,19 +239,15 @@ void *ECNotificationManager::Work() {
          * TCP timeout of 70 seconds, we need to respond well within those 70 seconds. We therefore use a timeout
          * value of 60 seconds here.
          */
-        pthread_mutex_lock(&m_mutexRequests);
+		ulock_normal l_req(m_mutexRequests);
         time(&ulNow);
-        iterRequest = m_mapRequests.begin();
-        while(iterRequest != m_mapRequests.end()) {
-            if(ulNow - iterRequest->second.ulRequestTime > m_ulTimeout) {
+        for (const auto &req : m_mapRequests)
+            if (ulNow - req.second.ulRequestTime > m_ulTimeout)
                 // Mark the session as active so it will be processed in the next loop
-                NotifyChange(iterRequest->first);
-            }
-            ++iterRequest;
-        } 
-        pthread_mutex_unlock(&m_mutexRequests);
-        
+                NotifyChange(req.first);
     }
     
     return NULL;
 }
+
+} /* namespace */

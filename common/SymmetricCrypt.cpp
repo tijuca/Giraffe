@@ -16,12 +16,13 @@
  */
 
 #include <kopano/platform.h>
-#include <kopano/base64.h>
-
 #include <string>
+#include <kopano/stringutil.h>
 #include <kopano/charset/convert.h>
 #include <cassert>
 #include "SymmetricCrypt.h"
+
+namespace KC {
 
 /**
  * Check if the provided password is crypted.
@@ -131,3 +132,5 @@ std::string SymmetricDecrypt(const wchar_t *wstrCrypted)
 	return SymmetricDecryptBlob(wstrCrypted[1] - '0',
 		base64_decode(convert_to<std::string>(wstrCrypted + 4)));
 }
+
+} /* namespace */

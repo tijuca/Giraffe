@@ -20,11 +20,13 @@
 
 #include <map>
 #include <memory>
+#include <kopano/zcdefs.h>
 #include "archivestateupdater_fwd.h"
 #include "ArchiverSessionPtr.h"     // For ArchiverSessionPtr
-#include <kopano/tstring.h>
 #include <kopano/archiver-common.h>
 #include "ECArchiverLogger.h"
+
+namespace KC {
 
 class ArchiveStateCollector;
 typedef std::shared_ptr<ArchiveStateCollector> ArchiveStateCollectorPtr;
@@ -35,14 +37,12 @@ typedef std::shared_ptr<ArchiveStateCollector> ArchiveStateCollectorPtr;
  * should-be archive state, which is the set of attached archives for each
  * primary store as specified in LDAP/ADS.
  */
-class ArchiveStateCollector {
+class _kc_export ArchiveStateCollector _kc_final {
 public:
 	static HRESULT Create(const ArchiverSessionPtr &ptrSession, ECLogger *lpLogger, ArchiveStateCollectorPtr *lpptrCollector);
-
-	~ArchiveStateCollector();
+	_kc_hidden ~ArchiveStateCollector(void);
 	HRESULT GetArchiveStateUpdater(ArchiveStateUpdaterPtr *lpptrUpdater);
 
-public:
 	struct ArchiveInfo {
 		tstring userName;
 		entryid_t storeId;
@@ -53,15 +53,16 @@ public:
 	typedef std::map<abentryid_t, ArchiveInfo> ArchiveInfoMap;
 
 private:
-	ArchiveStateCollector(const ArchiverSessionPtr &ptrSession, ECLogger *lpLogger);
-	HRESULT PopulateUserList();
-	HRESULT PopulateFromContainer(LPABCONT lpContainer);
+	_kc_hidden ArchiveStateCollector(const ArchiverSessionPtr &, ECLogger *);
+	_kc_hidden HRESULT PopulateUserList(void);
+	_kc_hidden HRESULT PopulateFromContainer(LPABCONT container);
 
-private:
 	ArchiverSessionPtr m_ptrSession;
 	ECArchiverLogger *m_lpLogger;
 
 	ArchiveInfoMap	m_mapArchiveInfo;
 };
+
+} /* namespace */
 
 #endif // !defined ARCHIVESTATECOLLECTOR_H_INCLUDED

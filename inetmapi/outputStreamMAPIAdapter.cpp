@@ -17,10 +17,9 @@
 
 #include <kopano/platform.h>
 
-// Damn windows header defines max which break C++ header files
-#undef max
-
 #include "outputStreamMAPIAdapter.h"
+
+namespace KC {
 
 outputStreamMAPIAdapter::outputStreamMAPIAdapter(IStream *lpStream)
 {
@@ -35,12 +34,14 @@ outputStreamMAPIAdapter::~outputStreamMAPIAdapter()
 		lpStream->Release();
 }
 
-void outputStreamMAPIAdapter::write(const value_type* const data, const size_type count)
+void outputStreamMAPIAdapter::writeImpl(const vmime::byte_t *data, size_t count)
 {
-	lpStream->Write((unsigned char *)data,count,NULL);
+	lpStream->Write(data, count, NULL);
 }
 
 void outputStreamMAPIAdapter::flush()
 {
     // just ignore the call, or call Commit() ?
 }
+
+} /* namespace */

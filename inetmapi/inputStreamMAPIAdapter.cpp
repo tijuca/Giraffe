@@ -17,17 +17,15 @@
 
 #include <kopano/platform.h>
 
-// Damn windows header defines max which break C++ header files
-#undef max
-
 #include "inputStreamMAPIAdapter.h"
+
+namespace KC {
 
 inputStreamMAPIAdapter::inputStreamMAPIAdapter(IStream *lpStream)
 {
 	this->lpStream = lpStream;
 	if (lpStream)
 		lpStream->AddRef();
-	this->ateof = false;
 }
 
 inputStreamMAPIAdapter::~inputStreamMAPIAdapter()
@@ -36,12 +34,11 @@ inputStreamMAPIAdapter::~inputStreamMAPIAdapter()
 		lpStream->Release();
 }
 
-vmime::utility::stream::size_type inputStreamMAPIAdapter::read(value_type* data, const size_type count)
+size_t inputStreamMAPIAdapter::read(unsigned char *data, size_t count)
 {
 	ULONG ulSize = 0;
 
-	lpStream->Read((unsigned char *)data, count, &ulSize);
-
+	lpStream->Read(data, count, &ulSize);
 	if (ulSize != count)
 		this->ateof = true;
 
@@ -59,7 +56,7 @@ void inputStreamMAPIAdapter::reset()
 	this->ateof = false;
 }
 
-vmime::utility::stream::size_type inputStreamMAPIAdapter::skip(const size_type count)
+size_t inputStreamMAPIAdapter::skip(size_t count)
 {
 	ULARGE_INTEGER ulSize;
 	LARGE_INTEGER move;
@@ -73,3 +70,5 @@ vmime::utility::stream::size_type inputStreamMAPIAdapter::skip(const size_type c
 
 	return ulSize.QuadPart;
 }
+
+} /* namespace */

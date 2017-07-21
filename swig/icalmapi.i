@@ -3,6 +3,8 @@
 %{
 #include "ICalToMAPI.h"
 #include "MAPIToICal.h"
+#include <mapitovcf.hpp>
+#include <vcftomapi.hpp>
 %}
 
 %include "std_string.i"
@@ -17,7 +19,8 @@
 %typemap(argout) (ICALMAPICLASS **) {
   %append_output(SWIG_NewPointerObj((void*)*($1), $*1_descriptor, SWIG_SHADOW | SWIG_OWNER));
 }
-%apply ICALMAPICLASS **{ ICalToMapi **, MapiToICal **};
+%apply ICALMAPICLASS **{ KC::ICalToMapi **, KC::MapiToICal **};
+%apply ICALMAPICLASS **{ KC::vcftomapi **, KC::mapitovcf **};
 
 /* GetItemInfo output parameters */
 %typemap(in,numinputs=0) (eIcalType *) (eIcalType temp) {
@@ -59,6 +62,8 @@
 typedef IAddrBook* LPADRBOOK;
 typedef IMessage* LPMESSAGE;
 
-%include "icalmapi.h"
+%include <kopano/zcdefs.h>
 %include "ICalToMAPI.h"
 %include "MAPIToICal.h"
+%include <mapitovcf.hpp>
+%include <vcftomapi.hpp>

@@ -21,8 +21,8 @@
 // the GNU General Public License cover the whole combination.
 //
 
-#include "vmime/net/serviceFactory.hpp"
-
+#include <memory>
+#include <vmime/net/serviceFactory.hpp>
 
 #ifndef VMIME_BUILDING_DOC
 
@@ -32,8 +32,7 @@ namespace net {
 
 
 template <class S>
-class registeredServiceImpl : public serviceFactory::registeredService
-{
+class registeredServiceImpl : public serviceFactory::registeredService {
 public:
 
 	registeredServiceImpl(const string& name, const int type)
@@ -41,11 +40,10 @@ public:
 	{
 	}
 
-	ref <service> create
-		(ref <session> sess,
-		 ref <security::authenticator> auth) const
+	vmime::shared_ptr<service> create(vmime::shared_ptr<session> sess,
+	    vmime::shared_ptr<security::authenticator> auth) const
 	{
-		return vmime::create <S>(sess, auth);
+		return vmime::make_shared<S>(sess, auth);
 	}
 
 	const serviceInfos& getInfos() const
@@ -72,15 +70,13 @@ private:
 
 
 // Basic service registerer
-template <class S>
-class serviceRegisterer
-{
+template<class S> class serviceRegisterer {
 public:
 
 	serviceRegisterer(const string& protocol, const service::Type type)
 	{
 		serviceFactory::getInstance()->registerService
-			(vmime::create <vmime::net::registeredServiceImpl <S> >(protocol, type));
+			(vmime::make_shared<net::registeredServiceImpl<S> >(protocol, type));
 	}
 };
 

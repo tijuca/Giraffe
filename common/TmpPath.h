@@ -18,18 +18,22 @@
 #include <kopano/zcdefs.h>
 #include <string>
 
+namespace KC {
+
 class ECConfig;
 
-class TmpPath _zcp_final {
+class _kc_export TmpPath _kc_final {
 	private:
 		std::string path;
 
 	public:
-		TmpPath();
+		_kc_hidden TmpPath(void);
 		static TmpPath *getInstance();
 
 		bool OverridePath(ECConfig *const ec);
-		const std::string &getTempPath(void) const { return path; }
+		_kc_hidden const std::string &getTempPath(void) const { return path; }
 };
 
 extern TmpPath *tmpPath;
+
+} /* namespace */

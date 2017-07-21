@@ -16,11 +16,18 @@
  */
 
 #include <kopano/platform.h>
-
+#include <exception>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
 #include <mapidefs.h>
 #include <mapitags.h>
 #include <kopano/mapiext.h>
-
+#include <kopano/tie.hpp>
 #include <map>
 #include <memory>
 #include <algorithm>
@@ -36,8 +43,6 @@
 #include "ECPamAuth.h"
 #include "ECKrbAuth.h"
 #include <kopano/UnixUtil.h>
-#include <kopano/base64.h>
-
 #include "ECICS.h"
 #include "ics.h"
 #include <kopano/ECGuid.h>
@@ -48,24 +53,22 @@
 #include <kopano/charset/convert.h>
 #include <kopano/charset/utf8string.h>
 
-#include <kopano/threadutil.h>
-
-#include <boost/algorithm/string.hpp>
-namespace ba = boost::algorithm;
-
 #ifndef AB_UNICODE_OK
 #define AB_UNICODE_OK ((ULONG) 0x00000040)
 #endif
+
+using namespace KCHL;
+
+namespace KC {
 
 extern ECSessionManager*	g_lpSessionManager;
 
 static bool execute_script(const char *scriptname, ...)
 {
 	va_list v;
-	char *envname, *envval;
+	char *envname;
 	const char *env[32];
 	std::list<std::string> lstEnv;
-	std::list<std::string>::const_iterator i;
 	std::string strEnv;
 	int n = 0;
 	
@@ -75,23 +78,22 @@ static bool execute_script(const char *scriptname, ...)
 		envname = va_arg(v, char *);
 		if (!envname)
 			break;
-		envval = va_arg(v, char *);
+		char *envval = va_arg(v, char *);
 		if (!envval)
 			break;
 		
 		strEnv = envname;
 		strEnv += '=';
 		strEnv += envval;
-		
-		lstEnv.push_back(strEnv);
+		lstEnv.push_back(std::move(strEnv));
 	}
 	va_end(v);
 
 	ec_log_debug("Running script `%s`", scriptname);
-	for (i = lstEnv.begin(); i != lstEnv.end(); ++i)
-		env[n++] = i->c_str();
+	for (const auto &s : lstEnv)
+		env[n++] = s.c_str();
 	env[n] = NULL;
-	return unix_system(scriptname, scriptname, env);
+	return unix_system(scriptname, {scriptname}, env);
 }
 
 static const char *ObjectClassToName(objectclass_t objclass)
@@ -158,19 +160,6 @@ ECUserManagement::ECUserManagement(BTSession *lpSession,
 	this->m_lpSession = lpSession;
 	this->m_lpPluginFactory = lpPluginFactory;
 	this->m_lpConfig = lpConfig;
-
-	pthread_mutexattr_t attr;
-	pthread_mutexattr_init(&attr);
-	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-
-	pthread_mutex_init(&m_hMutex, &attr);
-
-	pthread_mutexattr_destroy(&attr);
-}
-
-ECUserManagement::~ECUserManagement(void)
-{
-	pthread_mutex_destroy(&m_hMutex);
 }
 
 // Authenticate a user (NOTE: ECUserManagement will never authenticate SYSTEM unless it is actually
@@ -202,12 +191,10 @@ ECRESULT ECUserManagement::AuthUserAndSync(const char* szLoginname, const char* 
 	er = GetUserAndCompanyFromLoginName(szLoginname, &username, &companyname);
 	if (er != erSuccess && er != KCWARN_PARTIAL_COMPLETION)
 		return er;
-
-	if(SymmetricIsCrypted(szPassword)) {
+	if (SymmetricIsCrypted(szPassword))
 		password = SymmetricDecrypt(szPassword);
-	} else {
+	else
 		password = szPassword;
-	}
 
 	if (bHosted && !companyname.empty()) {
 		er = ResolveObject(CONTAINER_COMPANY, companyname, objectid_t(), &sCompany);
@@ -279,7 +266,8 @@ ECRESULT ECUserManagement::AuthUserAndSync(const char* szLoginname, const char* 
  * as a prototype, but that would mean percolating constness in class ECSecurity's methods, which proved to
  * be a task beyond a simple edit. NS 11 fFebruary 2014
  */
-bool ECUserManagement::MustHide(/*const*/ ECSecurity& security, unsigned int ulFlags, const objectdetails_t& details)
+bool ECUserManagement::MustHide(/*const*/ ECSecurity &security,
+    unsigned int ulFlags, const objectdetails_t &details) const
 {
 	return	(security.GetUserId() != KOPANO_UID_SYSTEM) &&
 		(security.GetAdminLevel() == 0) &&
@@ -300,13 +288,10 @@ ECRESULT ECUserManagement::GetLocalObjectListFromSignatures(const list<objectsig
 {
 	ECRESULT er;
 	ECSecurity *lpSecurity = NULL;
-	list<objectsignature_t>::const_iterator iterSignatures;
-	std::map<objectid_t, unsigned int>::const_iterator iterExternLocal;
 
 	// Extern details
 	list<objectid_t> lstExternIds;
 	std::unique_ptr<map<objectid_t, objectdetails_t> > lpExternDetails;
-	std::map<objectid_t, objectdetails_t>::const_iterator iterExternDetails;
 
 	objectdetails_t details;
 	unsigned int ulObjectId = 0;
@@ -320,10 +305,9 @@ ECRESULT ECUserManagement::GetLocalObjectListFromSignatures(const list<objectsig
 	if (er != erSuccess)
 		return er;
 
-	for (iterSignatures = lstSignatures.begin();
-	     iterSignatures != lstSignatures.end(); ++iterSignatures) {
-		iterExternLocal = mapExternToLocal.find(iterSignatures->id);
-		if (iterExternLocal == mapExternToLocal.end())
+	for (const auto &sig : lstSignatures) {
+		auto iterExternLocal = mapExternToLocal.find(sig.id);
+		if (iterExternLocal == mapExternToLocal.cend())
 			continue;
 
 		ulObjectId = iterExternLocal->second;
@@ -332,15 +316,13 @@ ECRESULT ECUserManagement::GetLocalObjectListFromSignatures(const list<objectsig
 		// it from the plugin.
 		er = m_lpSession->GetSessionManager()->GetCacheManager()->GetUserDetails(ulObjectId, &details);
 		if (er != erSuccess) {
-			lstExternIds.push_back(iterSignatures->id);
+			lstExternIds.push_back(sig.id);
 			er = erSuccess;
 			continue;
 		}
-
-		if (ulFlags & USERMANAGEMENT_ADDRESSBOOK) {
-			if (MustHide(*lpSecurity, ulFlags, details))
-				continue;
-		}
+		if (ulFlags & USERMANAGEMENT_ADDRESSBOOK &&
+		    MustHide(*lpSecurity, ulFlags, details))
+			continue;
 
 		// remove details, but keep the class information
 		if (ulFlags & USERMANAGEMENT_IDS_ONLY)
@@ -349,42 +331,38 @@ ECRESULT ECUserManagement::GetLocalObjectListFromSignatures(const list<objectsig
 		lpDetails->push_back(localobjectdetails_t(ulObjectId, details));
 	}
 
+	if (lstExternIds.empty())
+		return hrSuccess;
+
 	// We have a list of all objects which still require details from plugin
-	if (!lstExternIds.empty()) {
-		try {
-			// Get all pending details
-			lpExternDetails = lpPlugin->getObjectDetails(lstExternIds);
-		} catch (notsupported &) {
-			return KCERR_NO_SUPPORT;
-		} catch (objectnotfound &) {
-			return KCERR_NOT_FOUND;
-		} catch(std::exception &e) {
-			ec_log_warn("Unable to retrieve details from external user source: %s", e.what());
-			return KCERR_PLUGIN_ERROR;
-		}
+	try {
+		// Get all pending details
+		lpExternDetails = lpPlugin->getObjectDetails(lstExternIds);
+	} catch (notsupported &) {
+		return KCERR_NO_SUPPORT;
+	} catch (objectnotfound &) {
+		return KCERR_NOT_FOUND;
+	} catch(std::exception &e) {
+		ec_log_warn("Unable to retrieve details from external user source: %s", e.what());
+		return KCERR_PLUGIN_ERROR;
+	}
 
-		for (iterExternDetails = lpExternDetails->begin();
-		     iterExternDetails != lpExternDetails->end();
-		     ++iterExternDetails) {
-			iterExternLocal = mapExternToLocal.find(iterExternDetails->first);
-			if (iterExternLocal == mapExternToLocal.end())
+	for (const auto &ext_det : *lpExternDetails) {
+		auto iterExternLocal = mapExternToLocal.find(ext_det.first);
+		if (iterExternLocal == mapExternToLocal.cend())
+			continue;
+
+		ulObjectId = iterExternLocal->second;
+		if (ulFlags & USERMANAGEMENT_ADDRESSBOOK)
+			if (MustHide(*lpSecurity, ulFlags, ext_det.second))
 				continue;
+		if (ulFlags & USERMANAGEMENT_IDS_ONLY)
+			lpDetails->push_back(localobjectdetails_t(ulObjectId, objectdetails_t(ext_det.second.GetClass())));
+		else
+			lpDetails->push_back(localobjectdetails_t(ulObjectId, ext_det.second));
 
-			ulObjectId = iterExternLocal->second;
-
-			if (ulFlags & USERMANAGEMENT_ADDRESSBOOK) {
-				if (MustHide(*lpSecurity, ulFlags, iterExternDetails->second))
-					continue;
-			}
-
-			if (ulFlags & USERMANAGEMENT_IDS_ONLY)
-				lpDetails->push_back(localobjectdetails_t(ulObjectId, objectdetails_t(iterExternDetails->second.GetClass())));
-			else
-				lpDetails->push_back(localobjectdetails_t(ulObjectId, iterExternDetails->second));
-
-			// Update cache
-			m_lpSession->GetSessionManager()->GetCacheManager()->SetUserDetails(ulObjectId, &iterExternDetails->second);	
-		}
+		// Update cache
+		m_lpSession->GetSessionManager()->GetCacheManager()->SetUserDetails(ulObjectId, &ext_det.second);
 	}
 	return erSuccess;
 }
@@ -411,21 +389,17 @@ ECRESULT ECUserManagement::GetCompanyObjectListAndSync(objectclass_t objclass, u
 	bool bIsSafeMode = parseBool(m_lpConfig->GetSetting("user_safe_mode"));
 
 	// Return data
-	std::list<localobjectdetails_t> *lpObjects = new std::list<localobjectdetails_t>;
-	std::list<localobjectdetails_t>::iterator iterObjects;
+	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects(new std::list<localobjectdetails_t>);
 
 	// Local ids
-	std::list<unsigned int> *lpLocalIds = NULL;
-	std::list<unsigned int>::const_iterator iterLocalIds;
+	std::unique_ptr<std::list<unsigned int> > lpLocalIds;
 
 	// Extern ids
 	std::unique_ptr<signatures_t> lpExternSignatures;
-	signatures_t::const_iterator iterExternSignatures;
 
 	// Extern -> Local
 	std::map<objectid_t, unsigned int> mapExternIdToLocal;
 	std::map<objectid_t, std::pair<unsigned int, std::string> > mapSignatureIdToLocal;
-	std::map<objectid_t, std::pair<unsigned int, std::string> >::iterator iterSignatureIdToLocal;
 
 	objectid_t extcompany;
 	objectid_t externid;
@@ -438,11 +412,10 @@ ECRESULT ECUserManagement::GetCompanyObjectListAndSync(objectclass_t objclass, u
 
 	er = GetThreadLocalPlugin(m_lpPluginFactory, &lpPlugin);
 	if (er != erSuccess)
-		goto exit;
-
+		return er;
 	er = GetSecurity(&lpSecurity);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	if (m_lpSession->GetSessionManager()->IsHostedSupported()) {
 		/* When hosted is enabled, the companyid _must_ have an external id,
@@ -451,77 +424,64 @@ ECRESULT ECUserManagement::GetCompanyObjectListAndSync(objectclass_t objclass, u
 		if (objclass != CONTAINER_COMPANY && !IsInternalObject(ulCompanyId)) {
 			er = GetExternalId(ulCompanyId, &extcompany);
 			if (er != erSuccess)
-				goto exit;
+				return er;
 		}
 	} else {
-		if (objclass == CONTAINER_COMPANY) {
-			er = KCERR_NO_SUPPORT;
-			goto exit;
-		}
-
+		if (objclass == CONTAINER_COMPANY)
+			return KCERR_NO_SUPPORT;
 		/* When hosted is disabled, use company id 0 */
 		ulCompanyId = 0;
 	}
 
 	// Get all the items of the requested type
-	er = GetLocalObjectIdList(objclass, ulCompanyId, &lpLocalIds);
+	er = GetLocalObjectIdList(objclass, ulCompanyId, &unique_tie(lpLocalIds));
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
-	for (iterLocalIds = lpLocalIds->begin();
-	     iterLocalIds != lpLocalIds->end(); ++iterLocalIds) {
-		if(IsInternalObject(*iterLocalIds)) {
+	for (const auto &loc_id : *lpLocalIds) {
+		if (IsInternalObject(loc_id)) {
 			// Local user, add it to the result array directly
 			objectdetails_t details = objectdetails_t();
-
-			er = GetLocalObjectDetails(*iterLocalIds, &details);
+			er = GetLocalObjectDetails(loc_id, &details);
 			if(er != erSuccess)
-				goto exit;
-
-			if (ulFlags & USERMANAGEMENT_ADDRESSBOOK) {
+				return er;
+			if (ulFlags & USERMANAGEMENT_ADDRESSBOOK)
 				if (MustHide(*lpSecurity, ulFlags, details))
 					continue;
-			}
 			// Reset details, this saves time copying unwanted data, but keep the correct class
 			if (ulFlags & USERMANAGEMENT_IDS_ONLY)
 				details = objectdetails_t(details.GetClass());
 
-			lpObjects->push_back(localobjectdetails_t(*iterLocalIds, details));
-		} else if(GetExternalId(*iterLocalIds, &externid, NULL, &signature) == erSuccess) {
+			lpObjects->push_back(localobjectdetails_t(loc_id, details));
+		} else if (GetExternalId(loc_id, &externid, NULL, &signature) == erSuccess) {
 			mapSignatureIdToLocal.insert(
-				std::map<objectid_t, std::pair<unsigned int, std::string> >::value_type(externid, make_pair(*iterLocalIds, signature)));
+				std::map<objectid_t, std::pair<unsigned int, std::string> >::value_type(externid, make_pair(loc_id, signature)));
 		} else {
 			// cached externid not found for local object id
 		}
 	}
 
 	if (bSync && !bIsSafeMode) {
-		// We now have a map, mapping external id's to local user id's (and their signatures)
+		// We now have a map, mapping external IDs to local user IDs (and their signatures)
 		try {
 			// Get full user list
 			lpExternSignatures = lpPlugin->getAllObjects(extcompany, objclass);
 			// TODO: check requested 'objclass'
 		} catch (notsupported &) {
-			er = KCERR_NO_SUPPORT;
-			goto exit;
+			return KCERR_NO_SUPPORT;
 		} catch (objectnotfound &) {
-			er = KCERR_NOT_FOUND;
-			goto exit;
+			return KCERR_NOT_FOUND;
 		} catch(std::exception &e) {
 			ec_log_warn("Unable to retrieve list from external user source: %s", e.what());
-			er = KCERR_PLUGIN_ERROR;
-			goto exit;
+			return KCERR_PLUGIN_ERROR;
 		}
 
 		// Loop through all the external signatures, adding them to the lpUsers list which we're going to be returning
-		for (iterExternSignatures = lpExternSignatures->begin();
-		     iterExternSignatures != lpExternSignatures->end();
-		     ++iterExternSignatures) {
-			iterSignatureIdToLocal = mapSignatureIdToLocal.find(iterExternSignatures->id);
-
-			if (iterSignatureIdToLocal == mapSignatureIdToLocal.end()) {
+		for (const auto &ext_sig : *lpExternSignatures) {
+			auto iterSignatureIdToLocal = mapSignatureIdToLocal.find(ext_sig.id);
+			if (iterSignatureIdToLocal == mapSignatureIdToLocal.cend()) {
 				// User is in external user database, but not in local, so add
-				er = MoveOrCreateLocalObject(*iterExternSignatures, &ulObjectId, &bMoved);
+				er = MoveOrCreateLocalObject(ext_sig, &ulObjectId, &bMoved);
 				if(er != erSuccess) {
 					// Create failed, so skip this entry
 					er = erSuccess;
@@ -531,11 +491,10 @@ ECRESULT ECUserManagement::GetCompanyObjectListAndSync(objectclass_t objclass, u
 				// Entry was moved rather then created, this means that in our localIdList we have
 				// an entry which matches this object.
 				if (bMoved)
-					for (iterSignatureIdToLocal = mapSignatureIdToLocal.begin();
-					     iterSignatureIdToLocal != mapSignatureIdToLocal.end();
-					     ++iterSignatureIdToLocal)
-						if (iterSignatureIdToLocal->second.first == ulObjectId) {
-							mapSignatureIdToLocal.erase(iterSignatureIdToLocal);
+					for (auto i = mapSignatureIdToLocal.begin();
+					     i != mapSignatureIdToLocal.cend(); ++i)
+						if (i->second.first == ulObjectId) {
+							mapSignatureIdToLocal.erase(i);
 							break;
 						}
 			} else {
@@ -543,72 +502,60 @@ ECRESULT ECUserManagement::GetCompanyObjectListAndSync(objectclass_t objclass, u
 
 				er = CheckObjectModified(ulObjectId,							// Object id
 										 iterSignatureIdToLocal->second.second,	// local signature
-										 iterExternSignatures->signature);		// remote signature
+										 ext_sig.signature);		// remote signature
 				if (er != erSuccess)
-					goto exit;
+					return er;
 		
-				// Remove the external user from the list of internal ID's,
+				// Remove the external user from the list of internal IDs,
 				// since we don't need this entry for the plugin details match
 				mapSignatureIdToLocal.erase(iterSignatureIdToLocal);
 			}
 
 			// Add to conversion map so we can obtain the details
-			mapExternIdToLocal.insert(make_pair(iterExternSignatures->id, ulObjectId));
+			mapExternIdToLocal.insert(make_pair(ext_sig.id, ulObjectId));
 		}
 	} else {
 		if (bIsSafeMode)
 			ec_log_info("user_safe_mode: skipping retrieve/sync users from LDAP");
-
-		lpExternSignatures = std::unique_ptr<signatures_t>(new signatures_t());
-		
+		lpExternSignatures.reset(new signatures_t());
 		// Dont sync, just use whatever is in the local user database
-		for (iterSignatureIdToLocal = mapSignatureIdToLocal.begin();
-		     iterSignatureIdToLocal != mapSignatureIdToLocal.end();
-		     ++iterSignatureIdToLocal) {
-			lpExternSignatures->push_back(objectsignature_t(iterSignatureIdToLocal->first, iterSignatureIdToLocal->second.second));
-			
-			mapExternIdToLocal.insert(std::make_pair(iterSignatureIdToLocal->first, iterSignatureIdToLocal->second.first));
+		for (const auto &sil : mapSignatureIdToLocal) {
+			lpExternSignatures->push_back(objectsignature_t(sil.first, sil.second.second));
+			mapExternIdToLocal.insert(std::make_pair(sil.first, sil.second.first));
 		}
 		
 	}
 
-	er = GetLocalObjectListFromSignatures(*lpExternSignatures, mapExternIdToLocal, ulFlags, lpObjects);
+	er = GetLocalObjectListFromSignatures(*lpExternSignatures, mapExternIdToLocal, ulFlags, lpObjects.get());
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	// mapSignatureIdToLocal is now a map of objects that were NOT in the external user database
 	if(bSync) {
 		if (bIsSafeMode)
 			ec_log_err("user_safe_mode: would normally now delete %lu local users (you may see this message more often as the delete is now omitted)", static_cast<unsigned long>(mapExternIdToLocal.size() - lpExternSignatures->size()));
 		else
-		for (iterSignatureIdToLocal = mapSignatureIdToLocal.begin();
-		     iterSignatureIdToLocal != mapSignatureIdToLocal.end();
-		     ++iterSignatureIdToLocal)
-			MoveOrDeleteLocalObject(iterSignatureIdToLocal->second.first, iterSignatureIdToLocal->first.objclass); // second == map value, first == id
+		for (const auto &sil : mapSignatureIdToLocal)
+			/* second == map value, first == id */
+			MoveOrDeleteLocalObject(sil.second.first, sil.first.objclass);
 	}
 
 	// Convert details for client usage
 	if (!(ulFlags & USERMANAGEMENT_IDS_ONLY)) {
-		for (iterObjects = lpObjects->begin();
-		     iterObjects != lpObjects->end(); ++iterObjects) {
-			if (IsInternalObject(iterObjects->ulId))
+		for (auto &obj : *lpObjects) {
+			if (IsInternalObject(obj.ulId))
 				continue;
-			er = UpdateUserDetailsToClient(&(*iterObjects));
+			er = UpdateUserDetailsToClient(&obj);
 			if (er != erSuccess)
-				goto exit;
+				return er;
 		}
 	}
 
 	if (lppObjects) {
 		lpObjects->sort();
-		*lppObjects = lpObjects;
-		lpObjects = NULL;
+		*lppObjects = lpObjects.release();
 	}
-
-exit:
-	delete lpLocalIds;
-	delete lpObjects;
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECUserManagement::GetSubObjectsOfObjectAndSync(userobject_relation_t relation, unsigned int ulParentId,
@@ -617,14 +564,11 @@ ECRESULT ECUserManagement::GetSubObjectsOfObjectAndSync(userobject_relation_t re
 	ECRESULT er = erSuccess;
 
 	// Return data
-	std::list<localobjectdetails_t> *lpObjects = new std::list<localobjectdetails_t>();
-	std::list<localobjectdetails_t> *lpObjectsTmp = NULL;
-	std::list<localobjectdetails_t> *lpCompanies = NULL;
-	std::list<localobjectdetails_t>::iterator iterObjects;
+	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects(new std::list<localobjectdetails_t>);
+	std::unique_ptr<std::list<localobjectdetails_t> > lpCompanies;
 
 	// Extern ids
 	std::unique_ptr<signatures_t> lpSignatures;
-	signatures_t::const_iterator iterSignatures;
 
 	// Extern -> Local
 	map<objectid_t, unsigned int> mapExternIdToLocal;
@@ -636,14 +580,11 @@ ECRESULT ECUserManagement::GetSubObjectsOfObjectAndSync(userobject_relation_t re
 
 	er = GetThreadLocalPlugin(m_lpPluginFactory, &lpPlugin);
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	if (!m_lpSession->GetSessionManager()->IsHostedSupported() &&
-		(relation == OBJECTRELATION_COMPANY_VIEW ||
-		 relation == OBJECTRELATION_COMPANY_ADMIN)) {
-		er = KCERR_NO_SUPPORT;
-		goto exit;
-	}
+	    (relation == OBJECTRELATION_COMPANY_VIEW ||
+	    relation == OBJECTRELATION_COMPANY_ADMIN))
+		return KCERR_NO_SUPPORT;
 
 	// The 'everyone' group contains all visible users for the currently logged in user.
 	if (relation == OBJECTRELATION_GROUP_MEMBER && ulParentId == KOPANO_UID_EVERYONE) {
@@ -651,66 +592,57 @@ ECRESULT ECUserManagement::GetSubObjectsOfObjectAndSync(userobject_relation_t re
 
 		er = GetSecurity(&lpSecurity);
 		if (er != erSuccess)
-			goto exit;
-
-		er = lpSecurity->GetViewableCompanyIds(ulFlags, &lpCompanies);
+			return er;
+		er = lpSecurity->GetViewableCompanyIds(ulFlags, &unique_tie(lpCompanies));
 		if (er != erSuccess)
-			goto exit;
+			return er;
 
 		/* Fallback in case hosted is not supported */
 		if (lpCompanies->empty())
 			lpCompanies->push_back(localobjectdetails_t(0, CONTAINER_COMPANY));
 
-		for (iterObjects = lpCompanies->begin();
-		     iterObjects != lpCompanies->end(); ++iterObjects) {
-			er = GetCompanyObjectListAndSync(OBJECTCLASS_UNKNOWN, iterObjects->ulId, &lpObjectsTmp, ulFlags | USERMANAGEMENT_SHOW_HIDDEN);
+		for (const auto &obj : *lpCompanies) {
+			std::unique_ptr<std::list<localobjectdetails_t> > lpObjectsTmp;
+			er = GetCompanyObjectListAndSync(OBJECTCLASS_UNKNOWN,
+			     obj.ulId, &unique_tie(lpObjectsTmp),
+			     ulFlags | USERMANAGEMENT_SHOW_HIDDEN);
 			if (er != erSuccess)
-				goto exit;
-
+				return er;
 			lpObjects->merge(*lpObjectsTmp);
-
-			delete lpObjectsTmp;
-			lpObjectsTmp = NULL;
 		}
 		// TODO: remove excessive objects from lpObjects ? seems that this list is going to contain a lot... maybe too much?
 	} else {
 		er = GetExternalId(ulParentId, &objectid);
 		if(er != erSuccess)
-			goto exit;
-
+			return er;
 		try {
 			lpSignatures = lpPlugin->getSubObjectsForObject(relation, objectid);
 		} catch(objectnotfound &) {
 			MoveOrDeleteLocalObject(ulParentId, objectid.objclass);
-			er = KCERR_NOT_FOUND;
-			goto exit;
+			return KCERR_NOT_FOUND;
 		} catch (notsupported &) {
-			er = KCERR_NO_SUPPORT;
-			goto exit;
+			return KCERR_NO_SUPPORT;
 		} catch(std::exception &e) {
 			ec_log_warn("Unable to retrieve members for relation %s: %s.", RelationTypeToName(relation), e.what());
-			er = KCERR_PLUGIN_ERROR;
-			goto exit;
+			return KCERR_PLUGIN_ERROR;
 		}
 
 		er = GetLocalObjectsIdsOrCreate(*lpSignatures, &mapExternIdToLocal);
 		if (er != erSuccess)
-			goto exit;
-
-		er = GetLocalObjectListFromSignatures(*lpSignatures, mapExternIdToLocal, ulFlags | USERMANAGEMENT_SHOW_HIDDEN, lpObjects);
+			return er;
+		er = GetLocalObjectListFromSignatures(*lpSignatures, mapExternIdToLocal, ulFlags | USERMANAGEMENT_SHOW_HIDDEN, lpObjects.get());
 		if (er != erSuccess)
-			goto exit;
+			return er;
 	}
 
 	// Convert details for client usage
 	if (!(ulFlags & USERMANAGEMENT_IDS_ONLY)) {
-		for (iterObjects = lpObjects->begin();
-		     iterObjects != lpObjects->end(); ++iterObjects) {
-			if (IsInternalObject(iterObjects->ulId))
+		for (auto &obj : *lpObjects) {
+			if (IsInternalObject(obj.ulId))
 				continue;
-			er = UpdateUserDetailsToClient(&(*iterObjects));
+			er = UpdateUserDetailsToClient(&obj);
 			if (er != erSuccess)
-				goto exit;
+				return er;
 		}
 	}
 
@@ -725,14 +657,8 @@ ECRESULT ECUserManagement::GetSubObjectsOfObjectAndSync(userobject_relation_t re
 	if (lppObjects) {
 		lpObjects->sort();
 		lpObjects->unique();
-		*lppObjects = lpObjects;
-		lpObjects = NULL;
+		*lppObjects = lpObjects.release();
 	}
-
-exit:
-	delete lpCompanies;
-	delete lpObjectsTmp;
-	delete lpObjects;
 	return er;
 }
 
@@ -742,12 +668,10 @@ ECRESULT ECUserManagement::GetParentObjectsOfObjectAndSync(userobject_relation_t
 	ECRESULT er = erSuccess;
 
 	// Return data
-	std::list<localobjectdetails_t> *lpObjects = new std::list<localobjectdetails_t>();
-	std::list<localobjectdetails_t>::iterator iterObjects;
+	std::unique_ptr<std::list<localobjectdetails_t> > lpObjects(new std::list<localobjectdetails_t>());
 
 	// Extern ids
 	std::unique_ptr<signatures_t> lpSignatures;
-	signatures_t::const_iterator iterSignatures;
 
 	// Extern -> Local
 	map<objectid_t, unsigned int> mapExternIdToLocal;
@@ -761,48 +685,40 @@ ECRESULT ECUserManagement::GetParentObjectsOfObjectAndSync(userobject_relation_t
 
 	er = GetThreadLocalPlugin(m_lpPluginFactory, &lpPlugin);
 	if (er != erSuccess)
-		goto exit;
-
+		return er;
 	er = GetSecurity(&lpSecurity);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	if (!m_lpSession->GetSessionManager()->IsHostedSupported() &&
-		(relation == OBJECTRELATION_COMPANY_VIEW ||
-		 relation == OBJECTRELATION_COMPANY_ADMIN)) {
-		er = KCERR_NO_SUPPORT;
-		goto exit;
-	}
+	    (relation == OBJECTRELATION_COMPANY_VIEW ||
+	    relation == OBJECTRELATION_COMPANY_ADMIN))
+		return KCERR_NO_SUPPORT;
 
 	if (relation == OBJECTRELATION_GROUP_MEMBER && ulChildId == KOPANO_UID_SYSTEM) {
 		// System has no objects
 	} else {
 		er = GetExternalId(ulChildId, &objectid);
 		if (er != erSuccess)
-			goto exit;
-
+			return er;
 		try {
 			lpSignatures = lpPlugin->getParentObjectsForObject(relation, objectid);
 		} catch(objectnotfound &) {
 			MoveOrDeleteLocalObject(ulChildId, objectid.objclass);
-			er = KCERR_NOT_FOUND;
-			goto exit;
+			return KCERR_NOT_FOUND;
 		} catch (notsupported &) {
-			er = KCERR_NO_SUPPORT;
-			goto exit;
+			return KCERR_NO_SUPPORT;
 		} catch(std::exception &e) {
 			ec_log_warn("Unable to retrieve parents for relation %s: %s.", RelationTypeToName(relation), e.what());
-			er = KCERR_PLUGIN_ERROR;
-			goto exit;
+			return KCERR_PLUGIN_ERROR;
 		}
 
 		er = GetLocalObjectsIdsOrCreate(*lpSignatures, &mapExternIdToLocal);
 		if (er != erSuccess)
-			goto exit;
-
-		er = GetLocalObjectListFromSignatures(*lpSignatures, mapExternIdToLocal, ulFlags, lpObjects);
+			return er;
+		er = GetLocalObjectListFromSignatures(*lpSignatures, mapExternIdToLocal, ulFlags, lpObjects.get());
 		if (er != erSuccess)
-			goto exit;
+			return er;
 	}
 
 	// If we are requesting group membership we should always insert the everyone, since everyone is member of EVERYONE except for SYSTEM
@@ -810,8 +726,7 @@ ECRESULT ECUserManagement::GetParentObjectsOfObjectAndSync(userobject_relation_t
 		if ((!(ulFlags & USERMANAGEMENT_IDS_ONLY)) || (ulFlags & USERMANAGEMENT_ADDRESSBOOK)) {
 			er = GetLocalObjectDetails(KOPANO_UID_EVERYONE, &details);
 			if(er != erSuccess)
-				goto exit;
-
+				return er;
 			if (!(ulFlags & USERMANAGEMENT_ADDRESSBOOK) ||
 				(lpSecurity->GetUserId() != KOPANO_UID_SYSTEM &&
 				 !details.GetPropBool(OB_PROP_B_AB_HIDDEN)))
@@ -827,13 +742,12 @@ ECRESULT ECUserManagement::GetParentObjectsOfObjectAndSync(userobject_relation_t
 
 	// Convert details for client usage
 	if (!(ulFlags & USERMANAGEMENT_IDS_ONLY)) {
-		for (iterObjects = lpObjects->begin();
-		     iterObjects != lpObjects->end(); ++iterObjects) {
-			if (IsInternalObject(iterObjects->ulId))
+		for (auto &obj : *lpObjects) {
+			if (IsInternalObject(obj.ulId))
 				continue;
-			er = UpdateUserDetailsToClient(&(*iterObjects));
+			er = UpdateUserDetailsToClient(&obj);
 			if (er != erSuccess)
-				goto exit;
+				return er;
 		}
 	}
 
@@ -848,12 +762,8 @@ ECRESULT ECUserManagement::GetParentObjectsOfObjectAndSync(userobject_relation_t
 	if (lppObjects) {
 		lpObjects->sort();
 		lpObjects->unique();
-		*lppObjects = lpObjects;
-		lpObjects = NULL;
+		*lppObjects = lpObjects.release();
 	}
-
-exit:
-	delete lpObjects;
 	return er;
 }
 
@@ -955,77 +865,6 @@ ECRESULT ECUserManagement::CreateOrModifyObject(const objectid_t &sExternId, con
 		}
 	}
 	return erSuccess;
-}
-
-ECRESULT ECUserManagement::ModifyExternId(unsigned int ulObjectId, const objectid_t &sExternId)
-{
-	ECRESULT er = erSuccess;
-	objectid_t sOldExternId;
-	std::string strQuery;
-	unsigned int ulRows = 0;
-	ECDatabase *lpDatabase = NULL;
-	UserPlugin *lpPlugin = NULL;
-
-	er = m_lpSession->GetDatabase(&lpDatabase);
-	if (er != erSuccess)
-		goto exit;
-
-	if (IsInternalObject(ulObjectId) || sExternId.id.empty()) {
-		er = KCERR_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	er = GetExternalId(ulObjectId, &sOldExternId);
-	if(er != erSuccess)
-		goto exit;
-
-	// prepare to update the users table.
-	er = lpDatabase->Begin();
-	if (er != erSuccess)
-		goto exit;
-
-	strQuery = "UPDATE users SET externid='" + lpDatabase->Escape(sExternId.id) + "', objectclass = " + stringify(sExternId.objclass) +
-		" WHERE id=" + stringify(ulObjectId) + " AND externid='" + lpDatabase->Escape(sOldExternId.id) + "'";
-	er = lpDatabase->DoUpdate(strQuery, &ulRows);
-	if (er != erSuccess)
-		goto exit;
-
-	if (ulRows != 1) {
-		er = KCERR_DATABASE_ERROR;
-		ec_log_crit("ECUserManagement::ModifyExternId(): unexpected row count");
-		goto exit;
-	}
-
-	er = GetThreadLocalPlugin(m_lpPluginFactory, &lpPlugin);
-	if(er != erSuccess)
-		goto exit;
-
-	// modify plugin user
-	try {
-		lpPlugin->modifyObjectId(sOldExternId, sExternId);
-	} catch (std::exception &) {
-		er = KCERR_CALL_FAILED;
-		goto exit;
-	}
-
-	// save database change
-	er = lpDatabase->Commit();
-	if (er != erSuccess)
-		goto exit;
-
-	// remove user from cache
-	er = m_lpSession->GetSessionManager()->GetCacheManager()->UpdateUser(ulObjectId);
-	if (er != erSuccess)
-		goto exit;
-
-exit:
-	if (er != erSuccess) {
-		er = lpDatabase->Rollback();
-		if (er != erSuccess)
-			goto exit;
-	}
-
-	return er;
 }
 
 // Add a member to a group, with on-the-fly delete of the specified group id
@@ -1165,7 +1004,7 @@ ECRESULT ECUserManagement::ResolveObject(objectclass_t objclass, const std::stri
 		return KCERR_PLUGIN_ERROR;
 	}
 
-	*lpsExternId = objectsignature.id;
+	*lpsExternId = std::move(objectsignature.id);
 	return erSuccess;
 }
 
@@ -1319,13 +1158,12 @@ ECRESULT ECUserManagement::GetLocalObjectDetails(unsigned int ulId, objectdetail
 		sDetails.SetPropString(OB_PROP_S_FULLNAME, KOPANO_FULLNAME_EVERYONE);
 		sDetails.SetPropBool(OB_PROP_B_AB_HIDDEN, parseBool(m_lpConfig->GetSetting("hide_everyone")) && lpSecurity->GetAdminLevel() == 0);
 	
-		if (m_lpSession->GetSessionManager()->IsDistributedSupported()) {
-			if (GetPublicStoreDetails(&sPublicStoreDetails) == erSuccess)
-				sDetails.SetPropString(OB_PROP_S_SERVERNAME, sPublicStoreDetails.GetPropString(OB_PROP_S_SERVERNAME));
-		}
+		if (m_lpSession->GetSessionManager()->IsDistributedSupported() &&
+		    GetPublicStoreDetails(&sPublicStoreDetails) == erSuccess)
+			sDetails.SetPropString(OB_PROP_S_SERVERNAME, sPublicStoreDetails.GetPropString(OB_PROP_S_SERVERNAME));
 	}
 
-	*lpDetails = sDetails;
+	*lpDetails = std::move(sDetails);
 	return erSuccess;
 }
 
@@ -1348,7 +1186,7 @@ ECRESULT ECUserManagement::GetExternalObjectDetails(unsigned int ulId, objectdet
 		er = UpdateUserDetailsToClient(&detailscached);
 		if (er != erSuccess)
 			return er;
-		*lpDetails = detailscached;
+		*lpDetails = std::move(detailscached);
 		return erSuccess;
 	}
 
@@ -1430,26 +1268,22 @@ ECRESULT ECUserManagement::GetLocalObjectsIdsOrCreate(const list<objectsignature
 {
 	ECRESULT er;
 	list<objectid_t> lstExternObjIds;
-	list<objectsignature_t>::const_iterator iterSignature;
-	pair<map<objectid_t, unsigned int>::iterator,bool> result;
 	unsigned int ulObjectId;
 
-	for (iterSignature = lstSignatures.begin();
-	     iterSignature != lstSignatures.end(); ++iterSignature)
-		lstExternObjIds.push_back(iterSignature->id);
+	for (const auto &sig : lstSignatures)
+		lstExternObjIds.push_back(sig.id);
 
 	er = m_lpSession->GetSessionManager()->GetCacheManager()->GetUserObjects(lstExternObjIds, lpmapLocalObjIds);
 	if (er != erSuccess)
 		return er;
 
-	for (iterSignature = lstSignatures.begin();
-	     iterSignature != lstSignatures.end(); ++iterSignature) {
-		result = lpmapLocalObjIds->insert(make_pair(iterSignature->id, 0));
+	for (const auto &sig : lstSignatures) {
+		auto result = lpmapLocalObjIds->insert(make_pair(sig.id, 0));
 		if (result.second == false)
 			// object already exists
 			continue;
 
-		er = MoveOrCreateLocalObject(*iterSignature, &ulObjectId, NULL);
+		er = MoveOrCreateLocalObject(sig, &ulObjectId, NULL);
 		if (er != erSuccess) {
 			lpmapLocalObjIds->erase(result.first);
 			return er;
@@ -1464,21 +1298,20 @@ ECRESULT ECUserManagement::GetLocalObjectIdList(objectclass_t objclass, unsigned
 {
 	ECRESULT er = erSuccess;
 	ECDatabase *lpDatabase = NULL;
-	DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
 	DB_ROW lpRow = NULL;
-	std::list<unsigned int> *lpObjects = new std::list<unsigned int>();
+	std::unique_ptr<std::list<unsigned int> > lpObjects(new std::list<unsigned int>);
 	string strQuery;
 
 	er = m_lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
-		goto exit;
-
+		return er;
 	strQuery =
 		"SELECT id FROM users "
 		"WHERE " + OBJECTCLASS_COMPARE_SQL("objectclass", objclass);
 	/* As long as the Offline server has partial hosted support,
 	 * we must comment out this additional where statement... */
-	if (m_lpSession->GetSessionManager()->IsHostedSupported()) {
+	if (m_lpSession->GetSessionManager()->IsHostedSupported())
 		/* Everyone and SYSTEM don't have a company but must be
 		 * included by the query, so write exception case for them */
 		strQuery +=
@@ -1487,11 +1320,10 @@ ECRESULT ECUserManagement::GetLocalObjectIdList(objectclass_t objclass, unsigned
 				"OR id = " + stringify(ulCompanyId) + " "
 				"OR id = " + stringify(KOPANO_UID_SYSTEM) + " "
 				"OR id = " + stringify(KOPANO_UID_EVERYONE) + ")";
-	}
 
 	er = lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	while(1) {
 		lpRow = lpDatabase->FetchRow(lpResult);
@@ -1504,17 +1336,8 @@ ECRESULT ECUserManagement::GetLocalObjectIdList(objectclass_t objclass, unsigned
 
 		lpObjects->push_back(atoi(lpRow[0]));
 	}
-
-	*lppObjects = lpObjects;
-
-exit:
-	if(lpResult)
-		lpDatabase->FreeResult(lpResult);
-
-	if (er != erSuccess)
-		delete lpObjects;
-
-	return er;
+	*lppObjects = lpObjects.release();
+	return erSuccess;
 }
 
 ECRESULT ECUserManagement::CreateObjectAndSync(const objectdetails_t &details, unsigned int *lpulId)
@@ -1668,7 +1491,7 @@ ECRESULT ECUserManagement::GetQuotaDetailsAndSync(unsigned int ulId, quotadetail
 	 * when the quota is requested for a second time. */
 	m_lpSession->GetSessionManager()->GetCacheManager()->SetQuota(ulId, bGetUserDefault, details);
 
-	*lpDetails = details;
+	*lpDetails = std::move(details);
 	return erSuccess;
 }
 
@@ -1677,7 +1500,6 @@ ECRESULT ECUserManagement::SearchObjectAndSync(const char* szSearchString, unsig
 	ECRESULT er;
 	objectsignature_t objectsignature;
 	std::unique_ptr<signatures_t> lpObjectsignatures;
-	signatures_t::const_iterator iterSignature;
 	unsigned int ulId = 0;
 	string strUsername;
 	string strCompanyname;
@@ -1793,11 +1615,10 @@ done:
 	 * TODO: check with a point system,
 	 * if you have 2 objects, one have a match of 99% and one 50%
 	 * use the one with 99% */
-	for (iterSignature = lpObjectsignatures->begin();
-	     iterSignature != lpObjectsignatures->end(); ++iterSignature) {
+	for (const auto &sig : *lpObjectsignatures) {
 		unsigned int ulIdTmp = 0;
 
-		er = GetLocalObjectIdOrCreate(*iterSignature, &ulIdTmp);
+		er = GetLocalObjectIdOrCreate(sig, &ulIdTmp);
 		if (er != erSuccess)
 			return er;
 		if (lpSecurity->IsUserObjectVisible(ulIdTmp) != erSuccess)
@@ -1824,9 +1645,9 @@ done:
 
 			// combine on object class, and place contacts in their own place in the map, so they don't conflict on users.
 			// since they're indexed on the full object type, they'll be at the end of the map.
-			ULONG combine = OBJECTCLASS_TYPE(iterSignature->id.objclass);
-			if (iterSignature->id.objclass == NONACTIVE_CONTACT)
-				combine = iterSignature->id.objclass;
+			ULONG combine = OBJECTCLASS_TYPE(sig.id.objclass);
+			if (sig.id.objclass == NONACTIVE_CONTACT)
+				combine = sig.id.objclass;
 			// Store the matching entry for later analysis
 			mapMatches[combine].push_back(ulIdTmp);
 		}
@@ -1837,13 +1658,12 @@ done:
 			return KCERR_NOT_FOUND;
 
 		// mapMatches is already sorted numerically, so it's OBJECTTYPE_MAILUSER, OBJECTTYPE_DISTLIST, OBJECTTYPE_CONTAINER, NONACTIVE_CONTACT
-		if(mapMatches.begin()->second.size() == 1) {
-			ulId = *mapMatches.begin()->second.begin();
-		} else {
+		if(mapMatches.begin()->second.size() != 1) {
 			// size() cannot be 0. Otherwise, it would not be there at all. So apparently, it is > 1, so it is ambiguous.
 			ec_log_info("Resolved multiple users for search \"%s\".", szSearchString);
 			return KCERR_COLLISION;
 		}
+		ulId = *mapMatches.begin()->second.begin();
 	}
 
 	if(ulId == 0)
@@ -1865,16 +1685,9 @@ ECRESULT ECUserManagement::QueryContentsRowData(struct soap *soap, ECObjectTable
 	map<objectid_t, objectdetails_t> mapAllObjectDetails;
 
 	std::unique_ptr<map<objectid_t, objectdetails_t> > mapExternObjectDetails;
-	map<objectid_t, objectdetails_t>::iterator iterExternObjectDetails;
-
 	map<objectid_t, unsigned int> mapExternIdToRowId;
 	map<objectid_t, unsigned int> mapExternIdToObjectId;
-	std::map<objectid_t, unsigned int>::const_iterator iterObjectId;
-	std::map<objectid_t, unsigned int>::const_iterator iterRowId;
-	
 	objectdetails_t details;
-
-	ECObjectTableList::const_iterator iterRowList;
 	UserPlugin *lpPlugin = NULL;
 	string signature;
 
@@ -1882,8 +1695,7 @@ ECRESULT ECUserManagement::QueryContentsRowData(struct soap *soap, ECObjectTable
 	if (er != erSuccess)
 		goto exit;
 
-	ASSERT(lpRowList != NULL);
-
+	assert(lpRowList != NULL);
 	lpsRowSet = s_alloc<struct rowSet>(soap);
 	lpsRowSet->__size = 0;
 	lpsRowSet->__ptr = NULL;
@@ -1899,16 +1711,17 @@ ECRESULT ECUserManagement::QueryContentsRowData(struct soap *soap, ECObjectTable
 	memset(lpsRowSet->__ptr, 0, sizeof(propValArray) * lpRowList->size());
 
 	// Get Extern ID and Types for all items
-	for (i = 0, iterRowList = lpRowList->begin();
-	     iterRowList != lpRowList->end(); ++iterRowList, ++i) {
-		er = GetExternalId(iterRowList->ulObjId, &externid);
+	i = 0;
+	for (const auto &row : *lpRowList) {
+		er = GetExternalId(row.ulObjId, &externid);
 		if (er != erSuccess) {
+			++i;
 			er = erSuccess; /* Skip entry, but don't complain */
 			continue;
 		}
 		
 		// See if the item data is cached
-		if(m_lpSession->GetSessionManager()->GetCacheManager()->GetUserDetails(iterRowList->ulObjId, &mapAllObjectDetails[externid]) != erSuccess) {
+		if (m_lpSession->GetSessionManager()->GetCacheManager()->GetUserDetails(row.ulObjId, &mapAllObjectDetails[externid]) != erSuccess) {
 			// Item needs to be retrieved from the plugin
 			lstObjects.push_back(externid);
 			// remove from all map, since the address reference added an empty entry in the map
@@ -1916,26 +1729,24 @@ ECRESULT ECUserManagement::QueryContentsRowData(struct soap *soap, ECObjectTable
 		}
 
 		mapExternIdToRowId.insert(std::make_pair(externid, i));
-		mapExternIdToObjectId.insert(std::make_pair(externid, iterRowList->ulObjId));
+		mapExternIdToObjectId.insert(std::make_pair(externid, row.ulObjId));
+		++i;
 	}
 
 	// Do one request to the plugin for each type of object requested
 	try {
 		mapExternObjectDetails = lpPlugin->getObjectDetails(lstObjects);
 		// Copy each item over
-		for (iterExternObjectDetails = mapExternObjectDetails->begin();
-		     iterExternObjectDetails != mapExternObjectDetails->end();
-		     ++iterExternObjectDetails) {
-			mapAllObjectDetails.insert(std::make_pair(iterExternObjectDetails->first, iterExternObjectDetails->second));
+		for (const auto &eod : *mapExternObjectDetails) {
+			mapAllObjectDetails.insert(std::make_pair(eod.first, eod.second));
 
 			// Get the local object id for the item
-			iterObjectId = mapExternIdToObjectId.find(iterExternObjectDetails->first);
-			if (iterObjectId == mapExternIdToObjectId.end())
+			auto iterObjectId = mapExternIdToObjectId.find(eod.first);
+			if (iterObjectId == mapExternIdToObjectId.cend())
 				continue;
 
 			// Add data to the cache
-			m_lpSession->GetSessionManager()->GetCacheManager()->SetUserDetails(iterObjectId->second, &iterExternObjectDetails->second);
-
+			m_lpSession->GetSessionManager()->GetCacheManager()->SetUserDetails(iterObjectId->second, &eod.second);
 		}
 		/* We convert user and companyname to loginname later this function */
 	} catch (objectnotfound &) {
@@ -1953,21 +1764,18 @@ ECRESULT ECUserManagement::QueryContentsRowData(struct soap *soap, ECObjectTable
 	// mapAllObjectDetails now contains the details per type of all objects that we need.
 
 	// Loop through user data and fill in data in rowset
-	for (iterExternObjectDetails = mapAllObjectDetails.begin();
-	     iterExternObjectDetails != mapAllObjectDetails.end();
-	     ++iterExternObjectDetails)
-	{
-		objectid_t objectid = iterExternObjectDetails->first;
-		objectdetails_t &objectdetails = iterExternObjectDetails->second; // reference, no need to copy
+	for (auto &eod : mapAllObjectDetails) {
+		objectid_t objectid = eod.first;
+		objectdetails_t &objectdetails = eod.second; // reference, no need to copy
 
 		// If the objectid is not found, the plugin returned too many "hits"
-		iterRowId = mapExternIdToRowId.find(objectid);
-		if (iterRowId == mapExternIdToRowId.end())
+		auto iterRowId = mapExternIdToRowId.find(objectid);
+		if (iterRowId == mapExternIdToRowId.cend())
 			continue;
 
 		// Get the local object id for the item
-		iterObjectId = mapExternIdToObjectId.find(objectid);
-		if (iterObjectId == mapExternIdToObjectId.end())
+		auto iterObjectId = mapExternIdToObjectId.find(objectid);
+		if (iterObjectId == mapExternIdToObjectId.cend())
 			continue;
 
 		// objectdetails can only be from an extern object here, no need to check for SYSTEM or EVERYONE
@@ -1980,29 +1788,24 @@ ECRESULT ECUserManagement::QueryContentsRowData(struct soap *soap, ECObjectTable
 	}
 
 	// Loop through items, set local data and set other non-found data to NOT FOUND
-	for (i = 0, iterRowList = lpRowList->begin();
-	     iterRowList != lpRowList->end(); ++iterRowList) {
+	i = 0;
+	for (const auto &row : *lpRowList) {
 		// Fill in any missing data with KCERR_NOT_FOUND
-		if(IsInternalObject(iterRowList->ulObjId)) {
+		if (IsInternalObject(row.ulObjId)) {
 			objectdetails_t details;
-
-			er = GetLocalObjectDetails(iterRowList->ulObjId, &details);
+			er = GetLocalObjectDetails(row.ulObjId, &details);
 			if (er != erSuccess)
 				goto exit;
-
-			er = ConvertObjectDetailsToProps(soap, iterRowList->ulObjId, &details, lpPropTagArray, &lpsRowSet->__ptr[i]);
+			er = ConvertObjectDetailsToProps(soap, row.ulObjId, &details, lpPropTagArray, &lpsRowSet->__ptr[i]);
 			if(er != erSuccess)
 				goto exit;
-		} else {
-			if (lpsRowSet->__ptr[i].__ptr == NULL) {
-				lpsRowSet->__ptr[i].__ptr = s_alloc<propVal>(soap, lpPropTagArray->__size);
-				lpsRowSet->__ptr[i].__size = lpPropTagArray->__size;
-
-				for (gsoap_size_t j = 0; j < lpPropTagArray->__size; ++j) {
-					lpsRowSet->__ptr[i].__ptr[j].ulPropTag = PROP_TAG(PT_ERROR, PROP_ID(lpPropTagArray->__ptr[j]));
-					lpsRowSet->__ptr[i].__ptr[j].Value.ul = KCERR_NOT_FOUND;
-					lpsRowSet->__ptr[i].__ptr[j].__union = SOAP_UNION_propValData_ul;
-				}
+		} else if (lpsRowSet->__ptr[i].__ptr == NULL) {
+			lpsRowSet->__ptr[i].__ptr = s_alloc<propVal>(soap, lpPropTagArray->__size);
+			lpsRowSet->__ptr[i].__size = lpPropTagArray->__size;
+			for (gsoap_size_t j = 0; j < lpPropTagArray->__size; ++j) {
+				lpsRowSet->__ptr[i].__ptr[j].ulPropTag = PROP_TAG(PT_ERROR, PROP_ID(lpPropTagArray->__ptr[j]));
+				lpsRowSet->__ptr[i].__ptr[j].Value.ul = KCERR_NOT_FOUND;
+				lpsRowSet->__ptr[i].__ptr[j].__union = SOAP_UNION_propValData_ul;
 			}
 		}
 		++i;
@@ -2023,12 +1826,12 @@ ECRESULT ECUserManagement::QueryHierarchyRowData(struct soap *soap, ECObjectTabl
 {
 	ECRESULT er = erSuccess;
 	struct rowSet *lpsRowSet = NULL;
-	ECObjectTableList::const_iterator iterRowList;
 	unsigned int i = 0;
 
-	ASSERT(lpRowList != NULL);
-
-	lpsRowSet = s_alloc<struct rowSet>(soap);
+	assert(lpRowList != NULL);
+	lpsRowSet = s_alloc_nothrow<struct rowSet>(soap);
+	if (lpsRowSet == NULL)
+		return KCERR_NOT_ENOUGH_MEMORY;
 	lpsRowSet->__size = 0;
 	lpsRowSet->__ptr = NULL;
 
@@ -2042,34 +1845,30 @@ ECRESULT ECUserManagement::QueryHierarchyRowData(struct soap *soap, ECObjectTabl
 	lpsRowSet->__ptr = s_alloc<propValArray>(soap, lpRowList->size());
 	memset(lpsRowSet->__ptr, 0, sizeof(propValArray) * lpRowList->size());
 
-	for (iterRowList = lpRowList->begin(); iterRowList != lpRowList->end();
-	     ++iterRowList) {
+	for (const auto &row : *lpRowList) {
 		/* Although it propbably doesn't make a lot of sense, we need to check for company containers here.
 		 * this is because with convenient depth tables, the children of the Kopano Address Book will not
 		 * only be the Global Address Book, but also the company containers. */
-		if (iterRowList->ulObjId == KOPANO_UID_ADDRESS_BOOK ||
-			iterRowList->ulObjId == KOPANO_UID_GLOBAL_ADDRESS_BOOK ||
-			iterRowList->ulObjId == KOPANO_UID_GLOBAL_ADDRESS_LISTS)
-		{
-			er = ConvertABContainerToProps(soap, iterRowList->ulObjId, lpPropTagArray, &lpsRowSet->__ptr[i]);
+		if (row.ulObjId == KOPANO_UID_ADDRESS_BOOK ||
+		    row.ulObjId == KOPANO_UID_GLOBAL_ADDRESS_BOOK ||
+		    row.ulObjId == KOPANO_UID_GLOBAL_ADDRESS_LISTS) {
+			er = ConvertABContainerToProps(soap, row.ulObjId, lpPropTagArray, &lpsRowSet->__ptr[i]);
 			if (er != erSuccess)
 				goto exit;
-		} else {
-			objectdetails_t details;
-			objectid_t sExternId;
-
-			er = GetObjectDetails(iterRowList->ulObjId, &details);
-			if (er != erSuccess)
-				goto exit;
-				
-			er = GetExternalId(iterRowList->ulObjId, &sExternId);
-			if (er != erSuccess)
-				goto exit;
-
-			er = ConvertContainerObjectDetailsToProps(soap, iterRowList->ulObjId, &details, lpPropTagArray, &lpsRowSet->__ptr[i]);
-			if(er != erSuccess)
-				goto exit;
+			++i;
+			continue;
 		}
+		objectdetails_t details;
+		objectid_t sExternId;
+		er = GetObjectDetails(row.ulObjId, &details);
+		if (er != erSuccess)
+			goto exit;
+		er = GetExternalId(row.ulObjId, &sExternId);
+		if (er != erSuccess)
+			goto exit;
+		er = ConvertContainerObjectDetailsToProps(soap, row.ulObjId, &details, lpPropTagArray, &lpsRowSet->__ptr[i]);
+		if (er != erSuccess)
+			goto exit;
 		++i;
 	}
 
@@ -2077,7 +1876,7 @@ ECRESULT ECUserManagement::QueryHierarchyRowData(struct soap *soap, ECObjectTabl
 	*lppRowSet = lpsRowSet;
 
 exit:
-	if (er != erSuccess && lpsRowSet != NULL) {
+	if (er != erSuccess) {
 		s_free(soap, lpsRowSet->__ptr);
 		s_free(soap, lpsRowSet);
 	}
@@ -2279,7 +2078,6 @@ ECRESULT ECUserManagement::ConvertExternIDsToLocalIDs(objectdetails_t *lpDetails
 	ECRESULT er;
 	list<objectid_t> lstExternIDs;
 	map<objectid_t, unsigned int> mapLocalIDs;
-	std::map<objectid_t, unsigned int>::const_iterator iterLocalIDs;
 	objectid_t sExternID;
 	unsigned int ulLocalID = 0;
 
@@ -2300,11 +2098,11 @@ ECRESULT ECUserManagement::ConvertExternIDsToLocalIDs(objectdetails_t *lpDetails
 		if (er != erSuccess)
 			return er;
 
-		for (iterLocalIDs = mapLocalIDs.begin();
-		     iterLocalIDs != mapLocalIDs.end(); ++iterLocalIDs) {
-			if (iterLocalIDs->first.objclass != ACTIVE_USER && OBJECTCLASS_TYPE(iterLocalIDs->first.objclass) != OBJECTTYPE_DISTLIST)
+		for (const auto &loc_id : mapLocalIDs) {
+			if (loc_id.first.objclass != ACTIVE_USER &&
+			    OBJECTCLASS_TYPE(loc_id.first.objclass) != OBJECTTYPE_DISTLIST)
 				continue;
-			lpDetails->AddPropInt(OB_PROP_LI_SENDAS, iterLocalIDs->second);
+			lpDetails->AddPropInt(OB_PROP_LI_SENDAS, loc_id.second);
 		}
 		break;
 	case CONTAINER_COMPANY:
@@ -2370,14 +2168,12 @@ ECRESULT ECUserManagement::ComplementDefaultFeatures(objectdetails_t *lpDetails)
 	}
 
 	set<string> defaultEnabled = getFeatures();
-	set<string> defaultDisabled;
 	list<string> userEnabled = lpDetails->GetPropListString((property_key_t)PR_EC_ENABLED_FEATURES_A);
 	list<string> userDisabled = lpDetails->GetPropListString((property_key_t)PR_EC_DISABLED_FEATURES_A);
-	string config = m_lpConfig->GetSetting("disabled_features");
+	std::vector<std::string> ddv = tokenize(m_lpConfig->GetSetting("disabled_features"), "\t ");
+	std::set<std::string> defaultDisabled(ddv.begin(), ddv.end());
 
-	ba::split(defaultDisabled, config, ba::is_any_of("\t "), ba::token_compress_on);
-
-	for (std::set<std::string>::const_iterator i = defaultDisabled.begin(); i != defaultDisabled.end(); ) {
+	for (auto i = defaultDisabled.cbegin(); i != defaultDisabled.cend(); ) {
 		if (i->empty()) {
 			// nasty side effect of boost split, when input consists only of a split predicate.
 			defaultDisabled.erase(i++);
@@ -2388,17 +2184,15 @@ ECRESULT ECUserManagement::ComplementDefaultFeatures(objectdetails_t *lpDetails)
 	}
 
 	// explicit enable remove from default disable, and add in defaultEnabled
-	for (std::list<std::string>::const_iterator i = userEnabled.begin();
-	     i != userEnabled.end(); ++i) {
-		defaultDisabled.erase(*i);
-		defaultEnabled.insert(*i);
+	for (const auto &s : userEnabled) {
+		defaultDisabled.erase(s);
+		defaultEnabled.insert(s);
 	}
 
 	// explicit disable remove from default enable, and add in defaultDisabled
-	for (std::list<std::string>::const_iterator i = userDisabled.begin();
-	     i != userDisabled.end(); ++i) {
-		defaultEnabled.erase(*i);
-		defaultDisabled.insert(*i);
+	for (const auto &s : userDisabled) {
+		defaultEnabled.erase(s);
+		defaultDisabled.insert(s);
 	}
 
 	userEnabled.assign(defaultEnabled.begin(), defaultEnabled.end());
@@ -2435,18 +2229,16 @@ ECRESULT ECUserManagement::RemoveDefaultFeatures(objectdetails_t *lpDetails)
 		return erSuccess;
 
 	set<string> defaultEnabled = getFeatures();
-	set<string> defaultDisabled;
 	list<string> userEnabled = lpDetails->GetPropListString((property_key_t)PR_EC_ENABLED_FEATURES_A);
 	list<string> userDisabled = lpDetails->GetPropListString((property_key_t)PR_EC_DISABLED_FEATURES_A);
-	string config = m_lpConfig->GetSetting("disabled_features");
 
-	ba::split(defaultDisabled, config, ba::is_any_of("\t "));
+	std::vector<std::string> ddv = tokenize(m_lpConfig->GetSetting("disabled_features"), "\t ");
+	std::set<std::string> defaultDisabled(ddv.begin(), ddv.end());
 
 	// remove all default disabled from enabled and user explicit list
-	for (std::set<std::string>::const_iterator i = defaultDisabled.begin();
-	     i != defaultDisabled.end(); ++i) {
-		defaultEnabled.erase(*i);
-		userDisabled.remove(*i);
+	for (const auto &s : defaultDisabled) {
+		defaultEnabled.erase(s);
+		userDisabled.remove(s);
 	}
 
 	// remove all default enabled features from explicit list
@@ -2688,11 +2480,10 @@ ECRESULT ECUserManagement::CreateLocalObject(const objectsignature_t &signature,
 	case NONACTIVE_ROOM:
 	case NONACTIVE_EQUIPMENT:
 		strUserServer = details.GetPropString(OB_PROP_S_SERVERNAME);
-		if (!bDistributed || strcasecmp(strUserServer.c_str(), strThisServer.c_str()) == 0) {
+		if (!bDistributed || strcasecmp(strUserServer.c_str(), strThisServer.c_str()) == 0)
 			execute_script(m_lpConfig->GetSetting("createuser_script"),
 						   "KOPANO_USER", details.GetPropString(OB_PROP_S_LOGIN).c_str(),
 						   NULL);
-		}
 		break;
 	case DISTLIST_GROUP:
 	case DISTLIST_SECURITY:
@@ -2702,11 +2493,10 @@ ECRESULT ECUserManagement::CreateLocalObject(const objectsignature_t &signature,
 		break;
 	case CONTAINER_COMPANY:
 		strUserServer = details.GetPropString(OB_PROP_S_SERVERNAME);
-		if (!bDistributed || strcasecmp(strUserServer.c_str(), strThisServer.c_str()) == 0) {
+		if (!bDistributed || strcasecmp(strUserServer.c_str(), strThisServer.c_str()) == 0)
 			execute_script(m_lpConfig->GetSetting("createcompany_script"),
 						   "KOPANO_COMPANY", details.GetPropString(OB_PROP_S_FULLNAME).c_str(),
 						   NULL);
-		}
 		break;
 	default:
 		break;
@@ -2731,7 +2521,7 @@ ECRESULT ECUserManagement::CreateLocalObjectSimple(const objectsignature_t &sign
 	std::string strQuery;
 	unsigned int ulCompanyId;
 	UserPlugin *lpPlugin = NULL;
-	DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
 	std::string strUserId;
 	bool bLocked = false;
 
@@ -2824,7 +2614,7 @@ ECRESULT ECUserManagement::UpdateObjectclassOrDelete(const objectid_t &sExternId
 {
 	ECRESULT er = erSuccess;
 	ECDatabase *lpDatabase = NULL;
-	DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
 	DB_ROW lpRow = NULL;
 	string strQuery;
 	unsigned int ulObjectId;
@@ -2834,20 +2624,17 @@ ECRESULT ECUserManagement::UpdateObjectclassOrDelete(const objectid_t &sExternId
 
 	er = m_lpSession->GetDatabase(&lpDatabase);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	strQuery = "SELECT id, objectclass FROM users WHERE externid='" + lpDatabase->Escape(sExternId.id) + "' AND " +
 		OBJECTCLASS_COMPARE_SQL("objectclass", OBJECTCLASS_CLASSTYPE(sExternId.objclass));
 	er = lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	lpRow = lpDatabase->FetchRow(lpResult);
-	if (!lpRow) {
-		er = KCERR_NOT_FOUND;
-		goto exit;
-	}
-
+	if (lpRow == nullptr)
+		return KCERR_NOT_FOUND;
 	ulObjectId = atoui(lpRow[0]);
 	objClass = (objectclass_t)atoui(lpRow[1]);
 
@@ -2858,38 +2645,32 @@ ECRESULT ECUserManagement::UpdateObjectclassOrDelete(const objectid_t &sExternId
 	{
 		if (parseBool(m_lpConfig->GetSetting("user_safe_mode"))) {
 			ec_log_crit("user_safe_mode: Would update %d from %s to %s", ulObjectId, ObjectClassToName(objClass), ObjectClassToName(sExternId.objclass));
-			goto exit;
+			return er;
 		}
 
 		// probable situation: change ACTIVE_USER to NONACTIVE_USER (or room/equipment), or change group to security group
 		strQuery = "UPDATE users SET objectclass = " + stringify(sExternId.objclass) + " WHERE id = " + stringify(ulObjectId);
 		er = lpDatabase->DoUpdate(strQuery);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 
 		// Log the change to ICS
 		er = GetABSourceKeyV1(ulObjectId, &sSourceKey);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 
 		AddABChange(m_lpSession, ICS_AB_CHANGE, sSourceKey, SOURCEKEY(CbABEID(&eid), (char *)&eid));
 
 		if (lpulObjectId)
 			*lpulObjectId = ulObjectId;
+		return erSuccess;
 	} else {
 		// type of object changed, so we must fully delete the object first.
 		er = DeleteLocalObject(ulObjectId, objClass);
 		if (er != erSuccess)
-			goto exit;
-
-		er = KCERR_NOT_FOUND;
+			return er;
+		return KCERR_NOT_FOUND;
 	}
-
-exit:
-	if(lpResult)
-		lpDatabase->FreeResult(lpResult);
-
-	return er;
 }
 
 // Check if an object has moved to a new company, or if it was created as new 
@@ -3131,7 +2912,7 @@ exit:
 ECRESULT ECUserManagement::DeleteLocalObject(unsigned int ulObjectId, objectclass_t objclass) {
 	ECRESULT er = erSuccess;
 	ECDatabase *lpDatabase = NULL;
-	DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
 	DB_ROW lpRow = NULL;
 	unsigned int ulDeletedRows = 0;
 	std::string strQuery;
@@ -3182,8 +2963,6 @@ ECRESULT ECUserManagement::DeleteLocalObject(unsigned int ulObjectId, objectclas
 				goto exit;
 		}
 
-		lpDatabase->FreeResult(lpResult);
-		lpResult = NULL;
 		lpRow = NULL;
 
 		ec_log_info("Done auto-deleting %s members", ObjectClassToName(objclass));
@@ -3296,15 +3075,8 @@ exit:
 		ec_log_info("Auto-deleting %s %d done. Error code 0x%08X", ObjectClassToName(objclass), ulObjectId, er);
 	else
 		ec_log_info("Auto-deleting %s %d done.", ObjectClassToName(objclass), ulObjectId);
-	
-	if (lpDatabase) {
-		if (bTransaction && er != erSuccess)
-			lpDatabase->Rollback();
-
-		if (lpResult)
-			lpDatabase->FreeResult(lpResult);
-	}
-
+	if (lpDatabase != nullptr && bTransaction && er != erSuccess)
+		lpDatabase->Rollback();
 	return er;
 }
 
@@ -3332,9 +3104,7 @@ ECRESULT ECUserManagement::ConvertAnonymousObjectDetailToProp(struct soap *soap,
 	struct propVal sPropVal;
 	std::string strValue;
 	std::list<std::string> lstrValues;
-	std::list<std::string>::const_iterator iterValues;
 	std::list<objectid_t> lobjValues;
-	std::list<objectid_t>::const_iterator iterObjects;
 	unsigned int i = 0;
 	unsigned int ulGetPropTag;
 
@@ -3374,9 +3144,9 @@ ECRESULT ECUserManagement::ConvertAnonymousObjectDetailToProp(struct soap *soap,
 		lpPropVal->Value.mvbin.__size = 0;
 		lpPropVal->Value.mvbin.__ptr = s_alloc<struct xsd__base64Binary>(soap, lobjValues.size());
 
-		for (i = 0, iterObjects = lobjValues.begin();
-		     iterObjects != lobjValues.end(); ++iterObjects) {
-			er = CreateABEntryID(soap, *iterObjects, &sPropVal);
+		i = 0;
+		for (const auto &obj : lobjValues) {
+			er = CreateABEntryID(soap, obj, &sPropVal);
 			if (er != erSuccess)
 				continue;
 
@@ -3392,7 +3162,7 @@ ECRESULT ECUserManagement::ConvertAnonymousObjectDetailToProp(struct soap *soap,
 	switch (PROP_TYPE(ulPropTag)) {
 	case PT_BOOLEAN:
 		lpPropVal->ulPropTag = ulPropTag;
-		lpPropVal->Value.b = parseBool(strValue);
+		lpPropVal->Value.b = parseBool(strValue.c_str());
 		lpPropVal->__union = SOAP_UNION_propValData_b;
 		break;
 	case PT_SHORT:
@@ -3421,9 +3191,9 @@ ECRESULT ECUserManagement::ConvertAnonymousObjectDetailToProp(struct soap *soap,
 		lpPropVal->ulPropTag = ulPropTag;
 		lpPropVal->Value.mvszA.__size = lstrValues.size();		
 		lpPropVal->Value.mvszA.__ptr = s_alloc<char *>(soap, lstrValues.size());
-		for (i = 0, iterValues = lstrValues.begin();
-		     iterValues != lstrValues.end(); ++i, ++iterValues)
-			lpPropVal->Value.mvszA.__ptr[i] = s_strcpy(soap, iterValues->c_str());
+		i = 0;
+		for (const auto &val : lstrValues)
+			lpPropVal->Value.mvszA.__ptr[i++] = s_strcpy(soap, val.c_str());
 		lpPropVal->__union = SOAP_UNION_propValData_mvszA;
 		break;
 	case PT_BINARY:
@@ -3438,12 +3208,11 @@ ECRESULT ECUserManagement::ConvertAnonymousObjectDetailToProp(struct soap *soap,
 		lpPropVal->ulPropTag = ulPropTag;
 		lpPropVal->Value.mvbin.__size = lstrValues.size();		
 		lpPropVal->Value.mvbin.__ptr = s_alloc<struct xsd__base64Binary>(soap, lstrValues.size());
-		for (i = 0, iterValues = lstrValues.begin();
-		     iterValues != lstrValues.end(); ++i, ++iterValues) {
-			lpPropVal->Value.mvbin.__ptr[i].__size = iterValues->size();
-			lpPropVal->Value.mvbin.__ptr[i].__ptr = s_alloc<unsigned char>(soap, iterValues->size());
-
-			memcpy(lpPropVal->Value.mvbin.__ptr[i].__ptr, iterValues->data(), iterValues->size());
+		i = 0;
+		for (const auto &val : lstrValues) {
+			lpPropVal->Value.mvbin.__ptr[i].__size = val.size();
+			lpPropVal->Value.mvbin.__ptr[i].__ptr = s_alloc<unsigned char>(soap, val.size());
+			memcpy(lpPropVal->Value.mvbin.__ptr[i++].__ptr, val.data(), val.size());
 		}
 		lpPropVal->__union = SOAP_UNION_propValData_mvbin;
 		break;
@@ -3696,14 +3465,11 @@ ECRESULT ECUserManagement::ConvertObjectDetailsToProps(struct soap *soap, unsign
 				break;
 			case PR_EMS_AB_X509_CERT: {
 				list<string> strCerts = lpDetails->GetPropListString(OB_PROP_LS_CERTIFICATE);
-				std::list<std::string>::const_iterator iCert;
-
-				if (strCerts.empty()) {
+				if (strCerts.empty())
 					/* This is quite annoying. The LDAP plugin loads it in a specific location, while the db plugin
 					  saves it through the anonymous map into the proptag location.
 					 */
 					strCerts = lpDetails->GetPropListString((property_key_t)lpPropTags->__ptr[i]);
-				}
 
 				if (!strCerts.empty()) {
 					unsigned int i = 0;
@@ -3711,14 +3477,10 @@ ECRESULT ECUserManagement::ConvertObjectDetailsToProps(struct soap *soap, unsign
 					lpPropVal->__union = SOAP_UNION_propValData_mvbin;
 					lpPropVal->Value.mvbin.__size = strCerts.size();
 					lpPropVal->Value.mvbin.__ptr = s_alloc<struct xsd__base64Binary>(soap, strCerts.size());
-
-					for (i = 0, iCert = strCerts.begin();
-					     iCert != strCerts.end();
-					     ++iCert, ++i) {
-						lpPropVal->Value.mvbin.__ptr[i].__size = iCert->size();
-						lpPropVal->Value.mvbin.__ptr[i].__ptr = s_alloc<unsigned char>(soap, iCert->size());
-
-						memcpy(lpPropVal->Value.mvbin.__ptr[i].__ptr, iCert->data(), iCert->size());
+					for (const auto &cert : strCerts) {
+						lpPropVal->Value.mvbin.__ptr[i].__size = cert.size();
+						lpPropVal->Value.mvbin.__ptr[i].__ptr = s_alloc<unsigned char>(soap, cert.size());
+						memcpy(lpPropVal->Value.mvbin.__ptr[i++].__ptr, cert.data(), cert.size());
 					}
 				} else {
 					lpPropVal->ulPropTag = PROP_TAG(PT_ERROR, PROP_ID(lpPropTags->__ptr[i]));
@@ -3729,7 +3491,6 @@ ECRESULT ECUserManagement::ConvertObjectDetailsToProps(struct soap *soap, unsign
 			}
 			case PR_EC_SENDAS_USER_ENTRYIDS: {
 				list<objectid_t> userIds = lpDetails->GetPropListObject(OB_PROP_LO_SENDAS);
-				std::list<objectid_t>::const_iterator iterUserIds;
 
 				if (!userIds.empty()) {
 					unsigned int i;
@@ -3739,11 +3500,9 @@ ECRESULT ECUserManagement::ConvertObjectDetailsToProps(struct soap *soap, unsign
 					lpPropVal->Value.mvbin.__size = 0;
 					lpPropVal->Value.mvbin.__ptr = s_alloc<struct xsd__base64Binary>(soap, userIds.size());
 
-					for (i = 0, iterUserIds = userIds.begin();
-					     iterUserIds != userIds.end();
-					     ++iterUserIds)
-					{
-						er = CreateABEntryID(soap, *iterUserIds, &sPropVal);
+					i = 0;
+					for (const auto &uid : userIds) {
+						er = CreateABEntryID(soap, uid, &sPropVal);
 						if (er != erSuccess)
 							continue;
 
@@ -3763,7 +3522,6 @@ ECRESULT ECUserManagement::ConvertObjectDetailsToProps(struct soap *soap, unsign
 				std::string strPrefix("SMTP:");
 				std::string address(lpDetails->GetPropString(OB_PROP_S_EMAIL));
 				std::list<std::string> lstAliases = lpDetails->GetPropListString(OB_PROP_LS_ALIASES);
-				std::list<std::string>::const_iterator iterAliases;
 				ULONG nAliases = lstAliases.size();
 				ULONG i = 0;
 
@@ -3777,10 +3535,8 @@ ECRESULT ECUserManagement::ConvertObjectDetailsToProps(struct soap *soap, unsign
 
 				// Use lower-case 'smtp' prefix for aliases
 				strPrefix = "smtp:";
-				for (iterAliases = lstAliases.begin();
-				     iterAliases != lstAliases.end();
-				     ++iterAliases)
-					lpPropVal->Value.mvszA.__ptr[i++] = s_strcpy(soap, (strPrefix + *iterAliases).c_str());
+				for (const auto &alias : lstAliases)
+					lpPropVal->Value.mvszA.__ptr[i++] = s_strcpy(soap, (strPrefix + alias).c_str());
 				
 				lpPropVal->Value.mvszA.__size = i;
 				break;
@@ -3945,7 +3701,6 @@ ECRESULT ECUserManagement::ConvertObjectDetailsToProps(struct soap *soap, unsign
 				break;
 			case PR_EC_SENDAS_USER_ENTRYIDS: {
 				list<objectid_t> userIds = lpDetails->GetPropListObject(OB_PROP_LO_SENDAS);
-				std::list<objectid_t>::const_iterator iterUserIds;
 
 				if (!userIds.empty()) {
 					unsigned int i;
@@ -3955,11 +3710,9 @@ ECRESULT ECUserManagement::ConvertObjectDetailsToProps(struct soap *soap, unsign
 					lpPropVal->Value.mvbin.__size = 0;
 					lpPropVal->Value.mvbin.__ptr = s_alloc<struct xsd__base64Binary>(soap, userIds.size());
 
-					for (i = 0, iterUserIds = userIds.begin();
-					     iterUserIds != userIds.end();
-					     ++iterUserIds)
-					{
-						er = CreateABEntryID(soap, *iterUserIds, &sPropVal);
+					i = 0;
+					for (const auto &uid : userIds) {
+						er = CreateABEntryID(soap, uid, &sPropVal);
 						if (er != erSuccess)
 							continue;
 
@@ -3979,7 +3732,6 @@ ECRESULT ECUserManagement::ConvertObjectDetailsToProps(struct soap *soap, unsign
 				std::string strPrefix("SMTP:");
 				std::string address(lpDetails->GetPropString(OB_PROP_S_EMAIL));
 				std::list<std::string> lstAliases = lpDetails->GetPropListString(OB_PROP_LS_ALIASES);
-				std::list<std::string>::const_iterator iterAliases;
 				ULONG nAliases = lstAliases.size();
 				ULONG i = 0;
 
@@ -3993,10 +3745,8 @@ ECRESULT ECUserManagement::ConvertObjectDetailsToProps(struct soap *soap, unsign
 
 				// Use lower-case 'smtp' prefix for aliases
 				strPrefix = "smtp:";
-				for (iterAliases = lstAliases.begin();
-				     iterAliases != lstAliases.end();
-				     ++iterAliases)
-					lpPropVal->Value.mvszA.__ptr[i++] = s_strcpy(soap, (strPrefix + *iterAliases).c_str());
+				for (const auto &alias : lstAliases)
+					lpPropVal->Value.mvszA.__ptr[i++] = s_strcpy(soap, (strPrefix + alias).c_str());
 
 				lpPropVal->Value.mvszA.__size = i;
 				break;
@@ -4032,8 +3782,7 @@ ECRESULT ECUserManagement::ConvertObjectDetailsToProps(struct soap *soap, unsign
 
 exit:
 	if (er != erSuccess && soap == NULL)
-		delete [] lpPropVals->__ptr;
-
+		s_free(nullptr, lpPropVals->__ptr);
 	return er;
 }
 
@@ -4368,17 +4117,15 @@ ECRESULT ECUserManagement::ConvertABContainerToProps(struct soap *soap, unsigned
 			lpSession = dynamic_cast<ECSession *>(m_lpSession);
 			if(lpSession)
 				lpSession->GetClientApp(&strApp);
-			
-			if(strncasecmp(strApp.c_str(), "blackberry", 10) == 0) {
+			if (strncasecmp(strApp.c_str(), "blackberry", 10) == 0)
 				// For blackberry, we pose as being the Exchange AddressList. We have to do this
 				// since it searches for the GAB by restricting by this GUID, otherwise the Lookup
 				// function will not function properly.
 				// Multiple blackberry binaries need to be able to access, including BlackBerryAgent.exe
 				// and BlackBerryMailStore.exe
 				memcpy(lpPropVal->Value.bin->__ptr, MUIDEMSAB, sizeof(GUID));
-			} else {
+			else
 				memcpy(lpPropVal->Value.bin->__ptr, &MUIDECSAB, sizeof(GUID));
-			}
 			break;
 		}
 		case PR_EMS_AB_IS_MASTER:
@@ -4447,7 +4194,7 @@ ECRESULT ECUserManagement::GetUserCount(usercount_t *lpUserCount)
 {
     ECRESULT er = erSuccess;
     ECDatabase *lpDatabase = NULL;
-    DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
     DB_ROW lpRow = NULL;
     std::string strQuery;
     unsigned int ulActive = 0;
@@ -4458,8 +4205,7 @@ ECRESULT ECUserManagement::GetUserCount(usercount_t *lpUserCount)
 
 	er = m_lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
-		goto exit;
-
+		return er;
 	strQuery =
 		"SELECT COUNT(*), objectclass "
 		"FROM users "
@@ -4468,7 +4214,7 @@ ECRESULT ECUserManagement::GetUserCount(usercount_t *lpUserCount)
 		"GROUP BY objectclass";
 	er = lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	while((lpRow = lpDatabase->FetchRow(lpResult)) != NULL) {
 		if(lpRow[0] == NULL || lpRow[1] == NULL)
@@ -4496,21 +4242,17 @@ ECRESULT ECUserManagement::GetUserCount(usercount_t *lpUserCount)
 	if (lpUserCount)
 		lpUserCount->assign(ulActive, ulNonActiveUser, ulRoom, ulEquipment, ulContact);
 
-    pthread_mutex_lock(&m_hMutex);
-    m_userCount.assign(ulActive, ulNonActiveUser, ulRoom, ulEquipment, ulContact);
-    m_usercount_ts = time(NULL);
-    pthread_mutex_unlock(&m_hMutex);
-
-exit:
-    if(lpResult)
-        lpDatabase->FreeResult(lpResult);
-
-    return er;
+	{
+		std::lock_guard<std::recursive_mutex> lock(m_hMutex);
+		m_userCount.assign(ulActive, ulNonActiveUser, ulRoom, ulEquipment, ulContact);
+		m_usercount_ts = time(NULL);
+	}
+	return erSuccess;
 }
 
 ECRESULT ECUserManagement::GetCachedUserCount(usercount_t *lpUserCount)
 {
-	scoped_lock lock(m_hMutex);
+	std::lock_guard<std::recursive_mutex> lock(m_hMutex);
 
 	if (!m_userCount.isValid() || m_usercount_ts - time(NULL) > 5*60)
 		return GetUserCount(lpUserCount);
@@ -4683,8 +4425,9 @@ ECRESULT ECUserManagement::GetABSourceKeyV1(unsigned int ulUserId, SOURCEKEY *lp
 		return er;
 
 	unsigned int ulLen = CbNewABEID(strEncExId.c_str());
-	auto lpAbeid = reinterpret_cast<ABEID *>(new char[ulLen]);
-	memset(lpAbeid, 0, ulLen);
+	std::unique_ptr<char[]> abchar(new char[ulLen]);
+	memset(abchar.get(), 0, ulLen);
+	auto lpAbeid = reinterpret_cast<ABEID *>(abchar.get());
 	lpAbeid->ulId = ulUserId;
 	lpAbeid->ulType = ulType;
 	memcpy(&lpAbeid->guid, &MUIDECSAB, sizeof(GUID));
@@ -4695,8 +4438,7 @@ ECRESULT ECUserManagement::GetABSourceKeyV1(unsigned int ulUserId, SOURCEKEY *lp
 		memcpy(lpAbeid->szExId, strEncExId.c_str(), strEncExId.length()+1);
 	}
 
-	*lpsSourceKey = SOURCEKEY(ulLen, reinterpret_cast<const char *>(lpAbeid));
-	delete[] lpAbeid;
+	*lpsSourceKey = SOURCEKEY(ulLen, abchar.get());
 	return erSuccess;
 }
 
@@ -4723,10 +4465,9 @@ ECRESULT ECUserManagement::CreateABEntryID(struct soap *soap,
 	gsoap_size_t ulSize = 0;
 	std::string	strEncExId;
 	
-	ASSERT(ulVersion == 0 || ulVersion == 1);
-	
 	if (IsInternalObject(ulObjId)) {
-		ASSERT(ulVersion == 0); // Internal objects always have version 0 ABEIDs
+		if (ulVersion != 0)
+			throw std::runtime_error("Internal objects must always have v0 ABEIDs");
 		lpEid = reinterpret_cast<ABEID *>(s_alloc<unsigned char>(soap, sizeof(ABEID)));
 		memset(lpEid, 0, sizeof(ABEID));
 		ulSize = sizeof(ABEID);
@@ -4748,6 +4489,8 @@ ECRESULT ECUserManagement::CreateABEntryID(struct soap *soap,
 
 			// avoid FORTIFY_SOURCE checks in strcpy to an address that the compiler thinks is 1 size large
 			memcpy(lpEid->szExId, strEncExId.c_str(), strEncExId.length()+1);
+		} else {
+			throw std::runtime_error("Unknown user entry version " + stringify(ulVersion));
 		}
 	}
 
@@ -4810,10 +4553,8 @@ ECRESULT ECUserManagement::SyncAllObjects()
 {
 	ECRESULT er = erSuccess;
 	ECCacheManager *lpCacheManager = m_lpSession->GetSessionManager()->GetCacheManager();	// Don't delete
-
-	std::list<localobjectdetails_t> *lplstCompanyObjects = NULL;
-	std::list<localobjectdetails_t>::const_iterator iCompany;
-	std::list<localobjectdetails_t> *lplstUserObjects = NULL;
+	std::unique_ptr<std::list<localobjectdetails_t> > lplstCompanyObjects;
+	std::unique_ptr<std::list<localobjectdetails_t> > lplstUserObjects;
 	unsigned int ulFlags = USERMANAGEMENT_IDS_ONLY | USERMANAGEMENT_FORCE_SYNC;
 	
 	/*
@@ -4830,15 +4571,15 @@ ECRESULT ECUserManagement::SyncAllObjects()
 
 	er = lpCacheManager->PurgeCache(PURGE_CACHE_USEROBJECT | PURGE_CACHE_EXTERNID | PURGE_CACHE_USERDETAILS | PURGE_CACHE_SERVER);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	// request all companies
-	er = GetCompanyObjectListAndSync(CONTAINER_COMPANY, 0, &lplstCompanyObjects, ulFlags);
+	er = GetCompanyObjectListAndSync(CONTAINER_COMPANY, 0, &unique_tie(lplstCompanyObjects), ulFlags);
 	if (er == KCERR_NO_SUPPORT) {
 		er = erSuccess;
 	} else if (er != erSuccess) {
 		ec_log_err("Error synchronizing company list: %08X", er);
-		goto exit;
+		return er;
 	} else { 
 		ec_log_info("Synchronized company list");
 	}
@@ -4846,28 +4587,24 @@ ECRESULT ECUserManagement::SyncAllObjects()
 
 	if (!lplstCompanyObjects || lplstCompanyObjects->empty()) {
 		// get all users of server
-		er = GetCompanyObjectListAndSync(OBJECTCLASS_UNKNOWN, 0, &lplstUserObjects, ulFlags);
+		er = GetCompanyObjectListAndSync(OBJECTCLASS_UNKNOWN, 0, &unique_tie(lplstUserObjects), ulFlags);
 		if (er != erSuccess) {
 			ec_log_err("Error synchronizing user list: %08X", er);
-			goto exit;
+			return er;
 		}
 		ec_log_info("Synchronized user list");
-	} else {
-		// per company, get all users
-		for (iCompany = lplstCompanyObjects->begin();
-		     iCompany != lplstCompanyObjects->end(); ++iCompany) {
-			er = GetCompanyObjectListAndSync(OBJECTCLASS_UNKNOWN, iCompany->ulId, &lplstUserObjects, ulFlags);
-			if (er != erSuccess) {
-				ec_log_err("Error synchronizing user list for company %d: %08X", iCompany->ulId, er);
-				goto exit;
-			}
-			ec_log_info("Synchronized list for company %d", iCompany->ulId);
-		}
+		return erSuccess;
 	}
-
-exit:
-	delete lplstUserObjects;
-	delete lplstCompanyObjects;
-
-	return er;
+	// per company, get all users
+	for (const auto &com : *lplstCompanyObjects) {
+		er = GetCompanyObjectListAndSync(OBJECTCLASS_UNKNOWN, com.ulId, &unique_tie(lplstUserObjects), ulFlags);
+		if (er != erSuccess) {
+			ec_log_err("Error synchronizing user list for company %d: %08X", com.ulId, er);
+			return er;
+		}
+		ec_log_info("Synchronized list for company %d", com.ulId);
+	}
+	return erSuccess;
 }
+
+} /* namespace */

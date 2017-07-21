@@ -18,6 +18,7 @@
 #ifndef EC_FEATURES_H
 #define EC_FEATURES_H
 
+#include <kopano/zcdefs.h>
 #include <kopano/platform.h>
 #include <mapidefs.h>
 #include <mapix.h>
@@ -25,11 +26,14 @@
 #include <string>
 #include <set>
 
-bool isFeature(const char* feature);
-HRESULT hasFeature(const char* feature, LPSPropValue lpProps);
-HRESULT hasFeature(const WCHAR* feature, LPSPropValue lpProps);
-std::set<std::string> getFeatures();
+namespace KC {
 
-bool isFeatureDisabled(const char* feature, IAddrBook *lpAddrBook, IMsgStore *lpUser);
+extern _kc_export bool isFeature(const char *);
+extern HRESULT hasFeature(const char *feature, const SPropValue *lpProps);
+extern _kc_export HRESULT hasFeature(const wchar_t *feature, const SPropValue *props);
+std::set<std::string> getFeatures();
+extern _kc_export bool isFeatureDisabled(const char *, IAddrBook *, IMsgStore *user);
+
+} /* namespace */
 
 #endif

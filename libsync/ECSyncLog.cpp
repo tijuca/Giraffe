@@ -16,7 +16,9 @@
  */
 
 #include <kopano/platform.h>
+#include <mutex>
 #include <kopano/ecversion.h>
+#include <kopano/lockhelper.hpp>
 
 #include "ECSyncLog.h"
 #include "ECSyncSettings.h"
@@ -35,7 +37,7 @@ HRESULT ECSyncLog::GetLogger(ECLogger **lppLogger)
 
 	*lppLogger = NULL;
 
-	pthread_mutex_lock(&s_hMutex);
+	scoped_lock lock(s_hMutex);
 
 	if (s_lpLogger == NULL) {
 		ECSyncSettings *lpSettings = ECSyncSettings::GetInstance();
@@ -74,22 +76,17 @@ HRESULT ECSyncLog::GetLogger(ECLogger **lppLogger)
 		}
 	}
 
-	if (!s_lpLogger) {
+	if (!s_lpLogger)
 		s_lpLogger = new ECLogger_Syslog(EC_LOGLEVEL_DEBUG, "kclibsync", LOG_MAIL);
-	}
-
 	*lppLogger = s_lpLogger;
 
 	s_lpLogger->AddRef();
-
-	pthread_mutex_unlock(&s_hMutex);
-
 	return hr;
 }
 
 HRESULT ECSyncLog::SetLogger(ECLogger *lpLogger)
 {
-	pthread_mutex_lock(&s_hMutex);
+	scoped_lock lock(s_hMutex);
 
 	if (s_lpLogger)
 		s_lpLogger->Release();
@@ -97,28 +94,19 @@ HRESULT ECSyncLog::SetLogger(ECLogger *lpLogger)
 	s_lpLogger = lpLogger;
 	if (s_lpLogger)
 		s_lpLogger->AddRef();
-
-	pthread_mutex_unlock(&s_hMutex);
-
 	return hrSuccess;
 }
 
-pthread_mutex_t	ECSyncLog::s_hMutex;
+std::mutex ECSyncLog::s_hMutex;
 ECLogger		*ECSyncLog::s_lpLogger = NULL;
 
-ECSyncLog::__initializer::__initializer() {
-	pthread_mutex_init(&ECSyncLog::s_hMutex, NULL);
-}
-
 ECSyncLog::__initializer::~__initializer() {
-	if (ECSyncLog::s_lpLogger) {
-		unsigned ulRef = ECSyncLog::s_lpLogger->Release();
-		// Make sure all references are released so compressed logs don't get corrupted.
-		while (ulRef)
-			ulRef = ECSyncLog::s_lpLogger->Release();
-	}
-
-	pthread_mutex_destroy(&ECSyncLog::s_hMutex);
+	if (ECSyncLog::s_lpLogger == nullptr)
+		return;
+	unsigned ulRef = ECSyncLog::s_lpLogger->Release();
+	// Make sure all references are released so compressed logs don't get corrupted.
+	while (ulRef)
+		ulRef = ECSyncLog::s_lpLogger->Release();
 }
 
 ECSyncLog::__initializer ECSyncLog::__i;

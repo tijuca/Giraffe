@@ -16,6 +16,8 @@
  */
 
 #include <kopano/platform.h>
+#include <condition_variable>
+#include <mutex>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
@@ -28,9 +30,9 @@
 #include <mapidefs.h>
 
 #include <mapiguid.h>
-#include <cctype>
 
 #include <kopano/ECScheduler.h>
+#include <kopano/lockhelper.hpp>
 #include <kopano/my_getopt.h>
 #include "ECMonitorDefs.h"
 #include "ECQuotaMonitor.h"
@@ -58,24 +60,60 @@ static void deleteThreadMonitor(ECTHREADMONITOR *lpThreadMonitor,
 
 static ECTHREADMONITOR *m_lpThreadMonitor;
 
-static pthread_mutex_t		m_hExitMutex;
-static pthread_cond_t		m_hExitSignal;
+static std::mutex m_hExitMutex;
+static std::condition_variable m_hExitSignal;
 static pthread_t			mainthread;
 
-static HRESULT running_service(const char *szPath);
+static HRESULT running_service(void)
+{
+	HRESULT hr = hrSuccess;
+	ECScheduler *lpECScheduler = nullptr;
+	unsigned int ulInterval = 0;
+	bool bMapiInit = false;
+	ulock_normal l_exit(m_hExitMutex, std::defer_lock_t());
+
+	hr = MAPIInitialize(nullptr);
+	if (hr != hrSuccess) {
+		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to initialize MAPI");
+		goto exit;
+	}
+	bMapiInit = true;
+	lpECScheduler = new ECScheduler(m_lpThreadMonitor->lpLogger);
+	ulInterval = atoi(m_lpThreadMonitor->lpConfig->GetSetting("quota_check_interval", nullptr, "15"));
+	if (ulInterval == 0)
+		ulInterval = 15;
+	m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting kopano-monitor version " PROJECT_VERSION_MONITOR_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
+
+	// Add Quota monitor
+	hr = lpECScheduler->AddSchedule(SCHEDULE_MINUTES, ulInterval, ECQuotaMonitor::Create, m_lpThreadMonitor);
+	if (hr != hrSuccess) {
+		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to add quota monitor schedule");
+		goto exit;
+	}
+	l_exit.lock();
+	m_hExitSignal.wait(l_exit);
+	l_exit.unlock();
+ exit:
+	delete lpECScheduler;
+	if (bMapiInit)
+		MAPIUninitialize();
+	return hr;
+}
 
 static void sighandle(int sig)
 {
-	// Win32 has unix semantics and therefore requires us to reset the signal handler.
+	// Win32 has Unix semantics and therefore requires us to reset the signal handler.
 	signal(SIGTERM , sighandle);
 	signal(SIGINT  , sighandle);	// CTRL+C
 
-	if (m_lpThreadMonitor && m_lpThreadMonitor->bShutdown == false)// do not log multimple shutdown messages
-		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_NOTICE, "Termination requested, shutting down.");
+	if (m_lpThreadMonitor) {
+		if (!m_lpThreadMonitor->bShutdown)
+			/* do not log multimple shutdown messages */
+			m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_NOTICE, "Termination requested, shutting down.");
 	
-	m_lpThreadMonitor->bShutdown = true;
-
-	pthread_cond_signal(&m_hExitSignal);
+		m_lpThreadMonitor->bShutdown = true;
+	}
+	m_hExitSignal.notify_one();
 }
 
 static void sighup(int signr)
@@ -84,23 +122,22 @@ static void sighup(int signr)
 	// not needed or required.
 	if (pthread_equal(pthread_self(), mainthread)==0)
 		return;
-	if (m_lpThreadMonitor) {
-		if (m_lpThreadMonitor->lpConfig) {
-			if (!m_lpThreadMonitor->lpConfig->ReloadSettings() && m_lpThreadMonitor->lpLogger)
-				m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to reload configuration file, continuing with current settings.");
-		}
-
-		if (m_lpThreadMonitor->lpLogger) {
-			if (m_lpThreadMonitor->lpConfig) {
-				const char *ll = m_lpThreadMonitor->lpConfig->GetSetting("log_level");
-				int new_ll = ll ? atoi(ll) : EC_LOGLEVEL_WARNING;
-				m_lpThreadMonitor->lpLogger->SetLoglevel(new_ll);
-			}
-
-			m_lpThreadMonitor->lpLogger->Reset();
-			m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_WARNING, "Log connection was reset");
-		}
+	if (m_lpThreadMonitor == NULL)
+		return;
+	if (m_lpThreadMonitor->lpConfig != NULL &&
+	    !m_lpThreadMonitor->lpConfig->ReloadSettings() &&
+	    m_lpThreadMonitor->lpLogger != NULL)
+		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to reload configuration file, continuing with current settings.");
+	if (m_lpThreadMonitor->lpLogger == NULL)
+		return;
+	if (m_lpThreadMonitor->lpConfig) {
+		const char *ll = m_lpThreadMonitor->lpConfig->GetSetting("log_level");
+		int new_ll = ll ? atoi(ll) : EC_LOGLEVEL_WARNING;
+		m_lpThreadMonitor->lpLogger->SetLoglevel(new_ll);
 	}
+
+	m_lpThreadMonitor->lpLogger->Reset();
+	m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_WARNING, "Log connection was reset");
 }
 
 // SIGSEGV catcher
@@ -215,7 +252,7 @@ int main(int argc, char *argv[]) {
 
 	m_lpThreadMonitor->lpConfig = ECConfig::Create(lpDefaults);
 	if (!m_lpThreadMonitor->lpConfig->LoadSettings(szConfig) ||
-	    !m_lpThreadMonitor->lpConfig->ParseParams(argc - optind, &argv[optind], NULL) ||
+	    m_lpThreadMonitor->lpConfig->ParseParams(argc - optind, &argv[optind]) < 0 ||
 	    (!bIgnoreUnknownConfigOptions && m_lpThreadMonitor->lpConfig->HasErrors())) {
 		m_lpThreadMonitor->lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false); // create fatal logger without a timestamp to stderr
 		ec_log_set(m_lpThreadMonitor->lpLogger);
@@ -253,6 +290,7 @@ int main(int argc, char *argv[]) {
 
 	act.sa_sigaction = sigsegv;
 	act.sa_flags = SA_ONSTACK | SA_RESETHAND | SA_SIGINFO;
+	sigemptyset(&act.sa_mask);
 
 	sigaltstack(&st, NULL);
 	sigaction(SIGSEGV, &act, NULL);
@@ -261,65 +299,20 @@ int main(int argc, char *argv[]) {
 
 	// fork if needed and drop privileges as requested.
 	// this must be done before we do anything with pthreads
-	if (unix_runas(m_lpThreadMonitor->lpConfig, m_lpThreadMonitor->lpLogger))
+	if (unix_runas(m_lpThreadMonitor->lpConfig))
 		goto exit;
-	if (daemonize && unix_daemonize(m_lpThreadMonitor->lpConfig, m_lpThreadMonitor->lpLogger))
+	if (daemonize && unix_daemonize(m_lpThreadMonitor->lpConfig))
 		goto exit;
 	if (!daemonize)
 		setsid();
-	if (unix_create_pidfile(argv[0], m_lpThreadMonitor->lpConfig, m_lpThreadMonitor->lpLogger, false) < 0)
+	if (unix_create_pidfile(argv[0], m_lpThreadMonitor->lpConfig, false) < 0)
 		goto exit;
 
 	// Init exit threads
-	pthread_mutex_init(&m_hExitMutex, NULL);
-	pthread_cond_init(&m_hExitSignal, NULL);
-	hr = running_service(szPath);
+	hr = running_service();
 exit:
 	if(m_lpThreadMonitor)
 		deleteThreadMonitor(m_lpThreadMonitor, true);
 
 	return hr == hrSuccess ? 0 : 1;
-}
-
-static HRESULT running_service(const char *szPath)
-{
-	HRESULT			hr = hrSuccess;
-	ECScheduler*	lpECScheduler = NULL;
-	unsigned int	ulInterval = 0;
-	bool			bMapiInit = false;
-	
-	hr = MAPIInitialize(NULL);
-	if (hr != hrSuccess) {
-		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to initialize MAPI");
-		goto exit;
-	}
-	bMapiInit = true;
-
-	lpECScheduler = new ECScheduler(m_lpThreadMonitor->lpLogger);
-
-	ulInterval = atoi(m_lpThreadMonitor->lpConfig->GetSetting("quota_check_interval", NULL, "15"));
-	if (ulInterval == 0)
-		ulInterval = 15;
-
-	m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_ALWAYS, "Starting kopano-monitor version " PROJECT_VERSION_MONITOR_STR " (" PROJECT_SVN_REV_STR "), pid %d", getpid());
-
-	// Add Quota monitor
-	hr = lpECScheduler->AddSchedule(SCHEDULE_MINUTES, ulInterval, ECQuotaMonitor::Create, m_lpThreadMonitor);
-	if(hr != hrSuccess) {
-		m_lpThreadMonitor->lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to add quota monitor schedule");
-		goto exit;
-	}
-
-	pthread_mutex_lock(&m_hExitMutex);
-
-	pthread_cond_wait(&m_hExitSignal, &m_hExitMutex);
-
-	pthread_mutex_unlock(&m_hExitMutex);
-
-exit:
-	delete lpECScheduler;
-	if (bMapiInit)
-		MAPIUninitialize();
-		
-	return hr;
 }

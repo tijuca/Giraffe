@@ -11,36 +11,49 @@ Makefile.in
 .dirstamp
 stamp-h1
 stamp-h2
-@
 
 # /
+/@
 /aclocal.m4
 /autom4te.cache/
 /build-arch-stamp
 /build-indep-stamp
 /compile
-/config.log
-/config.status
-/config.cache
+/config.*
 /configure
 /libtool
 /python-config
-/specialbuild
 /version
 
 /default.sym
 
-/ECtools/kopano-admin
-/ECtools/kopano-archiver
-/ECtools/kopano-cfgchecker
-/ECtools/kopano-fsck
-/ECtools/kopano-monitor
-/ECtools/kopano-passwd
-/ECtools/kopano-stats
-/ECtools/mapitime
+/spooler/PythonSWIGRuntime.h
+/kopano-admin
+/kopano-archiver
+/kopano-cfgchecker
+/kopano-dagent
+/kopano-fsck
+/kopano-gateway
+/kopano-ical
+/kopano-monitor
+/kopano-passwd
+/kopano-pst-import
+/kopano-server
+/kopano-spooler
+/kopano-stats
+/mapitime
+/mapi4linux/src/libmapi.sym
+/mapi4linux/src/libkchl.sym
+/provider/plugin.sym
+/provider/provider.sym
+/provider/soap/
+/ECtools/backup/kopano-backup
 /ECtools/backup/build/
+/ECtools/presence/kopano-presence
 /ECtools/presence/build/
+/ECtools/search/kopano-search
 /ECtools/search/build/
+/ECtools/migration-pst/kopano-migration-pst
 
 # /autoconf/
 /autoconf/ltsugar.m4
@@ -57,9 +70,6 @@ stamp-h2
 /autoconf/ylwrap
 /autoconf/compile
 
-# /caldav/
-/caldav/kopano-ical
-
 # /common/
 /common/config.h*
 /common/cov-scope
@@ -67,15 +77,12 @@ stamp-h2
 /common/include/kopano/ecversion.h
 /common/include/kopano/zconfig.h
 /common/kopano.pc
-
-# /doc/
-/doc/*.[0-9]
+/common/libkcmapi.sym
+/common/libkcutil.sym
 
 ## /doc/php-ext/
 #/doc/php-ext/*html
 #
-# /gateway/
-/gateway/kopano-gateway
 
 # /installer/
 /installer/kopano.ldif
@@ -94,28 +101,8 @@ stamp-h2
 /installer/userscripts/createcompany
 /installer/userscripts/deletecompany
 
-/provider/kopano-server
-
-# /provider/soap/
-/provider/soap/*res.xml
-/provider/soap/*req.xml
-/provider/soap/ns.xsd
-/provider/soap/KCmd.wsdl
-/provider/soap/KCmd.nsmap
-/provider/soap/soapClient.cpp
-/provider/soap/soapServer.cpp
-/provider/soap/soapStub.h
-/provider/soap/soapC.cpp
-/provider/soap/soapH.h
-/provider/soap/soapClientLib.cpp
-/provider/soap/soapServerLib.cpp
-/provider/soap/soapKCmdProxy.h
-/provider/soap/soapKCmdObject.h
-
-# /spooler/
-/spooler/kopano-spooler
-/spooler/kopano-dagent
-/spooler/PythonSWIGRuntime.h
+/provider/libkcsoap.sym
+/provider/libkcserver.sym
 
 # /swig/python/
 /swig/python/build/
@@ -138,6 +125,7 @@ stamp-h2
 /swig/python/RecurrenceState_wrap.cxx
 /swig/python/kopano/build/
 /swig/python/zarafa/build/
+/swig/python/python.sym
 
 # Ignore Python compiled files
 *.pyc

@@ -20,6 +20,7 @@
 #include <memory>
 #include <new>
 #include <ostream>
+#include <utility>
 #include "ArchiveManage.h"
 #include "ArchiveManageImpl.h"
 #include "ArchiverSession.h"
@@ -31,9 +32,11 @@
 #include "ArchiveStateUpdater.h"
 #include <kopano/ECRestriction.h>
 #include <kopano/MAPIErrors.h>
-    
-using namespace za::helpers;
 
+using namespace KC::helpers;
+
+namespace KC {
+    
 inline UserEntry ArchiveManageImpl::MakeUserEntry(const std::string &strUser) {
 	UserEntry entry;
 	entry.UserName = strUser;
@@ -57,17 +60,14 @@ inline UserEntry ArchiveManageImpl::MakeUserEntry(const std::string &strUser) {
 HRESULT ArchiveManageImpl::Create(ArchiverSessionPtr ptrSession, ECConfig *lpConfig, const TCHAR *lpszUser, ECLogger *lpLogger, ArchiveManagePtr *lpptrArchiveManage)
 {
 	HRESULT hr;
-	std::unique_ptr<ArchiveManageImpl> ptrArchiveManage;
 
 	if (lpszUser == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 	
-	try {
-		ptrArchiveManage.reset(new ArchiveManageImpl(ptrSession, lpConfig, lpszUser, lpLogger));
-	} catch (std::bad_alloc &) {
+	std::unique_ptr<ArchiveManageImpl> ptrArchiveManage(
+		new(std::nothrow) ArchiveManageImpl(ptrSession, lpConfig, lpszUser, lpLogger));
+	if (ptrArchiveManage == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-	}
-	
 	hr = ptrArchiveManage->Init();
 	if (hr != hrSuccess)
 		return hr;
@@ -105,16 +105,16 @@ ArchiveManageImpl::ArchiveManageImpl(ArchiverSessionPtr ptrSession, ECConfig *lp
 	m_strUser(strUser)
 {
 	m_lpLogger = new(std::nothrow) ECArchiverLogger(lpLogger);
-	if (m_lpLogger) {
-		m_lpLogger->SetUser(strUser);
-		if (lpConfig) {
-			const char*	loglevelstring = lpConfig->GetSetting("log_level");
-			if (loglevelstring) {
-				unsigned int loglevel = strtoul(loglevelstring, NULL, 0);
-				m_lpLogger->SetLoglevel(loglevel);
-			}
-		}
-	}
+	if (m_lpLogger == nullptr)
+		return;
+	m_lpLogger->SetUser(strUser);
+	if (lpConfig == nullptr)
+		return;
+	const char *loglevelstring = lpConfig->GetSetting("log_level");
+	if (loglevelstring == nullptr)
+		return;
+	unsigned int loglevel = strtoul(loglevelstring, NULL, 0);
+	m_lpLogger->SetLoglevel(loglevel);
 }
 
 ArchiveManageImpl::~ArchiveManageImpl()
@@ -129,7 +129,7 @@ HRESULT ArchiveManageImpl::Init()
 {
 	HRESULT hr;
 
-	hr = m_ptrSession->OpenStoreByName(m_strUser, &m_ptrUserStore);
+	hr = m_ptrSession->OpenStoreByName(m_strUser, &~m_ptrUserStore);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to open user store '" TSTRING_PRINTF "' (hr=%s).", m_strUser.c_str(), stringify(hr, true).c_str());
 		return hr;
@@ -176,8 +176,8 @@ HRESULT ArchiveManageImpl::AttachTo(const char *lpszArchiveServer, const TCHAR *
 		return hr;
 	}
 
-	if ((ulFlags & UseIpmSubtree) == UseIpmSubtree)
-		strFoldername.clear();	// Empty folder name indicates tje IPM subtree.
+	if (ulFlags & UseIpmSubtree)
+		strFoldername.clear();	// Empty folder name indicates the IPM subtree.
 	else if (lpszFolder)
 		strFoldername.assign(lpszFolder);
 		
@@ -192,7 +192,7 @@ HRESULT ArchiveManageImpl::AttachTo(const char *lpszArchiveServer, const TCHAR *
 	}
 	
 	// Find the requested archive.
-	hr = ptrArchiveSession->OpenStoreByName(lpszArchive, &ptrArchiveStore);
+	hr = ptrArchiveSession->OpenStoreByName(lpszArchive, &~ptrArchiveStore);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to open archive store '" TSTRING_PRINTF "' (hr=%s).", lpszArchive, stringify(hr, true).c_str());
 		return hr;
@@ -225,8 +225,7 @@ HRESULT ArchiveManageImpl::AttachTo(LPMDB lpArchiveStore, const tstring &strFold
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "User and archive store are the same.");
 		return MAPI_E_INVALID_PARAMETER;
 	}
-
-	hr = HrGetOneProp(lpArchiveStore, PR_ENTRYID, &ptrArchiveStoreId);
+	hr = HrGetOneProp(lpArchiveStore, PR_ENTRYID, &~ptrArchiveStoreId);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to get archive store entryid (hr=%s).", stringify(hr, true).c_str());
 		return hr;
@@ -245,9 +244,9 @@ HRESULT ArchiveManageImpl::AttachTo(LPMDB lpArchiveStore, const tstring &strFold
 	}
 
 	// Find ptrArchiveStoreId in lstArchives
-	for (ObjectEntryList::const_iterator i = lstArchives.begin(); i != lstArchives.end(); ++i) {
+	for (const auto &arc : lstArchives) {
 		bool bEqual;
-		if (m_ptrSession->CompareStoreIds(i->sStoreEntryId, ptrArchiveStoreId->Value.bin, &bEqual) == hrSuccess && bEqual) {
+		if (m_ptrSession->CompareStoreIds(arc.sStoreEntryId, ptrArchiveStoreId->Value.bin, &bEqual) == hrSuccess && bEqual) {
 			m_lpLogger->Log(EC_LOGLEVEL_FATAL, "An archive for this '" TSTRING_PRINTF "' is already present in this store.", m_strUser.c_str());
 			return MAPI_E_UNABLE_TO_COMPLETE;
 		}
@@ -310,7 +309,7 @@ HRESULT ArchiveManageImpl::AttachTo(LPMDB lpArchiveStore, const tstring &strFold
 		return hr;
 	}
 
-	lstArchives.push_back(objectEntry);
+	lstArchives.push_back(std::move(objectEntry));
 	lstArchives.sort();
 	lstArchives.unique();
 	
@@ -347,8 +346,7 @@ HRESULT ArchiveManageImpl::AttachTo(LPMDB lpArchiveStore, const tstring &strFold
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to set search folders (hr=%s).", stringify(hr, true).c_str());
 		return hr;	
 	}
-
-	hr = HrGetOneProp(lpArchiveStore, PR_DISPLAY_NAME, &ptrArchiveName);
+	hr = HrGetOneProp(lpArchiveStore, PR_DISPLAY_NAME, &~ptrArchiveName);
 	if (hr != hrSuccess) {
 		hr = hrSuccess;
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Successfully attached '" TSTRING_PRINTF "' in 'Unknown' for user '" TSTRING_PRINTF "'.", strFoldername.empty() ? _T("Root") : strFoldername.c_str(), m_strUser.c_str());
@@ -411,13 +409,12 @@ eResult ArchiveManageImpl::DetachFrom(const char *lpszArchiveServer, const TCHAR
 		ptrArchiveSession = ptrRemoteSession;
 	}
 
-	hr = ptrArchiveSession->OpenStoreByName(lpszArchive, &ptrArchiveStore);
+	hr = ptrArchiveSession->OpenStoreByName(lpszArchive, &~ptrArchiveStore);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to open archive store '" TSTRING_PRINTF "' (hr=%s).", lpszArchive, stringify(hr, true).c_str());
 		return MAPIErrorToArchiveError(hr);
 	}
-	
-	hr = HrGetOneProp(ptrArchiveStore, PR_ENTRYID, &ptrArchiveStoreEntryId);
+	hr = HrGetOneProp(ptrArchiveStore, PR_ENTRYID, &~ptrArchiveStoreEntryId);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to get archive entryid (hr=%s).", stringify(hr, true).c_str());
 		return MAPIErrorToArchiveError(hr);
@@ -444,13 +441,12 @@ eResult ArchiveManageImpl::DetachFrom(const char *lpszArchiveServer, const TCHAR
 	// If a folder name was passed, we need to find the correct folder.
 	if (lpszFolder) {
 		while (iArchive != lstArchives.end()) {
-			hr = ptrArchiveStore->OpenEntry(iArchive->sItemEntryId.size(), iArchive->sItemEntryId, &ptrArchiveFolder.iid, fMapiDeferredErrors, &ulType, &ptrArchiveFolder);
+			hr = ptrArchiveStore->OpenEntry(iArchive->sItemEntryId.size(), iArchive->sItemEntryId, &ptrArchiveFolder.iid(), fMapiDeferredErrors, &ulType, &~ptrArchiveFolder);
 			if (hr != hrSuccess) {
 				m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to open archive folder (hr=%s).", stringify(hr, true).c_str());
 				return MAPIErrorToArchiveError(hr);
 			}
-			
-			hr = HrGetOneProp(ptrArchiveFolder, PR_DISPLAY_NAME, &ptrDisplayName);
+			hr = HrGetOneProp(ptrArchiveFolder, PR_DISPLAY_NAME, &~ptrDisplayName);
 			if (hr != hrSuccess) {
 				m_lpLogger->Log(EC_LOGLEVEL_FATAL, "Failed to get archive folder name (hr=%s).", stringify(hr, true).c_str());
 				return MAPIErrorToArchiveError(hr);
@@ -560,19 +556,19 @@ eResult ArchiveManageImpl::ListArchives(std::ostream &ostr)
 		return er;
 
 	ostr << "User '" << convert_to<std::string>(m_strUser) << "' has " << lstArchives.size() << " attached archives:" << std::endl;
-	for (ArchiveList::const_iterator iArchive = lstArchives.begin(); iArchive != lstArchives.end(); ++iArchive, ++ulIdx) {
+	for (const auto &arc : lstArchives) {
 		ostr << "\t" << ulIdx
-			 << ": Store: " << iArchive->StoreName
-			 << ", Folder: " << iArchive->FolderName;
+			 << ": Store: " << arc.StoreName
+			 << ", Folder: " << arc.FolderName;
 
-		if (iArchive->Rights != ARCHIVE_RIGHTS_ABSENT) {
+		if (arc.Rights != ARCHIVE_RIGHTS_ABSENT) {
 			 ostr << ", Rights: ";
-			if (iArchive->Rights == ROLE_OWNER)
+			if (arc.Rights == ROLE_OWNER)
 				ostr << "Read Write";
-			else if (iArchive->Rights == ROLE_REVIEWER)
+			else if (arc.Rights == ROLE_REVIEWER)
 				ostr << "Read Only";
 			else
-				ostr << "Modified: " << AclRightsToString(iArchive->Rights);
+				ostr << "Modified: " << AclRightsToString(arc.Rights);
 		}
 
 		ostr << std::endl;
@@ -586,7 +582,6 @@ eResult ArchiveManageImpl::ListArchives(ArchiveList *lplstArchives, const char *
 	StoreHelperPtr ptrStoreHelper;
 	bool bAclCapable = true;
 	ObjectEntryList lstArchives;
-	ObjectEntryList::const_iterator iArchive;
 	MsgStorePtr ptrArchiveStore;
 	ULONG ulType = 0;
 	ArchiveList lstEntries;
@@ -603,7 +598,7 @@ eResult ArchiveManageImpl::ListArchives(ArchiveList *lplstArchives, const char *
 	if (hr != hrSuccess)
 		return MAPIErrorToArchiveError(hr);
 		
-	for (iArchive = lstArchives.begin(); iArchive != lstArchives.end(); ++iArchive) {
+	for (const auto &arc : lstArchives) {
 		HRESULT hrTmp = hrSuccess;
 		ULONG cStoreProps = 0;
 		SPropArrayPtr ptrStoreProps;
@@ -611,21 +606,20 @@ eResult ArchiveManageImpl::ListArchives(ArchiveList *lplstArchives, const char *
 		MAPIFolderPtr ptrArchiveFolder;
 		SPropValuePtr ptrPropValue;
 		ULONG ulCompareResult = FALSE;
-
-		SizedSPropTagArray(4, sptaStoreProps) = {4, {PR_DISPLAY_NAME_A, PR_MAILBOX_OWNER_ENTRYID, PR_IPM_SUBTREE_ENTRYID, PR_STORE_RECORD_KEY}};
+		static constexpr const SizedSPropTagArray(4, sptaStoreProps) = {4, {PR_DISPLAY_NAME_A, PR_MAILBOX_OWNER_ENTRYID, PR_IPM_SUBTREE_ENTRYID, PR_STORE_RECORD_KEY}};
 		enum {IDX_DISPLAY_NAME, IDX_MAILBOX_OWNER_ENTRYID, IDX_IPM_SUBTREE_ENTRYID, IDX_STORE_RECORD_KEY};
 
 		entry.Rights = ARCHIVE_RIGHTS_ERROR;
 
-		hrTmp = m_ptrSession->OpenStore(iArchive->sStoreEntryId, &ptrArchiveStore);
+		hrTmp = m_ptrSession->OpenStore(arc.sStoreEntryId, &~ptrArchiveStore);
 		if (hrTmp != hrSuccess) {
 			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to open store (hr=%s)", stringify(hrTmp, true).c_str());
-			entry.StoreName = "Failed id=" + iArchive->sStoreEntryId.tostring() + ", hr=" + stringify(hrTmp, true);
-			lstEntries.push_back(entry);
+			entry.StoreName = "Failed id=" + arc.sStoreEntryId.tostring() + ", hr=" + stringify(hrTmp, true);
+			lstEntries.push_back(std::move(entry));
 			continue;
 		}
 		
-		hrTmp = ptrArchiveStore->GetProps((LPSPropTagArray)&sptaStoreProps, 0, &cStoreProps, &ptrStoreProps);
+		hrTmp = ptrArchiveStore->GetProps(sptaStoreProps, 0, &cStoreProps, &~ptrStoreProps);
 		if (FAILED(hrTmp))
 			entry.StoreName = entry.StoreOwner = "Unknown (" + stringify(hrTmp, true) + ")";
 		else {
@@ -638,10 +632,10 @@ eResult ArchiveManageImpl::ListArchives(ArchiveList *lplstArchives, const char *
 				MAPIPropPtr ptrOwner;
 
 				hrTmp = m_ptrSession->OpenMAPIProp(ptrStoreProps[IDX_MAILBOX_OWNER_ENTRYID].Value.bin.cb,
-												  (LPENTRYID)ptrStoreProps[IDX_MAILBOX_OWNER_ENTRYID].Value.bin.lpb,
-												  &ptrOwner);
+				        reinterpret_cast<ENTRYID *>(ptrStoreProps[IDX_MAILBOX_OWNER_ENTRYID].Value.bin.lpb),
+				        &~ptrOwner);
 				if (hrTmp == hrSuccess)
-					hrTmp = HrGetOneProp(ptrOwner, PR_ACCOUNT_A, &ptrPropValue);
+					hrTmp = HrGetOneProp(ptrOwner, PR_ACCOUNT_A, &~ptrPropValue);
 
 				if (hrTmp == hrSuccess)
 					entry.StoreOwner = ptrPropValue->Value.lpszA;
@@ -654,7 +648,7 @@ eResult ArchiveManageImpl::ListArchives(ArchiveList *lplstArchives, const char *
 				if (ptrStoreProps[IDX_IPM_SUBTREE_ENTRYID].ulPropTag != PR_IPM_SUBTREE_ENTRYID)
 					hrTmp = MAPI_E_NOT_FOUND;
 				else
-					hrTmp = ptrArchiveStore->CompareEntryIDs(iArchive->sItemEntryId.size(), iArchive->sItemEntryId,
+					hrTmp = ptrArchiveStore->CompareEntryIDs(arc.sItemEntryId.size(), arc.sItemEntryId,
 															 ptrStoreProps[IDX_IPM_SUBTREE_ENTRYID].Value.bin.cb, (LPENTRYID)ptrStoreProps[IDX_IPM_SUBTREE_ENTRYID].Value.bin.lpb,
 															 0, &ulCompareResult);
 				if (hrTmp != hrSuccess) {
@@ -662,39 +656,37 @@ eResult ArchiveManageImpl::ListArchives(ArchiveList *lplstArchives, const char *
 					ulCompareResult = FALSE;	// Let's assume it's not the IPM Subtree.
 				}
 			}
-
-			if (ptrStoreProps[IDX_STORE_RECORD_KEY].ulPropTag == PR_STORE_RECORD_KEY) {
+			if (ptrStoreProps[IDX_STORE_RECORD_KEY].ulPropTag == PR_STORE_RECORD_KEY)
 				entry.StoreGuid = bin2hex(ptrStoreProps[IDX_STORE_RECORD_KEY].Value.bin.cb, ptrStoreProps[IDX_STORE_RECORD_KEY].Value.bin.lpb);
-			}
 		}
 
-		hrTmp = ptrArchiveStore->OpenEntry(iArchive->sItemEntryId.size(), iArchive->sItemEntryId, &ptrArchiveFolder.iid, fMapiDeferredErrors, &ulType, &ptrArchiveFolder);
+		hrTmp = ptrArchiveStore->OpenEntry(arc.sItemEntryId.size(), arc.sItemEntryId, &ptrArchiveFolder.iid(), fMapiDeferredErrors, &ulType, &~ptrArchiveFolder);
 		if (hrTmp != hrSuccess) {
 			m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to open folder (hr=%s)", stringify(hrTmp, true).c_str());
-			entry.FolderName = "Failed id=" + iArchive->sStoreEntryId.tostring() + ", hr=" + stringify(hrTmp, true);
-			lstEntries.push_back(entry);
+			entry.FolderName = "Failed id=" + arc.sStoreEntryId.tostring() + ", hr=" + stringify(hrTmp, true);
+			lstEntries.push_back(std::move(entry));
 			continue;
 		}
 		
 		if (lpszIpmSubtreeSubstitude && ulCompareResult == TRUE) {
-			ASSERT(lpszIpmSubtreeSubstitude != NULL);
+			assert(lpszIpmSubtreeSubstitude != NULL);
 			entry.FolderName = lpszIpmSubtreeSubstitude;
 		} else {
-			hrTmp = HrGetOneProp(ptrArchiveFolder, PR_DISPLAY_NAME_A, &ptrPropValue);
+			hrTmp = HrGetOneProp(ptrArchiveFolder, PR_DISPLAY_NAME_A, &~ptrPropValue);
 			if (hrTmp != hrSuccess)
 				entry.FolderName = "Unknown (" + stringify(hrTmp, true) + ")";
 			else
 				entry.FolderName = ptrPropValue->Value.lpszA ;
 		}
 
-		if (bAclCapable && !iArchive->sStoreEntryId.isWrapped()) {
+		if (bAclCapable && !arc.sStoreEntryId.isWrapped()) {
 			hrTmp = GetRights(ptrArchiveFolder, &entry.Rights);
 			if (hrTmp != hrSuccess)
 				m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to get archive rights (hr=%s)", stringify(hrTmp, true).c_str());
 		} else
 			entry.Rights = ARCHIVE_RIGHTS_ABSENT;
 
-		lstEntries.push_back(entry);
+		lstEntries.push_back(std::move(entry));
 	}
 
 	lplstArchives->swap(lstEntries);
@@ -724,8 +716,8 @@ eResult ArchiveManageImpl::ListAttachedUsers(std::ostream &ostr)
 	}
 
 	ostr << "Users with an attached archive:" << std::endl;
-	for (UserList::const_iterator iUser = lstUsers.begin(); iUser != lstUsers.end(); ++iUser)
-		ostr << "\t" << iUser->UserName << std::endl;
+	for (const auto &user : lstUsers)
+		ostr << "\t" << user.UserName << std::endl;
 	return Success;
 }
 
@@ -738,11 +730,8 @@ eResult ArchiveManageImpl::ListAttachedUsers(UserList *lplstUsers)
 	if (lplstUsers == NULL)
 		return MAPIErrorToArchiveError(MAPI_E_INVALID_PARAMETER);
 
-	hr = GetArchivedUserList(m_lpLogger, 
-							 m_ptrSession->GetMAPISession(),
-							 m_ptrSession->GetSSLPath(),
-							 m_ptrSession->GetSSLPass(),
-							 &lstUsers);
+	hr = GetArchivedUserList(m_ptrSession->GetMAPISession(),
+	     m_ptrSession->GetSSLPath(), m_ptrSession->GetSSLPass(), &lstUsers);
 	if (hr != hrSuccess)
 		return MAPIErrorToArchiveError(hr);
 
@@ -806,11 +795,8 @@ HRESULT ArchiveManageImpl::GetRights(LPMAPIFOLDER lpFolder, unsigned *lpulRights
 	ExchangeModifyTablePtr ptrACLModifyTable;
 	MAPITablePtr ptrACLTable;
 	SPropValue sPropUser;
-	ECPropertyRestriction res(RELOP_EQ, PR_MEMBER_NAME, &sPropUser, ECRestriction::Cheap);
-	SRestrictionPtr ptrRes;
 	SRowSetPtr ptrRows;
-
-	SizedSPropTagArray(1, sptaTableProps) = {1, {PR_MEMBER_RIGHTS}};
+	static constexpr const SizedSPropTagArray(1, sptaTableProps) = {1, {PR_MEMBER_RIGHTS}};
 
 	if (lpFolder == NULL || lpulRights == NULL)
 		return MAPI_E_INVALID_PARAMETER;
@@ -820,26 +806,24 @@ HRESULT ArchiveManageImpl::GetRights(LPMAPIFOLDER lpFolder, unsigned *lpulRights
 	// comparing AB entryids correctly over multiple servers. Since we're
 	// most likely dealing with multiple servers here, we'll use the users
 	// fullname instead.
-	hr = HrGetOneProp(m_ptrUserStore, PR_MAILBOX_OWNER_NAME, &ptrName);
+	hr = HrGetOneProp(m_ptrUserStore, PR_MAILBOX_OWNER_NAME, &~ptrName);
 	if (hr != hrSuccess)
 		return hr;
-	hr = lpFolder->OpenProperty(PR_ACL_TABLE, &IID_IExchangeModifyTable, 0, 0, &ptrACLModifyTable);
+	hr = lpFolder->OpenProperty(PR_ACL_TABLE, &IID_IExchangeModifyTable, 0, 0, &~ptrACLModifyTable);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrACLModifyTable->GetTable(0, &ptrACLTable);
+	hr = ptrACLModifyTable->GetTable(0, &~ptrACLTable);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrACLTable->SetColumns((LPSPropTagArray)&sptaTableProps, TBL_BATCH);
+	hr = ptrACLTable->SetColumns(sptaTableProps, TBL_BATCH);
 	if (hr != hrSuccess)
 		return hr;
 
 	sPropUser.ulPropTag = PR_MEMBER_NAME;
 	sPropUser.Value.LPSZ = ptrName->Value.LPSZ;
 
-	hr = res.CreateMAPIRestriction(&ptrRes, ECRestriction::Cheap);
-	if (hr != hrSuccess)
-		return hr;
-	hr = ptrACLTable->FindRow(ptrRes, 0, BOOKMARK_BEGINNING);
+	hr = ECPropertyRestriction(RELOP_EQ, PR_MEMBER_NAME, &sPropUser, ECRestriction::Cheap)
+	     .FindRowIn(ptrACLTable, BOOKMARK_BEGINNING, 0);
 	if (hr != hrSuccess)
 		return hr;
 	hr = ptrACLTable->QueryRows(1, 0, &ptrRows);
@@ -847,10 +831,12 @@ HRESULT ArchiveManageImpl::GetRights(LPMAPIFOLDER lpFolder, unsigned *lpulRights
 		return hr;
 
 	if (ptrRows.empty()) {
-		ASSERT(false);
+		assert(false);
 		return MAPI_E_NOT_FOUND;
 	}
 
 	*lpulRights = ptrRows[0].lpProps[0].Value.ul;
 	return hrSuccess;
 }
+
+} /* namespace */

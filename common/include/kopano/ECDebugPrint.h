@@ -20,12 +20,12 @@
 
 // @todo: Cleanup 'n' Document
 
+#include <kopano/zcdefs.h>
 #include <mapidefs.h>
 #include <kopano/stringutil.h>
 #include <kopano/ECDebug.h>
 
-#include <boost/type_traits/is_convertible.hpp>
-#include <boost/utility/enable_if.hpp>
+namespace KC {
 
 class ECDebugPrintBase {
 public:
@@ -150,7 +150,7 @@ class RecurrencePattern; // Forward declarations
 class TimezoneDefinition;
 
 template<typename string_type, ECDebugPrintBase::DerefMode deref_mode>
-class ECDebugPrint : public ECDebugPrintBase {
+class ECDebugPrint _kc_final : public ECDebugPrintBase {
 public:
 	typedef details::conversion_helpers<string_type>	helpers;
 
@@ -159,7 +159,8 @@ public:
 	}
 
 	template <typename T>
-	static string_type toString(T& a, typename boost::disable_if<boost::is_convertible<T, LPUNKNOWN> >::type* = 0) {
+	static string_type toString(T& a, typename std::enable_if<!std::is_convertible<T, IUnknown *>::value>::type * = nullptr)
+	{
 		return details::makeDefaultPrinter<deref_mode, string_type>(a).toString();
 	}
 
@@ -255,7 +256,8 @@ public:
 		return helpers::convert_from(restrictionstring);
 	}
 
-	static string_type toString(LPSSortOrderSet lpSortOrderSet) {
+	static string_type toString(const SSortOrderSet *lpSortOrderSet)
+	{
 		std::string sortorderstring = SortOrderSetToString(lpSortOrderSet);
 		return helpers::convert_from(sortorderstring);
 	}
@@ -340,5 +342,7 @@ public:
 		return helpers::convert_from(errorstring);
 	}
 };
+
+} /* namespace */
 
 #endif // ndef ECDebugPrint_INCLUDED

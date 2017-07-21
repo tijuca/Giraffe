@@ -24,7 +24,7 @@
 
 // We have 2 types of entryids: those of objects, and those of stores.
 // Objects have a store-relative path, however they do have a GUID to make
-// sure that we can differentiate 2 entryid's from different stores
+// sure that we can differentiate 2 entryids from different stores
 //
 // The ulType fields makes sure that we can read whether it is a store EID
 // or an object EID. This is used when opening a store's properties.
@@ -40,7 +40,7 @@
 // (also the hierarchy table). Each record in on the server has a different
 // ulId, even across different stores.
 //
-// We can differentiate two EntryID's of 2 different servers with the same
+// We can differentiate two EntryIDs of 2 different servers with the same
 // ulId because the guid is different. (This guid is different per server)
 //
 // When this is a store EID, the szServer field is also set, and the ulId
@@ -49,8 +49,8 @@
 
 #pragma pack(push,1)
 // Entryid from version 6
-// Entryid version 1
-typedef struct EID {
+// Entryid version 1 (48 bytes)
+struct EID {
 	BYTE	abFlags[4];
 	GUID	guid;			// StoreGuid
 	ULONG	ulVersion;
@@ -60,7 +60,8 @@ typedef struct EID {
 	CHAR	szServer[1];
 	CHAR	szPadding[3];
 
-	EID(USHORT usType, GUID guid, GUID uniqueId, USHORT usFlags = 0) {
+	EID(USHORT usType, const GUID &guid, const GUID &uniqueId, USHORT usFlags = 0)
+	{
 		memset(this, 0, sizeof(EID));
 		this->ulVersion = 1; //Always last version
 		this->usType = usType;
@@ -69,7 +70,8 @@ typedef struct EID {
 		this->uniqueId = uniqueId;
 	}
 
-	EID(EID *oldEID) {
+	EID(const EID *oldEID)
+	{
 		memset(this, 0, sizeof(EID));
 		this->ulVersion = oldEID->ulVersion;
 		this->usType = oldEID->usType;
@@ -81,13 +83,11 @@ typedef struct EID {
 		memset(this, 0, sizeof(EID));
 		this->ulVersion = 1;
 	}
-
-} EID;
-
+};
 
 // The entryid from the begin of zarafa till 5.20
-// Entryid version is zero
-typedef struct EID_V0 {
+// Entryid version is zero (36 bytes)
+struct EID_V0 {
 	BYTE	abFlags[4];
 	GUID	guid;			// StoreGuid
 	ULONG	ulVersion;
@@ -97,14 +97,16 @@ typedef struct EID_V0 {
 	CHAR	szServer[1];
 	CHAR	szPadding[3];
 
-	EID_V0(USHORT usType, GUID guid, ULONG ulId) {
+	EID_V0(USHORT usType, const GUID &guid, ULONG ulId)
+	{
 		memset(this, 0, sizeof(EID_V0));
 		this->usType = usType;
 		this->guid = guid;
 		this->ulId = ulId;
 	}
 
-	EID_V0(EID_V0 *oldEID) {
+	EID_V0(const EID_V0 *oldEID)
+	{
 		memset(this, 0, sizeof(EID_V0));
 		this->usType = oldEID->usType;
 		this->guid = oldEID->guid;
@@ -114,12 +116,11 @@ typedef struct EID_V0 {
 	EID_V0() {
 		memset(this, 0, sizeof(EID_V0));
 	}
-
-} EID_V0;
+};
 
 #pragma pack(pop)
 
-typedef struct ABEID {
+struct ABEID {
 	BYTE	abFlags[4];
 	GUID	guid;
 	ULONG	ulVersion;
@@ -128,14 +129,15 @@ typedef struct ABEID {
 	CHAR	szExId[1];
 	CHAR	szPadding[3];
 
-	ABEID(ULONG ulType, GUID guid, ULONG ulId) {
+	ABEID(ULONG ulType, const GUID &guid, ULONG ulId) {
 		memset(this, 0, sizeof(ABEID));
 		this->ulType = ulType;
 		this->guid = guid;
 		this->ulId = ulId;
 	}
 
-	ABEID(ABEID *oldEID) {
+	ABEID(const ABEID *oldEID)
+	{
 		memset(this, 0, sizeof(ABEID));
 		this->ulType = oldEID->ulType;
 		this->guid = oldEID->guid;
@@ -145,8 +147,8 @@ typedef struct ABEID {
 	ABEID() {
 		memset(this, 0, sizeof(ABEID));
 	}
-
-} ABEID, *PABEID;
+};
+typedef struct ABEID *PABEID;
 #define _CbABEID(p)	((sizeof(ABEID)+strlen((char*)(p)->szExId))&~3)
 #define CbABEID(p)	(sizeof(ABEID)>_CbABEID((p))?sizeof(ABEID):_CbABEID((p)))
 
@@ -156,7 +158,7 @@ typedef struct ABEID {
 #define ABEID_TYPE(p)	((p) ? ((ABEID *)(p))->ulType : -1)
 #define ABEID_ID(p)		((p) ? ((ABEID *)(p))->ulId : 0)
 
-typedef struct SIEID {
+struct SIEID {
 	BYTE	abFlags[4];
 	GUID	guid;
 	ULONG	ulVersion;
@@ -165,14 +167,16 @@ typedef struct SIEID {
 	CHAR	szServerId[1];
 	CHAR	szPadding[3];
 
-	SIEID(ULONG ulType, GUID guid, ULONG ulId) {
+	SIEID(ULONG ulType, const GUID &guid, ULONG ulId)
+	{
 		memset(this, 0, sizeof(SIEID));
 		this->ulType = ulType;
 		this->guid = guid;
 		this->ulId = ulId;
 	}
 
-	SIEID(SIEID *oldEID) {
+	SIEID(const SIEID *oldEID)
+	{
 		memset(this, 0, sizeof(SIEID));
 		this->ulType = oldEID->ulType;
 		this->guid = oldEID->guid;
@@ -182,7 +186,8 @@ typedef struct SIEID {
 	SIEID() {
 		memset(this, 0, sizeof(SIEID));
 	}
-} SIEID, *LPSIEID;
+};
+typedef struct SIEID *LPSIEID;
 
 /* Bit definitions for abFlags[3] of ENTRYID */
 #define	KOPANO_FAVORITE		0x01		// Entryid from the favorits folder
@@ -254,6 +259,7 @@ typedef EID * PEID;
 // This is what we support for archive store
 #define EC_SUPPORTMASK_ARCHIVE \
 							STORE_ENTRYID_UNIQUE | \
+							STORE_SEARCH_OK | \
 							STORE_MODIFY_OK | \
 							STORE_CREATE_OK | \
 							STORE_ATTACH_OK | \
@@ -270,6 +276,7 @@ typedef EID * PEID;
 // This is what we support for delegate store
 #define EC_SUPPORTMASK_DELEGATE \
 							STORE_ENTRYID_UNIQUE | \
+							STORE_SEARCH_OK | \
 							STORE_MODIFY_OK | \
 							STORE_CREATE_OK | \
 							STORE_ATTACH_OK | \
@@ -287,6 +294,7 @@ typedef EID * PEID;
 // This is what we support for public store
 #define EC_SUPPORTMASK_PUBLIC \
 							STORE_ENTRYID_UNIQUE | \
+							STORE_SEARCH_OK | \
 							STORE_MODIFY_OK | \
 							STORE_CREATE_OK | \
 							STORE_ATTACH_OK | \
@@ -329,7 +337,7 @@ typedef EID * PEID;
 // Server sends Mod. time and Create time in readProps() call
 //#define KOPANO_CAP_TIMES_IN_READPROPS	0x0004 //not needed since saveObject is introduced
 #define KOPANO_CAP_CRYPT				0x0008
-// 64 bit session id's
+// 64 bit session IDs
 #define KOPANO_CAP_LARGE_SESSIONID		0x0010
 // Includes license server
 #define KOPANO_CAP_LICENSE_SERVER		0x0020
@@ -358,7 +366,7 @@ typedef EID * PEID;
 //
 // Logon flags, sent with ns__logon()
 //
-// Don't allow uid based authentication (unix socket only)
+// Don't allow uid based authentication (Unix socket only)
 #define KOPANO_LOGON_NO_UID_AUTH		0x0001
 
 // MTOM IDs

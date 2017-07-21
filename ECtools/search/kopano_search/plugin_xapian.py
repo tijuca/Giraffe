@@ -44,14 +44,15 @@ class Plugin:
             else:
                 return xapian.Database(dbpath)
         except xapian.DatabaseOpeningError:
-            if log: 
-                log.warn('could not open database: %s' % dbpath)
-            
+            if log:
+                log.warn('could not open database: %s', dbpath)
+
     def extract_terms(self, text):
         """ extract terms as if we are indexing """
         doc = xapian.Document()
         tg = xapian.TermGenerator()
         tg.set_document(doc)
+        text = text.replace('_', ' ') # xapian sees '_' as a word-character (to search for identifiers in source code)
         tg.index_text(text)
         return [t.term.decode('utf-8') for t in doc.termlist()]
 
@@ -68,7 +69,7 @@ class Plugin:
         for fields, terms in fields_terms:
             for field in fields:
                 qp.add_prefix('mapi%d' % field, "XM%d:" % field)
-        log.info('performing query: %s' % query)
+        log.info('performing query: %s', query)
         qp.set_database(db)
         query = qp.parse_query(query, xapian.QueryParser.FLAG_BOOLEAN|xapian.QueryParser.FLAG_PHRASE|xapian.QueryParser.FLAG_WILDCARD)
         enquire = xapian.Enquire(db)
@@ -125,6 +126,7 @@ class Plugin:
                     termgenerator.set_document(xdoc)
                     for key, value in doc.items():
                         if key.startswith('mapi'):
+                            value = value.replace('_', ' ') # xapian sees '_' as a word-character (to search for identifiers in source code)
                             termgenerator.index_text_without_positions(value) # add to full-text, needed for spelling dict?
                             termgenerator.index_text_without_positions(value, 1, 'XM%s:' % key[4:])
                     xdoc.add_value(0, str(doc['docid']))
@@ -135,7 +137,7 @@ class Plugin:
                     db.replace_document(sourcekey_term, xdoc)
                 for doc in self.deletes:
                     db.delete_document('XK:'+doc['sourcekey'].lower())
-            self.log.debug('commit took %.2f seconds (%d items)' % (time.time()-t0, nitems))
+            self.log.debug('commit took %.2f seconds (%d items)', time.time()-t0, nitems)
         finally:
             self.data = []
             self.deletes = []
@@ -144,5 +146,5 @@ class Plugin:
         """ remove database so we can cleanly reindex the store """
 
         dbpath = os.path.join(self.index_path, '%s-%s' % (server_guid, store_guid))
-        self.log.info('removing %s' % dbpath)
+        self.log.info('removing %s', dbpath)
         shutil.rmtree(dbpath, ignore_errors=True) # may not exist yet (no items to index)

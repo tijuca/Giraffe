@@ -16,7 +16,6 @@
  */
 
 #include <kopano/platform.h>
-#include <kopano/base64.h>
 #include "plugin.h"
 
 #include <openssl/des.h>
@@ -27,10 +26,12 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
+#include <kopano/stringutil.h>
 #include "ldappasswords.h"
 
 using namespace std;
+
+namespace KC {
 
 static const char b64chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -86,8 +87,7 @@ static char *password_encrypt_crypt(const char *data, unsigned int len) {
 	DES_fcrypt(data, salt, cryptbuf);
 
 	char *res = new char[32];
-	snprintf(res, sizeof *res, "{CRYPT}%s", cryptbuf);
-
+	snprintf(res, 32, "{CRYPT}%s", cryptbuf);
 	return res;
 }
 
@@ -266,3 +266,5 @@ int checkPassword(int type, const char *password, const char *crypted) {
 		return 1;
 	}
 }
+
+} /* namespace */

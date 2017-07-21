@@ -52,9 +52,10 @@
 
 #include "TmpPath.h"
 #include <kopano/UnixUtil.h>
-#ifdef ZCP_USES_ICU
+#ifdef KC_USES_ICU
 #include <unicode/uclean.h>
 #endif
+#include <openssl/ssl.h>
 
 /**
  * @defgroup gateway Gateway for IMAP and POP3 
@@ -78,25 +79,29 @@ static void sigterm(int s)
 
 static void sighup(int sig)
 {
-	// In Win32, the signal is sent in a separate, special signal thread. So this test is
-	// not needed or required.
 	if (bThreads && pthread_equal(pthread_self(), mainthread)==0)
 		return;
-	if (g_lpConfig) {
-		if (!g_lpConfig->ReloadSettings() && g_lpLogger)
-			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to reload configuration file, continuing with current settings.");
-	}
+	if (g_lpConfig != nullptr && !g_lpConfig->ReloadSettings() &&
+	    g_lpLogger != nullptr)
+		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to reload configuration file, continuing with current settings.");
+	if (g_lpLogger == nullptr || g_lpConfig == nullptr)
+		return;
+	g_lpLogger->Log(EC_LOGLEVEL_INFO, "Got SIGHUP config was reloaded");
 
-	if (g_lpLogger) {
-		if (g_lpConfig) {
-			const char *ll = g_lpConfig->GetSetting("log_level");
-			int new_ll = ll ? atoi(ll) : EC_LOGLEVEL_WARNING;
-			g_lpLogger->SetLoglevel(new_ll);
-		}
+	const char *ll = g_lpConfig->GetSetting("log_level");
+	int new_ll = ll ? atoi(ll) : EC_LOGLEVEL_WARNING;
+	g_lpLogger->SetLoglevel(new_ll);
 
-		g_lpLogger->Reset();
-		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Log connection was reset");
+	bool listen_pop3s = strcmp(g_lpConfig->GetSetting("pop3s_enable"), "yes") == 0;
+	bool listen_imaps = strcmp(g_lpConfig->GetSetting("imaps_enable"), "yes") == 0;
+	if (listen_pop3s || listen_imaps) {
+		if (ECChannel::HrSetCtx(g_lpConfig) != hrSuccess)
+			g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error reloading SSL context");
+		else
+			g_lpLogger->Log(EC_LOGLEVEL_INFO, "Reloaded SSL context");
 	}
+	g_lpLogger->Reset();
+	g_lpLogger->Log(EC_LOGLEVEL_INFO, "Log connection was reset");
 }
 
 static void sigchld(int)
@@ -154,19 +159,18 @@ static void *Handler(void *lpArg)
 	delete lpHandlerArgs;
 
 	// make sure the pipe logger does not exit when this handler exits, but only frees the memory.
-	if (dynamic_cast<ECLogger_Pipe*>(lpLogger) != NULL)
-		dynamic_cast<ECLogger_Pipe*>(lpLogger)->Disown();
+	auto pipelog = dynamic_cast<ECLogger_Pipe *>(lpLogger);
+	if (pipelog != nullptr)
+		pipelog->Disown();
 
 	std::string inBuffer;
 	HRESULT hr;
 	bool bQuit = false;
 	int timeouts = 0;
 
-	if (bUseSSL) {
-		if (lpChannel->HrEnableTLS(lpLogger) != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to negotiate SSL connection");
-			goto exit;
-		}
+	if (bUseSSL && lpChannel->HrEnableTLS() != hrSuccess) {
+		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to negotiate SSL connection");
+		goto exit;
 	}
 
 	hr = client->HrSendGreeting(g_strHostString);
@@ -181,10 +185,9 @@ static void *Handler(void *lpArg)
 			/* signalled - reevaluate bQuit */
 			continue;
 		if (hr == MAPI_E_TIMEOUT) {
-			if (++timeouts < client->getTimeoutMinutes()) {
+			if (++timeouts < client->getTimeoutMinutes())
 				// ignore select() timeout for 5 (POP3) or 30 (IMAP) minutes
 				continue;
-			}
 			// close idle first, so we don't have a race condition with the channel
 			client->HrCloseConnection("BYE Connection closed because of timeout");
 			lpLogger->Log(EC_LOGLEVEL_ERROR, "Connection closed because of timeout");
@@ -220,7 +223,7 @@ static void *Handler(void *lpArg)
 			// we asked the client for more data, do not parse the buffer, but send it "to the previous command"
 			// that last part is currently only HrCmdAuthenticate(), so no difficulties here.
 			// also, PLAIN is the only supported auth method.
-			hr = client->HrProcessContinue(inBuffer);
+			client->HrProcessContinue(inBuffer);
 			// no matter what happens, we continue handling the connection.
 			continue;
 		}
@@ -249,7 +252,7 @@ exit:
 		delete g_lpConfig;
 	}
 
-	/** free ssl error data **/
+	/** free SSL error data **/
 	ERR_remove_state(0);
 
 	if (bThreads)
@@ -290,24 +293,31 @@ int main(int argc, char *argv[]) {
 		{ "imap_generate_utf8", "no", CONFIGSETTING_RELOADABLE },
 		{ "imap_expunge_on_delete", "no", CONFIGSETTING_RELOADABLE },
 		{ "imap_store_rfc822", "yes", CONFIGSETTING_RELOADABLE },
+		{ "imap_cache_folders_time_limit", "0", CONFIGSETTING_RELOADABLE },
+		{ "imap_ignore_command_idle", "no", CONFIGSETTING_RELOADABLE },
 		{ "disable_plaintext_auth", "no", CONFIGSETTING_RELOADABLE },
 		{ "server_socket", "http://localhost:236/" },
 		{ "server_hostname", "" },
 		{ "server_hostname_greeting", "no", CONFIGSETTING_RELOADABLE },
-		{ "ssl_private_key_file", "/etc/kopano/gateway/privkey.pem" },
-		{ "ssl_certificate_file", "/etc/kopano/gateway/cert.pem" },
-		{ "ssl_verify_client", "no" },
-		{ "ssl_verify_file", "" },
-		{ "ssl_verify_path", "" },
-		{ "ssl_protocols", "!SSLv2" },
-		{ "ssl_ciphers", "ALL:!LOW:!SSLv2:!EXP:!aNULL" },
-		{ "ssl_prefer_server_ciphers", "no" },
+		{"ssl_private_key_file", "/etc/kopano/gateway/privkey.pem", CONFIGSETTING_RELOADABLE},
+		{"ssl_certificate_file", "/etc/kopano/gateway/cert.pem", CONFIGSETTING_RELOADABLE},
+		{"ssl_verify_client", "no", CONFIGSETTING_RELOADABLE},
+		{"ssl_verify_file", "", CONFIGSETTING_RELOADABLE},
+		{"ssl_verify_path", "", CONFIGSETTING_RELOADABLE},
+#ifdef SSL_TXT_SSLV2
+		{"ssl_protocols", "!SSLv2", CONFIGSETTING_RELOADABLE},
+#else
+		{"ssl_protocols", "", CONFIGSETTING_RELOADABLE},
+#endif
+		{"ssl_ciphers", "ALL:!LOW:!SSLv2:!EXP:!aNULL", CONFIGSETTING_RELOADABLE},
+		{"ssl_prefer_server_ciphers", "no", CONFIGSETTING_RELOADABLE},
 		{ "log_method", "file" },
 		{ "log_file", "-" },
 		{ "log_level", "3", CONFIGSETTING_RELOADABLE },
 		{ "log_timestamp", "1" },
 		{ "log_buffer_size", "0" },
 		{ "tmp_path", "/tmp" },
+		{"bypass_auth", "no"},
 		{ NULL, NULL },
 	};
 	enum {
@@ -366,7 +376,7 @@ int main(int argc, char *argv[]) {
 	// Setup config
 	g_lpConfig = ECConfig::Create(lpDefaults);
 	if (!g_lpConfig->LoadSettings(szConfig) ||
-	    !g_lpConfig->ParseParams(argc - optind, &argv[optind], NULL) ||
+	    g_lpConfig->ParseParams(argc - optind, &argv[optind]) < 0 ||
 	    (!bIgnoreUnknownConfigOptions && g_lpConfig->HasErrors())) {
 		g_lpLogger = new ECLogger_File(EC_LOGLEVEL_INFO, 0, "-", false);	// create logger without a timestamp to stderr
 		ec_log_set(g_lpLogger);
@@ -384,6 +394,9 @@ int main(int argc, char *argv[]) {
 
 	if (!TmpPath::getInstance() -> OverridePath(g_lpConfig))
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Ignoring invalid path-setting!");
+
+	if (parseBool(g_lpConfig->GetSetting("bypass_auth")))
+		g_lpLogger->Log(EC_LOGLEVEL_WARNING, "Gateway is started with bypass_auth=yes meaning username and password will not be checked.");
 
 	if (strncmp(g_lpConfig->GetSetting("process_model"), "thread", strlen("thread")) == 0) {
 		bThreads = true;
@@ -427,7 +440,7 @@ static int gw_listen_on(const char *service, const char *interface,
 		ec_log_crit("\"%s\" is not an acceptable port number", port_str);
 		return E_FAIL;
 	}
-	HRESULT hr = HrListen(ec_log_get(), interface, port, fd);
+	HRESULT hr = HrListen(interface, port, fd);
 	if (hr != hrSuccess) {
 		ec_log_crit("Unable to listen on port %u", port);
 		return E_FAIL;
@@ -443,7 +456,7 @@ static int gw_listen_on(const char *service, const char *interface,
  * incoming connections on any configured service.
  *
  * @param[in]	szPath		Unused, should be removed.
- * @param[in]	servicename	Name of the service, used to create a unix pidfile.
+ * @param[in]	servicename	Name of the service, used to create a Unix pidfile.
  */
 static HRESULT running_service(const char *szPath, const char *servicename)
 {
@@ -484,8 +497,9 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 	bListenIMAP = (strcmp(g_lpConfig->GetSetting("imap_enable"), "yes") == 0);
 	bListenIMAPs = (strcmp(g_lpConfig->GetSetting("imaps_enable"), "yes") == 0);
 
-	// Setup ssl context
-	if ((bListenPOP3s || bListenIMAPs) && ECChannel::HrSetCtx(g_lpConfig, g_lpLogger) != hrSuccess) {
+	// Setup SSL context
+	if ((bListenPOP3s || bListenIMAPs) &&
+	    ECChannel::HrSetCtx(g_lpConfig) != hrSuccess) {
 		g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error loading SSL context, POP3S and IMAPS will be disabled");
 		bListenPOP3s = false;
 		bListenIMAPs = false;
@@ -536,6 +550,7 @@ static HRESULT running_service(const char *szPath, const char *servicename)
   
 	act.sa_sigaction = sigsegv;
 	act.sa_flags = SA_ONSTACK | SA_RESETHAND | SA_SIGINFO;
+	sigemptyset(&act.sa_mask);
   
     sigaltstack(&st, NULL);
     sigaction(SIGSEGV, &act, NULL);
@@ -553,17 +568,17 @@ static HRESULT running_service(const char *szPath, const char *servicename)
     }        
 
 	if (parseBool(g_lpConfig->GetSetting("coredump_enabled")))
-		unix_coredump_enable(g_lpLogger);
+		unix_coredump_enable();
 
 	// fork if needed and drop privileges as requested.
 	// this must be done before we do anything with pthreads
-	if (unix_runas(g_lpConfig, g_lpLogger))
+	if (unix_runas(g_lpConfig))
 		goto exit;
-	if (daemonize && unix_daemonize(g_lpConfig, g_lpLogger))
+	if (daemonize && unix_daemonize(g_lpConfig))
 		goto exit;
 	if (!daemonize)
 		setsid();
-	unix_create_pidfile(servicename, g_lpConfig, g_lpLogger);
+	unix_create_pidfile(servicename, g_lpConfig);
 	if (bThreads == false)
 		g_lpLogger = StartLoggerProcess(g_lpConfig, g_lpLogger); // maybe replace logger
 	ec_log_set(g_lpLogger);
@@ -624,10 +639,10 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 			// Incoming POP3(s) connection
 			if (bListenPOP3s && FD_ISSET(ulListenPOP3s, &readfds)) {
 				usessl = true;
-				hr = HrAccept(g_lpLogger, ulListenPOP3s, &lpHandlerArgs->lpChannel);
+				hr = HrAccept(ulListenPOP3s, &lpHandlerArgs->lpChannel);
 			} else {
 				usessl = false;
-				hr = HrAccept(g_lpLogger, ulListenPOP3, &lpHandlerArgs->lpChannel);
+				hr = HrAccept(ulListenPOP3, &lpHandlerArgs->lpChannel);
 			}
 			if (hr != hrSuccess) {
 				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to accept POP3 socket connection.");
@@ -658,13 +673,11 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 				set_thread_name(POP3Thread, "ZGateway " + std::string(method));
 			}
 			else {
-				if (unix_fork_function(Handler, lpHandlerArgs, nCloseFDs, pCloseFDs) < 0) {
+				if (unix_fork_function(Handler, lpHandlerArgs, nCloseFDs, pCloseFDs) < 0)
 					g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Can't create %s %s.", method, model);
 					// just keep running
-				}
-				else {
+				else
 					++nChildren;
-				}
 				// main handler always closes information it doesn't need
 				delete lpHandlerArgs->lpChannel;
 				delete lpHandlerArgs;
@@ -681,10 +694,10 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 			// Incoming IMAP(s) connection
 			if (bListenIMAPs && FD_ISSET(ulListenIMAPs, &readfds)) {
 				usessl = true;
-				hr = HrAccept(g_lpLogger, ulListenIMAPs, &lpHandlerArgs->lpChannel);
+				hr = HrAccept(ulListenIMAPs, &lpHandlerArgs->lpChannel);
 			} else {
 				usessl = false;
-				hr = HrAccept(g_lpLogger, ulListenIMAP, &lpHandlerArgs->lpChannel);
+				hr = HrAccept(ulListenIMAP, &lpHandlerArgs->lpChannel);
 			}
 			if (hr != hrSuccess) {
 				g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to accept IMAP socket connection.");
@@ -715,13 +728,11 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 				set_thread_name(IMAPThread, "ZGateway " + std::string(method));
 			}
 			else {
-				if (unix_fork_function(Handler, lpHandlerArgs, nCloseFDs, pCloseFDs) < 0) {
+				if (unix_fork_function(Handler, lpHandlerArgs, nCloseFDs, pCloseFDs) < 0)
 					g_lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not create %s %s.", method, model);
 					// just keep running
-				}
-				else {
+				else
 					++nChildren;
-				}
 				// main handler always closes information it doesn't need
 				delete lpHandlerArgs->lpChannel;
 				delete lpHandlerArgs;
@@ -758,13 +769,11 @@ static HRESULT running_service(const char *szPath, const char *servicename)
 
 exit:
 	ECChannel::HrFreeCtx();
-
-	SSL_library_cleanup(); // Remove ssl data for the main application and other related libraries
-
+	SSL_library_cleanup(); // Remove SSL data for the main application and other related libraries
 	if (bThreads)
 		pthread_attr_destroy(&ThreadAttr);
 	free(st.ss_sp);
-#ifdef ZCP_USES_ICU
+#ifdef KC_USES_ICU
 	// cleanup ICU data so valgrind is happy
 	u_cleanup();
 #endif

@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <memory>
 #include <new>
 #include <cstdlib>
 #include <cmath> // for pow() 
@@ -31,6 +32,7 @@
 
 #include <kopano/ECDebug.h>
 #include <kopano/ECTags.h>
+#include <kopano/memory.hpp>
 #include <kopano/stringutil.h>
 #include <kopano/Util.h>
 
@@ -40,6 +42,8 @@
 #include "rtf.h"
 
 #include <kopano/charset/convstring.h>
+
+using namespace KCHL;
 
 ULONG __stdcall UlRelease(LPVOID lpUnknown)
 {
@@ -56,9 +60,17 @@ void __stdcall DeinitMapiUtil(void)
 	TRACE_MAPILIB(TRACE_RETURN, "DeInitMAPIUtil", "");
 }
 
-LPSPropValue __stdcall PpropFindProp(LPSPropValue lpPropArray, ULONG cValues, ULONG ulPropTag) {
+SPropValue * __stdcall PpropFindProp(SPropValue *lpPropArray, ULONG cValues,
+    ULONG ulPropTag)
+{
+	return const_cast<SPropValue *>(PCpropFindProp(lpPropArray, cValues, ulPropTag));
+}
+
+const SPropValue * __stdcall PCpropFindProp(const SPropValue *lpPropArray,
+    ULONG cValues, ULONG ulPropTag)
+{
 	TRACE_MAPILIB1(TRACE_ENTRY, "PpropFindProp", "%08x", ulPropTag);
-	LPSPropValue lpValue = NULL;
+	const SPropValue *lpValue = NULL;
 
 	if (lpPropArray == NULL)
 		goto exit;
@@ -205,7 +217,7 @@ static HRESULT RTFCommitFunc(IStream *lpUncompressedStream, void *lpData)
 	HRESULT hr = hrSuccess;
 	IStream *lpCompressedStream = (IStream *)lpData;
 	STATSTG sStatStg;
-	char *lpUncompressed = NULL;
+	std::unique_ptr<char[]> lpUncompressed;
 	char *lpReadPtr = NULL;
 	ULONG ulRead = 0;
 	ULONG ulWritten = 0;
@@ -218,16 +230,13 @@ static HRESULT RTFCommitFunc(IStream *lpUncompressedStream, void *lpData)
 
 	if(hr != hrSuccess)
 		goto exit;
-
-	lpUncompressed = (char *)malloc(sStatStg.cbSize.LowPart);
-
+	lpUncompressed.reset(new(std::nothrow) char[sStatStg.cbSize.LowPart]);
 	if(lpUncompressed == NULL) {
 		hr = MAPI_E_NOT_ENOUGH_MEMORY;
 		goto exit;
 	}
 
-	lpReadPtr = lpUncompressed;
-
+	lpReadPtr = lpUncompressed.get();
 	while(1) {
 		hr = lpUncompressedStream->Read(lpReadPtr, 1024, &ulRead);
 
@@ -238,8 +247,7 @@ static HRESULT RTFCommitFunc(IStream *lpUncompressedStream, void *lpData)
 	}
 
 	// We now have the complete uncompressed data in lpUncompressed
-
-	if(rtf_compress(&lpCompressed, &ulCompressedSize, lpUncompressed, sStatStg.cbSize.LowPart) != 0) {
+	if (rtf_compress(&lpCompressed, &ulCompressedSize, lpUncompressed.get(), sStatStg.cbSize.LowPart) != 0) {
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
 	}
@@ -263,7 +271,6 @@ static HRESULT RTFCommitFunc(IStream *lpUncompressedStream, void *lpData)
 
 exit:
 	free(lpCompressed);
-	free(lpUncompressed);
 	return hr;
 }
 
@@ -278,74 +285,51 @@ HRESULT __stdcall WrapCompressedRTFStream(LPSTREAM lpCompressedRTFStream, ULONG 
 
 	STATSTG sStatStg;
 	HRESULT hr = hrSuccess;
-	char *lpCompressed = NULL;
+	std::unique_ptr<char[]> lpCompressed, lpUncompressed;
 	char *lpReadPtr = NULL;
 	ULONG ulRead = 0;
-	ECMemStream *lpUncompressedStream = NULL;
+	object_ptr<ECMemStream> lpUncompressedStream;
 	ULONG ulUncompressedLen = 0;
-	char *lpUncompressed = NULL;
 	
 	hr = lpCompressedRTFStream->Stat(&sStatStg, STATFLAG_NONAME);
 
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	if(sStatStg.cbSize.LowPart > 0) {
-        	lpCompressed = (char *)malloc(sStatStg.cbSize.LowPart);
-
-        	if(lpCompressed == NULL) {
-        		hr = MAPI_E_NOT_ENOUGH_MEMORY;
-        		goto exit;
-        	}
+		lpCompressed.reset(new(std::nothrow) char[sStatStg.cbSize.LowPart]);
+		if (lpCompressed == nullptr)
+			return MAPI_E_NOT_ENOUGH_MEMORY;
 
         	// Read in the whole compressed data buffer
-        	
-        	lpReadPtr = lpCompressed;
-
+        	lpReadPtr = lpCompressed.get();
         	while(1) {
         		hr = lpCompressedRTFStream->Read(lpReadPtr, 1024, &ulRead);
 
         		if(hr != hrSuccess)
-        			goto exit;
-
+				return hr;
         		if(ulRead == 0)
         			break;	
         	
         		lpReadPtr += ulRead;		
         	}
-
-        	ulUncompressedLen = rtf_get_uncompressed_length(lpCompressed, sStatStg.cbSize.LowPart);
-
-        	lpUncompressed = (char *)malloc(ulUncompressedLen);
-
-        	if(lpUncompressed == NULL) {
-        		hr = MAPI_E_NOT_ENOUGH_MEMORY;
-        		goto exit;
-        	}
-
-        	if(rtf_decompress(lpUncompressed, lpCompressed, sStatStg.cbSize.LowPart) != 0) {
-        		hr = MAPI_E_INVALID_PARAMETER;
-        		goto exit;
-        	}
-        	
+        	ulUncompressedLen = rtf_get_uncompressed_length(lpCompressed.get(), sStatStg.cbSize.LowPart);
+        	lpUncompressed.reset(new(std::nothrow) char[ulUncompressedLen]);
+		if (lpUncompressed == nullptr)
+			return MAPI_E_NOT_ENOUGH_MEMORY;
+        	if (rtf_decompress(lpUncompressed.get(), lpCompressed.get(), sStatStg.cbSize.LowPart) != 0)
+			return MAPI_E_INVALID_PARAMETER;
         	// We now have the uncompressed data, create a stream and write the uncompressed data into it
 	}
 	
-	hr = ECMemStream::Create(lpUncompressed, ulUncompressedLen, STGM_WRITE | STGM_TRANSACTED,
-							 RTFCommitFunc, NULL, // NULL => no cleanup callbak
-							 lpCompressedRTFStream, &lpUncompressedStream);
-
+	hr = ECMemStream::Create(lpUncompressed.get(), ulUncompressedLen,
+	     STGM_WRITE | STGM_TRANSACTED, RTFCommitFunc,
+	     nullptr /* no cleanup */,
+	     lpCompressedRTFStream, &~lpUncompressedStream);
 	if(hr != hrSuccess)
-		goto exit;
-
-	hr = lpUncompressedStream->QueryInterface(IID_IStream, (void **)lppUncompressedStream);
-
-exit:
-	if(lpUncompressedStream)
-		lpUncompressedStream->Release();
-	free(lpCompressed);
-	free(lpUncompressed);
-	return hr;
+		return hr;
+	return lpUncompressedStream->QueryInterface(IID_IStream,
+	       reinterpret_cast<void **>(lppUncompressedStream));
 }
 
 // RTFSync is not much use even in windows, so we don't implement it
@@ -357,7 +341,10 @@ HRESULT __stdcall RTFSync(LPMESSAGE lpMessage, ULONG ulFlags, BOOL * lpfMessageU
 }
 
 //--- php-ext used functions
-HRESULT __stdcall HrQueryAllRows(LPMAPITABLE lpTable, LPSPropTagArray lpPropTags, LPSRestriction lpRestriction, LPSSortOrderSet lpSortOrderSet, LONG crowsMax, LPSRowSet *lppRows) {
+HRESULT __stdcall HrQueryAllRows(LPMAPITABLE lpTable,
+    const SPropTagArray *lpPropTags, LPSRestriction lpRestriction,
+    const SSortOrderSet *lpSortOrderSet, LONG crowsMax, LPSRowSet *lppRows)
+{
 	TRACE_MAPILIB1(TRACE_ENTRY, "HrQueryAllRows", "%s", PropNameFromPropTagArray(lpPropTags).c_str());
 	HRESULT hr = hrSuccess;
 
@@ -396,32 +383,25 @@ exit:
 HRESULT __stdcall HrGetOneProp(IMAPIProp *lpProp, ULONG ulPropTag, LPSPropValue *lppPropVal) {
 	TRACE_MAPILIB1(TRACE_ENTRY, "HrGetOneProp", "%08x", ulPropTag);
 	HRESULT hr = hrSuccess;
-	SPropTagArray sPropTag;
+	SizedSPropTagArray(1, sPropTag) = { 1, { ulPropTag } };
 	ULONG cValues = 0;
-	LPSPropValue lpPropVal = NULL;
-	
-	sPropTag.cValues = 1;
-	sPropTag.aulPropTag[0] = ulPropTag;
-	
-	hr = lpProp->GetProps(&sPropTag, 0, &cValues, &lpPropVal);
-	
+	memory_ptr<SPropValue> lpPropVal;
+
+	hr = lpProp->GetProps(sPropTag, 0, &cValues, &~lpPropVal);
 	if(HR_FAILED(hr))
 		goto exit;
 		
 	if(cValues != 1 || lpPropVal->ulPropTag != ulPropTag) {
-		MAPIFreeBuffer(lpPropVal);
 		hr = MAPI_E_NOT_FOUND;
 		goto exit;
 	}
-
-	*lppPropVal = lpPropVal;
-		
+	*lppPropVal = lpPropVal.release();
 exit:
 	TRACE_MAPILIB1(TRACE_RETURN, "HrGetOneProp", "0x%08x", hr);
 	return hr;
 }
 
-HRESULT __stdcall HrSetOneProp(LPMAPIPROP lpMapiProp, LPSPropValue lpProp)
+HRESULT __stdcall HrSetOneProp(LPMAPIPROP lpMapiProp, const SPropValue *lpProp)
 {
 	TRACE_MAPILIB1(TRACE_ENTRY, "HrSetOneProp", "%s", PropNameFromPropArray(1, lpProp).c_str());
 	HRESULT hr = hrSuccess;
@@ -437,12 +417,9 @@ BOOL __stdcall FPropExists(LPMAPIPROP lpMapiProp, ULONG ulPropTag)
 {
 	TRACE_MAPILIB1(TRACE_ENTRY, "FPropExists", "%08x", ulPropTag);
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpPropVal = NULL;
+	memory_ptr<SPropValue> lpPropVal = NULL;
 
-	hr = HrGetOneProp(lpMapiProp, ulPropTag, &lpPropVal);
-	if (hr == hrSuccess)
-		MAPIFreeBuffer(lpPropVal);
-
+	hr = HrGetOneProp(lpMapiProp, ulPropTag, &~lpPropVal);
 	TRACE_MAPILIB1(TRACE_RETURN, "FPropExists", "0x%08x", hr);
 	return (hr == hrSuccess);
 }
@@ -451,29 +428,18 @@ BOOL __stdcall FPropExists(LPMAPIPROP lpMapiProp, ULONG ulPropTag)
 HRESULT __stdcall CreateStreamOnHGlobal(void *hGlobal, BOOL fDeleteOnRelease, IStream **lppStream)
 {
 	HRESULT hr = hrSuccess;
-	ECMemStream *lpStream = NULL;
+	object_ptr<ECMemStream> lpStream;
 	
-	if(hGlobal != NULL || fDeleteOnRelease != TRUE) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	hr = ECMemStream::Create(NULL, 0, STGM_WRITE, NULL, NULL, NULL, &lpStream);	// NULL's: no callbacks and custom data
-	
+	if (hGlobal != nullptr || fDeleteOnRelease != TRUE)
+		return MAPI_E_INVALID_PARAMETER;
+	hr = ECMemStream::Create(nullptr, 0, STGM_WRITE, nullptr, nullptr, nullptr, &~lpStream); // NULLs: no callbacks and custom data
 	if(hr != hrSuccess) 
-		goto exit;
-		
-	hr = lpStream->QueryInterface(IID_IStream, (void **)lppStream);
-	
-exit:
-	if (lpStream)
-		lpStream->Release();
-	
-	return hr;
+		return hr;
+	return lpStream->QueryInterface(IID_IStream, reinterpret_cast<void **>(lppStream));
 }
 
 HRESULT __stdcall OpenStreamOnFile(LPALLOCATEBUFFER lpAllocateBuffer, LPFREEBUFFER lpFreeBuffer, ULONG ulFlags,
-													 LPTSTR lpszFileName, LPTSTR lpszPrefix, LPSTREAM FAR * lppStream)
+    LPTSTR lpszFileName, LPTSTR lpszPrefix, LPSTREAM *lppStream)
 {
 	TRACE_MAPILIB(TRACE_ENTRY, "OpenStreamOnFile", "");
 	HRESULT hr = MAPI_E_NOT_FOUND;
@@ -482,10 +448,10 @@ HRESULT __stdcall OpenStreamOnFile(LPALLOCATEBUFFER lpAllocateBuffer, LPFREEBUFF
 }
 
 HRESULT __stdcall BuildDisplayTable(LPALLOCATEBUFFER lpAllocateBuffer, LPALLOCATEMORE lpAllocateMore,
-									LPFREEBUFFER lpFreeBuffer, LPMALLOC lpMalloc,
-									HINSTANCE hInstance, UINT cPages,
-									LPDTPAGE lpPage, ULONG ulFlags,
-									LPMAPITABLE * lppTable, LPTABLEDATA * lppTblData)
+	LPFREEBUFFER lpFreeBuffer, LPMALLOC lpMalloc,
+	HINSTANCE hInstance, UINT cPages,
+	LPDTPAGE lpPage, ULONG ulFlags,
+	LPMAPITABLE * lppTable, LPTABLEDATA * lppTblData)
 {
 	TRACE_MAPILIB(TRACE_ENTRY, "BuildDisplayTable", "");
 	HRESULT hr = MAPI_E_NO_SUPPORT;
@@ -494,17 +460,17 @@ HRESULT __stdcall BuildDisplayTable(LPALLOCATEBUFFER lpAllocateBuffer, LPALLOCAT
 }
 
 #pragma pack(push, 1)
-typedef struct  {
+struct CONVERSATION_INDEX {
 	char ulReserved1;
 	char ftTime[5];
 	GUID guid;
-} CONVERSATION_INDEX;
+};
 #pragma pack(pop)
 
 HRESULT __stdcall ScCreateConversationIndex (ULONG cbParent,
-						LPBYTE lpbParent,
-						ULONG FAR *	lpcbConvIndex,
-						LPBYTE FAR * lppbConvIndex)
+	LPBYTE lpbParent,
+	ULONG *lpcbConvIndex,
+	LPBYTE *lppbConvIndex)
 {
 	HRESULT hr;
 	TRACE_MAPILIB1(TRACE_ENTRY, "ScCreateConversationIndex", "%s", lpbParent ? bin2hex(cbParent, lpbParent).c_str() : "<null>");
@@ -549,7 +515,7 @@ HRESULT __stdcall ScCreateConversationIndex (ULONG cbParent,
 	return hrSuccess;
 }
 
-SCODE __stdcall ScDupPropset( int cprop,  LPSPropValue rgprop,  LPALLOCATEBUFFER lpAllocateBuffer,  LPSPropValue FAR * prgprop )
+SCODE __stdcall ScDupPropset( int cprop,  LPSPropValue rgprop,  LPALLOCATEBUFFER lpAllocateBuffer,  LPSPropValue *prgprop )
 {
 	TRACE_MAPILIB(TRACE_ENTRY, "ScDupPropset", "");
 
@@ -576,7 +542,7 @@ exit:
 	return hr;
 }
 
-SCODE __stdcall ScRelocProps(int cprop, LPSPropValue rgprop, LPVOID pvBaseOld, LPVOID pvBaseNew, ULONG FAR * pcb)
+SCODE __stdcall ScRelocProps(int cprop, LPSPropValue rgprop, LPVOID pvBaseOld, LPVOID pvBaseNew, ULONG *pcb)
 {
 	TRACE_MAPILIB(TRACE_ENTRY, "ScRelocProps", "");
 	TRACE_MAPILIB1(TRACE_RETURN, "ScRelocProps", "0x%08x", S_FALSE);
@@ -601,7 +567,7 @@ ULONG __stdcall CchOfEncoding(LPCSTR lpszEnd)
 	return 0;
 }
 
-SCODE __stdcall ScCopyProps( int cprop,  LPSPropValue rgprop,  LPVOID pvDst,  ULONG FAR * pcb )
+SCODE __stdcall ScCopyProps( int cprop,  LPSPropValue rgprop,  LPVOID pvDst,  ULONG *pcb )
 {
 	TRACE_MAPILIB1(TRACE_ENTRY, "ScCopyProps", "%s", PropNameFromPropArray(cprop, rgprop).c_str());
 	BYTE *lpHeap = (BYTE *)pvDst + sizeof(SPropValue) * cprop;
@@ -808,14 +774,10 @@ BOOL __stdcall FBinFromHex(LPTSTR sz, LPBYTE pb)
 {
 	TRACE_MAPILIB1(TRACE_ENTRY, "FBinFromHex", "%s", sz);
 	ULONG len;
-	LPBYTE lpBin;
+	memory_ptr<BYTE> lpBin;
 
-	Util::hex2bin((char *)sz, strlen((char *)sz), &len, &lpBin);
-
+	Util::hex2bin((char *)sz, strlen((char *)sz), &len, &~lpBin);
 	memcpy(pb, lpBin, len);
-
-	MAPIFreeBuffer(lpBin);
-
 	TRACE_MAPILIB1(TRACE_RETURN, "FBinFromHex", "%s", sz);
 	return true;
 }
@@ -1028,21 +990,21 @@ void __stdcall FDecodeID(LPCSTR lpwEncoded, LPENTRYID *lpDecoded, ULONG *cbEncod
 	// ?
 }
 
-BOOL __stdcall FBadRglpszA(LPTSTR *lppszA, ULONG cStrings)
+BOOL __stdcall FBadRglpszA(const TCHAR *, ULONG cStrings)
 {
 	TRACE_MAPILIB(TRACE_ENTRY, "FBadRglpszA", "");
 	TRACE_MAPILIB(TRACE_RETURN, "FBadRglpszA", "");
 	return FALSE;
 }
 
-BOOL __stdcall FBadRglpszW(LPWSTR *lppszW, ULONG cStrings)
+BOOL __stdcall FBadRglpszW(const wchar_t *, ULONG cStrings)
 {
 	TRACE_MAPILIB(TRACE_ENTRY, "FBadRglpszW", "");
 	TRACE_MAPILIB(TRACE_RETURN, "FBadRglpszW", "");
 	return FALSE;
 }
 
-BOOL __stdcall FBadRowSet(LPSRowSet lpRowSet)
+BOOL __stdcall FBadRowSet(const SRowSet *)
 {
 	TRACE_MAPILIB(TRACE_ENTRY, "FBadRowSet", "");
 	TRACE_MAPILIB(TRACE_RETURN, "FBadRowSet", "");
@@ -1063,42 +1025,42 @@ ULONG __stdcall FBadPropTag(ULONG ulPropTag)
 	return FALSE;
 }
 
-ULONG __stdcall FBadRow(LPSRow lprow)
+ULONG __stdcall FBadRow(const SRow *)
 {
 	TRACE_MAPILIB(TRACE_ENTRY, "FBadRow", "");
 	TRACE_MAPILIB(TRACE_RETURN, "FBadRow", "");
 	return FALSE;
 }
 
-ULONG __stdcall FBadProp(LPSPropValue lpprop)
+ULONG __stdcall FBadProp(const SPropValue *)
 {
 	TRACE_MAPILIB(TRACE_ENTRY, "FBadProp", "");
 	TRACE_MAPILIB(TRACE_RETURN, "FBadProp", "");
 	return FALSE;
 }
 
-ULONG __stdcall FBadColumnSet(LPSPropTagArray lpptaCols)
+ULONG __stdcall FBadColumnSet(const SPropTagArray *lpptaCols)
 {
 	TRACE_MAPILIB(TRACE_ENTRY, "FBadColumnSet", "");
 	TRACE_MAPILIB(TRACE_RETURN, "FBadColumnSet", "");
 	return FALSE;
 }
 
-ULONG __stdcall FBadSortOrderSet( LPSSortOrderSet lpsos )
+ULONG __stdcall FBadSortOrderSet(const SSortOrderSet *)
 {
 	TRACE_MAPILIB(TRACE_ENTRY, "FBadSortOrderSet", "");
 	TRACE_MAPILIB(TRACE_RETURN, "FBadSortOrderSet", "");
 	return FALSE;
 }
 
-BOOL __stdcall FBadEntryList( LPENTRYLIST	lpEntryList)
+BOOL __stdcall FBadEntryList(const SBinaryArray *lpEntryList)
 {
 	TRACE_MAPILIB(TRACE_ENTRY, "FBadEntryList", "");
 	TRACE_MAPILIB(TRACE_RETURN, "FBadEntryList", "");
 	return FALSE;
 }
 
-ULONG __stdcall FBadRestriction( LPSRestriction lpres )
+ULONG __stdcall FBadRestriction(const SRestriction *)
 {
 	TRACE_MAPILIB(TRACE_ENTRY, "FBadRestriction", "");
 	TRACE_MAPILIB(TRACE_RETURN, "FBadRestriction", "");
@@ -1108,20 +1070,16 @@ ULONG __stdcall FBadRestriction( LPSRestriction lpres )
 HRESULT GetConnectionProperties(LPSPropValue lpServer, LPSPropValue lpUsername, ULONG *lpcValues, LPSPropValue *lppProps)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpProps = NULL;
+	memory_ptr<SPropValue> lpProps;
 	char *szUsername;
 	std::string strServerPath;
 	ULONG cProps = 0;
 
-	if(!lpServer || !lpUsername) {
-		hr = MAPI_E_UNCONFIGURED;
-		goto exit;
-	}
-
-	hr = MAPIAllocateBuffer(sizeof(SPropValue) * 5, (LPVOID *)&lpProps);
+	if (lpServer == nullptr || lpUsername == nullptr)
+		return MAPI_E_UNCONFIGURED;
+	hr = MAPIAllocateBuffer(sizeof(SPropValue) * 5, &~lpProps);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	if (m4l_lpConfig->GetSetting("server_address")[0])
 		strServerPath = (std::string)"https://" + m4l_lpConfig->GetSetting("server_address") + ":" + m4l_lpConfig->GetSetting("ssl_port") + "/";
 	else
@@ -1133,36 +1091,31 @@ HRESULT GetConnectionProperties(LPSPropValue lpServer, LPSPropValue lpUsername, 
 
 	lpProps[cProps].ulPropTag = PR_EC_PATH;
 	if ((hr = MAPIAllocateMore(strServerPath.size() + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
-		goto exit;
+		return hr;
 	memcpy(lpProps[cProps++].Value.lpszA, strServerPath.c_str(),strServerPath.size() + 1);
 
 	lpProps[cProps].ulPropTag = PR_EC_USERNAME_A;
 	if ((hr = MAPIAllocateMore(strlen(szUsername) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
-		goto exit;
+		return hr;
 	memcpy(lpProps[cProps++].Value.lpszA, szUsername, strlen(szUsername) + 1);
 
 	lpProps[cProps].ulPropTag = PR_EC_USERPASSWORD_A;
 	if ((hr = MAPIAllocateMore(1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
-		goto exit;
+		return hr;
 	memcpy(lpProps[cProps++].Value.lpszA, "", 1);
 
 	lpProps[cProps].ulPropTag = PR_EC_SSLKEY_FILE;
 	if ((hr = MAPIAllocateMore(strlen(m4l_lpConfig->GetSetting("ssl_key_file")) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
-		goto exit;
+		return hr;
 	memcpy(lpProps[cProps++].Value.lpszA, m4l_lpConfig->GetSetting("ssl_key_file"), strlen(m4l_lpConfig->GetSetting("ssl_key_file")) + 1);
 
 	lpProps[cProps].ulPropTag = PR_EC_SSLKEY_PASS;
 	if ((hr = MAPIAllocateMore(strlen(m4l_lpConfig->GetSetting("ssl_key_pass")) + 1, lpProps, (void**)&lpProps[cProps].Value.lpszA)) != hrSuccess)
-		goto exit;
+		return hr;
 	memcpy(lpProps[cProps++].Value.lpszA, m4l_lpConfig->GetSetting("ssl_key_pass"), strlen(m4l_lpConfig->GetSetting("ssl_key_pass")) + 1);
 
 	*lpcValues = cProps;
-	*lppProps = lpProps;
-
-exit:
-	if (hr != hrSuccess)
-		MAPIFreeBuffer(lpProps);
-
-	return hr;
+	*lppProps = lpProps.release();
+	return hrSuccess;
 }
 

@@ -25,8 +25,10 @@
 
 #include "IStreamAdapter.h"
 
-IStreamAdapter::IStreamAdapter(std::string& str) : m_pos(0), m_str(str) {
-}
+namespace KC {
+
+IStreamAdapter::IStreamAdapter(std::string &str) : m_str(str)
+{}
 
 HRESULT IStreamAdapter::QueryInterface(REFIID iid, void **pv){
 	if(iid == IID_IStream || iid == IID_ISequentialStream || iid == IID_IUnknown) {
@@ -134,3 +136,5 @@ HRESULT IStreamAdapter::Stat(STATSTG *pstatstg, DWORD grfStatFlag)
 	
 	return hrSuccess;
 }
+
+} /* namespace */

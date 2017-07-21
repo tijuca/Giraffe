@@ -28,6 +28,11 @@
 
 #include <string>
 
+struct propVal;
+struct soap;
+
+namespace KC {
+
 #define MAX_PROP_SIZE 8192	
 #define MAX_QUERY 4096
 
@@ -94,7 +99,7 @@ ECRESULT SetDatabaseSetting(ECDatabase *lpDatabase, const std::string &strSettin
  * This means the lock-error logging is restored when the scope in which an instance of
  * this class exists is exited.
  */
-class SuppressLockErrorLogging _zcp_final {
+class SuppressLockErrorLogging _kc_final {
 public:
 	SuppressLockErrorLogging(ECDatabase *lpDatabase);
 	~SuppressLockErrorLogging();
@@ -103,7 +108,6 @@ private:
 	ECDatabase *m_lpDatabase;
 	bool m_bResetValue;
 
-private:
 	SuppressLockErrorLogging(const SuppressLockErrorLogging &) = delete;
 	SuppressLockErrorLogging &operator=(const SuppressLockErrorLogging &) = delete;
 };
@@ -124,5 +128,7 @@ private:
  */
 #define WITH_SUPPRESSED_LOGGING(_db)	\
 	for (SuppressLockErrorLogging suppressor(_db), *ptr = NULL; ptr == NULL; ptr = &suppressor)
+
+} /* namespace */
 
 #endif // ECDATABASEUTILS_H

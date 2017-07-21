@@ -31,6 +31,8 @@
 #include <kopano/Util.h>
 #include <kopano/stringutil.h>
 
+namespace KC {
+
 /**
  * Generates ical VALARM component from reminderbefore minutes.
  * Mapi -> Ical conversion
@@ -44,15 +46,11 @@
  */
 HRESULT HrParseReminder(LONG lRemindBefore, time_t ttReminderTime, bool bTask, icalcomponent **lppAlarm)
 {
-	HRESULT hr = hrSuccess;
 	icalcomponent *lpVAlarm = NULL;
 	icaltriggertype sittTrigger;
 
-	if (lppAlarm == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (lppAlarm == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 	if (lRemindBefore == 1525252321) // OL sets this value for default 15 mins time.
 		lRemindBefore = 15;
 
@@ -70,13 +68,7 @@ HRESULT HrParseReminder(LONG lRemindBefore, time_t ttReminderTime, bool bTask, i
 	icalcomponent_add_property(lpVAlarm, icalproperty_new_description("Reminder"));
 
 	*lppAlarm = lpVAlarm;
-	lpVAlarm = NULL;
-
-exit:
-	if (lpVAlarm)
-		icalcomponent_free(lpVAlarm);
-
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -111,9 +103,9 @@ HRESULT HrParseVAlarm(icalcomponent *lpicAlarm, LONG *lplRemindBefore, time_t *l
 
 		lRemindBefore = -1 * (icaldurationtype_as_int(sittTrigger.duration) / 60);
 
-		// In iCal an remind before can be both negative (meaning alarm BEFORE startdate) or positive (meaning
-		// alarm AFTER startdate). In MAPI an remind before can only be positive (meaning alarm BEFORE startdate).
-		// If (after inverting iCal remind before so it's compatible with MAPI) remind before is negative we need
+		// In iCal, a reminder before can be both negative (meaning alarm BEFORE startdate) or positive (meaning
+		// alarm AFTER startdate). In MAPI, a remind before can only be positive (meaning alarm BEFORE startdate).
+		// If (after inverting iCal remind before so it's compatible with MAPI) remind before is negative, we need
 		// to set it to 0.
 		if (lRemindBefore < 0)
 			lRemindBefore = 0;
@@ -138,3 +130,5 @@ HRESULT HrParseVAlarm(icalcomponent *lpicAlarm, LONG *lplRemindBefore, time_t *l
 
 	return hr;
 }
+
+} /* namespace */

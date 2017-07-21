@@ -1,4 +1,11 @@
-EC_@PACKAGE_VERSION@ {
+KC_@PACKAGE_ABI@ {
 global:
+	extern "C++" {
+		KC::*;
+		typeinfo*;
+		vtable*;
+		*::_Rep::_S_empty_rep_storage;
+	};
+local:
 	*;
 };

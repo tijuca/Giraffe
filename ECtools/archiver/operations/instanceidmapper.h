@@ -19,32 +19,32 @@
 #define instanceidmapper_INCLUDED
 
 #include <memory>
+#include <kopano/zcdefs.h>
 #include "instanceidmapper_fwd.h"
 #include <mapidefs.h>
 
+namespace KC {
+
 class ECConfig;
 class ECLogger;
-class ECDatabaseMySQL;
-typedef std::shared_ptr<ECDatabaseMySQL> DatabasePtr;
+class KCMDatabaseMySQL;
+typedef std::shared_ptr<KCMDatabaseMySQL> DatabasePtr;
 
-namespace za { namespace operations {
+namespace operations {
 
-class InstanceIdMapper
-{
+class _kc_export InstanceIdMapper _kc_final {
 	public:
 		static HRESULT Create(ECLogger *lpLogger, ECConfig *lpConfig, InstanceIdMapperPtr *lpptrMapper);
-		HRESULT GetMappedInstanceId(const SBinary &sourceServerUID, ULONG cbSourceInstanceID, LPENTRYID lpSourceInstanceID, const SBinary &destServerUID, ULONG *lpcbDestInstanceID, LPENTRYID *lppDestInstanceID);
-		HRESULT SetMappedInstances(ULONG ulPropId, const SBinary &sourceServerUID, ULONG cbSourceInstanceID, LPENTRYID lpSourceInstanceID, const SBinary &destServerUID, ULONG cbDestInstanceID, LPENTRYID lpDestInstanceID);
+	_kc_hidden HRESULT GetMappedInstanceId(const SBinary &src_server_uid, ULONG src_instance_id_size, LPENTRYID src_instance_id, const SBinary &dst_server_uid, ULONG *dst_instance_id_size, LPENTRYID *dst_instance_id);
+	_kc_hidden HRESULT SetMappedInstances(ULONG prop_id, const SBinary &src_server_uid, ULONG src_instance_id_size, LPENTRYID src_instance_id, const SBinary &dst_server_uid, ULONG dst_instance_id_size, LPENTRYID dst_instance_id);
 
 	private:
-		InstanceIdMapper(ECLogger *lpLogger);
-		HRESULT Init(ECConfig *lpConfig);
+	_kc_hidden InstanceIdMapper(ECLogger *);
+	_kc_hidden HRESULT Init(ECConfig *);
 
-	private:
 		DatabasePtr m_ptrDatabase;
 };
 
-}} // namespace operations, za
-
+}} /* namespace */
 
 #endif // ndef instanceidmapper_INCLUDED

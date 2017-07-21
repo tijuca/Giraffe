@@ -21,11 +21,15 @@
 #include <kopano/kcodes.h>
 
 struct soap;
+
+namespace KC {
+
 class ECSession;
 
-ECRESULT TestPerform(struct soap *soap, ECSession *lpSession, char *szCommand, unsigned int ulArgs, char **args);
-ECRESULT TestSet(struct soap *soap, ECSession *lpSession, char *szVarName, char *szValue);
-ECRESULT TestGet(struct soap *soap, ECSession *lpSession, char *szVarName, char **szValue);
-            
+extern ECRESULT TestPerform(struct soap *soap, ECSession *lpSession, const char *cmd, unsigned int ulArgs, char **args);
+extern ECRESULT TestSet(struct soap *soap, ECSession *lpSession, const char *name, const char *value);
+extern ECRESULT TestGet(struct soap *soap, ECSession *lpSession, const char *name, char **value);
+
+} /* namespace */            
 
 #endif

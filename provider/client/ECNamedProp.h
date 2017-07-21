@@ -18,6 +18,7 @@
 #ifndef ECNAMEDPROP_H
 #define ECNAMEDPROP_H
 
+#include <kopano/zcdefs.h>
 #include <mapidefs.h>
 #include <map>
 
@@ -51,13 +52,13 @@ struct ltmap {
 	}
 };
 
-class ECNamedProp {
+class ECNamedProp _kc_final {
 public:
 	ECNamedProp(WSTransport *lpTransport);
 	virtual ~ECNamedProp();
 
-	virtual HRESULT GetNamesFromIDs(LPSPropTagArray FAR * lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG FAR * lpcPropNames, LPMAPINAMEID FAR * FAR * lpppPropNames);
-	virtual HRESULT GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID FAR * lppPropNames, ULONG ulFlags, LPSPropTagArray FAR * lppPropTags);
+	virtual HRESULT GetNamesFromIDs(LPSPropTagArray *lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames, LPMAPINAMEID **lpppPropNames);
+	virtual HRESULT GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropNames, ULONG ulFlags, LPSPropTagArray *lppPropTags);
 
 private:
 	std::map<MAPINAMEID *,ULONG,ltmap>		mapNames;

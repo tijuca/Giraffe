@@ -20,6 +20,8 @@
 #include <mapix.h>
 #include <kopano/stringutil.h>
 
+namespace KC {
+
 /**
  * Check if UID is of outlook format.
  *
@@ -42,21 +44,18 @@ bool IsOutlookUid(const std::string &strUid)
  */
 HRESULT HrGenerateUid(std::string *lpStrData)
 {
-	HRESULT hr = hrSuccess;
 	std::string strByteArrayID = "040000008200E00074C5B7101A82E008";
 	std::string strBinUid;
 	GUID sGuid;
 	FILETIME ftNow;
 	ULONG ulSize = 1;
 
-	hr = CoCreateGuid(&sGuid);
+	HRESULT hr = CoCreateGuid(&sGuid);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = UnixTimeToFileTime(time(NULL), &ftNow);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	strBinUid = strByteArrayID;	// Outlook Guid
 	strBinUid += "00000000";	// InstanceDate
 	strBinUid += bin2hex(sizeof(FILETIME), (LPBYTE)&ftNow);
@@ -65,9 +64,7 @@ HRESULT HrGenerateUid(std::string *lpStrData)
 	strBinUid += bin2hex(sizeof(GUID), (LPBYTE)&sGuid);	// new guid
 
 	lpStrData->swap(strBinUid);
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -112,7 +109,7 @@ HRESULT HrCreateGlobalID(ULONG ulNamedTag, void *base, LPSPropValue *lppPropVal)
 	*lppPropVal = lpPropVal;
 
 exit:
-	if (hr != hrSuccess && lpPropVal)
+	if (hr != hrSuccess && base == nullptr)
 		MAPIFreeBuffer(lpPropVal);
 
 	return hr;
@@ -129,17 +126,15 @@ exit:
  * @param[out]	lpStrUid	returned ical string UID 
  * @return		MAPI error code
  */
-HRESULT HrGetICalUidFromBinUid(SBinary &sBin, std::string *lpStrUid)
+HRESULT HrGetICalUidFromBinUid(const SBinary &sBin, std::string *lpStrUid)
 {
 	HRESULT hr = hrSuccess;
 	std::string strUid;
 
-	if (sBin.cb > 0x34 && memcmp(sBin.lpb + 0x28, "vCal-Uid", 8) == 0) {
+	if (sBin.cb > 0x34 && memcmp(sBin.lpb + 0x28, "vCal-Uid", 8) == 0)
 		strUid = (char*)sBin.lpb + 0x34;
-	} else {
+	else
 		strUid = bin2hex(sBin.cb, sBin.lpb);
-	}
-
 	lpStrUid->swap(strUid);
 
 	return hr;
@@ -173,3 +168,5 @@ HRESULT HrMakeBinUidFromICalUid(const std::string &strUid, std::string *lpStrBin
 
 	return hr;
 }
+
+} /* namespace */

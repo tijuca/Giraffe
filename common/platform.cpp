@@ -30,6 +30,8 @@
 #include <kopano/ECLogger.h>
 #include "TmpPath.h"
 
+namespace KC {
+
 HRESULT UnixTimeToFileTime(time_t t, FILETIME *ft)
 {
     __int64 l;
@@ -91,7 +93,7 @@ static const LONGLONG UnitsPerHalfMinute = 300000000;
 
 void RTimeToFileTime(LONG rtime, FILETIME *pft)
 {
-	// ASSERT(pft != NULL);
+	// assert(pft != NULL);
 	ULONGLONG q = rtime;
 	q *= UnitsPerMinute;
 	pft->dwLowDateTime  = q & 0xFFFFFFFF;
@@ -100,9 +102,8 @@ void RTimeToFileTime(LONG rtime, FILETIME *pft)
  
 void FileTimeToRTime(const FILETIME *pft, LONG *prtime)
 {
-	// ASSERT(pft != NULL);
-	// ASSERT(prtime != NULL);
-
+	// assert(pft != NULL);
+	// assert(prtime != NULL);
 	ULONGLONG q = pft->dwHighDateTime;
 	q <<= 32;
 	q |= pft->dwLowDateTime;
@@ -134,26 +135,6 @@ HRESULT UnixTimeToRTime(time_t unixtime, LONG *rtime)
 	return hrSuccess;
 }
 
-// time only, not date!
-time_t SystemTimeToUnixTime(const SYSTEMTIME &stime)
-{
-	return stime.wSecond + (stime.wMinute*60) + ((stime.wHour)*60*60);
-}
-
-SYSTEMTIME TMToSystemTime(const struct tm &t)
-{
-	SYSTEMTIME stime = {0};
-	stime.wYear = t.tm_year;
-	stime.wMonth = t.tm_mon;
-	stime.wDayOfWeek = t.tm_wday;
-	stime.wDay = t.tm_mday;
-	stime.wHour = t.tm_hour;
-	stime.wMinute = t.tm_min;
-	stime.wSecond = t.tm_sec;
-	stime.wMilliseconds = 0;
-	return stime;	
-}
-
 /* The 'IntDate' and 'IntTime' date and time encoding are used for some CDO calculations. They
  * are basically a date or time encoded in a bitshifted way, packed so that it uses the least amount
  * of bits. Eg. a date (day,month,year) is encoded as 5 bits for the day (1-31), 4 bits for the month (1-12),
@@ -163,70 +144,6 @@ SYSTEMTIME TMToSystemTime(const struct tm &t)
  * For dates, everything is 1-index (1st January is 1-1) and year is full (2008)
  */
  
-/**
- * Create INT date
- *
- * @param[in] day Day of month 1-31
- * @param[in] month Month of year 1-12
- * @param[in] year Full year (eg 2008)
- * @return ULONG Calculated INT date
- */
-ULONG   CreateIntDate(ULONG day, ULONG month, ULONG year)
-{
-	return day + month * 32 + year * 32 * 16;
-}
-
-/**
- * Create INT time
- *
- * @param[in] seconds Seconds 0-59
- * @param[in] minutes Minutes 0-59
- * @param[in] hours Hours
- * @return Calculated INT time
- */
-ULONG   CreateIntTime(ULONG seconds, ULONG minutes, ULONG hours)
-{
-	return seconds + minutes * 64 + hours * 64 * 64;
-}
-
-/**
- * Create INT date from filetime
- *
- * Discards time information from the passed FILETIME stamp, and returns the date
- * part as an INT date. The passed FILETIME is interpreted in GMT.
- *
- * @param[in] ft FileTime to convert
- * @return Converted DATE part of the file time.
- */
-ULONG FileTimeToIntDate(const FILETIME &ft)
-{
-	struct tm date;
-	time_t t;
-	FileTimeToUnixTime(ft, &t);
-	gmtime_safe(&t, &date);
-	
-	return CreateIntDate(date.tm_mday, date.tm_mon+1, date.tm_year+1900);
-}
-
-/**
- * Create INT time from offset in seconds
- *
- * Creates an INT time value for the moment at which the passed amount of seconds
- * has passed on a day.
- *
- * @param[in] seconds Number of seconds since beginning of day
- * @return Converted INT time
- */
-ULONG SecondsToIntTime(ULONG seconds)
-{
-	ULONG hours = seconds / (60*60);
-	seconds -= hours * 60 * 60;
-	ULONG minutes = seconds / 60;
-	seconds -= minutes * 60;
-	
-	return CreateIntTime(seconds, minutes, hours);
-}
-
 bool operator ==(const FILETIME &a, const FILETIME &b)
 {
 	return a.dwLowDateTime == b.dwLowDateTime && a.dwHighDateTime == b.dwHighDateTime;
@@ -338,39 +255,31 @@ int CreatePath(const char *createpath)
 	while (len > 0 && (path[len-1] == '/' || path[len-1] == '\\'))
 		path[--len] = 0;
 
-	if(stat(path, &s) == 0) {
-		if(s.st_mode & S_IFDIR) {
-			free(path);
-			return 0; // Directory is already there
-		} else {
-			free(path);
-			return -1; // Item is not a directory
-		}
-	} else {
-		// We need to create the directory
-
-		// First, create parent directories
-		char *trail = strrchr(path, '/') > strrchr(path, '\\') ? strrchr(path, '/') : strrchr(path, '\\');
-
-		if(!trail) {
-		    // Should only happen if you're trying to create /path/to/dir in win32
-		    // or \path\to\dir in linux
-		    free(path);
-		    return -1;
-		}
-		
-		*trail = 0;
-
-		if(CreatePath(path) != 0) {
-			free(path);
-			return -1;
-		}
-
-		// Create the actual directory
-		int ret = mkdir(createpath, 0700);
+	if (stat(path, &s) == 0) {
 		free(path);
-		return ret;
+		if (s.st_mode & S_IFDIR)
+			return 0; // Directory is already there
+		return -1; // Item is not a directory
 	}
+	// We need to create the directory
+	// First, create parent directories
+	char *trail = strrchr(path, '/') > strrchr(path, '\\') ?
+	              strrchr(path, '/') : strrchr(path, '\\');
+	if (trail == NULL) {
+		// Should only happen if you are trying to create /path/to/dir
+		// in win32 or \path\to\dir in linux
+		free(path);
+		return -1;
+	}
+	*trail = '\0';
+	if (CreatePath(path) != 0) {
+		free(path);
+		return -1;
+	}
+	// Create the actual directory
+	int ret = mkdir(createpath, 0700);
+	free(path);
+	return ret;
 }
 
 double GetTimeOfDay()
@@ -441,83 +350,23 @@ bool force_buffers_to_disk(const int fd)
 
 void my_readahead(const int fd)
 {
+#ifdef LINUX
 	struct stat st;
 
 	if (fstat(fd, &st) == 0)
 		(void)readahead(fd, 0, st.st_size);
+#endif
 }
 
 void give_filesize_hint(const int fd, const off_t len)
 {
+#ifdef LINUX
 	// this helps preventing filesystem fragmentation as the
 	// kernel can now look for the best disk allocation
 	// pattern as it knows how much date is going to be
 	// inserted
 	posix_fallocate(fd, 0, len);
+#endif
 }
 
-/**
- * Restart the program with a new preloaded library.
- * @argv:	full argv of current invocation
- * @lib:	library to load via LD_PRELOAD
- *
- * As every program under Linux is linked to libc and symbol resolution is done
- * breadth-first, having just libkcserver.so linked to the alternate allocator
- * is not enough to ensure the allocator is being used in favor of libc malloc.
- *
- * A program built against glibc will have a record for e.g.
- * "malloc@GLIBC_2.2.5". The use of LD_PRELOAD appears to relax the version
- * requirement, though; the benefit would be that libtcmalloc's malloc will
- * take over _all_ malloc calls.
- */
-int kc_reexec_with_allocator(char **argv, const char *lib)
-{
-	if (lib == NULL || *lib == '\0')
-		return 0;
-	const char *s = getenv("KC_ALLOCATOR_DONE");
-	if (s != NULL)
-		/* avoid repeatedly reexecing ourselves */
-		return 0;
-	s = getenv("LD_PRELOAD");
-	if (s == NULL)
-		setenv("LD_PRELOAD", lib, true);
-	else if (strstr(s, "/valgrind/") != NULL)
-		/*
-		 * Within vg, everything is a bit different — since it catches
-		 * execve itself. Execing /proc/self/exe therefore won't work,
-		 * we would need to use argv[0]. But… don't bother.
-		 */
-		return 0;
-	else
-		setenv("LD_PRELOAD", (std::string(s) + ":" + lib).c_str(), true);
-	void *handle = dlopen(lib, RTLD_LAZY | RTLD_LOCAL);
-	if (handle == NULL)
-		/*
-		 * Ignore libraries that won't load anyway. This avoids
-		 * ld.so emitting a scary warning if we did re-exec.
-		 */
-		return 0;
-	dlclose(handle);
-	setenv("KC_ALLOCATOR_DONE", lib, true);
-
-	/* Resolve "exe" symlink before exec to please the sysadmin */
-	std::vector<char> linkbuf(16);
-	ssize_t linklen;
-	while (true) {
-		linklen = readlink("/proc/self/exe", &linkbuf[0], linkbuf.size());
-		if (linklen < 0 || static_cast<size_t>(linklen) < linkbuf.size())
-			break;
-		linkbuf.resize(linkbuf.size() * 2);
-	}
-	if (linklen < 0) {
-		int ret = -errno;
-		ec_log_warn("kc_reexec_with_allocator: readlink: %s", strerror(errno));
-		return ret;
-	}
-	linkbuf[linklen] = '\0';
-	ec_log_debug("Reexecing %s with %s", &linkbuf[0], lib);
-	execv(&linkbuf[0], argv);
-	int ret = -errno;
-	ec_log_info("Failed to reexec self: %s. Continuing with standard allocator.", strerror(errno));
-	return ret;
-}
+} /* namespace */

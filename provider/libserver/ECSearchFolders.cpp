@@ -16,7 +16,9 @@
  */
 
 #include <kopano/platform.h>
-
+#include <utility>
+#include <kopano/lockhelper.hpp>
+#include <pthread.h>
 #include <mapidefs.h>
 #include <mapitags.h>
 
@@ -36,62 +38,39 @@
 
 #include "ECSearchClient.h"
 
-typedef struct {
+namespace KC {
+
+struct THREADINFO {
     SEARCHFOLDER 	*lpFolder;
     ECSearchFolders *lpSearchFolders;
-} THREADINFO;
+};
 
 ECSearchFolders::ECSearchFolders(ECSessionManager *lpSessionManager,
-    ECDatabaseFactory *lpFactory)
+    ECDatabaseFactory *lpFactory) :
+	m_lpDatabaseFactory(lpFactory), m_lpSessionManager(lpSessionManager)
 {
-    this->m_lpSessionManager = lpSessionManager;
-    this->m_lpDatabaseFactory = lpFactory;
-    this->m_bExitThread = false;
-    this->m_bRunning = false;
-
-    pthread_mutexattr_t attr;
-    pthread_mutexattr_init(&attr);
-    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-
-    pthread_mutex_init(&m_mutexMapSearchFolders, &attr);
-    pthread_cond_init(&m_condThreadExited, NULL);
-    
-    pthread_mutex_init(&m_mutexEvents, &attr);
-    pthread_cond_init(&m_condEvents, NULL);
-    
     pthread_create(&m_threadProcess, NULL, ECSearchFolders::ProcessThread, (void *)this);
     set_thread_name(m_threadProcess, "SearchFolders");
 }
 
 ECSearchFolders::~ECSearchFolders() {
-    STOREFOLDERIDSEARCH::iterator iterStore;
-    FOLDERIDSEARCH::iterator iterFolder;
+	ulock_rec l_sf(m_mutexMapSearchFolders);
 
-	pthread_mutex_lock(&m_mutexMapSearchFolders);
-
-	for (iterStore = m_mapSearchFolders.begin();
-	     iterStore != m_mapSearchFolders.end(); ++iterStore) {
-		for (iterFolder = iterStore->second.begin();
-		     iterFolder != iterStore->second.end(); ++iterFolder)
-			delete iterFolder->second;
-		iterStore->second.clear();
+	for (auto &p : m_mapSearchFolders) {
+		for (auto &f : p.second)
+			delete f.second;
+		p.second.clear();
 	}
     
 	m_mapSearchFolders.clear();
-	pthread_mutex_unlock(&m_mutexMapSearchFolders);
+	l_sf.unlock();
     
-    pthread_mutex_destroy(&m_mutexMapSearchFolders);
-    pthread_cond_destroy(&m_condThreadExited);
-    
-	pthread_mutex_lock(&m_mutexEvents);
+	ulock_rec l_events(m_mutexEvents);
     m_bExitThread = true;
-	pthread_cond_broadcast(&m_condEvents);
-	pthread_mutex_unlock(&m_mutexEvents);
+	m_condEvents.notify_all();
+	l_events.unlock();
 
     pthread_join(m_threadProcess, NULL);
-    
-    pthread_mutex_destroy(&m_mutexEvents);
-    pthread_cond_destroy(&m_condEvents);
 }
 
 // Only loads the search criteria for all search folders. Used once at boot time
@@ -99,7 +78,7 @@ ECRESULT ECSearchFolders::LoadSearchFolders()
 {
     ECRESULT er = erSuccess;
     ECDatabase *lpDatabase = NULL;
-    DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
     DB_ROW lpRow = NULL;
     unsigned int ulFolderId = 0;
     unsigned int ulStoreId = 0;
@@ -163,9 +142,6 @@ ECRESULT ECSearchFolders::LoadSearchFolders()
     }
 
 exit:
-    if(lpResult)
-        lpDatabase->FreeResult(lpResult);
-
     if(lpSearchCriteria)
         FreeSearchCriteria(lpSearchCriteria);
         
@@ -196,39 +172,26 @@ ECRESULT ECSearchFolders::SetSearchCriteria(unsigned int ulStoreId, unsigned int
 ECRESULT ECSearchFolders::GetSearchCriteria(unsigned int ulStoreId, unsigned int ulFolderId, struct searchCriteria **lppSearchCriteria, unsigned int *lpulFlags)
 {
 	ECRESULT er = erSuccess;
-	STOREFOLDERIDSEARCH::const_iterator iterStore;
 	FOLDERIDSEARCH::const_iterator iterFolder;
+	scoped_rlock l_sf(m_mutexMapSearchFolders);
 
-    pthread_mutex_lock(&m_mutexMapSearchFolders);
-    
     // See if there are any searches for this store first
-    iterStore = m_mapSearchFolders.find(ulStoreId);
-    
-    if(iterStore == m_mapSearchFolders.end()) {
-        er = KCERR_NOT_INITIALIZED;
-        goto exit;
-    }
-    
-    iterFolder = iterStore->second.find(ulFolderId);
-    if(iterFolder == iterStore->second.end()) {
-        er = KCERR_NOT_INITIALIZED;
-        goto exit;
-    }
+	auto iterStore = m_mapSearchFolders.find(ulStoreId);
+	if (iterStore == m_mapSearchFolders.cend())
+		return KCERR_NOT_INITIALIZED;
+	iterFolder = iterStore->second.find(ulFolderId);
+	if (iterFolder == iterStore->second.cend())
+		return KCERR_NOT_INITIALIZED;
     
     er = CopySearchCriteria(NULL, iterFolder->second->lpSearchCriteria, lppSearchCriteria);
     if(er != erSuccess)
-        goto exit;
-        
+		return er;
     er = GetState(ulStoreId, ulFolderId, lpulFlags);
     if(er != erSuccess)
-        goto exit;
+		return er;
         
     // Add recursive flag if necessary
     *lpulFlags |= iterFolder->second->lpSearchCriteria->ulFlags & SEARCH_RECURSIVE;
-        
-exit:
-    pthread_mutex_unlock(&m_mutexMapSearchFolders); 
-    
     return er;
 }
 
@@ -240,6 +203,7 @@ ECRESULT ECSearchFolders::AddSearchFolder(unsigned int ulStoreId, unsigned int u
     STOREFOLDERIDSEARCH::iterator iterStore;
     SEARCHFOLDER *lpSearchFolder = NULL;    
     unsigned int ulParent = 0;
+	ulock_rec l_sf(m_mutexMapSearchFolders, std::defer_lock_t());
 
     if(lpSearchCriteria == NULL) {
         er = LoadSearchCriteria(ulStoreId, ulFolderId, &lpCriteria);
@@ -288,9 +252,8 @@ ECRESULT ECSearchFolders::AddSearchFolder(unsigned int ulStoreId, unsigned int u
         goto exit;
     }
 
-    pthread_mutex_lock(&m_mutexMapSearchFolders);
-    
     // Get searches for this store, or add it to the list.
+	l_sf.lock();
 	iterStore = m_mapSearchFolders.insert(STOREFOLDERIDSEARCH::value_type(ulStoreId, FOLDERIDSEARCH())).first;
 
     iterStore->second.insert(FOLDERIDSEARCH::value_type(ulFolderId, lpSearchFolder));
@@ -317,9 +280,7 @@ ECRESULT ECSearchFolders::AddSearchFolder(unsigned int ulStoreId, unsigned int u
         }
 	set_thread_name(lpSearchFolder->sThreadId, "SearchFolders:Folder");
     }
-    
-    pthread_mutex_unlock(&m_mutexMapSearchFolders);
-
+	l_sf.unlock();
 exit:
     if (lpCriteria)
         FreeSearchCriteria(lpCriteria);
@@ -332,71 +293,49 @@ ECRESULT ECSearchFolders::IsSearchFolder(unsigned int ulStoreID, unsigned int ul
 {
     ECRESULT er = erSuccess;
 	ECDatabase		*lpDatabase = NULL;
-	DB_RESULT		lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 	DB_ROW			lpDBRow = NULL;
 	std::string		strQuery;
 
 	/* Get database */
 	er = GetThreadLocalDatabase(m_lpDatabaseFactory, &lpDatabase);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	// Find out what kind of table this is
 	strQuery = "SELECT flags FROM hierarchy WHERE id=" + stringify(ulFolderId);
 
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
-	if(!lpDBRow || lpDBRow[0] == NULL) {
-	    er = KCERR_NOT_FOUND;
-	    goto exit;
-    }
-    
-    if(atoui(lpDBRow[0]) != FOLDER_SEARCH) {
-        er = KCERR_NOT_FOUND;
-        goto exit;
-    }
-
-exit:
-
-    if(lpDBResult)
-        lpDatabase->FreeResult(lpDBResult);
-
-    return er;
+	if (lpDBRow == nullptr || lpDBRow[0] == nullptr)
+		return KCERR_NOT_FOUND;
+	if (atoui(lpDBRow[0]) != FOLDER_SEARCH)
+		return KCERR_NOT_FOUND;
+	return erSuccess;
 }
 
 // Cancel a search: stop any rebuild thread and stop processing updates for this search folder
 ECRESULT ECSearchFolders::CancelSearchFolder(unsigned int ulStoreID, unsigned int ulFolderId)
 {
-    STOREFOLDERIDSEARCH::iterator iterStore;
-    FOLDERIDSEARCH::iterator iterFolder;
     SEARCHFOLDER *lpFolder = NULL;
-
     // Lock the list, preventing other Cancel requests messing with the thread    
-    pthread_mutex_lock(&m_mutexMapSearchFolders);
-    
-    iterStore = m_mapSearchFolders.find(ulStoreID);
-    if(iterStore == m_mapSearchFolders.end()) {
-        pthread_mutex_unlock(&m_mutexMapSearchFolders);
-        return KCERR_NOT_FOUND;
-    }
+	ulock_rec l_sf(m_mutexMapSearchFolders);
 
-    iterFolder = iterStore->second.find(ulFolderId);
-    if(iterFolder == iterStore->second.end()) {
-        pthread_mutex_unlock(&m_mutexMapSearchFolders);
-        return KCERR_NOT_FOUND;
-    }
+	auto iterStore = m_mapSearchFolders.find(ulStoreID);
+	if (iterStore == m_mapSearchFolders.cend())
+		return KCERR_NOT_FOUND;
+	auto iterFolder = iterStore->second.find(ulFolderId);
+	if (iterFolder == iterStore->second.cend())
+		return KCERR_NOT_FOUND;
     
     lpFolder = iterFolder->second;
     
     // Remove the item from the list
     iterStore->second.erase(iterFolder);
 	g_lpStatsCollector->Increment(SCN_SEARCHFOLDER_COUNT, -1);
-    
-    pthread_mutex_unlock(&m_mutexMapSearchFolders);
-
+	l_sf.unlock();
 	DestroySearchFolder(lpFolder);
 	return erSuccess;
 }
@@ -410,17 +349,14 @@ void ECSearchFolders::DestroySearchFolder(SEARCHFOLDER *lpFolder)
     // Signal the thread to exit
     lpFolder->bThreadExit = true;
     
-    pthread_mutex_lock(&lpFolder->mMutexThreadFree);
-    
-    while(lpFolder->bThreadFree == false) {
-        // Wait for the thread to signal that lpFolder is no longer in use by the thread
-        
-        // The condition is used for all threads, so it may have been fired for a different
-        // thread. This is efficient enough.
-        pthread_cond_wait(&m_condThreadExited, &lpFolder->mMutexThreadFree);
-    }
-    
-    pthread_mutex_unlock(&lpFolder->mMutexThreadFree);
+	/*
+	 * Wait for the thread to signal that lpFolder is no longer in use by
+	 * the thread The condition is used for all threads, so it may have
+	 * been fired for a different thread. This is efficient enough.
+	 */
+	ulock_normal lk(lpFolder->mMutexThreadFree);
+	m_condThreadExited.wait(lk, [=](void) { return lpFolder->bThreadFree; });
+	lk.unlock();
 
     // Nobody is using lpFolder now
     delete lpFolder;
@@ -435,41 +371,29 @@ void ECSearchFolders::DestroySearchFolder(SEARCHFOLDER *lpFolder)
  */
 ECRESULT ECSearchFolders::RemoveSearchFolder(unsigned int ulStoreID)
 {
-	STOREFOLDERIDSEARCH::iterator iterStore;
-	FOLDERIDSEARCH::iterator iterFolder;
 	unsigned int ulFolderID;
 	std::list<SEARCHFOLDER*>	listSearchFolders;
-	std::list<SEARCHFOLDER *>::const_iterator iterSearchFolder;
-
 	// Lock the list, preventing other Cancel requests messing with the thread
-	pthread_mutex_lock(&m_mutexMapSearchFolders);
+	ulock_rec l_sf(m_mutexMapSearchFolders);
 
-	iterStore = m_mapSearchFolders.find(ulStoreID);
-	if(iterStore == m_mapSearchFolders.end()) {
-		pthread_mutex_unlock(&m_mutexMapSearchFolders);
+	auto iterStore = m_mapSearchFolders.find(ulStoreID);
+	if (iterStore == m_mapSearchFolders.cend())
 		return KCERR_NOT_FOUND;
-	}
-
-	for (iterFolder = iterStore->second.begin();
-	     iterFolder != iterStore->second.end(); ++iterFolder)
-		listSearchFolders.push_back(iterFolder->second);
+	for (const auto &p : iterStore->second)
+		listSearchFolders.push_back(p.second);
 
 	iterStore->second.clear();
 	
 	// Remove store from list, items of the store will be delete in 'DestroySearchFolder'
 	m_mapSearchFolders.erase(iterStore);
-
-	pthread_mutex_unlock(&m_mutexMapSearchFolders);
+	l_sf.unlock();
 
 //@fixme: server shutdown can result in a crash?
-	for (iterSearchFolder = listSearchFolders.begin();
-	     iterSearchFolder != listSearchFolders.end(); ++iterSearchFolder) {
+	for (auto srfolder : listSearchFolders) {
 		g_lpStatsCollector->Increment(SCN_SEARCHFOLDER_COUNT, -1);
-		ulFolderID = (*iterSearchFolder)->ulFolderId;
-
+		ulFolderID = srfolder->ulFolderId;
 		// Wait and free searchfolder data
-		DestroySearchFolder((*iterSearchFolder));
-
+		DestroySearchFolder(srfolder);
 		// Remove results from database
 		ResetResults(ulStoreID, ulFolderID);
 	}
@@ -496,19 +420,14 @@ ECRESULT ECSearchFolders::RemoveSearchFolder(unsigned int ulStoreId, unsigned in
 ECRESULT ECSearchFolders::RestartSearches()
 {
 	ECRESULT er = erSuccess;
-	STOREFOLDERIDSEARCH::const_iterator iterStore;
-	FOLDERIDSEARCH::const_iterator iterFolder;
 
     ec_log_crit("Starting rebuild of search folders... This may take a while.");
     
-    for (iterStore = m_mapSearchFolders.begin();
-         iterStore != m_mapSearchFolders.end(); ++iterStore)
-    {
-        ec_log_crit("  Rebuilding searchfolders of store %d", iterStore->first);
-        for (iterFolder = iterStore->second.begin();
-             iterFolder != iterStore->second.end(); ++iterFolder) {
-            ResetResults(iterStore->first, iterFolder->first);
-            Search(iterStore->first, iterFolder->first, iterFolder->second->lpSearchCriteria, NULL, false);
+    for (const auto &store_p : m_mapSearchFolders) {
+        ec_log_crit("  Rebuilding searchfolders of store %d", store_p.first);
+        for (const auto &folder_p : store_p.second) {
+            ResetResults(store_p.first, folder_p.first);
+            Search(store_p.first, folder_p.first, folder_p.second->lpSearchCriteria, NULL, false);
         }
     }    
 
@@ -529,17 +448,14 @@ ECRESULT ECSearchFolders::UpdateSearchFolders(unsigned int ulStoreId, unsigned i
     ev.ulObjectId = ulObjId;
     ev.ulType = ulType;
     
-    pthread_mutex_lock(&m_mutexEvents);
-
+	scoped_rlock l_ev(m_mutexEvents);
     // Add the event to the queue
-	m_lstEvents.push_back(ev);
-    
-    // Signal a change in the queue (actually only needed for the first event, but this wastes almost
-    // no time and is safer)
-	pthread_cond_broadcast(&m_condEvents);
-
-	pthread_mutex_unlock(&m_mutexEvents);
-    
+	m_lstEvents.push_back(std::move(ev));
+	/*
+	 * Signal a change in the queue (actually only needed for the first
+	 * event, but this wastes almost no time and is safer.
+	 */
+	m_condEvents.notify_all();
     return er;
 }
 
@@ -548,11 +464,8 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 {
     ECRESULT er = erSuccess;
 	STOREFOLDERIDSEARCH::const_iterator iterStore;
-	FOLDERIDSEARCH::const_iterator iterFolder;
     bool bIsInTargetFolder = false;
     std::set<unsigned int> setParents;
-	std::set<unsigned int>::const_iterator iterParents;
-	ECObjectTableList::const_iterator iterObjectIDs;
     unsigned int ulOwner = 0;
     ECSession *lpSession = NULL;
 	ECODStore ecOBStore;
@@ -571,15 +484,14 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 	lstPrefix.push_back(PR_MESSAGE_FLAGS);
 
 	ECLocale locale = m_lpSessionManager->GetSortLocale(ulStoreId);
-	
-    pthread_mutex_lock(&m_mutexMapSearchFolders);
+	ulock_rec l_sf(m_mutexMapSearchFolders);
 
     er = GetThreadLocalDatabase(m_lpDatabaseFactory, &lpDatabase);
     if(er != erSuccess)
         goto exit;
 
     iterStore = m_mapSearchFolders.find(ulStoreId);
-    if(iterStore == m_mapSearchFolders.end()) 
+    if (iterStore == m_mapSearchFolders.cend())
         // There are no search folders in the target store. We will therefore never match any search
         // result and might as well exit now.
         goto exit;
@@ -599,8 +511,7 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
     // a target folder if it is a recursive search.
     
     // Loop through search folders for this store
-    for (iterFolder = iterStore->second.begin();
-         iterFolder != iterStore->second.end(); ++iterFolder) {
+	for (const auto &folder : iterStore->second) {
 		ULONG ulAttempts = 4;	// Random number
 		
 		do {
@@ -608,7 +519,8 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 			lCount = 0;
 			lUnreadCount = 0;
 			
-			if(iterFolder->second->lpSearchCriteria->lpFolders == NULL || iterFolder->second->lpSearchCriteria->lpRestrict == NULL)
+			if (folder.second->lpSearchCriteria->lpFolders == NULL ||
+			    folder.second->lpSearchCriteria->lpRestrict == NULL)
 				continue;
 				
 			er = lpDatabase->Begin();
@@ -617,22 +529,21 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 			
 			// Lock searchfolder
 			WITH_SUPPRESSED_LOGGING(lpDatabase)
-				er = lpDatabase->DoSelect("SELECT properties.val_ulong FROM properties WHERE hierarchyid = " + stringify(iterFolder->first) + " FOR UPDATE", NULL);
+				er = lpDatabase->DoSelect("SELECT properties.val_ulong FROM properties WHERE hierarchyid = " +
+				     stringify(folder.first) + " FOR UPDATE", NULL);
 			if (er == KCERR_DATABASE_ERROR) {
 				DB_ERROR dberr = lpDatabase->GetLastError();
-				if (dberr == DB_E_LOCK_WAIT_TIMEOUT || dberr == DB_E_LOCK_DEADLOCK) {
-					er = lpDatabase->Rollback();
-					if (er != erSuccess) {
-						ec_log_crit("ECSearchFolders::ProcessMessageChange(): database rollback failed %d", er);
-						goto exit;
-					}
-					g_lpStatsCollector->Increment(SCN_SEARCHFOLDER_UPDATE_RETRY);
-					continue;
-				}
-				else {
+				if (dberr != DB_E_LOCK_WAIT_TIMEOUT && dberr != DB_E_LOCK_DEADLOCK) {
 					ec_log_err("ECSearchFolders::ProcessMessageChange(): select failed");
 					goto exit;
 				}
+				er = lpDatabase->Rollback();
+				if (er != erSuccess) {
+					ec_log_crit("ECSearchFolders::ProcessMessageChange(): database rollback failed %d", er);
+					goto exit;
+				}
+				g_lpStatsCollector->Increment(SCN_SEARCHFOLDER_UPDATE_RETRY);
+				continue;
 			} else if (er != erSuccess) {
 				ec_log_crit("ECSearchFolders::ProcessMessageChange(): unexpected error %d", er);
 				goto exit;
@@ -640,15 +551,15 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 			
 			if(ulType != ECKeyTable::TABLE_ROW_DELETE) {
 				// Loop through all targets for each searchfolder, if one matches, then match the restriction with the objects
-				for (unsigned int i = 0; i < iterFolder->second->lpSearchCriteria->lpFolders->__size; ++i)
-					if(m_lpSessionManager->GetCacheManager()->GetObjectFromEntryId(&iterFolder->second->lpSearchCriteria->lpFolders->__ptr[i], &ulSCFolderId) == erSuccess &&
+				for (unsigned int i = 0; i < folder.second->lpSearchCriteria->lpFolders->__size; ++i)
+					if (m_lpSessionManager->GetCacheManager()->GetObjectFromEntryId(&folder.second->lpSearchCriteria->lpFolders->__ptr[i], &ulSCFolderId) == erSuccess &&
 						ulSCFolderId == ulFolderId)
 					{
 						bIsInTargetFolder = true;
 						break;
 					}
 
-				if(!bIsInTargetFolder && iterFolder->second->lpSearchCriteria->ulFlags & RECURSIVE_SEARCH) {
+				if (!bIsInTargetFolder && folder.second->lpSearchCriteria->ulFlags & RECURSIVE_SEARCH) {
 					// The item is not in one of the base folders, but it may be in one of children of the folders.
 					// We do it in this order because the GetParent() calls below may cause database accesses, so
 					// we only actually do those database accesses if we have to.
@@ -668,16 +579,13 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 					
 					// setParents now contains all the parent of this object, now we can check if any of the ancestors
 					// are in the search target
-					for (unsigned int i = 0; i < iterFolder->second->lpSearchCriteria->lpFolders->__size; ++i) {
-						if(m_lpSessionManager->GetCacheManager()->GetObjectFromEntryId(&iterFolder->second->lpSearchCriteria->lpFolders->__ptr[i], &ulSCFolderId) == erSuccess)
-						{
-
-							iterParents = setParents.find(ulSCFolderId);
-
-							if(iterParents != setParents.end()) {
-								bIsInTargetFolder = true;
-								break;
-							}
+					for (unsigned int i = 0; i < folder.second->lpSearchCriteria->lpFolders->__size; ++i) {
+						if (m_lpSessionManager->GetCacheManager()->GetObjectFromEntryId(&folder.second->lpSearchCriteria->lpFolders->__ptr[i], &ulSCFolderId) != erSuccess)
+							continue;
+						auto iterParents = setParents.find(ulSCFolderId);
+						if (iterParents != setParents.cend()) {
+							bIsInTargetFolder = true;
+							break;
 						}
 					}
 				}
@@ -709,7 +617,7 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 					std::list<ULONG> lstPropTags;
 					
 					// Get the restriction ready for this search folder
-					er = ECGenericObjectTable::GetRestrictPropTags(iterFolder->second->lpSearchCriteria->lpRestrict, &lstPrefix, &lpPropTags);
+					er = ECGenericObjectTable::GetRestrictPropTags(folder.second->lpSearchCriteria->lpRestrict, &lstPrefix, &lpPropTags);
 					if(er != erSuccess) {
 						ec_log_crit("ECSearchFolders::ProcessMessageChange(): ECGenericObjectTable::GetRestrictPropTags failed %d", er);
 						goto exit;
@@ -722,20 +630,19 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 						goto exit;
 					}
 						
-					er = RunSubRestrictions(lpSession, &ecOBStore, iterFolder->second->lpSearchCriteria->lpRestrict, lstObjectIDs, locale, &lpSubResults);
+					er = RunSubRestrictions(lpSession, &ecOBStore, folder.second->lpSearchCriteria->lpRestrict, lstObjectIDs, locale, &lpSubResults);
 					if(er != erSuccess) {
 						ec_log_crit("ECSearchFolders::ProcessMessageChange(): RunSubRestrictions failed %d", er);
 						goto exit;
 					}
 
-					iterObjectIDs = lstObjectIDs->begin();
-		
+					auto iterObjectIDs = lstObjectIDs->cbegin();
 					// Check if the item matches for each item
 					for (gsoap_size_t i = 0; i < lpRowSet->__size; ++i, ++iterObjectIDs) {
 						bool fMatch;
 
 						// Match the restriction
-						er = ECGenericObjectTable::MatchRowRestrict(lpSession->GetSessionManager()->GetCacheManager(), &lpRowSet->__ptr[i], iterFolder->second->lpSearchCriteria->lpRestrict, lpSubResults, locale, &fMatch);
+						er = ECGenericObjectTable::MatchRowRestrict(lpSession->GetSessionManager()->GetCacheManager(), &lpRowSet->__ptr[i], folder.second->lpSearchCriteria->lpRestrict, lpSubResults, locale, &fMatch);
 
 						if(er == erSuccess) {
 							if (fMatch) {
@@ -746,7 +653,7 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 								ulFlags = lpRowSet->__ptr[i].__ptr[0].Value.ul & MSGFLAG_READ;
 								
 								// Update on-disk search folder
-								if(AddResults(ulStoreId, iterFolder->first, iterObjectIDs->ulObjId, ulFlags, &fInserted) == erSuccess) {
+								if (AddResults(ulStoreId, folder.first, iterObjectIDs->ulObjId, ulFlags, &fInserted) == erSuccess) {
 									if(fInserted) {
 										// One more match
 										++lCount;
@@ -754,7 +661,7 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 											++lUnreadCount;
 
 										// Send table notification
-										m_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_ADD, 0, iterFolder->first, iterObjectIDs->ulObjId, MAPI_MESSAGE);
+										m_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_ADD, 0, folder.first, iterObjectIDs->ulObjId, MAPI_MESSAGE);
 									} else {
 										// Row was modified, so flags has changed. Since the only possible values are MSGFLAG_READ or 0, we know the new flags.
 										
@@ -764,22 +671,22 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 											++lUnreadCount; // New state is unread, so old state was read, so ++unread
 										
 										// Send table notification
-										m_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_MODIFY, 0, iterFolder->first, iterObjectIDs->ulObjId, MAPI_MESSAGE);
+										m_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_MODIFY, 0, folder.first, iterObjectIDs->ulObjId, MAPI_MESSAGE);
 									}
 									
 								} else {
 									// AddResults will return an error if the call didn't do anything (record was already in the table).
 									
 									// Even though, we should still send notifications since the row changed
-									m_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_MODIFY, 0, iterFolder->first, iterObjectIDs->ulObjId, MAPI_MESSAGE);
+									m_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_MODIFY, 0, folder.first, iterObjectIDs->ulObjId, MAPI_MESSAGE);
 								}
 							} else if (ulType == ECKeyTable::TABLE_ROW_MODIFY) {
 								// Only delete modified items, not new items
-								if (DeleteResults(ulStoreId, iterFolder->first, iterObjectIDs->ulObjId, &ulFlags) == erSuccess) {
+								if (DeleteResults(ulStoreId, folder.first, iterObjectIDs->ulObjId, &ulFlags) == erSuccess) {
 									--lCount;
 									if(!ulFlags)
 										--lUnreadCount; // Removed message was unread
-									m_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_DELETE, 0, iterFolder->first, iterObjectIDs->ulObjId, MAPI_MESSAGE);
+									m_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_DELETE, 0, folder.first, iterObjectIDs->ulObjId, MAPI_MESSAGE);
 								}
 							}
 
@@ -789,10 +696,9 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 					}
 				} else {
 					// Message was deleted anyway, update on-disk search folder and send table notification
-					for (iterObjectIDs = lstObjectIDs->begin();
-					     iterObjectIDs != lstObjectIDs->end(); ++iterObjectIDs)
-						if (DeleteResults(ulStoreId, iterFolder->first, iterObjectIDs->ulObjId, &ulFlags) == erSuccess) {
-							m_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_DELETE, 0, iterFolder->first, iterObjectIDs->ulObjId, MAPI_MESSAGE); 
+					for (const auto &obj_id : *lstObjectIDs)
+						if (DeleteResults(ulStoreId, folder.first, obj_id.ulObjId, &ulFlags) == erSuccess) {
+							m_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_DELETE, 0, folder.first, obj_id.ulObjId, MAPI_MESSAGE);
 							--lCount;
 							if(!ulFlags)
 								--lUnreadCount; // Removed message was unread
@@ -814,11 +720,9 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 
 			} else {
 				// Not in a target folder, remove from search results
-				for (iterObjectIDs = lstObjectIDs->begin();
-				     iterObjectIDs != lstObjectIDs->end();
-				     ++iterObjectIDs)
-					if(DeleteResults(ulStoreId, iterFolder->first, iterObjectIDs->ulObjId, &ulFlags) == erSuccess) {
-						m_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_DELETE, 0, iterFolder->first, iterObjectIDs->ulObjId, MAPI_MESSAGE); 
+				for (const auto &obj_id : *lstObjectIDs)
+					if (DeleteResults(ulStoreId, folder.first, obj_id.ulObjId, &ulFlags) == erSuccess) {
+						m_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_DELETE, 0, folder.first, obj_id.ulObjId, MAPI_MESSAGE);
 						--lCount;
 						if(!ulFlags)
 							--lUnreadCount; // Removed message was unread
@@ -828,9 +732,9 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 			if(lCount || lUnreadCount) {
 				// If the searchfolder has changed, update counts and send notifications
 				WITH_SUPPRESSED_LOGGING(lpDatabase) {
-					er = UpdateFolderCount(lpDatabase, iterFolder->first, PR_CONTENT_COUNT, lCount);
+					er = UpdateFolderCount(lpDatabase, folder.first, PR_CONTENT_COUNT, lCount);
 					if (er == erSuccess)
-						er = UpdateFolderCount(lpDatabase, iterFolder->first, PR_CONTENT_UNREAD, lUnreadCount);
+						er = UpdateFolderCount(lpDatabase, folder.first, PR_CONTENT_UNREAD, lUnreadCount);
 				}
 				
 				if (er == KCERR_DATABASE_ERROR) {
@@ -851,12 +755,10 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 					goto exit;
 				}
 				
-				m_lpSessionManager->GetCacheManager()->Update(fnevObjectModified, iterFolder->first);
-				er = m_lpSessionManager->NotificationModified(MAPI_FOLDER, iterFolder->first);
-				
-				if(m_lpSessionManager->GetCacheManager()->GetParent(iterFolder->first, &ulParent) == erSuccess)
-					er = m_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_MODIFY, 0, ulParent, iterFolder->first, MAPI_FOLDER);
-
+				m_lpSessionManager->GetCacheManager()->Update(fnevObjectModified, folder.first);
+				er = m_lpSessionManager->NotificationModified(MAPI_FOLDER, folder.first);
+				if (m_lpSessionManager->GetCacheManager()->GetParent(folder.first, &ulParent) == erSuccess)
+					er = m_lpSessionManager->UpdateTables(ECKeyTable::TABLE_ROW_MODIFY, 0, ulParent, folder.first, MAPI_FOLDER);
 				er = erSuccess; // Ignore errors
 			}        
 			
@@ -884,14 +786,12 @@ ECRESULT ECSearchFolders::ProcessMessageChange(unsigned int ulStoreId, unsigned 
 		
 		if (ulAttempts == 0) {
 			// The only way to get here is if all attempts failed with an SQL error.
-			ASSERT(er != KCERR_DATABASE_ERROR);
+			assert(er != KCERR_DATABASE_ERROR);
 			g_lpStatsCollector->Increment(SCN_SEARCHFOLDER_UPDATE_FAIL);
 		}
     }
-
-exit:    
-    pthread_mutex_unlock(&m_mutexMapSearchFolders);
-
+ exit:
+	l_sf.unlock();
     if(lpPropTags)
         FreePropTagArray(lpPropTags);
         
@@ -936,7 +836,6 @@ ECRESULT ECSearchFolders::ProcessCandidateRows(ECDatabase *lpDatabase,
     const ECLocale &locale, bool bNotify)
 {
 	ECRESULT er = erSuccess;
-	ECObjectTableList::const_iterator iterRows;
 	struct rowSet *lpRowSet = NULL;
 	SUBRESTRICTIONRESULTS *lpSubResults = NULL;
 	int lCount = 0;
@@ -947,10 +846,8 @@ ECRESULT ECSearchFolders::ProcessCandidateRows(ECDatabase *lpDatabase,
 	std::list<unsigned int> lstMatches;
 	std::list<unsigned int> lstFlags;
 	
-	ASSERT(lpPropTags->__ptr[0] == PR_MESSAGE_FLAGS);
-    
-    iterRows = ecRows.begin();
-    
+	assert(lpPropTags->__ptr[0] == PR_MESSAGE_FLAGS);
+	auto iterRows = ecRows.cbegin();
     if(bNotify) {
         er = lpDatabase->Begin();
 		if (er != erSuccess) {
@@ -1061,7 +958,6 @@ ECRESULT ECSearchFolders::Search(unsigned int ulStoreId, unsigned int ulFolderId
 {
     ECRESULT			er = erSuccess;
 	ECListInt			lstFolders;
-	ECListInt::const_iterator iterFolders;
 	ECObjectTableList ecRows;
 
 	sObjectTableKey sRow;
@@ -1070,13 +966,12 @@ ECRESULT ECSearchFolders::Search(unsigned int ulStoreId, unsigned int ulFolderId
 	unsigned int ulUserId = 0;
 	std::string strQuery;
 	ECDatabase *lpDatabase = NULL;
-	DB_RESULT lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 	DB_ROW lpDBRow = NULL;
 	struct propTagArray *lpPropTags = NULL;
 	unsigned int i=0;
 	struct restrictTable *lpAdditionalRestrict = NULL;
 	unsigned int ulParent = 0;
-	std::list<unsigned int>::const_iterator iterResults;
 	std::string suggestion;
 
 	std::list<ULONG> lstPrefix;
@@ -1146,26 +1041,17 @@ ECRESULT ECSearchFolders::Search(unsigned int ulStoreId, unsigned int ulFolderId
 
 	// Expand target folders if recursive
     if(lpSearchCrit->ulFlags & RECURSIVE_SEARCH) {
-		iterFolders = lstFolders.begin();
-
-		while(iterFolders != lstFolders.end()) {
-
+		auto iterFolders = lstFolders.cbegin();
+		while (iterFolders != lstFolders.cend()) {
 			strQuery = "SELECT hierarchy.id from hierarchy WHERE hierarchy.parent = " + stringify(*iterFolders) + " AND hierarchy.type=3 AND hierarchy.flags & " + stringify(MSGFLAG_DELETED|MSGFLAG_ASSOCIATED) + " = 0 ORDER by hierarchy.id DESC";
 
 			er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 			if(er == erSuccess) {
-				while((lpDBRow = lpDatabase->FetchRow(lpDBResult)) != NULL) {
+				while ((lpDBRow = lpDatabase->FetchRow(lpDBResult)) != NULL)
 					if(lpDBRow && lpDBRow[0])
 						lstFolders.push_back(atoi(lpDBRow[0]));
-				}
 			} else
 				ec_log_crit("ECSearchFolders::Search() could not expand target folders: 0x%x", er);
-
-			if(lpDBResult) {
-				lpDatabase->FreeResult(lpDBResult);
-				lpDBResult = NULL;
-			}
-
 			++iterFolders;
 		}
 	}
@@ -1199,13 +1085,14 @@ ECRESULT ECSearchFolders::Search(unsigned int ulStoreId, unsigned int ulFolderId
 			goto exit;
 		}
 
-        iterResults = lstIndexerResults.begin();
+        auto iterResults = lstIndexerResults.cbegin();
         while(1) {
             // Loop through the results data
             int n = 0;
             
             ecRows.clear();
-            for (; iterResults != lstIndexerResults.end() && (!lpbCancel || !*lpbCancel) && n < 200; ++iterResults) {
+            for (; iterResults != lstIndexerResults.cend() &&
+                 (lpbCancel == NULL || !*lpbCancel) && n < 200; ++iterResults) {
                 sRow.ulObjId = *iterResults;
                 sRow.ulOrderId = 0;
                 
@@ -1254,7 +1141,9 @@ ECRESULT ECSearchFolders::Search(unsigned int ulStoreId, unsigned int ulFolderId
 			lpDatabase->Begin();
 
 		// lstFolders now contains all folders to search through
-		for (iterFolders = lstFolders.begin(); iterFolders != lstFolders.end() && (!lpbCancel || !*lpbCancel); ++iterFolders) {
+		for (auto iterFolders = lstFolders.cbegin();
+		     iterFolders != lstFolders.cend() &&
+		     (lpbCancel == NULL || !*lpbCancel); ++iterFolders) {
 			// Optimisation: we know the folder id of the objects we're querying
 			ecODStore.ulFolderId = *iterFolders;
 			
@@ -1295,11 +1184,6 @@ ECRESULT ECSearchFolders::Search(unsigned int ulStoreId, unsigned int ulFolderId
 					goto exit;
 				}
 			}
-			
-			if(lpDBResult) {
-				lpDatabase->FreeResult(lpDBResult);
-				lpDBResult = NULL;
-			}
 		}
 
 		// Search done
@@ -1323,10 +1207,6 @@ exit:
         
     if(lpPropTags)
         FreePropTagArray(lpPropTags);
-
-    if(lpDBResult)
-        lpDatabase->FreeResult(lpDBResult);
-
     if (lpAdditionalRestrict)
         FreeRestrictTable(lpAdditionalRestrict);
 
@@ -1337,17 +1217,15 @@ exit:
 ECRESULT ECSearchFolders::GetState(unsigned int ulStoreId, unsigned int ulFolderId, unsigned int *lpulState)
 {
 	ECRESULT er = erSuccess;
-	STOREFOLDERIDSEARCH::const_iterator iterStore;
-	FOLDERIDSEARCH::const_iterator iterFolder;
 	unsigned int ulState = 0;
     
-    iterStore = m_mapSearchFolders.find(ulStoreId);
-    if(iterStore == m_mapSearchFolders.end()) {
+	auto iterStore = m_mapSearchFolders.find(ulStoreId);
+	if (iterStore == m_mapSearchFolders.cend()) {
         ulState = 0;
     } else {
         
-        iterFolder = iterStore->second.find(ulFolderId);
-        if(iterFolder == iterStore->second.end()) {
+		auto iterFolder = iterStore->second.find(ulFolderId);
+		if (iterFolder == iterStore->second.cend()) {
             ulState = 0;
         } else {
             
@@ -1381,11 +1259,11 @@ void* ECSearchFolders::SearchThread(void *lpParam)
     // Signal search complete to clients
     lpSearchFolders->m_lpSessionManager->NotificationSearchComplete(lpFolder->ulFolderId, lpFolder->ulStoreId);
     
-    // Signal exit from thread
-    pthread_mutex_lock(&lpFolder->mMutexThreadFree);
-    lpFolder->bThreadFree = true;
-    pthread_cond_broadcast(&lpSearchFolders->m_condThreadExited);
-    pthread_mutex_unlock(&lpFolder->mMutexThreadFree);
+	/* Signal exit from thread */
+	ulock_normal l_thr(lpFolder->mMutexThreadFree);
+	lpFolder->bThreadFree = true;
+	lpSearchFolders->m_condThreadExited.notify_one();
+	l_thr.unlock();
     
     // We may not access lpFolder from this point on (it will be freed when the searchfolder is removed)
     lpFolder = NULL;
@@ -1470,49 +1348,40 @@ ECRESULT ECSearchFolders::AddResults(unsigned int ulStoreId, unsigned int ulFold
     ECDatabase *lpDatabase = NULL;
     ECRESULT er = erSuccess;
     std::string strQuery;
-    DB_RESULT lpDBResult = NULL;
+	DB_RESULT lpDBResult;
     DB_ROW lpDBRow = NULL;
     
-    ASSERT((ulFlags &~ MSGFLAG_READ) == 0);
-    
+    assert((ulFlags &~ MSGFLAG_READ) == 0);
     er = GetThreadLocalDatabase(this->m_lpDatabaseFactory, &lpDatabase);
     if(er != erSuccess) {
 		ec_log_crit("ECSearchFolders::AddResults(): GetThreadLocalDatabase failed 0x%x", er);
-		goto exit;
+		return er;
 	}
 
     strQuery = "SELECT flags FROM searchresults WHERE folderid = " + stringify(ulFolderId) + " AND hierarchyid = " + stringify(ulObjId);
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess) {
 		ec_log_err("ECSearchFolders::AddResults(): select searchresults failed 0x%x", er);
-		goto exit;
+		return er;
 	}
 		
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
-	
-	if(lpDBRow && lpDBRow[0] && atoui(lpDBRow[0]) == ulFlags) {
+	if (lpDBRow != nullptr && lpDBRow[0] != nullptr && atoui(lpDBRow[0]) == ulFlags)
 		// The record in the database is the same as what we're trying to insert; this is an error because we can't update or insert the record
-		er = KCERR_NOT_FOUND;
-		goto exit;
-	}
+		return KCERR_NOT_FOUND;
         
 	// This will either update or insert the record
     strQuery = "INSERT INTO searchresults (folderid, hierarchyid, flags) VALUES(" + stringify(ulFolderId) + "," + stringify(ulObjId) + "," + stringify(ulFlags) + ") ON DUPLICATE KEY UPDATE flags=" + stringify(ulFlags);
     er = lpDatabase->DoInsert(strQuery);
     if(er != erSuccess) {
 		ec_log_err("ECSearchFolders::AddResults(): INSERT failed 0x%x", er);
-		goto exit;
+		return er;
 	}
         
 	// We have inserted if the previous SELECT returned no row
 	if (lpfInserted)
 		*lpfInserted = (lpDBRow == NULL);
-        
-exit:
-	if (lpDBResult)
-		lpDatabase->FreeResult(lpDBResult);
-        
-    return er;
+	return erSuccess;
 }
 
 ECRESULT ECSearchFolders::AddResults(unsigned int ulStoreId, unsigned int ulFolderId, std::list<unsigned int> &lstObjId, std::list<unsigned int>& lstFlags, int *lpulCount, int *lpulUnread)
@@ -1523,8 +1392,7 @@ ECRESULT ECSearchFolders::AddResults(unsigned int ulStoreId, unsigned int ulFold
     unsigned int ulInserted = 0;
     unsigned int ulModified = 0;
     
-    ASSERT(lstObjId.size() == lstFlags.size());
-    
+	assert(lstObjId.size() == lstFlags.size());
     if(lstObjId.empty())
 		return erSuccess;
     
@@ -1535,13 +1403,11 @@ ECRESULT ECSearchFolders::AddResults(unsigned int ulStoreId, unsigned int ulFold
 	}
 
     strQuery = "INSERT IGNORE INTO searchresults (folderid, hierarchyid, flags) VALUES";
-    for (std::list<unsigned int>::const_iterator i = lstObjId.begin();
-         i != lstObjId.end(); ++i)
-    {
+	for (const auto n : lstObjId) {
         strQuery += "(";
         strQuery += stringify(ulFolderId);
         strQuery += ",";
-        strQuery += stringify(*i);
+		strQuery += stringify(n);
         strQuery += ",1),";
     }
     strQuery.resize(strQuery.size()-1);
@@ -1556,9 +1422,8 @@ ECRESULT ECSearchFolders::AddResults(unsigned int ulStoreId, unsigned int ulFold
      * Combining the following queries in one query seems to cause MySQL to do a range- or gaplock, causing deadlocks
      * when folders with adjacent ids are updated at the same time.
      */
-    for (std::list<unsigned int>::const_iterator i = lstFlags.begin(),
-         j = lstObjId.begin(); i != lstFlags.end(); ++i, ++j)
-    {
+	for (auto i = lstFlags.cbegin(), j = lstObjId.cbegin();
+	     i != lstFlags.cend(); ++i, ++j) {
         if(*i == 0) {
             unsigned int modified = 0;
             
@@ -1587,29 +1452,26 @@ ECRESULT ECSearchFolders::DeleteResults(unsigned int ulStoreId, unsigned int ulF
     ECDatabase *lpDatabase = NULL;
     ECRESULT er = erSuccess;
     std::string strQuery;
-    DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
     DB_ROW lpRow = NULL;
     
     unsigned int ulAffected = 0;
     
 	er = GetThreadLocalDatabase(this->m_lpDatabaseFactory, &lpDatabase);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	if(lpulOldFlags) {
 		strQuery = "SELECT flags FROM searchresults WHERE folderid=" + stringify(ulFolderId) + " AND hierarchyid=" + stringify(ulObjId);
 		er = lpDatabase->DoSelect(strQuery, &lpResult);
 		if(er != erSuccess) {
 			ec_log_err("ECSearchFolders::DeleteResults(): SELECT failed 0x%x", er);
-			goto exit;
+			return er;
 		}
 			
 		lpRow = lpDatabase->FetchRow(lpResult);
-		if(lpRow == NULL || lpRow[0] == NULL) {
-			er = KCERR_NOT_FOUND;
-			goto exit;
-		}
-		
+		if (lpRow == nullptr || lpRow[0] == nullptr)
+			return KCERR_NOT_FOUND;
 		*lpulOldFlags = atoui(lpRow[0]);
 	}
         
@@ -1617,19 +1479,9 @@ ECRESULT ECSearchFolders::DeleteResults(unsigned int ulStoreId, unsigned int ulF
     er = lpDatabase->DoDelete(strQuery, &ulAffected);
     if(er != erSuccess) {
 		ec_log_err("ECSearchFolders::DeleteResults(): DELETE failed 0x%x", er);
-		goto exit;
+		return er;
 	}
-        
-    if(ulAffected == 0) {
-        er = KCERR_NOT_FOUND;
-        goto exit;
-    }
-        
-exit:
-	if(lpResult)
-		lpDatabase->FreeResult(lpResult);
-		
-    return er;
+	return ulAffected != 0 ? erSuccess : KCERR_NOT_FOUND;
 }
 
 // Write the status of a search folder to the PR_EC_SEARCHFOLDER_STATUS property
@@ -1679,7 +1531,7 @@ ECRESULT ECSearchFolders::SetStatus(unsigned int ulFolderId, unsigned int ulStat
 ECRESULT ECSearchFolders::GetSearchResults(unsigned int ulStoreId, unsigned int ulFolderId,  std::list<unsigned int> *lstObjIds)
 {
     ECDatabase *lpDatabase = NULL;
-    DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
     DB_ROW lpRow = NULL;
     ECRESULT er = erSuccess;
     std::string strQuery;
@@ -1687,14 +1539,14 @@ ECRESULT ECSearchFolders::GetSearchResults(unsigned int ulStoreId, unsigned int 
     er = GetThreadLocalDatabase(this->m_lpDatabaseFactory, &lpDatabase);
     if(er != erSuccess) {
 		ec_log_crit("ECSearchFolders::GetSearchResults(): GetThreadLocalDatabase failed 0x%x", er);
-		goto exit;
+		return er;
 	}
         
     strQuery = "SELECT hierarchyid FROM searchresults WHERE folderid=" + stringify(ulFolderId);
     er = lpDatabase->DoSelect(strQuery, &lpResult);
     if(er != erSuccess) {
 		ec_log_err("ECSearchFolders::GetSearchResults(): SELECT failed 0x%x", er);
-		goto exit;
+		return er;
 	}
         
     lstObjIds->clear();
@@ -1706,12 +1558,7 @@ ECRESULT ECSearchFolders::GetSearchResults(unsigned int ulStoreId, unsigned int 
 
         lstObjIds->push_back(atoui(lpRow[0]));
     }
-    
-exit:
-    if(lpResult)
-        lpDatabase->FreeResult(lpResult);
-        
-    return er;
+	return erSuccess;
 }
 
 // Loads the search criteria from the database
@@ -1719,17 +1566,16 @@ ECRESULT ECSearchFolders::LoadSearchCriteria(unsigned int ulStoreId, unsigned in
 {
     ECRESULT er = erSuccess;
 	ECDatabase		*lpDatabase = NULL;
-	DB_RESULT		lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 	DB_ROW			lpDBRow = NULL;
 	std::string		strQuery;
-	struct searchCriteria *lpSearchCriteria = NULL;
 	struct soap				xmlsoap;
 
     // Get database
     er = GetThreadLocalDatabase(m_lpDatabaseFactory, &lpDatabase);
     if(er != erSuccess) {
 		ec_log_crit("ECSearchFolders::LoadSearchCriteria(): GetThreadLocalDatabase failed 0x%x", er);
-		goto exit;
+		return er;
 	}
 
 	// We use the soap serializer / deserializer to store the data
@@ -1741,7 +1587,7 @@ ECRESULT ECSearchFolders::LoadSearchCriteria(unsigned int ulStoreId, unsigned in
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess) {
 		ec_log_err("ECSearchFolders::LoadSearchCriteria(): SELECT failed 0x%x", er);
-		goto exit;
+		return er;
 	}
 
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
@@ -1749,23 +1595,19 @@ ECRESULT ECSearchFolders::LoadSearchCriteria(unsigned int ulStoreId, unsigned in
 	if(lpDBRow && lpDBRow[0] && atoi(lpDBRow[0]) == 2 && lpDBRow[1]) {
 		std::string xmldata(lpDBRow[1]);
 		std::istringstream xml(xmldata);
-
-		lpSearchCriteria = new struct searchCriteria;
+		struct searchCriteria crit;
 
 		xmlsoap.is = &xml;
-		soap_default_searchCriteria(&xmlsoap, lpSearchCriteria);
-		if (soap_begin_recv(&xmlsoap) != 0) {
-			er = KCERR_NETWORK_ERROR;
-			goto exit;
-		}
-		soap_get_searchCriteria(&xmlsoap, lpSearchCriteria, "SearchCriteria", NULL);
+		soap_default_searchCriteria(&xmlsoap, &crit);
+		if (soap_begin_recv(&xmlsoap) != 0)
+			return KCERR_NETWORK_ERROR;
+		soap_get_searchCriteria(&xmlsoap, &crit, "SearchCriteria", NULL);
 
 		// We now have the object, allocated by xmlsoap object,
 		if (soap_end_recv(&xmlsoap) != 0)
 			er = KCERR_NETWORK_ERROR;
 		else
-			er = CopySearchCriteria(NULL, lpSearchCriteria, lppSearchCriteria);
-
+			er = CopySearchCriteria(nullptr, &crit, lppSearchCriteria);
 		/*
 		 * We do not need the error here: lppSearchCriteria will not be
 		 * touched, and we need to free the soap structs.
@@ -1776,14 +1618,7 @@ ECRESULT ECSearchFolders::LoadSearchCriteria(unsigned int ulStoreId, unsigned in
 	} else {
 		er = KCERR_NOT_FOUND;
 	}
-
-exit:
-	delete lpSearchCriteria;
-
-	if(lpDBResult)
-		lpDatabase->FreeResult(lpDBResult);
-
-    return er;
+	return er;
 }
 
 // Saves the search criteria in the database
@@ -1846,7 +1681,7 @@ ECRESULT ECSearchFolders::SaveSearchCriteria(ECDatabase *lpDatabase, unsigned in
 	soap_end_send(&xmlsoap);
 
 	// Make sure we're linking with the correct SOAP (c++ version)
-	ASSERT(!xml.str().empty());
+	assert(!xml.str().empty());
 
 	// xml now contains XML version of search criteria
 
@@ -1863,12 +1698,12 @@ ECRESULT ECSearchFolders::SaveSearchCriteria(ECDatabase *lpDatabase, unsigned in
 
 void ECSearchFolders::FlushAndWait()
 {
-	pthread_mutex_lock(&m_mutexEvents);
-	pthread_cond_broadcast(&m_condEvents);
-	pthread_mutex_unlock(&m_mutexEvents);
+	ulock_rec l_ev(m_mutexEvents);
+	m_condEvents.notify_all();
+	l_ev.unlock();
 	// let ProcessThread get this lock, and mark the thread running
-	pthread_mutex_lock(&m_mutexEvents);
-	pthread_mutex_unlock(&m_mutexEvents);
+	l_ev.lock();
+	l_ev.unlock();
 	// wait for an inactive search thread
 	while (m_bRunning) Sleep(10);
 }
@@ -1884,25 +1719,28 @@ void * ECSearchFolders::ProcessThread(void *lpSearchFolders)
     
     while(1) {    
         // Get events to process
-        pthread_mutex_lock(&lpThis->m_mutexEvents);
-        
-        if(lpThis->m_bExitThread) {
-			pthread_mutex_unlock(&lpThis->m_mutexEvents);
-            break;
-		}
-
-        if(lpThis->m_lstEvents.empty()) {
-            // No events, wait until one arrives (the mutex is unlocked by pthread_cond_wait so people are able to add new
-            // events). The condition also occurs when the server is exiting.
-            pthread_cond_wait(&lpThis->m_condEvents, &lpThis->m_mutexEvents);
-        }
+		ulock_rec l_ev(lpThis->m_mutexEvents);
+		if (lpThis->m_bExitThread)
+			break;
+		if (lpThis->m_lstEvents.empty())
+			/*
+			 * No events, wait until one arrives (the mutex is
+			 * unlocked by pthread_cond_wait so people are able to
+			 * add new events). The condition also occurs when the
+			 * server is exiting.
+			 */
+			lpThis->m_condEvents.wait(l_ev);
 
 		lpThis->m_bRunning = true;
-
-        // The condition ended. Two things can have happened: there is now at least one event waiting, or and exit has been requested.
-        // In both cases, we simply unlock the mutex and process any (may be 0) events currently in the queue. This means that the caller
-        // must make sure that no new events can be added after the m_bThreadExit flag is set to TRUE.
-        pthread_mutex_unlock(&lpThis->m_mutexEvents);
+		/*
+		 * The condition ended. Two things can have happened: there is
+		 * now at least one event waiting, or and exit has been
+		 * requested. In both cases, we simply unlock the mutex and
+		 * process any (may be 0) events currently in the queue. This
+		 * means that the caller must make sure that no new events can
+		 * be added after the m_bThreadExit flag is set to TRUE.
+		 */
+		l_ev.unlock();
         
         lpThis->FlushEvents();
         Sleep(1000);
@@ -1914,15 +1752,14 @@ void * ECSearchFolders::ProcessThread(void *lpSearchFolders)
     return NULL;
 }
 
-typedef struct {
+struct FOLDERSORT {
     bool operator () (const EVENT &a, const EVENT &b) { return a.ulFolderId < b.ulFolderId; } 
-} FOLDERSORT;
+};
 
 // Process all waiting events in an efficient order
 ECRESULT ECSearchFolders::FlushEvents()
 {
     ECRESULT er = erSuccess;
-    std::list<EVENT>::const_iterator iterEvents;
     std::list<EVENT> lstEvents;
     ECObjectTableList lstObjectIDs;
     sObjectTableKey sRow;
@@ -1934,14 +1771,14 @@ ECRESULT ECSearchFolders::FlushEvents()
     
     // We do a copy-remove-process cycle here to keep the event queue locked for the least time as possible with
     // 500 events at a time
-    pthread_mutex_lock(&m_mutexEvents);
+	ulock_rec l_ev(m_mutexEvents);
     for (int i = 0; i < 500; ++i) {
         // Move the first element of m_lstEvents to the head of our list.
         if(m_lstEvents.empty())
             break;
         lstEvents.splice(lstEvents.end(), m_lstEvents, m_lstEvents.begin());
     }
-    pthread_mutex_unlock(&m_mutexEvents);
+	l_ev.unlock();
     
     // Sort the items by folder. The order of DELETE and ADDs will remain unchanged. This is important
     // because the order of the incoming ADD or DELETE is obviously important for the final result.
@@ -1953,8 +1790,8 @@ ECRESULT ECSearchFolders::FlushEvents()
     ulType = ECKeyTable::TABLE_ROW_MODIFY;
     
     // Process changes by finding sequences of events of the same type (eg ADD ADD ADD DELETE will result in two sequences: 3xADD + 1xDELETE)
-    for (iterEvents = lstEvents.begin(); iterEvents != lstEvents.end(); ++iterEvents) {
-        if(iterEvents->ulFolderId != ulFolderId || iterEvents->ulType != ulType) {
+    for (const auto &event : lstEvents) {
+        if (event.ulFolderId != ulFolderId || event.ulType != ulType) {
             if(!lstObjectIDs.empty()) {
                 // This is important: make the events unique. We need to do this because the ECStoreObjectTable
                 // row engine does not support requesting the exact same row twice within the same call. If we have
@@ -1968,11 +1805,11 @@ ECRESULT ECSearchFolders::FlushEvents()
                 lstObjectIDs.clear();
             }
         }
-        ulStoreId = iterEvents->ulStoreId;
-        ulFolderId = iterEvents->ulFolderId;
-        ulType = iterEvents->ulType;
+        ulStoreId = event.ulStoreId;
+        ulFolderId = event.ulFolderId;
+        ulType = event.ulType;
             
-        sRow.ulObjId = iterEvents->ulObjectId;
+        sRow.ulObjId = event.ulObjectId;
         sRow.ulOrderId = 0;
         
         lstObjectIDs.push_back(sRow);
@@ -2002,32 +1839,26 @@ ECRESULT ECSearchFolders::FlushEvents()
  */
 ECRESULT ECSearchFolders::GetStats(sSearchFolderStats &sStats)
 {
-	STOREFOLDERIDSEARCH::const_iterator iterStoreFolder;
-	FOLDERIDSEARCH::const_iterator iterFS;
-
 	memset(&sStats, 0, sizeof(sSearchFolderStats));
-
-	pthread_mutex_lock(&m_mutexMapSearchFolders);
+	ulock_rec l_sf(m_mutexMapSearchFolders);
 
 	sStats.ulStores = m_mapSearchFolders.size();
 	sStats.ullSize = sStats.ulStores * sizeof(STOREFOLDERIDSEARCH::value_type);
 
-	for (iterStoreFolder = m_mapSearchFolders.begin();
-	     iterStoreFolder != m_mapSearchFolders.end(); ++iterStoreFolder) {
-		sStats.ulFolders+= iterStoreFolder->second.size();
-		sStats.ullSize+= iterStoreFolder->second.size() * (sizeof(FOLDERIDSEARCH::value_type) + sizeof(SEARCHFOLDER));
-		for (iterFS = iterStoreFolder->second.begin();
-		     iterFS != iterStoreFolder->second.end(); ++iterFS)
-			sStats.ullSize+= SearchCriteriaSize(iterFS->second->lpSearchCriteria);
+	for (const auto &storefolder : m_mapSearchFolders) {
+		sStats.ulFolders += storefolder.second.size();
+		sStats.ullSize += storefolder.second.size() * (sizeof(FOLDERIDSEARCH::value_type) + sizeof(SEARCHFOLDER));
+		for (const auto &fs : storefolder.second)
+			sStats.ullSize += SearchCriteriaSize(fs.second->lpSearchCriteria);
 	}
-	
-	pthread_mutex_unlock(&m_mutexMapSearchFolders);
+	l_sf.unlock();
 
-	pthread_mutex_lock(&m_mutexEvents);
+	ulock_rec l_ev(m_mutexEvents);
 	sStats.ulEvents = m_lstEvents.size();
-	pthread_mutex_unlock(&m_mutexEvents);
-
+	l_ev.unlock();
 	sStats.ullSize += sStats.ulEvents * sizeof(EVENT);
 
 	return erSuccess;
 }
+
+} /* namespace */

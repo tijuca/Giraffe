@@ -20,8 +20,10 @@
 
 #include <list>
 #include <map>
+#include <mutex>
 #include <pthread.h>
 
+#include <kopano/zcdefs.h>
 #include "ECSessionGroupManager.h"
 #include <kopano/ECUnknown.h>
 #include <kopano/kcodes.h>
@@ -29,12 +31,11 @@
 class ECNotifyClient;
 class ECNotifyMaster;
 class WSTransport;
-class WSTransportNotify;
 struct notification;
 
 typedef std::list<notification*> NOTIFYLIST;
 typedef HRESULT(ECNotifyClient::*NOTIFYCALLBACK)(ULONG,const NOTIFYLIST &);
-class ECNotifySink {
+class ECNotifySink _kc_final {
 public:
 	ECNotifySink(ECNotifyClient *lpClient, NOTIFYCALLBACK fnCallback);
 	HRESULT Notify(ULONG ulConnection, const NOTIFYLIST &lNotifications) const;
@@ -49,8 +50,7 @@ typedef std::list<ECNotifyClient*> NOTIFYCLIENTLIST;
 typedef std::map<ULONG, ECNotifySink> NOTIFYCONNECTIONCLIENTMAP;
 typedef std::map<ULONG, NOTIFYLIST> NOTIFYCONNECTIONMAP;
 
-class ECNotifyMaster : public ECUnknown
-{
+class ECNotifyMaster _kc_final : public ECUnknown {
 protected:
 	ECNotifyMaster(SessionGroupData *lpData);
 	virtual ~ECNotifyMaster(void);
@@ -81,17 +81,15 @@ private:
 	NOTIFYCONNECTIONCLIENTMAP	m_mapConnections;
 
 	/* Connection settings */
-	SessionGroupData*			m_lpSessionGroupData;
-	WSTransport*				m_lpTransport;
-	ULONG						m_ulConnection;
+	SessionGroupData *m_lpSessionGroupData;
+	WSTransport *m_lpTransport = nullptr;
+	ULONG m_ulConnection = 0;
 
 	/* Threading information */
-	pthread_mutex_t				m_hMutex;
-	pthread_mutexattr_t			m_hMutexAttrib;
-	pthread_attr_t				m_hAttrib;
+	std::recursive_mutex m_hMutex;
 	pthread_t					m_hThread;
-	BOOL						m_bThreadRunning;
-	BOOL						m_bThreadExit;
+	BOOL m_bThreadRunning = false;
+	BOOL m_bThreadExit = false;
 };
 
 #endif /* ECNOTIFYMASTER_H */

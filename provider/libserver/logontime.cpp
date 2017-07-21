@@ -5,15 +5,14 @@
 #include <mutex>
 #include <unordered_map>
 #include <cstdio>
-#include <pthread.h>
 #include <kopano/kcodes.h>
 #include "logontime.hpp"
-#include "ECDatabaseMySQL.h"
+#include "ECDatabase.h"
 #include "ECSecurity.h"
 #include "ECSession.h"
 #include "edkmdb.h"
 
-namespace kcsrv {
+namespace KC {
 
 static std::unordered_map<unsigned int, time_t> ltm_ontime_cache, ltm_offtime_cache;
 static std::mutex ltm_ontime_mutex, ltm_offtime_mutex;
@@ -24,22 +23,18 @@ static ECRESULT ltm_sync_time(ECDatabase *db,
 	FILETIME ft;
 	UnixTimeToFileTime(e.second, &ft);
 	std::string query = "SELECT hierarchy_id FROM stores WHERE stores.user_id=" + stringify(e.first);
-	DB_RESULT result = NULL;
+	DB_RESULT result;
 	ECRESULT ret = db->DoSelect(query, &result);
 	if (ret != erSuccess)
 		return ret;
-	if (db->GetNumRows(result) == 0) {
-		db->FreeResult(result);
+	if (db->GetNumRows(result) == 0)
 		return erSuccess;
-	}
 	DB_ROW row = db->FetchRow(result);
-	if (row == NULL) {
-		db->FreeResult(result);
+	if (row == nullptr)
 		return erSuccess;
-	}
 	unsigned int store_id = strtoul(row[0], NULL, 0);
 	unsigned int prop = dir ? PR_LAST_LOGON_TIME : PR_LAST_LOGOFF_TIME;
-	db->FreeResult(result);
+	result = DB_RESULT();
 	query = "REPLACE INTO properties (tag, type, hierarchyid, val_hi, val_lo) VALUES(" +
                 stringify(PROP_ID(prop)) + "," + stringify(PROP_TYPE(prop)) + "," +
                 stringify(store_id) + "," + stringify(ft.dwHighDateTime) + "," +
@@ -60,9 +55,9 @@ void sync_logon_times(ECDatabase *db)
 	ltm_offtime_mutex.lock();
 	decltype(ltm_offtime_cache) logoff_time = std::move(ltm_offtime_cache);
 	ltm_offtime_mutex.unlock();
-	ec_log_debug("Writing out logon/logoff time cache (%zu/%zu entries) to DB",
-		logon_time.size(), logoff_time.size());
-
+	if (logon_time.size() > 0 || logoff_time.size() > 0)
+		ec_log_debug("Writing out logon/logoff time cache (%zu/%zu entries) to DB",
+			logon_time.size(), logoff_time.size());
 	for (const auto &i : logon_time)
 		failed |= ltm_sync_time(db, i, 0) != erSuccess;
 	for (const auto &i : logoff_time)
@@ -90,4 +85,4 @@ void record_logon_time(ECSession *ses, bool logon)
 	}
 }
 
-} /* namespace kcsrv */
+} /* namespace */

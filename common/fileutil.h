@@ -18,13 +18,15 @@
 #ifndef _FILEUTIL_H
 #define _FILEUTIL_H
 
+#include <kopano/zcdefs.h>
 #include <string>
 
-HRESULT HrFileLFtoCRLF(FILE *fin, FILE** fout);
-HRESULT HrMapFileToString(FILE *f, std::string *lpstrBuffer, int *lpSize = NULL);
-HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize, bool *lpImmap);
-HRESULT HrUnmapFileBuffer(char *lpBuffer, int ulSize, bool bImmap);
+namespace KC {
 
-bool DuplicateFile(FILE *lpFile, std::string &strFileName);
+extern _kc_export HRESULT HrFileLFtoCRLF(FILE *fin, FILE **fout);
+extern _kc_export HRESULT HrMapFileToString(FILE *f, std::string *buf, int *size = nullptr);
+extern _kc_export bool DuplicateFile(FILE *, std::string &newname);
+
+} /* namespace */
 
 #endif

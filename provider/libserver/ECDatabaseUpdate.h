@@ -18,7 +18,12 @@
 #ifndef ECDATABASEUPDATE_H
 #define ECDATABASEUPDATE_H
 
+#include <kopano/zcdefs.h>
 #include <kopano/ECLogger.h>
+
+namespace KC {
+
+ECRESULT UpdateDatabaseConvertToUnicode(ECDatabase *);
 
 ECRESULT UpdateDatabaseCreateVersionsTable(ECDatabase *lpDatabase);
 ECRESULT UpdateDatabaseCreateSearchFolders(ECDatabase *lpDatabase);
@@ -80,8 +85,6 @@ ECRESULT UpdateDatabaseMoveSubscribedList(ECDatabase *lpDatabase);
 ECRESULT UpdateDatabaseSyncTimeIndex(ECDatabase *lpDatabase);
 ECRESULT UpdateDatabaseAddStateKey(ECDatabase *lpDatabase);
 
-ECRESULT UpdateDatabaseConvertToUnicode(ECDatabase *lpDatabase);
-
 ECRESULT UpdateDatabaseConvertStoreUsername(ECDatabase *lpDatabase);
 ECRESULT UpdateDatabaseConvertRules(ECDatabase *lpDatabase);
 ECRESULT UpdateDatabaseConvertSearchFolders(ECDatabase *lpDatabase);
@@ -105,5 +108,9 @@ ECRESULT UpdateWLinkRecordKeys(ECDatabase *lpDatabase);
 ECRESULT UpdateVersionsTbl(ECDatabase *db);
 ECRESULT UpdateChangesTbl(ECDatabase *db);
 ECRESULT UpdateABChangesTbl(ECDatabase *db);
+
+extern _kc_export bool searchfolder_restart_required;
+
+} /* namespace */
 
 #endif // #ifndef ECDATABASEUPDATE_H

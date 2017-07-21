@@ -22,9 +22,11 @@
 #include <cstring>
 #include <ctime>
 #include <unistd.h>
-
+#include <kopano/lockhelper.hpp>
 #include "StatsClient.h"
 #include "TmpPath.h"
+
+namespace KC {
 
 static void submitThreadDo(void *p)
 {
@@ -34,30 +36,14 @@ static void submitThreadDo(void *p)
 
 	time_t now = time(NULL);
 
-		pthread_mutex_lock(&psc -> mapsLock);
-
-	std::map<std::string, double>::iterator doubleIterator = psc -> countsMapDouble.begin();
-		for (; doubleIterator != psc->countsMapDouble.end(); ++doubleIterator) {
-		std::string key = doubleIterator -> first;
-			double v = doubleIterator -> second;
-
-		psc -> submit(key, now, v);
-		}
-
-		psc -> countsMapDouble.clear();
-
-	std::map<std::string, int64_t>::iterator int64Iterator = psc -> countsMapInt64.begin();
-		for (; int64Iterator != psc->countsMapInt64.end(); ++int64Iterator) {
-		std::string key = int64Iterator -> first;
-			int64_t v = int64Iterator -> second;
-
-		psc -> submit(key, now, v);
-		}
-
-		psc -> countsMapInt64.clear();
-
-		pthread_mutex_unlock(&psc -> mapsLock);
-	}
+	scoped_lock l_map(psc->mapsLock);
+	for (const auto &it : psc->countsMapDouble)
+		psc->submit(it.first, now, it.second);
+	psc->countsMapDouble.clear();
+	for (const auto &it : psc->countsMapInt64)
+		psc->submit(it.first, now, it.second);
+	psc->countsMapInt64.clear();
+}
 
 static void *submitThread(void *p)
 {
@@ -81,9 +67,10 @@ static void *submitThread(void *p)
 }
 
 StatsClient::StatsClient(ECLogger *l) :
-	fd(-1), thread_running(false), logger(l), terminate(false)
+	logger(l)
 {
-	pthread_mutex_init(&mapsLock, NULL);
+	memset(&addr, 0, sizeof(addr));
+	memset(&countsSubmitThread, 0, sizeof(countsSubmitThread));
 }
 
 int StatsClient::startup(const std::string &collectorSocket)
@@ -156,8 +143,6 @@ StatsClient::~StatsClient() {
 		void *dummy = NULL;
 		pthread_join(countsSubmitThread, &dummy);
 	}
-	pthread_mutex_destroy(&mapsLock);
-
 	close(fd);
 
 	logger -> Log(EC_LOGLEVEL_DEBUG, "StatsClient terminated");
@@ -184,7 +169,9 @@ void StatsClient::submit(const std::string & key, const time_t ts, const int64_t
 		return;
 
 	char msg[4096];
-	int len = snprintf(msg, sizeof msg, "ADD int %s %ld %ld", key.c_str(), ts, value); 
+	int len = snprintf(msg, sizeof msg, "ADD int %s %ld %zd",
+	          key.c_str(), static_cast<long>(ts),
+	          static_cast<size_t>(value));
 
 	// in theory snprintf can return -1
 	if (len > 0) {
@@ -201,30 +188,24 @@ void StatsClient::countInc(const std::string & key, const std::string & key_sub)
 
 void StatsClient::countAdd(const std::string & key, const std::string & key_sub, const double n) {
 	std::string kp = key + " " + key_sub;
+	scoped_lock l_map(mapsLock);
 
-	pthread_mutex_lock(&mapsLock);
-
-	std::map<std::string, double>::iterator doubleIterator = countsMapDouble.find(kp);
-
-	if (doubleIterator == countsMapDouble.end())
+	auto doubleIterator = countsMapDouble.find(kp);
+	if (doubleIterator == countsMapDouble.cend())
 		countsMapDouble.insert(std::pair<std::string, double>(kp, n));
 	else
 		doubleIterator -> second += n;
-
-	pthread_mutex_unlock(&mapsLock);
 }
 
 void StatsClient::countAdd(const std::string & key, const std::string & key_sub, const int64_t n) {
 	std::string kp = key + " " + key_sub;
+	scoped_lock l_map(mapsLock);
 
-	pthread_mutex_lock(&mapsLock);
-
-	std::map<std::string, int64_t>::iterator int64Iterator = countsMapInt64.find(kp);
-
-	if (int64Iterator == countsMapInt64.end())
+	auto int64Iterator = countsMapInt64.find(kp);
+	if (int64Iterator == countsMapInt64.cend())
 		countsMapInt64.insert(std::pair<std::string, int64_t>(kp, n));
 	else
 		int64Iterator -> second += n;
-
-	pthread_mutex_unlock(&mapsLock);
 }
+
+} /* namespace */

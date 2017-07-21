@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <utility>
 #include "ECDatabase.h"
 
 #include <mapidefs.h>
@@ -29,6 +30,8 @@
 
 #include <list>
 
+namespace KC {
+
 ECConvenientDepthObjectTable::ECConvenientDepthObjectTable(ECSession *lpSession, unsigned int ulStoreId, LPGUID lpGuid, unsigned int ulFolderId, unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale) : ECStoreObjectTable(lpSession, ulStoreId, lpGuid, 0, ulObjType, ulFlags, 0, locale) {
     m_ulFolderId = ulFolderId;
 }
@@ -36,7 +39,7 @@ ECConvenientDepthObjectTable::ECConvenientDepthObjectTable(ECSession *lpSession,
 /*
  * Loads an entire multi-depth hierarchy table recursively.
  *
- * The only way to do this nicely is by recursively getting all the hierarchy id's for all folders under the root folder X
+ * The only way to do this nicely is by recursively getting all the hierarchy IDs for all folders under the root folder X
  *
  * Because these queries are really light and fast, the main goals is to limit the amount of calls to mysql to an absolute minimum. We do
  * this by querying all the information we know until now; We first request the subfolders for folder X. In the next call, we request all
@@ -48,16 +51,16 @@ ECConvenientDepthObjectTable::ECConvenientDepthObjectTable(ECSession *lpSession,
  */
 
 typedef std::list<ECSortKey> SortKey;
-typedef struct FOLDERINFO {
+struct FOLDERINFO {
     unsigned int ulFolderId;		// Actual folder id in the DB
     std::string strFolderName;		// Folder name like 'inbox'
     SortKey sortKey;				// List of collation keys of the folder names.
     
     bool operator < (const FOLDERINFO &a) {
-		SortKey::const_iterator iKeyThis = sortKey.begin();
-		SortKey::const_iterator iKeyOther = a.sortKey.begin();
+		SortKey::const_iterator iKeyThis = sortKey.cbegin();
+		SortKey::const_iterator iKeyOther = a.sortKey.cbegin();
 
-		while (iKeyThis != sortKey.end() && iKeyOther != a.sortKey.end()) {
+		while (iKeyThis != sortKey.cend() && iKeyOther != a.sortKey.cend()) {
 			int res = iKeyThis->compareTo(*iKeyOther);
 			if (res < 0) return true;
 			if (res > 0) return false;
@@ -69,9 +72,12 @@ typedef struct FOLDERINFO {
 		// If we get this far, all collation keys were equal. So we should only return true if this.sortKey has less items than a.sortKey.
 		return sortKey.size() < a.sortKey.size();
     }
-} FOLDERINFO;
+};
 
-ECRESULT ECConvenientDepthObjectTable::Create(ECSession *lpSession, unsigned int ulStoreId, GUID *lpGuid, unsigned int ulFolderId, unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale, ECConvenientDepthObjectTable **lppTable)
+ECRESULT ECConvenientDepthObjectTable::Create(ECSession *lpSession,
+    unsigned int ulStoreId, GUID *lpGuid, unsigned int ulFolderId,
+    unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale,
+    ECStoreObjectTable **lppTable)
 {
 	ECRESULT er = erSuccess;
 
@@ -85,7 +91,7 @@ ECRESULT ECConvenientDepthObjectTable::Create(ECSession *lpSession, unsigned int
 ECRESULT ECConvenientDepthObjectTable::Load() {
 	ECRESULT er = erSuccess;
 	ECDatabase *lpDatabase = NULL;
-	DB_RESULT 	lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 	DB_ROW		lpDBRow = NULL;
 	std::string	strQuery;
 	ECODStore	*lpData = (ECODStore *)m_lpObjectData;
@@ -105,7 +111,7 @@ ECRESULT ECConvenientDepthObjectTable::Load() {
 
 	er = lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	sRoot.ulFolderId = ulFolderId;
 	sRoot.strFolderName.clear();
@@ -114,16 +120,16 @@ ECRESULT ECConvenientDepthObjectTable::Load() {
 	lstFolders.push_back(sRoot);
 	mapSortKey[ulFolderId] = sRoot.sortKey;
 
-	iterFolders = lstFolders.begin();
-	while (iterFolders != lstFolders.end()) {
+	iterFolders = lstFolders.cbegin();
+	while (iterFolders != lstFolders.cend()) {
 		strQuery = "SELECT hierarchy.id, hierarchy.parent, hierarchy.owner, hierarchy.flags, hierarchy.type, properties.val_string FROM hierarchy LEFT JOIN properties ON properties.hierarchyid = hierarchy.id AND properties.tag = 12289  AND properties.type = 30 WHERE hierarchy.type = " +  stringify(MAPI_FOLDER) + " AND hierarchy.flags & "+stringify(MSGFLAG_DELETED)+" = " + stringify(ulFlags&MSGFLAG_DELETED);
 
 		strQuery += " AND hierarchy.parent IN(";
 		
-		while(iterFolders != lstFolders.end()) {
+		while (iterFolders != lstFolders.cend()) {
 		    strQuery += stringify(iterFolders->ulFolderId);
 		    ++iterFolders;
-		    if(iterFolders != lstFolders.end())
+		    if (iterFolders != lstFolders.cend())
     		    strQuery += ",";
         }
         
@@ -131,7 +137,7 @@ ECRESULT ECConvenientDepthObjectTable::Load() {
 		
 		er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 		if (er != erSuccess)
-			goto exit;
+			return er;
 
 		while (1) {
 		    FOLDERINFO sFolderInfo;
@@ -154,24 +160,17 @@ ECRESULT ECConvenientDepthObjectTable::Load() {
             
             // Since we have this information, give the cache manager the hierarchy information for this object
 			lpSession->GetSessionManager()->GetCacheManager()->SetObject(atoui(lpDBRow[0]), atoui(lpDBRow[1]), atoui(lpDBRow[2]), atoui(lpDBRow[3]), atoui(lpDBRow[4]));
-
-			if (lpSession->GetSecurity()->CheckPermission(sFolderInfo.ulFolderId, ecSecurityFolderVisible) != erSuccess) {
+			if (lpSession->GetSecurity()->CheckPermission(sFolderInfo.ulFolderId, ecSecurityFolderVisible) != erSuccess)
 				continue;
-			}
 			
 			// Push folders onto end of list
-            lstFolders.push_back(sFolderInfo);
+            lstFolders.push_back(std::move(sFolderInfo));
             
             // If we were pointing at the last item, point at the freshly inserted item
             if(iterFolders == lstFolders.end())
 			--iterFolders;
 		}
 
-		if (lpDBResult) {
-			lpDatabase->FreeResult(lpDBResult);
-			lpDBResult = NULL;
-		}
-		
 		// If you're insane enough to have more than 256 levels over folders than we cut it off here because this function's
 		// memory usage goes up exponentially ..
 		if (++ulDepth > 256)
@@ -191,12 +190,7 @@ ECRESULT ECConvenientDepthObjectTable::Load() {
     }
     
     LoadRows(&lstObjIds, 0);
-    
-exit:   
-    if (lpDBResult)
-        lpDatabase->FreeResult(lpDBResult);
-    
-    return er;
+	return erSuccess;
 }
 
 ECRESULT ECConvenientDepthObjectTable::GetComputedDepth(struct soap *soap, ECSession* lpSession, unsigned int ulObjId, struct propVal *lpPropVal){
@@ -211,7 +205,7 @@ ECRESULT ECConvenientDepthObjectTable::GetComputedDepth(struct soap *soap, ECSes
 		er = lpSession->GetSessionManager()->GetCacheManager()->GetObject(ulObjId, &ulObjId, NULL, NULL, &ulObjType);
 		if(er != erSuccess) {
 			// should never happen
-			ASSERT(FALSE);
+			assert(false);
 			return KCERR_NOT_FOUND;
 		}
 		if (ulObjType != MAPI_FOLDER)
@@ -220,3 +214,5 @@ ECRESULT ECConvenientDepthObjectTable::GetComputedDepth(struct soap *soap, ECSes
 	}
 	return erSuccess;
 }
+
+} /* namespace */

@@ -22,9 +22,9 @@
 #include <kopano/archiver-common.h>
 #include "helpers/MAPIPropHelper.h"
 #include <kopano/mapiext.h>
-using namespace za::helpers;
+using namespace KC::helpers;
 
-namespace za { namespace operations {
+namespace KC { namespace operations {
 
 /**
  * @param[in]	lpLogger
@@ -40,22 +40,21 @@ Stubber::Stubber(ECArchiverLogger *lpLogger, ULONG ulptStubbed, int ulAge, bool 
 HRESULT Stubber::ProcessEntry(LPMAPIFOLDER lpFolder, ULONG cProps, const LPSPropValue lpProps)
 {
 	HRESULT hr;
-	LPSPropValue lpEntryId = NULL;
 	MessagePtr ptrMessage;
 	ULONG ulType = 0;
 
-	ASSERT(lpFolder != NULL);
+	assert(lpFolder != NULL);
 	if (lpFolder == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 	
-	lpEntryId = PpropFindProp(lpProps, cProps, PR_ENTRYID);
+	auto lpEntryId = PCpropFindProp(lpProps, cProps, PR_ENTRYID);
 	if (lpEntryId == NULL) {
 		Logger()->Log(EC_LOGLEVEL_FATAL, "PR_ENTRYID missing");
 		return MAPI_E_NOT_FOUND;
 	}
 
 	Logger()->Log(EC_LOGLEVEL_DEBUG, "Opening message (%s)", bin2hex(lpEntryId->Value.bin.cb, lpEntryId->Value.bin.lpb).c_str());
-	hr = lpFolder->OpenEntry(lpEntryId->Value.bin.cb, (LPENTRYID)lpEntryId->Value.bin.lpb, &IID_IECMessageRaw, MAPI_BEST_ACCESS, &ulType, &ptrMessage);
+	hr = lpFolder->OpenEntry(lpEntryId->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpEntryId->Value.bin.lpb), &IID_IECMessageRaw, MAPI_BEST_ACCESS, &ulType, &~ptrMessage);
 	if (hr == MAPI_E_NOT_FOUND) {
 		Logger()->Log(EC_LOGLEVEL_WARNING, "Failed to open message. This can happen if the search folder is lagging.");
 		return hrSuccess;
@@ -78,10 +77,9 @@ HRESULT Stubber::ProcessEntry(LPMESSAGE lpMessage)
 	ULONG ulAttachNum = 0;
 	MAPIPropHelperPtr ptrMsgHelper;
 	ObjectEntryList lstMsgArchives;
+	static constexpr const SizedSPropTagArray(1, sptaTableProps) = {1, {PR_ATTACH_NUM}};
 
-	SizedSPropTagArray(1, sptaTableProps) = {1, {PR_ATTACH_NUM}};
-
-	ASSERT(lpMessage != NULL);
+	assert(lpMessage != NULL);
 	if (lpMessage == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 
@@ -132,14 +130,12 @@ HRESULT Stubber::ProcessEntry(LPMESSAGE lpMessage)
 		Logger()->Log(EC_LOGLEVEL_FATAL, "Failed to set properties. (hr=%s)", stringify(hr, true).c_str());
 		return hr;
 	}
-
-	hr = lpMessage->GetAttachmentTable(fMapiDeferredErrors, &ptrAttTable);
+	hr = lpMessage->GetAttachmentTable(fMapiDeferredErrors, &~ptrAttTable);
 	if (hr != hrSuccess) {
 		Logger()->Log(EC_LOGLEVEL_FATAL, "Failed to get attachment table. (hr=%s)", stringify(hr, true).c_str());
 		return hr;
 	}
-	
-	hr = HrQueryAllRows(ptrAttTable, (LPSPropTagArray)&sptaTableProps, NULL, NULL, 0, &ptrRowSet);
+	hr = HrQueryAllRows(ptrAttTable, sptaTableProps, NULL, NULL, 0, &ptrRowSet);
 	if (hr != hrSuccess) {
 		Logger()->Log(EC_LOGLEVEL_FATAL, "Failed to get attachment numbers. (hr=%s)", stringify(hr, true).c_str());
 		return hr;
@@ -156,7 +152,7 @@ HRESULT Stubber::ProcessEntry(LPMESSAGE lpMessage)
 		}
 		
 		Logger()->Log(EC_LOGLEVEL_INFO, "Adding placeholder attachment");		
-		hr = lpMessage->CreateAttach(&ptrAttach.iid, 0, &ulAttachNum, &ptrAttach);
+		hr = lpMessage->CreateAttach(&ptrAttach.iid(), 0, &ulAttachNum, &~ptrAttach);
 		if (hr != hrSuccess) {
 			Logger()->Log(EC_LOGLEVEL_FATAL, "Failed to create attachment. (hr=%s)", stringify(hr, true).c_str());
 			return hr;
@@ -185,4 +181,4 @@ HRESULT Stubber::ProcessEntry(LPMESSAGE lpMessage)
 	return hrSuccess;
 }
 
-}} // namespaces 
+}} /* namespace */

@@ -20,51 +20,42 @@
 
 #include <kopano/zcdefs.h>
 #include <kopano/charset/convert.h>
-#include <kopano/tstring.h>
 #include <string>
 #include <kopano/charset/utf8string.h>
 
 #include <mapidefs.h>
 
-class convstring _zcp_final {
-public:
-	static convstring from_SPropValue(const SPropValue *lpsPropVal, bool bCheapCopy = true);
-	static convstring from_SPropValue(const SPropValue &sPropVal, bool bCheapCopy = true);
+namespace KC {
 
-	convstring();
-	convstring(const convstring &other);
-	convstring(const char *lpsz, bool bCheapCopy = true);
-	convstring(const wchar_t *lpsz, bool bCheapCopy = true);
-	convstring(const TCHAR *lpsz, ULONG ulFlags, bool bCheapCopy = true);
+class _kc_export convstring _kc_final {
+public:
+	static convstring from_SPropValue(const SPropValue *lpsPropVal);
+	_kc_hidden static convstring from_SPropValue(const SPropValue &);
+	_kc_hidden convstring(void) = default;
+	_kc_hidden convstring(const convstring &);
+	_kc_hidden convstring(const char *);
+	convstring(const wchar_t *lpsz);
+	convstring(const TCHAR *lpsz, ULONG ulFlags);
 	
 	bool null_or_empty() const;
 	
 	operator utf8string() const;
-	operator std::string() const;
-	operator std::wstring() const;
+	operator std::string(void) const;
+	operator std::wstring(void) const;
 	const char *c_str() const;
-	const wchar_t *wc_str() const;
 	const char *u8_str() const;
 
-#ifdef UNICODE
-	#define t_str	wc_str
-#else
-	#define t_str	c_str
-#endif
-	
 private:
-	template<typename T>
-	T convert_to() const;
-	
-	template<typename T>
-	T convert_to(const char *tocode) const;
+	template<typename T> _kc_hidden T convert_to(void) const;
+	template<typename T> _kc_hidden T convert_to(const char *tocode) const;
 
-private:
-	const TCHAR *m_lpsz;
-	ULONG		m_ulFlags;
+	const TCHAR *m_lpsz = nullptr;
+	ULONG m_ulFlags = 0;
 	tstring		m_str;
 
 	mutable convert_context	m_converter;
 };
+
+} /* namespace */
 
 #endif // ndef convstring_INCLUDED

@@ -16,32 +16,26 @@
  */
 
 #include <kopano/platform.h>
+#include <new>
 #include "ECMessageStreamImporterIStreamAdapter.h"
 #include <kopano/ECInterfaceDefs.h>
 
 HRESULT ECMessageStreamImporterIStreamAdapter::Create(WSMessageStreamImporter *lpStreamImporter, IStream **lppStream)
 {
-	ECMessageStreamImporterIStreamAdapterPtr ptrAdapter;
-
 	if (lpStreamImporter == NULL || lppStream == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 
-	try {
-		ptrAdapter.reset(new ECMessageStreamImporterIStreamAdapter(lpStreamImporter));
-	} catch (const std::bad_alloc &) {
+	ECMessageStreamImporterIStreamAdapterPtr ptrAdapter(new(std::nothrow) ECMessageStreamImporterIStreamAdapter(lpStreamImporter));
+	if (ptrAdapter == nullptr)
 		return MAPI_E_NOT_ENOUGH_MEMORY;
-	}
-
 	return ptrAdapter->QueryInterface(IID_IStream, reinterpret_cast<LPVOID *>(lppStream));
 }
 
 HRESULT ECMessageStreamImporterIStreamAdapter::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
-	REGISTER_INTERFACE(IID_ISequentialStream, &this->m_xSequentialStream);
-	REGISTER_INTERFACE(IID_IStream, &this->m_xStream);
-
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(ISequentialStream, &this->m_xSequentialStream);
+	REGISTER_INTERFACE2(IStream, &this->m_xStream);
 	return ECUnknown::QueryInterface(refiid, lppInterface);
 }
 
@@ -56,7 +50,7 @@ HRESULT ECMessageStreamImporterIStreamAdapter::Write(const void *pv, ULONG cb, U
 	HRESULT hr;
 
 	if (!m_ptrSink) {
-		hr = m_ptrStreamImporter->StartTransfer(&m_ptrSink);
+		hr = m_ptrStreamImporter->StartTransfer(&~m_ptrSink);
 		if (hr != hrSuccess)
 			return hr;
 	}
@@ -139,39 +133,15 @@ ECMessageStreamImporterIStreamAdapter::~ECMessageStreamImporterIStreamAdapter()
 }
 
 // ISequentialStream proxies
-ULONG ECMessageStreamImporterIStreamAdapter::xSequentialStream::AddRef()
-{
-	METHOD_PROLOGUE_(ECMessageStreamImporterIStreamAdapter, SequentialStream);
-	TRACE_MAPI(TRACE_ENTRY, "ISequentialStream::AddRef", "");
-	return pThis->AddRef();
-}
-
-ULONG ECMessageStreamImporterIStreamAdapter::xSequentialStream::Release()
-{
-	METHOD_PROLOGUE_(ECMessageStreamImporterIStreamAdapter, SequentialStream);
-	TRACE_MAPI(TRACE_ENTRY, "ISequentialStream::Release", "");	
-	return pThis->Release();
-}
-
+DEF_ULONGMETHOD1(TRACE_MAPI, ECMessageStreamImporterIStreamAdapter, SequentialStream, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECMessageStreamImporterIStreamAdapter, SequentialStream, Release, (void))
 DEF_HRMETHOD(TRACE_MAPI, ECMessageStreamImporterIStreamAdapter, SequentialStream, QueryInterface, (REFIID, refiid), (void **, lppInterface))
 DEF_HRMETHOD(TRACE_MAPI, ECMessageStreamImporterIStreamAdapter, SequentialStream, Read, (void *, pv), (ULONG, cb), (ULONG *, pcbRead))
 DEF_HRMETHOD(TRACE_MAPI, ECMessageStreamImporterIStreamAdapter, SequentialStream, Write, (const void *, pv), (ULONG, cb), (ULONG *, pcbWritten))
 
 // IStream proxies
-ULONG ECMessageStreamImporterIStreamAdapter::xStream::AddRef()
-{
-	METHOD_PROLOGUE_(ECMessageStreamImporterIStreamAdapter, Stream);
-	TRACE_MAPI(TRACE_ENTRY, "IStream::AddRef", "");
-	return pThis->AddRef();
-}
-
-ULONG ECMessageStreamImporterIStreamAdapter::xStream::Release()
-{
-	METHOD_PROLOGUE_(ECMessageStreamImporterIStreamAdapter, Stream);
-	TRACE_MAPI(TRACE_ENTRY, "IStream::Release", "");	
-	return pThis->Release();
-}
-
+DEF_ULONGMETHOD1(TRACE_MAPI, ECMessageStreamImporterIStreamAdapter, Stream, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECMessageStreamImporterIStreamAdapter, Stream, Release, (void))
 DEF_HRMETHOD(TRACE_MAPI, ECMessageStreamImporterIStreamAdapter, Stream, QueryInterface, (REFIID, refiid), (void **, lppInterface))
 DEF_HRMETHOD(TRACE_MAPI, ECMessageStreamImporterIStreamAdapter, Stream, Read, (void *, pv), (ULONG, cb), (ULONG *, pcbRead))
 DEF_HRMETHOD(TRACE_MAPI, ECMessageStreamImporterIStreamAdapter, Stream, Write, (const void *, pv), (ULONG, cb), (ULONG *, pcbWritten))

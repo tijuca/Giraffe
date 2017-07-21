@@ -16,11 +16,13 @@
  */
 
 #include <kopano/platform.h>
+#include <kopano/memory.hpp>
 #include "ECArchiveAwareMsgStore.h"
 #include "ECArchiveAwareMessage.h"
 #include <kopano/ECGuid.h>
 #include <kopano/mapi_ptr.h>
-#include <kopano/threadutil.h>
+
+using namespace KCHL;
 
 ECArchiveAwareMsgStore::ECArchiveAwareMsgStore(char *lpszProfname, LPMAPISUP lpSupport, WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags, BOOL fIsSpooler, BOOL fIsDefaultStore, BOOL bOfflineStore)
 : ECMsgStore(lpszProfname, lpSupport, lpTransport, fModify, ulProfileFlags, fIsSpooler, fIsDefaultStore, bOfflineStore)
@@ -69,7 +71,7 @@ HRESULT ECArchiveAwareMsgStore::OpenItemFromArchive(LPSPropValue lpPropStoreEIDs
 	BinaryList			lstItemEIDs;
 	BinaryListIterator	iterStoreEID;
 	BinaryListIterator	iterIterEID;
-	mapi_object_ptr<ECMessage, IID_ECMessage>	ptrArchiveMessage;
+	object_ptr<ECMessage, IID_ECMessage> ptrArchiveMessage;
 
 	if (lpPropStoreEIDs == NULL || 
 		lpPropItemEIDs == NULL || 
@@ -90,18 +92,14 @@ HRESULT ECArchiveAwareMsgStore::OpenItemFromArchive(LPSPropValue lpPropStoreEIDs
 		ECMsgStorePtr	ptrArchiveStore;
 		ULONG			ulType = 0;
 
-		hr = GetArchiveStore(*iterStoreEID, &ptrArchiveStore);
+		hr = GetArchiveStore(*iterStoreEID, &~ptrArchiveStore);
 		if (hr == MAPI_E_NO_SUPPORT)
 			return hr;	// No need to try any other archives.
-		if (hr != hrSuccess) {
+		if (hr != hrSuccess)
 			continue;
-		}
-
-		hr = ptrArchiveStore->OpenEntry((*iterIterEID)->cb, (LPENTRYID)(*iterIterEID)->lpb, &IID_ECMessage, 0, &ulType, &ptrArchiveMessage);
-		if (hr != hrSuccess) {
+		hr = ptrArchiveStore->OpenEntry((*iterIterEID)->cb, reinterpret_cast<ENTRYID *>((*iterIterEID)->lpb), &IID_ECMessage, 0, &ulType, &~ptrArchiveMessage);
+		if (hr != hrSuccess)
 			continue;
-		}
-
 		break;
 	}
 
@@ -146,94 +144,79 @@ HRESULT ECArchiveAwareMsgStore::GetArchiveStore(LPSBinary lpStoreEID, ECMsgStore
 
 	const std::vector<BYTE> eid(lpStoreEID->lpb, lpStoreEID->lpb + lpStoreEID->cb);
 	MsgStoreMap::const_iterator iterStore = m_mapStores.find(eid);
-	if (iterStore != m_mapStores.end()) {
-		hr = iterStore->second->QueryInterface(IID_ECMsgStore, (LPVOID*)lppArchiveStore);
-		if (hr != hrSuccess)
-			return hr;
-	} 
+	if (iterStore != m_mapStores.cend())
+		return iterStore->second->QueryInterface(IID_ECMsgStore, (LPVOID*)lppArchiveStore);
 	
-	else {
-		// @todo: Consolidate this with ECMSProvider::LogonByEntryID
-		UnknownPtr ptrUnknown;
-		ECMsgStorePtr ptrOnlineStore;
-		ULONG cbEntryID = 0;
-		EntryIdPtr ptrEntryID;
-		std::string ServerURL;
-		bool bIsPseudoUrl = false;
-		std::string strServer;
-		bool bIsPeer = false;
-		mapi_object_ptr<WSTransport> ptrTransport;
-		ECMsgStorePtr ptrArchiveStore;
-		mapi_object_ptr<IECPropStorage, IID_IECPropStorage> ptrPropStorage;
+	// @todo: Consolidate this with ECMSProvider::LogonByEntryID
+	UnknownPtr ptrUnknown;
+	ECMsgStorePtr ptrOnlineStore;
+	ULONG cbEntryID = 0;
+	EntryIdPtr ptrEntryID;
+	std::string ServerURL;
+	bool bIsPseudoUrl = false;
+	std::string strServer;
+	bool bIsPeer = false;
+	object_ptr<WSTransport> ptrTransport;
+	ECMsgStorePtr ptrArchiveStore;
+	object_ptr<IECPropStorage, IID_IECPropStorage> ptrPropStorage;
 
-		hr = QueryInterface(IID_ECMsgStoreOnline, &ptrUnknown);
+	hr = QueryInterface(IID_ECMsgStoreOnline, &~ptrUnknown);
+	if (hr != hrSuccess)
+		return hr;
+	hr = ptrUnknown->QueryInterface(IID_ECMsgStore, &~ptrOnlineStore);
+	if (hr != hrSuccess)
+		return hr;
+	hr = UnWrapStoreEntryID(lpStoreEID->cb, (LPENTRYID)lpStoreEID->lpb, &cbEntryID, &~ptrEntryID);
+	if (hr != hrSuccess)
+		return hr;
+	hr = HrGetServerURLFromStoreEntryId(cbEntryID, ptrEntryID, ServerURL, &bIsPseudoUrl);
+	if (hr != hrSuccess)
+		return hr;
+
+	if (bIsPseudoUrl) {
+		hr = HrResolvePseudoUrl(ptrOnlineStore->lpTransport, ServerURL.c_str(), strServer, &bIsPeer);
 		if (hr != hrSuccess)
 			return hr;
-
-		hr = ptrUnknown->QueryInterface(IID_ECMsgStore, &ptrOnlineStore);
-		if (hr != hrSuccess)
-			return hr;
-		hr = UnWrapStoreEntryID(lpStoreEID->cb, (LPENTRYID)lpStoreEID->lpb, &cbEntryID, &ptrEntryID);
-		if (hr != hrSuccess)
-			return hr;
-
-		hr = HrGetServerURLFromStoreEntryId(cbEntryID, ptrEntryID, ServerURL, &bIsPseudoUrl);
-		if (hr != hrSuccess)
-			return hr;
-
-		if (bIsPseudoUrl) {
-			hr = HrResolvePseudoUrl(ptrOnlineStore->lpTransport, ServerURL.c_str(), strServer, &bIsPeer);
-			if (hr != hrSuccess)
-				return hr;
-			
-			if (!bIsPeer)
-				ServerURL = strServer;
-			
-			else {
-				// We can't just use the transport from ptrOnlineStore as that will be
-				// logged off when ptrOnlineStore gets destroyed (at the end of this finction).
-				hr = ptrOnlineStore->lpTransport->CloneAndRelogon(&ptrTransport);
-				if (hr != hrSuccess)
-					return hr;
-			}
-		}
-
-		if (!ptrTransport) {
-			// We get here if lpszServer wasn't a pseudo URL or if it was and it resolved
-			// to another server than the one we're connected with.
-			hr = ptrOnlineStore->lpTransport->CreateAndLogonAlternate(ServerURL.c_str(), &ptrTransport);
+		if (!bIsPeer)
+			ServerURL = strServer;
+		else {
+			// We can't just use the transport from ptrOnlineStore as that will be
+			// logged off when ptrOnlineStore gets destroyed (at the end of this finction).
+			hr = ptrOnlineStore->lpTransport->CloneAndRelogon(&~ptrTransport);
 			if (hr != hrSuccess)
 				return hr;
 		}
-
-		hr = ECMsgStore::Create((char*)GetProfileName(), this->lpSupport, ptrTransport, FALSE, 0, FALSE, FALSE, FALSE, &ptrArchiveStore);
-		if (hr != hrSuccess)
-			return hr;
-
-		// Get a propstorage for the message store
-		hr = ptrTransport->HrOpenPropStorage(0, NULL, cbEntryID, ptrEntryID, 0, &ptrPropStorage);
-		if (hr != hrSuccess)
-			return hr;
-
-		// Set up the message store to use this storage
-		hr = ptrArchiveStore->HrSetPropStorage(ptrPropStorage, FALSE);
-		if (hr != hrSuccess)
-			return hr;
-
-		// Setup callback for session change
-		hr = ptrTransport->AddSessionReloadCallback(ptrArchiveStore, ECMsgStore::Reload, NULL);
-		if (hr != hrSuccess)
-			return hr;
-
-		hr = ptrArchiveStore->SetEntryId(cbEntryID, ptrEntryID);
-		if (hr != hrSuccess)
-			return hr;
-
-		hr = ptrArchiveStore->QueryInterface(IID_ECMsgStore, (LPVOID*)lppArchiveStore);
-		if (hr != hrSuccess)
-			return hr;
-
-		m_mapStores.insert(MsgStoreMap::value_type(eid, ptrArchiveStore));
 	}
+
+	if (!ptrTransport) {
+		// We get here if lpszServer wasn't a pseudo URL or if it was and it resolved
+		// to another server than the one we're connected with.
+		hr = ptrOnlineStore->lpTransport->CreateAndLogonAlternate(ServerURL.c_str(), &~ptrTransport);
+		if (hr != hrSuccess)
+			return hr;
+	}
+
+	hr = ECMsgStore::Create(const_cast<char *>(GetProfileName()), this->lpSupport, ptrTransport, FALSE, 0, FALSE, FALSE, FALSE, &~ptrArchiveStore);
+	if (hr != hrSuccess)
+		return hr;
+	// Get a propstorage for the message store
+	hr = ptrTransport->HrOpenPropStorage(0, nullptr, cbEntryID, ptrEntryID, 0, &~ptrPropStorage);
+	if (hr != hrSuccess)
+		return hr;
+	// Set up the message store to use this storage
+	hr = ptrArchiveStore->HrSetPropStorage(ptrPropStorage, FALSE);
+	if (hr != hrSuccess)
+		return hr;
+	// Setup callback for session change
+	hr = ptrTransport->AddSessionReloadCallback(ptrArchiveStore, ECMsgStore::Reload, NULL);
+	if (hr != hrSuccess)
+		return hr;
+	hr = ptrArchiveStore->SetEntryId(cbEntryID, ptrEntryID);
+	if (hr != hrSuccess)
+		return hr;
+	hr = ptrArchiveStore->QueryInterface(IID_ECMsgStore, (LPVOID*)lppArchiveStore);
+	if (hr != hrSuccess)
+		return hr;
+	m_mapStores.insert(MsgStoreMap::value_type(eid, ptrArchiveStore));
 	return hrSuccess;
 }

@@ -16,25 +16,28 @@
  */
 
 #include <kopano/platform.h>
+#include <exception>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 #include <kopano/MAPIErrors.h>
-
-// Damn windows header defines max which break C++ header files
-#undef max
 
 // vmime
 #include <vmime/vmime.hpp>
 #include <vmime/platforms/posix/posixHandler.hpp>
 #include <vmime/contentTypeField.hpp>
 #include <vmime/parsedMessageAttachment.hpp>
+#include <vmime/emptyContentHandler.hpp>
 
 // mapi
+#include <kopano/memory.hpp>
 #include <mapi.h>
 #include <mapiutil.h>
 #include <kopano/mapiext.h>
 #include <edkmdb.h>
 #include <kopano/mapiguidext.h>
 #include <kopano/mapi_ptr.h>
-#include <boost/algorithm/string.hpp>
 #include "tnef.h"
 
 // inetmapi
@@ -59,6 +62,9 @@
 #include "MAPIToICal.h"
 
 using namespace std;
+using namespace KCHL;
+
+namespace KC {
 
 /* These are the properties that we DON'T send through TNEF. Reasons can be:
  *
@@ -67,10 +73,8 @@ using namespace std;
  * - Not part of an outgoing message (PR_TRANSPORT_MESSAGE_HEADERS)
  */
 
-SizedSPropTagArray(1, sptaBestBodyInclude) = {1, {PR_RTF_COMPRESSED} };
-
 // Since UNICODE is defined, the strings will be PT_UNICODE, as required by ECTNEF::AddProps()
-SizedSPropTagArray(54, sptaExclude) = {
+static constexpr const SizedSPropTagArray(54, sptaExclude) = {
     54, 	{
         PR_BODY,
         PR_HTML,
@@ -141,41 +145,32 @@ SizedSPropTagArray(54, sptaExclude) = {
 MAPIToVMIME::MAPIToVMIME()
 {
 	srand((unsigned)time(NULL));
-	lpLogger = new ECLogger_Null();
 	m_lpAdrBook = NULL;
 	imopt_default_sending_options(&sopt);
+	m_lpSession = NULL;
 }
 
 /**
- * @param[in]	lpSession	current mapi session, used to open contact entryid's
+ * @param[in]	lpSession	current mapi session, used to open contact entryids
  * @param[in]	lpAddrBook	global addressbook
  * @param[in]	newlogger	logger object
  * @param[in]	sopt		struct with optional settings to change conversion
  */
-MAPIToVMIME::MAPIToVMIME(IMAPISession *lpSession, IAddrBook *lpAddrBook, ECLogger *newlogger, sending_options sopt)
+MAPIToVMIME::MAPIToVMIME(IMAPISession *lpSession, IAddrBook *lpAddrBook,
+    sending_options sopt)
 {
 	srand((unsigned)time(NULL));
-	lpLogger = newlogger;
-	if (!lpLogger)
-		lpLogger = new ECLogger_Null();
-	else
-		lpLogger->AddRef();
-	
 	this->sopt = sopt;
-	if (lpSession && !lpAddrBook) {
+	if (lpSession != nullptr && lpAddrBook == nullptr)
 		lpSession->OpenAddressBook(0, NULL, AB_NO_DIALOG, &m_lpAdrBook);
 		// ignore error
-	} else {
+	else
 		lpAddrBook->QueryInterface(IID_IAddrBook, (void**)&m_lpAdrBook);
-	}
-
 	m_lpSession = lpSession;
 }
 
 MAPIToVMIME::~MAPIToVMIME()
 {
-	lpLogger->Release();
-
 	if (m_lpAdrBook)
 		m_lpAdrBook->Release();
 }
@@ -191,49 +186,45 @@ MAPIToVMIME::~MAPIToVMIME()
 HRESULT MAPIToVMIME::processRecipients(IMessage *lpMessage, vmime::messageBuilder *lpVMMessageBuilder)
 {
 	HRESULT			hr					= hrSuccess;
-	vmime::ref<vmime::address>	vmMailbox;
-	LPMAPITABLE		lpRecipientTable	= NULL;
-	LPSRowSet		pRows				= NULL;
-	LPSPropValue	pPropRecipType		= NULL;
-	LPSPropValue	pPropDispl			= NULL;
-	LPSPropValue	pPropAType			= NULL;
-	LPSPropValue	pPropEAddr			= NULL;
+	vmime::shared_ptr<vmime::address> vmMailbox;
+	object_ptr<IMAPITable> lpRecipientTable;
+	rowset_ptr pRows;
 	bool			fToFound			= false;
 	bool			hasRecips			= false;
-	
-	SizedSPropTagArray(7, sPropRecipColumns) = {7, { PR_ENTRYID, PR_EMAIL_ADDRESS_W, PR_DISPLAY_NAME_W, PR_RECIPIENT_TYPE, PR_SMTP_ADDRESS_W, PR_ADDRTYPE_W, PR_OBJECT_TYPE} };
+	static constexpr const SizedSPropTagArray(7, sPropRecipColumns) =
+		{7, {PR_ENTRYID, PR_EMAIL_ADDRESS_W, PR_DISPLAY_NAME_W,
+		PR_RECIPIENT_TYPE, PR_SMTP_ADDRESS_W, PR_ADDRTYPE_W,
+		PR_OBJECT_TYPE}};
 
-	hr = lpMessage->GetRecipientTable(MAPI_UNICODE | MAPI_DEFERRED_ERRORS, &lpRecipientTable);
+	hr = lpMessage->GetRecipientTable(MAPI_UNICODE | MAPI_DEFERRED_ERRORS, &~lpRecipientTable);
 	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open recipient table. Error: 0x%08X", hr);
-		goto exit;
+		ec_log_err("Unable to open recipient table. Error: 0x%08X", hr);
+		return hr;
 	}
-
-	hr = lpRecipientTable->SetColumns((LPSPropTagArray)&sPropRecipColumns, 0);
+	hr = lpRecipientTable->SetColumns(sPropRecipColumns, 0);
 	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to set columns on recipient table. Error: 0x%08X", hr);
-		goto exit;
+		ec_log_err("Unable to set columns on recipient table. Error: 0x%08X", hr);
+		return hr;
 	}
-
-	hr = HrQueryAllRows(lpRecipientTable, NULL, NULL, NULL, 0, &pRows);
+	hr = HrQueryAllRows(lpRecipientTable, nullptr, nullptr, nullptr, 0, &~pRows);
 	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to read recipient table. Error: 0x%08X", hr);
-		goto exit;
+		ec_log_err("Unable to read recipient table. Error: 0x%08X", hr);
+		return hr;
 	}
 
 	try {
 		for (ULONG i = 0; i < pRows->cRows; ++i) {
-			pPropRecipType = PpropFindProp(pRows->aRow[i].lpProps, pRows->aRow[i].cValues, PR_RECIPIENT_TYPE);
+			auto pPropRecipType = PCpropFindProp(pRows->aRow[i].lpProps, pRows->aRow[i].cValues, PR_RECIPIENT_TYPE);
 
 			if(pPropRecipType == NULL) {
 				// getMailBox properties
-				pPropDispl = PpropFindProp(pRows->aRow[i].lpProps, pRows->aRow[i].cValues, PR_DISPLAY_NAME_W);
-				pPropAType = PpropFindProp(pRows->aRow[i].lpProps, pRows->aRow[i].cValues, PR_ADDRTYPE_W);
-				pPropEAddr = PpropFindProp(pRows->aRow[i].lpProps, pRows->aRow[i].cValues, PR_EMAIL_ADDRESS_W);
-				lpLogger->Log(EC_LOGLEVEL_ERROR, "No recipient type set for recipient. DisplayName: %ls, AddrType: %ls, Email: %ls",
-							  pPropDispl?pPropDispl->Value.lpszW:L"(none)",
-							  pPropAType?pPropAType->Value.lpszW:L"(none)",
-							  pPropEAddr?pPropEAddr->Value.lpszW:L"(none)");
+				auto pPropDispl = PCpropFindProp(pRows->aRow[i].lpProps, pRows->aRow[i].cValues, PR_DISPLAY_NAME_W);
+				auto pPropAType = PCpropFindProp(pRows->aRow[i].lpProps, pRows->aRow[i].cValues, PR_ADDRTYPE_W);
+				auto pPropEAddr = PCpropFindProp(pRows->aRow[i].lpProps, pRows->aRow[i].cValues, PR_EMAIL_ADDRESS_W);
+				ec_log_err("No recipient type set for recipient. DisplayName: %ls, AddrType: %ls, Email: %ls",
+					pPropDispl ? pPropDispl->Value.lpszW : L"(none)",
+					pPropAType ? pPropAType->Value.lpszW : L"(none)",
+					pPropEAddr ? pPropEAddr->Value.lpszW : L"(none)");
 				continue;
 			}
 
@@ -241,7 +232,7 @@ HRESULT MAPIToVMIME::processRecipients(IMessage *lpMessage, vmime::messageBuilde
 			if (hr == MAPI_E_INVALID_PARAMETER)	// skip invalid addresses
 				continue;
 			if (hr != hrSuccess)
-				goto exit;			// Logging done in getMailBox
+				return hr; // Logging done in getMailBox
 
 			switch (pPropRecipType->Value.ul) {
 			case MAPI_TO:
@@ -263,41 +254,29 @@ HRESULT MAPIToVMIME::processRecipients(IMessage *lpMessage, vmime::messageBuilde
 		if (!fToFound) {
 			if (!hasRecips && sopt.no_recipients_workaround == false) {
 				// spooler will exit here, gateway will continue with the workaround
-				lpLogger->Log(EC_LOGLEVEL_ERROR, "No valid recipients found.");
-				hr = MAPI_E_NOT_FOUND;
-				goto exit;
+				ec_log_err("No valid recipients found.");
+				return MAPI_E_NOT_FOUND;
 			}
 
 			// No recipients were in the 'To' .. add 'undisclosed recipients'
-			vmime::ref<vmime::mailboxGroup> undisclosed = vmime::create<vmime::mailboxGroup>(vmime::text("undisclosed-recipients"));
+			vmime::shared_ptr<vmime::mailboxGroup> undisclosed = vmime::make_shared<vmime::mailboxGroup>(vmime::text("undisclosed-recipients"));
 			lpVMMessageBuilder->getRecipients().appendAddress(undisclosed);
 		}
 			
 	}
 	catch (vmime::exception& e) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "VMIME exception: %s", e.what());
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
+		ec_log_err("VMIME exception: %s", e.what());
+		return MAPI_E_CALL_FAILED;
 	}
 	catch (std::exception& e) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "STD exception on recipients: %s", e.what());
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
+		ec_log_err("STD exception on recipients: %s", e.what());
+		return MAPI_E_CALL_FAILED;
 	}
 	catch (...) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unknown generic exception occurred on recipients");
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
+		ec_log_err("Unknown generic exception occurred on recipients");
+		return MAPI_E_CALL_FAILED;
 	}
-
-exit:
-	if (lpRecipientTable)
-		lpRecipientTable->Release();
-
-	if (pRows)
-		FreeProws(pRows);
-
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -311,81 +290,69 @@ exit:
  */
 HRESULT MAPIToVMIME::handleSingleAttachment(IMessage* lpMessage, LPSRow lpRow, vmime::messageBuilder *lpVMMessageBuilder) {
 	HRESULT			hr					= hrSuccess;
-	IStream*		lpStream			= NULL; 
-	LPATTACH		lpAttach			= NULL;
-	LPSPropValue	pPropAttachNum		= NULL;
-	LPSPropValue	pPropAttachType		= NULL;
-	LPSPropValue	lpContentId 		= NULL;
-	LPSPropValue	lpContentLocation	= NULL;
-	LPSPropValue	lpHidden			= NULL;
-	LPSPropValue	lpFilename			= NULL;
+	object_ptr<IStream> lpStream;
+	object_ptr<IAttach> lpAttach;
+	const SPropValue *pPropAttachType = nullptr;
+	memory_ptr<SPropValue> lpContentId, lpContentLocation, lpHidden;
+	memory_ptr<SPropValue> lpFilename;
 	ULONG			ulAttachmentNum		= 0;
 	ULONG			ulAttachmentMethod	= 0;
-	IMessage*		lpAttachedMessage	= NULL;
-
-	vmime::ref<vmime::utility::inputStream> inputDataStream = NULL;
-	vmime::ref<mapiAttachment> vmMapiAttach = NULL;
-	vmime::ref<vmime::attachment> vmMsgAtt = NULL;
+	object_ptr<IMessage> lpAttachedMessage;
+	vmime::shared_ptr<vmime::utility::inputStream> inputDataStream;
+	vmime::shared_ptr<mapiAttachment> vmMapiAttach;
+	vmime::shared_ptr<vmime::attachment> vmMsgAtt;
 	std::string		strContentId;
 	std::string		strContentLocation;
 	bool			bHidden = false;
 	sending_options sopt_keep;
-	LPSPropValue	lpAMClass = NULL;
-	LPSPropValue	lpAMAttach = NULL;
-	LPSPropValue	lpMIMETag = NULL;
+	memory_ptr<SPropValue> lpAMClass, lpAMAttach, lpMIMETag;
 	const wchar_t *szFilename = NULL;  // just a reference, don't free
 	vmime::mediaType vmMIMEType;
 	std::string		strBoundary;
 	bool			bSendBinary = true;
-	MapiToICal		*mapiical = NULL;
 
-	pPropAttachNum = PpropFindProp(lpRow->lpProps, lpRow->cValues, PR_ATTACH_NUM);
+	auto pPropAttachNum = PCpropFindProp(lpRow->lpProps, lpRow->cValues, PR_ATTACH_NUM);
 	if (pPropAttachNum == NULL) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Attachment in table not correct, no attachment number present.");
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
+		ec_log_err("Attachment in table not correct, no attachment number present.");
+		return MAPI_E_NOT_FOUND;
 	}
 
 	ulAttachmentNum = pPropAttachNum->Value.ul;
 
 	// check PR_ATTACH_METHOD to determine Attachment or email
 	ulAttachmentMethod = ATTACH_BY_VALUE;
-	pPropAttachType	= PpropFindProp(lpRow->lpProps, lpRow->cValues, PR_ATTACH_METHOD);
-	if (pPropAttachType == NULL) {
-		lpLogger->Log(EC_LOGLEVEL_WARNING, "Attachment method not present for attachment %d, assuming default value", ulAttachmentNum);
-	} else {
+	pPropAttachType	= PCpropFindProp(lpRow->lpProps, lpRow->cValues, PR_ATTACH_METHOD);
+	if (pPropAttachType == NULL)
+		ec_log_warn("Attachment method not present for attachment %d, assuming default value", ulAttachmentNum);
+	else
 		ulAttachmentMethod = pPropAttachType->Value.ul;
-	}
 
 	if (ulAttachmentMethod == ATTACH_EMBEDDED_MSG) {
-		vmime::ref<vmime::message> vmNewMess;
+		vmime::shared_ptr<vmime::message> vmNewMess;
 		std::string strBuff;
 		vmime::utility::outputStreamStringAdapter mout(strBuff);
 
-		hr = lpMessage->OpenAttach(ulAttachmentNum, NULL, MAPI_BEST_ACCESS, &lpAttach);
+		hr = lpMessage->OpenAttach(ulAttachmentNum, nullptr, MAPI_BEST_ACCESS, &~lpAttach);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not open message attachment %d. Error: 0x%08X", ulAttachmentNum, hr);
-			goto exit;
+			ec_log_err("Could not open message attachment %d. Error: 0x%08X", ulAttachmentNum, hr);
+			return hr;
 		}
-
-		hr = lpAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, MAPI_DEFERRED_ERRORS, (LPUNKNOWN *)&lpAttachedMessage);
+		hr = lpAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, MAPI_DEFERRED_ERRORS, &~lpAttachedMessage);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not open data of message attachment %d. Error: 0x%08X", ulAttachmentNum, hr);
-			goto exit;
+			ec_log_err("Could not open data of message attachment %d. Error: 0x%08X", ulAttachmentNum, hr);
+			return hr;
 		}
 
 		// Check whether we're sending a calendar object
 		// if so, we do not need to create a message-in-message object, but just attach the ics file.
-		hr = HrGetOneProp(lpAttachedMessage, PR_MESSAGE_CLASS_A, &lpAMClass);
+		hr = HrGetOneProp(lpAttachedMessage, PR_MESSAGE_CLASS_A, &~lpAMClass);
 		if (hr == hrSuccess &&
 			strcmp(lpAMClass->Value.lpszA, "IPM.OLE.CLASS.{00061055-0000-0000-C000-000000000046}") == 0)
-		{
 				// This is an exception message. We might get here because kopano-ical is able to
 				// SubmitMessage for Mac Ical meeting requests. The way Outlook does this, is
 				// send a message for each exception itself. We just ignore this exception, since
 				// it's already in the main ical data on the top level message.
-				goto exit;
-		}
+			return hr;
 
 		// sub objects do not necessarily need to have valid recipients, so disable the test
 		sopt_keep = sopt;
@@ -402,61 +369,57 @@ HRESULT MAPIToVMIME::handleSingleAttachment(IMessage* lpMessage, LPSRow lpRow, v
 
 		// recursive processing of embedded message as a new e-mail
 		hr = convertMAPIToVMIME(lpAttachedMessage, &vmNewMess);
-		if (hr != hrSuccess) {
+		if (hr != hrSuccess)
 			// Logging has been done by convertMAPIToVMIME()
-			goto exit;
-		}
+			return hr;
 		sopt = sopt_keep;
 
-		vmMsgAtt = vmime::create<vmime::parsedMessageAttachment>(vmNewMess);
+		vmMsgAtt = vmime::make_shared<vmime::parsedMessageAttachment>(vmNewMess);
 		lpVMMessageBuilder->appendAttachment(vmMsgAtt);
 	} else if (ulAttachmentMethod == ATTACH_BY_VALUE) {
-		hr = lpMessage->OpenAttach(ulAttachmentNum, NULL, MAPI_BEST_ACCESS, &lpAttach);
+		hr = lpMessage->OpenAttach(ulAttachmentNum, nullptr, MAPI_BEST_ACCESS, &~lpAttach);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not open attachment %d. Error: 0x%08X", ulAttachmentNum, hr);
-			goto exit;
+			ec_log_err("Could not open attachment %d. Error: 0x%08X", ulAttachmentNum, hr);
+			return hr;
 		}
-		
-		if (HrGetOneProp(lpAttach, PR_ATTACH_CONTENT_ID_A, &lpContentId) == hrSuccess)
+	
+		if (HrGetOneProp(lpAttach, PR_ATTACH_CONTENT_ID_A, &~lpContentId) == hrSuccess)
 			strContentId = lpContentId->Value.lpszA;
-
-		if (HrGetOneProp(lpAttach, PR_ATTACH_CONTENT_LOCATION_A, &lpContentLocation) == hrSuccess)
+		if (HrGetOneProp(lpAttach, PR_ATTACH_CONTENT_LOCATION_A, &~lpContentLocation) == hrSuccess)
 			strContentLocation = lpContentLocation->Value.lpszA;
-			
-		if (HrGetOneProp(lpAttach, PR_ATTACHMENT_HIDDEN, &lpHidden) == hrSuccess)
+		if (HrGetOneProp(lpAttach, PR_ATTACHMENT_HIDDEN, &~lpHidden) == hrSuccess)
 			bHidden = lpHidden->Value.b;
 
         // Optimize: if we're only outputting headers, we needn't bother with attachment data
         if(sopt.headers_only)
-            CreateStreamOnHGlobal(NULL, true, &lpStream);
+            CreateStreamOnHGlobal(nullptr, true, &~lpStream);
         else {
-            hr = lpAttach->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, 0, MAPI_DEFERRED_ERRORS, (LPUNKNOWN *)&lpStream);
+            hr = lpAttach->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, 0, MAPI_DEFERRED_ERRORS, &~lpStream);
             if (hr != hrSuccess) {
-                lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not open data of attachment %d. Error: 0x%08X", ulAttachmentNum, hr);
-                goto exit;
+                ec_log_err("Could not open data of attachment %d. Error: 0x%08X", ulAttachmentNum, hr);
+			return hr;
             }
         }
         	
 		try {
-			inputDataStream = vmime::create<inputStreamMAPIAdapter>(lpStream);	// add ref to lpStream
+			// add ref to lpStream
+			if (lpStream != nullptr)
+				inputDataStream = vmime::make_shared<inputStreamMAPIAdapter>(lpStream);
 
 			// Set filename
 			szFilename = L"data.bin";
-
-			if (HrGetOneProp(lpAttach, PR_ATTACH_LONG_FILENAME_W, &lpFilename) == hrSuccess) {
+			if (HrGetOneProp(lpAttach, PR_ATTACH_LONG_FILENAME_W, &~lpFilename) == hrSuccess)
 				szFilename = lpFilename->Value.lpszW;
-			} else {
-				if (HrGetOneProp(lpAttach, PR_ATTACH_FILENAME_W, &lpFilename) == hrSuccess) {
-					szFilename = lpFilename->Value.lpszW;
-				}
-			}
+			else if (HrGetOneProp(lpAttach, PR_ATTACH_FILENAME_W, &~lpFilename) == hrSuccess)
+				szFilename = lpFilename->Value.lpszW;
             
             // Set MIME type
             parseMimeTypeFromFilename(szFilename, &vmMIMEType, &bSendBinary);
-            
-			if (HrGetOneProp(lpAttach, PR_ATTACH_MIME_TAG_A, &lpMIMETag) == hrSuccess) {
+			if (HrGetOneProp(lpAttach, PR_ATTACH_MIME_TAG_A, &~lpMIMETag) == hrSuccess)
 				vmMIMEType = lpMIMETag->Value.lpszA;
-			}
+
+			static const char absent_note[] = "Attachment is missing.";
+			vmime::mediaType note_type("text/plain");
 
 			// inline attachments: Only make attachments inline if they are hidden and have a content-id or content-location.
 			if ((!strContentId.empty() || !strContentLocation.empty()) && bHidden &&
@@ -465,66 +428,53 @@ HRESULT MAPIToVMIME::handleSingleAttachment(IMessage* lpMessage, LPSRow lpRow, v
 				// add inline object to html part
 				vmime::mapiTextPart& textPart = dynamic_cast<vmime::mapiTextPart&>(*lpVMMessageBuilder->getTextPart());
 				// had szFilename .. but how, on inline?
-				// @todo find out how Content-Disposition receives highchar filename... always utf-8?
-				textPart.addObject(vmime::create<vmime::streamContentHandler>(inputDataStream, 0), vmime::encoding("base64"), vmMIMEType, strContentId, string(), strContentLocation);
-			} else {
-				vmMapiAttach = vmime::create<mapiAttachment>(vmime::create<vmime::streamContentHandler>(inputDataStream, 0),
-															 bSendBinary ? vmime::encoding("base64") : vmime::encoding("quoted-printable"),
-															 vmMIMEType, strContentId,
-															 vmime::word(m_converter.convert_to<string>(m_strCharset.c_str(), szFilename, rawsize(szFilename), CHARSET_WCHAR), m_vmCharset));
+				// @todo find out how Content-Disposition receives highchar filename... always UTF-8?
+				if (inputDataStream != nullptr)
+					textPart.addObject(vmime::make_shared<vmime::streamContentHandler>(inputDataStream, 0), vmime::encoding("base64"), vmMIMEType, strContentId, string(), strContentLocation);
+				else
+					textPart.addObject(vmime::make_shared<vmime::stringContentHandler>(absent_note), vmime::encoding("base64"), note_type, strContentId, std::string(), strContentLocation);
+			} else if (inputDataStream != nullptr) {
+				vmMapiAttach = vmime::make_shared<mapiAttachment>(vmime::make_shared<vmime::streamContentHandler>(inputDataStream, 0),
+				               bSendBinary ? vmime::encoding("base64") : vmime::encoding("quoted-printable"),
+				               vmMIMEType, strContentId,
+				               vmime::word(m_converter.convert_to<string>(m_strCharset.c_str(), szFilename, rawsize(szFilename), CHARSET_WCHAR), m_vmCharset));
 
 				// add to message (copies pointer, not data)
 				lpVMMessageBuilder->appendAttachment(vmMapiAttach); 
+			} else {
+				vmMapiAttach = vmime::make_shared<mapiAttachment>(vmime::make_shared<vmime::stringContentHandler>(absent_note),
+				               bSendBinary ? vmime::encoding("base64") : vmime::encoding("quoted-printable"),
+				               note_type, strContentId,
+				               vmime::word(m_converter.convert_to<std::string>(m_strCharset.c_str(), szFilename, rawsize(szFilename), CHARSET_WCHAR), m_vmCharset));
+				lpVMMessageBuilder->appendAttachment(vmMapiAttach);
 			}
 		}
 		catch (vmime::exception& e) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "VMIME exception: %s", e.what());
-			hr = MAPI_E_CALL_FAILED;
-			goto exit;
+			ec_log_err("VMIME exception: %s", e.what());
+			return MAPI_E_CALL_FAILED;
 		}
 		catch (std::exception& e) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "STD exception on attachment: %s", e.what());
-			hr = MAPI_E_CALL_FAILED;
-			goto exit;
+			ec_log_err("STD exception on attachment: %s", e.what());
+			return MAPI_E_CALL_FAILED;
 		}
 		catch (...) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Unknown generic exception occurred on attachment");
-			hr = MAPI_E_CALL_FAILED;
-			goto exit;
+			ec_log_err("Unknown generic exception occurred on attachment");
+			return MAPI_E_CALL_FAILED;
 		}
 	} else if (ulAttachmentMethod == ATTACH_OLE) {
 	    // Ignore ATTACH_OLE attachments, they are handled in handleTNEF()
 	} else {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Attachment %d contains invalid method %d.", ulAttachmentNum, ulAttachmentMethod);
+		ec_log_err("Attachment %d contains invalid method %d.", ulAttachmentNum, ulAttachmentMethod);
 		hr = MAPI_E_INVALID_PARAMETER;
 	}
-
-exit:
 	// ATTN: lpMapiAttach are linked in the VMMessageBuilder. The VMMessageBuilder will delete() it.
-	delete mapiical;
-	MAPIFreeBuffer(lpMIMETag);
-	MAPIFreeBuffer(lpAMClass);
-	MAPIFreeBuffer(lpAMAttach);
-	MAPIFreeBuffer(lpFilename);
-	MAPIFreeBuffer(lpContentId);
-	MAPIFreeBuffer(lpContentLocation);
-	MAPIFreeBuffer(lpHidden);
-	if (lpStream)
-		lpStream->Release();
-
-	if (lpAttach)
-		lpAttach->Release();
-
-	if (lpAttachedMessage)
-		lpAttachedMessage->Release();
-
 	return hr;
 }
 
 /**
- * Return an mimetype for filename of an attachment.
+ * Return a MIME type for the filename of an attachment.
  *
- * Mimetype is found by using the extension. Also returns if the
+ * The MIME type is found using the extension. Also returns if the
  * attachment should be attached in text or binary mode. Currently
  * only edifact files (.edi) are forced as text attachment.
  *
@@ -542,7 +492,7 @@ HRESULT MAPIToVMIME::parseMimeTypeFromFilename(std::wstring strFilename, vmime::
 	bool bSendBinary = true;
 
 	// to lowercase
-	transform(strFilename.begin(), strFilename.end(), strFilename.begin(), ::tolower);
+	transform(strFilename.begin(), strFilename.end(), strFilename.begin(), ::towlower);
 	strExt = m_converter.convert_to<string>(m_strCharset.c_str(), strFilename, rawsize(strFilename), CHARSET_WCHAR);
 	strExt.erase(0, strExt.find_last_of(".")+1);
 
@@ -662,38 +612,30 @@ HRESULT MAPIToVMIME::parseMimeTypeFromFilename(std::wstring strFilename, vmime::
  */
 HRESULT MAPIToVMIME::handleAttachments(IMessage* lpMessage, vmime::messageBuilder *lpVMMessageBuilder) {
 	HRESULT		hr					= hrSuccess;
-	LPSRowSet	pRows				= NULL;
-	LPMAPITABLE	lpAttachmentTable	= NULL;
-	SizedSSortOrderSet(1, sosRTFSeq) = {1, 0, 0, { {PR_RENDERING_POSITION, TABLE_SORT_ASCEND} } };
+	rowset_ptr pRows;
+	object_ptr<IMAPITable> lpAttachmentTable;
+	static constexpr const SizedSSortOrderSet(1, sosRTFSeq) =
+		{1, 0, 0, {{PR_RENDERING_POSITION, TABLE_SORT_ASCEND}}};
 
 	// get attachment table
-	hr = lpMessage->GetAttachmentTable(0, &lpAttachmentTable);
+	hr = lpMessage->GetAttachmentTable(0, &~lpAttachmentTable);
 	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open attachment table. Error: 0x%08X", hr);
-		goto exit;
+		ec_log_err("Unable to open attachment table. Error: 0x%08X", hr);
+		return hr;
 	}
-
-	hr = HrQueryAllRows(lpAttachmentTable, NULL, NULL, (LPSSortOrderSet)&sosRTFSeq, 0, &pRows);
+	hr = HrQueryAllRows(lpAttachmentTable, nullptr, nullptr, sosRTFSeq, 0, &~pRows);
 	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to fetch rows of attachment table. Error: 0x%08X", hr);
-		goto exit;
+		ec_log_err("Unable to fetch rows of attachment table. Error: 0x%08X", hr);
+		return hr;
 	}
 	
 	for (ULONG i = 0; i < pRows->cRows; ++i) {
 		// if one attachment fails, we're not sending what the user intended to send so abort. Logging was done in handleSingleAttachment()
 		hr = handleSingleAttachment(lpMessage, &pRows->aRow[i], lpVMMessageBuilder);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	} 
-
-exit:
-	if(pRows)
-		FreeProws(pRows);
-
-	if (lpAttachmentTable)
-		lpAttachmentTable->Release();
-
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -709,27 +651,21 @@ exit:
  * @param[in]	boundary	new boundary string to use.
  * @return Always hrSuccess
  */
-HRESULT MAPIToVMIME::setBoundaries(vmime::ref<vmime::header> vmHeader, vmime::ref<vmime::body> vmBody, const std::string& boundary)
+HRESULT MAPIToVMIME::setBoundaries(vmime::shared_ptr<vmime::header> vmHeader,
+    vmime::shared_ptr<vmime::body> vmBody, const std::string& boundary)
 {
-	int i = 0;
-	vmime::ref<vmime::contentTypeField> vmCTF;
-
-	try {
-		vmCTF = vmHeader->findField(vmime::fields::CONTENT_TYPE).dynamicCast <vmime::contentTypeField>();
-	}
-	catch (vmime::exceptions::no_such_field) {
+	if (!vmHeader->hasField(vmime::fields::CONTENT_TYPE))
 		return hrSuccess;
-	}
 
-	if(vmCTF->getValue().dynamicCast<vmime::mediaType>()->getType() == vmime::mediaTypes::MULTIPART) {
+	auto vmCTF = vmime::dynamicCast<vmime::contentTypeField>(vmHeader->findField(vmime::fields::CONTENT_TYPE));
+	if (vmime::dynamicCast<vmime::mediaType>(vmCTF->getValue())->getType() == vmime::mediaTypes::MULTIPART) {
 		// This is a multipart, so set the boundary for this part
 		vmCTF->setBoundary(boundary);
         
 		// Set boundaries on children also
-		for (i = 0; i < vmBody->getPartCount(); ++i) {
+		for (size_t i = 0; i < vmBody->getPartCount(); ++i) {
 			std::ostringstream os;
-
-			vmime::ref<vmime::bodyPart> vmBodyPart = vmBody->getPartAt(i);
+			vmime::shared_ptr<vmime::bodyPart> vmBodyPart = vmBody->getPartAt(i);
 
 			os << boundary << "_" << i;
             
@@ -740,7 +676,7 @@ HRESULT MAPIToVMIME::setBoundaries(vmime::ref<vmime::header> vmHeader, vmime::re
 }
 
 /**
- * Build a normal vmime message from an MAPI lpMessage.
+ * Build a normal vmime message from a MAPI lpMessage.
  *
  * @param[in]	lpMessage		MAPI message to convert
  * @param[in]	bSkipContent	set to true if only the headers of the e-mail are required to obtain
@@ -748,59 +684,55 @@ HRESULT MAPIToVMIME::setBoundaries(vmime::ref<vmime::header> vmHeader, vmime::re
  * @param[out]	lpvmMessage		vmime message version of lpMessage
  * @return Mapi error code
  */
-HRESULT MAPIToVMIME::BuildNoteMessage(IMessage *lpMessage, bool bSkipContent, vmime::ref<vmime::message> *lpvmMessage)
+HRESULT MAPIToVMIME::BuildNoteMessage(IMessage *lpMessage,
+    vmime::shared_ptr<vmime::message> *lpvmMessage, unsigned int flags)
 {
 	HRESULT					hr					= hrSuccess;
-	LPSPropValue			lpDeliveryDate		= NULL;
-	LPSPropValue			lpTransportHeaders	= NULL;
+	memory_ptr<SPropValue> lpDeliveryDate, lpTransportHeaders;
 	vmime::messageBuilder   vmMessageBuilder;
-	vmime::ref<vmime::message>			vmMessage;
+	vmime::shared_ptr<vmime::message> vmMessage;
 
 	// construct the message..
 	try {
 		// messageBuilder is body and simple headers only (to/cc/subject/...)
-		hr = fillVMIMEMail(lpMessage, bSkipContent, &vmMessageBuilder);
+		hr = fillVMIMEMail(lpMessage, flags & MTV_SKIP_CONTENT, &vmMessageBuilder);
 		if (hr != hrSuccess)
-			goto exit;			// Logging has been done in fillVMIMEMail()
+			return hr; // Logging has been done in fillVMIMEMail()
 
 		vmMessage = vmMessageBuilder.construct();
 		// message builder has set Date header to now(). this will be overwritten.
-
-		vmime::ref<vmime::header> vmHeader = vmMessage->getHeader();
-
-		hr = handleExtraHeaders(lpMessage, vmHeader);
+		auto vmHeader = vmMessage->getHeader();
+		hr = handleExtraHeaders(lpMessage, vmHeader, flags);
 		if (hr!= hrSuccess)
-			goto exit;
+			return hr;
 
 		// from/sender headers
 		hr = handleSenderInfo(lpMessage, vmHeader);
 		if (hr!= hrSuccess)
-			goto exit;
+			return hr;
 
 		// add reply to email, ignore errors
 		hr = handleReplyTo(lpMessage, vmHeader);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to set reply-to address");
+			ec_log_warn("Unable to set reply-to address");
 			hr = hrSuccess;
 		}
 
 		// Set consistent boundary (optional)
-		if(sopt.alternate_boundary) {
+		if (sopt.alternate_boundary != nullptr)
 			setBoundaries(vmMessage->getHeader(), vmMessage->getBody(), sopt.alternate_boundary);
-		}
 
-		HrGetOneProp(lpMessage, PR_MESSAGE_DELIVERY_TIME, &lpDeliveryDate);
+		HrGetOneProp(lpMessage, PR_MESSAGE_DELIVERY_TIME, &~lpDeliveryDate);
 
 		// If we're sending a msg-in-msg, use the original date of that message
-		if (sopt.msg_in_msg && lpDeliveryDate) {
+		if (sopt.msg_in_msg && lpDeliveryDate != nullptr)
 			vmHeader->Date()->setValue(FiletimeTovmimeDatetime(lpDeliveryDate->Value.ft));
-		}
 		
 		// Regenerate some headers if available (basically a copy of the headers in
 		// PR_TRANSPORT_MESSAGE_HEADERS)
 		// currently includes: Received*, Return-Path, List* and Precedence.
 		// New e-mails should not have this property.
-		HrGetOneProp(lpMessage, PR_TRANSPORT_MESSAGE_HEADERS_A, &lpTransportHeaders);
+		HrGetOneProp(lpMessage, PR_TRANSPORT_MESSAGE_HEADERS_A, &~lpTransportHeaders);
 
 		if(lpTransportHeaders) {
 			try {
@@ -810,8 +742,8 @@ HRESULT MAPIToVMIME::BuildNoteMessage(IMessage *lpMessage, bool bSkipContent, vm
 				strHeaders += "\r\n\r\n";
 				headers.parse(strHeaders);
 				
-				for (int i = 0; i < headers.getFieldCount(); ++i) {
-					vmime::ref<vmime::headerField> vmField = headers.getFieldAt(i);
+				for (size_t i = 0; i < headers.getFieldCount(); ++i) {
+					vmime::shared_ptr<vmime::headerField> vmField = headers.getFieldAt(i);
 					std::string name = vmField->getName();
 
 					// Received checks start of string to accept Received-SPF
@@ -822,11 +754,11 @@ HRESULT MAPIToVMIME::BuildNoteMessage(IMessage *lpMessage, bool bSkipContent, vm
 					} else if (strncasecmp(name.c_str(), "list-", strlen("list-")) == 0 ||
 							   strcasecmp(name.c_str(), "precedence") == 0) {
 						// Just append at the end of this list, order is not important
-						vmHeader->appendField(vmField->clone().dynamicCast<vmime::headerField>());
+						vmHeader->appendField(vmime::dynamicCast<vmime::headerField>(vmField->clone()));
 					}
 				}
 			} catch (vmime::exception& e) {
-				lpLogger->Log(EC_LOGLEVEL_WARNING, "VMIME exception adding extra headers: %s", e.what());
+				ec_log_warn("VMIME exception adding extra headers: %s", e.what());
 			}
 			catch(...) { 
 				// If we can't parse, just ignore
@@ -835,42 +767,35 @@ HRESULT MAPIToVMIME::BuildNoteMessage(IMessage *lpMessage, bool bSkipContent, vm
 
 		// POP3 wants the delivery date as received header to correctly show in outlook
 		if (sopt.add_received_date && lpDeliveryDate) {
-			vmime::headerFieldFactory* hff = vmime::headerFieldFactory::getInstance();
-			vmime::ref<vmime::headerField> rf = hff->create(vmime::fields::RECEIVED);
-			rf->getValue().dynamicCast<vmime::relay>()->setDate(FiletimeTovmimeDatetime(lpDeliveryDate->Value.ft));
+			auto hff = vmime::headerFieldFactory::getInstance();
+			vmime::shared_ptr<vmime::headerField> rf = hff->create(vmime::fields::RECEIVED);
+			vmime::dynamicCast<vmime::relay>(rf->getValue())->setDate(FiletimeTovmimeDatetime(lpDeliveryDate->Value.ft));
 			// set received header at the start
 			vmHeader->insertFieldBefore(0, rf);
 		}
 
 		// no hr checking
-		handleXHeaders(lpMessage, vmHeader);
+		handleXHeaders(lpMessage, vmHeader, flags);
 	}
 	catch (vmime::exception& e) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "VMIME exception: %s", e.what());
-		hr = MAPI_E_CALL_FAILED; // set real error
-		goto exit;
+		ec_log_err("VMIME exception: %s", e.what());
+		return MAPI_E_CALL_FAILED; // set real error
 	}
 	catch (std::exception& e) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "STD exception on note message: %s", e.what());
-		hr = MAPI_E_CALL_FAILED; // set real error
-		goto exit;
+		ec_log_err("STD exception on note message: %s", e.what());
+		return MAPI_E_CALL_FAILED; // set real error
 	}
 	catch (...) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unknown generic exception on note message");
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
+		ec_log_err("Unknown generic exception on note message");
+		return MAPI_E_CALL_FAILED;
 	}
 
-	*lpvmMessage = vmMessage;
-
-exit:
-	MAPIFreeBuffer(lpTransportHeaders);
-	MAPIFreeBuffer(lpDeliveryDate);
-	return hr;
+	*lpvmMessage = std::move(vmMessage);
+	return hrSuccess;
 }
 
 /**
- * Build an MDN vmime message from an MAPI lpMessage.
+ * Build an MDN vmime message from a MAPI lpMessage.
  *
  * MDN (Mail Disposition Notification) is a read receipt message,
  * which notifies a sender that the e-mail was read.
@@ -880,24 +805,21 @@ exit:
  * @param[out]	lpvmMessage		vmime message version of lpMessage
  * @return Mapi error code
  */
-HRESULT MAPIToVMIME::BuildMDNMessage(IMessage *lpMessage, vmime::ref<vmime::message> *lpvmMessage)
+HRESULT MAPIToVMIME::BuildMDNMessage(IMessage *lpMessage,
+    vmime::shared_ptr<vmime::message> *lpvmMessage)
 {
 	HRESULT				hr = hrSuccess;
-	vmime::ref<vmime::message>	vmMessage = NULL;
-	IStream*			lpBodyStream = NULL;
-	LPSPropValue		lpiNetMsgId = NULL;
-	LPSPropValue		lpMsgClass = NULL;
-	LPSPropValue		lpSubject = NULL;
-	LPMAPITABLE			lpRecipientTable	= NULL;
-	LPSRowSet			pRows				= NULL;
-	
+	vmime::shared_ptr<vmime::message> vmMessage;
+	object_ptr<IStream> lpBodyStream;
+	memory_ptr<SPropValue> lpiNetMsgId, lpMsgClass, lpSubject;
+	object_ptr<IMAPITable> lpRecipientTable;
 	vmime::mailbox		expeditor; // From
 	string				strMDNText;
 	vmime::disposition	dispo;
 	string				reportingUA; //empty
 	std::vector<string>	reportingUAProducts; //empty
-	vmime::ref<vmime::message>	vmMsgOriginal;
-	vmime::ref<vmime::address>	vmRecipientbox;
+	vmime::shared_ptr<vmime::message> vmMsgOriginal;
+	vmime::shared_ptr<vmime::address> vmRecipientbox;
 	string				strActionMode;
 	std::wstring		strOut;
 
@@ -905,58 +827,54 @@ HRESULT MAPIToVMIME::BuildMDNMessage(IMessage *lpMessage, vmime::ref<vmime::mess
 	std::wstring strEmailAdd, strName, strType;
 	std::wstring strRepEmailAdd, strRepName, strRepType;
 
-	if (lpMessage == NULL || m_lpAdrBook == NULL || lpvmMessage == NULL) {
-		hr = MAPI_E_INVALID_OBJECT;
-		goto exit;
-	}
+	if (lpMessage == nullptr || m_lpAdrBook == nullptr ||
+	    lpvmMessage == nullptr)
+		return MAPI_E_INVALID_OBJECT;
 
 	try {
-		vmMsgOriginal = vmime::create<vmime::message>();
+		rowset_ptr pRows;
+		vmMsgOriginal = vmime::make_shared<vmime::message>();
 
 		// Create original vmime message
-		if (HrGetOneProp(lpMessage, PR_INTERNET_MESSAGE_ID_A, &lpiNetMsgId) == hrSuccess)
-		{
+		if (HrGetOneProp(lpMessage, PR_INTERNET_MESSAGE_ID_A, &~lpiNetMsgId) == hrSuccess) {
 			vmMsgOriginal->getHeader()->OriginalMessageId()->setValue(lpiNetMsgId->Value.lpszA);
 			vmMsgOriginal->getHeader()->MessageId()->setValue(lpiNetMsgId->Value.lpszA);
 		}
 		
 		// Create Recipient
-		hr = lpMessage->GetRecipientTable(MAPI_DEFERRED_ERRORS, &lpRecipientTable);
+		hr = lpMessage->GetRecipientTable(MAPI_DEFERRED_ERRORS, &~lpRecipientTable);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to open MDN recipient table. Error: 0x%08X", hr);
-			goto exit;
+			ec_log_err("Unable to open MDN recipient table. Error: 0x%08X", hr);
+			return hr;
 		}
-
-		hr = HrQueryAllRows(lpRecipientTable, NULL, NULL, NULL, 0, &pRows);
+		hr = HrQueryAllRows(lpRecipientTable, nullptr, nullptr, nullptr, 0, &~pRows);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to read MDN recipient table. Error: 0x%08X", hr);
-			goto exit;
+			ec_log_err("Unable to read MDN recipient table. Error: 0x%08X", hr);
+			return hr;
 		}
 
 		if (pRows->cRows == 0) {
 			if (sopt.no_recipients_workaround == false) {
-				lpLogger->Log(EC_LOGLEVEL_ERROR, "No MDN recipient found");
-				hr = MAPI_E_NOT_FOUND;
-				goto exit;
+				ec_log_err("No MDN recipient found");
+				return MAPI_E_NOT_FOUND;
 			} else {
 				// no recipient, but need to continue ... is this correct??
-				vmRecipientbox = vmime::create<vmime::mailbox>(string("undisclosed-recipients"));
+				vmRecipientbox = vmime::make_shared<vmime::mailbox>(string("undisclosed-recipients"));
 			}
 		} else {
 			hr = getMailBox(&pRows->aRow[0], &vmRecipientbox);
 			if (hr != hrSuccess)
-				goto exit;			// Logging done in getMailBox
+				return hr; // Logging done in getMailBox
 		}
 
 		// if vmRecipientbox is a vmime::mailboxGroup the dynamicCast to vmime::mailbox failed,
 		// so never send a MDN to a group.
 		if (vmRecipientbox->isGroup()) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Not possible to send a MDN to a group");
-			hr = MAPI_E_CORRUPT_DATA;
-			goto exit;
+			ec_log_err("Not possible to send a MDN to a group");
+			return MAPI_E_CORRUPT_DATA;
 		}
 
-		vmime::mdn::sendableMDNInfos mdnInfos(vmMsgOriginal, *vmRecipientbox.dynamicCast<vmime::mailbox>().get());
+		vmime::mdn::sendableMDNInfos mdnInfos(vmMsgOriginal, *vmime::dynamicCast<vmime::mailbox>(vmRecipientbox).get());
 		
 		//FIXME: Get the ActionMode and sending mode from the property 0x0081001E.
 		//		And the type in property 0x0080001E.
@@ -969,10 +887,9 @@ HRESULT MAPIToVMIME::BuildMDNMessage(IMessage *lpMessage, vmime::ref<vmime::mess
 		dispo.setActionMode(strActionMode);
 		dispo.setSendingMode(vmime::dispositionSendingModes::SENT_MANUALLY);
 
-		if (HrGetOneProp(lpMessage, PR_MESSAGE_CLASS_A, &lpMsgClass) != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "MDN message has no class.");
-			hr = MAPI_E_CORRUPT_DATA;
-			goto exit;
+		if (HrGetOneProp(lpMessage, PR_MESSAGE_CLASS_A, &~lpMsgClass) != hrSuccess) {
+			ec_log_err("MDN message has no class.");
+			return MAPI_E_CORRUPT_DATA;
 		}
 
 		if(strcasecmp(lpMsgClass->Value.lpszA, "REPORT.IPM.Note.IPNNRN") == 0)
@@ -981,14 +898,13 @@ HRESULT MAPIToVMIME::BuildMDNMessage(IMessage *lpMessage, vmime::ref<vmime::mess
 			dispo.setType(vmime::dispositionTypes::DISPLAYED);		
 	
 		strMDNText.clear();// Default Empty body
-
-		hr = lpMessage->OpenProperty(PR_BODY_W, &IID_IStream, 0, 0, (IUnknown**)&lpBodyStream);
+		hr = lpMessage->OpenProperty(PR_BODY_W, &IID_IStream, 0, 0, &~lpBodyStream);
 		if (hr == hrSuccess) {
 			std::wstring strBuffer;
 			hr = Util::HrStreamToString(lpBodyStream, strBuffer);
 			if (hr != hrSuccess) {
-				lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to read MDN message body.");
-				goto exit;
+				ec_log_err("Unable to read MDN message body.");
+				return hr;
 			}
 			strMDNText = m_converter.convert_to<string>(m_strCharset.c_str(), strBuffer, rawsize(strBuffer), CHARSET_WCHAR);
 		}
@@ -996,8 +912,8 @@ HRESULT MAPIToVMIME::BuildMDNMessage(IMessage *lpMessage, vmime::ref<vmime::mess
 		// Store owner, actual sender
 		hr = HrGetAddress(m_lpAdrBook, lpMessage, PR_SENDER_ENTRYID, PR_SENDER_NAME_W, PR_SENDER_ADDRTYPE_W, PR_SENDER_EMAIL_ADDRESS_W, strName, strType, strEmailAdd);
 		if(hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get MDN sender information. Error: 0x%08X", hr);
-			goto exit;
+			ec_log_err("Unable to get MDN sender information. Error: 0x%08X", hr);
+			return hr;
 		}
 		
 		// Ignore errors here and let strRep* untouched
@@ -1013,7 +929,7 @@ HRESULT MAPIToVMIME::BuildMDNMessage(IMessage *lpMessage, vmime::ref<vmime::mess
 		vmMessage = vmime::mdn::MDNHelper::buildMDN(mdnInfos, strMDNText, m_vmCharset, expeditor, dispo, reportingUA, reportingUAProducts);
 
 		// rewrite subject
-		if (HrGetOneProp(lpMessage, PR_SUBJECT_W, &lpSubject) == hrSuccess) {
+		if (HrGetOneProp(lpMessage, PR_SUBJECT_W, &~lpSubject) == hrSuccess) {
 			removeEnters(lpSubject->Value.lpszW);
 
 			strOut = lpSubject->Value.lpszW;
@@ -1032,35 +948,20 @@ HRESULT MAPIToVMIME::BuildMDNMessage(IMessage *lpMessage, vmime::ref<vmime::mess
 
 	}
 	catch (vmime::exception& e) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "VMIME exception: %s", e.what());
-		hr = MAPI_E_CALL_FAILED; // set real error
-		goto exit;
+		ec_log_err("VMIME exception: %s", e.what());
+		return MAPI_E_CALL_FAILED; // set real error
 	}
 	catch (std::exception& e) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "STD exception on MDN message: %s", e.what());
-		hr = MAPI_E_CALL_FAILED; // set real error
-		goto exit;
+		ec_log_err("STD exception on MDN message: %s", e.what());
+		return MAPI_E_CALL_FAILED; // set real error
 	}
 	catch (...) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unknown generic exception on MDN message");
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
+		ec_log_err("Unknown generic exception on MDN message");
+		return MAPI_E_CALL_FAILED;
 	}
 
-	*lpvmMessage = vmMessage;
-
-exit:
-	if(lpBodyStream)
-		lpBodyStream->Release();
-	MAPIFreeBuffer(lpiNetMsgId);
-	MAPIFreeBuffer(lpMsgClass);
-	if(lpRecipientTable)
-		lpRecipientTable->Release();
-	MAPIFreeBuffer(lpSubject);
-	if(pRows)
-		FreeProws(pRows);
-
-	return hr;
+	*lpvmMessage = std::move(vmMessage);
+	return hrSuccess;
 }
 
 /**
@@ -1080,30 +981,32 @@ std::wstring MAPIToVMIME::getConversionError(void) const
  * @param[out]	lpvmMessage		message to send to SMTP or Gateway client
  * @return Mapi error code
  */
-HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage, vmime::ref<vmime::message> *lpvmMessage) {
+HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage,
+    vmime::shared_ptr<vmime::message> *lpvmMessage, unsigned int flags)
+{
 	HRESULT					hr					= hrSuccess;
-	LPSPropValue			lpInternetCPID		= NULL;
-	LPSPropValue			lpMsgClass			= NULL;
-	vmime::ref<vmime::message> 	vmMessage;
+	memory_ptr<SPropValue> lpInternetCPID, lpMsgClass;
+	vmime::shared_ptr<vmime::message> vmMessage;
 	const char *lpszCharset = NULL;
-	char *					lpszRawSMTP			= NULL;
-	LPMAPITABLE				lpAttachmentTable	= NULL;
-	LPSRowSet				lpRows				= NULL;
-	LPSPropValue			lpPropAttach		= NULL;
-	LPATTACH				lpAttach			= NULL;
-	LPSTREAM				lpStream			= NULL;
+	std::unique_ptr<char[]> lpszRawSMTP;
+	object_ptr<IMAPITable> lpAttachmentTable;
+	const SPropValue *lpPropAttach = nullptr;
+	object_ptr<IAttach> lpAttach;
+	object_ptr<IStream> lpStream;
 	STATSTG					sStreamStat;
-	SizedSPropTagArray(2, sPropAttachColumns) = {2, { PR_ATTACH_NUM, PR_ATTACH_MIME_TAG} };
+	static constexpr const SizedSPropTagArray(2, sPropAttachColumns) =
+		{2, { PR_ATTACH_NUM, PR_ATTACH_MIME_TAG}};
 
-	if (HrGetOneProp(lpMessage, PR_MESSAGE_CLASS_A, &lpMsgClass) != hrSuccess) {
-		if ((hr = MAPIAllocateBuffer(sizeof(SPropValue), (void**)&lpMsgClass)) != hrSuccess)
-			goto exit;
+	if (HrGetOneProp(lpMessage, PR_MESSAGE_CLASS_A, &~lpMsgClass) != hrSuccess) {
+		hr = MAPIAllocateBuffer(sizeof(SPropValue), &~lpMsgClass);
+		if (hr != hrSuccess)
+			return hr;
 		lpMsgClass->ulPropTag = PR_MESSAGE_CLASS_A;
 		lpMsgClass->Value.lpszA = const_cast<char *>("IPM.Note");
 	}
 
 	// Get the outgoing charset we want to be using
-	if (HrGetOneProp(lpMessage, PR_INTERNET_CPID, &lpInternetCPID) == hrSuccess &&
+	if (HrGetOneProp(lpMessage, PR_INTERNET_CPID, &~lpInternetCPID) == hrSuccess &&
 		HrGetCharsetByCP(lpInternetCPID->Value.ul, &lpszCharset) == hrSuccess)
 	{
 		m_strHTMLCharset = lpszCharset;
@@ -1112,13 +1015,13 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage, vmime::ref<vmime::m
 		else
 			m_vmCharset = m_strHTMLCharset;
 	} else {
-		// default to utf-8 if not set
+		// default to UTF-8 if not set
 		m_vmCharset = MAPI_CHARSET_STRING;
 	}
 
 	if (strncasecmp(lpMsgClass->Value.lpszA, "IPM.Note", 8) && strncasecmp(lpMsgClass->Value.lpszA, "REPORT.IPM.Note", 15)) {
 		// Outlook sets some other incorrect charset for meeting requests and such,
-		// so for non-email we upgrade this to utf-8
+		// so for non-email we upgrade this to UTF-8
 		m_vmCharset = MAPI_CHARSET_STRING;
 	} else if (m_vmCharset == "us-ascii") {
 		// silently upgrade, since recipients and attachment filenames may contain high-chars, while the body does not.
@@ -1137,130 +1040,119 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage, vmime::ref<vmime::m
 		// Create a read receipt message
 		hr = BuildMDNMessage(lpMessage, &vmMessage);
 		if(hr != hrSuccess)
-			goto exit;		
+			return hr;
 	} else if ((strcasecmp(lpMsgClass->Value.lpszA, "IPM.Note.SMIME.MultiPartSigned") == 0) ||
 			   (strcasecmp(lpMsgClass->Value.lpszA, "IPM.Note.SMIME") == 0))
 	{
+		rowset_ptr lpRows;
 		// - find attachment, and convert to char, and place in lpszRawSMTP
 		// - normal convert the message, but only from/to headers and such .. nothing else
-
-		hr = lpMessage->GetAttachmentTable(0, &lpAttachmentTable);
+		hr = lpMessage->GetAttachmentTable(0, &~lpAttachmentTable);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not get attachment table of signed attachment. Error: 0x%08X", hr);
-			goto exit;
+			ec_log_err("Could not get attachment table of signed attachment. Error: 0x%08X", hr);
+			return hr;
 		}
 
 		// set columns to get pr attach mime tag and pr attach num only.
-		hr = lpAttachmentTable->SetColumns((LPSPropTagArray)&sPropAttachColumns, 0);
+		hr = lpAttachmentTable->SetColumns(sPropAttachColumns, 0);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Could set table contents of attachment table of signed attachment. Error: 0x%08X", hr);
-			goto exit;
+			ec_log_err("Could set table contents of attachment table of signed attachment. Error: 0x%08X", hr);
+			return hr;
 		}
-
-		hr = HrQueryAllRows(lpAttachmentTable, NULL, NULL, NULL, 0, &lpRows);
+		hr = HrQueryAllRows(lpAttachmentTable, nullptr, nullptr, nullptr, 0, &~lpRows);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not get table contents of attachment table of signed attachment. Error: 0x%08X", hr);
-			goto exit;
+			ec_log_err("Could not get table contents of attachment table of signed attachment. Error: 0x%08X", hr);
+			return hr;
 		}
 
 		if (lpRows->cRows != 1)
 			goto normal;
 
-		lpPropAttach = PpropFindProp(lpRows->aRow[0].lpProps, lpRows->aRow[0].cValues, PR_ATTACH_MIME_TAG);
+		lpPropAttach = PCpropFindProp(lpRows->aRow[0].lpProps, lpRows->aRow[0].cValues, PR_ATTACH_MIME_TAG);
 		if (!lpPropAttach)
 			goto normal;
-
-		lpPropAttach = PpropFindProp(lpRows->aRow[0].lpProps, lpRows->aRow[0].cValues, PR_ATTACH_NUM);
+		lpPropAttach = PCpropFindProp(lpRows->aRow[0].lpProps, lpRows->aRow[0].cValues, PR_ATTACH_NUM);
 		if (!lpPropAttach)
 			goto normal;
-
-		hr = lpMessage->OpenAttach(lpPropAttach->Value.ul, NULL, MAPI_BEST_ACCESS, &lpAttach);
+		hr = lpMessage->OpenAttach(lpPropAttach->Value.ul, nullptr, MAPI_BEST_ACCESS, &~lpAttach);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not open signed attachment. Error: 0x%08X", hr);
-			goto exit;
+			ec_log_err("Could not open signed attachment. Error: 0x%08X", hr);
+			return hr;
 		}
-
-		hr = lpAttach->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, 0, MAPI_DEFERRED_ERRORS, (LPUNKNOWN *)&lpStream);
+		hr = lpAttach->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, 0, MAPI_DEFERRED_ERRORS, &~lpStream);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not open data of signed attachment. Error: 0x%08X", hr);
-			goto exit;
+			ec_log_err("Could not open data of signed attachment. Error: 0x%08X", hr);
+			return hr;
 		}
 
 		hr = lpStream->Stat(&sStreamStat, 0);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not find size of signed attachment. Error: 0x%08X", hr);
-			goto exit;
+			ec_log_err("Could not find size of signed attachment. Error: 0x%08X", hr);
+			return hr;
 		}
 
-		lpszRawSMTP = new char[(ULONG)sStreamStat.cbSize.QuadPart+1];
-
-		hr = lpStream->Read(lpszRawSMTP, (ULONG)sStreamStat.cbSize.QuadPart, NULL);
+		lpszRawSMTP.reset(new char[(ULONG)sStreamStat.cbSize.QuadPart+1]);
+		hr = lpStream->Read(lpszRawSMTP.get(), (ULONG)sStreamStat.cbSize.QuadPart, NULL);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Could not read data of signed attachment. Error: 0x%08X", hr);
-			goto exit;
+			ec_log_err("Could not read data of signed attachment. Error: 0x%08X", hr);
+			return hr;
 		}
 		lpszRawSMTP[(ULONG)sStreamStat.cbSize.QuadPart] = '\0';
 
 		// build the message, but without the bodies and attachments
-		hr = BuildNoteMessage(lpMessage, true, &vmMessage);
+		hr = BuildNoteMessage(lpMessage, &vmMessage, flags | MTV_SKIP_CONTENT);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		// remove excess headers
-		vmMessage->getHeader()->removeField(vmMessage->getHeader()->findField(vmime::fields::CONTENT_TYPE));
-		vmMessage->getHeader()->removeField(vmMessage->getHeader()->findField(vmime::fields::CONTENT_TRANSFER_ENCODING));
+		if (vmMessage->getHeader()->hasField(vmime::fields::CONTENT_TYPE))
+			vmMessage->getHeader()->removeField(vmMessage->getHeader()->findField(vmime::fields::CONTENT_TYPE));
+		if (vmMessage->getHeader()->hasField(vmime::fields::CONTENT_TRANSFER_ENCODING))
+			vmMessage->getHeader()->removeField(vmMessage->getHeader()->findField(vmime::fields::CONTENT_TRANSFER_ENCODING));
 
 		if (strcasecmp(lpMsgClass->Value.lpszA, "IPM.Note.SMIME") != 0) {
-			std::string strRawSMTP = lpszRawSMTP;
-			vmime::ref<SMIMEMessage> vmSMIMEMessage = vmime::create<SMIMEMessage>();
+			auto vmSMIMEMessage = vmime::make_shared<SMIMEMessage>();
 			
 			// not sure why this was needed, and causes problems, eg ZCP-12994.
 			//vmMessage->getHeader()->removeField(vmMessage->getHeader()->findField(vmime::fields::MIME_VERSION));
 			
 			*vmSMIMEMessage->getHeader() = *vmMessage->getHeader();
-			vmSMIMEMessage->setSMIMEBody(strRawSMTP);
-			
+			vmSMIMEMessage->setSMIMEBody(lpszRawSMTP.get());
 			vmMessage = vmSMIMEMessage;
 		} else {
 			// encoded mail, set data as only mail body
-			LPMAPINAMEID lpNameID = NULL;
-			LPSPropTagArray lpPropTags = NULL;
-			LPSPropValue lpPropContentType = NULL;
+			memory_ptr<MAPINAMEID> lpNameID;
+			memory_ptr<SPropTagArray> lpPropTags;
+			memory_ptr<SPropValue> lpPropContentType;
 			const char *lpszContentType = NULL;
 
-			hr = MAPIAllocateBuffer(sizeof(MAPINAMEID), (void**)&lpNameID);
+			hr = MAPIAllocateBuffer(sizeof(MAPINAMEID), &~lpNameID);
 			if (hr != hrSuccess) {
-				lpLogger->Log(EC_LOGLEVEL_ERROR, "Not enough memory. Error: 0x%08X", hr);
-				goto exit;
+				ec_log_err("Not enough memory. Error: 0x%08X", hr);
+				return hr;
 			}
 
 			lpNameID->lpguid = (GUID*)&PS_INTERNET_HEADERS;
 			lpNameID->ulKind = MNID_STRING;
 			lpNameID->Kind.lpwstrName = const_cast<wchar_t *>(L"Content-Type");
 
-			hr = lpMessage->GetIDsFromNames(1, &lpNameID, MAPI_CREATE, &lpPropTags);
+			hr = lpMessage->GetIDsFromNames(1, &+lpNameID, MAPI_CREATE, &~lpPropTags);
 			if (hr != hrSuccess) {
-				lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to read encrypted mail properties. Error: 0x%08X", hr);
-				goto exit;
+				ec_log_err("Unable to read encrypted mail properties. Error: 0x%08X", hr);
+				return hr;
 			}
 
-			// Free Memory
-			MAPIFreeBuffer(lpNameID);
-			lpNameID = NULL;
-
-			if (HrGetOneProp(lpMessage, CHANGE_PROP_TYPE(lpPropTags->aulPropTag[0], PT_STRING8), &lpPropContentType) == hrSuccess) {
+			if (HrGetOneProp(lpMessage, CHANGE_PROP_TYPE(lpPropTags->aulPropTag[0], PT_STRING8), &~lpPropContentType) == hrSuccess)
 				lpszContentType = lpPropContentType->Value.lpszA;
-			} else {
+			else
 				// default, or exit?
 				lpszContentType = "application/x-pkcs7-mime;smime-type=enveloped-data;name=smime.p7m";
-			}
 
 			vmMessage->getHeader()->ContentType()->parse(lpszContentType);
-			MAPIFreeBuffer(lpPropContentType);
 
 			// copy via string so we can set the size of the string since it's binary
-			vmime::string inString(lpszRawSMTP, (size_t)sStreamStat.cbSize.QuadPart);
-			vmMessage->getBody()->setContents(vmime::create<vmime::stringContentHandler>(inString));
+			vmime::string inString(lpszRawSMTP.get(), (size_t)sStreamStat.cbSize.QuadPart);
+			vmMessage->getBody()->setContents(vmime::make_shared<vmime::stringContentHandler>(inString));
 
 			// vmime now encodes the body too, so I don't have to
 			vmMessage->getHeader()->appendField(vmime::headerFieldFactory::getInstance()->create(vmime::fields::CONTENT_TRANSFER_ENCODING, "base64"));
@@ -1269,29 +1161,13 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage, vmime::ref<vmime::m
 	} else {
 normal:
 		// Create default
-		hr = BuildNoteMessage(lpMessage, false, &vmMessage);
+		hr = BuildNoteMessage(lpMessage, &vmMessage, flags);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 
-	*lpvmMessage = vmMessage;
-
-exit:
-	delete [] lpszRawSMTP;
-	if (lpStream)
-		lpStream->Release();
-
-	if (lpAttach)
-		lpAttach->Release();
-
-	if (lpRows)
-		FreeProws(lpRows);
-
-	if (lpAttachmentTable)
-		lpAttachmentTable->Release();
-	MAPIFreeBuffer(lpInternetCPID);
-	MAPIFreeBuffer(lpMsgClass);
-	return hr;
+	*lpvmMessage = std::move(vmMessage);
+	return hrSuccess;
 }
 
 /**
@@ -1306,12 +1182,11 @@ exit:
 HRESULT MAPIToVMIME::fillVMIMEMail(IMessage *lpMessage, bool bSkipContent, vmime::messageBuilder *lpVMMessageBuilder) {
 	std::wstring	strOut;
 	HRESULT			hr				= hrSuccess;
-	LPSRowSet		prows			= NULL;
-	LPSPropValue	lpSubject		= NULL;
+	memory_ptr<SPropValue> lpSubject;
 	eBestBody bestBody = plaintext;
 
 	try {
-		if (HrGetOneProp(lpMessage, PR_SUBJECT_W, &lpSubject) == hrSuccess) {
+		if (HrGetOneProp(lpMessage, PR_SUBJECT_W, &~lpSubject) == hrSuccess) {
 			removeEnters(lpSubject->Value.lpszW);
 			strOut = lpSubject->Value.lpszW;
 		}
@@ -1324,23 +1199,24 @@ HRESULT MAPIToVMIME::fillVMIMEMail(IMessage *lpMessage, bool bSkipContent, vmime
 		// handle recipients
 		hr = processRecipients(lpMessage, lpVMMessageBuilder);
 		if (hr != hrSuccess)
-			goto exit;			// Logging has been done in processRecipients()
+			// Logging has been done in processRecipients()
+			return hr;
 
 		if (!bSkipContent) {
 			// handle text
 			hr = handleTextparts(lpMessage, lpVMMessageBuilder, &bestBody);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			// handle attachments
 			hr = handleAttachments(lpMessage, lpVMMessageBuilder);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			// check for TNEF information, and add winmail.dat if needed
 			hr = handleTNEF(lpMessage, lpVMMessageBuilder, bestBody);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 
 		/*
@@ -1351,39 +1227,29 @@ HRESULT MAPIToVMIME::fillVMIMEMail(IMessage *lpMessage, bool bSkipContent, vmime
 		std::wstring strName, strType, strEmAdd;
 		hr = HrGetAddress(m_lpAdrBook, lpMessage, PR_SENDER_ENTRYID, PR_SENDER_NAME_W, PR_SENDER_ADDRTYPE_W, PR_SENDER_EMAIL_ADDRESS_W, strName, strType, strEmAdd);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get sender information. Error: 0x%08X", hr);
-			goto exit;
+			ec_log_err("Unable to get sender information. Error: 0x%08X", hr);
+			return hr;
 		}
 
-		if (!strName.empty()) {
+		if (!strName.empty())
 			lpVMMessageBuilder->setExpeditor(vmime::mailbox(getVmimeTextFromWide(strName), m_converter.convert_to<string>(strEmAdd)));
-		} else {
+		else
 			lpVMMessageBuilder->setExpeditor(vmime::mailbox(m_converter.convert_to<string>(strEmAdd)));
-		}
 		// sender and reply-to is set elsewhere because it can only be done on a message object...
 	}
 	catch (vmime::exception& e) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "VMIME exception: %s", e.what());
-		hr = MAPI_E_CALL_FAILED; // set real error
-		goto exit;
+		ec_log_err("VMIME exception: %s", e.what());
+		return MAPI_E_CALL_FAILED; // set real error
 	}
 	catch (std::exception& e) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "STD exception on fill message: %s", e.what());
-		hr = MAPI_E_CALL_FAILED; // set real error
-		goto exit;
+		ec_log_err("STD exception on fill message: %s", e.what());
+		return MAPI_E_CALL_FAILED; // set real error
 	}
 	catch (...) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unknown generic exception  on fill message");
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
+		ec_log_err("Unknown generic exception  on fill message");
+		return MAPI_E_CALL_FAILED;
 	}
-
-exit:
-	MAPIFreeBuffer(lpSubject);
-	if (prows)
-		FreeProws(prows);
-
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -1397,50 +1263,49 @@ exit:
  * @return MAPI error code
  * @retval MAPI_E_INVALID_PARAMTER email address in row is not usable for the SMTP protocol
  */
-HRESULT MAPIToVMIME::getMailBox(LPSRow lpRow, vmime::ref<vmime::address> *lpvmMailbox)
+HRESULT MAPIToVMIME::getMailBox(LPSRow lpRow,
+    vmime::shared_ptr<vmime::address> *lpvmMailbox)
 {
 	HRESULT hr;
-	vmime::ref<vmime::address> vmMailboxNew;
+	vmime::shared_ptr<vmime::address> vmMailboxNew;
 	std::wstring strName, strEmail, strType;
-	LPSPropValue pPropObjectType = NULL;
 
 	hr = HrGetAddress(m_lpAdrBook, lpRow->lpProps, lpRow->cValues, PR_ENTRYID, PR_DISPLAY_NAME_W, PR_ADDRTYPE_W, PR_EMAIL_ADDRESS_W, strName, strType, strEmail);
 	if(hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to create mailbox. Error: %08X", hr);
+		ec_log_err("Unable to create mailbox. Error: %08X", hr);
 		return hr;
 	}
 
-	pPropObjectType = PpropFindProp(lpRow->lpProps, lpRow->cValues, PR_OBJECT_TYPE);
-
+	auto pPropObjectType = PCpropFindProp(lpRow->lpProps, lpRow->cValues, PR_OBJECT_TYPE);
 	if (strName.empty() && !strEmail.empty()) {
 		// email address only
-		vmMailboxNew = vmime::create<vmime::mailbox>(m_converter.convert_to<string>(strEmail));
+		vmMailboxNew = vmime::make_shared<vmime::mailbox>(m_converter.convert_to<string>(strEmail));
 	} else if (strEmail.find('@') != string::npos) {
 		// email with fullname
-		vmMailboxNew = vmime::create<vmime::mailbox>(getVmimeTextFromWide(strName), m_converter.convert_to<string>(strEmail));
+		vmMailboxNew = vmime::make_shared<vmime::mailbox>(getVmimeTextFromWide(strName), m_converter.convert_to<string>(strEmail));
 	} else if (pPropObjectType && pPropObjectType->Value.ul == MAPI_DISTLIST) {
 		// if mailing to a group without email address
-		vmMailboxNew = vmime::create<vmime::mailboxGroup>(getVmimeTextFromWide(strName));
+		vmMailboxNew = vmime::make_shared<vmime::mailboxGroup>(getVmimeTextFromWide(strName));
 	} else if (sopt.no_recipients_workaround == true) {
-		// gateway must always return an mailbox object
+		// gateway must always return a mailbox object
 		if (strEmail.empty())
 			strEmail = L"@";	// force having an address to avoid vmime problems
-		vmMailboxNew = vmime::create<vmime::mailbox>(getVmimeTextFromWide(strName), m_converter.convert_to<string>(strEmail));
+		vmMailboxNew = vmime::make_shared<vmime::mailbox>(getVmimeTextFromWide(strName), m_converter.convert_to<string>(strEmail));
 	} else {
 		if (strEmail.empty()) {
 			// not an email address and not a group: invalid
 			m_strError = L"Invalid email address in recipient list found: \"" + strName + L"\". Email Address is empty.";
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "%ls", m_strError.c_str());
+			ec_log_err("%ls", m_strError.c_str());
 			return MAPI_E_INVALID_PARAMETER;
 		}
 
 		// we only want to have this recipient fail, and not the whole message, if the user has a username
 		m_strError = L"Invalid email address in recipient list found: \"" + strName + L"\" <" + strEmail + L">.";
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "%ls", m_strError.c_str());
+		ec_log_err("%ls", m_strError.c_str());
 		return MAPI_E_INVALID_PARAMETER;
 	}
 
-	*lpvmMailbox = vmMailboxNew;
+	*lpvmMailbox = std::move(vmMailboxNew);
 	return hr;
 }
 
@@ -1455,54 +1320,53 @@ HRESULT MAPIToVMIME::getMailBox(LPSRow lpRow, vmime::ref<vmime::address> *lpvmMa
 HRESULT MAPIToVMIME::handleTextparts(IMessage* lpMessage, vmime::messageBuilder *lpVMMessageBuilder, eBestBody *bestBody) {
 	std::string strHTMLOut, strRtf, strBodyConverted;
 	std::wstring strBody;
-	HRESULT		hr						= hrSuccess;
-	IStream*	lpCompressedRTFStream	= NULL; 
-	IStream*	lpUncompressedRTFStream	= NULL; 
-	IStream*	lpBody					= NULL;
-	IStream*	lpHTMLStream			= NULL;
+	object_ptr<IStream> lpCompressedRTFStream, lpUncompressedRTFStream;
 	vmime::charset HTMLcharset;
 
 	// set the encoder of plaintext body part
 	vmime::encoding bodyEncoding("quoted-printable");
 	// will skip enters in q-p encoding, "fixes" plaintext mails to be more plain text
-	vmime::ref<vmime::utility::encoder::encoder> vmBodyEncoder = bodyEncoding.getEncoder();
+	vmime::shared_ptr<vmime::utility::encoder::encoder> vmBodyEncoder = bodyEncoding.getEncoder();
 	vmBodyEncoder->getProperties().setProperty("text", true);
 
 	*bestBody = plaintext;
 
 	// grabbing rtf
-	hr = lpMessage->OpenProperty(PR_RTF_COMPRESSED, &IID_IStream, 0, 0, (LPUNKNOWN *)&lpCompressedRTFStream);
+	HRESULT hr = lpMessage->OpenProperty(PR_RTF_COMPRESSED, &IID_IStream,
+	             0, 0, &~lpCompressedRTFStream);
 	if(hr == hrSuccess) {
-
-		hr = WrapCompressedRTFStream(lpCompressedRTFStream, 0, &lpUncompressedRTFStream);
+		hr = WrapCompressedRTFStream(lpCompressedRTFStream, 0, &~lpUncompressedRTFStream);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to create RTF-text stream. Error: 0x%08X", hr);
+			ec_log_warn("Unable to create RTF-text stream. Error: 0x%08X", hr);
 			goto exit;
 		}
 
 		hr = Util::HrStreamToString(lpUncompressedRTFStream, strRtf);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to read RTF-text stream. Error: 0x%08X", hr);
+			ec_log_err("Unable to read RTF-text stream. Error: 0x%08X", hr);
 			goto exit;
 		}
 
-		if (isrtfhtml(strRtf.c_str(), strRtf.size()) || sopt.use_tnef == -1)
+		if (isrtfhtml(strRtf.c_str(), strRtf.size()) ||
+			(sopt.use_tnef == -1 && !isrtftext(strRtf.c_str(), strRtf.size())))
 		{
 			// Open html
-			hr = lpMessage->OpenProperty(PR_HTML, &IID_IStream, 0, 0, (LPUNKNOWN *)&lpHTMLStream);
+			object_ptr<IStream> lpHTMLStream;
+
+			hr = lpMessage->OpenProperty(PR_HTML, &IID_IStream, 0, 0, &~lpHTMLStream);
 			if (hr == hrSuccess) {
+
 				hr = Util::HrStreamToString(lpHTMLStream, strHTMLOut);
 				if (hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to read HTML-text stream. Error: 0x%08X", hr);
+					ec_log_warn("Unable to read HTML-text stream. Error: 0x%08X", hr);
 					goto exit;
 				}
 
 				// strHTMLout is now escaped us-ascii HTML, this is what we will be sending
 				// Or, if something failed, the HTML is now empty
-				lpHTMLStream->Release(); lpHTMLStream = NULL;
 				*bestBody = html;
 			} else {
-				lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to open HTML-text stream. Error: 0x%08X", hr);
+				ec_log_warn("Unable to open HTML-text stream. Error: 0x%08X", hr);
 				// continue with plaintext
 			}
 		} else if (isrtftext(strRtf.c_str(), strRtf.size())) {
@@ -1513,18 +1377,19 @@ HRESULT MAPIToVMIME::handleTextparts(IMessage* lpMessage, vmime::messageBuilder 
 		}
 	} else {
 		if (hr != MAPI_E_NOT_FOUND)
-			lpLogger->Log(EC_LOGLEVEL_INFO, "Unable to open rtf-text stream. Error: 0x%08X", hr);
+			ec_log_info("Unable to open rtf-text stream. Error: 0x%08X", hr);
 		hr = hrSuccess;
 	}
 	
 	try {
-		hr = lpMessage->OpenProperty(PR_BODY_W, &IID_IStream, 0, 0, (IUnknown**)&lpBody);
+		object_ptr<IStream> lpBody;
+
+		hr = lpMessage->OpenProperty(PR_BODY_W, &IID_IStream, 0, 0, &~lpBody);
 		if (hr == hrSuccess) {
 			hr = Util::HrStreamToString(lpBody, strBody);
-			lpBody->Release(); lpBody = NULL;
 		} else {
 			if (hr != MAPI_E_NOT_FOUND)
-				lpLogger->Log(EC_LOGLEVEL_INFO, "Unable to open plain-text stream. Error: 0x%08X", hr);
+				ec_log_info("Unable to open plain-text stream. Error: 0x%08X", hr);
 			hr = hrSuccess;
 		}
 
@@ -1540,65 +1405,48 @@ HRESULT MAPIToVMIME::handleTextparts(IMessage* lpMessage, vmime::messageBuilder 
 				// convert from HTML charset to vmime output charset
 				strHTMLOut = m_converter.convert_to<string>(m_vmCharset.getName().c_str(), strHTMLOut, rawsize(strHTMLOut), m_strHTMLCharset.c_str());
 			}
-			vmime::ref<vmime::mapiTextPart> textPart = lpVMMessageBuilder->getTextPart().dynamicCast<vmime::mapiTextPart>();
-			textPart->setText(vmime::create<vmime::stringContentHandler>(strHTMLOut));
+			vmime::shared_ptr<vmime::mapiTextPart> textPart = vmime::dynamicCast<vmime::mapiTextPart>(lpVMMessageBuilder->getTextPart());
+			textPart->setText(vmime::make_shared<vmime::stringContentHandler>(strHTMLOut));
 			textPart->setCharset(m_vmCharset);
 			if (!strBodyConverted.empty())
-				textPart->setPlainText(vmime::create<vmime::stringContentHandler>(strBodyConverted));
-		} else { // else just plaintext
-			if (!strBodyConverted.empty()) {
-				// make sure we give vmime CRLF data, so SMTP servers (qmail) won't complain on the forced plaintext
-				char *crlfconv = NULL;
-				size_t outsize = 0;
-				crlfconv = new char[strBodyConverted.length()*2+1];
-				BufferLFtoCRLF(strBodyConverted.length(), strBodyConverted.c_str(), crlfconv, &outsize);
-				strBodyConverted.assign(crlfconv, outsize);
-				delete [] crlfconv;
+				textPart->setPlainText(vmime::make_shared<vmime::stringContentHandler>(strBodyConverted));
+		}
+		// else just plaintext
+		else if (!strBodyConverted.empty()) {
+			// make sure we give vmime CRLF data, so SMTP servers (qmail) won't complain on the forced plaintext
+			std::unique_ptr<char[]> crlfconv(new char[strBodyConverted.length()*2+1]);
+			size_t outsize = 0;
+			BufferLFtoCRLF(strBodyConverted.length(), strBodyConverted.c_str(), crlfconv.get(), &outsize);
+			strBodyConverted.assign(crlfconv.get(), outsize);
 
-				// encode to q-p ourselves
-				vmime::utility::inputStreamStringAdapter in(strBodyConverted);
-				vmime::string outString;
-				vmime::utility::outputStreamStringAdapter out(outString);
-
-				vmBodyEncoder->encode(in, out);
-
-				lpVMMessageBuilder->getTextPart()->setCharset(m_vmCharset);
-				lpVMMessageBuilder->getTextPart().dynamicCast<vmime::mapiTextPart>()->setPlainText(vmime::create<vmime::stringContentHandler>(outString, bodyEncoding));
-			}
+			// encode to q-p ourselves
+			vmime::utility::inputStreamStringAdapter in(strBodyConverted);
+			vmime::string outString;
+			vmime::utility::outputStreamStringAdapter out(outString);
+			vmBodyEncoder->encode(in, out);
+			lpVMMessageBuilder->getTextPart()->setCharset(m_vmCharset);
+			vmime::dynamicCast<vmime::mapiTextPart>(lpVMMessageBuilder->getTextPart())->setPlainText(vmime::make_shared<vmime::stringContentHandler>(outString, bodyEncoding));
 		}
 	}
 	catch (vmime::exception& e) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "VMIME exception: %s", e.what());
+		ec_log_err("VMIME exception: %s", e.what());
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
 	}
 	catch (std::exception& e) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "STD exception on text part: %s", e.what());
+		ec_log_err("STD exception on text part: %s", e.what());
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
 	}
 	catch (...) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unknown generic exception on text part");
+		ec_log_err("Unknown generic exception on text part");
 		hr = MAPI_E_CALL_FAILED;
 		goto exit;
 	}
 
 exit:
 	if (hr != hrSuccess)
-		lpLogger->Log(EC_LOGLEVEL_WARNING, "Could not parse mail body");
-
-	if (lpHTMLStream)
-		lpHTMLStream->Release();
-
-	if (lpBody)
-		lpBody->Release();
-
-	if (lpUncompressedRTFStream)
-		lpUncompressedRTFStream->Release();
-		
-	if (lpCompressedRTFStream)
-		lpCompressedRTFStream->Release(); 
-
+		ec_log_warn("Could not parse mail body");
 	return hr;
 }
 
@@ -1610,21 +1458,23 @@ exit:
  * @param[in]	vmHeader	vmime header object to add X headers to
  * @return Mapi error code
  */
-HRESULT MAPIToVMIME::handleXHeaders(IMessage *lpMessage, vmime::ref<vmime::header> vmHeader) {
+HRESULT MAPIToVMIME::handleXHeaders(IMessage *lpMessage,
+    vmime::shared_ptr<vmime::header> vmHeader, unsigned int flags)
+{
 	HRESULT hr;
 	ULONG i;
 	ULONG cValues;
-	LPSPropTagArray lpsAllTags = NULL;
-	LPSPropTagArray lpsNamedTags = NULL;
-	LPSPropValue lpPropArray = NULL;
+	memory_ptr<SPropTagArray> lpsNamedTags;
+	memory_ptr<SPropTagArray> lpsAllTags;
+	memory_ptr<SPropValue> lpPropArray;
 	ULONG cNames;
-	LPMAPINAMEID *lppNames = NULL;
-	vmime::headerFieldFactory* hff = vmime::headerFieldFactory::getInstance();
+	memory_ptr<MAPINAMEID *> lppNames;
+	auto hff = vmime::headerFieldFactory::getInstance();
 
 	// get all props on message
-	hr = lpMessage->GetPropList(0, &lpsAllTags);
+	hr = lpMessage->GetPropList(0, &~lpsAllTags);
 	if (FAILED(hr))
-		goto exit;
+		return hr;
 
 	// find number of named props, which contain a string
 	cNames = 0;
@@ -1634,11 +1484,10 @@ HRESULT MAPIToVMIME::handleXHeaders(IMessage *lpMessage, vmime::ref<vmime::heade
 
 	// no string named properties found, we're done.
 	if (cNames == 0)
-		goto exit;
-
-	hr = MAPIAllocateBuffer(CbNewSPropTagArray(cNames), (void **)&lpsNamedTags);
+		return hr;
+	hr = MAPIAllocateBuffer(CbNewSPropTagArray(cNames), &~lpsNamedTags);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	lpsNamedTags->cValues = cNames;
 
 	// make named prop array
@@ -1647,51 +1496,39 @@ HRESULT MAPIToVMIME::handleXHeaders(IMessage *lpMessage, vmime::ref<vmime::heade
 		if (PROP_ID(lpsAllTags->aulPropTag[i]) >= 0x8000 && PROP_TYPE(lpsAllTags->aulPropTag[i]) == PT_STRING8)
 			lpsNamedTags->aulPropTag[cNames++] = lpsAllTags->aulPropTag[i];
 	
-	hr = lpMessage->GetNamesFromIDs(&lpsNamedTags, NULL, 0, &cNames, &lppNames);
+	hr = lpMessage->GetNamesFromIDs(&+lpsNamedTags, NULL, 0, &cNames, &~lppNames);
 	if (FAILED(hr))
-		goto exit;
-
-	hr = lpMessage->GetProps(lpsNamedTags, 0, &cValues, &lpPropArray);
+		return hr;
+	hr = lpMessage->GetProps(lpsNamedTags, 0, &cValues, &~lpPropArray);
 	if (FAILED(hr))
-		goto exit;
+		return hr;
 
 	for (i = 0; i < cNames; ++i) {
-		if (lppNames[i] && lppNames[i]->ulKind == MNID_STRING && lppNames[i]->Kind.lpwstrName &&
-			PROP_TYPE(lpPropArray[i].ulPropTag) == PT_STRING8)
-		{
-			char *str;
-			int l = wcstombs(NULL, lppNames[i]->Kind.lpwstrName, 0) +1;
-			str = new char[l];
-			wcstombs(str, lppNames[i]->Kind.lpwstrName, l);
+		if (lppNames[i] == nullptr ||
+		    lppNames[i]->ulKind != MNID_STRING ||
+		    lppNames[i]->Kind.lpwstrName == nullptr ||
+		    PROP_TYPE(lpPropArray[i].ulPropTag) != PT_STRING8)
+			continue;
 
-			if ((str[0] == 'X' || str[0] == 'x') && str[1] == '-') {
-				if (str[0] == 'x')
-					capitalize(str);
+		std::unique_ptr<char[]> str;
+		int l = wcstombs(NULL, lppNames[i]->Kind.lpwstrName, 0) +1;
+		str.reset(new char[l]);
+		wcstombs(str.get(), lppNames[i]->Kind.lpwstrName, l);
 
-				// keep the original x-mailer header under a different name
-				// we still want to know that this mail was generated by kopano in the x-mailer header from handleExtraHeaders
-				if (strcasecmp(str, "X-Mailer") == 0) {
-					delete [] str;
-					str = new char[18];
-					strcpy(str, "X-Original-Mailer");
-				}
+		if ((str[0] == 'X' || str[0] == 'x') && str[1] == '-') {
+			if (str[0] == 'x')
+				capitalize(str.get());
 
-				try {
-					vmHeader->findField(str);
-				}
-				catch (vmime::exceptions::no_such_field) {
-					vmHeader->appendField(hff->create(str, lpPropArray[i].Value.lpszA));
-				}
+			// keep the original x-mailer header under a different name
+			// we still want to know that this mail was generated by kopano in the x-mailer header from handleExtraHeaders
+			if (flags & MTV_SPOOL && strcasecmp(str.get(), "X-Mailer") == 0) {
+				str.reset(new char[18]);
+				strcpy(str.get(), "X-Original-Mailer");
 			}
-			delete [] str;
+			if (!vmHeader->hasField(str.get()))
+				vmHeader->appendField(hff->create(str.get(), lpPropArray[i].Value.lpszA));
 		}
 	}
-
-exit:
-	MAPIFreeBuffer(lpPropArray);
-	MAPIFreeBuffer(lpsNamedTags);
-	MAPIFreeBuffer(lpsAllTags);
-	MAPIFreeBuffer(lppNames);
 	return hr;
 }
 
@@ -1706,65 +1543,61 @@ exit:
  * \li Thread-Index
  * \li Thread-Topic
  * \li Sensitivity
- * \li Expity-Time
+ * \li Expiry-Time
  *  
  * @param[in]	lpMessage	Message to convert extra headers for
  * @param[in]	charset		Charset to use in Thread-Topic header
  * @param[in]	vmHeader	Add headers to this vmime header object
  * @return always hrSuccess
  */
-HRESULT MAPIToVMIME::handleExtraHeaders(IMessage *lpMessage, vmime::ref<vmime::header> vmHeader) {
-	HRESULT hr = hrSuccess;
+HRESULT MAPIToVMIME::handleExtraHeaders(IMessage *lpMessage,
+    vmime::shared_ptr<vmime::header> vmHeader, unsigned int flags)
+{
 	SPropValuePtr ptrMessageId;
-	LPSPropValue lpImportance = NULL;
-	LPSPropValue lpPriority = NULL;
-	LPSPropValue lpConversationIndex = NULL;
-	LPSPropValue lpConversationTopic = NULL;
-	LPSPropValue lpNormSubject = NULL;
-	LPSPropValue lpSensitivity = NULL;
-	vmime::headerFieldFactory* hff = vmime::headerFieldFactory::getInstance();
-	LPSPropValue lpExpiryTime = NULL;
+	memory_ptr<SPropValue> lpImportance, lpPriority, lpConversationIndex;
+	memory_ptr<SPropValue> lpConversationTopic, lpNormSubject;
+	memory_ptr<SPropValue> lpSensitivity, lpExpiryTime;
+	auto hff = vmime::headerFieldFactory::getInstance();
 
 	// Conversation headers. New Message-Id header is set just before sending.
-	if (HrGetOneProp(lpMessage, PR_IN_REPLY_TO_ID_A, &ptrMessageId) == hrSuccess && ptrMessageId->Value.lpszA[0]) {
-		vmime::ref<vmime::messageId> mid = vmime::create<vmime::messageId>(ptrMessageId->Value.lpszA);
-		vmHeader->InReplyTo()->getValue().dynamicCast<vmime::messageIdSequence>()->appendMessageId(mid);
+	if (HrGetOneProp(lpMessage, PR_IN_REPLY_TO_ID_A, &~ptrMessageId) == hrSuccess && ptrMessageId->Value.lpszA[0]) {
+		vmime::shared_ptr<vmime::messageId> mid = vmime::make_shared<vmime::messageId>(ptrMessageId->Value.lpszA);
+		vmime::dynamicCast<vmime::messageIdSequence>(vmHeader->InReplyTo()->getValue())->appendMessageId(mid);
 	}
 
 	// Outlook never adds this property
-	if (HrGetOneProp(lpMessage, PR_INTERNET_REFERENCES_A, &ptrMessageId) == hrSuccess && ptrMessageId->Value.lpszA[0]) {
-		std::vector<std::string> ids;
-		boost::split(ids, ptrMessageId->Value.lpszA, boost::is_any_of(" "));
+	if (HrGetOneProp(lpMessage, PR_INTERNET_REFERENCES_A, &~ptrMessageId) == hrSuccess && ptrMessageId->Value.lpszA[0]) {
+		std::vector<std::string> ids = tokenize(ptrMessageId->Value.lpszA, ' ', true);
 
 		const size_t n = ids.size();
 		for (size_t i = 0; i < n; ++i) {
-			vmime::ref<vmime::messageId> mid = vmime::create<vmime::messageId>(ids.at(i));
-
-			vmHeader->References()->getValue().dynamicCast<vmime::messageIdSequence>()->appendMessageId(mid);
+			vmime::shared_ptr<vmime::messageId> mid = vmime::make_shared<vmime::messageId>(ids.at(i));
+			vmime::dynamicCast<vmime::messageIdSequence>(vmHeader->References()->getValue())->appendMessageId(mid);
 		}
 	}
 
 	// only for message-in-message items, add Message-ID header from MAPI
-	if (sopt.msg_in_msg && HrGetOneProp(lpMessage, PR_INTERNET_MESSAGE_ID_A, &ptrMessageId) == hrSuccess && ptrMessageId->Value.lpszA[0])
+	if (sopt.msg_in_msg && HrGetOneProp(lpMessage, PR_INTERNET_MESSAGE_ID_A, &~ptrMessageId) == hrSuccess && ptrMessageId->Value.lpszA[0])
 		vmHeader->MessageId()->setValue(ptrMessageId->Value.lpszA);
 
 	// priority settings
 	static const char *const priomap[3] = { "5 (Lowest)", "3 (Normal)", "1 (Highest)" }; // 2 and 4 cannot be set from outlook
-	if (HrGetOneProp(lpMessage, PR_IMPORTANCE, &lpImportance) == hrSuccess)
+	if (HrGetOneProp(lpMessage, PR_IMPORTANCE, &~lpImportance) == hrSuccess)
 		vmHeader->appendField(hff->create("X-Priority", priomap[min(2, (int)(lpImportance->Value.ul)&3)])); // IMPORTANCE_* = 0..2
-	else if (HrGetOneProp(lpMessage, PR_PRIORITY, &lpPriority) == hrSuccess)
+	else if (HrGetOneProp(lpMessage, PR_PRIORITY, &~lpPriority) == hrSuccess)
 		vmHeader->appendField(hff->create("X-Priority", priomap[min(2, (int)(lpPriority->Value.ul+1)&3)])); // PRIO_* = -1..1
 
 	// When adding a X-Priority, spamassassin may add a severe punishment because no User-Agent header
 	// or X-Mailer header is present. So we set the X-Mailer header :)
-	vmHeader->appendField(hff->create("X-Mailer", "Kopano " PROJECT_VERSION_DOT_STR "-" PROJECT_SVN_REV_STR));
+	if (flags & MTV_SPOOL)
+		vmHeader->appendField(hff->create("X-Mailer", "Kopano " PROJECT_VERSION_DOT_STR "-" PROJECT_SVN_REV_STR));
 
 	// PR_CONVERSATION_INDEX
-	if (HrGetOneProp(lpMessage, PR_CONVERSATION_INDEX, &lpConversationIndex) == hrSuccess) {
+	if (HrGetOneProp(lpMessage, PR_CONVERSATION_INDEX, &~lpConversationIndex) == hrSuccess) {
 		vmime::string inString;
 		inString.assign((const char*)lpConversationIndex->Value.bin.lpb, lpConversationIndex->Value.bin.cb);
 
-		vmime::ref<vmime::utility::encoder::encoder> enc = vmime::utility::encoder::encoderFactory::getInstance()->create("base64");
+		vmime::shared_ptr<vmime::utility::encoder::encoder> enc = vmime::utility::encoder::encoderFactory::getInstance()->create("base64");
 		vmime::utility::inputStreamStringAdapter in(inString);
 		vmime::string outString;
 		vmime::utility::outputStreamStringAdapter out(outString);
@@ -1775,16 +1608,13 @@ HRESULT MAPIToVMIME::handleExtraHeaders(IMessage *lpMessage, vmime::ref<vmime::h
 	}
 
 	// PR_CONVERSATION_TOPIC is always the original started topic
-	if (HrGetOneProp(lpMessage, PR_CONVERSATION_TOPIC_W, &lpConversationTopic) == hrSuccess) {
-		if (HrGetOneProp(lpMessage, PR_NORMALIZED_SUBJECT_W, &lpNormSubject) != hrSuccess ||
-			wcscmp(lpNormSubject->Value.lpszW, lpConversationTopic->Value.lpszW) != 0)
-		{
-			removeEnters(lpConversationTopic->Value.lpszW);
-			vmHeader->appendField(hff->create("Thread-Topic", getVmimeTextFromWide(lpConversationTopic->Value.lpszW).generate()));
-		}
+	if (HrGetOneProp(lpMessage, PR_CONVERSATION_TOPIC_W, &~lpConversationTopic) == hrSuccess &&
+	    (HrGetOneProp(lpMessage, PR_NORMALIZED_SUBJECT_W, &~lpNormSubject) != hrSuccess ||
+	    wcscmp(lpNormSubject->Value.lpszW, lpConversationTopic->Value.lpszW) != 0)) {
+		removeEnters(lpConversationTopic->Value.lpszW);
+		vmHeader->appendField(hff->create("Thread-Topic", getVmimeTextFromWide(lpConversationTopic->Value.lpszW).generate()));
 	}
-
-	if (HrGetOneProp(lpMessage, PR_SENSITIVITY, &lpSensitivity) == hrSuccess) {
+	if (HrGetOneProp(lpMessage, PR_SENSITIVITY, &~lpSensitivity) == hrSuccess) {
 		const char *strSens;
 		switch (lpSensitivity->Value.ul) {
 		case SENSITIVITY_PERSONAL:
@@ -1804,19 +1634,25 @@ HRESULT MAPIToVMIME::handleExtraHeaders(IMessage *lpMessage, vmime::ref<vmime::h
 		if (strSens)
 			vmHeader->appendField(hff->create("Sensitivity", strSens));
 	}
-
-	if (HrGetOneProp(lpMessage, PR_EXPIRY_TIME, &lpExpiryTime) == hrSuccess)
+	if (HrGetOneProp(lpMessage, PR_EXPIRY_TIME, &~lpExpiryTime) == hrSuccess)
 		vmHeader->appendField(hff->create("Expiry-Time", FiletimeTovmimeDatetime(lpExpiryTime->Value.ft).generate()));
 
-//exit:
-	MAPIFreeBuffer(lpExpiryTime);
-	MAPIFreeBuffer(lpImportance);
-	MAPIFreeBuffer(lpPriority);
-	MAPIFreeBuffer(lpSensitivity);
-	MAPIFreeBuffer(lpConversationIndex);
-	MAPIFreeBuffer(lpConversationTopic);
-	MAPIFreeBuffer(lpNormSubject);
-	return hr;
+	if (flags & MTV_SPOOL) {
+		char buffer[4096] = {0};
+
+		if (gethostname(buffer, sizeof buffer) == -1)
+			strcpy(buffer, "???");
+
+		vmime::relay relay;
+		relay.setBy(std::string(buffer) + " (kopano-spooler)");
+		relay.getWithList().push_back("MAPI");
+		auto now = vmime::datetime::now();
+		relay.setDate(now);
+		auto header_field = hff->create("Received");
+		header_field->setValue(relay);
+		vmHeader->insertFieldBefore(0, header_field);
+	}
+	return hrSuccess;
 }
 
 /**
@@ -1838,10 +1674,10 @@ HRESULT MAPIToVMIME::handleContactEntryID(ULONG cValues, LPSPropValue lpProps, w
 	LPCONTAB_ENTRYID lpContabEntryID = NULL;
 	GUID* guid = NULL;
 	ULONG ulObjType;
-	LPSPropTagArray lpNameTags = NULL;
-	LPSPropValue lpNamedProps = NULL;
-	LPMAILUSER lpContact = NULL;
-	LPMAPINAMEID *lppNames = NULL;
+	memory_ptr<SPropTagArray> lpNameTags;
+	memory_ptr<SPropValue> lpNamedProps;
+	object_ptr<IMailUser> lpContact;
+	memory_ptr<MAPINAMEID *> lppNames;
 	ULONG i;
 	ULONG ulNames = 5;
 	MAPINAMEID mnNamedProps[5] = {
@@ -1853,65 +1689,51 @@ HRESULT MAPIToVMIME::handleContactEntryID(ULONG cValues, LPSPropValue lpProps, w
 		{(LPGUID)&PSETID_Address, MNID_ID, {0x8085}}, // real entryid
 	};
 
-	if (PROP_TYPE(lpProps[0].ulPropTag) != PT_BINARY) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
+	if (PROP_TYPE(lpProps[0].ulPropTag) != PT_BINARY)
+		return MAPI_E_NOT_FOUND;
 
 	lpContabEntryID = (LPCONTAB_ENTRYID)lpProps[0].Value.bin.lpb;
-	if (lpContabEntryID == NULL) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
+	if (lpContabEntryID == NULL)
+		return MAPI_E_NOT_FOUND;
 	guid = (GUID*)&lpContabEntryID->muid;
-	if (sizeof(CONTAB_ENTRYID) > lpProps[0].Value.bin.cb || *guid != PSETID_CONTACT_FOLDER_RECIPIENT || lpContabEntryID->email_offset > 2) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
-	hr = m_lpSession->OpenEntry(lpContabEntryID->cbeid, (LPENTRYID)lpContabEntryID->abeid, NULL, 0, &ulObjType, (LPUNKNOWN*)&lpContact);
+	if (sizeof(CONTAB_ENTRYID) > lpProps[0].Value.bin.cb ||
+	    *guid != PSETID_CONTACT_FOLDER_RECIPIENT ||
+	    lpContabEntryID->email_offset > 2)
+		return MAPI_E_NOT_FOUND;
+	hr = m_lpSession->OpenEntry(lpContabEntryID->cbeid, reinterpret_cast<ENTRYID *>(lpContabEntryID->abeid), nullptr, 0, &ulObjType, &~lpContact);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// add offset to get correct named properties
 	for (i = 0; i < ulNames; ++i)
 		mnNamedProps[i].Kind.lID += (lpContabEntryID->email_offset * 0x10);
 
-	hr = MAPIAllocateBuffer(sizeof(LPMAPINAMEID) * (ulNames), (void**)&lppNames);
+	hr = MAPIAllocateBuffer(sizeof(LPMAPINAMEID) * (ulNames), &~lppNames);
 	if (hr != hrSuccess) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "No memory for named ids from contact");
-		goto exit;
+		ec_log_err("No memory for named ids from contact");
+		return hr;
 	}
 
 	for (i = 0; i < ulNames; ++i)
 		lppNames[i] = &mnNamedProps[i];
 
-	hr = lpContact->GetIDsFromNames(ulNames, lppNames, MAPI_CREATE, &lpNameTags);
+	hr = lpContact->GetIDsFromNames(ulNames, lppNames, MAPI_CREATE, &~lpNameTags);
 	if (FAILED(hr))
-		goto exit;
+		return hr;
 
 	lpNameTags->aulPropTag[0] = CHANGE_PROP_TYPE(lpNameTags->aulPropTag[0], PT_UNICODE);
 	lpNameTags->aulPropTag[1] = CHANGE_PROP_TYPE(lpNameTags->aulPropTag[1], PT_UNICODE);
 	lpNameTags->aulPropTag[2] = CHANGE_PROP_TYPE(lpNameTags->aulPropTag[2], PT_UNICODE);
 	lpNameTags->aulPropTag[3] = CHANGE_PROP_TYPE(lpNameTags->aulPropTag[3], PT_UNICODE); // unused
 	lpNameTags->aulPropTag[4] = CHANGE_PROP_TYPE(lpNameTags->aulPropTag[4], PT_BINARY);
-
-	hr = lpContact->GetProps(lpNameTags, 0, &ulNames, &lpNamedProps);
+	hr = lpContact->GetProps(lpNameTags, 0, &ulNames, &~lpNamedProps);
 	if (FAILED(hr))
-		goto exit;
+		return hr;
 
-	hr = HrGetAddress(m_lpAdrBook, lpNamedProps, ulNames,
-					  lpNameTags->aulPropTag[4], lpNameTags->aulPropTag[0], lpNameTags->aulPropTag[1], lpNameTags->aulPropTag[2],
-					  strName, strType, strEmail);
-
-exit:
-	MAPIFreeBuffer(lpNamedProps);
-	MAPIFreeBuffer(lpNameTags);
-	if (lpContact)
-		lpContact->Release();
-	MAPIFreeBuffer(lppNames);
-	return hr;
+	return HrGetAddress(m_lpAdrBook, lpNamedProps, ulNames,
+	       lpNameTags->aulPropTag[4], lpNameTags->aulPropTag[0],
+	       lpNameTags->aulPropTag[1], lpNameTags->aulPropTag[2],
+	       strName, strType, strEmail);
 }
 
 /**
@@ -1922,68 +1744,53 @@ exit:
  * @param[in]	vmHeader	vmime header object to modify.
  * @return Mapi error code
  */
-HRESULT MAPIToVMIME::handleSenderInfo(IMessage *lpMessage, vmime::ref<vmime::header> vmHeader) {
-	HRESULT hr = hrSuccess;
+HRESULT MAPIToVMIME::handleSenderInfo(IMessage *lpMessage,
+    vmime::shared_ptr<vmime::header> vmHeader)
+{
 	ULONG cValues;
-	LPSPropValue lpProps = NULL;
-	LPSPropTagArray lpPropTags = NULL;
-	LPSPropValue lpReadReceipt = NULL;
+	memory_ptr<SPropValue> lpProps, lpReadReceipt;
 
 	// sender information
 	std::wstring strEmail, strName, strType;
 	std::wstring strResEmail, strResName, strResType;
-
-	hr = MAPIAllocateBuffer(CbNewSPropTagArray(4), (void**)&lpPropTags);
-	if (hr != hrSuccess)
-		goto exit;
-
-	lpPropTags->cValues = 4;
-	lpPropTags->aulPropTag[0] = PR_SENDER_ENTRYID;
-	lpPropTags->aulPropTag[1] = PR_SENDER_NAME_W;
-	lpPropTags->aulPropTag[2] = PR_SENDER_ADDRTYPE_W;
-	lpPropTags->aulPropTag[3] = PR_SENDER_EMAIL_ADDRESS_W;
-
-	hr = lpMessage->GetProps(lpPropTags, 0, &cValues, &lpProps);
+	static constexpr const SizedSPropTagArray(4, sender_proptags) =
+		{4, {PR_SENDER_ENTRYID, PR_SENDER_NAME_W,
+		PR_SENDER_ADDRTYPE_W, PR_SENDER_EMAIL_ADDRESS_W}};
+	HRESULT hr = lpMessage->GetProps(sender_proptags, 0, &cValues, &~lpProps);
 	if (FAILED(hr))
-		goto exit;
+		return hr;
 
 	hr = handleContactEntryID(cValues, lpProps, strName, strType, strEmail);
 	if (hr != hrSuccess) {
 		// Store owner, actual sender
 		hr = HrGetAddress(m_lpAdrBook, lpProps, cValues, PR_SENDER_ENTRYID, PR_SENDER_NAME_W, PR_SENDER_ADDRTYPE_W, PR_SENDER_EMAIL_ADDRESS_W, strName, strType, strEmail);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to get sender information. Error: 0x%08X", hr);
-			goto exit;
+			ec_log_err("Unable to get sender information. Error: 0x%08X", hr);
+			return hr;
 		}
 	}
 
-	MAPIFreeBuffer(lpProps);
-	lpProps = NULL;
-
 	// -- sender
-	lpPropTags->cValues = 4;
-	lpPropTags->aulPropTag[0] = PR_SENT_REPRESENTING_ENTRYID;
-	lpPropTags->aulPropTag[1] = PR_SENT_REPRESENTING_NAME_W;
-	lpPropTags->aulPropTag[2] = PR_SENT_REPRESENTING_ADDRTYPE_W;
-	lpPropTags->aulPropTag[3] = PR_SENT_REPRESENTING_EMAIL_ADDRESS_W;
-
-	hr = lpMessage->GetProps(lpPropTags, 0, &cValues, &lpProps);
+	static constexpr const SizedSPropTagArray(4, repr_proptags) =
+		{4, {PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_NAME_W,
+		PR_SENT_REPRESENTING_ADDRTYPE_W,
+		PR_SENT_REPRESENTING_EMAIL_ADDRESS_W}};
+	hr = lpMessage->GetProps(repr_proptags, 0, &cValues, &~lpProps);
 	if (FAILED(hr))
-		goto exit;
+		return hr;
 
 	hr = handleContactEntryID(cValues, lpProps, strResName, strResType, strResEmail);
 	if (hr != hrSuccess) {
 		hr = HrGetAddress(m_lpAdrBook, lpProps, cValues, PR_SENT_REPRESENTING_ENTRYID, PR_SENT_REPRESENTING_NAME_W, PR_SENT_REPRESENTING_ADDRTYPE_W, PR_SENT_REPRESENTING_EMAIL_ADDRESS_W, strResName, strResType, strResEmail);
 		if (hr != hrSuccess) {
-			lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to get representing information. Error: 0x%08X", hr);
+			ec_log_warn("Unable to get representing information. Error: 0x%08X", hr);
 			// ignore error, since we still have enough information to send, maybe not just under the correct name
 			hr = hrSuccess;
 		}
 		if (sopt.no_recipients_workaround == false && strResEmail.empty() && PROP_TYPE(lpProps[0].ulPropTag) != PT_ERROR) {
 			m_strError = L"Representing email address is empty";
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "%ls", m_strError.c_str());
-			hr = MAPI_E_NOT_FOUND;
-			goto exit;
+			ec_log_err("%ls", m_strError.c_str());
+			return MAPI_E_NOT_FOUND;
 		}
 	}
 
@@ -2003,43 +1810,36 @@ HRESULT MAPIToVMIME::handleSenderInfo(IMessage *lpMessage, vmime::ref<vmime::hea
 			else
 				vmHeader->Sender()->setValue(vmime::mailbox(getVmimeTextFromWide(strName), m_converter.convert_to<string>(strEmail)));
 		}
-	} else {
+	} else if (strName.empty() || strName == strEmail) {
 		// Set store owner as from, sender does not need to be set
-		if (strName.empty() || strName == strEmail) 
-			vmHeader->From()->setValue(vmime::mailbox(m_converter.convert_to<string>(strEmail)));
-		else
-			vmHeader->From()->setValue(vmime::mailbox(getVmimeTextFromWide(strName), m_converter.convert_to<string>(strEmail)));
+		vmHeader->From()->setValue(vmime::mailbox(m_converter.convert_to<string>(strEmail)));
+	} else {
+		vmHeader->From()->setValue(vmime::mailbox(getVmimeTextFromWide(strName), m_converter.convert_to<string>(strEmail)));
 	}
 
 	// read receipt request
-	if (HrGetOneProp(lpMessage, PR_READ_RECEIPT_REQUESTED, &lpReadReceipt) == hrSuccess && lpReadReceipt->Value.b == TRUE) {
+	if (HrGetOneProp(lpMessage, PR_READ_RECEIPT_REQUESTED, &~lpReadReceipt) == hrSuccess && lpReadReceipt->Value.b == TRUE) {
 		vmime::mailboxList mbl;
 		if (!strResEmail.empty() && strResEmail != strEmail) {
 			// use user added from address
 			if (strResName.empty() || strName == strResEmail)
-				mbl.appendMailbox(vmime::create<vmime::mailbox>(m_converter.convert_to<string>(strResEmail)));
+				mbl.appendMailbox(vmime::make_shared<vmime::mailbox>(m_converter.convert_to<string>(strResEmail)));
 			else
-				mbl.appendMailbox(vmime::create<vmime::mailbox>(getVmimeTextFromWide(strResName), m_converter.convert_to<string>(strResEmail)));
+				mbl.appendMailbox(vmime::make_shared<vmime::mailbox>(getVmimeTextFromWide(strResName), m_converter.convert_to<string>(strResEmail)));
+		} else if (strName.empty() || strName == strEmail) {
+			mbl.appendMailbox(vmime::make_shared<vmime::mailbox>(m_converter.convert_to<string>(strEmail)));
 		} else {
-			if (strName.empty() || strName == strEmail)
-				mbl.appendMailbox(vmime::create<vmime::mailbox>(m_converter.convert_to<string>(strEmail)));
-			else
-				mbl.appendMailbox(vmime::create<vmime::mailbox>(getVmimeTextFromWide(strName), m_converter.convert_to<string>(strEmail)));
+			mbl.appendMailbox(vmime::make_shared<vmime::mailbox>(getVmimeTextFromWide(strName), m_converter.convert_to<string>(strEmail)));
 		}
 		vmHeader->DispositionNotificationTo()->setValue(mbl);
 	}
-
-exit:
-	MAPIFreeBuffer(lpPropTags);
-	MAPIFreeBuffer(lpProps);
-	MAPIFreeBuffer(lpReadReceipt);
-	return hr;
+	return hrSuccess;
 }
 
 /**
  * Set Reply-To header.
  *
- * @note In RFC-822 and MAPI, you can set multiple Reply-To
+ * @note In RFC 2822 and MAPI, you can set multiple Reply-To
  * values. However, in vmime this is currently not possible, so we
  * only convert the first.
  *
@@ -2048,67 +1848,60 @@ exit:
  * @param[in]	vmHeader	vmime header object to modify.
  * @return Mapi error code
  */
-HRESULT MAPIToVMIME::handleReplyTo(IMessage *lpMessage, vmime::ref<vmime::header> vmHeader) {
+HRESULT MAPIToVMIME::handleReplyTo(IMessage *lpMessage,
+    vmime::shared_ptr<vmime::header> vmHeader)
+{
 	HRESULT			hr = hrSuccess;
-	LPSPropValue	lpReplyTo = NULL;
 	FLATENTRYLIST	*lpEntryList = NULL;
 	FLATENTRY		*lpEntry = NULL;
 	LPCONTAB_ENTRYID lpContabEntryID = NULL;
 	GUID*			guid = NULL;
 	ULONG			ulObjType;
-	LPMAILUSER		lpContact = NULL;
+	object_ptr<IMailUser> lpContact;
 	wstring			strName, strType, strEmail;
 
 	// "Email1DisplayName","Email1AddressType","Email1Address","Email1EntryID"
-	ULONG lpulNamesIDs[] = {0x8080, 0x8082, 0x8083, 0x8085,
-							0x8090, 0x8092, 0x8093, 0x8095,
-							0x80A0, 0x80A2, 0x80A3, 0x80A5};
+	static const ULONG lpulNamesIDs[] = {0x8080, 0x8082, 0x8083, 0x8085,
+				0x8090, 0x8092, 0x8093, 0x8095,
+				0x80A0, 0x80A2, 0x80A3, 0x80A5};
 	ULONG cNames, i, offset;
-	LPMAPINAMEID lpNames = NULL;
-	LPMAPINAMEID *lppNames = NULL;
-	LPSPropTagArray lpNameTagArray = NULL;
-	LPSPropValue lpAddressProps = NULL;
+	memory_ptr<MAPINAMEID> lpNames;
+	memory_ptr<MAPINAMEID *> lppNames;
+	memory_ptr<SPropTagArray> lpNameTagArray;
+	memory_ptr<SPropValue> lpAddressProps, lpReplyTo;
 
-	if (HrGetOneProp(lpMessage, PR_REPLY_RECIPIENT_ENTRIES, &lpReplyTo) != hrSuccess)
-		goto exit;
-
+	if (HrGetOneProp(lpMessage, PR_REPLY_RECIPIENT_ENTRIES, &~lpReplyTo) != hrSuccess)
+		return hr;
 	if (lpReplyTo->Value.bin.cb == 0)
-		goto exit;
-
+		return hr;
 	lpEntryList = (FLATENTRYLIST *)lpReplyTo->Value.bin.lpb;
 
 	if (lpEntryList->cEntries == 0)
-		goto exit;
+		return hr;
 
 	lpEntry = (FLATENTRY *)&lpEntryList->abEntries;
 
 	hr = HrGetAddress(m_lpAdrBook, (LPENTRYID)lpEntry->abEntry, lpEntry->cb, strName, strType, strEmail);
 	if (hr != hrSuccess) {
-		if (!m_lpSession) {
-			hr = MAPI_E_INVALID_PARAMETER;
-			goto exit;
-		}
+		if (m_lpSession == nullptr)
+			return MAPI_E_INVALID_PARAMETER;
 
 		// user selected a contact (or distrolist ?) in the reply-to
 		lpContabEntryID = (LPCONTAB_ENTRYID)lpEntry->abEntry;
 		guid = (GUID*)&lpContabEntryID->muid;
 
 		if (sizeof(CONTAB_ENTRYID) > lpEntry->cb || *guid != PSETID_CONTACT_FOLDER_RECIPIENT || lpContabEntryID->email_offset > 2)
-			goto exit;
-
-		hr = m_lpSession->OpenEntry(lpContabEntryID->cbeid, (LPENTRYID)lpContabEntryID->abeid, NULL, 0, &ulObjType, (LPUNKNOWN*)&lpContact);
+			return hr;
+		hr = m_lpSession->OpenEntry(lpContabEntryID->cbeid, reinterpret_cast<ENTRYID *>(lpContabEntryID->abeid), nullptr, 0, &ulObjType, &~lpContact);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		cNames = ARRAY_SIZE(lpulNamesIDs);
-
-		hr = MAPIAllocateBuffer(sizeof(MAPINAMEID) * cNames, (void**)&lpNames);
+		hr = MAPIAllocateBuffer(sizeof(MAPINAMEID) * cNames, &~lpNames);
 		if (hr != hrSuccess)
-			goto exit;
-
-		hr = MAPIAllocateBuffer(sizeof(LPMAPINAMEID) * cNames, (void**)&lppNames);
+			return hr;
+		hr = MAPIAllocateBuffer(sizeof(LPMAPINAMEID) * cNames, &~lppNames);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		for (i = 0; i < cNames; ++i) {
 			lpNames[i].lpguid = (GUID*)&PSETID_Address;
@@ -2116,21 +1909,19 @@ HRESULT MAPIToVMIME::handleReplyTo(IMessage *lpMessage, vmime::ref<vmime::header
 			lpNames[i].Kind.lID = lpulNamesIDs[i];
 			lppNames[i] = &lpNames[i];
 		}
-
-		hr = lpContact->GetIDsFromNames(cNames, lppNames, 0, &lpNameTagArray);
+		hr = lpContact->GetIDsFromNames(cNames, lppNames, 0, &~lpNameTagArray);
 		if (FAILED(hr))
-			goto exit;
+			return hr;
 
 		// PT_UNSPECIFIED in tagarray, but we want PT_UNICODE
-		hr = lpContact->GetProps(lpNameTagArray, MAPI_UNICODE, &cNames, &lpAddressProps);
+		hr = lpContact->GetProps(lpNameTagArray, MAPI_UNICODE, &cNames, &~lpAddressProps);
 		if (FAILED(hr))
-			goto exit;
-
+			return hr;
 		offset = lpContabEntryID->email_offset * 4; // 4 props per email address
 
 		if (PROP_TYPE(lpAddressProps[offset+0].ulPropTag) == PT_ERROR || PROP_TYPE(lpAddressProps[offset+1].ulPropTag) == PT_ERROR ||
 			PROP_TYPE(lpAddressProps[offset+2].ulPropTag) == PT_ERROR || PROP_TYPE(lpAddressProps[offset+3].ulPropTag) == PT_ERROR)
-			goto exit;
+			return hr;
 
 		if (wcscmp(lpAddressProps[offset+1].Value.lpszW, L"SMTP") == 0) {
 			strName = lpAddressProps[offset+0].Value.lpszW;
@@ -2138,27 +1929,16 @@ HRESULT MAPIToVMIME::handleReplyTo(IMessage *lpMessage, vmime::ref<vmime::header
 		} else if (wcscmp(lpAddressProps[offset+1].Value.lpszW, L"ZARAFA") == 0) {
 			hr = HrGetAddress(m_lpAdrBook, (LPENTRYID)lpAddressProps[offset+2].Value.bin.lpb, lpAddressProps[offset+2].Value.bin.cb, strName, strType, strEmail);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 	}
 
 	// vmime can only set 1 email address in the ReplyTo field.
 	if (!strName.empty() && strName != strEmail)
-		vmHeader->ReplyTo()->setValue(vmime::create<vmime::mailbox>(getVmimeTextFromWide(strName), m_converter.convert_to<string>(strEmail)));
+		vmHeader->ReplyTo()->setValue(vmime::make_shared<vmime::mailbox>(getVmimeTextFromWide(strName), m_converter.convert_to<string>(strEmail)));
 	else
-		vmHeader->ReplyTo()->setValue(vmime::create<vmime::mailbox>(m_converter.convert_to<string>(strEmail)));
-
-	hr = hrSuccess;
-
-exit:
-	MAPIFreeBuffer(lpNames);
-	MAPIFreeBuffer(lppNames);
-	MAPIFreeBuffer(lpNameTagArray);
-	MAPIFreeBuffer(lpAddressProps);
-	if (lpContact)
-		lpContact->Release();
-	MAPIFreeBuffer(lpReplyTo);
-	return hr;
+		vmHeader->ReplyTo()->setValue(vmime::make_shared<vmime::mailbox>(m_converter.convert_to<string>(strEmail)));
+	return hrSuccess;
 }
 
 /**
@@ -2168,21 +1948,43 @@ exit:
 bool MAPIToVMIME::is_voting_request(IMessage *lpMessage)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropTagArray lpPropTags = NULL;
-	LPSPropValue lpPropContentType = NULL;
+	memory_ptr<SPropTagArray> lpPropTags;
+	memory_ptr<SPropValue> lpPropContentType;
 	MAPINAMEID named_prop = {(LPGUID)&PSETID_Common, MNID_ID, {0x8520}};
 	MAPINAMEID *named_proplist = &named_prop;
 
-	hr = lpMessage->GetIDsFromNames(1, &named_proplist, MAPI_CREATE, &lpPropTags);
+	hr = lpMessage->GetIDsFromNames(1, &named_proplist, MAPI_CREATE, &~lpPropTags);
 	if (hr != hrSuccess)
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to read voting property. Error: %s (0x%08X)",
+		ec_log_err("Unable to read voting property. Error: %s (0x%08X)",
 			GetMAPIErrorMessage(hr), hr);
 	else
-		hr = HrGetOneProp(lpMessage, CHANGE_PROP_TYPE(lpPropTags->aulPropTag[0], PT_BINARY), &lpPropContentType);
-
-	MAPIFreeBuffer(lpPropTags);
-	MAPIFreeBuffer(lpPropContentType);
+		hr = HrGetOneProp(lpMessage, CHANGE_PROP_TYPE(lpPropTags->aulPropTag[0], PT_BINARY), &~lpPropContentType);
 	return hr == hrSuccess;
+}
+
+/**
+ * CCheck if the named property exists which denotes if reminder is set
+ */
+bool MAPIToVMIME::has_reminder(IMessage *msg)
+{
+	memory_ptr<SPropTagArray> tags;
+	memory_ptr<SPropValue> content_type;
+	MAPINAMEID named_prop = {const_cast<GUID *>(&PSETID_Common), MNID_ID, {0x8503}};
+	auto named_proplist = &named_prop;
+	bool result = false;
+
+	auto hr = msg->GetIDsFromNames(1, &named_proplist, MAPI_CREATE, &~tags);
+	if (hr != hrSuccess)
+		ec_log_err("Unable to read reminder property: %s (0x%08x)",
+			GetMAPIErrorMessage(hr), hr);
+	else {
+		hr = HrGetOneProp(msg, CHANGE_PROP_TYPE(tags->aulPropTag[0], PT_BOOLEAN), &~content_type);
+		if(hr == hrSuccess)
+			result = content_type->Value.b;
+		else
+			ec_log_debug("Message has no reminder property");
+	}
+	return result;
 }
 
 /**
@@ -2197,63 +1999,51 @@ bool MAPIToVMIME::is_voting_request(IMessage *lpMessage)
  */
 HRESULT MAPIToVMIME::handleTNEF(IMessage* lpMessage, vmime::messageBuilder* lpVMMessageBuilder, eBestBody bestBody) {
 	HRESULT			hr				= hrSuccess;
-	LPSPropValue	lpSendAsICal	= NULL;
-	LPSPropValue	lpOutlookVersion = NULL;
-	LPSPropValue	lpMessageClass	= NULL;
-	LPSPropValue	lpDelegateRule	= NULL;
-	IStream 		*lpStream = NULL;
-	MapiToICal		*mapiical = NULL;
-	
-	LPMAPINAMEID	lpNames			= NULL;	
-	LPSPropTagArray lpNameTagArray	= NULL;
+	memory_ptr<SPropValue> lpSendAsICal, lpOutlookVersion, lpMessageClass;
+	memory_ptr<SPropValue> lpDelegateRule;
+	object_ptr<IStream> lpStream;
+	std::unique_ptr<MapiToICal> mapiical;
+	memory_ptr<MAPINAMEID> lpNames;
+	memory_ptr<SPropTagArray> lpNameTagArray;
 	int				iUseTnef = sopt.use_tnef;
 	std::string		strTnefReason;
 
 	std::list<ULONG> lstOLEAttach; // list of OLE attachments that must be sent via TNEF
-	std::list<ULONG>::const_iterator iterAttach;
-	IMAPITable *	lpAttachTable = NULL;
-	LPSRowSet		lpAttachRows = NULL;
-	SizedSPropTagArray(2, sptaAttachProps) = {2, {PR_ATTACH_METHOD, PR_ATTACH_NUM }};
-	SizedSPropTagArray(5, sptaOLEAttachProps) = {5, {PR_ATTACH_FILENAME, PR_ATTACH_LONG_FILENAME, PR_ATTACH_DATA_OBJ, PR_ATTACH_CONTENT_ID, PR_ATTACHMENT_HIDDEN}};
-	SizedSSortOrderSet(1, sosRTFSeq) = {1, 0, 0, { {PR_RENDERING_POSITION, TABLE_SORT_ASCEND} } };
+	object_ptr<IMAPITable> lpAttachTable;
+	static constexpr const SizedSPropTagArray(2, sptaAttachProps) =
+		{2, {PR_ATTACH_METHOD, PR_ATTACH_NUM}};
+	static constexpr const SizedSPropTagArray(5, sptaOLEAttachProps) =
+		{5, {PR_ATTACH_FILENAME, PR_ATTACH_LONG_FILENAME,
+		PR_ATTACH_DATA_OBJ, PR_ATTACH_CONTENT_ID, PR_ATTACHMENT_HIDDEN}};
+	static constexpr const SizedSSortOrderSet(1, sosRTFSeq) =
+		{1, 0, 0, {{PR_RENDERING_POSITION, TABLE_SORT_ASCEND}}};
 
 	try {
+		rowset_ptr lpAttachRows;
 	    // Find all ATTACH_OLE attachments and put them in lstOLEAttach
-	    hr = lpMessage->GetAttachmentTable(0, &lpAttachTable);
+		hr = lpMessage->GetAttachmentTable(0, &~lpAttachTable);
 	    if(hr != hrSuccess)
-	        goto exit;
-	    
-        hr = HrQueryAllRows(lpAttachTable, (LPSPropTagArray)&sptaAttachProps, NULL, (LPSSortOrderSet)&sosRTFSeq, 0, &lpAttachRows);
-        if(hr != hrSuccess)
-            goto exit;
+			return hr;
+		hr = HrQueryAllRows(lpAttachTable, sptaAttachProps, NULL,
+	             sosRTFSeq, 0, &~lpAttachRows);
+		if (hr != hrSuccess)
+			return hr;
             
-        for ( unsigned int i = 0; i < lpAttachRows->cRows; ++i) {
+        for (unsigned int i = 0; i < lpAttachRows->cRows; ++i)
             if(lpAttachRows->aRow[i].lpProps[0].ulPropTag == PR_ATTACH_METHOD && 
                 lpAttachRows->aRow[i].lpProps[1].ulPropTag == PR_ATTACH_NUM &&
                 lpAttachRows->aRow[i].lpProps[0].Value.ul == ATTACH_OLE)
-            {
                 lstOLEAttach.push_back(lpAttachRows->aRow[i].lpProps[1].Value.ul);
-            }
-        }
 	
         // Start processing TNEF properties
-
-		if(HrGetOneProp(lpMessage, PR_EC_SEND_AS_ICAL, &lpSendAsICal) != hrSuccess) {
+		if (HrGetOneProp(lpMessage, PR_EC_SEND_AS_ICAL, &~lpSendAsICal) != hrSuccess)
 			lpSendAsICal = NULL;
-		}
-		
-		if(HrGetOneProp(lpMessage, PR_EC_OUTLOOK_VERSION, &lpOutlookVersion) != hrSuccess) {
+		if (HrGetOneProp(lpMessage, PR_EC_OUTLOOK_VERSION, &~lpOutlookVersion) != hrSuccess)
 			lpOutlookVersion = NULL;
-		} 
-		
-		if(HrGetOneProp(lpMessage, PR_MESSAGE_CLASS_A, &lpMessageClass) != hrSuccess) {
+		if (HrGetOneProp(lpMessage, PR_MESSAGE_CLASS_A, &~lpMessageClass) != hrSuccess)
 			lpMessageClass = NULL;
-		}
-
-		if(HrGetOneProp(lpMessage, PR_DELEGATED_BY_RULE, &lpDelegateRule) != hrSuccess) {
+		if (HrGetOneProp(lpMessage, PR_DELEGATED_BY_RULE, &~lpDelegateRule) != hrSuccess)
 			lpDelegateRule = NULL;
-		}
-
 		if (iUseTnef > 0)
 			strTnefReason = "Force TNEF on request";
 
@@ -2274,6 +2064,10 @@ HRESULT MAPIToVMIME::handleTNEF(IMessage* lpMessage, vmime::messageBuilder* lpVM
 			strTnefReason = "Force TNEF because of voting request";
 		}
 
+		if (iUseTnef == 0 && has_reminder(lpMessage)) {
+			iUseTnef = 1;
+			strTnefReason = "Force TNEF because of reminder";
+		}
         /*
          * Outlook 2000 always sets PR_EC_SEND_AS_ICAL to FALSE, because the
          * iCal option is somehow missing from the options property sheet, and 
@@ -2287,9 +2081,8 @@ HRESULT MAPIToVMIME::handleTNEF(IMessage* lpMessage, vmime::messageBuilder* lpVM
 			bestBody == realRTF)
 		{
 		    // Send either TNEF or iCal data
-		    
-			vmime::ref<vmime::attachment> vmTNEFAtt;
-			vmime::ref<vmime::utility::inputStream> inputDataStream = NULL;
+			vmime::shared_ptr<vmime::attachment> vmTNEFAtt;
+			vmime::shared_ptr<vmime::utility::inputStream> inputDataStream = NULL;
 
 			/* 
 			 * Send TNEF information for this message if we really need to, or otherwise iCal
@@ -2298,26 +2091,26 @@ HRESULT MAPIToVMIME::handleTNEF(IMessage* lpMessage, vmime::messageBuilder* lpVM
 			if (lstOLEAttach.size() == 0 && iUseTnef <= 0 && lpMessageClass && (strncasecmp("IPM.Note", lpMessageClass->Value.lpszA, 8) != 0)) {
 				// iCAL
 				string ical, method;
-				vmime::ref<mapiAttachment> vmAttach = NULL;
+				vmime::shared_ptr<mapiAttachment> vmAttach = NULL;
+				MapiToICal *tmp;
 
-				lpLogger->Log(EC_LOGLEVEL_INFO, "Adding ICS attachment for extra information");
-
-				CreateMapiToICal(m_lpAdrBook, "utf-8", &mapiical);
-
+				ec_log_info("Adding ICS attachment for extra information");
+				CreateMapiToICal(m_lpAdrBook, "utf-8", &tmp);
+				mapiical.reset(tmp);
 				hr = mapiical->AddMessage(lpMessage, std::string(), 0);
 				if (hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to create ical object, sending as TNEF");
+					ec_log_warn("Unable to create ical object, sending as TNEF");
 					goto tnef_anyway;
 				}
 
 				hr = mapiical->Finalize(0, &method, &ical);
 				if (hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_WARNING, "Unable to create ical object, sending as TNEF");
+					ec_log_warn("Unable to create ical object, sending as TNEF");
 					goto tnef_anyway;
 				}
 
-				vmime::ref<vmime::mapiTextPart> lpvmMapiText = lpVMMessageBuilder->getTextPart().dynamicCast<vmime::mapiTextPart>();
-				lpvmMapiText->setOtherText(vmime::create<vmime::stringContentHandler>(ical));
+				vmime::shared_ptr<vmime::mapiTextPart> lpvmMapiText = vmime::dynamicCast<vmime::mapiTextPart>(lpVMMessageBuilder->getTextPart());
+				lpvmMapiText->setOtherText(vmime::make_shared<vmime::stringContentHandler>(ical));
 				lpvmMapiText->setOtherContentType(vmime::mediaType(vmime::mediaTypes::TEXT, "calendar"));
 				lpvmMapiText->setOtherContentEncoding(vmime::encoding(vmime::encodingTypes::EIGHT_BIT));
 				lpvmMapiText->setOtherMethod(method);
@@ -2325,54 +2118,54 @@ HRESULT MAPIToVMIME::handleTNEF(IMessage* lpMessage, vmime::messageBuilder* lpVM
 
 			} else {
 				if (lstOLEAttach.size())
-					lpLogger->Log(EC_LOGLEVEL_INFO, "TNEF because of OLE attachments");
+					ec_log_info("TNEF because of OLE attachments");
 				else if (iUseTnef == 0)
-					lpLogger->Log(EC_LOGLEVEL_INFO, "TNEF because of RTF body");
+					ec_log_info("TNEF because of RTF body");
 				else
-					lpLogger->Log(EC_LOGLEVEL_INFO, strTnefReason);
+					ec_log_info(strTnefReason);
 
 tnef_anyway:
-				hr = CreateStreamOnHGlobal(NULL, TRUE, &lpStream);
+				hr = CreateStreamOnHGlobal(nullptr, TRUE, &~lpStream);
 				if (hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to create stream for TNEF attachment. Error 0x%08X", hr);
-					goto exit;
+					ec_log_err("Unable to create stream for TNEF attachment. Error 0x%08X", hr);
+					return hr;
 				}
 			 
 				ECTNEF tnef(TNEF_ENCODE, lpMessage, lpStream);
 			
 				// Encode the properties now, add all message properties except for the exclude list
-				hr = tnef.AddProps(TNEF_PROP_EXCLUDE, (LPSPropTagArray)&sptaExclude);
+				hr = tnef.AddProps(TNEF_PROP_EXCLUDE, sptaExclude);
 				if(hr != hrSuccess) {
-					lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to exclude properties from TNEF object");
-					goto exit;
+					ec_log_err("Unable to exclude properties from TNEF object");
+					return hr;
 				}
 			
 				// plaintext is never added to TNEF, only HTML or "real" RTF
 				if (bestBody != plaintext) {
+					SizedSPropTagArray(1, sptaBestBodyInclude) = {1, {PR_RTF_COMPRESSED}};
+
 					if (bestBody == html) sptaBestBodyInclude.aulPropTag[0] = PR_HTML;
 					else if (bestBody == realRTF) sptaBestBodyInclude.aulPropTag[0] = PR_RTF_COMPRESSED;
 
-					hr = tnef.AddProps(TNEF_PROP_INCLUDE, (LPSPropTagArray)&sptaBestBodyInclude);
+					hr = tnef.AddProps(TNEF_PROP_INCLUDE, sptaBestBodyInclude);
 					if(hr != hrSuccess) {
-						lpLogger->Log(EC_LOGLEVEL_ERROR, "Unable to include body property 0x%08x to TNEF object", sptaBestBodyInclude.aulPropTag[0]);
-						goto exit;
+						ec_log_err("Unable to include body property 0x%08x to TNEF object", sptaBestBodyInclude.aulPropTag[0]);
+						return hr;
 					}
 				}
 				
 				// Add all OLE attachments
-				for (iterAttach = lstOLEAttach.begin();
-				     iterAttach != lstOLEAttach.end();
-				     ++iterAttach)
-					tnef.FinishComponent(0x00002000, *iterAttach, (LPSPropTagArray)&sptaOLEAttachProps);
+				for (const auto atnum : lstOLEAttach)
+					tnef.FinishComponent(0x00002000, atnum, sptaOLEAttachProps);
 		
 				// Write the stream
 				hr = tnef.Finish();
 
-				inputDataStream = vmime::create<inputStreamMAPIAdapter>(lpStream);
+				inputDataStream = vmime::make_shared<inputStreamMAPIAdapter>(lpStream);
 			
 				// Now, add the stream as an attachment to the message, filename winmail.dat 
 				// and MIME type 'application/ms-tnef', no content-id
-				vmTNEFAtt = vmime::create<mapiAttachment>(vmime::create<vmime::streamContentHandler>(inputDataStream, 0),
+				vmTNEFAtt = vmime::make_shared<mapiAttachment>(vmime::make_shared<vmime::streamContentHandler>(inputDataStream, 0),
 														  vmime::encoding("base64"), vmime::mediaType("application/ms-tnef"), string(),
 														  vmime::word("winmail.dat"));
 											  
@@ -2382,35 +2175,17 @@ tnef_anyway:
 		}
 	}
 	catch (vmime::exception& e) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "VMIME exception: %s", e.what());
-	    hr = MAPI_E_CALL_FAILED; // set real error
-	    goto exit;
+		ec_log_err("VMIME exception: %s", e.what());
+		return MAPI_E_CALL_FAILED; // set real error
 	}
 	catch (std::exception& e) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "STD exception on fill message: %s", e.what());
-	    hr = MAPI_E_CALL_FAILED; // set real error
-	    goto exit;
+		ec_log_err("STD exception on fill message: %s", e.what());
+		return MAPI_E_CALL_FAILED; // set real error
 	}
 	catch (...) {
-		lpLogger->Log(EC_LOGLEVEL_ERROR, "Unknown generic exception on fill message");
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
+		ec_log_err("Unknown generic exception on fill message");
+		return MAPI_E_CALL_FAILED;
 	}
-
-exit:
-	if (lpAttachRows != NULL)
-		FreeProws(lpAttachRows);
-	if (lpAttachTable != NULL)
-		lpAttachTable->Release();
-	delete mapiical;
-	if (lpStream)
-		lpStream->Release();
-	MAPIFreeBuffer(lpNames);
-	MAPIFreeBuffer(lpDelegateRule);
-	MAPIFreeBuffer(lpNameTagArray);
-	MAPIFreeBuffer(lpMessageClass);
-	MAPIFreeBuffer(lpOutlookVersion);
-	MAPIFreeBuffer(lpSendAsICal);
 	return hr;
 }
 
@@ -2475,3 +2250,5 @@ vmime::text MAPIToVMIME::getVmimeTextFromWide(const std::wstring& strwInput, boo
 	else
 		return vmime::text(output, m_vmCharset);
 }
+
+} /* namespace */

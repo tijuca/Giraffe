@@ -16,14 +16,17 @@
  */
 
 #include <kopano/platform.h>
+#include <memory>
+#include <new>
 #include <arpa/inet.h>
 #include "ECFifoBuffer.h"
 #include "ECSerializer.h"
 
+namespace KC {
+
 ECStreamSerializer::ECStreamSerializer(IStream *lpBuffer)
 {
 	SetBuffer(lpBuffer);
-	m_ulRead = m_ulWritten = 0;
 }
 
 ECRESULT ECStreamSerializer::SetBuffer(void *lpBuffer)
@@ -162,19 +165,18 @@ ECRESULT ECStreamSerializer::Stat(ULONG *lpcbRead, ULONG *lpcbWrite)
 	return erSuccess;
 }
 
-ECFifoSerializer::ECFifoSerializer(ECFifoBuffer *lpBuffer, eMode mode)
+ECFifoSerializer::ECFifoSerializer(ECFifoBuffer *lpBuffer, eMode mode) :
+	m_mode(mode)
 {
 	SetBuffer(lpBuffer);
-	m_mode = mode;
-	m_ulRead = m_ulWritten = 0;
 }
 
-ECFifoSerializer::~ECFifoSerializer()
+ECFifoSerializer::~ECFifoSerializer(void)
 {
-	if (m_lpBuffer) {
-		ECFifoBuffer::close_flags flags = (m_mode == serialize ? ECFifoBuffer::cfWrite : ECFifoBuffer::cfRead);
-		m_lpBuffer->Close(flags);
-	}
+	if (m_lpBuffer == nullptr)
+		return;
+	ECFifoBuffer::close_flags flags = (m_mode == serialize ? ECFifoBuffer::cfWrite : ECFifoBuffer::cfRead);
+	m_lpBuffer->Close(flags);
 }
 
 ECRESULT ECFifoSerializer::SetBuffer(void *lpBuffer)
@@ -274,22 +276,10 @@ ECRESULT ECFifoSerializer::Read(void *ptr, size_t size, size_t nmemb)
 
 ECRESULT ECFifoSerializer::Skip(size_t size, size_t nmemb)
 {
-	ECRESULT er = erSuccess;
-	char *buf = NULL;
-
-	try {
-		buf = new char[size*nmemb];
-	} catch(...) {
-		er = KCERR_NOT_ENOUGH_MEMORY;
-	}
-	if (er != erSuccess)
-		goto exit;
-
-	er = Read(buf, size, nmemb);
-
-exit:
-	delete[] buf;
-	return er;
+	std::unique_ptr<char[]> buf(new(std::nothrow) char[size*nmemb]);
+	if (buf == nullptr)
+		return KCERR_NOT_ENOUGH_MEMORY;
+	return Read(buf.get(), size, nmemb);
 }
 
 ECRESULT ECFifoSerializer::Flush()
@@ -321,3 +311,5 @@ ECRESULT ECFifoSerializer::Stat(ULONG *lpcbRead, ULONG *lpcbWrite)
 		
 	return erSuccess;
 }
+
+} /* namespace */

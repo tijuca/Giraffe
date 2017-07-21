@@ -23,13 +23,11 @@
 
 #include <kopano/ECGuid.h>
 #include <kopano/ECDebug.h>
-
-#include "ECDisplayTable.h"
-
+#include <kopano/ECInterfaceDefs.h>
 #include <kopano/CommonUtil.h>
 #include "ics.h"
 #include <kopano/mapiext.h>
-
+#include <kopano/memory.hpp>
 #include "ECABContainer.h"
 
 #include <edkmdb.h>
@@ -37,6 +35,8 @@
 
 #include <kopano/charset/convstring.h>
 #include <kopano/ECGetText.h>
+
+using namespace KCHL;
 
 ECABContainer::ECABContainer(void *lpProvider, ULONG ulObjType, BOOL fModify,
     const char *szClassName) :
@@ -51,8 +51,6 @@ ECABContainer::ECABContainer(void *lpProvider, ULONG ulObjType, BOOL fModify,
 	this->HrAddPropHandlers(PR_NORMALIZED_SUBJECT,	DefaultABContainerGetProp, DefaultSetPropIgnore, (void*) this);
 	this->HrAddPropHandlers(PR_DISPLAY_NAME,	DefaultABContainerGetProp, DefaultSetPropIgnore, (void*) this);
 	this->HrAddPropHandlers(PR_TRANSMITABLE_DISPLAY_NAME,	DefaultABContainerGetProp, DefaultSetPropIgnore, (void*) this);
-
-	m_lpImporter = NULL;
 }
 
 ECABContainer::~ECABContainer()
@@ -63,14 +61,13 @@ ECABContainer::~ECABContainer()
 
 HRESULT	ECABContainer::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECABContainer, this);
-	REGISTER_INTERFACE(IID_ECABProp, this);
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-	REGISTER_INTERFACE(IID_IABContainer, &this->m_xABContainer);
-	REGISTER_INTERFACE(IID_IMAPIContainer, &this->m_xABContainer);
-	REGISTER_INTERFACE(IID_IMAPIProp, &this->m_xABContainer);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xABContainer);
-
+	REGISTER_INTERFACE2(ECABContainer, this);
+	REGISTER_INTERFACE2(ECABProp, this);
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IABContainer, &this->m_xABContainer);
+	REGISTER_INTERFACE2(IMAPIContainer, &this->m_xABContainer);
+	REGISTER_INTERFACE2(IMAPIProp, &this->m_xABContainer);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xABContainer);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -80,7 +77,7 @@ HRESULT	ECABContainer::Create(void* lpProvider, ULONG ulObjType, BOOL fModify, E
 	return lpABContainer->QueryInterface(IID_ECABContainer, reinterpret_cast<void **>(lppABContainer));
 }
 
-HRESULT	ECABContainer::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
+HRESULT	ECABContainer::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN *lppUnk)
 {
 	HRESULT			hr = hrSuccess;
 
@@ -113,12 +110,17 @@ HRESULT	ECABContainer::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInter
 	return hr;
 }
 
-HRESULT ECABContainer::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
+HRESULT ECABContainer::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude,
+    const SPropTagArray *lpExcludeProps, ULONG ulUIParam,
+    LPMAPIPROGRESS lpProgress, LPCIID lpInterface, void *lpDestObj,
+    ULONG ulFlags, SPropProblemArray **lppProblems)
 {
 	return Util::DoCopyTo(&IID_IABContainer, &this->m_xABContainer, ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
 
-HRESULT ECABContainer::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
+HRESULT ECABContainer::CopyProps(const SPropTagArray *lpIncludeProps,
+    ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface,
+    void *lpDestObj, ULONG ulFlags, SPropProblemArray **lppProblems)
 {
 	return Util::DoCopyProps(&IID_IABContainer, &this->m_xABContainer, lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
 }
@@ -127,24 +129,23 @@ HRESULT	ECABContainer::DefaultABContainerGetProp(ULONG ulPropTag, void* lpProvid
 {
 	HRESULT		hr = hrSuccess;
 	ECABProp*	lpProp = (ECABProp *)lpParam;
-
-	LPSPropValue lpSectionUid = NULL;
-	IProfSect *lpProfSect = NULL;
+	memory_ptr<SPropValue> lpSectionUid;
+	object_ptr<IProfSect> lpProfSect;
 
 	switch(PROP_ID(ulPropTag)) {
 	case PROP_ID(PR_EMSMDB_SECTION_UID): {
 		ECABLogon *lpLogon = (ECABLogon *)lpProvider;
-		hr = lpLogon->m_lpMAPISup->OpenProfileSection(NULL, 0, &lpProfSect);
+		if (lpLogon->m_lpMAPISup == nullptr)
+			return MAPI_E_NOT_FOUND;
+		hr = lpLogon->m_lpMAPISup->OpenProfileSection(nullptr, 0, &~lpProfSect);
 		if(hr != hrSuccess)
-			goto exit;
-
-		hr = HrGetOneProp(lpProfSect, PR_EMSMDB_SECTION_UID, &lpSectionUid);
+			return hr;
+		hr = HrGetOneProp(lpProfSect, PR_EMSMDB_SECTION_UID, &~lpSectionUid);
 		if(hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		lpsPropValue->ulPropTag = PR_EMSMDB_SECTION_UID;
 		if ((hr = MAPIAllocateMore(sizeof(GUID), lpBase, (void **) &lpsPropValue->Value.bin.lpb)) != hrSuccess)
-			goto exit;
+			return hr;
 		memcpy(lpsPropValue->Value.bin.lpb, lpSectionUid->Value.bin.lpb, sizeof(GUID));
 		lpsPropValue->Value.bin.cb = sizeof(GUID);
 		break;
@@ -167,15 +168,15 @@ HRESULT	ECABContainer::DefaultABContainerGetProp(ULONG ulPropTag, void* lpProvid
 
 		hr = lpProp->HrGetRealProp(ulPropTag, ulFlags, lpBase, lpsPropValue);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		if (PROP_TYPE(lpsPropValue->ulPropTag) == PT_UNICODE)
 			strValue = convert_to<std::wstring>(lpsPropValue->Value.lpszW);
 		else if (PROP_TYPE(lpsPropValue->ulPropTag) == PT_STRING8)
 			strValue = convert_to<std::wstring>(lpsPropValue->Value.lpszA);
 		else
-			goto exit;
-		
+			return hr;
+
 		if(strValue.compare( L"Global Address Book" ) == 0)
 			lpszName = _("Global Address Book");
 		else if(strValue.compare( L"Global Address Lists" ) == 0)
@@ -189,16 +190,14 @@ HRESULT	ECABContainer::DefaultABContainerGetProp(ULONG ulPropTag, void* lpProvid
 
 				hr = MAPIAllocateMore((strTmp.size() + 1) * sizeof(WCHAR), lpBase, (void**)&lpsPropValue->Value.lpszW);
 				if (hr != hrSuccess) 
-					goto exit;
-
+					return hr;
 				wcscpy(lpsPropValue->Value.lpszW, strTmp.c_str());
 			} else {
 				const std::string strTmp = convert_to<std::string>(lpszName);
 
 				hr = MAPIAllocateMore(strTmp.size() + 1, lpBase, (void**)&lpsPropValue->Value.lpszA);
 				if (hr != hrSuccess) 
-					goto exit;
-
+					return hr;
 				strcpy(lpsPropValue->Value.lpszA, strTmp.c_str());
 			}
 			lpsPropValue->ulPropTag = ulPropTag;
@@ -209,11 +208,6 @@ HRESULT	ECABContainer::DefaultABContainerGetProp(ULONG ulPropTag, void* lpProvid
 		hr = lpProp->HrGetRealProp(ulPropTag, ulFlags, lpBase, lpsPropValue);
 		break;
 	}
-
-exit:
-	if(lpProfSect)
-		lpProfSect->Release();
-	MAPIFreeBuffer(lpSectionUid);
 	return hr;
 }
 
@@ -223,56 +217,51 @@ HRESULT ECABContainer::TableRowGetProp(void* lpProvider, struct propVal *lpsProp
 	ULONG size = 0;
 
 	switch(lpsPropValSrc->ulPropTag) {
-		case PR_ACCOUNT_W:
-		case PR_NORMALIZED_SUBJECT_W:
-		case PR_DISPLAY_NAME_W:
-		case PR_TRANSMITABLE_DISPLAY_NAME_W:
-			{
-				LPWSTR lpszW = NULL;
-				if (strcmp(lpsPropValSrc->Value.lpszA, "Global Address Book" ) == 0)
-					lpszW = _W("Global Address Book");
-				else if (strcmp(lpsPropValSrc->Value.lpszA, "Global Address Lists" ) == 0)
-					lpszW = _W("Global Address Lists");
-				else if (strcmp(lpsPropValSrc->Value.lpszA, "All Address Lists" ) == 0)
-					lpszW = _W("All Address Lists");
-				else
-					return MAPI_E_NOT_FOUND;
-				size = (wcslen(lpszW) + 1) * sizeof(WCHAR);
-				hr = MAPIAllocateMore(size, lpBase, (void **)&lpsPropValDst->Value.lpszW);
-				if (hr != hrSuccess)
-					return hr;
-
-				memcpy(lpsPropValDst->Value.lpszW, lpszW, size);
-				lpsPropValDst->ulPropTag = lpsPropValSrc->ulPropTag;
-			}
-			break;
-		case PR_ACCOUNT_A:
-		case PR_NORMALIZED_SUBJECT_A:
-		case PR_DISPLAY_NAME_A:
-		case PR_TRANSMITABLE_DISPLAY_NAME_A:
-			{
-				LPSTR lpszA = NULL;
-				if (strcmp(lpsPropValSrc->Value.lpszA, "Global Address Book" ) == 0)
-					lpszA = _A("Global Address Book");
-				else if (strcmp(lpsPropValSrc->Value.lpszA, "Global Address Lists" ) == 0)
-					lpszA = _A("Global Address Lists");
-				else if (strcmp(lpsPropValSrc->Value.lpszA, "All Address Lists" ) == 0)
-					lpszA = _A("All Address Lists");
-				else
-					return MAPI_E_NOT_FOUND;
-				
-				size = (strlen(lpszA) + 1) * sizeof(CHAR);
-				hr = MAPIAllocateMore(size, lpBase, (void **)&lpsPropValDst->Value.lpszA);
-				if (hr != hrSuccess)
-					return hr;
-
-				memcpy(lpsPropValDst->Value.lpszA, lpszA, size);
-				lpsPropValDst->ulPropTag = lpsPropValSrc->ulPropTag;
-			}
-			break;
-		default:
-			hr = MAPI_E_NOT_FOUND;
-			break;
+	case PR_ACCOUNT_W:
+	case PR_NORMALIZED_SUBJECT_W:
+	case PR_DISPLAY_NAME_W:
+	case PR_TRANSMITABLE_DISPLAY_NAME_W: {
+		LPWSTR lpszW = NULL;
+		if (strcmp(lpsPropValSrc->Value.lpszA, "Global Address Book" ) == 0)
+			lpszW = _W("Global Address Book");
+		else if (strcmp(lpsPropValSrc->Value.lpszA, "Global Address Lists" ) == 0)
+			lpszW = _W("Global Address Lists");
+		else if (strcmp(lpsPropValSrc->Value.lpszA, "All Address Lists" ) == 0)
+			lpszW = _W("All Address Lists");
+		else
+			return MAPI_E_NOT_FOUND;
+		size = (wcslen(lpszW) + 1) * sizeof(WCHAR);
+		hr = MAPIAllocateMore(size, lpBase, (void **)&lpsPropValDst->Value.lpszW);
+		if (hr != hrSuccess)
+			return hr;
+		memcpy(lpsPropValDst->Value.lpszW, lpszW, size);
+		lpsPropValDst->ulPropTag = lpsPropValSrc->ulPropTag;
+		break;
+	}
+	case PR_ACCOUNT_A:
+	case PR_NORMALIZED_SUBJECT_A:
+	case PR_DISPLAY_NAME_A:
+	case PR_TRANSMITABLE_DISPLAY_NAME_A: {
+		LPSTR lpszA = NULL;
+		if (strcmp(lpsPropValSrc->Value.lpszA, "Global Address Book" ) == 0)
+			lpszA = _A("Global Address Book");
+		else if (strcmp(lpsPropValSrc->Value.lpszA, "Global Address Lists" ) == 0)
+			lpszA = _A("Global Address Lists");
+		else if (strcmp(lpsPropValSrc->Value.lpszA, "All Address Lists" ) == 0)
+			lpszA = _A("All Address Lists");
+		else
+			return MAPI_E_NOT_FOUND;
+		size = (strlen(lpszA) + 1) * sizeof(CHAR);
+		hr = MAPIAllocateMore(size, lpBase, (void **)&lpsPropValDst->Value.lpszA);
+		if (hr != hrSuccess)
+			return hr;
+		memcpy(lpsPropValDst->Value.lpszA, lpszA, size);
+		lpsPropValDst->ulPropTag = lpsPropValSrc->ulPropTag;
+		break;
+	}
+	default:
+		hr = MAPI_E_NOT_FOUND;
+		break;
 	}
 	return hr;
 }
@@ -281,9 +270,9 @@ HRESULT ECABContainer::TableRowGetProp(void* lpProvider, struct propVal *lpsProp
 HRESULT ECABContainer::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 {
 	HRESULT			hr = hrSuccess;
-	ECMAPITable*	lpTable = NULL;
-	WSTableView*	lpTableOps = NULL;
-	SSortOrderSet	sSortByDisplayName;
+	object_ptr<ECMAPITable> lpTable;
+	object_ptr<WSTableView> lpTableOps;
+	SizedSSortOrderSet(1, sSortByDisplayName);
 
 	sSortByDisplayName.cSorts = 1;
 	sSortByDisplayName.cCategories = 0;
@@ -291,68 +280,43 @@ HRESULT ECABContainer::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 	sSortByDisplayName.aSort[0].ulPropTag = PR_DISPLAY_NAME;
 	sSortByDisplayName.aSort[0].ulOrder = TABLE_SORT_ASCEND;
 
-	hr = ECMAPITable::Create("AB Contents", NULL, 0, &lpTable);
+	hr = ECMAPITable::Create("AB Contents", nullptr, 0, &~lpTable);
 	if(hr != hrSuccess)
-		goto exit;
-
-	hr = GetABStore()->m_lpTransport->HrOpenABTableOps(MAPI_MAILUSER, ulFlags, m_cbEntryId, m_lpEntryId, (ECABLogon*)this->lpProvider, &lpTableOps); // also MAPI_DISTLIST
+		return hr;
+	hr = GetABStore()->m_lpTransport->HrOpenABTableOps(MAPI_MAILUSER, ulFlags, m_cbEntryId, m_lpEntryId, (ECABLogon *)this->lpProvider, &~lpTableOps); // also MAPI_DISTLIST
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpTable->HrSetTableOps(lpTableOps, !(ulFlags & MAPI_DEFERRED_ERRORS));
 	if(hr != hrSuccess)
-		goto exit;
-
-	hr = lpTableOps->HrSortTable(&sSortByDisplayName);
+		return hr;
+	hr = lpTableOps->HrSortTable(sSortByDisplayName);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpTable->QueryInterface(IID_IMAPITable, (void **)lppTable);
 
 	AddChild(lpTable);
-
-exit:
-	if(lpTable)
-		lpTable->Release();
-
-	if(lpTableOps)
-		lpTableOps->Release();
-
 	return hr;
 }
 
 HRESULT ECABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 {
 	HRESULT			hr = hrSuccess;
-	ECMAPITable*	lpTable = NULL;
-	WSTableView*	lpTableOps = NULL;
+	object_ptr<ECMAPITable> lpTable;
+	object_ptr<WSTableView> lpTableOps;
 
-	hr = ECMAPITable::Create("AB hierarchy", GetABStore()->m_lpNotifyClient, ulFlags, &lpTable);
-
+	hr = ECMAPITable::Create("AB hierarchy", GetABStore()->m_lpNotifyClient, ulFlags, &~lpTable);
 	if(hr != hrSuccess)
-		goto exit;
-
-	hr = GetABStore()->m_lpTransport->HrOpenABTableOps(MAPI_ABCONT, ulFlags, m_cbEntryId, m_lpEntryId, (ECABLogon*)this->lpProvider, &lpTableOps);
-
+		return hr;
+	hr = GetABStore()->m_lpTransport->HrOpenABTableOps(MAPI_ABCONT, ulFlags, m_cbEntryId, m_lpEntryId, (ECABLogon *)this->lpProvider, &~lpTableOps);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpTable->HrSetTableOps(lpTableOps, !(ulFlags & MAPI_DEFERRED_ERRORS));
 
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpTable->QueryInterface(IID_IMAPITable, (void **)lppTable);
 
 	AddChild(lpTable);
-
-exit:
-	if(lpTable)
-		lpTable->Release();
-
-	if(lpTableOps)
-		lpTableOps->Release();
-
 	return hr;
 }
 
@@ -387,229 +351,50 @@ HRESULT ECABContainer::DeleteEntries(LPENTRYLIST lpEntries, ULONG ulFlags)
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ECABContainer::ResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlags, LPADRLIST lpAdrList, LPFlagList lpFlagList)
+HRESULT ECABContainer::ResolveNames(const SPropTagArray *lpPropTagArray,
+    ULONG ulFlags, LPADRLIST lpAdrList, LPFlagList lpFlagList)
 {
-	SizedSPropTagArray(11, sptaDefault) = {11, {PR_ADDRTYPE_A, PR_DISPLAY_NAME_A, PR_DISPLAY_TYPE, PR_EMAIL_ADDRESS_A, PR_SMTP_ADDRESS_A, PR_ENTRYID,
-												PR_INSTANCE_KEY, PR_OBJECT_TYPE, PR_RECORD_KEY, PR_SEARCH_KEY, PR_EC_SENDAS_USER_ENTRYIDS}};
-
-	SizedSPropTagArray(11, sptaDefaultUnicode) = {11, {PR_ADDRTYPE_W, PR_DISPLAY_NAME_W, PR_DISPLAY_TYPE, PR_EMAIL_ADDRESS_W, PR_SMTP_ADDRESS_W, PR_ENTRYID,
-												       PR_INSTANCE_KEY, PR_OBJECT_TYPE, PR_RECORD_KEY, PR_SEARCH_KEY, PR_EC_SENDAS_USER_ENTRYIDS}};
-
-	if (lpPropTagArray == NULL) {
-		if(ulFlags & MAPI_UNICODE)
-			lpPropTagArray = (LPSPropTagArray)&sptaDefaultUnicode;
-		else
-			lpPropTagArray = (LPSPropTagArray)&sptaDefault;
-	}
+	static constexpr const SizedSPropTagArray(11, sptaDefault) =
+		{11, {PR_ADDRTYPE_A, PR_DISPLAY_NAME_A, PR_DISPLAY_TYPE,
+		PR_EMAIL_ADDRESS_A, PR_SMTP_ADDRESS_A, PR_ENTRYID,
+		PR_INSTANCE_KEY, PR_OBJECT_TYPE, PR_RECORD_KEY, PR_SEARCH_KEY,
+		PR_EC_SENDAS_USER_ENTRYIDS}};
+	static constexpr const SizedSPropTagArray(11, sptaDefaultUnicode) =
+		{11, {PR_ADDRTYPE_W, PR_DISPLAY_NAME_W, PR_DISPLAY_TYPE,
+		PR_EMAIL_ADDRESS_W, PR_SMTP_ADDRESS_W, PR_ENTRYID,
+		PR_INSTANCE_KEY, PR_OBJECT_TYPE, PR_RECORD_KEY, PR_SEARCH_KEY,
+		PR_EC_SENDAS_USER_ENTRYIDS}};
+	if (lpPropTagArray == NULL)
+		lpPropTagArray = (ulFlags & MAPI_UNICODE) ?
+		                 sptaDefaultUnicode : sptaDefault;
 	return ((ECABLogon*)lpProvider)->m_lpTransport->HrResolveNames(lpPropTagArray, ulFlags, lpAdrList, lpFlagList);
 }
 
 // Interface IUnknown
-HRESULT ECABContainer::xABContainer::QueryInterface(REFIID refiid , void** lppInterface)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->QueryInterface(refiid,lppInterface);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-ULONG ECABContainer::xABContainer::AddRef()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::AddRef", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	return pThis->AddRef();
-}
-
-ULONG ECABContainer::xABContainer::Release()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::Release", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	ULONG ulRef = pThis->Release();
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::Release", "%d", ulRef);
-	return ulRef;
-}
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, QueryInterface, (REFIID, id), (void **, intf))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, Release, (void))
 
 // Interface IABContainer
-HRESULT ECABContainer::xABContainer::CreateEntry(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulCreateFlags, LPMAPIPROP* lppMAPIPropEntry)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::CreateEntry", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->CreateEntry(cbEntryID, lpEntryID, ulCreateFlags, lppMAPIPropEntry);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::CreateEntry", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::CopyEntries(LPENTRYLIST lpEntries, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::CopyEntries", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->CopyEntries(lpEntries, ulUIParam, lpProgress, ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::CopyEntries", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::DeleteEntries(LPENTRYLIST lpEntries, ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::DeleteEntries", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->DeleteEntries(lpEntries, ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::DeleteEntries", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::ResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlags, LPADRLIST lpAdrList, LPFlagList lpFlagList)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::ResolveNames", "\nlpPropTagArray:\t%s\nlpAdrList:\t%s", PropNameFromPropTagArray(lpPropTagArray).c_str(), AdrRowSetToString(lpAdrList, lpFlagList).c_str() );
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->ResolveNames(lpPropTagArray, ulFlags, lpAdrList, lpFlagList);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::ResolveNames", "%s, lpadrlist=\n%s", GetMAPIErrorDescription(hr).c_str(), AdrRowSetToString(lpAdrList, lpFlagList).c_str() );
-	return hr;
-}
-
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, CreateEntry, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (ULONG, ulCreateFlags), (LPMAPIPROP *, lppMAPIPropEntry))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, CopyEntries, (LPENTRYLIST, lpEntries), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, DeleteEntries, (LPENTRYLIST, lpEntries), (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, ResolveNames, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags), (LPADRLIST, lpAdrList), (LPFlagList, lpFlagList))
 // Interface IMAPIContainer
-HRESULT ECABContainer::xABContainer::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetContentsTable", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->GetContentsTable(ulFlags, lppTable);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetContentsTable", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetHierarchyTable", ""); 
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->GetHierarchyTable(ulFlags, lppTable);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetHierarchyTable", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::OpenEntry", "interface=%s", (lpInterface)?DBGGUIDToString(*lpInterface).c_str():"NULL");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, lpulObjType, lppUnk);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::OpenEntry", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::SetSearchCriteria(LPSRestriction lpRestriction, LPENTRYLIST lpContainerList, ULONG ulSearchFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::SetSearchCriteria", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->SetSearchCriteria(lpRestriction, lpContainerList, ulSearchFlags);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::SetSearchCriteria", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::GetSearchCriteria(ULONG ulFlags, LPSRestriction *lppRestriction, LPENTRYLIST *lppContainerList, ULONG *lpulSearchState)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetSearchCriteria", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr =pThis->GetSearchCriteria(ulFlags, lppRestriction, lppContainerList, lpulSearchState);;
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetSearchCriteria", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, GetContentsTable, (ULONG, ulFlags), (LPMAPITABLE *, lppTable))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, GetHierarchyTable, (ULONG, ulFlags), (LPMAPITABLE *, lppTable))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, OpenEntry, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (LPCIID, lpInterface), (ULONG, ulFlags), (ULONG *, lpulObjType), (LPUNKNOWN *, lppUnk))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, SetSearchCriteria, (LPSRestriction, lpRestriction), (LPENTRYLIST, lpContainerList), (ULONG, ulSearchFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, GetSearchCriteria, (ULONG, ulFlags), (LPSRestriction *, lppRestriction), (LPENTRYLIST *, lppContainerList), (ULONG *, lpulSearchState))
 // Interface IMAPIProp
-HRESULT ECABContainer::xABContainer::GetLastError(HRESULT hError, ULONG ulFlags, LPMAPIERROR * lppMapiError)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetLastError", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->GetLastError(hError, ulFlags, lppMapiError);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetLastError", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::SaveChanges(ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::SaveChanges", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->SaveChanges(ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::SaveChanges", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG FAR * lpcValues, LPSPropValue FAR * lppPropArray)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetProps", "%s", PropNameFromPropTagArray(lpPropTagArray).c_str());
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->GetProps(lpPropTagArray, ulFlags, lpcValues, lppPropArray);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropTagArray)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetPropList", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->GetPropList(ulFlags, lppPropTagArray);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetPropList", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::OpenProperty", "PropTag=%s, lpiid=%s", PropNameFromPropTag(ulPropTag).c_str(), DBGGUIDToString(*lpiid).c_str());
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->OpenProperty(ulPropTag, lpiid, ulInterfaceOptions, ulFlags, lppUnk);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::OpenProperty", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::SetProps", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->SetProps(cValues, lpPropArray, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::SetProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::DeleteProps", "%s", PropNameFromPropTagArray(lpPropTagArray).c_str());
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->DeleteProps(lpPropTagArray, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::DeleteProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::CopyTo", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->CopyTo(ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);;
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::CopyTo", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::CopyProps", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->CopyProps(lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::CopyProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::GetNamesFromIDs(LPSPropTagArray * pptaga, LPGUID lpguid, ULONG ulFlags, ULONG * pcNames, LPMAPINAMEID ** pppNames)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetNamesFromIDs", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->GetNamesFromIDs(pptaga, lpguid, ulFlags, pcNames, pppNames);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetIDsFromNames", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ECABContainer::xABContainer::GetIDsFromNames(ULONG cNames, LPMAPINAMEID * ppNames, ULONG ulFlags, LPSPropTagArray * pptaga)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetIDsFromNames", "");
-	METHOD_PROLOGUE_(ECABContainer, ABContainer);
-	HRESULT hr = pThis->GetIDsFromNames(cNames, ppNames, ulFlags, pptaga);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetIDsFromNames", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, SaveChanges, (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, GetProps, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags), (ULONG *, lpcValues), (SPropValue **, lppPropArray))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, GetPropList, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, OpenProperty, (ULONG, ulPropTag), (LPCIID, lpiid), (ULONG, ulInterfaceOptions), (ULONG, ulFlags), (LPUNKNOWN *, lppUnk))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, SetProps, (ULONG, cValues), (const SPropValue *, lpPropArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, DeleteProps, (const SPropTagArray *, lpPropTagArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, CopyTo, (ULONG, ciidExclude), (LPCIID, rgiidExclude), (const SPropTagArray *, lpExcludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, CopyProps, (const SPropTagArray *, lpIncludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, GetNamesFromIDs, (LPSPropTagArray *, pptaga), (LPGUID, lpguid), (ULONG, ulFlags), (ULONG *, pcNames), (LPMAPINAMEID **, pppNames))
+DEF_HRMETHOD1(TRACE_MAPI, ECABContainer, ABContainer, GetIDsFromNames, (ULONG, cNames), (LPMAPINAMEID *, ppNames), (ULONG, ulFlags), (LPSPropTagArray *, pptaga))

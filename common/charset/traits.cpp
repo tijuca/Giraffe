@@ -16,8 +16,8 @@
  */
 
 #include <kopano/charset/traits.h>
-#include <kopano/charset/utf16string.h>
-#include "utf32string.h"
+
+namespace KC {
 
 /** 
  * Make charset string ignore invalid characters, possebly converting
@@ -30,18 +30,4 @@ void setCharsetBestAttempt(std::string &strCharset)
 	strCharset += "//TRANSLIT";
 }
 
-template <typename _T>
-static size_t ucslen(const _T* p) {
-	size_t len = 0;
-	while (*p++ != 0)
-		++len;
-	return len;
-}
-
-size_t iconv_charset<unsigned short*>::rawsize(const unsigned short *from) {
-	return ucslen(from) * sizeof(unsigned short);
-}
-
-size_t iconv_charset<const unsigned short*>::rawsize(const unsigned short *from) {
-	return ucslen(from) * sizeof(unsigned short);
-}
+} /* namespace */

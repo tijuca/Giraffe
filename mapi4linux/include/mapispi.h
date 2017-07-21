@@ -20,7 +20,7 @@
 #define MAPISPI_H
 
 #include <kopano/platform.h>
-
+#include <initializer_list>
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapiguid.h>
@@ -71,17 +71,18 @@ typedef IMAPISupport* LPMAPISUP;
 
 /* Notification key structure for the MAPI notification engine */
 
-typedef struct
-{
+struct NOTIFKEY {
+	NOTIFKEY(void) = delete;
+	template<typename _T> NOTIFKEY(std::initializer_list<_T>) = delete;
     ULONG       cb;             /* How big the key is */
     BYTE        ab[MAPI_DIM];   /* Key contents */
-} NOTIFKEY, *LPNOTIFKEY;
+};
+typedef struct NOTIFKEY *LPNOTIFKEY;
 
 #define CbNewNOTIFKEY(_cb)      (offsetof(NOTIFKEY,ab) + (_cb))
 #define CbNOTIFKEY(_lpkey)      (offsetof(NOTIFKEY,ab) + (_lpkey)->cb)
 #define SizedNOTIFKEY(_cb, _name) \
-    struct _NOTIFKEY_ ## _name \
-{ \
+struct _NOTIFKEY_ ## _name { \
     ULONG       cb; \
     BYTE        ab[_cb]; \
 } _name
@@ -154,7 +155,7 @@ typedef HRESULT (REMOVEPREPROCESSINFO)(LPMESSAGE lpMessage);
 //#warning "please correctly define LPSTORAGE!!"
 //#define LPSTORAGE void*
 
-class IMAPISupport : public IUnknown {
+class IMAPISupport : public virtual IUnknown {
 public:
     //    virtual ~IMAPISupport() = 0;
 
@@ -197,13 +198,8 @@ public:
     virtual HRESULT CopyFolder(LPCIID lpSrcInterface, LPVOID lpSrcFolder, ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpDestInterface,
 			       LPVOID lpDestFolder, LPTSTR lszNewFolderName, ULONG ulUIParam, LPMAPIPROGRESS lpProgress,
 			       ULONG ulFlags) = 0;
-
-    virtual HRESULT DoCopyTo(LPCIID lpSrcInterface, LPVOID lpSrcObj, ULONG ciidExclude, LPCIID rgiidExclude,
-			     LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpDestInterface,
-			     LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray * lppProblems) = 0; 
-    virtual HRESULT DoCopyProps(LPCIID lpSrcInterface, LPVOID lpSrcObj, LPSPropTagArray lpIncludeProps, ULONG ulUIParam,
-				LPMAPIPROGRESS lpProgress, LPCIID lpDestInterface, LPVOID lpDestObj, ULONG ulFlags,
-				LPSPropProblemArray * lppProblems) = 0; 
+	virtual HRESULT DoCopyTo(LPCIID lpSrcInterface, LPVOID lpSrcObj, ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpDestInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems) = 0; 
+	virtual HRESULT DoCopyProps(LPCIID lpSrcInterface, LPVOID lpSrcObj, const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpDestInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems) = 0;
     virtual HRESULT DoProgressDialog(ULONG ulUIParam, ULONG ulFlags, LPMAPIPROGRESS * lppProgress) = 0; 
     virtual HRESULT ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAGE * lppEmptyMessage) = 0; 
     virtual HRESULT PrepareSubmit(LPMESSAGE lpMessage, ULONG * lpulFlags) = 0; 
@@ -269,7 +265,7 @@ public:
     virtual HRESULT OpenTemplateID(ULONG cbTemplateID, LPENTRYID lpTemplateID, ULONG ulTemplateFlags, LPMAPIPROP lpMAPIPropData,
 				   LPCIID lpInterface, LPMAPIPROP * lppMAPIPropNew, LPMAPIPROP lpMAPIPropSibling) = 0; 
     virtual HRESULT GetOneOffTable(ULONG ulFlags, LPMAPITABLE * lppTable) = 0; 
-    virtual HRESULT PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, LPADRLIST lpRecipList) = 0;
+	virtual HRESULT PrepareRecips(ULONG ulFlags, const SPropTagArray *lpPropTagArray, LPADRLIST lpRecipList) = 0;
 };
 
 extern "C" {
@@ -337,8 +333,7 @@ public:
 #define OPTION_TYPE_RECIPIENT       ((ULONG) 0x00000001)
 #define OPTION_TYPE_MESSAGE         ((ULONG) 0x00000002)
 
-typedef struct _OPTIONDATA
-{
+struct OPTIONDATA {
     ULONG           ulFlags;        /* MAPI_RECIPIENT, MAPI_MESSAGE */
     LPGUID          lpRecipGUID;    /* Same as returned by AddressTypes() */
     LPTSTR          lpszAdrType;    /* Same as returned by AddressTypes() */
@@ -348,7 +343,8 @@ typedef struct _OPTIONDATA
     LPBYTE          lpbOptionsData; /* Providers per [recip|message] option data */
     ULONG           cOptionsProps;  /* Count of Options default prop values */
     LPSPropValue    lpOptionsProps; /* Default Options property values */
-} OPTIONDATA, *LPOPTIONDATA;
+};
+typedef struct OPTIONDATA *LPOPTIONDATA;
 
 typedef SCODE (OPTIONCALLBACK)(
             HINSTANCE           hInst,

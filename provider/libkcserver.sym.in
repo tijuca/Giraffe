@@ -1,0 +1,17 @@
+KC_@PACKAGE_ABI@ {
+global:
+	/* unlucky gsoap linkage */
+	namespaces;
+	soap_*;
+
+	extern "C++" {
+		ns__*;
+
+		KC::*;
+		typeinfo*;
+		vtable*;
+		*::_Rep::_S_empty_rep_storage;
+	};
+local:
+	*;
+};

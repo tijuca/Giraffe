@@ -31,7 +31,7 @@
  * How our named properties work
  *
  * Basically, named properties in objects with the same PR_MAPPING_SIGNATURE should have the same
- * mapping of named properties to property ID's and vice-versa. We can use this information, together
+ * mapping of named properties to property IDs and vice-versa. We can use this information, together
  * with the information that Outlook mainly uses a fixed set of named properties to speed up things
  * considerably;
  *
@@ -63,11 +63,11 @@
  * named properties will change, which will BREAK THINGS BADLY
  *
  * Special constraints for this structure:
- * - The ulMappedId's must not overlap the previous row
- * - The ulMappedId's must be in ascending order
+ * - The ulMappedIds must not overlap the previous row
+ * - The ulMappedIds must be in ascending order
  */
 
-struct _sLocalNames {
+static const struct _sLocalNames {
 	GUID guid;
 	LONG ulMin;
 	LONG ulMax;
@@ -94,17 +94,15 @@ ECNamedProp::ECNamedProp(WSTransport *lpTransport)
 
 ECNamedProp::~ECNamedProp()
 {
-	std::map<MAPINAMEID *, ULONG, ltmap>::const_iterator iterMap;
-
 	// Clear all the cached names
-	for (iterMap = mapNames.begin(); iterMap != mapNames.end(); ++iterMap)
-		if(iterMap->first)
-			ECFreeBuffer(iterMap->first);
+	for (const auto &p : mapNames)
+		if (p.first)
+			ECFreeBuffer(p.first);
 	if(lpTransport)
 		lpTransport->Release();
 }
 
-HRESULT ECNamedProp::GetNamesFromIDs(LPSPropTagArray FAR * lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG FAR * lpcPropNames, LPMAPINAMEID FAR * FAR * lpppPropNames)
+HRESULT ECNamedProp::GetNamesFromIDs(LPSPropTagArray *lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames, LPMAPINAMEID **lpppPropNames)
 {
 	HRESULT			hr = hrSuccess;
 	unsigned int	i = 0;
@@ -135,14 +133,12 @@ HRESULT ECNamedProp::GetNamesFromIDs(LPSPropTagArray FAR * lppPropTags, LPGUID l
 
 	// Pass 2, cache reverse mapping (FAST)
 	for (i = 0; i < lpsPropTags->cValues; ++i) {
-		if(lppPropNames[i] == NULL) {
-			if(PROP_ID(lpsPropTags->aulPropTag[i]) > SERVER_NAMED_OFFSET) {
-				ResolveReverseCache(PROP_ID(lpsPropTags->aulPropTag[i]), lpPropSetGuid, ulFlags, lppPropNames, &lppPropNames[i]);
-			} else {
-				// Hmmm, so here is a named property, which is < SERVER_NAMED_OFFSET, but CANNOT be 
-				// resolved internally. Looks like somebody's pulling our leg ... We just leave it unknown
-			}
-		}
+		if (lppPropNames[i] != NULL)
+			continue;
+		if (PROP_ID(lpsPropTags->aulPropTag[i]) > SERVER_NAMED_OFFSET)
+			ResolveReverseCache(PROP_ID(lpsPropTags->aulPropTag[i]), lpPropSetGuid, ulFlags, lppPropNames, &lppPropNames[i]);
+		// else { Hmmm, so here is a named property, which is < SERVER_NAMED_OFFSET, but CANNOT be
+		// resolved internally. Looks like somebody's pulling our leg ... We just leave it unknown }
 	}
 
 	ECAllocateBuffer(CbNewSPropTagArray(lpsPropTags->cValues), (void **)&lpsUnresolved);
@@ -202,12 +198,12 @@ exit:
 	return hr;
 }
 
-HRESULT ECNamedProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID FAR * lppPropNames, ULONG ulFlags, LPSPropTagArray FAR * lppPropTags)
+HRESULT ECNamedProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropNames, ULONG ulFlags, LPSPropTagArray *lppPropTags)
 {
 	HRESULT			hr = hrSuccess;
 	unsigned int	i=0;
 	LPSPropTagArray	lpsPropTagArray = NULL;
-	LPMAPINAMEID*	lppPropNamesUnresolved = NULL;
+	std::unique_ptr<MAPINAMEID *[]> lppPropNamesUnresolved;
 	ULONG			cUnresolved = 0;
 	ULONG*			lpServerIDs = NULL;
 
@@ -243,8 +239,7 @@ HRESULT ECNamedProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID FAR * lppPro
 			ResolveCache(lppPropNames[i], &lpsPropTagArray->aulPropTag[i]);
 
 	// Pass 3, resolve names from server (SLOW, but decreases in frequency with store lifetime)
-
-	lppPropNamesUnresolved = new MAPINAMEID * [lpsPropTagArray->cValues]; // over-allocated
+	lppPropNamesUnresolved.reset(new MAPINAMEID *[lpsPropTagArray->cValues]); // over-allocated
 
 	// Get a list of unresolved names
 	for (i = 0; i < cPropNames; ++i)
@@ -255,8 +250,7 @@ HRESULT ECNamedProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID FAR * lppPro
 
 	if(cUnresolved) {
 		// Let the server resolve these names 
-		hr = lpTransport->HrGetIDsFromNames(lppPropNamesUnresolved, cUnresolved, ulFlags, &lpServerIDs);
-
+		hr = lpTransport->HrGetIDsFromNames(lppPropNamesUnresolved.get(), cUnresolved, ulFlags, &lpServerIDs);
 		if(hr != hrSuccess)
 			goto exit;
 
@@ -287,8 +281,6 @@ HRESULT ECNamedProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID FAR * lppPro
 exit:
 	if(lpsPropTagArray)
 		ECFreeBuffer(lpsPropTagArray);
-
-	delete[] lppPropNamesUnresolved;
 	if(lpServerIDs)
 		ECFreeBuffer(lpServerIDs);
 
@@ -317,18 +309,16 @@ HRESULT ECNamedProp::ResolveLocal(MAPINAMEID *lpName, ULONG *ulPropTag)
 HRESULT ECNamedProp::ResolveReverseCache(ULONG ulId, LPGUID lpGuid, ULONG ulFlags, void *lpBase, MAPINAMEID **lppName)
 {
 	HRESULT hr = MAPI_E_NOT_FOUND;
-	std::map<MAPINAMEID *, ULONG, ltmap>::const_iterator iterMap;
 
 	// Loop through the map to find the reverse-lookup of the named property. This could be speeded up by
 	// used a bimap (bi-directional map)
 
-	for (iterMap = mapNames.begin(); iterMap != mapNames.end(); ++iterMap)
-		if(iterMap->second == ulId) { // FIXME match GUID
-			if(lpGuid) {
-				ASSERT(memcmp(lpGuid, iterMap->first->lpguid, sizeof(GUID)) == 0); // TEST michel
-			}
+	for (const auto &p : mapNames)
+		if (p.second == ulId) { // FIXME match GUID
+			if (lpGuid != nullptr)
+				assert(memcmp(lpGuid, p.first->lpguid, sizeof(GUID)) == 0); // TEST michel
 			// found it
-			hr = HrCopyNameId(iterMap->first, lppName, lpBase);
+			hr = HrCopyNameId(p.first, lppName, lpBase);
 			break;
 		}
 
@@ -337,14 +327,11 @@ HRESULT ECNamedProp::ResolveReverseCache(ULONG ulId, LPGUID lpGuid, ULONG ulFlag
 
 HRESULT ECNamedProp::ResolveReverseLocal(ULONG ulId, LPGUID lpGuid, ULONG ulFlags, void *lpBase, MAPINAMEID **lppName)
 {
-	HRESULT		hr = hrSuccess;
 	MAPINAMEID*	lpName = NULL; 
 
 	// Local mapping is only for MNID_ID
-	if(ulFlags & MAPI_NO_IDS) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
+	if (ulFlags & MAPI_NO_IDS)
+		return MAPI_E_NOT_FOUND;
 
 	// Loop through the local names to see if we can reverse-map the id
 	for (size_t i = 0; i < ARRAY_SIZE(sLocalNames); ++i) {
@@ -360,13 +347,10 @@ HRESULT ECNamedProp::ResolveReverseLocal(ULONG ulId, LPGUID lpGuid, ULONG ulFlag
 			break;
 		}
 	}
-
-	if(lpName)
-		*lppName = lpName;
-	else
-		hr = MAPI_E_NOT_FOUND;
-exit:
-	return hr;
+	if (lpName == NULL)
+		return MAPI_E_NOT_FOUND;
+	*lppName = lpName;
+	return hrSuccess;
 }
 
 // Update the cache with the given data
@@ -401,7 +385,7 @@ HRESULT ECNamedProp::ResolveCache(MAPINAMEID *lpName, ULONG *lpulPropTag)
 
 	iterMap = mapNames.find(lpName);
 
-	if (iterMap == mapNames.end())
+	if (iterMap == mapNames.cend())
 		return MAPI_E_NOT_FOUND;
 	*lpulPropTag = PROP_TAG(PT_UNSPECIFIED, iterMap->second);
 	return hrSuccess;

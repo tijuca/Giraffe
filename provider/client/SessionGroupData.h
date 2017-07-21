@@ -18,8 +18,8 @@
 #ifndef ECSESSIONGROUPDATA_H
 #define ECSESSIONGROUPDATA_H
 
-#include <pthread.h>
-
+#include <kopano/zcdefs.h>
+#include <mutex>
 #include <mapispi.h>
 
 #include <kopano/kcodes.h>
@@ -28,7 +28,7 @@
 class ECNotifyMaster;
 class WSTransport;
 
-class ECSessionGroupInfo {
+class ECSessionGroupInfo _kc_final {
 public:
 	std::string strServer;
 	std::string strProfile;
@@ -56,24 +56,22 @@ static inline bool operator<(const ECSessionGroupInfo &a, const ECSessionGroupIn
 			((a.strServer.compare(b.strServer) == 0) && (a.strProfile.compare(b.strProfile) < 0));
 }
 
-class SessionGroupData
-{
+class SessionGroupData _kc_final {
 private:
 	/* SessionGroup ID to which this data belongs */
 	ECSESSIONGROUPID	m_ecSessionGroupId;
 	ECSessionGroupInfo	m_ecSessionGroupInfo;
 
 	/* Notification information */
-	ECNotifyMaster*		m_lpNotifyMaster;
+	ECNotifyMaster *m_lpNotifyMaster = nullptr;
 
 	/* Mutex */
-	pthread_mutex_t		m_hMutex;
-	pthread_mutexattr_t	m_hMutexAttrib;
+	std::recursive_mutex m_hMutex;
 	sGlobalProfileProps m_sProfileProps;
 
 	/* Refcounting */
-	pthread_mutex_t		m_hRefMutex;
-	ULONG				m_cRef;
+	std::recursive_mutex m_hRefMutex;
+	ULONG m_cRef = 0;
 
 public:
 	SessionGroupData(ECSESSIONGROUPID ecSessionGroupId, ECSessionGroupInfo *lpInfo, const sGlobalProfileProps &sProfileProps);

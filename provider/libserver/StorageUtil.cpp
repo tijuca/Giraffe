@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <kopano/memory.hpp>
 #include "StorageUtil.h"
 #include "ECDatabase.h"
 #include "ECAttachmentStorage.h"
@@ -24,6 +25,10 @@
 #include "ECSecurity.h"
 #include "cmdutil.hpp"
 #include <edkmdb.h>
+
+using namespace KCHL;
+
+namespace KC {
 
 // External objects
 extern ECSessionManager *g_lpSessionManager;	// ECServerEntrypoint.cpp
@@ -41,7 +46,7 @@ ECRESULT CreateObject(ECSession *lpecSession, ECDatabase *lpDatabase, unsigned i
 	unsigned int	ulOwner = 0;
 	std::string		strQuery;
 
-	ASSERT(ulParentType == MAPI_FOLDER || ulParentType == MAPI_MESSAGE || ulParentType == MAPI_ATTACH);
+	assert(ulParentType == MAPI_FOLDER || ulParentType == MAPI_MESSAGE || ulParentType == MAPI_ATTACH);
 	//
     // We skip quota checking because we do this during writeProps.
 
@@ -81,7 +86,7 @@ ECRESULT CreateObject(ECSession *lpecSession, ECDatabase *lpDatabase, unsigned i
 ECRESULT GetObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned int* lpulSize)
 {
 	ECRESULT		er = erSuccess;
-	DB_RESULT		lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 	DB_ROW			lpDBRow = NULL;
 	unsigned int	ulSize = 0;
 	std::string		strQuery;
@@ -89,42 +94,26 @@ ECRESULT GetObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned in
 	strQuery = "SELECT val_ulong FROM properties WHERE hierarchyid="+stringify(ulObjId)+" AND ((tag="+stringify(PROP_ID(PR_MESSAGE_SIZE))+" AND type="+stringify(PROP_TYPE(PR_MESSAGE_SIZE))+") OR (tag="+stringify(PROP_ID(PR_ATTACH_SIZE))+" AND type="+stringify(PROP_TYPE(PR_ATTACH_SIZE))+") )";
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
-		goto exit;
-
-	if(lpDatabase->GetNumRows(lpDBResult) != 1) {
-		er = KCERR_NOT_FOUND;
-		goto exit;
-	}
-
+		return er;
+	if (lpDatabase->GetNumRows(lpDBResult) != 1)
+		return KCERR_NOT_FOUND;
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
-	if(lpDBRow == NULL || lpDBRow[0] == NULL) {
-		er = KCERR_NOT_FOUND;
-		goto exit;
-	}
-
+	if (lpDBRow == nullptr || lpDBRow[0] == nullptr)
+		return KCERR_NOT_FOUND;
 	ulSize = atoi(lpDBRow[0]);
-
-	// Free results
-	if(lpDBResult) { lpDatabase->FreeResult(lpDBResult); lpDBResult = NULL; }
-
 	*lpulSize = ulSize;
-exit:
-	// Free results
-	if(lpDBResult)
-		lpDatabase->FreeResult(lpDBResult);
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT CalculateObjectSize(ECDatabase* lpDatabase, unsigned int objid, unsigned int ulObjType, unsigned int* lpulSize)
 {
 	ECRESULT		er = erSuccess;
-	DB_RESULT		lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 	DB_ROW			lpDBRow = NULL;
 	unsigned int	ulSize = 0;
 	std::string		strQuery;
-	ECAttachmentStorage *lpAttachmentStorage = NULL;
-	ECFileAttachment *lpFileStorage = NULL;
+	object_ptr<ECAttachmentStorage> lpAttachmentStorage;
+	ECDatabaseAttachment *lpDatabaseStorage = NULL;
 
 	*lpulSize = 0;
 	//	strQuery = "SELECT SUM(16 + IF(val_ulong, 4, 0)+IF(val_double||val_longint||val_hi||val_lo, 8, 0)+ LENGTH(IFNULL(val_string, 0))+length(IFNULL(val_binary, 0))) FROM properties WHERE hierarchyid=" + stringify(objid);
@@ -133,7 +122,7 @@ ECRESULT CalculateObjectSize(ECDatabase* lpDatabase, unsigned int objid, unsigne
 	strQuery = "SELECT (SELECT SUM(20 + LENGTH(IFNULL(val_string, 0))+length(IFNULL(val_binary, 0))) FROM properties WHERE hierarchyid=" + stringify(objid) + ") + IFNULL( (SELECT SUM(LENGTH(lob.val_binary)) FROM `lob` JOIN `singleinstances` ON singleinstances.instanceid = lob.instanceid WHERE singleinstances.hierarchyid=" + stringify(objid) + "), 0)";
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if(lpDBRow == NULL || lpDBRow[0] == NULL)
@@ -141,62 +130,40 @@ ECRESULT CalculateObjectSize(ECDatabase* lpDatabase, unsigned int objid, unsigne
 	else
 		ulSize = atoui(lpDBRow[0])+ 28;// + hierarchy size
 
-	er = CreateAttachmentStorage(lpDatabase, &lpAttachmentStorage);
+	er = CreateAttachmentStorage(lpDatabase, &~lpAttachmentStorage);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
-	// since we already did the length magic in the previous query, we only need the extra size for filestorage
-	lpFileStorage = dynamic_cast<ECFileAttachment*>(lpAttachmentStorage);
-	if (lpFileStorage) {
-		// @todo maybe we want this one without tag
+	// since we already did the length magic in the previous query, we only need the 
+	// extra size for filestorage and S3 storage, i.e. not database storage
+	lpDatabaseStorage = dynamic_cast<ECDatabaseAttachment *>(lpAttachmentStorage.get());
+	if (!lpDatabaseStorage) {
 		size_t ulAttachSize = 0;
-		er = lpFileStorage->GetSize(objid, PROP_ID(PR_ATTACH_DATA_BIN), &ulAttachSize);
+		er = lpAttachmentStorage->GetSize(objid, PROP_ID(PR_ATTACH_DATA_BIN), &ulAttachSize);
 		if (er != erSuccess)
-			goto exit;
-
+			return er;
 		ulSize += ulAttachSize;
 	}
-
-	// Free results
-	if(lpDBResult) { lpDatabase->FreeResult(lpDBResult); lpDBResult = NULL; }
 
 	// Calculate also mv-props
 	strQuery = "SELECT SUM(20 + LENGTH(IFNULL(val_string, 0))+length(IFNULL(val_binary, 0))) FROM mvproperties WHERE hierarchyid=" + stringify(objid);
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if(lpDBRow != NULL && lpDBRow[0] != NULL)
 		ulSize += atoui(lpDBRow[0]); // Add the size
-
-	// Free results
-	if(lpDBResult) { lpDatabase->FreeResult(lpDBResult); lpDBResult = NULL; }
 
 	// Get parent sizes
 	strQuery = "SELECT SUM(IFNULL(p.val_ulong, 0)) FROM hierarchy as h JOIN properties AS p ON hierarchyid=h.id WHERE h.parent=" + stringify(objid)+ " AND ((p.tag="+stringify(PROP_ID(PR_MESSAGE_SIZE))+" AND p.type="+stringify(PROP_TYPE(PR_MESSAGE_SIZE)) + ") || (p.tag="+stringify(PROP_ID(PR_ATTACH_SIZE))+" AND p.type="+stringify(PROP_TYPE(PR_ATTACH_SIZE))+ "))";
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
-		goto exit;
-
+		return er;
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if(lpDBRow != NULL && lpDBRow[0] != NULL)
 		ulSize += atoui(lpDBRow[0]); // Add the size
-
-	// Free results
-	if(lpDBResult) { lpDatabase->FreeResult(lpDBResult); lpDBResult = NULL; }
-
 	*lpulSize = ulSize;
-
-exit:
-	if (lpAttachmentStorage)
-		lpAttachmentStorage->Release();
-
-	// Free results
-	if(lpDBResult)
-		lpDatabase->FreeResult(lpDBResult);
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT UpdateObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned int ulObjType, eSizeUpdateAction updateAction, long long llSize)
@@ -268,3 +235,5 @@ ECRESULT UpdateObjectSize(ECDatabase* lpDatabase, unsigned int ulObjId, unsigned
 	}
 	return erSuccess;
 }
+
+} /* namespace */

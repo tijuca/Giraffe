@@ -21,8 +21,10 @@
 #ifndef ARCHIVECONTROL_H_INCLUDED
 #define ARCHIVECONTROL_H_INCLUDED
 
+#include <kopano/zcdefs.h>
 #include <memory>
-#include <kopano/tstring.h>
+
+namespace KC {
 
 enum eResult {
 	Success = 0,
@@ -35,22 +37,21 @@ enum eResult {
 	PartialCompletion
 };
 
-class ArchiveControl 
-{
+class ArchiveControl {
 public:
 	typedef std::unique_ptr<ArchiveControl> auto_ptr_type;
-
-	virtual ~ArchiveControl() {};
-
+	virtual ~ArchiveControl(void) _kc_impdtor;
 	virtual eResult ArchiveAll(bool bLocalOnly, bool bAutoAttach, unsigned int ulFlags) = 0;
 	virtual eResult Archive(const tstring& strUser, bool bAutoAttach, unsigned int ulFlags) = 0;
 	virtual eResult CleanupAll(bool bLocalOnly) = 0;
 	virtual eResult Cleanup(const tstring& strUser) = 0;
 
 protected:
-	ArchiveControl() {};
+	ArchiveControl(void) = default;
 };
 
 typedef ArchiveControl::auto_ptr_type	ArchiveControlPtr;
+
+} /* namespace */
 
 #endif // !defined ARCHIVECONTROL_H_INCLUDED

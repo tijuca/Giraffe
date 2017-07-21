@@ -16,16 +16,14 @@
  */
 
 #include <kopano/platform.h>
-
-// Damn windows header defines max which break C++ header files
-#undef max
-
 #include <pthread.h>
 #include <mapix.h>
 #include <ctime>
 #include <iostream>
 
 #include "ECMapiUtils.h"
+
+namespace KC {
 
 // Returns the FILETIME as GM-time
 FILETIME vmimeDatetimeToFiletime(vmime::datetime dt) {
@@ -59,3 +57,5 @@ vmime::datetime FiletimeTovmimeDatetime(FILETIME ft) {
 	gmtime_safe(&tmp, &convert);
 	return vmime::datetime(convert.tm_year + 1900, convert.tm_mon + 1, convert.tm_mday, convert.tm_hour, convert.tm_min, convert.tm_sec);
 }
+
+} /* namespace */

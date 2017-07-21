@@ -30,11 +30,11 @@ using namespace std;
 #include <string>
 #include <cstring>
 #include <pthread.h>
-
-#include <boost/filesystem/path.hpp>
-
 #include <iostream>
 #include <fstream>
+#include <kopano/lockhelper.hpp>
+
+namespace KC {
 
 struct settingkey_t {
 	char s[256];
@@ -42,8 +42,7 @@ struct settingkey_t {
 	unsigned short ulGroup;
 };
 
-struct settingcompare
-{
+struct settingcompare {
 	bool operator()(const settingkey_t &a, const settingkey_t &b) const
 	{
 		return strcmp(a.s, b.s) < 0;
@@ -57,10 +56,10 @@ class ECConfigImpl;
 /* Note: char* in map is allocated ONCE to 1024, and GetSetting will always return the same pointer to this buffer */
 typedef std::map<settingkey_t, char*, settingcompare> settingmap_t;
 typedef bool (ECConfigImpl::*directive_func_t)(const char *, unsigned int);
-typedef struct {
+struct directive_t {
 	const char			*lpszDirective;
 	directive_func_t	fExecute;
-} directive_t;
+};
 
 /*
  * Flags for the InitDefaults & InitConfigFile functions
@@ -72,43 +71,30 @@ typedef struct {
 #define LOADSETTING_OVERWRITE_RELOAD	0x0010	/* Same as CONFIG_LOAD_OVERWRITE but only if option is marked reloadable */
 #define LOADSETTING_CMDLINE_PARAM		0x0020	/* This setting is being set from commandline parameters. Sets the option non-reloadable */
 
-class ECConfigImpl _zcp_final : public ECConfig {
+class ECConfigImpl _kc_final : public ECConfig {
 public:
 	ECConfigImpl(const configsetting_t *lpDefaults, const char *const *lpszDirectives);
 	~ECConfigImpl();
-
-	bool LoadSettings(const char *szFilename) _zcp_override;
-	virtual bool ParseParams(int argc, char *argv[], int *lpargidx) _zcp_override;
+	bool LoadSettings(const char *file) _kc_override;
+	virtual int ParseParams(int argc, char **argv) _kc_override;
 	const char *GetSettingsPath(void) _kc_override { return m_szConfigFile; }
-	bool ReloadSettings(void) _zcp_override;
-
-	bool AddSetting(const char *szName, const char *szValue, const unsigned int ulGroup = 0) _zcp_override;
-
-	void	AddWriteSetting(const char *szName, const char *szValue, const unsigned int ulGroup = 0);
-
-	const char *GetSetting(const char *szName) _zcp_override;
-	const char *GetSetting(const char *szName, const char *equal, const char *other) _zcp_override;
-	const wchar_t *GetSettingW(const char *szName) _zcp_override;
-	const wchar_t *GetSettingW(const char *szName, const wchar_t *equal, const wchar_t *other) _zcp_override;
-
-	std::list<configsetting_t> GetSettingGroup(unsigned int ulGroup) _zcp_override;
-	std::list<configsetting_t> GetAllSettings(void) _zcp_override;
-
-	bool HasWarnings(void) _zcp_override;
+	bool ReloadSettings(void) _kc_override;
+	bool AddSetting(const char *name, const char *value, const unsigned int group = 0) _kc_override;
+	const char *GetSetting(const char *name) _kc_override;
+	const char *GetSetting(const char *name, const char *equal, const char *other) _kc_override;
+	const wchar_t *GetSettingW(const char *name) _kc_override;
+	const wchar_t *GetSettingW(const char *name, const wchar_t *equal, const wchar_t *other) _kc_override;
+	std::list<configsetting_t> GetSettingGroup(unsigned int group) _kc_override;
+	std::list<configsetting_t> GetAllSettings(void) _kc_override;
+	bool HasWarnings(void) _kc_override;
 	const std::list<std::string> *GetWarnings(void) _kc_override { return &warnings; }
-	bool HasErrors(void) _zcp_override;
+	bool HasErrors(void) _kc_override;
 	const std::list<std::string> *GetErrors(void) _kc_override { return &errors; }
 
-	bool WriteSettingToFile(const char *szName, const char *szValue, const char *szFileName) _zcp_override;
-	bool WriteSettingsToFile(const char *szFileName) _zcp_override;
-
 private:
-	typedef boost::filesystem::path path_type;
-
 	bool	InitDefaults(unsigned int ulFlags);
 	bool	InitConfigFile(unsigned int ulFlags);
-	bool	ReadConfigFile(const path_type &file, unsigned int ulFlags, unsigned int ulGroup = 0);
-
+	bool	ReadConfigFile(const std::string &file, unsigned int ulFlags, unsigned int ulGroup = 0);
 	bool	HandleDirective(const std::string &strLine, unsigned int ulFlags);
 	bool	HandleInclude(const char *lpszArgs, unsigned int ulFlags);
 	bool	HandlePropMap(const char *lpszArgs, unsigned int ulFlags);
@@ -126,28 +112,25 @@ private:
 	bool	CopyConfigSetting(const configsetting_t *lpsSetting, settingkey_t *lpsKey);
 	bool	CopyConfigSetting(const settingkey_t *lpsKey, const char *szValue, configsetting_t *lpsSetting);
 
-	void    WriteLinesToFile(const char* szName, const char* szValue, ifstream& in, ofstream& out, bool bWriteAll);
-
-private:
 	const configsetting_t	*m_lpDefaults;
-	const char*				m_szConfigFile;
+	const char *m_szConfigFile = nullptr;
 	std::list<std::string>	m_lDirectives;
 
 	/* m_mapSettings & m_mapAliases are protected by m_settingsLock */
-	pthread_rwlock_t m_settingsRWLock;
-
+	KC::shared_mutex m_settingsRWLock;
 	settingmap_t			m_mapSettings;
 	settingmap_t			m_mapAliases;
 	std::list<std::string>	warnings;
 	std::list<std::string>	errors;
-	
-	path_type			m_currentFile;
-	std::set<path_type>	m_readFiles;
+	std::string m_currentFile;
+	std::set<std::string> m_readFiles;
 
 	typedef std::map<const char*, std::wstring>	ConvertCache;
 	ConvertCache		m_convertCache;
 
 	static const directive_t	s_sDirectives[];
 };
+
+} /* namespace */
 
 #endif // ECCONFIGIMPL_H

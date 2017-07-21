@@ -6,6 +6,12 @@ import sys
 import MAPICore
 from MAPI.Defs import *
 
+def _convert(s):
+    if sys.hexversion >= 0x03000000 and isinstance(s, bytes):
+        return s.decode('ascii')
+    else:
+        return s
+
 class MAPIStruct:
     def __init__(self): pass
     def __eq__(self, other):
@@ -14,6 +20,10 @@ class MAPIStruct:
         return self.__dict__ == other.__dict__
     def __repr__(self):
         return repr(self.__dict__)
+    def __setstate__(self, d):
+        # XXX pickle with python2, unpickle with python3 (encoding='bytes')
+        for k, v in d.items():
+            setattr(self, _convert(k), v)
 
 class SPropValue(MAPIStruct):
     def __init__(self, ulPropTag, Value):
@@ -215,23 +225,38 @@ class ACTIONS(MAPIStruct):
     def __repr__(self):
         return 'ACTIONS(%r,%r)' % (self.ulVersion, self.lpAction)
     
+# pylint (let's replace the horror which comes after this with a simple list)
+MAPIErrorNotFound = None
+MAPIErrorInterfaceNotSupported = None
+MAPIErrorNotEnoughMemory = None
+MAPIErrorNoSupport = None
+MAPIErrorInvalidParameter = None
+MAPIErrorNoAccess = None
+MAPIErrorInvalidEntryid = None
+MAPIErrorUnknownEntryid = None
+MAPIErrorNoSupport = None
+MAPIErrorNetworkError = None
+MAPIErrorDiskError = None
+MAPIErrorLogonFailed = None
+
 class MAPIError(Exception):
     _errormap = {}
     
     @staticmethod
     def _initialize_errors():
+        error_prefix = 'MAPI_E_'
         for name, value in inspect.getmembers(sys.modules['MAPICore']):
-            if name.startswith('MAPI_E_'):
-                clsname = 'MAPIError' + ''.join(s.capitalize() for s in name[7:].split('_'))
-                def construct_class(hr):
+            if name.startswith(error_prefix):
+                clsname = 'MAPIError' + ''.join(s.capitalize() for s in name[len(error_prefix):].split('_'))
+                def construct_class(hr, descr):
                     if issubclass(MAPIError, object):
-                        return type(clsname, (MAPIError,), {'__init__': lambda self: MAPIError.__init__(self, hr)})
+                        return type(clsname, (MAPIError,), {'__init__': lambda self: MAPIError.__init__(self, hr, descr)})
                     else:
                         class MAPIErrorDynamic(MAPIError):
                             def __init__(self):
-                                MAPIError.__init__(self, hr)
+                                MAPIError.__init__(self, hr, descr)
                         return MAPIErrorDynamic
-                t = construct_class(value)
+                t = construct_class(value, name)
                 setattr(sys.modules[__name__], clsname, t)
                 MAPIError._errormap[value] = t
     
@@ -251,11 +276,12 @@ class MAPIError(Exception):
             return t()
         return MAPIError(hr)
     
-    def __init__(self, hr):
+    def __init__(self, hr, descr=None):
         self.hr = hr
+        self.descr = descr
         
     def __repr__(self):
-        return "MAPI error %X" % (self.hr)
+        return "MAPI error %X (%s)" % (self.hr, self.descr)
 
     def __str__(self):
         return self.__repr__()
@@ -294,22 +320,25 @@ class ECUSER(MAPIStruct):
 # @todo sGroupId ECENTRYID?
 # @todo propmap?
 class ECGROUP(MAPIStruct):
-    def __init__(self, Groupname, Fullname, Email, IsHidden = False, GroupID = None):
+    def __init__(self, Groupname, Fullname, Email, IsHidden = False, GroupID = None, MVPropMap = None):
         self.Groupname = Groupname
         self.Fullname = Fullname
         self.Email = Email
         self.IsHidden = IsHidden
         self.GroupID = GroupID
+        self.MVPropMap = MVPropMap
 
 # @todo sCompanyId ECENTRYID?
 # @todo sAdministrator ECENTRYID?
 # @todo propmap?
 class ECCOMPANY(MAPIStruct):
-    def __init__(self, Companyname, Servername, IsHidden = False, CompanyID = None):
+    def __init__(self, Companyname, Servername, IsHidden = False, CompanyID = None, MVPropMap = None, AdministratorID = None):
         self.Companyname = Companyname
         self.Servername = Servername
         self.IsHidden = IsHidden
         self.CompanyID = CompanyID
+        self.MVPropMap = MVPropMap
+        self.AdministratorID = AdministratorID
 
 class ECUSERCLIENTUPDATESTATUS(MAPIStruct):
     def __init__(self, TrackId, Updatetime, Currentversion, Latestversion, Computername, Status):
@@ -394,5 +423,12 @@ class SYSTEMTIME(MAPIStruct):
         self.wMinute = wMinute
         self.wSecond = wSecond
         self.wMilliseconds = wMilliseconds
+
+class FreeBusyBlock(MAPIStruct):
+    def __init__(self, start, end, status):
+        self.start = start
+        self.end = end
+        self.status = status
+
 
 MAPIError._initialize_errors()

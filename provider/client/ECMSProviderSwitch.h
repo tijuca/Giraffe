@@ -26,27 +26,17 @@ protected:
 	ECMSProviderSwitch(ULONG ulFlags);
 public:
 	static  HRESULT Create(ULONG ulFlags, ECMSProviderSwitch **lppMSProvider);
-
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
-	virtual ULONG Release();
-
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
+	virtual ULONG Release(void) _kc_override;
 	virtual HRESULT Shutdown(ULONG * lpulFlags);
 	virtual HRESULT Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, LPCIID lpInterface, ULONG *lpcbSpoolSecurity, LPBYTE *lppbSpoolSecurity, LPMAPIERROR *lppMAPIError, LPMSLOGON *lppMSLogon, LPMDB *lppMDB);
 	virtual HRESULT SpoolerLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, LPCIID lpInterface, ULONG lpcbSpoolSecurity, LPBYTE lppbSpoolSecurity, LPMAPIERROR *lppMAPIError, LPMSLOGON *lppMSLogon, LPMDB *lppMDB);
 	virtual HRESULT CompareStoreIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult);
 
 private:
-	class xMSProvider _zcp_final : public IMSProvider {
-		// IUnknown
-		virtual ULONG __stdcall AddRef(void) _zcp_override;
-		virtual ULONG __stdcall Release(void) _zcp_override;
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _zcp_override;
-
-		// MSProvider
-		virtual HRESULT __stdcall Shutdown(ULONG * lpulFlags);
-		virtual HRESULT __stdcall Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, LPCIID lpInterface, ULONG *lpcbSpoolSecurity, LPBYTE *lppbSpoolSecurity, LPMAPIERROR *lppMAPIError, LPMSLOGON *lppMSLogon, LPMDB *lppMDB);
-		virtual HRESULT __stdcall SpoolerLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, LPCIID lpInterface, ULONG lpcbSpoolSecurity, LPBYTE lppbSpoolSecurity, LPMAPIERROR *lppMAPIError, LPMSLOGON *lppMSLogon, LPMDB *lppMDB);
-		virtual HRESULT __stdcall CompareStoreIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult);
+	class xMSProvider _kc_final : public IMSProvider {
+		#include <kopano/xclsfrag/IUnknown.hpp>
+		#include <kopano/xclsfrag/IMSProvider.hpp>
 	} m_xMSProvider;
 
 protected:

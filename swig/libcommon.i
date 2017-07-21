@@ -2,6 +2,7 @@
 
 %{
     #include <kopano/platform.h>
+    #include <kopano/memory.hpp>
     #include <mapi.h>
     #include <mapidefs.h>
     #include <mapicode.h>
@@ -79,6 +80,8 @@ HRESULT GetShortcutFolder(IMAPISession *lpSession, LPTSTR lpszFolderName, LPTSTR
 HRESULT DelFavoriteFolder(IMAPIFolder *lpShortcutFolder, LPSPropValue lpPropSourceKey);
 HRESULT AddFavoriteFolder(IMAPIFolder *lpShortcutFolder, IMAPIFolder *lpFolder, LPTSTR lpszAliasName, ULONG ulFlags);
 
+HRESULT GetConfigMessage(IMsgStore *lpStore, char *szMessageName, IMessage **OUTPUT);
+
 // functions from common/Util.h
 class Util {
 public:
@@ -107,6 +110,8 @@ public:
 	}
 };
 
+%cstring_input_binary(const char *pv, ULONG cb);
+
 class IStreamAdapter {
 public:
 	// Hard to typemap so using other method below
@@ -118,13 +123,12 @@ public:
 			HRESULT hr = MAPIAllocateBuffer(cb, (void **)&buffer);
 
 			if(hr != hrSuccess)
-				goto exit;			
+				return hr;
 
 			self->Read(buffer, cb, ulRead);
 
 			*lpOutput = buffer;
-		exit:
-			return hr;
+			return hrSuccess;
 		}
     }
     virtual HRESULT Seek(LARGE_INTEGER dlibMove, DWORD dwOrigin, ULARGE_INTEGER *plibNewPosition) = 0;

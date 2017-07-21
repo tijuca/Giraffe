@@ -18,18 +18,15 @@
 #ifndef __DAGENT_ARCHIVE_H
 #define __DAGENT_ARCHIVE_H
 
+#include <kopano/zcdefs.h>
 #include <mapidefs.h>
 #include <mapix.h>
 
 #include <kopano/mapi_ptr.h>
-#include <kopano/tstring.h>
-
 #include <list>
 #include <memory>
 
-class ECLogger;
-
-class ArchiveResult {
+class ArchiveResult _kc_final {
 public:
 	void AddMessage(MessagePtr ptrMessage);
 	void Undo(IMAPISession *lpSession);
@@ -42,11 +39,9 @@ private:
 class Archive;
 typedef std::unique_ptr<Archive> ArchivePtr;
 
-class Archive {
+class Archive _kc_final {
 public:
-	static HRESULT Create(IMAPISession *lpSession, ECLogger *lpLogger, ArchivePtr *lpptrArchive);
-	~Archive();
-
+	static HRESULT Create(IMAPISession *, ArchivePtr *);
 	HRESULT HrArchiveMessageForDelivery(IMessage *lpMessage);
 	HRESULT HrArchiveMessageForSending(IMessage *lpMessage, ArchiveResult *lpResult);
 
@@ -54,16 +49,14 @@ public:
 	LPCTSTR GetErrorMessage() const { return m_strErrorMessage.c_str(); }
 
 private:
-	Archive(IMAPISession *lpSession, ECLogger *lpLogger);
+	Archive(IMAPISession *);
 	void SetErrorMessage(HRESULT hr, LPCTSTR lpszMessage);
 
 	// Inhibit copying
 	Archive(const Archive &) = delete;
 	Archive &operator=(const Archive &) = delete;
 
-private:
 	MAPISessionPtr	m_ptrSession;
-	ECLogger		*m_lpLogger;
 	tstring			m_strErrorMessage;
 };
 

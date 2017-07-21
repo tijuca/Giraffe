@@ -7,7 +7,9 @@
 #include <mapidefs.h>
 #include <mapicode.h>
 #include <mapiutil.h>
+#include <kopano/CommonUtil.h>
 #include <kopano/IECServiceAdmin.h>
+#include <kopano/memory.hpp>
 #include "IECSpooler.h"
 #include "IECTestProtocol.h"
 #include "IECMultiStoreTable.h"
@@ -21,17 +23,28 @@
 #include "MAPINotifSink.h"
 #include <kopano/director_util.h>
 
-HRESULT MAPIInitialize_Multithreaded() {
-	MAPIINIT_0 init = {0, MAPI_MULTITHREAD_NOTIFICATIONS};
+/*
+ * This dummy class ensure that we initialize properly on module load
+ * and deinitialize as well whenever the intepreter exits.
+ */
+class MAPIInitializer {
+	public:
+	MAPIInitializer(void)
+	{
+		MAPIINIT_0 init = {0, MAPI_MULTITHREAD_NOTIFICATIONS};
+		MAPIInitialize(&init);
+	}
+	~MAPIInitializer(void)
+	{
+		MAPIUninitialize();
+	}
+};
 
-	return MAPIInitialize(&init);
-}
+MAPIInitializer mapiInitializer;
 
 %}
 
 %include <kopano/typemap.i>
-
-HRESULT MAPIInitialize_Multithreaded();
 
 #if SWIGPYTHON
 %exception {
@@ -79,30 +92,37 @@ virtual HRESULT QueryInterface(const IID& USE_IID_FOR_OUTPUT, void **OUTPUT_USE_
 #define STGM_NOSNAPSHOT         0x00200000L
 #define STGM_DIRECT_SWMR        0x00400000L
 
-typedef enum tagSTGTY {
+enum STGTY {
     STGTY_STORAGE       = 1,
     STGTY_STREAM        = 2,
     STGTY_LOCKBYTES     = 3,
     STGTY_PROPERTY      = 4
-} STGTY;
+};
 
-typedef enum tagSTREAM_SEEK {
+enum STREAM_SEEK {
     STREAM_SEEK_SET     = 0,
     STREAM_SEEK_CUR     = 1,
     STREAM_SEEK_END     = 2
-} STREAM_SEEK;
+};
 
-typedef enum tagLOCKTYPE {
+enum LOCKTYPE {
     LOCK_WRITE          = 1,
     LOCK_EXCLUSIVE      = 2,
     LOCK_ONLYONCE       = 4
-} LOCKTYPE;
+};
 
-typedef enum tagSTATFLAG {
+enum STATFLAG {
     STATFLAG_DEFAULT    = 0,
     STATFLAG_NONAME     = 1,
     STATFLAG_NOOPEN     = 2
-} STATFLAG;
+};
+
+%typemap(argout) (char **lpOutput, ULONG *ulRead) {
+  if (*$1) {
+    %append_output(PyBytes_FromStringAndSize(*$1, *$2));
+    MAPIFreeBuffer(*$1);
+  }
+}
 
 /* IStream Interface */
 class ISequentialStream : public IUnknown {
@@ -116,32 +136,33 @@ public:
 			char *buffer;
 			StreamPtr ptrStream;
 
-			if (self->QueryInterface(ptrStream.iid, &ptrStream) == hrSuccess) {
+			if (self->QueryInterface(ptrStream.iid(), &~ptrStream) == hrSuccess) {
 				const LARGE_INTEGER liMove = {0, 0};
 				ULARGE_INTEGER liPosition;
 				STATSTG statbuf;
 
 				hr = ptrStream->Seek(liMove, SEEK_CUR, &liPosition);
 				if (hr != hrSuccess)
-					goto exit;
-
+					return hr;
 				hr = ptrStream->Stat(&statbuf, 0);
 				if (hr != hrSuccess)
-					goto exit;
-
+					return hr;
 				if ((statbuf.cbSize.QuadPart - liPosition.QuadPart) < cb)
 					cb = (ULONG)(statbuf.cbSize.QuadPart - liPosition.QuadPart);
 			}
 
 			hr = MAPIAllocateBuffer(cb, (void **)&buffer);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			self->Read(buffer, cb, ulRead);
 
 			*lpOutput = buffer;
-		exit:
-			return hr;
+			return hrSuccess;
+		}
+		~ISequentialStream(void)
+		{
+			self->Release();
 		}
     }
 };

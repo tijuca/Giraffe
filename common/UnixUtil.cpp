@@ -14,13 +14,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <memory>
+#include <new>
 #include <kopano/platform.h>
+#include <kopano/ECLogger.h>
 #include <kopano/UnixUtil.h>
-
+#include <kopano/stringutil.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
+#include <spawn.h>
 #include <pwd.h>
 #include <grp.h>
 #include <cerrno>
@@ -32,6 +35,8 @@
 
 #include <string>
 using namespace std;
+
+namespace KC {
 
 static int unix_runpath(ECConfig *conf)
 {
@@ -51,42 +56,61 @@ static int unix_runpath(ECConfig *conf)
 	return ret;
 }
 
-int unix_runas(ECConfig *lpConfig, ECLogger *lpLogger) {
+static int unix_runasgroup(const struct passwd *pw, const char *group)
+{
+	auto gr = getgrnam(group);
+	if (gr == nullptr) {
+		ec_log_err("Looking up group \"%s\" failed: %s", group, strerror(errno));
+		return -1;
+	}
+	if (getgid() != gr->gr_gid && setgid(gr->gr_gid) != 0) {
+		ec_log_crit("Changing to group \"%s\" failed: %s", gr->gr_name, strerror(errno));
+		return -1;
+	}
+	if (pw == nullptr)
+		/* No user change desired, so no initgroups desired. */
+		return 0;
+	if (getuid() == pw->pw_uid) {
+		/*
+		 * The process is already the (supposedly unprivileged) target
+		 * user - initgroup is unlikely to succeed, so ignore its
+		 * return value.
+		 */
+		initgroups(pw->pw_name, gr->gr_gid);
+		return 0;
+	}
+	if (initgroups(pw->pw_name, gr->gr_gid) != 0) {
+		ec_log_crit("Changing supplementary groups failed: %s", strerror(errno));
+		return -1;
+	}
+	return 0;
+}
+
+int unix_runas(ECConfig *lpConfig)
+{
 	const char *group = lpConfig->GetSetting("run_as_group");
 	const char *user  = lpConfig->GetSetting("run_as_user");
-	int ret;
-
-	ret = unix_runpath(lpConfig);
+	auto ret = unix_runpath(lpConfig);
 	if (ret != 0)
 		return ret;
 
-	if (getgroups(0, NULL) != 0 && setgroups(0, NULL) < 0)
-		ec_log_warn("setgroups(0): %s", strerror(errno));
-
-	if (group != NULL && *group != '\0') {
-		const struct group *gr = getgrnam(group);
-		if (!gr) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Looking up group \"%s\" failed: %s", group, strerror(errno));
-			return -1;
-		}
-		if (getgid() != gr->gr_gid && setgid(gr->gr_gid) != 0) {
-			lpLogger->Log(EC_LOGLEVEL_CRIT, "Changing to group \"%s\" failed: %s", gr->gr_name, strerror(errno));
-			return -1;
-		}
-	}
-
-	if (user != NULL && *user != '\0') {
-		const struct passwd *pw = getpwnam(user);
+	const struct passwd *pw = nullptr;
+	if (user != nullptr && *user != '\0') {
+		pw = getpwnam(user);
 		if (!pw) {
-			lpLogger->Log(EC_LOGLEVEL_ERROR, "Looking up user \"%s\" failed: %s", user, strerror(errno));
-			return -1;
-		}
-		if (getuid() != pw->pw_uid && setuid(pw->pw_uid) != 0) {
-			lpLogger->Log(EC_LOGLEVEL_CRIT, "Changing to user \"%s\" failed: %s", pw->pw_name, strerror(errno));
+			ec_log_err("Looking up user \"%s\" failed: %s", user, strerror(errno));
 			return -1;
 		}
 	}
-
+	if (group != nullptr && *group != '\0') {
+		ret = unix_runasgroup(pw, group);
+		if (ret != 0)
+			return ret;
+	}
+	if (pw != nullptr && getuid() != pw->pw_uid && setuid(pw->pw_uid) != 0) {
+		ec_log_crit("Changing to user \"%s\" failed: %s", pw->pw_name, strerror(errno));
+		return -1;
+	}
 	return 0;
 }
 
@@ -115,23 +139,22 @@ int unix_chown(const char *filename, const char *username, const char *groupname
 	return chown(filename, uid, gid);
 }
 
-void unix_coredump_enable(ECLogger *logger)
+void unix_coredump_enable(void)
 {
 	struct rlimit limit;
 
 	limit.rlim_cur = RLIM_INFINITY;
 	limit.rlim_max = RLIM_INFINITY;
-	if (setrlimit(RLIMIT_CORE, &limit) < 0 && logger != NULL)
-		logger->Log(EC_LOGLEVEL_ERROR, "Unable to raise coredump filesize limit: %s", strerror(errno));
+	if (setrlimit(RLIMIT_CORE, &limit) < 0)
+		ec_log_err("Unable to raise coredump filesize limit: %s", strerror(errno));
 }
 
-int unix_create_pidfile(const char *argv0, ECConfig *lpConfig,
-    ECLogger *lpLogger, bool bForce)
+int unix_create_pidfile(const char *argv0, ECConfig *lpConfig, bool bForce)
 {
 	string pidfilename = "/var/run/kopano/" + string(argv0) + ".pid";
 	FILE *pidfile;
 	int oldpid;
-	char tmp[255];
+	char tmp[256];
 	bool running = false;
 
 	if (strcmp(lpConfig->GetSetting("pid_file"), "")) {
@@ -141,27 +164,29 @@ int unix_create_pidfile(const char *argv0, ECConfig *lpConfig,
 	// test for existing and running process
 	pidfile = fopen(pidfilename.c_str(), "r");
 	if (pidfile) {
-		fscanf(pidfile, "%d", &oldpid);
+		if (fscanf(pidfile, "%d", &oldpid) < 1)
+			oldpid = -1;
 		fclose(pidfile);
 
 		snprintf(tmp, 255, "/proc/%d/cmdline", oldpid);
 		pidfile = fopen(tmp, "r");
 		if (pidfile) {
-			fscanf(pidfile, "%s", tmp);
+			memset(tmp, '\0', sizeof(tmp));
+			if (fscanf(pidfile, "%255s", tmp) < 1)
+				/* nothing */;
 			fclose(pidfile);
 
 			if (strlen(tmp) < strlen(argv0)) {
 				if (strstr(argv0, tmp))
 					running = true;
-			} else {
-				if (strstr(tmp, argv0))
-					running = true;
+			} else if (strstr(tmp, argv0)) {
+				running = true;
 			}
 
 			if (running) {
-				lpLogger->Log(EC_LOGLEVEL_FATAL, "Warning: Process %s is probably already running.", argv0);
+				ec_log_crit("Warning: Process %s is probably already running.", argv0);
 				if (!bForce) {
-					lpLogger->Log(EC_LOGLEVEL_FATAL, "If you are sure the process is stopped, please remove pidfile %s", pidfilename.c_str());
+					ec_log_crit("If you are sure the process is stopped, please remove pidfile %s", pidfilename.c_str());
 					return -1;
 				}
 			}
@@ -170,7 +195,7 @@ int unix_create_pidfile(const char *argv0, ECConfig *lpConfig,
 
 	pidfile = fopen(pidfilename.c_str(), "w");
 	if (!pidfile) {
-		lpLogger->Log(EC_LOGLEVEL_FATAL, "Unable to open pidfile '%s'", pidfilename.c_str());
+		ec_log_crit("Unable to open pidfile '%s'", pidfilename.c_str());
 		return 1;
 	}
 
@@ -179,7 +204,8 @@ int unix_create_pidfile(const char *argv0, ECConfig *lpConfig,
 	return 0;
 }
 
-int unix_daemonize(ECConfig *lpConfig, ECLogger *lpLogger) {
+int unix_daemonize(ECConfig *lpConfig)
+{
 	int ret;
 
 	// make sure we daemonize in an always existing directory
@@ -189,7 +215,7 @@ int unix_daemonize(ECConfig *lpConfig, ECLogger *lpLogger) {
 
 	ret = fork();
 	if (ret == -1) {
-		lpLogger->Log(EC_LOGLEVEL_FATAL, "Daemonizing failed on 1st step");
+		ec_log_crit("Daemonizing failed on 1st step");
 		return -1;
 	}
 	if (ret)
@@ -199,7 +225,7 @@ int unix_daemonize(ECConfig *lpConfig, ECLogger *lpLogger) {
 
 	ret = fork();
 	if (ret == -1) {
-		lpLogger->Log(EC_LOGLEVEL_FATAL, "Daemonizing failed on 2nd step");
+		ec_log_crit("Daemonizing failed on 2nd step");
 		return -1;
 	}
 	if (ret)
@@ -214,7 +240,7 @@ int unix_daemonize(ECConfig *lpConfig, ECLogger *lpLogger) {
 }
 
 /**
- * Starts a new unix process and calls the given function. Optionally
+ * Starts a new Unix process and calls the given function. Optionally
  * closes some given file descriptors. The child process does not
  * return from this function.
  *
@@ -272,63 +298,54 @@ int unix_fork_function(void*(func)(void*), void *param, int nCloseFDs, int *pClo
  * 
  * @return new process pid, or -1 on failure.
  */
-static pid_t unix_popen_rw(const char *lpszCommand, int *lpulIn, int *lpulOut,
-    popen_rlimit_array *lpLimits, const char **env, bool bNonBlocking,
-    bool bStdErr)
+static pid_t unix_popen_rw(const char *const *argv, int *lpulIn, int *lpulOut,
+    const char **env)
 {
-	int ulIn[2];
-	int ulOut[2];
-	pid_t pid;
+	posix_spawn_file_actions_t fa;
+	int ulIn[2] = {-1, -1};
+	int ulOut[2] = {-1, -1};
+	pid_t pid = -1;
 
-	if (!lpszCommand || !lpulIn || !lpulOut)
-		return -1;
-
-	if (pipe(ulIn) || pipe(ulOut))
-		return -1;
-
-	if (bNonBlocking) {
-		if (fcntl(ulIn[0], F_SETFL, O_NONBLOCK) < 0 || fcntl(ulIn[1], F_SETFL, O_NONBLOCK) < 0 ||
-			fcntl(ulOut[0], F_SETFL, O_NONBLOCK) < 0 || fcntl(ulOut[1], F_SETFL, O_NONBLOCK) < 0)
-			return -1;
+	if (argv == nullptr || argv[0] == nullptr)
+		return -EINVAL;
+	if (pipe(ulIn) < 0 || pipe(ulOut) < 0) {
+		pid = -errno;
+		goto exit;
 	}
-
-	pid = vfork();
-	if (pid < 0)
-		return pid;
-
-	if (pid == 0) {
-		/* Close pipes we aren't going to use */
-		close(ulIn[STDOUT_FILENO]);
-		dup2(ulIn[STDIN_FILENO], STDIN_FILENO);
-		close(ulOut[STDIN_FILENO]);
-		dup2(ulOut[STDOUT_FILENO], STDOUT_FILENO);
-		if (bStdErr)
-			dup2(ulOut[STDOUT_FILENO], STDERR_FILENO);
-
-		// give the process a new group id, so we can easely kill all sub processes of this child too when needed.
-		setsid();
-
-		/* If provided set rlimit settings */
-		if (lpLimits != NULL)
-			for (unsigned int i = 0; i < lpLimits->cValues; ++i)
-				if (setrlimit(lpLimits->sLimit[i].resource, &lpLimits->sLimit[i].limit) != 0)
-					ec_log_err("Unable to set rlimit for popen - resource %d, errno %d",
-								  lpLimits->sLimit[i].resource, errno);
-
-		if (execle("/bin/sh", "sh", "-c", lpszCommand, NULL, env) == 0)
-			_exit(EXIT_SUCCESS);
-		else
-			_exit(EXIT_FAILURE);
-		return 0;
+	memset(&fa, 0, sizeof(fa));
+	if (posix_spawn_file_actions_init(&fa) < 0) {
+		pid = -errno;
+		goto exit;
 	}
-
+	if (posix_spawn_file_actions_addclose(&fa, STDIN_FILENO) < 0 ||
+	    posix_spawn_file_actions_addclose(&fa, STDOUT_FILENO) < 0 ||
+	    posix_spawn_file_actions_addclose(&fa, STDERR_FILENO) < 0 ||
+	    posix_spawn_file_actions_adddup2(&fa, ulIn[STDIN_FILENO], STDIN_FILENO) < 0 ||
+	    posix_spawn_file_actions_adddup2(&fa, ulOut[STDOUT_FILENO], STDOUT_FILENO) < 0 ||
+	    posix_spawn_file_actions_adddup2(&fa, ulOut[STDOUT_FILENO], STDERR_FILENO) < 0 ||
+	    posix_spawn(&pid, argv[0], &fa, nullptr, const_cast<char **>(argv),
+	    const_cast<char **>(env)) < 0) {
+		pid = -errno;
+		goto exit2;
+	}
 	*lpulIn = ulIn[STDOUT_FILENO];
 	close(ulIn[STDIN_FILENO]);
-
 	*lpulOut = ulOut[STDIN_FILENO];
 	close(ulOut[STDOUT_FILENO]);
-
+	posix_spawn_file_actions_destroy(&fa);
 	return pid;
+exit2:
+	posix_spawn_file_actions_destroy(&fa);
+exit:
+	if (ulIn[0] != -1)
+		close(ulIn[0]);
+	if (ulIn[1] != -1)
+		close(ulIn[1]);
+	if (ulOut[0] != -1)
+		close(ulOut[0]);
+	if (ulOut[1] != -1)
+		close(ulOut[1]);
+	return -pid;
 }
 
 /**
@@ -345,51 +362,72 @@ static pid_t unix_popen_rw(const char *lpszCommand, int *lpulIn, int *lpulOut,
  *
  * @return Returns TRUE on success, FALSE on failure
  */
-bool unix_system(const char *lpszLogName, const char *lpszCommand, const char **env)
+bool unix_system(const char *lpszLogName, const std::vector<std::string> &cmd,
+    const char **env)
 {
+	int argc = 0;
+	if (cmd.size() == 0)
+		return false;
+	std::unique_ptr<const char *[]> argv(new(std::nothrow) const char *[cmd.size()+1]);
+	if (argv == nullptr)
+		return false;
+	for (const auto &e : cmd)
+		argv[argc++] = e.c_str();
+	argv[argc] = nullptr;
+
+	auto cmdtxt = "\"" + kc_join(cmd, "\" \"") + "\"";
 	int fdin = 0, fdout = 0;
-	int pid = unix_popen_rw(lpszCommand, &fdin, &fdout, NULL, env, false, true);
-	char buffer[1024];
-	int status = 0;
-	bool rv = true;
-	FILE *fp = fdopen(fdout, "rb");
+	int pid = unix_popen_rw(argv.get(), &fdin, &fdout, env);
+	if (pid < 0) {
+		ec_log_debug("popen(%s) failed: %s", cmdtxt.c_str(), strerror(errno));
+		return false;
+	}
 	close(fdin);
+	FILE *fp = fdopen(fdout, "rb");
+	if (fp == nullptr) {
+		close(fdout);
+		return false;
+	}
 	
+	char buffer[1024];
 	while (fgets(buffer, sizeof(buffer), fp)) {
-		buffer[strlen(buffer) - 1] = '\0'; // strip enter
+		size_t z = strlen(buffer);
+		if (z > 0 && buffer[z-1] == '\n')
+			buffer[--z] = '\0';
 		ec_log_debug("%s[%d]: %s", lpszLogName, pid, buffer);
 	}
 	
 	fclose(fp);
-	
-	waitpid(pid, &status, 0);
-
-	if(status != -1) {
+	int status = 0;
+	if (waitpid(pid, &status, 0) < 0)
+		return false;
+	if (status == -1) {
+		ec_log_err(string("System call \"system\" failed: ") + strerror(errno));
+		return false;
+	}
+	bool rv = true;
 #ifdef WEXITSTATUS
-		if(WIFEXITED(status)) { /* Child exited by itself */
-			if(WEXITSTATUS(status)) {
-				ec_log_err("Command `%s` exited with non-zero status %d", lpszCommand, WEXITSTATUS(status));
-				rv = false;
-			}
-			else
-				ec_log_info("Command `%s` ran successfully", lpszCommand);
-		} else if(WIFSIGNALED(status)) {        /* Child was killed by a signal */
-			ec_log_err("Command `%s` was killed by signal %d", lpszCommand, WTERMSIG(status));
-			rv = false;
-		} else {                        /* Something strange happened */
-			ec_log_err(string("Command `") + lpszCommand + "` terminated abnormally");
+	if (WIFEXITED(status)) { /* Child exited by itself */
+		if (WEXITSTATUS(status)) {
+			ec_log_err("Command %s exited with non-zero status %d", cmdtxt.c_str(), WEXITSTATUS(status));
 			rv = false;
 		}
-#else
-		if (status)
-			ec_log_err("Command `%s` exited with status %d", lpszCommand, status);
 		else
-			ec_log_info("Command `%s` ran successfully", lpszCommand);
-#endif
-	} else {
-		ec_log_err(string("System call \"system\" failed: ") + strerror(errno));
+			ec_log_info("Command %s ran successfully", cmdtxt.c_str());
+	} else if (WIFSIGNALED(status)) {        /* Child was killed by a signal */
+		ec_log_err("Command %s was killed by signal %d", cmdtxt.c_str(), WTERMSIG(status));
+		rv = false;
+	} else {                        /* Something strange happened */
+		ec_log_err("Command %s terminated abnormally", cmdtxt.c_str());
 		rv = false;
 	}
-	
+#else
+	if (status)
+		ec_log_err("Command %s exited with status %d", cmdtxt.c_str(), status);
+	else
+		ec_log_info("Command %s ran successfully", cmdtxt.c_str());
+#endif
 	return rv;
 }
+
+} /* namespace */

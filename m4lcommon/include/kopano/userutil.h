@@ -18,25 +18,28 @@
 #ifndef USERUTIL_INCLUDED
 #define USERUTIL_INCLUDED
 
+#include <kopano/zcdefs.h>
 #include <set>
 #include <list>
 #include <string>
 
 #include <mapidefs.h>
 #include <mapix.h>
-class ECLogger;
 
-HRESULT GetArchivedUserList(ECLogger *lpLogger, IMAPISession *lpMapiSession, const char *lpSSLKey, const char *lpSSLPass, std::list<std::string> *lplstUsers, bool bLocalOnly = false);
-HRESULT GetArchivedUserList(ECLogger *lpLogger, IMAPISession *lpMapiSession, const char *lpSSLKey, const char *lpSSLPass, std::list<std::wstring> *lplstUsers, bool bLocalOnly = false);
+namespace KC {
 
-class DataCollector
-{
+extern _kc_export HRESULT GetArchivedUserList(IMAPISession *, const char *sslkey, const char *sslpass, std::list<std::string> *users, bool local_only = false);
+extern _kc_export HRESULT GetArchivedUserList(IMAPISession *, const char *sslkey, const char *sslpass, std::list<std::wstring> *users, bool local_only = false);
+
+class _kc_export DataCollector {
 public:
-	virtual HRESULT GetRequiredPropTags(LPMAPIPROP lpProp, LPSPropTagArray *lppPropTagArray) const;
+	_kc_hidden virtual HRESULT GetRequiredPropTags(LPMAPIPROP, LPSPropTagArray *) const;
 	virtual HRESULT GetRestriction(LPMAPIPROP lpProp, LPSRestriction *lppRestriction);
-	virtual HRESULT CollectData(LPMAPITABLE lpStoreTable) = 0;
+	_kc_hidden virtual HRESULT CollectData(LPMAPITABLE store_table) = 0;
 };
 
-HRESULT GetMailboxData(ECLogger *lpLogger, IMAPISession *lpMapiSession, const char *lpSSLKey, const char *lpSSLPass, bool bLocalOnly, DataCollector *lpCollector);
+extern _kc_export HRESULT GetMailboxData(IMAPISession *, const char *sslkey, const char *sslpass, bool local_only, DataCollector *);
+
+} /* namespace */
 
 #endif

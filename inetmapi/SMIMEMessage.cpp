@@ -16,33 +16,28 @@
  */
 
 #include <kopano/platform.h>
-
 #include <vmime/message.hpp>
 #include "SMIMEMessage.h"
 
-SMIMEMessage::SMIMEMessage()
-{
-}
+namespace KC {
 
-void SMIMEMessage::generate(vmime::utility::outputStream& os, const std::string::size_type maxLineLength, const std::string::size_type curLinePos, std::string::size_type* newLinePos) const
+void SMIMEMessage::generateImpl(const vmime::generationContext &ctx,
+    vmime::utility::outputStream &os, size_t curLinePos,
+    size_t *newLinePos) const
 {
-    if(!m_body.empty()) {
+	if (m_body.empty()) {
+		// Normal generation
+		vmime::bodyPart::generateImpl(ctx, os, curLinePos, newLinePos);
+		return;
+	}
         // Generate headers
-        getHeader()->generate(os, maxLineLength);
+        getHeader()->generate(ctx, os);
 
         // Concatenate S/MIME body without CRLF since it also contains some additional headers
         os << m_body;
         
     	if (newLinePos)
 	    	*newLinePos = 0;
-    } else {
-        // Normal generation
-        vmime::message::generate(os, maxLineLength, curLinePos, newLinePos);
-    }
 }
 
-void SMIMEMessage::setSMIMEBody(std::string &body)
-{
-    m_body = body;
-}
-
+} /* namespace */

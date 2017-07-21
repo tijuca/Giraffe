@@ -20,8 +20,9 @@
 #include "MAPIConsoleTable.h"
 #include "ConsoleTable.h"
 #include <kopano/mapi_ptr.h>
-#include <kopano/mapi_ptr/mapi_rowset_ptr.h>
 #include <kopano/stringutil.h>
+
+namespace KC {
 
 static std::string ToString(const SPropValue *lpProp)
 {
@@ -63,19 +64,17 @@ static std::string ToString(const SPropValue *lpProp)
 
 HRESULT MAPITablePrint(IMAPITable *lpTable, bool humanreadable /* = true */)
 {
-    HRESULT hr = hrSuccess;
     SPropTagArrayPtr ptrColumns;
     SRowSetPtr ptrRows;
     ConsoleTable ct(0, 0);
     unsigned int i = 0, j = 0;
     
-    hr = lpTable->QueryColumns(0, &ptrColumns);
-    if(hr != hrSuccess)
-        goto exit;
-        
-    hr = lpTable->QueryRows(-1, 0, &ptrRows);
-    if(hr != hrSuccess)
-        goto exit;
+	HRESULT hr = lpTable->QueryColumns(0, &~ptrColumns);
+	if (hr != hrSuccess)
+		return hr;
+	hr = lpTable->QueryRows(-1, 0, &ptrRows);
+	if (hr != hrSuccess)
+		return hr;
         
     ct.Resize(ptrRows.size(), ptrColumns->cValues);
     
@@ -87,7 +86,7 @@ HRESULT MAPITablePrint(IMAPITable *lpTable, bool humanreadable /* = true */)
 			ct.SetColumn(i, j, ToString(&ptrRows[i].lpProps[j]));
     
 	humanreadable ? ct.PrintTable() : ct.DumpTable();
-        
-exit:
-    return hr;
+	return hrSuccess;
 }
+
+} /* namespace */

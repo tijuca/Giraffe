@@ -40,15 +40,21 @@ FILETIME		Object_to_FILETIME(PyObject *object);
 PyObject *		Object_from_FILETIME(FILETIME ft);
 int				Object_is_FILETIME(PyObject *object);
 
-LPSPropValue	Object_to_LPSPropValue(PyObject *object, ULONG ulFlags = CONV_COPY_SHALLOW, void *lpBase = NULL);
-int				Object_is_LPSPropValue(PyObject *object);
-PyObject *		List_from_LPSPropValue(LPSPropValue lpProps, ULONG cValues);
-LPSPropValue	List_to_LPSPropValue(PyObject *sv, ULONG *cValues, ULONG ulFlags = CONV_COPY_SHALLOW, void *lpBase = NULL);
+extern SPropValue *Object_to_p_SPropValue(PyObject *, ULONG flags = CONV_COPY_SHALLOW, void *base = nullptr);
+extern SPropValue *Object_to_LPSPropValue(PyObject *, ULONG flags = CONV_COPY_SHALLOW, void *base = nullptr);
+extern int Object_is_SPropValue(PyObject *);
+extern int Object_is_LPSPropValue(PyObject *);
+extern PyObject *List_from_SPropValue(const SPropValue *, ULONG n);
+extern PyObject *List_from_LPSPropValue(const SPropValue *, ULONG n);
+extern SPropValue *List_to_p_SPropValue(PyObject *, ULONG *nvals, ULONG flags = CONV_COPY_SHALLOW, void *base = nullptr);
+extern SPropValue *List_to_LPSPropValue(PyObject *, ULONG *nvals, ULONG flags = CONV_COPY_SHALLOW, void *base = nullptr);
 
 PyObject *		List_from_LPTSTRPtr(LPTSTR *lpStrings, ULONG cValues);
 
-LPSPropTagArray	List_to_LPSPropTagArray(PyObject *sv, ULONG ulFlags = CONV_COPY_SHALLOW);
-PyObject *		List_from_LPSPropTagArray(LPSPropTagArray lpPropTagArray);
+SPropTagArray *List_to_p_SPropTagArray(PyObject *sv, ULONG ulFlags = CONV_COPY_SHALLOW);
+PyObject *List_from_SPropTagArray(const SPropTagArray *lpPropTagArray);
+SPropTagArray *List_to_LPSPropTagArray(PyObject *sv, ULONG ulFlags = CONV_COPY_SHALLOW);
+PyObject *List_from_LPSPropTagArray(const SPropTagArray *lpPropTagArray);
 
 LPSRestriction	Object_to_LPSRestriction(PyObject *sv, void *lpBase = NULL);
 void			Object_to_LPSRestriction(PyObject *sv, LPSRestriction lpsRestriction, void *lpBase = NULL);
@@ -59,14 +65,17 @@ PyObject *		Object_from_LPACTIONS(ACTIONS *lpsActions);
 void			Object_to_LPACTION(PyObject *object, ACTION *lpAction, void *lpBase);
 void			Object_to_LPACTIONS(PyObject *object, ACTIONS *lpActions, void *lpBase = NULL);
 
-LPSSortOrderSet	Object_to_LPSSortOrderSet(PyObject *sv);
-PyObject *		Object_from_LPSSortOrderSet(LPSSortOrderSet lpSortOrderSet);
+SSortOrderSet *Object_to_p_SSortOrderSet(PyObject *sv);
+PyObject *Object_from_SSortOrderSet(const SSortOrderSet *lpSortOrderSet);
 
-PyObject *		List_from_LPSRowSet(LPSRowSet lpRowSet);
-LPSRowSet		List_to_LPSRowSet(PyObject *av, ULONG ulFlags = CONV_COPY_SHALLOW);
-
-LPADRLIST		List_to_LPADRLIST(PyObject *av, ULONG ulFlags = CONV_COPY_SHALLOW);
-PyObject *		List_from_LPADRLIST(LPADRLIST lpAdrList);
+extern PyObject *List_from_SRowSet(const SRowSet *);
+extern PyObject *List_from_LPSRowSet(const SRowSet *);
+extern SRowSet *List_to_p_SRowSet(PyObject *, ULONG flags = CONV_COPY_SHALLOW);
+extern SRowSet *List_to_LPSRowSet(PyObject *, ULONG flags = CONV_COPY_SHALLOW);
+extern ADRLIST *List_to_p_ADRLIST(PyObject *, ULONG flags = CONV_COPY_SHALLOW);
+extern ADRLIST *List_to_LPADRLIST(PyObject *, ULONG flags = CONV_COPY_SHALLOW);
+extern PyObject *List_from_ADRLIST(const ADRLIST *);
+extern PyObject *List_from_LPADRLIST(const ADRLIST *);
 
 LPADRPARM		Object_to_LPADRPARM(PyObject *av);
 

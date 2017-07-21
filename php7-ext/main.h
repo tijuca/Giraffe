@@ -297,15 +297,13 @@ ZEND_FUNCTION(mapi_wrap_importhierarchychanges);
 ZEND_FUNCTION(mapi_inetmapi_imtoinet);
 ZEND_FUNCTION(mapi_inetmapi_imtomapi);
 
+ZEND_FUNCTION(mapi_icaltomapi);
+ZEND_FUNCTION(mapi_mapitoical);
+ZEND_FUNCTION(mapi_vcftomapi);
+ZEND_FUNCTION(mapi_mapitovcf);
+
 ZEND_FUNCTION(mapi_enable_exceptions);
 
 ZEND_FUNCTION(mapi_feature);
-
-// Destructor functions needed for the PHP resources. 
-static void _php_free_mapi_session(zend_resource *rsrc TSRMLS_DC);
-static void _php_free_mapi_rowset(zend_resource *rsrc TSRMLS_DC);
-static void _php_free_mapi_object(zend_resource *rsrc TSRMLS_DC);
-static void _php_free_istream(zend_resource *rsrc TSRMLS_DC);
-static void _php_free_fb_object(zend_resource *rsrc TSRMLS_DC);
 
 #endif

@@ -14,9 +14,16 @@
 
 %include "cstring.i"
 %include "cwstring.i"
-%cstring_input_binary(const char *pv, ULONG cb);
-%cstring_input_binary(const void *pv, ULONG cb);
 %cstring_output_allocate_size(char **lpOutput, ULONG *ulRead, MAPIFreeBuffer(*$1));
+
+%typemap(in) (const void *pv, ULONG cb) (int res, char *buf = 0, Py_ssize_t size, int alloc = 0)
+{
+  if(PyBytes_AsStringAndSize($input, &buf, &size) == -1)
+    %argument_fail(SWIG_ERROR,"$type",$symname, $argnum);
+
+  $1 = %reinterpret_cast(buf, $1_ltype);
+  $2 = %numeric_cast(size, $2_ltype);
+}
 
 // HRESULT
 %include "exception.i"
@@ -99,7 +106,7 @@
     $2 = NULL;
   } else {
     if(PyBytes_AsStringAndSize($input, &buf, (Py_ssize_t *)&size) == -1) {
-      %argument_fail(res,"$type",$symname, $argnum);
+      %argument_fail(SWIG_ERROR,"$type",$symname, $argnum);
     }
     $1 = %numeric_cast(size, $1_ltype);
     $2 = %reinterpret_cast(buf, $2_ltype);
@@ -113,23 +120,20 @@
 (ULONG cbEIDContainer, LPENTRYID lpEIDContainer), (ULONG cbEIDNewEntryTpl, LPENTRYID lpEIDNewEntryTpl), (ULONG cbUserEntryID, LPENTRYID lpUserEntryID) };
 
 // Output
-%typemap(in,numinputs=0) (ULONG *OUTPUT, LPENTRYID *OUTPUT) (ULONG cbEntryID = 0, $*2_type lpEntryID = NULL) {
-  $1 = &cbEntryID; $2 = &lpEntryID;
+%typemap(in,numinputs=0) (ULONG *OUTPUT, LPENTRYID *OUTPUT) (ULONG cbEntryID = 0, KCHL::memory_ptr< std::remove_pointer<$*2_type>::type > lpEntryID) {
+  $1 = &cbEntryID; $2 = &~lpEntryID;
 }
 %typemap(argout,fragment="SWIG_FromCharPtrAndSize") (ULONG *OUTPUT, LPENTRYID *OUTPUT)
 {
   if (*$2) {
-    %append_output(SWIG_FromCharPtrAndSize((const char *)*$2,*$1));
+    %append_output(PyBytes_FromStringAndSize((const char *)*$2,*$1));
   }
-}
-%typemap(freearg) (ULONG *OUTPUT, LPENTRYID *OUTPUT) {
-	MAPIFreeBuffer(*$2);
 }
 %apply (ULONG *OUTPUT, LPENTRYID *OUTPUT) {(ULONG* lpcbStoreId, LPENTRYID* lppStoreId), (ULONG* lpcbRootId, LPENTRYID *lppRootId), (ULONG *lpulOutput, LPBYTE *lpOutput)};
 
 // Optional In & Output
-%typemap(in) (ULONG *OPTINOUT, LPENTRYID *OPTINOUT) (int res, char *buf = 0, size_t size, int alloc = 0, ULONG cbEntryID = 0, LPENTRYID lpEntryID = NULL, LPENTRYID lpOrig = NULL) {
-  $1 = &cbEntryID; $2 = &lpEntryID;
+%typemap(in) (ULONG *OPTINOUT, LPENTRYID *OPTINOUT) (int res, char *buf = 0, size_t size, int alloc = 0, ULONG cbEntryID = 0, KCHL::memory_ptr<ENTRYID> tmp) {
+  $1 = &cbEntryID;
 
   res = SWIG_AsCharPtrAndSize($input, &buf, &size, &alloc);
   if (!SWIG_IsOK(res)) {
@@ -137,22 +141,18 @@
   }
   if(buf == NULL) {
     *$1 = 0;
-    *$2 = NULL;
+    $2 = &~tmp;
   } else {
     *$1 = %numeric_cast(size - 1, $*1_ltype);
-    *$2 = %reinterpret_cast(buf, $*2_ltype);
+    tmp.reset(%reinterpret_cast(buf, $*2_ltype));
+    $2 = &+tmp;
   }
-  lpOrig = *$2;
 }
 %typemap(argout,fragment="SWIG_FromCharPtrAndSize") (ULONG *OPTINOUT, LPENTRYID *OPTINOUT)
 {
   if (*$2) {
-    %append_output(SWIG_FromCharPtrAndSize((const char *)*$2,*$1));
+    %append_output(PyBytes_FromStringAndSize((const char *)*$2,*$1));
   }
-}
-%typemap(freearg) (ULONG *OPTINOUT, LPENTRYID *OPTINOUT) {
-	if(!lpOrig$argnum && $2)
-		MAPIFreeBuffer(*$2);
 }
 %apply (ULONG *OPTINOUT, LPENTRYID *OPTINOUT) {(ULONG* lpcbStoreId_oio, LPENTRYID* lppStoreId_oio), (ULONG* lpcbRootId_oio, LPENTRYID *lppRootId_oio)};
 
@@ -181,7 +181,7 @@
     $1 = 0;
   else {
     if(PyBytes_AsStringAndSize($input, &buf, (Py_ssize_t *)&size) == -1 || size != sizeof(MAPIUID)) {
-      %argument_fail(res,"$type",$symname, $argnum);
+      %argument_fail(SWIG_ERROR,"$type",$symname, $argnum);
     }
     $1 = %reinterpret_cast(buf, $1_ltype);
   }
@@ -193,7 +193,7 @@
       $1 = 0;
   else {
       if(!(buf = PyBytes_AsString($input))) {
-        %argument_fail(res, "$type", $symname, $argnum);
+        %argument_fail(SWIG_ERROR, "$type", $symname, $argnum);
       }
       $1 = %reinterpret_cast(buf, $1_ltype);
   }
@@ -218,7 +218,7 @@
 
 %typemap(argout) LPMAPIUID OUTPUT
 {
-	%append_output(SWIG_FromCharPtrAndSize((const char *)$1,sizeof(MAPIUID)));
+	%append_output(PyBytes_FromStringAndSize((const char *)$1,sizeof(MAPIUID)));
 }
 
 // ULONG ulFlags
@@ -329,44 +329,24 @@
 // Input
 %typemap(arginit) MAPISTRUCT
 	"$1 = NULL;"
-%typemap(freearg)	MAPISTRUCT
-{
-	MAPIFreeBuffer($1);
-}
 
 // MAPISTRUCT_W_FLAGS (MAPI data struct with LPTSTR members)
 
 // Input
 %typemap(arginit) MAPISTRUCT_W_FLAGS
 	"$1 = NULL;"
-%typemap(freearg)	MAPISTRUCT_W_FLAGS
-{
-	MAPIFreeBuffer($1);
-}
 
 // MAPILIST (MAPI list of data structs)
 
 // Input
 %typemap(arginit) MAPILIST
 	"$1 = NULL;"
-%typemap(freearg)	MAPILIST
-{
-	MAPIFreeBuffer($1);
-}
 
 // Output
-%typemap(in,numinputs=0)	MAPILIST * ($basetype temp), MAPISTRUCT * ($basetype temp)
-	"temp = NULL; $1 = &temp;";
-%typemap(freearg) 	MAPILIST *, MAPISTRUCT *
+%typemap(in,numinputs=0)	MAPILIST * (KCHL::memory_ptr< std::remove_pointer<$basetype>::type > temp), MAPISTRUCT * (KCHL::memory_ptr< std::remove_pointer<$basetype>::type > temp)
 {
-	MAPIFreeBuffer(*$1);
+        $1 = &~temp;
 }
-
-%typemap(freearg) 	MAPILIST *INPUT
-{
-	MAPIFreeBuffer(*$1);
-}
-
 
 // MAPICLASS (Class instances of MAPI objects)
 
@@ -387,11 +367,10 @@
 }
 
 // Output
-%typemap(in,numinputs=0)	(ULONG *,MAPIARRAY *)(ULONG c, $*2_type lp)
-	"lp = NULL; $2 = &lp; c = 0; $1 = &c;";
-%typemap(freearg) (ULONG *, MAPIARRAY *)
+%typemap(in,numinputs=0)	(ULONG *,MAPIARRAY *) (ULONG c, KCHL::memory_ptr< std::remove_pointer< std::remove_pointer< $2_type >::type >::type > tmp)
 {
-	MAPIFreeBuffer(*$2);
+        $2 = &~tmp;
+        c = 0; $1 = &c;
 }
 
 %typemap(arginit) (ULONG, MAPIARRAY)
@@ -414,7 +393,7 @@
 // ECLogger director
 #if SWIGPYTHON
 
-%typemap(in) ECLogger *lpLogger (int res, ECSimpleLogger *sl, ECLoggerProxy *proxy)
+%typemap(in) KC::ECLogger *annoyingswig (int res, ECSimpleLogger *sl, ECLoggerProxy *proxy)
 {
 	res = SWIG_ConvertPtr($input, (void **)&sl, SWIGTYPE_p_ECSimpleLogger, 0 | 0);
 	if(!SWIG_IsOK(res))
@@ -424,9 +403,10 @@
 	$1 = proxy;
 }
 
-%typemap(freearg) ECLogger *lpLogger
+%typemap(freearg) KC::ECLogger *annoyingswig
 {
-	$1->Release();
+	if ($1 != nullptr)
+		$1->Release();
 }
 
 #endif
@@ -439,33 +419,30 @@
 // Mapping of types to correct MAPI* handler type
 
 // Input
-%apply (ULONG, MAPIARRAY) {(ULONG cValues, LPSPropValue lpProps), (ULONG cPropNames, LPMAPINAMEID* lppPropNames), (ULONG cInterfaces, LPCIID lpInterfaces), ( ULONG cValuesConversion, LPSPropValue lpPropArrayConversion) };
-%apply MAPILIST {LPSPropTagArray, LPENTRYLIST, LPADRLIST, LPFlagList, LPROWLIST};
-%apply MAPILIST *INPUT {LPSPropTagArray *};
-%apply MAPISTRUCT {LPSRestriction, LPSSortOrderSet, LPSPropValue, LPNOTIFICATION};
+%apply (ULONG, MAPIARRAY) {(ULONG cValues, SPropValue *lpProps), (ULONG cValues, LPSPropValue lpProps), (ULONG cPropNames, LPMAPINAMEID* lppPropNames), (ULONG cInterfaces, LPCIID lpInterfaces), (ULONG cValuesConversion, SPropValue *lpPropArrayConversion), (ULONG cValuesConversion, LPSPropValue lpPropArrayConversion)};
+%apply MAPILIST {SPropTagArray *, LPSPropTagArray, LPENTRYLIST, ADRLIST *, LPADRLIST, LPFlagList};
+%apply MAPILIST *INPUT {SPropTagArray **, LPSPropTagArray *};
+%apply MAPISTRUCT {LPSRestriction, SSortOrderSet *, SPropValue *, LPSPropValue, LPNOTIFICATION};
 
 // Output
-%apply (ULONG *, MAPIARRAY *) {(ULONG *OUTPUTC, LPSPropValue *OUTPUTP), (ULONG *OUTPUTC, LPNOTIFICATION *OUTPUTP), (ULONG *OUTPUTC, LPMAPINAMEID **OUTPUTP)};
-%apply MAPILIST * {LPADRLIST *OUTPUT, LPSRowSet *OUTPUT, LPSPropProblemArray *OUTPUT, LPSPropTagArray *OUTPUT, LPENTRYLIST *OUTPUT};
-%apply MAPISTRUCT * {LPMAPIERROR *OUTPUT, LPSSortOrderSet *OUTPUT, LPSRestriction *OUTPUT};
+%apply (ULONG *, MAPIARRAY *) {(ULONG *OUTPUTC, SPropValue **OUTPUTP), (ULONG *OUTPUTC, LPSPropValue *OUTPUTP), (ULONG *OUTPUTC, LPNOTIFICATION *OUTPUTP), (ULONG *OUTPUTC, LPMAPINAMEID **OUTPUTP)};
+%apply MAPILIST * {ADRLIST **OUTPUT, LPADRLIST *OUTPUT, LPSRowSet *OUTPUT, LPSPropProblemArray *OUTPUT, SPropTagArray **OUTPUT, LPSPropTagArray *OUTPUT, LPENTRYLIST *OUTPUT};
+%apply MAPISTRUCT * {LPMAPIERROR *OUTPUT, SSortOrderSet **OUTPUT, LPSRestriction *OUTPUT};
 
 // Input/Output
-%apply MAPILIST INOUT {LPADRLIST INOUT, LPFlagList INOUT };
+%apply MAPILIST INOUT {ADRLIST *INOUT, LPADRLIST INOUT, LPFlagList INOUT };
 
 // Classes
 %apply MAPICLASS *{IMAPISession **, IProfAdmin **, IMsgServiceAdmin **, IMAPITable **, IMsgStore **, IMAPIFolder **, IMAPITable **, IStream **, IMessage **, IAttach **, IAddrBook **, IProviderAdmin **, IProfSect **, IUnknown **}
 
-// Specialization for LPSRowSet and LPADRLIST
-%typemap(arginit) LPSRowSet INPUT, LPADRLIST INPUT
-	"$1 = NULL;"
+// Specialization of MAPILIST * for rowset and adrlist types
 
-%typemap(freearg) LPSRowSet *OUTPUT, LPADRLIST *OUTPUT
+%typemap(in, numinputs=0) LPADRLIST *OUTPUT (KCHL::adrlist_ptr temp)
 {
-	FreeProws((LPSRowSet)*$1);
+       $1 = &~temp;
 }
 
-%typemap(freearg) LPADRLIST INOUT, LPSRowSet INOUT, LPSRowSet INPUT, LPADRLIST INPUT
+%typemap(in, numinputs=0) LPSRowSet *OUTPUT (KCHL::rowset_ptr temp)
 {
-    FreeProws((LPSRowSet)$1);
+        $1 = &~temp;
 }
-

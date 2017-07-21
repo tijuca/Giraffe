@@ -20,14 +20,13 @@
 <?php
 	require_once("class.baserecurrence.php");
 
-	class TaskRecurrence extends BaseRecurrence
-	{
+	class TaskRecurrence extends BaseRecurrence {
 		/**
 		 * Timezone info which is always false for task
 		 */
 		var $tz = false;
 
-		function TaskRecurrence($store, $message)
+		function __construct($store, $message)
 		{
 			$this->store = $store;
 			$this->message = $message;
@@ -76,7 +75,7 @@
 
 			$this->proptags = getPropIdsFromStrings($store, $properties);
 
-			parent::BaseRecurrence($store, $message, $properties);
+			parent::__construct($store, $message, $properties);
 		}
 
 		/**
@@ -307,7 +306,7 @@
 
 			if (!empty($msgbody) && strrpos($msgbody, $separator) === false) {
 				$msgbody = $separator . $msgbody;
-				$stream = mapi_openpropertytostream($this->message, PR_BODY, MAPI_CREATE | MAPI_MODIFY);
+				$stream = mapi_openproperty($this->message, PR_BODY, 0, MAPI_CREATE | MAPI_MODIFY);
 				mapi_stream_setsize($stream, strlen($msgbody));
 				mapi_stream_write($stream, $msgbody);
 				mapi_stream_commit($stream);
@@ -327,19 +326,17 @@
 		 */
 		function processOccurrenceItem(&$items, $start, $end, $now)
 		{
-			if ($now > $start) {
-				$newItem = array();
-				$newItem[$this->proptags['startdate']] = $now;
+			if ($now <= $start)
+				return;
+			$newItem = array();
+			$newItem[$this->proptags['startdate']] = $now;
 
-				// If startdate and enddate are set on task, then slide enddate according to duration 
-				if (isset($this->messageprops[$this->proptags["startdate"]]) && isset($this->messageprops[$this->proptags["duedate"]])) {
-					$newItem[$this->proptags['duedate']] = $newItem[$this->proptags['startdate']] + ($this->messageprops[$this->proptags["duedate"]] - $this->messageprops[$this->proptags["startdate"]]);
-				} else {
-					$newItem[$this->proptags['duedate']] = $newItem[$this->proptags['startdate']];
-				}
-
-				$items[] = $newItem;
-			}
+			// If startdate and enddate are set on task, then slide enddate according to duration
+			if (isset($this->messageprops[$this->proptags["startdate"]]) && isset($this->messageprops[$this->proptags["duedate"]]))
+				$newItem[$this->proptags['duedate']] = $newItem[$this->proptags['startdate']] + ($this->messageprops[$this->proptags["duedate"]] - $this->messageprops[$this->proptags["startdate"]]);
+			else
+				$newItem[$this->proptags['duedate']] = $newItem[$this->proptags['startdate']];
+			$items[] = $newItem;
 		}
 
 		/**

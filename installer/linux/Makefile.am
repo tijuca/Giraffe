@@ -10,11 +10,12 @@ dist_systemunit_DATA = kopano-dagent.service kopano-gateway.service \
                   kopano-server.service kopano-spooler.service
 dist_sysusers_DATA = kopano-sysusers.conf
 dist_tmpfiles_DATA = kopano-tmpfiles.conf
+dist_pkgdata_DATA = ldap.active-directory.cfg ldap.openldap.cfg ldap.propmap.cfg
 
 config_files = \
-	server.cfg unix.cfg ldap.propmap.cfg presence.cfg \
+	server.cfg unix.cfg presence.cfg \
 	spooler.cfg gateway.cfg monitor.cfg dagent.cfg ical.cfg search.cfg \
-	autorespond archiver.cfg backup.cfg
+	autorespond archiver.cfg backup.cfg migration-pst.cfg
 
 rhel_initscript_files = \
 	kopano-server.init.rhel kopano-spooler.init.rhel \
@@ -32,11 +33,6 @@ cbs4_initscript_files = \
 	kopano-gateway.init.cbs4 kopano-monitor.init.cbs4 \
 	kopano-ical.init.cbs4 kopano-dagent.init.cbs4 kopano-search.init.cbs4 \
 	kopano-presence.init.cbs4
-alt_initscript_files = \
-	kopano-server.init.alt kopano-spooler.init.alt \
-	kopano-gateway.init.alt kopano-monitor.init.alt \
-	kopano-ical.init.alt kopano-dagent.init.alt kopano-search.init.alt \
-	kopano-presence.init.alt
 debian_initscript_files = \
 	kopano-server.init.debi kopano-spooler.init.debi \
 	kopano-gateway.init.debi kopano-monitor.init.debi \
@@ -44,8 +40,7 @@ debian_initscript_files = \
 	kopano-presence.init.debi
 
 data_configdir = ${docdir}/example-config
-dist_data_config_DATA = \
-	${config_files} ldapms.active-directory.cfg ldapms.openldap.cfg
+dist_data_config_DATA = ${config_files} ldap.cfg
 
 sysconf_configdir = ${sysconfdir}/kopano
 dist_sysconf_config_DATA = ${config_files}
@@ -58,7 +53,6 @@ suse_sysconfig_path = ${localstatedir}/adm/fillup-templates
 sles_sysconfig_path = ${localstatedir}/adm/fillup-templates
 sysconf_sysconfigdir = ${@DISTRO@_sysconfig_path}
 sysconf_sysconfig_DATA = sysconfig.txt
-alt_sysconfig_path = ${sysconfdir}/sysconfig
 
 dist_doc_DATA = \
 	db-calc-storesize db-convert-attachments-to-files \
@@ -76,12 +70,6 @@ ldap.openldap.cfg: ldap.m4
 ldap.active-directory.cfg: ldap.m4
 	m4 -DTYPE=ADS ${top_srcdir}/installer/linux/ldap.m4 > $@
 
-ldapms.openldap.cfg: ldap.m4
-	m4 -DTYPE=OPENLDAP -DMULTISERVER=1 ${top_srcdir}/installer/linux/ldap.m4 > $@
-
-ldapms.active-directory.cfg: ldap.m4
-	m4 -DTYPE=ADS -DMULTISERVER=1 ${top_srcdir}/installer/linux/ldap.m4 > $@
-
 dist_sbin_SCRIPTS = kopano-autorespond kopano-mr-accept kopano-mr-process
 
 sysconf_rotatedir = ${sysconfdir}/logrotate.d
@@ -95,9 +83,8 @@ dist_sysconf_bc_DATA = kopano-bash-completion.sh
 
 sysconf_certdir = ${sysconfdir}/kopano/report-ca
 
-config_files += $(BUILT_SOURCES)
 EXTRA_DIST = ${BUILT_SOURCES} ldap.m4 \
-	$(rhel_initscript_files) $(suse_initscript_files) $(cbs4_initscript_files) $(alt_initscript_files) \
+	$(rhel_initscript_files) $(suse_initscript_files) $(cbs4_initscript_files) \
 	sysconfig.txt
 
 install-data-hook:
@@ -107,7 +94,7 @@ install-data-hook:
 	mv -v ${DESTDIR}${sysconf_crondir}/kopano-client-update.cron ${DESTDIR}${sysconf_crondir}/kopano-client-update
 	if test ${DISTRO} = "sles" -o ${DISTRO} = "suse"; then \
 		mv -v ${DESTDIR}${sysconf_sysconfigdir}/sysconfig.txt ${DESTDIR}${sysconf_sysconfigdir}/sysconfig.kopano; \
-	elif test ${DISTRO} = "rhel" -o ${DISTRO} = "alt"; then \
+	elif test ${DISTRO} = "rhel"; then \
 		mv -v ${DESTDIR}${sysconf_sysconfigdir}/sysconfig.txt ${DESTDIR}${sysconf_sysconfigdir}/kopano; \
 	fi
 	for f in ${sysconf_init_SCRIPTS}; do \
@@ -120,7 +107,7 @@ uninstall-local:
 		"${DESTDIR}${sysconf_crondir}/kopano-client-update"
 	if test ${DISTRO} = "sles" -o ${DISTRO} = "suse"; then \
 		rm -f "${DESTDIR}${sysconf_sysconfigdir}/sysconfig.kopano"; \
-	elif test ${DISTRO} = "rhel" -o ${DISTRO} = "alt"; then \
+	elif test ${DISTRO} = "rhel"; then \
 		rm -f "${DESTDIR}${sysconf_sysconfigdir}/kopano"; \
 	fi
 	for f in ${sysconf_init_SCRIPTS}; do \

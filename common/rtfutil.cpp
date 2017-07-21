@@ -24,6 +24,7 @@
 #include <kopano/CommonUtil.h>
 #include <kopano/Util.h>
 #include <kopano/charset/convert.h>
+#include <kopano/stringutil.h>
 #include "HtmlEntity.h"
 
 #include "rtfutil.h"
@@ -32,6 +33,8 @@
 #include <sstream>
 
 using namespace std;
+
+namespace KC {
 
 static const char szHex[] = "0123456789ABCDEF";
 
@@ -176,10 +179,11 @@ static std::wstring RTFFlushStateOutput(convert_context &convertContext,
  * @param[out]	lpStrHTMLOut	HTML output in requested ulCodepage
  * @param[out]	ulCodepage		codepage for HTML output
  */
-HRESULT HrExtractHTMLFromRTF(const std::string &lpStrRTFIn,
+HRESULT HrExtractHTMLFromRTF(const std::string &rtf_unfilt,
     std::string &lpStrHTMLOut, ULONG ulCodepage)
 {
 	HRESULT hr;
+ 	auto lpStrRTFIn = string_strip_nuls(rtf_unfilt);
 	const char *szInput = lpStrRTFIn.c_str();
 	const char *szANSICharset = "us-ascii";
 	const char *szHTMLCharset;
@@ -255,7 +259,8 @@ HRESULT HrExtractHTMLFromRTF(const std::string &lpStrRTFIn,
 					}
 				} else if(strcmp(szCommand,"htmltag") == 0) {
 				} else if(strcmp(szCommand,"mhtmltag") == 0) {
-				} else if(strcmp(szCommand,"pard") == 0 || strcmp(szCommand,"par") == 0) {
+				} else if (strcmp(szCommand,"pard") == 0) {
+				} else if (strcmp(szCommand,"par") == 0) {
 					if(!sState[ulState].bInFontTbl && !sState[ulState].bRTFOnly && !sState[ulState].bInColorTbl && !sState[ulState].bInSkipTbl) {		
 						sState[ulState].output.append(1,'\r');
 						sState[ulState].output.append(1,'\n');
@@ -272,8 +277,8 @@ HRESULT HrExtractHTMLFromRTF(const std::string &lpStrRTFIn,
 					sState[ulState].ulFont = lArg;
 
 					if(!sState[ulState].bInFontTbl) {
-						fontmap_t::iterator i = mapFontToCharset.find(lArg);
-						if (i == mapFontToCharset.end())
+						fontmap_t::const_iterator i = mapFontToCharset.find(lArg);
+						if (i == mapFontToCharset.cend())
 							continue;
 
 						// Output any data before this point
@@ -298,13 +303,7 @@ HRESULT HrExtractHTMLFromRTF(const std::string &lpStrRTFIn,
 					sState[ulState].ulSkipChars += sState[ulState].ulUnicodeSkip;
 				}
 				else if(strcmp(szCommand,"htmlrtf") == 0) {
-					if(lArg != 0) {
-						// \\htmlrtf
-						sState[ulState].bRTFOnly = true;
-					} else {
-						// \\htmlrtf0
-						sState[ulState].bRTFOnly = false;
-					}
+					sState[ulState].bRTFOnly = lArg != 0;
 				}else if(isRTFIgnoreCommand(szCommand)) {
 					sState[ulState].bInSkipTbl = true;
 				}
@@ -410,10 +409,11 @@ HRESULT HrExtractHTMLFromRTF(const std::string &lpStrRTFIn,
  * @param[out]	lpStrHTMLOut	HTML output in requested ulCodepage
  * @param[out]	ulCodepage		codepage for HTML output
  */
-HRESULT HrExtractHTMLFromTextRTF(const std::string &lpStrRTFIn,
+HRESULT HrExtractHTMLFromTextRTF(const std::string &rtf_unfilt,
     std::string &lpStrHTMLOut, ULONG ulCodepage)
 {
 	HRESULT hr;
+	auto lpStrRTFIn = string_strip_nuls(rtf_unfilt);
 	std::wstring wstrUnicodeTmp;
 	const char *szInput = lpStrRTFIn.c_str();
 	const char *szANSICharset = "us-ascii";
@@ -422,7 +422,6 @@ HRESULT HrExtractHTMLFromTextRTF(const std::string &lpStrRTFIn,
 	std::wstring strOutput;
 	int ulState = 0;
 	bool bPar = false;
-	bool bNewLine = false;
 	int nLineChar=0;
 	RTFSTATE sState[RTF_MAXSTATE];	
 	fontmap_t mapFontToCharset;
@@ -443,7 +442,7 @@ HRESULT HrExtractHTMLFromTextRTF(const std::string &lpStrRTFIn,
 		 "<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=";
 	tmp += szHTMLCharset;
 	tmp += 	"\">\r\n"												\
-		 "<META NAME=\"Generator\" CONTENT=\"Kopano text/HTML builder 1.0\">\r\n" \
+		 "<META NAME=\"Generator\" CONTENT=\"Kopano HrExtractHTMLFromTextRTF\">\r\n" \
 		 "<TITLE></TITLE>\r\n" \
 		 "</HEAD>\r\n" \
 		 "<BODY>\r\n" \
@@ -507,18 +506,17 @@ HRESULT HrExtractHTMLFromTextRTF(const std::string &lpStrRTFIn,
 					}
 				} else if(strcmp(szCommand,"htmltag") == 0) {
 				} else if(strcmp(szCommand,"mhtmltag") == 0) {
-				} else if(strcmp(szCommand,"pard") == 0 || strcmp(szCommand,"par") == 0) {
-					if(!sState[ulState].bInFontTbl && !sState[ulState].bRTFOnly && !sState[ulState].bInColorTbl && !sState[ulState].bInSkipTbl) {
-
-						if(bNewLine == true && nLineChar >0 && bPar == true){
-							sState[ulState].output.append("</P>\r\n\r\n");
-							bPar = false;
-							nLineChar = 0;
-						}else if(bNewLine == false && nLineChar >0)
-							sState[ulState].output.append("</FONT>\r\n");
-						else
-							sState[ulState].output.append("\r\n");
-					}
+				} else if (strcmp(szCommand, "line") == 0) {
+					sState[ulState].output.append("<br>\r\n");
+				} else if (strcmp(szCommand, "par") == 0 &&
+				    !sState[ulState].bInFontTbl &&
+				    !sState[ulState].bRTFOnly &&
+				    !sState[ulState].bInColorTbl &&
+				    !sState[ulState].bInSkipTbl &&
+				    bPar) {
+					sState[ulState].output.append("</P>\r\n\r\n");
+					bPar = false;
+					nLineChar = 0;
 				} else if(strcmp(szCommand,"tab") == 0) {
 					if(!sState[ulState].bInFontTbl && !sState[ulState].bRTFOnly && !sState[ulState].bInColorTbl && !sState[ulState].bInSkipTbl) {		
 						sState[ulState].output.append(1,' ');
@@ -531,8 +529,8 @@ HRESULT HrExtractHTMLFromTextRTF(const std::string &lpStrRTFIn,
 					sState[ulState].ulFont = lArg;
 
 					if(!sState[ulState].bInFontTbl) {
-						fontmap_t::iterator i = mapFontToCharset.find(lArg);
-						if (i == mapFontToCharset.end())
+						fontmap_t::const_iterator i = mapFontToCharset.find(lArg);
+						if (i == mapFontToCharset.cend())
 							continue;
 
 						// Output any data before this point
@@ -550,6 +548,10 @@ HRESULT HrExtractHTMLFromTextRTF(const std::string &lpStrRTFIn,
 					// ignore error
 				}
 				else if (strcmp(szCommand,"u") == 0) {
+					if (!bPar) {
+						sState[ulState].output.append("<p>");
+						bPar = true;
+					}
 					// unicode character, in signed short WCHAR
 					strOutput += RTFFlushStateOutput(convertContext, sState, ulState);
 					if (!sState[ulState].bRTFOnly)
@@ -557,13 +559,7 @@ HRESULT HrExtractHTMLFromTextRTF(const std::string &lpStrRTFIn,
 					sState[ulState].ulSkipChars += sState[ulState].ulUnicodeSkip;
 				}
 				else if(strcmp(szCommand,"htmlrtf") == 0) {
-					if(lArg != 0) {
-						// \\htmlrtf
-						sState[ulState].bRTFOnly = true;
-					} else {
-						// \\htmlrtf0
-						sState[ulState].bRTFOnly = false;
-					}
+					sState[ulState].bRTFOnly = lArg != 0;
 				} else if(isRTFIgnoreCommand(szCommand)) {
 					sState[ulState].bInSkipTbl = true;
 				}
@@ -587,6 +583,10 @@ HRESULT HrExtractHTMLFromTextRTF(const std::string &lpStrRTFIn,
 			else if(*szInput == '\'') {
 				unsigned int ulChar;
 
+				if (!bPar) {
+					sState[ulState].output.append("<p>");
+					bPar = true;
+				}
 				// Dump output data until now, if we're switching charsets
 				if(szANSICharset == NULL || strcmp(sState[ulState].szCharset, szANSICharset) != 0) {
 					strOutput += RTFFlushStateOutput(convertContext, sState, ulState);
@@ -648,54 +648,41 @@ HRESULT HrExtractHTMLFromTextRTF(const std::string &lpStrRTFIn,
 			if(ulState > 0)
 				--ulState;
 			++szInput;
-		} else if(*szInput == '\r' || *szInput == '\n') {
-			bNewLine = true;
+		} else if (*szInput == '\r' || *szInput == '\n') {
 			++szInput;
-		} else {
-			if(!sState[ulState].bInFontTbl && !sState[ulState].bRTFOnly && !sState[ulState].bInColorTbl && !sState[ulState].bInSkipTbl && !sState[ulState].ulSkipChars) {
-				if(bPar == false){
-					sState[ulState].output.append("<P>");
-					bPar = true;
-				}else if(bNewLine == true && bPar == true)
-					sState[ulState].output.append("\r\n<BR>");
-
-				if(bNewLine == true){
-					sState[ulState].output.append("<FONT SIZE=2>");
-					bNewLine = false;
-				}
-
-				// Change space to &nbsp; . The last space is a real space like "&nbsp;&nbsp; " or " "
-				if(*szInput == ' ') {
-					++szInput;
-
-					while(*szInput == ' ') {
-						sState[ulState].output.append("&nbsp;");
-						++szInput;
-					}
-
-					sState[ulState].output.append(1, ' ');
-				} else {
-					std::wstring entity;
-
-					if (! CHtmlEntity::CharToHtmlEntity((WCHAR)*szInput, entity))
-						sState[ulState].output.append(1, *szInput);
-					else
-						sState[ulState].output.append(entity.begin(), entity.end());
-
+		} else if (!sState[ulState].bInFontTbl && !sState[ulState].bRTFOnly && !sState[ulState].bInColorTbl && !sState[ulState].bInSkipTbl && !sState[ulState].ulSkipChars) {
+			if (bPar == false) {
+				sState[ulState].output.append("<P>");
+				bPar = true;
+			}
+			// Change space to &nbsp; . The last space is a real space like "&nbsp;&nbsp; " or " "
+			if (*szInput == ' ') {
+				++szInput;
+				while (*szInput == ' ') {
+					sState[ulState].output.append("&nbsp;");
 					++szInput;
 				}
-
-				++nLineChar;
+				sState[ulState].output.append(1, ' ');
 			} else {
-				if (sState[ulState].ulSkipChars)
-					--sState[ulState].ulSkipChars;
+				std::wstring entity;
+
+				if (!CHtmlEntity::CharToHtmlEntity((WCHAR)*szInput, entity))
+					sState[ulState].output.append(1, *szInput);
+				else
+					sState[ulState].output.append(entity.begin(), entity.end());
 				++szInput;
 			}
+			++nLineChar;
+		} else {
+			if (sState[ulState].ulSkipChars)
+				--sState[ulState].ulSkipChars;
+			++szInput;
 		}
 	}
 
 	strOutput += RTFFlushStateOutput(convertContext, sState, ulState);
-
+	if (bPar)
+		strOutput += L"</p>\r\n";
 	strOutput += L"\r\n" \
 		     L"</BODY>\r\n" \
 		     L"</HTML>\r\n";
@@ -721,10 +708,11 @@ HRESULT HrExtractHTMLFromTextRTF(const std::string &lpStrRTFIn,
  *
  * @todo Export the right HTML tags, now only plain stuff
  */
-HRESULT HrExtractHTMLFromRealRTF(const std::string &lpStrRTFIn,
+HRESULT HrExtractHTMLFromRealRTF(const std::string &rtf_unfilt,
     std::string &lpStrHTMLOut, ULONG ulCodepage)
 {
 	HRESULT hr;
+	auto lpStrRTFIn = string_strip_nuls(rtf_unfilt);
 	std::wstring wstrUnicodeTmp;
 	const char *szInput = lpStrRTFIn.c_str();
 	const char *szANSICharset = "us-ascii";
@@ -736,6 +724,7 @@ HRESULT HrExtractHTMLFromRealRTF(const std::string &lpStrRTFIn,
 	convert_context convertContext;
 	string tmp;
 	fontmap_t mapFontToCharset;
+	bool bPar = false;
 
 	// select output charset
 	hr = HrGetCharsetByCP(ulCodepage, &szHTMLCharset);
@@ -751,7 +740,7 @@ HRESULT HrExtractHTMLFromRealRTF(const std::string &lpStrRTFIn,
 		 "<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=";
 	tmp += szHTMLCharset;
 	tmp +=	"\">\r\n"															\
-		 "<META NAME=\"Generator\" CONTENT=\"Kopano rtf/HTML builder 1.0\">\r\n" \
+		 "<META NAME=\"Generator\" CONTENT=\"Kopano HrExtractHTMLFromRealRTF\">\r\n" \
 		 "<TITLE></TITLE>\r\n" \
 		 "</HEAD>\r\n" \
 		 "<BODY>\r\n" \
@@ -820,9 +809,14 @@ HRESULT HrExtractHTMLFromRealRTF(const std::string &lpStrRTFIn,
 				} else if(strcmp(szCommand,"datastore") == 0) {
 					sState[ulState].bRTFOnly = true;
 				} else if(strcmp(szCommand,"mhtmltag") == 0) {
-				} else if(strcmp(szCommand,"pard") == 0 || strcmp(szCommand,"par") == 0 || strcmp(szCommand,"line") == 0) {
+				} else if (strcmp(szCommand, "line") == 0) {
+					sState[ulState].output.append("<br>\r\n");
+				} else if (strcmp(szCommand,"par") == 0) {
 					if(!sState[ulState].bInFontTbl && !sState[ulState].bRTFOnly && !sState[ulState].bInColorTbl && !sState[ulState].bInSkipTbl) {		
-						sState[ulState].output.append("<br>\r\n");
+						if (bPar)
+							sState[ulState].output.append("</p>\r\n\r\n");
+						sState[ulState].output.append("<p>");
+						bPar = true;
 					}
 				} else if(strcmp(szCommand,"tab") == 0) {
 					if(!sState[ulState].bInFontTbl && !sState[ulState].bRTFOnly && !sState[ulState].bInColorTbl && !sState[ulState].bInSkipTbl) {		
@@ -839,8 +833,8 @@ HRESULT HrExtractHTMLFromRealRTF(const std::string &lpStrRTFIn,
 					sState[ulState].ulFont = lArg;
 
 					if(!sState[ulState].bInFontTbl) {
-						fontmap_t::iterator i = mapFontToCharset.find(lArg);
-						if (i == mapFontToCharset.end())
+						fontmap_t::const_iterator i = mapFontToCharset.find(lArg);
+						if (i == mapFontToCharset.cend())
 							continue;
 
 						// Output any data before this point
@@ -860,6 +854,10 @@ HRESULT HrExtractHTMLFromRealRTF(const std::string &lpStrRTFIn,
 					// ignore error
 				}
 				else if (strcmp(szCommand,"u") == 0) {
+					if (!bPar) {
+						sState[ulState].output.append("<p>");
+						bPar = true;
+					}
 					// unicode character, in signed short WCHAR
 					strOutput += RTFFlushStateOutput(convertContext, sState, ulState);
 					if(!sState[ulState].bInFontTbl && !sState[ulState].bRTFOnly && !sState[ulState].bInColorTbl && !sState[ulState].bInSkipTbl) {
@@ -873,13 +871,7 @@ HRESULT HrExtractHTMLFromRealRTF(const std::string &lpStrRTFIn,
 					sState[ulState].ulSkipChars += sState[ulState].ulUnicodeSkip;
 				}
 				else if(strcmp(szCommand,"htmlrtf") == 0) {
-					if(lArg != 0) {
-						// \\htmlrtf
-						sState[ulState].bRTFOnly = true;
-					} else {
-						// \\htmlrtf0
-						sState[ulState].bRTFOnly = false;
-					}
+					sState[ulState].bRTFOnly = lArg != 0;
 				}
 				/*else if(strcmp(szCommand,"b") == 0) {
 				  if( lArg == -1)
@@ -966,6 +958,10 @@ HRESULT HrExtractHTMLFromRealRTF(const std::string &lpStrRTFIn,
 				unsigned int ulChar;
 				std::wstring wstrUnicode;
 
+				if (!bPar) {
+					sState[ulState].output.append("<p>");
+					bPar = true;
+				}
 				while(*szInput == '\'')
 				{
 					ulChar = 0;
@@ -1018,6 +1014,10 @@ HRESULT HrExtractHTMLFromRealRTF(const std::string &lpStrRTFIn,
 			++szInput;
 		} else {
 			if(!sState[ulState].bInFontTbl && !sState[ulState].bRTFOnly && !sState[ulState].bInColorTbl && !sState[ulState].bInSkipTbl && !sState[ulState].ulSkipChars) {
+				if (!bPar) {
+					sState[ulState].output.append("<p>");
+					bPar = true;
+				}
 				// basic html escaping only
 				if (*szInput == '&')
 					sState[ulState].output.append("&amp;");
@@ -1034,7 +1034,8 @@ HRESULT HrExtractHTMLFromRealRTF(const std::string &lpStrRTFIn,
 	}
 
 	strOutput += RTFFlushStateOutput(convertContext, sState, ulState);
-
+	if (bPar)
+		strOutput += L"</p>\r\n";
 	strOutput += L"\r\n" \
 		     L"</BODY>\r\n" \
 		     L"</HTML>\r\n";
@@ -1093,9 +1094,10 @@ bool isrtftext(const char *buf, unsigned int len)
  * @return	mapi error code
  * @retval	MAPI_E_NOT_ENOUGH_MEMORY	too many states in rtf, > 256
  */
-HRESULT HrExtractBODYFromTextRTF(const std::string &lpStrRTFIn,
+HRESULT HrExtractBODYFromTextRTF(const std::string &rtf_unfilt,
     std::wstring &strBodyOut)
 {
+	auto lpStrRTFIn = string_strip_nuls(rtf_unfilt);
 	const char *szInput = lpStrRTFIn.c_str();
 	const char *szANSICharset = "us-ascii";
 	int ulState = 0;
@@ -1171,8 +1173,8 @@ HRESULT HrExtractBODYFromTextRTF(const std::string &lpStrRTFIn,
 					sState[ulState].ulFont = lArg;
 
 					if(!sState[ulState].bInFontTbl) {
-						fontmap_t::iterator i = mapFontToCharset.find(lArg);
-						if (i == mapFontToCharset.end())
+						fontmap_t::const_iterator i = mapFontToCharset.find(lArg);
+						if (i == mapFontToCharset.cend())
 							continue;
 
 						// Output any data before this point
@@ -1196,13 +1198,7 @@ HRESULT HrExtractBODYFromTextRTF(const std::string &lpStrRTFIn,
 					sState[ulState].ulSkipChars += sState[ulState].ulUnicodeSkip;
 				}
 				else if(strcmp(szCommand,"htmlrtf") == 0) {
-					if(lArg != 0) {
-						// \\htmlrtf
-						sState[ulState].bRTFOnly = true;
-					} else {
-						// \\htmlrtf0
-						sState[ulState].bRTFOnly = false;
-					}
+					sState[ulState].bRTFOnly = lArg != 0;
 				}
 				else if(strcmp(szCommand,"generator") == 0){
 					while (*szInput != ';' && *szInput != '}' && *szInput)
@@ -1286,9 +1282,9 @@ HRESULT HrExtractBODYFromTextRTF(const std::string &lpStrRTFIn,
 		} else if(*szInput == '\r' || *szInput == '\n') {
 			++szInput;
 		} else {
-			if(!sState[ulState].bInFontTbl && !sState[ulState].bRTFOnly && !sState[ulState].bInColorTbl && !sState[ulState].bInSkipTbl && !sState[ulState].ulSkipChars) {
+			if (!sState[ulState].bInFontTbl && !sState[ulState].bRTFOnly && !sState[ulState].bInColorTbl && !sState[ulState].bInSkipTbl && !sState[ulState].ulSkipChars)
 				sState[ulState].output.append(1,*szInput);
-			} else if (sState[ulState].ulSkipChars)
+			else if (sState[ulState].ulSkipChars)
 				--sState[ulState].ulSkipChars;
 			++szInput;
 		}
@@ -1297,3 +1293,5 @@ HRESULT HrExtractBODYFromTextRTF(const std::string &lpStrRTFIn,
 	strBodyOut += RTFFlushStateOutput(convertContext, sState, ulState);
 	return hrSuccess;
 }
+
+} /* namespace */

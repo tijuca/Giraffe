@@ -21,7 +21,7 @@
 
 using namespace std;
 
-namespace za { namespace operations {
+namespace KC { namespace operations {
 
 /**
  * @param[in]	lpLogger
@@ -44,9 +44,7 @@ HRESULT Deleter::LeaveFolder()
 
 HRESULT Deleter::DoProcessEntry(ULONG cProps, const LPSPropValue &lpProps)
 {
-	LPSPropValue lpEntryId = NULL;
-
-	lpEntryId = PpropFindProp(lpProps, cProps, PR_ENTRYID);
+	auto lpEntryId = PCpropFindProp(lpProps, cProps, PR_ENTRYID);
 	if (lpEntryId == NULL) {
 		Logger()->Log(EC_LOGLEVEL_FATAL, "PR_ENTRYID missing");
 		return MAPI_E_NOT_FOUND;
@@ -68,12 +66,11 @@ HRESULT Deleter::PurgeQueuedMessages()
 {
 	HRESULT hr;
 	EntryListPtr ptrEntryList;
-	list<entryid_t>::const_iterator iEntryId;
 	ULONG ulIdx = 0;
 	
 	if (m_lstEntryIds.empty())
 		return hrSuccess;
-	hr = MAPIAllocateBuffer(sizeof(ENTRYLIST), &ptrEntryList);
+	hr = MAPIAllocateBuffer(sizeof(ENTRYLIST), &~ptrEntryList);
 	if (hr != hrSuccess)
 		return hr;
 	hr = MAPIAllocateMore(m_lstEntryIds.size() * sizeof(SBinary), ptrEntryList, (LPVOID*)&ptrEntryList->lpbin);
@@ -81,9 +78,9 @@ HRESULT Deleter::PurgeQueuedMessages()
 		return hr;
 		
 	ptrEntryList->cValues = m_lstEntryIds.size();
-	for (iEntryId = m_lstEntryIds.begin(); iEntryId != m_lstEntryIds.end(); ++iEntryId, ++ulIdx) {
-		ptrEntryList->lpbin[ulIdx].cb = iEntryId->size();
-		ptrEntryList->lpbin[ulIdx].lpb = *iEntryId;
+	for (const auto &e : m_lstEntryIds) {
+		ptrEntryList->lpbin[ulIdx].cb = e.size();
+		ptrEntryList->lpbin[ulIdx++].lpb = e;
 	}
 	
 	hr = CurrentFolder()->DeleteMessages(ptrEntryList, 0, NULL, 0);
@@ -96,4 +93,4 @@ HRESULT Deleter::PurgeQueuedMessages()
 	return hrSuccess;
 }
 
-}} // namespaces 
+}} /* namespace */

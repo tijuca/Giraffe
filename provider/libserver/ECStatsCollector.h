@@ -21,7 +21,9 @@
 #include <kopano/zcdefs.h>
 #include <string>
 #include <map>
-#include <pthread.h>
+#include <mutex>
+
+namespace KC {
 
 enum SCName {
 	/* server stats */
@@ -47,77 +49,77 @@ enum SCName {
 	SCN_INDEXER_SEARCH_ERRORS, SCN_INDEXER_SEARCH_MAX, SCN_INDEXER_SEARCH_AVG, SCN_INDEXED_SEARCHES, SCN_DATABASE_SEARCHES
 };
 
-typedef union _statdata {
+union SCData {
 	float f;
 	LONGLONG ll;
 	time_t ts;
-} SCData;
+};
 
 enum SCType { SCDT_FLOAT, SCDT_LONGLONG, SCDT_TIMESTAMP };
 
-typedef struct _ECStat {
+struct ECStat {
 	SCData data;
 	LONGLONG avginc;
 	SCType type;
 	const char *name;
 	const char *description;
-	pthread_mutex_t lock;
-} ECStat;
+	std::mutex lock;
+#if defined(__GNUG__) && __GNUG__ == 4 && \
+    defined(__GNUC_MINOR__) && __GNUC_MINOR__ <= 7
+	/*
+	 * g++-4.7 does not have std::map emplace support yet, so it just
+	 * attempts to use copy constructors when inserting an element.
+	 * However, a default copy ctor is not available for ECStat because
+	 * std::mutex is uncopyable. So we provide one.
+	 */
+	ECStat(const ECStat &o) :
+		data(o.data), avginc(o.avginc), type(o.type), name(o.name),
+		description(o.description), lock()
+	{}
+	/* and if we define one ctor, we have to name all of them: */
+	ECStat(void) = default;
+#endif
+};
 
 typedef std::map<SCName, ECStat> SCMap;
 
-typedef struct _ECStrings {
+struct ECStrings {
 	std::string description;
 	std::string value;
-} ECStrings;
+};
 
-class ECStatsCollector _zcp_final {
+class _kc_export ECStatsCollector _kc_final {
 public:
-	ECStatsCollector();
-	~ECStatsCollector();
-
-	void Increment(SCName name, float inc);
+	_kc_hidden ECStatsCollector(void);
+	_kc_hidden void Increment(SCName name, float inc);
 	void Increment(SCName name, int inc = 1);
 	void Increment(SCName name, LONGLONG inc);
-
-	void Set(SCName name, float set);
-	void Set(SCName name, LONGLONG set);
+	_kc_hidden void Set(SCName name, float set);
+	_kc_hidden void Set(SCName name, LONGLONG set);
 	void SetTime(SCName name, time_t set);
-
-	void Min(SCName name, float min);
-	void Min(SCName name, LONGLONG min);
-	void MinTime(SCName name, time_t min);
-
-	void Max(SCName name, float max);
 	void Max(SCName name, LONGLONG max);
-	void MaxTime(SCName name, time_t max);
-
-	void Avg(SCName name, float add);
+	_kc_hidden void Avg(SCName name, float add);
 	void Avg(SCName name, LONGLONG add);
-	void AvgTime(SCName name, time_t add);
 
 	/* strings are separate, used by ECSerial */
-	void Set(const std::string &name, const std::string &description, const std::string &value);
-	void Remove(const std::string &name);
-
-	std::string GetValue(SCMap::const_iterator iSD);
-	std::string GetValue(SCName name);
-
-	void ForEachStat(void(callback)(const std::string &, const std::string &, const std::string &, void*), void *obj);
-	void ForEachString(void(callback)(const std::string &, const std::string &, const std::string &, void*), void *obj);
-
-	void Reset(void);
-	void Reset(SCName name);
+	_kc_hidden std::string GetValue(const SCMap::const_iterator::value_type &);
+	_kc_hidden std::string GetValue(const SCName &name);
+	_kc_hidden void ForEachStat(void (*cb)(const std::string &, const std::string &, const std::string &, void *), void *obj);
+	_kc_hidden void ForEachString(void (*cb)(const std::string &, const std::string &, const std::string &, void *), void *obj);
+	_kc_hidden void Reset(void);
+	_kc_hidden void Reset(SCName name);
 
 private:
-	void AddStat(SCName index, SCType type, const char *name, const char *description);
+	_kc_hidden void AddStat(SCName index, SCType type, const char *name, const char *desc);
 
 	SCMap m_StatData;
-	pthread_mutex_t m_StringsLock;
+	std::mutex m_StringsLock;
 	std::map<std::string, ECStrings> m_StatStrings;
 };
 
 /* actual variable is in ECServerEntryPoint.cpp */
 extern ECStatsCollector* g_lpStatsCollector;
+
+} /* namespace */
 
 #endif

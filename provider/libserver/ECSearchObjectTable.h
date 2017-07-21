@@ -21,20 +21,23 @@
 #include <kopano/zcdefs.h>
 #include "ECStoreObjectTable.h"
 
+namespace KC {
+
 // The search folders only differ from normal 'store' tables in that they load the object list
 // from the searchresults instead of from the hierarchy table.
-class ECSearchObjectTable _zcp_final : public ECStoreObjectTable {
+class ECSearchObjectTable _kc_final : public ECStoreObjectTable {
 protected:
 	ECSearchObjectTable(ECSession *lpSession, unsigned int ulStoreId, GUID *lpGuid, unsigned int ulFolderId, unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale);
 
 public:
-	static ECRESULT Create(ECSession *lpSession, unsigned int ulStoreId, GUID *lpGuid, unsigned int ulFolderId, unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale, ECSearchObjectTable **lppTable);
-
+	static ECRESULT Create(ECSession *, unsigned int store_id, GUID *guid, unsigned int folder_id, unsigned int obj_type, unsigned int flags, const ECLocale &, ECStoreObjectTable **);
     virtual ECRESULT Load();
     
 private:
     unsigned int m_ulFolderId;
     unsigned int m_ulStoreId;
 };
+
+} /* namespace */
 
 #endif

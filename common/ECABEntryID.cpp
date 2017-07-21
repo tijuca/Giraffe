@@ -21,9 +21,11 @@
 
 #include <mapicode.h>
 
+namespace KC {
+
 /* This is a copy from the definition in kcore.hpp. It's for internal use only as we
  * don't want to expose the format of the entry id. */
-typedef struct ABEID {
+struct ABEID {
 	BYTE	abFlags[4];
 	GUID	guid;
 	ULONG	ulVersion;
@@ -38,7 +40,7 @@ typedef struct ABEID {
 		this->guid = guid;
 		this->ulId = ulId;
 	}
-} ABEID;
+};
 
 static ABEID		g_sDefaultEid(MAPI_MAILUSER, MUIDECSAB, 0);
 unsigned char		*g_lpDefaultEid = (unsigned char*)&g_sDefaultEid;
@@ -110,38 +112,4 @@ HRESULT GetNonPortableObjectType(unsigned int cbEntryId,
 	return hrSuccess;
 }
 
-HRESULT GeneralizeEntryIdInPlace(unsigned int cbEntryId, ENTRYID *lpEntryId)
-{
-	if (cbEntryId < sizeof(ABEID) || lpEntryId == NULL)
-		return MAPI_E_INVALID_PARAMETER;
-
-	auto lpAbeid = reinterpret_cast<ABEID *>(lpEntryId);
-	switch (lpAbeid->ulVersion) {
-		// A version 0 entry id is generalized by nature as it's not used to be shared
-		// between servers.
-		case 0:
-			break;
-
-		// A version 1 entry id can be understood by all servers in a cluster, but they
-		// cannot be compared with memcpy because the ulId field is server specific.
-		// However we can zero this field as the server doesn't need it to locate the
-		// object referenced with the entry id.
-		// An exception on this rule are SYSTEM en EVERYONE as they don't have an external
-		// id. However their ulId fields are specified as 1 and 2 respectively. So every
-		// server will understand the entry id, regardless of the version number. We will
-		// downgrade anyway be as compatible as possible in that case.
-		case 1:
-			if (lpAbeid->szExId[0])	// remove the 'legacy ulId field'
-				lpAbeid->ulId = 0;			
-			else {								// downgrade to version 0
-				ASSERT(cbEntryId == sizeof(ABEID));
-				lpAbeid->ulVersion = 0;
-			}
-			break;
-
-		default:
-			ASSERT(FALSE);
-			break;
-	}
-	return hrSuccess;
-}
+} /* namespace */

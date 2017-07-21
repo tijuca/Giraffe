@@ -9,9 +9,95 @@
 #include <kopano/ECGuid.h>
 #include <kopano/ECLogger.h>
 #include <kopano/hl.hpp>
+#include <kopano/memory.hpp>
 #include <mapiutil.h>
 
+using namespace KC;
+
 namespace KCHL {
+
+KProp::KProp(SPropValue *s) :
+	m_s(s)
+{
+}
+
+KProp::KProp(KProp &&other) :
+	m_s(other.m_s)
+{
+	other.m_s = NULL;
+}
+
+KProp::~KProp() {
+	if (m_s != nullptr)
+		MAPIFreeBuffer(m_s);
+}
+
+KProp &KProp::operator=(KProp &&other)
+{
+	std::swap(m_s, other.m_s);
+	return *this;
+}
+
+const unsigned int & KProp::prop_tag() const
+{
+	return m_s->ulPropTag;
+}
+
+const bool KProp::b() const
+{
+	if (PROP_TYPE(prop_tag()) != PT_BOOLEAN)
+		throw KMAPIError(MAPI_E_INVALID_TYPE);
+
+	return m_s->Value.b;
+}
+
+const unsigned int & KProp::ul() const
+{
+	if (PROP_TYPE(prop_tag()) != PT_LONG)
+		throw KMAPIError(MAPI_E_INVALID_TYPE);
+
+	return m_s->Value.ul;
+}
+
+const int & KProp::l() const
+{
+	if (PROP_TYPE(prop_tag()) != PT_LONG)
+		throw KMAPIError(MAPI_E_INVALID_TYPE);
+
+	return m_s->Value.l;
+}
+
+std::string KProp::str()
+{
+	if (PROP_TYPE(prop_tag()) != PT_STRING8)
+		throw KMAPIError(MAPI_E_INVALID_TYPE);
+
+	return std::string(m_s->Value.lpszA);
+}
+
+std::wstring KProp::wstr()
+{
+	if (PROP_TYPE(prop_tag()) != PT_UNICODE)
+		throw KMAPIError(MAPI_E_INVALID_TYPE);
+
+	return std::wstring(m_s->Value.lpszW);
+}
+
+KEntryId KProp::entry_id()
+{
+	if (PROP_TYPE(prop_tag()) != PT_BINARY)
+		throw KMAPIError(MAPI_E_INVALID_TYPE);
+
+	memory_ptr<ENTRYID> entry_id;
+	HRESULT ret = MAPIAllocateBuffer(m_s->Value.bin.cb, &~entry_id);
+
+	if (ret != hrSuccess)
+		throw KMAPIError(ret);
+
+	memcpy(entry_id, m_s->Value.bin.lpb, m_s->Value.bin.cb);
+
+	return KEntryId(entry_id.release(), m_s->Value.bin.cb);
+}
 
 KAttach::KAttach(IAttach *attach, unsigned int num) :
 	m_attach(attach), m_num(num)
@@ -19,9 +105,10 @@ KAttach::KAttach(IAttach *attach, unsigned int num) :
 }
 
 KAttach::KAttach(KAttach &&other) :
-	m_attach(other.m_attach)
+	m_attach(other.m_attach), m_num(other.m_num)
 {
 	other.m_attach = NULL;
+	other.m_num = 0;
 }
 
 KAttach::~KAttach(void)
@@ -33,6 +120,7 @@ KAttach::~KAttach(void)
 KAttach &KAttach::operator=(KAttach &&other)
 {
 	std::swap(m_attach, other.m_attach);
+	std::swap(m_num, other.m_num);
 	return *this;
 }
 
@@ -50,21 +138,6 @@ KStream KAttach::open_property_stream(unsigned int tag, unsigned int intopts,
 HRESULT KAttach::save_changes(unsigned int flags)
 {
 	return m_attach->SaveChanges(flags);
-}
-
-void KDeleter::operator()(SPropValue *p)
-{
-	MAPIFreeBuffer(p);
-}
-
-void KDeleter::operator()(SRowSet *p)
-{
-	FreeProws(p);
-}
-
-KEntryId::KEntryId(void) :
-	m_eid(NULL), m_size(0)
-{
 }
 
 KEntryId::KEntryId(ENTRYID *eid, size_t size) :
@@ -95,7 +168,7 @@ KMAPIError::KMAPIError(HRESULT code) :
 {
 }
 
-const char *KMAPIError::what(void) const throw()
+const char *KMAPIError::what(void) const noexcept
 {
 	return m_message.c_str();
 }
@@ -136,6 +209,15 @@ KTable KFolder::get_contents_table(unsigned int flags)
 {
 	IMAPITable *table;
 	int ret = m_folder->GetContentsTable(flags, &table);
+	if (ret != hrSuccess)
+		throw KMAPIError(ret);
+	return KTable(table);
+}
+
+KTable KFolder::get_hierarchy_table(unsigned int flags)
+{
+	IMAPITable *table;
+	int ret = m_folder->GetHierarchyTable(flags, &table);
 	if (ret != hrSuccess)
 		throw KMAPIError(ret);
 	return KTable(table);
@@ -193,51 +275,31 @@ HRESULT KMessage::set_read_flag(unsigned int f)
 	return m_message->SetReadFlag(f);
 }
 
-KPropertyRestriction::KPropertyRestriction(ULONG op, SPropValue *prop)
+KSession::KSession(void)
 {
-	relop = op;
-	if (prop == NULL)
-		throw KMAPIError(MAPI_E_INVALID_TYPE);
-	ulPropTag = prop->ulPropTag;
-	lpProp = prop;
-}
-
-KPropertyRestriction::operator SRestriction(void) const
-{
-	SRestriction r;
-	r.rt = RES_PROPERTY;
-	r.res.resProperty = *this;
-	return r;
-}
-
-KSession::KSession(void) :
-	m_log(new ECLogger_File(EC_LOGLEVEL_DEBUG, false, "-", 0))
-{
-	m_session = NULL;
 	const char *sock = getenv("KOPANO_SOCKET");
 	if (sock == NULL)
 		sock = "default:";
-	int ret = HrOpenECSession(m_log, &m_session, "app_vers", "app_misc",
+	int ret = HrOpenECSession(&m_session, "app_vers", "app_misc",
 	          L"SYSTEM", L"", sock, 0, 0, 0);
 	if (ret != hrSuccess)
 		throw KMAPIError(ret);
 }
 
-KSession::KSession(const wchar_t *user, const wchar_t *pass) :
-	m_log(new ECLogger_File(EC_LOGLEVEL_DEBUG, false, "-", 0))
+KSession::KSession(const wchar_t *user, const wchar_t *pass)
 {
 	m_session = NULL;
 	const char *sock = getenv("KOPANO_SOCKET");
 	if (sock == NULL)
 		sock = "default:";
-	int ret = HrOpenECSession(m_log, &m_session, "app_vers", "app_misc",
+	int ret = HrOpenECSession(&m_session, "app_vers", "app_misc",
 	          user, pass, sock, 0, 0, 0);
 	if (ret != hrSuccess)
 		throw KMAPIError(ret);
 }
 
 KSession::KSession(IMAPISession *session) :
-	m_log(NULL), m_session(session)
+	m_session(session)
 {
 }
 
@@ -245,8 +307,6 @@ KSession::~KSession(void)
 {
 	if (m_session != NULL)
 		m_session->Release();
-	if (m_log != NULL)
-		m_log->Release();
 }
 
 KStore KSession::open_default_store(void)
@@ -259,12 +319,12 @@ KStore KSession::open_default_store(void)
 }
 
 KStore::KStore(IMsgStore *store) :
-	m_store(store)
+	m_store(store), m_type(0)
 {
 }
 
 KStore::KStore(KStore &&other) :
-	m_store(other.m_store)
+	m_store(other.m_store), m_type(other.m_type)
 {
 	other.m_store = NULL;
 }
@@ -278,7 +338,40 @@ KStore::~KStore(void)
 KStore &KStore::operator=(KStore &&other)
 {
 	std::swap(m_store, other.m_store);
+	std::swap(m_type, other.m_type);
 	return *this;
+}
+
+KEntryId KStore::get_receive_folder(const char *cls, char **xcls)
+{
+	ULONG eid_size = 0;
+	ENTRYID *raw_eid = nullptr;
+	auto ret = m_store->GetReceiveFolder(reinterpret_cast<TCHAR *>(const_cast<char *>(cls)),
+	           0, &eid_size, &raw_eid, reinterpret_cast<TCHAR **>(xcls));
+	KEntryId eid(raw_eid, eid_size); /* stuff into RAII object before throw */
+	if (ret != hrSuccess)
+		throw KMAPIError(ret);
+	return eid;
+}
+
+KProp KStore::get_prop(unsigned int tag)
+{
+	SPropValue *prop;
+	int ret = HrGetOneProp(m_store, tag, &prop);
+	if (ret != hrSuccess)
+		throw KMAPIError(ret);
+	return KProp(prop);
+}
+
+KUnknown KStore::open_entry(const KEntryId &eid, LPCIID intf,
+    unsigned int flags)
+{
+	IUnknown *unk;
+	auto ret = m_store->OpenEntry(eid.m_size, eid.m_eid,
+                   intf, flags, &m_type, &unk);
+	if (ret != hrSuccess)
+		throw KMAPIError(ret);
+	return KUnknown(unk);
 }
 
 KUnknown KStore::open_entry(const SPropValue *eid, LPCIID intf,
@@ -333,6 +426,44 @@ HRESULT KStream::commit(unsigned int flags)
 	return m_stream->Commit(flags);
 }
 
+KRow::KRow(SRow row) :
+	m_row(row)
+{
+}
+
+KProp KRow::operator[](size_t index) const
+{
+	memory_ptr<SPropValue> prop;
+
+	HRESULT ret = MAPIAllocateBuffer(sizeof(SPropValue), &~prop);
+	if (ret != hrSuccess)
+		throw KMAPIError(ret);
+
+	memcpy(prop, &m_row.lpProps[index], sizeof(SPropValue));
+
+	return KProp(prop.release());
+}
+
+unsigned int KRow::count() const
+{
+	return m_row.cValues;
+}
+
+KRowSet::KRowSet(SRowSet *rowset) :
+	m_rowset(rowset)
+{
+}
+
+KRow KRowSet::operator[](size_t index) const
+{
+	return KRow(m_rowset->aRow[index]);
+}
+
+unsigned int KRowSet::count() const
+{
+	return m_rowset->cRows;
+}
+
 KTable::KTable(IMAPITable *table) :
 	m_table(table)
 {
@@ -359,6 +490,50 @@ KTable &KTable::operator=(KTable &&other)
 HRESULT KTable::restrict(const SRestriction &r, unsigned int flags)
 {
 	return m_table->Restrict(const_cast<SRestriction *>(&r), flags);
+}
+
+void KTable::columns(std::initializer_list<unsigned int> props)
+{
+	size_t len = props.size();
+	memory_ptr<SPropTagArray> array;
+
+	HRESULT ret = MAPIAllocateBuffer(CbNewSPropTagArray(len), &~array);
+	if (ret != hrSuccess)
+		throw KMAPIError(ret);
+
+	array->cValues = len;
+
+	int i = 0;
+	for (const auto &prop : props) {
+		array->aulPropTag[i] = prop;
+		i++;
+	}
+
+	ret = m_table->SetColumns(array, 0);
+	if (ret != hrSuccess)
+		throw KMAPIError(ret);
+}
+
+KRowSet KTable::rows(unsigned int size, unsigned int offset)
+{
+	rowset_ptr rowset;
+
+	HRESULT ret = m_table->QueryRows(size, offset, &~rowset);
+	if (ret != hrSuccess)
+		throw KMAPIError(ret);
+
+	return KRowSet(rowset.release());
+}
+
+unsigned int KTable::count(unsigned int flags)
+{
+	unsigned int result;
+
+	auto ret = m_table->GetRowCount(flags, &result);
+	if (ret != hrSuccess)
+		throw KMAPIError(ret);
+
+	return result;
 }
 
 KUnknown::KUnknown(IUnknown *p) :

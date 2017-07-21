@@ -18,14 +18,15 @@
 #ifndef __MAPI_CONTACT_H
 #define __MAPI_CONTACT_H
 
+namespace KC {
+
 // http://blogs.msdn.com/stephen_griffin/archive/2005/10/25/new-outlook-documentation-part-1-contact-linking.aspx
 
 // example usage:
 // Used in MAPIToVMIME: PR_REPLY_RECIPIENT_ENTRIES when you choose a contact from your personal folders
 // Used in Spooler: when sending a Fax
 
-typedef struct _s_CONTAB_ENTRYID
-{
+struct CONTAB_ENTRYID {
 	BYTE misc1[4];
 	MAPIUID muid;
 	ULONG misc3;
@@ -39,6 +40,9 @@ typedef struct _s_CONTAB_ENTRYID
 	ULONG cbeid;
 	BYTE abeid[1];
 	BYTE padding[3];			/* not mentioned, but it's there */
-} CONTAB_ENTRYID, *LPCONTAB_ENTRYID;
+};
+typedef struct CONTAB_ENTRYID *LPCONTAB_ENTRYID;
+
+} /* namespace */
 
 #endif

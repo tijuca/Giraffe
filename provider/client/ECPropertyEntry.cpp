@@ -16,7 +16,7 @@
  */
 
 #include <kopano/platform.h>
-
+#include <new>
 #include "ECPropertyEntry.h"
 #include "Mem.h"
 #include <kopano/charset/convert.h>
@@ -26,20 +26,18 @@
 //
 DEF_INVARIANT_CHECK(ECPropertyEntry) {
 	// There should always be a proptag set.
-	ASSERT(ulPropTag != 0);
-	ASSERT(PROP_ID(ulPropTag) != 0);
+	assert(ulPropTag != 0);
+	assert(PROP_ID(ulPropTag) != 0);
 
 	// PT_STRING8 and PT_MV_STRING8 are never stored.
-	ASSERT(PROP_TYPE(ulPropTag) != PT_STRING8);
-	ASSERT(PROP_TYPE(ulPropTag) != PT_MV_STRING8);
+	assert(PROP_TYPE(ulPropTag) != PT_STRING8);
+	assert(PROP_TYPE(ulPropTag) != PT_MV_STRING8);
 }
 
-ECPropertyEntry::ECPropertyEntry(ULONG ulPropTag)
+ECPropertyEntry::ECPropertyEntry(ULONG ulPropTag) :
+	lpProperty(nullptr)
 {
 	this->ulPropTag = ulPropTag;
-	this->lpProperty = NULL;
-	this->fDirty = TRUE;
-	
 	DEBUG_CHECK_INVARIANT;
 }
 
@@ -47,8 +45,6 @@ ECPropertyEntry::ECPropertyEntry(ECProperty *property)
 {
 	this->ulPropTag = property->GetPropTag();
 	this->lpProperty = property;
-	this->fDirty = TRUE;
-
 	DEBUG_CHECK_INVARIANT;
 }
 
@@ -58,14 +54,13 @@ ECPropertyEntry::~ECPropertyEntry()
 }
 
 // NOTE: lpsPropValue must be checked already
-HRESULT ECPropertyEntry::HrSetProp(LPSPropValue lpsPropValue)
+HRESULT ECPropertyEntry::HrSetProp(const SPropValue *lpsPropValue)
 {
 	DEBUG_GUARD;
 
 	HRESULT hr = hrSuccess;
-
-	ASSERT(this->ulPropTag != 0);
-	ASSERT(this->ulPropTag == lpsPropValue->ulPropTag);
+	assert(this->ulPropTag != 0);
+	assert(this->ulPropTag == lpsPropValue->ulPropTag);
 
 	if(this->lpProperty)
 		this->lpProperty->CopyFrom(lpsPropValue);
@@ -83,8 +78,8 @@ HRESULT ECPropertyEntry::HrSetProp(ECProperty *property)
 
 	HRESULT hr = hrSuccess;
 
-	ASSERT(property->GetPropTag() != 0);
-	ASSERT(this->lpProperty == NULL);
+	assert(property->GetPropTag() != 0);
+	assert(this->lpProperty == NULL);
 	this->lpProperty = property;
 	this->fDirty = TRUE;
 
@@ -117,22 +112,21 @@ void ECPropertyEntry::DeleteProperty()
 //
 DEF_INVARIANT_CHECK(ECProperty) {
 	// There should always be a proptag set.
-	ASSERT(ulPropTag != 0);
-	ASSERT(PROP_ID(ulPropTag) != 0);
+	assert(ulPropTag != 0);
+	assert(PROP_ID(ulPropTag) != 0);
 
 	// PT_STRING8 and PT_MV_STRING8 are never stored.
-	ASSERT(PROP_TYPE(ulPropTag) != PT_STRING8);
-	ASSERT(PROP_TYPE(ulPropTag) != PT_MV_STRING8);
+	assert(PROP_TYPE(ulPropTag) != PT_STRING8);
+	assert(PROP_TYPE(ulPropTag) != PT_MV_STRING8);
 }
 
 ECProperty::ECProperty(const ECProperty &Property) {
 	SPropValue sPropValue;
 
-	ASSERT(Property.ulPropTag != 0);
+	assert(Property.ulPropTag != 0);
 	sPropValue.ulPropTag = Property.ulPropTag;
 	sPropValue.Value = Property.Value;
-
-	memset(&this->Value, 0, sizeof(union _PV));
+	memset(&this->Value, 0, sizeof(union __UPV));
 	this->ulSize = 0;
 
 	CopyFromInternal(&sPropValue);
@@ -140,23 +134,24 @@ ECProperty::ECProperty(const ECProperty &Property) {
 	DEBUG_CHECK_INVARIANT;
 }
 	
-ECProperty::ECProperty(LPSPropValue lpsProp) {
-	memset(&this->Value, 0, sizeof(union _PV));
+ECProperty::ECProperty(const SPropValue *lpsProp)
+{
+	memset(&this->Value, 0, sizeof(union __UPV));
 	this->ulSize = 0;
-
-	ASSERT(lpsProp->ulPropTag != 0);
-
+	assert(lpsProp->ulPropTag != 0);
 	CopyFromInternal(lpsProp);
 
 	DEBUG_CHECK_INVARIANT;
 }
 
-HRESULT ECProperty::CopyFrom(LPSPropValue lpsProp) {
+HRESULT ECProperty::CopyFrom(const SPropValue *lpsProp)
+{
 	DEBUG_GUARD;
 	return CopyFromInternal(lpsProp);
 }
 
-HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
+HRESULT ECProperty::CopyFromInternal(const SPropValue *lpsProp)
+{
 	ULONG ulNewSize = 0;
 	unsigned int i;
 
@@ -165,7 +160,7 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 
 	this->dwLastError = 0;
 	this->ulPropTag = lpsProp->ulPropTag;
-	ASSERT(lpsProp->ulPropTag != 0);
+	assert(lpsProp->ulPropTag != 0);
 
 	switch(PROP_TYPE(lpsProp->ulPropTag)) {
 	case PT_I2:
@@ -212,8 +207,7 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 		ulNewSize = wstrTmp.length() + 1;
 		if(ulSize < ulNewSize) {
 			delete[] this->Value.lpszW;
-			this->Value.lpszW = new WCHAR[ulNewSize];
-
+			this->Value.lpszW = new(std::nothrow) WCHAR[ulNewSize];
 			if (this->Value.lpszW == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 		}
@@ -241,8 +235,7 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 
 		if(ulSize < ulNewSize) {
 			delete[] this->Value.bin.lpb;
-			this->Value.bin.lpb = new BYTE[ulNewSize];
-
+			this->Value.bin.lpb = new(std::nothrow) BYTE[ulNewSize];
 			if (this->Value.bin.lpb == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 		}
@@ -260,8 +253,7 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 		ulNewSize = wcslen(lpsProp->Value.lpszW)+1;
 		if(ulSize < ulNewSize) {
 			delete[] this->Value.lpszW;
-			this->Value.lpszW = new WCHAR[ulNewSize];
-
+			this->Value.lpszW = new(std::nothrow) WCHAR[ulNewSize];
 			if (this->Value.lpszW == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 		}
@@ -278,8 +270,7 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 
 		if(ulSize != sizeof(GUID)) {
 			ulSize = sizeof(GUID);
-			this->Value.lpguid = new GUID;			
-
+			this->Value.lpguid = new(std::nothrow) GUID;
 			if (this->Value.lpguid == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 		}
@@ -300,8 +291,7 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 
 		if(ulSize < ulNewSize) {
 			delete[] this->Value.MVi.lpi;
-			this->Value.MVi.lpi = new short int[lpsProp->Value.MVi.cValues];
-		
+			this->Value.MVi.lpi = new(std::nothrow) short int[lpsProp->Value.MVi.cValues];
 			if (this->Value.MVi.lpi == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 		}
@@ -321,8 +311,7 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 
 		if(ulSize < ulNewSize) {
 			delete[] this->Value.MVl.lpl;
-			this->Value.MVl.lpl = new LONG[lpsProp->Value.MVl.cValues];
-
+			this->Value.MVl.lpl = new(std::nothrow) LONG[lpsProp->Value.MVl.cValues];
 			if (this->Value.MVl.lpl == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 		}
@@ -342,8 +331,7 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 
 		if(ulSize < ulNewSize) {
 			delete[] this->Value.MVflt.lpflt;
-			this->Value.MVflt.lpflt = new float[lpsProp->Value.MVflt.cValues];
-
+			this->Value.MVflt.lpflt = new(std::nothrow) float[lpsProp->Value.MVflt.cValues];
 			if (this->Value.MVflt.lpflt == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 		}
@@ -363,8 +351,7 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 
 		if(ulSize < ulNewSize) {
 			delete[] this->Value.MVdbl.lpdbl;
-			this->Value.MVdbl.lpdbl = new double[lpsProp->Value.MVdbl.cValues];
-
+			this->Value.MVdbl.lpdbl = new(std::nothrow) double[lpsProp->Value.MVdbl.cValues];
 			if (this->Value.MVdbl.lpdbl == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 		}
@@ -384,8 +371,7 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 
 		if(ulSize < ulNewSize) {
 			delete[] this->Value.MVcur.lpcur;
-			this->Value.MVcur.lpcur = new CURRENCY[lpsProp->Value.MVcur.cValues];
-			
+			this->Value.MVcur.lpcur = new(std::nothrow) CURRENCY[lpsProp->Value.MVcur.cValues];
 			if (this->Value.MVcur.lpcur == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 		}
@@ -406,9 +392,7 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 		if(ulSize < ulNewSize) {
 			if(this->Value.MVat.lpat)
 				delete[] this->Value.MVat.lpat;
-
-			this->Value.MVat.lpat = new double[lpsProp->Value.MVat.cValues];
-			
+			this->Value.MVat.lpat = new(std::nothrow) double[lpsProp->Value.MVat.cValues];
 			if (this->Value.MVat.lpat == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 		}
@@ -428,8 +412,7 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 
 		if(ulSize < ulNewSize) {
 			delete[] this->Value.MVft.lpft;
-			this->Value.MVft.lpft = new FILETIME[lpsProp->Value.MVft.cValues];
-
+			this->Value.MVft.lpft = new(std::nothrow) FILETIME[lpsProp->Value.MVft.cValues];
 			if (this->Value.MVft.lpft == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 		}
@@ -454,13 +437,15 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 					delete[] this->Value.MVbin.lpbin[i].lpb;
 				delete[] this->Value.MVbin.lpbin;
 			}
-
-			this->Value.MVbin.lpbin = new SBinary[lpsProp->Value.MVbin.cValues];
-
+			this->Value.MVbin.lpbin = new(std::nothrow) SBinary[lpsProp->Value.MVbin.cValues];
 			if (this->Value.MVbin.lpbin == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 
 			memset(this->Value.MVbin.lpbin, 0, sizeof(SBinary) * lpsProp->Value.MVbin.cValues);
+		}
+		else {
+			for(unsigned int i = lpsProp->Value.MVbin.cValues; i < this->Value.MVbin.cValues; ++i)
+				delete[] this->Value.MVbin.lpbin[i].lpb;
 		}
 
 		ulSize = ulNewSize;
@@ -502,13 +487,15 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 					delete [] this->Value.MVszW.lppszW[i];
 				delete [] this->Value.MVszW.lppszW;
 			}
-
-			this->Value.MVszW.lppszW = new WCHAR *[lpsProp->Value.MVszA.cValues];
-
+			this->Value.MVszW.lppszW = new(std::nothrow) wchar_t *[lpsProp->Value.MVszA.cValues];
 			if (this->Value.MVszW.lppszW == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 
 			memset(this->Value.MVszW.lppszW, 0, sizeof(wchar_t *) * lpsProp->Value.MVszA.cValues);
+		}
+		else {
+			for(unsigned int i = lpsProp->Value.MVszW.cValues; i < this->Value.MVszW.cValues; ++i)
+				delete[] this->Value.MVszW.lppszW[i];
 		}
 
 		ulSize = ulNewSize;
@@ -545,13 +532,15 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 					delete[] this->Value.MVszW.lppszW[i];
 				delete[] this->Value.MVszW.lppszW;
 			}
-
-			this->Value.MVszW.lppszW = new WCHAR *[lpsProp->Value.MVszW.cValues];
-
+			this->Value.MVszW.lppszW = new(std::nothrow) wchar_t *[lpsProp->Value.MVszW.cValues];
 			if (this->Value.MVszW.lppszW == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 
 			memset(this->Value.MVszW.lppszW, 0, sizeof(WCHAR *) * lpsProp->Value.MVszW.cValues);
+		}
+		else {
+			for(unsigned int i = lpsProp->Value.MVszW.cValues; i < this->Value.MVszW.cValues; ++i)
+				delete[] this->Value.MVszW.lppszW[i];
 		}
 		
 		ulSize = ulNewSize;
@@ -578,8 +567,7 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 
 		if(ulSize < ulNewSize) {
 			delete[] this->Value.MVguid.lpguid;
-			this->Value.MVguid.lpguid = new GUID[lpsProp->Value.MVguid.cValues];
-
+			this->Value.MVguid.lpguid = new(std::nothrow) GUID[lpsProp->Value.MVguid.cValues];
 			if (this->Value.MVguid.lpguid == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 		}
@@ -599,8 +587,7 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 
 		if(ulSize < ulNewSize) {
 			delete[] this->Value.MVli.lpli;
-			this->Value.MVli.lpli = new LARGE_INTEGER[lpsProp->Value.MVli.cValues];
-
+			this->Value.MVli.lpli = new(std::nothrow) LARGE_INTEGER[lpsProp->Value.MVli.cValues];
 			if (this->Value.MVli.lpli == NULL)
 				return dwLastError = MAPI_E_NOT_ENOUGH_MEMORY;
 		}
@@ -617,7 +604,7 @@ HRESULT ECProperty::CopyFromInternal(LPSPropValue lpsProp) {
 		break;
 	default:
 		// Unknown type (PR_NULL not include)
-		ASSERT(FALSE);
+		assert(false);
 		dwLastError = MAPI_E_INVALID_PARAMETER;
 		break;
 	}
@@ -628,8 +615,7 @@ ECProperty::~ECProperty()
 {
 	DEBUG_GUARD;
 
-	if(dwLastError == hrSuccess) {
-		switch(PROP_TYPE(ulPropTag)) {
+	switch(PROP_TYPE(ulPropTag)) {
 		case PT_I2:
 		case PT_I4:
 		case PT_R4:
@@ -644,7 +630,7 @@ ECProperty::~ECProperty()
 			delete[] this->Value.bin.lpb;
 			break;
 		case PT_STRING8:
-			ASSERT(("We should never have PT_STRING8 storage", 0));
+			assert("We should never have PT_STRING8 storage" == nullptr);
 			// Deliberate fallthrough
 		case PT_UNICODE:
 			delete [] this->Value.lpszW;
@@ -680,7 +666,7 @@ ECProperty::~ECProperty()
 			break;
 		}
 		case PT_MV_STRING8:
-			ASSERT(("We should never have PT_MV_STRING8 storage", 0));
+			assert("We should never have PT_MV_STRING8 storage" == nullptr);
 			// Deliberate fallthrough
 		case PT_MV_UNICODE: {
 			for (unsigned int i = 0; i < this->Value.MVszW.cValues; ++i)
@@ -699,7 +685,6 @@ ECProperty::~ECProperty()
 			break;
 		default:
 			break;
-		}
 	}
 }
 
@@ -710,8 +695,7 @@ HRESULT ECProperty::CopyToByRef(LPSPropValue lpsProp) const
     HRESULT hr = hrSuccess;
     
     lpsProp->ulPropTag = this->ulPropTag;
-    memcpy(&lpsProp->Value, &this->Value, sizeof(union _PV));
-    
+	memcpy(&lpsProp->Value, &this->Value, sizeof(union __UPV));
     return hr;
 }
 
@@ -720,7 +704,7 @@ HRESULT ECProperty::CopyTo(LPSPropValue lpsProp, void *lpBase, ULONG ulRequestPr
 
 	HRESULT hr = hrSuccess;
 
-	ASSERT
+	assert
 	(
 		PROP_TYPE(ulRequestPropTag) == PROP_TYPE(this->ulPropTag) ||
 		((PROP_TYPE(ulRequestPropTag) == PT_STRING8 || PROP_TYPE(ulRequestPropTag) == PT_UNICODE) && PROP_TYPE(this->ulPropTag) == PT_UNICODE) ||
@@ -773,7 +757,7 @@ HRESULT ECProperty::CopyTo(LPSPropValue lpsProp, void *lpBase, ULONG ulRequestPr
 		break;
 	}
 	case PT_STRING8:
-		ASSERT(("We should never have PT_STRING8 storage", 0));
+		assert("We should never have PT_STRING8 storage" == nullptr);
 		// Deliberate fallthrough
 	case PT_UNICODE: {
 		if (PROP_TYPE(ulRequestPropTag) == PT_UNICODE) {
@@ -928,7 +912,7 @@ HRESULT ECProperty::CopyTo(LPSPropValue lpsProp, void *lpBase, ULONG ulRequestPr
 		break;
 	}
 	case PT_MV_STRING8:
-		ASSERT(("We should never have PT_MV_STRING8 storage", 0));
+		assert("We should never have PT_MV_STRING8 storage" == nullptr);
 		// Deliberate fallthrough
 	case PT_MV_UNICODE: {
 		if (PROP_TYPE(ulRequestPropTag) == PT_MV_STRING8) {
@@ -1002,7 +986,7 @@ HRESULT ECProperty::CopyTo(LPSPropValue lpsProp, void *lpBase, ULONG ulRequestPr
 		lpsProp->Value.err = this->Value.err;
 		break;
 	default: // I hope there are no pointers involved here!
-		ASSERT(FALSE);
+		assert(false);
 		lpsProp->Value = this->Value;
 		break;
 	}

@@ -18,6 +18,7 @@
 #include <kopano/platform.h>
 #include <kopano/stringutil.h>
 #include <kopano/charset/convert.h>
+#include <memory>
 #include <string>
 #include <cerrno>
 #include <cstring>
@@ -33,6 +34,8 @@
 #include "fileutil.h"
 
 #define BLOCKSIZE	65536
+
+namespace KC {
 
 /** 
  * Reads the contents of a file, and writes it to the output file
@@ -50,7 +53,7 @@ HRESULT HrFileLFtoCRLF(FILE *fin, FILE** fout)
 {
 	char	bufferin[BLOCKSIZE / 2];
 	char	bufferout[BLOCKSIZE+1];
-	size_t	sizebufferout, readsize;
+	size_t sizebufferout;
 	FILE*	fTmp = NULL;
 
 	if(fin == NULL || fout == NULL)
@@ -63,7 +66,7 @@ HRESULT HrFileLFtoCRLF(FILE *fin, FILE** fout)
 	}
 
 	while (!feof(fin)) {
-		readsize = fread(bufferin, 1, BLOCKSIZE / 2, fin);
+		size_t readsize = fread(bufferin, 1, BLOCKSIZE / 2, fin);
 		if (ferror(fin)) {
 			perror("Read error");//FIXME: What an error?, what now?
 			fclose(fTmp);
@@ -106,12 +109,12 @@ static inline int mmapsize(unsigned int size)
  * 
  * @return MAPI error code
  */
-HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize, bool *lpImmap)
+static HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize,
+    bool *lpImmap)
 {
 	char *lpBuffer = NULL;
 	int offset = 0;
 	long ulBufferSize = BLOCKSIZE;
-	long ulReadsize;
 	struct stat stat;
 	int fd = fileno(f);
 
@@ -135,7 +138,7 @@ HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize, bool *lpImmap)
 	/* mmap failed (probably reading from STDIN as a stream), just read the file into memory, and return that */
 	lpBuffer = (char*)malloc(BLOCKSIZE); // will be deleted as soon as possible
 	while (!feof(f)) {
-		ulReadsize = fread(lpBuffer+offset, 1, BLOCKSIZE, f);
+		long ulReadsize = fread(lpBuffer+offset, 1, BLOCKSIZE, f);
 		if (ferror(f)) {
 			perror("Read error");
 			break;
@@ -158,13 +161,12 @@ HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize, bool *lpImmap)
 		free(lpBuffer);
 		*lppBuffer = NULL;
 		*lpSize = 0;
-	} else {
-		/* Add terminate character */
-		lpBuffer[offset] = 0;
-
-		*lppBuffer = lpBuffer;
-		*lpSize = offset;
+		return hrSuccess;
 	}
+	/* Add terminate character */
+	lpBuffer[offset] = 0;
+	*lppBuffer = lpBuffer;
+	*lpSize = offset;
 	return hrSuccess;
 }
 
@@ -175,7 +177,7 @@ HRESULT HrMapFileToBuffer(FILE *f, char **lppBuffer, int *lpSize, bool *lpImmap)
  * @param[in] ulSize size of the buffer
  * @param[in] bImmap marker if the buffer is mapped or not
  */
-HRESULT HrUnmapFileBuffer(char *lpBuffer, int ulSize, bool bImmap)
+static HRESULT HrUnmapFileBuffer(char *lpBuffer, int ulSize, bool bImmap)
 {
 	if (bImmap)
 		munmap(lpBuffer, mmapsize(ulSize));
@@ -185,7 +187,7 @@ HRESULT HrUnmapFileBuffer(char *lpBuffer, int ulSize, bool bImmap)
 }
 
 /** 
- * Reads a file into an std::string using file mapping if possible.
+ * Reads a file into a std::string using file mapping if possible.
  *
  * @todo doesn't the std::string undermine the whole idea of mapping?
  * @todo std::string has a length method, so what's with the lpSize parameter?
@@ -223,7 +225,7 @@ exit:
  * Duplicate a file, to a given location
  *
  * @param[in]	lpFile Pointer to the source file
- * @param[in]	strFileName	The new file name
+ * @param[in]	strFileName	The new filename
  *
  * @return The result of the duplication of the file
  *
@@ -234,7 +236,7 @@ bool DuplicateFile(FILE *lpFile, std::string &strFileName)
 	bool bResult = true;
 	size_t	ulReadsize = 0;
 	FILE *pfNew = NULL;
-	char *lpBuffer = NULL;
+	std::unique_ptr<char[]> lpBuffer;
 
 	// create new file
 	pfNew = fopen(strFileName.c_str(), "wb");
@@ -246,8 +248,7 @@ bool DuplicateFile(FILE *lpFile, std::string &strFileName)
 
 	// Set file pointer at the begin.
 	rewind(lpFile);
-
-	lpBuffer = (char*)malloc(BLOCKSIZE); 
+	lpBuffer.reset(new(std::nothrow) char[BLOCKSIZE]);
 	if (!lpBuffer) {
 		ec_log_crit("DuplicateFile is out of memory");
 
@@ -257,15 +258,13 @@ bool DuplicateFile(FILE *lpFile, std::string &strFileName)
 
 	// FIXME use splice
 	while (!feof(lpFile)) {
-		ulReadsize = fread(lpBuffer, 1, BLOCKSIZE, lpFile);
+		ulReadsize = fread(lpBuffer.get(), 1, BLOCKSIZE, lpFile);
 		if (ferror(lpFile)) {
 			ec_log_crit("DuplicateFile: fread: %s", strerror(errno));
 			bResult = false;
 			goto exit;
 		}
-		
-
-		if (fwrite(lpBuffer, 1, ulReadsize , pfNew) != ulReadsize) {
+		if (fwrite(lpBuffer.get(), 1, ulReadsize , pfNew) != ulReadsize) {
 			ec_log_crit("Error during write to \"%s\": %s", strFileName.c_str(), strerror(errno));
 			bResult = false;
 			goto exit;
@@ -273,9 +272,10 @@ bool DuplicateFile(FILE *lpFile, std::string &strFileName)
 	}
 
 exit:
-	free(lpBuffer);
 	if (pfNew)
 		fclose(pfNew);
 
 	return bResult;
 }
+
+} /* namespace */

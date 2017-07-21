@@ -19,8 +19,9 @@
 #ifndef LDAPUSERPLUGIN_H
 #define LDAPUSERPLUGIN_H
 
-#include <stdexcept>
+#include <mutex>
 #include <string>
+#include <kopano/zcdefs.h>
 #include <kopano/ECIConv.h>
 
 #include <set>
@@ -34,7 +35,7 @@
  * @ingroup userplugin
  * @{
  */
-
+namespace KC {
 
 /** 
  * LDAP user plugin
@@ -66,7 +67,7 @@ public:
 	 * infinite, instead it'd be better to use ldap_search instead of
 	 * ldap_search_s.
 	 */
-	LDAPUserPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *shareddata);
+	LDAPUserPlugin(std::mutex &, ECPluginSharedData *shareddata);
 	virtual ~LDAPUserPlugin();
 
     /**
@@ -608,29 +609,6 @@ private:
 	string getObjectSearchFilter(const objectid_t &id, const char *attr = NULL, const char *attr_type = NULL);
 
 	/**
-	 * Resolve object from attribute data
-	 *
-	 * This will call LDAPUserPlugin::resolveObjectsFromAttribute()
-	 *
-	 * @param[in]	objclass
-	 *					The objectclass to which this search should be restricted.
-	 *					The objectclass can be partially unknown (OBJECTCLASS_UNKNOWN, MAILUSER_UNKNOWN, ...)
-	 * @param[in]	AttrData
-	 *					The contents of the attribute
-	 * @param[in]	lpAttr
-	 *					The attribute which should contain the AttrData. lpAttr must be in charset which defined 
-	 *					in config value ldap_server_charset
-	 * @param[in]	company
-	 *					Optional argument, The company where the possible object should belong.
-	 * @return The object signature which was found
-	 * @throw objectnotfound When no object was found with the attribute data
-	 * @throw toomanyobjects When more then one object was found with the attribute data
-	 */
-	objectsignature_t resolveObjectFromAttribute(objectclass_t objclass,
-												 const string &AttrData, const char* lpAttr,
-												 const objectid_t &company = objectid_t(CONTAINER_COMPANY));
-
-	/**
 	 * Resolve objects from attribute data
 	 *
 	 * This will call LDAPUserPlugin::resolveObjectsFromAttributes()
@@ -749,20 +727,6 @@ private:
 	string objectUniqueIDtoAttributeData(const objectid_t &uniqueid, const char* lpAttr);
 
 	/**
-	 * Determine attribute data for a specific DN
-	 *
-	 * @param[in]	dn
-	 *					The DN which should be converted
-	 * @param[in]	lpAttr
-	 *					The LDAP attribute which should be read from the DN
-	 * @return The attribute data from lpAtrr in the DN
-	 * @throw runtime_error When the LDAP query failed
-	 * @throw objectnotfound When DN does not point to an existing object
-	 * @throw toomanyobjects When multiple objects were found
-	 */
-	string objectDNtoAttributeData(const string &dn, const char *lpAttr);
-
-	/**
 	 * Apply filter to LDAP and request all object signatures
 	 * of the objects which were returned by the filter.
 	 *
@@ -879,10 +843,12 @@ private:
 	std::vector<std::string> ldap_servers;
 };
 
+} /* namespace */
+
 extern "C" {
-	extern UserPlugin* getUserPluginInstance(pthread_mutex_t*, ECPluginSharedData*);
-	extern void deleteUserPluginInstance(UserPlugin*);
-	extern int getUserPluginVersion();
+	extern _kc_export UserPlugin *getUserPluginInstance(std::mutex &, ECPluginSharedData *);
+	extern _kc_export void deleteUserPluginInstance(UserPlugin *);
+	extern _kc_export int getUserPluginVersion(void);
 }
 /** @} */
 #endif

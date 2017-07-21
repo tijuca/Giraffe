@@ -16,6 +16,9 @@
  */
 
 #include <kopano/platform.h>
+#include <memory>
+#include <dirent.h>
+#include <sys/stat.h>
 #include <kopano/stringutil.h>
 
 #include "m4l.mapisvc.h"
@@ -24,19 +27,12 @@
 #include <mapicode.h>
 #include <mapitags.h>
 #include <mapiutil.h>
-#include <kopano/boost_compat.h>
-
 #include <kopano/Util.h>
 
 #include <iostream>
 #include <arpa/inet.h>
 #include <climits>
-
-#include <boost/algorithm/string.hpp>
-namespace ba = boost::algorithm;
-
-#include <boost/filesystem.hpp>
-namespace bfs = boost::filesystem;
+#include <kopano/UnixUtil.h>
 
 using namespace std;
 
@@ -81,28 +77,24 @@ HRESULT INFLoader::LoadINFs()
 	HRESULT hr;
 	vector<string> paths = GetINFPaths();
 
-	for (std::vector<std::string>::const_iterator i = paths.begin();
-	     i != paths.end(); ++i)
-	{
-		bfs::path infdir(*i);
-		if (!bfs::exists(infdir))
-			// silently continue or print init error?
+	for (const auto &path : paths) {
+		std::unique_ptr<DIR, fs_deleter> dh(opendir(path.c_str()));
+		if (dh == nullptr)
 			continue;
 
-		bfs::directory_iterator inffile_last;
-		for (bfs::directory_iterator inffile(infdir);
-		     inffile != inffile_last; ++inffile) {
-			if (is_directory(inffile->status()))
+		for (const struct dirent *dentry = readdir(dh.get());
+		     dentry != nullptr; dentry = readdir(dh.get())) {
+			struct stat sb;
+			std::string strFilename = path + PATH_SEPARATOR + dentry->d_name;
+			if (stat(strFilename.c_str(), &sb) < 0 || !S_ISREG(sb.st_mode))
 				continue;
 
- 			string strFilename = path_to_string(inffile->path());
 			string::size_type pos = strFilename.rfind(".inf", strFilename.size(), strlen(".inf"));
 
 			if (pos == string::npos || strFilename.size() - pos != strlen(".inf"))
 				// silently skip files not ending in pos
 				continue;
-
-			hr = LoadINF(path_to_string(inffile->path()).c_str());
+			hr = LoadINF(strFilename.c_str());
 			if (hr != hrSuccess)
 				return hr;
 		}
@@ -159,15 +151,14 @@ HRESULT INFLoader::LoadINF(const char *filename)
 				if (pos == string::npos)
 					continue;	// skip line
 				strName = strLine.substr(1, pos-1);
-
-				pair<inf::iterator, bool> rv = m_mapSections.insert(make_pair(strName, inf_section()));
+				auto rv = m_mapSections.insert(make_pair(strName, inf_section()));
 				iSection = rv.first;
 			}
 			// always continue with next line.
 			continue;
 		}
 
-		if (iSection == m_mapSections.end())
+		if (iSection == m_mapSections.cend())
 			continue;
 
 		// Parse strName in a property, else leave name?
@@ -190,10 +181,8 @@ exit:
  */
 const inf_section* INFLoader::GetSection(const string& strSectionName) const
 {
-	inf::const_iterator iSection;
-
-	iSection = m_mapSections.find(strSectionName);
-	if (iSection == m_mapSections.end()) {
+	inf::const_iterator iSection = m_mapSections.find(strSectionName);
+	if (iSection == m_mapSections.cend()) {
 		static inf_section empty;
 		return &empty;
 	}
@@ -210,7 +199,7 @@ vector<string> INFLoader::GetINFPaths()
 	vector<string> ret;
 	char *env = getenv("MAPI_CONFIG_PATH");
 	if (env)
-		ba::split(ret, env, ba::is_any_of(":"), ba::token_compress_on);
+		ret = tokenize(env, ':', true);
 	else
 	// @todo, load both, or just one?
 		ret.push_back(MAPICONFIGDIR);
@@ -238,16 +227,14 @@ HRESULT INFLoader::MakeProperty(const std::string& strTag, const std::string& st
 	case PT_LONG:
 	{
 		// either a definition, or a hexed network order value
-		set<string> vValues;
 		sProp.Value.ul = 0;
-		ba::split(vValues, strData, ba::is_any_of("| \t"), ba::token_compress_on);
-		for (std::set<std::string>::const_iterator i = vValues.begin();
-		     i != vValues.end(); ++i)
-			sProp.Value.ul |= DefinitionFromString(*i, false);
+		for (const auto &val : tokenize(strData, "| \t"))
+			sProp.Value.ul |= DefinitionFromString(val, false);
 		break;
 	}
 	case PT_UNICODE:
 		sProp.ulPropTag = CHANGE_PROP_TYPE(sProp.ulPropTag, PT_STRING8);
+		/* fallthru */
 	case PT_STRING8:
 		hr = MAPIAllocateMore(strData.length() + 1, base, (void**)&sProp.Value.lpszA);
 		if (hr != hrSuccess)
@@ -278,24 +265,17 @@ HRESULT INFLoader::MakeProperty(const std::string& strTag, const std::string& st
  */
 ULONG INFLoader::DefinitionFromString(const std::string& strDef, bool bProp) const
 {
-	std::map<std::string, unsigned int>::const_iterator i;
 	char *end;
 	unsigned int hex;
 
-	i = m_mapDefs.find(strDef);
-	if (i != m_mapDefs.end())
+	std::map<std::string, unsigned int>::const_iterator i = m_mapDefs.find(strDef);
+	if (i != m_mapDefs.cend())
 		return i->second;
 	// parse strProp as hex
 	hex = strtoul(strDef.c_str(), &end, 16);
 	if (end < strDef.c_str()+strDef.length())
 		return bProp ? PR_NULL : 0;
 	return (ULONG)ntohl(hex);
-}
-
-SVCProvider::SVCProvider()
-{
-	m_cValues = 0;
-	m_lpProps = NULL;
 }
 
 SVCProvider::~SVCProvider()
@@ -317,31 +297,17 @@ void SVCProvider::GetProps(ULONG *lpcValues, LPSPropValue *lppPropValues)
 
 HRESULT SVCProvider::Init(const INFLoader& cINF, const inf_section* infProvider)
 {
-	HRESULT hr;
-	inf_section::const_iterator iSection;
-
-	hr = MAPIAllocateBuffer(sizeof(SPropValue) * infProvider->size(), (void**)&m_lpProps);
+	HRESULT hr = MAPIAllocateBuffer(sizeof(SPropValue) * infProvider->size(),
+		reinterpret_cast<void **>(&m_lpProps));
 	if (hr != hrSuccess)
 		return hr;
 
-	for (m_cValues = 0, iSection = infProvider->begin();
-	     iSection != infProvider->end(); ++iSection)
+	m_cValues = 0;
+	for (const auto &sp : *infProvider)
 		// add properties to list
-		if (cINF.MakeProperty(iSection->first, iSection->second, m_lpProps, &m_lpProps[m_cValues]) == hrSuccess)
+		if (cINF.MakeProperty(sp.first, sp.second, m_lpProps, &m_lpProps[m_cValues]) == hrSuccess)
 			++m_cValues;
 	return hrSuccess;
-}
-
-SVCService::SVCService()
-{
-	m_dl = NULL;
-
-	m_fnMSGServiceEntry = NULL;
-	m_fnMSProviderInit = NULL;
-	m_fnABProviderInit = NULL;
-
-	m_cValues = 0;
-	m_lpProps = NULL;
 }
 
 SVCService::~SVCService()
@@ -351,9 +317,8 @@ SVCService::~SVCService()
 		dlclose(m_dl);
 #endif
 	MAPIFreeBuffer(m_lpProps);
-	for (std::map<std::string, SVCProvider *>::iterator i = m_sProviders.begin();
-	     i != m_sProviders.end(); ++i)
-		delete i->second;
+	for (const auto &i : m_sProviders)
+		delete i.second;
 }
 
 /** 
@@ -369,10 +334,8 @@ SVCService::~SVCService()
 HRESULT SVCService::Init(const INFLoader& cINF, const inf_section* infService)
 {
 	HRESULT hr;
-	inf_section::const_iterator iSection;
 	const inf_section* infProvider = NULL;
 	vector<string> prop;
-	LPSPropValue lpSO;
 	void **cf;
 	char filename[PATH_MAX + 1];
 
@@ -380,36 +343,31 @@ HRESULT SVCService::Init(const INFLoader& cINF, const inf_section* infService)
 	if (hr != hrSuccess)
 		return hr;
 
-	for (m_cValues = 0, iSection = infService->begin();
-	     iSection != infService->end(); ++iSection) {
+	m_cValues = 0;
+	for (const auto &sp : *infService) {
 		// convert section to class
-		if (iSection->first.compare("Providers") == 0) {
+		if (sp.first.compare("Providers") == 0) {
 			// make new providers list
 			// *new function, new loop
-			ba::split(prop, iSection->second, ba::is_any_of(", \t"), ba::token_compress_on);
+			for (const auto &i : tokenize(sp.second, ", \t")) {
+				infProvider = cINF.GetSection(i);
 
-			for (std::vector<std::string>::const_iterator i = prop.begin();
-			     i != prop.end(); ++i)
-			{
-				infProvider = cINF.GetSection(*i);
-
-				std::pair<std::map<std::string, SVCProvider *>::const_iterator, bool> prov = m_sProviders.insert(make_pair(*i, new SVCProvider()));
+				auto prov = m_sProviders.insert(make_pair(i, new SVCProvider));
 				if (prov.second == false)
 					continue;	// already exists
 
 				prov.first->second->Init(cINF, infProvider);
 			}
-		} else {
+		} else if (cINF.MakeProperty(sp.first, sp.second, m_lpProps, &m_lpProps[m_cValues]) == hrSuccess) {
 			// add properties to list
-			if (cINF.MakeProperty(iSection->first, iSection->second, m_lpProps, &m_lpProps[m_cValues]) == hrSuccess)
-				++m_cValues;
+			++m_cValues;
 		}
 	}
 
 	// find PR_SERVICE_SO_NAME / PR_SERVICE_DLL_NAME, load library
-	lpSO = PpropFindProp(m_lpProps, m_cValues, PR_SERVICE_SO_NAME_A);
+	auto lpSO = PCpropFindProp(m_lpProps, m_cValues, PR_SERVICE_SO_NAME_A);
 	if (!lpSO)
-		lpSO = PpropFindProp(m_lpProps, m_cValues, PR_SERVICE_DLL_NAME_A);
+		lpSO = PCpropFindProp(m_lpProps, m_cValues, PR_SERVICE_DLL_NAME_A);
 	if (lpSO == NULL)
 		return MAPI_E_NOT_FOUND;
 
@@ -450,27 +408,24 @@ HRESULT SVCService::Init(const INFLoader& cINF, const inf_section* infService)
  */
 HRESULT SVCService::CreateProviders(IProviderAdmin *lpProviderAdmin)
 {
-	HRESULT hr;
-	std::map<std::string, SVCProvider *>::const_iterator i;
-
-	for (i = m_sProviders.begin(); i != m_sProviders.end(); ++i)  {
+	for (const auto &i : m_sProviders) {
 		// CreateProvider will find the provider properties itself. the property parameters can be used for other properties.
-		hr = lpProviderAdmin->CreateProvider((TCHAR*)i->first.c_str(), 0, NULL, 0, 0, NULL);
+		HRESULT hr = lpProviderAdmin->CreateProvider(const_cast<TCHAR *>(reinterpret_cast<const TCHAR *>(i.first.c_str())), 0, NULL, 0, 0, NULL);
 		if (hr != hrSuccess)
 			return hr;
 	}
 	return hrSuccess;
 }
 
-LPSPropValue SVCService::GetProp(ULONG ulPropTag)
+const SPropValue *SVCService::GetProp(ULONG ulPropTag)
 {
-	return PpropFindProp(m_lpProps, m_cValues, ulPropTag);
+	return PCpropFindProp(m_lpProps, m_cValues, ulPropTag);
 }
 
 SVCProvider* SVCService::GetProvider(LPTSTR lpszProvider, ULONG ulFlags)
 {
 	std::map<std::string, SVCProvider*>::const_iterator i = m_sProviders.find(reinterpret_cast<const char *>(lpszProvider));
-	if (i == m_sProviders.end())
+	if (i == m_sProviders.cend())
 		return NULL;
 	return i->second;
 }
@@ -479,9 +434,8 @@ vector<SVCProvider*> SVCService::GetProviders()
 {
 	vector<SVCProvider*> ret;
 
-	for (std::map<std::string, SVCProvider *>::const_iterator i = m_sProviders.begin();
-	     i != m_sProviders.end(); ++i)
-		ret.push_back(i->second);
+	for (const auto &i : m_sProviders)
+		ret.push_back(i.second);
 	return ret;
 }
 
@@ -500,15 +454,10 @@ SVC_ABProviderInit SVCService::ABProviderInit()
 	return m_fnABProviderInit;
 }
 
-MAPISVC::MAPISVC()
-{
-}
-
 MAPISVC::~MAPISVC()
 {
-	for (std::map<std::string, SVCService *>::const_iterator i = m_sServices.begin();
-	     i != m_sServices.end(); ++i)
-		delete i->second;
+	for (const auto &i : m_sServices)
+		delete i.second;
 }
 
 HRESULT MAPISVC::Init()
@@ -516,7 +465,6 @@ HRESULT MAPISVC::Init()
 	HRESULT hr;
 	INFLoader inf;
 	const inf_section* infServices = NULL;
-	inf_section::const_iterator iServices;
 	const inf_section* infService = NULL;
 
 	hr = inf.LoadINFs();
@@ -525,11 +473,10 @@ HRESULT MAPISVC::Init()
 
 	infServices = inf.GetSection("Services");
 
-	for (iServices = infServices->begin(); iServices != infServices->end(); ++iServices) {
+	for (const auto &sp : *infServices) {
 		// ZARAFA6, ZCONTACTS
-		infService = inf.GetSection(iServices->first);
-
-		pair<std::map<std::string, SVCService*>::iterator, bool> i = m_sServices.insert(make_pair(iServices->first, new SVCService()));
+		infService = inf.GetSection(sp.first);
+		auto i = m_sServices.insert(make_pair(sp.first, new SVCService()));
 		if (i.second == false)
 			continue;			// already exists
 
@@ -558,7 +505,7 @@ HRESULT MAPISVC::GetService(LPTSTR lpszService, ULONG ulFlags, SVCService **lppS
 	std::map<std::string, SVCService *>::const_iterator i;
 	
 	i = m_sServices.find((char*)lpszService);
-	if (i == m_sServices.end())
+	if (i == m_sServices.cend())
 		return MAPI_E_NOT_FOUND;
 
 	*lppService = i->second;
@@ -577,15 +524,12 @@ HRESULT MAPISVC::GetService(LPTSTR lpszService, ULONG ulFlags, SVCService **lppS
  */
 HRESULT MAPISVC::GetService(char* lpszDLLName, SVCService **lppService)
 {
-	std::map<std::string, SVCService *>::const_iterator i;
-	LPSPropValue lpDLLName;
-
-	for (i = m_sServices.begin(); i != m_sServices.end(); ++i) {
-		lpDLLName = i->second->GetProp(PR_SERVICE_DLL_NAME_A);
+	for (const auto &i : m_sServices) {
+		const SPropValue *lpDLLName = i.second->GetProp(PR_SERVICE_DLL_NAME_A);
 		if (!lpDLLName || !lpDLLName->Value.lpszA)
 			continue;
 		if (strcmp(lpDLLName->Value.lpszA, lpszDLLName) == 0) {
-			*lppService = i->second;
+			*lppService = i.second;
 			return hrSuccess;
 		}
 	}

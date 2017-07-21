@@ -18,14 +18,17 @@
 #ifndef ECDATABASEFACTORY_H
 #define ECDATABASEFACTORY_H
 
+#include <kopano/zcdefs.h>
 #include "ECDatabase.h"
 #include <kopano/ECConfig.h>
 #include <kopano/ECLogger.h>
 
+namespace KC {
+
 // The ECDatabaseFactory creates database objects connected to the server database. Which
 // database is returned is chosen by the database_engine configuration setting.
 
-class ECDatabaseFactory _zcp_final {
+class _kc_export ECDatabaseFactory _kc_final {
 public:
 	ECDatabaseFactory(ECConfig *lpConfig);
 	
@@ -34,11 +37,13 @@ public:
 	ECRESULT		UpdateDatabase(bool bForceUpdate, std::string &strError);
 
 private:
-	ECRESULT GetDatabaseFactory(ECDatabase **lppDatabase);
+	_kc_hidden ECRESULT GetDatabaseFactory(ECDatabase **);
 
 	ECConfig*		m_lpConfig;
 };
 
 ECRESULT	GetThreadLocalDatabase(ECDatabaseFactory *lpFactory, ECDatabase **lppDatabase);
+
+} /* namespace */
 
 #endif // ECDATABASEFACTORY_H

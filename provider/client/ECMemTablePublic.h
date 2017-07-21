@@ -24,34 +24,30 @@
 
 #include <mapidefs.h>
 
-class ECMemTablePublic _zcp_final : public ECMemTable
-{
+class ECMemTablePublic _kc_final : public ECMemTable {
 public:
-	typedef struct _sRelation {
+	struct t_sRelation {
 		unsigned int ulRowID;
 		IMAPIFolder* lpFolder;
 		LPMAPIADVISESINK lpAdviseSink;
 		ULONG ulAdviseConnectionId;
 		ULONG cbEntryID; // Folder entryid
 		LPENTRYID lpEntryID;
-	}t_sRelation;
+	};
 
 	typedef std::map<std::string, t_sRelation> ECMAPFolderRelation; // <instancekey, relation>
 
 protected:
-	ECMemTablePublic(ECMAPIFolderPublic *lpECParentFolder, SPropTagArray *lpsPropTags, ULONG ulRowPropTag);
+	ECMemTablePublic(ECMAPIFolderPublic *lpECParentFolder, const SPropTagArray *lpsPropTags, ULONG ulRowPropTag);
 	virtual ~ECMemTablePublic(void);
 
 public:
 	static HRESULT Create(ECMAPIFolderPublic *lpECParentFolder, ECMemTablePublic **lppECMemTable);
 	
 	static void FreeRelation(t_sRelation* lpRelation);
-
-	HRESULT QueryInterface(REFIID refiid, void **lppInterface) _zcp_override;
-
-	//virtual ULONG AddRef(void) _zcp_override;
-	//virtual ULONG Release(void) _zcp_override;
-
+	HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
+	//virtual ULONG AddRef(void) _kc_override;
+	//virtual ULONG Release(void) _kc_override;
 	HRESULT Init(ULONG ulFlags);
 
 	HRESULT ModifyRow(SBinary* lpInstanceKey, LPSRow lpsRow);
@@ -61,11 +57,10 @@ public:
 	HRESULT AdviseFolder(ULONG cbSourceKey, LPBYTE lpbSourceKey, LPMAPIFOLDER lpFolder);
 
 	ECMAPIFolderPublic *m_lpECParentFolder;
-	LPMAPIADVISESINK	m_lpShortCutAdviseSink;
-	ULONG				m_ulFlags; //UNICODE flags
-	LPMAPITABLE			m_lpShortcutTable;
-
-	ULONG				m_ulRowId;
+	IMAPIAdviseSink *m_lpShortCutAdviseSink = nullptr;
+	ULONG m_ulFlags = 0; //UNICODE flags
+	IMAPITable *m_lpShortcutTable = nullptr;
+	ULONG m_ulRowId = 1;
 	ECMAPFolderRelation	m_mapRelation; //Relation between shortcut instancekey and rowid
 
 };

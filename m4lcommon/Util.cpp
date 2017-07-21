@@ -17,25 +17,27 @@
 
 #include <kopano/zcdefs.h>
 #include <kopano/platform.h>
-
+#include <exception>
+#include <cwctype>
 #include <mapidefs.h>
 #include <mapiutil.h>
 #include <mapispi.h>
-
+#include <memory>
+#include <new>
 #include <string>
 #include <stack>
 #include <set>
 #include <map>
+#include <cstring>
 
 #include <edkmdb.h>
 
 #include <kopano/Util.h>
 #include <kopano/ECIConv.h>
 #include <kopano/CommonUtil.h>
+#include <kopano/memory.hpp>
 #include <kopano/stringutil.h>
 #include <kopano/charset/convert.h>
-#include <kopano/tstring.h>
-
 #include "ECMemStream.h"
 #include <kopano/IECSingleInstance.h>
 #include <kopano/ECGuid.h>
@@ -51,13 +53,16 @@
 #include "HtmlEntity.h"
 
 using namespace std;
+using namespace KCHL;
 
 #include <kopano/ECGetText.h>
+
+namespace KC {
 
 // HACK: prototypes may differ depending on the compiler and/or system (the
 // second parameter may or may not be 'const'). This redeclaration is a hack
 // to have a common prototype "iconv_cast".
-class iconv_HACK _zcp_final {
+class iconv_HACK _kc_final {
 public:
 	iconv_HACK(const char** ptr) : m_ptr(ptr) { }
 
@@ -69,9 +74,8 @@ private:
 	const char** m_ptr;
 };
 
-class PropTagCompare _zcp_final {
+class PropTagCompare _kc_final {
 public:
-	PropTagCompare() {}
 	bool operator()(ULONG lhs, ULONG rhs) const { 
 		if (PROP_TYPE(lhs) == PT_UNSPECIFIED || PROP_TYPE(rhs) == PT_UNSPECIFIED)
 			return PROP_ID(lhs) < PROP_ID(rhs); 
@@ -95,15 +99,14 @@ typedef std::set<ULONG,PropTagCompare> PropTagSet;
 HRESULT Util::HrAddToPropertyArray(const SPropValue *lpSrc, ULONG cValues,
     const SPropValue *lpToAdd, SPropValue **lppDest, ULONG *cDestValues)
 {
-	HRESULT hr = hrSuccess;
 	LPSPropValue lpDest = NULL;
-	LPSPropValue lpFind = NULL;
 	unsigned int i = 0;
 	unsigned int n = 0;
 
-	hr = MAPIAllocateBuffer(sizeof(SPropValue) * (cValues + 1), (void **)&lpDest);
+	HRESULT hr = MAPIAllocateBuffer(sizeof(SPropValue) * (cValues + 1),
+	             reinterpret_cast<void **>(&lpDest));
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	for (i = 0; i < cValues; ++i) {
 		hr = HrCopyProperty(&lpDest[n], &lpSrc[i], lpDest);
@@ -113,24 +116,16 @@ HRESULT Util::HrAddToPropertyArray(const SPropValue *lpSrc, ULONG cValues,
 		hr = hrSuccess;
 	}
 
-	lpFind = PpropFindProp(lpDest, n, lpToAdd->ulPropTag);
-
-	if(lpFind) {
+	auto lpFind = PpropFindProp(lpDest, n, lpToAdd->ulPropTag);
+	if (lpFind != nullptr)
 		hr = HrCopyProperty(lpFind, lpToAdd, lpDest);
-	} else {
-
-		hr = HrCopyProperty(&lpDest[n], lpToAdd, lpDest);
-		++n;
-	}
-
+	else
+		hr = HrCopyProperty(&lpDest[n++], lpToAdd, lpDest);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	*lppDest = lpDest;
 	*cDestValues = n;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -145,18 +140,14 @@ exit:
 bool Util::FHasHTML(IMAPIProp *lpProp)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpPropSupport = NULL;
+	memory_ptr<SPropValue> lpPropSupport = NULL;
 
-	hr = HrGetOneProp(lpProp, PR_STORE_SUPPORT_MASK, &lpPropSupport);
+	hr = HrGetOneProp(lpProp, PR_STORE_SUPPORT_MASK, &~lpPropSupport);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return false; /* hr */
 	if((lpPropSupport->Value.ul & STORE_HTML_OK) == 0)
-		hr = MAPI_E_NOT_FOUND;
-
-exit:
-	MAPIFreeBuffer(lpPropSupport);
-	return hr == hrSuccess;
+		return false; /* MAPI_E_NOT_FOUND */
+	return true;
 }
 
 /** 
@@ -177,33 +168,28 @@ HRESULT	Util::HrMergePropertyArrays(const SPropValue *lpSrc, ULONG cValues,
 {
 	HRESULT hr = hrSuccess;
 	map<ULONG, const SPropValue *> mapPropSource;
-	map<ULONG, const SPropValue *>::const_iterator iterPropSource;
 	ULONG i = 0;
-	LPSPropValue lpProps = NULL;
+	memory_ptr<SPropValue> lpProps;
 
 	for (i = 0; i < cValues; ++i)
 		mapPropSource[lpSrc[i].ulPropTag] = &lpSrc[i];
 	for (i = 0; i < cAddValues; ++i)
 		mapPropSource[lpAdds[i].ulPropTag] = &lpAdds[i];
-
-	hr = MAPIAllocateBuffer(sizeof(SPropValue)*mapPropSource.size(), (void**)&lpProps);
+	hr = MAPIAllocateBuffer(sizeof(SPropValue)*mapPropSource.size(), &~lpProps);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
-	for (i = 0, iterPropSource = mapPropSource.begin();
-	     iterPropSource != mapPropSource.end(); ++iterPropSource, ++i) {
-		hr = Util::HrCopyProperty(&lpProps[i], iterPropSource->second, lpProps);
+	i = 0;
+	for (const auto &ips : mapPropSource) {
+		hr = Util::HrCopyProperty(&lpProps[i], ips.second, lpProps);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
+		++i;
 	}
 
 	*cDestValues = i;
-	*lppDest = lpProps;
-	lpProps = NULL;
-
-exit:
-	MAPIFreeBuffer(lpProps);
-	return hr;
+	*lppDest = lpProps.release();
+	return hrSuccess;
 }
 
 /** 
@@ -222,31 +208,24 @@ exit:
 HRESULT Util::HrCopyPropertyArrayByRef(const SPropValue *lpSrc, ULONG cValues,
     LPSPropValue *lppDest, ULONG *cDestValues, bool bExcludeErrors)
 {
-    HRESULT hr = hrSuccess;
-    LPSPropValue lpDest = NULL;
+	memory_ptr<SPropValue> lpDest;
     unsigned int i = 0;
     unsigned int n = 0;
     
-    hr = MAPIAllocateBuffer(sizeof(SPropValue) * cValues, (void **)&lpDest);
+	HRESULT hr = MAPIAllocateBuffer(sizeof(SPropValue) * cValues, &~lpDest);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
     
-    for (i = 0; i < cValues; ++i) {
-        if(!bExcludeErrors || PROP_TYPE(lpSrc[i].ulPropTag) != PT_ERROR) {
-            hr = HrCopyPropertyByRef(&lpDest[n], &lpSrc[i]);
-        
-            if(hr == hrSuccess)
-                ++n;
-            
-            hr = hrSuccess;
-        }
-    }
-    
-    *lppDest = lpDest;
+	for (i = 0; i < cValues; ++i) {
+		if (bExcludeErrors && PROP_TYPE(lpSrc[i].ulPropTag) == PT_ERROR)
+			continue;
+		hr = HrCopyPropertyByRef(&lpDest[n], &lpSrc[i]);
+		if (hr == hrSuccess)
+			++n;
+	}
+	*lppDest = lpDest.release();
 	*cDestValues = n;
-
-exit:    
-    return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -264,32 +243,28 @@ exit:
 HRESULT Util::HrCopyPropertyArray(const SPropValue *lpSrc, ULONG cValues,
     LPSPropValue *lppDest, ULONG *cDestValues, bool bExcludeErrors)
 {
-	HRESULT hr = hrSuccess;
-	LPSPropValue lpDest = NULL;
+	memory_ptr<SPropValue> lpDest;
 	unsigned int i = 0;
 	unsigned int n = 0;
 
-	hr = MAPIAllocateBuffer(sizeof(SPropValue) * cValues, (void **)&lpDest);
+	HRESULT hr = MAPIAllocateBuffer(sizeof(SPropValue) * cValues, &~lpDest);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	for (i = 0; i < cValues; ++i) {
-	    if(!bExcludeErrors || PROP_TYPE(lpSrc[i].ulPropTag) != PT_ERROR) {
-    		hr = HrCopyProperty(&lpDest[n], &lpSrc[i], lpDest);
-
-	    	if(hr == hrSuccess)
-			++n;
-
-    		hr = hrSuccess;
-        }
+		if (bExcludeErrors && PROP_TYPE(lpSrc[i].ulPropTag) == PT_ERROR)
+			continue;
+		hr = HrCopyProperty(&lpDest[n], &lpSrc[i], lpDest);
+		if (hr == MAPI_E_INVALID_PARAMETER)
+			/* traditionally ignored */
+			continue;
+		else if (hr != hrSuccess)
+			return hr; /* give back memory errors */
+		++n;
 	}
-
-	*lppDest = lpDest;
+	*lppDest = lpDest.release();
 	*cDestValues = n;
-
-exit:
-	return hr;
-	// FIXME potential incomplete copy possible, should free data (?)
+	return hrSuccess;
 }
 
 /** 
@@ -305,18 +280,14 @@ exit:
 HRESULT Util::HrCopyPropertyArray(const SPropValue *lpSrc, ULONG cValues,
     LPSPropValue lpDest, void *lpBase)
 {
-	HRESULT hr = hrSuccess;
 	unsigned int i;
 
 	for (i = 0; i < cValues; ++i) {
-		hr = HrCopyProperty(&lpDest[i], &lpSrc[i], lpBase);
-
+		HRESULT hr = HrCopyProperty(&lpDest[i], &lpSrc[i], lpBase);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -333,18 +304,14 @@ exit:
 HRESULT Util::HrCopyPropertyArrayByRef(const SPropValue *lpSrc, ULONG cValues,
     LPSPropValue lpDest)
 {
-	HRESULT hr = hrSuccess;
 	unsigned int i;
 
 	for (i = 0; i < cValues; ++i) {
-		hr = HrCopyPropertyByRef(&lpDest[i], &lpSrc[i]);
-
+		HRESULT hr = HrCopyPropertyByRef(&lpDest[i], &lpSrc[i]);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -410,35 +377,27 @@ HRESULT Util::HrCopyProperty(LPSPropValue lpDest, const SPropValue *lpSrc,
 		lpDest->Value.li = lpSrc->Value.li;
 		break;
 	case PT_UNICODE:
-		if(lpSrc->Value.lpszW == NULL) {
-			hr = MAPI_E_INVALID_PARAMETER;
-			goto exit;
-		}
-
+		if (lpSrc->Value.lpszW == NULL)
+			return MAPI_E_INVALID_PARAMETER;
 		hr = lpfAllocMore(wcslen(lpSrc->Value.lpszW)*sizeof(wchar_t)+sizeof(wchar_t), lpBase, (void**)&lpDest->Value.lpszW);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		wcscpy(lpDest->Value.lpszW, lpSrc->Value.lpszW);
 		break;
 	case PT_STRING8:
-		if(lpSrc->Value.lpszA == NULL) {
-			hr = MAPI_E_INVALID_PARAMETER;
-			goto exit;
-		}
-
+		if (lpSrc->Value.lpszA == NULL)
+			return MAPI_E_INVALID_PARAMETER;
 		hr = lpfAllocMore(strlen(lpSrc->Value.lpszA) + 1, lpBase, (void**)&lpDest->Value.lpszA);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		strcpy(lpDest->Value.lpszA, lpSrc->Value.lpszA);
 		break;
 	case PT_BINARY:
 		if(lpSrc->Value.bin.cb > 0) {
 			hr = lpfAllocMore(lpSrc->Value.bin.cb, lpBase, (void **) &lpDest->Value.bin.lpb);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
-
-		
 		lpDest->Value.bin.cb = lpSrc->Value.bin.cb;
 		
 		if(lpSrc->Value.bin.cb > 0)
@@ -450,32 +409,36 @@ HRESULT Util::HrCopyProperty(LPSPropValue lpDest, const SPropValue *lpSrc,
 	case PT_CLSID:
 		hr = lpfAllocMore(sizeof(GUID), lpBase, (void **)&lpDest->Value.lpguid);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		memcpy(lpDest->Value.lpguid, lpSrc->Value.lpguid, sizeof(GUID));
 		break;
 	case PT_ERROR:
 		lpDest->Value.err = lpSrc->Value.err;
 		break;
 	case PT_SRESTRICTION:
-		if(lpSrc->Value.lpszA == NULL) {
-			hr = MAPI_E_INVALID_PARAMETER;
-			goto exit;
-		}
-		// NOTE: we place the object pointer in lpszA to make sure it's on the same offset as Value.x on 32bit as 64bit machines
+		if (lpSrc->Value.lpszA == NULL)
+			return MAPI_E_INVALID_PARAMETER;
+		/*
+		 * NOTE: we place the object pointer in lpszA to make sure it
+		 * is on the same offset as Value.x on 32-bit as 64-bit
+		 * machines.
+		 */
 		hr = lpfAllocMore(sizeof(SRestriction), lpBase, (void **)&lpDest->Value.lpszA);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		hr = Util::HrCopySRestriction((LPSRestriction)lpDest->Value.lpszA, (LPSRestriction)lpSrc->Value.lpszA, lpBase);
 		break;
 	case PT_ACTIONS:
-		if(lpSrc->Value.lpszA == NULL) {
-			hr = MAPI_E_INVALID_PARAMETER;
-			goto exit;
-		}
-		// NOTE: we place the object pointer in lpszA to make sure it's on the same offset as Value.x on 32bit as 64bit machines
+		if (lpSrc->Value.lpszA == NULL)
+			return MAPI_E_INVALID_PARAMETER;
+		/*
+		 * NOTE: we place the object pointer in lpszA to make sure it
+		 * is on the same offset as Value.x on 32-bit as 64-bit
+		 * machines.
+		 */
 		hr = lpfAllocMore(sizeof(ACTIONS), lpBase, (void **)&lpDest->Value.lpszA);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		hr = Util::HrCopyActions((ACTIONS *)lpDest->Value.lpszA, (ACTIONS *)lpSrc->Value.lpszA, lpBase);
 		break;
 	case PT_NULL:
@@ -487,21 +450,21 @@ HRESULT Util::HrCopyProperty(LPSPropValue lpDest, const SPropValue *lpSrc,
 	case PT_MV_I2:
 		hr = lpfAllocMore(sizeof(short int) * lpSrc->Value.MVi.cValues, lpBase, (void **)&lpDest->Value.MVi.lpi);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		memcpy(lpDest->Value.MVi.lpi, lpSrc->Value.MVi.lpi, sizeof(short int) * lpSrc->Value.MVi.cValues);
 		lpDest->Value.MVi.cValues = lpSrc->Value.MVi.cValues;
 		break;
 	case PT_MV_LONG:
 		hr = lpfAllocMore(sizeof(LONG) * lpSrc->Value.MVl.cValues, lpBase, (void **)&lpDest->Value.MVl.lpl);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		memcpy(lpDest->Value.MVl.lpl, lpSrc->Value.MVl.lpl, sizeof(LONG) * lpSrc->Value.MVl.cValues);
 		lpDest->Value.MVl.cValues = lpSrc->Value.MVl.cValues;
 		break;
 	case PT_MV_FLOAT:
 		hr = lpfAllocMore(sizeof(float) * lpSrc->Value.MVflt.cValues, lpBase, (void **)&lpDest->Value.MVflt.lpflt);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		memcpy(lpDest->Value.MVflt.lpflt, lpSrc->Value.MVflt.lpflt, sizeof(float) * lpSrc->Value.MVflt.cValues);
 		lpDest->Value.MVflt.cValues = lpSrc->Value.MVflt.cValues;
 		break;
@@ -509,40 +472,40 @@ HRESULT Util::HrCopyProperty(LPSPropValue lpDest, const SPropValue *lpSrc,
 	case PT_MV_APPTIME:
 		hr = lpfAllocMore(sizeof(double) * lpSrc->Value.MVdbl.cValues, lpBase, (void **)&lpDest->Value.MVdbl.lpdbl);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		memcpy(lpDest->Value.MVdbl.lpdbl, lpSrc->Value.MVdbl.lpdbl, sizeof(double) * lpSrc->Value.MVdbl.cValues);
 		lpDest->Value.MVdbl.cValues = lpSrc->Value.MVdbl.cValues;
 		break;
 	case PT_MV_I8:
 		hr = lpfAllocMore(sizeof(LONGLONG) * lpSrc->Value.MVli.cValues, lpBase, (void **)&lpDest->Value.MVli.lpli);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		memcpy(lpDest->Value.MVli.lpli, lpSrc->Value.MVli.lpli, sizeof(LONGLONG) * lpSrc->Value.MVli.cValues);
 		lpDest->Value.MVli.cValues = lpSrc->Value.MVli.cValues;
 		break;
 	case PT_MV_CURRENCY:
 		hr = lpfAllocMore(sizeof(CURRENCY) * lpSrc->Value.MVcur.cValues, lpBase, (void **)&lpDest->Value.MVcur.lpcur);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		memcpy(lpDest->Value.MVcur.lpcur, lpSrc->Value.MVcur.lpcur, sizeof(CURRENCY) * lpSrc->Value.MVcur.cValues);
 		lpDest->Value.MVcur.cValues = lpSrc->Value.MVcur.cValues;
 		break;
 	case PT_MV_SYSTIME:
 		hr = lpfAllocMore(sizeof(FILETIME) * lpSrc->Value.MVft.cValues, lpBase, (void **)&lpDest->Value.MVft.lpft);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		memcpy(lpDest->Value.MVft.lpft, lpSrc->Value.MVft.lpft, sizeof(FILETIME) * lpSrc->Value.MVft.cValues);
 		lpDest->Value.MVft.cValues = lpSrc->Value.MVft.cValues;
 		break;
 	case PT_MV_STRING8:
 		hr = lpfAllocMore(sizeof(LPSTR *) * lpSrc->Value.MVszA.cValues, lpBase, (void **)&lpDest->Value.MVszA.lppszA);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		for (ULONG i = 0; i < lpSrc->Value.MVszA.cValues; ++i) {
 			int datalength = strlen(lpSrc->Value.MVszA.lppszA[i]) + 1;
 			hr = lpfAllocMore(datalength, lpBase, (void **)&lpDest->Value.MVszA.lppszA[i]);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 			memcpy(lpDest->Value.MVszA.lppszA[i], lpSrc->Value.MVszA.lppszA[i], datalength);
 		}
 		lpDest->Value.MVszA.cValues = lpSrc->Value.MVszA.cValues;
@@ -550,11 +513,11 @@ HRESULT Util::HrCopyProperty(LPSPropValue lpDest, const SPropValue *lpSrc,
 	case PT_MV_UNICODE:
 		hr = lpfAllocMore(sizeof(LPWSTR *) * lpSrc->Value.MVszW.cValues, lpBase, (void **)&lpDest->Value.MVszW.lppszW);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		for (ULONG i = 0; i < lpSrc->Value.MVszW.cValues; ++i) {
 			hr = lpfAllocMore(wcslen(lpSrc->Value.MVszW.lppszW[i]) * sizeof(WCHAR) + sizeof(WCHAR), lpBase, (void**)&lpDest->Value.MVszW.lppszW[i]);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 			wcscpy(lpDest->Value.MVszW.lppszW[i], lpSrc->Value.MVszW.lppszW[i]);
 		}
 		lpDest->Value.MVszW.cValues = lpSrc->Value.MVszW.cValues;
@@ -562,11 +525,11 @@ HRESULT Util::HrCopyProperty(LPSPropValue lpDest, const SPropValue *lpSrc,
 	case PT_MV_BINARY:
 		hr = lpfAllocMore(sizeof(SBinary) * lpSrc->Value.MVbin.cValues, lpBase, (void **)&lpDest->Value.MVbin.lpbin);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		for (ULONG i = 0; i < lpSrc->Value.MVbin.cValues; ++i) {
 			hr = lpfAllocMore(lpSrc->Value.MVbin.lpbin[i].cb, lpBase, (void **)&lpDest->Value.MVbin.lpbin[i].lpb);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 			memcpy(lpDest->Value.MVbin.lpbin[i].lpb, lpSrc->Value.MVbin.lpbin[i].lpb, lpSrc->Value.MVbin.lpbin[i].cb);
 			lpDest->Value.MVbin.lpbin[i].cb = lpSrc->Value.MVbin.lpbin[i].cb;
 		}
@@ -575,19 +538,16 @@ HRESULT Util::HrCopyProperty(LPSPropValue lpDest, const SPropValue *lpSrc,
 	case PT_MV_CLSID:
 		hr = lpfAllocMore(sizeof(GUID) * lpSrc->Value.MVguid.cValues, lpBase, (void **)&lpDest->Value.MVguid.lpguid);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		memcpy(lpDest->Value.MVguid.lpguid, lpSrc->Value.MVguid.lpguid, sizeof(GUID) * lpSrc->Value.MVguid.cValues);
 		lpDest->Value.MVguid.cValues = lpSrc->Value.MVguid.cValues;
 		break;
 
 	default:
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
+		return MAPI_E_INVALID_PARAMETER;
 	}
 
 	lpDest->ulPropTag = lpSrc->ulPropTag;
-
-exit:
 	return hr;
 }
 
@@ -602,22 +562,16 @@ exit:
 HRESULT Util::HrCopySRestriction(LPSRestriction *lppDest,
     const SRestriction *lpSrc)
 {
-	HRESULT hr = hrSuccess;
 	LPSRestriction lpDest = NULL;
-
-	hr = MAPIAllocateBuffer(sizeof(SRestriction), (void **)&lpDest);
+	HRESULT hr = MAPIAllocateBuffer(sizeof(SRestriction),
+	             reinterpret_cast<void **>(&lpDest));
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = HrCopySRestriction(lpDest, lpSrc, lpDest);
-
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	*lppDest = lpDest;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -633,114 +587,100 @@ HRESULT	Util::HrCopySRestriction(LPSRestriction lpDest,
     const SRestriction *lpSrc, void *lpBase)
 {
 	HRESULT hr = hrSuccess;
-	unsigned int i = 0;
+	unsigned int i;
 
-	if (!lpDest || !lpSrc || !lpBase) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpDest == NULL || lpSrc == NULL || lpBase == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	lpDest->rt = lpSrc->rt;
 
 	switch(lpSrc->rt) {
-		case RES_AND:
-			lpDest->res.resAnd.cRes = lpSrc->res.resAnd.cRes;
-			hr = MAPIAllocateMore(sizeof(SRestriction) * lpSrc->res.resAnd.cRes, lpBase, (void **)&lpDest->res.resAnd.lpRes);
-			if (hr != hrSuccess)
-				goto exit;
+	case RES_AND:
+		lpDest->res.resAnd.cRes = lpSrc->res.resAnd.cRes;
+		hr = MAPIAllocateMore(sizeof(SRestriction) * lpSrc->res.resAnd.cRes, lpBase, (void **)&lpDest->res.resAnd.lpRes);
+		if (hr != hrSuccess)
+			return hr;
+		for (i = 0; i < lpSrc->res.resAnd.cRes; ++i) {
+			hr = HrCopySRestriction(&lpDest->res.resAnd.lpRes[i], &lpSrc->res.resAnd.lpRes[i], lpBase);
+			if(hr != hrSuccess)
+				return hr;
+		}
+		break;
+	case RES_OR:
+		lpDest->res.resOr.cRes = lpSrc->res.resOr.cRes;
+		hr = MAPIAllocateMore(sizeof(SRestriction) * lpSrc->res.resOr.cRes, lpBase, (void **)&lpDest->res.resOr.lpRes);
+		if (hr != hrSuccess)
+			return hr;
+		for (i = 0; i < lpSrc->res.resOr.cRes; ++i) {
+			hr = HrCopySRestriction(&lpDest->res.resOr.lpRes[i], &lpSrc->res.resOr.lpRes[i], lpBase);
+			if(hr != hrSuccess)
+				return hr;
+		}
+		break;
+	case RES_NOT:
+		hr = MAPIAllocateMore(sizeof(SRestriction), lpBase, (void **) &lpDest->res.resNot.lpRes);
+		if (hr != hrSuccess)
+			return hr;
+		return HrCopySRestriction(lpDest->res.resNot.lpRes, lpSrc->res.resNot.lpRes, lpBase);
+	case RES_CONTENT:
+		lpDest->res.resContent.ulFuzzyLevel = lpSrc->res.resContent.ulFuzzyLevel;
+		lpDest->res.resContent.ulPropTag = lpSrc->res.resContent.ulPropTag;
+		hr = MAPIAllocateMore(sizeof(SPropValue), lpBase, (void **) &lpDest->res.resContent.lpProp);
+		if (hr != hrSuccess)
+			return hr;
+		return HrCopyProperty(lpDest->res.resContent.lpProp, lpSrc->res.resContent.lpProp, lpBase);
+	case RES_PROPERTY:
+		lpDest->res.resProperty.relop = lpSrc->res.resProperty.relop;
+		lpDest->res.resProperty.ulPropTag = lpSrc->res.resProperty.ulPropTag;
+		hr = MAPIAllocateMore(sizeof(SPropValue), lpBase, (void **) &lpDest->res.resProperty.lpProp);
+		if (hr != hrSuccess)
+			return hr;
+		return HrCopyProperty(lpDest->res.resProperty.lpProp, lpSrc->res.resProperty.lpProp, lpBase);
+	case RES_COMPAREPROPS:
+		lpDest->res.resCompareProps.relop = lpSrc->res.resCompareProps.relop;
+		lpDest->res.resCompareProps.ulPropTag1 = lpSrc->res.resCompareProps.ulPropTag1;
+		lpDest->res.resCompareProps.ulPropTag2 = lpSrc->res.resCompareProps.ulPropTag2;
+		break;
+	case RES_BITMASK:
+		lpDest->res.resBitMask.relBMR = lpSrc->res.resBitMask.relBMR;
+		lpDest->res.resBitMask.ulMask = lpSrc->res.resBitMask.ulMask;
+		lpDest->res.resBitMask.ulPropTag = lpSrc->res.resBitMask.ulPropTag;
+		break;
+	case RES_SIZE:
+		lpDest->res.resSize.cb = lpSrc->res.resSize.cb;
+		lpDest->res.resSize.relop = lpSrc->res.resSize.relop;
+		lpDest->res.resSize.ulPropTag = lpSrc->res.resSize.ulPropTag;
+		break;
+	case RES_EXIST:
+		lpDest->res.resExist.ulPropTag = lpSrc->res.resExist.ulPropTag;
+		break;
+	case RES_SUBRESTRICTION:
+		lpDest->res.resSub.ulSubObject = lpSrc->res.resSub.ulSubObject;
+		hr = MAPIAllocateMore(sizeof(SRestriction), lpBase, (void **)&lpDest->res.resSub.lpRes);
+		if (hr != hrSuccess)
+			return hr;
+		return HrCopySRestriction(lpDest->res.resSub.lpRes, lpSrc->res.resSub.lpRes, lpBase);
+	case RES_COMMENT: // What a weird restriction type
+		lpDest->res.resComment.cValues	= lpSrc->res.resComment.cValues;
+		lpDest->res.resComment.lpRes	= NULL;
 
-			for (i = 0; i < lpSrc->res.resAnd.cRes; ++i) {
-				hr = HrCopySRestriction(&lpDest->res.resAnd.lpRes[i], &lpSrc->res.resAnd.lpRes[i], lpBase);
-				if(hr != hrSuccess)
-					goto exit;
-			}
-			break;
-		case RES_OR:
-			lpDest->res.resOr.cRes = lpSrc->res.resOr.cRes;
-			hr = MAPIAllocateMore(sizeof(SRestriction) * lpSrc->res.resOr.cRes, lpBase, (void **)&lpDest->res.resOr.lpRes);
+		if (lpSrc->res.resComment.cValues > 0)
+		{
+			hr = MAPIAllocateMore(sizeof(SPropValue) * lpSrc->res.resComment.cValues, lpBase, (void **) &lpDest->res.resComment.lpProp);
 			if (hr != hrSuccess)
-				goto exit;
-
-			for (i = 0; i < lpSrc->res.resOr.cRes; ++i) {
-				hr = HrCopySRestriction(&lpDest->res.resOr.lpRes[i], &lpSrc->res.resOr.lpRes[i], lpBase);
-				if(hr != hrSuccess)
-					goto exit;
-			}
-			break;
-		case RES_NOT:
-			hr = MAPIAllocateMore(sizeof(SRestriction), lpBase, (void **) &lpDest->res.resNot.lpRes);
+				return hr;
+			hr = HrCopyPropertyArray(lpSrc->res.resComment.lpProp, lpSrc->res.resComment.cValues, lpDest->res.resComment.lpProp, lpBase);
 			if (hr != hrSuccess)
-				goto exit;
-			hr = HrCopySRestriction(lpDest->res.resNot.lpRes, lpSrc->res.resNot.lpRes, lpBase);
-			
-			break;
-		case RES_CONTENT:
-			lpDest->res.resContent.ulFuzzyLevel = lpSrc->res.resContent.ulFuzzyLevel;
-			lpDest->res.resContent.ulPropTag = lpSrc->res.resContent.ulPropTag;
-			hr = MAPIAllocateMore(sizeof(SPropValue), lpBase, (void **) &lpDest->res.resContent.lpProp);
+				return hr;
+		}
+		if (lpSrc->res.resComment.lpRes) {
+			hr = MAPIAllocateMore(sizeof(SRestriction), lpBase, (void **) &lpDest->res.resComment.lpRes);
 			if (hr != hrSuccess)
-				goto exit;
-			hr = HrCopyProperty(lpDest->res.resContent.lpProp, lpSrc->res.resContent.lpProp, lpBase);
-			break;
-		case RES_PROPERTY:
-			lpDest->res.resProperty.relop = lpSrc->res.resProperty.relop;
-			lpDest->res.resProperty.ulPropTag = lpSrc->res.resProperty.ulPropTag;
-			hr = MAPIAllocateMore(sizeof(SPropValue), lpBase, (void **) &lpDest->res.resProperty.lpProp);
-			if (hr != hrSuccess)
-				goto exit;
-			hr = HrCopyProperty(lpDest->res.resProperty.lpProp, lpSrc->res.resProperty.lpProp, lpBase);
-			break;
-		case RES_COMPAREPROPS:	 
-			lpDest->res.resCompareProps.relop = lpSrc->res.resCompareProps.relop;
-			lpDest->res.resCompareProps.ulPropTag1 = lpSrc->res.resCompareProps.ulPropTag1;
-			lpDest->res.resCompareProps.ulPropTag2 = lpSrc->res.resCompareProps.ulPropTag2;
-			break;
-		case RES_BITMASK:			 
-			lpDest->res.resBitMask.relBMR = lpSrc->res.resBitMask.relBMR;
-			lpDest->res.resBitMask.ulMask = lpSrc->res.resBitMask.ulMask;
-			lpDest->res.resBitMask.ulPropTag = lpSrc->res.resBitMask.ulPropTag;
-			break;
-		case RES_SIZE:			
-			lpDest->res.resSize.cb = lpSrc->res.resSize.cb;
-			lpDest->res.resSize.relop = lpSrc->res.resSize.relop;
-			lpDest->res.resSize.ulPropTag = lpSrc->res.resSize.ulPropTag;
-			break;
-		case RES_EXIST:			
-			lpDest->res.resExist.ulPropTag = lpSrc->res.resExist.ulPropTag;
-			break;
-		case RES_SUBRESTRICTION:	
-			lpDest->res.resSub.ulSubObject = lpSrc->res.resSub.ulSubObject;
-			hr = MAPIAllocateMore(sizeof(SRestriction), lpBase, (void **)&lpDest->res.resSub.lpRes);
-			if (hr != hrSuccess)
-				goto exit;
-			hr = HrCopySRestriction(lpDest->res.resSub.lpRes, lpSrc->res.resSub.lpRes, lpBase);
-			break;
-		case RES_COMMENT: // What a weird restriction type
-			lpDest->res.resComment.cValues	= lpSrc->res.resComment.cValues;
-			lpDest->res.resComment.lpRes	= NULL;
-
-			if(lpSrc->res.resComment.cValues > 0)
-			{
-				hr = MAPIAllocateMore(sizeof(SPropValue) * lpSrc->res.resComment.cValues, lpBase, (void **) &lpDest->res.resComment.lpProp);
-				if (hr != hrSuccess)
-					goto exit;
-
-				hr = HrCopyPropertyArray(lpSrc->res.resComment.lpProp, lpSrc->res.resComment.cValues, lpDest->res.resComment.lpProp, lpBase);
-				if(hr != hrSuccess)
-					goto exit;
-			}
-
-			if(lpSrc->res.resComment.lpRes) {
-				hr = MAPIAllocateMore(sizeof(SRestriction), lpBase, (void **) &lpDest->res.resComment.lpRes);
-				if (hr != hrSuccess)
-					goto exit;
-				hr = HrCopySRestriction(lpDest->res.resComment.lpRes, lpSrc->res.resComment.lpRes, lpBase);
-			}
-
-			break;
+				return hr;
+			hr = HrCopySRestriction(lpDest->res.resComment.lpRes, lpSrc->res.resComment.lpRes, lpBase);
+		}
+		break;
 	}
-
-exit:
 	return hr;
 }
 
@@ -756,25 +696,23 @@ exit:
 HRESULT	Util::HrCopyActions(ACTIONS *lpDest, const ACTIONS *lpSrc,
     void *lpBase)
 {
-	HRESULT hr = hrSuccess;
 	unsigned int i;
 
 	lpDest->cActions = lpSrc->cActions;
 	lpDest->ulVersion = lpSrc->ulVersion;
-	hr = MAPIAllocateMore(sizeof(ACTION) * lpSrc->cActions, lpBase, (void **)&lpDest->lpAction);
+	HRESULT hr = MAPIAllocateMore(sizeof(ACTION) * lpSrc->cActions, lpBase,
+	             reinterpret_cast<void **>(&lpDest->lpAction));
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	memset(lpDest->lpAction, 0, sizeof(ACTION) * lpSrc->cActions);
 
 	for (i = 0; i < lpSrc->cActions; ++i) {
 		hr = HrCopyAction(&lpDest->lpAction[i], &lpSrc->lpAction[i], lpBase);
 		if(hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -797,60 +735,52 @@ HRESULT	Util::HrCopyAction(ACTION *lpDest, const ACTION *lpSrc, void *lpBase)
 	lpDest->ulFlags = lpSrc->ulFlags;
 
 	switch(lpSrc->acttype) {
-		case OP_MOVE:
-		case OP_COPY:
-			lpDest->actMoveCopy.cbStoreEntryId = lpSrc->actMoveCopy.cbStoreEntryId;
-			hr = MAPIAllocateMore(lpSrc->actMoveCopy.cbStoreEntryId, lpBase, (void **) &lpDest->actMoveCopy.lpStoreEntryId);
-			if(hr != hrSuccess)
-				goto exit;
-			memcpy(lpDest->actMoveCopy.lpStoreEntryId, lpSrc->actMoveCopy.lpStoreEntryId, lpSrc->actMoveCopy.cbStoreEntryId);
-
-			lpDest->actMoveCopy.cbFldEntryId = lpSrc->actMoveCopy.cbFldEntryId;
-			hr = MAPIAllocateMore(lpSrc->actMoveCopy.cbFldEntryId, lpBase, (void **) &lpDest->actMoveCopy.lpFldEntryId);
-			if(hr != hrSuccess)
-				goto exit;
-			memcpy(lpDest->actMoveCopy.lpFldEntryId, lpSrc->actMoveCopy.lpFldEntryId, lpSrc->actMoveCopy.cbFldEntryId);
-
-			break;
-		case OP_REPLY:
-		case OP_OOF_REPLY:
-			lpDest->actReply.cbEntryId = lpSrc->actReply.cbEntryId;
-			hr = MAPIAllocateMore(lpSrc->actReply.cbEntryId, lpBase, (void **) &lpDest->actReply.lpEntryId);
-			if(hr != hrSuccess)
-				goto exit;
-			memcpy(lpDest->actReply.lpEntryId, lpSrc->actReply.lpEntryId, lpSrc->actReply.cbEntryId);
-
-			lpDest->actReply.guidReplyTemplate = lpSrc->actReply.guidReplyTemplate;
-			break;
-		case OP_DEFER_ACTION:
-			lpDest->actDeferAction.cbData = lpSrc->actDeferAction.cbData;
-			hr = MAPIAllocateMore(lpSrc->actDeferAction.cbData, lpBase, (void **)&lpDest->actDeferAction.pbData);
-			if(hr != hrSuccess)
-				goto exit;
-			memcpy(lpDest->actDeferAction.pbData, lpSrc->actDeferAction.pbData, lpSrc->actDeferAction.cbData);
-
-			break;
-		case OP_BOUNCE:
-			lpDest->scBounceCode = lpSrc->scBounceCode;
-			break;
-		case OP_FORWARD:
-		case OP_DELEGATE:
-			hr = MAPIAllocateMore(CbNewADRLIST(lpSrc->lpadrlist->cEntries), lpBase, (void **)&lpDest->lpadrlist);
-			if(hr != hrSuccess)
-				goto exit;
-			hr = HrCopySRowSet((LPSRowSet)lpDest->lpadrlist, (LPSRowSet)lpSrc->lpadrlist, lpBase);
-			break;
-		case OP_TAG:
-			hr = HrCopyProperty(&lpDest->propTag, &lpSrc->propTag, lpBase);
-			break;
-		case OP_DELETE:
-		case OP_MARK_AS_READ:
-			 break;
-		default:
-			break;
+	case OP_MOVE:
+	case OP_COPY:
+		lpDest->actMoveCopy.cbStoreEntryId = lpSrc->actMoveCopy.cbStoreEntryId;
+		hr = MAPIAllocateMore(lpSrc->actMoveCopy.cbStoreEntryId, lpBase, (void **) &lpDest->actMoveCopy.lpStoreEntryId);
+		if (hr != hrSuccess)
+			return hr;
+		memcpy(lpDest->actMoveCopy.lpStoreEntryId, lpSrc->actMoveCopy.lpStoreEntryId, lpSrc->actMoveCopy.cbStoreEntryId);
+		lpDest->actMoveCopy.cbFldEntryId = lpSrc->actMoveCopy.cbFldEntryId;
+		hr = MAPIAllocateMore(lpSrc->actMoveCopy.cbFldEntryId, lpBase, (void **) &lpDest->actMoveCopy.lpFldEntryId);
+		if (hr != hrSuccess)
+			return hr;
+		memcpy(lpDest->actMoveCopy.lpFldEntryId, lpSrc->actMoveCopy.lpFldEntryId, lpSrc->actMoveCopy.cbFldEntryId);
+		break;
+	case OP_REPLY:
+	case OP_OOF_REPLY:
+		lpDest->actReply.cbEntryId = lpSrc->actReply.cbEntryId;
+		hr = MAPIAllocateMore(lpSrc->actReply.cbEntryId, lpBase, (void **) &lpDest->actReply.lpEntryId);
+		if (hr != hrSuccess)
+			return hr;
+		memcpy(lpDest->actReply.lpEntryId, lpSrc->actReply.lpEntryId, lpSrc->actReply.cbEntryId);
+		lpDest->actReply.guidReplyTemplate = lpSrc->actReply.guidReplyTemplate;
+		break;
+	case OP_DEFER_ACTION:
+		lpDest->actDeferAction.cbData = lpSrc->actDeferAction.cbData;
+		hr = MAPIAllocateMore(lpSrc->actDeferAction.cbData, lpBase, (void **)&lpDest->actDeferAction.pbData);
+		if (hr != hrSuccess)
+			return hr;
+		memcpy(lpDest->actDeferAction.pbData, lpSrc->actDeferAction.pbData, lpSrc->actDeferAction.cbData);
+		break;
+	case OP_BOUNCE:
+		lpDest->scBounceCode = lpSrc->scBounceCode;
+		break;
+	case OP_FORWARD:
+	case OP_DELEGATE:
+		hr = MAPIAllocateMore(CbNewSRowSet(lpSrc->lpadrlist->cEntries), lpBase, reinterpret_cast<void **>(&lpDest->lpadrlist));
+		if (hr != hrSuccess)
+			return hr;
+		return HrCopySRowSet((LPSRowSet)lpDest->lpadrlist, (LPSRowSet)lpSrc->lpadrlist, lpBase);
+	case OP_TAG:
+		return HrCopyProperty(&lpDest->propTag, &lpSrc->propTag, lpBase);
+	case OP_DELETE:
+	case OP_MARK_AS_READ:
+		break;
+	default:
+		break;
 	}
-
-exit:
 	return hr;
 }
 
@@ -866,19 +796,16 @@ exit:
 HRESULT Util::HrCopySRowSet(LPSRowSet lpDest, const SRowSet *lpSrc,
     void *lpBase)
 {
-	HRESULT hr = hrSuccess;
 	unsigned int i;
 
 	lpDest->cRows = 0;
 	for (i = 0; i < lpSrc->cRows; ++i) {
-		hr = HrCopySRow(&lpDest->aRow[i], &lpSrc->aRow[i], lpBase);
+		HRESULT hr = HrCopySRow(&lpDest->aRow[i], &lpSrc->aRow[i], lpBase);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		++lpDest->cRows;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -901,7 +828,7 @@ exit:
  */
 HRESULT	Util::HrCopySRow(LPSRow lpDest, const SRow *lpSrc, void *lpBase)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	lpDest->cValues = lpSrc->cValues;
 
@@ -910,31 +837,24 @@ HRESULT	Util::HrCopySRow(LPSRow lpDest, const SRow *lpSrc, void *lpBase)
 	else
 		hr = MAPIAllocateBuffer(sizeof(SPropValue) * lpSrc->cValues, (void **) &lpDest->lpProps);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
-	hr = HrCopyPropertyArray(lpSrc->lpProps, lpSrc->cValues, lpDest->lpProps, lpBase ? lpBase : lpDest->lpProps);
-
-exit:
-	return hr;
+	return HrCopyPropertyArray(lpSrc->lpProps, lpSrc->cValues, lpDest->lpProps, lpBase ? lpBase : lpDest->lpProps);
 }
 
 HRESULT	Util::HrCopyPropTagArray(const SPropTagArray *lpSrc,
     LPSPropTagArray *lppDest)
 {
-	HRESULT hr = hrSuccess;
 	SPropTagArrayPtr ptrPropTagArray;
-
-	hr = MAPIAllocateBuffer(CbNewSPropTagArray(lpSrc->cValues), &ptrPropTagArray);
+	HRESULT hr = MAPIAllocateBuffer(CbNewSPropTagArray(lpSrc->cValues), &~ptrPropTagArray);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	memcpy(ptrPropTagArray->aulPropTag, lpSrc->aulPropTag, lpSrc->cValues * sizeof *lpSrc->aulPropTag);
 	ptrPropTagArray->cValues = lpSrc->cValues;
 
 	*lppDest = ptrPropTagArray.release();
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -949,12 +869,11 @@ exit:
 HRESULT Util::HrCopyUnicodePropTagArray(ULONG ulFlags,
     const SPropTagArray *lpSrc, LPSPropTagArray *lppDest)
 {
-	HRESULT hr = hrSuccess;
 	LPSPropTagArray lpPropTagArray = NULL;
-
-	hr = MAPIAllocateBuffer(CbNewSPropTagArray(lpSrc->cValues), (void**)&lpPropTagArray);
+	HRESULT hr = MAPIAllocateBuffer(CbNewSPropTagArray(lpSrc->cValues),
+	             reinterpret_cast<void **>(&lpPropTagArray));
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	for (ULONG n = 0; n < lpSrc->cValues; ++n) {
 		if (PROP_TYPE(lpSrc->aulPropTag[n]) == PT_STRING8 || PROP_TYPE(lpSrc->aulPropTag[n]) == PT_UNICODE)
@@ -965,9 +884,7 @@ HRESULT Util::HrCopyUnicodePropTagArray(ULONG ulFlags,
 	lpPropTagArray->cValues = lpSrc->cValues;
 
 	*lppDest = lpPropTagArray;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -986,13 +903,13 @@ exit:
 HRESULT Util::HrCopyBinary(ULONG ulSize, const BYTE *lpSrc,
     ULONG *lpulDestSize, LPBYTE *lppDest, LPVOID lpBase)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	LPBYTE lpDest = NULL;
 
 	if (ulSize == 0) {
 		*lpulDestSize = 0;
 		*lppDest = NULL;
-		goto exit;
+		return hrSuccess;
 	}
 
 	if (lpBase)
@@ -1000,15 +917,13 @@ HRESULT Util::HrCopyBinary(ULONG ulSize, const BYTE *lpSrc,
 	else
 		hr = MAPIAllocateBuffer(ulSize, (void **) &lpDest);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	memcpy(lpDest, lpSrc, ulSize);
 
 	*lppDest = lpDest;
 	*lpulDestSize = ulSize;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -1093,15 +1008,10 @@ HRESULT Util::CompareProp(const SPropValue *lpProp1, const SPropValue *lpProp2,
 	int		nCompareResult = 0;
 	unsigned int		i;
 
-	if(lpProp1 == NULL || lpProp2 == NULL || lpCompareResult == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if(PROP_TYPE(lpProp1->ulPropTag) != PROP_TYPE(lpProp2->ulPropTag)) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpProp1 == NULL || lpProp2 == NULL || lpCompareResult == NULL)
+		return MAPI_E_INVALID_PARAMETER;
+	if (PROP_TYPE(lpProp1->ulPropTag) != PROP_TYPE(lpProp2->ulPropTag))
+		return MAPI_E_INVALID_PARAMETER;
 
 	switch(PROP_TYPE(lpProp1->ulPropTag)) {
 	case PT_I2:
@@ -1125,9 +1035,9 @@ HRESULT Util::CompareProp(const SPropValue *lpProp1, const SPropValue *lpProp2,
 		break;
 	case PT_UNICODE:
 		if (lpProp1->Value.lpszW && lpProp2->Value.lpszW)
-			if(lpProp2->ulPropTag == PR_ANR) {
+			if (lpProp2->ulPropTag == PR_ANR)
 				nCompareResult = wcs_icontains(lpProp1->Value.lpszW, lpProp2->Value.lpszW, locale);
-			} else
+			else
 				nCompareResult = wcs_icompare(lpProp1->Value.lpszW, lpProp2->Value.lpszW, locale);
 		else
 			nCompareResult = lpProp1->Value.lpszW != lpProp2->Value.lpszW;
@@ -1222,11 +1132,10 @@ HRESULT Util::CompareProp(const SPropValue *lpProp1, const SPropValue *lpProp2,
 			nCompareResult = lpProp1->Value.MVcur.cValues == lpProp2->Value.MVcur.cValues;
 		break;
 	case PT_MV_CLSID:
-		if (lpProp1->Value.MVguid.cValues == lpProp2->Value.MVguid.cValues) {
+		if (lpProp1->Value.MVguid.cValues == lpProp2->Value.MVguid.cValues)
 			nCompareResult = memcmp(lpProp1->Value.MVguid.lpguid, lpProp2->Value.MVguid.lpguid, sizeof(GUID)*lpProp1->Value.MVguid.cValues);
-		} else {
+		else
 			nCompareResult = twcmp(lpProp1->Value.MVguid.cValues, lpProp2->Value.MVguid.cValues);
-		}
 		break;
 	case PT_MV_BINARY:
 		if (lpProp1->Value.MVbin.cValues == lpProp2->Value.MVbin.cValues) {
@@ -1267,14 +1176,10 @@ HRESULT Util::CompareProp(const SPropValue *lpProp1, const SPropValue *lpProp2,
 			nCompareResult = twcmp(lpProp1->Value.MVszA.cValues, lpProp2->Value.MVszA.cValues);
 		break;
 	default:
-		hr = MAPI_E_INVALID_TYPE;
-		goto exit;
-		break;
+		return MAPI_E_INVALID_TYPE;
 	}
 
 	*lpCompareResult = nCompareResult;
-
-exit:
 	return hr;
 }
 
@@ -1401,7 +1306,7 @@ HRESULT Util::HrTextToHtml(IStream *text, IStream *html, ULONG ulCodepage)
 	size_t	stWritten;
 	size_t  err;
 	const char	*readBuffer = NULL;
-	char	*writeBuffer = NULL;
+	std::unique_ptr<char[]> writeBuffer;
 	char	*wPtr = NULL;
 	iconv_t	cd = (iconv_t)-1;
 	const char *lpszCharset;
@@ -1418,10 +1323,8 @@ HRESULT Util::HrTextToHtml(IStream *text, IStream *html, ULONG ulCodepage)
 		hr = MAPI_E_BAD_CHARWIDTH;
 		goto exit;
 	}
-
-	try {
-		writeBuffer = new char[BUFSIZE * 2];
-	} catch (...) {
+	writeBuffer.reset(new(std::nothrow) char[BUFSIZE * 2]);
+	if (writeBuffer == nullptr) {
 		hr = MAPI_E_NOT_ENOUGH_MEMORY;
 		goto exit;
 	}
@@ -1453,48 +1356,48 @@ HRESULT Util::HrTextToHtml(IStream *text, IStream *html, ULONG ulCodepage)
 
 		// escape some characters in HTML
 		for (i = 0; i < cRead; ++i) {
-			if (lpBuffer[i] == ' ') {
-				if ((i+1) < cRead && lpBuffer[i+1] == ' ')
-					strHtml += L"&nbsp;";
-				else
-					strHtml += L" ";
-			} else {
+			if (lpBuffer[i] != ' ') {
 				std::wstring str;
 				CHtmlEntity::CharToHtmlEntity(lpBuffer[i], str);
 				strHtml += str;
+				continue;
 			}
+			if ((i + 1) < cRead && lpBuffer[i+1] == ' ')
+				strHtml += L"&nbsp;";
+			else
+				strHtml += L" ";
 		}
 
-		// convert WCHAR to wanted (8bit) charset 
+		/* Convert WCHAR to wanted (8-bit) charset */
 		readBuffer = (const char*)strHtml.c_str();
 		stRead = strHtml.size() * sizeof(WCHAR);
 
 		while (stRead > 0) {
-			wPtr = writeBuffer;
+			wPtr = writeBuffer.get();
 			stWrite = BUFSIZE * 2;
 
 			err = iconv(cd, iconv_HACK(&readBuffer), &stRead, &wPtr, &stWrite);
 
 			stWritten = (BUFSIZE * 2) - stWrite;
 			// write to stream
-			hr = html->Write(writeBuffer, stWritten, NULL);
+			hr = html->Write(writeBuffer.get(), stWritten, NULL);
 			if (hr != hrSuccess)
 				goto exit;
 
-			if (err == (size_t)-1) {
-				// make html number from WCHAR entry
-				std::string strHTMLUnicode = "&#";
-				strHTMLUnicode += stringify(*(WCHAR*)readBuffer);
-				strHTMLUnicode += ";";
+			if (err != static_cast<size_t>(-1))
+				continue;
+			// make html number from WCHAR entry
+			std::string strHTMLUnicode = "&#";
+			strHTMLUnicode += stringify(*(WCHAR*)readBuffer);
+			strHTMLUnicode += ";";
 
-				hr = html->Write(strHTMLUnicode.c_str(), strHTMLUnicode.length(), NULL);
-				if (hr != hrSuccess)
-					goto exit;
+			hr = html->Write(strHTMLUnicode.c_str(), strHTMLUnicode.length(), NULL);
+			if (hr != hrSuccess)
+				goto exit;
 
-				// skip unknown character
-				readBuffer += sizeof(WCHAR);
-				stRead -= sizeof(WCHAR);
-			}
+			// skip unknown character
+			readBuffer += sizeof(WCHAR);
+			stRead -= sizeof(WCHAR);
 		}
 	}
 	// @todo, run through iconv?
@@ -1503,7 +1406,6 @@ HRESULT Util::HrTextToHtml(IStream *text, IStream *html, ULONG ulCodepage)
 exit:
 	if (cd != (iconv_t)-1)
 		iconv_close(cd);
-	delete[] writeBuffer;
 	return hr;
 }
 
@@ -1533,16 +1435,16 @@ HRESULT Util::HrTextToHtml(const WCHAR *text, std::string &strHTML, ULONG ulCode
 
 	// escape some characters in HTML
 	for (ULONG i = 0; text[i] != '\0'; ++i) {
-		if (text[i] == ' ') {
-			if (text[i+1] == ' ')
-				wHTML += L"&nbsp;";
-			else
-				wHTML += L" ";
-		} else {
+		if (text[i] != ' ') {
 			std::wstring str;
 			CHtmlEntity::CharToHtmlEntity(text[i], str);
 			wHTML += str;
+			continue;
 		}
+		if (text[i+1] == ' ')
+			wHTML += L"&nbsp;";
+		else
+			wHTML += L" ";
 	}
 
 	try {
@@ -1553,7 +1455,7 @@ HRESULT Util::HrTextToHtml(const WCHAR *text, std::string &strHTML, ULONG ulCode
 	return hr;
 }
 
-struct _rtfcodepages {
+static const struct _rtfcodepages {
 	int id;						// RTF codepage ID
 	ULONG ulCodepage;			// Windows codepage
 } RTFCODEPAGES[] = {
@@ -1606,14 +1508,14 @@ HRESULT Util::HrTextToRtf(IStream *text, IStream *rtf)
 {
 	ULONG cRead;
 	WCHAR c[BUFSIZE];
-	const char header[] = "{\\rtf1\\ansi\\ansicpg1252\\fromtext \\deff0{\\fonttbl\n" \
+	static const char header[] = "{\\rtf1\\ansi\\ansicpg1252\\fromtext \\deff0{\\fonttbl\n" \
 					"{\\f0\\fswiss Arial;}\n" \
 					"{\\f1\\fmodern Courier New;}\n" \
 					"{\\f2\\fnil\\fcharset2 Symbol;}\n" \
 					"{\\f3\\fmodern\\fcharset0 Courier New;}}\n" \
 					"{\\colortbl\\red0\\green0\\blue0;\\red0\\green0\\blue255;}\n" \
 					"\\uc1\\pard\\plain\\deftab360 \\f0\\fs20 ";
-	const char footer[] = "}";
+	static const char footer[] = "}";
 	ULONG i = 0;
 
 	rtf->Write(header, strlen(header), NULL);
@@ -1633,7 +1535,7 @@ HRESULT Util::HrTextToRtf(IStream *text, IStream *rtf)
 			case '\r':
 				break;
 			case '\n':
-				rtf->Write("\\par\n",5,NULL);
+				rtf->Write("\\line\n", 6, nullptr);
 				break;
 
 			case '\\':
@@ -1726,10 +1628,8 @@ HRESULT Util::HrMAPIErrorToText(HRESULT hr, LPTSTR *lppszError, void *lpBase)
 	tstring strError;
 	LPCTSTR lpszError = NULL;
 
-	if (lppszError == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lppszError == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	switch(hr)
 	{
@@ -1791,12 +1691,9 @@ HRESULT Util::HrMAPIErrorToText(HRESULT hr, LPTSTR *lppszError, void *lpBase)
 	else
 		hr = MAPIAllocateMore((_tcslen(lpszError) + 1) * sizeof *lpszError, lpBase, (void**)lppszError);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	_tcscpy(*lppszError, lpszError);
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -1813,53 +1710,47 @@ bool Util::ValidatePropTagArray(const SPropTagArray *lpPropTagArray)
 	bool bResult = false;
 	unsigned int i;
 
-	if(lpPropTagArray == NULL){
-		bResult = true;
-		goto exit;
-	}
+	if (lpPropTagArray == NULL)
+		return true;
 
 	for (i = 0; i < lpPropTagArray->cValues; ++i) {
 		switch (PROP_TYPE(lpPropTagArray->aulPropTag[i]))
 		{
-			case PT_UNSPECIFIED:
-			case PT_NULL:
-			case PT_I2:
-			case PT_I4:
-			case PT_R4:
-			case PT_R8:
-			case PT_BOOLEAN:
-			case PT_CURRENCY:
-			case PT_APPTIME:
-			case PT_SYSTIME:
-			case PT_I8:
-			case PT_STRING8:
-			case PT_BINARY:
-			case PT_UNICODE:
-			case PT_CLSID:
-			case PT_OBJECT:
-			case PT_MV_I2:
-			case PT_MV_LONG:
-			case PT_MV_R4:
-			case PT_MV_DOUBLE:
-			case PT_MV_CURRENCY:
-			case PT_MV_APPTIME:
-			case PT_MV_SYSTIME:
-			case PT_MV_BINARY:
-			case PT_MV_STRING8:
-			case PT_MV_UNICODE:
-			case PT_MV_CLSID:
-			case PT_MV_I8:
-			case PT_ERROR:
-				bResult = true;
-				break;
-			default:
-				bResult = false;
-				goto exit;
-				break;
+		case PT_UNSPECIFIED:
+		case PT_NULL:
+		case PT_I2:
+		case PT_I4:
+		case PT_R4:
+		case PT_R8:
+		case PT_BOOLEAN:
+		case PT_CURRENCY:
+		case PT_APPTIME:
+		case PT_SYSTIME:
+		case PT_I8:
+		case PT_STRING8:
+		case PT_BINARY:
+		case PT_UNICODE:
+		case PT_CLSID:
+		case PT_OBJECT:
+		case PT_MV_I2:
+		case PT_MV_LONG:
+		case PT_MV_R4:
+		case PT_MV_DOUBLE:
+		case PT_MV_CURRENCY:
+		case PT_MV_APPTIME:
+		case PT_MV_SYSTIME:
+		case PT_MV_BINARY:
+		case PT_MV_STRING8:
+		case PT_MV_UNICODE:
+		case PT_MV_CLSID:
+		case PT_MV_I8:
+		case PT_ERROR:
+			bResult = true;
+			break;
+		default:
+			return false;
 		}
 	}
-
-exit:
 	return bResult;
 }
 
@@ -1876,33 +1767,26 @@ exit:
  */
 HRESULT Util::HrStreamToString(IStream *sInput, std::string &strOutput) {
 	HRESULT hr = hrSuccess;
-	ECMemStream *lpMemStream = NULL;
+	object_ptr<ECMemStream> lpMemStream;
 	ULONG ulRead = 0;
 	char buffer[BUFSIZE];
 	LARGE_INTEGER zero = {{0,0}};
 
-	if (sInput->QueryInterface(IID_ECMemStream, (LPVOID*)&lpMemStream) == hrSuccess) {
+	if (sInput->QueryInterface(IID_ECMemStream, &~lpMemStream) == hrSuccess) {
 		// getsize, getbuffer, assign
 		strOutput.append(lpMemStream->GetBuffer(), lpMemStream->GetSize());
-		lpMemStream->Release();
-	} else {
-		// manual copy
-
-		hr = sInput->Seek(zero, SEEK_SET, NULL);
-		if (hr != hrSuccess)
-			goto exit;
-
-		while(1) {
-			hr = sInput->Read(buffer, BUFSIZE, &ulRead);
-
-			if(hr != hrSuccess || ulRead == 0)
-				break;
-
-			strOutput.append(buffer, ulRead);
-		}
+		return hr;
 	}
-
-exit:
+	// manual copy
+	hr = sInput->Seek(zero, SEEK_SET, NULL);
+	if (hr != hrSuccess)
+		return hr;
+	while (1) {
+		hr = sInput->Read(buffer, BUFSIZE, &ulRead);
+		if (hr != hrSuccess || ulRead == 0)
+			break;
+		strOutput.append(buffer, ulRead);
+	}
 	return hr;
 }
 
@@ -1919,33 +1803,26 @@ exit:
  */
 HRESULT Util::HrStreamToString(IStream *sInput, std::wstring &strOutput) {
 	HRESULT hr = hrSuccess;
-	ECMemStream *lpMemStream = NULL;
+	object_ptr<ECMemStream> lpMemStream;
 	ULONG ulRead = 0;
 	char buffer[BUFSIZE];
 	LARGE_INTEGER zero = {{0,0}};
 
-	if (sInput->QueryInterface(IID_ECMemStream, (LPVOID*)&lpMemStream) == hrSuccess) {
+	if (sInput->QueryInterface(IID_ECMemStream, &~lpMemStream) == hrSuccess) {
 		// getsize, getbuffer, assign
 		strOutput.append((WCHAR*)lpMemStream->GetBuffer(), lpMemStream->GetSize() / sizeof(WCHAR));
-		lpMemStream->Release();
-	} else {
-		// manual copy
-
-		hr = sInput->Seek(zero, SEEK_SET, NULL);
-		if (hr != hrSuccess)
-			goto exit;
-
-		while(1) {
-			hr = sInput->Read(buffer, BUFSIZE, &ulRead);
-
-			if(hr != hrSuccess || ulRead == 0)
-				break;
-
-			strOutput.append((WCHAR*)buffer, ulRead / sizeof(WCHAR));
-		}
+		return hr;
 	}
-
-exit:
+	// manual copy
+	hr = sInput->Seek(zero, SEEK_SET, NULL);
+	if (hr != hrSuccess)
+		return hr;
+	while (1) {
+		hr = sInput->Read(buffer, BUFSIZE, &ulRead);
+		if (hr != hrSuccess || ulRead == 0)
+			break;
+		strOutput.append((WCHAR*)buffer, ulRead / sizeof(WCHAR));
+	}
 	return hr;
 }
 
@@ -1959,12 +1836,10 @@ exit:
  */
 HRESULT Util::HrConvertStreamToWString(IStream *sInput, ULONG ulCodepage, std::wstring *wstrOutput)
 {
-	HRESULT hr = hrSuccess;
 	const char *lpszCharset;
 	convert_context converter;
 	string data;
-
-	hr = HrGetCharsetByCP(ulCodepage, &lpszCharset);
+	HRESULT hr = HrGetCharsetByCP(ulCodepage, &lpszCharset);
 	if (hr != hrSuccess) {
 		lpszCharset = "us-ascii";
 		hr = hrSuccess;
@@ -1972,17 +1847,14 @@ HRESULT Util::HrConvertStreamToWString(IStream *sInput, ULONG ulCodepage, std::w
 
 	hr = HrStreamToString(sInput, data);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	try {
 		wstrOutput->assign(converter.convert_to<wstring>(CHARSET_WCHAR"//IGNORE", data, rawsize(data), lpszCharset));
 	} catch (std::exception &) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
+		return MAPI_E_INVALID_PARAMETER;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -1995,34 +1867,23 @@ exit:
  */
 HRESULT Util::HrHtmlToText(IStream *html, IStream *text, ULONG ulCodepage)
 {
-	HRESULT hr = hrSuccess;
-	wstring wstrHTML;
+	std::wstring wstrHTML;
 	CHtmlToTextParser	parser;
-	
-	hr = HrConvertStreamToWString(html, ulCodepage, &wstrHTML);
+	HRESULT hr = HrConvertStreamToWString(html, ulCodepage, &wstrHTML);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
+	if (!parser.Parse(string_strip_nuls(wstrHTML).c_str()))
+		return MAPI_E_CORRUPT_DATA;
 
-	if (!parser.Parse(wstrHTML.c_str())) {
-		hr = MAPI_E_CORRUPT_DATA;
-		goto exit;
-	}
-
-	{
-		std::wstring &strText = parser.GetText();
-
-		hr = text->Write(strText.data(), (strText.size()+1)*sizeof(WCHAR), NULL);
-	}
-
-exit:
-	return hr;
+	std::wstring &strText = parser.GetText();
+	return text->Write(strText.data(), (strText.size()+1)*sizeof(WCHAR), NULL);
 }
 
 /**
  * This converts from HTML to RTF by doing to following:
  *
  * Always escape { and } to \{ and \}
- * Always escape \r\n to \par
+ * Always escape \r\n to \par (dfq?)
  * All HTML tags are converted from, say <BODY onclick=bla> to \r\n{\htmltagX <BODY onclick=bla>}
  * Each tag with text content gets an extra {\htmltag64} to suppress generated <P>'s in the final HTML output
  * Some tags output \htmlrtf \par \htmlrtf0 so that the plaintext version of the RTF has newlines in the right places
@@ -2038,8 +1899,6 @@ exit:
  */
 HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
 {
-    HRESULT hr = hrSuccess;
-    
 	int tag = 0, type = 0;
 	stack<unsigned int> stackTag;
 	size_t pos = 0;
@@ -2050,10 +1909,8 @@ HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
 	bool bFirstText = true;
 	bool bPlainCRLF = false;
 
-	if (!lpwHTML) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpwHTML == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	// @todo default codepage is set on windows-1252, but is this correct for non-western outlooks?
 	strRTF = "{\\rtf1\\ansi\\ansicpg1252\\fromhtml1 \\deff0{\\fonttbl\r\n"
@@ -2126,9 +1983,9 @@ HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
 				type = RTF_TAG_TYPE_HEADER;
 			} else if(StrCaseCompare(lpwHTML, L"<LINK", pos)) {
 				type = RTF_TAG_TYPE_HEADER;
-			} else if(StrCaseCompare(lpwHTML, L"<H", pos) && isdigit(lpwHTML[pos+2]) ) {
+			} else if (StrCaseCompare(lpwHTML, L"<H", pos) && iswdigit(lpwHTML[pos+2])) {
 				type = RTF_TAG_TYPE_HEADER;
-			} else if(StrCaseCompare(lpwHTML, L"</H", pos) && isdigit(lpwHTML[pos+3]) ) {
+			} else if (StrCaseCompare(lpwHTML, L"</H", pos) && iswdigit(lpwHTML[pos+3])) {
 				type = RTF_TAG_TYPE_HEADER;
 			} else if(StrCaseCompare(lpwHTML, L"<TITLE", pos)) {
 				type = RTF_TAG_TYPE_TITLE;
@@ -2139,10 +1996,8 @@ HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
 			} else if(StrCaseCompare(lpwHTML, L"</PLAIN", pos)) {
 				type = RTF_TAG_TYPE_FONT;
 			}
-	        
-			if(StrCaseCompare(lpwHTML, L"</", pos)) {
+			if (StrCaseCompare(lpwHTML, L"</", pos))
 				type |= RTF_FLAG_CLOSE;
-			}
 		}
 
         // Set correct state flag if closing tag (RTF_IN*)
@@ -2202,7 +2057,7 @@ HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
             // Ingore \r
         } else if(lpwHTML[pos] == '\n') {
             if(inTag || ulCommentMode || ulStyleMode)
-                strRTF += "\\par ";
+                strRTF += " ";
             else
                 strRTF += "\r\n{\\*\\htmltag" + stringify((ulParMode == 2 ? RTF_FLAG_INPAR : 0) | stackTag.top()) + " \\par }";
         } else if(lpwHTML[pos] == '\t') {
@@ -2258,9 +2113,8 @@ HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
                 continue;
             }
         } else {
-            if(!inTag && bFirstText) {
+            if (!inTag && bFirstText)
                 bFirstText = false;
-            }
             strRTF += lpwHTML[pos];
         }
 
@@ -2295,17 +2149,13 @@ HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
                 strRTF += "\r\n{\\*\\htmltag" + stringify(RTF_TAG_TYPE_UNK | stackTag.top()) + " ";
             } 
             
-            if(!ulStyleMode && !ulCommentMode) {
+            if (!ulStyleMode && !ulCommentMode)
                 // Normal text must have \*\htmltag64 to suppress <p> in the final html output
                 strRTF += "{\\*\\htmltag64}";
-            }            
-            
             inTag = false;
-
-            if(bPlainCRLF && !ulCommentMode && !ulStyleMode) {
+            if (bPlainCRLF && !ulCommentMode && !ulStyleMode)
                 // Add a plaintext newline if needed, but only for non-style and non-comment parts
-                strRTF += "\\htmlrtf \\par \\htmlrtf0 ";
-            }
+                strRTF += "\\htmlrtf \\line \\htmlrtf0 ";
         }
         
         
@@ -2331,9 +2181,7 @@ HRESULT Util::HrHtmlToRtf(const WCHAR *lpwHTML, std::string &strRTF)
 	}
 	
 	strRTF +="}\r\n";
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /**
@@ -2349,22 +2197,15 @@ exit:
  */
 HRESULT	Util::HrHtmlToRtf(IStream *html, IStream *rtf, unsigned int ulCodepage)
 {
-	HRESULT hr = hrSuccess;
 	wstring wstrHTML;
 	std::string strRTF;
-	
-	hr = HrConvertStreamToWString(html, ulCodepage, &wstrHTML);
+	HRESULT hr = HrConvertStreamToWString(html, ulCodepage, &wstrHTML);
 	if(hr != hrSuccess)
-		goto exit;
-	
+		return hr;
 	hr = HrHtmlToRtf(wstrHTML.c_str(), strRTF);
 	if(hr != hrSuccess)
-		goto exit;
-
-	hr = rtf->Write(strRTF.c_str(), strRTF.size(), NULL);
-
-exit:
-	return hr;
+		return hr;
+	return rtf->Write(strRTF.c_str(), strRTF.size(), NULL);
 }
 
 /** 
@@ -2377,10 +2218,12 @@ exit:
  * 
  * @return MAPI error code
  */
-HRESULT Util::bin2hex(ULONG inLength, LPBYTE input, char **output, void *parent) {
-	const char digits[] = "0123456789ABCDEF";
+HRESULT Util::bin2hex(ULONG inLength, const BYTE *input, char **output,
+    void *parent)
+{
+	static const char digits[] = "0123456789ABCDEF";
 	char *buffer = NULL;
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	ULONG i, j;
 
 	if (parent)
@@ -2388,7 +2231,7 @@ HRESULT Util::bin2hex(ULONG inLength, LPBYTE input, char **output, void *parent)
 	else
 		hr = MAPIAllocateBuffer(inLength*2+1, (void**)&buffer);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	for (i = 0, j = 0; i < inLength; ++i) {
 		buffer[j++] = digits[input[i]>>4];
@@ -2397,9 +2240,7 @@ HRESULT Util::bin2hex(ULONG inLength, LPBYTE input, char **output, void *parent)
 
 	buffer[j] = '\0';
 	*output = buffer;
-exit:
-	
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -2419,32 +2260,26 @@ exit:
  */
 HRESULT Util::hex2bin(const char *input, size_t len, ULONG *outLength, LPBYTE *output, void *parent)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	LPBYTE buffer = NULL;
 
-	if (len % 2 != 0) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (len % 2 != 0)
+		return MAPI_E_INVALID_PARAMETER;
 	if (parent)
 		hr = MAPIAllocateMore(len/2+1, parent, (void**)&buffer);
 	else
 		hr = MAPIAllocateBuffer(len/2+1, (void**)&buffer);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = hex2bin(input, len, buffer);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	buffer[len/2] = '\0';
 
 	*outLength = len/2;
 	*output = buffer;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -2459,21 +2294,16 @@ exit:
  */
 HRESULT Util::hex2bin(const char *input, size_t len, LPBYTE output)
 {
-	HRESULT hr = hrSuccess;
 	ULONG i, j;
 
-	if (len % 2 != 0) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (len % 2 != 0)
+		return MAPI_E_INVALID_PARAMETER;
 
 	for (i = 0, j = 0; i < len; ++j) {
 		output[j] = x2b(input[i++]) << 4;
 		output[j] |= x2b(input[i++]);
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -2499,40 +2329,29 @@ ULONG Util::GetBestBody(const SPropValue *lpBody, const SPropValue *lpHtml,
 	 * Some checks performed here seem redundant, but are actualy required to determine if the source provider
 	 * implements this scheme as we expect it (Scalix doesn't always seem to do so).
 	 */
-	ULONG ulProp = PR_NULL;
 	const ULONG ulBodyTag = ((ulFlags & MAPI_UNICODE) ? PR_BODY_W : PR_BODY_A);
 
 	if (lpRtfInSync->ulPropTag != PR_RTF_IN_SYNC)
-		goto exit;
+		return PR_NULL;
 
 	if ((lpBody->ulPropTag == ulBodyTag || (PROP_TYPE(lpBody->ulPropTag) == PT_ERROR && lpBody->Value.err == MAPI_E_NOT_ENOUGH_MEMORY)) &&
 		(PROP_TYPE(lpHtml->ulPropTag) == PT_ERROR && lpHtml->Value.err == MAPI_E_NOT_FOUND) &&
 		(PROP_TYPE(lpRtfCompressed->ulPropTag) == PT_ERROR && lpRtfCompressed->Value.err == MAPI_E_NOT_FOUND))
-	{
-		ulProp = ulBodyTag;
-		goto exit;
-	}
+		return ulBodyTag;
 
 	if ((lpHtml->ulPropTag == PR_HTML || (PROP_TYPE(lpHtml->ulPropTag) == PT_ERROR && lpHtml->Value.err == MAPI_E_NOT_ENOUGH_MEMORY)) &&
 		(PROP_TYPE(lpBody->ulPropTag) == PT_ERROR && lpBody->Value.err == MAPI_E_NOT_ENOUGH_MEMORY) &&
 		(PROP_TYPE(lpRtfCompressed->ulPropTag) == PT_ERROR && lpRtfCompressed->Value.err == MAPI_E_NOT_ENOUGH_MEMORY) &&
 		lpRtfInSync->Value.b == FALSE)
-	{
-		ulProp = PR_HTML;
-		goto exit;
-	}
+		return PR_HTML;
 
 	if ((lpRtfCompressed->ulPropTag == PR_RTF_COMPRESSED || (PROP_TYPE(lpRtfCompressed->ulPropTag) == PT_ERROR && lpRtfCompressed->Value.err == MAPI_E_NOT_ENOUGH_MEMORY)) &&
 		(PROP_TYPE(lpBody->ulPropTag) == PT_ERROR && lpBody->Value.err == MAPI_E_NOT_ENOUGH_MEMORY) &&
 		(PROP_TYPE(lpHtml->ulPropTag) == PT_ERROR && lpHtml->Value.err == MAPI_E_NOT_FOUND) &&
 		lpRtfInSync->Value.b == TRUE)
-	{
-		ulProp = PR_RTF_COMPRESSED;
-		goto exit;
-	}
+		return PR_RTF_COMPRESSED;
 
-exit:
-	return ulProp;
+	return PR_NULL;
 }
 
 /** 
@@ -2547,7 +2366,6 @@ exit:
  */
 ULONG Util::GetBestBody(IMAPIProp* lpPropObj, ULONG ulFlags)
 {
-	ULONG ulProp = PR_NULL;
 	HRESULT hr = hrSuccess;
 	SPropArrayPtr ptrBodies;
 	const ULONG ulBodyTag = ((ulFlags & MAPI_UNICODE) ? PR_BODY_W : PR_BODY_A);
@@ -2559,14 +2377,10 @@ ULONG Util::GetBestBody(IMAPIProp* lpPropObj, ULONG ulFlags)
 		} };
 	ULONG cValues = 0;
 
-	hr = lpPropObj->GetProps((LPSPropTagArray)&sBodyTags, 0, &cValues, &ptrBodies);
+	hr = lpPropObj->GetProps(sBodyTags, 0, &cValues, &~ptrBodies);
 	if (FAILED(hr))
-		goto exit;
-
-	ulProp = GetBestBody(&ptrBodies[0], &ptrBodies[1], &ptrBodies[2], &ptrBodies[3], ulFlags);
-
-exit:
-	return ulProp;
+		return PR_NULL;
+	return GetBestBody(&ptrBodies[0], &ptrBodies[1], &ptrBodies[2], &ptrBodies[3], ulFlags);
 }
 
 /** 
@@ -2584,29 +2398,19 @@ exit:
  */
 ULONG Util::GetBestBody(LPSPropValue lpPropArray, ULONG cValues, ULONG ulFlags)
 {
-	ULONG ulProp = PR_NULL;
-	LPSPropValue lpBody, lpHtml, lpRtfCompressed, lpRtfInSync;
-
-	lpBody = PpropFindProp(lpPropArray, cValues, CHANGE_PROP_TYPE(PR_BODY, PT_UNSPECIFIED));
+	auto lpBody = PCpropFindProp(lpPropArray, cValues, CHANGE_PROP_TYPE(PR_BODY, PT_UNSPECIFIED));
 	if (!lpBody)
-		goto exit;
-
-	lpHtml = PpropFindProp(lpPropArray, cValues, CHANGE_PROP_TYPE(PR_HTML, PT_UNSPECIFIED));
+		return PR_NULL;
+	auto lpHtml = PCpropFindProp(lpPropArray, cValues, CHANGE_PROP_TYPE(PR_HTML, PT_UNSPECIFIED));
 	if (!lpHtml)
-		goto exit;
-
-	lpRtfCompressed = PpropFindProp(lpPropArray, cValues, CHANGE_PROP_TYPE(PR_RTF_COMPRESSED, PT_UNSPECIFIED));
+		return PR_NULL;
+	auto lpRtfCompressed = PCpropFindProp(lpPropArray, cValues, CHANGE_PROP_TYPE(PR_RTF_COMPRESSED, PT_UNSPECIFIED));
 	if (!lpRtfCompressed)
-		goto exit;
-
-	lpRtfInSync = PpropFindProp(lpPropArray, cValues, CHANGE_PROP_TYPE(PR_RTF_IN_SYNC, PT_UNSPECIFIED));
+		return PR_NULL;
+	auto lpRtfInSync = PCpropFindProp(lpPropArray, cValues, CHANGE_PROP_TYPE(PR_RTF_IN_SYNC, PT_UNSPECIFIED));
 	if (!lpRtfInSync)
-		goto exit;
-
-	ulProp = GetBestBody(lpBody, lpHtml, lpRtfCompressed, lpRtfInSync, ulFlags);
-
-exit:
-	return ulProp;
+		return PR_NULL;
+	return GetBestBody(lpBody, lpHtml, lpRtfCompressed, lpRtfInSync, ulFlags);
 }
 
 /**
@@ -2621,13 +2425,12 @@ exit:
 bool Util::IsBodyProp(ULONG ulPropTag)
 {
 	switch (PROP_ID(ulPropTag)) {
-		case PROP_ID(PR_BODY):
-		case PROP_ID(PR_HTML):
-		case PROP_ID(PR_RTF_COMPRESSED):
-			return true;
-
-		default:
-			return false;
+	case PROP_ID(PR_BODY):
+	case PROP_ID(PR_HTML):
+	case PROP_ID(PR_RTF_COMPRESSED):
+		return true;
+	default:
+		return false;
 	}
 }
 
@@ -2646,7 +2449,7 @@ HRESULT Util::FindInterface(LPCIID lpIID, ULONG ulIIDs, LPCIID lpIIDs) {
 	ULONG i;
 
 	if (!lpIIDs || !lpIID)
-		goto exit;
+		return MAPI_E_NOT_FOUND;
 
 	for (i = 0; i < ulIIDs; ++i) {
 		if (*lpIID == lpIIDs[i]) {
@@ -2654,8 +2457,6 @@ HRESULT Util::FindInterface(LPCIID lpIID, ULONG ulIIDs, LPCIID lpIIDs) {
 			break;
 		}
 	}
-
-exit:
 	return hr;
 }
 
@@ -2668,27 +2469,17 @@ exit:
  * @return MAPI error code
  */
 HRESULT Util::CopyStream(LPSTREAM lpSrc, LPSTREAM lpDest) {
-	HRESULT hr;
 	ULARGE_INTEGER liRead = {{0}}, liWritten = {{0}};
 	STATSTG stStatus;
-
-	hr = lpSrc->Stat(&stStatus, 0);
+	HRESULT hr = lpSrc->Stat(&stStatus, 0);
 	if (FAILED(hr))
-		goto exit;
-
+		return hr;
 	hr = lpSrc->CopyTo(lpDest, stStatus.cbSize, &liRead, &liWritten);
 	if (FAILED(hr))
-		goto exit;
-
-	if (liRead.QuadPart != liWritten.QuadPart) {
-		hr = MAPI_W_PARTIAL_COMPLETION;
-		goto exit;
-	}
-
-	hr = lpDest->Commit(0);
-
-exit:
-	return hr;
+		return hr;
+	if (liRead.QuadPart != liWritten.QuadPart)
+		return MAPI_W_PARTIAL_COMPLETION;
+	return lpDest->Commit(0);
 }
 
 /** 
@@ -2701,52 +2492,35 @@ exit:
  */
 HRESULT Util::CopyRecipients(LPMESSAGE lpSrc, LPMESSAGE lpDest) {
 	HRESULT hr;
-	LPMAPITABLE lpTable = NULL;
-	LPSRowSet lpRows = NULL;
-	LPSPropTagArray lpTableColumns = NULL;
+	object_ptr<IMAPITable> lpTable;
+	rowset_ptr lpRows;
+	memory_ptr<SPropTagArray> lpTableColumns;
 	ULONG ulRows = 0;
 
-	hr = lpSrc->GetRecipientTable(MAPI_UNICODE, &lpTable);
+	hr = lpSrc->GetRecipientTable(MAPI_UNICODE, &~lpTable);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpTable->QueryColumns(TBL_ALL_COLUMNS, &lpTableColumns);
+		return hr;
+	hr = lpTable->QueryColumns(TBL_ALL_COLUMNS, &~lpTableColumns);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpTable->SetColumns(lpTableColumns, 0);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpTable->GetRowCount(0, &ulRows);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	if (ulRows == 0)	// Nothing to do!
-		goto exit;
-
-	hr = lpTable->QueryRows(ulRows, 0, &lpRows);
+		return hrSuccess;
+	hr = lpTable->QueryRows(ulRows, 0, &~lpRows);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	// LPADRLIST and LPSRowSet are binary compatible \o/
-	hr = lpDest->ModifyRecipients(MODRECIP_ADD, (LPADRLIST)lpRows);
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-	MAPIFreeBuffer(lpTableColumns);
-	if (lpRows)
-		FreeProws(lpRows);
-
-	if (lpTable)
-		lpTable->Release();
-
-	return hr;
+	return lpDest->ModifyRecipients(MODRECIP_ADD,
+	       reinterpret_cast<ADRLIST *>(lpRows.get()));
 }
 
 /** 
- * Copy an single-instance id to another object, if possible.
+ * Copy a single-instance id to another object, if possible.
  * 
  * @param lpSrc Source object (message or attachment)
  * @param lpDst Destination object to have the same contents as source
@@ -2755,21 +2529,18 @@ exit:
  */
 HRESULT Util::CopyInstanceIds(LPMAPIPROP lpSrc, LPMAPIPROP lpDst)
 {
-	HRESULT hr = hrSuccess;
-	IECSingleInstance *lpSrcInstance = NULL;
-	IECSingleInstance *lpDstInstance = NULL;
+	object_ptr<IECSingleInstance> lpSrcInstance, lpDstInstance;
 	ULONG cbInstanceID = 0;
-	LPENTRYID lpInstanceID = NULL;
+	memory_ptr<ENTRYID> lpInstanceID;
 
 	/* 
 	 * We are always going to return hrSuccess, if for some reason we can't copy the single instance,
 	 * we always have the real data as fallback.
 	 */
-	if (lpSrc->QueryInterface(IID_IECSingleInstance, (LPVOID *)&lpSrcInstance) != hrSuccess)
-		goto exit;
-
-	if (lpDst->QueryInterface(IID_IECSingleInstance, (LPVOID *)&lpDstInstance) != hrSuccess)
-		goto exit;
+	if (lpSrc->QueryInterface(IID_IECSingleInstance, &~lpSrcInstance) != hrSuccess)
+		return hrSuccess;
+	if (lpDst->QueryInterface(IID_IECSingleInstance, &~lpDstInstance) != hrSuccess)
+		return hrSuccess;
 
 	/*
 	 * Transfer instance Id, if this succeeds we're in luck and we might not
@@ -2778,19 +2549,11 @@ HRESULT Util::CopyInstanceIds(LPMAPIPROP lpSrc, LPMAPIPROP lpDst)
 	 * SetSingleInstanceId() and SaveChanges(). In that case SaveChanges will fail
 	 * and we will have to resend the attachment data.
 	 */
-	if (lpSrcInstance->GetSingleInstanceId(&cbInstanceID, &lpInstanceID) != hrSuccess)
-		goto exit;
-
+	if (lpSrcInstance->GetSingleInstanceId(&cbInstanceID, &~lpInstanceID) != hrSuccess)
+		return hrSuccess;
 	if (lpDstInstance->SetSingleInstanceId(cbInstanceID, lpInstanceID) != hrSuccess)
-		goto exit;
-
-exit:
-	if (lpSrcInstance)
-		lpSrcInstance->Release();
-	if (lpDstInstance)
-		lpDstInstance->Release();
-	MAPIFreeBuffer(lpInstanceID);
-	return hr;
+		return hrSuccess;
+	return hrSuccess;
 }
 
 /** 
@@ -2805,14 +2568,8 @@ exit:
  */
 HRESULT Util::CopyAttachmentProps(LPATTACH lpSrcAttach, LPATTACH lpDstAttach, LPSPropTagArray lpExcludeProps)
 {
-	HRESULT hr = hrSuccess;
-
-	hr = Util::DoCopyTo(&IID_IAttachment, lpSrcAttach, 0, NULL, lpExcludeProps, 0, NULL, &IID_IAttachment, lpDstAttach, 0, NULL);
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-	return hr;
+	return Util::DoCopyTo(&IID_IAttachment, lpSrcAttach, 0, NULL,
+	       lpExcludeProps, 0, NULL, &IID_IAttachment, lpDstAttach, 0, NULL);
 }
 
 /** 
@@ -2830,66 +2587,55 @@ HRESULT Util::CopyAttachments(LPMESSAGE lpSrc, LPMESSAGE lpDest, LPSRestriction 
 	bool bPartial = false;
 
 	// table
-	LPMAPITABLE lpTable = NULL;
-	LPSRowSet lpRows = NULL;
-	LPSPropTagArray lpTableColumns = NULL;
+	object_ptr<IMAPITable> lpTable;
+	rowset_ptr lpRows;
+	memory_ptr<SPropTagArray> lpTableColumns;
 	ULONG ulRows = 0;
 
 	// attachments
-	LPSPropValue lpAttachNum = NULL;
-	LPSPropValue lpHasAttach = NULL;
+	memory_ptr<SPropValue> lpHasAttach;
 	ULONG ulAttachNr = 0;
-	LPATTACH lpSrcAttach = NULL;
-	LPATTACH lpDestAttach = NULL;
 
-	hr = HrGetOneProp(lpSrc, PR_HASATTACH, &lpHasAttach);
-	if (hr != hrSuccess) {
-		hr = hrSuccess;
-		goto exit;
-	}
+	hr = HrGetOneProp(lpSrc, PR_HASATTACH, &~lpHasAttach);
+	if (hr != hrSuccess)
+		return hrSuccess;
 	if (lpHasAttach->Value.b == FALSE)
-		goto exit;
-
-	hr = lpSrc->GetAttachmentTable(MAPI_UNICODE, &lpTable);
+		return hrSuccess;
+	hr = lpSrc->GetAttachmentTable(MAPI_UNICODE, &~lpTable);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpTable->QueryColumns(TBL_ALL_COLUMNS, &lpTableColumns);
+		return hr;
+	hr = lpTable->QueryColumns(TBL_ALL_COLUMNS, &~lpTableColumns);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpTable->SetColumns(lpTableColumns, 0);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	if (lpRestriction) {
 		hr = lpTable->Restrict(lpRestriction, 0);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
 
 	hr = lpTable->GetRowCount(0, &ulRows);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpTable->QueryRows(ulRows, 0, &lpRows);
+		return hr;
+	hr = lpTable->QueryRows(ulRows, 0, &~lpRows);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	for (ULONG i = 0; i < lpRows->cRows; ++i) {
-		lpAttachNum = PpropFindProp(lpRows->aRow[i].lpProps, lpRows->aRow[i].cValues, PR_ATTACH_NUM);
+		object_ptr<IAttach> lpDestAttach, lpSrcAttach;
+		auto lpAttachNum = PCpropFindProp(lpRows->aRow[i].lpProps, lpRows->aRow[i].cValues, PR_ATTACH_NUM);
 		if (!lpAttachNum) {
 			bPartial = true;
 			goto next_attach;
 		}
-
-		hr = lpSrc->OpenAttach(lpAttachNum->Value.ul, NULL, 0, &lpSrcAttach);
+		hr = lpSrc->OpenAttach(lpAttachNum->Value.ul, NULL, 0, &~lpSrcAttach);
 		if (hr != hrSuccess) {
 			bPartial = true;
 			goto next_attach;
 		}
-
-		hr = lpDest->CreateAttach(NULL, 0, &ulAttachNr, &lpDestAttach);
+		hr = lpDest->CreateAttach(NULL, 0, &ulAttachNr, &~lpDestAttach);
 		if (hr != hrSuccess) {
 			bPartial = true;
 			goto next_attach;
@@ -2909,32 +2655,13 @@ HRESULT Util::CopyAttachments(LPMESSAGE lpSrc, LPMESSAGE lpDest, LPSRestriction 
 
 		hr = lpDestAttach->SaveChanges(0);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 next_attach:
-		if (lpSrcAttach) {
-			lpSrcAttach->Release();
-			lpSrcAttach = NULL;
-		}
-
-		if (lpDestAttach) {
-			lpDestAttach->Release();
-			lpDestAttach = NULL;
-		}
+		;
 	}
 
 	if (bPartial)
 		hr = MAPI_W_PARTIAL_COMPLETION;
-
-exit:
-	MAPIFreeBuffer(lpHasAttach);
-	MAPIFreeBuffer(lpTableColumns);
-	if (lpRows)
-		FreeProws(lpRows);
-
-	if (lpTable)
-		lpTable->Release();
-
 	return hr;
 }
 
@@ -2956,107 +2683,63 @@ exit:
 HRESULT Util::CopyHierarchy(LPMAPIFOLDER lpSrc, LPMAPIFOLDER lpDest, ULONG ulFlags, ULONG ulUIParam, LPMAPIPROGRESS lpProgress) {
 	HRESULT hr;
 	bool bPartial = false;
-	LPMAPITABLE lpTable = NULL;
-	LPSRowSet lpRowSet = NULL;
-	SizedSPropTagArray(2, sptaName) = { 2, { PR_DISPLAY_NAME_W, PR_ENTRYID } };
-	LPMAPIFOLDER lpSrcFolder = NULL, lpDestFolder = NULL;
+	object_ptr<IMAPITable> lpTable;
+	static constexpr const SizedSPropTagArray(2, sptaName) =
+		{2, {PR_DISPLAY_NAME_W, PR_ENTRYID}};
+	object_ptr<IMAPIFolder> lpSrcParam, lpDestParam;
 	ULONG ulObj;
-	LPMAPIFOLDER lpSrcParam = NULL;
-	LPMAPIFOLDER lpDestParam = NULL;
 
 	// sanity checks
-	if (!lpSrc || !lpDest) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	hr = lpSrc->QueryInterface(IID_IMAPIFolder, (void**)&lpSrcParam);
+	if (lpSrc == nullptr || lpDest == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+	hr = lpSrc->QueryInterface(IID_IMAPIFolder, &~lpSrcParam);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpDest->QueryInterface(IID_IMAPIFolder, (void**)&lpDestParam);
+		return hr;
+	hr = lpDest->QueryInterface(IID_IMAPIFolder, &~lpDestParam);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpSrc->GetHierarchyTable(MAPI_UNICODE, &lpTable);
+		return hr;
+	hr = lpSrc->GetHierarchyTable(MAPI_UNICODE, &~lpTable);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpTable->SetColumns((LPSPropTagArray)&sptaName, 0);
+		return hr;
+	hr = lpTable->SetColumns(sptaName, 0);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	while (true) {
-		hr = lpTable->QueryRows(1, 0, &lpRowSet);
-		if (hr != hrSuccess)
-			goto exit;
+		object_ptr<IMAPIFolder> lpSrcFolder, lpDestFolder;
+		rowset_ptr lpRowSet;
 
+		hr = lpTable->QueryRows(1, 0, &~lpRowSet);
+		if (hr != hrSuccess)
+			return hr;
 		if (lpRowSet->cRows == 0)
 			break;
-
-		hr = lpSrc->OpenEntry(lpRowSet->aRow[0].lpProps[1].Value.bin.cb, (LPENTRYID)lpRowSet->aRow[0].lpProps[1].Value.bin.lpb, &IID_IMAPIFolder, 0, &ulObj, (LPUNKNOWN*)&lpSrcFolder);
+		hr = lpSrc->OpenEntry(lpRowSet->aRow[0].lpProps[1].Value.bin.cb, reinterpret_cast<ENTRYID *>(lpRowSet->aRow[0].lpProps[1].Value.bin.lpb), &IID_IMAPIFolder, 0, &ulObj, &~lpSrcFolder);
 		if (hr != hrSuccess) {
 			bPartial = true;
-			goto next_folder;
+			continue;
 		}
-
 		hr = lpDest->CreateFolder(FOLDER_GENERIC, (LPTSTR)lpRowSet->aRow[0].lpProps[0].Value.lpszW, NULL, &IID_IMAPIFolder,
-								  MAPI_UNICODE | (ulFlags & MAPI_NOREPLACE ? 0 : OPEN_IF_EXISTS), &lpDestFolder);
+		     MAPI_UNICODE | (ulFlags & MAPI_NOREPLACE ? 0 : OPEN_IF_EXISTS), &~lpDestFolder);
 		if (hr != hrSuccess) {
 			bPartial = true;
-			goto next_folder;
+			continue;
 		}
 
 		hr = Util::DoCopyTo(&IID_IMAPIFolder, lpSrcFolder, 0, NULL, NULL, ulUIParam, lpProgress, &IID_IMAPIFolder, lpDestFolder, ulFlags, NULL);
 		if (FAILED(hr))
-			goto exit;
+			return hr;
 		else if (hr != hrSuccess) {
 			bPartial = true;
-			goto next_folder;
+			continue;
 		}
 
 		if (ulFlags & MAPI_MOVE)
 			lpSrc->DeleteFolder(lpRowSet->aRow[0].lpProps[1].Value.bin.cb, (LPENTRYID)lpRowSet->aRow[0].lpProps[1].Value.bin.lpb, 0, NULL, 0);
-
-next_folder:
-		if (lpRowSet) {
-			FreeProws(lpRowSet);
-			lpRowSet = NULL;
-		}
-
-		if (lpSrcFolder) {
-			lpSrcFolder->Release();
-			lpSrcFolder = NULL;
-		}
-
-		if (lpDestFolder) {
-			lpDestFolder->Release();
-			lpDestFolder = NULL;
-		}
 	}
 
 	if (bPartial)
 		hr = MAPI_W_PARTIAL_COMPLETION;
-
-exit:
-	if (lpDestParam)
-		lpDestParam->Release();
-
-	if (lpSrcParam)
-		lpSrcParam->Release();
-
-	if (lpRowSet)
-		FreeProws(lpRowSet);
-
-	if (lpSrcFolder)
-		lpSrcFolder->Release();
-
-	if (lpDestFolder)
-		lpDestFolder->Release();
-
-	if (lpTable)
-		lpTable->Release();
-
 	return hr;
 }
 
@@ -3076,58 +2759,54 @@ exit:
 HRESULT Util::CopyContents(ULONG ulWhat, LPMAPIFOLDER lpSrc, LPMAPIFOLDER lpDest, ULONG ulFlags, ULONG ulUIParam, LPMAPIPROGRESS lpProgress) {
 	HRESULT hr;
 	bool bPartial = false;
-	LPMAPITABLE lpTable = NULL;
-	LPSRowSet lpRowSet = NULL;
-	SizedSPropTagArray(1, sptaEntryID) = { 1, { PR_ENTRYID } };
+	object_ptr<IMAPITable> lpTable;
+	static constexpr const SizedSPropTagArray(1, sptaEntryID) = {1, {PR_ENTRYID}};
 	ULONG ulObj;
-	LPMESSAGE lpSrcMessage = NULL, lpDestMessage = NULL;
-	LPENTRYLIST lpDeleteEntries = NULL;
+	memory_ptr<ENTRYLIST> lpDeleteEntries;
 
-	hr = lpSrc->GetContentsTable(MAPI_UNICODE | ulWhat, &lpTable);
+	hr = lpSrc->GetContentsTable(MAPI_UNICODE | ulWhat, &~lpTable);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpTable->SetColumns((LPSPropTagArray)&sptaEntryID, 0);
+		return hr;
+	hr = lpTable->SetColumns(sptaEntryID, 0);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = MAPIAllocateBuffer(sizeof(ENTRYLIST), (void**)&lpDeleteEntries);
+		return hr;
+	hr = MAPIAllocateBuffer(sizeof(ENTRYLIST), &~lpDeleteEntries);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = MAPIAllocateMore(sizeof(SBinary)*MAX_ROWS, lpDeleteEntries, (void**)&lpDeleteEntries->lpbin);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	while (true) {
-		hr = lpTable->QueryRows(MAX_ROWS, 0, &lpRowSet);
+		rowset_ptr lpRowSet;
+		hr = lpTable->QueryRows(MAX_ROWS, 0, &~lpRowSet);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		if (lpRowSet->cRows == 0)
 			break;
 
 		lpDeleteEntries->cValues = 0;
 
 		for (ULONG i = 0; i < lpRowSet->cRows; ++i) {
-			hr = lpSrc->OpenEntry(lpRowSet->aRow[i].lpProps[0].Value.bin.cb, (LPENTRYID)lpRowSet->aRow[i].lpProps[0].Value.bin.lpb, &IID_IMessage, 0, &ulObj, (LPUNKNOWN*)&lpSrcMessage);
-			if (hr != hrSuccess) {
-				bPartial = true;
-				goto next_item;
-			}
+			object_ptr<IMessage> lpSrcMessage, lpDestMessage;
 
-			hr = lpDest->CreateMessage(&IID_IMessage, ulWhat | MAPI_MODIFY, &lpDestMessage);
+			hr = lpSrc->OpenEntry(lpRowSet->aRow[i].lpProps[0].Value.bin.cb, reinterpret_cast<ENTRYID *>(lpRowSet->aRow[i].lpProps[0].Value.bin.lpb), &IID_IMessage, 0, &ulObj, &~lpSrcMessage);
 			if (hr != hrSuccess) {
 				bPartial = true;
-				goto next_item;
+				continue;
+			}
+			hr = lpDest->CreateMessage(&IID_IMessage, ulWhat | MAPI_MODIFY, &~lpDestMessage);
+			if (hr != hrSuccess) {
+				bPartial = true;
+				continue;
 			}
 
 			hr = Util::DoCopyTo(&IID_IMessage, lpSrcMessage, 0, NULL, NULL, ulUIParam, lpProgress, &IID_IMessage, lpDestMessage, ulFlags, NULL);
 			if (FAILED(hr))
-				goto exit;
+				return hr;
 			else if (hr != hrSuccess) {
 				bPartial = true;
-				goto next_item;
+				continue;
 			}
 
 			hr = lpDestMessage->SaveChanges(0);
@@ -3138,46 +2817,14 @@ HRESULT Util::CopyContents(ULONG ulWhat, LPMAPIFOLDER lpSrc, LPMAPIFOLDER lpDest
 				lpDeleteEntries->lpbin[lpDeleteEntries->cValues].lpb = lpRowSet->aRow[i].lpProps[0].Value.bin.lpb;
 				++lpDeleteEntries->cValues;
 			}
-next_item:
-			if (lpDestMessage) {
-				lpDestMessage->Release();
-				lpDestMessage = NULL;
-			}
-
-			if (lpSrcMessage) {
-				lpSrcMessage->Release();
-				lpSrcMessage = NULL;
-			}
 		}
-
-		if ((ulFlags & MAPI_MOVE) && lpDeleteEntries->cValues > 0) {
-			if (lpSrc->DeleteMessages(lpDeleteEntries, 0, NULL, 0) != hrSuccess)
-				bPartial = true;
-		}
-
-		if (lpRowSet) {
-			FreeProws(lpRowSet);
-			lpRowSet = NULL;
-		}
+		if (ulFlags & MAPI_MOVE && lpDeleteEntries->cValues > 0 &&
+		    lpSrc->DeleteMessages(lpDeleteEntries, 0, NULL, 0) != hrSuccess)
+			bPartial = true;
 	}
 
 	if (bPartial)
 		hr = MAPI_W_PARTIAL_COMPLETION;
-
-exit:
-	MAPIFreeBuffer(lpDeleteEntries);
-	if (lpDestMessage)
-		lpDestMessage->Release();
-
-	if (lpSrcMessage)
-		lpSrcMessage->Release();
-
-	if (lpRowSet)
-		FreeProws(lpRowSet);
-
-	if (lpTable)
-		lpTable->Release();
-
 	return hr;
 }
 
@@ -3198,33 +2845,21 @@ exit:
  */
 HRESULT Util::TryOpenProperty(ULONG ulPropType, ULONG ulSrcPropTag, LPMAPIPROP lpPropSrc, ULONG ulDestPropTag, LPMAPIPROP lpPropDest, LPSTREAM *lppSrcStream, LPSTREAM *lppDestStream) {
 	HRESULT hr;
-	LPSTREAM lpSrc = NULL, lpDest = NULL;
+	object_ptr<IStream> lpSrc, lpDest;
 
-	hr = lpPropSrc->OpenProperty(PROP_TAG(ulPropType, PROP_ID(ulSrcPropTag)), &IID_IStream, 0, 0, (LPUNKNOWN*)&lpSrc);
+	hr = lpPropSrc->OpenProperty(PROP_TAG(ulPropType, PROP_ID(ulSrcPropTag)), &IID_IStream, 0, 0, &~lpSrc);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// some mapi functions/providers don't implement STGM_TRANSACTED, retry again without this flag
-	hr = lpPropDest->OpenProperty(PROP_TAG(ulPropType, PROP_ID(ulDestPropTag)), &IID_IStream, STGM_WRITE | STGM_TRANSACTED, MAPI_CREATE | MAPI_MODIFY, (LPUNKNOWN*)&lpDest);
-	if (hr != hrSuccess) {
-		hr = lpPropDest->OpenProperty(PROP_TAG(ulPropType, PROP_ID(ulDestPropTag)), &IID_IStream, STGM_WRITE, MAPI_CREATE | MAPI_MODIFY, (LPUNKNOWN*)&lpDest);
-	}
+	hr = lpPropDest->OpenProperty(PROP_TAG(ulPropType, PROP_ID(ulDestPropTag)), &IID_IStream, STGM_WRITE | STGM_TRANSACTED, MAPI_CREATE | MAPI_MODIFY, &~lpDest);
 	if (hr != hrSuccess)
-		goto exit;
-
-	*lppSrcStream = lpSrc;
-	*lppDestStream = lpDest;
-
-exit:
-	if (hr != hrSuccess) {
-		if (lpSrc)
-			lpSrc->Release();
-
-		if (lpDest)
-			lpDest->Release();
-	}
-
-	return hr;
+		hr = lpPropDest->OpenProperty(PROP_TAG(ulPropType, PROP_ID(ulDestPropTag)), &IID_IStream, STGM_WRITE, MAPI_CREATE | MAPI_MODIFY, &~lpDest);
+	if (hr != hrSuccess)
+		return hr;
+	*lppSrcStream = lpSrc.release();
+	*lppDestStream = lpDest.release();
+	return hrSuccess;
 }
 
 /** 
@@ -3238,21 +2873,19 @@ exit:
  * @return MAPI error code
  */
 HRESULT Util::AddProblemToArray(LPSPropProblem lpProblem, LPSPropProblemArray *lppProblems) {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	LPSPropProblemArray lpNewProblems = NULL;
 	LPSPropProblemArray lpOrigProblems = *lppProblems;
 
 	if (!lpOrigProblems) {
 		hr = MAPIAllocateBuffer(CbNewSPropProblemArray(1), (void**)&lpNewProblems);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		lpNewProblems->cProblem = 1;
 	} else {
 		hr = MAPIAllocateBuffer(CbNewSPropProblemArray(lpOrigProblems->cProblem+1), (void**)&lpNewProblems);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		lpNewProblems->cProblem = lpOrigProblems->cProblem +1;
 		memcpy(lpNewProblems->aProblem, lpOrigProblems->aProblem, sizeof(SPropProblem) * lpOrigProblems->cProblem);
 		MAPIFreeBuffer(lpOrigProblems);
@@ -3261,9 +2894,7 @@ HRESULT Util::AddProblemToArray(LPSPropProblem lpProblem, LPSPropProblemArray *l
 	memcpy(&lpNewProblems->aProblem[lpNewProblems->cProblem -1], lpProblem, sizeof(SPropProblem));
 
 	*lppProblems = lpNewProblems;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -3284,9 +2915,10 @@ exit:
  * 
  * @return MAPI error code
  */
-HRESULT Util::DoCopyTo(LPCIID lpSrcInterface, LPVOID lpSrcObj, ULONG ciidExclude, LPCIID rgiidExclude,
-					   LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpDestInterface,
-					   LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray * lppProblems)
+HRESULT Util::DoCopyTo(LPCIID lpSrcInterface, LPVOID lpSrcObj,
+    ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps,
+    ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpDestInterface,
+    void *lpDestObj, ULONG ulFlags, SPropProblemArray **lppProblems)
 {
 	HRESULT hr = hrSuccess;
 	LPUNKNOWN lpUnkSrc = (LPUNKNOWN)lpSrcObj, lpUnkDest = (LPUNKNOWN)lpDestObj;
@@ -3298,8 +2930,8 @@ HRESULT Util::DoCopyTo(LPCIID lpSrcInterface, LPVOID lpSrcObj, ULONG ciidExclude
 													 PR_OBJECT_TYPE, PR_ENTRYID, PR_PARENT_ENTRYID, PR_INTERNET_CONTENT,
 													 PR_NULL, PR_NULL, PR_NULL, PR_NULL }};
 
-	LPMAPIPROP lpPropSrc = NULL, lpPropDest = NULL;
-	LPSPropTagArray lpSPropTagArray = NULL;
+	object_ptr<IMAPIProp> lpPropSrc, lpPropDest;
+	memory_ptr<SPropTagArray> lpSPropTagArray;
 
 	if (!lpSrcInterface || !lpSrcObj || !lpDestInterface || !lpDestObj) {
 		hr = MAPI_E_INVALID_PARAMETER;
@@ -3396,19 +3028,15 @@ HRESULT Util::DoCopyTo(LPCIID lpSrcInterface, LPVOID lpSrcObj, ULONG ciidExclude
 	}
 
 	// we have a IMAPIProp compatible interface here, and we don't want to crash
-	hr = QueryInterfaceMapiPropOrValidFallback(lpUnkSrc, lpSrcInterface, (IUnknown**)&lpPropSrc);
+	hr = QueryInterfaceMapiPropOrValidFallback(lpUnkSrc, lpSrcInterface, &~lpPropSrc);
 	if (hr != hrSuccess)
 		goto exit;
-
-	hr = QueryInterfaceMapiPropOrValidFallback(lpUnkDest, lpDestInterface, (IUnknown**)&lpPropDest);
+	hr = QueryInterfaceMapiPropOrValidFallback(lpUnkDest, lpDestInterface, &~lpPropDest);
 	if (hr != hrSuccess)
 		goto exit;
-
-	if(!FHasHTML(lpPropDest)) {
+	if (!FHasHTML(lpPropDest))
 		sExtraExcludes.aulPropTag[sExtraExcludes.cValues++] = PR_HTML;
-	}
-
-	hr = lpPropSrc->GetPropList(MAPI_UNICODE, &lpSPropTagArray);
+	hr = lpPropSrc->GetPropList(MAPI_UNICODE, &~lpSPropTagArray);
 	if (FAILED(hr))
 		goto exit;
 
@@ -3417,7 +3045,7 @@ HRESULT Util::DoCopyTo(LPCIID lpSrcInterface, LPVOID lpSrcObj, ULONG ciidExclude
 		for (ULONG i = 0; i < lpSPropTagArray->cValues; ++i) {
 			if (lpExcludeProps && Util::FindPropInArray(lpExcludeProps, CHANGE_PROP_TYPE(lpSPropTagArray->aulPropTag[i], PT_UNSPECIFIED)) != -1)
 				lpSPropTagArray->aulPropTag[i] = PR_NULL;
-			else if (Util::FindPropInArray((LPSPropTagArray)&sExtraExcludes, CHANGE_PROP_TYPE(lpSPropTagArray->aulPropTag[i], PT_UNSPECIFIED)) != -1)
+			else if (Util::FindPropInArray(sExtraExcludes, CHANGE_PROP_TYPE(lpSPropTagArray->aulPropTag[i], PT_UNSPECIFIED)) != -1)
 				lpSPropTagArray->aulPropTag[i] = PR_NULL;
 		}
 	}
@@ -3436,10 +3064,10 @@ HRESULT Util::DoCopyTo(LPCIID lpSrcInterface, LPVOID lpSrcObj, ULONG ciidExclude
 			bAddRecip = true;
 
 		if (bAddAttach || bAddRecip) {
-			LPSPropTagArray lpTempSPropTagArray = NULL;
+			memory_ptr<SPropTagArray> lpTempSPropTagArray;
 			ULONG ulNewPropCount = lpSPropTagArray->cValues + (bAddAttach ? (bAddRecip ? 2 : 1) : 1);
 			
-			hr = MAPIAllocateBuffer(CbNewSPropTagArray(ulNewPropCount), (LPVOID*)&lpTempSPropTagArray);
+			hr = MAPIAllocateBuffer(CbNewSPropTagArray(ulNewPropCount), &~lpTempSPropTagArray);
 			if (hr != hrSuccess)
 				goto exit;
 
@@ -3452,7 +3080,6 @@ HRESULT Util::DoCopyTo(LPCIID lpSrcInterface, LPVOID lpSrcObj, ULONG ciidExclude
 			lpTempSPropTagArray->cValues = ulNewPropCount;
 
 			std::swap(lpTempSPropTagArray, lpSPropTagArray);
-			MAPIFreeBuffer(lpTempSPropTagArray);
 		}
 	}
 
@@ -3467,18 +3094,11 @@ exit:
 	// Partial warning when data was copied.
 	if (bPartial)
 		hr = MAPI_W_PARTIAL_COMPLETION;
-	MAPIFreeBuffer(lpSPropTagArray);
-	if (lpPropSrc)
-		lpPropSrc->Release();
-
-	if (lpPropDest)
-		lpPropDest->Release();
-
 	return hr;
 }
 
 /**
- * Check if the interface is an validate IMAPIProp interface
+ * Check if the interface is a valid IMAPIProp interface
  *
  * @param[in] lpInterface Pointer to an interface GUID
  *
@@ -3487,10 +3107,8 @@ exit:
  */
 HRESULT Util::ValidMapiPropInterface(LPCIID lpInterface)
 {
-	HRESULT hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
-	
 	if (!lpInterface)
-		goto exit;
+		return MAPI_E_INTERFACE_NOT_SUPPORTED;
 
 	if (*lpInterface == IID_IAttachment ||
 		*lpInterface == IID_IMAPIProp ||
@@ -3503,12 +3121,8 @@ HRESULT Util::ValidMapiPropInterface(LPCIID lpInterface)
 		*lpInterface == IID_IMAPIFolder ||
 		*lpInterface == IID_IABContainer ||
 		*lpInterface == IID_IDistList)
-	{
-		hr = S_OK;
-	}
-
-exit:
-	return hr;
+		return S_OK;
+	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
 /**
@@ -3523,27 +3137,17 @@ exit:
  */
 HRESULT Util::QueryInterfaceMapiPropOrValidFallback(LPUNKNOWN lpInObj, LPCIID lpInterface, LPUNKNOWN *lppOutObj)
 {
-	HRESULT hr = hrSuccess;
+	if (lpInObj == NULL || lppOutObj == NULL)
+		return MAPI_E_INTERFACE_NOT_SUPPORTED;
 
-	if (!lpInObj || !lppOutObj) {
-		hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
-		goto exit;
-	}
-
-	hr = lpInObj->QueryInterface(IID_IMAPIProp, (void**)lppOutObj);
+	HRESULT hr = lpInObj->QueryInterface(IID_IMAPIProp,
+	             reinterpret_cast<void **>(lppOutObj));
 	if (hr == hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = ValidMapiPropInterface(lpInterface);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpInObj->QueryInterface(*lpInterface, (void**)lppOutObj);
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-	return hr;
+		return hr;
+	return lpInObj->QueryInterface(*lpInterface, reinterpret_cast<void **>(lppOutObj));
 }
 
 /** 
@@ -3562,71 +3166,75 @@ exit:
  * 
  * @return MAPI error code
  */
-HRESULT Util::DoCopyProps(LPCIID lpSrcInterface, LPVOID lpSrcObj, LPSPropTagArray lpIncludeProps, ULONG ulUIParam,
-						  LPMAPIPROGRESS lpProgress, LPCIID lpDestInterface, LPVOID lpDestObj, ULONG ulFlags,
-						  LPSPropProblemArray * lppProblems)
+HRESULT Util::DoCopyProps(LPCIID lpSrcInterface, void *lpSrcObj,
+    const SPropTagArray *inclprop, ULONG ulUIParam, LPMAPIPROGRESS lpProgress,
+    LPCIID lpDestInterface, void *lpDestObj, ULONG ulFlags,
+    SPropProblemArray **lppProblems)
 {
 	HRESULT hr = hrSuccess;
 	LPUNKNOWN lpUnkSrc = (LPUNKNOWN)lpSrcObj, lpUnkDest = (LPUNKNOWN)lpDestObj;
-	IECUnknown* lpKopano = NULL;
-	LPSPropValue lpZObj = NULL;
+	object_ptr<IECUnknown> lpKopano;
+	memory_ptr<SPropValue> lpZObj, lpProps;
 	bool bPartial = false;
 
-	LPMAPIPROP lpSrcProp = NULL, lpDestProp = NULL;
-	LPSPropValue lpProps = NULL;
+	object_ptr<IMAPIProp> lpSrcProp, lpDestProp;
 	ULONG cValues = 0;
-	LPSPropTagArray lpsDestPropArray = NULL;
-	LPSPropProblemArray lpProblems = NULL;
+	memory_ptr<SPropTagArray> lpsDestPropArray;
+	memory_ptr<SPropProblemArray> lpProblems;
 
 	// named props
 	ULONG cNames = 0;
-	LPSPropTagArray lpsSrcNameTagArray = NULL, lpsDestNameTagArray = NULL;
-	LPMAPINAMEID *lppNames = NULL;
-	LPSPropTagArray lpsDestTagArray = NULL;
+	memory_ptr<SPropTagArray> lpIncludeProps;
+	memory_ptr<SPropTagArray> lpsSrcNameTagArray, lpsDestNameTagArray;
+	memory_ptr<SPropTagArray> lpsDestTagArray;
+	memory_ptr<MAPINAMEID *> lppNames;
 
 	// attachments
-	LPSPropValue lpAttachMethod = NULL;
-	LPSTREAM lpSrcStream = NULL, lpDestStream = NULL;
-	LPMESSAGE lpSrcMessage = NULL, lpDestMessage = NULL;
-
+	memory_ptr<SPropValue> lpAttachMethod;
 	LONG ulIdCPID;
 	LONG ulIdRTF;
 	LONG ulIdHTML;
 	LONG ulIdBODY;
 	ULONG ulBodyProp = PR_BODY;
 
-	if (!lpSrcInterface || !lpDestInterface || !lpSrcObj || !lpDestObj || !lpIncludeProps) {
+	if (lpSrcInterface == nullptr || lpDestInterface == nullptr ||
+	    lpSrcObj == nullptr || lpDestObj == nullptr ||
+	    inclprop == nullptr) {
 		hr = MAPI_E_INVALID_PARAMETER;
 		goto exit;
 	}
 
 	// q-i src and dest to check if IID_IMAPIProp is present
-	hr = QueryInterfaceMapiPropOrValidFallback(lpUnkSrc, lpSrcInterface, (IUnknown**)&lpSrcProp);
+	hr = QueryInterfaceMapiPropOrValidFallback(lpUnkSrc, lpSrcInterface, &~lpSrcProp);
 	if (hr != hrSuccess)
 		goto exit;
-
-	hr = QueryInterfaceMapiPropOrValidFallback(lpUnkDest, lpDestInterface, (IUnknown**)&lpDestProp);
+	hr = QueryInterfaceMapiPropOrValidFallback(lpUnkDest, lpDestInterface, &~lpDestProp);
 	if (hr != hrSuccess)
 		goto exit;
 
 	// take some shortcuts if we're dealing with a Kopano message destination
-	if (HrGetOneProp(lpDestProp, PR_EC_OBJECT, &lpZObj) == hrSuccess) {
-		if (lpZObj->Value.lpszA != NULL)
-			((IECUnknown*)lpZObj->Value.lpszA)->QueryInterface(IID_ECMessage, (void**)&lpKopano);
-	}
+	if (HrGetOneProp(lpDestProp, PR_EC_OBJECT, &~lpZObj) == hrSuccess &&
+	    lpZObj->Value.lpszA != NULL)
+		reinterpret_cast<IECUnknown *>(lpZObj->Value.lpszA)->QueryInterface(IID_ECMessage, &~lpKopano);
+
+	/* remember which props not to copy */
+	hr = MAPIAllocateBuffer(CbNewSPropTagArray(inclprop->cValues), &~lpIncludeProps);
+	if (hr != hrSuccess)
+		return hr;
+	memcpy(lpIncludeProps, inclprop, CbNewSPropTagArray(inclprop->cValues));
 
 	if (ulFlags & MAPI_NOREPLACE) {
-		hr = lpDestProp->GetPropList(MAPI_UNICODE, &lpsDestPropArray);
+		hr = lpDestProp->GetPropList(MAPI_UNICODE, &~lpsDestPropArray);
 		if (hr != hrSuccess)
 			goto exit;
 
 		for (ULONG i = 0; i < lpIncludeProps->cValues; ++i) {
-			if (Util::FindPropInArray(lpsDestPropArray, lpIncludeProps->aulPropTag[i]) != -1) {
-				// hr = MAPI_E_COLLISION;
-				// goto exit;
-				// MSDN says collision, MS MAPI ignores these properties.
-				lpIncludeProps->aulPropTag[i] = PR_NULL;
-			}
+			if (Util::FindPropInArray(lpsDestPropArray, lpIncludeProps->aulPropTag[i]) == -1)
+				continue;
+			// hr = MAPI_E_COLLISION;
+			// goto exit;
+			// MSDN says collision, MS MAPI ignores these properties.
+			lpIncludeProps->aulPropTag[i] = PR_NULL;
 		}
 	}
 
@@ -3662,177 +3270,136 @@ HRESULT Util::DoCopyProps(LPCIID lpSrcInterface, LPVOID lpSrcObj, LPSPropTagArra
 
 	for (ULONG i = 0; i < lpIncludeProps->cValues; ++i) {
 		bool isProblem = false;
-
 		// TODO: ?
 		// for all PT_OBJECT properties on IMAPIProp, MS MAPI tries:
 		// IID_IMessage, IID_IStreamDocfile, IID_IStorage
 
-		if (PROP_TYPE(lpIncludeProps->aulPropTag[i]) == PT_OBJECT ||
-			PROP_ID(lpIncludeProps->aulPropTag[i]) == PROP_ID(PR_ATTACH_DATA_BIN)) {
-			// if IMessage: PR_MESSAGE_RECIPIENTS, PR_MESSAGE_ATTACHMENTS
-			if (*lpSrcInterface == IID_IMessage) {
-
-				if (lpIncludeProps->aulPropTag[i] == PR_MESSAGE_RECIPIENTS) {
-					// TODO: add ulFlags, and check for MAPI_NOREPLACE
-					hr = Util::CopyRecipients((LPMESSAGE)lpSrcObj, (LPMESSAGE)lpDestObj);
-				} else if (lpIncludeProps->aulPropTag[i] == PR_MESSAGE_ATTACHMENTS) {
-					// TODO: add ulFlags, and check for MAPI_NOREPLACE
-					hr = Util::CopyAttachments((LPMESSAGE)lpSrcObj, (LPMESSAGE)lpDestObj, NULL);
-				} else {
-					hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
-				}
-				if (hr != hrSuccess) {
-					isProblem = true;
-					goto next_include_check;
-				}
-
-			} else if (*lpSrcInterface == IID_IMAPIFolder) {
-				// MS MAPI skips these in CopyProps(), for unknown reasons
-				if (lpIncludeProps->aulPropTag[i] == PR_CONTAINER_CONTENTS ||
-					lpIncludeProps->aulPropTag[i] == PR_CONTAINER_HIERARCHY ||
-					lpIncludeProps->aulPropTag[i] == PR_FOLDER_ASSOCIATED_CONTENTS) {
-					lpIncludeProps->aulPropTag[i] = PR_NULL;
-				} else {
-					isProblem = true;
-				}
-			} else if (*lpSrcInterface == IID_IAttachment) {
-				ULONG ulAttachMethod;
-
-				// In attachments, IID_IMessage can be present!  for PR_ATTACH_DATA_OBJ
-				// find method and copy this PT_OBJECT
-				if (HrGetOneProp(lpSrcProp, PR_ATTACH_METHOD, &lpAttachMethod) != hrSuccess) {
-					ulAttachMethod = ATTACH_BY_VALUE;
-				} else {
-					ulAttachMethod = lpAttachMethod->Value.ul;
-				}
-				switch (ulAttachMethod) {
-				case ATTACH_BY_VALUE:
-				case ATTACH_OLE:
-					// stream
-
-					// Not being able to open the source message is not an error: it may just not be there
-					if(((LPATTACH)lpSrcObj)->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, 0, 0, (LPUNKNOWN *)&lpSrcStream) == hrSuccess) {
-						// While dragging and dropping, Outlook 2007 (atleast) returns an internal MAPI object to CopyTo as destination
-						// The internal MAPI object is unable to make a stream STGM_TRANSACTED, so we retry the action without that flag
-						// to get the stream without the transaction feature.
-						hr = ((LPATTACH)lpDestObj)->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, STGM_WRITE | STGM_TRANSACTED, MAPI_CREATE | MAPI_MODIFY, (LPUNKNOWN *)&lpDestStream);
-						if (hr != hrSuccess)
-							hr = ((LPATTACH)lpDestObj)->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, STGM_WRITE, MAPI_CREATE | MAPI_MODIFY, (LPUNKNOWN *)&lpDestStream);
-						if (hr != hrSuccess) {
-							isProblem = true;
-							goto next_include_check;
-						}
-
-						hr = Util::CopyStream(lpSrcStream, lpDestStream);
-						if (hr != hrSuccess) {
-							isProblem = true;
-							goto next_include_check;
-						}
-					} else if(lpAttachMethod->Value.ul == ATTACH_OLE &&
-						((LPATTACH)lpSrcObj)->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IStream, 0, 0, (LPUNKNOWN *)&lpSrcStream) == hrSuccess) {
-						// OLE 2.0 must be open with PR_ATTACH_DATA_OBJ
-
-						hr = ((LPATTACH)lpDestObj)->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IStream, STGM_WRITE | STGM_TRANSACTED, MAPI_CREATE | MAPI_MODIFY, (LPUNKNOWN *)&lpDestStream);
-						if (hr == E_FAIL)
-							hr = ((LPATTACH)lpDestObj)->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IStream, STGM_WRITE, MAPI_CREATE | MAPI_MODIFY, (LPUNKNOWN *)&lpDestStream);
-						if (hr != hrSuccess) {
-							isProblem = true;
-							goto next_include_check;
-						}
-
-						hr = Util::CopyStream(lpSrcStream, lpDestStream);
-						if (hr != hrSuccess) {
-							isProblem = true;
-							goto next_include_check;
-						}
-					}
-
-					break;
-				case ATTACH_EMBEDDED_MSG:
-					// message
-
-					if(((LPATTACH)lpSrcObj)->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, 0, (LPUNKNOWN *)&lpSrcMessage) == hrSuccess) {
-						// Not being able to open the source message is not an error: it may just not be there
-						hr = ((LPATTACH)lpDestObj)->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, MAPI_CREATE | MAPI_MODIFY, (LPUNKNOWN *)&lpDestMessage);
-						if (hr != hrSuccess) {
-							isProblem = true;
-							goto next_include_check;
-						}
-
-						hr = Util::DoCopyTo(&IID_IMessage, lpSrcMessage, 0, NULL, NULL, ulUIParam, lpProgress, &IID_IMessage, lpDestMessage, 0, NULL);
-						if (hr != hrSuccess) {
-							isProblem = true;
-							goto next_include_check;
-						}
-
-						hr = lpDestMessage->SaveChanges(0);
-						if (hr != hrSuccess) {
-							isProblem = true;
-							goto next_include_check;
-						}
-					}
-
-					break;
-				default:
-					// OLE objects?
-					isProblem = true;
-					break;
-				};
+		if (PROP_TYPE(lpIncludeProps->aulPropTag[i]) != PT_OBJECT &&
+		    PROP_ID(lpIncludeProps->aulPropTag[i]) != PROP_ID(PR_ATTACH_DATA_BIN))
+			continue;
+		// if IMessage: PR_MESSAGE_RECIPIENTS, PR_MESSAGE_ATTACHMENTS
+		if (*lpSrcInterface == IID_IMessage) {
+			if (lpIncludeProps->aulPropTag[i] == PR_MESSAGE_RECIPIENTS)
+				// TODO: add ulFlags, and check for MAPI_NOREPLACE
+				hr = Util::CopyRecipients((LPMESSAGE)lpSrcObj, (LPMESSAGE)lpDestObj);
+			else if (lpIncludeProps->aulPropTag[i] == PR_MESSAGE_ATTACHMENTS)
+				// TODO: add ulFlags, and check for MAPI_NOREPLACE
+				hr = Util::CopyAttachments((LPMESSAGE)lpSrcObj, (LPMESSAGE)lpDestObj, NULL);
+			else
+				hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
+			if (hr != hrSuccess) {
+				isProblem = true;
+				goto next_include_check;
+			}
+		} else if (*lpSrcInterface == IID_IMAPIFolder) {
+			// MS MAPI skips these in CopyProps(), for unknown reasons
+			if (lpIncludeProps->aulPropTag[i] == PR_CONTAINER_CONTENTS ||
+				lpIncludeProps->aulPropTag[i] == PR_CONTAINER_HIERARCHY ||
+				lpIncludeProps->aulPropTag[i] == PR_FOLDER_ASSOCIATED_CONTENTS) {
+				lpIncludeProps->aulPropTag[i] = PR_NULL;
 			} else {
 				isProblem = true;
 			}
+		} else if (*lpSrcInterface == IID_IAttachment) {
+			object_ptr<IStream> lpSrcStream, lpDestStream;
+			object_ptr<IMessage> lpSrcMessage, lpDestMessage;
+			ULONG ulAttachMethod;
 
-			// TODO: try the 3 MSMAPI interfaces (message, stream, storage) if unhandled?
-
-next_include_check:
-
-			if (isProblem) {
-				SPropProblem sProblem;
-
-				bPartial = true;
-
-				sProblem.ulIndex = i;
-				sProblem.ulPropTag = lpIncludeProps->aulPropTag[i];
-				sProblem.scode = MAPI_E_INTERFACE_NOT_SUPPORTED; // hr?
-
-				hr = AddProblemToArray(&sProblem, &lpProblems);
-				if (hr != hrSuccess)
-					goto exit;
-			}
-
-			MAPIFreeBuffer(lpAttachMethod);
-			lpAttachMethod = NULL;
-			if (lpDestStream) {
-				lpDestStream->Release();
-				lpDestStream = NULL;
-			}
-
-			if (lpSrcStream) {
-				lpSrcStream->Release();
-				lpSrcStream = NULL;
-			}
-
-			if (lpSrcMessage) {
-				lpSrcMessage->Release();
-				lpSrcMessage = NULL;
-			}
-
-			if (lpDestMessage) {
-				lpDestMessage->Release();
-				lpDestMessage = NULL;
-			}
-
-			// skip this prop for the final SetProps()
-			lpIncludeProps->aulPropTag[i] = PR_NULL;
+			// In attachments, IID_IMessage can be present!  for PR_ATTACH_DATA_OBJ
+			// find method and copy this PT_OBJECT
+			if (HrGetOneProp(lpSrcProp, PR_ATTACH_METHOD, &~lpAttachMethod) != hrSuccess)
+				ulAttachMethod = ATTACH_BY_VALUE;
+			else
+				ulAttachMethod = lpAttachMethod->Value.ul;
+			switch (ulAttachMethod) {
+			case ATTACH_BY_VALUE:
+			case ATTACH_OLE:
+				// stream
+				// Not being able to open the source message is not an error: it may just not be there
+				if (((LPATTACH)lpSrcObj)->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, 0, 0, &~lpSrcStream) == hrSuccess) {
+					// While dragging and dropping, Outlook 2007 (atleast) returns an internal MAPI object to CopyTo as destination
+					// The internal MAPI object is unable to make a stream STGM_TRANSACTED, so we retry the action without that flag
+					// to get the stream without the transaction feature.
+					hr = ((LPATTACH)lpDestObj)->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, STGM_WRITE | STGM_TRANSACTED, MAPI_CREATE | MAPI_MODIFY, &~lpDestStream);
+					if (hr != hrSuccess)
+						hr = ((LPATTACH)lpDestObj)->OpenProperty(PR_ATTACH_DATA_BIN, &IID_IStream, STGM_WRITE, MAPI_CREATE | MAPI_MODIFY, &~lpDestStream);
+					if (hr != hrSuccess) {
+						isProblem = true;
+						goto next_include_check;
+					}
+					hr = Util::CopyStream(lpSrcStream, lpDestStream);
+					if (hr != hrSuccess) {
+						isProblem = true;
+						goto next_include_check;
+					}
+				} else if(lpAttachMethod->Value.ul == ATTACH_OLE &&
+				    ((LPATTACH)lpSrcObj)->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IStream, 0, 0, &~lpSrcStream) == hrSuccess) {
+					// OLE 2.0 must be open with PR_ATTACH_DATA_OBJ
+					hr = ((LPATTACH)lpDestObj)->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IStream, STGM_WRITE | STGM_TRANSACTED, MAPI_CREATE | MAPI_MODIFY, &~lpDestStream);
+					if (hr == E_FAIL)
+						hr = ((LPATTACH)lpDestObj)->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IStream, STGM_WRITE, MAPI_CREATE | MAPI_MODIFY, &~lpDestStream);
+					if (hr != hrSuccess) {
+						isProblem = true;
+						goto next_include_check;
+					}
+					hr = Util::CopyStream(lpSrcStream, lpDestStream);
+					if (hr != hrSuccess) {
+						isProblem = true;
+						goto next_include_check;
+					}
+				}
+				break;
+			case ATTACH_EMBEDDED_MSG:
+				// message
+				if (((LPATTACH)lpSrcObj)->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, 0, &~lpSrcMessage) == hrSuccess) {
+					// Not being able to open the source message is not an error: it may just not be there
+					hr = ((LPATTACH)lpDestObj)->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, MAPI_CREATE | MAPI_MODIFY, &~lpDestMessage);
+					if (hr != hrSuccess) {
+						isProblem = true;
+						goto next_include_check;
+					}
+					hr = Util::DoCopyTo(&IID_IMessage, lpSrcMessage, 0, NULL, NULL, ulUIParam, lpProgress, &IID_IMessage, lpDestMessage, 0, NULL);
+					if (hr != hrSuccess) {
+						isProblem = true;
+						goto next_include_check;
+					}
+					hr = lpDestMessage->SaveChanges(0);
+					if (hr != hrSuccess) {
+						isProblem = true;
+						goto next_include_check;
+					}
+				}
+				break;
+			default:
+				// OLE objects?
+				isProblem = true;
+				break;
+			};
+		} else {
+			isProblem = true;
 		}
+		// TODO: try the 3 MSMAPI interfaces (message, stream, storage) if unhandled?
+next_include_check:
+		if (isProblem) {
+			SPropProblem sProblem;
+			bPartial = true;
+			sProblem.ulIndex = i;
+			sProblem.ulPropTag = lpIncludeProps->aulPropTag[i];
+			sProblem.scode = MAPI_E_INTERFACE_NOT_SUPPORTED; // hr?
+			hr = AddProblemToArray(&sProblem, &+lpProblems);
+			if (hr != hrSuccess)
+				goto exit;
+		}
+		// skip this prop for the final SetProps()
+		lpIncludeProps->aulPropTag[i] = PR_NULL;
 	}
 
-	hr = lpSrcProp->GetProps(lpIncludeProps, 0, &cValues, &lpProps);
+	hr = lpSrcProp->GetProps(lpIncludeProps, 0, &cValues, &~lpProps);
 	if (FAILED(hr))
 		goto exit;
 
-	// make map for destination property tags, because named id's may differ in src and dst
-	hr = MAPIAllocateBuffer(CbNewSPropTagArray(cValues), (void**)&lpsDestTagArray);
+	// make map for destination property tags, because named IDs may differ in src and dst
+	hr = MAPIAllocateBuffer(CbNewSPropTagArray(cValues), &~lpsDestTagArray);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -3845,7 +3412,7 @@ next_include_check:
 	}
 
 	if (cNames) {
-		hr = MAPIAllocateBuffer(CbNewSPropTagArray(cNames), (void**)&lpsSrcNameTagArray);
+		hr = MAPIAllocateBuffer(CbNewSPropTagArray(cNames), &~lpsSrcNameTagArray);
 		if (hr != hrSuccess)
 			goto exit;
 
@@ -3856,27 +3423,25 @@ next_include_check:
 				lpsSrcNameTagArray->aulPropTag[cNames++] = lpProps[i].ulPropTag;
 
 		// ignore warnings on unknown named properties, but don't copy those either (see PT_ERROR below)
-		hr = lpSrcProp->GetNamesFromIDs(&lpsSrcNameTagArray, NULL, 0, &cNames, &lppNames);
+		hr = lpSrcProp->GetNamesFromIDs(&+lpsSrcNameTagArray, NULL, 0, &cNames, &~lppNames);
 		if (FAILED(hr))
 			goto exit;
-
-		hr = lpDestProp->GetIDsFromNames(cNames, lppNames, MAPI_CREATE, &lpsDestNameTagArray);
+		hr = lpDestProp->GetIDsFromNames(cNames, lppNames, MAPI_CREATE, &~lpsDestNameTagArray);
 		if (FAILED(hr))
 			goto exit;
 
 		// make new lookup map for lpProps[] -> lpsDestNameTag[]
 		for (ULONG i = 0, j = 0; i < cValues && j < cNames; ++i) {
-			if (PROP_ID(lpProps[i].ulPropTag) == PROP_ID(lpsSrcNameTagArray->aulPropTag[j])) {
-				if (PROP_TYPE(lpsDestNameTagArray->aulPropTag[j]) != PT_ERROR) {
-					// replace with new proptag, so we can open the correct property
-					lpsDestTagArray->aulPropTag[i] = PROP_TAG(PROP_TYPE(lpProps[i].ulPropTag), PROP_ID(lpsDestNameTagArray->aulPropTag[j]));
-				} else {
-					// leave on PT_ERROR, so we don't copy the property
-					lpsDestTagArray->aulPropTag[i] = PROP_TAG(PT_ERROR, PROP_ID(lpsDestNameTagArray->aulPropTag[j]));
-					// don't even return a warning because although not all data could be copied
-				}
-				++j;
-			}
+			if (PROP_ID(lpProps[i].ulPropTag) != PROP_ID(lpsSrcNameTagArray->aulPropTag[j]))
+				continue;
+			if (PROP_TYPE(lpsDestNameTagArray->aulPropTag[j]) != PT_ERROR)
+				// replace with new proptag, so we can open the correct property
+				lpsDestTagArray->aulPropTag[i] = PROP_TAG(PROP_TYPE(lpProps[i].ulPropTag), PROP_ID(lpsDestNameTagArray->aulPropTag[j]));
+			else
+				// leave on PT_ERROR, so we don't copy the property
+				lpsDestTagArray->aulPropTag[i] = PROP_TAG(PT_ERROR, PROP_ID(lpsDestNameTagArray->aulPropTag[j]));
+				// don't even return a warning because although not all data could be copied
+			++j;
 		}
 	}
 
@@ -3890,38 +3455,27 @@ next_include_check:
 
 	// find all MAPI_E_NOT_ENOUGH_MEMORY errors
 	for (ULONG i = 0; i < cValues; ++i) {
-		if (PROP_TYPE(lpProps[i].ulPropTag) == PT_ERROR && (lpProps[i].Value.err == MAPI_E_NOT_ENOUGH_MEMORY || 
-			(PROP_ID(lpProps[i].ulPropTag) == PROP_ID(PR_BODY) || 
-			 PROP_ID(lpProps[i].ulPropTag) == PROP_ID(PR_HTML) ||
-			 PROP_ID(lpProps[i].ulPropTag) == PROP_ID(PR_RTF_COMPRESSED)) ))
-		{
-
-			ASSERT(PROP_ID(lpIncludeProps->aulPropTag[i]) == PROP_ID(lpProps[i].ulPropTag));
-			
-			hr = Util::TryOpenProperty(PROP_TYPE(lpIncludeProps->aulPropTag[i]), lpProps[i].ulPropTag, lpSrcProp, lpsDestTagArray->aulPropTag[i], lpDestProp, &lpSrcStream, &lpDestStream);
-			if (hr != hrSuccess) {
-				// TODO: check, partial or problemarray?
-				// when the prop was not found (body property), it actually wasn't present, so don't mark as partial
-				if (hr != MAPI_E_NOT_FOUND)
-					bPartial = true;
-				goto next_stream_prop;
-			}
-
-			hr = Util::CopyStream(lpSrcStream, lpDestStream);
-			if (hr != hrSuccess)
+		bool err = false;
+		if(PROP_TYPE(lpProps[i].ulPropTag) == PT_ERROR)
+			err = lpProps[i].Value.err == MAPI_E_NOT_ENOUGH_MEMORY ||
+				PROP_ID(lpProps[i].ulPropTag) == PROP_ID(PR_BODY) ||
+				PROP_ID(lpProps[i].ulPropTag) == PROP_ID(PR_HTML) ||
+				PROP_ID(lpProps[i].ulPropTag) == PROP_ID(PR_RTF_COMPRESSED);
+		if (!err)
+			continue;
+		assert(PROP_ID(lpIncludeProps->aulPropTag[i]) == PROP_ID(lpProps[i].ulPropTag));
+		object_ptr<IStream> lpSrcStream, lpDestStream;
+		hr = Util::TryOpenProperty(PROP_TYPE(lpIncludeProps->aulPropTag[i]), lpProps[i].ulPropTag, lpSrcProp, lpsDestTagArray->aulPropTag[i], lpDestProp, &~lpSrcStream, &~lpDestStream);
+		if (hr != hrSuccess) {
+			// TODO: check, partial or problemarray?
+			// when the prop was not found (body property), it actually wasn't present, so don't mark as partial
+			if (hr != MAPI_E_NOT_FOUND)
 				bPartial = true;
-
-next_stream_prop:
-			if (lpSrcStream) {
-				lpSrcStream->Release();
-				lpSrcStream = NULL;
-			}
-
-			if (lpDestStream) {
-				lpDestStream->Release();
-				lpDestStream = NULL;
-			}
+			continue;
 		}
+		hr = Util::CopyStream(lpSrcStream, lpDestStream);
+		if (hr != hrSuccess)
+			bPartial = true;
 	}
 
 	// set destination proptags in original properties
@@ -3948,43 +3502,9 @@ next_stream_prop:
 exit:
 	if (bPartial)
 		hr = MAPI_W_PARTIAL_COMPLETION;
-
-	if (hr != hrSuccess) {
-		// may not return a problem set when we have an warning/error code in hr
-		MAPIFreeBuffer(lpProblems);
-	} else {
-		if (lppProblems)
-			*lppProblems = lpProblems;
-		else
-			MAPIFreeBuffer(lpProblems);
-	}
-
-	MAPIFreeBuffer(lppNames);
-	MAPIFreeBuffer(lpsSrcNameTagArray);
-	MAPIFreeBuffer(lpsDestNameTagArray);
-	MAPIFreeBuffer(lpsDestTagArray);
-	if (lpSrcMessage)
-		lpSrcMessage->Release();
-
-	if (lpDestMessage)
-		lpDestMessage->Release();
-
-	if (lpSrcStream)
-		lpSrcStream->Release();
-
-	if (lpDestStream)
-		lpDestStream->Release();
-	MAPIFreeBuffer(lpAttachMethod);
-	if (lpSrcProp)
-		lpSrcProp->Release();
-
-	if (lpDestProp)
-		lpDestProp->Release();
-	MAPIFreeBuffer(lpProps);
-	MAPIFreeBuffer(lpsDestPropArray);
-	if (lpKopano)
-		lpKopano->Release();
-	MAPIFreeBuffer(lpZObj);
+	if (hr == hrSuccess && lppProblems != nullptr)
+		// may not return a problem set when we have a warning/error code in hr
+		*lppProblems = lpProblems.release();
 	return hr;
 }
 
@@ -4000,61 +3520,41 @@ exit:
 HRESULT Util::HrCopyIMAPData(LPMESSAGE lpSrcMsg, LPMESSAGE lpDstMsg)
 {
 	HRESULT hr = hrSuccess;
-	LPSTREAM lpSrcStream = NULL;
-	LPSTREAM lpDestStream = NULL;
-	SizedSPropTagArray(3, sptaIMAP) = {
-		3, { PR_EC_IMAP_EMAIL_SIZE,
-			 PR_EC_IMAP_BODY,
-			 PR_EC_IMAP_BODYSTRUCTURE
-		}
-	};
+	object_ptr<IStream> lpSrcStream, lpDestStream;
+	static constexpr const SizedSPropTagArray(3, sptaIMAP) =
+		{3, {PR_EC_IMAP_EMAIL_SIZE, PR_EC_IMAP_BODY,
+		PR_EC_IMAP_BODYSTRUCTURE}};
 	ULONG cValues = 0;
-	LPSPropValue lpIMAPProps = NULL;
+	memory_ptr<SPropValue> lpIMAPProps;
 
 	// special case: get PR_EC_IMAP_BODY if present, and copy with single instance
 	// hidden property in kopano, try to copy contents
-	if (Util::TryOpenProperty(PT_BINARY, PR_EC_IMAP_EMAIL, lpSrcMsg, PR_EC_IMAP_EMAIL, lpDstMsg, &lpSrcStream, &lpDestStream) == hrSuccess) {
-		if (Util::CopyStream(lpSrcStream, lpDestStream) == hrSuccess) {
-			/*
-			 * Try making a single instance copy for IMAP body data (without sending the data to server).
-			 * No error checking, we do not care if this fails, we still have all the data.
-			 */
-			Util::CopyInstanceIds(lpSrcMsg, lpDstMsg);
+	if (Util::TryOpenProperty(PT_BINARY, PR_EC_IMAP_EMAIL, lpSrcMsg,
+	    PR_EC_IMAP_EMAIL, lpDstMsg, &~lpSrcStream, &~lpDestStream) != hrSuccess ||
+	    Util::CopyStream(lpSrcStream, lpDestStream) != hrSuccess)
+		return hrSuccess;
+	/*
+	 * Try making a single instance copy for IMAP body data (without sending the data to server).
+	 * No error checking, we do not care if this fails, we still have all the data.
+	 */
+	Util::CopyInstanceIds(lpSrcMsg, lpDstMsg);
 
-			// Since we have a copy of the original email body, copy the other properties for IMAP too
-			hr = lpSrcMsg->GetProps((LPSPropTagArray)&sptaIMAP, 0, &cValues, &lpIMAPProps);
-			if (FAILED(hr))
-				goto exit;
-
-			hr = lpDstMsg->SetProps(cValues, lpIMAPProps, NULL);
-			if (FAILED(hr))
-				goto exit;
-
-			hr = hrSuccess;
-		}
-	}
-
-exit:
-	if (lpDestStream)
-		lpDestStream->Release();
-
-	if (lpSrcStream)
-		lpSrcStream->Release();
-	MAPIFreeBuffer(lpIMAPProps);
-	return hr;
+	// Since we have a copy of the original email body, copy the other properties for IMAP too
+	hr = lpSrcMsg->GetProps(sptaIMAP, 0, &cValues, &~lpIMAPProps);
+	if (FAILED(hr))
+		return hr;
+	hr = lpDstMsg->SetProps(cValues, lpIMAPProps, NULL);
+	if (FAILED(hr))
+		return hr;
+	return hrSuccess;
 }
 
 HRESULT Util::HrDeleteIMAPData(LPMESSAGE lpMsg)
 {
-	SizedSPropTagArray(4, sptaIMAP) = {
-		4, { PR_EC_IMAP_EMAIL_SIZE,
-			 PR_EC_IMAP_EMAIL,
-			 PR_EC_IMAP_BODY,
-			 PR_EC_IMAP_BODYSTRUCTURE
-		}
-	};
-
-	return lpMsg->DeleteProps((SPropTagArray*)&sptaIMAP, NULL);
+	static constexpr const SizedSPropTagArray(4, sptaIMAP) =
+		{4, { PR_EC_IMAP_EMAIL_SIZE,  PR_EC_IMAP_EMAIL,
+		 PR_EC_IMAP_BODY, PR_EC_IMAP_BODYSTRUCTURE}};
+	return lpMsg->DeleteProps(sptaIMAP, NULL);
 }
 
 /** 
@@ -4070,28 +3570,21 @@ HRESULT Util::HrGetQuotaStatus(IMsgStore *lpMsgStore, ECQUOTA *lpsQuota,
     ECQUOTASTATUS **lppsQuotaStatus)
 {
 	HRESULT			hr = hrSuccess;
-	ECQUOTASTATUS *lpsQuotaStatus = NULL;
-	LPSPropValue 	lpProps = NULL;
-    SizedSPropTagArray(1, sptaProps) = {1, {PR_MESSAGE_SIZE_EXTENDED}};
+	memory_ptr<ECQUOTASTATUS> lpsQuotaStatus;
+	memory_ptr<SPropValue> lpProps;
+	static constexpr const SizedSPropTagArray(1, sptaProps) = {1, {PR_MESSAGE_SIZE_EXTENDED}};
     ULONG 			cValues = 0;
 	
-	if (lpMsgStore == NULL || lppsQuotaStatus == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-	
-	hr = lpMsgStore->GetProps((LPSPropTagArray)&sptaProps, 0, &cValues, &lpProps);
+	if (lpMsgStore == nullptr || lppsQuotaStatus == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+	hr = lpMsgStore->GetProps(sptaProps, 0, &cValues, &~lpProps);
 	if (hr != hrSuccess)
-		goto exit;
-		
-	if (cValues != 1 || lpProps[0].ulPropTag != PR_MESSAGE_SIZE_EXTENDED) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-	
-	hr = MAPIAllocateBuffer(sizeof *lpsQuotaStatus, (void**)&lpsQuotaStatus);
+		return hr;		
+	if (cValues != 1 || lpProps[0].ulPropTag != PR_MESSAGE_SIZE_EXTENDED)
+		return MAPI_E_NOT_FOUND;
+	hr = MAPIAllocateBuffer(sizeof *lpsQuotaStatus, &~lpsQuotaStatus);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	memset(lpsQuotaStatus, 0, sizeof *lpsQuotaStatus);
 	
 	lpsQuotaStatus->llStoreSize = lpProps[0].Value.li.QuadPart;
@@ -4104,14 +3597,8 @@ HRESULT Util::HrGetQuotaStatus(IMsgStore *lpMsgStore, ECQUOTA *lpsQuota,
 		else if (lpsQuota->llWarnSize > 0 && lpsQuotaStatus->llStoreSize > lpsQuota->llWarnSize)
 			lpsQuotaStatus->quotaStatus = QUOTA_WARN;
 	}
-	
-	*lppsQuotaStatus = lpsQuotaStatus;
-	lpsQuotaStatus = NULL;
-	
-exit:
-	MAPIFreeBuffer(lpsQuotaStatus);
-	MAPIFreeBuffer(lpProps);
-	return hr;
+	*lppsQuotaStatus = lpsQuotaStatus.release();
+	return hrSuccess;
 }
 
 /** 
@@ -4131,25 +3618,20 @@ exit:
 HRESULT Util::HrDeleteResidualProps(LPMESSAGE lpDestMsg, LPMESSAGE lpSourceMsg, LPSPropTagArray lpsValidProps)
 {
 	HRESULT			hr = hrSuccess;
-	LPSPropTagArray	lpsPropArray = NULL;
-	LPSPropTagArray	lpsNamedPropArray = NULL;
-	LPSPropTagArray	lpsMappedPropArray = NULL;
+	memory_ptr<SPropTagArray> lpsPropArray, lpsNamedPropArray;
+	memory_ptr<SPropTagArray> lpsMappedPropArray;
 	ULONG			cPropNames = 0;
-	LPMAPINAMEID	*lppPropNames = NULL;
+	memory_ptr<MAPINAMEID *> lppPropNames;
 	PropTagSet		sPropTagSet;
 
-	if (lpDestMsg == NULL || lpSourceMsg == NULL || lpsValidProps == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	hr = lpDestMsg->GetPropList(0, &lpsPropArray);
+	if (lpDestMsg == nullptr || lpSourceMsg == nullptr || lpsValidProps == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+	hr = lpDestMsg->GetPropList(0, &~lpsPropArray);
 	if (hr != hrSuccess || lpsPropArray->cValues == 0)
-		goto exit;
-
-	hr = MAPIAllocateBuffer(CbNewSPropTagArray(lpsValidProps->cValues), (void**)&lpsNamedPropArray);
+		return hr;
+	hr = MAPIAllocateBuffer(CbNewSPropTagArray(lpsValidProps->cValues), &~lpsNamedPropArray);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	memset(lpsNamedPropArray, 0, CbNewSPropTagArray(lpsValidProps->cValues));
 
 	for (unsigned i = 0; i < lpsValidProps->cValues; ++i)
@@ -4157,15 +3639,13 @@ HRESULT Util::HrDeleteResidualProps(LPMESSAGE lpDestMsg, LPMESSAGE lpSourceMsg, 
 			lpsNamedPropArray->aulPropTag[lpsNamedPropArray->cValues++] = lpsValidProps->aulPropTag[i];
 
 	if (lpsNamedPropArray->cValues > 0) {
-		hr = lpSourceMsg->GetNamesFromIDs(&lpsNamedPropArray, NULL, 0, &cPropNames, &lppPropNames);
+		hr = lpSourceMsg->GetNamesFromIDs(&+lpsNamedPropArray, NULL, 0, &cPropNames, &~lppPropNames);
 		if (FAILED(hr))
-			goto exit;
-
-		hr = lpDestMsg->GetIDsFromNames(cPropNames, lppPropNames, MAPI_CREATE, &lpsMappedPropArray);
+			return hr;
+		hr = lpDestMsg->GetIDsFromNames(cPropNames, lppPropNames, MAPI_CREATE, &~lpsMappedPropArray);
 		if (FAILED(hr))
-			goto exit;
+			return hr;
 	}
-	hr = hrSuccess;
 
 	// Add the PropTags the message currently has
 	for (unsigned i = 0; i < lpsPropArray->cValues; ++i)
@@ -4182,28 +3662,20 @@ HRESULT Util::HrDeleteResidualProps(LPMESSAGE lpDestMsg, LPMESSAGE lpSourceMsg, 
 			sPropTagSet.erase(lpsMappedPropArray->aulPropTag[i]);
 
 	if (sPropTagSet.empty())
-		goto exit;
+		return hrSuccess;
 
 	// Reuse lpsPropArray to hold the properties we're going to delete
-	ASSERT(lpsPropArray->cValues >= sPropTagSet.size());
+	assert(lpsPropArray->cValues >= sPropTagSet.size());
 	memset(lpsPropArray->aulPropTag, 0, lpsPropArray->cValues * sizeof *lpsPropArray->aulPropTag);
 	lpsPropArray->cValues = 0;
 
-	for (PropTagSet::const_iterator it = sPropTagSet.begin(); it != sPropTagSet.end(); ++it)
-		lpsPropArray->aulPropTag[lpsPropArray->cValues++] = *it;
+	for (const auto &i : sPropTagSet)
+		lpsPropArray->aulPropTag[lpsPropArray->cValues++] = i;
 
 	hr = lpDestMsg->DeleteProps(lpsPropArray, NULL);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpDestMsg->SaveChanges(KEEP_OPEN_READWRITE);
-
-exit:
-	MAPIFreeBuffer(lpsMappedPropArray);
-	MAPIFreeBuffer(lppPropNames);
-	MAPIFreeBuffer(lpsNamedPropArray);
-	MAPIFreeBuffer(lpsPropArray);
-	return hr;
+		return hr;
+	return lpDestMsg->SaveChanges(KEEP_OPEN_READWRITE);
 }
 
 /** 
@@ -4222,14 +3694,12 @@ exit:
  */
 HRESULT Util::HrFindEntryIDs(ULONG cbEID, LPENTRYID lpEID, ULONG cbEntryIDs, LPSPropValue lpEntryIDs, BOOL *lpbFound, ULONG* lpPos)
 {
-	HRESULT hr = hrSuccess;
 	BOOL bFound = FALSE;
 	ULONG i;
 
-	if (cbEID == 0 || lpEID == NULL || cbEntryIDs == 0 || lpEntryIDs == NULL || lpbFound == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (cbEID == 0 || lpEID == NULL || cbEntryIDs == 0 ||
+	    lpEntryIDs == NULL || lpbFound == NULL)
+		return MAPI_E_INVALID_PARAMETER;
 
 	for (i = 0; bFound == FALSE && i < cbEntryIDs; ++i) {
 		if (PROP_TYPE(lpEntryIDs[i].ulPropTag) != PT_BINARY)
@@ -4245,103 +3715,74 @@ HRESULT Util::HrFindEntryIDs(ULONG cbEID, LPENTRYID lpEID, ULONG cbEntryIDs, LPS
 	*lpbFound = bFound;
 	if (bFound && lpPos)
 		*lpPos = i;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT Util::HrDeleteAttachments(LPMESSAGE lpMsg)
 {
-	HRESULT hr = hrSuccess;
 	MAPITablePtr ptrAttachTable;
 	SRowSetPtr ptrRows;
+	static constexpr const SizedSPropTagArray(1, sptaAttachNum) = {1, {PR_ATTACH_NUM}};
 
-	SizedSPropTagArray(1, sptaAttachNum) = {1, {PR_ATTACH_NUM}};
-
-	if (lpMsg == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	hr = lpMsg->GetAttachmentTable(0, &ptrAttachTable);
+	if (lpMsg == NULL)
+		return MAPI_E_INVALID_PARAMETER;
+	HRESULT hr = lpMsg->GetAttachmentTable(0, &~ptrAttachTable);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = HrQueryAllRows(ptrAttachTable, (LPSPropTagArray)&sptaAttachNum, NULL, NULL, 0, &ptrRows);
+		return hr;
+	hr = HrQueryAllRows(ptrAttachTable, sptaAttachNum, NULL, NULL, 0, &ptrRows);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
 		hr = lpMsg->DeleteAttach(ptrRows[i].lpProps[0].Value.l, 0, NULL, 0);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT Util::HrDeleteRecipients(LPMESSAGE lpMsg)
 {
-	HRESULT hr = hrSuccess;
 	MAPITablePtr ptrRecipTable;
 	SRowSetPtr ptrRows;
+	static constexpr const SizedSPropTagArray(1, sptaRowId) = {1, {PR_ROWID}};
 
-	SizedSPropTagArray(1, sptaRowId) = {1, {PR_ROWID}};
-
-	if (lpMsg == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	hr = lpMsg->GetRecipientTable(0, &ptrRecipTable);
+	if (lpMsg == NULL)
+		return MAPI_E_INVALID_PARAMETER;
+	HRESULT hr = lpMsg->GetRecipientTable(0, &~ptrRecipTable);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = HrQueryAllRows(ptrRecipTable, (LPSPropTagArray)&sptaRowId, NULL, NULL, 0, &ptrRows);
+		return hr;
+	hr = HrQueryAllRows(ptrRecipTable, sptaRowId, NULL, NULL, 0, &ptrRows);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpMsg->ModifyRecipients(MODRECIP_REMOVE, (LPADRLIST)ptrRows.get());
-	if (hr != hrSuccess)
-		goto exit;
-
-exit:
-	return hr;
+		return hr;
+	return lpMsg->ModifyRecipients(MODRECIP_REMOVE, (LPADRLIST)ptrRows.get());
 }
 
 HRESULT Util::HrDeleteMessage(IMAPISession *lpSession, IMessage *lpMessage)
 {
-	HRESULT hr = hrSuccess;
 	ULONG cMsgProps;
 	SPropArrayPtr ptrMsgProps;
 	MsgStorePtr ptrStore;
 	ULONG ulType;
 	MAPIFolderPtr ptrFolder;
 	ENTRYLIST entryList = {1, NULL};
-
-	SizedSPropTagArray(3, sptaMessageProps) = {3, {PR_ENTRYID, PR_STORE_ENTRYID, PR_PARENT_ENTRYID}};
+	static constexpr const SizedSPropTagArray(3, sptaMessageProps) =
+		{3, {PR_ENTRYID, PR_STORE_ENTRYID, PR_PARENT_ENTRYID}};
 	enum {IDX_ENTRYID, IDX_STORE_ENTRYID, IDX_PARENT_ENTRYID};
 
-	hr = lpMessage->GetProps((LPSPropTagArray)&sptaMessageProps, 0, &cMsgProps, &ptrMsgProps);
+	HRESULT hr = lpMessage->GetProps(sptaMessageProps, 0, &cMsgProps, &~ptrMsgProps);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpSession->OpenMsgStore(0, ptrMsgProps[IDX_STORE_ENTRYID].Value.bin.cb, (LPENTRYID)ptrMsgProps[IDX_STORE_ENTRYID].Value.bin.lpb, &ptrStore.iid, MDB_WRITE, &ptrStore);
+		return hr;
+	hr = lpSession->OpenMsgStore(0, ptrMsgProps[IDX_STORE_ENTRYID].Value.bin.cb, reinterpret_cast<ENTRYID *>(ptrMsgProps[IDX_STORE_ENTRYID].Value.bin.lpb), &ptrStore.iid(), MDB_WRITE, &~ptrStore);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = ptrStore->OpenEntry(ptrMsgProps[IDX_PARENT_ENTRYID].Value.bin.cb, (LPENTRYID)ptrMsgProps[IDX_PARENT_ENTRYID].Value.bin.lpb, &ptrFolder.iid, MAPI_MODIFY, &ulType, &ptrFolder);
+		return hr;
+	hr = ptrStore->OpenEntry(ptrMsgProps[IDX_PARENT_ENTRYID].Value.bin.cb, reinterpret_cast<ENTRYID *>(ptrMsgProps[IDX_PARENT_ENTRYID].Value.bin.lpb), &ptrFolder.iid(), MAPI_MODIFY, &ulType, &~ptrFolder);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	entryList.cValues = 1;
 	entryList.lpbin = &ptrMsgProps[IDX_ENTRYID].Value.bin;
-
-	hr = ptrFolder->DeleteMessages(&entryList, 0, NULL, DELETE_HARD_DELETE);
-
-exit:
-	return hr;
+	return ptrFolder->DeleteMessages(&entryList, 0, NULL, DELETE_HARD_DELETE);
 }
 
 /**
@@ -4355,21 +3796,12 @@ exit:
 HRESULT Util::ReadProperty(IMAPIProp *lpProp, ULONG ulPropTag, std::string &strData)
 {
 	HRESULT hr = hrSuccess;
-	IStream *lpStream = NULL;
+	object_ptr<IStream> lpStream;
 
-	hr = lpProp->OpenProperty(ulPropTag, &IID_IStream, 0, 0, (IUnknown **)&lpStream);
+	hr = lpProp->OpenProperty(ulPropTag, &IID_IStream, 0, 0, &~lpStream);
 	if(hr != hrSuccess)
-		goto exit;
-		
-	hr = HrStreamToString(lpStream, strData);
-	if(hr != hrSuccess)
-		goto exit;
-	
-exit:
-	if(lpStream)
-		lpStream->Release();
-		
-	return hr;
+		return hr;
+	return HrStreamToString(lpStream, strData);
 }
 
 /**
@@ -4387,26 +3819,16 @@ exit:
 HRESULT Util::WriteProperty(IMAPIProp *lpProp, ULONG ulPropTag, const std::string &strData)
 {
 	HRESULT hr = hrSuccess;
-	IStream *lpStream = NULL;
+	object_ptr<IStream> lpStream;
 	ULONG len = 0;
 
-	hr = lpProp->OpenProperty(ulPropTag, &IID_IStream, STGM_DIRECT, MAPI_CREATE | MAPI_MODIFY, (IUnknown **)&lpStream);
+	hr = lpProp->OpenProperty(ulPropTag, &IID_IStream, STGM_DIRECT, MAPI_CREATE | MAPI_MODIFY, &~lpStream);
 	if(hr != hrSuccess)
-		goto exit;
-		
+		return hr;
 	hr = lpStream->Write(strData.data(), strData.size(), &len);
 	if(hr != hrSuccess)
-		goto exit;
-		
-	hr = lpStream->Commit(0);
-	if(hr != hrSuccess)
-		goto exit;
-
-exit:
-	if(lpStream)
-		lpStream->Release();
-		
-	return hr;
+		return hr;
+	return lpStream->Commit(0);
 }
 
 HRESULT Util::ExtractRSSEntryID(LPSPropValue lpPropBlob, ULONG *lpcbEntryID, LPENTRYID *lppEntryID)
@@ -4421,61 +3843,43 @@ HRESULT Util::ExtractSuggestedContactsEntryID(LPSPropValue lpPropBlob, ULONG *lp
 
 HRESULT Util::ExtractAdditionalRenEntryID(LPSPropValue lpPropBlob, unsigned short usBlockType, ULONG *lpcbEntryID, LPENTRYID *lppEntryID)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	LPBYTE lpPos = lpPropBlob->Value.bin.lpb;
 	LPBYTE lpEnd = lpPropBlob->Value.bin.lpb + lpPropBlob->Value.bin.cb;
 		
 	while (true) {
-		if (lpPos + 8 <= lpEnd) {
-			if (*(unsigned short*)lpPos == 0) {
-				hr = MAPI_E_NOT_FOUND;
-				goto exit;
-			}
-			if (*(unsigned short*)lpPos == usBlockType) {
-				unsigned short usLen = 0;
-
-				lpPos += 4;	// Skip ID + total length
-				if (*(unsigned short*)lpPos != RSF_ELID_ENTRYID) {
-					hr = MAPI_E_CORRUPT_DATA;
-					goto exit;
-				}
-				lpPos += 2;	// Skip check
-				usLen = *(unsigned short*)lpPos;
-
-				lpPos += 2;
-				if (lpPos + usLen > lpEnd) {
-					hr = MAPI_E_CORRUPT_DATA;
-					goto exit;
-				}
-
-				hr = MAPIAllocateBuffer(usLen, (LPVOID*)lppEntryID);
-				if (hr != hrSuccess)
-					goto exit;
-
-				memcpy(*lppEntryID, lpPos, usLen);
-				*lpcbEntryID = usLen;
-				goto exit;
-			} else {
-				unsigned short usLen = 0;
-
-				lpPos += 2;	// Skip ID
-				usLen = *(unsigned short*)lpPos;
-				
-				lpPos += 2;
-				if (lpPos + usLen > lpEnd) {
-					hr = MAPI_E_CORRUPT_DATA;
-					goto exit;
-				}
-
-				lpPos += usLen;
-			}
-		} else {
-			hr = MAPI_E_NOT_FOUND;
-			break;
+		if (lpPos + 8 > lpEnd)
+			return MAPI_E_NOT_FOUND;
+		if (*reinterpret_cast<unsigned short *>(lpPos) == 0)
+			return MAPI_E_NOT_FOUND;
+		if (*(unsigned short *)lpPos != usBlockType) {
+			unsigned short usLen = 0;
+			lpPos += 2;	// Skip ID
+			usLen = *(unsigned short*)lpPos;
+			lpPos += 2;
+			if (lpPos + usLen > lpEnd)
+				return MAPI_E_CORRUPT_DATA;
+			lpPos += usLen;
+			continue;
 		}
+		unsigned short usLen = 0;
+		lpPos += 4;	// Skip ID + total length
+		if (*reinterpret_cast<unsigned short *>(lpPos) != RSF_ELID_ENTRYID)
+			return MAPI_E_CORRUPT_DATA;
+		lpPos += 2;	// Skip check
+		usLen = *(unsigned short *)lpPos;
+		lpPos += 2;
+		if (lpPos + usLen > lpEnd)
+			return MAPI_E_CORRUPT_DATA;
+		hr = MAPIAllocateBuffer(usLen, (LPVOID*)lppEntryID);
+		if (hr != hrSuccess)
+			return hr;
+		memcpy(*lppEntryID, lpPos, usLen);
+		*lpcbEntryID = usLen;
+		return hrSuccess;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
+
+} /* namespace */

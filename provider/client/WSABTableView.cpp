@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <mutex>
 #include "kcore.hpp"
 
 #include <kopano/kcodes.h>
@@ -30,13 +31,20 @@
 #include "SOAPUtils.h"
 #include "WSUtil.h"
 
-WSABTableView::WSABTableView(ULONG ulType, ULONG ulFlags, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport) : WSTableView(ulType, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpTransport, "WSABTableView")
+WSABTableView::WSABTableView(ULONG ulType, ULONG ulFlags, KCmd *lpCmd,
+    std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
+    LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport) :
+	WSTableView(ulType, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId,
+	    lpEntryId, lpTransport, "WSABTableView")
 {
 	m_lpProvider = lpABLogon;
 	m_ulTableType = TABLETYPE_AB;
 }
 
-HRESULT WSABTableView::Create(ULONG ulType, ULONG ulFlags, KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport, WSTableView **lppTableView)
+HRESULT WSABTableView::Create(ULONG ulType, ULONG ulFlags, KCmd *lpCmd,
+    std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
+    LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport,
+    WSTableView **lppTableView)
 {
 	HRESULT hr = hrSuccess;
 	WSABTableView *lpTableView = NULL; 
@@ -53,7 +61,6 @@ HRESULT WSABTableView::Create(ULONG ulType, ULONG ulFlags, KCmd *lpCmd, pthread_
 
 HRESULT WSABTableView::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECTableView, this);
-
+	REGISTER_INTERFACE3(ECTableView, WSTableView, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }

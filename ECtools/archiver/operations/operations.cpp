@@ -34,9 +34,9 @@
 
 #include <algorithm>
 using namespace std;
-using namespace za::helpers;
+using namespace KC::helpers;
 
-namespace za { namespace operations {
+namespace KC { namespace operations {
 
 /**
  * Constructor.
@@ -59,29 +59,18 @@ HRESULT ArchiveOperationBase::GetRestriction(LPMAPIPROP lpMapiProp, LPSRestricti
 	SPropValue sPropRefTime;
 	ECAndRestriction resResult;
 
-	const ECOrRestriction resDefault(
-		ECAndRestriction(
-			ECExistRestriction(PR_MESSAGE_DELIVERY_TIME) +
-			ECPropertyRestriction(RELOP_LT, PR_MESSAGE_DELIVERY_TIME, &sPropRefTime, ECRestriction::Cheap)
-		) +
-		ECAndRestriction(
-			ECExistRestriction(PR_CLIENT_SUBMIT_TIME) +
-			ECPropertyRestriction(RELOP_LT, PR_CLIENT_SUBMIT_TIME, &sPropRefTime, ECRestriction::Cheap)
-		)
-	);
-
-	PROPMAP_START
+	PROPMAP_START(1)
 	PROPMAP_NAMED_ID(FLAGS, PT_LONG, PSETID_Archive, dispidFlags)
 	PROPMAP_INIT(lpMapiProp)
 
 	if (lppRestriction == NULL) {
 		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
+		goto exitpm;
 	}
 
 	if (m_ulAge < 0) {
 		hr = MAPI_E_NOT_FOUND;
-		goto exit;
+		goto exitpm;
 	}
 
 	li.LowPart = m_ftCurrent.dwLowDateTime;
@@ -92,22 +81,26 @@ HRESULT ArchiveOperationBase::GetRestriction(LPMAPIPROP lpMapiProp, LPSRestricti
 	sPropRefTime.ulPropTag = PROP_TAG(PT_SYSTIME, 0);
 	sPropRefTime.Value.ft.dwLowDateTime = li.LowPart;
 	sPropRefTime.Value.ft.dwHighDateTime = li.HighPart;
-
-	resResult.append(resDefault);
+	resResult += ECOrRestriction(
+		ECAndRestriction(
+			ECExistRestriction(PR_MESSAGE_DELIVERY_TIME) +
+			ECPropertyRestriction(RELOP_LT, PR_MESSAGE_DELIVERY_TIME, &sPropRefTime, ECRestriction::Cheap)
+		) +
+		ECAndRestriction(
+			ECExistRestriction(PR_CLIENT_SUBMIT_TIME) +
+			ECPropertyRestriction(RELOP_LT, PR_CLIENT_SUBMIT_TIME, &sPropRefTime, ECRestriction::Cheap)
+		));
 	if (!m_bProcessUnread)
-		resResult.append(ECBitMaskRestriction(BMR_NEZ, PR_MESSAGE_FLAGS, MSGFLAG_READ));
-	resResult.append(
+		resResult += ECBitMaskRestriction(BMR_NEZ, PR_MESSAGE_FLAGS, MSGFLAG_READ);
+	resResult +=
 		ECNotRestriction(
 			ECAndRestriction(
 				ECExistRestriction(PROP_FLAGS) +
 				ECBitMaskRestriction(BMR_NEZ, PROP_FLAGS, m_ulInhibitMask)
 			)
-		)
-	);
-
-	hr = resResult.CreateMAPIRestriction(lppRestriction);
-
-exit:
+		);
+	hr = resResult.CreateMAPIRestriction(lppRestriction, ECRestriction::Full);
+ exitpm:
 	return hr;
 }
 
@@ -116,7 +109,7 @@ HRESULT ArchiveOperationBase::VerifyRestriction(LPMESSAGE lpMessage)
 	HRESULT hr = hrSuccess;
 	SRestrictionPtr ptrRestriction;
 
-	hr = GetRestriction(lpMessage, &ptrRestriction);
+	hr = GetRestriction(lpMessage, &~ptrRestriction);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -147,21 +140,20 @@ ArchiveOperationBaseEx::ArchiveOperationBaseEx(ECArchiverLogger *lpLogger, int u
 HRESULT ArchiveOperationBaseEx::ProcessEntry(LPMAPIFOLDER lpFolder, ULONG cProps, const LPSPropValue lpProps)
 {
 	HRESULT hr;
-	LPSPropValue lpFolderEntryId;
 	bool bReloadFolder = false;
 	ULONG ulType = 0;
 
-	ASSERT(lpFolder != NULL);
+	assert(lpFolder != NULL);
 	if (lpFolder == NULL)
 		return MAPI_E_INVALID_PARAMETER;
 	
-	lpFolderEntryId = PpropFindProp(lpProps, cProps, PR_PARENT_ENTRYID);
+	auto lpFolderEntryId = PCpropFindProp(lpProps, cProps, PR_PARENT_ENTRYID);
 	if (lpFolderEntryId == NULL) {
 		Logger()->Log(EC_LOGLEVEL_FATAL, "PR_PARENT_ENTRYID missing");
 		return MAPI_E_NOT_FOUND;
 	}
 	
-	if (!m_ptrCurFolderEntryId.is_null()) {
+	if (m_ptrCurFolderEntryId != nullptr) {
 		int nResult = 0;
 		// @todo: Create correct locale.
 		hr = Util::CompareProp(m_ptrCurFolderEntryId, lpFolderEntryId, createLocaleFromName(""), &nResult);
@@ -183,25 +175,22 @@ HRESULT ArchiveOperationBaseEx::ProcessEntry(LPMAPIFOLDER lpFolder, ULONG cProps
 		}
 	}
 	
-	if (m_ptrCurFolderEntryId.is_null() || bReloadFolder) {
+	if (m_ptrCurFolderEntryId == nullptr || bReloadFolder) {
 		SPropValuePtr ptrPropValue;
         
 		Logger()->Log(EC_LOGLEVEL_DEBUG, "Opening folder (%s)", bin2hex(lpFolderEntryId->Value.bin.cb, lpFolderEntryId->Value.bin.lpb).c_str());
-	
-		hr = lpFolder->OpenEntry(lpFolderEntryId->Value.bin.cb, (LPENTRYID)lpFolderEntryId->Value.bin.lpb, &m_ptrCurFolder.iid, MAPI_BEST_ACCESS|fMapiDeferredErrors, &ulType, &m_ptrCurFolder);
+		hr = lpFolder->OpenEntry(lpFolderEntryId->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpFolderEntryId->Value.bin.lpb), &m_ptrCurFolder.iid(), MAPI_BEST_ACCESS | fMapiDeferredErrors, &ulType, &~m_ptrCurFolder);
 		if (hr != hrSuccess) {
 			Logger()->Log(EC_LOGLEVEL_FATAL, "Failed to open folder. (hr=%s)", stringify(hr, true).c_str());
 			return hr;
 		}
-		
-		hr = MAPIAllocateBuffer(sizeof(SPropValue), &m_ptrCurFolderEntryId);
+		hr = MAPIAllocateBuffer(sizeof(SPropValue), &~m_ptrCurFolderEntryId);
 		if (hr != hrSuccess)
 			return hr;
 		hr = Util::HrCopyProperty(m_ptrCurFolderEntryId, lpFolderEntryId, m_ptrCurFolderEntryId);
 		if (hr != hrSuccess)
 			return hr;
-
-		if (HrGetOneProp(m_ptrCurFolder, PR_DISPLAY_NAME, &ptrPropValue) == hrSuccess)
+		if (HrGetOneProp(m_ptrCurFolder, PR_DISPLAY_NAME, &~ptrPropValue) == hrSuccess)
 			Logger()->SetFolder(ptrPropValue->Value.LPSZ);
 		else
 			Logger()->SetFolder(_T("<Unnamed>"));
@@ -215,4 +204,4 @@ HRESULT ArchiveOperationBaseEx::ProcessEntry(LPMAPIFOLDER lpFolder, ULONG cProps
 	return DoProcessEntry(cProps, lpProps);
 }
 
-}} // namespaces 
+}} /* namespace */

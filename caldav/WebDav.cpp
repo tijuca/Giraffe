@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <utility>
 #include "WebDav.h"
 #include <kopano/stringutil.h>
 #include <kopano/CommonUtil.h>
@@ -26,11 +27,11 @@ using namespace std;
 /**
  * @param[in]	lpRequest	Pointer to http Request object
  * @param[in]	lpSession	Pointer to mapi session of the user
- * @param[in]	lpLogger	Pointer to logger object to log errors and information
  */
-WebDav::WebDav(Http *lpRequest, IMAPISession *lpSession, ECLogger *lpLogger, std::string strSrvTz, std::string strCharset):ProtocolBase(lpRequest, lpSession, lpLogger, strSrvTz, strCharset)
+WebDav::WebDav(Http *lpRequest, IMAPISession *lpSession,
+    const std::string &strSrvTz, const std::string &strCharset) :
+	ProtocolBase(lpRequest, lpSession, strSrvTz, strCharset)
 {	
-	m_lpXmlDoc  = NULL;
 }
 
 WebDav::~WebDav()
@@ -49,7 +50,7 @@ HRESULT WebDav::HrParseXml()
 	HRESULT hr = hrSuccess;
 	std::string strBody;
 
-	ASSERT(m_lpXmlDoc == NULL);
+	assert(m_lpXmlDoc == NULL);
 	if (m_lpXmlDoc != NULL)
 		return hr;
 
@@ -123,7 +124,7 @@ HRESULT WebDav::HrPropfind()
 		WEBDAVPROPERTY sProperty;
 		
 		HrSetDavPropName(&(sProperty.sPropName),lpXmlNode);
-		sDavPropRet.lstProps.push_back(sProperty);
+		sDavPropRet.lstProps.push_back(std::move(sProperty));
 		lpXmlNode = lpXmlNode->next;
 	}
 
@@ -140,7 +141,7 @@ HRESULT WebDav::HrPropfind()
 	hr = RespStructToXml(&sDavMStatus, &strXml);
 	if (hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unable to convert response to xml: 0x%08X", hr);
+		ec_log_debug("Unable to convert response to xml: 0x%08X", hr);
 		goto exit;
 	}
 	
@@ -178,9 +179,7 @@ HRESULT WebDav::RespStructToXml(WEBDAVMULTISTATUS *sDavMStatus, std::string *str
 	std::string strNsPrefix;
 	xmlTextWriter *xmlWriter = NULL;
 	xmlBuffer *xmlBuff = NULL;
-	std::list<WEBDAVRESPONSE>::const_iterator iterResp;
 	std::string strNs;	
-	std::map<std::string,std::string>::const_iterator iterMapNS;
 
 	strNsPrefix = "C";
 	xmlBuff = xmlBufferCreate();
@@ -188,7 +187,7 @@ HRESULT WebDav::RespStructToXml(WEBDAVMULTISTATUS *sDavMStatus, std::string *str
 	if (xmlBuff == NULL)
 	{
 		hr = MAPI_E_NOT_ENOUGH_MEMORY;
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error allocating memory to xmlBuffer");
+		ec_log_err("Error allocating memory to xmlBuffer");
 		goto exit;
 	}
 
@@ -197,7 +196,7 @@ HRESULT WebDav::RespStructToXml(WEBDAVMULTISTATUS *sDavMStatus, std::string *str
 	if (xmlWriter == NULL)
 	{
 		hr = MAPI_E_CALL_FAILED;
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error Initializing xmlWriter");
+		ec_log_err("Error Initializing xmlWriter");
 		goto exit;
 	}
 
@@ -223,17 +222,16 @@ HRESULT WebDav::RespStructToXml(WEBDAVMULTISTATUS *sDavMStatus, std::string *str
 
 	//<multistatus>	
 	ulRet = xmlTextWriterStartElementNS(xmlWriter,
-								(const xmlChar *)strNsPrefix.c_str(),
-								(const xmlChar *)sDavMStatus->sPropName.strPropname.c_str(),
-								(const xmlChar *)sDavMStatus->sPropName.strNS.c_str());
+		(const xmlChar *)strNsPrefix.c_str(),
+		(const xmlChar *)sDavMStatus->sPropName.strPropname.c_str(),
+		(const xmlChar *)sDavMStatus->sPropName.strNS.c_str());
 	if (ulRet < 0)
 		goto xmlfail;
 
 	//write all xmlname spaces in main tag.
-	for (iterMapNS = m_mapNs.begin(); iterMapNS != m_mapNs.end(); ++iterMapNS)
-	{
+	for (const auto &ns : m_mapNs) {
 		std::string strprefix;
-		strNs = iterMapNS->first;
+		strNs = ns.first;
 		if(sDavMStatus->sPropName.strNS == strNs || strNs.empty())
 			continue;
 		RegisterNs(strNs, &strNsPrefix);
@@ -246,12 +244,8 @@ HRESULT WebDav::RespStructToXml(WEBDAVMULTISTATUS *sDavMStatus, std::string *str
 			goto xmlfail;
 	}
 	// <response>
-	iterResp = sDavMStatus->lstResp.begin();
-	for (int i = 0; sDavMStatus->lstResp.end() != iterResp; ++i, ++iterResp)
-	{
-		WEBDAVRESPONSE sDavResp;
-		sDavResp = *iterResp;
-		hr = HrWriteSResponse(xmlWriter, &strNsPrefix, sDavResp);
+	for (const auto &resp : sDavMStatus->lstResp) {
+		hr = HrWriteSResponse(xmlWriter, &strNsPrefix, resp);
 		if(hr != hrSuccess)
 			goto exit;
 	}
@@ -282,7 +276,7 @@ exit:
 
 xmlfail:
 	hr = MAPI_E_CALL_FAILED;
-	m_lpLogger->Log(EC_LOGLEVEL_ERROR, "Error writing xml data");
+	ec_log_err("Error writing xml data");
 	goto exit;
 }
 
@@ -407,51 +401,38 @@ HRESULT WebDav::HrHandleRptCalQry()
 			sReptQuery.sFilter.lstFilters.push_back((char *)lpXmlChildAttr->content);
 
 			lpXmlChildNode = lpXmlChildNode->children;
-			if (lpXmlChildNode->properties && lpXmlChildNode->properties->children)
-			{
-				lpXmlAttr = lpXmlChildNode->properties;
-				lpXmlChildAttr = lpXmlAttr->children;
-			}
-			else
-			{
+			if (lpXmlChildNode->properties == nullptr || lpXmlChildNode->properties->children == nullptr) {
 				hr = MAPI_E_CORRUPT_DATA;
 				goto exit;
 			}
-
+			lpXmlAttr = lpXmlChildNode->properties;
+			lpXmlChildAttr = lpXmlAttr->children;
 			if (lpXmlChildAttr == NULL || lpXmlChildAttr->content == NULL) {
 				hr = MAPI_E_CORRUPT_DATA;
 				goto exit;
 			}
-
-			if (xmlStrcmp( lpXmlChildAttr->content, (const xmlChar *)"VTODO") == 0 || xmlStrcmp(lpXmlChildAttr->content, (const xmlChar *)"VEVENT") == 0) {
-				sReptQuery.sFilter.lstFilters.push_back((char *)lpXmlChildAttr->content);
-			} else {
+			if (xmlStrcmp(lpXmlChildAttr->content, (const xmlChar *)"VTODO") != 0 &&
+			    xmlStrcmp(lpXmlChildAttr->content, (const xmlChar *)"VEVENT") != 0) {
 				hr = MAPI_E_CORRUPT_DATA;
 				goto exit;
 			}
+			sReptQuery.sFilter.lstFilters.push_back((char *)lpXmlChildAttr->content);
 
 			// filter not done here.., time-range in lpXmlChildNode->children.
 			if (lpXmlChildNode->children) {
-				lpXmlChildNode = lpXmlChildNode->children;
-				while (lpXmlChildNode) {
-					if (xmlStrcmp(lpXmlChildNode->name, (const xmlChar *)"time-range") == 0) {
-
-						if (lpXmlChildNode->properties == NULL || lpXmlChildNode->properties->children == NULL) {
-							lpXmlChildNode = lpXmlChildNode->next;
-							continue;
-						}
-
-						lpXmlChildAttr = lpXmlChildNode->properties->children;
-						if (xmlStrcmp(lpXmlChildAttr->name, (const xmlChar *)"start") == 0) {
-							// timestamp from ical
-							icaltimetype iTime = icaltime_from_string((const char *)lpXmlChildAttr->content);
-							sReptQuery.sFilter.tStart = icaltime_as_timet(iTime);
-							// @note this is still being ignored in CalDavProto::HrListCalEntries
-						}
+				for (lpXmlChildNode = lpXmlChildNode->children; lpXmlChildNode != NULL; lpXmlChildNode = lpXmlChildNode->next) {
+					if (xmlStrcmp(lpXmlChildNode->name, (const xmlChar *)"time-range") != 0)
+						continue;
+					if (lpXmlChildNode->properties == NULL || lpXmlChildNode->properties->children == NULL)
+						continue;
+					lpXmlChildAttr = lpXmlChildNode->properties->children;
+					if (xmlStrcmp(lpXmlChildAttr->name, (const xmlChar *)"start") != 0)
 						// other lpXmlChildAttr->name .. like "end" maybe?
-					}
-					// other lpXmlChildNode->name ..  like, uh?
-					lpXmlChildNode = lpXmlChildNode->next;
+						continue;
+					// timestamp from ical
+					icaltimetype iTime = icaltime_from_string((const char *)lpXmlChildAttr->content);
+					sReptQuery.sFilter.tStart = icaltime_as_timet(iTime);
+					// @note this is still being ignored in CalDavProto::HrListCalEntries
 				}
 			}
 		}
@@ -470,11 +451,11 @@ HRESULT WebDav::HrHandleRptCalQry()
 				WEBDAVPROPERTY sWebProperty;
 
 				HrSetDavPropName(&(sWebProperty.sPropName),lpXmlChildNode);
-				sReptQuery.sProp.lstProps.push_back(sWebProperty);
+				sReptQuery.sProp.lstProps.push_back(std::move(sWebProperty));
 				lpXmlChildNode = lpXmlChildNode->next;
 			}
 		} else {
-			m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Skipping unknown XML element: %s", lpXmlNode->name);
+			ec_log_debug("Skipping unknown XML element: %s", lpXmlNode->name);
 		}
 		lpXmlNode = lpXmlNode->next;
 	}
@@ -499,7 +480,7 @@ HRESULT WebDav::HrHandleRptCalQry()
 exit:
 	if (hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unable to process report calendar query: 0x%08X", hr);
+		ec_log_debug("Unable to process report calendar query: 0x%08X", hr);
 		m_lpRequest->HrResponseHeader(500, "Internal Server Error");
 	}
 
@@ -557,7 +538,7 @@ HRESULT WebDav::HrHandleRptMulGet()
 		WEBDAVPROPERTY sWebProperty;
 	
 		HrSetDavPropName(&(sWebProperty.sPropName),lpXmlChildNode);
-		sRptMGet.sProp.lstProps.push_back(sWebProperty);
+		sRptMGet.sProp.lstProps.push_back(std::move(sWebProperty));
 		lpXmlChildNode = lpXmlChildNode->next;
 	}
 	
@@ -592,8 +573,7 @@ HRESULT WebDav::HrHandleRptMulGet()
 		strGuid.erase(strGuid.length() - 4);
 		strGuid = urlDecode(strGuid);
 		sWebVal.strValue = strGuid;
-
-		sRptMGet.lstWebVal.push_back(sWebVal);
+		sRptMGet.lstWebVal.push_back(std::move(sWebVal));
 		lpXmlChildNode = lpXmlChildNode->next;
 	}
 
@@ -614,7 +594,7 @@ HRESULT WebDav::HrHandleRptMulGet()
 exit:
 	if(hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unable to process report multi-get: 0x%08X", hr);
+		ec_log_debug("Unable to process report multi-get: 0x%08X", hr);
 		m_lpRequest->HrResponseHeader(500, "Internal Server Error");
 	}
 	
@@ -720,7 +700,7 @@ HRESULT WebDav::HrPropertySearch()
 exit:
 	if(hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unable to process report multi-get: 0x%08X", hr);
+		ec_log_debug("Unable to process report multi-get: 0x%08X", hr);
 		m_lpRequest->HrResponseHeader(500, "Internal Server Error");
 	}
 	
@@ -762,16 +742,13 @@ HRESULT WebDav::HrPropertySearchSet()
 HRESULT WebDav::HrPostFreeBusy(WEBDAVFBINFO *lpsWebFbInfo)
 {
 	HRESULT hr = hrSuccess;
-	std::list<WEBDAVFBUSERINFO>::const_iterator itFbUserInfo;
 	WEBDAVMULTISTATUS sWebMStatus;
 	
 	std::string strXml;
 
 	HrSetDavPropName(&sWebMStatus.sPropName,"schedule-response", CALDAVNS);
 
-	for (itFbUserInfo = lpsWebFbInfo->lstFbUserInfo.begin();
-	     itFbUserInfo != lpsWebFbInfo->lstFbUserInfo.end(); ++itFbUserInfo)
-	{
+	for (const auto &ui : lpsWebFbInfo->lstFbUserInfo) {
 		WEBDAVPROPERTY sWebProperty;
 		WEBDAVVALUE sWebVal;
 		WEBDAVRESPONSE sWebResPonse;
@@ -781,23 +758,23 @@ HRESULT WebDav::HrPostFreeBusy(WEBDAVFBINFO *lpsWebFbInfo)
 		HrSetDavPropName(&sWebProperty.sPropName,"recipient", CALDAVNS);
 		HrSetDavPropName(&sWebVal.sPropName,"href", WEBDAVNS);
 		
-		sWebVal.strValue = "mailto:" + itFbUserInfo->strUser;
+		sWebVal.strValue = "mailto:" + ui.strUser;
 		sWebProperty.lstValues.push_back(sWebVal);
 		sWebResPonse.lstProps.push_back(sWebProperty);
 
 		sWebProperty.lstValues.clear();
 		
 		HrSetDavPropName(&sWebProperty.sPropName,"request-status", CALDAVNS);
-		sWebProperty.strValue = itFbUserInfo->strIcal.empty() ? "3.8;No authority" : "2.0;Success";
+		sWebProperty.strValue = ui.strIcal.empty() ? "3.8;No authority" : "2.0;Success";
 		sWebResPonse.lstProps.push_back(sWebProperty);
 		
-		if (!itFbUserInfo->strIcal.empty()) {	
+		if (!ui.strIcal.empty()) {
 			HrSetDavPropName(&sWebProperty.sPropName,"calendar-data", CALDAVNS);
-			sWebProperty.strValue = itFbUserInfo->strIcal;
+			sWebProperty.strValue = ui.strIcal;
 			sWebResPonse.lstProps.push_back(sWebProperty);
 		}
 
-		sWebMStatus.lstResp.push_back(sWebResPonse);
+		sWebMStatus.lstResp.push_back(std::move(sWebResPonse));
 	}
 
 	hr = RespStructToXml(&sWebMStatus, &strXml);
@@ -837,8 +814,8 @@ HRESULT WebDav::WriteData(xmlTextWriter *xmlWriter, const WEBDAVVALUE &sWebVal,
 	if(strNs.empty())
 	{
 		ulRet = xmlTextWriterWriteElement(xmlWriter,
-										  (const xmlChar *)sWebVal.sPropName.strPropname.c_str(),
-										  (const xmlChar *)sWebVal.strValue.c_str());
+			(const xmlChar *)sWebVal.sPropName.strPropname.c_str(),
+			(const xmlChar *)sWebVal.strValue.c_str());
 		if (ulRet < 0)
 			return MAPI_E_CALL_FAILED;
 		return hrSuccess;
@@ -854,10 +831,10 @@ HRESULT WebDav::WriteData(xmlTextWriter *xmlWriter, const WEBDAVVALUE &sWebVal,
 	 *	<D:href>/caldav/user/calendar/entryGUID.ics</D:href>
 	 */
 	ulRet =	xmlTextWriterWriteElementNS(xmlWriter,
-										(const xmlChar *)szNsPrefix->c_str(),
-										(const xmlChar *)sWebVal.sPropName.strPropname.c_str(),
-										(const xmlChar *)(strNs.empty() ? NULL : strNs.c_str()),
-										(const xmlChar *)sWebVal.strValue.c_str());
+		(const xmlChar *)szNsPrefix->c_str(),
+		(const xmlChar *)sWebVal.sPropName.strPropname.c_str(),
+		(const xmlChar *)(strNs.empty() ? NULL : strNs.c_str()),
+		(const xmlChar *)sWebVal.strValue.c_str());
 	if (ulRet < 0)
 		return MAPI_E_CALL_FAILED;
 	return hrSuccess;
@@ -880,8 +857,8 @@ HRESULT WebDav::WriteNode(xmlTextWriter *xmlWriter,
 	
 	if(strNs.empty())
 	{
-		ulRet = xmlTextWriterStartElement	(xmlWriter,
-											(const xmlChar *)sWebPropName.strPropname.c_str());
+		ulRet = xmlTextWriterStartElement(xmlWriter,
+			(const xmlChar *)sWebPropName.strPropname.c_str());
 		if (ulRet < 0)
 			return MAPI_E_CALL_FAILED;
 		return hrSuccess;
@@ -896,10 +873,9 @@ HRESULT WebDav::WriteNode(xmlTextWriter *xmlWriter,
 	 * the end tag </D:propstat> is written by "xmlTextWriterEndElement(xmlWriter)"
 	 */
 	ulRet =	xmlTextWriterStartElementNS (xmlWriter,
-										(const xmlChar *)lpstrNsPrefix->c_str(),
-										(const xmlChar *)sWebPropName.strPropname.c_str(),
-										(const xmlChar *)(strNs.empty() ? NULL : strNs.c_str()));
-
+		(const xmlChar *)lpstrNsPrefix->c_str(),
+		(const xmlChar *)sWebPropName.strPropname.c_str(),
+		(const xmlChar *)(strNs.empty() ? NULL : strNs.c_str()));
 	if (ulRet < 0)
 		return MAPI_E_CALL_FAILED;
 	
@@ -917,7 +893,7 @@ HRESULT WebDav::WriteNode(xmlTextWriter *xmlWriter,
  * @param[in]	lpstrNsPrefix	Namespace prefix
  * @return		HRESULT			Always returns hrSuccess 
  */
-void WebDav::RegisterNs(std::string strNs, std::string *lpstrNsPrefix)
+void WebDav::RegisterNs(const std::string &strNs, std::string *lpstrNsPrefix)
 {
 	(*lpstrNsPrefix)[0]++;
 	m_mapNs[strNs] = *lpstrNsPrefix;
@@ -933,11 +909,8 @@ void WebDav::RegisterNs(std::string strNs, std::string *lpstrNsPrefix)
 HRESULT WebDav::GetNs(std::string * lpstrPrefx, std::string *lpstrNs)
 {
 	HRESULT hr = hrSuccess;
-	map <std::string,std::string>::const_iterator itMpNs;
-
-	itMpNs = m_mapNs.find(*lpstrNs);
-	if (itMpNs != m_mapNs.end())
-	{
+	auto itMpNs = m_mapNs.find(*lpstrNs);
+	if (itMpNs != m_mapNs.cend()) {
 		lpstrPrefx->assign(itMpNs->second);
 		lpstrNs->clear();
 	}
@@ -959,8 +932,6 @@ HRESULT WebDav::HrWriteSResponse(xmlTextWriter *xmlWriter,
 {
 	HRESULT hr;
 	WEBDAVRESPONSE sWebResp;
-	std::list<WEBDAVPROPSTAT>::const_iterator iterPropStat;
-	std::list<WEBDAVPROPERTY>::const_iterator iterProperty;
 	int ulRet;
 
 	sWebResp = sResponse;
@@ -984,12 +955,8 @@ HRESULT WebDav::HrWriteSResponse(xmlTextWriter *xmlWriter,
 			return hr;
 	}
 
-	for (iterPropStat = sWebResp.lstsPropStat.begin();
-	     iterPropStat != sWebResp.lstsPropStat.end(); ++iterPropStat)
-	{
-		WEBDAVPROPSTAT sDavPropStat;
-		sDavPropStat = *iterPropStat;
-		hr = HrWriteSPropStat(xmlWriter, lpstrNsPrefix, sDavPropStat);
+	for (const auto &stat : sWebResp.lstsPropStat) {
+		hr = HrWriteSPropStat(xmlWriter, lpstrNsPrefix, stat);
 		if (hr != hrSuccess)
 			return hr;
 	}
@@ -1021,15 +988,10 @@ HRESULT WebDav::HrWriteResponseProps(xmlTextWriter *xmlWriter,
     std::string *lpstrNsPrefix, std::list<WEBDAVPROPERTY> *lplstProps)
 {
 	HRESULT hr;
-	std::list<WEBDAVPROPERTY>::const_iterator iterProp;
-	ULONG ulRet;
+	int ulRet;
 
-	for (iterProp = lplstProps->begin(); iterProp != lplstProps->end();
-	     ++iterProp)
-	{
-		WEBDAVPROPERTY sWebProperty;
-		sWebProperty = *iterProp;
-		
+	for (const auto &iterProp : *lplstProps) {
+		auto sWebProperty = iterProp;
 		if (!sWebProperty.strValue.empty())
 		{
 			WEBDAVVALUE sWebVal;
@@ -1088,7 +1050,6 @@ HRESULT WebDav::HrWriteSPropStat(xmlTextWriter *xmlWriter,
 	WEBDAVPROPSTAT sWebPropStat;
 	WEBDAVPROP sWebProp;
 	int ulRet;
-	std::list<WEBDAVPROPERTY>::const_iterator iterProp;
 	
 	sWebPropStat = lpsPropStat;
 	//<propstat>
@@ -1104,11 +1065,8 @@ HRESULT WebDav::HrWriteSPropStat(xmlTextWriter *xmlWriter,
 		return hr;
 
 	//loop	for properties list
-	for (iterProp = sWebProp.lstProps.begin();
-	     iterProp != sWebProp.lstProps.end(); ++iterProp)
-	{			
-		WEBDAVPROPERTY sWebProperty;
-		sWebProperty = *iterProp;
+	for (const auto &iterProp : sWebProp.lstProps) {
+		auto sWebProperty = iterProp;
 		
 		if (!sWebProperty.strValue.empty())
 		{
@@ -1262,7 +1220,10 @@ HRESULT WebDav::HrWriteItems(xmlTextWriter *xmlWriter,
 void WebDav::HrSetDavPropName(WEBDAVPROPNAME *lpsDavPropName, xmlNode *lpXmlNode)
 {
 	lpsDavPropName->strPropname.assign((const char*)lpXmlNode->name);
-	lpsDavPropName->strNS.assign((const char*)lpXmlNode->ns->href);
+	if (lpXmlNode->ns != NULL && lpXmlNode->ns->href != NULL)
+		lpsDavPropName->strNS.assign(reinterpret_cast<const char *>(lpXmlNode->ns->href));
+	else
+		lpsDavPropName->strNS.clear();
 	if(!lpsDavPropName->strNS.empty())
 		m_mapNs[lpsDavPropName->strNS] = "";
 
@@ -1375,12 +1336,11 @@ HRESULT WebDav::HrPropPatch()
 		else
 			HrSetDavPropName(&(sProperty.sPropName),(char *)lpXmlNode->name, WEBDAVNS);
 
-		if (lpXmlNode->children && lpXmlNode->children->content) {
+		if (lpXmlNode->children != nullptr &&
+		    lpXmlNode->children->content != nullptr)
 			sProperty.strValue = (char *)lpXmlNode->children->content;
-		}
 
-		sDavProp.lstProps.push_back(sProperty);
-
+		sDavProp.lstProps.push_back(std::move(sProperty));
 		lpXmlNode = lpXmlNode->next;
 	}	
 
@@ -1392,7 +1352,7 @@ HRESULT WebDav::HrPropPatch()
 	hr = RespStructToXml(&sDavMStatus, &strXml);
 	if (hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "Unable to convert response to xml: 0x%08X", hr);
+		ec_log_debug("Unable to convert response to xml: 0x%08X", hr);
 		goto exit;
 	}
 
@@ -1442,7 +1402,7 @@ HRESULT WebDav::HrMkCalendar()
 	hr = HrParseXml();
 	if(hr != hrSuccess)
 	{
-		m_lpLogger->Log(EC_LOGLEVEL_ERROR,"Parsing Error For MKCALENDAR");
+		ec_log_err("Parsing Error For MKCALENDAR");
 		goto exit;
 	}
 	
@@ -1489,23 +1449,22 @@ HRESULT WebDav::HrMkCalendar()
 		if (sProperty.sPropName.strPropname.compare("supported-calendar-component-set") == 0) {
 			xmlNode *lpXmlChild = lpXmlNode->children;
 			while (lpXmlChild) {
-				if (lpXmlChild->type == XML_ELEMENT_NODE && xmlStrcmp(lpXmlChild->name, (const xmlChar *)"comp") == 0) {
-					if (lpXmlChild->properties && lpXmlChild->properties->children && lpXmlChild->properties->children->content)
-						sProperty.strValue = (char*)lpXmlChild->properties->children->content;
-				}
+				if (lpXmlChild->type == XML_ELEMENT_NODE &&
+				    xmlStrcmp(lpXmlChild->name, reinterpret_cast<const xmlChar *>("comp")) == 0 &&
+				    lpXmlChild->properties != nullptr &&
+				    lpXmlChild->properties->children != nullptr &&
+				    lpXmlChild->properties->children->content != nullptr)
+					sProperty.strValue = reinterpret_cast<char *>(lpXmlChild->properties->children->content);
 				lpXmlChild = lpXmlChild->next;
 			}
 		}
-
-		sDavProp.lstProps.push_back(sProperty);	
-
+		sDavProp.lstProps.push_back(std::move(sProperty));
 		lpXmlNode = lpXmlNode->next;
 	}
 
 	hr = HrHandleMkCal(&sDavProp);
 
 exit:
-
 	if(hr == MAPI_E_COLLISION)
 	{
 		m_lpRequest->HrResponseHeader(409,"CONFLICT");

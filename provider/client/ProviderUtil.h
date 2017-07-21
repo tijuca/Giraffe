@@ -24,14 +24,12 @@
 #define CT_ONLINE			0x01
 #define CT_OFFLINE			0x02
 
-typedef struct {
+struct PROVIDER_INFO {
 	IMSProvider *lpMSProviderOnline;
-	IMSProvider *lpMSProviderOffline;
 	IABProvider *lpABProviderOnline;
-	IABProvider *lpABProviderOffline;
 	ULONG		ulProfileFlags;	//  Profile flags when you start the first time
 	ULONG		ulConnectType; // CT_* values, The type of connection when you start the first time
-}PROVIDER_INFO;
+};
 
 typedef std::map<std::string, PROVIDER_INFO> ECMapProvider;
 
@@ -41,7 +39,6 @@ HRESULT CreateMsgStoreObject(char *lpszProfname, LPMAPISUP lpMAPISup, ULONG cbEn
 							MAPIUID* lpguidMDBProvider, BOOL bSpooler, BOOL fIsDefaultStore, BOOL bOfflineStore,
 							ECMsgStore** lppMsgStore);
 
-HRESULT RemoveAllProviders(ECMapProvider *lpmapProvider);
 HRESULT SetProviderMode(IMAPISupport *lpMAPISup, ECMapProvider *lpmapProvider, LPCSTR lpszProfileName, ULONG ulConnectType);
 HRESULT GetProviders(ECMapProvider *lpmapProvider, IMAPISupport *lpMAPISup, LPCSTR lpszProfileName, ULONG ulFlags, PROVIDER_INFO *lpsProviderInfo);
 

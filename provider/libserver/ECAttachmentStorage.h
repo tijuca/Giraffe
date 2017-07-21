@@ -21,10 +21,15 @@
 #include <kopano/zcdefs.h>
 #include "ECDatabase.h"
 #include <list>
+#include <mutex>
 #include <set>
 #include <string>
 #include <dirent.h>
 #include <sys/types.h>
+
+struct soap;
+
+namespace KC {
 
 class ECSerializer;
 class ECLogger;
@@ -65,7 +70,7 @@ public:
 	virtual ECRESULT Rollback() = 0;
 
 protected:
-	virtual ~ECAttachmentStorage(void) {}
+	virtual ~ECAttachmentStorage(void) _kc_impdtor;
 	
 	/* Single Instance Attachment handlers (must be overridden by subclasses) */
 	virtual ECRESULT LoadAttachmentInstance(struct soap *soap, ULONG ulInstanceId, size_t *lpiSize, unsigned char **lppData) = 0;
@@ -91,10 +96,10 @@ protected:
 	bool m_bFileCompression;
 	std::string m_CompressionLevel;
 	ULONG m_ulRef;
-	pthread_mutex_t m_refcnt_lock;
+	std::mutex m_refcnt_lock;
 };
 
-class ECDatabaseAttachment _zcp_final : public ECAttachmentStorage {
+class ECDatabaseAttachment _kc_final : public ECAttachmentStorage {
 public:
 	ECDatabaseAttachment(ECDatabase *lpDatabase);
 
@@ -114,47 +119,48 @@ protected:
 	virtual ECRESULT Rollback();
 };
 
-class ECFileAttachment _zcp_final : public ECAttachmentStorage {
-public:
-	ECFileAttachment(ECDatabase *lpDatabase, const std::string &basepath, unsigned int ulCompressionLevel, const bool force_changes_to_disk);
+class _kc_export_dycast ECFileAttachment _kc_final :
+    public ECAttachmentStorage {
+	public:
+	_kc_hidden ECFileAttachment(ECDatabase *, const std::string &basepath, unsigned int compr_lvl, bool sync);
 
 protected:
-	virtual ~ECFileAttachment();
+	_kc_hidden virtual ~ECFileAttachment(void);
 	
 	/* Single Instance Attachment handlers */
-	virtual bool ExistAttachmentInstance(ULONG ulInstanceId);
-	virtual ECRESULT LoadAttachmentInstance(struct soap *soap, ULONG ulInstanceId, size_t *lpiSize, unsigned char **lppData);
-	virtual ECRESULT LoadAttachmentInstance(ULONG ulObjId, size_t *lpiSize, ECSerializer *lpSink);
-	virtual ECRESULT SaveAttachmentInstance(ULONG ulInstanceId, ULONG ulPropId, size_t iSize, unsigned char *lpData);
-	virtual ECRESULT SaveAttachmentInstance(ULONG ulObjId, ULONG ulPropId, size_t iSize, ECSerializer *lpSource);
-	virtual ECRESULT DeleteAttachmentInstances(const std::list<ULONG> &lstDeleteInstances, bool bReplace);
-	virtual ECRESULT DeleteAttachmentInstance(ULONG ulInstanceId, bool bReplace);
-	virtual ECRESULT GetSizeInstance(ULONG ulInstanceId, size_t *lpulSize, bool *lpbCompressed = NULL);
-
-	virtual ECRESULT Begin();
-	virtual ECRESULT Commit();
-	virtual ECRESULT Rollback();
+	_kc_hidden virtual bool ExistAttachmentInstance(ULONG instance);
+	_kc_hidden virtual ECRESULT LoadAttachmentInstance(struct soap *, ULONG instance, size_t *size, unsigned char **data);
+	_kc_hidden virtual ECRESULT LoadAttachmentInstance(ULONG obj_id, size_t *size, ECSerializer *sink);
+	_kc_hidden virtual ECRESULT SaveAttachmentInstance(ULONG instance, ULONG prop_id, size_t size, unsigned char *data);
+	_kc_hidden virtual ECRESULT SaveAttachmentInstance(ULONG obj_id, ULONG prop_id, size_t size, ECSerializer *source);
+	_kc_hidden virtual ECRESULT DeleteAttachmentInstances(const std::list<ULONG> &instances, bool replace);
+	_kc_hidden virtual ECRESULT DeleteAttachmentInstance(ULONG instance, bool replace);
+	_kc_hidden virtual ECRESULT GetSizeInstance(ULONG instance, size_t *size, bool *compr = nullptr);
+	_kc_hidden virtual ECRESULT Begin(void);
+	_kc_hidden virtual ECRESULT Commit(void);
+	_kc_hidden virtual ECRESULT Rollback(void);
 
 private:
-	std::string CreateAttachmentFilename(ULONG ulInstanceId, bool bCompressed);
+	_kc_hidden std::string CreateAttachmentFilename(ULONG instance, bool compressed);
 
 	size_t attachment_size_safety_limit;
-	int m_dirFd;
-	DIR *m_dirp;
+	int m_dirFd = -1;
+	DIR *m_dirp = nullptr;
 	bool force_changes_to_disk;
 
 	/* helper functions for transacted deletion */
-	ECRESULT MarkAttachmentForDeletion(ULONG ulInstanceId);
-	ECRESULT DeleteMarkedAttachment(ULONG ulInstanceId);
-	ECRESULT RestoreMarkedAttachment(ULONG ulInstanceId);
-
-	bool VerifyInstanceSize(const ULONG ulInstanceId, const size_t expectedSize, const std::string & filename);
+	_kc_hidden ECRESULT MarkAttachmentForDeletion(ULONG instance);
+	_kc_hidden ECRESULT DeleteMarkedAttachment(ULONG instance);
+	_kc_hidden ECRESULT RestoreMarkedAttachment(ULONG instance);
+	_kc_hidden bool VerifyInstanceSize(ULONG instance, size_t expected_size, const std::string &filename);
 
 	std::string m_basepath;
-	bool m_bTransaction;
+	bool m_bTransaction = false;
 	std::set<ULONG> m_setNewAttachment;
 	std::set<ULONG> m_setDeletedAttachment;
 	std::set<ULONG> m_setMarkedAttachment;
 };
+
+} /* namespace */
 
 #endif

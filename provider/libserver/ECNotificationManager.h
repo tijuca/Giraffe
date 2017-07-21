@@ -19,12 +19,19 @@
 #define ECNOTIFICATIONMANAGER_H
 
 #include <kopano/zcdefs.h>
+#include <condition_variable>
+#include <mutex>
+#include <pthread.h>
 #include "ECSession.h"
 #include <kopano/ECLogger.h>
 #include <kopano/ECConfig.h>
 
 #include <map>
 #include <set>
+
+struct soap;
+
+namespace KC {
 
 /*
  * The notification manager runs in a single thread, servicing notifications to ALL clients
@@ -40,7 +47,7 @@ struct NOTIFREQUEST {
     time_t ulRequestTime;
 };
 
-class ECNotificationManager _zcp_final {
+class ECNotificationManager _kc_final {
 public:
 	ECNotificationManager();
 	~ECNotificationManager();
@@ -56,10 +63,9 @@ private:
     static void * Thread(void *lpParam);
     void * Work();
     
-    bool		m_bExit;
+	bool m_bExit = false;
     pthread_t 	m_thread;
-    
-    unsigned int m_ulTimeout;
+	unsigned int m_ulTimeout = 60; /* Currently hardcoded at 60s, see comment in Work() */
 
     // A map of all sessions that are waiting for a SOAP response to be sent (an item can be in here for up to 60 seconds)
     std::map<ECSESSIONID, NOTIFREQUEST> 	m_mapRequests;
@@ -67,12 +73,14 @@ private:
     // (a session is in here for only very short periods of time, and contains only a few sessions even if the load is high)
     std::set<ECSESSIONID> 					m_setActiveSessions;
     
-    pthread_mutex_t m_mutexRequests;
-    pthread_mutex_t m_mutexSessions;
-    pthread_cond_t m_condSessions;
+	std::mutex m_mutexRequests;
+	std::mutex m_mutexSessions;
+	std::condition_variable m_condSessions;
 };
 
 extern ECSessionManager *g_lpSessionManager;
-extern void kopano_notify_done(struct soap *soap);
+extern _kc_export void (*kopano_notify_done)(struct soap *);
+
+} /* namespace */
 
 #endif

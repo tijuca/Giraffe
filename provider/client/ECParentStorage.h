@@ -34,10 +34,8 @@
 
 #include <mapi.h>
 #include <mapispi.h>
-#include <pthread.h>
 
-class ECParentStorage : public ECUnknown
-{
+class ECParentStorage _kc_final : public ECUnknown {
 	/*
 	  lpParentObject:	The property object of the parent (eg. ECMessage for ECAttach)
 	  ulUniqueId:		A unique client-side to find the object in the children list on the parent (PR_ATTACH_NUM (attachments) or PR_ROWID (recipients))
@@ -50,8 +48,7 @@ protected:
 
 public:
 	static HRESULT Create(ECGenericProp *lpParentObject, ULONG ulUniqueId, ULONG ulObjId, IECPropStorage *lpServerStorage, ECParentStorage **lppParentStorage);
-
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 
 private:
 
@@ -65,7 +62,7 @@ private:
 	virtual	HRESULT	HrWriteProps(ULONG cValues, LPSPropValue pValues, ULONG ulFlags = 0);
 
 	// Not implemented
-	virtual HRESULT HrDeleteProps(LPSPropTagArray lpsPropTagArray);
+	virtual HRESULT HrDeleteProps(const SPropTagArray *lpsPropTagArray);
 
 	// Save complete object, deletes/adds/modifies/creates
 	virtual HRESULT HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject);
@@ -77,21 +74,9 @@ private:
 	virtual IECPropStorage* GetServerStorage();
 
 public:
-	class xECPropStorage _zcp_final : public IECPropStorage {
-		public:
-			// IECUnknown
-			virtual ULONG AddRef(void) _zcp_override;
-			virtual ULONG Release(void) _zcp_override;
-			virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _zcp_override;
-
-			// IECPropStorage
-			virtual HRESULT HrReadProps(LPSPropTagArray *lppPropTags,ULONG *cValues, LPSPropValue *lppValues);
-			virtual HRESULT HrLoadProp(ULONG ulObjId, ULONG ulPropTag, LPSPropValue *lppsPropValue);
-			virtual	HRESULT	HrWriteProps(ULONG cValues, LPSPropValue lpValues, ULONG ulFlags = 0);
-			virtual HRESULT HrDeleteProps(LPSPropTagArray lpsPropTagArray);
-			virtual HRESULT HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject);
-			virtual HRESULT HrLoadObject(MAPIOBJECT **lppsMapiObject);
-			virtual IECPropStorage* GetServerStorage();
+	class xECPropStorage _kc_final : public IECPropStorage {
+		#include <kopano/xclsfrag/IECUnknown.hpp>
+		#include <kopano/xclsfrag/IECPropStorage.hpp>
 	} m_xECPropStorage;
 
 private:

@@ -20,8 +20,8 @@
 
 #include <kopano/zcdefs.h>
 #include <map>
-#include <pthread.h>
-
+#include <memory>
+#include <mutex>
 #include "ECDatabaseFactory.h"
 #include "ECDatabaseUtils.h"
 #include "ECGenericObjectTable.h"	// ECListInt
@@ -34,36 +34,27 @@
 
 #include <kopano/ECKeyTable.h>
 
-#if __cplusplus >= 201100L
+struct soap;
+
 #include <unordered_map>
-#define HASH_NAMESPACE std
 
 template<typename Key, typename T>
 struct hash_map {
 	typedef std::unordered_map<Key, T, std::hash<Key>, std::equal_to<Key>> Type;
 };
 
-#else
-#include <boost/unordered_map.hpp>
-#define HASH_NAMESPACE boost
-
-template <typename Key, typename T>
-struct hash_map {
-	typedef boost::unordered_map<Key, T, boost::hash<Key>, std::equal_to<Key> > Type;
-};
-
-#endif
+namespace KC {
 
 class ECSessionManager;
 
-class ECsStores : public ECsCacheEntry {
+class ECsStores _kc_final : public ECsCacheEntry {
 public:
 	unsigned int	ulStore;
 	GUID			guidStore;
 	unsigned int	ulType;
 };
 
-class ECsUserObject : public ECsCacheEntry {
+class ECsUserObject _kc_final : public ECsCacheEntry {
 public:
 	objectclass_t		ulClass;
 	std::string			strExternId;
@@ -72,10 +63,10 @@ public:
 };
 
 /* same as objectid_t, join? */
-typedef struct {
+struct ECsUEIdKey {
 	objectclass_t		ulClass;
 	std::string			strExternId;
-} ECsUEIdKey;
+};
 
 inline bool operator <(const ECsUEIdKey &a, const ECsUEIdKey &b)
 {
@@ -87,24 +78,24 @@ inline bool operator <(const ECsUEIdKey &a, const ECsUEIdKey &b)
 }
 
 /* Intern Id cache */
-class ECsUEIdObject _zcp_final : public ECsCacheEntry {
+class ECsUEIdObject _kc_final : public ECsCacheEntry {
 public:
 	unsigned int		ulCompanyId;
 	unsigned int		ulUserId;
 	std::string			strSignature;
 };
 
-class ECsUserObjectDetails _zcp_final : public ECsCacheEntry {
+class ECsUserObjectDetails _kc_final : public ECsCacheEntry {
 public:
 	objectdetails_t			sDetails;
 };
 
-class ECsServerDetails _zcp_final : public ECsCacheEntry {
+class ECsServerDetails _kc_final : public ECsCacheEntry {
 public:
 	serverdetails_t			sDetails;
 };
 
-class ECsObjects _zcp_final : public ECsCacheEntry {
+class ECsObjects _kc_final : public ECsCacheEntry {
 public:
 	unsigned int	ulParent;
 	unsigned int	ulOwner;
@@ -112,12 +103,12 @@ public:
 	unsigned int	ulType;
 };
 
-class ECsQuota _zcp_final : public ECsCacheEntry {
+class ECsQuota _kc_final : public ECsCacheEntry {
 public:
 	quotadetails_t	quota;
 };
 
-class ECsIndexObject _zcp_final : public ECsCacheEntry {
+class ECsIndexObject _kc_final : public ECsCacheEntry {
 public:
 	inline bool operator==(const ECsIndexObject &other) const
 	{
@@ -137,19 +128,13 @@ public:
 		return false;
 	}
 
-public:
 	unsigned int ulObjId;
 	unsigned int ulTag;
 };
 
-class ECsIndexProp _zcp_final : public ECsCacheEntry {
+class ECsIndexProp _kc_final : public ECsCacheEntry {
 public:
-    ECsIndexProp() : ECsCacheEntry() { 
-		lpData = NULL; 
-		ulTag = 0; 
-		cbData = 0;
-	}
-
+	ECsIndexProp(void) = default;
 	~ECsIndexProp() {
 		delete[] lpData;
 	}
@@ -159,12 +144,24 @@ public:
             return;
         Copy(&src, this);
     }
+
+	ECsIndexProp(ECsIndexProp &&o) :
+		ulTag(o.ulTag), lpData(o.lpData), cbData(o.cbData)
+	{
+		o.lpData = nullptr;
+		o.cbData = 0;
+	}
+
+	ECsIndexProp(unsigned int tag, const unsigned char *d, unsigned int z)
+	{
+		SetValue(tag, d, z);
+	}
     
     ECsIndexProp& operator=(const ECsIndexProp &src) {
-        if(this != &src) {
-			Free();
-			Copy(&src, this);
-		}
+		if (this == &src)
+			return *this;
+		Free();
+		Copy(&src, this);
 		return *this;
     }
 
@@ -174,21 +171,19 @@ public:
 
 		if(cbData < other.cbData)
 			return true;
-
-		if(cbData == other.cbData) {
-			if(lpData == NULL && other.lpData)
-				return true;
-			else if (lpData != NULL && other.lpData == NULL)
-				return false;
-			else if (lpData == NULL && other.lpData == NULL)
-				return false;
-			int c = memcmp(lpData, other.lpData, cbData);
-			if(c < 0)
-				return true;
-			else if(c == 0 && ulTag < other.ulTag)
-				return true;
-		}
-
+		if (cbData != other.cbData)
+			return false;
+		if (lpData == NULL && other.lpData)
+			return true;
+		else if (lpData != NULL && other.lpData == NULL)
+			return false;
+		else if (lpData == NULL && other.lpData == NULL)
+			return false;
+		int c = memcmp(lpData, other.lpData, cbData);
+		if (c < 0)
+			return true;
+		else if (c == 0 && ulTag < other.ulTag)
+			return true;
 		return false;
 	}
 
@@ -210,8 +205,8 @@ public:
 		return false;
 	}
 
-	void SetValue(unsigned int ulTag, unsigned char* lpData, unsigned int cbData) {
-
+	void SetValue(unsigned int ulTag, const unsigned char *lpData, unsigned int cbData)
+	{
 		if(lpData == NULL|| cbData == 0)
 			return;
 
@@ -245,43 +240,37 @@ protected:
 		dst->ulTag = src->ulTag;
 	}
 public:
-	unsigned int	ulTag;
-	unsigned char*	lpData;
-	unsigned int	cbData;
+	unsigned int ulTag = 0;
+	unsigned char *lpData = nullptr;
+	unsigned int cbData = 0;
 };
 
-class ECsCells _zcp_final : public ECsCacheEntry {
+class ECsCells _kc_final : public ECsCacheEntry {
 public:
-    ECsCells() : ECsCacheEntry() { 
-    	m_bComplete = false; 
-	};
+	ECsCells(void) = default;
     ~ECsCells() {
-		std::map<unsigned int, struct propVal>::iterator i;
-		for (i = mapPropVals.begin(); i != mapPropVals.end(); ++i)
-			FreePropVal(&i->second, false);
+		for (auto &p : mapPropVals)
+			FreePropVal(&p.second, false);
     };
     
     ECsCells(const ECsCells &src) {
         struct propVal val;
-        std::map<unsigned int, struct propVal>::const_iterator i;
-        for (i = src.mapPropVals.begin(); i != src.mapPropVals.end(); ++i) {
-            CopyPropVal((struct propVal *)&i->second, &val);
-            mapPropVals[i->first] = val;
+		for (const auto &p : src.mapPropVals) {
+			CopyPropVal(const_cast<struct propVal *>(&p.second), &val);
+			mapPropVals[p.first] = val;
         }
         m_bComplete = src.m_bComplete;
     }
     
     ECsCells& operator=(const ECsCells &src) {
         struct propVal val;
-        std::map<unsigned int, struct propVal>::iterator i;
-		for (i = mapPropVals.begin(); i != mapPropVals.end(); ++i)
-			FreePropVal(&i->second, false);
+		for (auto &p : mapPropVals)
+			FreePropVal(&p.second, false);
         mapPropVals.clear();
         
-        for (i = ((ECsCells &)src).mapPropVals.begin();
-             i != ((ECsCells &)src).mapPropVals.end(); ++i) {
-            CopyPropVal((struct propVal *)&i->second, &val);
-            mapPropVals[i->first] = val;
+		for (const auto &p : src.mapPropVals) {
+			CopyPropVal(const_cast<struct propVal *>(&p.second), &val);
+			mapPropVals[p.first] = val;
         }
         m_bComplete = src.m_bComplete;
 		return *this;
@@ -291,10 +280,9 @@ public:
     void AddPropVal(unsigned int ulPropTag, const struct propVal *lpPropVal) {
         struct propVal val;
         ulPropTag = NormalizeDBPropTag(ulPropTag); // Only cache PT_STRING8
-		std::pair<std::map<unsigned int, struct propVal>::iterator,bool> res;
         CopyPropVal(lpPropVal, &val, NULL, true);
         val.ulPropTag = NormalizeDBPropTag(val.ulPropTag);
-		res = mapPropVals.insert(std::make_pair(ulPropTag, val));
+		auto res = mapPropVals.insert(std::make_pair(ulPropTag, val));
 		if (res.second == false) {
             FreePropVal(&res.first->second, false); 
             res.first->second = val;	// reassign
@@ -303,10 +291,9 @@ public:
     
     // get a property value for this object
     bool GetPropVal(unsigned int ulPropTag, struct propVal *lpPropVal, struct soap *soap) {
-        std::map<unsigned int, struct propVal>::const_iterator i;
-        i = mapPropVals.find(NormalizeDBPropTag(ulPropTag));
-        if(i == mapPropVals.end())
-            return false;
+		auto i = mapPropVals.find(NormalizeDBPropTag(ulPropTag));
+		if (i == mapPropVals.cend())
+			return false;
         CopyPropVal(&i->second, lpPropVal, soap);
         if(NormalizeDBPropTag(ulPropTag) == lpPropVal->ulPropTag)
 	        lpPropVal->ulPropTag = ulPropTag; // Switch back to requested type (not on PT_ERROR of course)
@@ -315,23 +302,23 @@ public:
     
     // Updates a LONG type property
     void UpdatePropVal(unsigned int ulPropTag, int lDelta) {
-        std::map<unsigned int, struct propVal>::iterator i;
         if(PROP_TYPE(ulPropTag) != PT_LONG)
             return;
-        i = mapPropVals.find(ulPropTag);
-        if(i == mapPropVals.end() || PROP_TYPE(i->second.ulPropTag) != PT_LONG)
-            return;
+		auto i = mapPropVals.find(ulPropTag);
+		if (i == mapPropVals.cend() ||
+		    PROP_TYPE(i->second.ulPropTag) != PT_LONG)
+			return;
         i->second.Value.ul += lDelta;
     }
     
     // Updates a LONG type property
     void UpdatePropVal(unsigned int ulPropTag, unsigned int ulMask, unsigned int ulValue) {
-        std::map<unsigned int, struct propVal>::iterator i;
         if(PROP_TYPE(ulPropTag) != PT_LONG)
             return;
-        i = mapPropVals.find(ulPropTag);
-        if(i == mapPropVals.end() || PROP_TYPE(i->second.ulPropTag) != PT_LONG)
-            return;
+		auto i = mapPropVals.find(ulPropTag);
+		if (i == mapPropVals.cend() ||
+		    PROP_TYPE(i->second.ulPropTag) != PT_LONG)
+			return;
         i->second.Value.ul &= ~ulMask;
         i->second.Value.ul |= ulValue & ulMask;
     }
@@ -348,17 +335,19 @@ public:
     size_t GetSize() const {
         size_t ulSize = 0;
         
-        std::map<unsigned int, struct propVal>::const_iterator i;
-        for (i = mapPropVals.begin(); i != mapPropVals.end(); ++i) {
-            switch(i->second.__union) {
+        for (const auto &p : mapPropVals) {
+            switch (p.second.__union) {
                 case SOAP_UNION_propValData_lpszA:
-                    ulSize += i->second.Value.lpszA ? (unsigned int)strlen(i->second.Value.lpszA) : 0;
+                    ulSize += p.second.Value.lpszA != NULL ?
+                              strlen(p.second.Value.lpszA) : 0;
 					break;
                 case SOAP_UNION_propValData_bin:
-                    ulSize += i->second.Value.bin ? i->second.Value.bin->__size + sizeof(i->second.Value.bin[0]) : 0;
+                    ulSize += p.second.Value.bin != NULL ?
+                              p.second.Value.bin->__size +
+                              sizeof(p.second.Value.bin[0]) : 0;
 					break;
                 case SOAP_UNION_propValData_hilo:
-                    ulSize += sizeof(i->second.Value.hilo[0]);
+                    ulSize += sizeof(p.second.Value.hilo[0]);
 					break;
                 default:
                     break;
@@ -373,43 +362,38 @@ public:
     
     // All properties for this object; propTag => propVal
     std::map<unsigned int, struct propVal> mapPropVals;
-    
-    bool m_bComplete;
+	bool m_bComplete = false;
 };
 
-class ECsACLs _zcp_final : public ECsCacheEntry {
+class ECsACLs _kc_final : public ECsCacheEntry {
 public:
-	ECsACLs() : ECsCacheEntry() { ulACLs = 0; aACL = NULL; }
-    ECsACLs(const ECsACLs &src) {
-        ulACLs = src.ulACLs;
-        aACL = new ACL[src.ulACLs];
-        memcpy(aACL, src.aACL, sizeof(ACL) * src.ulACLs);
-    };
+	ECsACLs(void) = default;
+	ECsACLs(const ECsACLs &src) : ulACLs(src.ulACLs)
+	{
+		aACL.reset(new ACL[ulACLs]);
+		memcpy(aACL.get(), src.aACL.get(), sizeof(ACL) * ulACLs);
+	}
     ECsACLs& operator=(const ECsACLs &src) {
 		if (this != &src) {
-			delete[] aACL;
 			ulACLs = src.ulACLs;
-			aACL = new ACL[src.ulACLs];
-			memcpy(aACL, src.aACL, sizeof(ACL) * src.ulACLs);
+			aACL.reset(new ACL[ulACLs]);
+			memcpy(aACL.get(), src.aACL.get(), sizeof(ACL) * ulACLs);
 		}
 		return *this;
     };
-    ~ECsACLs() {
-		delete[] aACL;
-    }
-    unsigned int 	ulACLs;
+	unsigned int ulACLs = 0;
     struct ACL {
         unsigned int ulType;
         unsigned int ulMask;
         unsigned int ulUserId;
-    } *aACL;
+    };
+	std::unique_ptr<ACL[]> aACL;
 };
 
-typedef struct {
+struct ECsSortKeyKey {
 	sObjectTableKey	sKey;
 	unsigned int	ulPropTag;
-}ECsSortKeyKey;
-
+};
 
 struct lessindexobjectkey {
 	bool operator()(const ECsIndexObject& a, const ECsIndexObject& b) const
@@ -438,14 +422,13 @@ inline unsigned int IPRSHash(const ECsIndexProp& _Keyval1)
 	return hash;
 }
 
-namespace HASH_NAMESPACE {
+} /* namespace KC */
+
+namespace std {
 	// hash function for type ECsIndexProp
 	template<>
 	struct hash<ECsIndexProp> {
 		public:
-			hash() {};
-			~hash() {};
-
 			size_t operator() (const ECsIndexProp &value) const { return IPRSHash(value); }
 	};
 
@@ -453,8 +436,6 @@ namespace HASH_NAMESPACE {
 	template<>
 	struct hash<ECsIndexObject> {
 		public:
-			hash() {};
-			~hash() {};
 			size_t operator() (const ECsIndexObject &value) const {
 					hash<unsigned int> hasher;
 					// @TODO check the hash function!
@@ -462,6 +443,8 @@ namespace HASH_NAMESPACE {
 			}
 	};
 }
+
+namespace KC {
 
 typedef hash_map<unsigned int, ECsObjects>::Type ECMapObjects;
 typedef hash_map<unsigned int, ECsStores>::Type ECMapStores;
@@ -479,7 +462,7 @@ typedef hash_map<ECsIndexProp, ECsIndexObject>::Type ECMapPropToObject;
 
 #define CACHE_NO_PARENT 0xFFFFFFFF
 
-class ECCacheManager _zcp_final {
+class ECCacheManager _kc_final {
 public:
 	ECCacheManager(ECConfig *lpConfig, ECDatabaseFactory *lpDatabase);
 	virtual ~ECCacheManager();
@@ -596,11 +579,10 @@ private:
 	// Cache Index properties
 	ECRESULT _AddIndexData(const ECsIndexObject *lpObject, const ECsIndexProp *lpProp);
 
-private:
 	ECDatabaseFactory*	m_lpDatabaseFactory;
-	pthread_mutex_t		m_hCacheMutex;			// Store, Object, User, ACL, server cache
-	pthread_mutex_t		m_hCacheCellsMutex;		// Cell cache
-	pthread_mutex_t		m_hCacheIndPropMutex;	// Indexed properties cache
+	std::recursive_mutex m_hCacheMutex; /* Store, Object, User, ACL, server cache */
+	std::recursive_mutex m_hCacheCellsMutex; /* Cell cache */
+	std::recursive_mutex m_hCacheIndPropMutex; /* Indexed properties cache */
 	
 	// Quota cache, to reduce the impact of the user plugin
 	// m_mapQuota contains user and company cache, except when it's the company user default quota
@@ -635,10 +617,12 @@ private:
 	
 	// Properties from kopano-search
 	std::set<unsigned int> 		m_setExcludedIndexProperties;
-	pthread_mutex_t				m_hExcludedIndexPropertiesMutex;
+	std::mutex m_hExcludedIndexPropertiesMutex;
 	
 	// Testing
-	bool						m_bCellCacheDisabled;
+	bool m_bCellCacheDisabled = false;
 };
+
+} /* namespace */
 
 #endif

@@ -17,24 +17,23 @@
 
 #include <kopano/platform.h>
 #include <memory>
-
+#include <mutex>
+#include <stdexcept>
 #include "DBBase.h"
 #include <kopano/ECDefs.h>
 #include <kopano/EMSAbTag.h>
 #include <kopano/stringutil.h>
-#include <kopano/md5.h>
 #include <mapidefs.h>
-#include <kopano/base64.h>
+#include "ECServerEntrypoint.h"
 
-KDLLAPI ECRESULT GetDatabaseObject(ECDatabase **lppDatabase);
-
-DBPlugin::DBPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *shareddata) :
-	UserPlugin(pluginlock, shareddata), m_lpDatabase(NULL) {
+DBPlugin::DBPlugin(std::mutex &pluginlock, ECPluginSharedData *shareddata) :
+	UserPlugin(pluginlock, shareddata)
+{
 }
 
-DBPlugin::~DBPlugin() {
-    // Do not delete m_lpDatabase as it is freed when the thread exits
-}
+//DBPlugin::~DBPlugin() {
+//    // Do not delete m_lpDatabase as it is freed when the thread exits
+//}
 
 void DBPlugin::InitPlugin() {
 
@@ -85,10 +84,8 @@ std::unique_ptr<std::map<objectid_t, objectdetails_t> >
 DBPlugin::getObjectDetails(const std::list<objectid_t> &objectids)
 {
 	map<objectid_t,objectdetails_t> *mapdetails = new map<objectid_t,objectdetails_t>;
-	map<objectid_t,objectdetails_t>::iterator iterDetails;
 	ECRESULT er;
 	map<objectclass_t, string> objectstrings;
-	std::map<objectclass_t, std::string>::const_iterator iterStrings;
 	string strQuery;
 	string strSubQuery;
 	DB_RESULT_AUTOFREE lpResult(m_lpDatabase);
@@ -103,17 +100,16 @@ DBPlugin::getObjectDetails(const std::list<objectid_t> &objectids)
 
 	LOG_PLUGIN_DEBUG("%s N=%d", __FUNCTION__, (int)objectids.size());
 
-	for (std::list<objectid_t>::const_iterator i = objectids.begin();
-	     i != objectids.end(); ++i) {
-		if (!objectstrings[i->objclass].empty())
-			objectstrings[i->objclass] += ", ";
-		objectstrings[i->objclass] += "'" + m_lpDatabase->Escape(i->id) + "'";
+	for (const auto &id : objectids) {
+		if (!objectstrings[id.objclass].empty())
+			objectstrings[id.objclass] += ", ";
+		objectstrings[id.objclass] += "'" + m_lpDatabase->Escape(id.id) + "'";
 	}
 
 	/* Create subquery which combines all externids with the matching objectclass */
-	for (iterStrings = objectstrings.begin();
-	     iterStrings != objectstrings.end(); ++iterStrings) {
-		if (iterStrings != objectstrings.begin())
+	for (auto iterStrings = objectstrings.cbegin();
+	     iterStrings != objectstrings.cend(); ++iterStrings) {
+		if (iterStrings != objectstrings.cbegin())
 			strSubQuery += " OR ";
 		strSubQuery += "(o.externid IN (" + iterStrings->second + ") "
 				"AND " + OBJECTCLASS_COMPARE_SQL("objectclass", iterStrings->first) + ")";
@@ -213,6 +209,7 @@ DBPlugin::getObjectDetails(const std::list<objectid_t> &objectids)
 	if(er != erSuccess)
 		throw runtime_error(string("db_query: ") + strerror(er));
 
+	std::map<objectid_t, objectdetails_t>::iterator iterDetails;
 	while((lpDBRow = m_lpDatabase->FetchRow(lpResult)) != NULL) {
 		if(lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL || lpDBRow[3] == NULL)
 			continue;
@@ -225,7 +222,7 @@ DBPlugin::getObjectDetails(const std::list<objectid_t> &objectids)
 
 		if (lastid != curid) {
 			iterDetails = mapdetails->find(curid);
-			if (iterDetails == mapdetails->end())
+			if (iterDetails == mapdetails->cend())
 				continue;
 		}
 
@@ -304,10 +301,7 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 	bool bFirstDel = true;
 	string strData;
 	property_map anonymousProps;
-	property_map::const_iterator iterAnonymous;
 	property_mv_map anonymousMVProps;
-	property_mv_map::const_iterator iterMVAnonymous;
-	std::list<std::string>::const_iterator iterProps;
 	unsigned int ulOrderId = 0;
 
 	struct props sUserValidProps[] = {
@@ -350,11 +344,10 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 
 		bFirstOne = true;
 
-		for (iterProps = lpDeleteProps->begin();
-		     iterProps != lpDeleteProps->end(); ++iterProps) {
+		for (const auto &prop : *lpDeleteProps) {
 			if (!bFirstOne)
 				strDeleteQuery += ",";
-			strDeleteQuery += *iterProps;
+			strDeleteQuery += prop;
 			bFirstOne = false;
 		}
 
@@ -394,11 +387,12 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 	while (sValidProps[i].column != NULL) {
 		string propvalue = details.GetPropString(sValidProps[i].id);
 
-		if (strcasecmp(sValidProps[i].column, OP_PASSWORD) == 0 && !propvalue.empty()) {
-			// Password value has special treatment
-			if (CreateMD5Hash(propvalue, &propvalue) != erSuccess) // WARNING input and output point to the same data
-				throw runtime_error(string("db_changeUser: create md5"));
-		}
+		if (strcasecmp(sValidProps[i].column, OP_PASSWORD) == 0 &&
+		    !propvalue.empty() &&
+			/* Password value has special treatment */
+		    CreateMD5Hash(propvalue, &propvalue) != erSuccess)
+			/* WARNING input and output point to the same data */
+			throw runtime_error(string("db_changeUser: create md5"));
 
 		if (sValidProps[i].id == OB_PROP_O_COMPANYID) {
 			propvalue = details.GetPropObject(OB_PROP_O_COMPANYID).id;
@@ -417,22 +411,20 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 
 	/* Load optional anonymous attributes */
 	anonymousProps = details.GetPropMapAnonymous();
-	for (iterAnonymous = anonymousProps.begin();
-	     iterAnonymous != anonymousProps.end(); ++iterAnonymous) {
-		if (!iterAnonymous->second.empty()) {
-			if (!bFirstOne)
-				strQuery += ",";
-			if (PROP_TYPE(iterAnonymous->first) == PT_BINARY) {
-				strData = base64_encode((const unsigned char*)iterAnonymous->second.c_str(), iterAnonymous->second.size());
-			} else {
-				strData = iterAnonymous->second;
-			}
-			strQuery +=
-				"((" + strSubQuery + "),"
-				"'" + m_lpDatabase->Escape(stringify(iterAnonymous->first, true)) + "',"
-				"'" +  m_lpDatabase->Escape(strData) + "')";
-			bFirstOne = false;
-		}
+	for (const auto &ap : anonymousProps) {
+		if (ap.second.empty())
+			continue;
+		if (!bFirstOne)
+			strQuery += ",";
+		if (PROP_TYPE(ap.first) == PT_BINARY)
+			strData = base64_encode(reinterpret_cast<const unsigned char *>(ap.second.c_str()), ap.second.size());
+		else
+			strData = ap.second;
+		strQuery +=
+			"((" + strSubQuery + "),"
+			"'" + m_lpDatabase->Escape(stringify(ap.first, true)) + "',"
+			"'" +  m_lpDatabase->Escape(strData) + "')";
+		bFirstOne = false;
 	}
 
 	/* Only update when there were actually properties provided. */
@@ -451,31 +443,28 @@ void DBPlugin::changeObject(const objectid_t &objectid, const objectdetails_t &d
 		" AND propname IN (";
 
 	anonymousMVProps = details.GetPropMapListAnonymous();
-	for (iterMVAnonymous = anonymousMVProps.begin();
-	     iterMVAnonymous != anonymousMVProps.end(); ++iterMVAnonymous) {
+	for (const auto &mva : anonymousMVProps) {
 		ulOrderId = 0;
 
 		if (!bFirstDel)
 			strDeleteQuery += ",";
-		strDeleteQuery += "'" + m_lpDatabase->Escape(stringify(iterMVAnonymous->first, true)) + "'";
+		strDeleteQuery += "'" + m_lpDatabase->Escape(stringify(mva.first, true)) + "'";
 		bFirstDel = false;
 
-		if (iterMVAnonymous->second.empty())
+		if (mva.second.empty())
 			continue;
 
-		for (iterProps = iterMVAnonymous->second.begin();
-		     iterProps != iterMVAnonymous->second.end(); ++iterProps) {
-			if (!iterProps->empty()) {
+		for (const auto &prop : mva.second) {
+			if (!prop.empty()) {
 				if (!bFirstOne)
 					strQuery += ",";
-				if (PROP_TYPE(iterMVAnonymous->first) == PT_MV_BINARY) {
-					strData = base64_encode((const unsigned char*)iterProps->c_str(), iterProps->size());
-				} else {
-					strData = *iterProps;
-				}
+				if (PROP_TYPE(mva.first) == PT_MV_BINARY)
+					strData = base64_encode(reinterpret_cast<const unsigned char *>(prop.c_str()), prop.size());
+				else
+					strData = prop;
 				strQuery +=
 					"((" + strSubQuery + "),"
-					"'" + m_lpDatabase->Escape(stringify(iterMVAnonymous->first, true)) + "',"
+					"'" + m_lpDatabase->Escape(stringify(mva.first, true)) + "',"
 					"" + stringify(ulOrderId) + ","
 					"'" +  m_lpDatabase->Escape(strData) + "')";
 				++ulOrderId;
@@ -796,7 +785,7 @@ std::unique_ptr<quotadetails_t> DBPlugin::getQuota(const objectid_t &objectid,
 	if (er != erSuccess)
 		throw runtime_error(string("db_query: ") + strerror(er));
 
-	lpDetails = std::unique_ptr<quotadetails_t>(new quotadetails_t());
+	lpDetails.reset(new quotadetails_t());
 	lpDetails->bIsUserDefaultQuota = bGetUserDefault;
 
 	while ((lpDBRow = m_lpDatabase->FetchRow(lpResult)) != NULL) {
@@ -895,7 +884,7 @@ DBPlugin::CreateSignatureList(const std::string &query)
 		objclass = objectclass_t(atoi(lpDBRow[1]));
 
 		lpDBLen = m_lpDatabase->FetchRowLengths(lpResult);
-		ASSERT(lpDBLen != NULL);
+		assert(lpDBLen != NULL);
 		if (lpDBLen[0] == 0)
 			throw runtime_error(string("db_row_failed: object empty"));
 
@@ -931,12 +920,11 @@ ECRESULT DBPlugin::CreateMD5Hash(const std::string &strData, std::string* lpstrR
 void DBPlugin::addSendAsToDetails(const objectid_t &objectid, objectdetails_t *lpDetails)
 {
 	std::unique_ptr<signatures_t> sendas;
-	signatures_t::const_iterator iter;
 
 	sendas = getSubObjectsForObject(OBJECTRELATION_USER_SENDAS, objectid);
 
-	for (iter = sendas->begin(); iter != sendas->end(); ++iter)
-		lpDetails->AddPropObject(OB_PROP_LO_SENDAS, iter->id);
+	for (const auto &objlist : *sendas)
+		lpDetails->AddPropObject(OB_PROP_LO_SENDAS, objlist.id);
 }
 
 std::unique_ptr<abprops_t> DBPlugin::getExtraAddressbookProperties(void)

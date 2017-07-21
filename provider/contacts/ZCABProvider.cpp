@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <new>
 #include "ZCABProvider.h"
 #include "ZCABLogon.h"
 
@@ -24,8 +25,12 @@
 #include <mapiguid.h>
 
 #include <kopano/ECGuid.h>
+#include <kopano/ECInterfaceDefs.h>
 #include <kopano/ECDebug.h>
 #include <kopano/Trace.h>
+#include <kopano/memory.hpp>
+
+using namespace KCHL;
 
 ZCABProvider::ZCABProvider(ULONG ulFlags, const char *szClassName) :
     ECUnknown(szClassName)
@@ -34,33 +39,22 @@ ZCABProvider::ZCABProvider(ULONG ulFlags, const char *szClassName) :
 
 HRESULT ZCABProvider::Create(ZCABProvider **lppZCABProvider)
 {
-	HRESULT hr = hrSuccess;
-	ZCABProvider *lpZCABProvider = NULL;
-
-	try {
-		lpZCABProvider = new ZCABProvider(0, "ZCABProvider");
-	} catch (...) {
-		hr = MAPI_E_NOT_ENOUGH_MEMORY;
-		goto exit;
-	}
-
-	hr = lpZCABProvider->QueryInterface(IID_ZCABProvider, (void **)lppZCABProvider);
-
+	auto lpZCABProvider = new(std::nothrow) ZCABProvider(0, "ZCABProvider");
+	if (lpZCABProvider == nullptr)
+		return MAPI_E_NOT_ENOUGH_MEMORY;
+	HRESULT hr = lpZCABProvider->QueryInterface(IID_ZCABProvider,
+	             reinterpret_cast<void **>(lppZCABProvider));
 	if(hr != hrSuccess)
 		delete lpZCABProvider;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ZCABProvider::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ZCABProvider, this);
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
-	REGISTER_INTERFACE(IID_IABProvider, &this->m_xABProvider);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xABProvider);
-
+	REGISTER_INTERFACE2(ZCABProvider, this);
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IABProvider, &this->m_xABProvider);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xABProvider);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -73,24 +67,20 @@ HRESULT ZCABProvider::Shutdown(ULONG * lpulFlags)
 HRESULT ZCABProvider::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG ulFlags, ULONG * lpulcbSecurity, LPBYTE * lppbSecurity, LPMAPIERROR * lppMAPIError, LPABLOGON * lppABLogon)
 {
 	HRESULT hr = hrSuccess;
-	ZCABLogon* lpABLogon = NULL;
+	object_ptr<ZCABLogon> lpABLogon;
 
-	if (!lpMAPISup || !lppABLogon) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpMAPISup == nullptr || lppABLogon == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
 
 	// todo: remove flags & guid .. probably add other stuff from profile?
-	hr = ZCABLogon::Create(lpMAPISup, 0, NULL, &lpABLogon);
+	hr = ZCABLogon::Create(lpMAPISup, 0, nullptr, &~lpABLogon);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	AddChild(lpABLogon);
 
 	hr = lpABLogon->QueryInterface(IID_IABLogon, (void **)lppABLogon);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	if (lpulcbSecurity)
 		*lpulcbSecurity = 0;
 
@@ -99,51 +89,11 @@ HRESULT ZCABProvider::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszPro
 
 	if (lppMAPIError)
 		*lppMAPIError = NULL;
-
-exit:
-	if (lpABLogon)
-		lpABLogon->Release();
-
-	return hr;
+	return hrSuccess;
 }
 
-ULONG ZCABProvider::xABProvider::AddRef()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABProvider::AddRef", "");
-	METHOD_PROLOGUE_(ZCABProvider, ABProvider);
-	return pThis->AddRef();
-}
-
-ULONG ZCABProvider::xABProvider::Release()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABProvider::Release", "");
-	METHOD_PROLOGUE_(ZCABProvider, ABProvider);
-	return pThis->Release();
-}
-
-HRESULT ZCABProvider::xABProvider::QueryInterface(REFIID refiid, void **lppInterface)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABProvider::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
-	METHOD_PROLOGUE_(ZCABProvider , ABProvider);
-	HRESULT hr = pThis->QueryInterface(refiid, lppInterface);
-	TRACE_MAPI(TRACE_RETURN, "IABProvider::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABProvider::xABProvider::Shutdown(ULONG * lpulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABProvider::Shutdown", "");
-	METHOD_PROLOGUE_(ZCABProvider, ABProvider);
-	HRESULT hr = pThis->Shutdown(lpulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IABProvider::Shutdown", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABProvider::xABProvider::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG ulFlags, ULONG * lpulcbSecurity, LPBYTE * lppbSecurity, LPMAPIERROR * lppMAPIError, LPABLOGON * lppABLogon)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABProvider::Logon", "");
-	METHOD_PROLOGUE_(ZCABProvider, ABProvider);
-	HRESULT hr = pThis->Logon(lpMAPISup, ulUIParam, lpszProfileName, ulFlags, lpulcbSecurity, lppbSecurity, lppMAPIError, lppABLogon);
-	TRACE_MAPI(TRACE_RETURN, "IABProvider::Logon", "%s", GetMAPIErrorDescription(hr).c_str());
-	return  hr;
-}
+DEF_ULONGMETHOD1(TRACE_MAPI, ZCABProvider, ABProvider, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ZCABProvider, ABProvider, Release, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABProvider, ABProvider, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABProvider, ABProvider, Shutdown, (ULONG *, lpulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABProvider, ABProvider, Logon, (LPMAPISUP, lpMAPISup), (ULONG, ulUIParam), (LPTSTR, lpszProfileName), (ULONG, ulFlags), (ULONG *, lpulcbSecurity), (LPBYTE *, lppbSecurity), (LPMAPIERROR *, lppMAPIError), (LPABLOGON *, lppABLogon))

@@ -15,14 +15,17 @@
  *
  */
 
+#include <chrono>
 #include <kopano/platform.h>
+#include <kopano/lockhelper.hpp>
 #include "MAPINotifSink.h"
 
 #include <kopano/Util.h>
 
 #include <mapi.h>
 #include <mapix.h>
-#include <pthread.h>
+
+namespace KC {
 
 /**
  * This is a special advisesink so that we can do notifications in Perl. What it does
@@ -42,72 +45,60 @@
 static HRESULT MAPICopyMem(ULONG cb, void *lpb, void *lpBase, ULONG *lpCb,
     void **lpDest)
 {
-    HRESULT hr = hrSuccess;
-    
     if(lpb == NULL) {
         *lpDest = NULL;
         *lpCb = 0;
-        goto exit;
+		return hrSuccess;
     }
     
-    hr = MAPIAllocateMore(cb, lpBase, lpDest);
-
-    if(hr != hrSuccess)
-        goto exit;
+	HRESULT hr = MAPIAllocateMore(cb, lpBase, lpDest);
+	if (hr != hrSuccess)
+		return hr;
         
     memcpy(*lpDest, lpb, cb);
     *lpCb = cb;
-
-exit:    
-    return hr;
+	return hrSuccess;
 }
 
 HRESULT MAPICopyString(char *lpSrc, void *lpBase, char **lpDst)
 {
-    HRESULT hr = hrSuccess;
-    
     if(lpSrc == NULL) {
         *lpDst = NULL;
-        goto exit;
-    }
+		return hrSuccess;
+	}
     
-    hr = MAPIAllocateMore(strlen(lpSrc)+1, lpBase, (void **)lpDst);
-    if(hr != hrSuccess)
-        goto exit;
-        
-    strcpy(*lpDst, lpSrc);
-        
-exit:
-    return hr;
+	HRESULT hr = MAPIAllocateMore(strlen(lpSrc) + 1, lpBase,
+	             reinterpret_cast<void **>(lpDst));
+	if (hr != hrSuccess)
+		return hr;
+	strcpy(*lpDst, lpSrc);
+	return hrSuccess;
 }
 
 HRESULT MAPICopyUnicode(WCHAR *lpSrc, void *lpBase, WCHAR **lpDst)
 {
-    HRESULT hr = hrSuccess;
-    
     if(lpSrc == NULL) {
         *lpDst = NULL;
-        goto exit;
+		return hrSuccess;
     }
     
-    hr = MAPIAllocateMore(wcslen(lpSrc)*sizeof(WCHAR)+sizeof(WCHAR), lpBase, (void **)lpDst);
-    if(hr != hrSuccess)
-        goto exit;
-        
-    wcscpy(*lpDst, lpSrc);
-        
-exit:
-    return hr;
+	HRESULT hr = MAPIAllocateMore(wcslen(lpSrc) * sizeof(WCHAR) +
+	             sizeof(WCHAR), lpBase, reinterpret_cast<void **>(lpDst));
+	if (hr != hrSuccess)
+		return hr;
+	wcscpy(*lpDst, lpSrc);
+	return hrSuccess;
 }
 
 static HRESULT CopyMAPIERROR(const MAPIERROR *lpSrc, void *lpBase,
     MAPIERROR **lppDst)
 {
-    HRESULT hr = hrSuccess;
     MAPIERROR *lpDst = NULL;
     
-    if ((hr = MAPIAllocateMore(sizeof(MAPIERROR), lpBase, (void **)&lpDst)) != hrSuccess)
-		goto exit;
+	HRESULT hr = MAPIAllocateMore(sizeof(MAPIERROR), lpBase,
+	             reinterpret_cast<void **>(&lpDst));
+	if (hr != hrSuccess)
+		return hr;
 
     lpDst->ulVersion = lpSrc->ulVersion;
 	// @todo we don't know if the strings were create with unicode anymore
@@ -121,16 +112,14 @@ static HRESULT CopyMAPIERROR(const MAPIERROR *lpSrc, void *lpBase,
     lpDst->ulLowLevelError = lpSrc->ulLowLevelError;
     lpDst->ulContext = lpSrc->ulContext;
     
-    *lppDst = lpDst;
-
-exit:
-    return hr;
+	*lppDst = lpDst;
+	return hrSuccess;
 }
 
 static HRESULT CopyNotification(const NOTIFICATION *lpSrc, void *lpBase,
     NOTIFICATION *lpDst)
 {
-    HRESULT hr = hrSuccess;
+    HRESULT hr;
 
     memset(lpDst, 0, sizeof(NOTIFICATION));
 
@@ -180,30 +169,28 @@ static HRESULT CopyNotification(const NOTIFICATION *lpSrc, void *lpBase,
             lpDst->info.tab.hResult = lpSrc->info.tab.hResult;
             hr = Util::HrCopyProperty(&lpDst->info.tab.propPrior, &lpSrc->info.tab.propPrior, lpBase);
             if (hr != hrSuccess)
-		goto exit;
+			return hr;
             hr = Util::HrCopyProperty(&lpDst->info.tab.propIndex, &lpSrc->info.tab.propIndex, lpBase);
             if (hr != hrSuccess)
-		goto exit;
+			return hr;
             if ((hr = MAPIAllocateMore(lpSrc->info.tab.row.cValues * sizeof(SPropValue), lpBase, (void **)&lpDst->info.tab.row.lpProps)) != hrSuccess)
-		goto exit;
+			return hr;
             hr = Util::HrCopyPropertyArray(lpSrc->info.tab.row.lpProps, lpSrc->info.tab.row.cValues, lpDst->info.tab.row.lpProps, lpBase);
             if (hr != hrSuccess)
-                goto exit;
+			return hr;
             lpDst->info.tab.row.cValues = lpSrc->info.tab.row.cValues;
             break;
         case fnevStatusObjectModified:
             MAPICopyMem(lpSrc->info.statobj.cbEntryID, 		lpSrc->info.statobj.lpEntryID, 		lpBase, &lpDst->info.statobj.cbEntryID, 	(void**)&lpDst->info.statobj.lpEntryID);
             if ((hr = MAPIAllocateMore(lpSrc->info.statobj.cValues * sizeof(SPropValue), lpBase, (void **)&lpDst->info.statobj.lpPropVals)) != hrSuccess)
-			goto exit;
+			return hr;
             hr = Util::HrCopyPropertyArray(lpSrc->info.statobj.lpPropVals, lpSrc->info.statobj.cValues, lpDst->info.statobj.lpPropVals, lpBase);
             if (hr != hrSuccess)
-                goto exit;
+			return hr;
             lpDst->info.statobj.cValues = lpSrc->info.statobj.cValues;
             break;
-    }
-
-exit:
-    return hr;
+	}
+	return hrSuccess;
 }
 
 HRESULT MAPINotifSink::Create(MAPINotifSink **lppSink)
@@ -217,25 +204,11 @@ HRESULT MAPINotifSink::Create(MAPINotifSink **lppSink)
     return hrSuccess;
 }
 
-MAPINotifSink::MAPINotifSink() {
-    m_bExit = false;
-    m_cRef = 0;
-    pthread_mutex_init(&m_hMutex, NULL);
-    pthread_cond_init(&m_hCond, NULL);
-}
-
 MAPINotifSink::~MAPINotifSink() {
     m_bExit = true;
-    pthread_cond_broadcast(&m_hCond);
-    
-    pthread_cond_destroy(&m_hCond);
-    pthread_mutex_destroy(&m_hMutex);
-
-	std::list<NOTIFICATION *>::const_iterator iterNotif;
-
-	for (iterNotif = m_lstNotifs.begin(); iterNotif != m_lstNotifs.end(); ++iterNotif)
-		MAPIFreeBuffer(*iterNotif);	
-
+	m_hCond.notify_all();
+	for (auto n : m_lstNotifs)
+		MAPIFreeBuffer(n);
 	m_lstNotifs.clear();
 }
 
@@ -243,10 +216,8 @@ MAPINotifSink::~MAPINotifSink() {
 ULONG MAPINotifSink::OnNotify(ULONG cNotifications, LPNOTIFICATION lpNotifications)
 {
 	ULONG rc = 0;
-
 	LPNOTIFICATION lpNotif;
-    
-	pthread_mutex_lock(&m_hMutex);
+	ulock_normal biglock(m_hMutex);
 	for (unsigned int i = 0; i < cNotifications; ++i) {
 		if (MAPIAllocateBuffer(sizeof(NOTIFICATION), (LPVOID*)&lpNotif) != hrSuccess) {
 			rc = 1;
@@ -256,11 +227,8 @@ ULONG MAPINotifSink::OnNotify(ULONG cNotifications, LPNOTIFICATION lpNotificatio
 		if (CopyNotification(&lpNotifications[i], lpNotif, lpNotif) == 0)
 			m_lstNotifs.push_back(lpNotif);
 	}
-    
-	pthread_mutex_unlock(&m_hMutex);
-    
-	pthread_cond_broadcast(&m_hCond);
-    
+	biglock.unlock();
+	m_hCond.notify_all();
 	return rc;
 }
 
@@ -268,7 +236,6 @@ ULONG MAPINotifSink::OnNotify(ULONG cNotifications, LPNOTIFICATION lpNotificatio
 HRESULT MAPINotifSink::GetNotifications(ULONG *lpcNotif, LPNOTIFICATION *lppNotifications, BOOL fNonBlock, ULONG timeout)
 {
     HRESULT hr = hrSuccess;
-    std::list<NOTIFICATION *>::const_iterator iterNotif;
     ULONG cNotifs = 0;
     struct timespec t;
     
@@ -278,31 +245,28 @@ HRESULT MAPINotifSink::GetNotifications(ULONG *lpcNotif, LPNOTIFICATION *lppNoti
     t.tv_sec = now;
     t.tv_nsec = (now-t.tv_sec) * 1000000000.0;
 
-	pthread_mutex_lock(&m_hMutex);
-
+	ulock_normal biglock(m_hMutex);
 	if (!fNonBlock) {
 		while(m_lstNotifs.empty() && !m_bExit && (timeout == 0 || GetTimeOfDay() < now)) {
 			if (timeout > 0)
-				pthread_cond_timedwait(&m_hCond, &m_hMutex, &t);
+				m_hCond.wait_for(biglock, std::chrono::milliseconds(timeout));
 			else
-				pthread_cond_wait(&m_hCond, &m_hMutex);
+				m_hCond.wait(biglock);
 		}
 	}
     
 	LPNOTIFICATION lpNotifications = NULL;
     
 	if ((hr = MAPIAllocateBuffer(sizeof(NOTIFICATION) * m_lstNotifs.size(), (void **) &lpNotifications)) == hrSuccess) {
-		for (iterNotif = m_lstNotifs.begin(); iterNotif != m_lstNotifs.end(); ++iterNotif) {
-			if(CopyNotification(*iterNotif, lpNotifications, &lpNotifications[cNotifs]) == 0) 
+		for (auto n : m_lstNotifs) {
+			if (CopyNotification(n, lpNotifications, &lpNotifications[cNotifs]) == 0)
 				++cNotifs;
-			MAPIFreeBuffer(*iterNotif);
+			MAPIFreeBuffer(n);
 		}
 	}
 
 	m_lstNotifs.clear();
-    
-	pthread_mutex_unlock(&m_hMutex);       
-
+	biglock.unlock();
     *lppNotifications = lpNotifications;
     *lpcNotif = cNotifs;
 
@@ -332,3 +296,5 @@ ULONG MAPINotifSink::Release()
         
     return ref;
 }
+
+} /* namespace */

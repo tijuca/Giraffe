@@ -19,18 +19,19 @@
 #define ARCHIVER_H_INCLUDED
 
 #include <memory>
+#include <kopano/zcdefs.h>
 #include "ArchiveManage.h" // for ArchiveManagePtr
+
+namespace KC {
 
 class ECConfig;
 
 #define ARCHIVE_RIGHTS_ERROR	(unsigned)-1
 #define ARCHIVE_RIGHTS_ABSENT	(unsigned)-2
 
-#define ARCHIVER_API
-
 struct configsetting_t;
 
-class Archiver {
+class _kc_export Archiver {
 public:
 	typedef std::unique_ptr<Archiver> auto_ptr_type;
 
@@ -45,25 +46,23 @@ public:
 		LogOnly			= 1
 	};
 
-	static const char* ARCHIVER_API GetConfigPath();
-	static const configsetting_t* ARCHIVER_API GetConfigDefaults();
-	static eResult ARCHIVER_API Create(auto_ptr_type *lpptrArchiver);
-
-	virtual ~Archiver() {};
-
-	virtual eResult Init(const char *lpszAppName, const char *lpszConfig, const configsetting_t *lpExtraSettings = NULL, unsigned int ulFlags = 0) = 0;
-
-	virtual eResult GetControl(ArchiveControlPtr *lpptrControl, bool bForceCleanup = false) = 0;
-	virtual eResult GetManage(const TCHAR *lpszUser, ArchiveManagePtr *lpptrManage) = 0;
-	virtual eResult AutoAttach(unsigned int ulFlags) = 0;
-
-	virtual ECConfig* GetConfig() const = 0;
-	virtual ECLogger* GetLogger(eLogType which = DefaultLog) const = 0;
+	static const char *GetConfigPath(void);
+	_kc_hidden static const configsetting_t *GetConfigDefaults(void);
+	static eResult Create(auto_ptr_type *);
+	_kc_hidden virtual ~Archiver(void) _kc_impdtor;
+	_kc_hidden virtual eResult Init(const char *app_name, const char *config, const configsetting_t *extra_opts = nullptr, unsigned int flags = 0) = 0;
+	_kc_hidden virtual eResult GetControl(ArchiveControlPtr *, bool force_cleanup = false) = 0;
+	_kc_hidden virtual eResult GetManage(const TCHAR *user, ArchiveManagePtr *) = 0;
+	_kc_hidden virtual eResult AutoAttach(unsigned int flags) = 0;
+	_kc_hidden virtual ECConfig *GetConfig(void) const = 0;
+	_kc_hidden virtual ECLogger *GetLogger(eLogType which = DefaultLog) const = 0;
 
 protected:
-	Archiver() {};
+	_kc_hidden Archiver(void) {};
 };
 
 typedef Archiver::auto_ptr_type		ArchiverPtr;
+
+} /* namespace */
 
 #endif // !defined ARCHIVER_H_INCLUDED

@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <new>
 #include "ZCABContainer.h"
 #include "ZCMAPIProp.h"
 #include <kopano/Trace.h>
@@ -24,10 +25,12 @@
 
 #include <kopano/ECMemTable.h>
 #include <kopano/ECGuid.h>
+#include <kopano/ECInterfaceDefs.h>
 #include <kopano/ECDebug.h>
 #include <kopano/CommonUtil.h>
 #include <kopano/mapiext.h>
 #include <kopano/mapiguidext.h>
+#include <kopano/memory.hpp>
 #include <kopano/namedprops.h>
 #include <kopano/charset/convert.h>
 #include <kopano/mapi_ptr.h>
@@ -36,22 +39,19 @@
 #include <kopano/ECRestriction.h>
 
 #include <iostream>
+#include <kopano/Util.h>
 #include <kopano/stringutil.h>
 using namespace std;
+using namespace KCHL;
 
 ZCABContainer::ZCABContainer(std::vector<zcabFolderEntry> *lpFolders,
     IMAPIFolder *lpContacts, LPMAPISUP lpMAPISup, void *lpProvider,
     const char *szClassName) :
-	ECUnknown(szClassName)
+	ECUnknown(szClassName), m_lpFolders(lpFolders),
+	m_lpContactFolder(lpContacts), m_lpMAPISup(lpMAPISup),
+	m_lpProvider(lpProvider)
 {
-	ASSERT(!(lpFolders && lpContacts));
-
-	m_lpFolders = lpFolders;
-	m_lpContactFolder = lpContacts;
-	m_lpMAPISup = lpMAPISup;
-	m_lpProvider = lpProvider;
-	m_lpDistList = NULL;
-
+	assert(!(lpFolders != NULL && lpContacts != NULL));
 	if (m_lpMAPISup)
 		m_lpMAPISup->AddRef();
 	if (m_lpContactFolder)
@@ -70,21 +70,18 @@ ZCABContainer::~ZCABContainer()
 
 HRESULT	ZCABContainer::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	if (m_lpDistList == NULL) {
-		REGISTER_INTERFACE(IID_ZCABContainer, this);
-	} else {
+	if (m_lpDistList == NULL)
+		REGISTER_INTERFACE2(ZCABContainer, this);
+	else
 		REGISTER_INTERFACE(IID_ZCDistList, this);
-	}
-	REGISTER_INTERFACE(IID_ECUnknown, this);
+	REGISTER_INTERFACE2(ECUnknown, this);
 
-	if (m_lpDistList == NULL) {
-		REGISTER_INTERFACE(IID_IABContainer, &this->m_xABContainer);
-	} else {
+	if (m_lpDistList == NULL)
+		REGISTER_INTERFACE2(IABContainer, &this->m_xABContainer);
+	else
 		REGISTER_INTERFACE(IID_IDistList, &this->m_xABContainer);
-	}
-	REGISTER_INTERFACE(IID_IMAPIProp, &this->m_xABContainer);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xABContainer);
-
+	REGISTER_INTERFACE2(IMAPIProp, &this->m_xABContainer);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xABContainer);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -102,35 +99,23 @@ HRESULT	ZCABContainer::QueryInterface(REFIID refiid, void **lppInterface)
  */
 HRESULT	ZCABContainer::Create(std::vector<zcabFolderEntry> *lpFolders, IMAPIFolder *lpContacts, LPMAPISUP lpMAPISup, void* lpProvider, ZCABContainer **lppABContainer)
 {
-	HRESULT			hr = hrSuccess;
-	ZCABContainer*	lpABContainer = NULL;
-
-	try {
-		lpABContainer = new ZCABContainer(lpFolders, lpContacts, lpMAPISup, lpProvider, "IABContainer");
-
-		hr = lpABContainer->QueryInterface(IID_ZCABContainer, (void **)lppABContainer);
-	} catch (...) {
-		hr = MAPI_E_NOT_ENOUGH_MEMORY;
-	}
-
-	return hr;
+	auto lpABContainer = new(std::nothrow) ZCABContainer(lpFolders, lpContacts, lpMAPISup, lpProvider, "IABContainer");
+	if (lpABContainer == nullptr)
+		return MAPI_E_NOT_ENOUGH_MEMORY;
+	return lpABContainer->QueryInterface(IID_ZCABContainer, (void **)lppABContainer);
 }
 
 HRESULT	ZCABContainer::Create(IMessage *lpContact, ULONG cbEntryID, LPENTRYID lpEntryID, LPMAPISUP lpMAPISup, ZCABContainer **lppABContainer)
 {
 	HRESULT hr = hrSuccess;
-	ZCABContainer*	lpABContainer = NULL;
-	ZCMAPIProp* lpDistList = NULL;
-
-	try {
-		lpABContainer = new ZCABContainer(NULL, NULL, lpMAPISup, NULL, "IABContainer");
-	} catch (...) {
+	object_ptr<ZCMAPIProp> lpDistList;
+	auto lpABContainer = new(std::nothrow) ZCABContainer(NULL, NULL, lpMAPISup, NULL, "IABContainer");
+	if (lpABContainer == nullptr) {
 		hr = MAPI_E_NOT_ENOUGH_MEMORY;
-	}
-	if (hr != hrSuccess)
 		goto exit;
+	}
 
-	hr = ZCMAPIProp::Create(lpContact, cbEntryID, lpEntryID, &lpDistList);
+	hr = ZCMAPIProp::Create(lpContact, cbEntryID, lpEntryID, &~lpDistList);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -143,24 +128,18 @@ HRESULT	ZCABContainer::Create(IMessage *lpContact, ULONG cbEntryID, LPENTRYID lp
 exit:
 	if (hr != hrSuccess)
 		delete lpABContainer;
-
-	if (lpDistList)
-		lpDistList->Release();
-
 	return hr;
 }
 
 // IMAPIContainer
 HRESULT ZCABContainer::MakeWrappedEntryID(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulObjType, ULONG ulOffset, ULONG *lpcbEntryID, LPENTRYID *lppEntryID)
 {
-	HRESULT hr = hrSuccess;
-	ULONG cbWrapped = 0;
 	cabEntryID *lpWrapped = NULL;
-
-	cbWrapped = CbNewCABENTRYID(cbEntryID);
-	hr = MAPIAllocateBuffer(cbWrapped, (void**)&lpWrapped);
+	ULONG cbWrapped = CbNewCABENTRYID(cbEntryID);
+	HRESULT hr = MAPIAllocateBuffer(cbWrapped,
+	             reinterpret_cast<void **>(&lpWrapped));
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	memset(lpWrapped, 0, cbWrapped);
 	memcpy(&lpWrapped->muid, &MUIDZCSAB, sizeof(MAPIUID));
@@ -171,9 +150,7 @@ HRESULT ZCABContainer::MakeWrappedEntryID(ULONG cbEntryID, LPENTRYID lpEntryID, 
 
 	*lpcbEntryID = cbWrapped;
 	*lppEntryID = (LPENTRYID)lpWrapped;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
@@ -181,18 +158,19 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 	HRESULT hr = hrSuccess;
 	MAPITablePtr ptrContents;
 	SRowSetPtr	ptrRows;
-	ECMemTable*		lpTable = NULL;
-	ECMemTableView*	lpTableView = NULL;
+	object_ptr<ECMemTable> lpTable;
+	object_ptr<ECMemTableView> lpTableView;
 	ULONG i, j = 0;
-	ECOrRestriction resOr;
 	ECAndRestriction resAnd;
 	SPropValue sRestrictProp;
-	SRestrictionPtr ptrRestriction;
 
 #define I_NCOLS 11
 	// data from the contact
-	SizedSPropTagArray(I_NCOLS, inputCols) = {I_NCOLS, {PR_DISPLAY_NAME, PR_ADDRTYPE, PR_EMAIL_ADDRESS, PR_NORMALIZED_SUBJECT, PR_ENTRYID, PR_MESSAGE_CLASS, PR_ORIGINAL_DISPLAY_NAME,
-														PR_PARENT_ENTRYID, PR_SOURCE_KEY, PR_PARENT_SOURCE_KEY, PR_CHANGE_KEY}};
+	static constexpr const SizedSPropTagArray(I_NCOLS, inputCols) =
+		{I_NCOLS, {PR_DISPLAY_NAME, PR_ADDRTYPE, PR_EMAIL_ADDRESS,
+		PR_NORMALIZED_SUBJECT, PR_ENTRYID, PR_MESSAGE_CLASS,
+		PR_ORIGINAL_DISPLAY_NAME, PR_PARENT_ENTRYID, PR_SOURCE_KEY,
+		PR_PARENT_SOURCE_KEY, PR_CHANGE_KEY}};
 	// I_MV_INDEX is dispidABPEmailList from mnNamedProps
 	enum {I_DISPLAY_NAME = 0, I_ADDRTYPE, I_EMAIL_ADDRESS, I_NORMALIZED_SUBJECT, I_ENTRYID, I_MESSAGE_CLASS, I_ORIGINAL_DISPLAY_NAME, 
 		  I_PARENT_ENTRYID, I_SOURCE_KEY, I_PARENT_SOURCE_KEY, I_CHANGE_KEY, I_MV_INDEX, I_NAMEDSTART};
@@ -200,20 +178,24 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 
 #define O_NCOLS 21
 	// data for the table
-	SizedSPropTagArray(O_NCOLS, outputCols) = {O_NCOLS, {PR_DISPLAY_NAME, PR_ADDRTYPE, PR_EMAIL_ADDRESS, PR_NORMALIZED_SUBJECT, PR_ENTRYID, PR_DISPLAY_TYPE, PR_OBJECT_TYPE, PR_ORIGINAL_DISPLAY_NAME, 
-														 PR_ZC_ORIGINAL_ENTRYID, PR_ZC_ORIGINAL_PARENT_ENTRYID, PR_ZC_ORIGINAL_SOURCE_KEY, PR_ZC_ORIGINAL_PARENT_SOURCE_KEY, PR_ZC_ORIGINAL_CHANGE_KEY,
-														 PR_SEARCH_KEY, PR_INSTANCE_KEY, PR_ROWID}};
+	static constexpr const SizedSPropTagArray(O_NCOLS, outputCols) =
+		{O_NCOLS, {PR_DISPLAY_NAME, PR_ADDRTYPE, PR_EMAIL_ADDRESS,
+		PR_NORMALIZED_SUBJECT, PR_ENTRYID, PR_DISPLAY_TYPE,
+		PR_OBJECT_TYPE, PR_ORIGINAL_DISPLAY_NAME,
+		PR_ZC_ORIGINAL_ENTRYID, PR_ZC_ORIGINAL_PARENT_ENTRYID,
+		PR_ZC_ORIGINAL_SOURCE_KEY, PR_ZC_ORIGINAL_PARENT_SOURCE_KEY,
+		PR_ZC_ORIGINAL_CHANGE_KEY, PR_SEARCH_KEY, PR_INSTANCE_KEY,
+		PR_ROWID}};
 	enum {O_DISPLAY_NAME = 0, O_ADDRTYPE, O_EMAIL_ADDRESS, O_NORMALIZED_SUBJECT, O_ENTRYID, O_DISPLAY_TYPE, O_OBJECT_TYPE, O_ORIGINAL_DISPLAY_NAME, 
 		  O_ZC_ORIGINAL_ENTRYID, O_ZC_ORIGINAL_PARENT_ENTRYID, O_ZC_ORIGINAL_SOURCE_KEY, O_ZC_ORIGINAL_PARENT_SOURCE_KEY, O_ZC_ORIGINAL_CHANGE_KEY,
 		  O_SEARCH_KEY, O_INSTANCE_KEY, O_ROWID};
 	SPropTagArrayPtr ptrOutputCols;
 
 	SPropTagArrayPtr ptrContactCols;
-	SPropValue lpColData[O_NCOLS];
 
 	// named properties
 	SPropTagArrayPtr ptrNameTags;
-	LPMAPINAMEID *lppNames = NULL;
+	KCHL::memory_ptr<MAPINAMEID *> lppNames;
 	ULONG ulNames = (6 * 5) + 2;
 	ULONG ulType = (ulFlags & MAPI_UNICODE) ? PT_UNICODE : PT_STRING8;
 	MAPINAMEID mnNamedProps[(6 * 5) + 2] = {
@@ -267,36 +249,31 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 	};
 
 	ulFlags = ulFlags & MAPI_UNICODE;
-
-	hr = Util::HrCopyUnicodePropTagArray(ulFlags, (LPSPropTagArray)&inputCols, &ptrInputCols);
+	hr = Util::HrCopyUnicodePropTagArray(ulFlags, inputCols, &~ptrInputCols);
 	if (hr != hrSuccess)
-		goto exit;
-	hr = Util::HrCopyUnicodePropTagArray(ulFlags, (LPSPropTagArray)&outputCols, &ptrOutputCols);
+		return hr;
+	hr = Util::HrCopyUnicodePropTagArray(ulFlags, outputCols, &~ptrOutputCols);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = ECMemTable::Create(ptrOutputCols, PR_ROWID, &lpTable);
+		return hr;
+	hr = ECMemTable::Create(ptrOutputCols, PR_ROWID, &~lpTable);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// root container has no contents, on hierarchy entries
 	if (m_lpContactFolder == NULL)
 		goto done;
-
-	hr = m_lpContactFolder->GetContentsTable(ulFlags | MAPI_DEFERRED_ERRORS, &ptrContents);
+	hr = m_lpContactFolder->GetContentsTable(ulFlags | MAPI_DEFERRED_ERRORS, &~ptrContents);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = MAPIAllocateBuffer(sizeof(LPMAPINAMEID) * (ulNames), (void**)&lppNames);
+		return hr;
+	hr = MAPIAllocateBuffer(sizeof(LPMAPINAMEID) * ulNames, &~lppNames);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	for (i = 0; i < ulNames; ++i)
 		lppNames[i] = &mnNamedProps[i];
-
-	hr = m_lpContactFolder->GetIDsFromNames(ulNames, lppNames, MAPI_CREATE, &ptrNameTags);
+	hr = m_lpContactFolder->GetIDsFromNames(ulNames, lppNames, MAPI_CREATE, &~ptrNameTags);
 	if (FAILED(hr))
-		goto exit;
+		return hr;
 
 	// fix types
 	ptrNameTags->aulPropTag[0] = CHANGE_PROP_TYPE(ptrNameTags->aulPropTag[0], PT_MV_LONG | MV_INSTANCE);
@@ -310,9 +287,9 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 	ptrNameTags->aulPropTag[ulNames-1] = CHANGE_PROP_TYPE(ptrNameTags->aulPropTag[ulNames-1], PT_LONG);
 
 	// add func HrCombinePropTagArrays(part1, part2, dest);
-	hr = MAPIAllocateBuffer(CbNewSPropTagArray(ptrInputCols->cValues + ptrNameTags->cValues), &ptrContactCols);
+	hr = MAPIAllocateBuffer(CbNewSPropTagArray(ptrInputCols->cValues + ptrNameTags->cValues), &~ptrContactCols);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	j = 0;
 	for (i = 0; i < ptrInputCols->cValues; ++i)
 		ptrContactCols->aulPropTag[j++] = ptrInputCols->aulPropTag[i];
@@ -322,45 +299,40 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 
 	// the exists is extra compared to the outlook restriction
 	// restrict: ( distlist || ( contact && exist(abparraytype) && abparraytype != 0 ) )
-	sRestrictProp.ulPropTag = PR_MESSAGE_CLASS_A;
-	sRestrictProp.Value.lpszA = const_cast<char *>("IPM.DistList");
-	resOr.append(ECContentRestriction(FL_PREFIX|FL_IGNORECASE, PR_MESSAGE_CLASS_A, &sRestrictProp));
 
+	sRestrictProp.ulPropTag = PR_MESSAGE_CLASS_A;
 	sRestrictProp.Value.lpszA = const_cast<char *>("IPM.Contact");
-	resAnd.append(ECContentRestriction(FL_PREFIX|FL_IGNORECASE, PR_MESSAGE_CLASS_A, &sRestrictProp));
+	resAnd += ECContentRestriction(FL_PREFIX|FL_IGNORECASE, PR_MESSAGE_CLASS_A, &sRestrictProp, ECRestriction::Shallow);
 	sRestrictProp.ulPropTag = ptrNameTags->aulPropTag[ulNames-1];
 	sRestrictProp.Value.ul = 0;
-	resAnd.append(ECExistRestriction(sRestrictProp.ulPropTag));
-	resAnd.append(ECPropertyRestriction(RELOP_NE, sRestrictProp.ulPropTag, &sRestrictProp));
+	resAnd += ECExistRestriction(sRestrictProp.ulPropTag);
+	resAnd += ECPropertyRestriction(RELOP_NE, sRestrictProp.ulPropTag, &sRestrictProp, ECRestriction::Shallow);
 
-	resOr.append(resAnd);
-
-	hr = resOr.CreateMAPIRestriction(&ptrRestriction);
+	sRestrictProp.ulPropTag = PR_MESSAGE_CLASS_A;
+	sRestrictProp.Value.lpszA = const_cast<char *>("IPM.DistList");
+	hr = ECOrRestriction(
+		ECContentRestriction(FL_PREFIX | FL_IGNORECASE, PR_MESSAGE_CLASS_A, &sRestrictProp, ECRestriction::Cheap) +
+		resAnd
+	).RestrictTable(ptrContents, TBL_BATCH);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = ptrContents->Restrict(ptrRestriction, TBL_BATCH);
-	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	// set columns
 	hr = ptrContents->SetColumns(ptrContactCols, TBL_BATCH);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	j = 0;
 	while (true) {
 		hr = ptrContents->QueryRows(256, 0, &ptrRows);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		if (ptrRows.empty())
 			break;
 
 		for (i = 0; i < ptrRows.size(); ++i) {
 			ULONG ulOffset = 0;
 			std::string strSearchKey;
-			std::wstring wstrSearchKey;
+			SPropValue lpColData[O_NCOLS];
 
 			memset(lpColData, 0, sizeof(lpColData));
 
@@ -406,39 +378,37 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 			}
 
 			// devide by 5 since a block of properties on a contact is a set of 5 (see mnNamedProps above)
+			memory_ptr<ENTRYID> wrapped_eid;
 			hr = MakeWrappedEntryID(ptrRows[i].lpProps[I_ENTRYID].Value.bin.cb, (LPENTRYID)ptrRows[i].lpProps[I_ENTRYID].Value.bin.lpb,
 									lpColData[O_OBJECT_TYPE].Value.ul, ulOffset/5,
-									&lpColData[O_ENTRYID].Value.bin.cb, (LPENTRYID*)&lpColData[O_ENTRYID].Value.bin.lpb);
+						&lpColData[O_ENTRYID].Value.bin.cb, &~wrapped_eid);
 			if (hr != hrSuccess)
-				goto exit;
-
+				return hr;
+			lpColData[O_ENTRYID].Value.bin.lpb = reinterpret_cast<BYTE *>(wrapped_eid.get());
 			lpColData[O_ENTRYID].ulPropTag = PR_ENTRYID;
 
 			ulOffset += I_NAMEDSTART;
 
 			lpColData[O_DISPLAY_NAME].ulPropTag = CHANGE_PROP_TYPE(ptrOutputCols->aulPropTag[O_DISPLAY_NAME], PROP_TYPE(ptrRows[i].lpProps[ulOffset + 0].ulPropTag));
-			if (PROP_TYPE(lpColData[O_DISPLAY_NAME].ulPropTag) == PT_ERROR) {
+			if (PROP_TYPE(lpColData[O_DISPLAY_NAME].ulPropTag) == PT_ERROR)
 				// Email#Display not available, fallback to normal PR_DISPLAY_NAME
 				lpColData[O_DISPLAY_NAME] = ptrRows[i].lpProps[I_DISPLAY_NAME];
-			} else {
+			else
 				lpColData[O_DISPLAY_NAME].Value = ptrRows[i].lpProps[ulOffset + 0].Value;
-			}
 
 			lpColData[O_EMAIL_ADDRESS].ulPropTag = CHANGE_PROP_TYPE(ptrOutputCols->aulPropTag[O_EMAIL_ADDRESS], PROP_TYPE(ptrRows[i].lpProps[ulOffset + 2].ulPropTag));
-			if (PROP_TYPE(lpColData[O_EMAIL_ADDRESS].ulPropTag) == PT_ERROR) {
+			if (PROP_TYPE(lpColData[O_EMAIL_ADDRESS].ulPropTag) == PT_ERROR)
 				// Email#Address not available, fallback to normal PR_EMAIL_ADDRESS
 				lpColData[O_EMAIL_ADDRESS] = ptrRows[i].lpProps[I_EMAIL_ADDRESS];
-			} else {
+			else
 				lpColData[O_EMAIL_ADDRESS].Value = ptrRows[i].lpProps[ulOffset + 2].Value;
-			}
 
 			lpColData[O_NORMALIZED_SUBJECT].ulPropTag = CHANGE_PROP_TYPE(ptrOutputCols->aulPropTag[O_NORMALIZED_SUBJECT], PROP_TYPE(ptrRows[i].lpProps[ulOffset + 3].ulPropTag));
-			if (PROP_TYPE(lpColData[O_NORMALIZED_SUBJECT].ulPropTag) == PT_ERROR) {
+			if (PROP_TYPE(lpColData[O_NORMALIZED_SUBJECT].ulPropTag) == PT_ERROR)
 				// Email#OriginalDisplayName not available, fallback to normal PR_NORMALIZED_SUBJECT
 				lpColData[O_NORMALIZED_SUBJECT] = ptrRows[i].lpProps[I_NORMALIZED_SUBJECT];
-			} else {
+			else
 				lpColData[O_NORMALIZED_SUBJECT].Value = ptrRows[i].lpProps[ulOffset + 3].Value;
-			}
 
 			lpColData[O_ORIGINAL_DISPLAY_NAME].ulPropTag = CHANGE_PROP_TYPE(ptrOutputCols->aulPropTag[O_ORIGINAL_DISPLAY_NAME], PROP_TYPE(ptrRows[i].lpProps[I_DISPLAY_NAME].ulPropTag));
 			lpColData[O_ORIGINAL_DISPLAY_NAME].Value = ptrRows[i].lpProps[I_DISPLAY_NAME].Value;
@@ -459,17 +429,16 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 			lpColData[O_ZC_ORIGINAL_CHANGE_KEY].Value = ptrRows[i].lpProps[I_CHANGE_KEY].Value;
 
 			// @note, outlook seems to set the gab original search key (if possible, otherwise SMTP). The IMessage contact in the folder contains some unusable binary blob.
-			if (PROP_TYPE(lpColData[O_ADDRTYPE].ulPropTag) == PT_STRING8 && PROP_TYPE(lpColData[O_EMAIL_ADDRESS].ulPropTag) == PT_STRING8) {
-				strSearchKey = string(lpColData[O_ADDRTYPE].Value.lpszA) + ":" + lpColData[O_EMAIL_ADDRESS].Value.lpszA;
-			} else if (PROP_TYPE(lpColData[O_ADDRTYPE].ulPropTag) == PT_UNICODE && PROP_TYPE(lpColData[O_EMAIL_ADDRESS].ulPropTag) == PT_UNICODE) {
-				wstrSearchKey = wstring(lpColData[O_ADDRTYPE].Value.lpszW) + L":" + lpColData[O_EMAIL_ADDRESS].Value.lpszW;
-				strSearchKey = convert_to<string>(wstrSearchKey);
-			} else {
+			if (PROP_TYPE(lpColData[O_ADDRTYPE].ulPropTag) == PT_STRING8 &&
+			    PROP_TYPE(lpColData[O_EMAIL_ADDRESS].ulPropTag) == PT_STRING8)
+				strSearchKey = strToUpper(std::string(lpColData[O_ADDRTYPE].Value.lpszA) + ":" + lpColData[O_EMAIL_ADDRESS].Value.lpszA);
+			else if (PROP_TYPE(lpColData[O_ADDRTYPE].ulPropTag) == PT_UNICODE &&
+			    PROP_TYPE(lpColData[O_EMAIL_ADDRESS].ulPropTag) == PT_UNICODE)
+				strSearchKey = strToUpper(convert_to<std::string>(std::wstring(lpColData[O_ADDRTYPE].Value.lpszW) + L":" + lpColData[O_EMAIL_ADDRESS].Value.lpszW));
+			else
 				// eg. distlists
 				hr = MAPI_E_NOT_FOUND;
-			}
 			if (hr == hrSuccess) {
-				transform(strSearchKey.begin(), strSearchKey.end(), strSearchKey.begin(), ::toupper);
 				lpColData[O_SEARCH_KEY].ulPropTag = PR_SEARCH_KEY;
 				lpColData[O_SEARCH_KEY].Value.bin.cb = strSearchKey.length()+1;
 				lpColData[O_SEARCH_KEY].Value.bin.lpb = (BYTE*)strSearchKey.data();
@@ -487,61 +456,51 @@ HRESULT ZCABContainer::GetFolderContentsTable(ULONG ulFlags, LPMAPITABLE *lppTab
 
 			hr = lpTable->HrModifyRow(ECKeyTable::TABLE_ROW_ADD, NULL, lpColData, O_NCOLS);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 	}
 		
 done:
 	AddChild(lpTable);
-
-	hr = lpTable->HrGetView(createLocaleFromName(NULL), ulFlags, &lpTableView);
+	hr = lpTable->HrGetView(createLocaleFromName(nullptr), ulFlags, &~lpTableView);
 	if(hr != hrSuccess)
-		goto exit;
-	
-	hr = lpTableView->QueryInterface(IID_IMAPITable, (void **)lppTable);
-
-exit:
-	MAPIFreeBuffer(lppNames);
-	if(lpTable)
-		lpTable->Release();
-
-	if(lpTableView)
-		lpTableView->Release();
-
-	return hr;
+		return hr;
+	return lpTableView->QueryInterface(IID_IMAPITable,
+	       reinterpret_cast<void **>(lppTable));
 #undef TCOLS
 }
 
 HRESULT ZCABContainer::GetDistListContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 {
 	HRESULT hr = hrSuccess;
-	SizedSPropTagArray(13, sptaCols) = {13, {PR_NULL /* reserve for PR_ROWID */,
-											 PR_ADDRTYPE, PR_DISPLAY_NAME, PR_DISPLAY_TYPE, PR_EMAIL_ADDRESS, PR_ENTRYID,
-											 PR_INSTANCE_KEY, PR_OBJECT_TYPE, PR_RECORD_KEY, PR_SEARCH_KEY, PR_SEND_INTERNET_ENCODING,
-											 PR_SEND_RICH_INFO, PR_TRANSMITABLE_DISPLAY_NAME }};
+	static constexpr const SizedSPropTagArray(13, sptaCols) =
+		{13, {PR_NULL /* reserve for PR_ROWID */, PR_ADDRTYPE,
+		PR_DISPLAY_NAME, PR_DISPLAY_TYPE, PR_EMAIL_ADDRESS, PR_ENTRYID,
+		PR_INSTANCE_KEY, PR_OBJECT_TYPE, PR_RECORD_KEY, PR_SEARCH_KEY,
+		PR_SEND_INTERNET_ENCODING, PR_SEND_RICH_INFO,
+		PR_TRANSMITABLE_DISPLAY_NAME}};
 	SPropTagArrayPtr ptrCols;
-	ECMemTable* lpTable = NULL;
-	ECMemTableView*	lpTableView = NULL;
+	object_ptr<ECMemTable> lpTable;
+	object_ptr<ECMemTableView> lpTableView;
 	SPropValuePtr ptrEntries;
 	MAPIPropPtr ptrUser;
 	ULONG ulObjType;
 	ULONG cValues;
 	SPropArrayPtr ptrProps;
 	SPropValue sKey;
-	mapi_object_ptr<ZCMAPIProp> ptrZCMAPIProp;
+	KCHL::object_ptr<ZCMAPIProp> ptrZCMAPIProp;
 
-	hr = Util::HrCopyUnicodePropTagArray(ulFlags, (LPSPropTagArray)&sptaCols, &ptrCols);
+	hr = Util::HrCopyUnicodePropTagArray(ulFlags, sptaCols, &~ptrCols);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = ECMemTable::Create(ptrCols, PR_ROWID, &lpTable);
+		return hr;
+	hr = ECMemTable::Create(ptrCols, PR_ROWID, &~lpTable);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// getprops, open real contacts, make table
-	hr = HrGetOneProp(m_lpDistList, 0x81051102, &ptrEntries); // Members "entryids" named property, see data layout below
+	hr = HrGetOneProp(m_lpDistList, 0x81051102, &~ptrEntries); // Members "entryids" named property, see data layout below
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	sKey.ulPropTag = PR_ROWID;
 	sKey.Value.ul = 0;
@@ -549,7 +508,7 @@ HRESULT ZCABContainer::GetDistListContentsTable(ULONG ulFlags, LPMAPITABLE *lppT
 		ULONG ulOffset = 0;
 		BYTE cType = 0;
 
-		// Wrapped entryid's:
+		// Wrapped entryids:
 		// Flags: (ULONG) 0
 		// Provider: (GUID) 0xC091ADD3519DCF11A4A900AA0047FAA4
 		// Type: (BYTE) <value>, describes wrapped entryid
@@ -576,8 +535,7 @@ HRESULT ZCABContainer::GetDistListContentsTable(ULONG ulFlags, LPMAPITABLE *lppT
 			ulOffset = sizeof(ULONG) + sizeof(GUID) + sizeof(BYTE);
 			cType = ptrEntries->Value.MVbin.lpbin[i].lpb[sizeof(ULONG) + sizeof(GUID)];
 		}
-
-		hr = m_lpMAPISup->OpenEntry(ptrEntries->Value.MVbin.lpbin[i].cb - ulOffset, (LPENTRYID)(ptrEntries->Value.MVbin.lpbin[i].lpb + ulOffset), NULL, 0, &ulObjType, &ptrUser);
+		hr = m_lpMAPISup->OpenEntry(ptrEntries->Value.MVbin.lpbin[i].cb - ulOffset, reinterpret_cast<ENTRYID *>(ptrEntries->Value.MVbin.lpbin[i].lpb + ulOffset), nullptr, 0, &ulObjType, &~ptrUser);
 		if (hr != hrSuccess)
 			continue;
 
@@ -588,9 +546,9 @@ HRESULT ZCABContainer::GetDistListContentsTable(ULONG ulFlags, LPMAPITABLE *lppT
 			ULONG ulObjOffset = 0;
 			ULONG ulObjType = 0;
 
-			hr = HrGetOneProp(ptrUser, PR_ENTRYID, &ptrPropEntryID);
+			hr = HrGetOneProp(ptrUser, PR_ENTRYID, &~ptrPropEntryID);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			if ((cType & 0x0F) == 3) {
 				ulObjType = MAPI_MAILUSER;
@@ -598,20 +556,18 @@ HRESULT ZCABContainer::GetDistListContentsTable(ULONG ulFlags, LPMAPITABLE *lppT
 			} else 
 				ulObjType = MAPI_DISTLIST;
 
-			hr = MakeWrappedEntryID(ptrPropEntryID->Value.bin.cb, (LPENTRYID)ptrPropEntryID->Value.bin.lpb, ulObjType, ulObjOffset, &cbEntryID, &ptrEntryID);
+			hr = MakeWrappedEntryID(ptrPropEntryID->Value.bin.cb, (LPENTRYID)ptrPropEntryID->Value.bin.lpb, ulObjType, ulObjOffset, &cbEntryID, &~ptrEntryID);
 			if (hr != hrSuccess)
-				goto exit;
-
-			hr = ZCMAPIProp::Create(ptrUser, cbEntryID, ptrEntryID, &ptrZCMAPIProp);
+				return hr;
+			hr = ZCMAPIProp::Create(ptrUser, cbEntryID, ptrEntryID, &~ptrZCMAPIProp);
 			if (hr != hrSuccess)
-				goto exit;
-
-			hr = ptrZCMAPIProp->GetProps(ptrCols, 0, &cValues, &ptrProps);
+				return hr;
+			hr = ptrZCMAPIProp->GetProps(ptrCols, 0, &cValues, &~ptrProps);
 			if (FAILED(hr))
 				continue;
 
 		} else {
-			hr = ptrUser->GetProps(ptrCols, 0, &cValues, &ptrProps);
+			hr = ptrUser->GetProps(ptrCols, 0, &cValues, &~ptrProps);
 			if (FAILED(hr))
 				continue;
 		}
@@ -620,27 +576,16 @@ HRESULT ZCABContainer::GetDistListContentsTable(ULONG ulFlags, LPMAPITABLE *lppT
 
 		hr = lpTable->HrModifyRow(ECKeyTable::TABLE_ROW_ADD, NULL, ptrProps.get(), cValues);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		++sKey.Value.ul;
 	}
-	hr = hrSuccess;
 
 	AddChild(lpTable);
-
-	hr = lpTable->HrGetView(createLocaleFromName(NULL), ulFlags, &lpTableView);
+	hr = lpTable->HrGetView(createLocaleFromName(nullptr), ulFlags, &~lpTableView);
 	if(hr != hrSuccess)
-		goto exit;
-	
-	hr = lpTableView->QueryInterface(IID_IMAPITable, (void **)lppTable);
-
-exit:
-	if(lpTable)
-		lpTable->Release();
-
-	if(lpTableView)
-		lpTableView->Release();
-
-	return hr;
+		return hr;
+	return lpTableView->QueryInterface(IID_IMAPITable,
+	       reinterpret_cast<void **>(lppTable));
 }
 
 /** 
@@ -677,23 +622,20 @@ HRESULT ZCABContainer::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 HRESULT ZCABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 {
 	HRESULT			hr = hrSuccess;
-	ECMemTable*		lpTable = NULL;
-	ECMemTableView*	lpTableView = NULL;
+	object_ptr<ECMemTable> lpTable;
+	object_ptr<ECMemTableView> lpTableView;
 #define TCOLS 9
 	SizedSPropTagArray(TCOLS, sptaCols) = {TCOLS, {PR_ENTRYID, PR_STORE_ENTRYID, PR_DISPLAY_NAME_W, PR_OBJECT_TYPE, PR_CONTAINER_FLAGS, PR_DISPLAY_TYPE, PR_AB_PROVIDER_ID, PR_DEPTH, PR_INSTANCE_KEY}};
-	enum {ENTRYID = 0, STORE_ENTRYID, DISPLAY_NAME, OBJECT_TYPE, CONTAINER_FLAGS, DISPLAY_TYPE, AB_PROVIDER_ID, DEPTH, INSTANCE_KEY, ROWID};
-	std::vector<zcabFolderEntry>::const_iterator iter;
+	enum {XENTRYID = 0, STORE_ENTRYID, DISPLAY_NAME, OBJECT_TYPE, CONTAINER_FLAGS, DISPLAY_TYPE, AB_PROVIDER_ID, DEPTH, INSTANCE_KEY, ROWID};
 	ULONG ulInstance = 0;
 	SPropValue sProps[TCOLS + 1];
 	convert_context converter;
 
 	if ((ulFlags & MAPI_UNICODE) == 0)
 		sptaCols.aulPropTag[DISPLAY_NAME] = PR_DISPLAY_NAME_A;
-
-	hr = ECMemTable::Create((LPSPropTagArray)&sptaCols, PR_ROWID, &lpTable);
+	hr = ECMemTable::Create(sptaCols, PR_ROWID, &~lpTable);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	/*
 	  1. root container		: m_lpFolders = NULL, m_lpContactFolder = NULL, m_lpDistList = NULL, m_lpProvider = ZCABLogon (one entry: provider)
 	  2. provider container	: m_lpFolders = data, m_lpContactFolder = NULL, m_lpDistList = NULL, m_lpProvider = ZCABLogon (N entries: folders)
@@ -706,35 +648,34 @@ HRESULT ZCABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 
 	if (m_lpFolders) {
 		// create hierarchy with folders from user stores
-		for (iter = m_lpFolders->begin(); iter != m_lpFolders->end(); ++iter, ++ulInstance) {
+		for (const auto &folder : *m_lpFolders) {
 			std::string strName;
-			cabEntryID *lpEntryID = NULL;
-			ULONG cbEntryID = CbNewCABENTRYID(iter->cbFolder);
+			KCHL::memory_ptr<cabEntryID> lpEntryID;
+			ULONG cbEntryID = CbNewCABENTRYID(folder.cbFolder);
 
-			hr = MAPIAllocateBuffer(cbEntryID, (void**)&lpEntryID);
+			hr = MAPIAllocateBuffer(cbEntryID, &~lpEntryID);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			memset(lpEntryID, 0, cbEntryID);
 			memcpy(&lpEntryID->muid, &MUIDZCSAB, sizeof(MAPIUID));
 			lpEntryID->ulObjType = MAPI_ABCONT;
 			lpEntryID->ulOffset = 0;
-			memcpy(lpEntryID->origEntryID, iter->lpFolder, iter->cbFolder);
+			memcpy(lpEntryID->origEntryID, folder.lpFolder, folder.cbFolder);
 
-			sProps[ENTRYID].ulPropTag = sptaCols.aulPropTag[ENTRYID];
-			sProps[ENTRYID].Value.bin.cb = cbEntryID;
-			sProps[ENTRYID].Value.bin.lpb = (BYTE*)lpEntryID;
-
+			sProps[XENTRYID].ulPropTag = sptaCols.aulPropTag[XENTRYID];
+			sProps[XENTRYID].Value.bin.cb = cbEntryID;
+			sProps[XENTRYID].Value.bin.lpb = reinterpret_cast<BYTE *>(lpEntryID.get());
 			sProps[STORE_ENTRYID].ulPropTag = CHANGE_PROP_TYPE(sptaCols.aulPropTag[STORE_ENTRYID], PT_ERROR);
 			sProps[STORE_ENTRYID].Value.err = MAPI_E_NOT_FOUND;
 
 			sProps[DISPLAY_NAME].ulPropTag = sptaCols.aulPropTag[DISPLAY_NAME];
 			if ((ulFlags & MAPI_UNICODE) == 0) {
 				sProps[DISPLAY_NAME].ulPropTag = PR_DISPLAY_NAME_A;
-				strName = converter.convert_to<std::string>(iter->strwDisplayName);
+				strName = converter.convert_to<std::string>(folder.strwDisplayName);
 				sProps[DISPLAY_NAME].Value.lpszA = (char*)strName.c_str();
 			} else {
-				sProps[DISPLAY_NAME].Value.lpszW = (WCHAR*)iter->strwDisplayName.c_str();
+				sProps[DISPLAY_NAME].Value.lpszW = const_cast<wchar_t *>(folder.strwDisplayName.c_str());
 			}
 
 			sProps[OBJECT_TYPE].ulPropTag = sptaCols.aulPropTag[OBJECT_TYPE];
@@ -761,11 +702,9 @@ HRESULT ZCABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 			sProps[ROWID].Value.ul = ulInstance;
 
 			hr = lpTable->HrModifyRow(ECKeyTable::TABLE_ROW_ADD, NULL, sProps, TCOLS + 1);
-
-			MAPIFreeBuffer(lpEntryID);
-
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
+			++ulInstance;
 		}
 	} else if (!m_lpContactFolder) {
 		// only if not using a contacts folder, which should make the contents table. so this would return an empty hierarchy table, which is true.
@@ -775,10 +714,9 @@ HRESULT ZCABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 		memset(sEntryID, 0, sizeof(sEntryID));
 		memcpy(sEntryID + 4, &MUIDZCSAB, sizeof(GUID));
 
-		sProps[ENTRYID].ulPropTag = sptaCols.aulPropTag[ENTRYID];
-		sProps[ENTRYID].Value.bin.cb = sizeof(sEntryID);
-		sProps[ENTRYID].Value.bin.lpb = sEntryID;
-
+		sProps[XENTRYID].ulPropTag = sptaCols.aulPropTag[XENTRYID];
+		sProps[XENTRYID].Value.bin.cb = sizeof(sEntryID);
+		sProps[XENTRYID].Value.bin.lpb = sEntryID;
 		sProps[STORE_ENTRYID].ulPropTag = CHANGE_PROP_TYPE(sptaCols.aulPropTag[STORE_ENTRYID], PT_ERROR);
 		sProps[STORE_ENTRYID].Value.err = MAPI_E_NOT_FOUND;
 
@@ -816,7 +754,7 @@ HRESULT ZCABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 
 		hr = lpTable->HrModifyRow(ECKeyTable::TABLE_ROW_ADD, NULL, sProps, TCOLS + 1);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		if (ulFlags & CONVENIENT_DEPTH) {
 			ABContainerPtr ptrContainer;			
@@ -824,47 +762,37 @@ HRESULT ZCABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
 			MAPITablePtr ptrTable;
 			SRowSetPtr	ptrRows;
 
-			hr = ((ZCABLogon*)m_lpProvider)->OpenEntry(sizeof(sEntryID), (LPENTRYID)sEntryID, NULL, 0, &ulObjType, &ptrContainer);
+			hr = ((ZCABLogon*)m_lpProvider)->OpenEntry(sizeof(sEntryID), reinterpret_cast<ENTRYID *>(sEntryID), nullptr, 0, &ulObjType, &~ptrContainer);
 			if (hr != hrSuccess)
-				goto exit;
-
-			hr = ptrContainer->GetHierarchyTable(ulFlags, &ptrTable);
+				return hr;
+			hr = ptrContainer->GetHierarchyTable(ulFlags, &~ptrTable);
 			if (hr != hrSuccess)
-				goto exit;
-
+				return hr;
 			hr = ptrTable->QueryRows(-1, 0, &ptrRows);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			for (SRowSetPtr::size_type i = 0; i < ptrRows.size(); ++i) {
 				// use PR_STORE_ENTRYID field to set instance key, since that is always MAPI_E_NOT_FOUND (see above)
-				LPSPropValue lpProp = PpropFindProp(ptrRows[i].lpProps, ptrRows[i].cValues, CHANGE_PROP_TYPE(PR_STORE_ENTRYID, PT_ERROR));
+				auto lpProp = PpropFindProp(ptrRows[i].lpProps, ptrRows[i].cValues, CHANGE_PROP_TYPE(PR_STORE_ENTRYID, PT_ERROR));
+				if (lpProp == nullptr)
+					continue;
 				lpProp->ulPropTag = PR_ROWID;
 				lpProp->Value.ul = ulInstance++;
 
 				hr = lpTable->HrModifyRow(ECKeyTable::TABLE_ROW_ADD, NULL, ptrRows[i].lpProps, ptrRows[i].cValues);
 				if (hr != hrSuccess)
-					goto exit;
+					return hr;
 			}
 		}
 	}
 
 	AddChild(lpTable);
-
-	hr = lpTable->HrGetView(createLocaleFromName(NULL), ulFlags, &lpTableView);
+	hr = lpTable->HrGetView(createLocaleFromName(nullptr), ulFlags, &~lpTableView);
 	if(hr != hrSuccess)
-		goto exit;
-		
-	hr = lpTableView->QueryInterface(IID_IMAPITable, (void **)lppTable);
-
-exit:
-	if(lpTable)
-		lpTable->Release();
-
-	if(lpTableView)
-		lpTableView->Release();
-
-	return hr;
+		return hr;
+	return lpTableView->QueryInterface(IID_IMAPITable,
+	       reinterpret_cast<void **>(lppTable));
 #undef TCOLS
 }
 
@@ -889,27 +817,24 @@ HRESULT ZCABContainer::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lp
 	LPENTRYID lpFolder = NULL;
 	ULONG ulObjType = 0;
 	MAPIFolderPtr ptrContactFolder;
-	ZCABContainer *lpZCABContacts = NULL;
+	object_ptr<ZCABContainer> lpZCABContacts;
 	MessagePtr ptrContact;
-	ZCMAPIProp *lpZCMAPIProp = NULL;
+	object_ptr<ZCMAPIProp> lpZCMAPIProp;
 
-	if (cbEntryID < cbNewCABEntryID || memcmp((LPBYTE)&lpCABEntryID->muid, &MUIDZCSAB, sizeof(MAPIUID)) != 0) {
-		hr = MAPI_E_UNKNOWN_ENTRYID;
-		goto exit;
-	}
+	if (cbEntryID < cbNewCABEntryID ||
+	    memcmp(&lpCABEntryID->muid, &MUIDZCSAB, sizeof(MAPIUID)) != 0)
+		return MAPI_E_UNKNOWN_ENTRYID;
 
-	if (m_lpDistList) {
+	if (m_lpDistList)
 		// there is nothing to open from the distlist point of view
 		// @todo, passthrough to IMAPISupport object?
-		hr = MAPI_E_NO_SUPPORT;
-		goto exit;
-	}
+		return MAPI_E_NO_SUPPORT;
 
 	cbFolder = cbEntryID - cbNewCABEntryID;
 	lpFolder = (LPENTRYID)((LPBYTE)lpEntryID + cbNewCABEntryID);
 
 	if (lpCABEntryID->ulObjType == MAPI_ABCONT) {
-		hr = m_lpMAPISup->OpenEntry(cbFolder, lpFolder, NULL, 0, &ulObjType, &ptrContactFolder);
+		hr = m_lpMAPISup->OpenEntry(cbFolder, lpFolder, nullptr, 0, &ulObjType, &~ptrContactFolder);
 		if (hr == MAPI_E_NOT_FOUND) {
 			// the folder is most likely in a store that is not yet available through this MAPI session
 			// try opening the store through the support object, and see if we can get it anyway
@@ -917,39 +842,33 @@ HRESULT ZCABContainer::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lp
 			MAPIGetSessionPtr ptrGetSession;
 			MAPISessionPtr ptrSession;
 
-			hr = m_lpMAPISup->QueryInterface(IID_IMAPIGetSession, (void**)&ptrGetSession);
+			hr = m_lpMAPISup->QueryInterface(IID_IMAPIGetSession, &~ptrGetSession);
 			if (hr != hrSuccess)
-				goto exit;
-
-			hr = ptrGetSession->GetMAPISession(&ptrSession);
+				return hr;
+			hr = ptrGetSession->GetMAPISession(&~ptrSession);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			std::vector<zcabFolderEntry>::const_iterator i;
 			// find the store of this folder
-			for (i = m_lpFolders->begin(); i != m_lpFolders->end(); ++i) {
+			for (i = m_lpFolders->cbegin();
+			     i != m_lpFolders->cend(); ++i) {
 				ULONG res;
 				if ((m_lpMAPISup->CompareEntryIDs(i->cbFolder, (LPENTRYID)i->lpFolder, cbFolder, lpFolder, 0, &res) == hrSuccess) && res == TRUE)
 					break;
 			}
-			if (i == m_lpFolders->end()) {
-				hr = MAPI_E_NOT_FOUND;
-				goto exit;
-			}
-
-			hr = ptrSession->OpenMsgStore(0, i->cbStore, (LPENTRYID)i->lpStore, NULL, 0, &ptrStore);
+			if (i == m_lpFolders->cend())
+				return MAPI_E_NOT_FOUND;
+			hr = ptrSession->OpenMsgStore(0, i->cbStore, reinterpret_cast<ENTRYID *>(i->lpStore), nullptr, 0, &~ptrStore);
 			if (hr != hrSuccess)
-				goto exit;
-
-			hr = ptrStore->OpenEntry(cbFolder, lpFolder, NULL, 0, &ulObjType, &ptrContactFolder);
+				return hr;
+			hr = ptrStore->OpenEntry(cbFolder, lpFolder, nullptr, 0, &ulObjType, &~ptrContactFolder);
 		}
 		if (hr != hrSuccess)
-			goto exit;
-
-		hr = ZCABContainer::Create(NULL, ptrContactFolder, m_lpMAPISup, m_lpProvider, &lpZCABContacts);
+			return hr;
+		hr = ZCABContainer::Create(nullptr, ptrContactFolder, m_lpMAPISup, m_lpProvider, &~lpZCABContacts);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		AddChild(lpZCABContacts);
 
 		if (lpInterface)
@@ -958,14 +877,12 @@ HRESULT ZCABContainer::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lp
 			hr = lpZCABContacts->QueryInterface(IID_IABContainer, (void**)lppUnk);
 	} else if (lpCABEntryID->ulObjType == MAPI_DISTLIST) {
 		// open the Original Message
-		hr = m_lpMAPISup->OpenEntry(cbFolder, lpFolder, NULL, 0, &ulObjType, &ptrContact);
+		hr = m_lpMAPISup->OpenEntry(cbFolder, lpFolder, nullptr, 0, &ulObjType, &~ptrContact);
 		if (hr != hrSuccess)
-			goto exit;
-		
-		hr = ZCABContainer::Create(ptrContact, cbEntryID, lpEntryID, m_lpMAPISup, &lpZCABContacts);
+			return hr;
+		hr = ZCABContainer::Create(ptrContact, cbEntryID, lpEntryID, m_lpMAPISup, &~lpZCABContacts);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		AddChild(lpZCABContacts);
 
 		if (lpInterface)
@@ -974,14 +891,12 @@ HRESULT ZCABContainer::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lp
 			hr = lpZCABContacts->QueryInterface(IID_IDistList, (void**)lppUnk);
 	} else if (lpCABEntryID->ulObjType == MAPI_MAILUSER) {
 		// open the Original Message
-		hr = m_lpMAPISup->OpenEntry(cbFolder, lpFolder, NULL, 0, &ulObjType, &ptrContact);
+		hr = m_lpMAPISup->OpenEntry(cbFolder, lpFolder, nullptr, 0, &ulObjType, &~ptrContact);
 		if (hr != hrSuccess)
-			goto exit;
-
-		hr = ZCMAPIProp::Create(ptrContact, cbEntryID, lpEntryID, &lpZCMAPIProp);
+			return hr;
+		hr = ZCMAPIProp::Create(ptrContact, cbEntryID, lpEntryID, &~lpZCMAPIProp);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		AddChild(lpZCMAPIProp);
 
 		if (lpInterface)
@@ -989,19 +904,10 @@ HRESULT ZCABContainer::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lp
 		else
 			hr = lpZCMAPIProp->QueryInterface(IID_IMAPIProp, (void**)lppUnk);
 	} else {
-		hr = MAPI_E_UNKNOWN_ENTRYID;
-		goto exit;
+		return MAPI_E_UNKNOWN_ENTRYID;
 	}
 
 	*lpulObjType = lpCABEntryID->ulObjType;
-
-exit:
-	if (lpZCMAPIProp)
-		lpZCMAPIProp->Release();
-
-	if (lpZCABContacts)
-		lpZCABContacts->Release();
-
 	return hr;
 }
 
@@ -1041,24 +947,26 @@ HRESULT ZCABContainer::DeleteEntries(LPENTRYLIST lpEntries, ULONG ulFlags)
  * 
  * @return 
  */
-HRESULT ZCABContainer::ResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlags, LPADRLIST lpAdrList, LPFlagList lpFlagList)
+HRESULT ZCABContainer::ResolveNames(const SPropTagArray *lpPropTagArray,
+    ULONG ulFlags, LPADRLIST lpAdrList, LPFlagList lpFlagList)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 	// only columns we can set from our contents table
-	SizedSPropTagArray(7, sptaDefault) = {7, {PR_ADDRTYPE_A, PR_DISPLAY_NAME_A, PR_DISPLAY_TYPE, PR_EMAIL_ADDRESS_A, PR_ENTRYID, PR_INSTANCE_KEY, PR_OBJECT_TYPE}};
-	SizedSPropTagArray(7, sptaUnicode) = {7, {PR_ADDRTYPE_W, PR_DISPLAY_NAME_W, PR_DISPLAY_TYPE, PR_EMAIL_ADDRESS_W, PR_ENTRYID, PR_INSTANCE_KEY, PR_OBJECT_TYPE}};
+	static constexpr const SizedSPropTagArray(7, sptaDefault) =
+		{7, {PR_ADDRTYPE_A, PR_DISPLAY_NAME_A, PR_DISPLAY_TYPE,
+		PR_EMAIL_ADDRESS_A, PR_ENTRYID, PR_INSTANCE_KEY,
+		PR_OBJECT_TYPE}};
+	static constexpr const SizedSPropTagArray(7, sptaUnicode) =
+		{7, {PR_ADDRTYPE_W, PR_DISPLAY_NAME_W, PR_DISPLAY_TYPE,
+		PR_EMAIL_ADDRESS_W, PR_ENTRYID, PR_INSTANCE_KEY,
+		PR_OBJECT_TYPE}};
 	ULONG i;
 	SRowSetPtr	ptrRows;
 
-	if (lpPropTagArray == NULL) {
-		if(ulFlags & MAPI_UNICODE)
-			lpPropTagArray = (LPSPropTagArray)&sptaUnicode;
-		else
-			lpPropTagArray = (LPSPropTagArray)&sptaDefault;
-	}
+	if (lpPropTagArray == NULL)
+		lpPropTagArray = (ulFlags & MAPI_UNICODE) ? sptaUnicode : sptaDefault;
 
 	// in this container table, find given PR_DISPLAY_NAME
-
 	if (m_lpFolders) {
 		// return MAPI_E_NO_SUPPORT ? since you should not query on this level
 
@@ -1066,32 +974,29 @@ HRESULT ZCABContainer::ResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlag
 		MAPITablePtr ptrHierarchy;
 
 		if (m_lpFolders->empty())
-			goto exit;
-		
-		hr = this->GetHierarchyTable(0, &ptrHierarchy);
+			return hrSuccess;
+		hr = this->GetHierarchyTable(0, &~ptrHierarchy);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		hr = ptrHierarchy->QueryRows(m_lpFolders->size(), 0, &ptrRows);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		for (i = 0; i < ptrRows.size(); ++i) {
 			ABContainerPtr ptrContainer;
-			LPSPropValue lpEntryID = PpropFindProp(ptrRows[i].lpProps, ptrRows[i].cValues, PR_ENTRYID);
+			auto lpEntryID = PCpropFindProp(ptrRows[i].lpProps, ptrRows[i].cValues, PR_ENTRYID);
 			ULONG ulObjType;
 
 			if (!lpEntryID)
 				continue;
 
 			// this? provider?
-			hr = this->OpenEntry(lpEntryID->Value.bin.cb, (LPENTRYID)lpEntryID->Value.bin.lpb, NULL, 0, &ulObjType, &ptrContainer);
+			hr = this->OpenEntry(lpEntryID->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpEntryID->Value.bin.lpb), nullptr, 0, &ulObjType, &~ptrContainer);
 			if (hr != hrSuccess)
-				goto exit;
-
+				return hr;
 			hr = ptrContainer->ResolveNames(lpPropTagArray, ulFlags, lpAdrList, lpFlagList);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 	} else if (m_lpContactFolder) {
 		// only search within this folder and set entries in lpAdrList / lpFlagList
@@ -1103,23 +1008,22 @@ HRESULT ZCABContainer::ResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlag
 		std::copy(lpPropTagArray->aulPropTag, lpPropTagArray->aulPropTag + lpPropTagArray->cValues, std::inserter(stProps, stProps.begin()));
 		for (i = 0; i < lpAdrList->aEntries[0].cValues; ++i)
 			stProps.insert(lpAdrList->aEntries[0].rgPropVals[i].ulPropTag);
-		hr = MAPIAllocateBuffer(CbNewSPropTagArray(stProps.size()), &ptrColumns);
+		hr = MAPIAllocateBuffer(CbNewSPropTagArray(stProps.size()), &~ptrColumns);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		ptrColumns->cValues = stProps.size();
 		std::copy(stProps.begin(), stProps.end(), ptrColumns->aulPropTag);
 
-		hr = this->GetContentsTable(ulFlags & MAPI_UNICODE, &ptrContents);
+		hr = this->GetContentsTable(ulFlags & MAPI_UNICODE, &~ptrContents);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		hr = ptrContents->SetColumns(ptrColumns, 0);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		for (i = 0; i < lpAdrList->cEntries; ++i) {
-			LPSPropValue lpDisplayNameA = PpropFindProp(lpAdrList->aEntries[i].rgPropVals, lpAdrList->aEntries[i].cValues, PR_DISPLAY_NAME_A);
-			LPSPropValue lpDisplayNameW = PpropFindProp(lpAdrList->aEntries[i].rgPropVals, lpAdrList->aEntries[i].cValues, PR_DISPLAY_NAME_W);
+			auto lpDisplayNameA = PCpropFindProp(lpAdrList->aEntries[i].rgPropVals, lpAdrList->aEntries[i].cValues, PR_DISPLAY_NAME_A);
+			auto lpDisplayNameW = PCpropFindProp(lpAdrList->aEntries[i].rgPropVals, lpAdrList->aEntries[i].cValues, PR_DISPLAY_NAME_W);
 
 			if (!lpDisplayNameA && !lpDisplayNameW)
 				continue;
@@ -1129,25 +1033,19 @@ HRESULT ZCABContainer::ResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlag
 			SPropValue sProp = lpDisplayNameW ? *lpDisplayNameW : *lpDisplayNameA;
 
 			ECOrRestriction resFind;
-			ULONG ulSearchTags[] = {PR_DISPLAY_NAME, PR_EMAIL_ADDRESS, PR_ORIGINAL_DISPLAY_NAME};
+			static const ULONG ulSearchTags[] = {PR_DISPLAY_NAME, PR_EMAIL_ADDRESS, PR_ORIGINAL_DISPLAY_NAME};
 
 			for (ULONG j = 0; j < arraySize(ulSearchTags); ++j) {
 				sProp.ulPropTag = CHANGE_PROP_TYPE(ulSearchTags[j], ulStringType);
-				resFind.append( ECContentRestriction(ulResFlag, CHANGE_PROP_TYPE(ulSearchTags[j], ulStringType), &sProp, ECRestriction::Cheap) );
+				resFind += ECContentRestriction(ulResFlag, CHANGE_PROP_TYPE(ulSearchTags[j], ulStringType), &sProp, ECRestriction::Cheap);
 			}
 
-			SRestrictionPtr ptrRestriction;
-			hr = resFind.CreateMAPIRestriction(&ptrRestriction);
+			hr = resFind.RestrictTable(ptrContents, 0);
 			if (hr != hrSuccess)
-				goto exit;
-
-			hr = ptrContents->Restrict(ptrRestriction, 0);
-			if (hr != hrSuccess)
-				goto exit;
-
+				return hr;
 			hr = ptrContents->QueryRows(-1, MAPI_UNICODE, &ptrRows);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 
 			if (ptrRows.size() == 1) {
 				lpFlagList->ulFlag[i] = MAPI_RESOLVED;
@@ -1158,235 +1056,61 @@ HRESULT ZCABContainer::ResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlag
 
 				hr = Util::HrCopySRow((LPSRow)&lpAdrList->aEntries[i], &ptrRows[0], NULL);
 				if (hr != hrSuccess)
-					goto exit;
-
+					return hr;
 			} else if (ptrRows.size() > 1) {
 				lpFlagList->ulFlag[i] = MAPI_AMBIGUOUS;
 			}
 		}
 	} else {
 		// not supported within MAPI_DISTLIST container
-		hr = MAPI_E_NO_SUPPORT;
+		return MAPI_E_NO_SUPPORT;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 // IMAPIProp for m_lpDistList
-HRESULT ZCABContainer::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG FAR * lpcValues, LPSPropValue FAR * lppPropArray)
+HRESULT ZCABContainer::GetProps(const SPropTagArray *lpPropTagArray,
+    ULONG ulFlags, ULONG *lpcValues, SPropValue **lppPropArray)
 {
-	HRESULT hr = MAPI_E_NO_SUPPORT;
-	if (m_lpDistList)
-		hr = m_lpDistList->GetProps(lpPropTagArray, ulFlags, lpcValues, lppPropArray);
-	return hr;
+	if (m_lpDistList != NULL)
+		return m_lpDistList->GetProps(lpPropTagArray, ulFlags, lpcValues, lppPropArray);
+	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ZCABContainer::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropTagArray)
+HRESULT ZCABContainer::GetPropList(ULONG ulFlags, LPSPropTagArray *lppPropTagArray)
 {
-	HRESULT hr = MAPI_E_NO_SUPPORT;
-	if (m_lpDistList)
-		hr = m_lpDistList->GetPropList(ulFlags, lppPropTagArray);
-	return hr;
+	if (m_lpDistList != NULL)
+		return m_lpDistList->GetPropList(ulFlags, lppPropTagArray);
+	return MAPI_E_NO_SUPPORT;
 }
 
 // Interface IUnknown
-HRESULT ZCABContainer::xABContainer::QueryInterface(REFIID refiid , void** lppInterface)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
-	METHOD_PROLOGUE_(ZCABContainer, ABContainer);
-	HRESULT hr = pThis->QueryInterface(refiid,lppInterface);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-ULONG ZCABContainer::xABContainer::AddRef()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::AddRef", "");
-	METHOD_PROLOGUE_(ZCABContainer, ABContainer);
-	return pThis->AddRef();
-}
-
-ULONG ZCABContainer::xABContainer::Release()
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::Release", "");
-	METHOD_PROLOGUE_(ZCABContainer, ABContainer);
-	ULONG ulRef = pThis->Release();
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::Release", "%d", ulRef);
-	return ulRef;
-}
+DEF_HRMETHOD1(TRACE_MAPI, ZCABContainer, ABContainer, QueryInterface, (REFIID, refiid), (void**, lppInterface))
+DEF_ULONGMETHOD1(TRACE_MAPI, ZCABContainer, ABContainer, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ZCABContainer, ABContainer, Release, (void))
 
 // Interface IABContainer
-HRESULT ZCABContainer::xABContainer::CreateEntry(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulCreateFlags, LPMAPIPROP* lppMAPIPropEntry)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::CreateEntry", "");
-	METHOD_PROLOGUE_(ZCABContainer, ABContainer);
-	HRESULT hr = pThis->CreateEntry(cbEntryID, lpEntryID, ulCreateFlags, lppMAPIPropEntry);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::CreateEntry", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::CopyEntries(LPENTRYLIST lpEntries, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::CopyEntries", "");
-	METHOD_PROLOGUE_(ZCABContainer, ABContainer);
-	HRESULT hr = pThis->CopyEntries(lpEntries, ulUIParam, lpProgress, ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::CopyEntries", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::DeleteEntries(LPENTRYLIST lpEntries, ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::DeleteEntries", "");
-	METHOD_PROLOGUE_(ZCABContainer, ABContainer);
-	HRESULT hr = pThis->DeleteEntries(lpEntries, ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::DeleteEntries", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::ResolveNames(LPSPropTagArray lpPropTagArray, ULONG ulFlags, LPADRLIST lpAdrList, LPFlagList lpFlagList)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::ResolveNames", "\nlpPropTagArray:\t%s\nlpAdrList:\t%s", PropNameFromPropTagArray(lpPropTagArray).c_str(), AdrRowSetToString(lpAdrList, lpFlagList).c_str() );
-	METHOD_PROLOGUE_(ZCABContainer, ABContainer);
-	HRESULT hr = pThis->ResolveNames(lpPropTagArray, ulFlags, lpAdrList, lpFlagList);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::ResolveNames", "%s, lpadrlist=\n%s", GetMAPIErrorDescription(hr).c_str(), AdrRowSetToString(lpAdrList, lpFlagList).c_str() );
-	return hr;
-}
+DEF_HRMETHOD1(TRACE_MAPI, ZCABContainer, ABContainer, CreateEntry, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (ULONG, ulCreateFlags), (LPMAPIPROP*, lppMAPIPropEntry))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABContainer, ABContainer, CopyEntries, (LPENTRYLIST, lpEntries), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABContainer, ABContainer, DeleteEntries, (LPENTRYLIST, lpEntries), (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABContainer, ABContainer, ResolveNames, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags), (LPADRLIST, lpAdrList), (LPFlagList, lpFlagList))
 
 // Interface IMAPIContainer
-HRESULT ZCABContainer::xABContainer::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTable)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetContentsTable", "");
-	METHOD_PROLOGUE_(ZCABContainer, ABContainer);
-	HRESULT hr = pThis->GetContentsTable(ulFlags, lppTable);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetContentsTable", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::GetHierarchyTable(ULONG ulFlags, LPMAPITABLE *lppTable)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetHierarchyTable", ""); 
-	METHOD_PROLOGUE_(ZCABContainer, ABContainer);
-	HRESULT hr = pThis->GetHierarchyTable(ulFlags, lppTable);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetHierarchyTable", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::OpenEntry", "interface=%s", (lpInterface)?DBGGUIDToString(*lpInterface).c_str():"NULL");
-	METHOD_PROLOGUE_(ZCABContainer, ABContainer);
-	HRESULT hr = pThis->OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, lpulObjType, lppUnk);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::OpenEntry", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::SetSearchCriteria(LPSRestriction lpRestriction, LPENTRYLIST lpContainerList, ULONG ulSearchFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::SetSearchCriteria", "");
-	METHOD_PROLOGUE_(ZCABContainer, ABContainer);
-	HRESULT hr = pThis->SetSearchCriteria(lpRestriction, lpContainerList, ulSearchFlags);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::SetSearchCriteria", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::GetSearchCriteria(ULONG ulFlags, LPSRestriction *lppRestriction, LPENTRYLIST *lppContainerList, ULONG *lpulSearchState)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetSearchCriteria", "");
-	METHOD_PROLOGUE_(ZCABContainer, ABContainer);
-	HRESULT hr = pThis->GetSearchCriteria(ulFlags, lppRestriction, lppContainerList, lpulSearchState);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetSearchCriteria", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
+DEF_HRMETHOD1(TRACE_MAPI, ZCABContainer, ABContainer, GetContentsTable, (ULONG, ulFlags), (LPMAPITABLE *, lppTable))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABContainer, ABContainer, GetHierarchyTable, (ULONG, ulFlags), (LPMAPITABLE *, lppTable))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABContainer, ABContainer, OpenEntry, (ULONG, cbEntryID), (LPENTRYID, lpEntryID), (LPCIID, lpInterface), (ULONG, ulFlags), (ULONG *, lpulObjType), (LPUNKNOWN *, lppUnk))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABContainer, ABContainer, SetSearchCriteria, (LPSRestriction, lpRestriction), (LPENTRYLIST, lpContainerList), (ULONG, ulSearchFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABContainer, ABContainer, GetSearchCriteria, (ULONG, ulFlags), (LPSRestriction *, lppRestriction), (LPENTRYLIST *, lppContainerList), (ULONG *, lpulSearchState))
 
 // Interface IMAPIProp
-HRESULT ZCABContainer::xABContainer::GetLastError(HRESULT hError, ULONG ulFlags, LPMAPIERROR * lppMapiError)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetLastError", "");
-	HRESULT hr = MAPI_E_NO_SUPPORT;
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetLastError", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::SaveChanges(ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::SaveChanges", "");
-	HRESULT hr = MAPI_E_NO_SUPPORT;
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::SaveChanges", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG FAR * lpcValues, LPSPropValue FAR * lppPropArray)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetProps", "%s", PropNameFromPropTagArray(lpPropTagArray).c_str());
-	METHOD_PROLOGUE_(ZCABContainer, ABContainer);
-	HRESULT hr = pThis->GetProps(lpPropTagArray, ulFlags, lpcValues, lppPropArray);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropTagArray)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetPropList", "");
-	METHOD_PROLOGUE_(ZCABContainer, ABContainer);
-	HRESULT hr = pThis->GetPropList(ulFlags, lppPropTagArray);
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetPropList", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::OpenProperty", "PropTag=%s, lpiid=%s", PropNameFromPropTag(ulPropTag).c_str(), DBGGUIDToString(*lpiid).c_str());
-	HRESULT hr = MAPI_E_NO_SUPPORT;
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::OpenProperty", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::SetProps", "");
-	HRESULT hr = MAPI_E_NO_SUPPORT;
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::SetProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::DeleteProps", "%s", PropNameFromPropTagArray(lpPropTagArray).c_str());
-	HRESULT hr = MAPI_E_NO_SUPPORT;
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::DeleteProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::CopyTo", "");
-	HRESULT hr = MAPI_E_NO_SUPPORT;
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::CopyTo", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::CopyProps", "");
-	HRESULT hr = MAPI_E_NO_SUPPORT;
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::CopyProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::GetNamesFromIDs(LPSPropTagArray * pptaga, LPGUID lpguid, ULONG ulFlags, ULONG * pcNames, LPMAPINAMEID ** pppNames)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetNamesFromIDs", "");
-	HRESULT hr = MAPI_E_NO_SUPPORT;
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetIDsFromNames", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT ZCABContainer::xABContainer::GetIDsFromNames(ULONG cNames, LPMAPINAMEID * ppNames, ULONG ulFlags, LPSPropTagArray * pptaga)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IABContainer::GetIDsFromNames", "");
-	HRESULT hr = MAPI_E_NO_SUPPORT;
-	TRACE_MAPI(TRACE_RETURN, "IABContainer::GetIDsFromNames", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
+DEF_HRMETHOD_NOSUPPORT(TRACE_MAPI, ZCABContainer, ABContainer, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
+DEF_HRMETHOD_NOSUPPORT(TRACE_MAPI, ZCABContainer, ABContainer, SaveChanges, (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABContainer, ABContainer, GetProps, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags), (ULONG *, lpcValues), (SPropValue **, lppPropArray))
+DEF_HRMETHOD1(TRACE_MAPI, ZCABContainer, ABContainer, GetPropList, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
+DEF_HRMETHOD_NOSUPPORT(TRACE_MAPI, ZCABContainer, ABContainer, OpenProperty, (ULONG, ulPropTag), (LPCIID, lpiid), (ULONG, ulInterfaceOptions), (ULONG, ulFlags), (LPUNKNOWN *, lppUnk))
+DEF_HRMETHOD_NOSUPPORT(TRACE_MAPI, ZCABContainer, ABContainer, SetProps, (ULONG, cValues), (const SPropValue *, lpPropArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD_NOSUPPORT(TRACE_MAPI, ZCABContainer, ABContainer, DeleteProps, (const SPropTagArray *, lpPropTagArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD_NOSUPPORT(TRACE_MAPI, ZCABContainer, ABContainer, CopyTo, (ULONG, ciidExclude), (LPCIID, rgiidExclude), (const SPropTagArray *, lpExcludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD_NOSUPPORT(TRACE_MAPI, ZCABContainer, ABContainer, CopyProps, (const SPropTagArray *, lpIncludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD_NOSUPPORT(TRACE_MAPI, ZCABContainer, ABContainer, GetNamesFromIDs, (LPSPropTagArray *, pptaga), (LPGUID, lpguid), (ULONG, ulFlags), (ULONG *, pcNames), (LPMAPINAMEID **, pppNames))
+DEF_HRMETHOD_NOSUPPORT(TRACE_MAPI, ZCABContainer, ABContainer, GetIDsFromNames, (ULONG, cNames), (LPMAPINAMEID *, ppNames), (ULONG, ulFlags), (LPSPropTagArray *, pptaga))

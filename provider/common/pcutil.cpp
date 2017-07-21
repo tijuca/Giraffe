@@ -16,15 +16,15 @@
  */
 
 #include <kopano/platform.h>
-
+#include <utility>
 #include "pcutil.hpp"
 #include <mapicode.h>
 #include <kopano/stringutil.h>
-#include <kopano/base64.h>
-
 #include <mapidefs.h>
 #include <kopano/ECGuid.h>
 #include "versions.h"
+
+namespace KC {
 
 bool IsKopanoEntryId(ULONG cb, LPBYTE lpEntryId)
 {
@@ -166,8 +166,7 @@ ECRESULT ABEntryIDToID(ULONG cb, LPBYTE lpEntryId, unsigned int* lpulID, objecti
 	*lpulID = ulID;
 
 	if (lpsExternId)
-		*lpsExternId = sExternId;
-
+		*lpsExternId = std::move(sExternId);
 	if (lpulMapiType)
 		*lpulMapiType = lpABEID->ulType;
 	return erSuccess;
@@ -197,8 +196,14 @@ ECRESULT SIEntryIDToID(ULONG cb, LPBYTE lpInstanceId, LPGUID guidServer, unsigne
 	return erSuccess;
 }
 
+template<typename T> static int twcmp(T a, T b)
+{
+	/* see elsewhere for raison d'être */
+	return (a < b) ? -1 : (a == b) ? 0 : 1;
+}
+
 /**
- * Compares ab entryid's and returns an int, can be used for sorting algorithms.
+ * Compares ab entryids and returns an int, can be used for sorting algorithms.
  * <0 left first
  *  0 same, or invalid
  * >0 right first
@@ -212,20 +217,22 @@ int SortCompareABEID(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, L
 	if (lpEntryID1 == NULL || lpEntryID2 == NULL)
 		return 0;
 	if (peid1->ulVersion != peid2->ulVersion)
-		return peid1->ulVersion - peid2->ulVersion;
+		return twcmp(peid1->ulVersion, peid2->ulVersion);
 
 	// sort: user(6), group(8), company(4)
 	if (peid1->ulType != peid2->ulType)  {
 		if (peid1->ulType == MAPI_ABCONT)
-			rv = -1;
+			return -1;
 		else if (peid2->ulType == MAPI_ABCONT)
-			rv = 1;
-
-		rv = peid1->ulType - peid2->ulType;
+			return 1;
+		else
+			rv = twcmp(peid1->ulType, peid2->ulType);
+		if (rv != 0)
+			return rv;
 	}
 
 	if (peid1->ulVersion == 0) {
-		rv = peid1->ulId - peid2->ulId;
+		rv = twcmp(peid1->ulId, peid2->ulId);
 	} else {
 		rv = strcmp((char*)peid1->szExId, (char*)peid2->szExId);
 	}
@@ -320,8 +327,7 @@ ECRESULT SIIDToEntryID(struct soap *soap, LPGUID guidServer, unsigned int ulInst
 	LPSIEID lpInstanceEid = NULL;
 	ULONG ulSize = 0;
 
-	ASSERT(ulPropId < 0x0000FFFF);
-
+	assert(ulPropId < 0x0000FFFF);
 	if (lpsInstanceId == NULL)
 		return KCERR_INVALID_PARAMETER;
 
@@ -373,7 +379,7 @@ ECRESULT MAPITypeToType(ULONG ulMAPIType, objectclass_t *lpsUserObjClass)
 		return KCERR_INVALID_TYPE;
 	}
 
-	*lpsUserObjClass = sUserObjClass;
+	*lpsUserObjClass = std::move(sUserObjClass);
 	return erSuccess;
 }
 
@@ -406,7 +412,7 @@ ECRESULT TypeToMAPIType(objectclass_t sUserObjClass, ULONG *lpulMAPIType)
 
 /**
  * Parse a Kopano version string in the form [0,]<general>,<major>,<minor>[,<svn_revision>] and
- * place the result in a 32bit unsigned integer.
+ * place the result in a 32 bit unsigned integer.
  * The format of the result is 1 byte general, 1 bytes major and 2 bytes minor.
  * The svn_revision is optional and ignored in any case.
  *
@@ -445,3 +451,5 @@ ECRESULT ParseKopanoVersion(const std::string &strVersion, unsigned int *lpulVer
 		*lpulVersion = MAKE_KOPANO_VERSION(ulGeneral, ulMajor, ulMinor);
 	return erSuccess;
 }
+
+} /* namespace */

@@ -1,20 +1,8 @@
 #!/bin/bash
 
+svnrev=0
 if [ -f revision ]; then
-	svnrev=$(sed 's/[^0-9].*//g' <revision)
-	if [ -z "$svnrev" ]; then
-		svnrev=0
-	fi
-else
-	svnrev=$(svnversion -nc `dirname "$0"` | awk -F: '{print $NF}' | sed 's/[^0-9]//g')
-	if [ -z "$svnrev" ]; then
-	    if [ -f ".git/svn/.metadata" ]; then
-		svnrev=$(git svn info | grep Revision | awk '{print $2}')
-	    else
-		svnrev=0
-	    fi
-	fi
-
+	svnrev=$(cat revision)
 fi
 
 dot_version=`cat version`
@@ -22,7 +10,6 @@ major_version=$(sed <version -e 's;^\([^.]*\).*;\1;')
 minor_version=$(sed <version -e 's;^[^.]*\.\([^.]*\).*;\1;')
 micro_version=$(sed <version -e 's;^[^.]*\.[^.]*\.\([^.]*\).*;\1;')
 comma_version="$major_version,$minor_version,$micro_version,$svnrev"
-specialbuild=`cat specialbuild`
 
 cat << EOF
 #define PROJECT_VERSION_SERVER          $comma_version
@@ -41,7 +28,6 @@ cat << EOF
 #define PROJECT_VERSION_SEARCH_STR      "$comma_version"
 #define PROJECT_VERSION_ARCHIVER_STR    "$comma_version"
 #define PROJECT_VERSION_DOT_STR         "$dot_version"
-#define PROJECT_SPECIALBUILD            "$specialbuild"
 #define PROJECT_SVN_REV_STR             "$svnrev"
 #define PROJECT_VERSION_MAJOR           $major_version
 #define PROJECT_VERSION_MINOR           $minor_version

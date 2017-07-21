@@ -18,15 +18,20 @@
 #ifndef __RTFUTIL_H
 #define __RTFUTIL_H
 
+#include <kopano/zcdefs.h>
 #include <kopano/CommonUtil.h>
 #include <string>
 
-bool isrtfhtml(const char *buf, unsigned int len);
-bool isrtftext(const char *buf, unsigned int len);
+namespace KC {
 
-HRESULT HrExtractHTMLFromRTF(const std::string &lpStrRTFIn, std::string &lpStrHTMLOut, ULONG ulCodepage);
-HRESULT HrExtractHTMLFromTextRTF(const std::string &lpStrRTFIn, std::string &lpStrHTMLOut, ULONG ulCodepage);
-HRESULT HrExtractHTMLFromRealRTF(const std::string &lpStrRTFIn, std::string &lpStrHTMLOut, ULONG ulCodepage);
-HRESULT HrExtractBODYFromTextRTF(const std::string &lpStrRTFIn, std::wstring &strBodyOut);
+extern _kc_export bool isrtfhtml(const char *, unsigned int);
+extern _kc_export bool isrtftext(const char *, unsigned int);
+
+extern _kc_export HRESULT HrExtractHTMLFromRTF(const std::string &rtf, std::string &html, ULONG codepage);
+extern _kc_export HRESULT HrExtractHTMLFromTextRTF(const std::string &rtf, std::string &html, ULONG codepage);
+extern _kc_export HRESULT HrExtractHTMLFromRealRTF(const std::string &rtf, std::string &html, ULONG codepage);
+extern _kc_export HRESULT HrExtractBODYFromTextRTF(const std::string &rtf, std::wstring &bodyout);
+
+} /* namespace */
 
 #endif

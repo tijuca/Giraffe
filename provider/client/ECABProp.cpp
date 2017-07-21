@@ -16,7 +16,7 @@
  */
 
 #include <kopano/platform.h>
-
+#include <kopano/ECInterfaceDefs.h>
 #include "kcore.hpp"
 #include "ECABProp.h"
 #include "Mem.h"
@@ -36,12 +36,10 @@ ECABProp::ECABProp(void *lpProvider, ULONG ulObjType, BOOL fModify,
 
 HRESULT ECABProp::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECABProp, this);
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
-	REGISTER_INTERFACE(IID_IMAPIProp, &this->m_xMAPIProp);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xMAPIProp);
-
+	REGISTER_INTERFACE2(ECABProp, this);
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IMAPIProp, &this->m_xMAPIProp);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xMAPIProp);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -90,18 +88,15 @@ HRESULT ECABProp::TableRowGetProp(void* lpProvider, struct propVal *lpsPropValSr
 	HRESULT hr = hrSuccess;
 
 	switch(lpsPropValSrc->ulPropTag) {
-		case PROP_TAG(PT_ERROR,PROP_ID(PR_AB_PROVIDER_ID)):
-			lpsPropValDst->ulPropTag = PR_AB_PROVIDER_ID;
-
-			lpsPropValDst->Value.bin.cb = sizeof(GUID);
-			ECAllocateMore(sizeof(GUID), lpBase, (void**)&lpsPropValDst->Value.bin.lpb);
-
-			memcpy(lpsPropValDst->Value.bin.lpb, &MUIDECSAB, sizeof(GUID));
-
-			break;
-		default:
-			hr = MAPI_E_NOT_FOUND;
-			break;
+	case PROP_TAG(PT_ERROR,PROP_ID(PR_AB_PROVIDER_ID)):
+		lpsPropValDst->ulPropTag = PR_AB_PROVIDER_ID;
+		lpsPropValDst->Value.bin.cb = sizeof(GUID);
+		ECAllocateMore(sizeof(GUID), lpBase, (void **)&lpsPropValDst->Value.bin.lpb);
+		memcpy(lpsPropValDst->Value.bin.lpb, &MUIDECSAB, sizeof(GUID));
+		break;
+	default:
+		hr = MAPI_E_NOT_FOUND;
+		break;
 	}
 
 	return hr;
@@ -113,124 +108,17 @@ ECABLogon* ECABProp::GetABStore()
 }
 
 // Interface IMAPIProp
-HRESULT __stdcall ECABProp::xMAPIProp::QueryInterface(REFIID refiid, void ** lppInterface)
-{
-	TRACE_MAPI(TRACE_ENTRY, "AB::IMAPIProp::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
-	METHOD_PROLOGUE_(ECABProp , MAPIProp);
-	HRESULT hr = pThis->QueryInterface(refiid, lppInterface);
-	TRACE_MAPI(TRACE_RETURN, "AB::IMAPIProp::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-ULONG __stdcall ECABProp::xMAPIProp::AddRef()
-{
-	TRACE_MAPI(TRACE_ENTRY, "AB::IMAPIProp::AddRef", "");
-	METHOD_PROLOGUE_(ECABProp , MAPIProp);
-	return pThis->AddRef();
-}
-
-ULONG __stdcall ECABProp::xMAPIProp::Release()
-{
-	TRACE_MAPI(TRACE_ENTRY, "AB::IMAPIProp::Release", "");
-	METHOD_PROLOGUE_(ECABProp , MAPIProp);
-	return pThis->Release();
-}
-
-HRESULT __stdcall ECABProp::xMAPIProp::GetLastError(HRESULT hError, ULONG ulFlags, LPMAPIERROR * lppMapiError)
-{
-	TRACE_MAPI(TRACE_ENTRY, "AB::IMAPIProp::GetLastError", "");
-	METHOD_PROLOGUE_(ECABProp , MAPIProp);
-	HRESULT hr = pThis->GetLastError(hError, ulFlags, lppMapiError);
-	TRACE_MAPI(TRACE_RETURN, "AB::IMAPIProp::GetLastError", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECABProp::xMAPIProp::SaveChanges(ULONG ulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "AB::IMAPIProp::SaveChanges", "");
-	METHOD_PROLOGUE_(ECABProp , MAPIProp);
-	HRESULT hr = pThis->SaveChanges(ulFlags);
-	TRACE_MAPI(TRACE_RETURN, "AB::IMAPIProp::SaveChanges", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECABProp::xMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG FAR * lpcValues, LPSPropValue FAR * lppPropArray)
-{
-	TRACE_MAPI(TRACE_ENTRY, "AB::IMAPIProp::GetProps", "%s,  flags=%08X", PropNameFromPropTagArray(lpPropTagArray).c_str(), ulFlags);
-	METHOD_PROLOGUE_(ECABProp , MAPIProp);
-	HRESULT hr = pThis->GetProps(lpPropTagArray, ulFlags, lpcValues, lppPropArray);
-	TRACE_MAPI(TRACE_RETURN, "AB::IMAPIProp::GetProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECABProp::xMAPIProp::GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropTagArray)
-{
-	TRACE_MAPI(TRACE_ENTRY, "AB::IMAPIProp::GetPropList", "");
-	METHOD_PROLOGUE_(ECABProp , MAPIProp);
-	HRESULT hr = pThis->GetPropList(ulFlags, lppPropTagArray);
-	TRACE_MAPI(TRACE_RETURN, "AB::IMAPIProp::GetPropList", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECABProp::xMAPIProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk)
-{
-	TRACE_MAPI(TRACE_ENTRY, "AB::IMAPIProp::OpenProperty", "proptag=%s, flags=%d, lpiid=%s, InterfaceOptions=%d", PropNameFromPropTag(ulPropTag).c_str(), ulFlags, (lpiid)?DBGGUIDToString(*lpiid).c_str():"NULL", ulInterfaceOptions);
-	METHOD_PROLOGUE_(ECABProp , MAPIProp);
-	HRESULT hr = pThis->OpenProperty(ulPropTag, lpiid, ulInterfaceOptions, ulFlags, lppUnk);
-	TRACE_MAPI(TRACE_RETURN, "AB::IMAPIProp::OpenProperty", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECABProp::xMAPIProp::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "AB::IMAPIProp::SetProps", "%s", PropNameFromPropArray(cValues, lpPropArray).c_str());
-	METHOD_PROLOGUE_(ECABProp , MAPIProp);
-	HRESULT hr = pThis->SetProps(cValues, lpPropArray, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "AB::IMAPIProp::SetProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECABProp::xMAPIProp::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "AB::IMAPIProp::DeleteProps", "%s", PropNameFromPropTagArray(lpPropTagArray).c_str());
-	METHOD_PROLOGUE_(ECABProp , MAPIProp);
-	HRESULT hr = pThis->DeleteProps(lpPropTagArray, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "AB::IMAPIProp::DeleteProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECABProp::xMAPIProp::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "AB::IMAPIProp::CopyTo", "");
-	METHOD_PROLOGUE_(ECABProp , MAPIProp);
-	HRESULT hr = pThis->CopyTo(ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "AB::IMAPIProp::CopyTo", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECABProp::xMAPIProp::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems)
-{
-	TRACE_MAPI(TRACE_ENTRY, "AB::IMAPIProp::CopyProps", "");
-	METHOD_PROLOGUE_(ECABProp , MAPIProp);
-	HRESULT hr = pThis->CopyProps(lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-	TRACE_MAPI(TRACE_RETURN, "AB::IMAPIProp::CopyProps", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECABProp::xMAPIProp::GetNamesFromIDs(LPSPropTagArray * pptaga, LPGUID lpguid, ULONG ulFlags, ULONG * pcNames, LPMAPINAMEID ** pppNames)
-{
-	TRACE_MAPI(TRACE_ENTRY, "AB::IMAPIProp::GetNamesFromIDs", "");
-	METHOD_PROLOGUE_(ECABProp , MAPIProp);
-	HRESULT hr = pThis->GetNamesFromIDs(pptaga, lpguid, ulFlags, pcNames, pppNames);
-	TRACE_MAPI(TRACE_RETURN, "AB::IMAPIProp::GetNamesFromIDs", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-HRESULT __stdcall ECABProp::xMAPIProp::GetIDsFromNames(ULONG cNames, LPMAPINAMEID * ppNames, ULONG ulFlags, LPSPropTagArray * pptaga)
-{
-	TRACE_MAPI(TRACE_ENTRY, "AB::IMAPIProp::GetIDsFromNames", "");
-	METHOD_PROLOGUE_(ECABProp , MAPIProp);
-	HRESULT hr = pThis->GetIDsFromNames(cNames, ppNames, ulFlags, pptaga);
-	TRACE_MAPI(TRACE_RETURN, "AB::IMAPIProp::GetIDsFromNames", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
+DEF_ULONGMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, Release, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, QueryInterface, (REFIID, id), (void **, intf))
+DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
+DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, SaveChanges, (ULONG, ulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, GetProps, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags), (ULONG *, lpcValues), (SPropValue **, lppPropArray))
+DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, GetPropList, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
+DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, OpenProperty, (ULONG, ulPropTag), (LPCIID, lpiid), (ULONG, ulInterfaceOptions), (ULONG, ulFlags), (LPUNKNOWN *, lppUnk))
+DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, SetProps, (ULONG, cValues), (const SPropValue *, lpPropArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, DeleteProps, (const SPropTagArray *, lpPropTagArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, CopyTo, (ULONG, ciidExclude), (LPCIID, rgiidExclude), (const SPropTagArray *, lpExcludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, CopyProps, (const SPropTagArray *, lpIncludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, GetNamesFromIDs, (LPSPropTagArray *, pptaga), (LPGUID, lpguid), (ULONG, ulFlags), (ULONG *, pcNames), (LPMAPINAMEID **, pppNames))
+DEF_HRMETHOD1(TRACE_MAPI, ECABProp, MAPIProp, GetIDsFromNames, (ULONG, cNames), (LPMAPINAMEID *, ppNames), (ULONG, ulFlags), (LPSPropTagArray *, pptaga))

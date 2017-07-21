@@ -26,30 +26,23 @@
  */
 #define START_SOAP_CALL retry:
 #define END_SOAP_CALL 	\
-	if(er == KCERR_END_OF_SESSION) { if(m_lpTransport->HrReLogon() == hrSuccess) goto retry; } \
+	if (er == KCERR_END_OF_SESSION && m_lpTransport->HrReLogon() == hrSuccess) \
+		goto retry; \
 	hr = kcerr_to_mapierr(er, MAPI_E_NOT_FOUND); \
 	if(hr != hrSuccess) \
 		goto exit;
 
 WSTableView::WSTableView(ULONG ulType, ULONG ulFlags, KCmd *lpCmd,
-    pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
+    std::recursive_mutex &data_lock, ECSESSIONID ecSessionId, ULONG cbEntryId,
     LPENTRYID lpEntryId, WSTransport *lpTransport, const char *szClassName) :
-	ECUnknown(szClassName)
+	ECUnknown(szClassName), lpDataLock(data_lock),
+	m_lpTransport(lpTransport)
 {
 	this->ulType = ulType;
 	this->ulFlags = ulFlags;
 
 	this->lpCmd = lpCmd;
-	this->lpDataLock = lpDataLock;
 	this->ecSessionId = ecSessionId;
-	this->ulTableId = 0;
-	this->m_lpTransport = lpTransport;
-	this->m_lpsPropTagArray = NULL;
-	this->m_lpsRestriction = NULL;
-	this->m_lpsSortOrderSet = NULL;
-	this->m_lpCallback = NULL;
-	this->m_lpParam = NULL;
-
 	m_lpTransport->AddSessionReloadCallback(this, Reload, &m_ulSessionReloadCallback);
 
 	CopyMAPIEntryIdToSOAPEntryId(cbEntryId, lpEntryId, &m_sEntryId);
@@ -68,7 +61,7 @@ WSTableView::~WSTableView()
 
 HRESULT WSTableView::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECTableView, this);
+	REGISTER_INTERFACE3(ECTableView, WSTableView, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -127,7 +120,7 @@ exit:
 	return hr;
 }
 
-HRESULT WSTableView::HrSetColumns(LPSPropTagArray lpsPropTagArray)
+HRESULT WSTableView::HrSetColumns(const SPropTagArray *lpsPropTagArray)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -201,7 +194,7 @@ exit:
 	return hr;
 }
 
-HRESULT WSTableView::HrRestrict(LPSRestriction lpsRestriction)
+HRESULT WSTableView::HrRestrict(const SRestriction *lpsRestriction)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -236,7 +229,7 @@ exit:
 	return hr;
 }
 
-HRESULT WSTableView::HrSortTable(LPSSortOrderSet lpsSortOrderSet)
+HRESULT WSTableView::HrSortTable(const SSortOrderSet *lpsSortOrderSet)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -249,7 +242,7 @@ HRESULT WSTableView::HrSortTable(LPSSortOrderSet lpsSortOrderSet)
 	memcpy(m_lpsSortOrderSet, lpsSortOrderSet, CbSSortOrderSet(lpsSortOrderSet));
 
 	sSort.__size = lpsSortOrderSet->cSorts;
-	sSort.__ptr = new sortOrder[lpsSortOrderSet->cSorts];
+	sSort.__ptr = s_alloc<sortOrder>(nullptr, lpsSortOrderSet->cSorts);
 
 	for (i = 0; i < lpsSortOrderSet->cSorts; ++i) {
 		sSort.__ptr[i].ulOrder = lpsSortOrderSet->aSort[i].ulOrder;
@@ -272,7 +265,7 @@ HRESULT WSTableView::HrSortTable(LPSSortOrderSet lpsSortOrderSet)
 exit:
 	UnLockSoap();
 	delete[] lpOld;
-	delete[] sSort.__ptr;
+	s_free(nullptr, sSort.__ptr);
 	return hr;
 }
 
@@ -334,7 +327,8 @@ exit:
 	return hr;
 }
 
-HRESULT WSTableView::HrFindRow(LPSRestriction lpsRestriction, BOOKMARK bkOrigin, ULONG ulFlags)
+HRESULT WSTableView::HrFindRow(const SRestriction *lpsRestriction,
+    BOOKMARK bkOrigin, ULONG ulFlags)
 {
 	ECRESULT er = erSuccess;
 	HRESULT hr = hrSuccess;
@@ -663,7 +657,7 @@ HRESULT WSTableView::HrMulti(ULONG ulDeferredFlags, LPSPropTagArray lpsPropTagAr
 
 		// Copy sort order for call
         sSort.sSortOrder.__size = lpsSortOrderSet->cSorts;
-        sSort.sSortOrder.__ptr = new sortOrder[lpsSortOrderSet->cSorts];
+		sSort.sSortOrder.__ptr = s_alloc<sortOrder>(nullptr, lpsSortOrderSet->cSorts);
 
         for (i = 0; i < lpsSortOrderSet->cSorts; ++i) {
             sSort.sSortOrder.__ptr[i].ulOrder = lpsSortOrderSet->aSort[i].ulOrder;
@@ -694,17 +688,14 @@ HRESULT WSTableView::HrMulti(ULONG ulDeferredFlags, LPSPropTagArray lpsPropTagAr
 	}
 	END_SOAP_CALL
 
-    if(sResponse.ulTableId) {
-        ulTableId = sResponse.ulTableId;
-    }
-    
+	if (sResponse.ulTableId != 0)
+		ulTableId = sResponse.ulTableId;
 	if (lppRowSet)
 		hr = CopySOAPRowSetToMAPIRowSet(m_lpProvider, &sResponse.sRowSet, lppRowSet, this->ulType);
 
 exit:
 	UnLockSoap();
-	delete[] sSort.sSortOrder.__ptr;
-
+	s_free(nullptr, sSort.sSortOrder.__ptr);
 	if(lpsRestrictTable)
 		FreeRestrictTable(lpsRestrictTable);
         
@@ -714,7 +705,7 @@ exit:
 //FIXME: one lock/unlock function
 HRESULT WSTableView::LockSoap()
 {
-	pthread_mutex_lock(lpDataLock);
+	lpDataLock.lock();
 	return erSuccess;
 }
 
@@ -725,8 +716,7 @@ HRESULT WSTableView::UnLockSoap()
 		soap_destroy(lpCmd->soap);
 		soap_end(lpCmd->soap);
 	}
-
-	pthread_mutex_unlock(lpDataLock);
+	lpDataLock.unlock();
 	return erSuccess;
 }
 
@@ -739,15 +729,12 @@ HRESULT WSTableView::Reload(void *lpParam, ECSESSIONID sessionId)
 	lpThis->ulTableId = 0;
 
 	// Restore state
-	if(lpThis->m_lpsPropTagArray) {
+	if (lpThis->m_lpsPropTagArray != nullptr)
+		// ignore error
 		lpThis->HrSetColumns(lpThis->m_lpsPropTagArray);
+	if (lpThis->m_lpsSortOrderSet != nullptr)
 		// ignore error
-	}
-
-	if(lpThis->m_lpsSortOrderSet) {
 		lpThis->HrSortTable(lpThis->m_lpsSortOrderSet);
-		// ignore error
-	}
 
 	// Call the reload callback if necessary
 	if(lpThis->m_lpCallback)
@@ -767,11 +754,18 @@ HRESULT WSTableView::SetReloadCallback(RELOADCALLBACK callback, void *lpParam)
 }
 
 // WSTableOutGoingQueue view
-WSTableOutGoingQueue::WSTableOutGoingQueue(KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport) : WSStoreTableView(MAPI_MESSAGE, 0, lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpMsgStore, lpTransport)
+WSTableOutGoingQueue::WSTableOutGoingQueue(KCmd *lpCmd,
+    std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
+    LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport) :
+	WSStoreTableView(MAPI_MESSAGE, 0, lpCmd, lpDataLock, ecSessionId,
+	    cbEntryId, lpEntryId, lpMsgStore, lpTransport)
 {
 }
 
-HRESULT WSTableOutGoingQueue::Create(KCmd *lpCmd, pthread_mutex_t *lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport, WSTableOutGoingQueue **lppTableOutGoingQueue)
+HRESULT WSTableOutGoingQueue::Create(KCmd *lpCmd,
+    std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
+    LPENTRYID lpEntryId, ECMsgStore *lpMsgStore, WSTransport *lpTransport,
+    WSTableOutGoingQueue **lppTableOutGoingQueue)
 {
 	HRESULT hr = hrSuccess;
 	WSTableOutGoingQueue *lpTableOutGoingQueue = NULL; 
@@ -788,7 +782,7 @@ HRESULT WSTableOutGoingQueue::Create(KCmd *lpCmd, pthread_mutex_t *lpDataLock, E
 
 HRESULT	WSTableOutGoingQueue::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ECTableOutGoingQueue, this);
+	REGISTER_INTERFACE3(ECTableOutGoingQueue, WSTableOutGoingQueue, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 

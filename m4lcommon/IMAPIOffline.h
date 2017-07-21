@@ -21,6 +21,8 @@
 #include <mapix.h>
 #include <mapidefs.h>
 
+namespace KC {
+
 /* interface IMAPIOfflineNotify, Notify */
 
 #define MAPIOFFLINE_ADVISE_DEFAULT				(ULONG)0 
@@ -42,45 +44,38 @@
 #define MAPIOFFLINE_STATE_OFFLINE				0x00000001  
 #define MAPIOFFLINE_STATE_ONLINE				0x00000002 
 
-
-typedef enum 
-{ 
+enum MAPIOFFLINE_CALLBACK_TYPE {
      MAPIOFFLINE_CALLBACK_TYPE_NOTIFY = 0
-} MAPIOFFLINE_CALLBACK_TYPE;
-
+};
 
 // The MAPIOFFLINE_NOTIFY_TYPE of a notification identifies if a change in the connection state is going to take place, is taking place, or has completed. 
-typedef enum {
+enum MAPIOFFLINE_NOTIFY_TYPE {
 	MAPIOFFLINE_NOTIFY_TYPE_STATECHANGE_START = 1, 
 	MAPIOFFLINE_NOTIFY_TYPE_STATECHANGE = 2, 
 	MAPIOFFLINE_NOTIFY_TYPE_STATECHANGE_DONE = 3 
-} MAPIOFFLINE_NOTIFY_TYPE;
+};
 
-typedef struct
-{
+struct MAPIOFFLINE_ADVISEINFO {
 	ULONG				ulSize;					// The size of MAPIOFFLINE_ADVISEINFO
 	ULONG				ulClientToken;			// A token defined by the client about a callback. It is the ulClientToken member of the MAPIOFFLINE_NOTIFY structure passed to IMAPIOfflineNotify::Notify.
 	MAPIOFFLINE_CALLBACK_TYPE	CallbackType;	// Type of callback to make.
 	IUnknown*			pCallback;				// Interface to use for callback. This is the client's implementation of IMAPIOfflineNotify.
 	ULONG				ulAdviseTypes;			//The types of advise, as identified by the condition for advising. The only supported type is MAPIOFFLINE_ADVISE_TYPE_STATECHANGE.
 	ULONG				ulStateMask;			// The only supported state is MAPIOFFLINE_STATE_ALL
-} MAPIOFFLINE_ADVISEINFO;
+};
 
-typedef struct 
-{
+struct MAPIOFFLINE_NOTIFY {
 	ULONG ulSize;								// Size of the MAPIOFFLINE_NOTIFY structure.		
 	MAPIOFFLINE_NOTIFY_TYPE NotifyType;			// Type of notification
 	ULONG ulClientToken;						// A token defined by the client in the MAPIOFFLINE_ADVISEINFO structure in IMAPIOfflineMgr::Advise
 	union {
-		struct
-		{
+		struct {
 			ULONG ulMask;						// The part of the connection state that has changed.
 			ULONG ulStateOld;					// The old connection state
 			ULONG ulStateNew;					// The new connection state
 		} StateChange;
 	} Info;
-} MAPIOFFLINE_NOTIFY;
-
+};
 
 /*
 Provides information for an offline object.
@@ -93,8 +88,7 @@ Interface identifier: IID_IMAPIOffline
 Remarks:
 The client must implement this interface and pass a pointer to it as a member in MAPIOFFLINE_ADVISEINFO when setting up callbacks using IMAPIOfflineMgr::Advise. Subsequently, Outlook will be able to use this interface to send notification callbacks to the client.
 */
-class IMAPIOffline : public IUnknown
-{
+class IMAPIOffline : public IUnknown {
 public:
 	/*
 	Sets the current state of an offline object to online or offline.
@@ -163,8 +157,6 @@ public:
 		Unknown
 	*/
 	virtual HRESULT __stdcall GetCurrentState(ULONG* pulState) = 0;
-
-	virtual HRESULT __stdcall Placeholder1(void* ulTest) = 0;
 };
 
 /*
@@ -178,9 +170,7 @@ Interface identifier: IID_IMAPIOfflineNotify
 Remarks:
 The client must implement this interface and pass a pointer to it as a member in MAPIOFFLINE_ADVISEINFO when setting up callbacks using IMAPIOfflineMgr::Advise. Subsequently, Outlook will be able to use this interface to send notification callbacks to the client.
 */
-
-class IMAPIOfflineNotify : public IUnknown
-{
+class IMAPIOfflineNotify : public IUnknown {
 public:
 	/*
 	Sends notifications to the client about changes in connection state.
@@ -223,8 +213,7 @@ Remarks:
 	offline object (by calling IMAPIOffline::GetCapabilities), and choose to set up callbacks (by using IMAPIOfflineMgr::Advise).
 
 */
-class IMAPIOfflineMgr : public IMAPIOffline
-{
+class IMAPIOfflineMgr : public IMAPIOffline {
 public:
 	/*
 	Registers a client to receive callbacks on an offline object.
@@ -273,45 +262,8 @@ public:
 		object associated with ulAdviseToken.
 	*/
 	virtual HRESULT __stdcall Unadvise(ULONG ulFlags,ULONG ulAdviseToken) = 0;
-	virtual HRESULT __stdcall Placeholder2() = 0;
-	virtual HRESULT __stdcall Placeholder3() = 0;
-	virtual HRESULT __stdcall Placeholder4() = 0;
-	virtual HRESULT __stdcall Placeholder5() = 0;
-	virtual HRESULT __stdcall Placeholder6() = 0;
-	virtual HRESULT __stdcall Placeholder7() = 0;
-	virtual HRESULT __stdcall Placeholder8() = 0;
-
 };
 
-/*
-Opens an offline object based on a given profile.
-
-Parameters:
-	ulReserved 
-		[in] This parameter is not used. It must be 0. 
-
-	pwszProfileNameIn
-		[in] The name of the profile that the offline object is for. It must be expressed in Unicode. 
-	pGUID 
-		[in] Pointer to a GUID which can be used to uniquely identify this object from other offline objects.
-			It must be GUID_GlobalState.
-	pReserved 
-		[in] This parameter is not used. It must be NULL. 
-	ppOfflineObj 
-		[out] A pointer to the requested offline object. The caller can use this pointer to access the 
-			IMAPIOfflineMgr interface to find out the callbacks that this object supports and to set up callbacks for it.
-
-Return Values:
-	S_OK 
-		The function call is successful.
-
-Remarks:
-	This is the first call that a client makes when the client wants to be notified of any connection state changes for 
-	a given profile. Upon calling HrOpenOfflineObj, the client obtains an offline object that supports IMAPIOfflineMgr.
-	The client can check for the kinds of callbacks supported by the object (by using IMAPIOffline::GetCapabilities),
-	and then set up callbacks for it (by using IMAPIOfflineMgr::Advise).
-
-	When using GetProcAddress to look for the address of this function in msmapi32.dll, specify HrOpenOfflineObj@20 as the procedure name.  
-*/
+} /* namespace */
 
 #endif //IMAPIOFFLINE_INCLUDED

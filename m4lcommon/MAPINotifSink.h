@@ -19,40 +19,41 @@
 #define MAPINOTIFSINK_H
 
 #include <kopano/zcdefs.h>
+#include <condition_variable>
 #include <list>
+#include <mutex>
 #include <mapi.h>
 #include <mapix.h>
 #include <mapidefs.h>
-#include <pthread.h>
 #include <kopano/ECUnknown.h>
 
-class MAPINotifSink _zcp_final : public IMAPIAdviseSink {
+namespace KC {
+
+class _kc_export MAPINotifSink _kc_final : public IMAPIAdviseSink {
 public:
     static HRESULT Create(MAPINotifSink **lppSink);
-    
-    virtual ULONG 	__stdcall 	AddRef(void) _zcp_override;
-    virtual ULONG 	__stdcall 	Release(void) _zcp_override;
-    
-    virtual HRESULT __stdcall	QueryInterface(REFIID iid, void **lpvoid) _zcp_override;
-    
-    virtual ULONG 	__stdcall 	OnNotify(ULONG cNotif, LPNOTIFICATION lpNotifications) _zcp_override;
-    virtual HRESULT __stdcall 	GetNotifications(ULONG *lpcNotif, LPNOTIFICATION *lppNotifications, BOOL fNonBlock, ULONG timeout);
+	_kc_hidden virtual ULONG __stdcall AddRef(void) _kc_override;
+	virtual ULONG __stdcall Release(void) _kc_override;
+	_kc_hidden virtual HRESULT __stdcall QueryInterface(REFIID iid, void **iface) _kc_override;
+	_kc_hidden virtual ULONG __stdcall OnNotify(ULONG n, LPNOTIFICATION notif) _kc_override;
+	virtual HRESULT __stdcall GetNotifications(ULONG *n, LPNOTIFICATION *notif, BOOL fNonBlock, ULONG timeout);
 
 private:
-    MAPINotifSink();
-    virtual ~MAPINotifSink();
+	_kc_hidden MAPINotifSink(void) = default;
+	_kc_hidden virtual ~MAPINotifSink(void);
 
-    pthread_mutex_t m_hMutex;
-    pthread_cond_t 	m_hCond;
-    bool			m_bExit;
+	std::mutex m_hMutex;
+	std::condition_variable m_hCond;
     std::list<NOTIFICATION *> m_lstNotifs;
-    
-    unsigned int	m_cRef;
+	bool m_bExit = false;
+	unsigned int m_cRef = 0;
 };
 
 
 HRESULT MAPICopyUnicode(WCHAR *lpSrc, void *lpBase, WCHAR **lpDst);
 HRESULT MAPICopyString(char *lpSrc, void *lpBase, char **lpDst);
+
+} /* namespace */
 
 #endif
 

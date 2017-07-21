@@ -26,12 +26,13 @@
 #include <netinet/in.h>
 #include <sys/un.h>
 #include <sys/socket.h>
-#include <kopano/base64.h>
 #include <kopano/ECChannel.h>
 #include <kopano/ECDefs.h>
 #include <kopano/stringutil.h>
 
 #include "ECChannelClient.h"
+
+namespace KC {
 
 ECChannelClient::ECChannelClient(const char *szPath, const char *szTokenizer)
 {
@@ -42,13 +43,10 @@ ECChannelClient::ECChannelClient(const char *szPath, const char *szTokenizer)
 	if (strncmp(szPath, "file", 4) == 0 || szPath[0] == PATH_SEPARATOR) {
 		m_bSocket = true;
 		m_ulPort = 0;
-	} else {
-		m_bSocket = false;
-		m_ulPort = atoi(GetServerPortFromPath(szPath).c_str());
+		return;
 	}
-
-	m_lpChannel = NULL;
-	m_ulTimeout = 5;
+	m_bSocket = false;
+	m_ulPort = atoi(GetServerPortFromPath(szPath).c_str());
 }
 
 ECChannelClient::~ECChannelClient()
@@ -109,7 +107,12 @@ ECRESULT ECChannelClient::ConnectSocket()
 
 	memset(&saddr, 0, sizeof(saddr));
 	saddr.sun_family = AF_UNIX;
-	strcpy(saddr.sun_path, m_strPath.c_str());
+	if (m_strPath.size() >= sizeof(saddr.sun_path)) {
+		ec_log_warn("%s: path %s too long", __PRETTY_FUNCTION__,
+			m_strPath.c_str());
+		return KCERR_INVALID_PARAMETER;
+	}
+	kc_strlcpy(saddr.sun_path, m_strPath.c_str(), sizeof(saddr.sun_path));
 
 	if ((fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0) {
 		er = KCERR_INVALID_PARAMETER;
@@ -192,3 +195,5 @@ exit:
 
 	return er;
 }
+
+} /* namespace */

@@ -2,36 +2,58 @@
 #define _KCHL_HPP 1
 
 #include <kopano/zcdefs.h>
+#include <kopano/memory.hpp>
+#include <exception>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <mapidefs.h>
 
-class ECLogger_File;
-struct IAttach;
-struct IMAPIFolder;
-struct IMAPISession;
-struct IMessage;
-struct IMsgFolder;
-struct IMsgStore;
-struct IStream;
-struct IUnknown;
+class IAttach;
+class IMAPIFolder;
+class IMAPISession;
+class IMessage;
+class IMsgFolder;
+class IMsgStore;
+class IStream;
+class IUnknown;
 
 namespace KCHL {
+using namespace KC;
 
 class KAttach;
-class KDeleter;
 class KFolder;
 class KMessage;
 class KStore;
 class KStream;
 class KTable;
 class KUnknown;
+class KEntryId;
 
-typedef std::unique_ptr<SPropValue, KDeleter> KProp;
-typedef std::unique_ptr<SRowSet, KDeleter> KRowSet;
+class _kc_export KProp _kc_final {
+	public:
+	KProp(SPropValue *);
+	KProp(KProp &&);
+	~KProp(void);
+	KProp &operator=(KProp &&);
+	SPropValue *operator->(void) { return m_s; }
+	const SPropValue *operator->(void) const { return m_s; }
+	operator SPropValue *(void) { return m_s; }
+	operator const SPropValue *(void) const { return m_s; }
 
-class KAttach {
+	const unsigned int &prop_tag() const;
+	const bool b() const;
+	const unsigned int &ul() const;
+	const int &l() const;
+	std::string str();
+	std::wstring wstr();
+	KEntryId entry_id();
+
+	private:
+	SPropValue *m_s;
+};
+
+class _kc_export KAttach _kc_final {
 	public:
 	KAttach(IAttach *, unsigned int);
 	KAttach(KAttach &&);
@@ -48,39 +70,35 @@ class KAttach {
 	unsigned int m_num;
 };
 
-class KEntryId _kc_final {
+class _kc_export KEntryId _kc_final {
 	public:
-	KEntryId(void);
+	KEntryId(void) = default;
 	KEntryId(KEntryId &&);
 	KEntryId(ENTRYID *, size_t);
 	~KEntryId(void);
 	KEntryId &operator=(KEntryId &&);
 
 	private:
-	ENTRYID *m_eid;
-	size_t m_size;
+	friend class KStore;
+	ENTRYID *m_eid = nullptr;
+	size_t m_size = 0;
 };
 
-class KMAPIError _kc_final : public std::exception {
+class _kc_export_throw KMAPIError _kc_final : public std::exception {
 	public:
 	KMAPIError(HRESULT = hrSuccess);
-	virtual ~KMAPIError(void) throw() {}
-	HRESULT code(void) const throw() { return m_code; }
-	virtual const char *what(void) const throw();
+	virtual ~KMAPIError(void) noexcept _kc_impdtor;
+	HRESULT code(void) const noexcept { return m_code; }
+	virtual const char *what(void) const noexcept;
 
 	private:
 	HRESULT m_code;
 	std::string m_message;
 };
 
-class KDeleter _kc_final {
+class _kc_export KFolder _kc_final {
 	public:
-	void operator()(SPropValue *);
-	void operator()(SRowSet *);
-};
-
-class KFolder {
-	public:
+	KFolder(void) = default;
 	KFolder(IMAPIFolder *);
 	KFolder(KFolder &&);
 	~KFolder(void);
@@ -90,13 +108,15 @@ class KFolder {
 
 	KMessage create_message(LPCIID = NULL, unsigned int = 0);
 	KTable get_contents_table(unsigned int = 0);
+	KTable get_hierarchy_table(unsigned int = 0);
 
 	protected:
-	IMAPIFolder *m_folder;
+	IMAPIFolder *m_folder = nullptr;
 };
 
-class KMessage {
+class _kc_export KMessage _kc_final {
 	public:
+	KMessage(void) = default;
 	KMessage(IMessage *);
 	KMessage(KMessage &&);
 	~KMessage(void);
@@ -110,16 +130,10 @@ class KMessage {
 	HRESULT set_read_flag(unsigned int = 0);
 
 	protected:
-	IMessage *m_message;
+	IMessage *m_message = nullptr;
 };
 
-class KPropertyRestriction : public SPropertyRestriction {
-	public:
-	KPropertyRestriction(ULONG, SPropValue *);
-	operator SRestriction(void) const;
-};
-
-class KSession {
+class _kc_export KSession _kc_final {
 	public:
 	KSession(void);
 	KSession(const wchar_t *, const wchar_t *);
@@ -132,11 +146,10 @@ class KSession {
 	KStore open_default_store(void);
 
 	protected:
-	ECLogger_File *m_log;
-	IMAPISession *m_session;
+	IMAPISession *m_session = nullptr;
 };
 
-class KStore {
+class _kc_export KStore _kc_final {
 	public:
 	KStore(IMsgStore *);
 	KStore(KStore &&);
@@ -145,6 +158,9 @@ class KStore {
 	IMsgStore *operator->(void) { return m_store; }
 	operator IMsgStore *(void) { return m_store; }
 
+	KEntryId get_receive_folder(const char *cls = nullptr, char **xcls = nullptr);
+	KProp get_prop(unsigned int);
+	KUnknown open_entry(const KEntryId &, LPCIID = nullptr, unsigned int = 0);
 	KUnknown open_entry(const SPropValue * = NULL, LPCIID = NULL, unsigned int = 0);
 
 	protected:
@@ -152,7 +168,7 @@ class KStore {
 	ULONG m_type;
 };
 
-class KStream {
+class _kc_export KStream _kc_final {
 	public:
 	KStream(IStream *);
 	KStream(KStream &&);
@@ -167,7 +183,28 @@ class KStream {
 	IStream *m_stream;
 };
 
-class KTable {
+class _kc_export KRow _kc_final {
+	public:
+	KRow(SRow);
+	KProp operator[](size_t index) const;
+	unsigned int count() const;
+	private:
+	SRow m_row;
+};
+
+class _kc_export KRowSet _kc_final {
+	public:
+	KRowSet(SRowSet*);
+	KRow operator[](size_t) const;
+	unsigned int count() const;
+	SRowSet* operator->(void) { return m_rowset.get(); }
+	operator SRowSet *(void) { return m_rowset.get(); }
+
+	protected:
+	rowset_ptr m_rowset;
+};
+
+class _kc_export KTable _kc_final {
 	public:
 	KTable(IMAPITable *);
 	KTable(KTable &&);
@@ -177,12 +214,15 @@ class KTable {
 	operator IMAPITable *(void) { return m_table; }
 
 	HRESULT restrict(const SRestriction &, unsigned int = 0);
+	void columns(std::initializer_list<unsigned int>);
+	KRowSet rows(unsigned int, unsigned int);
+	unsigned int count(unsigned int = 0);
 
 	protected:
 	IMAPITable *m_table;
 };
 
-class KUnknown {
+class _kc_export KUnknown _kc_final {
 	public:
 	KUnknown(IUnknown * = NULL);
 	KUnknown(KUnknown &&);

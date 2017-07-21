@@ -19,6 +19,7 @@
 #define __M4L_MAPIX_H_
 #define MAPIX_H
 
+#include <kopano/zcdefs.h>
 #include <kopano/platform.h>
 
 /* Include common MAPI header files if they haven't been already. */
@@ -60,12 +61,11 @@ typedef IMAPISession* LPMAPISESSION;
 
 /* Structure passed to MAPIInitialize(), and its ulFlags values */
 
-typedef struct
-{
+struct MAPIINIT_0 {
     ULONG           ulVersion;
     ULONG           ulFlags;
-} MAPIINIT_0, *LPMAPIINIT_0;
-
+};
+typedef struct MAPIINIT_0 *LPMAPIINIT_0;
 typedef MAPIINIT_0 MAPIINIT;
 typedef MAPIINIT *LPMAPIINIT;
 
@@ -84,10 +84,8 @@ typedef MAPIINITIALIZE* LPMAPIINITIALIZE;
 
 typedef void (MAPIUNINITIALIZE)(void);
 typedef MAPIUNINITIALIZE* LPMAPIUNINITIALIZE;
-
-MAPIINITIALIZE      MAPIInitialize;
-MAPIUNINITIALIZE    MAPIUninitialize;
-
+extern _kc_export MAPIINITIALIZE MAPIInitialize;
+extern _kc_export MAPIUNINITIALIZE MAPIUninitialize;
 
 /*  Extended MAPI Logon function */
 
@@ -99,8 +97,7 @@ typedef HRESULT (MAPILOGONEX)(
     LPMAPISESSION* lppSession
 );
 typedef MAPILOGONEX* LPMAPILOGONEX;
-MAPILOGONEX MAPILogonEx;
-
+extern _kc_export MAPILOGONEX MAPILogonEx;
 
 typedef SCODE (MAPIALLOCATEBUFFER)(
     ULONG           cbSize,
@@ -117,17 +114,16 @@ typedef ULONG (MAPIFREEBUFFER)(
 typedef MAPIALLOCATEBUFFER  *LPMAPIALLOCATEBUFFER;
 typedef MAPIALLOCATEMORE    *LPMAPIALLOCATEMORE;
 typedef MAPIFREEBUFFER      *LPMAPIFREEBUFFER;
-MAPIALLOCATEBUFFER MAPIAllocateBuffer;
-MAPIALLOCATEMORE MAPIAllocateMore;
-MAPIFREEBUFFER MAPIFreeBuffer;
-
+extern _kc_export MAPIALLOCATEBUFFER MAPIAllocateBuffer;
+extern _kc_export MAPIALLOCATEMORE MAPIAllocateMore;
+extern _kc_export MAPIFREEBUFFER MAPIFreeBuffer;
 
 typedef HRESULT (MAPIADMINPROFILES)(
     ULONG ulFlags,
     LPPROFADMIN *lppProfAdmin
 );
 typedef MAPIADMINPROFILES *LPMAPIADMINPROFILES;
-MAPIADMINPROFILES MAPIAdminProfiles;
+extern _kc_export MAPIADMINPROFILES MAPIAdminProfiles;
 
 } // EXTERN "C"
 
@@ -157,7 +153,7 @@ MAPIADMINPROFILES MAPIAdminProfiles;
 #define MAPI_POST_MESSAGE       0x00000001  /* Selects post/send semantics */
 #define MAPI_NEW_MESSAGE        0x00000002  /* Governs copying during submission */
 
-class IMAPISession : public IUnknown {
+class IMAPISession : public virtual IUnknown {
 public:
     //    virtual ~IMAPISession() = 0;
 
@@ -192,7 +188,7 @@ public:
 /* IAddrBook Interface ----------------------------------------------------- */
 
 
-class IAddrBook : public IMAPIProp {
+class IAddrBook : public virtual IMAPIProp {
 public:
     //    virtual ~IAddrBook() = 0;
 
@@ -218,7 +214,7 @@ public:
     virtual HRESULT SetDefaultDir(ULONG cbEntryID, LPENTRYID lpEntryID) = 0;
     virtual HRESULT GetSearchPath(ULONG ulFlags, LPSRowSet* lppSearchPath) = 0;
     virtual HRESULT SetSearchPath(ULONG ulFlags, LPSRowSet lpSearchPath) = 0;
-    virtual HRESULT PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, LPADRLIST lpRecipList) = 0;
+	virtual HRESULT PrepareRecips(ULONG ulFlags, const SPropTagArray *lpPropTagArray, LPADRLIST lpRecipList) = 0;
 };
 
 typedef IAddrBook* LPADRBOOK;
@@ -230,7 +226,7 @@ typedef IAddrBook* LPADRBOOK;
 #define MAPI_DEFAULT_SERVICES           0x00000001
 
 
-class IProfAdmin : public IUnknown {
+class IProfAdmin : public virtual IUnknown {
 public:
     //    virtual ~IProfAdmin() = 0;
 
@@ -263,7 +259,7 @@ public:
 #define SERVICE_NO_PRIMARY_IDENTITY 0x00000020
 
 
-class IMsgServiceAdmin : public IUnknown {
+class IMsgServiceAdmin : public virtual IUnknown {
 public:
     //    virtual ~IMsgServiceAdmin() = 0;
 

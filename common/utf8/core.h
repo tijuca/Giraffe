@@ -47,18 +47,18 @@ DEALINGS IN THE SOFTWARE.
 
 #include <iterator>
 
-namespace utf8
-{
+namespace KC {
+
+namespace utf8 {
     // The typedefs for 8-bit, 16-bit and 32-bit unsigned integers
     // You may need to change them to match your system.
-    // These typedefs have the same names as ones from cstdint, or boost/cstdint
+    // These typedefs have the same names as ones from cstdint
     typedef unsigned char   uint8_t;
     typedef unsigned short  uint16_t;
     typedef unsigned int    uint32_t;
 
 // Helper code - not intended to be directly called by the library users. May be changed at any time
-namespace internal
-{
+namespace internal {
     // Unicode constants
     // Leading (high) surrogates: 0xd800 - 0xdbff
     // Trailing (low) surrogates: 0xdc00 - 0xdfff
@@ -137,7 +137,7 @@ namespace internal
 
     enum utf_error {UTF8_OK, NOT_ENOUGH_ROOM, INVALID_LEAD, INCOMPLETE_SEQUENCE, OVERLONG_SEQUENCE, INVALID_CODE_POINT};
 
-    /// get_sequence_x functions decode utf-8 sequences of the length x
+    /// get_sequence_x functions decode UTF-8 sequences of the length x
 
     template <typename octet_iterator>
     utf_error get_sequence_1(octet_iterator& it, octet_iterator end, uint32_t* code_point)
@@ -345,6 +345,8 @@ namespace internal
            );
     }
 } // namespace utf8
+
+} /* namespace */
 
 #endif // header guard
 

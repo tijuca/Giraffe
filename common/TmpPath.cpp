@@ -25,6 +25,8 @@
 #include "TmpPath.h"
 #include <kopano/ECConfig.h>
 
+namespace KC {
+
 TmpPath::TmpPath() {
 	const char *dummy = NULL;
 
@@ -54,23 +56,20 @@ bool TmpPath::OverridePath(ECConfig *const ec) {
 	bool rc = true;
 	const char *newPath = ec->GetSetting("tmp_path");
 
-	if (newPath && newPath[0]) {
-		path = newPath;
+	if (newPath == nullptr || newPath[0] == '\0')
+		return true;
 
-		size_t s = path.size();
-		if (path.at(s - 1) == '/' && s > 1)
-			path = path.substr(0, s - 1);
-
-		struct stat st;
-		if (stat(path.c_str(), &st) == -1) {
-			path = "/tmp"; // what to do if we can't access that path either? FIXME
-			rc = false;
-		}
-
-		setenv("TMP", newPath, 1);
-		setenv("TEMP", newPath, 1);
+	path = newPath;
+	size_t s = path.size();
+	if (path.at(s - 1) == '/' && s > 1)
+		path = path.substr(0, s - 1);
+	struct stat st;
+	if (stat(path.c_str(), &st) == -1) {
+		path = "/tmp"; // what to do if we can't access that path either? FIXME
+		rc = false;
 	}
-
+	setenv("TMP", newPath, 1);
+	setenv("TEMP", newPath, 1);
 	return rc;
 }
 
@@ -79,3 +78,5 @@ TmpPath *TmpPath::getInstance()
         static std::unique_ptr<TmpPath> instance(new TmpPath);
         return instance.get();
 }
+
+} /* namespace */

@@ -29,10 +29,12 @@
 #include "ECIndexer.h"
 
 #include <map>
+#include <memory>
 #include <new>
 #include <string>
 #include <list>
-#include <boost/algorithm/string/join.hpp>
+
+namespace KC {
 
 /**
  * Returns TRUE if the restriction is always FALSE.
@@ -54,15 +56,12 @@ static BOOL NormalizeRestrictionIsFalse(const struct restrictTable *lpRestrict)
     if(lpRestrict->ulType != RES_AND)
 		return false;
         
-    for (gsoap_size_t i = 0; i < lpRestrict->lpAnd->__size; ++i) {
+    for (gsoap_size_t i = 0; i < lpRestrict->lpAnd->__size; ++i)
         if (lpRestrict->lpAnd->__ptr[i]->ulType == RES_EXIST)
             setExist.insert(lpRestrict->lpAnd->__ptr[i]->lpExist->ulPropTag);
-        else if (lpRestrict->lpAnd->__ptr[i]->ulType == RES_NOT) {
-            if (lpRestrict->lpAnd->__ptr[i]->lpNot->lpNot->ulType == RES_EXIST) {
+        else if (lpRestrict->lpAnd->__ptr[i]->ulType == RES_NOT &&
+            lpRestrict->lpAnd->__ptr[i]->lpNot->lpNot->ulType == RES_EXIST)
                 setNotExist.insert(lpRestrict->lpAnd->__ptr[i]->lpNot->lpNot->lpExist->ulPropTag);
-            }
-        }
-    }
     
     set_intersection(setExist.begin(), setExist.end(), setNotExist.begin(), setNotExist.end(), inserter(setBoth, setBoth.begin()));
     
@@ -105,10 +104,9 @@ static ECRESULT NormalizeRestrictionNestedAnd(struct restrictTable *lpRestrict)
             for (gsoap_size_t j = 0; j < lpRestrict->lpAnd->__ptr[i]->lpAnd->__size; ++j)
                 lstClauses.push_back(lpRestrict->lpAnd->__ptr[i]->lpAnd->__ptr[j]);
 
-            delete [] lpRestrict->lpAnd->__ptr[i]->lpAnd->__ptr;
-            delete lpRestrict->lpAnd->__ptr[i]->lpAnd;
-			delete lpRestrict->lpAnd->__ptr[i];
-            
+			s_free(nullptr, lpRestrict->lpAnd->__ptr[i]->lpAnd->__ptr);
+			s_free(nullptr, lpRestrict->lpAnd->__ptr[i]->lpAnd);
+			s_free(nullptr, lpRestrict->lpAnd->__ptr[i]);
             bModified = true;
         } else {
             lstClauses.push_back(lpRestrict->lpAnd->__ptr[i]);
@@ -117,14 +115,12 @@ static ECRESULT NormalizeRestrictionNestedAnd(struct restrictTable *lpRestrict)
         
     if(bModified) {
         // We changed something, free the previous toplevel data and create a new list of children
-        delete [] lpRestrict->lpAnd->__ptr;
-        
+		s_free(nullptr, lpRestrict->lpAnd->__ptr);
         lpRestrict->lpAnd->__ptr = s_alloc<restrictTable *>(NULL, lstClauses.size());
         
         int n = 0;
-        for (std::list<struct restrictTable *>::const_iterator clause = lstClauses.begin();
-             clause != lstClauses.end(); ++clause)
-		lpRestrict->lpAnd->__ptr[n++] = *clause;
+		for (const auto rt : lstClauses)
+			lpRestrict->lpAnd->__ptr[n++] = rt;
         
         lpRestrict->lpAnd->__size = n;
     }
@@ -244,33 +240,29 @@ static ECRESULT NormalizeRestrictionMultiFieldSearch(
     
     if (lpRestrict->ulType == RES_AND) {
         for (gsoap_size_t i = 0; i < lpRestrict->lpAnd->__size;) {
-            if(NormalizeGetMultiSearch(lpRestrict->lpAnd->__ptr[i], setExcludeProps, sMultiSearch) == erSuccess) {
-                lpMultiSearches->push_back(sMultiSearch);
-
-                // Remove it from the restriction since it is now handled as a multisearch
-                FreeRestrictTable(lpRestrict->lpAnd->__ptr[i]);
-                memmove(&lpRestrict->lpAnd->__ptr[i], &lpRestrict->lpAnd->__ptr[i+1], sizeof(struct restrictTable *) * (lpRestrict->lpAnd->__size - i - 1));
-                --lpRestrict->lpAnd->__size;
-            } else {
-                ++i;
-            }
-        }
-    } else {
-        // Direct RES_CONTENT
-        if(NormalizeGetMultiSearch(lpRestrict, setExcludeProps, sMultiSearch) == erSuccess) {
+            if (NormalizeGetMultiSearch(lpRestrict->lpAnd->__ptr[i], setExcludeProps, sMultiSearch) != erSuccess) {
+	        ++i;
+	        continue;
+	    }
             lpMultiSearches->push_back(sMultiSearch);
-            
-            // We now have to remove the entire restriction since the top-level restriction here is
-            // now obsolete. Since the above loop will generate an empty AND clause, we will do that here as well.
-			// Do not delete the lpRestrict itself, since we place new content in it.
-			FreeRestrictTable(lpRestrict, false);
-			memset(lpRestrict, 0, sizeof(struct restrictTable));
-            
-            lpRestrict->ulType = RES_AND;
-            lpRestrict->lpAnd = new struct restrictAnd;
-            lpRestrict->lpAnd->__size = 0;
-            lpRestrict->lpAnd->__ptr = NULL;
+            // Remove it from the restriction since it is now handled as a multisearch
+            FreeRestrictTable(lpRestrict->lpAnd->__ptr[i]);
+            memmove(&lpRestrict->lpAnd->__ptr[i], &lpRestrict->lpAnd->__ptr[i+1], sizeof(struct restrictTable *) * (lpRestrict->lpAnd->__size - i - 1));
+            --lpRestrict->lpAnd->__size;
         }
+    } else if (NormalizeGetMultiSearch(lpRestrict, setExcludeProps, sMultiSearch) == erSuccess) {
+        // Direct RES_CONTENT
+        lpMultiSearches->push_back(sMultiSearch);
+
+        // We now have to remove the entire restriction since the top-level restriction here is
+        // now obsolete. Since the above loop will generate an empty AND clause, we will do that here as well.
+	// Do not delete the lpRestrict itself, since we place new content in it.
+	FreeRestrictTable(lpRestrict, false);
+	memset(lpRestrict, 0, sizeof(struct restrictTable));
+        lpRestrict->ulType = RES_AND;
+		lpRestrict->lpAnd = s_alloc<restrictAnd>(nullptr);
+        lpRestrict->lpAnd->__size = 0;
+        lpRestrict->lpAnd->__ptr = NULL;
     }
     
     return er;
@@ -332,7 +324,7 @@ ECRESULT GetIndexerResults(ECDatabase *lpDatabase, ECConfig *lpConfig,
     std::string &suggestion)
 {
     ECRESULT er = erSuccess;
-	ECSearchClient *lpSearchClient = NULL;
+	std::unique_ptr<ECSearchClient> lpSearchClient;
 	std::set<unsigned int> setExcludePropTags;
 	struct timeval tstart, tend;
 	LONGLONG	llelapsedtime;
@@ -349,7 +341,7 @@ ECRESULT GetIndexerResults(ECDatabase *lpDatabase, ECConfig *lpConfig,
 	lstMatches.clear();
 
 	if (parseBool(lpConfig->GetSetting("search_enabled")) == true && szSocket[0]) {
-		lpSearchClient = new(std::nothrow) ECSearchClient(szSocket, atoui(lpConfig->GetSetting("search_timeout")) );
+		lpSearchClient.reset(new(std::nothrow) ECSearchClient(szSocket, atoui(lpConfig->GetSetting("search_timeout"))));
 		if (!lpSearchClient) {
 			er = KCERR_NOT_ENOUGH_MEMORY;
 			goto exit;
@@ -412,8 +404,6 @@ ECRESULT GetIndexerResults(ECDatabase *lpDatabase, ECConfig *lpConfig,
 exit:
 	if (lpOptimizedRestrict != NULL)
 		FreeRestrictTable(lpOptimizedRestrict);
-	delete lpSearchClient;
-
 	if (er != erSuccess)
 		g_lpStatsCollector->Increment(SCN_DATABASE_SEARCHES);
 	else
@@ -421,3 +411,5 @@ exit:
     
     return er;
 }
+
+} /* namespace */

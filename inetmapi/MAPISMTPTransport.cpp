@@ -42,29 +42,31 @@
 //
 
 #include <kopano/platform.h>
+#include <memory>
+#include <utility>
+#include <kopano/tie.hpp>
 #include <kopano/stringutil.h>
 #include "MAPISMTPTransport.h"
-#include "vmime/net/smtp/SMTPResponse.hpp"
-
-#include "vmime/exception.hpp"
-#include "vmime/platform.hpp"
-#include "vmime/mailboxList.hpp"
-
-#include "vmime/utility/filteredStream.hpp"
-#include "vmime/utility/stringUtils.hpp"
-#include "vmime/net/defaultConnectionInfos.hpp"
-
+#include <vmime/net/smtp/SMTPResponse.hpp>
+#include <vmime/exception.hpp>
+#include <vmime/platform.hpp>
+#include <vmime/mailboxList.hpp>
+#include <vmime/utility/filteredStream.hpp>
+#include <vmime/utility/outputStreamSocketAdapter.hpp>
+#include <vmime/utility/streamUtils.hpp>
+#include <vmime/utility/stringUtils.hpp>
+#include <vmime/net/defaultConnectionInfos.hpp>
 #include <kopano/ECDebugPrint.h>
 #include <kopano/ECLogger.h>
 #include <kopano/charset/traits.h>
 
 #if VMIME_HAVE_SASL_SUPPORT
-	#include "vmime/security/sasl/SASLContext.hpp"
+#	include <vmime/security/sasl/SASLContext.hpp>
 #endif // VMIME_HAVE_SASL_SUPPORT
 
 #if VMIME_HAVE_TLS_SUPPORT
-	#include "vmime/net/tls/TLSSession.hpp"
-	#include "vmime/net/tls/TLSSecuredConnectionInfos.hpp"
+#	include <vmime/net/tls/TLSSession.hpp>
+#	include <vmime/net/tls/TLSSecuredConnectionInfos.hpp>
 #endif // VMIME_HAVE_TLS_SUPPORT
 
 // Helpers for service properties
@@ -79,15 +81,15 @@
 #include "serviceRegistration.inl"
 REGISTER_SERVICE(smtp::MAPISMTPTransport, mapismtp, TYPE_TRANSPORT);
 
+using namespace KCHL;
+
 namespace vmime {
 namespace net {
 namespace smtp {
 
-MAPISMTPTransport::MAPISMTPTransport(ref <session> sess, ref <security::authenticator> auth, const bool secured)
-	: transport(sess, getInfosInstance(), auth), m_socket(NULL),
-	  m_authentified(false), m_extendedSMTP(false), m_timeoutHandler(NULL),
-	  m_isSMTPS(secured), m_secured(false), m_lpLogger(NULL),
-	  m_bDSNRequest(false)
+MAPISMTPTransport::MAPISMTPTransport(vmime::shared_ptr<session> sess,
+    vmime::shared_ptr<security::authenticator> auth, const bool secured) :
+	transport(sess, getInfosInstance(), auth), m_isSMTPS(secured)
 {
 }
 
@@ -104,8 +106,6 @@ MAPISMTPTransport::~MAPISMTPTransport()
 	{
 		// Ignore
 	}
-	if (m_lpLogger != NULL)
-		m_lpLogger->Release();
 }
 
 void MAPISMTPTransport::connect()
@@ -129,37 +129,29 @@ void MAPISMTPTransport::connect()
 #if VMIME_HAVE_TLS_SUPPORT
 	if (m_isSMTPS)  // dedicated port/SMTPS
 	{
-		ref <tls::TLSSession> tlsSession =
-			vmime::create <tls::TLSSession>(getCertificateVerifier());
-
-		ref <tls::TLSSocket> tlsSocket =
-			tlsSession->getSocket(m_socket);
-
+		auto tlsSession = tls::TLSSession::create(getCertificateVerifier(), getSession()->getTLSProperties());
+		auto tlsSocket = tlsSession->getSocket(m_socket);
 		m_socket = tlsSocket;
 
 		m_secured = true;
-		m_cntInfos = vmime::create <tls::TLSSecuredConnectionInfos>(address, port, tlsSession, tlsSocket);
+		m_cntInfos = vmime::make_shared<tls::TLSSecuredConnectionInfos>(address, port, tlsSession, tlsSocket);
 	}
 	else
 #endif // VMIME_HAVE_TLS_SUPPORT
 	{
-		m_cntInfos = vmime::create <defaultConnectionInfos>(address, port);
+		m_cntInfos = vmime::make_shared<defaultConnectionInfos>(address, port);
 	}
 
-	if (m_lpLogger && m_lpLogger->Log(EC_LOGLEVEL_DEBUG))
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "SMTP connecting to %s:%d", address.c_str(), port);
-
+	ec_log_debug("SMTP connecting to %s:%d", address.c_str(), port);
 	m_socket->connect(address, port);
-
-	if (m_lpLogger && m_lpLogger->Log(EC_LOGLEVEL_DEBUG))
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "SMTP server connected.");
+	ec_log_debug("SMTP server connected.");
 
 	// Connection
 	//
 	// eg:  C: <connection to server>
 	// ---  S: 220 smtp.domain.com Service ready
 
-	ref <SMTPResponse> resp;
+	vmime::shared_ptr<SMTPResponse> resp;
 
 	if ((resp = readResponse())->getCode() != 220)
 	{
@@ -225,8 +217,7 @@ void MAPISMTPTransport::helo()
 
 	sendRequest("EHLO " + platform::getHandler()->getHostName());
 
-	ref <SMTPResponse> resp;
-
+	vmime::shared_ptr<SMTPResponse> resp;
 	if ((resp = readResponse())->getCode() != 250)
 	{
 		// Next, try "Basic" SMTP
@@ -286,7 +277,7 @@ void MAPISMTPTransport::authenticate()
 		throw exceptions::command_error("AUTH", "ESMTP not supported.");
 	}
 
-	getAuthenticator()->setService(thisRef().dynamicCast <service>());
+	getAuthenticator()->setService(vmime::dynamicCast<service>(shared_from_this()));
 
 #if VMIME_HAVE_SASL_SUPPORT
 	// First, try SASL authentication
@@ -328,7 +319,7 @@ void MAPISMTPTransport::authenticate()
 
 void MAPISMTPTransport::authenticateSASL()
 {
-	if (!getAuthenticator().dynamicCast <security::sasl::SASLAuthenticator>())
+	if (!vmime::dynamicCast<security::sasl::SASLAuthenticator>(getAuthenticator()))
 		throw exceptions::authentication_error("No SASL authenticator available.");
 
 	// Obtain SASL mechanisms supported by server from ESMTP extensions
@@ -339,10 +330,8 @@ void MAPISMTPTransport::authenticateSASL()
 	if (saslMechs.empty())
 		throw exceptions::authentication_error("No SASL mechanism available.");
 
-	std::vector <ref <security::sasl::SASLMechanism> > mechList;
-
-	ref <security::sasl::SASLContext> saslContext =
-		vmime::create <security::sasl::SASLContext>();
+	std::vector<vmime::shared_ptr<security::sasl::SASLMechanism> > mechList;
+	auto saslContext = security::sasl::SASLContext::create();
 
 	for (unsigned int i = 0 ; i < saslMechs.size() ; ++i)
 	{
@@ -361,14 +350,12 @@ void MAPISMTPTransport::authenticateSASL()
 		throw exceptions::authentication_error("No SASL mechanism available.");
 
 	// Try to suggest a mechanism among all those supported
-	ref <security::sasl::SASLMechanism> suggestedMech =
-		saslContext->suggestMechanism(mechList);
-
+	auto suggestedMech = saslContext->suggestMechanism(mechList);
 	if (!suggestedMech)
 		throw exceptions::authentication_error("Unable to suggest SASL mechanism.");
 
 	// Allow application to choose which mechanisms to use
-	mechList = getAuthenticator().dynamicCast <security::sasl::SASLAuthenticator>()->
+	mechList = vmime::dynamicCast<security::sasl::SASLAuthenticator>(getAuthenticator())->
 		getAcceptableMechanisms(mechList, suggestedMech);
 
 	if (mechList.empty())
@@ -377,19 +364,15 @@ void MAPISMTPTransport::authenticateSASL()
 	// Try each mechanism in the list in turn
 	for (unsigned int i = 0 ; i < mechList.size() ; ++i)
 	{
-		ref <security::sasl::SASLMechanism> mech = mechList[i];
-
-		ref <security::sasl::SASLSession> saslSession =
-			saslContext->createSession("smtp", getAuthenticator(), mech);
-
+		auto mech = mechList[i];
+		auto saslSession = saslContext->createSession("smtp", getAuthenticator(), mech);
 		saslSession->init();
 
 		sendRequest("AUTH " + mech->getName());
 
 		for (bool cont = true ; cont ; )
 		{
-			ref <SMTPResponse> response = readResponse();
-
+			auto response = readResponse();
 			switch (response->getCode())
 			{
 			case 235:
@@ -399,42 +382,23 @@ void MAPISMTPTransport::authenticateSASL()
 			}
 			case 334:
 			{
-				byte_t* challenge = 0;
-				int challengeLen = 0;
-
-				byte_t* resp = 0;
-				int respLen = 0;
+				std::unique_ptr<byte_t[]> challenge, resp;
+				size_t challengeLen = 0, respLen = 0;
 
 				try
 				{
 					// Extract challenge
-					saslContext->decodeB64(response->getText(), &challenge, &challengeLen);
-
+					saslContext->decodeB64(response->getText(), &unique_tie(challenge), &challengeLen);
 					// Prepare response
-					saslSession->evaluateChallenge
-						(challenge, challengeLen, &resp, &respLen);
-
+					saslSession->evaluateChallenge(challenge.get(), challengeLen, &unique_tie(resp), &respLen);
 					// Send response
-					sendRequest(saslContext->encodeB64(resp, respLen));
+					sendRequest(saslContext->encodeB64(resp.get(), respLen));
 				}
 				catch (exceptions::sasl_exception& e)
 				{
-					delete[] challenge;
-					challenge = NULL;
-					delete[] resp;
-					resp = NULL;
 					// Cancel SASL exchange
 					sendRequest("*");
 				}
-				catch (...)
-				{
-					delete[] challenge;
-					delete[] resp;
-					throw;
-				}
-
-				delete[] challenge;
-				delete[] resp;
 				break;
 			}
 			default:
@@ -458,24 +422,18 @@ void MAPISMTPTransport::startTLS()
 	try
 	{
 		sendRequest("STARTTLS");
-
-		ref <SMTPResponse> resp = readResponse();
-
+		auto resp = readResponse();
 		if (resp->getCode() != 220)
 			throw exceptions::command_error("STARTTLS", resp->getText());
 
-		ref <tls::TLSSession> tlsSession =
-			vmime::create <tls::TLSSession>(getCertificateVerifier());
-
-		ref <tls::TLSSocket> tlsSocket =
-			tlsSession->getSocket(m_socket);
-
-		tlsSocket->handshake(m_timeoutHandler);
+		auto tlsSession = tls::TLSSession::create(getCertificateVerifier(), getSession()->getTLSProperties());
+		auto tlsSocket = tlsSession->getSocket(m_socket);
+		tlsSocket->handshake();
 
 		m_socket = tlsSocket;
 
 		m_secured = true;
-		m_cntInfos = vmime::create <tls::TLSSecuredConnectionInfos>
+		m_cntInfos = vmime::make_shared<tls::TLSSecuredConnectionInfos>
 			(m_cntInfos->getHost(), m_cntInfos->getPort(), tlsSession, tlsSocket);
 	}
 	catch (exceptions::command_error&)
@@ -536,8 +494,7 @@ void MAPISMTPTransport::noop()
 
 	sendRequest("NOOP");
 
-	ref <SMTPResponse> resp = readResponse();
-
+	auto resp = readResponse();
 	if (resp->getCode() != 250)
 		throw exceptions::command_error("NOOP", resp->getText());
 }
@@ -545,9 +502,9 @@ void MAPISMTPTransport::noop()
 //                             
 // Only this function is altered, to return per recipient failure.
 //                             
-void MAPISMTPTransport::send(const mailbox& expeditor, const mailboxList& recipients,
-                         utility::inputStream& is, const utility::stream::size_type size,
-                         utility::progressListener* progress)
+void MAPISMTPTransport::send(const mailbox &expeditor,
+    const mailboxList &recipients, utility::inputStream &is, size_t size,
+    utility::progressListener *progress, const mailbox &sender)
 {
 	if (!isConnected())
 		throw exceptions::not_connected();
@@ -559,16 +516,16 @@ void MAPISMTPTransport::send(const mailbox& expeditor, const mailboxList& recipi
 		throw exceptions::no_expeditor();
 
 	// Emit the "MAIL" command
-	ref <SMTPResponse> resp;
+	vmime::shared_ptr<SMTPResponse> resp;
 	string strSend;
 	bool bDSN = m_bDSNRequest;
 	
 	if(bDSN && m_extensions.find("DSN") == m_extensions.end()) {
-		if (m_lpLogger) m_lpLogger->Log(EC_LOGLEVEL_NOTICE, "SMTP server does not support Delivery Status Notifications (DSN)");
+		ec_log_notice("SMTP server does not support Delivery Status Notifications (DSN)");
 		bDSN = false; // Disable DSN because the server does not support this.
 	}
 
-	strSend = "MAIL FROM: <" + expeditor.getEmail() + ">";
+	strSend = "MAIL FROM: <" + expeditor.getEmail().toString() + ">";
 	if (bDSN) {
 		strSend += " RET=HDRS";
 		if (!m_strDSNTrackid.empty())
@@ -586,12 +543,11 @@ void MAPISMTPTransport::send(const mailbox& expeditor, const mailboxList& recipi
 	// Emit a "RCPT TO" command for each recipient
 	mTemporaryFailedRecipients.clear();
 	mPermanentFailedRecipients.clear();
-	for (int i = 0 ; i < recipients.getMailboxCount() ; ++i)
-	{
+	for (size_t i = 0 ; i < recipients.getMailboxCount(); ++i) {
 		const mailbox& mbox = *recipients.getMailboxAt(i);
 		unsigned int code;
 
-		strSend = "RCPT TO: <" + mbox.getEmail() + ">";
+		strSend = "RCPT TO: <" + mbox.getEmail().toString() + ">";
 		if (bDSN)
 			 strSend += " NOTIFY=SUCCESS,DELAY";
 
@@ -600,8 +556,9 @@ void MAPISMTPTransport::send(const mailbox& expeditor, const mailboxList& recipi
 		code = resp->getCode();
 
 		sFailedRecip entry;
-		entry.strRecipName = (WCHAR*)mbox.getName().getConvertedText(charset(CHARSET_WCHAR)).c_str(); // does this work?, or convert to utf-8 then wstring?
-		entry.strRecipEmail = mbox.getEmail();
+		auto recip_name = mbox.getName().getConvertedText(charset(CHARSET_WCHAR));
+		entry.strRecipName.assign(reinterpret_cast<const wchar_t *>(recip_name.c_str()), recip_name.length() / sizeof(wchar_t));
+		entry.strRecipEmail = mbox.getEmail().toString();
 		entry.ulSMTPcode = code;
 		entry.strSMTPResponse = resp->getText();
 
@@ -619,19 +576,19 @@ void MAPISMTPTransport::send(const mailbox& expeditor, const mailboxList& recipi
 			 * 550 5.1.1 <fox>: Recipient address rejected: User unknown in virtual mailbox table
 			 * 550 5.7.1 REJECT action without code by means of e.g. /etc/postfix/header_checks
 			 */
-			mPermanentFailedRecipients.push_back(entry);
+			mPermanentFailedRecipients.push_back(std::move(entry));
 			ec_log_err("RCPT line gave SMTP error %d %s. (no retry)",
 				resp->getCode(), resp->getText().c_str());
 			continue;
 		} else if (code / 100 != 4) {
-			mPermanentFailedRecipients.push_back(entry);
+			mPermanentFailedRecipients.push_back(std::move(entry));
 			ec_log_err("RCPT line gave unexpected SMTP reply %d %s. (no retry)",
 				resp->getCode(), resp->getText().c_str());
 			continue;
 		}
 
 		/* Other 4xx codes (disk full, ... ?) */
-		mTemporaryFailedRecipients.push_back(entry);
+		mTemporaryFailedRecipients.push_back(std::move(entry));
 		ec_log_err("RCPT line gave SMTP error: %d %s. (will be retried)",
 			resp->getCode(), resp->getText().c_str());
 	}
@@ -655,29 +612,19 @@ void MAPISMTPTransport::send(const mailbox& expeditor, const mailboxList& recipi
 	fos.flush();
 
 	// Send end-of-data delimiter
-	m_socket->sendRaw("\r\n.\r\n", 5);
+	m_socket->sendRaw(reinterpret_cast<const vmime::byte_t *>("\r\n.\r\n"), 5);
 
 	if ((resp = readResponse())->getCode() != 250)
 	{
 		internalDisconnect();
 		throw exceptions::command_error("DATA", format("%d %s", resp->getCode(), resp->getText().c_str()));
-	} else {
-		// postfix: 2.0.0 Ok: queued as B36E73608E
-		// qmail: ok 1295860788 qp 29154
-		// exim: OK id=1PhIZ9-0002Ko-Q8
-		if (!m_lpLogger->Log(EC_LOGLEVEL_DEBUG)) // prevent double logging
-			m_lpLogger->Log(EC_LOGLEVEL_WARNING, "SMTP: %s", resp->getText().c_str());
+		return;
 	}
+	// postfix: 2.0.0 Ok: queued as B36E73608E
+	// qmail: ok 1295860788 qp 29154
+	// exim: OK id=1PhIZ9-0002Ko-Q8
+	ec_log_debug("SMTP: %s", resp->getText().c_str());
 }
-
-void MAPISMTPTransport::setLogger(ECLogger *lpLogger)
-{                              
-	if (m_lpLogger != NULL)
-		m_lpLogger->Release();
-	m_lpLogger = lpLogger;
-	if (m_lpLogger != NULL)
-		m_lpLogger->AddRef();
-}                              
 
 void MAPISMTPTransport::requestDSN(BOOL bRequest, const std::string &strTrackid)
 {
@@ -687,19 +634,19 @@ void MAPISMTPTransport::requestDSN(BOOL bRequest, const std::string &strTrackid)
 
 void MAPISMTPTransport::sendRequest(const string& buffer, const bool end)
 {
-	if (m_lpLogger && m_lpLogger->Log(EC_LOGLEVEL_DEBUG))
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "< %s", buffer.c_str());
+	ec_log_debug("< %s", buffer.c_str());
 	if (end)
 		m_socket->send(buffer + "\r\n");
 	else
 		m_socket->send(buffer);
 }
 
-ref <SMTPResponse> MAPISMTPTransport::readResponse()
+vmime::shared_ptr<SMTPResponse> MAPISMTPTransport::readResponse(void)
 {
-	ref <SMTPResponse> resp = SMTPResponse::readResponse(m_socket, m_timeoutHandler);
-	if (m_lpLogger && m_lpLogger->Log(EC_LOGLEVEL_DEBUG))
-		m_lpLogger->Log(EC_LOGLEVEL_DEBUG, "> %d %s", resp->getCode(), resp->getText().c_str());
+	vmime::shared_ptr<tracer> t;
+	auto resp = SMTPResponse::readResponse(t, m_socket, m_timeoutHandler, m_response_state);
+	m_response_state = resp->getCurrentState();
+	ec_log_debug("> %d %s", resp->getCode(), resp->getText().c_str());
 	return resp;
 }
 

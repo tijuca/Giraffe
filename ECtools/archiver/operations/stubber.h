@@ -18,15 +18,15 @@
 #ifndef stubber_INCLUDED
 #define stubber_INCLUDED
 
+#include <kopano/zcdefs.h>
 #include "operations.h"
 
-namespace za { namespace operations {
+namespace KC { namespace operations {
 
 /**
  * Performs the stub part of the archive oepration.
  */
-class Stubber : public ArchiveOperationBase
-{
+class Stubber _kc_final : public ArchiveOperationBase {
 public:
 	Stubber(ECArchiverLogger *lpLogger, ULONG ulptStubbed, int ulAge, bool bProcessUnread);
 	HRESULT ProcessEntry(LPMAPIFOLDER lpFolder, ULONG cProps, const LPSPropValue lpProps);
@@ -36,6 +36,6 @@ private:
 	ULONG m_ulptStubbed;
 };
 
-}} // namespaces
+}} /* namespace */
 
 #endif // ndef stubber_INCLUDED

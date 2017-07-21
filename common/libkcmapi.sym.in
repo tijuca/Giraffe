@@ -1,0 +1,20 @@
+KC_@PACKAGE_ABI@ {
+global:
+	GUID_NULL;
+	IID_*;
+	KOPANO_*_GUID;
+	MSEMS_*_GUID;
+	MUID*;
+	PS_[A-Z]*;
+	PSETID_*;
+	WAB_GUID;
+	muidStoreWrap;
+	extern "C++" {
+		KC::*;
+		typeinfo*;
+		vtable*;
+		*::_Rep::_S_empty_rep_storage;
+	};
+local:
+	*;
+};

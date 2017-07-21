@@ -23,11 +23,12 @@
 #include <vector>
 #include <kopano/charset/convert.h>
 
-class ConsoleTable _zcp_final {
+namespace KC {
+
+class _kc_export ConsoleTable _kc_final {
 public:
 	ConsoleTable(size_t rows, size_t columns);
-
-	void Clear();
+	_kc_hidden void Clear(void);
 	void Resize(size_t rows, size_t columns);
 
 	bool SetHeader(size_t col, const std::string& entry);
@@ -47,8 +48,10 @@ private:
 	convert_context m_converter;
 	bool bHaveHeader;
 
-	void PrintRow(const std::vector<std::wstring>& vRow);
-	void DumpRow(const std::vector<std::wstring>& vRow);
+	_kc_hidden void PrintRow(const std::vector<std::wstring> &row);
+	_kc_hidden void DumpRow(const std::vector<std::wstring> &row);
 };
+
+} /* namespace */
 
 #endif

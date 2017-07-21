@@ -4,6 +4,7 @@
 #include <mapix.h>
 #include <mapidefs.h>
 #include <kopano/ECLogger.h>
+#include <kopano/memory.hpp>
 #include "freebusy.h"
 #include "freebusyguid.h"
 #include "ECFreeBusySupport.h"
@@ -33,8 +34,7 @@
 %apply ICLASS *{IFreeBusySupport**, IFreeBusyData**, IFreeBusyUpdate**, IEnumFBBlock**}
 %apply long {time_t}
 
-enum FBStatus
-{
+enum FBStatus {
         fbFree  = 0,                                    /**< Free */
         fbTentative = fbFree + 1,               /**< Tentative */
         fbBusy  = fbTentative + 1,              /**< Busy */
@@ -43,7 +43,28 @@ enum FBStatus
 };
 
 %apply (ULONG, MAPIARRAY) { (ULONG cMax, FBUser *rgfbuser), (ULONG cUsers, FBUser *lpUsers) };
+%apply (MAPIARRAY, ULONG) { (FBBlock_1 *lpBlocks, ULONG nBlocks), (FBBlock_1 *lpBlocks, ULONG nBlocks) }
 
+%typemap(in) (LONG, FBBLOCK)
+{
+	$1 = PyLong_AsLong($input);
+	if (MAPIAllocateBuffer($1 * sizeof(FBBlock_1),
+	    reinterpret_cast<void **>(&$2)) != hrSuccess)
+		SWIG_fail;
+}
+
+%apply (LONG, FBBLOCK) { (LONG celt, FBBlock_1 *pblk), (ULONG celt, FBBlock_1 *pblk) }
+%apply (MAPIARRAY, LONG) { (FBBlock_1 *pblk, LONG* pcfetch), (FBBlock_1 *pblk, LONG* pcfetch) }
+
+%typemap(argout) LONG *
+{
+        %append_output(PyLong_FromLong(*$1));
+}
+
+%typemap(argout) ULONG *
+{
+        %append_output(PyLong_FromUnsignedLong(*$1));
+}
 
 class IUnknown {
 public:
@@ -54,6 +75,9 @@ virtual HRESULT QueryInterface(const IID& USE_IID_FOR_OUTPUT, void **OUTPUT_USE_
 ~IUnknown() { self->Release(); }
 };
 
+%init %{
+	InitFreebusy();
+%}
 
 %{
 swig_type_info *TypeFromIID(REFIID iid)
@@ -77,9 +101,7 @@ LPCIID IIDFromType(const char *type)
 }
 %}
   
-
-class IFreeBusyUpdate : public IUnknown
-{
+class IFreeBusyUpdate : public IUnknown {
 public:
         virtual HRESULT Reload() = 0;
         virtual HRESULT PublishFreeBusy(FBBlock_1 *lpBlocks, ULONG nBlocks) = 0;
@@ -108,8 +130,7 @@ public:
         }
 };
 
-class IFreeBusyData  : public IUnknown
-{
+class IFreeBusyData : public IUnknown {
 public:
         virtual HRESULT Reload(void*) = 0;
         virtual HRESULT EnumBlocks(IEnumFBBlock **ppenumfb, FILETIME ftmStart, FILETIME ftmEnd) = 0;
@@ -127,8 +148,7 @@ public:
 
 %feature("notabstract") IFreeBusySupport;
 
-class IFreeBusySupport : public IUnknown
-{
+class IFreeBusySupport : public IUnknown {
 public:
         virtual HRESULT Open(IMAPISession* lpMAPISession, IMsgStore* lpMsgStore, BOOL bStore) = 0;
         virtual HRESULT Close() = 0;
@@ -152,15 +172,13 @@ public:
         virtual HRESULT CleanTombstone() = 0;
         virtual HRESULT GetDelegateInfoEx(FBUser sFBUser, unsigned int *lpulStatus, unsigned int *prtmStart, unsigned int *prtmEnd) = 0;
         virtual HRESULT PushDelegateInfoToWorkspace() = 0;
-        virtual HRESULT Placeholder21(void *, HWND, BOOL ) = 0;
-        virtual HRESULT Placeholder22() = 0;
         %extend {
                 IFreeBusySupport() {
                     HRESULT hr = hrSuccess;
-                    ECFreeBusySupport*  lpFreeBusySup = NULL;
+                    KCHL::object_ptr<ECFreeBusySupport> lpFreeBusySup;
                        IFreeBusySupport *lpFreeBusySupport = NULL;
 
-                    hr = ECFreeBusySupport::Create(&lpFreeBusySup);
+                    hr = ECFreeBusySupport::Create(&~lpFreeBusySup);
                     if(hr != hrSuccess)
                         goto exit;
 
@@ -169,9 +187,6 @@ public:
                         goto exit;
 
                     exit:
-                        if(lpFreeBusySup)
-                            lpFreeBusySup->Release();
-
                     return lpFreeBusySupport;
                 }
 
@@ -179,17 +194,3 @@ public:
         }        
 
 };
-
-
-
-%inline %{
-
-HRESULT HrPublishDefaultCalendar(IMAPISession *lpSession, IMsgStore *lpStore, time_t tsStart, ULONG ulMonths)
-{
-    return HrPublishDefaultCalendar(lpSession, lpStore, tsStart, ulMonths, NULL);
-}
-
-%}
-
-
-

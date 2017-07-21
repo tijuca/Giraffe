@@ -26,21 +26,22 @@
 #include <list>
 #include <map>
 
-typedef struct _statstrings {
+namespace KC {
+
+struct statstrings {
 	std::string name;
 	std::string description;
 	std::string value;
-} statstrings;
+};
 
-class ECSystemStatsTable _zcp_final : public ECGenericObjectTable {
+class ECSystemStatsTable _kc_final : public ECGenericObjectTable {
 protected:
 	ECSystemStatsTable(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale);
 
 public:
-	static ECRESULT Create(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale, ECSystemStatsTable **lppTable);
-
+	static ECRESULT Create(ECSession *, unsigned int flags, const ECLocale &, ECGenericObjectTable **);
 	virtual ECRESULT Load();
-
+	void load_tcmalloc(void);
 	static ECRESULT QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit);
 
 private:
@@ -51,7 +52,7 @@ private:
 };
 
 
-typedef struct _sessiondata {
+struct sessiondata {
 	ECSESSIONID sessionid;
 	ECSESSIONGROUPID sessiongroupid;
 	std::string srcaddress;
@@ -69,15 +70,14 @@ typedef struct _sessiondata {
 	std::string url;
 	std::string proxyhost;
 	std::string client_application_version, client_application_misc;
-} sessiondata;
+};
 
-class ECSessionStatsTable _zcp_final : public ECGenericObjectTable {
+class ECSessionStatsTable _kc_final : public ECGenericObjectTable {
 protected:
 	ECSessionStatsTable(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale);
 
 public:
-	static ECRESULT Create(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale, ECSessionStatsTable **lppTable);
-
+	static ECRESULT Create(ECSession *, unsigned int flags, const ECLocale &, ECGenericObjectTable **);
 	virtual ECRESULT Load();
 
 	static ECRESULT QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit);
@@ -89,14 +89,12 @@ private:
 	unsigned int id;
 };
 
-
-class ECUserStatsTable _zcp_final : public ECGenericObjectTable {
+class ECUserStatsTable _kc_final : public ECGenericObjectTable {
 protected:
 	ECUserStatsTable(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale);
 
 public:
-	static ECRESULT Create(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale, ECUserStatsTable **lppTable);
-
+	static ECRESULT Create(ECSession *, unsigned int flags, const ECLocale &, ECGenericObjectTable **);
 	virtual ECRESULT Load();
 
 	static ECRESULT QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit);
@@ -105,13 +103,12 @@ private:
 	ECRESULT LoadCompanyUsers(ULONG ulCompanyId);
 };
 
-class ECCompanyStatsTable _zcp_final : public ECGenericObjectTable {
+class ECCompanyStatsTable _kc_final : public ECGenericObjectTable {
 protected:
 	ECCompanyStatsTable(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale);
 
 public:
-	static ECRESULT Create(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale, ECCompanyStatsTable **lppTable);
-
+	static ECRESULT Create(ECSession *, unsigned int flags, const ECLocale &, ECGenericObjectTable **);
 	virtual ECRESULT Load();
 
 	static ECRESULT QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit);
@@ -119,13 +116,12 @@ public:
 private:
 };
 
-class ECServerStatsTable _zcp_final : public ECGenericObjectTable {
+class ECServerStatsTable _kc_final : public ECGenericObjectTable {
 protected:
 	ECServerStatsTable(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale);
 
 public:
-	static ECRESULT Create(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale, ECServerStatsTable **lppTable);
-
+	static ECRESULT Create(ECSession *, unsigned int flags, const ECLocale &, ECGenericObjectTable **);
 	virtual ECRESULT Load();
 
 	static ECRESULT QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit);
@@ -135,6 +131,8 @@ private:
 };
 
 // Link to provider/server
-void kopano_get_server_stats(unsigned int *lpulQueueLen, double *lpDblQueueAge, unsigned int *lpulThreads, unsigned int *lpulIdleThreads);
+extern _kc_export void (*kopano_get_server_stats)(unsigned int *qlen, double *qage, unsigned int *nthr, unsigned int *nidlethr);
+
+} /* namespace */
 
 #endif

@@ -16,6 +16,7 @@
  */
 
 #include <kopano/platform.h>
+#include <new>
 #include "ZCMAPIProp.h"
 #include "ZCABData.h"
 
@@ -26,15 +27,15 @@
 
 #include <kopano/Util.h>
 #include <kopano/ECGuid.h>
+#include <kopano/ECInterfaceDefs.h>
 #include <kopano/mapi_ptr.h>
+#include <kopano/memory.hpp>
 #include <kopano/namedprops.h>
 #include <kopano/mapiguidext.h>
 
 ZCMAPIProp::ZCMAPIProp(ULONG ulObjType, const char *szClassName) :
     ECUnknown(szClassName), m_ulObject(ulObjType)
 {
-	m_base = NULL;
-	empty[0] = 0;
 }
 
 ZCMAPIProp::~ZCMAPIProp()
@@ -46,7 +47,7 @@ ZCMAPIProp::~ZCMAPIProp()
 	if (src) {															\
 		hr = Util::HrCopyProperty(&dest, src, base);					\
 		if (hr != hrSuccess)											\
-			goto exit;													\
+			goto exitm; \
 		dest.ulPropTag = propid;										\
 		m_mapProperties.insert(std::make_pair(PROP_ID(propid), dest));	\
 		src = NULL;														\
@@ -65,12 +66,12 @@ ZCMAPIProp::~ZCMAPIProp()
 HRESULT ZCMAPIProp::ConvertMailUser(LPSPropTagArray lpNames, ULONG cValues, LPSPropValue lpProps, ULONG ulIndex)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpProp = NULL;
+//	LPSPropValue lpProp = NULL;
 	SPropValue sValue, sSource;
 	std::string strSearchKey;
 	convert_context converter;
 
-	lpProp = PpropFindProp(lpProps, cValues, PR_BODY);
+	auto lpProp = PCpropFindProp(lpProps, cValues, PR_BODY);
 	if (lpProp) {
 		ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_BODY);
 	} else {
@@ -79,22 +80,19 @@ HRESULT ZCMAPIProp::ConvertMailUser(LPSPropTagArray lpNames, ULONG cValues, LPSP
 		m_mapProperties.insert(std::make_pair(PROP_ID(PR_BODY), sValue));
 	}
 
-	lpProp = PpropFindProp(lpProps, cValues, PR_BUSINESS_ADDRESS_CITY);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_BUSINESS_ADDRESS_CITY);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_BUSINESS_ADDRESS_CITY);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_BUSINESS_ADDRESS_STATE_OR_PROVINCE);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_BUSINESS_ADDRESS_STATE_OR_PROVINCE);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_BUSINESS_ADDRESS_STATE_OR_PROVINCE);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_BUSINESS_FAX_NUMBER);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_BUSINESS_FAX_NUMBER);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_BUSINESS_FAX_NUMBER);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_COMPANY_NAME);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_COMPANY_NAME);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_COMPANY_NAME);
 
 	if (lpNames)
-		lpProp = PpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[0], PT_UNICODE));
+		lpProp = PCpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[0], PT_UNICODE));
 	if (!lpProp)
-		lpProp = PpropFindProp(lpProps, cValues, PR_DISPLAY_NAME);
+		lpProp = PCpropFindProp(lpProps, cValues, PR_DISPLAY_NAME);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_DISPLAY_NAME);
 
 	sValue.ulPropTag = PR_DISPLAY_TYPE;
@@ -102,24 +100,22 @@ HRESULT ZCMAPIProp::ConvertMailUser(LPSPropTagArray lpNames, ULONG cValues, LPSP
 	m_mapProperties.insert(std::make_pair(PROP_ID(PR_DISPLAY_TYPE), sValue));
 
 	if (lpNames)
-		lpProp = PpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[1], PT_UNICODE));
+		lpProp = PCpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[1], PT_UNICODE));
 	if (!lpProp)
-		lpProp = PpropFindProp(lpProps, cValues, PR_ADDRTYPE);
+		lpProp = PCpropFindProp(lpProps, cValues, PR_ADDRTYPE);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ADDRTYPE);
 
 	if (lpNames)
-		lpProp = PpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[2], PT_UNICODE));
+		lpProp = PCpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[2], PT_UNICODE));
 	if (!lpProp)
-		lpProp = PpropFindProp(lpProps, cValues, PR_EMAIL_ADDRESS);
+		lpProp = PCpropFindProp(lpProps, cValues, PR_EMAIL_ADDRESS);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_EMAIL_ADDRESS);
 
-	lpProp = PpropFindProp(lpProps, cValues, PR_GIVEN_NAME);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_GIVEN_NAME);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_GIVEN_NAME);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_MIDDLE_NAME);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_MIDDLE_NAME);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_MIDDLE_NAME);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_NORMALIZED_SUBJECT);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_NORMALIZED_SUBJECT);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_NORMALIZED_SUBJECT);
 
 	sValue.ulPropTag = PR_OBJECT_TYPE;
@@ -127,28 +123,28 @@ HRESULT ZCMAPIProp::ConvertMailUser(LPSPropTagArray lpNames, ULONG cValues, LPSP
 	m_mapProperties.insert(std::make_pair(PROP_ID(PR_OBJECT_TYPE), sValue));
 
 	if (lpNames)
-		lpProp = PpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[3], PT_UNICODE));
+		lpProp = PCpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[3], PT_UNICODE));
 	if (!lpProp)
-		lpProp = PpropFindProp(lpProps, cValues, PR_DISPLAY_NAME);
+		lpProp = PCpropFindProp(lpProps, cValues, PR_DISPLAY_NAME);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ORIGINAL_DISPLAY_NAME);
 
 	if (lpNames)
-		lpProp = PpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[4], PT_BINARY));
+		lpProp = PCpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[4], PT_BINARY));
 	if (!lpProp)
-		lpProp = PpropFindProp(lpProps, cValues, PR_ENTRYID);
+		lpProp = PCpropFindProp(lpProps, cValues, PR_ENTRYID);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ORIGINAL_ENTRYID);
 
-	lpProp = PpropFindProp(lpProps, cValues, PR_RECORD_KEY);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_RECORD_KEY);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_RECORD_KEY);
 
 	if (lpNames) {
-		lpProp = PpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[1], PT_UNICODE));
+		lpProp = PCpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[1], PT_UNICODE));
 		if (lpProp) {
 			strSearchKey += converter.convert_to<std::string>(lpProp->Value.lpszW) + ":";
 		} else {
 			strSearchKey += "SMTP:";
 		}
-		lpProp = PpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[2], PT_UNICODE));
+		lpProp = PCpropFindProp(lpProps, cValues, CHANGE_PROP_TYPE(lpNames->aulPropTag[2], PT_UNICODE));
 		if (lpProp)
 			strSearchKey += converter.convert_to<std::string>(lpProp->Value.lpszW);
 
@@ -159,43 +155,36 @@ HRESULT ZCMAPIProp::ConvertMailUser(LPSPropTagArray lpNames, ULONG cValues, LPSP
 		ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_SEARCH_KEY);
 	}
 
-	lpProp = PpropFindProp(lpProps, cValues, PR_TITLE);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_TITLE);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_TITLE);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_TRANSMITABLE_DISPLAY_NAME);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_TRANSMITABLE_DISPLAY_NAME);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_TRANSMITABLE_DISPLAY_NAME);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_ENTRYID);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_ENTRYID);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ZC_ORIGINAL_ENTRYID);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_PARENT_ENTRYID);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_PARENT_ENTRYID);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ZC_ORIGINAL_PARENT_ENTRYID);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_SOURCE_KEY);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_SOURCE_KEY);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ZC_ORIGINAL_SOURCE_KEY);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_PARENT_SOURCE_KEY);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_PARENT_SOURCE_KEY);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ZC_ORIGINAL_PARENT_SOURCE_KEY);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_CHANGE_KEY);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_CHANGE_KEY);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ZC_ORIGINAL_CHANGE_KEY);
-
-exit:
+ exitm:
 	return hr;
 }
 
 HRESULT ZCMAPIProp::ConvertDistList(LPSPropTagArray lpNames, ULONG cValues, LPSPropValue lpProps)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpProp = NULL;
+//	LPSPropValue lpProp = NULL;
 	SPropValue sValue, sSource;
 
 	sSource.ulPropTag = PR_ADDRTYPE;
 	sSource.Value.lpszW = const_cast<wchar_t *>(L"MAPIPDL");
-	lpProp = &sSource;
+	const SPropValue *lpProp = &sSource;
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ADDRTYPE);
 
-	lpProp = PpropFindProp(lpProps, cValues, PR_DISPLAY_NAME);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_DISPLAY_NAME);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_DISPLAY_NAME);
 
 	sValue.ulPropTag = PR_DISPLAY_TYPE;
@@ -206,36 +195,30 @@ HRESULT ZCMAPIProp::ConvertDistList(LPSPropTagArray lpNames, ULONG cValues, LPSP
 	sValue.Value.ul = MAPI_DISTLIST;
 	m_mapProperties.insert(std::make_pair(PROP_ID(PR_OBJECT_TYPE), sValue));
 
-	lpProp = PpropFindProp(lpProps, cValues, PR_RECORD_KEY);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_RECORD_KEY);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_RECORD_KEY);
 
 	// above are all the props present in the Outlook Contact Provider ..
 	// but I need the props below too
 
 	// one off members in 0x81041102
-	lpProp = PpropFindProp(lpProps, cValues, 0x81041102);
+	lpProp = PCpropFindProp(lpProps, cValues, 0x81041102);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, 0x81041102);
 
 	// real eid members in 0x81051102 (gab, maybe I only need this one)
-	lpProp = PpropFindProp(lpProps, cValues, 0x81051102);
+	lpProp = PCpropFindProp(lpProps, cValues, 0x81051102);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, 0x81051102);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_ENTRYID);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_ENTRYID);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ZC_ORIGINAL_ENTRYID);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_PARENT_ENTRYID);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_PARENT_ENTRYID);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ZC_ORIGINAL_PARENT_ENTRYID);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_SOURCE_KEY);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_SOURCE_KEY);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ZC_ORIGINAL_SOURCE_KEY);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_PARENT_SOURCE_KEY);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_PARENT_SOURCE_KEY);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ZC_ORIGINAL_PARENT_SOURCE_KEY);
-
-	lpProp = PpropFindProp(lpProps, cValues, PR_CHANGE_KEY);
+	lpProp = PCpropFindProp(lpProps, cValues, PR_CHANGE_KEY);
 	ADD_PROP_OR_EXIT(sValue, lpProp, m_base, PR_ZC_ORIGINAL_CHANGE_KEY);
-
-exit:
+ exitm:
 	return hr;
 }
 
@@ -257,7 +240,7 @@ HRESULT ZCMAPIProp::ConvertProps(IMAPIProp *lpContact, ULONG cbEntryID, LPENTRYI
 
 	// named properties
 	SPropTagArrayPtr ptrNameTags;
-	LPMAPINAMEID *lppNames = NULL;
+	KCHL::memory_ptr<MAPINAMEID *> lppNames;
 	ULONG ulNames = 5;
 	MAPINAMEID mnNamedProps[5] = {
 		{(LPGUID)&PSETID_Address, MNID_ID, {dispidEmail1DisplayName}},
@@ -267,28 +250,25 @@ HRESULT ZCMAPIProp::ConvertProps(IMAPIProp *lpContact, ULONG cbEntryID, LPENTRYI
 		{(LPGUID)&PSETID_Address, MNID_ID, {dispidEmail1OriginalEntryID}}
 	};
 
-	hr = MAPIAllocateBuffer(sizeof(LPMAPINAMEID) * (ulNames), (void**)&lppNames);
+	hr = MAPIAllocateBuffer(sizeof(LPMAPINAMEID) * ulNames, &~lppNames);
 	if (hr != hrSuccess)
-		goto exit;
+		goto exitm;
 
 	if (ulIndex < 3) {
 		for (ULONG i = 0; i < ulNames; ++i) {
 			mnNamedProps[i].Kind.lID += (ulIndex * 0x10);
 			lppNames[i] = &mnNamedProps[i];
 		}
-
-		hr = lpContact->GetIDsFromNames(ulNames, lppNames, MAPI_CREATE, &ptrNameTags);
+		hr = lpContact->GetIDsFromNames(ulNames, lppNames, MAPI_CREATE, &~ptrNameTags);
 		if (FAILED(hr))
-			goto exit;
+			goto exitm;
 	}
-
-	hr = lpContact->GetProps(NULL, MAPI_UNICODE, &cValues, &ptrContactProps);
+	hr = lpContact->GetProps(NULL, MAPI_UNICODE, &cValues, &~ptrContactProps);
 	if (FAILED(hr))
-		goto exit;
-
+		goto exitm;
 	hr = MAPIAllocateBuffer(sizeof(SPropValue), (void**)&m_base);
 	if (hr != hrSuccess)
-		goto exit;
+		goto exitm;
 
 	sSource.ulPropTag = PR_ENTRYID;
 	sSource.Value.bin.cb = cbEntryID;
@@ -301,8 +281,7 @@ HRESULT ZCMAPIProp::ConvertProps(IMAPIProp *lpContact, ULONG cbEntryID, LPENTRYI
 	else
 		hr = ConvertDistList(ptrNameTags, cValues, ptrContactProps);
 
-exit:
-	MAPIFreeBuffer(lppNames);
+ exitm:
 	return hr;
 }
 
@@ -316,11 +295,8 @@ HRESULT ZCMAPIProp::Create(IMAPIProp *lpContact, ULONG cbEntryID, LPENTRYID lpEn
 		hr = MAPI_E_INVALID_OBJECT;
 		goto exit;
 	}
-
-	try {
-		lpZCMAPIProp = new ZCMAPIProp(lpCABEntryID->ulObjType);
-	}
-	catch (...) {
+	lpZCMAPIProp = new(std::nothrow) ZCMAPIProp(lpCABEntryID->ulObjType);
+	if (lpZCMAPIProp == nullptr) {
 		hr = MAPI_E_NOT_ENOUGH_MEMORY;
 		goto exit;
 	}
@@ -340,16 +316,13 @@ exit:
 
 HRESULT ZCMAPIProp::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE(IID_ZCMAPIProp, this);
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
-	REGISTER_INTERFACE(IID_IMAPIProp, &this->m_xMAPIProp);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xMAPIProp);
-
+	REGISTER_INTERFACE2(ZCMAPIProp, this);
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IMAPIProp, &this->m_xMAPIProp);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xMAPIProp);
 	if (m_ulObject == MAPI_MAILUSER) {
 		REGISTER_INTERFACE(IID_IMailUser, &this->m_xMAPIProp);
 	}
-
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -367,7 +340,7 @@ HRESULT ZCMAPIProp::CopyOneProp(convert_context &converter, ULONG ulFlags,
     const std::map<short, SPropValue>::const_iterator &i, LPSPropValue lpProp,
     LPSPropValue lpBase)
 {
-	HRESULT hr = hrSuccess;
+	HRESULT hr;
 
 	if ((ulFlags & MAPI_UNICODE) == 0 && PROP_TYPE(i->second.ulPropTag) == PT_UNICODE) {
 		std::string strAnsi;
@@ -376,16 +349,14 @@ HRESULT ZCMAPIProp::CopyOneProp(convert_context &converter, ULONG ulFlags,
 		strAnsi = converter.convert_to<std::string>(i->second.Value.lpszW);
 		hr = MAPIAllocateMore(strAnsi.size() + 1, lpBase, (void**)&lpProp->Value.lpszA);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		strcpy(lpProp->Value.lpszA, strAnsi.c_str());
 	} else {
 		hr = Util::HrCopyProperty(lpProp, &i->second, lpBase);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 /** 
@@ -398,12 +369,11 @@ exit:
  * 
  * @return MAPI Error code
  */
-HRESULT ZCMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG * lpcValues, LPSPropValue * lppPropArray)
+HRESULT ZCMAPIProp::GetProps(const SPropTagArray *lpPropTagArray, ULONG ulFlags,
+    ULONG *lpcValues, SPropValue **lppPropArray)
 {
 	HRESULT hr = hrSuccess;
-	std::map<short, SPropValue>::const_iterator i;
-	ULONG j = 0;
-	LPSPropValue lpProps = NULL;
+	KCHL::memory_ptr<SPropValue> lpProps;
 	convert_context converter;
 
 	if((lpPropTagArray != NULL && lpPropTagArray->cValues == 0) || Util::ValidatePropTagArray(lpPropTagArray) == false)
@@ -411,26 +381,29 @@ HRESULT ZCMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULON
 
 	if (lpPropTagArray == NULL) {
 		// check ulFlags for MAPI_UNICODE
-		hr = MAPIAllocateBuffer(sizeof(SPropValue) * m_mapProperties.size(), (void**)&lpProps);
+		hr = MAPIAllocateBuffer(sizeof(SPropValue) * m_mapProperties.size(), &~lpProps);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
-		for (i = m_mapProperties.begin(), j = 0; i != m_mapProperties.end(); ++i, ++j) {
+		ULONG j = 0;
+		for (auto i = m_mapProperties.cbegin();
+		     i != m_mapProperties.cend(); ++i) {
 			hr = CopyOneProp(converter, ulFlags, i, &lpProps[j], lpProps);
 			if (hr != hrSuccess)
-				goto exit;				
+				return hr;
+			++j;
 		}
 		
 		*lpcValues = m_mapProperties.size();
 	} else {
 		// check lpPropTagArray->aulPropTag[x].ulPropTag for PT_UNICODE or PT_STRING8
-		hr = MAPIAllocateBuffer(sizeof(SPropValue) * lpPropTagArray->cValues, (void**)&lpProps);
+		hr = MAPIAllocateBuffer(sizeof(SPropValue) * lpPropTagArray->cValues, &~lpProps);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		for (ULONG n = 0, j = 0; n < lpPropTagArray->cValues; ++n, ++j) {
-			i = m_mapProperties.find(PROP_ID(lpPropTagArray->aulPropTag[n]));
-			if (i == m_mapProperties.end()) {
+			auto i = m_mapProperties.find(PROP_ID(lpPropTagArray->aulPropTag[n]));
+			if (i == m_mapProperties.cend()) {
 				lpProps[j].ulPropTag = CHANGE_PROP_TYPE(lpPropTagArray->aulPropTag[n], PT_ERROR);
 				lpProps[j].Value.ul = MAPI_E_NOT_FOUND;
 				continue;
@@ -438,18 +411,13 @@ HRESULT ZCMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULON
 
 			hr = CopyOneProp(converter, ulFlags, i, &lpProps[j], lpProps);
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 		}
 
 		*lpcValues = lpPropTagArray->cValues;
 	}
-
-	*lppPropArray = lpProps;
-	lpProps = NULL;
-
-exit:
-	MAPIFreeBuffer(lpProps);
-	return hr;
+	*lppPropArray = lpProps.release();
+	return hrSuccess;
 }
 
 /** 
@@ -462,14 +430,14 @@ exit:
  */
 HRESULT ZCMAPIProp::GetPropList(ULONG ulFlags, LPSPropTagArray * lppPropTagArray)
 {
-	HRESULT hr = hrSuccess;
 	LPSPropTagArray lpPropTagArray = NULL;
 	std::map<short, SPropValue>::const_iterator i;
 	ULONG j = 0;
 
-	hr = MAPIAllocateBuffer(CbNewSPropTagArray(m_mapProperties.size()), (void**)&lpPropTagArray);
+	HRESULT hr = MAPIAllocateBuffer(CbNewSPropTagArray(m_mapProperties.size()),
+	             reinterpret_cast<void **>(&lpPropTagArray));
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	lpPropTagArray->cValues = m_mapProperties.size();
 	for (i = m_mapProperties.begin(); i != m_mapProperties.end(); ++i, ++j) {
@@ -479,9 +447,7 @@ HRESULT ZCMAPIProp::GetPropList(ULONG ulFlags, LPSPropTagArray * lppPropTagArray
 	}
 
 	*lppPropTagArray = lpPropTagArray;
-
-exit:
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT ZCMAPIProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN * lppUnk)
@@ -489,22 +455,28 @@ HRESULT ZCMAPIProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfac
 	return  MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ZCMAPIProp::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray * lppProblems)
+HRESULT ZCMAPIProp::SetProps(ULONG vals, const SPropValue *,
+    SPropProblemArray **)
 {
 	return  MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ZCMAPIProp::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray * lppProblems)
+HRESULT ZCMAPIProp::DeleteProps(const SPropTagArray *lpPropTagArray,
+    SPropProblemArray **lppProblems)
 {
 	return  MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ZCMAPIProp::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray * lppProblems)
+HRESULT ZCMAPIProp::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude,
+    const SPropTagArray *, ULONG ui_param, LPMAPIPROGRESS, LPCIID intf,
+    void *dest_obj, ULONG flags, SPropProblemArray **)
 {
 	return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT ZCMAPIProp::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray * lppProblems)
+HRESULT ZCMAPIProp::CopyProps(const SPropTagArray *, ULONG ui_param,
+    LPMAPIPROGRESS, LPCIID intf, void *dest_obj, ULONG flags,
+    SPropProblemArray **)
 {
 	return MAPI_E_NO_SUPPORT;
 }
@@ -520,86 +492,17 @@ HRESULT ZCMAPIProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID * lppPropName
 }
 
 // Interface IMAPIProp
-HRESULT __stdcall ZCMAPIProp::xMAPIProp::QueryInterface(REFIID refiid, void ** lppInterface)
-{
-	METHOD_PROLOGUE_(ZCMAPIProp , MAPIProp);
-	return pThis->QueryInterface(refiid, lppInterface);
-}
-
-ULONG __stdcall ZCMAPIProp::xMAPIProp::AddRef()
-{
-	METHOD_PROLOGUE_(ZCMAPIProp , MAPIProp);
-	return pThis->AddRef();
-}
-
-ULONG __stdcall ZCMAPIProp::xMAPIProp::Release()
-{
-	METHOD_PROLOGUE_(ZCMAPIProp , MAPIProp);
-	return pThis->Release();
-}
-
-HRESULT __stdcall ZCMAPIProp::xMAPIProp::GetLastError(HRESULT hError, ULONG ulFlags, LPMAPIERROR * lppMapiError)
-{
-	METHOD_PROLOGUE_(ZCMAPIProp , MAPIProp);
-	return pThis->GetLastError(hError, ulFlags, lppMapiError);
-}
-
-HRESULT __stdcall ZCMAPIProp::xMAPIProp::SaveChanges(ULONG ulFlags)
-{
-	METHOD_PROLOGUE_(ZCMAPIProp , MAPIProp);
-	return pThis->SaveChanges(ulFlags);
-}
-
-HRESULT __stdcall ZCMAPIProp::xMAPIProp::GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG * lpcValues, LPSPropValue * lppPropArray)
-{
-	METHOD_PROLOGUE_(ZCMAPIProp , MAPIProp);
-	return pThis->GetProps(lpPropTagArray, ulFlags, lpcValues, lppPropArray);
-}
-
-HRESULT __stdcall ZCMAPIProp::xMAPIProp::GetPropList(ULONG ulFlags, LPSPropTagArray * lppPropTagArray)
-{
-	METHOD_PROLOGUE_(ZCMAPIProp , MAPIProp);
-	return pThis->GetPropList(ulFlags, lppPropTagArray);
-}
-
-HRESULT __stdcall ZCMAPIProp::xMAPIProp::OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN * lppUnk)
-{
-	METHOD_PROLOGUE_(ZCMAPIProp , MAPIProp);
-	return pThis->OpenProperty(ulPropTag, lpiid, ulInterfaceOptions, ulFlags, lppUnk);
-}
-
-HRESULT __stdcall ZCMAPIProp::xMAPIProp::SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray * lppProblems)
-{
-	METHOD_PROLOGUE_(ZCMAPIProp , MAPIProp);
-	return pThis->SetProps(cValues, lpPropArray, lppProblems);
-}
-
-HRESULT __stdcall ZCMAPIProp::xMAPIProp::DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray * lppProblems)
-{
-	METHOD_PROLOGUE_(ZCMAPIProp , MAPIProp);
-	return pThis->DeleteProps(lpPropTagArray, lppProblems);
-}
-
-HRESULT __stdcall ZCMAPIProp::xMAPIProp::CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray * lppProblems)
-{
-	METHOD_PROLOGUE_(ZCMAPIProp , MAPIProp);
-	return pThis->CopyTo(ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-}
-
-HRESULT __stdcall ZCMAPIProp::xMAPIProp::CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray * lppProblems)
-{
-	METHOD_PROLOGUE_(ZCMAPIProp , MAPIProp);
-	return pThis->CopyProps(lpIncludeProps, ulUIParam, lpProgress, lpInterface, lpDestObj, ulFlags, lppProblems);
-}
-
-HRESULT __stdcall ZCMAPIProp::xMAPIProp::GetNamesFromIDs(LPSPropTagArray * pptaga, LPGUID lpguid, ULONG ulFlags, ULONG * pcNames, LPMAPINAMEID ** pppNames)
-{
-	METHOD_PROLOGUE_(ZCMAPIProp , MAPIProp);
-	return pThis->GetNamesFromIDs(pptaga, lpguid, ulFlags, pcNames, pppNames);
-}
-
-HRESULT __stdcall ZCMAPIProp::xMAPIProp::GetIDsFromNames(ULONG cNames, LPMAPINAMEID * ppNames, ULONG ulFlags, LPSPropTagArray * pptaga)
-{
-	METHOD_PROLOGUE_(ZCMAPIProp , MAPIProp);
-	return pThis->GetIDsFromNames(cNames, ppNames, ulFlags, pptaga);
-}
+DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_ULONGMETHOD0(ZCMAPIProp, MAPIProp, AddRef, (void))
+DEF_ULONGMETHOD0(ZCMAPIProp, MAPIProp, Release, (void))
+DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
+DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, SaveChanges, (ULONG, ulFlags))
+DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, GetProps, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags), (ULONG *, lpcValues), (SPropValue **, lppPropArray))
+DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, GetPropList, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
+DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, OpenProperty, (ULONG, ulPropTag), (LPCIID, lpiid), (ULONG, ulInterfaceOptions), (ULONG, ulFlags), (LPUNKNOWN *, lppUnk))
+DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, SetProps, (ULONG, cValues), (const SPropValue *, lpPropArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, DeleteProps, (const SPropTagArray *, lpPropTagArray), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, CopyTo, (ULONG, ciidExclude), (LPCIID, rgiidExclude), (const SPropTagArray *, lpExcludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, CopyProps, (const SPropTagArray *, lpIncludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
+DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, GetNamesFromIDs, (LPSPropTagArray *, pptaga), (LPGUID, lpguid), (ULONG, ulFlags), (ULONG *, pcNames), (LPMAPINAMEID **, pppNames))
+DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, GetIDsFromNames, (ULONG, cNames), (LPMAPINAMEID *, ppNames), (ULONG, ulFlags), (LPSPropTagArray *, pptaga))

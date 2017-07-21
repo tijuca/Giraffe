@@ -22,6 +22,10 @@
 #include "ECICS.h"
 #include "ECDatabase.h"
 
+struct soap;
+
+namespace KC {
+
 // Indexes into the database rows.
 enum {
 	icsID				= 0,
@@ -48,7 +52,7 @@ typedef std::map<SOURCEKEY,SAuxMessageData>	MESSAGESET, *LPMESSAGESET;
 class IDbQueryCreator;
 class IMessageProcessor;
 
-class ECGetContentChangesHelper _zcp_final {
+class ECGetContentChangesHelper _kc_final {
 public:
 	static ECRESULT Create(struct soap *soap, ECSession *lpSession, ECDatabase *lpDatabase, const SOURCEKEY &sFolderSourceKey, unsigned int ulSyncId, unsigned int ulChangeId, unsigned int ulFlags, struct restrictTable *lpsRestrict, ECGetContentChangesHelper **lppHelper);
 	~ECGetContentChangesHelper();
@@ -67,26 +71,25 @@ private:
 	static bool CompareMessageEntry(const MESSAGESET::value_type &lhs, const MESSAGESET::value_type &rhs);
 	bool MessageSetsDiffer() const;
 	
-private:
 	// Interfaces for delegated processing
-	IDbQueryCreator		*m_lpQueryCreator;
-	IMessageProcessor	*m_lpMsgProcessor;
+	IDbQueryCreator *m_lpQueryCreator = nullptr;
+	IMessageProcessor *m_lpMsgProcessor = nullptr;
 	
 	// Internal variables
 	soap			*m_soap;
 	ECSession		*m_lpSession;
 	ECDatabase		*m_lpDatabase;
 	restrictTable	*m_lpsRestrict;
-	icsChangesArray *m_lpChanges;
+	icsChangesArray *m_lpChanges = nullptr;
 	const SOURCEKEY	&m_sFolderSourceKey;
 	unsigned int	m_ulSyncId;
 	unsigned int	m_ulChangeId;
-	unsigned int	m_ulChangeCnt;
-	unsigned int	m_ulMaxFolderChange;
+	unsigned int m_ulChangeCnt = 0, m_ulMaxFolderChange = 0;
 	unsigned int	m_ulFlags;
 	MESSAGESET		m_setLegacyMessages;
 	MESSAGESET		m_setNewMessages;
 };
 
+} /* namespace */
 
 #endif // ndef ECICSHELPERS_H

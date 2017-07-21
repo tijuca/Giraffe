@@ -28,93 +28,91 @@
 #include "ProtocolBase.h"
 #include "Http.h"
 
-typedef struct {
+struct WEBDAVPROPNAME {
 	std::string strNS;
 	std::string strPropname;
 	std::string strPropAttribName;
 	std::string strPropAttribValue;
-} WEBDAVPROPNAME;
+};
 
-
-typedef struct {
+struct WEBDAVVALUE {
 	WEBDAVPROPNAME sPropName;
 	std::string strValue;
-} WEBDAVVALUE;
+};
 
-typedef struct {
+struct WEBDAVITEM {
 	WEBDAVVALUE sDavValue;
 	ULONG ulDepth;
-} WEBDAVITEM;
+};
 
-typedef struct {
+struct WEBDAVPROPERTY {
 	WEBDAVPROPNAME sPropName;
 	std::list<WEBDAVVALUE> lstValues;
 	std::string strValue;
 	std::list<WEBDAVITEM> lstItems;
-} WEBDAVPROPERTY;
+};
 
-typedef struct {
+struct WEBDAVPROP {
 	WEBDAVPROPNAME sPropName;
 	std::list<WEBDAVPROPERTY> lstProps;
-} WEBDAVPROP;
+};
 
-typedef struct {
+struct WEBDAVPROPSTAT {
 	WEBDAVPROPNAME sPropName;	/* always propstat */
 	WEBDAVPROP sProp;
 	WEBDAVVALUE sStatus;		/* always status */
-} WEBDAVPROPSTAT;
+};
 
-typedef struct {
+struct WEBDAVRESPONSE {
 	WEBDAVPROPNAME sPropName;
 	std::list<WEBDAVPROPSTAT> lstsPropStat;
 	std::list<WEBDAVPROPERTY> lstProps;
 	WEBDAVVALUE sHRef;
 	WEBDAVVALUE sStatus;		/* possible on delete (but we don't use that) */
-} WEBDAVRESPONSE;
+};
 
-typedef struct {
+struct WEBDAVMULTISTATUS {
 	WEBDAVPROPNAME sPropName;
 	std::list<WEBDAVRESPONSE> lstResp;
-} WEBDAVMULTISTATUS;
+};
 
-typedef struct {
+struct WEBDAVFILTER {
 	WEBDAVPROPNAME sPropName;
 	std::list<std::string> lstFilters;
 	time_t tStart;
-} WEBDAVFILTER;
+};
 
-typedef struct {
+struct WEBDAVREQSTPROPS {
 	WEBDAVPROPNAME sPropName;
 	WEBDAVPROP sProp;
 	WEBDAVFILTER sFilter;
-} WEBDAVREQSTPROPS;
+};
 
-typedef struct {
+struct WEBDAVRPTMGET {
 	WEBDAVPROPNAME sPropName;
 	WEBDAVPROP sProp;
 	std::list<WEBDAVVALUE> lstWebVal;
-} WEBDAVRPTMGET;
+};
 
-typedef struct {
+struct WEBDAVFBUSERINFO {
 	std::string strUser;
 	std::string strIcal;
-}WEBDAVFBUSERINFO;
+};
 
-typedef struct {
+struct WEBDAVFBINFO {
 	time_t tStart;
 	time_t tEnd;
 	std::string strOrganiser;
 	std::string strUID;
 	std::list<WEBDAVFBUSERINFO> lstFbUserInfo;
-}WEBDAVFBINFO;
+};
 
 #define WEBDAVNS "DAV:"
 #define CALDAVNS "urn:ietf:params:xml:ns:caldav"
 
-class WebDav: public ProtocolBase
-{
+class WebDav : public ProtocolBase {
 public:
-	WebDav(Http *lpRequest, IMAPISession *lpSession, ECLogger *lpLogger, std::string strSrvTz, std::string strCharset);
+	WebDav(Http *, IMAPISession *, const std::string &srv_tz, const std::string &charset);
 	virtual ~WebDav();
 
 protected:
@@ -137,7 +135,7 @@ protected:
 	virtual HRESULT HrHandleDelete() = 0;
 
 private:
-	xmlDoc *m_lpXmlDoc;
+	xmlDoc *m_lpXmlDoc = nullptr;
 	std::map <std::string,std::string> m_mapNs;
 
 	HRESULT HrParseXml();
@@ -150,7 +148,7 @@ private:
 
 	HRESULT RespStructToXml(WEBDAVMULTISTATUS *sDavMStatus, std::string *strXml);
 	HRESULT GetNs(std::string *szPrefx, std::string *strNs);
-	void RegisterNs(std::string strNs, std::string *strPrefix);
+	void RegisterNs(const std::string &strNs, std::string *strPrefix);
 	HRESULT WriteData(xmlTextWriter *xmlWriter, const WEBDAVVALUE &sWebVal, std::string *szNsPrefix);
 	HRESULT WriteNode(xmlTextWriter *xmlWriter, const WEBDAVPROPNAME &sWebPrName, std::string *szNsPrefix);
 	HRESULT HrWriteSResponse(xmlTextWriter *xmlWriter, std::string *lpstrNsPrefix, const WEBDAVRESPONSE &sResponse);

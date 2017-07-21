@@ -19,13 +19,16 @@
 #ifndef __DBBASE_H
 #define __DBBASE_H
 
+#include <kopano/zcdefs.h>
 #include "plugin.h"
 #include <memory>
-#include <stdexcept>
+#include <mutex>
 #include <string>
 
 #include "ECDatabase.h"
 #include <kopano/ECDefs.h>
+
+namespace KC {
 
 /**
  * @defgroup userplugin_dbbase Database common for user plugins
@@ -71,7 +74,7 @@
  *
  * @todo move the class DB_RESULT_AUTOFREE to a common place
  */
-class DB_RESULT_AUTOFREE {
+class DB_RESULT_AUTOFREE _kc_final {
 public:
 	/**
 	 * @param[in]	lpDatabase
@@ -79,20 +82,12 @@ public:
 	 */
     DB_RESULT_AUTOFREE(ECDatabase *lpDatabase) {
         m_lpDatabase = lpDatabase;
-        m_lpResult = NULL;
-    };
-
-    ~DB_RESULT_AUTOFREE() {
-        if(m_lpDatabase && m_lpResult)
-            m_lpDatabase->FreeResult(m_lpResult);
     };
 
 	/**
 	 * Cast DB_RESULT_AUTOFREE to DB_RESULT
 	 */
-    operator DB_RESULT () const {
-        return m_lpResult;
-    };
+	operator DB_RESULT &(void) { return m_lpResult; }
 
 	/**
 	 * Obtain reference to DB_RESULT
@@ -103,9 +98,7 @@ public:
 	 */
     DB_RESULT * operator & () {
         // Assume overwrite will happen soon
-        if(m_lpDatabase && m_lpResult)
-            m_lpDatabase->FreeResult(m_lpResult);
-        m_lpResult = NULL;
+        m_lpResult = DB_RESULT();
         return &m_lpResult;
     };
 
@@ -129,8 +122,7 @@ public:
 	 *					The singleton shared plugin data.
 	 * @throw std::exception
 	 */
-	DBPlugin(pthread_mutex_t *pluginlock, ECPluginSharedData *shareddata);
-	virtual ~DBPlugin();
+	DBPlugin(std::mutex &, ECPluginSharedData *shareddata);
 
 	/**
 	 * Initialize plugin
@@ -138,8 +130,6 @@ public:
 	 * @throw runtime_error when the database could not be initialized
 	 */	
 	virtual void InitPlugin();
-
-public:
 
 	/**
 	 * Request a list of objects for a particular company and specified objectclass.
@@ -397,7 +387,10 @@ protected:
 	 */
 	virtual void addSendAsToDetails(const objectid_t &objectid, objectdetails_t *lpDetails);
 
-	ECDatabase *m_lpDatabase;
+	ECDatabase *m_lpDatabase = nullptr;
 };
 /** @} */
+
+} /* namespace */
+
 #endif

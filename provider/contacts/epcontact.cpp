@@ -20,10 +20,11 @@
 #include <mapispi.h>
 #include <kopano/ECDebug.h>
 #include <kopano/Trace.h>
-
+#include <kopano/memory.hpp>
 #include "ZCABProvider.h"
+#include "EntryPoint.h"
 
-extern "C" MSGSERVICEENTRY __stdcall MSGServiceEntry;
+using namespace KCHL;
 
 HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst, LPMALLOC lpMalloc,
     LPMAPISUP psup, ULONG ulUIParam, ULONG ulFlags, ULONG ulContext,
@@ -46,7 +47,7 @@ HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst, LPMALLOC lpMalloc,
 		break;
 	case MSG_SERVICE_PROVIDER_CREATE:
 		// we never get here in linux (see M4LProviderAdmin::CreateProvider)
-		ASSERT(FALSE);
+		assert(false);
 		hr = hrSuccess;
 		break;
 	case MSG_SERVICE_PROVIDER_DELETE:
@@ -65,12 +66,15 @@ HRESULT __stdcall MSGServiceEntry(HINSTANCE hInst, LPMALLOC lpMalloc,
 	return hr;
 }
 
-extern "C" HRESULT  __cdecl ABProviderInit(HINSTANCE hInstance, LPMALLOC lpMalloc, LPALLOCATEBUFFER lpAllocateBuffer, LPALLOCATEMORE lpAllocateMore, LPFREEBUFFER lpFreeBuffer, ULONG ulFlags, ULONG ulMAPIVer, ULONG * lpulProviderVer, LPABPROVIDER * lppABProvider)
+HRESULT  __cdecl ABProviderInit(HINSTANCE hInstance, LPMALLOC lpMalloc,
+    LPALLOCATEBUFFER lpAllocateBuffer, LPALLOCATEMORE lpAllocateMore,
+    LPFREEBUFFER lpFreeBuffer, ULONG ulFlags, ULONG ulMAPIVer,
+    ULONG *lpulProviderVer, LPABPROVIDER *lppABProvider)
 {
 	TRACE_MAPI(TRACE_ENTRY, "ZContacts::ABProviderInit", "");
 
 	HRESULT hr = hrSuccess;
-	ZCABProvider *lpABProvider = NULL;
+	object_ptr<ZCABProvider> lpABProvider;
 
 	if (ulMAPIVer < CURRENT_SPI_VERSION)
 	{
@@ -79,7 +83,7 @@ extern "C" HRESULT  __cdecl ABProviderInit(HINSTANCE hInstance, LPMALLOC lpMallo
 	}
 
 	// create provider and query interface.
-	hr = ZCABProvider::Create(&lpABProvider);
+	hr = ZCABProvider::Create(&~lpABProvider);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -90,9 +94,6 @@ extern "C" HRESULT  __cdecl ABProviderInit(HINSTANCE hInstance, LPMALLOC lpMallo
 	*lpulProviderVer = CURRENT_SPI_VERSION;
 
 exit:
-	if (lpABProvider)
-		lpABProvider->Release();
-
 	TRACE_MAPI(TRACE_RETURN, "ZContacts::ABProviderInit", "%s", GetMAPIErrorDescription(hr).c_str());
 	return hr;
 }

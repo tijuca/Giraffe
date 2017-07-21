@@ -23,14 +23,20 @@
 #define ECSESSIONGROUP
 
 #include <kopano/zcdefs.h>
+#include <condition_variable>
 #include <list>
 #include <map>
+#include <mutex>
 #include <set>
 
 #include <kopano/ECKeyTable.h>
 #include "ECNotification.h"
 #include <kopano/kcodes.h>
 #include <kopano/CommonUtil.h>
+
+struct soap;
+
+namespace KC {
 
 class ECSession;
 class ECSessionGroup;
@@ -50,7 +56,7 @@ struct subscribeItem {
 	unsigned int ulEventMask;
 };
 
-typedef std::list<ECNotification> NOTIFICATIONLIST;
+typedef std::list<ECNotification> ECNOTIFICATIONLIST;
 typedef std::map<unsigned int, subscribeItem> SUBSCRIBEMAP;
 typedef std::multimap<unsigned int, unsigned int> SUBSCRIBESTOREMULTIMAP;
 
@@ -61,7 +67,7 @@ struct changeSubscribeItem {
 };
 typedef std::multimap<unsigned int, changeSubscribeItem> CHANGESUBSCRIBEMAP;	// SyncId -> changeSubscribeItem
 
-class ECSessionGroup _zcp_final {
+class ECSessionGroup _kc_final {
 public:
 	ECSessionGroup(ECSESSIONGROUPID sessionGroupId, ECSessionManager *lpSessionManager);
 	virtual ~ECSessionGroup();
@@ -126,38 +132,39 @@ private:
 	/* List of all items the group is subscribed to */
 	SUBSCRIBEMAP        m_mapSubscribe;
 	CHANGESUBSCRIBEMAP	m_mapChangeSubscribe;
-	pthread_mutex_t		m_hSessionMapLock;
+	std::recursive_mutex m_hSessionMapLock;
 
 	/* Notifications */
-	NOTIFICATIONLIST	m_listNotification;
-	double				m_dblLastQueryTime;
+	ECNOTIFICATIONLIST m_listNotification;
 
 	/* Notifications lock/event */
-	pthread_mutex_t		m_hNotificationLock;
-	pthread_cond_t      m_hNewNotificationEvent;
-	ECSESSIONID			m_getNotifySession;
+	std::mutex m_hNotificationLock;
+	std::condition_variable m_hNewNotificationEvent;
+	ECSESSIONID m_getNotifySession = 0;
 
 	/* Thread safety mutex/event */
-	unsigned int		m_ulRefCount;
-	pthread_mutex_t		m_hThreadReleasedMutex;
-	pthread_cond_t		m_hThreadReleased;
+	unsigned int m_ulRefCount = 0;
+	std::mutex m_hThreadReleasedMutex;
+	std::condition_variable m_hThreadReleased;
 
 	/* Set to TRUE if no more GetNextNotifyItems() should be done on this group since the main
 	 * session has exited
 	 */
-	bool				m_bExit;
+	bool m_bExit = false;
 	
 	/* Reference to the session manager needed to notify changes in our queue */
 	ECSessionManager *	m_lpSessionManager;
 	
 	/* Multimap of subscriptions that we have (key -> store id) */
 	SUBSCRIBESTOREMULTIMAP	m_mapSubscribedStores;
-	pthread_mutex_t		m_mutexSubscribedStores;
+	std::mutex m_mutexSubscribedStores;
 	
 private:
 	// Make ECSessionGroup non-copyable
 	ECSessionGroup(const ECSessionGroup &) = delete;
 	ECSessionGroup &operator=(const ECSessionGroup &) = delete;
 };
+
+} /* namespace */
 
 #endif // #ifndef ECSESSIONGROUP

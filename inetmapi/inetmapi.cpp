@@ -15,11 +15,11 @@
  *
  */
 
+#include <exception>
+#include <mutex>
 #include <kopano/platform.h>
+#include <kopano/lockhelper.hpp>
 #include <kopano/stringutil.h>
-
-// Damn windows header defines max which break C++ header files
-#undef max
 
 #include <string>
 #include <fstream>
@@ -27,15 +27,16 @@
 #include <cstdlib>
 
 // vmime
-#include "vmime/vmime.hpp"
-#include "vmime/textPartFactory.hpp"
+#include <vmime/vmime.hpp>
+#include <vmime/textPartFactory.hpp>
 #include "mapiTextPart.h"
-#include "vmime/platforms/posix/posixHandler.hpp"
+#include <vmime/platforms/posix/posixHandler.hpp>
 
 // mapi
 #include <mapix.h>
 #include <mapiutil.h>
 #include <kopano/mapiext.h>
+#include <kopano/memory.hpp>
 #include <edkmdb.h>
 #include <kopano/CommonUtil.h>
 #include <kopano/charset/convert.h>
@@ -49,11 +50,19 @@
 #include <kopano/mapi_ptr.h>
 
 using namespace std;
+using namespace KCHL;
+
+namespace KC {
 
 bool ValidateCharset(const char *charset)
 {
-	iconv_t cd;
-	cd = iconv_open(CHARSET_WCHAR, charset);
+	/*
+	 * iconv does not like to convert wchar_t to wchar_t, so filter that
+	 * one. https://sourceware.org/bugzilla/show_bug.cgi?id=20804
+	 */
+	if (strcmp(charset, CHARSET_WCHAR) == 0)
+		return true;
+	iconv_t cd = iconv_open(CHARSET_WCHAR, charset);
 	if (cd == (iconv_t)(-1))
 		return false;
 		
@@ -61,20 +70,11 @@ bool ValidateCharset(const char *charset)
 	return true;
 }
 
-ECSender::ECSender(ECLogger *newlpLogger, const std::string &strSMTPHost, int port) {
-	lpLogger = newlpLogger;
-	if (!lpLogger)
-		lpLogger = new ECLogger_Null();
-	else
-		lpLogger->AddRef();
-
+ECSender::ECSender(const std::string &strSMTPHost, int port)
+{
 	smtpresult = 0;
 	smtphost = strSMTPHost;
 	smtpport = port;
-}
-
-ECSender::~ECSender() {
-	lpLogger->Release();
 }
 
 int ECSender::getSMTPResult() {
@@ -97,21 +97,27 @@ bool ECSender::haveError() {
 	return ! error.empty();
 }
 
-pthread_mutex_t vmInitLock = PTHREAD_MUTEX_INITIALIZER;
+static std::mutex vmInitLock;
+static bool vmimeInitialized = false;
+
 static void InitializeVMime()
 {
-	pthread_mutex_lock(&vmInitLock);
+	scoped_lock l_vm(vmInitLock);
 	try {
 		vmime::platform::getHandler();
 	}
 	catch (vmime::exceptions::no_platform_handler &) {
 		vmime::platform::setHandler<vmime::platforms::posix::posixHandler>();
-		// need to have a unique indentifier in the mediaType
-		vmime::textPartFactory::getInstance()->registerType<vmime::mapiTextPart>(vmime::mediaType(vmime::mediaTypes::TEXT, "mapi"));
-		// init our random engine for random message id generation
-		rand_init();
 	}
-	pthread_mutex_unlock(&vmInitLock);
+	if (vmimeInitialized)
+		return;
+
+	vmime::generationContext::getDefaultContext().setWrapMessageId(false);
+	// need to have a unique indentifier in the mediaType
+	vmime::textPartFactory::getInstance()->registerType<vmime::mapiTextPart>(vmime::mediaType(vmime::mediaTypes::TEXT, "mapi"));
+	// init our random engine for random message id generation
+	rand_init();
+	vmimeInitialized = true;
 }
 
 static string generateRandomMessageId()
@@ -126,44 +132,63 @@ static string generateRandomMessageId()
 #undef IDLEN
 }
 
-INETMAPI_API ECSender* CreateSender(ECLogger *lpLogger, const std::string &smtp, int port) {
-	return new ECVMIMESender(lpLogger, smtp, port);
+ECSender *CreateSender(const std::string &smtp, int port)
+{
+	return new ECVMIMESender(smtp, port);
+}
+
+/*
+ * Because it calls iconv_open() with @s in at least one of iconv_open's two
+ * argument, this function also implicitly checks whether @s is valid.
+ */
+static bool vtm_ascii_compatible(const char *s)
+{
+	static const char in[] = {
+		0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,
+		24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,
+		45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,
+		66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,
+		87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,
+		106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,
+		121,122,123,124,125,126,127,
+	};
+	char out[sizeof(in)];
+	iconv_t cd = iconv_open(s, "us-ascii");
+	if (cd == reinterpret_cast<iconv_t>(-1))
+		return false;
+	char *inbuf = const_cast<char *>(in), *outbuf = out;
+	size_t insize = sizeof(in), outsize = sizeof(out);
+	bool mappable = iconv(cd, &inbuf, &insize, &outbuf, &outsize) != static_cast<size_t>(-1);
+	iconv_close(cd);
+	return mappable && memcmp(in, out, sizeof(in)) == 0;
 }
 
 // parse rfc822 input, and set props in lpMessage
-INETMAPI_API HRESULT IMToMAPI(IMAPISession *lpSession, IMsgStore *lpMsgStore, IAddrBook *lpAddrBook, IMessage *lpMessage, const string &input, delivery_options dopt, ECLogger *lpLogger)
+HRESULT IMToMAPI(IMAPISession *lpSession, IMsgStore *lpMsgStore,
+    IAddrBook *lpAddrBook, IMessage *lpMessage, const string &input,
+    delivery_options dopt)
 {
-	HRESULT hr = hrSuccess;
-	VMIMEToMAPI *VMToM = NULL;
-	
 	// Sanitize options
-	if(!ValidateCharset(dopt.default_charset)) {
-		const char *charset = "iso-8859-15";
-		if(lpLogger)
-			lpLogger->Log(EC_LOGLEVEL_WARNING, "Configured default_charset '%s' is invalid. Reverting to '%s'", dopt.default_charset, charset);
-		dopt.default_charset = charset;
+	if (dopt.ascii_upgrade == nullptr || *dopt.ascii_upgrade == '\0') {
+		dopt.ascii_upgrade = "us-ascii";
+	} else if (!vtm_ascii_compatible(dopt.ascii_upgrade)) {
+		ec_log_warn("Configured default_charset \"%s\" is unknown, or not ASCII compatible. "
+			"Disabling forced charset upgrades.",
+			dopt.ascii_upgrade);
+		dopt.ascii_upgrade = "us-ascii";
 	}
-
-	VMToM = new VMIMEToMAPI(lpAddrBook, lpLogger, dopt);
-
 	InitializeVMime();
-
 	// fill mapi object from buffer
-	hr = VMToM->convertVMIMEToMAPI(input, lpMessage);
-
-	delete VMToM;
-	
-	return hr;
+	return VMIMEToMAPI(lpAddrBook, dopt).convertVMIMEToMAPI(input, lpMessage);
 }
 
 // Read properties from lpMessage object and fill a buffer with internet rfc822 format message
-INETMAPI_API HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook, IMessage *lpMessage, char** lppbuf, sending_options sopt, ECLogger *lpLogger)
+HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook,
+    IMessage *lpMessage, char **lppbuf, sending_options sopt)
 {
-	HRESULT hr;
 	std::ostringstream oss;
 	char *lpszData = NULL;
-
-	hr = IMToINet(lpSession, lpAddrBook, lpMessage, oss, sopt, lpLogger);
+	HRESULT hr = IMToINet(lpSession, lpAddrBook, lpMessage, oss, sopt);
 	if (hr != hrSuccess)
 		return hr;
         
@@ -174,128 +199,105 @@ INETMAPI_API HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook, IM
 	return hr;
 }
 
-INETMAPI_API HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook, IMessage *lpMessage, std::ostream &os, sending_options sopt, ECLogger *lpLogger)
+HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook,
+    IMessage *lpMessage, std::ostream &os, sending_options sopt)
 {
 	HRESULT			hr			= hrSuccess;
-	LPSPropValue	lpTime		= NULL;
-	LPSPropValue	lpMessageId	= NULL;
-	MAPIToVMIME*	mToVM		= new MAPIToVMIME(lpSession, lpAddrBook, lpLogger, sopt);
-	vmime::ref<vmime::message>	lpVMMessage	= NULL;
+	memory_ptr<SPropValue> lpTime, lpMessageId;
+	MAPIToVMIME mToVM(lpSession, lpAddrBook, sopt);
+	vmime::shared_ptr<vmime::message> lpVMMessage;
 	vmime::utility::outputStreamAdapter adapter(os);
 
 	InitializeVMime();
-
-	hr = mToVM->convertMAPIToVMIME(lpMessage, &lpVMMessage);
+	hr = mToVM.convertMAPIToVMIME(lpMessage, &lpVMMessage);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	try {
 		// vmime messageBuilder has set Date header to now(), so we overwrite it.
-		if (HrGetOneProp(lpMessage, PR_CLIENT_SUBMIT_TIME, &lpTime) == hrSuccess) {
+		if (HrGetOneProp(lpMessage, PR_CLIENT_SUBMIT_TIME, &~lpTime) == hrSuccess)
 			lpVMMessage->getHeader()->Date()->setValue(FiletimeTovmimeDatetime(lpTime->Value.ft));
-		}
 		// else, try PR_MESSAGE_DELIVERY_TIME, maybe other timestamps?
-
-		if (HrGetOneProp(lpMessage, PR_INTERNET_MESSAGE_ID_A, &lpMessageId) == hrSuccess) {
+		if (HrGetOneProp(lpMessage, PR_INTERNET_MESSAGE_ID_A, &~lpMessageId) == hrSuccess)
 			lpVMMessage->getHeader()->MessageId()->setValue(lpMessageId->Value.lpszA);
-		}
-
 		lpVMMessage->generate(adapter);
 	}
 	catch (vmime::exception&) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
+		return MAPI_E_NOT_FOUND;
 	}
 	catch (std::exception&) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
+		return MAPI_E_NOT_FOUND;
 	}
-	
-exit:
-	MAPIFreeBuffer(lpTime);
-	MAPIFreeBuffer(lpMessageId);
-	delete mToVM;
-	return hr;
+	return hrSuccess;
 }
 
 // Read properties from lpMessage object and to internet rfc2822 format message
 // then send it using the provided ECSender object
-INETMAPI_API HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook, IMessage *lpMessage, ECSender *mailer_base, sending_options sopt, ECLogger *lpLogger)
+HRESULT IMToINet(IMAPISession *lpSession, IAddrBook *lpAddrBook,
+    IMessage *lpMessage, ECSender *mailer_base, sending_options sopt)
 {
 	HRESULT			hr	= hrSuccess;
-	MAPIToVMIME		*mToVM	= new MAPIToVMIME(lpSession, lpAddrBook, lpLogger, sopt);
-	vmime::ref<vmime::message>	vmMessage;
+	MAPIToVMIME mToVM(lpSession, lpAddrBook, sopt);
+	vmime::shared_ptr<vmime::message> vmMessage;
 	ECVMIMESender		*mailer	= dynamic_cast<ECVMIMESender*>(mailer_base);
 	wstring			wstrError;
 	SPropArrayPtr	ptrProps;
-	SizedSPropTagArray(2, sptaForwardProps) = { 2, { PR_AUTO_FORWARDED, PR_INTERNET_MESSAGE_ID_A } };
+	static constexpr const SizedSPropTagArray(2, sptaForwardProps) =
+		{2, {PR_AUTO_FORWARDED, PR_INTERNET_MESSAGE_ID_A}};
 	ULONG cValues = 0;
 
-	if (!mailer) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (mailer == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
 
 	InitializeVMime();
-
-	hr = mToVM->convertMAPIToVMIME(lpMessage, &vmMessage);
-
+	hr = mToVM.convertMAPIToVMIME(lpMessage, &vmMessage, MTV_SPOOL);
 	if (hr != hrSuccess) {
-		wstrError = mToVM->getConversionError();
+		wstrError = mToVM.getConversionError();
 		if (wstrError.empty())
 			wstrError = L"No error details specified";
 
 		mailer->setError(L"Conversion error: " + wstringify(hr, true) + L". " + wstrError + L". Your email is not sent at all and cannot be retried.");
-		goto exit;
+		return hr;
 	}
 
 	try {
 		vmime::messageId msgId;
-		hr = lpMessage->GetProps((LPSPropTagArray)&sptaForwardProps, 0, &cValues, &ptrProps);
-		if (!FAILED(hr) && ptrProps[0].ulPropTag == PR_AUTO_FORWARDED && ptrProps[0].Value.b == TRUE && ptrProps[1].ulPropTag == PR_INTERNET_MESSAGE_ID_A) {
+		hr = lpMessage->GetProps(sptaForwardProps, 0, &cValues, &~ptrProps);
+		if (!FAILED(hr) && ptrProps[0].ulPropTag == PR_AUTO_FORWARDED && ptrProps[0].Value.b == TRUE && ptrProps[1].ulPropTag == PR_INTERNET_MESSAGE_ID_A)
 			// only allow mapi programs to set a messageId for an outgoing message when it comes from rules processing
 			msgId = ptrProps[1].Value.lpszA;
-		} else {
+		else
 			// vmime::messageId::generateId() is not random enough since we use forking in the spooler
 			msgId = vmime::messageId(generateRandomMessageId(), vmime::platform::getHandler()->getHostName());
-		}
-		hr = hrSuccess;
 		vmMessage->getHeader()->MessageId()->setValue(msgId);
-		lpLogger->Log(EC_LOGLEVEL_DEBUG, "Sending message with Message-ID: " + msgId.getId());
+		ec_log_debug("Sending message with Message-ID: " + msgId.getId());
 	}
 	catch (vmime::exception& e) {
 		mailer->setError(e.what());
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
+		return MAPI_E_NOT_FOUND;
 	}
 	catch (std::exception& e) {
 		mailer->setError(e.what());
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
+		return MAPI_E_NOT_FOUND;
 	}
 	catch (...) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
+		return MAPI_E_NOT_FOUND;
 	}
-	
-	hr = mailer->sendMail(lpAddrBook, lpMessage, vmMessage, sopt.allow_send_to_everyone, sopt.always_expand_distr_list);
-
-exit:
-	delete mToVM;
-
-	return hr;
+	return mailer->sendMail(lpAddrBook, lpMessage, vmMessage,
+	       sopt.allow_send_to_everyone, sopt.always_expand_distr_list);
 }
 
 /** 
  * Create BODY and BODYSTRUCTURE strings for IMAP.
  * 
- * @param[in] input an RFC-822 email
+ * @param[in] input an RFC 2822 email
  * @param[out] lpSimple optional BODY result
  * @param[out] lpExtended optional BODYSTRUCTURE result
  * 
  * @return MAPI Error code
  */
-INETMAPI_API HRESULT createIMAPProperties(const std::string &input, std::string *lpEnvelope, std::string *lpBody, std::string *lpBodyStructure)
+HRESULT createIMAPProperties(const std::string &input, std::string *lpEnvelope,
+    std::string *lpBody, std::string *lpBodyStructure)
 {
 	InitializeVMime();
 
@@ -304,3 +306,4 @@ INETMAPI_API HRESULT createIMAPProperties(const std::string &input, std::string 
 	return VMToM.createIMAPProperties(input, lpEnvelope, lpBody, lpBodyStructure);
 }
 
+} /* namespace */

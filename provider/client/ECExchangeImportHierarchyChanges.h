@@ -23,42 +23,38 @@
 #include "ECMAPIFolder.h"
 #include <kopano/ECUnknown.h>
 
-class ECExchangeImportHierarchyChanges : public ECUnknown {
+class ECExchangeImportHierarchyChanges _kc_final : public ECUnknown {
 protected:
 	ECExchangeImportHierarchyChanges(ECMAPIFolder *lpFolder);
 	virtual ~ECExchangeImportHierarchyChanges();
 
 public:
 	static	HRESULT Create(ECMAPIFolder *lpFolder, LPEXCHANGEIMPORTHIERARCHYCHANGES* lppExchangeImportHierarchyChanges);
-
-	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface);
-
+	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
 	virtual HRESULT GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
 	virtual HRESULT Config(LPSTREAM lpStream, ULONG ulFlags);
 	virtual HRESULT UpdateState(LPSTREAM lpStream);
 	virtual HRESULT ImportFolderChange(ULONG cValue, LPSPropValue lpPropArray);
 	virtual HRESULT ImportFolderDeletion(ULONG ulFlags, LPENTRYLIST lpSourceEntryList);
 
-	class xExchangeImportHierarchyChanges _zcp_final : public IExchangeImportHierarchyChanges{
-		// IUnknown
-		virtual ULONG __stdcall AddRef(void) _zcp_override;
-		virtual ULONG __stdcall Release(void) _zcp_override;
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _zcp_override;
+	class xExchangeImportHierarchyChanges _kc_final :
+	    public IExchangeImportHierarchyChanges {
+		#include <kopano/xclsfrag/IUnknown.hpp>
 
-		// IExchangeImportContentsChanges
-		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError);
-		virtual HRESULT __stdcall Config(LPSTREAM lpStream, ULONG ulFlags);
-		virtual HRESULT __stdcall UpdateState(LPSTREAM lpStream);
-		virtual HRESULT __stdcall ImportFolderChange(ULONG cValue, LPSPropValue lpPropArray);
-		virtual HRESULT __stdcall ImportFolderDeletion(ULONG ulFlags, LPENTRYLIST lpSourceEntryList);
+		// <kopano/xclsfrag/IExchangeImportHierarchyChanges.hpp>
+		virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG flags, LPMAPIERROR *lppMAPIError) _kc_override;
+		virtual HRESULT __stdcall Config(LPSTREAM lpStream, ULONG flags) _kc_override;
+		virtual HRESULT __stdcall UpdateState(LPSTREAM lpStream) _kc_override;
+		virtual HRESULT __stdcall ImportFolderChange(ULONG cValue, LPSPropValue lpPropArray) _kc_override;
+		virtual HRESULT __stdcall ImportFolderDeletion(ULONG flags, LPENTRYLIST lpSourceEntryList) _kc_override;
 	} m_xExchangeImportHierarchyChanges;
 
 private:
-	ECMAPIFolder*	m_lpFolder;
-	LPSTREAM		m_lpStream;
-	ULONG			m_ulFlags;
-	ULONG			m_ulSyncId;
-	ULONG			m_ulChangeId;
+	ECMAPIFolder *m_lpFolder = nullptr;
+	IStream *m_lpStream = nullptr;
+	ULONG m_ulFlags = 0;
+	ULONG m_ulSyncId = 0;
+	ULONG m_ulChangeId = 0;
 };
 
 #endif // ECEXCHANGEIMPORTCHIERARCHYCHANGES_H

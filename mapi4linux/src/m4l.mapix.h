@@ -19,8 +19,7 @@
 #define __M4L_MAPIX_IMPL_H
 
 #include <kopano/zcdefs.h>
-#include <pthread.h>
-
+#include <mutex>
 #include "m4l.common.h"
 #include "m4l.mapidefs.h"
 #include "m4l.mapisvc.h"
@@ -36,39 +35,37 @@ using namespace std;
 
 class M4LMsgServiceAdmin;
 
-typedef struct _s_providerentry {
+struct providerEntry {
 	MAPIUID uid;
 	string servicename; // this provider belongs to service 'servicename'
 	M4LProfSect *profilesection;
-} providerEntry;
+};
 
-typedef struct _s_serviceentry {
+struct serviceEntry {
     MAPIUID muid;
     string servicename;
 	string displayname;
 	M4LProviderAdmin *provideradmin;
 	bool bInitialize;
 	SVCService* service;
-} serviceEntry;
+};
 
-typedef struct _s_profentry {
+struct profEntry {
     string profname;
     string password;
     M4LMsgServiceAdmin *serviceadmin;
-} profEntry;
+};
 
-
-class M4LProfAdmin _zcp_final : public M4LUnknown, public IProfAdmin {
+class M4LProfAdmin _kc_final : public M4LUnknown, public IProfAdmin {
 private:
     // variables
     list<profEntry*> profiles;
-    pthread_mutex_t m_mutexProfiles;
+	std::recursive_mutex m_mutexProfiles;
 
     // functions
     list<profEntry*>::iterator findProfile(LPTSTR lpszProfileName);
 
 public:
-    M4LProfAdmin();
     virtual ~M4LProfAdmin();
 
     virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR* lppMAPIError);
@@ -85,21 +82,19 @@ public:
 				  LPSERVICEADMIN* lppServiceAdmin);
 
     // iunknown passthru
-    virtual ULONG __stdcall AddRef();
-    virtual ULONG __stdcall Release();
-    virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid);
+	virtual ULONG __stdcall AddRef(void) _kc_override;
+	virtual ULONG __stdcall Release(void) _kc_override;
+	virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid) _kc_override;
 };
 
-
-class M4LMsgServiceAdmin _zcp_final : public M4LUnknown, public IMsgServiceAdmin {
+class M4LMsgServiceAdmin _kc_final : public M4LUnknown, public IMsgServiceAdmin {
 private:
 
 	list<providerEntry*> providers;
     list<serviceEntry*> services;
 
 	M4LProfSect	*profilesection;  // Global Profile Section
-
-	pthread_mutex_t m_mutexserviceadmin;
+	std::recursive_mutex m_mutexserviceadmin;
 
     // functions
     serviceEntry* findServiceAdmin(LPTSTR lpszServiceName);
@@ -125,9 +120,9 @@ public:
     virtual HRESULT __stdcall GetProviderTable(ULONG ulFlags, LPMAPITABLE* lppTable);
 
     // iunknown passthru
-    virtual ULONG __stdcall AddRef();
-    virtual ULONG __stdcall Release();
-    virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid);
+	virtual ULONG __stdcall AddRef(void) _kc_override;
+	virtual ULONG __stdcall Release(void) _kc_override;
+	virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid) _kc_override;
 
 	friend class M4LProviderAdmin;
 	friend class M4LMAPISession;
@@ -137,7 +132,7 @@ inline bool operator <(const GUID &a, const GUID &b) {
     return memcmp(&a, &b, sizeof(GUID)) < 0;
 }
 
-class M4LMAPISession _zcp_final : public M4LUnknown, public IMAPISession {
+class M4LMAPISession _kc_final : public M4LUnknown, public IMAPISession {
 private:
 	// variables
 	string profileName;
@@ -174,35 +169,31 @@ public:
 	virtual HRESULT __stdcall PrepareForm(LPCIID lpInterface, LPMESSAGE lpMessage, ULONG* lpulMessageToken);
 
     // iunknown passthru
-	virtual ULONG __stdcall AddRef();
-	virtual ULONG __stdcall Release();
-	virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid);
+	virtual ULONG __stdcall AddRef(void) _kc_override;
+	virtual ULONG __stdcall Release(void) _kc_override;
+	virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid) _kc_override;
 
 private:
     std::map<GUID, IMsgStore *> mapStores;
 	/* @todo need a status row per provider */
-	ULONG m_cValuesStatus;
-	LPSPropValue m_lpPropsStatus;
-    pthread_mutex_t m_mutexStatusRow;
+	ULONG m_cValuesStatus = 0;
+	SPropValue *m_lpPropsStatus = nullptr;
+	std::mutex m_mutexStatusRow;
 
 public:
 	HRESULT __stdcall setStatusRow(ULONG cValues, LPSPropValue lpProps);
 };
 
-class M4LAddrBook _zcp_final : public M4LMAPIProp, public IAddrBook {
+class M4LAddrBook _kc_final : public M4LMAPIProp, public IAddrBook {
 public:
 	M4LAddrBook(M4LMsgServiceAdmin *new_serviceAdmin, LPMAPISUP newlpMAPISup);
 	virtual ~M4LAddrBook();
 
-	virtual HRESULT __stdcall OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG * lpulObjType,
-										LPUNKNOWN * lppUnk);
-	virtual HRESULT __stdcall CompareEntryIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2,
-											  ULONG ulFlags, ULONG* lpulResult);
-	virtual HRESULT __stdcall Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink,
-									 ULONG* lpulConnection);
+	virtual HRESULT __stdcall OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk) _kc_override;
+	virtual HRESULT __stdcall CompareEntryIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2, ULONG ulFlags, ULONG *lpulResult) _kc_override;
+	virtual HRESULT __stdcall Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink, ULONG *lpulConnection) _kc_override;
 	virtual HRESULT __stdcall Unadvise(ULONG ulConnection);
-	virtual HRESULT __stdcall CreateOneOff(LPTSTR lpszName, LPTSTR lpszAdrType, LPTSTR lpszAddress, ULONG ulFlags, ULONG* lpcbEntryID,
-										   LPENTRYID* lppEntryID);
+	virtual HRESULT __stdcall CreateOneOff(LPTSTR lpszName, LPTSTR lpszAdrType, LPTSTR lpszAddress, ULONG ulFlags, ULONG *lpcbEntryID, LPENTRYID *lppEntryID) _kc_override;
 	virtual HRESULT __stdcall NewEntry(ULONG ulUIParam, ULONG ulFlags, ULONG cbEIDContainer, LPENTRYID lpEIDContainer,
 									   ULONG cbEIDNewEntryTpl, LPENTRYID lpEIDNewEntryTpl, ULONG* lpcbEIDNewEntry,
 									   LPENTRYID* lppEIDNewEntry);
@@ -219,38 +210,32 @@ public:
 	virtual HRESULT __stdcall SetDefaultDir(ULONG cbEntryID, LPENTRYID lpEntryID);
 	virtual HRESULT __stdcall GetSearchPath(ULONG ulFlags, LPSRowSet* lppSearchPath);
 	virtual HRESULT __stdcall SetSearchPath(ULONG ulFlags, LPSRowSet lpSearchPath);
-	virtual HRESULT __stdcall PrepareRecips(ULONG ulFlags, LPSPropTagArray lpPropTagArray, LPADRLIST lpRecipList);
+	virtual HRESULT __stdcall PrepareRecips(ULONG ulFlags, const SPropTagArray *lpPropTagArray, LPADRLIST lpRecipList);
 
 	// imapiprop passthru
-	virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR* lppMAPIError);
-	virtual HRESULT __stdcall SaveChanges(ULONG ulFlags);
-	virtual HRESULT __stdcall GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG* lpcValues, LPSPropValue* lppPropArray);
-	virtual HRESULT __stdcall GetPropList(ULONG ulFlags, LPSPropTagArray* lppPropTagArray);
-	virtual HRESULT __stdcall OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN* lppUnk);
-	virtual HRESULT __stdcall SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray* lppProblems);
-	virtual HRESULT __stdcall DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray* lppProblems);
-	virtual HRESULT __stdcall CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam,
-									 LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags,
-									 LPSPropProblemArray* lppProblems);
-	virtual HRESULT __stdcall CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface,
-										LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray* lppProblems);
-	virtual HRESULT __stdcall GetNamesFromIDs(LPSPropTagArray* lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG* lpcPropNames,
-											  LPMAPINAMEID** lpppPropNames);
-	virtual HRESULT __stdcall GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID* lppPropNames, ULONG ulFlags, LPSPropTagArray* lppPropTags);
+	virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError) _kc_override;
+	virtual HRESULT __stdcall SaveChanges(ULONG ulFlags) _kc_override;
+	virtual HRESULT __stdcall GetProps(const SPropTagArray *lpPropTagArray, ULONG ulFlags, ULONG *lpcValues, LPSPropValue *lppPropArray) _kc_override;
+	virtual HRESULT __stdcall GetPropList(ULONG ulFlags, LPSPropTagArray *lppPropTagArray) _kc_override;
+	virtual HRESULT __stdcall OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN *lppUnk) _kc_override;
+	virtual HRESULT __stdcall SetProps(ULONG cValues, const SPropValue *lpPropArray, LPSPropProblemArray *lppProblems) _kc_override;
+	virtual HRESULT __stdcall DeleteProps(const SPropTagArray *lpPropTagArray, LPSPropProblemArray *lppProblems) _kc_override;
+	virtual HRESULT __stdcall CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems) _kc_override;
+	virtual HRESULT __stdcall CopyProps(const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems) _kc_override;
+	virtual HRESULT __stdcall GetNamesFromIDs(LPSPropTagArray *lppPropTags, LPGUID lpPropSetGuid, ULONG ulFlags, ULONG *lpcPropNames, LPMAPINAMEID **lpppPropNames) _kc_override;
+	virtual HRESULT __stdcall GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID *lppPropNames, ULONG ulFlags, LPSPropTagArray *lppPropTags) _kc_override;
 
 	// iunknown passthru
-	virtual ULONG __stdcall AddRef();
-	virtual ULONG __stdcall Release();
-	virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid);
+	virtual ULONG __stdcall AddRef(void) _kc_override;
+	virtual ULONG __stdcall Release(void) _kc_override;
+	virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lpvoid) _kc_override;
 
 private:
 	// variables
-	M4LMsgServiceAdmin *serviceAdmin; /* from session object */
 	LPMAPISUP m_lpMAPISup;
 
 	std::list<abEntry> m_lABProviders;
-
-	LPSRowSet m_lpSavedSearchPath;
+	SRowSet *m_lpSavedSearchPath = nullptr;
 	HRESULT getDefaultSearchPath(ULONG ulFlags, LPSRowSet* lppSearchPath);
 
 public:

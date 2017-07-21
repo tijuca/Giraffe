@@ -98,17 +98,15 @@ public:
 	 *
 	 * \return hrSuccess on success.
 	 */
-	static HRESULT	SetPropHandler(ULONG ulPropTag, void* lpProvider, LPSPropValue lpsPropValue, void *lpParam);
-
-	virtual HRESULT	QueryInterface(REFIID refiid, void **lppInterface);
-
-	virtual HRESULT OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk);
+	static HRESULT SetPropHandler(ULONG ulPropTag, void *lpProvider, const SPropValue *lpsPropValue, void *lpParam);
+	virtual HRESULT	QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
+	virtual HRESULT OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN *lppUnk);
 	virtual HRESULT GetAttachmentTable(ULONG ulFlags, LPMAPITABLE *lppTable);
 	virtual HRESULT OpenAttach(ULONG ulAttachmentNum, LPCIID lpInterface, ULONG ulFlags, LPATTACH *lppAttach);
 	virtual HRESULT CreateAttach(LPCIID lpInterface, ULONG ulFlags, ULONG *lpulAttachmentNum, LPATTACH *lppAttach);
 	virtual HRESULT DeleteAttach(ULONG ulAttachmentNum, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags);
 	virtual HRESULT GetRecipientTable(ULONG ulFlags, LPMAPITABLE *lppTable);
-	virtual HRESULT ModifyRecipients(ULONG ulFlags, LPADRLIST lpMods);
+	virtual HRESULT ModifyRecipients(ULONG ulFlags, const ADRLIST *lpMods);
 	virtual HRESULT SubmitMessage(ULONG ulFlags);
 	virtual HRESULT SetReadFlag(ULONG ulFlags);
 
@@ -116,48 +114,33 @@ public:
 	virtual HRESULT SaveChanges(ULONG ulFlags);
 	virtual HRESULT HrSaveChild(ULONG ulFlags, MAPIOBJECT *lpsMapiObject);
 	// override for IMAPIProp::CopyTo
-	virtual HRESULT CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems);
-	virtual HRESULT CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems);
+	virtual HRESULT CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
+	virtual HRESULT CopyProps(const SPropTagArray *lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray *lppProblems);
 
 	// RTF/Subject overrides
-	virtual HRESULT SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray FAR * lppProblems);
-	virtual HRESULT DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray FAR * lppProblems);
+	virtual HRESULT SetProps(ULONG cValues, const SPropValue *lpPropArray, LPSPropProblemArray *lppProblems);
+	virtual HRESULT DeleteProps(const SPropTagArray *lpPropTagArray, LPSPropProblemArray *lppProblems);
 	virtual HRESULT HrLoadProps();
 
 	// Our table-row getprop handler (handles client-side generation of table columns)
 	static HRESULT TableRowGetProp(void* lpProvider, struct propVal *lpsPropValSrc, LPSPropValue lpsPropValDst, void **lpBase, ULONG ulType);
 
 	// RTF overrides
-	virtual HRESULT		HrSetRealProp(SPropValue *lpsPropValue);
+	virtual HRESULT HrSetRealProp(const SPropValue *lpsPropValue);
 
-	class xMessage _zcp_final : public IMessage {
-		// From IUnknown
-		virtual HRESULT __stdcall QueryInterface(REFIID refiid, void **lppInterface) _zcp_override;
-		virtual ULONG __stdcall AddRef(void) _zcp_override;
-		virtual ULONG __stdcall Release(void) _zcp_override;
-		
-		// From IMAPIProp
-		virtual HRESULT __stdcall GetLastError(HRESULT hError, ULONG ulFlags, LPMAPIERROR * lppMapiError);
-		virtual HRESULT __stdcall SaveChanges(ULONG ulFlags);
-		virtual HRESULT __stdcall GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG FAR * lpcValues, LPSPropValue FAR * lppPropArray);
-		virtual HRESULT __stdcall GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropTagArray);
-		virtual HRESULT __stdcall OpenProperty(ULONG ulPropTag, LPCIID lpiid, ULONG ulInterfaceOptions, ULONG ulFlags, LPUNKNOWN FAR * lppUnk);
-		virtual HRESULT __stdcall SetProps(ULONG cValues, LPSPropValue lpPropArray, LPSPropProblemArray FAR * lppProblems);
-		virtual HRESULT __stdcall DeleteProps(LPSPropTagArray lpPropTagArray, LPSPropProblemArray FAR * lppProblems);
-		virtual HRESULT __stdcall CopyTo(ULONG ciidExclude, LPCIID rgiidExclude, LPSPropTagArray lpExcludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems);
-		virtual HRESULT __stdcall CopyProps(LPSPropTagArray lpIncludeProps, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpInterface, LPVOID lpDestObj, ULONG ulFlags, LPSPropProblemArray FAR * lppProblems);
-		virtual HRESULT __stdcall GetNamesFromIDs(LPSPropTagArray * pptaga, LPGUID lpguid, ULONG ulFlags, ULONG * pcNames, LPMAPINAMEID ** pppNames);
-		virtual HRESULT __stdcall GetIDsFromNames(ULONG cNames, LPMAPINAMEID * ppNames, ULONG ulFlags, LPSPropTagArray * pptaga);
+	class xMessage _kc_final : public IMessage {
+		#include <kopano/xclsfrag/IUnknown.hpp>
+		#include <kopano/xclsfrag/IMAPIProp.hpp>
 
-		// From IMessage
-		virtual HRESULT __stdcall GetAttachmentTable(ULONG ulFlags, LPMAPITABLE *lppTable);
-		virtual HRESULT __stdcall OpenAttach(ULONG ulAttachmentNum, LPCIID lpInterface, ULONG ulFlags, LPATTACH *lppAttach);
-		virtual HRESULT __stdcall CreateAttach(LPCIID lpInterface, ULONG ulFlags, ULONG *lpulAttachmentNum, LPATTACH *lppAttach);
-		virtual HRESULT __stdcall DeleteAttach(ULONG ulAttachmentNum, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags);
-		virtual HRESULT __stdcall GetRecipientTable(ULONG ulFlags, LPMAPITABLE *lppTable);
-		virtual HRESULT __stdcall ModifyRecipients(ULONG ulFlags, LPADRLIST lpMods);
-		virtual HRESULT __stdcall SubmitMessage(ULONG ulFlags);
-		virtual HRESULT __stdcall SetReadFlag(ULONG ulFlags);
+		// <kopano/xclsfrag/IMessage.hpp>
+		virtual HRESULT __stdcall GetAttachmentTable(ULONG flags, LPMAPITABLE *lppTable) _kc_override;
+		virtual HRESULT __stdcall OpenAttach(ULONG ulAttachmentNum, LPCIID lpInterface, ULONG flags, LPATTACH *lppAttach) _kc_override;
+		virtual HRESULT __stdcall CreateAttach(LPCIID lpInterface, ULONG flags, ULONG *lpulAttachmentNum, LPATTACH *lppAttach) _kc_override;
+		virtual HRESULT __stdcall DeleteAttach(ULONG ulAttachmentNum, ULONG ui_param, LPMAPIPROGRESS lpProgress, ULONG flags) _kc_override;
+		virtual HRESULT __stdcall GetRecipientTable(ULONG flags, LPMAPITABLE *lppTable) _kc_override;
+		virtual HRESULT __stdcall ModifyRecipients(ULONG flags, const ADRLIST *lpMods) _kc_override;
+		virtual HRESULT __stdcall SubmitMessage(ULONG flags) _kc_override;
+		virtual HRESULT __stdcall SetReadFlag(ULONG flags) _kc_override;
 	} m_xMessage;
 
 protected:
@@ -182,8 +165,8 @@ private:
 	HRESULT GetBodyType(eBodyType *lpulBodyType);
 	
 	// Override GetProps/GetPropList so we can sync RTF before calling GetProps
-	virtual HRESULT GetProps(LPSPropTagArray lpPropTagArray, ULONG ulFlags, ULONG FAR * lpcValues, LPSPropValue FAR * lppPropArray);
-	virtual HRESULT GetPropList(ULONG ulFlags, LPSPropTagArray FAR * lppPropTagArray);
+	virtual HRESULT GetProps(const SPropTagArray *lpPropTagArray, ULONG ulFlags, ULONG *lpcValues, LPSPropValue *lppPropArray);
+	virtual HRESULT GetPropList(ULONG ulFlags, LPSPropTagArray *lppPropTagArray);
 
 	HRESULT GetSyncedBodyProp(ULONG ulPropTag, ULONG ulFlags, void *lpBase, LPSPropValue lpsPropValue);
 	HRESULT SyncBody(ULONG ulPropTag);
@@ -195,24 +178,18 @@ private:
 	
 	BOOL			fNew;
 	BOOL			m_bEmbedded;
-	BOOL			m_bExplicitSubjectPrefix;
-	BOOL			m_bRecipsDirty;
-
-	eBodyType		m_ulBodyType;
-	BOOL			m_bInhibitSync;
+	BOOL m_bExplicitSubjectPrefix = false;
+	BOOL m_bRecipsDirty = false, m_bInhibitSync = false;
+	eBodyType m_ulBodyType = bodyTypeUnknown;
 
 public:
-	ULONG			m_cbParentID;
-	LPENTRYID		m_lpParentID; // For new messages
-
-	ECMemTable		*lpRecips;
-	ECMemTable		*lpAttachments;
-
-	ULONG			ulNextAttUniqueId;
-	ULONG			ulNextRecipUniqueId;
+	ULONG m_cbParentID = 0;
+	ENTRYID *m_lpParentID = nullptr; // For new messages
+	ECMemTable *lpRecips = nullptr, *lpAttachments = nullptr;
+	ULONG ulNextRecipUniqueId = 0, ulNextAttUniqueId = 0;
 };
 
-class ECMessageFactory : public IMessageFactory{
+class ECMessageFactory _kc_final : public IMessageFactory {
 public:
 	HRESULT Create(ECMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFlags, BOOL bEmbedded, ECMAPIProp *lpRoot, ECMessage **lpMessage) const;
 };

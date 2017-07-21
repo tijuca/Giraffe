@@ -32,6 +32,7 @@
 #define OPENSTORE_REMOTE_TRANSPORT			((ULONG)64)
 
 #include <kopano/platform.h>
+#include <initializer_list>
 
 class IExchangeManageStore : public IUnknown {
 public:
@@ -608,16 +609,20 @@ typedef IExchangeManageStore* LPEXCHANGEMANAGESTORE;
 #define ROW_REMOVE			((ULONG)4)
 #define ROW_EMPTY			(ROW_ADD|ROW_REMOVE)
 
-typedef struct _ROWENTRY {
+struct ROWENTRY {
 	ULONG			ulRowFlags;
 	ULONG			cValues;
 	LPSPropValue	rgPropVals;
-} ROWENTRY, *LPROWENTRY;
+};
+typedef struct ROWENTRY *LPROWENTRY;
 
-typedef struct _ROWLIST {
+struct ROWLIST {
+	ROWLIST(void) = delete;
+	template<typename _T> ROWLIST(std::initializer_list<_T>) = delete;
 	ULONG			cEntries;
 	ROWENTRY		aEntries[MAPI_DIM];
-} ROWLIST, *LPROWLIST;
+};
+typedef struct ROWLIST *LPROWLIST;
 
 #define CbNewROWLIST(_centries) \
     (offsetof(ROWLIST,aEntries) + (_centries)*sizeof(ROWENTRY))
@@ -698,7 +703,7 @@ typedef IExchangeModifyTable* LPEXCHANGEMODIFYTABLE;
 #define RELOP_MEMBER_OF_DL	100
 
 //Action types
-typedef enum {
+enum ACTTYPE {
 	OP_MOVE = 1,
 	OP_COPY,
 	OP_REPLY,
@@ -710,7 +715,7 @@ typedef enum {
 	OP_TAG,
 	OP_DELETE,
 	OP_MARK_AS_READ
-} ACTTYPE;
+};
 
 // provider name for moderator rules
 #define szProviderModeratorRule		"MSFT:MR"
@@ -737,7 +742,7 @@ typedef enum {
 #define szOofTemplateMsgClassPrefix		"IPM.Note.Rules.OofTemplate."
 
 //Action structure
-typedef struct _action {
+struct ACTION {
 	ACTTYPE		acttype;
 
 	// to indicate which flavor of the action.
@@ -787,17 +792,18 @@ typedef struct _action {
 		// prop value for OP_TAG action
 		SPropValue		propTag;
 	};
-} ACTION, *LPACTION;
+};
+typedef struct ACTION *LPACTION;
 
 // Rules version
 #define EDK_RULES_VERSION		1
 
 //Array of actions
-typedef struct _actions {
+struct ACTIONS {
 	ULONG		ulVersion;		// use the #define above
 	UINT		cActions;
 	LPACTION	lpAction;
-} ACTIONS;
+};
 
 #ifdef __cplusplus
 extern "C" {
@@ -858,12 +864,12 @@ public:
 	virtual HRESULT __stdcall IsAttachmentBlocked(LPCWSTR pwszFileName, BOOL *pfBlocked) = 0;
 };
 
-typedef struct _ReadState
-{
+struct READSTATE {
 	ULONG		cbSourceKey;
 	BYTE	*	pbSourceKey;
 	ULONG		ulFlags;
-} READSTATE, *LPREADSTATE;
+};
+typedef struct READSTATE *LPREADSTATE;
 
 /*      Special flag bit for DeleteFolder */
 #define DELETE_HARD_DELETE                              ((ULONG) 0x00000010)
@@ -916,6 +922,7 @@ typedef struct _ReadState
 #define SYNC_FXRECOVERMODE			0x10000
 #define SYNC_DEFER_CONFIG			0x20000
 #define SYNC_FORCE_UNICODE			0x40000	// Forces server to return Unicode properties
+#define SYNC_NO_DB_CHANGES			0x80000
 
 /*------------------------------------------------------------------------
  *
@@ -938,7 +945,7 @@ class IExchangeExportChanges : public IUnknown {
 public:
 	virtual HRESULT __stdcall GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError) = 0;
 	virtual HRESULT __stdcall Config(LPSTREAM lpStream, ULONG ulFlags, LPUNKNOWN lpCollector, LPSRestriction lpRestriction, LPSPropTagArray lpIncludeProps, LPSPropTagArray lpExcludeProps, ULONG ulBufferSize) = 0;
-	virtual HRESULT __stdcall Synchronize(ULONG FAR * pulSteps, ULONG FAR * pulProgress) = 0;
+	virtual HRESULT __stdcall Synchronize(ULONG *pulSteps, ULONG *pulProgress) = 0;
 	virtual HRESULT __stdcall UpdateState(LPSTREAM lpStream) = 0;
 };
 
@@ -952,7 +959,7 @@ public:
 	virtual HRESULT __stdcall ImportMessageChange(ULONG cValue, LPSPropValue lpPropArray, ULONG ulFlags, LPMESSAGE * lppMessage) = 0;
 	virtual HRESULT __stdcall ImportMessageDeletion(ULONG ulFlags, LPENTRYLIST lpSourceEntryList) = 0;
 	virtual HRESULT __stdcall ImportPerUserReadStateChange(ULONG cElements, LPREADSTATE lpReadState) = 0;
-	virtual HRESULT __stdcall ImportMessageMove(ULONG cbSourceKeySrcFolder, BYTE FAR * pbSourceKeySrcFolder, ULONG cbSourceKeySrcMessage, BYTE FAR * pbSourceKeySrcMessage, ULONG cbPCLMessage, BYTE FAR * pbPCLMessage, ULONG cbSourceKeyDestMessage, BYTE FAR * pbSourceKeyDestMessage, ULONG cbChangeNumDestMessage, BYTE FAR * pbChangeNumDestMessage) = 0;
+	virtual HRESULT __stdcall ImportMessageMove(ULONG cbSourceKeySrcFolder, BYTE *pbSourceKeySrcFolder, ULONG cbSourceKeySrcMessage, BYTE *pbSourceKeySrcMessage, ULONG cbPCLMessage, BYTE *pbPCLMessage, ULONG cbSourceKeyDestMessage, BYTE *pbSourceKeyDestMessage, ULONG cbChangeNumDestMessage, BYTE *pbChangeNumDestMessage) = 0;
 };
 
 typedef IExchangeImportContentsChanges* LPEXCHANGEIMPORTCONTENTSCHANGES;
@@ -997,7 +1004,7 @@ public:
 };
 
 /* New from Outlook 2010 MAPI Extension */
-class IMAPIGetSession : public IUnknown {
+class IMAPIGetSession : public virtual IUnknown {
 public:
     //    virtual ~IMAPIGetSession() = 0;
 

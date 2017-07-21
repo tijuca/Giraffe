@@ -29,6 +29,8 @@
 
 #include "ECMailBoxTable.h"
 
+namespace KC {
+
 ECMailBoxTable::ECMailBoxTable(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale) : 
 	ECStoreObjectTable(lpSession, 0, NULL, 0, MAPI_STORE, ulFlags, TABLE_FLAG_OVERRIDE_HOME_MDB, locale)
 {
@@ -48,14 +50,14 @@ ECRESULT ECMailBoxTable::Load()
 {
 	ECRESULT er = erSuccess;
 	ECDatabase *lpDatabase = NULL;
-	DB_RESULT 	lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 	DB_ROW		lpDBRow = NULL;
 	std::string strQuery;
 	std::list<unsigned int> lstObjIds;
 
 	er = lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	Clear();
 
@@ -63,7 +65,7 @@ ECRESULT ECMailBoxTable::Load()
 	strQuery = "SELECT hierarchy_id FROM stores";
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	while(1) {
 		lpDBRow = lpDatabase->FetchRow(lpDBResult);
@@ -78,11 +80,7 @@ ECRESULT ECMailBoxTable::Load()
 	}
 
 	LoadRows(&lstObjIds, 0);
-
-exit:
-	if (lpDBResult) {
-		lpDatabase->FreeResult(lpDBResult);
-		lpDBResult = NULL;
-	}
-	return er;
+	return erSuccess;
 }
+
+} /* namespace */

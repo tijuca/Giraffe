@@ -18,13 +18,15 @@
 #ifndef VMIMETOMAPI
 #define VMIMETOMAPI
 
-#include <vmime/vmime.hpp>
 #include <list>
+#include <kopano/zcdefs.h>
+#include <vmime/vmime.hpp>
 #include <mapix.h>
 #include <mapidefs.h>
-#include <kopano/ECLogger.h>
 #include <inetmapi/options.h>
 #include <kopano/charset/convert.h>
+
+namespace KC {
 
 #define MAPI_CHARSET vmime::charset(vmime::charsets::UTF_8)
 #define MAPI_CHARSET_STRING "UTF-8"
@@ -32,7 +34,7 @@
 enum BODYLEVEL { BODY_NONE, BODY_PLAIN, BODY_HTML };
 enum ATTACHLEVEL { ATTACH_NONE, ATTACH_INLINE, ATTACH_NORMAL };
 
-typedef struct sMailState {
+struct sMailState {
 	BODYLEVEL bodyLevel;		//!< the current body state. plain upgrades none, html upgrades plain and none.
 	ULONG ulLastCP;
 	ATTACHLEVEL attachLevel;	//!< the current attachment state
@@ -53,47 +55,45 @@ typedef struct sMailState {
 		bAttachSignature = false;
 		strHTMLBody.clear();
 	};
-} sMailState;
+};
 
 void ignoreError(void *ctx, const char *msg, ...);
 
-class VMIMEToMAPI
-{
+class VMIMEToMAPI _kc_final {
 public:
 	VMIMEToMAPI();
-	VMIMEToMAPI(LPADRBOOK lpAdrBook, ECLogger *newlogger, delivery_options dopt);
+	VMIMEToMAPI(LPADRBOOK lpAdrBook, delivery_options dopt);
 	virtual	~VMIMEToMAPI();
 
 	HRESULT convertVMIMEToMAPI(const std::string &input, IMessage *lpMessage);
 	HRESULT createIMAPProperties(const std::string &input, std::string *lpEnvelope, std::string *lpBody, std::string *lpBodyStructure);
 
 private:
-	ECLogger *lpLogger;
 	delivery_options m_dopt;
 	LPADRBOOK m_lpAdrBook;
-	IABContainer *m_lpDefaultDir;
+	IABContainer *m_lpDefaultDir = nullptr;
 	sMailState m_mailState;
 	convert_context m_converter;
 
-	HRESULT fillMAPIMail(vmime::ref<vmime::message> vmMessage, IMessage *lpMessage);
-	HRESULT dissect_body(vmime::ref<vmime::header> vmHeader, vmime::ref<vmime::body> vmBody, IMessage *lpMessage, bool filterDouble = false, bool appendBody = false);
-	void dissect_message(vmime::ref<vmime::body>, IMessage *);
-	HRESULT dissect_multipart(vmime::ref<vmime::header>, vmime::ref<vmime::body>, IMessage *, bool filterDouble = false, bool appendBody = false);
-	HRESULT dissect_ical(vmime::ref<vmime::header>, vmime::ref<vmime::body>, IMessage *, bool bIsAttachment);
+	HRESULT fillMAPIMail(vmime::shared_ptr<vmime::message>, IMessage *lpMessage);
+	HRESULT dissect_body(vmime::shared_ptr<vmime::header>, vmime::shared_ptr<vmime::body>, IMessage *lpMessage, bool filterDouble = false, bool appendBody = false);
+	void dissect_message(vmime::shared_ptr<vmime::body>, IMessage *);
+	HRESULT dissect_multipart(vmime::shared_ptr<vmime::header>, vmime::shared_ptr<vmime::body>, IMessage *, bool filterDouble = false, bool appendBody = false);
+	HRESULT dissect_ical(vmime::shared_ptr<vmime::header>, vmime::shared_ptr<vmime::body>, IMessage *, bool bIsAttachment);
 
-	HRESULT handleHeaders(vmime::ref<vmime::header> vmHeader, IMessage* lpMessage);
-	HRESULT handleRecipients(vmime::ref<vmime::header> vmHeader, IMessage* lpMessage);
-	HRESULT modifyRecipientList(LPADRLIST lpRecipients, vmime::ref<vmime::addressList> vmAddressList, ULONG ulRecipType);
-	HRESULT modifyFromAddressBook(LPSPropValue *lppPropVals, ULONG *lpulValues, const char *email, const WCHAR *fullname, ULONG ulRecipType, LPSPropTagArray lpPropsList);
+	HRESULT handleHeaders(vmime::shared_ptr<vmime::header>, IMessage* lpMessage);
+	HRESULT handleRecipients(vmime::shared_ptr<vmime::header>, IMessage* lpMessage);
+	HRESULT modifyRecipientList(LPADRLIST lpRecipients, vmime::shared_ptr<vmime::addressList>, ULONG ulRecipType);
+	HRESULT modifyFromAddressBook(LPSPropValue *lppPropVals, ULONG *lpulValues, const char *email, const wchar_t *fullname, ULONG ulRecipType, const SPropTagArray *lpPropsList);
 
-	std::string content_transfer_decode(vmime::ref<vmime::body>) const;
-	vmime::charset get_mime_encoding(vmime::ref<vmime::header>, vmime::ref<vmime::body>) const;
+	std::string content_transfer_decode(vmime::shared_ptr<vmime::body>) const;
+	vmime::charset get_mime_encoding(vmime::shared_ptr<vmime::header>, vmime::shared_ptr<vmime::body>) const;
 	int renovate_encoding(std::string &, const std::vector<std::string> &);
 	int renovate_encoding(std::wstring &, std::string &, const std::vector<std::string> &);
 
-	HRESULT handleTextpart(vmime::ref<vmime::header> vmHeader, vmime::ref<vmime::body> vmBody, IMessage* lpMessage, bool bAppendBody);
-	HRESULT handleHTMLTextpart(vmime::ref<vmime::header> vmHeader, vmime::ref<vmime::body> vmBody, IMessage* lpMessage, bool bAppendBody);
-	HRESULT handleAttachment(vmime::ref<vmime::header> vmHeader, vmime::ref<vmime::body> vmBody, IMessage* lpMessage, bool bAllowEmpty = true);
+	HRESULT handleTextpart(vmime::shared_ptr<vmime::header>, vmime::shared_ptr<vmime::body>, IMessage* lpMessage, bool bAppendBody);
+	HRESULT handleHTMLTextpart(vmime::shared_ptr<vmime::header>, vmime::shared_ptr<vmime::body>, IMessage* lpMessage, bool bAppendBody);
+	HRESULT handleAttachment(vmime::shared_ptr<vmime::header>, vmime::shared_ptr<vmime::body>, IMessage* lpMessage, bool bAllowEmpty = true);
 	HRESULT handleMessageToMeProps(IMessage *lpMessage, LPADRLIST lpRecipients);
 
 	int getCharsetFromHTML(const std::string &strHTML, vmime::charset *htmlCharset);
@@ -102,18 +102,20 @@ private:
 	
 	HRESULT postWriteFixups(IMessage *lpMessage);
 
-	std::string mailboxToEnvelope(vmime::ref<vmime::mailbox> mbox);
-	std::string addressListToEnvelope(vmime::ref<vmime::addressList> mbox);
-	HRESULT createIMAPEnvelope(vmime::ref<vmime::message> vmMessage, IMessage* lpMessage);
-	std::string createIMAPEnvelope(vmime::ref<vmime::message> vmMessage);
+	std::string mailboxToEnvelope(vmime::shared_ptr<vmime::mailbox>);
+	std::string addressListToEnvelope(vmime::shared_ptr<vmime::addressList> mbox);
+	HRESULT createIMAPEnvelope(vmime::shared_ptr<vmime::message>, IMessage* lpMessage);
+	std::string createIMAPEnvelope(vmime::shared_ptr<vmime::message>);
 
-	HRESULT createIMAPBody(const std::string &input, vmime::ref<vmime::message> vmMessage, IMessage* lpMessage);
+	HRESULT createIMAPBody(const std::string &input, vmime::shared_ptr<vmime::message>, IMessage* lpMessage);
 
-	HRESULT messagePartToStructure(const std::string &input, vmime::ref<vmime::bodyPart> vmBodyPart, std::string *lpSimple, std::string *lpExtended);
-	HRESULT bodyPartToStructure(const std::string &input, vmime::ref<vmime::bodyPart> vmBodyPart, std::string *lpSimple, std::string *lpExtended);
-	std::string getStructureExtendedFields(vmime::ref<vmime::header> vmHeaderPart);
-	std::string parameterizedFieldToStructure(vmime::ref<vmime::parameterizedHeaderField> vmParamField);
+	HRESULT messagePartToStructure(const std::string &input, vmime::shared_ptr<vmime::bodyPart>, std::string *lpSimple, std::string *lpExtended);
+	HRESULT bodyPartToStructure(const std::string &input, vmime::shared_ptr<vmime::bodyPart>, std::string *lpSimple, std::string *lpExtended);
+	std::string getStructureExtendedFields(vmime::shared_ptr<vmime::header> vmHeaderPart);
+	std::string parameterizedFieldToStructure(vmime::shared_ptr<vmime::parameterizedHeaderField>);
 	std::string::size_type countBodyLines(const std::string &input, std::string::size_type start, std::string::size_type length);
 };
+
+} /* namespace */
 
 #endif

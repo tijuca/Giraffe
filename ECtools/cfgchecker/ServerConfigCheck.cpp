@@ -25,11 +25,10 @@ ServerConfigCheck::ServerConfigCheck(const char *lpszConfigFile) : ECConfigCheck
 
 	setting = getSetting("enable_hosted_kopano");
 	if (!setting.empty())
-		setHosted(parseBool(setting));
-
+		setHosted(parseBool(setting.c_str()));
 	setting = getSetting("enable_distributed_kopano");
 	if (!setting.empty())
-		setMulti(parseBool(setting));
+		setMulti(parseBool(setting.c_str()));
 }
 
 void ServerConfigCheck::loadChecks()
@@ -182,11 +181,9 @@ int ServerConfigCheck::testLoginname(const config_check_t *check)
 			printError(check->option2, "multi-tenancy enabled, but value does not contain %c: \"" + check->value2 + "\"");
 			return CHECK_ERROR;
 		}
-	} else {
-		if (check->value2.find("%c") != std::string::npos) {
-			printError(check->option2, "multi-tenancy disabled, but value contains %c: \"" + check->value2 + "\"");
-			return CHECK_ERROR;
-		}
+	} else if (check->value2.find("%c") != std::string::npos) {
+		printError(check->option2, "multi-tenancy disabled, but value contains %c: \"" + check->value2 + "\"");
+		return CHECK_ERROR;
 	}
 
 	return CHECK_OK;

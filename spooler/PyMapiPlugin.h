@@ -19,19 +19,20 @@
 #define _PYMAPIPLUGIN_H
 
 #include <Python.h>
+#include <memory>
+#include <kopano/zcdefs.h>
 #include <kopano/ECLogger.h>
 #include <kopano/ECConfig.h>
+#include <kopano/memory.hpp>
 #include "PythonSWIGRuntime.h"
 #include <edkmdb.h>
 
-#include <kopano/auto_free.h>
+class kcpy_decref {
+	public:
+	void operator()(PyObject *obj) { Py_DECREF(obj); }
+};
 
-inline void my_DECREF(PyObject *obj) {
-	Py_DECREF(obj);
-}
-
-//@fixme wrong name, autofree should be auto_decref
-typedef auto_free<PyObject, auto_free_dealloc<PyObject*, void, my_DECREF> >PyObjectAPtr;
+typedef KCHL::memory_ptr<PyObject, kcpy_decref> PyObjectAPtr;
 
 #define MAKE_CUSTOM_SCODE(sev,fac,code) \
 				(((unsigned int)(sev)<<31) | ((unsigned int)(1)<<29) | ((unsigned int)(fac)<<16) | ((unsigned int)(code)))
@@ -45,11 +46,9 @@ typedef auto_free<PyObject, auto_free_dealloc<PyObject*, void, my_DECREF> >PyObj
 #define MP_EXIT				4	// Exit the all the hook calls and go futher with the mail process.
 #define MP_RETRY_LATER		5	// Stop Process and retry later
 
-
-class PyMapiPlugin
-{
+class PyMapiPlugin _kc_final {
 public:
-	PyMapiPlugin(void);
+	PyMapiPlugin(void) = default;
 	virtual ~PyMapiPlugin(void);
 
 	HRESULT Init(ECLogger *lpLogger, PyObject *lpModMapiPlugin, const char* lpPluginManagerClassName, const char *lpPluginPath);
@@ -57,52 +56,41 @@ public:
 	HRESULT RulesProcessing(const char *lpFunctionName, IMAPISession *lpMapiSession, IAddrBook *lpAdrBook, IMsgStore *lpMsgStore, IExchangeModifyTable *lpEMTRules, ULONG *lpulResult);
 	HRESULT RequestCallExecution(const char *lpFunctionName, IMAPISession *lpMapiSession, IAddrBook *lpAdrBook, IMsgStore *lpMsgStore,  IMAPIFolder *lpFolder, IMessage *lpMessage, ULONG *lpulDoCallexe, ULONG *lpulResult);
 
-    swig_type_info *type_p_ECLogger;
-	swig_type_info *type_p_IAddrBook;
-	swig_type_info *type_p_IMAPIFolder;
-	swig_type_info *type_p_IMAPISession;
-	swig_type_info *type_p_IMsgStore;
-	swig_type_info *type_p_IMessage;
-	swig_type_info *type_p_IExchangeModifyTable;
+	swig_type_info *type_p_ECLogger = nullptr, *type_p_IAddrBook = nullptr;
+	swig_type_info *type_p_IMAPIFolder = nullptr;
+	swig_type_info *type_p_IMAPISession = nullptr;
+	swig_type_info *type_p_IMsgStore = nullptr;
+	swig_type_info *type_p_IMessage = nullptr;
+	swig_type_info *type_p_IExchangeModifyTable = nullptr;
 
 private:
-	PyObjectAPtr m_ptrMapiPluginManager;
-	ECLogger *m_lpLogger;
+	PyObjectAPtr m_ptrMapiPluginManager{nullptr};
+	ECLogger *m_lpLogger = nullptr;
 
-private:
 	// Inhibit (accidental) copying
 	PyMapiPlugin(const PyMapiPlugin &) = delete;
 	PyMapiPlugin &operator=(const PyMapiPlugin &) = delete;
 };
 
-
-
-class PyMapiPluginFactory
-{
+class PyMapiPluginFactory _kc_final {
 public:
-	PyMapiPluginFactory();
+	PyMapiPluginFactory(void) = default;
 	HRESULT Init(ECConfig* lpConfig, ECLogger *lpLogger);
 	~PyMapiPluginFactory();
 
 	HRESULT CreatePlugin(const char* lpPluginManagerClassName, PyMapiPlugin **lppPlugin);
 
 private:
-	PyObjectAPtr m_ptrModMapiPlugin;
-	bool m_bEnablePlugin;
+	PyObjectAPtr m_ptrModMapiPlugin{nullptr};
+	bool m_bEnablePlugin = false;
 	std::string m_strPluginPath;
-	ECLogger *m_lpLogger;
+	ECLogger *m_lpLogger = nullptr;
 
-private:
 	// Inhibit (accidental) copying
 	PyMapiPluginFactory(const PyMapiPluginFactory &) = delete;
 	PyMapiPluginFactory &operator=(const PyMapiPluginFactory &) = delete;
 };
 
-
-
-inline void my_delete(PyMapiPlugin *obj) { delete obj; }
-
-typedef auto_free<PyMapiPlugin, auto_free_dealloc<PyMapiPlugin*, void, my_delete> >PyMapiPluginAPtr;
-
+typedef KCHL::memory_ptr<PyMapiPlugin, std::default_delete<PyMapiPlugin> > PyMapiPluginAPtr;
 
 #endif

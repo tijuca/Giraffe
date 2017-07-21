@@ -19,26 +19,34 @@
 #define KC_CMDUTIL_HPP 1
 
 #include <kopano/zcdefs.h>
+#include <stdexcept>
 #include "ECICS.h"
 #include "SOAPUtils.h"
 
-#include <exception>
 #include <map>
 #include <set>
 #include <list>
 #include <string>
 
+namespace KC {
+
 // Above EC_TABLE_CHANGE_THRESHOLD, a TABLE_CHANGE notification is sent instead of individual notifications
 #define EC_TABLE_CHANGE_THRESHOLD 10
 
-class EntryId _zcp_final {
+class EntryId _kc_final {
 public:
     EntryId() { 
         updateStruct();
     }
     EntryId(const EntryId &s) { 
         m_data = s.m_data;
+        updateStruct();
     }
+	EntryId(EntryId &&o) :
+	    m_data(std::move(o.m_data))
+	{
+		updateStruct();
+	}
     EntryId(const entryId *entryid) {
         if(entryid) 
             m_data = std::string((char *)entryid->__ptr, entryid->__size);
@@ -67,20 +75,19 @@ public:
 
     unsigned int type() const {
 		auto d = reinterpret_cast<EID_V0 *>(const_cast<char *>(m_data.data()));
-		if (m_data.size() < offsetof(EID_V0, usType) + sizeof(d->usType)) {
-			ec_log_err("%s: entryid has size %zu; not enough for EID_V0.usType",
-				__func__, m_data.size());
-			throw runtime_error("entryid is not of type EID_V0");
-		}
-		return d->usType;
+		if (m_data.size() >= offsetof(EID_V0, usType) + sizeof(d->usType))
+			return d->usType;
+		ec_log_err("K-1570: %s: entryid has size %zu; not enough for EID_V0.usType (%zu)",
+			__func__, m_data.size(), offsetof(EID_V0, usType) + sizeof(d->usType));
+		throw runtime_error("K-1570: entryid is not of type EID_V0");
     }
 
     void setFlags(unsigned int ulFlags) {
 		auto d = reinterpret_cast<EID_V0 *>(const_cast<char *>(m_data.data()));
 		if (m_data.size() < offsetof(EID_V0, usFlags) + sizeof(d->usFlags)) {
-			ec_log_err("%s: entryid has size %zu; not enough for EID_V0.usFlags",
-				__func__, m_data.size());
-			throw runtime_error("entryid is not of type EID_V0");
+			ec_log_err("K-1571: %s: entryid has size %zu; not enough for EID_V0.usFlags (%zu)",
+				__func__, m_data.size(), offsetof(EID_V0, usFlags) + sizeof(d->usFlags));
+			throw runtime_error("K-1571: entryid is not of type EID_V0");
 		}
 		d->usFlags = ulFlags;
     }
@@ -111,7 +118,7 @@ private:
 };
 
 // this belongs to the DeleteObjects function
-typedef struct {
+struct DELETEITEM {
 	unsigned int ulId;
 	unsigned int ulParent;
 	bool fRoot;
@@ -125,31 +132,23 @@ typedef struct {
 	SOURCEKEY sSourceKey;
 	SOURCEKEY sParentSourceKey;
 	entryId sEntryId; //fixme: auto destroy entryid
-} DELETEITEM;
+};
 
 // Used to group notify flags and object type.
-typedef struct _TCN {
-	_TCN(unsigned int t, unsigned int f): ulFlags(f), ulType(t) {}
-	bool operator<(const _TCN &rhs) const { return ulFlags < rhs.ulFlags || (ulFlags == rhs.ulFlags && ulType < rhs.ulType); }
+struct TABLECHANGENOTIFICATION {
+	TABLECHANGENOTIFICATION(unsigned int t, unsigned int f): ulFlags(f), ulType(t) {}
+	bool operator<(const TABLECHANGENOTIFICATION &rhs) const { return ulFlags < rhs.ulFlags || (ulFlags == rhs.ulFlags && ulType < rhs.ulType); }
 
 	unsigned int ulFlags;
 	unsigned int ulType;
-} TABLECHANGENOTIFICATION;
+};
 
-class PARENTINFO _zcp_final {
+class PARENTINFO _kc_final {
 public:
-    PARENTINFO() : lItems(0), lFolders(0), lAssoc(0), lDeleted(0), lDeletedFolders(0), lDeletedAssoc(0), lUnread(0), ulStoreId(0) { }
-    ~PARENTINFO() { }
-	int lItems;
-	int lFolders;
-	int lAssoc;
-
-	int lDeleted;
-	int lDeletedFolders;
-	int lDeletedAssoc;
-
-	int lUnread;
-	unsigned int ulStoreId;
+	int lItems = 0, lFolders = 0, lAssoc = 0;
+	int lDeleted = 0, lDeletedFolders = 0, lDeletedAssoc = 0;
+	int lUnread = 0;
+	unsigned int ulStoreId = 0;
 };
 
 #define EC_DELETE_FOLDERS		0x00000001
@@ -216,23 +215,24 @@ ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const std::set<EntryId>& setOb
 ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const EntryId &entryid, unsigned int ulFlags);				// single entryid, folder or message
 ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const SOURCEKEY &sourcekey, unsigned int ulFlags);			// single sourcekey, folder or message
 
-typedef struct {
+struct NAMEDPROPDEF {
     GUID			guid;
     unsigned int	ulKind;
     unsigned int	ulId;
     std::string		strName;
-} NAMEDPROPDEF;
+};
 typedef std::map<unsigned int, NAMEDPROPDEF> NamedPropDefMap;
 
-typedef struct {
+struct CHILDPROPS {
     DynamicPropValArray *lpPropVals;
     DynamicPropTagArray *lpPropTags;
-} CHILDPROPS;
+};
 typedef std::map<unsigned int, CHILDPROPS> ChildPropsMap;
 
 
 ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQuery, bool fUnicode, unsigned int ulObjId, unsigned int ulParentId, unsigned int ulMaxSize, ChildPropsMap *lpChildProps, NamedPropDefMap *lpNamedProps);
 ECRESULT FreeChildProps(std::map<unsigned int, CHILDPROPS> *lpChildProps);
 
+} /* namespace */
 
 #endif /* KC_CMDUTIL_HPP */

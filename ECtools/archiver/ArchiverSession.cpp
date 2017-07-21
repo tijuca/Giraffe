@@ -16,17 +16,21 @@
  */
 
 #include <kopano/platform.h>
+#include <kopano/memory.hpp>
 #include "ArchiverSession.h"
 #include <kopano/ecversion.h>
 #include <kopano/mapi_ptr.h>
 #include <kopano/ECConfig.h>
 #include <kopano/ECLogger.h>
+#include <kopano/ECRestriction.h>
 #include <kopano/CommonUtil.h>
 #include <kopano/mapiext.h>
 #include <kopano/userutil.h>
 #include "ECMsgStore.h"
 
-typedef mapi_memory_ptr<ECSERVERLIST> ECServerListPtr;
+namespace KC {
+
+typedef KCHL::memory_ptr<ECSERVERLIST> ECServerListPtr;
 
 /**
  * Create a ArchiverSession object based on the passed configuration and a specific logger
@@ -94,14 +98,14 @@ HRESULT ArchiverSession::Create(const MAPISessionPtr &ptrSession, ECConfig *lpCo
 {
 	HRESULT hr = hrSuccess;
 	ArchiverSession *lpSession = NULL;
-	ECLogger *lpLocalLogger = lpLogger;
+	KCHL::object_ptr<ECLogger> lpLocalLogger;
 	const char *lpszSslKeyFile = NULL;
 	const char *lpszSslKeyPass = NULL;
 
-	if (lpLocalLogger != NULL)
-		lpLocalLogger->AddRef();
+	if (lpLogger != nullptr)
+		lpLocalLogger.reset(lpLogger);
 	else
-		lpLocalLogger = new ECLogger_Null();
+		lpLocalLogger.reset(new ECLogger_Null(), false);
 
 	if (lpConfig) {
 		lpszSslKeyFile = lpConfig->GetSetting("sslkey_file", "", NULL);
@@ -112,13 +116,10 @@ HRESULT ArchiverSession::Create(const MAPISessionPtr &ptrSession, ECConfig *lpCo
 	hr = lpSession->Init(ptrSession, lpszSslKeyFile, lpszSslKeyPass);
 	if (FAILED(hr)) {
 		delete lpSession;
-		goto exit;
+		return hr;
 	}
 
 	lpptrSession->reset(lpSession);
-
-exit:
-	lpLocalLogger->Release();
 	return hr;
 }
 
@@ -161,7 +162,10 @@ HRESULT ArchiverSession::Init(const char *lpszServerPath, const char *lpszSslPat
 {
 	HRESULT hr;
 	
-	hr = HrOpenECAdminSession(m_lpLogger, &m_ptrSession, "kopano-archiver:system", PROJECT_SVN_REV_STR, (char*)lpszServerPath, EC_PROFILE_FLAGS_NO_NOTIFICATIONS, (char*)lpszSslPath, (char*)lpszSslPass);
+	hr = HrOpenECAdminSession(&~m_ptrSession, "kopano-archiver:system",
+	     PROJECT_SVN_REV_STR, const_cast<char *>(lpszServerPath),
+	     EC_PROFILE_FLAGS_NO_NOTIFICATIONS, const_cast<char *>(lpszSslPath),
+	     const_cast<char *>(lpszSslPass));
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Unable to open Admin ArchiverSession.");
 		switch (hr) {
@@ -179,7 +183,7 @@ HRESULT ArchiverSession::Init(const char *lpszServerPath, const char *lpszSslPat
 		return hr;
 	}
 
-	hr = HrOpenDefaultStore(m_ptrSession, MDB_NO_MAIL | MDB_TEMPORARY, &m_ptrAdminStore);
+	hr = HrOpenDefaultStore(m_ptrSession, MDB_NO_MAIL | MDB_TEMPORARY, &~m_ptrAdminStore);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Unable to open Admin store (hr=%s).", stringify(hr,true).c_str());
 		return hr;
@@ -207,7 +211,7 @@ HRESULT ArchiverSession::Init(const MAPISessionPtr &ptrSession, const char *lpsz
 
 	m_ptrSession = ptrSession;
 
-	hr = HrOpenDefaultStore(m_ptrSession, &m_ptrAdminStore);
+	hr = HrOpenDefaultStore(m_ptrSession, &~m_ptrAdminStore);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -237,19 +241,17 @@ HRESULT ArchiverSession::OpenStoreByName(const tstring &strUser, LPMDB *lppMsgSt
 	ULONG cbEntryId = 0;
 	EntryIdPtr ptrEntryId;
 	
-	hr = m_ptrAdminStore->QueryInterface(ptrEMS.iid, &ptrEMS);
+	hr = m_ptrAdminStore->QueryInterface(ptrEMS.iid(), &~ptrEMS);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Failed to get EMS interface (hr=%s).", stringify(hr, true).c_str());
 		return hr;
 	}
-	
-	hr = ptrEMS->CreateStoreEntryID(NULL, (LPTSTR)strUser.c_str(), fMapiUnicode, &cbEntryId, &ptrEntryId);
+	hr = ptrEMS->CreateStoreEntryID(NULL, (LPTSTR)strUser.c_str(), fMapiUnicode, &cbEntryId, &~ptrEntryId);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Failed to create store entryid for user '" TSTRING_PRINTF "' (hr=%s).", strUser.c_str(), stringify(hr, true).c_str());
 		return hr;
 	}
-		
-	hr = m_ptrSession->OpenMsgStore(0, cbEntryId, ptrEntryId, &ptrUserStore.iid, MDB_WRITE|fMapiDeferredErrors|MDB_NO_MAIL|MDB_TEMPORARY, &ptrUserStore);
+	hr = m_ptrSession->OpenMsgStore(0, cbEntryId, ptrEntryId, &ptrUserStore.iid(), MDB_WRITE | fMapiDeferredErrors | MDB_NO_MAIL | MDB_TEMPORARY, &~ptrUserStore);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Failed to open store for user '" TSTRING_PRINTF "' (hr=%s).", strUser.c_str(), stringify(hr, true).c_str());
 		return hr;
@@ -292,7 +294,7 @@ HRESULT ArchiverSession::OpenStore(const entryid_t &sEntryId, ULONG ulFlags, LPM
 		
 		hr = ptrSession->OpenStore(sTempEntryId, ulFlags, lppMsgStore);		
 	} else {	
-		hr = m_ptrSession->OpenMsgStore(0, sEntryId.size(), sEntryId, &ptrUserStore.iid, ulFlags, &ptrUserStore);
+		hr = m_ptrSession->OpenMsgStore(0, sEntryId.size(), sEntryId, &ptrUserStore.iid(), ulFlags, &~ptrUserStore);
 		if (hr != hrSuccess) {
 			m_lpLogger->Log(EC_LOGLEVEL_INFO, "Failed to open store. (entryid=%s, hr=%s)", sEntryId.tostring().c_str(), stringify(hr, true).c_str());
 			return hr;
@@ -357,7 +359,7 @@ HRESULT ArchiverSession::GetUserInfo(const tstring &strUser, abentryid_t *lpsEnt
 	ULONG cbEntryId = 0;
 	EntryIdPtr ptrEntryId;
 
-	hr = HrOpenDefaultStore(m_ptrSession, &ptrStore);
+	hr = HrOpenDefaultStore(m_ptrSession, &~ptrStore);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Failed to open default store (hr=%s)", stringify(hr, true).c_str());
 		return hr;
@@ -368,8 +370,7 @@ HRESULT ArchiverSession::GetUserInfo(const tstring &strUser, abentryid_t *lpsEnt
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Failed to obtain the serviceadmin interface (hr=%s)", stringify(hr, true).c_str());
 		return hr;
 	}
-
-	hr = ptrServiceAdmin->ResolveUserName((LPCTSTR)strUser.c_str(), fMapiUnicode, &cbEntryId, &ptrEntryId);
+	hr = ptrServiceAdmin->ResolveUserName((LPCTSTR)strUser.c_str(), fMapiUnicode, &cbEntryId, &~ptrEntryId);
 	if (hr != hrSuccess) {
 		m_lpLogger->Log(EC_LOGLEVEL_INFO, "Failed to resolve user '" TSTRING_PRINTF "' (hr=%s)", strUser.c_str(), stringify(hr, true).c_str());
 		return hr;
@@ -380,17 +381,16 @@ HRESULT ArchiverSession::GetUserInfo(const tstring &strUser, abentryid_t *lpsEnt
 		MailUserPtr ptrUser;
 		ULONG cValues = 0;
 		SPropArrayPtr ptrUserProps;
-
-		SizedSPropTagArray(2, sptaUserProps) = {2, {PR_DISPLAY_NAME, PR_DISPLAY_TYPE_EX}};
+		static constexpr const SizedSPropTagArray(2, sptaUserProps) =
+			{2, {PR_DISPLAY_NAME, PR_DISPLAY_TYPE_EX}};
 		enum {IDX_DISPLAY_NAME, IDX_DISPLAY_TYPE_EX};
 
-		hr = m_ptrSession->OpenEntry(cbEntryId, ptrEntryId, &IID_IMailUser, 0, &ulType, &ptrUser);
+		hr = m_ptrSession->OpenEntry(cbEntryId, ptrEntryId, &IID_IMailUser, 0, &ulType, &~ptrUser);
 		if (hr != hrSuccess) {
 			m_lpLogger->Log(EC_LOGLEVEL_INFO, "Failed to open user object for user '" TSTRING_PRINTF "' (hr=%s)", strUser.c_str(), stringify(hr, true).c_str());
 			return hr;
 		}
-
-		hr = ptrUser->GetProps((LPSPropTagArray)&sptaUserProps, 0, &cValues, &ptrUserProps);
+		hr = ptrUser->GetProps(sptaUserProps, 0, &cValues, &~ptrUserProps);
 		if (FAILED(hr)) {
 			m_lpLogger->Log(EC_LOGLEVEL_INFO, "Failed to obtain properties from user '" TSTRING_PRINTF "' (hr=0x%08x)", strUser.c_str(), hr);
 			return hr;
@@ -429,14 +429,14 @@ HRESULT ArchiverSession::GetUserInfo(const abentryid_t &sEntryId, tstring *lpstr
 	MAPIPropPtr ptrUser;
 	ULONG cUserProps = 0;
 	SPropArrayPtr ptrUserProps;
-
-	SizedSPropTagArray(2, sptaUserProps) = {2, {PR_ACCOUNT, PR_DISPLAY_NAME}};
+	static constexpr const SizedSPropTagArray(2, sptaUserProps) =
+		{2, {PR_ACCOUNT, PR_DISPLAY_NAME}};
 	enum {IDX_ACCOUNT, IDX_DISPLAY_NAME};
 
-	hr = m_ptrSession->OpenEntry(sEntryId.size(), sEntryId, NULL, MAPI_DEFERRED_ERRORS, &ulType, &ptrUser);
+	hr = m_ptrSession->OpenEntry(sEntryId.size(), sEntryId, nullptr, MAPI_DEFERRED_ERRORS, &ulType, &~ptrUser);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrUser->GetProps((LPSPropTagArray)&sptaUserProps, 0, &cUserProps, &ptrUserProps);
+	hr = ptrUser->GetProps(sptaUserProps, 0, &cUserProps, &~ptrUserProps);
 	if (FAILED(hr))
 		return hr;
 
@@ -472,34 +472,28 @@ HRESULT ArchiverSession::GetGAL(LPABCONT *lppAbContainer)
 	MAPITablePtr	ptrABRCTable;
 	SRowSetPtr		ptrRows;
 	ULONG			ulType = 0;
-
-	SizedSPropTagArray(1, sGALProps) = {1, {PR_ENTRYID}};
+	static constexpr const SizedSPropTagArray(1, sGALProps) = {1, {PR_ENTRYID}};
 	SPropValue			  sGALPropVal = {0};
-	SRestriction		  sGALRestrict = {0};
 
-	hr = m_ptrSession->OpenAddressBook(0, &ptrAdrBook.iid, AB_NO_DIALOG, &ptrAdrBook);
+	hr = m_ptrSession->OpenAddressBook(0, &ptrAdrBook.iid(), AB_NO_DIALOG, &~ptrAdrBook);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrAdrBook->OpenEntry(0, NULL, &ptrABRootContainer.iid, MAPI_BEST_ACCESS, &ulType, (LPUNKNOWN*)&ptrABRootContainer);
+	hr = ptrAdrBook->OpenEntry(0, nullptr, &ptrABRootContainer.iid(), MAPI_BEST_ACCESS, &ulType, &~ptrABRootContainer);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrABRootContainer->GetHierarchyTable(0, &ptrABRCTable);
+	hr = ptrABRootContainer->GetHierarchyTable(0, &~ptrABRCTable);
 	if (hr != hrSuccess)
 		return hr;
-
-	sGALRestrict.rt = RES_PROPERTY;
-	sGALRestrict.res.resProperty.relop = RELOP_EQ;
-	sGALRestrict.res.resProperty.ulPropTag = PR_AB_PROVIDER_ID;
-	sGALRestrict.res.resProperty.lpProp = &sGALPropVal;
 
 	sGALPropVal.ulPropTag = PR_AB_PROVIDER_ID;
 	sGALPropVal.Value.bin.cb = sizeof(GUID);
 	sGALPropVal.Value.bin.lpb = (LPBYTE)&MUIDECSAB;
 
-	hr = ptrABRCTable->SetColumns((LPSPropTagArray)&sGALProps, TBL_BATCH); 
+	hr = ptrABRCTable->SetColumns(sGALProps, TBL_BATCH); 
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrABRCTable->Restrict(&sGALRestrict, TBL_BATCH);
+	hr = ECPropertyRestriction(RELOP_EQ, PR_AB_PROVIDER_ID, &sGALPropVal, ECRestriction::Cheap)
+	     .RestrictTable(ptrABRCTable, TBL_BATCH);
 	if (hr != hrSuccess)
 		return hr;
 	hr = ptrABRCTable->QueryRows(1, 0, &ptrRows);
@@ -508,8 +502,9 @@ HRESULT ArchiverSession::GetGAL(LPABCONT *lppAbContainer)
 	if (ptrRows.size() != 1 || ptrRows[0].lpProps[0].ulPropTag != PR_ENTRYID)
 		return MAPI_E_NOT_FOUND;
 
-	hr = ptrAdrBook->OpenEntry(ptrRows[0].lpProps[0].Value.bin.cb, (LPENTRYID)ptrRows[0].lpProps[0].Value.bin.lpb,
-							&ptrGAL.iid, MAPI_BEST_ACCESS, &ulType, (LPUNKNOWN*)&ptrGAL);
+	hr = ptrAdrBook->OpenEntry(ptrRows[0].lpProps[0].Value.bin.cb,
+	     reinterpret_cast<ENTRYID *>(ptrRows[0].lpProps[0].Value.bin.lpb), &ptrGAL.iid(),
+	     MAPI_BEST_ACCESS, &ulType, &~ptrGAL);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -536,10 +531,10 @@ HRESULT ArchiverSession::CompareStoreIds(LPMDB lpUserStore, LPMDB lpArchiveStore
 	SPropValuePtr ptrArchiveStoreEntryId;
 	ULONG ulResult = 0;
 
-	hr = HrGetOneProp(lpUserStore, PR_ENTRYID, &ptrUserStoreEntryId);
+	hr = HrGetOneProp(lpUserStore, PR_ENTRYID, &~ptrUserStoreEntryId);
 	if (hr != hrSuccess)
 		return hr;
-	hr = HrGetOneProp(lpArchiveStore, PR_ENTRYID, &ptrArchiveStoreEntryId);
+	hr = HrGetOneProp(lpArchiveStore, PR_ENTRYID, &~ptrArchiveStoreEntryId);
 	if (hr != hrSuccess)
 		return hr;
 	
@@ -607,7 +602,8 @@ HRESULT ArchiverSession::OpenMAPIProp(ULONG cbEntryID, LPENTRYID lpEntryID, LPMA
 	ULONG ulType = 0;
 	MAPIPropPtr ptrMapiProp;
 
-	hr = m_ptrSession->OpenEntry(cbEntryID, lpEntryID, &ptrMapiProp.iid, MAPI_BEST_ACCESS|fMapiDeferredErrors, &ulType, &ptrMapiProp);
+	hr = m_ptrSession->OpenEntry(cbEntryID, lpEntryID, &ptrMapiProp.iid(),
+	     MAPI_BEST_ACCESS|fMapiDeferredErrors, &ulType, &~ptrMapiProp);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -634,11 +630,11 @@ HRESULT ArchiverSession::OpenOrCreateArchiveStore(const tstring& strUserName, co
 	hr = m_ptrAdminStore.QueryInterface(ptrServiceAdmin);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrServiceAdmin->GetArchiveStoreEntryID(strUserName.c_str(), strServerName.c_str(), fMapiUnicode, &cbStoreId, &ptrStoreId);
+	hr = ptrServiceAdmin->GetArchiveStoreEntryID(strUserName.c_str(), strServerName.c_str(), fMapiUnicode, &cbStoreId, &~ptrStoreId);
 	if (hr == hrSuccess)
-		hr = m_ptrSession->OpenMsgStore(0, cbStoreId, ptrStoreId, &ptrArchiveStore.iid, MDB_WRITE, &ptrArchiveStore);
+		hr = m_ptrSession->OpenMsgStore(0, cbStoreId, ptrStoreId, &ptrArchiveStore.iid(), MDB_WRITE, &~ptrArchiveStore);
 	else if (hr == MAPI_E_NOT_FOUND)
-		hr = CreateArchiveStore(strUserName, strServerName, &ptrArchiveStore);
+		hr = CreateArchiveStore(strUserName, strServerName, &~ptrArchiveStore);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -656,8 +652,7 @@ HRESULT ArchiverSession::GetArchiveStoreEntryId(const tstring& strUserName, cons
 	hr = m_ptrAdminStore.QueryInterface(ptrServiceAdmin);
 	if (hr != hrSuccess)
 		return hr;
-
-	hr = ptrServiceAdmin->GetArchiveStoreEntryID(strUserName.c_str(), strServerName.c_str(), fMapiUnicode, &cbStoreId, &ptrStoreId);
+	hr = ptrServiceAdmin->GetArchiveStoreEntryID(strUserName.c_str(), strServerName.c_str(), fMapiUnicode, &cbStoreId, &~ptrStoreId);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -684,35 +679,35 @@ HRESULT ArchiverSession::CreateArchiveStore(const tstring& strUserName, const ts
 	hr = GetUserInfo(strUserName, &userId, NULL, NULL);
 	if (hr != hrSuccess)
 		return hr;
-	hr = HrGetRemoteAdminStore(m_ptrSession, m_ptrAdminStore, strServerName.c_str(), fMapiUnicode, &ptrRemoteAdminStore);
+	hr = HrGetRemoteAdminStore(m_ptrSession, m_ptrAdminStore, strServerName.c_str(), fMapiUnicode, &~ptrRemoteAdminStore);
 	if (hr != hrSuccess)
 		return hr;
 	hr = ptrRemoteAdminStore.QueryInterface(ptrRemoteServiceAdmin);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrRemoteServiceAdmin->CreateEmptyStore(ECSTORE_TYPE_ARCHIVE, userId.size(), userId, EC_OVERRIDE_HOMESERVER, &cbStoreId, &ptrStoreId, &cbRootId, &ptrRootId);
+	hr = ptrRemoteServiceAdmin->CreateEmptyStore(ECSTORE_TYPE_ARCHIVE, userId.size(), userId, EC_OVERRIDE_HOMESERVER, &cbStoreId, &~ptrStoreId, &cbRootId, &~ptrRootId);
 	if (hr != hrSuccess)
 		return hr;
 
 	// The entryids returned from CreateEmptyStore are unwrapped and unusable from external client code. So
 	// we'll resolve the correct entryids through GetArchiveStoreEntryID.
-	hr = ptrRemoteServiceAdmin->GetArchiveStoreEntryID(strUserName.c_str(), strServerName.c_str(), fMapiUnicode, &cbStoreId, &ptrStoreId);
+	hr = ptrRemoteServiceAdmin->GetArchiveStoreEntryID(strUserName.c_str(), strServerName.c_str(), fMapiUnicode, &cbStoreId, &~ptrStoreId);
 	if (hr != hrSuccess)
 		return hr;
-	hr = m_ptrSession->OpenMsgStore(0, cbStoreId, ptrStoreId, &ptrArchiveStore.iid, MDB_WRITE, &ptrArchiveStore);
+	hr = m_ptrSession->OpenMsgStore(0, cbStoreId, ptrStoreId, &ptrArchiveStore.iid(), MDB_WRITE, &~ptrArchiveStore);
 	if (hr != hrSuccess)
 		return hr;
-	hr = ptrArchiveStore->OpenEntry(0, NULL, &ptrRoot.iid, MAPI_MODIFY, &ulType, &ptrRoot);
+	hr = ptrArchiveStore->OpenEntry(0, nullptr, &ptrRoot.iid(), MAPI_MODIFY, &ulType, &~ptrRoot);
 	if (hr != hrSuccess)
 		return hr;
 
 	hr = ptrRoot->CreateFolder(FOLDER_GENERIC,
 	     const_cast<TCHAR *>(_T("IPM_SUBTREE")),
 	     const_cast<TCHAR *>(_T("")), &IID_IMAPIFolder, fMapiUnicode,
-	     &ptrIpmSubtree);
+	     &~ptrIpmSubtree);
 	if (hr != hrSuccess)
 		return hr;
-	hr = HrGetOneProp(ptrIpmSubtree, PR_ENTRYID, &ptrIpmSubtreeId);
+	hr = HrGetOneProp(ptrIpmSubtree, PR_ENTRYID, &~ptrIpmSubtreeId);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -725,3 +720,5 @@ HRESULT ArchiverSession::CreateArchiveStore(const tstring& strUserName, const ts
 	return ptrArchiveStore->QueryInterface(IID_IMsgStore,
 		reinterpret_cast<LPVOID *>(lppArchiveStore));
 }
+
+} /* namespace */

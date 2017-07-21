@@ -23,6 +23,10 @@
 
 #include "ECGenericObjectTable.h"
 
+struct soap;
+
+namespace KC {
+
 /*
  * This object is an actual table, with a cursor in-memory. We also keep the complete
  * keyset of the table in memory, so seeks and queries can be really fast. Also, we
@@ -32,20 +36,19 @@
 class ECSession;
 
 // Objectdata for a store
-typedef struct _ECODStore {
+struct ECODStore {
 	unsigned int	ulStoreId;		// The Store ID this table is watching (0 == multi-store)
 	unsigned int	ulFolderId;		// The Folder ID this table is watching (0 == multi-folder)
 	unsigned int	ulObjType;
 	unsigned int	ulFlags;
 	unsigned int 	ulTableFlags;
 	GUID*			lpGuid;			// The GUID of the store
-}ECODStore;
+};
 
 // For ulTableFlags
 #define TABLE_FLAG_OVERRIDE_HOME_MDB 0x00000001
 
-class ECStoreObjectTable : public ECGenericObjectTable
-{
+class ECStoreObjectTable : public ECGenericObjectTable {
 protected:
 	ECStoreObjectTable(ECSession *lpSession, unsigned int ulStoreId, GUID *lpGuid, unsigned int ulFolderId, unsigned int ulObjType, unsigned int ulFlags, unsigned int ulTableFlags, const ECLocale &locale);
 	virtual ~ECStoreObjectTable();
@@ -75,13 +78,13 @@ private:
 	virtual ECRESULT ReloadTableMVData(ECObjectTableList* lplistRows, ECListInt* lplistMVPropTag);
 	virtual ECRESULT CheckPermissions(unsigned int ulObjId);
 
-	unsigned int ulPermission;
-	bool		 fPermissionRead;
-
+	unsigned int ulPermission = 0;
+	bool fPermissionRead = false;
 };
 
 ECRESULT GetDeferredTableUpdates(ECDatabase *lpDatabase, unsigned int ulFolderId, std::list<unsigned int> *lpDeferred);
 ECRESULT GetDeferredTableUpdates(ECDatabase *lpDatabase, ECObjectTableList* lpRowList, std::list<unsigned int> *lpDeferred);
 
+} /* namespace */
 
 #endif // OBJECTTABLE_H

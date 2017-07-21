@@ -16,7 +16,7 @@
  */
 
 #include <kopano/platform.h>
-
+#include <kopano/memory.hpp>
 #include "StreamUtil.h"
 #include "StorageUtil.h"
 #include "cmdutil.hpp"
@@ -67,6 +67,15 @@
 	  <message>
 */
 
+using namespace KCHL;
+
+static inline bool operator<(const GUID &lhs, const GUID &rhs)
+{
+	return memcmp(&lhs, &rhs, sizeof(GUID)) < 0;
+}
+
+namespace KC {
+
 const static struct StreamCaps {
 	bool bSupportUnicode;
 } g_StreamCaps[] = {
@@ -86,13 +95,8 @@ const static struct StreamCaps {
 // External objects
 extern ECSessionManager *g_lpSessionManager;	// ECServerEntrypoint.cpp
 
-static inline bool operator<(const GUID &lhs, const GUID &rhs) {
-	return memcmp(&lhs, &rhs, sizeof(GUID)) < 0;
-}
-
 // Helper class for mapping named properties from the stream to local proptags
-class NamedPropertyMapper
-{
+class NamedPropertyMapper {
 public:
 	NamedPropertyMapper(ECDatabase *lpDatabase);
 
@@ -113,7 +117,7 @@ private:
 NamedPropertyMapper::NamedPropertyMapper(ECDatabase *lpDatabase)
 	: m_lpDatabase(lpDatabase) 
 {
-	ASSERT(lpDatabase != NULL);
+	assert(lpDatabase != NULL);
 }
 
 ECRESULT NamedPropertyMapper::GetId(const GUID &guid, unsigned int ulNameId, unsigned int *lpulId)
@@ -121,15 +125,14 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, unsigned int ulNameId, uns
 	ECRESULT er = erSuccess;
 
 	std::string strQuery;
-	DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
 	DB_ROW lpRow = NULL;
 
 	nameidkey_t key(guid, ulNameId);
 	nameidmap_t::const_iterator i = m_mapNameIds.find(key);
-
-	if (i != m_mapNameIds.end()) {
+	if (i != m_mapNameIds.cend()) {
 		*lpulId = i->second;
-		goto exit;
+		return erSuccess;
 	}
 
 	// Check the database
@@ -140,13 +143,12 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, unsigned int ulNameId, uns
 
 	er = m_lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	if ((lpRow = m_lpDatabase->FetchRow(lpResult)) != NULL) {
 		if (lpRow[0] == NULL) {
-			er = KCERR_DATABASE_ERROR;
 			ec_log_err("NamedPropertyMapper::GetId(): column null");
-			goto exit;
+			return KCERR_DATABASE_ERROR;
 		}
 
 		*lpulId = atoui((char*)lpRow[0]) + 0x8501;
@@ -158,19 +160,13 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, unsigned int ulNameId, uns
 		
 		er = m_lpDatabase->DoInsert(strQuery, lpulId);
 		if (er != erSuccess)
-			goto exit;
-
+			return er;
 		*lpulId += 0x8501;
 	}
 
 	// *lpulId now contains the local propid, update the cache
 	m_mapNameIds.insert(nameidmap_t::value_type(key, *lpulId));
-
-exit:
-	if (lpResult)
-		m_lpDatabase->FreeResult(lpResult);
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT NamedPropertyMapper::GetId(const GUID &guid, const std::string &strNameString, unsigned int *lpulId)
@@ -178,15 +174,14 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, const std::string &strName
 	ECRESULT er = erSuccess;
 
 	std::string strQuery;
-	DB_RESULT lpResult = NULL;
+	DB_RESULT lpResult;
 	DB_ROW lpRow = NULL;
 
 	namestringkey_t key(guid, strNameString);
 	namestringmap_t::const_iterator i = m_mapNameStrings.find(key);
-
-	if (i != m_mapNameStrings.end()) {
+	if (i != m_mapNameStrings.cend()) {
 		*lpulId = i->second;
-		goto exit;
+		return erSuccess;
 	}
 
 	// Check the database
@@ -197,13 +192,12 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, const std::string &strName
 
 	er = m_lpDatabase->DoSelect(strQuery, &lpResult);
 	if (er != erSuccess)
-		goto exit;
+		return er;
 
 	if ((lpRow = m_lpDatabase->FetchRow(lpResult)) != NULL) {
 		if (lpRow[0] == NULL) {
-			er = KCERR_DATABASE_ERROR;
 			ec_log_err("NamedPropertyMapper::GetId(): column null");
-			goto exit;
+			return KCERR_DATABASE_ERROR;
 		}
 
 		*lpulId = atoui((char*)lpRow[0]) + 0x8501;
@@ -215,19 +209,13 @@ ECRESULT NamedPropertyMapper::GetId(const GUID &guid, const std::string &strName
 		
 		er = m_lpDatabase->DoInsert(strQuery, lpulId);
 		if (er != erSuccess)
-			goto exit;
-
+			return er;
 		*lpulId += 0x8501;
 	}
 
 	// *lpulId now contains the local propid, update the cache
 	m_mapNameStrings.insert(namestringmap_t::value_type(key, *lpulId));
-
-exit:
-	if (lpResult)
-		m_lpDatabase->FreeResult(lpResult);
-
-	return er;
+	return erSuccess;
 }
 
 // Utility Functions
@@ -554,12 +542,12 @@ ECRESULT SerializePropVal(LPCSTREAMCAPS lpStreamCaps, const struct propVal &sPro
 		ulPropTag = CHANGE_PROP_TYPE(ulPropTag, PT_MV_STRING8);
 
 	if (PROP_ID(ulPropTag) > 0x8500) {
-		ASSERT(lpNamedPropDefs);
+		assert(lpNamedPropDefs != NULL);
 		if (!lpNamedPropDefs)
 			return KCERR_INVALID_TYPE;
 		iNamedPropDef = lpNamedPropDefs->find(ulPropTag);
-		ASSERT(iNamedPropDef != lpNamedPropDefs->end());
-		if (iNamedPropDef == lpNamedPropDefs->end())
+		assert(iNamedPropDef != lpNamedPropDefs->cend());
+		if (iNamedPropDef == lpNamedPropDefs->cend())
 			return KCERR_NOT_FOUND;
 	}
 	
@@ -684,7 +672,7 @@ ECRESULT SerializePropVal(LPCSTREAMCAPS lpStreamCaps, const struct propVal &sPro
 	
 	// If property is named property in the dynamic range we need to add some extra info
 	if (PROP_ID(sPropVal.ulPropTag) > 0x8500) {
-		ASSERT(lpNamedPropDefs && iNamedPropDef != lpNamedPropDefs->end());
+		assert(lpNamedPropDefs != NULL && iNamedPropDef != lpNamedPropDefs->cend());
 		// Send out the GUID.
 		er = lpSink->Write(&iNamedPropDef->second.guid, 1, sizeof(iNamedPropDef->second.guid));
 		if (er == erSuccess)
@@ -734,25 +722,19 @@ static ECRESULT GetBestBody(ECDatabase *lpDatabase, unsigned int ulObjId,
 {
 	ECRESULT er = erSuccess;
 	DB_ROW 			lpDBRow = NULL;
-	DB_RESULT		lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 	string strQuery;
 
 	strQuery = "SELECT tag FROM properties WHERE hierarchyid=" + stringify(ulObjId) + " AND tag IN (0x1009, 0x1013) ORDER BY tag LIMIT 1";
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess)
-		goto exit;
-
+		return er;
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
 	if (lpDBRow && lpDBRow[0])
 		*lpstrBestBody = lpDBRow[0];
 	else
 		*lpstrBestBody = "0";
-		
- exit:
-	if (lpDBResult)
-		lpDatabase->FreeResult(lpDBResult);
-
-	return er;
+	return erSuccess;
 }
 
 static ECRESULT SerializeProps(ECSession *lpecSession, ECDatabase *lpDatabase,
@@ -768,23 +750,20 @@ static ECRESULT SerializeProps(ECSession *lpecSession, ECDatabase *lpDatabase,
 
 	DB_ROW 			lpDBRow = NULL;
 	DB_LENGTHS		lpDBLen = NULL;
-	DB_RESULT		lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 	std::string		strQuery;
-	
-	ECMemStream *	lpStream = NULL;
-	IStream *		lpIStream = NULL;
+	object_ptr<ECMemStream> lpStream;
+	object_ptr<IStream> lpIStream;
 	ECStreamSerializer *	lpTempSink = NULL;
 	bool			bUseSQLMulti = parseBool(g_lpSessionManager->GetConfig()->GetSetting("enable_sql_procedures"));
 
 	std::list<struct propVal> sPropValList;
 
-	ASSERT(lpStreamCaps != NULL);
-	
-	er = ECMemStream::Create(NULL, 0, STGM_SHARE_EXCLUSIVE | STGM_WRITE, NULL, NULL, NULL, &lpStream);
+	assert(lpStreamCaps != NULL);
+	er = ECMemStream::Create(nullptr, 0, STGM_SHARE_EXCLUSIVE | STGM_WRITE, nullptr, nullptr, nullptr, &~lpStream);
 	if (er != erSuccess)
 		goto exit;
-		
-	er = lpStream->QueryInterface(IID_IStream, (void **)&lpIStream);
+	er = lpStream->QueryInterface(IID_IStream, &~lpIStream);
 	if (er != erSuccess)
 		goto exit;
 	
@@ -844,8 +823,9 @@ static ECRESULT SerializeProps(ECSession *lpecSession, ECDatabase *lpDatabase,
 		++ulCount;
 	}
 
-	for (std::list<struct propVal>::const_iterator it = sPropValList.begin(); it != sPropValList.end(); ++it) {
-		er = SerializePropVal(lpStreamCaps, *it, lpTempSink, NULL);		// No NamedPropDefMap needed for computed properties
+	for (const auto &pv : sPropValList) {
+		/* No NamedPropDefMap needed for computed properties */
+		er = SerializePropVal(lpStreamCaps, pv, lpTempSink, NULL);
 		if (er != erSuccess)
 			goto exit;
 		++ulCount;
@@ -860,19 +840,7 @@ static ECRESULT SerializeProps(ECSession *lpecSession, ECDatabase *lpDatabase,
 		goto exit;
 
 exit:
-	if (lpStream)
-		lpStream->Release();
-		
-	if (lpIStream)
-		lpIStream->Release();
-
 	delete lpTempSink;
-
-	if (lpDatabase) {
-		if (lpDBResult)
-			lpDatabase->FreeResult(lpDBResult);
-	}
-	
 	if (soap) {
 		soap_destroy(soap);
 		soap_end(soap);
@@ -911,13 +879,11 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECDatabase *lpStreamDatabase, 
 	unsigned int	ulSubObjType = 0;
 	unsigned int	ulCount = 0;
 	ChildPropsMap	mapChildProps;
-	ChildPropsMap::const_iterator iterChild;
 	NamedPropDefMap	mapNamedPropDefs;
 
 	DB_ROW 			lpDBRow = NULL;
 	DB_LENGTHS		lpDBLen = NULL;
-	DB_RESULT		lpDBResult = NULL;
-	DB_RESULT		lpDBResultAttachment = NULL;
+	DB_RESULT lpDBResult, lpDBResultAttachment;
 	std::string		strQuery;
 	bool			bUseSQLMulti = parseBool(g_lpSessionManager->GetConfig()->GetSetting("enable_sql_procedures"));
 
@@ -989,9 +955,8 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECDatabase *lpStreamDatabase, 
 			goto exit;
 			
 		// Output properties for this object
-		iterChild = mapChildProps.find(ulSubObjId);
-		
-		if(iterChild != mapChildProps.end()) {
+		auto iterChild = mapChildProps.find(ulSubObjId);
+		if (iterChild != mapChildProps.cend()) {
 			struct propValArray props;
 			
 			iterChild->second.lpPropVals->GetPropValArray(&props);
@@ -1069,9 +1034,6 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECDatabase *lpStreamDatabase, 
 				if (er != erSuccess)
 					goto exit;
 			}
-			
-			lpStreamDatabase->FreeResult(lpDBResultAttachment);
-			lpDBResultAttachment = NULL;
 		}
 
 	}
@@ -1082,12 +1044,6 @@ ECRESULT SerializeMessage(ECSession *lpecSession, ECDatabase *lpStreamDatabase, 
 exit:
 	if (er != erSuccess)
 		ec_log_err("SerializeObject failed with error code 0x%08x for object %d", er, ulObjId );
-	if (lpDBResult)
-		lpStreamDatabase->FreeResult(lpDBResult);
-		
-	if (lpDBResultAttachment)
-	 	lpStreamDatabase->FreeResult(lpDBResultAttachment);
-	 	
 	FreeChildProps(&mapChildProps);
 		
 	return er;
@@ -1337,12 +1293,10 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 	std::string		strColName;
 
 	SOURCEKEY		sSourceKey;
-
-	DB_RESULT		lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 	DB_ROW			lpDBRow = NULL;
 
 	std::set<unsigned int>				setInserted;
-	std::set<unsigned int>::const_iterator iterInserted;
 
 	if (!lpDatabase) {
 		er = KCERR_DATABASE_ERROR;
@@ -1381,15 +1335,15 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 
 	for (unsigned i = 0; i < ulCount; ++i) {
 		// We'll (ab)use a soap structure as a memory pool.
-		ASSERT(soap == NULL);
+		assert(soap == NULL);
 		soap = soap_new();
 
 		er = DeserializePropVal(soap, lpStreamCaps, namedPropertyMapper, &lpsPropval, lpSource);
 		if (er != erSuccess)
 			goto exit;
 
-		iterInserted = setInserted.find(lpsPropval->ulPropTag);
-		if (iterInserted != setInserted.end())
+		auto iterInserted = setInserted.find(lpsPropval->ulPropTag);
+		if (iterInserted != setInserted.cend())
 			goto next_property;
 
 		if (ECGenProps::IsPropRedundant(lpsPropval->ulPropTag, ulObjType) == erSuccess)
@@ -1399,7 +1353,7 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 		if (lpsPropval->ulPropTag == PR_MESSAGE_FLAGS) {
 		    // ulFlags is obtained from the hierarchy table, which should only contain
 		    // 'unsettable' flags
-		    ASSERT((ulFlags & ~MSGFLAG_UNSETTABLE) == 0);
+			assert((ulFlags & ~MSGFLAG_UNSETTABLE) == 0);
 
 			// Normalize PR_MESSAGE_FLAGS so that the user cannot change flags that are also
 			// stored in the hierarchy table.
@@ -1423,8 +1377,6 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 				goto exit;
 
 			lpDBRow = lpDatabase->FetchRow(lpDBResult);
-			lpDatabase->FreeResult(lpDBResult); 
-			lpDBResult = NULL;
 
 			// We can't use lpDBRow here except for checking if it was NULL.
 			if (lpDBRow != NULL)
@@ -1441,7 +1393,7 @@ ECRESULT DeserializeProps(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtta
 			goto next_property;
 		}
 
-		if ((PROP_TYPE(lpsPropval->ulPropTag) & MV_FLAG) == MV_FLAG) {
+		if (PROP_TYPE(lpsPropval->ulPropTag) & MV_FLAG) {
 			nMVItems = GetMVItemCount(lpsPropval);
 			for (gsoap_size_t j = 0; j < nMVItems; ++j) {
 				er = CopySOAPPropValToDatabaseMVPropVal(lpsPropval, j, strColName, strColData, lpDatabase);
@@ -1535,8 +1487,8 @@ next_property:
 	}
 
 	if (bNewItem && ulParentType == MAPI_FOLDER && RealObjType(ulObjType, ulParentType) == MAPI_MESSAGE) {
-		iterInserted = setInserted.find(PR_SOURCE_KEY);
-		if (iterInserted == setInserted.end()) {
+		auto iterInserted = setInserted.find(PR_SOURCE_KEY);
+		if (iterInserted == setInserted.cend()) {
 			er = lpecSession->GetNewSourceKey(&sSourceKey);
 			if (er != erSuccess)
 				goto exit;
@@ -1568,7 +1520,7 @@ next_property:
 	g_lpSessionManager->GetCacheManager()->SetObject(ulObjId, ulParentId, ulOwner, ulFlags, ulObjType);
 	
 	if (lpPropValArray) {
-		ASSERT(lppPropValArray != NULL);
+		assert(lppPropValArray != NULL);
 		*lppPropValArray = lpPropValArray;
 		lpPropValArray = NULL;
 	}
@@ -1754,12 +1706,12 @@ ECRESULT DeserializeObject(ECSession *lpecSession, ECDatabase *lpDatabase, ECAtt
 			}
 
 		} else {
-			ASSERT(FALSE);
+			assert(false);
 		}
 	}
 	
 	if (lpPropValArray) {
-		ASSERT(lppPropValArray != NULL);
+		assert(lppPropValArray != NULL);
 		*lppPropValArray = lpPropValArray;
 		lpPropValArray = NULL;
 	}
@@ -1872,3 +1824,5 @@ ECRESULT GetValidatedPropType(DB_ROW lpRow, unsigned int *lpulType)
 	*lpulType = ulType;
 	return erSuccess;
 }
+
+} /* namespace */

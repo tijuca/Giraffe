@@ -18,7 +18,13 @@
 #ifndef KC_CMD_HPP
 #define KC_CMD_HPP 1
 
-extern ECRESULT GetBestServerPath(struct soap *, ECSession *, const std::string &, std::string *);
-extern void *SoftDeleteRemover(void *);
+#include <kopano/zcdefs.h>
+
+namespace KC {
+
+extern _kc_export ECRESULT GetBestServerPath(struct soap *, ECSession *, const std::string &, std::string *);
+extern _kc_export void *SoftDeleteRemover(void *);
+
+} /* namespace */
 
 #endif /* KC_CMD_HPP */

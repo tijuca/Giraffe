@@ -16,8 +16,8 @@
  */
 
 #include <kopano/platform.h>
-
-#include <memory.h>
+#include <kopano/ECInterfaceDefs.h>
+#include <kopano/memory.hpp>
 #include <mapi.h>
 #include <mapiutil.h>
 #include <mapispi.h>
@@ -38,6 +38,8 @@
 #include "ProviderUtil.h"
 
 #include <kopano/charset/convstring.h>
+
+using namespace KCHL;
 
 ECABProviderSwitch::ECABProviderSwitch(void) : ECUnknown("ECABProviderSwitch")
 {
@@ -60,13 +62,10 @@ HRESULT ECABProviderSwitch::Create(ECABProviderSwitch **lppECABProvider)
 HRESULT ECABProviderSwitch::QueryInterface(REFIID refiid, void **lppInterface)
 {
 	REGISTER_INTERFACE(IID_ECABProvider, this);
-	REGISTER_INTERFACE(IID_ECUnknown, this);
-
-	REGISTER_INTERFACE(IID_IABProvider, &this->m_xABProvider);
-	REGISTER_INTERFACE(IID_IUnknown, &this->m_xABProvider);
-
-	REGISTER_INTERFACE(IID_ISelectUnicode, &this->m_xUnknown);
-
+	REGISTER_INTERFACE2(ECUnknown, this);
+	REGISTER_INTERFACE2(IABProvider, &this->m_xABProvider);
+	REGISTER_INTERFACE2(IUnknown, &this->m_xABProvider);
+	REGISTER_INTERFACE3(ISelectUnicode, IUnknown, &this->m_xUnknown);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -80,54 +79,45 @@ HRESULT ECABProviderSwitch::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR l
 	HRESULT hr = hrSuccess;
 	PROVIDER_INFO sProviderInfo;
 	ULONG ulConnectType = CT_UNSPECIFIED;
-
-	IABLogon *lpABLogon = NULL;
-	IABProvider *lpOnline = NULL;
+	object_ptr<IABLogon> lpABLogon;
+	object_ptr<IABProvider> lpOnline;
 
 	convstring tstrProfileName(lpszProfileName, ulFlags);
 	hr = GetProviders(&g_mapProviders, lpMAPISup, convstring(lpszProfileName, ulFlags).c_str(), ulFlags, &sProviderInfo);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = sProviderInfo.lpABProviderOnline->QueryInterface(IID_IABProvider, (void **)&lpOnline);
+		return hr;
+	hr = sProviderInfo.lpABProviderOnline->QueryInterface(IID_IABProvider, &~lpOnline);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// Online
-	hr = lpOnline->Logon(lpMAPISup, ulUIParam, lpszProfileName, ulFlags, NULL, NULL, NULL, &lpABLogon);
+	hr = lpOnline->Logon(lpMAPISup, ulUIParam, lpszProfileName, ulFlags, nullptr, nullptr, nullptr, &~lpABLogon);
 	ulConnectType = CT_ONLINE;
 
 	// Set the provider in the right connection type
-	if (SetProviderMode(lpMAPISup, &g_mapProviders, convstring(lpszProfileName, ulFlags).c_str(), ulConnectType) != hrSuccess) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (SetProviderMode(lpMAPISup, &g_mapProviders,
+	    convstring(lpszProfileName, ulFlags).c_str(), ulConnectType) != hrSuccess)
+		return MAPI_E_INVALID_PARAMETER;
 
 	if(hr != hrSuccess) {
-		if(ulFlags & MDB_NO_DIALOG) {
-			hr = MAPI_E_FAILONEPROVIDER;
-			goto exit;
-		} else if(hr == MAPI_E_NETWORK_ERROR) {
-			hr = MAPI_E_FAILONEPROVIDER; //for disable public folders, so you can work offline
-			goto exit;
-		} else if (hr == MAPI_E_LOGON_FAILED) {
-			hr = MAPI_E_UNCONFIGURED; // Linux error ??//
+		if (ulFlags & MDB_NO_DIALOG)
+			return MAPI_E_FAILONEPROVIDER;
+		else if(hr == MAPI_E_NETWORK_ERROR)
+			/* for disable public folders, so you can work offline */
+			return MAPI_E_FAILONEPROVIDER;
+		else if (hr == MAPI_E_LOGON_FAILED)
+			return MAPI_E_UNCONFIGURED; /* Linux error ?? */
 			//hr = MAPI_E_LOGON_FAILED;
-			goto exit;
-		}else{
-			hr = MAPI_E_LOGON_FAILED;
-			goto exit;
-		}
+		else
+			return MAPI_E_LOGON_FAILED;
 	}
 
 	hr = lpMAPISup->SetProviderUID((LPMAPIUID)&MUIDECSAB, 0);
 	if(hr != hrSuccess)
-		goto exit;
-	
+		return hr;
 	hr = lpABLogon->QueryInterface(IID_IABLogon, (void **)lppABLogon);
 	if(hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	if(lpulcbSecurity)
 		*lpulcbSecurity = 0;
 
@@ -136,53 +126,11 @@ HRESULT ECABProviderSwitch::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR l
 
 	if (lppMAPIError)
 		*lppMAPIError = NULL;
-
-exit:
-	if (lpABLogon)
-		lpABLogon->Release();
-
-	if (lpOnline)
-		lpOnline->Release();
-	return hr;
+	return hrSuccess;
 }
 
-HRESULT __stdcall ECABProviderSwitch::xABProvider::QueryInterface(REFIID refiid, void ** lppInterface)
-{
-	TRACE_MAPI(TRACE_ENTRY, "ECABProviderSwitch::QueryInterface", "%s", DBGGUIDToString(refiid).c_str());
-	METHOD_PROLOGUE_(ECABProviderSwitch , ABProvider);
-	HRESULT hr = pThis->QueryInterface(refiid, lppInterface);
-	TRACE_MAPI(TRACE_RETURN, "ECABProviderSwitch::QueryInterface", "%s", GetMAPIErrorDescription(hr).c_str());
-	return hr;
-}
-
-ULONG __stdcall ECABProviderSwitch::xABProvider::AddRef()
-{
-	TRACE_MAPI(TRACE_ENTRY, "ECABProviderSwitch::AddRef", "");
-	METHOD_PROLOGUE_(ECABProviderSwitch , ABProvider);
-	return pThis->AddRef();
-}
-
-ULONG __stdcall ECABProviderSwitch::xABProvider::Release()
-{
-	TRACE_MAPI(TRACE_ENTRY, "ECABProviderSwitch::Release", "");
-	METHOD_PROLOGUE_(ECABProviderSwitch , ABProvider);
-	ULONG ulRef = pThis->Release();
-	TRACE_MAPI(TRACE_RETURN, "ECABProviderSwitch::Release", "%d", ulRef);
-	return ulRef;
-}
-
-HRESULT ECABProviderSwitch::xABProvider::Shutdown(ULONG *lpulFlags)
-{
-	TRACE_MAPI(TRACE_ENTRY, "ECABProviderSwitch::Shutdown", "");
-	METHOD_PROLOGUE_(ECABProviderSwitch , ABProvider);
-	return pThis->Shutdown(lpulFlags);
-}
-
-HRESULT ECABProviderSwitch::xABProvider::Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG ulFlags, ULONG * lpulcbSecurity, LPBYTE * lppbSecurity, LPMAPIERROR * lppMAPIError, LPABLOGON * lppABLogon)
-{
-	TRACE_MAPI(TRACE_ENTRY, "ECABProviderSwitch::Logon", "");
-	METHOD_PROLOGUE_(ECABProviderSwitch , ABProvider);
-	HRESULT hr = pThis->Logon(lpMAPISup, ulUIParam, lpszProfileName, ulFlags, lpulcbSecurity, lppbSecurity, lppMAPIError, lppABLogon);
-	TRACE_MAPI(TRACE_RETURN, "ECABProviderSwitch::Logon", "%s", GetMAPIErrorDescription(hr).c_str());
-	return  hr;
-}
+DEF_HRMETHOD1(TRACE_MAPI, ECABProviderSwitch, ABProvider, QueryInterface, (REFIID, refiid), (void **, lppInterface))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECABProviderSwitch, ABProvider, AddRef, (void))
+DEF_ULONGMETHOD1(TRACE_MAPI, ECABProviderSwitch, ABProvider, Release, (void))
+DEF_HRMETHOD1(TRACE_MAPI, ECABProviderSwitch, ABProvider, Shutdown, (ULONG *, lpulFlags))
+DEF_HRMETHOD1(TRACE_MAPI, ECABProviderSwitch, ABProvider, Logon, (LPMAPISUP, lpMAPISup), (ULONG, ulUIParam), (LPTSTR, lpszProfileName), (ULONG, ulFlags), (ULONG *, lpulcbSecurity), (LPBYTE *, lppbSecurity), (LPMAPIERROR *, lppMAPIError), (LPABLOGON *, lppABLogon))

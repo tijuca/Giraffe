@@ -17,7 +17,7 @@
 
 #include <kopano/zcdefs.h>
 #include <kopano/platform.h>
-
+#include <utility>
 #include <cstdio>
 #include <mapi.h>
 #include <mapix.h>
@@ -26,7 +26,6 @@
 #include <kopano/stringutil.h>
 #include <kopano/RecurrenceState.h>
 #include <kopano/charset/convert.h>
-#include <kopano/charset/utf16string.h>
 
 #ifndef WIN32
 #define DEBUGREAD 0
@@ -41,9 +40,11 @@
 		#define DEBUGPRINT(...)
 #endif
 
-class BinReader _zcp_final {
+namespace KC {
+
+class BinReader _kc_final {
 public:
-    BinReader(char *lpData, unsigned int ulLen) {
+    BinReader(const char *lpData, unsigned int ulLen) {
         this->m_lpData = lpData;
         this->m_ulLen = ulLen;
         this->m_ulCursor = 0;
@@ -104,19 +105,16 @@ public:
         return reallen == len ? reallen : -1;
     };
     
-    int GetCursorPos() { return m_ulCursor; }
+	int GetCursorPos(void) const { return m_ulCursor; }
     
 private:
-    char *m_lpData;
+	const char *m_lpData;
     unsigned int m_ulLen;
     unsigned int m_ulCursor;
 };
 
-class BinWriter _zcp_final {
+class BinWriter _kc_final {
 public:
-    BinWriter() {};
-    ~BinWriter() {};
-    
     void GetData(char **lppData, unsigned int *lpulLen, void *base) {
         char *lpData;
 
@@ -195,43 +193,6 @@ private:
 		data.WriteString((x), (l)); \
 	} while (false)
 
-RecurrenceState::RecurrenceState()
-{
-	ulReaderVersion = 0x3004;
-	ulWriterVersion = 0x3004;
-
-	ulRecurFrequency = 0x0000;	// invalid value
-	ulPatternType = 0x0000;
-	ulCalendarType = 0x0000;
-	ulFirstDateTime = 0x0000;
-	ulPeriod = 0x0000;
-	ulSlidingFlag = 0x0000;
-
-	ulWeekDays = 0x0000;
-	ulDayOfMonth = 0x0000;
-	ulWeekNumber = 0x0000;
-
-	ulEndType = 0x0000;
-	ulOccurrenceCount = 0x0000;
-	ulFirstDOW = 0x0001;		// default outlook, monday
-	ulDeletedInstanceCount = 0;
-	ulModifiedInstanceCount = 0;
-
-	ulStartDate = 0x0000;
-	ulEndType = 0x0000;
-
-	ulReaderVersion2 = 0x3006;
-	ulWriterVersion2 = 0x3008;	// can also be 3009, but outlook (2003) sets 3008
-	ulStartTimeOffset = 0x0000;	// max 1440-1
-	ulEndTimeOffset = 0x0000;	// max 1440-1
-
-	ulExceptionCount = 0;
-}
-
-RecurrenceState::~RecurrenceState() 
-{
-}
-
 /**
  * Reads exception data from outlook blob.
  *
@@ -241,12 +202,12 @@ RecurrenceState::~RecurrenceState()
  * @param[in]	ulLen	length of lpData
  * @param[in]	ulFlags	possible task flag
  */
-HRESULT RecurrenceState::ParseBlob(char *lpData, unsigned int ulLen, ULONG ulFlags)
+HRESULT RecurrenceState::ParseBlob(const char *lpData, unsigned int ulLen,
+    ULONG ulFlags)
 {
     HRESULT hr = hrSuccess;
     unsigned int ulReservedBlock1Size;
     unsigned int ulReservedBlock2Size;
-    std::vector<Exception>::const_iterator iterExceptions;
     bool bReadValid = false; // Read is valid if first set of exceptions was read ok
 	bool bExtended = false;	 // false if we need to sync extended data from "normal" data
 	convert_context converter;
@@ -266,13 +227,15 @@ HRESULT RecurrenceState::ParseBlob(char *lpData, unsigned int ulLen, ULONG ulFla
     READLONG(ulPeriod);
     READLONG(ulSlidingFlag);
     
-    if(ulPatternType == 0x0000) {
+    if (ulPatternType == PT_DAY) {
         // No patterntype specific
-    } else if(ulPatternType == 0x0001) {
+    } else if (ulPatternType == PT_WEEK) {
         READLONG(ulWeekDays);
-    } else if(ulPatternType == 0x0002 || ulPatternType == 0x0004 || ulPatternType == 0x000a || ulPatternType == 0x000c) {
+    } else if (ulPatternType == PT_MONTH || ulPatternType == PT_MONTH_END ||
+        ulPatternType == PT_HJ_MONTH || ulPatternType == PT_HJ_MONTH_END) {
         READLONG(ulDayOfMonth);
-    } else if(ulPatternType == 0x0003 || ulPatternType == 0x000b) {
+    } else if (ulPatternType == PT_MONTH_NTH ||
+        ulPatternType == PT_HJ_MONTH_NTH) {
         READLONG(ulWeekDays);
         READLONG(ulWeekNumber);
     }
@@ -327,42 +290,26 @@ HRESULT RecurrenceState::ParseBlob(char *lpData, unsigned int ulLen, ULONG ulFla
             READSHORT(ulSubjectLength2);
             READSTRING(sException.strSubject, ulSubjectLength2);
         }
-        
-        if(sException.ulOverrideFlags & ARO_MEETINGTYPE) {
+        if (sException.ulOverrideFlags & ARO_MEETINGTYPE)
             READLONG(sException.ulApptStateFlags);
-        }
-        
-        if(sException.ulOverrideFlags & ARO_REMINDERDELTA) {
+        if (sException.ulOverrideFlags & ARO_REMINDERDELTA)
             READLONG(sException.ulReminderDelta);
-        }
-        
-        if(sException.ulOverrideFlags & ARO_REMINDERSET) {
+        if (sException.ulOverrideFlags & ARO_REMINDERSET)
             READLONG(sException.ulReminderSet);
-        }
-             
         if(sException.ulOverrideFlags & ARO_LOCATION) {
             READSHORT(ulLocationLength);
             READSHORT(ulLocationLength2);
             READSTRING(sException.strLocation, ulLocationLength2);
         }
-        
-        if(sException.ulOverrideFlags & ARO_BUSYSTATUS) {
+        if (sException.ulOverrideFlags & ARO_BUSYSTATUS)
             READLONG(sException.ulBusyStatus);
-        }
-        
-        if(sException.ulOverrideFlags & ARO_ATTACHMENT) {
+        if (sException.ulOverrideFlags & ARO_ATTACHMENT)
             READLONG(sException.ulAttachment);
-        }
-        
-        if(sException.ulOverrideFlags & ARO_SUBTYPE) {
+        if (sException.ulOverrideFlags & ARO_SUBTYPE)
             READLONG(sException.ulSubType);
-        }
-
-        if(sException.ulOverrideFlags & ARO_APPTCOLOR) {
+        if (sException.ulOverrideFlags & ARO_APPTCOLOR)
             READLONG(sException.ulAppointmentColor);
-        }
-        
-        lstExceptions.push_back(sException);
+        lstExceptions.push_back(std::move(sException));
     }
     
     bReadValid  = true;
@@ -370,9 +317,7 @@ HRESULT RecurrenceState::ParseBlob(char *lpData, unsigned int ulLen, ULONG ulFla
     READLONG(ulReservedBlock1Size);
     READSTRING(strReservedBlock1, ulReservedBlock1Size);
 
-    for (iterExceptions = lstExceptions.begin();
-         iterExceptions != lstExceptions.end(); ++iterExceptions)
-    {
+    for (auto &exc : lstExceptions) {
         ExtendedException sExtendedException;
         unsigned int ulReservedBlock1Size;
         unsigned int ulReservedBlock2Size;
@@ -390,32 +335,33 @@ HRESULT RecurrenceState::ParseBlob(char *lpData, unsigned int ulLen, ULONG ulFla
         READSTRING(sExtendedException.strReservedBlock1, ulReservedBlock1Size);
         
         // According to the docs, these are condition depending on the OverrideFlags field. But that's wrong.
-        if(iterExceptions->ulOverrideFlags & ARO_SUBJECT || iterExceptions->ulOverrideFlags & ARO_LOCATION) {       
+        if (exc.ulOverrideFlags & ARO_SUBJECT ||
+            exc.ulOverrideFlags & ARO_LOCATION) {
             READLONG(sExtendedException.ulStartDateTime);
             READLONG(sExtendedException.ulEndDateTime);
             READLONG(sExtendedException.ulOriginalStartDate);
         }
         
-        if(iterExceptions->ulOverrideFlags & ARO_SUBJECT) {
+        if (exc.ulOverrideFlags & ARO_SUBJECT) {
 			std::string strBytes;
             READSHORT(ulWideCharSubjectLength);
             READSTRING(strBytes, ulWideCharSubjectLength * sizeof(short));
 			TryConvert(converter, strBytes, ulWideCharSubjectLength * sizeof(short), "UCS-2LE", sExtendedException.strWideCharSubject);
         }
 
-        if(iterExceptions->ulOverrideFlags & ARO_LOCATION) {
+        if (exc.ulOverrideFlags & ARO_LOCATION) {
 			std::string strBytes;
             READSHORT(ulWideCharLocationLength);
             READSTRING(strBytes, ulWideCharLocationLength * sizeof(short));
 			TryConvert(converter, strBytes, ulWideCharLocationLength * sizeof(short), "UCS-2LE", sExtendedException.strWideCharLocation);
         }
         
-        if(iterExceptions->ulOverrideFlags & ARO_SUBJECT || iterExceptions->ulOverrideFlags & ARO_LOCATION) {       
+        if (exc.ulOverrideFlags & ARO_SUBJECT ||
+            exc.ulOverrideFlags & ARO_LOCATION) {
             READLONG(ulReservedBlock2Size);
             READSTRING(sExtendedException.strReservedBlock2, ulReservedBlock2Size);
         }
-        
-        lstExtendedExceptions.push_back(sExtendedException);
+        lstExtendedExceptions.push_back(std::move(sExtendedException));
     }
 	bExtended = true;
 
@@ -474,17 +420,14 @@ exit:
  */
 HRESULT RecurrenceState::GetBlob(char **lppData, unsigned int *lpulLen, void *base)
 {
-    HRESULT hr = hrSuccess;
     BinWriter data;
     std::vector<Exception>::const_iterator j = lstExceptions.begin();
     
     // There is one hard requirement: there must be as many Exceptions as there are ExtendedExceptions. Other
     // inconstencies are also bad, but we need at least that to even write the stream
     
-    if(lstExceptions.size() != lstExtendedExceptions.size()) {
-        hr = MAPI_E_CORRUPT_DATA;
-        goto exit;
-    }
+	if (lstExceptions.size() != lstExtendedExceptions.size())
+		return MAPI_E_CORRUPT_DATA;
     
     WRITESHORT(ulReaderVersion); 		WRITESHORT(ulWriterVersion);
     WRITESHORT(ulRecurFrequency);		WRITESHORT(ulPatternType);
@@ -493,13 +436,15 @@ HRESULT RecurrenceState::GetBlob(char **lppData, unsigned int *lpulLen, void *ba
     WRITELONG(ulPeriod);
     WRITELONG(ulSlidingFlag);
     
-    if(ulPatternType == 0x0000) {
+    if (ulPatternType == PT_DAY) {
         // No data
-    } else if(ulPatternType == 0x0001) {
+    } else if (ulPatternType == PT_WEEK) {
         WRITELONG(ulWeekDays);
-    } else if(ulPatternType == 0x0002 || ulPatternType == 0x0004 || ulPatternType == 0x000a || ulPatternType == 0x000c) {
+    } else if (ulPatternType == PT_MONTH || ulPatternType == PT_MONTH_END ||
+        ulPatternType == PT_HJ_MONTH || ulPatternType == PT_HJ_MONTH_END) {
         WRITELONG(ulDayOfMonth);
-    } else if(ulPatternType == 0x0003 || ulPatternType == 0x000b) {
+    } else if (ulPatternType == PT_MONTH_NTH ||
+        ulPatternType == PT_HJ_MONTH_NTH) {
         WRITELONG(ulWeekDays);
         WRITELONG(ulWeekNumber);
     }
@@ -509,15 +454,13 @@ HRESULT RecurrenceState::GetBlob(char **lppData, unsigned int *lpulLen, void *ba
     WRITELONG(ulFirstDOW);
     WRITELONG(ulDeletedInstanceCount);
     
-	for (std::vector<unsigned int>::const_iterator i = lstDeletedInstanceDates.begin();
-	     i != lstDeletedInstanceDates.end(); ++i)
-		WRITELONG(*i);
+	for (const auto i : lstDeletedInstanceDates)
+		WRITELONG(i);
     
     WRITELONG(ulModifiedInstanceCount);
     
-	for (std::vector<unsigned int>::const_iterator i = lstModifiedInstanceDates.begin();
-	     i != lstModifiedInstanceDates.end(); ++i)
-		WRITELONG(*i);
+	for (const auto i : lstModifiedInstanceDates)
+		WRITELONG(i);
     
     WRITELONG(ulStartDate);
     WRITELONG(ulEndDate);
@@ -529,95 +472,77 @@ HRESULT RecurrenceState::GetBlob(char **lppData, unsigned int *lpulLen, void *ba
     
     WRITESHORT(ulExceptionCount);
     
-    for (std::vector<Exception>::const_iterator i = lstExceptions.begin(); i != lstExceptions.end(); ++i) {
-        WRITELONG(i->ulStartDateTime);
-        WRITELONG(i->ulEndDateTime);
-        WRITELONG(i->ulOriginalStartDate);
-        WRITESHORT(i->ulOverrideFlags);
-        
-        if(i->ulOverrideFlags & ARO_SUBJECT) {
-            WRITESHORT((ULONG)i->strSubject.size()+1);
-            WRITESHORT((ULONG)i->strSubject.size());
-            WRITESTRING(i->strSubject.c_str(), (ULONG)i->strSubject.size());
-        }
-        
-        if(i->ulOverrideFlags & ARO_MEETINGTYPE) {
-            WRITELONG(i->ulApptStateFlags);
-        }
-        
-        if(i->ulOverrideFlags & ARO_REMINDERDELTA) {
-            WRITELONG(i->ulReminderDelta);
-        }
-        
-        if(i->ulOverrideFlags & ARO_REMINDERSET) {
-            WRITELONG(i->ulReminderSet);
-        }
-        
-        if(i->ulOverrideFlags & ARO_LOCATION) {
-            WRITESHORT((ULONG)i->strLocation.size()+1);
-            WRITESHORT((ULONG)i->strLocation.size());
-            WRITESTRING(i->strLocation.c_str(), (ULONG)i->strLocation.size());
-        }
-        
-        if(i->ulOverrideFlags & ARO_BUSYSTATUS) {
-            WRITELONG(i->ulBusyStatus);
-        }
-        
-        if(i->ulOverrideFlags & ARO_ATTACHMENT) {
-            WRITELONG(i->ulAttachment);
-        }
-        
-        if(i->ulOverrideFlags & ARO_SUBTYPE) {
-            WRITELONG(i->ulSubType);
-        }
-        
-        if(i->ulOverrideFlags & ARO_APPTCOLOR) {
-            WRITELONG(i->ulAppointmentColor);
-        }
-    }
+	for (const auto &i : lstExceptions) {
+		WRITELONG(i.ulStartDateTime);
+		WRITELONG(i.ulEndDateTime);
+		WRITELONG(i.ulOriginalStartDate);
+		WRITESHORT(i.ulOverrideFlags);
+		if (i.ulOverrideFlags & ARO_SUBJECT) {
+			WRITESHORT(static_cast<ULONG>(i.strSubject.size() + 1));
+			WRITESHORT(static_cast<ULONG>(i.strSubject.size()));
+			WRITESTRING(i.strSubject.c_str(), static_cast<ULONG>(i.strSubject.size()));
+		}
+		if (i.ulOverrideFlags & ARO_MEETINGTYPE)
+			WRITELONG(i.ulApptStateFlags);
+		if (i.ulOverrideFlags & ARO_REMINDERDELTA)
+			WRITELONG(i.ulReminderDelta);
+		if (i.ulOverrideFlags & ARO_REMINDERSET)
+			WRITELONG(i.ulReminderSet);
+		if (i.ulOverrideFlags & ARO_LOCATION) {
+			WRITESHORT(static_cast<ULONG>(i.strLocation.size()) + 1);
+			WRITESHORT(static_cast<ULONG>(i.strLocation.size()));
+			WRITESTRING(i.strLocation.c_str(), static_cast<ULONG>(i.strLocation.size()));
+		}
+		if (i.ulOverrideFlags & ARO_BUSYSTATUS)
+			WRITELONG(i.ulBusyStatus);
+		if (i.ulOverrideFlags & ARO_ATTACHMENT)
+			WRITELONG(i.ulAttachment);
+		if (i.ulOverrideFlags & ARO_SUBTYPE)
+			WRITELONG(i.ulSubType);
+		if (i.ulOverrideFlags & ARO_APPTCOLOR)
+			WRITELONG(i.ulAppointmentColor);
+	}
     
     WRITELONG((ULONG)strReservedBlock1.size());
     WRITESTRING(strReservedBlock1.c_str(), (ULONG)strReservedBlock1.size());
 
-    for (std::vector<ExtendedException>::const_iterator i = lstExtendedExceptions.begin(); i != lstExtendedExceptions.end(); ++i) {
-        if(ulWriterVersion2 >= 0x00003009) {
-            WRITELONG((ULONG)i->strReserved.size()+4);
-            WRITELONG(i->ulChangeHighlightValue);
-            WRITESTRING(i->strReserved.c_str(), (ULONG)i->strReserved.size());
-        }
-        
-        WRITELONG((ULONG)i->strReservedBlock1.size());
-        WRITESTRING(i->strReservedBlock1.c_str(), (ULONG)i->strReservedBlock1.size());
-        
-        if(j->ulOverrideFlags & ARO_SUBJECT || j->ulOverrideFlags & ARO_LOCATION) {
-            WRITELONG(i->ulStartDateTime);
-            WRITELONG(i->ulEndDateTime);
-            WRITELONG(i->ulOriginalStartDate);
-        }        
-        
-        if(j->ulOverrideFlags & ARO_SUBJECT) {
-			utf16string strWide = convert_to<utf16string>(i->strWideCharSubject);
-            WRITESHORT((ULONG)strWide.size());
-            WRITESTRING((const char*)strWide.c_str(), (ULONG)strWide.size()*2);
-        }
-        
-        if(j->ulOverrideFlags & ARO_LOCATION) {
-			utf16string strWide = convert_to<utf16string>(i->strWideCharLocation);
-            WRITESHORT((ULONG)strWide.size());
-            WRITESTRING((const char*)strWide.c_str(), (ULONG)strWide.size()*2);
-        }
-        
-        if(j->ulOverrideFlags & ARO_SUBJECT || j->ulOverrideFlags & ARO_LOCATION) {
-            WRITELONG((ULONG)i->strReservedBlock2.size());
-            WRITESTRING(i->strReservedBlock2.c_str(), (ULONG)i->strReservedBlock2.size());
-        }
-        ++j;
-    }    
+	for (const auto &i : lstExtendedExceptions) {
+		if (ulWriterVersion2 >= 0x00003009) {
+			WRITELONG(static_cast<ULONG>(i.strReserved.size() + 4));
+			WRITELONG(i.ulChangeHighlightValue);
+			WRITESTRING(i.strReserved.c_str(), static_cast<ULONG>(i.strReserved.size()));
+		}
+
+		WRITELONG(static_cast<ULONG>(i.strReservedBlock1.size()));
+		WRITESTRING(i.strReservedBlock1.c_str(), static_cast<ULONG>(i.strReservedBlock1.size()));
+
+		if ((j->ulOverrideFlags & ARO_SUBJECT) || (j->ulOverrideFlags & ARO_LOCATION)) {
+			WRITELONG(i.ulStartDateTime);
+			WRITELONG(i.ulEndDateTime);
+			WRITELONG(i.ulOriginalStartDate);
+		}
+		if (j->ulOverrideFlags & ARO_SUBJECT) {
+			auto strWide = convert_to<std::u16string>(i.strWideCharSubject);
+			WRITESHORT(static_cast<ULONG>(strWide.size()));
+			WRITESTRING(reinterpret_cast<const char *>(strWide.c_str()), static_cast<ULONG>(strWide.size()) * 2);
+		}
+		if (j->ulOverrideFlags & ARO_LOCATION) {
+			auto strWide = convert_to<std::u16string>(i.strWideCharLocation);
+			WRITESHORT(static_cast<ULONG>(strWide.size()));
+			WRITESTRING(reinterpret_cast<const char *>(strWide.c_str()), static_cast<ULONG>(strWide.size()) * 2);
+		}
+		if ((j->ulOverrideFlags & ARO_SUBJECT) || (j->ulOverrideFlags & ARO_LOCATION)) {
+			WRITELONG(static_cast<ULONG>(i.strReservedBlock2.size()));
+			WRITESTRING(i.strReservedBlock2.c_str(), static_cast<ULONG>(i.strReservedBlock2.size()));
+		}
+		++j;
+	}
 
     WRITELONG((ULONG)strReservedBlock2.size());
     WRITESTRING(strReservedBlock2.c_str(), (ULONG)strReservedBlock2.size());
     
-    data.GetData(lppData, lpulLen, base);
-exit:    
-    return hr;
+	data.GetData(lppData, lpulLen, base);
+	return hrSuccess;
 }
+
+} /* namespace */

@@ -47,10 +47,10 @@ DEALINGS IN THE SOFTWARE.
 
 #include "core.h"
 
-namespace utf8
-{
-    namespace unchecked 
-    {
+namespace KC {
+
+namespace utf8 {
+    namespace unchecked {
         template <typename octet_iterator>
         octet_iterator append(uint32_t cp, octet_iterator result)
         {
@@ -196,7 +196,7 @@ namespace utf8
           class iterator : public std::iterator <std::bidirectional_iterator_tag, uint32_t> { 
             octet_iterator it;
             public:
-            iterator () {};
+            iterator(void) = default;
             explicit iterator (const octet_iterator& octet_it): it(octet_it) {}
             // the default "big three" are OK
             octet_iterator base () const { return it; }
@@ -240,6 +240,7 @@ namespace utf8
     } // namespace utf8::unchecked
 } // namespace utf8 
 
+} /* namespace */
 
 #endif // header guard
 

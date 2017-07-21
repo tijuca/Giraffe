@@ -22,14 +22,14 @@
 #include <list>
 #include <string>
 #include <vector>
+#include <utility>
 #include <cassert>
 
 #include <kopano/platform.h>
 
-class ECLogger;
+namespace KC {
 
-template<typename Key>
-class KeyEntry _zcp_final {
+template<typename Key> class KeyEntry _kc_final {
 public:
 	Key key;
 	time_t ulLastAccess;
@@ -47,29 +47,25 @@ unsigned int GetCacheAdditionalSize(const Value &val) {
 
 class ECsCacheEntry {
 public:
-	ECsCacheEntry() { ulLastAccess = 0; }
-
-	time_t 	ulLastAccess;
+	time_t ulLastAccess = 0;
 };
 
-class ECCacheBase
-{
+class _kc_export ECCacheBase {
 public:
 	typedef unsigned long		count_type;
 		typedef uint64_t	size_type;
 
-	virtual ~ECCacheBase(void) {}
-
-	virtual count_type ItemCount() const = 0;
-	virtual size_type Size() const = 0;
-	
-	size_type MaxSize() const { return m_ulMaxSize; }
-	long MaxAge() const { return m_lMaxAge; }
-	size_type HitCount() const { return m_ulCacheHit; }
-	size_type ValidCount() const { return m_ulCacheValid; }
+	_kc_hidden virtual ~ECCacheBase(void) _kc_impdtor;
+	_kc_hidden virtual count_type ItemCount(void) const = 0;
+	_kc_hidden virtual size_type Size(void) const = 0;
+	_kc_hidden size_type MaxSize(void) const { return m_ulMaxSize; }
+	_kc_hidden long MaxAge(void) const { return m_lMaxAge; }
+	_kc_hidden size_type HitCount(void) const { return m_ulCacheHit; }
+	_kc_hidden size_type ValidCount(void) const { return m_ulCacheValid; }
 
 	// Decrement the valid count. Used from ECCacheManger::GetCell.
-	void DecrementValidCount() { 
+	_kc_hidden void DecrementValidCount(void)
+	{ 
 		assert(m_ulCacheValid >= 1);
 		--m_ulCacheValid;
 	}
@@ -82,22 +78,19 @@ public:
 
 protected:
 	ECCacheBase(const std::string &strCachename, size_type ulMaxSize, long lMaxAge);
-	void IncrementHitCount(void) { ++m_ulCacheHit; }
-	void IncrementValidCount(void) { ++m_ulCacheValid; }
-	void ClearCounters() { m_ulCacheHit = m_ulCacheValid = 0; }
+	_kc_hidden void IncrementHitCount(void) { ++m_ulCacheHit; }
+	_kc_hidden void IncrementValidCount(void) { ++m_ulCacheValid; }
+	_kc_hidden void ClearCounters(void) { m_ulCacheHit = m_ulCacheValid = 0; }
 
 private:
 	const std::string	m_strCachename;
 	const size_type		m_ulMaxSize;
 	const long			m_lMaxAge;
-	size_type			m_ulCacheHit;
-	size_type			m_ulCacheValid;
+	size_type m_ulCacheHit = 0, m_ulCacheValid = 0;
 };
 
 
-template<typename _MapType>
-class ECCache _zcp_final : public ECCacheBase
-{
+template<typename _MapType> class ECCache _kc_final : public ECCacheBase {
 public:
 	typedef typename _MapType::key_type		key_type;
 	typedef typename _MapType::mapped_type	mapped_type;
@@ -115,12 +108,12 @@ public:
 		return erSuccess;
 	}
 	
-	count_type ItemCount() const _zcp_override
+	count_type ItemCount(void) const _kc_override
 	{
 		return m_map.size();
 	}
 	
-	size_type Size() const _zcp_override
+	size_type Size(void) const _kc_override
 	{
 		// it works with map and hash_map
 		return (m_map.size() * (sizeof(typename _MapType::value_type) + sizeof(_MapType) )) + m_ulSize;
@@ -128,9 +121,7 @@ public:
 
 	ECRESULT RemoveCacheItem(const key_type &key) 
 	{
-		typename _MapType::iterator iter;
-
-		iter = m_map.find(key);
+		auto iter = m_map.find(key);
 		if (iter == m_map.end())
 			return KCERR_NOT_FOUND;
 
@@ -144,9 +135,7 @@ public:
 	{
 		ECRESULT er = erSuccess;
 		time_t	tNow  = GetProcessTime();
-		typename _MapType::iterator iter;
-
-		iter = m_map.find(key);
+		auto iter = m_map.find(key);
 		
 		if (iter != m_map.end()) {
 			// Cache age of the cached item, if expired remove the item from the cache
@@ -163,8 +152,8 @@ public:
 				for (iter = m_map.begin(); iter != m_map.end(); ++iter)
 					if ((long)(tNow - iter->second.ulLastAccess) >= MaxAge())
 						dl.push_back(iter->first);
-				for (typename std::vector<key_type>::const_iterator i = dl.begin(); i != dl.end(); ++i)
-					m_map.erase(*i);
+				for (const auto &i : dl)
+					m_map.erase(i);
 				er = KCERR_NOT_FOUND;
 			} else {
 				*lppValue = &iter->second;
@@ -189,11 +178,9 @@ public:
 
 	ECRESULT GetCacheRange(const key_type &lower, const key_type &upper, std::list<typename _MapType::value_type> *values)
 	{
-		typedef typename _MapType::iterator iterator;
-
-		iterator iLower = m_map.lower_bound(lower);
-		iterator iUpper = m_map.upper_bound(upper);
-		for (iterator i = iLower; i != iUpper; ++i)
+		auto iLower = m_map.lower_bound(lower);
+		auto iUpper = m_map.upper_bound(upper);
+		for (auto i = iLower; i != iUpper; ++i)
 			values->push_back(*i);
 
 		return erSuccess;
@@ -202,14 +189,11 @@ public:
 	ECRESULT AddCacheItem(const key_type &key, const mapped_type &value)
 	{
 		typedef typename _MapType::value_type value_type;
-		typedef typename _MapType::iterator iterator;
-		std::pair<iterator,bool> result;
 
 		if (MaxSize() == 0)
 			return erSuccess;
 
-		result = m_map.insert(value_type(key, value));
-
+		auto result = m_map.insert(value_type(key, value));
 		if (result.second == false) {
 			// The key already exists but its value is unmodified. So update it now
 			m_ulSize += GetCacheAdditionalSize(value);
@@ -241,15 +225,12 @@ private:
 	ECRESULT PurgeCache(float ratio)
 	{
 		std::list<KeyEntry<key_type> > lstEntries;
-		typename std::list<KeyEntry<key_type> >::iterator iterEntry;
-		typename _MapType::iterator iterMap;
 
-		for (iterMap = m_map.begin(); iterMap != m_map.end(); ++iterMap) {
+		for (const auto &im : m_map) {
 			KeyEntry<key_type> k;
-			k.key = iterMap->first;
-			k.ulLastAccess = iterMap->second.ulLastAccess;
-
-			lstEntries.push_back(k);
+			k.key = im.first;
+			k.ulLastAccess = im.second.ulLastAccess;
+			lstEntries.push_back(std::move(k));
 		}
 
 		lstEntries.sort(KeyEntryOrder<key_type>);
@@ -259,8 +240,10 @@ private:
 
 		// Remove the oldest ulDelete entries from the cache, removing [ratio] % of all
 		// cache entries.
-		for (iterEntry = lstEntries.begin(); iterEntry != lstEntries.end() && ulDelete > 0; ++iterEntry, --ulDelete) {
-			iterMap = m_map.find(iterEntry->key);
+		for (auto iterEntry = lstEntries.cbegin();
+		     iterEntry != lstEntries.cend() && ulDelete > 0;
+		     ++iterEntry, --ulDelete) {
+			auto iterMap = m_map.find(iterEntry->key);
 			assert(iterMap != m_map.end());
 			m_ulSize -= GetCacheAdditionalSize(iterMap->second);
 			m_ulSize -= GetCacheAdditionalSize(iterMap->first);
@@ -279,9 +262,10 @@ private:
 		return erSuccess;
 	}
 
-private:
 	_MapType			m_map;	
 	size_type			m_ulSize;
 };
+
+} /* namespace */
 
 #endif // ndef ECCACHE_INCLUDED

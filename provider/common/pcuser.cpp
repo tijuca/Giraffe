@@ -22,6 +22,8 @@
 
 #include <sstream>
 
+namespace KC {
+
 template<int(*fnCmp)(const char*, const char*)>
 class StringComparer {
 public:
@@ -34,12 +36,6 @@ public:
 private:
 	const std::string &m_str;
 };
-
-objectid_t::objectid_t(const std::string &id, objectclass_t objclass)
-{
-	this->id = id;
-	this->objclass = objclass;
-}
 
 objectid_t::objectid_t(const std::string &str)
 {
@@ -60,16 +56,6 @@ objectid_t::objectid_t(const std::string &str)
 	}
 }
 
-objectid_t::objectid_t(objectclass_t objclass)
-{
-	this->objclass = objclass;
-}
-
-objectid_t::objectid_t()
-{
-	objclass = OBJECTCLASS_UNKNOWN;
-}
-
 bool objectid_t::operator==(const objectid_t &x) const
 {
 	return this->objclass == x.objclass && this->id == x.id;
@@ -85,37 +71,28 @@ std::string objectid_t::tostring() const
 	return stringify(this->objclass) + ";" + bin2hex(this->id);
 }
 
-objectdetails_t::objectdetails_t(objectclass_t objclass) : m_objclass(objclass) {}
-objectdetails_t::objectdetails_t() : m_objclass(OBJECTCLASS_UNKNOWN) {}
-
-objectdetails_t::objectdetails_t(const objectdetails_t &objdetails) {
-	m_objclass = objdetails.m_objclass;
-	m_mapProps = objdetails.m_mapProps;
-	m_mapMVProps = objdetails.m_mapMVProps;
-}
-
 unsigned int objectdetails_t::GetPropInt(property_key_t propname) const
 {
 	property_map::const_iterator item = m_mapProps.find(propname);
-	return item == m_mapProps.end() ? 0 : atoi(item->second.c_str());
+	return item == m_mapProps.cend() ? 0 : atoi(item->second.c_str());
 }
 
 bool objectdetails_t::GetPropBool(property_key_t propname) const
 {
 	property_map::const_iterator item = m_mapProps.find(propname);
-	return item == m_mapProps.end() ? false : atoi(item->second.c_str());
+	return item == m_mapProps.cend() ? false : atoi(item->second.c_str());
 }
 
 std::string objectdetails_t::GetPropString(property_key_t propname) const
 {
 	property_map::const_iterator item = m_mapProps.find(propname);
-	return item == m_mapProps.end() ? std::string() : item->second;
+	return item == m_mapProps.cend() ? std::string() : item->second;
 }
 
 objectid_t objectdetails_t::GetPropObject(property_key_t propname) const
 {
 	property_map::const_iterator item = m_mapProps.find(propname);
-	return item == m_mapProps.end() ? objectid_t() : objectid_t(item->second);
+	return item == m_mapProps.cend() ? objectid_t() : objectid_t(item->second);
 }
 
 void objectdetails_t::SetPropInt(property_key_t propname, unsigned int value)
@@ -167,11 +144,11 @@ std::list<unsigned int>
 objectdetails_t::GetPropListInt(property_key_t propname) const
 {
 	property_mv_map::const_iterator mvitem = m_mapMVProps.find(propname);
-	if (mvitem == m_mapMVProps.end())
+	if (mvitem == m_mapMVProps.cend())
 		return std::list<unsigned int>();
 	std::list<unsigned int> l;
-	for (std::list<std::string>::const_iterator i = mvitem->second.begin(); i != mvitem->second.end(); ++i)
-		l.push_back(atoui(i->c_str()));
+	for (const auto &i : mvitem->second)
+		l.push_back(atoui(i.c_str()));
 	return l;
 }
 
@@ -179,39 +156,37 @@ std::list<std::string>
 objectdetails_t::GetPropListString(property_key_t propname) const
 {
 	property_mv_map::const_iterator mvitem = m_mapMVProps.find(propname);
-	if (mvitem != m_mapMVProps.end()) return mvitem->second;
-	else return std::list<std::string>();
+	if (mvitem != m_mapMVProps.cend())
+		return mvitem->second;
+	return std::list<std::string>();
 }
 
 std::list<objectid_t>
 objectdetails_t::GetPropListObject(property_key_t propname) const
 {
 	property_mv_map::const_iterator mvitem = m_mapMVProps.find(propname);
-	if (mvitem == m_mapMVProps.end())
+	if (mvitem == m_mapMVProps.cend())
 		return std::list<objectid_t>();
 	std::list<objectid_t> l;
-	for (std::list<std::string>::const_iterator i = mvitem->second.begin(); i != mvitem->second.end(); ++i)
-		l.push_back(objectid_t(*i));
+	for (const auto &i : mvitem->second)
+		l.push_back(objectid_t(i));
 	return l;
 }
 
 property_map objectdetails_t::GetPropMapAnonymous() const {
 	property_map anonymous;
-	property_map::const_iterator iter;
 
-	for (iter = m_mapProps.begin(); iter != m_mapProps.end(); ++iter)
-		if (((unsigned int)iter->first) & 0xffff0000)
-			anonymous.insert(*iter);
+	for (const auto &iter : m_mapProps)
+		if (((unsigned int)iter.first) & 0xffff0000)
+			anonymous.insert(iter);
 	return anonymous;
 }
 
 property_mv_map objectdetails_t::GetPropMapListAnonymous() const {
 	property_mv_map anonymous;
-	property_mv_map::const_iterator iter;
-
-	for (iter = m_mapMVProps.begin(); iter != m_mapMVProps.end(); ++iter)
-		if (((unsigned int)iter->first) & 0xffff0000)
-			anonymous.insert(*iter);
+	for (const auto &iter : m_mapMVProps)
+		if (((unsigned int)iter.first) & 0xffff0000)
+			anonymous.insert(iter);
 	return anonymous;
 }
 
@@ -244,15 +219,11 @@ objectclass_t objectdetails_t::GetClass() const {
 }
 
 void objectdetails_t::MergeFrom(const objectdetails_t &from) {
-	property_map::const_iterator i, fi;
-	property_mv_map::const_iterator mvi, fmvi;
-
-	ASSERT(this->m_objclass == from.m_objclass);
-
-	for (fi = from.m_mapProps.begin(); fi != from.m_mapProps.end(); ++fi)
-		this->m_mapProps[fi->first].assign(fi->second);
-	for (fmvi = from.m_mapMVProps.begin(); fmvi != from.m_mapMVProps.end(); ++fmvi)
-		this->m_mapMVProps[fmvi->first].assign(fmvi->second.begin(), fmvi->second.end());
+	assert(this->m_objclass == from.m_objclass);
+	for (const auto &p : from.m_mapProps)
+		this->m_mapProps[p.first].assign(p.second);
+	for (const auto &p : from.m_mapMVProps)
+		this->m_mapMVProps[p.first].assign(p.second.cbegin(), p.second.cend());
 }
 
 /**
@@ -260,44 +231,43 @@ void objectdetails_t::MergeFrom(const objectdetails_t &from) {
  *
  * @return Memory usage of this object in bytes
  */
-size_t objectdetails_t::GetObjectSize(void)
+size_t objectdetails_t::GetObjectSize(void) const
 {
 	size_t ulSize = sizeof(*this);
-	property_map::const_iterator i;
-	property_mv_map::const_iterator mvi;
-	std::list<std::string>::const_iterator istr;
 
 	ulSize += MEMORY_USAGE_MAP(m_mapProps.size(), property_map);
-	for (i = m_mapProps.begin(); i != m_mapProps.end(); ++i)
-		ulSize += MEMORY_USAGE_STRING(i->second);
+	for (const auto &p : m_mapProps)
+		ulSize += MEMORY_USAGE_STRING(p.second);
 
 	ulSize += MEMORY_USAGE_MAP(m_mapMVProps.size(), property_mv_map);
-	for (mvi = m_mapMVProps.begin(); mvi != m_mapMVProps.end(); ++mvi)
-		for (istr = mvi->second.begin(); istr != mvi->second.end(); ++istr)
-			ulSize += MEMORY_USAGE_STRING((*istr));
+	for (const auto &p : m_mapMVProps)
+		for (const auto &s : p.second)
+			ulSize += MEMORY_USAGE_STRING(s);
 	return ulSize;
 }
 
 std::string objectdetails_t::ToStr(void) const
 {
 	std::string str;
-	property_map::const_iterator i;
-	property_mv_map::const_iterator mvi;
-	std::list<std::string>::const_iterator istr;
 
 	str = "propmap: ";
-	for (i = m_mapProps.begin(); i != m_mapProps.end(); ++i) {
-		if(i != m_mapProps.begin())  str+= ", ";
+	for (auto i = m_mapProps.cbegin(); i != m_mapProps.cend(); ++i) {
+		if (i != m_mapProps.cbegin())
+			str += ", ";
 		str+= stringify(i->first) + "='";
 		str+= i->second + "'";
 	}
 
 	str += " mvpropmap: ";
-	for (mvi = m_mapMVProps.begin(); mvi != m_mapMVProps.end(); ++mvi) {
-		if(mvi != m_mapMVProps.begin()) str += ", ";
+	for (auto mvi = m_mapMVProps.cbegin();
+	     mvi != m_mapMVProps.cend(); ++mvi) {
+		if (mvi != m_mapMVProps.begin())
+			str += ", ";
 		str += stringify(mvi->first) + "=(";
-		for (istr = mvi->second.begin(); istr != mvi->second.end(); ++istr) {
-			if(istr != mvi->second.begin()) str +=", ";
+		for (auto istr = mvi->second.cbegin();
+		     istr != mvi->second.cend(); ++istr) {
+			if (istr != mvi->second.cbegin())
+				str += ", ";
 			str += *istr;
 		}
 		str +=")";
@@ -308,8 +278,6 @@ std::string objectdetails_t::ToStr(void) const
 
 serverdetails_t::serverdetails_t(const std::string &servername)
 : m_strServerName(servername)
-, m_ulHttpPort(0)
-, m_ulSslPort(0)
 { }
 
 void serverdetails_t::SetHostAddress(const std::string &hostaddress) {
@@ -375,3 +343,5 @@ std::string serverdetails_t::GetSslPath() const {
 const std::string &serverdetails_t::GetProxyPath() const {
 	return m_strProxyPath;
 }
+
+} /* namespace */

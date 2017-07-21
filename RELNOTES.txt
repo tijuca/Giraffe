@@ -1,3 +1,170 @@
+Release notes for 8.3.2
+=======================
+Fixes:
+* gateway: fix an IMAP protocol error [KC-668]
+  Apple Mail/Alpine did not show mails with long encoded subjects
+* common: restore ability to output crashdump [KC-630]
+* caldav: counter proposal without dates [KC-710]
+* inetmapi: avoid short allocation on group expansion [KC-388,KC-727]
+Changes:
+* server: improve wording of ntlm_auth messages [KC-572]
+
+
+Release notes for 8.3.1 [2017-06-20]
+====================================
+Enhancements:
+* gateway: add option to ignore commands during IDLE
+Fixes:
+* dagent.cfg:forward_whitelist_domains commentary has been reworded [KC-593]
+* inetmapi: do not force HTML when use_tnef is set to minimal [KC-664]
+* spooler: avoid a use-after-free, and a deadlock after this failure [KC-588]
+* backup: batch storage updates [KC-662]
+* spooler: custom bounce message text for forward_whitelist_domain [KC-618]
+* server: avoid unchecked return value and unsigned underflow [KC-656]
+* php: rework pointer value storing
+* daemons: call initgroups when switching user and don't fall over
+  [KC-684,KC-690]
+
+
+Release notes for 8.3.0 [2017-04-27]
+====================================
+Enhancements:
+* mapi: drop global lock and replace singleton allocmore table by
+  per-object vectors [KC-328]
+* swig: expose group and company properties in Python [KC-320]
+* xapian-compact.py: new -c option to specify config file [KC-205]
+* utils: support setting out-of-office without an until-date [KC-275]
+* gateway, server: reload SSL certificates on SIGHUP [KC-301]
+* gateway: optimize LIST, SELECT, STATUS [KC-490]
+* dagent: log_raw_message option can now be used selectively on users [KC-370]
+* icalmapi: VCF conversion [KC-420]
+* migration-pst: call SaveChanges only once [KC-534]
+Fixes:
+* pyko: do not throw backtraces on log messages [KC-340]
+* server: Ctrl-C now works in gdb [KC-171]
+* ics: make creation of new syncids work incrementally [KC-208]
+* libserver: change incorrect compare operator for EID_V0 [KC-365]
+* migration-pst: show usage, not traceback, for invalid options [KC-372]
+* migration-pst: skip root folder more intelligently [KC-487]
+* migration-pst: MV properties are handled better [KC-457]
+* inetmapi: avoid buffer overread on rejected recipients
+  (showed garbage in logs) [KC-398]
+* client: add extra checks for EID sizes [KC-500]
+* gateway: enforce user and password checking on local socket [KC-396,KC-490]
+* caldav: avoid a nullptr dereference [KC-236]
+* cachestat: avoid exception and unpack tuple [KC-402]
+* ldapplugin: revert "catch empty ldap_search_base" [KC-602]
+* spooler: fix crash on forwarding rules [KC-608]
+* dagent: avoid shell command injections [KC-619]
+* server: avoid returning garbage for getLicenseAuth [KA-2]
+Changes:
+* server: compressed attachments now get the same permissions as uncompressed
+  ones [KC-380]
+* server: make softdelete_lifetime config setting a reloadable
+  property [KC-472]
+* icalmapi: handle missing timezone for RRULE [KC-414]
+* backup: maintain deleted folders and add --purge N option [KC-376]
+* migration-pst: filter metadata at start of subject [KC-424]
+* migration-pst: ignore decode errors [KC-521]
+* common: fix empty text bodies when converting U+0000 from
+  RTF/HTML [KC-557,KC-580]
+* icalmapi: reworked copying description into mail body [KC-568]
+Of special mention:
+* search: python3 support (but requires new python-xapian and,
+  as a result, a db migration or full reindexing)
+Developer/packager notes:
+* KC variables and functions now live in the KC:: C++ namespace [KC-369]
+* Build-time requirements: gsoap >= 2.8.39 [KC-335], libvmime >= 0.9.2,
+  boost no longer needed at all [KC-451], xmlto no longer needed at all.
+
+
+Release notes for 8.2.0 [2017-02-17]
+====================================
+Fixes:
+* backup: avoid exceptions on problematic rules/ACLs/delegates [KC-213,KC-266]
+* The comment for server.cfg's "disabled_features" was wrong [KC-262]
+* php: fix crash by adding missing pointer type conversions [KC-274]
+* dagent: the "Received" debugging header had the wrong target address
+* gateway: do not emit an X-Mailer field when retrieving mail [KC-277]
+* gateway: report missing attachments over IMAP better [KC-436]
+* server/ldap: report empty ldap_search_base setting
+* client: verify peer's SSL certificate name [KC-156,KC-409]
+* admin: support unwrapping "default:" type URLs [KC-289]
+* backup: fix tracebacks when used with ZCP [KC-306,KC-307,KC-308]
+* server: implement missing readback of compressed attachments [KC-285]
+* dagent: iCal descriptions caused wrong body parts to be displayed [KC-138]
+* dagent: mr-process failed to copy attachments to the calendar item [KC-202]
+* dagent: restore/rework forced ASCII charset upgrade [KC-294]
+* server: S3 attachment size was not calculated [KC-351]
+* inetmapi: review misdetection of TNEF necessity for reminders [KC-348]
+* icalmapi: unbreak timezone lookup [KC-313]
+* icalmapi: handle RRULE with missing timezone [KC-341]
+* inetmapi: avoid an infinite recursion on SMIME handling [KC-366]
+* inetmapi: avoid buffer overread when generating NDR [KC-398]
+* inetmapi: avoid overzealously generating winmail.dat [KC-348]
+* server: equalize fs permissions for attachments [KC-380]
+* migration-pst: resolve tracebacks [KC-372,KC-373,KC-377]
+* migration-pst: do not skip folder when items unprocessible [KC-417]
+* common: fix spurious crash in sk_SSL_COMP_free on shutdown [KC-443]
+Enhancements:
+* client: Kerberos/GSSAPI support [KC-396]
+* PST importer [KC-59]
+* Python 3 support [KC-48,KC-267]
+* search: files are now compacted, and their uid/gid checked [KC-188]
+* server: allow search folder creation outside of own store [KC-271]
+* dagent: forwarding by rule can be restricted with a whitelist [KC-109]
+* search: add script for findroot upgrade [KC-300]
+* php: can build with ZTS again [KC-442]
+* php: ICS import/export functions [KC-302]
+* server: AWS4-HMAC-SHA256 support for S3 [KC-170]
+* pyko: permit "public@company" syntax to specify stores [KC-317]
+* dagent: new AUTORESPOND_BCC option for use with OOF [KC-319]
+* kopano-stats: bind 'q' key to exit as well [KC-105]
+* presence: log authentication errors
+* Improved PHP7 support [*,KC-330]
+* backup: backup deleted items and folders [KC-376]
+* backup: add --purge option [KC-376]
+* backup: improved logging when ACL does not resolve to user/group [KC-431]
+Changes:
+* Non-Delivery Reports now originate from "Mail Delivery System"
+  (like postfix) instead of yourself [KC-309]
+* Support for building with a no-SSLv2 OpenSSL 1.1. [KC-230]
+  If you run such a setup, be aware that a config setting like
+  "ssl_protocol = !SSLv2" in one or more of kopano-{server,gateway,ical}.cfg
+  can inhibit the process from starting.
+* Cleanup of the example LDAP configuration files. [KC-229]
+  /usr/share/doc/kopano/example-configs/ now has just a ldap.cfg,
+  and no more ldap{,ms}.{active-directory,ldap}.cfg.
+* The example LDAP config file now has a different proposed value for
+  ldap_object_search_filter for OpenLDAP. [KC-218]
+* spooler: messages with reminder will be sent with a TNEF copy [KC-152]
+* admin: group features will no longer be shown [KC-239]
+* search: log to file (if set) instead of stdout [KC-204]
+* search: treat '_' as a word break [KC-290]
+* swig: resolve crash when python programs end [KC-269]
+* config: change ldap_object_search_filter for WebApp to be able to
+  search by mail address [KC-337]
+* backup: synchronize soft-deleted items [KC-376]
+* The RTF encoder incorrectly produced paragraphs where
+  it should have created linefeeds [KC-338]
+* The RTF decoder failed to see that \uXXXX could start a paragraph [KC-338]
+* The RTF decoder erroneously created a new paragraph on \pard [KC-338]
+Developer/packager notes:
+* Support for building the source with newer gsoap
+  (upto and including 2.8.37) [KC-261]
+* KC 8.2 is the first to support 2.8.34+ at runtime. [KC-261]
+  Earlier KC releases only support gsoap < 2.8.30 because KC was using
+  undocumented behavior for which the generator changed the wire protocol.
+* New libvmime API is now being used [KC-263]
+Internal:
+* Many "goto exit" were abolished and reordered [KC-87]
+* for() loop verbosity reduced by using range-based loops [KC-88]
+* pthread_mutex calls have been switched to std::mutex [KC-191]
+* Coverity report fixes and other possible NULL dereferences [KC-23,KC-235]
+* Memory leak fixes [KC-93,KC-98,KC-316]
+* Reduction of symbol table sizes [KC-20]
+
+
 Release notes for 8.1.0 [2016-10-05]
 ====================================
 Fixes:
@@ -24,6 +191,7 @@ Fixes:
 * search: cure an infinite loop [KC-157]
 * backup: miscellaneous [KC-161, KC-162, KC-192]
 * init: classic init scripts showed wrong status for python daemons [KC-220]
+* client: do check SSL certificate subject names [KC-156]
 Enhancements:
 * server: add ICS log messages [KC-18]
 * server: ship example config files for ldap multi-server [KC-65]

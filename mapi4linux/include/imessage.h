@@ -19,8 +19,9 @@
 #define _M4L_IMESSAGE_H_
 #define _IMESSAGE_H_
 
-extern "C"
-{
+#include <initializer_list>
+
+extern "C" {
 
 typedef struct _MSGSESS *LPMSGSESS;
 
@@ -43,11 +44,15 @@ STDAPI_(SCODE) OpenIMsgOnIStg(LPMSGSESS lpMsgSess, LPALLOCATEBUFFER lpAllocateBu
 
 #define PROPATTR_NOT_PRESENT	((ULONG) 0x00000008)
 
-typedef struct _SPropAttrArray
-{
+} /* extern "C" */
+
+struct SPropAttrArray {
+	SPropAttrArray(void) = delete;
+	template<typename _T> SPropAttrArray(std::initializer_list<_T>) = delete;
 	ULONG	cValues;							
 	ULONG	aPropAttr[MAPI_DIM];
-} SPropAttrArray, * LPSPropAttrArray;
+};
+typedef struct SPropAttrArray *LPSPropAttrArray;
 
 #define CbNewSPropAttrArray(_cattr) \
 	(offsetof(SPropAttrArray,aPropAttr) + (_cattr)*sizeof(ULONG))
@@ -56,18 +61,15 @@ typedef struct _SPropAttrArray
 	(UINT)((_lparray)->cValues)*sizeof(ULONG))
 
 #define SizedSPropAttrArray(_cattr, _name) \
-struct _SPropAttrArray_ ## _name \
-{ \
+struct _SPropAttrArray_ ## _name { \
 	ULONG	cValues; \
 	ULONG	aPropAttr[_cattr]; \
 } _name
 
-STDAPI_(HRESULT) GetAttribIMsgOnIStg(LPVOID lpObject, LPSPropTagArray lpPropTagArray, 
-						   LPSPropAttrArray *lppPropAttrArray );
+extern "C" {
 
-STDAPI_(HRESULT) SetAttribIMsgOnIStg(LPVOID lpObject, LPSPropTagArray lpPropTags, 
-						   LPSPropAttrArray lpPropAttrs, LPSPropProblemArray *lppPropProblems);
-
+extern STDAPI_(HRESULT) GetAttribIMsgOnIStg(LPVOID lpObject, const SPropTagArray *lpPropTagArray, LPSPropAttrArray *lppPropAttrArray);
+extern STDAPI_(HRESULT) SetAttribIMsgOnIStg(void *lpObject, const SPropTagArray *lpPropTags, const SPropAttrArray *lpPropAttrs, LPSPropProblemArray *lppPropProblems);
 STDAPI_(SCODE) MapStorageSCode( SCODE StgSCode );
 
 } //extern "C"

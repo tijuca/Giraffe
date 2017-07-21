@@ -24,10 +24,13 @@
 #include <kopano/CommonUtil.h>
 #include <kopano/mapiext.h>
 #include <kopano/mapiguidext.h>
+#include <kopano/memory.hpp>
 #include <mapiutil.h>
 #include <mapix.h>
 #include <kopano/stringutil.h>
 #include "fsck.h"
+
+using namespace KCHL;
 
 static bool ReadYesNoMessage(const std::string &strMessage,
     const std::string &strAuto)
@@ -46,12 +49,11 @@ static bool ReadYesNoMessage(const std::string &strMessage,
 	return (strReply[0] == 'y' || strReply[0] == 'Y');
 }
 
-static HRESULT DeleteEntry(LPMAPIFOLDER lpFolder, LPSPropValue lpItemProperty)
+static HRESULT DeleteEntry(LPMAPIFOLDER lpFolder,
+    const SPropValue *lpItemProperty)
 {
-	HRESULT hr = hrSuccess;
-	LPENTRYLIST lpEntryList = NULL;
-
-	hr = MAPIAllocateBuffer(sizeof(ENTRYLIST), (void**)&lpEntryList);
+	memory_ptr<ENTRYLIST> lpEntryList;
+	HRESULT hr = MAPIAllocateBuffer(sizeof(ENTRYLIST), &~lpEntryList);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -66,7 +68,6 @@ static HRESULT DeleteEntry(LPMAPIFOLDER lpFolder, LPSPropValue lpItemProperty)
 	hr = lpFolder->DeleteMessages(lpEntryList, 0, NULL, 0);
 
 exit:
-	MAPIFreeBuffer(lpEntryList);
 	if (hr == hrSuccess)
 		cout << "Item deleted." << endl;
 	else
@@ -85,20 +86,18 @@ static HRESULT FixProperty(LPMESSAGE lpMessage, const std::string &strName,
 	ErrorProp.Value = Value;
 	/* NOTE: Named properties don't have the PT value set by default,
 	   The caller of this function should have taken care of this. */
-	if (PROP_ID(ulTag) && PROP_TYPE(ulTag)) {
-		hr = lpMessage->SetProps(1, &ErrorProp, NULL);
-		if (hr != hrSuccess) {
-			cout << "Failed to fix broken property." << endl;
-			return hr;
-		}
-
-		hr = lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
-		if (hr != hrSuccess)
-			cout << "Failed to save changes to fix broken property";
-	} else {
+	if (PROP_ID(ulTag) == 0 || PROP_TYPE(ulTag) == 0) {
 		cout << "Invalid property tag: " << stringify(ulTag, true) << endl;
-		hr = MAPI_E_INVALID_PARAMETER;
+		return MAPI_E_INVALID_PARAMETER;
 	}
+	hr = lpMessage->SetProps(1, &ErrorProp, NULL);
+	if (hr != hrSuccess) {
+		cout << "Failed to fix broken property." << endl;
+		return hr;
+	}
+	hr = lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
+	if (hr != hrSuccess)
+		cout << "Failed to save changes to fix broken property";
 	return hr;
 }
 
@@ -106,25 +105,16 @@ static HRESULT DetectFolderEntryDetails(LPMESSAGE lpMessage, string *lpName,
     string *lpClass)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpPropertyArray;
+	memory_ptr<SPropValue> lpPropertyArray;
 	ULONG ulPropertyCount;
+	static constexpr const SizedSPropTagArray(3, PropertyTagArray) =
+		{3, {PR_SUBJECT_A, PR_NORMALIZED_SUBJECT_A, PR_MESSAGE_CLASS_A}};
 
-	SizedSPropTagArray(3, PropertyTagArray) = {
-		3,
-		{
-			PR_SUBJECT_A,
-			PR_NORMALIZED_SUBJECT_A,
-			PR_MESSAGE_CLASS_A,
-		}
-	};
-
-	hr = lpMessage->GetProps((LPSPropTagArray)&PropertyTagArray,
-				 0,
-				 &ulPropertyCount,
-				 &lpPropertyArray);
+	hr = lpMessage->GetProps(PropertyTagArray, 0, &ulPropertyCount,
+	     &~lpPropertyArray);
 	if (FAILED(hr)) {
 		cout << "Failed to obtain all properties." << endl;
-		goto exit;
+		return hr;
 	}
 
 	for (ULONG i = 0; i < ulPropertyCount; ++i) {
@@ -145,9 +135,6 @@ static HRESULT DetectFolderEntryDetails(LPMESSAGE lpMessage, string *lpName,
 		cout << "Unable to detect message class.";
 	else
 		hr = hrSuccess;
-
-exit:
-	MAPIFreeBuffer(lpPropertyArray);
 	return hr;
 }
 
@@ -155,24 +142,19 @@ static HRESULT ProcessFolderEntry(Fsck *lpFsck, LPMAPIFOLDER lpFolder,
     LPSRow lpRow)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpItemProperty = NULL;
-	LPMESSAGE lpMessage = NULL;
+	object_ptr<IMessage> lpMessage;
 	ULONG ulObjectType = 0;
 	string strName;
 	string strClass;
 
-	lpItemProperty = PpropFindProp(lpRow->lpProps, lpRow->cValues, PR_ENTRYID);
+	auto lpItemProperty = PCpropFindProp(lpRow->lpProps, lpRow->cValues, PR_ENTRYID);
 	if (!lpItemProperty) {
 		cout << "Row does not contain an EntryID." << endl;
 		goto exit;
 	}
-
 	hr = lpFolder->OpenEntry(lpItemProperty->Value.bin.cb,
-			         (LPENTRYID)lpItemProperty->Value.bin.lpb,
-			         &IID_IMessage,
-			         MAPI_MODIFY,
-			         &ulObjectType,
-			         (IUnknown**)&lpMessage);
+	     reinterpret_cast<ENTRYID *>(lpItemProperty->Value.bin.lpb),
+	     &IID_IMessage, MAPI_MODIFY, &ulObjectType, &~lpMessage);
 	if (hr != hrSuccess) {
 		cout << "Failed to open EntryID." << endl;
 		goto exit;
@@ -187,9 +169,6 @@ static HRESULT ProcessFolderEntry(Fsck *lpFsck, LPMAPIFOLDER lpFolder,
 		goto exit;
 
 exit:
-	if (lpMessage)
-		lpMessage->Release();
-
 	if (hr != hrSuccess)
 		hr = lpFsck->DeleteMessage(lpFolder, lpItemProperty);
 
@@ -199,15 +178,13 @@ exit:
 static HRESULT ProcessFolder(Fsck *lpFsck, LPMAPIFOLDER lpFolder,
     const std::string &strName)
 {
-	HRESULT hr = hrSuccess;
-	LPMAPITABLE lpTable = NULL;
-	LPSRowSet lpRows = NULL;
+	object_ptr<IMAPITable> lpTable;
 	ULONG ulCount;
 
-	hr = lpFolder->GetContentsTable(0, &lpTable);
+	HRESULT hr = lpFolder->GetContentsTable(0, &~lpTable);
  	if(hr != hrSuccess) {
 		cout << "Failed to open Folder table." << endl;
-		goto exit;
+		return hr;
 	}
 
 	/*
@@ -216,20 +193,20 @@ static HRESULT ProcessFolder(Fsck *lpFsck, LPMAPIFOLDER lpFolder,
 	hr = lpTable->GetRowCount(0, &ulCount);
 	if(hr != hrSuccess) {
 		cout << "Failed to count number of rows." << endl;
-		goto exit;
+		return hr;
 	} else if (!ulCount) {
 		cout << "No entries inside folder." << endl;
-		goto exit;
+		return hr;
 	}
 
 	/*
 	 * Loop through each row/entry and validate.
 	 */
 	while (true) {
-		hr = lpTable->QueryRows(20, 0, &lpRows);
+		rowset_ptr lpRows;
+		hr = lpTable->QueryRows(20, 0, &~lpRows);
 		if (hr != hrSuccess)
-			break;
-
+			return hr;
 		if (lpRows->cRows == 0)
 			break;
 
@@ -240,42 +217,20 @@ static HRESULT ProcessFolder(Fsck *lpFsck, LPMAPIFOLDER lpFolder,
 				// Move along, nothing to see.
 			}
 		}
-
-		FreeProws(lpRows);
-		lpRows = NULL;
 	}
-
-exit:
-	if (lpRows)
-		FreeProws(lpRows);
-
-	if (lpTable)
-		lpTable->Release();
-
-	return hr;
+	return hrSuccess;
 }
 
 /*
  * Fsck implementation.
  */
-Fsck::Fsck()
-{
-	ulFolders = 0;
-	ulEntries = 0;
-	ulProblems = 0;
-	ulFixed = 0;
-	ulDeleted = 0;
-}
-
 HRESULT Fsck::ValidateMessage(LPMESSAGE lpMessage,
     const std::string &strName, const std::string &strClass)
 {
-	HRESULT hr = hrSuccess;
-
 	cout << "Validating entry: \"" << strName << "\"" << endl;
 
 	++this->ulEntries;
-	hr = this->ValidateItem(lpMessage, strClass);
+	HRESULT hr = this->ValidateItem(lpMessage, strClass);
 
 	cout << "Validating of entry \"" << strName << "\" ended" << endl;
 
@@ -285,13 +240,10 @@ HRESULT Fsck::ValidateMessage(LPMESSAGE lpMessage,
 HRESULT Fsck::ValidateFolder(LPMAPIFOLDER lpFolder,
     const std::string &strName)
 {
-	HRESULT hr = hrSuccess;
-
 	cout << "Validating folder \"" << strName << "\"" << endl;
 
 	++this->ulFolders;
-	hr = ProcessFolder(this, lpFolder, strName);
-
+	HRESULT hr = ProcessFolder(this, lpFolder, strName);
 	cout << "Validating of folder \"" << strName << "\" ended" << endl;
 
 	return hr;
@@ -334,50 +286,39 @@ HRESULT Fsck::ReplaceProperty(LPMESSAGE lpMessage,
 
 HRESULT Fsck::DeleteRecipientList(LPMESSAGE lpMessage, std::list<unsigned int> &mapiReciptDel, bool &bChanged)
 {
-	HRESULT hr = hrSuccess;
-
-	std::list<unsigned int>::const_iterator iter;
-	SRowSet *lpMods = NULL;
-
 	++this->ulProblems;
-
 	cout << mapiReciptDel.size() << " duplicate or invalid recipients found. " << endl;
+	if (!ReadYesNoMessage("Remove duplicate or invalid recipients?", auto_fix))
+		return hrSuccess;
 
-	if (ReadYesNoMessage("Remove duplicate or invalid recipients?", auto_fix) )
-	{
-		hr = MAPIAllocateBuffer(CbNewADRLIST(mapiReciptDel.size()), (void**)&lpMods);
+	memory_ptr<ADRLIST> lpMods;
+	HRESULT hr = MAPIAllocateBuffer(CbNewADRLIST(mapiReciptDel.size()), &~lpMods);
+	if (hr != hrSuccess)
+		return hr;
+
+	lpMods->cEntries = 0;
+	for (const auto &recip : mapiReciptDel) {
+		lpMods->aEntries[lpMods->cEntries].cValues = 1;
+		hr = MAPIAllocateMore(sizeof(SPropValue), lpMods, reinterpret_cast<void **>(&lpMods->aEntries[lpMods->cEntries].rgPropVals));
 		if (hr != hrSuccess)
-			goto exit;
-
-		lpMods->cRows = 0;
-		for (iter = mapiReciptDel.begin(); iter != mapiReciptDel.end(); ++iter) {
-			lpMods->aRow[lpMods->cRows].cValues = 1;
-			if ((hr = MAPIAllocateMore(sizeof(SPropValue), lpMods, (void**)&lpMods->aRow[lpMods->cRows].lpProps)) != hrSuccess)
-				goto exit;
-			lpMods->aRow[lpMods->cRows].lpProps->ulPropTag = PR_ROWID;
-			lpMods->aRow[lpMods->cRows].lpProps->Value.ul = *iter;
-
-			++lpMods->cRows;
-		}
-
-		hr = lpMessage->ModifyRecipients(MODRECIP_REMOVE, (LPADRLIST)lpMods);
-		if (hr != hrSuccess)
-			goto exit;
-
-		hr = lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
-		if (hr != hrSuccess)
-			goto exit;
-
-		bChanged = true;
-
-		++this->ulFixed;
+			return hr;
+		lpMods->aEntries[lpMods->cEntries].rgPropVals->ulPropTag = PR_ROWID;
+		lpMods->aEntries[lpMods->cEntries++].rgPropVals->Value.ul = recip;
 	}
-exit:
-	MAPIFreeBuffer(lpMods);
-	return hr;
+
+	hr = lpMessage->ModifyRecipients(MODRECIP_REMOVE, lpMods.get());
+	if (hr != hrSuccess)
+		return hr;
+	hr = lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
+	if (hr != hrSuccess)
+		return hr;
+	bChanged = true;
+	++this->ulFixed;
+	return hrSuccess;
 }
 
-HRESULT Fsck::DeleteMessage(LPMAPIFOLDER lpFolder, LPSPropValue lpItemProperty)
+HRESULT Fsck::DeleteMessage(LPMAPIFOLDER lpFolder,
+    const SPropValue *lpItemProperty)
 {
 	HRESULT hr = hrSuccess;
 
@@ -394,138 +335,96 @@ HRESULT Fsck::ValidateRecursiveDuplicateRecipients(LPMESSAGE lpMessage, bool &bC
 {
 	HRESULT hr = hrSuccess;
 	bool bSubChanged = false;
-	LPATTACH lpAttach = NULL;
-	LPMAPITABLE lpTable = NULL;
+	object_ptr<IMAPITable> lpTable;
     ULONG cRows = 0;
-    SRowSet *pRows = NULL;
-	LPMESSAGE lpSubMessage = NULL;
+	static constexpr const SizedSPropTagArray(2, sptaProps) =
+		{2, {PR_ATTACH_NUM, PR_ATTACH_METHOD}};
 
-	SizedSPropTagArray(2, sptaProps) = {2, {PR_ATTACH_NUM, PR_ATTACH_METHOD}};
-
-	hr = lpMessage->GetAttachmentTable(0, &lpTable);
+	hr = lpMessage->GetAttachmentTable(0, &~lpTable);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpTable->GetRowCount(0, &cRows);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	if (cRows == 0)
 		goto message;
-
-	hr = lpTable->SetColumns((LPSPropTagArray)&sptaProps, 0);
+	hr = lpTable->SetColumns(sptaProps, 0);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	while (true) {
-		hr = lpTable->QueryRows(50, 0, &pRows);
+		rowset_ptr pRows;
+		hr = lpTable->QueryRows(50, 0, &~pRows);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		if (pRows->cRows == 0)
 			break;
 
 		for (unsigned int i = 0; i < pRows->cRows; ++i) {
-			if (pRows->aRow[i].lpProps[1].ulPropTag == PR_ATTACH_METHOD && pRows->aRow[i].lpProps[1].Value.ul == ATTACH_EMBEDDED_MSG)
-			{
-				bSubChanged = false;
+			if (pRows->aRow[i].lpProps[1].ulPropTag != PR_ATTACH_METHOD ||
+			    pRows->aRow[i].lpProps[1].Value.ul != ATTACH_EMBEDDED_MSG)
+				continue;
 
-				hr = lpMessage->OpenAttach(pRows->aRow[i].lpProps[0].Value.ul, NULL, MAPI_BEST_ACCESS, &lpAttach);
+			object_ptr<IAttach> lpAttach;
+			object_ptr<IMessage> lpSubMessage;
+			bSubChanged = false;
+			hr = lpMessage->OpenAttach(pRows->aRow[i].lpProps[0].Value.ul, nullptr, MAPI_BEST_ACCESS, &~lpAttach);
+			if (hr != hrSuccess)
+				return hr;
+			hr = lpAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, MAPI_MODIFY, &~lpSubMessage);
+			if (hr != hrSuccess)
+				return hr;
+			hr = ValidateRecursiveDuplicateRecipients(lpSubMessage, bSubChanged);
+			if (hr != hrSuccess)
+				return hr;
+			if (bSubChanged) {
+				hr = lpAttach->SaveChanges(KEEP_OPEN_READWRITE);
 				if (hr != hrSuccess)
-					goto exit;
-
-				hr = lpAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, MAPI_MODIFY, (LPUNKNOWN*)&lpSubMessage);
-				if (hr != hrSuccess)
-					goto exit;
-
-				hr = ValidateRecursiveDuplicateRecipients(lpSubMessage, bSubChanged);
-				if (hr != hrSuccess)
-					goto exit;
-
-				if (bSubChanged) {
-					hr = lpAttach->SaveChanges(KEEP_OPEN_READWRITE);
-					if (hr != hrSuccess)
-						goto exit;
-
-					bChanged = bSubChanged;
-				}
-				lpAttach->Release();
-				lpAttach = NULL;
-				lpSubMessage->Release();
-				lpSubMessage = NULL;
-
+					return hr;
+				bChanged = bSubChanged;
 			}
-
 		}
-
-		FreeProws(pRows);
-		pRows = NULL;
 	}
 
 message:
-	lpTable->Release();
-	lpTable = NULL;
-
 	hr = ValidateDuplicateRecipients(lpMessage, bChanged);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	if (bChanged)
 		lpMessage->SaveChanges(KEEP_OPEN_READWRITE);
-
-exit:
-	if (lpTable)
-		lpTable->Release();
-
-	if (lpAttach)
-		lpAttach->Release();
-
-	if (lpSubMessage)
-		lpSubMessage->Release();
-
-	if (pRows)
-		FreeProws(pRows);
-
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT Fsck::ValidateDuplicateRecipients(LPMESSAGE lpMessage, bool &bChanged)
 {
-	HRESULT hr = hrSuccess;
-	LPMAPITABLE lpTable = NULL;
+	object_ptr<IMAPITable> lpTable;
 	ULONG cRows = 0;
 	std::set<std::string> mapRecip;
 	std::list<unsigned int> mapiReciptDel;
-	std::list<unsigned int>::const_iterator iter;
-	SRowSet *pRows = NULL;
 	std::string strData;
-	std::pair<std::set<std::string>::const_iterator, bool> res;
 	unsigned int i = 0;
+	static constexpr const SizedSPropTagArray(5, sptaProps) =
+		{5, {PR_ROWID, PR_DISPLAY_NAME_A, PR_EMAIL_ADDRESS_A,
+		PR_RECIPIENT_TYPE, PR_ENTRYID}};
 
-	SizedSPropTagArray(5, sptaProps) = {5, {PR_ROWID, PR_DISPLAY_NAME_A, PR_EMAIL_ADDRESS_A, PR_RECIPIENT_TYPE, PR_ENTRYID}};
-
-	hr = lpMessage->GetRecipientTable(0, &lpTable);
+	HRESULT hr = lpMessage->GetRecipientTable(0, &~lpTable);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = lpTable->GetRowCount(0, &cRows);
 	if (hr != hrSuccess)
-		goto exit;
-
-	if (cRows < 1) {
+		return hr;
+	if (cRows < 1)
 		// 0 or 1 row not needed to check
-		goto exit;
-	}
-
-	hr = lpTable->SetColumns((LPSPropTagArray)&sptaProps, 0);
+		return hr;
+	hr = lpTable->SetColumns(sptaProps, 0);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	while (true) {
-		hr = lpTable->QueryRows(50, 0, &pRows);
+		rowset_ptr pRows;
+		hr = lpTable->QueryRows(50, 0, &~pRows);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		if (pRows->cRows == 0)
 			break;
 
@@ -548,30 +447,14 @@ HRESULT Fsck::ValidateDuplicateRecipients(LPMESSAGE lpMessage, bool &bChanged)
 			if (pRows->aRow[i].lpProps[2].ulPropTag == PR_EMAIL_ADDRESS_A)  strData += pRows->aRow[i].lpProps[2].Value.lpszA;
 			if (pRows->aRow[i].lpProps[3].ulPropTag == PR_RECIPIENT_TYPE)   strData += stringify(pRows->aRow[i].lpProps[3].Value.ul);
 
-			res = mapRecip.insert(strData);
+			auto res = mapRecip.insert(strData);
 			if (res.second == false)
 				mapiReciptDel.push_back(pRows->aRow[i].lpProps[0].Value.ul);
 		}
-
-		FreeProws(pRows);
-		pRows = NULL;
 	}
-
-	lpTable->Release();
-	lpTable = NULL;
-
 	// modify
-	if (!mapiReciptDel.empty()) {
+	if (!mapiReciptDel.empty())
 		hr = DeleteRecipientList(lpMessage, mapiReciptDel, bChanged);
-	}
-
-	
-exit:
-	if (lpTable)
-		lpTable->Release();
-
-	if (pRows)
-		FreeProws(pRows);
 	return hr;
 }
 

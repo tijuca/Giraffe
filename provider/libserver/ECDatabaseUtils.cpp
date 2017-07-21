@@ -28,9 +28,9 @@
 #include "SOAPUtils.h"
 #include <kopano/stringutil.h>
 #include "ECSessionManager.h"
-
-#include <pthread.h>
 #include <string>
+
+namespace KC {
 
 ECRESULT GetPropSize(DB_ROW lpRow, DB_LENGTHS lpLen, unsigned int *lpulSize)
 {
@@ -74,11 +74,7 @@ ECRESULT GetPropSize(DB_ROW lpRow, DB_LENGTHS lpLen, unsigned int *lpulSize)
 static size_t
 ci_find_substr(const std::string &first, const std::string &second)
 {
-	std::string lc_first(first);
-	std::transform(lc_first.begin(), lc_first.end(), lc_first.begin(), ::tolower);
-	std::string lc_second(second);
-	std::transform(lc_second.begin(), lc_second.end(), lc_second.begin(), ::tolower);
-	return lc_first.find(lc_second);
+	return strToLower(first).find(strToLower(second));
 }
 
 ECRESULT CopySOAPPropValToDatabasePropVal(struct propVal *lpPropVal, unsigned int *lpulColNr, std::string &strColData, ECDatabase *lpDatabase, bool bTruncate)
@@ -152,11 +148,10 @@ ECRESULT CopySOAPPropValToDatabasePropVal(struct propVal *lpPropVal, unsigned in
 		if (lpPropVal->__union != SOAP_UNION_propValData_lpszA ||
 		    lpPropVal->Value.lpszA == NULL)
 			return KCERR_INVALID_PARAMETER;
-		if(bTruncate) {
+		if (bTruncate)
 			u8_ncpy(lpPropVal->Value.lpszA, TABLE_CAP_STRING, &strData);
-		} else {
+		else
 			strData = lpPropVal->Value.lpszA;
-		}
 		
 		strColData = "'" +  lpDatabase->Escape(lpDatabase->FilterBMP(strData)) + "'";
 		*lpulColNr = VALUE_NR_STRING;
@@ -169,11 +164,10 @@ ECRESULT CopySOAPPropValToDatabasePropVal(struct propVal *lpPropVal, unsigned in
 		    lpPropVal->Value.bin->__ptr == NULL)
 			return KCERR_INVALID_PARAMETER;
 
-		if(bTruncate && lpPropVal->Value.bin->__size > TABLE_CAP_BINARY) {
+		if (bTruncate && lpPropVal->Value.bin->__size > TABLE_CAP_BINARY)
 			ulSize = TABLE_CAP_BINARY;
-		} else {
+		else
 			ulSize = lpPropVal->Value.bin->__size;
-		}
 		
 		strColData = lpDatabase->EscapeBinary(lpPropVal->Value.bin->__ptr, ulSize);
 		*lpulColNr = VALUE_NR_BINARY;
@@ -199,76 +193,76 @@ gsoap_size_t GetMVItemCount(struct propVal *lpPropVal)
 	gsoap_size_t ulSize = 0;
 
 	switch(type) {
-		case PT_MV_I2:
-			if (lpPropVal->__union != SOAP_UNION_propValData_mvi || lpPropVal->Value.mvi.__ptr == NULL)
-				ulSize = 0;
-			else
-				ulSize = lpPropVal->Value.mvi.__size;
-			break;
-		case PT_MV_LONG:
-			if (lpPropVal->__union != SOAP_UNION_propValData_mvl || lpPropVal->Value.mvl.__ptr == NULL)
-				ulSize = 0;
-			else
-				ulSize = lpPropVal->Value.mvl.__size;
-			break;
-		case PT_MV_R4:
-			if (lpPropVal->__union != SOAP_UNION_propValData_mvflt || lpPropVal->Value.mvflt.__ptr == NULL)
-				ulSize = 0;
-			else
-				ulSize = lpPropVal->Value.mvflt.__size;
-			break;
-		case PT_MV_DOUBLE:
-			if (lpPropVal->__union != SOAP_UNION_propValData_mvdbl || lpPropVal->Value.mvdbl.__ptr == NULL)
-				ulSize = 0;
-			else
-				ulSize = lpPropVal->Value.mvdbl.__size;
-			break;
-		case PT_MV_CURRENCY:
-			if (lpPropVal->__union != SOAP_UNION_propValData_mvhilo || lpPropVal->Value.mvhilo.__ptr == NULL)
-				ulSize = 0;
-			else
-				ulSize = lpPropVal->Value.mvhilo.__size;
-			break;
-		case PT_MV_APPTIME:
-			if (lpPropVal->__union != SOAP_UNION_propValData_mvdbl || lpPropVal->Value.mvdbl.__ptr == NULL)
-				ulSize = 0;
-			else
-				ulSize = lpPropVal->Value.mvdbl.__size;
-			break;
-		case PT_MV_SYSTIME:
-			if (lpPropVal->__union != SOAP_UNION_propValData_mvhilo || lpPropVal->Value.mvhilo.__ptr == NULL)
-				ulSize = 0;
-			else
-				ulSize = lpPropVal->Value.mvhilo.__size;
-			break;
-		case PT_MV_BINARY:
-			if (lpPropVal->__union != SOAP_UNION_propValData_mvbin || lpPropVal->Value.mvbin.__ptr == NULL)
-				ulSize = 0;
-			else
-				ulSize = lpPropVal->Value.mvbin.__size;
-			break;
-		case PT_MV_STRING8:
-		case PT_MV_UNICODE:
-			if (lpPropVal->__union != SOAP_UNION_propValData_mvszA || lpPropVal->Value.mvszA.__ptr == NULL)
-				ulSize = 0;
-			else
-				ulSize = lpPropVal->Value.mvszA.__size;
-			break;
-		case PT_MV_CLSID:
-			if (lpPropVal->__union != SOAP_UNION_propValData_mvbin || lpPropVal->Value.mvbin.__ptr == NULL)
-				ulSize = 0;
-			else
-				ulSize = lpPropVal->Value.mvbin.__size;
-			break;
-		case PT_MV_I8:
-			if (lpPropVal->__union != SOAP_UNION_propValData_mvli || lpPropVal->Value.mvli.__ptr == NULL)
-				ulSize = 0;
-			else
-				ulSize = lpPropVal->Value.mvli.__size;
-			break;
-		default:
+	case PT_MV_I2:
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvi || lpPropVal->Value.mvi.__ptr == NULL)
 			ulSize = 0;
-			break;
+		else
+			ulSize = lpPropVal->Value.mvi.__size;
+		break;
+	case PT_MV_LONG:
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvl || lpPropVal->Value.mvl.__ptr == NULL)
+			ulSize = 0;
+		else
+			ulSize = lpPropVal->Value.mvl.__size;
+		break;
+	case PT_MV_R4:
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvflt || lpPropVal->Value.mvflt.__ptr == NULL)
+			ulSize = 0;
+		else
+			ulSize = lpPropVal->Value.mvflt.__size;
+		break;
+	case PT_MV_DOUBLE:
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvdbl || lpPropVal->Value.mvdbl.__ptr == NULL)
+			ulSize = 0;
+		else
+			ulSize = lpPropVal->Value.mvdbl.__size;
+		break;
+	case PT_MV_CURRENCY:
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvhilo || lpPropVal->Value.mvhilo.__ptr == NULL)
+			ulSize = 0;
+		else
+			ulSize = lpPropVal->Value.mvhilo.__size;
+		break;
+	case PT_MV_APPTIME:
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvdbl || lpPropVal->Value.mvdbl.__ptr == NULL)
+			ulSize = 0;
+		else
+			ulSize = lpPropVal->Value.mvdbl.__size;
+		break;
+	case PT_MV_SYSTIME:
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvhilo || lpPropVal->Value.mvhilo.__ptr == NULL)
+			ulSize = 0;
+		else
+			ulSize = lpPropVal->Value.mvhilo.__size;
+		break;
+	case PT_MV_BINARY:
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvbin || lpPropVal->Value.mvbin.__ptr == NULL)
+			ulSize = 0;
+		else
+			ulSize = lpPropVal->Value.mvbin.__size;
+		break;
+	case PT_MV_STRING8:
+	case PT_MV_UNICODE:
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvszA || lpPropVal->Value.mvszA.__ptr == NULL)
+			ulSize = 0;
+		else
+			ulSize = lpPropVal->Value.mvszA.__size;
+		break;
+	case PT_MV_CLSID:
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvbin || lpPropVal->Value.mvbin.__ptr == NULL)
+			ulSize = 0;
+		else
+			ulSize = lpPropVal->Value.mvbin.__size;
+		break;
+	case PT_MV_I8:
+		if (lpPropVal->__union != SOAP_UNION_propValData_mvli || lpPropVal->Value.mvli.__ptr == NULL)
+			ulSize = 0;
+		else
+			ulSize = lpPropVal->Value.mvli.__size;
+		break;
+	default:
+		ulSize = 0;
+		break;
 	}
 
 	return ulSize;
@@ -370,8 +364,7 @@ ECRESULT ParseMVProp(const char *lpRowData, ULONG ulSize,
 	ULONG   ulLen = 0;
 	char	*lpEnd = NULL;
 	// lpRowData -> length:datalength:data
-
-	ASSERT(ulPos < ulSize);
+	assert(ulPos < ulSize);
 
 	if (ulPos >= ulSize)
 		return KCERR_INVALID_PARAMETER;
@@ -462,10 +455,9 @@ ECRESULT CopyDatabasePropValToSOAPPropVal(struct soap *soap, DB_ROW lpRow, DB_LE
 	unsigned int ulPropTag;
 	locale_t loc = createlocale(LC_NUMERIC, "C");
 
-	if((type & MVI_FLAG) == MVI_FLAG) {
+	if ((type & MVI_FLAG) == MVI_FLAG)
 		// Treat MVI as normal property
 		type &= ~MVI_FLAG;
-	}
 
 	ulPropTag = PROP_TAG(type,atoi(lpRow[FIELD_NR_TAG]));
 
@@ -745,28 +737,20 @@ bool CompareDBPropTag(unsigned int ulPropTag1, unsigned int ulPropTag2)
 ECRESULT GetDatabaseSettingAsInteger(ECDatabase *lpDatabase, const std::string &strSettings, unsigned int *lpulResult)
 {
 	ECRESULT		er = erSuccess;
-	DB_RESULT		lpDBResult = NULL;
+	DB_RESULT lpDBResult;
 	DB_ROW			lpDBRow = NULL;
 	std::string		strQuery;
 
 	strQuery = "SELECT `value` FROM settings WHERE `name` = '"+lpDatabase->Escape(strSettings)+"'";
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
-		goto exit;
+		return er;
 
 	lpDBRow = lpDatabase->FetchRow(lpDBResult);
-	if(lpDBRow == NULL || lpDBRow[0] == NULL) {
-		er = KCERR_NOT_FOUND;
-		goto exit;
-	}
-
+	if (lpDBRow == nullptr || lpDBRow[0] == nullptr)
+		return KCERR_NOT_FOUND;
 	*lpulResult = atoui(lpDBRow[0]);
-
-exit:
-	if (lpDBResult)
-		lpDatabase->FreeResult(lpDBResult);
-
-	return er;
+	return erSuccess;
 }
 
 ECRESULT SetDatabaseSetting(ECDatabase *lpDatabase, const std::string &strSettings, unsigned int ulValue)
@@ -790,3 +774,5 @@ SuppressLockErrorLogging::~SuppressLockErrorLogging()
 	if (m_lpDatabase)
 		m_lpDatabase->SuppressLockErrorLogging(m_bResetValue);
 }
+
+} /* namespace */

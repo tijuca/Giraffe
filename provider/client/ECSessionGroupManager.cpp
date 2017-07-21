@@ -16,7 +16,7 @@
  */
 
 #include <kopano/platform.h>
-
+#include <kopano/lockhelper.hpp>
 #include <mapicode.h>
 #include <mapix.h>
 
@@ -26,8 +26,7 @@
 #include "SSLUtil.h"
 
 /* std::algorithm helper structures/functions */
-struct findSessionGroupId
-{
+struct findSessionGroupId {
 	ECSESSIONGROUPID ecSessionGroupId;
 
 	findSessionGroupId(ECSESSIONGROUPID ecSessionGroupId) : ecSessionGroupId(ecSessionGroupId)
@@ -43,45 +42,25 @@ struct findSessionGroupId
 /* Global SessionManager for entire client */
 ECSessionGroupManager g_ecSessionManager;
 
-ECSessionGroupManager::ECSessionGroupManager()
-{
-	pthread_mutexattr_init(&m_hMutexAttrib);
-	pthread_mutexattr_settype(&m_hMutexAttrib, PTHREAD_MUTEX_RECURSIVE);
-
-	pthread_mutex_init(&m_hMutex, &m_hMutexAttrib);
-}
-
-ECSessionGroupManager::~ECSessionGroupManager()
-{
-	pthread_mutex_destroy(&m_hMutex);
-	pthread_mutexattr_destroy(&m_hMutexAttrib);
-}
-
 ECSESSIONGROUPID ECSessionGroupManager::GetSessionGroupId(const sGlobalProfileProps &sProfileProps)
 {
-	std::pair<SESSIONGROUPIDMAP::iterator, bool> result;
 	ECSESSIONGROUPID ecSessionGroupId;
-
-	pthread_mutex_lock(&m_hMutex);
+	scoped_rlock lock(m_hMutex);
 
     ECSessionGroupInfo ecSessionGroup = ECSessionGroupInfo(sProfileProps.strServerPath, sProfileProps.strProfileName);
-
-	result = m_mapSessionGroupIds.insert(SESSIONGROUPIDMAP::value_type(ecSessionGroup, 0));
+	auto result = m_mapSessionGroupIds.insert(SESSIONGROUPIDMAP::value_type(ecSessionGroup, 0));
 	if (result.second == true) {
         // Not found, generate one now
     	ssl_random((sizeof(ecSessionGroupId) == 8), &ecSessionGroupId);
 		// Register the new SessionGroupId, this is needed because we are not creating a SessionGroupData
 		// object yet, and thus we are not putting anything in the m_mapSessionGroups yet. To prevent 2
-		// threads to obtain 2 different SessionGroup ID's for the same server & profile combination we
-		// use this separate map containing SessionGroup ID's.
+		// threads to obtain 2 different SessionGroup IDs for the same server & profile combination we
+		// use this separate map containing SessionGroup IDs.
 		result.first->second = ecSessionGroupId;
 	}
 	else {
 		ecSessionGroupId = result.first->second;
 	}
-
-	pthread_mutex_unlock(&m_hMutex);
-
 	return ecSessionGroupId;
 }
 
@@ -100,11 +79,9 @@ HRESULT ECSessionGroupManager::GetSessionGroupData(ECSESSIONGROUPID ecSessionGro
 	HRESULT hr = hrSuccess;
 	ECSessionGroupInfo ecSessionGroup = ECSessionGroupInfo(sProfileProps.strServerPath, sProfileProps.strProfileName);
 	SessionGroupData *lpData = NULL;
-	std::pair<SESSIONGROUPMAP::iterator, bool> result;
+	scoped_rlock lock(m_hMutex);
 
-	pthread_mutex_lock(&m_hMutex);
-
-	result = m_mapSessionGroups.insert(SESSIONGROUPMAP::value_type(ecSessionGroup, NULL));
+	auto result = m_mapSessionGroups.insert(SESSIONGROUPMAP::value_type(ecSessionGroup, NULL));
 	if (result.second == true) {
         hr = SessionGroupData::Create(ecSessionGroupId, &ecSessionGroup, sProfileProps, &lpData);
         if (hr == hrSuccess)
@@ -115,11 +92,7 @@ HRESULT ECSessionGroupManager::GetSessionGroupData(ECSESSIONGROUPID ecSessionGro
 		lpData = result.first->second;
 		lpData->AddRef();
 	}
-
-	pthread_mutex_unlock(&m_hMutex);
-
 	*lppData = lpData;
-
 	return hr;
 }
 
@@ -127,11 +100,10 @@ HRESULT ECSessionGroupManager::DeleteSessionGroupDataIfOrphan(ECSESSIONGROUPID e
 {
 	HRESULT hr = hrSuccess;
 	SessionGroupData *lpSessionGroupData = NULL;
+	ulock_rec biglock(m_hMutex);
 
-	pthread_mutex_lock(&m_hMutex);
-
-	SESSIONGROUPMAP::iterator iter = find_if(m_mapSessionGroups.begin(), m_mapSessionGroups.end(), findSessionGroupId(ecSessionGroupId));
-    if (iter != m_mapSessionGroups.end()) {
+	auto iter = find_if(m_mapSessionGroups.cbegin(), m_mapSessionGroups.cend(), findSessionGroupId(ecSessionGroupId));
+	if (iter != m_mapSessionGroups.cend()) {
         if(iter->second->IsOrphan()) {
             // If the group is an orphan now, we can delete it safely since the only way
             // a new session would connect to the sessiongroup would be through us, and we 
@@ -140,9 +112,7 @@ HRESULT ECSessionGroupManager::DeleteSessionGroupDataIfOrphan(ECSESSIONGROUPID e
             m_mapSessionGroups.erase(iter);
         }
     }
-
-	pthread_mutex_unlock(&m_hMutex);
-	
+	biglock.unlock();
 	// Delete the object outside the lock; we can do this because nobody can access this group
 	// now (since it is not in the map anymore), and the delete() will cause a pthread_join(), 
 	// which could be blocked by the m_hMutex.

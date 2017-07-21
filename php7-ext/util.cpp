@@ -18,6 +18,7 @@
 #include <kopano/platform.h>
 
 #include <cmath>
+#include <kopano/memory.hpp>
 #include <mapi.h>
 #include <mapix.h>
 #include <mapidefs.h>
@@ -26,6 +27,7 @@
 #include <string>
 
 using namespace std;
+using namespace KCHL;
 
 #include "util.h"
 
@@ -35,20 +37,19 @@ HRESULT mapi_util_createprof(const char *szProfName, const char *szServiceName,
     ULONG cValues, LPSPropValue lpPropVals)
 {
 	HRESULT			hr = hrSuccess;
-	IProfAdmin *lpProfAdmin = NULL;
-	LPSERVICEADMIN	lpServiceAdmin = NULL;
-	LPMAPITABLE		lpTable = NULL;
-	LPSRowSet		lpRows = NULL;
-	LPSPropValue	lpServiceUID = NULL;
-	LPSPropValue	lpServiceName = NULL;
-	SizedSPropTagArray(2, sptaMsgServiceCols) = { 2, { PR_SERVICE_NAME_A, PR_SERVICE_UID }};
+	object_ptr<IProfAdmin> lpProfAdmin;
+	object_ptr<IMsgServiceAdmin> lpServiceAdmin;
+	object_ptr<IMAPITable> lpTable;
+	rowset_ptr lpRows;
+	const SPropValue *lpServiceUID = nullptr;
+	static constexpr const SizedSPropTagArray(2, sptaMsgServiceCols) =
+		{2, {PR_SERVICE_NAME_A, PR_SERVICE_UID}};
 
 	// Get the MAPI Profile administration object
-	hr = MAPIAdminProfiles(0, &lpProfAdmin);
-
+	hr = MAPIAdminProfiles(0, &~lpProfAdmin);
 	if(hr != hrSuccess) {
 		last_error = "Unable to get IProfAdmin object";
-		goto exit;
+		return hr;
 	}
 
 	lpProfAdmin->DeleteProfile((LPTSTR)szProfName, 0);
@@ -58,15 +59,14 @@ HRESULT mapi_util_createprof(const char *szProfName, const char *szServiceName,
 
 	if(hr != hrSuccess) {
 		last_error = "Unable to create new profile";
-		goto exit;
+		return hr;
 	}
 
 	// Get the services admin object
-	hr = lpProfAdmin->AdminServices((LPTSTR)szProfName, (LPTSTR)"", 0, 0, &lpServiceAdmin);
-
+	hr = lpProfAdmin->AdminServices((LPTSTR)szProfName, (LPTSTR)"", 0, 0, &~lpServiceAdmin);
 	if(hr != hrSuccess) {
 		last_error = "Unable to administer new profile";
-		goto exit;
+		return hr;
 	}
 
 	// Create a message service (provider) for the szServiceName (see mapisvc.inf) service
@@ -75,7 +75,7 @@ HRESULT mapi_util_createprof(const char *szProfName, const char *szServiceName,
 	
 	if(hr != hrSuccess) {
 		last_error = "Service unavailable";
-		goto exit;
+		return hr;
 	}
 
 	// optional, ignore error
@@ -84,92 +84,58 @@ HRESULT mapi_util_createprof(const char *szProfName, const char *szServiceName,
 
 	// Strangely we now have to get the SERVICE_UID for the service we just added from
 	// the table. (see MSDN help page of CreateMsgService at the bottom of the page)
-	hr = lpServiceAdmin->GetMsgServiceTable(0, &lpTable);
-
+	hr = lpServiceAdmin->GetMsgServiceTable(0, &~lpTable);
 	if(hr != hrSuccess) {
 		last_error = "Service table unavailable";
-		goto exit;
+		return hr;
 	}
-	
-	hr = lpTable->SetColumns((LPSPropTagArray)&sptaMsgServiceCols, 0);
+	hr = lpTable->SetColumns(sptaMsgServiceCols, 0);
 	if(hr != hrSuccess) {
 		last_error = "Unable to set columns on service table";
-		goto exit;
+		return hr;
 	}
 
 	// Find the correct row
 	while(TRUE) {
-		hr = lpTable->QueryRows(1, 0, &lpRows);
-		
+		hr = lpTable->QueryRows(1, 0, &~lpRows);
 		if(hr != hrSuccess || lpRows->cRows != 1) {
 			last_error = "Unable to read service table";
-			goto exit;
+			return hr;
 		}
 
-		lpServiceName = PpropFindProp(lpRows->aRow[0].lpProps, lpRows->aRow[0].cValues, PR_SERVICE_NAME_A);
-		
+		auto lpServiceName = PCpropFindProp(lpRows->aRow[0].lpProps, lpRows->aRow[0].cValues, PR_SERVICE_NAME_A);
 		if(lpServiceName && strcmp(lpServiceName->Value.lpszA, szServiceName) == 0)
 			break;
-			
-		FreeProws(lpRows);
-		lpRows = NULL;
-			
 	}
 
 	// Get the PR_SERVICE_UID from the row
-	lpServiceUID = PpropFindProp(lpRows->aRow[0].lpProps, lpRows->aRow[0].cValues, PR_SERVICE_UID);
-
+	lpServiceUID = PCpropFindProp(lpRows->aRow[0].lpProps, lpRows->aRow[0].cValues, PR_SERVICE_UID);
 	if(!lpServiceUID) {
-		hr = MAPI_E_NOT_FOUND;
 		last_error = "Unable to find service UID";
-		goto exit;
+		return MAPI_E_NOT_FOUND;
 	}
 
 	// Configure the message service
 	hr = lpServiceAdmin->ConfigureMsgService((MAPIUID *)lpServiceUID->Value.bin.lpb, 0, 0, cValues, lpPropVals);
-
-	if(hr != hrSuccess) {
+	if (hr != hrSuccess)
 		last_error = "Unable to setup service for provider";
-		goto exit;
-	}
-
-exit:
-
-	if(lpRows)
-		FreeProws(lpRows);
-
-	if(lpTable)
-		lpTable->Release();
-
-	if(lpServiceAdmin)
-		lpServiceAdmin->Release();
-
-	if(lpProfAdmin)
-		lpProfAdmin->Release();
-
 	return hr;
 }
 
 HRESULT mapi_util_deleteprof(const char *szProfName)
 {
-	IProfAdmin *lpProfAdmin = NULL;
+	object_ptr<IProfAdmin> lpProfAdmin;
 	HRESULT hr = hrSuccess;
 
 	// Get the MAPI Profile administration object
-	hr = MAPIAdminProfiles(0, &lpProfAdmin);
-
+	hr = MAPIAdminProfiles(0, &~lpProfAdmin);
 	if(hr != hrSuccess) {
 		last_error = "Unable to get IProfAdmin object";
-		goto exit;
+		return hr;
 	}
 
 	lpProfAdmin->DeleteProfile((LPTSTR)szProfName, 0);
-
-exit:
-	if(lpProfAdmin)
-		lpProfAdmin->Release();
-
-	return hr;
+	return hrSuccess;
 }
 
 std::string mapi_util_getlasterror()

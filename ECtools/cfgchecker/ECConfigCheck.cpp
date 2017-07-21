@@ -19,9 +19,10 @@
 #include <algorithm>
 
 #include <sys/stat.h>
-#include <memory.h>
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
+#include <kopano/stringutil.h>
 
 using namespace std;
 
@@ -135,16 +136,14 @@ void ECConfigCheck::validate()
 
 	cout << "Starting configuration validation of " << m_lpszName << endl;
 
-	for (list<config_check_t>::iterator it = m_lChecks.begin(); it != m_lChecks.end(); ++it) {
-		it->hosted = m_bHosted;
-		it->multi = m_bMulti;
-		it->value1 = getSetting(it->option1);
-		it->value2 = getSetting(it->option2);
+	for (auto &c : m_lChecks) {
+		c.hosted = m_bHosted;
+		c.multi = m_bMulti;
+		c.value1 = getSetting(c.option1);
+		c.value2 = getSetting(c.option2);
 		int retval = 0;
-
-		if (it->check)
-			retval = it->check(&(*it));
-
+		if (c.check)
+			retval = c.check(&c);
 		warnings += (retval == CHECK_WARNING);
 		errors += (retval == CHECK_ERROR);
 	}
@@ -245,38 +244,35 @@ int ECConfigCheck::testCharset(const config_check_t *check)
 
 	/* When grepping iconv output, all lines have '//' appended,
 	 * additionally all charsets are uppercase */
-	std::string v1 = check->value1;
-	std::transform(v1.begin(), v1.end(), v1.begin(), ::toupper);
+	auto v1 = strToUpper(check->value1);
 	fp = popen(("iconv -l | grep -x \"" + v1 + "//\"").c_str(), "r");
 
-	if (fp) {
-		char buffer[50];
-		string output;
-
-		memset(buffer, 0, sizeof(buffer));
-
-		fread(buffer, sizeof(buffer), 1, fp);
-		output = buffer;
-
-		pclose(fp);
-
-		if (output.find(v1) == string::npos) {
-			printError(check->option1, "contains unknown chartype \"" + v1 + "\"");
-			return CHECK_ERROR;
-		}
-	} else {
+	if (fp == nullptr) {
 		printWarning(check->option1, "Failed to validate charset");
 		return CHECK_WARNING;
 	}
 
+	char buffer[50];
+	string output;
+
+	memset(buffer, 0, sizeof(buffer));
+	if (fgets(buffer, sizeof(buffer), fp) == nullptr) {
+		printWarning(check->option1, "unable to validate charset: \"" + v1 + "\"");
+		pclose(fp);
+		return CHECK_WARNING;
+	}
+	output = buffer;
+	pclose(fp);
+	if (output.find(v1) == string::npos) {
+		printError(check->option1, "contains unknown chartype \"" + v1 + "\"");
+		return CHECK_ERROR;
+	}
 	return CHECK_OK;
 }
 
 int ECConfigCheck::testBoolean(const config_check_t *check)
 {
-	std::string v1 = check->value1;
-	std::transform(v1.begin(), v1.end(), v1.begin(), ::tolower);
-
+	auto v1 = strToLower(check->value1);
 	if (v1.empty() || v1 == "true" || v1 == "false" || v1 == "yes" ||
 	    v1 == "no")
 		return CHECK_OK;

@@ -16,7 +16,7 @@
  */
 
 #include <kopano/platform.h>
-
+#include <kopano/lockhelper.hpp>
 #include <mapicode.h>
 #include <mapix.h>
 
@@ -26,33 +26,20 @@
 #include "SessionGroupData.h"
 #include "WSTransport.h"
 
-SessionGroupData::SessionGroupData(ECSESSIONGROUPID ecSessionGroupId, ECSessionGroupInfo *lpInfo, const sGlobalProfileProps &sProfileProps)
+SessionGroupData::SessionGroupData(ECSESSIONGROUPID ecSessionGroupId,
+    ECSessionGroupInfo *lpInfo, const sGlobalProfileProps &sProfileProps) :
+	m_ecSessionGroupId(ecSessionGroupId), m_sProfileProps(sProfileProps)
 {
-	m_ecSessionGroupId = ecSessionGroupId;
-
-	if (lpInfo) {
-		m_ecSessionGroupInfo.strServer = lpInfo->strServer;
-		m_ecSessionGroupInfo.strProfile = lpInfo->strProfile;
-	}
-
-	m_lpNotifyMaster = NULL;
-	m_sProfileProps = sProfileProps;
-	m_cRef = 0;
-
-	pthread_mutexattr_init(&m_hMutexAttrib);
-	pthread_mutexattr_settype(&m_hMutexAttrib, PTHREAD_MUTEX_RECURSIVE);
-	pthread_mutex_init(&m_hMutex, &m_hMutexAttrib);
-	pthread_mutex_init(&m_hRefMutex, &m_hMutexAttrib);
+	if (lpInfo == nullptr)
+		return;
+	m_ecSessionGroupInfo.strServer = lpInfo->strServer;
+	m_ecSessionGroupInfo.strProfile = lpInfo->strProfile;
 }
 
 SessionGroupData::~SessionGroupData(void)
 {
 	if (m_lpNotifyMaster)
 		m_lpNotifyMaster->Release();
-
-	pthread_mutex_destroy(&m_hMutex);
-	pthread_mutex_destroy(&m_hRefMutex);
-	pthread_mutexattr_destroy(&m_hMutexAttrib);
 }
 
 HRESULT SessionGroupData::Create(ECSESSIONGROUPID ecSessionGroupId, ECSessionGroupInfo *lpInfo, const sGlobalProfileProps &sProfileProps, SessionGroupData **lppData)
@@ -71,16 +58,11 @@ HRESULT SessionGroupData::Create(ECSESSIONGROUPID ecSessionGroupId, ECSessionGro
 HRESULT SessionGroupData::GetOrCreateNotifyMaster(ECNotifyMaster **lppMaster)
 {
 	HRESULT hr = hrSuccess;
-
-	pthread_mutex_lock(&m_hMutex);
+	scoped_rlock lock(m_hMutex);
 
 	if (!m_lpNotifyMaster)
 		hr = ECNotifyMaster::Create(this, &m_lpNotifyMaster);
-
-	pthread_mutex_unlock(&m_hMutex);
-
 	*lppMaster = m_lpNotifyMaster;
-
 	return hr;
 }
 
@@ -111,22 +93,14 @@ ECSESSIONGROUPID SessionGroupData::GetSessionGroupId()
 
 ULONG SessionGroupData::AddRef()
 {
-	ULONG cRef;
-    
-	pthread_mutex_lock(&m_hRefMutex);
-	cRef = ++m_cRef;
-	pthread_mutex_unlock(&m_hRefMutex);
-	return cRef;
+	scoped_rlock lock(m_hRefMutex);
+	return ++m_cRef;
 }
 
 ULONG SessionGroupData::Release()
 {
-	ULONG cRef;
-    
-	pthread_mutex_lock(&m_hRefMutex);
-	cRef = --m_cRef;
-	pthread_mutex_unlock(&m_hRefMutex);
-	return cRef;
+	scoped_rlock lock(m_hRefMutex);
+	return --m_cRef;
 }
 
 BOOL SessionGroupData::IsOrphan()

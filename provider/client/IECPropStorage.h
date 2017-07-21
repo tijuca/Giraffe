@@ -43,7 +43,7 @@
 #include "kcore.hpp"
 #include <kopano/Util.h>
 
-typedef struct MAPIOBJECT {
+struct MAPIOBJECT {
 	MAPIOBJECT() {
 		/* see AllocNewMapiObject :: Mem.cpp */
 	};
@@ -64,7 +64,6 @@ typedef struct MAPIOBJECT {
 		}
 	};
 
-	/* copy constructor */
 	MAPIOBJECT(const MAPIOBJECT *lpSource)
 	{
 		this->bChanged = lpSource->bChanged;
@@ -77,43 +76,34 @@ typedef struct MAPIOBJECT {
 		Util::HrCopyEntryId(lpSource->cbInstanceID, (LPENTRYID)lpSource->lpInstanceID,
 							&this->cbInstanceID, (LPENTRYID *)&this->lpInstanceID);
 
-		this->lstChildren = new std::set<MAPIOBJECT*, CompareMAPIOBJECT>;
-		this->lstDeleted = new std::list<ULONG>;
-		this->lstAvailable = new std::list<ULONG>;
-		this->lstModified = new std::list<ECProperty>;
-		this->lstProperties = new std::list<ECProperty>;
+		this->lstDeleted = lpSource->lstDeleted;
+		this->lstModified = lpSource->lstModified;
+		this->lstProperties = lpSource->lstProperties;
+		this->lstAvailable = lpSource->lstAvailable;
 
-		*this->lstDeleted = *lpSource->lstDeleted;
-		*this->lstModified = *lpSource->lstModified;
-		*this->lstProperties = *lpSource->lstProperties;
-		*this->lstAvailable = *lpSource->lstAvailable;
-
-		for (std::set<MAPIOBJECT *, CompareMAPIOBJECT>::const_iterator i = lpSource->lstChildren->begin();
-		     i != lpSource->lstChildren->end(); ++i)
-			this->lstChildren->insert(new MAPIOBJECT(*i));
+		for (const auto &i : lpSource->lstChildren)
+			this->lstChildren.insert(new MAPIOBJECT(i));
 	};
 
 	/* data */
-	std::set<MAPIOBJECT*, CompareMAPIOBJECT>	*lstChildren;	/* ECSavedObjects */
-	std::list<ULONG>		*lstDeleted;	/* proptags client->server only */
-	std::list<ULONG>		*lstAvailable;	/* proptags server->client only */
-	std::list<ECProperty>	*lstModified;	/* propval client->server only */
-	std::list<ECProperty>	*lstProperties;	/* propval client->server but not serialized and server->client  */
-	LPSIEID					lpInstanceID;	/* Single Instance ID */
-	ULONG					cbInstanceID;	/* Single Instance ID length */
-	BOOL					bChangedInstance; /* Single Instance ID changed */
-	BOOL					bChanged;		/* this is a saved child, otherwise only loaded */
-	BOOL					bDelete;		/* delete this object completely */
-	ULONG					ulUniqueId;		/* PR_ROWID (recipients) or PR_ATTACH_NUM (attachments) only */
-	ULONG					ulObjId;		/* hierarchy id of recipients and attachments */
-	ULONG					ulObjType;
-} MAPIOBJECT;
+	std::set<MAPIOBJECT *, CompareMAPIOBJECT> lstChildren; /* ECSavedObjects */
+	std::list<ULONG> lstDeleted; /* proptags client->server only */
+	std::list<ULONG> lstAvailable; /* proptags server->client only */
+	std::list<ECProperty> lstModified; /* propval client->server only */
+	std::list<ECProperty> lstProperties; /* propval client->server but not serialized and server->client  */
+	LPSIEID lpInstanceID = nullptr; /* Single Instance ID */
+	ULONG cbInstanceID = 0; /* Single Instance ID length */
+	BOOL bChangedInstance = false; /* Single Instance ID changed */
+	BOOL bChanged = false; /* this is a saved child, otherwise only loaded */
+	BOOL bDelete = false; /* delete this object completely */
+	ULONG ulUniqueId = 0; /* PR_ROWID (recipients) or PR_ATTACH_NUM (attachments) only */
+	ULONG ulObjId = 0; /* hierarchy id of recipients and attachments */
+	ULONG ulObjType = 0;
+};
 
 typedef std::set<MAPIOBJECT*, MAPIOBJECT::CompareMAPIOBJECT>	ECMapiObjects;
 
-
-class IECPropStorage : public IECUnknown
-{
+class IECPropStorage : public IECUnknown {
 public:
 	// Get a list of the properties
 	virtual HRESULT HrReadProps(LPSPropTagArray *lppPropTags,ULONG *cValues, LPSPropValue *ppValues) = 0;
@@ -125,7 +115,7 @@ public:
 	virtual	HRESULT	HrWriteProps(ULONG cValues, LPSPropValue pValues, ULONG ulFlags = 0) = 0;
 
 	// Delete properties from file
-	virtual HRESULT HrDeleteProps(LPSPropTagArray lpsPropTagArray) = 0;
+	virtual HRESULT HrDeleteProps(const SPropTagArray *lpsPropTagArray) = 0;
 
 	// Save a complete object to the server
 	virtual HRESULT HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpSavedObjects) = 0;

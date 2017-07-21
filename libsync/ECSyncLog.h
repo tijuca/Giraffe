@@ -18,26 +18,28 @@
 #ifndef ECSYNCLOG_INCLUDED
 #define ECSYNCLOG_INCLUDED
 
-#include "ECLibSync.h"
-#include <pthread.h>
+#include <mutex>
+#include <kopano/zcdefs.h>
+
+namespace KC {
 
 class ECLogger;
 
-class ECSyncLog
-{
+class _kc_export ECSyncLog _kc_final {
 public:
-	static HRESULT ECLIBSYNC_API GetLogger(ECLogger **lppLogger);
-	static HRESULT ECLIBSYNC_API SetLogger(ECLogger *lpLogger);
+	static HRESULT GetLogger(ECLogger **);
+	static HRESULT SetLogger(ECLogger *annoyingswig);
 
 private:
-	static pthread_mutex_t	s_hMutex;
+	static std::mutex s_hMutex;
 	static ECLogger			*s_lpLogger;
 
-	struct __initializer {
-		__initializer();
+	struct _kc_hidden __initializer _kc_final {
 		~__initializer();
 	};
 	static __initializer __i;
 };
+
+} /* namespace */
 
 #endif // ndef ECSYNCLOG_INCLUDED

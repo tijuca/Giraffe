@@ -18,8 +18,9 @@
 #ifndef ECARCHIVEAWAREMSGSTORE_H
 #define ECARCHIVEAWAREMSGSTORE_H
 
+#include <kopano/zcdefs.h>
+#include <kopano/memory.hpp>
 #include "ECMsgStore.h"
-#include <kopano/mapi_ptr/mapi_object_ptr.h>
 #include <kopano/ECGuid.h>
 
 #include <list>
@@ -28,27 +29,23 @@
 
 class ECMessage;
 
-class ECArchiveAwareMsgStore : public ECMsgStore {
+class _kc_export_dycast ECArchiveAwareMsgStore _kc_final : public ECMsgStore {
 public:
-	ECArchiveAwareMsgStore(char *lpszProfname, LPMAPISUP lpSupport, WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags, BOOL fIsSpooler, BOOL fIsDefaultStore, BOOL bOfflineStore);
-
-	static HRESULT Create(char *lpszProfname, LPMAPISUP lpSupport, WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags, BOOL bIsSpooler, BOOL fIsDefaultStore, BOOL bOfflineStore, ECMsgStore **lppECMsgStore);
-
-	virtual HRESULT OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk);
-
-	virtual HRESULT OpenItemFromArchive(LPSPropValue lpPropStoreEIDs, LPSPropValue lpPropItemEIDs, ECMessage **lppMessage);
+	_kc_hidden ECArchiveAwareMsgStore(char *profname, LPMAPISUP, WSTransport *, BOOL modify, ULONG profflags, BOOL is_spooler, BOOL is_dfl_store, BOOL offline_store);
+	_kc_hidden static HRESULT Create(char *profname, LPMAPISUP, WSTransport *, BOOL modify, ULONG profflags, BOOL is_spooler, BOOL is_dfl_store, BOOL offline_store, ECMsgStore **ret);
+	_kc_hidden virtual HRESULT OpenEntry(ULONG eid_size, LPENTRYID eid, LPCIID, ULONG flags, ULONG *obj_type, LPUNKNOWN *ret);
+	_kc_hidden virtual HRESULT OpenItemFromArchive(LPSPropValue propstore_eids, LPSPropValue propitem_eids, ECMessage **ret);
 
 private:
-	typedef std::list<LPSBinary>	BinaryList;
+	typedef std::list<SBinary *> BinaryList;
 	typedef BinaryList::iterator	BinaryListIterator;
-	typedef mapi_object_ptr<ECMsgStore, IID_ECMsgStore>	ECMsgStorePtr;
+	typedef KCHL::object_ptr<ECMsgStore, IID_ECMsgStore> ECMsgStorePtr;
 	typedef std::vector<BYTE>		EntryID;
 	typedef std::map<EntryID, ECMsgStorePtr>			MsgStoreMap;
 
-	HRESULT CreateCacheBasedReorderedList(SBinaryArray sbaStoreEIDs, SBinaryArray sbaItemEIDs, BinaryList *lplstStoreEIDs, BinaryList *lplstItemEIDs);
-	HRESULT GetArchiveStore(LPSBinary lpStoreEID, ECMsgStore **lppArchiveStore);
+	_kc_hidden HRESULT CreateCacheBasedReorderedList(SBinaryArray b_store_eids, SBinaryArray b_item_eids, BinaryList *store_eids, BinaryList *item_eids);
+	_kc_hidden HRESULT GetArchiveStore(LPSBinary store_eid, ECMsgStore **ret);
 
-private:
 	MsgStoreMap	m_mapStores;
 };
 

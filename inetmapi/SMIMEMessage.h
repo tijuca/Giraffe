@@ -18,8 +18,13 @@
 #ifndef SMIMEMESSAGE_H
 #define SMIMEMESSAGE_H
 
+#include <kopano/zcdefs.h>
+#include <string>
 #include <vmime/message.hpp>
 #include <vmime/utility/stream.hpp>
+#include <vmime/generationContext.hpp>
+
+namespace KC {
 
 /**
  * We are adding a bit of functionality to vmime::message here for S/MIME support.
@@ -36,22 +41,20 @@
  * -----------------------
  *
  * This class works just like a vmime::message instance, except that when then 'SMIMEBody' is set, it will
- * use that body (including some headers!) to generate the RFC822 message. All other methods are inherited
+ * use that body (including some headers!) to generate the RFC 2822 message. All other methods are inherited
  * directly from vmime::message.
  *
  * Note that any other body data set will be override by the SMIMEBody.
  *
  */
-class SMIMEMessage : public vmime::message {
+class SMIMEMessage _kc_final : public vmime::message {
 public:
-    SMIMEMessage();
-
-	void generate(vmime::utility::outputStream& os, const std::string::size_type maxLineLength = vmime::options::getInstance()->message.maxLineLength(), const std::string::size_type curLinePos = 0, std::string::size_type* newLinePos = NULL) const;
-
-    void setSMIMEBody(std::string &body);    
-    
+	void generateImpl(const vmime::generationContext &, vmime::utility::outputStream &, size_t curLinePos = 0, size_t *newLinePos = NULL) const;
+	void setSMIMEBody(const char *body) { m_body = body; }
 private:
     std::string m_body;
 };
+
+} /* namespace */
 
 #endif
