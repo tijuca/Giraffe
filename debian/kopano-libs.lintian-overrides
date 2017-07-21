@@ -1,2 +1,3 @@
 # No spelling issue -> common/ustringutil.cpp: {"vi",42,"Vietnamese_Viet Nam"}
 kopano-libs: spelling-error-in-binary usr/lib/x86_64-linux-gnu/libkcutil.so.0.0.0 Nam Name
+kopano-libs: spelling-error-in-binary usr/lib/x86_64-linux-gnu/libkcserver.so.0.0.0 iff if
