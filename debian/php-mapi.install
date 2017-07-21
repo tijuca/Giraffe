@@ -1,2 +1,2 @@
 # installation of mapi.{ini,so} is handled by php7.0-mapi.php
-usr/share/php/mapi/
+usr/share/kopano/php/mapi/
