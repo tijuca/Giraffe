@@ -4,7 +4,5 @@ usr/lib/python*/*/inetmapi.py
 usr/lib/python*/*/_inetmapi.so
 usr/lib/python*/*/icalmapi.py
 usr/lib/python*/*/_icalmapi.so
-usr/lib/python*/*/licenseclient.py
-usr/lib/python*/*/_licenseclient.so
 usr/lib/python*/*/MAPI*.egg-info
 usr/lib/python*/*/MAPI/

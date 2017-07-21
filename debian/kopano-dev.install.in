@@ -9,9 +9,7 @@ usr/lib/@DEB_HOST_MULTIARCH@/libkcmapi.so
 usr/lib/@DEB_HOST_MULTIARCH@/libkcpyconv.so
 usr/lib/@DEB_HOST_MULTIARCH@/libkcpydirector.so
 usr/lib/@DEB_HOST_MULTIARCH@/libkcserver.so
-usr/lib/@DEB_HOST_MULTIARCH@/libkcservice.so
-usr/lib/@DEB_HOST_MULTIARCH@/libkcsoapclient.so
-usr/lib/@DEB_HOST_MULTIARCH@/libkcsoapserver.so
+usr/lib/@DEB_HOST_MULTIARCH@/libkcsoap.so
 usr/lib/@DEB_HOST_MULTIARCH@/libkcssl.so
 usr/lib/@DEB_HOST_MULTIARCH@/libkcsync.so
 usr/lib/@DEB_HOST_MULTIARCH@/libkcutil.so
