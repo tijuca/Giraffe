@@ -1,7 +1,4 @@
 etc/kopano/userscripts
-etc/kopano/ldap.active-directory.cfg
-etc/kopano/ldap.openldap.cfg
-etc/kopano/ldap.propmap.cfg
 etc/kopano/server.cfg
 etc/kopano/unix.cfg
 usr/lib/@DEB_HOST_MULTIARCH@/kopano/dbplugin.so
@@ -15,3 +12,7 @@ usr/share/man/man5/kopano-unix.cfg.5
 usr/share/man/man7/kopano.7
 usr/share/man/man8/kopano-server.8
 usr/share/kopano/debian
+usr/share/kopano/ldap.active-directory.cfg
+usr/share/kopano/ldap.openldap.cfg
+usr/share/kopano/ldap.propmap.cfg
+
