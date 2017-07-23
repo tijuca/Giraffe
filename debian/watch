@@ -1,11 +1,11 @@
 # watch file for kopanocore from Kopano
 #
-# Kopano is mirroring there git tree on GitHub
+# Kopano is mirroring some of their git trees on GitHub, also kopanocore.
 # That's makes it a lot easier to use uscan for tracking new upstream versions.
 #
 # Release Tags are signed by OpenPGP key 0x6A3933DA297DFB7D from Jan Engelhard
 #               Fingerprint  2F8B FE96 D14F 8B56 0FBC 1F1D A28B DFEE B5A2 B2FF
-# But there aren't any armored detached signing files (*.asc), thus we can use
+# But there aren't any armored detached signing files (*.asc), thus we can't use
 # any cryptographic signature verification and don't use 'pgpsigurlmangle'.
 
 # opts= ...
