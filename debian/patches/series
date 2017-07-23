@@ -7,3 +7,4 @@ server.cfg-prepare-later-M-A-substition-while-built.patch
 build-support-gsoap-2.8.36.patch
 adjust-search-path-for-php-config-script-on-php7.0.patch
 typofix-small-fix-up-for-missspelled-another.patch
+Don-t-redefine-__FD_SETSIZE.patch

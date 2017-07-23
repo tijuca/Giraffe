@@ -1,0 +1,46 @@
+From: =?utf-8?q?Guido_G=C3=BCnther?= <agx@sigxcpu.org>
+Date: Sun, 23 Jul 2017 13:36:14 +0200
+Subject: Don't redefine __FD_SETSIZE
+
+This allows for hardening gets us out of other trouble when redefining
+__FD_SETSIZE
+
+    https://sourceware.org/ml/libc-alpha/2013-03/msg00556.html
+---
+ common/include/kopano/platform.h | 23 -----------------------
+ 1 file changed, 23 deletions(-)
+
+diff --git a/common/include/kopano/platform.h b/common/include/kopano/platform.h
+index 54a72c4..25b5644 100644
+--- a/common/include/kopano/platform.h
++++ b/common/include/kopano/platform.h
+@@ -34,29 +34,6 @@
+ #	define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)) + __array_size_check(x))
+ #endif
+ 
+-/* About _FORTIFY_SOURCE a.k.a. _BREAKIFY_SOURCE_IN_INSANE_WAYS
+- *
+- * This has the insane feature that it will assert() when you attempt
+- * to FD_SET(n, &set) with n > 1024, irrespective of your compile-time FD_SETSIZE
+- * Even stranger, this should be easily fixed but nobody is interested apparently.
+- *
+- * Although you could just not use select() anywhere, we depend on some libs that
+- * are doing select(), so we can't just remove them. 
+- *
+- * This will also disable a few other valid buffer-overflow checks, but we'll have
+- * to live with that for now.
+- */
+-
+-#ifdef _FORTIFY_SOURCE
+-#undef _FORTIFY_SOURCE
+-#endif
+-
+-  // We have to include this now in case select.h is included too soon.
+-  // Increase our maximum amount of file descriptors to 8192
+-  #include <bits/types.h>
+-  #undef __FD_SETSIZE
+-  #define __FD_SETSIZE 8192
+-
+   // Log the pthreads locks
+   #define DEBUG_PTHREADS 0
+ 
