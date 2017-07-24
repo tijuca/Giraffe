@@ -20,6 +20,7 @@ echo "done."
 
 echo "Installing database and server packages..."
 apt-get -y install mariadb-server
+/etc/init.d/mysql start
 apt-get -y install kopano-server kopano-utils
 echo "done."
 
