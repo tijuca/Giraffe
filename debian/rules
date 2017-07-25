@@ -16,6 +16,7 @@ DEB_BUILD_DIR=debian/build
 
 INSTDIR=$(CURDIR)/debian/tmp
 PHPVERSION=7.0
+PREPROCESS_FILES := $(wildcard debian/*.in)
 
 ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
 	CONFFLAG = ""
@@ -41,23 +42,16 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
     $(CONFFLAG) \
     $(NULL)
 
+$(PREPROCESS_FILES:.in=): %: %.in
+	sed 's,/@DEB_HOST_MULTIARCH@,$(DEB_HOST_MULTIARCH:%=/%),g' $< > $@
+
 %:
 	dh $@ --builddirectory=$(DEB_BUILD_DIR) --parallel --with systemd,autoreconf,php
 
-override_dh_auto_configure:
+override_dh_auto_configure: $(PREPROCESS_FILES:.in=)
 	echo ${DEB_VERSION} > $(CURDIR)/revision
 	[ -x ./bootstrap.sh ] && ./bootstrap.sh || true
 	dh_auto_configure -- $(DEB_CONFIGURE_EXTRA_ARGS)
-	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' \
-		debian/kopano-contacts.install.in > debian/kopano-contacts.install
-	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' \
-		debian/kopano-dev.install.in > debian/kopano-dev.install
-	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' \
-		debian/kopano-dev.links.in > debian/kopano-dev.links
-	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' \
-		debian/kopano-libs.install.in > debian/kopano-libs.install
-	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' \
-		debian/kopano-server.install.in > debian/kopano-server.install
 
 override_dh_auto_clean:
 	[ ! -f Makefile ] || dh_auto_clean
