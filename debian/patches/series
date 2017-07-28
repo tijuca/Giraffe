@@ -1,10 +1,7 @@
-Add-include-for-database-configuration.patch
-Run-deamons-as-user-group-kopano.patch
-Be-pessimistic-about-daemon-startup.patch
-adding-.NOTPARALLEL-target-to-swig-python-Makefiel.am.patch
-bash-completion-remove-shebang-from-file.patch
-server.cfg-prepare-later-M-A-substition-while-built.patch
-build-support-gsoap-2.8.36.patch
-adjust-search-path-for-php-config-script-on-php7.0.patch
-typofix-small-fix-up-for-missspelled-another.patch
-Don-t-redefine-__FD_SETSIZE.patch
+debian/Add-include-for-database-configuration.patch
+debian/Run-deamons-as-user-group-kopano.patch
+fixes/Be-pessimistic-about-daemon-startup.patch
+fixes/bash-completion-remove-shebang-from-file.patch
+debian/server.cfg-prepare-later-M-A-substition-while-built.patch
+fixes/typofix-small-fix-up-for-missspelled-another.patch
+fixes/Don-t-redefine-__FD_SETSIZE.patch
