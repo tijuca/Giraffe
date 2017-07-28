@@ -33,12 +33,12 @@ DEB_CONFIGURE_EXTRA_ARGS :=      \
     --sysconfdir=/etc \
     --mandir=\$${prefix}/share/man \
     --infodir=\$${prefix}/share/info \
-    --with-userscript-prefix=/etc/kopano/userscripts \
+    --with-php-config=/usr/bin/php-config$(PHPVERSION) \
     --with-quotatemplate-prefix=/etc/kopano/quotamail \
+    --with-userscript-prefix=/etc/kopano/userscripts \
     --disable-static \
     --enable-epoll \
     --enable-unicode \
-    --with-php-config=/usr/bin/php-config$(PHPVERSION) \
     $(CONFFLAG) \
     $(NULL)
 
