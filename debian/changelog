@@ -1,3 +1,78 @@
+kopanocore (8.3.2-1) unstable; urgency=medium
+
+  [ Carsten Schoenert ]
+  * [32b1d1d] rebuild patch queue from patch-queue branch
+    Modified patches:
+       - OpenSSL-Make-SSLv2-conditional.patch
+    (Closes: #861849)
+  * [491f616] kopano-server.postrm: missed substitute for kopano
+    (Closes: #863958)
+  * [85aaecc] debian/control: rename package php7.0-mapi to php-mapi
+    (Closes: #861775)
+  * [860645f] debian/control: mark some packages Multi-Arch: same
+  * [3e029cd] debian/control: let kopano-dev conflict with libmapi-dev
+    (Closes: #857377)
+  * [caf7313] New upstream version 8.3.1
+  * [2bd9fee] New upstream version 8.3.2
+  * [edc4753] rebuild patch queue from patch-queue branch
+    Update patches:
+       - Be-pessimistic-about-daemon-startup.patch
+       - build-support-gsoap-2.8.36.patch
+       - server.cfg-prepare-later-M-A-substition-while-built.patch
+    Removed patches (fixed upstream):
+       - OpenSSL-Make-SSLv2-conditional.patch
+       - change-shebang-to-usr-bin-php7.0.patch
+       - fixup-spelling-issues-against-8.1.0.patch
+       - kopano-cachestat-update-docstring-remove-diff-function.patch
+       - remove-undocummented-sk_SSL_COMP_free-call.patch
+  * [f964415] debian/watch: use the GitHub mirror from Kopano
+  * [58e6a07] Build-Depends: remove no longer needed packages
+    Upstream doesn't need Boost and Google perftools anymore.
+    Drop deps, will allow us to build on more architectures as well.
+  * [8f12375] d/rules: remove obsolete configure options
+    As the Google perftools aren't needed any longer also the old configuration
+    option for tcmalloc are gone, but also no extra option for python and swig
+    must be set.
+  * [494c1c7] debian/copyright: update due upstream adjustments
+  * [7bea455] debian/kopano-libs.override: 'iff' is correct word.
+    Upstream is will rework this part to make this override obsolete.
+  * [35b751b] Reshuffle libs
+    Some existing libraries are gone since > 8.1.0, new libraries need to
+    be added.
+  * [fb4d747] kopano-server: move some config files into private folder
+  * [05fce39] kopano-utils.install: add new tools to package
+  * [ec0aba0] debian/php-mapi.install; adjust installation folder
+  * [999ece1] debian/rules: Tell dh where to find the private libs
+  * [a957574] debian/rules: remove more *.la files
+  * [7abd16f] debian/rules: don't build non existing man pages
+    We don't need to build manpages any longer, upstream is providing them now
+    groff
+  * [9ece6b8] debian/rules: remove unused variable
+  * [9a0dd4b] debian/rules: use helper from dpkg for version selecting
+  * [729a53a] kopano-utils needs a lintian-overrides
+  * [9ac7b85] debian/control: increase Standards-Version to 4.0.0
+  * [ad19ed5, 7deeb41] debian/kopano-libs.symbols: update symbols to 8.3.2-1
+    (Closes: #871276)
+  * [740b113] debian/control: update gsoap related Build-Depends
+  * [4402ae6] debian/watch: fixup meaning and spelling in comment
+  * [7c83655] debian/rules: use make magic for transforming *.in files
+  * [2745d43] rebuild patch queue from patch-queue branch
+    Splitting up the patches into Debian specific and more generic fix-up
+    patches.
+    Removed patches (obsolete after upstream version 8.3.2):
+       - adding-.NOTPARALLEL-target-to-swig-python-Makefiel.am.patch
+       - adjust-search-path-for-php-config-script-on-php7.0.patch
+       - build-support-gsoap-2.8.36.patch
+
+  [ Guido Günther ]
+  * [44087f3] Don't redefine __FD_SETSIZE,
+    so we can enable hardening.
+  * [398e021] autopkgtests: Start mysql server
+  * [bbc3c29] Drop fixes/Be-pessimistic-about-daemon-startup.patch
+    Fixed slightly different upstream.
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Thu, 10 Aug 2017 12:33:45 -0400
+
 kopanocore (8.1.0-3) unstable; urgency=medium
 
   [ Guido Günther ]
