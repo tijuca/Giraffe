@@ -100,6 +100,7 @@ Architecture: all
 Depends: ${shlibs:Depends},
  ${misc:Depends},
  python,
+ python-dateutil,
  python-kopano (>= ${source:Version}),
  kopano-common (>= ${source:Version})
 Description: Complete and feature rich groupware solution - backup
@@ -235,6 +236,7 @@ Depends: ${shlibs:Depends},
  mktemp (>= 1.5),
  poppler-utils,
  python,
+ python-dateutil,
  python-xapian,
  python-kopano (>= ${source:Version}),
  unzip,
