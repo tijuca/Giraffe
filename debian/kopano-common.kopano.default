@@ -6,9 +6,9 @@
 KOPANO_LOCALE="C"
 
 
-#######################################
+########################################
 # Defaults for kopano-dagent initscript
-#######################################
+########################################
 
 # Set this to 'yes' to enable the kopano-dagent to start in LMTP mode
 DAGENT_ENABLED=yes
@@ -21,9 +21,9 @@ DAGENT_CONFIG=/etc/kopano/dagent.cfg
 DAGENT_OPTS="-d"
 
 
-#######################################
+########################################
 # Defaults for kopano-server initscript
-#######################################
+########################################
 
 # set to no to disable kopano-server at startup
 SERVER_ENABLED=yes
@@ -36,20 +36,6 @@ SERVER_OPTS=""
 
 # Locale to export to userscripts
 KOPANO_USERSCRIPT_LOCALE="C"
-
-
-#########################################
-# Defaults for kopano-licensed initscript
-#########################################
-
-# Set to no to disable kopano-licensed at startup
-LICENSED_ENABLED=yes
-
-# Location of the configuration files 
-LICENSED_CONFIG=/etc/kopano/licensed.cfg
-
-# Additional options that are passed to the Daemon.
-LICENSED_OPTS=""
 
 
 ########################################
@@ -94,9 +80,9 @@ GATEWAY_CONFIG=/etc/kopano/gateway.cfg
 GATEWAY_OPTS=""
 
 
-#####################################
+########################################
 # Defaults for kopano-ical initscript
-#####################################
+########################################
 
 # set to no to disable kopano-ical at startup
 ICAL_ENABLED=yes
@@ -108,9 +94,9 @@ ICAL_CONFIG=/etc/kopano/ical.cfg
 ICAL_OPTS=""
 
 
-#######################################
+########################################
 # Defaults for kopano-search initscript
-#######################################
+########################################
 
 # set to no to disable kopano-search at startup
 SEARCH_ENABLED=yes
