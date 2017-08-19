@@ -74,10 +74,11 @@ Depends: kopano-server (>= ${source:Version}),
  kopano-search (>= ${source:Version}),
  ${misc:Depends},
 Suggests: kopano-webapp
-Description: Metapackage for the Kopano Core
+Description: Metapackage to install the Kopano Core stack
  The Kopano Collaboration Platform (KCP) is a complete, stable and
  flexible groupware solution supporting open source as well as proprietary
- clients including mobile ones. It also features a web interface.
+ clients including mobile ones. By install of the additional package
+ kopano-webapp it also features a modern web interface.
  .
  This metapackage contains the dependencies to pull in all important parts of
  Kopano Core.
