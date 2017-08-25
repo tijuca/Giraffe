@@ -2733,7 +2733,15 @@ SOAP_ENTRY_START(saveObject, lpsLoadObjectResponse->er, entryId sParentEntryId, 
 		}
 	}
 
-	er = SaveObject(soap, lpecSession, lpDatabase, lpAttachmentStorage, ulStoreId, ulParentObjId, ulParentObjType, ulFlags, ulSyncId, lpsSaveObj, &sReturnObject, atoui(g_lpSessionManager->GetConfig()->GetSetting("embedded_attachment_limit")), &fHaveChangeKey);
+	er = SaveObject(soap, lpecSession, lpDatabase, lpAttachmentStorage,
+	     ulStoreId, ulParentObjId, ulParentObjType, ulFlags, ulSyncId,
+	     lpsSaveObj, &sReturnObject,
+	     /* message itself occupies another level */
+	     1 + atoui(g_lpSessionManager->GetConfig()->GetSetting("embedded_attachment_limit")),
+	     &fHaveChangeKey);
+	if (er == KCERR_TOO_COMPLEX)
+		ec_log_debug("saveObject: refusing to store object \"%s\" (store %u): too many levels of attachments/subobjects",
+			sEntryId.__ptr != nullptr ? base64_encode(sEntryId.__ptr, sEntryId.__size).c_str() : "", ulStoreId);
 	if (er != erSuccess)
 		goto exit;
 
@@ -3071,19 +3079,40 @@ SOAP_ENTRY_START(loadObject, lpsLoadObjectResponse->er, entryId sEntryId, struct
 			er = KCERR_NO_ACCESS;
 			goto exit;
 		}
-		
+
 		ulParentObjType = MAPI_FOLDER;
 	} else if(ulObjType == MAPI_FOLDER) {
-        er = g_lpSessionManager->GetCacheManager()->GetObject(ulParentId, NULL, NULL, NULL, &ulParentObjType);
+		er = g_lpSessionManager->GetCacheManager()->GetObject(ulParentId, NULL, NULL, NULL, &ulParentObjType);
 		if (er != erSuccess)
 			goto exit;
-			
-        // Reset folder counts now (Note: runs in a DB transaction!). Note: we only update counts when lpNotSubscribe is not NULL; this
-        // makes sure that we only reset folder counts on the first open of a folder, and not when the folder properties are updated (eg
-        // due to counter changes)
-        if(lpsNotSubscribe && ulObjFlags != FOLDER_SEARCH && parseBool(g_lpSessionManager->GetConfig()->GetSetting("counter_reset")))
-            ResetFolderCount(lpecSession, ulObjId);
-    }
+
+		// avoid reminders from shared stores by detecting that we are opening non-owned reminders folder
+		if((ulObjFlags&FOLDER_SEARCH) && lpecSession->GetSecurity()->IsStoreOwner(ulObjId) == KCERR_NO_ACCESS) {
+			strQuery = "SELECT val_string FROM properties where hierarchyid=" + stringify(ulObjId) + " AND tag = " + stringify(PROP_ID(PR_CONTAINER_CLASS))+ ";";
+			er = lpDatabase->DoSelect(strQuery, &lpDBResult);
+			if(er != erSuccess)
+				goto exit;
+
+			if (lpDatabase->GetNumRows(lpDBResult) == 1) {
+				lpDBRow = lpDatabase->FetchRow(lpDBResult);
+				if (lpDBRow == NULL || lpDBRow[0] == NULL ) {
+					ec_log_err("ECSearchObjectTable::Load(): row or columns null");
+					er = KCERR_DATABASE_ERROR;
+					goto exit;
+				}
+				if(!strcmp(lpDBRow[0], "Outlook.Reminder")) {
+					er = KCERR_NOT_FOUND;
+					goto exit;
+				}
+			}
+		}
+
+		// Reset folder counts now (Note: runs in a DB transaction!). Note: we only update counts when lpNotSubscribe is not NULL; this
+		// makes sure that we only reset folder counts on the first open of a folder, and not when the folder properties are updated (eg
+		// due to counter changes)
+		if(lpsNotSubscribe && ulObjFlags != FOLDER_SEARCH && parseBool(g_lpSessionManager->GetConfig()->GetSetting("counter_reset")))
+			ResetFolderCount(lpecSession, ulObjId);
+	}
 
 	// check if flags were passed, older clients call checkExistObject
     if(ulFlags & 0x80000000) {
@@ -9958,8 +9987,7 @@ SOAP_ENTRY_START(exportMessageChangesAsStream, lpsResponse->er, unsigned int ulF
 	} else if (er != erSuccess)
 		goto exit;
 
-	ulDepth = atoui(lpecSession->GetSessionManager()->GetConfig()->GetSetting("embedded_attachment_limit"));
-	
+	ulDepth = atoui(lpecSession->GetSessionManager()->GetConfig()->GetSetting("embedded_attachment_limit")) + 1;
 	er = lpecSession->GetAdditionalDatabase(&lpBatchDB);
 	if (er != erSuccess)
 	    goto exit;
