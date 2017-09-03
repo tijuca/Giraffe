@@ -1,3 +1,27 @@
+kopanocore (8.3.3-1) unstable; urgency=medium
+
+  [ Guido Günther ]
+  * [3fb8819] backup,search: Depend python-dateutil
+    The packages kopano-{backup,search} needing dateutil from python-dateutil
+    to work properly, so ensure we depend on that.
+
+  [ Felix Bartels ]
+  * [6fde1a7] kopano-core: no need for depending kopano-archiver
+    The archiver functions are mostly not needed in typical installation of
+    the core package, we don#t need to depend on.
+  * [d1ab087] syncing /etc/default/kopano with upstream
+  * [3bba4ba] kopano-core: improve the package description
+
+  [ Carsten Schoenert ]
+  * [e3b5796] New upstream version 8.3.3
+  * [5418e96] debian/kopano-libs.symbols: update symbols to 8.3.3-1
+  * [516fcf5] Uploaders: update email address of Mark
+  * [da6b474] Revert "debian/kopano-libs: adding one more override"
+    The previous added lintian override isn't needed any more.
+  * [16ff4e3] debian/control: increase Standards-Version to 4.0.1
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Sun, 03 Sep 2017 16:01:30 +0200
+
 kopanocore (8.3.2-1) unstable; urgency=medium
 
   [ Carsten Schoenert ]
