@@ -9,7 +9,7 @@ Subject: typofix: small fix up for missspelled "another"
  3 files changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/doc/kopano-server.cfg.5 b/doc/kopano-server.cfg.5
-index f9b5dcd..86a78a4 100644
+index 4211c64..cb3a584 100644
 --- a/doc/kopano-server.cfg.5
 +++ b/doc/kopano-server.cfg.5
 @@ -987,7 +987,7 @@ Default:
@@ -35,7 +35,7 @@ index 03d53ed..9f9c33a 100644
  	HRESULT HrPropertyFetchRow(LPSPropValue lpProps, ULONG cValues, string &strResponse, ULONG ulMailnr, bool bForceFlags, const vector<string> &lstDataItems);
  
 diff --git a/installer/linux/server.cfg b/installer/linux/server.cfg
-index 9a094bb..be3fbb0 100644
+index 41d9949..0b397aa 100644
 --- a/installer/linux/server.cfg
 +++ b/installer/linux/server.cfg
 @@ -155,7 +155,7 @@ attachment_compression	= 6

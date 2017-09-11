@@ -10,7 +10,7 @@ can be substituted while package creation.
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/installer/linux/server.cfg b/installer/linux/server.cfg
-index b0eff91..9a094bb 100644
+index b68f225..41d9949 100644
 --- a/installer/linux/server.cfg
 +++ b/installer/linux/server.cfg
 @@ -344,8 +344,8 @@ user_plugin		= db

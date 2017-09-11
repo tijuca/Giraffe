@@ -7,12 +7,12 @@ Subject: Add include for database configuration
  1 file changed, 2 insertions(+)
 
 diff --git a/installer/linux/server.cfg b/installer/linux/server.cfg
-index cac539e..64b118b 100644
+index 5999013..10efd3e 100644
 --- a/installer/linux/server.cfg
 +++ b/installer/linux/server.cfg
-@@ -482,3 +482,5 @@ embedded_attachment_limit = 20
- # is taken to be received via a proxy. An empty value disables proxy detection
- # and the value of '*' is used to indicate that all connections are proxied
- proxy_header = 
+@@ -485,3 +485,5 @@ proxy_header =
+ 
+ # Enable/disable reminders for shared stores
+ shared_reminders = yes
 +
 +!include debian-db.cfg
