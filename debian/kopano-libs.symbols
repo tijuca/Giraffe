@@ -1,13 +1,16 @@
 libkcarchiver.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
  *@KC_8.3 8.3.2
 
 libkcarchivercore.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
  *@KC_8.3 8.3.2
 
 libkcfreebusy.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
  *@KC_8.3 8.3.2
 
 libkchl.so.0 kopano-libs #MINVER#
@@ -15,18 +18,22 @@ libkchl.so.0 kopano-libs #MINVER#
 
 libkcicalmapi.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
  *@KC_8.3 8.3.2
 
 libkcinetmapi.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
  *@KC_8.3 8.3.2
 
 libkcmapi.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
  *@KC_8.3 8.3.2
 
 libkcpyconv.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
  *@KC_8.3 8.3.2
   _Z11DoExceptioni@Base 8.3.2
   _Z13CopyPyUnicodePPwP7_objectPv@Base 8.3.2
@@ -55,9 +62,12 @@ libkcpyconv.so.0 kopano-libs #MINVER#
   _Z16conv_out_defaultIN2KC7ECGROUPEjXadL_ZNS1_12ulIsABHiddenEEEEvPT_P7_objectPKcPvj@Base 8.3.2
   _Z16conv_out_defaultIN2KC7ECQUOTAEbXadL_ZNS1_16bUseDefaultQuotaEEEEvPT_P7_objectPKcPvj@Base 8.3.2
   _Z16conv_out_defaultIN2KC7ECQUOTAEbXadL_ZNS1_19bIsUserDefaultQuotaEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC7ECQUOTAElXadL_ZNS1_10llHardSizeEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC7ECQUOTAElXadL_ZNS1_10llSoftSizeEEEEvPT_P7_objectPKcPvj@Base 8.3.2
-  _Z16conv_out_defaultIN2KC7ECQUOTAElXadL_ZNS1_10llWarnSizeEEEEvPT_P7_objectPKcPvj@Base 8.3.2
+  (arch-bits=64)_Z16conv_out_defaultIN2KC7ECQUOTAElXadL_ZNS1_10llHardSizeEEEEvPT_P7_objectPKcPvj@Base 8.3.2
+  (arch-bits=64)_Z16conv_out_defaultIN2KC7ECQUOTAElXadL_ZNS1_10llSoftSizeEEEEvPT_P7_objectPKcPvj@Base 8.3.2
+  (arch-bits=64)_Z16conv_out_defaultIN2KC7ECQUOTAElXadL_ZNS1_10llWarnSizeEEEEvPT_P7_objectPKcPvj@Base 8.3.2
+  (arch-bits=32)_Z16conv_out_defaultIN2KC7ECQUOTAExXadL_ZNS1_10llHardSizeEEEEvPT_P7_objectPKcPvj@Base 8.3.2
+  (arch-bits=32)_Z16conv_out_defaultIN2KC7ECQUOTAExXadL_ZNS1_10llSoftSizeEEEEvPT_P7_objectPKcPvj@Base 8.3.2
+  (arch-bits=32)_Z16conv_out_defaultIN2KC7ECQUOTAExXadL_ZNS1_10llWarnSizeEEEEvPT_P7_objectPKcPvj@Base 8.3.2
   _Z16conv_out_defaultIN2KC9ECCOMPANYENS0_9ECENTRYIDEXadL_ZNS1_10sCompanyIdEEEEvPT_P7_objectPKcPvj@Base 8.3.2
   _Z16conv_out_defaultIN2KC9ECCOMPANYENS0_9ECENTRYIDEXadL_ZNS1_14sAdministratorEEEEvPT_P7_objectPKcPvj@Base 8.3.2
   _Z16conv_out_defaultIN2KC9ECCOMPANYEPwXadL_ZNS1_14lpszServernameEEEEvPT_P7_objectPKcPvj@Base 8.3.2
@@ -76,11 +86,13 @@ libkcpyconv.so.0 kopano-libs #MINVER#
   _ZN4priv8conv_outIPwEEvP7_objectPvjPT_@Base 8.3.2
   _ZN4priv8conv_outIbEEvP7_objectPvjPT_@Base 8.3.2
   _ZN4priv8conv_outIjEEvP7_objectPvjPT_@Base 8.3.2
-  _ZN4priv8conv_outIlEEvP7_objectPvjPT_@Base 8.3.2
+  (arch-bits=64)_ZN4priv8conv_outIlEEvP7_objectPvjPT_@Base 8.3.2
+  (arch-bits=32)_ZN4priv8conv_outIxEEvP7_objectPvjPT_@Base 8.3.3
   _ZN4priv8conv_outItEEvP7_objectPvjPT_@Base 8.3.2
 
 libkcpydirector.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
  *@KC_8.3 8.3.2
  _Z21mark_call_from_pythonv@Base 8.3.2
  _Z22check_call_from_pythonv@Base 8.3.2
@@ -88,6 +100,7 @@ libkcpydirector.so.0 kopano-libs #MINVER#
 
 libkcserver.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
  *@KC_8.3 8.3.2
 
 libkcsoap.so.0 kopano-libs #MINVER#
@@ -98,6 +111,7 @@ libkcssl.so.0 kopano-libs #MINVER#
 
 libkcsync.so.0 kopano-libs #MINVER#
 #MISSING: 8.3.3-1# (symver|optional)EC_8.1.0 8.0.1
+#MISSING: 8.3.4-1# (symver|optional)EC_8.1.0 8.0.1
  *@KC_8.3 8.3.2
 
 libkcutil.so.0 kopano-libs #MINVER#
