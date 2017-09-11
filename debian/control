@@ -33,7 +33,7 @@ Build-Depends:
  libpam0g-dev,
  libssl-dev,
  libtool (>= 1.5),
- libvmime-dev,
+ libvmime-dev (>= 0.9.2),
  libxml2-dev,
  m4,
  php7.0-dev,
