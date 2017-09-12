@@ -1,3 +1,17 @@
+kopanocore (8.3.4-1) unstable; urgency=medium
+
+  [ Carsten Schoenert ]
+  * [ffe603c] New upstream version 8.3.4
+  * [c23daaf] rebuild patch queue from patch-queue branch
+    Modified patch:
+       - Add-include-for-database-configuration.patch
+  * [69be9b9] debian/control: adding version B-D on libvmime-dev
+    (Closes: #875454)
+  * [f581cd2] debian/kopano-libs.symbols: update symbols to 8.3.4-1
+    (Closes: #875453)
+
+ -- Carsten Schoenert <c.schoenert@t-online.de>  Tue, 12 Sep 2017 20:52:31 +0200
+
 kopanocore (8.3.3-1) unstable; urgency=medium
 
   [ Guido Günther ]
