@@ -83,6 +83,10 @@ override_dh_install:
 	sed -i 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/' $(INSTDIR)/etc/kopano/server.cfg
 	dh_install
 
+	dh_apparmor --profile-name=usr.sbin.kopano-server -pkopano-server
+	dh_apparmor --profile-name=usr.sbin.kopano-dagent -pkopano-dagent
+
+
 override_dh_installinit:
 	dh_installinit --name kopano-server
 	dh_installinit --name kopano-spooler

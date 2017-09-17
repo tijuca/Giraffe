@@ -14,3 +14,4 @@ usr/share/man/man8/kopano-mr-process.8
 usr/share/kopano-dagent/python/
 usr/share/kopano-dagent/python/plugins/
 var/lib/kopano/dagent/plugins/
+debian/apparmor/usr.sbin.kopano-dagent etc/apparmor.d

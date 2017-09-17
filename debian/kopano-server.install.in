@@ -15,4 +15,4 @@ usr/share/kopano/debian
 usr/share/kopano/ldap.active-directory.cfg
 usr/share/kopano/ldap.openldap.cfg
 usr/share/kopano/ldap.propmap.cfg
-
+debian/apparmor/usr.sbin.kopano-server etc/apparmor.d
