@@ -4,3 +4,4 @@ usr/sbin/kopano-search
 usr/share/doc/kopano-server/example-config/search.cfg  usr/share/doc/kopano-search/example-config
 usr/share/man/man5/kopano-search.cfg.5
 usr/share/man/man8/kopano-search.8
+debian/apparmor/usr.sbin.kopano-search etc/apparmor.d
