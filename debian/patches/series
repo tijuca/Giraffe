@@ -2,5 +2,3 @@ debian/Add-include-for-database-configuration.patch
 debian/Run-deamons-as-user-group-kopano.patch
 fixes/bash-completion-remove-shebang-from-file.patch
 debian/server.cfg-prepare-later-M-A-substition-while-built.patch
-fixes/typofix-small-fix-up-for-missspelled-another.patch
-fixes/Don-t-redefine-__FD_SETSIZE.patch
