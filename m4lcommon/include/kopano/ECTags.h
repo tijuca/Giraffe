@@ -18,6 +18,9 @@
 #ifndef ECTAGS_H
 #define ECTAGS_H
 
+/*
+ * Inside MAPI, p.38: private range for service providers (6600-67ff)
+ */
 // Public Kopano properties
 #define PR_EC_BASE			0x6700
 
@@ -153,7 +156,13 @@
 #define PR_EC_STATS_SERVER_HTTPSURL		PROP_TAG(PT_STRING8, 	PR_EC_BASE+0xF7)
 #define PR_EC_STATS_SERVER_FILEURL		PROP_TAG(PT_STRING8,	PR_EC_BASE+0xF8)
 
-// The hidden object property which can be used to access the underlying IECUnknown object though a pointer in lpszA
+/* WSTransport within a profile, exposed as IUnknown */
+#define PR_EC_TRANSPORTOBJECT			PROP_TAG(PT_OBJECT,	PR_EC_BASE+0x7e)
+
+/*
+ * The hidden object property which can be used to access the underlying
+ * IUnknown object though a pointer in lpszA.
+ */
 #define PR_EC_OBJECT				PROP_TAG(PT_OBJECT,	PR_EC_BASE+0x7f)
 
 // Contains the 'flags' column in the outgoing queue (EC_SUBMIT_{MASTER,LOCAL,DOSENTMAIL})
@@ -211,6 +220,7 @@
 #define PR_EC_ARCHIVE_COUPLINGS_W		PROP_TAG(PT_MV_UNICODE,	PR_EC_BASE+0xC5)
 
 #define PR_EC_SEARCHFOLDER_STATUS		PROP_TAG(PT_LONG,	PR_EC_BASE+0x90)
+#define PR_EC_BODY_FILTERED			PROP_TAG(PT_BINARY,     PR_EC_BASE+0x91)
 
 #define PR_EC_OFFLINE_SYNC_STATUS		PROP_TAG(PT_BINARY,	PR_EC_BASE+0xA0)
 #define PR_EC_ONLINE_SYNC_STATUS		PROP_TAG(PT_BINARY,	PR_EC_BASE+0xA1)

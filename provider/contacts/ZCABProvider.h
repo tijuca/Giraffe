@@ -20,9 +20,10 @@
 
 #include <kopano/zcdefs.h>
 #include <kopano/ECUnknown.h>
+#include <kopano/Util.h>
 #include <mapispi.h>
 
-class ZCABProvider _kc_final : public ECUnknown  {
+class ZCABProvider _kc_final : public ECUnknown, public IABProvider {
 protected:
 	ZCABProvider(ULONG ulFlags, const char *szClassName);
 
@@ -30,13 +31,10 @@ public:
 	static  HRESULT Create(ZCABProvider **lppZCABProvider);
 	virtual HRESULT QueryInterface(REFIID refiid, void **lppInterface) _kc_override;
     virtual HRESULT Shutdown(ULONG * lpulFlags);
-	virtual HRESULT Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG ulFlags, ULONG * lpulcbSecurity, LPBYTE * lppbSecurity, LPMAPIERROR * lppMAPIError, LPABLOGON * lppABLogon);
+	virtual HRESULT Logon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam, const TCHAR *lpszProfileName, ULONG ulFlags, ULONG *lpulcbSecurity, LPBYTE *lppbSecurity, LPMAPIERROR *lppMAPIError, LPABLOGON *lppABLogon);
 
 private:
-	class xABProvider _kc_final : public IABProvider {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/IABProvider.hpp>
-	} m_xABProvider;
+	ALLOC_WRAP_FRIEND;
 };
 
 #endif

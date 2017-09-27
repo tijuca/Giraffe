@@ -114,8 +114,7 @@
 #define MNID_ID                 0
 #define MNID_STRING             1
 
-
-class IMAPIProp : public IUnknown {
+class IMAPIProp : public virtual IUnknown {
 public:
     //    virtual ~IMAPIProp() = 0;
 
@@ -149,7 +148,7 @@ public:
 #define FOREGROUND_SEARCH       (0x00000010)
 #define BACKGROUND_SEARCH       (0x00000020)
 
-class IMAPIContainer : public IMAPIProp {
+class IMAPIContainer : public virtual IMAPIProp {
 public:
     //    virtual ~IMAPIContainer() = 0;
 
@@ -265,8 +264,7 @@ public:
     virtual HRESULT Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, IMAPIAdviseSink *lpAdviseSink,
 			   ULONG* OUTPUT /*lpulConnection*/) = 0;
     virtual HRESULT Unadvise(ULONG ulConnection) = 0;
-    virtual HRESULT CompareEntryIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2,
-				    ULONG ulFlags, ULONG* OUTPUT /*lpulResult*/) = 0;
+	virtual HRESULT CompareEntryIDs(ULONG cbEntryID1, const ENTRYID *lpEntryID1, ULONG cbEntryID2, const ENTRYID *lpEntryID2, ULONG ulFlags, ULONG *OUTPUT /*lpulResult*/) = 0;
     virtual HRESULT OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG* OUTPUT /*lpulObjType*/,
 			      IUnknown ** OUTPUT /*lppUnk*/) = 0;
     virtual HRESULT SetReceiveFolder(LPTSTR lpszMessageClass, ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID) = 0;
@@ -285,11 +283,8 @@ public:
 	}
 };
 
-class IProxyStoreObject : public IUnknown {
+class IProxyStoreObject : public virtual IUnknown {
 public:
-    virtual HRESULT PlaceHolder1() = 0;
-    virtual HRESULT PlaceHolder2() = 0;
-
     %extend {
         ~IProxyStoreObject() { self->Release(); }
 
@@ -329,7 +324,7 @@ public:
 #define FLDSTATUS_HIDDEN        (0x00000004)
 #define FLDSTATUS_DELMARKED     (0x00000008)
 
-class IMAPIFolder : public IMAPIContainer {
+class IMAPIFolder : public virtual IMAPIContainer {
 public:
     //    virtual ~IMAPIFolder() = 0;
 
@@ -339,7 +334,7 @@ public:
     virtual HRESULT DeleteMessages(LPENTRYLIST lpMsgList, ULONG ulUIParam, IMAPIProgress * lpProgress, ULONG ulFlags) = 0;
     virtual HRESULT CreateFolder(ULONG ulFolderType, LPTSTR lpszFolderName, LPTSTR lpszFolderComment, LPCIID lpInterface,
 				 ULONG ulFlags, IMAPIFolder** OUTPUT /*lppFolder*/) = 0;
-    virtual HRESULT CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, IUnknown *lpDestFolder, LPTSTR lpszNewFolderName,
+    virtual HRESULT CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, void *lpDestFolder, LPTSTR lpszNewFolderName,
 			       ULONG ulUIParam, IMAPIProgress * lpProgress, ULONG ulFlags) = 0;
     virtual HRESULT DeleteFolder(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulUIParam, IMAPIProgress * lpProgress, ULONG ulFlags) = 0;
     virtual HRESULT SetReadFlags(LPENTRYLIST lpMsgList, ULONG ulUIParam, IMAPIProgress * lpProgress, ULONG ulFlags) = 0;
@@ -388,7 +383,7 @@ public:
 #define IMPORTANCE_NORMAL       (1)
 #define IMPORTANCE_HIGH         (2)
 
-class IMessage : public IMAPIProp {
+class IMessage : public virtual IMAPIProp {
 public:
     //    virtual ~IMessage() = 0;
 
@@ -413,7 +408,7 @@ public:
 #define ATTACH_EMBEDDED_MSG     (0x00000005)
 #define ATTACH_OLE              (0x00000006)
 
-class IAttach : public IMAPIProp {
+class IAttach : public virtual IMAPIProp {
 public:
 	%extend {
 		~IAttach() { self->Release(); }
@@ -433,9 +428,9 @@ public:
 #define MAPI_AMBIGUOUS          (0x00000001)
 #define MAPI_RESOLVED           (0x00000002)
 
-class IABContainer : public IMAPIContainer {
+class IABContainer : public virtual IMAPIContainer {
 public:
-    virtual HRESULT CreateEntry(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulCreateFlags, LPMAPIPROP* OUTPUT /*lppMAPIPropEntry*/) = 0;
+	virtual HRESULT CreateEntry(ULONG cbEntryID, const ENTRYID *lpEntryID, ULONG flags, IMAPIProp **OUTPUT /*lppMAPIPropEntry*/) = 0;
     virtual HRESULT CopyEntries(LPENTRYLIST lpEntries, ULONG ulUIParam, IMAPIProgress * lpProgress, ULONG ulFlags) = 0;
     virtual HRESULT DeleteEntries(LPENTRYLIST lpEntries, ULONG ulFlags) = 0;
 	virtual HRESULT ResolveNames(const SPropTagArray *lpPropTagArray, ULONG ulFlags, LPADRLIST INOUT /*lpAdrList*/, LPFlagList INOUT /*lpFlagList*/) = 0;
@@ -505,16 +500,16 @@ public:
 #define MAPI_MH_DP_PDS_PATRON                       (5)
 #define MAPI_MH_DP_OTHER_AU                         (6)
 
-class IMailUser : public IMAPIProp {
+class IMailUser : public virtual IMAPIProp {
 public:
 	%extend {
 		~IMailUser() { self->Release(); }
 	}
 };
 
-class IDistList : public IMAPIContainer {
+class IDistList : public virtual IMAPIContainer {
 public:
-    virtual HRESULT CreateEntry(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulCreateFlags, LPMAPIPROP* OUTPUT /*lppMAPIPropEntry*/) = 0;
+	virtual HRESULT CreateEntry(ULONG cbEntryID, const ENTRYID *lpEntryID, ULONG create_flags, IMAPIProp **OUTPUT /*lppMAPIPropEntry*/) = 0;
     virtual HRESULT CopyEntries(LPENTRYLIST lpEntries, ULONG ulUIParam, IMAPIProgress * lpProgress, ULONG ulFlags) = 0;
     virtual HRESULT DeleteEntries(LPENTRYLIST lpEntries, ULONG ulFlags) = 0;
 	virtual HRESULT ResolveNames(const SPropTagArray *lpPropTagArray, ULONG ulFlags, LPADRLIST INOUT /*lpAdrList*/, LPFlagList INOUT /*lpFlagList*/) = 0;
@@ -607,7 +602,7 @@ typedef ULONG       BOOKMARK;
 
 #define TBL_NOADVANCE       0x00000001
 
-class IMAPITable : public IUnknown {
+class IMAPITable : public virtual IUnknown {
 public:
     //    virtual ~IMAPITable() = 0;
 
@@ -701,7 +696,7 @@ public:
 #define FLUSH_NO_UI         (0x00000010)
 #define FLUSH_ASYNC_OK      (0x00000020)
 
-class IProfSect : public IMAPIProp {
+class IProfSect : public virtual IMAPIProp {
 public:
 	%extend {
 		~IProfSect() { self->Release(); }

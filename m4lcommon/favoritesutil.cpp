@@ -34,6 +34,9 @@ using namespace KCHL;
 
 namespace KC {
 
+static HRESULT AddToFavorite(IMAPIFolder *shortcut, ULONG level, const TCHAR *alias, ULONG flags, ULONG nvals, SPropValue *);
+static HRESULT CreateShortcutFolder(IMsgStore *store, TCHAR *folder, TCHAR *comment, ULONG flags, IMAPIFolder **shortcut);
+
 static constexpr const SizedSPropTagArray(SHORTCUT_NUM, sPropsShortcuts) = {SHORTCUT_NUM, {
 	PR_INSTANCE_KEY, PR_FAV_PUBLIC_SOURCE_KEY, PR_FAV_PARENT_SOURCE_KEY,
 	PR_FAV_DISPLAY_NAME, PR_FAV_DISPLAY_ALIAS, PR_FAV_LEVEL_MASK,
@@ -194,12 +197,12 @@ HRESULT DelFavoriteFolder(IMAPIFolder *lpShortcutFolder, LPSPropValue lpPropSour
 	lpsMsgList->cValues = 0;
 
 	// add entryid
-	lpsMsgList->lpbin[lpsMsgList->cValues].cb = lpRows->aRow[0].lpProps[0].Value.bin.cb;
-
-	if ((hr = MAPIAllocateMore(lpsMsgList->lpbin[lpsMsgList->cValues].cb, lpsMsgList, (void **) &lpsMsgList->lpbin[lpsMsgList->cValues].lpb)) != hrSuccess)
+	auto bin = &lpsMsgList->lpbin[lpsMsgList->cValues];
+	bin->cb = lpRows->aRow[0].lpProps[0].Value.bin.cb;
+	hr = MAPIAllocateMore(bin->cb, lpsMsgList, reinterpret_cast<void **>(&bin->lpb));
+	if (hr != hrSuccess)
 		return hr;
-
-	memcpy(lpsMsgList->lpbin[lpsMsgList->cValues].lpb, lpRows->aRow[0].lpProps[0].Value.bin.lpb, lpsMsgList->lpbin[lpsMsgList->cValues].cb);
+	memcpy(bin->lpb, lpRows->aRow[0].lpProps[0].Value.bin.lpb, bin->cb);
 	++lpsMsgList->cValues;
 
 	strSourceKey.assign((char*)lpRows->aRow[0].lpProps[1].Value.bin.lpb, lpRows->aRow[0].lpProps[1].Value.bin.cb);
@@ -230,11 +233,12 @@ HRESULT DelFavoriteFolder(IMAPIFolder *lpShortcutFolder, LPSPropValue lpPropSour
 //FIXME: check the properties in the row!!!!
 
 			// add entryid
-			lpsMsgList->lpbin[lpsMsgList->cValues].cb = lpRows->aRow[0].lpProps[0].Value.bin.cb;
-
-			if ((hr = MAPIAllocateMore(lpsMsgList->lpbin[lpsMsgList->cValues].cb, lpsMsgList, (void **) &lpsMsgList->lpbin[lpsMsgList->cValues].lpb)) != hrSuccess)
+			bin = &lpsMsgList->lpbin[lpsMsgList->cValues];
+			bin->cb = lpRows->aRow[0].lpProps[0].Value.bin.cb;
+			hr = MAPIAllocateMore(bin->cb, lpsMsgList, reinterpret_cast<void **>(&bin->lpb));
+			if (hr != hrSuccess)
 				return hr;
-			memcpy(lpsMsgList->lpbin[lpsMsgList->cValues].lpb, lpRows->aRow[0].lpProps[0].Value.bin.lpb, lpsMsgList->lpbin[lpsMsgList->cValues].cb);
+			memcpy(bin->lpb, lpRows->aRow[0].lpProps[0].Value.bin.lpb, bin->cb);
 			++lpsMsgList->cValues;
 
 			// Add sourcekey into the list

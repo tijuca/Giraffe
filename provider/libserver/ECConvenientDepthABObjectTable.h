@@ -19,31 +19,11 @@
 #define ECCONVENIENTDEPTHABOBJECTTABLE_H
 
 #include <kopano/zcdefs.h>
-#include "ECABObjectTable.h"
+#include <kopano/Util.h>
 
 struct soap;
 
 namespace KC {
-
-class ECConvenientDepthABObjectTable _kc_final : public ECABObjectTable {
-protected:
-	ECConvenientDepthABObjectTable(ECSession *lpSession, unsigned int ulABId, unsigned int ulABType, unsigned int ulABParentId, unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale);
-
-public:
-	static ECRESULT Create(ECSession *, unsigned int ab_id, unsigned int ab_type, unsigned int ab_parent_id, unsigned int ab_parent_type, unsigned int flags, const ECLocale &, ECABObjectTable **);
-	virtual ECRESULT Load();
-
-	static ECRESULT QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bTableData,bool bTableLimit);
-
-private:
-	struct CONTAINERINFO {
-		unsigned int ulId;
-		unsigned int ulDepth;
-		std::string strPath;
-	};
-	std::map<unsigned int, unsigned int> m_mapDepth;
-	std::map<unsigned int, std::string> m_mapPath;
-};
 
 } /* namespace */
 

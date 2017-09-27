@@ -23,7 +23,6 @@
 
 #include <kopano/ECUnknown.h>
 #include <kopano/ECGuid.h>
-#include <kopano/ECInterfaceDefs.h>
 
 namespace KC {
 
@@ -64,7 +63,7 @@ ULONG ECUnknown::Release() {
 
 HRESULT ECUnknown::QueryInterface(REFIID refiid, void **lppInterface) {
 	REGISTER_INTERFACE2(ECUnknown, this);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xUnknown);
+	REGISTER_INTERFACE2(IUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -164,9 +163,5 @@ HRESULT ECUnknown::Suicide() {
 		lpParent->RemoveChild(self);
 	return hrSuccess;
 }
-
-DEF_HRMETHOD0(ECUnknown, Unknown, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_ULONGMETHOD0(ECUnknown, Unknown, AddRef, (void))
-DEF_ULONGMETHOD0(ECUnknown, Unknown, Release, (void))
 
 } /* namespace */

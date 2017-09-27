@@ -24,7 +24,7 @@
 
 namespace KC {
 
-template<typename _Type> class iconv_charset _kc_final {
+template<typename Type> class iconv_charset _kc_final {
 };
 
 #define CHARSET_CHAR "//TRANSLIT"
@@ -73,29 +73,33 @@ public:
 	}
 };
 
-template<size_t _N> class iconv_charset<char[_N]> _kc_final {
+template<size_t N> class iconv_charset<char[N]> _kc_final {
 public:
 	static const char *name() {
 		return CHARSET_CHAR;	// Current locale
 	}
-	static const char *rawptr(const char (&from) [_N]) {
+	static const char *rawptr(const char (&from)[N])
+	{
 		return from;
 	}
-	static size_t rawsize(const char (&) [_N]) {
-		return _N - 1;
+	static size_t rawsize(const char (&)[N])
+	{
+		return N - 1;
 	}
 };
 
-template<size_t _N> class iconv_charset<const char[_N]> _kc_final {
+template<size_t N> class iconv_charset<const char[N]> _kc_final {
 public:
 	static const char *name() {
 		return CHARSET_CHAR;	// Current locale
 	}
-	static const char *rawptr(const char (&from) [_N]) {
+	static const char *rawptr(const char (&from)[N])
+	{
 		return from;
 	}
-	static size_t rawsize(const char (&) [_N]) {
-		return _N - 1;
+	static size_t rawsize(const char (&)[N])
+	{
+		return N - 1;
 	}
 };
 
@@ -140,29 +144,33 @@ public:
 	}
 };
 
-template<size_t _N> class iconv_charset<wchar_t[_N]> _kc_final {
+template<size_t N> class iconv_charset<wchar_t[N]> _kc_final {
 public:
 	static const char *name() {
 		return CHARSET_WCHAR;	// Current locale
 	}
-	static const char *rawptr(const wchar_t (&from) [_N]) {
+	static const char *rawptr(const wchar_t (&from)[N])
+	{
 		return reinterpret_cast<const char*>(from);
 	}
-	static size_t rawsize(const wchar_t (&) [_N]) {
-		return (_N - 1) * sizeof(wchar_t);
+	static size_t rawsize(const wchar_t (&)[N])
+	{
+		return (N - 1) * sizeof(wchar_t);
 	}
 };
 
-template<size_t _N> class iconv_charset<const wchar_t[_N]> _kc_final {
+template<size_t N> class iconv_charset<const wchar_t[N]> _kc_final {
 public:
 	static const char *name() {
 		return CHARSET_WCHAR;	// Current locale
 	}
-	static const char *rawptr(const wchar_t (&from) [_N]) {
+	static const char *rawptr(const wchar_t (&from)[N])
+	{
 		return reinterpret_cast<const char*>(from);
 	}
-	static size_t rawsize(const wchar_t (&) [_N]) {
-		return (_N - 1) * sizeof(wchar_t);
+	static size_t rawsize(const wchar_t (&)[N])
+	{
+		return (N - 1) * sizeof(wchar_t);
 	}
 };
 
@@ -181,9 +189,9 @@ public:
 	}
 };
 
-template<typename _Type>
-size_t rawsize(const _Type &_x) {
-	return iconv_charset<_Type>::rawsize(_x);
+template<typename Type> size_t rawsize(const Type &_x)
+{
+	return iconv_charset<Type>::rawsize(_x);
 }
 
 } /* namespace */

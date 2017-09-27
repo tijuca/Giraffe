@@ -7,8 +7,8 @@ SWIG_CXXFLAGS = -Wall -python -c++ -threads \
 	-I${srcdir}/include
 
 lib_LTLIBRARIES = libkcpyconv.la libkcpydirector.la
-pyexec_LTLIBRARIES = _MAPICore.la _inetmapi.la _icalmapi.la
-noinst_LTLIBRARIES = _libcommon.la _archiver.la _libfreebusy.la _RecurrenceState.la
+pyexec_LTLIBRARIES = _MAPICore.la _inetmapi.la _icalmapi.la _libfreebusy.la
+noinst_LTLIBRARIES = _libcommon.la _archiver.la _RecurrenceState.la
 noinst_DATA = libkcpyconv.ldd libkcpydirector.ldd \
 	_MAPICore.ldd _inetmapi.ldd _icalmapi.ldd \
 	_libcommon.ldd _archiver.ldd _libfreebusy.ldd _RecurrenceState.ldd
@@ -18,17 +18,21 @@ CLEANFILES = ${noinst_DATA}
 AM_CPPFLAGS = ${ZCPPFLAGS} $(DEBUGFLAGS) \
 	-I${top_srcdir}/mapi4linux/include -I${top_srcdir}/provider/common \
 	-I${top_srcdir}/common -I${top_srcdir}/m4lcommon \
-	$(PYTHON_INCLUDES) -I${top_srcdir}/swig -w \
+	${PYTHON_CFLAGS} -I${top_srcdir}/swig -w \
 	-DSWIG_PYTHON_OUTPUT_TUPLE -DSWIG_TYPE_TABLE=MAPI
+AM_CXXFLAGS = ${ZCXXFLAGS} -fvisibility=default
+python_SYFLAGS = -Wl,--version-script=python.sym
 
 libkcpyconv_la_SOURCES = conversion.cpp
-libkcpyconv_la_LDFLAGS = ${AM_LDFLAGS} -Wl,--version-script=python.sym
+libkcpyconv_la_LDFLAGS = ${AM_LDFLAGS} ${python_SYFLAGS${NO_VSYM}} \
+	-release ${PYTHON_VERSION}
 libkcpyconv_la_LIBADD  = ${PYTHON_LIBS} \
 	${top_builddir}/libmapi.la
 EXTRA_libkcpyconv_la_DEPENDENCIES = python.sym
 
 libkcpydirector_la_SOURCES = ../director_util.cpp
-libkcpydirector_la_LDFLAGS = ${AM_LDFLAGS} -Wl,--version-script=python.sym
+libkcpydirector_la_LDFLAGS = ${AM_LDFLAGS} ${python_SYFLAGS${NO_VSYM}} \
+	-release ${PYTHON_VERSION}
 libkcpydirector_la_LIBADD  = -lpthread
 EXTRA_libkcpydirector_la_DEPENDENCIES = python.sym
 
@@ -83,7 +87,7 @@ _RecurrenceState_la_LIBADD = libkcpyconv.la \
 	$(PROG_LIBS) $(PYTHON_LIBS)
 
 _libfreebusy_la_CPPFLAGS = ${AM_CPPFLAGS} -I${top_srcdir}/libfreebusy
-_libfreebusy_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version -rpath '$(libdir)'
+_libfreebusy_la_LDFLAGS = ${AM_LDFLAGS} -module -avoid-version
 _libfreebusy_la_LIBADD = libkcpyconv.la ${top_builddir}/libmapi.la \
 	${top_builddir}/libkcfreebusy.la \
 	${top_builddir}/libkcmapi.la \
@@ -130,9 +134,9 @@ _RecurrenceState_la_SOURCES = RecurrenceState_wrap.cxx
 _libfreebusy_la_SOURCES = libfreebusy_wrap.cxx libfreebusy_conv.h libfreebusy_conv.cpp
 
 
-EXTRA_DIST = helpers_python.i setup.py $(BUILT_SOURCES) MAPICore.py inetmapi.py icalmapi.py MAPI/Defs.py  MAPI/__init__.py  MAPI/Struct.py  MAPI/Tags.py  MAPI/Time.py MAPI/Util/__init__.py MAPI/Util/Generators.py MAPI/Util/Iterators.py MAPI/Util/AddressBook.py MAPI/Util/codepage.py archiver_python.i
+EXTRA_DIST = helpers_python.i setup.py $(BUILT_SOURCES) MAPICore.py inetmapi.py icalmapi.py libfreebusy.py MAPI/Defs.py  MAPI/__init__.py  MAPI/Struct.py  MAPI/Tags.py  MAPI/Time.py MAPI/Util/__init__.py MAPI/Util/Generators.py MAPI/Util/Iterators.py MAPI/Util/AddressBook.py MAPI/Util/codepage.py archiver_python.i
 datadir = ${pythondir}
-data_DATA = MAPICore.py inetmapi.py icalmapi.py
+data_DATA = MAPICore.py inetmapi.py icalmapi.py libfreebusy.py
 noinst_datadir = libcommon.py RecurrenceState.py
 
 

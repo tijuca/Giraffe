@@ -14,7 +14,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
+#include <utility>
 #include <kopano/platform.h>
 #include <kopano/memory.hpp>
 #include "ECArchiveAwareMsgStore.h"
@@ -24,25 +25,27 @@
 
 using namespace KCHL;
 
-ECArchiveAwareMsgStore::ECArchiveAwareMsgStore(char *lpszProfname, LPMAPISUP lpSupport, WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags, BOOL fIsSpooler, BOOL fIsDefaultStore, BOOL bOfflineStore)
-: ECMsgStore(lpszProfname, lpSupport, lpTransport, fModify, ulProfileFlags, fIsSpooler, fIsDefaultStore, bOfflineStore)
+ECArchiveAwareMsgStore::ECArchiveAwareMsgStore(const char *lpszProfname,
+    IMAPISupport *lpSupport, WSTransport *lpTransport, BOOL fModify,
+    ULONG ulProfileFlags, BOOL fIsSpooler, BOOL fIsDefaultStore,
+    BOOL bOfflineStore) :
+	ECMsgStore(lpszProfname, lpSupport, lpTransport, fModify,
+	    ulProfileFlags, fIsSpooler, fIsDefaultStore, bOfflineStore)
 { }
 
-HRESULT ECArchiveAwareMsgStore::Create(char *lpszProfname, LPMAPISUP lpSupport, WSTransport *lpTransport, BOOL fModify, ULONG ulProfileFlags, BOOL fIsSpooler, BOOL fIsDefaultStore, BOOL bOfflineStore, ECMsgStore **lppECMsgStore)
+HRESULT ECArchiveAwareMsgStore::Create(const char *lpszProfname,
+    IMAPISupport *lpSupport, WSTransport *lpTransport, BOOL fModify,
+    ULONG ulProfileFlags, BOOL fIsSpooler, BOOL fIsDefaultStore,
+    BOOL bOfflineStore, ECMsgStore **lppECMsgStore)
 {
-	HRESULT hr = hrSuccess;
-
-	ECArchiveAwareMsgStore *lpStore = new ECArchiveAwareMsgStore(lpszProfname, lpSupport, lpTransport, fModify, ulProfileFlags, fIsSpooler, fIsDefaultStore, bOfflineStore);
-
-	hr = lpStore->QueryInterface(IID_ECMsgStore, (void **)lppECMsgStore);
-
-	if(hr != hrSuccess)
-		delete lpStore;
-
-	return hr;
+	return alloc_wrap<ECArchiveAwareMsgStore>(lpszProfname, lpSupport,
+	       lpTransport, fModify, ulProfileFlags, fIsSpooler, fIsDefaultStore,
+	       bOfflineStore).as(IID_ECMsgStore, lppECMsgStore);
 }
 
-HRESULT ECArchiveAwareMsgStore::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk)
+HRESULT ECArchiveAwareMsgStore::OpenEntry(ULONG cbEntryID,
+    const ENTRYID *lpEntryID, const IID *lpInterface, ULONG ulFlags,
+    ULONG *lpulObjType, IUnknown **lppUnk)
 {
 	// By default we'll try to open an archive aware message when a message is opened. The exception
 	// is when the client is not licensed to do so or when it's explicitly disabled by passing 
@@ -52,16 +55,9 @@ HRESULT ECArchiveAwareMsgStore::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, 
 	// pass an ECMessageFactory instance to our parents OpenEntry.
 	// Otherwise we'll pass an ECArchiveAwareMessageFactory instance, which will check the license
 	// create the appropriate message type. If the object turns out to be a message that is.
-
-	const bool bRawMessage = (lpInterface && memcmp(lpInterface, &IID_IECMessageRaw, sizeof(IID)) == 0);
-	HRESULT hr = hrSuccess;
-
-	if (bRawMessage)
-		hr = ECMsgStore::OpenEntry(cbEntryID, lpEntryID, &IID_IMessage, ulFlags, ECMessageFactory(), lpulObjType, lppUnk);
-	else
-		hr = ECMsgStore::OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, ECArchiveAwareMessageFactory(), lpulObjType, lppUnk);
-
-	return hr;
+	if (lpInterface != nullptr && memcmp(lpInterface, &IID_IECMessageRaw, sizeof(IID)) == 0)
+		return ECMsgStore::OpenEntry(cbEntryID, lpEntryID, &IID_IMessage, ulFlags, ECMessageFactory(), lpulObjType, lppUnk);
+	return ECMsgStore::OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, ECArchiveAwareMessageFactory(), lpulObjType, lppUnk);
 }
 
 HRESULT ECArchiveAwareMsgStore::OpenItemFromArchive(LPSPropValue lpPropStoreEIDs, LPSPropValue lpPropItemEIDs, ECMessage **lppMessage)
@@ -71,7 +67,7 @@ HRESULT ECArchiveAwareMsgStore::OpenItemFromArchive(LPSPropValue lpPropStoreEIDs
 	BinaryList			lstItemEIDs;
 	BinaryListIterator	iterStoreEID;
 	BinaryListIterator	iterIterEID;
-	object_ptr<ECMessage, IID_ECMessage> ptrArchiveMessage;
+	object_ptr<ECMessage> ptrArchiveMessage;
 
 	if (lpPropStoreEIDs == NULL || 
 		lpPropItemEIDs == NULL || 
@@ -131,10 +127,8 @@ HRESULT ECArchiveAwareMsgStore::CreateCacheBasedReorderedList(SBinaryArray sbaSt
 
 	lstStoreEIDs.splice(lstStoreEIDs.end(), lstUncachedStoreEIDs);
 	lstItemEIDs.splice(lstItemEIDs.end(), lstUncachedItemEIDs);
-
-	lplstStoreEIDs->swap(lstStoreEIDs);
-	lplstItemEIDs->swap(lstItemEIDs);
-
+	*lplstStoreEIDs = std::move(lstStoreEIDs);
+	*lplstItemEIDs = std::move(lstItemEIDs);
 	return hrSuccess;
 }
 
@@ -148,7 +142,7 @@ HRESULT ECArchiveAwareMsgStore::GetArchiveStore(LPSBinary lpStoreEID, ECMsgStore
 		return iterStore->second->QueryInterface(IID_ECMsgStore, (LPVOID*)lppArchiveStore);
 	
 	// @todo: Consolidate this with ECMSProvider::LogonByEntryID
-	UnknownPtr ptrUnknown;
+	object_ptr<IMsgStore> ptrUnknown;
 	ECMsgStorePtr ptrOnlineStore;
 	ULONG cbEntryID = 0;
 	EntryIdPtr ptrEntryID;
@@ -158,7 +152,7 @@ HRESULT ECArchiveAwareMsgStore::GetArchiveStore(LPSBinary lpStoreEID, ECMsgStore
 	bool bIsPeer = false;
 	object_ptr<WSTransport> ptrTransport;
 	ECMsgStorePtr ptrArchiveStore;
-	object_ptr<IECPropStorage, IID_IECPropStorage> ptrPropStorage;
+	object_ptr<IECPropStorage> ptrPropStorage;
 
 	hr = QueryInterface(IID_ECMsgStoreOnline, &~ptrUnknown);
 	if (hr != hrSuccess)
@@ -166,7 +160,7 @@ HRESULT ECArchiveAwareMsgStore::GetArchiveStore(LPSBinary lpStoreEID, ECMsgStore
 	hr = ptrUnknown->QueryInterface(IID_ECMsgStore, &~ptrOnlineStore);
 	if (hr != hrSuccess)
 		return hr;
-	hr = UnWrapStoreEntryID(lpStoreEID->cb, (LPENTRYID)lpStoreEID->lpb, &cbEntryID, &~ptrEntryID);
+	hr = UnWrapStoreEntryID(lpStoreEID->cb, reinterpret_cast<ENTRYID *>(lpStoreEID->lpb), &cbEntryID, &~ptrEntryID);
 	if (hr != hrSuccess)
 		return hr;
 	hr = HrGetServerURLFromStoreEntryId(cbEntryID, ptrEntryID, ServerURL, &bIsPseudoUrl);
@@ -217,6 +211,6 @@ HRESULT ECArchiveAwareMsgStore::GetArchiveStore(LPSBinary lpStoreEID, ECMsgStore
 	hr = ptrArchiveStore->QueryInterface(IID_ECMsgStore, (LPVOID*)lppArchiveStore);
 	if (hr != hrSuccess)
 		return hr;
-	m_mapStores.insert(MsgStoreMap::value_type(eid, ptrArchiveStore));
+	m_mapStores.insert({eid, ptrArchiveStore});
 	return hrSuccess;
 }

@@ -14,10 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
 #include <kopano/memory.hpp>
-#include <kopano/ECInterfaceDefs.h>
 #include "ECFreeBusySupport.h"
 
 #include "ECFreeBusyUpdate.h"
@@ -55,31 +54,15 @@ ECFreeBusySupport::~ECFreeBusySupport(void)
 
 HRESULT ECFreeBusySupport::Create(ECFreeBusySupport **lppECFreeBusySupport)
 {
-	HRESULT				hr = hrSuccess;
-	ECFreeBusySupport*	lpECFreeBusySupport = NULL;
-
-	lpECFreeBusySupport = new ECFreeBusySupport();
-
-	hr = lpECFreeBusySupport->QueryInterface(IID_ECFreeBusySupport, (void **)lppECFreeBusySupport);
-
-	if(hr != hrSuccess)
-		delete lpECFreeBusySupport;
-
-	return hr;
+	return alloc_wrap<ECFreeBusySupport>().put(lppECFreeBusySupport);
 }
 
 HRESULT ECFreeBusySupport::QueryInterface(REFIID refiid, void **lppInterface)
 {
 	REGISTER_INTERFACE2(ECFreeBusySupport, this);
 	REGISTER_INTERFACE2(ECUnknown, this);
-	if (m_ulOutlookVersion == CLIENT_VERSION_OLK2000) {
-		REGISTER_INTERFACE(IID_IFreeBusySupport, &this->m_xFreeBusySupportOutlook2000);
-		REGISTER_INTERFACE2(IUnknown, &this->m_xFreeBusySupportOutlook2000);
-	} else {
-		REGISTER_INTERFACE2(IFreeBusySupport, &this->m_xFreeBusySupport);
-		REGISTER_INTERFACE2(IUnknown, &this->m_xFreeBusySupport);
-	}
-
+	REGISTER_INTERFACE2(IFreeBusySupport, this);
+	REGISTER_INTERFACE2(IUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -94,7 +77,7 @@ HRESULT ECFreeBusySupport::Open(IMAPISession* lpMAPISession, IMsgStore* lpMsgSto
 	if (lpMsgStore) {
 		memory_ptr<SPropValue> lpPropArray;
 		HrGetOneProp(lpMsgStore, PR_DISPLAY_NAME_A, &lpPropArray);
-		TRACE_MAPI(TRACE_ENTRY, "ECFreeBusySupport::Open", "Storename=%s", (lpPropArray && lpPropArray->ulPropTag == PR_DISPLAY_NAME_A) ? lpPropArray->Value.lpszA : "Error");
+		ec_log_debug("ECFreeBusySupport::Open", "Storename=%s", (lpPropArray && lpPropArray->ulPropTag == PR_DISPLAY_NAME_A) ? lpPropArray->Value.lpszA : "Error");
 	}
 #endif
 
@@ -189,8 +172,6 @@ HRESULT ECFreeBusySupport::LoadFreeBusyData(ULONG cMax, FBUser *rgfbuser, IFreeB
 
 HRESULT ECFreeBusySupport::LoadFreeBusyUpdate(ULONG cUsers, FBUser *lpUsers, IFreeBusyUpdate **lppFBUpdate, ULONG *lpcFBUpdate, void *lpData4)
 {
-	TRACE_MAPI(TRACE_ENTRY, "ECFreeBusySupport::LoadFreeBusyUpdate", "cUsers=%d", cUsers);
-
 	HRESULT				hr = hrSuccess;
 	ULONG				cFBUpdate = 0;
 
@@ -290,7 +271,7 @@ HRESULT ECFreeBusySupport::GetDelegateInfoEx(FBUser sFBUser, unsigned int *lpulS
 	MsgStorePtr ptrStore;
 	SPropValuePtr ptrName;
 
-	if (m_lpSession->OpenEntry(sFBUser.m_cbEid, sFBUser.m_lpEid, nullptr, 0, &ulObjType, &~ptrUser) == hrSuccess && 
+	if (m_lpSession->OpenEntry(sFBUser.m_cbEid, sFBUser.m_lpEid, &iid_of(ptrUser), 0, &ulObjType, &~ptrUser) == hrSuccess &&
 	    HrGetOneProp(ptrUser, PR_ACCOUNT, &~ptrName) == hrSuccess &&
 	    HrOpenUserMsgStore(m_lpSession, ptrName->Value.LPSZ, &~ptrStore) == hrSuccess)
 	{
@@ -359,83 +340,5 @@ HRESULT ECFreeBusySupport::GetDelegateInfoEx(FBUser sFBUser, unsigned int *lpulS
 	// if an error is returned, outlook will send an email to the resource.
 	// PR_LAST_VERB_EXECUTED (ulong) will be set to 516, so outlook knows modifications need to be mailed too.
 }
-
-// IUnknown
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, QueryInterface, (REFIID, refiid), (void**, lppInterface))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, AddRef, (void))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, Release, (void))
-
-// IFreeBusySupport
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, Open, (IMAPISession*, lpMAPISession), (IMsgStore*, lpMsgStore), (BOOL, bStore))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, Close, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, LoadFreeBusyData, (ULONG, cMax), (FBUser *, rgfbuser), (IFreeBusyData **, prgfbdata), (HRESULT *, phrStatus), (ULONG *, pcRead))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, LoadFreeBusyUpdate, (ULONG, cUsers), (FBUser *, lpUsers), (IFreeBusyUpdate **, lppFBUpdate), (ULONG *, lpcFBUpdate), (void *, lpData4))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, CommitChanges, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, GetDelegateInfo, (FBUser, fbUser), (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, SetDelegateInfo, (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, AdviseFreeBusy, (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, Reload, (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, GetFBDetailSupport, (void **, lppData), (BOOL, bData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, HrHandleServerSched, (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, HrHandleServerSchedAccess, (void))
-
-BOOL __stdcall ECFreeBusySupport::xFreeBusySupport::FShowServerSched(BOOL bData)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFreeBusySupport::FShowServerSched", "");
-	METHOD_PROLOGUE_(ECFreeBusySupport , FreeBusySupport);
-	BOOL b = pThis->FShowServerSched(bData);
-	TRACE_MAPI(TRACE_RETURN, "IFreeBusySupport::FShowServerSched", "%s", (b == TRUE)?"TRUE":"FALSE");
-	return b;
-}
-
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, HrDeleteServerSched, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, GetFReadOnly, (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, SetLocalFB, (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, PrepareForSync, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, GetFBPublishMonthRange, (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, PublishRangeChanged, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, CleanTombstone, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, GetDelegateInfoEx, (FBUser, fbUser), (unsigned int *, lpData1), (unsigned int *, lpData2), (unsigned int *, lpData3))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupport, PushDelegateInfoToWorkspace, (void))
-
-// IUnknown
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, QueryInterface, (REFIID, refiid), (void**, lppInterface))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, AddRef, (void))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, Release, (void))
-
-// IFreeBusySupport
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, Open, (IMAPISession*, lpMAPISession), (IMsgStore*, lpMsgStore), (BOOL, bStore))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, Close, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, LoadFreeBusyData, (ULONG, cMax), (FBUser *, rgfbuser), (IFreeBusyData **, prgfbdata), (HRESULT *, phrStatus), (ULONG *, pcRead))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, LoadFreeBusyUpdate, (ULONG, cUsers), (FBUser *, lpUsers), (IFreeBusyUpdate **, lppFBUpdate), (ULONG *, lpcFBUpdate), (void *, lpData4))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, CommitChanges, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, GetDelegateInfo, (FBUser, fbUser), (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, SetDelegateInfo, (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, AdviseFreeBusy, (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, Reload, (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, GetFBDetailSupport, (void **, lppData), (BOOL, bData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, HrHandleServerSched, (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, HrHandleServerSchedAccess, (void))
-
-BOOL __stdcall ECFreeBusySupport::xFreeBusySupportOutlook2000::FShowServerSched(BOOL bData)
-{
-	TRACE_MAPI(TRACE_ENTRY, "IFreeBusySupportOutlook2000::FShowServerSched", "");
-	METHOD_PROLOGUE_(ECFreeBusySupport , FreeBusySupportOutlook2000);
-	BOOL b = pThis->FShowServerSched(bData);
-	TRACE_MAPI(TRACE_RETURN, "IFreeBusySupportOutlook2000::FShowServerSched", "%s", (b == TRUE)?"TRUE":"FALSE");
-	return b;
-}
-
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, HrDeleteServerSched, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, GetFReadOnly, (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, SetLocalFB, (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, PrepareForSync, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, GetFBPublishMonthRange, (void *, lpData))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, PublishRangeChanged, (void))
-/*
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, CleanTombstone, (void))
-*/
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, GetDelegateInfoEx, (FBUser, fbUser), (unsigned int *, lpData1), (unsigned int *, lpData2), (unsigned int *, lpData3))
-DEF_HRMETHOD1(TRACE_MAPI, ECFreeBusySupport, FreeBusySupportOutlook2000, PushDelegateInfoToWorkspace, (void))
 
 } /* namespace */

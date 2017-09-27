@@ -70,9 +70,9 @@ const configsetting_t* Archiver::GetConfigDefaults()
 		{ "auto_attach_writable",	"yes" },
 
 		// Log options
-		{ "log_method",		"file" },
-		{ "log_file",		"-" },
-		{ "log_level",		"3", CONFIGSETTING_RELOADABLE },
+		{"log_method", "file", CONFIGSETTING_NONEMPTY},
+		{"log_file", "-", CONFIGSETTING_NONEMPTY},
+		{"log_level", "3", CONFIGSETTING_NONEMPTY | CONFIGSETTING_RELOADABLE},
 		{ "log_timestamp",	"yes" },
 		{ "log_buffer_size",    "0" },
 
@@ -90,11 +90,11 @@ const configsetting_t* Archiver::GetConfigDefaults()
 	return s_lpDefaults;
 }
 
-eResult Archiver::Create(auto_ptr_type *lpptrArchiver)
+eResult Archiver::Create(std::unique_ptr<Archiver> *lpptrArchiver)
 {
 	if (lpptrArchiver == NULL)
 		return InvalidParameter;
-	auto_ptr_type ptrArchiver(new(std::nothrow) ArchiverImpl);
+	std::unique_ptr<Archiver> ptrArchiver(new(std::nothrow) ArchiverImpl);
 	if (ptrArchiver == nullptr)
 		return OutOfMemory;
 	*lpptrArchiver = std::move(ptrArchiver);

@@ -18,6 +18,7 @@
 #ifndef UTIL_H
 #define UTIL_H
 
+#include <memory>
 #include <kopano/zcdefs.h>
 #include <mapix.h>
 #include <edkmdb.h>
@@ -45,12 +46,10 @@ class Util _kc_final {
 	static HRESULT	HrCopyPropertyByRef(LPSPropValue lpDest, const SPropValue *lpSrc);
 	_kc_export static HRESULT HrCopySRestriction(LPSRestriction dst, const SRestriction *src, void *base);
 	_kc_export static HRESULT  HrCopySRestriction(LPSRestriction *dst, const SRestriction *src);
-	static HRESULT	HrCopyActions(ACTIONS *lpDest, const ACTIONS *lpSrc, void *lpBase);
-	static HRESULT	HrCopyAction(ACTION *lpDest, const ACTION *lpSrc, void *lpBase);
 	static HRESULT	HrCopySRowSet(LPSRowSet lpDest, const SRowSet *lpSrc, void *lpBase);
 	_kc_export static HRESULT HrCopySRow(LPSRow dest, const SRow *src, void *base);
 	_kc_export static HRESULT HrCopyPropTagArray(const SPropTagArray *src, LPSPropTagArray *dst);
-	_kc_export static HRESULT HrCopyUnicodePropTagArray(ULONG flags, const SPropTagArray *src, LPSPropTagArray *dst);
+	_kc_export static void proptag_change_unicode(ULONG flags, SPropTagArray &);
 	_kc_export static HRESULT HrCopyBinary(ULONG size, const BYTE *src, ULONG *destsize, LPBYTE *dest, LPVOID lpBase = nullptr);
 	_kc_export static HRESULT HrCopyEntryId(ULONG size, const ENTRYID *src, ULONG *destsize, LPENTRYID *dest, LPVOID base = nullptr);
 	_kc_export static int CompareSBinary(const SBinary &, const SBinary &);
@@ -77,23 +76,8 @@ class Util _kc_final {
 	_kc_export static HRESULT hex2bin(const char *input, size_t len, ULONG *outlen, LPBYTE *output, void *parent = nullptr);
 	static HRESULT hex2bin(const char *input, size_t len, LPBYTE output);
 
-	template <size_t N>
-	static bool StrCaseCompare(const WCHAR *lpString, const WCHAR (&lpFind)[N], size_t pos = 0) {
-		return wcsncasecmp(lpString + pos, lpFind, N-1) == 0;
-	}
-
 	/* DoCopyTo/DoCopyProps functions & their helpers */
-	static HRESULT FindInterface(LPCIID lpIID, ULONG ulIIDs, LPCIID lpIIDs);
-	static HRESULT CopyStream(LPSTREAM lpSrc, LPSTREAM lpDest);
-	static HRESULT CopyRecipients(LPMESSAGE lpSrc, LPMESSAGE lpDest);
-	static HRESULT CopyInstanceIds(LPMAPIPROP lpSrc, LPMAPIPROP lpDst);
-	static HRESULT CopyAttachmentProps(LPATTACH lpSrcAttach, LPATTACH lpDestAttach, LPSPropTagArray lpExcludeProps = NULL);
 	_kc_export static HRESULT CopyAttachments(LPMESSAGE src, LPMESSAGE dst, LPSRestriction r);
-	static HRESULT CopyHierarchy(LPMAPIFOLDER lpSrc, LPMAPIFOLDER lpDest, ULONG ulFlags, ULONG ulUIParam, LPMAPIPROGRESS lpProgress);
-	static HRESULT CopyContents(ULONG ulWhat, LPMAPIFOLDER lpSrc, LPMAPIFOLDER lpDest, ULONG ulFlags, ULONG ulUIParam, LPMAPIPROGRESS lpProgress);
-	static HRESULT TryOpenProperty(ULONG ulPropType, ULONG ulSrcPropTag, LPMAPIPROP lpPropSrc, ULONG ulDestPropTag, LPMAPIPROP lpPropDest,
-								   LPSTREAM *lppSrcStream, LPSTREAM *lppDestStream);
-	static HRESULT AddProblemToArray(LPSPropProblem lpProblem, LPSPropProblemArray *lppProblems);
 	_kc_export static HRESULT DoCopyTo(LPCIID src_intf, LPVOID src_obj, ULONG ciidExclude, LPCIID rgiidExclude, const SPropTagArray *exclprop, ULONG ui_param, LPMAPIPROGRESS, LPCIID dst_intf, LPVOID dst_obj, ULONG flags, LPSPropProblemArray *);
 	_kc_export static HRESULT DoCopyProps(LPCIID src_intf, LPVOID src_obj, const SPropTagArray *inclprop, ULONG ui_param, LPMAPIPROGRESS, LPCIID dst_intf, LPVOID dst_obj, ULONG flags, LPSPropProblemArray *);
 	_kc_export static HRESULT HrCopyIMAPData(LPMESSAGE src, LPMESSAGE dst);
@@ -101,13 +85,9 @@ class Util _kc_final {
 	_kc_export static HRESULT HrGetQuotaStatus(IMsgStore *, ECQUOTA *, ECQUOTASTATUS **ret);
 	_kc_export static HRESULT HrDeleteResidualProps(LPMESSAGE dstmsg, LPMESSAGE srcmsg, LPSPropTagArray valid_props);
 	static HRESULT ValidMapiPropInterface(LPCIID lpInterface);
-	static HRESULT QueryInterfaceMapiPropOrValidFallback(LPUNKNOWN lpInObj, LPCIID lpInterface, LPUNKNOWN *lppOutObj);
-
-	static HRESULT HrFindEntryIDs(ULONG cbEID, LPENTRYID lpEID, ULONG cbEntryIDs, LPSPropValue lpEntryIDs, BOOL *lpbFound, ULONG* lpPos);
 	_kc_export static HRESULT HrDeleteAttachments(LPMESSAGE);
 	_kc_export static HRESULT HrDeleteRecipients(LPMESSAGE);
 	_kc_export static HRESULT HrDeleteMessage(IMAPISession *, IMessage *);
-	static bool FHasHTML(IMAPIProp *lpProp);
 
 	struct SBinaryLess {
 		bool operator()(const SBinary &left, const SBinary &right) const {
@@ -145,6 +125,39 @@ class Util _kc_final {
 #define RTF_FLAG_INPAR		0x0004
 #define RTF_FLAG_CLOSE		0x0008
 #define RTF_FLAG_MHTML		0x0100
+
+template<typename T> class alloc_wrap {
+	private:
+	T *obj;
+	public:
+	template<typename... ArgTp> alloc_wrap(ArgTp &&... args) :
+	    obj(new(std::nothrow) T(std::forward<ArgTp>(args)...))
+	{
+		if (obj != nullptr)
+			obj->AddRef();
+	}
+	~alloc_wrap()
+	{
+		if (obj != nullptr)
+			obj->Release();
+	}
+	template<typename U> HRESULT put(U **p)
+	{
+		if (obj == nullptr)
+			return MAPI_E_NOT_ENOUGH_MEMORY;
+		obj->AddRef(); /* what QueryInterface would have done */
+		*p = obj;
+		return hrSuccess;
+	}
+	template<typename Base> HRESULT as(const IID &iid, Base **p)
+	{
+		if (obj == nullptr)
+			return MAPI_E_NOT_ENOUGH_MEMORY;
+		return obj->QueryInterface(iid, reinterpret_cast<void **>(p));
+	}
+};
+
+#define ALLOC_WRAP_FRIEND template<typename T> friend class ::KC::alloc_wrap
 
 } /* namespace */
 

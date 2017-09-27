@@ -13,11 +13,11 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <new>
 #include <kopano/platform.h>
 #include "WSABPropStorage.h"
 #include "Mem.h"
 #include <kopano/ECGuid.h>
-#include <kopano/ECInterfaceDefs.h>
 #include "SOAPUtils.h"
 #include "WSUtil.h"
 #include <kopano/charset/convert.h>
@@ -59,7 +59,7 @@ WSABPropStorage::~WSABPropStorage()
 HRESULT WSABPropStorage::QueryInterface(REFIID refiid, void **lppInterface)
 {
 	REGISTER_INTERFACE2(WSABPropStorage, this);
-	REGISTER_INTERFACE2(IECPropStorage, &this->m_xECPropStorage);
+	REGISTER_INTERFACE2(IECPropStorage, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -67,17 +67,8 @@ HRESULT WSABPropStorage::Create(ULONG cbEntryId, LPENTRYID lpEntryId,
     KCmd *lpCmd, std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId,
     WSTransport *lpTransport, WSABPropStorage **lppPropStorage)
 {
-	HRESULT hr = hrSuccess;
-	WSABPropStorage *lpStorage = NULL;
-	
-	lpStorage = new WSABPropStorage(cbEntryId, lpEntryId, lpCmd, lpDataLock, ecSessionId, lpTransport);
-
-	hr = lpStorage->QueryInterface(IID_WSABPropStorage, (void **)lppPropStorage);
-
-	if(hr != hrSuccess)
-		delete lpStorage;
-
-	return hr;
+	return alloc_wrap<WSABPropStorage>(cbEntryId, lpEntryId, lpCmd,
+	       lpDataLock, ecSessionId, lpTransport).put(lppPropStorage);
 }
 
 HRESULT WSABPropStorage::HrReadProps(LPSPropTagArray *lppPropTags,ULONG *cValues, LPSPropValue *ppValues)
@@ -248,9 +239,8 @@ exit:
 
 HRESULT WSABPropStorage::HrSaveObject(ULONG ulFlags, MAPIOBJECT *lpsMapiObject)
 {
-	HRESULT		hr = MAPI_E_NO_SUPPORT;
+	return MAPI_E_NO_SUPPORT;
 	// TODO: this should be supported eventually
-	return hr;
 }
 
 HRESULT WSABPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
@@ -278,7 +268,9 @@ HRESULT WSABPropStorage::HrLoadObject(MAPIOBJECT **lppsMapiObject)
 	//(type,objectid)
 	AllocNewMapiObject(0, 0, 0, &mo);
 	
-	ECAllocateBuffer(sizeof(SPropValue) * sResponse.aPropVal.__size, (void **)&lpProp);
+	hr = ECAllocateBuffer(sizeof(SPropValue) * sResponse.aPropVal.__size, (void **)&lpProp);
+	if (hr != hrSuccess)
+		goto exit;
 
 	for (gsoap_size_t i = 0; i < sResponse.aPropTag.__size; ++i)
 		mo->lstAvailable.push_back(sResponse.aPropTag.__ptr[i]);
@@ -306,7 +298,7 @@ exit:
 
 IECPropStorage* WSABPropStorage::GetServerStorage()
 {
-	return &this->m_xECPropStorage;
+	return this;
 }
 
 HRESULT WSABPropStorage::LockSoap()
@@ -328,25 +320,32 @@ HRESULT WSABPropStorage::UnLockSoap()
 
 // Called when the session ID has changed
 HRESULT WSABPropStorage::Reload(void *lpParam, ECSESSIONID sessionId) {
-    WSABPropStorage *lpThis = (WSABPropStorage *)lpParam;
-    lpThis->ecSessionId = sessionId;
-        
-    return hrSuccess;
+	static_cast<WSABPropStorage *>(lpParam)->ecSessionId = sessionId;
+	return hrSuccess;
 }
-            
-// Interface IECPropStorage
-DEF_ULONGMETHOD0(WSABPropStorage, ECPropStorage, AddRef, (void))
-DEF_ULONGMETHOD0(WSABPropStorage, ECPropStorage, Release, (void))
-DEF_HRMETHOD0(WSABPropStorage, ECPropStorage, QueryInterface, (REFIID, refiid), (void**, lppInterface))
-DEF_HRMETHOD0(WSABPropStorage, ECPropStorage, HrReadProps, (LPSPropTagArray *, lppPropTags), (ULONG *, cValues), (LPSPropValue *, lppValues))
-DEF_HRMETHOD0(WSABPropStorage, ECPropStorage, HrLoadProp, (ULONG, ulObjId), (ULONG, ulPropTag), (LPSPropValue *, lppsPropValue))
-DEF_HRMETHOD0(WSABPropStorage, ECPropStorage, HrWriteProps, (ULONG, cValues), (LPSPropValue, lpValues), (ULONG, ulFlags))
-DEF_HRMETHOD0(WSABPropStorage, ECPropStorage, HrDeleteProps, (const SPropTagArray *, lpsPropTagArray))
-DEF_HRMETHOD0(WSABPropStorage, ECPropStorage, HrSaveObject, (ULONG, ulFlags), (MAPIOBJECT *, lpsMapiObject))
-DEF_HRMETHOD0(WSABPropStorage, ECPropStorage, HrLoadObject, (MAPIOBJECT **, lppsMapiObject))
 
-IECPropStorage* WSABPropStorage::xECPropStorage::GetServerStorage()
+WSABTableView::WSABTableView(ULONG ulType, ULONG ulFlags, KCmd *lpCmd,
+    std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
+    LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport) :
+	WSTableView(ulType, ulFlags, lpCmd, lpDataLock, ecSessionId, cbEntryId,
+	    lpEntryId, lpTransport, "WSABTableView")
 {
-	METHOD_PROLOGUE_(WSABPropStorage, ECPropStorage);
-	return pThis->GetServerStorage();
+	m_lpProvider = lpABLogon;
+	m_ulTableType = TABLETYPE_AB;
+}
+
+HRESULT WSABTableView::Create(ULONG ulType, ULONG ulFlags, KCmd *lpCmd,
+    std::recursive_mutex &lpDataLock, ECSESSIONID ecSessionId, ULONG cbEntryId,
+    LPENTRYID lpEntryId, ECABLogon* lpABLogon, WSTransport *lpTransport,
+    WSTableView **lppTableView)
+{
+	return alloc_wrap<WSABTableView>(ulType, ulFlags, lpCmd, lpDataLock,
+	       ecSessionId, cbEntryId, lpEntryId, lpABLogon, lpTransport)
+	       .as(IID_ECTableView, lppTableView);
+}
+
+HRESULT WSABTableView::QueryInterface(REFIID refiid, void **lppInterface)
+{
+	REGISTER_INTERFACE3(ECTableView, WSTableView, this);
+	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }

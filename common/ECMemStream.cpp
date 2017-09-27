@@ -19,10 +19,8 @@
 #include <new>
 #include <mapix.h>
 #include <kopano/ECGuid.h>
-#include <kopano/ECInterfaceDefs.h>
 #include <kopano/memory.hpp>
 #include "ECMemStream.h"
-#include <kopano/Trace.h>
 #include <kopano/ECDebug.h>
 #define EC_MEMBLOCK_SIZE 8192
 
@@ -60,10 +58,7 @@ ECMemBlock::~ECMemBlock()
 HRESULT	ECMemBlock::Create(const char *buffer, ULONG ulDataLen, ULONG ulFlags,
     ECMemBlock **lppStream)
 {
-	auto lpMemBlock = new(std::nothrow) ECMemBlock(buffer, ulDataLen, ulFlags);
-	if (lpMemBlock == nullptr)
-		return MAPI_E_NOT_ENOUGH_MEMORY;
-	return lpMemBlock->QueryInterface(IID_ECMemBlock, (void **)lppStream);
+	return alloc_wrap<ECMemBlock>(buffer, ulDataLen, ulFlags).put(lppStream);
 }
 
 HRESULT ECMemBlock::QueryInterface(REFIID refiid, void **lppInterface)
@@ -95,7 +90,7 @@ HRESULT ECMemBlock::WriteAt(ULONG ulPos, ULONG ulLen, const char *buffer,
 	
 	if(cbTotal < dsize) {
 		ULONG newsize = cbTotal + ((dsize/EC_MEMBLOCK_SIZE)+1)*EC_MEMBLOCK_SIZE;	// + atleast 8k
-		char *lpNew = (char *)realloc(lpCurrent, newsize);
+		auto lpNew = static_cast<char *>(realloc(lpCurrent, newsize));
 		if (lpNew == NULL)
 			return MAPI_E_NOT_ENOUGH_MEMORY;
 
@@ -165,28 +160,20 @@ HRESULT ECMemBlock::GetSize(ULONG *ulSize) const
 /*
  * ECMemStream, IStream compatible in-memory stream object
  */
-
-ECMemStream::ECMemStream(char *buffer, ULONG ulDataLen, ULONG ulFlags, CommitFunc lpCommitFunc, DeleteFunc lpDeleteFunc,
-						 void *lpParam) : ECUnknown("IStream")
+ECMemStream::ECMemStream(const char *buffer, ULONG ulDataLen, ULONG f,
+    CommitFunc cf, DeleteFunc df, void *p) :
+	ECUnknown("IStream"), lpCommitFunc(cf), lpDeleteFunc(df), lpParam(p),
+	ulFlags(f)
 {
-	this->liPos.QuadPart = 0;
 	ECMemBlock::Create(buffer, ulDataLen, ulFlags, &this->lpMemBlock);
-	this->lpCommitFunc = lpCommitFunc;
-	this->lpDeleteFunc = lpDeleteFunc;
-	this->lpParam = lpParam;
-	this->ulFlags = ulFlags;
 }
 
-ECMemStream::ECMemStream(ECMemBlock *lpMemBlock, ULONG ulFlags, CommitFunc lpCommitFunc, DeleteFunc lpDeleteFunc,
-						 void *lpParam) : ECUnknown("IStream")
+ECMemStream::ECMemStream(ECMemBlock *mb, ULONG f, CommitFunc cf,
+    DeleteFunc df, void *p) :
+	ECUnknown("IStream"), lpMemBlock(mb), lpCommitFunc(cf),
+	lpDeleteFunc(df), lpParam(p), ulFlags(f)
 {
-	this->liPos.QuadPart = 0;
-	this->lpMemBlock = lpMemBlock;
 	lpMemBlock->AddRef();
-	this->lpCommitFunc = lpCommitFunc;
-	this->lpDeleteFunc = lpDeleteFunc;
-	this->lpParam = lpParam;
-	this->ulFlags = ulFlags;
 }
 
 ECMemStream::~ECMemStream()
@@ -202,9 +189,9 @@ ECMemStream::~ECMemStream()
 
 HRESULT ECMemStream::QueryInterface(REFIID refiid, void **lppInterface)
 {
-	REGISTER_INTERFACE2(IStream, &this->m_xStream);
-	REGISTER_INTERFACE2(ISequentialStream, &this->m_xStream);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xStream);
+	REGISTER_INTERFACE2(IStream, this);
+	REGISTER_INTERFACE2(ISequentialStream, this);
+	REGISTER_INTERFACE2(IUnknown, this);
 	REGISTER_INTERFACE2(ECMemStream, this);
 	REGISTER_INTERFACE2(ECUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
@@ -226,19 +213,15 @@ ULONG ECMemStream::Release()
 HRESULT	ECMemStream::Create(char *buffer, ULONG ulDataLen, ULONG ulFlags, CommitFunc lpCommitFunc, DeleteFunc lpDeleteFunc,
 							void *lpParam, ECMemStream **lppStream)
 {
-	auto lpStream = new(std::nothrow) ECMemStream(buffer, ulDataLen, ulFlags, lpCommitFunc, lpDeleteFunc, lpParam);
-	if (lpStream == nullptr)
-		return MAPI_E_NOT_ENOUGH_MEMORY;
-	return lpStream->QueryInterface(IID_ECMemStream, (void **)lppStream);
+	return alloc_wrap<ECMemStream>(buffer, ulDataLen, ulFlags,
+	       lpCommitFunc, lpDeleteFunc, lpParam).put(lppStream);
 }
 
 HRESULT	ECMemStream::Create(ECMemBlock *lpMemBlock, ULONG ulFlags, CommitFunc lpCommitFunc, DeleteFunc lpDeleteFunc,
 							void *lpParam, ECMemStream **lppStream)
 {
-	auto lpStream = new(std::nothrow) ECMemStream(lpMemBlock, ulFlags, lpCommitFunc, lpDeleteFunc, lpParam);
-	if (lpStream == nullptr)
-		return MAPI_E_NOT_ENOUGH_MEMORY;
-	return lpStream->QueryInterface(IID_ECMemStream, (void **)lppStream);
+	return alloc_wrap<ECMemStream>(lpMemBlock, ulFlags, lpCommitFunc,
+	       lpDeleteFunc, lpParam).put(lppStream);
 }
 
 HRESULT ECMemStream::Read(void *pv, ULONG cb, ULONG *pcbRead)
@@ -398,11 +381,8 @@ HRESULT ECMemStream::Revert()
 /* we don't support locking ! */
 HRESULT ECMemStream::LockRegion(ULARGE_INTEGER libOffset, ULARGE_INTEGER cb, DWORD dwLockType)
 {
-	HRESULT hr = STG_E_INVALIDFUNCTION;
-
-	hr=hrSuccess; //hack for loadsim
-
-	return hr;
+	/* return STG_E_INVALIDFUNCTION; */
+	return hrSuccess; /* hack for loadsim */
 }
 
 HRESULT ECMemStream::UnlockRegion(ULARGE_INTEGER libOffset, ULARGE_INTEGER cb, DWORD dwLockType)
@@ -457,20 +437,5 @@ char* ECMemStream::GetBuffer()
 {
 	return this->lpMemBlock->GetBuffer();
 }
-
-DEF_ULONGMETHOD1(TRACE_MAPI, ECMemStream, Stream, AddRef, (void))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECMemStream, Stream, Release, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, QueryInterface, (REFIID, refiid), (LPVOID *, lppInterface))
-DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, Read, (void *, pv), (ULONG, cb), (ULONG *, pcbRead))
-DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, Write, (const void *, pv), (ULONG, cb), (ULONG *, pcbWritten))
-DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, Seek, (LARGE_INTEGER, dlibmove), (DWORD, dwOrigin), (ULARGE_INTEGER *, plibNewPosition))
-DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, SetSize, (ULARGE_INTEGER, libNewSize))
-DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, CopyTo, (IStream *, pstm), (ULARGE_INTEGER, cb), (ULARGE_INTEGER *, pcbRead), (ULARGE_INTEGER *, pcbWritten))
-DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, Commit, (DWORD, grfCommitFlags))
-DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, Revert, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, LockRegion, (ULARGE_INTEGER, libOffset), (ULARGE_INTEGER, cb), (DWORD, dwLockType))
-DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, UnlockRegion, (ULARGE_INTEGER, libOffset), (ULARGE_INTEGER, cb), (DWORD, dwLockType))
-DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, Stat, (STATSTG *, pstatstg), (DWORD, grfStatFlag))
-DEF_HRMETHOD1(TRACE_MAPI, ECMemStream, Stream, Clone, (IStream **, ppstm))
 
 } /* namespace */

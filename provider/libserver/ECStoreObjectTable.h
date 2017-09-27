@@ -18,6 +18,7 @@
 #ifndef ECSTORE_OBJECTTABLE_H
 #define ECSTORE_OBJECTTABLE_H
 
+#include <kopano/Util.h>
 #include "soapH.h"
 #include "ECDatabase.h"
 
@@ -63,9 +64,8 @@ public:
 	// you either lock the passed arguments or all arguments are from the local stack.
 
 	static ECRESULT CopyEmptyCellToSOAPPropVal(struct soap *soap, unsigned int ulPropTag, struct propVal *lpPropVal);
-
-	static ECRESULT QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit);
-	static ECRESULT QueryRowData(ECGenericObjectTable *lpThis, struct soap *soap, ECSession *lpSession, ECObjectTableList* lpRowList, struct propTagArray *lpsPropTagArray, void* lpObjectData, struct rowSet **lppRowSet, bool bCacheTableData, bool bTableLimit, bool bSubObjects);
+	static ECRESULT QueryRowData(ECGenericObjectTable *, struct soap *, ECSession *, ECObjectTableList *, struct propTagArray *, const void *priv, struct rowSet **, bool cache_table_data, bool table_limit);
+	static ECRESULT QueryRowData(ECGenericObjectTable *, struct soap *, ECSession *, ECObjectTableList *, struct propTagArray *, const void *priv, struct rowSet **, bool cache_table_data, bool table_limit, bool sub_objects);
 
 protected:
 	virtual ECRESULT AddRowKey(ECObjectTableList* lpRows, unsigned int *lpulLoaded, unsigned int ulFlags, bool bInitialLoad, bool bOverride, struct restrictTable *lpOverride);
@@ -80,6 +80,7 @@ private:
 
 	unsigned int ulPermission = 0;
 	bool fPermissionRead = false;
+	ALLOC_WRAP_FRIEND;
 };
 
 ECRESULT GetDeferredTableUpdates(ECDatabase *lpDatabase, unsigned int ulFolderId, std::list<unsigned int> *lpDeferred);

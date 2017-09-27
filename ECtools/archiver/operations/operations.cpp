@@ -63,15 +63,10 @@ HRESULT ArchiveOperationBase::GetRestriction(LPMAPIPROP lpMapiProp, LPSRestricti
 	PROPMAP_NAMED_ID(FLAGS, PT_LONG, PSETID_Archive, dispidFlags)
 	PROPMAP_INIT(lpMapiProp)
 
-	if (lppRestriction == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exitpm;
-	}
-
-	if (m_ulAge < 0) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exitpm;
-	}
+	if (lppRestriction == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+	if (m_ulAge < 0)
+		return MAPI_E_NOT_FOUND;
 
 	li.LowPart = m_ftCurrent.dwLowDateTime;
 	li.HighPart = m_ftCurrent.dwHighDateTime;
@@ -164,7 +159,7 @@ HRESULT ArchiveOperationBaseEx::ProcessEntry(LPMAPIFOLDER lpFolder, ULONG cProps
 		
 		if (nResult != 0) {
 			Logger()->Log(EC_LOGLEVEL_DEBUG, "Leaving folder (%s)", bin2hex(m_ptrCurFolderEntryId->Value.bin.cb, m_ptrCurFolderEntryId->Value.bin.lpb).c_str());
-			Logger()->SetFolder(_T(""));
+			Logger()->SetFolder(KC_T(""));
 			hr = LeaveFolder();
 			if (hr != hrSuccess) {
 				Logger()->Log(EC_LOGLEVEL_FATAL, "Failed to leave folder. (hr=%s)", stringify(hr, true).c_str());
@@ -174,32 +169,35 @@ HRESULT ArchiveOperationBaseEx::ProcessEntry(LPMAPIFOLDER lpFolder, ULONG cProps
 			bReloadFolder = true;
 		}
 	}
-	
-	if (m_ptrCurFolderEntryId == nullptr || bReloadFolder) {
-		SPropValuePtr ptrPropValue;
-        
-		Logger()->Log(EC_LOGLEVEL_DEBUG, "Opening folder (%s)", bin2hex(lpFolderEntryId->Value.bin.cb, lpFolderEntryId->Value.bin.lpb).c_str());
-		hr = lpFolder->OpenEntry(lpFolderEntryId->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpFolderEntryId->Value.bin.lpb), &m_ptrCurFolder.iid(), MAPI_BEST_ACCESS | fMapiDeferredErrors, &ulType, &~m_ptrCurFolder);
-		if (hr != hrSuccess) {
-			Logger()->Log(EC_LOGLEVEL_FATAL, "Failed to open folder. (hr=%s)", stringify(hr, true).c_str());
-			return hr;
-		}
-		hr = MAPIAllocateBuffer(sizeof(SPropValue), &~m_ptrCurFolderEntryId);
-		if (hr != hrSuccess)
-			return hr;
-		hr = Util::HrCopyProperty(m_ptrCurFolderEntryId, lpFolderEntryId, m_ptrCurFolderEntryId);
-		if (hr != hrSuccess)
-			return hr;
-		if (HrGetOneProp(m_ptrCurFolder, PR_DISPLAY_NAME, &~ptrPropValue) == hrSuccess)
-			Logger()->SetFolder(ptrPropValue->Value.LPSZ);
-		else
-			Logger()->SetFolder(_T("<Unnamed>"));
 
-		hr = EnterFolder(m_ptrCurFolder);
-		if (hr != hrSuccess) {
-			Logger()->Log(EC_LOGLEVEL_FATAL, "Failed to enter folder. (hr=%s)", stringify(hr, true).c_str());
-			return hr;
-		}
+	if (m_ptrCurFolderEntryId != nullptr && !bReloadFolder)
+		return DoProcessEntry(cProps, lpProps);
+
+	SPropValuePtr ptrPropValue;
+	Logger()->Log(EC_LOGLEVEL_DEBUG, "Opening folder (%s)", bin2hex(lpFolderEntryId->Value.bin.cb, lpFolderEntryId->Value.bin.lpb).c_str());
+	hr = lpFolder->OpenEntry(lpFolderEntryId->Value.bin.cb,
+	     reinterpret_cast<ENTRYID *>(lpFolderEntryId->Value.bin.lpb),
+	     &iid_of(m_ptrCurFolder), MAPI_BEST_ACCESS | fMapiDeferredErrors,
+	     &ulType, &~m_ptrCurFolder);
+	if (hr != hrSuccess) {
+		Logger()->Log(EC_LOGLEVEL_FATAL, "Failed to open folder. (hr=%s)", stringify(hr, true).c_str());
+		return hr;
+	}
+	hr = MAPIAllocateBuffer(sizeof(SPropValue), &~m_ptrCurFolderEntryId);
+	if (hr != hrSuccess)
+		return hr;
+	hr = Util::HrCopyProperty(m_ptrCurFolderEntryId, lpFolderEntryId, m_ptrCurFolderEntryId);
+	if (hr != hrSuccess)
+		return hr;
+	if (HrGetOneProp(m_ptrCurFolder, PR_DISPLAY_NAME, &~ptrPropValue) == hrSuccess)
+		Logger()->SetFolder(ptrPropValue->Value.LPSZ);
+	else
+		Logger()->SetFolder(KC_T("<Unnamed>"));
+
+	hr = EnterFolder(m_ptrCurFolder);
+	if (hr != hrSuccess) {
+		Logger()->Log(EC_LOGLEVEL_FATAL, "Failed to enter folder. (hr=%s)", stringify(hr, true).c_str());
+		return hr;
 	}
 	return DoProcessEntry(cProps, lpProps);
 }

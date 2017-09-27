@@ -24,12 +24,14 @@
 #include <cerrno>
 #include <cstring>
 #include <dirent.h>
+#include <poll.h>
 #include <pwd.h>
 #include <sys/stat.h>
 #include <mapidefs.h>
 #include <mapitags.h>
 #include <kopano/lockhelper.hpp>
 #include <kopano/UnixUtil.h>
+#include <kopano/memory.hpp>
 #include "ECSession.h"
 #include "ECSessionManager.h"
 #include "ECUserManagement.h"
@@ -49,6 +51,8 @@
 #else
 #define WHITESPACE L" \t\n\r"
 #endif
+
+using namespace std;
 
 namespace KC {
 
@@ -194,7 +198,7 @@ void BTSession::RecordRequest(struct soap* soap)
 	scoped_lock lock(m_hRequestStats);
 	m_strLastRequestURL = soap->endpoint;
 	m_ulLastRequestPort = soap->port;
-	if (soap->proxy_from && ((SOAPINFO*)soap->user)->bProxy)
+	if (soap->proxy_from != nullptr && soap_info(soap)->bProxy)
 		m_strProxyHost = soap->host;
 	++m_ulRequests;
 }
@@ -296,8 +300,6 @@ ECSession::~ECSession()
  */
 ECRESULT ECSession::Shutdown(unsigned int ulTimeout)
 {
-	ECRESULT er = erSuccess;
-
 	/* Shutdown blocking calls for this session on our session group */
 	if (m_lpSessionGroup != nullptr)
 		m_lpSessionGroup->ShutdownSession(this);
@@ -309,8 +311,8 @@ ECRESULT ECSession::Shutdown(unsigned int ulTimeout)
 			break;
 	lk.unlock();
 	if (IsLocked())
-		er = KCERR_TIMEOUT;
-	return er;
+		return KCERR_TIMEOUT;
+	return erSuccess;
 }
 
 ECRESULT ECSession::AddAdvise(unsigned int ulConnection, unsigned int ulKey, unsigned int ulEventMask)
@@ -366,11 +368,9 @@ ECRESULT ECSession::AddChangeAdvise(unsigned int ulConnection, notifySyncState *
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != hrSuccess)
 		goto exit;
-
-	if (lpDatabase->GetNumRows(lpDBResult) == 0)
+	if (lpDBResult.get_num_rows() == 0)
 		goto exit;
-
-    lpDBRow = lpDatabase->FetchRow(lpDBResult);
+	lpDBRow = lpDBResult.fetch_row();
 	if (lpDBRow == NULL || lpDBRow[0] == NULL) {
 		er = KCERR_DATABASE_ERROR;
 		ec_log_err("ECSession::AddChangeAdvise(): row or column null");
@@ -536,12 +536,11 @@ void ECSession::GetClientApp(std::string *lpstrClientApp)
  */
 ECRESULT ECSession::GetObjectFromEntryId(const entryId *lpEntryId, unsigned int *lpulObjId, unsigned int *lpulEidFlags)
 {
-	ECRESULT er;
 	unsigned int ulObjId = 0;
 
 	if (lpEntryId == NULL || lpulObjId == NULL)
 		return KCERR_INVALID_PARAMETER;
-	er = m_lpSessionManager->GetCacheManager()->GetObjectFromEntryId(lpEntryId, &ulObjId);
+	auto er = m_lpSessionManager->GetCacheManager()->GetObjectFromEntryId(lpEntryId, &ulObjId);
 	if (er != erSuccess)
 		return er;
 	*lpulObjId = ulObjId;
@@ -562,25 +561,21 @@ ECRESULT ECSession::GetObjectFromEntryId(const entryId *lpEntryId, unsigned int 
 
 ECRESULT ECSession::LockObject(unsigned int ulObjId)
 {
-	ECRESULT er = erSuccess;
 	scoped_lock lock(m_hLocksLock);
-
-	auto res = m_mapLocks.insert(LockMap::value_type(ulObjId, ECObjectLock()));
+	auto res = m_mapLocks.insert({ulObjId, {}});
 	if (res.second == true)
-		er = m_lpSessionManager->GetLockManager()->LockObject(ulObjId, m_sessionID, &res.first->second);
-
-	return er;
+		return m_lpSessionManager->GetLockManager()->LockObject(ulObjId, m_sessionID, &res.first->second);
+	return erSuccess;
 }
 
 ECRESULT ECSession::UnlockObject(unsigned int ulObjId)
 {
-	ECRESULT er;
 	scoped_lock lock(m_hLocksLock);
 
 	auto i = m_mapLocks.find(ulObjId);
 	if (i == m_mapLocks.cend())
 		return erSuccess;
-	er = i->second.Unlock();
+	auto er = i->second.Unlock();
 	if (er == erSuccess)
 		m_mapLocks.erase(i);
 	return er;
@@ -742,25 +737,23 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 	bool			allowLocalUsers = false;
 	int				pid = 0;
 	char			*ptr = NULL;
-	char			*localAdminUsers = NULL;
+	std::unique_ptr<char, KCHL::cstdlib_deleter> localAdminUsers;
 
     if (!lpszName)
     {
 		ec_log_err("Invalid argument \"lpszName\" in call to ECAuthSession::ValidateUserSocket()");
-		er = KCERR_INVALID_PARAMETER;
-		goto exit;
+		return KCERR_INVALID_PARAMETER;
     }
 	if (!lpszImpersonateUser) {
 		ec_log_err("Invalid argument \"lpszImpersonateUser\" in call to ECAuthSession::ValidateUserSocket()");
-		er = KCERR_INVALID_PARAMETER;
-		goto exit;
+		return KCERR_INVALID_PARAMETER;
 	}
 	p = m_lpSessionManager->GetConfig()->GetSetting("allow_local_users");
 	if (p != nullptr && strcasecmp(p, "yes") == 0)
 		allowLocalUsers = true;
 
 	// Authentication stage
-	localAdminUsers = strdup(m_lpSessionManager->GetConfig()->GetSetting("local_admin_users"));
+	localAdminUsers.reset(strdup(m_lpSessionManager->GetConfig()->GetSetting("local_admin_users")));
 
 	struct passwd pwbuf;
 	struct passwd *pw;
@@ -771,10 +764,8 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 	unsigned int cr_len;
 
 	cr_len = sizeof(struct ucred);
-	if(getsockopt(socket, SOL_SOCKET, SO_PEERCRED, &cr, &cr_len) != 0 || cr_len != sizeof(struct ucred)) {
-		er = KCERR_LOGON_FAILED;
-		goto exit;
-	}
+	if (getsockopt(socket, SOL_SOCKET, SO_PEERCRED, &cr, &cr_len) != 0 || cr_len != sizeof(struct ucred))
+		return KCERR_LOGON_FAILED;
 
 	uid = cr.uid; // uid is the uid of the user that is connecting
 	pid = cr.pid;
@@ -782,10 +773,8 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 #ifdef HAVE_GETPEEREID
 	gid_t gid;
 
-	if (getpeereid(socket, &uid, &gid)) {
-		er = KCERR_LOGON_FAILED;
-		goto exit;
-	}
+	if (getpeereid(socket, &uid, &gid) != 0)
+		return KCERR_LOGON_FAILED;
 #else // HAVE_GETPEEREID
 #error I have no way to find out the remote user and I want to cry
 #endif // HAVE_GETPEEREID
@@ -808,7 +797,7 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 		// User connected as himself
 		goto userok;
 
-	p = strtok_r(localAdminUsers, WHITESPACE, &ptr);
+	p = strtok_r(localAdminUsers.get(), WHITESPACE, &ptr);
 
 	while (p) {
 	    pw = NULL;
@@ -822,26 +811,20 @@ ECRESULT ECAuthSession::ValidateUserSocket(int socket, const char* lpszName, con
 			goto userok;
 		p = strtok_r(NULL, WHITESPACE, &ptr);
 	}
-	er = KCERR_LOGON_FAILED;
-	goto exit;
+	return KCERR_LOGON_FAILED;
 
 userok:
     // Check whether user exists in the user database
 	er = m_lpUserManagement->ResolveObjectAndSync(OBJECTCLASS_USER, lpszName, &m_ulUserID);
 	if (er != erSuccess)
-	    goto exit;
-
+		return er;
 	er = ProcessImpersonation(lpszImpersonateUser);
 	if (er != erSuccess)
-		goto exit;
-
+		return er;
 	m_bValidated = true;
 	m_ulValidationMethod = METHOD_SOCKET;
 	m_ulConnectingPid = pid;
-
-exit:
-	free(localAdminUsers);
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ECAuthSession::ValidateUserCertificate(struct soap* soap, const char* lpszName, const char* lpszImpersonateUser)
@@ -856,30 +839,27 @@ ECRESULT ECAuthSession::ValidateUserCertificate(struct soap* soap, const char* l
 	std::unique_ptr<DIR, fs_deleter> dh;
 	if (!soap) {
 		ec_log_err("Invalid argument \"soap\" in call to ECAuthSession::ValidateUserCertificate()");
-		er = KCERR_INVALID_PARAMETER;
-		goto exit;
+		return KCERR_INVALID_PARAMETER;
 	}
 	if (!lpszName) {
 		ec_log_err("Invalid argument \"lpszName\" in call to ECAuthSession::ValidateUserCertificate()");
-		er = KCERR_INVALID_PARAMETER;
-		goto exit;
+		return KCERR_INVALID_PARAMETER;
 	}
 	if (!lpszImpersonateUser) {
 		ec_log_err("Invalid argument \"lpszImpersonateUser\" in call to ECAuthSession::ValidateUserCertificate()");
-		er = KCERR_INVALID_PARAMETER;
-		goto exit;
+		return KCERR_INVALID_PARAMETER;
 	}
 
 	if (!sslkeys_path || sslkeys_path[0] == '\0') {
 		ec_log_warn("No public keys directory defined in sslkeys_path.");
-		goto exit;
+		return KCERR_LOGON_FAILED;
 	}
 
 	cert = SSL_get_peer_certificate(soap->ssl);
 	if (!cert) {
 		// Windows client without SSL certificate
 		ec_log_info("No certificate in SSL connection.");
-		goto exit;
+		return KCERR_LOGON_FAILED;
 	}
 	pubkey = X509_get_pubkey(cert);	// need to free
 	if (!pubkey) {
@@ -995,11 +975,7 @@ ECRESULT ECAuthSession::ValidateSSOData(struct soap* soap, const char* lpszName,
 		er = ValidateSSOData_KRB5(soap, lpszName, szClientVersion, szClientApp, szClientAppVersion, szClientAppMisc, lpInput, lppOutput);
 	if (er != erSuccess)
 		return er;
-
-	er = ProcessImpersonation(lpszImpersonateUser);
-	if (er != erSuccess)
-		return er;
-	return erSuccess;
+	return ProcessImpersonation(lpszImpersonateUser);
 }
 
 #ifdef HAVE_GSSAPI
@@ -1207,9 +1183,7 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 	std::string strEncoded, strDecoded, strAnswer;
 	ssize_t bytes = 0;
 	char separator = '\\';      // get config version
-	fd_set fds;
-	int max, ret;
-	struct timeval tv;
+	struct pollfd pollfd[2] = {{m_stdout, POLLIN | POLLRDHUP}, {m_stderr, POLLIN | POLLRDHUP}};
 
 	if (!soap) {
 		ec_log_err("Invalid argument \"soap\" in call to ECAuthSession::ValidateSSOData_NTLM()");
@@ -1312,16 +1286,9 @@ ECRESULT ECAuthSession::ValidateSSOData_NTLM(struct soap* soap, const char* lpsz
 
 	memset(buffer, 0, NTLMBUFFER);
 
-	tv.tv_sec = 10;             // timeout of 10 seconds before ntlm_auth can respond too large?
-	tv.tv_usec = 0;
-
-	FD_ZERO(&fds);
-	FD_SET(m_stdout, &fds);
-	FD_SET(m_stderr, &fds);
-	max = m_stderr > m_stdout ? m_stderr : m_stdout;
-
 retry:
-	ret = select(max+1, &fds, NULL, NULL, &tv);
+	pollfd[0].revents = pollfd[1].revents = 0;
+	int ret = poll(pollfd, 2, 10 * 1000); // timeout of 10 seconds before ntlm_auth can respond too large?
 	if (ret < 0) {
 		if (errno == EINTR)
 			goto retry;
@@ -1337,11 +1304,12 @@ retry:
 	}
 
 	// stderr is optional, and always written first
-	if (FD_ISSET(m_stderr, &fds)) {
+	if (pollfd[1].revents & (POLLIN | POLLRDHUP)) {
 		// log stderr of ntlm_auth to logfile (loop?)
 		bytes = read(m_stderr, buffer, NTLMBUFFER-1);
-		if (bytes >= 0)
-			buffer[bytes] = '\0';
+		if (bytes < 0)
+			return er;
+		buffer[bytes] = '\0';
 		// print in lower level. if ntlm_auth was not installed (kerberos only environment), you won't care that ntlm_auth doesn't work.
 		// login error is returned to the client, which was expected anyway.
 		ec_log_notice(string("Received error from ntlm_auth:\n") + buffer);
@@ -1470,9 +1438,7 @@ ECRESULT ECAuthSession::ProcessImpersonation(const char* lpszImpersonateUser)
 
 size_t ECAuthSession::GetObjectSize()
 {
-	size_t ulSize = sizeof(*this);
-
-	return ulSize;
+	return sizeof(*this);
 }
 
 } /* namespace */

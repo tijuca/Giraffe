@@ -14,19 +14,24 @@ from MAPI.Struct import (
 )
 from MAPI.Defs import bin2hex
 
+from .base import Base
 from .errors import NotFoundError, DuplicateError
-from .compat import repr as _repr, fake_unicode as _unicode
+from .compat import fake_unicode as _unicode
 
 if sys.hexversion >= 0x03000000:
-    from . import utils as _utils
-    from . import server as _server
-    from . import user as _user
+    try:
+        from . import server as _server
+    except ImportError:
+        _server = sys.modules[__package__+'.server']
+    try:
+        from . import user as _user
+    except ImportError:
+        _user = sys.modules[__package__+'.user']
 else:
-    import utils as _utils
     import server as _server
     import user as _user
 
-class Group(object):
+class Group(Base):
     """Group class"""
 
     def __init__(self, name, server=None):
@@ -95,26 +100,21 @@ class Group(object):
         self._update(email=_unicode(value))
 
     @property
-    def fullname(self):
+    def fullname(self): # XXX deprecate, seems always identical to 'name'?
         return self._ecgroup.Fullname
 
     @fullname.setter
-    def fullname(self, value):
+    def fullname(self, value): # XXX deprecate
         self._update(fullname=_unicode(value))
 
     @property
     def hidden(self):
-        return self._ecgroup.IsHidden
+        """The group is hidden from the addressbook."""
+        return bool(self._ecgroup.IsHidden)
 
     @hidden.setter
     def hidden(self, value):
         self._update(hidden=value)
-
-    def prop(self, proptag):
-        return _utils.prop(self, self.mapiobj, proptag)
-
-    def props(self):
-        return _utils.props(self.mapiobj)
 
     def send_as(self):
         for u in self.server.sa.GetSendAsList(self._ecgroup.GroupID, MAPI_UNICODE):
@@ -171,6 +171,3 @@ class Group(object):
 
     def __unicode__(self):
         return u"Group('%s')" % self.name
-
-    def __repr__(self):
-        return _repr(self)

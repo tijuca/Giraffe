@@ -16,8 +16,6 @@
  *
  */
 
-?>
-<?php
 /**
 * Status codes returned by MAPI functions 
 *
@@ -35,7 +33,7 @@ define('SEVERITY_ERROR',     1);
 /* from winerror.h */ 
 
 /**
-* Function to make a error
+* Function to make an error
 */
 function make_mapi_e($code)
 {
@@ -218,7 +216,3 @@ define('SYNC_E_UNSYNCHRONIZED',                   		make_mapi_e(0x805));
 
 define('SYNC_W_PROGRESS',                         		make_mapi_s(0x820));
 define('SYNC_W_CLIENT_CHANGE_NEWER',              		make_mapi_s(0x821));
-
-
-
-?>

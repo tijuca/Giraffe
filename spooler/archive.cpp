@@ -35,12 +35,11 @@
 
 #include <kopano/Util.h>
 #include <kopano/ECDebug.h>
+#include "PyMapiPlugin.h"
 
 using namespace std;
 using namespace KC::helpers;
 using namespace KC::operations;
-
-typedef std::unique_ptr<Copier::Helper> HelperPtr;
 
 #ifdef UNICODE
 typedef std::wostringstream tostringstream;
@@ -86,7 +85,7 @@ HRESULT Archive::HrArchiveMessageForDelivery(IMessage *lpMessage)
 	ObjectEntryList lstArchives;
 	ArchiverSessionPtr ptrSession;
 	InstanceIdMapperPtr ptrMapper;
-	HelperPtr ptrHelper;
+	std::unique_ptr<Copier::Helper> ptrHelper;
 	list<pair<MessagePtr,PostSaveActionPtr> > lstArchivedMessages;
 	ArchiveResult result;
 	ObjectEntryList lstReferences;
@@ -108,7 +107,9 @@ HRESULT Archive::HrArchiveMessageForDelivery(IMessage *lpMessage)
 
 	refMsgEntry.sStoreEntryId.assign(ptrMsgProps[IDX_STORE_ENTRYID].Value.bin);
 	refMsgEntry.sItemEntryId.assign(ptrMsgProps[IDX_ENTRYID].Value.bin);
-	hr = m_ptrSession->OpenMsgStore(0, ptrMsgProps[IDX_STORE_ENTRYID].Value.bin.cb, reinterpret_cast<ENTRYID *>(ptrMsgProps[IDX_STORE_ENTRYID].Value.bin.lpb), &ptrStore.iid(), MDB_WRITE, &~ptrStore);
+	hr = m_ptrSession->OpenMsgStore(0, ptrMsgProps[IDX_STORE_ENTRYID].Value.bin.cb,
+	     reinterpret_cast<ENTRYID *>(ptrMsgProps[IDX_STORE_ENTRYID].Value.bin.lpb),
+	     &iid_of(ptrStore), MDB_WRITE, &~ptrStore);
 	if (hr != hrSuccess) {
 		ec_log_warn("Archive::HrArchiveMessageForDelivery(): OpenMsgStore failed %x", hr);
 		goto exit;
@@ -130,7 +131,9 @@ HRESULT Archive::HrArchiveMessageForDelivery(IMessage *lpMessage)
 		ec_log_debug("No archives attached to store");
 		goto exit;
 	}
-	hr = ptrStore->OpenEntry(ptrMsgProps[IDX_PARENT_ENTRYID].Value.bin.cb, reinterpret_cast<ENTRYID *>(ptrMsgProps[IDX_PARENT_ENTRYID].Value.bin.lpb), &ptrFolder.iid(), MAPI_MODIFY, &ulType, &~ptrFolder);
+	hr = ptrStore->OpenEntry(ptrMsgProps[IDX_PARENT_ENTRYID].Value.bin.cb,
+	     reinterpret_cast<ENTRYID *>(ptrMsgProps[IDX_PARENT_ENTRYID].Value.bin.lpb),
+	     &iid_of(ptrFolder), MAPI_MODIFY, &ulType, &~ptrFolder);
 	if (hr != hrSuccess) {
 		ec_log_warn("Archive::HrArchiveMessageForDelivery(): StoreHelper::OpenEntry failed %x", hr);
 		goto exit;
@@ -153,7 +156,12 @@ HRESULT Archive::HrArchiveMessageForDelivery(IMessage *lpMessage)
 	}
 
 	// First create all (mostly one) the archive messages without saving them.
-	ptrHelper.reset(new Copier::Helper(ptrSession, ec_log_get(), ptrMapper, NULL, ptrFolder));
+	ptrHelper.reset(new(std::nothrow) Copier::Helper(ptrSession,
+		ec_log_get(), ptrMapper, nullptr, ptrFolder));
+	if (ptrHelper == nullptr) {
+		hr = MAPI_E_NOT_ENOUGH_MEMORY;
+		goto exit;
+	}
 	for (const auto &arc : lstArchives) {
 		MessagePtr ptrArchivedMsg;
 		PostSaveActionPtr ptrPSAction;
@@ -164,7 +172,7 @@ HRESULT Archive::HrArchiveMessageForDelivery(IMessage *lpMessage)
 			goto exit;
 		}
 
-		lstArchivedMessages.push_back(make_pair(ptrArchivedMsg, ptrPSAction));
+		lstArchivedMessages.push_back({ptrArchivedMsg, ptrPSAction});
 	}
 
 	// Now save the messages one by one. On failure all saved messages need to be deleted.
@@ -229,7 +237,7 @@ HRESULT Archive::HrArchiveMessageForSending(IMessage *lpMessage, ArchiveResult *
 	ObjectEntryList lstArchives;
 	ArchiverSessionPtr ptrSession;
 	InstanceIdMapperPtr ptrMapper;
-	HelperPtr ptrHelper;
+	std::unique_ptr<Copier::Helper> ptrHelper;
 	list<pair<MessagePtr,PostSaveActionPtr> > lstArchivedMessages;
 	ArchiveResult result;
 	static constexpr const SizedSPropTagArray(2, sptaMessageProps) = {1, {PR_STORE_ENTRYID}};
@@ -244,7 +252,9 @@ HRESULT Archive::HrArchiveMessageForSending(IMessage *lpMessage, ArchiveResult *
 		ec_log_warn("Archive::HrArchiveMessageForSending(): GetProps failed %x", hr);
 		goto exit;
 	}
-	hr = m_ptrSession->OpenMsgStore(0, ptrMsgProps[IDX_STORE_ENTRYID].Value.bin.cb, reinterpret_cast<ENTRYID *>(ptrMsgProps[IDX_STORE_ENTRYID].Value.bin.lpb), &ptrStore.iid(), 0, &~ptrStore);
+	hr = m_ptrSession->OpenMsgStore(0, ptrMsgProps[IDX_STORE_ENTRYID].Value.bin.cb,
+	     reinterpret_cast<ENTRYID *>(ptrMsgProps[IDX_STORE_ENTRYID].Value.bin.lpb),
+	     &iid_of(ptrStore), 0, &~ptrStore);
 	if (hr != hrSuccess) {
 		ec_log_warn("Archive::HrArchiveMessageForSending(): OpenMsgStore failed %x", hr);
 		goto exit;
@@ -285,7 +295,13 @@ HRESULT Archive::HrArchiveMessageForSending(IMessage *lpMessage, ArchiveResult *
 	}
 
 	// First create all (mostly one) the archive messages without saving them.
-	ptrHelper.reset(new Copier::Helper(ptrSession, ec_log_get(), ptrMapper, NULL, MAPIFolderPtr()));	// We pass an empty MAPIFolderPtr here!
+	// We pass an empty MAPIFolderPtr here!
+	ptrHelper.reset(new(std::nothrow) Copier::Helper(ptrSession,
+		ec_log_get(), ptrMapper, nullptr, MAPIFolderPtr()));
+	if (ptrHelper == nullptr) {
+		hr = MAPI_E_NOT_ENOUGH_MEMORY;
+		goto exit;
+	}
 	for (const auto &arc : lstArchives) {
 		ArchiveHelperPtr ptrArchiveHelper;
 		MAPIFolderPtr ptrArchiveFolder;
@@ -303,7 +319,7 @@ HRESULT Archive::HrArchiveMessageForSending(IMessage *lpMessage, ArchiveResult *
 			SetErrorMessage(hr, _("Unable to get outgoing archive folder."));
 			goto exit;
 		}
-		hr = ptrArchiveFolder->CreateMessage(&ptrArchivedMsg.iid(), 0, &~ptrArchivedMsg);
+		hr = ptrArchiveFolder->CreateMessage(&iid_of(ptrArchivedMsg), 0, &~ptrArchivedMsg);
 		if (hr != hrSuccess) {
 			ec_log_err("Failed to create message in outgoing archive folder. hr=0x%08x", hr);
 			SetErrorMessage(hr, _("Unable to create archive message in outgoing archive folder."));
@@ -317,7 +333,7 @@ HRESULT Archive::HrArchiveMessageForSending(IMessage *lpMessage, ArchiveResult *
 		}
 
 		ec_log_info("Stored message in archive");
-		lstArchivedMessages.push_back(make_pair(ptrArchivedMsg, ptrPSAction));
+		lstArchivedMessages.push_back({ptrArchivedMsg, ptrPSAction});
 	}
 
 	// Now save the messages one by one. On failure all saved messages need to be deleted.
@@ -355,11 +371,21 @@ void Archive::SetErrorMessage(HRESULT hr, LPCTSTR lpszMessage)
 	LPTSTR lpszDesc;
 
 	oss << lpszMessage << endl;
-	oss << _("Error code:") << _T(" ") << convert_to<tstring>(GetMAPIErrorDescription(hr))
-		<< _T(" (") << tstringify(hr, true) << _T(")") << endl;
-
+	oss << _("Error code:") << KC_T(" ") << convert_to<tstring>(GetMAPIErrorDescription(hr))
+		<< KC_T(" (") << tstringify(hr, true) << KC_T(")") << endl;
 	if (Util::HrMAPIErrorToText(hr, &lpszDesc) == hrSuccess)
-		oss << _("Error description:") << _T(" ") << lpszDesc << endl;
-
+		oss << _("Error description:") << KC_T(" ") << lpszDesc << endl;
 	m_strErrorMessage.assign(oss.str());
 }
+
+#ifndef ENABLE_PYTHON
+PyMapiPluginFactory::PyMapiPluginFactory() {}
+PyMapiPluginFactory::~PyMapiPluginFactory() {}
+
+HRESULT PyMapiPluginFactory::create_plugin(ECConfig *, ECLogger *,
+    const char *, pym_plugin_intf **ret)
+{
+	*ret = new(std::nothrow) pym_plugin_intf;
+	return *ret != nullptr ? hrSuccess : MAPI_E_NOT_ENOUGH_MEMORY;
+}
+#endif

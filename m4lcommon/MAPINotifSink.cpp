@@ -16,6 +16,7 @@
  */
 
 #include <chrono>
+#include <new>
 #include <kopano/platform.h>
 #include <kopano/lockhelper.hpp>
 #include "MAPINotifSink.h"
@@ -24,6 +25,8 @@
 
 #include <mapi.h>
 #include <mapix.h>
+
+using namespace KCHL;
 
 namespace KC {
 
@@ -42,7 +45,7 @@ namespace KC {
  * were to start fiddling in Perl structures from our own thread, this would very probably cause
  * segmentation faults.
  */
-static HRESULT MAPICopyMem(ULONG cb, void *lpb, void *lpBase, ULONG *lpCb,
+static HRESULT MAPICopyMem(ULONG cb, const void *lpb, void *lpBase, ULONG *lpCb,
     void **lpDest)
 {
     if(lpb == NULL) {
@@ -60,7 +63,7 @@ static HRESULT MAPICopyMem(ULONG cb, void *lpb, void *lpBase, ULONG *lpCb,
 	return hrSuccess;
 }
 
-HRESULT MAPICopyString(char *lpSrc, void *lpBase, char **lpDst)
+static HRESULT MAPICopyString(const char *lpSrc, void *lpBase, char **lpDst)
 {
     if(lpSrc == NULL) {
         *lpDst = NULL;
@@ -75,7 +78,7 @@ HRESULT MAPICopyString(char *lpSrc, void *lpBase, char **lpDst)
 	return hrSuccess;
 }
 
-HRESULT MAPICopyUnicode(WCHAR *lpSrc, void *lpBase, WCHAR **lpDst)
+static HRESULT MAPICopyUnicode(const wchar_t *lpSrc, void *lpBase, wchar_t **lpDst)
 {
     if(lpSrc == NULL) {
         *lpDst = NULL;
@@ -126,106 +129,106 @@ static HRESULT CopyNotification(const NOTIFICATION *lpSrc, void *lpBase,
     lpDst->ulEventType = lpSrc->ulEventType;
     
     switch(lpSrc->ulEventType) {
-        case fnevCriticalError:
-            MAPICopyMem(lpSrc->info.err.cbEntryID, 		lpSrc->info.err.lpEntryID, 		lpBase, &lpDst->info.err.cbEntryID, 	(void**)&lpDst->info.err.lpEntryID);
-            
-            lpDst->info.err.scode =  lpSrc->info.err.scode;
-            lpDst->info.err.ulFlags = lpSrc->info.err.ulFlags;
-            
-            CopyMAPIERROR(lpSrc->info.err.lpMAPIError, lpBase, &lpDst->info.err.lpMAPIError);
-            
-            break;
-        case fnevNewMail:
-            MAPICopyMem(lpSrc->info.newmail.cbEntryID, 		lpSrc->info.newmail.lpEntryID, 		lpBase, &lpDst->info.newmail.cbEntryID, 	(void**)&lpDst->info.newmail.lpEntryID);
-            MAPICopyMem(lpSrc->info.newmail.cbParentID, 	lpSrc->info.newmail.lpParentID, 	lpBase, &lpDst->info.newmail.cbParentID, 	(void**)&lpDst->info.newmail.lpParentID);
-            
-            lpDst->info.newmail.ulFlags = lpSrc->info.newmail.ulFlags;
-			if (lpSrc->info.newmail.ulFlags&MAPI_UNICODE)
-				MAPICopyUnicode((LPWSTR)lpSrc->info.newmail.lpszMessageClass, lpBase, (LPWSTR*)&lpDst->info.newmail.lpszMessageClass);
+		case fnevCriticalError: {
+			auto &src = lpSrc->info.err;
+			auto &dst = lpDst->info.err;
+			MAPICopyMem(src.cbEntryID, src.lpEntryID, lpBase, &dst.cbEntryID, reinterpret_cast<void **>(&dst.lpEntryID));
+			dst.scode = src.scode;
+			dst.ulFlags = src.ulFlags;
+			CopyMAPIERROR(src.lpMAPIError, lpBase, &dst.lpMAPIError);
+			break;
+		}
+		case fnevNewMail: {
+			auto &src = lpSrc->info.newmail;
+			auto &dst = lpDst->info.newmail;
+			MAPICopyMem(src.cbEntryID,  src.lpEntryID,  lpBase, &dst.cbEntryID,  reinterpret_cast<void **>(&dst.lpEntryID));
+			MAPICopyMem(src.cbParentID, src.lpParentID, lpBase, &dst.cbParentID, reinterpret_cast<void **>(&dst.lpParentID));
+			dst.ulFlags = src.ulFlags;
+			if (src.ulFlags & MAPI_UNICODE)
+				MAPICopyUnicode(reinterpret_cast<const wchar_t *>(src.lpszMessageClass), lpBase, reinterpret_cast<wchar_t **>(&dst.lpszMessageClass));
 			else
-				MAPICopyString((char*)lpSrc->info.newmail.lpszMessageClass, lpBase, (char**)&lpDst->info.newmail.lpszMessageClass);
-			
-            lpDst->info.newmail.ulMessageFlags = lpSrc->info.newmail.ulMessageFlags;
-            
-            break;
+				MAPICopyString(reinterpret_cast<const char *>(src.lpszMessageClass), lpBase, reinterpret_cast<char **>(&dst.lpszMessageClass));
+			dst.ulMessageFlags = src.ulMessageFlags;
+			break;
+		}
         case fnevObjectCreated:
         case fnevObjectDeleted:
         case fnevObjectModified:
         case fnevObjectMoved:
         case fnevObjectCopied:
-        case fnevSearchComplete:
-            lpDst->info.obj.ulObjType = lpSrc->info.obj.ulObjType;
-            
-            MAPICopyMem(lpSrc->info.obj.cbEntryID, 		lpSrc->info.obj.lpEntryID, 		lpBase, &lpDst->info.obj.cbEntryID, 	(void**)&lpDst->info.obj.lpEntryID);
-            MAPICopyMem(lpSrc->info.obj.cbParentID, 	lpSrc->info.obj.lpParentID, 	lpBase, &lpDst->info.obj.cbParentID, 	(void**)&lpDst->info.obj.lpParentID);
-            MAPICopyMem(lpSrc->info.obj.cbOldID, 		lpSrc->info.obj.lpOldID, 		lpBase, &lpDst->info.obj.cbOldID, 		(void**)&lpDst->info.obj.lpOldID);
-            MAPICopyMem(lpSrc->info.obj.cbOldParentID, 	lpSrc->info.obj.lpOldParentID, 	lpBase, &lpDst->info.obj.cbOldParentID, (void**)&lpDst->info.obj.lpOldParentID);
-
-            if(lpSrc->info.obj.lpPropTagArray)           
-                MAPICopyMem(CbSPropTagArray(lpSrc->info.obj.lpPropTagArray), lpSrc->info.obj.lpPropTagArray, lpBase, NULL, (void**)&lpDst->info.obj.lpPropTagArray);
-            break;
-        case fnevTableModified:
-            lpDst->info.tab.ulTableEvent = lpSrc->info.tab.ulTableEvent;
-            lpDst->info.tab.hResult = lpSrc->info.tab.hResult;
-            hr = Util::HrCopyProperty(&lpDst->info.tab.propPrior, &lpSrc->info.tab.propPrior, lpBase);
-            if (hr != hrSuccess)
-			return hr;
-            hr = Util::HrCopyProperty(&lpDst->info.tab.propIndex, &lpSrc->info.tab.propIndex, lpBase);
-            if (hr != hrSuccess)
-			return hr;
-            if ((hr = MAPIAllocateMore(lpSrc->info.tab.row.cValues * sizeof(SPropValue), lpBase, (void **)&lpDst->info.tab.row.lpProps)) != hrSuccess)
-			return hr;
-            hr = Util::HrCopyPropertyArray(lpSrc->info.tab.row.lpProps, lpSrc->info.tab.row.cValues, lpDst->info.tab.row.lpProps, lpBase);
-            if (hr != hrSuccess)
-			return hr;
-            lpDst->info.tab.row.cValues = lpSrc->info.tab.row.cValues;
-            break;
-        case fnevStatusObjectModified:
-            MAPICopyMem(lpSrc->info.statobj.cbEntryID, 		lpSrc->info.statobj.lpEntryID, 		lpBase, &lpDst->info.statobj.cbEntryID, 	(void**)&lpDst->info.statobj.lpEntryID);
-            if ((hr = MAPIAllocateMore(lpSrc->info.statobj.cValues * sizeof(SPropValue), lpBase, (void **)&lpDst->info.statobj.lpPropVals)) != hrSuccess)
-			return hr;
-            hr = Util::HrCopyPropertyArray(lpSrc->info.statobj.lpPropVals, lpSrc->info.statobj.cValues, lpDst->info.statobj.lpPropVals, lpBase);
-            if (hr != hrSuccess)
-			return hr;
-            lpDst->info.statobj.cValues = lpSrc->info.statobj.cValues;
-            break;
+		case fnevSearchComplete: {
+			auto &src = lpSrc->info.obj;
+			auto &dst = lpDst->info.obj;
+			dst.ulObjType = src.ulObjType;
+			MAPICopyMem(src.cbEntryID,     src.lpEntryID,     lpBase, &dst.cbEntryID,     reinterpret_cast<void **>(&dst.lpEntryID));
+			MAPICopyMem(src.cbParentID,    src.lpParentID,    lpBase, &dst.cbParentID,    reinterpret_cast<void **>(&dst.lpParentID));
+			MAPICopyMem(src.cbOldID,       src.lpOldID,       lpBase, &dst.cbOldID,       reinterpret_cast<void **>(&dst.lpOldID));
+			MAPICopyMem(src.cbOldParentID, src.lpOldParentID, lpBase, &dst.cbOldParentID, reinterpret_cast<void **>(&dst.lpOldParentID));
+			if (src.lpPropTagArray != nullptr)
+				MAPICopyMem(CbSPropTagArray(src.lpPropTagArray), src.lpPropTagArray, lpBase, nullptr, reinterpret_cast<void **>(&dst.lpPropTagArray));
+			break;
+		}
+		case fnevTableModified: {
+			auto &src = lpSrc->info.tab;
+			auto &dst = lpDst->info.tab;
+			dst.ulTableEvent = src.ulTableEvent;
+			dst.hResult = src.hResult;
+			hr = Util::HrCopyProperty(&dst.propPrior, &src.propPrior, lpBase);
+			if (hr != hrSuccess)
+				return hr;
+			hr = Util::HrCopyProperty(&dst.propIndex, &src.propIndex, lpBase);
+			if (hr != hrSuccess)
+				return hr;
+			hr = MAPIAllocateMore(src.row.cValues * sizeof(SPropValue), lpBase, reinterpret_cast<void **>(&dst.row.lpProps));
+			if (hr != hrSuccess)
+				return hr;
+			hr = Util::HrCopyPropertyArray(src.row.lpProps, src.row.cValues, dst.row.lpProps, lpBase);
+			if (hr != hrSuccess)
+				return hr;
+			dst.row.cValues = src.row.cValues;
+			break;
+		}
+		case fnevStatusObjectModified: {
+			auto &src = lpSrc->info.statobj;
+			auto &dst = lpDst->info.statobj;
+			MAPICopyMem(src.cbEntryID, src.lpEntryID, lpBase, &dst.cbEntryID, reinterpret_cast<void **>(&dst.lpEntryID));
+			hr = MAPIAllocateMore(src.cValues * sizeof(SPropValue), lpBase, reinterpret_cast<void **>(&dst.lpPropVals));
+			if (hr != hrSuccess)
+				return hr;
+			hr = Util::HrCopyPropertyArray(src.lpPropVals, src.cValues, dst.lpPropVals, lpBase);
+			if (hr != hrSuccess)
+				return hr;
+			dst.cValues = src.cValues;
+			break;
+		}
 	}
 	return hrSuccess;
 }
 
 HRESULT MAPINotifSink::Create(MAPINotifSink **lppSink)
 {
-    MAPINotifSink *lpSink = new MAPINotifSink();
-
-    lpSink->AddRef();
-    
-    *lppSink = lpSink;
-    
-    return hrSuccess;
+	return alloc_wrap<MAPINotifSink>().put(lppSink);
 }
 
 MAPINotifSink::~MAPINotifSink() {
     m_bExit = true;
 	m_hCond.notify_all();
-	for (auto n : m_lstNotifs)
-		MAPIFreeBuffer(n);
-	m_lstNotifs.clear();
 }
 
 // Add a notification to the queue; Normally called as notification sink
 ULONG MAPINotifSink::OnNotify(ULONG cNotifications, LPNOTIFICATION lpNotifications)
 {
 	ULONG rc = 0;
-	LPNOTIFICATION lpNotif;
+	memory_ptr<NOTIFICATION> lpNotif;
 	ulock_normal biglock(m_hMutex);
 	for (unsigned int i = 0; i < cNotifications; ++i) {
-		if (MAPIAllocateBuffer(sizeof(NOTIFICATION), (LPVOID*)&lpNotif) != hrSuccess) {
+		if (MAPIAllocateBuffer(sizeof(NOTIFICATION), &~lpNotif) != hrSuccess) {
 			rc = 1;
 			break;
 		}
 
 		if (CopyNotification(&lpNotifications[i], lpNotif, lpNotif) == 0)
-			m_lstNotifs.push_back(lpNotif);
+			m_lstNotifs.push_back(std::move(lpNotif));
 	}
 	biglock.unlock();
 	m_hCond.notify_all();
@@ -247,27 +250,23 @@ HRESULT MAPINotifSink::GetNotifications(ULONG *lpcNotif, LPNOTIFICATION *lppNoti
 
 	ulock_normal biglock(m_hMutex);
 	if (!fNonBlock) {
-		while(m_lstNotifs.empty() && !m_bExit && (timeout == 0 || GetTimeOfDay() < now)) {
+		while (m_lstNotifs.empty() && !m_bExit && (timeout == 0 || GetTimeOfDay() < now))
 			if (timeout > 0)
 				m_hCond.wait_for(biglock, std::chrono::milliseconds(timeout));
 			else
 				m_hCond.wait(biglock);
-		}
 	}
     
-	LPNOTIFICATION lpNotifications = NULL;
-    
-	if ((hr = MAPIAllocateBuffer(sizeof(NOTIFICATION) * m_lstNotifs.size(), (void **) &lpNotifications)) == hrSuccess) {
-		for (auto n : m_lstNotifs) {
+	memory_ptr<NOTIFICATION> lpNotifications;
+	hr = MAPIAllocateBuffer(sizeof(NOTIFICATION) * m_lstNotifs.size(), &~lpNotifications);
+	if (hr == hrSuccess)
+		for (auto const &n : m_lstNotifs)
 			if (CopyNotification(n, lpNotifications, &lpNotifications[cNotifs]) == 0)
 				++cNotifs;
-			MAPIFreeBuffer(n);
-		}
-	}
 
 	m_lstNotifs.clear();
 	biglock.unlock();
-    *lppNotifications = lpNotifications;
+	*lppNotifications = lpNotifications.release();
     *lpcNotif = cNotifs;
 
     return hr;

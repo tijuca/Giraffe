@@ -50,6 +50,7 @@
 #define FIELD_NR_NAMESTR	(FIELD_NR_MAX + 2)
 #define FIELD_NR_NAMEGUID	(FIELD_NR_MAX + 3)
 
+using namespace std;
 using namespace KCHL;
 
 namespace KC {
@@ -64,12 +65,8 @@ ECRESULT GetSourceKey(unsigned int ulObjId, SOURCEKEY *lpSourceKey)
 	unsigned int cbData = 0;
 
 	er = g_lpSessionManager->GetCacheManager()->GetPropFromObject(PROP_ID(PR_SOURCE_KEY), ulObjId, NULL, &cbData, &lpData);
-	if(er != erSuccess)
-		goto exit;
-
-	*lpSourceKey = SOURCEKEY(cbData, (char *)lpData);
-
-exit:
+	if (er == erSuccess)
+		*lpSourceKey = SOURCEKEY(cbData, reinterpret_cast<const char *>(lpData));
 	s_free(nullptr, lpData);
 	return er;
 }
@@ -193,10 +190,9 @@ ECRESULT ExpandDeletedItems(ECSession *lpSession, ECDatabase *lpDatabase, ECList
 	ECCacheManager *lpCacheManager = NULL;
 	unsigned int ulParent = 0;
 	
-	if (lpSession == NULL || lpDatabase == NULL || lpsObjectList == NULL || lplstDeleteItems == NULL) {
-		er = KCERR_INVALID_PARAMETER;
-		goto exit;
-	}
+	if (lpSession == nullptr || lpDatabase == nullptr ||
+	    lpsObjectList == nullptr || lplstDeleteItems == nullptr)
+		return KCERR_INVALID_PARAMETER;
 
 	lpSessionManager = lpSession->GetSessionManager();
 	lpCacheManager = lpSessionManager->GetCacheManager();
@@ -235,8 +231,7 @@ ECRESULT ExpandDeletedItems(ECSession *lpSession, ECDatabase *lpDatabase, ECList
 		if(er != erSuccess)
 			goto exit;
 
-		while ( (lpDBRow = lpDatabase->FetchRow(lpDBResult)) )
-		{
+		while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
 			// No type or flags exist
 			if(lpDBRow[2] == NULL || lpDBRow[3] == NULL) {
 				//er = KCERR_DATABASE_ERROR;
@@ -300,9 +295,7 @@ ECRESULT ExpandDeletedItems(ECSession *lpSession, ECDatabase *lpDatabase, ECList
 		if(er != erSuccess)
 			goto exit;
 
-		while((lpDBRow = lpDatabase->FetchRow(lpDBResult)) != NULL )
-		{
-
+		while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
 			// No id, type or flags exist
 			if(lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL)
 				continue;
@@ -992,10 +985,7 @@ ECRESULT MarkStoreAsDeleted(ECSession *lpSession, ECDatabase *lpDatabase, unsign
  */
 ECRESULT DeleteObjects(ECSession *lpSession, ECDatabase *lpDatabase, unsigned int ulObjectId, unsigned int ulFlags, unsigned int ulSyncId, bool bNoTransaction, bool bCheckPermission)
 {
-	ECListInt sObjectList;
-
-	sObjectList.push_back(ulObjectId);
-
+	ECListInt sObjectList = {ulObjectId};
 	return DeleteObjects(lpSession, lpDatabase, &sObjectList, ulFlags, ulSyncId, bNoTransaction, bCheckPermission);
 }
 
@@ -1284,10 +1274,7 @@ ECRESULT UpdateFolderCount(ECDatabase *lpDatabase, unsigned int ulFolderId, unsi
 	er = lpDatabase->DoUpdate(strQuery);
 	if(er != erSuccess)
 		return er;
-	er = UpdateTProp(lpDatabase, ulPropTag, ulParentId, ulFolderId);
-	if(er != erSuccess)
-		return er;
-	return erSuccess;
+	return UpdateTProp(lpDatabase, ulPropTag, ulParentId, ulFolderId);
 }
 
 ECRESULT CheckQuota(ECSession *lpecSession, ULONG ulStoreId)
@@ -1314,7 +1301,7 @@ ECRESULT MapEntryIdToObjectId(ECSession *lpecSession, ECDatabase *lpDatabase, UL
 
 	er = RemoveStaleIndexedProp(lpDatabase, PR_ENTRYID, sEntryId.__ptr, sEntryId.__size);
 	if(er != erSuccess) {
-		ec_log_crit("ERROR: Collision detected while setting entryid. objectid=%u, entryid=%s, user=%u", ulObjId, bin2hex(sEntryId.__size, (unsigned char *)sEntryId.__ptr).c_str(), lpecSession->GetSecurity()->GetUserId());
+		ec_log_crit("ERROR: Collision detected while setting entryid. objectid=%u, entryid=%s, user=%u", ulObjId, bin2hex(sEntryId.__size, sEntryId.__ptr).c_str(), lpecSession->GetSecurity()->GetUserId());
 		return KCERR_DATABASE_ERROR;
 	}
 
@@ -1376,12 +1363,12 @@ ECRESULT ProcessSubmitFlag(ECDatabase *lpDatabase, ULONG ulSyncId, ULONG ulStore
 			ulPrevSubmitFlag = 0;
 		} else {
 			// Existing item. Check its current submit flag by looking at the outgoing queue.
-			strQuery = "SELECT hierarchy_id FROM outgoingqueue WHERE hierarchy_id=" + stringify(ulObjId) + " AND flags & " + stringify(EC_SUBMIT_MASTER) + " = 0";
+			strQuery = "SELECT hierarchy_id FROM outgoingqueue WHERE hierarchy_id=" + stringify(ulObjId) + " AND flags & " + stringify(EC_SUBMIT_MASTER) + " = 0 LIMIT 1";
 			er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 			if (er != erSuccess)
-				goto exit;
+				return er;
 			// Item is (1)/is not (0) in the outgoing queue at the moment
-			ulPrevSubmitFlag = lpDatabase->GetNumRows(lpDBResult) > 0;
+			ulPrevSubmitFlag = lpDBResult.get_num_rows() > 0;
 		}
 
 		if ((lpPropMessageFlags->Value.ul & MSGFLAG_SUBMIT) && ulPrevSubmitFlag == 0) {
@@ -1390,7 +1377,7 @@ ECRESULT ProcessSubmitFlag(ECDatabase *lpDatabase, ULONG ulSyncId, ULONG ulStore
 			strQuery = "INSERT INTO outgoingqueue (store_id, hierarchy_id, flags) VALUES("+stringify(ulStoreId)+", "+stringify(ulObjId)+"," + stringify(EC_SUBMIT_LOCAL) + ")";
 			er = lpDatabase->DoInsert(strQuery);
 			if (er != erSuccess)
-				goto exit;
+				return er;
 
 			strQuery = "UPDATE properties SET val_ulong = val_ulong | " + stringify(MSGFLAG_SUBMIT) +
 							" WHERE hierarchyid = " + stringify(ulObjId) +
@@ -1398,7 +1385,7 @@ ECRESULT ProcessSubmitFlag(ECDatabase *lpDatabase, ULONG ulSyncId, ULONG ulStore
 							" AND tag = " + stringify(PROP_ID(PR_MESSAGE_FLAGS));
 			er = lpDatabase->DoUpdate(strQuery);
 			if (er != erSuccess)
-				goto exit;
+				return er;
 
 			// The object has changed, update the cache.
 		    g_lpSessionManager->GetCacheManager()->Update(fnevObjectModified, ulObjId);
@@ -1411,7 +1398,7 @@ ECRESULT ProcessSubmitFlag(ECDatabase *lpDatabase, ULONG ulSyncId, ULONG ulStore
 			strQuery = "DELETE FROM outgoingqueue WHERE hierarchy_id = " + stringify(ulObjId);
 			er = lpDatabase->DoDelete(strQuery);
 			if (er != erSuccess)
-				goto exit;
+				return er;
 
 			strQuery = "UPDATE properties SET val_ulong = val_ulong & ~" + stringify(MSGFLAG_SUBMIT) +
 							" WHERE hierarchyid = " + stringify(ulObjId) +
@@ -1419,7 +1406,7 @@ ECRESULT ProcessSubmitFlag(ECDatabase *lpDatabase, ULONG ulSyncId, ULONG ulStore
 							" AND tag = " + stringify(PROP_ID(PR_MESSAGE_FLAGS));
 			er = lpDatabase->DoUpdate(strQuery);
 			if (er != erSuccess)
-				goto exit;
+				return er;
 
 			// The object has changed, update the cache.
 		    g_lpSessionManager->GetCacheManager()->Update(fnevObjectModified, ulObjId);
@@ -1427,9 +1414,7 @@ ECRESULT ProcessSubmitFlag(ECDatabase *lpDatabase, ULONG ulSyncId, ULONG ulStore
 			g_lpSessionManager->UpdateOutgoingTables(ECKeyTable::TABLE_ROW_DELETE, ulStoreId, ulObjId, EC_SUBMIT_LOCAL, MAPI_MESSAGE);
 		}
 	}
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT CreateNotifications(ULONG ulObjId, ULONG ulObjType, ULONG ulParentId, ULONG ulGrandParentId, bool bNewItem, propValArray *lpModProps, struct propVal *lpvCommitTime)
@@ -1570,17 +1555,15 @@ ECRESULT GetNamesFromIDs(struct soap *soap, ECDatabase *lpDatabase, struct propT
 	memset(lpsNames->__ptr, 0, sizeof(struct namedProp) * lpPropTags->__size);
 
 	for (gsoap_size_t i = 0; i < lpPropTags->__size; ++i) {
-		strQuery = "SELECT nameid, namestring, guid FROM names WHERE id=" + stringify(lpPropTags->__ptr[i]-1);
+		strQuery = "SELECT nameid, namestring, guid FROM names WHERE id=" + stringify(lpPropTags->__ptr[i]-1) + " LIMIT 1";
 
 		er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 		if(er != erSuccess)
-			goto exit;
+			return er;
 
-		if(lpDatabase->GetNumRows(lpDBResult) == 1) {
-
-			lpDBRow = lpDatabase->FetchRow(lpDBResult);
-			lpDBLen = lpDatabase->FetchRowLengths(lpDBResult);
-
+		if (lpDBResult.get_num_rows() == 1) {
+			lpDBRow = lpDBResult.fetch_row();
+			lpDBLen = lpDBResult.fetch_row_lengths();
 			if(lpDBRow != NULL) {
 				if(lpDBRow[0] != NULL) {
 					// It's an ID type
@@ -1600,9 +1583,8 @@ ECRESULT GetNamesFromIDs(struct soap *soap, ECDatabase *lpDatabase, struct propT
 					memcpy(lpsNames->__ptr[i].lpguid->__ptr, lpDBRow[2], lpDBLen[2]);
 				}
 			} else {
-				er = KCERR_DATABASE_ERROR;
 				ec_log_crit("GetNamesFromIDs(): row/col NULL");
-				goto exit;
+				return KCERR_DATABASE_ERROR;
 			}
 		} else {
 			// No entry
@@ -1611,9 +1593,7 @@ ECRESULT GetNamesFromIDs(struct soap *soap, ECDatabase *lpDatabase, struct propT
 			lpsNames->__ptr[i].lpString = NULL;
 		}
 	}
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 /**
@@ -1648,7 +1628,8 @@ ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId, unsigned i
 	
 	unsigned int ulAffected = 0;
 	unsigned int ulParent = 0;
-	
+	auto sesmgr = lpSession->GetSessionManager();
+	auto cache = sesmgr->GetCacheManager();
 	ECDatabase *lpDatabase = NULL;
 
 	er = lpSession->GetDatabase(&lpDatabase);
@@ -1672,8 +1653,7 @@ ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId, unsigned i
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess)
 		goto exit;
-
-	lpDBRow = lpDatabase->FetchRow(lpDBResult);
+	lpDBRow = lpDBResult.fetch_row();
 	if(lpDBRow == NULL || lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL || lpDBRow[3] == NULL || lpDBRow[4] == NULL) {
 		er = KCERR_DATABASE_ERROR;
 		ec_log_crit("ResetFolderCount(): row/col NULL (1)");
@@ -1698,8 +1678,7 @@ ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId, unsigned i
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if (er != erSuccess)
 		goto exit;
-
-	lpDBRow = lpDatabase->FetchRow(lpDBResult);
+	lpDBRow = lpDBResult.fetch_row();
 	if(lpDBRow == NULL || lpDBRow[0] == NULL) {
 		er = KCERR_DATABASE_ERROR;
 		ec_log_crit("ResetFolderCount(): row/col NULL (2)");
@@ -1738,8 +1717,7 @@ ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId, unsigned i
     // Trigger an assertion since in practice this should never happen
 //	assert(false);
 	g_lpStatsCollector->Increment(SCN_DATABASE_COUNTER_RESYNCS);
-
-	er = lpSession->GetSessionManager()->GetCacheManager()->GetParent(ulObjId, &ulParent);
+	er = cache->GetParent(ulObjId, &ulParent);
 	if(er != erSuccess) {
 		// No parent -> root folder. Nothing else we need to do now.
 		er = erSuccess;
@@ -1767,8 +1745,8 @@ ECRESULT ResetFolderCount(ECSession *lpSession, unsigned int ulObjId, unsigned i
         
     // Clear cache and update table entries. We do not send an object notification since the object hasn't really changed and
     // this is normally called just before opening an entry anyway, so the counters retrieved there will be ok.
-    lpSession->GetSessionManager()->GetCacheManager()->Update(fnevObjectModified, ulObjId);
-    er = lpSession->GetSessionManager()->UpdateTables(ECKeyTable::TABLE_ROW_MODIFY, 0, ulParent, ulObjId, MAPI_FOLDER);
+	cache->Update(fnevObjectModified, ulObjId);
+	er = sesmgr->UpdateTables(ECKeyTable::TABLE_ROW_MODIFY, 0, ulParent, ulObjId, MAPI_FOLDER);
     if(er != erSuccess)
     	goto exit;
     	
@@ -1813,26 +1791,24 @@ ECRESULT RemoveStaleIndexedProp(ECDatabase *lpDatabase, unsigned int ulPropTag, 
 	unsigned int ulStoreId = 0;
 	bool bStale = false;
 
-	strQuery = "SELECT hierarchyid FROM indexedproperties WHERE tag= " + stringify(PROP_ID(ulPropTag)) + " AND val_binary=" + lpDatabase->EscapeBinary(lpData, cbSize);
+	strQuery = "SELECT hierarchyid FROM indexedproperties WHERE tag= " + stringify(PROP_ID(ulPropTag)) + " AND val_binary=" + lpDatabase->EscapeBinary(lpData, cbSize) + " LIMIT 1";
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
-	    goto exit;
-	    
-    lpDBRow = lpDatabase->FetchRow(lpDBResult);
+		return er;
+	lpDBRow = lpDBResult.fetch_row();
     if(!lpDBRow || lpDBRow[0] == NULL)
-        goto exit; // Nothing there, no need to do anything
+		return er; /* Nothing there, no need to do anything */
         
     ulObjId = atoui(lpDBRow[0]);
         
     // Check if the found item is in a deleted store
     if(g_lpSessionManager->GetCacheManager()->GetStore(ulObjId, &ulStoreId, NULL) == erSuccess) {
         // Find the store
-        strQuery = "SELECT hierarchy_id FROM stores WHERE hierarchy_id = " + stringify(ulStoreId);
+        strQuery = "SELECT hierarchy_id FROM stores WHERE hierarchy_id = " + stringify(ulStoreId) + " LIMIT 1";
         er = lpDatabase->DoSelect(strQuery, &lpDBResult);
         if(er != erSuccess)
-            goto exit;
-
-        lpDBRow = lpDatabase->FetchRow(lpDBResult);
+			return er;
+        lpDBRow = lpDBResult.fetch_row();
         if (lpDBRow == nullptr || lpDBRow[0] == nullptr)
             bStale = true;
     } else {
@@ -1844,17 +1820,15 @@ ECRESULT RemoveStaleIndexedProp(ECDatabase *lpDatabase, unsigned int ulPropTag, 
         // Item is in a deleted store. This means we can delete it
         er = lpDatabase->DoDelete("DELETE FROM indexedproperties WHERE hierarchyid = " + stringify(ulObjId));
         if(er != erSuccess)
-            goto exit;
-            
+			return er;
         // Remove it from the cache
         g_lpSessionManager->GetCacheManager()->RemoveIndexData(ulPropTag, cbSize, lpData);
     }
 	else {
-		er = KCERR_COLLISION;
 		ec_log_crit("RemoveStaleIndexedProp(): caller wanted to remove the entry, but we cannot since it is in use");
+		return KCERR_COLLISION;
 	}
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT ApplyFolderCounts(ECDatabase *lpDatabase, unsigned int ulFolderId, const PARENTINFO &pi) {
@@ -1930,12 +1904,20 @@ static ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag,
     
     // See if we can get the object IDs for the passed objects from the cache
     for (const auto &s : setIds) {
-        if (g_lpSessionManager->GetCacheManager()->QueryObjectFromProp(ulTag, s.size(), reinterpret_cast<unsigned char *>(const_cast<char *>(s.data())), &ulId) == erSuccess) {
-            if(ulTag == PROP_ID(PR_SOURCE_KEY))
-                setFolders.insert(ulId);
-            else if(ulTag == PROP_ID(PR_ENTRYID)) {
-                EntryId eid(s);
-                
+		if (g_lpSessionManager->GetCacheManager()->QueryObjectFromProp(ulTag, s.size(),
+		    reinterpret_cast<unsigned char *>(const_cast<char *>(s.data())), &ulId) != erSuccess) {
+			setUncached.insert(s);
+			continue;
+		}
+		if (ulTag == PROP_ID(PR_SOURCE_KEY)) {
+			setFolders.insert(ulId);
+			continue;
+		} else if (ulTag != PROP_ID(PR_ENTRYID)) {
+			assert(false);
+			continue;
+		}
+
+		EntryId eid(s);
 		try {
 			if (eid.type() == MAPI_FOLDER)
 				setFolders.insert(ulId);
@@ -1945,15 +1927,8 @@ static ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag,
 				assert(false);
 		} catch (runtime_error &e) {
 			ec_log_err("eid.type(): %s\n", e.what());
-			assert(false);
+			return MAPI_E_CORRUPT_DATA;
 		}
-            }
-            else {
-                assert(false);
-            }
-        } else {
-            setUncached.insert(s);
-        }
     }
 
     if(!setUncached.empty()) {    
@@ -1968,9 +1943,9 @@ static ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag,
         
         er = lpDatabase->DoSelect(strQuery, &lpDBResult);
         if(er != erSuccess)
-            goto exit;
+            return er;
         
-        while((lpDBRow = lpDatabase->FetchRow(lpDBResult))) {
+        while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
             if(lpDBRow[0] == NULL || lpDBRow[1] == NULL || lpDBRow[2] == NULL)
                 continue;
                 
@@ -2004,9 +1979,8 @@ static ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag,
         
         er = lpDatabase->DoSelect(strQuery, &lpDBResult);
         if(er != erSuccess)
-            goto exit;
-
-        while((lpDBRow = lpDatabase->FetchRow(lpDBResult))) {
+            return er;
+        while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
             if(lpDBRow[0] == NULL)
                 continue;
                 
@@ -2015,22 +1989,13 @@ static ECRESULT BeginLockFolders(ECDatabase *lpDatabase, unsigned int ulTag,
     }
         
     // Query objectid -> parentid for messages
-    if(setFolders.empty()) {
+    if (setFolders.empty())
         // No objects found that we can lock, fail.
-        er = KCERR_NOT_FOUND;
-        goto exit;
-    }
-    
+        return KCERR_NOT_FOUND;
     er = lpDatabase->Begin();
     if(er != erSuccess)
-        goto exit;
-        
-    er = LockFolders(lpDatabase, ulFlags & LOCK_SHARED, setFolders);
-    if(er != erSuccess)
-        goto exit;
-    
-exit:
-	return er;
+        return er;
+    return LockFolders(lpDatabase, ulFlags & LOCK_SHARED, setFolders);
 }
 
 /**
@@ -2081,11 +2046,7 @@ ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const EntryId &entryid, unsign
 
 ECRESULT BeginLockFolders(ECDatabase *lpDatabase, const SOURCEKEY &sourcekey, unsigned int ulFlags)
 {
-    std::set<SOURCEKEY> set;
-    
-    set.insert(sourcekey);
-    
-    return BeginLockFolders(lpDatabase, set, ulFlags);
+	return BeginLockFolders(lpDatabase, std::set<SOURCEKEY>({sourcekey}), ulFlags);
 }
 
 // Prepares child property data. This can be passed to ReadProps(). This allows the properties of child objects of object ulObjId to be
@@ -2103,10 +2064,8 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
 	DB_ROW lpDBRow = NULL;
 	DB_LENGTHS lpDBLen = NULL;
 
-	if(ulObjId == 0 && ulParentId == 0) {
-	    er = KCERR_INVALID_PARAMETER;
-	    goto exit;
-    }
+	if (ulObjId == 0 && ulParentId == 0)
+		return KCERR_INVALID_PARAMETER;
 
     if(fDoQuery) {
 		// although we don't always use the names columns, we need to join anyway to check for existing nameids
@@ -2131,34 +2090,31 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
 
         er = lpDatabase->DoSelect(strQuery, &lpDBResult);
         if(er != erSuccess)
-            goto exit;
+			return er;
     } else {
         er = lpDatabase->GetNextResult(&lpDBResult);
         if(er != erSuccess)
-            goto exit;
+			return er;
     }
 
-    while((lpDBRow = lpDatabase->FetchRow(lpDBResult)) != NULL) {
+	while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
         unsigned int ulPropTag;
         
-        lpDBLen = lpDatabase->FetchRowLengths(lpDBResult);
-
+		lpDBLen = lpDBResult.fetch_row_lengths();
         if(lpDBLen == NULL) {
-		er = KCERR_DATABASE_ERROR; // this should never happen
 		ec_log_crit("PrepareReadProps(): FetchRowLengths failed");
-		goto exit;
+			return KCERR_DATABASE_ERROR; /* this should never happen */
         }
 
         ulPropTag = PROP_TAG(atoi(lpDBRow[FIELD_NR_TYPE]),atoi(lpDBRow[FIELD_NR_TAG]));
         
         if (PROP_ID(ulPropTag) > 0x8500 && lpNamedPropDefs) {
-            std::pair<NamedPropDefMap::iterator, bool> resInsert = lpNamedPropDefs->insert(NamedPropDefMap::value_type(ulPropTag, NAMEDPROPDEF()));
+			auto resInsert = lpNamedPropDefs->insert({ulPropTag, {}});
             if (resInsert.second) {
                 // New entry
                 if (lpDBLen[FIELD_NR_NAMEGUID] != sizeof(resInsert.first->second.guid)) {
-			er = KCERR_DATABASE_ERROR;
 			ec_log_err("PrepareReadProps(): record size mismatch");
-			goto exit;
+					return KCERR_DATABASE_ERROR;
                 }
                 memcpy(&resInsert.first->second.guid, lpDBRow[FIELD_NR_NAMEGUID], sizeof(resInsert.first->second.guid));
                 
@@ -2169,8 +2125,7 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
                     resInsert.first->second.ulKind = MNID_STRING;
                     resInsert.first->second.strName.assign((char*)lpDBRow[FIELD_NR_NAMESTR], lpDBLen[FIELD_NR_NAMESTR]);
                 } else {
-                    er = KCERR_INVALID_TYPE;
-                    goto exit;
+					return KCERR_INVALID_TYPE;
                 }
             }
         }
@@ -2193,12 +2148,12 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
             sChild.lpPropVals = new DynamicPropValArray(soap, 20);
             
             // First property for this child
-            iterChild = lpChildProps->insert(ChildPropsMap::value_type(ulChildId, sChild)).first;
+			iterChild = lpChildProps->insert({ulChildId, sChild}).first;
         }
         
         er = iterChild->second.lpPropTags->AddPropTag(ulPropTag);
         if(er != erSuccess)
-            goto exit;
+			return er;
 
         er = GetPropSize(lpDBRow, lpDBLen, &ulSize);
 
@@ -2244,33 +2199,30 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
 
         er = lpDatabase->DoSelect(strQuery, &lpDBResult);
         if(er != erSuccess)
-            goto exit;
+			return er;
     } else {
         er = lpDatabase->GetNextResult(&lpDBResult);
         if(er != erSuccess)
-            goto exit;
+			return er;
     }
     
     // Do MV props
-    while((lpDBRow = lpDatabase->FetchRow(lpDBResult)) != NULL) {
-        lpDBLen = lpDatabase->FetchRowLengths(lpDBResult);
-
+	while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
+		lpDBLen = lpDBResult.fetch_row_lengths();
         if(lpDBLen == NULL) {
-			er = KCERR_DATABASE_ERROR; // this should never happen
 			ec_log_crit("PrepareReadProps(): FetchRowLengths failed(2)");
-			goto exit;
+			return KCERR_DATABASE_ERROR; /* this should never happen */
         }
         
         if (lpNamedPropDefs) {
             unsigned int ulPropTag = PROP_TAG(atoi(lpDBRow[FIELD_NR_TYPE]),atoi(lpDBRow[FIELD_NR_TAG]));
             if (PROP_ID(ulPropTag) > 0x8500) {
-                std::pair<NamedPropDefMap::iterator, bool> resInsert = lpNamedPropDefs->insert(NamedPropDefMap::value_type(ulPropTag, NAMEDPROPDEF()));
+				auto resInsert = lpNamedPropDefs->insert({ulPropTag, {}});
                 if (resInsert.second) {
                     // New entry
                     if (lpDBLen[FIELD_NR_NAMEGUID] != sizeof(resInsert.first->second.guid)) {
-                        er = KCERR_DATABASE_ERROR;
 			ec_log_crit("PrepareReadProps(): record size mismatch(2)");
-                        goto exit;
+						return KCERR_DATABASE_ERROR;
                     }
                     memcpy(&resInsert.first->second.guid, lpDBRow[FIELD_NR_NAMEGUID], sizeof(resInsert.first->second.guid));
                     
@@ -2281,8 +2233,7 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
                         resInsert.first->second.ulKind = MNID_STRING;
                         resInsert.first->second.strName.assign((char*)lpDBRow[FIELD_NR_NAMESTR], lpDBLen[FIELD_NR_NAMESTR]);
                     } else {
-                        er = KCERR_INVALID_TYPE;
-                        goto exit;
+						return KCERR_INVALID_TYPE;
                     }
                 }
             }
@@ -2298,7 +2249,7 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
             sChild.lpPropVals = new DynamicPropValArray(soap, 20);
             
             // First property for this child
-            iterChild = lpChildProps->insert(ChildPropsMap::value_type(ulChildId, sChild)).first;
+			iterChild = lpChildProps->insert({ulChildId, sChild}).first;
         }
         
         er = CopyDatabasePropValToSOAPPropVal(soap, lpDBRow, lpDBLen, &sPropVal);
@@ -2318,9 +2269,7 @@ ECRESULT PrepareReadProps(struct soap *soap, ECDatabase *lpDatabase, bool fDoQue
 		if (!soap)
 			FreePropVal(&sPropVal, false);
     }
-
-exit:
-	return er;
+	return erSuccess;
 }
 
 ECRESULT FreeChildProps(std::map<unsigned int, CHILDPROPS> *lpChildProps)

@@ -40,8 +40,7 @@
 #include <kopano/charset/convert.h>
 #include <kopano/ecversion.h>
 #include <kopano/charset/utf8string.h>
-#include "ECFeatures.h"
-
+#include <kopano/ECFeatures.hpp>
 #include "POP3.h"
 using namespace std;
 using namespace KCHL;
@@ -60,17 +59,6 @@ POP3::POP3(const char *szServerPath, ECChannel *lpChannel, ECLogger *lpLogger, E
 POP3::~POP3() {
 	for (auto &m : lstMails)
 		delete[] m.sbEntryID.lpb;
-	if (lpInbox)
-		lpInbox->Release();
-
-	if (lpStore)
-		lpStore->Release();
-
-	if (lpSession)
-		lpSession->Release();
-
-	if (lpAddrBook)
-		lpAddrBook->Release();
 }
 
 /** 
@@ -734,8 +722,7 @@ HRESULT POP3::HrLogin(const std::string &strUsername, const std::string &strPass
 
 	if (!parseBool(lpConfig->GetSetting("bypass_auth")))
 		flags |= EC_PROFILE_FLAGS_NO_UID_AUTH;
-
-	hr = HrOpenECSession(&lpSession, "gateway/pop3", PROJECT_SVN_REV_STR,
+	hr = HrOpenECSession(&~lpSession, "gateway/pop3", PROJECT_VERSION,
 	     strwUsername.c_str(), strwPassword.c_str(), m_strPath.c_str(),
 	     flags, NULL, NULL);
 	if (hr != hrSuccess) {
@@ -748,13 +735,13 @@ HRESULT POP3::HrLogin(const std::string &strUsername, const std::string &strPass
 		goto exit;
 	}
 
-	hr = HrOpenDefaultStore(lpSession, &lpStore);
+	hr = HrOpenDefaultStore(lpSession, &~lpStore);
 	if (hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to open default store");
 		goto exit;
 	}
 
-	hr = lpSession->OpenAddressBook(0, NULL, AB_NO_DIALOG, &lpAddrBook);
+	hr = lpSession->OpenAddressBook(0, NULL, AB_NO_DIALOG, &~lpAddrBook);
 	if (hr != hrSuccess) {
 		lpLogger->Log(EC_LOGLEVEL_ERROR, "Failed to open addressbook");
 		goto exit;
@@ -772,7 +759,7 @@ HRESULT POP3::HrLogin(const std::string &strUsername, const std::string &strPass
 		goto exit;
 	}
 
-	hr = lpStore->OpenEntry(cbEntryID, lpEntryID, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, (LPUNKNOWN *) &lpInbox);
+	hr = lpStore->OpenEntry(cbEntryID, lpEntryID, &IID_IMAPIFolder, MAPI_MODIFY, &ulObjType, &~lpInbox);
 	if (ulObjType != MAPI_FOLDER)
 		hr = MAPI_E_NOT_FOUND;
 
@@ -785,14 +772,8 @@ HRESULT POP3::HrLogin(const std::string &strUsername, const std::string &strPass
 
 exit:
 	if (hr != hrSuccess) {
-		if (lpInbox) {
-			lpInbox->Release();
-			lpInbox = NULL;
-		}
-		if (lpStore) {
-			lpStore->Release();
-			lpStore = NULL;
-		}
+		lpInbox.reset();
+		lpStore.reset();
 	}
 
 	return hr;

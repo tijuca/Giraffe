@@ -25,6 +25,7 @@
 #include <mapidefs.h>
 #include <inetmapi/options.h>
 #include <kopano/charset/convert.h>
+#include <kopano/memory.hpp>
 
 namespace KC {
 
@@ -63,7 +64,6 @@ class VMIMEToMAPI _kc_final {
 public:
 	VMIMEToMAPI();
 	VMIMEToMAPI(LPADRBOOK lpAdrBook, delivery_options dopt);
-	virtual	~VMIMEToMAPI();
 
 	HRESULT convertVMIMEToMAPI(const std::string &input, IMessage *lpMessage);
 	HRESULT createIMAPProperties(const std::string &input, std::string *lpEnvelope, std::string *lpBody, std::string *lpBodyStructure);
@@ -71,7 +71,7 @@ public:
 private:
 	delivery_options m_dopt;
 	LPADRBOOK m_lpAdrBook;
-	IABContainer *m_lpDefaultDir = nullptr;
+	KCHL::object_ptr<IABContainer> m_lpDefaultDir;
 	sMailState m_mailState;
 	convert_context m_converter;
 
@@ -93,7 +93,7 @@ private:
 
 	HRESULT handleTextpart(vmime::shared_ptr<vmime::header>, vmime::shared_ptr<vmime::body>, IMessage* lpMessage, bool bAppendBody);
 	HRESULT handleHTMLTextpart(vmime::shared_ptr<vmime::header>, vmime::shared_ptr<vmime::body>, IMessage* lpMessage, bool bAppendBody);
-	HRESULT handleAttachment(vmime::shared_ptr<vmime::header>, vmime::shared_ptr<vmime::body>, IMessage* lpMessage, bool bAllowEmpty = true);
+	HRESULT handleAttachment(vmime::shared_ptr<vmime::header>, vmime::shared_ptr<vmime::body>, IMessage *lpMessage, const wchar_t *sugg_filename = nullptr, bool bAllowEmpty = true);
 	HRESULT handleMessageToMeProps(IMessage *lpMessage, LPADRLIST lpRecipients);
 
 	int getCharsetFromHTML(const std::string &strHTML, vmime::charset *htmlCharset);
@@ -114,6 +114,7 @@ private:
 	std::string getStructureExtendedFields(vmime::shared_ptr<vmime::header> vmHeaderPart);
 	std::string parameterizedFieldToStructure(vmime::shared_ptr<vmime::parameterizedHeaderField>);
 	std::string::size_type countBodyLines(const std::string &input, std::string::size_type start, std::string::size_type length);
+	bool filter_html(IMessage *, IStream *, ULONG, const std::string &);
 };
 
 } /* namespace */

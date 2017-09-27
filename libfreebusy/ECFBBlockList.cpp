@@ -38,7 +38,7 @@ HRESULT ECFBBlockList::Add(FBBlock_1* lpFBBlock)
 {
 	if (lpFBBlock == NULL)
 		return MAPI_E_INVALID_PARAMETER;
-	m_FBMap.insert(mapFB::value_type(lpFBBlock->m_tmStart, *lpFBBlock));
+	m_FBMap.insert({lpFBBlock->m_tmStart, *lpFBBlock});
 	return hrSuccess;
 }
 
@@ -97,7 +97,7 @@ HRESULT ECFBBlockList::Skip(LONG items)
 	for (LONG i = 0; i < items; ++i) {
 		// Check if you are at the end of the list or the item doesn't matched with the restriction
 		if (m_FBIter == m_FBMap.cend() || (m_tmRestictEnd != 0 && (ULONG)m_FBIter->second.m_tmStart > (ULONG)m_tmRestictEnd) )
-			break; //FIXME: gives a error or always oke?
+			break; // FIXME: gives an error or always ok?
 		++m_FBIter;
 	}
 

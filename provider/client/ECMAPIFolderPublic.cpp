@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
 #include <kopano/memory.hpp>
 #include "ECMAPIFolderPublic.h"
@@ -78,24 +78,16 @@ HRESULT	ECMAPIFolderPublic::QueryInterface(REFIID refiid, void **lppInterface)
 
 HRESULT ECMAPIFolderPublic::Create(ECMsgStore *lpMsgStore, BOOL fModify, WSMAPIFolderOps *lpFolderOps, enumPublicEntryID ePublicEntryID, ECMAPIFolder **lppECMAPIFolder)
 {
-	HRESULT hr = hrSuccess;
-	ECMAPIFolderPublic *lpMAPIFolder = NULL;
-
-	lpMAPIFolder = new ECMAPIFolderPublic(lpMsgStore, fModify, lpFolderOps, ePublicEntryID);
-
-	hr = lpMAPIFolder->QueryInterface(IID_ECMAPIFolder, (void **)lppECMAPIFolder);
-
-	if(hr != hrSuccess)
-		delete lpMAPIFolder;
-
-	return hr;
+	return alloc_wrap<ECMAPIFolderPublic>(lpMsgStore, fModify,
+	       lpFolderOps, ePublicEntryID)
+	       .as(IID_ECMAPIFolder, reinterpret_cast<void **>(lppECMAPIFolder));
 }
 
 HRESULT ECMAPIFolderPublic::GetPropHandler(ULONG ulPropTag, void* lpProvider, ULONG ulFlags, LPSPropValue lpsPropValue, void *lpParam, void *lpBase)
 {
 	HRESULT hr = hrSuccess;
 	LPCTSTR lpszName = NULL;
-	ECMAPIFolderPublic *lpFolder = (ECMAPIFolderPublic *)lpParam;
+	auto lpFolder = static_cast<ECMAPIFolderPublic *>(lpParam);
 
 	switch(PROP_ID(ulPropTag)) {
 
@@ -168,7 +160,7 @@ HRESULT ECMAPIFolderPublic::GetPropHandler(ULONG ulPropTag, void* lpProvider, UL
 		else if (lpFolder->m_ePublicEntryID == ePE_Favorites)
 			lpszName = _("Favorites");
 		else if (lpFolder->m_ePublicEntryID == ePE_IPMSubtree)
-			lpszName = _T("IPM_SUBTREE");
+			lpszName = KC_T("IPM_SUBTREE");
 
 		if (lpszName)
 		{
@@ -267,7 +259,7 @@ HRESULT ECMAPIFolderPublic::SetPropHandler(ULONG ulPropTag, void *lpProvider,
     const SPropValue *lpsPropValue, void *lpParam)
 {
 	HRESULT hr = hrSuccess;
-	ECMAPIFolderPublic *lpFolder = (ECMAPIFolderPublic *)lpParam;
+	auto lpFolder = static_cast<ECMAPIFolderPublic *>(lpParam);
 
 	switch(PROP_ID(ulPropTag)) {
 	case PROP_ID(PR_DISPLAY_NAME):
@@ -308,7 +300,7 @@ HRESULT ECMAPIFolderPublic::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTabl
 	object_ptr<ECMemTable> lpMemTable;
 	object_ptr<ECMemTableView> lpView;
 	memory_ptr<SPropTagArray> lpPropTagArray;
-	static constexpr const SizedSPropTagArray(11, sPropsContentColumns) =
+	SizedSPropTagArray(11, sPropsContentColumns) =
 		{11, {PR_ENTRYID, PR_DISPLAY_NAME, PR_MESSAGE_FLAGS, PR_SUBJECT,
 		PR_STORE_ENTRYID, PR_STORE_RECORD_KEY, PR_STORE_SUPPORT_MASK,
 		PR_INSTANCE_KEY, PR_RECORD_KEY, PR_ACCESS, PR_ACCESS_LEVEL}};
@@ -317,11 +309,8 @@ HRESULT ECMAPIFolderPublic::GetContentsTable(ULONG ulFlags, LPMAPITABLE *lppTabl
 		return ECMAPIFolder::GetContentsTable(ulFlags, lppTable);
 	if (ulFlags & SHOW_SOFT_DELETES)
 		return MAPI_E_NO_SUPPORT;
-	hr = Util::HrCopyUnicodePropTagArray(ulFlags,
-	     sPropsContentColumns, &~lpPropTagArray);
-	if (hr != hrSuccess)
-		return hr;
-	hr = ECMemTable::Create(lpPropTagArray, PR_ROWID, &~lpMemTable);
+	Util::proptag_change_unicode(ulFlags, sPropsContentColumns);
+	hr = ECMemTable::Create(sPropsContentColumns, PR_ROWID, &~lpMemTable);
 	if (hr != hrSuccess)
 		return hr;
 	hr = lpMemTable->HrGetView(createLocaleFromName(""), ulFlags & MAPI_UNICODE, &~lpView);
@@ -405,14 +394,20 @@ HRESULT ECMAPIFolderPublic::DeleteProps(const SPropTagArray *lpPropTagArray,
 	return ECMAPIContainer::SaveChanges(KEEP_OPEN_READWRITE);
 }
 
-HRESULT ECMAPIFolderPublic::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG *lpulObjType, LPUNKNOWN *lppUnk)
+HRESULT ECMAPIFolderPublic::OpenEntry(ULONG cbEntryID, const ENTRYID *eid,
+    const IID *lpInterface, ULONG ulFlags, ULONG *lpulObjType,
+    IUnknown **lppUnk)
 {
-	HRESULT hr;
 	unsigned int ulObjType = 0;
+	memory_ptr<ENTRYID> lpEntryID;
+	auto hr = MAPIAllocateBuffer(cbEntryID, &~lpEntryID);
+	if (hr != hrSuccess)
+		return hr;
+	memcpy(lpEntryID, eid, cbEntryID);
 
 	if (cbEntryID > 0)
 	{
-		hr = HrGetObjTypeFromEntryId(cbEntryID, (LPBYTE)lpEntryID, &ulObjType);
+		hr = HrGetObjTypeFromEntryId(cbEntryID, reinterpret_cast<BYTE *>(lpEntryID.get()), &ulObjType);
 		if(hr != hrSuccess)
 			return hr;
 
@@ -422,7 +417,7 @@ HRESULT ECMAPIFolderPublic::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCI
 	return ECMAPIFolder::OpenEntry(cbEntryID, lpEntryID, lpInterface, ulFlags, lpulObjType, lppUnk);
 }
 
-HRESULT ECMAPIFolderPublic::SetEntryId(ULONG cbEntryId, LPENTRYID lpEntryId)
+HRESULT ECMAPIFolderPublic::SetEntryId(ULONG cbEntryId, const ENTRYID *lpEntryId)
 {
 	if (m_ePublicEntryID == ePE_Favorites || m_ePublicEntryID == ePE_IPMSubtree)
 		return ECGenericProp::SetEntryId(cbEntryId, lpEntryId);
@@ -436,7 +431,7 @@ HRESULT ECMAPIFolderPublic::CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPC
 	HRESULT hr = hrSuccess;
 	ULONG ulResult = 0;
 	object_ptr<IMAPIFolder> lpMapiFolder;
-	LPSPropValue lpPropArray = NULL;
+	ecmem_ptr<SPropValue> lpPropArray;
 	GUID guidDest;
 	GUID guidFrom;
 
@@ -453,44 +448,32 @@ HRESULT ECMAPIFolderPublic::CopyFolder(ULONG cbEntryID, LPENTRYID lpEntryID, LPC
 		hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
 	
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// Get the destination entry ID
-	hr = HrGetOneProp(lpMapiFolder, PR_ENTRYID, &lpPropArray);
+	hr = HrGetOneProp(lpMapiFolder, PR_ENTRYID, &~lpPropArray);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// Check if it's  the same store of kopano so we can copy/move fast
-	if( IsKopanoEntryId(cbEntryID, (LPBYTE)lpEntryID) && 
-		IsKopanoEntryId(lpPropArray[0].Value.bin.cb, lpPropArray[0].Value.bin.lpb) &&
-		HrGetStoreGuidFromEntryId(cbEntryID, (LPBYTE)lpEntryID, &guidFrom) == hrSuccess && 
-		HrGetStoreGuidFromEntryId(lpPropArray[0].Value.bin.cb, lpPropArray[0].Value.bin.lpb, &guidDest) == hrSuccess &&
-		memcmp(&guidFrom, &guidDest, sizeof(GUID)) == 0 &&
-		lpFolderOps != NULL)
-	{
-		// if the entryid a a publicfolders entryid just change the entryid to a server entryid
-		if(((ECMsgStorePublic*)GetMsgStore())->ComparePublicEntryId(ePE_PublicFolders, lpPropArray[0].Value.bin.cb, (LPENTRYID)lpPropArray[0].Value.bin.lpb, &ulResult) == hrSuccess && ulResult == TRUE)
-		{
-			ECFreeBuffer(lpPropArray);
-			lpPropArray = NULL;
-			hr = HrGetOneProp(lpMapiFolder, PR_ORIGINAL_ENTRYID, &lpPropArray);
-			if(hr != hrSuccess)
-				goto exit;
-		}
-		//FIXME: Progressbar
-		hr = this->lpFolderOps->HrCopyFolder(cbEntryID, lpEntryID, lpPropArray[0].Value.bin.cb, (LPENTRYID)lpPropArray[0].Value.bin.lpb, convstring(lpszNewFolderName, ulFlags), ulFlags, 0);
-			
-	}else
-	{
+	if (!IsKopanoEntryId(cbEntryID, (LPBYTE)lpEntryID) ||
+	    !IsKopanoEntryId(lpPropArray[0].Value.bin.cb, lpPropArray[0].Value.bin.lpb) ||
+	    HrGetStoreGuidFromEntryId(cbEntryID, reinterpret_cast<BYTE *>(lpEntryID), &guidFrom) != hrSuccess ||
+	    HrGetStoreGuidFromEntryId(lpPropArray[0].Value.bin.cb, lpPropArray[0].Value.bin.lpb, &guidDest) != hrSuccess ||
+	    memcmp(&guidFrom, &guidDest, sizeof(GUID)) != 0 ||
+	    lpFolderOps == nullptr)
 		// Support object handled de copy/move
-		hr = this->GetMsgStore()->lpSupport->CopyFolder(&IID_IMAPIFolder, &this->m_xMAPIFolder, cbEntryID, lpEntryID, lpInterface, lpDestFolder, lpszNewFolderName, ulUIParam, lpProgress, ulFlags);
+		return this->GetMsgStore()->lpSupport->CopyFolder(&IID_IMAPIFolder, static_cast<IMAPIFolder *>(this), cbEntryID, lpEntryID, lpInterface, lpDestFolder, lpszNewFolderName, ulUIParam, lpProgress, ulFlags);
+
+	// if the entryid a a publicfolders entryid just change the entryid to a server entryid
+	if (((ECMsgStorePublic *)GetMsgStore())->ComparePublicEntryId(ePE_PublicFolders, lpPropArray[0].Value.bin.cb, (LPENTRYID)lpPropArray[0].Value.bin.lpb, &ulResult) == hrSuccess && ulResult == TRUE)
+	{
+		hr = HrGetOneProp(lpMapiFolder, PR_ORIGINAL_ENTRYID, &~lpPropArray);
+		if(hr != hrSuccess)
+			return hr;
 	}
-
-exit:
-	if(lpPropArray)
-		ECFreeBuffer(lpPropArray);
-
-	return hr;
+	//FIXME: Progressbar
+	return this->lpFolderOps->HrCopyFolder(cbEntryID, lpEntryID, lpPropArray[0].Value.bin.cb, reinterpret_cast<ENTRYID *>(lpPropArray[0].Value.bin.lpb), convstring(lpszNewFolderName, ulFlags), ulFlags, 0);
 }
 
 HRESULT ECMAPIFolderPublic::DeleteFolder(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags)
@@ -507,7 +490,7 @@ HRESULT ECMAPIFolderPublic::DeleteFolder(ULONG cbEntryID, LPENTRYID lpEntryID, U
 
 	// remove the shortcut from the shortcut folder
 	object_ptr<IMAPIFolder> lpFolder, lpShortcutFolder;
-	hr = OpenEntry(cbEntryID, lpEntryID, nullptr, 0, &ulObjType, &~lpFolder);
+	hr = OpenEntry(cbEntryID, lpEntryID, &iid_of(lpFolder), 0, &ulObjType, &~lpFolder);
 	if (hr != hrSuccess)
 		return hr;
 	hr = HrGetOneProp(lpFolder, PR_SOURCE_KEY, &~lpProp);

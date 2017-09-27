@@ -488,116 +488,17 @@ HRESULT MAPIToVMIME::handleSingleAttachment(IMessage* lpMessage, LPSRow lpRow, v
 HRESULT MAPIToVMIME::parseMimeTypeFromFilename(std::wstring strFilename, vmime::mediaType *lpMT, bool *lpbSendBinary)
 {
 	std::string strExt;
-	std::string strMedType;
-	bool bSendBinary = true;
+	const char *strMedType = nullptr;
 
 	// to lowercase
 	transform(strFilename.begin(), strFilename.end(), strFilename.begin(), ::towlower);
 	strExt = m_converter.convert_to<string>(m_strCharset.c_str(), strFilename, rawsize(strFilename), CHARSET_WCHAR);
 	strExt.erase(0, strExt.find_last_of(".")+1);
 
-	// application
-	if (strExt == "bin" || strExt == "exe") {
-		strMedType = "application/octet-stream";
-	} else if (strExt == "ai" || strExt == "eps" || strExt == "ps") {
-		strMedType = "application/postscript";
-	} else if (strExt == "pdf") {
-		strMedType = "application/pdf";
-	} else if (strExt == "rtf") {
-		strMedType = "application/rtf";
-	} else if (strExt == "zip") {
-		strMedType = "application/zip";
-	} else if (strExt == "doc" || strExt == "dot") {
-		strMedType = "application/msword";
-	} else if (strExt == "mdb") {
-		strMedType = "application/x-msaccess";
-	} else if (strExt == "xla" || strExt == "xls" || strExt == "xlt" || strExt == "xlw") {
-		strMedType = "application/vnd.ms-excel";
-	} else if (strExt == "pot" || strExt == "ppt" || strExt == "pps") {
-		strMedType = "application/vnd.ms-powerpoint";
-	} else if (strExt == "mpp") {
-		strMedType = "application/vnd.ms-project";
-	} else if (strExt == "edi") {
-		strMedType = "application/edifact";
-		bSendBinary = false;
-	} else if(strExt == "docm") {
-		strMedType = "application/vnd.ms-word.document.macroEnabled.12";
-	} else if(strExt == "docx") {
-		strMedType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-	} else if(strExt == "dotm") {
-		strMedType = "application/vnd.ms-word.template.macroEnabled.12";
-	} else if(strExt == "dotx") {
-		strMedType = "application/vnd.openxmlformats-officedocument.wordprocessingml.template";
-	} else if(strExt == "potm") {
-		strMedType = "application/vnd.ms-powerpoint.template.macroEnabled.12";
-	} else if(strExt == "potx") {
-		strMedType = "application/vnd.openxmlformats-officedocument.presentationml.template";
-	} else if(strExt == "ppam") {
-		strMedType = "application/vnd.ms-powerpoint.addin.macroEnabled.12";
-	} else if(strExt == "ppsm") {
-		strMedType = "application/vnd.ms-powerpoint.slideshow.macroEnabled.12";
-	} else if(strExt == "ppsx") {
-		strMedType = "application/vnd.openxmlformats-officedocument.presentationml.slideshow";
-	} else if(strExt == "pptm") {
-		strMedType = "application/vnd.ms-powerpoint.presentation.macroEnabled.12";
-	} else if(strExt == "pptx") {
-		strMedType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-	} else if(strExt == "xlam") {
-		strMedType = "application/vnd.ms-excel.addin.macroEnabled.12";
-	} else if(strExt == "xlsb") {
-		strMedType = "application/vnd.ms-excel.sheet.binary.macroEnabled.12";
-	} else if(strExt == "xlsm") {
-		strMedType = "application/vnd.ms-excel.sheet.macroEnabled.12";
-	} else if(strExt == "xltm") {
-		strMedType = "application/vnd.ms-excel.template.macroEnabled.12";
-	} else if(strExt == "xlsx") {
-		strMedType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-	} else if(strExt == "xltx") {
-		strMedType = "application/vnd.openxmlformats-officedocument.spreadsheetml.template";
-	}
-	
-	// audio
-
-	else if (strExt == "ua") {
-		strMedType = "audio/basic";
-	} else if (strExt == "wav") {
-		strMedType = "audio/x-wav";
-	} else if (strExt == "mid") {
-		strMedType = "audio/x-midi";
-	}
-	
-	// image
-
-	else if (strExt == "gif") {
-		strMedType = "image/gif";
-	} else if (strExt == "jpg" || strExt == "jpe" || strExt == "jpeg") {
-		strMedType = "image/jpeg";
-	} else if (strExt == "png") {
-		strMedType = "image/png";
-	} else if (strExt == "bmp") {
-		strMedType = "image/x-ms-bmp";
-	} else if (strExt == "tiff") {
-		strMedType = "image/tiff";
-	} else if (strExt == "xbm") {
-		strMedType = "image/xbm";
-	}
-	
-	// video
-
-	else if (strExt == "mpg" || strExt == "mpe" || strExt == "mpeg") {
-		strMedType = "video/mpeg";
-	} else if (strExt == "qt" || strExt == "mov") {
-		strMedType = "video/quicktime";
-	} else if (strExt == "avi") {
-		strMedType = "video/x-msvideo";
-	}
-
-	else {
-		strMedType = "application/octet-stream";
-	}
+	strMedType = ext_to_mime_type(strExt.c_str());
 
 	*lpMT = vmime::mediaType(strMedType);
-	*lpbSendBinary = bSendBinary;
+	*lpbSendBinary = strMedType != nullptr && strcmp(strMedType, "application/edifact") != 0;
 
 	return hrSuccess;
 }
@@ -632,6 +533,8 @@ HRESULT MAPIToVMIME::handleAttachments(IMessage* lpMessage, vmime::messageBuilde
 	for (ULONG i = 0; i < pRows->cRows; ++i) {
 		// if one attachment fails, we're not sending what the user intended to send so abort. Logging was done in handleSingleAttachment()
 		hr = handleSingleAttachment(lpMessage, &pRows->aRow[i], lpVMMessageBuilder);
+		if (sopt.ignore_missing_attachments && hr == MAPI_E_NOT_FOUND)
+			continue;
 		if (hr != hrSuccess)
 			return hr;
 	} 
@@ -732,9 +635,8 @@ HRESULT MAPIToVMIME::BuildNoteMessage(IMessage *lpMessage,
 		// PR_TRANSPORT_MESSAGE_HEADERS)
 		// currently includes: Received*, Return-Path, List* and Precedence.
 		// New e-mails should not have this property.
-		HrGetOneProp(lpMessage, PR_TRANSPORT_MESSAGE_HEADERS_A, &~lpTransportHeaders);
-
-		if(lpTransportHeaders) {
+		if (HrGetOneProp(lpMessage, PR_TRANSPORT_MESSAGE_HEADERS_A, &~lpTransportHeaders) == hrSuccess &&
+		    lpTransportHeaders != nullptr) {
 			try {
 				int j=0;
 				vmime::header headers;
@@ -748,14 +650,13 @@ HRESULT MAPIToVMIME::BuildNoteMessage(IMessage *lpMessage,
 
 					// Received checks start of string to accept Received-SPF
 					if (strncasecmp(name.c_str(), vmime::fields::RECEIVED, strlen(vmime::fields::RECEIVED)) == 0 ||
-						strcasecmp(name.c_str(), vmime::fields::RETURN_PATH) == 0) {
+					    strcasecmp(name.c_str(), vmime::fields::RETURN_PATH) == 0)
 						// Insert in same order at start of headers
 						vmHeader->insertFieldBefore(j++, vmField);
-					} else if (strncasecmp(name.c_str(), "list-", strlen("list-")) == 0 ||
-							   strcasecmp(name.c_str(), "precedence") == 0) {
+					else if (strncasecmp(name.c_str(), "list-", strlen("list-")) == 0 ||
+					    strcasecmp(name.c_str(), "precedence") == 0)
 						// Just append at the end of this list, order is not important
 						vmHeader->appendField(vmime::dynamicCast<vmime::headerField>(vmField->clone()));
-					}
 				}
 			} catch (vmime::exception& e) {
 				ec_log_warn("VMIME exception adding extra headers: %s", e.what());
@@ -857,10 +758,9 @@ HRESULT MAPIToVMIME::BuildMDNMessage(IMessage *lpMessage,
 			if (sopt.no_recipients_workaround == false) {
 				ec_log_err("No MDN recipient found");
 				return MAPI_E_NOT_FOUND;
-			} else {
-				// no recipient, but need to continue ... is this correct??
-				vmRecipientbox = vmime::make_shared<vmime::mailbox>(string("undisclosed-recipients"));
 			}
+			// no recipient, but need to continue ... is this correct??
+			vmRecipientbox = vmime::make_shared<vmime::mailbox>(string("undisclosed-recipients"));
 		} else {
 			hr = getMailBox(&pRows->aRow[0], &vmRecipientbox);
 			if (hr != hrSuccess)
@@ -1105,10 +1005,12 @@ HRESULT MAPIToVMIME::convertMAPIToVMIME(IMessage *lpMessage,
 			return hr;
 
 		// remove excess headers
-		if (vmMessage->getHeader()->hasField(vmime::fields::CONTENT_TYPE))
-			vmMessage->getHeader()->removeField(vmMessage->getHeader()->findField(vmime::fields::CONTENT_TYPE));
-		if (vmMessage->getHeader()->hasField(vmime::fields::CONTENT_TRANSFER_ENCODING))
-			vmMessage->getHeader()->removeField(vmMessage->getHeader()->findField(vmime::fields::CONTENT_TRANSFER_ENCODING));
+		auto field = vmMessage->getHeader()->findField(vmime::fields::CONTENT_TYPE);
+		if (field != nullptr)
+			vmMessage->getHeader()->removeField(field);
+		field = vmMessage->getHeader()->findField(vmime::fields::CONTENT_TRANSFER_ENCODING);
+		if (field != nullptr)
+			vmMessage->getHeader()->removeField(field);
 
 		if (strcasecmp(lpMsgClass->Value.lpszA, "IPM.Note.SMIME") != 0) {
 			auto vmSMIMEMessage = vmime::make_shared<SMIMEMessage>();
@@ -1288,8 +1190,6 @@ HRESULT MAPIToVMIME::getMailBox(LPSRow lpRow,
 		vmMailboxNew = vmime::make_shared<vmime::mailboxGroup>(getVmimeTextFromWide(strName));
 	} else if (sopt.no_recipients_workaround == true) {
 		// gateway must always return a mailbox object
-		if (strEmail.empty())
-			strEmail = L"@";	// force having an address to avoid vmime problems
 		vmMailboxNew = vmime::make_shared<vmime::mailbox>(getVmimeTextFromWide(strName), m_converter.convert_to<string>(strEmail));
 	} else {
 		if (strEmail.empty()) {
@@ -1590,7 +1490,7 @@ HRESULT MAPIToVMIME::handleExtraHeaders(IMessage *lpMessage,
 	// When adding a X-Priority, spamassassin may add a severe punishment because no User-Agent header
 	// or X-Mailer header is present. So we set the X-Mailer header :)
 	if (flags & MTV_SPOOL)
-		vmHeader->appendField(hff->create("X-Mailer", "Kopano " PROJECT_VERSION_DOT_STR "-" PROJECT_SVN_REV_STR));
+		vmHeader->appendField(hff->create("X-Mailer", "Kopano " PROJECT_VERSION));
 
 	// PR_CONVERSATION_INDEX
 	if (HrGetOneProp(lpMessage, PR_CONVERSATION_INDEX, &~lpConversationIndex) == hrSuccess) {
@@ -1700,7 +1600,7 @@ HRESULT MAPIToVMIME::handleContactEntryID(ULONG cValues, LPSPropValue lpProps, w
 	    *guid != PSETID_CONTACT_FOLDER_RECIPIENT ||
 	    lpContabEntryID->email_offset > 2)
 		return MAPI_E_NOT_FOUND;
-	hr = m_lpSession->OpenEntry(lpContabEntryID->cbeid, reinterpret_cast<ENTRYID *>(lpContabEntryID->abeid), nullptr, 0, &ulObjType, &~lpContact);
+	hr = m_lpSession->OpenEntry(lpContabEntryID->cbeid, reinterpret_cast<ENTRYID *>(lpContabEntryID->abeid), &iid_of(lpContact), 0, &ulObjType, &~lpContact);
 	if (hr != hrSuccess)
 		return hr;
 
@@ -1892,7 +1792,7 @@ HRESULT MAPIToVMIME::handleReplyTo(IMessage *lpMessage,
 
 		if (sizeof(CONTAB_ENTRYID) > lpEntry->cb || *guid != PSETID_CONTACT_FOLDER_RECIPIENT || lpContabEntryID->email_offset > 2)
 			return hr;
-		hr = m_lpSession->OpenEntry(lpContabEntryID->cbeid, reinterpret_cast<ENTRYID *>(lpContabEntryID->abeid), nullptr, 0, &ulObjType, &~lpContact);
+		hr = m_lpSession->OpenEntry(lpContabEntryID->cbeid, reinterpret_cast<ENTRYID *>(lpContabEntryID->abeid), &iid_of(lpContact), 0, &ulObjType, &~lpContact);
 		if (hr != hrSuccess)
 			return hr;
 		cNames = ARRAY_SIZE(lpulNamesIDs);
@@ -1945,7 +1845,7 @@ HRESULT MAPIToVMIME::handleReplyTo(IMessage *lpMessage,
  * check if named property exists which is used to hold voting options
  */
 
-bool MAPIToVMIME::is_voting_request(IMessage *lpMessage)
+bool MAPIToVMIME::is_voting_request(IMessage *lpMessage) const
 {
 	HRESULT hr = hrSuccess;
 	memory_ptr<SPropTagArray> lpPropTags;
@@ -1965,7 +1865,7 @@ bool MAPIToVMIME::is_voting_request(IMessage *lpMessage)
 /**
  * CCheck if the named property exists which denotes if reminder is set
  */
-bool MAPIToVMIME::has_reminder(IMessage *msg)
+bool MAPIToVMIME::has_reminder(IMessage *msg) const
 {
 	memory_ptr<SPropTagArray> tags;
 	memory_ptr<SPropValue> content_type;
@@ -2166,9 +2066,9 @@ tnef_anyway:
 				// Now, add the stream as an attachment to the message, filename winmail.dat 
 				// and MIME type 'application/ms-tnef', no content-id
 				vmTNEFAtt = vmime::make_shared<mapiAttachment>(vmime::make_shared<vmime::streamContentHandler>(inputDataStream, 0),
-														  vmime::encoding("base64"), vmime::mediaType("application/ms-tnef"), string(),
-														  vmime::word("winmail.dat"));
-											  
+				            vmime::encoding("base64"), vmime::mediaType("application/ms-tnef"), string(),
+				            vmime::word("winmail.dat"));
+
 				// add to message (copies pointer, not data)
 				lpVMMessageBuilder->appendAttachment(vmTNEFAtt); 
 			}

@@ -19,10 +19,7 @@
 #include <kopano/lockhelper.hpp>
 #include <kopano/memory.hpp>
 #include "m4l.mapispi.h"
-#include "m4l.mapiutil.h"
 #include "m4l.mapix.h"
-#include "m4l.debug.h"
-
 #include <mapi.h>
 #include <kopano/CommonUtil.h>
 #include <kopano/Util.h>
@@ -45,24 +42,12 @@ M4LMAPIGetSession::~M4LMAPIGetSession() {
 
 HRESULT M4LMAPIGetSession::GetMAPISession(LPUNKNOWN *lppSession)
 {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::GetMAPISession", "");
 	HRESULT hr;
 	hr = session->QueryInterface(IID_IMAPISession, (void**)lppSession);
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::GetMAPISession", "0x%08x", hr);
 	return hr;
 }
 
-// iunknown passthru
-ULONG M4LMAPIGetSession::AddRef() {
-    return M4LUnknown::AddRef();
-}
-ULONG M4LMAPIGetSession::Release() {
-    return M4LUnknown::Release();
-}
 HRESULT M4LMAPIGetSession::QueryInterface(REFIID refiid, void **lpvoid) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::QueryInterface", "");
-	HRESULT hr = hrSuccess;
-
 	if (refiid == IID_IMAPIGetSession) {
 		AddRef();
 		*lpvoid = static_cast<IMAPIGetSession *>(this);
@@ -70,10 +55,9 @@ HRESULT M4LMAPIGetSession::QueryInterface(REFIID refiid, void **lpvoid) {
 		AddRef();
 		*lpvoid = static_cast<IUnknown *>(this);
     } else
-		hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
+		return MAPI_E_INTERFACE_NOT_SUPPORTED;
 
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::QueryInterface", "0x%08x", hr);
-	return hr;
+	return hrSuccess;
 }
 
 M4LMAPISupport::M4LMAPISupport(LPMAPISESSION new_session, LPMAPIUID lpUid,
@@ -100,217 +84,156 @@ HRESULT M4LMAPISupport::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR
 
 HRESULT M4LMAPISupport::GetMemAllocRoutines(LPALLOCATEBUFFER * lpAllocateBuffer, LPALLOCATEMORE * lpAllocateMore,
 											LPFREEBUFFER * lpFreeBuffer) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::GetMemAllocRoutines", "");
-	HRESULT hr = hrSuccess;
-
 	*lpAllocateBuffer = MAPIAllocateBuffer;
 	*lpAllocateMore   = MAPIAllocateMore;
 	*lpFreeBuffer     = MAPIFreeBuffer;
-
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::GetMemAllocRoutines", "0x%08x", hr);
-    return hr;
+	return hrSuccess;
 }
 
 HRESULT M4LMAPISupport::Subscribe(LPNOTIFKEY lpKey, ULONG ulEventMask, ULONG ulFlags, LPMAPIADVISESINK lpAdviseSink,
 								  ULONG * lpulConnection) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::Subscribe", "");
-	HRESULT hr = hrSuccess;
 	LPNOTIFKEY lpNewKey = NULL;
 	ulock_normal l_adv(m_advises_mutex, std::defer_lock_t());
 
 	/* Copy key (this should prevent deletion of the key while it is still in the list */
-	hr = MAPIAllocateBuffer(CbNewNOTIFKEY(sizeof(GUID)), (void **)&lpNewKey);
+	auto hr = MAPIAllocateBuffer(CbNewNOTIFKEY(sizeof(GUID)), reinterpret_cast<void **>(&lpNewKey));
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	memcpy(lpNewKey, lpKey, sizeof(*lpKey));
 	l_adv.lock();
 	++m_connections;
-	m_advises.insert(M4LSUPPORTADVISES::value_type(m_connections, M4LSUPPORTADVISE(lpNewKey, ulEventMask, ulFlags, lpAdviseSink)));
+	m_advises.insert({m_connections, {lpNewKey, ulEventMask, ulFlags, lpAdviseSink}});
 	*lpulConnection = m_connections;
-	l_adv.unlock();
-exit:
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::Subscribe", "0x%08x", hr);
-    return hr;
+	return hrSuccess;
 }
 
 HRESULT M4LMAPISupport::Unsubscribe(ULONG ulConnection) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::Unsubscribe", "");
-	HRESULT hr = hrSuccess;
 	M4LSUPPORTADVISES::iterator i;
 	scoped_lock l_adv(m_advises_mutex);
 
 	i = m_advises.find(ulConnection);
-	if (i != m_advises.cend()) {
-		MAPIFreeBuffer(i->second.lpKey);
-		m_advises.erase(i);
-	} else
-		hr = MAPI_E_NOT_FOUND;
-
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::Unsubscribe", "0x%08x", hr);
-    return hr;
+	if (i == m_advises.cend())
+		return MAPI_E_NOT_FOUND;
+	MAPIFreeBuffer(i->second.lpKey);
+	m_advises.erase(i);
+	return hrSuccess;
 }
 
 HRESULT M4LMAPISupport::Notify(LPNOTIFKEY lpKey, ULONG cNotification, LPNOTIFICATION lpNotifications, ULONG * lpulFlags) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::Notify", "");
-	HRESULT hr = hrSuccess;
 	KCHL::object_ptr<IMAPIAdviseSink> lpAdviseSink;
 	ulock_normal l_adv(m_advises_mutex);
 
 	auto iter = find_if(m_advises.cbegin(), m_advises.cend(), findKey(lpKey));
-	if (iter == m_advises.cend()) {
-		l_adv.unlock();
+	if (iter == m_advises.cend())
 		/* Should this be reported as error? */
-		goto exit;
-	}
+		return hrSuccess;
 	lpAdviseSink.reset(iter->second.lpAdviseSink);
 	l_adv.unlock();
-	hr = lpAdviseSink->OnNotify(cNotification, lpNotifications);
-
-exit:
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::Notify", "0x%08x", hr);
-    return hr;
+	return lpAdviseSink->OnNotify(cNotification, lpNotifications);
 }
 
 HRESULT M4LMAPISupport::ModifyStatusRow(ULONG cValues, LPSPropValue lpColumnVals, ULONG ulFlags) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::ModifyStatusRow", "");
-	HRESULT hr = hrSuccess;
-	M4LMAPISession *lpSession = (M4LMAPISession *)this->session;
-
-	hr = lpSession->setStatusRow(cValues, lpColumnVals);
-
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::ModifyStatusRow", "0x%08x", hr);
-    return hr;
+	return static_cast<M4LMAPISession *>(this->session)->setStatusRow(cValues, lpColumnVals);
 }
 
-HRESULT M4LMAPISupport::OpenProfileSection(LPMAPIUID lpUid, ULONG ulFlags, LPPROFSECT * lppProfileObj) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::OpenProfileSection", "");
+HRESULT M4LMAPISupport::OpenProfileSection(const MAPIUID *lpUid, ULONG ulFlags,
+    IProfSect **lppProfileObj)
+{
 	if (lpUid == NULL)
 		lpUid = lpsProviderUID;
-        
-	HRESULT hr = session->OpenProfileSection(lpUid, NULL, ulFlags, lppProfileObj);
-
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::OpenProfileSection", "0x%08x", hr);
-	return hr;
+	return session->OpenProfileSection(lpUid, nullptr, ulFlags, lppProfileObj);
 }
 
 HRESULT M4LMAPISupport::RegisterPreprocessor(LPMAPIUID lpMuid, LPTSTR lpszAdrType, LPTSTR lpszDLLName, LPSTR lpszPreprocess,
 											 LPSTR lpszRemovePreprocessInfo, ULONG ulFlags) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::RegisterPreprocessor", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::RegisterPreprocessor", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::NewUID(LPMAPIUID lpMuid) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::NewUID", "");
     HRESULT hr = CoCreateGuid((GUID*)lpMuid);
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::NewUID", "0x%08x", hr);
 	return hr;
 }
 
 HRESULT M4LMAPISupport::MakeInvalid(ULONG ulFlags, LPVOID lpObject, ULONG ulRefCount, ULONG cMethods) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::MakeInvalid", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::MakeInvalid", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::SpoolerYield(ULONG ulFlags) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::SpoolerYield", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::SpoolerYield", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::SpoolerNotify(ULONG ulFlags, LPVOID lpvData) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::SpoolerNotify", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::SpoolerNotify", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::CreateOneOff(LPTSTR lpszName, LPTSTR lpszAdrType, LPTSTR lpszAddress, ULONG ulFlags,
 									 ULONG * lpcbEntryID, LPENTRYID * lppEntryID) {
 	// although it's called EC... the return value is HRESULT :)
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::CreateOneOff", "");
-	HRESULT hr = ECCreateOneOff(lpszName, lpszAdrType, lpszAddress, ulFlags, lpcbEntryID, lppEntryID);
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::CreateOneOff", "0x%08x", hr);
-	return hr;
+	return ECCreateOneOff(lpszName, lpszAdrType, lpszAddress, ulFlags,
+	       lpcbEntryID, lppEntryID);
 }
 
 HRESULT M4LMAPISupport::SetProviderUID(LPMAPIUID lpProviderID, ULONG ulFlags) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::SetProviderUID", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::SetProviderUID", "0x%08x", hrSuccess);
     return hrSuccess;
 }
 
-HRESULT M4LMAPISupport::CompareEntryIDs(ULONG cbEntry1, LPENTRYID lpEntry1, ULONG cbEntry2, LPENTRYID lpEntry2,
-										ULONG ulCompareFlags, ULONG * lpulResult) {
-	HRESULT hr = hrSuccess;
-	TRACE_MAPILIB(TRACE_ENTRY, "CompareEntryIDs::CompareEntryIDs", "");
-
+HRESULT M4LMAPISupport::CompareEntryIDs(ULONG cbEntry1, const ENTRYID *lpEntry1,
+    ULONG cbEntry2, const ENTRYID *lpEntry2, ULONG ulCompareFlags,
+    ULONG *lpulResult)
+{
 	if (cbEntry1 != cbEntry2)
 		*lpulResult = FALSE;
 	else if (!lpEntry1 || !lpEntry2)
-		hr = MAPI_E_INVALID_ENTRYID;
+		return MAPI_E_INVALID_ENTRYID;
 	else if (memcmp(lpEntry1, lpEntry2, cbEntry1) != 0)
 		*lpulResult = FALSE;
 	else
 		*lpulResult = TRUE;
-
-	TRACE_MAPILIB1(TRACE_RETURN, "CompareEntryIDs::CompareEntryIDs", "0x%08x", hr);
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT M4LMAPISupport::OpenTemplateID(ULONG cbTemplateID, LPENTRYID lpTemplateID, ULONG ulTemplateFlags, LPMAPIPROP lpMAPIPropData,
 									   LPCIID lpInterface, LPMAPIPROP * lppMAPIPropNew, LPMAPIPROP lpMAPIPropSibling) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::OpenTemplateID", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::OpenTemplateID", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPISupport::OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulOpenFlags, ULONG * lpulObjType,
-								  LPUNKNOWN * lppUnk) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::OpenEntry", "");
-	HRESULT hr = session->OpenEntry(cbEntryID, lpEntryID, lpInterface, ulOpenFlags, lpulObjType, lppUnk);
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::OpenEntry", "0x%08x", hr);
-	return hr;
+HRESULT M4LMAPISupport::OpenEntry(ULONG cbEntryID, const ENTRYID *lpEntryID,
+    const IID *lpInterface, ULONG ulOpenFlags, ULONG *lpulObjType,
+    IUnknown **lppUnk)
+{
+	return session->OpenEntry(cbEntryID, lpEntryID, lpInterface,
+	       ulOpenFlags, lpulObjType, lppUnk);
 }
 
 HRESULT M4LMAPISupport::GetOneOffTable(ULONG ulFlags, LPMAPITABLE * lppTable) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::GetOneOffTable", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::GetOneOffTable", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::Address(ULONG * lpulUIParam, LPADRPARM lpAdrParms, LPADRLIST * lppAdrList) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::Address", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::Address", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::Details(ULONG * lpulUIParam, LPFNDISMISS lpfnDismiss, LPVOID lpvDismissContext, ULONG cbEntryID,
 								LPENTRYID lpEntryID, LPFNBUTTON lpfButtonCallback, LPVOID lpvButtonContext, LPTSTR lpszButtonText,
 								ULONG ulFlags) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::Details", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::Details", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPISupport::NewEntry(ULONG ulUIParam, ULONG ulFlags, ULONG cbEIDContainer, LPENTRYID lpEIDContainer, ULONG cbEIDNewEntryTpl,
-								 LPENTRYID lpEIDNewEntryTpl, ULONG * lpcbEIDNewEntry, LPENTRYID * lppEIDNewEntry) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::NewEntry", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::NewEntry", "0x%08x", MAPI_E_NO_SUPPORT);
+HRESULT M4LMAPISupport::NewEntry(ULONG_PTR ulUIParam, ULONG ulFlags,
+    ULONG cbEIDContainer, ENTRYID *lpEIDContainer, ULONG cbEIDNewEntryTpl,
+    ENTRYID *lpEIDNewEntryTpl, ULONG *lpcbEIDNewEntry, ENTRYID **lppEIDNewEntry)
+{
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::DoConfigPropsheet(ULONG ulUIParam, ULONG ulFlags, LPTSTR lpszTitle, LPMAPITABLE lpDisplayTable,
 										  LPMAPIPROP lpCOnfigData, ULONG ulTopPage) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::DoConfigPropsheet", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::DoConfigPropsheet", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::CopyMessages(LPCIID lpSrcInterface, LPVOID lpSrcFolder, LPENTRYLIST lpMsgList, LPCIID lpDestInterface,
 									 LPVOID lpDestFolder, ULONG ulUIParam, LPMAPIPROGRESS lpProgress, ULONG ulFlags) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::CopyMessages", "");
 	HRESULT hr = hrSuccess;
 	LPMAPIFOLDER lpSource = NULL;
 	LPMAPIFOLDER lpDest = NULL;
@@ -319,25 +242,21 @@ HRESULT M4LMAPISupport::CopyMessages(LPCIID lpSrcInterface, LPVOID lpSrcFolder, 
 	bool bPartial = false;
 	ULONG i;
 
-	if (!lpSrcInterface || !lpSrcFolder || !lpDestFolder || !lpMsgList) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if (*lpSrcInterface != IID_IMAPIFolder || (lpDestInterface != NULL && *lpDestInterface != IID_IMAPIFolder)) {
-		hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
-		goto exit;
-	}
+	if (lpSrcInterface == nullptr || lpSrcFolder == nullptr ||
+	    lpDestFolder == nullptr || lpMsgList == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+	if (*lpSrcInterface != IID_IMAPIFolder ||
+	    (lpDestInterface != nullptr && *lpDestInterface != IID_IMAPIFolder))
+		return MAPI_E_INTERFACE_NOT_SUPPORTED;
 
 	lpSource = (LPMAPIFOLDER)lpSrcFolder;
 	lpDest = (LPMAPIFOLDER)lpDestFolder;
 	hr = MAPIAllocateBuffer(sizeof(ENTRYLIST), &~lpDeleteEntries);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = MAPIAllocateMore(sizeof(SBinary)*lpMsgList->cValues, lpDeleteEntries, (void**)&lpDeleteEntries->lpbin);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	lpDeleteEntries->cValues = 0;
 
@@ -350,20 +269,20 @@ HRESULT M4LMAPISupport::CopyMessages(LPCIID lpSrcInterface, LPVOID lpSrcFolder, 
 		if (hr != hrSuccess) {
 			// partial, or error to calling client?
 			bPartial = true;
-			goto next_item;
+			continue;
 		}
 		hr = lpDest->CreateMessage(&IID_IMessage, MAPI_MODIFY, &~lpDestMessage);
 		if (hr != hrSuccess) {
 			bPartial = true;
-			goto next_item;
+			continue;
 		}
 
 		hr = this->DoCopyTo(&IID_IMessage, lpSrcMessage, 0, NULL, NULL, ulUIParam, lpProgress, &IID_IMessage, lpDestMessage, 0, NULL);
 		if (FAILED(hr)) {
-			goto exit;
+			return hr;
 		} else if (hr != hrSuccess) {
 			bPartial = true;
-			goto next_item;
+			continue;
 		}
 
 		hr = lpDestMessage->SaveChanges(0);
@@ -374,61 +293,48 @@ HRESULT M4LMAPISupport::CopyMessages(LPCIID lpSrcInterface, LPVOID lpSrcFolder, 
 			lpDeleteEntries->lpbin[lpDeleteEntries->cValues].lpb = lpMsgList->lpbin[i].lpb;
 			++lpDeleteEntries->cValues;
 		}
-
-next_item:
-		;
 	}
 
-	if ((ulFlags & MAPI_MOVE) && lpDeleteEntries->cValues > 0) {
-		if (lpSource->DeleteMessages(lpDeleteEntries, 0, NULL, 0) != hrSuccess)
-			bPartial = true;
-	}
-	
+	if ((ulFlags & MAPI_MOVE) && lpDeleteEntries->cValues > 0 &&
+	    lpSource->DeleteMessages(lpDeleteEntries, 0, NULL, 0) != hrSuccess)
+		bPartial = true;
 	if (bPartial)
 		hr = MAPI_W_PARTIAL_COMPLETION;
-
-exit:
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::CopyMessages", "0x%08x", hr);
 	return hr;
 }
 
 HRESULT M4LMAPISupport::CopyFolder(LPCIID lpSrcInterface, LPVOID lpSrcFolder, ULONG cbEntryID, LPENTRYID lpEntryID,
 								   LPCIID lpDestInterface, LPVOID lpDestFolder, LPTSTR lpszNewFolderName, ULONG ulUIParam,
 								   LPMAPIPROGRESS lpProgress, ULONG ulFlags) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::CopyFolder", "");
 	HRESULT hr = hrSuccess;
-	object_ptr<IMAPIFolder> lpSource, lpDest, lpFolder, lpSubFolder;
+	IMAPIFolder *lpSource, *lpDest;
+	object_ptr<IMAPIFolder> lpFolder, lpSubFolder;
 	KCHL::memory_ptr<SPropValue> lpSourceName;
 	ULONG ulObjType  = 0;
 	ULONG ulFolderFlags = 0;
 	static constexpr const SizedSPropTagArray (1, sExcludeProps) = {1, {PR_DISPLAY_NAME_A}};
 
-	if (!lpSrcInterface || !lpSrcFolder || cbEntryID == 0 || !lpEntryID || !lpDestFolder) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
-	if (*lpSrcInterface != IID_IMAPIFolder) {
-		hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
-		goto exit;
-	}
-	hr = ((LPUNKNOWN)lpSrcFolder)->QueryInterface(IID_IMAPIFolder, &~lpSource);
-	if (hr != hrSuccess)
-		goto exit;
-
-	// lpDestInterface == NULL or IID_IMAPIFolder compatible
-	hr = ((LPUNKNOWN)lpDestFolder)->QueryInterface(IID_IMAPIFolder, &~lpDest);
-	if (hr != hrSuccess)
-		goto exit;
+	if (lpSrcInterface == nullptr || lpSrcFolder == nullptr ||
+	    cbEntryID == 0 || lpEntryID == nullptr || lpDestFolder == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
+	if (*lpSrcInterface != IID_IMAPIFolder)
+		return MAPI_E_INTERFACE_NOT_SUPPORTED;
+	/*
+	 * lpDestInterface == NULL or IID_IMAPIFolder compatible.
+	 * [Since IMAPIFolder has no known I* descendants, there is
+	 * just this one class to handle.]
+	 */
+	if (lpDestInterface != nullptr && *lpDestInterface != IID_IMAPIFolder)
+		return MAPI_E_INTERFACE_NOT_SUPPORTED;
+	lpSource = static_cast<IMAPIFolder *>(lpSrcFolder);
+	lpDest = static_cast<IMAPIFolder *>(lpDestFolder);
 	hr = lpSource->OpenEntry(cbEntryID, lpEntryID, &IID_IMAPIFolder, 0, &ulObjType, &~lpFolder);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	if (!lpszNewFolderName) {
 		hr = HrGetOneProp(lpFolder, PR_DISPLAY_NAME_W, &~lpSourceName);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		ulFolderFlags |= MAPI_UNICODE;
 		lpszNewFolderName = (LPTSTR)lpSourceName->Value.lpszW;
 	} else
@@ -436,18 +342,14 @@ HRESULT M4LMAPISupport::CopyFolder(LPCIID lpSrcInterface, LPVOID lpSrcFolder, UL
 
 	hr = lpDest->CreateFolder(FOLDER_GENERIC, lpszNewFolderName, nullptr, &IID_IMAPIFolder, ulFolderFlags, &~lpSubFolder);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	hr = this->DoCopyTo(&IID_IMAPIFolder, lpFolder, 0, NULL, sExcludeProps,
 	     ulUIParam, lpProgress, &IID_IMAPIFolder, lpSubFolder, ulFlags, NULL);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	if (ulFlags & MAPI_MOVE)
 		lpSource->DeleteFolder(cbEntryID, (LPENTRYID)lpEntryID, 0, NULL, DEL_FOLDERS | DEL_MESSAGES);
-
-exit:
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::CopyFolder", "0x%08x", hr);
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT M4LMAPISupport::DoCopyTo(LPCIID lpSrcInterface, LPVOID lpSrcObj,
@@ -455,13 +357,9 @@ HRESULT M4LMAPISupport::DoCopyTo(LPCIID lpSrcInterface, LPVOID lpSrcObj,
     ULONG ulUIParam, LPMAPIPROGRESS lpProgress, LPCIID lpDestInterface,
     void *lpDestObj, ULONG ulFlags, SPropProblemArray **lppProblems)
 {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::DoCopyTo", "");
-	HRESULT hr = hrSuccess;
-
-	hr = Util::DoCopyTo(lpSrcInterface, lpSrcObj, ciidExclude, rgiidExclude, lpExcludeProps, ulUIParam, lpProgress, lpDestInterface, lpDestObj, ulFlags, lppProblems);
-
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::DoCopyTo", "0x%08x", hr);
-	return hr;
+	return Util::DoCopyTo(lpSrcInterface, lpSrcObj, ciidExclude,
+	       rgiidExclude, lpExcludeProps, ulUIParam, lpProgress,
+	       lpDestInterface, lpDestObj, ulFlags, lppProblems);
 }
 
 HRESULT M4LMAPISupport::DoCopyProps(LPCIID lpSrcInterface, void *lpSrcObj,
@@ -469,30 +367,20 @@ HRESULT M4LMAPISupport::DoCopyProps(LPCIID lpSrcInterface, void *lpSrcObj,
     LPMAPIPROGRESS lpProgress, LPCIID lpDestInterface, void *lpDestObj,
     ULONG ulFlags, SPropProblemArray **lppProblems)
 {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::DoCopyProps", "");
-	HRESULT hr = hrSuccess;
-
-	hr = Util::DoCopyProps(lpSrcInterface, lpSrcObj, lpIncludeProps, ulUIParam, lpProgress, lpDestInterface, lpDestObj, ulFlags, lppProblems);
-
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::DoCopyProps", "0x%08x", hr);
-    return hr;
+	return Util::DoCopyProps(lpSrcInterface, lpSrcObj, lpIncludeProps,
+	       ulUIParam, lpProgress, lpDestInterface, lpDestObj, ulFlags,
+	       lppProblems);
 }
 
 HRESULT M4LMAPISupport::DoProgressDialog(ULONG ulUIParam, ULONG ulFlags, LPMAPIPROGRESS * lppProgress) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::DoProgressDialog", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::DoProgressDialog", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::ReadReceipt(ULONG ulFlags, LPMESSAGE lpReadMessage, LPMESSAGE * lppEmptyMessage) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::ReadReceipt", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::ReadReceipt", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::PrepareSubmit(LPMESSAGE lpMessage, ULONG * lpulFlags) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::PrepareSubmit", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::PrepareSubmit", "0x%08x", MAPI_E_NO_SUPPORT);
 	// for every recipient,
 	// if mapi_submitted flag, clear flag, responsibility == false
 	// else set recipient type P1, responsibility == true
@@ -517,7 +405,6 @@ HRESULT M4LMAPISupport::PrepareSubmit(LPMESSAGE lpMessage, ULONG * lpulFlags) {
  * @return MAPI Error code
  */
 HRESULT M4LMAPISupport::ExpandRecips(LPMESSAGE lpMessage, ULONG * lpulFlags) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::ExpandRecips", "");
 	HRESULT hr = hrSuccess;
 	MAPITablePtr ptrRecipientTable;
 	SRowSetPtr ptrRow;
@@ -527,38 +414,35 @@ HRESULT M4LMAPISupport::ExpandRecips(LPMESSAGE lpMessage, ULONG * lpulFlags) {
 
 	hr = session->OpenAddressBook(0, NULL, AB_NO_DIALOG, &~ptrAddrBook);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	hr = lpMessage->GetRecipientTable(fMapiUnicode | MAPI_DEFERRED_ERRORS, &~ptrRecipientTable);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 	hr = ptrRecipientTable->QueryColumns(TBL_ALL_COLUMNS, &~ptrColumns);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	hr = ptrRecipientTable->SetColumns(ptrColumns, 0);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	while (true) {
 		const SPropValue *lpAddrType = NULL;
 		const SPropValue *lpDLEntryID = NULL;
 		ULONG ulObjType;
-		DistListPtr ptrDistList;
+		object_ptr<IDistList> ptrDistList;
 		MAPITablePtr ptrMemberTable;
 		SRowSetPtr ptrMembers;
 
 		hr = ptrRecipientTable->QueryRows(1, 0L, &ptrRow);
 		if (hr != hrSuccess)
-			goto exit;
-
+			return hr;
 		if (ptrRow.size() == 0)
 			break;
 
 		lpAddrType = PCpropFindProp(ptrRow[0].lpProps, ptrRow[0].cValues, PR_ADDRTYPE);
 		if (!lpAddrType)
 			continue;
-
-		if (_tcscmp(lpAddrType->Value.LPSZ, _T("MAPIPDL")))
+		if (_tcscmp(lpAddrType->Value.LPSZ, KC_T("MAPIPDL")))
 			continue;
 
 		lpDLEntryID = PCpropFindProp(ptrRow[0].lpProps, ptrRow[0].cValues, PR_ENTRYID);
@@ -569,18 +453,20 @@ HRESULT M4LMAPISupport::ExpandRecips(LPMESSAGE lpMessage, ULONG * lpulFlags) {
 			// already expanded this group so continue without opening
 			hr = lpMessage->ModifyRecipients(MODRECIP_REMOVE, (LPADRLIST)ptrRow.get());
 			if (hr != hrSuccess)
-				goto exit;
+				return hr;
 			continue;
 		}
 		setFilter.insert(std::vector<unsigned char>(lpDLEntryID->Value.bin.lpb, lpDLEntryID->Value.bin.lpb + lpDLEntryID->Value.bin.cb));
-		hr = ptrAddrBook->OpenEntry(lpDLEntryID->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpDLEntryID->Value.bin.lpb), NULL, 0, &ulObjType, &~ptrDistList);
+		hr = ptrAddrBook->OpenEntry(lpDLEntryID->Value.bin.cb,
+		     reinterpret_cast<ENTRYID *>(lpDLEntryID->Value.bin.lpb),
+		     &iid_of(ptrDistList), 0, &ulObjType, &~ptrDistList);
 		if (hr != hrSuccess)
 			continue;
 
 		// remove MAPIPDL entry when distlist is opened
 		hr = lpMessage->ModifyRecipients(MODRECIP_REMOVE, (LPADRLIST)ptrRow.get());
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 		hr = ptrDistList->GetContentsTable(fMapiUnicode, &~ptrMemberTable);
 		if (hr != hrSuccess)
 			continue;
@@ -588,7 +474,7 @@ HRESULT M4LMAPISupport::ExpandRecips(LPMESSAGE lpMessage, ULONG * lpulFlags) {
 		// Same columns as recipient table
 		hr = ptrMemberTable->SetColumns(ptrColumns, 0);
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 
 		// Get all recipients in distlist, and add to message.
 		// If another distlist is here, it will expand in the next loop.
@@ -613,120 +499,74 @@ HRESULT M4LMAPISupport::ExpandRecips(LPMESSAGE lpMessage, ULONG * lpulFlags) {
 
 		hr = lpMessage->ModifyRecipients(MODRECIP_ADD, (LPADRLIST)ptrMembers.get());
 		if (hr != hrSuccess)
-			goto exit;
+			return hr;
 	}
-	hr = hrSuccess;
-
 	// Return 0 (no spooler needed, no preprocessing needed)
 	if(lpulFlags)
 		*lpulFlags = 0;
-
-exit:
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::ExpandRecips", "0x%08x", hrSuccess);
-	return hr;
+	return hrSuccess;
 }
 
 HRESULT M4LMAPISupport::UpdatePAB(ULONG ulFlags, LPMESSAGE lpMessage) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::UpdatePAB", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::UpdatePAB", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::DoSentMail(ULONG ulFlags, LPMESSAGE lpMessage) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::DoSentMail", "");
-	HRESULT hr = ::DoSentMail(session, NULL, ulFlags, object_ptr<IMessage>(lpMessage)); // from CommonUtil
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::DoSentMail", "0x%08x", hr);
-	return hr;
+	return ::DoSentMail(session, nullptr, ulFlags,
+	       object_ptr<IMessage>(lpMessage)); /* from CommonUtil */
 }
 
 HRESULT M4LMAPISupport::OpenAddressBook(LPCIID lpInterface, ULONG ulFlags, LPADRBOOK * lppAdrBook) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::OpenAddressBook", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::OpenAddressBook", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::Preprocess(ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::Preprocess", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::Preprocess", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::CompleteMsg(ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::CompleteMsg", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::CompleteMsg", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::StoreLogoffTransports(ULONG * lpulFlags) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::StoreLogoffTransports", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::StoreLogoffTransports", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::StatusRecips(LPMESSAGE lpMessage, LPADRLIST lpRecipList) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::StatusRecips", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::StatusRecips", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
-HRESULT M4LMAPISupport::WrapStoreEntryID(ULONG cbOrigEntry, LPENTRYID lpOrigEntry, ULONG * lpcbWrappedEntry,
-										 LPENTRYID * lppWrappedEntry) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::WrapStoreEntryID", "");
+HRESULT M4LMAPISupport::WrapStoreEntryID(ULONG cbOrigEntry,
+    const ENTRYID *lpOrigEntry, ULONG *lpcbWrappedEntry,
+    ENTRYID **lppWrappedEntry)
+{
 	// get the dll name from SVCService
-	HRESULT hr = hrSuccess;
 	const SPropValue *lpDLLName = NULL;
 
-	if (!service) {
+	if (service == nullptr)
 		// addressbook provider doesn't have the SVCService object
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
-	}
-
+		return MAPI_E_CALL_FAILED;
 	lpDLLName = service->GetProp(PR_SERVICE_DLL_NAME_A);
-	if (!lpDLLName || !lpDLLName->Value.lpszA) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
-
+	if (lpDLLName == nullptr || lpDLLName->Value.lpszA == nullptr)
+		return MAPI_E_NOT_FOUND;
 	// call mapiutil version
-	hr = ::WrapStoreEntryID(0, (TCHAR*)lpDLLName->Value.lpszA, cbOrigEntry, lpOrigEntry, lpcbWrappedEntry, lppWrappedEntry);
-
-exit:	
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::WrapStoreEntryID", "0x%08x", hr);
-	return hr;
+	return ::WrapStoreEntryID(0, reinterpret_cast<TCHAR *>(lpDLLName->Value.lpszA),
+	       cbOrigEntry, lpOrigEntry, lpcbWrappedEntry, lppWrappedEntry);
 }
 
 HRESULT M4LMAPISupport::ModifyProfile(ULONG ulFlags) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::ModifyProfile", "");
-	HRESULT hr = hrSuccess;
-
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::ModifyProfile", "0x%08x", hr);
-    return hr;
+	return hrSuccess;
 }
 
 HRESULT M4LMAPISupport::IStorageFromStream(LPUNKNOWN lpUnkIn, LPCIID lpInterface, ULONG ulFlags, LPSTORAGE * lppStorageOut) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::IStorageFromStream", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::IStorageFromStream", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
 HRESULT M4LMAPISupport::GetSvcConfigSupportObj(ULONG ulFlags, LPMAPISUP * lppSvcSupport) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::GetSvcConfigSupportObj", "");
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::GetSvcConfigSupportObj", "0x%08x", MAPI_E_NO_SUPPORT);
     return MAPI_E_NO_SUPPORT;
 }
 
-// iunknown passthru
-ULONG M4LMAPISupport::AddRef() {
-    return M4LUnknown::AddRef();
-}
-ULONG M4LMAPISupport::Release() {
-    return M4LUnknown::Release();
-}
 HRESULT M4LMAPISupport::QueryInterface(REFIID refiid, void **lpvoid) {
-	TRACE_MAPILIB(TRACE_ENTRY, "M4LMAPISupport::QueryInterface", "");
-	HRESULT hr = hrSuccess;
-
 	if (refiid == IID_IMAPISup) {
 		AddRef();
 		*lpvoid = static_cast<IMAPISupport *>(this);
@@ -738,8 +578,7 @@ HRESULT M4LMAPISupport::QueryInterface(REFIID refiid, void **lpvoid) {
 		lpGetSession->AddRef();
 		*lpvoid = lpGetSession;
     } else
-		hr = MAPI_E_INTERFACE_NOT_SUPPORTED;
+		return MAPI_E_INTERFACE_NOT_SUPPORTED;
 
-	TRACE_MAPILIB1(TRACE_RETURN, "M4LMAPISupport::QueryInterface", "0x%08x", hr);
-	return hr;
+	return hrSuccess;
 }

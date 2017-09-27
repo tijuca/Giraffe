@@ -299,21 +299,21 @@ HRESULT CalDAV::HrListCalEntries(WEBDAVREQSTPROPS *lpsWebRCalQry, WEBDAVMULTISTA
 		hr = HrGetOneProp(m_lpUsrFld, PR_CONTAINER_CLASS_A, &~lpsPropVal);
 		if (hr != hrSuccess) {
 			ec_log_debug("CalDAV::HrListCalEntries HrGetOneProp failed 0x%08x %s", hr, GetMAPIErrorMessage(hr));
-			goto exit;
+			return hr;
 		}
 
 		if (lpsWebRCalQry->sFilter.lstFilters.back() == "VTODO"
 			&& strncmp(lpsPropVal->Value.lpszA, "IPF.Task", strlen("IPF.Task")))
-				goto exit;
+			return hr;
 		if (lpsWebRCalQry->sFilter.lstFilters.back() == "VEVENT"
 			&& strncmp(lpsPropVal->Value.lpszA, "IPF.Appointment", strlen("IPF.Appointment")))
-			goto exit;
+			return hr;
 	}
 
 	hr = m_lpUsrFld->GetContentsTable(0, &~lpTable);
 	if (hr != hrSuccess) {
 		ec_log_err("Error in GetContentsTable, error code: 0x%08X %s", hr, GetMAPIErrorMessage(hr));
-		goto exit;
+		return hr;
 	}
 
 	// restrict on meeting requests and appointments
@@ -327,7 +327,7 @@ HRESULT CalDAV::HrListCalEntries(WEBDAVREQSTPROPS *lpsWebRCalQry, WEBDAVMULTISTA
 	hr = rst.RestrictTable(lpTable, 0);
 	if (hr != hrSuccess) {
 		ec_log_err("Unable to restrict folder contents, error code: 0x%08X %s", hr, GetMAPIErrorMessage(hr));
-		goto exit;
+		return hr;
 	}
 
 	// +4 to add GlobalObjid, dispidApptTsRef , PR_ENTRYID and private in SetColumns along with requested data.
@@ -336,7 +336,7 @@ HRESULT CalDAV::HrListCalEntries(WEBDAVREQSTPROPS *lpsWebRCalQry, WEBDAVMULTISTA
 	if(hr != hrSuccess)
 	{
 		ec_log_err("Cannot allocate memory");
-		goto exit;
+		return hr;
 	}
 
 	lpPropTagArr->cValues = cbsize;
@@ -353,22 +353,19 @@ HRESULT CalDAV::HrListCalEntries(WEBDAVREQSTPROPS *lpsWebRCalQry, WEBDAVMULTISTA
 	hr = m_lpUsrFld->GetProps(lpPropTagArr, 0, &cValues, &~lpProps);
 	if (FAILED(hr)) {
 		ec_log_err("Unable to receive folder properties, error 0x%08X %s", hr, GetMAPIErrorMessage(hr));
-		goto exit;
+		return hr;
 	}
 
 	// @todo, add "start time" property and recurrence data to table and filter in loop
 	// if lpsWebRCalQry->sFilter.tStart is set.
 	hr = lpTable->SetColumns(lpPropTagArr, 0);
 	if(hr != hrSuccess)
-		goto exit;
+		return hr;
 
 	// @todo do we really need this converter, since we're only listing the items?
 	CreateMapiToICal(m_lpAddrBook, "utf-8", &unique_tie(lpMtIcal));
 	if (!lpMtIcal)
-	{
-		hr = MAPI_E_CALL_FAILED;
-		goto exit;
-	}
+		return MAPI_E_CALL_FAILED;
 
 	while(1)
 	{
@@ -377,7 +374,7 @@ HRESULT CalDAV::HrListCalEntries(WEBDAVREQSTPROPS *lpsWebRCalQry, WEBDAVMULTISTA
 		if(hr != hrSuccess)
 		{
 			ec_log_err("Error retrieving rows of table");
-			goto exit;
+			return hr;
 		}
 
 		if(lpRowSet->cRows == 0)
@@ -430,9 +427,7 @@ HRESULT CalDAV::HrListCalEntries(WEBDAVREQSTPROPS *lpsWebRCalQry, WEBDAVMULTISTA
 		}
 	}
 
-exit:
-	if (hr == hrSuccess)
-		ec_log_info("Number of items in folder returned: %u", ulItemCount);
+	ec_log_info("Number of items in folder returned: %u", ulItemCount);
 	return hr;
 }
 
@@ -655,7 +650,7 @@ HRESULT CalDAV::HrHandlePropertySearch(WEBDAVRPTMGET *sWebRMGet, WEBDAVMULTISTAT
 		ec_log_debug("CalDAV::HrHandlePropertySearch GetDefaultDir failed: 0x%08x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
-	hr = m_lpSession->OpenEntry(sbEid.cb, reinterpret_cast<ENTRYID *>(sbEid.lpb), nullptr, 0, &ulObjType, &~lpAbCont);
+	hr = m_lpSession->OpenEntry(sbEid.cb, reinterpret_cast<ENTRYID *>(sbEid.lpb), &iid_of(lpAbCont), 0, &ulObjType, &~lpAbCont);
 	if (hr != hrSuccess) {
 		ec_log_debug("CalDAV::HrHandlePropertySearch OpenEntry failed: 0x%08x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
@@ -802,7 +797,7 @@ HRESULT CalDAV::HrHandleDelete()
 		ec_log_err("Error finding \"Deleted items\" folder, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
-	hr = m_lpDefStore->OpenEntry(lpPropWstBxEID->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpPropWstBxEID->Value.bin.lpb), nullptr, MAPI_MODIFY, &ulObjType, &~lpWastBoxFld);
+	hr = m_lpDefStore->OpenEntry(lpPropWstBxEID->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpPropWstBxEID->Value.bin.lpb), &iid_of(lpWastBoxFld), MAPI_MODIFY, &ulObjType, &~lpWastBoxFld);
 	if (hr != hrSuccess)
 	{
 		ec_log_err("Error opening \"Deleted items\" folder, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
@@ -1177,7 +1172,7 @@ HRESULT CalDAV::CreateAndGetGuid(SBinary sbEid, ULONG ulPropTag, std::string *lp
 	ULONG ulObjType = 0;
 	memory_ptr<SPropValue> lpProp;
 
-	hr = m_lpActiveStore->OpenEntry(sbEid.cb, reinterpret_cast<ENTRYID *>(sbEid.lpb), nullptr, MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
+	hr = m_lpActiveStore->OpenEntry(sbEid.cb, reinterpret_cast<ENTRYID *>(sbEid.lpb), &iid_of(lpMessage), MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
 	if (hr != hrSuccess) {
 		ec_log_err("Error opening message to add Guid, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		return hr;
@@ -1363,7 +1358,7 @@ HRESULT CalDAV::HrListCalendar(WEBDAVREQSTPROPS *sDavProp, WEBDAVMULTISTATUS *lp
 			hr = hrSuccess;
 			goto nowaste;
 		}
-		hr = m_lpActiveStore->OpenEntry(lpSpropWbEID->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpSpropWbEID->Value.bin.lpb), nullptr, MAPI_BEST_ACCESS, &ulObjType, &~lpWasteBox);
+		hr = m_lpActiveStore->OpenEntry(lpSpropWbEID->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpSpropWbEID->Value.bin.lpb), &iid_of(lpWasteBox), MAPI_BEST_ACCESS, &ulObjType, &~lpWasteBox);
 		if(hr != hrSuccess)
 		{
 			hr = hrSuccess;
@@ -1701,7 +1696,8 @@ HRESULT CalDAV::HrHandleMeeting(ICalToMapi *lpIcalToMapi)
 		ec_log_debug("CalDAV::HrHandleMeeting GetProps failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
 	}
-	hr = m_lpDefStore->OpenEntry(lpsGetPropVal[0].Value.bin.cb, reinterpret_cast<ENTRYID *>(lpsGetPropVal[0].Value.bin.lpb), nullptr, MAPI_BEST_ACCESS, &ulObjType, &~lpOutbox);
+	hr = m_lpDefStore->OpenEntry(lpsGetPropVal[0].Value.bin.cb, reinterpret_cast<ENTRYID *>(lpsGetPropVal[0].Value.bin.lpb),
+	     &iid_of(lpOutbox), MAPI_BEST_ACCESS, &ulObjType, &~lpOutbox);
 	if (hr != hrSuccess) {
 		ec_log_debug("CalDAV::HrHandleMeeting OpenEntry failed: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		goto exit;
@@ -1766,8 +1762,9 @@ HRESULT CalDAV::HrConvertToIcal(const SPropValue *lpEid, MapiToICal *lpMtIcal,
 	object_ptr<IMessage> lpMessage;
 	ULONG ulObjType = 0;
 
-	hr = m_lpActiveStore->OpenEntry(lpEid->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpEid->Value.bin.lpb), nullptr, MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
-	if (hr != hrSuccess && ulObjType == MAPI_MESSAGE)
+	hr = m_lpActiveStore->OpenEntry(lpEid->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpEid->Value.bin.lpb),
+	     &iid_of(lpMessage), MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
+	if (hr != hrSuccess || ulObjType != MAPI_MESSAGE)
 	{
 		ec_log_err("Error opening calendar entry, error code: 0x%x %s", hr, GetMAPIErrorMessage(hr));
 		return hr;
@@ -1829,6 +1826,7 @@ HRESULT CalDAV::HrMapValtoStruct(LPMAPIPROP lpObj, LPSPropValue lpProps, ULONG u
 		ulFolderType = TASKS_FOLDER;
 	else
 		ulFolderType = OTHER_FOLDER;
+	/* ignore errors - nullptr will be handled */
 	HrGetOneProp(m_lpActiveUser, PR_SMTP_ADDRESS_A, &~ptrEmail);
 	HrGetOneProp(m_lpActiveUser, PR_DISPLAY_NAME_W, &~ptrFullname);
 
@@ -1887,7 +1885,7 @@ HRESULT CalDAV::HrMapValtoStruct(LPMAPIPROP lpObj, LPSPropValue lpProps, ULONG u
 			// foldername from given properties (propfind command) username from properties (propsearch command) or fullname of user ("root" props)
 			if (bPropsFirst)
 				sWebProperty.strValue = SPropValToString(lpFoundProp);
-			else
+			else if (ptrFullname != nullptr)
 				sWebProperty.strValue = W2U(ptrFullname->Value.lpszW);
 			
 		} else if (strProperty == "calendar-user-address-set" && (m_ulUrlFlag & REQ_PUBLIC) == 0 && !!ptrEmail) {
@@ -2092,7 +2090,7 @@ HRESULT CalDAV::HrGetCalendarOrder(SBinary sbEid, std::string *lpstrCalendarOrde
 	ULONG ulResult = 0;
 
 	lpstrCalendarOrder->assign("2");
-	hr = m_lpActiveStore->OpenEntry(0, nullptr, nullptr, 0, &ulObjType, &~lpRootCont);
+	hr = m_lpActiveStore->OpenEntry(0, nullptr, &iid_of(lpRootCont), 0, &ulObjType, &~lpRootCont);
 	if (hr != hrSuccess || ulObjType != MAPI_FOLDER) {
 		ec_log_err("Error opening root Container of user %ls, error code: (0x%08X)", m_wstrUser.c_str(), hr);
 		return hr;

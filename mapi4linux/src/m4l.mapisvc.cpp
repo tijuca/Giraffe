@@ -123,10 +123,8 @@ HRESULT INFLoader::LoadINF(const char *filename)
 	size_t pos;
 
 	fp = fopen(filename, "r");
-	if (fp == NULL) {
-		hr = MAPI_E_NOT_FOUND;
-		goto exit;
-	}
+	if (fp == nullptr)
+		return MAPI_E_NOT_FOUND;
 
 	while (!feof(fp)) {
 		memset(&cBuffer, 0, sizeof(cBuffer));
@@ -165,7 +163,6 @@ HRESULT INFLoader::LoadINF(const char *filename)
 		iSection->second.insert(make_pair(trim(strName, " \t\r\n"), trim(strValue, " \t\r\n")));
 	}
 
-exit:
 	if (fp)
 		fclose(fp);
 
@@ -197,7 +194,7 @@ const inf_section* INFLoader::GetSection(const string& strSectionName) const
 vector<string> INFLoader::GetINFPaths()
 {
 	vector<string> ret;
-	char *env = getenv("MAPI_CONFIG_PATH");
+	const char *env = getenv("MAPI_CONFIG_PATH");
 	if (env)
 		ret = tokenize(env, ':', true);
 	else
@@ -372,7 +369,7 @@ HRESULT SVCService::Init(const INFLoader& cINF, const inf_section* infService)
 		return MAPI_E_NOT_FOUND;
 
 	m_dl = dlopen(lpSO->Value.lpszA, RTLD_NOW);
-	if (!m_dl) {
+	if (m_dl == nullptr && strchr(lpSO->Value.lpszA, '/') == nullptr) {
 		snprintf(filename, PATH_MAX + 1, "%s%c%s", PKGLIBDIR, PATH_SEPARATOR, lpSO->Value.lpszA);
 		m_dl = dlopen(filename, RTLD_NOW);
 	}
@@ -422,9 +419,9 @@ const SPropValue *SVCService::GetProp(ULONG ulPropTag)
 	return PCpropFindProp(m_lpProps, m_cValues, ulPropTag);
 }
 
-SVCProvider* SVCService::GetProvider(LPTSTR lpszProvider, ULONG ulFlags)
+SVCProvider* SVCService::GetProvider(const TCHAR *lpszProvider, ULONG ulFlags)
 {
-	std::map<std::string, SVCProvider*>::const_iterator i = m_sProviders.find(reinterpret_cast<const char *>(lpszProvider));
+	auto i = m_sProviders.find(reinterpret_cast<const char *>(lpszProvider));
 	if (i == m_sProviders.cend())
 		return NULL;
 	return i->second;
@@ -500,11 +497,11 @@ HRESULT MAPISVC::Init()
  * 
  * @return 
  */
-HRESULT MAPISVC::GetService(LPTSTR lpszService, ULONG ulFlags, SVCService **lppService)
+HRESULT MAPISVC::GetService(const TCHAR *lpszService, ULONG ulFlags, SVCService **lppService)
 {
 	std::map<std::string, SVCService *>::const_iterator i;
 	
-	i = m_sServices.find((char*)lpszService);
+	i = m_sServices.find(reinterpret_cast<const char *>(lpszService));
 	if (i == m_sServices.cend())
 		return MAPI_E_NOT_FOUND;
 
@@ -522,7 +519,7 @@ HRESULT MAPISVC::GetService(LPTSTR lpszService, ULONG ulFlags, SVCService **lppS
  * @return MAPI Error code
  * @retval MAPI_E_NOT_FOUND no service object for the given dll name
  */
-HRESULT MAPISVC::GetService(char* lpszDLLName, SVCService **lppService)
+HRESULT MAPISVC::GetService(const char *lpszDLLName, SVCService **lppService)
 {
 	for (const auto &i : m_sServices) {
 		const SPropValue *lpDLLName = i.second->GetProp(PR_SERVICE_DLL_NAME_A);

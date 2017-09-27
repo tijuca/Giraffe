@@ -14,9 +14,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
 #include <kopano/lockhelper.hpp>
+#include <kopano/Util.h>
 #include "ECSecurity.h"
 #include "ECDatabase.h"
 
@@ -42,13 +43,8 @@ ECRESULT ECSearchObjectTable::Create(ECSession *lpSession,
     unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale,
     ECStoreObjectTable **lppTable)
 {
-	ECRESULT er = erSuccess;
-
-	*lppTable = new ECSearchObjectTable(lpSession, ulStoreId, lpGuid, ulFolderId, ulObjType, ulFlags, locale);
-
-	(*lppTable)->AddRef();
-	
-	return er;
+	return alloc_wrap<ECSearchObjectTable>(lpSession, ulStoreId, lpGuid,
+	       ulFolderId, ulObjType, ulFlags, locale).put(lppTable);
 }
 
 ECRESULT ECSearchObjectTable::Load() {
@@ -94,8 +90,7 @@ ECRESULT ECSearchObjectTable::Load() {
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
 		return er;
-
-	while ( (lpDBRow = lpDatabase->FetchRow(lpDBResult)) ) {
+	while ((lpDBRow = lpDBResult.fetch_row()) != nullptr) {
 		if(lpDBRow == NULL || lpDBRow[0] == NULL)
 			continue;
 		setObjIdPrivate.insert(atoui(lpDBRow[0]));

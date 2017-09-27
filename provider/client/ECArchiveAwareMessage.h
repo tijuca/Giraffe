@@ -94,14 +94,13 @@ private:
 	};
 	eMode	m_mode;
 	bool	m_bChanged;
-
-	typedef KCHL::object_ptr<ECMessage, IID_ECMessage> ECMessagePtr;
-	ECMessagePtr	m_ptrArchiveMsg;
+	KCHL::object_ptr<ECMessage> m_ptrArchiveMsg;
+	ALLOC_WRAP_FRIEND;
 };
 
 class ECArchiveAwareMessageFactory _kc_final : public IMessageFactory {
 public:
-	HRESULT Create(ECMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFlags, BOOL bEmbedded, ECMAPIProp *lpRoot, ECMessage **lppMessage) const;
+	HRESULT Create(ECMsgStore *, BOOL fnew, BOOL modify, ULONG flags, BOOL embedded, const ECMAPIProp *root, ECMessage **) const;
 };
 
 #endif // ndef ECARCHIVEAWAREMESSAGE_H

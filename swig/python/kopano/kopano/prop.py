@@ -5,35 +5,232 @@ Copyright 2005 - 2016 Zarafa and its licensors (see LICENSE file for details)
 Copyright 2016 - Kopano and its licensors (see LICENSE file for details)
 """
 
-import codecs
 import datetime
 import sys
 import time
 
 from MAPI import (
-    PT_ERROR, PT_BINARY, PT_MV_BINARY, PT_UNICODE,
-    PT_SYSTIME, MAPI_E_NOT_ENOUGH_MEMORY, KEEP_OPEN_READWRITE,
-    MNID_STRING
+    PT_ERROR, PT_BINARY, PT_MV_BINARY, PT_UNICODE, PT_LONG, PT_OBJECT,
+    PT_BOOLEAN, PT_STRING8, MV_FLAG, PT_SHORT, PT_MV_SHORT, PT_LONGLONG,
+    PT_MV_LONG, PT_FLOAT, PT_MV_FLOAT, PT_DOUBLE, PT_MV_DOUBLE, PT_STRING8,
+    PT_CURRENCY, PT_MV_CURRENCY, PT_APPTIME, PT_MV_APPTIME, PT_MV_LONGLONG,
+    PT_SYSTIME, MAPI_E_NOT_ENOUGH_MEMORY, KEEP_OPEN_READWRITE, PT_MV_STRING8,
+    PT_MV_UNICODE, PT_MV_SYSTIME, PT_CLSID, PT_MV_CLSID, MNID_STRING,
+    MAPI_E_NOT_FOUND, MNID_ID, KEEP_OPEN_READWRITE, MAPI_UNICODE,
 )
 from MAPI.Defs import (
-    PROP_ID, PROP_TAG, PROP_TYPE, HrGetOneProp, bin2hex
+    PROP_ID, PROP_TAG, PROP_TYPE, HrGetOneProp, bin2hex,
+    CHANGE_PROP_TYPE,
 )
 from MAPI.Struct import (
     SPropValue, MAPIErrorNotFound, MAPIErrorNoSupport,
     MAPIErrorNotEnoughMemory
 )
 from MAPI.Tags import (
-    PR_BODY_W, PR_HTML, PR_RTF_COMPRESSED
+    PR_BODY_W, PR_HTML, PR_RTF_COMPRESSED, PR_RTF_IN_SYNC, PR_NULL
 )
 from MAPI.Time import unixtime
 
-from .defs import REV_TAG, REV_TYPE, GUID_NAMESPACE
-from .compat import repr as _repr, fake_unicode as _unicode
+from .defs import (
+    REV_TAG, REV_TYPE, GUID_NAMESPACE, MAPINAMEID, NAMESPACE_GUID, STR_GUID,
+)
+from .compat import (
+    repr as _repr, fake_unicode as _unicode, is_int as _is_int, hex as _hex
+)
+from .errors import Error, NotFoundError
 
 if sys.hexversion >= 0x03000000:
-    from . import utils as _utils
+    try:
+        from . import utils as _utils
+    except ImportError:
+        _utils = sys.modules[__package__+'.utils']
 else:
     import utils as _utils
+
+TYPEMAP = {
+    'PT_SHORT': PT_SHORT,
+    'PT_MV_SHORT': PT_MV_SHORT,
+    'PT_LONG': PT_LONG,
+    'PT_MV_LONG': PT_MV_LONG,
+    'PT_FLOAT': PT_FLOAT,
+    'PT_MV_FLOAT': PT_MV_FLOAT,
+    'PT_DOUBLE': PT_DOUBLE,
+    'PT_MV_DOUBLE': PT_MV_DOUBLE,
+    'PT_CURRENCY': PT_CURRENCY,
+    'PT_MV_CURRENCY': PT_MV_CURRENCY,
+    'PT_APPTIME': PT_APPTIME,
+    'PT_MV_APPTIME': PT_MV_APPTIME,
+    'PT_BOOLEAN': PT_BOOLEAN,
+    'PT_OBJECT': PT_OBJECT,
+    'PT_LONGLONG': PT_LONGLONG,
+    'PT_MV_LONGLONG': PT_MV_LONGLONG,
+    'PT_STRING8': PT_STRING8,
+    'PT_MV_STRING8': PT_MV_STRING8,
+    'PT_UNICODE': PT_UNICODE,
+    'PT_MV_UNICODE': PT_MV_UNICODE,
+    'PT_SYSTIME': PT_SYSTIME,
+    'PT_MV_SYSTIME': PT_MV_SYSTIME,
+    'PT_CLSID': PT_CLSID,
+    'PT_MV_CLSID': PT_MV_CLSID,
+    'PT_BINARY': PT_BINARY,
+    'PT_MV_BINARY': PT_MV_BINARY,
+}
+
+def bestbody(mapiobj): # XXX we may want to use the swigged version in libcommon, once available
+    # apparently standardized method for determining original message type!
+    tag = PR_NULL
+    props = mapiobj.GetProps([PR_BODY_W, PR_HTML, PR_RTF_COMPRESSED, PR_RTF_IN_SYNC], 0)
+
+    if (props[3].ulPropTag != PR_RTF_IN_SYNC): # XXX why..
+        return tag
+
+    # MAPI_E_NOT_ENOUGH_MEMORY indicates the property exists, but has to be streamed
+    if((props[0].ulPropTag == PR_BODY_W or (PROP_TYPE(props[0].ulPropTag) == PT_ERROR and props[0].Value == MAPI_E_NOT_ENOUGH_MEMORY)) and
+       (PROP_TYPE(props[1].ulPropTag) == PT_ERROR and props[1].Value == MAPI_E_NOT_FOUND) and
+       (PROP_TYPE(props[2].ulPropTag) == PT_ERROR and props[2].Value == MAPI_E_NOT_FOUND)):
+        tag = PR_BODY_W
+
+    # XXX why not just check MAPI_E_NOT_FOUND..?
+    elif((props[1].ulPropTag == PR_HTML or (PROP_TYPE(props[1].ulPropTag) == PT_ERROR and props[1].Value == MAPI_E_NOT_ENOUGH_MEMORY)) and
+         (PROP_TYPE(props[0].ulPropTag) == PT_ERROR and props[0].Value == MAPI_E_NOT_ENOUGH_MEMORY) and
+         (PROP_TYPE(props[2].ulPropTag) == PT_ERROR and props[2].Value == MAPI_E_NOT_ENOUGH_MEMORY) and
+         not props[3].Value):
+        tag = PR_HTML
+
+    elif((props[2].ulPropTag == PR_RTF_COMPRESSED or (PROP_TYPE(props[2].ulPropTag) == PT_ERROR and props[2].Value == MAPI_E_NOT_ENOUGH_MEMORY)) and
+         (PROP_TYPE(props[0].ulPropTag) == PT_ERROR and props[0].Value == MAPI_E_NOT_ENOUGH_MEMORY) and
+         (PROP_TYPE(props[1].ulPropTag) == PT_ERROR and props[1].Value == MAPI_E_NOT_FOUND) and
+         props[3].Value):
+        tag = PR_RTF_COMPRESSED
+
+    return tag
+
+def _split_proptag(proptag): # XXX syntax error exception
+    parts = proptag.split(':')
+    if len(parts) == 2:
+        namespace, name = parts
+        return None, namespace, name
+    else:
+        proptype, namespace, name = parts
+        return TYPEMAP[proptype], namespace, name
+
+def _name_to_proptag(proptag, mapiobj, proptype=None):
+    ptype, namespace, name = _split_proptag(proptag)
+    proptype = proptype or ptype
+
+    if name.isdigit(): # XXX
+        name = int(name)
+    elif name.startswith('0x'):
+        name = int(name, 16)
+
+    if namespace in NAMESPACE_GUID:
+        guid = NAMESPACE_GUID[namespace]
+    elif namespace in STR_GUID:
+        guid = STR_GUID[namespace]
+
+    if proptype is None:
+        return None, proptype, namespace, name
+
+    nameid = MAPINAMEID(guid, MNID_ID if isinstance(name, int) else MNID_STRING, name)
+    lpname = mapiobj.GetIDsFromNames([nameid], 0)
+    proptag = CHANGE_PROP_TYPE(lpname[0], proptype)
+
+    return proptag, proptype, namespace, name
+
+def _proptag_to_name(proptag, store, proptype=False):
+    lpname = store.mapiobj.GetNamesFromIDs([proptag], None, 0)[0]
+    namespace = GUID_NAMESPACE.get(lpname.guid)
+    name = lpname.id
+    if proptype:
+        type_ = REV_TYPE.get(PROP_TYPE(proptag))
+        return u'%s:%s:%s' % (namespace, name, type_)
+    return u'%s:%s' % (namespace, name)
+
+def create_prop(self, mapiobj, proptag, value=None, proptype=None): # XXX selfie
+
+    if _is_int(proptag):
+        proptag2, proptype2 = proptag, proptype
+        if proptype is None:
+            proptype2 = PROP_TYPE(proptag)
+
+    else: # named property
+        proptag2, proptype2, _, _ = _name_to_proptag(proptag, mapiobj, proptype)
+
+        if proptype2 is None:
+            raise Error('Missing type to create named property') # XXX exception too general?
+
+    if value is None:
+        if proptype2 in (PT_STRING8, PT_UNICODE):
+            value = u''
+        elif proptype2 == PT_BINARY:
+            value = b''
+        elif proptype2 == PT_SYSTIME:
+            value = unixtime(0)
+        elif proptype2 & MV_FLAG:
+            value = []
+        else:
+            value = 0
+    else:
+        if proptype2 == PT_SYSTIME:
+            value = unixtime(time.mktime(value.timetuple()))
+
+    # handle invalid type versus value. For example proptype=PT_UNICODE and value=True
+    try:
+        mapiobj.SetProps([SPropValue(proptag2, value)])
+    except TypeError:
+        raise Error('Could not create property, type and value did not match')
+
+    return prop(self, mapiobj, proptag)
+
+def prop(self, mapiobj, proptag, create=False, value=None, proptype=None): # XXX selfie
+    if _is_int(proptag): # regular property
+        # search for property
+        try:
+            sprop = HrGetOneProp(mapiobj, proptag)
+        except MAPIErrorNotEnoughMemory:
+            data = _utils.stream(mapiobj, proptag)
+            sprop = SPropValue(proptag, data)
+        except MAPIErrorNotFound as e:
+            # not found, create it?
+            if create:
+                return create_prop(self, mapiobj, proptag, value=value, proptype=proptype)
+            else:
+                raise NotFoundError('no such property: %s' % REV_TAG.get(proptag, hex(proptag)))
+        return Property(mapiobj, sprop)
+
+    else: # named property
+        proptag2, proptype2, namespace, name = _name_to_proptag(proptag, mapiobj, proptype)
+
+        # search for property
+        if proptype2:
+            try:
+                sprop = HrGetOneProp(mapiobj, proptag2) # XXX merge two main branches?
+                return Property(mapiobj, sprop)
+            except MAPIErrorNotEnoughMemory:
+                data = _utils.stream(mapiobj, proptag2)
+                sprop = SPropValue(proptag2, data)
+                return Property(mapiobj, sprop)
+            except MAPIErrorNotFound:
+                pass
+        else:
+            for prop in self.props(namespace=namespace): # XXX sloow, streaming? default pidlid type-db?
+                if prop.name == name:
+                    return prop
+
+        # not found, create it?
+        if create:
+            return create_prop(self, mapiobj, proptag, value=value, proptype=proptype)
+        else:
+            raise NotFoundError('no such property: %s' % proptag)
+
+def props(mapiobj, namespace=None):
+    proptags = mapiobj.GetPropList(MAPI_UNICODE)
+    sprops = mapiobj.GetProps(proptags, MAPI_UNICODE)
+    sprops = [s for s in sprops if not (PROP_TYPE(s.ulPropTag) == PT_ERROR and s.Value == MAPI_E_NOT_FOUND)]
+    props = [Property(mapiobj, sprop) for sprop in sprops]
+    for p in sorted(props):
+        if not namespace or p.namespace == namespace:
+            yield p
 
 class SPropDelayedValue(SPropValue):
     def __init__(self, mapiobj, proptag):
@@ -108,7 +305,7 @@ class Property(object):
         if self._value is None:
             if self.type_ == PT_SYSTIME: # XXX generalize, property?
                 #
-                # The datetime object is of "naive" type, has local time and
+                # XXX The datetime object is of "naive" type, has local time and
                 # no TZ info. :-(
                 #
                 try:
@@ -122,7 +319,6 @@ class Property(object):
     def set_value(self, value):
         self._value = value
         if self.type_ == PT_SYSTIME:
-            # Timezones are handled.
             value = unixtime(time.mktime(value.timetuple()))
         self._parent_mapiobj.SetProps([SPropValue(self.proptag, value)])
         self._parent_mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
@@ -137,17 +333,17 @@ class Property(object):
 
     @property
     def strval(self):
+        """ String representation of value; useful for overviews, debugging """
+
         def flatten(v):
             if isinstance(v, list):
                 return u','.join(flatten(e) for e in v)
             elif isinstance(v, bool):
                 return u'01'[v]
-            elif self.type_ == PT_BINARY:
-                return codecs.encode(v, 'hex').decode('ascii').upper()
-            elif self.type_ == PT_MV_BINARY:
-                return u'PT_MV_BINARY()' # XXX
             elif v is None:
                 return ''
+            elif self.type_ in (PT_BINARY, PT_MV_BINARY):
+                return _hex(v)
             else:
                 return _unicode(v)
         return flatten(self.value)

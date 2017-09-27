@@ -27,7 +27,6 @@
 
 #include <kopano/Util.h>
 #include <kopano/ECGuid.h>
-#include <kopano/ECInterfaceDefs.h>
 #include <kopano/mapi_ptr.h>
 #include <kopano/memory.hpp>
 #include <kopano/namedprops.h>
@@ -230,7 +229,8 @@ HRESULT ZCMAPIProp::ConvertDistList(LPSPropTagArray lpNames, ULONG cValues, LPSP
  * 
  * @return 
  */
-HRESULT ZCMAPIProp::ConvertProps(IMAPIProp *lpContact, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulIndex)
+HRESULT ZCMAPIProp::ConvertProps(IMAPIProp *lpContact, ULONG cbEntryID,
+    const ENTRYID *lpEntryID, ULONG ulIndex)
 {
 	HRESULT hr = hrSuccess;
 	ULONG cValues = 0;
@@ -285,44 +285,32 @@ HRESULT ZCMAPIProp::ConvertProps(IMAPIProp *lpContact, ULONG cbEntryID, LPENTRYI
 	return hr;
 }
 
-HRESULT ZCMAPIProp::Create(IMAPIProp *lpContact, ULONG cbEntryID, LPENTRYID lpEntryID, ZCMAPIProp **lppZCMAPIProp)
+HRESULT ZCMAPIProp::Create(IMAPIProp *lpContact, ULONG cbEntryID,
+    const ENTRYID *lpEntryID, ZCMAPIProp **lppZCMAPIProp)
 {
 	HRESULT	hr = hrSuccess;
-	ZCMAPIProp *lpZCMAPIProp = NULL;
-	cabEntryID *lpCABEntryID = (cabEntryID*)lpEntryID;
+	auto lpCABEntryID = reinterpret_cast<const cabEntryID *>(lpEntryID);
 
-	if (lpCABEntryID->ulObjType != MAPI_MAILUSER && lpCABEntryID->ulObjType != MAPI_DISTLIST) {
-		hr = MAPI_E_INVALID_OBJECT;
-		goto exit;
-	}
-	lpZCMAPIProp = new(std::nothrow) ZCMAPIProp(lpCABEntryID->ulObjType);
-	if (lpZCMAPIProp == nullptr) {
-		hr = MAPI_E_NOT_ENOUGH_MEMORY;
-		goto exit;
-	}
-
+	if (lpCABEntryID->ulObjType != MAPI_MAILUSER && lpCABEntryID->ulObjType != MAPI_DISTLIST)
+		return MAPI_E_INVALID_OBJECT;
+	KCHL::object_ptr<ZCMAPIProp> lpZCMAPIProp(new(std::nothrow) ZCMAPIProp(lpCABEntryID->ulObjType));
+	if (lpZCMAPIProp == nullptr)
+		return MAPI_E_NOT_ENOUGH_MEMORY;
 	hr = lpZCMAPIProp->ConvertProps(lpContact, cbEntryID, lpEntryID, lpCABEntryID->ulOffset);
 	if (hr != hrSuccess)
-		goto exit;
-
-	hr = lpZCMAPIProp->QueryInterface(IID_ZCMAPIProp, (void**)lppZCMAPIProp);
-
-exit:
-	if (hr != hrSuccess)
-		delete lpZCMAPIProp;
-
-	return hr;
+		return hr;
+	*lppZCMAPIProp = lpZCMAPIProp.release();
+	return hrSuccess;
 }
 
 HRESULT ZCMAPIProp::QueryInterface(REFIID refiid, void **lppInterface)
 {
 	REGISTER_INTERFACE2(ZCMAPIProp, this);
 	REGISTER_INTERFACE2(ECUnknown, this);
-	REGISTER_INTERFACE2(IMAPIProp, &this->m_xMAPIProp);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xMAPIProp);
-	if (m_ulObject == MAPI_MAILUSER) {
-		REGISTER_INTERFACE(IID_IMailUser, &this->m_xMAPIProp);
-	}
+	REGISTER_INTERFACE2(IMAPIProp, this);
+	REGISTER_INTERFACE2(IUnknown, this);
+	if (m_ulObject == MAPI_MAILUSER)
+		REGISTER_INTERFACE2(IMailUser, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -490,19 +478,3 @@ HRESULT ZCMAPIProp::GetIDsFromNames(ULONG cPropNames, LPMAPINAMEID * lppPropName
 {
 	return MAPI_E_NO_SUPPORT;
 }
-
-// Interface IMAPIProp
-DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_ULONGMETHOD0(ZCMAPIProp, MAPIProp, AddRef, (void))
-DEF_ULONGMETHOD0(ZCMAPIProp, MAPIProp, Release, (void))
-DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, GetLastError, (HRESULT, hError), (ULONG, ulFlags), (LPMAPIERROR *, lppMapiError))
-DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, SaveChanges, (ULONG, ulFlags))
-DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, GetProps, (const SPropTagArray *, lpPropTagArray), (ULONG, ulFlags), (ULONG *, lpcValues), (SPropValue **, lppPropArray))
-DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, GetPropList, (ULONG, ulFlags), (LPSPropTagArray *, lppPropTagArray))
-DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, OpenProperty, (ULONG, ulPropTag), (LPCIID, lpiid), (ULONG, ulInterfaceOptions), (ULONG, ulFlags), (LPUNKNOWN *, lppUnk))
-DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, SetProps, (ULONG, cValues), (const SPropValue *, lpPropArray), (SPropProblemArray **, lppProblems))
-DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, DeleteProps, (const SPropTagArray *, lpPropTagArray), (SPropProblemArray **, lppProblems))
-DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, CopyTo, (ULONG, ciidExclude), (LPCIID, rgiidExclude), (const SPropTagArray *, lpExcludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
-DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, CopyProps, (const SPropTagArray *, lpIncludeProps), (ULONG, ulUIParam), (LPMAPIPROGRESS, lpProgress), (LPCIID, lpInterface), (void *, lpDestObj), (ULONG, ulFlags), (SPropProblemArray **, lppProblems))
-DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, GetNamesFromIDs, (LPSPropTagArray *, pptaga), (LPGUID, lpguid), (ULONG, ulFlags), (ULONG *, pcNames), (LPMAPINAMEID **, pppNames))
-DEF_HRMETHOD0(ZCMAPIProp, MAPIProp, GetIDsFromNames, (ULONG, cNames), (LPMAPINAMEID *, ppNames), (ULONG, ulFlags), (LPSPropTagArray *, pptaga))

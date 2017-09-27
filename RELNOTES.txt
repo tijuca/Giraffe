@@ -1,7 +1,91 @@
+Release notes for 8.4.0
+=======================
+Enhancements:
+* dagent, gateway: whitelist-based HTML filter [ZCP-13472]
+* New scripts/utilities: kopano-fix-ipm-subtree, kopano-localize-folders,
+  kopano-recreate-systemfolders, kopano-rules [KC-533]
+* server: drop excessive locking in ECABObjectTable/ECStoreObjectTable hot path
+* provider: speed up getIDsFromNames by reducing SQL queries
+* server: add LIMIT clauses to single-result SELECT statements [KC-5]
+* client: speedup from-scratch MAPI session creation by avoiding
+  extraneous logon-logoff cycles during provider initialization [KC-667]
+* client: add API for dump+restore of MAPI session profile data so libmapi
+  users can skip provider reinitialization at program startup [KC-67,KC-165]
+* gateway: add option to ignore commands during IDLE
+* php: copy back improvements from the Z-Push project's bundled copy [KC-463]
+* search: make searchfolder creation in shared stores configurable [KC-565]
+* mapi: disable very slow RTF compression [KC-622]
+* server: add entry cache for S3 backend [KC-702]
+* icalmapi: handle up to three email addresses in a vcard [KC-420]
+* inetmapi: add the right extension for attachments without filename [KC-624]
+* search: index embedded messages (recursively) [KC-151]
+* migration-pst: new options -S, --clean-folders option [KC-651,KC-485]
+* pyko: fall back to search-key to determine recipient email address [KC-566]
+* pyko: support processing basic cancellations [KC-612]
+* pyko: support cancellation of existing exception [KC-612]
+* icalmapi: support ADR, ORG, TITLE tags in VCF files
+* swig: lazy opening of folder objects [KC-632]
+* backup: the "backup_servers" option is back again [KC-364]
+* backup: save and restore store-level ACLs [KC-687]
+* backup: use store GUID for backup directory [KC-686]
+* backup: merge store-level metadata [KC-627]
+Fixes:
+* spooler: do not run mr-process before mr-accept [KC-498]
+* Coverity reports on absent return value checks [KC-595];
+* freebusy: avoid potential divison by zero when trying to determine the end
+  date of a non-recurring recurrence. [KC-595]
+* libserver: ensure same endianess for SOURCEKEYs [KC-628]
+* server plugins: more escaping in SQL commands [KC-620]
+* gateway: set PR_FOLLOWUP_ICON for WebApp [KC-653]
+* server: avoid crash when NTLM subprocess gives no newline [KC-656]
+* pyko: avoid hang on shutdown of Python services with logging [KC-643]
+* server: disable reminders from shared stores [KC-728]
+* server: improved error reporting when users/groups/group members
+  are not found/not complete [KC-497]
+* backup: avoid emitting tracebacks [KC-411]
+Changes:
+* server: the underlying call for traditional-style fd monitoring was
+  changed from select(2) to poll(2) [ZCP-13065]
+* server: the sync_log_all_changes is obsolete [KC-527]
+* server: use SQL autocommit=0 during transactions
+* gateway: ignore missing (lost) attachments [KC-363]
+* dagent: turn on PHP7 SCL on RHEL6 [KC-621]
+* pyko/backup: change error into warning for 'missing' attachments
+  [KC-545, KC-555, KC-575]
+* server: hide private messages' reminders from shared stores [KC-565]
+* server: drop ZCP client update support [KC-644]
+Packager notes:
+* libicu changed from optional to required build dependency
+* kopano-server S3 store required libs3 4.1 [KC-751]
+* python/swig is now optional [KC-753]
+
+
+Release notes for 8.3.5
+=======================
+Fixes:
+* server: complete signal blocking [KC-779]
+* ical: avoid freeing garbage pointers [KC-803]
+* caldav: fix unbounded copy/iteration past end [KC-792]
+* migration-pst: skip archiver properties [KC-812]
+* icalmapi: cure a NULL dereference when generating VCFs
+* inetmapi: support embedded messages once again [KC-540, KC-775]
+* inetmapi: stop generating <"@"@hostname> [KC-689, KC-772]
+* server: admin user is to always open shared reminders [KC-813]
+
+
 Release notes for 8.3.4
 =======================
 Fixes:
 * server: configurable shared reminders [KC-789]
+* migration-pst: create unknown named-properties [KC-788]
+* server: filter private shared messages from search,
+  and filter private shared notifications [KC-565]
+* dagent: check quota on delivery
+* m4lcommon: ensure right condition for SRowSetPtr::empty [KC-773]
+Changes:
+* server: rename disable_shared_reminders option [KC-565]
+
+
 
 Release notes for 8.3.3
 =======================

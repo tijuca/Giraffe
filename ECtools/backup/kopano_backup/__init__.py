@@ -22,10 +22,29 @@ import time
 from xml.etree import ElementTree
 import zlib
 
-from MAPI.Util import *
+from MAPI import (
+    PT_UNICODE, PT_ERROR, MAPI_UNICODE, KEEP_OPEN_READWRITE, MAPI_MODIFY,
+    ROW_ADD,
+)
+
+from MAPI.Defs import (
+    PROP_TYPE, CHANGE_PROP_TYPE, HrGetOneProp,
+)
+
+from MAPI.Struct import (
+    MAPIErrorNotFound, SPropValue, ROWENTRY,
+)
+
+from MAPI.Tags import (
+    PR_EC_BACKUP_SOURCE_KEY, PR_EC_WEBACCESS_SETTINGS_JSON, PR_EC_OUTOFOFFICE,
+    PR_EC_OUTOFOFFICE_SUBJECT, PR_EC_OUTOFOFFICE_MSG, PR_EC_OUTOFOFFICE_FROM,
+    PR_EC_OUTOFOFFICE_UNTIL, IID_IExchangeModifyTable, PR_CONTAINER_CLASS_W,
+    PR_SOURCE_KEY, PR_ACL_TABLE, PR_STORE_RECORD_KEY, PR_RULES_DATA,
+    PR_FREEBUSY_ENTRYIDS, PR_SCHDINFO_DELEGATE_ENTRYIDS, PT_TSTRING,
+)
 
 import kopano
-from kopano import log_exc
+from kopano import log_exc, Config
 
 """
 kopano-backup - a MAPI-level backup/restore tool built on python-kopano.
@@ -37,6 +56,8 @@ restore is not parallelized.
 items are serialized and maintained in per-folder key-value stores.
 
 metadata such as webapp settings, rules, acls and delegation permissions are also stored per-folder.
+
+differential backups are possible via the --differential option.
 
 basic commands (see --help for all options):
 
@@ -55,17 +76,53 @@ kopano-backup --index user1 -f Inbox/subfolder --recursive --period-begin 2014-0
 
 """
 
+CONFIG = {
+    'backup_servers': Config.string(multiple=True, default=None),
+}
+
 CACHE_SIZE = 64000000 # XXX make configurable
 
-def dbopen(path): # XXX unfortunately dbhash.open doesn't seem to accept unicode
+def fatal(s):
+    sys.stderr.write(s + "\n")
+    sys.exit(1)
+
+def dbopen(path): # unfortunately dbhash.open doesn't seem to accept unicode
     return dbhash.open(path.encode(sys.stdout.encoding or 'utf8'), 'c')
 
 def _decode(s):
     return s.decode(sys.stdout.encoding or 'utf8')
 
+def _copy_folder_meta(from_dir, to_dir, keep_db=False):
+    if not os.path.exists(to_dir):
+        os.makedirs(to_dir)
+
+    for filename in ('acl', 'folder', 'rules', 'items', 'index', 'state', 'path'): # 'path' last to indicate completion
+        if not (keep_db and filename in ('index', 'items')):
+            from_path = from_dir+'/'+filename
+            to_path = to_dir+'/'+filename
+            if os.path.exists(from_path):
+                shutil.copy(from_path, to_dir) # overwrites
+
+def _copy_store_meta(from_dir, to_dir):
+    for filename in ('delegates', 'store', 'user'):
+        from_path = from_dir+'/'+filename
+        to_path = to_dir+'/'+filename
+        if os.path.exists(from_path):
+            shutil.copy(from_path, to_dir) # overwrites
+
+def _mark_deleted( index, fpath, timestamp, log):
+    log.debug("marking deleted folder '%s'", fpath)
+
+    with closing(dbopen(index)) as db_index:
+        idx = db_index.get('folder')
+        d = pickle.loads(idx) if idx else {}
+        if not d.get('backup_deleted'):
+            d['backup_deleted'] = timestamp
+            db_index['folder'] = pickle.dumps(d)
+
 class BackupWorker(kopano.Worker):
     """ each worker takes stores from a queue, and backs them up to disk (or syncs them),
-        according to the given command-line options; it also detects deleted folders """
+        according to the given command-line options """
 
     def main(self):
         config, server, options = self.service.config, self.service.server, self.service.options
@@ -78,48 +135,32 @@ class BackupWorker(kopano.Worker):
                 store = server.store(entryid=store_entryid)
                 user = store.user
 
-                # create main directory and lock it
+                # from- and to- paths for differential
+                self.orig_path = path
+                if options.differential:
+                    path = 'differential/' + path
+
+                # create main directory
                 if not os.path.isdir(path):
                     os.makedirs(path)
 
+                # differential: determine to- and from- backups
+                if options.differential:
+                    diff_ids = [int(x) for x in os.listdir(path)]
+                    if diff_ids:
+                        self.orig_path = path + '/' + str(max(diff_ids))
+                        diff_id = max(diff_ids)+1
+                    else:
+                        diff_id = 1
+                    path = path + '/' + str(diff_id)
+                    self.log.info("performing differential backup from '%s' to '%s'", self.orig_path, path)
+                    os.makedirs(path)
+
+                # lock backup dir and sync hierarchy
                 with open(path+'/lock', 'w') as lockfile:
                     fcntl.flock(lockfile.fileno(), fcntl.LOCK_EX)
-
-                    # backup user and store properties
-                    if not options.folders:
-                        file(path+'/store', 'w').write(dump_props(store.props(), stats, self.log))
-                        if user:
-                            file(path+'/user', 'w').write(dump_props(user.props(), stats, self.log))
-                            if not options.skip_meta:
-                                file(path+'/delegates', 'w').write(dump_delegates(user, server, stats, self.log))
-
-                    # check command-line options and backup folders
                     t0 = time.time()
-                    self.log.info('backing up: %s', path)
-                    paths = set()
-                    folders = list(store.folders())
-                    if options.recursive:
-                        folders = sum([[f]+list(f.folders()) for f in folders], [])
-                    for folder in folders:
-                        if (not store.public and \
-                            ((options.skip_junk and folder == store.junk) or \
-                             (options.skip_deleted and folder == store.wastebasket))):
-                            continue
-                        paths.add(folder.path)
-                        self.backup_folder(path, folder, store.subtree, config, options, stats, user, server)
-
-                    # timestamp deleted folders
-                    if not options.folders:
-                        path_folder = folder_struct(path, options)
-                        for fpath in set(path_folder) - paths:
-                            with closing(dbopen(path_folder[fpath]+'/index')) as db_index:
-                                idx = db_index.get('folder')
-                                d = pickle.loads(idx) if idx else {}
-                                if not d.get('backup_deleted'):
-                                    self.log.info('deleted folder: %s', fpath)
-                                    d['backup_deleted'] = self.service.timestamp
-                                    db_index['folder'] = pickle.dumps(d)
-
+                    self.backup_hierarchy(path, stats, options, store, user, server, config)
                     changes = stats['changes'] + stats['deletes']
                     self.log.info('backing up %s took %.2f seconds (%d changes, ~%.2f/sec, %d errors)',
                         path, time.time()-t0, changes, changes/(time.time()-t0), stats['errors'])
@@ -127,15 +168,70 @@ class BackupWorker(kopano.Worker):
             # return statistics in output queue
             self.oqueue.put(stats)
 
-    def backup_folder(self, path, folder, subtree, config, options, stats, user, server):
+    def backup_hierarchy(self, path, stats, options, store, user, server, config):
+        # backup user and store properties
+        if not options.folders:
+            file(path+'/store', 'w').write(dump_props(store.props(), stats, self.log))
+            if user:
+                file(path+'/user', 'w').write(dump_props(user.props(), stats, self.log))
+                if not options.skip_meta:
+                    file(path+'/delegates', 'w').write(dump_delegates(user, server, stats, self.log)) # XXX why 'if user'?
+                    file(path+'/acl', 'w').write(dump_acl(store, user, server, stats, self.log))
+
+        # time of last backup
+        file(path+'/timestamp', 'w').write(pickle.dumps(self.service.timestamp))
+        if not os.path.exists(path+'/folders'):
+            os.makedirs(path+'/folders')
+
+        # check command-line options and collect folders
+        self.log.info('backing up: %s', path)
+        sk_folder = {}
+        folders = list(store.folders())
+        subtree = store.subtree
+        if options.recursive:
+            folders = sum([[f]+list(f.folders()) for f in folders], [])
+        for folder in folders:
+            if (not store.public and \
+                ((options.skip_junk and folder == store.junk) or \
+                 (options.skip_deleted and folder == store.wastebasket))):
+                continue
+            sk_folder[folder.sourcekey] = folder
+        sk_dir = sk_struct(self.orig_path, options)
+
+        # differential
+        if options.differential:
+            for sk, folder in sk_folder.items():
+                data_path = path+'/folders/'+folder.sourcekey
+                orig_data_path = self.orig_path+'/'+sk_dir.get(sk)
+                self.backup_folder(data_path, orig_data_path, folder, subtree, config, options, stats, store, user, server)
+            return
+
+        # add new folders
+        for new_sk in set(sk_folder) - set(sk_dir):
+            data_path = path+'/folders/'+new_sk
+            folder = sk_folder[new_sk]
+            self.backup_folder(data_path, data_path, folder, subtree, config, options, stats, store, user, server)
+
+        # update existing folders
+        for both_sk in set(sk_folder) & set(sk_dir):
+            data_path = path+'/'+sk_dir[both_sk]
+            folder = sk_folder[both_sk]
+            self.backup_folder(data_path, data_path, folder, subtree, config, options, stats, store, user, server)
+
+        # timestamp deleted folders
+        if not options.folders:
+            for del_sk in set(sk_dir) - set(sk_folder):
+                fpath = file(path+'/'+sk_dir[del_sk]+'/path').read().decode('utf8')
+                index = (path+'/'+sk_dir[del_sk]+'/index')
+                _mark_deleted(index, fpath, self.service.timestamp, self.log)
+
+    def backup_folder(self, data_path, orig_data_path, folder, subtree, config, options, stats, store, user, server):
         """ backup single folder """
 
-        self.log.info('backing up folder: %s', folder.path)
+        self.log.debug('backing up folder: "%s" "%s"', store.name, folder.path)
 
-        # create directory for subfolders
-        data_path = path+'/'+folder_path(folder, subtree)
-        if not os.path.isdir('%s/folders' % data_path):
-            os.makedirs('%s/folders' % data_path)
+        if not os.path.isdir(data_path):
+            os.makedirs(data_path)
 
         # backup folder properties, path, metadata
         file(data_path+'/path', 'w').write(folder.path.encode('utf8'))
@@ -148,16 +244,18 @@ class BackupWorker(kopano.Worker):
 
         # sync over ICS, using stored 'state'
         importer = FolderImporter(folder, data_path, config, options, self.log, stats, self.service)
-        statepath = '%s/state' % data_path
         state = None
-        if os.path.exists(statepath):
-            state = file(statepath).read()
-            self.log.info('found previous folder sync state: %s', state)
+        if orig_data_path:
+            orig_statepath = '%s/state' % orig_data_path
+            if os.path.exists(orig_statepath):
+                state = file(orig_statepath).read()
+                self.log.info('found previous folder sync state: %s', state)
         new_state = folder.sync(importer, state, log=self.log, stats=stats, begin=options.period_begin, end=options.period_end)
-        if new_state != state:
+        if new_state != state or options.differential:
             importer.commit()
+            statepath = '%s/state' % data_path
             file(statepath, 'w').write(new_state)
-            self.log.info('saved folder sync state: %s', new_state)
+            self.log.debug('saved folder sync state: %s', new_state)
 
 class FolderImporter:
     """ tracks changes for a given folder """
@@ -201,29 +299,32 @@ class FolderImporter:
         """ deleted item from 'items' and 'index' databases """
 
         with log_exc(self.log, self.stats):
-            with closing(dbopen(self.folder_path+'/items')) as db_items:
-                with closing(dbopen(self.folder_path+'/index')) as db_index:
-                    if item.sourcekey in db_items: # ICS can generate delete events without update events..
-                        self.log.debug('folder %s: deleted document with sourcekey %s', self.folder.sourcekey, item.sourcekey)
-                        if self.options.deletes in (None, 'yes'):
-                            idx = pickle.loads(db_index[item.sourcekey])
-                            idx['backup_deleted'] = self.service.timestamp
-                            db_index[item.sourcekey] = pickle.dumps(idx)
-                        else:
-                            del db_items[item.sourcekey]
-                            del db_index[item.sourcekey]
-                        self.stats['deletes'] += 1
+         with closing(dbopen(self.folder_path+'/items')) as db_items:
+          with closing(dbopen(self.folder_path+'/index')) as db_index:
+
+            self.log.debug('folder %s: deleted document with sourcekey %s', self.folder.sourcekey, item.sourcekey)
+
+            if item.sourcekey in db_items: # ICS may generate delete events without update events (soft-deletes?)
+                idx = pickle.loads(db_index[item.sourcekey])
+                idx['backup_deleted'] = self.service.timestamp
+                db_index[item.sourcekey] = pickle.dumps(idx)
+            else:
+                db_index[item.sourcekey] = pickle.dumps({
+                    'backup_deleted': self.service.timestamp
+                })
+            self.stats['deletes'] += 1
 
     def commit(self):
         """ commit data to storage """
 
         t0 = time.time()
         with closing(dbopen(self.folder_path+'/items')) as item_db:
-            with closing(dbopen(self.folder_path+'/index')) as index_db:
-                for sourcekey, data in self.item_updates:
-                    item_db[sourcekey] = data
-                for sourcekey, idx in self.index_updates:
-                    index_db[sourcekey] = idx
+         with closing(dbopen(self.folder_path+'/index')) as index_db:
+
+            for sourcekey, data in self.item_updates:
+                item_db[sourcekey] = data
+            for sourcekey, idx in self.index_updates:
+                index_db[sourcekey] = idx
 
         self.log.debug('commit took %.2f seconds (%d items)', time.time()-t0, len(self.item_updates))
         self.reset_cache()
@@ -234,15 +335,16 @@ class Service(kopano.Service):
     def main(self):
         self.timestamp = datetime.datetime.now()
 
-        if self.options.restore or self.options.purge:
+        if self.options.restore or (self.options.purge is not None) or self.options.merge:
             data_path = _decode(self.args[0].rstrip('/'))
             with open(data_path+'/lock', 'w') as lockfile:
                 fcntl.flock(lockfile.fileno(), fcntl.LOCK_EX)
-
                 if self.options.restore:
                     self.restore(data_path)
-                elif self.options.purge:
+                elif (self.options.purge is not None):
                     self.purge(data_path)
+                elif self.options.merge:
+                    self.merge(data_path)
         else:
             self.backup()
 
@@ -254,7 +356,10 @@ class Service(kopano.Service):
                        for i in range(self.config['worker_processes'])]
         for worker in workers:
             worker.start()
-        jobs = self.create_jobs()
+        try:
+            jobs = self.create_jobs()
+        except kopano.Error as e:
+            fatal(e.message)
         for job in jobs:
             self.iqueue.put(job)
         self.log.info('queued %d store(s) for parallel backup (%s processes)', len(jobs), len(workers))
@@ -269,15 +374,22 @@ class Service(kopano.Service):
         """ restore data from backup """
 
         # determine store to restore to
-        self.data_path = data_path # XXX remove var
-        self.log.info('starting restore of %s', self.data_path)
-        username = os.path.split(self.data_path)[1]
-        if self.options.users:
-            store = self._store(self.options.users[0])
-        elif self.options.stores:
-            store = self.server.store(self.options.stores[0])
-        else:
-            store = self._store(username)
+        self.log.info('starting restore of %s', data_path)
+        username = os.path.split(data_path)[1]
+
+        try:
+            if self.options.users:
+                store = self._store(self.options.users[0])
+            elif self.options.stores:
+                store = self.server.store(self.options.stores[0])
+            else:
+                store = self._store(username)
+        except kopano.NotFoundError:
+            store = None
+
+        if not store:
+            fatal('unable to open store (username: %s)' % username)
+
         user = store.user
 
         # start restore
@@ -286,9 +398,9 @@ class Service(kopano.Service):
         stats = {'changes': 0, 'errors': 0}
 
         # restore metadata (webapp/mapi settings)
-        if user and not self.options.folders and not self.options.skip_meta:
-            if os.path.exists('%s/store' % self.data_path):
-                storeprops = pickle.loads(file('%s/store' % self.data_path).read())
+        if user and not self.options.folders and not self.options.restore_root and not self.options.skip_meta:
+            if os.path.exists('%s/store' % data_path):
+                storeprops = pickle.loads(file('%s/store' % data_path).read())
                 for proptag in (PR_EC_WEBACCESS_SETTINGS_JSON, PR_EC_OUTOFOFFICE_SUBJECT, PR_EC_OUTOFOFFICE_MSG,
                                 PR_EC_OUTOFOFFICE, PR_EC_OUTOFOFFICE_FROM, PR_EC_OUTOFOFFICE_UNTIL):
                     if PROP_TYPE(proptag) == PT_TSTRING:
@@ -297,11 +409,13 @@ class Service(kopano.Service):
                     if value:
                         store.mapiobj.SetProps([SPropValue(proptag, value)])
                 store.mapiobj.SaveChanges(KEEP_OPEN_READWRITE)
-            if os.path.exists('%s/delegates' % self.data_path):
-                load_delegates(user, self.server, file('%s/delegates' % self.data_path).read(), stats, self.log)
+            if os.path.exists('%s/delegates' % data_path):
+                load_delegates(user, self.server, file('%s/delegates' % data_path).read(), stats, self.log)
+            if os.path.exists('%s/acl' % data_path):
+                load_acl(store, user, self.server, file('%s/acl' % data_path).read(), stats, self.log)
 
         # determine stored and specified folders
-        path_folder = folder_struct(self.data_path, self.options)
+        path_folder = folder_struct(data_path, self.options)
         paths = self.options.folders or sorted(path_folder.keys())
         if self.options.recursive:
             paths = [path2 for path2 in path_folder for path in paths if (path2+'//').startswith(path+'/')]
@@ -313,6 +427,10 @@ class Service(kopano.Service):
                 self.log.error('no such folder: %s', path)
                 stats['errors'] += 1
             else:
+                fpath = path_folder[path]
+                if self.options.deletes in (None, 'no') and folder_deleted(fpath):
+                    continue
+
                 # handle --restore-root, filter and start restore
                 restore_path = _decode(self.options.restore_root)+'/'+path if self.options.restore_root else path
                 folder = store.subtree.folder(restore_path, create=True)
@@ -320,21 +438,17 @@ class Service(kopano.Service):
                     ((self.options.skip_junk and folder == store.junk) or \
                     (self.options.skip_deleted and folder == store.wastebasket))):
                         continue
-                data_path = path_folder[path]
-
-                if self.options.deletes in (None, 'no') and folder_deleted(data_path):
-                    continue
 
                 if not self.options.only_meta:
-                    self.restore_folder(folder, path, data_path, store, store.subtree, stats, user, self.server)
-                restored.append((folder, data_path))
+                    self.restore_folder(folder, path, fpath, store, store.subtree, stats, user, self.server)
+                restored.append((folder, fpath))
 
         # restore metadata
         if not (self.options.sourcekeys or self.options.skip_meta):
             self.log.info('restoring metadata')
-            for (folder, data_path) in restored:
-                load_acl(folder, user, self.server, file(data_path+'/acl').read(), stats, self.log)
-                load_rules(folder, user, self.server, file(data_path+'/rules').read(), stats, self.log)
+            for (folder, fpath) in restored:
+                load_acl(folder, user, self.server, file(fpath+'/acl').read(), stats, self.log)
+                load_rules(folder, user, self.server, file(fpath+'/rules').read(), stats, self.log)
 
         self.log.info('restore completed in %.2f seconds (%d changes, ~%.2f/sec, %d errors)',
             time.time()-t0, stats['changes'], stats['changes']/(time.time()-t0), stats['errors'])
@@ -342,33 +456,90 @@ class Service(kopano.Service):
     def purge(self, data_path):
         """ permanently delete old folders/items from backup """
 
-        assert not self.options.folders, 'cannot combine --folder with --purge'
-
         stats = {'folders': 0, 'items': 0}
-        self.data_path = data_path # XXX remove var
-        path_folder = folder_struct(self.data_path, self.options)
+        path_folder = folder_struct(data_path, self.options)
 
-        for path, data_path in path_folder.items():
+        for path, fpath in path_folder.items():
             # check if folder was deleted
             self.log.info('checking folder: %s', path)
-            if folder_deleted(data_path):
-                if (self.timestamp - folder_deleted(data_path)).days > self.options.purge:
+            if folder_deleted(fpath):
+                if (self.timestamp - folder_deleted(fpath)).days >= self.options.purge:
                     self.log.debug('purging folder')
-                    shutil.rmtree(data_path)
+                    shutil.rmtree(fpath)
                     stats['folders'] += 1
             else: # check all items for deletion
-                with closing(dbopen(data_path+'/items')) as db_items:
-                    with closing(dbopen(data_path+'/index')) as db_index:
+                with closing(dbopen(fpath+'/items')) as db_items:
+                    with closing(dbopen(fpath+'/index')) as db_index:
                         for item, idx in db_index.items():
                             d = pickle.loads(idx)
                             backup_deleted = d.get('backup_deleted')
-                            if backup_deleted and (self.timestamp - backup_deleted).days > self.options.purge:
+                            if backup_deleted and (self.timestamp - backup_deleted).days >= self.options.purge:
                                 self.log.debug('purging item: %s', item)
                                 stats['items'] += 1
                                 del db_items[item]
                                 del db_index[item]
 
         self.log.info('purged %d folders and %d items', stats['folders'], stats['items'])
+
+    def merge(self, data_path):
+        """ merge differential backups """
+
+        diff_base = 'differential/'+data_path
+        diff_ids = sorted((x for x in os.listdir(diff_base)), key=lambda x: int(x))
+
+        for diff_id in diff_ids:
+            diff_path = diff_base+'/'+diff_id
+            self.log.info("merging differential backup '%s' into '%s'", diff_path, data_path)
+
+            timestamp = pickle.loads(file(diff_path+'/timestamp').read())
+
+            orig_sk_dir = sk_struct(data_path, self.options)
+            diff_sk_dir = sk_struct(diff_path, self.options)
+
+            # add new folders
+            for new_sk in set(diff_sk_dir) - set(orig_sk_dir):
+                from_dir = diff_path+'/'+diff_sk_dir[new_sk]
+                to_dir = data_path+'/folders/'+new_sk
+                fpath = file(from_dir+'/path').read().decode('utf8')
+                self.log.debug("merging new folder '%s'", fpath)
+                _copy_folder_meta(from_dir, to_dir)
+
+            # update existing folders # XXX check matching & higher syncstate?
+            for both_sk in set(orig_sk_dir) & set(diff_sk_dir):
+                folder_dir = diff_path+'/'+diff_sk_dir[both_sk]
+                fpath = file(folder_dir+'/path').read().decode('utf8')
+                orig_dir = data_path+'/'+orig_sk_dir[both_sk]
+
+                # now merge new data
+                with closing(dbopen(orig_dir+'/items')) as orig_db_items:
+                 with closing(dbopen(orig_dir+'/index')) as orig_db_index:
+                  with closing(dbopen(folder_dir+'/items')) as diff_db_items:
+                   with closing(dbopen(folder_dir+'/index')) as diff_db_index:
+
+                    if diff_db_index: # XXX check higher if file exists
+                        self.log.debug("merging '%s' (%d updates)", fpath, len(diff_db_index))
+
+                        for key, value in diff_db_index.items():
+                            if key in orig_db_index:
+                                idx = pickle.loads(orig_db_index[key])
+                                idx.update(pickle.loads(value)) # possibly only update 'backup_deleted' (differential)
+                            else:
+                                idx = pickle.loads(value)
+                            orig_db_index[key] = pickle.dumps(idx)
+
+                            if key in diff_db_items:
+                                orig_db_items[key] = diff_db_items[key] # differential may contain pure delete (no item)
+
+                _copy_folder_meta(folder_dir, orig_dir, keep_db=True)
+
+            # timestamp deleted folders
+            for del_sk in set(orig_sk_dir) - set(diff_sk_dir):
+                orig_dir = data_path+'/'+orig_sk_dir[del_sk]
+                fpath = file(orig_dir+'/path').read().decode('utf8')
+
+                _mark_deleted(orig_dir+'/index', fpath, timestamp, self.log)
+
+            _copy_store_meta(diff_path, data_path)
 
     def create_jobs(self):
         """ check command-line options and determine which stores should be backed up """
@@ -378,12 +549,18 @@ class Service(kopano.Service):
 
         # specified companies/all users
         if self.options.companies or not (self.options.users or self.options.stores):
+            servers = self.config['backup_servers']
+            if servers is None:
+                servers = [self.server.name]
             for company in self.server.companies():
                 companyname = company.name if company.name != 'Default' else ''
                 for user in company.users():
-                    if user.store:
+                    if user.store and \
+                       (not servers or user.store.home_server in servers):
                         jobs.append((user.store, user.name, os.path.join(output_dir, companyname, user.name)))
-                if company.public_store and not self.options.skip_public:
+                public_store = company.public_store
+                if public_store and not self.options.skip_public and \
+                   (not servers or public_store.home_server in servers):
                     target = 'public@'+companyname if companyname else 'public'
                     jobs.append((company.public_store, None, os.path.join(output_dir, companyname, target)))
 
@@ -399,8 +576,13 @@ class Service(kopano.Service):
                 if store.public:
                     target = 'public' + ('@'+store.company.name if store.company.name != 'Default' else '')
                 else:
-                    target = store.entryid
+                    target = store.guid
                 jobs.append((store, None, os.path.join(output_dir, target)))
+
+        # check folders
+        if self.options.folders:
+            for job in jobs:
+                list(job[0].folders())
 
         return [(job[0].entryid,)+job[1:] for job in sorted(jobs, reverse=True, key=lambda x: x[0].size)]
 
@@ -413,7 +595,7 @@ class Service(kopano.Service):
                 if not [sk for sk in self.options.sourcekeys if sk in db]:
                     return
         else:
-            self.log.info('restoring folder %s', path)
+            self.log.debug('restoring folder %s', path)
 
             # restore container class
             folderprops = pickle.loads(file('%s/folder' % data_path).read())
@@ -462,7 +644,7 @@ class Service(kopano.Service):
                         # store original sourcekey or it is lost
                         try:
                             item.prop(PR_EC_BACKUP_SOURCE_KEY)
-                        except MAPIErrorNotFound:
+                        except (MAPIErrorNotFound, kopano.NotFoundError):
                             item.mapiobj.SetProps([SPropValue(PR_EC_BACKUP_SOURCE_KEY, sourcekey2.decode('hex'))])
                             item.mapiobj.SaveChanges(0)
 
@@ -482,7 +664,21 @@ class Service(kopano.Service):
         else:
             return self.server.user(username).store
 
-def folder_struct(data_path, options, mapper=None):
+def sk_struct(data_path, options, mapper=None, base_path=None):
+    """ determine all folders in backup directory """
+
+    if mapper is None:
+        mapper = {}
+        base_path = data_path
+    if os.path.exists(data_path+'/folders'):
+        for f in os.listdir(data_path+'/folders'):
+            d = data_path+'/folders/'+f
+            if os.path.exists(d+'/path'): # XXX purge empty dirs?
+                mapper[d.split('/')[-1]] = d[len(base_path)+1:] # XXX ugly
+                sk_struct(d, options, mapper, base_path)
+    return mapper
+
+def folder_struct(data_path, options, mapper=None): # XXX deprecate?
     """ determine all folders in backup directory """
 
     if mapper is None:
@@ -547,7 +743,8 @@ def show_contents(data_path, options):
                         (options.period_end and d['last_modified'] >= options.period_end) or
                         (options.deletes == 'no' and d.get('backup_deleted'))):
                         continue
-                    items.append((key, d))
+                    if 'last_modified' in d: # ignore sourcekey-only deletes (differential)
+                        items.append((key, d))
 
         # --stats: one entry per folder
         if options.stats:
@@ -567,12 +764,12 @@ def dump_props(props, stats, log):
         data = dict((prop.proptag, prop.mapiobj.Value) for prop in props)
     return pickle.dumps(data)
 
-def dump_acl(folder, user, server, stats, log):
-    """ dump acl for given folder """
+def dump_acl(obj, user, server, stats, log):
+    """ dump acl for given store or folder """
 
     rows = []
     with log_exc(log, stats):
-        acl_table = folder.mapiobj.OpenProperty(PR_ACL_TABLE, IID_IExchangeModifyTable, 0, 0)
+        acl_table = obj.mapiobj.OpenProperty(PR_ACL_TABLE, IID_IExchangeModifyTable, 0, 0)
         table = acl_table.GetTable(0)
         for row in table.QueryRows(-1,0):
             entryid = row[1].Value
@@ -587,8 +784,8 @@ def dump_acl(folder, user, server, stats, log):
             rows.append(row)
     return pickle.dumps(rows)
 
-def load_acl(folder, user, server, data, stats, log):
-    """ load acl for given folder """
+def load_acl(obj, user, server, data, stats, log):
+    """ load acl for given store or folder """
 
     with log_exc(log, stats):
         data = pickle.loads(data)
@@ -604,7 +801,7 @@ def load_acl(folder, user, server, data, stats, log):
                 rows.append(row)
             except kopano.NotFoundError:
                 log.warning("skipping access control entry for unknown user/group '%s'", value)
-        acltab = folder.mapiobj.OpenProperty(PR_ACL_TABLE, IID_IExchangeModifyTable, 0, MAPI_MODIFY)
+        acltab = obj.mapiobj.OpenProperty(PR_ACL_TABLE, IID_IExchangeModifyTable, 0, MAPI_MODIFY)
         acltab.ModifyTable(0, [ROWENTRY(ROW_ADD, row) for row in rows])
 
 def dump_rules(folder, user, server, stats, log):
@@ -614,7 +811,7 @@ def dump_rules(folder, user, server, stats, log):
     with log_exc(log, stats):
         try:
             ruledata = folder.prop(PR_RULES_DATA).value
-        except MAPIErrorNotFound:
+        except (MAPIErrorNotFound, kopano.NotFoundError):
             pass
         else:
             etxml = ElementTree.fromstring(ruledata)
@@ -632,7 +829,7 @@ def dump_rules(folder, user, server, stats, log):
                         f = movecopy.findall('folder')[0]
                         path = store.folder(entryid=f.text.decode('base64').encode('hex')).path
                         f.text = path
-                    except (kopano.NotFoundError, MAPIErrorNotFound, binascii.Error):
+                    except (MAPIErrorNotFound, kopano.NotFoundError, binascii.Error):
                         log.warning("cannot serialize rule for unknown store/folder")
             ruledata = ElementTree.tostring(etxml)
     return pickle.dumps(ruledata)
@@ -660,31 +857,12 @@ def load_rules(folder, user, server, data, stats, log):
             etxml = ElementTree.tostring(etxml)
             folder.create_prop(PR_RULES_DATA, etxml)
 
-def _get_fbf(user, flags, log):
-    try:
-        fbeid = user.root.prop(PR_FREEBUSY_ENTRYIDS).value[1]
-        return user.store.mapiobj.OpenEntry(fbeid, None, flags)
-    except MAPIErrorNotFound:
-        log.warning("skipping delegation because of missing freebusy data")
-
 def dump_delegates(user, server, stats, log):
     """ dump delegate users for given user """
 
     usernames = []
     with log_exc(log, stats):
-        fbf = _get_fbf(user, 0, log)
-        delegate_uids = []
-        try:
-            if fbf:
-                delegate_uids = HrGetOneProp(fbf, PR_SCHDINFO_DELEGATE_ENTRYIDS).Value
-        except MAPIErrorNotFound:
-            pass
-
-        for uid in delegate_uids:
-            try:
-                usernames.append(server.sa.GetUser(uid, MAPI_UNICODE).Username)
-            except MAPIErrorNotFound:
-                log.warning("skipping delegate user for unknown userid")
+        usernames = [d.user.name for d in user.delegations()]
 
     return pickle.dumps(usernames)
 
@@ -692,17 +870,16 @@ def load_delegates(user, server, data, stats, log):
     """ load delegate users for given user """
 
     with log_exc(log, stats):
-        userids = []
+        users = []
         for name in pickle.loads(data):
             try:
-                userids.append(server.user(name).userid.decode('hex'))
+                users.append(server.user(name))
             except kopano.NotFoundError:
                 log.warning("skipping delegation for unknown user '%s'", name)
 
-        fbf = _get_fbf(user, MAPI_MODIFY, log)
-        if fbf:
-            fbf.SetProps([SPropValue(PR_SCHDINFO_DELEGATE_ENTRYIDS, userids)])
-            fbf.SaveChanges(0)
+        user.delete(user.delegations()) # XXX not in combination with --import-root, -f?
+        for user2 in users:
+            user.delegation(user2, create=True)
 
 def main():
     # select common options
@@ -723,23 +900,31 @@ def main():
     parser.add_option('', '--index', dest='index', action='store_true', help='list items for PATH')
     parser.add_option('', '--sourcekey', dest='sourcekeys', action='append', help='restore specific sourcekey', metavar='SOURCEKEY')
     parser.add_option('', '--recursive', dest='recursive', action='store_true', help='backup/restore folders recursively')
+    parser.add_option('', '--differential', dest='differential', action='store_true', help='create differential backup')
+    parser.add_option('', '--merge', dest='merge', action='store_true', help='merge differential backups')
 
     # parse and check command-line options
     options, args = parser.parse_args()
+
     options.service = False
-    if options.restore or options.stats or options.index or options.purge:
-        assert len(args) == 1 and os.path.isdir(args[0]), 'please specify path to backup data'
-    else:
-        assert len(args) == 0, 'too many arguments'
+    if options.restore or options.merge or options.stats or options.index or (options.purge is not None):
+        if len(args) != 1 or not os.path.isdir(args[0]):
+            fatal('please specify path to backup data')
+    elif len(args) != 0:
+        fatal('too many arguments')
     if options.deletes and options.deletes not in ('yes', 'no'):
-        raise Exception("--deletes option takes 'yes' or 'no'")
+        fatal("--deletes option takes 'yes' or 'no'")
+    if options.folders and (options.differential or (options.purge is not None) or options.merge):
+        fatal('invalid use of --folder option')
+    if options.output_dir and options.differential:
+        fatal('invalid use of --output-dir option')
 
     if options.stats or options.index:
         # handle --stats/--index
         show_contents(args[0], options)
     else:
         # start backup/restore
-        Service('backup', options=options, args=args).start()
+        Service('backup', options=options, config=CONFIG, args=args).start()
 
 if __name__ == '__main__':
     main()

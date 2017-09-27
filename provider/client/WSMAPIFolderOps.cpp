@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
 #include <kopano/memory.hpp>
 #include "WSMAPIFolderOps.h"
@@ -64,17 +64,8 @@ HRESULT WSMAPIFolderOps::Create(KCmd *lpCmd, std::recursive_mutex &lpDataLock,
     ECSESSIONID ecSessionId, ULONG cbEntryId, LPENTRYID lpEntryId,
     WSTransport *lpTransport, WSMAPIFolderOps **lppFolderOps)
 {
-	HRESULT hr = hrSuccess;
-	WSMAPIFolderOps *lpFolderOps = NULL;
-
-	lpFolderOps = new WSMAPIFolderOps(lpCmd, lpDataLock, ecSessionId, cbEntryId, lpEntryId, lpTransport);
-
-	hr = lpFolderOps->QueryInterface(IID_ECMAPIFolderOps, (void **)lppFolderOps);
-
-	if(hr != hrSuccess)
-		delete lpFolderOps;
-
-	return hr;
+	return alloc_wrap<WSMAPIFolderOps>(lpCmd, lpDataLock, ecSessionId,
+	       cbEntryId, lpEntryId, lpTransport).put(lppFolderOps);
 }
 
 HRESULT WSMAPIFolderOps::QueryInterface(REFIID refiid, void **lppInterface)
@@ -267,8 +258,8 @@ HRESULT WSMAPIFolderOps::HrGetSearchCriteria(ENTRYLIST **lppMsgList, LPSRestrict
 {
 	HRESULT			hr = hrSuccess;
 	ECRESULT		er = erSuccess;
-	ENTRYLIST*		lpMsgList = NULL;
-	SRestriction*	lpRestriction = NULL;
+	ecmem_ptr<ENTRYLIST> lpMsgList;
+	ecmem_ptr<SRestriction> lpRestriction;
 
 	struct tableGetSearchCriteriaResponse sResponse;
 
@@ -284,8 +275,7 @@ HRESULT WSMAPIFolderOps::HrGetSearchCriteria(ENTRYLIST **lppMsgList, LPSRestrict
 	END_SOAP_CALL
 
 	if(lppRestriction) {
-
-		hr = ECAllocateBuffer(sizeof(SRestriction), (void **)&lpRestriction);
+		hr = ECAllocateBuffer(sizeof(SRestriction), &~lpRestriction);
 		if(hr != hrSuccess)
 			goto exit;
 
@@ -295,30 +285,21 @@ HRESULT WSMAPIFolderOps::HrGetSearchCriteria(ENTRYLIST **lppMsgList, LPSRestrict
 	}
 
 	if(lppMsgList) {
-		hr = CopySOAPEntryListToMAPIEntryList(sResponse.lpFolderIDs, &lpMsgList);
+		hr = CopySOAPEntryListToMAPIEntryList(sResponse.lpFolderIDs, &~lpMsgList);
 		if(hr != hrSuccess)
 			goto exit;
 
 	}
 
 	if(lppMsgList)
-		*lppMsgList = lpMsgList;
-
+		*lppMsgList = lpMsgList.release();
 	if(lppRestriction)
-		*lppRestriction = lpRestriction;
-	
+		*lppRestriction = lpRestriction.release();
 	if(lpulFlags)
 		*lpulFlags = sResponse.ulFlags;
 
 exit:
 	UnLockSoap();
-
-	if(hr != hrSuccess && lpMsgList)
-		ECFreeBuffer(lpMsgList);
-
-	if(hr != hrSuccess && lpRestriction)
-		ECFreeBuffer(lpRestriction);
-
 	return hr;
 }
 
@@ -464,7 +445,7 @@ HRESULT WSMAPIFolderOps::HrGetChangeInfo(ULONG cbEntryID, LPENTRYID lpEntryID, L
 {
 	HRESULT		hr = hrSuccess;
 	ECRESULT	er = erSuccess;
-	entryId		sEntryId = {0};
+	entryId sEntryId;
 	KCHL::memory_ptr<SPropValue> lpSPropValPCL, lpSPropValCK;
 	getChangeInfoResponse sChangeInfo{__gszeroinit};
 
@@ -538,10 +519,6 @@ HRESULT WSMAPIFolderOps::UnLockSoap()
 
 HRESULT WSMAPIFolderOps::Reload(void *lpParam, ECSESSIONID sessionid)
 {
-	HRESULT hr = hrSuccess;
-	WSMAPIFolderOps *lpThis = (WSMAPIFolderOps *)lpParam;
-
-	lpThis->ecSessionId = sessionid;
-
-	return hr;
+	static_cast<WSMAPIFolderOps *>(lpParam)->ecSessionId = sessionid;
+	return hrSuccess;
 }

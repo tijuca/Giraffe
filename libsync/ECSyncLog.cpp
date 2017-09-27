@@ -64,7 +64,7 @@ HRESULT ECSyncLog::GetLogger(ECLogger **lppLogger)
 			}
 
 			s_lpLogger->Log(EC_LOGLEVEL_FATAL, "********************");
-			s_lpLogger->Log(EC_LOGLEVEL_FATAL, "New sync log session openend (Kopano-" PROJECT_VERSION_CLIENT_STR ")");
+			s_lpLogger->Log(EC_LOGLEVEL_FATAL, "New sync log session openend (Kopano " PROJECT_VERSION ")");
 			s_lpLogger->Log(EC_LOGLEVEL_FATAL, " - Log level: %u", lpSettings->SyncLogLevel());
 			s_lpLogger->Log(EC_LOGLEVEL_FATAL, " - Sync stream: %s", lpSettings->SyncStreamEnabled() ? "enabled" : "disabled");
 			s_lpLogger->Log(EC_LOGLEVEL_FATAL, " - Change notifications: %s", lpSettings->ChangeNotificationsEnabled() ? "enabled" : "disabled");
@@ -100,7 +100,8 @@ HRESULT ECSyncLog::SetLogger(ECLogger *lpLogger)
 std::mutex ECSyncLog::s_hMutex;
 ECLogger		*ECSyncLog::s_lpLogger = NULL;
 
-ECSyncLog::__initializer::~__initializer() {
+ECSyncLog::initializer::~initializer()
+{
 	if (ECSyncLog::s_lpLogger == nullptr)
 		return;
 	unsigned ulRef = ECSyncLog::s_lpLogger->Release();
@@ -109,4 +110,4 @@ ECSyncLog::__initializer::~__initializer() {
 		ulRef = ECSyncLog::s_lpLogger->Release();
 }
 
-ECSyncLog::__initializer ECSyncLog::__i;
+ECSyncLog::initializer ECSyncLog::xinit;

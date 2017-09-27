@@ -24,6 +24,8 @@
 #include <mapicode.h>
 #include <mapix.h>
 
+using namespace KCHL;
+
 namespace KC {
 
 /**
@@ -84,33 +86,24 @@ HRESULT ECRestriction::CopyProp(SPropValue *lpPropSrc, void *lpBase,
     ULONG ulFlags, SPropValue **lppPropDst)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpPropDst = NULL;
+	memory_ptr<SPropValue> lpPropDst;
 
-	if (lpPropSrc == NULL || lppPropDst == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (lpPropSrc == nullptr || lppPropDst == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
 	if (lpBase == NULL)
-		hr = MAPIAllocateBuffer(sizeof *lpPropDst, (LPVOID*)&lpPropDst);
+		hr = MAPIAllocateBuffer(sizeof *lpPropDst, &~lpPropDst);
 	else
-		hr = MAPIAllocateMore(sizeof *lpPropDst, lpBase, (LPVOID*)&lpPropDst);
+		hr = MAPIAllocateMore(sizeof *lpPropDst, lpBase, &~lpPropDst);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	if (ulFlags & Shallow)
 		hr = Util::HrCopyPropertyByRef(lpPropDst, lpPropSrc);
 	else
 		hr = Util::HrCopyProperty(lpPropDst, lpPropSrc, lpBase ? lpBase : lpPropDst);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
-	*lppPropDst = lpPropDst;
-	lpPropDst = NULL;
-
-exit:
-	if (lpBase == nullptr)
-		MAPIFreeBuffer(lpPropDst);
+	*lppPropDst = lpPropDst.release();
 
 	return hr;
 }
@@ -128,33 +121,24 @@ HRESULT ECRestriction::CopyPropArray(ULONG cValues, SPropValue *lpPropSrc,
     void *lpBase, ULONG ulFlags, SPropValue **lppPropDst)
 {
 	HRESULT hr = hrSuccess;
-	LPSPropValue lpPropDst = NULL;
+	memory_ptr<SPropValue> lpPropDst;
 
-	if (lpPropSrc == NULL || lppPropDst == NULL) {
-		hr = MAPI_E_INVALID_PARAMETER;
-		goto exit;
-	}
-
+	if (lpPropSrc == nullptr || lppPropDst == nullptr)
+		return MAPI_E_INVALID_PARAMETER;
 	if (lpBase == NULL)
-		hr = MAPIAllocateBuffer(cValues * sizeof *lpPropDst, (LPVOID*)&lpPropDst);
+		hr = MAPIAllocateBuffer(cValues * sizeof *lpPropDst, &~lpPropDst);
 	else
-		hr = MAPIAllocateMore(cValues * sizeof *lpPropDst, lpBase, (LPVOID*)&lpPropDst);
+		hr = MAPIAllocateMore(cValues * sizeof *lpPropDst, lpBase, &~lpPropDst);
 	if (hr != hrSuccess)
-		goto exit;
-
+		return hr;
 	if (ulFlags & Shallow)
 		hr = Util::HrCopyPropertyArrayByRef(lpPropSrc, cValues, lpPropDst);
 	else
 		hr = Util::HrCopyPropertyArray(lpPropSrc, cValues, lpPropDst, lpBase ? lpBase : lpPropDst);
 	if (hr != hrSuccess)
-		goto exit;
+		return hr;
 
-	*lppPropDst = lpPropDst;
-	lpPropDst = NULL;
-
-exit:
-	if (lpBase == nullptr)
-		MAPIFreeBuffer(lpPropDst);
+	*lppPropDst = lpPropDst.release();
 
 	return hr;
 }
@@ -210,7 +194,7 @@ HRESULT ECAndRestriction::GetMAPIRestriction(LPVOID lpBase, LPSRestriction lpRes
 
 ECRestriction *ECAndRestriction::Clone(void) const _kc_lvqual
 {
-	ECAndRestriction *lpNew = new ECAndRestriction();
+	auto lpNew = new ECAndRestriction;
 	lpNew->m_lstRestrictions.assign(m_lstRestrictions.begin(), m_lstRestrictions.end());
 	return lpNew;
 }
@@ -264,7 +248,7 @@ HRESULT ECOrRestriction::GetMAPIRestriction(LPVOID lpBase, LPSRestriction lpRest
 
 ECRestriction *ECOrRestriction::Clone(void) const _kc_lvqual
 {
-	ECOrRestriction *lpNew = new ECOrRestriction();
+	auto lpNew = new ECOrRestriction;
 	lpNew->m_lstRestrictions.assign(m_lstRestrictions.begin(), m_lstRestrictions.end());
 	return lpNew;
 }

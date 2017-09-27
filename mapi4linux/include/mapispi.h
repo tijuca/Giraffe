@@ -12,7 +12,11 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
+ */
+
+/*
+ * mapispi.h – Defines flags and interfaces that MAPI implements for service
+ * providers and message services.
  */
 
 #ifndef __M4L_MAPISPI_H_
@@ -73,7 +77,7 @@ typedef IMAPISupport* LPMAPISUP;
 
 struct NOTIFKEY {
 	NOTIFKEY(void) = delete;
-	template<typename _T> NOTIFKEY(std::initializer_list<_T>) = delete;
+	template<typename T> NOTIFKEY(std::initializer_list<T>) = delete;
     ULONG       cb;             /* How big the key is */
     BYTE        ab[MAPI_DIM];   /* Key contents */
 };
@@ -157,8 +161,6 @@ typedef HRESULT (REMOVEPREPROCESSINFO)(LPMESSAGE lpMessage);
 
 class IMAPISupport : public virtual IUnknown {
 public:
-    //    virtual ~IMAPISupport() = 0;
-
     virtual HRESULT GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR * lppMAPIError) = 0; 
     virtual HRESULT GetMemAllocRoutines(LPALLOCATEBUFFER * lpAllocateBuffer, LPALLOCATEMORE * lpAllocateMore,
 					LPFREEBUFFER * lpFreeBuffer) = 0; 
@@ -167,7 +169,7 @@ public:
     virtual HRESULT Unsubscribe(ULONG ulConnection) = 0; 
     virtual HRESULT Notify(LPNOTIFKEY lpKey, ULONG cNotification, LPNOTIFICATION lpNotifications, ULONG * lpulFlags) = 0; 
     virtual HRESULT ModifyStatusRow(ULONG cValues, LPSPropValue lpColumnVals, ULONG ulFlags) = 0; 
-    virtual HRESULT OpenProfileSection(LPMAPIUID lpUid, ULONG ulFlags, LPPROFSECT * lppProfileObj) = 0; 
+	virtual HRESULT OpenProfileSection(const MAPIUID *uid, ULONG flags, IProfSect **) = 0; 
     virtual HRESULT RegisterPreprocessor(LPMAPIUID lpMuid, LPTSTR lpszAdrType, LPTSTR lpszDLLName, LPSTR lpszPreprocess,
 					 LPSTR lpszRemovePreprocessInfo, ULONG ulFlags) = 0; 
     virtual HRESULT NewUID(LPMAPIUID lpMuid) = 0; 
@@ -178,19 +180,16 @@ public:
     virtual HRESULT CreateOneOff(LPTSTR lpszName, LPTSTR lpszAdrType, LPTSTR lpszAddress, ULONG ulFlags,
 				 ULONG * lpcbEntryID, LPENTRYID * lppEntryID) = 0; 
     virtual HRESULT SetProviderUID(LPMAPIUID lpProviderID, ULONG ulFlags) = 0; 
-    virtual HRESULT CompareEntryIDs(ULONG cbEntry1, LPENTRYID lpEntry1, ULONG cbEntry2, LPENTRYID lpEntry2,
-				    ULONG ulCompareFlags, ULONG * lpulResult) = 0; 
+	virtual HRESULT CompareEntryIDs(ULONG asize, const ENTRYID *a, ULONG bsize, const ENTRYID *b, ULONG cmp_flags, ULONG *result) = 0;
     virtual HRESULT OpenTemplateID(ULONG cbTemplateID, LPENTRYID lpTemplateID, ULONG ulTemplateFlags, LPMAPIPROP lpMAPIPropData,
 				   LPCIID lpInterface, LPMAPIPROP * lppMAPIPropNew, LPMAPIPROP lpMAPIPropSibling) = 0; 
-    virtual HRESULT OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulOpenFlags, ULONG * lpulObjType,
-			      LPUNKNOWN * lppUnk) = 0; 
+	virtual HRESULT OpenEntry(ULONG eid_size, const ENTRYID *eid, const IID *intf, ULONG flags, ULONG *obj_type, IUnknown **) = 0;
     virtual HRESULT GetOneOffTable(ULONG ulFlags, LPMAPITABLE * lppTable) = 0; 
     virtual HRESULT Address(ULONG * lpulUIParam, LPADRPARM lpAdrParms, LPADRLIST * lppAdrList) = 0; 
     virtual HRESULT Details(ULONG * lpulUIParam, LPFNDISMISS lpfnDismiss, LPVOID lpvDismissContext, ULONG cbEntryID,
 			    LPENTRYID lpEntryID, LPFNBUTTON lpfButtonCallback, LPVOID lpvButtonContext, LPTSTR lpszButtonText,
 			    ULONG ulFlags) = 0; 
-    virtual HRESULT NewEntry(ULONG ulUIParam, ULONG ulFlags, ULONG cbEIDContainer, LPENTRYID lpEIDContainer, ULONG cbEIDNewEntryTpl,
-			     LPENTRYID lpEIDNewEntryTpl, ULONG * lpcbEIDNewEntry, LPENTRYID * lppEIDNewEntry) = 0; 
+    virtual HRESULT NewEntry(ULONG_PTR ulUIParam, ULONG ulFlags, ULONG cbEIDContainer, ENTRYID *lpEIDContainer, ULONG cbEIDNewEntryTpl, ENTRYID *lpEIDNewEntryTpl, ULONG * lpcbEIDNewEntry, ENTRYID **lppEIDNewEntry) = 0;
     virtual HRESULT DoConfigPropsheet(ULONG ulUIParam, ULONG ulFlags, LPTSTR lpszTitle, LPMAPITABLE lpDisplayTable,
 				      LPMAPIPROP lpCOnfigData, ULONG ulTopPage) = 0; 
     virtual HRESULT CopyMessages(LPCIID lpSrcInterface, LPVOID lpSrcFolder, LPENTRYLIST lpMsgList, LPCIID lpDestInterface,
@@ -211,8 +210,7 @@ public:
     virtual HRESULT CompleteMsg(ULONG ulFlags, ULONG cbEntryID, LPENTRYID lpEntryID) = 0; 
     virtual HRESULT StoreLogoffTransports(ULONG * lpulFlags) = 0; 
     virtual HRESULT StatusRecips(LPMESSAGE lpMessage, LPADRLIST lpRecipList) = 0; 
-    virtual HRESULT WrapStoreEntryID(ULONG cbOrigEntry, LPENTRYID lpOrigEntry, ULONG * lpcbWrappedEntry,
-				     LPENTRYID * lppWrappedEntry) = 0; 
+	virtual HRESULT WrapStoreEntryID(ULONG cbOrigEntry, const ENTRYID *lpOrigEntry, ULONG *lpcbWrappedEntry,ENTRYID **lppWrappedEntry) = 0;
     virtual HRESULT ModifyProfile(ULONG ulFlags) = 0; 
 
     virtual HRESULT IStorageFromStream(LPUNKNOWN lpUnkIn, LPCIID lpInterface, ULONG ulFlags, LPSTORAGE * lppStorageOut) = 0; 
@@ -238,26 +236,18 @@ typedef IABProvider* LPABPROVIDER;
 class IABLogon;
 typedef IABLogon* LPABLOGON;
 
-class IABProvider : public IUnknown {
+class IABProvider : public virtual IUnknown {
 public:
-    //    virtual ~IABProvider() = 0;
-
     virtual HRESULT Shutdown(ULONG * lpulFlags) = 0; 
-    virtual HRESULT Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG ulFlags, ULONG * lpulpcbSecurity,
-			  LPBYTE * lppbSecurity, LPMAPIERROR * lppMAPIError, LPABLOGON * lppABLogon) = 0;
+	virtual HRESULT Logon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam, const TCHAR *profname, ULONG ulFlags, ULONG *lpulpcbSecurity, LPBYTE * lppbSecurity, LPMAPIERROR *lppMAPIError, LPABLOGON *lppABLogon) = 0;
 };
 
-
-class IABLogon : public IUnknown {
+class IABLogon : public virtual IUnknown {
 public: 
-    //    virtual ~IABLogon() = 0;
-    
     virtual HRESULT GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR * lppMAPIError) = 0; 
     virtual HRESULT Logoff(ULONG ulFlags) = 0; 
-    virtual HRESULT OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG * lpulObjType,
-			      LPUNKNOWN * lppUnk) = 0; 
-    virtual HRESULT CompareEntryIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2,
-				    ULONG ulFlags, ULONG * lpulResult) = 0; 
+	virtual HRESULT OpenEntry(ULONG eid_size, const ENTRYID *eid, const IID *intf, ULONG flags, ULONG *obj_type, IUnknown **) = 0;
+	virtual HRESULT CompareEntryIDs(ULONG asize, const ENTRYID *a, ULONG bsize, const ENTRYID *b, ULONG cmp_flags, ULONG *result) = 0;
     virtual HRESULT Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink,
 			   ULONG * lpulConnection) = 0; 
     virtual HRESULT Unadvise(ULONG ulConnection) = 0; 
@@ -321,11 +311,8 @@ typedef IXPLogon* LPXPLOGON;
 
 class IXPProvider : public IUnknown {
 public: 
-    //    virtual ~IXPProvider() = 0;
-    
     virtual HRESULT Shutdown(ULONG * lpulFlags) = 0; 
-    virtual HRESULT TransportLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName,
-				   ULONG * lpulFlags, LPMAPIERROR * lppMAPIError, LPXPLOGON * lppXPLogon) = 0;
+	virtual HRESULT TransportLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, const TCHAR *lpszProfileName, ULONG *lpulFlags, LPMAPIERROR *lppMAPIError, LPXPLOGON *lppXPLogon) = 0;
 };
 
 /* OptionData returned from call to RegisterOptions */
@@ -392,8 +379,6 @@ typedef SCODE (OPTIONCALLBACK)(
 
 class IXPLogon : public IUnknown {
 public: 
-    //    virtual ~IXPLogon() = 0;
-
     virtual HRESULT AddressTypes(ULONG * lpulFlags, ULONG * lpcAdrType, LPTSTR** lpppAdrTypeArray,
 				   ULONG * lpcMAPIUID, LPMAPIUID * * lpppUIDArray) = 0; 
     virtual HRESULT RegisterOptions(ULONG * lpulFlags, ULONG * lpcOptions, LPOPTIONDATA * lppOptions) = 0; 
@@ -411,7 +396,6 @@ public:
 
 
 /* Transport Provider Entry Point */
-extern "C" {
 typedef HRESULT (XPPROVIDERINIT)(
     HINSTANCE           hInstance,
     LPMALLOC            lpMalloc,
@@ -422,9 +406,6 @@ typedef HRESULT (XPPROVIDERINIT)(
     ULONG               ulMAPIVer,
     ULONG *         lpulProviderVer,
     LPXPPROVIDER *  lppXPProvider);
-
-XPPROVIDERINIT XPProviderInit;
-}
 
 /********************************************************************/
 /*                                                                  */
@@ -472,18 +453,11 @@ class IMSProvider;
 typedef IMSProvider* LPMSPROVIDER;
 
 /* Message Store Provider Interface (IMSPROVIDER) */
-
-class IMSProvider : public IUnknown {
+class IMSProvider : public virtual IUnknown {
 public: 
-    //    virtual ~IMSProvider() = 0;
-    
     virtual HRESULT Shutdown(ULONG * lpulFlags) = 0; 
-    virtual HRESULT Logon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG cbEntryID, LPENTRYID lpEntryID,
-			  ULONG ulFlags, LPCIID lpInterface, ULONG * lpcbSpoolSecurity, LPBYTE * lppbSpoolSecurity,
-			  LPMAPIERROR * lppMAPIError, LPMSLOGON * lppMSLogon, LPMDB * lppMDB) = 0; 
-    virtual HRESULT SpoolerLogon(LPMAPISUP lpMAPISup, ULONG ulUIParam, LPTSTR lpszProfileName, ULONG cbEntryID,
-				 LPENTRYID lpEntryID, ULONG ulFlags, LPCIID lpInterface, ULONG cbSpoolSecurity,
-				 LPBYTE lpbSpoolSecurity, LPMAPIERROR * lppMAPIError, LPMSLOGON * lppMSLogon, LPMDB * lppMDB) = 0; 
+	virtual HRESULT Logon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam, const TCHAR *lpszProfileName, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, LPCIID lpInterface, ULONG *lpcbSpoolSecurity, LPBYTE *lppbSpoolSecurity, LPMAPIERROR *lppMAPIError, LPMSLOGON *lppMSLogon, LPMDB *lppMDB) = 0;
+	virtual HRESULT SpoolerLogon(LPMAPISUP lpMAPISup, ULONG_PTR ulUIParam, const TCHAR *lpszProfileName, ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulFlags, LPCIID lpInterface, ULONG cbSpoolSecurity, LPBYTE lpbSpoolSecurity, LPMAPIERROR *lppMAPIError, LPMSLOGON *lppMSLogon, LPMDB *lppMDB) = 0;
     virtual HRESULT CompareStoreIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2,
 				    ULONG ulFlags, ULONG * lpulResult) = 0;
 };
@@ -491,16 +465,12 @@ public:
 /* The MSLOGON object is returned by the Logon() method of the
  * MSPROVIDER interface.  This object is for use by MAPIX.DLL.
  */
-class IMSLogon : public IUnknown {
+class IMSLogon : public virtual IUnknown {
 public: 
-    //    virtual ~IMSLogon() = 0;
-    
     virtual HRESULT GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR * lppMAPIError) = 0; 
     virtual HRESULT Logoff(ULONG * lpulFlags) = 0; 
-    virtual HRESULT OpenEntry(ULONG cbEntryID, LPENTRYID lpEntryID, LPCIID lpInterface, ULONG ulFlags, ULONG * lpulObjType,
-			      LPUNKNOWN * lppUnk) = 0; 
-    virtual HRESULT CompareEntryIDs(ULONG cbEntryID1, LPENTRYID lpEntryID1, ULONG cbEntryID2, LPENTRYID lpEntryID2,
-				    ULONG ulFlags, ULONG * lpulResult) = 0; 
+	virtual HRESULT OpenEntry(ULONG eid_size, const ENTRYID *eid, const IID *intf, ULONG flags, ULONG *obj_type, IUnknown **) = 0;
+	virtual HRESULT CompareEntryIDs(ULONG asize, const ENTRYID *a, ULONG bsize, const ENTRYID *b, ULONG cmp_flags, ULONG *result) = 0;
     virtual HRESULT Advise(ULONG cbEntryID, LPENTRYID lpEntryID, ULONG ulEventMask, LPMAPIADVISESINK lpAdviseSink,
 			   ULONG * lpulConnection) = 0; 
     virtual HRESULT Unadvise(ULONG ulConnection) = 0; 

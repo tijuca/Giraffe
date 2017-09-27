@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
 #include "ECArchiveAwareMsgStore.h"
 #include "ECArchiveAwareAttach.h"
@@ -49,9 +49,11 @@ private:
 	ULONG m_ulPropTag;
 };
 
-HRESULT ECArchiveAwareMessageFactory::Create(ECMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFlags, BOOL bEmbedded, ECMAPIProp* lpRoot, ECMessage **lppMessage) const
+HRESULT ECArchiveAwareMessageFactory::Create(ECMsgStore *lpMsgStore, BOOL fNew,
+    BOOL fModify, ULONG ulFlags, BOOL bEmbedded, const ECMAPIProp *lpRoot,
+    ECMessage **lppMessage) const
 {
-	ECArchiveAwareMsgStore *lpArchiveAwareStore = dynamic_cast<ECArchiveAwareMsgStore*>(lpMsgStore);
+	auto lpArchiveAwareStore = dynamic_cast<ECArchiveAwareMsgStore *>(lpMsgStore);
 
 	// New and embedded messages don't need to be archive aware. Also if the calling store
 	// is not archive aware, the message won't.
@@ -64,7 +66,7 @@ HRESULT ECArchiveAwareMessageFactory::Create(ECMsgStore *lpMsgStore, BOOL fNew, 
 ECArchiveAwareMessage::ECArchiveAwareMessage(ECArchiveAwareMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFlags)
 : ECMessage(lpMsgStore, fNew, fModify, ulFlags, FALSE, NULL)
 , m_bLoading(false)
-, m_bNamedPropsMapped(false), __propmap(5)
+, m_bNamedPropsMapped(false), m_propmap(5)
 , m_mode(MODE_UNARCHIVED)
 , m_bChanged(false)
 {
@@ -74,8 +76,8 @@ ECArchiveAwareMessage::ECArchiveAwareMessage(ECArchiveAwareMsgStore *lpMsgStore,
 
 HRESULT	ECArchiveAwareMessage::Create(ECArchiveAwareMsgStore *lpMsgStore, BOOL fNew, BOOL fModify, ULONG ulFlags, ECMessage **lppMessage)
 {
-	ECArchiveAwareMessage *lpMessage = new ECArchiveAwareMessage(lpMsgStore, fNew, fModify, ulFlags);
-	return lpMessage->QueryInterface(IID_ECMessage, reinterpret_cast<void **>(lppMessage));
+	return alloc_wrap<ECArchiveAwareMessage>(lpMsgStore, fNew, fModify,
+	       ulFlags).as(IID_ECMessage, lppMessage);
 }
 
 HRESULT ECArchiveAwareMessage::HrLoadProps()
@@ -105,7 +107,7 @@ HRESULT ECArchiveAwareMessage::HrLoadProps()
 		PR_MESSAGE_CLASS, PR_MESSAGE_SIZE}};
 
 	if (!m_ptrArchiveMsg) {
-		ECArchiveAwareMsgStore *lpStore = dynamic_cast<ECArchiveAwareMsgStore *>(lpMsgStore);
+		auto lpStore = dynamic_cast<ECArchiveAwareMsgStore *>(lpMsgStore);
 		if (lpStore == NULL) {
 			// This is quite a serious error since an ECArchiveAwareMessage can only be created by an
 			// ECArchiveAwareMsgStore. We won't just die here though...
@@ -133,9 +135,9 @@ HRESULT ECArchiveAwareMessage::HrLoadProps()
 		this->fModify = fModifyCopy;
 		goto exit;
 	}
-	hr = Util::DoCopyProps(&IID_IMAPIProp, &m_ptrArchiveMsg->m_xMAPIProp,
+	hr = Util::DoCopyProps(&IID_IMAPIProp, static_cast<IMAPIProp *>(m_ptrArchiveMsg),
 	     sptaRestoreProps, 0, NULL, &IID_IMAPIProp,
-	     &this->m_xMAPIProp, 0, NULL);
+	     static_cast<IMAPIProp *>(this), 0, nullptr);
 	if (hr != hrSuccess) {
 		this->fModify = fModifyCopy;
 		goto exit;
@@ -143,13 +145,12 @@ HRESULT ECArchiveAwareMessage::HrLoadProps()
 
 	// Now remove any dummy attachment(s) and copy the attachments from the archive (except the properties
 	// that are too big in the firt place).
-	hr = Util::HrDeleteAttachments(&m_xMessage);
+	hr = Util::HrDeleteAttachments(this);
 	if (hr != hrSuccess) {
 		this->fModify = fModifyCopy;
 		goto exit;
 	}
-
-	hr = Util::CopyAttachments(&m_ptrArchiveMsg->m_xMessage, &m_xMessage, NULL);
+	hr = Util::CopyAttachments(m_ptrArchiveMsg, this, NULL);
 	this->fModify = fModifyCopy;
 exit:
 	m_bLoading = false;
@@ -354,7 +355,7 @@ HRESULT ECArchiveAwareMessage::SaveChanges(ULONG ulFlags)
 HRESULT ECArchiveAwareMessage::SetPropHandler(ULONG ulPropTag,
     void */*lpProvider*/, const SPropValue *lpsPropValue, void *lpParam)
 {
-	ECArchiveAwareMessage *lpMessage = (ECArchiveAwareMessage *)lpParam;
+	auto lpMessage = static_cast<ECArchiveAwareMessage *>(lpParam);
 	HRESULT hr = hrSuccess;
 
 	switch(ulPropTag) {
@@ -380,8 +381,7 @@ HRESULT ECArchiveAwareMessage::MapNamedProps()
 	PROPMAP_INIT_NAMED_ID(STUBBED,                PT_BOOLEAN,   PSETID_Archive, dispidStubbed);
 	PROPMAP_INIT_NAMED_ID(DIRTY,				  PT_BOOLEAN,   PSETID_Archive, dispidDirty);
 	PROPMAP_INIT_NAMED_ID(ORIGINAL_SOURCE_KEY,    PT_BINARY,    PSETID_Archive, dispidOrigSourceKey);
-	PROPMAP_INIT(&this->m_xMAPIProp);
-
+	PROPMAP_INIT(this);
 	m_bNamedPropsMapped = true;
  exitpm:
 	return hr;
@@ -403,10 +403,10 @@ HRESULT ECArchiveAwareMessage::CreateInfoMessage(const SPropTagArray *lpptaDelet
 
 	sPropVal.ulPropTag = PR_INTERNET_CPID;
 	sPropVal.Value.l = 65001;
-	hr = HrSetOneProp(&this->m_xMAPIProp, &sPropVal);
+	hr = HrSetOneProp(this, &sPropVal);
 	if (hr != hrSuccess)
 		goto exit;
-	hr = OpenProperty(PR_HTML, &ptrHtmlStream.iid(), 0, MAPI_CREATE | MAPI_MODIFY, &~ptrHtmlStream);
+	hr = OpenProperty(PR_HTML, &iid_of(ptrHtmlStream), 0, MAPI_CREATE | MAPI_MODIFY, &~ptrHtmlStream);
 	if (hr != hrSuccess)
 		goto exit;
 
@@ -429,53 +429,53 @@ exit:
 std::string ECArchiveAwareMessage::CreateErrorBodyUtf8(HRESULT hResult) {
 	std::basic_ostringstream<TCHAR> ossHtmlBody;
 
-	ossHtmlBody << _T("<HTML><HEAD><STYLE type=\"text/css\">")
-				   _T("BODY {font-family: \"sans-serif\";margin-left: 1em;}")
-				   _T("P {margin: .1em 0;}")
-				   _T("P.spacing {margin: .8em 0;}")
-				   _T("H1 {margin: .3em 0;}")
-				   _T("SPAN#errcode {display: inline;font-weight: bold;}")
-				   _T("SPAN#errmsg {display: inline;font-style: italic;}")
-				   _T("DIV.indented {margin-left: 4em;}")
-				   _T("</STYLE></HEAD><BODY><H1>")
+	ossHtmlBody << KC_T("<HTML><HEAD><STYLE type=\"text/css\">")
+				   KC_T("BODY {font-family: \"sans-serif\";margin-left: 1em;}")
+				   KC_T("P {margin: .1em 0;}")
+				   KC_T("P.spacing {margin: .8em 0;}")
+				   KC_T("H1 {margin: .3em 0;}")
+				   KC_T("SPAN#errcode {display: inline;font-weight: bold;}")
+				   KC_T("SPAN#errmsg {display: inline;font-style: italic;}")
+				   KC_T("DIV.indented {margin-left: 4em;}")
+				   KC_T("</STYLE></HEAD><BODY><H1>")
 				<< _("Kopano Archiver")
-				<< _T("</H1><P>")
+				<< KC_T("</H1><P>")
 				<< _("An error has occurred while fetching the message from the archive.")
-				<< _T(" ")
+				<< KC_T(" ")
 				<< _("Please contact your system administrator.")
-				<< _T("</P><P class=\"spacing\"></P>")
-				   _T("<P>")
+				<< KC_T("</P><P class=\"spacing\"></P>")
+				   KC_T("<P>")
 				<< _("Error code:")
-				<< _T("<SPAN id=\"errcode\">")
+				<< KC_T("<SPAN id=\"errcode\">")
 				<< tstringify(hResult, true)
-				<< _T("</SPAN> (<SPAN id=\"errmsg\">")
+				<< KC_T("</SPAN> (<SPAN id=\"errmsg\">")
 				<< convert_to<tstring>(GetMAPIErrorDescription(hResult))
-				<< _T("</SPAN>)</P>");
+				<< KC_T("</SPAN>)</P>");
 
 	if (hResult == MAPI_E_NO_SUPPORT) {
-		ossHtmlBody << _T("<P class=\"spacing\"></P><P>")
+		ossHtmlBody << KC_T("<P class=\"spacing\"></P><P>")
 				    << _("It seems no valid archiver license is installed.")
-					<< _T("</P>");
+					<< KC_T("</P>");
 	} else if (hResult == MAPI_E_NOT_FOUND) {
-		ossHtmlBody << _T("<P class=\"spacing\"></P><P>")
+		ossHtmlBody << KC_T("<P class=\"spacing\"></P><P>")
 				    << _("The archive could not be found.")
-					<< _T("</P>");
+					<< KC_T("</P>");
 	} else if (hResult == MAPI_E_NO_ACCESS) {
-		ossHtmlBody << _T("<P class=\"spacing\"></P><P>")
+		ossHtmlBody << KC_T("<P class=\"spacing\"></P><P>")
 				    << _("You don't have sufficient access to the archive.")
-					<< _T("</P>");
+					<< KC_T("</P>");
 	} else {
 		KCHL::memory_ptr<TCHAR> lpszDescription;
 		HRESULT hr = Util::HrMAPIErrorToText(hResult, &~lpszDescription);
 		if (hr == hrSuccess)
-			ossHtmlBody << _T("<P>")
+			ossHtmlBody << KC_T("<P>")
 						<< _("Error description:")
-						<< _T("<DIV class=\"indented\">")
+						<< KC_T("<DIV class=\"indented\">")
 						<< lpszDescription
-						<< _T("</DIV></P>");
+						<< KC_T("</DIV></P>");
 	}
 
-	ossHtmlBody << _T("</BODY></HTML>");
+	ossHtmlBody << KC_T("</BODY></HTML>");
 
 	tstring strHtmlBody = ossHtmlBody.str();
 	return convert_to<std::string>("UTF-8", strHtmlBody, rawsize(strHtmlBody), CHARSET_TCHAR);
@@ -485,19 +485,19 @@ std::string ECArchiveAwareMessage::CreateOfflineWarnBodyUtf8()
 {
 	std::basic_ostringstream<TCHAR> ossHtmlBody;
 
-	ossHtmlBody << _T("<HTML><HEAD><STYLE type=\"text/css\">")
-				   _T("BODY {font-family: \"sans-serif\";margin-left: 1em;}")
-				   _T("P {margin: .1em 0;}")
-				   _T("P.spacing {margin: .8em 0;}")
-				   _T("H1 {margin: .3em 0;}")
-				   _T("SPAN#errcode {display: inline;font-weight: bold;}")
-				   _T("SPAN#errmsg {display: inline;font-style: italic;}")
-				   _T("DIV.indented {margin-left: 4em;}")
-				   _T("</STYLE></HEAD><BODY><H1>")
+	ossHtmlBody << KC_T("<HTML><HEAD><STYLE type=\"text/css\">")
+				   KC_T("BODY {font-family: \"sans-serif\";margin-left: 1em;}")
+				   KC_T("P {margin: .1em 0;}")
+				   KC_T("P.spacing {margin: .8em 0;}")
+				   KC_T("H1 {margin: .3em 0;}")
+				   KC_T("SPAN#errcode {display: inline;font-weight: bold;}")
+				   KC_T("SPAN#errmsg {display: inline;font-style: italic;}")
+				   KC_T("DIV.indented {margin-left: 4em;}")
+				   KC_T("</STYLE></HEAD><BODY><H1>")
 				<< _("Kopano Archiver")
-				<< _T("</H1><P>")
+				<< KC_T("</H1><P>")
 				<< _("Archives can not be destubbed when working offline.")
-				<< _T("</P></BODY></HTML>");
+				<< KC_T("</P></BODY></HTML>");
 
 	tstring strHtmlBody = ossHtmlBody.str();
 	return convert_to<std::string>("UTF-8", strHtmlBody, rawsize(strHtmlBody), CHARSET_TCHAR);

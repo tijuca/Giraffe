@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+#include <new>
 #include <kopano/platform.h>
 #include "ECDatabase.h"
 
@@ -26,7 +26,7 @@
 #include "ECGenProps.h"
 #include "ECSession.h"
 #include <kopano/stringutil.h>
-
+#include <kopano/Util.h>
 #include "ECMailBoxTable.h"
 
 namespace KC {
@@ -39,37 +39,29 @@ ECMailBoxTable::ECMailBoxTable(ECSession *lpSession, unsigned int ulFlags, const
 
 ECRESULT ECMailBoxTable::Create(ECSession *lpSession, unsigned int ulFlags, const ECLocale &locale, ECMailBoxTable **lppTable)
 {
-	*lppTable = new ECMailBoxTable(lpSession, ulFlags, locale);
-
-	(*lppTable)->AddRef();
-
-	return erSuccess;
+	return alloc_wrap<ECMailBoxTable>(lpSession, ulFlags, locale).put(lppTable);
 }
 
 ECRESULT ECMailBoxTable::Load()
 {
-	ECRESULT er = erSuccess;
 	ECDatabase *lpDatabase = NULL;
 	DB_RESULT lpDBResult;
-	DB_ROW		lpDBRow = NULL;
-	std::string strQuery;
 	std::list<unsigned int> lstObjIds;
 
-	er = lpSession->GetDatabase(&lpDatabase);
+	auto er = lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
 		return er;
 
 	Clear();
 
 	//@todo Load all stores depends on m_ulStoreTypes, 1. privates, 2. publics or both
-	strQuery = "SELECT hierarchy_id FROM stores";
+	std::string strQuery = "SELECT hierarchy_id FROM stores";
 	er = lpDatabase->DoSelect(strQuery, &lpDBResult);
 	if(er != erSuccess)
 		return er;
 
 	while(1) {
-		lpDBRow = lpDatabase->FetchRow(lpDBResult);
-
+		auto lpDBRow = lpDBResult.fetch_row();
 		if(lpDBRow == NULL)
 			break;
 

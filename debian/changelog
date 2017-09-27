@@ -1,3 +1,16 @@
+kopanocore (8.4.0~beta1-1~1.gbpbf4432) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @bf44322a821ddd10ad1a2063cc3899ce1f449777 **
+
+  * [a8cd857] Version libvmime build-dep (Closes: #875454)
+  * [e8ba560] Add apparmor profiles for kopano-server and kopano-dagent
+  * [236d51a] apparmor: add initial policy for search
+  * [4133b28] uscan: switch to https
+  * [a84434e] uscan: Match on beta versions and ignore .90 "betas"
+  * [00bf6e9] New upstream version 8.4.0~beta1
+
+ -- Guido Günther <agx@sigxcpu.org>  Wed, 27 Sep 2017 17:02:22 +0200
+
 kopanocore (8.3.4-1) unstable; urgency=medium
 
   [ Carsten Schoenert ]

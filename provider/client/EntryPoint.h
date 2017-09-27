@@ -25,15 +25,14 @@
 
 extern "C" {
 
-extern _kc_export HRESULT __cdecl MSProviderInit(HINSTANCE, LPMALLOC, LPALLOCATEBUFFER, LPALLOCATEMORE, LPFREEBUFFER, ULONG flags, ULONG mapi_ver, ULONG *mdb_ver, LPMSPROVIDER *);
-extern _kc_export HRESULT __stdcall MSGServiceEntry(HINSTANCE, LPMALLOC, LPMAPISUP, ULONG ui_param, ULONG se_flags, ULONG ctx, ULONG cvals, LPSPropValue pvals, LPPROVIDERADMIN admprovs, LPMAPIERROR *);
-extern _kc_export HRESULT __cdecl XPProviderInit(HINSTANCE, LPMALLOC, LPALLOCATEBUFFER, LPALLOCATEMORE, LPFREEBUFFER, ULONG flags, ULONG mapi_ver, ULONG *prov_ver, LPXPPROVIDER *);
-extern _kc_export HRESULT  __cdecl ABProviderInit(HINSTANCE, LPMALLOC, LPALLOCATEBUFFER, LPALLOCATEMORE, LPFREEBUFFER, ULONG flags, ULONG mapi_ver, ULONG *prov_ver, LPABPROVIDER *);
+extern _kc_export HRESULT MSProviderInit(HINSTANCE, LPMALLOC, LPALLOCATEBUFFER, LPALLOCATEMORE, LPFREEBUFFER, ULONG flags, ULONG mapi_ver, ULONG *mdb_ver, LPMSPROVIDER *);
+extern _kc_export HRESULT MSGServiceEntry(HINSTANCE, IMalloc *, IMAPISupport *, ULONG ui_param, ULONG se_flags, ULONG ctx, ULONG nprops, const SPropValue *props, IProviderAdmin *, MAPIERROR **);
+extern _kc_export HRESULT  ABProviderInit(HINSTANCE, LPMALLOC, LPALLOCATEBUFFER, LPALLOCATEMORE, LPFREEBUFFER, ULONG flags, ULONG mapi_ver, ULONG *prov_ver, LPABPROVIDER *);
 
 }
 
 class WSTransport;
-HRESULT InitializeProvider(LPPROVIDERADMIN lpAdminProvider, IProfSect *lpProfSect, const sGlobalProfileProps &, ULONG *lpcStoreID, LPENTRYID *lppStoreID, WSTransport * = NULL);
+extern HRESULT InitializeProvider(IProviderAdmin *, IProfSect *, const sGlobalProfileProps &, ULONG *eid_size, ENTRYID **store_eid);
 
 // Global values
 extern tstring	g_strCommonFilesKopano;

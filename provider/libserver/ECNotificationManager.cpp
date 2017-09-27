@@ -19,14 +19,77 @@
 #include <chrono>
 #include <kopano/lockhelper.hpp>
 #include <pthread.h>
+#include "ECMAPI.h"
+#include "ECNotification.h"
 #include "ECNotificationManager.h"
 #include "ECSession.h"
 #include "ECSessionManager.h"
 #include "ECStringCompat.h"
-
+#include "SOAPUtils.h"
 #include "soapH.h"
 
 namespace KC {
+
+ECNotification::ECNotification()
+{
+	Init();
+}
+
+ECNotification::~ECNotification()
+{
+	FreeNotificationStruct(m_lpsNotification, true);
+}
+
+ECNotification::ECNotification(const ECNotification &x)
+{
+	Init();
+	*this = x;
+}
+
+ECNotification::ECNotification(notification &notification)
+{
+	Init();
+	*this = notification;
+}
+
+void ECNotification::Init()
+{
+	this->m_lpsNotification = s_alloc<notification>(nullptr);
+	memset(m_lpsNotification, 0, sizeof(notification));
+}
+
+ECNotification& ECNotification::operator=(const ECNotification &x)
+{
+	if (this != &x)
+		CopyNotificationStruct(nullptr, x.m_lpsNotification, *this->m_lpsNotification);
+	return *this;
+}
+
+ECNotification &ECNotification::operator=(const notification &srcNotification)
+{
+	CopyNotificationStruct(nullptr, &srcNotification, *this->m_lpsNotification);
+	return *this;
+}
+
+void ECNotification::SetConnection(unsigned int ulConnection)
+{
+	m_lpsNotification->ulConnection = ulConnection;
+}
+
+void ECNotification::GetCopy(struct soap *soap, notification &notification) const
+{
+	CopyNotificationStruct(soap, this->m_lpsNotification, notification);
+}
+
+/**
+ * Get object size
+ *
+ * @return Object size in bytes
+ */
+size_t ECNotification::GetObjectSize(void) const
+{
+	return NotificationStructSize(m_lpsNotification);
+}
 
 // Copied from generated soapServer.cpp
 static int soapresponse(struct notifyResponse notifications, struct soap *soap)
@@ -140,13 +203,11 @@ HRESULT ECNotificationManager::NotifyChange(ECSESSIONID ecSessionId)
 
 void * ECNotificationManager::Thread(void *lpParam)
 {
-    ECNotificationManager *lpThis = (ECNotificationManager *)lpParam;
-    
-    return lpThis->Work();
+	kcsrv_blocksigs();
+	return static_cast<ECNotificationManager *>(lpParam)->Work();
 }
 
 void *ECNotificationManager::Work() {
-    ECRESULT er = erSuccess;
     ECSession *lpecSession = NULL;
     struct notifyResponse notifications;
 
@@ -180,7 +241,7 @@ void *ECNotificationManager::Work() {
                 soap_default_notifyResponse(iterRequest->second.soap, &notifications);
                 if(g_lpSessionManager->ValidateSession(iterRequest->second.soap, ses, &lpecSession, true) == erSuccess) {
                     // Get the notifications from the session
-                    er = lpecSession->GetNotifyItems(iterRequest->second.soap, &notifications);
+					auto er = lpecSession->GetNotifyItems(iterRequest->second.soap, &notifications);
                     
                     if(er == KCERR_NOT_FOUND) {
                         if(time(NULL) - iterRequest->second.ulRequestTime < m_ulTimeout) {

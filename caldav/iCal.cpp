@@ -18,7 +18,7 @@
 #include <kopano/platform.h>
 #include "iCal.h"
 #include "CalDavUtil.h"
-
+#include <memory>
 #include <vector>
 
 #include <kopano/CommonUtil.h>
@@ -140,7 +140,6 @@ HRESULT iCal::HrHandleIcalPost()
 	SBinary sbUid = {0,0};
 	ULONG ulItemCount = 0;
 	ULONG ulProptag = 0;
-	ICalToMapi *lpICalToMapi = NULL;
 	time_t tLastMod = 0;
 	bool blCensorPrivate = false;
 
@@ -162,7 +161,8 @@ HRESULT iCal::HrHandleIcalPost()
 	//Include PR_ENTRYID,PR_LAST_MODIFICATION_TIME & Named Prop GlobalObjUid.
 	
 	//retrive entries from ical data.
-	CreateICalToMapi(m_lpActiveStore, m_lpAddrBook, false, &lpICalToMapi);
+	std::unique_ptr<ICalToMapi> lpICalToMapi;
+	CreateICalToMapi(m_lpActiveStore, m_lpAddrBook, false, &unique_tie(lpICalToMapi));
 
 	m_lpRequest->HrGetBody(&strIcal);
 	if(!strIcal.empty())
@@ -180,8 +180,7 @@ HRESULT iCal::HrHandleIcalPost()
 		hr = lpICalToMapi->GetItemInfo(i, &etype, &tLastMod, &sbEid);
 		if (hr != hrSuccess || etype != VEVENT)
 			continue;
-		
-		strUidString = bin2hex((ULONG)sbEid.cb,(LPBYTE)sbEid.lpb);
+		strUidString = bin2hex(sbEid.cb, sbEid.lpb);
 		mpIcalEntries[strUidString] = i;
 	}
 
@@ -217,7 +216,7 @@ HRESULT iCal::HrHandleIcalPost()
 			if ((hr = MAPIAllocateBuffer(sbEid.cb, (void **)&sbEid.lpb)) != hrSuccess)
 				goto exit;
 			memcpy(sbEid.lpb, lpRows->aRow[i].lpProps[0].Value.bin.lpb, sbEid.cb);
-			strUidString = bin2hex((ULONG)sbUid.cb, (LPBYTE)sbUid.lpb);
+			strUidString = bin2hex(sbUid.cb, sbUid.lpb);
 			mpSrvEntries[strUidString] = sbEid;
 			if (lpRows->aRow[i].lpProps[1].ulPropTag == PR_LAST_MODIFICATION_TIME)
 				mpSrvTimes[strUidString] = lpRows->aRow[i].lpProps[1].Value.ft;				
@@ -241,7 +240,7 @@ HRESULT iCal::HrHandleIcalPost()
 			}
 			++mpIterJ;
 		} else if (mpIcalEntries.cend() != mpIterI && mpSrvEntries.cend() == mpIterJ) {
-			hr = HrAddMessage(lpICalToMapi, mpIterI->second);
+			hr = HrAddMessage(lpICalToMapi.get(), mpIterI->second);
 			if(hr != hrSuccess)
 			{
 				ec_log_err("Unable to Add New Message: 0x%08X", hr);
@@ -257,7 +256,7 @@ HRESULT iCal::HrHandleIcalPost()
 				FileTimeToUnixTime(ftModTime, &tUnixModTime);
 				if(tUnixModTime != tLastMod && etype == VEVENT)
 				{
-					hr = HrModify(lpICalToMapi, mpIterJ->second, mpIterI->second, blCensorPrivate);
+					hr = HrModify(lpICalToMapi.get(), mpIterJ->second, mpIterI->second, blCensorPrivate);
 					if(hr != hrSuccess)
 					{
 						ec_log_err("Unable to Modify Message: 0x%08X", hr);
@@ -269,7 +268,7 @@ HRESULT iCal::HrHandleIcalPost()
 			}
 			else if( mpIterI->first.compare(mpIterJ->first) < 0 )
 			{
-				hr = HrAddMessage(lpICalToMapi, mpIterI->second);
+				hr = HrAddMessage(lpICalToMapi.get(), mpIterI->second);
 				if(hr != hrSuccess)
 				{
 					ec_log_err("Unable to Add New Message: 0x%08X", hr);
@@ -308,8 +307,6 @@ exit:
 
 	for (mpIterJ = mpSrvEntries.cbegin(); mpIterJ != mpSrvEntries.cend(); ++mpIterJ)
 		MAPIFreeBuffer(mpIterJ->second.lpb);
-	if(lpICalToMapi)
-		delete lpICalToMapi;
 	mpSrvEntries.clear();
 	mpIcalEntries.clear();
 	mpSrvTimes.clear();
@@ -335,7 +332,7 @@ HRESULT iCal::HrModify( ICalToMapi *lpIcal2Mapi, SBinary sbSrvEid, ULONG ulPos, 
 	ulTagPrivate = CHANGE_PROP_TYPE(m_lpNamedProps->aulPropTag[PROP_PRIVATE], PT_BOOLEAN);
 
 	HRESULT hr = m_lpUsrFld->OpenEntry(sbSrvEid.cb, reinterpret_cast<ENTRYID *>(sbSrvEid.lpb),
-	             nullptr, MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
+	             &iid_of(lpMessage), MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
 	if(hr != hrSuccess)
 		return hr;
 	if (blCensor && IsPrivate(lpMessage, ulTagPrivate))
@@ -403,7 +400,8 @@ HRESULT iCal::HrDelMessage(SBinary sbEid, bool blCensor)
 		ec_log_err("Error allocating memory, error code: 0x%08X",hr);
 		return hr;
 	}
-	hr = m_lpUsrFld->OpenEntry(sbEid.cb, reinterpret_cast<ENTRYID *>(sbEid.lpb), nullptr, MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
+	hr = m_lpUsrFld->OpenEntry(sbEid.cb, reinterpret_cast<ENTRYID *>(sbEid.lpb),
+	     &iid_of(lpMessage), MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
 	if(hr != hrSuccess)
 		return hr;
 	
@@ -526,7 +524,7 @@ HRESULT iCal::HrGetIcal(IMAPITable *lpTable, bool blCensorPrivate, std::string *
 
 			object_ptr<IMessage> lpMessage;
 			hr = m_lpUsrFld->OpenEntry(sbEid.cb, (LPENTRYID)sbEid.lpb,
-			     nullptr, MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
+			     &iid_of(lpMessage), MAPI_BEST_ACCESS, &ulObjType, &~lpMessage);
 			if (hr != hrSuccess)
 			{
 				ec_log_debug("Error opening message for ical conversion, error code: 0x%08X", hr);
@@ -584,7 +582,8 @@ HRESULT iCal::HrDelFolder()
 	hr = HrGetOneProp(m_lpActiveStore, PR_IPM_WASTEBASKET_ENTRYID, &~lpWstBoxEid);
 	if (hr != hrSuccess)
 		goto exit;
-	hr = m_lpActiveStore->OpenEntry(lpWstBoxEid->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpWstBoxEid->Value.bin.lpb), nullptr, MAPI_MODIFY, &ulObjType, &~lpWasteBoxFld);
+	hr = m_lpActiveStore->OpenEntry(lpWstBoxEid->Value.bin.cb, reinterpret_cast<ENTRYID *>(lpWstBoxEid->Value.bin.lpb),
+	     &iid_of(lpWasteBoxFld), MAPI_MODIFY, &ulObjType, &~lpWasteBoxFld);
 	if (hr != hrSuccess)
 	{
 		ec_log_err("Error opening \"Deleted items\" folder, error code: 0x%08X", hr);

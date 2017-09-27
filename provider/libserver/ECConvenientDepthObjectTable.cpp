@@ -16,18 +16,23 @@
  */
 
 #include <kopano/platform.h>
+#include <list>
+#include <memory>
+#include <new>
 #include <utility>
 #include "ECDatabase.h"
 
 #include <mapidefs.h>
-
+#include <mapitags.h>
 #include "ECSecurity.h"
 #include "ECSessionManager.h"
 #include "ECConvenientDepthObjectTable.h"
 #include "ECSession.h"
 #include "ECMAPI.h"
 #include <kopano/stringutil.h>
-
+#include <kopano/tie.hpp>
+#include <kopano/EMSAbTag.h>
+#include <kopano/Util.h>
 #include <list>
 
 namespace KC {
@@ -49,14 +54,15 @@ ECConvenientDepthObjectTable::ECConvenientDepthObjectTable(ECSession *lpSession,
  * around 5 or so.
  *
  */
+typedef std::list<ECUSortKey> SortKey;
 
-typedef std::list<ECSortKey> SortKey;
 struct FOLDERINFO {
     unsigned int ulFolderId;		// Actual folder id in the DB
     std::string strFolderName;		// Folder name like 'inbox'
     SortKey sortKey;				// List of collation keys of the folder names.
     
-    bool operator < (const FOLDERINFO &a) {
+	bool operator<(const FOLDERINFO &a) const
+	{
 		SortKey::const_iterator iKeyThis = sortKey.cbegin();
 		SortKey::const_iterator iKeyOther = a.sortKey.cbegin();
 
@@ -79,22 +85,15 @@ ECRESULT ECConvenientDepthObjectTable::Create(ECSession *lpSession,
     unsigned int ulObjType, unsigned int ulFlags, const ECLocale &locale,
     ECStoreObjectTable **lppTable)
 {
-	ECRESULT er = erSuccess;
-
-	*lppTable = new ECConvenientDepthObjectTable(lpSession, ulStoreId, lpGuid, ulFolderId, ulObjType, ulFlags, locale);
-
-	(*lppTable)->AddRef();
-
-	return er;
+	return alloc_wrap<ECConvenientDepthObjectTable>(lpSession, ulStoreId,
+	       lpGuid, ulFolderId, ulObjType, ulFlags, locale).put(lppTable);
 }
 
 ECRESULT ECConvenientDepthObjectTable::Load() {
-	ECRESULT er = erSuccess;
 	ECDatabase *lpDatabase = NULL;
 	DB_RESULT lpDBResult;
 	DB_ROW		lpDBRow = NULL;
-	std::string	strQuery;
-	ECODStore	*lpData = (ECODStore *)m_lpObjectData;
+	auto lpData = static_cast<const ECODStore *>(m_lpObjectData);
 	sObjectTableKey		sRowItem;
 	unsigned int ulDepth = 0;
 	
@@ -109,7 +108,7 @@ ECRESULT ECConvenientDepthObjectTable::Load() {
 
 	FOLDERINFO sRoot;
 
-	er = lpSession->GetDatabase(&lpDatabase);
+	auto er = lpSession->GetDatabase(&lpDatabase);
 	if (er != erSuccess)
 		return er;
 
@@ -122,8 +121,7 @@ ECRESULT ECConvenientDepthObjectTable::Load() {
 
 	iterFolders = lstFolders.cbegin();
 	while (iterFolders != lstFolders.cend()) {
-		strQuery = "SELECT hierarchy.id, hierarchy.parent, hierarchy.owner, hierarchy.flags, hierarchy.type, properties.val_string FROM hierarchy LEFT JOIN properties ON properties.hierarchyid = hierarchy.id AND properties.tag = 12289  AND properties.type = 30 WHERE hierarchy.type = " +  stringify(MAPI_FOLDER) + " AND hierarchy.flags & "+stringify(MSGFLAG_DELETED)+" = " + stringify(ulFlags&MSGFLAG_DELETED);
-
+		std::string strQuery = "SELECT hierarchy.id, hierarchy.parent, hierarchy.owner, hierarchy.flags, hierarchy.type, properties.val_string FROM hierarchy LEFT JOIN properties ON properties.hierarchyid = hierarchy.id AND properties.tag = 12289  AND properties.type = 30 WHERE hierarchy.type = " +  stringify(MAPI_FOLDER) + " AND hierarchy.flags & "+stringify(MSGFLAG_DELETED)+" = " + stringify(ulFlags&MSGFLAG_DELETED);
 		strQuery += " AND hierarchy.parent IN(";
 		
 		while (iterFolders != lstFolders.cend()) {
@@ -139,11 +137,12 @@ ECRESULT ECConvenientDepthObjectTable::Load() {
 		if (er != erSuccess)
 			return er;
 
+		auto cache = lpSession->GetSessionManager()->GetCacheManager();
+		auto sec = lpSession->GetSecurity();
 		while (1) {
 		    FOLDERINFO sFolderInfo;
 		    
-			lpDBRow = lpDatabase->FetchRow(lpDBResult);
-
+			lpDBRow = lpDBResult.fetch_row();
 			if (lpDBRow == NULL)
 				break;
 
@@ -159,8 +158,8 @@ ECRESULT ECConvenientDepthObjectTable::Load() {
             mapSortKey[sFolderInfo.ulFolderId] = sFolderInfo.sortKey;
             
             // Since we have this information, give the cache manager the hierarchy information for this object
-			lpSession->GetSessionManager()->GetCacheManager()->SetObject(atoui(lpDBRow[0]), atoui(lpDBRow[1]), atoui(lpDBRow[2]), atoui(lpDBRow[3]), atoui(lpDBRow[4]));
-			if (lpSession->GetSecurity()->CheckPermission(sFolderInfo.ulFolderId, ecSecurityFolderVisible) != erSuccess)
+			cache->SetObject(atoui(lpDBRow[0]), atoui(lpDBRow[1]), atoui(lpDBRow[2]), atoui(lpDBRow[3]), atoui(lpDBRow[4]));
+			if (sec->CheckPermission(sFolderInfo.ulFolderId, ecSecurityFolderVisible) != erSuccess)
 				continue;
 			
 			// Push folders onto end of list
@@ -194,15 +193,15 @@ ECRESULT ECConvenientDepthObjectTable::Load() {
 }
 
 ECRESULT ECConvenientDepthObjectTable::GetComputedDepth(struct soap *soap, ECSession* lpSession, unsigned int ulObjId, struct propVal *lpPropVal){
-	ECRESULT er;
 	unsigned int ulObjType;
 
 	lpPropVal->ulPropTag = PR_DEPTH;
 	lpPropVal->__union = SOAP_UNION_propValData_ul;
 	lpPropVal->Value.ul = 0;
 
+	auto cache = lpSession->GetSessionManager()->GetCacheManager();
 	while(ulObjId != m_ulFolderId && lpPropVal->Value.ul < 50){
-		er = lpSession->GetSessionManager()->GetCacheManager()->GetObject(ulObjId, &ulObjId, NULL, NULL, &ulObjType);
+		auto er = cache->GetObject(ulObjId, &ulObjId, nullptr, nullptr, &ulObjType);
 		if(er != erSuccess) {
 			// should never happen
 			assert(false);
@@ -211,6 +210,106 @@ ECRESULT ECConvenientDepthObjectTable::GetComputedDepth(struct soap *soap, ECSes
 		if (ulObjType != MAPI_FOLDER)
 			return KCERR_NOT_FOUND;
 		++lpPropVal->Value.ul;
+	}
+	return erSuccess;
+}
+
+ECConvenientDepthABObjectTable::ECConvenientDepthABObjectTable(ECSession *lpSession,
+    unsigned int ulABId, unsigned int ulABType, unsigned int ulABParentId,
+    unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale) :
+	ECABObjectTable(lpSession, ulABId, ulABType, ulABParentId, ulABParentType, ulFlags, locale)
+{
+	m_lpfnQueryRowData = ECConvenientDepthABObjectTable::QueryRowData;
+	/* We require the details to construct the PR_EMS_AB_HIERARCHY_PATH */
+	m_ulUserManagementFlags &= ~USERMANAGEMENT_IDS_ONLY;
+}
+
+ECRESULT ECConvenientDepthABObjectTable::Create(ECSession *lpSession,
+    unsigned int ulABId, unsigned int ulABType, unsigned int ulABParentId,
+    unsigned int ulABParentType, unsigned int ulFlags, const ECLocale &locale,
+    ECABObjectTable **lppTable)
+{
+	return alloc_wrap<ECConvenientDepthABObjectTable>(lpSession, ulABId,
+	       ulABType, ulABParentId, ulABParentType, ulFlags, locale).put(lppTable);
+}
+
+/*
+ * We override the standard QueryRowData call so that we can correctly generate
+ * PR_DEPTH and PR_EMS_AB_HIERARCHY_PARENT. Since this is dependent on data
+ * which is not available for ECUserManagement, we have to do those properties
+ * here.
+ */
+ECRESULT ECConvenientDepthABObjectTable::QueryRowData(ECGenericObjectTable *lpGenTable,
+    struct soap *soap, ECSession *lpSession, ECObjectTableList *lpRowList,
+    struct propTagArray *lpsPropTagArray, const void *lpObjectData,
+    struct rowSet **lppRowSet, bool bTableData, bool bTableLimit)
+{
+	unsigned int n = 0;
+	struct propVal *lpProp = nullptr;
+	auto lpThis = static_cast<ECConvenientDepthABObjectTable *>(lpGenTable);
+	auto er = ECABObjectTable::QueryRowData(lpThis, soap, lpSession, lpRowList, lpsPropTagArray, lpObjectData, lppRowSet, bTableData, bTableLimit);
+	if (er != erSuccess)
+		return er;
+
+	// Insert the PR_DEPTH for all the rows since the row engine has no knowledge of depth
+	for (const auto &row : *lpRowList) {
+		lpProp = FindProp(&(*lppRowSet)->__ptr[n], PROP_TAG(PT_ERROR, PROP_ID(PR_DEPTH)));
+		if (lpProp != nullptr) {
+			lpProp->Value.ul = lpThis->m_mapDepth[row.ulObjId];
+			lpProp->ulPropTag = PR_DEPTH;
+			lpProp->__union = SOAP_UNION_propValData_ul;
+		}
+		lpProp = FindProp(&(*lppRowSet)->__ptr[n], PROP_TAG(PT_ERROR, PROP_ID(PR_EMS_AB_HIERARCHY_PATH)));
+		if (lpProp != nullptr) {
+			lpProp->Value.lpszA = s_strcpy(soap, lpThis->m_mapPath[row.ulObjId].c_str());
+			lpProp->ulPropTag = PR_EMS_AB_HIERARCHY_PATH;
+			lpProp->__union = SOAP_UNION_propValData_lpszA;
+		}
+		++n;
+	}
+	return erSuccess;
+}
+
+/*
+ * Loads an entire multi-depth hierarchy table recursively.
+ */
+ECRESULT ECConvenientDepthABObjectTable::Load()
+{
+	auto lpODAB = static_cast<const ECODAB *>(m_lpObjectData);
+	sObjectTableKey	sRowItem;
+	std::list<CONTAINERINFO> lstObjects;
+	CONTAINERINFO root;
+
+	if (lpODAB->ulABType != MAPI_ABCONT)
+		return KCERR_INVALID_PARAMETER;
+
+	// Load this container
+	root.ulId = lpODAB->ulABParentId;
+	root.ulDepth = -1; // Our children are at depth 0, so the root object is depth -1. Note that this object is not actually added as a row in the end.
+	root.strPath = "";
+	lstObjects.push_back(std::move(root));
+
+	// 'Recursively' loop through all our containers and add each of those children to our object list
+	for (const auto &obj : lstObjects) {
+		std::unique_ptr<std::list<localobjectdetails_t> > lpSubObjects;
+		if (LoadHierarchyContainer(obj.ulId, 0, &KCHL::unique_tie(lpSubObjects)) != erSuccess)
+			continue;
+		for (const auto &subobj : *lpSubObjects) {
+			CONTAINERINFO folder;
+			folder.ulId = subobj.ulId;
+			folder.ulDepth = obj.ulDepth + 1;
+			folder.strPath = obj.strPath + "/" + subobj.GetPropString(OB_PROP_S_LOGIN);
+			lstObjects.push_back(std::move(folder));
+		}
+	}
+
+	// Add all the rows into the row engine, except the root object (the folder itself does not show in its own hierarchy table)
+	for (const auto &obj : lstObjects) {
+		if (obj.ulId == lpODAB->ulABParentId)
+			continue;
+		m_mapDepth[obj.ulId] = obj.ulDepth;
+		m_mapPath[obj.ulId] = obj.strPath;
+		UpdateRow(ECKeyTable::TABLE_ROW_ADD, obj.ulId, 0);
 	}
 	return erSuccess;
 }

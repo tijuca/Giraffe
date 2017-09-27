@@ -19,52 +19,19 @@
 #define PLATFORM_H
 
 #include <kopano/zcdefs.h>
-#if defined(__GNUC__) && !defined(__cplusplus)
-	/*
-	 * If typeof @a stays the same through a demotion to pointer,
-	 * @a cannot be an array.
-	 */
-#	define __array_size_check(a) BUILD_BUG_ON_EXPR(\
-		__builtin_types_compatible_p(__typeof__(a), \
-		__typeof__(DEMOTE_TO_PTR(a))))
-#else
-#	define __array_size_check(a) 0
-#endif
-#ifndef ARRAY_SIZE
-#	define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)) + __array_size_check(x))
-#endif
 
-/* About _FORTIFY_SOURCE a.k.a. _BREAKIFY_SOURCE_IN_INSANE_WAYS
- *
- * This has the insane feature that it will assert() when you attempt
- * to FD_SET(n, &set) with n > 1024, irrespective of your compile-time FD_SETSIZE
- * Even stranger, this should be easily fixed but nobody is interested apparently.
- *
- * Although you could just not use select() anywhere, we depend on some libs that
- * are doing select(), so we can't just remove them. 
- *
- * This will also disable a few other valid buffer-overflow checks, but we'll have
- * to live with that for now.
- */
-
-#ifdef _FORTIFY_SOURCE
-#undef _FORTIFY_SOURCE
-#endif
-
-  // We have to include this now in case select.h is included too soon.
-  // Increase our maximum amount of file descriptors to 8192
-  #include <bits/types.h>
-  #undef __FD_SETSIZE
-  #define __FD_SETSIZE 8192
-
-  // Log the pthreads locks
-  #define DEBUG_PTHREADS 0
+enum {
+	KC_DESIRED_FILEDES = 8192,
+};
 
   #ifdef HAVE_CONFIG_H
   #include "config.h"
   #endif
   #include <kopano/platform.linux.h>
 #include <string>
+#include <type_traits>
+#include <cstddef>
+#include <endian.h>
 #include <pthread.h>
 
 namespace KC {
@@ -105,12 +72,11 @@ extern _kc_export struct tm *gmtime_safe(const time_t *timer, struct tm *result)
 struct timespec GetDeadline(unsigned int ulTimeoutMs);
 
 extern _kc_export double timespec2dbl(const struct timespec &);
-
-bool operator ==(const FILETIME &, const FILETIME &);
-extern _kc_export bool operator >(const FILETIME &, const FILETIME &);
-bool operator >=(const FILETIME &, const FILETIME &);
-extern _kc_export bool operator <(const FILETIME &, const FILETIME &);
-bool operator <=(const FILETIME &, const FILETIME &);
+extern bool operator==(const FILETIME &, const FILETIME &) noexcept;
+extern _kc_export bool operator >(const FILETIME &, const FILETIME &) noexcept;
+extern bool operator>=(const FILETIME &, const FILETIME &) noexcept;
+extern _kc_export bool operator <(const FILETIME &, const FILETIME &) noexcept;
+extern bool operator<=(const FILETIME &, const FILETIME &) noexcept;
 extern _kc_export time_t operator -(const FILETIME &, const FILETIME &);
 
 /* convert struct tm to time_t in timezone UTC0 (GM time) */
@@ -128,12 +94,10 @@ extern _kc_export void rand_free(void);
 extern _kc_export void rand_get(char *p, int n);
 extern _kc_export char *get_password(const char *prompt);
 
- #define KDLLAPI
-
 /**
  * Memory usage calculation macros
  */
-#define MEMALIGN(x) (((x) + sizeof(void*) - 1) & ~(sizeof(void*) - 1))
+#define MEMALIGN(x) (((x) + alignof(void *) - 1) & ~(alignof(void *) - 1))
 
 #define MEMORY_USAGE_MAP(items, map)		(items * (sizeof(map) + sizeof(map::value_type)))
 #define MEMORY_USAGE_LIST(items, list)		(items * (MEMALIGN(sizeof(list) + sizeof(list::value_type))))
@@ -150,7 +114,42 @@ extern _kc_export void give_filesize_hint(int fd, off_t len);
 
 extern _kc_export bool force_buffers_to_disk(int fd);
 extern _kc_export int ec_relocate_fd(int);
+extern _kc_export void kcsrv_blocksigs(void);
+extern _kc_export unsigned long kc_threadid(void);
+
+/* Determine the size of an array */
+template<typename T, size_t N> constexpr inline size_t ARRAY_SIZE(T (&)[N]) { return N; }
+
+/* Get the one-past-end item of an array */
+template<typename T, size_t N> constexpr inline T *ARRAY_END(T (&a)[N]) { return a + N; }
+
+template<typename T> constexpr const IID &iid_of();
+template<typename T> static inline constexpr const IID &iid_of(const T &)
+{
+	return iid_of<typename std::remove_cv<typename std::remove_pointer<T>::type>::type>();
+}
+
+#if (defined(__BYTE_ORDER) && __BYTE_ORDER == __BIG_ENDIAN) || \
+    (defined(_BYTE_ORDER) && _BYTE_ORDER == _BIG_ENDIAN)
+	/* We need to use constexpr functions, and htole16 unfortunately is not. */
+#	define cpu_to_le16(x) __builtin_bswap16(x)
+#	define cpu_to_le32(x) __builtin_bswap32(x)
+#	define cpu_to_be64(x) (x)
+#	define le16_to_cpu(x) __builtin_bswap16(x)
+#	define le32_to_cpu(x) __builtin_bswap32(x)
+#	define be64_to_cpu(x) (x)
+#else
+#	define cpu_to_le16(x) (x)
+#	define cpu_to_le32(x) (x)
+#	define cpu_to_be64(x) __builtin_bswap64(x)
+#	define le16_to_cpu(x) (x)
+#	define le32_to_cpu(x) (x)
+#	define be64_to_cpu(x) __builtin_bswap64(x)
+#endif
 
 } /* namespace */
+
+#define IID_OF(T) namespace KC { template<> inline constexpr const IID &iid_of<T>() { return IID_ ## T; } }
+#define IID_OF2(T, U) namespace KC { template<> inline constexpr const IID &iid_of<T>() { return IID_ ## U; } }
 
 #endif // PLATFORM_H

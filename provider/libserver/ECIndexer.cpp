@@ -51,7 +51,6 @@ static BOOL NormalizeRestrictionIsFalse(const struct restrictTable *lpRestrict)
     std::set<unsigned int> setExist;
     std::set<unsigned int> setNotExist;
     std::set<unsigned int> setBoth;
-    bool fAlwaysFalse = false;
     
     if(lpRestrict->ulType != RES_AND)
 		return false;
@@ -64,10 +63,7 @@ static BOOL NormalizeRestrictionIsFalse(const struct restrictTable *lpRestrict)
                 setNotExist.insert(lpRestrict->lpAnd->__ptr[i]->lpNot->lpNot->lpExist->ulPropTag);
     
     set_intersection(setExist.begin(), setExist.end(), setNotExist.begin(), setNotExist.end(), inserter(setBoth, setBoth.begin()));
-    
-    if(!setBoth.empty())
-        fAlwaysFalse = true;
-    return fAlwaysFalse;
+	return !setBoth.empty();
 }
 
 /**
@@ -86,7 +82,6 @@ static BOOL NormalizeRestrictionIsFalse(const struct restrictTable *lpRestrict)
  */
 static ECRESULT NormalizeRestrictionNestedAnd(struct restrictTable *lpRestrict)
 {
-	ECRESULT er;
     std::list<struct restrictTable *> lstClauses;
     bool bModified = false;
     
@@ -96,7 +91,7 @@ static ECRESULT NormalizeRestrictionNestedAnd(struct restrictTable *lpRestrict)
     for (gsoap_size_t i = 0; i < lpRestrict->lpAnd->__size; ++i) {
         if(lpRestrict->lpAnd->__ptr[i]->ulType == RES_AND) {
             // First, flatten our subchild
-            er = NormalizeRestrictionNestedAnd(lpRestrict->lpAnd->__ptr[i]);
+			auto er = NormalizeRestrictionNestedAnd(lpRestrict->lpAnd->__ptr[i]);
             if (er != erSuccess)
 				return er;
 
@@ -150,8 +145,6 @@ static ECRESULT NormalizeRestrictionNestedAnd(struct restrictTable *lpRestrict)
 static ECRESULT NormalizeGetMultiSearch(struct restrictTable *lpRestrict,
     const std::set<unsigned int> &setExcludeProps, SIndexedTerm &sMultiSearch)
 {
-    ECRESULT er;
-    
     sMultiSearch.strTerm.clear();
     sMultiSearch.setFields.clear();
     
@@ -161,8 +154,7 @@ static ECRESULT NormalizeGetMultiSearch(struct restrictTable *lpRestrict,
             
             if(NormalizeRestrictionIsFalse(lpRestrict->lpOr->__ptr[i]))
                 continue;
-                
-            er = NormalizeGetMultiSearch(lpRestrict->lpOr->__ptr[i], setExcludeProps, terms);
+			auto er = NormalizeGetMultiSearch(lpRestrict->lpOr->__ptr[i], setExcludeProps, terms);
             if (er != erSuccess)
                 return er;
                 
@@ -233,7 +225,6 @@ static ECRESULT NormalizeRestrictionMultiFieldSearch(
     const std::set<unsigned int> &setExcludeProps,
     std::list<SIndexedTerm> *lpMultiSearches)
 {
-    ECRESULT er = erSuccess;
     SIndexedTerm sMultiSearch;
     
     lpMultiSearches->clear();
@@ -264,8 +255,7 @@ static ECRESULT NormalizeRestrictionMultiFieldSearch(
         lpRestrict->lpAnd->__size = 0;
         lpRestrict->lpAnd->__ptr = NULL;
     }
-    
-    return er;
+	return erSuccess;
 }
 
 /**
@@ -287,10 +277,8 @@ static ECRESULT NormalizeGetOptimalMultiFieldSearch(
     const std::set<unsigned int> &setExcludeProps,
     std::list<SIndexedTerm> *lpMultiSearches)
 {
-    ECRESULT er;
-    
     // Normalize nested ANDs, if any
-    er = NormalizeRestrictionNestedAnd(lpRestrict);
+	auto er = NormalizeRestrictionNestedAnd(lpRestrict);
     if (er != erSuccess)
 		return er;
         
@@ -340,65 +328,57 @@ ECRESULT GetIndexerResults(ECDatabase *lpDatabase, ECConfig *lpConfig,
 	
 	lstMatches.clear();
 
-	if (parseBool(lpConfig->GetSetting("search_enabled")) == true && szSocket[0]) {
-		lpSearchClient.reset(new(std::nothrow) ECSearchClient(szSocket, atoui(lpConfig->GetSetting("search_timeout"))));
-		if (!lpSearchClient) {
-			er = KCERR_NOT_ENOUGH_MEMORY;
-			goto exit;
-		}
-
-		if(lpCacheManager->GetExcludedIndexProperties(setExcludePropTags) != erSuccess) {
-			er = lpSearchClient->GetProperties(setExcludePropTags);
-			if (er == KCERR_NETWORK_ERROR)
-				ec_log_err("Error while connecting to search on \"%s\"", szSocket);
-			else if (er != erSuccess)
-				ec_log_err("Error while querying search on \"%s\", 0x%08x", szSocket, er);
-
-            if (er != erSuccess)
-                goto exit;
-                
-            er = lpCacheManager->SetExcludedIndexProperties(setExcludePropTags);
-            
-            if (er != erSuccess)
-                goto exit;
-        }  
-
-        er = CopyRestrictTable(NULL, lpRestrict, &lpOptimizedRestrict);
-        if (er != erSuccess)
-            goto exit;
-        
-        er = NormalizeGetOptimalMultiFieldSearch(lpOptimizedRestrict, setExcludePropTags, &lstMultiSearches);
-        if (er != erSuccess)
-            goto exit; // Note this will happen if the restriction cannot be handled by the indexer
-        
-        if (lstMultiSearches.empty()) {
-            // Although the restriction was strictly speaking indexer-compatible, no index queries could
-            // be found, so bail out
-            er = KCERR_NOT_FOUND;
-            goto exit;
-        }
-
-		ec_log_debug("Using index, %lu index queries", static_cast<unsigned long>(lstMultiSearches.size()));
-		gettimeofday(&tstart, NULL);
-
-		er = lpSearchClient->Query(guidServer, guidStore, lstFolders, lstMultiSearches, lstMatches, suggestion);
-		gettimeofday(&tend, NULL);
-		llelapsedtime = difftimeval(&tstart,&tend);
-		g_lpStatsCollector->Max(SCN_INDEXER_SEARCH_MAX, llelapsedtime);
-		g_lpStatsCollector->Avg(SCN_INDEXER_SEARCH_AVG, llelapsedtime);
-
-        if (er != erSuccess) {
-			g_lpStatsCollector->Increment(SCN_INDEXER_SEARCH_ERRORS);
+	if (!parseBool(lpConfig->GetSetting("search_enabled")) || szSocket[0] == '\0') {
+		er = KCERR_NOT_FOUND;
+		goto exit;
+	}
+	lpSearchClient.reset(new(std::nothrow) ECSearchClient(szSocket, atoui(lpConfig->GetSetting("search_timeout"))));
+	if (!lpSearchClient) {
+		er = KCERR_NOT_ENOUGH_MEMORY;
+		goto exit;
+	}
+	if (lpCacheManager->GetExcludedIndexProperties(setExcludePropTags) != erSuccess) {
+		er = lpSearchClient->GetProperties(setExcludePropTags);
+		if (er == KCERR_NETWORK_ERROR)
+			ec_log_err("Error while connecting to search on \"%s\"", szSocket);
+		else if (er != erSuccess)
 			ec_log_err("Error while querying search on \"%s\", 0x%08x", szSocket, er);
-		} else
-			ec_log_debug("Indexed query results found in %.4f ms", llelapsedtime/1000.0);
-		ec_log_debug("%lu indexed matches found", static_cast<unsigned long>(lstMatches.size()));
-	} else {
-	    er = KCERR_NOT_FOUND;
-	    goto exit;
-    }
-    
-    *lppNewRestrict = lpOptimizedRestrict;
+		if (er != erSuccess)
+			goto exit;
+		er = lpCacheManager->SetExcludedIndexProperties(setExcludePropTags);
+		if (er != erSuccess)
+			goto exit;
+	}
+
+	er = CopyRestrictTable(NULL, lpRestrict, &lpOptimizedRestrict);
+	if (er != erSuccess)
+		goto exit;
+	er = NormalizeGetOptimalMultiFieldSearch(lpOptimizedRestrict, setExcludePropTags, &lstMultiSearches);
+	if (er != erSuccess)
+		goto exit; // Note this will happen if the restriction cannot be handled by the indexer
+	if (lstMultiSearches.empty()) {
+		// Although the restriction was strictly speaking indexer-compatible, no index queries could
+		// be found, so bail out
+		er = KCERR_NOT_FOUND;
+		goto exit;
+	}
+
+	ec_log_debug("Using index, %zu index queries", lstMultiSearches.size());
+	gettimeofday(&tstart, NULL);
+	er = lpSearchClient->Query(guidServer, guidStore, lstFolders, lstMultiSearches, lstMatches, suggestion);
+	gettimeofday(&tend, NULL);
+	llelapsedtime = difftimeval(&tstart,&tend);
+	g_lpStatsCollector->Max(SCN_INDEXER_SEARCH_MAX, llelapsedtime);
+	g_lpStatsCollector->Avg(SCN_INDEXER_SEARCH_AVG, llelapsedtime);
+
+	if (er != erSuccess) {
+		g_lpStatsCollector->Increment(SCN_INDEXER_SEARCH_ERRORS);
+		ec_log_err("Error while querying search on \"%s\", 0x%08x", szSocket, er);
+	} else
+		ec_log_debug("Indexed query results found in %.4f ms", llelapsedtime/1000.0);
+
+	ec_log_debug("%zu indexed matches found", lstMatches.size());
+	*lppNewRestrict = lpOptimizedRestrict;
     lpOptimizedRestrict = NULL;
     
 exit:

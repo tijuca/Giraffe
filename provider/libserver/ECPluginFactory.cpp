@@ -47,37 +47,30 @@ ECRESULT ECPluginFactory::CreateUserPlugin(UserPlugin **lppPlugin) {
     UserPlugin *lpPlugin = NULL;
 
     if(m_dl == NULL) {    
-        const char *pluginpath = m_config->GetSetting("plugin_path");
         const char *pluginname = m_config->GetSetting("user_plugin");
         char filename[PATH_MAX + 1];
-
-        if (pluginpath == nullptr || strcmp(pluginpath, "") == 0)
-            pluginpath = "";
         if (!pluginname || !strcmp(pluginname, "")) {
-			ec_log_crit("User plugin is unavailable.");
-			ec_log_crit("Please correct your configuration file and set the \"plugin_path\" and \"user_plugin\" options.");
+			ec_log_crit("No user plugin was declared in the config file.");
 			return KCERR_NOT_FOUND;
         }
-
-        snprintf(filename, PATH_MAX + 1, "%s%c%splugin.%s", 
-                 pluginpath, PATH_SEPARATOR, pluginname, SHARED_OBJECT_EXTENSION);
-        
+		snprintf(filename, sizeof(filename), "libkcserver-%s.%s",
+		         pluginname, SHARED_OBJECT_EXTENSION);
         m_dl = dlopen(filename, RTLD_NOW | RTLD_GLOBAL);
 
         if (!m_dl) {
 			ec_log_crit("Failed to load \"%s\": %s", filename, dlerror());
-			ec_log_crit("Please correct your configuration file and set the \"plugin_path\" and \"user_plugin\" options.");
+			ec_log_crit("Please correct your configuration file and set the \"user_plugin\" option.");
 			goto out;
         }
-
-        int (*fngetUserPluginInstance)() = (int (*)()) dlsym(m_dl, "getUserPluginVersion");
+        auto fngetUserPluginInstance = reinterpret_cast<unsigned long (*)()>(dlsym(m_dl, "getUserPluginVersion"));
         if (fngetUserPluginInstance == NULL) {
 			ec_log_crit("Failed to load getUserPluginVersion from plugin: %s", dlerror());
 			goto out;
         }
-        int version = fngetUserPluginInstance(); 
+	unsigned long version = fngetUserPluginInstance();
         if (version != PROJECT_VERSION_REVISION) {
-			ec_log_crit("Version of the plugin \"%s\" is not the same for the server. Expected %d, plugin %d", filename, PROJECT_VERSION_REVISION, version);
+			ec_log_crit("Version of the plugin \"%s\" is not the same for the server. Expected 0x%lx (%s), plugin 0x%lx",
+				filename, PROJECT_VERSION_REVISION, PROJECT_VERSION, version);
 			goto out;
 	}
     
@@ -96,8 +89,7 @@ ECRESULT ECPluginFactory::CreateUserPlugin(UserPlugin **lppPlugin) {
 	try {
 		lpPlugin = m_getUserPluginInstance(m_plugin_lock, m_shareddata);
 		lpPlugin->InitPlugin();
-	}
-	catch (exception &e) {
+	} catch (std::exception &e) {
 		ec_log_crit("Cannot instantiate user plugin: %s", e.what());
 		return KCERR_NOT_FOUND;
 	}
@@ -123,14 +115,9 @@ extern pthread_key_t plugin_key;
 ECRESULT GetThreadLocalPlugin(ECPluginFactory *lpPluginFactory,
     UserPlugin **lppPlugin)
 {
-	ECRESULT er;
-	UserPlugin *lpPlugin = NULL;
-
-	lpPlugin = (UserPlugin *)pthread_getspecific(plugin_key);
-
+	auto lpPlugin = static_cast<UserPlugin *>(pthread_getspecific(plugin_key));
 	if (lpPlugin == NULL) {
-		er = lpPluginFactory->CreateUserPlugin(&lpPlugin);
-
+		auto er = lpPluginFactory->CreateUserPlugin(&lpPlugin);
 		if (er != erSuccess) {
 			lpPlugin = NULL;
 			ec_log_crit("Unable to instantiate user plugin");

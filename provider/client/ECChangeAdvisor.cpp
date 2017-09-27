@@ -19,7 +19,6 @@
 #include <kopano/lockhelper.hpp>
 #include <kopano/memory.hpp>
 #include <kopano/ECGuid.h>
-#include <kopano/ECInterfaceDefs.h>
 #include <ECSyncLog.h>
 #include <kopano/ECDebug.h>
 #include <kopano/ECLogger.h>
@@ -86,8 +85,8 @@ HRESULT ECChangeAdvisor::QueryInterface(REFIID refiid, void **lppInterface)
 {
 	REGISTER_INTERFACE2(ECChangeAdvisor, this);
 	REGISTER_INTERFACE2(ECUnknown, this);
-	REGISTER_INTERFACE2(IECChangeAdvisor, &this->m_xECChangeAdvisor);
-	REGISTER_INTERFACE2(IUnknown, &this->m_xECChangeAdvisor);
+	REGISTER_INTERFACE2(IECChangeAdvisor, this);
+	REGISTER_INTERFACE2(IUnknown, this);
 	return MAPI_E_INTERFACE_NOT_SUPPORTED;
 }
 
@@ -117,15 +116,13 @@ HRESULT ECChangeAdvisor::Create(ECMsgStore *lpMsgStore, ECChangeAdvisor **lppCha
 		return hr;
 	if (!fEnhancedICS)
 		return MAPI_E_NO_SUPPORT;
-	lpChangeAdvisor.reset(new ECChangeAdvisor(lpMsgStore), false);
-	hr = lpChangeAdvisor->QueryInterface(IID_ECChangeAdvisor, (void**)lppChangeAdvisor);
-	if (hr != hrSuccess)
-		return hr;
+	lpChangeAdvisor.reset(new ECChangeAdvisor(lpMsgStore));
 	hr = lpMsgStore->lpTransport->AddSessionReloadCallback(lpChangeAdvisor, &Reload, &lpChangeAdvisor->m_ulReloadId);
 	if (hr != hrSuccess)
 		return hr;
-	lpChangeAdvisor.release();
-	return hrSuccess;
+	lpChangeAdvisor->AddRef();
+	*lppChangeAdvisor = lpChangeAdvisor;
+	return hr;
 }
 
 HRESULT ECChangeAdvisor::GetLastError(HRESULT hResult, ULONG ulFlags, LPMAPIERROR *lppMAPIError)
@@ -314,7 +311,7 @@ HRESULT ECChangeAdvisor::AddKeys(LPENTRYLIST lpEntryList)
 			if (!(m_ulFlags & SYNC_CATCHUP))
 				listSyncStates.push_back(*lpsSyncState);
 			else
-				listConnections.push_back(ConnectionMap::value_type(lpsSyncState->ulSyncId, 0));
+				listConnections.push_back({lpsSyncState->ulSyncId, 0});
 		} else {
 			m_lpLogger->Log(EC_LOGLEVEL_ERROR, " - Key %u: Invalid size=%u", i, lpEntryList->lpbin[i].cb);
 			hr = MAPI_E_INVALID_PARAMETER;
@@ -387,7 +384,7 @@ HRESULT ECChangeAdvisor::UpdateSyncState(syncid_t ulSyncId, changeid_t ulChangeI
 HRESULT ECChangeAdvisor::Reload(void *lpParam, ECSESSIONID /*newSessionId*/)
 {
 	HRESULT				hr = hrSuccess;
-	ECChangeAdvisor		*lpChangeAdvisor = (ECChangeAdvisor*)lpParam;
+	auto lpChangeAdvisor = static_cast<ECChangeAdvisor *>(lpParam);
 	ECLISTSYNCSTATE		listSyncStates;
 	ECLISTCONNECTION	listConnections;
 
@@ -413,15 +410,3 @@ HRESULT ECChangeAdvisor::Reload(void *lpParam, ECSESSIONID /*newSessionId*/)
 		lpChangeAdvisor->m_mapConnections.insert(listConnections.begin(), listConnections.end());
 	return hr;
 }
-
-// IECChangeAdvisor interface
-DEF_ULONGMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, AddRef, (void))
-DEF_ULONGMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, Release, (void))
-DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, QueryInterface, (REFIID, refiid), (void **, lppInterface))
-DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, GetLastError, (HRESULT, hResult), (ULONG, ulFlags), (LPMAPIERROR *, lppMAPIError))
-DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, Config, (LPSTREAM, lpStream), (LPGUID, lpGUID), (IECChangeAdviseSink *, lpAdviseSink), (ULONG, ulFlags))
-DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, UpdateState, (LPSTREAM, lpStream))
-DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, AddKeys, (LPENTRYLIST, lpEntryList))
-DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, RemoveKeys, (LPENTRYLIST, lpEntryList))
-DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, IsMonitoringSyncId, (syncid_t, ulSyncId))
-DEF_HRMETHOD1(TRACE_MAPI, ECChangeAdvisor, ECChangeAdvisor, UpdateSyncState, (syncid_t, ulSyncId), (changeid_t, ulChangeId))

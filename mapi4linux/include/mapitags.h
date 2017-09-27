@@ -12,8 +12,9 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
+
+/* mapitags.h – Defines property tags */
 
 #ifndef __M4L_MAPITAGS_H_
 #define __M4L_MAPITAGS_H_
@@ -272,6 +273,8 @@
 #define PR_RTF_SYNC_PREFIX_COUNT                    PROP_TAG( PT_LONG,      0x1010)
 #define PR_RTF_SYNC_TRAILING_COUNT                  PROP_TAG( PT_LONG,      0x1011)
 #define PR_ORIGINALLY_INTENDED_RECIP_ENTRYID        PROP_TAG( PT_BINARY,    0x1012)
+
+#define PR_BLOCK_STATUS                             PROP_TAG( PT_LONG,      0x1096)
 
 /*
  *  Reserved 0x1100-0x1200

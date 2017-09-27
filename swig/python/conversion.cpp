@@ -1791,11 +1791,7 @@ LPADRENTRY		Object_to_LPADRENTRY(PyObject *av)
 
 PyObject *		Object_from_LPSPropProblem(LPSPropProblem lpProblem)
 {
-	PyObject *problem = NULL;
-
-	problem = PyObject_CallFunction(PyTypeSPropProblem, "(lII)", lpProblem->ulIndex, lpProblem->ulPropTag, lpProblem->scode);
-
-	return problem;
+	return PyObject_CallFunction(PyTypeSPropProblem, "(lII)", lpProblem->ulIndex, lpProblem->ulPropTag, lpProblem->scode);
 }
 
 void	Object_to_LPSPropProblem(PyObject *object, LPSPropProblem lpProblem)
@@ -2003,7 +1999,8 @@ void Object_to_LPMAPINAMEID(PyObject *elem, LPMAPINAMEID *lppName, void *lpBase)
 		CopyPyUnicode(&lpName->Kind.lpwstrName, id, lpBase);
 	}
 
-	PyString_AsStringAndSize(guid, (char **)&lpName->lpguid, &len);
+	if (PyString_AsStringAndSize(guid, reinterpret_cast<char **>(&lpName->lpguid), &len) == -1)
+		goto exit;
 	if(len != sizeof(GUID)) {
 		PyErr_Format(PyExc_RuntimeError, "GUID parameter of MAPINAMEID must be exactly %d bytes", (int)sizeof(GUID));
 		goto exit;
@@ -2094,8 +2091,8 @@ LPENTRYLIST		List_to_LPENTRYLIST(PyObject *list)
 		char *ptr;
 		Py_ssize_t strlen;
 
-		PyString_AsStringAndSize(elem, &ptr, &strlen);
-		if (PyErr_Occurred())
+		if (PyString_AsStringAndSize(elem, &ptr, &strlen) == -1 ||
+		    PyErr_Occurred())
 			goto exit;
 
 		lpEntryList->lpbin[i].cb = strlen;
@@ -2322,8 +2319,8 @@ NOTIFICATION *	Object_to_LPNOTIFICATION(PyObject *obj)
 			if (oTmp != Py_None) {
 				if (lpNotif->info.newmail.ulFlags & MAPI_UNICODE)
 				    CopyPyUnicode(&lpNotif->info.newmail.lpszMessageClass, oTmp, lpNotif);
-				else
-					PyString_AsStringAndSize(oTmp, (char**)&lpNotif->info.newmail.lpszMessageClass, NULL);
+				else if (PyString_AsStringAndSize(oTmp, reinterpret_cast<char **>(&lpNotif->info.newmail.lpszMessageClass), nullptr) == -1)
+					goto exit;
 			}
 
 			Py_DECREF(oTmp);
@@ -2451,8 +2448,8 @@ LPREADSTATE		List_to_LPREADSTATE(PyObject *list, ULONG *lpcElements)
 		if (PyErr_Occurred())
 			goto exit;
 
-		PyString_AsStringAndSize(sourcekey, &ptr, &len);
-		if (PyErr_Occurred())
+		if (PyString_AsStringAndSize(sourcekey, &ptr, &len) == -1 ||
+		    PyErr_Occurred())
 			goto exit;
 
 		hr = MAPIAllocateMore(len, lpList, (LPVOID*)&lpList[i].pbSourceKey);
@@ -2551,8 +2548,8 @@ LPCIID			List_to_LPCIID(PyObject *list, ULONG *cInterfaces)
 		char *ptr = NULL;
 		Py_ssize_t strlen = 0;
 
-		PyString_AsStringAndSize(elem, &ptr, &strlen);
-		if (PyErr_Occurred())
+		if (PyString_AsStringAndSize(elem, &ptr, &strlen) == -1 ||
+		    PyErr_Occurred())
 			goto exit;
 
 		if (strlen != sizeof(*lpList)) {
@@ -2922,6 +2919,7 @@ ECCOMPANY *Object_to_LPECCOMPANY(PyObject *elem, ULONG ulFlags)
 	memset(lpCompany, 0, sizeof *lpCompany);
 
 	process_conv_out_array(lpCompany, elem, conv_info, lpCompany, ulFlags);
+
 	Object_to_MVPROPMAP(elem, lpCompany, ulFlags);
 exit:
 	if (PyErr_Occurred()) {
@@ -2940,9 +2938,9 @@ PyObject *Object_from_LPECCOMPANY(ECCOMPANY *lpCompany, ULONG ulFlags)
 	PyObject *result = NULL;
 
         if(ulFlags & MAPI_UNICODE)
-		result = PyObject_CallFunction(PyTypeECCompany, "(uulOO)", lpCompany->lpszCompanyname, lpCompany->lpszServername, lpCompany->ulIsABHidden, companyid, MVProps, adminid);
+		result = PyObject_CallFunction(PyTypeECCompany, "(uulOOO)", lpCompany->lpszCompanyname, lpCompany->lpszServername, lpCompany->ulIsABHidden, companyid, MVProps, adminid);
 	else
-		result = PyObject_CallFunction(PyTypeECCompany, "(sslOO)", lpCompany->lpszCompanyname, lpCompany->lpszServername, lpCompany->ulIsABHidden, companyid, MVProps, adminid);
+		result = PyObject_CallFunction(PyTypeECCompany, "(sslOOO)", lpCompany->lpszCompanyname, lpCompany->lpszServername, lpCompany->ulIsABHidden, companyid, MVProps, adminid);
 
 	Py_DECREF(MVProps);
 	Py_DECREF(companyid);
@@ -3190,8 +3188,8 @@ ECSVRNAMELIST *List_to_LPECSVRNAMELIST(PyObject *object)
 		char *ptr = NULL;
 		Py_ssize_t strlen = 0;
 
-		PyString_AsStringAndSize(elem, &ptr, &strlen);
-		if (PyErr_Occurred())
+		if (PyString_AsStringAndSize(elem, &ptr, &strlen) == -1 ||
+		    PyErr_Occurred())
 			goto exit;
 
 		hr = MAPIAllocateMore(strlen,  lpSvrNameList, (void**)&lpSvrNameList->lpszaServer[lpSvrNameList->cServers]);
@@ -3301,13 +3299,9 @@ PyObject *Object_from_STATSTG(STATSTG *lpStatStg)
 
 PyObject *Object_from_SYSTEMTIME(const SYSTEMTIME &time)
 {
-	PyObject *object = NULL;
-
-	object = PyObject_CallFunction(PyTypeSYSTEMTIME, "(iiiiiiii)",
-								   time.wYear, time.wMonth, time.wDayOfWeek, time.wDay,
-								   time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
-
-	return object;
+	return PyObject_CallFunction(PyTypeSYSTEMTIME, "(iiiiiiii)",
+	       time.wYear, time.wMonth, time.wDayOfWeek, time.wDay,
+	       time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
 }
 
 SYSTEMTIME Object_to_SYSTEMTIME(PyObject *object)

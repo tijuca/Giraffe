@@ -13,6 +13,8 @@ import pst
 def _encode(s):
     return s.encode(sys.stdout.encoding or 'utf8')
 
+PSETID_Archive = DEFINE_GUID(0x72e98ebc, 0x57d2, 0x4ab5, 0xb0, 0xaa, 0xd5, 0x0a, 0x7b, 0x53, 0x1c, 0xb9)
+
 class Service(kopano.Service):
     def import_props(self, parent, mapiobj, embedded=False):
         props2 = []
@@ -25,6 +27,8 @@ class Service(kopano.Service):
             nameid = self.propid_nameid.get(propid)
             if nameid:
                 propid = PROP_ID(mapiobj.GetIDsFromNames([MAPINAMEID(*nameid)], MAPI_CREATE)[0])
+                if nameid[0] == PSETID_Archive:
+                    continue
 
             if propid == (PR_SUBJECT>>16) and value and ord(value[0]) == 0x01:
                 value = value[2:] # \x01 plus another char indicates normalized-subject-prefix-length
@@ -87,7 +91,7 @@ class Service(kopano.Service):
             recipients.append(props)
         mapiobj.ModifyRecipients(0, recipients)
 
-    def import_pst(self, p, user):
+    def import_pst(self, p, store):
         folders = p.folder_generator()
         root_path = folders.next().path # skip root
         for folder in folders:
@@ -98,7 +102,9 @@ class Service(kopano.Service):
                 self.log.info("importing folder '%s'" % path)
                 if self.options.import_root:
                     path = self.options.import_root + '/' + path
-                folder2 = user.folder(path, create=True)
+                folder2 = store.folder(path, create=True)
+                if self.options.clean_folders:
+                    folder2.empty()
                 if folder.ContainerClass:
                     folder2.container_class = folder.ContainerClass
                 for message in p.message_generator(folder):
@@ -132,7 +138,11 @@ class Service(kopano.Service):
             self.propid_nameid = self.get_named_property_map(p)
             for name in self.options.users:
                 self.log.info("importing to user '%s'" % name)
-                self.import_pst(p, self.server.user(name))
+                self.import_pst(p, self.server.user(name).store)
+            for guid in self.options.stores:
+                self.log.info("importing to store '%s'" % guid)
+                self.import_pst(p, self.server.store(guid))
+
         self.log.info('imported %d items in %.2f seconds (%.2f/sec, %d errors)' %
             (self.stats['messages'], time.time()-t0, self.stats['messages']/(time.time()-t0), self.stats['errors']))
 
@@ -154,15 +164,16 @@ def show_contents(args, options):
                     writer.writerow([_encode(path), _encode(message.Subject or '')])
 
 def main():
-    parser = kopano.parser('cflskpUPu', usage='kopano-migration-pst PATH [-u NAME]')
+    parser = kopano.parser('cflskpUPuS', usage='kopano-migration-pst PATH [-u NAME]')
     parser.add_option('', '--stats', dest='stats', action='store_true', help='list folders for PATH')
     parser.add_option('', '--index', dest='index', action='store_true', help='list items for PATH')
     parser.add_option('', '--import-root', dest='import_root', action='store', help='import under specific folder', metavar='PATH')
+    parser.add_option('', '--clean-folders', dest='clean_folders', action='store_true', default=False, help='empty folders before import (dangerous!)', metavar='PATH')
 
     options, args = parser.parse_args()
     options.service = False
 
-    if not args or (bool(options.stats or options.index) == bool(options.users)):
+    if not args or (bool(options.stats or options.index) == bool(options.users or options.stores)):
         parser.print_help()
         sys.exit(1)
 

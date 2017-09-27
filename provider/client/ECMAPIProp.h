@@ -20,7 +20,7 @@
 
 #include <kopano/zcdefs.h>
 #include "kcore.hpp"
-#include <kopano/IECSecurity.h>
+#include <kopano/IECInterfaces.hpp>
 #include "ECGenericProp.h"
 
 // For HrSetFlags
@@ -29,9 +29,9 @@
 
 class ECMsgStore;
 
-class ECMAPIProp : public ECGenericProp {
+class ECMAPIProp : public ECGenericProp, public IECSecurity {
 protected:
-	ECMAPIProp(void *lpProvider, ULONG ulObjType, BOOL fModify, ECMAPIProp *lpRoot, const char *szClassName = NULL);
+	ECMAPIProp(void *provider, ULONG obj_type, BOOL modify, const ECMAPIProp *root, const char *class_name = nullptr);
 	virtual ~ECMAPIProp();
 
 public:
@@ -84,23 +84,7 @@ protected:
 	virtual HRESULT SetPermissionRules(ULONG cPermissions, ECPERMISSION *lpECPermissions);
 
 public:
-	ECMsgStore*				GetMsgStore();
-
-	class xMAPIProp _kc_final : public IMAPIProp {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		#include <kopano/xclsfrag/IMAPIProp.hpp>
-	} m_xMAPIProp;
-
-	class xECSecurity _kc_final : public IECSecurity {
-		#include <kopano/xclsfrag/IUnknown.hpp>
-		// <kopano/xclsfrag/IECSecurity.hpp>
-		virtual HRESULT GetOwner(ULONG *lpcbOwner, LPENTRYID *lppOwner) _kc_override;
-		virtual HRESULT GetPermissionRules(int ulType, ULONG *lpcPermissions, ECPERMISSION **lppECPermissions) _kc_override;
-		virtual HRESULT SetPermissionRules(ULONG cPermissions, ECPERMISSION *lpECPermissions) _kc_override;
-		virtual HRESULT GetUserList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG flags, ULONG *lpcUsers, ECUSER **lppsUsers) _kc_override;
-		virtual HRESULT GetGroupList(ULONG cbCompanyId, LPENTRYID lpCompanyId, ULONG flags, ULONG *lpcGroups, ECGROUP **lppsGroups) _kc_override;
-		virtual HRESULT GetCompanyList(ULONG flags, ULONG *lpcCompanies, ECCOMPANY **lppCompanies) _kc_override;
-	} m_xECSecurity;
+	ECMsgStore *GetMsgStore() const;
 
 private:
 	BOOL m_bICSObject = false; // coming from the ICS system
@@ -108,7 +92,7 @@ private:
 	ENTRYID *m_lpParentID = nullptr; // Overrides the parentid from the server
 
 public:
-	ECMAPIProp *m_lpRoot;		// Points to the 'root' object that was opened by OpenEntry; normally points to 'this' except for Attachments and Submessages
+	const ECMAPIProp *m_lpRoot; // Points to the 'root' object that was opened by OpenEntry; normally points to 'this' except for Attachments and Submessages
 };
 
 #endif // ECMAPIPROP_H
